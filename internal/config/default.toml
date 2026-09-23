@@ -1,0 +1,252 @@
+# sesh configuration
+#
+# Create this template with `sesh config init`, or select a file with --config.
+# Existing configuration is not replaced during ordinary command execution.
+#
+# Built-in defaults are shown as commented settings below. Remove the leading
+# "# " from a setting to override it. Leaving defaults commented allows newer
+# sesh releases to improve them without changing your personal configuration.
+#
+# Core popup and session behavior.
+[settings]
+
+# Ask before killing a live tmux session.
+# confirm_kill = true
+
+# Ask before deleting both live and saved session data.
+# confirm_delete = true
+
+# Show key hints at the bottom of the popup.
+# show_footer = true
+
+# Number of directory completions shown while creating a session.
+# directory_suggestions = 5
+
+# Initial create-directory value. {session} becomes the proposed session name.
+# default_session_path_suggestion = "~/Projects/{session}"
+
+# Enabled popup modes, in cycle order. Use one entry to lock to one mode.
+# display_modes = ["sesh", "agents"]
+
+# Logging level (debug, info, warn, error, disabled).
+# log_level = "info"
+
+# Shortcut number display style in the popup: "none" (default), "indent", or "right".
+# shortcut_style = "none"
+
+# Preferred popup dimensions. Values are terminal cells ("80"), percentages ("50%"), or "auto".
+# Tall/narrow preferences use balanced responsive sizing for the active popup mode.
+[popup]
+
+# sesh_width = "40%"
+# sesh_height = "45%"
+# agents_width = "40%"
+# agents_height = "80%"
+
+# Session and agent row templates. {right} starts a shared right-aligned column.
+# Width controls follow {field:<20}, {field:>20}, {field:^20}, and
+# {field:<20.20}; {{ and }} produce literal braces.
+[display]
+
+# Rows in SESH mode.
+# sesh_format = "{source_prefix}{session_name}{right}{session_agent_context}"
+
+# Session headings in AGENTS mode.
+# agents_session_format = "{source_prefix}{session_name}"
+
+# Selectable agent rows in AGENTS mode.
+# agents_agent_format = "{tree}{status_glyph} {status_age:<7}   {agent_cwd_name:<23.23}  {agent_session}{right}{harness:<6.6}   {agent_git_label:<6.22} {agent_git_added:<5} {agent_git_deleted:<5} {agent_git_ahead:<2} {agent_git_behind:<2}"
+
+# Coding-agent integration and tmux navigation bindings.
+# Requires the aht runtime and `sesh setup agents`.
+[agent_sessions]
+
+# Order agents within each tmux session: "position", "name", or "attention".
+# Position follows window index, then panes left to right and top to bottom.
+# popup_sort = "position"
+
+# Enable agent state, navigation, and counts. Application recovery is incomplete.
+# enabled = true
+
+# Show agent counts in the default SESH row.
+# popup_counts = true
+
+# Fallback agent-state refresh rate when the realtime broker is unavailable.
+# refresh_interval = "250ms"
+
+# Agent key preferences used by `sesh setup tmux`. Explicit --next-key,
+# --local-next-key, and --back-key flags override these values.
+# next_idle_key = "F24"
+# next_idle_local_key = "M-F24"
+# navigation_back_key = "F13"
+
+# State representation style: "glyph" (default: colored UTF circles) or "text" (WORKING, IDLE, etc.).
+# status_style = "glyph"
+
+# Status duration format: "relative" (now, 12m, 1h 23m), "relative-seconds"
+# (40s, 2m, 1h 23m; seconds only below one minute), "clock" (00:01:23), or "hh:mm" (00:01).
+# status_time_format = "relative"
+
+# Realtime tmux window status styling based on coding-agent activity.
+# Dynamically styles window tabs when agents require attention (waiting, failed, unread).
+[agent_status]
+
+# Enable realtime tmux window styling for agent activity.
+# enabled = true
+
+# Custom AHT registry store path (defaults to ~/.local/state/aht/state.json).
+# store_path = ""
+
+# Tmux executable binary used to apply and clear window styles.
+# tmux_binary = "tmux"
+
+# Tmux window style strings applied to windows in non-normal agent states.
+# style_waiting = "fg=#1e1e2e,bg=#ffdd57,bold"
+# style_failed = "fg=#1e1e2e,bg=#ff4da6,bold"
+# style_unread = "fg=#1e1e2e,bg=#6c7086,bold"
+
+# Set tmux window-status-style when an agent needs attention.
+# set_window_status_style = true
+
+# Set tmux window-status-bell-style when an agent needs attention.
+# set_window_status_bell_style = true
+
+# Bypass unread latching if the window containing the agent was already active when running finished.
+# active_bypass = true
+
+# Clear failure alert styling when visiting the window containing the agent.
+# clear_failed_on_visit = true
+
+# Initial reconnection backoff duration when disconnected from the AHT broker.
+# initial_backoff = "500ms"
+
+# Maximum reconnection backoff duration.
+# max_backoff = "5s"
+
+# Exponential backoff factor multiplier.
+# backoff_factor = 2.0
+
+# Clear all applied window styles when shutting down the status daemon.
+# clear_on_shutdown = true
+
+# Silence informational log output in daemon mode.
+# quiet = false
+
+# SSH-backed remote session inventory. Remote access is opt-in.
+[remote]
+
+# enabled = false
+# ssh_path = "ssh"
+# tmux_poll_interval = "1s"
+# connect_timeout = "5s"
+# action_timeout = "2m"
+# heartbeat_interval = "10s"
+# stale_after = "30s"
+# hide_after = "10m"
+# Concurrent connection attempts (1..128; at most 128 configured connections).
+# max_parallel_connects = 4
+# permissions = { create = true, rename = true, kill = false, delete = false, snapshot = true, restore = true }
+# enable_reverse_bridge = true
+# return_to_origin = true
+#
+# OpenSSH configuration owns users, ports, identities, proxies, and options.
+# Use explicit Host aliases configured for noninteractive BatchMode authentication.
+# connections = []
+# Example with an SSH alias, custom remote sesh path, and tmux socket:
+#   { id = "work", label = "Work", host = "work", sesh_path = "/usr/local/bin/sesh", tmux_socket = "/tmp/work-tmux.sock" }
+#
+# Preview service definitions with `sesh setup remote --socket /absolute/path/to/tmux.sock`.
+# Run the foreground monitor with `sesh remote monitor run`.
+# The popup reads the local cache: entries become stale after stale_after and
+# disappear after hide_after. Remote mutations are checked against peer permissions.
+# Snapshot and restore retain the native engine's partial-recovery limitations.
+
+# Automatic snapshots.
+[autosave]
+
+# enabled = true
+# interval = "3m"
+
+# Request startup restoration; incomplete or unresolved sources remain ineligible.
+# restore_last_on_start = true
+
+# Snapshot history retention. The newest five snapshots are always retained.
+[snapshot]
+
+# Remove older snapshots after this many days. Set 0 to disable the age limit.
+# retention_days = 14
+
+# Optional additional limits. Set 0 to disable a limit.
+# max_count = 0
+# max_bytes = 0
+
+# Selective process environment variables captured for foreground applications.
+# Preserves execution context such as PATH, virtual environments, and Conda environments.
+# To disable process environment capture completely, set an empty list: process_environment = []
+# Source TMUX and TMUX_PANE variables are always excluded.
+# process_environment = ["PATH", "VIRTUAL_ENV", "CONDA_PREFIX", "CONDA_DEFAULT_ENV", "PYTHONPATH", "NODE_PATH"]
+
+# Keys handled while the popup is focused.
+[keys]
+
+# Session actions and help.
+# create = "alt+c"
+# rename = "alt+r"
+# kill = "alt+x"
+# delete = "alt+shift+x"
+# snapshot = "alt+s"
+# help = "?"
+
+# Mode and list navigation.
+# cycle_mode = "ctrl+f"
+# agent_sort = "ctrl+s"
+# page_up = "pgup"
+# page_down = "pgdown"
+# top = "home"
+# bottom = "end"
+
+# Select one of the first ten visible rows.
+# select_1 = "ctrl+1"
+# select_2 = "ctrl+2"
+# select_3 = "ctrl+3"
+# select_4 = "ctrl+4"
+# select_5 = "ctrl+5"
+# select_6 = "ctrl+6"
+# select_7 = "ctrl+7"
+# select_8 = "ctrl+8"
+# select_9 = "ctrl+9"
+# select_0 = "ctrl+0"
+
+# TUI colors. Hex values and terminal color names are accepted.
+[theme]
+
+# primary = "#24c8ff"
+# secondary = "#ffdd57"
+# muted = "#6c7086"
+# error = "#ff4da6"
+# warning = "#ff9e3b"
+# success = "#50fa7b"
+# border = "#3a3d45"
+# selected = "#2a2a2a"
+
+# State, metadata, and diagnostic log locations.
+[paths]
+
+# data_dir = ""
+# log_file = ""
+
+# Lifecycle commands. Lists accept shell strings or command tables such as:
+#   session_switch_post = [
+#     "notify-send 'sesh' \"$SESH_SESSION\"",
+#     { command = "logger", args = ["sesh switched"], timeout = "2s" },
+#   ]
+[hooks]
+
+# Default command timeout (Go duration syntax).
+# timeout = "30s"
+
+# session_switch_pre = []
+# session_switch_post = []
+# session_attach_pre = []
+# session_attach_post = []
+# tmux_startup_post = []

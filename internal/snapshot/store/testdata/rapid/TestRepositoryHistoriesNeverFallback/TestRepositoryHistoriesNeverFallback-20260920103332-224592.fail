@@ -1,0 +1,8 @@
+# 2026/09/20 10:33:32.290865 [TestRepositoryHistoriesNeverFallback] [rapid] draw outcomes: []string{"pending"}
+# 2026/09/20 10:33:32.291065 [TestRepositoryHistoriesNeverFallback] current after pending: snapshot generation unavailable, want latest save requires explicit recovery
+#
+v0.4.8#4858868589365594420
+0x0
+0x0
+0x1
+0x0

@@ -1,0 +1,123 @@
+//go:build linux || darwin
+
+package cmdpicker
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"io"
+	"os"
+	"syscall"
+
+	"github.com/samber/oops"
+	gotmux "github.com/zigai/gotmux/tmux"
+
+	"github.com/zigai/sesh/internal/session"
+)
+
+const pickerHandoffMaxBytes = 4096
+
+var errPickerHandoffInvalid = errors.New("invalid popup switch handoff")
+
+type pickerSwitchHandoff struct {
+	SessionID   string `json:"sessionId"`
+	SessionName string `json:"sessionName"`
+	PaneID      string `json:"paneId,omitempty"`
+}
+
+func createPickerSwitchHandoff() (string, func(), error) {
+	file, err := os.CreateTemp("", "sesh-picker-*.handoff")
+	if err != nil {
+		return "", nil, oops.In("cli").With("operation", "create_picker_handoff").Wrap(err)
+	}
+
+	path := file.Name()
+	if err := file.Close(); err != nil {
+		_ = os.Remove(path)
+		return "", nil, oops.In("cli").With("operation", "create_picker_handoff").Wrap(err)
+	}
+
+	return path, func() { _ = os.Remove(path) }, nil
+}
+
+func writePickerSwitchHandoff(path string, target session.Session, paneID string) error {
+	if target.ID == "" || target.Name == "" || target.Kind != session.KindLive || target.Origin != session.OriginLocal {
+		return errPickerHandoffInvalid
+	}
+
+	encoded, err := json.Marshal(pickerSwitchHandoff{SessionID: target.ID, SessionName: target.Name, PaneID: paneID})
+	if err != nil {
+		return oops.In("cli").With("operation", "encode_picker_handoff").Wrap(err)
+	}
+
+	if len(encoded) > pickerHandoffMaxBytes {
+		return errPickerHandoffInvalid
+	}
+
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return oops.In("cli").With("operation", "open_picker_handoff").Wrap(err)
+	}
+
+	_, writeErr := file.Write(encoded)
+
+	return errors.Join(writeErr, file.Close())
+}
+
+func readPickerSwitchHandoff(path string) (pickerSwitchHandoff, bool, error) {
+	file, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return pickerSwitchHandoff{}, false, oops.In("cli").With("operation", "open_picker_handoff").Wrap(err)
+	}
+
+	encoded, readErr := io.ReadAll(io.LimitReader(file, pickerHandoffMaxBytes+1))
+	if err := errors.Join(readErr, file.Close()); err != nil {
+		return pickerSwitchHandoff{}, false, oops.In("cli").With("operation", "read_picker_handoff").Wrap(err)
+	}
+
+	if len(encoded) == 0 {
+		return pickerSwitchHandoff{SessionID: "", SessionName: "", PaneID: ""}, false, nil
+	}
+
+	if len(encoded) > pickerHandoffMaxBytes {
+		return pickerSwitchHandoff{}, false, errPickerHandoffInvalid
+	}
+
+	var handoff pickerSwitchHandoff
+
+	if json.Unmarshal(encoded, &handoff) != nil || handoff.SessionID == "" || handoff.SessionName == "" {
+		return pickerSwitchHandoff{}, false, errPickerHandoffInvalid
+	}
+
+	return handoff, true, nil
+}
+
+func completePickerSwitchHandoff(
+	ctx context.Context,
+	runtime pickerCommandRuntime,
+	path, clientName, originSessionID string,
+) error {
+	handoff, selected, err := readPickerSwitchHandoff(path)
+	if err != nil || !selected {
+		return err
+	}
+
+	if clientName == "" || originSessionID == "" {
+		return errPickerHandoffInvalid
+	}
+
+	services, err := newPickerServices(ctx, runtime.cfg, runtime.socketPath, runtime.repositoryPath,
+		runtime.leaseRoot, runtime.historyPath, "", gotmux.TerminalStreams{In: nil, Out: nil, Err: nil},
+		PickerRemoteServices{Catalog: nil, Watcher: nil, Actions: nil, Attach: nil, OriginBridge: nil})
+	if err != nil {
+		return err
+	}
+
+	target, targetErr := findPickerLiveTarget(ctx, services.server, handoff.SessionID, handoff.SessionName)
+	if targetErr == nil {
+		targetErr = services.performSwitch(ctx, target, handoff.PaneID, clientName, originSessionID)
+	}
+
+	return errors.Join(targetErr, services.Close())
+}

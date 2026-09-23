@@ -1,0 +1,30 @@
+# 2026/09/20 11:09:08.420788 [TestPlanProperties] [rapid] draw sessionCount: 1
+# 2026/09/20 11:09:08.420793 [TestPlanProperties] [rapid] draw windowCount: 1
+# 2026/09/20 11:09:08.420794 [TestPlanProperties] [rapid] draw paneCount: 2
+# 2026/09/20 11:09:08.420795 [TestPlanProperties] [rapid] draw zoomed: false
+# 2026/09/20 11:09:08.420802 [TestPlanProperties] [rapid] draw subsetSize: 1
+# 2026/09/20 11:09:08.420804 [TestPlanProperties] [rapid] draw subset: []string{"s0"}
+# 2026/09/20 11:09:08.420812 [TestPlanProperties] [rapid] draw extraDups: 0
+# 2026/09/20 11:09:08.420879 [TestPlanProperties] BuildPlan failed on valid manifest: invalid native snapshot
+#
+v0.4.8#13362735980907636075
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0

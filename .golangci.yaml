@@ -1,0 +1,221 @@
+version: "2"
+
+run:
+  timeout: 3m
+
+formatters:
+  enable:
+    - goimports
+    - gofumpt
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/zigai/sesh
+
+linters:
+  enable:
+    - arangolint
+    - asasalint
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - canonicalheader
+    - containedctx
+    - contextcheck
+    - copyloopvar
+    - cyclop
+    - decorder
+    - dogsled
+    - dupl
+    - dupword
+    - durationcheck
+    - embeddedstructfieldcheck
+    - err113
+    - errcheck
+    - errchkjson
+    - errname
+    - errorlint
+    - exhaustive
+    - exhaustruct_v5
+    - exptostd
+    - fatcontext
+    - forcetypeassert
+    - funcorder
+    - ginkgolinter
+    - gocheckcompilerdirectives
+    - gochecknoinits
+    - gochecksumtype
+    - gocognit
+    - goconst
+    - gocritic
+    - godoclint
+    - godot
+    - gomoddirectives
+    - gomodguard_v2
+    - goprintffuncname
+    - gosec
+    - gosmopolitan
+    - govet
+    - grouper
+    - iface
+    - importas
+    - inamedparam
+    - ineffassign
+    - interfacebloat
+    - intrange
+    - iotamixing
+    - loggercheck
+    - maintidx
+    - makezero
+    - mirror
+    - misspell
+    - mnd
+    - modernize
+    - musttag
+    - nakedret
+    - nestif
+    - nilerr
+    - nilnesserr
+    - nilnil
+    - noctx
+    - nolintlint
+    - nonamedreturns
+    - nosprintfhostport
+    - perfsprint
+    - prealloc
+    - predeclared
+    - promlinter
+    - protogetter
+    - reassign
+    - recvcheck
+    - revive
+    - rowserrcheck
+    - sloglint
+    - spancheck
+    - sqlclosecheck
+    - staticcheck
+    - tagalign
+    - tagliatelle
+    - testableexamples
+    - testifylint
+    - thelper
+    - unconvert
+    - unparam
+    - unqueryvet
+    - unused
+    - usestdlibvars
+    - usetesting
+    - wastedassign
+    - whitespace
+    - wrapcheck
+    - wsl_v5
+    - zerologlint
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+    exhaustive:
+      check:
+        - switch
+        - map
+    gochecksumtype:
+      default-signifies-exhaustive: false
+    cyclop:
+      max-complexity: 12
+    decorder:
+      disable-dec-order-check: false
+      dec-order:
+        - const
+        - var
+        - type
+        - func
+    funcorder:
+      function: true
+    gocognit:
+      min-complexity: 20
+    goconst:
+      min-occurrences: 16
+    gocritic:
+      settings:
+        captLocal:
+          paramsOnly: false
+        underef:
+          skipRecvDeref: false
+    godoclint:
+      enable:
+        - no-unused-link
+        - require-stdlib-doclink
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+        - shadow
+    mnd:
+      ignored-numbers:
+        - "0o600"
+        - "0o644"
+        - "0o700"
+        - "0o750"
+        - "0600"
+        - "0644"
+        - "0700"
+        - "0750"
+    misspell:
+      locale: US
+    nakedret:
+      max-func-lines: 5
+    revive:
+      rules:
+        - name: error-naming
+        - name: if-return
+        - name: var-naming
+        - name: error-strings
+        - name: receiver-naming
+        - name: indent-error-flow
+        - name: superfluous-else
+        - name: modifies-parameter
+        - name: unreachable-code
+          disabled: true
+        - name: redefines-builtin-id
+          disabled: true
+    rowserrcheck:
+      packages:
+        - github.com/jmoiron/sqlx
+    staticcheck:
+      checks:
+        - all
+        - -ST1000
+        - -ST1016
+        - -QF1008
+    nolintlint:
+      allow-no-explanation: [funlen, gocognit, golines]
+      require-explanation: true
+      require-specific: true
+    gosec:
+      excludes:
+        - G204 # exec.Command from $EDITOR is user-controlled by design
+        - G301 # directory perms
+        - G302 # file perms
+        - G304 # file path from variable
+    exhaustruct_v5:
+      ignore-patterns:
+        - "github.com/urfave/cli/v3\\..*"
+        - "github.com/urfave/cli\\..*"
+        - "github.com/spf13/cobra\\..*"
+        - "github.com/spf13/pflag\\..*"
+
+  exclusions:
+    warn-unused: false
+    presets: []
+    rules:
+      - path: "main\\.go"
+        linters: [mnd]
+
+      - path: "internal/cli/.*"
+        linters: [wrapcheck, contextcheck, funcorder, decorder]
+
+      - path: "internal/cli/root\\.go"
+        linters: [exhaustruct_v5]
+
+      - path: ".*_test\\.go"
+        linters: [decorder, funcorder, exhaustruct_v5, unparam, contextcheck]

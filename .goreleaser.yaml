@@ -1,0 +1,78 @@
+version: 2
+project_name: "sesh"
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: ./cmd/sesh
+    binary: sesh
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/zigai/sesh/internal/cli.version={{.Version}}
+      - -X github.com/zigai/sesh/internal/cli.commit={{.ShortCommit}}
+      - -X github.com/zigai/sesh/internal/cli.date={{.Date}}
+
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats:
+      - tar.gz
+    files:
+
+      - README.md
+      - docs/*.md
+
+nfpms:
+  - id: "sesh"
+    package_name: "sesh"
+    vendor: "zigai"
+    homepage: "https://github.com/zigai/sesh"
+    maintainer: "zigai"
+    description: "Native tmux workspace and snapshot manager"
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+changelog:
+  sort: desc
+  abbrev: 7
+
+  format: '[`{{ printf "%.7s" .SHA }}`](https://github.com/zigai/sesh/commit/{{ .SHA }}) {{ .Message }}'
+
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([^)]+\))?!?:.+$'
+      order: 0
+    - title: Bug Fixes
+      regexp: '^.*?fix(\([^)]+\))?!?:.+$'
+      order: 1
+    - title: Other Changes
+      order: 999
+  filters:
+    exclude:
+      - '^docs(\([^)]+\))?!?:'
+      - '^test(\([^)]+\))?!?:'
+      - '^ci(\([^)]+\))?!?:'
+      - '^chore(\([^)]+\))?!?:'
+
+
+release:
+  github:
+    owner: "zigai"
+    name: "sesh"
+  draft: false
+  prerelease: auto

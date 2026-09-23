@@ -1,0 +1,7 @@
+/sesh
+/sesh.exe
+dist/
+coverage.out
+.DS_Store
+/AGENTS.md
+/.agents/

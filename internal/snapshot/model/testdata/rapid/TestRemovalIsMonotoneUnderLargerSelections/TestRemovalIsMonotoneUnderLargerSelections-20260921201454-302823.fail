@@ -1,0 +1,119 @@
+# 2026/09/21 20:14:54.780539 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw sessionCount: 1
+# 2026/09/21 20:14:54.780543 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw windowCount: 1
+# 2026/09/21 20:14:54.780543 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw artifactCount: 0
+# 2026/09/21 20:14:54.780544 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw optionCount: 0
+# 2026/09/21 20:14:54.780544 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw environmentCount: 0
+# 2026/09/21 20:14:54.780545 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw width: 80
+# 2026/09/21 20:14:54.780546 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw height: 24
+# 2026/09/21 20:14:54.780546 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw paneCount: 1
+# 2026/09/21 20:14:54.780546 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw zoomed: false
+# 2026/09/21 20:14:54.780547 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw optionCount: 0
+# 2026/09/21 20:14:54.780550 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw paneIndex: 0
+# 2026/09/21 20:14:54.780550 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw dead: true
+# 2026/09/21 20:14:54.780551 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw optionCount: 0
+# 2026/09/21 20:14:54.780551 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw history: 0
+# 2026/09/21 20:14:54.780551 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw alternate: false
+# 2026/09/21 20:14:54.780551 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw cursorX: 0
+# 2026/09/21 20:14:54.780552 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw cursorY: 0
+# 2026/09/21 20:14:54.780552 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw mode: ""
+# 2026/09/21 20:14:54.780552 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw restart: true
+# 2026/09/21 20:14:54.780553 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw environmentCount: 0
+# 2026/09/21 20:14:54.780554 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw paneIndexStep: 1
+# 2026/09/21 20:14:54.780554 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw shapeCount: 1
+# 2026/09/21 20:14:54.780555 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw shapeWindow: false
+# 2026/09/21 20:14:54.780555 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw shapeStart: 0
+# 2026/09/21 20:14:54.780555 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw shapeStep: 1
+# 2026/09/21 20:14:54.780556 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw shapeDuplicate: false
+# 2026/09/21 20:14:54.780556 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw shape: 0
+# 2026/09/21 20:14:54.780556 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw flags: ""
+# 2026/09/21 20:14:54.780557 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw activeLink: 0
+# 2026/09/21 20:14:54.780557 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw grouped: false
+# 2026/09/21 20:14:54.780558 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw nilGroups: false
+# 2026/09/21 20:14:54.780559 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw optionCount: 0
+# 2026/09/21 20:14:54.780559 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw environmentCount: 0
+# 2026/09/21 20:14:54.780559 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw selected: false
+# 2026/09/21 20:14:54.780560 [TestRemovalIsMonotoneUnderLargerSelections] [rapid] draw selectionOrder: []string(nil)
+# 2026/09/21 20:14:54.780566 [TestRemovalIsMonotoneUnderLargerSelections] invalid native snapshot
+#
+v0.4.8#12635255747490290890
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0

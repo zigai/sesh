@@ -1,0 +1,123 @@
+name: Test
+
+on:
+  push:
+    branches: []
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      GOWORK: "off"
+      CGO_ENABLED: "1"
+      TMUX_INTEGRATION_REQUIRED: "1"
+      SESH_LIFECYCLE_INTEGRATION_REQUIRED: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.27.1"
+          cache: true
+      - name: Install Linux build dependencies and application test fixtures
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update && sudo apt-get install -y \
+            build-essential \
+            libevent-dev \
+            libncurses-dev \
+            bison \
+            pkg-config \
+            dbus \
+            openssh-server \
+            openssh-client \
+            neovim \
+            procps \
+            htop \
+            bash \
+            nodejs
+          echo "SESH_APPLICATION_INTEGRATION_REQUIRED=1" >> "$GITHUB_ENV"
+          echo "/usr/sbin" >> "$GITHUB_PATH"
+      - name: Verify Linux test fixtures
+        if: runner.os == 'Linux'
+        run: |
+          for tool in nvim top htop bash node dbus-daemon sshd ssh-keygen; do
+            command -v "$tool" >/dev/null || { echo "missing required fixture tool: $tool" >&2; exit 1; }
+          done
+      - name: Require access to the private terminal-test tool
+        if: runner.os == 'Linux'
+        env:
+          TERMTRACE_READ_TOKEN: ${{ secrets.TERMTRACE_READ_TOKEN }}
+        run: |
+          if [[ -z "$TERMTRACE_READ_TOKEN" ]]; then
+            echo 'Add TERMTRACE_READ_TOKEN with read-only contents access to zigai/termtrace.' >&2
+            exit 1
+          fi
+      - name: Check out pinned Termtrace and its native dependency
+        if: runner.os == 'Linux'
+        uses: actions/checkout@v7
+        with:
+          repository: zigai/termtrace
+          ref: bbbb5513a9f928bf6157ec0f27f6590848578ef4
+          token: ${{ secrets.TERMTRACE_READ_TOKEN }}
+          path: .ci/termtrace
+          submodules: recursive
+          persist-credentials: false
+      - name: Install Termtrace's pinned Rust toolchain
+        if: runner.os == 'Linux'
+        uses: dtolnay/rust-toolchain@46511b1c83438f0dd37c02d843619ece5a4abb5b
+        with:
+          toolchain: 1.97.1
+      - name: Cache terminal-tool Rust build
+        if: runner.os == 'Linux'
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        with:
+          workspaces: .ci/termtrace -> target
+      - name: Build and require the terminal-test tool
+        if: runner.os == 'Linux'
+        run: |
+          sh .github/scripts/install-termtrace.sh "$RUNNER_TEMP/sesh-termtrace" "$GITHUB_WORKSPACE/.ci/termtrace"
+          echo "$RUNNER_TEMP/sesh-termtrace/bin" >> "$GITHUB_PATH"
+          echo "SESH_TERMINAL_INTEGRATION_REQUIRED=1" >> "$GITHUB_ENV"
+      - name: Install macOS build dependencies
+        if: runner.os == 'macOS'
+        run: brew install libevent ncurses pkgconf
+      - name: Build checksum-pinned tmux
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == macOS ]]; then
+            export PKG_CONFIG_PATH="$(brew --prefix libevent)/lib/pkgconfig:$(brew --prefix ncurses)/lib/pkgconfig"
+          fi
+          sh .github/scripts/install-tmux.sh "$RUNNER_TEMP/sesh-tmux"
+          echo "$RUNNER_TEMP/sesh-tmux/bin" >> "$GITHUB_PATH"
+      - name: Verify published dependencies
+        run: |
+          go mod tidy -diff
+          go mod verify
+      - name: Run tests and required isolated integration with race detection
+        run: go test -race -count=1 -timeout=5m -tags=integration ./...
+      - name: Check macOS process observation without cgo
+        if: runner.os == 'macOS'
+        env:
+          CGO_ENABLED: "0"
+        run: go test -count=1 -timeout=1m ./internal/integration/process
+      - name: Build standalone artifact
+        run: go build -o "$RUNNER_TEMP/sesh" ./cmd/sesh
+      - name: Check artifact outside the checkout
+        working-directory: ${{ runner.temp }}
+        run: ./sesh --version && ./sesh --help
+      - name: Validate packaging configuration
+        if: runner.os == 'Linux'
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: check

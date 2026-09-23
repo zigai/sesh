@@ -1,0 +1,8 @@
+# 2026/09/20 16:09:44.876304 [TestUpdateStatePreservesGeneratedSwitchHistory] [rapid] draw switches: map[string]int64{}
+# 2026/09/20 16:09:44.876315 [TestUpdateStatePreservesGeneratedSwitchHistory] [rapid] draw mode: "sesh"
+# 2026/09/20 16:09:44.876332 [TestUpdateStatePreservesGeneratedSwitchHistory] SaveState() error = open history directory /tmp/TestUpdateStatePreservesGeneratedSwitchHistory1670254587/001: unsafe private storage entry
+#
+v0.4.8#818962351961906830
+0x0
+0x0
+0x0

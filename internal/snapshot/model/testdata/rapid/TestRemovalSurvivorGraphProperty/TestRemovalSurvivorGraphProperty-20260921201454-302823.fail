@@ -1,0 +1,220 @@
+# 2026/09/21 20:14:54.758261 [TestRemovalSurvivorGraphProperty] [rapid] draw sessionCount: 1
+# 2026/09/21 20:14:54.758273 [TestRemovalSurvivorGraphProperty] [rapid] draw windowCount: 1
+# 2026/09/21 20:14:54.758275 [TestRemovalSurvivorGraphProperty] [rapid] draw artifactCount: 1
+# 2026/09/21 20:14:54.758276 [TestRemovalSurvivorGraphProperty] [rapid] draw optionCount: 0
+# 2026/09/21 20:14:54.758277 [TestRemovalSurvivorGraphProperty] [rapid] draw environmentCount: 0
+# 2026/09/21 20:14:54.758289 [TestRemovalSurvivorGraphProperty] [rapid] draw digest: []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}
+# 2026/09/21 20:14:54.758292 [TestRemovalSurvivorGraphProperty] [rapid] draw artifactLength: 0
+# 2026/09/21 20:14:54.758294 [TestRemovalSurvivorGraphProperty] [rapid] draw width: 80
+# 2026/09/21 20:14:54.758313 [TestRemovalSurvivorGraphProperty] [rapid] draw height: 24
+# 2026/09/21 20:14:54.758313 [TestRemovalSurvivorGraphProperty] [rapid] draw paneCount: 1
+# 2026/09/21 20:14:54.758314 [TestRemovalSurvivorGraphProperty] [rapid] draw zoomed: false
+# 2026/09/21 20:14:54.758317 [TestRemovalSurvivorGraphProperty] [rapid] draw optionCount: 0
+# 2026/09/21 20:14:54.758318 [TestRemovalSurvivorGraphProperty] [rapid] draw paneIndex: 0
+# 2026/09/21 20:14:54.758318 [TestRemovalSurvivorGraphProperty] [rapid] draw artifact: false
+# 2026/09/21 20:14:54.758319 [TestRemovalSurvivorGraphProperty] [rapid] draw dead: true
+# 2026/09/21 20:14:54.758320 [TestRemovalSurvivorGraphProperty] [rapid] draw optionCount: 0
+# 2026/09/21 20:14:54.758321 [TestRemovalSurvivorGraphProperty] [rapid] draw history: 0
+# 2026/09/21 20:14:54.758321 [TestRemovalSurvivorGraphProperty] [rapid] draw alternate: false
+# 2026/09/21 20:14:54.758322 [TestRemovalSurvivorGraphProperty] [rapid] draw cursorX: 0
+# 2026/09/21 20:14:54.758322 [TestRemovalSurvivorGraphProperty] [rapid] draw cursorY: 0
+# 2026/09/21 20:14:54.758323 [TestRemovalSurvivorGraphProperty] [rapid] draw mode: ""
+# 2026/09/21 20:14:54.758324 [TestRemovalSurvivorGraphProperty] [rapid] draw restart: true
+# 2026/09/21 20:14:54.758326 [TestRemovalSurvivorGraphProperty] [rapid] draw environmentCount: 0
+# 2026/09/21 20:14:54.758328 [TestRemovalSurvivorGraphProperty] [rapid] draw paneIndexStep: 1
+# 2026/09/21 20:14:54.758329 [TestRemovalSurvivorGraphProperty] [rapid] draw shapeCount: 1
+# 2026/09/21 20:14:54.758329 [TestRemovalSurvivorGraphProperty] [rapid] draw shapeWindow: false
+# 2026/09/21 20:14:54.758330 [TestRemovalSurvivorGraphProperty] [rapid] draw shapeStart: 0
+# 2026/09/21 20:14:54.758330 [TestRemovalSurvivorGraphProperty] [rapid] draw shapeStep: 1
+# 2026/09/21 20:14:54.758330 [TestRemovalSurvivorGraphProperty] [rapid] draw shapeDuplicate: false
+# 2026/09/21 20:14:54.758331 [TestRemovalSurvivorGraphProperty] [rapid] draw shape: 0
+# 2026/09/21 20:14:54.758333 [TestRemovalSurvivorGraphProperty] [rapid] draw flags: ""
+# 2026/09/21 20:14:54.758334 [TestRemovalSurvivorGraphProperty] [rapid] draw activeLink: 0
+# 2026/09/21 20:14:54.758335 [TestRemovalSurvivorGraphProperty] [rapid] draw grouped: false
+# 2026/09/21 20:14:54.758339 [TestRemovalSurvivorGraphProperty] [rapid] draw nilGroups: false
+# 2026/09/21 20:14:54.758340 [TestRemovalSurvivorGraphProperty] [rapid] draw optionCount: 0
+# 2026/09/21 20:14:54.758341 [TestRemovalSurvivorGraphProperty] [rapid] draw environmentCount: 0
+# 2026/09/21 20:14:54.758379 [TestRemovalSurvivorGraphProperty] generator produced an invalid graph
+# invalid native snapshot
+#
+v0.4.8#4309279680231144389
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
