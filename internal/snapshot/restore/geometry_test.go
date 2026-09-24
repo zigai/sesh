@@ -65,9 +65,9 @@ func TestSplitDependenciesPreserveIntermediateSubtrees(t *testing.T) {
 
 		step := steps[chosen]
 
-		completed[step.ID] = true
-		if step.SplitPane != nil {
-			splitOrder = append(splitOrder, step.SplitPane.PaneID)
+		completed[step.ID()] = true
+		if split, ok := step.(*SplitPaneStep); ok {
+			splitOrder = append(splitOrder, split.PaneID)
 		}
 
 		steps = append(steps[:chosen], steps[chosen+1:]...)
@@ -79,7 +79,7 @@ func TestSplitDependenciesPreserveIntermediateSubtrees(t *testing.T) {
 }
 
 func dependenciesComplete(step Step, completed map[string]bool) bool {
-	for _, dependency := range step.DependsOn {
+	for _, dependency := range step.DependsOn() {
 		if !completed[dependency] {
 			return false
 		}

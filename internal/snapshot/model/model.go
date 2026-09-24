@@ -7,15 +7,13 @@ const (
 	MaxArtifactBytes   = 256 << 20
 	MaxGenerationBytes = 1 << 30
 
-	RecoveryUnverified     = "unverified"
-	RecoveryRestart        = "restart"
-	RecoveryResume         = "resume"
-	RecoveryNonrestartable = "nonrestartable"
-
-	ReasonPaneDead                = "pane_dead"
-	ReasonExecutableDeleted       = "executable_deleted"
-	ReasonWorkingDirectoryDeleted = "working_directory_deleted"
+	RecoveryUnverified     Recovery = "unverified"
+	RecoveryRestart        Recovery = "restart"
+	RecoveryResume         Recovery = "resume"
+	RecoveryNonrestartable Recovery = "nonrestartable"
 )
+
+type Recovery string
 
 type Manifest struct {
 	Format    string     `json:"format"`
@@ -138,7 +136,7 @@ type Launch struct {
 	Directory   Bytes      `json:"directory"`
 	Environment []Variable `json:"environment"`
 	Birth       Bytes      `json:"birth"`
-	Recovery    string     `json:"recovery"`
+	Recovery    Recovery   `json:"recovery"`
 	Reason      string     `json:"reason"`
 }
 

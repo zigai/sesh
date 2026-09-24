@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"sort"
+	"sync"
 	"syscall"
 
 	"github.com/samber/oops"
@@ -30,9 +31,10 @@ import (
 )
 
 var (
-	version = "dev"
-	commit  = "none"
-	date    = "unknown"
+	version               = "dev"
+	commit                = "none"
+	date                  = "unknown"
+	disableCommandSorting sync.Once
 )
 
 var hookEvents = []string{
@@ -93,7 +95,9 @@ func NewRootCommand(ctx context.Context) *cobra.Command {
 }
 
 func newRootCommand(ctx context.Context) *cobra.Command {
-	cobra.EnableCommandSorting = false
+	disableCommandSorting.Do(func() {
+		cobra.EnableCommandSorting = false
+	})
 
 	rootCommand := &cobra.Command{
 		Use:           "sesh",

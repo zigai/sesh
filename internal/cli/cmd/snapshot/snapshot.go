@@ -447,7 +447,6 @@ func parseRestoreInput(cmd *cobra.Command, args []string) (string, string, engin
 		Sessions:               allSessions,
 		LaunchProcesses:        !noProcesses,
 		AllowMissingWorkingDir: allowMissingDir,
-		CompensateOnFailure:    false,
 		Profile:                engine.RecoveryPractical,
 	}
 
@@ -546,7 +545,7 @@ func restoreJSONResult(res engine.RestoreResult) snapshotRestoreResultJSON {
 		missing = append(missing, snapshotEvidenceJSON{
 			Domain: m.Domain,
 			Status: m.Status,
-			Reason: m.Reason,
+			Reason: string(m.Reason),
 		})
 	}
 

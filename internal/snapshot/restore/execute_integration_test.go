@@ -232,7 +232,6 @@ func TestExecutor_MissingWorkingDirPolicy(t *testing.T) {
 
 	cfgFailClosed := DefaultExecuteConfig()
 	cfgFailClosed.AllowMissingWorkingDir = false
-	cfgFailClosed.CompensateOnFailure = true
 	cfgFailClosed.LaunchProcesses = false
 
 	executor := NewExecutor(server, manifest, cfgFailClosed)
@@ -244,10 +243,6 @@ func TestExecutor_MissingWorkingDirPolicy(t *testing.T) {
 
 	if !errors.Is(err, ErrWorkingDirNotFound) {
 		t.Fatalf("expected ErrWorkingDirNotFound, got %v", err)
-	}
-
-	if !errors.Is(err, ErrCompensationUnavailable) {
-		t.Fatalf("expected unsafe compensation request to fail closed, got %v", err)
 	}
 
 	cfgAllow := DefaultExecuteConfig()
@@ -267,7 +262,7 @@ func TestExecutor_MissingWorkingDirPolicy(t *testing.T) {
 	}
 }
 
-func TestExecutor_FailureCompensation(t *testing.T) {
+func TestExecutor_FailureRetainsCreatedSession(t *testing.T) {
 	server := tmuxtest.NewServer(t)
 
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
@@ -280,18 +275,13 @@ func TestExecutor_FailureCompensation(t *testing.T) {
 		t.Fatalf("BuildPlan failed: %v", err)
 	}
 
-	plan.Steps = append(plan.Steps, Step{
-		ID:   "invalid-step",
-		Kind: StepApplyLayout,
-		ApplyLayout: &ApplyLayoutStep{
-			WindowID: "nonexistent-window-id",
-			Layout:   model.Layout{Width: 10, Height: 10, Pane: "p0"},
-		},
-		DependsOn: []string{plan.Steps[0].ID},
+	plan.Steps = append(plan.Steps, &ApplyLayoutStep{
+		stepBase: newStep("invalid-step", []string{plan.Steps[0].ID()}),
+		WindowID: "nonexistent-window-id",
+		Layout:   model.Layout{Width: 10, Height: 10, Pane: "p0"},
 	})
 
 	cfg := DefaultExecuteConfig()
-	cfg.CompensateOnFailure = true
 	cfg.LaunchProcesses = false
 
 	executor := NewExecutor(server, manifest, cfg)
@@ -299,10 +289,6 @@ func TestExecutor_FailureCompensation(t *testing.T) {
 	_, err = executor.Execute(ctx, plan, newMemoryJournal())
 	if err == nil {
 		t.Fatal("expected execution failure, got nil")
-	}
-
-	if !errors.Is(err, ErrCompensationUnavailable) {
-		t.Fatalf("expected unsafe compensation request to fail closed, got %v", err)
 	}
 
 	_, findErr := server.FindSession(ctx, "alpha")

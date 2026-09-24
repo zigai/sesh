@@ -852,7 +852,7 @@ func assertPrepared(
 	wantReason apps.Reason,
 	wantExecutable string,
 	wantArguments []string,
-	wantRecovery string,
+	wantRecovery model.Recovery,
 ) {
 	t.Helper()
 

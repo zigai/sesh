@@ -104,11 +104,11 @@ func validatePlanBounds(p Plan) error {
 	total := 0
 
 	for _, step := range p.Steps {
-		if len(step.DependsOn) > maxDependencies {
+		if len(step.DependsOn()) > maxDependencies {
 			return planFailure("validation", "bounds", ErrInvalid)
 		}
 
-		total += len(step.DependsOn)
+		total += len(step.DependsOn())
 		if total > maxTotalDependencies {
 			return planFailure("validation", "bounds", ErrInvalid)
 		}
@@ -160,22 +160,18 @@ func validatePlanningBudget(g model.Manifest) error {
 
 func validatePlanSteps(steps []Step, ctx validationContext) error {
 	for i, step := range steps {
-		if step.ID == "" {
+		if step.ID() == "" {
 			return planFailure("validation", "empty_step_id", ErrInvalid)
 		}
 
-		if _, exists := ctx.seenSteps[step.ID]; exists {
+		if _, exists := ctx.seenSteps[step.ID()]; exists {
 			return planFailure("validation", "duplicate_step_id", ErrInvalid)
 		}
 
-		ctx.seenSteps[step.ID] = i
+		ctx.seenSteps[step.ID()] = i
 
 		if err := validateDAGDependencies(step, ctx.seenSteps, i); err != nil {
 			return err
-		}
-
-		if countPayloads(step) != 1 {
-			return planFailure("validation", "invalid_step_payload_count", ErrInvalid)
 		}
 
 		if err := ctx.tracker.recordAndValidateStep(step, ctx); err != nil {
@@ -373,7 +369,7 @@ func validateSharedCounts(s PlanSummary, g model.Manifest) error {
 }
 
 func validateDAGDependencies(step Step, seenSteps map[string]int, currentIndex int) error {
-	for _, dep := range step.DependsOn {
+	for _, dep := range step.DependsOn() {
 		depIdx, exists := seenSteps[dep]
 		if !exists {
 			return planFailure("validation", "dangling_dependency", ErrInvalid)
@@ -388,57 +384,44 @@ func validateDAGDependencies(step Step, seenSteps map[string]int, currentIndex i
 }
 
 func (t *planTracker) recordAndValidateStep(step Step, ctx validationContext) error {
-	switch step.Kind {
-	case StepCreateSession:
+	switch step := step.(type) {
+	case *CreateSessionStep:
 		return t.recordCreateSession(step, ctx)
-	case StepPlaceInitialWindow:
+	case *PlaceInitialWindowStep:
 		return t.validateInitialPlacement(step)
-	case StepCreateWindow:
+	case *CreateWindowStep:
 		return t.recordCreateWindow(step, ctx)
-	case StepSplitPane:
+	case *SplitPaneStep:
 		return t.recordSplitPane(step, ctx)
-	case StepLinkWindow:
+	case *LinkWindowStep:
 		return t.recordLinkWindow(step, ctx)
-	case StepCloseBootstrapWindow:
+	case *CloseBootstrapWindowStep:
 		return t.recordCloseBootstrap(step, ctx)
-	case StepApplyLayout, StepSetPaneTitle, StepSelectPane, StepApplyZoom, StepSelectWindow:
-		return t.recordFinalizationStep(step, ctx)
-	default:
-		return planFailure("validation", "unknown_step_kind", ErrInvalid)
-	}
-}
-
-func (t *planTracker) recordFinalizationStep(step Step, ctx validationContext) error {
-	switch step.Kind {
-	case StepApplyLayout:
+	case *ApplyLayoutStep:
 		return t.recordApplyLayout(step, ctx)
-	case StepSetPaneTitle:
+	case *SetPaneTitleStep:
 		return t.recordSetPaneTitle(step, ctx)
-	case StepSelectPane:
+	case *SelectPaneStep:
 		return t.recordSelectPane(step, ctx)
-	case StepApplyZoom:
+	case *ApplyZoomStep:
 		return t.recordApplyZoom(step, ctx)
-	case StepSelectWindow:
+	case *SelectWindowStep:
 		return t.recordSelectWindow(step, ctx)
-	case StepCreateSession, StepPlaceInitialWindow, StepCreateWindow, StepSplitPane, StepLinkWindow, StepCloseBootstrapWindow:
-		return planFailure("validation", "unexpected_step_in_finalization", ErrInvalid)
-	default:
-		return planFailure("validation", "unknown_step_kind", ErrInvalid)
 	}
+
+	return planFailure("validation", "unknown_step_kind", ErrInvalid)
 }
 
-func (t *planTracker) validateInitialPlacement(step Step) error {
-	placement := step.PlaceInitialWindow
-	if placement == nil || !slices.Contains(step.DependsOn, t.createdSessions[placement.SessionID]) {
+func (t *planTracker) validateInitialPlacement(step *PlaceInitialWindowStep) error {
+	if !slices.Contains(step.DependsOn(), t.createdSessions[step.SessionID]) {
 		return planFailure("validation", "initial_window_missing_session", ErrInvalid)
 	}
 
 	return nil
 }
 
-func (t *planTracker) recordCreateSession(step Step, ctx validationContext) error {
-	cs := step.CreateSession
-	if cs == nil || !model.ValidID(cs.SessionID) {
+func (t *planTracker) recordCreateSession(cs *CreateSessionStep, ctx validationContext) error {
+	if !model.ValidID(cs.SessionID) {
 		return planFailure("validation", "invalid_create_session", ErrInvalid)
 	}
 
@@ -454,7 +437,7 @@ func (t *planTracker) recordCreateSession(step Step, ctx validationContext) erro
 		t.bootstrapSessions[cs.SessionID] = true
 	}
 
-	t.createdSessions[cs.SessionID] = step.ID
+	t.createdSessions[cs.SessionID] = cs.ID()
 
 	return t.recordCreateSessionInitialWindow(cs, ctx)
 }
@@ -586,9 +569,8 @@ func validateCreateWindowPayload(cw *CreateWindowStep, windows []model.Window) e
 	return planFailure("validation", "unknown_window_in_create_step", ErrInvalid)
 }
 
-func (t *planTracker) recordCreateWindow(step Step, ctx validationContext) error {
-	cw := step.CreateWindow
-	if cw == nil || !model.ValidID(cw.WindowID) || !model.ValidID(cw.OwnerSessionID) {
+func (t *planTracker) recordCreateWindow(cw *CreateWindowStep, ctx validationContext) error {
+	if !model.ValidID(cw.WindowID) || !model.ValidID(cw.OwnerSessionID) {
 		return planFailure("validation", "invalid_create_window", ErrInvalid)
 	}
 
@@ -601,7 +583,7 @@ func (t *planTracker) recordCreateWindow(step Step, ctx validationContext) error
 		return planFailure("validation", "create_window_owner_session_not_created", ErrInvalid)
 	}
 
-	if !slices.Contains(step.DependsOn, sessStep) {
+	if !slices.Contains(cw.DependsOn(), sessStep) {
 		return planFailure("validation", "create_window_missing_owner_dep", ErrInvalid)
 	}
 
@@ -613,17 +595,16 @@ func (t *planTracker) recordCreateWindow(step Step, ctx validationContext) error
 		return planFailure("validation", "duplicate_pane_creation", ErrInvalid)
 	}
 
-	t.createdWindows[cw.WindowID] = step.ID
-	t.createdPanes[cw.InitialPaneID] = step.ID
+	t.createdWindows[cw.WindowID] = cw.ID()
+	t.createdPanes[cw.InitialPaneID] = cw.ID()
 	t.windowPaneIDs[cw.WindowID] = append(t.windowPaneIDs[cw.WindowID], cw.InitialPaneID)
 	t.handledLinks[linkSlotKey{session: cw.OwnerSessionID, window: cw.WindowID, index: cw.Index}] = true
 
 	return nil
 }
 
-func (t *planTracker) recordSplitPane(step Step, ctx validationContext) error {
-	sp := step.SplitPane
-	if sp == nil || !model.ValidID(sp.PaneID) || !model.ValidID(sp.TargetPaneID) || !model.ValidID(sp.WindowID) {
+func (t *planTracker) recordSplitPane(sp *SplitPaneStep, ctx validationContext) error {
+	if !model.ValidID(sp.PaneID) || !model.ValidID(sp.TargetPaneID) || !model.ValidID(sp.WindowID) {
 		return planFailure("validation", "invalid_split_pane", ErrInvalid)
 	}
 
@@ -636,7 +617,7 @@ func (t *planTracker) recordSplitPane(step Step, ctx validationContext) error {
 		return planFailure("validation", "split_target_pane_not_created", ErrInvalid)
 	}
 
-	if !slices.Contains(step.DependsOn, targetStep) {
+	if !slices.Contains(sp.DependsOn(), targetStep) {
 		return planFailure("validation", "split_missing_target_dep", ErrInvalid)
 	}
 
@@ -644,7 +625,7 @@ func (t *planTracker) recordSplitPane(step Step, ctx validationContext) error {
 		return err
 	}
 
-	t.createdPanes[sp.PaneID] = step.ID
+	t.createdPanes[sp.PaneID] = sp.ID()
 	t.windowPaneIDs[sp.WindowID] = append(t.windowPaneIDs[sp.WindowID], sp.PaneID)
 
 	return nil
@@ -683,9 +664,8 @@ func validateSplitDimensionsAndTarget(sp *SplitPaneStep, g model.Manifest) error
 	return nil
 }
 
-func (t *planTracker) recordLinkWindow(step Step, ctx validationContext) error {
-	lw := step.LinkWindow
-	if lw == nil || !model.ValidID(lw.SessionID) || !model.ValidID(lw.WindowID) {
+func (t *planTracker) recordLinkWindow(lw *LinkWindowStep, ctx validationContext) error {
+	if !model.ValidID(lw.SessionID) || !model.ValidID(lw.WindowID) {
 		return planFailure("validation", "invalid_link_window", ErrInvalid)
 	}
 
@@ -704,7 +684,7 @@ func (t *planTracker) recordLinkWindow(step Step, ctx validationContext) error {
 		return planFailure("validation", "link_window_not_created", ErrInvalid)
 	}
 
-	if !slices.Contains(step.DependsOn, sessStep) || !slices.Contains(step.DependsOn, winStep) {
+	if !slices.Contains(lw.DependsOn(), sessStep) || !slices.Contains(lw.DependsOn(), winStep) {
 		return planFailure("validation", "link_missing_prereq_deps", ErrInvalid)
 	}
 
@@ -713,7 +693,7 @@ func (t *planTracker) recordLinkWindow(step Step, ctx validationContext) error {
 	}
 
 	t.handledLinks[key] = true
-	t.sessionLinkStepIDs[lw.SessionID] = append(t.sessionLinkStepIDs[lw.SessionID], step.ID)
+	t.sessionLinkStepIDs[lw.SessionID] = append(t.sessionLinkStepIDs[lw.SessionID], lw.ID())
 
 	return nil
 }
@@ -732,9 +712,8 @@ func validateLinkStepMatch(lw *LinkWindowStep, links []model.Link) error {
 	return planFailure("validation", "unmatched_link_step", ErrInvalid)
 }
 
-func (t *planTracker) recordCloseBootstrap(step Step, _ validationContext) error {
-	cb := step.CloseBootstrapWindow
-	if cb == nil || !model.ValidID(cb.SessionID) {
+func (t *planTracker) recordCloseBootstrap(cb *CloseBootstrapWindowStep, _ validationContext) error {
+	if !model.ValidID(cb.SessionID) {
 		return planFailure("validation", "invalid_close_bootstrap", ErrInvalid)
 	}
 
@@ -746,14 +725,13 @@ func (t *planTracker) recordCloseBootstrap(step Step, _ validationContext) error
 		return planFailure("validation", "duplicate_close_bootstrap", ErrInvalid)
 	}
 
-	t.closedBootstraps[cb.SessionID] = step.ID
+	t.closedBootstraps[cb.SessionID] = cb.ID()
 
 	return nil
 }
 
-func (t *planTracker) recordApplyLayout(step Step, ctx validationContext) error {
-	al := step.ApplyLayout
-	if al == nil || !model.ValidID(al.WindowID) {
+func (t *planTracker) recordApplyLayout(al *ApplyLayoutStep, ctx validationContext) error {
+	if !model.ValidID(al.WindowID) {
 		return planFailure("validation", "invalid_apply_layout", ErrInvalid)
 	}
 
@@ -766,7 +744,7 @@ func (t *planTracker) recordApplyLayout(step Step, ctx validationContext) error 
 		return planFailure("validation", "layout_window_not_created", ErrInvalid)
 	}
 
-	if !slices.Contains(step.DependsOn, winStep) {
+	if !slices.Contains(al.DependsOn(), winStep) {
 		return planFailure("validation", "layout_missing_window_dep", ErrInvalid)
 	}
 
@@ -787,8 +765,8 @@ func (t *planTracker) recordApplyLayout(step Step, ctx validationContext) error 
 		return planFailure("validation", "layout_dimensions_mismatch", ErrInvalid)
 	}
 
-	t.layoutWindows[al.WindowID] = step.ID
-	t.windowFinalStepIDs[al.WindowID] = step.ID
+	t.layoutWindows[al.WindowID] = al.ID()
+	t.windowFinalStepIDs[al.WindowID] = al.ID()
 
 	return nil
 }
@@ -801,7 +779,7 @@ func (t *planTracker) validateSelectPaneDeps(step Step, windowID string, windows
 			initPane := firstLeaf(windows[i].Layout)
 			if initPane != "" {
 				titleStep, exists := t.titledPanes[initPane]
-				if !exists || !slices.Contains(step.DependsOn, titleStep) {
+				if !exists || !slices.Contains(step.DependsOn(), titleStep) {
 					return planFailure("validation", "select_pane_missing_title_dep", ErrInvalid)
 				}
 
@@ -816,7 +794,7 @@ func (t *planTracker) validateSelectPaneDeps(step Step, windowID string, windows
 		expectedPrevStep = t.layoutWindows[windowID]
 	}
 
-	if expectedPrevStep == "" || !slices.Contains(step.DependsOn, expectedPrevStep) {
+	if expectedPrevStep == "" || !slices.Contains(step.DependsOn(), expectedPrevStep) {
 		return planFailure("validation", "select_pane_missing_layout_dep", ErrInvalid)
 	}
 
@@ -837,9 +815,8 @@ func validateSelectPaneActive(panes []model.Pane, windowID, paneID string) error
 	return planFailure("validation", "select_pane_not_active_in_source", ErrInvalid)
 }
 
-func (t *planTracker) recordSelectPane(step Step, ctx validationContext) error {
-	sp := step.SelectPane
-	if sp == nil || !model.ValidID(sp.WindowID) || !model.ValidID(sp.PaneID) {
+func (t *planTracker) recordSelectPane(sp *SelectPaneStep, ctx validationContext) error {
+	if !model.ValidID(sp.WindowID) || !model.ValidID(sp.PaneID) {
 		return planFailure("validation", "invalid_select_pane", ErrInvalid)
 	}
 
@@ -847,7 +824,7 @@ func (t *planTracker) recordSelectPane(step Step, ctx validationContext) error {
 		return planFailure("validation", "duplicate_select_pane", ErrInvalid)
 	}
 
-	if err := t.validateSelectPaneDeps(step, sp.WindowID, ctx.graph.Windows); err != nil {
+	if err := t.validateSelectPaneDeps(sp, sp.WindowID, ctx.graph.Windows); err != nil {
 		return err
 	}
 
@@ -855,8 +832,8 @@ func (t *planTracker) recordSelectPane(step Step, ctx validationContext) error {
 		return err
 	}
 
-	t.selectedPaneWindows[sp.WindowID] = step.ID
-	t.windowFinalStepIDs[sp.WindowID] = step.ID
+	t.selectedPaneWindows[sp.WindowID] = sp.ID()
+	t.windowFinalStepIDs[sp.WindowID] = sp.ID()
 
 	return nil
 }
@@ -875,9 +852,8 @@ func validateSetPaneTitleMatch(spt *SetPaneTitleStep, panes []model.Pane) error 
 	return planFailure("validation", "unknown_pane_in_set_pane_title_step", ErrInvalid)
 }
 
-func (t *planTracker) recordSetPaneTitle(step Step, ctx validationContext) error {
-	spt := step.SetPaneTitle
-	if spt == nil || !model.ValidID(spt.WindowID) || !model.ValidID(spt.PaneID) {
+func (t *planTracker) recordSetPaneTitle(spt *SetPaneTitleStep, ctx validationContext) error {
+	if !model.ValidID(spt.WindowID) || !model.ValidID(spt.PaneID) {
 		return planFailure("validation", "invalid_set_pane_title", ErrInvalid)
 	}
 
@@ -890,12 +866,12 @@ func (t *planTracker) recordSetPaneTitle(step Step, ctx validationContext) error
 	}
 
 	paneStep, paneExists := t.createdPanes[spt.PaneID]
-	if !paneExists || !slices.Contains(step.DependsOn, paneStep) {
+	if !paneExists || !slices.Contains(spt.DependsOn(), paneStep) {
 		return planFailure("validation", "set_pane_title_missing_pane_dep", ErrInvalid)
 	}
 
 	layoutStep, layoutExists := t.layoutWindows[spt.WindowID]
-	if !layoutExists || !slices.Contains(step.DependsOn, layoutStep) {
+	if !layoutExists || !slices.Contains(spt.DependsOn(), layoutStep) {
 		return planFailure("validation", "set_pane_title_missing_layout_dep", ErrInvalid)
 	}
 
@@ -903,15 +879,14 @@ func (t *planTracker) recordSetPaneTitle(step Step, ctx validationContext) error
 		return err
 	}
 
-	t.titledPanes[spt.PaneID] = step.ID
-	t.windowFinalStepIDs[spt.WindowID] = step.ID
+	t.titledPanes[spt.PaneID] = spt.ID()
+	t.windowFinalStepIDs[spt.WindowID] = spt.ID()
 
 	return nil
 }
 
-func (t *planTracker) recordApplyZoom(step Step, ctx validationContext) error {
-	az := step.ApplyZoom
-	if az == nil || !model.ValidID(az.WindowID) || !model.ValidID(az.PaneID) {
+func (t *planTracker) recordApplyZoom(az *ApplyZoomStep, ctx validationContext) error {
+	if !model.ValidID(az.WindowID) || !model.ValidID(az.PaneID) {
 		return planFailure("validation", "invalid_apply_zoom", ErrInvalid)
 	}
 
@@ -920,7 +895,7 @@ func (t *planTracker) recordApplyZoom(step Step, ctx validationContext) error {
 	}
 
 	spStep, spExists := t.selectedPaneWindows[az.WindowID]
-	if !spExists || !slices.Contains(step.DependsOn, spStep) {
+	if !spExists || !slices.Contains(az.DependsOn(), spStep) {
 		return planFailure("validation", "zoom_missing_select_pane_dep", ErrInvalid)
 	}
 
@@ -937,15 +912,14 @@ func (t *planTracker) recordApplyZoom(step Step, ctx validationContext) error {
 		return planFailure("validation", "zoom_applied_to_unzoomed_window", ErrInvalid)
 	}
 
-	t.zoomedWindows[az.WindowID] = step.ID
-	t.windowFinalStepIDs[az.WindowID] = step.ID
+	t.zoomedWindows[az.WindowID] = az.ID()
+	t.windowFinalStepIDs[az.WindowID] = az.ID()
 
 	return nil
 }
 
-func (t *planTracker) recordSelectWindow(step Step, ctx validationContext) error {
-	sw := step.SelectWindow
-	if sw == nil || !model.ValidID(sw.SessionID) || !model.ValidID(sw.ActiveWindowID) {
+func (t *planTracker) recordSelectWindow(sw *SelectWindowStep, ctx validationContext) error {
+	if !model.ValidID(sw.SessionID) || !model.ValidID(sw.ActiveWindowID) {
 		return planFailure("validation", "invalid_select_window", ErrInvalid)
 	}
 
@@ -953,7 +927,7 @@ func (t *planTracker) recordSelectWindow(step Step, ctx validationContext) error
 		return planFailure("validation", "duplicate_select_window", ErrInvalid)
 	}
 
-	if err := t.validateSelectWindowPrereqs(step, sw.SessionID, ctx.graph.Links); err != nil {
+	if err := t.validateSelectWindowPrereqs(sw, sw.SessionID, ctx.graph.Links); err != nil {
 		return err
 	}
 
@@ -961,7 +935,7 @@ func (t *planTracker) recordSelectWindow(step Step, ctx validationContext) error
 		return err
 	}
 
-	t.selectedWindowSessions[sw.SessionID] = step.ID
+	t.selectedWindowSessions[sw.SessionID] = sw.ID()
 
 	return nil
 }
@@ -972,18 +946,18 @@ func (t *planTracker) validateSelectWindowPrereqs(step Step, sessionID string, l
 		return planFailure("validation", "select_window_session_not_created", ErrInvalid)
 	}
 
-	if !slices.Contains(step.DependsOn, sessStep) {
+	if !slices.Contains(step.DependsOn(), sessStep) {
 		return planFailure("validation", "select_window_missing_session_dep", ErrInvalid)
 	}
 
 	for _, linkStep := range t.sessionLinkStepIDs[sessionID] {
-		if !slices.Contains(step.DependsOn, linkStep) {
+		if !slices.Contains(step.DependsOn(), linkStep) {
 			return planFailure("validation", "select_window_missing_link_dep", ErrInvalid)
 		}
 	}
 
 	if cbStep, hasCB := t.closedBootstraps[sessionID]; hasCB {
-		if !slices.Contains(step.DependsOn, cbStep) {
+		if !slices.Contains(step.DependsOn(), cbStep) {
 			return planFailure("validation", "select_window_missing_close_bootstrap_dep", ErrInvalid)
 		}
 	}
@@ -994,7 +968,7 @@ func (t *planTracker) validateSelectWindowPrereqs(step Step, sessionID string, l
 		}
 
 		finalStep, finalExists := t.windowFinalStepIDs[l.Window]
-		if !finalExists || !slices.Contains(step.DependsOn, finalStep) {
+		if !finalExists || !slices.Contains(step.DependsOn(), finalStep) {
 			return planFailure("validation", "select_window_missing_window_final_dep", ErrInvalid)
 		}
 	}
@@ -1141,54 +1115,4 @@ func (t *planTracker) checkFinalizationCoverage(g model.Manifest) error {
 	}
 
 	return nil
-}
-
-func countPayloads(s Step) int {
-	var n int
-
-	if s.CreateSession != nil {
-		n++
-	}
-
-	if s.PlaceInitialWindow != nil {
-		n++
-	}
-
-	if s.CreateWindow != nil {
-		n++
-	}
-
-	if s.SplitPane != nil {
-		n++
-	}
-
-	if s.LinkWindow != nil {
-		n++
-	}
-
-	if s.CloseBootstrapWindow != nil {
-		n++
-	}
-
-	if s.ApplyLayout != nil {
-		n++
-	}
-
-	if s.SelectPane != nil {
-		n++
-	}
-
-	if s.ApplyZoom != nil {
-		n++
-	}
-
-	if s.SelectWindow != nil {
-		n++
-	}
-
-	if s.SetPaneTitle != nil {
-		n++
-	}
-
-	return n
 }

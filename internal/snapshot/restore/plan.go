@@ -10,14 +10,9 @@ import (
 )
 
 type MissingRequirement struct {
-	Domain string `json:"domain"`
-	Status string `json:"status"`
-	Reason string `json:"reason"`
-}
-
-type RequirementClassification struct {
-	FidelityLimits []MissingRequirement
-	Blockers       []MissingRequirement
+	Domain string       `json:"domain"`
+	Status string       `json:"status"`
+	Reason model.Reason `json:"reason"`
 }
 
 type PlanSummary struct {
@@ -49,29 +44,6 @@ type Plan struct {
 
 func (p Plan) SourceEvidenceComplete() bool {
 	return p.SourceGraph.Complete()
-}
-
-func (p Plan) PracticalRecoveryReady() bool {
-	classification := ClassifyPracticalRequirements(p.MissingRequirements)
-
-	return p.SourceGraph.PracticalRecoveryReady() && len(classification.Blockers) == 0
-}
-
-func ClassifyPracticalRequirements(requirements []MissingRequirement) RequirementClassification {
-	classification := RequirementClassification{
-		FidelityLimits: make([]MissingRequirement, 0, len(requirements)),
-		Blockers:       make([]MissingRequirement, 0),
-	}
-
-	for _, requirement := range requirements {
-		if practicalFidelityReason(requirement.Reason) {
-			classification.FidelityLimits = append(classification.FidelityLimits, requirement)
-		} else {
-			classification.Blockers = append(classification.Blockers, requirement)
-		}
-	}
-
-	return classification
 }
 
 func BuildPlan(m model.Manifest, selected []string) (Plan, error) {
@@ -283,27 +255,27 @@ func collectMissingRequirements(m model.Manifest) []MissingRequirement {
 		{
 			Domain: "atomicity",
 			Status: "unsupported",
-			Reason: "atomic_restore_transaction_unavailable",
+			Reason: model.ReasonAtomicRestoreTransactionUnavailable,
 		},
 		{
 			Domain: "target",
 			Status: "unsupported",
-			Reason: "target_options_and_group_names_require_adaptation",
+			Reason: model.ReasonTargetOptionsAndGroupNamesRequireAdaptation,
 		},
 		{
 			Domain: "launch",
 			Status: "unsupported",
-			Reason: "exactly_once_process_launch_unavailable",
+			Reason: model.ReasonExactlyOnceProcessLaunchUnavailable,
 		},
 		{
 			Domain: "ownership",
 			Status: "unsupported",
-			Reason: "immutable_ownership_enforcement_unavailable",
+			Reason: model.ReasonImmutableOwnershipEnforcementUnavailable,
 		},
 		{
 			Domain: "terminal",
 			Status: "unsupported",
-			Reason: "terminal_state_checkpoint_unavailable",
+			Reason: model.ReasonTerminalStateCheckpointUnavailable,
 		},
 	}
 
@@ -311,7 +283,7 @@ func collectMissingRequirements(m model.Manifest) []MissingRequirement {
 		missing = append(missing, MissingRequirement{
 			Domain: "S00_Consistency",
 			Status: m.Source.Consistency,
-			Reason: "capture_not_atomic",
+			Reason: model.ReasonCaptureNotAtomic,
 		})
 	}
 
@@ -320,7 +292,7 @@ func collectMissingRequirements(m model.Manifest) []MissingRequirement {
 			missing = append(missing, MissingRequirement{
 				Domain: e.Domain,
 				Status: e.Status,
-				Reason: e.Reason,
+				Reason: model.Reason(e.Reason),
 			})
 		}
 	}
@@ -330,7 +302,7 @@ func collectMissingRequirements(m model.Manifest) []MissingRequirement {
 			missing = append(missing, MissingRequirement{
 				Domain: "launch",
 				Status: "unsupported",
-				Reason: p.Launch.Reason,
+				Reason: model.Reason(p.Launch.Reason),
 			})
 		}
 	}
@@ -340,48 +312,4 @@ func collectMissingRequirements(m model.Manifest) []MissingRequirement {
 	})
 
 	return missing
-}
-
-func practicalFidelityReason(reason string) bool {
-	return slices.Contains([]string{
-		"application_checkpoint_unavailable",
-		"application_restart_unsupported",
-		"approved_launch_unavailable",
-		"atomic_restore_transaction_unavailable",
-		"capture_not_atomic",
-		"dead_pane",
-		"directory_deleted",
-		"executable_deleted",
-		"exactly_once_process_launch_unavailable",
-		"global_scope_environment_materialized_locally",
-		"global_scope_options_not_applied",
-		"immutable_ownership_enforcement_unavailable",
-		"inherited_option_not_representable",
-		"inherited_options_materialized_locally",
-		"launch_context_nonrestartable",
-		"launch_environment_incomplete",
-		"nonrestartable_pane",
-		"not_captured",
-		"observed_only",
-		"ownership_unverified",
-		"pane_dead",
-		"pane_launch_nonrestartable",
-		"pane_not_restartable",
-		"pane_process_deleted",
-		"pane_process_terminated",
-		"pane_process_unavailable",
-		"process_cwd_deleted",
-		"process_deleted",
-		"process_executable_deleted",
-		"process_identity_unavailable",
-		"process_launch_not_attempted",
-		"saved_working_directory_missing",
-		"target_environment_masked_locally",
-		"target_environment_unmasked",
-		"target_inherited_options_unmasked",
-		"target_options_and_group_names_require_adaptation",
-		"terminal_checkpoint_unavailable",
-		"terminal_state_checkpoint_unavailable",
-		"working_directory_deleted",
-	}, reason)
 }

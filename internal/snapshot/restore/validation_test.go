@@ -44,6 +44,7 @@ func TestValidatePlanRejectsNestedPayloadChanges(t *testing.T) {
 			}
 
 			for i := range plan.Steps {
+				plan.Steps[i] = cloneStepForValidationTest(plan.Steps[i])
 				mutate(&plan.Steps[i])
 			}
 
@@ -57,43 +58,43 @@ func TestValidatePlanRejectsNestedPayloadChanges(t *testing.T) {
 func basePayloadMutations() map[string]func(*Step) {
 	return map[string]func(*Step){
 		"session environment": func(s *Step) {
-			if s.CreateSession != nil {
-				s.CreateSession.Environment = []model.Variable{{Name: model.Bytes("EXTRA"), State: "set", Value: model.Bytes("value")}}
+			if typed, ok := (*s).(*CreateSessionStep); ok {
+				typed.Environment = []model.Variable{{Name: model.Bytes("EXTRA"), State: "set", Value: model.Bytes("value")}}
 			}
 		},
 		"group name": func(s *Step) {
-			if s.CreateSession != nil {
-				s.CreateSession.GroupName = model.Bytes("tampered")
+			if typed, ok := (*s).(*CreateSessionStep); ok {
+				typed.GroupName = model.Bytes("tampered")
 			}
 		},
 		"group leader": func(s *Step) {
-			if s.CreateSession != nil {
-				s.CreateSession.GroupLeaderSessionID = "s0"
+			if typed, ok := (*s).(*CreateSessionStep); ok {
+				typed.GroupLeaderSessionID = "s0"
 			}
 		},
 		"session width": func(s *Step) {
-			if s.CreateSession != nil {
-				s.CreateSession.Width++
+			if typed, ok := (*s).(*CreateSessionStep); ok {
+				typed.Width++
 			}
 		},
 		"session height": func(s *Step) {
-			if s.CreateSession != nil {
-				s.CreateSession.Height++
+			if typed, ok := (*s).(*CreateSessionStep); ok {
+				typed.Height++
 			}
 		},
 		"initial placement": func(s *Step) {
-			if s.PlaceInitialWindow != nil {
-				s.PlaceInitialWindow.Index = 5
+			if typed, ok := (*s).(*PlaceInitialWindowStep); ok {
+				typed.Index = 5
 			}
 		},
 		"process arguments": func(s *Step) {
-			if s.SplitPane != nil {
-				s.SplitPane.Launch.Arguments = []model.Bytes{model.Bytes("unexpected")}
+			if typed, ok := (*s).(*SplitPaneStep); ok {
+				typed.Launch.Arguments = []model.Bytes{model.Bytes("unexpected")}
 			}
 		},
 		"terminal": func(s *Step) {
-			if s.SplitPane != nil {
-				s.SplitPane.Terminal.CursorX++
+			if typed, ok := (*s).(*SplitPaneStep); ok {
+				typed.Terminal.CursorX++
 			}
 		},
 	}
@@ -102,28 +103,28 @@ func basePayloadMutations() map[string]func(*Step) {
 func titlePayloadMutations() map[string]func(*Step) {
 	return map[string]func(*Step){
 		"initial window name": func(s *Step) {
-			if s.CreateSession != nil {
-				s.CreateSession.InitialWindowName = model.Bytes("tampered-win-name")
+			if typed, ok := (*s).(*CreateSessionStep); ok {
+				typed.InitialWindowName = model.Bytes("tampered-win-name")
 			}
 		},
 		"set pane title text": func(s *Step) {
-			if s.SetPaneTitle != nil {
-				s.SetPaneTitle.Title = model.Bytes("tampered-title")
+			if typed, ok := (*s).(*SetPaneTitleStep); ok {
+				typed.Title = model.Bytes("tampered-title")
 			}
 		},
 		"set pane title unknown pane": func(s *Step) {
-			if s.SetPaneTitle != nil {
-				s.SetPaneTitle.PaneID = "p999"
+			if typed, ok := (*s).(*SetPaneTitleStep); ok {
+				typed.PaneID = "p999"
 			}
 		},
 		"set pane title window mismatch": func(s *Step) {
-			if s.SetPaneTitle != nil {
-				s.SetPaneTitle.WindowID = "w999"
+			if typed, ok := (*s).(*SetPaneTitleStep); ok {
+				typed.WindowID = "w999"
 			}
 		},
 		"set pane title missing deps": func(s *Step) {
-			if s.SetPaneTitle != nil {
-				s.DependsOn = nil
+			if typed, ok := (*s).(*SetPaneTitleStep); ok {
+				typed.stepBase.dependsOn = nil
 			}
 		},
 	}
@@ -134,6 +135,31 @@ func nestedPayloadMutations() map[string]func(*Step) {
 	maps.Copy(muts, titlePayloadMutations())
 
 	return muts
+}
+
+func cloneStepForValidationTest(step Step) Step {
+	switch step := step.(type) {
+	case *CreateSessionStep:
+		cloned := *step
+		return &cloned
+	case *PlaceInitialWindowStep:
+		cloned := *step
+		return &cloned
+	case *CreateWindowStep:
+		cloned := *step
+		return &cloned
+	case *SplitPaneStep:
+		cloned := *step
+		return &cloned
+	case *SetPaneTitleStep:
+		cloned := *step
+		return &cloned
+	case *LinkWindowStep, *CloseBootstrapWindowStep, *ApplyLayoutStep, *SelectPaneStep,
+		*ApplyZoomStep, *SelectWindowStep:
+		return step
+	}
+
+	panic("unexpected step type")
 }
 
 func TestValidatePlanRejectsCreateWindowPayloadChanges(t *testing.T) {
@@ -150,13 +176,13 @@ func TestValidatePlanRejectsCreateWindowPayloadChanges(t *testing.T) {
 
 	mutations := map[string]func(*Step){
 		"window width": func(s *Step) {
-			if s.CreateWindow != nil {
-				s.CreateWindow.Width++
+			if typed, ok := (*s).(*CreateWindowStep); ok {
+				typed.Width++
 			}
 		},
 		"window height": func(s *Step) {
-			if s.CreateWindow != nil {
-				s.CreateWindow.Height++
+			if typed, ok := (*s).(*CreateWindowStep); ok {
+				typed.Height++
 			}
 		},
 	}
@@ -169,6 +195,7 @@ func TestValidatePlanRejectsCreateWindowPayloadChanges(t *testing.T) {
 			}
 
 			for i := range plan.Steps {
+				plan.Steps[i] = cloneStepForValidationTest(plan.Steps[i])
 				mutate(&plan.Steps[i])
 			}
 
@@ -187,7 +214,7 @@ func TestValidatePlanRejectsMissingPaneTitleFinalization(t *testing.T) {
 
 	filtered := make([]Step, 0, len(plan.Steps))
 	for _, s := range plan.Steps {
-		if s.Kind != StepSetPaneTitle {
+		if _, ok := s.(*SetPaneTitleStep); !ok {
 			filtered = append(filtered, s)
 		}
 	}
@@ -206,18 +233,19 @@ func TestValidatePlanRejectsDuplicatePaneTitleFinalization(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var duplicate Step
+	var duplicate *SetPaneTitleStep
 
 	for _, s := range plan.Steps {
-		if s.Kind == StepSetPaneTitle {
-			duplicate = s
-			duplicate.ID = "duplicate-title-step"
+		if title, ok := s.(*SetPaneTitleStep); ok {
+			cloned := *title
+			cloned.stepBase.id = "duplicate-title-step"
+			duplicate = &cloned
 
 			break
 		}
 	}
 
-	if duplicate.ID == "" {
+	if duplicate == nil {
 		t.Fatal("expected at least one set_pane_title step in plan")
 	}
 
@@ -226,24 +254,6 @@ func TestValidatePlanRejectsDuplicatePaneTitleFinalization(t *testing.T) {
 
 	if err := ValidatePlan(plan); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("expected ErrInvalid for duplicate set_pane_title step, got: %v", err)
-	}
-}
-
-func TestValidatePlanRejectsMissingSetPaneTitlePayload(t *testing.T) {
-	plan, err := BuildPlan(nestedLayoutFixture(), []string{"s0"})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for i := range plan.Steps {
-		if plan.Steps[i].Kind == StepSetPaneTitle {
-			plan.Steps[i].SetPaneTitle = nil
-			break
-		}
-	}
-
-	if err := ValidatePlan(plan); !errors.Is(err, ErrInvalid) {
-		t.Fatalf("expected ErrInvalid for nil SetPaneTitle payload, got: %v", err)
 	}
 }
 
@@ -257,8 +267,11 @@ func TestValidatePlanRejectsUnexpectedInitialWindowNameOnBootstrap(t *testing.T)
 	}
 
 	for i := range plan.Steps {
-		if plan.Steps[i].Kind == StepCreateSession && plan.Steps[i].CreateSession.BootstrapWindow {
-			plan.Steps[i].CreateSession.InitialWindowName = model.Bytes("illegal-bootstrap-name")
+		if session, ok := plan.Steps[i].(*CreateSessionStep); ok && session.BootstrapWindow {
+			cloned := *session
+			cloned.InitialWindowName = model.Bytes("illegal-bootstrap-name")
+			plan.Steps[i] = &cloned
+
 			break
 		}
 	}
@@ -275,8 +288,11 @@ func TestValidatePlanRejectsTamperedInitialWindowName(t *testing.T) {
 	}
 
 	for i := range plan.Steps {
-		if plan.Steps[i].Kind == StepCreateSession {
-			plan.Steps[i].CreateSession.InitialWindowName = model.Bytes("tampered-init-win")
+		if session, ok := plan.Steps[i].(*CreateSessionStep); ok {
+			cloned := *session
+			cloned.InitialWindowName = model.Bytes("tampered-init-win")
+			plan.Steps[i] = &cloned
+
 			break
 		}
 	}
@@ -294,8 +310,11 @@ func TestValidatePlanRejectsSelectWindowMissingWindowFinalizationDep(t *testing.
 
 	corruptedSteps := append([]Step(nil), plan.Steps...)
 	for i := range corruptedSteps {
-		if corruptedSteps[i].Kind == StepSelectWindow {
-			corruptedSteps[i].DependsOn = []string{"create-session:s0", "place-initial-window:s0"}
+		if selection, ok := corruptedSteps[i].(*SelectWindowStep); ok {
+			cloned := *selection
+			cloned.stepBase.dependsOn = []string{"create-session:s0", "place-initial-window:s0"}
+			corruptedSteps[i] = &cloned
+
 			break
 		}
 	}
@@ -334,11 +353,11 @@ func TestValidatePlanRejectsSelectPaneBeforePaneTitle(t *testing.T) {
 	var titleIdx, selectIdx int
 
 	for i, s := range plan.Steps {
-		if s.Kind == StepSetPaneTitle {
+		if _, ok := s.(*SetPaneTitleStep); ok {
 			titleIdx = i
 		}
 
-		if s.Kind == StepSelectPane {
+		if _, ok := s.(*SelectPaneStep); ok {
 			selectIdx = i
 		}
 	}
@@ -348,7 +367,15 @@ func TestValidatePlanRejectsSelectPaneBeforePaneTitle(t *testing.T) {
 	}
 
 	corruptedSteps := append([]Step(nil), plan.Steps...)
-	corruptedSteps[selectIdx].DependsOn = []string{"apply-layout:w0"}
+
+	selection, ok := corruptedSteps[selectIdx].(*SelectPaneStep)
+	if !ok {
+		t.Fatal("expected select pane step")
+	}
+
+	cloned := *selection
+	cloned.stepBase.dependsOn = []string{"apply-layout:w0"}
+	corruptedSteps[selectIdx] = &cloned
 	corruptedSteps[titleIdx], corruptedSteps[selectIdx] = corruptedSteps[selectIdx], corruptedSteps[titleIdx]
 
 	corruptedPlan := plan

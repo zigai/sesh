@@ -43,8 +43,8 @@ func TestNativeResumeRequiresExecutableArgumentsAndDirectory(t *testing.T) {
 func TestNonrestartableLaunchValidation(t *testing.T) {
 	cases := []struct {
 		name      string
-		recovery  string
-		reason    string
+		recovery  Recovery
+		reason    Reason
 		exe       Bytes
 		args      []Bytes
 		dir       Bytes
@@ -67,7 +67,7 @@ func TestNonrestartableLaunchValidation(t *testing.T) {
 			m := fixture()
 			launch := &m.Panes[0].Launch
 			launch.Recovery = tc.recovery
-			launch.Reason = tc.reason
+			launch.Reason = string(tc.reason)
 			launch.Executable = tc.exe
 			launch.Arguments = tc.args
 			launch.Directory = tc.dir
@@ -90,7 +90,7 @@ func TestDeadPaneDirectoryValidation(t *testing.T) {
 		m.Panes[0].Dead = true
 		m.Panes[0].Directory = nil
 		m.Panes[0].Launch.Recovery = RecoveryNonrestartable
-		m.Panes[0].Launch.Reason = ReasonPaneDead
+		m.Panes[0].Launch.Reason = string(ReasonPaneDead)
 
 		if err := m.Validate(); err != nil {
 			t.Fatalf("expected valid dead pane without directory, got: %v", err)
@@ -112,7 +112,7 @@ func TestDeadPaneDirectoryValidation(t *testing.T) {
 		m.Panes[0].Dead = true
 		m.Panes[0].Directory = Bytes("relative/path")
 		m.Panes[0].Launch.Recovery = RecoveryNonrestartable
-		m.Panes[0].Launch.Reason = ReasonPaneDead
+		m.Panes[0].Launch.Reason = string(ReasonPaneDead)
 
 		if err := m.Validate(); !errors.Is(err, ErrInvalid) {
 			t.Fatalf("expected dead pane with relative directory to fail, got: %v", err)

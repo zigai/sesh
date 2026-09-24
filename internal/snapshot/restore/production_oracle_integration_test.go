@@ -100,10 +100,9 @@ func TestProductionExecutorResumeAfterPartialFailure(t *testing.T) {
 	interrupted := plan.Steps[len(plan.Steps)/2]
 
 	journal := newFaultJournal(newPlanJournal(t, ctx, repo, operation))
-	journal.failIntent[interrupted.ID] = errInjectedIntentFault
+	journal.failIntent[interrupted.ID()] = errInjectedIntentFault
 
 	resumable := DefaultExecuteConfig()
-	resumable.CompensateOnFailure = false
 
 	if _, err := NewExecutor(targetServer, observation.Manifest, resumable).Execute(ctx, plan, journal); err == nil {
 		t.Fatal("expected the interrupted attempt to fail")

@@ -24,14 +24,6 @@ const (
 	environmentProgram  = "/usr/bin/env"
 )
 
-const (
-	CompensationRemoved      = "removed"
-	CompensationFailed       = "failed"
-	CompensationUncertain    = "uncertain"
-	CompensationNotAttempted = "not-attempted"
-	CompensationRetained     = "retained"
-)
-
 var (
 	errGroupLeaderNotFound      = errors.New("group leader session not found")
 	errInitialPlacementNotFound = errors.New("session not found for initial window placement")
@@ -46,16 +38,11 @@ var (
 )
 
 type ExecuteConfig struct {
-	LaunchProcesses bool
-
-	CompensateOnFailure bool
-
+	LaunchProcesses        bool
 	AllowMissingWorkingDir bool
 }
 
 type stepEffect struct {
-	knownRuntimeID string
-
 	run func(ctx context.Context) (string, error)
 }
 
@@ -70,8 +57,8 @@ type paneLaunch struct {
 
 type planIndex struct {
 	stepsByID            map[string]Step
-	splitStepsByWindow   map[string][]Step
-	placeStepBySession   map[string]Step
+	splitStepsByWindow   map[string][]*SplitPaneStep
+	placeStepBySession   map[string]*PlaceInitialWindowStep
 	initialPaneByWindow  map[string]string
 	ownerSessionByWindow map[string]string
 	panesByID            map[string]model.Pane
@@ -90,7 +77,6 @@ type Executor struct {
 	panes      map[string]tmux.Pane
 
 	receipts    map[string]string
-	unconfirmed map[string]string
 	sessionLog  []string
 	missing     []MissingRequirement
 	paneResults map[string]PaneResult
@@ -103,21 +89,13 @@ type ExecutionReport struct {
 	Dispatched      []string             `json:"dispatched"`
 	Adopted         []string             `json:"adopted"`
 	Receipts        map[string]string    `json:"receipts"`
-	Compensation    []CompensationEntry  `json:"compensation"`
 	Missing         []MissingRequirement `json:"missingRequirements"`
 	Panes           []PaneResult         `json:"panes,omitempty"`
-}
-
-type CompensationEntry struct {
-	StepID    string `json:"stepId"`
-	RuntimeID string `json:"runtimeId"`
-	Status    string `json:"status"`
 }
 
 func DefaultExecuteConfig() ExecuteConfig {
 	return ExecuteConfig{
 		LaunchProcesses:        false,
-		CompensateOnFailure:    false,
 		AllowMissingWorkingDir: false,
 	}
 }
@@ -134,8 +112,8 @@ func NewExecutor(server *tmux.Server, manifest model.Manifest, cfg ExecuteConfig
 		cfg:      cfg,
 		index: planIndex{
 			stepsByID:            map[string]Step{},
-			splitStepsByWindow:   map[string][]Step{},
-			placeStepBySession:   map[string]Step{},
+			splitStepsByWindow:   map[string][]*SplitPaneStep{},
+			placeStepBySession:   map[string]*PlaceInitialWindowStep{},
 			initialPaneByWindow:  map[string]string{},
 			ownerSessionByWindow: map[string]string{},
 			panesByID:            panesByID,
@@ -146,7 +124,6 @@ func NewExecutor(server *tmux.Server, manifest model.Manifest, cfg ExecuteConfig
 		windows:     map[string]tmux.Window{},
 		panes:       map[string]tmux.Pane{},
 		receipts:    map[string]string{},
-		unconfirmed: map[string]string{},
 		sessionLog:  nil,
 		missing:     nil,
 		paneResults: map[string]PaneResult{},
@@ -247,15 +224,16 @@ func checkSessionCollisions(liveSessions []tmux.SessionInfo, plan Plan, adoptedS
 
 func checkGroupCollisions(ctx context.Context, server *tmux.Server, plan Plan, adoptedSessions map[string]bool) error {
 	for _, step := range plan.Steps {
-		if step.Kind != StepCreateSession || step.CreateSession == nil || len(step.CreateSession.GroupName) == 0 {
+		create, ok := step.(*CreateSessionStep)
+		if !ok || len(create.GroupName) == 0 {
 			continue
 		}
 
-		if adoptedSessions[step.CreateSession.SessionID] {
+		if adoptedSessions[create.SessionID] {
 			continue
 		}
 
-		grp := string(step.CreateSession.GroupName)
+		grp := string(create.GroupName)
 		if err := PreflightCheckGroupCollision(ctx, server, grp); err != nil {
 			return err
 		}
@@ -272,7 +250,6 @@ func (e *Executor) Execute(ctx context.Context, plan Plan, journal Journal) (Exe
 		Dispatched:      nil,
 		Adopted:         nil,
 		Receipts:        nil,
-		Compensation:    nil,
 		Missing:         nil,
 		Panes:           nil,
 	}
@@ -308,7 +285,7 @@ func (e *Executor) Execute(ctx context.Context, plan Plan, journal Journal) (Exe
 	}
 
 	for _, step := range plan.Steps {
-		if err := e.executeStep(ctx, step, states[step.ID], journal, &report); err != nil {
+		if err := e.executeStep(ctx, step, states[step.ID()], journal, &report); err != nil {
 			return e.abort(ctx, plan, &report, err)
 		}
 	}
@@ -316,8 +293,7 @@ func (e *Executor) Execute(ctx context.Context, plan Plan, journal Journal) (Exe
 	e.ensureAllPaneResults(plan)
 	report.Receipts = e.cloneReceipts()
 	report.SessionsCreated = e.restoredSessionIDs(plan)
-	report.WindowsCreated = e.restoredIDList(plan, StepCreateWindow)
-	report.PanesCreated = e.restoredIDList(plan, StepSplitPane)
+	report.WindowsCreated, report.PanesCreated = e.restoredWindowAndPaneIDs(plan)
 	report.Missing = slices.Clone(e.missing)
 	report.Panes = e.collectedPaneResults(plan)
 
@@ -328,7 +304,7 @@ func (e *Executor) executeStep(ctx context.Context, step Step, state StepState, 
 	if err := ctx.Err(); err != nil {
 		return oops.In("snapshot.restore").
 			Code("operation_canceled").
-			With("operation", "execute_step", "step_id", step.ID).
+			With("operation", "execute_step", "step_id", step.ID()).
 			Wrap(err)
 	}
 
@@ -338,11 +314,11 @@ func (e *Executor) executeStep(ctx context.Context, step Step, state StepState, 
 			return err
 		}
 
-		report.Adopted = append(report.Adopted, step.ID)
+		report.Adopted = append(report.Adopted, step.ID())
 
 		return nil
 	case StatePlanned, StateNotSent:
-	default:
+	case StateIssued, StateUnknown:
 		return nil
 	}
 
@@ -360,7 +336,7 @@ func (e *Executor) executeStep(ctx context.Context, step Step, state StepState, 
 		return err
 	}
 
-	report.Dispatched = append(report.Dispatched, step.ID)
+	report.Dispatched = append(report.Dispatched, step.ID())
 
 	return nil
 }
@@ -368,8 +344,8 @@ func (e *Executor) executeStep(ctx context.Context, step Step, state StepState, 
 func indexPlan(plan Plan) planIndex {
 	index := planIndex{
 		stepsByID:            make(map[string]Step, len(plan.Steps)),
-		splitStepsByWindow:   map[string][]Step{},
-		placeStepBySession:   map[string]Step{},
+		splitStepsByWindow:   map[string][]*SplitPaneStep{},
+		placeStepBySession:   map[string]*PlaceInitialWindowStep{},
 		initialPaneByWindow:  map[string]string{},
 		ownerSessionByWindow: map[string]string{},
 		panesByID:            map[string]model.Pane{},
@@ -377,23 +353,23 @@ func indexPlan(plan Plan) planIndex {
 	}
 
 	for _, step := range plan.Steps {
-		index.stepsByID[step.ID] = step
+		index.stepsByID[step.ID()] = step
 
-		switch step.Kind {
-		case StepSplitPane:
-			index.splitStepsByWindow[step.SplitPane.WindowID] = append(index.splitStepsByWindow[step.SplitPane.WindowID], step)
-		case StepPlaceInitialWindow:
-			index.placeStepBySession[step.PlaceInitialWindow.SessionID] = step
-		case StepCreateWindow:
-			index.initialPaneByWindow[step.CreateWindow.WindowID] = step.CreateWindow.InitialPaneID
-			index.ownerSessionByWindow[step.CreateWindow.WindowID] = step.CreateWindow.OwnerSessionID
-		case StepCreateSession:
-			if step.CreateSession.InitialWindowID != "" {
-				index.initialPaneByWindow[step.CreateSession.InitialWindowID] = step.CreateSession.InitialPaneID
-				index.ownerSessionByWindow[step.CreateSession.InitialWindowID] = step.CreateSession.SessionID
+		switch s := step.(type) {
+		case *SplitPaneStep:
+			index.splitStepsByWindow[s.WindowID] = append(index.splitStepsByWindow[s.WindowID], s)
+		case *PlaceInitialWindowStep:
+			index.placeStepBySession[s.SessionID] = s
+		case *CreateWindowStep:
+			index.initialPaneByWindow[s.WindowID] = s.InitialPaneID
+			index.ownerSessionByWindow[s.WindowID] = s.OwnerSessionID
+		case *CreateSessionStep:
+			if s.InitialWindowID != "" {
+				index.initialPaneByWindow[s.InitialWindowID] = s.InitialPaneID
+				index.ownerSessionByWindow[s.InitialWindowID] = s.SessionID
 			}
-		case StepLinkWindow, StepCloseBootstrapWindow, StepApplyLayout,
-			StepSelectPane, StepApplyZoom, StepSelectWindow, StepSetPaneTitle:
+		case *LinkWindowStep, *CloseBootstrapWindowStep, *ApplyLayoutStep,
+			*SelectPaneStep, *ApplyZoomStep, *SelectWindowStep, *SetPaneTitleStep:
 		}
 	}
 
@@ -410,7 +386,7 @@ func indexPlan(plan Plan) planIndex {
 
 func validateJournalStates(plan Plan, states map[string]StepState) error {
 	for _, step := range plan.Steps {
-		state, ok := states[step.ID]
+		state, ok := states[step.ID()]
 		if !ok || state.State == "" {
 			return oops.In("snapshot.restore").
 				Code("restore_failed").
@@ -419,11 +395,6 @@ func validateJournalStates(plan Plan, states map[string]StepState) error {
 		}
 
 		switch state.State {
-		case StateConflict:
-			return oops.In("snapshot.restore").
-				Code("operation_uncertain").
-				With("operation", "execute", "reason", "prior_effect_conflicted").
-				Wrap(ErrPriorConflict)
 		case StateIssued, StateUnknown:
 			return oops.In("snapshot.restore").
 				Code("operation_uncertain").
@@ -445,13 +416,15 @@ func adoptedSessionIDs(plan Plan, states map[string]StepState) map[string]bool {
 	adopted := map[string]bool{}
 
 	for _, step := range plan.Steps {
-		if step.Kind != StepCreateSession || step.CreateSession == nil {
+		create, ok := step.(*CreateSessionStep)
+		if !ok {
 			continue
 		}
 
-		switch states[step.ID].State {
+		switch states[step.ID()].State {
 		case StateConfirmed, StateVerified:
-			adopted[step.CreateSession.SessionID] = true
+			adopted[create.SessionID] = true
+		case StatePlanned, StateIssued, StateNotSent, StateUnknown:
 		}
 	}
 
@@ -460,8 +433,8 @@ func adoptedSessionIDs(plan Plan, states map[string]StepState) map[string]bool {
 
 func (e *Executor) seedReceipts(plan Plan, states map[string]StepState) {
 	for _, step := range plan.Steps {
-		if id := states[step.ID].RuntimeID; id != "" {
-			e.receipts[step.ID] = id
+		if id := states[step.ID()].RuntimeID; id != "" {
+			e.receipts[step.ID()] = id
 		}
 	}
 }
@@ -475,19 +448,20 @@ func (e *Executor) noteUnsupportedLaunches(plan Plan) {
 		switch pane.Launch.Recovery {
 		case model.RecoveryNonrestartable:
 			if pane.Launch.Reason != "" {
-				e.note("launch", pane.Launch.Reason)
+				e.note("launch", model.Reason(pane.Launch.Reason))
 			} else {
-				e.note("launch", "nonrestartable_pane")
+				e.note("launch", model.ReasonNonrestartablePane)
 			}
 		case model.RecoveryUnverified:
 			if len(pane.Launch.Executable) > 0 && len(pane.Launch.Arguments) > 0 {
-				e.note("launch", "application_restart_unsupported")
+				e.note("launch", model.ReasonApplicationRestartUnsupported)
 			}
+		case model.RecoveryRestart, model.RecoveryResume:
 		}
 	}
 }
 
-func (e *Executor) note(domain, reason string) {
+func (e *Executor) note(domain string, reason model.Reason) {
 	entry := MissingRequirement{Domain: domain, Status: "partial", Reason: reason}
 	if slices.Contains(e.missing, entry) {
 		return
@@ -513,8 +487,8 @@ func (e *Executor) restoredSessionIDs(plan Plan) []string {
 
 	for _, sessionID := range plan.SourceGraph.Sessions {
 		for _, step := range plan.Steps {
-			if step.Kind == StepCreateSession && step.CreateSession != nil && step.CreateSession.SessionID == sessionID.ID {
-				if id := e.receipts[step.ID]; id != "" {
+			if create, ok := step.(*CreateSessionStep); ok && create.SessionID == sessionID.ID {
+				if id := e.receipts[step.ID()]; id != "" {
 					ids = append(ids, id)
 				}
 
@@ -526,73 +500,44 @@ func (e *Executor) restoredSessionIDs(plan Plan) []string {
 	return ids
 }
 
-func (e *Executor) restoredIDList(plan Plan, kind StepKind) []string {
-	ids := make([]string, 0, len(plan.Steps))
+func (e *Executor) restoredWindowAndPaneIDs(plan Plan) ([]string, []string) {
+	windows := make([]string, 0, len(plan.SourceGraph.Windows))
+	panes := make([]string, 0, len(plan.SourceGraph.Panes))
 
 	for _, step := range plan.Steps {
-		if step.Kind == kind {
-			if id := e.receipts[step.ID]; id != "" {
-				ids = append(ids, id)
-			}
+		id := e.receipts[step.ID()]
+		if id == "" {
+			continue
+		}
+
+		switch step.(type) {
+		case *CreateWindowStep:
+			windows = append(windows, id)
+		case *SplitPaneStep:
+			panes = append(panes, id)
+		case *CreateSessionStep, *PlaceInitialWindowStep, *LinkWindowStep,
+			*CloseBootstrapWindowStep, *ApplyLayoutStep, *SelectPaneStep,
+			*ApplyZoomStep, *SelectWindowStep, *SetPaneTitleStep:
 		}
 	}
 
-	return ids
+	return windows, panes
 }
 
-func (e *Executor) abort(ctx context.Context, plan Plan, report *ExecutionReport, err error) (ExecutionReport, error) {
-	entries, cleanupErr := e.compensate(ctx, plan)
-	report.Compensation = entries
+func (e *Executor) abort(_ context.Context, plan Plan, report *ExecutionReport, err error) (ExecutionReport, error) {
 	report.Receipts = e.cloneReceipts()
 	report.SessionsCreated = e.restoredSessionIDs(plan)
-	report.WindowsCreated = e.restoredIDList(plan, StepCreateWindow)
-	report.PanesCreated = e.restoredIDList(plan, StepSplitPane)
+	report.WindowsCreated, report.PanesCreated = e.restoredWindowAndPaneIDs(plan)
 	report.Missing = slices.Clone(e.missing)
 
-	return *report, errors.Join(err, cleanupErr)
-}
-
-func (e *Executor) compensate(ctx context.Context, plan Plan) ([]CompensationEntry, error) {
-	_ = ctx
-
-	entries := make([]CompensationEntry, 0, 1)
-	requested := false
-
-	for _, step := range plan.Steps {
-		if step.Kind != StepCreateSession || step.CreateSession == nil {
-			continue
-		}
-
-		runtimeID := e.receipts[step.ID]
-		if runtimeID == "" {
-			runtimeID = e.unconfirmed[step.ID]
-		}
-
-		if runtimeID == "" {
-			continue
-		}
-
-		entry := CompensationEntry{StepID: step.ID, RuntimeID: runtimeID, Status: CompensationNotAttempted}
-		if e.cfg.CompensateOnFailure {
-			entry.Status = CompensationRetained
-			requested = true
-		}
-
-		entries = append(entries, entry)
-	}
-
-	if requested {
-		return entries, ErrCompensationUnavailable
-	}
-
-	return entries, nil
+	return *report, err
 }
 
 func (e *Executor) dispatch(ctx context.Context, step Step, effect stepEffect, journal Journal) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", oops.In("snapshot.restore").
 			Code("operation_canceled").
-			With("operation", "dispatch_step", "step_id", step.ID).
+			With("operation", "dispatch_step", "step_id", step.ID()).
 			Wrap(err)
 	}
 
@@ -616,23 +561,14 @@ func (e *Executor) dispatch(ctx context.Context, step Step, effect stepEffect, j
 		return runtimeID, nil
 	}
 
-	return e.handleFailedEffect(ctx, step, effect, journal, runErr)
+	return e.handleFailedEffect(ctx, step, journal, runErr)
 }
 
-func (e *Executor) handleFailedEffect(ctx context.Context, step Step, effect stepEffect, journal Journal, runErr error) (string, error) {
+func (e *Executor) handleFailedEffect(ctx context.Context, step Step, journal Journal, runErr error) (string, error) {
 	outcome := classifyMutation(runErr)
 
 	switch outcome.Effect {
 	case tmux.Confirmed:
-		recovered := outcome.RuntimeID
-		if recovered == "" {
-			recovered = effect.knownRuntimeID
-		}
-
-		if recovered != "" {
-			e.unconfirmed[step.ID] = recovered
-		}
-
 		return "", e.uncertain(ctx, step, journal, runErr)
 	case tmux.NotSent:
 		recordCtx, cancel := detach(ctx)
@@ -642,12 +578,8 @@ func (e *Executor) handleFailedEffect(ctx context.Context, step Step, effect ste
 			return "", e.uncertain(ctx, step, journal, errors.Join(runErr, err))
 		}
 
-		return "", &mutationError{step: step.ID, err: runErr}
+		return "", &mutationError{step: step.ID(), err: runErr}
 	case tmux.Unknown:
-		if outcome.RuntimeID != "" {
-			e.unconfirmed[step.ID] = outcome.RuntimeID
-		}
-
 		return "", e.uncertain(ctx, step, journal, runErr)
 	}
 
@@ -659,8 +591,6 @@ func (e *Executor) confirm(ctx context.Context, journal Journal, step Step, runt
 	defer cancel()
 
 	if err := journal.Confirmed(recordCtx, step, runtimeID); err != nil {
-		e.unconfirmed[step.ID] = runtimeID
-
 		return e.uncertain(ctx, step, journal, err)
 	}
 
@@ -675,7 +605,7 @@ func (e *Executor) uncertain(ctx context.Context, step Step, journal Journal, ca
 		cause = errors.Join(cause, err)
 	}
 
-	return &uncertainError{step: step.ID, err: cause}
+	return &uncertainError{step: step.ID(), err: cause}
 }
 
 func (e *Executor) installStep(ctx context.Context, step Step, runtimeID string) error {
@@ -683,29 +613,29 @@ func (e *Executor) installStep(ctx context.Context, step Step, runtimeID string)
 		return oops.In("snapshot.restore").
 			Code("operation_uncertain").
 			With("operation", "install_step", "reason", "runtime_identity_missing").
-			Wrapf(errRuntimeHandleUnusable, "step %s", step.ID)
+			Wrapf(errRuntimeHandleUnusable, "step %s", step.ID())
 	}
 
-	e.receipts[step.ID] = runtimeID
+	e.receipts[step.ID()] = runtimeID
 
-	switch step.Kind {
-	case StepCreateSession:
-		return e.installSession(ctx, *step.CreateSession, runtimeID)
-	case StepPlaceInitialWindow:
-		return e.installInitialPlacement(ctx, *step.PlaceInitialWindow, runtimeID)
-	case StepCreateWindow:
-		return e.installWindow(ctx, *step.CreateWindow, runtimeID)
-	case StepSplitPane:
-		return e.installPane(ctx, *step.SplitPane, runtimeID)
-	case StepCloseBootstrapWindow:
-		delete(e.bootstraps, step.CloseBootstrapWindow.SessionID)
+	switch s := step.(type) {
+	case *CreateSessionStep:
+		return e.installSession(ctx, *s, runtimeID)
+	case *PlaceInitialWindowStep:
+		return e.installInitialPlacement(ctx, *s, runtimeID)
+	case *CreateWindowStep:
+		return e.installWindow(ctx, *s, runtimeID)
+	case *SplitPaneStep:
+		return e.installPane(ctx, *s, runtimeID)
+	case *CloseBootstrapWindowStep:
+		delete(e.bootstraps, s.SessionID)
 
 		return nil
-	case StepLinkWindow, StepApplyLayout, StepSelectPane, StepApplyZoom, StepSelectWindow, StepSetPaneTitle:
+	case *LinkWindowStep, *ApplyLayoutStep, *SelectPaneStep, *ApplyZoomStep, *SelectWindowStep, *SetPaneTitleStep:
 		return nil
 	}
 
-	return nil
+	return planFailure("execution", "unknown_step_kind", ErrInvalid)
 }
 
 func (e *Executor) installSession(ctx context.Context, step CreateSessionStep, runtimeID string) error {
@@ -767,8 +697,8 @@ func (e *Executor) sessionInitialLink(ctx context.Context, step CreateSessionSte
 			Wrapf(errInitialPlacementNotFound, "%s", step.SessionID)
 	}
 
-	if windowID := e.receipts[placement.ID]; windowID != "" {
-		link, err := e.linkAt(ctx, session, placement.PlaceInitialWindow.Index, tmux.WindowID(windowID))
+	if windowID := e.receipts[placement.ID()]; windowID != "" {
+		link, err := e.linkAt(ctx, session, placement.Index, tmux.WindowID(windowID))
 		if err != nil && step.InitialWindowID == "" && errors.Is(err, errRuntimeHandleUnusable) {
 			return tmux.WindowLink{}, false, nil
 		}
@@ -892,7 +822,7 @@ func (e *Executor) confirmedSplitPaneIDs(windowID string) map[tmux.PaneID]bool {
 	produced := map[tmux.PaneID]bool{}
 
 	for _, step := range e.index.splitStepsByWindow[windowID] {
-		if id := e.receipts[step.ID]; id != "" {
+		if id := e.receipts[step.ID()]; id != "" {
 			produced[tmux.PaneID(id)] = true
 		}
 	}
@@ -913,32 +843,32 @@ func (e *Executor) paneHandle(ctx context.Context, id tmux.PaneID) (tmux.Pane, e
 }
 
 func (e *Executor) prepareStep(step Step) (stepEffect, error) {
-	switch step.Kind {
-	case StepCreateSession:
-		return e.prepareCreateSession(*step.CreateSession)
-	case StepPlaceInitialWindow:
-		return e.preparePlaceInitialWindow(*step.PlaceInitialWindow)
-	case StepCreateWindow:
-		return e.prepareCreateWindow(*step.CreateWindow)
-	case StepSplitPane:
-		return e.prepareSplitPane(*step.SplitPane)
-	case StepLinkWindow:
-		return e.prepareLinkWindow(*step.LinkWindow)
-	case StepCloseBootstrapWindow:
-		return e.prepareCloseBootstrap(*step.CloseBootstrapWindow)
-	case StepApplyLayout:
-		return e.prepareApplyLayout(*step.ApplyLayout)
-	case StepSelectPane:
-		return e.prepareSelectPane(*step.SelectPane)
-	case StepApplyZoom:
-		return e.prepareApplyZoom(*step.ApplyZoom)
-	case StepSelectWindow:
-		return e.prepareSelectWindow(*step.SelectWindow)
-	case StepSetPaneTitle:
-		return e.prepareSetPaneTitle(*step.SetPaneTitle)
+	switch s := step.(type) {
+	case *CreateSessionStep:
+		return e.prepareCreateSession(*s)
+	case *PlaceInitialWindowStep:
+		return e.preparePlaceInitialWindow(*s)
+	case *CreateWindowStep:
+		return e.prepareCreateWindow(*s)
+	case *SplitPaneStep:
+		return e.prepareSplitPane(*s)
+	case *LinkWindowStep:
+		return e.prepareLinkWindow(*s)
+	case *CloseBootstrapWindowStep:
+		return e.prepareCloseBootstrap(*s)
+	case *ApplyLayoutStep:
+		return e.prepareApplyLayout(*s)
+	case *SelectPaneStep:
+		return e.prepareSelectPane(*s)
+	case *ApplyZoomStep:
+		return e.prepareApplyZoom(*s)
+	case *SelectWindowStep:
+		return e.prepareSelectWindow(*s)
+	case *SetPaneTitleStep:
+		return e.prepareSetPaneTitle(*s)
 	}
 
-	return stepEffect{knownRuntimeID: "", run: func(context.Context) (string, error) { return "", nil }}, nil
+	return stepEffect{}, planFailure("execution", "unknown_step_kind", ErrInvalid)
 }
 
 func (e *Executor) prepareCreateSession(step CreateSessionStep) (stepEffect, error) {
@@ -971,7 +901,6 @@ func (e *Executor) prepareFollowerSession(step CreateSessionStep) (stepEffect, e
 	}
 
 	return stepEffect{
-		knownRuntimeID: "",
 		run: func(ctx context.Context) (string, error) {
 			session, err := e.server.NewSession(ctx, options)
 			if err != nil {
@@ -993,7 +922,6 @@ func (e *Executor) prepareStandaloneSession(step CreateSessionStep) (stepEffect,
 	windowName := string(step.InitialWindowName)
 
 	return stepEffect{
-		knownRuntimeID: "",
 		run: func(ctx context.Context) (string, error) {
 			session, err := e.server.NewSession(ctx, options)
 			if err != nil {
@@ -1109,7 +1037,6 @@ func (e *Executor) preparePlaceInitialWindow(step PlaceInitialWindowStep) (stepE
 	}
 
 	return stepEffect{
-		knownRuntimeID: string(bootLink.Window().ID()),
 		run: func(ctx context.Context) (string, error) {
 			info, err := bootLink.Info(ctx)
 			if err != nil {
@@ -1153,7 +1080,6 @@ func (e *Executor) prepareCreateWindow(step CreateWindowStep) (stepEffect, error
 	windowName := string(step.Name)
 
 	return stepEffect{
-		knownRuntimeID: "",
 		run: func(ctx context.Context) (string, error) {
 			return e.createWindow(ctx, session, step, options, size, windowName, launch)
 		},
@@ -1312,7 +1238,6 @@ func (e *Executor) prepareSplitPane(step SplitPaneStep) (stepEffect, error) {
 	title := string(step.Title)
 
 	return stepEffect{
-		knownRuntimeID: "",
 		run: func(ctx context.Context) (string, error) {
 			newPane, err := targetPane.Split(ctx, options)
 			if err != nil {
@@ -1348,7 +1273,6 @@ func (e *Executor) prepareSetPaneTitle(step SetPaneTitleStep) (stepEffect, error
 	title := string(step.Title)
 
 	return stepEffect{
-		knownRuntimeID: string(pane.ID()),
 		run: func(ctx context.Context) (string, error) {
 			if err := pane.SetTitle(ctx, title); err != nil {
 				return "", fmt.Errorf("set title for pane %s: %w", step.PaneID, err)
@@ -1369,7 +1293,6 @@ func (e *Executor) prepareCloseBootstrap(step CloseBootstrapWindowStep) (stepEff
 	}
 
 	return stepEffect{
-		knownRuntimeID: string(bootLink.Window().ID()),
 		run: func(ctx context.Context) (string, error) {
 			if err := bootLink.UnlinkWith(ctx, tmux.UnlinkOptions{Force: true}); err != nil {
 				return "", fmt.Errorf("close bootstrap window for %s: %w", step.SessionID, err)
@@ -1400,7 +1323,6 @@ func (e *Executor) prepareLinkWindow(step LinkWindowStep) (stepEffect, error) {
 	idx := step.Index
 
 	return stepEffect{
-		knownRuntimeID: string(window.ID()),
 		run: func(ctx context.Context) (string, error) {
 			if _, err := window.Link(ctx, session, tmux.LinkOptions{
 				Index:   &idx,
@@ -1438,7 +1360,6 @@ func (e *Executor) prepareApplyLayout(step ApplyLayoutStep) (stepEffect, error) 
 	}
 
 	return stepEffect{
-		knownRuntimeID: string(window.ID()),
 		run: func(ctx context.Context) (string, error) {
 			if err := window.SelectLayout(ctx, encoded); err != nil {
 				return "", fmt.Errorf("select layout for window %s: %w", step.WindowID, err)
@@ -1459,7 +1380,6 @@ func (e *Executor) prepareSelectPane(step SelectPaneStep) (stepEffect, error) {
 	}
 
 	return stepEffect{
-		knownRuntimeID: string(pane.ID()),
 		run: func(ctx context.Context) (string, error) {
 			if err := pane.Select(ctx); err != nil {
 				return "", fmt.Errorf("select pane %s: %w", step.PaneID, err)
@@ -1480,7 +1400,6 @@ func (e *Executor) prepareApplyZoom(step ApplyZoomStep) (stepEffect, error) {
 	}
 
 	return stepEffect{
-		knownRuntimeID: string(pane.ID()),
 		run: func(ctx context.Context) (string, error) {
 			if err := pane.ToggleZoom(ctx); err != nil {
 				return "", fmt.Errorf("toggle zoom for pane %s: %w", step.PaneID, err)
@@ -1501,7 +1420,6 @@ func (e *Executor) prepareSelectWindow(step SelectWindowStep) (stepEffect, error
 	}
 
 	return stepEffect{
-		knownRuntimeID: string(session.ID()),
 		run: func(ctx context.Context) (string, error) {
 			if err := e.selectWindows(ctx, session, step); err != nil {
 				return "", err
@@ -1555,14 +1473,14 @@ func (e *Executor) resolveNonrestartableWorkingDir(pane model.Pane) string {
 
 	if statErr := statSavedWorkingDirectory(dir); statErr != nil {
 		switch pane.Launch.Reason {
-		case model.ReasonWorkingDirectoryDeleted:
-			e.note("launch", "working_directory_deleted")
-		case model.ReasonPaneDead:
-			e.note("launch", "pane_dead")
-		case model.ReasonExecutableDeleted:
-			e.note("launch", "executable_deleted")
+		case string(model.ReasonWorkingDirectoryDeleted):
+			e.note("launch", model.ReasonWorkingDirectoryDeleted)
+		case string(model.ReasonPaneDead):
+			e.note("launch", model.ReasonPaneDead)
+		case string(model.ReasonExecutableDeleted):
+			e.note("launch", model.ReasonExecutableDeleted)
 		default:
-			e.note("directory", "saved_working_directory_missing")
+			e.note("directory", model.ReasonSavedWorkingDirectoryMissing)
 		}
 
 		return ""
@@ -1591,7 +1509,7 @@ func (e *Executor) resolveWorkingDir(pane model.Pane) (string, bool, error) {
 				Wrap(ErrWorkingDirNotFound)
 		}
 
-		e.note("directory", "saved_working_directory_missing")
+		e.note("directory", model.ReasonSavedWorkingDirectoryMissing)
 
 		return "", true, nil
 	}
@@ -1622,7 +1540,7 @@ func savedWorkingDir(pane model.Pane) string {
 
 func (e *Executor) preparePaneLaunch(pane model.Pane, ownerSessionID string) (paneLaunch, error) {
 	launch := pane.Launch
-	if !e.cfg.LaunchProcesses || (launch.Recovery != "restart" && launch.Recovery != "resume") {
+	if !e.cfg.LaunchProcesses || (launch.Recovery != model.RecoveryRestart && launch.Recovery != model.RecoveryResume) {
 		result := disabledPaneLaunch()
 
 		_, cwdFallback, err := e.resolveWorkingDir(pane)
@@ -1641,7 +1559,7 @@ func (e *Executor) preparePaneLaunch(pane model.Pane, ownerSessionID string) (pa
 	executable := string(launch.Executable)
 
 	if !executableAvailable(executable) {
-		e.note("launch", "approved_launch_unavailable")
+		e.note("launch", model.ReasonApprovedLaunchUnavailable)
 
 		result := disabledPaneLaunch()
 		result.reason = PaneReasonExecutableUnavailable
@@ -1663,7 +1581,7 @@ func (e *Executor) preparePaneLaunch(pane model.Pane, ownerSessionID string) (pa
 
 	program, ok := literalLaunchProgram(executable, arguments, removed)
 	if !ok {
-		e.note("launch", "approved_launch_unavailable")
+		e.note("launch", model.ReasonApprovedLaunchUnavailable)
 
 		result := disabledPaneLaunch()
 		result.reason = PaneReasonExecutableUnavailable
@@ -1801,7 +1719,7 @@ func respawnPane(ctx context.Context, pane tmux.Pane, launch paneLaunch) error {
 	return nil
 }
 
-func (e *Executor) runnableLaunchOutcome(recovery string, enabled bool) string {
+func (e *Executor) runnableLaunchOutcome(recovery model.Recovery, enabled bool) string {
 	if !enabled {
 		return PaneOutcomeMissingExecutable
 	}
@@ -1889,18 +1807,19 @@ func (e *Executor) ensureAllPaneResults(plan Plan) {
 			runtimeID = string(handle.ID())
 		} else {
 			for _, step := range plan.Steps {
-				if step.Kind == StepSplitPane && step.SplitPane.PaneID == pane.ID {
-					runtimeID = e.receipts[step.ID]
+				if split, ok := step.(*SplitPaneStep); ok && split.PaneID == pane.ID {
+					runtimeID = e.receipts[step.ID()]
 					break
 				}
 			}
 		}
 
+		outcome, reason := paneOutcome(pane.Launch, e.cfg.LaunchProcesses)
 		e.paneResults[pane.ID] = PaneResult{
 			PaneID:             pane.ID,
 			RuntimeID:          runtimeID,
-			Outcome:            verifiedPaneOutcome(pane.Launch, e.cfg.LaunchProcesses),
-			Reason:             verifiedPaneReason(pane.Launch, e.cfg.LaunchProcesses),
+			Outcome:            outcome,
+			Reason:             reason,
 			AppVerified:        false,
 			CWDFallback:        false,
 			VerificationReason: "",

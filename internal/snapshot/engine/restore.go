@@ -79,8 +79,6 @@ type RestoreConfig struct {
 
 	AllowMissingWorkingDir bool
 
-	CompensateOnFailure bool
-
 	Profile RecoveryProfile
 }
 
@@ -93,7 +91,6 @@ type RestoreResult struct {
 	Verified            bool                         `json:"verified"`
 	Uncertain           bool                         `json:"uncertain"`
 	MissingRequirements []restore.MissingRequirement `json:"missingRequirements"`
-	Compensation        []restore.CompensationEntry  `json:"compensation"`
 	Panes               []restore.PaneResult         `json:"panes,omitempty"`
 }
 
@@ -137,7 +134,6 @@ func Restore(ctx context.Context, repository *store.Repository, server *gotmux.S
 		Verified:            false,
 		Uncertain:           false,
 		MissingRequirements: nil,
-		Compensation:        nil,
 		Panes:               nil,
 	}
 
@@ -303,7 +299,6 @@ func executeRestore(
 		Verified:            false,
 		Uncertain:           false,
 		MissingRequirements: nil,
-		Compensation:        nil,
 		Panes:               nil,
 	}
 
@@ -328,16 +323,11 @@ func executeRestore(
 	}
 
 	report, err := executeRestorePlan(ctx, server, daemon, cfg, plan, ledger)
-	result.Compensation = report.Compensation
 	result.SessionsRestored = report.SessionsCreated
 	result.Panes = slices.Clone(report.Panes)
 
 	if err != nil {
-		hasUncertainCleanup := slices.ContainsFunc(report.Compensation, func(c restore.CompensationEntry) bool {
-			return c.Status == restore.CompensationUncertain
-		})
-
-		result.Uncertain = isUncertain(err) || hasUncertainCleanup
+		result.Uncertain = isUncertain(err)
 		if result.Uncertain {
 			result.Status = "uncertain"
 			result.Reason = "effect_outcome_uncertain"
@@ -345,9 +335,7 @@ func executeRestore(
 
 		result.MissingRequirements = mergeRequirements(plan.MissingRequirements, report.Missing)
 
-		tombstoneErr := tombstoneCompensated(ctx, ledger, report.Compensation)
-
-		return result, closeWith(ctx, lease, "execute", errors.Join(err, tombstoneErr))
+		return result, closeWith(ctx, lease, "execute", err)
 	}
 
 	result.MissingRequirements = mergeRequirements(plan.MissingRequirements, report.Missing)
@@ -419,7 +407,6 @@ func executeRestorePlan(
 
 	executor := restore.NewExecutor(server, readManifest(plan), restore.ExecuteConfig{
 		LaunchProcesses:        cfg.LaunchProcesses,
-		CompensateOnFailure:    cfg.CompensateOnFailure,
 		AllowMissingWorkingDir: cfg.AllowMissingWorkingDir,
 	})
 
@@ -442,9 +429,9 @@ func restoreDispatchCandidates(plan restore.Plan, ledger *actionLedger) map[stri
 	candidates := make(map[string]bool)
 
 	for _, step := range plan.Steps {
-		action, ok := ledger.states[restore.ActionID(step.ID)]
+		action, ok := ledger.states[restore.ActionID(step.ID())]
 		if ok && (action.State == "planned" || action.State == "not-sent") {
-			candidates[step.ID] = true
+			candidates[step.ID()] = true
 		}
 	}
 
@@ -517,7 +504,7 @@ func verifiedOperationReceipts(plan restore.Plan, ledger *actionLedger) (map[str
 	receipts := make(map[string]string, len(plan.Steps))
 
 	for _, step := range plan.Steps {
-		action, err := ledger.state(restore.ActionID(step.ID))
+		action, err := ledger.state(restore.ActionID(step.ID()))
 		if err != nil {
 			return nil, false, err
 		}
@@ -527,7 +514,7 @@ func verifiedOperationReceipts(plan restore.Plan, ledger *actionLedger) (map[str
 		}
 
 		if len(action.RuntimeID) > 0 {
-			receipts[step.ID] = string(action.RuntimeID)
+			receipts[step.ID()] = string(action.RuntimeID)
 		}
 	}
 
@@ -548,11 +535,11 @@ func verifiedOperationReceipts(plan restore.Plan, ledger *actionLedger) (map[str
 func restoredSessionReceipts(plan restore.Plan, receipts map[string]string) []string {
 	ids := make([]string, 0, len(plan.ClosureSessions))
 	for _, step := range plan.Steps {
-		if step.Kind != restore.StepCreateSession {
+		if _, ok := step.(*restore.CreateSessionStep); !ok {
 			continue
 		}
 
-		if id := receipts[step.ID]; id != "" {
+		if id := receipts[step.ID()]; id != "" {
 			ids = append(ids, id)
 		}
 	}
@@ -685,8 +672,7 @@ func finishRestore(
 	result.Verified = true
 
 	if len(result.MissingRequirements) > 0 {
-		classification := restore.ClassifyPracticalRequirements(result.MissingRequirements)
-		if profile == RecoveryPractical && len(classification.Blockers) == 0 {
+		if profile == RecoveryPractical {
 			finishErr := repository.Finish(ctx, operation, false)
 			if err := errors.Join(finishErr, lease.Close()); err != nil {
 				result.Reason = "finalize_failed"
@@ -742,10 +728,10 @@ func restoreTarget(endpoint string, daemon restoreDaemonIdentity, cfg RestoreCon
 		}
 	}
 
-	target := fmt.Sprintf("%s%s\n%d\n%d\nlaunch=%t\nallow_missing_dir=%t\ncompensate=%t\nprofile=%s",
+	target := fmt.Sprintf("%s%s\n%d\n%d\nlaunch=%t\nallow_missing_dir=%t\ncompensate=false\nprofile=%s",
 		restoreTargetPrefix,
 		endpoint, identity.PID, identity.Started.UnixNano(),
-		cfg.LaunchProcesses, cfg.AllowMissingWorkingDir, cfg.CompensateOnFailure, cfg.Profile)
+		cfg.LaunchProcesses, cfg.AllowMissingWorkingDir, cfg.Profile)
 	target += restoreDaemonTargetAppendix(daemon)
 
 	if len(target) > maxRestoreTargetBytes {
@@ -831,7 +817,7 @@ func (l *actionLedger) state(id string) (store.Action, error) {
 	return action, nil
 }
 
-func (l *actionLedger) transition(ctx context.Context, id, expected, next string, runtimeID model.Bytes) error {
+func (l *actionLedger) transition(ctx context.Context, id string, expected, next model.ActionState, runtimeID model.Bytes) error {
 	if err := l.repository.Transition(ctx, l.operation, id, expected, next, runtimeID); err != nil {
 		return fmt.Errorf("record action transition: %w", err)
 	}
@@ -851,22 +837,23 @@ func (l *actionLedger) advance(ctx context.Context, id string) error {
 	}
 
 	switch action.State {
-	case "issued":
+	case model.ActionStateIssued:
 		return nil
-	case "planned":
+	case model.ActionStatePlanned:
 		return l.transition(ctx, id, "planned", "issued", nil)
-	case "not-sent":
+	case model.ActionStateNotSent:
 		if err := l.transition(ctx, id, "not-sent", "planned", nil); err != nil {
 			return err
 		}
 
 		return l.transition(ctx, id, "planned", "issued", nil)
-	default:
-		return oops.In("snapshot.store").
-			Code("operation_uncertain").
-			With("operation", "advance_action", "reason", "effect_outcome_uncertain").
-			Wrapf(restore.ErrPriorUncertainty, "%s", id)
+	case model.ActionStateUnknown, model.ActionStateConfirmed, model.ActionStateVerified:
 	}
+
+	return oops.In("snapshot.store").
+		Code("operation_uncertain").
+		With("operation", "advance_action", "reason", "effect_outcome_uncertain").
+		Wrapf(restore.ErrPriorUncertainty, "%s", id)
 }
 
 func (j *stepJournal) Steps(ctx context.Context, steps []restore.Step) (map[string]restore.StepState, error) {
@@ -885,7 +872,7 @@ func (j *stepJournal) Steps(ctx context.Context, steps []restore.Step) (map[stri
 				Wrapf(store.ErrConflict, "%s", action.ID)
 		}
 
-		states[step.ID] = restore.StepState{State: action.State, RuntimeID: string(action.RuntimeID)}
+		states[step.ID()] = restore.StepState{State: action.State, RuntimeID: string(action.RuntimeID)}
 	}
 
 	return states, nil
@@ -917,7 +904,7 @@ func (j *stepJournal) Unknown(ctx context.Context, step restore.Step) error {
 }
 
 func (j *stepJournal) actionID(step restore.Step) string {
-	return restore.ActionID(step.ID)
+	return restore.ActionID(step.ID())
 }
 
 func runScopedImport(
@@ -935,7 +922,7 @@ func runScopedImport(
 	}
 
 	switch action.State {
-	case "confirmed", "verified":
+	case model.ActionStateConfirmed, model.ActionStateVerified:
 		mismatches, observeErr := restore.ObserveScopedStateConflicts(ctx, server, plan, receipts)
 		if observeErr != nil {
 			return staticMissing, false, fmt.Errorf("observe scoped state conflicts: %w", observeErr)
@@ -949,11 +936,12 @@ func runScopedImport(
 		}
 
 		return staticMissing, false, nil
-	case "issued", "unknown", "conflict":
+	case model.ActionStateIssued, model.ActionStateUnknown:
 		return staticMissing, false, oops.In("snapshot.restore").
 			Code("operation_uncertain").
 			With("operation", "import_scoped_state", "reason", "prior_effect_uncertain").
 			Wrap(restore.ErrPriorUncertainty)
+	case model.ActionStatePlanned, model.ActionStateNotSent:
 	}
 
 	if err := ledger.advance(ctx, restore.ImportStateActionID); err != nil {
@@ -989,7 +977,7 @@ func markVerified(ctx context.Context, ledger *actionLedger, plan restore.Plan, 
 	}
 
 	for _, step := range plan.Steps {
-		id := restore.ActionID(step.ID)
+		id := restore.ActionID(step.ID())
 
 		action, err := ledger.state(id)
 		if err != nil {
@@ -1033,16 +1021,16 @@ func verifyAction(ctx context.Context, ledger *actionLedger, id string) error {
 	}
 
 	switch action.State {
-	case "verified":
+	case model.ActionStateVerified:
 		return nil
-	case "planned", "not-sent":
+	case model.ActionStatePlanned, model.ActionStateNotSent:
 		if err := ledger.advance(ctx, id); err != nil {
 			return err
 		}
-	case "issued":
-	case "confirmed":
+	case model.ActionStateIssued:
+	case model.ActionStateConfirmed:
 		return ledger.transition(ctx, id, "confirmed", "verified", action.RuntimeID)
-	default:
+	case model.ActionStateUnknown:
 		return oops.In("snapshot.restore").
 			Code("operation_uncertain").
 			With("operation", "verify_action", "reason", "effect_outcome_uncertain").
@@ -1054,33 +1042,6 @@ func verifyAction(ctx context.Context, ledger *actionLedger, id string) error {
 	}
 
 	return ledger.transition(ctx, id, "confirmed", "verified", nil)
-}
-
-func tombstoneCompensated(ctx context.Context, ledger *actionLedger, compensation []restore.CompensationEntry) error {
-	var err error
-
-	for _, entry := range compensation {
-		if entry.Status != restore.CompensationRemoved {
-			continue
-		}
-
-		id := restore.ActionID(entry.StepID)
-
-		action, stateErr := ledger.state(id)
-		if stateErr != nil {
-			err = errors.Join(err, stateErr)
-
-			continue
-		}
-
-		if action.State != "confirmed" {
-			continue
-		}
-
-		err = errors.Join(err, ledger.transition(ctx, id, "confirmed", "conflict", action.RuntimeID))
-	}
-
-	return err
 }
 
 func mergeRequirements(planned, runtime []restore.MissingRequirement) []restore.MissingRequirement {
@@ -1121,17 +1082,18 @@ func operationStatus(op store.Operation) OperationStatus {
 	for _, action := range op.Actions {
 		status.Actions = append(status.Actions, ActionStatus{
 			ID:        action.ID,
-			Kind:      action.Kind,
-			State:     action.State,
+			Kind:      string(action.Kind),
+			State:     string(action.State),
 			RuntimeID: string(action.RuntimeID),
 		})
 
 		switch action.State {
-		case "issued", "unknown", "conflict":
+		case model.ActionStateIssued, model.ActionStateUnknown:
 			status.Uncertain = append(status.Uncertain, action.ID)
 			status.Settled = false
-		case "planned", "not-sent":
+		case model.ActionStatePlanned, model.ActionStateNotSent:
 			status.Settled = false
+		case model.ActionStateConfirmed, model.ActionStateVerified:
 		}
 	}
 

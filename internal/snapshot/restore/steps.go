@@ -7,40 +7,20 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/model"
 )
 
-const (
-	StepCreateSession        StepKind = "create_session"
-	StepPlaceInitialWindow   StepKind = "place_initial_window"
-	StepCreateWindow         StepKind = "create_window"
-	StepSplitPane            StepKind = "split_pane"
-	StepLinkWindow           StepKind = "link_window"
-	StepCloseBootstrapWindow StepKind = "close_bootstrap_window"
-	StepApplyLayout          StepKind = "apply_layout"
-	StepSelectPane           StepKind = "select_pane"
-	StepApplyZoom            StepKind = "apply_zoom"
-	StepSelectWindow         StepKind = "select_window"
-	StepSetPaneTitle         StepKind = "set_pane_title"
-)
+type Step interface {
+	ID() string
+	DependsOn() []string
+	step()
+}
 
-type StepKind string
-
-type Step struct {
-	ID                   string                    `json:"id"`
-	Kind                 StepKind                  `json:"kind"`
-	DependsOn            []string                  `json:"dependsOn,omitempty"`
-	CreateSession        *CreateSessionStep        `json:"createSession,omitempty"`
-	PlaceInitialWindow   *PlaceInitialWindowStep   `json:"placeInitialWindow,omitempty"`
-	CreateWindow         *CreateWindowStep         `json:"createWindow,omitempty"`
-	SplitPane            *SplitPaneStep            `json:"splitPane,omitempty"`
-	LinkWindow           *LinkWindowStep           `json:"linkWindow,omitempty"`
-	CloseBootstrapWindow *CloseBootstrapWindowStep `json:"closeBootstrapWindow,omitempty"`
-	ApplyLayout          *ApplyLayoutStep          `json:"applyLayout,omitempty"`
-	SelectPane           *SelectPaneStep           `json:"selectPane,omitempty"`
-	ApplyZoom            *ApplyZoomStep            `json:"applyZoom,omitempty"`
-	SelectWindow         *SelectWindowStep         `json:"selectWindow,omitempty"`
-	SetPaneTitle         *SetPaneTitleStep         `json:"setPaneTitle,omitempty"`
+type stepBase struct {
+	id        string
+	dependsOn []string
 }
 
 type CreateSessionStep struct {
+	stepBase
+
 	SessionID            string           `json:"sessionId"`
 	Name                 model.Bytes      `json:"name"`
 	Directory            model.Bytes      `json:"directory"`
@@ -59,12 +39,16 @@ type CreateSessionStep struct {
 }
 
 type PlaceInitialWindowStep struct {
+	stepBase
+
 	SessionID string `json:"sessionId"`
 	WindowID  string `json:"windowId,omitempty"`
 	Index     int    `json:"index"`
 }
 
 type CreateWindowStep struct {
+	stepBase
+
 	WindowID       string         `json:"windowId"`
 	OwnerSessionID string         `json:"ownerSessionId"`
 	OwnerGroupID   string         `json:"ownerGroupId,omitempty"`
@@ -77,6 +61,8 @@ type CreateWindowStep struct {
 }
 
 type SplitPaneStep struct {
+	stepBase
+
 	PaneID        string         `json:"paneId"`
 	WindowID      string         `json:"windowId"`
 	TargetPaneID  string         `json:"targetPaneId"`
@@ -93,6 +79,8 @@ type SplitPaneStep struct {
 }
 
 type LinkWindowStep struct {
+	stepBase
+
 	SessionID string      `json:"sessionId"`
 	WindowID  string      `json:"windowId"`
 	Index     int         `json:"index"`
@@ -102,10 +90,14 @@ type LinkWindowStep struct {
 }
 
 type CloseBootstrapWindowStep struct {
+	stepBase
+
 	SessionID string `json:"sessionId"`
 }
 
 type ApplyLayoutStep struct {
+	stepBase
+
 	WindowID string       `json:"windowId"`
 	Layout   model.Layout `json:"layout"`
 	Width    int          `json:"width"`
@@ -113,16 +105,22 @@ type ApplyLayoutStep struct {
 }
 
 type SelectPaneStep struct {
+	stepBase
+
 	WindowID string `json:"windowId"`
 	PaneID   string `json:"paneId"`
 }
 
 type ApplyZoomStep struct {
+	stepBase
+
 	WindowID string `json:"windowId"`
 	PaneID   string `json:"paneId"`
 }
 
 type SelectWindowStep struct {
+	stepBase
+
 	SessionID      string `json:"sessionId"`
 	ActiveWindowID string `json:"activeWindowId"`
 	ActiveIndex    int    `json:"activeIndex"`
@@ -131,6 +129,8 @@ type SelectWindowStep struct {
 }
 
 type SetPaneTitleStep struct {
+	stepBase
+
 	WindowID string      `json:"windowId"`
 	PaneID   string      `json:"paneId"`
 	Title    model.Bytes `json:"title"`
@@ -183,6 +183,36 @@ type linkSlotKey struct {
 	window  string
 	index   int
 }
+
+func (s *stepBase) ID() string {
+	return s.id
+}
+
+func (s *stepBase) DependsOn() []string {
+	return s.dependsOn
+}
+
+func (*CreateSessionStep) step() {}
+
+func (*PlaceInitialWindowStep) step() {}
+
+func (*CreateWindowStep) step() {}
+
+func (*SplitPaneStep) step() {}
+
+func (*LinkWindowStep) step() {}
+
+func (*CloseBootstrapWindowStep) step() {}
+
+func (*ApplyLayoutStep) step() {}
+
+func (*SelectPaneStep) step() {}
+
+func (*ApplyZoomStep) step() {}
+
+func (*SelectWindowStep) step() {}
+
+func (*SetPaneTitleStep) step() {}
 
 func cloneBytes(b model.Bytes) model.Bytes {
 	if b == nil {
@@ -281,27 +311,12 @@ func cloneTerminal(t model.Terminal) model.Terminal {
 	}
 }
 
-func newStep(id string, kind StepKind, deps []string) Step {
+func newStep(id string, deps []string) stepBase {
 	deps = slices.Clone(deps)
 	slices.Sort(deps)
 	deps = slices.Compact(deps)
 
-	return Step{
-		ID:                   id,
-		Kind:                 kind,
-		DependsOn:            deps,
-		CreateSession:        nil,
-		PlaceInitialWindow:   nil,
-		CreateWindow:         nil,
-		SplitPane:            nil,
-		LinkWindow:           nil,
-		CloseBootstrapWindow: nil,
-		ApplyLayout:          nil,
-		SelectPane:           nil,
-		ApplyZoom:            nil,
-		SelectWindow:         nil,
-		SetPaneTitle:         nil,
-	}
+	return stepBase{id: id, dependsOn: deps}
 }
 
 func firstLeaf(node model.Layout) string {
@@ -517,8 +532,12 @@ func newStepRegistry(sessionCount, windowCount, paneCount, linkCount int) *stepR
 
 func placeInitialWindow(session, window string, index int, reg *stepRegistry) Step {
 	id := "place-initial-window:" + session
-	step := newStep(id, StepPlaceInitialWindow, []string{reg.sessionStepID[session]})
-	step.PlaceInitialWindow = &PlaceInitialWindowStep{SessionID: session, WindowID: window, Index: index}
+	step := &PlaceInitialWindowStep{
+		stepBase:  newStep(id, []string{reg.sessionStepID[session]}),
+		SessionID: session,
+		WindowID:  window,
+		Index:     index,
+	}
 	reg.sessionReadyStepID[session] = id
 
 	return step
@@ -550,8 +569,8 @@ func planNonFollowerInitialWindow(
 	stepID := "create-session:" + s.ID
 	steps := make([]Step, 0, 1+len(splits))
 
-	step := newStep(stepID, StepCreateSession, nil)
-	step.CreateSession = &CreateSessionStep{
+	step := &CreateSessionStep{
+		stepBase:             newStep(stepID, nil),
 		SessionID:            s.ID,
 		Name:                 cloneBytes(s.Name),
 		Directory:            cloneBytes(s.Directory),
@@ -576,15 +595,15 @@ func planNonFollowerInitialWindow(
 	reg.paneStepID[pInitID] = stepID
 	reg.handledLinks[linkSlotKey{session: s.ID, window: wInit.ID, index: wIdx}] = true
 
-	previousSplit := placement.ID
+	previousSplit := placement.ID()
 
 	for _, split := range splits {
 		pane := idx.panesByID[split.newPaneID]
 		splitID := "split-pane:" + split.newPaneID
 		targetStep := reg.paneStepID[split.targetPaneID]
 
-		spStep := newStep(splitID, StepSplitPane, []string{targetStep, previousSplit})
-		spStep.SplitPane = &SplitPaneStep{
+		spStep := &SplitPaneStep{
+			stepBase:      newStep(splitID, []string{targetStep, previousSplit}),
 			PaneID:        split.newPaneID,
 			WindowID:      wInit.ID,
 			TargetPaneID:  split.targetPaneID,
@@ -633,8 +652,8 @@ func planWindowCreation(
 	winStepID := "create-window:" + w.ID
 	steps := make([]Step, 0, 1+len(splits))
 
-	cwStep := newStep(winStepID, StepCreateWindow, []string{reg.sessionStepID[s.ID], reg.sessionReadyStepID[s.ID]})
-	cwStep.CreateWindow = &CreateWindowStep{
+	cwStep := &CreateWindowStep{
+		stepBase:       newStep(winStepID, []string{reg.sessionStepID[s.ID], reg.sessionReadyStepID[s.ID]}),
 		WindowID:       w.ID,
 		OwnerSessionID: s.ID,
 		OwnerGroupID:   own.ownerGroup[w.ID],
@@ -658,8 +677,8 @@ func planWindowCreation(
 		splitID := "split-pane:" + split.newPaneID
 		targetStep := reg.paneStepID[split.targetPaneID]
 
-		spStep := newStep(splitID, StepSplitPane, []string{targetStep, previousSplit})
-		spStep.SplitPane = &SplitPaneStep{
+		spStep := &SplitPaneStep{
+			stepBase:      newStep(splitID, []string{targetStep, previousSplit}),
 			PaneID:        split.newPaneID,
 			WindowID:      w.ID,
 			TargetPaneID:  split.targetPaneID,
@@ -716,8 +735,8 @@ func planNonFollowerSessions(
 			)...)
 		} else {
 			stepID := "create-session:" + s.ID
-			csStep := newStep(stepID, StepCreateSession, nil)
-			csStep.CreateSession = &CreateSessionStep{
+			csStep := &CreateSessionStep{
+				stepBase:             newStep(stepID, nil),
 				SessionID:            s.ID,
 				Name:                 cloneBytes(s.Name),
 				Directory:            cloneBytes(s.Directory),
@@ -750,7 +769,7 @@ func planNonFollowerSessions(
 
 			steps = append(steps, wSteps...)
 			for _, st := range wSteps {
-				createdStepIDs = append(createdStepIDs, st.ID)
+				createdStepIDs = append(createdStepIDs, st.ID())
 			}
 		}
 
@@ -760,8 +779,8 @@ func planNonFollowerSessions(
 			slices.Sort(createdStepIDs)
 			createdStepIDs = slices.Compact(createdStepIDs)
 
-			cbStep := newStep(closeStepID, StepCloseBootstrapWindow, createdStepIDs)
-			cbStep.CloseBootstrapWindow = &CloseBootstrapWindowStep{
+			cbStep := &CloseBootstrapWindowStep{
+				stepBase:  newStep(closeStepID, createdStepIDs),
 				SessionID: s.ID,
 			}
 			steps = append(steps, cbStep)
@@ -806,8 +825,8 @@ func planGroupFollowers(
 
 		for _, follower := range grp.Members[1:] {
 			stepID := "create-session:" + follower
-			folStep := newStep(stepID, StepCreateSession, deps)
-			folStep.CreateSession = &CreateSessionStep{
+			folStep := &CreateSessionStep{
+				stepBase:             newStep(stepID, deps),
 				SessionID:            follower,
 				Name:                 cloneBytes(idx.sessionsByID[follower].Name),
 				Directory:            cloneBytes(idx.sessionsByID[follower].Directory),
@@ -866,8 +885,8 @@ func planSharedLinks(
 			slices.Sort(deps)
 			deps = slices.Compact(deps)
 
-			lwStep := newStep(linkStepID, StepLinkWindow, deps)
-			lwStep.LinkWindow = &LinkWindowStep{
+			lwStep := &LinkWindowStep{
+				stepBase:  newStep(linkStepID, deps),
 				SessionID: s.ID,
 				WindowID:  l.Window,
 				Index:     l.Index,
@@ -889,8 +908,8 @@ func planSharedLinks(
 			slices.Sort(deps)
 			deps = slices.Compact(deps)
 
-			cbStep := newStep(stepID, StepCloseBootstrapWindow, deps)
-			cbStep.CloseBootstrapWindow = &CloseBootstrapWindowStep{
+			cbStep := &CloseBootstrapWindowStep{
+				stepBase:  newStep(stepID, deps),
 				SessionID: s.ID,
 			}
 			steps = append(steps, cbStep)
@@ -921,8 +940,8 @@ func planWindowFinalization(
 		slices.Sort(deps)
 		deps = slices.Compact(deps)
 
-		alStep := newStep(layoutStepID, StepApplyLayout, deps)
-		alStep.ApplyLayout = &ApplyLayoutStep{
+		alStep := &ApplyLayoutStep{
+			stepBase: newStep(layoutStepID, deps),
 			WindowID: w.ID,
 			Layout:   cloneLayout(w.Layout),
 			Width:    w.Width,
@@ -938,8 +957,8 @@ func planWindowFinalization(
 			slices.Sort(titleDeps)
 			titleDeps = slices.Compact(titleDeps)
 
-			sptStep := newStep(titleStepID, StepSetPaneTitle, titleDeps)
-			sptStep.SetPaneTitle = &SetPaneTitleStep{
+			sptStep := &SetPaneTitleStep{
+				stepBase: newStep(titleStepID, titleDeps),
 				WindowID: w.ID,
 				PaneID:   pInitID,
 				Title:    cloneBytes(idx.panesByID[pInitID].Title),
@@ -959,8 +978,8 @@ func planWindowFinalization(
 
 		if activePaneID != "" {
 			paneStepID := fmt.Sprintf("select-pane:%s:%s", w.ID, activePaneID)
-			spStep := newStep(paneStepID, StepSelectPane, []string{currentWinStep})
-			spStep.SelectPane = &SelectPaneStep{
+			spStep := &SelectPaneStep{
+				stepBase: newStep(paneStepID, []string{currentWinStep}),
 				WindowID: w.ID,
 				PaneID:   activePaneID,
 			}
@@ -970,8 +989,8 @@ func planWindowFinalization(
 
 		if w.Zoomed && activePaneID != "" {
 			zoomStepID := fmt.Sprintf("apply-zoom:%s:%s", w.ID, activePaneID)
-			azStep := newStep(zoomStepID, StepApplyZoom, []string{currentWinStep})
-			azStep.ApplyZoom = &ApplyZoomStep{
+			azStep := &ApplyZoomStep{
+				stepBase: newStep(zoomStepID, []string{currentWinStep}),
 				WindowID: w.ID,
 				PaneID:   activePaneID,
 			}
@@ -1053,8 +1072,8 @@ func planSessionFinalization(
 			activeIdx = activeLink.Index
 		}
 
-		swStep := newStep(stepID, StepSelectWindow, deps)
-		swStep.SelectWindow = &SelectWindowStep{
+		swStep := &SelectWindowStep{
+			stepBase:       newStep(stepID, deps),
 			SessionID:      s.ID,
 			ActiveWindowID: activeWinID,
 			ActiveIndex:    activeIdx,

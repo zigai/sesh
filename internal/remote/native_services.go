@@ -140,7 +140,7 @@ func (service *NativeSavedSessions) Restore(ctx context.Context, socket, generat
 
 	result, err := engine.Restore(ctx, repo, service.config.Server, engine.RestoreConfig{
 		LeaseRoot: service.config.LeaseRoot, Generation: generation, Sessions: ids, OperationID: "",
-		LaunchProcesses: true, AllowMissingWorkingDir: false, CompensateOnFailure: false,
+		LaunchProcesses: true, AllowMissingWorkingDir: false,
 		Profile: engine.RecoveryPractical,
 	})
 	if err == nil && restoreIncomplete(result) {

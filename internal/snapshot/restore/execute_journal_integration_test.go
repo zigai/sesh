@@ -88,14 +88,14 @@ func createSessionStep(t *testing.T, plan Plan) Step {
 	t.Helper()
 
 	for _, step := range plan.Steps {
-		if step.Kind == StepCreateSession {
+		if _, ok := step.(*CreateSessionStep); ok {
 			return step
 		}
 	}
 
 	t.Fatal("plan has no session creation step")
 
-	return Step{}
+	return nil
 }
 
 const (
@@ -166,7 +166,7 @@ func TestExecutorJournalIntentFaultPreventsEffect(t *testing.T) {
 	createStep := createSessionStep(t, plan)
 
 	journal := newFaultJournal(newPlanJournal(t, ctx, repo, operation))
-	journal.failIntent[createStep.ID] = errInjectedIntentFault
+	journal.failIntent[createStep.ID()] = errInjectedIntentFault
 
 	cfg := DefaultExecuteConfig()
 
@@ -190,7 +190,7 @@ func TestExecutorJournalIntentFaultPreventsEffect(t *testing.T) {
 	}
 
 	for _, action := range op.Actions {
-		if action.ID != ActionID(createStep.ID) {
+		if action.ID != ActionID(createStep.ID()) {
 			continue
 		}
 
@@ -226,13 +226,12 @@ func TestExecutorRefusesPriorUncertainEffect(t *testing.T) {
 
 	createStep := createSessionStep(t, plan)
 
-	if err := repo.Transition(ctx, operation, ActionID(createStep.ID), StatePlanned, StateIssued, nil); err != nil {
+	if err := repo.Transition(ctx, operation, ActionID(createStep.ID()), StatePlanned, StateIssued, nil); err != nil {
 		t.Fatalf("Transition failed: %v", err)
 	}
 
 	journal := newPlanJournal(t, ctx, repo, operation)
 	cfg := DefaultExecuteConfig()
-	cfg.CompensateOnFailure = true
 
 	executor := NewExecutor(server, manifest, cfg)
 
@@ -322,26 +321,22 @@ func assertCanceledReceiptOutcome(
 		t.Fatalf("expected joined cancellation, got %v", err)
 	}
 
-	if !errors.Is(err, ErrCompensationUnavailable) {
-		t.Fatalf("expected unsafe cleanup request to be reported, got %v", err)
-	}
-
 	op, reconcileErr := repo.ReconcileOperation(ctx, operation)
 	if reconcileErr != nil {
 		t.Fatalf("ReconcileOperation failed: %v", reconcileErr)
 	}
 
 	states := actionStates(op)
-	if states[ActionID(createStep.ID)] != StateUnknown {
-		t.Fatalf("expected the unconfirmed effect to be recorded as %q, got %q", StateUnknown, states[ActionID(createStep.ID)])
+	if states[ActionID(createStep.ID())] != StateUnknown {
+		t.Fatalf("expected the unconfirmed effect to be recorded as %q, got %q", StateUnknown, states[ActionID(createStep.ID())])
 	}
 
 	if count := restoredSessionCount(t, ctx, server); count != 1 {
-		t.Fatalf("unsafe compensation must retain the created session, got %d restored sessions", count)
+		t.Fatalf("failed attempt must retain the created session, got %d restored sessions", count)
 	}
 
 	if _, findErr := server.FindSession(ctx, restoredSessionName); findErr != nil {
-		t.Fatalf("created session must survive unsafe compensation: %v", findErr)
+		t.Fatalf("created session must survive failure: %v", findErr)
 	}
 
 	requireFixtureIntact(t, ctx, server)
@@ -377,7 +372,7 @@ func TestExecutorCancellationDuringReceiptKeepsUncertainty(t *testing.T) {
 
 	journal := newFaultJournal(newPlanJournal(t, ctx, repo, operation))
 	journal.beforeConfirmed = func(step Step) error {
-		if step.ID != createStep.ID {
+		if step.ID() != createStep.ID() {
 			return nil
 		}
 
@@ -387,7 +382,6 @@ func TestExecutorCancellationDuringReceiptKeepsUncertainty(t *testing.T) {
 	}
 
 	cfg := DefaultExecuteConfig()
-	cfg.CompensateOnFailure = true
 
 	executor := NewExecutor(server, manifest, cfg)
 
@@ -404,8 +398,8 @@ func TestExecutorCancellationDuringReceiptKeepsUncertainty(t *testing.T) {
 	}
 }
 
-func actionStates(op store.Operation) map[string]string {
-	states := make(map[string]string, len(op.Actions))
+func actionStates(op store.Operation) map[string]model.ActionState {
+	states := make(map[string]model.ActionState, len(op.Actions))
 
 	for _, action := range op.Actions {
 		states[action.ID] = action.State
@@ -444,7 +438,7 @@ func TestExecutorCrashAfterEffectNeverDuplicates(t *testing.T) {
 
 	createStep := createSessionStep(t, plan)
 
-	runCrashWorker(t, ctx, repoDir, generation, operation, server.Endpoint().SocketPath, createStep.ID)
+	runCrashWorker(t, ctx, repoDir, generation, operation, server.Endpoint().SocketPath, createStep.ID())
 
 	requireCrashedCreationSurvived(t, ctx, server, repo, operation, createStep)
 	requireRefusedRetryWithoutDuplicates(t, ctx, server, repo, operation, plan, manifest)
@@ -478,8 +472,8 @@ func requireCrashedCreationSurvived(
 		t.Fatalf("ReconcileOperation failed: %v", err)
 	}
 
-	if states := actionStates(op); states[ActionID(createStep.ID)] != StateIssued {
-		t.Fatalf("expected the interrupted effect to stay %q, got %q", StateIssued, states[ActionID(createStep.ID)])
+	if states := actionStates(op); states[ActionID(createStep.ID())] != StateIssued {
+		t.Fatalf("expected the interrupted effect to stay %q, got %q", StateIssued, states[ActionID(createStep.ID())])
 	}
 }
 
@@ -612,7 +606,7 @@ func TestRestoreCrashWorker(t *testing.T) {
 
 	journal := newFaultJournal(newPlanJournal(t, ctx, repo, operation))
 	journal.beforeConfirmed = func(step Step) error {
-		if step.ID != stepID {
+		if step.ID() != stepID {
 			return nil
 		}
 

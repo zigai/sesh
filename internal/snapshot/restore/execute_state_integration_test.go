@@ -1037,7 +1037,7 @@ func waitForLaunchMarker(t *testing.T, ctx context.Context, path string) string 
 	}
 }
 
-func TestExecutorCompensationRequestRetainsCreatedAndUnrelatedSessions(t *testing.T) {
+func TestExecutorFailureRetainsCreatedAndUnrelatedSessions(t *testing.T) {
 	server := tmuxtest.NewServer(t)
 
 	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
@@ -1066,32 +1066,25 @@ func TestExecutorCompensationRequestRetainsCreatedAndUnrelatedSessions(t *testin
 	failing := plan.Steps[len(plan.Steps)-1]
 
 	journal := newFaultJournal(newPlanJournal(t, ctx, repo, operation))
-	journal.failIntent[failing.ID] = errInjectedIntentFault
+	journal.failIntent[failing.ID()] = errInjectedIntentFault
 
-	cfg := DefaultExecuteConfig()
-	cfg.CompensateOnFailure = true
-
-	report, err := NewExecutor(server, manifest, cfg).Execute(ctx, plan, journal)
+	report, err := NewExecutor(server, manifest, DefaultExecuteConfig()).Execute(ctx, plan, journal)
 	if err == nil {
 		t.Fatal("expected execution failure")
 	}
 
-	if !errors.Is(err, ErrCompensationUnavailable) {
-		t.Fatalf("expected ErrCompensationUnavailable, got %v", err)
-	}
-
-	if len(report.Compensation) != 1 || report.Compensation[0].Status != CompensationRetained {
-		t.Fatalf("expected one retained compensation entry, got %+v", report.Compensation)
+	if len(report.SessionsCreated) != 1 {
+		t.Fatalf("expected one retained created session, got %+v", report.SessionsCreated)
 	}
 
 	if _, err := server.FindSession(ctx, restoredSessionName); err != nil {
-		t.Fatalf("created session must be retained when cleanup is unsafe: %v", err)
+		t.Fatalf("created session must be retained after failure: %v", err)
 	}
 
 	assertUnrelatedLiveSessionIntact(t, ctx, server, unrelated, unrelatedLinks, unrelatedPaneInfo)
 }
 
-func TestExecutorCompensationDisabledKeepsConfirmedObjects(t *testing.T) {
+func TestExecutorFailureKeepsConfirmedObjects(t *testing.T) {
 	server := tmuxtest.NewServer(t)
 
 	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
@@ -1118,22 +1111,19 @@ func TestExecutorCompensationDisabledKeepsConfirmedObjects(t *testing.T) {
 	failing := plan.Steps[len(plan.Steps)-1]
 
 	journal := newFaultJournal(newPlanJournal(t, ctx, repo, operation))
-	journal.failIntent[failing.ID] = errInjectedIntentFault
+	journal.failIntent[failing.ID()] = errInjectedIntentFault
 
-	cfg := DefaultExecuteConfig()
-	cfg.CompensateOnFailure = false
-
-	report, err := NewExecutor(server, manifest, cfg).Execute(ctx, plan, journal)
+	report, err := NewExecutor(server, manifest, DefaultExecuteConfig()).Execute(ctx, plan, journal)
 	if err == nil {
 		t.Fatal("expected execution failure")
 	}
 
-	if len(report.Compensation) != 1 || report.Compensation[0].Status != CompensationNotAttempted {
-		t.Fatalf("expected an unattempted compensation entry, got %+v", report.Compensation)
+	if len(report.SessionsCreated) != 1 {
+		t.Fatalf("expected one retained created session, got %+v", report.SessionsCreated)
 	}
 
 	if _, err := server.FindSession(ctx, restoredSessionName); err != nil {
-		t.Fatalf("confirmed session must stay without compensation: %v", err)
+		t.Fatalf("confirmed session must stay after failure: %v", err)
 	}
 }
 
@@ -1286,7 +1276,7 @@ func assertUnrelatedLiveSessionIntact(
 
 	found, err := server.FindSession(ctx, "unrelated-live")
 	if err != nil {
-		t.Fatalf("unrelated session must survive compensation: %v", err)
+		t.Fatalf("unrelated session must survive failure: %v", err)
 	}
 
 	if found.ID() != unrelated.ID() {
@@ -1313,7 +1303,7 @@ func assertUnrelatedLiveSessionIntact(
 	}
 }
 
-func TestExecutorCompensationRetainsSessionWithForeignWork(t *testing.T) {
+func TestExecutorFailureRetainsSessionWithForeignWork(t *testing.T) {
 	server := tmuxtest.NewServer(t)
 
 	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
@@ -1340,7 +1330,7 @@ func TestExecutorCompensationRetainsSessionWithForeignWork(t *testing.T) {
 
 	journal := newFaultJournal(newPlanJournal(t, ctx, repo, operation))
 	journal.beforeIntent = func(step Step) error {
-		if step.ID == failing.ID {
+		if step.ID() == failing.ID() {
 			sess, findErr := server.FindSession(ctx, restoredSessionName)
 			if findErr != nil {
 				return fmt.Errorf("find session: %w", findErr)
@@ -1358,21 +1348,14 @@ func TestExecutorCompensationRetainsSessionWithForeignWork(t *testing.T) {
 		return nil
 	}
 
-	cfg := DefaultExecuteConfig()
-	cfg.CompensateOnFailure = true
-
-	report, err := NewExecutor(server, manifest, cfg).Execute(ctx, plan, journal)
+	_, err = NewExecutor(server, manifest, DefaultExecuteConfig()).Execute(ctx, plan, journal)
 	if err == nil {
 		t.Fatal("expected execution failure")
 	}
 
 	found, err := server.FindSession(ctx, restoredSessionName)
 	if err != nil {
-		t.Fatalf("session containing foreign work must survive compensation, got %v", err)
-	}
-
-	if len(report.Compensation) != 1 || report.Compensation[0].Status != CompensationRetained {
-		t.Fatalf("expected compensation status %s, got %+v", CompensationRetained, report.Compensation)
+		t.Fatalf("session containing foreign work must survive failure, got %v", err)
 	}
 
 	_, links, err := found.WindowInfos(ctx)
@@ -1381,7 +1364,7 @@ func TestExecutorCompensationRetainsSessionWithForeignWork(t *testing.T) {
 	}
 }
 
-type compensationMutation func(context.Context, *testing.T, tmux.Session)
+type externalMutation func(context.Context, *testing.T, tmux.Session)
 
 func soleWindowLink(t *testing.T, ctx context.Context, session tmux.Session) tmux.WindowLinkInfo {
 	t.Helper()
@@ -1437,7 +1420,7 @@ func changeLiveProcess(ctx context.Context, t *testing.T, session tmux.Session) 
 	}
 }
 
-func runCompensationOwnershipCase(t *testing.T, mutate compensationMutation) {
+func runFailureWithExternalMutation(t *testing.T, mutate externalMutation) {
 	t.Helper()
 
 	server := tmuxtest.NewServer(t)
@@ -1455,7 +1438,7 @@ func runCompensationOwnershipCase(t *testing.T, mutate compensationMutation) {
 	failing := plan.Steps[len(plan.Steps)-1]
 	journal := newMemoryJournal()
 	journal.beforeIntent = func(step Step) error {
-		if step.ID != failing.ID {
+		if step.ID() != failing.ID() {
 			return nil
 		}
 
@@ -1469,16 +1452,9 @@ func runCompensationOwnershipCase(t *testing.T, mutate compensationMutation) {
 		return errInjectedIntentFault
 	}
 
-	cfg := DefaultExecuteConfig()
-	cfg.CompensateOnFailure = true
-
-	report, err := NewExecutor(server, manifest, cfg).Execute(ctx, plan, journal)
-	if !errors.Is(err, ErrCompensationUnavailable) {
-		t.Fatalf("expected ErrCompensationUnavailable, got %v", err)
-	}
-
-	if len(report.Compensation) != 1 || report.Compensation[0].Status != CompensationRetained {
-		t.Fatalf("expected retained compensation, got %+v", report.Compensation)
+	_, err = NewExecutor(server, manifest, DefaultExecuteConfig()).Execute(ctx, plan, journal)
+	if !errors.Is(err, errInjectedIntentFault) {
+		t.Fatalf("expected intent fault after external mutation, got %v", err)
 	}
 
 	if _, err := server.FindSession(ctx, restoredSessionName); err != nil {
@@ -1486,10 +1462,10 @@ func runCompensationOwnershipCase(t *testing.T, mutate compensationMutation) {
 	}
 }
 
-func TestExecutorCompensationNeverInfersOwnershipFromCurrentShape(t *testing.T) {
+func TestExecutorFailureLeavesExternallyChangedSessionIntact(t *testing.T) {
 	mutations := []struct {
 		name   string
-		mutate compensationMutation
+		mutate externalMutation
 	}{
 		{name: "sole pane replaced", mutate: replaceSolePane},
 		{name: "sole window replaced", mutate: replaceSoleWindow},
@@ -1498,7 +1474,7 @@ func TestExecutorCompensationNeverInfersOwnershipFromCurrentShape(t *testing.T) 
 
 	for _, mutation := range mutations {
 		t.Run(mutation.name, func(t *testing.T) {
-			runCompensationOwnershipCase(t, mutation.mutate)
+			runFailureWithExternalMutation(t, mutation.mutate)
 		})
 	}
 }

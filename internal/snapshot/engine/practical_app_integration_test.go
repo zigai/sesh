@@ -806,7 +806,7 @@ func TestEnginePracticalRestoreMixedHealthyAndNonrestartablePanes(t *testing.T) 
 	manifest.Panes[1].Dead = true
 	manifest.Panes[1].Directory = nil
 	manifest.Panes[1].Launch.Recovery = model.RecoveryNonrestartable
-	manifest.Panes[1].Launch.Reason = model.ReasonPaneDead
+	manifest.Panes[1].Launch.Reason = string(model.ReasonPaneDead)
 	manifest.Panes[1].Launch.Executable = nil
 	manifest.Panes[1].Launch.Arguments = nil
 
@@ -815,7 +815,7 @@ func TestEnginePracticalRestoreMixedHealthyAndNonrestartablePanes(t *testing.T) 
 	manifest.Panes[2].Directory = model.Bytes(missingDir)
 	manifest.Panes[2].Launch.Directory = model.Bytes(missingDir)
 	manifest.Panes[2].Launch.Recovery = model.RecoveryNonrestartable
-	manifest.Panes[2].Launch.Reason = model.ReasonWorkingDirectoryDeleted
+	manifest.Panes[2].Launch.Reason = string(model.ReasonWorkingDirectoryDeleted)
 	manifest.Panes[2].Launch.Executable = model.Bytes(shPath)
 	manifest.Panes[2].Launch.Arguments = []model.Bytes{model.Bytes("sh")}
 
@@ -927,12 +927,12 @@ func assertMixedPanesOutcomes(
 		t.Errorf("healthy pane outcome = %+v, want restart_dispatch", p)
 	}
 
-	if p, ok := outcomes[p1ID]; !ok || p.Outcome != restore.PaneOutcomeUnsupported || p.Reason != model.ReasonPaneDead {
-		t.Errorf("dead pane outcome = %+v, want unsupported/%s", p, model.ReasonPaneDead)
+	if p, ok := outcomes[p1ID]; !ok || p.Outcome != restore.PaneOutcomeUnsupported || p.Reason != string(model.ReasonPaneDead) {
+		t.Errorf("dead pane outcome = %+v, want unsupported/%s", p, string(model.ReasonPaneDead))
 	}
 
-	if p, ok := outcomes[p2ID]; !ok || p.Outcome != restore.PaneOutcomeUnsupported || p.Reason != model.ReasonWorkingDirectoryDeleted {
-		t.Errorf("deleted cwd pane outcome = %+v, want unsupported/%s", p, model.ReasonWorkingDirectoryDeleted)
+	if p, ok := outcomes[p2ID]; !ok || p.Outcome != restore.PaneOutcomeUnsupported || p.Reason != string(model.ReasonWorkingDirectoryDeleted) {
+		t.Errorf("deleted cwd pane outcome = %+v, want unsupported/%s", p, string(model.ReasonWorkingDirectoryDeleted))
 	}
 }
 

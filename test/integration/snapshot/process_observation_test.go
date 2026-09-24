@@ -255,7 +255,7 @@ func TestProcessObservationPreservesPaneWithDeletedExecutable(t *testing.T) {
 		t.Fatalf("observe pane with deleted executable: %v", err)
 	}
 
-	assertPreservedNonrestartablePane(t, observation, false, model.ReasonExecutableDeleted)
+	assertPreservedNonrestartablePane(t, observation, false, string(model.ReasonExecutableDeleted))
 }
 
 func TestProcessObservationPreservesPaneWithDeletedDirectory(t *testing.T) {
@@ -297,7 +297,7 @@ func TestProcessObservationPreservesPaneWithDeletedDirectory(t *testing.T) {
 		t.Fatalf("observe pane with deleted directory: %v", err)
 	}
 
-	assertPreservedNonrestartablePane(t, observation, false, model.ReasonWorkingDirectoryDeleted)
+	assertPreservedNonrestartablePane(t, observation, false, string(model.ReasonWorkingDirectoryDeleted))
 }
 
 func TestProcessObservationPreservesExitedAndUnaffectedPanes(t *testing.T) {
@@ -386,8 +386,8 @@ func assertPreservedDeadAndLivePanes(t *testing.T, observation capture.Observati
 		if pane.Dead {
 			deadCount++
 
-			if pane.Launch.Recovery != model.RecoveryNonrestartable || pane.Launch.Reason != model.ReasonPaneDead {
-				t.Fatalf("dead pane recovery/reason = %q/%q, want %q/%q", pane.Launch.Recovery, pane.Launch.Reason, model.RecoveryNonrestartable, model.ReasonPaneDead)
+			if pane.Launch.Recovery != model.RecoveryNonrestartable || pane.Launch.Reason != string(model.ReasonPaneDead) {
+				t.Fatalf("dead pane recovery/reason = %q/%q, want %q/%q", pane.Launch.Recovery, pane.Launch.Reason, model.RecoveryNonrestartable, string(model.ReasonPaneDead))
 			}
 
 			continue

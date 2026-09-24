@@ -58,13 +58,13 @@ func runPlannedSplitsAtBase(t *testing.T, base int) {
 	target := newStructuralFixture(server)
 
 	for _, step := range plan.Steps {
-		if step.Kind == StepApplyLayout {
+		if _, ok := step.(*ApplyLayoutStep); ok {
 			target.assertRectangles(t, ctx)
 		}
 
 		target.apply(t, ctx, step)
 
-		if step.Kind == StepApplyLayout {
+		if _, ok := step.(*ApplyLayoutStep); ok {
 			target.assertRectangles(t, ctx)
 		}
 	}
@@ -526,13 +526,13 @@ func verifyDeepLayoutAtBorder(t *testing.T, border tmux.PaneBorderStatus) {
 	target := newStructuralFixture(server)
 
 	for _, step := range plan.Steps {
-		if step.Kind == StepApplyLayout {
+		if _, ok := step.(*ApplyLayoutStep); ok {
 			target.assertPaneRectangles(t, ctx, wantRects)
 		}
 
 		target.apply(t, ctx, step)
 
-		if step.Kind == StepApplyLayout {
+		if _, ok := step.(*ApplyLayoutStep); ok {
 			target.assertPaneRectangles(t, ctx, wantRects)
 		}
 	}
@@ -969,29 +969,29 @@ func (f *structuralFixture) apply(t *testing.T, ctx context.Context, step Step) 
 	t.Helper()
 	f.ensureMaps()
 
-	switch step.Kind {
-	case StepCreateSession:
-		f.createSessionStep(t, ctx, *step.CreateSession)
-	case StepPlaceInitialWindow:
-		f.placeInitialWindowStep(t, ctx, *step.PlaceInitialWindow)
-	case StepCreateWindow:
-		f.createWindowStep(t, ctx, *step.CreateWindow)
-	case StepSplitPane:
-		f.splitPaneStep(t, ctx, *step.SplitPane)
-	case StepLinkWindow:
-		f.linkWindowStep(t, ctx, *step.LinkWindow)
-	case StepCloseBootstrapWindow:
-		f.closeBootstrapStep(t, ctx, *step.CloseBootstrapWindow)
-	case StepApplyLayout:
-		f.applyLayoutStep(t, ctx, *step.ApplyLayout)
-	case StepSelectPane:
-		f.selectPaneStep(t, ctx, *step.SelectPane)
-	case StepApplyZoom:
-		f.applyZoomStep(t, ctx, *step.ApplyZoom)
-	case StepSelectWindow:
-		f.selectWindowStep(t, ctx, *step.SelectWindow)
-	case StepSetPaneTitle:
-		f.setPaneTitleStep(t, ctx, *step.SetPaneTitle)
+	switch s := step.(type) {
+	case *CreateSessionStep:
+		f.createSessionStep(t, ctx, *s)
+	case *PlaceInitialWindowStep:
+		f.placeInitialWindowStep(t, ctx, *s)
+	case *CreateWindowStep:
+		f.createWindowStep(t, ctx, *s)
+	case *SplitPaneStep:
+		f.splitPaneStep(t, ctx, *s)
+	case *LinkWindowStep:
+		f.linkWindowStep(t, ctx, *s)
+	case *CloseBootstrapWindowStep:
+		f.closeBootstrapStep(t, ctx, *s)
+	case *ApplyLayoutStep:
+		f.applyLayoutStep(t, ctx, *s)
+	case *SelectPaneStep:
+		f.selectPaneStep(t, ctx, *s)
+	case *ApplyZoomStep:
+		f.applyZoomStep(t, ctx, *s)
+	case *SelectWindowStep:
+		f.selectWindowStep(t, ctx, *s)
+	case *SetPaneTitleStep:
+		f.setPaneTitleStep(t, ctx, *s)
 	}
 }
 
@@ -1017,7 +1017,7 @@ func (f *structuralFixture) applyAdversarial(t *testing.T, ctx context.Context, 
 
 		step := steps[chosen]
 		f.apply(t, ctx, step)
-		completed[step.ID] = true
+		completed[step.ID()] = true
 
 		steps = append(steps[:chosen], steps[chosen+1:]...)
 	}

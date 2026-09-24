@@ -53,9 +53,9 @@ func captureProcessLaunch(ctx context.Context, pid int, keys []string, agent *ap
 		launch.Recovery = model.RecoveryNonrestartable
 
 		if observed.ExecutableDeleted {
-			launch.Reason = model.ReasonExecutableDeleted
+			launch.Reason = string(model.ReasonExecutableDeleted)
 		} else {
-			launch.Reason = model.ReasonWorkingDirectoryDeleted
+			launch.Reason = string(model.ReasonWorkingDirectoryDeleted)
 		}
 
 		return launch, record, nil

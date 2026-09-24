@@ -20,8 +20,6 @@ var (
 	ErrWorkingDirNotFound = errors.New("working directory not found")
 
 	ErrExecutionFailed = errors.New("execution failed")
-
-	ErrCompensationUnavailable = errors.New("safe destructive compensation unavailable")
 )
 
 func planFailure(phase, reason string, cause error) error {

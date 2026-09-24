@@ -14,6 +14,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/zigai/sesh/internal/snapshot/model"
 )
 
 func TestProcessDeathAtPublicationBoundaries(t *testing.T) {
@@ -276,9 +278,9 @@ func TestJournalWorker(t *testing.T) {
 	id := os.Getenv("SESH_TEST_ATTEMPT")
 
 	if mode == "verify" {
-		want := actionIssued
+		want := model.ActionStateIssued
 		if os.Getenv("SESH_TEST_PHASE") == faultCatalogSynced {
-			want = actionPlanned
+			want = model.ActionStatePlanned
 		}
 
 		verifyJournal(t, r, id, want)
@@ -318,7 +320,7 @@ func TestJournalWorker(t *testing.T) {
 	t.Fatal("journal worker escaped interruption")
 }
 
-func verifyJournal(t *testing.T, r *Repository, id, want string) {
+func verifyJournal(t *testing.T, r *Repository, id string, want model.ActionState) {
 	t.Helper()
 
 	op, err := r.ReconcileOperation(t.Context(), id)

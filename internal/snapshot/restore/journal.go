@@ -20,23 +20,22 @@ import (
 // proves the effect was never attempted and "issued" or "unknown" never authorize a
 // redispatch.
 const (
-	StatePlanned   = "planned"
-	StateIssued    = "issued"
-	StateNotSent   = "not-sent"
-	StateUnknown   = "unknown"
-	StateConfirmed = "confirmed"
-	StateVerified  = "verified"
-	StateConflict  = "conflict"
+	StatePlanned   = model.ActionStatePlanned
+	StateIssued    = model.ActionStateIssued
+	StateNotSent   = model.ActionStateNotSent
+	StateUnknown   = model.ActionStateUnknown
+	StateConfirmed = model.ActionStateConfirmed
+	StateVerified  = model.ActionStateVerified
 )
 
 const (
-	KindCreateSession = "create-session"
-	KindCreateWindow  = "create-window"
-	KindCreatePane    = "create-pane"
-	KindLink          = "link"
-	KindConfigure     = "configure"
-	KindLaunch        = "launch"
-	KindVerify        = "verify"
+	KindCreateSession = model.ActionKindCreateSession
+	KindCreateWindow  = model.ActionKindCreateWindow
+	KindCreatePane    = model.ActionKindCreatePane
+	KindLink          = model.ActionKindLink
+	KindConfigure     = model.ActionKindConfigure
+	KindLaunch        = model.ActionKindLaunch
+	KindVerify        = model.ActionKindVerify
 )
 
 const (
@@ -54,7 +53,7 @@ var (
 
 	ErrPriorUncertainty = errors.New("previous attempt left an uncertain effect")
 
-	ErrPriorConflict = errors.New("previous attempt left a compensated effect")
+	ErrPriorConflict = errors.New("previous attempt conflicts with scoped state")
 
 	ErrExecutionUncertain = errors.New("effect outcome uncertain")
 
@@ -62,12 +61,12 @@ var (
 )
 
 type ActionSpec struct {
-	ID   string `json:"id"`
-	Kind string `json:"kind"`
+	ID   string           `json:"id"`
+	Kind model.ActionKind `json:"kind"`
 }
 
 type StepState struct {
-	State string `json:"state"`
+	State model.ActionState `json:"state"`
 
 	RuntimeID string `json:"runtimeId"`
 }
@@ -84,21 +83,21 @@ type Journal interface {
 	Unknown(ctx context.Context, step Step) error
 }
 
-func StepKindAction(step Step) string {
-	switch step.Kind {
-	case StepCreateSession:
+func StepKindAction(step Step) model.ActionKind {
+	switch step.(type) {
+	case *CreateSessionStep:
 		return KindCreateSession
-	case StepPlaceInitialWindow, StepCreateWindow:
+	case *PlaceInitialWindowStep, *CreateWindowStep:
 		return KindCreateWindow
-	case StepSplitPane:
+	case *SplitPaneStep:
 		return KindCreatePane
-	case StepLinkWindow:
+	case *LinkWindowStep:
 		return KindLink
-	case StepCloseBootstrapWindow, StepApplyLayout, StepSelectPane, StepApplyZoom, StepSelectWindow, StepSetPaneTitle:
+	case *CloseBootstrapWindowStep, *ApplyLayoutStep, *SelectPaneStep, *ApplyZoomStep, *SelectWindowStep, *SetPaneTitleStep:
 		return KindConfigure
 	}
 
-	return KindConfigure
+	panic("unknown step type")
 }
 
 func ActionID(stepID string) string {
@@ -124,7 +123,7 @@ func PlanActions(plan Plan) ([]ActionSpec, error) {
 	seen := make(map[string]bool, len(plan.Steps)+terminalActionCount)
 
 	for _, step := range plan.Steps {
-		id := ActionID(step.ID)
+		id := ActionID(step.ID())
 		if !model.ValidID(id) || seen[id] {
 			return nil, oops.In("snapshot.restore").
 				Code("restore_unsupported").

@@ -1,0 +1,31 @@
+package model
+
+const (
+	ReasonNotCaptured                                 Reason = "not_captured"
+	ReasonCaptureNotAtomic                            Reason = "capture_not_atomic"
+	ReasonTerminalCheckpointUnavailable               Reason = "terminal_checkpoint_unavailable"
+	ReasonApplicationCheckpointUnavailable            Reason = "application_checkpoint_unavailable"
+	ReasonOwnershipUnverified                         Reason = "ownership_unverified"
+	ReasonObservedOnly                                Reason = "observed_only"
+	ReasonPaneDead                                    Reason = "pane_dead"
+	ReasonExecutableDeleted                           Reason = "executable_deleted"
+	ReasonWorkingDirectoryDeleted                     Reason = "working_directory_deleted"
+	ReasonAtomicRestoreTransactionUnavailable         Reason = "atomic_restore_transaction_unavailable"
+	ReasonTargetOptionsAndGroupNamesRequireAdaptation Reason = "target_options_and_group_names_require_adaptation"
+	ReasonExactlyOnceProcessLaunchUnavailable         Reason = "exactly_once_process_launch_unavailable"
+	ReasonImmutableOwnershipEnforcementUnavailable    Reason = "immutable_ownership_enforcement_unavailable"
+	ReasonTerminalStateCheckpointUnavailable          Reason = "terminal_state_checkpoint_unavailable"
+	ReasonNonrestartablePane                          Reason = "nonrestartable_pane"
+	ReasonApplicationRestartUnsupported               Reason = "application_restart_unsupported"
+	ReasonSavedWorkingDirectoryMissing                Reason = "saved_working_directory_missing"
+	ReasonApprovedLaunchUnavailable                   Reason = "approved_launch_unavailable"
+	ReasonGlobalScopeOptionsNotApplied                Reason = "global_scope_options_not_applied"
+	ReasonGlobalScopeEnvironmentMaterializedLocally   Reason = "global_scope_environment_materialized_locally"
+	ReasonInheritedOptionNotRepresentable             Reason = "inherited_option_not_representable"
+	ReasonInheritedOptionsMaterializedLocally         Reason = "inherited_options_materialized_locally"
+	ReasonTargetEnvironmentMaskedLocally              Reason = "target_environment_masked_locally"
+	ReasonTargetInheritedOptionsUnmasked              Reason = "target_inherited_options_unmasked"
+	ReasonTargetEnvironmentUnmasked                   Reason = "target_environment_unmasked"
+)
+
+type Reason string

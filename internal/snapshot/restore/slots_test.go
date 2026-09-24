@@ -36,9 +36,9 @@ func assertSimulatedSlots(t *testing.T, plan Plan, base int) {
 func (s slotSimulation) apply(t *testing.T, step Step, base int) {
 	t.Helper()
 
-	switch step.Kind {
-	case StepCreateSession:
-		cs := step.CreateSession
+	switch step := step.(type) {
+	case *CreateSessionStep:
+		cs := step
 		if cs.GroupLeaderSessionID != "" {
 			s[cs.SessionID] = s[cs.GroupLeaderSessionID]
 		} else {
@@ -49,19 +49,19 @@ func (s slotSimulation) apply(t *testing.T, step Step, base int) {
 
 			s[cs.SessionID] = map[int]string{base: window}
 		}
-	case StepPlaceInitialWindow:
-		s.place(t, *step.PlaceInitialWindow)
-	case StepCreateWindow:
-		cw := step.CreateWindow
+	case *PlaceInitialWindowStep:
+		s.place(t, *step)
+	case *CreateWindowStep:
+		cw := step
 		s.link(t, cw.OwnerSessionID, cw.WindowID, cw.Index)
-	case StepLinkWindow:
-		lw := step.LinkWindow
+	case *LinkWindowStep:
+		lw := step
 		s.link(t, lw.SessionID, lw.WindowID, lw.Index)
-	case StepCloseBootstrapWindow:
-		s.closeBootstrap(t, step.CloseBootstrapWindow.SessionID)
-	case StepSelectWindow:
-		s.selectWindow(t, *step.SelectWindow)
-	case StepSplitPane, StepApplyLayout, StepSetPaneTitle, StepSelectPane, StepApplyZoom:
+	case *CloseBootstrapWindowStep:
+		s.closeBootstrap(t, step.SessionID)
+	case *SelectWindowStep:
+		s.selectWindow(t, *step)
+	case *SplitPaneStep, *ApplyLayoutStep, *SetPaneTitleStep, *SelectPaneStep, *ApplyZoomStep:
 	}
 }
 

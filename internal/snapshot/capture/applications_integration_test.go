@@ -478,7 +478,7 @@ func assertDeadPaneState(t *testing.T, pane model.Pane, data []byte) {
 		t.Fatalf("dead pane recovery = %q, want nonrestartable", pane.Launch.Recovery)
 	}
 
-	if pane.Launch.Reason != model.ReasonPaneDead {
+	if pane.Launch.Reason != string(model.ReasonPaneDead) {
 		t.Fatalf("dead pane reason = %q, want pane_dead", pane.Launch.Reason)
 	}
 
@@ -572,7 +572,7 @@ func assertDeletedExecutablePane(t *testing.T, observation Observation) {
 		t.Fatalf("recovery = %q, want nonrestartable", paneRecord.Launch.Recovery)
 	}
 
-	if paneRecord.Launch.Reason != model.ReasonExecutableDeleted {
+	if paneRecord.Launch.Reason != string(model.ReasonExecutableDeleted) {
 		t.Fatalf("reason = %q, want executable_deleted", paneRecord.Launch.Reason)
 	}
 
@@ -642,7 +642,7 @@ func assertDeletedWorkingDirPane(t *testing.T, observation Observation) {
 		t.Fatalf("recovery = %q, want nonrestartable", paneRecord.Launch.Recovery)
 	}
 
-	if paneRecord.Launch.Reason != model.ReasonWorkingDirectoryDeleted {
+	if paneRecord.Launch.Reason != string(model.ReasonWorkingDirectoryDeleted) {
 		t.Fatalf("reason = %q, want working_directory_deleted", paneRecord.Launch.Reason)
 	}
 

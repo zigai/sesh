@@ -56,22 +56,23 @@ func resolvePaneIdentities(plan Plan, receipts map[string]string, identities *Ru
 	produced := map[string]map[tmux.PaneID]bool{}
 
 	for _, step := range plan.Steps {
-		if step.Kind != StepSplitPane {
+		split, ok := step.(*SplitPaneStep)
+		if !ok {
 			continue
 		}
 
-		windowID := step.SplitPane.WindowID
+		windowID := split.WindowID
 		if produced[windowID] == nil {
 			produced[windowID] = map[tmux.PaneID]bool{}
 		}
 
-		id := receipts[step.ID]
+		id := receipts[split.ID()]
 		if id == "" {
-			return nil, missingReceipt(step.ID)
+			return nil, missingReceipt(split.ID())
 		}
 
 		produced[windowID][tmux.PaneID(id)] = true
-		identities.Panes[step.SplitPane.PaneID] = tmux.PaneID(id)
+		identities.Panes[split.PaneID] = tmux.PaneID(id)
 	}
 
 	return produced, nil
@@ -79,49 +80,49 @@ func resolvePaneIdentities(plan Plan, receipts map[string]string, identities *Ru
 
 func resolveStructuralIdentities(plan Plan, index planIndex, receipts map[string]string, identities *RuntimeIdentities) error {
 	for _, step := range plan.Steps {
-		switch step.Kind {
-		case StepCreateSession:
+		switch step := step.(type) {
+		case *CreateSessionStep:
 			if err := resolveCreatedSession(step, index, receipts, identities); err != nil {
 				return err
 			}
-		case StepCreateWindow:
-			id := receipts[step.ID]
+		case *CreateWindowStep:
+			id := receipts[step.ID()]
 			if id == "" {
-				return missingReceipt(step.ID)
+				return missingReceipt(step.ID())
 			}
 
-			identities.Windows[step.CreateWindow.WindowID] = tmux.WindowID(id)
-		case StepPlaceInitialWindow, StepSplitPane, StepLinkWindow, StepCloseBootstrapWindow,
-			StepApplyLayout, StepSelectPane, StepApplyZoom, StepSelectWindow, StepSetPaneTitle:
+			identities.Windows[step.WindowID] = tmux.WindowID(id)
+		case *PlaceInitialWindowStep, *SplitPaneStep, *LinkWindowStep, *CloseBootstrapWindowStep,
+			*ApplyLayoutStep, *SelectPaneStep, *ApplyZoomStep, *SelectWindowStep, *SetPaneTitleStep:
 		}
 	}
 
 	return nil
 }
 
-func resolveCreatedSession(step Step, index planIndex, receipts map[string]string, identities *RuntimeIdentities) error {
-	id := receipts[step.ID]
+func resolveCreatedSession(step *CreateSessionStep, index planIndex, receipts map[string]string, identities *RuntimeIdentities) error {
+	id := receipts[step.ID()]
 	if id == "" {
-		return missingReceipt(step.ID)
+		return missingReceipt(step.ID())
 	}
 
-	identities.Sessions[step.CreateSession.SessionID] = tmux.SessionID(id)
+	identities.Sessions[step.SessionID] = tmux.SessionID(id)
 
-	if step.CreateSession.GroupLeaderSessionID != "" || step.CreateSession.InitialWindowID == "" {
+	if step.GroupLeaderSessionID != "" || step.InitialWindowID == "" {
 		return nil
 	}
 
-	placement, ok := index.placeStepBySession[step.CreateSession.SessionID]
+	placement, ok := index.placeStepBySession[step.SessionID]
 	if !ok {
-		return missingReceipt(step.CreateSession.SessionID)
+		return missingReceipt(step.SessionID)
 	}
 
-	windowID := receipts[placement.ID]
+	windowID := receipts[placement.ID()]
 	if windowID == "" {
-		return missingReceipt(placement.ID)
+		return missingReceipt(placement.ID())
 	}
 
-	identities.Windows[step.CreateSession.InitialWindowID] = tmux.WindowID(windowID)
+	identities.Windows[step.InitialWindowID] = tmux.WindowID(windowID)
 
 	return nil
 }

@@ -214,7 +214,7 @@ func (o *Observation) processes(ctx context.Context, snapshot gotmux.Snapshot, e
 				Environment: nil,
 				Birth:       nil,
 				Recovery:    model.RecoveryNonrestartable,
-				Reason:      model.ReasonPaneDead,
+				Reason:      string(model.ReasonPaneDead),
 			}
 
 			records[paneID] = paneProcessRecord{

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -89,21 +90,21 @@ func countStepCreations(steps []Step) (map[string]int, map[string]int) {
 	paneCreateCount := make(map[string]int)
 
 	for _, step := range steps {
-		switch step.Kind {
-		case StepCreateSession:
-			if step.CreateSession.InitialWindowID != "" {
-				windowCreateCount[step.CreateSession.InitialWindowID]++
+		switch step := step.(type) {
+		case *CreateSessionStep:
+			if step.InitialWindowID != "" {
+				windowCreateCount[step.InitialWindowID]++
 			}
 
-			if step.CreateSession.InitialPaneID != "" {
-				paneCreateCount[step.CreateSession.InitialPaneID]++
+			if step.InitialPaneID != "" {
+				paneCreateCount[step.InitialPaneID]++
 			}
-		case StepCreateWindow:
-			windowCreateCount[step.CreateWindow.WindowID]++
-			paneCreateCount[step.CreateWindow.InitialPaneID]++
-		case StepSplitPane:
-			paneCreateCount[step.SplitPane.PaneID]++
-		case StepPlaceInitialWindow, StepLinkWindow, StepCloseBootstrapWindow, StepApplyLayout, StepSetPaneTitle, StepSelectPane, StepApplyZoom, StepSelectWindow:
+		case *CreateWindowStep:
+			windowCreateCount[step.WindowID]++
+			paneCreateCount[step.InitialPaneID]++
+		case *SplitPaneStep:
+			paneCreateCount[step.PaneID]++
+		case *PlaceInitialWindowStep, *LinkWindowStep, *CloseBootstrapWindowStep, *ApplyLayoutStep, *SetPaneTitleStep, *SelectPaneStep, *ApplyZoomStep, *SelectWindowStep:
 		}
 	}
 
@@ -200,14 +201,14 @@ func assertPlanTitlesAndNames(rt *rapid.T, plan Plan) {
 	}
 
 	for _, step := range plan.Steps {
-		switch step.Kind {
-		case StepCreateSession:
-			assertCreateSessionTitle(rt, step.CreateSession, windowsByID)
-		case StepSetPaneTitle:
-			assertSetPaneTitlePayload(rt, step.SetPaneTitle, panesByID)
-		case StepSplitPane:
-			assertSplitPaneTitlePayload(rt, step.SplitPane, panesByID)
-		case StepPlaceInitialWindow, StepCreateWindow, StepLinkWindow, StepCloseBootstrapWindow, StepApplyLayout, StepSelectPane, StepApplyZoom, StepSelectWindow:
+		switch step := step.(type) {
+		case *CreateSessionStep:
+			assertCreateSessionTitle(rt, step, windowsByID)
+		case *SetPaneTitleStep:
+			assertSetPaneTitlePayload(rt, step, panesByID)
+		case *SplitPaneStep:
+			assertSplitPaneTitlePayload(rt, step, panesByID)
+		case *PlaceInitialWindowStep, *CreateWindowStep, *LinkWindowStep, *CloseBootstrapWindowStep, *ApplyLayoutStep, *SelectPaneStep, *ApplyZoomStep, *SelectWindowStep:
 		}
 	}
 }
@@ -221,7 +222,11 @@ func assertPlanEquivalence(rt *rapid.T, m model.Manifest, plan Plan, withDups []
 		rt.Fatalf("BuildPlan failed on shuffled input: %v", err)
 	}
 
-	if diff := cmp.Diff(plan, shuffledPlan); diff != "" {
+	stepEqual := cmp.Comparer(func(a, b Step) bool {
+		return reflect.DeepEqual(a, b)
+	})
+
+	if diff := cmp.Diff(plan, shuffledPlan, stepEqual); diff != "" {
 		rt.Fatalf("plan differed under permutation/duplicates: %s", diff)
 	}
 }

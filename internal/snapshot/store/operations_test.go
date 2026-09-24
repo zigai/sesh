@@ -20,15 +20,15 @@ import (
 const actionLaunch = "launch"
 
 func TestUncertainActionsCannotBeDispatchedAgain(t *testing.T) {
-	for _, state := range []string{actionIssued, actionUnknown, actionConfirmed, actionVerified, actionConflict} {
-		t.Run(state, func(t *testing.T) {
+	for _, state := range []model.ActionState{actionIssued, actionUnknown, actionConfirmed, actionVerified} {
+		t.Run(string(state), func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "repository")
 			r := openRepository(t, path)
 			op := pinnedLaunch(t, r)
 			advanceAction(t, r, op.ID, state)
 
 			reopened := openRepository(t, path)
-			for _, next := range []string{actionPlanned, actionIssued} {
+			for _, next := range []model.ActionState{actionPlanned, actionIssued} {
 				if err := reopened.Transition(t.Context(), op.ID, "launch", state, next, nil); !errors.Is(err, ErrConflict) {
 					t.Fatal("replayed potentially executed launch", err)
 				}
@@ -49,19 +49,22 @@ func pinnedLaunch(t *testing.T, r *Repository) Operation {
 	return op
 }
 
-func advanceAction(t *testing.T, r *Repository, id, state string) {
+func advanceAction(t *testing.T, r *Repository, id string, state model.ActionState) {
 	t.Helper()
 
-	steps := []string{actionIssued}
+	steps := []model.ActionState{actionIssued}
 
 	switch state {
-	case actionUnknown, actionConfirmed, actionConflict:
+	case actionPlanned, actionNotSent:
+		t.Fatalf("cannot advance fixture to %q", state)
+	case actionIssued:
+	case actionUnknown, actionConfirmed:
 		steps = append(steps, state)
 	case actionVerified:
 		steps = append(steps, actionConfirmed, actionVerified)
 	}
 
-	before := actionPlanned
+	before := model.ActionStatePlanned
 	for _, next := range steps {
 		if err := r.Transition(t.Context(), id, "launch", before, next, model.Bytes("original-runtime")); err != nil {
 			t.Fatal(err)
@@ -75,7 +78,7 @@ func TestOnlyNotSentPermitsRedispatch(t *testing.T) {
 	r := openRepository(t, filepath.Join(t.TempDir(), "repository"))
 
 	op := pinnedLaunch(t, r)
-	for _, step := range [][2]string{{actionPlanned, actionIssued}, {actionIssued, actionNotSent}, {actionNotSent, actionPlanned}, {actionPlanned, actionIssued}} {
+	for _, step := range [][2]model.ActionState{{actionPlanned, actionIssued}, {actionIssued, actionNotSent}, {actionNotSent, actionPlanned}, {actionPlanned, actionIssued}} {
 		if err := r.Transition(t.Context(), op.ID, "launch", step[0], step[1], nil); err != nil {
 			t.Fatal(err)
 		}
@@ -193,8 +196,8 @@ func TestReconcileOperationAfterInterruptedRegistration(t *testing.T) {
 func TestReconcileOperationAfterInterruptedUpdate(t *testing.T) {
 	for _, tt := range []struct {
 		name      string
-		before    string
-		after     string
+		before    model.ActionState
+		after     model.ActionState
 		operation string
 		apply     func(context.Context, *Repository, string) error
 	}{

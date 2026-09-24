@@ -287,7 +287,7 @@ func TestEnginePracticalRestoreSettlesVerifiedFidelityLimits(t *testing.T) {
 
 	result, err := engine.Restore(ctx, repo, server, engine.RestoreConfig{
 		LeaseRoot: leaseRoot, Generation: generation, Sessions: nil, OperationID: "",
-		LaunchProcesses: false, AllowMissingWorkingDir: false, CompensateOnFailure: false,
+		LaunchProcesses: false, AllowMissingWorkingDir: false,
 		Profile: engine.RecoveryPractical,
 	})
 	if err != nil {
@@ -330,7 +330,7 @@ func assertMissingRequirementReason(t *testing.T, result engine.RestoreResult, r
 	t.Helper()
 
 	for _, requirement := range result.MissingRequirements {
-		if requirement.Reason == reason {
+		if string(requirement.Reason) == reason {
 			return
 		}
 	}
@@ -354,7 +354,7 @@ func TestEngineRestoreFailureRetainsPinAndSource(t *testing.T) {
 
 	result := runFailingRestoreOnMissingDir(t, ctx, repo, server, leaseRoot, generation)
 
-	assertCompensationAndUnrelatedIntact(t, ctx, server, result, unrelated, unrelatedLinks, unrelatedPaneInfo)
+	assertRetainedAndUnrelatedIntact(t, ctx, server, result, unrelated, unrelatedLinks, unrelatedPaneInfo)
 	assertFailureRetainedPinAndExplicitAbandonment(t, ctx, repo, server, leaseRoot, generation, result.OperationID)
 }
 
@@ -405,7 +405,7 @@ func TestEngineRestoreRefusesDispatchedButUnconfirmedEffect(t *testing.T) {
 
 	firstStep := plan.Steps[0]
 
-	if err := repo.Transition(ctx, result.OperationID, restore.ActionID(firstStep.ID), "planned", "issued", nil); err != nil {
+	if err := repo.Transition(ctx, result.OperationID, restore.ActionID(firstStep.ID()), "planned", "issued", nil); err != nil {
 		t.Fatalf("Transition failed: %v", err)
 	}
 
@@ -506,7 +506,6 @@ func TestEngineRestoreRefusesRestartedDaemonTarget(t *testing.T) {
 		OperationID:            result.OperationID,
 		LaunchProcesses:        false,
 		AllowMissingWorkingDir: false,
-		CompensateOnFailure:    true,
 	})
 	if err == nil {
 		t.Fatal("expected resumption against a restarted daemon to be refused")
@@ -707,7 +706,6 @@ func runFailingRestoreOnMissingDir(
 		OperationID:            "",
 		LaunchProcesses:        false,
 		AllowMissingWorkingDir: false,
-		CompensateOnFailure:    true,
 	})
 	if err == nil {
 		t.Fatal("expected the restore to fail on the missing working directory")
@@ -724,7 +722,7 @@ func runFailingRestoreOnMissingDir(
 	return result
 }
 
-func assertCompensationAndUnrelatedIntact(
+func assertRetainedAndUnrelatedIntact(
 	t *testing.T,
 	ctx context.Context,
 	server *gotmux.Server,
@@ -735,25 +733,19 @@ func assertCompensationAndUnrelatedIntact(
 ) {
 	t.Helper()
 
-	assertCompensationRetained(t, ctx, server, result)
+	assertCreatedSessionRetained(t, ctx, server, result)
 	assertUnrelatedSurvives(t, ctx, server, unrelated, unrelatedLinks, unrelatedPaneInfo)
 }
 
-func assertCompensationRetained(t *testing.T, ctx context.Context, server *gotmux.Server, result engine.RestoreResult) {
+func assertCreatedSessionRetained(t *testing.T, ctx context.Context, server *gotmux.Server, result engine.RestoreResult) {
 	t.Helper()
 
-	if len(result.Compensation) == 0 {
-		t.Fatal("expected the created session to be compensated")
-	}
-
-	for _, entry := range result.Compensation {
-		if entry.Status != restore.CompensationRetained {
-			t.Fatalf("expected unsafe compensation to retain the created session, got %+v", entry)
-		}
-	}
-
-	if _, err := server.FindSession(ctx, "fail-first"); err != nil {
+	found, err := server.FindSession(ctx, "fail-first")
+	if err != nil {
 		t.Fatalf("retained session must survive, got %v", err)
+	}
+	if len(result.SessionsRestored) != 1 || result.SessionsRestored[0] != string(found.ID()) {
+		t.Fatalf("expected restored session receipt for fail-first, got %+v", result.SessionsRestored)
 	}
 }
 
@@ -829,9 +821,8 @@ func assertFailureRetainedPinAndExplicitAbandonment(
 		OperationID:            operationID,
 		LaunchProcesses:        false,
 		AllowMissingWorkingDir: false,
-		CompensateOnFailure:    true,
 	})
-	if !errors.Is(err, restore.ErrWorkingDirNotFound) || !errors.Is(err, restore.ErrCompensationUnavailable) {
+	if !errors.Is(err, restore.ErrWorkingDirNotFound) {
 		t.Fatalf("expected retained operation to resume without replay and fail at the same missing directory, got %v", err)
 	}
 
@@ -930,7 +921,6 @@ func runFailingRestoreForLogging(t *testing.T, logCtx context.Context, repo *sto
 		OperationID:            "",
 		LaunchProcesses:        false,
 		AllowMissingWorkingDir: false,
-		CompensateOnFailure:    true,
 	})
 	if err == nil {
 		t.Fatal("expected restoring a missing generation to fail")
@@ -991,7 +981,6 @@ func TestEngineRestoreRefusesConfigMismatchOnSameOperationID(t *testing.T) {
 		OperationID:            "",
 		LaunchProcesses:        false,
 		AllowMissingWorkingDir: false,
-		CompensateOnFailure:    false,
 	}
 
 	result, err := engine.Restore(ctx, repo, server, cfgOriginal)
@@ -1061,7 +1050,6 @@ func TestEngineRestoreVerificationFailureSingleOwningErrorRecord(t *testing.T) {
 		OperationID:            "",
 		LaunchProcesses:        false,
 		AllowMissingWorkingDir: false,
-		CompensateOnFailure:    true,
 	})
 	if err == nil {
 		t.Fatal("expected verification to fail on slot mismatch")

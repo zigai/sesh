@@ -22,7 +22,7 @@ var (
 )
 
 type TestStep struct {
-	State     string
+	State     model.ActionState
 	RuntimeID string
 }
 
@@ -82,7 +82,7 @@ func (j *memoryJournal) Steps(_ context.Context, steps []Step) (map[string]StepS
 
 	states := make(map[string]StepState, len(steps))
 	for _, step := range steps {
-		states[step.ID] = StepState(j.state(step.ID))
+		states[step.ID()] = StepState(j.state(step.ID()))
 	}
 
 	return states, nil
@@ -92,7 +92,7 @@ func (j *memoryJournal) Intent(_ context.Context, step Step) error {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 
-	j.calls = append(j.calls, "intent:"+step.ID)
+	j.calls = append(j.calls, "intent:"+step.ID())
 
 	if hook := j.beforeIntent; hook != nil {
 		if err := hook(step); err != nil {
@@ -100,17 +100,17 @@ func (j *memoryJournal) Intent(_ context.Context, step Step) error {
 		}
 	}
 
-	if err := j.failIntent[step.ID]; err != nil {
+	if err := j.failIntent[step.ID()]; err != nil {
 		return err
 	}
 
-	current := j.state(step.ID)
+	current := j.state(step.ID())
 
 	switch current.State {
 	case StatePlanned:
-		j.set(step.ID, TestStep{State: StateIssued, RuntimeID: ""})
+		j.set(step.ID(), TestStep{State: StateIssued, RuntimeID: ""})
 	case StateNotSent:
-		j.set(step.ID, TestStep{State: StateIssued, RuntimeID: ""})
+		j.set(step.ID(), TestStep{State: StateIssued, RuntimeID: ""})
 	case StateIssued:
 		return nil
 	default:
@@ -124,8 +124,8 @@ func (j *memoryJournal) Confirmed(_ context.Context, step Step, runtimeID string
 	j.mu.Lock()
 	defer j.mu.Unlock()
 
-	j.calls = append(j.calls, "confirmed:"+step.ID)
-	j.confirmCount[step.ID]++
+	j.calls = append(j.calls, "confirmed:"+step.ID())
+	j.confirmCount[step.ID()]++
 
 	if hook := j.beforeConfirmed; hook != nil {
 		if err := hook(step); err != nil {
@@ -133,15 +133,15 @@ func (j *memoryJournal) Confirmed(_ context.Context, step Step, runtimeID string
 		}
 	}
 
-	if err := j.failConfirm[step.ID]; err != nil {
+	if err := j.failConfirm[step.ID()]; err != nil {
 		return err
 	}
 
-	if j.state(step.ID).State != StateIssued {
-		return fmt.Errorf("%w: confirm from %s", errJournalOrder, j.state(step.ID).State)
+	if j.state(step.ID()).State != StateIssued {
+		return fmt.Errorf("%w: confirm from %s", errJournalOrder, j.state(step.ID()).State)
 	}
 
-	j.set(step.ID, TestStep{State: StateConfirmed, RuntimeID: runtimeID})
+	j.set(step.ID(), TestStep{State: StateConfirmed, RuntimeID: runtimeID})
 
 	return nil
 }
@@ -150,17 +150,17 @@ func (j *memoryJournal) NotSent(_ context.Context, step Step) error {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 
-	j.calls = append(j.calls, "not-sent:"+step.ID)
+	j.calls = append(j.calls, "not-sent:"+step.ID())
 
-	if err := j.failNotSent[step.ID]; err != nil {
+	if err := j.failNotSent[step.ID()]; err != nil {
 		return err
 	}
 
-	if j.state(step.ID).State != StateIssued {
-		return fmt.Errorf("%w: not-sent from %s", errJournalOrder, j.state(step.ID).State)
+	if j.state(step.ID()).State != StateIssued {
+		return fmt.Errorf("%w: not-sent from %s", errJournalOrder, j.state(step.ID()).State)
 	}
 
-	j.set(step.ID, TestStep{State: StateNotSent, RuntimeID: ""})
+	j.set(step.ID(), TestStep{State: StateNotSent, RuntimeID: ""})
 
 	return nil
 }
@@ -169,17 +169,17 @@ func (j *memoryJournal) Unknown(_ context.Context, step Step) error {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 
-	j.calls = append(j.calls, "unknown:"+step.ID)
+	j.calls = append(j.calls, "unknown:"+step.ID())
 
-	if err := j.failUnknown[step.ID]; err != nil {
+	if err := j.failUnknown[step.ID()]; err != nil {
 		return err
 	}
 
-	if j.state(step.ID).State != StateIssued {
+	if j.state(step.ID()).State != StateIssued {
 		return nil
 	}
 
-	j.set(step.ID, TestStep{State: StateUnknown, RuntimeID: ""})
+	j.set(step.ID(), TestStep{State: StateUnknown, RuntimeID: ""})
 
 	return nil
 }
@@ -204,7 +204,7 @@ func newStoreJournal(ctx context.Context, repository *store.Repository, operatio
 	return &storeJournal{repository: repository, operation: operation, states: states}, nil
 }
 
-func (j *storeJournal) transition(ctx context.Context, id, expected, next string, runtimeID model.Bytes) error {
+func (j *storeJournal) transition(ctx context.Context, id string, expected, next model.ActionState, runtimeID model.Bytes) error {
 	if err := j.repository.Transition(ctx, j.operation, id, expected, next, runtimeID); err != nil {
 		return fmt.Errorf("record action transition: %w", err)
 	}
@@ -243,7 +243,7 @@ func (j *storeJournal) Steps(_ context.Context, steps []Step) (map[string]StepSt
 	states := make(map[string]StepState, len(steps))
 
 	for _, step := range steps {
-		action, ok := j.states[ActionID(step.ID)]
+		action, ok := j.states[ActionID(step.ID())]
 		if !ok {
 			return nil, errJournalActionSet
 		}
@@ -252,26 +252,26 @@ func (j *storeJournal) Steps(_ context.Context, steps []Step) (map[string]StepSt
 			return nil, errJournalKind
 		}
 
-		states[step.ID] = StepState{State: action.State, RuntimeID: string(action.RuntimeID)}
+		states[step.ID()] = StepState{State: action.State, RuntimeID: string(action.RuntimeID)}
 	}
 
 	return states, nil
 }
 
 func (j *storeJournal) Intent(ctx context.Context, step Step) error {
-	return j.advance(ctx, ActionID(step.ID))
+	return j.advance(ctx, ActionID(step.ID()))
 }
 
 func (j *storeJournal) Confirmed(ctx context.Context, step Step, runtimeID string) error {
-	return j.transition(ctx, ActionID(step.ID), StateIssued, StateConfirmed, model.Bytes(runtimeID))
+	return j.transition(ctx, ActionID(step.ID()), StateIssued, StateConfirmed, model.Bytes(runtimeID))
 }
 
 func (j *storeJournal) NotSent(ctx context.Context, step Step) error {
-	return j.transition(ctx, ActionID(step.ID), StateIssued, StateNotSent, nil)
+	return j.transition(ctx, ActionID(step.ID()), StateIssued, StateNotSent, nil)
 }
 
 func (j *storeJournal) Unknown(ctx context.Context, step Step) error {
-	action, ok := j.states[ActionID(step.ID)]
+	action, ok := j.states[ActionID(step.ID())]
 	if !ok {
 		return errJournalActionSet
 	}
@@ -280,7 +280,7 @@ func (j *storeJournal) Unknown(ctx context.Context, step Step) error {
 		return nil
 	}
 
-	return j.transition(ctx, ActionID(step.ID), StateIssued, StateUnknown, nil)
+	return j.transition(ctx, ActionID(step.ID()), StateIssued, StateUnknown, nil)
 }
 
 type faultJournal struct {
@@ -327,7 +327,7 @@ func (j *faultJournal) Steps(ctx context.Context, steps []Step) (map[string]Step
 }
 
 func (j *faultJournal) Intent(ctx context.Context, step Step) error {
-	j.record("intent:" + step.ID)
+	j.record("intent:" + step.ID())
 
 	if hook := j.beforeIntent; hook != nil {
 		if err := hook(step); err != nil {
@@ -335,7 +335,7 @@ func (j *faultJournal) Intent(ctx context.Context, step Step) error {
 		}
 	}
 
-	if err := j.failIntent[step.ID]; err != nil {
+	if err := j.failIntent[step.ID()]; err != nil {
 		return err
 	}
 
@@ -347,10 +347,10 @@ func (j *faultJournal) Intent(ctx context.Context, step Step) error {
 }
 
 func (j *faultJournal) Confirmed(ctx context.Context, step Step, runtimeID string) error {
-	j.record("confirmed:" + step.ID)
+	j.record("confirmed:" + step.ID())
 
 	j.mu.Lock()
-	j.confirmCount[step.ID]++
+	j.confirmCount[step.ID()]++
 	j.mu.Unlock()
 
 	if hook := j.beforeConfirmed; hook != nil {
@@ -359,7 +359,7 @@ func (j *faultJournal) Confirmed(ctx context.Context, step Step, runtimeID strin
 		}
 	}
 
-	if err := j.failConfirmed[step.ID]; err != nil {
+	if err := j.failConfirmed[step.ID()]; err != nil {
 		return err
 	}
 
@@ -371,7 +371,7 @@ func (j *faultJournal) Confirmed(ctx context.Context, step Step, runtimeID strin
 }
 
 func (j *faultJournal) NotSent(ctx context.Context, step Step) error {
-	j.record("not-sent:" + step.ID)
+	j.record("not-sent:" + step.ID())
 
 	if err := j.inner.NotSent(ctx, step); err != nil {
 		return fmt.Errorf("record delegate refusal: %w", err)
@@ -381,7 +381,7 @@ func (j *faultJournal) NotSent(ctx context.Context, step Step) error {
 }
 
 func (j *faultJournal) Unknown(ctx context.Context, step Step) error {
-	j.record("unknown:" + step.ID)
+	j.record("unknown:" + step.ID())
 
 	if err := j.inner.Unknown(ctx, step); err != nil {
 		return fmt.Errorf("record delegate uncertainty: %w", err)

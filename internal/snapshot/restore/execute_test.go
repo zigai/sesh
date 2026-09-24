@@ -18,10 +18,6 @@ func TestDefaultExecuteConfig(t *testing.T) {
 		t.Error("expected process launches to be disabled by default")
 	}
 
-	if cfg.CompensateOnFailure {
-		t.Error("expected CompensateOnFailure to be false by default")
-	}
-
 	if cfg.AllowMissingWorkingDir {
 		t.Error("expected AllowMissingWorkingDir to be false by default")
 	}
@@ -180,9 +176,9 @@ func TestVerifiedRuntimePaneResultsDoNotInventLaunchEvidence(t *testing.T) {
 
 	plan := Plan{SourceGraph: model.Manifest{Panes: []model.Pane{
 		{ID: "p-restart", Launch: model.Launch{Recovery: model.RecoveryRestart}},
-		{ID: "p-dead", Launch: model.Launch{Recovery: model.RecoveryNonrestartable, Reason: model.ReasonPaneDead}},
-		{ID: "p-executable", Launch: model.Launch{Recovery: model.RecoveryNonrestartable, Reason: model.ReasonExecutableDeleted}},
-		{ID: "p-directory", Launch: model.Launch{Recovery: model.RecoveryNonrestartable, Reason: model.ReasonWorkingDirectoryDeleted}},
+		{ID: "p-dead", Launch: model.Launch{Recovery: model.RecoveryNonrestartable, Reason: string(model.ReasonPaneDead)}},
+		{ID: "p-executable", Launch: model.Launch{Recovery: model.RecoveryNonrestartable, Reason: string(model.ReasonExecutableDeleted)}},
+		{ID: "p-directory", Launch: model.Launch{Recovery: model.RecoveryNonrestartable, Reason: string(model.ReasonWorkingDirectoryDeleted)}},
 	}}}
 	runtimePanes := map[string]string{"p-restart": "%10", "p-dead": "%11", "p-executable": "%12", "p-directory": "%13"}
 
@@ -191,11 +187,11 @@ func TestVerifiedRuntimePaneResultsDoNotInventLaunchEvidence(t *testing.T) {
 		t.Fatalf("reinspected restart result = %+v", got)
 	}
 
-	if got := launched[1]; got.RuntimeID != "%11" || got.Outcome != PaneOutcomeUnsupported || got.Reason != model.ReasonPaneDead {
+	if got := launched[1]; got.RuntimeID != "%11" || got.Outcome != PaneOutcomeUnsupported || got.Reason != string(model.ReasonPaneDead) {
 		t.Fatalf("reinspected dead-pane result = %+v", got)
 	}
 
-	for index, reason := range []string{model.ReasonExecutableDeleted, model.ReasonWorkingDirectoryDeleted} {
+	for index, reason := range []string{string(model.ReasonExecutableDeleted), string(model.ReasonWorkingDirectoryDeleted)} {
 		if got := launched[index+2]; got.Outcome != PaneOutcomeUnsupported || got.Reason != reason {
 			t.Fatalf("reinspected nonrestartable result = %+v, want reason %q", got, reason)
 		}

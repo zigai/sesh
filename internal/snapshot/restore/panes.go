@@ -32,11 +32,12 @@ func PanesFromVerifiedRuntime(plan Plan, runtimePanes map[string]string, launchP
 	results := make([]PaneResult, 0, len(plan.SourceGraph.Panes))
 
 	for _, pane := range plan.SourceGraph.Panes {
+		outcome, reason := paneOutcome(pane.Launch, launchProcesses)
 		results = append(results, PaneResult{
 			PaneID:             pane.ID,
 			RuntimeID:          runtimePanes[pane.ID],
-			Outcome:            verifiedPaneOutcome(pane.Launch, launchProcesses),
-			Reason:             verifiedPaneReason(pane.Launch, launchProcesses),
+			Outcome:            outcome,
+			Reason:             reason,
 			AppVerified:        false,
 			CWDFallback:        false,
 			VerificationReason: "",
@@ -46,46 +47,27 @@ func PanesFromVerifiedRuntime(plan Plan, runtimePanes map[string]string, launchP
 	return results
 }
 
-func verifiedPaneOutcome(launch model.Launch, launchProcesses bool) string {
-	if !launchProcesses {
-		return PaneOutcomeDefaultShell
-	}
-
-	switch launch.Recovery {
-	case model.RecoveryNonrestartable:
-		return PaneOutcomeUnsupported
-	case model.RecoveryUnverified:
-		if len(launch.Executable) > 0 || len(launch.Arguments) > 0 {
-			return PaneOutcomeUnsupported
-		}
-
-		return PaneOutcomeDefaultShell
-	case model.RecoveryRestart, model.RecoveryResume:
-		return PaneOutcomeEvidenceUnavailable
-	default:
-		return PaneOutcomeDefaultShell
-	}
-}
-
-func verifiedPaneReason(launch model.Launch, launchProcesses bool) string {
+func paneOutcome(launch model.Launch, launchProcesses bool) (string, string) {
 	if !launchProcesses {
 		if launch.Recovery == model.RecoveryRestart || launch.Recovery == model.RecoveryResume {
-			return PaneReasonProcessLaunchDisabled
+			return PaneOutcomeDefaultShell, PaneReasonProcessLaunchDisabled
 		}
 
-		return ""
+		return PaneOutcomeDefaultShell, ""
 	}
 
 	switch launch.Recovery {
 	case model.RecoveryNonrestartable:
-		return launch.Reason
+		return PaneOutcomeUnsupported, launch.Reason
 	case model.RecoveryUnverified:
 		if len(launch.Executable) > 0 || len(launch.Arguments) > 0 {
-			return PaneReasonUnsupportedLaunch
+			return PaneOutcomeUnsupported, PaneReasonUnsupportedLaunch
 		}
+
+		return PaneOutcomeDefaultShell, ""
 	case model.RecoveryRestart, model.RecoveryResume:
-		return PaneReasonEvidenceUnavailable
+		return PaneOutcomeEvidenceUnavailable, PaneReasonEvidenceUnavailable
 	}
 
-	return ""
+	return PaneOutcomeDefaultShell, ""
 }

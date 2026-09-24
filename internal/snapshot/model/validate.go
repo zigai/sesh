@@ -108,10 +108,10 @@ func validEvidence(e Evidence) bool {
 		return false
 	}
 
-	return slices.Contains([]string{
-		"not_captured", "capture_not_atomic", "terminal_checkpoint_unavailable",
-		"application_checkpoint_unavailable", "ownership_unverified", "observed_only",
-	}, e.Reason)
+	return slices.Contains([]Reason{
+		ReasonNotCaptured, ReasonCaptureNotAtomic, ReasonTerminalCheckpointUnavailable,
+		ReasonApplicationCheckpointUnavailable, ReasonOwnershipUnverified, ReasonObservedOnly,
+	}, Reason(e.Reason))
 }
 
 func (m Manifest) validateSessions() error {

@@ -752,7 +752,7 @@ func verifiedSteps(plan Plan, state *verifiedState) []string {
 
 	for _, step := range plan.Steps {
 		if stepObserved(step, state) {
-			verified = append(verified, step.ID)
+			verified = append(verified, step.ID())
 		}
 	}
 
@@ -760,74 +760,50 @@ func verifiedSteps(plan Plan, state *verifiedState) []string {
 }
 
 func stepObserved(step Step, state *verifiedState) bool {
-	switch step.Kind {
-	case StepCreateSession, StepPlaceInitialWindow, StepCreateWindow:
-		return structuralStepObserved(step, state)
-	case StepSplitPane, StepLinkWindow, StepCloseBootstrapWindow:
-		return placementStepObserved(step, state)
-	case StepApplyLayout, StepSelectPane, StepApplyZoom, StepSelectWindow, StepSetPaneTitle:
-		return finalizationStepObserved(step, state)
+	switch step := step.(type) {
+	case *CreateSessionStep:
+		return createdSessionObserved(step, state)
+	case *PlaceInitialWindowStep:
+		return placedInitialWindowObserved(step, state)
+	case *CreateWindowStep:
+		return createdWindowObserved(step, state)
+	case *SplitPaneStep:
+		return state.pane[step.PaneID]
+	case *LinkWindowStep:
+		return state.slot[slotKey{session: step.SessionID, index: step.Index}]
+	case *CloseBootstrapWindowStep:
+		return state.nav[step.SessionID]
+	case *ApplyLayoutStep:
+		return state.layout[step.WindowID]
+	case *SelectPaneStep:
+		return state.active[step.WindowID]
+	case *ApplyZoomStep:
+		return state.zoom[step.WindowID]
+	case *SelectWindowStep:
+		return state.nav[step.SessionID]
+	case *SetPaneTitleStep:
+		return state.title[step.PaneID]
 	}
 
 	return false
 }
 
-func structuralStepObserved(step Step, state *verifiedState) bool {
-	switch step.Kind {
-	case StepCreateSession:
-		session := step.CreateSession.SessionID
+func createdSessionObserved(step *CreateSessionStep, state *verifiedState) bool {
+	session := step.SessionID
 
-		return state.session[session] && state.group[session] && state.options[session] && state.variables[session]
-	case StepPlaceInitialWindow:
-		if step.PlaceInitialWindow.WindowID == "" {
-			return state.nav[step.PlaceInitialWindow.SessionID]
-		}
-
-		return state.slot[slotKey{session: step.PlaceInitialWindow.SessionID, index: step.PlaceInitialWindow.Index}]
-	case StepCreateWindow:
-		window := step.CreateWindow.WindowID
-
-		return state.window[window] && state.layout[window] && state.zoom[window]
-	case StepSplitPane, StepLinkWindow, StepCloseBootstrapWindow,
-		StepApplyLayout, StepSelectPane, StepApplyZoom, StepSelectWindow, StepSetPaneTitle:
-		return false
-	}
-
-	return false
+	return state.session[session] && state.group[session] && state.options[session] && state.variables[session]
 }
 
-func placementStepObserved(step Step, state *verifiedState) bool {
-	switch step.Kind {
-	case StepSplitPane:
-		return state.pane[step.SplitPane.PaneID]
-	case StepLinkWindow:
-		return state.slot[slotKey{session: step.LinkWindow.SessionID, index: step.LinkWindow.Index}]
-	case StepCloseBootstrapWindow:
-		return state.nav[step.CloseBootstrapWindow.SessionID]
-	case StepCreateSession, StepPlaceInitialWindow, StepCreateWindow,
-		StepApplyLayout, StepSelectPane, StepApplyZoom, StepSelectWindow, StepSetPaneTitle:
-		return false
+func placedInitialWindowObserved(step *PlaceInitialWindowStep, state *verifiedState) bool {
+	if step.WindowID == "" {
+		return state.nav[step.SessionID]
 	}
 
-	return false
+	return state.slot[slotKey{session: step.SessionID, index: step.Index}]
 }
 
-func finalizationStepObserved(step Step, state *verifiedState) bool {
-	switch step.Kind {
-	case StepApplyLayout:
-		return state.layout[step.ApplyLayout.WindowID]
-	case StepSelectPane:
-		return state.active[step.SelectPane.WindowID]
-	case StepApplyZoom:
-		return state.zoom[step.ApplyZoom.WindowID]
-	case StepSelectWindow:
-		return state.nav[step.SelectWindow.SessionID]
-	case StepSetPaneTitle:
-		return state.title[step.SetPaneTitle.PaneID]
-	case StepCreateSession, StepPlaceInitialWindow, StepCreateWindow,
-		StepSplitPane, StepLinkWindow, StepCloseBootstrapWindow:
-		return false
-	}
+func createdWindowObserved(step *CreateWindowStep, state *verifiedState) bool {
+	window := step.WindowID
 
-	return false
+	return state.window[window] && state.layout[window] && state.zoom[window]
 }

@@ -75,7 +75,7 @@ func PickerAgentSummaries(observed []agents.AgentSession) []session.AgentSummary
 func (e *pickerRestoreOutcomeError) Error() string {
 	details := make([]string, 0, len(e.result.MissingRequirements))
 	for _, requirement := range e.result.MissingRequirements {
-		details = append(details, requirement.Domain+"/"+requirement.Status+"/"+requirement.Reason)
+		details = append(details, requirement.Domain+"/"+requirement.Status+"/"+string(requirement.Reason))
 	}
 
 	message := fmt.Sprintf(
@@ -114,7 +114,6 @@ func newPickerRestoreOutcomeError(result engine.RestoreResult, cause error) erro
 func cloneRestoreResult(result engine.RestoreResult) engine.RestoreResult {
 	result.SessionsRestored = slices.Clone(result.SessionsRestored)
 	result.MissingRequirements = slices.Clone(result.MissingRequirements)
-	result.Compensation = slices.Clone(result.Compensation)
 
 	return result
 }
@@ -303,7 +302,6 @@ func (s *pickerServices) RestoreAndEnterSession(ctx context.Context, target sess
 		OperationID:            "",
 		LaunchProcesses:        true,
 		AllowMissingWorkingDir: false,
-		CompensateOnFailure:    false,
 		Profile:                engine.RecoveryPractical,
 	})
 	if err != nil {

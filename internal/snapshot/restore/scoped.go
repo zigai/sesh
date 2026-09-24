@@ -118,13 +118,13 @@ func ScopedStateRequirements(plan Plan) []MissingRequirement {
 
 	for _, option := range plan.SourceGraph.Source.Options {
 		if option.Scope == "server" || option.Scope == "global-session" || option.Scope == "global-window" {
-			report.note("options", "global_scope_options_not_applied")
+			report.note("options", model.ReasonGlobalScopeOptionsNotApplied)
 		}
 	}
 
 	for _, variable := range plan.SourceGraph.Source.Environment {
 		if variable.State == "set" || variable.State == "removed" || variable.State == "absent" {
-			report.note("environment", "global_scope_environment_materialized_locally")
+			report.note("environment", model.ReasonGlobalScopeEnvironmentMaterializedLocally)
 
 			break
 		}
@@ -143,11 +143,11 @@ func ScopedStateRequirements(plan Plan) []MissingRequirement {
 
 func (r *ImportReport) noteInheritedOptions(options []model.Option) {
 	if hasUnsupportedInheritedOption(options) {
-		r.note("options", "inherited_option_not_representable")
+		r.note("options", model.ReasonInheritedOptionNotRepresentable)
 	}
 
 	if hasMaterializableInheritedOption(options) {
-		r.note("options", "inherited_options_materialized_locally")
+		r.note("options", model.ReasonInheritedOptionsMaterializedLocally)
 	}
 }
 
@@ -198,7 +198,7 @@ func importSessionScope(
 	}
 
 	if masked {
-		report.note("environment", "target_environment_masked_locally")
+		report.note("environment", model.ReasonTargetEnvironmentMaskedLocally)
 	}
 
 	optionsMatch, err := effectiveOptionsMatch(ctx, handle.Options(), session.Options)
@@ -207,7 +207,7 @@ func importSessionScope(
 	}
 
 	if !optionsMatch {
-		report.note("options", "target_inherited_options_unmasked")
+		report.note("options", model.ReasonTargetInheritedOptionsUnmasked)
 	}
 
 	environmentMatch, err := effectiveEnvironmentMatch(ctx, targetGlobal, handle.Environment(), sourceGlobal, session.Environment)
@@ -216,7 +216,7 @@ func importSessionScope(
 	}
 
 	if !environmentMatch {
-		report.note("environment", "target_environment_unmasked")
+		report.note("environment", model.ReasonTargetEnvironmentUnmasked)
 	}
 
 	report.Sessions++
@@ -249,7 +249,7 @@ func importWindowScopes(ctx context.Context, server *tmux.Server, plan Plan, ide
 		}
 
 		if !matches {
-			report.note("options", "target_inherited_options_unmasked")
+			report.note("options", model.ReasonTargetInheritedOptionsUnmasked)
 		}
 
 		report.Windows++
@@ -282,7 +282,7 @@ func importPaneScopes(ctx context.Context, server *tmux.Server, plan Plan, ident
 		}
 
 		if !matches {
-			report.note("options", "target_inherited_options_unmasked")
+			report.note("options", model.ReasonTargetInheritedOptionsUnmasked)
 		}
 
 		report.Panes++
@@ -292,7 +292,7 @@ func importPaneScopes(ctx context.Context, server *tmux.Server, plan Plan, ident
 	return nil
 }
 
-func (r *ImportReport) note(domain, reason string) {
+func (r *ImportReport) note(domain string, reason model.Reason) {
 	entry := MissingRequirement{Domain: domain, Status: "partial", Reason: reason}
 	if slices.Contains(r.Missing, entry) {
 		return

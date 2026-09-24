@@ -191,7 +191,7 @@ func TestPopupHandoffSwitchesOnlyOpeningClientAfterPopupSelection(t *testing.T) 
 	}
 }
 
-func attachPickerTestClient(t *testing.T, session gotmux.Session) string {
+func attachPickerTestClient(t testing.TB, session gotmux.Session) string {
 	t.Helper()
 	before, err := session.Clients(t.Context())
 	if err != nil {

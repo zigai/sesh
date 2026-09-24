@@ -427,7 +427,7 @@ func TestRegisterOperationInvalidIDsAndActionRequests(t *testing.T) {
 	})
 
 	t.Run("action requests with non-planned state", func(t *testing.T) {
-		for _, badState := range []string{actionIssued, actionUnknown, actionConfirmed, actionVerified, actionConflict} {
+		for _, badState := range []model.ActionState{actionIssued, actionUnknown, actionConfirmed, actionVerified} {
 			badActions := []Action{{ID: "act", Kind: actionLaunch, State: badState}}
 			_, err := r.RegisterOperation(t.Context(), newID(), source.ID, validTarget, badActions)
 			assertRepositoryDiagnostic(t, err, "register_operation", "repository_conflict", ErrConflict)

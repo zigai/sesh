@@ -115,7 +115,7 @@ func paneObservation(info gotmux.PaneInfo) model.Pane {
 
 	if dead {
 		launch.Recovery = model.RecoveryNonrestartable
-		launch.Reason = model.ReasonPaneDead
+		launch.Reason = string(model.ReasonPaneDead)
 	}
 
 	return model.Pane{

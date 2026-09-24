@@ -9,7 +9,6 @@ const (
 	actionUnknown   = "unknown"
 	actionConfirmed = "confirmed"
 	actionVerified  = "verified"
-	actionConflict  = "conflict"
 )
 
 const (

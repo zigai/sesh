@@ -6,9 +6,12 @@ import (
 )
 
 func ValidNonrestartableReason(reason string) bool {
-	return reason == ReasonPaneDead ||
-		reason == ReasonExecutableDeleted ||
-		reason == ReasonWorkingDirectoryDeleted
+	switch reason {
+	case string(ReasonPaneDead), string(ReasonExecutableDeleted), string(ReasonWorkingDirectoryDeleted):
+		return true
+	default:
+		return false
+	}
 }
 
 func validateSettings(options []Option, environment []Variable) error {

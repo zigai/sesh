@@ -22,7 +22,7 @@ func NewOperationID() string {
 	return newID()
 }
 
-func (r *Repository) Transition(ctx context.Context, operation, action, expected, next string, runtimeID model.Bytes) error {
+func (r *Repository) Transition(ctx context.Context, operation, action string, expected, next model.ActionState, runtimeID model.Bytes) error {
 	err := r.update(ctx, func(c *Catalog) error {
 		index := slices.IndexFunc(c.Operations, func(op Operation) bool { return op.ID == operation })
 		if index < 0 || c.Operations[index].State != "active" {
@@ -32,7 +32,7 @@ func (r *Repository) Transition(ctx context.Context, operation, action, expected
 		actions := c.Operations[index].Actions
 
 		actionIndex := slices.IndexFunc(actions, func(a Action) bool { return a.ID == action })
-		if actionIndex < 0 || actions[actionIndex].State != expected || !allowedTransition(expected, next) {
+		if actionIndex < 0 || actions[actionIndex].State != expected || !expected.CanBecome(next) {
 			return ErrConflict
 		}
 
@@ -57,7 +57,7 @@ func (r *Repository) Finish(ctx context.Context, operation string, abandon bool)
 		}
 
 		for _, action := range c.Operations[index].Actions {
-			if action.State != "verified" {
+			if action.State != model.ActionStateVerified {
 				return ErrConflict
 			}
 		}
@@ -125,11 +125,11 @@ func validateActions(actions []Action) error {
 			return ErrCorrupt
 		}
 
-		if !slices.Contains([]string{"create-session", "create-window", "create-pane", "link", "configure", "launch", "verify"}, action.Kind) {
+		if !action.Kind.Valid() {
 			return ErrCorrupt
 		}
 
-		if !slices.Contains([]string{"planned", "issued", "not-sent", "unknown", "confirmed", "verified", "conflict"}, action.State) {
+		if !action.State.Valid() {
 			return ErrCorrupt
 		}
 
@@ -137,21 +137,4 @@ func validateActions(actions []Action) error {
 	}
 
 	return nil
-}
-
-func allowedTransition(before, after string) bool {
-	switch before {
-	case "planned":
-		return after == "issued" || after == "conflict"
-	case "issued":
-		return slices.Contains([]string{"not-sent", "unknown", "confirmed", "conflict"}, after)
-	case "not-sent":
-		return after == "planned" || after == "conflict"
-	case "unknown":
-		return after == "confirmed" || after == "conflict"
-	case "confirmed":
-		return after == "verified" || after == "conflict"
-	default:
-		return false
-	}
 }

@@ -76,10 +76,10 @@ type Operation struct {
 }
 
 type Action struct {
-	ID        string      `json:"id"`
-	Kind      string      `json:"kind"`
-	State     string      `json:"state"`
-	RuntimeID model.Bytes `json:"runtimeId"`
+	ID        string            `json:"id"`
+	Kind      model.ActionKind  `json:"kind"`
+	State     model.ActionState `json:"state"`
+	RuntimeID model.Bytes       `json:"runtimeId"`
 }
 
 func (c Catalog) validate() error {
