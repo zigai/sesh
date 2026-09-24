@@ -4,8 +4,10 @@ package session
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -17,6 +19,8 @@ const (
 	switchVerifyAttempts = 3
 
 	switchVerifyDelay = 20 * time.Millisecond
+
+	parallelSwitchQueries = 2
 )
 
 type previousSession struct {
@@ -113,8 +117,84 @@ func (w *Workflow) SwitchSessionOutcomeForClient(ctx context.Context, name, clie
 	return w.switchSessionOutcome(ctx, name, clientName, originSessionID)
 }
 
-func (w *Workflow) switchSessionOutcome(ctx context.Context, name, clientName, originSessionID string) (EnterOutcome, error) {
-	out := EnterOutcome{
+func (w *Workflow) SwitchSessionOutcomeForClientTarget(ctx context.Context, expected Session, clientName, originSessionID string) (EnterOutcome, error) {
+	if clientName == "" || originSessionID == "" {
+		return EnterOutcome{}, oops.In("session").Code("client_unavailable").With("operation", "select_client").Wrap(ErrInvokingClientUnavailable)
+	}
+
+	out := newSessionSwitchOutcome(expected.Name)
+	if err := validateLiveSwitchTarget(expected); err != nil {
+		return out, w.fail(ctx, "switch", lookupSessionError(err))
+	}
+
+	if w.server == nil {
+		return out, w.fail(ctx, "switch", oops.In("session").Code("endpoint_required").Wrap(errServerRequired))
+	}
+
+	target, err := w.server.SessionHandle(gotmux.SessionID(expected.ID))
+	if err != nil {
+		return out, w.fail(ctx, "switch", lookupSessionError(err))
+	}
+
+	var (
+		info      gotmux.SessionInfo
+		targetErr error
+		client    gotmux.ClientInfo
+		previous  previousSession
+		clientErr error
+		queries   sync.WaitGroup
+	)
+
+	queries.Add(parallelSwitchQueries)
+
+	go func() {
+		defer queries.Done()
+
+		info, targetErr = target.Info(ctx)
+	}()
+
+	go func() {
+		defer queries.Done()
+
+		client, previous, clientErr = w.clientForSession(ctx, clientName, originSessionID)
+	}()
+
+	queries.Wait()
+
+	if targetErr != nil {
+		return out, w.fail(ctx, "switch", lookupSessionError(targetErr))
+	}
+
+	target = info.Handle()
+	identity := target.Identity()
+
+	socket := identity.ReportedSocket
+	if socket == "" {
+		socket = w.server.Endpoint().SocketPath
+	}
+
+	current := buildLiveSession(info, socket, identity, "")
+	if current.RuntimeKey() != expected.RuntimeKey() {
+		return out, w.fail(ctx, "switch", lookupSessionError(gotmux.ErrNotFound))
+	}
+
+	if clientErr != nil {
+		return out, w.fail(ctx, "switch", clientErr)
+	}
+
+	return w.switchSessionOutcomeWithClient(ctx, out, target, client, previous)
+}
+
+func validateLiveSwitchTarget(expected Session) error {
+	if expected.Kind != KindLive || expected.Origin != OriginLocal || expected.ID == "" || expected.Name == "" {
+		return gotmux.ErrNotFound
+	}
+
+	return nil
+}
+
+func newSessionSwitchOutcome(name string) EnterOutcome {
+	return EnterOutcome{
 		SessionName: name,
 		SessionID:   "",
 		Action:      EnterSwitch,
@@ -123,6 +203,10 @@ func (w *Workflow) switchSessionOutcome(ctx context.Context, name, clientName, o
 		Client:      "",
 		Hooks:       HookSummary{Attempted: 0, Completed: 0, Failed: 0, TimedOut: 0},
 	}
+}
+
+func (w *Workflow) switchSessionOutcome(ctx context.Context, name, clientName, originSessionID string) (EnterOutcome, error) {
+	out := newSessionSwitchOutcome(name)
 
 	if w.server == nil {
 		return out, w.fail(ctx, "switch", oops.In("session").Code("endpoint_required").Wrap(errServerRequired))
@@ -133,11 +217,20 @@ func (w *Workflow) switchSessionOutcome(ctx context.Context, name, clientName, o
 		return out, w.fail(ctx, "switch", lookupSessionError(err))
 	}
 
-	out.SessionID = string(sess.ID())
+	return w.switchSessionOutcomeWithTarget(ctx, out, sess, clientName, originSessionID)
+}
 
-	var client gotmux.ClientInfo
-
-	var previous previousSession
+func (w *Workflow) switchSessionOutcomeWithTarget(
+	ctx context.Context,
+	out EnterOutcome,
+	sess gotmux.Session,
+	clientName, originSessionID string,
+) (EnterOutcome, error) {
+	var (
+		client   gotmux.ClientInfo
+		previous previousSession
+		err      error
+	)
 
 	if clientName != "" && originSessionID != "" {
 		client, previous, err = w.clientForSession(ctx, clientName, originSessionID)
@@ -149,6 +242,17 @@ func (w *Workflow) switchSessionOutcome(ctx context.Context, name, clientName, o
 		return out, w.fail(ctx, "switch", err)
 	}
 
+	return w.switchSessionOutcomeWithClient(ctx, out, sess, client, previous)
+}
+
+func (w *Workflow) switchSessionOutcomeWithClient(
+	ctx context.Context,
+	out EnterOutcome,
+	sess gotmux.Session,
+	client gotmux.ClientInfo,
+	previous previousSession,
+) (EnterOutcome, error) {
+	out.SessionID = string(sess.ID())
 	out.Client = string(client.Name)
 
 	event := HookEvent{
@@ -156,7 +260,7 @@ func (w *Workflow) switchSessionOutcome(ctx context.Context, name, clientName, o
 		Phase:         "pre",
 		Action:        "switch",
 		PrevSession:   previous.Name,
-		Session:       name,
+		Session:       out.SessionName,
 		PrevSessionID: previous.ID,
 		SessionID:     out.SessionID,
 		Source:        w.source,
@@ -188,7 +292,7 @@ func (w *Workflow) switchSessionOutcome(ctx context.Context, name, clientName, o
 		return out, w.fail(ctx, "switch", postErr)
 	}
 
-	if err := w.recordSwitch(ctx, name); err != nil {
+	if err := w.recordSwitch(ctx, out.SessionName); err != nil {
 		return out, w.fail(ctx, "switch", oops.In("session").Code("history_failed").With("operation", "record_switch").Wrap(err))
 	}
 
@@ -202,35 +306,32 @@ func (w *Workflow) switchSessionOutcome(ctx context.Context, name, clientName, o
 }
 
 func (w *Workflow) clientForSession(ctx context.Context, clientName, originSessionID string) (gotmux.ClientInfo, previousSession, error) {
-	clients, err := w.server.Clients(ctx)
+	clientHandle, err := w.server.ClientHandle(gotmux.ClientName(clientName))
 	if err != nil {
-		return gotmux.ClientInfo{}, previousSession{}, oops.In("session").Code("tmux_failed").With("operation", "list_clients").Wrap(err)
+		return gotmux.ClientInfo{}, previousSession{}, oops.In("session").Code("client_unavailable").With("operation", "select_client").Wrap(ErrInvokingClientUnavailable)
 	}
 
-	for _, client := range clients {
-		if string(client.Name) != clientName || client.Control {
-			continue
+	client, err := clientHandle.InfoWith(ctx, gotmux.QueryOptions{Filter: "", ExtraFields: []string{"session_name"}})
+	if err != nil {
+		if errors.Is(err, gotmux.ErrNotFound) || errors.Is(err, gotmux.ErrClientChanged) {
+			return gotmux.ClientInfo{}, previousSession{}, oops.In("session").Code("client_unavailable").With("operation", "select_client").Wrap(ErrInvokingClientUnavailable)
 		}
 
-		displayed, ok := client.SessionID.Get()
-		if !ok || string(displayed) != originSessionID {
-			break
-		}
-
-		origin, err := w.server.Session(ctx, displayed)
-		if err != nil {
-			return gotmux.ClientInfo{}, previousSession{}, oops.In("session").Code("invoking_context_failed").With("operation", "resolve_invoking_session").Wrap(err)
-		}
-
-		info, err := origin.Info(ctx)
-		if err != nil {
-			return gotmux.ClientInfo{}, previousSession{}, oops.In("session").Code("invoking_context_failed").With("operation", "resolve_invoking_session").Wrap(err)
-		}
-
-		return client, previousSession{Name: info.Name, ID: originSessionID}, nil
+		return gotmux.ClientInfo{}, previousSession{}, oops.In("session").Code("tmux_failed").With("operation", "resolve_client").Wrap(err)
 	}
 
-	return gotmux.ClientInfo{}, previousSession{}, oops.In("session").Code("client_unavailable").With("operation", "select_client").Wrap(ErrInvokingClientUnavailable)
+	displayed, ok := client.SessionID.Get()
+	if client.Control || !ok || string(displayed) != originSessionID {
+		return gotmux.ClientInfo{}, previousSession{}, oops.In("session").Code("client_unavailable").With("operation", "select_client").Wrap(ErrInvokingClientUnavailable)
+	}
+
+	originName, ok := client.Raw("session_name")
+	if !ok || len(originName) == 0 {
+		return gotmux.ClientInfo{}, previousSession{}, oops.In("session").Code("invoking_context_failed").
+			With("operation", "resolve_invoking_session").Wrap(gotmux.ErrProtocol)
+	}
+
+	return client, previousSession{Name: string(originName), ID: originSessionID}, nil
 }
 
 func (w *Workflow) createSession(ctx context.Context, name, dir string) (gotmux.Session, error) {

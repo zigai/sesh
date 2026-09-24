@@ -814,6 +814,38 @@ func TestWorkflow_SwitchHooksRunAroundVerifiedSwitch(t *testing.T) {
 	}
 }
 
+func TestWorkflow_SwitchForClientHookReceivesOriginSessionName(t *testing.T) {
+	fixture := newWorkflowFixture(t)
+
+	marker := filepath.Join(t.TempDir(), "hook-origin")
+	t.Setenv("SESH_TEST_HOOK_MARKER", marker)
+
+	origin := fixture.fixtureSession(t)
+	fixture.newLiveSession(t, "switch-target")
+	client := fixture.attachClient(t, origin.ID)
+
+	hooks := config.HookConfig{SessionSwitchPre: []config.HookCommand{{
+		ShellCommand: `printf '%s:%s' "$SESH_PREV_SESSION" "$SESH_PREV_SESSION_ID" > "$SESH_TEST_HOOK_MARKER"`,
+	}}}
+	wf := fixture.workflow(nil, nil, hooks)
+
+	outcome, err := wf.SwitchSessionOutcomeForClient(t.Context(), "switch-target", client, string(origin.ID))
+	if err != nil {
+		t.Fatalf("SwitchSessionOutcomeForClient failed: %v", err)
+	}
+	if outcome.Client != client {
+		t.Fatalf("switched client = %q, want %q", outcome.Client, client)
+	}
+
+	recorded, err := os.ReadFile(marker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(recorded), origin.Name+":"+string(origin.ID); got != want {
+		t.Fatalf("previous session hook fields = %q, want %q", got, want)
+	}
+}
+
 func TestWorkflow_SwitchPostHookFailureKeepsVerifiedSwitch(t *testing.T) {
 	fixture := newWorkflowFixture(t)
 

@@ -164,7 +164,14 @@ func TestPopupHandoffSwitchesOnlyOpeningClientAfterPopupSelection(t *testing.T) 
 		repositoryPath: filepath.Join(root, "repository"), leaseRoot: filepath.Join(root, "leases"),
 		historyPath: filepath.Join(historyDir, "history.json"),
 	}
-	if err := completePickerSwitchHandoff(ctx, runtime, path, openingClient, string(origin.ID)); err != nil {
+	services, err := newPickerServices(ctx, runtime.cfg, runtime.socketPath, runtime.repositoryPath,
+		runtime.leaseRoot, runtime.historyPath, "", gotmux.TerminalStreams{In: nil, Out: nil, Err: nil},
+		PickerRemoteServices{Catalog: nil, Watcher: nil, Actions: nil, Attach: nil, OriginBridge: nil})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = services.Close() })
+	if err := completePickerSwitchHandoff(ctx, services, path, openingClient, string(origin.ID)); err != nil {
 		t.Fatalf("popup handoff failed: %v", err)
 	}
 	clients, err := server.Clients(ctx)

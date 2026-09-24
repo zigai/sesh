@@ -11,7 +11,6 @@ import (
 	"syscall"
 
 	"github.com/samber/oops"
-	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/session"
 )
@@ -21,9 +20,12 @@ const pickerHandoffMaxBytes = 4096
 var errPickerHandoffInvalid = errors.New("invalid popup switch handoff")
 
 type pickerSwitchHandoff struct {
-	SessionID   string `json:"sessionId"`
-	SessionName string `json:"sessionName"`
-	PaneID      string `json:"paneId,omitempty"`
+	SessionID        string                  `json:"sessionId"`
+	SessionName      string                  `json:"sessionName"`
+	TmuxServerSocket string                  `json:"tmuxServerSocket"`
+	RuntimeIdentity  session.RuntimeIdentity `json:"runtimeIdentity"`
+	ActivePaneID     string                  `json:"activePaneId,omitempty"`
+	PaneID           string                  `json:"paneId,omitempty"`
 }
 
 func createPickerSwitchHandoff() (string, func(), error) {
@@ -46,7 +48,14 @@ func writePickerSwitchHandoff(path string, target session.Session, paneID string
 		return errPickerHandoffInvalid
 	}
 
-	encoded, err := json.Marshal(pickerSwitchHandoff{SessionID: target.ID, SessionName: target.Name, PaneID: paneID})
+	encoded, err := json.Marshal(pickerSwitchHandoff{
+		SessionID:        target.ID,
+		SessionName:      target.Name,
+		TmuxServerSocket: target.TmuxServerSocket,
+		RuntimeIdentity:  target.RuntimeIdentity,
+		ActivePaneID:     target.ActivePaneID,
+		PaneID:           paneID,
+	})
 	if err != nil {
 		return oops.In("cli").With("operation", "encode_picker_handoff").Wrap(err)
 	}
@@ -77,7 +86,9 @@ func readPickerSwitchHandoff(path string) (pickerSwitchHandoff, bool, error) {
 	}
 
 	if len(encoded) == 0 {
-		return pickerSwitchHandoff{SessionID: "", SessionName: "", PaneID: ""}, false, nil
+		var empty pickerSwitchHandoff
+
+		return empty, false, nil
 	}
 
 	if len(encoded) > pickerHandoffMaxBytes {
@@ -95,7 +106,7 @@ func readPickerSwitchHandoff(path string) (pickerSwitchHandoff, bool, error) {
 
 func completePickerSwitchHandoff(
 	ctx context.Context,
-	runtime pickerCommandRuntime,
+	services *pickerServices,
 	path, clientName, originSessionID string,
 ) error {
 	handoff, selected, err := readPickerSwitchHandoff(path)
@@ -107,17 +118,21 @@ func completePickerSwitchHandoff(
 		return errPickerHandoffInvalid
 	}
 
-	services, err := newPickerServices(ctx, runtime.cfg, runtime.socketPath, runtime.repositoryPath,
-		runtime.leaseRoot, runtime.historyPath, "", gotmux.TerminalStreams{In: nil, Out: nil, Err: nil},
-		PickerRemoteServices{Catalog: nil, Watcher: nil, Actions: nil, Attach: nil, OriginBridge: nil})
-	if err != nil {
-		return err
-	}
+	target := newPickerSwitchTarget(handoff)
 
-	target, targetErr := findPickerLiveTarget(ctx, services.server, handoff.SessionID, handoff.SessionName)
-	if targetErr == nil {
-		targetErr = services.performSwitch(ctx, target, handoff.PaneID, clientName, originSessionID)
-	}
+	return services.performSwitchValidated(ctx, target, handoff.PaneID, clientName, originSessionID)
+}
 
-	return errors.Join(targetErr, services.Close())
+func newPickerSwitchTarget(handoff pickerSwitchHandoff) session.Session {
+	var target session.Session
+
+	target.ID = handoff.SessionID
+	target.Name = handoff.SessionName
+	target.TmuxServerSocket = handoff.TmuxServerSocket
+	target.Kind = session.KindLive
+	target.Origin = session.OriginLocal
+	target.RuntimeIdentity = handoff.RuntimeIdentity
+	target.ActivePaneID = handoff.ActivePaneID
+
+	return target
 }

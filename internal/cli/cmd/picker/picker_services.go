@@ -784,11 +784,16 @@ func (s *pickerServices) performSwitch(ctx context.Context, target session.Sessi
 		return err
 	}
 
+	return s.performSwitchValidated(ctx, target, paneID, clientName, originSessionID)
+}
+
+// performSwitchValidated skips the duplicate catalog pass after a fresh handoff lookup.
+func (s *pickerServices) performSwitchValidated(ctx context.Context, target session.Session, paneID, clientName, originSessionID string) error {
 	var outcome session.EnterOutcome
 
 	var err error
 	if clientName != "" && originSessionID != "" {
-		outcome, err = s.workflow.SwitchSessionOutcomeForClient(ctx, target.Name, clientName, originSessionID)
+		outcome, err = s.workflow.SwitchSessionOutcomeForClientTarget(ctx, target, clientName, originSessionID)
 	} else {
 		outcome, err = s.workflow.SwitchSessionOutcome(ctx, target.Name)
 	}

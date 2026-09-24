@@ -491,11 +491,21 @@ func openPickerPopup(ctx context.Context, cmd *cobra.Command, runtime pickerComm
 		gotmux.Exec(executable, pickerPopupArguments(cmd, runtime.socketPath, string(client.Name), string(originSessionID), targetPane, handoffPath)...), width, height,
 	)
 
-	if err := client.Handle().Popup(ctx, options); err != nil {
-		return oops.In("cli").With("operation", "open_picker_popup").Wrap(err)
+	services, err := newPickerServices(ctx, runtime.cfg, runtime.socketPath, runtime.repositoryPath,
+		runtime.leaseRoot, runtime.historyPath, "", gotmux.TerminalStreams{In: nil, Out: nil, Err: nil},
+		PickerRemoteServices{Catalog: nil, Watcher: nil, Actions: nil, Attach: nil, OriginBridge: nil})
+	if err != nil {
+		return err
 	}
 
-	return completePickerSwitchHandoff(ctx, runtime, handoffPath, string(client.Name), string(originSessionID))
+	if err := client.Handle().Popup(ctx, options); err != nil {
+		return errors.Join(oops.In("cli").With("operation", "open_picker_popup").Wrap(err), services.Close())
+	}
+
+	return errors.Join(
+		completePickerSwitchHandoff(ctx, services, handoffPath, string(client.Name), string(originSessionID)),
+		services.Close(),
+	)
 }
 
 func pickerPopupOptions(program gotmux.Program, width, height string) gotmux.PopupOptions {
