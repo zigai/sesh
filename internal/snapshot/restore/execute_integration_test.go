@@ -179,13 +179,25 @@ func TestExecutor_PreflightGroupCollision(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
 
-	_, err := server.NewSession(ctx, tmux.NewSessionOptions{
-		Name:  "live-leader",
+	leader, err := server.NewSession(ctx, tmux.NewSessionOptions{
+		Name:  "grp-shared",
+		Start: tmux.ExistingOnly,
+	})
+	if err != nil {
+		t.Fatalf("pre-creating group leader failed: %v", err)
+	}
+
+	follower, err := server.NewSession(ctx, tmux.NewSessionOptions{
+		Name:  "live-follower",
 		Group: "grp-shared",
 		Start: tmux.ExistingOnly,
 	})
 	if err != nil {
-		t.Fatalf("pre-creating group session failed: %v", err)
+		t.Fatalf("pre-creating group follower failed: %v", err)
+	}
+
+	if err := leader.Rename(ctx, "live-leader"); err != nil {
+		t.Fatalf("renaming group leader failed: %v", err)
 	}
 
 	manifest := newIntegrationManifest()
@@ -212,6 +224,22 @@ func TestExecutor_PreflightGroupCollision(t *testing.T) {
 
 	if !errors.Is(err, ErrGroupCollision) {
 		t.Fatalf("expected ErrGroupCollision, got %v", err)
+	}
+
+	foundLeader, err := server.FindSession(ctx, "live-leader")
+	if err != nil {
+		t.Fatalf("pre-existing leader session should still exist: %v", err)
+	}
+	if foundLeader.ID() != leader.ID() {
+		t.Fatalf("leader session ID changed: %s vs %s", foundLeader.ID(), leader.ID())
+	}
+
+	foundFollower, err := server.FindSession(ctx, "live-follower")
+	if err != nil {
+		t.Fatalf("pre-existing follower session should still exist: %v", err)
+	}
+	if foundFollower.ID() != follower.ID() {
+		t.Fatalf("follower session ID changed: %s vs %s", foundFollower.ID(), follower.ID())
 	}
 }
 

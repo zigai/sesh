@@ -128,7 +128,7 @@ func testNativeGroupAtBase(t *testing.T, base int) {
 		t.Fatalf("ValidatePlan failed: %v", err)
 	}
 
-	target := newStructuralFixture(server)
+	target := newStructuralFixture(server, plan)
 	for _, step := range plan.Steps {
 		target.apply(t, ctx, step)
 	}
@@ -290,6 +290,13 @@ func TestPreflightCheckGroupCollisionRejectsExistingSessionAndGroup(t *testing.T
 	}
 
 	if _, err := server.NewSession(ctx, tmux.NewSessionOptions{
+		Name:  "existing-group",
+		Start: tmux.ExistingOnly,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := server.NewSession(ctx, tmux.NewSessionOptions{
 		Name:  "group-leader",
 		Group: "existing-group",
 		Start: tmux.ExistingOnly,
@@ -368,7 +375,7 @@ func TestSharedWindowsAcrossUnrelatedSessionsAndMultipleGroups(t *testing.T) {
 		t.Fatalf("ValidatePlan failed: %v", err)
 	}
 
-	target := newStructuralFixture(server)
+	target := newStructuralFixture(server, plan)
 	for _, step := range plan.Steps {
 		target.apply(t, ctx, step)
 	}
@@ -933,23 +940,48 @@ func verifyUnrelatedSessionsIntact(t *testing.T, ctx context.Context, u1, u2 tmu
 }
 
 type structuralFixture struct {
-	server     *tmux.Server
-	sessions   map[string]tmux.Session
-	bootstraps map[string]tmux.WindowLink
-	windows    map[string]tmux.Window
-	panes      map[string]tmux.Pane
+	server            *tmux.Server
+	sessions          map[string]tmux.Session
+	sessionNames      map[string]string
+	followersByLeader map[string][]string
+	bootstraps        map[string]tmux.WindowLink
+	windows           map[string]tmux.Window
+	panes             map[string]tmux.Pane
 }
 
-func newStructuralFixture(server *tmux.Server) *structuralFixture {
+func newStructuralFixture(server *tmux.Server, plans ...Plan) *structuralFixture {
 	f := &structuralFixture{server: server}
 	f.ensureMaps()
+	for _, p := range plans {
+		f.indexPlan(p)
+	}
 
 	return f
+}
+
+func (f *structuralFixture) indexPlan(plan Plan) {
+	if f.followersByLeader == nil {
+		f.followersByLeader = make(map[string][]string)
+	}
+
+	for _, step := range plan.Steps {
+		if cs, ok := step.(*CreateSessionStep); ok && cs.GroupLeaderSessionID != "" {
+			f.followersByLeader[cs.GroupLeaderSessionID] = append(f.followersByLeader[cs.GroupLeaderSessionID], cs.SessionID)
+		}
+	}
 }
 
 func (f *structuralFixture) ensureMaps() {
 	if f.sessions == nil {
 		f.sessions = make(map[string]tmux.Session)
+	}
+
+	if f.sessionNames == nil {
+		f.sessionNames = make(map[string]string)
+	}
+
+	if f.followersByLeader == nil {
+		f.followersByLeader = make(map[string][]string)
 	}
 
 	if f.bootstraps == nil {
@@ -997,6 +1029,7 @@ func (f *structuralFixture) apply(t *testing.T, ctx context.Context, step Step) 
 
 func (f *structuralFixture) applyAdversarial(t *testing.T, ctx context.Context, plan Plan) {
 	t.Helper()
+	f.indexPlan(plan)
 
 	steps := append([]Step(nil), plan.Steps...)
 	completed := make(map[string]bool)
@@ -1046,16 +1079,32 @@ func (f *structuralFixture) createGroupFollowerSession(t *testing.T, ctx context
 		t.Fatalf("group leader session %s not found in fixture", step.GroupLeaderSessionID)
 	}
 
+	groupTarget := string(step.GroupName)
+	if groupTarget == "" {
+		groupTarget = f.sessionNames[step.GroupLeaderSessionID]
+		if groupTarget == "" {
+			groupTarget = string(step.Name)
+		}
+	}
+
 	session, err := f.server.NewSession(ctx, tmux.NewSessionOptions{
 		Name:  string(step.Name),
-		Group: string(leader.ID()),
+		Group: groupTarget,
 		Start: tmux.ExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("NewSession for group follower %s failed: %v", step.SessionID, err)
 	}
 
+	targetLeaderName := f.sessionNames[step.GroupLeaderSessionID]
+	if targetLeaderName != "" && targetLeaderName != groupTarget {
+		if err := leader.Rename(ctx, targetLeaderName); err != nil {
+			t.Fatalf("rename leader session %s to %s failed: %v", step.GroupLeaderSessionID, targetLeaderName, err)
+		}
+	}
+
 	f.sessions[step.SessionID] = session
+	f.sessionNames[step.SessionID] = string(step.Name)
 }
 
 func preflightCheckGroupCollision(ctx context.Context, server *tmux.Server, groupName string) error {
@@ -1070,8 +1119,15 @@ func (f *structuralFixture) createLeaderOrStandaloneSession(t *testing.T, ctx co
 		size = tmux.Size{Width: step.Width, Height: step.Height}
 	}
 
+	hasFollowers := len(f.followersByLeader[step.SessionID]) > 0
+	sessionName := string(step.Name)
+	if hasFollowers && len(step.GroupName) > 0 && string(step.GroupName) != string(step.Name) {
+		sessionName = string(step.GroupName)
+	}
+	f.sessionNames[step.SessionID] = string(step.Name)
+
 	opts := tmux.NewSessionOptions{
-		Name:  string(step.Name),
+		Name:  sessionName,
 		Size:  size,
 		Start: tmux.ExistingOnly,
 	}
@@ -1085,7 +1141,6 @@ func (f *structuralFixture) createLeaderOrStandaloneSession(t *testing.T, ctx co
 			t.Fatalf("group preflight check failed: %v", err)
 		}
 
-		opts.Group = groupName
 		opts.Program = tmux.Program{}
 	} else {
 		opts.Program = tmux.Exec("sleep", "300")
@@ -1744,8 +1799,7 @@ func createSourceGroup(t *testing.T, ctx context.Context, server *tmux.Server) (
 	}
 
 	leadSess, err := server.NewSession(ctx, tmux.NewSessionOptions{
-		Name:  "source-lead",
-		Group: "src-group",
+		Name:  "src-group",
 		Size:  tmux.Size{Width: 80, Height: 24},
 		Start: tmux.ExistingOnly,
 	})
@@ -1774,11 +1828,15 @@ func createSourceGroup(t *testing.T, ctx context.Context, server *tmux.Server) (
 
 	follSess, err := server.NewSession(ctx, tmux.NewSessionOptions{
 		Name:  "source-foll",
-		Group: string(leadSess.ID()),
+		Group: "src-group",
 		Start: tmux.ExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("create source-foll session: %v", err)
+	}
+
+	if err := leadSess.Rename(ctx, "source-lead"); err != nil {
+		t.Fatalf("rename source-lead session: %v", err)
 	}
 
 	return leadSess, follSess, initWin
@@ -2069,7 +2127,7 @@ func TestStructuralRoundtripWorker(t *testing.T) {
 		t.Fatalf("worker: tmux.New failed: %v", err)
 	}
 
-	target := newStructuralFixture(targetServer)
+	target := newStructuralFixture(targetServer, plan)
 	for _, step := range plan.Steps {
 		target.apply(t, ctx, step)
 	}
