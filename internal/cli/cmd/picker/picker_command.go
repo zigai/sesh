@@ -715,7 +715,7 @@ func buildPickerModel(
 
 		return model, wrapPickerModelError(err)
 	default:
-		return nil, errUnknownPickerPresentation
+		return nil, wrapPickerModelError(errUnknownPickerPresentation)
 	}
 }
 
@@ -800,7 +800,7 @@ func runPickerDeferred(
 
 	if target, paneID, ok := model.DeferredRemoteAttach(); ok {
 		if services.remote.Attach == nil {
-			return errRemoteAttachUnavailable
+			return oops.In("cli").With("operation", "prepare_remote_attach").Wrap(errRemoteAttachUnavailable)
 		}
 
 		command, err := services.remote.Attach.AttachRemoteSession(ctx, target, paneID)
@@ -809,7 +809,7 @@ func runPickerDeferred(
 		}
 
 		if command == nil {
-			return errRemoteAttachCommandUnavailable
+			return oops.In("cli").With("operation", "prepare_remote_attach").Wrap(errRemoteAttachCommandUnavailable)
 		}
 
 		command.SetStdin(stdin)

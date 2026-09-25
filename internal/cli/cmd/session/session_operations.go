@@ -399,14 +399,14 @@ func resolveSessionDirectory(cmd *cobra.Command) (string, error) {
 	info, err := os.Stat(cleanDir)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return "", errDirectoryNotFound
+			return "", oops.In("cli").With("operation", "stat_directory").Wrap(errDirectoryNotFound)
 		}
 
 		return "", oops.In("cli").With("operation", "stat_directory").Wrap(err)
 	}
 
 	if !info.IsDir() {
-		return "", errDirectoryNotDir
+		return "", oops.In("cli").With("operation", "stat_directory").Wrap(errDirectoryNotDir)
 	}
 
 	return cleanDir, nil

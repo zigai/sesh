@@ -166,7 +166,11 @@ func WriteCapability(dir *privatefs.Dir, record StoredCapability) error {
 		return oops.In("remote").With("operation", "write_capability").Wrap(ErrFrameTooLarge)
 	}
 
-	return writeFileAtomic(dir, name, encoded)
+	if err := writeFileAtomic(dir, name, encoded); err != nil {
+		return oops.In("remote").With("operation", "write_capability").Wrap(err)
+	}
+
+	return nil
 }
 
 func ReadCapability(dir *privatefs.Dir, attachmentID string, now time.Time) (StoredCapability, error) {
@@ -203,10 +207,14 @@ func ReadCapability(dir *privatefs.Dir, attachmentID string, now time.Time) (Sto
 func RemoveCapability(dir *privatefs.Dir, attachmentID string) error {
 	name, err := CapabilityName(attachmentID)
 	if err != nil {
-		return err
+		return oops.In("remote").With("operation", "remove_capability").Wrap(err)
 	}
 
-	return removeFile(dir, name)
+	if err := removeFile(dir, name); err != nil {
+		return oops.In("remote").With("operation", "remove_capability").Wrap(err)
+	}
+
+	return nil
 }
 
 func CheckSocketAbsent(dir *privatefs.Dir, attachmentID string) error {

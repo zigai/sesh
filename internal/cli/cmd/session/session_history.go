@@ -93,8 +93,24 @@ func newSessionHistoryJSONResult(summaries []session.SessionHistorySummary) sess
 	return sessionHistoryJSONResult{Mode: "sessions", Sessions: items}
 }
 
+func wrapHistoryListError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	if _, ok := oops.AsOops(err); ok {
+		return err
+	}
+
+	return oops.In("cli").With("operation", "history").Wrap(err)
+}
+
 func renderHistoryPanes(cmd *cobra.Command, panes []session.PaneHistory, listErr error, full bool) error {
 	session.SortPaneHistory(panes)
+
+	if listErr != nil {
+		listErr = wrapHistoryListError(listErr)
+	}
 
 	if clibase.JSONOutputEnabled(cmd) {
 		res := newPaneHistoryJSONResult(panes)
@@ -114,6 +130,10 @@ func renderHistoryPanes(cmd *cobra.Command, panes []session.PaneHistory, listErr
 
 func renderHistorySessions(cmd *cobra.Command, panes []session.PaneHistory, listErr error, full bool) error {
 	summaries := session.SummarizePaneHistory(panes)
+
+	if listErr != nil {
+		listErr = wrapHistoryListError(listErr)
+	}
 
 	if clibase.JSONOutputEnabled(cmd) {
 		res := newSessionHistoryJSONResult(summaries)

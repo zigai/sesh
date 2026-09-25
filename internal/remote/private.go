@@ -12,6 +12,8 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"github.com/samber/oops"
+
 	"github.com/zigai/sesh/internal/privatefs"
 )
 
@@ -29,11 +31,11 @@ var (
 func EnsureDir(path string) error {
 	dir, err := privatefs.Ensure(path)
 	if err != nil {
-		return fmt.Errorf("securing remote storage directory: %w", err)
+		return oops.In("remote").Code("remote_storage_failed").With("operation", "ensure_dir").Wrapf(err, "securing remote storage directory")
 	}
 
 	if err := dir.Close(); err != nil {
-		return fmt.Errorf("closing remote storage directory: %w", err)
+		return oops.In("remote").Code("remote_storage_failed").With("operation", "ensure_dir").Wrapf(err, "closing remote storage directory")
 	}
 
 	return nil

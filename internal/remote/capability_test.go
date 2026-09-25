@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/samber/oops"
+
 	"github.com/zigai/sesh/internal/privatefs"
 )
 
@@ -287,5 +289,125 @@ func TestGrantMatchingIsConstantTimeAndTimeBound(t *testing.T) {
 
 	if !(BridgeGrant{}).Expired(now) {
 		t.Fatal("Expired() accepted a grant without an expiry")
+	}
+}
+
+func TestEnsureDirErrorWrapping(t *testing.T) {
+	t.Parallel()
+
+	f := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(f, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	err := EnsureDir(filepath.Join(f, "child"))
+	if err == nil {
+		t.Fatal("expected EnsureDir to fail under a file")
+	}
+
+	oopsErr, ok := oops.AsOops(err)
+	if !ok {
+		t.Fatalf("expected oops error, got %T", err)
+	}
+
+	if oopsErr.Domain() != "remote" {
+		t.Fatalf("domain = %q, want remote", oopsErr.Domain())
+	}
+
+	if oopsErr.Code() != "remote_storage_failed" {
+		t.Fatalf("code = %q, want remote_storage_failed", oopsErr.Code())
+	}
+
+	if oopsErr.Context()["operation"] != "ensure_dir" {
+		t.Fatalf("operation = %v, want ensure_dir", oopsErr.Context()["operation"])
+	}
+}
+
+func TestRemoveCapabilityInvalidAttachmentIDErrorWrapping(t *testing.T) {
+	t.Parallel()
+
+	dir, _ := openTestBridgeDir(t)
+
+	err := RemoveCapability(dir, "invalid-attachment-id")
+	if !errors.Is(err, ErrUnsafePath) {
+		t.Fatalf("expected ErrUnsafePath, got %v", err)
+	}
+
+	oopsErr, ok := oops.AsOops(err)
+	if !ok {
+		t.Fatalf("expected oops error, got %T", err)
+	}
+
+	if oopsErr.Domain() != "remote" {
+		t.Fatalf("domain = %q, want remote", oopsErr.Domain())
+	}
+
+	if oopsErr.Context()["operation"] != "remove_capability" {
+		t.Fatalf("operation = %v, want remove_capability", oopsErr.Context()["operation"])
+	}
+}
+
+func TestRemoveCapabilityClosedDirErrorWrapping(t *testing.T) {
+	t.Parallel()
+
+	dir, _ := openTestBridgeDir(t)
+
+	attachmentID, err := NewAttachmentID()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_ = dir.Close()
+
+	err = RemoveCapability(dir, attachmentID)
+	if err == nil {
+		t.Fatal("expected RemoveCapability to fail on closed dir")
+	}
+
+	oopsErr, ok := oops.AsOops(err)
+	if !ok {
+		t.Fatalf("expected oops error, got %T", err)
+	}
+
+	if oopsErr.Domain() != "remote" {
+		t.Fatalf("domain = %q, want remote", oopsErr.Domain())
+	}
+
+	if oopsErr.Context()["operation"] != "remove_capability" {
+		t.Fatalf("operation = %v, want remove_capability", oopsErr.Context()["operation"])
+	}
+}
+
+func TestWriteCapabilityWriteFailureErrorWrapping(t *testing.T) {
+	t.Parallel()
+
+	dir, path := openTestBridgeDir(t)
+	grant := validGrant(t)
+	record := StoredCapability{
+		Version:      ProtocolVersion,
+		Grant:        grant,
+		Target:       validTarget(t),
+		BridgeSocket: filepath.Join(path, "attach-"+grant.AttachmentID+".sock"),
+		WrittenAt:    time.Unix(1000, 0).UTC(),
+	}
+
+	_ = dir.Close()
+
+	err := WriteCapability(dir, record)
+	if err == nil {
+		t.Fatal("expected WriteCapability to fail on closed dir")
+	}
+
+	oopsErr, ok := oops.AsOops(err)
+	if !ok {
+		t.Fatalf("expected oops error, got %T", err)
+	}
+
+	if oopsErr.Domain() != "remote" {
+		t.Fatalf("domain = %q, want remote", oopsErr.Domain())
+	}
+
+	if oopsErr.Context()["operation"] != "write_capability" {
+		t.Fatalf("operation = %v, want write_capability", oopsErr.Context()["operation"])
 	}
 }

@@ -45,7 +45,7 @@ func createPickerSwitchHandoff() (string, func(), error) {
 
 func writePickerSwitchHandoff(path string, target session.Session, paneID string) error {
 	if target.ID == "" || target.Name == "" || target.Kind != session.KindLive || target.Origin != session.OriginLocal {
-		return errPickerHandoffInvalid
+		return oops.In("cli").With("operation", "write_picker_handoff").Wrap(errPickerHandoffInvalid)
 	}
 
 	encoded, err := json.Marshal(pickerSwitchHandoff{
@@ -61,7 +61,7 @@ func writePickerSwitchHandoff(path string, target session.Session, paneID string
 	}
 
 	if len(encoded) > pickerHandoffMaxBytes {
-		return errPickerHandoffInvalid
+		return oops.In("cli").With("operation", "write_picker_handoff").Wrap(errPickerHandoffInvalid)
 	}
 
 	file, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC|syscall.O_NOFOLLOW, 0)
@@ -92,13 +92,13 @@ func readPickerSwitchHandoff(path string) (pickerSwitchHandoff, bool, error) {
 	}
 
 	if len(encoded) > pickerHandoffMaxBytes {
-		return pickerSwitchHandoff{}, false, errPickerHandoffInvalid
+		return pickerSwitchHandoff{}, false, oops.In("cli").With("operation", "read_picker_handoff").Wrap(errPickerHandoffInvalid)
 	}
 
 	var handoff pickerSwitchHandoff
 
 	if json.Unmarshal(encoded, &handoff) != nil || handoff.SessionID == "" || handoff.SessionName == "" {
-		return pickerSwitchHandoff{}, false, errPickerHandoffInvalid
+		return pickerSwitchHandoff{}, false, oops.In("cli").With("operation", "read_picker_handoff").Wrap(errPickerHandoffInvalid)
 	}
 
 	return handoff, true, nil
@@ -115,7 +115,7 @@ func completePickerSwitchHandoff(
 	}
 
 	if clientName == "" || originSessionID == "" {
-		return errPickerHandoffInvalid
+		return oops.In("cli").With("operation", "complete_picker_handoff").Wrap(errPickerHandoffInvalid)
 	}
 
 	target := newPickerSwitchTarget(handoff)

@@ -672,7 +672,7 @@ func runRemoteLookup(cmd *cobra.Command, args []string) (resultErr error) {
 
 	state, ok := catalog.Connections[connection.ID]
 	if !ok {
-		return errRemoteTargetMissing
+		return remoteCLIError("resolve_remote_target", errRemoteTargetMissing)
 	}
 
 	options := remote.ActionOriginOptions{Remote: cfg.Remote, Connection: connection, State: state}
