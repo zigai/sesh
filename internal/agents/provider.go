@@ -9,8 +9,8 @@ import (
 	"io"
 
 	"github.com/samber/oops"
-	"github.com/zigai/aht/pkg/aht"
-	"github.com/zigai/aht/pkg/registry"
+	"github.com/zigai/aht/v2/pkg/aht"
+	"github.com/zigai/aht/v2/pkg/registry"
 )
 
 type SessionSource interface {

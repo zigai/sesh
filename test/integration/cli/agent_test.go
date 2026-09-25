@@ -27,7 +27,7 @@ type agentNavResultJSON struct {
 func writeAgentRegistry(t *testing.T, sessions ...string) string {
 	t.Helper()
 
-	document := `{"schema_version": 2, "revision": 1, "sessions": {` + strings.Join(sessions, ",") + `}}`
+	document := `{"schema_version": 3, "revision": 1, "sessions": {` + strings.Join(sessions, ",") + `}}`
 
 	path := filepath.Join(t.TempDir(), "state.json")
 	if err := os.WriteFile(path, []byte(document), 0o600); err != nil {
@@ -115,17 +115,16 @@ func livePane(t *testing.T, ctx context.Context, server *gotmux.Server, paneID s
 
 func agentRegistrySessionForPane(pane agents.PaneLocation, activity string) string {
 	return `"agent-` + pane.PaneID + `": {
-		"schema_version": 2,
+		"schema_version": 3,
 		"id": "agent-` + pane.PaneID + `",
 		"harness": "omp",
-		"presence": "live",
-		"activity": "` + activity + `",
+		"liveness": {"kind": "live", "activity": "` + activity + `"},
 		"observations": {},
 		"created_at": "2026-09-20T10:00:00Z",
 		"updated_at": "2026-09-20T10:00:00Z",
 		"presence_changed_at": "2026-09-20T10:00:00Z",
 		"activity_changed_at": "2026-09-20T10:00:00Z",
-		"tmux": {"inside": true, "server_socket": "` + pane.ServerSocket + `", "session_id": "` + pane.SessionID + `", "session_name": "` + pane.SessionName + `", "window_id": "` + pane.WindowID + `", "pane_id": "` + pane.PaneID + `", "pane_pid": ` + strconv.Itoa(pane.PanePID) + `}
+		"location": {"kind": "tmux", "server_id": "` + pane.ServerSocket + `", "session_id": "` + pane.SessionID + `", "session_name": "` + pane.SessionName + `", "window_id": "` + pane.WindowID + `", "pane_id": "` + pane.PaneID + `", "pane_pid": ` + strconv.Itoa(pane.PanePID) + `}
 	}`
 }
 

@@ -21,7 +21,7 @@ import (
 	"github.com/charmbracelet/x/term"
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
-	"github.com/zigai/aht/pkg/aht"
+	"github.com/zigai/aht/v2/pkg/aht"
 	gotmux "github.com/zigai/gotmux/tmux"
 	"golang.org/x/sync/errgroup"
 

@@ -11,7 +11,7 @@ import (
 func writeAgentRegistry(t *testing.T, sessions ...string) string {
 	t.Helper()
 
-	document := `{"schema_version": 2, "revision": 1, "sessions": {` + strings.Join(sessions, ",") + `}}`
+	document := `{"schema_version": 3, "revision": 1, "sessions": {` + strings.Join(sessions, ",") + `}}`
 
 	path := filepath.Join(t.TempDir(), "state.json")
 	if err := os.WriteFile(path, []byte(document), 0o600); err != nil {
@@ -23,17 +23,16 @@ func writeAgentRegistry(t *testing.T, sessions ...string) string {
 
 func agentRegistrySession(id string, activity string, paneID string) string {
 	return `"` + id + `": {
-		"schema_version": 2,
+		"schema_version": 3,
 		"id": "` + id + `",
 		"harness": "omp",
-		"presence": "live",
-		"activity": "` + activity + `",
+		"liveness": {"kind": "live", "activity": "` + activity + `"},
 		"observations": {},
 		"created_at": "2026-09-20T10:00:00Z",
 		"updated_at": "2026-09-20T10:00:00Z",
 		"presence_changed_at": "2026-09-20T10:00:00Z",
 		"activity_changed_at": "2026-09-20T10:00:00Z",
-		"tmux": {"inside": true, "server_socket": "/tmp/fixture/socket", "session_id": "$1", "session_name": "dev", "window_id": "@1", "pane_id": "` + paneID + `", "pane_pid": 4242}
+		"location": {"kind": "tmux", "server_id": "/tmp/fixture/socket", "session_id": "$1", "session_name": "dev", "window_id": "@1", "pane_id": "` + paneID + `", "pane_pid": 4242}
 	}`
 }
 

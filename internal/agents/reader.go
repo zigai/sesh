@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/samber/oops"
-	"github.com/zigai/aht/pkg/aht"
+	"github.com/zigai/aht/v2/pkg/aht"
 )
 
 var emptyAgentSession AgentSession
@@ -69,11 +69,11 @@ func NeedsAttention(agent AgentSession) bool {
 }
 
 func observedAgentSession(session aht.Session) (AgentSession, bool) {
-	if session.Presence != aht.PresenceLive {
+	if session.Presence() != aht.PresenceLive {
 		return emptyAgentSession, false
 	}
 
-	if strings.TrimSpace(session.Tmux.PaneID) == "" {
+	if session.Location.Kind != aht.MultiplexerTmux || strings.TrimSpace(session.Location.PaneID) == "" {
 		return emptyAgentSession, false
 	}
 
@@ -87,24 +87,24 @@ func observedAgentSession(session aht.Session) (AgentSession, bool) {
 func agentSessionFromRegistry(session aht.Session) AgentSession {
 	activity := ""
 
-	if session.Activity != nil {
-		activity = string(*session.Activity)
+	if act := session.Activity(); act != nil {
+		activity = string(*act)
 	}
 
 	agent := AgentSession{
 		ID:               session.ID,
 		Harness:          string(session.Harness),
-		Presence:         string(session.Presence),
+		Presence:         string(session.Presence()),
 		Activity:         activity,
 		Attention:        AttentionFor(activity),
-		ServerSocket:     NormalizeServerSocket(session.Tmux.ServerSocket),
-		SessionID:        session.Tmux.SessionID,
-		SessionName:      session.Tmux.SessionName,
-		WindowID:         session.Tmux.WindowID,
-		WindowIndex:      session.Tmux.WindowIndex,
-		PaneID:           session.Tmux.PaneID,
-		PaneIndex:        session.Tmux.PaneIndex,
-		PanePID:          session.Tmux.PanePID,
+		ServerSocket:     NormalizeServerSocket(session.Location.ServerID),
+		SessionID:        session.Location.SessionID,
+		SessionName:      session.Location.SessionName,
+		WindowID:         session.Location.WindowID,
+		WindowIndex:      session.Location.WindowIndex,
+		PaneID:           session.Location.PaneID,
+		PaneIndex:        session.Location.PaneIndex,
+		PanePID:          session.Location.PanePID,
 		Command:          "",
 		Interactive:      true,
 		CWD:              session.CWD,

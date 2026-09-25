@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/samber/oops"
-	"github.com/zigai/aht/pkg/harness"
-	"github.com/zigai/aht/pkg/manage"
-	"github.com/zigai/aht/pkg/registry"
+	"github.com/zigai/aht/v2/pkg/harness"
+	"github.com/zigai/aht/v2/pkg/manage"
+	"github.com/zigai/aht/v2/pkg/registry"
 )
 
 const (

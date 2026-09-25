@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/zigai/aht/pkg/aht"
+	"github.com/zigai/aht/v2/pkg/aht"
 )
 
 const minAgentCommandArguments = 2

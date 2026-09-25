@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zigai/aht/pkg/aht"
-	"github.com/zigai/aht/pkg/registry"
+	"github.com/zigai/aht/v2/pkg/aht"
+	"github.com/zigai/aht/v2/pkg/registry"
 	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/agents"
@@ -31,11 +31,19 @@ func TestPickerServicesLoadAndWatchPiConversationNames(t *testing.T) {
 	now := time.Now().UTC()
 	identity := registry.ProcessIdentity{PID: 42, StartIdentity: "fixture:42"}
 	agent := aht.Session{
-		SchemaVersion: 2,
-		ID:            "registry-id", Harness: aht.HarnessPi, Presence: aht.PresenceLive, Activity: new(aht.ActivityIdle),
+		SchemaVersion: 3,
+		ID:            "registry-id", Harness: aht.HarnessPi,
+		Liveness:  aht.Live{Activity: aht.ActivityIdle},
 		SessionID: "native-resume-id", SessionPath: transcript, Process: &identity,
 		ResumeCommand: []string{"pi", "--resume", "native-resume-id"},
-		Tmux:          aht.TmuxContext{SessionID: "$1", SessionName: "workspace", PaneID: "%1", PanePID: 42},
+		Location: aht.Location{
+			Kind:        aht.MultiplexerTmux,
+			ServerID:    "/tmp/tmux.sock",
+			SessionID:   "$1",
+			SessionName: "workspace",
+			PaneID:      "%1",
+			PanePID:     42,
+		},
 		Observations: registry.Observations{Native: &registry.NativeObservation{
 			Process: identity, Attributes: map[string]string{"aht_interaction_mode": "tui"}, ObservedAt: now,
 		}},
@@ -112,15 +120,22 @@ func TestPickerServicesLoadCodexAndOmpNativeTitles(t *testing.T) {
 	}
 
 	base := aht.Session{
-		Presence: aht.PresenceLive,
-		Tmux:     aht.TmuxContext{SessionID: "$1", SessionName: "workspace", PaneID: "%1"},
+		SchemaVersion: 3,
+		Liveness:      aht.Live{Activity: aht.ActivityIdle},
+		Location: aht.Location{
+			Kind:        aht.MultiplexerTmux,
+			ServerID:    "/tmp/tmux.sock",
+			SessionID:   "$1",
+			SessionName: "workspace",
+			PaneID:      "%1",
+		},
 	}
 	codex := base
 	codex.ID, codex.Harness, codex.SessionID = "codex-registry", aht.HarnessCodex, "codex-native"
 	codex.SessionPath = filepath.Join(codexHome, "sessions", "2026", "rollout.jsonl")
 	omp := base
 	omp.ID, omp.Harness, omp.SessionID, omp.SessionPath = "omp-registry", aht.HarnessOmp, "omp-native", ompPath
-	omp.Tmux.PaneID = "%2"
+	omp.Location.PaneID = "%2"
 
 	services := &pickerServices{agentStore: pickerNameWatchSource{sessions: []aht.Session{codex, omp}}}
 
@@ -149,7 +164,7 @@ func TestPickerServicesLoadCodexAndOmpNativeTitles(t *testing.T) {
 func writePickerAgentRegistry(t *testing.T, path string, agent aht.Session) {
 	t.Helper()
 
-	document := map[string]any{"schema_version": 2, "sessions": map[string]aht.Session{agent.ID: agent}}
+	document := map[string]any{"schema_version": 3, "sessions": map[string]aht.Session{agent.ID: agent}}
 
 	encoded, err := json.Marshal(document)
 	if err != nil {

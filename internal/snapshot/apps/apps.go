@@ -5,8 +5,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/zigai/aht/pkg/harness"
-	"github.com/zigai/aht/pkg/registry"
+	"github.com/zigai/aht/v2/pkg/aht"
+	"github.com/zigai/aht/v2/pkg/harness"
 
 	"github.com/zigai/sesh/internal/snapshot/model"
 )
@@ -41,23 +41,23 @@ const (
 	minimumEditorArguments  = 2
 )
 
-var agentArgumentPrefixes = map[registry.Harness][]string{
-	registry.HarnessClaude:   {"--resume"},
-	registry.HarnessCodex:    {"resume"},
-	registry.HarnessCursor:   {"--resume"},
-	registry.HarnessCopilot:  {"--resume"},
-	registry.HarnessCline:    {"--id"},
-	registry.HarnessKimiCode: {"--session"},
-	registry.HarnessGrok:     {"--resume"},
-	registry.HarnessGoose:    {"session", "--resume", "--session-id"},
-	registry.HarnessPi:       {"--session"},
-	registry.HarnessOmp:      {"--session"},
-	registry.HarnessOpenCode: {"--session"},
-	registry.HarnessAgy:      {"--conversation"},
-	registry.HarnessKilo:     {"--session"},
-	registry.HarnessDroid:    {"--resume"},
-	registry.HarnessOpenClaw: nil,
-	registry.HarnessHermes:   {"--resume"},
+var agentArgumentPrefixes = map[aht.Harness][]string{
+	aht.HarnessClaude:   {"--resume"},
+	aht.HarnessCodex:    {"resume"},
+	aht.HarnessCursor:   {"--resume"},
+	aht.HarnessCopilot:  {"--resume"},
+	aht.HarnessCline:    {"--id"},
+	aht.HarnessKimiCode: {"--session"},
+	aht.HarnessGrok:     {"--resume"},
+	aht.HarnessGoose:    {"session", "--resume", "--session-id"},
+	aht.HarnessPi:       {"--session"},
+	aht.HarnessOmp:      {"--session"},
+	aht.HarnessOpenCode: {"--session"},
+	aht.HarnessAgy:      {"--conversation"},
+	aht.HarnessKilo:     {"--session"},
+	aht.HarnessDroid:    {"--resume"},
+	aht.HarnessOpenClaw: nil,
+	aht.HarnessHermes:   {"--resume"},
 }
 
 type Reason string
@@ -151,7 +151,7 @@ func prepareAgent(observed model.Launch, agent *AgentResume) (model.Launch, Reas
 	}, ReasonAgentResume
 }
 
-func validateAgentMetadata(agent *AgentResume) (registry.Harness, Reason) {
+func validateAgentMetadata(agent *AgentResume) (aht.Harness, Reason) {
 	if agent.Harness == "" || len(agent.Command) == 0 {
 		return "", ReasonAgentMetadataMissing
 	}
@@ -160,10 +160,7 @@ func validateAgentMetadata(agent *AgentResume) (registry.Harness, Reason) {
 		return "", ReasonAgentExecutableInvalid
 	}
 
-	harnessID := registry.Harness(agent.Harness)
-	if !harnessID.IsValid() {
-		return "", ReasonAgentMetadataMismatch
-	}
+	harnessID := aht.Harness(agent.Harness)
 
 	commandHarness, ok := harness.FromCommand(agent.Command[0])
 	if !ok || commandHarness != harnessID {
@@ -184,7 +181,7 @@ func validateAgentMetadata(agent *AgentResume) (registry.Harness, Reason) {
 	return harnessID, ""
 }
 
-func agentInvocation(observed model.Launch, agent *AgentResume, harnessID registry.Harness) (string, []string, bool) {
+func agentInvocation(observed model.Launch, agent *AgentResume, harnessID aht.Harness) (string, []string, bool) {
 	if agent.Executable != "" {
 		return agent.Executable, slices.Clone(agent.Command), true
 	}
@@ -214,9 +211,9 @@ func agentInvocation(observed model.Launch, agent *AgentResume, harnessID regist
 	return executable, arguments, true
 }
 
-func validAgentCommand(harnessID registry.Harness, agent *AgentResume) bool {
+func validAgentCommand(harnessID aht.Harness, agent *AgentResume) bool {
 	reference := agent.SessionID
-	if (harnessID == registry.HarnessPi || harnessID == registry.HarnessOmp) && agent.SessionPath != "" {
+	if (harnessID == aht.HarnessPi || harnessID == aht.HarnessOmp) && agent.SessionPath != "" {
 		reference = agent.SessionPath
 	}
 
@@ -406,7 +403,7 @@ func executableName(path string) string {
 	return strings.TrimPrefix(filepath.Base(path), "-")
 }
 
-func observedAgentHarness(launch model.Launch) (registry.Harness, bool) {
+func observedAgentHarness(launch model.Launch) (aht.Harness, bool) {
 	if harnessID, ok := harness.FromCommand(string(launch.Executable)); ok {
 		return harnessID, true
 	}
@@ -428,10 +425,10 @@ func observedAgentHarness(launch model.Launch) (registry.Harness, bool) {
 
 	harnessID := scriptHarness(scriptPath)
 
-	return harnessID, harnessID.IsValid()
+	return harnessID, harnessID != ""
 }
 
-func scriptHarness(scriptPath string) registry.Harness {
+func scriptHarness(scriptPath string) aht.Harness {
 	candidate := filepath.Base(filepath.Clean(scriptPath))
 	candidate = strings.TrimSuffix(strings.TrimSuffix(strings.TrimSuffix(candidate, ".js"), ".mjs"), ".cjs")
 

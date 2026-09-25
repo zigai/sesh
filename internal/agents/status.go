@@ -6,7 +6,7 @@ import (
 	"context"
 
 	"github.com/samber/oops"
-	"github.com/zigai/aht/pkg/aht"
+	"github.com/zigai/aht/v2/pkg/aht"
 )
 
 func Status(ctx context.Context, statePath string) (StatusSummary, error) {

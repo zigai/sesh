@@ -10,7 +10,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/samber/oops"
-	"github.com/zigai/aht/pkg/aht"
+	"github.com/zigai/aht/v2/pkg/aht"
 )
 
 type TrackerOptions struct {
@@ -190,7 +190,7 @@ func (t *Tracker) reconcileSnapshotSessions(sessions []aht.Session, activePanes 
 	livePanes := make(map[string]bool, len(sessions))
 
 	for _, session := range sessions {
-		if session.Presence != aht.PresenceLive || !session.Tmux.Inside || session.Tmux.PaneID == "" {
+		if session.Presence() != aht.PresenceLive || session.Location.Kind != aht.MultiplexerTmux || session.Location.PaneID == "" {
 			continue
 		}
 
@@ -198,7 +198,7 @@ func (t *Tracker) reconcileSnapshotSessions(sessions []aht.Session, activePanes 
 			continue
 		}
 
-		paneID := session.Tmux.PaneID
+		paneID := session.Location.PaneID
 
 		pane, paneExists := activePanes[paneID]
 		if !paneExists {
@@ -207,7 +207,7 @@ func (t *Tracker) reconcileSnapshotSessions(sessions []aht.Session, activePanes 
 
 		windowID := pane.WindowID
 		if windowID == "" {
-			windowID = session.Tmux.WindowID
+			windowID = session.Location.WindowID
 		}
 
 		if windowID == "" {
@@ -218,8 +218,8 @@ func (t *Tracker) reconcileSnapshotSessions(sessions []aht.Session, activePanes 
 		t.paneWindow[paneID] = windowID
 
 		activity := string(aht.ActivityIdle)
-		if session.Activity != nil && *session.Activity != "" {
-			activity = string(*session.Activity)
+		if act := session.Activity(); act != nil && *act != "" {
+			activity = string(*act)
 		}
 
 		t.reconcilePaneActivity(paneID, windowID, activity, activePanes)

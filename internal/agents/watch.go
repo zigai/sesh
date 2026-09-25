@@ -8,7 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/samber/oops"
-	"github.com/zigai/aht/pkg/aht"
+	"github.com/zigai/aht/v2/pkg/aht"
 )
 
 const (

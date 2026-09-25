@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zigai/aht/pkg/aht"
+	"github.com/zigai/aht/v2/pkg/aht"
 
 	"github.com/zigai/sesh/internal/agents"
 )
@@ -44,11 +44,16 @@ func writeRegistry(t *testing.T, fixtures ...registryFixture) string {
 	sessions := make(map[string]any, len(fixtures))
 
 	for index, fixture := range fixtures {
-		sessions[registryFixtureID(fixture, index)] = registryRecord(fixture)
+		id := registryFixtureID(fixture, index)
+		if fixture.ID == "" {
+			fixture.ID = id
+		}
+
+		sessions[id] = registryRecord(fixture)
 	}
 
 	document := map[string]any{
-		"schema_version": 2,
+		"schema_version": 3,
 		"revision":       1,
 		"sessions":       sessions,
 	}
@@ -80,20 +85,30 @@ func registryRecord(fixture registryFixture) map[string]any {
 		updatedAt = time.Now().UTC().Format(time.RFC3339Nano)
 	}
 
+	presence := defaultString(fixture.Presence, string(aht.PresenceLive))
+	liveness := map[string]any{
+		"kind": presence,
+	}
+
+	if presence != string(aht.PresenceGone) {
+		act := fixture.Activity
+		if act == "" {
+			act = string(aht.ActivityIdle)
+		}
+
+		liveness["activity"] = act
+	}
+
 	record := map[string]any{
-		"schema_version":      2,
+		"schema_version":      3,
 		"id":                  fixture.ID,
 		"harness":             defaultString(fixture.Harness, string(aht.HarnessOmp)),
-		"presence":            defaultString(fixture.Presence, string(aht.PresenceLive)),
+		"liveness":            liveness,
 		"observations":        map[string]any{},
 		"created_at":          updatedAt,
 		"updated_at":          updatedAt,
 		"presence_changed_at": updatedAt,
 		"activity_changed_at": updatedAt,
-	}
-
-	if fixture.Activity != "" {
-		record["activity"] = fixture.Activity
 	}
 
 	addOptionalStrings(record, map[string]string{
@@ -105,8 +120,8 @@ func registryRecord(fixture registryFixture) map[string]any {
 		record["resume_command"] = fixture.ResumeCommand
 	}
 
-	if tmux := tmuxRecord(fixture); tmux != nil {
-		record["tmux"] = tmux
+	if location := locationRecord(fixture); location != nil {
+		record["location"] = location
 	}
 
 	if process := processRecord(fixture); process != nil {
@@ -120,26 +135,28 @@ func registryRecord(fixture registryFixture) map[string]any {
 	return record
 }
 
-func tmuxRecord(fixture registryFixture) map[string]any {
-	if fixture.PaneID == "" && fixture.ServerSocket == "" {
+func locationRecord(fixture registryFixture) map[string]any {
+	if fixture.PaneID == "" && fixture.ServerSocket == "" && fixture.SessionID == "" {
 		return nil
 	}
 
-	tmux := map[string]any{"inside": true}
+	location := map[string]any{
+		"kind": string(aht.MultiplexerTmux),
+	}
 
-	addOptionalStrings(tmux, map[string]string{
-		"server_socket": fixture.ServerSocket,
-		"session_id":    fixture.SessionID,
-		"session_name":  fixture.SessionName,
-		"window_id":     fixture.WindowID,
-		"pane_id":       fixture.PaneID,
+	addOptionalStrings(location, map[string]string{
+		"server_id":    fixture.ServerSocket,
+		"session_id":   fixture.SessionID,
+		"session_name": fixture.SessionName,
+		"window_id":    fixture.WindowID,
+		"pane_id":      fixture.PaneID,
 	})
 
 	if fixture.PanePID != 0 {
-		tmux["pane_pid"] = fixture.PanePID
+		location["pane_pid"] = fixture.PanePID
 	}
 
-	return tmux
+	return location
 }
 
 func processRecord(fixture registryFixture) map[string]any {
@@ -296,7 +313,7 @@ func TestLoadLiveAgentsCorruptRegistryFailsClosed(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "state.json")
-	if err := os.WriteFile(path, []byte(`{"schema_version": 2, "sessions": [`), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(`{"schema_version": 3, "sessions": [`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 

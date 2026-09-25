@@ -226,18 +226,18 @@ func writePickerPopupAgentRegistry(t *testing.T, socket string, origin gotmux.Se
 		}
 
 		records[id] = map[string]any{
-			"schema_version": 2, "id": id, "harness": "omp", "presence": "live", "activity": "running",
+			"schema_version": 3, "id": id, "harness": "omp", "liveness": map[string]any{"kind": "live", "activity": "running"},
 			"session_id": id, "created_at": now, "updated_at": now,
 			"presence_changed_at": now, "activity_changed_at": now,
-			"tmux": map[string]any{
-				"inside": true, "server_socket": socket, "session_id": string(origin.ID),
+			"location": map[string]any{
+				"kind": "tmux", "server_id": socket, "session_id": string(origin.ID),
 				"session_name": origin.Name, "window_id": string(pane.WindowID),
 				"pane_id": string(pane.ID), "pane_pid": pane.PID,
 			},
 		}
 	}
 
-	encoded, err := json.Marshal(map[string]any{"schema_version": 2, "revision": 1, "sessions": records})
+	encoded, err := json.Marshal(map[string]any{"schema_version": 3, "revision": 1, "sessions": records})
 	if err != nil {
 		t.Fatal(err)
 	}

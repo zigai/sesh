@@ -8,8 +8,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/zigai/aht/pkg/aht"
-	"github.com/zigai/aht/pkg/registry"
+	"github.com/zigai/aht/v2/pkg/aht"
+	"github.com/zigai/aht/v2/pkg/registry"
 )
 
 func TestAgentProcessArguments(t *testing.T) {
@@ -32,14 +32,12 @@ func TestNonInteractiveAgentReadsLiveProcessArguments(t *testing.T) {
 
 	printMode := aht.Session{
 		Harness:  aht.HarnessClaude,
-		Presence: aht.PresenceLive,
-		Activity: new(aht.ActivityRunning),
+		Liveness: aht.Live{Activity: aht.ActivityRunning},
 		Process:  &registry.ProcessIdentity{PID: printPID},
 	}
 	interactive := aht.Session{
 		Harness:  aht.HarnessClaude,
-		Presence: aht.PresenceLive,
-		Activity: new(aht.ActivityIdle),
+		Liveness: aht.Live{Activity: aht.ActivityIdle},
 		Process:  &registry.ProcessIdentity{PID: idlePID},
 	}
 

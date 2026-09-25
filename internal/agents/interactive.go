@@ -3,7 +3,7 @@
 package agents
 
 import (
-	"github.com/zigai/aht/pkg/aht"
+	"github.com/zigai/aht/v2/pkg/aht"
 )
 
 func nonInteractiveAgent(agent aht.Session) bool {

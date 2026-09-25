@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zigai/aht/pkg/aht"
+	"github.com/zigai/aht/v2/pkg/aht"
 	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/agents"
@@ -294,8 +294,7 @@ func TestTrackerRestoresUserStyleAfterSessionEnds(t *testing.T) {
 	}
 
 	gone := trackerSessionForPane(current, string(aht.ActivityWaiting))
-	gone.Presence = aht.PresenceGone
-	gone.Activity = nil
+	gone.Liveness = aht.Gone{}
 
 	if err := tracker.HandleSnapshot(ctx, []aht.Session{gone}); err != nil {
 		t.Fatalf("HandleSnapshot failed: %v", err)
@@ -351,18 +350,17 @@ func trackerSessionForPane(pane agents.PaneLocation, activity string) aht.Sessio
 	return aht.Session{
 		ID:       "agent-" + pane.PaneID,
 		Harness:  aht.HarnessOmp,
-		Presence: aht.PresenceLive,
-		Activity: new(aht.Activity(activity)),
-		Tmux: aht.TmuxContext{
-			Inside:       true,
-			ServerSocket: pane.ServerSocket,
-			SessionID:    pane.SessionID,
-			SessionName:  pane.SessionName,
-			WindowID:     pane.WindowID,
-			WindowIndex:  pane.WindowIndex,
-			PaneID:       pane.PaneID,
-			PaneIndex:    pane.PaneIndex,
-			PanePID:      pane.PanePID,
+		Liveness: aht.Live{Activity: aht.Activity(activity)},
+		Location: aht.Location{
+			Kind:        aht.MultiplexerTmux,
+			ServerID:    pane.ServerSocket,
+			SessionID:   pane.SessionID,
+			SessionName: pane.SessionName,
+			WindowID:    pane.WindowID,
+			WindowIndex: pane.WindowIndex,
+			PaneID:      pane.PaneID,
+			PaneIndex:   pane.PaneIndex,
+			PanePID:     pane.PanePID,
 		},
 	}
 }

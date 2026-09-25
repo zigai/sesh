@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	LibraryVersion            = "v0.4.0"
+	LibraryVersion            = "v0.5.0"
 	interactiveCommandTimeout = 24 * time.Hour
 )
 

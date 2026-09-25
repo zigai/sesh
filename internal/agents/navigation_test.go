@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
-	"github.com/zigai/aht/pkg/aht"
+	"github.com/zigai/aht/v2/pkg/aht"
 
 	"github.com/zigai/sesh/internal/agents"
 )
@@ -150,7 +150,7 @@ func (s fakeSource) List(_ context.Context, filter aht.Filter) ([]aht.Session, e
 	matched := make([]aht.Session, 0, len(s.sessions))
 
 	for _, session := range s.sessions {
-		if filter.Presence != "" && session.Presence != filter.Presence {
+		if filter.Presence != "" && session.Presence() != filter.Presence {
 			continue
 		}
 
@@ -216,31 +216,29 @@ func attentionSession(activity aht.Activity, paneID string) aht.Session {
 	}
 
 	return aht.Session{
-		Presence: aht.PresenceLive,
-		Activity: new(activity),
-		Tmux: aht.TmuxContext{
-			Inside:       true,
-			ServerSocket: defaultServerSocket,
-			SessionID:    "$1",
-			SessionName:  "one",
-			WindowID:     "@1",
-			PaneID:       paneID,
+		Liveness: aht.Live{Activity: activity},
+		Location: aht.Location{
+			Kind:        aht.MultiplexerTmux,
+			ServerID:    defaultServerSocket,
+			SessionID:   "$1",
+			SessionName: "one",
+			WindowID:    "@1",
+			PaneID:      paneID,
 		},
 	}
 }
 
 func attentionSessionFor(pane agents.PaneLocation, activity aht.Activity) aht.Session {
 	return aht.Session{
-		Presence: aht.PresenceLive,
-		Activity: new(activity),
-		Tmux: aht.TmuxContext{
-			Inside:       true,
-			ServerSocket: pane.ServerSocket,
-			SessionID:    pane.SessionID,
-			SessionName:  pane.SessionName,
-			WindowID:     pane.WindowID,
-			PaneID:       pane.PaneID,
-			PanePID:      pane.PanePID,
+		Liveness: aht.Live{Activity: activity},
+		Location: aht.Location{
+			Kind:        aht.MultiplexerTmux,
+			ServerID:    pane.ServerSocket,
+			SessionID:   pane.SessionID,
+			SessionName: pane.SessionName,
+			WindowID:    pane.WindowID,
+			PaneID:      pane.PaneID,
+			PanePID:     pane.PanePID,
 		},
 	}
 }
@@ -347,7 +345,7 @@ func TestNextIdleIgnoresAgentsOnOtherServers(t *testing.T) {
 	t.Parallel()
 
 	other := attentionSession(aht.ActivityWaiting, "%2")
-	other.Tmux.ServerSocket = "/tmp/other/socket"
+	other.Location.ServerID = "/tmp/other/socket"
 
 	controller := &fakeController{
 		current: agents.CurrentContext{ServerSocket: defaultServerSocket, SessionID: "$1", SessionName: firstSessionName, WindowID: "@1", PaneID: "%1"},

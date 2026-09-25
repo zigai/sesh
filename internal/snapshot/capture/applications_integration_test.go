@@ -13,8 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zigai/aht/pkg/aht"
-	"github.com/zigai/aht/pkg/registry"
+	"github.com/zigai/aht/v2/pkg/aht"
 	gotmux "github.com/zigai/gotmux/tmux"
 	"github.com/zigai/gotmux/tmuxtest"
 
@@ -156,14 +155,18 @@ func TestCaptureAgentResumeRequiresExactEndpointBinding(t *testing.T) {
 	}
 
 	registrySession := aht.Session{
+		SchemaVersion: 3,
 		ID:            "capture-agent",
-		Harness:       registry.HarnessCodex,
-		Presence:      registry.PresenceLive,
+		Harness:       aht.HarnessCodex,
+		Liveness:      aht.Live{Activity: aht.ActivityRunning},
 		SessionID:     "exact-session",
 		ResumeCommand: []string{"codex", "resume", "exact-session"},
-		Tmux: registry.TmuxContext{
-			Inside: true, ServerSocket: server.Endpoint().SocketPath,
-			SessionID: string(session.ID()), PaneID: string(info.ID), PanePID: info.PID,
+		Location: aht.Location{
+			Kind:      aht.MultiplexerTmux,
+			ServerID:  server.Endpoint().SocketPath,
+			SessionID: string(session.ID()),
+			PaneID:    string(info.ID),
+			PanePID:   info.PID,
 		},
 	}
 
@@ -181,7 +184,7 @@ func TestCaptureAgentResumeRequiresExactEndpointBinding(t *testing.T) {
 		t.Fatalf("agent resume launch = %#v", launch)
 	}
 
-	registrySession.Tmux.ServerSocket = filepath.Join(t.TempDir(), "wrong.sock")
+	registrySession.Location.ServerID = filepath.Join(t.TempDir(), "wrong.sock")
 
 	wrongEndpoint, err := ObserveWithApplicationRecovery(
 		t.Context(), server, []gotmux.SessionID{session.ID()}, nil,

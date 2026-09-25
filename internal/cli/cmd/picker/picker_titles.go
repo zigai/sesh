@@ -6,7 +6,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/zigai/aht/pkg/aht"
+	"github.com/zigai/aht/v2/pkg/aht"
 
 	"github.com/zigai/sesh/internal/agents"
 	"github.com/zigai/sesh/internal/session"
@@ -61,6 +61,7 @@ func pickerTitleLookupSession(agent agents.AgentSession) (aht.Session, bool) {
 		return lookup, false
 	}
 
+	lookup.SchemaVersion = 3
 	lookup.Harness = aht.Harness(agent.Harness)
 	lookup.SessionID = agent.HarnessSessionID
 	lookup.SessionPath = agent.SessionPath

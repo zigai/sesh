@@ -8,8 +8,8 @@ import (
 	"maps"
 	"testing"
 
-	"github.com/zigai/aht/pkg/aht"
-	"github.com/zigai/aht/pkg/registry"
+	"github.com/zigai/aht/v2/pkg/aht"
+	"github.com/zigai/aht/v2/pkg/registry"
 
 	"github.com/zigai/sesh/internal/agents"
 )
@@ -97,15 +97,14 @@ func trackerSession(paneID, windowID string, activity aht.Activity, presence aht
 	return aht.Session{
 		ID:       "session-" + paneID,
 		Harness:  aht.HarnessOmp,
-		Presence: presence,
-		Activity: new(activity),
-		Tmux: aht.TmuxContext{
-			Inside:       true,
-			ServerSocket: "/tmp/fixture/socket",
-			SessionID:    "$1",
-			SessionName:  "dev",
-			WindowID:     windowID,
-			PaneID:       paneID,
+		Liveness: registry.NewLiveness(presence, activity, nil),
+		Location: aht.Location{
+			Kind:        aht.MultiplexerTmux,
+			ServerID:    "/tmp/fixture/socket",
+			SessionID:   "$1",
+			SessionName: "dev",
+			WindowID:    windowID,
+			PaneID:      paneID,
 		},
 	}
 }

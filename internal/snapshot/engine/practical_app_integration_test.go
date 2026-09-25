@@ -14,8 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zigai/aht/pkg/aht"
-	"github.com/zigai/aht/pkg/registry"
+	"github.com/zigai/aht/v2/pkg/aht"
 	gotmux "github.com/zigai/gotmux/tmux"
 	"github.com/zigai/gotmux/tmuxtest"
 
@@ -453,17 +452,18 @@ func TestEnginePracticalRestoreSyntheticAgentResumeExactArgv(t *testing.T) {
 	sourceSession, paneInfo := startSyntheticAgentSession(t, ctx, source, nodePath, scriptPath)
 
 	registrySession := aht.Session{
+		SchemaVersion: 3,
 		ID:            "synthetic-agent-test",
-		Harness:       registry.HarnessCodex,
-		Presence:      registry.PresenceLive,
+		Harness:       aht.HarnessCodex,
+		Liveness:      aht.Live{Activity: aht.ActivityRunning},
 		SessionID:     "synthetic-session-987",
 		ResumeCommand: []string{"codex", "resume", "synthetic-session-987"},
-		Tmux: registry.TmuxContext{
-			Inside:       true,
-			ServerSocket: source.Endpoint().SocketPath,
-			SessionID:    string(sourceSession.ID()),
-			PaneID:       string(paneInfo.ID),
-			PanePID:      paneInfo.PID,
+		Location: aht.Location{
+			Kind:      aht.MultiplexerTmux,
+			ServerID:  source.Endpoint().SocketPath,
+			SessionID: string(sourceSession.ID()),
+			PaneID:    string(paneInfo.ID),
+			PanePID:   paneInfo.PID,
 		},
 	}
 
