@@ -4,6 +4,7 @@ package cmdpicker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -195,6 +196,66 @@ func TestPopupHandoffSwitchesOnlyOpeningClientAfterPopupSelection(t *testing.T) 
 		if !found {
 			t.Fatalf("client %q disappeared", test.name)
 		}
+	}
+}
+
+func TestResolvePopupClientSelection(t *testing.T) {
+	server := tmuxtest.NewServer(t)
+	ctx := t.Context()
+
+	t.Setenv(pickerClientEnvironment, "")
+
+	sessions, err := server.Sessions(ctx)
+	if err != nil || len(sessions) == 0 {
+		t.Fatalf("fixture sessions: %v", err)
+	}
+	origin := sessions[0]
+
+	conn, err := server.OpenControl(ctx, origin.Handle(), gotmux.ControlOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = conn.Close() })
+
+	cmd := NewPopupCommand(ctx)
+	if _, err := resolvePopupClient(ctx, cmd, server); !errors.Is(err, session.ErrInvokingClientUnavailable) {
+		t.Fatalf("expected ErrInvokingClientUnavailable for lone control client, got: %v", err)
+	}
+
+	openingClient := attachPickerTestClient(t, origin.Handle())
+
+	cmdAmbient := NewPopupCommand(ctx)
+	resolvedAmbient, err := resolvePopupClient(ctx, cmdAmbient, server)
+	if err != nil || string(resolvedAmbient.Name) != openingClient {
+		t.Fatalf("resolvePopupClient ambient = %v, want %q", err, openingClient)
+	}
+
+	cmdExplicit := NewPopupCommand(ctx)
+	_ = cmdExplicit.Flags().Set("client", openingClient)
+	resolved, err := resolvePopupClient(ctx, cmdExplicit, server)
+	if err != nil || string(resolved.Name) != openingClient {
+		t.Fatalf("resolvePopupClient explicit = %v, want %q", err, openingClient)
+	}
+
+	clients, err := server.Clients(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range clients {
+		if c.Control {
+			cmdControl := NewPopupCommand(ctx)
+			_ = cmdControl.Flags().Set("client", string(c.Name))
+			if _, err := resolvePopupClient(ctx, cmdControl, server); !errors.Is(err, session.ErrInvokingClientUnavailable) {
+				t.Fatalf("expected ErrInvokingClientUnavailable for explicit control client, got: %v", err)
+			}
+			break
+		}
+	}
+
+	cmdUnknown := NewPopupCommand(ctx)
+	_ = cmdUnknown.Flags().Set("client", "/dev/pts/nonexistent-client-id")
+	if _, err := resolvePopupClient(ctx, cmdUnknown, server); !errors.Is(err, session.ErrInvokingClientUnavailable) {
+		t.Fatalf("expected ErrInvokingClientUnavailable for unknown explicit client, got: %v", err)
 	}
 }
 
