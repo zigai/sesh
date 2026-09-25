@@ -63,6 +63,7 @@ type planIndex struct {
 	ownerSessionByWindow map[string]string
 	panesByID            map[string]model.Pane
 	sessionsByID         map[string]model.Session
+	followersByLeader    map[string][]string
 }
 
 type Executor struct {
@@ -118,6 +119,7 @@ func NewExecutor(server *tmux.Server, manifest model.Manifest, cfg ExecuteConfig
 			ownerSessionByWindow: map[string]string{},
 			panesByID:            panesByID,
 			sessionsByID:         map[string]model.Session{},
+			followersByLeader:    map[string][]string{},
 		},
 		sessions:    map[string]tmux.Session{},
 		bootstraps:  map[string]tmux.WindowLink{},
@@ -350,6 +352,7 @@ func indexPlan(plan Plan) planIndex {
 		ownerSessionByWindow: map[string]string{},
 		panesByID:            map[string]model.Pane{},
 		sessionsByID:         map[string]model.Session{},
+		followersByLeader:    map[string][]string{},
 	}
 
 	for _, step := range plan.Steps {
@@ -364,6 +367,10 @@ func indexPlan(plan Plan) planIndex {
 			index.initialPaneByWindow[s.WindowID] = s.InitialPaneID
 			index.ownerSessionByWindow[s.WindowID] = s.OwnerSessionID
 		case *CreateSessionStep:
+			if s.GroupLeaderSessionID != "" {
+				index.followersByLeader[s.GroupLeaderSessionID] = append(index.followersByLeader[s.GroupLeaderSessionID], s.SessionID)
+			}
+
 			if s.InitialWindowID != "" {
 				index.initialPaneByWindow[s.InitialWindowID] = s.InitialPaneID
 				index.ownerSessionByWindow[s.InitialWindowID] = s.SessionID
@@ -888,6 +895,17 @@ func (e *Executor) prepareFollowerSession(step CreateSessionStep) (stepEffect, e
 			Wrapf(errGroupLeaderNotFound, "%s", step.GroupLeaderSessionID)
 	}
 
+	groupTarget := string(step.GroupName)
+	leaderInfo := e.index.sessionsByID[step.GroupLeaderSessionID]
+	targetLeaderName := string(leaderInfo.Name)
+
+	if groupTarget == "" {
+		groupTarget = targetLeaderName
+		if groupTarget == "" {
+			groupTarget = string(step.Name)
+		}
+	}
+
 	options := tmux.NewSessionOptions{
 		Name:    string(step.Name),
 		Dir:     "",
@@ -897,7 +915,7 @@ func (e *Executor) prepareFollowerSession(step CreateSessionStep) (stepEffect, e
 		TmuxEnv: nil,
 		Size:    tmux.Size{Width: 0, Height: 0},
 		Start:   tmux.ExistingOnly,
-		Group:   string(leader.ID()),
+		Group:   groupTarget,
 	}
 
 	return stepEffect{
@@ -905,6 +923,12 @@ func (e *Executor) prepareFollowerSession(step CreateSessionStep) (stepEffect, e
 			session, err := e.server.NewSession(ctx, options)
 			if err != nil {
 				return "", fmt.Errorf("new group follower session %s: %w", step.SessionID, err)
+			}
+
+			if targetLeaderName != "" && targetLeaderName != groupTarget {
+				if err := leader.Rename(ctx, targetLeaderName); err != nil {
+					return string(session.ID()), &appliedError{runtimeID: string(session.ID()), err: err}
+				}
 			}
 
 			return string(session.ID()), nil
@@ -952,8 +976,15 @@ func (e *Executor) standaloneSessionOptions(step CreateSessionStep) (tmux.NewSes
 		size = tmux.Size{Width: step.Width, Height: step.Height}
 	}
 
+	hasFollowers := len(e.index.followersByLeader[step.SessionID]) > 0
+	sessionName := string(step.Name)
+
+	if hasFollowers && len(step.GroupName) > 0 && string(step.GroupName) != string(step.Name) {
+		sessionName = string(step.GroupName)
+	}
+
 	options := tmux.NewSessionOptions{
-		Name:    string(step.Name),
+		Name:    sessionName,
 		Dir:     "",
 		Window:  "",
 		Program: tmux.Program{},
@@ -966,10 +997,6 @@ func (e *Executor) standaloneSessionOptions(step CreateSessionStep) (tmux.NewSes
 
 	if len(step.GroupName) == 0 && len(step.InitialWindowName) > 0 {
 		options.Window = string(step.InitialWindowName)
-	}
-
-	if len(step.GroupName) > 0 {
-		options.Group = string(step.GroupName)
 	}
 
 	paneInfo, hasPane := e.index.panesByID[step.InitialPaneID]
