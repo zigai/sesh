@@ -12,12 +12,9 @@ import (
 )
 
 const (
-	DefaultInitialBackoff = 500 * time.Millisecond
-
-	DefaultMaxBackoff = 5 * time.Second
-
-	DefaultBackoffFactor = 2.0
-
+	DefaultInitialBackoff  = 500 * time.Millisecond
+	DefaultMaxBackoff      = 5 * time.Second
+	DefaultBackoffFactor   = 2.0
 	DefaultShutdownTimeout = 2 * time.Second
 )
 

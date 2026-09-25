@@ -25,21 +25,16 @@ const (
 )
 
 const (
-	DefaultHookTimeout = 30 * time.Second
-
-	MaxHookCount = 64
-
+	DefaultHookTimeout  = 30 * time.Second
+	MaxHookCount        = 64
 	hookEnvEntriesCount = 8
 )
 
 const (
 	HookStatusCompleted HookStatus = "completed"
-
-	HookStatusFailed HookStatus = "failed"
-
-	HookStatusTimedOut HookStatus = "timed_out"
-
-	HookStatusCanceled HookStatus = "canceled"
+	HookStatusFailed    HookStatus = "failed"
+	HookStatusTimedOut  HookStatus = "timed_out"
+	HookStatusCanceled  HookStatus = "canceled"
 )
 
 var (

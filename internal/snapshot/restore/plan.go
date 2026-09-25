@@ -27,19 +27,13 @@ type PlanSummary struct {
 }
 
 type Plan struct {
-	RequestedSessions []string `json:"requestedSessions"`
-
-	AddedSessions []string `json:"addedSessions"`
-
-	ClosureSessions []string `json:"closureSessions"`
-
-	SourceGraph model.Manifest `json:"sourceGraph"`
-
-	Steps []Step `json:"steps"`
-
+	RequestedSessions   []string             `json:"requestedSessions"`
+	AddedSessions       []string             `json:"addedSessions"`
+	ClosureSessions     []string             `json:"closureSessions"`
+	SourceGraph         model.Manifest       `json:"sourceGraph"`
+	Steps               []Step               `json:"steps"`
 	MissingRequirements []MissingRequirement `json:"missingRequirements"`
-
-	Summary PlanSummary `json:"summary"`
+	Summary             PlanSummary          `json:"summary"`
 }
 
 func (p Plan) SourceEvidenceComplete() bool {

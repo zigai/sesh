@@ -3,11 +3,9 @@ package process
 import "context"
 
 type ForegroundRequest struct {
-	PanePID int
-
+	PanePID           int
 	ExpectedPaneBirth Identity
-
-	EnvironmentKeys []string
+	EnvironmentKeys   []string
 }
 
 func ObserveForeground(ctx context.Context, req ForegroundRequest) (*Observation, error) {

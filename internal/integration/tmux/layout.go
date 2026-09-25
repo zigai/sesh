@@ -13,11 +13,9 @@ import (
 )
 
 const (
-	maxLayoutDepth = 64
-
+	maxLayoutDepth     = 64
 	typedLayoutVersion = 2
-
-	minBranchChildren = 2
+	minBranchChildren  = 2
 )
 
 type layoutReader struct {

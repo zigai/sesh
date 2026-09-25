@@ -29,11 +29,9 @@ const (
 )
 
 var (
-	ErrCapabilityExpired = errors.New("remote bridge capability expired")
-
+	ErrCapabilityExpired  = errors.New("remote bridge capability expired")
 	ErrCapabilityMismatch = errors.New("remote bridge capability does not match")
-
-	ErrForeignSocketPath = errors.New("remote bridge socket path is not owned by this attachment")
+	ErrForeignSocketPath  = errors.New("remote bridge socket path is not owned by this attachment")
 )
 
 type BridgeGrant struct {

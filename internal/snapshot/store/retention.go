@@ -20,12 +20,9 @@ import (
 var errByteAccountingOverflow = errors.New("byte accounting integer overflow")
 
 type Usage struct {
-	TotalBytes int64
-
-	ProtectedBytes int64
-
+	TotalBytes      int64
+	ProtectedBytes  int64
 	GenerationCount int
-
 	GenerationBytes map[string]int64
 }
 

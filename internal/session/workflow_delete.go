@@ -22,11 +22,9 @@ const (
 
 	catalogOperationActive = "active"
 	catalogRewritePending  = "pending"
+	catalogAttemptPending  = "pending"
 
-	catalogAttemptPending = "pending"
-
-	barrierOperationPin = "operation_pin"
-
+	barrierOperationPin   = "operation_pin"
 	barrierPendingRewrite = "pending_rewrite"
 )
 

@@ -48,22 +48,14 @@ const (
 
 var (
 	ErrConnectionUnavailable = errors.New("SSH connection unavailable")
-
-	ErrRemoteDisabled = errors.New("remote sessions are disabled")
-
-	ErrConnectionChanged = errors.New("remote connection configuration changed")
-
-	ErrConnectionMissing = errors.New("remote connection is not configured")
-
-	ErrSSHAuthUnavailable = errors.New("SSH authentication unavailable")
-
-	ErrSSHHostKeyRequired = errors.New("SSH host key acceptance required")
-
+	ErrRemoteDisabled        = errors.New("remote sessions are disabled")
+	ErrConnectionChanged     = errors.New("remote connection configuration changed")
+	ErrConnectionMissing     = errors.New("remote connection is not configured")
+	ErrSSHAuthUnavailable    = errors.New("SSH authentication unavailable")
+	ErrSSHHostKeyRequired    = errors.New("SSH host key acceptance required")
 	ErrRemotePeerUnavailable = errors.New("remote peer entry point unavailable")
-
-	ErrForwardingFailed = errors.New("SSH reverse forwarding failed")
-
-	errNilCommand = errors.New("SSH command is not configured")
+	ErrForwardingFailed      = errors.New("SSH reverse forwarding failed")
+	errNilCommand            = errors.New("SSH command is not configured")
 )
 
 var connectionErrorCodes = []string{

@@ -67,19 +67,13 @@ type restoreDaemonIdentity struct {
 }
 
 type RestoreConfig struct {
-	LeaseRoot string
-
-	Generation string
-
-	Sessions []string
-
-	OperationID string
-
-	LaunchProcesses bool
-
+	LeaseRoot              string
+	Generation             string
+	Sessions               []string
+	OperationID            string
+	LaunchProcesses        bool
 	AllowMissingWorkingDir bool
-
-	Profile RecoveryProfile
+	Profile                RecoveryProfile
 }
 
 type RestoreResult struct {

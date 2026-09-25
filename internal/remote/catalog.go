@@ -30,23 +30,17 @@ const (
 )
 
 const (
-	catalogReserveBytes = 64 << 10
-
-	maxCatalogBytes = MaxFrameBytes * 4
-
+	catalogReserveBytes   = 64 << 10
+	maxCatalogBytes       = MaxFrameBytes * 4
 	CatalogAdmissionBytes = maxCatalogBytes - catalogReserveBytes
-
-	minWatchInterval = 50 * time.Millisecond
-
-	catalogReadAttempts = 4
-	catalogReadBackoff  = time.Millisecond
+	minWatchInterval      = 50 * time.Millisecond
+	catalogReadAttempts   = 4
+	catalogReadBackoff    = time.Millisecond
 )
 
 var (
-	ErrCatalogCapacity = errors.New("remote catalog capacity exceeded")
-
-	ErrCatalogOwnerRunning = errors.New("remote catalog monitor is already running")
-
+	ErrCatalogCapacity        = errors.New("remote catalog capacity exceeded")
+	ErrCatalogOwnerRunning    = errors.New("remote catalog monitor is already running")
 	ErrIncompleteDependencies = errors.New("remote dependencies are incomplete")
 )
 

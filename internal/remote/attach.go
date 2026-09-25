@@ -15,15 +15,11 @@ const (
 	channelCommand = "remote"
 	peerCommand    = "peer"
 
-	ChannelStream = "stream"
-
-	ChannelAction = "action"
-
-	ChannelLookup = "lookup"
-
+	ChannelStream        = "stream"
+	ChannelAction        = "action"
+	ChannelLookup        = "lookup"
 	ChannelAttachPrepare = "attach-prepare"
-
-	ChannelAttach = "attach"
+	ChannelAttach        = "attach"
 
 	maxAttachTimeoutMillis = 24 * 60 * 60 * 1000
 )

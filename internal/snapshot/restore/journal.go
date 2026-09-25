@@ -40,23 +40,16 @@ const (
 
 const (
 	ImportStateActionID = "import-scoped-state"
-
-	VerifyActionID = "verify"
-
+	VerifyActionID      = "verify"
 	terminalActionCount = 2
 )
 
 var (
-	ErrJournalRequired = errors.New("a durable step journal is required")
-
-	ErrJournalIncomplete = errors.New("step journal does not describe the plan")
-
-	ErrPriorUncertainty = errors.New("previous attempt left an uncertain effect")
-
-	ErrPriorConflict = errors.New("previous attempt conflicts with scoped state")
-
-	ErrExecutionUncertain = errors.New("effect outcome uncertain")
-
+	ErrJournalRequired            = errors.New("a durable step journal is required")
+	ErrJournalIncomplete          = errors.New("step journal does not describe the plan")
+	ErrPriorUncertainty           = errors.New("previous attempt left an uncertain effect")
+	ErrPriorConflict              = errors.New("previous attempt conflicts with scoped state")
+	ErrExecutionUncertain         = errors.New("effect outcome uncertain")
 	ErrRuntimeIdentityUnavailable = errors.New("confirmed effect identity unavailable")
 )
 
@@ -66,20 +59,15 @@ type ActionSpec struct {
 }
 
 type StepState struct {
-	State model.ActionState `json:"state"`
-
-	RuntimeID string `json:"runtimeId"`
+	State     model.ActionState `json:"state"`
+	RuntimeID string            `json:"runtimeId"`
 }
 
 type Journal interface {
 	Steps(ctx context.Context, steps []Step) (map[string]StepState, error)
-
 	Intent(ctx context.Context, step Step) error
-
 	Confirmed(ctx context.Context, step Step, runtimeID string) error
-
 	NotSent(ctx context.Context, step Step) error
-
 	Unknown(ctx context.Context, step Step) error
 }
 

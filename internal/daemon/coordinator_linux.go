@@ -14,11 +14,9 @@ import (
 )
 
 var (
-	ErrFinalRecorded = errors.New("daemon final save outcome was durably recorded")
-
+	ErrFinalRecorded   = errors.New("daemon final save outcome was durably recorded")
 	ErrNewSchedulerNil = errors.New("cannot create replacement autosave scheduler: NewScheduler is nil")
-
-	ErrSchedulerNil = errors.New("cannot run shutdown autosave attempt: scheduler is nil")
+	ErrSchedulerNil    = errors.New("cannot run shutdown autosave attempt: scheduler is nil")
 )
 
 type CoordinatorConfig struct {

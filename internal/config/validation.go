@@ -19,12 +19,9 @@ const (
 	minimumSnapshotCount                = 5
 	maximumSnapshotRetentionDays        = math.MaxInt64 / int64(24*time.Hour)
 
-	MaxRemoteConnections = 128
-
-	MaxProcessEnvironmentKeys = 256
-
-	MaxProcessEnvironmentKeyLength = 256
-
+	MaxRemoteConnections               = 128
+	MaxProcessEnvironmentKeys          = 256
+	MaxProcessEnvironmentKeyLength     = 256
 	MaxProcessEnvironmentTotalKeyBytes = 4096
 )
 

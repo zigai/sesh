@@ -99,8 +99,7 @@ func createSessionStep(t *testing.T, plan Plan) Step {
 }
 
 const (
-	fixtureSessionName = "fixture"
-
+	fixtureSessionName  = "fixture"
 	restoredSessionName = "alpha"
 )
 

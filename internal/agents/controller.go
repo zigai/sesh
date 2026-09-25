@@ -19,19 +19,12 @@ const defaultLockTimeout = 3 * time.Second
 
 type Controller interface {
 	CurrentContext(ctx context.Context) (CurrentContext, error)
-
 	Panes(ctx context.Context) ([]PaneLocation, error)
-
 	SessionWindows(ctx context.Context, sessionID string) ([]SessionWindow, error)
-
 	Activate(ctx context.Context, current CurrentContext, target PaneLocation) error
-
 	History(ctx context.Context, clientKey string) (string, error)
-
 	SetHistory(ctx context.Context, clientKey string, raw string) error
-
 	Lock(ctx context.Context, channel string) error
-
 	Unlock(ctx context.Context, channel string) error
 }
 

@@ -9,89 +9,50 @@ import (
 )
 
 const (
-	Domain = "process"
-
-	CodeInvalidPID = "process_invalid_pid"
-
-	CodeBirthRequired = "process_birth_required"
-
-	CodeIdentityMismatch = "process_identity_mismatch"
-
-	CodeProcessVanished = "process_vanished"
-
-	CodeProcessZombie = "process_zombie"
-
-	CodeEmptyCmdline = "process_empty_cmdline"
-
-	CodeMalformedCmdline = "process_malformed_cmdline"
-
-	CodeMalformedEnviron = "process_malformed_environ"
-
-	CodeDuplicateVariable = "process_duplicate_variable"
-
-	CodeMalformedStat = "process_malformed_stat"
-
-	CodeInputTooLarge = "process_input_too_large"
-
-	CodeInvalidVariable = "process_invalid_variable"
-
-	CodeUnsupported = "process_unsupported"
-
-	CodeAmbiguousProcLink = "process_ambiguous_proc_link"
-
+	Domain                    = "process"
+	CodeInvalidPID            = "process_invalid_pid"
+	CodeBirthRequired         = "process_birth_required"
+	CodeIdentityMismatch      = "process_identity_mismatch"
+	CodeProcessVanished       = "process_vanished"
+	CodeProcessZombie         = "process_zombie"
+	CodeEmptyCmdline          = "process_empty_cmdline"
+	CodeMalformedCmdline      = "process_malformed_cmdline"
+	CodeMalformedEnviron      = "process_malformed_environ"
+	CodeDuplicateVariable     = "process_duplicate_variable"
+	CodeMalformedStat         = "process_malformed_stat"
+	CodeInputTooLarge         = "process_input_too_large"
+	CodeInvalidVariable       = "process_invalid_variable"
+	CodeUnsupported           = "process_unsupported"
+	CodeAmbiguousProcLink     = "process_ambiguous_proc_link"
 	CodeForegroundUnavailable = "process_foreground_unavailable"
-
-	CodeForegroundAmbiguous = "process_foreground_ambiguous"
-
-	CodeForegroundChanged = "process_foreground_changed"
-
-	CodeCanceled = "operation_canceled"
-
-	CodeTimeout = "operation_timed_out"
-
-	CodeFailed = "process_failed"
-
-	sanitizedPath = "[sanitized]"
+	CodeForegroundAmbiguous   = "process_foreground_ambiguous"
+	CodeForegroundChanged     = "process_foreground_changed"
+	CodeCanceled              = "operation_canceled"
+	CodeTimeout               = "operation_timed_out"
+	CodeFailed                = "process_failed"
+	sanitizedPath             = "[sanitized]"
 )
 
 var (
-	ErrInvalidPID = errors.New("a positive process identifier is required")
-
-	ErrBirthRequired = errors.New("expected birth identity precondition is required")
-
-	ErrIdentityMismatch = errors.New("process birth identity does not match expected identity")
-
-	ErrProcessVanished = errors.New("process does not exist or terminated during observation")
-
-	ErrProcessZombie = errors.New("process is in a zombie or terminated state")
-
-	ErrEmptyCmdline = errors.New("process command line is empty")
-
-	ErrMalformedCmdline = errors.New("process command line is malformed or truncated")
-
-	ErrMalformedEnviron = errors.New("process environment is malformed or truncated")
-
+	ErrInvalidPID                   = errors.New("a positive process identifier is required")
+	ErrBirthRequired                = errors.New("expected birth identity precondition is required")
+	ErrIdentityMismatch             = errors.New("process birth identity does not match expected identity")
+	ErrProcessVanished              = errors.New("process does not exist or terminated during observation")
+	ErrProcessZombie                = errors.New("process is in a zombie or terminated state")
+	ErrEmptyCmdline                 = errors.New("process command line is empty")
+	ErrMalformedCmdline             = errors.New("process command line is malformed or truncated")
+	ErrMalformedEnviron             = errors.New("process environment is malformed or truncated")
 	ErrDuplicateEnvironmentVariable = errors.New("duplicate requested environment variable in process environment")
-
-	ErrMalformedStat = errors.New("process stat is malformed or truncated")
-
-	ErrMalformedIdentity = errors.New("process birth identity format is invalid")
-
-	ErrInputTooLarge = errors.New("process input exceeded bounded read limit")
-
-	ErrInvalidVariableName = errors.New("requested environment variable name is invalid")
-
-	ErrEnvironmentLimitExceeded = errors.New("requested environment keys exceed count or byte bounds")
-
-	ErrUnsupported = errors.New("process observation is not supported on this platform")
-
-	ErrAmbiguousProcLink = errors.New("process link path is ambiguous")
-
-	ErrForegroundUnavailable = errors.New("foreground process is unavailable")
-
-	ErrForegroundAmbiguous = errors.New("foreground process is ambiguous")
-
-	ErrForegroundChanged = errors.New("foreground process changed during observation")
+	ErrMalformedStat                = errors.New("process stat is malformed or truncated")
+	ErrMalformedIdentity            = errors.New("process birth identity format is invalid")
+	ErrInputTooLarge                = errors.New("process input exceeded bounded read limit")
+	ErrInvalidVariableName          = errors.New("requested environment variable name is invalid")
+	ErrEnvironmentLimitExceeded     = errors.New("requested environment keys exceed count or byte bounds")
+	ErrUnsupported                  = errors.New("process observation is not supported on this platform")
+	ErrAmbiguousProcLink            = errors.New("process link path is ambiguous")
+	ErrForegroundUnavailable        = errors.New("foreground process is unavailable")
+	ErrForegroundAmbiguous          = errors.New("foreground process is ambiguous")
+	ErrForegroundChanged            = errors.New("foreground process changed during observation")
 )
 
 func wrapError(err error, op string) error {

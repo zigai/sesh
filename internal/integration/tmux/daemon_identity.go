@@ -14,14 +14,12 @@ import (
 
 const (
 	CodeDaemonIdentityUnavailable = "daemon_identity_unavailable"
-
-	CodeDaemonIdentityChanged = "daemon_identity_changed"
+	CodeDaemonIdentityChanged     = "daemon_identity_changed"
 )
 
 var (
 	ErrDaemonIdentityUnavailable = errors.New("tmux daemon identity is unavailable")
-
-	ErrDaemonIdentityChanged = errors.New("tmux daemon identity changed during observation")
+	ErrDaemonIdentityChanged     = errors.New("tmux daemon identity changed during observation")
 )
 
 type DaemonIdentity struct {

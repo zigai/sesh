@@ -22,8 +22,7 @@ const (
 )
 
 var (
-	ErrUnsafePath = errors.New("unsafe remote storage path")
-
+	ErrUnsafePath               = errors.New("unsafe remote storage path")
 	errPrivateDirectoryRequired = errors.New("remote storage directory must be an absolute cleaned path")
 )
 

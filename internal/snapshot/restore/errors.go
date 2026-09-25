@@ -9,17 +9,12 @@ import (
 )
 
 var (
-	ErrInvalid = model.ErrInvalid
-
-	ErrVersion = model.ErrVersion
-
-	ErrGroupCollision = errors.New("group collision")
-
-	ErrSessionCollision = errors.New("session collision")
-
+	ErrInvalid            = model.ErrInvalid
+	ErrVersion            = model.ErrVersion
+	ErrGroupCollision     = errors.New("group collision")
+	ErrSessionCollision   = errors.New("session collision")
 	ErrWorkingDirNotFound = errors.New("working directory not found")
-
-	ErrExecutionFailed = errors.New("execution failed")
+	ErrExecutionFailed    = errors.New("execution failed")
 )
 
 func planFailure(phase, reason string, cause error) error {

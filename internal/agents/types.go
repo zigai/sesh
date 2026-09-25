@@ -9,17 +9,13 @@ import (
 
 const (
 	NavigationGlobal NavigationScope = iota
-
 	NavigationCurrentSession
 )
 
 const (
-	StateNormal State = "normal"
-
-	StateUnread State = "unread"
-
-	StateFailed State = "failed"
-
+	StateNormal  State = "normal"
+	StateUnread  State = "unread"
+	StateFailed  State = "failed"
 	StateWaiting State = "waiting"
 )
 
@@ -31,29 +27,18 @@ const (
 )
 
 var (
-	ErrNoTargetPane = errors.New("no candidate agent pane found")
-
-	ErrEmptyNavigationHistory = errors.New("agent navigation history is empty")
-
+	ErrNoTargetPane             = errors.New("no candidate agent pane found")
+	ErrEmptyNavigationHistory   = errors.New("agent navigation history is empty")
 	ErrNavigationHistoryCorrupt = errors.New("agent navigation history is corrupt")
-
-	ErrCurrentContextUnknown = errors.New("current tmux context could not be determined")
-
-	ErrCurrentPaneNotLive = errors.New("current pane is not a live tmux pane")
-
-	ErrPaneNotLive = errors.New("pane is not a live tmux pane")
-
-	ErrServerRequired = errors.New("tmux server required")
-
-	ErrRegistryUnavailable = errors.New("agent registry unavailable")
-
-	ErrRegistryCorrupt = errors.New("agent registry is corrupt")
-
-	ErrRegistrySchema = errors.New("unsupported agent registry schema")
-
-	ErrRegistryTooLarge = errors.New("agent registry exceeds its size limit")
-
-	ErrStyleOwnershipCorrupt = errors.New("agent style ownership record is corrupt")
+	ErrCurrentContextUnknown    = errors.New("current tmux context could not be determined")
+	ErrCurrentPaneNotLive       = errors.New("current pane is not a live tmux pane")
+	ErrPaneNotLive              = errors.New("pane is not a live tmux pane")
+	ErrServerRequired           = errors.New("tmux server required")
+	ErrRegistryUnavailable      = errors.New("agent registry unavailable")
+	ErrRegistryCorrupt          = errors.New("agent registry is corrupt")
+	ErrRegistrySchema           = errors.New("unsupported agent registry schema")
+	ErrRegistryTooLarge         = errors.New("agent registry exceeds its size limit")
+	ErrStyleOwnershipCorrupt    = errors.New("agent style ownership record is corrupt")
 )
 
 type NavigationScope int

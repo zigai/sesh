@@ -19,21 +19,16 @@ import (
 )
 
 var (
-	ErrLeaseRootRequired = errors.New("explicit shared lease root required")
-
+	ErrLeaseRootRequired  = errors.New("explicit shared lease root required")
 	ErrRepositoryRequired = errors.New("repository required")
 )
 
 type SaveConfig struct {
-	LeaseRoot string
-
-	ProcessEnrichment bool
-
+	LeaseRoot              string
+	ProcessEnrichment      bool
 	ProcessEnvironmentKeys []string
-
-	AgentSource agents.SessionSource
-
-	Profile RecoveryProfile
+	AgentSource            agents.SessionSource
+	Profile                RecoveryProfile
 }
 
 type SaveResult struct {

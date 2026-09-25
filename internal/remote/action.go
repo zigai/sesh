@@ -18,25 +18,16 @@ import (
 )
 
 const (
-	ActionCodeInvalidRequest = "invalid_request"
-
-	ActionCodeForbidden = "forbidden"
-
-	ActionCodeUnsupported = "unsupported"
-
-	ActionCodeConflict = "conflict"
-
+	ActionCodeInvalidRequest     = "invalid_request"
+	ActionCodeForbidden          = "forbidden"
+	ActionCodeUnsupported        = "unsupported"
+	ActionCodeConflict           = "conflict"
 	ActionCodeInvocationConflict = "invocation_conflict"
-
-	ActionCodeTargetChanged = "target_changed"
-
-	ActionCodeUnavailable = "unavailable"
-
-	ActionCodePartial = "partial"
-
-	ActionCodeUnknownOutcome = "unknown_outcome"
-
-	ActionCodeNotFound = "not_found"
+	ActionCodeTargetChanged      = "target_changed"
+	ActionCodeUnavailable        = "unavailable"
+	ActionCodePartial            = "partial"
+	ActionCodeUnknownOutcome     = "unknown_outcome"
+	ActionCodeNotFound           = "not_found"
 )
 
 const (
@@ -45,22 +36,16 @@ const (
 )
 
 const (
-	ActionCreate Action = "create"
-
-	ActionRename Action = "rename"
-
-	ActionKill Action = "kill"
-
-	ActionDelete Action = "delete"
-
+	ActionCreate   Action = "create"
+	ActionRename   Action = "rename"
+	ActionKill     Action = "kill"
+	ActionDelete   Action = "delete"
 	ActionSnapshot Action = "snapshot"
-
-	ActionRestore Action = "restore"
+	ActionRestore  Action = "restore"
 )
 
 var (
 	ErrInvocationNotFound = errors.New("remote invocation record not found")
-
 	ErrInvocationConflict = errors.New("remote invocation intent does not match")
 	ErrActionFailed       = errors.New("remote action failed")
 	ErrActionUncertain    = errors.New("remote action outcome is uncertain")

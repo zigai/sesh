@@ -32,7 +32,6 @@ const (
 
 var (
 	ErrInvocationCapacity = errors.New("remote invocation receipts are full")
-
 	ErrInvocationResolved = errors.New("remote invocation already has a durable outcome")
 )
 

@@ -17,8 +17,7 @@ import (
 )
 
 var (
-	ErrPeerForbidden = errors.New("remote operation is not permitted by peer policy")
-
+	ErrPeerForbidden   = errors.New("remote operation is not permitted by peer policy")
 	ErrPeerUnsupported = errors.New("remote operation has no native peer handler")
 )
 

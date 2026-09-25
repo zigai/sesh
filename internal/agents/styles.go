@@ -34,11 +34,8 @@ type ActivePane struct {
 
 type StyleController interface {
 	ActivePanes(ctx context.Context) (map[string]ActivePane, error)
-
 	SetWindowStyle(ctx context.Context, windowID string, style string) error
-
 	ClearWindowStyle(ctx context.Context, windowID string) error
-
 	ClearOwned(ctx context.Context) error
 }
 

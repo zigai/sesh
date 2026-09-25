@@ -16,10 +16,8 @@ import (
 )
 
 const (
-	switchVerifyAttempts = 3
-
-	switchVerifyDelay = 20 * time.Millisecond
-
+	switchVerifyAttempts  = 3
+	switchVerifyDelay     = 20 * time.Millisecond
 	parallelSwitchQueries = 2
 )
 

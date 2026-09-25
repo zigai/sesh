@@ -22,24 +22,18 @@ import (
 //   - Every active recovery pin (in-flight restore operation source) is permanently retained.
 //   - Latest attempt safeguards (pending, failed, incomplete) remain intact.
 type RetentionPolicy struct {
-	MaxAge time.Duration
-
+	MaxAge   time.Duration
 	MaxCount int
-
 	MaxBytes int64
 }
 
 type RetentionResult struct {
-	Removed []string
-
-	Retained []string
-
-	Protected []string
-
+	Removed        []string
+	Retained       []string
+	Protected      []string
 	RetainedBytes  int64
 	ProtectedBytes int64
-
-	BudgetUnmet bool
+	BudgetUnmet    bool
 }
 
 func (p RetentionPolicy) Validate(now time.Time) error {

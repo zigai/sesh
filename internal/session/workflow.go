@@ -22,59 +22,37 @@ const (
 
 const (
 	EnterNone EnterAction = iota
-
 	EnterSwitch
-
 	EnterAttach
 )
 
 var (
-	ErrSessionAlreadyExists = errors.New("session already exists")
-
-	ErrSessionNotFound = errors.New("session not found")
-
-	ErrSessionAttached = errors.New("session is attached")
-
-	ErrInvalidSessionName = errors.New("invalid session name")
-
-	ErrNotInsideTmux = errors.New("not running inside tmux")
-
+	ErrSessionAlreadyExists      = errors.New("session already exists")
+	ErrSessionNotFound           = errors.New("session not found")
+	ErrSessionAttached           = errors.New("session is attached")
+	ErrInvalidSessionName        = errors.New("invalid session name")
+	ErrNotInsideTmux             = errors.New("not running inside tmux")
 	ErrInvokingClientUnavailable = errors.New("no attached client displays the invoking session")
-
-	ErrInvokingClientAmbiguous = errors.New("multiple attached clients display the invoking session")
-
-	ErrSwitchUnverified = errors.New("client switch could not be verified")
-
-	ErrTerminalRequired = errors.New("attach requires an interactive terminal")
-
+	ErrInvokingClientAmbiguous   = errors.New("multiple attached clients display the invoking session")
+	ErrSwitchUnverified          = errors.New("client switch could not be verified")
+	ErrTerminalRequired          = errors.New("attach requires an interactive terminal")
 	ErrSavedGenerationsProtected = errors.New("saved generations containing the session are protected")
-
 	ErrSavedSessionScopeConflict = errors.New("saved session endpoint scope is missing")
-
-	ErrSessionReplaced = errors.New("session identity changed or could not be verified during deletion")
-
-	errServerRequired     = errors.New("tmux server required")
-	errRepositoryRequired = errors.New("snapshot repository required")
+	ErrSessionReplaced           = errors.New("session identity changed or could not be verified during deletion")
+	errServerRequired            = errors.New("tmux server required")
+	errRepositoryRequired        = errors.New("snapshot repository required")
 )
 
 type WorkflowOptions struct {
-	Server *gotmux.Server
-
-	Repository *store.Repository
-
-	LeaseRoot string
-
+	Server      *gotmux.Server
+	Repository  *store.Repository
+	LeaseRoot   string
 	HistoryPath string
-
-	Hooks config.HookConfig
-
-	HookRunner *HookRunner
-
-	Getenv func(string) string
-
-	Streams gotmux.TerminalStreams
-
-	Source string
+	Hooks       config.HookConfig
+	HookRunner  *HookRunner
+	Getenv      func(string) string
+	Streams     gotmux.TerminalStreams
+	Source      string
 }
 
 type Workflow struct {

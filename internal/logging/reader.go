@@ -21,8 +21,7 @@ import (
 
 const (
 	MaxRetainedLogRecords = 100000
-
-	MaxRetainedLogBytes = 32 << 20
+	MaxRetainedLogBytes   = 32 << 20
 
 	maxLogRecordBytes         = 4 << 20
 	initialRingBufferCapacity = 64

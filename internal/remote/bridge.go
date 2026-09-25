@@ -27,18 +27,12 @@ import (
 
 const (
 	bridgeInitialFrameCapacity = 256
-
-	BridgeMaxFrameBytes = 1 << 20
-
-	bridgeHandshakeTimeout = 5 * time.Second
-
-	bridgeRequestTimeout = 30 * time.Second
-
-	bridgeMaxConnections = 8
-
-	bridgeMaxHandshakes = 2
-
-	bridgeMaxRequests = 64
+	BridgeMaxFrameBytes        = 1 << 20
+	bridgeHandshakeTimeout     = 5 * time.Second
+	bridgeRequestTimeout       = 30 * time.Second
+	bridgeMaxConnections       = 8
+	bridgeMaxHandshakes        = 2
+	bridgeMaxRequests          = 64
 )
 
 const (
@@ -51,23 +45,15 @@ const (
 )
 
 var (
-	ErrBridgeFrameTooLarge = errors.New("bridge frame exceeds size limit")
-
-	ErrBridgeInvalidFrame = errors.New("invalid bridge frame")
-
-	ErrBridgeAuthFailed = errors.New("bridge authentication failed")
-
+	ErrBridgeFrameTooLarge  = errors.New("bridge frame exceeds size limit")
+	ErrBridgeInvalidFrame   = errors.New("invalid bridge frame")
+	ErrBridgeAuthFailed     = errors.New("bridge authentication failed")
 	ErrBridgeSwitchRejected = errors.New("bridge switch rejected")
-
-	ErrBridgeClosed = errors.New("bridge closed")
-
+	ErrBridgeClosed         = errors.New("bridge closed")
 	ErrBridgeSocketRequired = errors.New("bridge socket path and capability are required")
-
-	ErrBridgeSocketExists = errors.New("bridge socket path already exists")
-
-	ErrBridgeBusy = errors.New("bridge connection limit reached")
-
-	ErrBridgeStaleCatalog = errors.New("bridge catalog generation is stale")
+	ErrBridgeSocketExists   = errors.New("bridge socket path already exists")
+	ErrBridgeBusy           = errors.New("bridge connection limit reached")
+	ErrBridgeStaleCatalog   = errors.New("bridge catalog generation is stale")
 )
 
 type BridgeServerConfig struct {

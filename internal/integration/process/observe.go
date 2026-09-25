@@ -8,39 +8,30 @@ import (
 )
 
 const (
-	MaxEnvironmentKeys = 256
-
-	MaxEnvironmentKeyLength = 256
-
+	MaxEnvironmentKeys          = 256
+	MaxEnvironmentKeyLength     = 256
 	MaxEnvironmentTotalKeyBytes = 4096
 )
 
 type Request struct {
-	PID int
-
-	ExpectedBirth Identity
-
+	PID             int
+	ExpectedBirth   Identity
 	EnvironmentKeys []string
 }
 
 type Observation struct {
-	PID int
-
-	Birth Identity
-
+	PID        int
+	Birth      Identity
 	Executable []byte
 
 	// ExecutableDeleted is true only if positive evidence (nlink==0) confirms the
 	// executable inode was unlinked from disk.
 	ExecutableDeleted bool
 
-	Arguments [][]byte
-
-	Directory []byte
-
+	Arguments        [][]byte
+	Directory        []byte
 	DirectoryDeleted bool
-
-	Environment []model.Variable
+	Environment      []model.Variable
 }
 
 func Observe(ctx context.Context, req Request) (*Observation, error) {

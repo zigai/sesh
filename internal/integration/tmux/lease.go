@@ -29,8 +29,7 @@ import (
 
 var (
 	ErrEndpointAlias = errors.New("tmux endpoint path must be canonical without symlinks, aliases, or hard-links")
-
-	ErrLeaseRoot = errors.New("an explicit private lease root directory is required")
+	ErrLeaseRoot     = errors.New("an explicit private lease root directory is required")
 )
 
 type Lease struct {

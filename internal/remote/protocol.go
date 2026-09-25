@@ -17,61 +17,40 @@ import (
 )
 
 const (
-	ProtocolVersion = 1
-
-	MaxFrameBytes = 1 << 20
-
-	MaxSessions = 4096
-
-	MaxAgents = 16384
-
-	MaxStringBytes = 16 << 10
-
+	ProtocolVersion    = 1
+	MaxFrameBytes      = 1 << 20
+	MaxSessions        = 4096
+	MaxAgents          = 16384
+	MaxStringBytes     = 16 << 10
 	MaxIdentifierBytes = 256
-
-	MaxActionBytes = 64 << 10
-
-	MaxBootstrapBytes = 64 << 10
-
+	MaxActionBytes     = 64 << 10
+	MaxBootstrapBytes  = 64 << 10
 	MaxCapabilityBytes = 4 << 10
-
-	MaxStreamFrames = 1 << 20
+	MaxStreamFrames    = 1 << 20
 )
 
 const (
-	FrameHello FrameType = "hello"
-
+	FrameHello    FrameType = "hello"
 	FrameSnapshot FrameType = "snapshot"
-
-	FrameHealth FrameType = "health"
+	FrameHealth   FrameType = "health"
 )
 
 const (
-	HealthOK HealthStatus = "ok"
-
-	HealthDegraded HealthStatus = "degraded"
-
-	HealthUnknown HealthStatus = "unknown"
-
-	HealthReasonNone HealthReason = "none"
-
+	HealthOK                HealthStatus = "ok"
+	HealthDegraded          HealthStatus = "degraded"
+	HealthUnknown           HealthStatus = "unknown"
+	HealthReasonNone        HealthReason = "none"
 	HealthReasonUnavailable HealthReason = "unavailable"
-
-	HealthReasonTimeout HealthReason = "timeout"
-
+	HealthReasonTimeout     HealthReason = "timeout"
 	HealthReasonInvalidData HealthReason = "invalid_data"
 )
 
 var (
-	ErrFrameTooLarge = errors.New("remote frame exceeds size limit")
-
+	ErrFrameTooLarge       = errors.New("remote frame exceeds size limit")
 	ErrUnsupportedProtocol = errors.New("unsupported remote protocol version")
-
-	ErrInvalidFrame = errors.New("invalid remote frame")
-
-	ErrPeerMismatch = errors.New("remote peer identity changed")
-
-	errNilFrameWriter = errors.New("remote frame writer is not configured")
+	ErrInvalidFrame        = errors.New("invalid remote frame")
+	ErrPeerMismatch        = errors.New("remote peer identity changed")
+	errNilFrameWriter      = errors.New("remote frame writer is not configured")
 )
 
 type FrameType string
