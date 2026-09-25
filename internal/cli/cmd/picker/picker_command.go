@@ -498,7 +498,10 @@ func openPickerPopup(ctx context.Context, cmd *cobra.Command, runtime pickerComm
 	targetPane := pickerCurrentPane(cmd)
 	width, height := pickerPopupDimensions(runtime.cfg, runtime.state, gotmux.Size{Width: client.Width, Height: client.Height})
 	options := pickerPopupOptions(
-		gotmux.Exec(executable, pickerPopupArguments(cmd, runtime.socketPath, string(client.Name), string(originSessionID), targetPane, handoffPath)...), width, height,
+		gotmux.Exec(executable, pickerPopupArguments(cmd, runtime.socketPath, string(client.Name), string(originSessionID), targetPane, handoffPath)...),
+		width,
+		height,
+		runtime.cfg.Theme.Background,
 	)
 
 	services, err := newPickerServices(ctx, runtime.cfg, runtime.socketPath, runtime.repositoryPath,
@@ -518,14 +521,25 @@ func openPickerPopup(ctx context.Context, cmd *cobra.Command, runtime pickerComm
 	)
 }
 
-func pickerPopupOptions(program gotmux.Program, width, height string) gotmux.PopupOptions {
+func pickerPopupOptions(program gotmux.Program, width, height, background string) gotmux.PopupOptions {
 	var opts gotmux.PopupOptions
 
 	opts.Program = program
 	opts.Width = width
 	opts.Height = height
 	opts.Borderless = true
-	opts.Style = "bg=#000000"
+
+	bg := strings.TrimSpace(background)
+	if bg == "" {
+		opts.Style = "bg=#000000"
+	} else if strings.EqualFold(bg, "default") {
+		opts.Style = ""
+	} else if strings.HasPrefix(bg, "#") {
+		opts.Style = "bg=" + bg
+	} else {
+		opts.Style = "bg=" + bg
+	}
+
 	opts.X = "C"
 	opts.Y = "C"
 	opts.CloseOnExit = true

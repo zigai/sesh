@@ -166,13 +166,23 @@ func TestPickerCommandsExposeLiveInteractiveSurface(t *testing.T) {
 func TestPickerPopupUsesApplicationOwnedFrame(t *testing.T) {
 	t.Parallel()
 
-	options := pickerPopupOptions(gotmux.Exec("/bin/true"), "120", "32")
+	options := pickerPopupOptions(gotmux.Exec("/bin/true"), "120", "32", "")
 	if !options.Borderless || options.Title != "" {
 		t.Fatalf("popup frame = borderless %t, title %q; want application-owned border", options.Borderless, options.Title)
 	}
 
 	if options.Style != "bg=#000000" || options.X != "C" || options.Y != "C" {
 		t.Fatalf("popup presentation = style %q at %q,%q", options.Style, options.X, options.Y)
+	}
+
+	transparentOpts := pickerPopupOptions(gotmux.Exec("/bin/true"), "120", "32", "default")
+	if transparentOpts.Style != "" {
+		t.Fatalf("transparent popup style = %q, want empty", transparentOpts.Style)
+	}
+
+	customBgOpts := pickerPopupOptions(gotmux.Exec("/bin/true"), "120", "32", "#1e1e2e")
+	if customBgOpts.Style != "bg=#1e1e2e" {
+		t.Fatalf("custom bg popup style = %q, want bg=#1e1e2e", customBgOpts.Style)
 	}
 
 	if !options.CloseOnExit || options.CloseOnSuccess || options.CloseOnKey || options.DisableDismiss {

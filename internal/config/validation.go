@@ -420,12 +420,23 @@ func NormalizeStatusTimeFormat(format string) string {
 	}
 }
 
+func ValidateThemeConfig(theme ThemeConfig) error {
+	if theme.Preset != "" {
+		if _, ok := LookupPreset(theme.Preset); !ok {
+			return fmt.Errorf("%w %q: expected dracula, catppuccin, catppuccin-latte, tokyo-night, gruvbox, nord, or terminal", errThemePresetInvalid, theme.Preset)
+		}
+	}
+
+	return nil
+}
+
 func validateConfig(cfg *Config) error {
 	if cfg == nil {
 		return errNilConfig
 	}
 
 	validators := []func() error{
+		func() error { return ValidateThemeConfig(cfg.Theme) },
 		func() error { return ValidateAutosaveConfig(cfg.Autosave) },
 		func() error { return ValidateKeyConfig(cfg.Keys) },
 		func() error { return ValidateHookConfig(cfg.Hooks) },
@@ -439,7 +450,6 @@ func validateConfig(cfg *Config) error {
 		func() error { return ValidateAgentStatusConfig(cfg.AgentStatus) },
 		func() error { return ValidateRemoteConfig(cfg.Remote) },
 	}
-
 	for _, v := range validators {
 		if err := v(); err != nil {
 			return err

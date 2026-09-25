@@ -538,7 +538,11 @@ func (m *Model) sessionRowStyles(layout sessionTableLayout) sessionRowStyles {
 	}
 
 	selectedBg := lipgloss.Color(m.config.Theme.Selected)
-	nameStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	fg := m.config.Theme.Foreground
+	if fg == "" || strings.EqualFold(fg, "default") {
+		fg = "252"
+	}
+	nameStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(fg))
 	selectedNameStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("255")).
 		Background(selectedBg).
@@ -893,9 +897,9 @@ func agentStatusGlyphChar(status session.AgentStatus) string {
 	case session.AgentStatusIdle:
 		return "○"
 	case session.AgentStatusUnknown:
-		return "◌"
+		return "○"
 	default:
-		return "◌"
+		return "○"
 	}
 }
 
@@ -904,19 +908,20 @@ func (m *Model) agentStatusColor(status session.AgentStatus) string {
 		return ""
 	}
 
+	colors := m.config.ResolvedAgentStatusColors()
 	switch status {
 	case session.AgentStatusRunning:
-		return m.config.Theme.Success
+		return colors.Running
 	case session.AgentStatusWaiting:
-		return m.config.Theme.Secondary
+		return colors.Waiting
 	case session.AgentStatusFailed:
-		return m.config.Theme.Error
+		return colors.Failed
 	case session.AgentStatusInterrupted:
-		return m.config.Theme.Warning
+		return colors.Interrupted
 	case session.AgentStatusIdle, session.AgentStatusUnknown:
-		return m.config.Theme.Muted
+		return colors.Idle
 	default:
-		return m.config.Theme.Muted
+		return colors.Idle
 	}
 }
 

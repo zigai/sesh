@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/pelletier/go-toml/v2"
@@ -70,15 +71,27 @@ type DisplayConfig struct {
 	AgentsAgentFormat   string `toml:"agents_agent_format"`
 }
 
+type AgentStatusThemeConfig struct {
+	Running     string `toml:"running"`
+	Waiting     string `toml:"waiting"`
+	Failed      string `toml:"failed"`
+	Interrupted string `toml:"interrupted"`
+	Idle        string `toml:"idle"`
+}
+
 type ThemeConfig struct {
-	Primary   string `toml:"primary"`
-	Secondary string `toml:"secondary"`
-	Muted     string `toml:"muted"`
-	Error     string `toml:"error"`
-	Warning   string `toml:"warning"`
-	Success   string `toml:"success"`
-	Border    string `toml:"border"`
-	Selected  string `toml:"selected"`
+	Preset      string                 `toml:"preset"`
+	Primary     string                 `toml:"primary"`
+	Secondary   string                 `toml:"secondary"`
+	Muted       string                 `toml:"muted"`
+	Error       string                 `toml:"error"`
+	Warning     string                 `toml:"warning"`
+	Success     string                 `toml:"success"`
+	Border      string                 `toml:"border"`
+	Selected    string                 `toml:"selected"`
+	Background  string                 `toml:"background"`
+	Foreground  string                 `toml:"foreground"`
+	AgentStatus *AgentStatusThemeConfig `toml:"agent_status,omitempty"`
 }
 
 type KeyConfig struct {
@@ -155,8 +168,9 @@ type AgentStatusConfig struct {
 	TmuxBinary               string            `toml:"tmux_binary,omitempty"`
 	StyleWaiting             string            `toml:"style_waiting,omitempty"`
 	StyleFailed              string            `toml:"style_failed,omitempty"`
-	StyleUnread              string            `toml:"style_unread,omitempty"`
-	Palette                  map[string]string `toml:"palette,omitempty"`
+	StyleUnread              string                  `toml:"style_unread,omitempty"`
+	Colors                   *AgentStatusThemeConfig `toml:"colors,omitempty"`
+	Palette                  map[string]string       `toml:"palette,omitempty"`
 	SetWindowStatusStyle     bool              `toml:"set_window_status_style"`
 	SetWindowStatusBellStyle bool              `toml:"set_window_status_bell_style"`
 	ActiveBypass             bool              `toml:"active_bypass"`
@@ -176,10 +190,11 @@ type rawAgentStatus struct {
 	TmuxBinary               *string           `toml:"tmux_binary"`
 	StyleWaiting             *string           `toml:"style_waiting"`
 	StyleFailed              *string           `toml:"style_failed"`
-	StyleUnread              *string           `toml:"style_unread"`
-	Palette                  map[string]string `toml:"palette"`
-	SetWindowStatusStyle     *bool             `toml:"set_window_status_style"`
-	SetWindowStatusBellStyle *bool             `toml:"set_window_status_bell_style"`
+	StyleUnread              *string                 `toml:"style_unread"`
+	Colors                   *AgentStatusThemeConfig `toml:"colors"`
+	Palette                  map[string]string       `toml:"palette"`
+	SetWindowStatusStyle     *bool                   `toml:"set_window_status_style"`
+	SetWindowStatusBellStyle *bool                   `toml:"set_window_status_bell_style"`
 	ActiveBypass             *bool             `toml:"active_bypass"`
 	ClearFailedOnVisit       *bool             `toml:"clear_failed_on_visit"`
 	InitialBackoff           *string           `toml:"initial_backoff"`
@@ -291,7 +306,10 @@ func (c *Config) Clone() *Config {
 
 	cp.Remote.Connections = slices.Clone(c.Remote.Connections)
 	cp.AgentStatus = c.AgentStatus.Clone()
-
+	if c.Theme.AgentStatus != nil {
+		cloned := *c.Theme.AgentStatus
+		cp.Theme.AgentStatus = &cloned
+	}
 	return &cp
 }
 
@@ -299,6 +317,11 @@ func (c *AgentStatusConfig) Clone() AgentStatusConfig {
 	cp := *c
 	if c.Palette != nil {
 		cp.Palette = maps.Clone(c.Palette)
+	}
+
+	if c.Colors != nil {
+		cloned := *c.Colors
+		cp.Colors = &cloned
 	}
 
 	if c.explicitBools != nil {
@@ -373,16 +396,7 @@ func (c *HookCommand) value() any {
 
 func DefaultConfig() *Config {
 	return &Config{
-		Theme: ThemeConfig{
-			Primary:   "#24c8ff",
-			Secondary: "#ffdd57",
-			Muted:     "#6c7086",
-			Error:     "#ff4da6",
-			Warning:   "#ff9e3b",
-			Success:   "#50fa7b",
-			Border:    "#3a3d45",
-			Selected:  "#2a2a2a",
-		},
+		Theme: DefaultThemeConfig(),
 		Keys: KeyConfig{
 			Create:    "alt+c",
 			Rename:    "alt+r",
@@ -491,7 +505,7 @@ func DefaultConfig() *Config {
 			StorePath:                "",
 			TmuxBinary:               "tmux",
 			StyleWaiting:             "fg=#1e1e2e,bg=#ffdd57,bold",
-			StyleFailed:              "fg=#1e1e2e,bg=#ff4da6,bold",
+			StyleFailed:              "fg=#1e1e2e,bg=#ff5555,bold",
 			StyleUnread:              "fg=#1e1e2e,bg=#6c7086,bold",
 			Palette:                  map[string]string{},
 			SetWindowStatusStyle:     true,
@@ -534,26 +548,153 @@ func (c AgentSessionsConfig) NormalizedStatusTimeFormat() string {
 }
 
 func (c *AgentStatusConfig) ResolvedPalette() map[string]string {
+	waitingStyle := c.StyleWaiting
+	if c.Colors != nil && c.Colors.Waiting != "" && (waitingStyle == "" || waitingStyle == "fg=#1e1e2e,bg=#ffdd57,bold") {
+		waitingStyle = SynthesizeTmuxStyle(c.Colors.Waiting)
+	} else if waitingStyle == "" {
+		waitingStyle = "fg=#1e1e2e,bg=#ffdd57,bold"
+	}
+
+	failedStyle := c.StyleFailed
+	if c.Colors != nil && c.Colors.Failed != "" && (failedStyle == "" || failedStyle == "fg=#1e1e2e,bg=#ff5555,bold") {
+		failedStyle = SynthesizeTmuxStyle(c.Colors.Failed)
+	} else if failedStyle == "" {
+		failedStyle = "fg=#1e1e2e,bg=#ff5555,bold"
+	}
+
+	unreadStyle := c.StyleUnread
+	if c.Colors != nil && c.Colors.Idle != "" && (unreadStyle == "" || unreadStyle == "fg=#1e1e2e,bg=#6c7086,bold") {
+		unreadStyle = SynthesizeTmuxStyle(c.Colors.Idle)
+	} else if unreadStyle == "" {
+		unreadStyle = "fg=#1e1e2e,bg=#6c7086,bold"
+	}
+
 	palette := map[string]string{
-		"waiting": c.StyleWaiting,
-		"failed":  c.StyleFailed,
-		"unread":  c.StyleUnread,
-	}
-	if palette["waiting"] == "" {
-		palette["waiting"] = "fg=#1e1e2e,bg=#ffdd57,bold"
-	}
-
-	if palette["failed"] == "" {
-		palette["failed"] = "fg=#1e1e2e,bg=#ff4da6,bold"
-	}
-
-	if palette["unread"] == "" {
-		palette["unread"] = "fg=#1e1e2e,bg=#6c7086,bold"
+		"waiting": waitingStyle,
+		"failed":  failedStyle,
+		"unread":  unreadStyle,
 	}
 
 	maps.Copy(palette, c.Palette)
 
 	return palette
+}
+
+func (c *Config) ResolvedAgentStatusColors() AgentStatusThemeConfig {
+	if c == nil {
+		return themePresets["dracula"].AgentStatus
+	}
+
+	var colors AgentStatusThemeConfig
+	if c.Theme.AgentStatus != nil {
+		colors = *c.Theme.AgentStatus
+	}
+	if c.AgentStatus.Colors != nil {
+		if c.AgentStatus.Colors.Running != "" {
+			colors.Running = c.AgentStatus.Colors.Running
+		}
+		if c.AgentStatus.Colors.Waiting != "" {
+			colors.Waiting = c.AgentStatus.Colors.Waiting
+		}
+		if c.AgentStatus.Colors.Failed != "" {
+			colors.Failed = c.AgentStatus.Colors.Failed
+		}
+		if c.AgentStatus.Colors.Interrupted != "" {
+			colors.Interrupted = c.AgentStatus.Colors.Interrupted
+		}
+		if c.AgentStatus.Colors.Idle != "" {
+			colors.Idle = c.AgentStatus.Colors.Idle
+		}
+	}
+
+	if colors.Running == "" {
+		colors.Running = c.Theme.Success
+	}
+	if colors.Waiting == "" {
+		colors.Waiting = c.Theme.Secondary
+	}
+	if colors.Failed == "" {
+		colors.Failed = c.Theme.Error
+	}
+	if colors.Interrupted == "" {
+		colors.Interrupted = c.Theme.Warning
+	}
+	if colors.Idle == "" {
+		colors.Idle = c.Theme.Muted
+	}
+
+	return colors
+}
+
+func (c *Config) ResolvedPalette() map[string]string {
+	if c == nil {
+		return DefaultConfig().AgentStatus.ResolvedPalette()
+	}
+
+	statusCfg := c.ResolvedAgentStatus()
+	colors := c.ResolvedAgentStatusColors()
+
+	waitingStyle := statusCfg.StyleWaiting
+	if waitingStyle == "" || (waitingStyle == "fg=#1e1e2e,bg=#ffdd57,bold" && colors.Waiting != "#ffdd57") {
+		waitingStyle = SynthesizeTmuxStyle(colors.Waiting)
+	}
+
+	failedStyle := statusCfg.StyleFailed
+	if failedStyle == "" || (failedStyle == "fg=#1e1e2e,bg=#ff5555,bold" && colors.Failed != "#ff5555") {
+		failedStyle = SynthesizeTmuxStyle(colors.Failed)
+	}
+
+	unreadStyle := statusCfg.StyleUnread
+	if unreadStyle == "" || (unreadStyle == "fg=#1e1e2e,bg=#6c7086,bold" && colors.Idle != "#6c7086") {
+		unreadStyle = SynthesizeTmuxStyle(colors.Idle)
+	}
+
+	palette := map[string]string{
+		"waiting": waitingStyle,
+		"failed":  failedStyle,
+		"unread":  unreadStyle,
+	}
+	maps.Copy(palette, statusCfg.Palette)
+
+	return palette
+}
+
+func SynthesizeTmuxStyle(color string) string {
+	color = strings.TrimSpace(color)
+	if color == "" || strings.EqualFold(color, "default") {
+		return "bold"
+	}
+
+	if strings.HasPrefix(color, "#") && (len(color) == 4 || len(color) == 7) {
+		contrast := ContrastForeground(color)
+		return fmt.Sprintf("fg=%s,bg=%s,bold", contrast, color)
+	}
+
+	return fmt.Sprintf("fg=black,bg=%s,bold", color)
+}
+
+func ContrastForeground(hexColor string) string {
+	hexColor = strings.TrimPrefix(hexColor, "#")
+	if len(hexColor) == 3 {
+		hexColor = string([]byte{hexColor[0], hexColor[0], hexColor[1], hexColor[1], hexColor[2], hexColor[2]})
+	}
+	if len(hexColor) != 6 {
+		return "#ffffff"
+	}
+
+	r, err1 := strconv.ParseUint(hexColor[0:2], 16, 8)
+	g, err2 := strconv.ParseUint(hexColor[2:4], 16, 8)
+	b, err3 := strconv.ParseUint(hexColor[4:6], 16, 8)
+	if err1 != nil || err2 != nil || err3 != nil {
+		return "#ffffff"
+	}
+
+	yiq := (r*299 + g*587 + b*114) / 1000
+	if yiq >= 100 {
+		return "#1e1e2e"
+	}
+
+	return "#ffffff"
 }
 
 func (c *AgentStatusConfig) applyRawBooleans(raw *rawAgentStatus) {
@@ -612,6 +753,11 @@ func (c *AgentStatusConfig) applyRawStringsAndFloats(raw *rawAgentStatus) {
 
 	if raw.StyleUnread != nil {
 		c.StyleUnread = *raw.StyleUnread
+	}
+
+	if raw.Colors != nil {
+		cloned := *raw.Colors
+		c.Colors = &cloned
 	}
 
 	if raw.InitialBackoff != nil {
@@ -732,6 +878,29 @@ func applyStringAndPaletteOverrides(merged *AgentStatusConfig, override AgentSta
 
 	if override.StyleUnread != "" {
 		merged.StyleUnread = override.StyleUnread
+	}
+
+	if override.Colors != nil {
+		if merged.Colors == nil {
+			cloned := *override.Colors
+			merged.Colors = &cloned
+		} else {
+			if override.Colors.Running != "" {
+				merged.Colors.Running = override.Colors.Running
+			}
+			if override.Colors.Waiting != "" {
+				merged.Colors.Waiting = override.Colors.Waiting
+			}
+			if override.Colors.Failed != "" {
+				merged.Colors.Failed = override.Colors.Failed
+			}
+			if override.Colors.Interrupted != "" {
+				merged.Colors.Interrupted = override.Colors.Interrupted
+			}
+			if override.Colors.Idle != "" {
+				merged.Colors.Idle = override.Colors.Idle
+			}
+		}
 	}
 
 	if len(override.Palette) > 0 {

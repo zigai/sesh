@@ -325,7 +325,7 @@ func TestSessionFormatValuesResolveAllDocumentedFields(t *testing.T) {
 		{field: display.FieldAgentGitInfo, want: "feature/popup / popup-worktree +12 -3"},
 		{field: display.FieldAgentGitLabel, want: "feature/popup / popup-worktree"},
 		{field: display.FieldAgentGitAdded, want: "\x1b[2;38;2;80;250;123m+12\x1b[m"},
-		{field: display.FieldAgentGitDeleted, want: "\x1b[2;38;2;255;77;166m-3\x1b[m"},
+		{field: display.FieldAgentGitDeleted, want: "\x1b[2;38;2;255;85;85m-3\x1b[m"},
 		{field: display.FieldAgentGitAhead, want: "\x1b[38;2;36;200;255m↑2\x1b[m"},
 		{field: display.FieldAgentGitBehind, want: "\x1b[38;2;255;221;87m↓1\x1b[m"},
 		{field: display.FieldAgentWorktree, want: "/work/popup-worktree"},

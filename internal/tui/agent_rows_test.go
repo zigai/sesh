@@ -101,7 +101,7 @@ func TestDefaultAgentFormatMaintainsStatusAlignmentAcrossAges(t *testing.T) {
 	for i := 1; i <= 4; i++ {
 		line := lines[i]
 
-		glyphIdx := strings.IndexAny(line, "●○◎◌")
+		glyphIdx := strings.IndexAny(line, "●○◎")
 		if glyphIdx < 0 {
 			t.Fatalf("line %d has no status glyph: %q", i, line)
 		}
@@ -148,7 +148,7 @@ func TestAgentFormatSupportsClockStatusTimeFormat(t *testing.T) {
 		for i := 1; i <= 3; i++ {
 			line := lines[i]
 
-			glyphIdx := strings.IndexAny(line, "●○◎◌")
+			glyphIdx := strings.IndexAny(line, "●○◎")
 			if glyphIdx < 0 {
 				t.Fatalf("line %d has no status glyph: %q", i, line)
 			}
@@ -551,7 +551,7 @@ func TestRenderAgentChildrenStaysBoundedAtNarrowWidth(t *testing.T) {
 
 	markerIndex := strings.Index(lines[1], "*")
 
-	statusIndex := strings.Index(lines[1], "◌")
+	statusIndex := strings.Index(lines[1], "○")
 	if !strings.Contains(lines[1], "Claude") || markerIndex < 0 || statusIndex < 0 || markerIndex >= statusIndex {
 		t.Fatalf("narrow child row lost required context: %q", lines[1])
 	}
@@ -1016,7 +1016,7 @@ func TestAgentStatusGlyphColors(t *testing.T) {
 	model := newTestModel()
 	model.config.Theme.Success = "#50fa7b"
 	model.config.Theme.Secondary = "#ffdd57"
-	model.config.Theme.Error = "#ff4da6"
+	model.config.Theme.Error = "#ff5555"
 	model.config.Theme.Warning = "#ff9e3b"
 	model.config.Theme.Muted = "#6c7086"
 
@@ -1028,10 +1028,10 @@ func TestAgentStatusGlyphColors(t *testing.T) {
 	}{
 		{name: "running", status: session.AgentStatusRunning, glyph: "●", color: "\x1b[38;2;80;250;123m"},
 		{name: "waiting", status: session.AgentStatusWaiting, glyph: "●", color: "\x1b[38;2;255;221;87m"},
-		{name: "failed", status: session.AgentStatusFailed, glyph: "●", color: "\x1b[38;2;255;77;166m"},
+		{name: "failed", status: session.AgentStatusFailed, glyph: "●", color: "\x1b[38;2;255;85;85m"},
 		{name: "interrupted", status: session.AgentStatusInterrupted, glyph: "●", color: "\x1b[38;2;255;158;59m"},
 		{name: "idle", status: session.AgentStatusIdle, glyph: "○", color: "\x1b[38;2;108;112;134m"},
-		{name: "unknown", status: session.AgentStatusUnknown, glyph: "◌", color: "\x1b[38;2;108;112;134m"},
+		{name: "unknown", status: session.AgentStatusUnknown, glyph: "○", color: "\x1b[38;2;108;112;134m"},
 	}
 
 	for _, tt := range tests {
@@ -1053,6 +1053,20 @@ func TestAgentStatusInterruptedCustomWarningColor(t *testing.T) {
 	got := model.agentStatusGlyph(session.AgentStatusInterrupted)
 	if !strings.Contains(got, "●") || !strings.Contains(got, wantColor) {
 		t.Fatalf("interrupted glyph = %q, want ● with custom color %q", got, wantColor)
+	}
+}
+
+func TestAgentStatusCustomColors(t *testing.T) {
+	model := newTestModel()
+	model.config.Theme.AgentStatus = &config.AgentStatusThemeConfig{
+		Failed: "#ff0077",
+	}
+
+	const wantColor = "\x1b[38;2;255;0;119m"
+
+	got := model.agentStatusGlyph(session.AgentStatusFailed)
+	if !strings.Contains(got, "●") || !strings.Contains(got, wantColor) {
+		t.Fatalf("failed glyph = %q, want ● with custom color %q", got, wantColor)
 	}
 }
 

@@ -294,7 +294,7 @@ func readStdinConfig(r io.Reader) ([]byte, error) {
 func loadAndValidate(target *Config, baseCfg *Config, files [][]byte) error {
 	current := baseCfg.Clone()
 	for _, data := range files {
-		if err := strictDecode(data, current); err != nil {
+		if err := decodeFileWithPresets(data, current); err != nil {
 			return enrichLoadError(err)
 		}
 	}
@@ -304,6 +304,90 @@ func loadAndValidate(target *Config, baseCfg *Config, files [][]byte) error {
 	}
 
 	return validateLoaded(target)
+}
+
+func decodeFileWithPresets(data []byte, current *Config) error {
+	if err := strictDecode(data, current); err != nil {
+		return err
+	}
+
+	type rawThemePresetProbe struct {
+		Theme struct {
+			Preset      *string                 `toml:"preset"`
+			Primary     *string                 `toml:"primary"`
+			Secondary   *string                 `toml:"secondary"`
+			Muted       *string                 `toml:"muted"`
+			Error       *string                 `toml:"error"`
+			Warning     *string                 `toml:"warning"`
+			Success     *string                 `toml:"success"`
+			Border      *string                 `toml:"border"`
+			Selected    *string                 `toml:"selected"`
+			Background  *string                 `toml:"background"`
+			Foreground  *string                 `toml:"foreground"`
+			AgentStatus *AgentStatusThemeConfig `toml:"agent_status"`
+		} `toml:"theme"`
+	}
+
+	var probe rawThemePresetProbe
+	_ = toml.Unmarshal(data, &probe)
+
+	if probe.Theme.Preset != nil && *probe.Theme.Preset != "" {
+		preset, ok := LookupPreset(*probe.Theme.Preset)
+		if !ok {
+			return fmt.Errorf("%w %q: expected dracula, catppuccin, catppuccin-latte, tokyo-night, gruvbox, nord, or terminal", errThemePresetInvalid, *probe.Theme.Preset)
+		}
+		current.Theme.applyPreset(preset)
+
+		if probe.Theme.Primary != nil {
+			current.Theme.Primary = *probe.Theme.Primary
+		}
+		if probe.Theme.Secondary != nil {
+			current.Theme.Secondary = *probe.Theme.Secondary
+		}
+		if probe.Theme.Muted != nil {
+			current.Theme.Muted = *probe.Theme.Muted
+		}
+		if probe.Theme.Error != nil {
+			current.Theme.Error = *probe.Theme.Error
+		}
+		if probe.Theme.Warning != nil {
+			current.Theme.Warning = *probe.Theme.Warning
+		}
+		if probe.Theme.Success != nil {
+			current.Theme.Success = *probe.Theme.Success
+		}
+		if probe.Theme.Border != nil {
+			current.Theme.Border = *probe.Theme.Border
+		}
+		if probe.Theme.Selected != nil {
+			current.Theme.Selected = *probe.Theme.Selected
+		}
+		if probe.Theme.Background != nil {
+			current.Theme.Background = *probe.Theme.Background
+		}
+		if probe.Theme.Foreground != nil {
+			current.Theme.Foreground = *probe.Theme.Foreground
+		}
+		if probe.Theme.AgentStatus != nil {
+			if probe.Theme.AgentStatus.Running != "" {
+				current.Theme.AgentStatus.Running = probe.Theme.AgentStatus.Running
+			}
+			if probe.Theme.AgentStatus.Waiting != "" {
+				current.Theme.AgentStatus.Waiting = probe.Theme.AgentStatus.Waiting
+			}
+			if probe.Theme.AgentStatus.Failed != "" {
+				current.Theme.AgentStatus.Failed = probe.Theme.AgentStatus.Failed
+			}
+			if probe.Theme.AgentStatus.Interrupted != "" {
+				current.Theme.AgentStatus.Interrupted = probe.Theme.AgentStatus.Interrupted
+			}
+			if probe.Theme.AgentStatus.Idle != "" {
+				current.Theme.AgentStatus.Idle = probe.Theme.AgentStatus.Idle
+			}
+		}
+	}
+
+	return nil
 }
 
 func loadConfigEnvironment(target *Config, baseCfg *Config) error {

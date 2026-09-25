@@ -363,7 +363,16 @@ func runAgentStatusRun(cmd *cobra.Command, _ []string) error {
 	quiet, _ := cmd.Flags().GetBool("quiet")
 
 	styles := agents.NewTmuxStyleController(server, true, true)
-	tracker := agents.NewTracker(styles, agents.DefaultTrackerOptions())
+	trackerOpts := agents.DefaultTrackerOptions()
+	if cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd); err == nil && cfg != nil {
+		resolved := cfg.ResolvedAgentStatus()
+		trackerOpts.Palette = cfg.ResolvedPalette()
+		trackerOpts.ActiveBypass = resolved.ActiveBypass
+		trackerOpts.ClearFailedOnVisit = resolved.ClearFailedOnVisit
+		trackerOpts.SetWindowStatusStyle = resolved.SetWindowStatusStyle
+		trackerOpts.SetWindowStatusBellStyle = resolved.SetWindowStatusBellStyle
+	}
+	tracker := agents.NewTracker(styles, trackerOpts)
 
 	ctx, stop := signal.NotifyContext(commandContextOrBackground(cmd), os.Interrupt, syscall.SIGTERM)
 	defer stop()

@@ -63,7 +63,7 @@ enabled = true
 store_path = "" # defaults to ~/.local/state/aht/state.json
 tmux_binary = "tmux"
 style_waiting = "fg=#1e1e2e,bg=#ffdd57,bold"
-style_failed = "fg=#1e1e2e,bg=#ff4da6,bold"
+style_failed = "fg=#1e1e2e,bg=#ff5555,bold"
 style_unread = "fg=#1e1e2e,bg=#6c7086,bold"
 set_window_status_style = true
 set_window_status_bell_style = true
@@ -108,14 +108,24 @@ cycle_mode = "ctrl+f"
 agent_sort = "ctrl+s"
 
 [theme]
+preset = "dracula" # dracula, catppuccin, catppuccin-latte, tokyo-night, gruvbox, nord, terminal
 primary = "#24c8ff"
 secondary = "#ffdd57"
 muted = "#6c7086"
-error = "#ff4da6"
+error = "#ff5555"
 warning = "#ff9e3b"
 success = "#50fa7b"
 border = "#3a3d45"
 selected = "#2a2a2a"
+background = "" # empty for black popup, "default" for transparent terminal background
+foreground = "" # empty/default for light text, or custom hex/ANSI
+
+[theme.agent_status]
+running = "#50fa7b"
+waiting = "#ffdd57"
+failed = "#ff5555"
+interrupted = "#ff9e3b"
+idle = "#6c7086"
 
 [paths]
 data_dir = "" # defaults to $XDG_DATA_HOME/sesh

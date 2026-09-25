@@ -399,7 +399,7 @@ func TestAgentContextLabelsStateAndIdleAge(t *testing.T) {
 		{name: "failed", row: session.Session{AgentFailed: 1, AgentTotal: 2}, wantGlyph: "●", wantText: "FAILED"},
 		{name: "interrupted", row: session.Session{AgentInterrupted: 1, AgentTotal: 2}, wantGlyph: "●", wantText: "PAUSED"},
 		{name: "idle", row: session.Session{AgentTotal: 1, AgentIdleSince: now.Add(-18 * time.Minute)}, wantGlyph: "○ 18m", wantText: "IDLE 18m"},
-		{name: "unknown", row: session.Session{AgentTotal: 1, AgentUnknown: 1}, wantGlyph: "◌", wantText: "UNKNOWN"},
+		{name: "unknown", row: session.Session{AgentTotal: 1, AgentUnknown: 1}, wantGlyph: "○", wantText: "UNKNOWN"},
 	}
 
 	for _, tt := range tests {

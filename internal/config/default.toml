@@ -102,7 +102,7 @@
 
 # Tmux window style strings applied to windows in non-normal agent states.
 # style_waiting = "fg=#1e1e2e,bg=#ffdd57,bold"
-# style_failed = "fg=#1e1e2e,bg=#ff4da6,bold"
+# style_failed = "fg=#1e1e2e,bg=#ff5555,bold"
 # style_unread = "fg=#1e1e2e,bg=#6c7086,bold"
 
 # Set tmux window-status-style when an agent needs attention.
@@ -220,14 +220,17 @@
 # TUI colors. Hex values and terminal color names are accepted.
 [theme]
 
+# preset = "dracula"
 # primary = "#24c8ff"
 # secondary = "#ffdd57"
 # muted = "#6c7086"
-# error = "#ff4da6"
+# error = "#ff5555"
 # warning = "#ff9e3b"
 # success = "#50fa7b"
 # border = "#3a3d45"
 # selected = "#2a2a2a"
+# background = ""
+# foreground = ""
 
 # State, metadata, and diagnostic log locations.
 [paths]
