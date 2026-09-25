@@ -29,6 +29,4 @@ sesh snapshot restore --pick
 ## Documentation
 
 - [Configuration](docs/configuration.md)
-- [Snapshots and recovery](docs/snapshots.md)
 - [Integrations](docs/integrations.md)
-- [Development](docs/development.md)

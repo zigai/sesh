@@ -33,11 +33,14 @@ sesh autosave status --json
 
 `sesh` tracks live coding agent panes using the Agent Host Tool (`aht`) registry.
 
-Install agent integration:
+Install AHT v2.0.2 and enable the sesh integration:
 
 ```sh
+go install github.com/zigai/aht/v2@v2.0.2
 sesh setup agents
 ```
+
+AHT v2 uses registry schema 3. `sesh` does not import older AHT registry files.
 
 Navigate agent panes:
 
