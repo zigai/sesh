@@ -586,7 +586,7 @@ func (e *Executor) handleFailedEffect(ctx context.Context, step Step, journal Jo
 		}
 
 		return "", &mutationError{step: step.ID(), err: runErr}
-	case tmux.Unknown:
+	case tmux.Unknown, tmux.Rejected:
 		return "", e.uncertain(ctx, step, journal, runErr)
 	}
 

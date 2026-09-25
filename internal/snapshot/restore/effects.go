@@ -38,6 +38,7 @@ type collectedEvidence struct {
 	hasNotSent   bool
 	hasUnknown   bool
 	hasConfirmed bool
+	hasRejected  bool
 	unrecognized bool
 	runtimeID    string
 }
@@ -79,6 +80,10 @@ func classifyMutation(err error) mutationOutcome {
 
 	if evidence.runtimeID != "" || evidence.hasConfirmed {
 		return mutationOutcome{Effect: tmux.Confirmed, RuntimeID: evidence.runtimeID}
+	}
+
+	if evidence.hasRejected {
+		return mutationOutcome{Effect: tmux.Rejected, RuntimeID: ""}
 	}
 
 	if evidence.hasNotSent && !evidence.hasUnknown && !evidence.unrecognized {
@@ -143,6 +148,8 @@ func inspectErrorNode(curr error, ev *collectedEvidence) {
 			ev.hasUnknown = true
 		case tmux.Confirmed:
 			ev.hasConfirmed = true
+		case tmux.Rejected:
+			ev.hasRejected = true
 		}
 	case isPreDispatchRefusal(curr):
 		ev.hasNotSent = true
