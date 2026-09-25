@@ -424,24 +424,34 @@ func resolvePopupClient(ctx context.Context, cmd *cobra.Command, server *gotmux.
 		return gotmux.ClientInfo{}, remoteCLIError("list_picker_clients", err)
 	}
 
-	if len(clients) > 0 {
+	if targetClient != "" {
 		for _, c := range clients {
-			if targetClient != "" && string(c.Name) == targetClient && !c.Control {
+			if string(c.Name) == targetClient && !c.Control {
 				applyClientDimensionOverrides(cmd, &c)
 
 				return c, nil
 			}
 		}
 
-		if targetClient != "" {
-			return gotmux.ClientInfo{}, session.ErrInvokingClientUnavailable
-		}
+		return gotmux.ClientInfo{}, session.ErrInvokingClientUnavailable
+	}
 
-		if targetClient == "" && len(clients) == 1 {
-			applyClientDimensionOverrides(cmd, &clients[0])
+	var eligible []gotmux.ClientInfo
 
-			return clients[0], nil
+	for _, c := range clients {
+		if !c.Control {
+			eligible = append(eligible, c)
 		}
+	}
+
+	if len(eligible) == 0 {
+		return gotmux.ClientInfo{}, session.ErrInvokingClientUnavailable
+	}
+
+	if len(eligible) == 1 {
+		applyClientDimensionOverrides(cmd, &eligible[0])
+
+		return eligible[0], nil
 	}
 
 	invoked, err := invokingPickerClient(ctx, server)
@@ -836,8 +846,16 @@ func invokingPickerClient(ctx context.Context, server *gotmux.Server) (gotmux.Cl
 		return gotmux.ClientInfo{}, remoteCLIError("resolve_invoking_picker_clients", err)
 	}
 
+	var eligible []gotmux.ClientInfo
+
+	for _, client := range clients {
+		if !client.Control {
+			eligible = append(eligible, client)
+		}
+	}
+
 	if name := os.Getenv(pickerClientEnvironment); name != "" {
-		for _, client := range clients {
+		for _, client := range eligible {
 			if string(client.Name) == name {
 				return client, nil
 			}
@@ -846,11 +864,11 @@ func invokingPickerClient(ctx context.Context, server *gotmux.Server) (gotmux.Cl
 		return gotmux.ClientInfo{}, session.ErrInvokingClientUnavailable
 	}
 
-	if len(clients) != 1 {
+	if len(eligible) != 1 {
 		return gotmux.ClientInfo{}, session.ErrInvokingClientUnavailable
 	}
 
-	return clients[0], nil
+	return eligible[0], nil
 }
 
 func (r *pickerTranscriptNameCache) annotateInventory(ctx context.Context, summaries []session.AgentSummary) {
