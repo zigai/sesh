@@ -28,13 +28,6 @@ race:
 model:
     go test ./internal/snapshot/model ./internal/snapshot/store
 
-# Measure native workloads; pass -tags=integration for real tmux benchmarks
-[positional-arguments]
-bench *args:
-    #!/usr/bin/env sh
-    set -eu
-    TMUX_INTEGRATION_REQUIRED=1 go test -run '^$' -bench . -benchmem "$@" ./...
-
 # Run the optional disposable Linux QEMU guest lifecycle harness (requires KVM)
 guest suite="standard":
     #!/usr/bin/env sh
