@@ -76,7 +76,7 @@ func TestObservePreservesStyledTrailingEmptyCells(t *testing.T) {
 
 	session, err := server.NewSession(t.Context(), tmux.NewSessionOptions{
 		Name:    "trailing-cells",
-		Program: tmux.Exec("sh", "-c", `printf 'anchor\033[41m\033[K\033[0m'; exec sleep 300`),
+		Program: tmux.Exec("sh", "-c", `printf 'scrollback-marker\nline2\nline3\nline4\nline5\nline6\nanchor\033[41m\033[K\033[0m'; exec sleep 300`),
 		Start:   tmux.ExistingOnly,
 		Size:    tmux.Size{Width: 20, Height: 5},
 	})
@@ -110,6 +110,10 @@ func TestObservePreservesStyledTrailingEmptyCells(t *testing.T) {
 	data, ok := observation.Artifacts[artifactID]
 	if !ok {
 		t.Fatalf("terminal artifact %q missing", artifactID)
+	}
+
+	if !bytes.Contains(data, []byte("scrollback-marker")) {
+		t.Fatalf("terminal artifact did not preserve scrollback history: %q", data)
 	}
 
 	want := []byte("anchor\x1b[41m              \n")
