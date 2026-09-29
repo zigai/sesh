@@ -40,6 +40,20 @@ type paneProcessRecord struct {
 	dead       bool
 }
 
+// OmittedTerminalText counts panes observed without a terminal text artifact because their
+// text exceeded the capture byte budget.
+func (o *Observation) OmittedTerminalText() int {
+	omitted := 0
+
+	for _, pane := range o.Manifest.Panes {
+		if pane.Terminal.Artifact == "" {
+			omitted++
+		}
+	}
+
+	return omitted
+}
+
 func Observe(ctx context.Context, server *gotmux.Server, selected []gotmux.SessionID) (Observation, error) {
 	observation, err := observe(ctx, server, selected, nil, false, nil)
 	return observation, captureError(err)
@@ -335,16 +349,24 @@ func (o *Observation) panes(ctx context.Context, snapshot gotmux.Snapshot, outpu
 			return err
 		}
 
+		o.Manifest.Panes[index].Options = settings
+
 		var capture gotmux.CaptureOptions
 
 		capture.EntireHistory, capture.IncludeEscapes, capture.PreserveSpaces = true, true, true
 
+		// A pane whose terminal text exceeds the remaining byte budget keeps no artifact
+		// rather than failing the whole observation; its structure is still recorded.
 		capture.MaxBytes = min(outputLimit, model.MaxArtifactBytes, model.MaxGenerationBytes-total)
 		if capture.MaxBytes <= 0 {
-			return ErrUnsupported
+			continue
 		}
 
 		data, err := info.Handle().Capture(ctx, capture)
+		if errors.Is(err, gotmux.ErrOutputLimit) {
+			continue
+		}
+
 		if err != nil {
 			return oops.In("snapshot.capture").With("operation", "observe_terminal_text").Wrapf(err, "observe terminal text")
 		}
@@ -354,7 +376,7 @@ func (o *Observation) panes(ctx context.Context, snapshot gotmux.Snapshot, outpu
 		id := ref("a", string(info.ID))
 		o.Artifacts[id] = data
 		o.Manifest.Artifacts = append(o.Manifest.Artifacts, model.Artifact{ID: id, Kind: "terminal-text", Length: int64(len(data)), SHA256: hex.EncodeToString(hash[:])})
-		o.Manifest.Panes[index].Options, o.Manifest.Panes[index].Terminal.Artifact = settings, id
+		o.Manifest.Panes[index].Terminal.Artifact = id
 	}
 
 	return nil

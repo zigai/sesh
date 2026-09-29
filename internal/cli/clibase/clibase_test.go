@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,7 @@ import (
 
 	prettytable "github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/cobra"
+	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/session"
@@ -134,6 +136,15 @@ func TestJSONHelpers(t *testing.T) {
 	code := clibase.JSONErrorCode(session.ErrSessionNotFound)
 	if code != "notFound" {
 		t.Fatalf("JSONErrorCode(ErrSessionNotFound) = %q, want 'notFound'", code)
+	}
+
+	outputLimit := fmt.Errorf("capture /private/path: %w", gotmux.ErrOutputLimit)
+	if code := clibase.JSONErrorCode(outputLimit); code != "outputLimitExceeded" {
+		t.Fatalf("JSONErrorCode(ErrOutputLimit) = %q, want 'outputLimitExceeded'", code)
+	}
+
+	if msg := clibase.SafeCommandErrorMessage(outputLimit); msg != "tmux command output exceeded its byte limit" {
+		t.Fatalf("SafeCommandErrorMessage(ErrOutputLimit) = %q", msg)
 	}
 
 	msg := clibase.SafeCommandErrorMessage(session.ErrSessionNotFound)

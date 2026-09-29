@@ -13,6 +13,10 @@ import (
 const (
 	LibraryVersion            = "v0.5.2"
 	interactiveCommandTimeout = 24 * time.Hour
+
+	// OutputBytes bounds stdout and stderr of one tmux command. It matches the snapshot
+	// artifact limit so a pane's full terminal text fits in a single capture.
+	OutputBytes = 256 << 20
 )
 
 var ErrEndpoint = errors.New("an explicit absolute tmux socket is required")
@@ -27,6 +31,8 @@ func Open(socket string) (*gotmux.Server, error) {
 	config.Binary = serverBinary(socket)
 	config.SocketPath = socket
 	config.ConfigFile = "/dev/null"
+	config.Limits = gotmux.DefaultLimits()
+	config.Limits.OutputBytes = OutputBytes
 
 	server, err := gotmux.New(config)
 	if err != nil {

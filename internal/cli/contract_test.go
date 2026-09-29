@@ -5,12 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/samber/oops"
+	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/snapshot/capture"
 	"github.com/zigai/sesh/internal/snapshot/store"
@@ -234,6 +236,7 @@ func TestJsonErrorCodeTaxonomyMappings(t *testing.T) {
 		{capture.ErrChanged, "captureChanged"},
 		{capture.ErrSelection, "selectionRequired"},
 		{capture.ErrUnsupported, "captureUnsupported"},
+		{fmt.Errorf("capture: %w", gotmux.ErrOutputLimit), "outputLimitExceeded"},
 		{os.ErrNotExist, "notFound"},
 		{os.ErrPermission, "permissionDenied"},
 		{context.DeadlineExceeded, "timeout"},

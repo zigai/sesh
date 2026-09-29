@@ -41,6 +41,7 @@ func TestSaveUsesExplicitServerAndExactSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	t.Setenv("TMUX", other.Endpoint().SocketPath+",1,0")
 	r := openSaveRepository(t)
 	cfg := engine.SaveConfig{
@@ -95,6 +96,7 @@ func saveSessionFixture(t *testing.T, server *tmux.Server, name, dir, marker str
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if err := windows[0].Handle().Options().SetAutomaticRename(t.Context(), false); err != nil {
 		t.Fatal(err)
 	}
@@ -162,6 +164,7 @@ func TestSaveLeaseContentionLeavesRepositoryUnchanged(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	timeoutCtx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
 	defer cancel()
 
@@ -169,6 +172,7 @@ func TestSaveLeaseContentionLeavesRepositoryUnchanged(t *testing.T) {
 	if !errors.Is(saveErr, context.DeadlineExceeded) {
 		t.Fatalf("expected save to fail with deadline exceeded, got: %v", saveErr)
 	}
+
 	catalog, err := r2.Inspect(t.Context())
 	if err != nil {
 		t.Fatal(err)

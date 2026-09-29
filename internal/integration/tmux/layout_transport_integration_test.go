@@ -3,10 +3,13 @@
 package tmux_test
 
 import (
+	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 
 	gotmux "github.com/zigai/gotmux/tmux"
 
@@ -18,6 +21,7 @@ func startCliServer(t *testing.T) string {
 	t.Helper()
 
 	socketPath := filepath.Join(t.TempDir(), "cli.sock")
+	t.Cleanup(func() { killCliServer(t, socketPath) })
 
 	for _, args := range [][]string{
 		{"new-session", "-d", "-s", "cli"},
@@ -33,6 +37,34 @@ func startCliServer(t *testing.T) string {
 	}
 
 	return socketPath
+}
+
+// killCliServer stops the server started through the tmux CLI before its socket directory is
+// removed, which would otherwise leave the daemon running without a reachable socket.
+func killCliServer(t *testing.T, socketPath string) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	server, err := gotmux.New(gotmux.Config{SocketPath: socketPath})
+	if err != nil {
+		t.Errorf("cleanup open cli server: %v", err)
+		return
+	}
+
+	info, err := server.Probe(ctx)
+	if errors.Is(err, gotmux.ErrNoServer) {
+		return
+	}
+
+	if err == nil {
+		err = server.KillIfIdentity(ctx, info.Identity)
+	}
+
+	if err != nil && !errors.Is(err, gotmux.ErrNoServer) {
+		t.Errorf("cleanup kill cli server: %v", err)
+	}
 }
 
 func paneReferences(snapshot gotmux.Snapshot) map[string]string {

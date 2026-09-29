@@ -283,6 +283,7 @@ func contractJSONItem(t *testing.T, values []any, key string, want any) map[stri
 	}
 
 	t.Fatalf("no record found with %s=%v in %v", key, want, values)
+
 	return nil
 }
 
@@ -407,6 +408,10 @@ func assertRuntimeLogFields(t *testing.T, record map[string]any) {
 		case "verified":
 			if _, ok := record[key].(bool); !ok || record["operation"] != "restore" || record["component"] != "snapshot" {
 				t.Fatalf("invalid verification field: %#v", record)
+			}
+		case "terminal_text_omitted":
+			if _, ok := record[key].(float64); !ok || record["operation"] != "save" || record["component"] != "snapshot" {
+				t.Fatalf("invalid terminal text count: %#v", record)
 			}
 		default:
 			t.Fatalf("unexpected log field: %s", key)

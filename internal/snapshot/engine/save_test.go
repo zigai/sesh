@@ -16,6 +16,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/samber/oops"
+	gotmux "github.com/zigai/gotmux/tmux"
 
 	integration "github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/snapshot/capture"
@@ -83,21 +84,37 @@ func assertSaveRecords(t *testing.T, data []byte, scenario string) {
 
 		validateLogSchema(t, fields)
 
-		wantLevel, wantStatus := `"info"`, `"started"`
-		if index == 1 {
-			wantLevel, wantStatus = `"error"`, `"failed"`
-			if scenario == "partial" {
-				wantLevel, wantStatus = `"warn"`, `"partial"`
+		if index == 0 {
+			if string(fields["level"]) != `"info"` || string(fields["status"]) != `"started"` {
+				t.Fatalf("incorrect start event: %s", line)
 			}
 
-			if len(fields["reason"]) == 0 {
-				t.Fatal("missing fixed reason")
-			}
+			continue
 		}
 
-		if string(fields["level"]) != wantLevel || string(fields["status"]) != wantStatus {
-			t.Fatalf("incorrect boundary event: %s", line)
-		}
+		assertSaveOutcomeRecord(t, fields, scenario)
+	}
+}
+
+func assertSaveOutcomeRecord(t *testing.T, fields map[string]jsontext.Value, scenario string) {
+	t.Helper()
+
+	// The fixture pane has no terminal text artifact; failures report no count.
+	wantLevel, wantStatus, wantOmitted := `"error"`, `"failed"`, ""
+	if scenario == "partial" {
+		wantLevel, wantStatus, wantOmitted = `"warn"`, `"partial"`, "1"
+	}
+
+	if string(fields["level"]) != wantLevel || string(fields["status"]) != wantStatus {
+		t.Fatalf("incorrect outcome event: level=%s status=%s", fields["level"], fields["status"])
+	}
+
+	if len(fields["reason"]) == 0 {
+		t.Fatal("missing fixed reason")
+	}
+
+	if omitted := string(fields["terminal_text_omitted"]); omitted != wantOmitted {
+		t.Fatalf("terminal_text_omitted = %q, want %q", omitted, wantOmitted)
 	}
 }
 
@@ -133,6 +150,32 @@ func TestUncertainPublicationReasonAndPrivacy(t *testing.T) {
 
 	assertSaveDiagnostic(t, err)
 	assertPrivateFailureRecord(t, output.Bytes())
+}
+
+func TestOutputLimitFailureHasFixedReason(t *testing.T) {
+	var output bytes.Buffer
+
+	logger := zerolog.New(&output)
+
+	err := saveFailure(logger.WithContext(t.Context()), "capture", fmt.Errorf("capture /secret/path: %w", gotmux.ErrOutputLimit))
+	if !errors.Is(err, gotmux.ErrOutputLimit) {
+		t.Fatal("lost output limit identity")
+	}
+
+	var fields map[string]jsontext.Value
+	if err := json.Unmarshal(output.Bytes(), &fields); err != nil {
+		t.Fatal(err)
+	}
+
+	validateLogSchema(t, fields)
+
+	if string(fields["reason"]) != `"output_limit_exceeded"` || string(fields["phase"]) != `"capture"` || string(fields["level"]) != `"error"` {
+		t.Fatalf("incorrect output limit record: %s", output.Bytes())
+	}
+
+	if bytes.Contains(output.Bytes(), []byte("secret")) {
+		t.Fatal("error metadata leaked")
+	}
 }
 
 func assertSaveDiagnostic(t *testing.T, err error) {
@@ -207,7 +250,7 @@ func validateLogSchema(t *testing.T, fields map[string]jsontext.Value) {
 
 	for key := range fields {
 		switch key {
-		case "level", "component", "operation", "status", "message", "reason", "phase", "sessions", "panes":
+		case "level", "component", "operation", "status", "message", "reason", "phase", "sessions", "panes", "terminal_text_omitted":
 		default:
 			t.Fatalf("unexpected log field %s", key)
 		}

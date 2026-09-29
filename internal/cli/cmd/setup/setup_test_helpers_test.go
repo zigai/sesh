@@ -397,6 +397,10 @@ func assertRuntimeLogFields(t *testing.T, record map[string]any) {
 			if _, ok := record[key].(bool); !ok || record["operation"] != "restore" || record["component"] != "snapshot" {
 				t.Fatalf("invalid verification field: %#v", record)
 			}
+		case "terminal_text_omitted":
+			if _, ok := record[key].(float64); !ok || record["operation"] != "save" || record["component"] != "snapshot" {
+				t.Fatalf("invalid terminal text count: %#v", record)
+			}
 		default:
 			t.Fatalf("unexpected log field: %s", key)
 		}

@@ -367,6 +367,7 @@ func TestEnginePracticalRestoreNvimReopensFilesAfterSourceDestruction(t *testing
 	saved := savePracticalObservation(t, ctx, repo, source, sourceSession, saveConfig)
 	newer := savePracticalObservation(t, ctx, repo, source, sourceSession, saveConfig)
 	assertDistinctPracticalGeneration(t, saved, newer)
+
 	if err := sourceSession.Kill(ctx); err != nil {
 		t.Fatalf("kill source session: %v", err)
 	}

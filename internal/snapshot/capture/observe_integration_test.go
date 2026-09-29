@@ -73,26 +73,7 @@ func TestSelectedMutationRejectsObservation(t *testing.T) {
 
 func TestObservePreservesStyledTrailingEmptyCells(t *testing.T) {
 	server := tmuxtest.NewServer(t)
-
-	session, err := server.NewSession(t.Context(), tmux.NewSessionOptions{
-		Name:    "trailing-cells",
-		Program: tmux.Exec("sh", "-c", `printf 'scrollback-marker\nline2\nline3\nline4\nline5\nline6\nanchor\033[41m\033[K\033[0m'; exec sleep 300`),
-		Start:   tmux.ExistingOnly,
-		Size:    tmux.Size{Width: 20, Height: 5},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	windows, _, err := session.WindowInfos(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	pane, err := windows[0].Handle().ActivePane(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
+	session, pane := scriptedSessionFixture(t, server, "trailing-cells", 20, `printf 'scrollback-marker\nline2\nline3\nline4\nline5\nline6\nanchor\033[41m\033[K\033[0m'; exec sleep 300`)
 
 	waitForPaneText(t, pane, []byte("anchor"))
 
@@ -120,6 +101,66 @@ func TestObservePreservesStyledTrailingEmptyCells(t *testing.T) {
 	if !bytes.Contains(data, want) {
 		t.Fatalf("terminal artifact did not preserve styled trailing cells: %q", data)
 	}
+}
+
+func TestObserveOmitsTerminalTextBeyondOutputLimit(t *testing.T) {
+	fixture := tmuxtest.NewServer(t)
+	small, smallPane := scriptedSessionFixture(t, fixture, "small", 20, `printf 'small-marker'; exec sleep 300`)
+	large, largePane := scriptedSessionFixture(t, fixture, "large", 160, `i=0; while [ $i -lt 1500 ]; do printf '%0150d\n' $i; i=$((i+1)); done; printf 'large-marker'; exec sleep 300`)
+
+	waitForPaneText(t, smallPane, []byte("small-marker"))
+	waitForPaneText(t, largePane, []byte("large-marker"))
+
+	server, err := tmux.New(tmux.Config{SocketPath: fixture.Endpoint().SocketPath, ConfigFile: "/dev/null", Limits: tmux.Limits{OutputBytes: 64 << 10}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	observation, err := Observe(t.Context(), server, []tmux.SessionID{small.ID(), large.ID()})
+	if err != nil {
+		t.Fatal("oversized terminal text failed the observation:", err)
+	}
+
+	if err := observation.Manifest.Validate(); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(observation.Manifest.Panes) != 2 || len(observation.Artifacts) != 1 || observation.OmittedTerminalText() != 1 {
+		t.Fatalf("got %d panes, %d artifacts, %d omitted; want 2, 1, 1", len(observation.Manifest.Panes), len(observation.Artifacts), observation.OmittedTerminalText())
+	}
+
+	for _, pane := range observation.Manifest.Panes {
+		data, captured := observation.Artifacts[pane.Terminal.Artifact]
+		if captured != bytes.Contains(data, []byte("small-marker")) {
+			t.Fatalf("pane %s kept the wrong terminal text", pane.ID)
+		}
+	}
+}
+
+func scriptedSessionFixture(t *testing.T, server *tmux.Server, name string, width int, script string) (tmux.Session, tmux.Pane) {
+	t.Helper()
+
+	session, err := server.NewSession(t.Context(), tmux.NewSessionOptions{
+		Name:    name,
+		Program: tmux.Exec("sh", "-c", script),
+		Start:   tmux.ExistingOnly,
+		Size:    tmux.Size{Width: width, Height: 5},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	windows, _, err := session.WindowInfos(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pane, err := windows[0].Handle().ActivePane(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return session, pane
 }
 
 func waitForPaneText(t *testing.T, pane tmux.Pane, marker []byte) {

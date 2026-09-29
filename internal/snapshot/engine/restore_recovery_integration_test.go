@@ -454,6 +454,8 @@ func TestEngineRestoreRefusesRestartedDaemonTarget(t *testing.T) {
 		t.Fatalf("NewSession failed: %v", err)
 	}
 
+	killDaemonOnCleanup(t, first, source.Identity())
+
 	disableSourceWindowRename(t, ctx, source)
 
 	repoDir := filepath.Join(t.TempDir(), "repo")
@@ -495,9 +497,12 @@ func TestEngineRestoreRefusesRestartedDaemonTarget(t *testing.T) {
 		t.Fatalf("tmux.New failed: %v", err)
 	}
 
-	if _, err := second.NewSession(ctx, gotmux.NewSessionOptions{Name: "restart-source", Start: gotmux.AllowStart}); err != nil {
+	replacement, err := second.NewSession(ctx, gotmux.NewSessionOptions{Name: "restart-source", Start: gotmux.AllowStart})
+	if err != nil {
 		t.Fatalf("starting the replacement daemon failed: %v", err)
 	}
+
+	killDaemonOnCleanup(t, second, replacement.Identity())
 
 	_, err = engine.Restore(ctx, repo, second, engine.RestoreConfig{
 		LeaseRoot:              leaseRoot,
@@ -514,6 +519,22 @@ func TestEngineRestoreRefusesRestartedDaemonTarget(t *testing.T) {
 	if !errors.Is(err, store.ErrConflict) {
 		t.Fatalf("expected a target identity conflict, got %v", err)
 	}
+}
+
+// killDaemonOnCleanup stops a daemon the test started itself. The identity guard keeps the
+// cleanup of a replaced daemon from killing its successor at the same socket.
+func killDaemonOnCleanup(t *testing.T, server *gotmux.Server, identity gotmux.ServerIdentity) {
+	t.Helper()
+
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		err := server.KillIfIdentity(ctx, identity)
+		if err != nil && !errors.Is(err, gotmux.ErrNoServer) && !errors.Is(err, gotmux.ErrServerChanged) {
+			t.Errorf("cleanup kill daemon: %v", err)
+		}
+	})
 }
 
 func TestEngineRestoreLogSchema(t *testing.T) {
@@ -744,6 +765,7 @@ func assertCreatedSessionRetained(t *testing.T, ctx context.Context, server *got
 	if err != nil {
 		t.Fatalf("retained session must survive, got %v", err)
 	}
+
 	if len(result.SessionsRestored) != 1 || result.SessionsRestored[0] != string(found.ID()) {
 		t.Fatalf("expected restored session receipt for fail-first, got %+v", result.SessionsRestored)
 	}

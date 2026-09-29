@@ -6,6 +6,8 @@ import (
 
 	"github.com/samber/oops"
 
+	gotmux "github.com/zigai/gotmux/tmux"
+
 	"github.com/zigai/sesh/internal/integration/process"
 	integration "github.com/zigai/sesh/internal/integration/tmux"
 )
@@ -22,6 +24,8 @@ func captureError(err error) error {
 		code = "operation_canceled"
 	case errors.Is(err, context.DeadlineExceeded):
 		code = "operation_timed_out"
+	case errors.Is(err, gotmux.ErrOutputLimit):
+		code = "output_limit_exceeded"
 	case errors.Is(err, ErrChanged):
 		code = "capture_changed"
 	case errors.Is(err, ErrSelection):

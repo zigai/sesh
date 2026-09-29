@@ -130,6 +130,7 @@ func saveWithProfile(ctx context.Context, repository *store.Repository, leaseRoo
 		Str("reason", reason).
 		Int("sessions", len(observation.Manifest.Sessions)).
 		Int("panes", len(observation.Manifest.Panes)).
+		Int("terminal_text_omitted", observation.OmittedTerminalText()).
 		Msg("snapshot observation saved")
 
 	return result, nil
@@ -145,6 +146,8 @@ func saveFailure(ctx context.Context, phase string, err error) error {
 		reason = "operation_canceled"
 	case errors.Is(err, context.DeadlineExceeded):
 		reason = "operation_timed_out"
+	case errors.Is(err, gotmux.ErrOutputLimit):
+		reason = "output_limit_exceeded"
 	}
 
 	zerolog.Ctx(ctx).Error().

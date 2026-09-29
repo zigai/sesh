@@ -46,6 +46,7 @@ var (
 		{ErrDoctorChecksFailed, "doctorChecksFailed", "doctor checks failed"},
 		{engine.ErrRetentionBudgetUnmet, "retentionBudgetUnmet", "protected snapshot bytes exceed retention budget"},
 		{engine.ErrCollectionQuarantined, "collectionQuarantined", "snapshot collection preserved contradictory evidence"},
+		{gotmux.ErrOutputLimit, "outputLimitExceeded", "tmux command output exceeded its byte limit"},
 		{config.ErrConfigExists, "configExists", "configuration already exists; use --force to replace it"},
 		{config.ErrConfigSymlink, "configSymlink", "configuration target must not be a symbolic link"},
 		{ErrPartialSnapshot, "partialSnapshot", "parity-incomplete save"},
