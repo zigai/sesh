@@ -392,7 +392,7 @@ func IsValidStatusTimeFormat(format string) bool {
 
 func NormalizeStatusTimeFormat(format string) string {
 	switch strings.ToLower(strings.TrimSpace(format)) {
-	case "relative-seconds":
+	case "", "default", "relative-seconds":
 		return "relative-seconds"
 	case "hh:mm":
 		return "hh:mm"

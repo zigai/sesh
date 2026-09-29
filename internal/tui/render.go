@@ -806,7 +806,7 @@ func (m *Model) agentStatusStyle() string {
 
 func (m *Model) agentStatusTimeFormat() string {
 	if m.config == nil {
-		return "relative"
+		return "relative-seconds"
 	}
 
 	return m.config.AgentSessions.NormalizedStatusTimeFormat()

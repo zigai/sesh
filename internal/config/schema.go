@@ -463,7 +463,7 @@ func DefaultConfig() *Config {
 			NextIdleLocalKey:  "M-F24",
 			NavigationBackKey: "F13",
 			StatusStyle:       "glyph",
-			StatusTimeFormat:  "relative",
+			StatusTimeFormat:  "relative-seconds",
 			StatusTimeStyle:   "",
 			Status:            nil,
 		},
@@ -534,7 +534,7 @@ func (c AgentSessionsConfig) NormalizedStatusTimeFormat() string {
 		return NormalizeStatusTimeFormat(c.StatusTimeStyle)
 	}
 
-	return "relative"
+	return "relative-seconds"
 }
 
 func (c *AgentStatusConfig) ResolvedPalette() map[string]string {

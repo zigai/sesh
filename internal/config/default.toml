@@ -85,7 +85,7 @@
 
 # Status duration format: "relative" (now, 12m, 1h 23m), "relative-seconds"
 # (40s, 2m, 1h 23m; seconds only below one minute), "clock" (00:01:23), or "hh:mm" (00:01).
-# status_time_format = "relative"
+# status_time_format = "relative-seconds"
 
 # Realtime tmux window status styling based on coding-agent activity.
 # Dynamically styles window tabs when agents require attention (waiting, failed, unread).

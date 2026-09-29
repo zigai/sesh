@@ -66,7 +66,7 @@ func TestLoadDefaults(t *testing.T) {
 	assertEqual(t, "AgentSessions popup counts", cfg.AgentSessions.PopupCounts, true)
 	assertEqual(t, "AgentSessions refresh interval", cfg.AgentSessions.RefreshInterval, "250ms")
 	assertEqual(t, "AgentSessions status style", cfg.AgentSessions.StatusStyle, "glyph")
-	assertEqual(t, "AgentSessions status time format", cfg.AgentSessions.StatusTimeFormat, "relative")
+	assertEqual(t, "AgentSessions status time format", cfg.AgentSessions.StatusTimeFormat, "relative-seconds")
 
 	assertEqual(t, "Remote enabled", cfg.Remote.Enabled, false)
 	assertEqual(t, "Remote SSH path", cfg.Remote.SSHPath, "ssh")
