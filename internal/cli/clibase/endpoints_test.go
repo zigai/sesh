@@ -19,7 +19,8 @@ func endpointCommand(t *testing.T, args ...string) *cobra.Command {
 	cmd.Flags().String("config", "", "")
 	cmd.Flags().Bool("no-config", true, "")
 	clibase.AddSocketFlag(cmd)
-	clibase.AddRepositoryFlags(cmd)
+	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
+	cmd.Flags().String("lease-root", "", clibase.LeaseRootFlagUsage)
 	cmd.SetContext(context.Background())
 
 	if err := cmd.ParseFlags(args); err != nil {

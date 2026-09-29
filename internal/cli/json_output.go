@@ -148,7 +148,7 @@ func jsonOutputEnabled(cmd *cobra.Command) bool {
 	}
 
 	if ctx := cmd.Context(); ctx != nil {
-		if rawArgs, ok := ctx.Value(rawArgsContextKey).([]string); ok && len(rawArgs) > 0 {
+		if rawArgs, ok := clibase.RawArgsFromContext(ctx); ok && len(rawArgs) > 0 {
 			return probeJSONFlag(cmd.Flags(), rawArgs)
 		}
 	}

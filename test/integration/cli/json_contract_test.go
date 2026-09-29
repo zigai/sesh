@@ -12,37 +12,30 @@ func TestJSONSessionWorkflowSuccessContracts(t *testing.T) {
 	home := isolateJSONContractHome(t)
 	fixture := newCLISessionFixture(t)
 
-	for _, prefix := range [][]string{{actionCmd}} {
-		t.Run(strings.Join(prefix, " ")+"sessions", func(t *testing.T) {
-			name := "json-contract"
-			newArgs := append(sessionContractCommand(prefix, "new"), name, "--dir", home)
-			created := runJSONContract(t, sessionContractName(prefix, "new"), append(newArgs, fixture.sessionArgs()...)...)
-			assertJSONContractFields(t, created, map[string]any{"session": name, "directory": home, "created": true})
+	name := "json-contract"
+	newArgs := []string{sessionCmd, "new", name, "--dir", home}
+	created := runJSONContract(t, "session.new", append(newArgs, fixture.sessionArgs()...)...)
+	assertJSONContractFields(t, created, map[string]any{"session": name, "directory": home, "created": true})
 
-			listed := runJSONContract(t, "list", "list", testSocketFlag, fixture.socket)
-			rows := contractJSONValue[[]any](t, listed, "sessions")
-			row := contractJSONItem(t, rows, "name", name)
-			assertJSONContractFields(t, row, map[string]any{"windowCount": float64(1), "attached": false, "current": false})
-			_ = contractJSONValue[string](t, row, "id")
-			_ = contractJSONValue[string](t, row, "activityAt")
+	listed := runJSONContract(t, "session.list", sessionCmd, "list", testSocketFlag, fixture.socket)
+	rows := contractJSONValue[[]any](t, listed, "sessions")
+	row := contractJSONItem(t, rows, "name", name)
+	assertJSONContractFields(t, row, map[string]any{"windowCount": float64(1), "attached": false, "current": false})
+	_ = contractJSONValue[string](t, row, "id")
+	_ = contractJSONValue[string](t, row, "activityAt")
 
-			renameArgs := append(sessionContractCommand(prefix, "rename"), "json-renamed", testSessionFlag, name)
-			renamed := runJSONContract(t, sessionContractName(prefix, "rename"), append(renameArgs, fixture.sessionArgs()...)...)
-			assertJSONContractFields(t, renamed, map[string]any{"previousName": name, "name": "json-renamed", "renamed": true})
+	renamed := runJSONContract(t, "session.rename", append([]string{sessionCmd, "rename", "json-renamed", testSessionFlag, name}, fixture.sessionArgs()...)...)
+	assertJSONContractFields(t, renamed, map[string]any{"previousName": name, "name": "json-renamed", "renamed": true})
 
-			killArgs := append(sessionContractCommand(prefix, "kill"), "json-renamed")
-			killed := runJSONContract(t, sessionContractName(prefix, "kill"), append(killArgs, fixture.sessionArgs()...)...)
-			assertJSONContractFields(t, killed, map[string]any{"session": "json-renamed", "killed": true})
+	killed := runJSONContract(t, "session.kill", append([]string{sessionCmd, "kill", "json-renamed"}, fixture.sessionArgs()...)...)
+	assertJSONContractFields(t, killed, map[string]any{"session": "json-renamed", "killed": true})
 
-			_ = runJSONContract(t, sessionContractName(prefix, "new"), append(newArgs, fixture.sessionArgs()...)...)
-			deleteArgs := append(sessionContractCommand(prefix, "delete"), name)
-			deleted := runJSONContract(t, sessionContractName(prefix, "delete"), append(deleteArgs, fixture.deleteArgs()...)...)
-			assertJSONContractFields(t, deleted, map[string]any{"session": name, "liveKilled": true, "savedDeleted": false})
-		})
-	}
+	_ = runJSONContract(t, "session.new", append(newArgs, fixture.sessionArgs()...)...)
+	deleted := runJSONContract(t, "session.delete", append([]string{sessionCmd, "delete", name}, fixture.deleteArgs()...)...)
+	assertJSONContractFields(t, deleted, map[string]any{"session": name, "liveKilled": true, "savedDeleted": false})
 
 	for _, panes := range []bool{false, true} {
-		args := []string{testHistoryCmd, testSocketFlag, fixture.socket}
+		args := []string{sessionCmd, "scrollback", testSocketFlag, fixture.socket}
 		mode, key := "sessions", "sessions"
 
 		if panes {
@@ -50,7 +43,7 @@ func TestJSONSessionWorkflowSuccessContracts(t *testing.T) {
 			mode, key = "panes", "panes"
 		}
 
-		result := runJSONContract(t, testHistoryCmd, args...)
+		result := runJSONContract(t, "session.scrollback", args...)
 		assertJSONContractFields(t, result, map[string]any{"mode": mode})
 		_ = contractJSONValue[[]any](t, result, key)
 	}
@@ -64,7 +57,7 @@ func TestJSONSwitchAndAgentClearSuccessContracts(t *testing.T) {
 	client := fixture.attachCLIClient(t, origin.ID)
 	target := fixture.newLiveSession(t, "json-target")
 
-	for _, path := range [][]string{{actionCmd, "session-switch"}} {
+	for _, path := range [][]string{{sessionCmd, "switch"}} {
 		args := slices.Clone(path)
 		args = append(args, "json-target")
 		result := runJSONContract(t, strings.Join(path, "."), append(args, fixture.sessionArgs()...)...)
@@ -76,7 +69,7 @@ func TestJSONSwitchAndAgentClearSuccessContracts(t *testing.T) {
 		}
 	}
 
-	for _, path := range [][]string{{actionCmd, "agent-status", "clear"}} {
+	for _, path := range [][]string{{actionCmd, "agent-window-status-clear"}} {
 		result := runJSONContract(t, strings.Join(path, "."), append(path, testSocketFlag, fixture.socket)...)
 		assertJSONContractFields(t, result, map[string]any{"cleared": true})
 	}

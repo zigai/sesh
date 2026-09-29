@@ -4,10 +4,10 @@ package cli_test
 
 import (
 	"errors"
+	"fmt"
 	"path/filepath"
 	"testing"
 
-	"github.com/zigai/sesh/internal/config"
 	integration "github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/snapshot/restore"
 	"github.com/zigai/sesh/internal/snapshot/store"
@@ -41,7 +41,7 @@ func TestJSONSnapshotWorkflowSuccessContracts(t *testing.T) {
 	assertJSONContractFields(t, restored, map[string]any{"generation": generation, "operationId": operation, contractStatusField: "best_effort", "verified": true, "uncertain": false})
 	_ = contractJSONValue[[]any](t, restored, "sessionsRestored")
 	_ = contractJSONValue[[]any](t, restored, "missingRequirements")
-	reconciled := runJSONContract(t, "snapshot.reconcile", snapshotCmd, "reconcile", testRepositoryFlag, repository, "--operation", operation)
+	reconciled := runJSONContract(t, "snapshot.recover.restore.show", snapshotCmd, "recover", "restore", "show", operation, testRepositoryFlag, repository)
 	assertJSONContractFields(t, reconciled, map[string]any{"operationId": operation, "state": "complete", "settled": true})
 
 	pruned := runJSONContract(t, "snapshot.prune", snapshotCmd, "prune", testRepositoryFlag, repository, "--retention-days", "0", "--max-count", "0", "--max-bytes", "0")
@@ -62,7 +62,7 @@ func assertSnapshotReadContracts(t *testing.T, repository, generation, attempt s
 	_ = contractJSONValue[string](t, row, "id")
 	_ = contractJSONValue[string](t, row, "directory")
 
-	history := runJSONContract(t, "snapshot.history", snapshotCmd, testHistoryCmd, testRepositoryFlag, repository)
+	history := runJSONContract(t, "snapshot.history", snapshotCmd, "history", testRepositoryFlag, repository)
 	assertJSONContractFields(t, history, map[string]any{"current": generation})
 	attempts := contractJSONValue[[]any](t, history, "attempts")
 	_ = contractJSONItem(t, attempts, "id", attempt)
@@ -86,16 +86,9 @@ func TestJSONRemoteActionAndLookupSuccessContracts(t *testing.T) {
 		t.Setenv(key, value)
 	}
 
-	cfg := config.DefaultConfig()
-	cfg.Remote.Enabled = true
-	cfg.Remote.SSHPath = fixture.sshWrapper
-	cfg.Remote.Permissions.Create = true
-	cfg.Remote.Connections = []config.RemoteConnectionConfig{fixture.connection}
-
 	configPath := filepath.Join(fixture.configHome, "sesh", "config.toml")
-	if _, err := config.Save(cfg, config.WithSavePath(configPath)); err != nil {
-		t.Fatal(err)
-	}
+	writeTestConfig(t, configPath, fmt.Sprintf("[remote]\nenabled = true\nssh_path = %q\n\n[remote.permissions]\ncreate = true\n", fixture.sshWrapper)+
+		remoteConnectionsTOML(fixture.connection))
 
 	peer, err := integration.Open(fixture.connection.TmuxSocket)
 	if err != nil {
@@ -143,9 +136,9 @@ func TestJSONSnapshotActionsAndAbandonSuccessContracts(t *testing.T) {
 		t.Fatalf("expected source-name collision before abandonment: %v", failed.err)
 	}
 
-	pending := runJSONContract(t, "snapshot.reconcile", snapshotCmd, "reconcile", testRepositoryFlag, repository, "--operation", operation)
+	pending := runJSONContract(t, "snapshot.recover.restore.show", snapshotCmd, "recover", "restore", "show", operation, testRepositoryFlag, repository)
 	assertJSONContractFields(t, pending, map[string]any{"operationId": operation, "source": generation, "state": "active", "settled": false})
-	abandoned := runJSONContract(t, "snapshot.abandon", snapshotCmd, "abandon", testRepositoryFlag, repository, "--operation", operation)
+	abandoned := runJSONContract(t, "snapshot.recover.restore.abandon", snapshotCmd, "recover", "restore", "abandon", operation, testRepositoryFlag, repository)
 	assertJSONContractFields(t, abandoned, map[string]any{"operationId": operation, "source": generation, "state": "abandoned", "settled": false})
 	_ = contractJSONValue[string](t, abandoned, "target")
 

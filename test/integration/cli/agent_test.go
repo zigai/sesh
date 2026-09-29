@@ -16,7 +16,6 @@ import (
 	"github.com/zigai/gotmux/tmuxtest"
 
 	"github.com/zigai/sesh/internal/agents"
-	"github.com/zigai/sesh/internal/cli"
 	"github.com/zigai/sesh/internal/session"
 )
 
@@ -155,7 +154,7 @@ func activeWindow(t *testing.T, ctx context.Context, server *gotmux.Server, sess
 func runAgentNavigation(t *testing.T, action string, args ...string) agentNavResultJSON {
 	t.Helper()
 
-	stdout, stderr, err := executeCommand(cli.NewRootCommand(t.Context()), append([]string{actionCmd, action}, args...)...)
+	stdout, stderr, err := executeCommand(t, append([]string{actionCmd, action}, args...)...)
 	if err != nil {
 		t.Fatalf("%s failed: %v\nstderr: %s", action, err, stderr)
 	}
@@ -225,9 +224,7 @@ func TestCLIAgentFocusActivatesNamedPane(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
 	defer cancel()
 
-	root := cli.NewRootCommand(t.Context())
-
-	_, stderr, err := executeCommand(root, actionCmd, "agent-focus",
+	_, stderr, err := executeCommand(t, actionCmd, "agent-focus",
 		testNoConfigFlag, testSocketFlag, fixture.socket, "--state", fixture.statePath,
 		"--pane", fixture.current.PaneID, "--target-pane", fixture.target.PaneID)
 	if err != nil {
@@ -246,9 +243,7 @@ func TestCLIAgentFocusActivatesNamedPane(t *testing.T) {
 func TestCLIAgentStatusReadsRegistry(t *testing.T) {
 	fixture := newAgentIntegrationFixture(t)
 
-	root := cli.NewRootCommand(t.Context())
-
-	stdout, stderr, err := executeCommand(root, actionCmd, "agent-status", testNoConfigFlag, "--state", fixture.statePath)
+	stdout, stderr, err := executeCommand(t, actionCmd, "agent-status", testNoConfigFlag, "--state", fixture.statePath)
 	if err != nil {
 		t.Fatalf("agent status failed: %v\nstderr: %s", err, stderr)
 	}

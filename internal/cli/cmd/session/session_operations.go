@@ -99,41 +99,6 @@ func (rt *sessionRuntime) close() error {
 	return nil
 }
 
-func NewActionSessionDeleteCommand() *cobra.Command {
-	cmd := newSessionDeleteCommand()
-	cmd.Use = "session-delete"
-
-	return cmd
-}
-
-func NewActionSessionKillCommand() *cobra.Command {
-	cmd := newSessionKillCommand()
-	cmd.Use = "session-kill"
-
-	return cmd
-}
-
-func NewActionSessionNewCommand() *cobra.Command {
-	cmd := newSessionNewCommand()
-	cmd.Use = "session-new"
-
-	return cmd
-}
-
-func NewActionSessionRenameCommand() *cobra.Command {
-	cmd := newSessionRenameCommand()
-	cmd.Use = "session-rename"
-
-	return cmd
-}
-
-func NewActionSessionSwitchCommand() *cobra.Command {
-	cmd := newSessionSwitchCommand()
-	cmd.Use = "session-switch"
-
-	return cmd
-}
-
 func newSessionDeleteCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "delete [session]",
@@ -146,13 +111,13 @@ func newSessionDeleteCommand() *cobra.Command {
 		Args: clibase.UsageArgs(cobra.MaximumNArgs(1)),
 		RunE: runSessionDelete,
 	}
-	cmd.Annotations = map[string]string{clibase.AnnotationSuccessOwned: annotationOwnedValue}
+	cmd.Annotations = map[string]string{clibase.AnnotationOperation: "delete", clibase.AnnotationSuccessOwned: annotationOwnedValue}
 
 	clibase.AddSocketFlag(cmd)
-	cmd.Flags().String("repository", "", "Native repository directory holding saved generations (defaults to native data directory)")
-	cmd.Flags().String("lease-root", "", "Directory holding shared cooperative endpoint leases")
+	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
+	cmd.Flags().String("lease-root", "", clibase.LeaseRootFlagUsage)
 	cmd.Flags().BoolP("force", "f", false, "Delete even if session has attached clients")
-	cmd.Flags().String("history", "", "History state JSON file path")
+	cmd.Flags().String("history", "", clibase.HistoryFlagUsage)
 	clibase.AddJSONFlag(cmd)
 
 	return cmd
@@ -166,11 +131,11 @@ func newSessionKillCommand() *cobra.Command {
 		Args:  clibase.UsageArgs(cobra.MaximumNArgs(1)),
 		RunE:  runSessionKill,
 	}
-	cmd.Annotations = map[string]string{clibase.AnnotationSuccessOwned: annotationOwnedValue}
+	cmd.Annotations = map[string]string{clibase.AnnotationOperation: "kill", clibase.AnnotationSuccessOwned: annotationOwnedValue}
 
 	clibase.AddSocketFlag(cmd)
 	cmd.Flags().BoolP("force", "f", false, "Kill even if session has attached clients")
-	cmd.Flags().String("history", "", "History state JSON file path")
+	cmd.Flags().String("history", "", clibase.HistoryFlagUsage)
 	clibase.AddJSONFlag(cmd)
 
 	return cmd
@@ -189,11 +154,11 @@ func newSessionNewCommand() *cobra.Command {
 		Args: clibase.UsageArgs(cobra.ExactArgs(1)),
 		RunE: runSessionNew,
 	}
-	cmd.Annotations = map[string]string{clibase.AnnotationSuccessOwned: annotationOwnedValue}
+	cmd.Annotations = map[string]string{clibase.AnnotationOperation: "new", clibase.AnnotationSuccessOwned: annotationOwnedValue}
 
 	clibase.AddSocketFlag(cmd)
 	cmd.Flags().StringP("dir", "d", "", "Initial working directory for the session")
-	cmd.Flags().String("history", "", "History state JSON file path")
+	cmd.Flags().String("history", "", clibase.HistoryFlagUsage)
 	clibase.AddJSONFlag(cmd)
 
 	return cmd
@@ -207,11 +172,11 @@ func newSessionRenameCommand() *cobra.Command {
 		Args:  clibase.UsageArgs(cobra.ExactArgs(1)),
 		RunE:  runSessionRename,
 	}
-	cmd.Annotations = map[string]string{clibase.AnnotationSuccessOwned: annotationOwnedValue}
+	cmd.Annotations = map[string]string{clibase.AnnotationOperation: "rename", clibase.AnnotationSuccessOwned: annotationOwnedValue}
 
 	clibase.AddSocketFlag(cmd)
-	cmd.Flags().StringP("session", "s", "", "Session to rename (defaults to current)")
-	cmd.Flags().String("history", "", "History state JSON file path")
+	cmd.Flags().StringP("session", "s", "", "Session to rename [default: the current session]")
+	cmd.Flags().String("history", "", clibase.HistoryFlagUsage)
 	clibase.AddJSONFlag(cmd)
 
 	return cmd
@@ -228,10 +193,10 @@ func newSessionSwitchCommand() *cobra.Command {
 		Args: clibase.UsageArgs(cobra.ExactArgs(1)),
 		RunE: runSessionSwitch,
 	}
-	cmd.Annotations = map[string]string{clibase.AnnotationSuccessOwned: annotationOwnedValue}
+	cmd.Annotations = map[string]string{clibase.AnnotationOperation: "switch", clibase.AnnotationSuccessOwned: annotationOwnedValue}
 
 	clibase.AddSocketFlag(cmd)
-	cmd.Flags().String("history", "", "History state JSON file path")
+	cmd.Flags().String("history", "", clibase.HistoryFlagUsage)
 	clibase.AddJSONFlag(cmd)
 
 	return cmd

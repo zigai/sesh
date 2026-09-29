@@ -252,7 +252,7 @@ func TestJsonErrorCodeTaxonomyMappings(t *testing.T) {
 	}
 }
 
-func TestJSONFlagParsingRegressions(t *testing.T) {
+func TestJSONFlagDetectionFollowsFinalParsedValue(t *testing.T) {
 	t.Run("json flag as string value produces plain text", func(t *testing.T) {
 		assertPlainTextErrorOutput(t, actionCmd, "snapshot-save", testRepositoryFlag, testJSONFlag)
 	})
@@ -291,9 +291,7 @@ func TestJSONFlagParsingRegressions(t *testing.T) {
 func assertPlainTextErrorOutput(t *testing.T, args ...string) {
 	t.Helper()
 
-	root := newRootCommand(t.Context())
-
-	stdout, stderr, err := executeCommand(root, args...)
+	stdout, stderr, err := executeCommand(t, args...)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

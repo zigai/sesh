@@ -1,17 +1,36 @@
-package cmdagent
+package cmdagent_test
 
 import (
 	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
 	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/cli/clibase"
+	"github.com/zigai/sesh/internal/testsupport/clitest"
 )
+
+type agentStatusResultJSON struct {
+	Total   int `json:"total"`
+	Live    int `json:"live"`
+	Waiting int `json:"waiting"`
+	Failed  int `json:"failed"`
+	Idle    int `json:"idle"`
+	Unread  int `json:"unread"`
+}
+
+func executeCommand(t *testing.T, args ...string) (string, string, error) {
+	t.Helper()
+
+	exec := clitest.Execute(t, args...)
+
+	return exec.Stdout, exec.Stderr, exec.Err
+}
 
 func writeAgentRegistry(t *testing.T, sessions ...string) string {
 	t.Helper()
@@ -41,34 +60,29 @@ func agentRegistrySession(id string, activity string, paneID string) string {
 	}`
 }
 
-func TestActionAgentCommandsHelp(t *testing.T) {
+func TestAgentCommandsHelp(t *testing.T) {
 	t.Parallel()
 
 	commands := [][]string{
-		{"agent-next"},
-		{"agent-back"},
-		{"agent-focus"},
-		{"agent-status"},
-		{"agent-status", "run"},
-		{"agent-status", "clear"},
+		{"action", "agent-next"},
+		{"action", "agent-back"},
+		{"action", "agent-focus"},
+		{"action", "agent-status"},
+		{"action", "agent-window-status-clear"},
+		{"daemon", "agent-window-status"},
 	}
 
-	for _, sub := range commands {
-		t.Run(strings.Join(sub, " "), func(t *testing.T) {
+	for _, command := range commands {
+		t.Run(strings.Join(command, " "), func(t *testing.T) {
 			t.Parallel()
 
-			root := newRootCommand(t.Context())
-
-			args := append([]string{actionCmd}, sub...)
-			args = append(args, "--help")
-
-			stdout, stderr, err := executeCommand(root, args...)
+			stdout, stderr, err := executeCommand(t, append(command, "--help")...)
 			if err != nil {
-				t.Fatalf("action %s --help failed: %v\nstderr: %s", strings.Join(sub, " "), err, stderr)
+				t.Fatalf("%s --help failed: %v\nstderr: %s", strings.Join(command, " "), err, stderr)
 			}
 
-			if !strings.Contains(stdout, sub[len(sub)-1]) {
-				t.Fatalf("stdout missing %s in help: %s", sub[len(sub)-1], stdout)
+			if !strings.Contains(stdout, "sesh "+strings.Join(command, " ")) {
+				t.Fatalf("stdout missing %s in help: %s", strings.Join(command, " "), stdout)
 			}
 		})
 	}
@@ -79,14 +93,12 @@ func TestAgentNavigationWithoutSocketTargetsDefaultTmuxServer(t *testing.T) {
 		t.Run(action, func(t *testing.T) {
 			t.Setenv("TMUX", "")
 
-			root := newRootCommand(t.Context())
-
-			_, _, err := executeCommand(root, actionCmd, action, "--no-config")
+			_, _, err := executeCommand(t, "action", action, "--no-config")
 			if !errors.Is(err, gotmux.ErrNoServer) {
 				t.Fatalf("error = %v, want the isolated default socket to report no tmux server", err)
 			}
 
-			if code := ExitCode(err); code != clibase.ExitCodeGeneral {
+			if code := clibase.ExitCode(err); code != clibase.ExitCodeGeneral {
 				t.Fatalf("exit code = %d, want %d", code, clibase.ExitCodeGeneral)
 			}
 		})
@@ -96,15 +108,13 @@ func TestAgentNavigationWithoutSocketTargetsDefaultTmuxServer(t *testing.T) {
 func TestAgentFocusRequiresTargetPane(t *testing.T) {
 	t.Setenv("TMUX", "")
 
-	root := newRootCommand(t.Context())
-
-	_, _, err := executeCommand(root, actionCmd, "agent-focus", "--no-config", "--socket", "/tmp/does-not-exist.sock")
+	_, _, err := executeCommand(t, "action", "agent-focus", "--no-config", "--socket", "/tmp/does-not-exist.sock")
 	if err == nil {
 		t.Fatal("expected usage error without a target pane, got nil")
 	}
 
-	if code := ExitCode(err); code != exitCodeUsage {
-		t.Fatalf("exit code = %d, want %d", code, exitCodeUsage)
+	if code := clibase.ExitCode(err); code != clibase.ExitCodeUsage {
+		t.Fatalf("exit code = %d, want %d", code, clibase.ExitCodeUsage)
 	}
 }
 
@@ -118,14 +128,12 @@ func TestAgentStatusSummaryJSON(t *testing.T) {
 		agentRegistrySession("idle-agent", "idle", "%3"),
 	)
 
-	root := newRootCommand(t.Context())
-
-	stdout, stderr, err := executeCommand(root, actionCmd, "agent-status", "--no-config", "--state", statePath, testJSONFlag)
+	stdout, stderr, err := executeCommand(t, "action", "agent-status", "--no-config", "--state", statePath, "--json")
 	if err != nil {
 		t.Fatalf("agent status failed: %v\nstderr: %s", err, stderr)
 	}
 
-	var envelope testJSONEnvelope
+	var envelope clitest.Envelope
 	if err := json.Unmarshal([]byte(strings.TrimSpace(stdout)), &envelope); err != nil {
 		t.Fatalf("decoding status envelope %q: %v", stdout, err)
 	}
@@ -134,7 +142,7 @@ func TestAgentStatusSummaryJSON(t *testing.T) {
 		t.Fatalf("status envelope is not ok: %s", stdout)
 	}
 
-	result := decodeJSONPayload[agentStatusResultJSON](t, envelope.Result)
+	result := clitest.DecodePayload[agentStatusResultJSON](t, envelope.Result)
 
 	if result.Total != 3 || result.Live != 3 {
 		t.Fatalf("status total/live = %d/%d, want 3/3", result.Total, result.Live)
@@ -154,9 +162,7 @@ func TestAgentStatusSummaryText(t *testing.T) {
 
 	statePath := writeAgentRegistry(t, agentRegistrySession("waiting-agent", "waiting", "%1"))
 
-	root := newRootCommand(t.Context())
-
-	stdout, stderr, err := executeCommand(root, actionCmd, "agent-status", "--no-config", "--state", statePath)
+	stdout, stderr, err := executeCommand(t, "action", "agent-status", "--no-config", "--state", statePath)
 	if err != nil {
 		t.Fatalf("agent status failed: %v\nstderr: %s", err, stderr)
 	}
@@ -174,10 +180,63 @@ func TestAgentStatusReportsUnsupportedRegistry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	root := newRootCommand(t.Context())
-
-	_, _, err := executeCommand(root, actionCmd, "agent-status", "--no-config", "--state", statePath)
+	_, _, err := executeCommand(t, "action", "agent-status", "--no-config", "--state", statePath)
 	if err == nil {
 		t.Fatal("expected failure on an unsupported registry schema")
+	}
+}
+
+func writeAgentStoreConfig(t *testing.T, storePath string) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte("[agent_status]\nstore_path = "+strconv.Quote(storePath)+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	return path
+}
+
+func agentStatusTotal(t *testing.T, args ...string) int {
+	t.Helper()
+
+	stdout, stderr, err := executeCommand(t, append([]string{"action", "agent-status", "--json"}, args...)...)
+	if err != nil {
+		t.Fatalf("agent status failed: %v\nstderr: %s", err, stderr)
+	}
+
+	var envelope clitest.Envelope
+	if err := json.Unmarshal([]byte(strings.TrimSpace(stdout)), &envelope); err != nil {
+		t.Fatalf("decoding status envelope %q: %v", stdout, err)
+	}
+
+	return clitest.DecodePayload[agentStatusResultJSON](t, envelope.Result).Total
+}
+
+func TestAgentStatusReadsConfiguredRegistryWithoutStateFlag(t *testing.T) {
+	t.Parallel()
+
+	configured := writeAgentRegistry(t,
+		agentRegistrySession("first-agent", "waiting", "%1"),
+		agentRegistrySession("second-agent", "idle", "%2"),
+	)
+
+	if total := agentStatusTotal(t, "--config", writeAgentStoreConfig(t, configured)); total != 2 {
+		t.Fatalf("status total = %d, want 2 agents from [agent_status].store_path", total)
+	}
+}
+
+func TestAgentStatusStateFlagOverridesConfiguredRegistry(t *testing.T) {
+	t.Parallel()
+
+	configured := writeAgentRegistry(t, agentRegistrySession("configured-agent", "waiting", "%1"))
+	explicit := writeAgentRegistry(t,
+		agentRegistrySession("first-agent", "waiting", "%1"),
+		agentRegistrySession("second-agent", "idle", "%2"),
+		agentRegistrySession("third-agent", "failed", "%3"),
+	)
+
+	if total := agentStatusTotal(t, "--config", writeAgentStoreConfig(t, configured), "--state", explicit); total != 3 {
+		t.Fatalf("status total = %d, want 3 agents from --state", total)
 	}
 }

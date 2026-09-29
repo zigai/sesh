@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
 	prettytable "github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/cobra"
 	gotmux "github.com/zigai/gotmux/tmux"
@@ -71,45 +72,138 @@ func TestContextWithRawArgs(t *testing.T) {
 	}
 }
 
-func TestTableHelpers(t *testing.T) {
-	t.Parallel()
-
-	wrapped := clibase.WrapText("foo bar baz", 5)
-	if len(wrapped) == 0 {
-		t.Fatal("expected non-empty wrapped text")
+func sessionTableColumns(sessionMinWidth int) []clibase.TableColumn {
+	return []clibase.TableColumn{
+		{Heading: "Session", Fixed: false, MinWidth: sessionMinWidth, Wrap: clibase.WrapSession},
+		{Heading: "Panes", Fixed: true, MinWidth: 0, Wrap: nil},
+		{Heading: "Attached", Fixed: true, MinWidth: 0, Wrap: nil},
+		{Heading: "Activity", Fixed: true, MinWidth: 0, Wrap: nil},
 	}
+}
 
-	wrappedID := clibase.WrapIdentifier("my-session-name", 5)
-	if len(wrappedID) == 0 {
-		t.Fatal("expected non-empty wrapped identifier")
-	}
-
-	wrappedSess := clibase.WrapSession("my session name", 5)
-	if len(wrappedSess) == 0 {
-		t.Fatal("expected non-empty wrapped session")
-	}
+func renderTableLines(t *testing.T, width int, columns []clibase.TableColumn, rows []prettytable.Row, full bool) []string {
+	t.Helper()
 
 	var buf bytes.Buffer
-
-	cols := []clibase.TableColumn{
-		{Heading: "Col1", Fixed: true, MinWidth: 5, Wrap: clibase.WrapText},
-		{Heading: "Col2", Fixed: false, MinWidth: 5, Wrap: clibase.WrapText},
-	}
-	rows := []prettytable.Row{
-		{"val1", "val2"},
+	if err := clibase.RenderResponsiveTable(&buf, width, columns, rows, full); err != nil {
+		t.Fatalf("RenderResponsiveTable() error = %v", err)
 	}
 
-	if err := clibase.RenderResponsiveTable(&buf, 80, cols, rows, false); err != nil {
-		t.Fatalf("RenderResponsiveTable failed: %v", err)
+	return strings.Split(strings.TrimSuffix(buf.String(), "\n"), "\n")
+}
+
+func TestResponsiveTableCompactTruncatesFlexibleColumnAndKeepsFixedColumns(t *testing.T) {
+	t.Parallel()
+
+	rows := []prettytable.Row{{"extremely-long-session-name-for-testing-truncation-behavior-in-terminal", 3, "yes", "just now"}}
+	lines := renderTableLines(t, 40, sessionTableColumns(20), rows, false)
+
+	if len(lines) != 3 || strings.Trim(lines[1], "─") != "" || strings.Contains(strings.Join(lines, "\n"), "│") {
+		t.Fatalf("compact table must be a header, one thin rule and one row: %q", lines)
 	}
 
-	if buf.Len() == 0 {
-		t.Fatal("expected non-empty rendered table")
+	row := lines[2]
+	if width := ansi.StringWidth(row); width > 40 {
+		t.Fatalf("compact row width = %d, want <= 40: %q", width, row)
 	}
 
-	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
-	if len(lines) != 3 || !strings.Contains(lines[1], "─") || strings.Contains(buf.String(), "│") {
-		t.Fatalf("table lacks one thin header rule: %q", buf.String())
+	if !strings.Contains(row, "extremely-lo…") || !strings.Contains(row, "yes") || !strings.Contains(row, "just now") {
+		t.Fatalf("compact row must truncate the session and keep fixed columns: %q", row)
+	}
+}
+
+func TestResponsiveTableLinesNeverExceedRequestedWidth(t *testing.T) {
+	t.Parallel()
+
+	rows := []prettytable.Row{{"extremely-long-session-name-for-testing-truncation-behavior-in-terminal", 3, "yes", "just now"}}
+
+	for _, full := range []bool{false, true} {
+		for _, width := range []int{40, 60, 120} {
+			for _, line := range renderTableLines(t, width, sessionTableColumns(20), rows, full) {
+				if got := ansi.StringWidth(line); got > width {
+					t.Errorf("full=%t width=%d: line width = %d, want <= %d: %q", full, width, got, width, line)
+				}
+			}
+		}
+	}
+}
+
+func TestResponsiveTableMeasuresCellsByDisplayWidth(t *testing.T) {
+	t.Parallel()
+
+	truncated := renderTableLines(t, 5, []clibase.TableColumn{{Heading: "Name", Fixed: false, MinWidth: 0, Wrap: nil}},
+		[]prettytable.Row{{"\x1b[31m\u754c\u754c\u754c\x1b[0m"}}, false)
+	if cell := truncated[len(truncated)-1]; ansi.StringWidth(cell) != 5 || ansi.Strip(cell) != "\u754c\u754c…" {
+		t.Fatalf("compact cell = %q, want display-aware truncation to %q", cell, "\u754c\u754c…")
+	}
+
+	columns := []clibase.TableColumn{
+		{Heading: "Name", Fixed: false, MinWidth: 0, Wrap: nil},
+		{Heading: "\x1b[34m\u540d\x1b[0m", Fixed: true, MinWidth: 0, Wrap: nil},
+	}
+	fitted := renderTableLines(t, 12, columns, []prettytable.Row{{"abcdef", "\x1b[31m\u754c\u754c\x1b[0m"}}, false)
+
+	if row := ansi.Strip(fitted[len(fitted)-1]); row != "abcdef  \u754c\u754c" {
+		t.Fatalf("row = %q, want the styled wide fixed cell measured as 4 columns so the name fits untruncated", row)
+	}
+}
+
+func TestWrapIdentifierBreaksAtDelimitersByDisplayWidth(t *testing.T) {
+	t.Parallel()
+
+	value := "\x1b[31mab/cd/e\u0301\u754c\x1b[0m"
+
+	lines := clibase.WrapIdentifier(value, 5)
+	for _, line := range lines {
+		if width := ansi.StringWidth(line); width > 5 {
+			t.Fatalf("wrapped line display width = %d, want <= 5: %q", width, line)
+		}
+	}
+
+	if first := ansi.Strip(lines[0]); first != "ab/" {
+		t.Fatalf("first wrapped line = %q, want delimiter-aware break %q", first, "ab/")
+	}
+
+	if got := ansi.Strip(strings.Join(lines, "")); got != ansi.Strip(value) {
+		t.Fatalf("wrapped text = %q, want all input text %q", got, ansi.Strip(value))
+	}
+}
+
+func TestResponsiveTableFullModeWrapsInsteadOfTruncating(t *testing.T) {
+	t.Parallel()
+
+	lines := renderTableLines(t, 40, sessionTableColumns(10), []prettytable.Row{{"session-one-two-three", 3, "yes", "just now"}}, true)
+
+	rendered := strings.Join(lines, "\n")
+	if strings.Contains(rendered, "…") || strings.Contains(rendered, "session-one-two-three") {
+		t.Fatalf("full table must wrap the session across lines without truncation:\n%s", rendered)
+	}
+
+	if len(lines) != 4 || !strings.HasPrefix(lines[2], "session-one-") || !strings.Contains(lines[2], "just now") ||
+		strings.TrimSpace(lines[3]) != "two-three" {
+		t.Fatalf("full table must continue the wrapped session on its own line:\n%s", rendered)
+	}
+}
+
+func TestResponsiveTableFullModeStacksRowsThatCannotFit(t *testing.T) {
+	t.Parallel()
+
+	lines := renderTableLines(t, 20, sessionTableColumns(10), []prettytable.Row{{"a-very-long-session-name-that-cannot-fit", 3, "yes", "just now"}}, true)
+
+	labels := make([]string, 0, 4)
+
+	for _, line := range lines {
+		if width := ansi.StringWidth(line); width > 20 {
+			t.Fatalf("stacked line width = %d, want <= 20: %q", width, line)
+		}
+
+		if label, _, ok := strings.Cut(line, ":"); ok && !strings.HasPrefix(line, " ") {
+			labels = append(labels, label)
+		}
+	}
+
+	if strings.Join(labels, ",") != "Session,Panes,Attached,Activity" {
+		t.Fatalf("stacked labels = %v, want every column labeled in order:\n%s", labels, strings.Join(lines, "\n"))
 	}
 }
 

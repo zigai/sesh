@@ -13,15 +13,20 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
-func TestSnapshotOperationRequiresIdentityBeforeOpeningRepository(t *testing.T) {
-	for _, command := range [][]string{{"reconcile"}, {"abandon"}, {"rewrite", "reconcile"}, {"rewrite", "resume"}} {
+func TestSnapshotRecoverRequiresOperationBeforeOpeningRepository(t *testing.T) {
+	for _, command := range [][]string{
+		{"restore", "show"},
+		{"restore", "abandon"},
+		{"delete", "show"},
+		{"delete", "resume"},
+	} {
 		t.Run(strings.Join(command, "_"), func(t *testing.T) {
 			cfg, logPath := runtimeConfig(t, "info")
 			path := filepath.Join(t.TempDir(), "missing")
 
 			var stdout, stderr bytes.Buffer
 
-			args := append([]string{"snapshot"}, command...)
+			args := append([]string{"snapshot", "recover"}, command...)
 			args = append(args, testRepositoryFlag, path, testConfigFlag, cfg, testJSONFlag)
 
 			err := cli.ExecuteApplication(t.Context(), args, nil, &stdout, &stderr)
@@ -42,15 +47,15 @@ func TestSnapshotOperationRequiresIdentityBeforeOpeningRepository(t *testing.T) 
 	}
 }
 
-func TestSnapshotOperationMissingIDPreservesRepository(t *testing.T) {
-	for _, name := range []string{"reconcile", "abandon"} {
-		t.Run(name, func(t *testing.T) {
-			testMissingOperation(t, name)
+func TestSnapshotRecoverUnknownRestorePreservesRepository(t *testing.T) {
+	for command, operation := range map[string]string{"show": "reconcile_restore", "abandon": "abandon_restore"} {
+		t.Run(command, func(t *testing.T) {
+			testMissingOperation(t, command, operation)
 		})
 	}
 }
 
-func testMissingOperation(t *testing.T, name string) {
+func testMissingOperation(t *testing.T, command, operation string) {
 	t.Helper()
 	cfg, logPath := runtimeConfig(t, "info")
 	path := filepath.Join(t.TempDir(), "repository")
@@ -71,7 +76,7 @@ func testMissingOperation(t *testing.T, name string) {
 
 	var stdout, stderr bytes.Buffer
 
-	err = cli.ExecuteApplication(t.Context(), []string{"snapshot", name, testRepositoryFlag, path, "--operation", store.NewOperationID(), testConfigFlag, cfg, testJSONFlag}, nil, &stdout, &stderr)
+	err = cli.ExecuteApplication(t.Context(), []string{"snapshot", "recover", "restore", command, store.NewOperationID(), testRepositoryFlag, path, testConfigFlag, cfg, testJSONFlag}, nil, &stdout, &stderr)
 	if !errors.Is(err, store.ErrUnavailable) || stdout.Len() != 0 {
 		t.Fatalf("missing operation: %v / %s", err, stdout.String())
 	}
@@ -85,18 +90,18 @@ func testMissingOperation(t *testing.T, name string) {
 		t.Fatal("missing operation changed catalog")
 	}
 
-	assertRuntimeLog(t, logPath, "cli", name+"_restore", "error", "failed", path, cfg)
+	assertRuntimeLog(t, logPath, "cli", operation, "error", "failed", path, cfg)
 }
 
-func TestSnapshotRewriteMissingReceiptIsVisibleWithoutMutation(t *testing.T) {
-	for _, command := range []string{"reconcile", "resume"} {
+func TestSnapshotRecoverUnknownDeletionIsVisibleWithoutMutation(t *testing.T) {
+	for command, operation := range map[string]string{"show": "reconcile_rewrite", "resume": "resume_rewrite"} {
 		t.Run(command, func(t *testing.T) {
-			checkMissingRewriteReceipt(t, command)
+			checkMissingRewriteReceipt(t, command, operation)
 		})
 	}
 }
 
-func checkMissingRewriteReceipt(t *testing.T, command string) {
+func checkMissingRewriteReceipt(t *testing.T, command, operation string) {
 	t.Helper()
 	cfg, logPath := runtimeConfig(t, "info")
 	path := filepath.Join(t.TempDir(), "repository")
@@ -119,7 +124,7 @@ func checkMissingRewriteReceipt(t *testing.T, command string) {
 
 	var stdout, stderr bytes.Buffer
 
-	args := []string{"snapshot", "rewrite", command, testRepositoryFlag, path, "--operation", id, testConfigFlag, cfg, testJSONFlag}
+	args := []string{"snapshot", "recover", "delete", command, id, testRepositoryFlag, path, testConfigFlag, cfg, testJSONFlag}
 
 	err = cli.ExecuteApplication(t.Context(), args, nil, &stdout, &stderr)
 	if err == nil || stderr.Len() != 0 {
@@ -138,5 +143,5 @@ func checkMissingRewriteReceipt(t *testing.T, command string) {
 		t.Fatal("unknown rewrite changed catalog")
 	}
 
-	assertRuntimeLog(t, logPath, "cli", command+"_rewrite", "error", "failed", path, cfg, id)
+	assertRuntimeLog(t, logPath, "cli", operation, "error", "failed", path, cfg, id)
 }

@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
@@ -69,9 +68,7 @@ func TestHelpAndIncompleteParityNotice(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			root := newRootCommand(t.Context())
-
-			stdout, stderr, err := executeCommand(root, tc.args...)
+			stdout, stderr, err := executeCommand(t, tc.args...)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -95,9 +92,7 @@ func TestBareCommandsPrintHelp(t *testing.T) {
 		{"action"},
 	} {
 		t.Run(strings.Join(cmdPath, " "), func(t *testing.T) {
-			root := newRootCommand(t.Context())
-
-			stdout, stderr, err := executeCommand(root, cmdPath...)
+			stdout, stderr, err := executeCommand(t, cmdPath...)
 			if ExitCode(err) != exitCodeUsage {
 				t.Fatalf("exit code = %d, want usage error: %v", ExitCode(err), err)
 			}
@@ -130,9 +125,7 @@ func TestUnknownCommandsAndFlagsExitCodeUsage(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			root := newRootCommand(t.Context())
-
-			stdout, stderr, err := executeCommand(root, tc.args...)
+			stdout, stderr, err := executeCommand(t, tc.args...)
 			if err == nil {
 				t.Fatalf("expected error for %v, got nil", tc.args)
 			}
@@ -169,9 +162,16 @@ func TestUnregisteredCommandsFail(t *testing.T) {
 		{"kill"},
 		{"delete"},
 		{"switch"},
-		{snapshotCmd, "save"},
-		{snapshotCmd, "restore"},
-		{"autosave", "status"},
+		{"list"},
+		{"history"},
+		{"popup"},
+		{"inline"},
+		{"standalone"},
+		{snapshotCmd, "reconcile"},
+		{snapshotCmd, "abandon"},
+		{snapshotCmd, "rewrite"},
+		{"autosave", "final-save"},
+		{"autosave", "ensure-default-session"},
 		{"autosave", "save-if-due"},
 		{"autosave", "restore-on-start"},
 		{"resurrect"},
@@ -196,13 +196,25 @@ func TestUnregisteredCommandsFail(t *testing.T) {
 		{snapshotCmd, "delete-all"},
 		{snapshotCmd, "picker"},
 		{"action", "snapshot-resume"},
+		{"action", "autosave-status"},
+		{"action", "session-new"},
+		{"action", "session-rename"},
+		{"action", "session-kill"},
+		{"action", "session-delete"},
+		{"action", "session-switch"},
+		{"setup", "refresh"},
+		{"setup", "autosave"},
+		{"setup", "coordinator"},
+		{"setup", "remote"},
+		{"daemon", "run"},
+		{"daemon", "serve"},
+		{"daemon", "wait-ready"},
+		{"remote", "monitor"},
 	}
 
 	for _, args := range prohibited {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
-			root := newRootCommand(t.Context())
-
-			_, _, err := executeCommand(root, args...)
+			_, _, err := executeCommand(t, args...)
 			if err == nil {
 				t.Fatalf("prohibited command %v succeeded, want error", args)
 			}
@@ -225,9 +237,7 @@ func TestSnapshotReadCommandsDefaultToConfiguredRepository(t *testing.T) {
 		{snapshotCmd, "verify", "--no-config"},
 	} {
 		t.Run(strings.Join(cmdArgs, " "), func(t *testing.T) {
-			root := newRootCommand(t.Context())
-
-			_, stderr, err := executeCommand(root, cmdArgs...)
+			_, stderr, err := executeCommand(t, cmdArgs...)
 			if ExitCode(err) == exitCodeUsage {
 				t.Fatalf("%v without --repository is a usage error: %v / %q", cmdArgs, err, stderr)
 			}
@@ -251,9 +261,7 @@ func TestReadCommandsDoNotCreateNonexistentRepository(t *testing.T) {
 
 	for _, cmdArgs := range commands {
 		t.Run(strings.Join(cmdArgs, " "), func(t *testing.T) {
-			root := newRootCommand(t.Context())
-
-			stdout, stderr, err := executeCommand(root, cmdArgs...)
+			stdout, stderr, err := executeCommand(t, cmdArgs...)
 			if err == nil {
 				t.Fatalf("expected error reading nonexistent repo, got nil")
 			}
@@ -279,25 +287,5 @@ func TestReadCommandsDoNotCreateNonexistentRepository(t *testing.T) {
 				t.Fatalf("read command created nonexistent repository directory: %v", statErr)
 			}
 		})
-	}
-}
-
-func TestOutputWriterFailureDetection(t *testing.T) {
-	cause := &os.PathError{Op: "write", Path: "/synthetic/pipe", Err: os.ErrPermission}
-	root := newRootCommand(t.Context())
-	root.SetOut(failedWriter{cause: cause})
-
-	var stderr bytes.Buffer
-	root.SetErr(&stderr)
-	root.SetArgs([]string{"--version"})
-
-	err := root.Execute()
-	if !errors.Is(err, os.ErrPermission) {
-		t.Fatalf("lost permission error identity: %v", err)
-	}
-
-	var pathErr *os.PathError
-	if !errors.As(err, &pathErr) || pathErr != cause {
-		t.Fatalf("lost typed *os.PathError: %v", err)
 	}
 }

@@ -13,20 +13,16 @@ import (
 )
 
 const (
-	SocketFlagUsage     = "tmux server socket path (default: the current tmux server, else tmux's default socket)"
-	RepositoryFlagUsage = "Snapshot repository directory (default: <data dir>/snapshots)"
-	LeaseRootFlagUsage  = "Shared tmux endpoint lease directory (default: <data dir>/leases)"
+	SocketFlagUsage     = "Socket path of the tmux server [default: the current tmux server, else tmux's default socket]"
+	RepositoryFlagUsage = "Snapshot repository directory [default: <data dir>/snapshots]"
+	LeaseRootFlagUsage  = "Shared tmux endpoint lease directory [default: <data dir>/leases]"
+	HistoryFlagUsage    = "Session history state file [default: $XDG_STATE_HOME/sesh/history.json]"
+	StatusFileFlagUsage = "Final save status file [default: $XDG_STATE_HOME/sesh/autosave-status.json]"
 )
 
 // AddSocketFlag registers the optional --socket flag resolved by [ResolveSocket].
 func AddSocketFlag(cmd *cobra.Command) {
 	cmd.Flags().String("socket", "", SocketFlagUsage)
-}
-
-// AddRepositoryFlags registers the optional --repository and --lease-root flags.
-func AddRepositoryFlags(cmd *cobra.Command) {
-	cmd.Flags().String("repository", "", RepositoryFlagUsage)
-	cmd.Flags().String("lease-root", "", LeaseRootFlagUsage)
 }
 
 // ResolveSocket selects the tmux server: --socket, else the server named by $TMUX,

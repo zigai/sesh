@@ -1,4 +1,4 @@
-package cmdsession
+package cmdsession_test
 
 import (
 	"errors"
@@ -9,36 +9,22 @@ import (
 
 	gotmux "github.com/zigai/gotmux/tmux"
 
-	"github.com/samber/oops"
-
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/session"
 )
 
-var errTestHistoryList = errors.New("test history list failure")
-
-func TestActionSessionCommandsHelp(t *testing.T) {
+func TestSessionCommandsHelp(t *testing.T) {
 	t.Parallel()
 
-	actions := []string{
-		"session-new",
-		"session-rename",
-		"session-kill",
-		"session-delete",
-		"session-switch",
-	}
-
-	for _, actionName := range actions {
-		t.Run(actionName, func(t *testing.T) {
-			root := newTestRootCommand(t.Context())
-
-			stdout, stderr, err := executeCommand(root, "action", actionName, "--help")
+	for _, name := range []string{"new", "rename", "kill", "delete", "switch"} {
+		t.Run(name, func(t *testing.T) {
+			stdout, stderr, err := executeCommand(t, "session", name, "--help")
 			if err != nil {
-				t.Fatalf("action %s --help failed: %v\nstderr: %s", actionName, err, stderr)
+				t.Fatalf("session %s --help failed: %v\nstderr: %s", name, err, stderr)
 			}
 
-			if !strings.Contains(stdout, actionName) {
-				t.Fatalf("stdout missing %s in help: %s", actionName, stdout)
+			if !strings.Contains(stdout, "sesh session "+name) {
+				t.Fatalf("stdout missing session %s in help: %s", name, stdout)
 			}
 		})
 	}
@@ -52,16 +38,14 @@ func TestSessionCommandsMissingArguments(t *testing.T) {
 		args     []string
 		wantCode int
 	}{
-		{name: "action new missing name", args: []string{"action", "session-new"}, wantCode: clibase.ExitCodeUsage},
-		{name: "action rename missing name", args: []string{"action", "session-rename"}, wantCode: clibase.ExitCodeUsage},
-		{name: "action switch missing target", args: []string{"action", "session-switch"}, wantCode: clibase.ExitCodeUsage},
+		{name: "new missing name", args: []string{"session", "new"}, wantCode: clibase.ExitCodeUsage},
+		{name: "rename missing name", args: []string{"session", "rename"}, wantCode: clibase.ExitCodeUsage},
+		{name: "switch missing target", args: []string{"session", "switch"}, wantCode: clibase.ExitCodeUsage},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			root := newTestRootCommand(t.Context())
-
-			_, _, err := executeCommand(root, tc.args...)
+			_, _, err := executeCommand(t, tc.args...)
 			if err == nil {
 				t.Fatalf("%s expected error, got nil", tc.name)
 			}
@@ -82,11 +66,11 @@ func TestSessionCommandsWithoutSocketTargetDefaultTmuxServer(t *testing.T) {
 		name string
 		args []string
 	}{
-		{name: "new", args: []string{"action", "session-new", "dev"}},
-		{name: "rename", args: []string{"action", "session-rename", "renamed", "--session", "dev"}},
-		{name: "kill", args: []string{"action", "session-kill", "dev"}},
-		{name: "delete", args: []string{"action", "session-delete", "dev"}},
-		{name: "switch", args: []string{"action", "session-switch", "dev"}},
+		{name: "new", args: []string{"session", "new", "dev"}},
+		{name: "rename", args: []string{"session", "rename", "renamed", "--session", "dev"}},
+		{name: "kill", args: []string{"session", "kill", "dev"}},
+		{name: "delete", args: []string{"session", "delete", "dev"}},
+		{name: "switch", args: []string{"session", "switch", "dev"}},
 	}
 
 	for _, tc := range tests {
@@ -94,12 +78,12 @@ func TestSessionCommandsWithoutSocketTargetDefaultTmuxServer(t *testing.T) {
 			exec := executeJSON(t, append(tc.args, testNoConfigFlag, testJSONFlag)...)
 
 			// Without a server, lookups find no session and mutations report the missing server.
-			if !errors.Is(exec.err, gotmux.ErrNoServer) && !errors.Is(exec.err, session.ErrSessionNotFound) {
-				t.Fatalf("error = %v, want the isolated default socket to have no server or session", exec.err)
+			if !errors.Is(exec.Err, gotmux.ErrNoServer) && !errors.Is(exec.Err, session.ErrSessionNotFound) {
+				t.Fatalf("error = %v, want the isolated default socket to have no server or session", exec.Err)
 			}
 
-			if code := clibase.ExitCode(exec.err); code == clibase.ExitCodeUsage || exec.envelope.OK {
-				t.Fatalf("exit code %d / envelope %+v, want a non-usage failure", code, exec.envelope)
+			if code := clibase.ExitCode(exec.Err); code == clibase.ExitCodeUsage || exec.Envelope.OK {
+				t.Fatalf("exit code %d / envelope %+v, want a non-usage failure", code, exec.Envelope)
 			}
 		})
 	}
@@ -110,23 +94,23 @@ func TestSessionNewRejectsMissingDirectoryBeforeTmuxWork(t *testing.T) {
 
 	exec := executeJSON(
 		t,
-		"action", "session-new", "dev",
+		"session", "new", "dev",
 		testSocketFlag, "/tmp/sesh-cli-unit-socket",
 		"--dir", missing,
 		testNoConfigFlag,
 		testJSONFlag,
 	)
 
-	if exec.err == nil {
+	if exec.Err == nil {
 		t.Fatal("expected a missing directory failure")
 	}
 
-	if exec.envelope.OK {
-		t.Fatalf("envelope reported success for a missing directory: %+v", exec.envelope)
+	if exec.Envelope.OK {
+		t.Fatalf("envelope reported success for a missing directory: %+v", exec.Envelope)
 	}
 
-	if !strings.Contains(exec.err.Error(), "directory does not exist") {
-		t.Fatalf("error = %v, want directory failure", exec.err)
+	if !strings.Contains(exec.Err.Error(), "directory does not exist") {
+		t.Fatalf("error = %v, want directory failure", exec.Err)
 	}
 }
 
@@ -138,23 +122,23 @@ func TestSessionDeletePropagatesRepositoryOpenFailure(t *testing.T) {
 
 	exec := executeJSON(
 		t,
-		"action", "session-delete", "dev",
+		"session", "delete", "dev",
 		testSocketFlag, "/tmp/sesh-cli-unit-socket",
 		testRepositoryFlag, repositoryFile,
 		testNoConfigFlag,
 		testJSONFlag,
 	)
 
-	if exec.err == nil {
+	if exec.Err == nil {
 		t.Fatal("expected a repository open failure")
 	}
 
-	if exec.envelope.OK {
-		t.Fatalf("envelope reported success for an unusable repository: %+v", exec.envelope)
+	if exec.Envelope.OK {
+		t.Fatalf("envelope reported success for an unusable repository: %+v", exec.Envelope)
 	}
 
-	if !strings.Contains(exec.err.Error(), "repository") {
-		t.Fatalf("error = %v, want a repository failure", exec.err)
+	if !strings.Contains(exec.Err.Error(), "repository") {
+		t.Fatalf("error = %v, want a repository failure", exec.Err)
 	}
 }
 
@@ -166,102 +150,21 @@ func TestSessionCommandsHonorConfigurationFailures(t *testing.T) {
 
 	exec := executeJSON(
 		t,
-		"action", "session-switch", "dev",
+		"session", "switch", "dev",
 		testSocketFlag, "/tmp/sesh-cli-unit-socket",
 		testConfigFlag, configPath,
 		testJSONFlag,
 	)
 
-	if exec.err == nil {
+	if exec.Err == nil {
 		t.Fatal("expected a configuration failure")
 	}
 
-	if exec.envelope.OK {
-		t.Fatalf("envelope reported success with invalid configuration: %+v", exec.envelope)
+	if exec.Envelope.OK {
+		t.Fatalf("envelope reported success with invalid configuration: %+v", exec.Envelope)
 	}
 
-	if exec.envelope.Error.Code != "configurationFailed" {
-		t.Fatalf("error code = %q, want configurationFailed", exec.envelope.Error.Code)
-	}
-}
-
-func TestResolveSessionDirectoryErrorWrapping(t *testing.T) {
-	t.Parallel()
-
-	t.Run("directory not found wraps oops", func(t *testing.T) {
-		t.Parallel()
-
-		cmd := NewActionSessionNewCommand()
-		missing := filepath.Join(t.TempDir(), "nonexistent")
-		_ = cmd.Flags().Set("dir", missing)
-
-		_, err := resolveSessionDirectory(cmd)
-		if !errors.Is(err, errDirectoryNotFound) {
-			t.Fatalf("expected errDirectoryNotFound, got %v", err)
-		}
-
-		oopsErr, ok := oops.AsOops(err)
-		if !ok {
-			t.Fatalf("expected oops error, got %T", err)
-		}
-
-		if oopsErr.Domain() != "cli" || oopsErr.Context()["operation"] != "stat_directory" {
-			t.Fatalf("unexpected oops metadata: domain=%q context=%v", oopsErr.Domain(), oopsErr.Context())
-		}
-	})
-
-	t.Run("directory not a dir wraps oops", func(t *testing.T) {
-		t.Parallel()
-
-		filePath := filepath.Join(t.TempDir(), "a-file")
-		if err := os.WriteFile(filePath, []byte("content"), 0o600); err != nil {
-			t.Fatal(err)
-		}
-
-		cmd := NewActionSessionNewCommand()
-		_ = cmd.Flags().Set("dir", filePath)
-
-		_, err := resolveSessionDirectory(cmd)
-		if !errors.Is(err, errDirectoryNotDir) {
-			t.Fatalf("expected errDirectoryNotDir, got %v", err)
-		}
-
-		oopsErr, ok := oops.AsOops(err)
-		if !ok {
-			t.Fatalf("expected oops error, got %T", err)
-		}
-
-		if oopsErr.Domain() != "cli" || oopsErr.Context()["operation"] != "stat_directory" {
-			t.Fatalf("unexpected oops metadata: domain=%q context=%v", oopsErr.Domain(), oopsErr.Context())
-		}
-	})
-}
-
-func TestWrapHistoryListError(t *testing.T) {
-	t.Parallel()
-
-	if err := wrapHistoryListError(nil); err != nil {
-		t.Fatalf("expected nil for nil error, got %v", err)
-	}
-
-	wrapped := wrapHistoryListError(errTestHistoryList)
-	if !errors.Is(wrapped, errTestHistoryList) {
-		t.Fatalf("expected errors.Is match, got %v", wrapped)
-	}
-
-	oopsErr, ok := oops.AsOops(wrapped)
-	if !ok {
-		t.Fatalf("expected oops error, got %T", wrapped)
-	}
-
-	if oopsErr.Domain() != "cli" || oopsErr.Context()["operation"] != "history" {
-		t.Fatalf("unexpected oops metadata: domain=%q context=%v", oopsErr.Domain(), oopsErr.Context())
-	}
-
-	again := wrapHistoryListError(wrapped)
-
-	againErr, ok := oops.AsOops(again)
-	if !ok || len(againErr.Layers()) != len(oopsErr.Layers()) || again.Error() != wrapped.Error() {
-		t.Fatalf("expected idempotent return of oops error, got %v", again)
+	if exec.Envelope.Error.Code != "configurationFailed" {
+		t.Fatalf("error code = %q, want configurationFailed", exec.Envelope.Error.Code)
 	}
 }

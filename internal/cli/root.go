@@ -16,6 +16,7 @@ import (
 
 	"github.com/zigai/sesh/internal/cli/clibase"
 
+	cmdagent "github.com/zigai/sesh/internal/cli/cmd/agent"
 	cmdautosave "github.com/zigai/sesh/internal/cli/cmd/autosave"
 	cmdconfig "github.com/zigai/sesh/internal/cli/cmd/config"
 	cmddaemon "github.com/zigai/sesh/internal/cli/cmd/daemon"
@@ -78,7 +79,7 @@ type keyBindingJSON struct {
 func Execute() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 
-	err := executeApplication(ctx, os.Args[1:], os.Stdin, os.Stdout, os.Stderr)
+	err := ExecuteApplication(ctx, os.Args[1:], os.Stdin, os.Stdout, os.Stderr)
 	if err == nil && ctx.Err() != nil {
 		err = ctx.Err()
 	}
@@ -88,10 +89,6 @@ func Execute() {
 	if err != nil {
 		os.Exit(ExitCode(err))
 	}
-}
-
-func NewRootCommand(ctx context.Context) *cobra.Command {
-	return newRootCommand(ctx)
 }
 
 func newRootCommand(ctx context.Context) *cobra.Command {
@@ -147,22 +144,22 @@ func newRootCommand(ctx context.Context) *cobra.Command {
 	rootCommand.PersistentFlags().Bool("no-config", false, "Use built-in settings without reading configuration files")
 	rootCommand.AddCommand(
 		cmdpicker.NewPickCommand(ctx, cmdremote.DefaultPickerRemoteFactory),
-		cmdsession.NewListCommand(),
+		cmdsession.NewCommand(),
 		cmdsnapshot.NewCommand(),
 		cmdautosave.NewCommand(),
-		cmdsession.NewHistoryCommand(),
 		cmdremote.NewCommand(),
 		newKeysCommand(),
 		cmdlogs.NewCommand(),
 		newHooksCommand(),
 		cmdconfig.NewCommand(),
 		cmdsetup.NewCommand(),
-		cmddaemon.NewCommand(),
+		cmddaemon.NewCommand(cmdremote.NewDaemonMonitorCommand(), cmdagent.NewDaemonWindowStatusCommand()),
 		newActionCommand(ctx),
 		cmddoctor.NewCommand(),
 	)
 	rootCommand.InitDefaultHelpCmd()
 	rootCommand.InitDefaultCompletionCmd()
+	configureCompletionHelp(rootCommand)
 	configureCommandHelp(rootCommand)
 
 	return rootCommand
@@ -180,15 +177,29 @@ func newHooksCommand() *cobra.Command {
 
 			return clibase.UnknownCommandError(cmd, args[0])
 		},
+		RunE: clibase.RequireSubcommand,
+	}
+
+	cmd.AddCommand(
+		newHooksListCommand("list", "List configured hook commands per lifecycle event", false),
+		newHooksListCommand("validate", "Validate hook configuration without running anything", true),
+		newHooksRunCommand(),
+	)
+
+	return cmd
+}
+
+func newHooksListCommand(use, short string, validate bool) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   use,
+		Short: short,
+		Args:  usageArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runHooksList(cmd)
+			return runHooksList(cmd, validate)
 		},
 	}
 
-	cmd.Flags().Bool("validate", false, "Validate hook configuration without running anything")
 	addJSONFlag(cmd)
-
-	cmd.AddCommand(newHooksRunCommand())
 
 	return cmd
 }
@@ -241,13 +252,11 @@ func hookTimeoutSeconds(cfg *config.Config) int {
 	return int(resolved.Seconds())
 }
 
-func runHooksList(cmd *cobra.Command) error {
+func runHooksList(cmd *cobra.Command, validate bool) error {
 	cfg, err := loadHookConfig(cmd)
 	if err != nil {
 		return err
 	}
-
-	validate, _ := cmd.Flags().GetBool("validate")
 
 	if validate {
 		for _, event := range hookEvents {
@@ -383,8 +392,8 @@ func hookRunStatus(result session.HookResult) string {
 func newKeysCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "keys",
-		Short: "List configured key bindings",
-		Long:  "List configured key bindings.\n\nBindings are read from configuration; this command does not modify any tmux key table. Use 'sesh setup tmux' to register the sesh tmux bindings.",
+		Short: "List the session picker key bindings",
+		Long:  "List the key bindings used inside the session picker.\n\nBindings are read from configuration; this command does not modify any tmux key table. Use 'sesh setup tmux' to register the sesh tmux bindings.",
 		Args:  usageArgs(cobra.NoArgs),
 		RunE:  func(cmd *cobra.Command, _ []string) error { return runKeysList(cmd) },
 	}

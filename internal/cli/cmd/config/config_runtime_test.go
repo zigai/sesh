@@ -105,7 +105,10 @@ func TestListSharesWorkflowHistoryPath(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", stateHome)
 
 	for _, explicit := range []bool{false, true} {
-		cmd := cmdsession.NewListCommand()
+		cmd, _, err := cmdsession.NewCommand().Find([]string{"list"})
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		path := filepath.Join(stateHome, "sesh", "history.json")
 		if explicit {

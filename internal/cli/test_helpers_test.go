@@ -2,7 +2,6 @@ package cli
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/cobra"
 	gotmux "github.com/zigai/gotmux/tmux"
 	"github.com/zigai/gotmux/tmuxtest"
 )
@@ -70,29 +68,12 @@ type commandExecution struct {
 	envelope testJSONEnvelope
 }
 
-func executeCommand(root *cobra.Command, args ...string) (string, string, error) {
-	var (
-		stdout bytes.Buffer
-		stderr bytes.Buffer
-	)
+func executeCommand(t *testing.T, args ...string) (string, string, error) {
+	t.Helper()
 
-	root.SetOut(&stdout)
-	root.SetErr(&stderr)
-	root.SetArgs(args)
+	var stdout, stderr bytes.Buffer
 
-	ctx := context.WithValue(context.Background(), rawArgsContextKey, args)
-	root.SetContext(ctx)
-
-	executed, err := root.ExecuteC()
-	if err != nil {
-		if executed == nil {
-			executed = root
-		}
-
-		if writeErr := WriteCommandError(executed, err); writeErr != nil {
-			err = errors.Join(err, writeErr)
-		}
-	}
+	err := ExecuteApplication(t.Context(), args, nil, &stdout, &stderr)
 
 	return stdout.String(), stderr.String(), err
 }
@@ -100,33 +81,7 @@ func executeCommand(root *cobra.Command, args ...string) (string, string, error)
 func executeJSON(t *testing.T, args ...string) commandExecution {
 	t.Helper()
 
-	root := newRootCommand(t.Context())
-
-	var (
-		stdout bytes.Buffer
-		stderr bytes.Buffer
-	)
-
-	root.SetOut(&stdout)
-	root.SetErr(&stderr)
-	root.SetArgs(args)
-
-	ctx := context.WithValue(context.Background(), rawArgsContextKey, args)
-	root.SetContext(ctx)
-
-	executed, err := root.ExecuteC()
-	if err != nil {
-		if executed == nil {
-			executed = root
-		}
-
-		if writeErr := WriteCommandError(executed, err); writeErr != nil {
-			err = errors.Join(err, writeErr)
-		}
-	}
-
-	rawOut := stdout.String()
-	rawErr := stderr.String()
+	rawOut, rawErr, err := executeCommand(t, args...)
 
 	target := rawOut
 	if target == "" {

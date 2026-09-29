@@ -30,12 +30,12 @@ func TestSnapshotRewriteCommandsPreserveCompletedDeletionReceipt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, command := range []string{"reconcile", "resume"} {
+	for command, operation := range map[string]string{"show": "reconcile_rewrite", "resume": "resume_rewrite"} {
 		cfg, logPath := runtimeConfig(t, "info")
 
 		var stdout, stderr bytes.Buffer
 
-		args := []string{snapshotCmd, "rewrite", command, testRepositoryFlag, path, "--operation", id, testConfigFlag, cfg, testJSONFlag}
+		args := []string{snapshotCmd, "recover", "delete", command, id, testRepositoryFlag, path, testConfigFlag, cfg, testJSONFlag}
 		if err := cli.ExecuteApplication(t.Context(), args, nil, &stdout, &stderr); err != nil {
 			t.Fatalf("%s: %v / %s", command, err, stderr.String())
 		}
@@ -47,7 +47,7 @@ func TestSnapshotRewriteCommandsPreserveCompletedDeletionReceipt(t *testing.T) {
 			t.Fatalf("wrong rewrite receipt: %s / %s", stdout.String(), stderr.String())
 		}
 
-		assertRuntimeLog(t, logPath, "cli", command+"_rewrite", "info", "ok", path, cfg, id, generation)
+		assertRuntimeLog(t, logPath, "cli", operation, "info", "ok", path, cfg, id, generation)
 	}
 
 	after, err := os.ReadFile(filepath.Join(path, "catalog.json"))

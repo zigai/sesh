@@ -17,12 +17,13 @@ Requirements: Linux, tmux 3.6+, Go 1.27.1+.
 sesh pick
 
 # Create or switch session
-sesh new work --dir ~/Projects/work
+sesh session new work --dir ~/Projects/work
 
 # Switch session
-sesh switch work
+sesh session switch work
 
-# Restore snapshots interactively
+# Save and restore snapshots
+sesh snapshot save --session '$1'
 sesh snapshot restore --pick
 ```
 

@@ -4,7 +4,6 @@ package cli_test
 
 import (
 	"bytes"
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -17,8 +16,6 @@ import (
 	"github.com/zigai/sesh/internal/privatefs"
 	"github.com/zigai/sesh/internal/remote"
 )
-
-var errRemoteActionTransport = errors.New("remote action transport failed")
 
 func remotePeerActionFixture(t *testing.T) (*tmux.Server, []byte, string) {
 	t.Helper()
@@ -125,41 +122,13 @@ func TestRemotePeerActionEntrypointCreatesAndReplaysOnDisposableServer(t *testin
 	}
 }
 
-func TestRemoteActionResultErrorRetainsReceiptAndTransportCause(t *testing.T) {
-	tests := []struct {
-		name string
-		code string
-		want error
-	}{
-		{name: "uncertain", code: remote.ActionCodeUnknownOutcome, want: remote.ErrActionUncertain},
-		{name: "partial", code: remote.ActionCodePartial, want: remote.ErrActionPartial},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			result := remote.ActionResult{
-				InvocationID:       "0123456789abcdef0123456789abcdef",
-				OK:                 false,
-				Code:               test.code,
-				DurableOperationID: "restore-operation",
-			}
-
-			err := cmdremote.RemoteActionResultError(result, errRemoteActionTransport)
-			if !errors.Is(err, test.want) || !errors.Is(err, errRemoteActionTransport) {
-				t.Fatalf("remoteActionResultError() = %v, want %v and transport causes", err, test.want)
-			}
-
-			var outcomeErr *remote.ActionOutcomeError
-			if !errors.As(err, &outcomeErr) || outcomeErr.Result != result {
-				t.Fatalf("remoteActionResultError() outcome = %#v, want %#v", outcomeErr, result)
-			}
-		})
-	}
-}
-
 func TestRemoteCommandTreeMarksProtocolChannelsLive(t *testing.T) {
+	if cmdremote.NewDaemonMonitorCommand().Annotations[clibase.AnnotationLiveIO] != "true" {
+		t.Error("daemon remote-monitor missing live I/O annotation")
+	}
+
 	root := cmdremote.NewCommand()
-	for _, path := range [][]string{{"monitor", "run"}, {"peer", "stream"}, {"peer", "action"}, {"peer", "lookup"}, {"peer", "attach-prepare"}, {"peer", "attach"}, {"attach"}} {
+	for _, path := range [][]string{{"peer", "stream"}, {"peer", "action"}, {"peer", "lookup"}, {"peer", "attach-prepare"}, {"peer", "attach"}, {"attach"}} {
 		command, _, err := root.Find(path)
 		if err != nil {
 			t.Fatalf("Find(%v): %v", path, err)

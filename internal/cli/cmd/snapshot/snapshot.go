@@ -162,14 +162,14 @@ func newSnapshotCommand() *cobra.Command {
 	}
 
 	cmd.AddCommand(
+		newSnapshotSaveCommand(),
+		newSnapshotRestoreCommand(),
 		newSnapshotListCommand(),
 		newSnapshotHistoryCommand(),
 		newSnapshotVerifyCommand(),
-		newSnapshotReconcileCommand(),
-		newSnapshotAbandonCommand(),
-		newSnapshotRewriteCommand(),
 		newSnapshotPruneCommand(),
 		newSnapshotGCCommand(),
+		newSnapshotRecoverCommand(),
 	)
 
 	return cmd
@@ -177,10 +177,11 @@ func newSnapshotCommand() *cobra.Command {
 
 func newSnapshotSaveCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "save",
-		Short: "Save explicitly selected live tmux sessions to the native repository",
-		Long:  "Save explicitly selected live tmux sessions to the native repository.\n\nSaves are practical recovery observations, not atomic checkpoints or application memory images.",
-		RunE:  runSnapshotSave,
+		Use:         "save",
+		Short:       "Save explicitly selected live tmux sessions to the native repository",
+		Long:        "Save explicitly selected live tmux sessions to the native repository.\n\nSaves are practical recovery observations, not atomic checkpoints or application memory images.",
+		RunE:        runSnapshotSave,
+		Annotations: map[string]string{clibase.AnnotationOperation: "save"},
 	}
 
 	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
@@ -378,18 +379,19 @@ func runSnapshotSave(cmd *cobra.Command, args []string) error {
 
 func newSnapshotRestoreCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "restore",
-		Short: "Restore sessions from the native snapshot repository onto tmux",
-		Long:  "Restore sessions from the native snapshot repository onto tmux.\n\nGuards against live session collisions, acquires endpoint leases, and verifies structural fidelity.",
-		RunE:  runSnapshotRestore,
+		Use:         "restore",
+		Short:       "Restore sessions from the native snapshot repository onto tmux",
+		Long:        "Restore sessions from the native snapshot repository onto tmux.\n\nGuards against live session collisions, acquires endpoint leases, and verifies structural fidelity.",
+		RunE:        runSnapshotRestore,
+		Annotations: map[string]string{clibase.AnnotationOperation: "restore"},
 	}
 
 	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
 	clibase.AddSocketFlag(cmd)
 	cmd.Flags().String("lease-root", "", clibase.LeaseRootFlagUsage)
-	cmd.Flags().String("generation", "", "Explicit generation ID to restore (defaults to current)")
-	cmd.Flags().String("operation", "", "Resume the exact restore operation without replaying uncertain effects")
-	cmd.Flags().StringSlice("session", nil, "Explicit selected session IDs to restore (defaults to all)")
+	cmd.Flags().String("generation", "", "Generation ID to restore [default: the current generation]")
+	cmd.Flags().StringSlice("session", nil, "Session IDs to restore [default: all saved sessions]")
+	cmd.Flags().String("operation", "", "Restore under this operation ID; an existing operation with this ID resumes without replaying uncertain effects [default: a new operation ID]")
 	cmd.Flags().Bool("pick", false, "Interactively select an immutable generation from the snapshot timeline")
 	cmd.Flags().Bool("no-processes", false, "Disable launching processes recorded in launch context")
 	cmd.Flags().Bool("allow-missing-dir", false, "Allow falling back if saved working directory does not exist")

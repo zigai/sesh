@@ -119,14 +119,13 @@ func TestCLIIntegrationListLiveSessions(t *testing.T) {
 func verifyListHumanTable(t *testing.T, socket string, full bool) {
 	t.Helper()
 
-	root := newRootCommand(t.Context())
-	args := []string{testListCmd, testSocketFlag, socket, testNoConfigFlag}
+	args := []string{sessionCmd, "list", testSocketFlag, socket, testNoConfigFlag}
 
 	if full {
 		args = append(args, "--full")
 	}
 
-	stdout, stderr, err := executeCommand(root, args...)
+	stdout, stderr, err := executeCommand(t, args...)
 	if err != nil {
 		t.Fatalf("list command error: %v", err)
 	}
@@ -152,12 +151,12 @@ func verifyListHumanTable(t *testing.T, socket string, full bool) {
 func verifyListJSONOutput(t *testing.T, socket string, expectedID gotmux.SessionID) {
 	t.Helper()
 
-	exec := executeJSON(t, testListCmd, testSocketFlag, socket, testNoConfigFlag, testJSONFlag)
+	exec := executeJSON(t, sessionCmd, "list", testSocketFlag, socket, testNoConfigFlag, testJSONFlag)
 	if exec.err != nil {
 		t.Fatalf("list --json error: %v", exec.err)
 	}
 
-	if !exec.envelope.OK || exec.envelope.Command != testListCmd {
+	if !exec.envelope.OK || exec.envelope.Command != "session.list" {
 		t.Fatalf("unexpected envelope: %+v", exec.envelope)
 	}
 
@@ -227,7 +226,7 @@ func TestCLIIntegrationListCurrentPaneResolution(t *testing.T) {
 
 	paneID := string(panes[0].ID)
 
-	exec := executeJSON(t, testListCmd, testSocketFlag, socket, "--current-pane", paneID, testNoConfigFlag, testJSONFlag)
+	exec := executeJSON(t, sessionCmd, "list", testSocketFlag, socket, "--current-pane", paneID, testNoConfigFlag, testJSONFlag)
 	if exec.err != nil {
 		t.Fatalf("list --current-pane error: %v", exec.err)
 	}
@@ -262,7 +261,7 @@ func TestCLIIntegrationListAmbiguousCurrentPane(t *testing.T) {
 
 	sharedPaneID := setupSharedWindowFixture(t, ctx, server)
 
-	exec := executeJSON(t, testListCmd, testSocketFlag, socket, "--current-pane", sharedPaneID, testNoConfigFlag, testJSONFlag)
+	exec := executeJSON(t, sessionCmd, "list", testSocketFlag, socket, "--current-pane", sharedPaneID, testNoConfigFlag, testJSONFlag)
 	if exec.envelope.OK {
 		t.Fatal("expected OK=false for ambiguous current pane")
 	}
@@ -359,9 +358,7 @@ func setupHistoryTotalsFixture(t *testing.T, ctx context.Context, server *gotmux
 func verifyHistorySessionTotalsTable(t *testing.T, socket string) {
 	t.Helper()
 
-	root := newRootCommand(t.Context())
-
-	stdout, stderr, err := executeCommand(root, testHistoryCmd, testSocketFlag, socket, testNoConfigFlag)
+	stdout, stderr, err := executeCommand(t, sessionCmd, "scrollback", testSocketFlag, socket, testNoConfigFlag)
 	if err != nil {
 		t.Fatalf("history command error: %v", err)
 	}
@@ -387,12 +384,12 @@ func verifyHistorySessionTotalsTable(t *testing.T, socket string) {
 func verifyHistorySessionTotalsJSON(t *testing.T, socket string) {
 	t.Helper()
 
-	exec := executeJSON(t, testHistoryCmd, testSocketFlag, socket, testNoConfigFlag, testJSONFlag)
+	exec := executeJSON(t, sessionCmd, "scrollback", testSocketFlag, socket, testNoConfigFlag, testJSONFlag)
 	if exec.err != nil {
 		t.Fatalf("history --json error: %v", exec.err)
 	}
 
-	if !exec.envelope.OK || exec.envelope.Command != testHistoryCmd {
+	if !exec.envelope.OK || exec.envelope.Command != "session.scrollback" {
 		t.Fatalf("unexpected envelope: %+v", exec.envelope)
 	}
 
@@ -461,9 +458,7 @@ func TestCLIIntegrationHistoryPanesDetail(t *testing.T) {
 func verifyHistoryPanesTable(t *testing.T, socket string) {
 	t.Helper()
 
-	root := newRootCommand(t.Context())
-
-	stdout, stderr, err := executeCommand(root, testHistoryCmd, "--panes", testSocketFlag, socket, testNoConfigFlag)
+	stdout, stderr, err := executeCommand(t, sessionCmd, "scrollback", "--panes", testSocketFlag, socket, testNoConfigFlag)
 	if err != nil {
 		t.Fatalf("history --panes error: %v", err)
 	}
@@ -489,12 +484,12 @@ func verifyHistoryPanesTable(t *testing.T, socket string) {
 func verifyHistoryPanesJSON(t *testing.T, socket string) {
 	t.Helper()
 
-	exec := executeJSON(t, testHistoryCmd, "--panes", testSocketFlag, socket, testNoConfigFlag, testJSONFlag)
+	exec := executeJSON(t, sessionCmd, "scrollback", "--panes", testSocketFlag, socket, testNoConfigFlag, testJSONFlag)
 	if exec.err != nil {
 		t.Fatalf("history --panes --json error: %v", exec.err)
 	}
 
-	if !exec.envelope.OK || exec.envelope.Command != testHistoryCmd {
+	if !exec.envelope.OK || exec.envelope.Command != "session.scrollback" {
 		t.Fatalf("unexpected envelope: %+v", exec.envelope)
 	}
 
@@ -535,7 +530,7 @@ func TestCLIIntegrationHistorySharedWindows(t *testing.T) {
 
 	setupSharedWindowHistoryFixture(t, ctx, server)
 
-	exec := executeJSON(t, testHistoryCmd, "--panes", testSocketFlag, socket, testNoConfigFlag, testJSONFlag)
+	exec := executeJSON(t, sessionCmd, "scrollback", "--panes", testSocketFlag, socket, testNoConfigFlag, testJSONFlag)
 	if exec.err != nil {
 		t.Fatalf("history --panes error: %v", exec.err)
 	}
@@ -598,7 +593,7 @@ func TestCLIIntegrationHistoryNumericSortIndex2vs10(t *testing.T) {
 
 	setupSparseWindowFixture(t, ctx, server)
 
-	exec := executeJSON(t, testHistoryCmd, "--panes", testSocketFlag, socket, testNoConfigFlag, testJSONFlag)
+	exec := executeJSON(t, sessionCmd, "scrollback", "--panes", testSocketFlag, socket, testNoConfigFlag, testJSONFlag)
 	if exec.err != nil {
 		t.Fatalf("history error: %v", exec.err)
 	}
@@ -682,7 +677,7 @@ func TestCLIIntegrationKilledServerEmptyResult(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	t.Run("list on killed server", func(t *testing.T) {
-		exec := executeJSON(t, testListCmd, testSocketFlag, socket, testNoConfigFlag, testJSONFlag)
+		exec := executeJSON(t, sessionCmd, "list", testSocketFlag, socket, testNoConfigFlag, testJSONFlag)
 		if exec.err != nil {
 			t.Fatalf("list on killed server returned error: %v", exec.err)
 		}
@@ -698,7 +693,7 @@ func TestCLIIntegrationKilledServerEmptyResult(t *testing.T) {
 	})
 
 	t.Run("history on killed server", func(t *testing.T) {
-		exec := executeJSON(t, testHistoryCmd, testSocketFlag, socket, testNoConfigFlag, testJSONFlag)
+		exec := executeJSON(t, sessionCmd, "scrollback", testSocketFlag, socket, testNoConfigFlag, testJSONFlag)
 		if exec.err != nil {
 			t.Fatalf("history on killed server returned error: %v", exec.err)
 		}
@@ -721,16 +716,9 @@ func TestCLIIntegrationCanceledContextFailsClosed(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	root := newRootCommand(t.Context())
-	root.SetArgs([]string{testListCmd, testSocketFlag, socket, testNoConfigFlag, testJSONFlag})
-	root.SetContext(ctx)
-
 	var stdout, stderr strings.Builder
 
-	root.SetOut(&stdout)
-	root.SetErr(&stderr)
-
-	err := root.Execute()
+	err := cli.ExecuteApplication(ctx, []string{sessionCmd, "list", testSocketFlag, socket, testNoConfigFlag, testJSONFlag}, nil, &stdout, &stderr)
 	if err == nil {
 		t.Fatal("expected error for canceled context, got nil")
 	}
@@ -1036,7 +1024,7 @@ func TestCLIIntegrationSessionSwitchWithoutClientFailsClosed(t *testing.T) {
 
 	target := fixture.newLiveSession(t, "switch-target")
 
-	exec := executeJSON(t, append([]string{actionCmd, "session-switch", "switch-target"}, append(fixture.sessionArgs(), testJSONFlag)...)...)
+	exec := executeJSON(t, append([]string{sessionCmd, "switch", "switch-target"}, append(fixture.sessionArgs(), testJSONFlag)...)...)
 	if exec.err == nil {
 		t.Fatal("switch reported success without an invoking client")
 	}
@@ -1065,7 +1053,7 @@ func TestCLIIntegrationSessionSwitchSwitchesInvokingClient(t *testing.T) {
 
 	client := fixture.attachCLIClient(t, origin.ID)
 
-	exec := executeJSON(t, append([]string{actionCmd, "session-switch", "switch-target"}, append(fixture.sessionArgs(), testJSONFlag)...)...)
+	exec := executeJSON(t, append([]string{sessionCmd, "switch", "switch-target"}, append(fixture.sessionArgs(), testJSONFlag)...)...)
 	if exec.err != nil {
 		t.Fatalf("switch failed: %v", exec.err)
 	}
@@ -1096,7 +1084,7 @@ func TestCLIIntegrationSessionSwitchUsesAmbientSocket(t *testing.T) {
 
 	client := fixture.attachCLIClient(t, origin.ID)
 
-	exec := executeJSON(t, actionCmd, "session-switch", "switch-target", testNoConfigFlag, "--history", fixture.historyPath, testJSONFlag)
+	exec := executeJSON(t, sessionCmd, "switch", "switch-target", testNoConfigFlag, "--history", fixture.historyPath, testJSONFlag)
 	if exec.err != nil || !exec.envelope.OK {
 		t.Fatalf("ambient switch failed: %v / %+v", exec.err, exec.envelope)
 	}
@@ -1119,7 +1107,7 @@ func TestCLIIntegrationSessionNewCreatesWithoutAttachInJSONMode(t *testing.T) {
 
 	client := fixture.attachCLIClient(t, origin.ID)
 
-	created := executeJSON(t, append([]string{actionCmd, "session-new", "created-session", "--dir", "/tmp"}, append(fixture.sessionArgs(), testJSONFlag)...)...)
+	created := executeJSON(t, append([]string{sessionCmd, "new", "created-session", "--dir", "/tmp"}, append(fixture.sessionArgs(), testJSONFlag)...)...)
 	if created.err != nil || !created.envelope.OK {
 		t.Fatalf("session new failed: %v / %+v", created.err, created.envelope)
 	}
@@ -1137,7 +1125,7 @@ func TestCLIIntegrationSessionNewCreatesWithoutAttachInJSONMode(t *testing.T) {
 		t.Fatalf("client displays %s, want origin %s for create-only --json", displayed, origin.ID)
 	}
 
-	again := executeJSON(t, append([]string{actionCmd, "session-new", "created-session", "--dir", "/tmp"}, append(fixture.sessionArgs(), testJSONFlag)...)...)
+	again := executeJSON(t, append([]string{sessionCmd, "new", "created-session", "--dir", "/tmp"}, append(fixture.sessionArgs(), testJSONFlag)...)...)
 	if again.err == nil || again.envelope.OK {
 		t.Fatal("expected already-exists failure for duplicate create-only new")
 	}
@@ -1159,15 +1147,9 @@ func TestCLIIntegrationSessionNewInteractiveEnters(t *testing.T) {
 
 	target := fixture.newLiveSession(t, "target-session")
 
-	root := newRootCommand(t.Context())
-	root.SetArgs(append([]string{actionCmd, "session-new", "target-session", "--dir", "/tmp"}, fixture.sessionArgs()...))
-
-	var stdout, stderr strings.Builder
-	root.SetOut(&stdout)
-	root.SetErr(&stderr)
-
-	if err := root.Execute(); err != nil {
-		t.Fatalf("interactive new failed: %v\nstderr: %s", err, stderr.String())
+	_, stderr, err := executeCommand(t, append([]string{sessionCmd, "new", "target-session", "--dir", "/tmp"}, fixture.sessionArgs()...)...)
+	if err != nil {
+		t.Fatalf("interactive new failed: %v\nstderr: %s", err, stderr)
 	}
 
 	if displayed := fixture.clientDisplayedSession(t, client); displayed != target.ID {
@@ -1182,7 +1164,7 @@ func TestCLIIntegrationSessionNewOutsideTmuxCreatesWithoutAttach(t *testing.T) {
 
 	clearAmbientTmux(t)
 
-	exec := executeJSON(t, append([]string{actionCmd, "session-new", "scripted-session", "--dir", "/tmp"}, append(fixture.sessionArgs(), testJSONFlag)...)...)
+	exec := executeJSON(t, append([]string{sessionCmd, "new", "scripted-session", "--dir", "/tmp"}, append(fixture.sessionArgs(), testJSONFlag)...)...)
 	if exec.err != nil || !exec.envelope.OK {
 		t.Fatalf("create-only new --json outside tmux failed: %v / %+v", exec.err, exec.envelope)
 	}
@@ -1204,14 +1186,7 @@ func TestCLIIntegrationSessionNewInteractiveOutsideTmuxFailsBeforeCreate(t *test
 
 	clearAmbientTmux(t)
 
-	root := newRootCommand(t.Context())
-	root.SetArgs(append([]string{actionCmd, "session-new", "interactive-session", "--dir", "/tmp"}, fixture.sessionArgs()...))
-
-	var stdout, stderr strings.Builder
-	root.SetOut(&stdout)
-	root.SetErr(&stderr)
-
-	err := root.Execute()
+	_, _, err := executeCommand(t, append([]string{sessionCmd, "new", "interactive-session", "--dir", "/tmp"}, fixture.sessionArgs()...)...)
 	if err == nil {
 		t.Fatal("interactive new outside tmux succeeded without an interactive terminal")
 	}
@@ -1237,7 +1212,7 @@ func TestCLIIntegrationSessionDeleteRemovesLiveAndSavedState(t *testing.T) {
 		t.Fatalf("fixture session was not saved: %v", names)
 	}
 
-	exec := executeJSON(t, append([]string{actionCmd, "session-delete", "fixture", testRepositoryFlag, fixture.repository}, append(fixture.deleteArgs(), testJSONFlag)...)...)
+	exec := executeJSON(t, append([]string{sessionCmd, "delete", "fixture", testRepositoryFlag, fixture.repository}, append(fixture.deleteArgs(), testJSONFlag)...)...)
 	if exec.err != nil || !exec.envelope.OK {
 		t.Fatalf("session delete failed: %v / %+v", exec.err, exec.envelope)
 	}
@@ -1264,7 +1239,7 @@ func TestCLIIntegrationSessionDeleteRetainsRecoveryBarrier(t *testing.T) {
 	fixture.saveLiveSession(t, session.ID)
 	fixture.beginPendingSave(t)
 
-	exec := executeJSON(t, append([]string{actionCmd, "session-delete", "fixture", testRepositoryFlag, fixture.repository}, append(fixture.deleteArgs(), testJSONFlag)...)...)
+	exec := executeJSON(t, append([]string{sessionCmd, "delete", "fixture", testRepositoryFlag, fixture.repository}, append(fixture.deleteArgs(), testJSONFlag)...)...)
 	if exec.err == nil {
 		t.Fatal("delete succeeded while a save attempt was pending")
 	}
@@ -1300,7 +1275,7 @@ func TestCLIIntegrationSessionDeleteRequiresForceForAttachedSession(t *testing.T
 
 	fixture.attachCLIClient(t, session.ID)
 
-	refused := executeJSON(t, append([]string{actionCmd, "session-delete", "fixture", testRepositoryFlag, fixture.repository}, append(fixture.deleteArgs(), testJSONFlag)...)...)
+	refused := executeJSON(t, append([]string{sessionCmd, "delete", "fixture", testRepositoryFlag, fixture.repository}, append(fixture.deleteArgs(), testJSONFlag)...)...)
 	if refused.err == nil {
 		t.Fatal("attached session was deleted without --force")
 	}
@@ -1313,7 +1288,7 @@ func TestCLIIntegrationSessionDeleteRequiresForceForAttachedSession(t *testing.T
 		t.Fatalf("attached session was destroyed: %v", err)
 	}
 
-	forced := executeJSON(t, append([]string{actionCmd, "session-delete", "fixture", "--force", testRepositoryFlag, fixture.repository}, append(fixture.deleteArgs(), testJSONFlag)...)...)
+	forced := executeJSON(t, append([]string{sessionCmd, "delete", "fixture", "--force", testRepositoryFlag, fixture.repository}, append(fixture.deleteArgs(), testJSONFlag)...)...)
 	if forced.err != nil || !forced.envelope.OK {
 		t.Fatalf("forced delete failed: %v / %+v", forced.err, forced.envelope)
 	}
@@ -1329,7 +1304,7 @@ func TestCLIIntegrationSessionKillReportsMissingSession(t *testing.T) {
 
 	fixture.newLiveSession(t, "keep-alive")
 
-	exec := executeJSON(t, append([]string{actionCmd, "session-kill", "missing-session"}, append(fixture.sessionArgs(), testJSONFlag)...)...)
+	exec := executeJSON(t, append([]string{sessionCmd, "kill", "missing-session"}, append(fixture.sessionArgs(), testJSONFlag)...)...)
 	if exec.err == nil {
 		t.Fatal("kill of a missing session reported success")
 	}
@@ -1373,7 +1348,7 @@ func TestCLIIntegrationSessionDeleteRemovesFromDefaultXDGRepository(t *testing.T
 		t.Fatalf("saving to default repository failed: %v", saveExec.err)
 	}
 
-	exec := executeJSON(t, actionCmd, "session-delete", "fixture", testSocketFlag, fixture.socket, testLeaseRootFlag, fixture.leaseRoot, testNoConfigFlag, "--history", fixture.historyPath, testJSONFlag)
+	exec := executeJSON(t, sessionCmd, "delete", "fixture", testSocketFlag, fixture.socket, testLeaseRootFlag, fixture.leaseRoot, testNoConfigFlag, "--history", fixture.historyPath, testJSONFlag)
 	if exec.err != nil || !exec.envelope.OK {
 		t.Fatalf("session delete without --repository failed: %v / %+v", exec.err, exec.envelope)
 	}
@@ -1396,7 +1371,7 @@ func TestCLIIntegrationSessionDeleteWithoutDefaultRepositorySucceedsForLive(t *t
 
 	fixture.newLiveSession(t, "keep-alive")
 
-	exec := executeJSON(t, actionCmd, "session-delete", "fixture", testSocketFlag, fixture.socket, testLeaseRootFlag, fixture.leaseRoot, testNoConfigFlag, "--history", fixture.historyPath, testJSONFlag)
+	exec := executeJSON(t, sessionCmd, "delete", "fixture", testSocketFlag, fixture.socket, testLeaseRootFlag, fixture.leaseRoot, testNoConfigFlag, "--history", fixture.historyPath, testJSONFlag)
 	if exec.err != nil || !exec.envelope.OK {
 		t.Fatalf("session delete failed: %v / %+v", exec.err, exec.envelope)
 	}

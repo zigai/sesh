@@ -79,10 +79,6 @@ func NewCommand() *cobra.Command {
 	return newRemoteCommand()
 }
 
-func NewRemoteCommand() *cobra.Command {
-	return NewCommand()
-}
-
 func newRemoteCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "remote",
@@ -94,22 +90,17 @@ func newRemoteCommand() *cobra.Command {
 		newRemoteAttachCommand(),
 		newRemoteActionCommand(),
 		newRemoteLookupCommand(),
-		newRemoteMonitorCommand(),
 		newRemotePeerCommand(),
 	)
 
 	return cmd
 }
 
-func newRemoteMonitorCommand() *cobra.Command {
+// NewDaemonMonitorCommand returns the foreground monitor that maintains the local remote
+// inventory cache.
+func NewDaemonMonitorCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "monitor",
-		Short: "Maintain the local remote inventory cache",
-		Args:  clibase.UsageArgs(cobra.NoArgs),
-		RunE:  clibase.RequireSubcommand,
-	}
-	run := &cobra.Command{
-		Use:   "run",
+		Use:   "remote-monitor",
 		Short: "Run the foreground remote inventory monitor",
 		Args:  clibase.UsageArgs(cobra.NoArgs),
 		Annotations: map[string]string{
@@ -118,18 +109,18 @@ func newRemoteMonitorCommand() *cobra.Command {
 		},
 		RunE: runRemoteMonitor,
 	}
-	run.Flags().String("socket", "", "Managed tmux socket retained for service-definition consistency")
-	cmd.AddCommand(run)
+	cmd.Flags().String("socket", "", "Managed tmux socket retained for service-definition consistency")
 
 	return cmd
 }
 
 func newRemotePeerCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "peer",
-		Short: "Serve one fixed remote protocol channel",
-		Args:  clibase.UsageArgs(cobra.NoArgs),
-		RunE:  clibase.RequireSubcommand,
+		Use:    "peer",
+		Short:  "Serve one fixed remote protocol channel",
+		Hidden: true,
+		Args:   clibase.UsageArgs(cobra.NoArgs),
+		RunE:   clibase.RequireSubcommand,
 	}
 	for _, child := range []*cobra.Command{
 		{Use: "stream", Args: clibase.UsageArgs(cobra.NoArgs), Annotations: remoteLiveAnnotations("remote_peer_stream"), RunE: runRemotePeerStream},

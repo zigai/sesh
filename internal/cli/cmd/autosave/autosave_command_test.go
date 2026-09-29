@@ -1,4 +1,4 @@
-package cmdautosave
+package cmdautosave_test
 
 import (
 	"os"
@@ -8,19 +8,17 @@ import (
 
 	"github.com/zigai/sesh/internal/automation"
 	"github.com/zigai/sesh/internal/cli/clibase"
-	"github.com/zigai/sesh/internal/session"
+	"github.com/zigai/sesh/internal/testsupport/clitest"
 )
 
 func TestAutosaveCommandHelp(t *testing.T) {
 	t.Parallel()
 
-	subcommands := []string{"final-save", "ensure-default-session"}
+	subcommands := []string{"status"}
 
 	for _, sub := range subcommands {
 		t.Run(sub, func(t *testing.T) {
-			root := newRootCommand(t.Context())
-
-			stdout, stderr, err := executeCommand(root, "autosave", sub, "--help")
+			stdout, stderr, err := executeCommand(t, "autosave", sub, "--help")
 			if err != nil {
 				t.Fatalf("autosave %s --help failed: %v\nstderr: %s", sub, err, stderr)
 			}
@@ -35,13 +33,11 @@ func TestAutosaveCommandHelp(t *testing.T) {
 func TestActionAutosaveCommandsHelp(t *testing.T) {
 	t.Parallel()
 
-	actions := []string{"autosave-status", "autosave-save-if-due", "autosave-restore-on-start"}
+	actions := []string{"autosave-save-if-due", "autosave-restore-on-start", "autosave-final-save", "session-adopt-startup"}
 
 	for _, actionName := range actions {
 		t.Run(actionName, func(t *testing.T) {
-			root := newRootCommand(t.Context())
-
-			stdout, stderr, err := executeCommand(root, actionCmd, actionName, "--help")
+			stdout, stderr, err := executeCommand(t, actionCmd, actionName, "--help")
 			if err != nil {
 				t.Fatalf("action %s --help failed: %v\nstderr: %s", actionName, err, stderr)
 			}
@@ -53,27 +49,15 @@ func TestActionAutosaveCommandsHelp(t *testing.T) {
 	}
 }
 
-func isolatedAutosaveHome(t *testing.T) {
-	t.Helper()
-
-	t.Setenv("TMUX", "")
-
-	home := t.TempDir()
-	t.Setenv("XDG_STATE_HOME", home)
-	t.Setenv("XDG_DATA_HOME", home)
-	t.Setenv("XDG_CONFIG_HOME", home)
-	t.Setenv("XDG_RUNTIME_DIR", home)
-}
-
 func TestAutosaveStatusReportsDueStateWithDefaults(t *testing.T) {
 	isolatedAutosaveHome(t)
 
-	exec := executeJSON(t, actionCmd, "autosave-status", testNoConfigFlag, testJSONFlag)
-	if !exec.envelope.OK {
-		t.Fatalf("autosave status failed: %s", exec.stderr)
+	exec := executeJSON(t, "autosave", "status", testNoConfigFlag, testJSONFlag)
+	if !exec.Envelope.OK {
+		t.Fatalf("autosave status failed: %s", exec.Stderr)
 	}
 
-	result := decodeJSONPayload[autosaveResultJSON](t, exec.envelope.Result)
+	result := clitest.DecodePayload[autosaveResultJSON](t, exec.Envelope.Result)
 
 	if result.Status != "due" {
 		t.Fatalf("status = %q, want due", result.Status)
@@ -96,14 +80,14 @@ func TestAutosaveDisabledIsANoOpWithoutSocket(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, action := range []string{"autosave-status", "autosave-save-if-due"} {
-		t.Run(action, func(t *testing.T) {
-			exec := executeJSON(t, actionCmd, action, testConfigFlag, cfgPath, testJSONFlag)
-			if !exec.envelope.OK {
-				t.Fatalf("disabled autosave %s must not fail: %s", action, exec.stderr)
+	for _, command := range [][]string{{"autosave", "status"}, {actionCmd, "autosave-save-if-due"}} {
+		t.Run(strings.Join(command, " "), func(t *testing.T) {
+			exec := executeJSON(t, append(command, testConfigFlag, cfgPath, testJSONFlag)...)
+			if !exec.Envelope.OK {
+				t.Fatalf("disabled autosave %v must not fail: %s", command, exec.Stderr)
 			}
 
-			result := decodeJSONPayload[autosaveResultJSON](t, exec.envelope.Result)
+			result := clitest.DecodePayload[autosaveResultJSON](t, exec.Envelope.Result)
 			if result.Status != "disabled" || result.Reason != "disabled" {
 				t.Fatalf("result = %#v, want disabled/disabled", result)
 			}
@@ -115,12 +99,12 @@ func TestAutosaveSaveIfDueSkipsWhenDefaultTmuxServerIsNotRunning(t *testing.T) {
 	isolatedAutosaveHome(t)
 
 	exec := executeJSON(t, actionCmd, "autosave-save-if-due", testNoConfigFlag, testJSONFlag)
-	if exec.err != nil || !exec.envelope.OK {
-		t.Fatalf("save-if-due without a running tmux server failed: %v\nstderr: %s", exec.err, exec.stderr)
+	if exec.Err != nil || !exec.Envelope.OK {
+		t.Fatalf("save-if-due without a running tmux server failed: %v\nstderr: %s", exec.Err, exec.Stderr)
 	}
 
-	result := decodeJSONPayload[autosaveResultJSON](t, exec.envelope.Result)
-	if result.Status != autosaveStatusSkipped || result.Reason != autosaveReasonTmuxNotRunning || result.Recorded {
+	result := clitest.DecodePayload[autosaveResultJSON](t, exec.Envelope.Result)
+	if result.Status != "skipped" || result.Reason != "tmux_not_running" || result.Recorded {
 		t.Fatalf("result = %#v, want an unrecorded skip because tmux is not running", result)
 	}
 
@@ -129,67 +113,24 @@ func TestAutosaveSaveIfDueSkipsWhenDefaultTmuxServerIsNotRunning(t *testing.T) {
 	}
 }
 
-func writeCorruptHistoryState(t *testing.T) {
-	t.Helper()
-
-	stateHome := filepath.Clean(os.Getenv("XDG_STATE_HOME"))
-	path := filepath.Join(stateHome, "sesh", "history.json")
-
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := os.WriteFile(path, []byte("{not json"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestLoadAutosaveHistoryDistinguishesMissingFromUnreadable(t *testing.T) {
-	isolatedAutosaveHome(t)
-
-	path := filepath.Join(os.Getenv("XDG_STATE_HOME"), "sesh", "history.json")
-
-	last, err := loadAutosaveHistory(path)
-	if err != nil || last != 0 {
-		t.Fatalf("missing history = (%d, %v), want (0, nil)", last, err)
-	}
-
-	if _, err := session.UpdateState(t.Context(), path, func(state *session.State) {
-		state.LastAutosaveTimestamp = 1_700_000_000
-	}); err != nil {
-		t.Fatalf("recording history failed: %v", err)
-	}
-
-	last, err = loadAutosaveHistory(path)
-	if err != nil || last != 1_700_000_000 {
-		t.Fatalf("recorded history = (%d, %v), want the recorded timestamp", last, err)
-	}
-
-	writeCorruptHistoryState(t)
-
-	if _, err := loadAutosaveHistory(path); err == nil {
-		t.Fatal("an unreadable history file must report an error instead of a zero timestamp")
-	}
-}
-
 func TestAutosaveStatusReportsHistoryUnavailable(t *testing.T) {
 	isolatedAutosaveHome(t)
 	writeCorruptHistoryState(t)
 
-	status := executeJSON(t, actionCmd, "autosave-status", testNoConfigFlag, testJSONFlag)
-	if status.err == nil {
+	status := executeJSON(t, "autosave", "status", testNoConfigFlag, testJSONFlag)
+	if status.Err == nil {
 		t.Fatal("autosave status with an unreadable history must report an error")
 	}
 
-	if clibase.ExitCode(status.err) != clibase.ExitCodeGeneral {
-		t.Fatalf("status exit code = %d, want %d", clibase.ExitCode(status.err), clibase.ExitCodeGeneral)
+	if clibase.ExitCode(status.Err) != clibase.ExitCodeGeneral {
+		t.Fatalf("status exit code = %d, want %d", clibase.ExitCode(status.Err), clibase.ExitCodeGeneral)
 	}
 
-	if status.envelope.Error == nil {
+	if status.Envelope.Error == nil {
 		t.Fatal("degraded status must carry an error payload")
 	}
 
-	degraded := decodeJSONPayload[autosaveResultJSON](t, status.envelope.Result)
+	degraded := clitest.DecodePayload[autosaveResultJSON](t, status.Envelope.Result)
 	if degraded.Status != "degraded" || degraded.Reason != automation.ReasonHistoryUnavailable {
 		t.Fatalf("status result = %#v, want degraded/history_unavailable", degraded)
 	}
@@ -204,15 +145,15 @@ func TestAutosaveSaveIfDueRefusesWhenHistoryUnavailable(t *testing.T) {
 	writeCorruptHistoryState(t)
 
 	save := executeJSON(t, actionCmd, "autosave-save-if-due", testNoConfigFlag, testJSONFlag)
-	if save.err == nil {
+	if save.Err == nil {
 		t.Fatal("save-if-due with an unreadable history must refuse")
 	}
 
-	if clibase.ExitCode(save.err) != clibase.ExitCodeGeneral {
-		t.Fatalf("save exit code = %d, want %d", clibase.ExitCode(save.err), clibase.ExitCodeGeneral)
+	if clibase.ExitCode(save.Err) != clibase.ExitCodeGeneral {
+		t.Fatalf("save exit code = %d, want %d", clibase.ExitCode(save.Err), clibase.ExitCodeGeneral)
 	}
 
-	refusal := decodeJSONPayload[autosaveResultJSON](t, save.envelope.Result)
+	refusal := clitest.DecodePayload[autosaveResultJSON](t, save.Envelope.Result)
 	if refusal.Status != "degraded" || refusal.Reason != automation.ReasonHistoryUnavailable {
 		t.Fatalf("save result = %#v, want degraded/history_unavailable", refusal)
 	}
@@ -225,12 +166,12 @@ func TestAutosaveSaveIfDueRefusesWhenHistoryUnavailable(t *testing.T) {
 func TestAutosaveStatusReportsDurableState(t *testing.T) {
 	isolatedAutosaveHome(t)
 
-	exec := executeJSON(t, actionCmd, "autosave-status", testNoConfigFlag, testJSONFlag)
-	if !exec.envelope.OK {
-		t.Fatalf("autosave status failed: %s", exec.stderr)
+	exec := executeJSON(t, "autosave", "status", testNoConfigFlag, testJSONFlag)
+	if !exec.Envelope.OK {
+		t.Fatalf("autosave status failed: %s", exec.Stderr)
 	}
 
-	result := decodeJSONPayload[autosaveResultJSON](t, exec.envelope.Result)
+	result := clitest.DecodePayload[autosaveResultJSON](t, exec.Envelope.Result)
 	if result.HistoryState != "never_run" {
 		t.Fatalf("historyState = %q, want never_run", result.HistoryState)
 	}
@@ -244,13 +185,13 @@ func TestAutosaveFinalSaveRequiresPositiveDeadline(t *testing.T) {
 	isolatedAutosaveHome(t)
 
 	deadline := executeJSON(
-		t, "autosave", "final-save",
+		t, actionCmd, "autosave-final-save",
 		testNoConfigFlag, testJSONFlag,
 		testSocketFlag, filepath.Join(os.Getenv("XDG_RUNTIME_DIR"), "sesh.sock"),
 		"--deadline", "0s",
 	)
-	if deadline.err == nil || clibase.ExitCode(deadline.err) != clibase.ExitCodeUsage {
-		t.Fatalf("final-save with a zero deadline = (%v, %d), want a usage error", deadline.err, clibase.ExitCode(deadline.err))
+	if deadline.Err == nil || clibase.ExitCode(deadline.Err) != clibase.ExitCodeUsage {
+		t.Fatalf("final-save with a zero deadline = (%v, %d), want a usage error", deadline.Err, clibase.ExitCode(deadline.Err))
 	}
 }
 
@@ -267,18 +208,18 @@ func TestAutosaveFinalSaveRejectsInvalidEnvironmentKeys(t *testing.T) {
 	socket := filepath.Join(os.Getenv("XDG_RUNTIME_DIR"), "sesh.sock")
 
 	exec := executeJSON(
-		t, "autosave", "final-save",
+		t, actionCmd, "autosave-final-save",
 		testConfigFlag, cfgPath,
 		testSocketFlag, socket,
 		testJSONFlag,
 	)
 
-	if exec.envelope.OK {
+	if exec.Envelope.OK {
 		t.Fatal("expected final-save to fail for invalid environment key")
 	}
 
-	if exec.envelope.Error == nil || exec.envelope.Error.Code != "configurationFailed" {
-		t.Fatalf("final-save error = %+v, want configurationFailed", exec.envelope.Error)
+	if exec.Envelope.Error == nil || exec.Envelope.Error.Code != "configurationFailed" {
+		t.Fatalf("final-save error = %+v, want configurationFailed", exec.Envelope.Error)
 	}
 }
 
@@ -301,7 +242,7 @@ func TestAutosaveSaveIfDueRejectsInvalidEnvironmentKeys(t *testing.T) {
 		testJSONFlag,
 	)
 
-	if exec.err == nil {
+	if exec.Err == nil {
 		t.Fatal("expected save-if-due to fail for invalid environment key")
 	}
 }
@@ -309,7 +250,7 @@ func TestAutosaveSaveIfDueRejectsInvalidEnvironmentKeys(t *testing.T) {
 func TestAutosaveStatusTextReportsIntervalInMinutes(t *testing.T) {
 	isolatedAutosaveHome(t)
 
-	stdout, stderr, err := executeCommand(newRootCommand(t.Context()), actionCmd, "autosave-status", testNoConfigFlag)
+	stdout, stderr, err := executeCommand(t, "autosave", "status", testNoConfigFlag)
 	if err != nil {
 		t.Fatalf("autosave-status failed: %v\nstderr: %s", err, stderr)
 	}

@@ -19,23 +19,24 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
-func NewEnsureDefaultSessionCommand() *cobra.Command {
+func NewActionAdoptStartupSessionCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "ensure-default-session",
+		Use:   "session-adopt-startup",
 		Short: "Adopt a fresh numbered startup session as the default session",
 		Long: "Adopt a fresh numbered startup session as the default session.\n\n" +
 			"Only the exact session shown by an attached client is considered, and only when it was created moments ago with a single " +
 			"window and pane. Unrelated sessions are never renamed or killed.",
 		Args: clibase.UsageArgs(cobra.NoArgs),
-		RunE: runAutosaveEnsureDefaultSession,
+		RunE: runAdoptStartupSession,
 	}
 
+	addAutosaveFlags(cmd.Flags())
 	clibase.AddJSONFlag(cmd)
 
 	return cmd
 }
 
-func runAutosaveEnsureDefaultSession(cmd *cobra.Command, _ []string) error {
+func runAdoptStartupSession(cmd *cobra.Command, _ []string) error {
 	env, err := resolveAutosaveEnv(cmd)
 	if err != nil {
 		return err
@@ -156,11 +157,12 @@ func currentAttachedClient(ctx context.Context, server *gotmux.Server) (gotmux.C
 
 func NewRestoreOnStartCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "restore-on-start",
-		Short: "Restore the newest committed snapshot when explicitly configured",
-		Long:  "Restore the newest committed snapshot when explicitly configured.\n\nA pending, failed or incomplete newest attempt keeps its recovery barrier and refuses automatic restoration.",
-		Args:  clibase.UsageArgs(cobra.NoArgs),
-		RunE:  runAutosaveRestoreOnStart,
+		Use:         "restore-on-start",
+		Short:       "Restore the newest committed snapshot when explicitly configured",
+		Long:        "Restore the newest committed snapshot when explicitly configured.\n\nA pending, failed or incomplete newest attempt keeps its recovery barrier and refuses automatic restoration.",
+		Args:        clibase.UsageArgs(cobra.NoArgs),
+		RunE:        runAutosaveRestoreOnStart,
+		Annotations: map[string]string{clibase.AnnotationOperation: "restore-on-start"},
 	}
 
 	clibase.AddJSONFlag(cmd)

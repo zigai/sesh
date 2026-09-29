@@ -46,11 +46,12 @@ func newFinalSaveStatus() automation.FinalSaveStatus {
 
 func NewSaveIfDueCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "save-if-due",
-		Short: "Save a snapshot when the configured autosave interval has elapsed",
-		Long:  "Save a snapshot when the configured autosave interval has elapsed.\n\nAn elapsed interval always admits a capture attempt; unchanged topology does not prove unchanged terminal or application state.",
-		Args:  clibase.UsageArgs(cobra.NoArgs),
-		RunE:  runAutosaveSaveIfDue,
+		Use:         "save-if-due",
+		Short:       "Save a snapshot when the configured autosave interval has elapsed",
+		Long:        "Save a snapshot when the configured autosave interval has elapsed.\n\nAn elapsed interval always admits a capture attempt; unchanged topology does not prove unchanged terminal or application state.",
+		Args:        clibase.UsageArgs(cobra.NoArgs),
+		RunE:        runAutosaveSaveIfDue,
+		Annotations: map[string]string{clibase.AnnotationOperation: "save-if-due"},
 	}
 
 	clibase.AddJSONFlag(cmd)
@@ -191,7 +192,7 @@ func NewFinalSaveCommand() *cobra.Command {
 	}
 
 	cmd.Flags().Duration("deadline", defaultFinalSaveDeadline, "Bounded time budget for the final save")
-	cmd.Flags().String("status-file", "", "Explicit path for the final save status artifact")
+	cmd.Flags().String("status-file", "", clibase.StatusFileFlagUsage)
 	clibase.AddJSONFlag(cmd)
 
 	return cmd

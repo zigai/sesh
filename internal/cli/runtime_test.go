@@ -26,7 +26,7 @@ func TestApplicationInformationalCommandsSkipConfiguration(t *testing.T) {
 			var stdout, stderr bytes.Buffer
 
 			args = append(args, testConfigFlag, filepath.Join(t.TempDir(), "missing.toml"))
-			if err := executeApplication(t.Context(), args, nil, &stdout, &stderr); err != nil {
+			if err := ExecuteApplication(t.Context(), args, nil, &stdout, &stderr); err != nil {
 				t.Fatal(err)
 			}
 
@@ -74,7 +74,7 @@ func testReadBoundaryLogging(t *testing.T, missing bool) {
 
 	var stdout, stderr bytes.Buffer
 
-	err := executeApplication(t.Context(), []string{"snapshot", "history", testRepositoryFlag, repoPath, testConfigFlag, cfg, testJSONFlag}, nil, &stdout, &stderr)
+	err := ExecuteApplication(t.Context(), []string{"snapshot", "history", testRepositoryFlag, repoPath, testConfigFlag, cfg, testJSONFlag}, nil, &stdout, &stderr)
 	if (err != nil) != missing {
 		t.Fatalf("result: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestApplicationDisabledLogging(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	_ = executeApplication(t.Context(), []string{"snapshot", "history", testRepositoryFlag, filepath.Join(t.TempDir(), "missing"), testConfigFlag, cfg, testJSONFlag}, nil, &stdout, &stderr)
+	_ = ExecuteApplication(t.Context(), []string{"snapshot", "history", testRepositoryFlag, filepath.Join(t.TempDir(), "missing"), testConfigFlag, cfg, testJSONFlag}, nil, &stdout, &stderr)
 	if _, err := os.Stat(logPath); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("disabled log exists: %v", err)
 	}
@@ -126,7 +126,7 @@ func TestApplicationNoConfigStillAppliesExplicitEnvironment(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	err := executeApplication(t.Context(), []string{"snapshot", "history", testRepositoryFlag, filepath.Join(base, "missing"), testConfigFlag, filepath.Join(base, "missing.toml"), testNoConfigFlag, testJSONFlag}, nil, &stdout, &stderr)
+	err := ExecuteApplication(t.Context(), []string{"snapshot", "history", testRepositoryFlag, filepath.Join(base, "missing"), testConfigFlag, filepath.Join(base, "missing.toml"), testNoConfigFlag, testJSONFlag}, nil, &stdout, &stderr)
 	if !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("unexpected outcome: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestApplicationUsageFailureDoesNotOpenLog(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	err := executeApplication(t.Context(), []string{actionCmd, "snapshot-save", "--unknown", testConfigFlag, cfg, testJSONFlag}, nil, &stdout, &stderr)
+	err := ExecuteApplication(t.Context(), []string{actionCmd, "snapshot-save", "--unknown", testConfigFlag, cfg, testJSONFlag}, nil, &stdout, &stderr)
 	if ExitCode(err) != exitCodeUsage {
 		t.Fatalf("unexpected outcome: %v", err)
 	}
@@ -166,7 +166,7 @@ func TestApplicationUsageFailureDoesNotOpenLog(t *testing.T) {
 func TestApplicationUnknownFlagNamesTheFlag(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
-	err := executeApplication(t.Context(), []string{"snapshot", "history", "--mistyped-flag=value-canary", testJSONFlag}, nil, &stdout, &stderr)
+	err := ExecuteApplication(t.Context(), []string{"snapshot", "history", "--mistyped-flag=value-canary", testJSONFlag}, nil, &stdout, &stderr)
 	if ExitCode(err) != exitCodeUsage {
 		t.Fatalf("unexpected outcome: %v", err)
 	}
@@ -188,7 +188,7 @@ func TestApplicationConfigurationUsesProvidedInput(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	err := executeApplication(t.Context(), []string{"snapshot", "history", testRepositoryFlag, filepath.Join(base, "missing"), testConfigFlag, "-", testJSONFlag}, input, &stdout, &stderr)
+	err := ExecuteApplication(t.Context(), []string{"snapshot", "history", testRepositoryFlag, filepath.Join(base, "missing"), testConfigFlag, "-", testJSONFlag}, input, &stdout, &stderr)
 	if !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("unexpected outcome: %v", err)
 	}
@@ -202,7 +202,7 @@ func TestApplicationConfigDiagnosticsRetainLocationWithoutPrivateValues(t *testi
 
 	input := strings.NewReader("[settings]\nsecret_private_key = 1\n")
 
-	err := executeApplication(t.Context(), []string{"snapshot", "history", testRepositoryFlag, filepath.Join(t.TempDir(), "missing"), testConfigFlag, "-", testJSONFlag}, input, &stdout, &stderr)
+	err := ExecuteApplication(t.Context(), []string{"snapshot", "history", testRepositoryFlag, filepath.Join(t.TempDir(), "missing"), testConfigFlag, "-", testJSONFlag}, input, &stdout, &stderr)
 	if err == nil {
 		t.Fatal("invalid config accepted")
 	}
@@ -239,7 +239,7 @@ func TestApplicationSaveOwnsOneOutcome(t *testing.T) {
 
 			var stdout, stderr bytes.Buffer
 
-			err := executeApplication(t.Context(), args, nil, &stdout, &stderr)
+			err := ExecuteApplication(t.Context(), args, nil, &stdout, &stderr)
 
 			payload := stdout.Bytes()
 			if len(payload) == 0 {
@@ -465,7 +465,7 @@ func TestFinalizationWithoutResultRetainsUncertaintyDiagnostic(t *testing.T) {
 func TestApplicationOutputFailurePreservesCause(t *testing.T) {
 	var stderr bytes.Buffer
 
-	err := executeApplication(t.Context(), []string{"--version"}, nil, failingRuntimeWriter{}, &stderr)
+	err := ExecuteApplication(t.Context(), []string{"--version"}, nil, failingRuntimeWriter{}, &stderr)
 	if !errors.Is(err, io.ErrClosedPipe) || stderr.Len() != 0 {
 		t.Fatalf("output failure: %v / %q", err, stderr.String())
 	}

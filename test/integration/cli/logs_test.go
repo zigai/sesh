@@ -19,7 +19,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zigai/sesh/internal/cli"
 	"github.com/zigai/sesh/internal/tui/logview"
 )
 
@@ -509,9 +508,7 @@ func TestLogsMissingLogPathDoesNotCreateFiles(t *testing.T) {
 		t.Fatalf("WriteFile(config.toml): %v", err)
 	}
 
-	cmd := cli.NewRootCommand(t.Context())
-
-	stdout, stderr, err := executeCommand(cmd, "--config", configFile, testLogsCmd, "--path")
+	stdout, stderr, err := executeCommand(t, "--config", configFile, testLogsCmd, "--path")
 	if err != nil {
 		t.Fatalf("logs --path failed: %v, stderr: %s", err, stderr)
 	}
@@ -524,9 +521,7 @@ func TestLogsMissingLogPathDoesNotCreateFiles(t *testing.T) {
 		t.Fatalf("logs --path created directory: %v", err)
 	}
 
-	cmd = cli.NewRootCommand(t.Context())
-
-	stdout, stderr, err = executeCommand(cmd, "--config", configFile, testLogsCmd, "--clear")
+	stdout, stderr, err = executeCommand(t, "--config", configFile, testLogsCmd, "--clear")
 	if err != nil {
 		t.Fatalf("logs --clear failed: %v, stderr: %s", err, stderr)
 	}

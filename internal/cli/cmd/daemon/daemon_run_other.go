@@ -12,9 +12,9 @@ import (
 
 var errDaemonRuntimeUnsupported = errors.New("daemon lifecycle runtime is available only on Linux")
 
-func newDaemonRunCommand() *cobra.Command {
+func newDaemonCoordinatorCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:   "run",
+		Use:   "coordinator",
 		Short: "Run lifecycle coordination",
 		Args:  clibase.UsageArgs(cobra.NoArgs),
 		RunE: func(*cobra.Command, []string) error {

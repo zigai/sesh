@@ -19,32 +19,31 @@ const (
 	contractReasonField = "reason"
 )
 
-const (
-	testListCmd    = "list"
-	testHistoryCmd = "history"
-)
-
 func TestJSONCommandTreeRequiresExplicitOutputContract(t *testing.T) {
 	contracts := map[string][]string{
 		"envelope": {
-			"action agent-back", "action agent-focus", "action agent-next", "action agent-status", "action agent-status clear",
-			"action autosave-restore-on-start", "action autosave-save-if-due", "action autosave-status",
-			"action session-delete", "action session-kill", "action session-new", "action session-rename", "action session-switch",
+			"action agent-back", "action agent-focus", "action agent-next", "action agent-status", "action agent-window-status-clear",
+			"action autosave-final-save", "action autosave-restore-on-start", "action autosave-save-if-due", "action session-adopt-startup",
 			"action snapshot-restore", "action snapshot-save",
-			"autosave ensure-default-session", "autosave final-save",
-			"config init", "doctor", testHistoryCmd, "hooks", "hooks run", "keys", testListCmd,
-			"remote action", "remote lookup", "setup agents", "setup autosave", "setup coordinator", "setup refresh", "setup remote", "setup tmux",
-			"snapshot abandon", "snapshot gc", "snapshot history", "snapshot list", "snapshot prune", "snapshot reconcile",
-			"snapshot rewrite reconcile", "snapshot rewrite resume", "snapshot verify",
+			"autosave status", "config init", "doctor", "hooks list", "hooks run", "hooks validate", "keys",
+			"remote action", "remote lookup",
+			"session delete", "session kill", "session list", "session new", "session rename", "session scrollback", "session switch",
+			"setup agents", "setup services", "setup tmux",
+			"snapshot gc", "snapshot history", "snapshot list", "snapshot prune", "snapshot restore", "snapshot save", "snapshot verify",
+			"snapshot recover delete resume", "snapshot recover delete show",
+			"snapshot recover restore abandon", "snapshot recover restore show",
 		},
 		"log stream; path and clear use envelopes": {"logs"},
 		"interactive terminal":                     {"action picker-open", "pick", "remote attach"},
 		"foreground service or readiness protocol": {
-			"action agent-status run", "daemon run", "daemon serve", "daemon wait-ready", "remote monitor run",
+			"action tmux-wait-ready", "daemon agent-window-status", "daemon coordinator", "daemon remote-monitor", "daemon tmux",
 		},
 		"private peer protocol": {"remote peer action", "remote peer attach", "remote peer attach-prepare", "remote peer lookup", "remote peer stream"},
-		"plain help or version": {"", actionCmd, "autosave", "config", "daemon", "help", "remote", "remote monitor", "remote peer", "setup", snapshotCmd, "snapshot rewrite"},
-		"shell completion":      {"completion", "completion bash", "completion fish", "completion powershell", "completion zsh"},
+		"plain help or version": {
+			"", actionCmd, "autosave", "config", "daemon", "help", "hooks", "remote", "remote peer", "session", "setup", snapshotCmd,
+			"snapshot recover", "snapshot recover delete", "snapshot recover restore",
+		},
+		"shell completion": {"completion", "completion bash", "completion fish", "completion powershell", "completion zsh"},
 	}
 	want := make(map[string]bool)
 
@@ -187,7 +186,7 @@ func TestJSONOfflineCommandSuccessContracts(t *testing.T) {
 	}{
 		{command: "config.init", args: []string{"config", "init", testConfigPathFlag, filepath.Join(home, "native.toml")}, want: map[string]any{"path": filepath.Join(home, "native.toml"), contractStatusField: "initialized"}},
 		{command: "action.agent-status", args: []string{actionCmd, "agent-status", "--state", filepath.Join(home, "missing-agents.json")}, want: map[string]any{"total": float64(0), "live": float64(0), "waiting": float64(0), "failed": float64(0), "unread": float64(0), "idle": float64(0)}},
-		{command: "action.autosave-status", args: []string{actionCmd, "autosave-status"}, want: map[string]any{contractStatusField: "due", contractReasonField: "never_run", "recorded": false, "elapsedSeconds": float64(0), "intervalMinutes": float64(3), "historyState": "never_run", "repositoryState": "missing", "inhibitorsHeld": false}},
+		{command: "autosave.status", args: []string{"autosave", "status"}, want: map[string]any{contractStatusField: "due", contractReasonField: "never_run", "recorded": false, "elapsedSeconds": float64(0), "intervalMinutes": float64(3), "historyState": "never_run", "repositoryState": "missing", "inhibitorsHeld": false}},
 		{command: "setup.tmux", args: []string{"setup", "tmux"}, want: map[string]any{"table": "root", "applied": float64(0), "skipped": float64(0)}},
 	}
 	for _, test := range cases {
@@ -209,15 +208,15 @@ func TestJSONKeysAndHooksContainConfiguredValues(t *testing.T) {
 
 	create := contractJSONItem(t, bindings, "name", "create")
 	assertJSONContractFields(t, create, map[string]any{"name": "create", "bind": "alt+c"})
-	hooks := runJSONContract(t, "hooks", "hooks")
+	hooks := runJSONContract(t, "hooks.list", "hooks", "list")
 	_ = contractJSONValue[[]any](t, hooks, "events")
 }
 
 func TestJSONServiceSetupPreviewContracts(t *testing.T) {
 	home := isolateJSONContractHome(t)
-	for _, command := range []string{"autosave", "coordinator", "remote", "refresh"} {
-		t.Run(command, func(t *testing.T) {
-			result := runJSONContract(t, "setup."+command, "setup", command, "--dir", filepath.Join(home, command))
+	for name, flags := range map[string][]string{"default": nil, "with-coordinator": {"--with-coordinator"}} {
+		t.Run(name, func(t *testing.T) {
+			result := runJSONContract(t, "setup.services", append([]string{"setup", "services", "--dir", filepath.Join(home, name)}, flags...)...)
 			assertJSONContractFields(t, result, map[string]any{"applied": false, "written": float64(0)})
 			_ = contractJSONValue[string](t, result, "platform")
 
@@ -235,7 +234,7 @@ func TestJSONServiceSetupPreviewContracts(t *testing.T) {
 			_ = contractJSONValue[string](t, service, "content")
 			assertJSONContractFields(t, service, map[string]any{"state": "missing", "changed": true})
 
-			if _, err := os.Stat(filepath.Join(home, command)); !os.IsNotExist(err) {
+			if _, err := os.Stat(filepath.Join(home, name)); !os.IsNotExist(err) {
 				t.Fatalf("preview created definition directory: %v", err)
 			}
 		})

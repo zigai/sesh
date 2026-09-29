@@ -253,9 +253,9 @@ func TestAutosaveEnsureDefaultSessionAdoptsScratchSession(t *testing.T) {
 
 	isolateAutosaveEnv(t)
 
-	exec := executeJSON(t, "autosave", "ensure-default-session", testSocketFlag, socketPath, testNoConfigFlag, testJSONFlag)
+	exec := executeJSON(t, actionCmd, "session-adopt-startup", testSocketFlag, socketPath, testNoConfigFlag, testJSONFlag)
 	if !exec.envelope.OK {
-		t.Fatalf("ensure-default-session failed: %+v\nstderr: %s", exec.err, exec.stderr)
+		t.Fatalf("session-adopt-startup failed: %+v\nstderr: %s", exec.err, exec.stderr)
 	}
 
 	result := decodeJSONPayload[autosaveResultJSON](t, exec.envelope.Result)
@@ -291,9 +291,9 @@ func TestAutosaveEnsureDefaultSessionProtectsUserNumberedSession(t *testing.T) {
 
 	isolateAutosaveEnv(t)
 
-	exec := executeJSON(t, "autosave", "ensure-default-session", testSocketFlag, socketPath, testNoConfigFlag, testJSONFlag)
+	exec := executeJSON(t, actionCmd, "session-adopt-startup", testSocketFlag, socketPath, testNoConfigFlag, testJSONFlag)
 	if !exec.envelope.OK {
-		t.Fatalf("ensure-default-session failed: %+v\nstderr: %s", exec.err, exec.stderr)
+		t.Fatalf("session-adopt-startup failed: %+v\nstderr: %s", exec.err, exec.stderr)
 	}
 
 	result := decodeJSONPayload[autosaveResultJSON](t, exec.envelope.Result)
@@ -314,9 +314,9 @@ func TestAutosaveEnsureDefaultSessionWithoutClientKeepsSessions(t *testing.T) {
 
 	isolateAutosaveEnv(t)
 
-	exec := executeJSON(t, "autosave", "ensure-default-session", testSocketFlag, socketPath, testNoConfigFlag, testJSONFlag)
+	exec := executeJSON(t, actionCmd, "session-adopt-startup", testSocketFlag, socketPath, testNoConfigFlag, testJSONFlag)
 	if !exec.envelope.OK {
-		t.Fatalf("ensure-default-session failed: %+v\nstderr: %s", exec.err, exec.stderr)
+		t.Fatalf("session-adopt-startup failed: %+v\nstderr: %s", exec.err, exec.stderr)
 	}
 
 	result := decodeJSONPayload[autosaveResultJSON](t, exec.envelope.Result)
@@ -369,7 +369,7 @@ func TestAutosaveFinalSaveRecordsPracticalRecovery(t *testing.T) {
 	statusPath := filepath.Join(dataHome(t), "final-save-status.json")
 
 	exec := executeJSON(
-		t, "autosave", "final-save",
+		t, actionCmd, "autosave-final-save",
 		testSocketFlag, socketPath,
 		testSessionFlag, string(sess.ID()),
 		testNoConfigFlag, testJSONFlag,
@@ -449,7 +449,7 @@ func TestAutosaveFinalSaveReportsAnUnavailableServer(t *testing.T) {
 	statusPath := filepath.Join(dataHome(t), "final-save-status.json")
 
 	exec := executeJSON(
-		t, "autosave", "final-save",
+		t, actionCmd, "autosave-final-save",
 		testSocketFlag, socketPath,
 		testNoConfigFlag, testJSONFlag,
 		"--deadline", "5s",

@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/spf13/cobra"
 	gotmux "github.com/zigai/gotmux/tmux"
 
+	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/config"
 	integration "github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/privatefs"
@@ -40,10 +42,21 @@ func TestNewCommand(t *testing.T) {
 		subcommands[sub.Name()] = true
 	}
 
-	for _, expected := range []string{"monitor", "peer", "action", "lookup", "attach"} {
+	for _, expected := range []string{"peer", "action", "lookup", "attach"} {
 		if !subcommands[expected] {
 			t.Errorf("missing subcommand %q in NewCommand()", expected)
 		}
+	}
+
+	if peer, _, err := cmd.Find([]string{"peer"}); err != nil || !peer.Hidden {
+		t.Errorf("peer protocol command must stay registered and hidden: %v", err)
+	}
+}
+
+func TestDaemonMonitorCommandRunsForeground(t *testing.T) {
+	cmd := NewDaemonMonitorCommand()
+	if cmd.Name() != "remote-monitor" || cmd.Annotations[clibase.AnnotationLiveIO] != "true" {
+		t.Fatalf("monitor command = %q live-io %q, want foreground remote-monitor", cmd.Name(), cmd.Annotations[clibase.AnnotationLiveIO])
 	}
 }
 
@@ -117,10 +130,7 @@ func TestRemoteMonitorReloadSourceDisablesRereadForStdinAndNoConfig(t *testing.T
 
 func TestRemoteMonitorReloadSourceParsesProvidedExplicitFileBytes(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.toml")
-	first := config.DefaultConfig()
-	first.Remote.SSHPath = "first"
-
-	saveRemoteReloadTestConfig(t, path, first)
+	writeRemoteReloadTestConfig(t, path, "first")
 
 	cmd := remoteReloadTestCommand(t, "--config", path)
 
@@ -140,10 +150,7 @@ func TestRemoteMonitorReloadSourceParsesProvidedExplicitFileBytes(t *testing.T) 
 		t.Fatalf("first load = %#v, %v", loaded, err)
 	}
 
-	second := first.Clone()
-
-	second.Remote.SSHPath = "second"
-	saveRemoteReloadTestConfig(t, path, second)
+	writeRemoteReloadTestConfig(t, path, "second")
 
 	loaded, err = load(firstContent)
 	if err != nil || loaded.SSHPath != "first" {
@@ -158,10 +165,10 @@ func TestRemoteMonitorReloadSourceParsesProvidedExplicitFileBytes(t *testing.T) 
 	}
 }
 
-func saveRemoteReloadTestConfig(t *testing.T, path string, cfg *config.Config) {
+func writeRemoteReloadTestConfig(t *testing.T, path, sshPath string) {
 	t.Helper()
 
-	if _, err := config.Save(cfg, config.WithSavePath(path)); err != nil {
+	if err := os.WriteFile(path, []byte("[remote]\nssh_path = "+strconv.Quote(sshPath)+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 }

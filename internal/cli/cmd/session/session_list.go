@@ -37,18 +37,19 @@ func LoadHistoryState(cmd *cobra.Command) (*session.State, error) {
 	return st, nil
 }
 
-func NewListCommand() *cobra.Command {
+func newListCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List live tmux sessions",
-		Long:  "List live tmux sessions ordered by activity and switch history.\n\nReads metadata only from the explicit tmux server socket and configured history state.",
-		Args:  clibase.UsageArgs(cobra.NoArgs),
-		RunE:  runList,
+		Use:         "list",
+		Short:       "List live tmux sessions",
+		Annotations: map[string]string{clibase.AnnotationOperation: "list"},
+		Long:        "List live tmux sessions ordered by activity and switch history.\n\nReads metadata only from the explicit tmux server socket and configured history state.",
+		Args:        clibase.UsageArgs(cobra.NoArgs),
+		RunE:        runList,
 	}
 
 	clibase.AddSocketFlag(cmd)
 	cmd.Flags().String("current-pane", "", "Explicit current pane ID for active session resolution")
-	cmd.Flags().String("history", "", "History state JSON file path (defaults to native XDG state)")
+	cmd.Flags().String("history", "", clibase.HistoryFlagUsage)
 	cmd.Flags().Bool("full", false, "Show complete values using an adaptive layout")
 	clibase.AddJSONFlag(cmd)
 

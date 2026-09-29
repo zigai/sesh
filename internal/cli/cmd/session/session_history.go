@@ -18,7 +18,7 @@ import (
 
 const colWidthHistorySession = 20
 
-var errHistoryPositionalArgs = errors.New("history accepts no positional arguments")
+var errScrollbackPositionalArgs = errors.New("scrollback accepts no positional arguments")
 
 type sessionHistoryJSONResult struct {
 	Mode     string                      `json:"mode"`
@@ -30,26 +30,27 @@ type paneHistoryJSONResult struct {
 	Panes []paneHistoryJSON `json:"panes"`
 }
 
-func NewHistoryCommand() *cobra.Command {
+func newScrollbackCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "history",
-		Short: "Show tmux history lines by session",
-		Long:  "Show tmux history lines by session or per pane.\n\nReads metadata only from the explicit tmux server socket.",
-		Args:  clibase.UsageArgs(cobra.NoArgs),
-		RunE:  runHistory,
+		Use:         "scrollback",
+		Short:       "Show tmux scrollback line counts by session",
+		Long:        "Show tmux scrollback line counts by session or per pane.\n\nReads metadata only from the explicit tmux server socket.",
+		Annotations: map[string]string{clibase.AnnotationOperation: "scrollback"},
+		Args:        clibase.UsageArgs(cobra.NoArgs),
+		RunE:        runHistory,
 	}
 
 	clibase.AddSocketFlag(cmd)
-	cmd.Flags().Bool("panes", false, "Show per-pane history lines")
+	cmd.Flags().Bool("panes", false, "Show per-pane scrollback line counts")
 	cmd.Flags().Bool("full", false, "Show complete values using an adaptive layout")
 	clibase.AddJSONFlag(cmd)
 
 	return cmd
 }
 
-func ValidateHistoryCommand(cmd *cobra.Command, args []string) error {
+func ValidateScrollbackCommand(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
-		return clibase.NewExitError(clibase.ExitCodeUsage, errHistoryPositionalArgs)
+		return clibase.NewExitError(clibase.ExitCodeUsage, errScrollbackPositionalArgs)
 	}
 
 	socketPath := clibase.ResolveSocket(cmd)

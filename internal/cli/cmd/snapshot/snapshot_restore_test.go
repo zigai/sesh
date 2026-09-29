@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
+
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/snapshot/engine"
 	"github.com/zigai/sesh/internal/snapshot/restore"
@@ -172,15 +174,10 @@ func TestPartialRestoreReportsDegradedResult(t *testing.T) {
 	}
 }
 
-func TestRestoreOperationFlagReachesEngineConfiguration(t *testing.T) {
+func TestRestoreOperationFlagSelectsOperationAndKeepsSessionArguments(t *testing.T) {
 	t.Parallel()
 
-	for _, action := range []bool{false, true} {
-		cmd := newSnapshotRestoreCommand()
-		if action {
-			cmd = NewActionRestoreCommand()
-		}
-
+	for _, cmd := range []*cobra.Command{newSnapshotRestoreCommand(), NewActionRestoreCommand()} {
 		for name, value := range map[string]string{
 			"repository": t.TempDir(),
 			"socket":     "/tmp/selected-test-server",
@@ -192,13 +189,13 @@ func TestRestoreOperationFlagReachesEngineConfiguration(t *testing.T) {
 			}
 		}
 
-		_, _, cfg, err := parseRestoreInput(cmd, nil)
+		_, _, cfg, err := parseRestoreInput(cmd, []string{"$1"})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if cfg.OperationID != "0123456789abcdef0123456789abcdef" {
-			t.Fatalf("operation flag lost for %s", cmd.Name())
+		if cfg.OperationID != "0123456789abcdef0123456789abcdef" || len(cfg.Sessions) != 1 || cfg.Sessions[0] != "$1" {
+			t.Fatalf("%s config = operation %q sessions %v, want the operation and session $1", cmd.Name(), cfg.OperationID, cfg.Sessions)
 		}
 	}
 }

@@ -21,23 +21,32 @@ const (
 
 var errDaemonSocketRequired = errors.New("--socket must be an explicit absolute path")
 
-func NewCommand() *cobra.Command {
+// NewCommand returns the group of long-running processes a service manager starts and stops.
+// Other packages contribute their own processes through processes.
+func NewCommand(processes ...*cobra.Command) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "daemon",
-		Short: "Run service-manager entry points",
+		Short: "Run the long-running processes started by service managers",
 		Args:  clibase.UsageArgs(cobra.NoArgs),
 		RunE:  clibase.RequireSubcommand,
 	}
-	cmd.AddCommand(NewServeCommand())
-	cmd.AddCommand(newDaemonRunCommand())
-	cmd.AddCommand(newDaemonWaitReadyCommand())
+	cmd.AddCommand(newDaemonTmuxCommand(), newDaemonCoordinatorCommand())
+	cmd.AddCommand(processes...)
 
 	return cmd
 }
 
-func NewServeCommand() *cobra.Command {
+// NewActionWaitReadyCommand returns the service start step that waits for a tmux server.
+func NewActionWaitReadyCommand() *cobra.Command {
+	cmd := newDaemonWaitReadyCommand()
+	cmd.Use = "tmux-wait-ready"
+
+	return cmd
+}
+
+func newDaemonTmuxCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "serve",
+		Use:   "tmux",
 		Short: "Supervise a socket-bound foreground tmux server",
 		Long: "Supervise a socket-bound foreground tmux server prepared through published gotmux. " +
 			"The process remains in the foreground and is joined before the command exits.",
@@ -49,8 +58,8 @@ func NewServeCommand() *cobra.Command {
 		RunE: runDaemonServe,
 	}
 	cmd.Flags().String("socket", "", "Explicit absolute path to the owned tmux server socket (required)")
-	cmd.Flags().String("tmux", "tmux", "Tmux executable path")
-	cmd.Flags().String("tmux-config", "", "Explicit tmux configuration file (empty uses tmux defaults)")
+	cmd.Flags().String("tmux", "tmux", "Path of the tmux executable")
+	cmd.Flags().String("tmux-config", "", "Configuration file for the tmux server [default: tmux's own configuration lookup]")
 	cmd.Flags().Duration("stop-grace", defaultDaemonStopGrace, "Grace period before a forced process stop is reported incomplete")
 
 	return cmd

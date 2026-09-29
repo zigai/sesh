@@ -4,7 +4,6 @@ package cli_test
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,18 +15,17 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/spf13/cobra"
 	gotmux "github.com/zigai/gotmux/tmux"
 	"github.com/zigai/gotmux/tmuxtest"
 
 	"github.com/zigai/sesh/internal/cli"
+	"github.com/zigai/sesh/internal/config"
 )
 
 const (
 	actionCmd                 = "action"
 	snapshotCmd               = "snapshot"
-	testHistoryCmd            = "history"
-	testListCmd               = "list"
+	sessionCmd                = "session"
 	testConfigPathFlag        = "--path"
 	contractStatusField       = "status"
 	contractReasonField       = "reason"
@@ -96,26 +94,12 @@ func newCaptureCLIServer(t *testing.T) *gotmux.Server {
 	return server
 }
 
-func executeCommand(root *cobra.Command, args ...string) (string, string, error) {
-	var (
-		stdout bytes.Buffer
-		stderr bytes.Buffer
-	)
+func executeCommand(t *testing.T, args ...string) (string, string, error) {
+	t.Helper()
 
-	root.SetOut(&stdout)
-	root.SetErr(&stderr)
-	root.SetArgs(args)
+	var stdout, stderr bytes.Buffer
 
-	executed, err := root.ExecuteC()
-	if err != nil {
-		if executed == nil {
-			executed = root
-		}
-
-		if writeErr := cli.WriteCommandError(executed, err); writeErr != nil {
-			err = errors.Join(err, writeErr)
-		}
-	}
+	err := cli.ExecuteApplication(t.Context(), args, nil, &stdout, &stderr)
 
 	return stdout.String(), stderr.String(), err
 }
@@ -123,30 +107,7 @@ func executeCommand(root *cobra.Command, args ...string) (string, string, error)
 func executeJSON(t *testing.T, args ...string) commandExecution {
 	t.Helper()
 
-	root := cli.NewRootCommand(t.Context())
-
-	var (
-		stdout bytes.Buffer
-		stderr bytes.Buffer
-	)
-
-	root.SetOut(&stdout)
-	root.SetErr(&stderr)
-	root.SetArgs(args)
-
-	executed, err := root.ExecuteC()
-	if err != nil {
-		if executed == nil {
-			executed = root
-		}
-
-		if writeErr := cli.WriteCommandError(executed, err); writeErr != nil {
-			err = errors.Join(err, writeErr)
-		}
-	}
-
-	rawOut := stdout.String()
-	rawErr := stderr.String()
+	rawOut, rawErr, err := executeCommand(t, args...)
 
 	target := rawOut
 	if target == "" {
@@ -300,22 +261,6 @@ func assertJSONContractFields(t *testing.T, object, want map[string]any) {
 	}
 }
 
-func sessionContractCommand(prefix []string, command string) []string {
-	if len(prefix) == 0 {
-		return []string{command}
-	}
-
-	return []string{actionCmd, "session-" + command}
-}
-
-func sessionContractName(prefix []string, command string) string {
-	return strings.Join(sessionContractCommand(prefix, command), ".")
-}
-
-func newRootCommand(ctx context.Context) *cobra.Command {
-	return cli.NewRootCommand(ctx)
-}
-
 func singleRuntimeEnvelope(t *testing.T, data []byte) testJSONEnvelope {
 	t.Helper()
 
@@ -417,4 +362,28 @@ func assertRuntimeLogFields(t *testing.T, record map[string]any) {
 			t.Fatalf("unexpected log field: %s", key)
 		}
 	}
+}
+
+// writeTestConfig writes a sparse native TOML configuration, creating parent directories.
+func writeTestConfig(t *testing.T, path, body string) {
+	t.Helper()
+
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func remoteConnectionsTOML(connections ...config.RemoteConnectionConfig) string {
+	var body strings.Builder
+
+	for _, connection := range connections {
+		fmt.Fprintf(&body, "\n[[remote.connections]]\nid = %q\nlabel = %q\nhost = %q\nsesh_path = %q\ntmux_socket = %q\n",
+			connection.ID, connection.Label, connection.Host, connection.SeshPath, connection.TmuxSocket)
+	}
+
+	return body.String()
 }

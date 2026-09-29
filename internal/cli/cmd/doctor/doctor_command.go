@@ -32,10 +32,6 @@ func (e *ChecksError) Unwrap() error { return e.error }
 
 func (e *ChecksError) OutcomeLogged() bool { return true }
 
-func NewChecksError(err error) error {
-	return &ChecksError{error: err}
-}
-
 type ResultJSON struct {
 	Checks      []doctor.Result `json:"checks"`
 	HasErrors   bool            `json:"hasErrors"`
@@ -61,7 +57,7 @@ func NewCommand() *cobra.Command {
 
 	clibase.AddSocketFlag(cmd)
 	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
-	cmd.Flags().String("history", "", "History state JSON file path")
+	cmd.Flags().String("history", "", clibase.HistoryFlagUsage)
 	clibase.AddJSONFlag(cmd)
 
 	return cmd

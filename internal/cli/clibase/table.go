@@ -14,6 +14,7 @@ import (
 
 const (
 	defaultTableWidth    = 120
+	headerRule           = "─"
 	columnSpacing        = 2
 	maxStackedLabelWidth = 24
 	stackedLabelGutter   = 4
@@ -50,11 +51,11 @@ func WriteTable(
 
 	style := prettytable.StyleDefault
 	style.Box.PaddingLeft = ""
-	style.Box.PaddingRight = "  "
+	style.Box.PaddingRight = strings.Repeat(" ", columnSpacing)
 	style.Format.Header = text.FormatDefault
 	style.Options = prettytable.OptionsNoBordersAndSeparators
 	style.Options.SeparateHeader = true
-	style.Box.MiddleHorizontal = "─"
+	style.Box.MiddleHorizontal = headerRule
 
 	writer.SetStyle(style)
 
@@ -66,11 +67,27 @@ func WriteTable(
 	writer.AppendRows(rows)
 	writer.SuppressTrailingSpaces()
 
-	if _, err := fmt.Fprintln(output, writer.Render()); err != nil {
+	if _, err := fmt.Fprintln(output, trimHeaderRulePadding(writer.Render())); err != nil {
 		return oops.In("cli").With("operation", "write_table").Wrap(err)
 	}
 
 	return nil
+}
+
+// trimHeaderRulePadding removes the last column's right padding from the header
+// rule, which SuppressTrailingSpaces cannot trim because the rule has no spaces.
+func trimHeaderRulePadding(rendered string) string {
+	lines := strings.Split(rendered, "\n")
+
+	for i, line := range lines {
+		if line != "" && strings.Trim(line, headerRule) == "" {
+			lines[i] = strings.TrimSuffix(line, strings.Repeat(headerRule, columnSpacing))
+
+			break
+		}
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 func WriteResponsiveTable(cmd *cobra.Command, columns []TableColumn, rows []prettytable.Row, full bool) error {

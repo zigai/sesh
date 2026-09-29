@@ -159,7 +159,7 @@ func Relocate(definitions []ServiceDefinition, directory string) []ServiceDefini
 }
 
 func RemoteMonitorArgs(inputs ServiceInputs) []string {
-	return []string{"remote", "monitor", "run", "--socket", inputs.SocketPath}
+	return []string{"daemon", "remote-monitor", "--socket", inputs.SocketPath}
 }
 
 func RemoteMonitorDefinition(inputs ServiceInputs, available bool) (ServiceDefinition, error) {
@@ -213,7 +213,7 @@ func RemoteMonitorDefinition(inputs ServiceInputs, available bool) (ServiceDefin
 
 func CoordinatorArgs(inputs ServiceInputs) []string {
 	args := []string{
-		"daemon", "run",
+		"daemon", "coordinator",
 		"--socket", inputs.SocketPath,
 		"--repository", inputs.RepositoryPath,
 		"--lease-root", inputs.LeaseRootPath,
@@ -564,7 +564,7 @@ func autosaveArgs(inputs ServiceInputs) []string {
 
 func finalSaveArgs(inputs ServiceInputs) []string {
 	args := []string{
-		"autosave", "final-save",
+		"action", "autosave-final-save",
 		"--socket", inputs.SocketPath,
 		"--repository", inputs.RepositoryPath,
 		"--lease-root", inputs.LeaseRootPath,
@@ -581,7 +581,7 @@ func finalSaveArgs(inputs ServiceInputs) []string {
 
 func daemonArgs(inputs ServiceInputs) []string {
 	return []string{
-		"daemon", "serve",
+		"daemon", "tmux",
 		"--socket", inputs.SocketPath,
 		"--tmux", inputs.Tmux,
 		"--stop-grace", stopBudgetGrace.String(),
@@ -589,7 +589,7 @@ func daemonArgs(inputs ServiceInputs) []string {
 }
 
 func daemonReadyArgs(inputs ServiceInputs) []string {
-	return []string{"daemon", "wait-ready", "--socket", inputs.SocketPath, "--timeout", stopBudgetGrace.String()}
+	return []string{"action", "tmux-wait-ready", "--socket", inputs.SocketPath, "--timeout", stopBudgetGrace.String()}
 }
 
 func systemdDefinitions(root string, inputs ServiceInputs) ([]ServiceDefinition, error) {

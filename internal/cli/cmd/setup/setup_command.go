@@ -35,8 +35,8 @@ type setupApplyResultJSON struct {
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "setup",
-		Short: "Render or apply sesh environment scaffolding",
-		Long: "Render or apply sesh environment scaffolding.\n\n" +
+		Short: "Render or apply tmux bindings, agent integrations and services",
+		Long: "Render or apply tmux bindings, agent integrations and services.\n\n" +
 			"Setup prints configuration blocks and owned service definitions by default and only writes files when --apply is given. " +
 			"Agent integrations are installed by AHT, never by duplicated hook installation.",
 		Args: func(cmd *cobra.Command, args []string) error {
@@ -52,17 +52,10 @@ func NewCommand() *cobra.Command {
 	cmd.AddCommand(
 		newSetupTmuxCommand(),
 		newSetupAgentsCommand(),
-		newSetupRefreshCommand(),
-		newSetupAutosaveCommand(),
-		newSetupRemoteCommand(),
-		newSetupCoordinatorCommand(),
+		newSetupServicesCommand(),
 	)
 
 	return cmd
-}
-
-func NewSetupCommand() *cobra.Command {
-	return NewCommand()
 }
 
 func newSetupTmuxCommand() *cobra.Command {

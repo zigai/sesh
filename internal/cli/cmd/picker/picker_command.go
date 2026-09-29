@@ -153,11 +153,12 @@ func NewPickCommand(ctx context.Context, remote ...PickerRemoteFactory) *cobra.C
 	}
 
 	addPickerPathFlags(cmd)
-	cmd.Flags().String(pickerUIFlag, pickerUIAuto, "Picker layout: auto, popup, inline, or fullscreen")
-	cmd.Flags().String("switch-handoff", "", "popup switch handoff")
-	cmd.Flags().Int64(pickerLaunchedAtFlag, 0, "popup launch time")
-	cmd.Flags().String("target-pane", "", "invoking tmux pane")
-	cmd.Flags().String("current-session-id", "", "invoking tmux session ID")
+	cmd.Flags().String(pickerUIFlag, pickerUIAuto, "Picker layout")
+	clibase.SetFlagChoices(cmd, pickerUIFlag, pickerUIAuto, "popup", "inline", "fullscreen")
+	cmd.Flags().String("switch-handoff", "", "Popup switch handoff file")
+	cmd.Flags().Int64(pickerLaunchedAtFlag, 0, "Popup launch time")
+	cmd.Flags().String("target-pane", "", "Invoking tmux pane")
+	cmd.Flags().String("current-session-id", "", "Invoking tmux session ID")
 
 	for _, name := range []string{"switch-handoff", pickerLaunchedAtFlag, "target-pane", "current-session-id"} {
 		_ = cmd.Flags().MarkHidden(name)
@@ -180,11 +181,11 @@ func NewPickerOpenCommand(ctx context.Context) *cobra.Command {
 	}
 
 	addPickerPathFlags(cmd)
-	cmd.Flags().StringP("client", "c", "", "target tmux client (name or tty)")
-	cmd.Flags().StringP("target-pane", "t", "", "target tmux pane")
-	cmd.Flags().String("current-session-id", "", "invoking tmux session ID")
-	cmd.Flags().IntP("client-width", "w", 0, "client width override")
-	cmd.Flags().IntP("client-height", "H", 0, "client height override")
+	cmd.Flags().StringP("client", "c", "", "Target tmux client, by name or tty [default: the invoking client]")
+	cmd.Flags().StringP("target-pane", "t", "", "Target tmux pane [default: $TMUX_PANE]")
+	cmd.Flags().String("current-session-id", "", "Invoking tmux session ID")
+	cmd.Flags().IntP("client-width", "w", 0, "Client width override [default: the client's width]")
+	cmd.Flags().IntP("client-height", "H", 0, "Client height override [default: the client's height]")
 
 	return cmd
 }
@@ -207,10 +208,10 @@ func firstPickerRemoteFactory(values []PickerRemoteFactory) PickerRemoteFactory 
 
 func addPickerPathFlags(cmd *cobra.Command) {
 	clibase.AddSocketFlag(cmd)
-	cmd.Flags().String("repository", "", "Native snapshot repository (defaults to the configured data directory)")
-	cmd.Flags().String("lease-root", "", "Shared tmux endpoint lease root (defaults to the configured data directory)")
-	cmd.Flags().String("history", "", "Session history state file")
-	cmd.Flags().String("agent-state", "", "AHT agent registry path")
+	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
+	cmd.Flags().String("lease-root", "", clibase.LeaseRootFlagUsage)
+	cmd.Flags().String("history", "", clibase.HistoryFlagUsage)
+	cmd.Flags().String("agent-state", "", "AHT agent registry file [default: agent_status.store_path setting, else AHT's default registry]")
 }
 
 func pickerExecutionContext(parent context.Context, cmd *cobra.Command) context.Context {

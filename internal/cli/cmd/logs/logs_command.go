@@ -1,9 +1,7 @@
 package cmdlogs
 
 import (
-	"context"
 	"errors"
-	"io"
 	"os"
 	"regexp"
 	"strconv"
@@ -24,12 +22,10 @@ import (
 const (
 	annotationStreaming = clibase.AnnotationStreaming
 	defaultLogLines     = logview.DefaultLogLines
-	maxLogRecordBytes   = logview.MaxLogRecordBytes
 	hoursPerDay         = 24
 )
 
 var (
-	errLogRecordTooLong      = logview.ErrLogRecordTooLong
 	errInvalidFilterLogLevel = errors.New("invalid log level: expected trace, debug, info, warn, or error")
 	errInvalidTimeFilter     = errors.New("invalid time filter: expected duration (e.g. 15m, 1h, 2d), 'today', or date/time")
 	errInvalidLinesCount     = errors.New("invalid line count: expected an integer from 0 to 100000")
@@ -41,33 +37,6 @@ var (
 	errAllAndLinesExclusive  = errors.New("--all and --lines cannot be used together")
 	errInvalidGrepPattern    = errors.New("invalid grep pattern: regular expression compilation failed")
 )
-
-type logViewOptions = logview.Options
-
-func displayRetainedLogs(ctx context.Context, output, diagnostics io.Writer, path string, options logview.Options) error {
-	if err := logview.DisplayRetainedLogs(ctx, output, diagnostics, path, options); err != nil {
-		return oops.In("cli").With("operation", "display_logs").Wrap(err)
-	}
-
-	return nil
-}
-
-func newLogStyles(color bool, extra ...any) logview.Styles {
-	return logview.NewLogStyles(color, extra...)
-}
-
-func renderLogLine(line []byte, styles logview.Styles) (string, error) {
-	rendered, err := logview.RenderLogLine(line, styles)
-	if err != nil {
-		return "", oops.In("cli").With("operation", "render_log_line").Wrap(err)
-	}
-
-	return rendered, nil
-}
-
-func newLogStreamWriter(output, diagnostics io.Writer, options logview.Options, styles logview.Styles) io.Writer {
-	return logview.NewLogStreamWriter(output, diagnostics, options, styles)
-}
 
 type fileDescriptor interface {
 	Fd() uintptr
@@ -105,11 +74,13 @@ JSON for humans and takes precedence over --json.`,
 	cmd.Flags().BoolP("verbose", "v", false, "Display all structured fields without compact pruning")
 	cmd.Flags().IntP("lines", "n", defaultLogLines, "Number of most recent log lines to display (0 for all, maximum 100000)")
 	cmd.Flags().BoolP("all", "a", false, "Display all historical log lines without limit")
-	cmd.Flags().StringP("level", "l", "", "Minimum log level to display (trace, debug, info, warn, error)")
+	cmd.Flags().StringP("level", "l", "", "Minimum log level to display")
+	clibase.SetFlagChoices(cmd, "level", "trace", "debug", "info", "warn", "error")
 	cmd.Flags().StringP("component", "c", "", "Filter logs by component (e.g. cli, capture, engine, store, hooks, logging)")
 	cmd.Flags().Bool("path", false, "Print the path to the diagnostic log file and exit")
 	cmd.Flags().Bool("clear", false, "Safely truncate the active log file and remove rotated backups")
-	cmd.Flags().String("color", "auto", "Colorize output: auto, always, or never")
+	cmd.Flags().String("color", "auto", "Colorize output")
+	clibase.SetFlagChoices(cmd, "color", "auto", "always", "never")
 	cmd.Flags().String("since", "", "Display log records newer than relative duration (e.g. 15m, 2h, 1d) or timestamp")
 	cmd.Flags().String("until", "", "Display log records older than relative duration or timestamp")
 	cmd.Flags().StringP("grep", "g", "", "Filter log records matching regular expression")

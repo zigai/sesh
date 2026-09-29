@@ -1,176 +1,84 @@
-package cmdautosave
+package cmdautosave_test
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
-	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
-	"github.com/samber/oops"
-
-	"github.com/spf13/cobra"
-
-	"github.com/zigai/sesh/internal/cli/clibase"
+	"github.com/zigai/sesh/internal/testsupport/clitest"
 )
 
 const (
-	testRepositoryFlag = "--repository"
-	testSocketFlag     = "--socket"
-	testLeaseRootFlag  = "--lease-root"
-	testSessionFlag    = "--session"
-	testJSONFlag       = "--json"
-	testConfigFlag     = "--config"
-	testNoConfigFlag   = "--no-config"
-	actionCmd          = "action"
+	testSocketFlag   = "--socket"
+	testJSONFlag     = "--json"
+	testConfigFlag   = "--config"
+	testNoConfigFlag = "--no-config"
+	actionCmd        = "action"
 )
 
-type testJSONEnvelope struct {
-	SchemaVersion int                       `json:"schemaVersion"`
-	Command       string                    `json:"command"`
-	OK            bool                      `json:"ok"`
-	Result        json.RawMessage           `json:"result"`
-	Error         *clibase.JSONErrorPayload `json:"error"`
+// autosaveResultJSON is the autosave wire contract decoded from --json output.
+type autosaveResultJSON struct {
+	Status           string `json:"status"`
+	Reason           string `json:"reason"`
+	Attempt          string `json:"attempt,omitempty"`
+	Generation       string `json:"generation,omitempty"`
+	Snapshot         string `json:"snapshotStatus,omitempty"`
+	HistoryState     string `json:"historyState,omitempty"`
+	RepositoryState  string `json:"repositoryState,omitempty"`
+	FinalSaveState   string `json:"finalSaveState,omitempty"`
+	DefaultAction    string `json:"defaultSessionAction,omitempty"`
+	DefaultFrom      string `json:"defaultSessionFrom,omitempty"`
+	DefaultTo        string `json:"defaultSessionTo,omitempty"`
+	Recorded         bool   `json:"recorded"`
+	ElapsedSec       int64  `json:"elapsedSeconds"`
+	IntervalM        int    `json:"intervalMinutes"`
+	DaemonState      string `json:"daemonState"`
+	DaemonPhase      string `json:"daemonPhase,omitempty"`
+	InhibitorsHeld   bool   `json:"inhibitorsHeld"`
+	LogindDelayMS    int64  `json:"logindDelayMillis,omitempty"`
+	AttemptTimeoutMS int64  `json:"attemptTimeoutMillis,omitempty"`
+	DrainGraceMS     int64  `json:"drainGraceMillis,omitempty"`
+	ServerManagement string `json:"serverManagement,omitempty"`
 }
 
-type commandExecution struct {
-	stdout   string
-	stderr   string
-	err      error
-	envelope testJSONEnvelope
-}
-
-func newTestRootCommand(_ context.Context) *cobra.Command {
-	rootCommand := &cobra.Command{
-		Use:           "sesh",
-		Short:         "Native tmux session persistence",
-		SilenceUsage:  true,
-		SilenceErrors: true,
-	}
-	rootCommand.PersistentFlags().String("config", "", "Explicit native TOML configuration file")
-	rootCommand.PersistentFlags().Bool("no-config", false, "Use built-in settings without reading configuration files")
-
-	rootCommand.AddCommand(
-		NewCommand(),
-	)
-
-	actionCommand := &cobra.Command{
-		Use:  actionCmd,
-		Long: "Invoke a named action used by bindings and the picker.",
-		Args: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return nil
-			}
-
-			return clibase.UnknownCommandError(cmd, args[0])
-		},
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := cmd.Help(); err != nil {
-				return oops.In("cli").With("operation", "show_help").Wrapf(err, "show help")
-			}
-
-			return nil
-		},
-	}
-
-	actionCommand.AddCommand(
-		NewActionStatusCommand(),
-		NewActionSaveIfDueCommand(),
-		NewActionRestoreOnStartCommand(),
-	)
-
-	rootCommand.AddCommand(actionCommand)
-
-	return rootCommand
-}
-
-func newRootCommand(ctx context.Context) *cobra.Command {
-	return newTestRootCommand(ctx)
-}
-
-func executeCommand(root *cobra.Command, args ...string) (string, string, error) {
-	var (
-		stdout bytes.Buffer
-		stderr bytes.Buffer
-	)
-
-	root.SetOut(&stdout)
-	root.SetErr(&stderr)
-	root.SetArgs(args)
-
-	ctx := clibase.ContextWithRawArgs(context.Background(), args)
-	root.SetContext(ctx)
-
-	executed, err := root.ExecuteC()
-	if err != nil {
-		if executed == nil {
-			executed = root
-		}
-
-		if writeErr := clibase.WriteCommandError(executed, err); writeErr != nil {
-			err = errors.Join(err, writeErr)
-		}
-	}
-
-	return stdout.String(), stderr.String(), err
-}
+type commandExecution = clitest.Execution
 
 func executeJSON(t *testing.T, args ...string) commandExecution {
 	t.Helper()
 
-	root := newTestRootCommand(t.Context())
-
-	var (
-		stdout bytes.Buffer
-		stderr bytes.Buffer
-	)
-
-	root.SetOut(&stdout)
-	root.SetErr(&stderr)
-	root.SetArgs(args)
-
-	ctx := clibase.ContextWithRawArgs(context.Background(), args)
-	root.SetContext(ctx)
-
-	executed, err := root.ExecuteC()
-	if err != nil {
-		if executed == nil {
-			executed = root
-		}
-
-		if writeErr := clibase.WriteCommandError(executed, err); writeErr != nil {
-			err = errors.Join(err, writeErr)
-		}
-	}
-
-	rawOut := stdout.String()
-	rawErr := stderr.String()
-
-	target := rawOut
-	if target == "" {
-		target = rawErr
-	}
-
-	var envelope testJSONEnvelope
-	if target != "" {
-		_ = json.Unmarshal([]byte(target), &envelope)
-	}
-
-	return commandExecution{
-		stdout:   rawOut,
-		stderr:   rawErr,
-		err:      err,
-		envelope: envelope,
-	}
+	return clitest.ExecuteJSON(t, args...)
 }
 
-func decodeJSONPayload[T any](t *testing.T, raw json.RawMessage) T {
+func executeCommand(t *testing.T, args ...string) (string, string, error) {
 	t.Helper()
 
-	var val T
-	if err := json.Unmarshal(raw, &val); err != nil {
-		t.Fatalf("failed to unmarshal JSON payload: %v\nraw: %s", err, string(raw))
+	exec := clitest.Execute(t, args...)
+
+	return exec.Stdout, exec.Stderr, exec.Err
+}
+
+func isolatedAutosaveHome(t *testing.T) {
+	t.Helper()
+
+	t.Setenv("TMUX", "")
+
+	home := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", home)
+	t.Setenv("XDG_DATA_HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", home)
+	t.Setenv("XDG_RUNTIME_DIR", home)
+}
+
+func writeCorruptHistoryState(t *testing.T) {
+	t.Helper()
+
+	path := filepath.Join(filepath.Clean(os.Getenv("XDG_STATE_HOME")), "sesh", "history.json")
+
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
 	}
 
-	return val
+	if err := os.WriteFile(path, []byte("{not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 }

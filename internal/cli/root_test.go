@@ -2,7 +2,6 @@ package cli
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -14,7 +13,7 @@ import (
 )
 
 func TestRootCommandShowsHelpByDefault(t *testing.T) {
-	stdout, stderr, err := executeRootCommand()
+	stdout, stderr, err := executeCommand(t)
 	if err != nil {
 		t.Fatalf("execute root command: %v", err)
 	}
@@ -33,7 +32,7 @@ func TestRootCommandShowsHelpByDefault(t *testing.T) {
 }
 
 func TestRootCommandShowsVersion(t *testing.T) {
-	stdout, stderr, err := executeRootCommand("--version")
+	stdout, stderr, err := executeCommand(t, "--version")
 	if err != nil {
 		t.Fatalf("execute root command: %v", err)
 	}
@@ -49,7 +48,7 @@ func TestRootCommandShowsVersion(t *testing.T) {
 }
 
 func TestRootHelpOrdersCoreCommandsFirstWithDoctorBeforeHelp(t *testing.T) {
-	stdout, stderr, err := executeRootCommand("--help")
+	stdout, stderr, err := executeCommand(t, "--help")
 	if err != nil || stderr != "" {
 		t.Fatalf("help failed: %v, stderr %q", err, stderr)
 	}
@@ -79,7 +78,7 @@ func TestRootHelpOrdersCoreCommandsFirstWithDoctorBeforeHelp(t *testing.T) {
 	}
 
 	want := []string{
-		"pick", "list", "snapshot", "autosave", "history", "remote",
+		"pick", "session", "snapshot", "autosave", "remote",
 		"keys", "logs", "hooks", "config", "setup", "daemon", "action", "doctor", "help",
 	}
 	if !slices.Equal(names, want) {
@@ -93,13 +92,13 @@ func TestRootHelpOrdersCoreCommandsFirstWithDoctorBeforeHelp(t *testing.T) {
 
 func TestHelpAndVersionShorthands(t *testing.T) {
 	for _, args := range [][]string{{"-h"}, {"snapshot", "-h"}, {"logs", "-h"}} {
-		stdout, _, err := executeRootCommand(args...)
+		stdout, _, err := executeCommand(t, args...)
 		if ExitCode(err) != exitCodeUsage || stdout != "" {
 			t.Fatalf("%v returned code %d and stdout %q", args, ExitCode(err), stdout)
 		}
 	}
 
-	stdout, stderr, err := executeRootCommand("-V")
+	stdout, stderr, err := executeCommand(t, "-V")
 	if err != nil || stderr != "" || !strings.HasPrefix(stdout, "sesh dev") {
 		t.Fatalf("-V returned %q, %q, %v", stdout, stderr, err)
 	}
@@ -107,14 +106,10 @@ func TestHelpAndVersionShorthands(t *testing.T) {
 
 func TestVersionOutputFailureRetainsDiagnostics(t *testing.T) {
 	cause := &os.PathError{Op: "write", Path: "/private/synthetic-output", Err: os.ErrPermission}
-	command := newRootCommand(t.Context())
-	command.SetOut(failedWriter{cause: cause})
 
 	var stderr bytes.Buffer
-	command.SetErr(&stderr)
-	command.SetArgs([]string{"--version"})
 
-	err := command.Execute()
+	err := ExecuteApplication(t.Context(), []string{"--version"}, nil, failedWriter{cause: cause}, &stderr)
 	if !errors.Is(err, os.ErrPermission) {
 		t.Fatal("lost permission identity")
 	}
@@ -125,7 +120,7 @@ func TestVersionOutputFailureRetainsDiagnostics(t *testing.T) {
 	}
 
 	diagnostic, ok := oops.AsOops(err)
-	if !ok || diagnostic.Domain() != "cli" || diagnostic.Context()["operation"] != "print_version" {
+	if !ok || diagnostic.Domain() != "cli" || diagnostic.Context()["operation"] != "write_output" {
 		t.Fatal("missing command diagnostics")
 	}
 
@@ -133,7 +128,7 @@ func TestVersionOutputFailureRetainsDiagnostics(t *testing.T) {
 		t.Fatal("missing diagnostic stack")
 	}
 
-	if err.Error() != "print version: "+cause.Error() {
+	if err.Error() != "writing command output: "+cause.Error() {
 		t.Fatal("changed command error message")
 	}
 }
@@ -141,22 +136,6 @@ func TestVersionOutputFailureRetainsDiagnostics(t *testing.T) {
 type failedWriter struct{ cause error }
 
 func (w failedWriter) Write([]byte) (int, error) { return 0, w.cause }
-
-func executeRootCommand(args ...string) (string, string, error) {
-	var (
-		stdout bytes.Buffer
-		stderr bytes.Buffer
-	)
-
-	rootCommand := newRootCommand(context.Background())
-	rootCommand.SetOut(&stdout)
-	rootCommand.SetErr(&stderr)
-	rootCommand.SetArgs(args)
-
-	err := rootCommand.Execute()
-
-	return stdout.String(), stderr.String(), err
-}
 
 func isolatedToolsHome(t *testing.T) {
 	t.Helper()
@@ -196,7 +175,7 @@ func TestHooksCommandListsConfiguredEvents(t *testing.T) {
 
 	cfgPath := writeToolsConfig(t, hooksTestConfig)
 
-	exec := executeJSON(t, "hooks", testConfigFlag, cfgPath, testJSONFlag)
+	exec := executeJSON(t, "hooks", "list", testConfigFlag, cfgPath, testJSONFlag)
 	if !exec.envelope.OK {
 		t.Fatalf("hooks failed: %+v\nstderr: %s", exec.err, exec.stderr)
 	}
@@ -229,9 +208,7 @@ func TestHooksCommandValidateAcceptsValidConfig(t *testing.T) {
 
 	cfgPath := writeToolsConfig(t, hooksTestConfig)
 
-	root := newRootCommand(t.Context())
-
-	stdout, stderr, err := executeCommand(root, "hooks", "--validate", testConfigFlag, cfgPath)
+	stdout, stderr, err := executeCommand(t, "hooks", "validate", testConfigFlag, cfgPath)
 	if err != nil {
 		t.Fatalf("hooks --validate failed: %v\nstderr: %s", err, stderr)
 	}
@@ -250,9 +227,7 @@ func TestHooksCommandValidateRejectsUnsupportedShellMode(t *testing.T) {
 shell = "exit 0"
 `)
 
-	root := newRootCommand(t.Context())
-
-	_, _, err := executeCommand(root, "hooks", "--validate", testConfigFlag, cfgPath)
+	_, _, err := executeCommand(t, "hooks", "validate", testConfigFlag, cfgPath)
 	if err == nil {
 		t.Fatal("expected validation failure for an unsupported hook entry")
 	}
@@ -263,9 +238,7 @@ func TestHooksRunRequiresConfiguredEvent(t *testing.T) {
 
 	cfgPath := writeToolsConfig(t, hooksTestConfig)
 
-	root := newRootCommand(t.Context())
-
-	_, _, err := executeCommand(root, "hooks", "run", "session_attach_pre", testConfigFlag, cfgPath)
+	_, _, err := executeCommand(t, "hooks", "run", "session_attach_pre", testConfigFlag, cfgPath)
 	if err == nil {
 		t.Fatal("expected failure for an event with no configured hooks")
 	}
@@ -280,9 +253,7 @@ func TestHooksRunRejectsUnknownEvent(t *testing.T) {
 
 	cfgPath := writeToolsConfig(t, hooksTestConfig)
 
-	root := newRootCommand(t.Context())
-
-	_, _, err := executeCommand(root, "hooks", "run", "not_an_event", testConfigFlag, cfgPath)
+	_, _, err := executeCommand(t, "hooks", "run", "not_an_event", testConfigFlag, cfgPath)
 	if err == nil {
 		t.Fatal("expected usage failure for an unknown event")
 	}
@@ -356,9 +327,7 @@ func TestHooksRunPlainDegradedKeepsCounts(t *testing.T) {
 command = "false"
 `)
 
-	root := newRootCommand(t.Context())
-
-	stdout, stderr, err := executeCommand(root, "hooks", "run", "session_switch_pre", testConfigFlag, cfgPath)
+	stdout, stderr, err := executeCommand(t, "hooks", "run", "session_switch_pre", testConfigFlag, cfgPath)
 	if err == nil {
 		t.Fatal("expected a failing hook to surface an error")
 	}
@@ -414,9 +383,7 @@ func TestKeysCommandPlainOutput(t *testing.T) {
 kill = "alt+x"
 `)
 
-	root := newRootCommand(t.Context())
-
-	stdout, stderr, err := executeCommand(root, "keys", testConfigFlag, cfgPath)
+	stdout, stderr, err := executeCommand(t, "keys", testConfigFlag, cfgPath)
 	if err != nil {
 		t.Fatalf("keys failed: %v\nstderr: %s", err, stderr)
 	}

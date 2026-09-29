@@ -61,7 +61,7 @@ func assertCompletedRestoreOperation(t *testing.T, path, id string) {
 		t.Fatal(err)
 	}
 
-	checkRestoreOperationCommand(t, path, id, "reconcile", "complete")
+	checkRestoreOperationCommand(t, path, id, "show", "complete")
 
 	after, readErr := os.ReadFile(filepath.Join(path, "catalog.json"))
 	if readErr != nil || !bytes.Equal(before, after) {
@@ -79,7 +79,7 @@ func assertCompletedRestoreCannotBeAbandoned(t *testing.T, path, id string, befo
 	var stdout, stderr bytes.Buffer
 
 	err := cli.ExecuteApplication(t.Context(), []string{
-		snapshotCmd, "abandon", testRepositoryFlag, path, "--operation", id, testConfigFlag, cfg, testJSONFlag,
+		snapshotCmd, "recover", "restore", "abandon", id, testRepositoryFlag, path, testConfigFlag, cfg, testJSONFlag,
 	}, nil, &stdout, &stderr)
 	if err == nil {
 		t.Fatalf("completed restore was abandoned: %s", stdout.String())
@@ -97,7 +97,7 @@ func checkRestoreOperationCommand(t *testing.T, path, id, command, want string) 
 
 	var stdout, stderr bytes.Buffer
 
-	args := []string{snapshotCmd, command, testRepositoryFlag, path, "--operation", id, testConfigFlag, cfg, testJSONFlag}
+	args := []string{snapshotCmd, "recover", "restore", command, id, testRepositoryFlag, path, testConfigFlag, cfg, testJSONFlag}
 	if err := cli.ExecuteApplication(t.Context(), args, nil, &stdout, &stderr); err != nil {
 		t.Fatalf("%s: %v / %s", command, err, stderr.String())
 	}

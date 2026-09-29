@@ -31,14 +31,14 @@ func (s *Service) checkSnapshot(ctx context.Context) (Result, Result, error) {
 			Status:  StatusWarning,
 			Reason:  ReasonNotConfigured,
 			Message: "snapshot repository path not configured",
-			Fix:     "Configure [paths].snapshot_dir or run 'sesh action snapshot-save'",
+			Fix:     "Configure [paths].snapshot_dir or run 'sesh snapshot save'",
 		}
 		curRes := Result{
 			Check:   CheckSnapshotCurrent,
 			Status:  StatusWarning,
 			Reason:  ReasonNotConfigured,
 			Message: "snapshot repository path not configured",
-			Fix:     "Configure [paths].snapshot_dir or run 'sesh action snapshot-save'",
+			Fix:     "Configure [paths].snapshot_dir or run 'sesh snapshot save'",
 		}
 
 		return repoRes, curRes, nil
@@ -166,7 +166,7 @@ func failedSaveResult() Result {
 		Status:  StatusError,
 		Reason:  ReasonRecoveryRequired,
 		Message: "current snapshot requires recovery (latest save failed)",
-		Fix:     "Run 'sesh action snapshot-save --json' and resolve the reported error code",
+		Fix:     "Run 'sesh snapshot save --json' and resolve the reported error code",
 	}
 }
 
@@ -221,14 +221,14 @@ func classifySnapshotOpenError(path string, err error) (Result, Result, error) {
 			Status:  StatusError,
 			Reason:  ReasonRecoveryRequired,
 			Message: "snapshot repository has an interrupted initialization or pending save barrier",
-			Fix:     "Run 'sesh action snapshot-save' to resume or recover repository",
+			Fix:     "Run 'sesh snapshot save' to resume or recover repository",
 		}
 		curRes := Result{
 			Check:   CheckSnapshotCurrent,
 			Status:  StatusWarning,
 			Reason:  ReasonUnavailable,
 			Message: "snapshot repository requires recovery; current snapshot cannot be read",
-			Fix:     "Run 'sesh action snapshot-save' to resume or recover repository",
+			Fix:     "Run 'sesh snapshot save' to resume or recover repository",
 		}
 
 		return repoRes, curRes, nil
@@ -283,14 +283,14 @@ func classifySnapshotNotExist(path string) (Result, Result, error) {
 			Status:  StatusWarning,
 			Reason:  ReasonNotFound,
 			Message: "snapshot repository directory does not exist",
-			Fix:     "Run 'sesh action snapshot-save' to initialize the repository",
+			Fix:     "Run 'sesh snapshot save' to initialize the repository",
 		}
 		curRes := Result{
 			Check:   CheckSnapshotCurrent,
 			Status:  StatusWarning,
 			Reason:  ReasonNotFound,
 			Message: "no snapshot generations found",
-			Fix:     "Run 'sesh action snapshot-save' to capture a snapshot",
+			Fix:     "Run 'sesh snapshot save' to capture a snapshot",
 		}
 
 		return repoRes, curRes, nil
@@ -303,14 +303,14 @@ func classifySnapshotNotExist(path string) (Result, Result, error) {
 			Status:  StatusError,
 			Reason:  ReasonRecoveryRequired,
 			Message: "snapshot repository has an interrupted initialization or pending save barrier",
-			Fix:     "Run 'sesh action snapshot-save' to resume or recover repository",
+			Fix:     "Run 'sesh snapshot save' to resume or recover repository",
 		}
 		curRes := Result{
 			Check:   CheckSnapshotCurrent,
 			Status:  StatusWarning,
 			Reason:  ReasonUnavailable,
 			Message: "snapshot repository requires recovery; current snapshot cannot be read",
-			Fix:     "Run 'sesh action snapshot-save' to resume or recover repository",
+			Fix:     "Run 'sesh snapshot save' to resume or recover repository",
 		}
 
 		return repoRes, curRes, nil
@@ -321,14 +321,14 @@ func classifySnapshotNotExist(path string) (Result, Result, error) {
 		Status:  StatusWarning,
 		Reason:  ReasonUninitialized,
 		Message: "snapshot repository is uninitialized",
-		Fix:     "Run 'sesh action snapshot-save' to initialize the repository",
+		Fix:     "Run 'sesh snapshot save' to initialize the repository",
 	}
 	curRes := Result{
 		Check:   CheckSnapshotCurrent,
 		Status:  StatusWarning,
 		Reason:  ReasonNotFound,
 		Message: "no snapshot generations found",
-		Fix:     "Run 'sesh action snapshot-save' to capture a snapshot",
+		Fix:     "Run 'sesh snapshot save' to capture a snapshot",
 	}
 
 	return repoRes, curRes, nil
@@ -345,7 +345,7 @@ func classifyReadCurrentError(err error) (Result, error) {
 			Status:  StatusWarning,
 			Reason:  ReasonNotFound,
 			Message: "no snapshot generations found",
-			Fix:     "Run 'sesh action snapshot-save' to capture a snapshot",
+			Fix:     "Run 'sesh snapshot save' to capture a snapshot",
 		}, nil
 	}
 
@@ -355,7 +355,7 @@ func classifyReadCurrentError(err error) (Result, error) {
 			Status:  StatusError,
 			Reason:  ReasonRecoveryRequired,
 			Message: "current snapshot requires recovery (interrupted save or pending attempt barrier)",
-			Fix:     "Run 'sesh action snapshot-save' to resolve pending attempt",
+			Fix:     "Run 'sesh snapshot save' to resolve pending attempt",
 		}, nil
 	}
 
@@ -388,7 +388,7 @@ func manifestResult(genID string, manifest model.Manifest) Result {
 				Status:  StatusWarning,
 				Reason:  ReasonEmpty,
 				Message: fmt.Sprintf("current snapshot %s contains no saved sessions", genID),
-				Fix:     "Run 'sesh action snapshot-save' with active sessions",
+				Fix:     "Run 'sesh snapshot save' with active sessions",
 			}
 		}
 
@@ -407,7 +407,7 @@ func manifestResult(genID string, manifest model.Manifest) Result {
 			Status:  StatusWarning,
 			Reason:  ReasonEmpty,
 			Message: fmt.Sprintf("current snapshot %s contains no saved sessions", genID),
-			Fix:     "Run 'sesh action snapshot-save' with active sessions",
+			Fix:     "Run 'sesh snapshot save' with active sessions",
 		}
 	}
 
@@ -426,7 +426,7 @@ func manifestResult(genID string, manifest model.Manifest) Result {
 		Status:  StatusWarning,
 		Reason:  ReasonIncomplete,
 		Message: fmt.Sprintf("current snapshot %s is incomplete/partial (%d sessions)", genID, sessionCount),
-		Fix:     "Run 'sesh action snapshot-save' to capture a complete snapshot",
+		Fix:     "Run 'sesh snapshot save' to capture a complete snapshot",
 	}
 }
 

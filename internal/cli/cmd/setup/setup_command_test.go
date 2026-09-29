@@ -1,4 +1,4 @@
-package cmdsetup
+package cmdsetup_test
 
 import (
 	"errors"
@@ -15,9 +15,7 @@ import (
 func TestSetupTmuxHelp(t *testing.T) {
 	t.Parallel()
 
-	root := newRootCommand(t.Context())
-
-	stdout, stderr, err := executeCommand(root, "setup", "tmux", "--help")
+	stdout, stderr, err := executeCommand(t, "setup", "tmux", "--help")
 	if err != nil {
 		t.Fatalf("setup tmux --help failed: %v\nstderr: %s", err, stderr)
 	}
@@ -32,9 +30,7 @@ func TestSetupTmuxHelp(t *testing.T) {
 func TestSetupTmuxPrintsBindingsWithoutSocket(t *testing.T) {
 	t.Setenv("TMUX", "")
 
-	root := newRootCommand(t.Context())
-
-	stdout, stderr, err := executeCommand(root, "setup", "tmux", testNoConfigFlag)
+	stdout, stderr, err := executeCommand(t, "setup", "tmux", testNoConfigFlag)
 	if err != nil {
 		t.Fatalf("setup tmux failed: %v\nstderr: %s", err, stderr)
 	}
@@ -59,9 +55,7 @@ func TestSetupTmuxPrintsBindingsWithoutSocket(t *testing.T) {
 func TestSetupTmuxJSONPlansBindings(t *testing.T) {
 	t.Setenv("TMUX", "")
 
-	root := newRootCommand(t.Context())
-
-	stdout, stderr, err := executeCommand(root, "setup", "tmux", testNoConfigFlag, testJSONFlag)
+	stdout, stderr, err := executeCommand(t, "setup", "tmux", testNoConfigFlag, testJSONFlag)
 	if err != nil {
 		t.Fatalf("setup tmux --json failed: %v\nstderr: %s", err, stderr)
 	}
@@ -78,10 +72,8 @@ func TestSetupTmuxJSONPlansBindings(t *testing.T) {
 func TestSetupTmuxCustomKeysAndTable(t *testing.T) {
 	t.Setenv("TMUX", "")
 
-	root := newRootCommand(t.Context())
-
 	stdout, stderr, err := executeCommand(
-		root, "setup", "tmux",
+		t, "setup", "tmux",
 		"--table", "prefix",
 		"--next-key", "C-n",
 		"--local-next-key", "C-l",
@@ -116,9 +108,7 @@ func TestSetupTmuxRejectsInvalidKeyAndTable(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			root := newRootCommand(t.Context())
-
-			_, _, err := executeCommand(root, tc.args...)
+			_, _, err := executeCommand(t, tc.args...)
 			if err == nil {
 				t.Fatal("expected usage failure, got nil")
 			}
@@ -133,9 +123,7 @@ func TestSetupTmuxRejectsInvalidKeyAndTable(t *testing.T) {
 func TestSetupTmuxApplyTargetsAmbientServerWithoutSocket(t *testing.T) {
 	t.Setenv("TMUX", filepath.Join(t.TempDir(), "ambient-tmux.sock")+",123,0")
 
-	root := newRootCommand(t.Context())
-
-	_, _, err := executeCommand(root, "setup", "tmux", "--apply", testNoConfigFlag)
+	_, _, err := executeCommand(t, "setup", "tmux", "--apply", testNoConfigFlag)
 	if !errors.Is(err, gotmux.ErrNoServer) {
 		t.Fatalf("error = %v, want the stopped ambient server to report no tmux server", err)
 	}
@@ -155,9 +143,7 @@ navigation_back_key = "F22"
 		t.Fatal(err)
 	}
 
-	root := newRootCommand(t.Context())
-
-	stdout, stderr, err := executeCommand(root, "setup", "tmux", testConfigFlag, configPath)
+	stdout, stderr, err := executeCommand(t, "setup", "tmux", testConfigFlag, configPath)
 	if err != nil {
 		t.Fatalf("setup tmux with configured keys failed: %v\nstderr: %s", err, stderr)
 	}
@@ -168,10 +154,8 @@ navigation_back_key = "F22"
 		}
 	}
 
-	root = newRootCommand(t.Context())
-
 	stdout, stderr, err = executeCommand(
-		root, "setup", "tmux", testConfigFlag, configPath,
+		t, "setup", "tmux", testConfigFlag, configPath,
 		"--next-key", "C-n",
 	)
 	if err != nil {

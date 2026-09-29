@@ -1,4 +1,4 @@
-package cmdsetup
+package cmdsetup_test
 
 import (
 	"os"
@@ -9,44 +9,45 @@ import (
 
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/setup"
+	"github.com/zigai/sesh/internal/testsupport/clitest"
 )
 
 func TestSetupCommandHelpListsOwnedSubcommands(t *testing.T) {
 	t.Parallel()
 
-	stdout, stderr, err := executeCommand(newRootCommand(t.Context()), "setup", "--help")
+	stdout, stderr, err := executeCommand(t, "setup", "--help")
 	if err != nil {
 		t.Fatalf("setup --help failed: %v\nstderr: %s", err, stderr)
 	}
 
-	for _, subcommand := range []string{"tmux", "agents", "autosave", "coordinator", "remote", "refresh"} {
+	for _, subcommand := range []string{"tmux", "agents", "services"} {
 		if !strings.Contains(stdout, subcommand) {
 			t.Fatalf("setup help is missing %q:\n%s", subcommand, stdout)
 		}
 	}
 }
 
-func TestSetupAutosavePrintsWithoutWriting(t *testing.T) {
+func TestSetupServicesPrintsWithoutWriting(t *testing.T) {
 	isolatedSetupHome(t)
 
 	directory := filepath.Join(t.TempDir(), "units")
 
 	exec := executeJSON(
-		t, "setup", "autosave",
+		t, "setup", "services",
 		"--dir", directory,
 		testNoConfigFlag, testJSONFlag,
 	)
-	if !exec.envelope.OK {
-		t.Fatalf("setup autosave failed: %+v\nstderr: %s", exec.err, exec.stderr)
+	if !exec.Envelope.OK {
+		t.Fatalf("setup services failed: %+v\nstderr: %s", exec.Err, exec.Stderr)
 	}
 
-	result := decodeJSONPayload[setupServicesResultJSON](t, exec.envelope.Result)
+	result := clitest.DecodePayload[setupServicesResultJSON](t, exec.Envelope.Result)
 	if result.Applied {
 		t.Fatal("preview must not report an applied result")
 	}
 
-	if len(result.Services) != 2 {
-		t.Fatalf("services = %d, want the autosave service and timer", len(result.Services))
+	if len(result.Services) != 3 {
+		t.Fatalf("services = %d, want the autosave service, timer and remote monitor", len(result.Services))
 	}
 
 	service := result.Services[0]
@@ -67,26 +68,26 @@ func TestSetupAutosavePrintsWithoutWriting(t *testing.T) {
 	}
 }
 
-func TestSetupAutosaveApplyWritesOwnedDefinitions(t *testing.T) {
+func TestSetupServicesApplyWritesOwnedDefinitions(t *testing.T) {
 	isolatedSetupHome(t)
 
 	directory := filepath.Join(t.TempDir(), "units")
 
 	exec := executeJSON(
-		t, "setup", "autosave", "--apply",
+		t, "setup", "services", "--apply",
 		"--dir", directory,
 		testNoConfigFlag, testJSONFlag,
 	)
-	if !exec.envelope.OK {
-		t.Fatalf("setup autosave --apply failed: %+v\nstderr: %s", exec.err, exec.stderr)
+	if !exec.Envelope.OK {
+		t.Fatalf("setup services --apply failed: %+v\nstderr: %s", exec.Err, exec.Stderr)
 	}
 
-	result := decodeJSONPayload[setupServicesResultJSON](t, exec.envelope.Result)
-	if !result.Applied || result.Written != 2 {
-		t.Fatalf("result = %+v, want two written definitions", result)
+	result := clitest.DecodePayload[setupServicesResultJSON](t, exec.Envelope.Result)
+	if !result.Applied || result.Written != 3 {
+		t.Fatalf("result = %+v, want three written definitions", result)
 	}
 
-	for _, name := range []string{setup.AutosaveServiceName, setup.AutosaveTimerName} {
+	for _, name := range []string{setup.AutosaveServiceName, setup.AutosaveTimerName, setup.RemoteServiceName} {
 		content, err := os.ReadFile(filepath.Join(directory, name))
 		if err != nil {
 			t.Fatalf("reading %s failed: %v", name, err)
@@ -98,15 +99,15 @@ func TestSetupAutosaveApplyWritesOwnedDefinitions(t *testing.T) {
 	}
 
 	again := executeJSON(
-		t, "setup", "autosave", "--apply",
+		t, "setup", "services", "--apply",
 		"--dir", directory,
 		testNoConfigFlag, testJSONFlag,
 	)
-	if !again.envelope.OK {
-		t.Fatalf("second apply failed: %s", again.stderr)
+	if !again.Envelope.OK {
+		t.Fatalf("second apply failed: %s", again.Stderr)
 	}
 
-	replanned := decodeJSONPayload[setupServicesResultJSON](t, again.envelope.Result)
+	replanned := clitest.DecodePayload[setupServicesResultJSON](t, again.Envelope.Result)
 	if replanned.Written != 0 {
 		t.Fatalf("second apply wrote %d definitions, want 0", replanned.Written)
 	}
@@ -118,7 +119,7 @@ func TestSetupAutosaveApplyWritesOwnedDefinitions(t *testing.T) {
 	}
 }
 
-func TestSetupAutosavePreservesForeignDefinitions(t *testing.T) {
+func TestSetupServicesPreservesForeignDefinitions(t *testing.T) {
 	isolatedSetupHome(t)
 
 	directory := filepath.Join(t.TempDir(), "units")
@@ -134,19 +135,19 @@ func TestSetupAutosavePreservesForeignDefinitions(t *testing.T) {
 	}
 
 	exec := executeJSON(
-		t, "setup", "autosave", "--apply",
+		t, "setup", "services", "--apply",
 		"--dir", directory,
 		testNoConfigFlag, testJSONFlag,
 	)
-	if exec.err == nil {
+	if exec.Err == nil {
 		t.Fatal("a foreign definition must be reported as a degraded outcome")
 	}
 
-	if clibase.ExitCode(exec.err) != clibase.ExitCodeGeneral {
-		t.Fatalf("exit code = %d, want %d", clibase.ExitCode(exec.err), clibase.ExitCodeGeneral)
+	if clibase.ExitCode(exec.Err) != clibase.ExitCodeGeneral {
+		t.Fatalf("exit code = %d, want %d", clibase.ExitCode(exec.Err), clibase.ExitCodeGeneral)
 	}
 
-	result := decodeJSONPayload[setupServicesResultJSON](t, exec.envelope.Result)
+	result := clitest.DecodePayload[setupServicesResultJSON](t, exec.Envelope.Result)
 	if len(result.Skipped) != 1 || result.Skipped[0] != setup.AutosaveServiceName {
 		t.Fatalf("skipped = %v, want the foreign definition", result.Skipped)
 	}
@@ -161,27 +162,27 @@ func TestSetupAutosavePreservesForeignDefinitions(t *testing.T) {
 	}
 }
 
-func TestSetupAutosaveDefaultsToUserTmuxServer(t *testing.T) {
+func TestSetupServicesDefaultsToUserTmuxServer(t *testing.T) {
 	isolatedSetupHome(t)
 
 	exec := executeJSON(
-		t, "setup", "autosave", "--with-coordinator",
+		t, "setup", "services", "--with-coordinator",
 		"--dir", filepath.Join(t.TempDir(), "units"),
 		testNoConfigFlag, testJSONFlag,
 	)
-	if !exec.envelope.OK {
-		t.Fatalf("setup autosave failed: %+v\nstderr: %s", exec.err, exec.stderr)
+	if !exec.Envelope.OK {
+		t.Fatalf("setup services failed: %+v\nstderr: %s", exec.Err, exec.Stderr)
 	}
 
-	want := "--socket " + clibase.DefaultTmuxSocket() + " "
+	want := clibase.DefaultTmuxSocket()
 
-	result := decodeJSONPayload[setupServicesResultJSON](t, exec.envelope.Result)
+	result := clitest.DecodePayload[setupServicesResultJSON](t, exec.Envelope.Result)
 	for _, service := range result.Services {
 		if service.Kind == string(setup.KindSystemdTimer) {
 			continue
 		}
 
-		if !strings.Contains(service.Content, want) {
+		if !targetsSocket(service.Content, want) {
 			t.Fatalf("%s does not target tmux's default server %q:\n%s", service.Name, want, service.Content)
 		}
 
@@ -191,76 +192,77 @@ func TestSetupAutosaveDefaultsToUserTmuxServer(t *testing.T) {
 	}
 }
 
-func TestSetupAutosaveWithTmuxServiceDefaultsToManagedSocket(t *testing.T) {
+func TestSetupServicesWithTmuxServiceDefaultsToManagedSocket(t *testing.T) {
 	isolatedSetupHome(t)
 
 	runtimeDir := t.TempDir()
 	t.Setenv("XDG_RUNTIME_DIR", runtimeDir)
 
 	exec := executeJSON(
-		t, "setup", "autosave", "--with-tmux-service", "--tmux", "/usr/bin/tmux",
+		t, "setup", "services", "--with-tmux-service", "--tmux", "/usr/bin/tmux",
 		"--dir", filepath.Join(t.TempDir(), "units"),
 		testNoConfigFlag, testJSONFlag,
 	)
-	if !exec.envelope.OK {
-		t.Fatalf("setup autosave failed: %+v\nstderr: %s", exec.err, exec.stderr)
+	if !exec.Envelope.OK {
+		t.Fatalf("setup services failed: %+v\nstderr: %s", exec.Err, exec.Stderr)
 	}
 
-	want := "--socket " + filepath.Join(runtimeDir, "sesh", "tmux.sock") + " "
+	want := filepath.Join(runtimeDir, "sesh", "tmux.sock")
 
-	result := decodeJSONPayload[setupServicesResultJSON](t, exec.envelope.Result)
+	result := clitest.DecodePayload[setupServicesResultJSON](t, exec.Envelope.Result)
 	for _, service := range result.Services {
-		if service.Kind == string(setup.KindSystemdService) && !strings.Contains(service.Content, want) {
+		if service.Kind == string(setup.KindSystemdService) && !targetsSocket(service.Content, want) {
 			t.Fatalf("%s does not target the managed server %q:\n%s", service.Name, want, service.Content)
 		}
 	}
 }
 
-func TestSetupAutosaveTmuxServiceRequiresExplicitTmuxPath(t *testing.T) {
+func TestSetupServicesTmuxServiceRequiresExplicitTmuxPath(t *testing.T) {
 	isolatedSetupHome(t)
 
 	directory := filepath.Join(t.TempDir(), "units")
 
 	exec := executeJSON(
-		t, "setup", "autosave",
+		t, "setup", "services",
 		"--with-tmux-service",
 		"--dir", directory,
 		testNoConfigFlag, testJSONFlag,
 	)
-	if exec.err == nil {
+	if exec.Err == nil {
 		t.Fatal("the managed tmux service requires an explicit tmux path")
 	}
 
-	if clibase.ExitCode(exec.err) != clibase.ExitCodeUsage {
-		t.Fatalf("exit code = %d, want %d", clibase.ExitCode(exec.err), clibase.ExitCodeUsage)
+	if clibase.ExitCode(exec.Err) != clibase.ExitCodeUsage {
+		t.Fatalf("exit code = %d, want %d", clibase.ExitCode(exec.Err), clibase.ExitCodeUsage)
 	}
 }
 
-func TestSetupRemoteWritesRunnableMonitorDefinition(t *testing.T) {
+func TestSetupServicesWritesRunnableRemoteMonitorDefinition(t *testing.T) {
 	isolatedSetupHome(t)
 
 	directory := filepath.Join(t.TempDir(), "units")
 
 	exec := executeJSON(
-		t, "setup", "remote", "--apply",
+		t, "setup", "services", "--apply",
 		"--dir", directory,
 		testNoConfigFlag, testJSONFlag,
 	)
-	if exec.err != nil {
-		t.Fatalf("setup remote failed: %v", exec.err)
+	if exec.Err != nil {
+		t.Fatalf("setup services failed: %v", exec.Err)
 	}
 
-	result := decodeJSONPayload[setupServicesResultJSON](t, exec.envelope.Result)
+	result := clitest.DecodePayload[setupServicesResultJSON](t, exec.Envelope.Result)
 	if len(result.Blocked) != 0 {
 		t.Fatalf("blocked = %v, want runnable remote monitor definition", result.Blocked)
 	}
 
-	if len(result.Services) != 1 || len(result.Services[0].Requires) != 0 {
-		t.Fatalf("services = %+v, want no unmet prerequisite", result.Services)
+	index := slices.IndexFunc(result.Services, func(service setupServiceJSON) bool { return service.Name == setup.RemoteServiceName })
+	if index < 0 || len(result.Services[index].Requires) != 0 {
+		t.Fatalf("services = %+v, want a remote monitor with no unmet prerequisite", result.Services)
 	}
 
-	if !strings.Contains(result.Services[0].Content, "remote monitor run") {
-		t.Fatalf("remote definition does not name the native entry point:\n%s", result.Services[0].Content)
+	if !strings.Contains(result.Services[index].Content, "daemon remote-monitor") {
+		t.Fatalf("remote definition does not name the native entry point:\n%s", result.Services[index].Content)
 	}
 
 	if _, err := os.Stat(filepath.Join(directory, setup.RemoteServiceName)); err != nil {
@@ -268,40 +270,16 @@ func TestSetupRemoteWritesRunnableMonitorDefinition(t *testing.T) {
 	}
 }
 
-func TestSetupRefreshPlansOwnedDefinitions(t *testing.T) {
-	isolatedSetupHome(t)
-
-	directory := filepath.Join(t.TempDir(), "units")
-
-	exec := executeJSON(
-		t, "setup", "refresh",
-		"--dir", directory,
-		testNoConfigFlag, testJSONFlag,
-	)
-	if exec.err != nil {
-		t.Fatalf("setup refresh failed: %v", exec.err)
-	}
-
-	result := decodeJSONPayload[setupServicesResultJSON](t, exec.envelope.Result)
-	if result.Applied {
-		t.Fatal("refresh without --apply must not write")
-	}
-
-	if len(result.Services) < 3 {
-		t.Fatalf("services = %d, want autosave, timer and remote definitions", len(result.Services))
-	}
-}
-
 func TestSetupAgentsRejectsUnknownNames(t *testing.T) {
 	isolatedSetupHome(t)
 
 	exec := executeJSON(t, "setup", "agents", "not-a-real-agent", "--dry-run", testNoConfigFlag, testJSONFlag)
-	if exec.err == nil {
+	if exec.Err == nil {
 		t.Fatal("an unknown agent name must fail")
 	}
 
-	if clibase.ExitCode(exec.err) != clibase.ExitCodeUsage {
-		t.Fatalf("exit code = %d, want %d", clibase.ExitCode(exec.err), clibase.ExitCodeUsage)
+	if clibase.ExitCode(exec.Err) != clibase.ExitCodeUsage {
+		t.Fatalf("exit code = %d, want %d", clibase.ExitCode(exec.Err), clibase.ExitCodeUsage)
 	}
 }
 
@@ -309,54 +287,59 @@ func TestSetupAgentsRejectsUnknownTrackerMode(t *testing.T) {
 	isolatedSetupHome(t)
 
 	exec := executeJSON(t, "setup", "agents", "--tracker", "bogus", "--dry-run", testNoConfigFlag, testJSONFlag)
-	if exec.err == nil {
+	if exec.Err == nil {
 		t.Fatal("an unknown tracker operation must fail")
 	}
 
-	if clibase.ExitCode(exec.err) != clibase.ExitCodeUsage {
-		t.Fatalf("exit code = %d, want %d", clibase.ExitCode(exec.err), clibase.ExitCodeUsage)
+	if clibase.ExitCode(exec.Err) != clibase.ExitCodeUsage {
+		t.Fatalf("exit code = %d, want %d", clibase.ExitCode(exec.Err), clibase.ExitCodeUsage)
 	}
 }
 
-func TestSetupAutosaveApplyWritesManagedTmuxService(t *testing.T) {
+func TestSetupServicesApplyWritesManagedTmuxService(t *testing.T) {
 	isolatedSetupHome(t)
 
 	directory := filepath.Join(t.TempDir(), "units")
 	tmuxPath := createFakeTmuxExecutable(t)
 
 	exec := executeJSON(
-		t, "setup", "autosave", "--apply",
+		t, "setup", "services", "--apply",
 		"--with-tmux-service",
 		"--tmux", tmuxPath,
 		"--dir", directory,
 		testNoConfigFlag, testJSONFlag,
 	)
-	if !exec.envelope.OK {
-		t.Fatalf("setup autosave --with-tmux-service --apply failed: %+v\nstderr: %s", exec.err, exec.stderr)
+	if !exec.Envelope.OK {
+		t.Fatalf("setup services --with-tmux-service --apply failed: %+v\nstderr: %s", exec.Err, exec.Stderr)
 	}
 
-	result := decodeJSONPayload[setupServicesResultJSON](t, exec.envelope.Result)
-	if !result.Applied || result.Written != 3 {
-		t.Fatalf("result = %+v, want 3 written definitions including tmux service", result)
+	result := clitest.DecodePayload[setupServicesResultJSON](t, exec.Envelope.Result)
+	if !result.Applied || result.Written != 4 {
+		t.Fatalf("result = %+v, want 4 written definitions including tmux service", result)
 	}
 
 	assertWrittenManagedUnits(t, directory)
 
 	again := executeJSON(
-		t, "setup", "autosave", "--apply",
+		t, "setup", "services", "--apply",
 		"--with-tmux-service",
 		"--tmux", tmuxPath,
 		"--dir", directory,
 		testNoConfigFlag, testJSONFlag,
 	)
-	if !again.envelope.OK {
-		t.Fatalf("second apply failed: %s", again.stderr)
+	if !again.Envelope.OK {
+		t.Fatalf("second apply failed: %s", again.Stderr)
 	}
 
-	replanned := decodeJSONPayload[setupServicesResultJSON](t, again.envelope.Result)
+	replanned := clitest.DecodePayload[setupServicesResultJSON](t, again.Envelope.Result)
 	if replanned.Written != 0 {
 		t.Fatalf("second apply wrote %d definitions, want 0", replanned.Written)
 	}
+}
+
+// targetsSocket reports whether a unit passes exactly socket to --socket.
+func targetsSocket(content, socket string) bool {
+	return strings.Contains(content, "--socket "+socket+" ") || strings.Contains(content, "--socket "+socket+"\n")
 }
 
 func createFakeTmuxExecutable(t *testing.T) string {
@@ -394,9 +377,9 @@ func assertWrittenManagedUnits(t *testing.T, directory string) {
 	}
 
 	for _, want := range []string{
-		"daemon serve",
-		"daemon wait-ready",
-		"autosave final-save",
+		"daemon tmux",
+		"action tmux-wait-ready",
+		"action autosave-final-save",
 		"TimeoutStopSec=25s",
 	} {
 		if !strings.Contains(string(tmuxContent), want) {
@@ -409,7 +392,7 @@ func assertWrittenManagedUnits(t *testing.T, directory string) {
 	}
 }
 
-func TestSetupAutosaveTmuxServicePreservesForeignDefinition(t *testing.T) {
+func TestSetupServicesTmuxServicePreservesForeignDefinition(t *testing.T) {
 	isolatedSetupHome(t)
 
 	directory := filepath.Join(t.TempDir(), "units")
@@ -427,17 +410,17 @@ func TestSetupAutosaveTmuxServicePreservesForeignDefinition(t *testing.T) {
 	tmuxPath := createFakeTmuxExecutable(t)
 
 	exec := executeJSON(
-		t, "setup", "autosave", "--apply",
+		t, "setup", "services", "--apply",
 		"--with-tmux-service",
 		"--tmux", tmuxPath,
 		"--dir", directory,
 		testNoConfigFlag, testJSONFlag,
 	)
-	if exec.err == nil {
+	if exec.Err == nil {
 		t.Fatal("a foreign tmux service must be reported as a degraded outcome")
 	}
 
-	result := decodeJSONPayload[setupServicesResultJSON](t, exec.envelope.Result)
+	result := clitest.DecodePayload[setupServicesResultJSON](t, exec.Envelope.Result)
 	if !slices.Contains(result.Skipped, setup.TmuxServiceName) {
 		t.Fatalf("skipped = %v, want foreign %s", result.Skipped, setup.TmuxServiceName)
 	}
@@ -452,14 +435,14 @@ func TestSetupAutosaveTmuxServicePreservesForeignDefinition(t *testing.T) {
 	}
 
 	forceExec := executeJSON(
-		t, "setup", "autosave", "--apply", "--force",
+		t, "setup", "services", "--apply", "--force",
 		"--with-tmux-service",
 		"--tmux", tmuxPath,
 		"--dir", directory,
 		testNoConfigFlag, testJSONFlag,
 	)
-	if !forceExec.envelope.OK {
-		t.Fatalf("apply with --force failed: %s", forceExec.stderr)
+	if !forceExec.Envelope.OK {
+		t.Fatalf("apply with --force failed: %s", forceExec.Stderr)
 	}
 
 	replaced, err := os.ReadFile(foreignPath)
@@ -472,7 +455,7 @@ func TestSetupAutosaveTmuxServicePreservesForeignDefinition(t *testing.T) {
 	}
 }
 
-func TestSetupAutosaveTmuxServiceSymlinkProtection(t *testing.T) {
+func TestSetupServicesTmuxServiceSymlinkProtection(t *testing.T) {
 	isolatedSetupHome(t)
 
 	directory := filepath.Join(t.TempDir(), "units")
@@ -495,13 +478,13 @@ func TestSetupAutosaveTmuxServiceSymlinkProtection(t *testing.T) {
 	tmuxPath := createFakeTmuxExecutable(t)
 
 	exec := executeJSON(
-		t, "setup", "autosave", "--apply",
+		t, "setup", "services", "--apply",
 		"--with-tmux-service",
 		"--tmux", tmuxPath,
 		"--dir", directory,
 		testNoConfigFlag, testJSONFlag,
 	)
-	if exec.err == nil {
+	if exec.Err == nil {
 		t.Fatal("symlink target must be reported as foreign/skipped")
 	}
 
@@ -515,26 +498,26 @@ func TestSetupAutosaveTmuxServiceSymlinkProtection(t *testing.T) {
 	}
 }
 
-func TestSetupRefreshWithTmuxService(t *testing.T) {
+func TestSetupServicesPlansTmuxServiceWithoutUnmetPrerequisites(t *testing.T) {
 	isolatedSetupHome(t)
 
 	directory := filepath.Join(t.TempDir(), "units")
 	tmuxPath := createFakeTmuxExecutable(t)
 
 	exec := executeJSON(
-		t, "setup", "refresh",
+		t, "setup", "services",
 		"--with-tmux-service",
 		"--tmux", tmuxPath,
 		"--dir", directory,
 		testNoConfigFlag, testJSONFlag,
 	)
-	if exec.err != nil {
-		t.Fatalf("setup refresh failed: %v", exec.err)
+	if exec.Err != nil {
+		t.Fatalf("setup services failed: %v", exec.Err)
 	}
 
-	result := decodeJSONPayload[setupServicesResultJSON](t, exec.envelope.Result)
+	result := clitest.DecodePayload[setupServicesResultJSON](t, exec.Envelope.Result)
 	if result.Applied {
-		t.Fatal("refresh without --apply must not write")
+		t.Fatal("preview must not write")
 	}
 
 	var foundTmux bool
@@ -554,40 +537,38 @@ func TestSetupRefreshWithTmuxService(t *testing.T) {
 	}
 }
 
-func TestSetupCoordinatorPrintsWithoutWriting(t *testing.T) {
+func TestSetupServicesCoordinatorPrintsWithoutWriting(t *testing.T) {
 	isolatedSetupHome(t)
 
 	directory := filepath.Join(t.TempDir(), "units")
 
 	exec := executeJSON(
-		t, "setup", "coordinator",
+		t, "setup", "services", "--with-coordinator",
 		"--dir", directory,
 		testNoConfigFlag, testJSONFlag,
 	)
-	if !exec.envelope.OK {
-		t.Fatalf("setup coordinator failed: %+v\nstderr: %s", exec.err, exec.stderr)
+	if !exec.Envelope.OK {
+		t.Fatalf("setup services --with-coordinator failed: %+v\nstderr: %s", exec.Err, exec.Stderr)
 	}
 
-	result := decodeJSONPayload[setupServicesResultJSON](t, exec.envelope.Result)
+	result := clitest.DecodePayload[setupServicesResultJSON](t, exec.Envelope.Result)
 	if result.Applied {
 		t.Fatal("preview must not report an applied result")
 	}
 
-	if len(result.Services) != 1 {
-		t.Fatalf("services = %d, want the coordinator service", len(result.Services))
+	index := slices.IndexFunc(result.Services, func(service setupServiceJSON) bool { return service.Name == setup.CoordinatorServiceName })
+	if index < 0 {
+		t.Fatalf("services = %+v, want %s included", result.Services, setup.CoordinatorServiceName)
 	}
 
-	service := result.Services[0]
-	if service.Name != setup.CoordinatorServiceName {
-		t.Fatalf("name = %q, want %q", service.Name, setup.CoordinatorServiceName)
-	}
+	service := result.Services[index]
 
 	if !strings.Contains(service.Content, setup.ManagedMarker) {
 		t.Fatalf("printed definition is missing the ownership marker:\n%s", service.Content)
 	}
 
-	if !strings.Contains(service.Content, "daemon run") {
-		t.Fatalf("printed definition does not use daemon run:\n%s", service.Content)
+	if !strings.Contains(service.Content, "daemon coordinator") {
+		t.Fatalf("printed definition does not use daemon coordinator:\n%s", service.Content)
 	}
 
 	if _, err := os.Stat(directory); !os.IsNotExist(err) {
@@ -595,92 +576,39 @@ func TestSetupCoordinatorPrintsWithoutWriting(t *testing.T) {
 	}
 }
 
-func TestSetupCoordinatorApplyWritesOwnedDefinition(t *testing.T) {
+func TestSetupServicesWithCoordinatorApplyWritesAllDefinitions(t *testing.T) {
 	isolatedSetupHome(t)
 
 	directory := filepath.Join(t.TempDir(), "units")
 
 	exec := executeJSON(
-		t, "setup", "coordinator", "--apply",
-		"--dir", directory,
-		testNoConfigFlag, testJSONFlag,
-	)
-	if !exec.envelope.OK {
-		t.Fatalf("setup coordinator --apply failed: %+v\nstderr: %s", exec.err, exec.stderr)
-	}
-
-	result := decodeJSONPayload[setupServicesResultJSON](t, exec.envelope.Result)
-	if !result.Applied || result.Written != 1 {
-		t.Fatalf("result = %+v, want 1 written definition", result)
-	}
-
-	content, err := os.ReadFile(filepath.Join(directory, setup.CoordinatorServiceName))
-	if err != nil {
-		t.Fatalf("reading %s failed: %v", setup.CoordinatorServiceName, err)
-	}
-
-	if !strings.Contains(string(content), setup.ManagedMarker) {
-		t.Fatalf("missing ownership marker:\n%s", string(content))
-	}
-
-	if !strings.Contains(string(content), "daemon run") {
-		t.Fatalf("missing daemon run:\n%s", string(content))
-	}
-}
-
-func TestSetupAutosaveWithCoordinatorApply(t *testing.T) {
-	isolatedSetupHome(t)
-
-	directory := filepath.Join(t.TempDir(), "units")
-
-	exec := executeJSON(
-		t, "setup", "autosave", "--apply",
+		t, "setup", "services", "--apply",
 		"--with-coordinator",
 		"--dir", directory,
 		testNoConfigFlag, testJSONFlag,
 	)
-	if !exec.envelope.OK {
-		t.Fatalf("setup autosave --with-coordinator --apply failed: %+v\nstderr: %s", exec.err, exec.stderr)
+	if !exec.Envelope.OK {
+		t.Fatalf("setup services --with-coordinator --apply failed: %+v\nstderr: %s", exec.Err, exec.Stderr)
 	}
 
-	result := decodeJSONPayload[setupServicesResultJSON](t, exec.envelope.Result)
-	if !result.Applied || result.Written != 3 {
-		t.Fatalf("result = %+v, want 3 written definitions", result)
+	result := clitest.DecodePayload[setupServicesResultJSON](t, exec.Envelope.Result)
+	if !result.Applied || result.Written != 4 {
+		t.Fatalf("result = %+v, want 4 written definitions", result)
 	}
 
-	for _, name := range []string{setup.AutosaveServiceName, setup.AutosaveTimerName, setup.CoordinatorServiceName} {
-		if _, err := os.Stat(filepath.Join(directory, name)); err != nil {
+	for _, name := range []string{setup.AutosaveServiceName, setup.AutosaveTimerName, setup.RemoteServiceName, setup.CoordinatorServiceName} {
+		content, err := os.ReadFile(filepath.Join(directory, name))
+		if err != nil {
 			t.Fatalf("expected %s to exist: %v", name, err)
 		}
-	}
-}
 
-func TestSetupRefreshWithCoordinator(t *testing.T) {
-	isolatedSetupHome(t)
-
-	directory := filepath.Join(t.TempDir(), "units")
-
-	exec := executeJSON(
-		t, "setup", "refresh",
-		"--with-coordinator",
-		"--dir", directory,
-		testNoConfigFlag, testJSONFlag,
-	)
-	if exec.err != nil {
-		t.Fatalf("setup refresh failed: %v", exec.err)
-	}
-
-	result := decodeJSONPayload[setupServicesResultJSON](t, exec.envelope.Result)
-
-	var foundCoordinator bool
-
-	for _, svc := range result.Services {
-		if svc.Name == setup.CoordinatorServiceName {
-			foundCoordinator = true
+		if !strings.Contains(string(content), setup.ManagedMarker) {
+			t.Fatalf("%s is missing the ownership marker:\n%s", name, content)
 		}
 	}
 
-	if !foundCoordinator {
-		t.Fatalf("services = %+v, want %s included", result.Services, setup.CoordinatorServiceName)
+	coordinator, err := os.ReadFile(filepath.Join(directory, setup.CoordinatorServiceName))
+	if err != nil || !strings.Contains(string(coordinator), "daemon coordinator") {
+		t.Fatalf("coordinator definition does not run daemon coordinator: %v\n%s", err, coordinator)
 	}
 }

@@ -60,9 +60,9 @@ type daemonAutosaveOutcome struct {
 	recorded   bool
 }
 
-func newDaemonRunCommand() *cobra.Command {
+func newDaemonCoordinatorCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "run",
+		Use:   "coordinator",
 		Short: "Run the Linux sleep and shutdown save coordinator",
 		Long: "Run the Linux sleep and shutdown save coordinator in the foreground. " +
 			"The runtime holds logind delay locks for shutdown and sleep before readiness, runs one bounded save when logind " +
@@ -75,11 +75,11 @@ func newDaemonRunCommand() *cobra.Command {
 		RunE: runDaemonRuntime,
 	}
 	cmd.Flags().String("socket", "", "Explicit absolute path to the tmux server socket (required)")
-	cmd.Flags().String("repository", "", "Native repository directory")
-	cmd.Flags().String("lease-root", "", "Explicit path to shared lease root directory")
-	cmd.Flags().String("history", "", "History state JSON file path")
+	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
+	cmd.Flags().String("lease-root", "", clibase.LeaseRootFlagUsage)
+	cmd.Flags().String("history", "", clibase.HistoryFlagUsage)
 	cmd.Flags().StringSlice("session", nil, "Explicit selected session IDs")
-	cmd.Flags().String("status-file", "", "Explicit path for the final save status artifact")
+	cmd.Flags().String("status-file", "", clibase.StatusFileFlagUsage)
 	cmd.Flags().Duration("attempt-timeout", defaultDaemonAttemptTimeout, "Save attempt bound reported in the coordinator runtime status")
 	cmd.Flags().Duration("drain-grace", automation.DefaultDrainGrace, "Grace period for stopping the coordinator scheduler")
 
@@ -245,18 +245,6 @@ func runDaemonLifecycle(
 	}
 
 	return nil
-}
-
-func normalizeDaemonCancellation(err error) error {
-	if daemonCancellationOnly(err) {
-		return nil
-	}
-
-	return err
-}
-
-func daemonCancellationOnly(err error) bool {
-	return daemon.DaemonCancellationOnly(err)
 }
 
 func executeDaemonFinalSave(cmd *cobra.Command, env autosaveEnv, ctx context.Context) (automation.AttemptResult, error) {

@@ -36,25 +36,7 @@ const (
 var (
 	errCommandOutputLimit = errors.New("command output exceeds limit")
 
-	actionOperations = map[string]string{
-		"snapshot-save":             "save",
-		"snapshot-restore":          "restore",
-		"session-new":               "new",
-		"session-rename":            "rename",
-		"session-kill":              "kill",
-		"session-delete":            "delete",
-		"session-switch":            "switch",
-		"agent-next":                "next",
-		"agent-back":                "back",
-		"agent-focus":               "focus",
-		"agent-status":              "status",
-		"autosave-status":           "status",
-		"autosave-save-if-due":      "save-if-due",
-		"autosave-restore-on-start": "restore-on-start",
-	}
-
 	namedOperations = map[string]bool{
-		"tmux":    true,
 		"verify":  true,
 		"list":    true,
 		"history": true,
@@ -134,11 +116,8 @@ func (b *commandBuffer) File() *os.File {
 	return nil
 }
 
+// ExecuteApplication runs the sesh command line through the production runtime.
 func ExecuteApplication(ctx context.Context, args []string, input io.Reader, stdout, stderr io.Writer) error {
-	return executeApplication(ctx, args, input, stdout, stderr)
-}
-
-func executeApplication(ctx context.Context, args []string, input io.Reader, stdout, stderr io.Writer) error {
 	root := newRootCommand(ctx)
 	root.SetContext(ctx)
 	root.SetArgs(args)
@@ -153,7 +132,7 @@ func executeApplication(ctx context.Context, args []string, input io.Reader, std
 
 	runtime := commandRuntime{cmd: root, sink: nil, operation: "", output: &output, diagnostics: &diagnostics}
 	root.PersistentPreRunE = runtime.prepare
-	ctx = context.WithValue(ctx, rawArgsContextKey, args)
+	ctx = clibase.ContextWithRawArgs(ctx, args)
 
 	executed, runErr := root.ExecuteContextC(ctx)
 	if executed == nil {
@@ -392,19 +371,11 @@ func commandOperation(cmd *cobra.Command) string {
 	}
 
 	parent := cmd.Parent()
-	if parent == nil {
+	if parent == nil || !namedOperations[cmd.Name()] {
 		return ""
 	}
 
-	if parent.Name() == "action" {
-		return actionOperations[cmd.Name()]
-	}
-
-	if !namedOperations[cmd.Name()] {
-		return ""
-	}
-
-	if parent.Name() == "snapshot" || parent.Name() == "agent" || parent.Name() == "autosave" || parent == cmd.Root() {
+	if parent.Name() == "snapshot" || parent == cmd.Root() {
 		return cmd.Name()
 	}
 
@@ -412,27 +383,19 @@ func commandOperation(cmd *cobra.Command) string {
 }
 
 func validateCommandBeforeConfig(cmd *cobra.Command, args []string) error {
-	if cmd.Parent() != nil && cmd.Parent().Name() == "rewrite" {
-		return cmdsnapshot.ValidateSnapshotOperation(cmd)
+	if err := cmdsnapshot.ValidateSnapshotCommand(cmd, args); err != nil {
+		return err
 	}
 
-	if cmd.Parent() != nil && (cmd.Parent().Name() == "snapshot" || (cmd.Parent().Name() == "action" && (cmd.Name() == "snapshot-save" || cmd.Name() == "snapshot-restore"))) {
-		return cmdsnapshot.ValidateSnapshotCommand(cmd, args)
+	if cmd.Parent() == nil || cmd.Parent().Name() != "session" || cmd.Parent().Parent() != cmd.Root() {
+		return nil
 	}
 
-	if cmd.Parent() == cmd.Root() {
-		return validateRootSubcommand(cmd, args)
-	}
-
-	return nil
-}
-
-func validateRootSubcommand(cmd *cobra.Command, args []string) error {
 	switch cmd.Name() {
 	case "list":
 		return cmdsession.ValidateListCommand(cmd, args)
-	case "history":
-		return cmdsession.ValidateHistoryCommand(cmd, args)
+	case "scrollback":
+		return cmdsession.ValidateScrollbackCommand(cmd, args)
 	default:
 		return nil
 	}

@@ -27,10 +27,7 @@ var (
 	errRepositoryRequired = clibase.ErrRepositoryRequired
 	errLeaseRootRequired  = clibase.ErrLeaseRootRequired
 	errDoctorChecksFailed = clibase.ErrDoctorChecksFailed
-	rawArgsContextKey     = rawArgsKey{}
 )
-
-type rawArgsKey struct{}
 
 type ExitError = clibase.ExitError
 
@@ -40,10 +37,6 @@ type fileDescriptor interface {
 
 func NewExitError(code int, err error) error {
 	return clibase.NewExitError(code, err)
-}
-
-func UnknownCommandError(cmd *cobra.Command, arg string) error {
-	return clibase.UnknownCommandError(cmd, arg)
 }
 
 func ExitCode(err error) int {

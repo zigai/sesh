@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json/v2"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -36,15 +37,11 @@ func TestRemoteMonitorBinaryReloadRemovesObsoleteConnection(t *testing.T) {
 	cacheHome := filepath.Join(root, "cache")
 	stateHome := filepath.Join(root, "state")
 
-	cfg := config.DefaultConfig()
-	cfg.Paths.LogFile = filepath.Join(stateHome, "sesh.log")
-	cfg.Remote.Enabled = true
-	cfg.Remote.SSHPath = "/bin/false"
-	cfg.Remote.Connections = []config.RemoteConnectionConfig{{ID: "remove-me", Host: "example.invalid"}}
+	logFile := filepath.Join(stateHome, "sesh.log")
+	logHeader := fmt.Sprintf("[paths]\nlog_file = %q\n\n", logFile)
 
-	if _, err := config.Save(cfg, config.WithSavePath(configPath)); err != nil {
-		t.Fatal(err)
-	}
+	writeTestConfig(t, configPath, logHeader+"[remote]\nenabled = true\nssh_path = \"/bin/false\"\n"+
+		remoteConnectionsTOML(config.RemoteConnectionConfig{ID: "remove-me", Host: "example.invalid"}))
 
 	process := startRemoteReloadProcess(t, binary, configPath, root, cacheHome, stateHome)
 	catalogPath := filepath.Join(cacheHome, "sesh", "remote", "catalog.json")
@@ -61,12 +58,7 @@ func TestRemoteMonitorBinaryReloadRemovesObsoleteConnection(t *testing.T) {
 
 	assertRemoteReloadCatalogRetained(t, catalogPath, process.done, "remove-me")
 
-	cfg.Remote.Enabled = false
-	cfg.Remote.Connections = nil
-
-	if _, err := config.Save(cfg, config.WithSavePath(configPath)); err != nil {
-		t.Fatal(err)
-	}
+	writeTestConfig(t, configPath, logHeader+"[remote]\nenabled = false\nssh_path = \"/bin/false\"\n")
 
 	waitForRemoteReloadCatalog(t, catalogPath, process.done, func(catalog remote.Catalog) bool {
 		return len(catalog.Connections) == 0
@@ -74,7 +66,7 @@ func TestRemoteMonitorBinaryReloadRemovesObsoleteConnection(t *testing.T) {
 
 	process.stop(t)
 
-	logData, err := os.ReadFile(cfg.Paths.LogFile)
+	logData, err := os.ReadFile(logFile)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +133,7 @@ func startRemoteReloadProcess(t *testing.T, binary, configPath, root, cacheHome,
 		stdout: bytes.Buffer{}, stderr: bytes.Buffer{},
 	}
 
-	process.command = exec.CommandContext(ctx, binary, "--config", configPath, "remote", "monitor", "run")
+	process.command = exec.CommandContext(ctx, binary, "--config", configPath, "daemon", "remote-monitor")
 
 	process.command.Env = append(append(os.Environ(), "GOWORK=off"),
 		"HOME="+filepath.Join(root, "home"),

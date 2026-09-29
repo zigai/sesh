@@ -155,8 +155,8 @@
 # Example with an SSH alias, custom remote sesh path, and tmux socket:
 #   { id = "work", label = "Work", host = "work", sesh_path = "/usr/local/bin/sesh", tmux_socket = "/tmp/work-tmux.sock" }
 #
-# Preview service definitions with `sesh setup remote --socket /absolute/path/to/tmux.sock`.
-# Run the foreground monitor with `sesh remote monitor run`.
+# Preview service definitions with `sesh setup services --socket /absolute/path/to/tmux.sock`.
+# Run the foreground monitor with `sesh daemon remote-monitor`.
 # The popup reads the local cache: entries become stale after stale_after and
 # disappear after hide_after. Remote mutations are checked against peer permissions.
 # Snapshot and restore retain the native engine's partial-recovery limitations.

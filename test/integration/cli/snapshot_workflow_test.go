@@ -138,10 +138,8 @@ func testActionSaveParity(t *testing.T, repoDir, socket, leaseDir, sessionID str
 func testSavePlainText(t *testing.T, repoDir, socket, leaseDir, sessionID string) {
 	t.Helper()
 
-	root := newRootCommand(t.Context())
-
 	stdout, stderr, err := executeCommand(
-		root,
+		t,
 		actionCmd, "snapshot-save",
 		testRepositoryFlag, repoDir,
 		testSocketFlag, socket,
@@ -209,10 +207,8 @@ func testListWorkflow(t *testing.T, repoDir, savedGen, sessionName string) {
 		t.Fatalf("session %q not found in list: %#v", sessionName, listRes.Sessions)
 	}
 
-	root := newRootCommand(t.Context())
-
 	stdout, stderr, err := executeCommand(
-		root,
+		t,
 		snapshotCmd, "list",
 		testRepositoryFlag, repoDir,
 		testGenerationFlag, savedGen,
@@ -253,10 +249,8 @@ func testHistoryWorkflow(t *testing.T, repoDir string) {
 		t.Fatalf("history current generation is empty")
 	}
 
-	root := newRootCommand(t.Context())
-
 	stdout, stderr, err := executeCommand(
-		root,
+		t,
 		snapshotCmd, "history",
 		testRepositoryFlag, repoDir,
 		"--full",
@@ -298,10 +292,8 @@ func testVerifyWorkflow(t *testing.T, repoDir, savedGen string) {
 	verRes := decodeJSONPayload[snapshotVerifyResultJSON](t, explicitExec.envelope.Result)
 	assertExplicitVerifyResult(t, verRes)
 
-	root := newRootCommand(t.Context())
-
 	stdout, stderr, err := executeCommand(
-		root,
+		t,
 		snapshotCmd, "verify",
 		testRepositoryFlag, repoDir,
 		testGenerationFlag, savedGen,

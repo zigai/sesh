@@ -13,7 +13,7 @@ func TestSessionLoggingOutcomeOwnership(t *testing.T) {
 
 	sockPath := filepath.Join(t.TempDir(), "nonexistent.sock")
 
-	err := executeApplication(t.Context(), []string{"list", testSocketFlag, sockPath, testConfigFlag, cfg, testJSONFlag}, nil, &stdout, &stderr)
+	err := ExecuteApplication(t.Context(), []string{"session", "list", testSocketFlag, sockPath, testConfigFlag, cfg, testJSONFlag}, nil, &stdout, &stderr)
 	if err != nil {
 		t.Fatalf("list on empty server returned error: %v", err)
 	}

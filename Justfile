@@ -97,7 +97,7 @@ install: install-binary
     @{{ quote(prefix + "/" + binary) }} --version
 
 refresh-services:
-    {{ quote(prefix + "/" + binary) }} setup refresh --apply
+    {{ quote(prefix + "/" + binary) }} setup services --apply
 
 install-binary:
     #!/usr/bin/env bash

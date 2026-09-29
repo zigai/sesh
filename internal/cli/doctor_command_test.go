@@ -42,9 +42,7 @@ type doctorInvocation struct {
 func TestDoctorCommandHelp(t *testing.T) {
 	t.Parallel()
 
-	root := newRootCommand(t.Context())
-
-	stdout, stderr, err := executeCommand(root, "doctor", "--help")
+	stdout, stderr, err := executeCommand(t, "doctor", "--help")
 	if err != nil {
 		t.Fatalf("doctor --help failed: %v\nstderr: %s", err, stderr)
 	}
@@ -75,8 +73,7 @@ func TestDoctorCommandJSONOutput(t *testing.T) {
 func TestDoctorCommandPlainReportListsChecksAndSummary(t *testing.T) {
 	t.Parallel()
 
-	root := newRootCommand(t.Context())
-	stdout, _, _ := executeCommand(root, "doctor", testNoConfigFlag)
+	stdout, _, _ := executeCommand(t, "doctor", testNoConfigFlag)
 
 	if !strings.Contains(stdout, "✗ tmux") || !strings.Contains(stdout, "checks: ") {
 		t.Fatalf("stdout missing check status markers or summary: %s", stdout)
@@ -142,7 +139,7 @@ func TestDoctorApplicationWarningOnlyJSONOwnsDegradedOutcome(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	err := executeApplication(t.Context(), []string{
+	err := ExecuteApplication(t.Context(), []string{
 		"doctor",
 		testSocketFlag, tmuxtest.NewServer(t).Endpoint().SocketPath,
 		"--history", filepath.Join(base, "missing-history.json"),
@@ -179,7 +176,7 @@ func TestDoctorOutcomeMarkerPreservesIndependentFailures(t *testing.T) {
 
 		var stderr bytes.Buffer
 
-		err := executeApplication(t.Context(), invocation.args, nil, failingRuntimeWriter{}, &stderr)
+		err := ExecuteApplication(t.Context(), invocation.args, nil, failingRuntimeWriter{}, &stderr)
 		if !errors.Is(err, errDoctorChecksFailed) || !errors.Is(err, io.ErrClosedPipe) {
 			t.Fatalf("output failure lost a cause: %v", err)
 		}
@@ -203,7 +200,7 @@ func testDoctorFinalizationFailure(t *testing.T) {
 	var output, diagnostics commandBuffer
 	cmd.SetOut(&output)
 
-	doctorErr := cmddoctor.NewChecksError(NewExitError(exitCodeGeneral, errDoctorChecksFailed))
+	doctorErr := loggedDoctorError{error: NewExitError(exitCodeGeneral, errDoctorChecksFailed)}
 	runErr := writeJSONResultError(cmd, doctorResultJSON{HasErrors: true}, doctorErr)
 	closeErr := io.ErrClosedPipe
 
@@ -227,7 +224,7 @@ func runFailedDoctorApplication(t *testing.T, jsonOutput bool) failedDoctorFixtu
 
 	var stdout, stderr bytes.Buffer
 
-	err := executeApplication(t.Context(), invocation.args, nil, &stdout, &stderr)
+	err := ExecuteApplication(t.Context(), invocation.args, nil, &stdout, &stderr)
 
 	logs, readErr := os.ReadFile(invocation.logPath)
 	if readErr != nil {
@@ -398,3 +395,10 @@ func assertDoctorTerminalRecord(
 		t.Fatalf("degraded doctor record lacks the warning count: %s", line)
 	}
 }
+
+// loggedDoctorError marks a doctor failure whose outcome was already logged.
+type loggedDoctorError struct{ error }
+
+func (e loggedDoctorError) Unwrap() error { return e.error }
+
+func (e loggedDoctorError) OutcomeLogged() bool { return true }

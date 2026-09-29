@@ -57,10 +57,11 @@ func emptyDaemonRuntimeStatus() daemon.RuntimeStatus {
 
 func NewStatusCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "status",
-		Short: "Report autosave configuration, durable state and due state",
-		Args:  clibase.UsageArgs(cobra.NoArgs),
-		RunE:  runAutosaveStatus,
+		Use:         "status",
+		Short:       "Report autosave configuration, durable state and due state",
+		Args:        clibase.UsageArgs(cobra.NoArgs),
+		RunE:        runAutosaveStatus,
+		Annotations: map[string]string{clibase.AnnotationOperation: "status"},
 	}
 
 	clibase.AddJSONFlag(cmd)

@@ -3,7 +3,6 @@
 package cmdpicker
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -28,11 +27,6 @@ import (
 	"github.com/zigai/sesh/internal/session"
 )
 
-const (
-	testRepositoryFlag = "--repository"
-	testSocketFlag     = "--socket"
-)
-
 func newTestRootCommand(ctx context.Context) *cobra.Command {
 	rootCommand := &cobra.Command{
 		Use:           "sesh",
@@ -46,48 +40,6 @@ func newTestRootCommand(ctx context.Context) *cobra.Command {
 	rootCommand.AddCommand(NewPickCommand(ctx), NewPickerOpenCommand(ctx))
 
 	return rootCommand
-}
-
-func TestPickRejectsNonTerminalBeforeRepositoryCreation(t *testing.T) {
-	repository := filepath.Join(t.TempDir(), "repository")
-	root := newTestRootCommand(t.Context())
-	root.SetIn(bytes.NewBufferString("not a terminal"))
-	root.SetOut(&bytes.Buffer{})
-	root.SetErr(&bytes.Buffer{})
-	root.SetArgs([]string{
-		"pick", "--ui", "fullscreen", "--no-config", testSocketFlag, "/tmp/sesh-picker-missing.sock",
-		testRepositoryFlag, repository,
-	})
-
-	err := root.Execute()
-	if !errors.Is(err, errPickerTerminalRequired) {
-		t.Fatalf("pick error = %v, want terminal required", err)
-	}
-
-	if _, statErr := os.Stat(repository); !errors.Is(statErr, os.ErrNotExist) {
-		t.Fatalf("repository created before terminal validation: %v", statErr)
-	}
-}
-
-func TestPickRejectsUnknownUIAsUsageBeforeRepositoryCreation(t *testing.T) {
-	repository := filepath.Join(t.TempDir(), "repository")
-	root := newTestRootCommand(t.Context())
-	root.SetIn(bytes.NewBufferString(""))
-	root.SetOut(&bytes.Buffer{})
-	root.SetErr(&bytes.Buffer{})
-	root.SetArgs([]string{
-		"pick", "--ui", "standalone", "--no-config", testSocketFlag, "/tmp/sesh-picker-missing.sock",
-		testRepositoryFlag, repository,
-	})
-
-	err := root.Execute()
-	if !errors.Is(err, errInvalidPickerUI) || clibase.ExitCode(err) != clibase.ExitCodeUsage {
-		t.Fatalf("pick error = %v (exit %d), want invalid ui usage error", err, clibase.ExitCode(err))
-	}
-
-	if _, statErr := os.Stat(repository); !errors.Is(statErr, os.ErrNotExist) {
-		t.Fatalf("repository created before ui validation: %v", statErr)
-	}
 }
 
 func TestResolvePickerPresentationFollowsChoiceAndTmuxContext(t *testing.T) {

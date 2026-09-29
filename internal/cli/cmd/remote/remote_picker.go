@@ -58,10 +58,6 @@ type remoteAttachExec struct {
 
 type originPickerAdapter struct{ socket string }
 
-func RemoteActionResultError(result remote.ActionResult, runErr error) error {
-	return remoteActionResultError(result, runErr)
-}
-
 func DefaultPickerRemoteFactory(_ context.Context, cfg *config.Config, socket string) (cmdpicker.PickerRemoteServices, error) {
 	if cfg == nil {
 		return cmdpicker.PickerRemoteServices{Catalog: nil, Watcher: nil, Actions: nil, Attach: nil, OriginBridge: nil}, nil

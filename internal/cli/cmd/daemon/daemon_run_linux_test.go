@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/zigai/sesh/internal/automation"
+	"github.com/zigai/sesh/internal/daemon"
 	"github.com/zigai/sesh/internal/integration/lifecycle"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
@@ -204,7 +205,7 @@ func TestDaemonRepositoryGateRefusesUnresolvedSave(t *testing.T) {
 		t.Fatalf("Close failed: %v", err)
 	}
 
-	cmd := newDaemonRunCommand()
+	cmd := newDaemonCoordinatorCommand()
 	if err := cmd.Flags().Set("repository", repositoryPath); err != nil {
 		t.Fatalf("set repository flag: %v", err)
 	}
@@ -217,13 +218,13 @@ func TestDaemonRepositoryGateRefusesUnresolvedSave(t *testing.T) {
 
 func TestDaemonCancellationNormalizationPreservesJoinedFailure(t *testing.T) {
 	pureCancellation := fmt.Errorf("receive lifecycle event: %w", context.Canceled)
-	if normalized := normalizeDaemonCancellation(pureCancellation); normalized != nil {
+	if normalized := daemon.NormalizeDaemonCancellation(pureCancellation); normalized != nil {
 		t.Fatalf("pure cancellation normalized to %v, want nil", normalized)
 	}
 
 	joined := errors.Join(pureCancellation, errDaemonLifecycleUncertain)
 
-	normalized := normalizeDaemonCancellation(joined)
+	normalized := daemon.NormalizeDaemonCancellation(joined)
 	if !errors.Is(normalized, context.Canceled) || !errors.Is(normalized, errDaemonLifecycleUncertain) {
 		t.Fatalf("joined lifecycle error normalized to %v, want cancellation and uncertainty", normalized)
 	}

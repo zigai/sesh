@@ -1,6 +1,6 @@
 //go:build linux
 
-package cmdautosave
+package cmdautosave_test
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/zigai/sesh/internal/daemon"
+	"github.com/zigai/sesh/internal/testsupport/clitest"
 )
 
 func autosaveRuntimeFixture(t *testing.T) (string, string) {
@@ -38,12 +39,12 @@ func autosaveRuntimeFixture(t *testing.T) (string, string) {
 func assertRuntimeJSONPrivacy(t *testing.T, execution commandExecution, endpoint string) {
 	t.Helper()
 
-	if execution.stderr != "" {
-		t.Fatalf("runtime JSON leaked to stderr: %q", execution.stderr)
+	if execution.Stderr != "" {
+		t.Fatalf("runtime JSON leaked to stderr: %q", execution.Stderr)
 	}
 
 	for _, private := range []string{endpoint, `"pid"`, `"bootId"`, `"processStartTicks"`, `"endpointId"`} {
-		if strings.Contains(execution.stdout, private) {
+		if strings.Contains(execution.Stdout, private) {
 			t.Fatalf("runtime JSON exposed private identity %q", private)
 		}
 	}
@@ -95,14 +96,14 @@ func TestAutosaveRuntimeStatusTracksReadinessAndLiveProbeFailure(t *testing.T) {
 			unavailable.Store(test.unavailable)
 			reporter.Update(test.phase)
 
-			execution := executeJSON(t, actionCmd, "autosave-status", testNoConfigFlag, testJSONFlag, testSocketFlag, endpoint)
-			if execution.err != nil || !execution.envelope.OK {
-				t.Fatalf("status inspection failed: %v", execution.err)
+			execution := executeJSON(t, "autosave", "status", testNoConfigFlag, testJSONFlag, testSocketFlag, endpoint)
+			if execution.Err != nil || !execution.Envelope.OK {
+				t.Fatalf("status inspection failed: %v", execution.Err)
 			}
 
 			assertRuntimeJSONPrivacy(t, execution, endpoint)
 
-			result := decodeJSONPayload[autosaveResultJSON](t, execution.envelope.Result)
+			result := clitest.DecodePayload[autosaveResultJSON](t, execution.Envelope.Result)
 			assertAutosaveRuntimeFacts(t, result, test.state, test.phase, test.held)
 		})
 	}
@@ -140,10 +141,10 @@ func TestAutosaveRuntimeStatusDistinguishesAbsentAndStaleEndpoints(t *testing.T)
 
 	query := func(want string) {
 		t.Helper()
-		execution := executeJSON(t, actionCmd, "autosave-status", testNoConfigFlag, testJSONFlag, testSocketFlag, endpoint)
+		execution := executeJSON(t, "autosave", "status", testNoConfigFlag, testJSONFlag, testSocketFlag, endpoint)
 		assertRuntimeJSONPrivacy(t, execution, endpoint)
 
-		result := decodeJSONPayload[autosaveResultJSON](t, execution.envelope.Result)
+		result := clitest.DecodePayload[autosaveResultJSON](t, execution.Envelope.Result)
 		if result.DaemonState != want || result.InhibitorsHeld || result.DaemonPhase != "" {
 			t.Fatalf("runtime result = %+v, want %s without live facts", result, want)
 		}

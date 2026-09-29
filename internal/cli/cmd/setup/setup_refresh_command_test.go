@@ -1,9 +1,10 @@
-package cmdsetup
+package cmdsetup_test
 
 import (
-	"context"
 	"errors"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -11,22 +12,32 @@ import (
 	"testing"
 
 	"github.com/zigai/sesh/internal/setup"
+	"github.com/zigai/sesh/internal/testsupport/clitest"
 )
 
-var errSetupTestManager = errors.New("private-service-manager-canary")
+const fakeSystemctlFailureExit = 3
 
-func TestSetupRefreshApplyReloadsAndPreservesActiveServices(t *testing.T) {
+// executeSetupServices runs the production pipeline against a fake systemctl on PATH.
+func executeSetupServices(t *testing.T, arguments ...string) commandExecution {
+	t.Helper()
+
+	args := append([]string{"setup", "services", "--program", "/private-program-canary/sesh", testJSONFlag}, arguments...)
+
+	return executeJSON(t, args...)
+}
+
+func TestSetupServicesApplyReloadsAndPreservesActiveServices(t *testing.T) {
 	setupRefreshHome(t)
 	seedSetupRefreshServices(t)
 	configPath, logPath := runtimeConfig(t, "info")
-	manager, calls := setupRefreshManager(t, "")
+	fake := setupRefreshManager(t, "")
 
-	execution := executeSetupRefresh(t, manager, "--apply", testConfigFlag, configPath)
-	if execution.err != nil || !execution.envelope.OK || execution.stderr != "" {
+	execution := executeSetupServices(t, "--apply", testConfigFlag, configPath)
+	if execution.Err != nil || !execution.Envelope.OK || execution.Stderr != "" {
 		t.Fatalf("refresh = %+v", execution)
 	}
 
-	result := decodeJSONPayload[setupServicesResultJSON](t, execution.envelope.Result)
+	result := clitest.DecodePayload[setupServicesResultJSON](t, execution.Envelope.Result)
 	if !result.Applied || result.Written != 3 || result.Manager == nil || !result.Manager.Reloaded {
 		t.Fatalf("refresh result = %+v", result)
 	}
@@ -35,8 +46,8 @@ func TestSetupRefreshApplyReloadsAndPreservesActiveServices(t *testing.T) {
 		t.Fatalf("restart result = %+v", result.Manager)
 	}
 
-	if !slices.Equal(*calls, []string{"daemon-reload", "try-restart " + setup.AutosaveTimerName, "try-restart " + setup.RemoteServiceName}) {
-		t.Fatalf("manager commands = %v", *calls)
+	if !slices.Equal(fake.commands(t), []string{"daemon-reload", "try-restart " + setup.AutosaveTimerName, "try-restart " + setup.RemoteServiceName}) {
+		t.Fatalf("manager commands = %v", fake.commands(t))
 	}
 
 	assertRuntimeLog(t, logPath, "cli", "refresh", "info", "ok", configPath, "private-program-canary", "systemctl")
@@ -73,56 +84,93 @@ func seedSetupRefreshServices(t *testing.T) string {
 	return directory
 }
 
-func setupRefreshManager(t *testing.T, failing string) (setup.ServiceManager, *[]string) {
-	t.Helper()
-
-	var calls []string
-
-	manager := setup.ServiceManager{
-		Inspect: func(_ context.Context, executable string, args ...string) (string, error) {
-			if executable != "systemctl" || !slices.Equal(args[:len(args)-1], []string{"--user", "show", "--property=ActiveState", "--value"}) {
-				t.Fatalf("unexpected inspection: %s %v", executable, args)
-			}
-
-			if failing == "inspect" {
-				return "", errSetupTestManager
-			}
-
-			return "active\n", nil
-		},
-		Run: func(_ context.Context, executable string, args ...string) error {
-			if executable != "systemctl" || args[0] != "--user" {
-				t.Fatalf("unexpected manager: %s %v", executable, args)
-			}
-
-			call := strings.Join(args[1:], " ")
-
-			calls = append(calls, call)
-			if call == failing {
-				return errSetupTestManager
-			}
-
-			return nil
-		},
-	}
-
-	return manager, &calls
+type fakeSystemctl struct {
+	callsPath string
 }
 
-func TestSetupRefreshManagerFailureRetainsPartialJSONAndOneErrorRecord(t *testing.T) {
+// commands returns the recorded systemctl mutations, without inspections.
+func (fake fakeSystemctl) commands(t *testing.T) []string {
+	t.Helper()
+
+	var commands []string
+
+	for _, call := range fake.calls(t) {
+		if !strings.HasPrefix(call, "--user show ") {
+			commands = append(commands, strings.TrimPrefix(call, "--user "))
+		}
+	}
+
+	return commands
+}
+
+func (fake fakeSystemctl) calls(t *testing.T) []string {
+	t.Helper()
+
+	data, err := os.ReadFile(fake.callsPath)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return strings.Split(strings.TrimSpace(string(data)), "\n")
+}
+
+// setupRefreshManager puts a systemctl stub first on PATH. failing names the
+// operation that exits non-zero: "inspect", "daemon-reload" or "try-restart <unit>".
+func setupRefreshManager(t *testing.T, failing string) fakeSystemctl {
+	t.Helper()
+
+	binDir := t.TempDir()
+	callsPath := filepath.Join(t.TempDir(), "calls")
+	script := fmt.Sprintf(`#!/bin/sh
+printf '%%s\n' "$*" >> %[1]q
+case "$*" in
+"--user show --property=ActiveState --value "*)
+	if [ %[2]q = inspect ]; then exit %[3]d; fi
+	echo active
+	exit 0;;
+esac
+if [ %[4]q = "$*" ]; then exit %[3]d; fi
+exit 0
+`, callsPath, failing, fakeSystemctlFailureExit, "--user "+failing)
+
+	if err := os.WriteFile(filepath.Join(binDir, "systemctl"), []byte(script), 0o700); err != nil { //nolint:gosec // reason: the stub must be executable.
+		t.Fatal(err)
+	}
+
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	return fakeSystemctl{callsPath: callsPath}
+}
+
+func requireFakeSystemctlFailure(t *testing.T, err error) {
+	t.Helper()
+
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) || exitErr.ExitCode() != fakeSystemctlFailureExit {
+		t.Fatalf("error = %v, want the manager command failure", err)
+	}
+}
+
+func TestSetupServicesManagerFailureRetainsPartialJSONAndOneErrorRecord(t *testing.T) {
 	for _, phase := range []string{"inspect", "daemon-reload", "try-restart " + setup.RemoteServiceName} {
 		t.Run(phase, func(t *testing.T) {
 			setupRefreshHome(t)
 			directory := seedSetupRefreshServices(t)
 			configPath, logPath := runtimeConfig(t, "info")
-			manager, _ := setupRefreshManager(t, phase)
+			setupRefreshManager(t, phase)
 
-			execution := executeSetupRefresh(t, manager, "--apply", testConfigFlag, configPath)
-			if !errors.Is(execution.err, errSetupTestManager) || execution.envelope.OK || execution.envelope.Error == nil || execution.stderr != "" {
+			execution := executeSetupServices(t, "--apply", testConfigFlag, configPath)
+			requireFakeSystemctlFailure(t, execution.Err)
+
+			if execution.Envelope.OK || execution.Envelope.Error == nil || execution.Stderr != "" {
 				t.Fatalf("failed refresh = %+v", execution)
 			}
 
-			result := decodeJSONPayload[setupServicesResultJSON](t, execution.envelope.Result)
+			result := clitest.DecodePayload[setupServicesResultJSON](t, execution.Envelope.Result)
 			if result.Manager == nil {
 				t.Fatal("missing partial manager result")
 			}
@@ -135,11 +183,11 @@ func TestSetupRefreshManagerFailureRetainsPartialJSONAndOneErrorRecord(t *testin
 
 			assertRefreshPartialManagerResult(t, phase, result.Manager)
 
-			if strings.Contains(execution.stdout+execution.stderr, errSetupTestManager.Error()) {
+			if strings.Contains(execution.Stdout+execution.Stderr, "exit status") {
 				t.Fatal("private manager diagnostics in JSON")
 			}
 
-			assertRuntimeLog(t, logPath, "cli", "refresh", "error", "failed", directory, configPath, "private-program-canary", errSetupTestManager.Error())
+			assertRuntimeLog(t, logPath, "cli", "refresh", "error", "failed", directory, configPath, "private-program-canary", "exit status")
 		})
 	}
 }
@@ -152,14 +200,14 @@ func assertRefreshPartialManagerResult(t *testing.T, phase string, manager *setu
 	}
 }
 
-func TestSetupRefreshDisabledLoggingDoesNotCreateSink(t *testing.T) {
+func TestSetupServicesDisabledLoggingDoesNotCreateSink(t *testing.T) {
 	setupRefreshHome(t)
 	seedSetupRefreshServices(t)
 	configPath, logPath := runtimeConfig(t, "disabled")
-	manager, _ := setupRefreshManager(t, "daemon-reload")
+	setupRefreshManager(t, "daemon-reload")
 
-	execution := executeSetupRefresh(t, manager, "--apply", testConfigFlag, configPath)
-	if execution.err == nil || execution.envelope.OK || execution.stderr != "" {
+	execution := executeSetupServices(t, "--apply", testConfigFlag, configPath)
+	if execution.Err == nil || execution.Envelope.OK || execution.Stderr != "" {
 		t.Fatalf("refresh with logging disabled = %+v", execution)
 	}
 
@@ -185,46 +233,50 @@ func assertRefreshInspectionDidNotWrite(t *testing.T, directory string, result s
 	}
 }
 
-func TestSetupRefreshPreviewAndExplicitDirectoryNeverContactManager(t *testing.T) {
+func TestSetupServicesPreviewAndExplicitDirectoryNeverContactManager(t *testing.T) {
 	for _, mode := range []string{"preview", "custom-directory", "explicit-default-directory"} {
 		t.Run(mode, func(t *testing.T) {
 			setupRefreshHome(t)
 			directory := seedSetupRefreshServices(t)
-			manager := setup.ServiceManager{
-				Inspect: func(context.Context, string, ...string) (string, error) {
-					t.Fatal("contacted manager from preview or explicit directory")
-					return "", errSetupTestManager
-				},
-				Run: func(context.Context, string, ...string) error {
-					t.Fatal("mutated manager from preview or explicit directory")
-					return errSetupTestManager
-				},
-			}
+			fake := setupRefreshManager(t, "")
 			args := []string{testNoConfigFlag}
 
-			if mode != "preview" {
-				if mode == "custom-directory" {
-					directory = filepath.Join(t.TempDir(), "custom-units")
-				}
+			if mode == "custom-directory" {
+				directory = filepath.Join(t.TempDir(), "custom-units")
+			}
 
+			if mode != "preview" {
 				args = append(args, "--apply", "--dir", directory)
 			}
 
-			execution := executeSetupRefresh(t, manager, args...)
-			if execution.err != nil || !execution.envelope.OK || execution.stderr != "" {
+			execution := executeSetupServices(t, args...)
+			if execution.Err != nil || !execution.Envelope.OK || execution.Stderr != "" {
 				t.Fatalf("definition-only refresh = %+v", execution)
 			}
 
-			result := decodeJSONPayload[setupServicesResultJSON](t, execution.envelope.Result)
-			if result.Manager != nil {
-				t.Fatalf("definition-only result claims manager operation: %+v", result.Manager)
-			}
+			assertDefinitionOnlyRefresh(t, mode == "preview", directory, clitest.DecodePayload[setupServicesResultJSON](t, execution.Envelope.Result))
 
-			if mode == "preview" {
-				assertRefreshInspectionDidNotWrite(t, directory, result)
-			} else if !result.Applied || result.Written != 3 {
-				t.Fatalf("definition-only apply = %+v", result)
+			if calls := fake.calls(t); len(calls) != 0 {
+				t.Fatalf("contacted manager from preview or explicit directory: %v", calls)
 			}
 		})
+	}
+}
+
+func assertDefinitionOnlyRefresh(t *testing.T, preview bool, directory string, result setupServicesResultJSON) {
+	t.Helper()
+
+	if result.Manager != nil {
+		t.Fatalf("definition-only result claims manager operation: %+v", result.Manager)
+	}
+
+	if preview {
+		assertRefreshInspectionDidNotWrite(t, directory, result)
+
+		return
+	}
+
+	if !result.Applied || result.Written != 3 {
+		t.Fatalf("definition-only apply = %+v", result)
 	}
 }

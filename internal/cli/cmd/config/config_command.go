@@ -53,7 +53,7 @@ func newConfigInitCommand() *cobra.Command {
 		RunE: runConfigInit,
 	}
 
-	cmd.Flags().String("path", "", "Configuration file to create instead of the native XDG path")
+	cmd.Flags().String("path", "", "Configuration file to create [default: $XDG_CONFIG_HOME/sesh/config.toml]")
 	cmd.Flags().Bool("force", false, "Replace an existing regular configuration file")
 	clibase.AddJSONFlag(cmd)
 

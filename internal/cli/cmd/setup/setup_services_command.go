@@ -100,7 +100,8 @@ func newSetupAgentsCommand() *cobra.Command {
 	cmd.Flags().Bool("force", false, "Replace integration files that AHT does not own")
 	cmd.Flags().Bool("shim", false, "Install a wrapper executable instead of editing harness files")
 	cmd.Flags().Bool("status", false, "Report integration and tracker state without changing anything")
-	cmd.Flags().String("tracker", setup.TrackerEnable, "Tracker operation: enable, disable or status")
+	cmd.Flags().String("tracker", setup.TrackerEnable, "Tracker operation")
+	clibase.SetFlagChoices(cmd, "tracker", setup.TrackerEnable, setup.TrackerDisable, setup.TrackerStatus)
 	cmd.Flags().String("target-binary", "", "Explicit harness executable path for a shim")
 	clibase.AddJSONFlag(cmd)
 
@@ -229,79 +230,27 @@ func agentStatusLine(item setup.AgentHarnessResult) string {
 	return "unchanged"
 }
 
-func newSetupAutosaveCommand() *cobra.Command {
+func newSetupServicesCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "autosave",
-		Short: "Render or install the owned autosave service definitions",
-		Long: "Render or install the owned autosave service definitions.\n\n" +
-			"Without --apply nothing is written and no service manager is contacted. The periodic timer executes save-if-due " +
-			"periodically while active. With --with-tmux-service, setup additionally renders a managed foreground tmux server " +
-			"(daemon serve) whose stop step runs one bounded final save while tmux is still alive. That covers the ordered stop " +
-			"of the managed unit only: OS sleep and shutdown delay-inhibitor integration requires its own running coordinator " +
-			"(sesh daemon run) and is not provided by unit ordering alone.",
+		Use:         "services",
+		Short:       "Render or apply the owned service definitions",
+		Annotations: map[string]string{clibase.AnnotationOperation: "refresh"},
+		Long: "Render or apply the owned service definitions.\n\n" +
+			"The periodic autosave timer and the remote monitor are always rendered. --with-tmux-service adds a managed " +
+			"foreground tmux server (daemon tmux) whose stop step runs one bounded final save while tmux is still alive. " +
+			"--with-coordinator adds the sleep and shutdown save coordinator (daemon coordinator), which holds logind delay " +
+			"inhibitors; unit ordering alone does not provide that.\n\n" +
+			"Without --apply the plan is printed and nothing is written. Existing files that sesh does not own are reported and " +
+			"left untouched. On Linux, --apply reloads the user service manager and refreshes an already running autosave timer " +
+			"and remote monitor. Stopped services stay stopped, enabled state is preserved, and the tmux server and in-flight " +
+			"autosave are never restarted. An explicit --dir writes definitions only and does not contact the service manager.",
 		Args: clibase.UsageArgs(cobra.NoArgs),
-		RunE: runSetupAutosave,
+		RunE: runSetupServices,
 	}
 
 	addServiceSetupFlags(cmd)
 	cmd.Flags().Bool("with-tmux-service", false, "Also render the managed tmux server definition")
-	cmd.Flags().Bool("with-coordinator", false, "Also render the lifecycle coordinator daemon definition")
-	cmd.Flags().Bool("verify-tmux", false, "Verify the target tmux version through the given socket before rendering the tmux service")
-
-	return cmd
-}
-
-func newSetupRemoteCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "remote",
-		Short: "Render the owned remote monitor service definition",
-		Long: "Render the owned remote monitor service definition.\n\n" +
-			"The definition invokes the native remote monitor; installation is refused " +
-			"while that prerequisite is unmet.",
-		Args: clibase.UsageArgs(cobra.NoArgs),
-		RunE: runSetupRemote,
-	}
-
-	addServiceSetupFlags(cmd)
-
-	return cmd
-}
-
-func newSetupCoordinatorCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "coordinator",
-		Aliases: []string{"daemon"},
-		Short:   "Render or install the owned lifecycle coordinator daemon service definition",
-		Long: "Render or install the owned lifecycle coordinator daemon service definition.\n\n" +
-			"Without --apply nothing is written and no service manager is contacted. The coordinator runs sesh daemon run " +
-			"in the foreground: it holds logind shutdown and sleep delay inhibitors and runs one bounded save for each. " +
-			"Periodic saves belong to the autosave timer.",
-		Args: clibase.UsageArgs(cobra.NoArgs),
-		RunE: runSetupCoordinator,
-	}
-
-	addServiceSetupFlags(cmd)
-
-	return cmd
-}
-
-func newSetupRefreshCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:         "refresh",
-		Short:       "Reconcile the owned service definitions with the current binary and configuration",
-		Annotations: map[string]string{clibase.AnnotationOperation: "refresh"},
-		Long: "Reconcile the owned service definitions with the current binary and configuration.\n\n" +
-			"Existing files that sesh does not own are reported and left untouched. Without --apply the plan is printed only. " +
-			"On Linux, --apply reloads the user service manager and refreshes an already running autosave timer and remote monitor. " +
-			"Stopped services stay stopped, enabled state is preserved, and the tmux server and in-flight autosave are never restarted. " +
-			"An explicit --dir writes definitions only and does not contact the service manager.",
-		Args: clibase.UsageArgs(cobra.NoArgs),
-		RunE: runSetupRefresh,
-	}
-
-	addServiceSetupFlags(cmd)
-	cmd.Flags().Bool("with-tmux-service", false, "Also reconcile the managed tmux server definition")
-	cmd.Flags().Bool("with-coordinator", false, "Also reconcile the lifecycle coordinator daemon definition")
+	cmd.Flags().Bool("with-coordinator", false, "Also render the sleep and shutdown save coordinator definition")
 	cmd.Flags().Bool("verify-tmux", false, "Verify the target tmux version through the given socket before rendering the tmux service")
 
 	return cmd
@@ -310,15 +259,15 @@ func newSetupRefreshCommand() *cobra.Command {
 func addServiceSetupFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("apply", false, "Write the rendered definitions to the service directory")
 	cmd.Flags().Bool("force", false, "Replace service files that sesh does not own")
-	cmd.Flags().String("dir", "", "Explicit service directory to render into (defaults to the platform user service directory)")
-	cmd.Flags().String("program", "", "Explicit absolute path of the sesh executable")
+	cmd.Flags().String("dir", "", "Service directory to render into [default: the platform user service directory]")
+	cmd.Flags().String("program", "", "Absolute path of the sesh executable [default: the running sesh executable]")
 	cmd.Flags().String("tmux", "", "Explicit absolute path of the tmux executable")
-	cmd.Flags().String("socket", "", "tmux server socket the services target (default: the sesh-managed socket with --with-tmux-service, else tmux's default socket)")
-	cmd.Flags().String("repository", "", "Native repository directory")
-	cmd.Flags().String("lease-root", "", "Explicit path to shared lease root directory")
-	cmd.Flags().String("history", "", "History state JSON file path")
-	cmd.Flags().String("status-file", "", "Explicit path for the final save status artifact")
-	cmd.Flags().Duration("interval", 0, "Autosave interval (defaults to the configured value)")
+	cmd.Flags().String("socket", "", "Socket of the tmux server the services target [default: the sesh-managed socket with --with-tmux-service, else tmux's default socket]")
+	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
+	cmd.Flags().String("lease-root", "", clibase.LeaseRootFlagUsage)
+	cmd.Flags().String("history", "", clibase.HistoryFlagUsage)
+	cmd.Flags().String("status-file", "", clibase.StatusFileFlagUsage)
+	cmd.Flags().Duration("interval", 0, "Autosave interval [default: autosave.interval setting]")
 	cmd.Flags().Duration("final-save-deadline", defaultServiceFinalSaveDeadline, "Bounded time budget for the shutdown final save")
 	clibase.AddJSONFlag(cmd)
 }
@@ -438,84 +387,11 @@ func resolveServiceTiming(cmd *cobra.Command, cfg *config.Config) (time.Duration
 	return interval, deadline, nil
 }
 
-func runSetupAutosave(cmd *cobra.Command, _ []string) error {
-	withTmux, err := cmd.Flags().GetBool("with-tmux-service")
-	if err != nil {
-		return oops.In("cli").With("operation", "read_setup_flag").Wrap(err)
-	}
-
-	withCoordinator, err := cmd.Flags().GetBool("with-coordinator")
-	if err != nil {
-		return oops.In("cli").With("operation", "read_setup_flag").Wrap(err)
-	}
-
-	inputs, err := resolveServiceInputs(cmd, withTmux)
-	if err != nil {
-		return err
-	}
-
-	inputs.WithCoordinator = withCoordinator
-
-	if withTmux {
-		verify, flagErr := cmd.Flags().GetBool("verify-tmux")
-		if flagErr != nil {
-			return oops.In("cli").With("operation", "read_setup_flag").Wrap(flagErr)
-		}
-
-		inputs.RequiresTmuxForeground = verify
-		if verify {
-			verified, verifyErr := verifySetupTmuxForeground(cmd, inputs.SocketPath)
-			if verifyErr != nil {
-				return verifyErr
-			}
-
-			inputs.TmuxForegroundVerified = verified
-		}
-	}
-
-	definitions, err := setup.Definitions(inputs)
-	if err != nil {
-		return clibase.NewExitError(clibase.ExitCodeUsage, err)
-	}
-
-	return applySetupDefinitions(cmd, definitions, "autosave")
+func runSetupServices(cmd *cobra.Command, _ []string) error {
+	return runSetupServicesWithManager(cmd, setup.ServiceManager{Inspect: nil, Run: nil})
 }
 
-func runSetupRemote(cmd *cobra.Command, _ []string) error {
-	inputs, err := resolveServiceInputs(cmd, false)
-	if err != nil {
-		return err
-	}
-
-	available := remoteMonitorAvailable(cmd)
-
-	definition, err := setup.RemoteMonitorDefinition(inputs, available)
-	if err != nil {
-		return clibase.NewExitError(clibase.ExitCodeUsage, err)
-	}
-
-	return applySetupDefinitions(cmd, []setup.ServiceDefinition{definition}, "remote")
-}
-
-func runSetupCoordinator(cmd *cobra.Command, _ []string) error {
-	inputs, err := resolveServiceInputs(cmd, false)
-	if err != nil {
-		return err
-	}
-
-	definition, err := setup.CoordinatorDefinition(inputs)
-	if err != nil {
-		return clibase.NewExitError(clibase.ExitCodeUsage, err)
-	}
-
-	return applySetupDefinitions(cmd, []setup.ServiceDefinition{definition}, "coordinator")
-}
-
-func runSetupRefresh(cmd *cobra.Command, _ []string) error {
-	return runSetupRefreshWithManager(cmd, setup.ServiceManager{Inspect: nil, Run: nil})
-}
-
-func runSetupRefreshWithManager(cmd *cobra.Command, manager setup.ServiceManager) error {
+func runSetupServicesWithManager(cmd *cobra.Command, manager setup.ServiceManager) error {
 	withTmux, err := cmd.Flags().GetBool("with-tmux-service")
 	if err != nil {
 		return oops.In("cli").With("operation", "read_setup_flag").Wrap(err)
@@ -563,10 +439,6 @@ func runSetupRefreshWithManager(cmd *cobra.Command, manager setup.ServiceManager
 	definitions = append(definitions, remoteDefinition)
 
 	return applySetupDefinitionsWithManager(cmd, definitions, "refresh", manager)
-}
-
-func applySetupDefinitions(cmd *cobra.Command, definitions []setup.ServiceDefinition, operation string) error {
-	return applySetupDefinitionsWithManager(cmd, definitions, operation, setup.ServiceManager{Inspect: nil, Run: nil})
 }
 
 func applySetupDefinitionsWithManager(
@@ -862,12 +734,12 @@ func remoteMonitorAvailable(cmd *cobra.Command) bool {
 		return false
 	}
 
-	found, _, err := root.Find([]string{"remote", "monitor"})
+	found, _, err := root.Find([]string{"daemon", "remote-monitor"})
 	if err != nil || found == nil {
 		return false
 	}
 
-	return found.Name() == "monitor"
+	return found.Name() == "remote-monitor"
 }
 
 func verifySetupTmuxForeground(cmd *cobra.Command, socketPath string) (bool, error) {

@@ -213,9 +213,9 @@ func assertTmuxServiceContent(t *testing.T, content string) {
 	t.Helper()
 
 	for _, want := range []string{
-		"ExecStart=/usr/local/bin/sesh daemon serve --socket /run/user/1000/sesh/tmux.sock --tmux /usr/bin/tmux --stop-grace 5s",
-		"ExecStartPost=/usr/local/bin/sesh daemon wait-ready --socket /run/user/1000/sesh/tmux.sock --timeout 5s",
-		"autosave final-save",
+		"ExecStart=/usr/local/bin/sesh daemon tmux --socket /run/user/1000/sesh/tmux.sock --tmux /usr/bin/tmux --stop-grace 5s",
+		"ExecStartPost=/usr/local/bin/sesh action tmux-wait-ready --socket /run/user/1000/sesh/tmux.sock --timeout 5s",
+		"action autosave-final-save",
 		"--deadline 20s",
 		"--status-file /home/user/.local/state/sesh/autosave-status.json",
 		"TimeoutStopSec=25s",
@@ -389,7 +389,7 @@ func TestRemoteMonitorDefinitionIsGatedOnTheEntryPoint(t *testing.T) {
 		t.Fatalf("requires = %v, want the missing entry point", blocked.Requires)
 	}
 
-	if !strings.Contains(blocked.Content, "ExecStart=/usr/local/bin/sesh remote monitor run --socket /run/user/1000/sesh/tmux.sock") {
+	if !strings.Contains(blocked.Content, "ExecStart=/usr/local/bin/sesh daemon remote-monitor --socket /run/user/1000/sesh/tmux.sock") {
 		t.Fatalf("remote monitor ExecStart is not the native command:\n%s", blocked.Content)
 	}
 
@@ -428,7 +428,7 @@ func TestServiceDirectoryUsesPlatformDefaults(t *testing.T) {
 	}
 }
 
-func TestCoordinatorDefinitionRendersDaemonRun(t *testing.T) {
+func TestCoordinatorDefinitionRendersDaemonCoordinator(t *testing.T) {
 	t.Parallel()
 
 	inputs := linuxInputs(t)
@@ -450,8 +450,8 @@ func TestCoordinatorDefinitionRendersDaemonRun(t *testing.T) {
 		t.Fatalf("coordinator service missing ownership marker:\n%s", definition.Content)
 	}
 
-	if !strings.Contains(definition.Content, "ExecStart=/usr/local/bin/sesh daemon run --socket /run/user/1000/sesh/tmux.sock") {
-		t.Fatalf("coordinator service ExecStart is not daemon run:\n%s", definition.Content)
+	if !strings.Contains(definition.Content, "ExecStart=/usr/local/bin/sesh daemon coordinator --socket /run/user/1000/sesh/tmux.sock") {
+		t.Fatalf("coordinator service ExecStart is not daemon coordinator:\n%s", definition.Content)
 	}
 
 	if !strings.Contains(definition.Content, "--repository /home/user/.local/share/sesh/snapshots") {

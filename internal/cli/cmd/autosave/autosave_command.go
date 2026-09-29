@@ -118,10 +118,7 @@ func NewCommand() *cobra.Command {
 
 	addAutosaveFlags(cmd.PersistentFlags())
 
-	cmd.AddCommand(
-		NewFinalSaveCommand(),
-		NewEnsureDefaultSessionCommand(),
-	)
+	cmd.AddCommand(NewStatusCommand())
 
 	return cmd
 }
@@ -130,16 +127,8 @@ func addAutosaveFlags(flags *pflag.FlagSet) {
 	flags.String("socket", "", clibase.SocketFlagUsage)
 	flags.String("repository", "", clibase.RepositoryFlagUsage)
 	flags.String("lease-root", "", clibase.LeaseRootFlagUsage)
-	flags.String("history", "", "History state JSON file path")
+	flags.String("history", "", clibase.HistoryFlagUsage)
 	flags.StringSlice("session", nil, "Explicit selected session IDs")
-}
-
-func NewActionStatusCommand() *cobra.Command {
-	cmd := NewStatusCommand()
-	cmd.Use = "autosave-status"
-	addAutosaveFlags(cmd.Flags())
-
-	return cmd
 }
 
 func NewActionSaveIfDueCommand() *cobra.Command {
@@ -153,6 +142,14 @@ func NewActionSaveIfDueCommand() *cobra.Command {
 func NewActionRestoreOnStartCommand() *cobra.Command {
 	cmd := NewRestoreOnStartCommand()
 	cmd.Use = "autosave-restore-on-start"
+	addAutosaveFlags(cmd.Flags())
+
+	return cmd
+}
+
+func NewActionFinalSaveCommand() *cobra.Command {
+	cmd := NewFinalSaveCommand()
+	cmd.Use = "autosave-final-save"
 	addAutosaveFlags(cmd.Flags())
 
 	return cmd

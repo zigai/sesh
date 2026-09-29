@@ -16,7 +16,6 @@ import (
 
 	gotmux "github.com/zigai/gotmux/tmux"
 
-	"github.com/zigai/sesh/internal/config"
 	integration "github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/privatefs"
 	"github.com/zigai/sesh/internal/remote"
@@ -49,17 +48,9 @@ func TestRemotePickerReturnsAcrossSSH(t *testing.T) {
 
 	destination := newRemoteReturnSession(t, origin, fixture, "origin-destination", "RETURNED_TO_ORIGIN")
 
-	cfg := config.DefaultConfig()
-	cfg.AgentSessions.Enabled = false
-	cfg.Remote.Enabled = true
-	cfg.Remote.ReturnToOrigin = false
-	cfg.Remote.SSHPath = fixture.sshWrapper
-	cfg.Remote.Connections = []config.RemoteConnectionConfig{fixture.connection}
-
 	configPath := filepath.Join(fixture.configHome, "sesh", "config.toml")
-	if _, err := config.Save(cfg, config.WithSavePath(configPath)); err != nil {
-		t.Fatal(err)
-	}
+	writeTestConfig(t, configPath, fmt.Sprintf("[agent_sessions]\nenabled = false\n\n[remote]\nenabled = true\nreturn_to_origin = false\nssh_path = %q\n", fixture.sshWrapper)+
+		remoteConnectionsTOML(fixture.connection))
 
 	publishRemoteReturnCatalog(t, fixture, peer)
 

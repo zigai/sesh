@@ -39,15 +39,15 @@ var errTargetPaneRequired = errors.New("--target-pane is required")
 
 func addAgentNavigationFlags(cmd *cobra.Command) {
 	clibase.AddSocketFlag(cmd)
-	cmd.Flags().String("state", "", "Path to the AHT agent registry")
+	cmd.Flags().String("state", "", "AHT agent registry file [default: agent_status.store_path setting, else AHT's default registry]")
 	cmd.Flags().String("client", "", "Explicit tmux client terminal to navigate")
 	cmd.Flags().String("pane", "", "Explicit invoking pane ID, for example %1")
 	cmd.Flags().String("session", "", "Explicit invoking session name or ID")
-	cmd.Flags().String("history", "", "Path to the sesh history state file")
+	cmd.Flags().String("history", "", clibase.HistoryFlagUsage)
 }
 
 func addAgentRegistryFlags(cmd *cobra.Command) {
-	cmd.Flags().String("state", "", "Path to the AHT agent registry")
+	cmd.Flags().String("state", "", "AHT agent registry file [default: agent_status.store_path setting, else AHT's default registry]")
 }
 
 func resolveAgentHistoryPath(cmd *cobra.Command) string {
@@ -84,17 +84,24 @@ func recordNavigatedAgentView(ctx context.Context, cmd *cobra.Command, target ag
 	})
 }
 
-func resolveAgentStatePath(cmd *cobra.Command) string {
+// resolveAgentStatePath returns --state, else [agent_status].store_path, else "" so AHT uses
+// its default registry.
+func resolveAgentStatePath(cmd *cobra.Command) (string, error) {
 	statePath, _ := cmd.Flags().GetString("state")
 	if statePath == "" {
-		return ""
+		cfg, err := clibase.LoadCommandConfig(commandContextOrBackground(cmd), cmd)
+		if err != nil {
+			return "", err
+		}
+
+		return cfg.ResolvedAgentStatus().StorePath, nil
 	}
 
 	if abs, err := filepath.Abs(statePath); err == nil {
-		return abs
+		return abs, nil
 	}
 
-	return statePath
+	return statePath, nil
 }
 
 func resolveAgentTarget(cmd *cobra.Command) agents.CurrentTarget {
@@ -123,9 +130,14 @@ func resolveAgentServer(cmd *cobra.Command) (*agents.Navigator, error) {
 		return nil, oops.In("cli").With("operation", "open_tmux").Wrap(err)
 	}
 
+	statePath, err := resolveAgentStatePath(cmd)
+	if err != nil {
+		return nil, err
+	}
+
 	navigator, err := agents.NewNavigator(agents.NavigatorOptions{
 		Server:     server,
-		StatePath:  resolveAgentStatePath(cmd),
+		StatePath:  statePath,
 		Target:     resolveAgentTarget(cmd),
 		Controller: nil,
 		Source:     nil,
@@ -145,7 +157,7 @@ func newAgentNextCommand() *cobra.Command {
 		Args:  clibase.UsageArgs(cobra.NoArgs),
 		RunE:  runAgentNext,
 	}
-	cmd.Annotations = map[string]string{clibase.AnnotationSuccessOwned: annotationOwnedValue}
+	cmd.Annotations = map[string]string{clibase.AnnotationOperation: "next", clibase.AnnotationSuccessOwned: annotationOwnedValue}
 
 	addAgentNavigationFlags(cmd)
 	cmd.Flags().Bool("local", false, "Only consider panes in the current tmux session")
@@ -189,7 +201,7 @@ func newAgentBackCommand() *cobra.Command {
 		Args:  clibase.UsageArgs(cobra.NoArgs),
 		RunE:  runAgentBack,
 	}
-	cmd.Annotations = map[string]string{clibase.AnnotationSuccessOwned: annotationOwnedValue}
+	cmd.Annotations = map[string]string{clibase.AnnotationOperation: "back", clibase.AnnotationSuccessOwned: annotationOwnedValue}
 
 	addAgentNavigationFlags(cmd)
 	clibase.AddJSONFlag(cmd)
@@ -223,7 +235,7 @@ func newAgentFocusCommand() *cobra.Command {
 		Args:  clibase.UsageArgs(cobra.NoArgs),
 		RunE:  runAgentFocus,
 	}
-	cmd.Annotations = map[string]string{clibase.AnnotationSuccessOwned: annotationOwnedValue}
+	cmd.Annotations = map[string]string{clibase.AnnotationOperation: "focus", clibase.AnnotationSuccessOwned: annotationOwnedValue}
 
 	addAgentNavigationFlags(cmd)
 	cmd.Flags().String("target-pane", "", "Pane ID to focus, for example %1")
@@ -271,26 +283,27 @@ func runAgentFocus(cmd *cobra.Command, _ []string) error {
 
 func newAgentStatusCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "status",
-		Short: "Show coding agent attention summary",
-		Long:  "Show coding agent attention summary across live sessions, run the realtime window status tracker, or clear its styles.",
-		Args:  clibase.UsageArgs(cobra.NoArgs),
-		RunE:  runAgentStatus,
+		Use:         "status",
+		Short:       "Show coding agent attention summary",
+		Long:        "Show coding agent attention summary across live sessions.",
+		Args:        clibase.UsageArgs(cobra.NoArgs),
+		RunE:        runAgentStatus,
+		Annotations: map[string]string{clibase.AnnotationOperation: "status"},
 	}
 
 	addAgentRegistryFlags(cmd)
 	clibase.AddJSONFlag(cmd)
 
-	cmd.AddCommand(
-		newAgentStatusRunCommand(),
-		newAgentStatusClearCommand(),
-	)
-
 	return cmd
 }
 
 func runAgentStatus(cmd *cobra.Command, _ []string) error {
-	summary, err := agents.Status(commandContextOrBackground(cmd), resolveAgentStatePath(cmd))
+	statePath, err := resolveAgentStatePath(cmd)
+	if err != nil {
+		return err
+	}
+
+	summary, err := agents.Status(commandContextOrBackground(cmd), statePath)
 	if err != nil {
 		return oops.In("cli").With("operation", "agent_status").Wrap(err)
 	}
@@ -352,9 +365,9 @@ func runAgentStatusRun(cmd *cobra.Command, _ []string) error {
 	styles := agents.NewTmuxStyleController(server, resolved.SetWindowStatusStyle, resolved.SetWindowStatusBellStyle)
 	tracker := agents.NewTracker(styles, agentStatusTrackerOptions(cfg, resolved))
 
-	statePath := resolveAgentStatePath(cmd)
-	if statePath == "" {
-		statePath = resolved.StorePath
+	statePath, err := resolveAgentStatePath(cmd)
+	if err != nil {
+		return err
 	}
 
 	ctx, stop := signal.NotifyContext(commandContextOrBackground(cmd), os.Interrupt, syscall.SIGTERM)
@@ -463,6 +476,20 @@ func NewActionFocusCommand() *cobra.Command {
 func NewActionStatusCommand() *cobra.Command {
 	cmd := newAgentStatusCommand()
 	cmd.Use = "agent-status"
+
+	return cmd
+}
+
+func NewActionWindowStatusClearCommand() *cobra.Command {
+	cmd := newAgentStatusClearCommand()
+	cmd.Use = "agent-window-status-clear"
+
+	return cmd
+}
+
+func NewDaemonWindowStatusCommand() *cobra.Command {
+	cmd := newAgentStatusRunCommand()
+	cmd.Use = "agent-window-status"
 
 	return cmd
 }

@@ -9,8 +9,8 @@ import (
 
 	cmdagent "github.com/zigai/sesh/internal/cli/cmd/agent"
 	cmdautosave "github.com/zigai/sesh/internal/cli/cmd/autosave"
+	cmddaemon "github.com/zigai/sesh/internal/cli/cmd/daemon"
 	cmdpicker "github.com/zigai/sesh/internal/cli/cmd/picker"
-	cmdsession "github.com/zigai/sesh/internal/cli/cmd/session"
 	cmdsnapshot "github.com/zigai/sesh/internal/cli/cmd/snapshot"
 )
 
@@ -19,8 +19,10 @@ const actionCmd = "action"
 func newActionCommand(ctx context.Context) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   actionCmd,
-		Short: "Run a named session, agent, snapshot, or autosave action",
-		Long:  "Run a named action used by bindings, services, and the picker.",
+		Short: "Run an action started by key bindings, services or other tools",
+		Long: "Run an action started by key bindings, services or other tools.\n\n" +
+			"Actions are short-lived commands that something else invokes, such as a tmux key binding, a systemd step or " +
+			"the session picker. Commands people run directly live in their own groups.",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				return nil
@@ -33,20 +35,18 @@ func newActionCommand(ctx context.Context) *cobra.Command {
 
 	cmd.AddCommand(
 		cmdpicker.NewPickerOpenCommand(ctx),
-		cmdsnapshot.NewActionSaveCommand(),
-		cmdsnapshot.NewActionRestoreCommand(),
-		cmdsession.NewActionSessionNewCommand(),
-		cmdsession.NewActionSessionRenameCommand(),
-		cmdsession.NewActionSessionKillCommand(),
-		cmdsession.NewActionSessionDeleteCommand(),
-		cmdsession.NewActionSessionSwitchCommand(),
 		cmdagent.NewActionNextCommand(),
 		cmdagent.NewActionBackCommand(),
 		cmdagent.NewActionFocusCommand(),
 		cmdagent.NewActionStatusCommand(),
-		cmdautosave.NewActionStatusCommand(),
+		cmdagent.NewActionWindowStatusClearCommand(),
+		cmdsnapshot.NewActionSaveCommand(),
+		cmdsnapshot.NewActionRestoreCommand(),
 		cmdautosave.NewActionSaveIfDueCommand(),
 		cmdautosave.NewActionRestoreOnStartCommand(),
+		cmdautosave.NewActionFinalSaveCommand(),
+		cmdautosave.NewActionAdoptStartupSessionCommand(),
+		cmddaemon.NewActionWaitReadyCommand(),
 	)
 
 	return cmd
