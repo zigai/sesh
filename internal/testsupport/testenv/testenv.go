@@ -2,8 +2,13 @@
 package testenv
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,10 +18,17 @@ import (
 // isolated environment; their SESH_ variables are fixture signals from the parent test.
 const isolatedMarker = "SESH_TESTENV_ISOLATED"
 
+// goToolchainVariables keep go subprocesses, such as tests building the sesh binary, on the
+// developer's module cache, build cache, and go env settings. Their defaults derive from $HOME
+// and the XDG directories, so isolation would otherwise download a fresh read-only module cache
+// into the isolated home on every run.
+var goToolchainVariables = []string{"GOPATH", "GOMODCACHE", "GOCACHE", "GOENV"}
+
 // RunIsolated runs the package tests inside a private home: $HOME, the XDG base directories,
 // $XDG_RUNTIME_DIR, and $TMUX_TMPDIR point at a temporary directory, $TMUX and every SESH_
 // variable are cleared. Commands that fall back to the ambient tmux server, tmux's default
-// socket, or the configured data directory therefore never reach live state.
+// socket, or the configured data directory therefore never reach live state. The go toolchain
+// keeps its module cache, build cache, and settings.
 func RunIsolated(m *testing.M) int {
 	if os.Getenv(isolatedMarker) == "1" {
 		return m.Run()
@@ -37,7 +49,7 @@ func RunIsolated(m *testing.M) int {
 		code = m.Run()
 	}
 
-	if err := os.RemoveAll(root); err != nil {
+	if err := removeIsolatedHome(root); err != nil {
 		fmt.Fprintln(os.Stderr, "remove isolated test home:", err)
 	}
 
@@ -45,6 +57,11 @@ func RunIsolated(m *testing.M) int {
 }
 
 func isolate(root string) error {
+	toolchain, err := goToolchainEnvironment()
+	if err != nil {
+		return err
+	}
+
 	for _, entry := range os.Environ() {
 		name, _, _ := strings.Cut(entry, "=")
 		if strings.HasPrefix(name, "SESH_") {
@@ -79,9 +96,80 @@ func isolate(root string) error {
 		}
 	}
 
+	for variable, value := range toolchain {
+		if err := os.Setenv(variable, value); err != nil {
+			return fmt.Errorf("set %s: %w", variable, err)
+		}
+	}
+
 	if err := os.Setenv(isolatedMarker, "1"); err != nil {
 		return fmt.Errorf("mark isolated environment: %w", err)
 	}
 
 	return nil
+}
+
+// goToolchainEnvironment resolves the effective go toolchain locations before isolation changes
+// $HOME. Without a go command no test can start a go subprocess, so nothing needs pinning.
+func goToolchainEnvironment() (map[string]string, error) {
+	values := make(map[string]string, len(goToolchainVariables))
+
+	gocmd, err := exec.LookPath("go")
+	if errors.Is(err, exec.ErrNotFound) {
+		return values, nil
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("find go command: %w", err)
+	}
+
+	arguments := append([]string{"env", "-json"}, goToolchainVariables...)
+
+	output, err := exec.CommandContext(context.Background(), gocmd, arguments...).Output()
+	if err != nil {
+		return nil, fmt.Errorf("resolve go toolchain environment: %w", err)
+	}
+
+	if err := json.Unmarshal(output, &values); err != nil {
+		return nil, fmt.Errorf("decode go toolchain environment: %w", err)
+	}
+
+	return values, nil
+}
+
+// removeIsolatedHome deletes the isolated home. Tools such as the go module cache create
+// read-only directories that [os.RemoveAll] cannot empty, so a failed removal makes every
+// directory writable and retries.
+func removeIsolatedHome(root string) error {
+	err := os.RemoveAll(root)
+	if err == nil {
+		return nil
+	}
+
+	if writableErr := makeDirectoriesWritable(root); writableErr != nil {
+		return errors.Join(err, writableErr)
+	}
+
+	if err := os.RemoveAll(root); err != nil {
+		return fmt.Errorf("remove writable isolated home: %w", err)
+	}
+
+	return nil
+}
+
+func makeDirectoriesWritable(root string) error {
+	scope, err := os.OpenRoot(root)
+	if err != nil {
+		return fmt.Errorf("open isolated home: %w", err)
+	}
+
+	walkErr := fs.WalkDir(scope.FS(), ".", func(path string, entry fs.DirEntry, err error) error {
+		if err != nil || !entry.IsDir() {
+			return err
+		}
+
+		return scope.Chmod(path, 0o700)
+	})
+
+	return errors.Join(walkErr, scope.Close())
 }
