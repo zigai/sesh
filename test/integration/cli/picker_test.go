@@ -102,18 +102,18 @@ func TestPickerPresentationsRenderInCurrentTerminal(t *testing.T) {
 
 	for _, test := range []struct {
 		name      string
-		command   string
+		ui        string
 		noColor   bool
 		wantColor bool
 	}{
-		{name: "standalone terminal profile", command: "standalone", wantColor: true},
-		{name: "standalone explicit no color", command: "standalone", noColor: true, wantColor: false},
-		{name: "bare popup terminal profile", command: "popup", wantColor: true},
-		{name: "bare popup explicit no color", command: "popup", noColor: true, wantColor: false},
+		{name: "fullscreen terminal profile", ui: "fullscreen", wantColor: true},
+		{name: "fullscreen explicit no color", ui: "fullscreen", noColor: true, wantColor: false},
+		{name: "bare popup terminal profile", ui: "popup", wantColor: true},
+		{name: "bare popup explicit no color", ui: "popup", noColor: true, wantColor: false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			arguments := []string{
-				test.command, "--config", configPath,
+				"pick", "--ui", test.ui, "--config", configPath,
 				testSocketFlag, server.Endpoint().SocketPath,
 				testRepositoryFlag, filepath.Join(root, "repository"),
 				"--lease-root", filepath.Join(root, "leases"),
@@ -121,7 +121,7 @@ func TestPickerPresentationsRenderInCurrentTerminal(t *testing.T) {
 				"--agent-state", filepath.Join(root, "agents.json"),
 			}
 			childArguments := append([]string{"-test.run=^TestPickerApplicationHelper$", "--"}, arguments...)
-			childOutput := runPickerTermtrace(t, testExecutable, childArguments, test.command, test.noColor)
+			childOutput := runPickerTermtrace(t, testExecutable, childArguments, test.ui, test.noColor)
 
 			if got := pickerOutputHasColor(childOutput); got != test.wantColor {
 				t.Fatalf("picker PTY color = %t, want %t: %q", got, test.wantColor, childOutput)

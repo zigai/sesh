@@ -10,7 +10,6 @@ import (
 	cmdagent "github.com/zigai/sesh/internal/cli/cmd/agent"
 	cmdautosave "github.com/zigai/sesh/internal/cli/cmd/autosave"
 	cmdpicker "github.com/zigai/sesh/internal/cli/cmd/picker"
-	cmdremote "github.com/zigai/sesh/internal/cli/cmd/remote"
 	cmdsession "github.com/zigai/sesh/internal/cli/cmd/session"
 	cmdsnapshot "github.com/zigai/sesh/internal/cli/cmd/snapshot"
 )
@@ -33,7 +32,7 @@ func newActionCommand(ctx context.Context) *cobra.Command {
 	}
 
 	cmd.AddCommand(
-		newActionPickerOpenCommand(ctx),
+		cmdpicker.NewPickerOpenCommand(ctx),
 		cmdsnapshot.NewActionSaveCommand(),
 		cmdsnapshot.NewActionRestoreCommand(),
 		cmdsession.NewActionSessionNewCommand(),
@@ -49,16 +48,6 @@ func newActionCommand(ctx context.Context) *cobra.Command {
 		cmdautosave.NewActionSaveIfDueCommand(),
 		cmdautosave.NewActionRestoreOnStartCommand(),
 	)
-
-	return cmd
-}
-
-func newActionPickerOpenCommand(ctx context.Context) *cobra.Command {
-	cmd := cmdpicker.NewPopupCommand(ctx, cmdremote.DefaultPickerRemoteFactory)
-	cmd.Use = "picker-open"
-	cmd.Short = "Open the configured tmux popup for a key binding"
-	_ = cmd.Flags().Set("tmux", "true")
-	cmd.Flags().Lookup("tmux").DefValue = "true"
 
 	return cmd
 }

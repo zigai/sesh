@@ -14,7 +14,7 @@ Requirements: Linux, tmux 3.6+, Go 1.27.1+.
 
 ```sh
 # Open session picker
-sesh popup
+sesh pick
 
 # Create or switch session
 sesh new work --dir ~/Projects/work

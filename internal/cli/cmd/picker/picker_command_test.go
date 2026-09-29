@@ -43,29 +43,25 @@ func newTestRootCommand(ctx context.Context) *cobra.Command {
 	rootCommand.PersistentFlags().String("config", "", "Explicit native TOML configuration file")
 	rootCommand.PersistentFlags().Bool("no-config", false, "Use built-in settings without reading configuration files")
 
-	rootCommand.AddCommand(
-		NewPopupCommand(ctx),
-		NewInlinePickerCommand(ctx),
-		NewStandalonePickerCommand(ctx),
-	)
+	rootCommand.AddCommand(NewPickCommand(ctx), NewPickerOpenCommand(ctx))
 
 	return rootCommand
 }
 
-func TestStandalonePickerRejectsNonTerminalBeforeRepositoryCreation(t *testing.T) {
+func TestPickRejectsNonTerminalBeforeRepositoryCreation(t *testing.T) {
 	repository := filepath.Join(t.TempDir(), "repository")
 	root := newTestRootCommand(t.Context())
 	root.SetIn(bytes.NewBufferString("not a terminal"))
 	root.SetOut(&bytes.Buffer{})
 	root.SetErr(&bytes.Buffer{})
 	root.SetArgs([]string{
-		"standalone", "--no-config", testSocketFlag, "/tmp/sesh-picker-missing.sock",
+		"pick", "--ui", "fullscreen", "--no-config", testSocketFlag, "/tmp/sesh-picker-missing.sock",
 		testRepositoryFlag, repository,
 	})
 
 	err := root.Execute()
 	if !errors.Is(err, errPickerTerminalRequired) {
-		t.Fatalf("standalone error = %v, want terminal required", err)
+		t.Fatalf("pick error = %v, want terminal required", err)
 	}
 
 	if _, statErr := os.Stat(repository); !errors.Is(statErr, os.ErrNotExist) {
@@ -73,43 +69,120 @@ func TestStandalonePickerRejectsNonTerminalBeforeRepositoryCreation(t *testing.T
 	}
 }
 
-func TestPopupCommandUsesCurrentTerminalUnlessTmuxRequested(t *testing.T) {
-	t.Parallel()
+func TestPickRejectsUnknownUIAsUsageBeforeRepositoryCreation(t *testing.T) {
+	repository := filepath.Join(t.TempDir(), "repository")
+	root := newTestRootCommand(t.Context())
+	root.SetIn(bytes.NewBufferString(""))
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs([]string{
+		"pick", "--ui", "standalone", "--no-config", testSocketFlag, "/tmp/sesh-picker-missing.sock",
+		testRepositoryFlag, repository,
+	})
 
-	cmd := NewPopupCommand(t.Context())
-	tmuxFlag := cmd.Flags().Lookup("tmux")
-
-	if tmuxFlag == nil || tmuxFlag.DefValue != "false" {
-		t.Fatalf("--tmux flag = %#v, want exposed false default", tmuxFlag)
+	err := root.Execute()
+	if !errors.Is(err, errInvalidPickerUI) || clibase.ExitCode(err) != clibase.ExitCodeUsage {
+		t.Fatalf("pick error = %v (exit %d), want invalid ui usage error", err, clibase.ExitCode(err))
 	}
 
-	if embedded := cmd.Flags().Lookup("embedded"); embedded != nil {
-		t.Fatalf("obsolete --embedded flag remains registered: %#v", embedded)
+	if _, statErr := os.Stat(repository); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("repository created before ui validation: %v", statErr)
+	}
+}
+
+func TestResolvePickerPresentationFollowsChoiceAndTmuxContext(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		name   string
+		choice string
+		env    map[string]string
+		want   pickerPresentation
+	}{
+		{name: "auto outside tmux", choice: "auto", env: nil, want: pickerFullscreen},
+		{name: "empty outside tmux", choice: "", env: nil, want: pickerFullscreen},
+		{name: "auto inside tmux", choice: "auto", env: map[string]string{"TMUX": "/tmp/tmux-1/default,1,0"}, want: pickerInline},
+		{name: "auto inside tmux popup", choice: "auto", env: map[string]string{"TMUX": "/tmp/tmux-1/default,1,0", "TMUX_POPUP": "1"}, want: pickerPopup},
+		{name: "auto ignores popup marker outside tmux", choice: "auto", env: map[string]string{"TMUX_POPUP": "1"}, want: pickerFullscreen},
+		{name: "explicit fullscreen inside tmux", choice: "fullscreen", env: map[string]string{"TMUX": "/tmp/tmux-1/default,1,0"}, want: pickerFullscreen},
+		{name: "explicit inline outside tmux", choice: "inline", env: nil, want: pickerInline},
+		{name: "explicit popup case insensitive", choice: " Popup ", env: nil, want: pickerPopup},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := resolvePickerPresentation(test.choice, func(key string) string { return test.env[key] })
+			if err != nil || got != test.want {
+				t.Fatalf("resolvePickerPresentation(%q) = %d, %v; want %d", test.choice, got, err, test.want)
+			}
+		})
+	}
+}
+
+func TestPickHidesPopupChildFlagsAndOmitsLauncherFlags(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewPickCommand(t.Context())
+
+	ui := cmd.Flags().Lookup("ui")
+	if ui == nil || ui.Hidden || ui.DefValue != "auto" {
+		t.Fatalf("--ui flag = %#v, want visible auto default", ui)
+	}
+
+	for _, name := range []string{"switch-handoff", "launched-at", "target-pane", "current-session-id"} {
+		if flag := cmd.Flags().Lookup(name); flag == nil || !flag.Hidden {
+			t.Fatalf("--%s flag = %#v, want hidden popup child flag", name, flag)
+		}
+	}
+
+	for _, name := range []string{"tmux", "embedded", "client", "client-width", "client-height"} {
+		if flag := cmd.Flags().Lookup(name); flag != nil {
+			t.Fatalf("pick registers launcher flag --%s", name)
+		}
+	}
+}
+
+func TestPickerOpenExposesInvokingClientFlags(t *testing.T) {
+	t.Parallel()
+
+	cmd := NewPickerOpenCommand(t.Context())
+
+	for name, shorthand := range map[string]string{
+		"client": "c", "target-pane": "t", "current-session-id": "", "client-width": "w", "client-height": "H",
+	} {
+		flag := cmd.Flags().Lookup(name)
+		if flag == nil || flag.Hidden || flag.Shorthand != shorthand {
+			t.Fatalf("--%s flag = %#v, want visible with shorthand %q", name, flag, shorthand)
+		}
+	}
+
+	if flag := cmd.Flags().Lookup("ui"); flag != nil {
+		t.Fatal("picker-open registers --ui")
 	}
 }
 
 func TestPopupChildReceivesInvokingPaneSessionAndRepository(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewPopupCommand(t.Context())
+	cmd := NewPickerOpenCommand(t.Context())
 
 	if err := cmd.Flags().Set("repository", "/private/repository"); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := cmd.Flags().Set("tmux", "true"); err != nil {
+	if err := cmd.Flags().Set("client", "/dev/pts/1"); err != nil {
 		t.Fatal(err)
 	}
 
 	launchedAt := time.Unix(0, 1790000000123456789)
 
-	arguments := pickerPopupArguments(cmd, "/private/tmux.sock", "/dev/pts/1", "$7", "%2", "/private/handoff", launchedAt)
-	if len(arguments) < 3 || arguments[0] != "popup" {
+	arguments := pickerPopupArguments(cmd, "/private/tmux.sock", "$7", "%2", "/private/handoff", launchedAt)
+	if !slices.Equal(arguments[:min(len(arguments), 3)], []string{"pick", "--ui", "popup"}) {
 		t.Fatalf("popup child arguments = %#v", arguments)
 	}
 
-	if slices.Contains(arguments, "--tmux") || slices.Contains(arguments, "--embedded") {
-		t.Fatalf("popup child arguments recurse through launcher: %#v", arguments)
+	if slices.Contains(arguments, "picker-open") || slices.Contains(arguments, "--client") {
+		t.Fatalf("popup child arguments carry launcher arguments: %#v", arguments)
 	}
 
 	for _, required := range []string{
@@ -119,6 +192,15 @@ func TestPopupChildReceivesInvokingPaneSessionAndRepository(t *testing.T) {
 		if !slices.Contains(arguments, required) {
 			t.Fatalf("popup child arguments lack %q: %#v", required, arguments)
 		}
+	}
+
+	pick, _, err := newTestRootCommand(t.Context()).Find(arguments)
+	if err != nil || pick.Name() != "pick" {
+		t.Fatalf("popup child arguments resolve to %v, %v; want pick", pick, err)
+	}
+
+	if err := pick.ParseFlags(arguments[1:]); err != nil {
+		t.Fatalf("pick rejects popup child arguments: %v", err)
 	}
 }
 
@@ -139,7 +221,7 @@ func TestPopupChildAcceptsOnlyRecentLaunchTimes(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			cmd := NewPopupCommand(t.Context())
+			cmd := NewPickCommand(t.Context())
 			if test.value != "" {
 				if err := cmd.Flags().Set("launched-at", test.value); err != nil {
 					t.Fatal(err)
@@ -156,44 +238,16 @@ func TestPopupChildAcceptsOnlyRecentLaunchTimes(t *testing.T) {
 func TestPickerCommandsExposeLiveInteractiveSurface(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name string
-		new  func(...PickerRemoteFactory) interface{ Name() string }
-	}{
-		{name: "popup", new: func(remote ...PickerRemoteFactory) interface{ Name() string } {
-			return NewPopupCommand(t.Context(), remote...)
-		}},
-		{name: "inline", new: func(remote ...PickerRemoteFactory) interface{ Name() string } {
-			return NewInlinePickerCommand(t.Context(), remote...)
-		}},
-		{name: "standalone", new: func(remote ...PickerRemoteFactory) interface{ Name() string } {
-			return NewStandalonePickerCommand(t.Context(), remote...)
-		}},
-	}
+	for _, cmd := range []*cobra.Command{NewPickCommand(t.Context()), NewPickerOpenCommand(t.Context())} {
+		t.Run(cmd.Name(), func(t *testing.T) {
+			t.Parallel()
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			cmd := test.new()
-
-			if cmd.Name() != test.name {
-				t.Fatalf("command name = %q, want %q", cmd.Name(), test.name)
-			}
-
-			concrete := NewPopupCommand(t.Context())
-
-			switch test.name {
-			case "inline":
-				concrete = NewInlinePickerCommand(t.Context())
-			case "standalone":
-				concrete = NewStandalonePickerCommand(t.Context())
-			}
-
-			if concrete.Annotations[clibase.AnnotationLiveIO] != "true" {
-				t.Fatalf("live I/O annotation = %q", concrete.Annotations[clibase.AnnotationLiveIO])
+			if cmd.Annotations[clibase.AnnotationLiveIO] != "true" {
+				t.Fatalf("live I/O annotation = %q", cmd.Annotations[clibase.AnnotationLiveIO])
 			}
 
 			for _, flag := range []string{"socket", "repository", "lease-root", "history", "agent-state"} {
-				if concrete.Flags().Lookup(flag) == nil {
+				if cmd.Flags().Lookup(flag) == nil {
 					t.Fatalf("missing --%s", flag)
 				}
 			}

@@ -38,13 +38,15 @@ import (
 const (
 	pickerPopup pickerPresentation = iota
 	pickerInline
-	pickerStandalone
+	pickerFullscreen
 )
 
 const (
 	pickerAnnotationEnabled = "true"
 	pickerClientEnvironment = "SESH_TMUX_CLIENT"
 	pickerLaunchedAtFlag    = "launched-at"
+	pickerUIFlag            = "ui"
+	pickerUIAuto            = "auto"
 	pickerLaunchMaxAge      = time.Minute
 )
 
@@ -73,6 +75,7 @@ const (
 var (
 	errPickerTerminalRequired                   = errors.New("picker requires an interactive terminal")
 	errUnknownPickerPresentation                = errors.New("unknown picker presentation")
+	errInvalidPickerUI                          = errors.New("invalid picker ui: expected auto, popup, inline, or fullscreen")
 	errRemoteAttachUnavailable                  = errors.New("remote attach is unavailable")
 	errRemoteAttachCommandUnavailable           = errors.New("remote attach returned no terminal command")
 	_                                 term.File = pickerTerminalOutput{Writer: nil, fd: 0}
@@ -135,16 +138,55 @@ func InvokingPickerClient(ctx context.Context, server *gotmux.Server) (gotmux.Cl
 	return invokingPickerClient(ctx, server)
 }
 
-func NewPopupCommand(ctx context.Context, remote ...PickerRemoteFactory) *cobra.Command {
-	return newPickerCommand(ctx, "popup", "Open the framed session picker in the current terminal", pickerPopup, firstPickerRemoteFactory(remote))
+// NewPickCommand returns the interactive session picker. The popup layout also serves as the
+// child that picker-open runs inside a tmux popup, so the handoff flags stay hidden.
+func NewPickCommand(ctx context.Context, remote ...PickerRemoteFactory) *cobra.Command {
+	remoteFactory := firstPickerRemoteFactory(remote)
+	cmd := &cobra.Command{
+		Use:         "pick",
+		Short:       "Open the interactive session picker",
+		Args:        clibase.UsageArgs(cobra.NoArgs),
+		Annotations: map[string]string{clibase.AnnotationLiveIO: pickerAnnotationEnabled, clibase.AnnotationOperation: "picker"},
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return runPickCommand(pickerExecutionContext(ctx, cmd), cmd, remoteFactory)
+		},
+	}
+
+	addPickerPathFlags(cmd)
+	cmd.Flags().String(pickerUIFlag, pickerUIAuto, "Picker layout: auto, popup, inline, or fullscreen")
+	cmd.Flags().String("switch-handoff", "", "popup switch handoff")
+	cmd.Flags().Int64(pickerLaunchedAtFlag, 0, "popup launch time")
+	cmd.Flags().String("target-pane", "", "invoking tmux pane")
+	cmd.Flags().String("current-session-id", "", "invoking tmux session ID")
+
+	for _, name := range []string{"switch-handoff", pickerLaunchedAtFlag, "target-pane", "current-session-id"} {
+		_ = cmd.Flags().MarkHidden(name)
+	}
+
+	return cmd
 }
 
-func NewInlinePickerCommand(ctx context.Context, remote ...PickerRemoteFactory) *cobra.Command {
-	return newPickerCommand(ctx, "inline", "Open the interactive session picker in the current pane", pickerInline, firstPickerRemoteFactory(remote))
-}
+// NewPickerOpenCommand returns the key-binding launcher that opens the picker in a tmux popup
+// sized for the invoking client.
+func NewPickerOpenCommand(ctx context.Context) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:         "picker-open",
+		Short:       "Open the session picker in a tmux popup for a key binding",
+		Args:        clibase.UsageArgs(cobra.NoArgs),
+		Annotations: map[string]string{clibase.AnnotationLiveIO: pickerAnnotationEnabled, clibase.AnnotationOperation: "picker"},
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return runPickerOpenCommand(pickerExecutionContext(ctx, cmd), cmd)
+		},
+	}
 
-func NewStandalonePickerCommand(ctx context.Context, remote ...PickerRemoteFactory) *cobra.Command {
-	return newPickerCommand(ctx, "standalone", "Open the interactive session picker in this terminal", pickerStandalone, firstPickerRemoteFactory(remote))
+	addPickerPathFlags(cmd)
+	cmd.Flags().StringP("client", "c", "", "target tmux client (name or tty)")
+	cmd.Flags().StringP("target-pane", "t", "", "target tmux pane")
+	cmd.Flags().String("current-session-id", "", "invoking tmux session ID")
+	cmd.Flags().IntP("client-width", "w", 0, "client width override")
+	cmd.Flags().IntP("client-height", "H", 0, "client height override")
+
+	return cmd
 }
 
 func PickerHasTerminal(cmd *cobra.Command) bool {
@@ -163,42 +205,12 @@ func firstPickerRemoteFactory(values []PickerRemoteFactory) PickerRemoteFactory 
 	return values[0]
 }
 
-func newPickerCommand(
-	ctx context.Context,
-	use, short string,
-	presentation pickerPresentation,
-	remoteFactory PickerRemoteFactory,
-) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:         use,
-		Short:       short,
-		Args:        clibase.UsageArgs(cobra.NoArgs),
-		Annotations: map[string]string{clibase.AnnotationLiveIO: pickerAnnotationEnabled, clibase.AnnotationOperation: "picker"},
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runPickerCommand(pickerExecutionContext(ctx, cmd), cmd, presentation, remoteFactory)
-		},
-	}
-
+func addPickerPathFlags(cmd *cobra.Command) {
 	clibase.AddSocketFlag(cmd)
 	cmd.Flags().String("repository", "", "Native snapshot repository (defaults to the configured data directory)")
 	cmd.Flags().String("lease-root", "", "Shared tmux endpoint lease root (defaults to the configured data directory)")
 	cmd.Flags().String("history", "", "Session history state file")
 	cmd.Flags().String("agent-state", "", "AHT agent registry path")
-
-	if presentation == pickerPopup {
-		cmd.Flags().Bool("tmux", false, "open using the configured size in a tmux popup")
-		cmd.Flags().String("switch-handoff", "", "popup switch handoff")
-		_ = cmd.Flags().MarkHidden("switch-handoff")
-		cmd.Flags().Int64(pickerLaunchedAtFlag, 0, "popup launch time")
-		_ = cmd.Flags().MarkHidden(pickerLaunchedAtFlag)
-		cmd.Flags().StringP("client", "c", "", "target tmux client (name or tty)")
-		cmd.Flags().StringP("target-pane", "t", "", "target tmux pane")
-		cmd.Flags().String("current-session-id", "", "invoking tmux session ID")
-		cmd.Flags().IntP("client-width", "w", 0, "client width override")
-		cmd.Flags().IntP("client-height", "H", 0, "client height override")
-	}
-
-	return cmd
 }
 
 func pickerExecutionContext(parent context.Context, cmd *cobra.Command) context.Context {
@@ -207,16 +219,6 @@ func pickerExecutionContext(parent context.Context, cmd *cobra.Command) context.
 	}
 
 	return parent
-}
-
-func getBoolFlag(cmd *cobra.Command, name string) bool {
-	if cmd == nil || cmd.Flags().Lookup(name) == nil {
-		return false
-	}
-
-	value, _ := cmd.Flags().GetBool(name)
-
-	return value
 }
 
 func commandTerminalStreams(cmd *cobra.Command) gotmux.TerminalStreams {
@@ -245,12 +247,7 @@ func remoteCLIError(operation string, err error) error {
 	return oops.In("cli").With("operation", operation).Wrap(err)
 }
 
-func runPickerCommand(
-	ctx context.Context,
-	cmd *cobra.Command,
-	presentation pickerPresentation,
-	remoteFactory PickerRemoteFactory,
-) error {
+func runPickerOpenCommand(ctx context.Context, cmd *cobra.Command) error {
 	launchedAt := time.Now()
 
 	runtime, err := preparePickerCommand(ctx, cmd)
@@ -258,8 +255,20 @@ func runPickerCommand(
 		return err
 	}
 
-	if presentation == pickerPopup && getBoolFlag(cmd, "tmux") {
-		return openPickerPopup(ctx, cmd, runtime, launchedAt)
+	return openPickerPopup(ctx, cmd, runtime, launchedAt)
+}
+
+func runPickCommand(ctx context.Context, cmd *cobra.Command, remoteFactory PickerRemoteFactory) error {
+	choice, _ := cmd.Flags().GetString(pickerUIFlag)
+
+	presentation, err := resolvePickerPresentation(choice, os.Getenv)
+	if err != nil {
+		return err
+	}
+
+	runtime, err := preparePickerCommand(ctx, cmd)
+	if err != nil {
+		return err
 	}
 
 	if !pickerHasTerminal(cmd) {
@@ -267,6 +276,30 @@ func runPickerCommand(
 	}
 
 	return runPickerInteractive(ctx, cmd, presentation, runtime, remoteFactory)
+}
+
+// resolvePickerPresentation maps the --ui choice to a layout. auto uses the popup layout inside
+// a tmux popup, inline elsewhere inside tmux, and fullscreen outside tmux.
+func resolvePickerPresentation(choice string, getenv func(string) string) (pickerPresentation, error) {
+	switch strings.ToLower(strings.TrimSpace(choice)) {
+	case "", pickerUIAuto:
+		switch {
+		case strings.TrimSpace(getenv("TMUX")) == "":
+			return pickerFullscreen, nil
+		case getenv("TMUX_POPUP") != "":
+			return pickerPopup, nil
+		default:
+			return pickerInline, nil
+		}
+	case "popup":
+		return pickerPopup, nil
+	case "inline":
+		return pickerInline, nil
+	case "fullscreen":
+		return pickerFullscreen, nil
+	default:
+		return 0, clibase.NewExitError(clibase.ExitCodeUsage, errInvalidPickerUI)
+	}
 }
 
 func runPickerInteractive(
@@ -292,14 +325,9 @@ func runPickerInteractive(
 	}
 
 	services.currentPane = pickerCurrentPane(cmd)
-	if flag := cmd.Flags().Lookup("switch-handoff"); flag != nil {
-		path, _ := cmd.Flags().GetString("switch-handoff")
-		services.popupChild = path != ""
-	}
-
-	if flag := cmd.Flags().Lookup("current-session-id"); flag != nil {
-		services.currentSessionID, _ = cmd.Flags().GetString("current-session-id")
-	}
+	handoffPath, _ := cmd.Flags().GetString("switch-handoff")
+	services.popupChild = handoffPath != ""
+	services.currentSessionID, _ = cmd.Flags().GetString("current-session-id")
 
 	model, err := buildPickerModel(ctx, presentation, runtime.cfg, runtime.state, services.TUIServices())
 	if err != nil {
@@ -340,11 +368,9 @@ func finishPickerInteractive(ctx context.Context, cmd *cobra.Command, finalModel
 
 	var handoffTarget *session.Session
 
-	var handoffPane, handoffPath string
+	var handoffPane string
 
-	if flag := cmd.Flags().Lookup("switch-handoff"); flag != nil {
-		handoffPath, _ = cmd.Flags().GetString("switch-handoff")
-	}
+	handoffPath, _ := cmd.Flags().GetString("switch-handoff")
 
 	if runErr == nil && ctx.Err() == nil {
 		if target, ok := finalModel.DeferredSwitchTarget(); ok && handoffPath != "" {
@@ -529,7 +555,7 @@ func openPickerPopup(ctx context.Context, cmd *cobra.Command, runtime pickerComm
 	targetPane := pickerCurrentPane(cmd)
 	width, height := pickerPopupDimensions(runtime.cfg, runtime.state, gotmux.Size{Width: client.Width, Height: client.Height})
 	options := pickerPopupOptions(
-		gotmux.Exec(executable, pickerPopupArguments(cmd, runtime.socketPath, string(client.Name), string(originSessionID), targetPane, handoffPath, launchedAt)...),
+		gotmux.Exec(executable, pickerPopupArguments(cmd, runtime.socketPath, string(originSessionID), targetPane, handoffPath, launchedAt)...),
 		width,
 		height,
 		runtime.cfg.Theme.Background,
@@ -578,8 +604,8 @@ func pickerPopupOptions(program gotmux.Program, width, height, background string
 	return opts
 }
 
-func pickerPopupArguments(cmd *cobra.Command, socketPath, clientName, sessionID, paneID, handoffPath string, launchedAt time.Time) []string {
-	arguments := []string{"popup", "--socket", socketPath}
+func pickerPopupArguments(cmd *cobra.Command, socketPath, sessionID, paneID, handoffPath string, launchedAt time.Time) []string {
+	arguments := []string{"pick", "--" + pickerUIFlag, "popup", "--socket", socketPath}
 
 	if !launchedAt.IsZero() {
 		arguments = append(arguments, "--"+pickerLaunchedAtFlag, strconv.FormatInt(launchedAt.UnixNano(), 10))
@@ -587,10 +613,6 @@ func pickerPopupArguments(cmd *cobra.Command, socketPath, clientName, sessionID,
 
 	if handoffPath != "" {
 		arguments = append(arguments, "--switch-handoff", handoffPath)
-	}
-
-	if clientName != "" {
-		arguments = append(arguments, "--client", clientName)
 	}
 
 	if paneID != "" {
@@ -743,8 +765,8 @@ func buildPickerModel(
 		model, err := tui.NewInlineModel(ctx, cfg, state, services)
 
 		return model, wrapPickerModelError(err)
-	case pickerStandalone:
-		model, err := tui.NewStandaloneModel(ctx, cfg, state, services)
+	case pickerFullscreen:
+		model, err := tui.NewFullscreenModel(ctx, cfg, state, services)
 
 		return model, wrapPickerModelError(err)
 	default:

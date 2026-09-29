@@ -220,7 +220,7 @@ func TestStandaloneLiveEnterDefersTerminalAttachToApplication(t *testing.T) {
 			return EnterOutcome{SessionName: s.Name, Action: EnterNeedsAttach, Restored: false}, nil
 		},
 	})
-	model.mode = modeStandalone
+	model.mode = modeFullscreen
 	model.filtered = []session.Session{target}
 	model.cursor = 0
 
@@ -299,7 +299,7 @@ func TestStandaloneLiveEnterExecutesInjectableTerminalAttach(t *testing.T) {
 			return mockCmd, nil
 		},
 	})
-	model.mode = modeStandalone
+	model.mode = modeFullscreen
 	model.filtered = []session.Session{target}
 	model.cursor = 0
 

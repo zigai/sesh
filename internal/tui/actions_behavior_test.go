@@ -258,7 +258,7 @@ func TestEnterLiveRowInPopupDefersSwitchUntilAfterQuit(t *testing.T) {
 
 func TestEnterLiveSessionOutsideTmuxAttachesThroughTerminalExec(t *testing.T) {
 	model := newTestModel()
-	model.mode = modeStandalone
+	model.mode = modeFullscreen
 	model.filtered = []session.Session{{Name: testSupportSessionDevName, Kind: session.KindLive}}
 
 	deps := dependenciesForTest(model)

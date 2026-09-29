@@ -92,7 +92,7 @@ func TestRemotePickerReturnsAcrossSSH(t *testing.T) {
 	attachLine := fmt.Sprintf("%s remote attach fixture remote-work --origin-socket %s", fixture.connection.SeshPath, origin.Endpoint().SocketPath)
 	remoteReturnCommand(t, ctx, "send", alias, "text:"+attachLine, "enter", "--until-screen", "REMOTE_READY", "--timeout", "8s")
 	assertRemoteBridgeAuthentication(t, fixture, peer)
-	popupLine := fixture.connection.SeshPath + " popup"
+	popupLine := fixture.connection.SeshPath + " pick --ui popup"
 	remoteReturnCommand(t, ctx, "send", "-q", alias, "text:"+popupLine, "enter", "--until-screen", "origin-destination", "--timeout", "8s")
 	assertPickerScreenRows(t, ctx, alias, []string{"origin-destination", "origin-start", "remote-work"}, nil)
 	remoteReturnCommand(t, ctx, "send", "-q", alias, "--text", "origin-destination", "--until-idle=100ms", "--timeout", "5s")

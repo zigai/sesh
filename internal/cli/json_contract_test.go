@@ -38,7 +38,7 @@ func TestJSONCommandTreeRequiresExplicitOutputContract(t *testing.T) {
 			"snapshot rewrite reconcile", "snapshot rewrite resume", "snapshot verify",
 		},
 		"log stream; path and clear use envelopes": {"logs"},
-		"interactive terminal":                     {"action picker-open", "inline", "popup", "standalone", "remote attach"},
+		"interactive terminal":                     {"action picker-open", "pick", "remote attach"},
 		"foreground service or readiness protocol": {
 			"action agent-status run", "daemon run", "daemon serve", "daemon wait-ready", "remote monitor run",
 		},

@@ -30,7 +30,7 @@ func TestSearchQueryChangeResetsCursorToFirstResult(t *testing.T) {
 }
 
 func TestSearchUpdatesResultsWithoutClearingScreen(t *testing.T) {
-	for _, mode := range []uiMode{modePopup, modeStandalone, modeInline} {
+	for _, mode := range []uiMode{modePopup, modeFullscreen, modeInline} {
 		synctest.Test(t, func(t *testing.T) {
 			model := newTestModel()
 			t.Cleanup(model.Close)

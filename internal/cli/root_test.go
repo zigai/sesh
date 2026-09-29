@@ -79,7 +79,7 @@ func TestRootHelpOrdersCoreCommandsFirstWithDoctorBeforeHelp(t *testing.T) {
 	}
 
 	want := []string{
-		"popup", "list", "snapshot", "autosave", "history", "inline", "standalone", "remote",
+		"pick", "list", "snapshot", "autosave", "history", "remote",
 		"keys", "logs", "hooks", "config", "setup", "daemon", "action", "doctor", "help",
 	}
 	if !slices.Equal(names, want) {

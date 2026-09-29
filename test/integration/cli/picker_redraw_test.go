@@ -43,7 +43,7 @@ func TestPickerSearchShrinkAndRegrowAvoidFullScreenErase(t *testing.T) {
 
 	alias := "sesh-picker-redraw-" + strconv.Itoa(os.Getpid()) + "-" + filepath.Base(root)
 	arguments := []string{
-		"-test.run=^TestPickerApplicationHelper$", "--", "popup",
+		"-test.run=^TestPickerApplicationHelper$", "--", "pick", "--ui", "popup",
 		"--config", configPath,
 		testSocketFlag, server.Endpoint().SocketPath,
 		testRepositoryFlag, filepath.Join(root, "repository"),

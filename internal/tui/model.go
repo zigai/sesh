@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	modeStandalone uiMode = iota
+	modeFullscreen uiMode = iota
 	modeInline
 	modePopup
 )
@@ -220,20 +220,20 @@ func NewInlineModel(ctx context.Context, cfg *config.Config, st *session.State, 
 	return model, nil
 }
 
-func NewStandaloneModel(ctx context.Context, cfg *config.Config, st *session.State, services Services) (*Model, error) {
+func NewFullscreenModel(ctx context.Context, cfg *config.Config, st *session.State, services Services) (*Model, error) {
 	model, err := buildModel(ctx, cfg, st, services)
 	if err != nil {
 		return nil, err
 	}
 
-	model.mode = modeStandalone
+	model.mode = modeFullscreen
 
 	return model, nil
 }
 
 func detectUIMode(deps Services) uiMode {
 	if deps.Detector == nil || !deps.Detector.TmuxIsInsideTmux() {
-		return modeStandalone
+		return modeFullscreen
 	}
 
 	if os.Getenv("TMUX_POPUP") != "" {
@@ -323,7 +323,7 @@ func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps
 		suppressInitialFrame:         false,
 		launchedAt:                   time.Time{},
 		initializedAt:                time.Time{},
-		agentLayoutKey:               agentLayoutReflow{width: 0, displayMode: "", uiMode: modeStandalone, query: ""},
+		agentLayoutKey:               agentLayoutReflow{width: 0, displayMode: "", uiMode: modeFullscreen, query: ""},
 		agentRowRatchet:              rowlayout.RatchetState{},
 		providerRunner:               providers.Runner{},
 		resourceSample:               providers.ResourceSample{At: time.Time{}, Processes: nil},

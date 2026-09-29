@@ -146,13 +146,11 @@ func newRootCommand(ctx context.Context) *cobra.Command {
 	rootCommand.PersistentFlags().String("config", "", "Explicit native TOML configuration file")
 	rootCommand.PersistentFlags().Bool("no-config", false, "Use built-in settings without reading configuration files")
 	rootCommand.AddCommand(
-		cmdpicker.NewPopupCommand(ctx, cmdremote.DefaultPickerRemoteFactory),
+		cmdpicker.NewPickCommand(ctx, cmdremote.DefaultPickerRemoteFactory),
 		cmdsession.NewListCommand(),
 		cmdsnapshot.NewCommand(),
 		cmdautosave.NewCommand(),
 		cmdsession.NewHistoryCommand(),
-		cmdpicker.NewInlinePickerCommand(ctx, cmdremote.DefaultPickerRemoteFactory),
-		cmdpicker.NewStandalonePickerCommand(ctx, cmdremote.DefaultPickerRemoteFactory),
 		cmdremote.NewCommand(),
 		newKeysCommand(),
 		cmdlogs.NewCommand(),

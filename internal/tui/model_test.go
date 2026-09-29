@@ -90,10 +90,10 @@ func TestModelDetectsPresentationMode(t *testing.T) {
 		popup  bool
 		want   uiMode
 	}{
-		{name: "standalone outside tmux", inside: false, want: modeStandalone},
+		{name: "standalone outside tmux", inside: false, want: modeFullscreen},
 		{name: "inline inside tmux", inside: true, want: modeInline},
 		{name: "popup inside tmux", inside: true, popup: true, want: modePopup},
-		{name: "popup flag outside tmux stays standalone", inside: false, popup: true, want: modeStandalone},
+		{name: "popup flag outside tmux stays standalone", inside: false, popup: true, want: modeFullscreen},
 	}
 
 	for _, test := range tests {

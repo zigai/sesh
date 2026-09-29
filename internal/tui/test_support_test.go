@@ -798,7 +798,7 @@ func newModelWithContext(
 	if adapter, ok := services.Catalog.(*testServiceAdapter); ok {
 		adapter.model = model
 		adapter.deps.DeferSwitch = model.mode == modePopup
-		adapter.deps.DeferAttach = model.mode == modeStandalone
+		adapter.deps.DeferAttach = model.mode == modeFullscreen
 	}
 
 	return model, nil

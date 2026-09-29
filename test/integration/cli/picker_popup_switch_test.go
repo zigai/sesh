@@ -54,7 +54,7 @@ func testTmuxPopupSelectionSwitchesOpeningClient(t *testing.T, newerSession bool
 	defer cancel()
 
 	command := exec.CommandContext(ctx, artifact.binary,
-		"popup", "--tmux", "--no-config", "--socket", fixture.socket,
+		"action", "picker-open", "--no-config", "--socket", fixture.socket,
 		"--client", clientName, "--target-pane", string(panes[0].ID),
 		"--current-session-id", string(origin.ID), "--history", fixture.historyPath,
 		"--repository", fixture.repository, "--lease-root", fixture.leaseRoot,
@@ -90,7 +90,7 @@ func TestAgentsPopupInitiallySelectsInvokingAgentPane(t *testing.T) {
 	defer cancel()
 
 	command := exec.CommandContext(ctx, artifact.binary,
-		"popup", "--no-config", "--socket", fixture.socket,
+		"pick", "--ui", "popup", "--no-config", "--socket", fixture.socket,
 		"--target-pane", string(secondInfo.ID), "--current-session-id", string(origin.ID),
 		"--agent-state", registryPath, "--switch-handoff", handoffPath,
 		"--history", fixture.historyPath, "--repository", fixture.repository, "--lease-root", fixture.leaseRoot,
@@ -132,6 +132,7 @@ func TestTmuxPopupSelectsInvokingAgentWithLinkedWindow(t *testing.T) {
 	artifact := newArtifactBinaryFixture(t)
 	origin, secondInfo, registryPath, _ := prepareAgentPickerPopup(t, fixture)
 	linked := fixture.newLiveSession(t, "linked-session")
+
 	window, err := secondInfo.Handle().Window(t.Context())
 	if err != nil {
 		t.Fatal(err)
@@ -192,12 +193,14 @@ func TestTmuxPopupSelectsInvokingAgentWithLinkedWindow(t *testing.T) {
 func prepareAgentPickerPopup(t *testing.T, fixture *cliSessionFixture) (gotmux.SessionInfo, gotmux.PaneInfo, string, string) {
 	t.Helper()
 	origin := fixture.fixtureSession(t)
+
 	panes, err := origin.Handle().Panes(t.Context())
 	if err != nil || len(panes) == 0 {
 		t.Fatalf("origin panes: %v", err)
 	}
 
 	first := panes[0].Handle()
+
 	second, err := first.Split(t.Context(), gotmux.SplitOptions{Direction: gotmux.Vertical})
 	if err != nil {
 		t.Fatal(err)
@@ -269,6 +272,7 @@ func writePickerPopupAgentRegistry(t *testing.T, socket string, origin gotmux.Se
 
 func openPickerPopupPTY(t *testing.T) (*os.File, *os.File) {
 	t.Helper()
+
 	master, slave := openTestPTY(t)
 	if err := unix.IoctlSetWinsize(int(slave.Fd()), unix.TIOCSWINSZ, &unix.Winsize{Row: 30, Col: 100}); err != nil {
 		t.Fatal(err)

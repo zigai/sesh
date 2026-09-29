@@ -122,6 +122,7 @@ func buildRemoteReloadBinary(t *testing.T, root string) string {
 	binary := filepath.Join(root, "sesh")
 	build := exec.CommandContext(t.Context(), "go", "build", "-mod=readonly", "-o", binary, "../../../cmd/sesh")
 	build.Dir = "."
+
 	build.Env = append(os.Environ(), "GOWORK=off")
 
 	if output, err := build.CombinedOutput(); err != nil {
