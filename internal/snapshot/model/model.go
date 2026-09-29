@@ -1,7 +1,7 @@
 package model
 
 const (
-	Schema             = 1
+	Schema             = 2
 	MaxManifestBytes   = 16 << 20
 	MaxEntities        = 10000
 	MaxArtifactBytes   = 256 << 20

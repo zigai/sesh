@@ -5,11 +5,14 @@ import (
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"errors"
+	"unicode/utf8"
 
 	"github.com/samber/oops"
 
 	"github.com/zigai/sesh/internal/strictjson"
 )
+
+const bytesBase64Member = "base64"
 
 var (
 	ErrInvalid    = errors.New("invalid native snapshot")
@@ -17,12 +20,27 @@ var (
 	ErrIncomplete = errors.New("snapshot parity is incomplete")
 )
 
+// Bytes holds exact bytes reported by tmux or the operating system. Valid UTF-8 encodes as a
+// plain JSON string so manifests stay readable; any other sequence encodes as
+// {"base64": "..."}. Each byte sequence has exactly one accepted encoding.
+//
 //nolint:recvcheck // Value marshaling and pointer decoding preserve the byte-slice JSON method contracts.
 type Bytes []byte
 
 func (b Bytes) MarshalJSONTo(out *jsontext.Encoder) error {
-	if err := out.WriteToken(jsontext.String(base64.StdEncoding.EncodeToString(b))); err != nil {
-		return oops.In("snapshot.model").With("operation", "encode_bytes").Wrapf(err, "encode bytes")
+	if utf8.Valid(b) {
+		return wrapBytesEncoding(out.WriteToken(jsontext.String(string(b))))
+	}
+
+	for _, token := range []jsontext.Token{
+		jsontext.BeginObject,
+		jsontext.String(bytesBase64Member),
+		jsontext.String(base64.StdEncoding.EncodeToString(b)),
+		jsontext.EndObject,
+	} {
+		if err := out.WriteToken(token); err != nil {
+			return wrapBytesEncoding(err)
+		}
 	}
 
 	return nil
@@ -30,13 +48,23 @@ func (b Bytes) MarshalJSONTo(out *jsontext.Encoder) error {
 
 func (b *Bytes) UnmarshalJSONFrom(in *jsontext.Decoder) error {
 	token, err := in.ReadToken()
-	if err != nil || token.Kind() != '"' {
+	if err != nil {
 		return ErrInvalid
 	}
 
-	value, err := base64.StdEncoding.Strict().DecodeString(token.String())
-	if err != nil || base64.StdEncoding.EncodeToString(value) != token.String() {
+	if token.Kind() == '"' {
+		*b = Bytes(token.String())
+
+		return nil
+	}
+
+	if token.Kind() != '{' {
 		return ErrInvalid
+	}
+
+	value, err := decodeBase64Bytes(in)
+	if err != nil {
+		return err
 	}
 
 	*b = value
@@ -76,4 +104,38 @@ func Decode(data []byte) (Manifest, error) {
 	}
 
 	return m, nil
+}
+
+// decodeBase64Bytes reads the rest of a {"base64": "..."} object. It accepts only canonical
+// base64 of a sequence that is not valid UTF-8, which must use the plain string form instead.
+func decodeBase64Bytes(in *jsontext.Decoder) (Bytes, error) {
+	member, err := in.ReadToken()
+	if err != nil || member.Kind() != '"' || member.String() != bytesBase64Member {
+		return nil, ErrInvalid
+	}
+
+	encoded, err := in.ReadToken()
+	if err != nil || encoded.Kind() != '"' {
+		return nil, ErrInvalid
+	}
+
+	value, err := base64.StdEncoding.Strict().DecodeString(encoded.String())
+	if err != nil || base64.StdEncoding.EncodeToString(value) != encoded.String() || utf8.Valid(value) {
+		return nil, ErrInvalid
+	}
+
+	end, err := in.ReadToken()
+	if err != nil || end.Kind() != '}' {
+		return nil, ErrInvalid
+	}
+
+	return value, nil
+}
+
+func wrapBytesEncoding(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	return oops.In("snapshot.model").With("operation", "encode_bytes").Wrapf(err, "encode bytes")
 }

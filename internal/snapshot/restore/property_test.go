@@ -278,7 +278,7 @@ func drawRandomManifest(rt *rapid.T) model.Manifest {
 
 	m := model.Manifest{
 		Format:   "sesh",
-		Version:  1,
+		Version:  model.Schema,
 		Started:  1000,
 		Finished: 2000,
 		Source: model.Source{

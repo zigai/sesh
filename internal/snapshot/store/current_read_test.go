@@ -189,3 +189,48 @@ func repositoryEntries(t *testing.T, path string) []string {
 
 	return names
 }
+
+func TestReadPracticalCurrentAdmitsLatestObservation(t *testing.T) {
+	r := openRepository(t, filepath.Join(t.TempDir(), "repository"))
+	if _, _, err := r.ReadPracticalCurrent(t.Context()); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("empty repository: %v", err)
+	}
+
+	observation := commitFixture(t, r)
+
+	if _, _, err := r.ReadCurrent(t.Context()); !errors.Is(err, ErrRecoveryRequired) {
+		t.Fatalf("strict current view of an observation: %v", err)
+	}
+
+	got, manifest, err := r.ReadPracticalCurrent(t.Context())
+	if err != nil || got != observation || manifest.Complete() || len(manifest.Sessions) != 1 {
+		t.Fatalf("practical current view = %v, %v", got, err)
+	}
+
+	attempt, err := r.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, err := r.ReadPracticalCurrent(t.Context()); !errors.Is(err, ErrRecoveryRequired) {
+		t.Fatalf("pending latest save must keep its barrier: %v", err)
+	}
+
+	if err := r.Fail(t.Context(), attempt.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, err := r.ReadPracticalCurrent(t.Context()); !errors.Is(err, ErrRecoveryRequired) {
+		t.Fatalf("failed latest save must not fall back to an older generation: %v", err)
+	}
+}
+
+func TestReadPracticalCurrentPrefersCompleteCurrent(t *testing.T) {
+	r := openRepository(t, filepath.Join(t.TempDir(), "repository"))
+	generation := commitCompleteFixture(t, r)
+
+	got, manifest, err := r.ReadPracticalCurrent(t.Context())
+	if err != nil || got != generation || !manifest.Complete() {
+		t.Fatalf("practical current view = %v, %v", got, err)
+	}
+}

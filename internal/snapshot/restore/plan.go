@@ -49,6 +49,10 @@ func BuildPlan(m model.Manifest, selected []string) (Plan, error) {
 		return Plan{}, planFailure("manifest", "invalid_manifest", err)
 	}
 
+	// Restore materializes inherited session and window options locally, so it works from the
+	// option lists tmux reported rather than the manifest's compact form.
+	m = m.WithInheritedOptions()
+
 	requested, err := validateSelection(m, selected)
 	if err != nil {
 		return Plan{}, err

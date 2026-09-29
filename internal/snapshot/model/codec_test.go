@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json/v2"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -68,19 +69,28 @@ func TestRejectsMalformedNativeDocuments(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	version := []byte(fmt.Sprintf(`"version":%d`, Schema))
+	withVersion := func(replacement string) []byte { return bytes.Replace(data, version, []byte(replacement), 1) }
+
 	cases := map[string][]byte{
-		"legacy":             []byte("session\twork\t0\n"),
-		"duplicate":          bytes.Replace(data, []byte(`"version":1`), []byte(`"version":1,"version":1`), 1),
-		"unknown":            bytes.Replace(data, []byte(`"version":1`), []byte(`"version":1,"other":0`), 1),
-		"missing":            bytes.Replace(data, []byte(`"version":1,`), nil, 1),
-		"case":               bytes.Replace(data, []byte(`"version"`), []byte(`"Version"`), 1),
-		"version":            bytes.Replace(data, []byte(`"version":1`), []byte(`"version":2`), 1),
-		"null":               bytes.Replace(data, []byte(`"last":false`), []byte(`"last":null`), 1),
-		"trailing":           append(bytes.Clone(data), []byte(` {}`)...),
-		"missing false":      bytes.Replace(data, []byte(`"last":false,`), nil, 1),
-		"invalid utf8":       append([]byte{'"', 0xff, '"'}, data...),
-		"noncanonical bytes": bytes.Replace(data, []byte(`"d29yaw=="`), []byte(`"d29yax=="`), 1),
-		"newline base64":     bytes.Replace(data, []byte(`"d29yaw=="`), []byte(`"d29y\naw=="`), 1),
+		"legacy":                 []byte("session\twork\t0\n"),
+		"duplicate":              withVersion(string(version) + "," + string(version)),
+		"unknown":                withVersion(string(version) + `,"other":0`),
+		"missing":                bytes.Replace(data, append(bytes.Clone(version), ','), nil, 1),
+		"case":                   bytes.Replace(data, []byte(`"version"`), []byte(`"Version"`), 1),
+		"version":                withVersion(fmt.Sprintf(`"version":%d`, Schema-1)),
+		"null":                   bytes.Replace(data, []byte(`"last":false`), []byte(`"last":null`), 1),
+		"trailing":               append(bytes.Clone(data), []byte(` {}`)...),
+		"missing false":          bytes.Replace(data, []byte(`"last":false,`), nil, 1),
+		"invalid utf8":           append([]byte{'"', 0xff, '"'}, data...),
+		"utf8 as base64":         bytes.Replace(data, []byte(`"work"`), []byte(`{"base64":"d29yaw=="}`), 1),
+		"noncanonical base64":    bytes.Replace(data, []byte(`"work"`), []byte(`{"base64":"/x=="}`), 1),
+		"newline base64":         bytes.Replace(data, []byte(`"work"`), []byte(`{"base64":"/\nw=="}`), 1),
+		"unknown bytes member":   bytes.Replace(data, []byte(`"work"`), []byte(`{"hex":"ff"}`), 1),
+		"extra bytes member":     bytes.Replace(data, []byte(`"work"`), []byte(`{"base64":"/w==","other":""}`), 1),
+		"bytes as number":        bytes.Replace(data, []byte(`"work"`), []byte(`7`), 1),
+		"bytes as array":         bytes.Replace(data, []byte(`"work"`), []byte(`[119]`), 1),
+		"empty base64 of object": bytes.Replace(data, []byte(`"work"`), []byte(`{}`), 1),
 	}
 	for name, input := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -91,6 +101,41 @@ func TestRejectsMalformedNativeDocuments(t *testing.T) {
 
 			if name == "version" && !errors.Is(err, ErrVersion) {
 				t.Fatalf("wrong version error: %v", err)
+			}
+		})
+	}
+}
+
+func TestBytesEncodeReadableTextAndBase64Otherwise(t *testing.T) {
+	cases := []struct {
+		name  string
+		value Bytes
+		want  string
+	}{
+		{name: "text", value: Bytes("work"), want: `"work"`},
+		{name: "unicode and controls", value: Bytes("é🚀\t\n\x00"), want: `"é🚀\t\n\u0000"`},
+		{name: "empty", value: Bytes{}, want: `""`},
+		{name: "invalid utf8", value: Bytes{0xff, 'a'}, want: `{"base64":"/2E="}`},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			data, err := json.Marshal(testCase.value)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if string(data) != testCase.want {
+				t.Fatalf("encoded = %s, want %s", data, testCase.want)
+			}
+
+			var decoded Bytes
+			if err := json.Unmarshal(data, &decoded); err != nil {
+				t.Fatal(err)
+			}
+
+			if !bytes.Equal(decoded, testCase.value) {
+				t.Fatalf("decoded = %q, want %q", decoded, testCase.value)
 			}
 		})
 	}

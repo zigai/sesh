@@ -175,6 +175,7 @@ func (o *Observation) finalize(info gotmux.ServerInfo, started int64, endpoint s
 
 	o.Manifest.Source.EndpointScope = endpointScope
 	o.Manifest.Evidence = observationEvidence(enriched)
+	o.Manifest = o.Manifest.CompactInheritedOptions()
 
 	if err := o.Manifest.Validate(); err != nil {
 		return oops.In("snapshot.capture").With("operation", "validate_observation").Wrapf(err, "validate observation")

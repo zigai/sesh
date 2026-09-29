@@ -1511,7 +1511,7 @@ func assertSlotWindowID(t *testing.T, ctx context.Context, sess tmux.Session, in
 func makeBaseManifest() model.Manifest {
 	return model.Manifest{
 		Format:   "sesh",
-		Version:  1,
+		Version:  model.Schema,
 		Started:  1000,
 		Finished: 2000,
 		Source: model.Source{

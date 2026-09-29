@@ -44,6 +44,74 @@ func (r *Repository) ReadCurrent(ctx context.Context) (Generation, model.Manifes
 	return generation, manifest, nil
 }
 
+// ReadPracticalCurrent reads the generation used for practical recovery. Besides everything
+// ReadCurrent admits, it admits a current generation that the latest save recorded as an
+// observation, the normal result of a capture that is not an atomic checkpoint. A failed,
+// pending or rewrite-blocked latest save still requires explicit recovery.
+func (r *Repository) ReadPracticalCurrent(ctx context.Context) (Generation, model.Manifest, error) {
+	lock, err := r.root.Lock(ctx, "repository.lock")
+	if err != nil {
+		return Generation{}, model.Manifest{}, repositoryError("current", oops.In("snapshot.store").With("operation", "lock_snapshot_read").Wrapf(err, "lock snapshot read"))
+	}
+
+	generation, manifest, readErr := r.practicalCurrentLocked(ctx)
+	if err := errors.Join(readErr, lock.Close()); err != nil {
+		return Generation{}, model.Manifest{}, repositoryError("current", err)
+	}
+
+	return generation, manifest, nil
+}
+
+func (r *Repository) practicalCurrentLocked(ctx context.Context) (Generation, model.Manifest, error) {
+	generation, manifest, err := r.currentLocked(ctx)
+	if !errors.Is(err, ErrRecoveryRequired) {
+		return generation, manifest, err
+	}
+
+	catalog, catalogErr := r.catalog()
+	if catalogErr != nil {
+		return Generation{}, model.Manifest{}, catalogErr
+	}
+
+	if !catalog.PracticalCurrentAdmissible() {
+		return Generation{}, model.Manifest{}, ErrRecoveryRequired
+	}
+
+	current := catalog.Generations[catalog.generationIndex(catalog.Current)]
+	manifest, err = r.readGeneration(ctx, current)
+
+	return current, manifest, err
+}
+
+// PracticalCurrentAdmissible reports whether the current generation is the latest save's
+// observation-only result with no pending rewrite of it.
+func (c Catalog) PracticalCurrentAdmissible() bool {
+	if c.Current == "" || len(c.Attempts) == 0 {
+		return false
+	}
+
+	latest := c.Attempts[0]
+	for _, attempt := range c.Attempts[1:] {
+		if attempt.Sequence > latest.Sequence {
+			latest = attempt
+		}
+	}
+
+	if latest.State != attemptStateIncomplete || latest.ID != c.Current {
+		return false
+	}
+
+	for _, rewrite := range c.Rewrites {
+		if rewrite.State == rewriteStatePending && rewrite.Source == c.Current {
+			return false
+		}
+	}
+
+	index := c.generationIndex(c.Current)
+
+	return index >= 0 && !c.Generations[index].Complete
+}
+
 func (r *Repository) currentLocked(ctx context.Context) (Generation, model.Manifest, error) {
 	catalog, err := r.catalog()
 	if err != nil {

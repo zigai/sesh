@@ -178,6 +178,9 @@ func (m Manifest) validateWindowPanes(window Window, leaves map[string]Layout, s
 	indexes := make(map[int]bool)
 	active, count := 0, 0
 
+	// Pane geometry depends on options such as pane-border-status, which a window often inherits.
+	window.Options = m.EffectiveWindowOptions(window)
+
 	for _, pane := range m.Panes {
 		if pane.Window != window.ID {
 			continue

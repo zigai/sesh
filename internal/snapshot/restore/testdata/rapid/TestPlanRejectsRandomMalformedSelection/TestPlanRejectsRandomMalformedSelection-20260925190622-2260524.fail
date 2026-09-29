@@ -1,0 +1,20 @@
+# 2026/09/25 19:06:22.206066 [TestPlanRejectsRandomMalformedSelection] [rapid] draw sessionCount: 1
+# 2026/09/25 19:06:22.206072 [TestPlanRejectsRandomMalformedSelection] [rapid] draw windowCount: 1
+# 2026/09/25 19:06:22.206072 [TestPlanRejectsRandomMalformedSelection] [rapid] draw paneCount: 1
+# 2026/09/25 19:06:22.206073 [TestPlanRejectsRandomMalformedSelection] [rapid] draw zoomed: false
+# 2026/09/25 19:06:22.206074 [TestPlanRejectsRandomMalformedSelection] [rapid] draw badID: ""
+# 2026/09/25 19:06:22.206082 [TestPlanRejectsRandomMalformedSelection] expected ErrInvalid for bad session ID "", got: unsupported native snapshot version
+# 
+v0.4.8#869303310040977734
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0

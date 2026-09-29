@@ -31,7 +31,7 @@ type StepKind string
 func baseFixture() model.Manifest {
 	return model.Manifest{
 		Format:   "sesh",
-		Version:  1,
+		Version:  model.Schema,
 		Started:  1000,
 		Finished: 2000,
 		Source: model.Source{
@@ -1541,5 +1541,36 @@ func TestSimulatedTmuxSlotOccupancyAndGroupLinkPropagation(t *testing.T) {
 
 	for _, base := range []int{0, 1, 5} {
 		assertSimulatedSlots(t, plan, base)
+	}
+}
+
+func TestBuildPlanRestoresOmittedInheritedSessionOptions(t *testing.T) {
+	m := baseFixture()
+	m.Source.Options = []model.Option{
+		{Scope: "global-session", Name: model.Bytes("status"), Value: model.Bytes("on"), Present: true},
+		{Scope: "global-session", Name: model.Bytes("@plugin"), Value: model.Bytes("tpm"), Present: true},
+	}
+	m.Sessions[0].Options = []model.Option{
+		{Scope: "session", Name: model.Bytes("status"), Value: model.Bytes("on"), Present: true, Inherited: true},
+	}
+	m = m.CompactInheritedOptions()
+
+	if len(m.Sessions[0].Options) != 0 {
+		t.Fatalf("compact session options = %+v, want the inherited option omitted", m.Sessions[0].Options)
+	}
+
+	plan, err := BuildPlan(m, []string{"s0"})
+	if err != nil {
+		t.Fatalf("BuildPlan failed: %v", err)
+	}
+
+	createSession, ok := plan.Steps[0].(*CreateSessionStep)
+	if !ok {
+		t.Fatalf("first step has type %T, want *CreateSessionStep", plan.Steps[0])
+	}
+
+	want := []model.Option{{Scope: "session", Name: model.Bytes("status"), Value: model.Bytes("on"), Present: true, Inherited: true}}
+	if diff := cmp.Diff(want, createSession.Options); diff != "" {
+		t.Fatalf("session step options (-want +got):\n%s", diff)
 	}
 }
