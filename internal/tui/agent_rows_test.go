@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"slices"
 	"strings"
 	"testing"
@@ -280,6 +281,60 @@ func TestCurrentActiveIdleAgentRecordsViewAndSurvivesSessionChange(t *testing.T)
 	outputAfterSwitch := stripANSI(model.renderList(60, 2))
 	if !strings.Contains(outputAfterSwitch, "○") || strings.Contains(outputAfterSwitch, "◎") {
 		t.Fatalf("idle row after leaving pane = %q, want viewed status to persist", outputAfterSwitch)
+	}
+}
+
+type deferringStateStore struct {
+	writes int
+	views  []AgentView
+}
+
+func (s *deferringStateStore) UpdateModelState(context.Context, session.StateUpdate) error {
+	s.writes++
+
+	return nil
+}
+
+func (s *deferringStateStore) DeferAgentViews(views []AgentView) bool {
+	s.views = append(s.views, views...)
+
+	return true
+}
+
+func TestDeferringStateStoreTakesAgentViewsWithoutHistoryWrite(t *testing.T) {
+	now := time.Now()
+	model := newTestModel()
+	model.displayMode = displayModeAgents
+	store := &deferringStateStore{}
+	model.deps.State = store
+	model = updateTestModel(t, model, sessionLoadResultMsg{sessions: []session.Session{{
+		ID:           "$1",
+		Name:         testSupportSessionProjectName,
+		IsCurrent:    true,
+		ActivePaneID: "%7",
+		AgentTotal:   1,
+		Agents: []session.AgentSession{{
+			PaneID:      "%7",
+			Status:      session.AgentStatusIdle,
+			StatusSince: now.Add(-time.Minute),
+		}},
+	}}})
+
+	if command := model.persistAgentViewsCommand(model.recordActiveAgentViews()); command != nil {
+		t.Fatal("a deferring state store still scheduled a history write")
+	}
+
+	if store.writes != 0 {
+		t.Fatalf("history writes = %d, want none while views are deferred", store.writes)
+	}
+
+	identity := model.filtered[0].SemanticIdentity()
+	if len(store.views) == 0 || store.views[len(store.views)-1] != (AgentView{Session: identity, PaneID: "%7"}) {
+		t.Fatalf("deferred views = %+v, want the current agent pane", store.views)
+	}
+
+	if got := model.state.GetLastAgentView(identity, "%7"); got == 0 {
+		t.Fatal("deferred agent view is missing from the model's in-memory state")
 	}
 }
 
@@ -1067,6 +1122,45 @@ func TestAgentStatusCustomColors(t *testing.T) {
 	got := model.agentStatusGlyph(session.AgentStatusFailed)
 	if !strings.Contains(got, "●") || !strings.Contains(got, wantColor) {
 		t.Fatalf("failed glyph = %q, want ● with custom color %q", got, wantColor)
+	}
+}
+
+func TestThemePresetsRenderInTUI(t *testing.T) {
+	presets := []string{
+		"dracula",
+		"catppuccin",
+		"catppuccin-latte",
+		"tokyo-night",
+		"gruvbox",
+		"nord",
+		"terminal",
+	}
+
+	for _, preset := range presets {
+		t.Run(preset, func(t *testing.T) {
+			cfg, err := config.Load(config.WithExplicitPath("-"), config.WithInput(strings.NewReader("[theme]\npreset = \""+preset+"\"\n")))
+			if err != nil {
+				t.Fatalf("Load preset %s: %v", preset, err)
+			}
+
+			model := newTestModel()
+			model.config = cfg
+
+			running := model.agentStatusGlyph(session.AgentStatusRunning)
+			if !strings.Contains(running, "●") {
+				t.Errorf("preset %s running glyph missing dot: %q", preset, running)
+			}
+
+			failed := model.agentStatusGlyph(session.AgentStatusFailed)
+			if !strings.Contains(failed, "●") {
+				t.Errorf("preset %s failed glyph missing dot: %q", preset, failed)
+			}
+
+			idle := model.agentStatusGlyph(session.AgentStatusIdle)
+			if !strings.Contains(idle, "○") {
+				t.Errorf("preset %s idle glyph missing circle: %q", preset, idle)
+			}
+		})
 	}
 }
 

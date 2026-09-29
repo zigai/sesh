@@ -25,7 +25,7 @@ func TestRegularArrowKeysSkipAgentSessionHeadings(t *testing.T) {
 		{key: keyCode(tea.KeyDown), want: popupListRow{sessionIndex: 2, agentIndex: 0}},
 		{key: keyCode(tea.KeyDown), want: popupListRow{sessionIndex: 0, agentIndex: 0}},
 		{key: keyCode(tea.KeyUp), want: popupListRow{sessionIndex: 2, agentIndex: 0}},
-		{key: keyCtrl('p'), want: popupListRow{sessionIndex: 1, agentIndex: 0}},
+		{key: keyCode(tea.KeyUp), want: popupListRow{sessionIndex: 1, agentIndex: 0}},
 	}
 
 	for index, step := range steps {
@@ -197,5 +197,22 @@ func agentNavigationSessions() []session.Session {
 		{Name: "pi-codex-core", Agents: []session.AgentSession{{HarnessSession: "first"}, {HarnessSession: "second"}}},
 		{Name: "termtrace", Agents: []session.AgentSession{{HarnessSession: "third"}}},
 		{Name: "pi-tweaks", Agents: []session.AgentSession{{HarnessSession: "fourth"}}},
+	}
+}
+
+func TestCtrlPQuitsWithFloatingTerminalReplayKey(t *testing.T) {
+	model := newTestModel()
+
+	handler := model.handleNavigationKeys(keyCtrl('p'))
+	if handler == nil {
+		t.Fatal("ctrl+p was not handled")
+	}
+
+	if _, cmd := handler(); cmd == nil {
+		t.Fatal("ctrl+p returned no quit command")
+	}
+
+	if got := model.ReplayKey(); got != ReplayKeyFloatingTerminal {
+		t.Fatalf("ReplayKey() = %q, want %q", got, ReplayKeyFloatingTerminal)
 	}
 }

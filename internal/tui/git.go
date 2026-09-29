@@ -11,27 +11,38 @@ import (
 )
 
 const (
-	gitScanBudget    = time.Second
-	gitCommandBudget = 200 * time.Millisecond
-	gitOutputLimit   = 64 * 1024
-	statFieldsCount  = 2
-	gitWaitDelay     = 50 * time.Millisecond
+	gitScanBudget      = time.Second
+	gitCommandBudget   = 200 * time.Millisecond
+	gitOutputLimit     = 64 * 1024
+	statFieldsCount    = 2
+	gitWaitDelay       = 50 * time.Millisecond
+	gitStatusCodeWidth = 2
 )
 
 type agentGitCacheEntry struct {
 	GitBranch        string `json:"gitBranch"`
 	Worktree         string `json:"worktree"`
+	GitRepo          string `json:"gitRepo"`
+	GitHasRemote     bool   `json:"gitHasRemote"`
 	GitChanges       string `json:"gitChanges"`
 	LinkedWorktree   bool   `json:"linkedWorktree"`
 	GitAhead         int    `json:"gitAhead"`
 	GitBehind        int    `json:"gitBehind"`
 	GitTrackingKnown bool   `json:"gitTrackingKnown"`
+	GitStash         int    `json:"gitStash"`
+	GitConflicts     int    `json:"gitConflicts"`
+	GitDirty         bool   `json:"gitDirty"`
 }
 
 type gitTracking struct {
 	ahead  int
 	behind int
 	known  bool
+}
+
+type gitStatus struct {
+	dirty     bool
+	conflicts int
 }
 
 type gitScanner func(ctx context.Context, directories []string) map[string]agentGitCacheEntry
@@ -91,16 +102,57 @@ func readGitMetadata(ctx context.Context, directory string) agentGitCacheEntry {
 
 	branch, _ := gitMetadataOutput(commandCtx, directory, "symbolic-ref", "--quiet", "--short", "HEAD")
 	tracking := readGitTracking(commandCtx, paths[0])
+	status := readGitStatus(commandCtx, paths[0])
+	remotes, remotesOK := gitMetadataOutput(commandCtx, paths[0], "remote")
 
 	return agentGitCacheEntry{
 		GitBranch:        branch,
 		Worktree:         paths[0],
+		GitRepo:          paths[2],
+		GitHasRemote:     remotesOK && remotes != "",
 		LinkedWorktree:   paths[1] != paths[2],
 		GitChanges:       readGitChanges(commandCtx, paths[0]),
 		GitAhead:         tracking.ahead,
 		GitBehind:        tracking.behind,
 		GitTrackingKnown: tracking.known,
+		GitStash:         readGitStashCount(commandCtx, paths[0]),
+		GitConflicts:     status.conflicts,
+		GitDirty:         status.dirty,
 	}
+}
+
+func readGitStatus(ctx context.Context, directory string) gitStatus {
+	output, ok := gitMetadataOutput(ctx, directory, "status", "--porcelain=v1", "--untracked-files=normal")
+	if !ok {
+		return gitStatus{dirty: false, conflicts: 0}
+	}
+
+	return parseGitStatus(output)
+}
+
+func parseGitStatus(output string) gitStatus {
+	status := gitStatus{dirty: output != "", conflicts: 0}
+	for line := range strings.SplitSeq(output, "\n") {
+		if len(line) < gitStatusCodeWidth {
+			continue
+		}
+
+		code := line[:gitStatusCodeWidth]
+		if code == "UU" || code == "AA" || code == "DD" || code == "AU" || code == "UA" || code == "DU" || code == "UD" {
+			status.conflicts++
+		}
+	}
+
+	return status
+}
+
+func readGitStashCount(ctx context.Context, directory string) int {
+	output, ok := gitMetadataOutput(ctx, directory, "stash", "list", "--format=%gd")
+	if !ok || output == "" {
+		return 0
+	}
+
+	return strings.Count(output, "\n") + 1
 }
 
 func readGitTracking(ctx context.Context, directory string) gitTracking {

@@ -636,6 +636,22 @@ func TestSelectedAgentRowPreservesStatusGlyphColorWithCustomTheme(t *testing.T) 
 	}
 }
 
+func TestRenderSessionRowWithCustomForeground(t *testing.T) {
+	model := newTestModel()
+	model.config.Theme.Foreground = "#123456"
+	model.filtered = []session.Session{
+		{Name: "selected-row"},
+		{Name: "unselected-row"},
+	}
+
+	output := model.renderList(60, 2)
+
+	const wantColor = "\x1b[38;2;18;52;86m"
+	if !strings.Contains(output, wantColor) {
+		t.Fatalf("rendered output = %q, want custom foreground color %q", output, wantColor)
+	}
+}
+
 func TestRenderSessionRowDoesNotShowAttachedBadge(t *testing.T) {
 	model := newTestModel()
 	layout := model.calcSessionLayout(48)
@@ -754,6 +770,71 @@ func TestRenderListDisplaysShortcutStyleRight(t *testing.T) {
 
 	if strings.Contains(lines[4], "^1") {
 		t.Fatalf("inactive session agent should not have badge: %q", lines[4])
+	}
+}
+
+func TestStatusMinimalBadgeRenderingAndInteractions(t *testing.T) {
+	model := newTestModel()
+	model.width = 80
+	model.height = 20
+	model.filtered = []session.Session{
+		{Name: "sess-1"},
+		{Name: "sess-2"},
+	}
+
+	// Degraded status
+	model.setDegradedSource(degradedSourceCatalog, "Session list is incomplete: some sources could not be read")
+
+	view := stripANSI(viewString(model.View()))
+	// Verify it does NOT render as a full-width line between input prompt and list
+	lines := strings.Split(view, "\n")
+	for i, line := range lines {
+		if strings.Contains(line, ">") && i+1 < len(lines) {
+			if strings.Contains(lines[i+1], "Session list is incomplete") {
+				t.Fatalf("status banner unexpectedly rendered directly below input bar: %q", lines[i+1])
+			}
+		}
+	}
+
+	// Verify minimal warning badge is in the view (in the footer)
+	if !strings.Contains(view, "⚠") {
+		t.Fatalf("view does not contain minimal warning badge: %q", view)
+	}
+
+	// Error status
+	model.setErrorStatus("command execution failed")
+
+	errorView := stripANSI(viewString(model.View()))
+	if !strings.Contains(errorView, "✖") {
+		t.Fatalf("view does not contain minimal error badge: %q", errorView)
+	}
+
+	// Help overlay displays status message
+	model.showHelp = true
+
+	helpView := stripANSI(viewString(model.View()))
+	if !strings.Contains(helpView, "command execution failed") {
+		t.Fatalf("help overlay does not contain status message: %q", helpView)
+	}
+
+	model.showHelp = false
+
+	// Mouse click on badge dismisses status
+	layout := model.popupMouseLayout()
+	badgeX := layout.bodyX + max(layout.layout.bodyWidth-lipgloss.Width(model.renderFooterBadges()), 0)
+
+	clickHandler, handled := model.handleFooterBadgeClick(tea.Mouse{
+		X: badgeX,
+		Y: layout.footerY,
+	}, layout)
+	if !handled || clickHandler == nil {
+		t.Fatal("clicking status badge was not handled")
+	}
+
+	clickHandler()
+
+	if model.hasStatusBadge() {
+		t.Fatalf("status badge still active after click dismiss: level=%v message=%q", model.statusLevel, model.statusMessage)
 	}
 }
 

@@ -168,6 +168,30 @@ func TestLoadSessionRowsSortsLocalCatalogByNativeIdentityHistoryAndActivity(t *t
 	}
 }
 
+func TestLoadSessionsKeepsLiveRowsWhenSavedCatalogFails(t *testing.T) {
+	model := newTestModelWithDeps(Dependencies{
+		LoadCatalog: func(context.Context) (session.CatalogResult, error) {
+			return session.CatalogResult{
+				Sessions: []session.Session{{ID: "$1", Name: "live", Kind: session.KindLive}},
+				Status:   session.StatusPartial,
+			}, errTmuxUnavailable
+		},
+	})
+	t.Cleanup(model.Close)
+
+	if err := model.loadSessions(); err != nil {
+		t.Fatalf("loadSessions() with a partial catalog = %v, want the live rows applied", err)
+	}
+
+	if got := sessionNamesForTest(model.sessions); !slices.Equal(got, []string{"live"}) {
+		t.Fatalf("sessions after partial reload = %v, want [live]", got)
+	}
+
+	if !errors.Is(model.sessionLoadErr, errTmuxUnavailable) {
+		t.Fatalf("sessionLoadErr = %v, want the retained partial cause", model.sessionLoadErr)
+	}
+}
+
 func TestLoadSessionRowsExposesPartialCatalogStatusAndKeepsRows(t *testing.T) {
 	model := newTestModelWithDeps(Dependencies{
 		LoadCatalog: func(context.Context) (session.CatalogResult, error) {
@@ -1463,7 +1487,8 @@ func TestAgentWatchUnavailableBrokerUsesPollingWithoutWarning(t *testing.T) {
 			default:
 			}
 
-			warningVisible := strings.Contains(stripANSI(viewString(model.View())), "Agent status unavailable")
+			warningVisible := strings.Contains(stripANSI(viewString(model.View())), "⚠") ||
+				strings.Contains(stripANSI(viewString(model.View())), "Agent status unavailable")
 			if warningVisible == testCase.pollEnabled {
 				t.Fatalf("agent warning visible = %t, poll available = %t", warningVisible, testCase.pollEnabled)
 			}

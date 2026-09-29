@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/samber/oops"
@@ -29,6 +30,10 @@ const (
 	tuiOperationAgentGitScan            tuiLogOperation = "agent_git_scan"
 )
 
+// tuiOperationFirstFrame names the once-per-popup timing record, which has its own schema
+// outside the closed set of operation outcomes.
+const tuiOperationFirstFrame = "first_frame"
+
 const (
 	tuiLogOutcomeSuccess tuiLogOutcome = iota
 	tuiLogOutcomeFailure
@@ -50,6 +55,15 @@ const (
 )
 
 type tuiLogOperation string
+
+// firstFrameTiming breaks down how long a popup took to show its first frame.
+type firstFrameTiming struct {
+	load        time.Duration
+	catalog     time.Duration
+	agents      time.Duration
+	sinceLaunch time.Duration
+	launched    bool
+}
 
 type tuiLogOutcome uint8
 
@@ -189,6 +203,40 @@ func logTUIEvent(ctx context.Context, operation tuiLogOperation, outcome tuiLogO
 			Str("status", "recovered").
 			Msg("tui dependency recovered")
 	}
+}
+
+// logTUIFirstFrame records once per popup how long its first frame took and which loader
+// held it: the frame waits for both the catalog and the agent inventory.
+func logTUIFirstFrame(ctx context.Context, timing firstFrameTiming) {
+	event := zerolog.Ctx(ctx).Info().
+		Str("component", "tui").
+		Str("operation", tuiOperationFirstFrame).
+		Str("status", "ok").
+		Int64("load_ms", timing.load.Milliseconds()).
+		Int64("catalog_ms", timing.catalog.Milliseconds()).
+		Int64("agents_ms", timing.agents.Milliseconds())
+
+	if timing.launched {
+		event.Int64("since_launch_ms", timing.sinceLaunch.Milliseconds())
+	}
+
+	event.Msg("tui first frame shown")
+}
+
+// firstFrameTimingAt measures a first frame shown at now. A zero initializedAt or
+// launchedAt leaves that span unknown.
+func firstFrameTimingAt(initializedAt, launchedAt time.Time, load sessionLoadTiming, now time.Time) firstFrameTiming {
+	timing := firstFrameTiming{load: 0, catalog: load.catalog, agents: load.agents, sinceLaunch: 0, launched: false}
+	if !initializedAt.IsZero() {
+		timing.load = now.Sub(initializedAt)
+	}
+
+	if !launchedAt.IsZero() && !launchedAt.After(now) {
+		timing.sinceLaunch = now.Sub(launchedAt)
+		timing.launched = true
+	}
+
+	return timing
 }
 
 func logTUILoadTransition(

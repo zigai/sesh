@@ -68,6 +68,10 @@ type AgentSession struct {
 	ResumeCommand    []string  `json:"resumeCommand"`
 	ActivityChanged  time.Time `json:"activityChangedAt"`
 	UpdatedAt        time.Time `json:"updatedAt"`
+	Model            string    `json:"model,omitempty"`
+	WaitingReason    string    `json:"waitingReason,omitempty"`
+	LastTool         string    `json:"lastTool,omitempty"`
+	PromptAt         time.Time `json:"promptAt,omitzero"`
 }
 
 type StatusSummary struct {

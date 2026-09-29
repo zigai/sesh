@@ -319,7 +319,7 @@ func assertDisplayModeState(t *testing.T, model *Model, wantMode displayMode, wa
 	}
 }
 
-func TestAgentsModePreservesSearchAndSortsSessionsByName(t *testing.T) {
+func TestAgentsModePreservesSearchAndSortsSessionsChronologically(t *testing.T) {
 	now := time.Date(2026, 7, 16, 12, 0, 0, 0, time.UTC)
 	model := newTestModel()
 	model.displayMode = displayModeAgents
@@ -332,7 +332,7 @@ func TestAgentsModePreservesSearchAndSortsSessionsByName(t *testing.T) {
 	model.refreshDisplaySessions()
 	model.filterSessions()
 
-	want := []string{"alpha", "bravo", "charlie", "plain"}
+	want := []string{"charlie", "alpha", "bravo", "plain"}
 	if got := sessionNamesForTest(model.filtered); !slicesEqual(got, want) {
 		t.Fatalf("agent rows = %#v, want %#v", got, want)
 	}

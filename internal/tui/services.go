@@ -137,6 +137,19 @@ type StateStore interface {
 	UpdateModelState(ctx context.Context, update session.StateUpdate) error
 }
 
+// AgentViewDeferrer is an optional StateStore capability. A store that returns true takes
+// ownership of persisting the views after the model exits, so a popup never holds its
+// close on a history write.
+type AgentViewDeferrer interface {
+	DeferAgentViews(views []AgentView) bool
+}
+
+// AgentView records that the agent pane of a session was on screen.
+type AgentView struct {
+	Session session.Identity
+	PaneID  string
+}
+
 type Services struct {
 	Catalog          CatalogSource
 	Detector         TmuxDetector

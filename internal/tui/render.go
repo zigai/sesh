@@ -70,13 +70,13 @@ type popupLayout struct {
 }
 
 type sessionTableLayout struct {
-	width          int
-	prefixWidth    int
-	leftWidth      int
-	rightWidth     int
-	agentAgeWidth  int
-	agentGitWidths map[string]int
-	now            time.Time
+	width         int
+	prefixWidth   int
+	leftWidth     int
+	rightWidth    int
+	agentAgeWidth int
+	agentRows     agentTableLayout
+	now           time.Time
 }
 
 type sessionRowStyles struct {
@@ -124,8 +124,7 @@ func (m *Model) viewContent() string {
 }
 
 func (m *Model) renderFrame() string {
-	status := m.renderStatus(max(m.contentWidth()-statusWidthInset, 1))
-	layout := m.calcPopupLayout(status != "")
+	layout := m.calcPopupLayout(false)
 
 	horizontal := strings.Repeat("─", layout.bodyWidth+frameBorderPadding)
 	topBorder, bottomBorder, leftBorder, rightBorder := m.renderFrameBorders(horizontal)
@@ -135,10 +134,6 @@ func (m *Model) renderFrame() string {
 	out.WriteString(topBorder)
 
 	writeExactFramedSection(&out, m.renderInputBar(layout.bodyWidth), leftBorder, rightBorder)
-
-	if status != "" {
-		writeExactFramedSection(&out, status, leftBorder, rightBorder)
-	}
 
 	m.writeListFramedSection(&out, layout.bodyWidth, layout.listHeight, leftBorder, rightBorder)
 
@@ -225,16 +220,13 @@ func (m *Model) insetPopupContent(content string) string {
 	return out.String()
 }
 
-func (m *Model) calcPopupLayout(hasStatus bool) popupLayout {
+func (m *Model) calcPopupLayout(_ bool) popupLayout {
 	bodyWidth := max(m.contentWidth()-popupBodyWidthMargin, 1)
 	bodyHeight := max(m.contentHeight()-popupBodyHeightMargin, 1)
 
 	reservedRows := 1
-	if hasStatus {
-		reservedRows++
-	}
 
-	wantsFooter := m.config.Settings.ShowFooter || m.showsDisplayModeIndicator() || m.showsAgentSortIndicator()
+	wantsFooter := m.config.Settings.ShowFooter || m.showsDisplayModeIndicator() || m.showsAgentSortIndicator() || m.hasStatusBadge()
 
 	showFooter := wantsFooter && bodyHeight-reservedRows >= minFooterRows
 	if showFooter {
@@ -276,29 +268,34 @@ func (m *Model) renderInputBar(width int) string {
 	return line
 }
 
-func (m *Model) renderStatus(width int) string {
-	if m.statusLevel == statusNone || m.statusMessage == "" {
+func (m *Model) renderStatusBadge() string {
+	if !m.hasStatusBadge() {
 		return ""
 	}
 
-	color := lipgloss.Color(m.config.Theme.Success)
-	switch m.statusLevel {
-	case statusError:
-		color = lipgloss.Color(m.config.Theme.Error)
-	case statusDegraded:
-		color = lipgloss.Color(m.config.Theme.Warning)
-	case statusNone:
-		return ""
+	glyph := "⚠"
+	color := ""
+
+	if m.config != nil {
+		color = m.config.Theme.Warning
 	}
 
-	line := display.Truncate(SanitizeTerminalText(m.statusMessage), width)
-	if lineWidth := lipgloss.Width(line); lineWidth < width {
-		line += strings.Repeat(" ", width-lineWidth)
+	if m.statusLevel == statusError {
+		glyph = "✖"
+
+		if m.config != nil {
+			color = m.config.Theme.Error
+		}
+	}
+
+	if color == "" {
+		return glyph
 	}
 
 	return lipgloss.NewStyle().
-		Foreground(color).
-		Render(line)
+		Foreground(lipgloss.Color(color)).
+		Bold(true).
+		Render(glyph)
 }
 
 func (m *Model) renderLoadingState(width int) string {
@@ -469,18 +466,26 @@ func (m *Model) writeSeparatorRow(
 func (m *Model) calcSessionLayout(width int) sessionTableLayout {
 	prefixWidth := lipgloss.Width(defaultSelectionBar)
 	now := time.Now()
-	agentAgeWidth := m.agentAgeColumnWidth(now)
-	layout := sessionTableLayout{
-		width:          width,
-		leftWidth:      0,
-		rightWidth:     0,
-		prefixWidth:    prefixWidth,
-		agentAgeWidth:  agentAgeWidth,
-		agentGitWidths: nil,
-		now:            now,
+
+	reflow := agentLayoutReflow{width: width, displayMode: m.displayMode, uiMode: m.mode, query: m.textInput.Value()}
+	if reflow != m.agentLayoutKey {
+		m.agentRowRatchet.Reset()
+		m.agentLayoutKey = reflow
 	}
 
-	layout.agentGitWidths = m.agentGitColumnWidths(layout)
+	var emptyAgentRows agentTableLayout
+
+	layout := sessionTableLayout{
+		width:         width,
+		leftWidth:     0,
+		rightWidth:    0,
+		prefixWidth:   prefixWidth,
+		agentAgeWidth: 0,
+		agentRows:     emptyAgentRows,
+		now:           now,
+	}
+
+	agents := m.measureAgentRows(layout)
 	rightWidth := m.sessionFormatRightColumnWidth(layout)
 	rightWidth = min(rightWidth, max(width-prefixWidth-frameBorderPadding, 0))
 
@@ -491,24 +496,9 @@ func (m *Model) calcSessionLayout(width int) sessionTableLayout {
 
 	layout.rightWidth = rightWidth
 	layout.leftWidth = max(width-prefixWidth-gapWidth-rightWidth, 1)
+	layout.agentRows = m.planAgentRows(layout, agents)
 
 	return layout
-}
-
-func (m *Model) agentAgeColumnWidth(now time.Time) int {
-	if m.displayMode != displayModeAgents {
-		return 0
-	}
-
-	ageWidth := 0
-
-	for _, row := range m.filtered {
-		for _, agent := range row.Agents {
-			ageWidth = max(ageWidth, lipgloss.Width(m.agentStatusAgeAt(agent, now)))
-		}
-	}
-
-	return ageWidth
 }
 
 func (m *Model) renderSessionRow(layout sessionTableLayout, s session.Session, isSelected bool) string {
@@ -538,10 +528,12 @@ func (m *Model) sessionRowStyles(layout sessionTableLayout) sessionRowStyles {
 	}
 
 	selectedBg := lipgloss.Color(m.config.Theme.Selected)
+
 	fg := m.config.Theme.Foreground
 	if fg == "" || strings.EqualFold(fg, "default") {
 		fg = "252"
 	}
+
 	nameStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(fg))
 	selectedNameStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("255")).
@@ -576,6 +568,15 @@ func (m *Model) sessionRowStyles(layout sessionTableLayout) sessionRowStyles {
 }
 
 func (m *Model) usesDefaultRowTheme() bool {
+	if m.config == nil {
+		return true
+	}
+
+	fg := m.config.Theme.Foreground
+	if fg != "" && !strings.EqualFold(fg, "default") && fg != "252" {
+		return false
+	}
+
 	return m.config.Theme.Secondary == "#ffdd57" && m.config.Theme.Selected == "#2a2a2a"
 }
 
@@ -657,6 +658,11 @@ func (m *Model) writeFormattedSessionRow(
 	isLastAgent bool,
 	isSelected bool,
 ) {
+	if hasAgent && layout.agentRows.valid {
+		m.writePlannedAgentRow(out, layout, styles, row, agent, isLastAgent, isSelected)
+		return
+	}
+
 	line := m.formattedSessionLine(row, agent, hasAgent, isLastAgent, layout)
 
 	left := fitSessionFormatParts(line.Left, layout.leftWidth)
@@ -909,6 +915,7 @@ func (m *Model) agentStatusColor(status session.AgentStatus) string {
 	}
 
 	colors := m.config.ResolvedAgentStatusColors()
+
 	switch status {
 	case session.AgentStatusRunning:
 		return colors.Running
@@ -1221,7 +1228,7 @@ func (m *Model) renderEmptyState(width int) string {
 	}
 
 	if m.sessionLoadErr != nil && len(m.sessions) == 0 {
-		message = fmt.Sprintf("Unable to load sessions: %v", m.sessionLoadErr)
+		message = fmt.Sprintf("Failed to load sessions: %v", m.sessionLoadErr)
 	}
 
 	if query := strings.TrimSpace(m.textInput.Value()); query != "" {
@@ -1251,7 +1258,7 @@ func (m *Model) renderModeFooter(width int, showHints bool) string {
 		return ""
 	}
 
-	if !m.showsDisplayModeIndicator() && !m.showsAgentSortIndicator() {
+	if !m.showsDisplayModeIndicator() && !m.showsAgentSortIndicator() && !m.hasStatusBadge() {
 		if showHints {
 			return m.renderFooter(width)
 		}
@@ -1269,7 +1276,9 @@ func (m *Model) renderModeFooter(width int, showHints bool) string {
 	prefixWidth := width - badgeWidth
 	prefix := strings.Repeat(" ", prefixWidth)
 
-	if showHints {
+	if m.hasStatusBadge() && m.statusBadgeHovered {
+		prefix = m.renderStatusHoverPrefix(prefixWidth)
+	} else if showHints {
 		hintWidth := m.modeFooterHintWidth(width)
 		if hintWidth > 0 {
 			prefix = m.renderFooter(hintWidth) + strings.Repeat(" ", prefixWidth-hintWidth)
@@ -1277,6 +1286,31 @@ func (m *Model) renderModeFooter(width int, showHints bool) string {
 	}
 
 	return prefix + badge
+}
+
+func (m *Model) renderStatusHoverPrefix(width int) string {
+	color := ""
+
+	if m.config != nil {
+		color = m.config.Theme.Warning
+		if m.statusLevel == statusError {
+			color = m.config.Theme.Error
+		}
+	}
+
+	statusStyle := lipgloss.NewStyle().Bold(true)
+	if color != "" {
+		statusStyle = statusStyle.Foreground(lipgloss.Color(color))
+	}
+
+	statusLine := display.Truncate(SanitizeTerminalText(m.statusMessage), max(width-frameBorderPadding, 1))
+	prefix := statusStyle.Render(statusLine)
+
+	if prefixLen := lipgloss.Width(prefix); prefixLen < width {
+		prefix += strings.Repeat(" ", width-prefixLen)
+	}
+
+	return prefix
 }
 
 func (m *Model) renderModeBadge() string {
@@ -1288,7 +1322,7 @@ func (m *Model) renderModeBadge() string {
 }
 
 func (m *Model) modeFooterHintWidth(width int) int {
-	if !m.showsDisplayModeIndicator() && !m.showsAgentSortIndicator() {
+	if !m.showsDisplayModeIndicator() && !m.showsAgentSortIndicator() && !m.hasStatusBadge() {
 		return max(width, 0)
 	}
 

@@ -3,12 +3,17 @@ package display
 import (
 	"errors"
 	"fmt"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
 	"unicode"
 
+	"github.com/charmbracelet/x/ansi"
+	"github.com/rivo/uniseg"
 	"github.com/samber/oops"
+
+	"github.com/zigai/sesh/internal/display/layout"
 )
 
 const (
@@ -90,6 +95,29 @@ const (
 	FieldAgentSessionFile    = "agent_session_file"
 	FieldAgentExecutable     = "agent_executable"
 	FieldAgentPID            = "agent_pid"
+	FieldAgentModel          = "agent_model"
+	FieldAgentWaitingReason  = "agent_waiting_reason"
+	FieldAgentLastTool       = "agent_last_tool"
+	FieldAgentTask           = "agent_task"
+	FieldAgentContextPct     = "agent_context_pct"
+	FieldAgentTokens         = "agent_tokens"
+	FieldAgentCost           = "agent_cost"
+	FieldAgentTodoDone       = "agent_todo_done"
+	FieldAgentTodoTotal      = "agent_todo_total"
+	FieldAgentSubagents      = "agent_subagents"
+	FieldSubagentCount       = "subagent_count"
+	FieldAgentPromptAge      = "agent_prompt_age"
+	FieldAgentPR             = "agent_pr"
+	FieldAgentCI             = "agent_ci"
+	FieldAgentGitStash       = "agent_git_stash"
+	FieldAgentGitConflicts   = "agent_git_conflicts"
+	FieldAgentGitDirty       = "agent_git_dirty"
+	FieldPaneCPU             = "pane_cpu"
+	FieldPaneMem             = "pane_mem"
+	FieldWindowCPU           = "window_cpu"
+	FieldWindowMem           = "window_mem"
+	FieldSessionCPU          = "session_cpu"
+	FieldSessionMem          = "session_mem"
 )
 
 const (
@@ -120,122 +148,6 @@ var (
 	ErrUnknownKind      = errors.New("unknown format kind")
 )
 
-var (
-	sessionAllowedFields = map[string]struct{}{
-		FieldSessionName:         {},
-		FieldSessionID:           {},
-		FieldSessionKind:         {},
-		FieldSource:              {},
-		FieldConnection:          {},
-		FieldSourcePrefix:        {},
-		FieldSourceStatus:        {},
-		FieldWindowCount:         {},
-		FieldActivityAge:         {},
-		FieldAttached:            {},
-		FieldCurrent:             {},
-		FieldCurrentMarker:       {},
-		FieldAttachedMarker:      {},
-		FieldActiveWindowName:    {},
-		FieldActiveWindowIndex:   {},
-		FieldActivePanePath:      {},
-		FieldActivePanePathName:  {},
-		FieldActivePaneCommand:   {},
-		FieldActivePaneTitle:     {},
-		FieldAgentCount:          {},
-		FieldAgentTotal:          {},
-		FieldAgentWorking:        {},
-		FieldAgentWaiting:        {},
-		FieldAgentIdle:           {},
-		FieldAgentFailed:         {},
-		FieldAgentInterrupted:    {},
-		FieldAgentUnknown:        {},
-		FieldAgentStatus:         {},
-		FieldAgentStatusGlyph:    {},
-		FieldAgentStatusText:     {},
-		FieldAgentAge:            {},
-		FieldAgentDuration:       {},
-		FieldAgentClock:          {},
-		FieldSessionAgentContext: {},
-		FieldShortcut:            {},
-		FieldShortcutBadge:       {},
-	}
-
-	agentAllowedFields = map[string]struct{}{
-		FieldSessionName:         {},
-		FieldSessionID:           {},
-		FieldSessionKind:         {},
-		FieldSource:              {},
-		FieldConnection:          {},
-		FieldSourcePrefix:        {},
-		FieldSourceStatus:        {},
-		FieldWindowCount:         {},
-		FieldActivityAge:         {},
-		FieldAttached:            {},
-		FieldCurrent:             {},
-		FieldCurrentMarker:       {},
-		FieldAttachedMarker:      {},
-		FieldActiveWindowName:    {},
-		FieldActiveWindowIndex:   {},
-		FieldActivePanePath:      {},
-		FieldActivePanePathName:  {},
-		FieldActivePaneCommand:   {},
-		FieldActivePaneTitle:     {},
-		FieldAgentCount:          {},
-		FieldAgentTotal:          {},
-		FieldAgentWorking:        {},
-		FieldAgentWaiting:        {},
-		FieldAgentIdle:           {},
-		FieldAgentFailed:         {},
-		FieldAgentInterrupted:    {},
-		FieldAgentUnknown:        {},
-		FieldAgentStatus:         {},
-		FieldAgentStatusGlyph:    {},
-		FieldAgentStatusText:     {},
-		FieldAgentAge:            {},
-		FieldAgentDuration:       {},
-		FieldAgentClock:          {},
-		FieldSessionAgentContext: {},
-		FieldShortcut:            {},
-		FieldShortcutBadge:       {},
-		FieldTree:                {},
-		FieldTreeBranch:          {},
-		FieldTreeIndent:          {},
-		FieldHarness:             {},
-		FieldHarnessRaw:          {},
-		FieldAgentSession:        {},
-		FieldRegistryID:          {},
-		FieldPaneID:              {},
-		FieldStatus:              {},
-		FieldStatusGlyph:         {},
-		FieldStatusText:          {},
-		FieldStatusAge:           {},
-		FieldStatusDuration:      {},
-		FieldStatusClock:         {},
-		FieldActiveMarker:        {},
-		FieldStale:               {},
-		FieldAgentContext:        {},
-		FieldAgentCWD:            {},
-		FieldAgentCWDName:        {},
-		FieldAgentProjectRoot:    {},
-		FieldAgentProjectName:    {},
-		FieldAgentGitBranch:      {},
-		FieldAgentGitGlyph:       {},
-		FieldAgentGitChanges:     {},
-		FieldAgentGitInfo:        {},
-		FieldAgentGitLabel:       {},
-		FieldAgentGitAdded:       {},
-		FieldAgentGitDeleted:     {},
-		FieldAgentGitAhead:       {},
-		FieldAgentGitBehind:      {},
-		FieldAgentWorktree:       {},
-		FieldAgentWorktreeName:   {},
-		FieldAgentSessionPath:    {},
-		FieldAgentSessionFile:    {},
-		FieldAgentExecutable:     {},
-		FieldAgentPID:            {},
-	}
-)
-
 type FormatKind string
 
 type Alignment byte
@@ -247,6 +159,11 @@ type Part struct {
 	Width       int
 	MaxWidth    int
 	HasMaxWidth bool
+	Group       string
+	Separator   bool
+	Role        string
+	State       layout.State
+	StateKnown  bool
 }
 
 type Line struct {
@@ -258,6 +175,10 @@ type Resolver interface {
 	ResolveSessionFormatField(field string) string
 }
 
+type CellResolver interface {
+	ResolveSessionFormatCell(field string) (string, layout.State)
+}
+
 type Template struct {
 	left  []token
 	right []token
@@ -265,11 +186,24 @@ type Template struct {
 
 type token struct {
 	field       string
+	fallback    string
+	pipes       []pipe
+	role        string
+	group       string
+	separator   bool
+	widget      string
+	secondary   string
+	threshold   int
 	text        string
 	alignment   Alignment
 	width       int
 	maxWidth    int
 	hasMaxWidth bool
+}
+
+type pipe struct {
+	name  string
+	value string
 }
 
 type fieldSpec struct {
@@ -300,6 +234,22 @@ func (t Template) Render(resolver Resolver) Line {
 
 func (t Template) UsesAny(fields ...string) bool {
 	return tokensUseAny(t.left, fields) || tokensUseAny(t.right, fields)
+}
+
+func (t Template) UsesWidget(widget string) bool {
+	for _, item := range t.left {
+		if item.widget == widget {
+			return true
+		}
+	}
+
+	for _, item := range t.right {
+		if item.widget == widget {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (t Template) RightWidth(resolver Resolver, measure func(string) int) int {
@@ -336,17 +286,31 @@ func MeasureRight[T Resolver](template Template, resolver T, measure func(string
 
 	width := 0
 
-	for _, item := range template.right {
-		value := item.text
-		if item.field != "" {
-			value = resolver.ResolveSessionFormatField(item.field)
+	for _, part := range renderTokens(template.right, resolver) {
+		valueWidth := measure(part.Value)
+		if part.HasMaxWidth {
+			valueWidth = min(valueWidth, part.MaxWidth)
 		}
 
-		valueWidth := measuredTokenWidth(item, measure(value))
-		width += max(valueWidth, item.width)
+		width += max(valueWidth, part.Width)
 	}
 
 	return width
+}
+
+func newToken() token {
+	return token{
+		field: "", fallback: "", pipes: nil, role: "", group: "", separator: false,
+		widget: "", secondary: "", threshold: 0, text: "", alignment: AlignmentNone,
+		width: 0, maxWidth: 0, hasMaxWidth: false,
+	}
+}
+
+func literalToken(value string) token {
+	item := newToken()
+	item.text = value
+
+	return item
 }
 
 func compile(kind FormatKind, source string) (Template, error) {
@@ -377,7 +341,7 @@ func safeKind(kind FormatKind) string {
 
 func tokensUseAny(tokens []token, fields []string) bool {
 	for _, item := range tokens {
-		if slices.Contains(fields, item.field) {
+		if slices.Contains(fields, item.field) || slices.Contains(fields, item.fallback) || slices.Contains(fields, item.secondary) {
 			return true
 		}
 	}
@@ -413,13 +377,15 @@ func parse(source string, allowed map[string]struct{}) (Template, error) {
 
 		source = remainder
 
-		field, spec, err := parseFieldExpression(expression)
+		item, err := parseExtendedExpression(expression, allowed)
 		if err != nil {
 			return Template{left: nil, right: nil}, err
 		}
 
-		if field == rightField {
-			if spec != (fieldSpec{
+		if item.field == rightField {
+			if item.fallback != "" || len(item.pipes) != 0 || item.role != "" || (fieldSpec{
+				alignment: item.alignment, width: item.width, maxWidth: item.maxWidth, hasMaxWidth: item.hasMaxWidth,
+			}) != (fieldSpec{
 				alignment:   AlignmentNone,
 				width:       0,
 				maxWidth:    0,
@@ -438,21 +404,214 @@ func parse(source string, allowed map[string]struct{}) (Template, error) {
 			continue
 		}
 
-		if _, ok := allowed[field]; !ok {
-			return Template{left: nil, right: nil}, fmt.Errorf("%w %q for this row", ErrUnknownField, field)
-		}
-
-		*current = append(*current, token{
-			field:       field,
-			text:        "",
-			alignment:   spec.alignment,
-			width:       spec.width,
-			maxWidth:    spec.maxWidth,
-			hasMaxWidth: spec.hasMaxWidth,
-		})
+		*current = append(*current, item)
 	}
 
+	template.left = assignGroups(template.left, "left")
+	template.right = assignGroups(template.right, "right")
+
 	return template, nil
+}
+
+func parseExtendedExpression(expression string, allowed map[string]struct{}) (token, error) {
+	if item, handled, err := parseWidgetExpression(expression, allowed); handled {
+		return item, err
+	}
+
+	role := ""
+
+	if before, after, ok := strings.Cut(expression, "@"); ok {
+		if !validIdentifier(after) {
+			return token{}, fmt.Errorf("%w %q", ErrInvalidFieldName, after)
+		}
+
+		expression, role = before, after
+	}
+
+	segments := strings.Split(expression, "|")
+
+	field, spec, err := parseFieldExpression(segments[0])
+	if err != nil {
+		return token{}, err
+	}
+
+	item := newToken()
+	item.field, item.role = field, role
+	item.alignment, item.width, item.maxWidth, item.hasMaxWidth = spec.alignment, spec.width, spec.maxWidth, spec.hasMaxWidth
+
+	if field != rightField {
+		if _, ok := allowed[field]; !ok {
+			return token{}, fmt.Errorf("%w %q for this row", ErrUnknownField, field)
+		}
+	}
+
+	for _, segment := range segments[1:] {
+		if err := applyTokenPipe(&item, segment, allowed); err != nil {
+			return token{}, err
+		}
+	}
+
+	return item, nil
+}
+
+func applyTokenPipe(item *token, segment string, allowed map[string]struct{}) error {
+	name, value, hasValue := strings.Cut(segment, ":")
+	if name == "trunc_left" || name == "default" || name == "upper" || name == "path_short" {
+		parsed, err := parseNamedPipe(name, value, hasValue)
+		if err != nil {
+			return fmt.Errorf("%w for %q", err, item.field)
+		}
+
+		item.pipes = append(item.pipes, parsed)
+
+		return nil
+	}
+
+	if item.fallback != "" || hasValue {
+		return fmt.Errorf("%w for %q", ErrInvalidFieldSpec, item.field)
+	}
+
+	if _, ok := allowed[segment]; !ok {
+		return fmt.Errorf("%w %q for this row", ErrUnknownField, segment)
+	}
+
+	item.fallback = segment
+
+	return nil
+}
+
+func parseNamedPipe(name, value string, hasValue bool) (pipe, error) {
+	switch name {
+	case "trunc_left":
+		width, err := parseFieldWidth(value)
+		if !hasValue || err != nil || width == 0 {
+			return pipe{}, ErrInvalidFieldSpec
+		}
+	case "default":
+		fallback, err := strconv.Unquote(value)
+		if !hasValue || err != nil || strings.IndexFunc(fallback, unicode.IsControl) >= 0 {
+			return pipe{}, ErrInvalidFieldSpec
+		}
+
+		value = fallback
+	case "upper", "path_short":
+		if hasValue {
+			return pipe{}, ErrInvalidFieldSpec
+		}
+	}
+
+	return pipe{name: name, value: value}, nil
+}
+
+func parseWidgetExpression(expression string, allowed map[string]struct{}) (token, bool, error) {
+	name, rest, _ := strings.Cut(expression, ":")
+
+	item, known, err := parseWidgetToken(name, rest)
+	if !known || err != nil {
+		return item, known, err
+	}
+
+	if _, ok := allowed[item.field]; !ok {
+		return token{}, true, fmt.Errorf("%w %q for this row", ErrUnknownField, item.field)
+	}
+
+	if item.secondary != "" {
+		if _, ok := allowed[item.secondary]; !ok {
+			return token{}, true, fmt.Errorf("%w %q for this row", ErrUnknownField, item.secondary)
+		}
+	}
+
+	return item, true, nil
+}
+
+func parseWidgetToken(name, rest string) (token, bool, error) {
+	item := newToken()
+	item.alignment = AlignmentLeft
+
+	switch name {
+	case "bar":
+		parsed, err := parseBarWidget(rest)
+		return parsed, true, err
+	case "todo_progress":
+		width, err := parseFieldWidth(rest)
+		if err != nil || width == 0 {
+			return token{}, true, ErrInvalidFieldSpec
+		}
+
+		item.field, item.secondary, item.widget = FieldAgentTodoDone, FieldAgentTodoTotal, name
+		item.width, item.maxWidth, item.hasMaxWidth = width+fractionPrefixWidth, width+fractionPrefixWidth, true
+	case "spinner":
+		if rest != "" {
+			return token{}, true, ErrInvalidFieldSpec
+		}
+
+		item.field, item.widget, item.width, item.maxWidth, item.hasMaxWidth = FieldStatus, name, 1, 1, true
+	case "badge":
+		parsed, err := parseBadgeWidget(rest)
+		return parsed, true, err
+	default:
+		return newToken(), false, nil
+	}
+
+	return item, true, nil
+}
+
+func parseBarWidget(rest string) (token, error) {
+	input, widthText, ok := strings.Cut(rest, ":")
+	if input == "context_pct" {
+		input = FieldAgentContextPct
+	}
+
+	width, err := parseFieldWidth(widthText)
+	if !ok || err != nil || width == 0 || input != FieldAgentContextPct {
+		return token{}, ErrInvalidFieldSpec
+	}
+
+	item := newToken()
+	item.alignment = AlignmentLeft
+	item.field, item.widget, item.width, item.maxWidth, item.hasMaxWidth = input, "bar", width, width, true
+
+	return item, nil
+}
+
+func parseBadgeWidget(rest string) (token, error) {
+	input, roleSpec, hasRole := strings.Cut(rest, "@")
+	if input != FieldSubagentCount && input != FieldAgentSubagents {
+		return token{}, ErrInvalidFieldSpec
+	}
+
+	item := newToken()
+	item.field, item.widget, item.width, item.maxWidth, item.hasMaxWidth = input, "badge", 3, 3, true
+
+	item.alignment = AlignmentLeft
+	if !hasRole {
+		return item, nil
+	}
+
+	role, threshold, ok := strings.Cut(roleSpec, ">")
+
+	parsed, err := strconv.Atoi(threshold)
+	if !ok || !validIdentifier(role) || err != nil || parsed < 0 {
+		return token{}, ErrInvalidFieldSpec
+	}
+
+	item.role, item.threshold = role, parsed
+
+	return item, nil
+}
+
+func validIdentifier(value string) bool {
+	if value == "" {
+		return false
+	}
+
+	for _, r := range value {
+		if r != '_' && (r < 'a' || r > 'z') && (r < '0' || r > '9') {
+			return false
+		}
+	}
+
+	return true
 }
 
 func nextLiteral(source string) (string, string, error) {
@@ -664,14 +823,79 @@ func appendLiteral(tokens *[]token, literal string) {
 		return
 	}
 
-	*tokens = append(*tokens, token{
-		field:       "",
-		text:        literal,
-		alignment:   AlignmentNone,
-		width:       0,
-		maxWidth:    0,
-		hasMaxWidth: false,
-	})
+	*tokens = append(*tokens, literalToken(literal))
+}
+
+func assignGroups(tokens []token, side string) []token {
+	split := splitGroupLiterals(tokens)
+	stack := make([]int, 0)
+
+	for i := range split {
+		switch split[i].text {
+		case "[":
+			stack = append(stack, i)
+		case "]":
+			if len(stack) == 0 {
+				continue
+			}
+
+			open := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+
+			markGroupRange(split, open, i, side)
+		}
+	}
+
+	return split
+}
+
+func splitGroupLiterals(tokens []token) []token {
+	var split []token
+
+	for _, item := range tokens {
+		if item.field != "" || !strings.ContainsAny(item.text, "[]") {
+			split = append(split, item)
+			continue
+		}
+
+		start := 0
+
+		for index, r := range item.text {
+			if r != '[' && r != ']' {
+				continue
+			}
+
+			if index > start {
+				split = append(split, literalToken(item.text[start:index]))
+			}
+
+			split = append(split, literalToken(string(r)))
+			start = index + 1
+		}
+
+		if start < len(item.text) {
+			split = append(split, literalToken(item.text[start:]))
+		}
+	}
+
+	return split
+}
+
+func markGroupRange(tokens []token, open, closeIndex int, side string) {
+	hasField := false
+	for i := open + 1; i < closeIndex; i++ {
+		hasField = hasField || tokens[i].field != ""
+	}
+
+	if !hasField {
+		return
+	}
+
+	group := side + strconv.Itoa(open)
+	for i := open; i <= closeIndex; i++ {
+		tokens[i].group = group
+		tokens[i].separator = i > open && i < closeIndex && tokens[i].field == ""
+	}
 }
 
 func renderTokens(tokens []token, resolver Resolver) []Part {
@@ -681,31 +905,173 @@ func renderTokens(tokens []token, resolver Resolver) []Part {
 
 	parts := make([]Part, 0, len(tokens))
 	for _, item := range tokens {
-		value := item.text
-		if item.field != "" && resolver != nil {
-			value = resolver.ResolveSessionFormatField(item.field)
-		}
-
-		parts = append(parts, Part{
-			Field:       item.field,
-			Value:       value,
-			Alignment:   item.alignment,
-			Width:       item.width,
-			MaxWidth:    item.maxWidth,
-			HasMaxWidth: item.hasMaxWidth,
-		})
+		parts = append(parts, renderToken(item, resolver))
 	}
+
+	hideAbsentGroups(parts)
 
 	return parts
 }
 
+func renderToken(item token, resolver Resolver) Part {
+	value, role := item.text, item.role
+
+	state, stateKnown := layout.Absent, false
+	if item.field != "" && resolver != nil {
+		value, state, stateKnown = resolveCell(resolver, item.field)
+		if value == "" && item.fallback != "" {
+			value, state, stateKnown = resolveCell(resolver, item.fallback)
+		}
+
+		value = applyTokenTransforms(value, item.pipes)
+		if item.widget != "" {
+			value, role, state = renderWidget(item, resolver, value, state)
+			stateKnown = true
+		}
+	}
+
+	if !stateKnown {
+		state = layout.Absent
+	}
+
+	return Part{
+		Field: item.field, Value: value, Alignment: item.alignment, Width: item.width,
+		MaxWidth: item.maxWidth, HasMaxWidth: item.hasMaxWidth, Group: item.group,
+		Separator: item.separator, Role: role, State: state, StateKnown: stateKnown,
+	}
+}
+
+func applyTokenTransforms(value string, transforms []pipe) string {
+	for _, transform := range transforms {
+		switch transform.name {
+		case "trunc_left":
+			width, _ := strconv.Atoi(transform.value)
+			value = truncateLeft(value, width)
+		case "default":
+			if value == "" {
+				value = transform.value
+			}
+		case "upper":
+			value = strings.ToUpper(value)
+		case "path_short":
+			if value != "" {
+				value = path.Base(value)
+			}
+		}
+	}
+
+	return value
+}
+
+func hideAbsentGroups(parts []Part) {
+	visible := make(map[string]bool)
+
+	for _, part := range parts {
+		if part.Group != "" && part.Field != "" && part.Value != "" {
+			visible[part.Group] = true
+		}
+	}
+
+	for i := range parts {
+		part := &parts[i]
+		if part.Group == "" {
+			continue
+		}
+
+		if !visible[part.Group] {
+			part.Value = ""
+			continue
+		}
+
+		if !part.Separator {
+			continue
+		}
+
+		if !separatorHasNeighbors(parts, i) {
+			part.Value = ""
+		}
+	}
+}
+
+func separatorHasNeighbors(parts []Part, index int) bool {
+	before, after := false, false
+
+	for i, part := range parts {
+		if part.Group != parts[index].Group || part.Field == "" || part.Value == "" {
+			continue
+		}
+
+		if i < index {
+			before = true
+		} else if i > index {
+			after = true
+		}
+	}
+
+	return before && after
+}
+
+func resolveCell(resolver Resolver, field string) (string, layout.State, bool) {
+	if cells, ok := resolver.(CellResolver); ok {
+		value, state := cells.ResolveSessionFormatCell(field)
+		return value, state, true
+	}
+
+	value := resolver.ResolveSessionFormatField(field)
+
+	state := layout.Absent
+	if value != "" {
+		state = layout.Present
+	}
+
+	return value, state, false
+}
+
+func truncateLeft(value string, width int) string {
+	if ansi.StringWidth(value) <= width {
+		return value
+	}
+
+	if width <= 1 {
+		return "…"
+	}
+
+	remaining := width - 1
+	graphemes := uniseg.NewGraphemes(value)
+
+	parts := make([]string, 0, len(value))
+	for graphemes.Next() {
+		parts = append(parts, graphemes.Str())
+	}
+
+	selected := make([]string, 0, len(parts))
+	for _, part := range slices.Backward(parts) {
+		partWidth := ansi.StringWidth(part)
+		if partWidth > remaining {
+			break
+		}
+
+		selected = append(selected, part)
+		remaining -= partWidth
+	}
+
+	slices.Reverse(selected)
+
+	return "…" + strings.Join(selected, "")
+}
+
 func allowedFields(kind FormatKind) (map[string]struct{}, error) {
-	switch kind {
-	case FormatKindSession, FormatKindAgentsSession:
-		return sessionAllowedFields, nil
-	case FormatKindAgentsAgent:
-		return agentAllowedFields, nil
-	default:
+	if kind != FormatKindSession && kind != FormatKindAgentsSession && kind != FormatKindAgentsAgent {
 		return nil, fmt.Errorf("%w %q", ErrUnknownKind, kind)
 	}
+
+	allowed := make(map[string]struct{})
+
+	for field, info := range fieldRegistry {
+		if (kind == FormatKindAgentsAgent && info.AgentRows) || (kind != FormatKindAgentsAgent && info.SessionRows) {
+			allowed[field] = struct{}{}
+		}
+	}
+
+	return allowed, nil
 }

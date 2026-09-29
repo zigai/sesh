@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/zigai/aht/v2/pkg/aht"
+	"github.com/zigai/aht/v2/pkg/registry"
 
 	"github.com/zigai/sesh/internal/agents"
 )
@@ -282,6 +283,31 @@ func TestLoadLiveAgentsReadsRegistryThroughAHT(t *testing.T) {
 
 	if !agent.Interactive {
 		t.Fatalf("expected interactive agent: %+v", agent)
+	}
+}
+
+func TestObservedAgentSessionsUsesPublishedNativeObservation(t *testing.T) {
+	at := time.Unix(500, 0)
+	sessions := []aht.Session{{
+		ID: "observed", Harness: aht.HarnessClaude, Liveness: aht.Live{Activity: aht.ActivityWaiting},
+		Location: aht.Location{Kind: aht.MultiplexerTmux, PaneID: "%1"},
+		Observations: registry.Observations{Native: &registry.NativeObservation{
+			Event: "UserPromptSubmit", ObservedAt: at,
+			Attributes: map[string]string{
+				"claude_model": "opus", "claude_notification_type": "permission_prompt", "claude_tool_name": "Bash",
+			},
+		}},
+	}}
+
+	observed := agents.ObservedAgentSessions(sessions)
+	if len(observed) != 1 || observed[0].Model != "opus" || observed[0].WaitingReason != "permission" ||
+		observed[0].LastTool != "Bash" || !observed[0].PromptAt.Equal(at) {
+		t.Fatalf("native observation = %+v", observed)
+	}
+
+	sessions[0].Observations.Native = &registry.NativeObservation{Event: "Stop", ObservedAt: at.Add(time.Second)}
+	if next := agents.ObservedAgentSessions(sessions); len(next) != 1 || next[0].Model != "" || !next[0].PromptAt.IsZero() {
+		t.Fatalf("later observation retained unsupported metadata = %+v", next)
 	}
 }
 

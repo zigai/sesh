@@ -1,7 +1,9 @@
 package tui
 
 import (
+	"cmp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/zigai/sesh/internal/config"
@@ -145,6 +147,30 @@ func (m *Model) refreshDisplaySessions() {
 }
 
 func compareAgentSessionRows(left session.Session, right session.Session) int {
+	leftCreated := left.RuntimeIdentity.TmuxSessionCreatedAt
+	rightCreated := right.RuntimeIdentity.TmuxSessionCreatedAt
+
+	if !leftCreated.IsZero() && !rightCreated.IsZero() {
+		if diff := leftCreated.Compare(rightCreated); diff != 0 {
+			return diff
+		}
+	}
+
+	leftNum, leftOK := parseTmuxSessionID(left.ID)
+	rightNum, rightOK := parseTmuxSessionID(right.ID)
+
+	if leftOK && rightOK {
+		if diff := cmp.Compare(leftNum, rightNum); diff != 0 {
+			return diff
+		}
+	}
+
+	if !left.Activity.IsZero() && !right.Activity.IsZero() {
+		if diff := left.Activity.Compare(right.Activity); diff != 0 {
+			return diff
+		}
+	}
+
 	for _, labels := range [][2]string{
 		{left.Name, right.Name},
 		{left.TmuxServerSocket, right.TmuxServerSocket},
@@ -158,10 +184,21 @@ func compareAgentSessionRows(left session.Session, right session.Session) int {
 	return 0
 }
 
+func parseTmuxSessionID(id string) (int, bool) {
+	trimmed := strings.TrimPrefix(id, "$")
+
+	num, err := strconv.Atoi(trimmed)
+	if err != nil {
+		return 0, false
+	}
+
+	return num, true
+}
+
 func compareAgentsModeSessions(left session.Session, right session.Session) int {
 	leftHasAgents := len(left.Agents) > 0
-
 	rightHasAgents := len(right.Agents) > 0
+
 	if leftHasAgents && !rightHasAgents {
 		return -1
 	}
@@ -170,11 +207,7 @@ func compareAgentsModeSessions(left session.Session, right session.Session) int 
 		return 1
 	}
 
-	if leftHasAgents && rightHasAgents {
-		return compareAgentSessionRows(left, right)
-	}
-
-	return 0
+	return compareAgentSessionRows(left, right)
 }
 
 func compareFoldedLabels(left string, right string) int {

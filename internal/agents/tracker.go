@@ -14,12 +14,9 @@ import (
 )
 
 type TrackerOptions struct {
-	Palette                  map[string]string
-	ActiveBypass             bool
-	ClearFailedOnVisit       bool
-	SetWindowStatusStyle     bool
-	SetWindowStatusBellStyle bool
-	ClearOnShutdown          bool
+	Palette            map[string]string
+	ActiveBypass       bool
+	ClearFailedOnVisit bool
 }
 
 type Tracker struct {
@@ -40,12 +37,9 @@ func DefaultTrackerOptions() TrackerOptions {
 	maps.Copy(palette, DefaultPalette)
 
 	return TrackerOptions{
-		Palette:                  palette,
-		ActiveBypass:             true,
-		ClearFailedOnVisit:       true,
-		SetWindowStatusStyle:     true,
-		SetWindowStatusBellStyle: true,
-		ClearOnShutdown:          true,
+		Palette:            palette,
+		ActiveBypass:       true,
+		ClearFailedOnVisit: true,
 	}
 }
 
@@ -310,23 +304,19 @@ func (t *Tracker) reconcileSingleWindow(ctx context.Context, windowID string, pa
 	}
 
 	isActive := isWindowActive(windowID, activePanes)
-	wasActive := t.windowWasActive[windowID]
-
-	if wasActive && !isActive {
-		delete(t.windowStyles, windowID)
-	}
+	reapply := t.windowWasActive[windowID] && !isActive
 
 	t.windowWasActive[windowID] = isActive
 
 	if highestState != StateNormal {
-		return t.applyTargetStyle(ctx, windowID, StyleFor(t.opts.Palette, highestState))
+		return t.applyTargetStyle(ctx, windowID, StyleFor(t.opts.Palette, highestState), reapply)
 	}
 
 	return t.clearTargetStyle(ctx, windowID)
 }
 
-func (t *Tracker) applyTargetStyle(ctx context.Context, windowID string, targetStyle string) error {
-	if t.windowStyles[windowID] == targetStyle {
+func (t *Tracker) applyTargetStyle(ctx context.Context, windowID string, targetStyle string, reapply bool) error {
+	if !reapply && t.windowStyles[windowID] == targetStyle {
 		return nil
 	}
 

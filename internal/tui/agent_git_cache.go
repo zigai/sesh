@@ -66,6 +66,9 @@ func writeAgentGitCache(path string, entries map[string]agentGitCacheEntry) erro
 	return nil
 }
 
+// publishAgentGitCache replaces the cache atomically but skips fsync: a crash can only leave
+// the previous or an unreadable cache, which readAgentGitCache rejects and the next scan
+// rebuilds, while a sync would stall the popup's worker shutdown under disk pressure.
 func publishAgentGitCache(dir *privatefs.Dir, name string, data []byte) error {
 	temporary := ".agent-git-" + rand.Text() + ".tmp"
 
@@ -75,19 +78,14 @@ func publishAgentGitCache(dir *privatefs.Dir, name string, data []byte) error {
 	}
 
 	_, writeErr := file.Write(data)
-	syncErr := file.Sync()
 	closeErr := file.Close()
 
-	if err := errors.Join(writeErr, syncErr, closeErr); err != nil {
+	if err := errors.Join(writeErr, closeErr); err != nil {
 		return errors.Join(err, dir.Remove(temporary))
 	}
 
 	if err := dir.Rename(temporary, dir, name); err != nil {
 		return errors.Join(err, dir.Remove(temporary))
-	}
-
-	if err := dir.Sync(); err != nil {
-		return oops.In("tui").Code("git_cache_failed").With("operation", "sync").Wrap(err)
 	}
 
 	return nil

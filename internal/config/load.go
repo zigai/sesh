@@ -25,6 +25,23 @@ type loadOptions struct {
 	input         io.Reader
 }
 
+type rawThemePresetProbe struct {
+	Theme struct {
+		Preset      *string                 `toml:"preset"`
+		Primary     *string                 `toml:"primary"`
+		Secondary   *string                 `toml:"secondary"`
+		Muted       *string                 `toml:"muted"`
+		Error       *string                 `toml:"error"`
+		Warning     *string                 `toml:"warning"`
+		Success     *string                 `toml:"success"`
+		Border      *string                 `toml:"border"`
+		Selected    *string                 `toml:"selected"`
+		Background  *string                 `toml:"background"`
+		Foreground  *string                 `toml:"foreground"`
+		AgentStatus *AgentStatusThemeConfig `toml:"agent_status"`
+	} `toml:"theme"`
+}
+
 func WithInput(r io.Reader) LoadOption {
 	return func(o *loadOptions) {
 		o.input = r
@@ -303,7 +320,46 @@ func loadAndValidate(target *Config, baseCfg *Config, files [][]byte) error {
 		return err
 	}
 
+	applyEnvironmentThemePreset(&target.Theme, current.Theme)
+
 	return validateLoaded(target)
+}
+
+// applyEnvironmentThemePreset expands a preset that only the environment selected, keeping
+// every other theme color the environment set explicitly. Invalid names are left for validation.
+func applyEnvironmentThemePreset(theme *ThemeConfig, fileTheme ThemeConfig) {
+	name := strings.TrimSpace(theme.Preset)
+	if name == "" || strings.EqualFold(name, strings.TrimSpace(fileTheme.Preset)) {
+		return
+	}
+
+	preset, ok := LookupPreset(name)
+	if !ok {
+		return
+	}
+
+	fromEnv := *theme
+	theme.applyPreset(preset)
+
+	for _, field := range []struct {
+		target        *string
+		fromEnv, file string
+	}{
+		{&theme.Primary, fromEnv.Primary, fileTheme.Primary},
+		{&theme.Secondary, fromEnv.Secondary, fileTheme.Secondary},
+		{&theme.Muted, fromEnv.Muted, fileTheme.Muted},
+		{&theme.Error, fromEnv.Error, fileTheme.Error},
+		{&theme.Warning, fromEnv.Warning, fileTheme.Warning},
+		{&theme.Success, fromEnv.Success, fileTheme.Success},
+		{&theme.Border, fromEnv.Border, fileTheme.Border},
+		{&theme.Selected, fromEnv.Selected, fileTheme.Selected},
+		{&theme.Background, fromEnv.Background, fileTheme.Background},
+		{&theme.Foreground, fromEnv.Foreground, fileTheme.Foreground},
+	} {
+		if field.fromEnv != field.file {
+			*field.target = field.fromEnv
+		}
+	}
 }
 
 func decodeFileWithPresets(data []byte, current *Config) error {
@@ -311,83 +367,105 @@ func decodeFileWithPresets(data []byte, current *Config) error {
 		return err
 	}
 
-	type rawThemePresetProbe struct {
-		Theme struct {
-			Preset      *string                 `toml:"preset"`
-			Primary     *string                 `toml:"primary"`
-			Secondary   *string                 `toml:"secondary"`
-			Muted       *string                 `toml:"muted"`
-			Error       *string                 `toml:"error"`
-			Warning     *string                 `toml:"warning"`
-			Success     *string                 `toml:"success"`
-			Border      *string                 `toml:"border"`
-			Selected    *string                 `toml:"selected"`
-			Background  *string                 `toml:"background"`
-			Foreground  *string                 `toml:"foreground"`
-			AgentStatus *AgentStatusThemeConfig `toml:"agent_status"`
-		} `toml:"theme"`
-	}
-
 	var probe rawThemePresetProbe
+
 	_ = toml.Unmarshal(data, &probe)
 
-	if probe.Theme.Preset != nil && *probe.Theme.Preset != "" {
-		preset, ok := LookupPreset(*probe.Theme.Preset)
-		if !ok {
-			return fmt.Errorf("%w %q: expected dracula, catppuccin, catppuccin-latte, tokyo-night, gruvbox, nord, or terminal", errThemePresetInvalid, *probe.Theme.Preset)
-		}
-		current.Theme.applyPreset(preset)
+	return applyThemeProbe(&current.Theme, &probe)
+}
 
-		if probe.Theme.Primary != nil {
-			current.Theme.Primary = *probe.Theme.Primary
-		}
-		if probe.Theme.Secondary != nil {
-			current.Theme.Secondary = *probe.Theme.Secondary
-		}
-		if probe.Theme.Muted != nil {
-			current.Theme.Muted = *probe.Theme.Muted
-		}
-		if probe.Theme.Error != nil {
-			current.Theme.Error = *probe.Theme.Error
-		}
-		if probe.Theme.Warning != nil {
-			current.Theme.Warning = *probe.Theme.Warning
-		}
-		if probe.Theme.Success != nil {
-			current.Theme.Success = *probe.Theme.Success
-		}
-		if probe.Theme.Border != nil {
-			current.Theme.Border = *probe.Theme.Border
-		}
-		if probe.Theme.Selected != nil {
-			current.Theme.Selected = *probe.Theme.Selected
-		}
-		if probe.Theme.Background != nil {
-			current.Theme.Background = *probe.Theme.Background
-		}
-		if probe.Theme.Foreground != nil {
-			current.Theme.Foreground = *probe.Theme.Foreground
-		}
-		if probe.Theme.AgentStatus != nil {
-			if probe.Theme.AgentStatus.Running != "" {
-				current.Theme.AgentStatus.Running = probe.Theme.AgentStatus.Running
-			}
-			if probe.Theme.AgentStatus.Waiting != "" {
-				current.Theme.AgentStatus.Waiting = probe.Theme.AgentStatus.Waiting
-			}
-			if probe.Theme.AgentStatus.Failed != "" {
-				current.Theme.AgentStatus.Failed = probe.Theme.AgentStatus.Failed
-			}
-			if probe.Theme.AgentStatus.Interrupted != "" {
-				current.Theme.AgentStatus.Interrupted = probe.Theme.AgentStatus.Interrupted
-			}
-			if probe.Theme.AgentStatus.Idle != "" {
-				current.Theme.AgentStatus.Idle = probe.Theme.AgentStatus.Idle
-			}
+func applyThemeProbe(theme *ThemeConfig, probe *rawThemePresetProbe) error {
+	if probe.Theme.Preset == nil || *probe.Theme.Preset == "" {
+		return nil
+	}
+
+	preset, ok := LookupPreset(*probe.Theme.Preset)
+	if !ok {
+		return fmt.Errorf("%w %q: expected dracula, catppuccin, catppuccin-latte, tokyo-night, gruvbox, nord, or terminal", errThemePresetInvalid, *probe.Theme.Preset)
+	}
+
+	theme.applyPreset(preset)
+	overlayThemeFields(theme, probe)
+
+	return nil
+}
+
+func overlayThemeFields(theme *ThemeConfig, probe *rawThemePresetProbe) {
+	if probe.Theme.Primary != nil {
+		theme.Primary = *probe.Theme.Primary
+	}
+
+	if probe.Theme.Secondary != nil {
+		theme.Secondary = *probe.Theme.Secondary
+	}
+
+	if probe.Theme.Muted != nil {
+		theme.Muted = *probe.Theme.Muted
+	}
+
+	if probe.Theme.Error != nil {
+		theme.Error = *probe.Theme.Error
+	}
+
+	if probe.Theme.Warning != nil {
+		theme.Warning = *probe.Theme.Warning
+	}
+
+	if probe.Theme.Success != nil {
+		theme.Success = *probe.Theme.Success
+	}
+
+	if probe.Theme.Border != nil {
+		theme.Border = *probe.Theme.Border
+	}
+
+	if probe.Theme.Selected != nil {
+		theme.Selected = *probe.Theme.Selected
+	}
+
+	if probe.Theme.Background != nil {
+		theme.Background = *probe.Theme.Background
+	}
+
+	if probe.Theme.Foreground != nil {
+		theme.Foreground = *probe.Theme.Foreground
+	}
+
+	if probe.Theme.AgentStatus != nil {
+		overlayAgentStatusTheme(theme, probe.Theme.AgentStatus)
+	}
+}
+
+func overlayAgentStatusTheme(theme *ThemeConfig, status *AgentStatusThemeConfig) {
+	if theme.AgentStatus == nil {
+		theme.AgentStatus = &AgentStatusThemeConfig{
+			Running:     "",
+			Waiting:     "",
+			Failed:      "",
+			Interrupted: "",
+			Idle:        "",
 		}
 	}
 
-	return nil
+	if status.Running != "" {
+		theme.AgentStatus.Running = status.Running
+	}
+
+	if status.Waiting != "" {
+		theme.AgentStatus.Waiting = status.Waiting
+	}
+
+	if status.Failed != "" {
+		theme.AgentStatus.Failed = status.Failed
+	}
+
+	if status.Interrupted != "" {
+		theme.AgentStatus.Interrupted = status.Interrupted
+	}
+
+	if status.Idle != "" {
+		theme.AgentStatus.Idle = status.Idle
+	}
 }
 
 func loadConfigEnvironment(target *Config, baseCfg *Config) error {

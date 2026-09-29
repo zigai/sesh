@@ -52,6 +52,10 @@ func (m *Model) showsAgentSortBadge() bool {
 
 func (m *Model) renderFooterBadges() string {
 	var badges []string
+	if m.hasStatusBadge() {
+		badges = append(badges, m.renderStatusBadge())
+	}
+
 	if m.showsAgentSortBadge() {
 		badges = append(badges, m.renderAgentSortBadge())
 	}

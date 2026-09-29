@@ -36,7 +36,7 @@ func TestSeshDisplayFormatControlsFieldsAndAlignment(t *testing.T) {
 		t.Fatalf("custom live row = %q", lines[0])
 	}
 
-	if !strings.Contains(lines[1], "  saved []  windows=1 ") || !strings.HasSuffix(lines[1], "0/0") {
+	if !strings.Contains(lines[1], "  saved   windows=1 ") || !strings.HasSuffix(lines[1], "0/0") {
 		t.Fatalf("custom saved row = %q", lines[1])
 	}
 
@@ -153,26 +153,18 @@ func TestAgentsDisplayFormatsControlParentAndChildRows(t *testing.T) {
 
 func TestAgentTreeRemainsMutedWhenSelected(t *testing.T) {
 	model := newTestModel()
-	styles := model.sessionRowStyles(sessionTableLayout{})
+	model.displayMode = displayModeAgents
+	model.filtered = []session.Session{{Name: "project", AgentTotal: 1, Agents: []session.AgentSession{{HarnessSession: "agent"}}}}
 
-	for _, last := range []bool{false, true} {
-		values := sessionFormatValues{model: model, hasAgent: true, isLastAgent: last}
-		tree := values.ResolveSessionFormatField(display.FieldTree)
+	for _, selected := range []bool{false, true} {
+		model.agentCursor = parentAgentIndex
+		if selected {
+			model.agentCursor = 0
+		}
 
-		for _, selected := range []bool{false, true} {
-			var out strings.Builder
-
-			model.writeAgentText(&out, tree+"agent", selected, styles)
-
-			wantStyle := ansiDefaultMuted
-			if selected {
-				wantStyle = ansiDefaultSelected
-			}
-
-			want := wantStyle + "\x1b[22m" + ansiDefaultMuted + agentTreeConnector(last) + "\x1b[m" + wantStyle + "agent" + ansiReset
-			if got := out.String(); got != want {
-				t.Fatalf("last=%t selected=%t: rendered row = %q, want %q", last, selected, got, want)
-			}
+		lines := strings.Split(model.renderList(60, 2), "\n")
+		if len(lines) != 2 || !strings.Contains(lines[1], "\x1b[22m"+ansiDefaultMuted+"└─ \x1b[m") {
+			t.Fatalf("selected=%t: tree is not muted: %q", selected, lines)
 		}
 	}
 }
@@ -292,13 +284,13 @@ func TestSessionFormatValuesResolveAllDocumentedFields(t *testing.T) {
 		{field: display.FieldAgentInterrupted, want: "0"},
 		{field: display.FieldAgentStatus, want: "WAITING"},
 		{field: display.FieldAgentStatusText, want: "WAITING"},
-		{field: display.FieldAgentStatusGlyph, want: "\x1b[38;2;255;221;87m●\x1b[m"},
+		{field: display.FieldAgentStatusGlyph, want: "●"},
 		{field: display.FieldAgentAge, want: "3m"},
 		{field: display.FieldAgentDuration, want: "00:03:00"},
 		{field: display.FieldAgentClock, want: "00:03:00"},
 		{field: display.FieldSessionAgentContext, want: ""},
-		{field: display.FieldTree, want: "\x1b[22m\x1b[38;2;108;112;134m└─ \x1b[m"},
-		{field: display.FieldTreeBranch, want: "\x1b[22m\x1b[38;2;108;112;134m└─ \x1b[m"},
+		{field: display.FieldTree, want: "└─ "},
+		{field: display.FieldTreeBranch, want: "└─ "},
 		{field: display.FieldTreeIndent, want: "   "},
 		{field: display.FieldShortcut, want: ""},
 		{field: display.FieldShortcutBadge, want: ""},
@@ -309,7 +301,7 @@ func TestSessionFormatValuesResolveAllDocumentedFields(t *testing.T) {
 		{field: display.FieldPaneID, want: "%7"},
 		{field: display.FieldStatus, want: "WAITING"},
 		{field: display.FieldStatusText, want: "WAITING"},
-		{field: display.FieldStatusGlyph, want: "\x1b[38;2;255;221;87m●\x1b[m"},
+		{field: display.FieldStatusGlyph, want: "●"},
 		{field: display.FieldStatusAge, want: "2m"},
 		{field: display.FieldStatusDuration, want: "00:02:00"},
 		{field: display.FieldStatusClock, want: "00:02:00"},
@@ -324,10 +316,10 @@ func TestSessionFormatValuesResolveAllDocumentedFields(t *testing.T) {
 		{field: display.FieldAgentGitChanges, want: "+12 -3"},
 		{field: display.FieldAgentGitInfo, want: "feature/popup / popup-worktree +12 -3"},
 		{field: display.FieldAgentGitLabel, want: "feature/popup / popup-worktree"},
-		{field: display.FieldAgentGitAdded, want: "\x1b[2;38;2;80;250;123m+12\x1b[m"},
-		{field: display.FieldAgentGitDeleted, want: "\x1b[2;38;2;255;85;85m-3\x1b[m"},
-		{field: display.FieldAgentGitAhead, want: "\x1b[38;2;36;200;255m↑2\x1b[m"},
-		{field: display.FieldAgentGitBehind, want: "\x1b[38;2;255;221;87m↓1\x1b[m"},
+		{field: display.FieldAgentGitAdded, want: "+12"},
+		{field: display.FieldAgentGitDeleted, want: "-3"},
+		{field: display.FieldAgentGitAhead, want: "↑2"},
+		{field: display.FieldAgentGitBehind, want: "↓1"},
 		{field: display.FieldAgentWorktree, want: "/work/popup-worktree"},
 		{field: display.FieldAgentWorktreeName, want: "popup-worktree"},
 		{field: display.FieldAgentSessionPath, want: "/state/codex/session.jsonl"},
@@ -377,19 +369,19 @@ func TestShortcutFieldResolution(t *testing.T) {
 		isActivePane: true,
 	}
 
-	if got := values.ResolveSessionFormatField(display.FieldShortcut); got != "\x1b[38;2;108;112;134m1\x1b[m" {
-		t.Fatalf("FieldShortcut = %q, want muted 1", got)
+	if got := values.ResolveSessionFormatField(display.FieldShortcut); got != "1" {
+		t.Fatalf("FieldShortcut = %q, want 1", got)
 	}
 
-	if got := values.ResolveSessionFormatField(display.FieldShortcutBadge); got != "\x1b[38;2;108;112;134m^1\x1b[m" {
-		t.Fatalf("FieldShortcutBadge = %q, want muted ^1", got)
+	if got := values.ResolveSessionFormatField(display.FieldShortcutBadge); got != "^1" {
+		t.Fatalf("FieldShortcutBadge = %q, want ^1", got)
 	}
 
-	if got := values.ResolveSessionFormatField(display.FieldTreeIndent); got != "\x1b[22m\x1b[38;2;108;112;134m 1 \x1b[m" {
-		t.Fatalf("FieldTreeIndent = %q, want muted ' 1 '", got)
+	if got := values.ResolveSessionFormatField(display.FieldTreeIndent); got != " 1 " {
+		t.Fatalf("FieldTreeIndent = %q, want ' 1 '", got)
 	}
 
-	if got := values.ResolveSessionFormatField(display.FieldTreeBranch); got != "\x1b[22m\x1b[38;2;108;112;134m└─ \x1b[m" {
+	if got := values.ResolveSessionFormatField(display.FieldTreeBranch); got != "└─ " {
 		t.Fatalf("FieldTreeBranch = %q, want tree branch", got)
 	}
 }

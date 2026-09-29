@@ -272,6 +272,62 @@ func TestTrackerIdleUnreadLifecycleAcrossSessionVisits(t *testing.T) {
 	}
 }
 
+func TestTrackerClearsStyleWhenWindowLeftAsStateReturnsNormal(t *testing.T) {
+	t.Parallel()
+
+	styles := newFakeStyles()
+	styles.setActive("%1", "@1", true, true)
+
+	tracker := agents.NewTracker(styles, agents.DefaultTrackerOptions())
+	ctx := t.Context()
+
+	if err := tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityWaiting, aht.PresenceLive)}); err != nil {
+		t.Fatalf("waiting snapshot failed: %v", err)
+	}
+
+	if _, applied := styles.applied["@1"]; !applied {
+		t.Fatal("waiting pane must style its window")
+	}
+
+	styles.setActive("%1", "@1", true, false)
+
+	if err := tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityInterrupted, aht.PresenceLive)}); err != nil {
+		t.Fatalf("interrupted snapshot failed: %v", err)
+	}
+
+	if style, applied := styles.applied["@1"]; applied {
+		t.Fatalf("tmux window style = %q after state returned to normal, want cleared", style)
+	}
+
+	if style := tracker.WindowStyle("@1"); style != "" {
+		t.Fatalf("tracked window style = %q, want empty", style)
+	}
+}
+
+func TestTrackerReappliesStyleWhenWindowLeft(t *testing.T) {
+	t.Parallel()
+
+	styles := newFakeStyles()
+	styles.setActive("%1", "@1", true, true)
+
+	tracker := agents.NewTracker(styles, agents.DefaultTrackerOptions())
+	ctx := t.Context()
+
+	if err := tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityWaiting, aht.PresenceLive)}); err != nil {
+		t.Fatalf("waiting snapshot failed: %v", err)
+	}
+
+	styles.setActive("%1", "@1", true, false)
+
+	if err := tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityWaiting, aht.PresenceLive)}); err != nil {
+		t.Fatalf("waiting snapshot after leaving failed: %v", err)
+	}
+
+	if len(styles.setCalls) != 2 {
+		t.Fatalf("set calls = %+v, want the waiting style reapplied after leaving the window", styles.setCalls)
+	}
+}
+
 func TestTrackerMultiPanePriority(t *testing.T) {
 	t.Parallel()
 
@@ -507,7 +563,7 @@ func TestTrackerRunningClearsFailedAlert(t *testing.T) {
 	}
 }
 
-func TestTrackerCustomPaletteAndStyleFlags(t *testing.T) {
+func TestTrackerCustomPalette(t *testing.T) {
 	t.Parallel()
 
 	styles := newFakeStyles()
@@ -515,7 +571,6 @@ func TestTrackerCustomPaletteAndStyleFlags(t *testing.T) {
 
 	opts := agents.DefaultTrackerOptions()
 	opts.Palette = map[string]string{string(agents.StateWaiting): "fg=white,bg=blue"}
-	opts.SetWindowStatusBellStyle = false
 
 	tracker := agents.NewTracker(styles, opts)
 

@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/samber/oops"
@@ -592,6 +593,46 @@ func TestLoaderLoggingRecordsOnlyHealthTransitions(t *testing.T) {
 	}
 }
 
+func TestLoaderLoggingRecordsPartialCatalogReloadAsOneDegradation(t *testing.T) {
+	var output bytes.Buffer
+
+	model := loggingTestModel(t, &output)
+	deps := dependenciesForTest(model)
+
+	deps.LoadCatalog = func(context.Context) (session.CatalogResult, error) {
+		return session.CatalogResult{
+			Sessions: []session.Session{{ID: "$1", Name: "live", Kind: session.KindLive}},
+			Status:   session.StatusPartial,
+		}, errLoggingTestCatalogFailure
+	}
+
+	for range 2 {
+		if err := model.loadSessions(); err != nil {
+			t.Fatalf("partial loadSessions() error = %v, want rows applied", err)
+		}
+	}
+
+	deps.LoadCatalog = func(context.Context) (session.CatalogResult, error) {
+		return session.CatalogResult{Status: session.StatusComplete}, nil
+	}
+
+	if err := model.loadSessions(); err != nil {
+		t.Fatalf("loadSessions() recovery error = %v", err)
+	}
+
+	records := loggingTestRecords(t, &output)
+	if len(records) != 2 {
+		t.Fatalf("partial reload log count = %d, want 2: %#v", len(records), records)
+	}
+
+	assertLoggingTestRecord(t, records[0], tuiOperationLoadCatalog, "warn", "degraded", "tui dependency degraded")
+	assertLoggingTestRecord(t, records[1], tuiOperationLoadCatalog, "info", "recovered", "tui dependency recovered")
+
+	if strings.Contains(output.String(), errLoggingTestCatalogFailure.Error()) {
+		t.Fatalf("loader log contains raw error: %s", output.String())
+	}
+}
+
 func TestLoaderLoggingKeepsHealthyLoadsSilent(t *testing.T) {
 	tests := []struct {
 		name string
@@ -629,6 +670,87 @@ func TestLoaderLoggingKeepsHealthyLoadsSilent(t *testing.T) {
 				t.Fatalf("healthy loader logged records: %#v", records)
 			}
 		})
+	}
+}
+
+func firstFrameTestLoad() sessionLoadResultMsg {
+	return sessionLoadResultMsg{
+		sessions: []session.Session{{ID: "$1", Name: loggingTestPrivacySentinel, Kind: session.KindLive}},
+		status:   session.StatusComplete,
+		timing:   sessionLoadTiming{catalog: 40 * time.Millisecond, agents: 120 * time.Millisecond},
+	}
+}
+
+func TestPopupFirstFrameLogsOneTimingRecord(t *testing.T) {
+	var output bytes.Buffer
+
+	model := loggingTestModel(t, &output)
+	model.mode = modePopup
+	model.SetLaunchedAt(time.Now().Add(-250 * time.Millisecond))
+	model.Init()
+
+	stdStreams := loggingTestWithCapturedStdStreams(t, func() {
+		model.handleSessionLoadResult(firstFrameTestLoad())
+		model.handleSessionLoadResult(firstFrameTestLoad())
+	})
+	if stdStreams != "" {
+		t.Fatalf("first-frame logging wrote to std streams: %q", stdStreams)
+	}
+
+	records := loggingTestRecords(t, &output)
+	if len(records) != 1 {
+		t.Fatalf("records = %#v, want one first-frame record for two loads", records)
+	}
+
+	record := records[0]
+	for _, field := range []string{"load_ms", "catalog_ms", "agents_ms", "since_launch_ms"} {
+		if _, ok := record[field].(float64); !ok {
+			t.Fatalf("record[%q] = %#v, want a millisecond count in %#v", field, record[field], record)
+		}
+	}
+
+	sinceLaunch, _ := record["since_launch_ms"].(float64)
+	if record["catalog_ms"] != float64(40) || record["agents_ms"] != float64(120) || sinceLaunch < 250 {
+		t.Fatalf("first-frame timing = %#v, want catalog 40, agents 120, since launch >= 250", record)
+	}
+
+	delete(record, "load_ms")
+	delete(record, "catalog_ms")
+	delete(record, "agents_ms")
+	delete(record, "since_launch_ms")
+	assertLoggingTestRecord(t, record, tuiLogOperation(tuiOperationFirstFrame), "info", "ok", "tui first frame shown")
+
+	if strings.Contains(output.String(), loggingTestPrivacySentinel) {
+		t.Fatalf("first-frame record leaked a session name: %s", output.String())
+	}
+}
+
+func TestFirstFrameRecordOmitsUnknownLaunchAndSkipsInlinePickers(t *testing.T) {
+	var popupOutput bytes.Buffer
+
+	popup := loggingTestModel(t, &popupOutput)
+	popup.mode = modePopup
+	popup.Init()
+	popup.handleSessionLoadResult(firstFrameTestLoad())
+
+	records := loggingTestRecords(t, &popupOutput)
+	if len(records) != 1 || records[0]["operation"] != tuiOperationFirstFrame {
+		t.Fatalf("popup records = %#v, want one first-frame record", records)
+	}
+
+	if _, ok := records[0]["since_launch_ms"]; ok {
+		t.Fatalf("first-frame record = %#v, want no launch latency without a launch time", records[0])
+	}
+
+	var inlineOutput bytes.Buffer
+
+	inline := loggingTestModel(t, &inlineOutput)
+	inline.mode = modeInline
+	inline.Init()
+	inline.handleSessionLoadResult(firstFrameTestLoad())
+
+	if records := loggingTestRecords(t, &inlineOutput); len(records) != 0 {
+		t.Fatalf("inline picker records = %#v, want none: it shows frames while loading", records)
 	}
 }
 

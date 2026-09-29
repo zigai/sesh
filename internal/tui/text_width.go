@@ -11,7 +11,10 @@ import (
 	"github.com/zigai/sesh/internal/config"
 )
 
-const ellipsisLength = 3
+const (
+	ellipsisLength     = 3
+	compactAgeMaxHours = 99
+)
 
 func SanitizeTerminalText(s string) string {
 	if s == "" {
@@ -51,6 +54,23 @@ func formatAgentAgeAt(t time.Time, now time.Time) string {
 	}
 
 	return fmt.Sprintf("%dh %dm", hours, minutes)
+}
+
+func formatCompactAgeAt(at, now time.Time) string {
+	if at.IsZero() {
+		return ""
+	}
+
+	duration := max(now.Sub(at), 0)
+	if duration < time.Minute {
+		return "<1m"
+	}
+
+	if duration < time.Hour {
+		return fmt.Sprintf("%dm", int(duration/time.Minute))
+	}
+
+	return fmt.Sprintf("%dh", min(int(duration/time.Hour), compactAgeMaxHours))
 }
 
 func formatAgentClockAt(t time.Time, now time.Time) string {

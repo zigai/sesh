@@ -30,45 +30,29 @@ const (
 	innerFrameMargin        = 2
 )
 
+type helpBinding struct {
+	key  string
+	desc string
+}
+
 func (m *Model) selectedRowIsSaved() bool {
 	return m.cursor < len(m.filtered) && m.filtered[m.cursor].IsSaved()
 }
 
-func (m *Model) renderHelpOverlay() string {
-	contentWidth := m.contentWidth()
-	width := min(max(contentWidth-helpWidthMargin, minHelpOverlayWidth), maxHelpOverlayWidth)
-	keys := newActionKeyMap(m.config.Keys)
-
-	title := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(m.config.Theme.Primary)).
-		Bold(true).
-		Background(lipgloss.Color("236")).
-		Padding(0, titleHorizontalPadding).
-		Render(" Popup Keys ")
-
-	keyStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(shortcutKeyColor)).
-		Bold(true)
-	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.Theme.Muted))
-
-	type helpBinding struct {
-		key  string
-		desc string
-	}
-
+func (m *Model) helpBindings(keys actionKeyMap) []helpBinding {
 	moveDescription := "Move between sessions"
 	if m.displayMode == displayModeAgents {
 		moveDescription = "Move between agents"
 	}
 
 	bindings := []helpBinding{
-		{"↑/↓, ctrl+p/ctrl+n", moveDescription},
+		{"↑/↓, ctrl+n", moveDescription},
 		{keys.pageUp.Help().Key + "/" + keys.pageDown.Help().Key, "Page up/down"},
 		{keys.top.Help().Key + "/" + keys.bottom.Help().Key, "Jump to top/bottom"},
 		{keys.enter.Help().Key, keys.enter.Help().Desc},
 		{m.visibleSessionShortcutLabel(), "Open visible session or agent by slot"},
 	}
+
 	if m.showsDisplayModeIndicator() {
 		bindings = append([]helpBinding{{keys.cycleMode.Help().Key, keys.cycleMode.Help().Desc}}, bindings...)
 	}
@@ -104,6 +88,28 @@ func (m *Model) renderHelpOverlay() string {
 		helpBinding{keys.help.Help().Key, keys.help.Help().Desc},
 	)
 
+	return bindings
+}
+
+func (m *Model) renderHelpOverlay() string {
+	contentWidth := m.contentWidth()
+	width := min(max(contentWidth-helpWidthMargin, minHelpOverlayWidth), maxHelpOverlayWidth)
+	keys := newActionKeyMap(m.config.Keys)
+
+	title := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(m.config.Theme.Primary)).
+		Bold(true).
+		Background(lipgloss.Color("236")).
+		Padding(0, titleHorizontalPadding).
+		Render(" Popup Keys ")
+
+	keyStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(shortcutKeyColor)).
+		Bold(true)
+	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.Theme.Muted))
+
+	bindings := m.helpBindings(keys)
 	lines := make([]string, 0, 1+len(bindings)+extraHelpLines)
 	lines = append(lines, title)
 
@@ -117,8 +123,11 @@ func (m *Model) renderHelpOverlay() string {
 		lines = append(lines, "  "+key+"  "+desc)
 	}
 
-	lines = append(lines, "", dimStyle.Render("  Press any key to dismiss"))
+	if statusLine := m.renderHelpStatusLine(width); statusLine != "" {
+		lines = append(lines, "", statusLine)
+	}
 
+	lines = append(lines, "", dimStyle.Render("  Press any key to dismiss"))
 	box := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(m.config.Theme.Border)).
@@ -127,6 +136,36 @@ func (m *Model) renderHelpOverlay() string {
 		Render(strings.Join(lines, "\n"))
 
 	return box
+}
+
+func (m *Model) renderHelpStatusLine(width int) string {
+	if !m.hasStatusBadge() {
+		return ""
+	}
+
+	glyph := "⚠ "
+	color := ""
+
+	if m.config != nil {
+		color = m.config.Theme.Warning
+	}
+
+	if m.statusLevel == statusError {
+		glyph = "✖ "
+
+		if m.config != nil {
+			color = m.config.Theme.Error
+		}
+	}
+
+	statusStyle := lipgloss.NewStyle().Bold(true)
+	if color != "" {
+		statusStyle = statusStyle.Foreground(lipgloss.Color(color))
+	}
+
+	statusText := display.Truncate(glyph+SanitizeTerminalText(m.statusMessage), max(width-statusWidthInset, 1))
+
+	return "  " + statusStyle.Render(statusText)
 }
 
 func (m *Model) renderDialog() string {

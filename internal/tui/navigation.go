@@ -12,6 +12,10 @@ func (m *Model) handleNavigationKeys(msg tea.KeyPressMsg) func() (tea.Model, tea
 	switch {
 	case bubbleskey.Matches(pressed, keys.close):
 		return func() (tea.Model, tea.Cmd) { return m, tea.Quit }
+	case bubbleskey.Matches(pressed, keys.handoff):
+		m.replayKey = ReplayKeyFloatingTerminal
+
+		return func() (tea.Model, tea.Cmd) { return m, tea.Quit }
 	case m.handleAgentGroupNavigation(pressed, keys),
 		m.handleJumpNavigation(pressed, keys),
 		m.handlePageNavigation(pressed, keys),

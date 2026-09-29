@@ -17,7 +17,9 @@ import (
 	"github.com/samber/oops"
 
 	"github.com/zigai/sesh/internal/config"
+	rowlayout "github.com/zigai/sesh/internal/display/layout"
 	"github.com/zigai/sesh/internal/session"
+	"github.com/zigai/sesh/internal/tui/providers"
 )
 
 const (
@@ -46,9 +48,11 @@ const (
 	degradedSourceRemote  = "remote"
 )
 
-const agentGitTickInterval = 2 * time.Second
-
 const remoteStatusTickInterval = 2 * time.Second
+
+// ReplayKeyFloatingTerminal is the tmux key the invoking process replays on the popup's client
+// after the picker closes, so the root binding for the floating terminal opens it.
+const ReplayKeyFloatingTerminal = "C-p"
 
 var (
 	errNilConfig   = errors.New("config must not be nil")
@@ -143,6 +147,7 @@ type Model struct {
 	statusLevel                  statusLevel
 	degradedSources              map[string]string
 	footerHoverDesc              string
+	statusBadgeHovered           bool
 	sessionLoadErr               error
 	agentSummaryErr              error
 	remoteCatalogErr             error
@@ -152,13 +157,19 @@ type Model struct {
 	remoteCatalogWatchDelivered  bool
 	remoteCatalogObservation     uint64
 	switchAfterQuit              string
+	replayKey                    string
 	paneAfterQuit                string
 	loadingSessions              bool
 	suppressInitialFrame         bool
+	launchedAt                   time.Time
+	initializedAt                time.Time
+	agentLayoutKey               agentLayoutReflow
+	agentRowRatchet              rowlayout.RatchetState
+	providerRunner               providers.Runner
+	resourceSample               providers.ResourceSample
+	resourceProcRoot             string
+	ghEntries                    map[ghKey]ghEntry
 	agentGit                     map[string]agentGitCacheEntry
-	agentGitRequest              uint64
-	agentGitCancel               context.CancelFunc
-	gitInFlight                  bool
 	gitScan                      gitScanner
 	remoteCatalogUpdates         chan remoteCatalogMsg
 	remoteCatalogWatchStarted    bool
@@ -296,6 +307,7 @@ func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps
 		statusLevel:                  statusNone,
 		degradedSources:              nil,
 		footerHoverDesc:              "",
+		statusBadgeHovered:           false,
 		sessionLoadErr:               nil,
 		agentSummaryErr:              nil,
 		remoteCatalogErr:             nil,
@@ -306,12 +318,18 @@ func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps
 		remoteCatalogObservation:     0,
 		switchAfterQuit:              "",
 		paneAfterQuit:                "",
+		replayKey:                    "",
 		loadingSessions:              false,
 		suppressInitialFrame:         false,
+		launchedAt:                   time.Time{},
+		initializedAt:                time.Time{},
+		agentLayoutKey:               agentLayoutReflow{width: 0, displayMode: "", uiMode: modeStandalone, query: ""},
+		agentRowRatchet:              rowlayout.RatchetState{},
+		providerRunner:               providers.Runner{},
+		resourceSample:               providers.ResourceSample{At: time.Time{}, Processes: nil},
+		resourceProcRoot:             "",
+		ghEntries:                    nil,
 		agentGit:                     map[string]agentGitCacheEntry{},
-		agentGitRequest:              0,
-		agentGitCancel:               nil,
-		gitInFlight:                  false,
 		gitScan:                      scanGitMetadata,
 		remoteCatalogUpdates:         make(chan remoteCatalogMsg, 1),
 		remoteCatalogWatchStarted:    false,
@@ -365,8 +383,7 @@ func (m *Model) Close() {
 		return
 	}
 
-	m.agentGitRequest++
-	m.stopAgentGit()
+	m.providerRunner.Close()
 	m.lifecycle.Close()
 }
 
@@ -397,9 +414,18 @@ func (m *Model) SetInitialSessions(sessions []session.Session) {
 		remoteCatalog:     RemoteCatalog{GeneratedAt: time.Time{}, Connections: nil},
 		remoteErr:         nil,
 		remoteObservation: 0,
+		timing:            sessionLoadTiming{catalog: 0, agents: 0},
 	})
 	m.loadingSessions = false
 	m.suppressInitialFrame = false
+}
+
+// SetLaunchedAt records when the process that opened this popup started, so the first-frame
+// record can report the latency the user saw.
+func (m *Model) SetLaunchedAt(launchedAt time.Time) {
+	if m != nil {
+		m.launchedAt = launchedAt
+	}
 }
 
 func (m *Model) DeferredSwitchTarget() (session.Session, bool) {
@@ -426,6 +452,11 @@ func (m *Model) DeferredAttachSession() string {
 	return ""
 }
 
+// ReplayKey returns the tmux key to replay on the invoking client after the picker closes.
+func (m *Model) ReplayKey() string {
+	return m.replayKey
+}
+
 func (m *Model) DeferredSwitchPane() string {
 	return m.paneAfterQuit
 }
@@ -439,6 +470,8 @@ func (m *Model) DeferredOriginDetach() bool {
 }
 
 func (m *Model) Init() tea.Cmd {
+	m.initializedAt = time.Now()
+
 	if len(m.sessions) == 0 {
 		m.loadingSessions = true
 		m.suppressInitialFrame = m.mode == modePopup
@@ -600,15 +633,15 @@ func (m *Model) updateTextInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleTickModelMessage(msg tea.Msg) func() (tea.Model, tea.Cmd) {
+	if handler := m.handleProviderModelMessage(msg); handler != nil {
+		return handler
+	}
+
 	switch msg := msg.(type) {
 	case agentSummaryTickMsg:
 		return func() (tea.Model, tea.Cmd) {
 			return m, tea.Batch(m.loadAgentSummariesCommand(), m.agentSummaryTickCommand())
 		}
-	case agentGitTickMsg:
-		return func() (tea.Model, tea.Cmd) { return m, m.loadAgentGitCommand() }
-	case agentGitResultMsg:
-		return func() (tea.Model, tea.Cmd) { return m, m.handleAgentGit(msg) }
 	case agentPositionTickMsg:
 		return func() (tea.Model, tea.Cmd) { return m, m.loadAgentPositionsCommand() }
 	case agentPositionsMsg:
@@ -625,6 +658,25 @@ func (m *Model) handleTickModelMessage(msg tea.Msg) func() (tea.Model, tea.Cmd) 
 			m.handleRemoteStatusTick(msg.now)
 			return m, m.remoteStatusTickCommand()
 		}
+	default:
+		return nil
+	}
+}
+
+func (m *Model) handleProviderModelMessage(msg tea.Msg) func() (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case agentGitTickMsg:
+		return func() (tea.Model, tea.Cmd) { return m, m.loadAgentGitCommand() }
+	case agentGitResultMsg:
+		return func() (tea.Model, tea.Cmd) { return m, m.handleAgentGit(msg) }
+	case resourceTickMsg:
+		return func() (tea.Model, tea.Cmd) { return m, m.loadResourceCommand() }
+	case resourceResultMsg:
+		return func() (tea.Model, tea.Cmd) { return m, m.handleResource(msg) }
+	case ghTickMsg:
+		return func() (tea.Model, tea.Cmd) { return m, m.loadGHCommand() }
+	case ghResultMsg:
+		return func() (tea.Model, tea.Cmd) { return m, m.handleGH(msg) }
 	default:
 		return nil
 	}
@@ -739,6 +791,10 @@ func (m *Model) applyDegradedStatus() {
 
 	m.statusMessage = strings.Join(parts, "; ")
 	m.statusLevel = statusDegraded
+}
+
+func (m *Model) hasStatusBadge() bool {
+	return m.statusLevel != statusNone && m.statusMessage != ""
 }
 
 func emptySession() session.Session {

@@ -3,6 +3,7 @@ package display
 import (
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/samber/oops"
@@ -25,6 +26,67 @@ func TestCompileAgentGitFields(t *testing.T) {
 	)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestTemplateGroupsFallbackPipesAndStyleRoles(t *testing.T) {
+	template, err := Compile(FormatKindAgentsAgent, "[{agent_git_label|agent_cwd_name|upper} {agent_git_added:5@success}]{right}{agent_cwd|path_short|trunc_left:4|default:\"-\"}")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !template.UsesAny(FieldAgentGitLabel, FieldAgentCWDName) || !template.UsesAny(FieldAgentCWD) {
+		t.Fatal("template did not report referenced fields")
+	}
+
+	line := template.Render(testResolver{FieldAgentCWDName: "workspace", FieldAgentGitAdded: "+2", FieldAgentCWD: "/work/development"})
+	if line.Left[1].Value != "WORKSPACE" || line.Left[3].Role != "success" || line.Right[0].Value != "…ent" {
+		t.Fatalf("rendered line = %+v", line)
+	}
+
+	if line.Left[0].Group == "" || line.Left[0].Group != line.Left[1].Group || !line.Left[2].Separator {
+		t.Fatalf("group metadata = %+v", line.Left)
+	}
+
+	if got := template.Render(testResolver{}).Right[0].Value; got != "-" {
+		t.Fatalf("default value = %q", got)
+	}
+}
+
+func TestTemplateGroupHidesBracketsAndSeparatorsWithoutPresentFields(t *testing.T) {
+	template, err := Compile(FormatKindSession, "[{source}/{connection}]")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	parts := template.Render(testResolver{FieldConnection: "ssh"}).Left
+	if got := joinPartValues(parts); got != "[ssh]" {
+		t.Fatalf("one present field = %q", got)
+	}
+
+	if got := joinPartValues(template.Render(testResolver{}).Left); got != "" {
+		t.Fatalf("empty group = %q", got)
+	}
+}
+
+func joinPartValues(parts []Part) string {
+	var value strings.Builder
+	for _, part := range parts {
+		value.WriteString(part.Value)
+	}
+
+	return value.String()
+}
+
+func TestTemplateRejectsInvalidExtendedExpressions(t *testing.T) {
+	for _, source := range []string{
+		"{agent_git_label|missing}", "{agent_git_label|trunc_left:0}",
+		"{agent_git_label|default:missing}", "{agent_git_label|upper:3}",
+		"{agent_git_label@bad-role}", "{right@success}",
+	} {
+		if _, err := Compile(FormatKindAgentsAgent, source); err == nil {
+			t.Fatalf("Compile(%q) accepted invalid expression", source)
+		}
 	}
 }
 
@@ -464,4 +526,34 @@ func TestCompileRejectsAllControlCharacters(t *testing.T) {
 			t.Fatalf("expected ErrControlCharacter for %q, got %v", char, err)
 		}
 	}
+}
+
+func FuzzCompile(f *testing.F) {
+	for _, seed := range []string{
+		"{session_name}",
+		"{tree}{status_glyph} {agent_session}{right}{harness:<6.6}",
+		"{{literal}} {agent_git_label:<6.22}",
+		"[{agent_git_glyph} {agent_git_label}]",
+		"{agent_git_label|agent_cwd_name}",
+		"{agent_git_added:5@success}",
+		"{bar:context_pct:8}",
+		"{right}{right}",
+		"{unclosed",
+	} {
+		f.Add(seed)
+	}
+
+	f.Fuzz(func(t *testing.T, source string) {
+		for _, kind := range []FormatKind{FormatKindSession, FormatKindAgentsSession, FormatKindAgentsAgent} {
+			template, err := Compile(kind, source)
+			if err != nil {
+				continue
+			}
+
+			line := template.Render(nil)
+			if len(line.Left)+len(line.Right) == 0 {
+				t.Fatalf("accepted source produced no parts: %q", source)
+			}
+		}
+	})
 }

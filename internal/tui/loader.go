@@ -15,6 +15,7 @@ import (
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/display"
 	"github.com/zigai/sesh/internal/session"
+	"github.com/zigai/sesh/internal/tui/providers"
 )
 
 const (
@@ -41,6 +42,13 @@ type sessionLoadResultMsg struct {
 	remoteCatalog     RemoteCatalog
 	remoteErr         error
 	remoteObservation uint64
+	timing            sessionLoadTiming
+}
+
+// sessionLoadTiming records how long the parallel catalog and agent loaders took.
+type sessionLoadTiming struct {
+	catalog time.Duration
+	agents  time.Duration
 }
 
 type refreshMsg struct{}
@@ -50,7 +58,7 @@ func (m *Model) loadSessions() error {
 	result.remoteObservation = m.remoteCatalogObservation
 	result.agentObservation = m.agentSummaryObservation
 
-	if result.catalogErr != nil {
+	if result.catalogErr != nil && len(result.sessions) == 0 {
 		logTUILoadTransition(
 			m.operationContext(),
 			tuiOperationLoadCatalog,
@@ -63,7 +71,16 @@ func (m *Model) loadSessions() error {
 		return result.catalogErr
 	}
 
-	if m.sessionLoadErr != nil {
+	if result.catalogErr != nil {
+		logTUILoadTransition(
+			m.operationContext(),
+			tuiOperationLoadCatalog,
+			m.sessionLoadErr,
+			result.catalogErr,
+			tuiLogOutcomeDegradation,
+		)
+		m.sessionLoadErr = result.catalogErr
+	} else if m.sessionLoadErr != nil {
 		logTUILoadTransition(m.operationContext(), tuiOperationLoadCatalog, m.sessionLoadErr, nil, tuiLogOutcomeFailure)
 		m.sessionLoadErr = nil
 	}
@@ -85,14 +102,21 @@ func loadSessionRows(ctx context.Context, cfg *config.Config, deps Services) ses
 		originErr       error
 	)
 
-	var loaders sync.WaitGroup
+	var (
+		loaders sync.WaitGroup
+		timing  sessionLoadTiming
+	)
 
 	loaders.Go(func() {
+		started := time.Now()
 		catalogResult, catalogErr = deps.Catalog.LoadCatalog(ctx)
+		timing.catalog = time.Since(started)
 	})
 
 	loaders.Go(func() {
+		started := time.Now()
 		agentSummaries, agentSummaryErr = loadAgentSummaries(ctx, cfg, deps)
+		timing.agents = time.Since(started)
 	})
 
 	if remoteSessionsEnabled(cfg, deps) {
@@ -126,6 +150,7 @@ func loadSessionRows(ctx context.Context, cfg *config.Config, deps Services) ses
 			remoteCatalog:     RemoteCatalog{GeneratedAt: time.Time{}, Connections: nil},
 			remoteErr:         nil,
 			remoteObservation: 0,
+			timing:            timing,
 		}
 	}
 
@@ -149,6 +174,7 @@ func loadSessionRows(ctx context.Context, cfg *config.Config, deps Services) ses
 		remoteCatalog:     remoteCatalog,
 		remoteErr:         remoteErr,
 		remoteObservation: 0,
+		timing:            timing,
 	}
 }
 
@@ -725,6 +751,17 @@ func (m *Model) persistAgentViewsCommand(views []agentViewStateUpdate) tea.Cmd {
 		return nil
 	}
 
+	if deferrer, ok := m.deps.State.(AgentViewDeferrer); ok {
+		deferred := make([]AgentView, 0, len(views))
+		for _, view := range views {
+			deferred = append(deferred, AgentView{Session: view.identity, PaneID: view.paneID})
+		}
+
+		if deferrer.DeferAgentViews(deferred) {
+			return nil
+		}
+	}
+
 	ctx := m.operationContext()
 
 	return func() tea.Msg {
@@ -893,6 +930,10 @@ func (m *Model) agentSummaryWatchEnabled() bool {
 }
 
 func (m *Model) handleSessionLoadResult(msg sessionLoadResultMsg) tea.Cmd {
+	if m.suppressInitialFrame {
+		logTUIFirstFrame(m.operationContext(), firstFrameTimingAt(m.initializedAt, m.launchedAt, msg.timing, time.Now()))
+	}
+
 	m.suppressInitialFrame = false
 
 	if m.loadingSessions {
@@ -934,11 +975,18 @@ func (m *Model) handleSessionLoadResult(msg sessionLoadResultMsg) tea.Cmd {
 		m.sessionLoadErr = nil
 	}
 
+	cachedGit := m.loadingSessions && msg.agentGit != nil
+
 	views := m.applySessionRows(msg)
+	if cachedGit {
+		m.providerRunner.Publish(providers.Git, m.gitProviderRows(m.agentGit))
+	}
 
 	commands := []tea.Cmd{
 		m.persistAgentViewsCommand(views),
 		m.loadAgentGitCommand(),
+		m.loadResourceCommand(),
+		m.loadGHCommand(),
 	}
 
 	if msg.agentSummaryErr != nil && m.acceptsLoadedAgents(msg) {
@@ -959,6 +1007,8 @@ func (m *Model) refreshSessions() tea.Cmd {
 
 	m.loadingSessions = true
 	m.invalidateAgentGit()
+	m.providerRunner.Invalidate(providers.Resource)
+	m.providerRunner.Invalidate(providers.GH)
 
 	return func() tea.Msg {
 		if !m.lifecycle.BeginWorker() {
@@ -992,11 +1042,15 @@ func (m *Model) agentSummaryTickCommand() tea.Cmd {
 }
 
 func (m *Model) agentClockTickCommand() tea.Cmd {
-	if !agentSummariesEnabled(m.config, m.deps) {
+	definition, _ := providers.DefinitionFor(providers.Clock)
+	if !agentSummariesEnabled(m.config, m.deps) ||
+		(!m.sessionFormats.agentsAgent.UsesAny(definition.Fields...) &&
+			!m.sessionFormats.agentsAgent.UsesAny(display.FieldAgentPromptAge) &&
+			!m.sessionFormats.agentsAgent.UsesWidget("spinner")) {
 		return nil
 	}
 
-	return tea.Tick(time.Second, func(time.Time) tea.Msg { return agentClockTickMsg{} })
+	return tea.Tick(definition.Cadence.Interval, func(time.Time) tea.Msg { return agentClockTickMsg{} })
 }
 
 func (m *Model) handleRefresh() {

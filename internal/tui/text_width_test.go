@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/x/ansi"
+	"pgregory.net/rapid"
 
 	"github.com/zigai/sesh/internal/display"
 )
@@ -158,4 +159,17 @@ func TestTruncateLeftWidthPreservesIdentitySuffix(t *testing.T) {
 	if width := ansi.StringWidth(got); width != 15 {
 		t.Fatalf("truncateLeftWidth() width = %d, want 15", width)
 	}
+}
+
+func TestCompactPromptAgeFitsThreeCellsAcrossDurations(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+
+	rapid.Check(t, func(t *rapid.T) {
+		seconds := rapid.Int64Range(-1_000_000, 100_000_000).Draw(t, "age seconds")
+
+		age := formatCompactAgeAt(now.Add(-time.Duration(seconds)*time.Second), now)
+		if width := ansi.StringWidth(age); width > 3 || width == 0 {
+			t.Fatalf("compact age %q has width %d", age, width)
+		}
+	})
 }

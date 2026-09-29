@@ -394,7 +394,28 @@ func TestScanGitMetadataReadsRealRepository(t *testing.T) {
 		t.Fatalf("GitChanges = %q, want +1 -0", entry.GitChanges)
 	}
 
+	assertCleanGitExtrasExceptDirty(t, entry)
+
 	if entry.GitTrackingKnown {
 		t.Fatal("GitTrackingKnown = true, want false without an upstream")
+	}
+}
+
+func assertCleanGitExtrasExceptDirty(t *testing.T, entry agentGitCacheEntry) {
+	t.Helper()
+
+	if !entry.GitDirty || entry.GitConflicts != 0 || entry.GitStash != 0 {
+		t.Fatalf("git extras = %+v", entry)
+	}
+}
+
+func TestParseGitStatusCountsConflictsAndDirtyWorktree(t *testing.T) {
+	status := parseGitStatus("UU conflicted.txt\nAA added.txt\n M edited.txt\n?? untracked.txt")
+	if !status.dirty || status.conflicts != 2 {
+		t.Fatalf("parsed status = %+v", status)
+	}
+
+	if clean := parseGitStatus(""); clean.dirty || clean.conflicts != 0 {
+		t.Fatalf("clean status = %+v", clean)
 	}
 }

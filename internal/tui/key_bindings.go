@@ -30,6 +30,7 @@ type actionKeyMap struct {
 	selectKeys []bubbleskey.Binding
 	enter      bubbleskey.Binding
 	close      bubbleskey.Binding
+	handoff    bubbleskey.Binding
 	stepUp     bubbleskey.Binding
 	stepDown   bubbleskey.Binding
 	groupUp    bubbleskey.Binding
@@ -61,9 +62,14 @@ func newActionKeyMap(keys config.KeyConfig) actionKeyMap {
 			"esc, ctrl+c, ctrl+o",
 			"Close popup",
 		),
+		handoff: newActionBindingSet(
+			[]string{"ctrl+p"},
+			"ctrl+p",
+			"Open floating terminal",
+		),
 		stepUp: newActionBindingSet(
-			[]string{"up", "ctrl+p"},
-			"↑/ctrl+p",
+			[]string{"up"},
+			"↑",
 			"Move selection up",
 		),
 		stepDown: newActionBindingSet(

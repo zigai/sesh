@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/samber/oops"
 	"github.com/zigai/aht/v2/pkg/aht"
@@ -114,6 +115,10 @@ func agentSessionFromRegistry(session aht.Session) AgentSession {
 		ResumeCommand:    slices.Clone(session.ResumeCommand),
 		ActivityChanged:  session.ActivityChangedAt,
 		UpdatedAt:        session.UpdatedAt,
+		Model:            "",
+		WaitingReason:    "",
+		LastTool:         "",
+		PromptAt:         time.Time{},
 	}
 
 	if session.Process != nil {
@@ -126,5 +131,38 @@ func agentSessionFromRegistry(session aht.Session) AgentSession {
 		}
 	}
 
+	if native := session.Observations.Native; native != nil {
+		prefix := string(session.Harness) + "_"
+		agent.Model = native.Attributes[prefix+"model"]
+		agent.LastTool = native.Attributes[prefix+"tool_name"]
+
+		agent.WaitingReason = nativeWaitingReason(native.Attributes[prefix+"notification_type"], native.Attributes[prefix+"permission_mode"])
+		if native.Event == "UserPromptSubmit" || native.Event == "beforeSubmitPrompt" {
+			agent.PromptAt = native.ObservedAt
+		}
+	}
+
+	if agent.WaitingReason == "" && session.Observations.Screen != nil {
+		agent.WaitingReason = nativeWaitingReason(session.Observations.Screen.RuleID, "")
+	}
+
 	return agent
+}
+
+func nativeWaitingReason(notification, permission string) string {
+	for _, candidate := range []string{notification, permission} {
+		candidate = strings.ToLower(candidate)
+		switch {
+		case strings.Contains(candidate, "permission"), strings.Contains(candidate, "approval"):
+			return "permission"
+		case strings.Contains(candidate, "input"), strings.Contains(candidate, "question"):
+			return "input"
+		case strings.Contains(candidate, "plan"):
+			return "plan"
+		case strings.Contains(candidate, "error"), strings.Contains(candidate, "fail"):
+			return "error"
+		}
+	}
+
+	return ""
 }

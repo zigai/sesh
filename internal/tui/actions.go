@@ -497,8 +497,16 @@ func (m *Model) setErrorStatusf(format string, args ...any) {
 func (m *Model) clearStatus() {
 	m.statusMessage = ""
 	m.statusLevel = statusNone
+	m.statusBadgeHovered = false
 
 	m.applyDegradedStatus()
+}
+
+func (m *Model) dismissStatus() {
+	m.statusMessage = ""
+	m.statusLevel = statusNone
+	m.degradedSources = nil
+	m.statusBadgeHovered = false
 }
 
 func (m *Model) handleEnter() func() (tea.Model, tea.Cmd) {

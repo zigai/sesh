@@ -24,6 +24,7 @@ func TestLookupPresets(t *testing.T) {
 		if !ok {
 			t.Fatalf("LookupPreset(%q) = false, want true", name)
 		}
+
 		if p.Primary == "" || p.Error == "" || p.Success == "" {
 			t.Fatalf("preset %q missing essential colors: %+v", name, p)
 		}
@@ -47,6 +48,7 @@ func TestLoadThemePreset(t *testing.T) {
 [theme]
 preset = "tokyo-night"
 `
+
 	cfg, err := config.Load(config.WithExplicitPath("-"), config.WithInput(strings.NewReader(tomlData)))
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
@@ -55,12 +57,15 @@ preset = "tokyo-night"
 	if cfg.Theme.Preset != "tokyo-night" {
 		t.Errorf("Theme.Preset = %q, want tokyo-night", cfg.Theme.Preset)
 	}
+
 	if cfg.Theme.Primary != "#7aa2f7" {
 		t.Errorf("Theme.Primary = %q, want #7aa2f7", cfg.Theme.Primary)
 	}
+
 	if cfg.Theme.Error != "#f7768e" {
 		t.Errorf("Theme.Error = %q, want #f7768e", cfg.Theme.Error)
 	}
+
 	if cfg.Theme.Secondary != "#e0af68" {
 		t.Errorf("Theme.Secondary = %q, want #e0af68", cfg.Theme.Secondary)
 	}
@@ -72,6 +77,7 @@ func TestLoadThemePresetWithFieldOverrides(t *testing.T) {
 preset = "catppuccin"
 primary = "#ffffff"
 `
+
 	cfg, err := config.Load(config.WithExplicitPath("-"), config.WithInput(strings.NewReader(tomlData)))
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
@@ -80,9 +86,11 @@ primary = "#ffffff"
 	if cfg.Theme.Preset != "catppuccin" {
 		t.Errorf("Theme.Preset = %q, want catppuccin", cfg.Theme.Preset)
 	}
+
 	if cfg.Theme.Primary != "#ffffff" {
 		t.Errorf("Theme.Primary = %q, want #ffffff (explicit override)", cfg.Theme.Primary)
 	}
+
 	if cfg.Theme.Secondary != "#f9e2af" {
 		t.Errorf("Theme.Secondary = %q, want #f9e2af (preset default)", cfg.Theme.Secondary)
 	}
@@ -93,10 +101,12 @@ func TestLoadThemePresetRejectsInvalid(t *testing.T) {
 [theme]
 preset = "invalid-preset"
 `
+
 	_, err := config.Load(config.WithExplicitPath("-"), config.WithInput(strings.NewReader(tomlData)))
 	if err == nil {
 		t.Fatal("Load() error = nil, want invalid theme.preset error")
 	}
+
 	if !strings.Contains(err.Error(), "invalid theme.preset") {
 		t.Fatalf("Load() error = %v, want invalid theme.preset", err)
 	}
@@ -110,9 +120,11 @@ func TestResolvedAgentStatusColorsAndPalette(t *testing.T) {
 		if colors.Running != cfg.Theme.Success {
 			t.Errorf("Running = %q, want %q", colors.Running, cfg.Theme.Success)
 		}
+
 		if colors.Waiting != cfg.Theme.Secondary {
 			t.Errorf("Waiting = %q, want %q", colors.Waiting, cfg.Theme.Secondary)
 		}
+
 		if colors.Failed != cfg.Theme.Error {
 			t.Errorf("Failed = %q, want %q", colors.Failed, cfg.Theme.Error)
 		}
@@ -126,6 +138,7 @@ error = "#ff0000"
 [theme.agent_status]
 failed = "#aa0000"
 `
+
 		cfg, err := config.Load(config.WithExplicitPath("-"), config.WithInput(strings.NewReader(tomlData)))
 		if err != nil {
 			t.Fatalf("Load() error = %v", err)
@@ -147,6 +160,7 @@ failed = "#aa0000"
 [agent_status.colors]
 failed = "#cc0000"
 `
+
 		cfg, err := config.Load(config.WithExplicitPath("-"), config.WithInput(strings.NewReader(tomlData)))
 		if err != nil {
 			t.Fatalf("Load() error = %v", err)
@@ -182,5 +196,68 @@ func TestSynthesizeTmuxStyle(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("SynthesizeTmuxStyle(%q) = %q, want %q", tt.color, got, tt.want)
 		}
+	}
+}
+
+func TestPresetWithThemeErrorOverride(t *testing.T) {
+	tomlData := `
+[theme]
+preset = "tokyo-night"
+error = "#ff0000"
+`
+
+	cfg, err := config.Load(config.WithExplicitPath("-"), config.WithInput(strings.NewReader(tomlData)))
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	colors := cfg.ResolvedAgentStatusColors()
+	if cfg.Theme.Error != "#ff0000" {
+		t.Errorf("Theme.Error = %q, want #ff0000", cfg.Theme.Error)
+	}
+
+	if colors.Failed != "#ff0000" {
+		t.Errorf("colors.Failed = %q, want #ff0000", colors.Failed)
+	}
+}
+
+func TestLoadThemePresetFromEnvironment(t *testing.T) {
+	t.Setenv("SESH_THEME_PRESET", "nord")
+	t.Setenv("SESH_THEME_ERROR", "#ff0000")
+
+	cfg, err := config.Load(config.WithExplicitPath("-"), config.WithInput(strings.NewReader("")))
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	nord, _ := config.LookupPreset("nord")
+	if cfg.Theme.Preset != "nord" || cfg.Theme.Primary != nord.Primary || cfg.Theme.Background != nord.Background {
+		t.Fatalf("theme = %+v, want the nord preset colors", cfg.Theme)
+	}
+
+	if cfg.Theme.Error != "#ff0000" {
+		t.Fatalf("Theme.Error = %q, want the environment override #ff0000", cfg.Theme.Error)
+	}
+}
+
+func TestLoadThemePresetFromEnvironmentRejectsInvalid(t *testing.T) {
+	t.Setenv("SESH_THEME_PRESET", "invalid-preset")
+
+	_, err := config.Load(config.WithExplicitPath("-"), config.WithInput(strings.NewReader("")))
+	if err == nil || !strings.Contains(err.Error(), "invalid theme.preset") {
+		t.Fatalf("Load() error = %v, want invalid theme.preset", err)
+	}
+}
+
+func TestExplicitDraculaPresetMatchesDefaultTheme(t *testing.T) {
+	t.Parallel()
+
+	cfg, err := config.Load(config.WithExplicitPath("-"), config.WithInput(strings.NewReader("[theme]\npreset = \"dracula\"\n")))
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if want := config.DefaultThemeConfig(); cfg.Theme != want {
+		t.Fatalf("explicit dracula theme = %+v, want default theme %+v", cfg.Theme, want)
 	}
 }

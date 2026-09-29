@@ -2,22 +2,27 @@ package tui
 
 import (
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/samber/oops"
 
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/display"
+	"github.com/zigai/sesh/internal/display/layout"
 	"github.com/zigai/sesh/internal/session"
+	"github.com/zigai/sesh/internal/tui/providers"
 )
 
 const (
 	gitChangePartsCount  = 2
 	centerPaddingDivisor = 2
+	spinnerFrameMillis   = 125
 )
 
 type sessionRowFormats struct {
@@ -38,9 +43,34 @@ type sessionFormatValues struct {
 	now          time.Time
 }
 
-type nonGitCandidate struct {
-	part        display.Part
-	isSeparator bool
+func (v sessionFormatValues) ResolveSessionFormatCell(field string) (string, layout.State) {
+	info, ok := display.FieldInfo(field)
+	if ok {
+		switch info.Provider {
+		case display.ProviderResource:
+			return v.resolveResourceCell(field)
+		case display.ProviderGH:
+			return v.resolveGHCell(field)
+		case display.ProviderAHT:
+			return v.resolveAHTCell(field)
+		case display.ProviderSession, display.ProviderAgent, display.ProviderClock, display.ProviderGit:
+		}
+	}
+
+	value := v.ResolveSessionFormatField(field)
+	if value == "" {
+		return "", layout.Absent
+	}
+
+	return value, layout.Present
+}
+
+func (v sessionFormatValues) WidgetFrame() int {
+	return int(v.now.UnixMilli() / spinnerFrameMillis)
+}
+
+func (v sessionFormatValues) WidgetWorking() bool {
+	return v.agent.Status == session.AgentStatusRunning
 }
 
 func emptyAgentSession() session.AgentSession {
@@ -119,26 +149,7 @@ func (m *Model) formattedSessionLine(
 	layout sessionTableLayout,
 ) display.Line {
 	template, values := m.sessionRowFormatter(row, agent, hasAgent, isLastAgent, layout)
-
-	line := template.Render(values)
-
-	if hasAgent {
-		if !agentHasGit(agent) {
-			hadGit := partsHaveGit(line.Right)
-			line = filterNonGitLine(line)
-
-			if hadGit && len(line.Right) > 0 {
-				line.Right = padNonGitRightLine(line.Right, layout.rightWidth)
-			}
-		} else {
-			for index := range line.Right {
-				part := &line.Right[index]
-				part.Width = max(part.Width, layout.agentGitWidths[part.Field])
-			}
-		}
-	}
-
-	return line
+	return template.Render(values)
 }
 
 func (m *Model) sessionRowFormatter(
@@ -175,48 +186,9 @@ func (m *Model) sessionFormatRightColumnWidth(layout sessionTableLayout) int {
 	for _, row := range m.filtered {
 		template, values := m.sessionRowFormatter(row, emptyAgentSession(), false, false, layout)
 		width = max(width, display.MeasureRight(template, values, lipgloss.Width))
-
-		if m.displayMode != displayModeAgents {
-			continue
-		}
-
-		for index, agent := range row.Agents {
-			line := m.formattedSessionLine(row, agent, true, index == len(row.Agents)-1, layout)
-
-			agentWidth := 0
-			for _, part := range line.Right {
-				agentWidth += lipgloss.Width(alignSessionFormatPart(part))
-			}
-
-			width = max(width, agentWidth)
-		}
 	}
 
 	return width
-}
-
-func (m *Model) agentGitColumnWidths(layout sessionTableLayout) map[string]int {
-	widths := make(map[string]int)
-	if m.displayMode != displayModeAgents {
-		return widths
-	}
-
-	for _, row := range m.filtered {
-		for _, agent := range row.Agents {
-			if !agentHasGit(agent) {
-				continue
-			}
-
-			template, values := m.sessionRowFormatter(row, agent, true, false, layout)
-			for _, part := range template.Render(values).Right {
-				if isGitField(part.Field) {
-					widths[part.Field] = max(widths[part.Field], lipgloss.Width(alignSessionFormatPart(part)))
-				}
-			}
-		}
-	}
-
-	return widths
 }
 
 func (v sessionFormatValues) ResolveSessionFormatField(field string) string {
@@ -233,6 +205,67 @@ func (v sessionFormatValues) ResolveSessionFormatField(field string) string {
 	}
 
 	return v.resolveAgentDetailField(field)
+}
+
+func (v sessionFormatValues) resolveResourceCell(field string) (string, layout.State) {
+	if runtime.GOOS != "linux" || v.row.Origin == session.OriginSSH || v.row.Origin == session.OriginBridge {
+		return "", layout.Unsupported
+	}
+
+	if !v.hasAgent {
+		return v.resolveResourceSummaryCell(field)
+	}
+
+	if v.agent.PaneID == "" || v.agent.PanePID <= 0 {
+		return "", layout.Absent
+	}
+
+	cell := v.model.providerRunner.Cell(providers.Resource, v.agent.PaneID, field)
+
+	return cell.Text, cell.State
+}
+
+func (v sessionFormatValues) resolveResourceSummaryCell(field string) (string, layout.State) {
+	for _, agent := range v.row.Agents {
+		if agent.PaneID == v.row.ActivePaneID {
+			cell := v.model.providerRunner.Cell(providers.Resource, agent.PaneID, field)
+			return cell.Text, cell.State
+		}
+	}
+
+	for _, agent := range v.row.Agents {
+		if agent.PaneID != "" {
+			cell := v.model.providerRunner.Cell(providers.Resource, agent.PaneID, field)
+			return cell.Text, cell.State
+		}
+	}
+
+	return "", layout.Absent
+}
+
+func (v sessionFormatValues) resolveGHCell(field string) (string, layout.State) {
+	if v.row.Origin == session.OriginSSH || v.row.Origin == session.OriginBridge {
+		return "", layout.Unsupported
+	}
+
+	if v.agent.PaneID == "" {
+		return "", layout.Absent
+	}
+
+	cell := v.model.providerRunner.Cell(providers.GH, v.agent.PaneID, field)
+
+	return cell.Text, cell.State
+}
+
+func (v sessionFormatValues) resolveAHTCell(field string) (string, layout.State) {
+	if v.agent.PaneID != "" && v.model.providerRunner.Version(providers.AHT) > 0 {
+		cell := v.model.providerRunner.Cell(providers.AHT, v.agent.PaneID, field)
+		return cell.Text, cell.State
+	}
+
+	cell := ahtFieldCell(v.agent, field, v.now)
+
+	return cell.Text, cell.State
 }
 
 func (v sessionFormatValues) resolveSessionTmuxField(field string) (string, bool) {
@@ -380,11 +413,11 @@ func (v sessionFormatValues) resolveSessionAgentStateField(field string) string 
 			return status
 		}
 
-		return v.model.agentStatusGlyph(statusEnum)
+		return agentStatusGlyphChar(statusEnum)
 	case display.FieldAgentStatusText:
 		return status
 	case display.FieldAgentStatusGlyph:
-		return v.model.agentStatusGlyph(statusEnum)
+		return agentStatusGlyphChar(statusEnum)
 	case display.FieldAgentAge:
 		return age
 	case display.FieldAgentDuration, display.FieldAgentClock:
@@ -502,7 +535,11 @@ func (v sessionFormatValues) resolveAgentLocationField(field string) (string, bo
 
 func (v sessionFormatValues) resolveAgentGitField(field string) (string, bool) {
 	if value, ok := v.resolveAgentGitCountField(field); ok {
-		return v.styleAgentGitCount(field, value), true
+		return value, true
+	}
+
+	if value, ok := v.resolveAgentGitExtraField(field); ok {
+		return value, true
 	}
 
 	switch field {
@@ -524,6 +561,31 @@ func (v sessionFormatValues) resolveAgentGitField(field string) (string, bool) {
 		return SanitizeTerminalText(v.agent.Worktree), true
 	case display.FieldAgentWorktreeName:
 		return SanitizeTerminalText(pathName(v.agent.Worktree)), true
+	default:
+		return "", false
+	}
+}
+
+func (v sessionFormatValues) resolveAgentGitExtraField(field string) (string, bool) {
+	switch field {
+	case display.FieldAgentGitStash:
+		if v.agent.GitStash > 0 {
+			return strconv.Itoa(v.agent.GitStash), true
+		}
+
+		return "", true
+	case display.FieldAgentGitConflicts:
+		if v.agent.GitConflicts > 0 {
+			return strconv.Itoa(v.agent.GitConflicts), true
+		}
+
+		return "", true
+	case display.FieldAgentGitDirty:
+		if v.agent.GitDirty {
+			return "dirty", true
+		}
+
+		return "", true
 	default:
 		return "", false
 	}
@@ -557,33 +619,6 @@ func (v sessionFormatValues) resolveAgentGitCountField(field string) (string, bo
 	default:
 		return "", false
 	}
-}
-
-func (v sessionFormatValues) styleAgentGitCount(field, value string) string {
-	if value == "" {
-		return ""
-	}
-
-	theme := v.model.config.Theme
-	color := theme.Muted
-	dim := false
-
-	if value != "+0" && value != "-0" && value != "↑0" && value != "↓0" {
-		switch field {
-		case display.FieldAgentGitAdded:
-			color = theme.Success
-			dim = true
-		case display.FieldAgentGitDeleted:
-			color = theme.Error
-			dim = true
-		case display.FieldAgentGitAhead:
-			color = theme.Primary
-		case display.FieldAgentGitBehind:
-			color = theme.Secondary
-		}
-	}
-
-	return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Faint(dim).Render(value)
 }
 
 func agentGitLabel(agent session.AgentSession) string {
@@ -625,11 +660,11 @@ func (v sessionFormatValues) resolveAgentStateField(field string) string {
 			return displayedAgentStatusLabel(v.agent.Status, unreadIdle)
 		}
 
-		return v.model.displayedAgentStatusGlyph(v.agent.Status, unreadIdle)
+		return displayedAgentStatusGlyphChar(v.agent.Status, unreadIdle)
 	case display.FieldStatusText:
 		return displayedAgentStatusLabel(v.agent.Status, unreadIdle)
 	case display.FieldStatusGlyph:
-		return v.model.displayedAgentStatusGlyph(v.agent.Status, unreadIdle)
+		return displayedAgentStatusGlyphChar(v.agent.Status, unreadIdle)
 	case display.FieldStatusAge:
 		return v.model.agentStatusAgeAt(v.agent, v.now)
 	case display.FieldStatusDuration, display.FieldStatusClock:
@@ -643,6 +678,14 @@ func (v sessionFormatValues) resolveAgentStateField(field string) string {
 	default:
 		return ""
 	}
+}
+
+func displayedAgentStatusGlyphChar(status session.AgentStatus, unreadIdle bool) string {
+	if status == session.AgentStatusIdle && unreadIdle {
+		return "◎"
+	}
+
+	return agentStatusGlyphChar(status)
 }
 
 func (v sessionFormatValues) agentCount() string {
@@ -667,10 +710,10 @@ func (v sessionFormatValues) sessionAgentContext() string {
 
 func (v sessionFormatValues) agentContext() string {
 	unreadIdle := v.model.agentIdleUnread(v.row, v.agent)
-	context := v.model.formattedAgentSessionContextAt(v.agent, v.now, v.ageWidth, v.isActivePane, unreadIdle)
+	context := ansi.Strip(v.model.formattedAgentSessionContextAt(v.agent, v.now, v.ageWidth, v.isActivePane, unreadIdle))
 
 	if v.contextWidth > 0 && lipgloss.Width(context) > v.contextWidth {
-		return v.model.compactAgentSessionContextAt(v.agent, v.now, v.isActivePane, unreadIdle)
+		return ansi.Strip(v.model.compactAgentSessionContextAt(v.agent, v.now, v.isActivePane, unreadIdle))
 	}
 
 	return context
@@ -748,39 +791,16 @@ func (v sessionFormatValues) shortcutDigit() string {
 }
 
 func (v sessionFormatValues) treeBranch() string {
-	muted := "#6c7086"
-	if v.model != nil && v.model.config != nil && v.model.config.Theme.Muted != "" {
-		muted = v.model.config.Theme.Muted
-	}
-
-	style := lipgloss.NewStyle().Foreground(lipgloss.Color(muted))
-
-	return "\x1b[22m" + style.Render(agentTreeConnector(v.isLastAgent))
+	return agentTreeConnector(v.isLastAgent)
 }
 
 func (v sessionFormatValues) treeIndent() string {
 	digit := v.shortcutDigit()
 	if digit != "" {
-		muted := "#6c7086"
-		if v.model != nil && v.model.config != nil && v.model.config.Theme.Muted != "" {
-			muted = v.model.config.Theme.Muted
-		}
-
-		style := lipgloss.NewStyle().Foreground(lipgloss.Color(muted))
-
-		return "\x1b[22m" + style.Render(" "+digit+" ")
+		return " " + digit + " "
 	}
 
 	return "   "
-}
-
-func (v sessionFormatValues) formatShortcut(text string) string {
-	muted := "#6c7086"
-	if v.model != nil && v.model.config != nil && v.model.config.Theme.Muted != "" {
-		muted = v.model.config.Theme.Muted
-	}
-
-	return lipgloss.NewStyle().Foreground(lipgloss.Color(muted)).Render(text)
 }
 
 func (v sessionFormatValues) resolveShortcutField(field string) (string, bool) {
@@ -791,14 +811,14 @@ func (v sessionFormatValues) resolveShortcutField(field string) (string, bool) {
 			return "", true
 		}
 
-		return v.formatShortcut(digit), true
+		return digit, true
 	case display.FieldShortcutBadge:
 		digit := v.shortcutDigit()
 		if digit == "" {
 			return "", true
 		}
 
-		return v.formatShortcut("^" + digit), true
+		return "^" + digit, true
 	default:
 		return "", false
 	}
@@ -827,7 +847,8 @@ func fitSessionFormatParts(parts []display.Part, width int) string {
 
 	if overflow := lineWidth - width; overflow > 0 {
 		for index, part := range parts {
-			if overflow <= 0 || !flexibleSessionFormatField(part.Field) {
+			info, ok := display.FieldInfo(part.Field)
+			if overflow <= 0 || !ok || !info.Flexible {
 				continue
 			}
 
@@ -852,7 +873,8 @@ func fitSessionFormatParts(parts []display.Part, width int) string {
 
 func expandFlexibleSessionFormatParts(parts []display.Part, values []string, extra int) {
 	for index, part := range parts {
-		if extra <= 0 || !flexibleSessionFormatField(part.Field) {
+		info, ok := display.FieldInfo(part.Field)
+		if extra <= 0 || !ok || !info.Flexible {
 			continue
 		}
 
@@ -879,46 +901,11 @@ func expandFlexibleSessionFormatParts(parts []display.Part, values []string, ext
 	}
 }
 
-func padNonGitRightLine(parts []display.Part, targetWidth int) []display.Part {
-	if len(parts) == 0 || targetWidth <= 0 {
-		return parts
-	}
-
-	currentRightWidth := 0
-	for _, part := range parts {
-		currentRightWidth += lipgloss.Width(alignSessionFormatPart(part))
-	}
-
-	if currentRightWidth >= targetWidth {
-		return parts
-	}
-
-	pad := targetWidth - currentRightWidth
-	if len(parts) > 1 && parts[len(parts)-1].Field == display.FieldShortcutBadge {
-		return slices.Insert(parts, len(parts)-1, display.Part{
-			Field:       "",
-			Value:       strings.Repeat(" ", pad),
-			Alignment:   display.AlignmentNone,
-			Width:       0,
-			MaxWidth:    0,
-			HasMaxWidth: false,
-		})
-	}
-
-	return append(parts, display.Part{
-		Field:       "",
-		Value:       strings.Repeat(" ", pad),
-		Alignment:   display.AlignmentNone,
-		Width:       0,
-		MaxWidth:    0,
-		HasMaxWidth: false,
-	})
-}
-
 func fitFlexibleSessionFormatPart(part display.Part, width int) string {
 	value := truncateSessionFormatPart(part)
 	if lipgloss.Width(value) > width {
-		if part.Field == display.FieldAgentSession || part.Alignment == display.AlignmentRight {
+		info, _ := display.FieldInfo(part.Field)
+		if info.TruncateLeft || part.Alignment == display.AlignmentRight {
 			return truncateLeftWidth(value, width)
 		}
 
@@ -965,140 +952,6 @@ func truncateSessionFormatPart(part display.Part) string {
 	return display.Truncate(part.Value, part.MaxWidth)
 }
 
-func flexibleSessionFormatField(field string) bool {
-	return field == display.FieldSessionName || field == display.FieldAgentSession
-}
-
 func agentHasGit(agent session.AgentSession) bool {
 	return agent.Worktree != "" || agent.GitBranch != "" || agent.GitChanges != ""
-}
-
-func partsHaveGit(parts []display.Part) bool {
-	for _, p := range parts {
-		if isGitField(p.Field) || containsGitGlyph(p.Value) {
-			return true
-		}
-	}
-
-	return false
-}
-
-func isGitField(field string) bool {
-	return strings.HasPrefix(field, "agent_git_") || strings.HasPrefix(field, "agent_worktree")
-}
-
-func isGitGlyph(r rune) bool {
-	switch r {
-	case '', '', '', '', '󰊢':
-		return true
-	default:
-		return false
-	}
-}
-
-func containsGitGlyph(s string) bool {
-	return strings.IndexFunc(s, isGitGlyph) >= 0
-}
-
-func stripGitGlyphs(s string) string {
-	return strings.Map(func(r rune) rune {
-		if isGitGlyph(r) {
-			return -1
-		}
-
-		return r
-	}, s)
-}
-
-func isSeparatorLiteral(s string) bool {
-	return strings.Trim(s, " \t\r\n|·-•/:") == ""
-}
-
-func filterNonGitLine(line display.Line) display.Line {
-	return display.Line{
-		Left:  filterNonGitParts(line.Left),
-		Right: filterNonGitParts(line.Right),
-	}
-}
-
-func filterNonGitParts(parts []display.Part) []display.Part {
-	hasGitContent := false
-	hasNonGitField := false
-
-	for _, p := range parts {
-		if isGitField(p.Field) || containsGitGlyph(p.Value) {
-			hasGitContent = true
-		} else if p.Field != "" {
-			hasNonGitField = true
-		}
-	}
-
-	if !hasGitContent {
-		return parts
-	}
-
-	if !hasNonGitField {
-		return nil
-	}
-
-	candidates, hasSubstantial := collectNonGitCandidates(parts)
-	if !hasSubstantial {
-		return nil
-	}
-
-	return collapseSeparators(candidates)
-}
-
-func collectNonGitCandidates(parts []display.Part) ([]nonGitCandidate, bool) {
-	var candidates []nonGitCandidate
-
-	hasSubstantialNonGit := false
-
-	for _, p := range parts {
-		if isGitField(p.Field) {
-			continue
-		}
-
-		if containsGitGlyph(p.Value) {
-			p.Value = stripGitGlyphs(p.Value)
-			if strings.TrimSpace(p.Value) == "" {
-				continue
-			}
-		}
-
-		if p.Field == "" && isSeparatorLiteral(p.Value) {
-			candidates = append(candidates, nonGitCandidate{part: p, isSeparator: true})
-
-			continue
-		}
-
-		candidates = append(candidates, nonGitCandidate{part: p, isSeparator: false})
-		hasSubstantialNonGit = true
-	}
-
-	return candidates, hasSubstantialNonGit
-}
-
-func collapseSeparators(candidates []nonGitCandidate) []display.Part {
-	var result []display.Part
-
-	prevWasSep := true
-
-	for _, c := range candidates {
-		if c.isSeparator {
-			if !prevWasSep {
-				result = append(result, c.part)
-				prevWasSep = true
-			}
-		} else {
-			result = append(result, c.part)
-			prevWasSep = false
-		}
-	}
-
-	for len(result) > 0 && result[len(result)-1].Field == "" && isSeparatorLiteral(result[len(result)-1].Value) {
-		result = result[:len(result)-1]
-	}
-
-	return result
 }
