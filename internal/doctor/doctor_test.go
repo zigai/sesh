@@ -558,6 +558,11 @@ func assertNewerAttemptBlocksPracticalGeneration(t *testing.T, terminalState str
 	if curRes.Status != doctor.StatusError || curRes.Reason != doctor.ReasonRecoveryRequired {
 		t.Fatalf("newer %s attempt did not preserve recovery barrier: %#v", terminalState, curRes)
 	}
+
+	failed := strings.Contains(curRes.Message, "latest save failed") && strings.Contains(curRes.Fix, "--json")
+	if failed != (terminalState == "failed") {
+		t.Fatalf("newer %s attempt reported the wrong barrier cause: %#v", terminalState, curRes)
+	}
 }
 
 func TestSnapshotRepository_CorruptPracticalGenerationArtifact(t *testing.T) {

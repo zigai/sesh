@@ -124,6 +124,10 @@ func resolveCurrentSnapshot(ctx context.Context, repo currentSnapshotReader) (Re
 
 		candidate, admissible := practicalCurrentGeneration(before)
 		if !admissible {
+			if latestSaveAttempt(before).State == "failed" {
+				return failedSaveResult(), nil
+			}
+
 			return classifyReadCurrentError(readErr)
 		}
 
@@ -152,6 +156,18 @@ func resolveCurrentSnapshot(ctx context.Context, repo currentSnapshotReader) (Re
 		Message: "snapshot repository changed during inspection; current snapshot could not be verified",
 		Fix:     "Run 'sesh doctor' again after snapshot activity settles",
 	}, nil
+}
+
+// failedSaveResult reports a recovery barrier left by a save that failed. Repeating the
+// same save cannot clear it until the cause the save reports is resolved.
+func failedSaveResult() Result {
+	return Result{
+		Check:   CheckSnapshotCurrent,
+		Status:  StatusError,
+		Reason:  ReasonRecoveryRequired,
+		Message: "current snapshot requires recovery (latest save failed)",
+		Fix:     "Run 'sesh action snapshot-save --json' and resolve the reported error code",
+	}
 }
 
 func repositoryResultFromCatalog(catalog store.Catalog) Result {
