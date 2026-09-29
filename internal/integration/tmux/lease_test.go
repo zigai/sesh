@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	gotmux "github.com/zigai/gotmux/tmux"
+
 	"golang.org/x/sys/unix"
 
 	"github.com/samber/oops"
@@ -74,7 +76,6 @@ func TestLeaseEndpointRejection_InvalidPaths(t *testing.T) {
 		{name: "root", socket: "/"},
 		{name: "unclean_dot_segments", socket: tempDir + "/a/../sock"},
 		{name: "trailing_slash", socket: filepath.Join(tempDir, "sock") + "/"},
-		{name: "nonexistent_parent", socket: filepath.Join(tempDir, "nonexistent", "sock")},
 		{name: "nul_byte", socket: tempDir + "/sock\x00path"},
 	} {
 		t.Run(invalid.name, func(t *testing.T) {
@@ -89,6 +90,21 @@ func TestLeaseEndpointRejection_InvalidPaths(t *testing.T) {
 				t.Fatalf("expected ErrEndpoint, got %v", err)
 			}
 		})
+	}
+}
+
+func TestLeaseReportsNoServerWhenSocketDirectoryIsMissing(t *testing.T) {
+	leaseRoot := t.TempDir()
+
+	lease, err := AcquireLease(t.Context(), leaseRoot, filepath.Join(t.TempDir(), "tmux-1000", "default"))
+	if lease != nil {
+		_ = lease.Close()
+
+		t.Fatal("expected nil lease without a socket directory")
+	}
+
+	if !errors.Is(err, gotmux.ErrNoServer) {
+		t.Fatalf("expected ErrNoServer, got %v", err)
 	}
 }
 

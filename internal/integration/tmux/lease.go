@@ -16,6 +16,8 @@ import (
 
 	"github.com/samber/oops"
 
+	gotmux "github.com/zigai/gotmux/tmux"
+
 	"github.com/zigai/sesh/internal/privatefs"
 )
 
@@ -121,6 +123,11 @@ func validateEndpoint(socket string) error {
 	parentDir := filepath.Dir(socket)
 
 	resolvedParent, err := filepath.EvalSymlinks(parentDir)
+	if errors.Is(err, fs.ErrNotExist) {
+		// tmux creates the socket directory when a server starts; its absence means no server.
+		return oops.In("tmux").Code("server_unavailable").With("operation", "acquire_lease").Wrap(gotmux.ErrNoServer)
+	}
+
 	if err != nil {
 		return oops.In("tmux").Code("endpoint_required").With("operation", "acquire_lease").Wrap(errors.Join(ErrEndpoint, sanitizePathError(err)))
 	}

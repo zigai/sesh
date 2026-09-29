@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	LibraryVersion            = "v0.5.0"
+	LibraryVersion            = "v0.5.2"
 	interactiveCommandTimeout = 24 * time.Hour
 )
 
@@ -24,6 +24,7 @@ func Open(socket string) (*gotmux.Server, error) {
 
 	var config gotmux.Config
 
+	config.Binary = serverBinary(socket)
 	config.SocketPath = socket
 	config.ConfigFile = "/dev/null"
 
@@ -42,6 +43,7 @@ func OpenInteractive(socket string) (*gotmux.Server, error) {
 
 	var config gotmux.Config
 
+	config.Binary = serverBinary(socket)
 	config.SocketPath = socket
 	config.ConfigFile = "/dev/null"
 	config.Limits = gotmux.DefaultLimits()
