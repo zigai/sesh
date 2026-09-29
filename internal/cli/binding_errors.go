@@ -26,7 +26,7 @@ const (
 // tmux to print "'…' returned 1". tmux run-shell discards stderr, so without this the reason
 // is lost. It reports whether the failure reached tmux; the caller then exits successfully.
 func reportBindingFailure(cmd *cobra.Command, err error, stdout, stderr io.Writer) bool {
-	if err == nil || !invokedByTmuxBinding(cmd, stdout, stderr) {
+	if err == nil || jsonOutputEnabled(cmd) || !invokedByTmuxBinding(cmd, stdout, stderr) {
 		return false
 	}
 
@@ -46,7 +46,11 @@ func reportBindingFailure(cmd *cobra.Command, err error, stdout, stderr io.Write
 }
 
 func invokedByTmuxBinding(cmd *cobra.Command, stdout, stderr io.Writer) bool {
-	if cmd == nil || cmd.Parent() == nil || cmd.Parent().Name() != actionCmd {
+	if cmd == nil || cmd.Parent() == nil {
+		return false
+	}
+
+	if cmd.Parent().Name() != actionCmd && (cmd.Parent().Name() != "hooks" || cmd.Name() != "run") {
 		return false
 	}
 

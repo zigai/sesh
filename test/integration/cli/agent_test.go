@@ -240,6 +240,55 @@ func TestCLIAgentFocusActivatesNamedPane(t *testing.T) {
 	}
 }
 
+func TestAgentNavigationActionsSucceedWithoutTerminalOutput(t *testing.T) {
+	for _, action := range []string{"agent-next", "agent-next-local", "agent-back", "agent-focus"} {
+		t.Run(action, func(t *testing.T) {
+			fixture := newAgentIntegrationFixture(t)
+			historyPath := filepath.Join(t.TempDir(), "history.json")
+			paneID := fixture.current.PaneID
+			want := fixture.target
+			command := action
+
+			var extra []string
+
+			switch action {
+			case "agent-next-local":
+				command = "agent-next"
+				extra = []string{"--local"}
+			case "agent-back":
+				runAgentNavigation(t, "agent-next", testNoConfigFlag, testSocketFlag, fixture.socket,
+					"--state", fixture.statePath, "--pane", paneID, "--history", historyPath, testJSONFlag)
+				paneID = fixture.target.PaneID
+				want = fixture.current
+			case "agent-focus":
+				extra = []string{"--target-pane", fixture.target.PaneID}
+			}
+
+			args := []string{
+				actionCmd, command, testNoConfigFlag, testSocketFlag, fixture.socket,
+				"--state", fixture.statePath, "--pane", paneID, "--history", historyPath,
+			}
+
+			stdout, stderr, err := executeCommand(t, append(args, extra...)...)
+			if err != nil {
+				t.Fatalf("navigation failed: %v\nstderr: %s", err, stderr)
+			}
+
+			if stdout != "" || stderr != "" {
+				t.Fatalf("navigation output = %q / %q, want empty stdout and stderr", stdout, stderr)
+			}
+
+			if got := activeWindow(t, t.Context(), fixture.server, want.SessionID); got != want.WindowID {
+				t.Fatalf("active window = %q, want %q", got, want.WindowID)
+			}
+
+			if got := livePane(t, t.Context(), fixture.server, want.PaneID); !got.PaneActive {
+				t.Fatalf("pane %s is not active after navigation", want.PaneID)
+			}
+		})
+	}
+}
+
 func TestCLIAgentStatusReadsRegistry(t *testing.T) {
 	fixture := newAgentIntegrationFixture(t)
 

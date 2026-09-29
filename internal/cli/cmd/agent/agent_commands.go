@@ -190,7 +190,7 @@ func runAgentNext(cmd *cobra.Command, _ []string) error {
 		return clibase.WriteJSONResult(cmd, agentNavResultJSON{TargetPaneID: target.PaneID})
 	}
 
-	return clibase.WriteOutput(cmd, "Switched to agent pane %s\n", target.PaneID)
+	return nil
 }
 
 func newAgentBackCommand() *cobra.Command {
@@ -224,7 +224,7 @@ func runAgentBack(cmd *cobra.Command, _ []string) error {
 		return clibase.WriteJSONResult(cmd, agentNavResultJSON{TargetPaneID: target.PaneID})
 	}
 
-	return clibase.WriteOutput(cmd, "Returned to pane %s\n", target.PaneID)
+	return nil
 }
 
 func newAgentFocusCommand() *cobra.Command {
@@ -278,7 +278,7 @@ func runAgentFocus(cmd *cobra.Command, _ []string) error {
 		return clibase.WriteJSONResult(cmd, agentNavResultJSON{TargetPaneID: target.PaneID})
 	}
 
-	return clibase.WriteOutput(cmd, "Focused agent pane %s\n", target.PaneID)
+	return nil
 }
 
 func newAgentStatusCommand() *cobra.Command {

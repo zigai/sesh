@@ -402,6 +402,10 @@ func validateCommandBeforeConfig(cmd *cobra.Command, args []string) error {
 }
 
 func publishCommandOutput(cmd *cobra.Command, output, diagnostics *commandBuffer, stdout, stderr io.Writer, runErr, closeErr error) error {
+	if !output.streaming && !jsonOutputEnabled(cmd) && invokedByTmuxBinding(cmd, stdout, stderr) {
+		stdout = io.Discard
+	}
+
 	cmd.SetOut(stdout)
 	cmd.SetErr(stderr)
 
