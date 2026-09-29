@@ -11,7 +11,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/zigai/sesh/internal/config"
 )
@@ -342,97 +341,6 @@ func TestConnectionErrorCodeClassifiesProtocolFailures(t *testing.T) {
 
 	if got := ConnectionErrorCode(nil); got != "" {
 		t.Fatalf("nil reason = %q, want an empty code", got)
-	}
-}
-
-func TestCheckConnectionsTimesOutSilentSSHCommand(t *testing.T) {
-	remote := testRemoteConfig()
-	remote.ConnectTimeout = "20ms"
-
-	command := scriptSSH(t, "exec sleep 60")
-
-	checkContext, cancel := context.WithTimeout(t.Context(), time.Second)
-	defer cancel()
-
-	remote.Connections = []config.RemoteConnectionConfig{{ID: "work", Host: "work"}}
-
-	checks := checkConnectionsWith(checkContext, remote, command)
-	if len(checks) != 1 || checks[0].Reason != ConnectionErrorTimeout || !errors.Is(checks[0].Err, context.DeadlineExceeded) {
-		t.Fatalf("silent SSH check = %#v, want timeout", checks)
-	}
-}
-
-func TestCheckConnectionsReportsSuccessAndFailure(t *testing.T) {
-	remote := testRemoteConfig()
-	remote.Connections = []config.RemoteConnectionConfig{
-		{ID: "ok", Host: "ok.example"},
-		{ID: "denied", Host: "denied.example"},
-	}
-
-	script := `case "$*" in
-	*denied.example*) echo "Permission denied (publickey)." >&2; exit 255 ;;
-	*) exit 0 ;;
-esac`
-
-	checks := checkConnectionsWith(t.Context(), remote, scriptSSH(t, script))
-	if len(checks) != 2 {
-		t.Fatalf("checks = %#v, want two results", checks)
-	}
-
-	if checks[0].Err != nil || checks[0].Reason != "" {
-		t.Fatalf("healthy check = %#v, want success", checks[0])
-	}
-
-	if checks[1].Reason != ConnectionErrorAuthUnavailable || !errors.Is(checks[1].Err, ErrSSHAuthUnavailable) {
-		t.Fatalf("denied check = %#v, want auth_unavailable", checks[1])
-	}
-}
-
-func checkConnectionsWith(ctx context.Context, remote config.RemoteConfig, command func(ctx context.Context, executable string, arguments ...string) *exec.Cmd) []ConnectionCheck {
-	results := make([]ConnectionCheck, len(remote.Connections))
-
-	for index, connection := range remote.Connections {
-		results[index] = checkConnectionWith(ctx, remote, connection, command)
-	}
-
-	return results
-}
-
-func checkConnectionWith(ctx context.Context, remote config.RemoteConfig, connection config.RemoteConnectionConfig, command func(ctx context.Context, executable string, arguments ...string) *exec.Cmd) ConnectionCheck {
-	startedAt := time.Now()
-
-	checkContext, cancel := context.WithTimeout(ctx, ParsedDuration(remote.ConnectTimeout, defaultConnect))
-	defer cancel()
-
-	sshCommand, cmdErr := NewSSHCommand(checkContext, remote, connection, SSHCommandOptions{Command: command}, "true")
-	if cmdErr != nil {
-		cancel()
-		return ConnectionCheck{ID: connection.ID, Host: connection.Host, Reason: ConnectionErrorUnavailable, Duration: 0, Err: cmdErr}
-	}
-
-	diagnostics := NewDiagnosticsBuffer(maxDiagnosticsBytes)
-
-	sshCommand.Stdout = diagnostics
-	sshCommand.Stderr = diagnostics
-
-	runErr := sshCommand.Run()
-
-	contextErr := checkContext.Err()
-
-	cancel()
-
-	var classified error
-
-	if runErr != nil {
-		classified = ClassifySSHFailure(contextErr, diagnostics.String())
-	}
-
-	return ConnectionCheck{
-		ID:       connection.ID,
-		Host:     connection.Host,
-		Reason:   ConnectionErrorCode(classified),
-		Duration: time.Since(startedAt),
-		Err:      classified,
 	}
 }
 

@@ -2,6 +2,7 @@ package config_test
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -9,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/pelletier/go-toml/v2"
+	"github.com/samber/oops"
 
 	"github.com/zigai/sesh/internal/config"
 )
@@ -499,4 +501,186 @@ func TestLoadSnapshotProcessEnvironmentOverrides(t *testing.T) {
 			t.Fatalf("ProcessEnvironment = %#v, want %#v", cfg.Snapshot.ProcessEnvironment, expected)
 		}
 	})
+}
+
+func TestLoadIntoPreservesTargetOnFailure(t *testing.T) {
+	t.Parallel()
+
+	target := config.DefaultConfig()
+	target.Theme.Primary = "#112233"
+
+	tempDir := t.TempDir()
+
+	badConfig := filepath.Join(tempDir, "broken.toml")
+	if err := os.WriteFile(badConfig, []byte("invalid toml syntax [["), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	err := config.LoadInto(target, config.WithExplicitPath(badConfig))
+	if err == nil {
+		t.Fatal("LoadInto() error = nil, want syntax error")
+	}
+
+	if target.Theme.Primary != "#112233" {
+		t.Fatalf("target was mutated on failure: Theme.Primary = %q, want #112233", target.Theme.Primary)
+	}
+}
+
+func TestLoadRejectsParentDirSymlink(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+
+	realDir := filepath.Join(tempDir, "real_dir")
+	if err := os.MkdirAll(realDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	configFile := filepath.Join(realDir, "config.toml")
+	if err := os.WriteFile(configFile, []byte("[theme]\nprimary = \"#111111\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	symlinkDir := filepath.Join(tempDir, "symlink_dir")
+	if err := os.Symlink(realDir, symlinkDir); err != nil {
+		t.Skipf("Symlink() unavailable: %v", err)
+	}
+
+	_, err := config.Load(config.WithExplicitPath(filepath.Join(symlinkDir, "config.toml")))
+	if !errors.Is(err, config.ErrConfigSymlink) {
+		t.Fatalf("Load() error = %v, want %v", err, config.ErrConfigSymlink)
+	}
+}
+
+func TestLoadDecodesNonTomlExtensionAsToml(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+
+	confPath := filepath.Join(tempDir, "myconfig.conf")
+	if err := os.WriteFile(confPath, []byte("[theme]\nprimary = \"#445566\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(config.WithExplicitPath(confPath))
+	if err != nil {
+		t.Fatalf("Load(myconfig.conf) error = %v", err)
+	}
+
+	if cfg.Theme.Primary != "#445566" {
+		t.Errorf("Theme.Primary = %q, want #445566", cfg.Theme.Primary)
+	}
+
+	yamlPath := filepath.Join(tempDir, "myconfig.yaml")
+
+	yamlContent := "theme:\n  primary: \"#112233\"\n"
+	if err := os.WriteFile(yamlPath, []byte(yamlContent), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = config.Load(config.WithExplicitPath(yamlPath))
+	if err == nil {
+		t.Fatal("Load(myconfig.yaml) unexpectedly succeeded, want TOML rejection for YAML syntax")
+	}
+
+	oopsErr, ok := oops.AsOops(err)
+	if !ok {
+		t.Fatalf("expected oops error: %v", err)
+	}
+
+	if oopsErr.Domain() != "config" {
+		t.Errorf("Domain = %q, want config", oopsErr.Domain())
+	}
+}
+
+func TestConsistentEnvironmentPrefixAcrossAllModes(t *testing.T) {
+	t.Setenv("SETTINGS_LOG_LEVEL", "debug")
+	t.Setenv("LOG_LEVEL", "debug")
+
+	tempDir := t.TempDir()
+
+	configPath := filepath.Join(tempDir, "config.toml")
+	if err := os.WriteFile(configPath, []byte("[theme]\nprimary = \"#000000\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfgA, err := config.Load(config.WithoutConfig())
+	if err != nil {
+		t.Fatalf("Load(WithoutConfig) error = %v", err)
+	}
+
+	if cfgA.Settings.LogLevel != "info" {
+		t.Errorf("Mode A LogLevel = %q, want default info (ambient env leaked)", cfgA.Settings.LogLevel)
+	}
+
+	cfgB, err := config.Load(config.WithExplicitPath(configPath))
+	if err != nil {
+		t.Fatalf("Load(WithExplicitPath) error = %v", err)
+	}
+
+	if cfgB.Settings.LogLevel != "info" {
+		t.Errorf("Mode B LogLevel = %q, want default info (ambient env leaked)", cfgB.Settings.LogLevel)
+	}
+
+	t.Setenv("SESH_SETTINGS_LOG_LEVEL", "warn")
+
+	cfgA2, err := config.Load(config.WithoutConfig())
+	if err != nil {
+		t.Fatalf("Load(WithoutConfig) error = %v", err)
+	}
+
+	if cfgA2.Settings.LogLevel != "warn" {
+		t.Errorf("Mode A with SESH_ prefix LogLevel = %q, want warn", cfgA2.Settings.LogLevel)
+	}
+
+	cfgB2, err := config.Load(config.WithExplicitPath(configPath))
+	if err != nil {
+		t.Fatalf("Load(WithExplicitPath) error = %v", err)
+	}
+
+	if cfgB2.Settings.LogLevel != "warn" {
+		t.Errorf("Mode B with SESH_ prefix LogLevel = %q, want warn", cfgB2.Settings.LogLevel)
+	}
+}
+
+func TestLoadRejectsAncestorDirSymlink(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	realGrandparent := filepath.Join(tempDir, "real_gp")
+
+	realParent := filepath.Join(realGrandparent, "nested")
+	if err := os.MkdirAll(realParent, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	configFile := filepath.Join(realParent, "config.toml")
+	if err := os.WriteFile(configFile, []byte("[theme]\nprimary = \"#111111\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	symlinkGrandparent := filepath.Join(tempDir, "symlink_gp")
+	if err := os.Symlink(realGrandparent, symlinkGrandparent); err != nil {
+		t.Skipf("Symlink() unavailable: %v", err)
+	}
+
+	_, err := config.Load(config.WithExplicitPath(filepath.Join(symlinkGrandparent, "nested", "config.toml")))
+	if !errors.Is(err, config.ErrConfigSymlink) {
+		t.Fatalf("Load() error = %v, want %v", err, config.ErrConfigSymlink)
+	}
+}
+
+func TestLoadWithInputCustomReader(t *testing.T) {
+	t.Parallel()
+
+	input := strings.NewReader("[theme]\nprimary = \"#abcdef\"\n")
+
+	cfg, err := config.Load(config.WithExplicitPath("-"), config.WithInput(input))
+	if err != nil {
+		t.Fatalf("Load(WithInput) error = %v", err)
+	}
+
+	if cfg.Theme.Primary != "#abcdef" {
+		t.Errorf("Theme.Primary = %q, want #abcdef", cfg.Theme.Primary)
+	}
 }

@@ -383,23 +383,6 @@ func (h *HookConfig) UnmarshalTOML(data []byte) error {
 	return nil
 }
 
-func (c *HookCommand) value() any {
-	if c.ShellCommand != "" {
-		return c.ShellCommand
-	}
-
-	value := map[string]any{"command": c.Command}
-	if len(c.Args) > 0 {
-		value["args"] = c.Args
-	}
-
-	if c.Timeout != "" {
-		value["timeout"] = c.Timeout
-	}
-
-	return value
-}
-
 func DefaultConfig() *Config {
 	return &Config{
 		Theme: DefaultThemeConfig(),

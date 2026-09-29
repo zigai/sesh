@@ -21,7 +21,6 @@ type LoadOption func(*loadOptions)
 type loadOptions struct {
 	explicitPath  string
 	withoutConfig bool
-	defaults      *Config
 	input         io.Reader
 }
 
@@ -57,12 +56,6 @@ func WithExplicitPath(path string) LoadOption {
 func WithoutConfig() LoadOption {
 	return func(o *loadOptions) {
 		o.withoutConfig = true
-	}
-}
-
-func WithDefaults(defaults *Config) LoadOption {
-	return func(o *loadOptions) {
-		o.defaults = defaults
 	}
 }
 
@@ -109,20 +102,13 @@ func LoadInto(target *Config, opts ...LoadOption) error {
 	options := &loadOptions{
 		explicitPath:  "",
 		withoutConfig: false,
-		defaults:      nil,
 		input:         nil,
 	}
 	for _, opt := range opts {
 		opt(options)
 	}
 
-	var baseCfg *Config
-	if options.defaults != nil {
-		baseCfg = options.defaults.Clone()
-	} else {
-		baseCfg = DefaultConfig()
-	}
-
+	baseCfg := DefaultConfig()
 	stagingCfg := baseCfg.Clone()
 
 	files, err := loadConfigFiles(options)

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -42,7 +43,7 @@ func TestAgentRowsUseCompactStatusAcrossWholeColumn(t *testing.T) {
 	}
 
 	for i, cells := range rows {
-		painted, spans := rowlayout.Paint(plan, cells, nil)
+		painted, spans := paintRow(plan, cells)
 
 		want := displayedAgentStatusGlyphChar(row.Agents[i].Status, false)
 		if ansi.Strip(painted) != want || spans[0].Offset != 0 {
@@ -97,4 +98,10 @@ func TestSpinnerTracksAgentStatusAcrossStatusStyles(t *testing.T) {
 			}
 		})
 	}
+}
+
+func paintRow(plan rowlayout.ColumnPlan, cells []rowlayout.Cell) (string, []rowlayout.Span) {
+	parts, spans := rowlayout.PaintColumns(plan, cells, nil)
+
+	return strings.Join(parts, ""), spans
 }

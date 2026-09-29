@@ -61,10 +61,6 @@ func SaveObservation(ctx context.Context, repository *store.Repository, server *
 	return saveWithProfile(ctx, repository, cfg.LeaseRoot, server.Endpoint().SocketPath, cfg.Profile, observe)
 }
 
-func save(ctx context.Context, repository *store.Repository, leaseRoot string, socketPath string, observe func(context.Context) (capture.Observation, error)) (SaveResult, error) {
-	return saveWithProfile(ctx, repository, leaseRoot, socketPath, RecoveryExact, observe)
-}
-
 func saveWithProfile(ctx context.Context, repository *store.Repository, leaseRoot string, socketPath string, profile RecoveryProfile, observe func(context.Context) (capture.Observation, error)) (SaveResult, error) {
 	zerolog.Ctx(ctx).Info().Str("component", "snapshot").Str("operation", "save").Str("status", "started").Msg("snapshot save started")
 

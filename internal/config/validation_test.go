@@ -8,7 +8,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/zigai/sesh/internal/config"
 )
@@ -121,14 +120,11 @@ refresh_interval = "soon"`
 	}
 }
 
-func TestAgentSessionsRefreshIntervalUsesResponsiveDefault(t *testing.T) {
+func TestDefaultConfigUsesResponsiveAgentSessionsRefreshInterval(t *testing.T) {
 	t.Parallel()
 
-	const want = 250 * time.Millisecond
-	for _, cfg := range []*config.Config{nil, config.DefaultConfig()} {
-		if got := config.AgentSessionsRefreshInterval(cfg); got != want {
-			t.Fatalf("AgentSessionsRefreshInterval() = %s, want %s", got, want)
-		}
+	if got := config.DefaultConfig().AgentSessions.RefreshInterval; got != "250ms" {
+		t.Fatalf("default agent_sessions.refresh_interval = %q, want 250ms", got)
 	}
 }
 
@@ -900,23 +896,6 @@ func TestResolvedAgentStatusMerging(t *testing.T) {
 
 	if resolved.MaxBackoff != "5s" {
 		t.Errorf("expected MaxBackoff to be 5s, got %q", resolved.MaxBackoff)
-	}
-}
-
-func TestValidateSnapshotProcessEnvironmentValid(t *testing.T) {
-	cfg := config.DefaultConfig()
-	if err := config.ValidateConfig(cfg); err != nil {
-		t.Fatalf("ValidateConfig(default) = %v", err)
-	}
-
-	cfg.Snapshot.ProcessEnvironment = []string{}
-	if err := config.ValidateConfig(cfg); err != nil {
-		t.Fatalf("ValidateConfig(empty env) = %v", err)
-	}
-
-	cfg.Snapshot.ProcessEnvironment = []string{"PATH", "VIRTUAL_ENV", "CONDA_PREFIX"}
-	if err := config.ValidateConfig(cfg); err != nil {
-		t.Fatalf("ValidateConfig(custom env) = %v", err)
 	}
 }
 

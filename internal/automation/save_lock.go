@@ -36,14 +36,6 @@ type SaveLock struct {
 	release func() error
 }
 
-func (l *SaveLock) Path() string {
-	if l == nil {
-		return ""
-	}
-
-	return l.path
-}
-
 // Release unlocks and closes the owned descriptor. The lock file itself is
 // never removed: unlinking an flock-guarded path races with other holders.
 func (l *SaveLock) Release() error {

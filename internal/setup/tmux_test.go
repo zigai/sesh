@@ -11,7 +11,7 @@ import (
 func TestBindingsDefaults(t *testing.T) {
 	t.Parallel()
 
-	bindings, err := setup.Bindings(setup.DefaultKeys())
+	bindings, err := setup.Bindings(defaultKeys())
 	if err != nil {
 		t.Fatalf("Bindings failed: %v", err)
 	}
@@ -56,7 +56,7 @@ func TestBindingsDefaults(t *testing.T) {
 func TestBindingsRejectsInvalidKey(t *testing.T) {
 	t.Parallel()
 
-	keys := setup.DefaultKeys()
+	keys := defaultKeys()
 	keys.Next = "not a key"
 
 	if _, err := setup.Bindings(keys); !errors.Is(err, setup.ErrInvalidKey) {
@@ -67,7 +67,7 @@ func TestBindingsRejectsInvalidKey(t *testing.T) {
 func TestBindingsRejectsDuplicateKeys(t *testing.T) {
 	t.Parallel()
 
-	keys := setup.DefaultKeys()
+	keys := defaultKeys()
 	keys.Back = keys.Picker
 
 	if _, err := setup.Bindings(keys); !errors.Is(err, setup.ErrDuplicateKey) {
@@ -96,7 +96,7 @@ func TestBindingsRejectsInvalidTable(t *testing.T) {
 func TestRenderBlockQuotesArgumentsWithSpaces(t *testing.T) {
 	t.Parallel()
 
-	bindings, err := setup.Bindings(setup.DefaultKeys())
+	bindings, err := setup.Bindings(defaultKeys())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,5 +138,14 @@ func TestBindingTextQuotesShellMetacharacters(t *testing.T) {
 
 	if !strings.Contains(text, `"echo \"$HOME\""`) {
 		t.Fatalf("text = %q, want an escaped quoted argument", text)
+	}
+}
+
+func defaultKeys() setup.Keys {
+	return setup.Keys{
+		Next:      setup.DefaultNextKey,
+		LocalNext: setup.DefaultLocalNextKey,
+		Back:      setup.DefaultBackKey,
+		Picker:    setup.DefaultPickerKey,
 	}
 }

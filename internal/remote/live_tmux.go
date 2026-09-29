@@ -9,7 +9,6 @@ import (
 	"github.com/samber/oops"
 	gotmux "github.com/zigai/gotmux/tmux"
 
-	"github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/session"
 )
 
@@ -19,15 +18,6 @@ type GotmuxLiveServer struct {
 
 func NewGotmuxLiveServer(server *gotmux.Server) *GotmuxLiveServer {
 	return &GotmuxLiveServer{server: server}
-}
-
-func OpenLiveServer(socket string) (*GotmuxLiveServer, error) {
-	server, err := tmux.Open(socket)
-	if err != nil {
-		return nil, oops.In("remote").Code("remote_tmux_failed").With("operation", "open_live_server").Wrap(err)
-	}
-
-	return NewGotmuxLiveServer(server), nil
 }
 
 func (live *GotmuxLiveServer) Sessions(ctx context.Context) ([]session.Session, error) {

@@ -72,10 +72,6 @@ var (
 	ErrSnapshotProcessEnvLimit   = errors.New("invalid snapshot.process_environment: environment limit exceeded")
 )
 
-func ValidateConfig(cfg *Config) error {
-	return enrichValidationError(validateConfig(cfg))
-}
-
 func ValidateAutosaveConfig(autosave AutosaveConfig) error {
 	if autosave.Interval != "" {
 		if _, err := validatePositiveDuration("autosave.interval", autosave.Interval, errAutosaveIntervalNotPositive); err != nil {
@@ -335,19 +331,6 @@ func ValidateHookCommand(command HookCommand) error {
 	}
 
 	return nil
-}
-
-func AgentSessionsRefreshInterval(cfg *Config) time.Duration {
-	if cfg == nil || cfg.AgentSessions.RefreshInterval == "" {
-		return defaultAgentSessionsRefreshInterval
-	}
-
-	interval, err := time.ParseDuration(cfg.AgentSessions.RefreshInterval)
-	if err != nil || interval <= 0 {
-		return defaultAgentSessionsRefreshInterval
-	}
-
-	return interval
 }
 
 func ValidateKeyConfig(keys KeyConfig) error {

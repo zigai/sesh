@@ -340,3 +340,7 @@ func TestSaveObservationAdmissionValidation(t *testing.T) {
 		t.Fatalf("expected ErrRepositoryRequired, got %v", err)
 	}
 }
+
+func save(ctx context.Context, repository *store.Repository, leaseRoot string, socketPath string, observe func(context.Context) (capture.Observation, error)) (SaveResult, error) {
+	return saveWithProfile(ctx, repository, leaseRoot, socketPath, RecoveryExact, observe)
+}

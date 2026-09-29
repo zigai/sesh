@@ -40,15 +40,6 @@ type Binding struct {
 	Program []string `json:"program"`
 }
 
-func DefaultKeys() Keys {
-	return Keys{
-		Next:      DefaultNextKey,
-		LocalNext: DefaultLocalNextKey,
-		Back:      DefaultBackKey,
-		Picker:    DefaultPickerKey,
-	}
-}
-
 func (b Binding) CommandSequence() (gotmux.CommandSequence, error) {
 	if len(b.Program) == 0 {
 		return gotmux.CommandSequence{}, oops.In("setup").Code("setup_tmux_failed").With("operation", "build_command_sequence").Wrap(errNoProgram)

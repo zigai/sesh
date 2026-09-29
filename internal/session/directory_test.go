@@ -217,3 +217,11 @@ func TestDefaultCreateSessionDirectory(t *testing.T) {
 		t.Fatalf("got %q, want /opt/my-sess", got)
 	}
 }
+
+func EnsureTrailingSeparator(path string) string {
+	if path == "" || strings.HasSuffix(path, string(os.PathSeparator)) {
+		return path
+	}
+
+	return path + string(os.PathSeparator)
+}

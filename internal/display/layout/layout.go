@@ -214,11 +214,6 @@ func (r *ratchetWidth) observe(natural int, now time.Time) int {
 	return r.width
 }
 
-func Paint(plan ColumnPlan, cells []Cell, theme Theme) (string, []Span) {
-	parts, spans := PaintColumns(plan, cells, theme)
-	return strings.Join(parts, ""), spans
-}
-
 func PaintColumns(plan ColumnPlan, cells []Cell, theme Theme) ([]string, []Span) {
 	spans := make([]Span, len(plan.Columns))
 	parts := make([]string, len(plan.Columns))

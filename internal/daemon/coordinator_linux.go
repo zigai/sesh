@@ -128,10 +128,6 @@ func NormalizeDaemonCancellation(err error) error {
 	return err
 }
 
-func NormalizeCancellation(err error) error {
-	return NormalizeDaemonCancellation(err)
-}
-
 func DaemonCancellationOnly(err error) bool {
 	if err == nil {
 		return false

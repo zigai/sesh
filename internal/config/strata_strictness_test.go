@@ -378,51 +378,6 @@ func TestLoadPrecedenceNoConfigVsExplicitPath(t *testing.T) {
 	}
 }
 
-func TestSaveAtomicRoundTrip(t *testing.T) {
-	tempDir := t.TempDir()
-	savePath := filepath.Join(tempDir, "saved_config.toml")
-
-	cfg := config.DefaultConfig()
-	cfg.Theme.Primary = "#123456"
-	cfg.Settings.ConfirmKill = false
-	cfg.Popup.SeshWidth = "85%"
-
-	savedPath, err := config.Save(cfg, config.WithSavePath(savePath))
-	if err != nil {
-		t.Fatalf("Save() error = %v", err)
-	}
-
-	if savedPath != savePath {
-		t.Fatalf("Save() path = %q, want %q", savedPath, savePath)
-	}
-
-	fi, err := os.Lstat(savePath)
-	if err != nil {
-		t.Fatalf("stat savePath: %v", err)
-	}
-
-	if fi.Mode().Perm() != 0o600 {
-		t.Fatalf("savePath mode = %o, want 0600", fi.Mode().Perm())
-	}
-
-	loaded, err := config.Load(config.WithExplicitPath(savePath))
-	if err != nil {
-		t.Fatalf("Load(savedPath) error = %v", err)
-	}
-
-	if loaded.Theme.Primary != "#123456" {
-		t.Errorf("Theme.Primary = %q, want #123456", loaded.Theme.Primary)
-	}
-
-	if loaded.Settings.ConfirmKill {
-		t.Errorf("ConfirmKill = true, want false")
-	}
-
-	if loaded.Popup.SeshWidth != "85%" {
-		t.Errorf("Popup.SeshWidth = %q, want 85%%", loaded.Popup.SeshWidth)
-	}
-}
-
 func TestLoadRejectsExplicitMissingFile(t *testing.T) {
 	tempDir := t.TempDir()
 	missingPath := filepath.Join(tempDir, "missing.toml")

@@ -4,8 +4,10 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -16,25 +18,30 @@ func TestEveryReasonHasProductionProducerOrValidator(t *testing.T) {
 	}
 
 	snapshotDir := filepath.Dir(modelDir)
-	reasons := declaredReasons(t, filepath.Join(modelDir, "reason.go"))
+	reasonPath := filepath.Join(modelDir, "reason.go")
+	reasons := declaredReasons(t, reasonPath)
 
-	if len(reasons) != 25 {
-		t.Fatalf("reason constants = %d, want 25", len(reasons))
+	if len(reasons) == 0 {
+		t.Fatal("no reason constants declared")
 	}
 
-	paths := []string{
-		filepath.Join(modelDir, "validate.go"),
-		filepath.Join(modelDir, "settings.go"),
-		filepath.Join(snapshotDir, "capture", "observe.go"),
-		filepath.Join(snapshotDir, "capture", "graph.go"),
-		filepath.Join(snapshotDir, "capture", "applications.go"),
-		filepath.Join(snapshotDir, "restore", "plan.go"),
-		filepath.Join(snapshotDir, "restore", "execute.go"),
-		filepath.Join(snapshotDir, "restore", "scoped.go"),
-	}
+	err = filepath.WalkDir(snapshotDir, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
 
-	for _, path := range paths {
-		markReasonUses(t, path, reasons)
+		if entry.IsDir() && entry.Name() == "testdata" {
+			return filepath.SkipDir
+		}
+
+		if isProductionGoSource(path, entry) && path != reasonPath {
+			markReasonUses(t, path, reasons)
+		}
+
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	for name, used := range reasons {
@@ -42,6 +49,10 @@ func TestEveryReasonHasProductionProducerOrValidator(t *testing.T) {
 			t.Errorf("%s has no production producer or validator", name)
 		}
 	}
+}
+
+func isProductionGoSource(path string, entry fs.DirEntry) bool {
+	return !entry.IsDir() && strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, "_test.go")
 }
 
 func declaredReasons(t *testing.T, path string) map[string]bool {

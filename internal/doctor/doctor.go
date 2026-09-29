@@ -99,10 +99,6 @@ func Run(ctx context.Context, opts Options) ([]Result, error) {
 	return NewService(opts).Run(ctx)
 }
 
-func (s *Service) RunContext(ctx context.Context) ([]Result, error) {
-	return s.Run(ctx)
-}
-
 func (s *Service) Run(ctx context.Context) ([]Result, error) {
 	if err := ctx.Err(); err != nil {
 		logDoctorCompleted(ctx, nil, err)

@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"github.com/samber/oops"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/zigai/sesh/internal/config"
 )
@@ -79,14 +78,6 @@ type SSHCommandOptions struct {
 	Interactive bool
 	Forward     []SocketForward
 	Command     func(ctx context.Context, executable string, arguments ...string) *exec.Cmd
-}
-
-type ConnectionCheck struct {
-	ID       string
-	Host     string
-	Reason   string
-	Duration time.Duration
-	Err      error
 }
 
 type DiagnosticsBuffer struct {
@@ -227,47 +218,6 @@ func ShellJoin(arguments []string) string {
 	return strings.Join(quoted, " ")
 }
 
-func CheckConnections(ctx context.Context, remote config.RemoteConfig) []ConnectionCheck {
-	if !remote.Enabled {
-		return nil
-	}
-
-	startedAt := time.Now()
-	results := make([]ConnectionCheck, len(remote.Connections))
-
-	limit := remote.MaxParallelConnects
-	if limit <= 0 {
-		limit = defaultParallel
-	}
-
-	var group errgroup.Group
-
-	group.SetLimit(limit)
-
-	for index, connection := range remote.Connections {
-		group.Go(func() error {
-			if ctx.Err() != nil {
-				results[index] = ConnectionCheck{
-					ID: connection.ID, Host: connection.Host,
-					Reason: ConnectionErrorUnavailable, Duration: 0, Err: ctx.Err(),
-				}
-
-				return ctx.Err()
-			}
-
-			results[index] = checkConnection(ctx, remote, connection)
-
-			return nil
-		})
-	}
-
-	_ = group.Wait()
-
-	_ = startedAt
-
-	return results
-}
-
 func ClassifySSHFailure(ctxErr error, diagnostics string) error {
 	if errors.Is(ctxErr, context.Canceled) {
 		return context.Canceled
@@ -361,53 +311,4 @@ func FinishCommand(ctx context.Context, command *exec.Cmd, stdout io.Closer, dia
 	}
 
 	return result
-}
-
-func checkConnection(ctx context.Context, remote config.RemoteConfig, connection config.RemoteConnectionConfig) ConnectionCheck {
-	startedAt := time.Now()
-
-	checkContext, cancel := context.WithTimeout(ctx, ParsedDuration(remote.ConnectTimeout, defaultConnect))
-	defer cancel()
-
-	command, cmdErr := NewSSHCommand(checkContext, remote, connection, SSHCommandOptions{
-		Interactive: false,
-		Forward:     nil,
-		Command:     nil,
-	}, "true")
-	if cmdErr != nil {
-		cancel()
-
-		return ConnectionCheck{
-			ID:       connection.ID,
-			Host:     connection.Host,
-			Reason:   ConnectionErrorUnavailable,
-			Duration: 0,
-			Err:      cmdErr,
-		}
-	}
-
-	diagnostics := NewDiagnosticsBuffer(maxDiagnosticsBytes)
-
-	command.Stdout = diagnostics
-	command.Stderr = diagnostics
-
-	runErr := command.Run()
-
-	contextErr := checkContext.Err()
-
-	cancel()
-
-	var classified error
-
-	if runErr != nil {
-		classified = ClassifySSHFailure(contextErr, diagnostics.String())
-	}
-
-	return ConnectionCheck{
-		ID:       connection.ID,
-		Host:     connection.Host,
-		Reason:   ConnectionErrorCode(classified),
-		Duration: time.Since(startedAt),
-		Err:      classified,
-	}
 }

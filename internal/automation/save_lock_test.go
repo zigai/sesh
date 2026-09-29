@@ -25,10 +25,6 @@ func TestAcquireSaveLock_ContentionAndRelease(t *testing.T) {
 		t.Fatalf("first acquisition = (%v, %t), want a held lock", err, acquired)
 	}
 
-	if lock.Path() != path {
-		t.Fatalf("Path() = %q, want %q", lock.Path(), path)
-	}
-
 	if _, acquired, err := automation.AcquireSaveLock(ctx, path, automation.SaveLockNonBlocking); err != nil || acquired {
 		t.Fatalf("second non-blocking acquisition = (%v, %t), want contention without error", err, acquired)
 	}

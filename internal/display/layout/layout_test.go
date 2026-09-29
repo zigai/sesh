@@ -405,3 +405,9 @@ func boolState(present bool) State {
 
 	return Absent
 }
+
+func Paint(plan ColumnPlan, cells []Cell, theme Theme) (string, []Span) {
+	parts, spans := PaintColumns(plan, cells, theme)
+
+	return strings.Join(parts, ""), spans
+}

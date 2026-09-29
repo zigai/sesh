@@ -89,15 +89,6 @@ func RemoteDir(cacheHome string) (string, error) {
 	return path, nil
 }
 
-func CatalogPath(cacheHome string) (string, error) {
-	dir, err := RemoteDir(cacheHome)
-	if err != nil {
-		return "", err
-	}
-
-	return joinComponents(dir, catalogName), nil
-}
-
 func EmptyCatalog() Catalog {
 	return Catalog{Version: ProtocolVersion, GeneratedAt: time.Time{}, Connections: make(map[string]ConnectionState)}
 }

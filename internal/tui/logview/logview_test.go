@@ -3,6 +3,7 @@ package logview
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -144,6 +145,39 @@ func TestLogWatchContinuesAfterCopyTruncateRotation(t *testing.T) {
 
 	if !strings.Contains(output, "resurrect") || !strings.Contains(output, "first") || !strings.Contains(output, "second") {
 		t.Fatalf("watch output = %q, want records before and after truncation", output)
+	}
+}
+
+func TestLogRendererPreservesExactNumbers(t *testing.T) {
+	line := []byte(`{"level":"info","message":"observed","sequence":9007199254740993,"duration_ms":4983}`)
+
+	text, err := RenderLogLine(line, NewLogStyles(false))
+	if err != nil || !strings.Contains(text, "sequence=9007199254740993") || !strings.Contains(text, "duration=5.0s") {
+		t.Fatalf("numbers changed in rendering: %q, %v", text, err)
+	}
+}
+
+type failingLogOutput struct{ err error }
+
+func (w failingLogOutput) Write([]byte) (int, error) { return 0, w.err }
+
+func TestDisplayRetainedLogsPreservesJoinedOutputFailure(t *testing.T) {
+	path := writeLogsTestFile(t, formattedInfoRecord+"\n")
+	cause := errors.Join(context.Canceled, io.ErrUnexpectedEOF)
+
+	err := DisplayRetainedLogs(t.Context(), failingLogOutput{err: cause}, io.Discard, path, Options{Raw: true})
+	if !errors.Is(err, context.Canceled) || !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Fatalf("joined output failure was discarded: %v", err)
+	}
+}
+
+func TestLogStreamWriterRejectsOversizedRecord(t *testing.T) {
+	writer := NewLogStreamWriter(io.Discard, io.Discard, Options{Raw: true}, NewLogStyles(false))
+	data := bytes.Repeat([]byte{'x'}, MaxLogRecordBytes+1)
+
+	data[len(data)-1] = '\n'
+	if _, err := writer.Write(data); !errors.Is(err, ErrLogRecordTooLong) {
+		t.Fatalf("oversized complete record accepted: %v", err)
 	}
 }
 

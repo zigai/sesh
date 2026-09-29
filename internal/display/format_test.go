@@ -461,7 +461,7 @@ func TestCompileEmptyTemplate(t *testing.T) {
 	}
 }
 
-func TestCompileMalformedAndExcessiveWidthRegressions(t *testing.T) {
+func TestCompileRejectsMalformedTemplatesAndExcessiveWidths(t *testing.T) {
 	valid := []string{
 		"{session_name:4096}",
 		"{session_name:.4096}",

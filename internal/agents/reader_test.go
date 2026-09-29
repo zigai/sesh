@@ -497,29 +497,6 @@ func TestPruneVanishedPanesDropsReusedAndDeadPanes(t *testing.T) {
 	}
 }
 
-func TestAttachPanePositionsUsesLiveGeometry(t *testing.T) {
-	t.Parallel()
-
-	observed := []agents.AgentSession{
-		{ID: "live", ServerSocket: "/s", PaneID: "%1", PanePID: 100},
-		{ID: "unknown", ServerSocket: "/s", PaneID: "%9", PanePID: 900},
-	}
-
-	panes := []agents.PaneLocation{
-		{ServerSocket: "/s", SessionID: "$1", SessionName: "dev", WindowID: "@1", WindowIndex: "2", PaneID: "%1", PaneIndex: "1", PanePID: 100},
-	}
-
-	positioned := agents.AttachPanePositions(observed, panes)
-
-	if positioned[0].WindowIndex != "2" || positioned[0].PaneIndex != "1" {
-		t.Fatalf("live agent position = %+v", positioned[0])
-	}
-
-	if positioned[1].WindowIndex != "" || positioned[1].PaneIndex != "" {
-		t.Fatalf("unobserved agent must keep unknown geometry: %+v", positioned[1])
-	}
-}
-
 func TestSameServerSocketComparesFullPaths(t *testing.T) {
 	t.Parallel()
 

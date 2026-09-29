@@ -20,14 +20,6 @@ const (
 
 var ErrDirectoryLimit = errors.New("directory suggestions limit exceeded")
 
-func EnsureTrailingSeparator(path string) string {
-	if path == "" || strings.HasSuffix(path, string(os.PathSeparator)) {
-		return path
-	}
-
-	return path + string(os.PathSeparator)
-}
-
 func DefaultCreateSessionDirectory(cwd string, sessionName string, suggestion string) string {
 	suggestion = strings.TrimSpace(suggestion)
 	if suggestion == "" {

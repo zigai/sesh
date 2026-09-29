@@ -76,17 +76,17 @@ func TestWriteCatalogIsPrivateAndLoadable(t *testing.T) {
 	}
 }
 
-func TestCatalogPathUsesPrivateCacheHome(t *testing.T) {
+func TestRemoteDirUsesPrivateCacheHome(t *testing.T) {
 	cacheHome := filepath.Join(t.TempDir(), "cache")
 
-	path, err := CatalogPath(cacheHome)
+	path, err := RemoteDir(cacheHome)
 	if err != nil {
-		t.Fatalf("CatalogPath() error = %v", err)
+		t.Fatalf("RemoteDir() error = %v", err)
 	}
 
-	want := filepath.Join(cacheHome, "sesh", "remote", catalogName)
+	want := filepath.Join(cacheHome, "sesh", "remote")
 	if path != want {
-		t.Fatalf("CatalogPath() = %q, want %q", path, want)
+		t.Fatalf("RemoteDir() = %q, want %q", path, want)
 	}
 
 	for _, directory := range []string{cacheHome, filepath.Join(cacheHome, "sesh"), filepath.Join(cacheHome, "sesh", "remote")} {
