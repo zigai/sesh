@@ -227,6 +227,17 @@ func TestClassifyProcLinkRejectsChangingDeletionEvidence(t *testing.T) {
 	}
 }
 
+func TestClassifyProcLinkAcceptsLinkCountChangesOfLiveTarget(t *testing.T) {
+	path, deleted, err := classifyProcLink([]byte("/tmp/work"), uint64(3), uint64(4))
+	if err != nil {
+		t.Fatalf("classifyProcLink: %v", err)
+	}
+
+	if string(path) != "/tmp/work" || deleted {
+		t.Fatalf("classifyProcLink = (%q, %t), want live path", path, deleted)
+	}
+}
+
 func TestClassifyProcLinkRejectsPositiveLinkDeletedSuffix(t *testing.T) {
 	_, _, err := classifyProcLink([]byte("/tmp/work (deleted)"), uint64(1), uint64(1))
 	if !errors.Is(err, ErrAmbiguousProcLink) {

@@ -270,8 +270,11 @@ func readOpenProcLink(ctx context.Context, fd int) ([]byte, bool, error) {
 	return classifyProcLink([]byte(targetText), beforeStat.Nlink, afterStat.Nlink)
 }
 
+// classifyProcLink uses the target's link count only as deletion evidence: zero links mean the
+// target was deleted. A live directory gains and loses links as subdirectories come and go, so
+// only a change in deletion state between the two stats counts as a changed target.
 func classifyProcLink[T ~uint32 | ~uint64](targetBytes []byte, beforeLinks, afterLinks T) ([]byte, bool, error) {
-	if beforeLinks != afterLinks {
+	if (beforeLinks == 0) != (afterLinks == 0) {
 		return nil, false, errProcLinkChanged
 	}
 
