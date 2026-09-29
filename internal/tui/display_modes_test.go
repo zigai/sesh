@@ -394,10 +394,10 @@ func TestAgentContextLabelsStateAndIdleAge(t *testing.T) {
 		wantGlyph string
 		wantText  string
 	}{
-		{name: "working", row: session.Session{AgentActive: 2, AgentTotal: 3}, wantGlyph: "●", wantText: "WORKING"},
+		{name: "working", row: session.Session{AgentActive: 2, AgentTotal: 3}, wantGlyph: "●", wantText: "RUNNING"},
 		{name: "waiting", row: session.Session{AgentWaiting: 1, AgentTotal: 2, AgentWaitingSince: now.Add(-4 * time.Minute)}, wantGlyph: "● 4m", wantText: "WAITING 4m"},
-		{name: "failed", row: session.Session{AgentFailed: 1, AgentTotal: 2}, wantGlyph: "●", wantText: "FAILED"},
-		{name: "interrupted", row: session.Session{AgentInterrupted: 1, AgentTotal: 2}, wantGlyph: "●", wantText: "PAUSED"},
+		{name: "failed", row: session.Session{AgentFailed: 1, AgentTotal: 2}, wantGlyph: "●", wantText: "ERROR"},
+		{name: "interrupted", row: session.Session{AgentInterrupted: 1, AgentTotal: 2}, wantGlyph: "○", wantText: "IDLE"},
 		{name: "idle", row: session.Session{AgentTotal: 1, AgentIdleSince: now.Add(-18 * time.Minute)}, wantGlyph: "○ 18m", wantText: "IDLE 18m"},
 		{name: "unknown", row: session.Session{AgentTotal: 1, AgentUnknown: 1}, wantGlyph: "○", wantText: "UNKNOWN"},
 	}
@@ -441,7 +441,7 @@ func TestFormattedAgentContextAlignsStateAndAgeColumns(t *testing.T) {
 	}, now, 3)
 
 	statusColumn := strings.Index(shortAge, "IDLE")
-	if strings.Index(longAge, "IDLE") != statusColumn || strings.Index(working, "WORKING") != statusColumn {
+	if strings.Index(longAge, "IDLE") != statusColumn || strings.Index(working, "RUNNING") != statusColumn {
 		t.Fatalf("contexts are not state-aligned: %q / %q / %q", shortAge, longAge, working)
 	}
 
@@ -467,7 +467,7 @@ func TestFormattedAgentSessionContextAlignsMinuteAndHourAges(t *testing.T) {
 		t.Fatalf("agent ages are not right-aligned: %q / %q", working, idle)
 	}
 
-	if strings.Index(working, "WORKING") != strings.Index(idle, "IDLE") {
+	if strings.Index(working, "RUNNING") != strings.Index(idle, "IDLE") {
 		t.Fatalf("agent statuses are not aligned: %q / %q", working, idle)
 	}
 }

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zigai/aht/v2/pkg/aht"
+
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/samber/oops"
@@ -672,6 +674,10 @@ func (v sessionFormatValues) resolveAgentStateField(field string) string {
 	case display.FieldActiveMarker:
 		return activePaneMarker(v.isActivePane)
 	case display.FieldStale:
+		if v.agent.Detail.Quality == aht.DetailStale {
+			return "~"
+		}
+
 		return ""
 	case display.FieldAgentContext:
 		return v.agentContext()
@@ -681,7 +687,7 @@ func (v sessionFormatValues) resolveAgentStateField(field string) string {
 }
 
 func displayedAgentStatusGlyphChar(status session.AgentStatus, unreadIdle bool) string {
-	if status == session.AgentStatusIdle && unreadIdle {
+	if status.DisplayStatus() == session.AgentStatusIdle && unreadIdle {
 		return "◎"
 	}
 
@@ -720,7 +726,7 @@ func (v sessionFormatValues) agentContext() string {
 }
 
 func agentIdleCount(row session.Session) int {
-	return max(row.AgentTotal-row.AgentActive-row.AgentWaiting-row.AgentFailed-row.AgentInterrupted-row.AgentUnknown, 0)
+	return max(row.AgentTotal-row.AgentActive-row.AgentWaiting-row.AgentFailed-row.AgentUnknown, 0)
 }
 
 func formatPresence(present bool, label string) string {

@@ -80,7 +80,7 @@ func buildFieldRegistry() map[string]FieldMetadata {
 		FieldAgentGitDeleted, FieldAgentGitAhead, FieldAgentGitBehind,
 		FieldAgentWorktree, FieldAgentWorktreeName, FieldAgentSessionPath,
 		FieldAgentSessionFile, FieldAgentExecutable, FieldAgentPID,
-		FieldAgentModel, FieldAgentWaitingReason, FieldAgentLastTool, FieldAgentTask,
+		FieldAgentModel, FieldAgentWaitingReason, FieldAgentFailureReason, FieldAgentLastTool, FieldAgentTask,
 		FieldAgentContextPct, FieldAgentTokens, FieldAgentCost, FieldAgentTodoDone,
 		FieldAgentTodoTotal, FieldAgentSubagents, FieldSubagentCount, FieldAgentPromptAge,
 		FieldAgentPR, FieldAgentCI, FieldAgentGitStash, FieldAgentGitConflicts,
@@ -108,7 +108,7 @@ func buildFieldRegistry() map[string]FieldMetadata {
 	})
 
 	setFieldProvider(registry, ProviderAHT, []string{
-		FieldAgentModel, FieldAgentWaitingReason, FieldAgentLastTool,
+		FieldAgentModel, FieldAgentWaitingReason, FieldAgentFailureReason, FieldAgentLastTool,
 		FieldAgentTask, FieldAgentContextPct, FieldAgentTokens, FieldAgentCost,
 		FieldAgentTodoDone, FieldAgentTodoTotal, FieldAgentSubagents,
 		FieldSubagentCount, FieldAgentPromptAge,

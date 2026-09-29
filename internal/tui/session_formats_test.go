@@ -136,11 +136,11 @@ func TestAgentsDisplayFormatsControlParentAndChildRows(t *testing.T) {
 	}}
 
 	lines := strings.Split(stripANSI(model.renderList(88, 2)), "\n")
-	if !strings.Contains(lines[0], "SESSION project [agents] [WORKING]") {
+	if !strings.Contains(lines[0], "SESSION project [agents] [RUNNING]") {
 		t.Fatalf("custom parent row = %q", lines[0])
 	}
 
-	for _, want := range []string{"└─ WORKING", "CODEX:agent-1", "[project]", "registry-1", "%7", "* "} {
+	for _, want := range []string{"└─ RUNNING", "CODEX:agent-1", "[project]", "registry-1", "%7", "* "} {
 		if !strings.Contains(lines[1], want) {
 			t.Fatalf("custom child row = %q, want %q", lines[1], want)
 		}

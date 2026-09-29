@@ -242,19 +242,19 @@ func pathMatches(query string, path string) bool {
 }
 
 func agentStatusMatches(query string, status session.AgentStatus) bool {
-	if fuzzyMatchAny(query, string(status), agentStatusLabel(status)) {
+	if fuzzyMatchAny(query, string(status), string(status.DisplayStatus()), agentStatusLabel(status)) {
 		return true
 	}
 
 	switch status {
 	case session.AgentStatusRunning:
-		return fuzzyMatchAny(query, "live", "active", "busy")
+		return fuzzyMatchAny(query, "live", "active", "busy", "working")
 	case session.AgentStatusWaiting:
 		return fuzzyMatchAny(query, "blocked", "approval", "prompt")
 	case session.AgentStatusFailed:
 		return fuzzyMatchAny(query, "error", "errored", "crash")
 	case session.AgentStatusInterrupted:
-		return fuzzyMatchAny(query, "stopped", "cancelled", "canceled") //nolint:misspell // British spelling is an intentional search alias.
+		return fuzzyMatchAny(query, "paused", "stopped", "cancelled", "canceled") //nolint:misspell // British spelling is an intentional search alias.
 	case session.AgentStatusIdle:
 		return fuzzyMatch(query, "offline")
 	case session.AgentStatusUnknown:

@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/zigai/aht/v2/pkg/aht"
+
 	"github.com/zigai/sesh/internal/display"
 	"github.com/zigai/sesh/internal/display/layout"
 	"github.com/zigai/sesh/internal/session"
@@ -16,6 +18,8 @@ func TestAHTCellsExposeObservedFieldsAndKeepMissingTelemetryUnsupported(t *testi
 	agent := session.AgentSession{
 		PaneID: "%1", Model: "opus", WaitingReason: "permission", LastTool: "Bash",
 		Task: "Review changes", PromptAt: at,
+		Status: session.AgentStatusWaiting,
+		Detail: aht.StateDetail{Value: aht.DetailPermission, Quality: aht.DetailCurrent, Authority: "hook", ObservedAt: at},
 	}
 	for field, want := range map[string]string{
 		display.FieldAgentModel: "opus", display.FieldAgentWaitingReason: "permission",
@@ -58,5 +62,37 @@ func TestAHTProviderPublishesPaneKeyedCells(t *testing.T) {
 
 	if got := model.providerRunner.Cell(providers.AHT, "%1", display.FieldAgentModel); got.Text != "gpt" || got.State != layout.Present {
 		t.Fatalf("model cell = %+v", got)
+	}
+}
+
+func TestAHTReasonCellsDistinguishInactiveMissingUnsupportedAndStale(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		status  session.AgentStatus
+		quality aht.DetailQuality
+		field   string
+		value   string
+		state   layout.State
+		text    string
+	}{
+		{name: "current permission", status: session.AgentStatusWaiting, quality: aht.DetailCurrent, field: display.FieldAgentWaitingReason, value: "permission", state: layout.Present, text: "permission"},
+		{name: "current limit", status: session.AgentStatusFailed, quality: aht.DetailCurrent, field: display.FieldAgentFailureReason, value: "usage_limit", state: layout.Present, text: "usage_limit"},
+		{name: "current general failure", status: session.AgentStatusFailed, quality: aht.DetailCurrent, field: display.FieldAgentFailureReason, value: "general", state: layout.Present, text: "general"},
+		{name: "stale permission", status: session.AgentStatusWaiting, quality: aht.DetailStale, field: display.FieldAgentWaitingReason, value: "permission", state: layout.Pending},
+		{name: "stale limit", status: session.AgentStatusFailed, quality: aht.DetailStale, field: display.FieldAgentFailureReason, value: "usage_limit", state: layout.Pending},
+		{name: "missing waiting", status: session.AgentStatusWaiting, quality: aht.DetailMissing, field: display.FieldAgentWaitingReason, state: layout.Pending},
+		{name: "old producer", status: session.AgentStatusWaiting, field: display.FieldAgentWaitingReason, state: layout.Pending},
+		{name: "unsupported waiting", status: session.AgentStatusWaiting, quality: aht.DetailUnsupported, field: display.FieldAgentWaitingReason, state: layout.Unsupported},
+		{name: "inactive waiting", status: session.AgentStatusIdle, quality: aht.DetailCurrent, field: display.FieldAgentWaitingReason, value: "permission", state: layout.Absent},
+		{name: "failure while waiting", status: session.AgentStatusWaiting, quality: aht.DetailCurrent, field: display.FieldAgentFailureReason, value: "general", state: layout.Absent},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			agent := session.AgentSession{Status: test.status, Detail: aht.StateDetail{Quality: test.quality}, WaitingReason: test.value, FailureReason: test.value}
+
+			cell := ahtFieldCell(agent, test.field, time.Unix(500, 0))
+			if cell.State != test.state || cell.Text != test.text {
+				t.Fatalf("reason cell = %+v, want %v/%q", cell, test.state, test.text)
+			}
+		})
 	}
 }

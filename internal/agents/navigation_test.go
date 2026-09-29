@@ -328,7 +328,6 @@ func TestNextIdleSkipsRunningAgents(t *testing.T) {
 
 	navigator := newFakeNavigator(t, controller, []aht.Session{
 		attentionSession(aht.ActivityRunning, "%2"),
-		attentionSession(aht.ActivityInterrupted, "%3"),
 	})
 
 	_, err := navigator.NextIdle(t.Context(), agents.NavigationGlobal)
@@ -338,6 +337,25 @@ func TestNextIdleSkipsRunningAgents(t *testing.T) {
 
 	if len(controller.activated) != 0 {
 		t.Fatalf("unexpected activations: %+v", controller.activated)
+	}
+}
+
+func TestNextIdleSelectsInterruptedAgent(t *testing.T) {
+	t.Parallel()
+
+	controller := &fakeController{
+		current: agents.CurrentContext{ServerSocket: defaultServerSocket, SessionID: "$1", SessionName: firstSessionName, WindowID: "@1", PaneID: "%1"},
+		panes:   navigationPanes(),
+	}
+	navigator := newFakeNavigator(t, controller, []aht.Session{attentionSession(aht.ActivityInterrupted, "%3")})
+
+	target, err := navigator.NextIdle(t.Context(), agents.NavigationGlobal)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if target.PaneID != "%3" {
+		t.Fatalf("target pane = %q, want %%3", target.PaneID)
 	}
 }
 
@@ -768,7 +786,7 @@ func TestAttentionVocabulary(t *testing.T) {
 		{activity: string(aht.ActivityFailed), want: "failed"},
 		{activity: string(aht.ActivityIdle), want: "idle"},
 		{activity: string(aht.ActivityRunning), want: "normal"},
-		{activity: string(aht.ActivityInterrupted), want: "normal"},
+		{activity: string(aht.ActivityInterrupted), want: "idle"},
 		{activity: string(aht.ActivityUnknown), want: "normal"},
 		{activity: "", want: "normal"},
 	}

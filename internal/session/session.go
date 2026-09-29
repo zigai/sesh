@@ -4,6 +4,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/zigai/aht/v2/pkg/aht"
 )
 
 const (
@@ -109,39 +111,49 @@ type AgentSummary struct {
 }
 
 type AgentSession struct {
-	PositionKnown    bool        `json:"positionKnown,omitempty"`
-	WindowIndex      int         `json:"windowIndex,omitempty"`
-	PaneLeft         int         `json:"paneLeft,omitempty"`
-	PaneTop          int         `json:"paneTop,omitempty"`
-	RegistryID       string      `json:"registryId,omitempty"`
-	Harness          string      `json:"harness,omitempty"`
-	HarnessSession   string      `json:"harnessSession,omitempty"`
-	PaneID           string      `json:"paneId,omitempty"`
-	PanePID          int         `json:"panePid,omitempty"`
-	CWD              string      `json:"cwd,omitempty"`
-	ProjectRoot      string      `json:"projectRoot,omitempty"`
-	GitBranch        string      `json:"gitBranch,omitempty"`
-	Worktree         string      `json:"worktree,omitempty"`
-	GitRepo          string      `json:"gitRepo,omitempty"`
-	GitHasRemote     bool        `json:"gitHasRemote,omitempty"`
-	GitChanges       string      `json:"gitChanges,omitempty"`
-	LinkedWorktree   bool        `json:"linkedWorktree,omitempty"`
-	GitAhead         int         `json:"gitAhead,omitempty"`
-	GitBehind        int         `json:"gitBehind,omitempty"`
-	GitTrackingKnown bool        `json:"gitTrackingKnown,omitempty"`
-	GitStash         int         `json:"gitStash,omitempty"`
-	GitConflicts     int         `json:"gitConflicts,omitempty"`
-	GitDirty         bool        `json:"gitDirty,omitempty"`
-	SessionPath      string      `json:"sessionPath,omitempty"`
-	Executable       string      `json:"executable,omitempty"`
-	PID              int         `json:"pid,omitempty"`
-	Status           AgentStatus `json:"status,omitempty"`
-	StatusSince      time.Time   `json:"statusSince"`
-	Model            string      `json:"model,omitempty"`
-	WaitingReason    string      `json:"waitingReason,omitempty"`
-	LastTool         string      `json:"lastTool,omitempty"`
-	Task             string      `json:"task,omitempty"`
-	PromptAt         time.Time   `json:"promptAt,omitzero"`
+	PositionKnown    bool            `json:"positionKnown,omitempty"`
+	WindowIndex      int             `json:"windowIndex,omitempty"`
+	PaneLeft         int             `json:"paneLeft,omitempty"`
+	PaneTop          int             `json:"paneTop,omitempty"`
+	RegistryID       string          `json:"registryId,omitempty"`
+	Harness          string          `json:"harness,omitempty"`
+	HarnessSession   string          `json:"harnessSession,omitempty"`
+	PaneID           string          `json:"paneId,omitempty"`
+	PanePID          int             `json:"panePid,omitempty"`
+	CWD              string          `json:"cwd,omitempty"`
+	ProjectRoot      string          `json:"projectRoot,omitempty"`
+	GitBranch        string          `json:"gitBranch,omitempty"`
+	Worktree         string          `json:"worktree,omitempty"`
+	GitRepo          string          `json:"gitRepo,omitempty"`
+	GitHasRemote     bool            `json:"gitHasRemote,omitempty"`
+	GitChanges       string          `json:"gitChanges,omitempty"`
+	LinkedWorktree   bool            `json:"linkedWorktree,omitempty"`
+	GitAhead         int             `json:"gitAhead,omitempty"`
+	GitBehind        int             `json:"gitBehind,omitempty"`
+	GitTrackingKnown bool            `json:"gitTrackingKnown,omitempty"`
+	GitStash         int             `json:"gitStash,omitempty"`
+	GitConflicts     int             `json:"gitConflicts,omitempty"`
+	GitDirty         bool            `json:"gitDirty,omitempty"`
+	SessionPath      string          `json:"sessionPath,omitempty"`
+	Executable       string          `json:"executable,omitempty"`
+	PID              int             `json:"pid,omitempty"`
+	Status           AgentStatus     `json:"status,omitempty"`
+	StatusSince      time.Time       `json:"statusSince"`
+	Model            string          `json:"model,omitempty"`
+	WaitingReason    string          `json:"waitingReason,omitempty"`
+	FailureReason    string          `json:"failureReason,omitempty"`
+	Detail           aht.StateDetail `json:"detail,omitzero"`
+	LastTool         string          `json:"lastTool,omitempty"`
+	Task             string          `json:"task,omitempty"`
+	PromptAt         time.Time       `json:"promptAt,omitzero"`
+}
+
+func (s AgentStatus) DisplayStatus() AgentStatus {
+	if s == AgentStatusInterrupted {
+		return AgentStatusIdle
+	}
+
+	return s
 }
 
 func (s Session) IsSaved() bool {

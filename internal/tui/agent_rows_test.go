@@ -50,7 +50,7 @@ func TestRenderAgentsModeShowsOneIndentedLinePerAgent(t *testing.T) {
 			t.Fatalf("child statuses are not aligned: %q / %q", lines[1], lines[2])
 		}
 
-		if strings.Contains(lines[0], "WORKING") || strings.Contains(lines[0], "IDLE") {
+		if strings.Contains(lines[0], "RUNNING") || strings.Contains(lines[0], "IDLE") {
 			t.Fatalf("expanded parent repeats child status: %q", lines[0])
 		}
 
@@ -68,7 +68,7 @@ func TestRenderAgentsModeShowsOneIndentedLinePerAgent(t *testing.T) {
 	t.Run("text style", func(t *testing.T) {
 		model.config.AgentSessions.StatusStyle = "text"
 		textOutput := stripANSI(model.renderList(80, 3))
-		requireTextContainsAll(t, textOutput, testSupportSessionProjectName, "├─ Codex  · codex-session", "WORKING", "└─ Claude · claude-session", "IDLE")
+		requireTextContainsAll(t, textOutput, testSupportSessionProjectName, "├─ Codex  · codex-session", "RUNNING", "└─ Claude · claude-session", "IDLE")
 	})
 }
 
@@ -167,7 +167,7 @@ func TestAgentFormatSupportsClockStatusTimeFormat(t *testing.T) {
 	t.Run("text style with clock", func(t *testing.T) {
 		model.config.AgentSessions.StatusStyle = "text"
 		output := stripANSI(model.renderList(80, 4))
-		requireTextContainsAll(t, output, "01:02:00", "WORKING", "00:01:23", "IDLE", "00:00:45")
+		requireTextContainsAll(t, output, "01:02:00", "RUNNING", "00:01:23", "IDLE", "00:00:45")
 	})
 
 	t.Run("status_time_style alias with 00:01:23 format value", func(t *testing.T) {
@@ -1084,7 +1084,7 @@ func TestAgentStatusGlyphColors(t *testing.T) {
 		{name: "running", status: session.AgentStatusRunning, glyph: "●", color: "\x1b[38;2;80;250;123m"},
 		{name: "waiting", status: session.AgentStatusWaiting, glyph: "●", color: "\x1b[38;2;255;221;87m"},
 		{name: "failed", status: session.AgentStatusFailed, glyph: "●", color: "\x1b[38;2;255;85;85m"},
-		{name: "interrupted", status: session.AgentStatusInterrupted, glyph: "●", color: "\x1b[38;2;255;158;59m"},
+		{name: "interrupted", status: session.AgentStatusInterrupted, glyph: "○", color: "\x1b[38;2;108;112;134m"},
 		{name: "idle", status: session.AgentStatusIdle, glyph: "○", color: "\x1b[38;2;108;112;134m"},
 		{name: "unknown", status: session.AgentStatusUnknown, glyph: "○", color: "\x1b[38;2;108;112;134m"},
 	}
@@ -1099,15 +1099,16 @@ func TestAgentStatusGlyphColors(t *testing.T) {
 	}
 }
 
-func TestAgentStatusInterruptedCustomWarningColor(t *testing.T) {
+func TestAgentStatusInterruptedUsesIdleColor(t *testing.T) {
 	model := newTestModel()
 	model.config.Theme.Warning = "#123456"
+	model.config.Theme.AgentStatus = &config.AgentStatusThemeConfig{Idle: "#123456"}
 
 	const wantColor = "\x1b[38;2;18;52;86m"
 
 	got := model.agentStatusGlyph(session.AgentStatusInterrupted)
-	if !strings.Contains(got, "●") || !strings.Contains(got, wantColor) {
-		t.Fatalf("interrupted glyph = %q, want ● with custom color %q", got, wantColor)
+	if !strings.Contains(got, "○") || !strings.Contains(got, wantColor) {
+		t.Fatalf("interrupted glyph = %q, want ○ with idle color %q", got, wantColor)
 	}
 }
 

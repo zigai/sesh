@@ -97,6 +97,7 @@ const (
 	FieldAgentPID            = "agent_pid"
 	FieldAgentModel          = "agent_model"
 	FieldAgentWaitingReason  = "agent_waiting_reason"
+	FieldAgentFailureReason  = "agent_failure_reason"
 	FieldAgentLastTool       = "agent_last_tool"
 	FieldAgentTask           = "agent_task"
 	FieldAgentContextPct     = "agent_context_pct"

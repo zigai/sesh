@@ -15,12 +15,11 @@ const (
 )
 
 const (
-	rankWaiting     = 0
-	rankFailed      = 1
-	rankInterrupted = 2
-	rankIdle        = 3
-	rankRunning     = 4
-	rankUnknown     = 5
+	rankWaiting = 0
+	rankFailed  = 1
+	rankIdle    = 2
+	rankRunning = 3
+	rankUnknown = 4
 )
 
 type agentSort string
@@ -104,14 +103,12 @@ func compareAgentPositions(left session.AgentSession, right session.AgentSession
 }
 
 func agentAttentionRank(status session.AgentStatus) int {
-	switch status {
+	switch status.DisplayStatus() {
 	case session.AgentStatusWaiting:
 		return rankWaiting
 	case session.AgentStatusFailed:
 		return rankFailed
-	case session.AgentStatusInterrupted:
-		return rankInterrupted
-	case session.AgentStatusIdle:
+	case session.AgentStatusIdle, session.AgentStatusInterrupted:
 		return rankIdle
 	case session.AgentStatusRunning:
 		return rankRunning

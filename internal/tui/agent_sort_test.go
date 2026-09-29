@@ -41,7 +41,7 @@ func TestAgentAttentionOrder(t *testing.T) {
 		{HarnessSession: "waiting old left", Status: session.AgentStatusWaiting, StatusSince: now.Add(-time.Hour), PositionKnown: true},
 	}
 	sortAgentSessions(agents, agentSortAttention)
-	assertAgentNames(t, agents, []string{"waiting old left", "waiting old right", "waiting new", "waiting no time", "failed", "interrupted", "idle", "working", "unknown"})
+	assertAgentNames(t, agents, []string{"waiting old left", "waiting old right", "waiting new", "waiting no time", "failed", "idle", "interrupted", "working", "unknown"})
 }
 
 func TestAgentSortCyclingPreservesSelectionAndSearch(t *testing.T) {

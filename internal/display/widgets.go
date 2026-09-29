@@ -85,7 +85,7 @@ func renderTodoWidget(item token, resolver Resolver, value string, state layout.
 }
 
 func renderSpinnerWidget(item token, resolver Resolver, value string) (string, string, layout.State) {
-	working := value == "running" || value == "WORKING"
+	working := value == "running" || value == "RUNNING" || value == "WORKING"
 	if source, ok := resolver.(WidgetActivityResolver); ok {
 		working = source.WidgetWorking()
 	}

@@ -5,6 +5,8 @@ package agents
 import (
 	"errors"
 	"time"
+
+	"github.com/zigai/aht/v2/pkg/aht"
 )
 
 const (
@@ -46,32 +48,34 @@ type NavigationScope int
 type State string
 
 type AgentSession struct {
-	ID               string    `json:"id"`
-	Harness          string    `json:"harness"`
-	Presence         string    `json:"presence"`
-	Activity         string    `json:"activity"`
-	Attention        string    `json:"attention"`
-	ServerSocket     string    `json:"serverSocket"`
-	SessionID        string    `json:"sessionId"`
-	SessionName      string    `json:"sessionName"`
-	WindowID         string    `json:"windowId"`
-	WindowIndex      string    `json:"windowIndex"`
-	PaneID           string    `json:"paneId"`
-	PaneIndex        string    `json:"paneIndex"`
-	PanePID          int       `json:"panePid"`
-	Command          string    `json:"command"`
-	Interactive      bool      `json:"interactive"`
-	CWD              string    `json:"cwd"`
-	ProjectRoot      string    `json:"projectRoot"`
-	HarnessSessionID string    `json:"harnessSessionId"`
-	SessionPath      string    `json:"sessionPath"`
-	ResumeCommand    []string  `json:"resumeCommand"`
-	ActivityChanged  time.Time `json:"activityChangedAt"`
-	UpdatedAt        time.Time `json:"updatedAt"`
-	Model            string    `json:"model,omitempty"`
-	WaitingReason    string    `json:"waitingReason,omitempty"`
-	LastTool         string    `json:"lastTool,omitempty"`
-	PromptAt         time.Time `json:"promptAt,omitzero"`
+	ID               string          `json:"id"`
+	Harness          string          `json:"harness"`
+	Presence         string          `json:"presence"`
+	Activity         string          `json:"activity"`
+	Attention        string          `json:"attention"`
+	ServerSocket     string          `json:"serverSocket"`
+	SessionID        string          `json:"sessionId"`
+	SessionName      string          `json:"sessionName"`
+	WindowID         string          `json:"windowId"`
+	WindowIndex      string          `json:"windowIndex"`
+	PaneID           string          `json:"paneId"`
+	PaneIndex        string          `json:"paneIndex"`
+	PanePID          int             `json:"panePid"`
+	Command          string          `json:"command"`
+	Interactive      bool            `json:"interactive"`
+	CWD              string          `json:"cwd"`
+	ProjectRoot      string          `json:"projectRoot"`
+	HarnessSessionID string          `json:"harnessSessionId"`
+	SessionPath      string          `json:"sessionPath"`
+	ResumeCommand    []string        `json:"resumeCommand"`
+	ActivityChanged  time.Time       `json:"activityChangedAt"`
+	UpdatedAt        time.Time       `json:"updatedAt"`
+	Model            string          `json:"model,omitempty"`
+	WaitingReason    string          `json:"waitingReason,omitempty"`
+	FailureReason    string          `json:"failureReason,omitempty"`
+	Detail           aht.StateDetail `json:"detail,omitzero"`
+	LastTool         string          `json:"lastTool,omitempty"`
+	PromptAt         time.Time       `json:"promptAt,omitzero"`
 }
 
 type StatusSummary struct {

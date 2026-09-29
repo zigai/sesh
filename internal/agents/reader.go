@@ -53,7 +53,7 @@ func AttentionFor(activity string) string {
 		return string(StateWaiting)
 	case string(aht.ActivityFailed):
 		return string(StateFailed)
-	case string(aht.ActivityIdle):
+	case string(aht.ActivityIdle), string(aht.ActivityInterrupted):
 		return "idle"
 	default:
 		return string(StateNormal)
@@ -88,6 +88,8 @@ func observedAgentSession(session aht.Session) (AgentSession, bool) {
 func agentSessionFromRegistry(session aht.Session) AgentSession {
 	activity := ""
 
+	var detail aht.StateDetail
+
 	if act := session.Activity(); act != nil {
 		activity = string(*act)
 	}
@@ -117,6 +119,8 @@ func agentSessionFromRegistry(session aht.Session) AgentSession {
 		UpdatedAt:        session.UpdatedAt,
 		Model:            "",
 		WaitingReason:    "",
+		FailureReason:    "",
+		Detail:           detail,
 		LastTool:         "",
 		PromptAt:         time.Time{},
 	}
@@ -136,33 +140,38 @@ func agentSessionFromRegistry(session aht.Session) AgentSession {
 		agent.Model = native.Attributes[prefix+"model"]
 		agent.LastTool = native.Attributes[prefix+"tool_name"]
 
-		agent.WaitingReason = nativeWaitingReason(native.Attributes[prefix+"notification_type"], native.Attributes[prefix+"permission_mode"])
 		if native.Event == "UserPromptSubmit" || native.Event == "beforeSubmitPrompt" {
 			agent.PromptAt = native.ObservedAt
 		}
 	}
 
-	if agent.WaitingReason == "" && session.Observations.Screen != nil {
-		agent.WaitingReason = nativeWaitingReason(session.Observations.Screen.RuleID, "")
+	if session.Detail != nil {
+		agent.Detail = *session.Detail
 	}
+
+	agent.WaitingReason, agent.FailureReason = agentDetailReasons(aht.Activity(activity), agent.Detail)
 
 	return agent
 }
 
-func nativeWaitingReason(notification, permission string) string {
-	for _, candidate := range []string{notification, permission} {
-		candidate = strings.ToLower(candidate)
-		switch {
-		case strings.Contains(candidate, "permission"), strings.Contains(candidate, "approval"):
-			return "permission"
-		case strings.Contains(candidate, "input"), strings.Contains(candidate, "question"):
-			return "input"
-		case strings.Contains(candidate, "plan"):
-			return "plan"
-		case strings.Contains(candidate, "error"), strings.Contains(candidate, "fail"):
-			return "error"
-		}
+func agentDetailReasons(activity aht.Activity, detail aht.StateDetail) (string, string) {
+	failure := ""
+	if activity == aht.ActivityFailed {
+		failure = string(aht.DetailGeneral)
 	}
 
-	return ""
+	if detail.Quality != aht.DetailCurrent || !detail.Value.ValidFor(activity) {
+		return "", failure
+	}
+
+	switch activity {
+	case aht.ActivityWaiting:
+		return string(detail.Value), ""
+	case aht.ActivityFailed:
+		return "", string(detail.Value)
+	case aht.ActivityRunning, aht.ActivityIdle, aht.ActivityInterrupted, aht.ActivityUnknown:
+		return "", ""
+	}
+
+	return "", failure
 }

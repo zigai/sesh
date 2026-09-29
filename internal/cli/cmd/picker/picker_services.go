@@ -629,6 +629,7 @@ func pickerAgentSummaries(observed []agents.AgentSession) []session.AgentSummary
 			summary.Failed++
 		case session.AgentStatusInterrupted:
 			summary.Interrupted++
+			summary.IdleSince = earlierNonZero(summary.IdleSince, agent.StatusSince)
 		case session.AgentStatusIdle:
 			summary.IdleSince = earlierNonZero(summary.IdleSince, agent.StatusSince)
 		case session.AgentStatusUnknown:
@@ -671,6 +672,8 @@ func pickerAgentSession(item agents.AgentSession) session.AgentSession {
 		StatusSince:      item.ActivityChanged,
 		Model:            item.Model,
 		WaitingReason:    item.WaitingReason,
+		FailureReason:    item.FailureReason,
+		Detail:           item.Detail,
 		LastTool:         item.LastTool,
 		Task:             "",
 		PromptAt:         item.PromptAt,
@@ -687,6 +690,10 @@ func pickerAgentStatus(item agents.AgentSession) session.AgentStatus {
 	case string(agents.StateFailed):
 		return session.AgentStatusFailed
 	case "idle":
+		if item.Activity == string(aht.ActivityInterrupted) {
+			return session.AgentStatusInterrupted
+		}
+
 		return session.AgentStatusIdle
 	}
 

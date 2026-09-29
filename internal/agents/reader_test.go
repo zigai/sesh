@@ -291,6 +291,7 @@ func TestObservedAgentSessionsUsesPublishedNativeObservation(t *testing.T) {
 	sessions := []aht.Session{{
 		ID: "observed", Harness: aht.HarnessClaude, Liveness: aht.Live{Activity: aht.ActivityWaiting},
 		Location: aht.Location{Kind: aht.MultiplexerTmux, PaneID: "%1"},
+		Detail:   &aht.StateDetail{Value: aht.DetailPermission, Quality: aht.DetailCurrent, Authority: "hook", ObservedAt: at},
 		Observations: registry.Observations{Native: &registry.NativeObservation{
 			Event: "UserPromptSubmit", ObservedAt: at,
 			Attributes: map[string]string{
@@ -306,6 +307,8 @@ func TestObservedAgentSessionsUsesPublishedNativeObservation(t *testing.T) {
 	}
 
 	sessions[0].Observations.Native = &registry.NativeObservation{Event: "Stop", ObservedAt: at.Add(time.Second)}
+
+	sessions[0].Detail = nil
 	if next := agents.ObservedAgentSessions(sessions); len(next) != 1 || next[0].Model != "" || !next[0].PromptAt.IsZero() {
 		t.Fatalf("later observation retained unsupported metadata = %+v", next)
 	}
@@ -452,7 +455,7 @@ func TestSummarizeAgentsCountsAttention(t *testing.T) {
 		t.Fatalf("summary total/live = %d/%d, want 5/5", summary.Total, summary.Live)
 	}
 
-	if summary.Waiting != 1 || summary.Failed != 1 || summary.Idle != 1 || summary.Running != 1 || summary.Interrupted != 1 {
+	if summary.Waiting != 1 || summary.Failed != 1 || summary.Idle != 2 || summary.Running != 1 || summary.Interrupted != 1 {
 		t.Fatalf("summary attention counts = %+v", summary)
 	}
 

@@ -3,6 +3,8 @@ package tui
 import (
 	"time"
 
+	"github.com/zigai/aht/v2/pkg/aht"
+
 	"github.com/zigai/sesh/internal/display"
 	"github.com/zigai/sesh/internal/display/layout"
 	"github.com/zigai/sesh/internal/session"
@@ -42,7 +44,9 @@ func ahtFieldCell(agent session.AgentSession, field string, now time.Time) layou
 	case display.FieldAgentModel:
 		value = agent.Model
 	case display.FieldAgentWaitingReason:
-		value = agent.WaitingReason
+		return ahtReasonCell(agent, session.AgentStatusWaiting, agent.WaitingReason)
+	case display.FieldAgentFailureReason:
+		return ahtReasonCell(agent, session.AgentStatusFailed, agent.FailureReason)
 	case display.FieldAgentLastTool:
 		value = agent.LastTool
 	case display.FieldAgentTask:
@@ -58,4 +62,25 @@ func ahtFieldCell(agent session.AgentSession, field string, now time.Time) layou
 	}
 
 	return layout.Cell{Text: SanitizeTerminalText(value), Role: "", Variants: nil, State: layout.Present}
+}
+
+func ahtReasonCell(agent session.AgentSession, status session.AgentStatus, value string) layout.Cell {
+	cell := layout.Cell{Text: "", Role: "", Variants: nil, State: layout.Absent}
+	if agent.Status != status {
+		return cell
+	}
+
+	switch agent.Detail.Quality {
+	case aht.DetailUnsupported:
+		cell.State = layout.Unsupported
+	case aht.DetailMissing, aht.DetailStale, "":
+		cell.State = layout.Pending
+	case aht.DetailCurrent:
+		if value != "" {
+			cell.Text = SanitizeTerminalText(value)
+			cell.State = layout.Present
+		}
+	}
+
+	return cell
 }

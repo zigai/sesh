@@ -813,7 +813,7 @@ func (m *Model) agentStatusTimeFormat() string {
 }
 
 func (m *Model) agentIdleUnread(row session.Session, agent session.AgentSession) bool {
-	if agent.Status != session.AgentStatusIdle || agent.StatusSince.IsZero() {
+	if agent.Status.DisplayStatus() != session.AgentStatusIdle || agent.StatusSince.IsZero() {
 		return false
 	}
 
@@ -859,7 +859,7 @@ func (m *Model) hasActiveAgentView(row session.Session, agent session.AgentSessi
 }
 
 func displayedAgentStatusLabel(status session.AgentStatus, unreadIdle bool) string {
-	if status == session.AgentStatusIdle && unreadIdle {
+	if status.DisplayStatus() == session.AgentStatusIdle && unreadIdle {
 		return "IDLE*"
 	}
 
@@ -867,7 +867,7 @@ func displayedAgentStatusLabel(status session.AgentStatus, unreadIdle bool) stri
 }
 
 func (m *Model) displayedAgentStatusGlyph(status session.AgentStatus, unreadIdle bool) string {
-	if status != session.AgentStatusIdle || !unreadIdle {
+	if status.DisplayStatus() != session.AgentStatusIdle || !unreadIdle {
 		return m.agentStatusGlyph(status)
 	}
 
@@ -891,16 +891,14 @@ func (m *Model) agentStatusGlyph(status session.AgentStatus) string {
 }
 
 func agentStatusGlyphChar(status session.AgentStatus) string {
-	switch status {
+	switch status.DisplayStatus() {
 	case session.AgentStatusRunning:
 		return "●"
 	case session.AgentStatusWaiting:
 		return "●"
 	case session.AgentStatusFailed:
 		return "●"
-	case session.AgentStatusInterrupted:
-		return "●"
-	case session.AgentStatusIdle:
+	case session.AgentStatusIdle, session.AgentStatusInterrupted:
 		return "○"
 	case session.AgentStatusUnknown:
 		return "○"
@@ -916,16 +914,14 @@ func (m *Model) agentStatusColor(status session.AgentStatus) string {
 
 	colors := m.config.ResolvedAgentStatusColors()
 
-	switch status {
+	switch status.DisplayStatus() {
 	case session.AgentStatusRunning:
 		return colors.Running
 	case session.AgentStatusWaiting:
 		return colors.Waiting
 	case session.AgentStatusFailed:
 		return colors.Failed
-	case session.AgentStatusInterrupted:
-		return colors.Interrupted
-	case session.AgentStatusIdle, session.AgentStatusUnknown:
+	case session.AgentStatusIdle, session.AgentStatusInterrupted, session.AgentStatusUnknown:
 		return colors.Idle
 	default:
 		return colors.Idle
@@ -979,7 +975,7 @@ func (m *Model) agentStatusAndAgeAt(s session.Session, now time.Time) (string, s
 
 	switch {
 	case s.AgentFailed > 0:
-		status = "FAILED"
+		status = "ERROR"
 		statusEnum = session.AgentStatusFailed
 		since = time.Time{}
 	case s.AgentWaiting > 0:
@@ -987,12 +983,8 @@ func (m *Model) agentStatusAndAgeAt(s session.Session, now time.Time) (string, s
 		statusEnum = session.AgentStatusWaiting
 		since = s.AgentWaitingSince
 	case s.AgentActive > 0:
-		status = "WORKING"
+		status = "RUNNING"
 		statusEnum = session.AgentStatusRunning
-		since = time.Time{}
-	case s.AgentInterrupted > 0:
-		status = "PAUSED"
-		statusEnum = session.AgentStatusInterrupted
 		since = time.Time{}
 	case s.AgentUnknown > 0:
 		status = "UNKNOWN"
@@ -1123,16 +1115,14 @@ func (m *Model) compactAgentSessionContextAt(
 }
 
 func agentStatusLabel(status session.AgentStatus) string {
-	switch status {
+	switch status.DisplayStatus() {
 	case session.AgentStatusRunning:
-		return "WORKING"
+		return "RUNNING"
 	case session.AgentStatusWaiting:
 		return "WAITING"
 	case session.AgentStatusFailed:
-		return "FAILED"
-	case session.AgentStatusInterrupted:
-		return "PAUSED"
-	case session.AgentStatusIdle:
+		return "ERROR"
+	case session.AgentStatusIdle, session.AgentStatusInterrupted:
 		return "IDLE"
 	case session.AgentStatusUnknown:
 		return "UNKNOWN"

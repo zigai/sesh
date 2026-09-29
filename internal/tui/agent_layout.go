@@ -327,11 +327,11 @@ func (m *Model) agentCellRole(row session.Session, agent session.AgentSession, p
 
 	switch part.Field {
 	case display.FieldStatusGlyph, display.FieldStatus:
-		if agent.Status == session.AgentStatusIdle && m.agentIdleUnread(row, agent) {
+		if agent.Status.DisplayStatus() == session.AgentStatusIdle && m.agentIdleUnread(row, agent) {
 			return "status_unread"
 		}
 
-		return "status_" + string(agent.Status)
+		return "status_" + string(agent.Status.DisplayStatus())
 	case display.FieldTree, display.FieldTreeBranch, display.FieldTreeIndent:
 		return "tree"
 	case display.FieldShortcut, display.FieldShortcutBadge:
