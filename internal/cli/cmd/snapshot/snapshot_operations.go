@@ -2,7 +2,6 @@ package cmdsnapshot
 
 import (
 	"errors"
-	"path/filepath"
 
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
@@ -43,7 +42,7 @@ func newSnapshotAbandonCommand() *cobra.Command {
 }
 
 func addSnapshotOperationFlags(cmd *cobra.Command) {
-	cmd.Flags().String("repository", "", "Native repository directory (required)")
+	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
 	cmd.Flags().String("operation", "", "Restore operation ID (required)")
 	clibase.AddJSONFlag(cmd)
 }
@@ -53,12 +52,11 @@ func runSnapshotOperation(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	path, _ := cmd.Flags().GetString("repository")
 	id, _ := cmd.Flags().GetString("operation")
 
-	path, err := filepath.Abs(path)
+	path, err := clibase.ResolveRepository(cmd)
 	if err != nil {
-		return oops.In("cli").With("operation", "resolve_repository_path").Wrap(err)
+		return err
 	}
 
 	repo, err := store.OpenExisting(cmd.Context(), path)
@@ -99,10 +97,6 @@ func ValidateSnapshotCommand(cmd *cobra.Command, args []string) error {
 		return validateSnapshotMaintenanceCommand(cmd)
 	}
 
-	if err := requiredRepository(cmd); err != nil {
-		return err
-	}
-
 	switch cmd.Name() {
 	case "save", "snapshot-save":
 		if _, _, _, _, err := parseSaveInput(cmd, args); err != nil {
@@ -118,10 +112,6 @@ func ValidateSnapshotCommand(cmd *cobra.Command, args []string) error {
 }
 
 func validateSnapshotOperation(cmd *cobra.Command) error {
-	if err := requiredRepository(cmd); err != nil {
-		return err
-	}
-
 	id, _ := cmd.Flags().GetString("operation")
 	if id == "" {
 		return clibase.NewExitError(clibase.ExitCodeUsage, errOperationRequired)

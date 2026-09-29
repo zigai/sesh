@@ -22,8 +22,8 @@ func TestCommandSocketValidation(t *testing.T) {
 func verifyCommandSocketValidation(t *testing.T, cmdName string) {
 	t.Helper()
 
-	t.Run("missing socket flag", func(t *testing.T) {
-		verifyMissingSocketFlag(t, cmdName)
+	t.Run("default socket without server", func(t *testing.T) {
+		verifyDefaultSocketWithoutServer(t, cmdName)
 	})
 
 	t.Run("relative socket path", func(t *testing.T) {
@@ -35,24 +35,12 @@ func verifyCommandSocketValidation(t *testing.T, cmdName string) {
 	})
 }
 
-func verifyMissingSocketFlag(t *testing.T, cmdName string) {
+func verifyDefaultSocketWithoutServer(t *testing.T, cmdName string) {
 	t.Helper()
 
 	exec := executeJSON(t, cmdName, testNoConfigFlag, testJSONFlag)
-	if exec.err == nil {
-		t.Fatal("expected error for missing --socket, got nil")
-	}
-
-	if clibase.ExitCode(exec.err) != clibase.ExitCodeUsage {
-		t.Fatalf("exit code = %d, want %d", clibase.ExitCode(exec.err), clibase.ExitCodeUsage)
-	}
-
-	if exec.envelope.Error == nil || exec.envelope.Error.Code != "usageError" {
-		t.Fatalf("error payload = %+v, want code usageError", exec.envelope.Error)
-	}
-
-	if !strings.Contains(exec.envelope.Error.Message, "--socket is required") {
-		t.Fatalf("error message = %q, want containing --socket is required", exec.envelope.Error.Message)
+	if exec.err != nil || !exec.envelope.OK {
+		t.Fatalf("%s without --socket on a server-less default socket = %v / %+v, want an empty result", cmdName, exec.err, exec.envelope.Error)
 	}
 }
 

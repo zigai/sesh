@@ -14,7 +14,8 @@ import (
 
 const (
 	maxDirectorySuggestions = 256
-	maxDirectoryEntriesRead = 1024
+	maxDirectoryEntriesRead = 16384
+	directoryReadBatch      = 512
 )
 
 var ErrDirectoryLimit = errors.New("directory suggestions limit exceeded")
@@ -64,18 +65,15 @@ func DirectoryPathSuggestions(ctx context.Context, input, cwd string) ([]string,
 		return nil, oops.In("session").Code("directory_open_failed").With("operation", "directory_suggestions").Wrap(err)
 	}
 
-	entries, readErr := f.ReadDir(maxDirectoryEntriesRead + 1)
-	if errors.Is(readErr, io.EOF) {
-		readErr = nil
-	}
+	entries, readErr := readPrefixedEntries(ctx, f, namePrefix)
 
 	closeErr := f.Close()
-	if err := errors.Join(readErr, closeErr); err != nil {
-		return nil, oops.In("session").Code("directory_read_failed").With("operation", "directory_suggestions").Wrap(err)
+	if readErr != nil {
+		return nil, errors.Join(readErr, closeErr)
 	}
 
-	if len(entries) > maxDirectoryEntriesRead {
-		return nil, oops.In("session").Code("directory_limit").With("operation", "directory_suggestions").Wrap(ErrDirectoryLimit)
+	if closeErr != nil {
+		return nil, oops.In("session").Code("directory_read_failed").With("operation", "directory_suggestions").Wrap(closeErr)
 	}
 
 	return collectMatchingDirectories(ctx, entries, parent, dirPart, namePrefix)
@@ -176,6 +174,41 @@ func resolveParentAndPrefix(input, cwd string) (string, string, string, error) {
 		}
 
 		return dirPart, namePrefix, parent, nil
+	}
+}
+
+// readPrefixedEntries keeps only entries matching namePrefix while reading in batches, so the
+// scan budget bounds work in huge directories without rejecting a prefix that narrows the results.
+func readPrefixedEntries(ctx context.Context, f *os.File, namePrefix string) ([]os.DirEntry, error) {
+	var matches []os.DirEntry
+
+	scanned := 0
+
+	for {
+		if err := ctx.Err(); err != nil {
+			return nil, oops.In("session").Code("operation_canceled").With("operation", "directory_suggestions").Wrap(err)
+		}
+
+		batch, err := f.ReadDir(directoryReadBatch)
+		scanned += len(batch)
+
+		if scanned > maxDirectoryEntriesRead {
+			return nil, oops.In("session").Code("directory_limit").With("operation", "directory_suggestions").Wrap(ErrDirectoryLimit)
+		}
+
+		for _, entry := range batch {
+			if strings.HasPrefix(entry.Name(), namePrefix) {
+				matches = append(matches, entry)
+			}
+		}
+
+		if errors.Is(err, io.EOF) || (err == nil && len(batch) == 0) {
+			return matches, nil
+		}
+
+		if err != nil {
+			return nil, oops.In("session").Code("directory_read_failed").With("operation", "directory_suggestions").Wrap(err)
+		}
 	}
 }
 

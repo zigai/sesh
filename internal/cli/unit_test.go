@@ -215,91 +215,25 @@ func TestUnregisteredCommandsFail(t *testing.T) {
 	}
 }
 
-func TestRequiredFlagsValidation(t *testing.T) {
-	tempDir := t.TempDir()
+func TestSnapshotReadCommandsDefaultToConfiguredRepository(t *testing.T) {
+	dataHome := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", dataHome)
 
-	tests := []struct {
-		name     string
-		args     []string
-		wantMsg  string
-		wantCode int
-	}{
-		{
-			name:     "action save missing repo",
-			args:     []string{actionCmd, "snapshot-save", testSocketFlag, "/tmp/sock", testLeaseRootFlag, "/tmp/lease", testSessionFlag, "$0"},
-			wantMsg:  "--repository is required",
-			wantCode: exitCodeUsage,
-		},
-		{
-			name:     "action save missing socket",
-			args:     []string{actionCmd, "snapshot-save", testRepositoryFlag, tempDir, testLeaseRootFlag, "/tmp/lease", testSessionFlag, "$0"},
-			wantMsg:  "--socket is required",
-			wantCode: exitCodeUsage,
-		},
-		{
-			name:     "action save missing lease-root",
-			args:     []string{actionCmd, "snapshot-save", testRepositoryFlag, tempDir, testSocketFlag, "/tmp/sock", testSessionFlag, "$0"},
-			wantMsg:  "--lease-root is required",
-			wantCode: exitCodeUsage,
-		},
-		{
-			name:     "list missing repo",
-			args:     []string{snapshotCmd, "list"},
-			wantMsg:  "--repository is required",
-			wantCode: exitCodeUsage,
-		},
-		{
-			name:     "history missing repo",
-			args:     []string{snapshotCmd, "history"},
-			wantMsg:  "--repository is required",
-			wantCode: exitCodeUsage,
-		},
-		{
-			name:     "verify missing repo",
-			args:     []string{snapshotCmd, "verify"},
-			wantMsg:  "--repository is required",
-			wantCode: exitCodeUsage,
-		},
-		{
-			name:     "action restore missing repo",
-			args:     []string{actionCmd, "snapshot-restore", testSocketFlag, "/tmp/sock", testLeaseRootFlag, "/tmp/lease"},
-			wantMsg:  "--repository is required",
-			wantCode: exitCodeUsage,
-		},
-		{
-			name:     "action restore missing socket",
-			args:     []string{actionCmd, "snapshot-restore", testRepositoryFlag, tempDir, testLeaseRootFlag, "/tmp/lease"},
-			wantMsg:  "--socket is required",
-			wantCode: exitCodeUsage,
-		},
-		{
-			name:     "action restore missing lease-root",
-			args:     []string{actionCmd, "snapshot-restore", testRepositoryFlag, tempDir, testSocketFlag, "/tmp/sock"},
-			wantMsg:  "--lease-root is required",
-			wantCode: exitCodeUsage,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, cmdArgs := range [][]string{
+		{snapshotCmd, "list", "--no-config"},
+		{snapshotCmd, "history", "--no-config"},
+		{snapshotCmd, "verify", "--no-config"},
+	} {
+		t.Run(strings.Join(cmdArgs, " "), func(t *testing.T) {
 			root := newRootCommand(t.Context())
 
-			stdout, stderr, err := executeCommand(root, tc.args...)
-			if err == nil {
-				t.Fatalf("expected error for %v, got nil", tc.args)
+			_, stderr, err := executeCommand(root, cmdArgs...)
+			if ExitCode(err) == exitCodeUsage {
+				t.Fatalf("%v without --repository is a usage error: %v / %q", cmdArgs, err, stderr)
 			}
 
-			code := ExitCode(err)
-			if code != tc.wantCode {
-				t.Fatalf("ExitCode = %d, want %d", code, tc.wantCode)
-			}
-
-			if stdout != "" {
-				t.Fatalf("stdout should be empty, got: %q", stdout)
-			}
-
-			if !strings.Contains(stderr, tc.wantMsg) {
-				t.Fatalf("stderr missing %q, got: %q", tc.wantMsg, stderr)
+			if _, statErr := os.Stat(filepath.Join(dataHome, "sesh", "snapshots")); !errors.Is(statErr, os.ErrNotExist) {
+				t.Fatalf("read command created the default repository: %v", statErr)
 			}
 		})
 	}

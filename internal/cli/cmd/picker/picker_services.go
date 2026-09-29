@@ -61,6 +61,8 @@ type pickerServices struct {
 	sessionNames     pickerTranscriptNameCache
 	workflow         *session.Workflow
 	remote           PickerRemoteServices
+	viewsMu          sync.Mutex
+	deferredViews    []tui.AgentView
 }
 
 type pickerRestoreOutcomeError struct {
@@ -135,15 +137,16 @@ func newPickerServices(
 	}
 
 	workflow := session.NewWorkflowWithOptions(session.WorkflowOptions{
-		Server:      server,
-		Repository:  nil,
-		LeaseRoot:   leaseRoot,
-		HistoryPath: historyPath,
-		Hooks:       cfg.Hooks,
-		HookRunner:  nil,
-		Getenv:      nil,
-		Streams:     streams,
-		Source:      "picker",
+		Server:             server,
+		Repository:         nil,
+		LeaseRoot:          leaseRoot,
+		HistoryPath:        historyPath,
+		Hooks:              cfg.Hooks,
+		HookRunner:         nil,
+		Getenv:             nil,
+		Streams:            streams,
+		Source:             "picker",
+		DeferSwitchHistory: true,
 	})
 
 	resolvedAgentStatePath := agentStatePath
@@ -166,6 +169,8 @@ func newPickerServices(
 		sessionNames:     pickerTranscriptNameCache{mu: sync.Mutex{}, cache: nil},
 		workflow:         workflow,
 		remote:           remote,
+		viewsMu:          sync.Mutex{},
+		deferredViews:    nil,
 	}, nil
 }
 
@@ -235,19 +240,40 @@ func (s *pickerServices) TUIServices() tui.Services {
 	}
 }
 
+// LoadCatalog lists saved sessions through a lock-free repository view: the picker's first
+// frame must not wait on a concurrent save's commit or on the durable open's fsync. Actions
+// that act on a saved session reopen the repository durably through getRepository.
 func (s *pickerServices) LoadCatalog(ctx context.Context) (session.CatalogResult, error) {
-	repo, _ := s.getRepository(ctx)
+	if s.repositoryPath == "" {
+		return s.listCatalog(ctx, nil)
+	}
 
+	// An unreadable repository leaves saved rows out, as the durable open did before.
+	view, err := store.OpenView(ctx, s.repositoryPath)
+	if err != nil {
+		return s.listCatalog(ctx, nil)
+	}
+
+	result, err := s.listCatalog(ctx, view)
+	if closeErr := view.Close(); closeErr != nil {
+		err = errors.Join(err, oops.In("cli").With("operation", "close_repository_view").Wrap(closeErr))
+	}
+
+	return result, err
+}
+
+func (s *pickerServices) listCatalog(ctx context.Context, saved session.SavedSnapshots) (session.CatalogResult, error) {
 	result, err := session.ListCatalog(ctx, session.CatalogOptions{
 		Server:           s.server,
-		Repository:       repo,
+		Repository:       saved,
 		RepositorySource: s.repositoryPath,
 		GenerationID:     "",
 		CurrentPane:      s.currentPane,
 		CurrentSessionID: s.currentSessionID,
 	})
 	if err != nil {
-		return session.CatalogResult{}, oops.In("cli").With("operation", "load_picker_catalog").Wrap(err)
+		// Partial results keep live sessions visible when the saved repository cannot be read.
+		return result, oops.In("cli").With("operation", "load_picker_catalog").Wrap(err)
 	}
 
 	return result, nil
@@ -628,16 +654,26 @@ func pickerAgentSession(item agents.AgentSession) session.AgentSession {
 		ProjectRoot:      item.ProjectRoot,
 		GitBranch:        "",
 		Worktree:         "",
+		GitRepo:          "",
+		GitHasRemote:     false,
 		GitChanges:       "",
 		LinkedWorktree:   false,
 		GitAhead:         0,
 		GitBehind:        0,
 		GitTrackingKnown: false,
+		GitStash:         0,
+		GitConflicts:     0,
+		GitDirty:         false,
 		SessionPath:      item.SessionPath,
 		Executable:       item.Command,
 		PID:              item.PanePID,
 		Status:           pickerAgentStatus(item),
 		StatusSince:      item.ActivityChanged,
+		Model:            item.Model,
+		WaitingReason:    item.WaitingReason,
+		LastTool:         item.LastTool,
+		Task:             "",
+		PromptAt:         item.PromptAt,
 	}
 	detail.HarnessSession = pickerHarnessSessionLabel(detail)
 
@@ -702,6 +738,44 @@ func (s *pickerServices) UpdateModelState(ctx context.Context, update session.St
 	}
 
 	return nil
+}
+
+// DeferAgentViews keeps a popup's agent views in memory: the invoking process records them
+// with its switch after the popup closes, so the popup never waits on a history write.
+func (s *pickerServices) DeferAgentViews(views []tui.AgentView) bool {
+	if !s.popupChild {
+		return false
+	}
+
+	s.viewsMu.Lock()
+	defer s.viewsMu.Unlock()
+
+	for _, view := range views {
+		index := slices.IndexFunc(s.deferredViews, func(existing tui.AgentView) bool {
+			return existing.Session == view.Session && existing.PaneID == view.PaneID
+		})
+		if index >= 0 {
+			s.deferredViews = slices.Delete(s.deferredViews, index, index+1)
+		}
+
+		s.deferredViews = append(s.deferredViews, view)
+	}
+
+	if excess := len(s.deferredViews) - pickerHandoffMaxAgentViews; excess > 0 {
+		s.deferredViews = slices.Delete(s.deferredViews, 0, excess)
+	}
+
+	return true
+}
+
+func (s *pickerServices) takeDeferredAgentViews() []tui.AgentView {
+	s.viewsMu.Lock()
+	defer s.viewsMu.Unlock()
+
+	views := s.deferredViews
+	s.deferredViews = nil
+
+	return views
 }
 
 func (s *pickerServices) enterExistingPickerSession(ctx context.Context, name string, createErr error) (tui.EnterOutcome, error) {
@@ -784,11 +858,17 @@ func (s *pickerServices) performSwitch(ctx context.Context, target session.Sessi
 		return err
 	}
 
-	return s.performSwitchValidated(ctx, target, paneID, clientName, originSessionID)
+	return s.performSwitchValidated(ctx, target, paneID, clientName, originSessionID, nil)
 }
 
-// performSwitchValidated skips the duplicate catalog pass after a fresh handoff lookup.
-func (s *pickerServices) performSwitchValidated(ctx context.Context, target session.Session, paneID, clientName, originSessionID string) error {
+// performSwitchValidated skips the duplicate catalog pass after a fresh handoff lookup. The
+// switch and pane focus come first; history, which fsyncs, is recorded once afterwards.
+func (s *pickerServices) performSwitchValidated(
+	ctx context.Context,
+	target session.Session,
+	paneID, clientName, originSessionID string,
+	views []tui.AgentView,
+) error {
 	var outcome session.EnterOutcome
 
 	var err error
@@ -799,7 +879,9 @@ func (s *pickerServices) performSwitchValidated(ctx context.Context, target sess
 	}
 
 	if err != nil {
-		return oops.In("cli").With("operation", "switch_picker_session").Wrap(err)
+		switchErr := oops.In("cli").With("operation", "switch_picker_session").Wrap(err)
+
+		return errors.Join(switchErr, s.recordPickerHistory(ctx, "", views))
 	}
 
 	viewPaneID := paneID
@@ -807,17 +889,40 @@ func (s *pickerServices) performSwitchValidated(ctx context.Context, target sess
 		viewPaneID = target.ActivePaneID
 	}
 
-	if viewPaneID != "" && s.historyPath != "" {
-		_, _ = session.UpdateState(ctx, s.historyPath, func(st *session.State) {
-			st.RecordAgentView(target.SemanticIdentity(), viewPaneID)
-		})
+	if viewPaneID != "" {
+		views = append(views, tui.AgentView{Session: target.SemanticIdentity(), PaneID: viewPaneID})
 	}
 
-	if paneID == "" {
+	var activateErr error
+	if paneID != "" {
+		activateErr = s.activatePane(ctx, target, paneID, outcome.Client)
+	}
+
+	return errors.Join(activateErr, s.recordPickerHistory(ctx, outcome.SessionName, views))
+}
+
+// recordPickerHistory records a completed switch to switched, when set, and the agent views
+// in one history update.
+func (s *pickerServices) recordPickerHistory(ctx context.Context, switched string, views []tui.AgentView) error {
+	identity, recordSwitch := s.workflow.SwitchHistoryIdentity(switched)
+	if s.historyPath == "" || (!recordSwitch && len(views) == 0) {
 		return nil
 	}
 
-	return s.activatePane(ctx, target, paneID, outcome.Client)
+	_, err := session.UpdateState(ctx, s.historyPath, func(st *session.State) {
+		if recordSwitch {
+			st.RecordSwitch(identity)
+		}
+
+		for _, view := range views {
+			st.RecordAgentView(view.Session, view.PaneID)
+		}
+	})
+	if err != nil {
+		return oops.In("cli").Code("history_failed").With("operation", "record_picker_history").Wrap(err)
+	}
+
+	return nil
 }
 
 func (s *pickerServices) performDeferredAttach(ctx context.Context, target session.Session) error {

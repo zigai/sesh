@@ -18,7 +18,7 @@ func TestResolveCurrentSnapshotPreservesCanceledPracticalGenerationRead(t *testi
 
 	reader := &snapshotReaderStub{
 		catalog: store.Catalog{
-			Version:  1,
+			Version:  model.Schema,
 			Sequence: 1,
 			Current:  generationID,
 			Attempts: []store.Attempt{

@@ -166,7 +166,12 @@ func executeApplication(ctx context.Context, args []string, input io.Reader, std
 
 	closeErr := runtime.finish(ctx, runErr)
 
-	return publishCommandOutput(executed, &output, &diagnostics, stdout, stderr, runErr, closeErr)
+	err := publishCommandOutput(executed, &output, &diagnostics, stdout, stderr, runErr, closeErr)
+	if reportBindingFailure(executed, err, stdout, stderr) {
+		return nil
+	}
+
+	return err
 }
 
 func (r *commandRuntime) prepare(cmd *cobra.Command, args []string) error {
@@ -486,7 +491,7 @@ func writeStreamDiagnosticError(cmd *cobra.Command, err error) error {
 		return nil
 	}
 
-	msg := safeCommandErrorMessage(err)
+	msg := humanErrorMessage(err)
 	if errors.Is(err, context.Canceled) {
 		msg = "log operation failed during cancellation"
 	}

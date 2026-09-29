@@ -2,10 +2,15 @@ package cmdagent
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	gotmux "github.com/zigai/gotmux/tmux"
+
+	"github.com/zigai/sesh/internal/cli/clibase"
 )
 
 func writeAgentRegistry(t *testing.T, sessions ...string) string {
@@ -69,49 +74,22 @@ func TestActionAgentCommandsHelp(t *testing.T) {
 	}
 }
 
-func TestAgentNextMissingSocketFlag(t *testing.T) {
-	t.Setenv("TMUX", "")
+func TestAgentNavigationWithoutSocketTargetsDefaultTmuxServer(t *testing.T) {
+	for _, action := range []string{"agent-next", "agent-back"} {
+		t.Run(action, func(t *testing.T) {
+			t.Setenv("TMUX", "")
 
-	root := newRootCommand(t.Context())
+			root := newRootCommand(t.Context())
 
-	_, _, err := executeCommand(root, actionCmd, "agent-next", "--no-config")
-	if err == nil {
-		t.Fatal("expected error on missing socket flag outside tmux, got nil")
-	}
+			_, _, err := executeCommand(root, actionCmd, action, "--no-config")
+			if !errors.Is(err, gotmux.ErrNoServer) {
+				t.Fatalf("error = %v, want the isolated default socket to report no tmux server", err)
+			}
 
-	code := ExitCode(err)
-	if code != exitCodeUsage {
-		t.Fatalf("exit code = %d, want %d", code, exitCodeUsage)
-	}
-}
-
-func TestAgentBackMissingSocketFlag(t *testing.T) {
-	t.Setenv("TMUX", "")
-
-	root := newRootCommand(t.Context())
-
-	_, _, err := executeCommand(root, actionCmd, "agent-back", "--no-config")
-	if err == nil {
-		t.Fatal("expected error on missing socket flag outside tmux, got nil")
-	}
-
-	if code := ExitCode(err); code != exitCodeUsage {
-		t.Fatalf("exit code = %d, want %d", code, exitCodeUsage)
-	}
-}
-
-func TestAgentStatusRunMissingSocketFlag(t *testing.T) {
-	t.Setenv("TMUX", "")
-
-	root := newRootCommand(t.Context())
-
-	_, _, err := executeCommand(root, actionCmd, "agent-status", "run", "--no-config", "--quiet")
-	if err == nil {
-		t.Fatal("expected error on missing socket flag outside tmux, got nil")
-	}
-
-	if code := ExitCode(err); code != exitCodeUsage {
-		t.Fatalf("exit code = %d, want %d", code, exitCodeUsage)
+			if code := ExitCode(err); code != clibase.ExitCodeGeneral {
+				t.Fatalf("exit code = %d, want %d", code, clibase.ExitCodeGeneral)
+			}
+		})
 	}
 }
 

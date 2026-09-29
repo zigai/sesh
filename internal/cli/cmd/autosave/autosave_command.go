@@ -3,9 +3,7 @@ package cmdautosave
 import (
 	"context"
 	"errors"
-	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/samber/oops"
@@ -27,7 +25,8 @@ const (
 	autosaveStatusDegraded = "degraded"
 	autosaveStatusFailed   = "failed"
 
-	autosaveReasonLockBusy = "lock_busy"
+	autosaveReasonLockBusy       = "lock_busy"
+	autosaveReasonTmuxNotRunning = "tmux_not_running"
 
 	autosaveHistoryRecorded    = "recorded"
 	autosaveHistoryNeverRun    = "never_run"
@@ -49,7 +48,6 @@ const (
 )
 
 var (
-	errAutosaveSocketRequired      = errors.New("--socket is required for autosave")
 	errAutosaveStartupRefused      = errors.New("startup restore refused")
 	errAutosaveHistoryUnavailable  = errors.New("autosave history state is unavailable")
 	errAutosaveBookkeeping         = errors.New("autosave bookkeeping did not complete")
@@ -75,12 +73,13 @@ type autosaveOutcome struct {
 }
 
 type autosaveEnv struct {
-	cfg          *config.Config
-	historyPath  string
-	interval     time.Duration
-	historyKnown bool
-	historyErr   error
-	decision     automation.DueDecision
+	cfg           *config.Config
+	historyPath   string
+	interval      time.Duration
+	historyKnown  bool
+	historyErr    error
+	decision      automation.DueDecision
+	lastSavedUnix int64
 }
 
 func newAutosaveOutcome(status, reason string) autosaveOutcome {
@@ -128,9 +127,9 @@ func NewCommand() *cobra.Command {
 }
 
 func addAutosaveFlags(flags *pflag.FlagSet) {
-	flags.String("socket", "", "Explicit absolute path to tmux server socket")
-	flags.String("repository", "", "Native repository directory")
-	flags.String("lease-root", "", "Explicit path to shared lease root directory")
+	flags.String("socket", "", clibase.SocketFlagUsage)
+	flags.String("repository", "", clibase.RepositoryFlagUsage)
+	flags.String("lease-root", "", clibase.LeaseRootFlagUsage)
 	flags.String("history", "", "History state JSON file path")
 	flags.StringSlice("session", nil, "Explicit selected session IDs")
 }
@@ -170,12 +169,13 @@ func resolveAutosaveEnv(cmd *cobra.Command) (autosaveEnv, error) {
 	lastCompleted, historyErr := loadAutosaveHistory(historyPath)
 
 	env := autosaveEnv{
-		cfg:          cfg,
-		historyPath:  historyPath,
-		interval:     automation.EffectiveInterval(config.AutosaveInterval(cfg)),
-		historyKnown: historyErr == nil,
-		historyErr:   historyErr,
-		decision:     automation.DueDecision{Due: false, Reason: "", Elapsed: 0},
+		cfg:           cfg,
+		historyPath:   historyPath,
+		interval:      automation.EffectiveInterval(config.AutosaveInterval(cfg)),
+		historyKnown:  historyErr == nil,
+		historyErr:    historyErr,
+		decision:      automation.DueDecision{Due: false, Reason: "", Elapsed: 0},
+		lastSavedUnix: lastCompleted,
 	}
 
 	env.decision = automation.EvaluateDueState(automation.DueState{
@@ -241,22 +241,6 @@ func resolveAutosaveStatusPath(cmd *cobra.Command) string {
 	}
 
 	return filepath.Join(config.GetXDGPaths().StateHome, "sesh", automation.FinalSaveStatusName)
-}
-
-func resolveAutosaveSocket(cmd *cobra.Command) string {
-	socketPath, _ := cmd.Flags().GetString("socket")
-	if socketPath != "" {
-		return socketPath
-	}
-
-	if tmuxEnv := os.Getenv("TMUX"); tmuxEnv != "" {
-		parts := strings.Split(tmuxEnv, ",")
-		if len(parts) > 0 && parts[0] != "" {
-			return parts[0]
-		}
-	}
-
-	return ""
 }
 
 func resolveAutosaveLeaseRoot(cmd *cobra.Command, cfg *config.Config) (string, error) {

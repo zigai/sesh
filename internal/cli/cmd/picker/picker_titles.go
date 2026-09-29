@@ -44,6 +44,7 @@ func annotatePickerNativeTitles(ctx context.Context, observed []agents.AgentSess
 			agent := &summaries[i].Agents[j]
 			if title := byRegistryID[agent.RegistryID]; title != "" {
 				agent.HarnessSession = title
+				agent.Task = title
 			}
 		}
 	}

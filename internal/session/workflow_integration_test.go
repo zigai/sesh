@@ -716,6 +716,39 @@ func TestWorkflow_SwitchMovesOnlyInvokingClient(t *testing.T) {
 	}
 }
 
+func TestWorkflow_SwitchWithDeferredHistoryLeavesRecordingToCaller(t *testing.T) {
+	fixture := newWorkflowFixture(t)
+
+	origin := fixture.fixtureSession(t)
+	target := fixture.newLiveSession(t, "deferred-target")
+	client := fixture.attachClient(t, origin.ID)
+
+	wf := session.NewWorkflowWithOptions(session.WorkflowOptions{
+		Server:             fixture.server,
+		HistoryPath:        fixture.historyPath,
+		Getenv:             fixture.ambientEnvironment(t, origin),
+		Source:             "test",
+		DeferSwitchHistory: true,
+	})
+
+	if _, err := wf.SwitchSessionOutcome(t.Context(), "deferred-target"); err != nil {
+		t.Fatalf("SwitchSessionOutcome failed: %v", err)
+	}
+
+	if displayed := fixture.clientSession(t, client); displayed != target.ID {
+		t.Fatalf("client displays %s, want %s", displayed, target.ID)
+	}
+
+	if recorded := fixture.recordedSwitch(t, "deferred-target"); recorded != 0 {
+		t.Fatalf("deferred switch recorded history at %d; the caller owns recording", recorded)
+	}
+
+	identity, ok := wf.SwitchHistoryIdentity("deferred-target")
+	if !ok || identity != fixture.historyIdentity("deferred-target") {
+		t.Fatalf("switch history identity = %+v, %t; want %+v", identity, ok, fixture.historyIdentity("deferred-target"))
+	}
+}
+
 func TestWorkflow_SwitchRefusesUnverifiedTargetSession(t *testing.T) {
 	fixture := newWorkflowFixture(t)
 

@@ -2,7 +2,6 @@ package cmdsnapshot
 
 import (
 	"errors"
-	"path/filepath"
 
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
@@ -37,7 +36,7 @@ func newSnapshotRewriteCommand() *cobra.Command {
 			RunE:        runSnapshotRewrite,
 			Annotations: map[string]string{clibase.AnnotationOperation: name + "_rewrite"},
 		}
-		child.Flags().String("repository", "", "Native repository directory (required)")
+		child.Flags().String("repository", "", clibase.RepositoryFlagUsage)
 		child.Flags().String("operation", "", "Saved-session rewrite operation ID (required)")
 		clibase.AddJSONFlag(child)
 		cmd.AddCommand(child)
@@ -51,12 +50,11 @@ func runSnapshotRewrite(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	path, _ := cmd.Flags().GetString("repository")
 	id, _ := cmd.Flags().GetString("operation")
 
-	path, err := filepath.Abs(path)
+	path, err := clibase.ResolveRepository(cmd)
 	if err != nil {
-		return oops.In("cli").With("operation", "resolve_repository_path").Wrap(err)
+		return err
 	}
 
 	repo, err := store.OpenExisting(cmd.Context(), path)

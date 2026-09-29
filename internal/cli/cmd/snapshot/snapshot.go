@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"slices"
 	"strings"
 
@@ -184,9 +183,9 @@ func newSnapshotSaveCommand() *cobra.Command {
 		RunE:  runSnapshotSave,
 	}
 
-	cmd.Flags().String("repository", "", "Native repository directory (required)")
-	cmd.Flags().String("socket", "", "Explicit absolute path to tmux server socket (required)")
-	cmd.Flags().String("lease-root", "", "Explicit path to shared lease root directory (required)")
+	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
+	clibase.AddSocketFlag(cmd)
+	cmd.Flags().String("lease-root", "", clibase.LeaseRootFlagUsage)
 	cmd.Flags().StringSlice("session", nil, "Explicit selected session IDs")
 	cmd.Flags().Bool("process-enrichment", true, "Capture foreground process and native application recovery context")
 	cmd.Flags().StringSlice("process-env", nil, "Selected environment keys to capture for observed foreground processes")
@@ -196,24 +195,16 @@ func newSnapshotSaveCommand() *cobra.Command {
 }
 
 func parseSaveInput(cmd *cobra.Command, args []string) (string, string, []gotmux.SessionID, engine.SaveConfig, error) {
-	repoPath, _ := cmd.Flags().GetString("repository")
-	if repoPath == "" {
-		return "", "", nil, engine.SaveConfig{LeaseRoot: "", ProcessEnrichment: false, ProcessEnvironmentKeys: nil, AgentSource: nil, Profile: engine.RecoveryExact}, clibase.NewExitError(clibase.ExitCodeUsage, clibase.ErrRepositoryRequired)
-	}
-
-	absRepoPath, err := filepath.Abs(repoPath)
+	absRepoPath, err := clibase.ResolveRepository(cmd)
 	if err != nil {
-		return "", "", nil, engine.SaveConfig{LeaseRoot: "", ProcessEnrichment: false, ProcessEnvironmentKeys: nil, AgentSource: nil, Profile: engine.RecoveryExact}, oops.In("cli").With("operation", "resolve_repository_path").Wrapf(err, "resolve repository path")
+		return "", "", nil, engine.SaveConfig{LeaseRoot: "", ProcessEnrichment: false, ProcessEnvironmentKeys: nil, AgentSource: nil, Profile: engine.RecoveryExact}, err
 	}
 
-	socketPath, _ := cmd.Flags().GetString("socket")
-	if socketPath == "" {
-		return "", "", nil, engine.SaveConfig{LeaseRoot: "", ProcessEnrichment: false, ProcessEnvironmentKeys: nil, AgentSource: nil, Profile: engine.RecoveryExact}, clibase.NewExitError(clibase.ExitCodeUsage, clibase.ErrSocketRequired)
-	}
+	socketPath := clibase.ResolveSocket(cmd)
 
-	leaseRoot, _ := cmd.Flags().GetString("lease-root")
-	if leaseRoot == "" {
-		return "", "", nil, engine.SaveConfig{LeaseRoot: "", ProcessEnrichment: false, ProcessEnvironmentKeys: nil, AgentSource: nil, Profile: engine.RecoveryExact}, clibase.NewExitError(clibase.ExitCodeUsage, clibase.ErrLeaseRootRequired)
+	leaseRoot, err := clibase.ResolveLeaseRoot(cmd)
+	if err != nil {
+		return "", "", nil, engine.SaveConfig{LeaseRoot: "", ProcessEnrichment: false, ProcessEnvironmentKeys: nil, AgentSource: nil, Profile: engine.RecoveryExact}, err
 	}
 
 	sessionFlags, _ := cmd.Flags().GetStringSlice("session")
@@ -393,9 +384,9 @@ func newSnapshotRestoreCommand() *cobra.Command {
 		RunE:  runSnapshotRestore,
 	}
 
-	cmd.Flags().String("repository", "", "Native repository directory (required)")
-	cmd.Flags().String("socket", "", "Explicit absolute path to tmux server socket (required)")
-	cmd.Flags().String("lease-root", "", "Explicit path to shared lease root directory (required)")
+	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
+	clibase.AddSocketFlag(cmd)
+	cmd.Flags().String("lease-root", "", clibase.LeaseRootFlagUsage)
 	cmd.Flags().String("generation", "", "Explicit generation ID to restore (defaults to current)")
 	cmd.Flags().String("operation", "", "Resume the exact restore operation without replaying uncertain effects")
 	cmd.Flags().StringSlice("session", nil, "Explicit selected session IDs to restore (defaults to all)")
@@ -412,24 +403,16 @@ func parseRestoreInput(cmd *cobra.Command, args []string) (string, string, engin
 		return "", "", engine.RestoreConfig{}, err
 	}
 
-	repoPath, _ := cmd.Flags().GetString("repository")
-	if repoPath == "" {
-		return "", "", engine.RestoreConfig{}, clibase.NewExitError(clibase.ExitCodeUsage, clibase.ErrRepositoryRequired)
-	}
-
-	absRepoPath, err := filepath.Abs(repoPath)
+	absRepoPath, err := clibase.ResolveRepository(cmd)
 	if err != nil {
-		return "", "", engine.RestoreConfig{}, oops.In("cli").With("operation", "resolve_repository_path").Wrapf(err, "resolve repository path")
+		return "", "", engine.RestoreConfig{}, err
 	}
 
-	socketPath, _ := cmd.Flags().GetString("socket")
-	if socketPath == "" {
-		return "", "", engine.RestoreConfig{}, clibase.NewExitError(clibase.ExitCodeUsage, clibase.ErrSocketRequired)
-	}
+	socketPath := clibase.ResolveSocket(cmd)
 
-	leaseRoot, _ := cmd.Flags().GetString("lease-root")
-	if leaseRoot == "" {
-		return "", "", engine.RestoreConfig{}, clibase.NewExitError(clibase.ExitCodeUsage, clibase.ErrLeaseRootRequired)
+	leaseRoot, err := clibase.ResolveLeaseRoot(cmd)
+	if err != nil {
+		return "", "", engine.RestoreConfig{}, err
 	}
 
 	generation, _ := cmd.Flags().GetString("generation")
@@ -606,7 +589,7 @@ func newSnapshotListCommand() *cobra.Command {
 		RunE:  runSnapshotList,
 	}
 
-	cmd.Flags().String("repository", "", "Native repository directory (required)")
+	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
 	cmd.Flags().String("generation", "", "Specific generation ID to inspect")
 	cmd.Flags().Bool("full", false, "Show complete values using an adaptive layout")
 	clibase.AddJSONFlag(cmd)
@@ -633,53 +616,12 @@ func practicalGeneration(ctx context.Context, repo *store.Repository, requested 
 		return requested, nil
 	}
 
-	if generation, _, err := repo.ReadCurrent(ctx); err == nil {
-		return generation.ID, nil
-	} else if !errors.Is(err, store.ErrRecoveryRequired) {
+	generation, _, err := repo.ReadPracticalCurrent(ctx)
+	if err != nil {
 		return "", oops.In("cli").With("operation", "read_current").Wrap(err)
 	}
 
-	catalog, err := repo.Inspect(ctx)
-	if err != nil {
-		return "", oops.In("cli").With("operation", "inspect_repository").Wrap(err)
-	}
-
-	if !practicalCurrentAdmissible(catalog) {
-		return "", oops.In("cli").With("operation", "read_current").Wrap(store.ErrRecoveryRequired)
-	}
-
-	return catalog.Current, nil
-}
-
-func practicalCurrentAdmissible(catalog store.Catalog) bool {
-	if catalog.Current == "" || len(catalog.Attempts) == 0 {
-		return false
-	}
-
-	latest := catalog.Attempts[0]
-	for _, attempt := range catalog.Attempts[1:] {
-		if attempt.Sequence > latest.Sequence {
-			latest = attempt
-		}
-	}
-
-	if latest.State != "incomplete" || latest.ID != catalog.Current {
-		return false
-	}
-
-	for _, rewrite := range catalog.Rewrites {
-		if rewrite.State == "pending" && rewrite.Source == catalog.Current {
-			return false
-		}
-	}
-
-	for _, generation := range catalog.Generations {
-		if generation.ID == catalog.Current {
-			return !generation.Complete
-		}
-	}
-
-	return false
+	return generation.ID, nil
 }
 
 func renderListJSON(cmd *cobra.Command, manifest model.Manifest, genID string, windowCount map[string]int) error {
@@ -725,14 +667,9 @@ func renderListTable(cmd *cobra.Command, manifest model.Manifest, windowCount ma
 }
 
 func runSnapshotList(cmd *cobra.Command, _ []string) error {
-	repoPath, _ := cmd.Flags().GetString("repository")
-	if repoPath == "" {
-		return clibase.NewExitError(clibase.ExitCodeUsage, clibase.ErrRepositoryRequired)
-	}
-
-	absRepoPath, err := filepath.Abs(repoPath)
+	absRepoPath, err := clibase.ResolveRepository(cmd)
 	if err != nil {
-		return oops.In("cli").With("operation", "resolve_repository_path").Wrapf(err, "resolve repository path")
+		return err
 	}
 
 	ctx := cmd.Context()
@@ -791,7 +728,7 @@ func newSnapshotHistoryCommand() *cobra.Command {
 		RunE:  runSnapshotHistory,
 	}
 
-	cmd.Flags().String("repository", "", "Native repository directory (required)")
+	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
 	cmd.Flags().Bool("full", false, "Show complete values using an adaptive layout")
 	clibase.AddJSONFlag(cmd)
 
@@ -878,14 +815,9 @@ func renderHistoryTable(cmd *cobra.Command, catalog store.Catalog, full bool) er
 }
 
 func runSnapshotHistory(cmd *cobra.Command, _ []string) error {
-	repoPath, _ := cmd.Flags().GetString("repository")
-	if repoPath == "" {
-		return clibase.NewExitError(clibase.ExitCodeUsage, clibase.ErrRepositoryRequired)
-	}
-
-	absRepoPath, err := filepath.Abs(repoPath)
+	absRepoPath, err := clibase.ResolveRepository(cmd)
 	if err != nil {
-		return oops.In("cli").With("operation", "resolve_repository_path").Wrapf(err, "resolve repository path")
+		return err
 	}
 
 	ctx := cmd.Context()
@@ -930,7 +862,7 @@ func newSnapshotVerifyCommand() *cobra.Command {
 		RunE:  runSnapshotVerify,
 	}
 
-	cmd.Flags().String("repository", "", "Native repository directory (required)")
+	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
 	cmd.Flags().String("generation", "", "Specific generation ID to verify")
 	clibase.AddJSONFlag(cmd)
 
@@ -1015,14 +947,9 @@ func practicalRestoreReason(ready bool) string {
 }
 
 func runSnapshotVerify(cmd *cobra.Command, _ []string) error {
-	repoPath, _ := cmd.Flags().GetString("repository")
-	if repoPath == "" {
-		return clibase.NewExitError(clibase.ExitCodeUsage, clibase.ErrRepositoryRequired)
-	}
-
-	absRepoPath, err := filepath.Abs(repoPath)
+	absRepoPath, err := clibase.ResolveRepository(cmd)
 	if err != nil {
-		return oops.In("cli").With("operation", "resolve_repository_path").Wrapf(err, "resolve repository path")
+		return err
 	}
 
 	ctx := cmd.Context()
@@ -1092,19 +1019,6 @@ func getBoolFlag(cmd *cobra.Command, name string) bool {
 	value, _ := cmd.Flags().GetBool(name)
 
 	return value
-}
-
-func requiredRepository(cmd *cobra.Command) error {
-	path, err := cmd.Flags().GetString("repository")
-	if err != nil {
-		return oops.In("cli").With("operation", "read_repository_flag").Wrap(err)
-	}
-
-	if path == "" {
-		return clibase.NewExitError(clibase.ExitCodeUsage, clibase.ErrRepositoryRequired)
-	}
-
-	return nil
 }
 
 func commandOperation(cmd *cobra.Command) string {

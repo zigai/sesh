@@ -4,8 +4,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/zigai/sesh/internal/snapshot/model"
 )
 
 const (
@@ -64,8 +62,8 @@ type Session struct {
 	Origin                 Origin          `json:"-"`
 	Generation             string          `json:"generation,omitempty"`
 	RepositorySource       string          `json:"repositorySource,omitempty"`
-	NameRaw                model.Bytes     `json:"nameRaw,omitempty"`
-	PathRaw                model.Bytes     `json:"pathRaw,omitempty"`
+	NameRaw                RawBytes        `json:"nameRaw,omitempty"`
+	PathRaw                RawBytes        `json:"pathRaw,omitempty"`
 	RuntimeIdentity        RuntimeIdentity `json:"runtimeIdentity"`
 	RemoteStatus           RemoteStatus    `json:"-"`
 	WindowCount            int             `json:"windowCount"`
@@ -124,16 +122,26 @@ type AgentSession struct {
 	ProjectRoot      string      `json:"projectRoot,omitempty"`
 	GitBranch        string      `json:"gitBranch,omitempty"`
 	Worktree         string      `json:"worktree,omitempty"`
+	GitRepo          string      `json:"gitRepo,omitempty"`
+	GitHasRemote     bool        `json:"gitHasRemote,omitempty"`
 	GitChanges       string      `json:"gitChanges,omitempty"`
 	LinkedWorktree   bool        `json:"linkedWorktree,omitempty"`
 	GitAhead         int         `json:"gitAhead,omitempty"`
 	GitBehind        int         `json:"gitBehind,omitempty"`
 	GitTrackingKnown bool        `json:"gitTrackingKnown,omitempty"`
+	GitStash         int         `json:"gitStash,omitempty"`
+	GitConflicts     int         `json:"gitConflicts,omitempty"`
+	GitDirty         bool        `json:"gitDirty,omitempty"`
 	SessionPath      string      `json:"sessionPath,omitempty"`
 	Executable       string      `json:"executable,omitempty"`
 	PID              int         `json:"pid,omitempty"`
 	Status           AgentStatus `json:"status,omitempty"`
 	StatusSince      time.Time   `json:"statusSince"`
+	Model            string      `json:"model,omitempty"`
+	WaitingReason    string      `json:"waitingReason,omitempty"`
+	LastTool         string      `json:"lastTool,omitempty"`
+	Task             string      `json:"task,omitempty"`
+	PromptAt         time.Time   `json:"promptAt,omitzero"`
 }
 
 func (s Session) IsSaved() bool {

@@ -10,8 +10,6 @@ import (
 
 	"github.com/samber/oops"
 	gotmux "github.com/zigai/gotmux/tmux"
-
-	"github.com/zigai/sesh/internal/snapshot/model"
 )
 
 const (
@@ -27,12 +25,12 @@ type PaneHistory struct {
 	WindowIndex int
 	PaneIndex   int
 	Lines       int
-	NameRaw     model.Bytes
+	NameRaw     RawBytes
 }
 
 type SessionHistorySummary struct {
 	SessionName string
-	NameRaw     model.Bytes
+	NameRaw     RawBytes
 	PaneCount   int
 	Lines       int
 }
@@ -205,7 +203,7 @@ func querySessionPanes(ctx context.Context, sessInfo gotmux.SessionInfo) ([]gotm
 func appendSessionPanes(panes []PaneHistory, sessPanes []gotmux.PaneInfo, sessInfo gotmux.SessionInfo) ([]PaneHistory, bool) {
 	rawName, hasRaw := sessInfo.Raw("session_name")
 
-	var nameRaw model.Bytes
+	var nameRaw RawBytes
 	if hasRaw && len(rawName) > 0 {
 		nameRaw = slices.Clone(rawName)
 	} else {

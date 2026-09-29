@@ -111,20 +111,21 @@ func TestAutosaveDisabledIsANoOpWithoutSocket(t *testing.T) {
 	}
 }
 
-func TestAutosaveSaveIfDueEnabledRequiresSocket(t *testing.T) {
+func TestAutosaveSaveIfDueSkipsWhenDefaultTmuxServerIsNotRunning(t *testing.T) {
 	isolatedAutosaveHome(t)
 
 	exec := executeJSON(t, actionCmd, "autosave-save-if-due", testNoConfigFlag, testJSONFlag)
-	if exec.err == nil {
-		t.Fatal("expected usage failure without a tmux socket, got nil")
+	if exec.err != nil || !exec.envelope.OK {
+		t.Fatalf("save-if-due without a running tmux server failed: %v\nstderr: %s", exec.err, exec.stderr)
 	}
 
-	if clibase.ExitCode(exec.err) != clibase.ExitCodeUsage {
-		t.Fatalf("exit code = %d, want %d", clibase.ExitCode(exec.err), clibase.ExitCodeUsage)
+	result := decodeJSONPayload[autosaveResultJSON](t, exec.envelope.Result)
+	if result.Status != autosaveStatusSkipped || result.Reason != autosaveReasonTmuxNotRunning || result.Recorded {
+		t.Fatalf("result = %#v, want an unrecorded skip because tmux is not running", result)
 	}
 
-	if exec.envelope.Error == nil || exec.envelope.Error.Code != "usageError" {
-		t.Fatalf("error payload = %#v, want usageError", exec.envelope.Error)
+	if result.Attempt != "" || result.Generation != "" {
+		t.Fatalf("result = %#v, want no save attempt without a tmux server", result)
 	}
 }
 
@@ -239,13 +240,8 @@ func TestAutosaveStatusReportsDurableState(t *testing.T) {
 	}
 }
 
-func TestAutosaveFinalSaveRequiresSocketAndPositiveDeadline(t *testing.T) {
+func TestAutosaveFinalSaveRequiresPositiveDeadline(t *testing.T) {
 	isolatedAutosaveHome(t)
-
-	exec := executeJSON(t, "autosave", "final-save", testNoConfigFlag, testJSONFlag)
-	if exec.err == nil || clibase.ExitCode(exec.err) != clibase.ExitCodeUsage {
-		t.Fatalf("final-save without a socket = (%v, %d), want a usage error", exec.err, clibase.ExitCode(exec.err))
-	}
 
 	deadline := executeJSON(
 		t, "autosave", "final-save",
@@ -307,5 +303,18 @@ func TestAutosaveSaveIfDueRejectsInvalidEnvironmentKeys(t *testing.T) {
 
 	if exec.err == nil {
 		t.Fatal("expected save-if-due to fail for invalid environment key")
+	}
+}
+
+func TestAutosaveStatusTextReportsIntervalInMinutes(t *testing.T) {
+	isolatedAutosaveHome(t)
+
+	stdout, stderr, err := executeCommand(newRootCommand(t.Context()), actionCmd, "autosave-status", testNoConfigFlag)
+	if err != nil {
+		t.Fatalf("autosave-status failed: %v\nstderr: %s", err, stderr)
+	}
+
+	if !strings.Contains(stdout, "Interval:   3m\n") {
+		t.Fatalf("status output does not report the default 3 minute interval:\n%s", stdout)
 	}
 }

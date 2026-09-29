@@ -23,15 +23,17 @@ var (
 )
 
 type daemonLifecycleRuntime struct {
-	events    chan lifecycle.Event
-	released  atomic.Int64
-	rearmed   atomic.Int64
-	cancel    context.CancelFunc
-	onRelease func()
+	events         chan lifecycle.Event
+	released       atomic.Int64
+	rearmed        atomic.Int64
+	cancel         context.CancelFunc
+	onRelease      func()
+	holdAfterRearm time.Duration
 }
 
 func (r *daemonLifecycleRuntime) Next(ctx context.Context) (lifecycle.Event, error) {
 	if r.rearmed.Load() > 0 {
+		time.Sleep(r.holdAfterRearm)
 		r.cancel()
 
 		return lifecycle.Event{}, fmt.Errorf("finish daemon lifecycle test: %w", context.Cause(ctx))
@@ -137,6 +139,50 @@ func TestDaemonLifecycleStopsForFinalSaveAndRestartsAfterCancellation(t *testing
 	}
 }
 
+func TestDaemonLifecycleNeverRunsPeriodicSaves(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+
+	runtime := &daemonLifecycleRuntime{
+		events:         make(chan lifecycle.Event, 2),
+		cancel:         cancel,
+		holdAfterRearm: 100 * time.Millisecond,
+	}
+
+	runtime.events <- lifecycle.Event{Kind: lifecycle.EventSleep, Cycle: 1, Deadline: time.Now().Add(time.Second)}
+
+	runtime.events <- lifecycle.Event{Kind: lifecycle.EventSleep, Cycle: 1, Canceled: true}
+
+	scheduledAttempts := new(atomic.Int64)
+
+	newScheduler := func() (*automation.Scheduler, error) {
+		return automation.NewScheduler(automation.SchedulerConfig{
+			Interval:       time.Millisecond,
+			AttemptTimeout: time.Second,
+			DrainGrace:     100 * time.Millisecond,
+			Attempt: func(_ context.Context, trigger automation.Trigger) (automation.AttemptResult, error) {
+				if trigger != automation.TriggerShutdown {
+					scheduledAttempts.Add(1)
+				}
+
+				return automation.AttemptResult{Recorded: true}, errDaemonFinalRecorded
+			},
+		})
+	}
+
+	scheduler, err := newScheduler()
+	if err != nil {
+		t.Fatalf("newScheduler failed: %v", err)
+	}
+
+	if err := runDaemonLifecycle(ctx, scheduler, newScheduler, runtime, time.Second, nil); err != nil {
+		t.Fatalf("runDaemonLifecycle failed: %v", err)
+	}
+
+	if got := scheduledAttempts.Load(); got != 0 {
+		t.Fatalf("periodic attempts = %d, want none: periodic saves belong to the autosave timer", got)
+	}
+}
+
 func TestDaemonRepositoryGateRefusesUnresolvedSave(t *testing.T) {
 	repositoryPath := filepath.Join(t.TempDir(), "repository")
 
@@ -166,17 +212,6 @@ func TestDaemonRepositoryGateRefusesUnresolvedSave(t *testing.T) {
 	err = ensureDaemonRepositoryReady(t.Context(), cmd, autosaveEnv{})
 	if !errors.Is(err, errDaemonRecoveryBarrier) {
 		t.Fatalf("ensureDaemonRepositoryReady error = %v, want recovery barrier", err)
-	}
-}
-
-func TestDaemonAutosaveDecisionRequiresDurableHistory(t *testing.T) {
-	decision := daemonAutosaveDecision(true, false, automation.PolicyFacts{
-		Attached:      0,
-		AttachedKnown: true,
-	})
-
-	if decision.Admit || decision.Reason != automation.ReasonHistoryUnavailable {
-		t.Fatalf("decision = %+v, want history unavailable refusal", decision)
 	}
 }
 

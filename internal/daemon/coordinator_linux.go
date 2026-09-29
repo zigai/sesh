@@ -34,7 +34,7 @@ type lifecycleCoordinator struct {
 	draining  bool
 }
 
-func (c *lifecycleCoordinator) handleCanceled(ctx context.Context) error {
+func (c *lifecycleCoordinator) handleCanceled() error {
 	if !c.draining {
 		return nil
 	}
@@ -43,12 +43,10 @@ func (c *lifecycleCoordinator) handleCanceled(ctx context.Context) error {
 		return oops.In("daemon").Code("lifecycle_failed").With("operation", "run_lifecycle").Wrap(ErrNewSchedulerNil)
 	}
 
+	// A scheduler runs one shutdown save, so a canceled sleep or shutdown needs a fresh one. Its
+	// periodic loop stays stopped: periodic saves belong to the autosave timer.
 	replacement, err := c.cfg.NewScheduler()
 	if err != nil {
-		return oops.In("daemon").Code("lifecycle_failed").With("operation", "run_lifecycle").Wrap(err)
-	}
-
-	if err = replacement.Start(ctx); err != nil {
 		return oops.In("daemon").Code("lifecycle_failed").With("operation", "run_lifecycle").Wrap(err)
 	}
 
@@ -85,9 +83,9 @@ func (c *lifecycleCoordinator) handleDraining(eventCtx context.Context) error {
 	return nil
 }
 
-func (c *lifecycleCoordinator) handleEvent(ctx, eventCtx context.Context, event lifecycle.Event) error {
+func (c *lifecycleCoordinator) handleEvent(eventCtx context.Context, event lifecycle.Event) error {
 	if event.Canceled {
-		return c.handleCanceled(ctx)
+		return c.handleCanceled()
 	}
 
 	return c.handleDraining(eventCtx)
@@ -101,7 +99,7 @@ func RunLifecycle(ctx context.Context, cfg CoordinatorConfig) error {
 	}
 
 	runErr := lifecycle.RunLogind(ctx, cfg.Runtime, func(eventCtx context.Context, event lifecycle.Event) error {
-		return c.handleEvent(ctx, eventCtx, event)
+		return c.handleEvent(eventCtx, event)
 	})
 
 	var stopErr error

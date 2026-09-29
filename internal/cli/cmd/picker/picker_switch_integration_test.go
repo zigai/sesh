@@ -19,6 +19,7 @@ import (
 
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/session"
+	"github.com/zigai/sesh/internal/tui"
 )
 
 func TestPickerAgentSelectionSwitchesClientAndFocusesPane(t *testing.T) {
@@ -157,7 +158,11 @@ func TestPopupHandoffSwitchesOnlyOpeningClientAfterPopupSelection(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := writePickerSwitchHandoff(path, target, ""); err != nil {
+	originView := tui.AgentView{
+		Session: session.Identity{Origin: "local", Socket: server.Endpoint().SocketPath, Name: "origin-agent-session"},
+		PaneID:  "%0",
+	}
+	if err := writePickerSwitchHandoff(path, &target, "", "", []tui.AgentView{originView}); err != nil {
 		t.Fatal(err)
 	}
 	runtime := pickerCommandRuntime{
@@ -196,6 +201,19 @@ func TestPopupHandoffSwitchesOnlyOpeningClientAfterPopupSelection(t *testing.T) 
 		if !found {
 			t.Fatalf("client %q disappeared", test.name)
 		}
+	}
+
+	// The invoking process records the switch and the popup's deferred views together.
+	st, err := session.LoadState(runtime.historyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	switched := session.Identity{Origin: "local", Socket: server.Endpoint().SocketPath, Name: "mobile-target"}
+	if st.GetLastSwitchIdentity(switched) == 0 {
+		t.Fatal("popup handoff did not record the switch in history")
+	}
+	if st.GetLastAgentView(originView.Session, originView.PaneID) == 0 {
+		t.Fatal("popup handoff did not record the popup's deferred agent view")
 	}
 }
 

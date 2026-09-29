@@ -483,6 +483,87 @@ func TestWatchCatalogYieldsTransitions(t *testing.T) {
 	}
 }
 
+type catalogDelivery struct {
+	catalog Catalog
+	err     error
+}
+
+// watchTestCatalog starts WatchCatalog and returns a bounded receive for its next delivery
+// and a stop function that cancels the watch and checks it ended by cancellation.
+func watchTestCatalog(t *testing.T, dir *privatefs.Dir) (func() catalogDelivery, func()) {
+	t.Helper()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	deliveries := make(chan catalogDelivery, 16)
+	done := make(chan error, 1)
+
+	go func() {
+		done <- WatchCatalog(ctx, dir, minWatchInterval, func(catalog Catalog, err error) error {
+			deliveries <- catalogDelivery{catalog: catalog, err: err}
+
+			return nil
+		})
+	}()
+
+	next := func() catalogDelivery {
+		t.Helper()
+
+		select {
+		case received := <-deliveries:
+			return received
+		case <-time.After(5 * time.Second):
+			t.Fatal("timed out waiting for a catalog delivery")
+
+			return catalogDelivery{catalog: Catalog{Version: 0, GeneratedAt: time.Time{}, Connections: nil}, err: nil}
+		}
+	}
+
+	stop := func() {
+		t.Helper()
+		cancel()
+
+		if err := <-done; !errors.Is(err, context.Canceled) {
+			t.Fatalf("WatchCatalog() error = %v, want cancellation", err)
+		}
+	}
+
+	return next, stop
+}
+
+func TestWatchCatalogRedeliversUnchangedCatalogAfterReadFailure(t *testing.T) {
+	dir, path := openTestCatalogDir(t)
+	catalogPath := filepath.Join(path, catalogName)
+
+	if err := WriteCatalog(dir, testCatalogFixture()); err != nil {
+		t.Fatal(err)
+	}
+
+	next, stop := watchTestCatalog(t, dir)
+	defer stop()
+
+	if first := next(); first.err != nil || first.catalog.Connections["host"].PeerID != testPeerID {
+		t.Fatalf("initial delivery = %#v, want the published connection", first)
+	}
+
+	// A directory in place of the catalog file makes the read fail; the original bytes are kept aside.
+	aside := catalogPath + ".aside"
+	if err := errors.Join(os.Rename(catalogPath, aside), os.Mkdir(catalogPath, 0o700)); err != nil {
+		t.Fatal(err)
+	}
+
+	if failed := next(); failed.err == nil {
+		t.Fatalf("delivery = %#v, want the catalog read failure", failed)
+	}
+
+	if err := errors.Join(os.Remove(catalogPath), os.Rename(aside, catalogPath)); err != nil {
+		t.Fatal(err)
+	}
+
+	if recovered := next(); recovered.err != nil || recovered.catalog.Connections["host"].PeerID != testPeerID {
+		t.Fatalf("delivery after recovery = %#v, want the unchanged catalog again", recovered)
+	}
+}
+
 func TestCatalogSessionsProjectsRemoteIdentity(t *testing.T) {
 	state := ConnectionState{
 		ID:             "host",

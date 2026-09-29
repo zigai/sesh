@@ -3,9 +3,11 @@ package cmddoctor
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"path/filepath"
+	"strings"
 
-	prettytable "github.com/jedib0t/go-pretty/v6/table"
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
 
@@ -17,11 +19,9 @@ import (
 )
 
 const (
-	colWidthDoctorCheck   = 16
-	colWidthDoctorStatus  = 8
-	colWidthDoctorReason  = 12
-	colWidthDoctorMessage = 28
-	colWidthDoctorFix     = 24
+	doctorReportWidth    = 100
+	doctorMinDetailWidth = 32
+	doctorLabelGap       = 2
 )
 
 var ErrDoctorChecksFailed = clibase.ErrDoctorChecksFailed
@@ -59,8 +59,8 @@ func NewCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().String("socket", "", "Explicit absolute path to tmux server socket")
-	cmd.Flags().String("repository", "", "Snapshot repository directory")
+	clibase.AddSocketFlag(cmd)
+	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
 	cmd.Flags().String("history", "", "History state JSON file path")
 	clibase.AddJSONFlag(cmd)
 
@@ -78,42 +78,26 @@ func resolveDoctorOptions(cmd *cobra.Command) (doctor.Options, error) {
 		LogindDelayMillis: 0,
 	}
 
-	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
-	if err != nil {
+	if _, err := clibase.LoadCommandConfig(cmd.Context(), cmd); err != nil {
 		return opts, err
 	}
 
-	socketPath, _ := cmd.Flags().GetString("socket")
-	if socketPath != "" {
-		server, err := integration.Open(socketPath)
-		if err != nil {
-			return opts, oops.In("cli").With("operation", "open_tmux").Wrap(err)
-		}
-
-		opts.Server = server
-
-		runtimeState, runtimeStatus := cmdautosave.AutosaveDaemonRuntimeState(cmd.Context(), cmd)
-		opts.DaemonState = runtimeState
-		opts.DaemonPhase = string(runtimeStatus.Phase)
-		opts.InhibitorsHeld = runtimeStatus.InhibitorsHeld
-		opts.LogindDelayMillis = runtimeStatus.LogindDelayMillis
+	server, err := integration.Open(clibase.ResolveSocket(cmd))
+	if err != nil {
+		return opts, oops.In("cli").With("operation", "open_tmux").Wrap(err)
 	}
 
-	repoPath, _ := cmd.Flags().GetString("repository")
-	if repoPath != "" {
-		absRepo, err := filepath.Abs(repoPath)
-		if err != nil {
-			return opts, oops.In("cli").With("operation", "read_repository_flag").Wrap(err)
-		}
+	opts.Server = server
 
-		opts.SnapshotDir = absRepo
-	} else {
-		dataDir, err := config.GetDataDir(cfg)
-		if err != nil {
-			return opts, oops.In("cli").With("operation", "resolve_default_repository").Wrap(err)
-		}
+	runtimeState, runtimeStatus := cmdautosave.AutosaveDaemonRuntimeState(cmd.Context(), cmd)
+	opts.DaemonState = runtimeState
+	opts.DaemonPhase = string(runtimeStatus.Phase)
+	opts.InhibitorsHeld = runtimeStatus.InhibitorsHeld
+	opts.LogindDelayMillis = runtimeStatus.LogindDelayMillis
 
-		opts.SnapshotDir = filepath.Join(dataDir, "snapshots")
+	opts.SnapshotDir, err = clibase.ResolveRepository(cmd)
+	if err != nil {
+		return opts, err
 	}
 
 	historyPath, _ := cmd.Flags().GetString("history")
@@ -156,7 +140,7 @@ func runDoctor(cmd *cobra.Command, _ []string) error {
 			return clibase.WriteJSONResultError(cmd, result, failure)
 		}
 
-		if renderErr := renderDoctorTable(cmd, results); renderErr != nil {
+		if renderErr := renderDoctorReport(cmd, results); renderErr != nil {
 			return errors.Join(failure, renderErr)
 		}
 
@@ -168,7 +152,7 @@ func runDoctor(cmd *cobra.Command, _ []string) error {
 			return clibase.WriteJSONResult(cmd, result)
 		}
 
-		return renderDoctorTable(cmd, results)
+		return renderDoctorReport(cmd, results)
 	}
 
 	failure := &doctorChecksError{
@@ -179,35 +163,93 @@ func runDoctor(cmd *cobra.Command, _ []string) error {
 		return clibase.WriteJSONResultError(cmd, result, failure)
 	}
 
-	if renderErr := renderDoctorTable(cmd, results); renderErr != nil {
+	if renderErr := renderDoctorReport(cmd, results); renderErr != nil {
 		return errors.Join(failure, renderErr)
 	}
 
 	return clibase.NewCommandResultError(failure)
 }
 
-func renderDoctorTable(cmd *cobra.Command, results []doctor.Result) error {
-	rows := make([]prettytable.Row, 0, len(results))
+func renderDoctorReport(cmd *cobra.Command, results []doctor.Result) error {
+	return clibase.CommandOutputError(writeDoctorReport(cmd.OutOrStdout(), clibase.CommandOutputWidth(cmd), results))
+}
+
+// writeDoctorReport prints one line per check with its message and fix wrapped beneath the
+// check name. Reason codes stay in --json output, where scripts consume them.
+func writeDoctorReport(output io.Writer, width int, results []doctor.Result) error {
+	if width <= 0 {
+		width = doctorReportWidth
+	}
+
+	nameWidth := 0
+	for _, r := range results {
+		nameWidth = max(nameWidth, len(r.Check))
+	}
+
+	indent := strings.Repeat(" ", 2+nameWidth+doctorLabelGap)
+	detailWidth := max(width-len(indent), doctorMinDetailWidth)
+
+	var b strings.Builder
 
 	for _, r := range results {
-		rows = append(rows, prettytable.Row{
-			r.Check,
-			r.Status,
-			r.Reason,
-			r.Message,
-			r.Fix,
-		})
+		lines := clibase.WrapText(r.Message, detailWidth)
+		if r.Fix != "" {
+			lines = append(lines, clibase.WrapText("fix: "+r.Fix, detailWidth)...)
+		}
+
+		if len(lines) == 0 {
+			lines = []string{""}
+		}
+
+		fmt.Fprintf(&b, "%s %-*s%s%s\n", doctorStatusSymbol(r.Status), nameWidth, r.Check, strings.Repeat(" ", doctorLabelGap), lines[0])
+
+		for _, line := range lines[1:] {
+			b.WriteString(strings.TrimRight(indent+line, " ") + "\n")
+		}
 	}
 
-	columns := []clibase.TableColumn{
-		{Heading: "Check", Fixed: true, MinWidth: colWidthDoctorCheck, Wrap: nil},
-		{Heading: "Status", Fixed: true, MinWidth: colWidthDoctorStatus, Wrap: nil},
-		{Heading: "Reason", Fixed: false, MinWidth: colWidthDoctorReason, Wrap: nil},
-		{Heading: "Message", Fixed: false, MinWidth: colWidthDoctorMessage, Wrap: clibase.WrapIdentifier},
-		{Heading: "Fix", Fixed: false, MinWidth: colWidthDoctorFix, Wrap: clibase.WrapIdentifier},
+	fmt.Fprintf(&b, "\n%s\n", doctorSummary(results))
+
+	_, err := io.WriteString(output, b.String())
+
+	return err
+}
+
+func doctorStatusSymbol(status string) string {
+	switch status {
+	case doctor.StatusOK:
+		return "✓"
+	case doctor.StatusWarning:
+		return "!"
+	default:
+		return "✗"
+	}
+}
+
+func doctorSummary(results []doctor.Result) string {
+	warnings, failures := 0, 0
+
+	for _, r := range results {
+		switch r.Status {
+		case doctor.StatusOK:
+		case doctor.StatusWarning:
+			warnings++
+		default:
+			failures++
+		}
 	}
 
-	return clibase.WriteResponsiveTable(cmd, columns, rows, false)
+	return fmt.Sprintf("%d checks: %d ok, %d %s, %d %s",
+		len(results), len(results)-warnings-failures,
+		warnings, plural(warnings, "warning"), failures, plural(failures, "error"))
+}
+
+func plural(count int, noun string) string {
+	if count == 1 {
+		return noun
+	}
+
+	return noun + "s"
 }
 
 func newDoctorResult(results []doctor.Result) doctorResultJSON {

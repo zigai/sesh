@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/zigai/sesh/internal/session"
-	"github.com/zigai/sesh/internal/snapshot/model"
 )
 
 const testSessionDev = "dev"
@@ -75,8 +74,8 @@ func TestSortPaneHistoryRawNameTiebreak(t *testing.T) {
 	t.Parallel()
 
 	input := []session.PaneHistory{
-		{SessionName: "sess", NameRaw: model.Bytes("sess-\xff"), WindowIndex: 1, PaneIndex: 0},
-		{SessionName: "sess", NameRaw: model.Bytes("sess-\xfe"), WindowIndex: 1, PaneIndex: 0},
+		{SessionName: "sess", NameRaw: session.RawBytes("sess-\xff"), WindowIndex: 1, PaneIndex: 0},
+		{SessionName: "sess", NameRaw: session.RawBytes("sess-\xfe"), WindowIndex: 1, PaneIndex: 0},
 	}
 
 	session.SortPaneHistory(input)

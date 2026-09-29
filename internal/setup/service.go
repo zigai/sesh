@@ -243,7 +243,7 @@ func CoordinatorDefinition(inputs ServiceInputs) (ServiceDefinition, error) {
 	definition := ServiceDefinition{
 		Name:     CoordinatorServiceName,
 		Kind:     KindSystemdService,
-		Purpose:  "lifecycle coordinator and periodic autosave daemon",
+		Purpose:  "sleep and shutdown save coordinator",
 		Path:     filepath.Join(root, CoordinatorServiceName),
 		Content:  "",
 		Requires: nil,
@@ -277,9 +277,9 @@ func renderSystemdCoordinatorService(inputs ServiceInputs) string {
 
 	content.WriteString(managedComment())
 	content.WriteString("[Unit]\n")
-	content.WriteString("Description=sesh lifecycle coordinator and periodic autosave daemon\n")
+	content.WriteString("Description=sesh sleep and shutdown save coordinator\n")
 	content.WriteString("Documentation=man:sesh(1)\n")
-	content.WriteString("After=sesh-tmux.service\n\n")
+	content.WriteString(managedTmuxOrdering(inputs, false) + "\n")
 	content.WriteString("[Service]\n")
 	content.WriteString("Type=exec\n")
 	content.WriteString("ExecStart=" + systemdCommand(inputs.Program, CoordinatorArgs(inputs)) + "\n")
@@ -297,7 +297,7 @@ func renderSystemdRemoteMonitor(inputs ServiceInputs) string {
 	content.WriteString("[Unit]\n")
 	content.WriteString("Description=sesh remote session monitor\n")
 	content.WriteString("Documentation=man:sesh(1)\n")
-	content.WriteString("After=sesh-tmux.service\n\n")
+	content.WriteString(managedTmuxOrdering(inputs, false) + "\n")
 	content.WriteString("[Service]\n")
 	content.WriteString("Type=exec\n")
 	content.WriteString("ExecStart=" + systemdCommand(inputs.Program, RemoteMonitorArgs(inputs)) + "\n")
@@ -315,13 +315,27 @@ func renderSystemdAutosaveService(inputs ServiceInputs) string {
 	content.WriteString("[Unit]\n")
 	content.WriteString("Description=sesh periodic tmux snapshot autosave\n")
 	content.WriteString("Documentation=man:sesh(1)\n")
-	content.WriteString("After=sesh-tmux.service\n")
-	content.WriteString("PartOf=sesh-tmux.service\n\n")
+	content.WriteString(managedTmuxOrdering(inputs, true) + "\n")
 	content.WriteString("[Service]\n")
 	content.WriteString("Type=oneshot\n")
 	content.WriteString("ExecStart=" + systemdCommand(inputs.Program, autosaveArgs(inputs)) + "\n")
 
 	return content.String()
+}
+
+// managedTmuxOrdering orders a unit after the sesh-managed tmux server, and binds its lifetime to
+// that server when partOf is set. Units rendered for a user-run tmux server reference no such unit.
+func managedTmuxOrdering(inputs ServiceInputs, partOf bool) string {
+	if !inputs.WithTmuxService {
+		return ""
+	}
+
+	ordering := "After=" + TmuxServiceName + "\n"
+	if partOf {
+		ordering += "PartOf=" + TmuxServiceName + "\n"
+	}
+
+	return ordering
 }
 
 func formatSystemdDuration(d time.Duration) string {
@@ -338,8 +352,14 @@ func renderSystemdAutosaveTimer(inputs ServiceInputs) string {
 	var content strings.Builder
 	content.WriteString(managedComment())
 	content.WriteString("[Unit]\n")
-	content.WriteString("Description=Run the sesh autosave service while the managed tmux server runs\n")
-	content.WriteString("PartOf=sesh-tmux.service\n\n")
+
+	if inputs.WithTmuxService {
+		content.WriteString("Description=Run the sesh autosave service while the managed tmux server runs\n")
+		content.WriteString("PartOf=" + TmuxServiceName + "\n\n")
+	} else {
+		content.WriteString("Description=Run the sesh autosave service periodically\n\n")
+	}
+
 	content.WriteString("[Timer]\n")
 	content.WriteString("OnActiveSec=" + interval + "\n")
 	content.WriteString("OnUnitActiveSec=" + interval + "\n")

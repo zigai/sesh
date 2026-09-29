@@ -16,7 +16,10 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
-var errSensitiveRaw = errors.New("sensitive raw internal path: /private/secret/key")
+var (
+	errSensitiveRaw         = errors.New("sensitive raw internal path: /private/secret/key")
+	errUnmappedHistoryCause = errors.New("open private history dir: unsafe private storage entry")
+)
 
 func TestJSONEnvelopeFormatAndTaxonomy(t *testing.T) {
 	tempDir := t.TempDir()
@@ -35,13 +38,6 @@ func TestJSONEnvelopeFormatAndTaxonomy(t *testing.T) {
 			wantCode:     "usageError",
 			wantExitCode: exitCodeUsage,
 			wantSubstr:   "unknown flag",
-		},
-		{
-			name:         "usage error missing required flag",
-			args:         []string{actionCmd, "snapshot-save", testJSONFlag},
-			wantCode:     "usageError",
-			wantExitCode: exitCodeUsage,
-			wantSubstr:   "--repository is required",
 		},
 		{
 			name: "selection required empty selection",
@@ -210,6 +206,17 @@ func TestSafeCommandErrorMessagePrivacy(t *testing.T) {
 
 	if msg := safeCommandErrorMessage(errPartialSnapshot); msg != "parity-incomplete save" {
 		t.Fatalf("errPartialSnapshot produced %q", msg)
+	}
+}
+
+func TestHumanErrorMessageReportsUnmappedCause(t *testing.T) {
+	wrapped := oops.In("cli").With("operation", "open_history").Wrap(errUnmappedHistoryCause)
+	if msg := humanErrorMessage(wrapped); msg != errUnmappedHistoryCause.Error() {
+		t.Fatalf("unmapped error produced %q, want its cause %q", msg, errUnmappedHistoryCause.Error())
+	}
+
+	if msg := humanErrorMessage(store.ErrUncertain); msg != "snapshot publication durability uncertain" {
+		t.Fatalf("ErrUncertain produced %q", msg)
 	}
 }
 

@@ -151,7 +151,7 @@ func TestApplicationUsageFailureDoesNotOpenLog(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	err := executeApplication(t.Context(), []string{actionCmd, "snapshot-save", testConfigFlag, cfg, testJSONFlag}, nil, &stdout, &stderr)
+	err := executeApplication(t.Context(), []string{actionCmd, "snapshot-save", "--unknown", testConfigFlag, cfg, testJSONFlag}, nil, &stdout, &stderr)
 	if ExitCode(err) != exitCodeUsage {
 		t.Fatalf("unexpected outcome: %v", err)
 	}
@@ -163,17 +163,21 @@ func TestApplicationUsageFailureDoesNotOpenLog(t *testing.T) {
 	}
 }
 
-func TestApplicationUnknownFlagDoesNotEchoPrivateText(t *testing.T) {
+func TestApplicationUnknownFlagNamesTheFlag(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
-	err := executeApplication(t.Context(), []string{"snapshot", "history", "--secret-token-canary", testJSONFlag}, nil, &stdout, &stderr)
+	err := executeApplication(t.Context(), []string{"snapshot", "history", "--mistyped-flag=value-canary", testJSONFlag}, nil, &stdout, &stderr)
 	if ExitCode(err) != exitCodeUsage {
 		t.Fatalf("unexpected outcome: %v", err)
 	}
 
 	env := singleRuntimeEnvelope(t, stderr.Bytes())
-	if bytes.Contains(stderr.Bytes(), []byte("secret-token-canary")) || env.Error == nil || !strings.Contains(env.Error.Message, "unknown flag") || !strings.Contains(env.Error.Message, "snapshot history --help") {
-		t.Fatalf("unsafe diagnostic: %s", stderr.Bytes())
+	if env.Error == nil || !strings.Contains(env.Error.Message, "unknown flag: --mistyped-flag") || !strings.Contains(env.Error.Message, "snapshot history --help") {
+		t.Fatalf("diagnostic does not name the unknown flag: %s", stderr.Bytes())
+	}
+
+	if bytes.Contains(stderr.Bytes(), []byte("value-canary")) {
+		t.Fatalf("diagnostic echoed the flag value: %s", stderr.Bytes())
 	}
 }
 
@@ -478,7 +482,7 @@ func TestHumanFinalizationReportsPrimaryAndCleanupFailures(t *testing.T) {
 		t.Fatalf("lost cause: %v", err)
 	}
 
-	if stderr.String() != "latest save requires explicit recovery\noperation failed\n" {
+	if stderr.String() != "latest save requires explicit recovery\nio: read/write on closed pipe\n" {
 		t.Fatalf("missing diagnostic: %q", stderr.String())
 	}
 }

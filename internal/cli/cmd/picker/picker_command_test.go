@@ -11,11 +11,13 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/colorprofile"
 	"github.com/spf13/cobra"
 	gotmux "github.com/zigai/gotmux/tmux"
 	"github.com/zigai/gotmux/tmuxtest"
@@ -99,7 +101,9 @@ func TestPopupChildReceivesInvokingPaneSessionAndRepository(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	arguments := pickerPopupArguments(cmd, "/private/tmux.sock", "/dev/pts/1", "$7", "%2", "/private/handoff")
+	launchedAt := time.Unix(0, 1790000000123456789)
+
+	arguments := pickerPopupArguments(cmd, "/private/tmux.sock", "/dev/pts/1", "$7", "%2", "/private/handoff", launchedAt)
 	if len(arguments) < 3 || arguments[0] != "popup" {
 		t.Fatalf("popup child arguments = %#v", arguments)
 	}
@@ -108,10 +112,44 @@ func TestPopupChildReceivesInvokingPaneSessionAndRepository(t *testing.T) {
 		t.Fatalf("popup child arguments recurse through launcher: %#v", arguments)
 	}
 
-	for _, required := range []string{"--repository", "/private/repository", "--target-pane", "%2", "--current-session-id", "$7", "--switch-handoff", "/private/handoff"} {
+	for _, required := range []string{
+		"--repository", "/private/repository", "--target-pane", "%2", "--current-session-id", "$7",
+		"--switch-handoff", "/private/handoff", "--launched-at", "1790000000123456789",
+	} {
 		if !slices.Contains(arguments, required) {
 			t.Fatalf("popup child arguments lack %q: %#v", required, arguments)
 		}
+	}
+}
+
+func TestPopupChildAcceptsOnlyRecentLaunchTimes(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1790000000, 0)
+	for _, test := range []struct {
+		name  string
+		value string
+		want  bool
+	}{
+		{"absent", "", false},
+		{"recent", strconv.FormatInt(now.Add(-300*time.Millisecond).UnixNano(), 10), true},
+		{"future", strconv.FormatInt(now.Add(time.Second).UnixNano(), 10), false},
+		{"stale", strconv.FormatInt(now.Add(-2*time.Minute).UnixNano(), 10), false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			cmd := NewPopupCommand(t.Context())
+			if test.value != "" {
+				if err := cmd.Flags().Set("launched-at", test.value); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			if _, ok := pickerLaunchedAt(cmd, now); ok != test.want {
+				t.Fatalf("launch time accepted = %t, want %t", ok, test.want)
+			}
+		})
 	}
 }
 
@@ -175,6 +213,44 @@ func TestPickerPopupUsesApplicationOwnedFrame(t *testing.T) {
 		t.Fatalf("popup presentation = style %q at %q,%q", options.Style, options.X, options.Y)
 	}
 
+	if !options.CloseOnExit || options.CloseOnSuccess || options.CloseOnKey || options.DisableDismiss {
+		t.Fatalf("popup close policy = %+v", options)
+	}
+
+	if options.Width != "120" || options.Height != "32" {
+		t.Fatalf("popup dimensions = %q x %q", options.Width, options.Height)
+	}
+}
+
+func TestPickerColorProfileInsideTmuxNeedsNoTmuxQuery(t *testing.T) {
+	t.Parallel()
+
+	inside := []string{"TMUX=/tmp/tmux-1000/default,42,0", "TERM=tmux-256color"}
+	for _, test := range []struct {
+		name    string
+		environ []string
+		want    colorprofile.Profile
+		decided bool
+	}{
+		{"outside tmux", []string{"TERM=xterm-256color"}, colorprofile.Unknown, false},
+		{"inside tmux", inside, colorprofile.TrueColor, true},
+		{"inside tmux without color", append(slices.Clone(inside), "NO_COLOR=1"), colorprofile.ASCII, true},
+		{"inside tmux on a dumb terminal", []string{"TMUX=/tmp/tmux-1000/default,42,0", "TERM=dumb"}, colorprofile.NoTTY, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, decided := pickerColorProfile(test.environ)
+			if got != test.want || decided != test.decided {
+				t.Fatalf("color profile = %v, %t; want %v, %t", got, decided, test.want, test.decided)
+			}
+		})
+	}
+}
+
+func TestPickerPopupBackgroundStyle(t *testing.T) {
+	t.Parallel()
+
 	transparentOpts := pickerPopupOptions(gotmux.Exec("/bin/true"), "120", "32", "default")
 	if transparentOpts.Style != "" {
 		t.Fatalf("transparent popup style = %q, want empty", transparentOpts.Style)
@@ -183,14 +259,6 @@ func TestPickerPopupUsesApplicationOwnedFrame(t *testing.T) {
 	customBgOpts := pickerPopupOptions(gotmux.Exec("/bin/true"), "120", "32", "#1e1e2e")
 	if customBgOpts.Style != "bg=#1e1e2e" {
 		t.Fatalf("custom bg popup style = %q, want bg=#1e1e2e", customBgOpts.Style)
-	}
-
-	if !options.CloseOnExit || options.CloseOnSuccess || options.CloseOnKey || options.DisableDismiss {
-		t.Fatalf("popup close policy = %+v", options)
-	}
-
-	if options.Width != "120" || options.Height != "32" {
-		t.Fatalf("popup dimensions = %q x %q", options.Width, options.Height)
 	}
 }
 

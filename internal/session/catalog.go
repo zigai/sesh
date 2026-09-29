@@ -37,9 +37,16 @@ var (
 
 type CatalogStatus string
 
+// SavedSnapshots reads the generations a catalog lists saved sessions from. Both a durable
+// *store.Repository and a lock-free *store.View satisfy it.
+type SavedSnapshots interface {
+	ReadPracticalCurrent(ctx context.Context) (store.Generation, model.Manifest, error)
+	Read(ctx context.Context, id string) (model.Manifest, error)
+}
+
 type CatalogOptions struct {
 	Server           *gotmux.Server
-	Repository       *store.Repository
+	Repository       SavedSnapshots
 	RepositorySource string
 	GenerationID     string
 	CurrentPane      string
@@ -113,7 +120,7 @@ func ListLive(ctx context.Context, server *gotmux.Server, currentPane string) ([
 	return listLive(ctx, server, currentPane, "")
 }
 
-func ListSaved(ctx context.Context, repo *store.Repository, source, generationID string) ([]Session, error) {
+func ListSaved(ctx context.Context, repo SavedSnapshots, source, generationID string) ([]Session, error) {
 	if repo == nil {
 		return nil, nil
 	}
@@ -151,8 +158,8 @@ func ListSaved(ctx context.Context, repo *store.Repository, source, generationID
 			Origin:                 OriginLocal,
 			Generation:             genID,
 			RepositorySource:       source,
-			NameRaw:                slices.Clone(ms.Name),
-			PathRaw:                slices.Clone(ms.Directory),
+			NameRaw:                RawBytes(slices.Clone(ms.Name)),
+			PathRaw:                RawBytes(slices.Clone(ms.Directory)),
 			RuntimeIdentity:        zeroRuntimeIdentity(),
 			RemoteStatus:           RemoteStatusAvailable,
 			WindowCount:            windowCounts[ms.ID],
@@ -355,7 +362,7 @@ func absentCommandCauses(err error) bool {
 	return errors.Is(err, gotmux.ErrNoServer)
 }
 
-func fetchSavedSessions(ctx context.Context, repo *store.Repository, source, genID string) ([]Session, error) {
+func fetchSavedSessions(ctx context.Context, repo SavedSnapshots, source, genID string) ([]Session, error) {
 	if repo == nil {
 		return nil, nil
 	}
@@ -376,7 +383,7 @@ func fetchSavedSessions(ctx context.Context, repo *store.Repository, source, gen
 	return saved, nil
 }
 
-func countConstituents(srv *gotmux.Server, repo *store.Repository, liveErr, savedErr error) (int, int) {
+func countConstituents(srv *gotmux.Server, repo SavedSnapshots, liveErr, savedErr error) (int, int) {
 	requested, failed := 0, 0
 	if srv != nil {
 		requested++
@@ -484,9 +491,9 @@ func paneLinkedToSession(ctx context.Context, server *gotmux.Server, paneID, ses
 	})
 }
 
-func loadSavedManifest(ctx context.Context, repo *store.Repository, generationID string) (model.Manifest, string, error) {
+func loadSavedManifest(ctx context.Context, repo SavedSnapshots, generationID string) (model.Manifest, string, error) {
 	if generationID == "" {
-		gen, manifest, err := repo.ReadCurrent(ctx)
+		gen, manifest, err := repo.ReadPracticalCurrent(ctx)
 		if err != nil {
 			return model.Manifest{}, "", fmt.Errorf("read current generation: %w", err)
 		}
@@ -524,7 +531,7 @@ func buildLiveSession(
 ) Session {
 	rawName, hasRawName := s.Raw("session_name")
 
-	var nameRaw model.Bytes
+	var nameRaw RawBytes
 	if hasRawName && len(rawName) > 0 {
 		nameRaw = slices.Clone(rawName)
 	} else {
@@ -538,7 +545,7 @@ func buildLiveSession(
 	paneCommand, _ := s.Raw("pane_current_command")
 	paneTitle, _ := s.Raw("pane_title")
 
-	var pathRaw model.Bytes
+	var pathRaw RawBytes
 	if len(panePath) > 0 {
 		pathRaw = slices.Clone(panePath)
 	}

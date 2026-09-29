@@ -46,7 +46,7 @@ func NewListCommand() *cobra.Command {
 		RunE:  runList,
 	}
 
-	cmd.Flags().String("socket", "", "Explicit absolute path to tmux server socket (required)")
+	clibase.AddSocketFlag(cmd)
 	cmd.Flags().String("current-pane", "", "Explicit current pane ID for active session resolution")
 	cmd.Flags().String("history", "", "History state JSON file path (defaults to native XDG state)")
 	cmd.Flags().Bool("full", false, "Show complete values using an adaptive layout")
@@ -60,10 +60,7 @@ func ValidateListCommand(cmd *cobra.Command, args []string) error {
 		return clibase.NewExitError(clibase.ExitCodeUsage, errListPositionalArgs)
 	}
 
-	socketPath, _ := cmd.Flags().GetString("socket")
-	if socketPath == "" {
-		return clibase.NewExitError(clibase.ExitCodeUsage, clibase.ErrSocketRequired)
-	}
+	socketPath := clibase.ResolveSocket(cmd)
 
 	if !filepath.IsAbs(socketPath) || filepath.Clean(socketPath) != socketPath {
 		return clibase.NewExitError(clibase.ExitCodeUsage, oops.In("tmux").Code("endpoint_required").With("operation", "open").Wrap(tmux.ErrEndpoint))
@@ -115,10 +112,7 @@ func newSessionListJSONResult(sessions []session.Session) sessionListJSONResult 
 }
 
 func parseListOptions(cmd *cobra.Command) (*gotmux.Server, string, bool, error) {
-	socketPath, _ := cmd.Flags().GetString("socket")
-	if socketPath == "" {
-		return nil, "", false, clibase.NewExitError(clibase.ExitCodeUsage, clibase.ErrSocketRequired)
-	}
+	socketPath := clibase.ResolveSocket(cmd)
 
 	server, err := tmux.Open(socketPath)
 	if err != nil {

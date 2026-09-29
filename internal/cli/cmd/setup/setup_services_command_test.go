@@ -161,6 +161,61 @@ func TestSetupAutosavePreservesForeignDefinitions(t *testing.T) {
 	}
 }
 
+func TestSetupAutosaveDefaultsToUserTmuxServer(t *testing.T) {
+	isolatedSetupHome(t)
+
+	exec := executeJSON(
+		t, "setup", "autosave", "--with-coordinator",
+		"--dir", filepath.Join(t.TempDir(), "units"),
+		testNoConfigFlag, testJSONFlag,
+	)
+	if !exec.envelope.OK {
+		t.Fatalf("setup autosave failed: %+v\nstderr: %s", exec.err, exec.stderr)
+	}
+
+	want := "--socket " + clibase.DefaultTmuxSocket() + " "
+
+	result := decodeJSONPayload[setupServicesResultJSON](t, exec.envelope.Result)
+	for _, service := range result.Services {
+		if service.Kind == string(setup.KindSystemdTimer) {
+			continue
+		}
+
+		if !strings.Contains(service.Content, want) {
+			t.Fatalf("%s does not target tmux's default server %q:\n%s", service.Name, want, service.Content)
+		}
+
+		if strings.Contains(service.Content, setup.TmuxServiceName) {
+			t.Fatalf("%s references the uninstalled managed tmux server:\n%s", service.Name, service.Content)
+		}
+	}
+}
+
+func TestSetupAutosaveWithTmuxServiceDefaultsToManagedSocket(t *testing.T) {
+	isolatedSetupHome(t)
+
+	runtimeDir := t.TempDir()
+	t.Setenv("XDG_RUNTIME_DIR", runtimeDir)
+
+	exec := executeJSON(
+		t, "setup", "autosave", "--with-tmux-service", "--tmux", "/usr/bin/tmux",
+		"--dir", filepath.Join(t.TempDir(), "units"),
+		testNoConfigFlag, testJSONFlag,
+	)
+	if !exec.envelope.OK {
+		t.Fatalf("setup autosave failed: %+v\nstderr: %s", exec.err, exec.stderr)
+	}
+
+	want := "--socket " + filepath.Join(runtimeDir, "sesh", "tmux.sock") + " "
+
+	result := decodeJSONPayload[setupServicesResultJSON](t, exec.envelope.Result)
+	for _, service := range result.Services {
+		if service.Kind == string(setup.KindSystemdService) && !strings.Contains(service.Content, want) {
+			t.Fatalf("%s does not target the managed server %q:\n%s", service.Name, want, service.Content)
+		}
+	}
+}
+
 func TestSetupAutosaveTmuxServiceRequiresExplicitTmuxPath(t *testing.T) {
 	isolatedSetupHome(t)
 

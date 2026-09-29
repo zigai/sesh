@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -175,6 +176,29 @@ func TestDirectoryPathSuggestionsBoundsResults(t *testing.T) {
 
 	if got != nil {
 		t.Fatalf("expected nil results on limit exceeded, got %v", got)
+	}
+}
+
+func TestDirectoryPathSuggestionsNarrowsLargeDirectoriesByPrefix(t *testing.T) {
+	cwd := t.TempDir()
+
+	for i := range 2*directoryReadBatch + 100 {
+		if err := os.WriteFile(filepath.Join(cwd, "file"+strconv.Itoa(i)), nil, 0o600); err != nil {
+			t.Fatalf("write file: %v", err)
+		}
+	}
+
+	if err := os.Mkdir(filepath.Join(cwd, "project"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	got, err := DirectoryPathSuggestions(t.Context(), "pro", cwd)
+	if err != nil {
+		t.Fatalf("DirectoryPathSuggestions() err = %v", err)
+	}
+
+	if want := []string{"project" + string(os.PathSeparator)}; !slices.Equal(got, want) {
+		t.Fatalf("DirectoryPathSuggestions() = %#v, want %#v", got, want)
 	}
 }
 

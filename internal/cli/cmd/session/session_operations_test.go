@@ -7,9 +7,12 @@ import (
 	"strings"
 	"testing"
 
+	gotmux "github.com/zigai/gotmux/tmux"
+
 	"github.com/samber/oops"
 
 	"github.com/zigai/sesh/internal/cli/clibase"
+	"github.com/zigai/sesh/internal/session"
 )
 
 var errTestHistoryList = errors.New("test history list failure")
@@ -71,7 +74,7 @@ func TestSessionCommandsMissingArguments(t *testing.T) {
 	}
 }
 
-func TestSessionCommandsRequireExplicitOrAmbientSocket(t *testing.T) {
+func TestSessionCommandsWithoutSocketTargetDefaultTmuxServer(t *testing.T) {
 	t.Setenv("TMUX", "")
 	t.Setenv("TMUX_PANE", "")
 
@@ -90,20 +93,13 @@ func TestSessionCommandsRequireExplicitOrAmbientSocket(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			exec := executeJSON(t, append(tc.args, testNoConfigFlag, testJSONFlag)...)
 
-			if exec.err == nil {
-				t.Fatal("expected a missing-endpoint failure")
+			// Without a server, lookups find no session and mutations report the missing server.
+			if !errors.Is(exec.err, gotmux.ErrNoServer) && !errors.Is(exec.err, session.ErrSessionNotFound) {
+				t.Fatalf("error = %v, want the isolated default socket to have no server or session", exec.err)
 			}
 
-			if clibase.ExitCode(exec.err) != clibase.ExitCodeUsage {
-				t.Fatalf("exit code = %d, want %d", clibase.ExitCode(exec.err), clibase.ExitCodeUsage)
-			}
-
-			if exec.envelope.OK {
-				t.Fatalf("envelope reported success without an endpoint: %+v", exec.envelope)
-			}
-
-			if !strings.Contains(exec.err.Error(), "--socket is required") {
-				t.Fatalf("error = %v, want explicit socket requirement", exec.err)
+			if code := clibase.ExitCode(exec.err); code == clibase.ExitCodeUsage || exec.envelope.OK {
+				t.Fatalf("exit code %d / envelope %+v, want a non-usage failure", code, exec.envelope)
 			}
 		})
 	}

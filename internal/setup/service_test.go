@@ -116,6 +116,63 @@ func TestSystemdDefinitionsRenderOwnedUnits(t *testing.T) {
 	}
 }
 
+func TestSystemdUnitsForUserTmuxServerDoNotReferenceManagedServer(t *testing.T) {
+	t.Parallel()
+
+	inputs := linuxInputs(t)
+	inputs.SocketPath = "/tmp/tmux-1000/default"
+	inputs.WithCoordinator = true
+
+	definitions, err := setup.Definitions(inputs)
+	if err != nil {
+		t.Fatalf("Definitions failed: %v", err)
+	}
+
+	remote, err := setup.RemoteMonitorDefinition(inputs, true)
+	if err != nil {
+		t.Fatalf("RemoteMonitorDefinition failed: %v", err)
+	}
+
+	for _, definition := range append(definitions, remote) {
+		if strings.Contains(definition.Content, setup.TmuxServiceName) {
+			t.Fatalf("%s references the uninstalled managed tmux server:\n%s", definition.Name, definition.Content)
+		}
+	}
+
+	timer := findServiceDefinition(t, definitions, setup.AutosaveTimerName)
+	if strings.Contains(timer.Content, "managed tmux server") {
+		t.Fatalf("timer describes a managed tmux server that is not installed:\n%s", timer.Content)
+	}
+}
+
+func TestSystemdUnitsForManagedTmuxServerFollowIt(t *testing.T) {
+	t.Parallel()
+
+	inputs := linuxInputs(t)
+	inputs.WithTmuxService = true
+	inputs.WithCoordinator = true
+
+	definitions, err := setup.Definitions(inputs)
+	if err != nil {
+		t.Fatalf("Definitions failed: %v", err)
+	}
+
+	service := findServiceDefinition(t, definitions, setup.AutosaveServiceName)
+	if !strings.Contains(service.Content, "After="+setup.TmuxServiceName+"\n") || !strings.Contains(service.Content, "PartOf="+setup.TmuxServiceName+"\n") {
+		t.Fatalf("autosave service is not bound to the managed tmux server:\n%s", service.Content)
+	}
+
+	timer := findServiceDefinition(t, definitions, setup.AutosaveTimerName)
+	if !strings.Contains(timer.Content, "PartOf="+setup.TmuxServiceName+"\n") {
+		t.Fatalf("autosave timer is not bound to the managed tmux server:\n%s", timer.Content)
+	}
+
+	coordinator := findServiceDefinition(t, definitions, setup.CoordinatorServiceName)
+	if !strings.Contains(coordinator.Content, "After="+setup.TmuxServiceName+"\n") {
+		t.Fatalf("coordinator is not ordered after the managed tmux server:\n%s", coordinator.Content)
+	}
+}
+
 func TestSystemdTmuxServiceRunsBoundedFinalSave(t *testing.T) {
 	t.Parallel()
 

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/samber/oops"
@@ -18,7 +17,6 @@ import (
 	integration "github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/privatefs"
 	"github.com/zigai/sesh/internal/session"
-	"github.com/zigai/sesh/internal/snapshot/model"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
@@ -65,28 +63,28 @@ type sessionSwitchJSONResult struct {
 }
 
 type sessionJSON struct {
-	ID          string      `json:"id"`
-	Name        string      `json:"name"`
-	NameRaw     model.Bytes `json:"nameRaw,omitempty"`
-	WindowCount int         `json:"windowCount"`
-	Attached    bool        `json:"attached"`
-	ActivityAt  *string     `json:"activityAt"`
-	Current     bool        `json:"current"`
+	ID          string           `json:"id"`
+	Name        string           `json:"name"`
+	NameRaw     session.RawBytes `json:"nameRaw,omitempty"`
+	WindowCount int              `json:"windowCount"`
+	Attached    bool             `json:"attached"`
+	ActivityAt  *string          `json:"activityAt"`
+	Current     bool             `json:"current"`
 }
 
 type sessionHistorySummaryJSON struct {
-	Name      string      `json:"name"`
-	NameRaw   model.Bytes `json:"nameRaw,omitempty"`
-	PaneCount int         `json:"paneCount"`
-	LineCount int         `json:"lineCount"`
+	Name      string           `json:"name"`
+	NameRaw   session.RawBytes `json:"nameRaw,omitempty"`
+	PaneCount int              `json:"paneCount"`
+	LineCount int              `json:"lineCount"`
 }
 
 type paneHistoryJSON struct {
-	SessionName string      `json:"sessionName"`
-	NameRaw     model.Bytes `json:"nameRaw,omitempty"`
-	WindowIndex string      `json:"windowIndex"`
-	PaneIndex   string      `json:"paneIndex"`
-	LineCount   int         `json:"lineCount"`
+	SessionName string           `json:"sessionName"`
+	NameRaw     session.RawBytes `json:"nameRaw,omitempty"`
+	WindowIndex string           `json:"windowIndex"`
+	PaneIndex   string           `json:"paneIndex"`
+	LineCount   int              `json:"lineCount"`
 }
 
 func (rt *sessionRuntime) close() error {
@@ -150,7 +148,7 @@ func newSessionDeleteCommand() *cobra.Command {
 	}
 	cmd.Annotations = map[string]string{clibase.AnnotationSuccessOwned: annotationOwnedValue}
 
-	cmd.Flags().String("socket", "", "Explicit absolute path to tmux server socket (defaults to the ambient tmux server)")
+	clibase.AddSocketFlag(cmd)
 	cmd.Flags().String("repository", "", "Native repository directory holding saved generations (defaults to native data directory)")
 	cmd.Flags().String("lease-root", "", "Directory holding shared cooperative endpoint leases")
 	cmd.Flags().BoolP("force", "f", false, "Delete even if session has attached clients")
@@ -170,7 +168,7 @@ func newSessionKillCommand() *cobra.Command {
 	}
 	cmd.Annotations = map[string]string{clibase.AnnotationSuccessOwned: annotationOwnedValue}
 
-	cmd.Flags().String("socket", "", "Explicit absolute path to tmux server socket (defaults to the ambient tmux server)")
+	clibase.AddSocketFlag(cmd)
 	cmd.Flags().BoolP("force", "f", false, "Kill even if session has attached clients")
 	cmd.Flags().String("history", "", "History state JSON file path")
 	clibase.AddJSONFlag(cmd)
@@ -193,7 +191,7 @@ func newSessionNewCommand() *cobra.Command {
 	}
 	cmd.Annotations = map[string]string{clibase.AnnotationSuccessOwned: annotationOwnedValue}
 
-	cmd.Flags().String("socket", "", "Explicit absolute path to tmux server socket (defaults to the ambient tmux server)")
+	clibase.AddSocketFlag(cmd)
 	cmd.Flags().StringP("dir", "d", "", "Initial working directory for the session")
 	cmd.Flags().String("history", "", "History state JSON file path")
 	clibase.AddJSONFlag(cmd)
@@ -211,7 +209,7 @@ func newSessionRenameCommand() *cobra.Command {
 	}
 	cmd.Annotations = map[string]string{clibase.AnnotationSuccessOwned: annotationOwnedValue}
 
-	cmd.Flags().String("socket", "", "Explicit absolute path to tmux server socket (defaults to the ambient tmux server)")
+	clibase.AddSocketFlag(cmd)
 	cmd.Flags().StringP("session", "s", "", "Session to rename (defaults to current)")
 	cmd.Flags().String("history", "", "History state JSON file path")
 	clibase.AddJSONFlag(cmd)
@@ -232,7 +230,7 @@ func newSessionSwitchCommand() *cobra.Command {
 	}
 	cmd.Annotations = map[string]string{clibase.AnnotationSuccessOwned: annotationOwnedValue}
 
-	cmd.Flags().String("socket", "", "Explicit absolute path to tmux server socket (defaults to the ambient tmux server)")
+	clibase.AddSocketFlag(cmd)
 	cmd.Flags().String("history", "", "History state JSON file path")
 	clibase.AddJSONFlag(cmd)
 
@@ -315,10 +313,7 @@ func openSessionRepository(ctx context.Context, cmd *cobra.Command, cfg *config.
 }
 
 func openSessionRuntime(cmd *cobra.Command) (*sessionRuntime, error) {
-	socketPath := resolveSessionSocket(cmd)
-	if socketPath == "" {
-		return nil, clibase.NewExitError(clibase.ExitCodeUsage, clibase.ErrSocketRequired)
-	}
+	socketPath := clibase.ResolveSocket(cmd)
 
 	server, err := integration.Open(socketPath)
 	if err != nil {
@@ -355,15 +350,16 @@ func openSessionRuntime(cmd *cobra.Command) (*sessionRuntime, error) {
 	}
 
 	wf := session.NewWorkflowWithOptions(session.WorkflowOptions{
-		Server:      server,
-		Repository:  repo,
-		LeaseRoot:   leaseRoot,
-		HistoryPath: resolveHistoryPath(cmd),
-		Hooks:       cfg.Hooks,
-		HookRunner:  nil,
-		Getenv:      nil,
-		Streams:     commandTerminalStreams(cmd),
-		Source:      "cli",
+		Server:             server,
+		Repository:         repo,
+		LeaseRoot:          leaseRoot,
+		HistoryPath:        resolveHistoryPath(cmd),
+		Hooks:              cfg.Hooks,
+		HookRunner:         nil,
+		Getenv:             nil,
+		Streams:            commandTerminalStreams(cmd),
+		Source:             "cli",
+		DeferSwitchHistory: false,
 	})
 
 	return &sessionRuntime{workflow: wf, repo: repo}, nil
@@ -449,25 +445,6 @@ func resolveSessionLeaseRoot(cmd *cobra.Command, cfg *config.Config) (string, er
 	}
 
 	return defaultLeaseRoot, nil
-}
-
-func resolveSessionSocket(cmd *cobra.Command) string {
-	socketPath, _ := cmd.Flags().GetString("socket")
-	if socketPath != "" {
-		return socketPath
-	}
-
-	tmuxEnv := os.Getenv("TMUX")
-	if tmuxEnv == "" {
-		return ""
-	}
-
-	parts := strings.Split(tmuxEnv, ",")
-	if len(parts) == 0 || parts[0] == "" {
-		return ""
-	}
-
-	return parts[0]
 }
 
 func runSessionDelete(cmd *cobra.Command, args []string) error {

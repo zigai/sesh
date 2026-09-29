@@ -50,6 +50,7 @@ type catalogWatchState struct {
 	previous    []byte
 	initialized bool
 	failed      bool
+	readFailed  bool
 }
 
 type ConnectionState struct {
@@ -165,6 +166,7 @@ func WatchCatalog(ctx context.Context, dir *privatefs.Dir, interval time.Duratio
 		previous:    nil,
 		initialized: false,
 		failed:      false,
+		readFailed:  false,
 	}
 
 	if err := state.deliver(); err != nil {
@@ -364,6 +366,7 @@ func (state *catalogWatchState) deliver() error {
 		}
 
 		state.failed = true
+		state.readFailed = true
 
 		return state.yield(Catalog{Version: 0, GeneratedAt: time.Time{}, Connections: nil},
 			oops.In("remote").With("operation", "watch_catalog").Wrap(err))
@@ -373,7 +376,12 @@ func (state *catalogWatchState) deliver() error {
 		content = nil
 	}
 
-	if state.initialized && bytes.Equal(state.previous, content) {
+	// A reported read failure replaced the consumer's catalog, so the first successful
+	// read must be delivered even when the catalog bytes are unchanged.
+	recovered := state.readFailed
+	state.readFailed = false
+
+	if state.initialized && !recovered && bytes.Equal(state.previous, content) {
 		return nil
 	}
 

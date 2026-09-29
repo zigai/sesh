@@ -85,12 +85,45 @@ func TestCatalogAbsentServerRetainsIndependentFailures(t *testing.T) {
 func commitTestSnapshot(t *testing.T, r *store.Repository, sessionName, dir string, linkCount int) store.Generation {
 	t.Helper()
 
+	return commitTestManifest(t, r, testSnapshotManifest(sessionName, dir, linkCount))
+}
+
+// commitTestObservation commits the observation-only result every real capture produces.
+func commitTestObservation(t *testing.T, r *store.Repository, sessionName, dir string) store.Generation {
+	t.Helper()
+
+	m := testSnapshotManifest(sessionName, dir, 1)
+	m.Source.Consistency = "observed"
+
+	for i := range m.Evidence {
+		m.Evidence[i].Status, m.Evidence[i].Reason = "observed", "observed_only"
+	}
+
+	return commitTestManifest(t, r, m)
+}
+
+func commitTestManifest(t *testing.T, r *store.Repository, m model.Manifest) store.Generation {
+	t.Helper()
+
 	attempt, err := r.Begin(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	content := []byte("terminal content\n")
+	gen, err := r.Commit(t.Context(), attempt.ID, m, map[string]io.Reader{
+		"a0": bytes.NewReader(testSnapshotContent),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return gen
+}
+
+var testSnapshotContent = []byte("terminal content\n")
+
+func testSnapshotManifest(sessionName, dir string, linkCount int) model.Manifest {
+	content := testSnapshotContent
 	hash := sha256.Sum256(content)
 
 	m := model.Manifest{
@@ -158,14 +191,7 @@ func commitTestSnapshot(t *testing.T, r *store.Repository, sessionName, dir stri
 		})
 	}
 
-	gen, err := r.Commit(t.Context(), attempt.ID, m, map[string]io.Reader{
-		"a0": bytes.NewReader(content),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return gen
+	return m
 }
 
 func TestListCatalogNilOptionsReturnsEmpty(t *testing.T) {
@@ -226,6 +252,69 @@ func TestListSavedPreservesManifestBytesAndMetadata(t *testing.T) {
 	if len(explicitSessions) != 1 || explicitSessions[0].Name != specialName {
 		t.Fatalf("explicit generation mismatch: %#v", explicitSessions)
 	}
+}
+
+func TestCatalogListsSavedSessionsThroughLockFreeView(t *testing.T) {
+	repoPath := filepath.Join(t.TempDir(), "repo")
+
+	repo, err := store.Open(t.Context(), repoPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = repo.Close() }()
+
+	gen := commitTestSnapshot(t, repo, "viewed", "/work/viewed", 2)
+
+	view, err := store.OpenView(t.Context(), repoPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = view.Close() }()
+
+	result, err := ListCatalog(t.Context(), CatalogOptions{Repository: view, RepositorySource: repoPath})
+	if err != nil || result.Status != StatusComplete || len(result.Sessions) != 1 {
+		t.Fatalf("catalog through view = %+v, %v; want one complete saved row", result, err)
+	}
+
+	assertSavedSessionProperties(t, result.Sessions[0], "viewed", "/work/viewed", gen.ID, repoPath, 2)
+}
+
+func TestCatalogThroughViewOfMissingRepositoryIsComplete(t *testing.T) {
+	repoPath := filepath.Join(t.TempDir(), "missing")
+
+	view, err := store.OpenView(t.Context(), repoPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = view.Close() }()
+
+	result, err := ListCatalog(t.Context(), CatalogOptions{Repository: view, RepositorySource: repoPath})
+	if err != nil || result.Status != StatusComplete || len(result.Sessions) != 0 {
+		t.Fatalf("catalog of missing repository = %+v, %v; want complete and empty", result, err)
+	}
+}
+
+func TestListSavedListsLatestObservationOnlySave(t *testing.T) {
+	repoPath := filepath.Join(t.TempDir(), "repo")
+
+	repo, err := store.Open(t.Context(), repoPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = repo.Close() }()
+
+	gen := commitTestObservation(t, repo, "observed", "/work")
+
+	sessions, err := ListSaved(t.Context(), repo, repoPath, "")
+	if err != nil {
+		t.Fatalf("ListSaved(current) error = %v, want the observation-only save listed", err)
+	}
+
+	if len(sessions) != 1 {
+		t.Fatalf("expected 1 session, got %d", len(sessions))
+	}
+
+	assertSavedSessionProperties(t, sessions[0], "observed", "/work", gen.ID, repoPath, 1)
 }
 
 func TestListSavedPreservesRecoveryBarriers(t *testing.T) {

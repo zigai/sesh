@@ -196,3 +196,28 @@ func TestEffectiveInterval(t *testing.T) {
 		t.Fatalf("EffectiveInterval(7m) = %v, want %v", got, 7*time.Minute)
 	}
 }
+
+func TestMaintenanceDueOncePerCalendarDay(t *testing.T) {
+	t.Parallel()
+
+	location := time.FixedZone("test", 2*60*60)
+	morning := time.Date(2026, 9, 25, 9, 0, 0, 0, location)
+
+	cases := []struct {
+		name     string
+		previous int64
+		now      time.Time
+		want     bool
+	}{
+		{name: "no previous save", previous: 0, now: morning, want: true},
+		{name: "earlier the same day", previous: morning.Add(-2 * time.Hour).Unix(), now: morning, want: false},
+		{name: "just before midnight", previous: time.Date(2026, 9, 24, 23, 59, 0, 0, location).Unix(), now: morning, want: true},
+		{name: "same day across utc midnight", previous: time.Date(2026, 9, 25, 1, 30, 0, 0, location).Unix(), now: morning, want: false},
+	}
+
+	for _, testCase := range cases {
+		if got := automation.MaintenanceDue(testCase.previous, testCase.now); got != testCase.want {
+			t.Errorf("%s: MaintenanceDue() = %t, want %t", testCase.name, got, testCase.want)
+		}
+	}
+}

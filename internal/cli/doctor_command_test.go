@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/zigai/gotmux/tmuxtest"
+
 	"github.com/spf13/cobra"
 
 	"github.com/zigai/sesh/internal/doctor"
@@ -70,14 +72,14 @@ func TestDoctorCommandJSONOutput(t *testing.T) {
 	}
 }
 
-func TestDoctorCommandTableOutput(t *testing.T) {
+func TestDoctorCommandPlainReportListsChecksAndSummary(t *testing.T) {
 	t.Parallel()
 
 	root := newRootCommand(t.Context())
 	stdout, _, _ := executeCommand(root, "doctor", testNoConfigFlag)
 
-	if !strings.Contains(stdout, "Check") || !strings.Contains(stdout, "Status") {
-		t.Fatalf("stdout missing table headers: %s", stdout)
+	if !strings.Contains(stdout, "✗ tmux") || !strings.Contains(stdout, "checks: ") {
+		t.Fatalf("stdout missing check status markers or summary: %s", stdout)
 	}
 
 	if !strings.Contains(stdout, "tmux") || !strings.Contains(stdout, "snapshot-repository") {
@@ -122,10 +124,8 @@ func TestDoctorApplicationFailedChecksRetainPlainReport(t *testing.T) {
 	}
 
 	stdout := string(fixture.stdout)
-	if !strings.Contains(stdout, "Check") ||
-		!strings.Contains(stdout, doctor.CheckHistoryState) ||
-		!strings.Contains(stdout, doctor.ReasonCorrupt) {
-		t.Fatalf("failed doctor table was not retained: %s", stdout)
+	if !strings.Contains(stdout, "✗ "+doctor.CheckHistoryState) || !strings.Contains(stdout, "checks: ") {
+		t.Fatalf("failed doctor report was not retained: %s", stdout)
 	}
 
 	if string(fixture.stderr) != "doctor checks failed\n" {
@@ -144,6 +144,7 @@ func TestDoctorApplicationWarningOnlyJSONOwnsDegradedOutcome(t *testing.T) {
 
 	err := executeApplication(t.Context(), []string{
 		"doctor",
+		testSocketFlag, tmuxtest.NewServer(t).Endpoint().SocketPath,
 		"--history", filepath.Join(base, "missing-history.json"),
 		testRepositoryFlag, filepath.Join(base, "missing-repository"),
 		testConfigFlag, cfg,

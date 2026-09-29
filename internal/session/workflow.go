@@ -53,18 +53,22 @@ type WorkflowOptions struct {
 	Getenv      func(string) string
 	Streams     gotmux.TerminalStreams
 	Source      string
+	// DeferSwitchHistory leaves recording a completed switch to the caller, which records
+	// SwitchHistoryIdentity after its own follow-up work.
+	DeferSwitchHistory bool
 }
 
 type Workflow struct {
-	server      *gotmux.Server
-	repo        *store.Repository
-	leaseRoot   string
-	historyPath string
-	hooks       config.HookConfig
-	hookRunner  *HookRunner
-	getenv      func(string) string
-	streams     gotmux.TerminalStreams
-	source      string
+	server             *gotmux.Server
+	repo               *store.Repository
+	leaseRoot          string
+	historyPath        string
+	hooks              config.HookConfig
+	hookRunner         *HookRunner
+	getenv             func(string) string
+	streams            gotmux.TerminalStreams
+	source             string
+	deferSwitchHistory bool
 }
 
 type EnterAction uint8
@@ -126,10 +130,11 @@ func NewWorkflow(server *gotmux.Server, repo *store.Repository, historyPath stri
 			SessionAttachPost: nil,
 			TmuxStartupPost:   nil,
 		},
-		HookRunner: nil,
-		Getenv:     nil,
-		Streams:    gotmux.TerminalStreams{In: nil, Out: nil, Err: nil},
-		Source:     "",
+		HookRunner:         nil,
+		Getenv:             nil,
+		Streams:            gotmux.TerminalStreams{In: nil, Out: nil, Err: nil},
+		Source:             "",
+		DeferSwitchHistory: false,
 	})
 }
 
@@ -150,16 +155,23 @@ func NewWorkflowWithOptions(opts WorkflowOptions) *Workflow {
 	}
 
 	return &Workflow{
-		server:      opts.Server,
-		repo:        opts.Repository,
-		leaseRoot:   opts.LeaseRoot,
-		historyPath: opts.HistoryPath,
-		hooks:       opts.Hooks,
-		hookRunner:  runner,
-		getenv:      getenv,
-		streams:     opts.Streams,
-		source:      source,
+		server:             opts.Server,
+		repo:               opts.Repository,
+		leaseRoot:          opts.LeaseRoot,
+		historyPath:        opts.HistoryPath,
+		hooks:              opts.Hooks,
+		hookRunner:         runner,
+		getenv:             getenv,
+		streams:            opts.Streams,
+		source:             source,
+		deferSwitchHistory: opts.DeferSwitchHistory,
 	}
+}
+
+// SwitchHistoryIdentity returns the history identity a switch to name records, and false when
+// the workflow keeps no history.
+func (w *Workflow) SwitchHistoryIdentity(name string) (Identity, bool) {
+	return w.localIdentity(name)
 }
 
 func (w *Workflow) SetRepository(repo *store.Repository) {

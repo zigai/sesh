@@ -12,7 +12,9 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
+
 	"github.com/spf13/pflag"
+	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/cli/clibase"
 
@@ -89,11 +91,35 @@ func WriteCommandError(cmd *cobra.Command, err error) error {
 		stderr = cmd.ErrOrStderr()
 	}
 
-	if _, writeErr := fmt.Fprintln(stderr, commandErrorMessage(cmd, err)); writeErr != nil {
+	if _, writeErr := fmt.Fprintln(stderr, humanCommandErrorMessage(cmd, err)); writeErr != nil {
 		return oops.In("cli").With("operation", "write_command_error").Wrapf(writeErr, "writing command error")
 	}
 
 	return nil
+}
+
+// humanErrorMessage is the terminal diagnostic: mapped sentinels keep their wording, other
+// causes are reported verbatim so the reader can act on them. JSON envelopes keep the
+// sanitized message from safeCommandErrorMessage.
+func humanErrorMessage(err error) string {
+	if msg, ok := sentinelErrorMessage(err); ok {
+		return msg
+	}
+
+	if msg := strings.TrimSpace(err.Error()); msg != "" {
+		return msg
+	}
+
+	return "operation failed"
+}
+
+func humanCommandErrorMessage(cmd *cobra.Command, err error) string {
+	message := humanErrorMessage(err)
+	if cmd == nil || ExitCode(err) != exitCodeUsage {
+		return message
+	}
+
+	return message + "; run '" + cmd.CommandPath() + " --help' for valid usage"
 }
 
 func commandErrorMessage(cmd *cobra.Command, err error) string {
@@ -279,6 +305,8 @@ func sentinelErrorMessage(err error) (string, bool) {
 
 func sessionSentinelMessage(err error) (string, bool) {
 	switch {
+	case errors.Is(err, gotmux.ErrNoServer):
+		return "no tmux server is running on the selected socket; start tmux or pass --socket", true
 	case errors.Is(err, session.ErrCurrentSessionAmbiguous):
 		return "current pane belongs to multiple sessions", true
 	case errors.Is(err, session.ErrCatalogLimitExceeded), errors.Is(err, session.ErrPaneHistoryLimitExceeded):
@@ -380,20 +408,13 @@ func generalSentinelMessage(err error) (string, bool) {
 func cobraErrorMessage(err error) string {
 	msg := err.Error()
 
-	if strings.HasPrefix(msg, "unknown flag: ") {
-		return "unknown flag"
-	}
+	// pflag and cobra name only the mistyped flag or command, never a flag value.
+	for _, prefix := range []string{"unknown flag: ", "unknown shorthand flag: ", "flag needs an argument: ", "unknown command "} {
+		if strings.HasPrefix(msg, prefix) {
+			line, _, _ := strings.Cut(msg, "\n")
 
-	if strings.HasPrefix(msg, "unknown shorthand flag: ") {
-		return "unknown shorthand flag"
-	}
-
-	if strings.HasPrefix(msg, "flag needs an argument: ") {
-		return "flag needs an argument"
-	}
-
-	if strings.HasPrefix(msg, "unknown command ") {
-		return "unknown command"
+			return line
+		}
 	}
 
 	if strings.Contains(msg, "invalid log level: expected trace, debug, info, warn, or error") {
@@ -496,6 +517,8 @@ func captureErrorCode(err error) (string, bool) {
 
 func generalErrorCode(err error) string {
 	switch {
+	case errors.Is(err, gotmux.ErrNoServer):
+		return "tmuxServerUnavailable"
 	case errors.Is(err, context.DeadlineExceeded):
 		return "timeout"
 	case errors.Is(err, context.Canceled):

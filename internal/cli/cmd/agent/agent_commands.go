@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
@@ -37,7 +38,7 @@ type agentStatusResultJSON struct {
 var errTargetPaneRequired = errors.New("--target-pane is required")
 
 func addAgentNavigationFlags(cmd *cobra.Command) {
-	cmd.Flags().String("socket", "", "Explicit absolute path to tmux server socket")
+	clibase.AddSocketFlag(cmd)
 	cmd.Flags().String("state", "", "Path to the AHT agent registry")
 	cmd.Flags().String("client", "", "Explicit tmux client terminal to navigate")
 	cmd.Flags().String("pane", "", "Explicit invoking pane ID, for example %1")
@@ -47,20 +48,6 @@ func addAgentNavigationFlags(cmd *cobra.Command) {
 
 func addAgentRegistryFlags(cmd *cobra.Command) {
 	cmd.Flags().String("state", "", "Path to the AHT agent registry")
-}
-
-func resolveAgentSocket(cmd *cobra.Command) string {
-	socketPath, _ := cmd.Flags().GetString("socket")
-	if socketPath == "" {
-		if tmuxEnv := os.Getenv("TMUX"); tmuxEnv != "" {
-			parts := strings.Split(tmuxEnv, ",")
-			if len(parts) > 0 && parts[0] != "" {
-				socketPath = parts[0]
-			}
-		}
-	}
-
-	return socketPath
 }
 
 func resolveAgentHistoryPath(cmd *cobra.Command) string {
@@ -129,10 +116,7 @@ func resolveAgentTarget(cmd *cobra.Command) agents.CurrentTarget {
 }
 
 func resolveAgentServer(cmd *cobra.Command) (*agents.Navigator, error) {
-	socketPath := resolveAgentSocket(cmd)
-	if socketPath == "" {
-		return nil, clibase.NewExitError(clibase.ExitCodeUsage, clibase.ErrSocketRequired)
-	}
+	socketPath := clibase.ResolveSocket(cmd)
 
 	server, err := integration.Open(socketPath)
 	if err != nil {
@@ -343,48 +327,74 @@ func newAgentStatusRunCommand() *cobra.Command {
 	}
 
 	addAgentRegistryFlags(cmd)
-	cmd.Flags().String("socket", "", "Explicit absolute path to tmux server socket")
+	clibase.AddSocketFlag(cmd)
 	cmd.Flags().Bool("quiet", false, "Silence informational log output")
 
 	return cmd
 }
 
 func runAgentStatusRun(cmd *cobra.Command, _ []string) error {
-	socketPath := resolveAgentSocket(cmd)
-	if socketPath == "" {
-		return clibase.NewExitError(clibase.ExitCodeUsage, clibase.ErrSocketRequired)
-	}
+	socketPath := clibase.ResolveSocket(cmd)
 
 	server, err := integration.Open(socketPath)
 	if err != nil {
 		return oops.In("cli").With("operation", "open_tmux").Wrap(err)
 	}
 
-	quiet, _ := cmd.Flags().GetBool("quiet")
-
-	styles := agents.NewTmuxStyleController(server, true, true)
-	trackerOpts := agents.DefaultTrackerOptions()
-	if cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd); err == nil && cfg != nil {
-		resolved := cfg.ResolvedAgentStatus()
-		trackerOpts.Palette = cfg.ResolvedPalette()
-		trackerOpts.ActiveBypass = resolved.ActiveBypass
-		trackerOpts.ClearFailedOnVisit = resolved.ClearFailedOnVisit
-		trackerOpts.SetWindowStatusStyle = resolved.SetWindowStatusStyle
-		trackerOpts.SetWindowStatusBellStyle = resolved.SetWindowStatusBellStyle
+	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
+	if err != nil {
+		return err
 	}
-	tracker := agents.NewTracker(styles, trackerOpts)
+
+	quiet, _ := cmd.Flags().GetBool("quiet")
+	resolved := cfg.ResolvedAgentStatus()
+
+	styles := agents.NewTmuxStyleController(server, resolved.SetWindowStatusStyle, resolved.SetWindowStatusBellStyle)
+	tracker := agents.NewTracker(styles, agentStatusTrackerOptions(cfg, resolved))
+
+	statePath := resolveAgentStatePath(cmd)
+	if statePath == "" {
+		statePath = resolved.StorePath
+	}
 
 	ctx, stop := signal.NotifyContext(commandContextOrBackground(cmd), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	watchOptions := agents.DefaultWatchOptions()
-	watchOptions.Quiet = quiet
+	watchOptions := agentStatusWatchOptions(resolved, quiet)
 
-	if err := agents.RunStatusTracker(ctx, agents.NewAHTStore(resolveAgentStatePath(cmd)), tracker, watchOptions, true); err != nil {
+	if err := agents.RunStatusTracker(ctx, agents.NewAHTStore(statePath), tracker, watchOptions, resolved.ClearOnShutdown); err != nil {
 		return oops.In("cli").With("operation", "agent_status_run").Wrap(err)
 	}
 
 	return nil
+}
+
+func agentStatusTrackerOptions(cfg *config.Config, resolved config.AgentStatusConfig) agents.TrackerOptions {
+	opts := agents.DefaultTrackerOptions()
+	opts.Palette = cfg.ResolvedPalette()
+	opts.ActiveBypass = resolved.ActiveBypass
+	opts.ClearFailedOnVisit = resolved.ClearFailedOnVisit
+
+	return opts
+}
+
+func agentStatusWatchOptions(resolved config.AgentStatusConfig, quiet bool) agents.WatchOptions {
+	opts := agents.DefaultWatchOptions()
+	opts.Quiet = quiet || resolved.Quiet
+
+	if initial, err := time.ParseDuration(resolved.InitialBackoff); err == nil && initial > 0 {
+		opts.InitialBackoff = initial
+	}
+
+	if maxBackoff, err := time.ParseDuration(resolved.MaxBackoff); err == nil && maxBackoff > 0 {
+		opts.MaxBackoff = maxBackoff
+	}
+
+	if resolved.BackoffFactor > 1 {
+		opts.BackoffFactor = resolved.BackoffFactor
+	}
+
+	return opts
 }
 
 func newAgentStatusClearCommand() *cobra.Command {
@@ -396,17 +406,14 @@ func newAgentStatusClearCommand() *cobra.Command {
 		RunE:  runAgentStatusClear,
 	}
 
-	cmd.Flags().String("socket", "", "Explicit absolute path to tmux server socket")
+	clibase.AddSocketFlag(cmd)
 	clibase.AddJSONFlag(cmd)
 
 	return cmd
 }
 
 func runAgentStatusClear(cmd *cobra.Command, _ []string) error {
-	socketPath := resolveAgentSocket(cmd)
-	if socketPath == "" {
-		return clibase.NewExitError(clibase.ExitCodeUsage, clibase.ErrSocketRequired)
-	}
+	socketPath := clibase.ResolveSocket(cmd)
 
 	server, err := integration.Open(socketPath)
 	if err != nil {

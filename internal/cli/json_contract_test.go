@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/zigai/gotmux/tmuxtest"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/cobra"
 )
@@ -261,7 +263,8 @@ func contractJSONItem(t *testing.T, values []any, key string, want any) map[stri
 
 func TestJSONDoctorWarningReportSuccessContract(t *testing.T) {
 	home := isolateJSONContractHome(t)
-	result := runJSONContract(t, "doctor", "doctor", testRepositoryFlag, filepath.Join(home, "missing-repo"), "--history", filepath.Join(home, "missing-history"))
+	socket := tmuxtest.NewServer(t).Endpoint().SocketPath
+	result := runJSONContract(t, "doctor", "doctor", testSocketFlag, socket, testRepositoryFlag, filepath.Join(home, "missing-repo"), "--history", filepath.Join(home, "missing-history"))
 	assertJSONContractFields(t, result, map[string]any{"hasErrors": false, "hasWarnings": true})
 
 	checks := contractJSONValue[[]any](t, result, "checks")

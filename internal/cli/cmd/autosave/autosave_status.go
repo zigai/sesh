@@ -102,10 +102,7 @@ func AutosaveDaemonRuntimeState(ctx context.Context, cmd *cobra.Command) (string
 }
 
 func autosaveDaemonRuntimeState(ctx context.Context, cmd *cobra.Command) (string, daemon.RuntimeStatus) {
-	endpoint := resolveAutosaveSocket(cmd)
-	if endpoint == "" {
-		return autosaveDaemonUnselected, emptyDaemonRuntimeStatus()
-	}
+	endpoint := clibase.ResolveSocket(cmd)
 
 	path, err := daemon.RuntimeStatusPath(os.Getenv("XDG_RUNTIME_DIR"), endpoint)
 	if err != nil {
@@ -218,7 +215,7 @@ func renderAutosaveResult(cmd *cobra.Command, env autosaveEnv, outcome autosaveO
 		"Autosave:   %s (reason: %s)\nInterval:   %dm\nElapsed:    %s\nHistory:    %s\nRepository: %s\nAttempt:    %s\nGeneration: %s\nSnapshot:   %s\nRecorded:   %t\nDaemon:     %s\nPhase:      %s\nInhibitors: %t\n",
 		outcome.status,
 		outcome.reason,
-		env.interval,
+		int(env.interval.Minutes()),
 		env.decision.Elapsed.Round(time.Second),
 		outcome.history,
 		outcome.repository,

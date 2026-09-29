@@ -3,14 +3,17 @@ package cmdautosave
 import (
 	"context"
 	"errors"
+	"math"
 	"time"
 
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
+	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/agents"
 	"github.com/zigai/sesh/internal/automation"
 	"github.com/zigai/sesh/internal/cli/clibase"
+	"github.com/zigai/sesh/internal/config"
 	integration "github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/snapshot/engine"
 	"github.com/zigai/sesh/internal/snapshot/store"
@@ -19,6 +22,11 @@ import (
 const autosaveBookkeepingTimeout = 3 * time.Second
 
 const defaultFinalSaveDeadline = 20 * time.Second
+
+const (
+	hoursPerDay                   = 24
+	autosaveCollectionGenerations = 10000
+)
 
 func newFinalSaveStatus() automation.FinalSaveStatus {
 	return automation.FinalSaveStatus{
@@ -74,10 +82,7 @@ func runAutosaveSaveIfDue(cmd *cobra.Command, _ []string) error {
 }
 
 func executeAutosaveSave(ctx context.Context, cmd *cobra.Command, env autosaveEnv) error {
-	socketPath := resolveAutosaveSocket(cmd)
-	if socketPath == "" {
-		return clibase.NewExitError(clibase.ExitCodeUsage, errAutosaveSocketRequired)
-	}
+	socketPath := clibase.ResolveSocket(cmd)
 
 	processEnv, agentStatePath, envErr := resolveAutosaveProcessEnv(cmd, env.cfg)
 	if envErr != nil {
@@ -100,6 +105,10 @@ func executeAutosaveSave(ctx context.Context, cmd *cobra.Command, env autosaveEn
 	}
 
 	selected, err := resolveAutosaveSelection(cmd, ctx, server)
+	if errors.Is(err, gotmux.ErrNoServer) {
+		return skipAutosaveWithoutServer(ctx, cmd, env, repo)
+	}
+
 	if err != nil {
 		return errors.Join(err, wrapCloseError(repo.Close()))
 	}
@@ -117,6 +126,15 @@ func executeAutosaveSave(ctx context.Context, cmd *cobra.Command, env autosaveEn
 		Profile:                engine.RecoveryPractical,
 	})
 
+	decision := automation.EvaluateSaveCompletion(automation.SaveCompletion{
+		Attempt:    result.Attempt,
+		Generation: result.Generation,
+		Status:     result.Status,
+		Uncertain:  false,
+	}, nil)
+
+	maintainAfterAutosave(ctx, repo, env, decision, saveErr)
+
 	closeErr := repo.Close()
 	lockErr := lock.Release()
 
@@ -130,13 +148,6 @@ func executeAutosaveSave(ctx context.Context, cmd *cobra.Command, env autosaveEn
 			errors.Join(oops.In("cli").With("operation", "autosave_save").Wrap(saveErr), wrapCloseError(closeErr), lockErr),
 		)
 	}
-
-	decision := automation.EvaluateSaveCompletion(automation.SaveCompletion{
-		Attempt:    result.Attempt,
-		Generation: result.Generation,
-		Status:     result.Status,
-		Uncertain:  false,
-	}, nil)
 
 	outcome := newAutosaveOutcome(decision.Status, decision.Reason)
 	outcome.attempt = result.Attempt
@@ -243,10 +254,7 @@ func executeFinalSave(
 
 	status := newFinalSaveStatus()
 
-	socketPath := resolveAutosaveSocket(cmd)
-	if socketPath == "" {
-		return finalSaveFailure(outcome, status, automation.FinalSaveFailed, "socket_required", clibase.NewExitError(clibase.ExitCodeUsage, errAutosaveSocketRequired))
-	}
+	socketPath := clibase.ResolveSocket(cmd)
 
 	processEnv, agentStatePath, envErr := resolveAutosaveProcessEnv(cmd, env.cfg)
 	if envErr != nil {
@@ -455,6 +463,42 @@ func recordFinalSaveBookkeeping(
 	status.Incomplete = true
 
 	return clibase.NewExitError(clibase.ExitCodeGeneral, errors.Join(errAutosaveBookkeeping, bookkeepingErr))
+}
+
+// maintainAfterAutosave runs repository maintenance with the first recorded save of each day.
+func maintainAfterAutosave(ctx context.Context, repo *store.Repository, env autosaveEnv, decision automation.CompletionDecision, saveErr error) {
+	if saveErr != nil || !decision.Record || !automation.MaintenanceDue(env.lastSavedUnix, time.Now()) {
+		return
+	}
+
+	maintainAutosaveRepository(ctx, repo, env.cfg.Snapshot)
+}
+
+// maintainAutosaveRepository applies the configured snapshot retention and reclaims the
+// generations it retires. It runs with the first recorded save of each day, so retention costs
+// one pass per day instead of one per save. The engine records each outcome, and maintenance
+// never fails the save that preceded it.
+func maintainAutosaveRepository(ctx context.Context, repo *store.Repository, snapshot config.SnapshotConfig) {
+	policy := store.RetentionPolicy{
+		MaxAge:   time.Duration(snapshot.RetentionDays) * hoursPerDay * time.Hour,
+		MaxCount: snapshot.MaxCount,
+		MaxBytes: snapshot.MaxBytes,
+	}
+
+	_, _ = engine.Prune(ctx, repo, time.Now().UTC(), policy)
+	_, _ = engine.GarbageCollect(ctx, repo, store.CollectionBudget{Generations: autosaveCollectionGenerations, Bytes: math.MaxInt64})
+}
+
+// skipAutosaveWithoutServer reports a skipped save when no tmux server is running on the target
+// socket, such as a timer firing after login before tmux starts: there is no state to observe.
+func skipAutosaveWithoutServer(ctx context.Context, cmd *cobra.Command, env autosaveEnv, repo *store.Repository) error {
+	closeErr := wrapCloseError(repo.Close())
+
+	idle := newAutosaveOutcome(autosaveStatusSkipped, autosaveReasonTmuxNotRunning)
+	idle.history = autosaveHistoryState(env)
+	idle.repository = autosaveRepositoryState(ctx, cmd, env)
+
+	return errors.Join(renderAutosaveResult(cmd, env, idle), closeErr)
 }
 
 func handleAutosaveLockError(ctx context.Context, cmd *cobra.Command, env autosaveEnv, repo *store.Repository, err error) error {

@@ -274,7 +274,8 @@ func newSetupCoordinatorCommand() *cobra.Command {
 		Short:   "Render or install the owned lifecycle coordinator daemon service definition",
 		Long: "Render or install the owned lifecycle coordinator daemon service definition.\n\n" +
 			"Without --apply nothing is written and no service manager is contacted. The coordinator runs sesh daemon run " +
-			"in the foreground to integrate periodic saving with logind shutdown and sleep delay inhibitors.",
+			"in the foreground: it holds logind shutdown and sleep delay inhibitors and runs one bounded save for each. " +
+			"Periodic saves belong to the autosave timer.",
 		Args: clibase.UsageArgs(cobra.NoArgs),
 		RunE: runSetupCoordinator,
 	}
@@ -312,7 +313,7 @@ func addServiceSetupFlags(cmd *cobra.Command) {
 	cmd.Flags().String("dir", "", "Explicit service directory to render into (defaults to the platform user service directory)")
 	cmd.Flags().String("program", "", "Explicit absolute path of the sesh executable")
 	cmd.Flags().String("tmux", "", "Explicit absolute path of the tmux executable")
-	cmd.Flags().String("socket", "", "Explicit absolute path of the managed tmux server socket")
+	cmd.Flags().String("socket", "", "tmux server socket the services target (default: the sesh-managed socket with --with-tmux-service, else tmux's default socket)")
 	cmd.Flags().String("repository", "", "Native repository directory")
 	cmd.Flags().String("lease-root", "", "Explicit path to shared lease root directory")
 	cmd.Flags().String("history", "", "History state JSON file path")
@@ -333,7 +334,7 @@ func resolveServiceInputs(cmd *cobra.Command, withTmux bool) (setup.ServiceInput
 		return setup.ServiceInputs{}, err
 	}
 
-	socketPath, err := resolveSetupServiceSocket(cmd)
+	socketPath, err := resolveSetupServiceSocket(cmd, withTmux)
 	if err != nil {
 		return setup.ServiceInputs{}, err
 	}
@@ -798,15 +799,22 @@ func resolveSetupTmuxProgram(cmd *cobra.Command) (string, error) {
 	return abs, nil
 }
 
-func resolveSetupServiceSocket(cmd *cobra.Command) (string, error) {
+// resolveSetupServiceSocket selects the tmux server the rendered services target: --socket, else
+// the sesh-managed server's socket when that server is rendered too, else the server a plain
+// `tmux` command uses. Services must never default to a managed socket nothing will create.
+func resolveSetupServiceSocket(cmd *cobra.Command, withTmux bool) (string, error) {
 	socketPath, _ := cmd.Flags().GetString("socket")
-	if socketPath == "" {
+	if socketPath == "" && withTmux {
 		runtimeDir := strings.TrimSpace(os.Getenv("XDG_RUNTIME_DIR"))
 		if runtimeDir == "" {
 			runtimeDir = filepath.Join(os.TempDir(), "sesh-runtime")
 		}
 
 		socketPath = filepath.Join(runtimeDir, "sesh", "tmux.sock")
+	}
+
+	if socketPath == "" {
+		socketPath = clibase.DefaultTmuxSocket()
 	}
 
 	abs, err := filepath.Abs(socketPath)

@@ -39,7 +39,7 @@ func NewHistoryCommand() *cobra.Command {
 		RunE:  runHistory,
 	}
 
-	cmd.Flags().String("socket", "", "Explicit absolute path to tmux server socket (required)")
+	clibase.AddSocketFlag(cmd)
 	cmd.Flags().Bool("panes", false, "Show per-pane history lines")
 	cmd.Flags().Bool("full", false, "Show complete values using an adaptive layout")
 	clibase.AddJSONFlag(cmd)
@@ -52,10 +52,7 @@ func ValidateHistoryCommand(cmd *cobra.Command, args []string) error {
 		return clibase.NewExitError(clibase.ExitCodeUsage, errHistoryPositionalArgs)
 	}
 
-	socketPath, _ := cmd.Flags().GetString("socket")
-	if socketPath == "" {
-		return clibase.NewExitError(clibase.ExitCodeUsage, clibase.ErrSocketRequired)
-	}
+	socketPath := clibase.ResolveSocket(cmd)
 
 	if !filepath.IsAbs(socketPath) || filepath.Clean(socketPath) != socketPath {
 		return clibase.NewExitError(clibase.ExitCodeUsage, oops.In("tmux").Code("endpoint_required").With("operation", "open").Wrap(tmux.ErrEndpoint))
@@ -194,10 +191,7 @@ func runHistory(cmd *cobra.Command, _ []string) error {
 		return oops.In("cli").With("operation", "history").Wrap(err)
 	}
 
-	socketPath, _ := cmd.Flags().GetString("socket")
-	if socketPath == "" {
-		return clibase.NewExitError(clibase.ExitCodeUsage, clibase.ErrSocketRequired)
-	}
+	socketPath := clibase.ResolveSocket(cmd)
 
 	server, err := tmux.Open(socketPath)
 	if err != nil {

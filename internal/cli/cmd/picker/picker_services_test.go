@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/zigai/aht/v2/pkg/aht"
 	"github.com/zigai/aht/v2/pkg/registry"
 	gotmux "github.com/zigai/gotmux/tmux"
@@ -144,16 +145,20 @@ func TestPickerServicesLoadCodexAndOmpNativeTitles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	labels := make(map[string]string)
+	titles := make(map[string][2]string)
 
 	for _, summary := range summaries {
 		for _, agent := range summary.Agents {
-			labels[agent.RegistryID] = agent.HarnessSession
+			titles[agent.RegistryID] = [2]string{agent.HarnessSession, agent.Task}
 		}
 	}
 
-	if labels["codex-registry"] != "Codex project plan" || labels["omp-registry"] != "OMP design review" {
-		t.Fatalf("native picker titles = %#v", labels)
+	want := map[string][2]string{
+		"codex-registry": {"Codex project plan", "Codex project plan"},
+		"omp-registry":   {"OMP design review", "OMP design review"},
+	}
+	if diff := cmp.Diff(want, titles); diff != "" {
+		t.Fatalf("native titles and tasks mismatch (-want +got):\n%s", diff)
 	}
 
 	if codex.SessionID != "codex-native" || omp.SessionID != "omp-native" {

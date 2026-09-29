@@ -21,6 +21,18 @@ import (
 )
 
 func TestTmuxPopupSelectionSwitchesOpeningClientAfterClose(t *testing.T) {
+	testTmuxPopupSelectionSwitchesOpeningClient(t, false)
+}
+
+// tmux targets the most recently active session by default; the switch handoff must still
+// validate the opening client against the session that client displays.
+func TestTmuxPopupSelectionSwitchesOpeningClientWhenAnotherSessionIsNewest(t *testing.T) {
+	testTmuxPopupSelectionSwitchesOpeningClient(t, true)
+}
+
+func testTmuxPopupSelectionSwitchesOpeningClient(t *testing.T, newerSession bool) {
+	t.Helper()
+
 	fixture := newCLISessionFixture(t)
 	artifact := newArtifactBinaryFixture(t)
 	origin := fixture.fixtureSession(t)
@@ -28,6 +40,11 @@ func TestTmuxPopupSelectionSwitchesOpeningClientAfterClose(t *testing.T) {
 
 	master, slave := openPickerPopupPTY(t)
 	clientName := attachPickerPopupClient(t, fixture, origin, slave)
+
+	if newerSession {
+		fixture.newLiveSession(t, "newest-idle")
+	}
+
 	panes, err := origin.Handle().Panes(t.Context())
 	if err != nil || len(panes) == 0 {
 		t.Fatalf("origin panes: %v", err)

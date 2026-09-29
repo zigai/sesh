@@ -3,7 +3,6 @@ package cmdsnapshot
 import (
 	"errors"
 	"math"
-	"path/filepath"
 	"time"
 
 	"github.com/samber/oops"
@@ -69,7 +68,7 @@ func newSnapshotPruneCommand() *cobra.Command {
 		RunE:  runSnapshotPrune,
 	}
 
-	cmd.Flags().String("repository", "", "Native repository directory (required)")
+	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
 	cmd.Flags().Int(retentionDaysFlag, 0, "Retain complete snapshot generations from the last N days (0 or greater)")
 	cmd.Flags().Int(maxCountFlag, 0, "Retain at most N complete snapshot generations (0 or at least 5)")
 	cmd.Flags().Int64(maxBytesFlag, 0, "Retain complete snapshot generations up to N total bytes (0 or greater)")
@@ -87,7 +86,7 @@ func newSnapshotGCCommand() *cobra.Command {
 		RunE:  runSnapshotGC,
 	}
 
-	cmd.Flags().String("repository", "", "Native repository directory (required)")
+	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
 	cmd.Flags().Int(maxGenerationsFlag, 0, "Collect at most N retired generations in one pass (required; 1 to 10000)")
 	cmd.Flags().Int64(maxBytesFlag, 0, "Collect at most N retired generation bytes in one pass (required; at least 1)")
 	clibase.AddJSONFlag(cmd)
@@ -104,10 +103,6 @@ func validateSnapshotMaintenanceArgs(cmd *cobra.Command, args []string) error {
 }
 
 func validateSnapshotMaintenanceCommand(cmd *cobra.Command) error {
-	if err := requiredRepository(cmd); err != nil {
-		return err
-	}
-
 	switch cmd.Name() {
 	case "prune":
 		return validateExplicitPruneFlags(cmd)
@@ -227,11 +222,9 @@ func collectionBudget(cmd *cobra.Command) (store.CollectionBudget, error) {
 }
 
 func openMaintenanceRepository(cmd *cobra.Command) (*store.Repository, error) {
-	path, _ := cmd.Flags().GetString("repository")
-
-	absPath, err := filepath.Abs(path)
+	absPath, err := clibase.ResolveRepository(cmd)
 	if err != nil {
-		return nil, oops.In("cli").With("operation", "resolve_repository_path").Wrap(err)
+		return nil, err
 	}
 
 	repository, err := store.OpenExisting(cmd.Context(), absPath)

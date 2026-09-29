@@ -14,10 +14,7 @@ import (
 	"github.com/zigai/sesh/internal/setup"
 )
 
-var (
-	errSetupSocketRequired = errors.New("--socket is required to apply tmux bindings")
-	errSetupConflicts      = errors.New("some tmux keys are already bound")
-)
+var errSetupConflicts = errors.New("some tmux keys are already bound")
 
 type setupBindingJSON struct {
 	Key      string   `json:"key"`
@@ -79,7 +76,7 @@ func newSetupTmuxCommand() *cobra.Command {
 
 	cmd.Flags().Bool("apply", false, "Register the bindings on the target tmux server")
 	cmd.Flags().Bool("force", false, "Overwrite keys that are already bound")
-	cmd.Flags().String("socket", "", "Explicit absolute path to tmux server socket (required with --apply)")
+	clibase.AddSocketFlag(cmd)
 	cmd.Flags().String("table", setup.DefaultTable, "Key table to target")
 	cmd.Flags().String("next-key", "", "Override the configured key for the next-attention agent action")
 	cmd.Flags().String("local-next-key", "", "Override the configured key for the current-session next-agent action")
@@ -200,12 +197,7 @@ func applySetupBindings(cmd *cobra.Command, bindings []setup.Binding, table stri
 		ctx = context.Background()
 	}
 
-	socketPath := resolveSetupSocket(cmd)
-	if socketPath == "" {
-		return clibase.NewExitError(clibase.ExitCodeUsage, errSetupSocketRequired)
-	}
-
-	server, err := integration.Open(socketPath)
+	server, err := integration.Open(clibase.ResolveSocket(cmd))
 	if err != nil {
 		return oops.In("cli").With("operation", "open_tmux").Wrap(err)
 	}
@@ -223,12 +215,6 @@ func applySetupBindings(cmd *cobra.Command, bindings []setup.Binding, table stri
 	}
 
 	return renderSetupApplyResult(cmd, table, applied, conflicts, bindings)
-}
-
-func resolveSetupSocket(cmd *cobra.Command) string {
-	socketPath, _ := cmd.Flags().GetString("socket")
-
-	return socketPath
 }
 
 func registerSetupBindings(

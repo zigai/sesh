@@ -87,7 +87,7 @@ func InspectStartupState(ctx context.Context, repository *store.Repository) (Sta
 	case readErr == nil:
 		state.Generation = generation.ID
 	case errors.Is(readErr, store.ErrRecoveryRequired):
-		if currentGenerationIncomplete(catalog) {
+		if catalog.PracticalCurrentAdmissible() {
 			state.ObservationOnly = true
 			state.Generation = catalog.Current
 		} else {
@@ -99,35 +99,4 @@ func InspectStartupState(ctx context.Context, repository *store.Repository) (Sta
 	}
 
 	return *state, nil
-}
-
-func currentGenerationIncomplete(catalog store.Catalog) bool {
-	if catalog.Current == "" || len(catalog.Attempts) == 0 {
-		return false
-	}
-
-	latest := catalog.Attempts[0]
-	for _, attempt := range catalog.Attempts[1:] {
-		if attempt.Sequence > latest.Sequence {
-			latest = attempt
-		}
-	}
-
-	if latest.State != "incomplete" || latest.ID != catalog.Current {
-		return false
-	}
-
-	for _, rewrite := range catalog.Rewrites {
-		if rewrite.State == "pending" && rewrite.Source == catalog.Current {
-			return false
-		}
-	}
-
-	for _, generation := range catalog.Generations {
-		if generation.ID == catalog.Current {
-			return !generation.Complete
-		}
-	}
-
-	return false
 }

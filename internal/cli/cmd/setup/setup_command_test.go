@@ -1,10 +1,13 @@
 package cmdsetup
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/cli/clibase"
 )
@@ -127,18 +130,14 @@ func TestSetupTmuxRejectsInvalidKeyAndTable(t *testing.T) {
 	}
 }
 
-func TestSetupTmuxApplyRequiresSocket(t *testing.T) {
-	t.Setenv("TMUX", "/tmp/ambient-tmux.sock,123,0")
+func TestSetupTmuxApplyTargetsAmbientServerWithoutSocket(t *testing.T) {
+	t.Setenv("TMUX", filepath.Join(t.TempDir(), "ambient-tmux.sock")+",123,0")
 
 	root := newRootCommand(t.Context())
 
 	_, _, err := executeCommand(root, "setup", "tmux", "--apply", testNoConfigFlag)
-	if err == nil {
-		t.Fatal("expected usage failure without a socket, got nil")
-	}
-
-	if clibase.ExitCode(err) != clibase.ExitCodeUsage {
-		t.Fatalf("exit code = %d, want %d", clibase.ExitCode(err), clibase.ExitCodeUsage)
+	if !errors.Is(err, gotmux.ErrNoServer) {
+		t.Fatalf("error = %v, want the stopped ambient server to report no tmux server", err)
 	}
 }
 

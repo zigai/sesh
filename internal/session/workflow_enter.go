@@ -290,8 +290,10 @@ func (w *Workflow) switchSessionOutcomeWithClient(
 		return out, w.fail(ctx, "switch", postErr)
 	}
 
-	if err := w.recordSwitch(ctx, out.SessionName); err != nil {
-		return out, w.fail(ctx, "switch", oops.In("session").Code("history_failed").With("operation", "record_switch").Wrap(err))
+	if !w.deferSwitchHistory {
+		if err := w.recordSwitch(ctx, out.SessionName); err != nil {
+			return out, w.fail(ctx, "switch", oops.In("session").Code("history_failed").With("operation", "record_switch").Wrap(err))
+		}
 	}
 
 	zerolog.Ctx(ctx).Info().

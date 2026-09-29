@@ -43,10 +43,7 @@ func runAutosaveEnsureDefaultSession(cmd *cobra.Command, _ []string) error {
 
 	ctx := clibase.CommandContext(cmd)
 
-	socketPath := resolveAutosaveSocket(cmd)
-	if socketPath == "" {
-		return clibase.NewExitError(clibase.ExitCodeUsage, errAutosaveSocketRequired)
-	}
+	socketPath := clibase.ResolveSocket(cmd)
 
 	server, err := integration.Open(socketPath)
 	if err != nil {
@@ -183,10 +180,7 @@ func runAutosaveRestoreOnStart(cmd *cobra.Command, _ []string) error {
 func executeStartupRestore(cmd *cobra.Command, env autosaveEnv) error {
 	ctx := clibase.CommandContext(cmd)
 
-	socketPath := resolveAutosaveSocket(cmd)
-	if socketPath == "" {
-		return clibase.NewExitError(clibase.ExitCodeUsage, errAutosaveSocketRequired)
-	}
+	socketPath := clibase.ResolveSocket(cmd)
 
 	leaseRoot, err := resolveAutosaveLeaseRoot(cmd, env.cfg)
 	if err != nil {

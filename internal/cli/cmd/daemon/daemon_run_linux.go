@@ -41,6 +41,7 @@ var (
 	errAutosaveIncomplete          = errors.New("autosave did not complete within its deadline")
 	errAutosaveBookkeeping         = errors.New("autosave bookkeeping did not complete")
 	errAutosaveSaveSkippedLockBusy = errors.New("another autosave holds the lock")
+	errDaemonPeriodicSave          = errors.New("the coordinator does not run periodic saves")
 )
 
 type autosaveEnv struct {
@@ -62,10 +63,10 @@ type daemonAutosaveOutcome struct {
 func newDaemonRunCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run",
-		Short: "Run periodic autosave and Linux lifecycle coordination",
-		Long: "Run periodic autosave and Linux lifecycle coordination in the foreground. " +
-			"The runtime holds logind delay locks for shutdown and sleep before readiness, stops periodic admission during drain, " +
-			"and records incomplete final saves without stopping tmux.",
+		Short: "Run the Linux sleep and shutdown save coordinator",
+		Long: "Run the Linux sleep and shutdown save coordinator in the foreground. " +
+			"The runtime holds logind delay locks for shutdown and sleep before readiness, runs one bounded save when logind " +
+			"announces either, and records incomplete final saves without stopping tmux. Periodic saves belong to the autosave timer.",
 		Args: clibase.UsageArgs(cobra.NoArgs),
 		Annotations: map[string]string{
 			clibase.AnnotationLiveIO:    strconv.FormatBool(true),
@@ -79,8 +80,8 @@ func newDaemonRunCommand() *cobra.Command {
 	cmd.Flags().String("history", "", "History state JSON file path")
 	cmd.Flags().StringSlice("session", nil, "Explicit selected session IDs")
 	cmd.Flags().String("status-file", "", "Explicit path for the final save status artifact")
-	cmd.Flags().Duration("attempt-timeout", defaultDaemonAttemptTimeout, "Bound for each periodic save attempt")
-	cmd.Flags().Duration("drain-grace", automation.DefaultDrainGrace, "Grace period for an in-flight periodic save before lifecycle cancellation")
+	cmd.Flags().Duration("attempt-timeout", defaultDaemonAttemptTimeout, "Save attempt bound reported in the coordinator runtime status")
+	cmd.Flags().Duration("drain-grace", automation.DefaultDrainGrace, "Grace period for stopping the coordinator scheduler")
 
 	return cmd
 }
@@ -147,16 +148,14 @@ func runDaemonRuntime(cmd *cobra.Command, _ []string) (resultErr error) {
 	defer func() { resultErr = errors.Join(resultErr, reporter.Close()) }()
 
 	newScheduler := func() (*automation.Scheduler, error) {
-		return newDaemonScheduler(cmd, env, socket, attemptTimeout, drainGrace, reporter)
+		return newDaemonScheduler(cmd, env, attemptTimeout, drainGrace, reporter)
 	}
 
+	// The coordinator never starts the scheduler's periodic loop: periodic saves belong to the
+	// autosave timer, and the coordinator only runs the sleep and shutdown saves logind announces.
 	scheduler, err := newScheduler()
 	if err != nil {
 		return clibase.NewExitError(clibase.ExitCodeUsage, err)
-	}
-
-	if err := scheduler.Start(ctx); err != nil {
-		return oops.In("cli").With("operation", "start_autosave_scheduler").Wrap(err)
 	}
 
 	reporter.Update(daemon.RuntimePhaseRunning)
@@ -167,7 +166,6 @@ func runDaemonRuntime(cmd *cobra.Command, _ []string) (resultErr error) {
 func newDaemonScheduler(
 	cmd *cobra.Command,
 	env autosaveEnv,
-	socket string,
 	attemptTimeout time.Duration,
 	drainGrace time.Duration,
 	reporter *daemon.RuntimeReporter,
@@ -176,38 +174,18 @@ func newDaemonScheduler(
 		Interval:       env.interval,
 		AttemptTimeout: attemptTimeout,
 		DrainGrace:     drainGrace,
-		Policy: func(facts automation.PolicyFacts) automation.PolicyDecision {
-			return daemonAutosaveDecision(env.cfg.Autosave.Enabled, env.historyKnown, facts)
-		},
-		Probe: func(ctx context.Context) (int, error) {
-			if readyErr := ensureDaemonRepositoryReady(ctx, cmd, env); readyErr != nil {
-				return 0, readyErr
-			}
-
-			server, openErr := integration.Open(socket)
-			if openErr != nil {
-				return 0, oops.In("cli").With("operation", "open_tmux_endpoint").Wrap(openErr)
-			}
-
-			clients, clientsErr := server.Clients(ctx)
-			if clientsErr != nil {
-				return 0, oops.In("cli").With("operation", "inspect_tmux_clients").Wrap(clientsErr)
-			}
-
-			return len(clients), nil
-		},
+		Policy:         nil,
+		Probe:          nil,
 		Attempt: func(ctx context.Context, trigger automation.Trigger) (automation.AttemptResult, error) {
-			if trigger == automation.TriggerShutdown {
-				if reporter != nil {
-					reporter.Update(daemon.RuntimePhaseFinalSave)
-				}
-
-				return executeDaemonFinalSave(cmd, env, ctx)
+			if trigger != automation.TriggerShutdown {
+				return automation.AttemptResult{Attempt: "", Generation: "", Status: "", Recorded: false}, errDaemonPeriodicSave
 			}
 
-			saveErr := executeAutosaveSave(ctx, cmd, env)
+			if reporter != nil {
+				reporter.Update(daemon.RuntimePhaseFinalSave)
+			}
 
-			return automation.AttemptResult{Attempt: "", Generation: "", Status: "", Recorded: saveErr == nil}, saveErr
+			return executeDaemonFinalSave(cmd, env, ctx)
 		},
 		Now: time.Now,
 	})
@@ -216,26 +194,6 @@ func newDaemonScheduler(
 	}
 
 	return scheduler, nil
-}
-
-func daemonAutosaveDecision(enabled, historyKnown bool, facts automation.PolicyFacts) automation.PolicyDecision {
-	if !enabled {
-		return automation.PolicyDecision{Admit: false, Reason: automation.ReasonDisabled}
-	}
-
-	if !historyKnown {
-		return automation.PolicyDecision{Admit: false, Reason: automation.ReasonHistoryUnavailable}
-	}
-
-	if !facts.AttachedKnown {
-		return automation.PolicyDecision{Admit: false, Reason: automation.ReasonAttachedUnknown}
-	}
-
-	if facts.Attached > 0 {
-		return automation.PolicyDecision{Admit: false, Reason: automation.ReasonAttachedClients}
-	}
-
-	return automation.PolicyDecision{Admit: true, Reason: automation.ReasonAdmitted}
 }
 
 func ensureDaemonRepositoryReady(ctx context.Context, cmd *cobra.Command, env autosaveEnv) error {
@@ -486,85 +444,6 @@ func executeFinalSave(
 	}
 
 	return outcome, status, errors.Join(bookkeepingErr, wrapCloseError(closeErr), lockErr)
-}
-
-func executeAutosaveSave(ctx context.Context, cmd *cobra.Command, env autosaveEnv) error {
-	socketPath := resolveAutosaveSocket(cmd)
-	if socketPath == "" {
-		return clibase.NewExitError(clibase.ExitCodeUsage, errAutosaveSocketRequired)
-	}
-
-	processEnv, agentStatePath, envErr := resolveAutosaveProcessEnv(cmd, env.cfg)
-	if envErr != nil {
-		return envErr
-	}
-
-	leaseRoot, err := resolveAutosaveLeaseRoot(cmd, env.cfg)
-	if err != nil {
-		return err
-	}
-
-	repo, err := openAutosaveRepository(ctx, cmd, env.cfg)
-	if err != nil {
-		return err
-	}
-
-	server, err := integration.Open(socketPath)
-	if err != nil {
-		return errors.Join(oops.In("cli").With("operation", "open_tmux").Wrap(err), wrapCloseError(repo.Close()))
-	}
-
-	selected, err := resolveAutosaveSelection(cmd, ctx, server)
-	if err != nil {
-		return errors.Join(err, wrapCloseError(repo.Close()))
-	}
-
-	lock, err := automation.TryAcquireSaveLock(ctx, automation.SaveLockPath())
-	if err != nil {
-		closeErr := wrapCloseError(repo.Close())
-		if errors.Is(err, automation.ErrSaveLockBusy) {
-			return errors.Join(errAutosaveSaveSkippedLockBusy, closeErr)
-		}
-
-		return errors.Join(oops.In("cli").With("operation", "acquire_autosave_lock").Wrap(err), closeErr)
-	}
-
-	result, saveErr := engine.SaveObservation(ctx, repo, server, selected, engine.SaveConfig{
-		LeaseRoot:              leaseRoot,
-		ProcessEnrichment:      true,
-		ProcessEnvironmentKeys: processEnv,
-		AgentSource:            agents.NewAHTStore(agentStatePath),
-		Profile:                engine.RecoveryPractical,
-	})
-
-	closeErr := repo.Close()
-	lockErr := lock.Release()
-
-	if saveErr != nil {
-		return errors.Join(oops.In("cli").With("operation", "autosave_save").Wrap(saveErr), wrapCloseError(closeErr), lockErr)
-	}
-
-	decision := automation.EvaluateSaveCompletion(automation.SaveCompletion{
-		Attempt:    result.Attempt,
-		Generation: result.Generation,
-		Status:     result.Status,
-		Uncertain:  false,
-	}, nil)
-
-	var bookkeepingErr error
-
-	if decision.Record {
-		bookkeepingCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), autosaveBookkeepingTimeout)
-		bookkeepingErr = recordAutosave(bookkeepingCtx, env.historyPath, time.Now().Unix())
-
-		cancel()
-	}
-
-	if bookkeepingErr != nil {
-		bookkeepingErr = clibase.NewExitError(clibase.ExitCodeGeneral, errors.Join(errAutosaveBookkeeping, bookkeepingErr))
-	}
-
-	return errors.Join(bookkeepingErr, wrapCloseError(closeErr), lockErr)
 }
 
 func newFinalSaveStatus() automation.FinalSaveStatus {

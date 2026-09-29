@@ -12,12 +12,15 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/term"
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
@@ -41,6 +44,8 @@ const (
 const (
 	pickerAnnotationEnabled = "true"
 	pickerClientEnvironment = "SESH_TMUX_CLIENT"
+	pickerLaunchedAtFlag    = "launched-at"
+	pickerLaunchMaxAge      = time.Minute
 )
 
 const (
@@ -174,7 +179,7 @@ func newPickerCommand(
 		},
 	}
 
-	cmd.Flags().String("socket", "", "Explicit absolute path to the tmux server socket (defaults to the ambient server)")
+	clibase.AddSocketFlag(cmd)
 	cmd.Flags().String("repository", "", "Native snapshot repository (defaults to the configured data directory)")
 	cmd.Flags().String("lease-root", "", "Shared tmux endpoint lease root (defaults to the configured data directory)")
 	cmd.Flags().String("history", "", "Session history state file")
@@ -184,6 +189,8 @@ func newPickerCommand(
 		cmd.Flags().Bool("tmux", false, "open using the configured size in a tmux popup")
 		cmd.Flags().String("switch-handoff", "", "popup switch handoff")
 		_ = cmd.Flags().MarkHidden("switch-handoff")
+		cmd.Flags().Int64(pickerLaunchedAtFlag, 0, "popup launch time")
+		_ = cmd.Flags().MarkHidden(pickerLaunchedAtFlag)
 		cmd.Flags().StringP("client", "c", "", "target tmux client (name or tty)")
 		cmd.Flags().StringP("target-pane", "t", "", "target tmux pane")
 		cmd.Flags().String("current-session-id", "", "invoking tmux session ID")
@@ -244,13 +251,15 @@ func runPickerCommand(
 	presentation pickerPresentation,
 	remoteFactory PickerRemoteFactory,
 ) error {
+	launchedAt := time.Now()
+
 	runtime, err := preparePickerCommand(ctx, cmd)
 	if err != nil {
 		return err
 	}
 
 	if presentation == pickerPopup && getBoolFlag(cmd, "tmux") {
-		return openPickerPopup(ctx, cmd, runtime)
+		return openPickerPopup(ctx, cmd, runtime, launchedAt)
 	}
 
 	if !pickerHasTerminal(cmd) {
@@ -297,9 +306,33 @@ func runPickerInteractive(
 		return errors.Join(oops.In("cli").With("operation", "construct_picker").Wrap(err), services.Close())
 	}
 
+	if launchedAt, ok := pickerLaunchedAt(cmd, time.Now()); ok {
+		model.SetLaunchedAt(launchedAt)
+	}
+
 	finalModel, runErr := runPickerProgram(ctx, cmd, model, presentation)
 
 	return finishPickerInteractive(ctx, cmd, finalModel, services, runErr)
+}
+
+// pickerLaunchedAt returns when the invoking picker-open started, ignoring a value that
+// cannot be a recent launch on this machine.
+func pickerLaunchedAt(cmd *cobra.Command, now time.Time) (time.Time, bool) {
+	if cmd.Flags().Lookup(pickerLaunchedAtFlag) == nil {
+		return time.Time{}, false
+	}
+
+	nanos, err := cmd.Flags().GetInt64(pickerLaunchedAtFlag)
+	if err != nil || nanos <= 0 {
+		return time.Time{}, false
+	}
+
+	launchedAt := time.Unix(0, nanos)
+	if launchedAt.After(now) || now.Sub(launchedAt) > pickerLaunchMaxAge {
+		return time.Time{}, false
+	}
+
+	return launchedAt, true
 }
 
 func finishPickerInteractive(ctx context.Context, cmd *cobra.Command, finalModel *tui.Model, services *pickerServices, runErr error) error {
@@ -309,11 +342,11 @@ func finishPickerInteractive(ctx context.Context, cmd *cobra.Command, finalModel
 
 	var handoffPane, handoffPath string
 
-	if runErr == nil && ctx.Err() == nil {
-		if flag := cmd.Flags().Lookup("switch-handoff"); flag != nil {
-			handoffPath, _ = cmd.Flags().GetString("switch-handoff")
-		}
+	if flag := cmd.Flags().Lookup("switch-handoff"); flag != nil {
+		handoffPath, _ = cmd.Flags().GetString("switch-handoff")
+	}
 
+	if runErr == nil && ctx.Err() == nil {
 		if target, ok := finalModel.DeferredSwitchTarget(); ok && handoffPath != "" {
 			handoffTarget = &target
 			handoffPane = finalModel.DeferredSwitchPane()
@@ -323,8 +356,9 @@ func finishPickerInteractive(ctx context.Context, cmd *cobra.Command, finalModel
 	}
 
 	closeErr := services.Close()
-	if handoffTarget != nil && closeErr == nil {
-		deferredErr = writePickerSwitchHandoff(handoffPath, *handoffTarget, handoffPane)
+	if handoffPath != "" && closeErr == nil {
+		handoffErr := writePickerSwitchHandoff(handoffPath, handoffTarget, handoffPane, finalModel.ReplayKey(), services.takeDeferredAgentViews())
+		deferredErr = errors.Join(deferredErr, handoffErr)
 	}
 
 	if runErr != nil {
@@ -340,10 +374,7 @@ func preparePickerCommand(ctx context.Context, cmd *cobra.Command) (pickerComman
 		return pickerCommandRuntime{}, err
 	}
 
-	socketPath := resolvePickerSocket(cmd)
-	if socketPath == "" {
-		return pickerCommandRuntime{}, clibase.NewExitError(clibase.ExitCodeUsage, clibase.ErrSocketRequired)
-	}
+	socketPath := clibase.ResolveSocket(cmd)
 
 	repositoryFlag, _ := cmd.Flags().GetString("repository")
 	leaseFlag, _ := cmd.Flags().GetString("lease-root")
@@ -464,7 +495,7 @@ func resolvePopupClient(ctx context.Context, cmd *cobra.Command, server *gotmux.
 	return invoked, nil
 }
 
-func openPickerPopup(ctx context.Context, cmd *cobra.Command, runtime pickerCommandRuntime) error {
+func openPickerPopup(ctx context.Context, cmd *cobra.Command, runtime pickerCommandRuntime, launchedAt time.Time) error {
 	server, err := integration.OpenInteractive(runtime.socketPath)
 	if err != nil {
 		return oops.In("cli").With("operation", "open_tmux").Wrap(err)
@@ -498,7 +529,7 @@ func openPickerPopup(ctx context.Context, cmd *cobra.Command, runtime pickerComm
 	targetPane := pickerCurrentPane(cmd)
 	width, height := pickerPopupDimensions(runtime.cfg, runtime.state, gotmux.Size{Width: client.Width, Height: client.Height})
 	options := pickerPopupOptions(
-		gotmux.Exec(executable, pickerPopupArguments(cmd, runtime.socketPath, string(client.Name), string(originSessionID), targetPane, handoffPath)...),
+		gotmux.Exec(executable, pickerPopupArguments(cmd, runtime.socketPath, string(client.Name), string(originSessionID), targetPane, handoffPath, launchedAt)...),
 		width,
 		height,
 		runtime.cfg.Theme.Background,
@@ -517,6 +548,7 @@ func openPickerPopup(ctx context.Context, cmd *cobra.Command, runtime pickerComm
 
 	return errors.Join(
 		completePickerSwitchHandoff(ctx, services, handoffPath, string(client.Name), string(originSessionID)),
+		replayPickerKey(ctx, handoffPath, runtime.socketPath, string(client.Name)),
 		services.Close(),
 	)
 }
@@ -530,13 +562,12 @@ func pickerPopupOptions(program gotmux.Program, width, height, background string
 	opts.Borderless = true
 
 	bg := strings.TrimSpace(background)
-	if bg == "" {
+	switch {
+	case bg == "":
 		opts.Style = "bg=#000000"
-	} else if strings.EqualFold(bg, "default") {
+	case strings.EqualFold(bg, "default"):
 		opts.Style = ""
-	} else if strings.HasPrefix(bg, "#") {
-		opts.Style = "bg=" + bg
-	} else {
+	default:
 		opts.Style = "bg=" + bg
 	}
 
@@ -547,8 +578,12 @@ func pickerPopupOptions(program gotmux.Program, width, height, background string
 	return opts
 }
 
-func pickerPopupArguments(cmd *cobra.Command, socketPath, clientName, sessionID, paneID, handoffPath string) []string {
+func pickerPopupArguments(cmd *cobra.Command, socketPath, clientName, sessionID, paneID, handoffPath string, launchedAt time.Time) []string {
 	arguments := []string{"popup", "--socket", socketPath}
+
+	if !launchedAt.IsZero() {
+		arguments = append(arguments, "--"+pickerLaunchedAtFlag, strconv.FormatInt(launchedAt.UnixNano(), 10))
+	}
 
 	if handoffPath != "" {
 		arguments = append(arguments, "--switch-handoff", handoffPath)
@@ -692,22 +727,6 @@ func balancePickerPopupSize(desired, maximum, minimum, target gotmux.Size) gotmu
 	return gotmux.Size{Width: min(width, maximum.Width), Height: min(height, maximum.Height)}
 }
 
-func resolvePickerSocket(cmd *cobra.Command) string {
-	socketPath, _ := cmd.Flags().GetString("socket")
-	if socketPath != "" {
-		return socketPath
-	}
-
-	tmuxValue := os.Getenv("TMUX")
-	if tmuxValue == "" {
-		return ""
-	}
-
-	socketPath, _, _ = strings.Cut(tmuxValue, ",")
-
-	return socketPath
-}
-
 func buildPickerModel(
 	ctx context.Context,
 	presentation pickerPresentation,
@@ -752,6 +771,10 @@ func runPickerProgram(ctx context.Context, cmd *cobra.Command, model *tui.Model,
 		programOptions = append(programOptions, tea.WithFPS(pickerRenderFPS))
 	}
 
+	if profile, ok := pickerColorProfile(os.Environ()); ok {
+		programOptions = append(programOptions, tea.WithColorProfile(profile))
+	}
+
 	if output, ok := cmd.OutOrStdout().(fileDescriptor); ok {
 		if width, height, err := term.GetSize(output.Fd()); err == nil {
 			model.SetSize(width, height)
@@ -783,6 +806,27 @@ func pickerProgramOutput(output io.Writer) io.Writer {
 	}
 
 	return pickerTerminalOutput{Writer: output, fd: terminal.Fd()}
+}
+
+// pickerColorProfile returns the color profile of a picker running inside tmux, and false
+// outside tmux. tmux converts RGB colors for each client's terminal, so every color-capable
+// profile is TrueColor there; deciding it from the environment keeps bubbletea's detection
+// from running `tmux info` before the first frame.
+func pickerColorProfile(environ []string) (colorprofile.Profile, bool) {
+	inside := slices.ContainsFunc(environ, func(entry string) bool {
+		value, ok := strings.CutPrefix(entry, "TMUX=")
+
+		return ok && value != ""
+	})
+	if !inside {
+		return colorprofile.Unknown, false
+	}
+
+	if profile := colorprofile.Env(environ); profile < colorprofile.ANSI {
+		return profile, true
+	}
+
+	return colorprofile.TrueColor, true
 }
 
 func wrapPickerProgramError(err error) error {

@@ -11,17 +11,9 @@ func TestSessionLoggingOutcomeOwnership(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	err := executeApplication(t.Context(), []string{"list", testConfigFlag, cfg, testJSONFlag}, nil, &stdout, &stderr)
-	if err == nil {
-		t.Fatal("expected validation error, got nil")
-	}
-
 	sockPath := filepath.Join(t.TempDir(), "nonexistent.sock")
 
-	stdout.Reset()
-	stderr.Reset()
-
-	err = executeApplication(t.Context(), []string{"list", testSocketFlag, sockPath, testConfigFlag, cfg, testJSONFlag}, nil, &stdout, &stderr)
+	err := executeApplication(t.Context(), []string{"list", testSocketFlag, sockPath, testConfigFlag, cfg, testJSONFlag}, nil, &stdout, &stderr)
 	if err != nil {
 		t.Fatalf("list on empty server returned error: %v", err)
 	}
