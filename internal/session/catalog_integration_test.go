@@ -96,6 +96,7 @@ func TestCatalogKeepsLiveRowsWhenInvokingPaneDisappears(t *testing.T) {
 	if _, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "first"}); err != nil {
 		t.Fatal(err)
 	}
+
 	if _, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "second"}); err != nil {
 		t.Fatal(err)
 	}
@@ -104,6 +105,7 @@ func TestCatalogKeepsLiveRowsWhenInvokingPaneDisappears(t *testing.T) {
 	if err == nil || result.Status != session.StatusPartial || len(result.Sessions) < 2 || result.LiveErr == nil {
 		t.Fatalf("stale pane catalog = status %s, rows %d, live error %v, error %v", result.Status, len(result.Sessions), result.LiveErr, err)
 	}
+
 	found := map[string]bool{}
 	for _, row := range result.Sessions {
 		found[row.Name] = true
@@ -111,6 +113,7 @@ func TestCatalogKeepsLiveRowsWhenInvokingPaneDisappears(t *testing.T) {
 			t.Fatalf("stale pane marked %q as current", row.Name)
 		}
 	}
+
 	if !found["first"] || !found["second"] {
 		t.Fatalf("stale pane catalog lost fixture sessions: %#v", found)
 	}
@@ -124,6 +127,7 @@ func TestCatalogUsesInvokingSessionHintWithoutPaneLookup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if _, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "second"}); err != nil {
 		t.Fatal(err)
 	}
@@ -134,6 +138,7 @@ func TestCatalogUsesInvokingSessionHintWithoutPaneLookup(t *testing.T) {
 	if err != nil || result.Status != session.StatusComplete {
 		t.Fatalf("session hint catalog = status %s, error %v", result.Status, err)
 	}
+
 	for _, row := range result.Sessions {
 		if row.IsCurrent != (row.ID == string(first.ID())) {
 			t.Fatalf("session hint marked %q (%s) current = %t", row.Name, row.ID, row.IsCurrent)
@@ -144,37 +149,47 @@ func TestCatalogUsesInvokingSessionHintWithoutPaneLookup(t *testing.T) {
 func TestCatalogPrefersInvokingPaneForCurrentAgentSelection(t *testing.T) {
 	server := tmuxtest.NewServer(t)
 	ctx := t.Context()
+
 	sessions, err := server.Sessions(ctx)
 	if err != nil || len(sessions) == 0 {
 		t.Fatalf("fixture sessions: %v", err)
 	}
+
 	origin := sessions[0]
+
 	panes, err := origin.Handle().Panes(ctx)
 	if err != nil || len(panes) == 0 {
 		t.Fatalf("origin panes: %v", err)
 	}
+
 	first := panes[0].Handle()
+
 	invoking, err := first.Split(ctx, gotmux.SplitOptions{Direction: gotmux.Vertical})
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if err := first.Select(ctx); err != nil {
 		t.Fatal(err)
 	}
+
 	result, err := session.ListCatalog(ctx, session.CatalogOptions{
 		Server: server, CurrentPane: string(invoking.ID()), CurrentSessionID: string(origin.ID),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	for _, row := range result.Sessions {
 		if row.ID == string(origin.ID) {
 			if !row.IsCurrent || row.ActivePaneID != string(invoking.ID()) {
 				t.Fatalf("current row = %+v, want invoking pane %s", row, invoking.ID())
 			}
+
 			return
 		}
 	}
+
 	t.Fatal("current session missing from catalog")
 }
 

@@ -230,6 +230,7 @@ func TestExecutor_PreflightGroupCollision(t *testing.T) {
 	if err != nil {
 		t.Fatalf("pre-existing leader session should still exist: %v", err)
 	}
+
 	if foundLeader.ID() != leader.ID() {
 		t.Fatalf("leader session ID changed: %s vs %s", foundLeader.ID(), leader.ID())
 	}
@@ -238,6 +239,7 @@ func TestExecutor_PreflightGroupCollision(t *testing.T) {
 	if err != nil {
 		t.Fatalf("pre-existing follower session should still exist: %v", err)
 	}
+
 	if foundFollower.ID() != follower.ID() {
 		t.Fatalf("follower session ID changed: %s vs %s", foundFollower.ID(), follower.ID())
 	}

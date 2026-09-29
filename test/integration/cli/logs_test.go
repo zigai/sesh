@@ -36,17 +36,20 @@ type logWatchTestWriter struct {
 	afterWrite func(count int)
 }
 
-func (w *logWatchTestWriter) Write(p []byte) (n int, err error) {
+func (w *logWatchTestWriter) Write(p []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
 	w.writeCount++
-	n, err = w.buf.Write(p)
+
+	// bytes.Buffer.Write always consumes all of p and never returns an error.
+	_, _ = w.buf.Write(p)
+
 	if w.afterWrite != nil {
 		w.afterWrite(w.writeCount)
 	}
 
-	return n, err
+	return len(p), nil
 }
 
 func (w *logWatchTestWriter) String() string {
@@ -203,6 +206,7 @@ func testBinaryWatchInterrupt(t *testing.T, binaryPath, configPath string) {
 	_, drainErr := io.Copy(io.Discard, reader)
 
 	waitErr := cmd.Wait()
+
 	if err := errors.Join(readErr, signalErr, drainErr); err != nil {
 		t.Fatalf("watch interrupted: %v, %q", err, stderr.String())
 	}
@@ -506,6 +510,7 @@ func TestLogsMissingLogPathDoesNotCreateFiles(t *testing.T) {
 	}
 
 	cmd := cli.NewRootCommand(t.Context())
+
 	stdout, stderr, err := executeCommand(cmd, "--config", configFile, testLogsCmd, "--path")
 	if err != nil {
 		t.Fatalf("logs --path failed: %v, stderr: %s", err, stderr)
@@ -520,6 +525,7 @@ func TestLogsMissingLogPathDoesNotCreateFiles(t *testing.T) {
 	}
 
 	cmd = cli.NewRootCommand(t.Context())
+
 	stdout, stderr, err = executeCommand(cmd, "--config", configFile, testLogsCmd, "--clear")
 	if err != nil {
 		t.Fatalf("logs --clear failed: %v, stderr: %s", err, stderr)

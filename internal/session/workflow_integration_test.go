@@ -866,6 +866,7 @@ func TestWorkflow_SwitchForClientHookReceivesOriginSessionName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SwitchSessionOutcomeForClient failed: %v", err)
 	}
+
 	if outcome.Client != client {
 		t.Fatalf("switched client = %q, want %q", outcome.Client, client)
 	}
@@ -874,6 +875,7 @@ func TestWorkflow_SwitchForClientHookReceivesOriginSessionName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if got, want := string(recorded), origin.Name+":"+string(origin.ID); got != want {
 		t.Fatalf("previous session hook fields = %q, want %q", got, want)
 	}

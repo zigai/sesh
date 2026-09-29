@@ -59,7 +59,7 @@ func testEnrichEditorOwnedServer(t *testing.T, nvim string, explicitListen bool)
 		t.Fatalf("reading nvim identity: %v", err)
 	}
 
-	observation, err := observeProcess(ctx, command.Process.Pid, birth)
+	observation, err := observeProcess(ctx, command.Process.Pid, birth, nvim)
 	if err != nil {
 		t.Fatalf("observing nvim: %v", err)
 	}
@@ -90,7 +90,7 @@ func TestEnrichEditorRestartsNvimWithoutListedFiles(t *testing.T) {
 		t.Fatalf("reading nvim identity: %v", err)
 	}
 
-	observation, err := observeProcess(ctx, command.Process.Pid, birth)
+	observation, err := observeProcess(ctx, command.Process.Pid, birth, nvim)
 	if err != nil {
 		t.Fatalf("observing nvim: %v", err)
 	}
@@ -122,7 +122,7 @@ func TestEnrichEditorExcludesUnlistedAndScratchBuffers(t *testing.T) {
 		t.Fatalf("reading nvim identity: %v", err)
 	}
 
-	observation, err := observeProcess(ctx, command.Process.Pid, birth)
+	observation, err := observeProcess(ctx, command.Process.Pid, birth, nvim)
 	if err != nil {
 		t.Fatalf("observing nvim: %v", err)
 	}
@@ -154,7 +154,7 @@ func TestEnrichEditorRejectsIdentityMismatch(t *testing.T) {
 		t.Fatalf("reading nvim identity: %v", err)
 	}
 
-	observation, err := observeProcess(ctx, command.Process.Pid, birth)
+	observation, err := observeProcess(ctx, command.Process.Pid, birth, nvim)
 	if err != nil {
 		t.Fatalf("observing nvim: %v", err)
 	}
@@ -187,7 +187,7 @@ func TestEnrichEditorReadsFilesOpenedAfterInteractiveNvimStartup(t *testing.T) {
 		t.Fatalf("reading interactive nvim identity: %v", err)
 	}
 
-	observation, err := observeProcess(ctx, interactive.command.Process.Pid, birth)
+	observation, err := observeProcess(ctx, interactive.command.Process.Pid, birth, nvim)
 	if err != nil {
 		t.Fatalf("observing interactive nvim: %v", err)
 	}
@@ -338,7 +338,7 @@ func assertInteractiveEditorIdentityRefusals(
 		t.Fatalf("reading unrelated nvim identity: %v", err)
 	}
 
-	unrelatedObservation, err := observeProcess(ctx, unrelated.Process.Pid, unrelatedBirth)
+	unrelatedObservation, err := observeProcess(ctx, unrelated.Process.Pid, unrelatedBirth, nvim)
 	if err != nil {
 		t.Fatalf("observing unrelated nvim: %v", err)
 	}
@@ -498,14 +498,22 @@ func startNvimContext(
 	return command
 }
 
-func observeProcess(ctx context.Context, pid int, birth process.Identity) (*process.Observation, error) {
+// observeProcess waits until pid reports the executable the test started. Under load, /proc
+// can still show the starting test binary's image and arguments for a few milliseconds
+// after [exec.Cmd.Start] returns.
+func observeProcess(ctx context.Context, pid int, birth process.Identity, executable string) (*process.Observation, error) {
+	want, err := filepath.EvalSymlinks(executable)
+	if err != nil {
+		return nil, fmt.Errorf("resolving executable: %w", err)
+	}
+
 	for ctx.Err() == nil {
 		observation, err := process.Observe(ctx, process.Request{PID: pid, ExpectedBirth: birth, EnvironmentKeys: nil})
-		if err == nil {
+		if err == nil && string(observation.Executable) == want {
 			return observation, nil
 		}
 
-		if !errors.Is(err, process.ErrEmptyCmdline) {
+		if err != nil && !errors.Is(err, process.ErrEmptyCmdline) {
 			return nil, fmt.Errorf("observing process: %w", err)
 		}
 
@@ -522,7 +530,7 @@ func waitForEditorEnrichment(
 ) (model.Launch, apps.Reason, error) {
 	for ctx.Err() == nil {
 		prepared, reason, err := apps.EnrichEditor(ctx, observed, pid)
-		if err == nil || !errors.Is(err, apps.ErrEditorEndpointMissing) {
+		if err == nil || !transientEnrichmentError(err) {
 			if err != nil {
 				return prepared, reason, fmt.Errorf("enrich editor: %w", err)
 			}
@@ -548,7 +556,7 @@ func waitForEditorArguments(
 			return prepared, reason, nil
 		}
 
-		if err != nil && !errors.Is(err, apps.ErrEditorEndpointMissing) {
+		if err != nil && !transientEnrichmentError(err) {
 			return prepared, reason, fmt.Errorf("enrich editor: %w", err)
 		}
 
@@ -556,6 +564,13 @@ func waitForEditorArguments(
 	}
 
 	return model.Launch{}, "", fmt.Errorf("wait for editor arguments: %w", ctx.Err())
+}
+
+// transientEnrichmentError reports failures a starting nvim can produce before it settles: its
+// server endpoint is not listening yet, or a child is mid-exec with an empty command line.
+// Capture treats the latter as a changed observation and retries it the same way.
+func transientEnrichmentError(err error) bool {
+	return errors.Is(err, apps.ErrEditorEndpointMissing) || errors.Is(err, process.ErrEmptyCmdline)
 }
 
 func observedLaunch(observation *process.Observation) model.Launch {

@@ -150,32 +150,40 @@ func activeWindow(t *testing.T, ctx context.Context, server *gotmux.Server, sess
 	return ""
 }
 
+// runAgentNavigation runs one agent navigation action with a fresh root command and decodes
+// its JSON result.
+func runAgentNavigation(t *testing.T, action string, args ...string) agentNavResultJSON {
+	t.Helper()
+
+	stdout, stderr, err := executeCommand(cli.NewRootCommand(t.Context()), append([]string{actionCmd, action}, args...)...)
+	if err != nil {
+		t.Fatalf("%s failed: %v\nstderr: %s", action, err, stderr)
+	}
+
+	var envelope testJSONEnvelope
+	if err := json.Unmarshal([]byte(strings.TrimSpace(stdout)), &envelope); err != nil {
+		t.Fatalf("decoding %s envelope %q: %v", action, stdout, err)
+	}
+
+	return decodeJSONPayload[agentNavResultJSON](t, envelope.Result)
+}
+
 func TestCLIAgentNextActivatesAgentWindow(t *testing.T) {
 	fixture := newAgentIntegrationFixture(t)
 
 	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
 	defer cancel()
 
-	root := cli.NewRootCommand(t.Context())
-
 	historyDir := filepath.Join(t.TempDir(), "history")
 	if err := os.Mkdir(historyDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
+
 	historyPath := filepath.Join(historyDir, "history.json")
-	stdout, stderr, err := executeCommand(root, actionCmd, "agent-next",
+
+	result := runAgentNavigation(t, "agent-next",
 		testNoConfigFlag, testSocketFlag, fixture.socket, "--state", fixture.statePath,
 		"--pane", fixture.current.PaneID, "--history", historyPath, testJSONFlag)
-	if err != nil {
-		t.Fatalf("agent next failed: %v\nstderr: %s", err, stderr)
-	}
-
-	var envelope testJSONEnvelope
-	if err := json.Unmarshal([]byte(strings.TrimSpace(stdout)), &envelope); err != nil {
-		t.Fatalf("decoding navigation envelope %q: %v", stdout, err)
-	}
-
-	result := decodeJSONPayload[agentNavResultJSON](t, envelope.Result)
 
 	if result.TargetPaneID != fixture.target.PaneID {
 		t.Fatalf("target pane = %q, want %q", result.TargetPaneID, fixture.target.PaneID)
@@ -193,24 +201,14 @@ func TestCLIAgentNextActivatesAgentWindow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loading state after agent-next: %v", err)
 	}
+
 	ident := session.Identity{Origin: "local", Socket: fixture.target.ServerSocket, Name: fixture.target.SessionName}
 	if got := st.GetLastAgentView(ident, fixture.target.PaneID); got == 0 {
 		t.Fatal("agent-next did not record agent view in history")
 	}
 
-	root = cli.NewRootCommand(t.Context())
-
-	stdout, stderr, err = executeCommand(root, actionCmd, "agent-back",
+	result = runAgentNavigation(t, "agent-back",
 		testNoConfigFlag, testSocketFlag, fixture.socket, "--state", fixture.statePath, "--pane", fixture.target.PaneID, testJSONFlag)
-	if err != nil {
-		t.Fatalf("agent back failed: %v\nstderr: %s", err, stderr)
-	}
-
-	if err := json.Unmarshal([]byte(strings.TrimSpace(stdout)), &envelope); err != nil {
-		t.Fatalf("decoding back envelope %q: %v", stdout, err)
-	}
-
-	result = decodeJSONPayload[agentNavResultJSON](t, envelope.Result)
 
 	if result.TargetPaneID != fixture.current.PaneID {
 		t.Fatalf("back target pane = %q, want %q", result.TargetPaneID, fixture.current.PaneID)

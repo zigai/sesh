@@ -952,6 +952,7 @@ type structuralFixture struct {
 func newStructuralFixture(server *tmux.Server, plans ...Plan) *structuralFixture {
 	f := &structuralFixture{server: server}
 	f.ensureMaps()
+
 	for _, p := range plans {
 		f.indexPlan(p)
 	}
@@ -1114,37 +1115,9 @@ func preflightCheckGroupCollision(ctx context.Context, server *tmux.Server, grou
 func (f *structuralFixture) createLeaderOrStandaloneSession(t *testing.T, ctx context.Context, step CreateSessionStep) {
 	t.Helper()
 
-	size := tmux.Size{Width: 80, Height: 24}
-	if step.Width > 0 && step.Height > 0 {
-		size = tmux.Size{Width: step.Width, Height: step.Height}
-	}
+	opts := f.leaderSessionOptions(t, ctx, step)
 
-	hasFollowers := len(f.followersByLeader[step.SessionID]) > 0
-	sessionName := string(step.Name)
-	if hasFollowers && len(step.GroupName) > 0 && string(step.GroupName) != string(step.Name) {
-		sessionName = string(step.GroupName)
-	}
 	f.sessionNames[step.SessionID] = string(step.Name)
-
-	opts := tmux.NewSessionOptions{
-		Name:  sessionName,
-		Size:  size,
-		Start: tmux.ExistingOnly,
-	}
-	if len(step.GroupName) == 0 && len(step.InitialWindowName) > 0 {
-		opts.Window = string(step.InitialWindowName)
-	}
-
-	if len(step.GroupName) > 0 {
-		groupName := string(step.GroupName)
-		if err := preflightCheckGroupCollision(ctx, f.server, groupName); err != nil {
-			t.Fatalf("group preflight check failed: %v", err)
-		}
-
-		opts.Program = tmux.Program{}
-	} else {
-		opts.Program = tmux.Exec("sleep", "300")
-	}
 
 	session, err := f.server.NewSession(ctx, opts)
 	if err != nil {
@@ -1162,8 +1135,50 @@ func (f *structuralFixture) createLeaderOrStandaloneSession(t *testing.T, ctx co
 	f.bootstraps[step.SessionID] = bootLink
 
 	if step.InitialWindowID != "" {
-		f.configureInitialWindow(t, ctx, links[0].Handle().Window(), size, step.InitialWindowID, step.InitialWindowName, step.InitialPaneID)
+		f.configureInitialWindow(t, ctx, links[0].Handle().Window(), opts.Size, step.InitialWindowID, step.InitialWindowName, step.InitialPaneID)
 	}
+}
+
+// leaderSessionOptions builds the tmux options for a standalone session or a group leader. A
+// leader with followers takes the group name, and a grouped session starts with no program.
+func (f *structuralFixture) leaderSessionOptions(t *testing.T, ctx context.Context, step CreateSessionStep) tmux.NewSessionOptions {
+	t.Helper()
+
+	size := tmux.Size{Width: 80, Height: 24}
+	if step.Width > 0 && step.Height > 0 {
+		size = tmux.Size{Width: step.Width, Height: step.Height}
+	}
+
+	hasFollowers := len(f.followersByLeader[step.SessionID]) > 0
+
+	sessionName := string(step.Name)
+	if hasFollowers && len(step.GroupName) > 0 && string(step.GroupName) != string(step.Name) {
+		sessionName = string(step.GroupName)
+	}
+
+	opts := tmux.NewSessionOptions{
+		Name:  sessionName,
+		Size:  size,
+		Start: tmux.ExistingOnly,
+	}
+
+	if len(step.GroupName) == 0 {
+		if len(step.InitialWindowName) > 0 {
+			opts.Window = string(step.InitialWindowName)
+		}
+
+		opts.Program = tmux.Exec("sleep", "300")
+
+		return opts
+	}
+
+	if err := preflightCheckGroupCollision(ctx, f.server, string(step.GroupName)); err != nil {
+		t.Fatalf("group preflight check failed: %v", err)
+	}
+
+	opts.Program = tmux.Program{}
+
+	return opts
 }
 
 func (f *structuralFixture) configureInitialWindow(t *testing.T, ctx context.Context, win tmux.Window, size tmux.Size, winID string, winName model.Bytes, paneID string) {

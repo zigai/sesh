@@ -852,6 +852,7 @@ func TestHookIntegrationCancellationLastHook(t *testing.T) {
 	defer cancelWG.Wait()
 	go func() {
 		defer cancelWG.Done()
+
 		time.Sleep(50 * time.Millisecond)
 		cancel()
 	}()

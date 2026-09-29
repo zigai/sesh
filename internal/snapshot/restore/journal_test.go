@@ -107,17 +107,16 @@ func (j *memoryJournal) Intent(_ context.Context, step Step) error {
 	current := j.state(step.ID())
 
 	switch current.State {
-	case StatePlanned:
+	case StatePlanned, StateNotSent:
 		j.set(step.ID(), TestStep{State: StateIssued, RuntimeID: ""})
-	case StateNotSent:
-		j.set(step.ID(), TestStep{State: StateIssued, RuntimeID: ""})
+
+		return nil
 	case StateIssued:
 		return nil
-	default:
-		return fmt.Errorf("%w: intent from %s", errJournalOrder, current.State)
+	case StateUnknown, StateConfirmed, StateVerified:
 	}
 
-	return nil
+	return fmt.Errorf("%w: intent from %s", errJournalOrder, current.State)
 }
 
 func (j *memoryJournal) Confirmed(_ context.Context, step Step, runtimeID string) error {
@@ -234,9 +233,10 @@ func (j *storeJournal) advance(ctx context.Context, id string) error {
 		}
 
 		return j.transition(ctx, id, StatePlanned, StateIssued, nil)
-	default:
-		return ErrPriorUncertainty
+	case StateUnknown, StateConfirmed, StateVerified:
 	}
+
+	return ErrPriorUncertainty
 }
 
 func (j *storeJournal) Steps(_ context.Context, steps []Step) (map[string]StepState, error) {
