@@ -103,6 +103,79 @@ func TestPickerServicesLoadAndWatchPiConversationNames(t *testing.T) {
 	}
 }
 
+func TestPickerServicesLoadAndWatchClaudeNativeTitles(t *testing.T) {
+	transcript := filepath.Join(t.TempDir(), "claude.jsonl")
+	writePickerNameFixture(t, transcript, `{"type":"ai-title","sessionId":"claude-native","aiTitle":"Generated title"}`+"\n")
+
+	source := pickerNameWatchSource{sessions: []aht.Session{{
+		SchemaVersion: 3,
+		ID:            "claude-registry",
+		Harness:       aht.HarnessClaude,
+		Liveness:      aht.Live{Activity: aht.ActivityIdle},
+		SessionID:     "claude-native",
+		SessionPath:   transcript,
+		ResumeCommand: []string{"claude", "--resume", "claude-native"},
+		Location: aht.Location{
+			Kind:        aht.MultiplexerTmux,
+			ServerID:    "/tmp/tmux.sock",
+			SessionID:   "$1",
+			SessionName: "workspace",
+			PaneID:      "%1",
+		},
+	}}}
+	services := &pickerServices{agentStore: source}
+	assertTitle := func(summaries []session.AgentSummary, want string) {
+		t.Helper()
+		assertPickerServiceName(t, summaries, want)
+
+		if got := summaries[0].Agents[0].Task; got != want {
+			t.Fatalf("picker task = %q, want %q", got, want)
+		}
+	}
+
+	summaries, err := services.LoadAgentSummaries(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertTitle(summaries, "Generated title")
+	appendPickerNameFixture(t, transcript, `{"type":"custom-title","sessionId":"claude-native","customTitle":"Manual title"}`+"\n")
+
+	published := 0
+
+	err = services.WatchAgentSummaries(t.Context(), func(_ uint64, summaries []session.AgentSummary, publishErr error) error {
+		if publishErr != nil {
+			return publishErr
+		}
+
+		assertTitle(summaries, "Manual title")
+
+		if published == 0 {
+			appendPickerNameFixture(t, transcript, `{"type":"ai-title","sessionId":"claude-native","aiTitle":"Later generated title"}`+"\n")
+		}
+
+		published++
+
+		return nil
+	})
+	if err != nil || published != 2 {
+		t.Fatalf("watch result: published=%d err=%v", published, err)
+	}
+
+	stored, err := services.agentStore.List(t.Context(), aht.Filter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(stored) != 1 || stored[0].SessionID != "claude-native" {
+		t.Fatalf("native resume identity changed: %#v", stored)
+	}
+
+	if diff := cmp.Diff([]string{"claude", "--resume", "claude-native"}, stored[0].ResumeCommand); diff != "" {
+		t.Fatalf("native resume command changed (-want +got):\n%s", diff)
+	}
+}
+
 func TestPickerServicesLoadCodexAndOmpNativeTitles(t *testing.T) {
 	root := t.TempDir()
 
