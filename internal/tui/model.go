@@ -48,6 +48,14 @@ const (
 	degradedSourceRemote  = "remote"
 )
 
+const (
+	popupStartupContent popupStartupPresentation = iota
+	popupStartupWaiting
+	popupStartupLoading
+)
+
+const popupStartupWait = 150 * time.Millisecond
+
 const remoteStatusTickInterval = 2 * time.Second
 
 // ReplayKeyFloatingTerminal is the tmux key the invoking process replays on the popup's client
@@ -65,6 +73,10 @@ type (
 	dialogState int
 	statusLevel int
 )
+
+type popupStartupPresentation uint8
+
+type popupStartupDeadlineMsg struct{}
 
 type sessionActionResultMsg struct {
 	operation      tuiLogOperation
@@ -161,7 +173,7 @@ type Model struct {
 	replayKey                    string
 	paneAfterQuit                string
 	loadingSessions              bool
-	suppressInitialFrame         bool
+	popupStartup                 popupStartupPresentation
 	launchedAt                   time.Time
 	initializedAt                time.Time
 	agentLayoutKey               agentLayoutReflow
@@ -322,7 +334,7 @@ func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps
 		paneAfterQuit:                "",
 		replayKey:                    "",
 		loadingSessions:              false,
-		suppressInitialFrame:         false,
+		popupStartup:                 popupStartupContent,
 		launchedAt:                   time.Time{},
 		initializedAt:                time.Time{},
 		agentLayoutKey:               agentLayoutReflow{width: 0, displayMode: "", uiMode: modeFullscreen, query: ""},
@@ -419,7 +431,7 @@ func (m *Model) SetInitialSessions(sessions []session.Session) {
 		timing:            sessionLoadTiming{catalog: 0, agents: 0},
 	})
 	m.loadingSessions = false
-	m.suppressInitialFrame = false
+	m.popupStartup = popupStartupContent
 }
 
 // SetLaunchedAt records when the process that opened this popup started, so the first-frame
@@ -476,7 +488,9 @@ func (m *Model) Init() tea.Cmd {
 
 	if len(m.sessions) == 0 {
 		m.loadingSessions = true
-		m.suppressInitialFrame = m.mode == modePopup
+		if m.mode == modePopup {
+			m.popupStartup = popupStartupWaiting
+		}
 	}
 
 	commands := []tea.Cmd{
@@ -485,6 +499,12 @@ func (m *Model) Init() tea.Cmd {
 		m.loadInitialSessionsCommand(),
 		m.loadOriginSessionsCommand(),
 		m.agentPositionTickCommand(),
+	}
+
+	if m.popupStartup == popupStartupWaiting {
+		commands = append(commands, tea.Tick(popupStartupWait, func(time.Time) tea.Msg {
+			return popupStartupDeadlineMsg{}
+		}))
 	}
 
 	if remoteSessionsEnabled(m.config, m.deps) {
@@ -537,7 +557,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *Model) View() tea.View {
 	content := ""
-	if !m.suppressInitialFrame {
+	if m.popupStartup != popupStartupWaiting {
 		content = m.viewContent()
 	}
 
@@ -577,6 +597,14 @@ func (m *Model) updateState(ctx context.Context, update session.StateUpdate) err
 }
 
 func (m *Model) handleKeyPressMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if m.popupStartup != popupStartupContent {
+		if cmd := m.handleNavigationKeys(msg); cmd != nil {
+			return cmd()
+		}
+
+		return m.handleSearchKeys(msg)()
+	}
+
 	if cmd := m.handleDialogKeys(msg); cmd != nil {
 		return cmd()
 	}
@@ -640,6 +668,8 @@ func (m *Model) handleTickModelMessage(msg tea.Msg) func() (tea.Model, tea.Cmd) 
 	}
 
 	switch msg := msg.(type) {
+	case popupStartupDeadlineMsg:
+		return m.handlePopupStartupDeadline
 	case agentSummaryTickMsg:
 		return func() (tea.Model, tea.Cmd) {
 			return m, tea.Batch(m.loadAgentSummariesCommand(), m.agentSummaryTickCommand())
@@ -750,6 +780,15 @@ func (m *Model) handleModelMessage(msg tea.Msg) func() (tea.Model, tea.Cmd) {
 	}
 
 	return nil
+}
+
+func (m *Model) handlePopupStartupDeadline() (tea.Model, tea.Cmd) {
+	if m.popupStartup == popupStartupWaiting {
+		logTUIFirstFrame(m.operationContext(), firstFrameTimingAt(m.initializedAt, m.launchedAt, nil, time.Now()))
+		m.popupStartup = popupStartupLoading
+	}
+
+	return m, nil
 }
 
 func (m *Model) setDegradedSource(source string, message string) {

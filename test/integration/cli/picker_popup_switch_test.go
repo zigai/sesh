@@ -127,6 +127,75 @@ func TestAgentsPopupInitiallySelectsInvokingAgentPane(t *testing.T) {
 	}
 }
 
+func TestTmuxAgentsPopupShowsLoadingWhileRegistryIsLocked(t *testing.T) {
+	fixture := newCLISessionFixture(t)
+	artifact := newArtifactBinaryFixture(t)
+	origin, secondInfo, registryPath, _ := prepareAgentPickerPopup(t, fixture)
+	master, slave := openPickerPopupPTY(t)
+	clientName := attachPickerPopupClient(t, fixture, origin, slave)
+
+	lock, err := os.OpenFile(registryPath+".lock", os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Cleanup(func() {
+		if err := lock.Close(); err != nil {
+			t.Error(err)
+		}
+	})
+
+	if err := unix.Flock(int(lock.Fd()), unix.LOCK_EX); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+
+	command := exec.CommandContext(ctx, artifact.binary,
+		"action", "picker-open", "--no-config", "--socket", fixture.socket,
+		"--client", clientName, "--target-pane", string(secondInfo.ID),
+		"--current-session-id", string(origin.ID), "--agent-state", registryPath,
+		"--history", fixture.historyPath, "--repository", fixture.repository,
+		"--lease-root", fixture.leaseRoot,
+	)
+	command.Dir = artifact.workDir
+	command.Env = artifact.env
+
+	var commandOutput bytes.Buffer
+
+	command.Stdout = &commandOutput
+	command.Stderr = &commandOutput
+	commandDone := runPickerPopupArtifact(command)
+	waitForPickerPopupText(t, ctx, master, commandDone, "Loading sessions...", "AGENTS")
+
+	if err := unix.Flock(int(lock.Fd()), unix.LOCK_UN); err != nil {
+		t.Fatal(err)
+	}
+
+	waitForPickerPopupText(t, ctx, master, commandDone, "alpha-agent", "zeta-agent")
+
+	if _, err := master.WriteString("\r"); err != nil {
+		t.Fatal(err)
+	}
+
+	waitForPickerPopupExit(t, ctx, commandDone, commandOutput.String)
+
+	active, err := secondInfo.Handle().Window(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	selected, err := active.ActivePane(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if selected.ID() != secondInfo.ID {
+		t.Fatalf("selected pane = %s, want invoking agent %s", selected.ID(), secondInfo.ID)
+	}
+}
+
 func TestTmuxPopupSelectsInvokingAgentWithLinkedWindow(t *testing.T) {
 	fixture := newCLISessionFixture(t)
 	artifact := newArtifactBinaryFixture(t)

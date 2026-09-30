@@ -691,6 +691,7 @@ func TestPopupFirstFrameLogsOneTimingRecord(t *testing.T) {
 
 	stdStreams := loggingTestWithCapturedStdStreams(t, func() {
 		model.handleSessionLoadResult(firstFrameTestLoad())
+		updateTestModel(t, model, popupStartupDeadlineMsg{})
 		model.handleSessionLoadResult(firstFrameTestLoad())
 	})
 	if stdStreams != "" {
@@ -722,6 +723,70 @@ func TestPopupFirstFrameLogsOneTimingRecord(t *testing.T) {
 
 	if strings.Contains(output.String(), loggingTestPrivacySentinel) {
 		t.Fatalf("first-frame record leaked a session name: %s", output.String())
+	}
+}
+
+func TestPopupLoadingFirstFrameOmitsUnfinishedLoaderTimings(t *testing.T) {
+	var output bytes.Buffer
+
+	model := loggingTestModel(t, &output)
+	model.mode = modePopup
+	model.SetLaunchedAt(time.Now().Add(-250 * time.Millisecond))
+	model.Init()
+
+	stdStreams := loggingTestWithCapturedStdStreams(t, func() {
+		updateTestModel(t, model, popupStartupDeadlineMsg{})
+		updateTestModel(t, model, popupStartupDeadlineMsg{})
+		model.handleSessionLoadResult(firstFrameTestLoad())
+		updateTestModel(t, model, popupStartupDeadlineMsg{})
+	})
+	if stdStreams != "" {
+		t.Fatalf("first-frame logging wrote to std streams: %q", stdStreams)
+	}
+
+	records := loggingTestRecords(t, &output)
+	if len(records) != 1 {
+		t.Fatalf("records = %#v, want one loading first-frame record", records)
+	}
+
+	record := records[0]
+	if _, ok := record["load_ms"].(float64); !ok {
+		t.Fatalf("record = %#v, want measured first-frame load duration", record)
+	}
+
+	sinceLaunch, ok := record["since_launch_ms"].(float64)
+	if !ok || sinceLaunch < 250 {
+		t.Fatalf("record = %#v, want measured launch duration >= 250ms", record)
+	}
+
+	delete(record, "load_ms")
+	delete(record, "since_launch_ms")
+	assertLoggingTestRecord(t, record, tuiLogOperation(tuiOperationFirstFrame), "info", "ok", "tui first frame shown")
+
+	if strings.Contains(output.String(), loggingTestPrivacySentinel) {
+		t.Fatalf("first-frame record leaked a session name: %s", output.String())
+	}
+}
+
+func TestSeededPopupStartupStaysPopulatedAndSilent(t *testing.T) {
+	var output bytes.Buffer
+
+	model := loggingTestModel(t, &output)
+	model.mode = modePopup
+	model.SetSize(80, 20)
+	model.SetInitialSessions(firstFrameTestLoad().sessions)
+	model.Init()
+	updateTestModel(t, model, popupStartupDeadlineMsg{})
+
+	view := stripANSI(viewString(model.View()))
+	if !strings.Contains(view, loggingTestPrivacySentinel) || strings.Contains(view, "Loading sessions...") {
+		t.Fatalf("seeded popup view = %q, want populated sessions without a loading frame", view)
+	}
+
+	model.handleSessionLoadResult(firstFrameTestLoad())
+
+	if records := loggingTestRecords(t, &output); len(records) != 0 {
+		t.Fatalf("seeded popup records = %#v, want none", records)
 	}
 }
 

@@ -59,8 +59,7 @@ type tuiLogOperation string
 // firstFrameTiming breaks down how long a popup took to show its first frame.
 type firstFrameTiming struct {
 	load        time.Duration
-	catalog     time.Duration
-	agents      time.Duration
+	loaders     *sessionLoadTiming
 	sinceLaunch time.Duration
 	launched    bool
 }
@@ -205,16 +204,17 @@ func logTUIEvent(ctx context.Context, operation tuiLogOperation, outcome tuiLogO
 	}
 }
 
-// logTUIFirstFrame records once per popup how long its first frame took and which loader
-// held it: the frame waits for both the catalog and the agent inventory.
 func logTUIFirstFrame(ctx context.Context, timing firstFrameTiming) {
 	event := zerolog.Ctx(ctx).Info().
 		Str("component", "tui").
 		Str("operation", tuiOperationFirstFrame).
 		Str("status", "ok").
-		Int64("load_ms", timing.load.Milliseconds()).
-		Int64("catalog_ms", timing.catalog.Milliseconds()).
-		Int64("agents_ms", timing.agents.Milliseconds())
+		Int64("load_ms", timing.load.Milliseconds())
+
+	if timing.loaders != nil {
+		event.Int64("catalog_ms", timing.loaders.catalog.Milliseconds()).
+			Int64("agents_ms", timing.loaders.agents.Milliseconds())
+	}
 
 	if timing.launched {
 		event.Int64("since_launch_ms", timing.sinceLaunch.Milliseconds())
@@ -225,8 +225,8 @@ func logTUIFirstFrame(ctx context.Context, timing firstFrameTiming) {
 
 // firstFrameTimingAt measures a first frame shown at now. A zero initializedAt or
 // launchedAt leaves that span unknown.
-func firstFrameTimingAt(initializedAt, launchedAt time.Time, load sessionLoadTiming, now time.Time) firstFrameTiming {
-	timing := firstFrameTiming{load: 0, catalog: load.catalog, agents: load.agents, sinceLaunch: 0, launched: false}
+func firstFrameTimingAt(initializedAt, launchedAt time.Time, load *sessionLoadTiming, now time.Time) firstFrameTiming {
+	timing := firstFrameTiming{load: 0, loaders: load, sinceLaunch: 0, launched: false}
 	if !initializedAt.IsZero() {
 		timing.load = now.Sub(initializedAt)
 	}

@@ -327,8 +327,8 @@ func (m *Model) renderList(width, height int) string {
 
 	rowCount := 0
 
-	if len(m.filtered) == 0 {
-		if m.loadingSessions {
+	if m.popupStartup == popupStartupLoading || len(m.filtered) == 0 {
+		if m.loadingSessions || m.popupStartup == popupStartupLoading {
 			out.WriteString(m.renderLoadingState(width))
 		} else {
 			out.WriteString(m.renderEmptyState(width))
@@ -374,8 +374,8 @@ func (m *Model) writeListFramedSection(
 	styles := m.sessionRowStyles(layout)
 	rowCount := 0
 
-	if len(m.filtered) == 0 {
-		if m.loadingSessions {
+	if m.popupStartup == popupStartupLoading || len(m.filtered) == 0 {
+		if m.loadingSessions || m.popupStartup == popupStartupLoading {
 			writeExactFramedLine(out, m.renderLoadingState(width), leftBorder, rightBorder)
 		} else {
 			writeExactFramedLine(out, m.renderEmptyState(width), leftBorder, rightBorder)

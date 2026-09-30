@@ -930,11 +930,11 @@ func (m *Model) agentSummaryWatchEnabled() bool {
 }
 
 func (m *Model) handleSessionLoadResult(msg sessionLoadResultMsg) tea.Cmd {
-	if m.suppressInitialFrame {
-		logTUIFirstFrame(m.operationContext(), firstFrameTimingAt(m.initializedAt, m.launchedAt, msg.timing, time.Now()))
+	if m.popupStartup == popupStartupWaiting {
+		logTUIFirstFrame(m.operationContext(), firstFrameTimingAt(m.initializedAt, m.launchedAt, &msg.timing, time.Now()))
 	}
 
-	m.suppressInitialFrame = false
+	m.popupStartup = popupStartupContent
 
 	if m.loadingSessions {
 		m.agentGit = msg.agentGit

@@ -172,6 +172,40 @@ func TestPopupInitialCatalogRendersWithoutLoadingFrame(t *testing.T) {
 	if !strings.Contains(view, testSupportSessionDevName) || strings.Contains(view, "Loading sessions...") {
 		t.Fatalf("loaded popup view = %q, want session row without loading frame", view)
 	}
+
+	updateTestModel(t, model, popupStartupDeadlineMsg{})
+
+	if got := stripANSI(viewString(model.View())); got != view {
+		t.Fatalf("late startup deadline changed the completed view = %q, want %q", got, view)
+	}
+}
+
+func TestPopupStartupLoadingHidesIncompleteOriginRows(t *testing.T) {
+	model := newTestModel()
+	model.mode = modePopup
+	model.displayMode = displayModeAgents
+	model.width = 80
+	model.height = 20
+	model.Init()
+	updateTestModel(t, model, originSessionsMsg{rows: []session.Session{{
+		ID: "$2", Name: "origin-agent-session", Kind: session.KindLive, Origin: session.OriginBridge, AgentTotal: 1,
+	}}})
+	updateTestModel(t, model, popupStartupDeadlineMsg{})
+
+	for _, rendered := range []string{viewString(model.View()), model.renderList(76, 12)} {
+		view := stripANSI(rendered)
+		if !strings.Contains(view, "Loading sessions...") || strings.Contains(view, "origin-agent-session") ||
+			strings.Contains(view, "No live agent sessions found") {
+			t.Fatalf("startup view = %q, want loading without incomplete origin rows", view)
+		}
+	}
+
+	model.handleSessionLoadResult(sessionLoadResultMsg{status: session.StatusComplete})
+
+	view := stripANSI(viewString(model.View()))
+	if !strings.Contains(view, "origin-agent-session") || strings.Contains(view, "Loading sessions...") {
+		t.Fatalf("completed startup view = %q, want observed origin row", view)
+	}
 }
 
 func TestPopupInitialCatalogFailureReplacesBlankView(t *testing.T) {
