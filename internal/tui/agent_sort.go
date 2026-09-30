@@ -133,6 +133,7 @@ func compareAgentStatusSince(left session.AgentSession, right session.AgentSessi
 
 func (m *Model) setAgentSort(order agentSort) {
 	selected := m.selectedSessionIdentity()
+	m.listViewportPolicy = listViewportFollowSelection
 	m.agentSort = order
 	m.refreshDisplaySessions()
 	m.filterSessions()

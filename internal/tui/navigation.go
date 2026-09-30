@@ -163,5 +163,6 @@ func (m *Model) moveAgentGroup(direction int) {
 	}
 
 	m.cursor = (m.cursor + direction + len(m.filtered)) % len(m.filtered)
+	m.listViewportPolicy = listViewportFollowSelection
 	m.agentCursor = parentAgentIndex
 }

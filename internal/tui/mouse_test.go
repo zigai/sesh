@@ -43,6 +43,91 @@ func TestMouseWheelScrollsPopupList(t *testing.T) {
 	}
 }
 
+func TestMouseWheelUpRevealsEarlierAgentGroup(t *testing.T) {
+	for _, testCase := range []struct {
+		name       string
+		hoverChild bool
+	}{
+		{name: "selected heading"},
+		{name: "selected first child", hoverChild: true},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			model := newTestModel()
+			model.mode = modePopup
+			model.displayMode = displayModeAgents
+			model.agentCursor = parentAgentIndex
+			model.width = 80
+			model.height = 9
+			model.filtered = []session.Session{
+				{Name: "earlier-project", Agents: threeAgentsForTest()},
+				{Name: "middle-project", Agents: threeAgentsForTest()},
+				{Name: "later-project", Agents: threeAgentsForTest()},
+			}
+
+			layout := model.popupMouseLayout()
+			model = updateTestModel(t, model, mouseWheel(layout.bodyX, layout.listY, tea.MouseWheelDown))
+
+			model = updateTestModel(t, model, mouseMotion(layout.bodyX, layout.listY+1))
+			if testCase.hoverChild {
+				model = updateTestModel(t, model, mouseMotion(layout.bodyX, layout.listY+2))
+				if model.agentCursor != 0 {
+					t.Fatalf("hovered agent = %d, want first child", model.agentCursor)
+				}
+			}
+
+			output := stripANSI(viewString(model.View()))
+			if strings.Contains(output, "earlier-project") || !strings.Contains(output, "middle-project") {
+				t.Fatalf("popup after wheel down = %q, want middle-project heading without earlier-project", output)
+			}
+
+			model = updateTestModel(t, model, mouseWheel(layout.bodyX, layout.listY, tea.MouseWheelUp))
+
+			output = stripANSI(viewString(model.View()))
+			if !strings.Contains(output, "earlier-project") {
+				t.Fatalf("popup after wheel up = %q, want earlier-project heading", output)
+			}
+		})
+	}
+}
+
+func TestMouseWheelUpWithinTallAgentGroupPreservesVisibleSelection(t *testing.T) {
+	model := newTestModel()
+	model.mode = modePopup
+	model.displayMode = displayModeAgents
+	model.agentCursor = parentAgentIndex
+	model.width = 80
+	model.height = 9
+
+	model.filtered = []session.Session{
+		{Name: "tall-project", Agents: make([]session.AgentSession, 7)},
+		{Name: "later-project", Agents: threeAgentsForTest()},
+	}
+	for index := range model.filtered[0].Agents {
+		model.filtered[0].Agents[index] = session.AgentSession{Harness: "codex", HarnessSession: fmt.Sprintf("agent-%d", index)}
+	}
+
+	layout := model.popupMouseLayout()
+	model = updateTestModel(t, model, mouseWheel(layout.bodyX, layout.listY, tea.MouseWheelDown))
+	model = updateTestModel(t, model, mouseWheel(layout.bodyX, layout.listY, tea.MouseWheelDown))
+
+	model = updateTestModel(t, model, mouseWheel(layout.bodyX, layout.listY, tea.MouseWheelUp))
+	if got := model.agentCursor; got != 5 {
+		t.Fatalf("selected agent after wheel up = %d, want visible agent 5", got)
+	}
+
+	output := stripANSI(viewString(model.View()))
+	if !strings.Contains(output, "agent-2") || !strings.Contains(output, "agent-5") {
+		t.Fatalf("popup after wheel up = %q, want earlier agent-2 and selected agent-5", output)
+	}
+
+	model = updateTestModel(t, model, mouseWheel(layout.bodyX, layout.listY, tea.MouseWheelUp))
+
+	output = stripANSI(viewString(model.View()))
+	if !strings.Contains(output, "tall-project") {
+		t.Fatalf("popup after second wheel up = %q, want tall-project heading", output)
+	}
+}
+
 func TestMouseHoverSelectsPopupRow(t *testing.T) {
 	model := newTestModel()
 	model.mode = modePopup

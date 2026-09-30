@@ -123,6 +123,7 @@ type Model struct {
 	cursor                       int
 	agentCursor                  int
 	listTop                      int
+	listViewportPolicy           listViewportPolicy
 	showHelp                     bool
 	width                        int
 	height                       int
@@ -283,6 +284,7 @@ func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps
 		cursor:                       0,
 		agentCursor:                  parentAgentIndex,
 		listTop:                      0,
+		listViewportPolicy:           listViewportFollowSelection,
 		showHelp:                     false,
 		width:                        0,
 		height:                       0,

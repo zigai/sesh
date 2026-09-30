@@ -96,6 +96,8 @@ func (m *Model) handleMouseMotion(mouse tea.Mouse) func() (tea.Model, tea.Cmd) {
 		m.clearStatus()
 	}
 
+	m.listViewportPolicy = listViewportPreserveTop
+
 	return func() (tea.Model, tea.Cmd) { return m, nil }
 }
 
@@ -195,10 +197,17 @@ func (m *Model) scrollListBy(delta int) bool {
 	}
 
 	m.listTop = next
+	m.listViewportPolicy = listViewportFollowSelection
 
 	selected := selectedVisualIndex(rows, m.selectedListRow())
 	if selected < next || selected >= next+height {
 		if target, ok := m.scrollTargetRow(rows, next, height, delta); ok {
+			m.selectListRow(target)
+		}
+	}
+
+	if delta < 0 && m.visibleListStart(rows, height) >= previous {
+		if target, ok := m.scrollTargetRow(rows, next, height, 1); ok {
 			m.selectListRow(target)
 		}
 	}

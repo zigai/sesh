@@ -5,6 +5,13 @@ const (
 	separatorAgentIndex = -2
 )
 
+const (
+	listViewportFollowSelection listViewportPolicy = iota
+	listViewportPreserveTop
+)
+
+type listViewportPolicy uint8
+
 type popupListRow struct {
 	sessionIndex int
 	agentIndex   int
@@ -51,6 +58,7 @@ func (m *Model) selectListRow(row popupListRow) {
 	}
 
 	m.cursor = row.sessionIndex
+	m.listViewportPolicy = listViewportFollowSelection
 	m.initialAgentSelectionPending = false
 
 	m.agentCursor = parentAgentIndex
@@ -184,6 +192,7 @@ func (m *Model) visibleListRows(height int) []popupListRow {
 	}
 
 	start := m.visibleListStart(rows, height)
+	m.listTop = start
 	end := min(start+height, len(rows))
 
 	return rows[start:end]
@@ -195,7 +204,12 @@ func (m *Model) visibleListStart(rows []popupListRow, height int) int {
 	}
 
 	maxTop := max(len(rows)-height, 0)
+
 	start := min(max(m.listTop, 0), maxTop)
+	if m.listViewportPolicy == listViewportPreserveTop {
+		start = alignListStartToSelection(rows, start, height, m.selectedListRow())
+		return min(max(start, 0), maxTop)
+	}
 
 	groupStart, groupEnd := selectedListRange(rows, m.selectedListRow())
 	if groupStart >= 0 {

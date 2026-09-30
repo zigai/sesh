@@ -44,7 +44,7 @@ func (m *Model) normalizeFilteredCursor() {
 
 	m.normalizeFilteredAgentCursor()
 
-	if m.cursor == 0 {
+	if m.cursor == 0 && m.listViewportPolicy == listViewportFollowSelection {
 		m.listTop = 0
 	}
 }
