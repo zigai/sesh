@@ -52,6 +52,7 @@ type AgentSession struct {
 	Harness          string          `json:"harness"`
 	Presence         string          `json:"presence"`
 	Activity         string          `json:"activity"`
+	InitialIdle      bool            `json:"initialIdle,omitempty"`
 	Attention        string          `json:"attention"`
 	ServerSocket     string          `json:"serverSocket"`
 	SessionID        string          `json:"sessionId"`

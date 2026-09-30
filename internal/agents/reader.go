@@ -99,6 +99,7 @@ func agentSessionFromRegistry(session aht.Session) AgentSession {
 		Harness:          string(session.Harness),
 		Presence:         string(session.Presence()),
 		Activity:         activity,
+		InitialIdle:      codexInitialIdle(session),
 		Attention:        AttentionFor(activity),
 		ServerSocket:     NormalizeServerSocket(session.Location.ServerID),
 		SessionID:        session.Location.SessionID,
@@ -152,6 +153,14 @@ func agentSessionFromRegistry(session aht.Session) AgentSession {
 	agent.WaitingReason, agent.FailureReason = agentDetailReasons(aht.Activity(activity), agent.Detail)
 
 	return agent
+}
+
+func codexInitialIdle(session aht.Session) bool {
+	activity := session.Activity()
+	native := session.Observations.Native
+
+	return session.Harness == aht.HarnessCodex && activity != nil && *activity == aht.ActivityIdle &&
+		native != nil && native.Event == "SessionStart" && native.Activity != nil && *native.Activity == aht.ActivityIdle
 }
 
 func agentDetailReasons(activity aht.Activity, detail aht.StateDetail) (string, string) {

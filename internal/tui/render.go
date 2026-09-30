@@ -813,7 +813,7 @@ func (m *Model) agentStatusTimeFormat() string {
 }
 
 func (m *Model) agentIdleUnread(row session.Session, agent session.AgentSession) bool {
-	if agent.Status.DisplayStatus() != session.AgentStatusIdle || agent.StatusSince.IsZero() {
+	if agent.Status.DisplayStatus() != session.AgentStatusIdle || agent.InitialIdle || agent.StatusSince.IsZero() {
 		return false
 	}
 

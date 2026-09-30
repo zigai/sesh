@@ -52,3 +52,28 @@ func TestPickerInterruptedAgentRetainsMachineStateAndCountsAsIdle(t *testing.T) 
 		t.Fatalf("interrupted summary = %+v", summaries)
 	}
 }
+
+func TestPickerConversionPreservesInitialIdleAndAge(t *testing.T) {
+	at := time.Unix(500, 0).UTC()
+
+	agent := pickerAgentSession(agents.AgentSession{
+		Activity: string(aht.ActivityIdle), Attention: "idle", InitialIdle: true, ActivityChanged: at,
+	})
+	if agent.Status != session.AgentStatusIdle || !agent.InitialIdle || !agent.StatusSince.Equal(at) {
+		t.Fatalf("picker conversion = %+v", agent)
+	}
+
+	data, err := json.Marshal(agent)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var decoded session.AgentSession
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatal(err)
+	}
+
+	if !decoded.InitialIdle || !decoded.StatusSince.Equal(at) {
+		t.Fatalf("JSON lost initial idle or age = %s", data)
+	}
+}

@@ -511,3 +511,35 @@ func TestSameServerSocketComparesFullPaths(t *testing.T) {
 		t.Fatal("bare server names must match their full path")
 	}
 }
+
+func TestObservedCodexInitialIdleIsDistinctFromCompletedIdle(t *testing.T) {
+	at := time.Unix(500, 0)
+
+	tests := []struct {
+		name     string
+		harness  aht.Harness
+		activity aht.Activity
+		native   *registry.NativeObservation
+		want     bool
+	}{
+		{name: "session start", harness: aht.HarnessCodex, activity: aht.ActivityIdle, native: &registry.NativeObservation{Event: "SessionStart", Activity: new(registry.ActivityIdle)}, want: true},
+		{name: "completed response", harness: aht.HarnessCodex, activity: aht.ActivityIdle, native: &registry.NativeObservation{Event: "Stop", Activity: new(registry.ActivityIdle)}},
+		{name: "running compaction", harness: aht.HarnessCodex, activity: aht.ActivityRunning, native: &registry.NativeObservation{Event: "SessionStart", Activity: new(registry.ActivityRunning)}},
+		{name: "no native evidence", harness: aht.HarnessCodex, activity: aht.ActivityIdle},
+		{name: "unknown native activity", harness: aht.HarnessCodex, activity: aht.ActivityIdle, native: &registry.NativeObservation{Event: "SessionStart"}},
+		{name: "other harness", harness: aht.HarnessClaude, activity: aht.ActivityIdle, native: &registry.NativeObservation{Event: "SessionStart", Activity: new(registry.ActivityIdle)}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			observed := agents.ObservedAgentSessions([]aht.Session{{
+				ID: "observed", Harness: tt.harness, Liveness: aht.Live{Activity: tt.activity},
+				Location:          aht.Location{Kind: aht.MultiplexerTmux, PaneID: "%1"},
+				ActivityChangedAt: at,
+				Observations:      registry.Observations{Native: tt.native},
+			}})
+			if len(observed) != 1 || observed[0].InitialIdle != tt.want || !observed[0].ActivityChanged.Equal(at) {
+				t.Fatalf("observed = %+v, want initial idle %t with preserved age", observed, tt.want)
+			}
+		})
+	}
+}

@@ -669,6 +669,7 @@ func pickerAgentSession(item agents.AgentSession) session.AgentSession {
 		Executable:       item.Command,
 		PID:              item.PanePID,
 		Status:           pickerAgentStatus(item),
+		InitialIdle:      item.InitialIdle,
 		StatusSince:      item.ActivityChanged,
 		Model:            item.Model,
 		WaitingReason:    item.WaitingReason,

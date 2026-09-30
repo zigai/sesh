@@ -138,6 +138,7 @@ type AgentSession struct {
 	Executable       string          `json:"executable,omitempty"`
 	PID              int             `json:"pid,omitempty"`
 	Status           AgentStatus     `json:"status,omitempty"`
+	InitialIdle      bool            `json:"initialIdle,omitempty"`
 	StatusSince      time.Time       `json:"statusSince"`
 	Model            string          `json:"model,omitempty"`
 	WaitingReason    string          `json:"waitingReason,omitempty"`

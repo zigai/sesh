@@ -311,6 +311,9 @@ func TestSessionFrameRoundTripPreservesSharedModel(t *testing.T) {
 			GitChanges: "+2 -1", LinkedWorktree: true, GitAhead: 2, GitBehind: 1, GitTrackingKnown: true,
 			SessionPath: "/remote/session", Executable: "codex", PID: 123,
 			Status: session.AgentStatusFailed, StatusSince: stamp,
+		}, {
+			RegistryID: "initial-agent", Harness: "codex", PaneID: "%3",
+			Status: session.AgentStatusIdle, InitialIdle: true, StatusSince: stamp,
 		}},
 	}
 

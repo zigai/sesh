@@ -1297,3 +1297,34 @@ func TestAgentHarnessFormatWithLongHarnessName(t *testing.T) {
 		t.Fatalf("rendered list missing long harness names: %q", output)
 	}
 }
+
+func TestInitialIdleAgentHasNoUnreadStatusUntilResponseCompletes(t *testing.T) {
+	model := newTestModel()
+	model.displayMode = displayModeAgents
+	model.filtered = []session.Session{{
+		Name: testSupportSessionProjectName, AgentTotal: 1,
+		Agents: []session.AgentSession{{
+			Harness: testSupportHarnessCodex, PaneID: "%7", Status: session.AgentStatusIdle,
+			StatusSince: time.Now().Add(-time.Minute), InitialIdle: true,
+		}},
+	}}
+
+	output := stripANSI(model.renderList(60, 2))
+	if !strings.Contains(output, "○") || strings.Contains(output, "◎") {
+		t.Fatalf("initial idle glyph = %q", output)
+	}
+
+	model.config.AgentSessions.StatusStyle = "text"
+
+	output = stripANSI(model.renderList(60, 2))
+	if !strings.Contains(output, "IDLE") || strings.Contains(output, "IDLE*") {
+		t.Fatalf("initial idle text = %q", output)
+	}
+
+	model.filtered[0].Agents[0].InitialIdle = false
+
+	output = stripANSI(model.renderList(60, 2))
+	if !strings.Contains(output, "IDLE*") {
+		t.Fatalf("completed idle text = %q", output)
+	}
+}
