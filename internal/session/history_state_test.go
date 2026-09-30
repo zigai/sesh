@@ -224,6 +224,63 @@ func TestStateAgentViewHistoryUsesSessionAndPaneIdentity(t *testing.T) {
 	}
 }
 
+func TestStateAgentViewAcknowledgesObservedTimestamp(t *testing.T) {
+	st := &State{}
+	ident := Identity{Name: historyTestSessionName}
+
+	st.RecordAgentViewAt(ident, "%7", time.Unix(0, 123))
+	st.RecordAgentViewAt(ident, "%7", time.Unix(0, 456))
+	st.RecordAgentViewAt(ident, "%7", time.Unix(0, 123))
+
+	if got := st.GetLastAgentView(ident, "%7"); got != 456 {
+		t.Fatalf("GetLastAgentView() = %d, want 456", got)
+	}
+
+	if len(st.AgentViewHistory) != 1 {
+		t.Fatalf("agent view history contains %d entries, want 1", len(st.AgentViewHistory))
+	}
+}
+
+func TestStateAgentViewIgnoresEmptyIdentityPaneAndTimestamp(t *testing.T) {
+	st := &State{}
+	ident := Identity{Name: historyTestSessionName}
+
+	st.RecordAgentViewAt(Identity{}, "%7", time.Unix(0, 123))
+	st.RecordAgentViewAt(ident, "", time.Unix(0, 123))
+	st.RecordAgentViewAt(ident, "%7", time.Time{})
+
+	if len(st.AgentViewHistory) != 0 {
+		t.Fatalf("agent view history contains %d entries, want 0", len(st.AgentViewHistory))
+	}
+}
+
+func TestAgentViewAcknowledgmentPreservesNewerPersistedTimestamp(t *testing.T) {
+	path := testStatePath(t)
+	ident := Identity{Name: historyTestSessionName}
+	service := NewService(ServiceDeps{})
+
+	if _, err := service.UpdateState(t.Context(), path, func(current *State) {
+		current.RecordAgentViewAt(ident, "%7", time.Unix(0, 456))
+	}); err != nil {
+		t.Fatalf("recording newer agent view: %v", err)
+	}
+
+	if _, err := service.UpdateState(t.Context(), path, func(current *State) {
+		current.RecordAgentViewAt(ident, "%7", time.Unix(0, 123))
+	}); err != nil {
+		t.Fatalf("recording earlier agent view: %v", err)
+	}
+
+	loaded, err := service.LoadState(path)
+	if err != nil {
+		t.Fatalf("LoadState() error = %v", err)
+	}
+
+	if got := loaded.GetLastAgentView(ident, "%7"); got != 456 {
+		t.Fatalf("persisted agent view timestamp = %d, want 456", got)
+	}
+}
+
 func TestStateRenameSession(t *testing.T) {
 	st := &State{
 		SwitchHistory: []SwitchHistoryEntry{

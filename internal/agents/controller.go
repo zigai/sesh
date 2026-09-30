@@ -196,7 +196,33 @@ func (c *tmuxController) contextFromPaneID(ctx context.Context, paneID string) (
 		return CurrentContext{}, oops.In("agents").Code("pane_not_live").With("operation", "current_context").Wrap(ErrPaneNotLive)
 	}
 
-	return contextFromPane(pane, c.soleClientForSession(ctx, pane.SessionID), c.resolveServerPID(ctx)), nil
+	if strings.TrimSpace(c.target.Client) == "" {
+		return contextFromPane(pane, c.soleClientForSession(ctx, pane.SessionID), c.resolveServerPID(ctx)), nil
+	}
+
+	client, err := c.contextFromClient(ctx, strings.TrimSpace(c.target.Client))
+	if err != nil {
+		return CurrentContext{}, err
+	}
+
+	if c.target.SessionID == "" && c.target.Session == "" {
+		windows, windowErr := c.SessionWindows(ctx, client.SessionID)
+		if windowErr != nil {
+			return CurrentContext{}, windowErr
+		}
+
+		for _, window := range windows {
+			if window.WindowID == pane.WindowID {
+				pane = retargetToWindow(pane, window)
+				break
+			}
+		}
+	}
+
+	current := contextFromPane(pane, client.ClientName, client.ServerPID)
+	current.ClientTTY = client.ClientTTY
+
+	return current, nil
 }
 
 func (c *tmuxController) paneLinkForTarget(ctx context.Context, panes []PaneLocation, paneID string) (PaneLocation, bool) {

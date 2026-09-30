@@ -39,6 +39,9 @@ type fakeController struct {
 	setHistoryFails   int
 	activated         []agents.PaneLocation
 	historyWrites     []string
+	toggleWrites      []string
+	toggleWriteErr    error
+	toggleFailAt      int
 	sessionWindows    map[string][]agents.SessionWindow
 	sessionWindowsErr error
 	historyMap        map[string]string
@@ -107,10 +110,30 @@ func (f *fakeController) History(_ context.Context, clientKey string) (string, e
 		return f.historyMap[clientKey], nil
 	}
 
+	if strings.HasPrefix(clientKey, "\x00sesh-agent-toggle\x00") {
+		return "", nil
+	}
+
 	return f.history, nil
 }
 
 func (f *fakeController) SetHistory(_ context.Context, clientKey string, raw string) error {
+	if after, ok := strings.CutPrefix(clientKey, "\x00sesh-agent-toggle\x00"); ok {
+		f.toggleWrites = append(f.toggleWrites, raw)
+		if f.toggleFailAt > 0 && len(f.toggleWrites) == f.toggleFailAt {
+			return f.toggleWriteErr
+		}
+
+		if f.historyMap == nil {
+			f.historyMap = make(map[string]string)
+			f.historyMap[after] = f.history
+		}
+
+		f.historyMap[clientKey] = raw
+
+		return nil
+	}
+
 	f.historyWrites = append(f.historyWrites, raw)
 
 	if f.setHistoryFails > 0 && len(f.historyWrites) == f.setHistoryFails {

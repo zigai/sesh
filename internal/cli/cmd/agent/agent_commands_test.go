@@ -65,6 +65,11 @@ func TestAgentCommandsHelp(t *testing.T) {
 
 	commands := [][]string{
 		{"action", "agent-next"},
+		{"action", "agent-latest"},
+		{"action", "agent-waiting"},
+		{"action", "agent-failed"},
+		{"action", "agent-unread"},
+		{"action", "agent-toggle"},
 		{"action", "agent-back"},
 		{"action", "agent-focus"},
 		{"action", "agent-status"},
@@ -89,7 +94,7 @@ func TestAgentCommandsHelp(t *testing.T) {
 }
 
 func TestAgentNavigationWithoutSocketTargetsDefaultTmuxServer(t *testing.T) {
-	for _, action := range []string{"agent-next", "agent-back"} {
+	for _, action := range []string{"agent-next", "agent-latest", "agent-back"} {
 		t.Run(action, func(t *testing.T) {
 			t.Setenv("TMUX", "")
 

@@ -36,6 +36,11 @@ func newActionCommand(ctx context.Context) *cobra.Command {
 	cmd.AddCommand(
 		cmdpicker.NewPickerOpenCommand(ctx),
 		cmdagent.NewActionNextCommand(),
+		cmdagent.NewActionLatestCommand(),
+		cmdagent.NewActionWaitingCommand(),
+		cmdagent.NewActionUnreadCommand(),
+		cmdagent.NewActionFailedCommand(),
+		cmdagent.NewActionToggleCommand(),
 		cmdagent.NewActionBackCommand(),
 		cmdagent.NewActionFocusCommand(),
 		cmdagent.NewActionStatusCommand(),

@@ -209,6 +209,49 @@ func newAgentBackCommand() *cobra.Command {
 	return cmd
 }
 
+func NewActionLatestCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:         "agent-latest",
+		Short:       "Focus the coding agent that most recently became idle",
+		Long:        "Focus the live coding agent pane with the most recent recorded transition to idle. Idle can include startup and does not confirm completed work.",
+		Args:        clibase.UsageArgs(cobra.NoArgs),
+		RunE:        runAgentLatest,
+		Annotations: map[string]string{clibase.AnnotationOperation: "latest", clibase.AnnotationSuccessOwned: annotationOwnedValue},
+	}
+	addAgentNavigationFlags(cmd)
+	cmd.Flags().Bool("local", false, "Only consider panes in the current tmux session")
+	clibase.AddJSONFlag(cmd)
+
+	return cmd
+}
+
+func runAgentLatest(cmd *cobra.Command, _ []string) error {
+	navigator, err := resolveAgentServer(cmd)
+	if err != nil {
+		return err
+	}
+
+	localOnly, _ := cmd.Flags().GetBool("local")
+
+	scope := agents.NavigationGlobal
+	if localOnly {
+		scope = agents.NavigationCurrentSession
+	}
+
+	target, err := navigator.LatestIdle(commandContextOrBackground(cmd), scope)
+	if err != nil {
+		return oops.In("cli").With("operation", "agent_latest").Wrap(err)
+	}
+
+	recordNavigatedAgentView(commandContextOrBackground(cmd), cmd, target)
+
+	if clibase.JSONOutputEnabled(cmd) {
+		return clibase.WriteJSONResult(cmd, agentNavResultJSON{TargetPaneID: target.PaneID})
+	}
+
+	return nil
+}
+
 func runAgentBack(cmd *cobra.Command, _ []string) error {
 	navigator, err := resolveAgentServer(cmd)
 	if err != nil {

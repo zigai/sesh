@@ -650,16 +650,23 @@ func (s *State) GetLastRemoteSwitch(ident Identity) int64 {
 }
 
 func (s *State) RecordAgentView(ident Identity, paneID string) {
-	if ident.Name == "" || paneID == "" {
+	s.RecordAgentViewAt(ident, paneID, time.Now())
+}
+
+func (s *State) RecordAgentViewAt(ident Identity, paneID string, viewedAt time.Time) {
+	if ident.Name == "" || paneID == "" || viewedAt.IsZero() {
 		return
 	}
 
-	now := time.Now().UnixNano()
+	timestamp := viewedAt.UnixNano()
 
 	for index := range s.AgentViewHistory {
 		entry := &s.AgentViewHistory[index]
 		if entry.Session == ident && entry.PaneID == paneID {
-			entry.ViewedAt = now
+			if timestamp > entry.ViewedAt {
+				entry.ViewedAt = timestamp
+			}
+
 			return
 		}
 	}
@@ -667,7 +674,7 @@ func (s *State) RecordAgentView(ident Identity, paneID string) {
 	s.AgentViewHistory = append(s.AgentViewHistory, AgentViewHistoryEntry{
 		Session:  ident,
 		PaneID:   paneID,
-		ViewedAt: now,
+		ViewedAt: timestamp,
 	})
 
 	if len(s.AgentViewHistory) > maxAgentViewHistory {
