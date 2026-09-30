@@ -212,7 +212,7 @@ func validateTrackerMode(mode string) error {
 }
 
 func resolveHarnesses(names []string) ([]registry.Harness, error) {
-	supported := manage.SupportedHarnesses()
+	supported := manage.InstallableHarnesses()
 
 	if len(names) == 0 {
 		return slices.Clone(supported), nil

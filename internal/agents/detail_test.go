@@ -43,13 +43,13 @@ func TestObservedAgentSessionsUsesNormalizedDetailAndPreservesEvidence(t *testin
 		waiting  string
 		failure  string
 	}{
-		{name: "native permission", activity: aht.ActivityWaiting, detail: aht.StateDetail{Value: aht.DetailPermission, Quality: aht.DetailCurrent, Authority: "hook", ObservedAt: at}, waiting: "permission"},
-		{name: "screen question overrides native metadata", activity: aht.ActivityWaiting, detail: aht.StateDetail{Value: aht.DetailQuestion, Quality: aht.DetailCurrent, Authority: "screen", ObservedAt: at}, waiting: "question"},
-		{name: "stale permission stays generic", activity: aht.ActivityWaiting, detail: aht.StateDetail{Value: aht.DetailPermission, Quality: aht.DetailStale, Authority: "hook", ObservedAt: at}},
-		{name: "unsupported waiting", activity: aht.ActivityWaiting, detail: aht.StateDetail{Quality: aht.DetailUnsupported}},
-		{name: "missing waiting", activity: aht.ActivityWaiting, detail: aht.StateDetail{Quality: aht.DetailMissing}},
-		{name: "terminal limit", activity: aht.ActivityFailed, detail: aht.StateDetail{Value: aht.DetailUsageLimit, Quality: aht.DetailCurrent, Authority: "hook", ObservedAt: at}, failure: "usage_limit"},
-		{name: "stale limit becomes general", activity: aht.ActivityFailed, detail: aht.StateDetail{Value: aht.DetailUsageLimit, Quality: aht.DetailStale, Authority: "screen", ObservedAt: at}, failure: "general"},
+		{name: "native permission", activity: aht.ActivityWaiting, detail: aht.StateDetail{Value: aht.ActivityDetailPermission, Quality: aht.DetailQualityCurrent, Authority: "hook", ObservedAt: at}, waiting: "permission"},
+		{name: "screen question overrides native metadata", activity: aht.ActivityWaiting, detail: aht.StateDetail{Value: aht.ActivityDetailQuestion, Quality: aht.DetailQualityCurrent, Authority: "screen", ObservedAt: at}, waiting: "question"},
+		{name: "stale permission stays generic", activity: aht.ActivityWaiting, detail: aht.StateDetail{Value: aht.ActivityDetailPermission, Quality: aht.DetailQualityStale, Authority: "hook", ObservedAt: at}},
+		{name: "unsupported waiting", activity: aht.ActivityWaiting, detail: aht.StateDetail{Quality: aht.DetailQualityUnsupported}},
+		{name: "missing waiting", activity: aht.ActivityWaiting, detail: aht.StateDetail{Quality: aht.DetailQualityMissing}},
+		{name: "terminal limit", activity: aht.ActivityFailed, detail: aht.StateDetail{Value: aht.ActivityDetailUsageLimit, Quality: aht.DetailQualityCurrent, Authority: "hook", ObservedAt: at}, failure: "usage_limit"},
+		{name: "stale limit becomes general", activity: aht.ActivityFailed, detail: aht.StateDetail{Value: aht.ActivityDetailUsageLimit, Quality: aht.DetailQualityStale, Authority: "screen", ObservedAt: at}, failure: "general"},
 		{name: "old failure is general", activity: aht.ActivityFailed, failure: "general"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -71,7 +71,7 @@ func TestObservedAgentSessionsUsesNormalizedDetailAndPreservesEvidence(t *testin
 				t.Fatalf("normalized detail = %+v", agent)
 			}
 
-			source.Detail.Value = aht.DetailGeneral
+			source.Detail.Value = aht.ActivityDetailGeneral
 			if agent.Detail != test.detail {
 				t.Fatal("conversion retained mutable registry evidence")
 			}

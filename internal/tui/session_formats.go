@@ -674,7 +674,7 @@ func (v sessionFormatValues) resolveAgentStateField(field string) string {
 	case display.FieldActiveMarker:
 		return activePaneMarker(v.isActivePane)
 	case display.FieldStale:
-		if v.agent.Detail.Quality == aht.DetailStale {
+		if v.agent.Detail.Quality == aht.DetailQualityStale {
 			return "~"
 		}
 

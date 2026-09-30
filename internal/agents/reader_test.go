@@ -291,7 +291,7 @@ func TestObservedAgentSessionsUsesPublishedNativeObservation(t *testing.T) {
 	sessions := []aht.Session{{
 		ID: "observed", Harness: aht.HarnessClaude, Liveness: aht.Live{Activity: aht.ActivityWaiting},
 		Location: aht.Location{Kind: aht.MultiplexerTmux, PaneID: "%1"},
-		Detail:   &aht.StateDetail{Value: aht.DetailPermission, Quality: aht.DetailCurrent, Authority: "hook", ObservedAt: at},
+		Detail:   &aht.StateDetail{Value: aht.ActivityDetailPermission, Quality: aht.DetailQualityCurrent, Authority: "hook", ObservedAt: at},
 		Observations: registry.Observations{Native: &registry.NativeObservation{
 			Event: "UserPromptSubmit", ObservedAt: at,
 			Attributes: map[string]string{

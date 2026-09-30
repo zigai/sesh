@@ -71,11 +71,11 @@ func ahtReasonCell(agent session.AgentSession, status session.AgentStatus, value
 	}
 
 	switch agent.Detail.Quality {
-	case aht.DetailUnsupported:
+	case aht.DetailQualityUnsupported:
 		cell.State = layout.Unsupported
-	case aht.DetailMissing, aht.DetailStale, "":
+	case aht.DetailQualityMissing, aht.DetailQualityStale, "":
 		cell.State = layout.Pending
-	case aht.DetailCurrent:
+	case aht.DetailQualityCurrent:
 		if value != "" {
 			cell.Text = SanitizeTerminalText(value)
 			cell.State = layout.Present

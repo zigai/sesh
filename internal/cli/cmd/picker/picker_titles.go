@@ -30,7 +30,7 @@ func annotatePickerNativeTitles(ctx context.Context, observed []agents.AgentSess
 		return
 	}
 
-	titles, _ := aht.LookupTitles(ctx, lookups)
+	titles, _ := aht.SessionTitles(ctx, lookups)
 	byRegistryID := make(map[string]string, len(titles))
 
 	for i, title := range titles {

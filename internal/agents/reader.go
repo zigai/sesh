@@ -166,10 +166,10 @@ func codexInitialIdle(session aht.Session) bool {
 func agentDetailReasons(activity aht.Activity, detail aht.StateDetail) (string, string) {
 	failure := ""
 	if activity == aht.ActivityFailed {
-		failure = string(aht.DetailGeneral)
+		failure = string(aht.ActivityDetailGeneral)
 	}
 
-	if detail.Quality != aht.DetailCurrent || !detail.Value.ValidFor(activity) {
+	if detail.Quality != aht.DetailQualityCurrent || !detail.Value.ValidFor(activity) {
 		return "", failure
 	}
 

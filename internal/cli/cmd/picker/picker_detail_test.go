@@ -18,7 +18,7 @@ func TestPickerConversionPreservesDetailEvidenceAndActivityAge(t *testing.T) {
 	source := agents.AgentSession{
 		Activity: string(aht.ActivityFailed), Attention: string(agents.StateFailed),
 		FailureReason: "usage_limit", ActivityChanged: at.Add(-time.Minute),
-		Detail: aht.StateDetail{Value: aht.DetailUsageLimit, Quality: aht.DetailCurrent, Authority: "screen", ObservedAt: at},
+		Detail: aht.StateDetail{Value: aht.ActivityDetailUsageLimit, Quality: aht.DetailQualityCurrent, Authority: "screen", ObservedAt: at},
 	}
 
 	agent := pickerAgentSession(source)

@@ -29,9 +29,9 @@ func TestAgentRowsRenderCurrentReasonsAndSuppressStaleReasons(t *testing.T) {
 
 			model.sessionFormats = formats
 			model.filtered = []session.Session{{Name: "project", AgentTotal: 4, Agents: []session.AgentSession{
-				{PaneID: "%1", HarnessSession: "approval", Status: session.AgentStatusWaiting, WaitingReason: "permission", Detail: aht.StateDetail{Value: aht.DetailPermission, Quality: aht.DetailCurrent, Authority: "hook", ObservedAt: at}},
-				{PaneID: "%2", HarnessSession: "limit", Status: session.AgentStatusFailed, FailureReason: "usage_limit", Detail: aht.StateDetail{Value: aht.DetailUsageLimit, Quality: aht.DetailCurrent, Authority: "screen", ObservedAt: at}},
-				{PaneID: "%3", HarnessSession: "old", Status: session.AgentStatusWaiting, WaitingReason: "question", Detail: aht.StateDetail{Value: aht.DetailQuestion, Quality: aht.DetailStale, Authority: "hook", ObservedAt: at}},
+				{PaneID: "%1", HarnessSession: "approval", Status: session.AgentStatusWaiting, WaitingReason: "permission", Detail: aht.StateDetail{Value: aht.ActivityDetailPermission, Quality: aht.DetailQualityCurrent, Authority: "hook", ObservedAt: at}},
+				{PaneID: "%2", HarnessSession: "limit", Status: session.AgentStatusFailed, FailureReason: "usage_limit", Detail: aht.StateDetail{Value: aht.ActivityDetailUsageLimit, Quality: aht.DetailQualityCurrent, Authority: "screen", ObservedAt: at}},
+				{PaneID: "%3", HarnessSession: "old", Status: session.AgentStatusWaiting, WaitingReason: "question", Detail: aht.StateDetail{Value: aht.ActivityDetailQuestion, Quality: aht.DetailQualityStale, Authority: "hook", ObservedAt: at}},
 				{PaneID: "%4", HarnessSession: "stopped", Status: session.AgentStatusInterrupted},
 			}}}
 

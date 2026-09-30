@@ -19,7 +19,7 @@ func TestAHTCellsExposeObservedFieldsAndKeepMissingTelemetryUnsupported(t *testi
 		PaneID: "%1", Model: "opus", WaitingReason: "permission", LastTool: "Bash",
 		Task: "Review changes", PromptAt: at,
 		Status: session.AgentStatusWaiting,
-		Detail: aht.StateDetail{Value: aht.DetailPermission, Quality: aht.DetailCurrent, Authority: "hook", ObservedAt: at},
+		Detail: aht.StateDetail{Value: aht.ActivityDetailPermission, Quality: aht.DetailQualityCurrent, Authority: "hook", ObservedAt: at},
 	}
 	for field, want := range map[string]string{
 		display.FieldAgentModel: "opus", display.FieldAgentWaitingReason: "permission",
@@ -75,16 +75,16 @@ func TestAHTReasonCellsDistinguishInactiveMissingUnsupportedAndStale(t *testing.
 		state   layout.State
 		text    string
 	}{
-		{name: "current permission", status: session.AgentStatusWaiting, quality: aht.DetailCurrent, field: display.FieldAgentWaitingReason, value: "permission", state: layout.Present, text: "permission"},
-		{name: "current limit", status: session.AgentStatusFailed, quality: aht.DetailCurrent, field: display.FieldAgentFailureReason, value: "usage_limit", state: layout.Present, text: "usage_limit"},
-		{name: "current general failure", status: session.AgentStatusFailed, quality: aht.DetailCurrent, field: display.FieldAgentFailureReason, value: "general", state: layout.Present, text: "general"},
-		{name: "stale permission", status: session.AgentStatusWaiting, quality: aht.DetailStale, field: display.FieldAgentWaitingReason, value: "permission", state: layout.Pending},
-		{name: "stale limit", status: session.AgentStatusFailed, quality: aht.DetailStale, field: display.FieldAgentFailureReason, value: "usage_limit", state: layout.Pending},
-		{name: "missing waiting", status: session.AgentStatusWaiting, quality: aht.DetailMissing, field: display.FieldAgentWaitingReason, state: layout.Pending},
+		{name: "current permission", status: session.AgentStatusWaiting, quality: aht.DetailQualityCurrent, field: display.FieldAgentWaitingReason, value: "permission", state: layout.Present, text: "permission"},
+		{name: "current limit", status: session.AgentStatusFailed, quality: aht.DetailQualityCurrent, field: display.FieldAgentFailureReason, value: "usage_limit", state: layout.Present, text: "usage_limit"},
+		{name: "current general failure", status: session.AgentStatusFailed, quality: aht.DetailQualityCurrent, field: display.FieldAgentFailureReason, value: "general", state: layout.Present, text: "general"},
+		{name: "stale permission", status: session.AgentStatusWaiting, quality: aht.DetailQualityStale, field: display.FieldAgentWaitingReason, value: "permission", state: layout.Pending},
+		{name: "stale limit", status: session.AgentStatusFailed, quality: aht.DetailQualityStale, field: display.FieldAgentFailureReason, value: "usage_limit", state: layout.Pending},
+		{name: "missing waiting", status: session.AgentStatusWaiting, quality: aht.DetailQualityMissing, field: display.FieldAgentWaitingReason, state: layout.Pending},
 		{name: "old producer", status: session.AgentStatusWaiting, field: display.FieldAgentWaitingReason, state: layout.Pending},
-		{name: "unsupported waiting", status: session.AgentStatusWaiting, quality: aht.DetailUnsupported, field: display.FieldAgentWaitingReason, state: layout.Unsupported},
-		{name: "inactive waiting", status: session.AgentStatusIdle, quality: aht.DetailCurrent, field: display.FieldAgentWaitingReason, value: "permission", state: layout.Absent},
-		{name: "failure while waiting", status: session.AgentStatusWaiting, quality: aht.DetailCurrent, field: display.FieldAgentFailureReason, value: "general", state: layout.Absent},
+		{name: "unsupported waiting", status: session.AgentStatusWaiting, quality: aht.DetailQualityUnsupported, field: display.FieldAgentWaitingReason, state: layout.Unsupported},
+		{name: "inactive waiting", status: session.AgentStatusIdle, quality: aht.DetailQualityCurrent, field: display.FieldAgentWaitingReason, value: "permission", state: layout.Absent},
+		{name: "failure while waiting", status: session.AgentStatusWaiting, quality: aht.DetailQualityCurrent, field: display.FieldAgentFailureReason, value: "general", state: layout.Absent},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			agent := session.AgentSession{Status: test.status, Detail: aht.StateDetail{Quality: test.quality}, WaitingReason: test.value, FailureReason: test.value}
