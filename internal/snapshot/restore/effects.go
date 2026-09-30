@@ -69,28 +69,28 @@ func (e *uncertainError) Unwrap() error {
 // Exit status and stderr diagnostics are never used to downgrade library Unknown.
 func classifyMutation(err error) mutationOutcome {
 	if err == nil {
-		return mutationOutcome{Effect: tmux.Confirmed, RuntimeID: ""}
+		return mutationOutcome{Effect: tmux.EffectConfirmed, RuntimeID: ""}
 	}
 
 	evidence := collectEvidence(err)
 
 	if evidence.hasUnknown || evidence.unrecognized {
-		return mutationOutcome{Effect: tmux.Unknown, RuntimeID: evidence.runtimeID}
+		return mutationOutcome{Effect: tmux.EffectUnknown, RuntimeID: evidence.runtimeID}
 	}
 
 	if evidence.runtimeID != "" || evidence.hasConfirmed {
-		return mutationOutcome{Effect: tmux.Confirmed, RuntimeID: evidence.runtimeID}
+		return mutationOutcome{Effect: tmux.EffectConfirmed, RuntimeID: evidence.runtimeID}
 	}
 
 	if evidence.hasRejected {
-		return mutationOutcome{Effect: tmux.Rejected, RuntimeID: ""}
+		return mutationOutcome{Effect: tmux.EffectRejected, RuntimeID: ""}
 	}
 
 	if evidence.hasNotSent && !evidence.hasUnknown && !evidence.unrecognized {
-		return mutationOutcome{Effect: tmux.NotSent, RuntimeID: ""}
+		return mutationOutcome{Effect: tmux.EffectNotSent, RuntimeID: ""}
 	}
 
-	return mutationOutcome{Effect: tmux.Unknown, RuntimeID: evidence.runtimeID}
+	return mutationOutcome{Effect: tmux.EffectUnknown, RuntimeID: evidence.runtimeID}
 }
 
 func collectEvidence(err error) collectedEvidence {
@@ -137,19 +137,21 @@ func inspectErrorNode(curr error, ev *collectedEvidence) {
 
 	switch {
 	case found:
-		if id := firstCreatedID(outcome.Created); id != "" && ev.runtimeID == "" {
-			ev.runtimeID = id
+		if ev.runtimeID == "" {
+			ev.runtimeID = firstCreatedID(outcome.Created)
 		}
 
 		switch outcome.Effect {
-		case tmux.NotSent:
+		case tmux.EffectNotSent:
 			ev.hasNotSent = true
-		case tmux.Unknown:
+		case tmux.EffectUnspecified, tmux.EffectUnknown:
 			ev.hasUnknown = true
-		case tmux.Confirmed:
+		case tmux.EffectConfirmed:
 			ev.hasConfirmed = true
-		case tmux.Rejected:
+		case tmux.EffectRejected:
 			ev.hasRejected = true
+		default:
+			ev.unrecognized = true
 		}
 	case isPreDispatchRefusal(curr):
 		ev.hasNotSent = true
@@ -167,7 +169,7 @@ func extractOutcome(err error) (tmux.Outcome, bool) {
 		return cmd.Outcome, true
 	}
 
-	return tmux.Outcome{Effect: tmux.NotSent, Steps: nil, Created: nil}, false
+	return tmux.Outcome{Effect: tmux.EffectNotSent, Steps: nil, Created: nil}, false
 }
 
 func isPreDispatchRefusal(err error) bool {

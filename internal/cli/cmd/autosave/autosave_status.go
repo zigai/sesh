@@ -1,4 +1,4 @@
-package cmdautosave
+package autosave
 
 import (
 	"context"
@@ -98,7 +98,7 @@ func runAutosaveStatus(cmd *cobra.Command, _ []string) error {
 	return renderAutosaveResult(cmd, env, outcome)
 }
 
-func AutosaveDaemonRuntimeState(ctx context.Context, cmd *cobra.Command) (string, daemon.RuntimeStatus) {
+func DaemonRuntimeState(ctx context.Context, cmd *cobra.Command) (string, daemon.RuntimeStatus) {
 	return autosaveDaemonRuntimeState(ctx, cmd)
 }
 

@@ -243,7 +243,7 @@ func requireNoProcessEnvironment(t *testing.T, report processReport, name string
 func sessionEnvironment(t *testing.T, session tmux.Session, name string) (string, bool) {
 	t.Helper()
 
-	value, err := session.Environment().Get(t.Context(), name, false)
+	value, err := session.Environment().Get(t.Context(), name)
 	if err != nil {
 		t.Fatalf("read session environment %s: %v", name, err)
 	}
@@ -302,7 +302,7 @@ func requireNoEnvironmentInScope(t *testing.T, label string, scope tmux.Environm
 	t.Helper()
 
 	for _, hidden := range []bool{false, true} {
-		value, err := scope.Get(t.Context(), name, hidden)
+		value, err := scope.GetWith(t.Context(), name, tmux.GetEnvironmentOptions{Hidden: hidden})
 		if err != nil {
 			t.Fatalf("read %s environment %s: %v", label, name, err)
 		}
@@ -461,7 +461,7 @@ func recordedLaunchFixture(t *testing.T, server *tmux.Server, helper string) (tm
 		Program: tmux.Exec("sleep", "300"),
 		TmuxEnv: map[string]string{sessionMarker: sessionToken},
 		Size:    tmux.Size{Width: 100, Height: 30},
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -507,7 +507,7 @@ func linkedWindowFixture(t *testing.T, server *tmux.Server, helper string) (tmux
 		Program: tmux.Exec("sleep", "300"),
 		TmuxEnv: map[string]string{sessionMarker: sessionToken},
 		Size:    tmux.Size{Width: 100, Height: 30},
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -518,7 +518,7 @@ func linkedWindowFixture(t *testing.T, server *tmux.Server, helper string) (tmux
 		Dir:     dir,
 		Program: tmux.Exec("sleep", "300"),
 		Size:    tmux.Size{Width: 100, Height: 30},
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -587,7 +587,7 @@ func restartDaemon(t *testing.T, server *tmux.Server) (tmux.ServerIdentity, tmux
 	if _, err = server.NewSession(t.Context(), tmux.NewSessionOptions{
 		Name:    "restart-anchor",
 		Program: tmux.Exec("sleep", "300"),
-		Start:   tmux.AllowStart,
+		Start:   tmux.StartPolicyAllowStart,
 	}); err != nil {
 		t.Fatal(err)
 	}

@@ -1,4 +1,4 @@
-package cmdsession
+package session
 
 import (
 	"errors"
@@ -77,7 +77,7 @@ func newPaneHistoryJSONResult(panes []session.PaneHistory) paneHistoryJSONResult
 	return paneHistoryJSONResult{Mode: "panes", Panes: items}
 }
 
-func newSessionHistoryJSONResult(summaries []session.SessionHistorySummary) sessionHistoryJSONResult {
+func newSessionHistoryJSONResult(summaries []session.HistorySummary) sessionHistoryJSONResult {
 	items := make([]sessionHistorySummaryJSON, 0, len(summaries))
 	for _, summary := range summaries {
 		items = append(items, sessionHistorySummaryJSON{
@@ -168,7 +168,7 @@ func renderPaneHistoryTable(cmd *cobra.Command, panes []session.PaneHistory, ful
 	return clibase.WriteResponsiveTable(cmd, columns, rows, full)
 }
 
-func renderSessionHistoryTable(cmd *cobra.Command, summaries []session.SessionHistorySummary, full bool) error {
+func renderSessionHistoryTable(cmd *cobra.Command, summaries []session.HistorySummary, full bool) error {
 	rows := make([]prettytable.Row, 0, len(summaries))
 	for _, summary := range summaries {
 		rows = append(rows, prettytable.Row{

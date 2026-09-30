@@ -28,7 +28,7 @@ type PaneHistory struct {
 	NameRaw     RawBytes
 }
 
-type SessionHistorySummary struct {
+type HistorySummary struct {
 	SessionName string
 	NameRaw     RawBytes
 	PaneCount   int
@@ -88,8 +88,8 @@ func SortPaneHistory(panes []PaneHistory) {
 	})
 }
 
-func SummarizePaneHistory(panes []PaneHistory) []SessionHistorySummary {
-	bySession := make(map[string]SessionHistorySummary)
+func SummarizePaneHistory(panes []PaneHistory) []HistorySummary {
+	bySession := make(map[string]HistorySummary)
 	for _, pane := range panes {
 		summary := bySession[pane.SessionName]
 		summary.SessionName = pane.SessionName
@@ -103,12 +103,12 @@ func SummarizePaneHistory(panes []PaneHistory) []SessionHistorySummary {
 		bySession[pane.SessionName] = summary
 	}
 
-	summaries := make([]SessionHistorySummary, 0, len(bySession))
+	summaries := make([]HistorySummary, 0, len(bySession))
 	for _, summary := range bySession {
 		summaries = append(summaries, summary)
 	}
 
-	slices.SortFunc(summaries, func(a, b SessionHistorySummary) int {
+	slices.SortFunc(summaries, func(a, b HistorySummary) int {
 		return cmp.Or(
 			cmp.Compare(b.Lines, a.Lines),
 			cmp.Compare(a.SessionName, b.SessionName),

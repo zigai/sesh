@@ -79,7 +79,7 @@ func TestWriteCatalogIsPrivateAndLoadable(t *testing.T) {
 func TestRemoteDirUsesPrivateCacheHome(t *testing.T) {
 	cacheHome := filepath.Join(t.TempDir(), "cache")
 
-	path, err := RemoteDir(cacheHome)
+	path, err := Dir(cacheHome)
 	if err != nil {
 		t.Fatalf("RemoteDir() error = %v", err)
 	}

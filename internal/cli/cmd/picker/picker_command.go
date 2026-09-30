@@ -1,6 +1,6 @@
 //go:build linux || darwin
 
-package cmdpicker
+package picker
 
 import (
 	"bufio"
@@ -81,7 +81,7 @@ var (
 	_                                 term.File = pickerTerminalOutput{Writer: nil, fd: 0}
 )
 
-var DefaultPickerRemoteFactory PickerRemoteFactory
+var DefaultPickerRemoteFactory RemoteFactory
 
 type pickerPresentation uint8
 
@@ -140,7 +140,7 @@ func InvokingPickerClient(ctx context.Context, server *gotmux.Server) (gotmux.Cl
 
 // NewPickCommand returns the interactive session picker. The popup layout also serves as the
 // child that picker-open runs inside a tmux popup, so the handoff flags stay hidden.
-func NewPickCommand(ctx context.Context, remote ...PickerRemoteFactory) *cobra.Command {
+func NewPickCommand(ctx context.Context, remote ...RemoteFactory) *cobra.Command {
 	remoteFactory := firstPickerRemoteFactory(remote)
 	cmd := &cobra.Command{
 		Use:         "pick",
@@ -190,15 +190,15 @@ func NewPickerOpenCommand(ctx context.Context) *cobra.Command {
 	return cmd
 }
 
-func PickerHasTerminal(cmd *cobra.Command) bool {
+func HasTerminal(cmd *cobra.Command) bool {
 	return pickerHasTerminal(cmd)
 }
 
-func PickerProgramOutput(output io.Writer) io.Writer {
+func ProgramOutput(output io.Writer) io.Writer {
 	return pickerProgramOutput(output)
 }
 
-func firstPickerRemoteFactory(values []PickerRemoteFactory) PickerRemoteFactory {
+func firstPickerRemoteFactory(values []RemoteFactory) RemoteFactory {
 	if len(values) == 0 {
 		return DefaultPickerRemoteFactory
 	}
@@ -222,8 +222,8 @@ func pickerExecutionContext(parent context.Context, cmd *cobra.Command) context.
 	return parent
 }
 
-func commandTerminalStreams(cmd *cobra.Command) gotmux.TerminalStreams {
-	var streams gotmux.TerminalStreams
+func commandTerminalStreams(cmd *cobra.Command) gotmux.Streams {
+	var streams gotmux.Streams
 
 	if in, ok := cmd.InOrStdin().(*os.File); ok {
 		streams.In = in
@@ -259,7 +259,7 @@ func runPickerOpenCommand(ctx context.Context, cmd *cobra.Command) error {
 	return openPickerPopup(ctx, cmd, runtime, launchedAt)
 }
 
-func runPickCommand(ctx context.Context, cmd *cobra.Command, remoteFactory PickerRemoteFactory) error {
+func runPickCommand(ctx context.Context, cmd *cobra.Command, remoteFactory RemoteFactory) error {
 	choice, _ := cmd.Flags().GetString(pickerUIFlag)
 
 	presentation, err := resolvePickerPresentation(choice, os.Getenv)
@@ -308,7 +308,7 @@ func runPickerInteractive(
 	cmd *cobra.Command,
 	presentation pickerPresentation,
 	runtime pickerCommandRuntime,
-	remoteFactory PickerRemoteFactory,
+	remoteFactory RemoteFactory,
 ) error {
 	remote, err := configurePickerRemote(ctx, runtime.cfg, runtime.socketPath, remoteFactory)
 	if err != nil {
@@ -427,17 +427,17 @@ func configurePickerRemote(
 	ctx context.Context,
 	cfg *config.Config,
 	socketPath string,
-	remoteFactory PickerRemoteFactory,
-) (PickerRemoteServices, error) {
+	remoteFactory RemoteFactory,
+) (RemoteServices, error) {
 	if remoteFactory == nil {
-		return PickerRemoteServices{
+		return RemoteServices{
 			Catalog: nil, Watcher: nil, Actions: nil, Attach: nil, OriginBridge: nil,
 		}, nil
 	}
 
 	remote, err := remoteFactory(ctx, cfg, socketPath)
 	if err != nil {
-		return PickerRemoteServices{}, oops.In("cli").With("operation", "configure_remote_picker").Wrap(err)
+		return RemoteServices{}, oops.In("cli").With("operation", "configure_remote_picker").Wrap(err)
 	}
 
 	return remote, nil
@@ -563,8 +563,8 @@ func openPickerPopup(ctx context.Context, cmd *cobra.Command, runtime pickerComm
 	)
 
 	services, err := newPickerServices(ctx, runtime.cfg, runtime.socketPath, runtime.repositoryPath,
-		runtime.leaseRoot, runtime.historyPath, "", gotmux.TerminalStreams{In: nil, Out: nil, Err: nil},
-		PickerRemoteServices{Catalog: nil, Watcher: nil, Actions: nil, Attach: nil, OriginBridge: nil})
+		runtime.leaseRoot, runtime.historyPath, "", gotmux.Streams{In: nil, Out: nil, Err: nil},
+		RemoteServices{Catalog: nil, Watcher: nil, Actions: nil, Attach: nil, OriginBridge: nil})
 	if err != nil {
 		return err
 	}
@@ -912,7 +912,7 @@ func runPickerDeferred(
 }
 
 func invokingPickerClient(ctx context.Context, server *gotmux.Server) (gotmux.ClientInfo, error) {
-	current, err := server.CurrentWithEnv(ctx, gotmux.Environment{TMUX: os.Getenv("TMUX"), TMUXPane: os.Getenv("TMUX_PANE")})
+	current, err := server.CurrentFrom(ctx, gotmux.TmuxVars{TMUX: os.Getenv("TMUX"), TMUXPane: os.Getenv("TMUX_PANE")})
 	if err != nil {
 		return gotmux.ClientInfo{}, remoteCLIError("resolve_invoking_picker_session", err)
 	}

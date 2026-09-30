@@ -242,7 +242,7 @@ func (service *NativeSavedSessions) workflow(repo *store.Repository) *session.Wo
 			SessionAttachPre: nil, SessionAttachPost: nil, TmuxStartupPost: nil,
 		},
 		HookRunner: nil, Getenv: nil,
-		Streams: gotmux.TerminalStreams{In: nil, Out: nil, Err: nil}, Source: "remote", DeferSwitchHistory: false,
+		Streams: gotmux.Streams{In: nil, Out: nil, Err: nil}, Source: "remote", DeferSwitchHistory: false,
 	})
 }
 

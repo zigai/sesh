@@ -22,8 +22,8 @@ import (
 )
 
 const (
-	artifactExpectedGotmuxVersion = "v0.5.2"
-	artifactExpectedGotmuxSum     = "h1:feNDODL/iilqQGuNomd9rgLJAKwEhjqXc30r4JeIEEc="
+	artifactExpectedGotmuxVersion = "v0.6.0"
+	artifactExpectedGotmuxSum     = "h1:IlJDh5mmJFjeAM/PenK5y8fDQFA5fTdxwqcyXEtUJoE="
 	exitCodeGeneral               = 1
 	jsonSchemaVersion             = 1
 )
@@ -213,7 +213,7 @@ func newArtifactSource(t *testing.T) (*gotmux.Server, gotmux.Session, artifactSe
 		t.Fatalf("observe initial source pane: %v", err)
 	}
 
-	if _, err := firstPane.Split(t.Context(), gotmux.SplitOptions{Direction: gotmux.Vertical}); err != nil {
+	if _, err := firstPane.Split(t.Context(), gotmux.SplitOptions{Direction: gotmux.DirectionVertical}); err != nil {
 		t.Fatalf("split source window: %v", err)
 	}
 

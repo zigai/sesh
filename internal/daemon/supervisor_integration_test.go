@@ -64,7 +64,7 @@ func TestTmuxSupervisorOwnsDisposableForegroundServer(t *testing.T) {
 	if _, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{
 		Name:    "supervisor-fixture",
 		Program: gotmux.Exec("sleep", "30"),
-		Start:   gotmux.ExistingOnly,
+		Start:   gotmux.StartPolicyExistingOnly,
 	}); err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}

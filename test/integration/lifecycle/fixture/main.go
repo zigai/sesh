@@ -237,7 +237,7 @@ func runCreate(socket, sessionName string) error {
 		Env:     nil,
 		TmuxEnv: nil,
 		Size:    tmux.Size{Width: terminalWidth, Height: terminalHeight},
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 		Group:   "",
 	})
 	if err != nil {

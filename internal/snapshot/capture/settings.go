@@ -79,7 +79,7 @@ func environmentUnsupported(reason string) error {
 }
 
 func environmentEntry(ctx context.Context, scope gotmux.EnvironmentScope, name string, hidden bool) (model.Variable, error) {
-	value, err := scope.Get(ctx, name, hidden)
+	value, err := scope.GetWith(ctx, name, gotmux.GetEnvironmentOptions{Hidden: hidden})
 	if err != nil {
 		return model.Variable{}, oops.In("snapshot.capture").With("operation", "observe_environment_value").Wrapf(err, "observe environment value")
 	}

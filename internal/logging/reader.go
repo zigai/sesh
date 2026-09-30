@@ -586,7 +586,7 @@ func (r *ringBuffer) drain() [][]byte {
 func streamAllLogs(ctx context.Context, paths []string, activePath string, opts ReadOptions, out io.Writer) error {
 	state, err := readInitialLogs(ctx, paths, opts.Filter, out)
 	if err != nil {
-		if opts.Follow && isCleanCancellation(err, ctx) {
+		if opts.Follow && isCleanCancellation(ctx, err) {
 			return nil
 		}
 
@@ -601,7 +601,7 @@ func streamBoundedLogs(ctx context.Context, paths []string, activePath string, o
 
 	state, err := readInitialLogs(ctx, paths, opts.Filter, ring)
 	if err != nil {
-		if opts.Follow && isCleanCancellation(err, ctx) {
+		if opts.Follow && isCleanCancellation(ctx, err) {
 			return nil
 		}
 
@@ -618,24 +618,24 @@ func streamBoundedLogs(ctx context.Context, paths []string, activePath string, o
 func drainRingRecords(ctx context.Context, lines [][]byte, opts ReadOptions, out io.Writer, state *followState) error {
 	for _, line := range lines {
 		if err := ctx.Err(); err != nil {
-			return handleDrainError(err, ctx, opts, state)
+			return handleDrainError(ctx, err, opts, state)
 		}
 
 		if err := writeLogRecord(out, line); err != nil {
-			return handleDrainError(err, ctx, opts, state)
+			return handleDrainError(ctx, err, opts, state)
 		}
 
 		if err := ctx.Err(); err != nil {
-			return handleDrainError(err, ctx, opts, state)
+			return handleDrainError(ctx, err, opts, state)
 		}
 	}
 
 	return nil
 }
 
-func handleDrainError(err error, ctx context.Context, opts ReadOptions, state *followState) error {
+func handleDrainError(ctx context.Context, err error, opts ReadOptions, state *followState) error {
 	closeErr := state.close()
-	if opts.Follow && isCleanCancellation(err, ctx) {
+	if opts.Follow && isCleanCancellation(ctx, err) {
 		return closeErr
 	}
 
@@ -711,7 +711,7 @@ func followLogFile(ctx context.Context, path string, filter FilterOptions, out i
 			}
 
 			if err := state.step(ctx, path, filter, out); err != nil {
-				if isCleanCancellation(err, ctx) {
+				if isCleanCancellation(ctx, err) {
 					return nil
 				}
 
@@ -721,7 +721,7 @@ func followLogFile(ctx context.Context, path string, filter FilterOptions, out i
 	}
 }
 
-func isCleanCancellation(err error, ctx context.Context) bool {
+func isCleanCancellation(ctx context.Context, err error) bool {
 	if err == nil {
 		return true
 	}

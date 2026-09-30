@@ -130,12 +130,12 @@ func agentRegistrySessionForPane(pane agents.PaneLocation, activity string) stri
 func activeWindow(t *testing.T, ctx context.Context, server *gotmux.Server, sessionID string) string {
 	t.Helper()
 
-	session, err := server.Session(ctx, gotmux.SessionID(sessionID))
+	liveSession, err := server.Session(ctx, gotmux.SessionID(sessionID))
 	if err != nil {
 		t.Fatalf("session handle: %v", err)
 	}
 
-	_, links, err := session.WindowInfos(ctx)
+	_, links, err := liveSession.WindowInfos(ctx)
 	if err != nil {
 		t.Fatalf("session windows: %v", err)
 	}
@@ -392,12 +392,12 @@ func TestCLIAgentUnreadAdvancesAndAcknowledgesObservedOrigin(t *testing.T) {
 func newAgentWindow(t *testing.T, fixture agentIntegrationFixture, name string) agents.PaneLocation {
 	t.Helper()
 
-	session, err := fixture.server.Session(t.Context(), gotmux.SessionID(fixture.current.SessionID))
+	liveSession, err := fixture.server.Session(t.Context(), gotmux.SessionID(fixture.current.SessionID))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	window, err := session.NewWindow(t.Context(), gotmux.NewWindowOptions{
+	window, err := liveSession.NewWindow(t.Context(), gotmux.NewWindowOptions{
 		Name: name, Dir: "", Program: gotmux.Exec("sleep", "300"), Env: nil, Select: false,
 	})
 	if err != nil {

@@ -164,7 +164,7 @@ func TestExecutorNeverMutatesGlobalScopes(t *testing.T) {
 		t.Fatalf("setting source global option failed: %v", err)
 	}
 
-	source, err := sourceServer.NewSession(ctx, tmux.NewSessionOptions{Name: "global-source", Program: tmux.Exec("sleep", "300"), Start: tmux.ExistingOnly})
+	source, err := sourceServer.NewSession(ctx, tmux.NewSessionOptions{Name: "global-source", Program: tmux.Exec("sleep", "300"), Start: tmux.StartPolicyExistingOnly})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -294,7 +294,7 @@ func createTwoPaneSession(
 	t.Helper()
 
 	session, err := server.NewSession(ctx, tmux.NewSessionOptions{
-		Name: name, Program: tmux.Exec("sleep", "300"), Start: tmux.ExistingOnly,
+		Name: name, Program: tmux.Exec("sleep", "300"), Start: tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("creating %s failed: %v", name, err)
@@ -421,7 +421,7 @@ func observeInheritedSource(t *testing.T, ctx context.Context, server *tmux.Serv
 	setInheritedFixture(t, ctx, server, "source")
 
 	source, err := server.NewSession(ctx, tmux.NewSessionOptions{
-		Name: "inherited-source", Program: tmux.Exec("sleep", "300"), Start: tmux.ExistingOnly,
+		Name: "inherited-source", Program: tmux.Exec("sleep", "300"), Start: tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
@@ -458,7 +458,7 @@ func setupInheritedTarget(t *testing.T, ctx context.Context, server *tmux.Server
 	}
 
 	unrelated, err := server.NewSession(ctx, tmux.NewSessionOptions{
-		Name: "unrelated-inherited", Program: tmux.Exec("sleep", "300"), Start: tmux.ExistingOnly,
+		Name: "unrelated-inherited", Program: tmux.Exec("sleep", "300"), Start: tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("creating unrelated session failed: %v", err)
@@ -549,12 +549,12 @@ func assertInheritedRestoreState(
 		t.Fatalf("target global option changed: %+v %v", targetGlobal, err)
 	}
 
-	targetOnly, err := restored.Environment().Get(ctx, "SESH_TARGET_ONLY", false)
+	targetOnly, err := restored.Environment().Get(ctx, "SESH_TARGET_ONLY")
 	if err != nil || !targetOnly.Unset {
 		t.Fatalf("target-only global environment was not locally masked: %+v %v", targetOnly, err)
 	}
 
-	hidden, err := restored.Environment().Get(ctx, "SESH_HIDDEN", true)
+	hidden, err := restored.Environment().GetWith(ctx, "SESH_HIDDEN", tmux.GetEnvironmentOptions{Hidden: true})
 
 	hiddenValue, hiddenPresent := hidden.Value.Get()
 	if err != nil || !hiddenPresent || hiddenValue != "source-hidden" || hidden.Unset {
@@ -590,7 +590,7 @@ func TestEnvironmentReinspectionPreservesMultilineValues(t *testing.T) {
 		server := tmuxtest.NewServer(t)
 
 		session, err := server.NewSession(ctx, tmux.NewSessionOptions{
-			Name: "multiline-session", Program: tmux.Exec("sleep", "300"), Start: tmux.ExistingOnly,
+			Name: "multiline-session", Program: tmux.Exec("sleep", "300"), Start: tmux.StartPolicyExistingOnly,
 		})
 		if err != nil {
 			t.Fatalf("NewSession failed: %v", err)
@@ -1173,7 +1173,7 @@ func TestExecutorWorkingDirFallbackIsExplicitlyPartial(t *testing.T) {
 func setupScopedStateSourceSession(t *testing.T, ctx context.Context, server *tmux.Server) (tmux.Session, observedScopeState) {
 	t.Helper()
 
-	source, err := server.NewSession(ctx, tmux.NewSessionOptions{Name: "state-source", Program: tmux.Exec("sleep", "300"), Start: tmux.ExistingOnly})
+	source, err := server.NewSession(ctx, tmux.NewSessionOptions{Name: "state-source", Program: tmux.Exec("sleep", "300"), Start: tmux.StartPolicyExistingOnly})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -1241,7 +1241,7 @@ func assertTargetScopedOptionsAndEnv(t *testing.T, sourceState, targetState obse
 func setupUnrelatedLiveSession(t *testing.T, ctx context.Context, server *tmux.Server) (tmux.Session, []tmux.WindowLinkInfo, tmux.PaneInfo) {
 	t.Helper()
 
-	unrelated, err := server.NewSession(ctx, tmux.NewSessionOptions{Name: "unrelated-live", Start: tmux.ExistingOnly})
+	unrelated, err := server.NewSession(ctx, tmux.NewSessionOptions{Name: "unrelated-live", Start: tmux.StartPolicyExistingOnly})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}

@@ -25,7 +25,7 @@ func TestBootstrapRelocationPreservesSparseWindowSlots(t *testing.T) {
 			}
 
 			session, err := server.NewSession(ctx, tmux.NewSessionOptions{
-				Name: "bootstrap", Program: tmux.Exec("sleep", "300"), Start: tmux.ExistingOnly,
+				Name: "bootstrap", Program: tmux.Exec("sleep", "300"), Start: tmux.StartPolicyExistingOnly,
 			})
 			if err != nil {
 				t.Fatal(err)

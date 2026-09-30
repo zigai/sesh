@@ -1,6 +1,6 @@
 //go:build linux || darwin
 
-package cmdpicker
+package picker
 
 import (
 	"context"
@@ -36,7 +36,7 @@ var (
 	_                           tui.DegradedOutcomeError = (*pickerRestoreOutcomeError)(nil)
 )
 
-type PickerRemoteServices struct {
+type RemoteServices struct {
 	Catalog      tui.RemoteCatalogSource
 	Watcher      tui.RemoteCatalogWatcher
 	Actions      tui.RemoteActionService
@@ -44,7 +44,7 @@ type PickerRemoteServices struct {
 	OriginBridge tui.OriginBridgeService
 }
 
-type PickerRemoteFactory func(context.Context, *config.Config, string) (PickerRemoteServices, error)
+type RemoteFactory func(context.Context, *config.Config, string) (RemoteServices, error)
 
 type pickerServices struct {
 	cfg              *config.Config
@@ -60,7 +60,7 @@ type pickerServices struct {
 	agentStore       agents.SnapshotSource
 	sessionNames     pickerTranscriptNameCache
 	workflow         *session.Workflow
-	remote           PickerRemoteServices
+	remote           RemoteServices
 	viewsMu          sync.Mutex
 	deferredViews    []tui.AgentView
 }
@@ -70,7 +70,7 @@ type pickerRestoreOutcomeError struct {
 	cause  error
 }
 
-func PickerAgentSummaries(observed []agents.AgentSession) []session.AgentSummary {
+func AgentSummaries(observed []agents.AgentSession) []session.AgentSummary {
 	return pickerAgentSummaries(observed)
 }
 
@@ -124,8 +124,8 @@ func newPickerServices(
 	ctx context.Context,
 	cfg *config.Config,
 	socketPath, repositoryPath, leaseRoot, historyPath, agentStatePath string,
-	streams gotmux.TerminalStreams,
-	remote PickerRemoteServices,
+	streams gotmux.Streams,
+	remote RemoteServices,
 ) (*pickerServices, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err

@@ -40,7 +40,7 @@ func TestEngineRestore_FullRoundtrip(t *testing.T) {
 	liveSess, err := server.NewSession(ctx, gotmux.NewSessionOptions{
 		Name:    "roundtrip-alpha",
 		Program: gotmux.Exec("sleep", "300"),
-		Start:   gotmux.ExistingOnly,
+		Start:   gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
@@ -122,7 +122,7 @@ func TestEngineRestore_SessionCollision(t *testing.T) {
 	liveSess, err := server.NewSession(ctx, gotmux.NewSessionOptions{
 		Name:    "collision-session",
 		Program: gotmux.Exec("sleep", "300"),
-		Start:   gotmux.ExistingOnly,
+		Start:   gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)

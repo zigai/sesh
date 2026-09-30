@@ -1,6 +1,6 @@
 //go:build linux || darwin
 
-package cmdremote
+package remote
 
 import (
 	"context"
@@ -58,12 +58,12 @@ type remoteAttachExec struct {
 
 type originPickerAdapter struct{ socket string }
 
-func DefaultPickerRemoteFactory(_ context.Context, cfg *config.Config, socket string) (cmdpicker.PickerRemoteServices, error) {
+func DefaultPickerRemoteFactory(_ context.Context, cfg *config.Config, socket string) (cmdpicker.RemoteServices, error) {
 	if cfg == nil {
-		return cmdpicker.PickerRemoteServices{Catalog: nil, Watcher: nil, Actions: nil, Attach: nil, OriginBridge: nil}, nil
+		return cmdpicker.RemoteServices{Catalog: nil, Watcher: nil, Actions: nil, Attach: nil, OriginBridge: nil}, nil
 	}
 
-	services := cmdpicker.PickerRemoteServices{Catalog: nil, Watcher: nil, Actions: nil, Attach: nil, OriginBridge: nil}
+	services := cmdpicker.RemoteServices{Catalog: nil, Watcher: nil, Actions: nil, Attach: nil, OriginBridge: nil}
 	if cfg.Remote.EnableReverseBridge {
 		services.OriginBridge = &originPickerAdapter{socket: socket}
 	}
@@ -93,7 +93,7 @@ func (adapter *remotePickerAdapter) LoadRemoteCatalog() (tui.RemoteCatalog, erro
 }
 
 func (adapter *remotePickerAdapter) WatchRemoteCatalog(ctx context.Context, publish func(tui.RemoteCatalog, error)) (resultErr error) {
-	path, err := remote.RemoteDir(config.GetXDGPaths().CacheHome)
+	path, err := remote.Dir(config.GetXDGPaths().CacheHome)
 	if err != nil {
 		return remoteCLIError("resolve_remote_picker_cache", err)
 	}
@@ -273,7 +273,7 @@ func prepareRemoteAttachExec(
 	target session.Session,
 	paneID string,
 ) (*remoteAttachExec, error) {
-	localRoot, err := remote.RemoteDir(config.GetXDGPaths().CacheHome)
+	localRoot, err := remote.Dir(config.GetXDGPaths().CacheHome)
 	if err != nil {
 		return nil, remoteCLIError("resolve_remote_attach_cache", err)
 	}
@@ -381,7 +381,7 @@ func originReturnAction(ctx context.Context, socket string) (func(remote.OriginS
 				return remoteCLIError("switch_origin_session", client.Switch(ctx, handle, gotmux.SwitchOptions{ToggleReadOnly: false, PreserveEnvironment: false}))
 			}
 
-			return remoteCLIError("attach_origin_session", handle.Attach(ctx, gotmux.TerminalStreams{In: os.Stdin, Out: os.Stdout, Err: os.Stderr}, gotmux.AttachOptions{ReadOnly: false, PreserveEnvironment: false, Detach: gotmux.DetachNone, Dir: "", Flags: nil}))
+			return remoteCLIError("attach_origin_session", handle.Attach(ctx, gotmux.Streams{In: os.Stdin, Out: os.Stdout, Err: os.Stderr}, gotmux.AttachOptions{ReadOnly: false, PreserveEnvironment: false, Detach: gotmux.DetachModeNone, Dir: "", Flags: nil}))
 		}
 
 		return remoteCLIError("origin_return_action", remote.ErrTargetChanged)
@@ -495,7 +495,7 @@ func (adapter *originPickerAdapter) client(ctx context.Context) (*remote.BridgeC
 		return nil, remoteCLIError("read_origin_picker_capability", err)
 	}
 
-	identity := client.Handle().Identity()
+	identity := client.Handle().ServerIdentity()
 	if record.Target.TmuxServerSocket != adapter.socket || record.Target.TmuxServerPID != identity.PID ||
 		!record.Target.TmuxServerStartedAt.Equal(identity.Started) {
 		return nil, remoteCLIError("origin_picker_adapter_client", remote.ErrTargetChanged)
@@ -541,7 +541,7 @@ func newRemoteAttachCommand() *cobra.Command {
 }
 
 func loadRemoteCatalog() (remote.Catalog, *privatefs.Dir, error) {
-	path, err := remote.RemoteDir(config.GetXDGPaths().CacheHome)
+	path, err := remote.Dir(config.GetXDGPaths().CacheHome)
 	if err != nil {
 		return remote.Catalog{}, nil, remoteCLIError("resolve_remote_cache", err)
 	}
@@ -734,7 +734,7 @@ func openRemoteOriginBridge(
 	originSocket string,
 	originLabel string,
 ) (remote.AttachBootstrap, *remote.BridgeServer, error) {
-	localDirPath, err := remote.RemoteDir(config.GetXDGPaths().CacheHome)
+	localDirPath, err := remote.Dir(config.GetXDGPaths().CacheHome)
 	if err != nil {
 		return remote.AttachBootstrap{}, nil, remoteCLIError("resolve_remote_cache", err)
 	}

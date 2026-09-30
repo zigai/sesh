@@ -103,7 +103,7 @@ func classifyTUIErrorCode(err error) string {
 		return code
 	}
 
-	if outcome, ok := operationOutcome(err); ok && outcome.Effect == gotmux.Unknown {
+	if outcome, ok := operationOutcome(err); ok && (outcome.Effect == gotmux.EffectUnspecified || outcome.Effect == gotmux.EffectUnknown) {
 		return tuiErrorUncertainOutcome
 	}
 
@@ -143,7 +143,7 @@ func operationOutcome(err error) (gotmux.Outcome, bool) {
 		return operationErr.Outcome, true
 	}
 
-	return gotmux.Outcome{Effect: gotmux.NotSent, Steps: nil, Created: nil}, false
+	return gotmux.Outcome{Effect: gotmux.EffectNotSent, Steps: nil, Created: nil}, false
 }
 
 func logTUIFailure(ctx context.Context, operation tuiLogOperation, err error) {

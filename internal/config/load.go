@@ -456,7 +456,7 @@ func overlayAgentStatusTheme(theme *ThemeConfig, status *AgentStatusThemeConfig)
 
 func loadConfigEnvironment(target *Config, baseCfg *Config) error {
 	strataOpts := []strata.Option{
-		strata.WithoutFiles(),
+		strata.WithoutFileDiscovery(),
 		strata.WithDefaults(*baseCfg),
 		strata.WithEnvPrefix("SESH_"),
 	}

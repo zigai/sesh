@@ -164,7 +164,7 @@ func TestCatalogPrefersInvokingPaneForCurrentAgentSelection(t *testing.T) {
 
 	first := panes[0].Handle()
 
-	invoking, err := first.Split(ctx, gotmux.SplitOptions{Direction: gotmux.Vertical})
+	invoking, err := first.Split(ctx, gotmux.SplitOptions{Direction: gotmux.DirectionVertical})
 	if err != nil {
 		t.Fatal(err)
 	}

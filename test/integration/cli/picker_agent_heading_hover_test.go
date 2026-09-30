@@ -120,7 +120,7 @@ func prepareHeadingHoverRegistry(t *testing.T, fixture *cliSessionFixture, root 
 		}
 
 		for range 2 {
-			if _, err := panes[0].Handle().Split(t.Context(), gotmux.SplitOptions{Direction: gotmux.Vertical}); err != nil {
+			if _, err := panes[0].Handle().Split(t.Context(), gotmux.SplitOptions{Direction: gotmux.DirectionVertical}); err != nil {
 				t.Fatal(err)
 			}
 		}

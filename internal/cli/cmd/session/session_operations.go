@@ -1,4 +1,4 @@
-package cmdsession
+package session
 
 import (
 	"context"
@@ -214,8 +214,8 @@ func closeRepository(repo *store.Repository) error {
 	return nil
 }
 
-func commandTerminalStreams(cmd *cobra.Command) gotmux.TerminalStreams {
-	var streams gotmux.TerminalStreams
+func commandTerminalStreams(cmd *cobra.Command) gotmux.Streams {
+	var streams gotmux.Streams
 
 	if in, ok := cmd.InOrStdin().(*os.File); ok {
 		streams.In = in

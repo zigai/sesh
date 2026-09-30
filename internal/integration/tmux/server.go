@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	LibraryVersion            = "v0.5.2"
+	LibraryVersion            = "v0.6.0"
 	interactiveCommandTimeout = 24 * time.Hour
 
 	// OutputBytes bounds stdout and stderr of one tmux command. It matches the snapshot

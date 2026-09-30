@@ -120,7 +120,7 @@ func TestOriginAttachmentRefusesExistingTerminalBinding(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	identity := sessions[0].Handle().Identity()
+	identity := sessions[0].Handle().ServerIdentity()
 
 	record := StoredCapability{Target: AttachTarget{
 		SessionID: string(sessions[0].ID), TmuxServerPID: identity.PID, TmuxServerStartedAt: identity.Started,

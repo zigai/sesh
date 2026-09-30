@@ -28,7 +28,7 @@ func setupTestMultiWindowSession(t *testing.T, ctx context.Context, server *gotm
 		Env:     nil,
 		TmuxEnv: nil,
 		Size:    gotmux.Size{Width: 120, Height: 40},
-		Start:   gotmux.ExistingOnly,
+		Start:   gotmux.StartPolicyExistingOnly,
 		Group:   "",
 	})
 	if err != nil {
@@ -54,7 +54,7 @@ func setupTestMultiWindowSession(t *testing.T, ctx context.Context, server *gotm
 	}
 
 	splitPane, err := activePane.Split(ctx, gotmux.SplitOptions{
-		Direction:           gotmux.Horizontal,
+		Direction:           gotmux.DirectionHorizontal,
 		Size:                gotmux.SplitSize{Cells: 40, Percent: 0},
 		Dir:                 "",
 		Program:             gotmux.Exec("sleep", "300"),

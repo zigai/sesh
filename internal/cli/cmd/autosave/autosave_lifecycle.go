@@ -1,4 +1,4 @@
-package cmdautosave
+package autosave
 
 import (
 	"context"
@@ -51,15 +51,15 @@ func runAdoptStartupSession(cmd *cobra.Command, _ []string) error {
 		return oops.In("cli").With("operation", "open_tmux").Wrap(err)
 	}
 
-	client, session, err := currentAttachedClient(ctx, server)
+	client, currentSession, err := currentAttachedClient(ctx, server)
 	if err != nil {
 		return err
 	}
 
-	receipt := resolveBootstrapReceipt(ctx, server, session)
+	receipt := resolveBootstrapReceipt(ctx, server, currentSession)
 
 	result, err := automation.EnsureDefaultSession(ctx, server, automation.DefaultSessionRequest{
-		Current: session,
+		Current: currentSession,
 		Client:  client,
 		Receipt: receipt,
 		Now:     time.Now(),
@@ -315,7 +315,7 @@ func autosaveRepositoryFromState(state automation.StartupState) string {
 	}
 }
 
-func resolveAutosaveSelection(cmd *cobra.Command, ctx context.Context, server *gotmux.Server) ([]gotmux.SessionID, error) {
+func resolveAutosaveSelection(ctx context.Context, cmd *cobra.Command, server *gotmux.Server) ([]gotmux.SessionID, error) {
 	flags, _ := cmd.Flags().GetStringSlice("session")
 
 	selected := make([]gotmux.SessionID, 0, len(flags))

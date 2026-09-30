@@ -1,4 +1,4 @@
-package cmdpicker
+package picker
 
 import (
 	"os"

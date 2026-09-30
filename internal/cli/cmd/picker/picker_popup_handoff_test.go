@@ -1,6 +1,6 @@
 //go:build linux || darwin
 
-package cmdpicker
+package picker
 
 import (
 	"errors"

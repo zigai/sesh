@@ -1,4 +1,4 @@
-package cmddaemon_test
+package daemon_test
 
 import (
 	"errors"

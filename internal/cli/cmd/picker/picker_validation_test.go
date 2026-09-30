@@ -1,4 +1,4 @@
-package cmdpicker_test
+package picker_test
 
 import (
 	"errors"

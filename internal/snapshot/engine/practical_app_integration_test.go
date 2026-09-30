@@ -38,7 +38,7 @@ func TestEnginePracticalRestoreRestartsForegroundMonitorOnce(t *testing.T) {
 	defer cancel()
 
 	sourceSession, err := source.NewSession(ctx, gotmux.NewSessionOptions{
-		Name: "practical-top", Program: gotmux.Exec(topPath, "-d", "100"), Start: gotmux.ExistingOnly,
+		Name: "practical-top", Program: gotmux.Exec(topPath, "-d", "100"), Start: gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("start source top: %v", err)
@@ -346,7 +346,7 @@ func TestEnginePracticalRestoreNvimReopensFilesAfterSourceDestruction(t *testing
 		Name:    "practical-nvim",
 		Program: gotmux.Exec(nvimPath, file1, file2),
 		TmuxEnv: map[string]string{"XDG_RUNTIME_DIR": runtimeDir},
-		Start:   gotmux.ExistingOnly,
+		Start:   gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("start source nvim: %v", err)
@@ -530,7 +530,7 @@ func startSyntheticAgentSession(
 	sourceSession, err := source.NewSession(ctx, gotmux.NewSessionOptions{
 		Name:    "synthetic-agent-source",
 		Program: gotmux.Exec(nodePath, scriptPath),
-		Start:   gotmux.ExistingOnly,
+		Start:   gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("start source session: %v", err)
@@ -663,7 +663,7 @@ func setupOutcomesSourceSession(
 	sourceSession, err := source.NewSession(ctx, gotmux.NewSessionOptions{
 		Name:    "outcomes-source",
 		Program: gotmux.Exec(shPath),
-		Start:   gotmux.ExistingOnly,
+		Start:   gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("new session: %v", err)
@@ -684,7 +684,7 @@ func setupOutcomesSourceSession(
 	}
 
 	p1, err := p0.Split(ctx, gotmux.SplitOptions{
-		Direction: gotmux.Horizontal,
+		Direction: gotmux.DirectionHorizontal,
 		Program:   gotmux.Exec(shPath, "-c", "sleep 300 | cat"),
 	})
 	if err != nil {
@@ -692,7 +692,7 @@ func setupOutcomesSourceSession(
 	}
 
 	_, err = p1.Split(ctx, gotmux.SplitOptions{
-		Direction: gotmux.Vertical,
+		Direction: gotmux.DirectionVertical,
 		Program:   gotmux.Exec(shPath, "-c", "sleep 300"),
 	})
 	if err != nil {
@@ -873,7 +873,7 @@ func setupMixedSourceSession(
 	sourceSession, err := source.NewSession(ctx, gotmux.NewSessionOptions{
 		Name:    "mixed-source",
 		Program: gotmux.Exec(topPath, "-d", "100"),
-		Start:   gotmux.ExistingOnly,
+		Start:   gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("new session: %v", err)
@@ -894,7 +894,7 @@ func setupMixedSourceSession(
 	}
 
 	p1, err := p0.Split(ctx, gotmux.SplitOptions{
-		Direction: gotmux.Horizontal,
+		Direction: gotmux.DirectionHorizontal,
 		Program:   gotmux.Exec(shPath),
 	})
 	if err != nil {
@@ -902,7 +902,7 @@ func setupMixedSourceSession(
 	}
 
 	_, err = p1.Split(ctx, gotmux.SplitOptions{
-		Direction: gotmux.Vertical,
+		Direction: gotmux.DirectionVertical,
 		Program:   gotmux.Exec(shPath, "-c", "sleep 300"),
 	})
 	if err != nil {

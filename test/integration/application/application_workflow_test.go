@@ -363,7 +363,7 @@ func setupSourceSession(
 		Window:  "shell-win",
 		Program: tmux.Exec(bashPath, "--norc", "--noprofile"),
 		Size:    tmux.Size{Width: 120, Height: 40},
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("creating source session: %v", err)

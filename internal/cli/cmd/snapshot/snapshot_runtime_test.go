@@ -1,4 +1,4 @@
-package cmdsnapshot
+package snapshot
 
 import (
 	"errors"

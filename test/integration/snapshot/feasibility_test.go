@@ -26,7 +26,7 @@ func TestPaneStateIsNotATerminalCheckpoint(t *testing.T) {
 	session, err := server.NewSession(t.Context(), tmux.NewSessionOptions{
 		Name:    "terminal-probe",
 		Program: tmux.Exec("/bin/sh", "-c", "printf '\033[31mCHECKPOINT_SENTINEL\033[0m'; exec sleep 300"),
-		Size:    tmux.Size{Width: 80, Height: 24}, Start: tmux.ExistingOnly,
+		Size:    tmux.Size{Width: 80, Height: 24}, Start: tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -126,7 +126,7 @@ func TestStructuralOracleDetectsGeometryAndOptions(t *testing.T) {
 	}
 
 	second, err := first.Split(t.Context(), tmux.SplitOptions{
-		Direction: tmux.Horizontal, Size: tmux.SplitSize{Cells: 31}, Program: tmux.Exec("/bin/sh"),
+		Direction: tmux.DirectionHorizontal, Size: tmux.SplitSize{Cells: 31}, Program: tmux.Exec("/bin/sh"),
 	})
 	if err != nil {
 		t.Fatal(err)

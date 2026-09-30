@@ -270,7 +270,7 @@ func prepareAgentPickerPopup(t *testing.T, fixture *cliSessionFixture) (gotmux.S
 
 	first := panes[0].Handle()
 
-	second, err := first.Split(t.Context(), gotmux.SplitOptions{Direction: gotmux.Vertical})
+	second, err := first.Split(t.Context(), gotmux.SplitOptions{Direction: gotmux.DirectionVertical})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -356,7 +356,7 @@ func attachPickerPopupClient(t *testing.T, fixture *cliSessionFixture, origin go
 
 	attachDone := make(chan error, 1)
 	go func() {
-		attachDone <- origin.Handle().Attach(attachCtx, gotmux.TerminalStreams{In: slave, Out: slave, Err: slave}, gotmux.AttachOptions{})
+		attachDone <- origin.Handle().Attach(attachCtx, gotmux.Streams{In: slave, Out: slave, Err: slave}, gotmux.AttachOptions{})
 	}()
 
 	t.Cleanup(func() {

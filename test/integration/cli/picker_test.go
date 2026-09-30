@@ -36,11 +36,11 @@ const termtraceExecutable = "termtrace"
 
 func TestPickerPopupClientDimensionsMatchAttachedTerminal(t *testing.T) {
 	fixture := newCLISessionFixture(t)
-	session := fixture.fixtureSession(t)
-	fixture.setAmbientTmux(t, session)
+	liveSession := fixture.fixtureSession(t)
+	fixture.setAmbientTmux(t, liveSession)
 	t.Setenv(pickerClientEnvironment, "")
 
-	clientName := fixture.attachCLIClient(t, session.ID)
+	clientName := fixture.attachCLIClient(t, liveSession.ID)
 
 	clients, err := fixture.server.Clients(t.Context())
 	if err != nil {

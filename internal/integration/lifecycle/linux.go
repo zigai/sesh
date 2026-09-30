@@ -49,6 +49,6 @@ func SleepInhibitor() InhibitorSpec {
 	}
 }
 
-func LifecycleInhibitors() [2]InhibitorSpec {
+func Inhibitors() [2]InhibitorSpec {
 	return [2]InhibitorSpec{ShutdownInhibitor(), SleepInhibitor()}
 }

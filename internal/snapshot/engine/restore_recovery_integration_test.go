@@ -134,7 +134,7 @@ func TestRestoreRecoveryAPIsRejectForeignOperation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 
-	live, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "foreign-operation-source", Program: gotmux.Exec("sleep", "300"), Start: gotmux.ExistingOnly})
+	live, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "foreign-operation-source", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -181,7 +181,7 @@ func TestEnginePartialRestoreKeepsPinUntilExplicitAbandon(t *testing.T) {
 	repoDir := filepath.Join(t.TempDir(), "repo")
 	leaseRoot := filepath.Join(t.TempDir(), "leases")
 
-	live, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "pin-release", Program: gotmux.Exec("sleep", "300"), Start: gotmux.ExistingOnly})
+	live, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "pin-release", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -270,7 +270,7 @@ func TestEnginePracticalRestoreSettlesVerifiedFidelityLimits(t *testing.T) {
 	leaseRoot := filepath.Join(t.TempDir(), "leases")
 
 	live, err := server.NewSession(ctx, gotmux.NewSessionOptions{
-		Name: "practical-release", Program: gotmux.Exec("sleep", "300"), Start: gotmux.ExistingOnly,
+		Name: "practical-release", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
@@ -367,7 +367,7 @@ func TestEngineRestoreRefusesDispatchedButUnconfirmedEffect(t *testing.T) {
 	repoDir := filepath.Join(t.TempDir(), "repo")
 	leaseRoot := filepath.Join(t.TempDir(), "leases")
 
-	live, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "collision-source", Program: gotmux.Exec("sleep", "300"), Start: gotmux.ExistingOnly})
+	live, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "collision-source", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -376,7 +376,7 @@ func TestEngineRestoreRefusesDispatchedButUnconfirmedEffect(t *testing.T) {
 
 	generation := observeSession(t, ctx, server, repoDir, live)
 
-	blocker, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "collision-source", Start: gotmux.ExistingOnly})
+	blocker, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "collision-source", Start: gotmux.StartPolicyExistingOnly})
 	if err == nil {
 		t.Fatal("expected a duplicate session name to be refused by tmux")
 	}
@@ -401,7 +401,7 @@ func TestEngineRestoreRefusesDispatchedButUnconfirmedEffect(t *testing.T) {
 		t.Fatal("operation identity must survive an admission conflict")
 	}
 
-	plan := buildAllSessionsPlan(t, repo, ctx, generation)
+	plan := buildAllSessionsPlan(t, ctx, repo, generation)
 
 	firstStep := plan.Steps[0]
 
@@ -449,12 +449,12 @@ func TestEngineRestoreRefusesRestartedDaemonTarget(t *testing.T) {
 		t.Fatalf("tmux.New failed: %v", err)
 	}
 
-	source, err := first.NewSession(ctx, gotmux.NewSessionOptions{Name: "restart-source", Program: gotmux.Exec("sleep", "300"), Start: gotmux.AllowStart})
+	source, err := first.NewSession(ctx, gotmux.NewSessionOptions{Name: "restart-source", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyAllowStart})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
 
-	killDaemonOnCleanup(t, first, source.Identity())
+	killDaemonOnCleanup(t, first, source.ServerIdentity())
 
 	disableSourceWindowRename(t, ctx, source)
 
@@ -463,7 +463,7 @@ func TestEngineRestoreRefusesRestartedDaemonTarget(t *testing.T) {
 
 	generation := observeSession(t, ctx, first, repoDir, source)
 
-	blocker, err := first.NewSession(ctx, gotmux.NewSessionOptions{Name: "restart-source", Start: gotmux.AllowStart})
+	blocker, err := first.NewSession(ctx, gotmux.NewSessionOptions{Name: "restart-source", Start: gotmux.StartPolicyAllowStart})
 	if err == nil {
 		t.Fatal("expected a duplicate session name to be refused by tmux")
 	}
@@ -497,12 +497,12 @@ func TestEngineRestoreRefusesRestartedDaemonTarget(t *testing.T) {
 		t.Fatalf("tmux.New failed: %v", err)
 	}
 
-	replacement, err := second.NewSession(ctx, gotmux.NewSessionOptions{Name: "restart-source", Start: gotmux.AllowStart})
+	replacement, err := second.NewSession(ctx, gotmux.NewSessionOptions{Name: "restart-source", Start: gotmux.StartPolicyAllowStart})
 	if err != nil {
 		t.Fatalf("starting the replacement daemon failed: %v", err)
 	}
 
-	killDaemonOnCleanup(t, second, replacement.Identity())
+	killDaemonOnCleanup(t, second, replacement.ServerIdentity())
 
 	_, err = engine.Restore(ctx, repo, second, engine.RestoreConfig{
 		LeaseRoot:              leaseRoot,
@@ -530,7 +530,7 @@ func killDaemonOnCleanup(t *testing.T, server *gotmux.Server, identity gotmux.Se
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		err := server.KillIfIdentity(ctx, identity)
+		err := server.KillMatching(ctx, identity)
 		if err != nil && !errors.Is(err, gotmux.ErrNoServer) && !errors.Is(err, gotmux.ErrServerChanged) {
 			t.Errorf("cleanup kill daemon: %v", err)
 		}
@@ -546,7 +546,7 @@ func TestEngineRestoreLogSchema(t *testing.T) {
 	repoDir := filepath.Join(t.TempDir(), "repo")
 	leaseRoot := filepath.Join(t.TempDir(), "leases")
 
-	live, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "log-source", Program: gotmux.Exec("sleep", "300"), Start: gotmux.ExistingOnly})
+	live, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "log-source", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -639,14 +639,14 @@ func assertSourcePinReleased(t *testing.T, ctx context.Context, repo *store.Repo
 func setupTwoSessionSourceWithMissingDir(t *testing.T, ctx context.Context, server *gotmux.Server, repoDir string) string {
 	t.Helper()
 
-	first, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "fail-first", Program: gotmux.Exec("sleep", "300"), Start: gotmux.ExistingOnly})
+	first, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "fail-first", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
 
 	disableSourceWindowRename(t, ctx, first)
 
-	second, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "fail-second", Program: gotmux.Exec("sleep", "300"), Start: gotmux.ExistingOnly})
+	second, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "fail-second", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -686,7 +686,7 @@ func setupTwoSessionSourceWithMissingDir(t *testing.T, ctx context.Context, serv
 func setupUnrelatedEngineSession(t *testing.T, ctx context.Context, server *gotmux.Server) (gotmux.Session, []gotmux.WindowLinkInfo, gotmux.PaneInfo) {
 	t.Helper()
 
-	unrelated, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "unrelated-engine", Program: gotmux.Exec("sleep", "300"), Start: gotmux.ExistingOnly})
+	unrelated, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "unrelated-engine", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -862,7 +862,7 @@ func assertFailureRetainedPinAndExplicitAbandonment(
 	}
 }
 
-func buildAllSessionsPlan(t *testing.T, repo *store.Repository, ctx context.Context, generation string) restore.Plan {
+func buildAllSessionsPlan(t *testing.T, ctx context.Context, repo *store.Repository, generation string) restore.Plan {
 	t.Helper()
 
 	manifest, err := repo.Read(ctx, generation)
@@ -986,7 +986,7 @@ func TestEngineRestoreRefusesConfigMismatchOnSameOperationID(t *testing.T) {
 	repoDir := filepath.Join(t.TempDir(), "repo")
 	leaseRoot := filepath.Join(t.TempDir(), "leases")
 
-	live, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "config-intent", Program: gotmux.Exec("sleep", "300"), Start: gotmux.ExistingOnly})
+	live, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "config-intent", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -1037,7 +1037,7 @@ func TestEngineRestoreVerificationFailureSingleOwningErrorRecord(t *testing.T) {
 	repoDir := filepath.Join(t.TempDir(), "repo")
 	leaseRoot := filepath.Join(t.TempDir(), "leases")
 
-	live, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "schema-verify", Program: gotmux.Exec("sleep", "300"), Start: gotmux.ExistingOnly})
+	live, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "schema-verify", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}

@@ -1,4 +1,4 @@
-package cmdautosave
+package autosave
 
 import (
 	"context"

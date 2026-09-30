@@ -87,7 +87,7 @@ func assertSavedSelection(t *testing.T, saved model.Manifest, pane tmux.Pane, di
 func saveSessionFixture(t *testing.T, server *tmux.Server, name, dir, marker string) (tmux.Session, tmux.Pane) {
 	t.Helper()
 
-	session, err := server.NewSession(t.Context(), tmux.NewSessionOptions{Name: name, Dir: dir, Program: tmux.Exec("/bin/sh", "-c", `printf '%s' "$1"; exec sleep 300`, "sh", marker), Start: tmux.ExistingOnly, Size: tmux.Size{Width: 100, Height: 35}})
+	session, err := server.NewSession(t.Context(), tmux.NewSessionOptions{Name: name, Dir: dir, Program: tmux.Exec("/bin/sh", "-c", `printf '%s' "$1"; exec sleep 300`, "sh", marker), Start: tmux.StartPolicyExistingOnly, Size: tmux.Size{Width: 100, Height: 35}})
 	if err != nil {
 		t.Fatal(err)
 	}

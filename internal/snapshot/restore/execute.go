@@ -575,9 +575,9 @@ func (e *Executor) handleFailedEffect(ctx context.Context, step Step, journal Jo
 	outcome := classifyMutation(runErr)
 
 	switch outcome.Effect {
-	case tmux.Confirmed:
+	case tmux.EffectConfirmed:
 		return "", e.uncertain(ctx, step, journal, runErr)
-	case tmux.NotSent:
+	case tmux.EffectNotSent:
 		recordCtx, cancel := detach(ctx)
 		defer cancel()
 
@@ -586,7 +586,7 @@ func (e *Executor) handleFailedEffect(ctx context.Context, step Step, journal Jo
 		}
 
 		return "", &mutationError{step: step.ID(), err: runErr}
-	case tmux.Unknown, tmux.Rejected:
+	case tmux.EffectUnspecified, tmux.EffectUnknown, tmux.EffectRejected:
 		return "", e.uncertain(ctx, step, journal, runErr)
 	}
 
@@ -914,7 +914,7 @@ func (e *Executor) prepareFollowerSession(step CreateSessionStep) (stepEffect, e
 		Env:     nil,
 		TmuxEnv: nil,
 		Size:    tmux.Size{Width: 0, Height: 0},
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 		Group:   groupTarget,
 	}
 
@@ -991,7 +991,7 @@ func (e *Executor) standaloneSessionOptions(step CreateSessionStep) (tmux.NewSes
 		Env:     nil,
 		TmuxEnv: nil,
 		Size:    size,
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 		Group:   "",
 	}
 
@@ -1215,11 +1215,11 @@ func (e *Executor) prepareSplitPane(step SplitPaneStep) (stepEffect, error) {
 			Wrapf(errTargetPaneNotFound, "%s", step.TargetPaneID)
 	}
 
-	direction := tmux.Horizontal
+	direction := tmux.DirectionHorizontal
 	cells := step.SubtreeWidth
 
 	if step.Axis == "y" {
-		direction = tmux.Vertical
+		direction = tmux.DirectionVertical
 		cells = step.SubtreeHeight
 	}
 

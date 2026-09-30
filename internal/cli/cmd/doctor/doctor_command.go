@@ -1,4 +1,4 @@
-package cmddoctor
+package doctor
 
 import (
 	"context"
@@ -85,7 +85,7 @@ func resolveDoctorOptions(cmd *cobra.Command) (doctor.Options, error) {
 
 	opts.Server = server
 
-	runtimeState, runtimeStatus := cmdautosave.AutosaveDaemonRuntimeState(cmd.Context(), cmd)
+	runtimeState, runtimeStatus := cmdautosave.DaemonRuntimeState(cmd.Context(), cmd)
 	opts.DaemonState = runtimeState
 	opts.DaemonPhase = string(runtimeStatus.Phase)
 	opts.InhibitorsHeld = runtimeStatus.InhibitorsHeld

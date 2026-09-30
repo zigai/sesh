@@ -139,7 +139,7 @@ func TestExecutor_PreflightSessionCollision(t *testing.T) {
 
 	preExisting, err := server.NewSession(ctx, tmux.NewSessionOptions{
 		Name:  "alpha",
-		Start: tmux.ExistingOnly,
+		Start: tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("pre-creating session failed: %v", err)
@@ -181,7 +181,7 @@ func TestExecutor_PreflightGroupCollision(t *testing.T) {
 
 	leader, err := server.NewSession(ctx, tmux.NewSessionOptions{
 		Name:  "grp-shared",
-		Start: tmux.ExistingOnly,
+		Start: tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("pre-creating group leader failed: %v", err)
@@ -190,7 +190,7 @@ func TestExecutor_PreflightGroupCollision(t *testing.T) {
 	follower, err := server.NewSession(ctx, tmux.NewSessionOptions{
 		Name:  "live-follower",
 		Group: "grp-shared",
-		Start: tmux.ExistingOnly,
+		Start: tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("pre-creating group follower failed: %v", err)

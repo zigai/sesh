@@ -1,6 +1,6 @@
 //go:build linux || darwin
 
-package cmdsnapshot
+package snapshot
 
 import (
 	"bytes"

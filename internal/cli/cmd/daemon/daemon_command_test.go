@@ -1,4 +1,4 @@
-package cmddaemon
+package daemon
 
 import (
 	"testing"

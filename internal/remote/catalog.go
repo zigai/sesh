@@ -76,7 +76,7 @@ type Catalog struct {
 	Connections map[string]ConnectionState `json:"connections"`
 }
 
-func RemoteDir(cacheHome string) (string, error) {
+func Dir(cacheHome string) (string, error) {
 	if cacheHome == "" {
 		return "", ErrIncompleteDependencies
 	}

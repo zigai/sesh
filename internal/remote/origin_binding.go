@@ -42,7 +42,7 @@ func (live *GotmuxLiveServer) AttachWithOrigin(ctx context.Context, record Store
 		return err
 	}
 
-	identity := handle.Identity()
+	identity := handle.ServerIdentity()
 	if identity.PID != record.Target.TmuxServerPID || !identity.Started.Equal(record.Target.TmuxServerStartedAt) {
 		return oops.In("remote").With("operation", "attach_with_origin").Wrap(ErrTargetChanged)
 	}
@@ -79,8 +79,8 @@ func (live *GotmuxLiveServer) AttachWithOrigin(ctx context.Context, record Store
 		return err
 	}
 
-	if err := handle.Attach(ctx, gotmux.TerminalStreams{In: streams.In, Out: streams.Out, Err: streams.Err}, gotmux.AttachOptions{
-		ReadOnly: false, PreserveEnvironment: false, Detach: gotmux.DetachNone, Dir: "", Flags: nil,
+	if err := handle.Attach(ctx, gotmux.Streams{In: streams.In, Out: streams.Out, Err: streams.Err}, gotmux.AttachOptions{
+		ReadOnly: false, PreserveEnvironment: false, Detach: gotmux.DetachModeNone, Dir: "", Flags: nil,
 	}); err != nil {
 		return oops.In("remote").With("operation", "attach_with_origin").Wrap(err)
 	}
@@ -121,7 +121,7 @@ func (live *GotmuxLiveServer) clearOriginBinding(ctx context.Context, handle got
 		return oops.In("remote").With("operation", "clear_origin_binding").Wrap(err)
 	}
 
-	identity := handle.Identity()
+	identity := handle.ServerIdentity()
 	if !identity.Equal(probe.Identity) {
 		return nil
 	}

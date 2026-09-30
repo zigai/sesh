@@ -20,7 +20,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	process "github.com/zigai/sesh/internal/integration/process"
+	"github.com/zigai/sesh/internal/integration/process"
 	"github.com/zigai/sesh/internal/snapshot/apps"
 	"github.com/zigai/sesh/internal/snapshot/model"
 )

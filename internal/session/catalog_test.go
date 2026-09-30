@@ -76,7 +76,7 @@ func TestCatalogAbsentServerRetainsIndependentFailures(t *testing.T) {
 		t.Fatal("classified command hid joined cleanup failure")
 	}
 
-	timedOut := &gotmux.CommandError{Err: command, Timeout: gotmux.CallerTimeout}
+	timedOut := &gotmux.CommandError{Err: command, Timeout: gotmux.TimeoutSourceCaller}
 	if serverAbsent(fmt.Errorf("query: %w", timedOut)) {
 		t.Fatal("nested classified command hid outer timeout")
 	}

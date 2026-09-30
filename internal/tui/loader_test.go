@@ -797,7 +797,7 @@ func TestLoadSessionsKeepsAgentSummariesWhenPaneListingFails(t *testing.T) {
 }
 
 func TestLoadSessionsMergesAgentSummariesIntoLiveRows(t *testing.T) {
-	agents := []session.AgentSession{{
+	agentSessions := []session.AgentSession{{
 		Harness: testSupportHarnessCodex, HarnessSession: testSupportAgentRegistryID, Status: session.AgentStatusRunning,
 	}}
 	model := newTestModelWithDeps(Dependencies{
@@ -812,7 +812,7 @@ func TestLoadSessionsMergesAgentSummariesIntoLiveRows(t *testing.T) {
 		},
 		LoadAgentSummaries: func(context.Context) ([]session.AgentSummary, error) {
 			return []session.AgentSummary{
-				{TmuxSessionID: "$1", TmuxSessionName: testSupportSessionDevName, Total: 5, Active: 3, Agents: agents},
+				{TmuxSessionID: "$1", TmuxSessionName: testSupportSessionDevName, Total: 5, Active: 3, Agents: agentSessions},
 				{TmuxSessionName: "ops", Total: 1, Active: 1},
 			}, nil
 		},
@@ -835,7 +835,7 @@ func TestLoadSessionsMergesAgentSummariesIntoLiveRows(t *testing.T) {
 		t.Fatalf("dev agent details = %#v, want mapped agent", got)
 	}
 
-	agents[0].HarnessSession = "mutated"
+	agentSessions[0].HarnessSession = "mutated"
 	if got := byName[testSupportSessionDevName].Agents[0].HarnessSession; got != testSupportAgentRegistryID {
 		t.Fatalf("dev agent details alias summary input: %q", got)
 	}

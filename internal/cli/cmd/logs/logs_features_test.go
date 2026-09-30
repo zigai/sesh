@@ -1,4 +1,4 @@
-package cmdlogs_test
+package logs_test
 
 import (
 	"fmt"

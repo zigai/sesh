@@ -28,7 +28,7 @@ type setupApplyResultJSON struct {
 func boundKeys(t *testing.T, server *gotmux.Server, table string) map[string]string {
 	t.Helper()
 
-	bindings, err := server.BindingsWith(t.Context(), gotmux.BindingsOptions{Table: gotmux.KeyTable(table)})
+	bindings, err := server.FindBindings(t.Context(), gotmux.BindingsOptions{Table: gotmux.KeyTable(table)})
 	if err != nil {
 		t.Fatalf("list bindings failed: %v", err)
 	}

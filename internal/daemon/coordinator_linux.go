@@ -121,14 +121,14 @@ func RunLifecycle(ctx context.Context, cfg CoordinatorConfig) error {
 }
 
 func NormalizeDaemonCancellation(err error) error {
-	if DaemonCancellationOnly(err) {
+	if CancellationOnly(err) {
 		return nil
 	}
 
 	return err
 }
 
-func DaemonCancellationOnly(err error) bool {
+func CancellationOnly(err error) bool {
 	if err == nil {
 		return false
 	}
@@ -140,7 +140,7 @@ func DaemonCancellationOnly(err error) bool {
 		}
 
 		for _, cause := range causes {
-			if !DaemonCancellationOnly(cause) {
+			if !CancellationOnly(cause) {
 				return false
 			}
 		}
@@ -149,7 +149,7 @@ func DaemonCancellationOnly(err error) bool {
 	}
 
 	if wrapped, ok := err.(interface{ Unwrap() error }); ok {
-		return DaemonCancellationOnly(wrapped.Unwrap())
+		return CancellationOnly(wrapped.Unwrap())
 	}
 
 	return errors.Is(err, context.Canceled)

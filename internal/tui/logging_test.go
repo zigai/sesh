@@ -1051,10 +1051,19 @@ func TestLogTUIFailureClassification(t *testing.T) {
 			wantCode: tuiErrorUnsupported,
 		},
 		{
+			name: "mutation with unspecified effect",
+			err: &gotmux.OperationError{
+				Operation: "kill-session",
+				Outcome:   gotmux.Outcome{},
+				Err:       errLoggingTestRandomFailure,
+			},
+			wantCode: tuiErrorUncertainOutcome,
+		},
+		{
 			name: "mutation with unknown effect",
 			err: &gotmux.OperationError{
 				Operation: "kill-session",
-				Outcome:   gotmux.Outcome{Effect: gotmux.Unknown},
+				Outcome:   gotmux.Outcome{Effect: gotmux.EffectUnknown},
 				Err:       errLoggingTestRandomFailure,
 			},
 			wantCode: tuiErrorUncertainOutcome,

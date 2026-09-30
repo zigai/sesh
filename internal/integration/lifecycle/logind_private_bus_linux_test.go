@@ -190,7 +190,7 @@ func TestOpenLogindUsesPrivateBusWireContract(t *testing.T) {
 
 	assertLiveStatus(t, client, true)
 
-	expectedRequests := LifecycleInhibitors()
+	expectedRequests := Inhibitors()
 	assertInhibitorRequests(t, manager.requestsSnapshot(), expectedRequests[:])
 
 	if err := manager.closeWriters(); err != nil {
@@ -248,7 +248,7 @@ func TestOpenLogindClosesFirstInhibitorWhenSecondAcquisitionFails(t *testing.T) 
 		t.Fatalf("openLogindOnConnection = (%v, %v), want second acquisition failure", client, err)
 	}
 
-	expectedRequests := LifecycleInhibitors()
+	expectedRequests := Inhibitors()
 	assertInhibitorRequests(t, manager.requestsSnapshot(), expectedRequests[:])
 	closeManagerWriters(t, manager)
 	assertReaderClosed(t, manager.reader(0))
@@ -294,7 +294,7 @@ func TestLogindRearmClosesFirstInhibitorWhenCanceledBetweenAcquisitions(t *testi
 		t.Fatalf("Rearm canceled between acquisitions error = %v, want context cancellation", err)
 	}
 
-	expectedRequests := LifecycleInhibitors()
+	expectedRequests := Inhibitors()
 	assertInhibitorRequests(
 		t,
 		manager.requestsSnapshot(),

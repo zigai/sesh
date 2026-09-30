@@ -1,4 +1,4 @@
-package cmdagent
+package agent
 
 import (
 	"os"

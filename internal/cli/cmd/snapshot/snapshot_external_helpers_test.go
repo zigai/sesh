@@ -1,4 +1,4 @@
-package cmdsnapshot_test
+package snapshot_test
 
 import (
 	"bytes"

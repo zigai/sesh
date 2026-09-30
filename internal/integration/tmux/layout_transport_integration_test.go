@@ -59,7 +59,7 @@ func killCliServer(t *testing.T, socketPath string) {
 	}
 
 	if err == nil {
-		err = server.KillIfIdentity(ctx, info.Identity)
+		err = server.KillMatching(ctx, info.Identity)
 	}
 
 	if err != nil && !errors.Is(err, gotmux.ErrNoServer) {

@@ -1,6 +1,6 @@
 //go:build linux || darwin
 
-package cmdremote
+package remote
 
 import (
 	"context"
@@ -201,7 +201,7 @@ func runRemoteMonitor(cmd *cobra.Command, _ []string) (resultErr error) {
 		return err
 	}
 
-	path, err := remote.RemoteDir(config.GetXDGPaths().CacheHome)
+	path, err := remote.Dir(config.GetXDGPaths().CacheHome)
 	if err != nil {
 		return remoteCLIError("resolve_remote_cache", err)
 	}
@@ -521,7 +521,7 @@ func remotePeerAgentSummaries(ctx context.Context, cfg *config.Config) ([]sessio
 		return nil, oops.In("cli").With("operation", "load_remote_agents").Wrap(err)
 	}
 
-	return cmdpicker.PickerAgentSummaries(observed), nil
+	return cmdpicker.AgentSummaries(observed), nil
 }
 
 func remotePeerSavedSessions(ctx context.Context, cfg *config.Config) ([]session.Session, error) {

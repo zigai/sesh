@@ -164,7 +164,7 @@ func (w *Workflow) SwitchSessionOutcomeForClientTarget(ctx context.Context, expe
 	}
 
 	target = info.Handle()
-	identity := target.Identity()
+	identity := target.ServerIdentity()
 
 	socket := identity.ReportedSocket
 	if socket == "" {
@@ -367,7 +367,7 @@ func (w *Workflow) createSession(ctx context.Context, name, dir string) (gotmux.
 		Env:     nil,
 		TmuxEnv: nil,
 		Size:    gotmux.Size{Width: 0, Height: 0},
-		Start:   gotmux.ExistingOnly,
+		Start:   gotmux.StartPolicyExistingOnly,
 		Group:   "",
 	})
 	if err != nil {
@@ -393,18 +393,18 @@ func (w *Workflow) insideTmux() bool {
 	return w.getenv("TMUX") != ""
 }
 
-func (w *Workflow) terminalStreams() gotmux.TerminalStreams {
+func (w *Workflow) terminalStreams() gotmux.Streams {
 	return w.streams
 }
 
 func (w *Workflow) invokingClient(ctx context.Context) (gotmux.ClientInfo, previousSession, error) {
-	env := gotmux.Environment{TMUX: w.getenv("TMUX"), TMUXPane: w.getenv("TMUX_PANE")}
+	env := gotmux.TmuxVars{TMUX: w.getenv("TMUX"), TMUXPane: w.getenv("TMUX_PANE")}
 
 	if env.TMUX == "" {
 		return gotmux.ClientInfo{}, previousSession{}, oops.In("session").Code("not_inside_tmux").Wrap(ErrNotInsideTmux)
 	}
 
-	info, err := w.server.CurrentWithEnv(ctx, env)
+	info, err := w.server.CurrentFrom(ctx, env)
 	if err != nil {
 		return gotmux.ClientInfo{}, previousSession{}, oops.In("session").Code("invoking_context_failed").With("operation", "resolve_invoking_context").Wrap(err)
 	}

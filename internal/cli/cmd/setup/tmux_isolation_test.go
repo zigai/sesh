@@ -1,4 +1,4 @@
-package cmdsetup
+package setup
 
 import (
 	"os"

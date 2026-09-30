@@ -294,15 +294,15 @@ func (c *tmuxController) contextFromClient(ctx context.Context, name string) (Cu
 		return CurrentContext{}, oops.In("agents").Code("client_detached").With("operation", "current_context").Wrap(ErrCurrentContextUnknown)
 	}
 
-	context, err := c.contextFromSessionID(ctx, sessionID)
+	current, err := c.contextFromSessionID(ctx, sessionID)
 	if err != nil {
 		return CurrentContext{}, err
 	}
 
-	context.ClientName = string(info.Name)
-	context.ClientTTY = info.TTY
+	current.ClientName = string(info.Name)
+	current.ClientTTY = info.TTY
 
-	return context, nil
+	return current, nil
 }
 
 func (c *tmuxController) contextFromSessionID(ctx context.Context, sessionID gotmux.SessionID) (CurrentContext, error) {
@@ -349,7 +349,7 @@ func (c *tmuxController) contextFromSession(ctx context.Context, session gotmux.
 			return CurrentContext{}, oops.In("agents").Code("tmux_failed").With("operation", "pane_info").Wrap(paneErr)
 		}
 
-		context := CurrentContext{
+		current := CurrentContext{
 			ServerSocket: c.socketPath(),
 			ClientName:   "",
 			ClientTTY:    "",
@@ -362,12 +362,12 @@ func (c *tmuxController) contextFromSession(ctx context.Context, session gotmux.
 		}
 
 		if sessionInfo, sessionErr := session.Info(ctx); sessionErr == nil {
-			context.SessionName = sessionInfo.Name
+			current.SessionName = sessionInfo.Name
 		}
 
-		context.ClientName = c.soleClientForSession(ctx, context.SessionID)
+		current.ClientName = c.soleClientForSession(ctx, current.SessionID)
 
-		return context, nil
+		return current, nil
 	}
 
 	return CurrentContext{}, oops.In("agents").Code("no_active_window").With("operation", "current_context").Wrap(ErrCurrentContextUnknown)
@@ -379,7 +379,7 @@ func (c *tmuxController) ambientContext(ctx context.Context) (CurrentContext, er
 		getenv = os.Getenv
 	}
 
-	info, err := c.server.CurrentWithEnv(ctx, gotmux.Environment{TMUX: getenv("TMUX"), TMUXPane: getenv("TMUX_PANE")})
+	info, err := c.server.CurrentFrom(ctx, gotmux.TmuxVars{TMUX: getenv("TMUX"), TMUXPane: getenv("TMUX_PANE")})
 	if err != nil {
 		return CurrentContext{}, oops.In("agents").Code("ambient_unverified").With("operation", "current_context").Wrap(err)
 	}
@@ -388,7 +388,7 @@ func (c *tmuxController) ambientContext(ctx context.Context) (CurrentContext, er
 		return c.contextFromSessionID(ctx, session.ID)
 	}
 
-	context := CurrentContext{
+	current := CurrentContext{
 		ServerSocket: c.socketPath(),
 		ClientName:   "",
 		ClientTTY:    "",
@@ -401,21 +401,21 @@ func (c *tmuxController) ambientContext(ctx context.Context) (CurrentContext, er
 	}
 
 	if session, ok := info.Session.Get(); ok {
-		context.SessionID = string(session.ID)
-		context.SessionName = session.Name
+		current.SessionID = string(session.ID)
+		current.SessionName = session.Name
 	}
 
-	if link, ok := info.Link.Get(); ok && context.SessionID == "" {
-		context.SessionID = string(link.SessionID)
+	if link, ok := info.Link.Get(); ok && current.SessionID == "" {
+		current.SessionID = string(link.SessionID)
 	}
 
-	if !context.Valid() {
+	if !current.Valid() {
 		return CurrentContext{}, oops.In("agents").Code("ambient_incomplete").With("operation", "current_context").Wrap(ErrCurrentContextUnknown)
 	}
 
-	context.ClientName = c.soleClientForSession(ctx, context.SessionID)
+	current.ClientName = c.soleClientForSession(ctx, current.SessionID)
 
-	return context, nil
+	return current, nil
 }
 
 func (c *tmuxController) paneIsLive(ctx context.Context, paneID string) bool {

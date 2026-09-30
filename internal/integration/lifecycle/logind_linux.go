@@ -204,7 +204,7 @@ func (l *Logind) rearm(
 
 	pending := [logindInhibitorCount]*os.File{}
 
-	for index, spec := range LifecycleInhibitors() {
+	for index, spec := range Inhibitors() {
 		inhibitor, err := acquire(ctx, spec)
 		if err != nil {
 			return errors.Join(err, closeInhibitors(pending))

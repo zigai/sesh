@@ -37,7 +37,7 @@ func TestLayoutRemappingPreservesExactGeometry(t *testing.T) {
 	}
 
 	target := tmuxtest.NewServer(t)
-	if _, err := target.NewSession(t.Context(), tmux.NewSessionOptions{Name: "unrelated", Program: tmux.Exec("sleep", "300"), Start: tmux.ExistingOnly}); err != nil {
+	if _, err := target.NewSession(t.Context(), tmux.NewSessionOptions{Name: "unrelated", Program: tmux.Exec("sleep", "300"), Start: tmux.StartPolicyExistingOnly}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -70,7 +70,7 @@ func TestCapturePaneBordersAndZoom(t *testing.T) {
 			server := tmuxtest.NewServer(t)
 
 			session, window, panes := layoutFixture(t, server, "borders", 29)
-			if _, err := panes[0].Split(t.Context(), tmux.SplitOptions{Direction: tmux.Vertical, Size: tmux.SplitSize{Cells: 11}, Program: tmux.Exec("sleep", "300")}); err != nil {
+			if _, err := panes[0].Split(t.Context(), tmux.SplitOptions{Direction: tmux.DirectionVertical, Size: tmux.SplitSize{Cells: 11}, Program: tmux.Exec("sleep", "300")}); err != nil {
 				t.Fatal(err)
 			}
 
@@ -115,7 +115,7 @@ func assertCaptureGeometry(t *testing.T, server *tmux.Server, session tmux.Sessi
 func layoutFixture(t *testing.T, server *tmux.Server, name string, rightWidth int) (tmux.Session, tmux.Window, []tmux.Pane) {
 	t.Helper()
 
-	session, err := server.NewSession(t.Context(), tmux.NewSessionOptions{Name: name, Program: tmux.Exec("sleep", "300"), Size: tmux.Size{Width: 121, Height: 41}, Start: tmux.ExistingOnly})
+	session, err := server.NewSession(t.Context(), tmux.NewSessionOptions{Name: name, Program: tmux.Exec("sleep", "300"), Size: tmux.Size{Width: 121, Height: 41}, Start: tmux.StartPolicyExistingOnly})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +132,7 @@ func layoutFixture(t *testing.T, server *tmux.Server, name string, rightWidth in
 		t.Fatal(err)
 	}
 
-	second, err := first.Split(t.Context(), tmux.SplitOptions{Direction: tmux.Horizontal, Size: tmux.SplitSize{Cells: rightWidth}, Program: tmux.Exec("sleep", "300")})
+	second, err := first.Split(t.Context(), tmux.SplitOptions{Direction: tmux.DirectionHorizontal, Size: tmux.SplitSize{Cells: rightWidth}, Program: tmux.Exec("sleep", "300")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +144,7 @@ func TestCaptureSharedWindowsAndGroupClosure(t *testing.T) {
 	server := tmuxtest.NewServer(t)
 	first, window, _ := layoutFixture(t, server, "group-first", 29)
 
-	second, err := server.NewSession(t.Context(), tmux.NewSessionOptions{Name: "group-second", Group: "group-first", Start: tmux.ExistingOnly})
+	second, err := server.NewSession(t.Context(), tmux.NewSessionOptions{Name: "group-second", Group: "group-first", Start: tmux.StartPolicyExistingOnly})
 	if err != nil {
 		t.Fatal(err)
 	}

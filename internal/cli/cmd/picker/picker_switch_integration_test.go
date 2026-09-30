@@ -1,6 +1,6 @@
 //go:build linux && integration
 
-package cmdpicker
+package picker
 
 import (
 	"context"
@@ -49,7 +49,7 @@ func TestPickerAgentSelectionSwitchesClientAndFocusesPane(t *testing.T) {
 
 	services, err := newPickerServices(ctx, config.DefaultConfig(), server.Endpoint().SocketPath,
 		filepath.Join(root, "repository"), filepath.Join(root, "leases"), historyPath,
-		filepath.Join(root, "agents.json"), gotmux.TerminalStreams{}, PickerRemoteServices{})
+		filepath.Join(root, "agents.json"), gotmux.Streams{}, RemoteServices{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,8 +164,8 @@ func TestPopupHandoffSwitchesOnlyOpeningClientAfterPopupSelection(t *testing.T) 
 	}
 
 	services, err := newPickerServices(ctx, runtime.cfg, runtime.socketPath, runtime.repositoryPath,
-		runtime.leaseRoot, runtime.historyPath, "", gotmux.TerminalStreams{In: nil, Out: nil, Err: nil},
-		PickerRemoteServices{Catalog: nil, Watcher: nil, Actions: nil, Attach: nil, OriginBridge: nil})
+		runtime.leaseRoot, runtime.historyPath, "", gotmux.Streams{In: nil, Out: nil, Err: nil},
+		RemoteServices{Catalog: nil, Watcher: nil, Actions: nil, Attach: nil, OriginBridge: nil})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -314,10 +314,10 @@ func assertPickerActiveWindow(t *testing.T, target gotmux.Session, want gotmux.W
 	t.Fatal("target session has no active window")
 }
 
-func attachPickerTestClient(t *testing.T, session gotmux.Session) string {
+func attachPickerTestClient(t *testing.T, liveSession gotmux.Session) string {
 	t.Helper()
 
-	before, err := session.Clients(t.Context())
+	before, err := liveSession.Clients(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -333,7 +333,7 @@ func attachPickerTestClient(t *testing.T, session gotmux.Session) string {
 
 	done := make(chan error, 1)
 	go func() {
-		done <- session.Attach(attachCtx, gotmux.TerminalStreams{In: slave, Out: slave, Err: slave}, gotmux.AttachOptions{})
+		done <- liveSession.Attach(attachCtx, gotmux.Streams{In: slave, Out: slave, Err: slave}, gotmux.AttachOptions{})
 	}()
 
 	t.Cleanup(func() {
@@ -346,7 +346,7 @@ func attachPickerTestClient(t *testing.T, session gotmux.Session) string {
 		}
 	})
 
-	return waitForNewPickerClient(t, session, existing)
+	return waitForNewPickerClient(t, liveSession, existing)
 }
 
 // openPickerTestPTY allocates a pseudo-terminal and returns its slave side for an attached client.
@@ -379,12 +379,12 @@ func openPickerTestPTY(t *testing.T) *os.File {
 	return slave
 }
 
-func waitForNewPickerClient(t *testing.T, session gotmux.Session, existing map[gotmux.ClientName]bool) string {
+func waitForNewPickerClient(t *testing.T, liveSession gotmux.Session, existing map[gotmux.ClientName]bool) string {
 	t.Helper()
 
 	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
-		clients, err := session.Clients(t.Context())
+		clients, err := liveSession.Clients(t.Context())
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -561,7 +561,7 @@ func environmentTable(ctx context.Context, scope tmux.EnvironmentScope) (map[env
 					Wrap(model.ErrInvalid)
 			}
 
-			value, err := scope.Get(ctx, entry.Name, hidden)
+			value, err := scope.GetWith(ctx, entry.Name, tmux.GetEnvironmentOptions{Hidden: hidden})
 			if err != nil {
 				return nil, oops.In("snapshot.restore").
 					Code("restore_failed").

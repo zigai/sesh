@@ -21,7 +21,7 @@ var (
 
 func graph(snapshot gotmux.Snapshot, selected []gotmux.SessionID) (model.Manifest, error) {
 	var m model.Manifest
-	if snapshot.Consistency != gotmux.Consistent {
+	if snapshot.Consistency != gotmux.ConsistencyComplete {
 		return m, ErrChanged
 	}
 

@@ -104,7 +104,7 @@ func testNativeGroupAtBase(t *testing.T, base int) {
 	unrelated, err := server.NewSession(ctx, tmux.NewSessionOptions{
 		Name:    "unrelated-fixture",
 		Program: tmux.Exec("sleep", "300"),
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -284,14 +284,14 @@ func TestPreflightCheckGroupCollisionRejectsExistingSessionAndGroup(t *testing.T
 	if _, err := server.NewSession(ctx, tmux.NewSessionOptions{
 		Name:    "existing-session",
 		Program: tmux.Exec("sleep", "300"),
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	}); err != nil {
 		t.Fatal(err)
 	}
 
 	if _, err := server.NewSession(ctx, tmux.NewSessionOptions{
 		Name:  "existing-group",
-		Start: tmux.ExistingOnly,
+		Start: tmux.StartPolicyExistingOnly,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -299,7 +299,7 @@ func TestPreflightCheckGroupCollisionRejectsExistingSessionAndGroup(t *testing.T
 	if _, err := server.NewSession(ctx, tmux.NewSessionOptions{
 		Name:  "group-leader",
 		Group: "existing-group",
-		Start: tmux.ExistingOnly,
+		Start: tmux.StartPolicyExistingOnly,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -489,7 +489,7 @@ func assertSparseRepeatedAndSharedLinks(t *testing.T, ctx context.Context, targe
 }
 
 func TestDeepAsymmetricLayoutTinyCellsBordersAndZoom(t *testing.T) {
-	for _, border := range []tmux.PaneBorderStatus{tmux.BorderOff, tmux.BorderTop, tmux.BorderBottom} {
+	for _, border := range []tmux.PaneBorderStatus{tmux.PaneBorderStatusOff, tmux.PaneBorderStatusTop, tmux.PaneBorderStatusBottom} {
 		t.Run(string(border), func(t *testing.T) {
 			verifyDeepLayoutAtBorder(t, border)
 		})
@@ -559,16 +559,16 @@ func computeExpectedBorderRectangles(wantRects map[string][4]int, border tmux.Pa
 		left, top, width, height := rect[0], rect[1], rect[2], rect[3]
 
 		switch border {
-		case tmux.BorderTop:
+		case tmux.PaneBorderStatusTop:
 			if top == 0 {
 				top++
 				height--
 			}
-		case tmux.BorderBottom:
+		case tmux.PaneBorderStatusBottom:
 			if top+height == 41 {
 				height--
 			}
-		case tmux.BorderOff:
+		case tmux.PaneBorderStatusOff:
 		}
 
 		expectedRects[id] = [4]int{left, top, width, height}
@@ -887,14 +887,14 @@ func TestUnrelatedFixturesPreservedAcrossTargetOptions(t *testing.T) {
 			}
 
 			u1, err := server.NewSession(ctx, tmux.NewSessionOptions{
-				Name: "unrelated-one", Program: tmux.Exec("sleep", "300"), Start: tmux.ExistingOnly,
+				Name: "unrelated-one", Program: tmux.Exec("sleep", "300"), Start: tmux.StartPolicyExistingOnly,
 			})
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			u2, err := server.NewSession(ctx, tmux.NewSessionOptions{
-				Name: "unrelated-two", Program: tmux.Exec("sleep", "300"), Start: tmux.ExistingOnly,
+				Name: "unrelated-two", Program: tmux.Exec("sleep", "300"), Start: tmux.StartPolicyExistingOnly,
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -1091,7 +1091,7 @@ func (f *structuralFixture) createGroupFollowerSession(t *testing.T, ctx context
 	session, err := f.server.NewSession(ctx, tmux.NewSessionOptions{
 		Name:  string(step.Name),
 		Group: groupTarget,
-		Start: tmux.ExistingOnly,
+		Start: tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("NewSession for group follower %s failed: %v", step.SessionID, err)
@@ -1159,7 +1159,7 @@ func (f *structuralFixture) leaderSessionOptions(t *testing.T, ctx context.Conte
 	opts := tmux.NewSessionOptions{
 		Name:  sessionName,
 		Size:  size,
-		Start: tmux.ExistingOnly,
+		Start: tmux.StartPolicyExistingOnly,
 	}
 
 	if len(step.GroupName) == 0 {
@@ -1284,9 +1284,9 @@ func (f *structuralFixture) splitPaneStep(t *testing.T, ctx context.Context, ste
 		t.Fatalf("target pane %s not found for split %s", step.TargetPaneID, step.PaneID)
 	}
 
-	direction, cells := tmux.Horizontal, step.SubtreeWidth
+	direction, cells := tmux.DirectionHorizontal, step.SubtreeWidth
 	if step.Axis == "y" {
-		direction, cells = tmux.Vertical, step.SubtreeHeight
+		direction, cells = tmux.DirectionVertical, step.SubtreeHeight
 	}
 
 	newPane, err := targetPane.Split(ctx, tmux.SplitOptions{
@@ -1816,7 +1816,7 @@ func createSourceGroup(t *testing.T, ctx context.Context, server *tmux.Server) (
 	leadSess, err := server.NewSession(ctx, tmux.NewSessionOptions{
 		Name:  "src-group",
 		Size:  tmux.Size{Width: 80, Height: 24},
-		Start: tmux.ExistingOnly,
+		Start: tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("create source-lead session: %v", err)
@@ -1844,7 +1844,7 @@ func createSourceGroup(t *testing.T, ctx context.Context, server *tmux.Server) (
 	follSess, err := server.NewSession(ctx, tmux.NewSessionOptions{
 		Name:  "source-foll",
 		Group: "src-group",
-		Start: tmux.ExistingOnly,
+		Start: tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("create source-foll session: %v", err)
@@ -1886,7 +1886,7 @@ func createSourceNestedWindow(t *testing.T, ctx context.Context, leadSess tmux.S
 	}
 
 	nestedP1, err := nestedP0.Split(ctx, tmux.SplitOptions{
-		Direction: tmux.Horizontal,
+		Direction: tmux.DirectionHorizontal,
 		Size:      tmux.SplitSize{Cells: 50},
 		Program:   tmux.Exec("sleep", "300"),
 	})
@@ -1899,7 +1899,7 @@ func createSourceNestedWindow(t *testing.T, ctx context.Context, leadSess tmux.S
 	}
 
 	nestedP2, err := nestedP1.Split(ctx, tmux.SplitOptions{
-		Direction: tmux.Vertical,
+		Direction: tmux.DirectionVertical,
 		Size:      tmux.SplitSize{Cells: 15},
 		Program:   tmux.Exec("sleep", "300"),
 	})
@@ -1962,7 +1962,7 @@ func createSourceRepeatSession(t *testing.T, ctx context.Context, server *tmux.S
 		Name:    "src-repeat",
 		Size:    tmux.Size{Width: 80, Height: 24},
 		Program: tmux.Exec("sleep", "300"),
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("create src-repeat session: %v", err)
@@ -2166,7 +2166,7 @@ func TestActualSourceDestructionRoundtrip(t *testing.T) {
 	scratch0, err := targetServer.NewSession(ctx, tmux.NewSessionOptions{
 		Name:    "scratch-pre-alloc-0",
 		Program: tmux.Exec("sleep", "300"),
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -2175,7 +2175,7 @@ func TestActualSourceDestructionRoundtrip(t *testing.T) {
 	scratch1, err := targetServer.NewSession(ctx, tmux.NewSessionOptions{
 		Name:    "scratch-pre-alloc-1",
 		Program: tmux.Exec("sleep", "300"),
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -2184,7 +2184,7 @@ func TestActualSourceDestructionRoundtrip(t *testing.T) {
 	unrelatedSess, err := targetServer.NewSession(ctx, tmux.NewSessionOptions{
 		Name:    "unrelated-target-sess",
 		Program: tmux.Exec("sleep", "300"),
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -2232,7 +2232,7 @@ func createEmptyNameAndTitleSourceSession(t *testing.T, ctx context.Context, ser
 	srcSess, err := server.NewSession(ctx, tmux.NewSessionOptions{
 		Name:    "source-empty",
 		Size:    tmux.Size{Width: 80, Height: 24},
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 		Program: tmux.Exec("sleep", "300"),
 	})
 	if err != nil {
@@ -2259,7 +2259,7 @@ func createEmptyNameAndTitleSourceSession(t *testing.T, ctx context.Context, ser
 	}
 
 	splitPane, err := initPane.Split(ctx, tmux.SplitOptions{
-		Direction: tmux.Horizontal,
+		Direction: tmux.DirectionHorizontal,
 		Size:      tmux.SplitSize{Cells: 40},
 		Program:   tmux.Exec("sleep", "300"),
 	})

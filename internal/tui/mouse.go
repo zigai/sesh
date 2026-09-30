@@ -102,7 +102,7 @@ func (m *Model) handleMouseMotion(mouse tea.Mouse) func() (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) mouseInteractionsEnabled() bool {
-	return m.width > 0 && m.height > 0 && !m.showHelp && m.dialog == dialogNone
+	return m.popupStartup == popupStartupContent && m.width > 0 && m.height > 0 && !m.showHelp && m.dialog == dialogNone
 }
 
 func (m *Model) popupMouseLayout() popupMouseLayout {

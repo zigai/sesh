@@ -1,4 +1,4 @@
-package cmdautosave
+package autosave
 
 import (
 	"context"
@@ -105,7 +105,7 @@ func executeAutosaveSave(ctx context.Context, cmd *cobra.Command, env autosaveEn
 		return errors.Join(oops.In("cli").With("operation", "open_tmux").Wrap(err), wrapCloseError(repo.Close()))
 	}
 
-	selected, err := resolveAutosaveSelection(cmd, ctx, server)
+	selected, err := resolveAutosaveSelection(ctx, cmd, server)
 	if errors.Is(err, gotmux.ErrNoServer) {
 		return skipAutosaveWithoutServer(ctx, cmd, env, repo)
 	}
@@ -218,7 +218,7 @@ func runAutosaveFinalSave(cmd *cobra.Command, _ []string) error {
 
 	started := time.Now()
 
-	outcome, status, saveErr := executeFinalSave(cmd, env, ctx)
+	outcome, status, saveErr := executeFinalSave(ctx, cmd, env)
 
 	status.StartedAtUnix = started.Unix()
 	status.CompletedAtUnix = time.Now().Unix()
@@ -246,9 +246,9 @@ func runAutosaveFinalSave(cmd *cobra.Command, _ []string) error {
 }
 
 func executeFinalSave(
+	ctx context.Context,
 	cmd *cobra.Command,
 	env autosaveEnv,
-	ctx context.Context,
 ) (autosaveOutcome, automation.FinalSaveStatus, error) {
 	outcome := newAutosaveOutcome(autosaveStatusSaved, automation.ReasonShutdownAdmit)
 	outcome.history = autosaveHistoryState(env)
@@ -288,7 +288,7 @@ func executeFinalSave(
 		)
 	}
 
-	selected, err := resolveAutosaveSelection(cmd, ctx, server)
+	selected, err := resolveAutosaveSelection(ctx, cmd, server)
 	if err != nil {
 		return finalSaveFailure(
 			outcome,

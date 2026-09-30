@@ -14,15 +14,15 @@ import (
 	"github.com/zigai/sesh/internal/session"
 )
 
-func attachTargetFor(session sessionTarget) AttachTarget {
+func attachTargetFor(target sessionTarget) AttachTarget {
 	return AttachTarget{
 		PeerID:              testPeerID,
-		TmuxServerSocket:    session.socket,
-		TmuxServerPID:       session.pid,
-		TmuxServerStartedAt: session.startedAt,
-		SessionID:           session.id,
-		SessionName:         session.name,
-		SessionCreatedAt:    session.createdAt,
+		TmuxServerSocket:    target.socket,
+		TmuxServerPID:       target.pid,
+		TmuxServerStartedAt: target.startedAt,
+		SessionID:           target.id,
+		SessionName:         target.name,
+		SessionCreatedAt:    target.createdAt,
 		PaneID:              "",
 		CatalogSequence:     1,
 	}

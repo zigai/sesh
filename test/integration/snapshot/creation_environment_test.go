@@ -37,7 +37,7 @@ func TestSessionCreationMarkerIsSessionScopedAndIndependentlyQueryable(t *testin
 		Program: tmux.Exec(helper, testArgs...),
 		TmuxEnv: map[string]string{sessionMarker: sessionToken},
 		Size:    tmux.Size{Width: 100, Height: 30},
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -72,7 +72,7 @@ func TestSessionCreationMarkerIsSessionScopedAndIndependentlyQueryable(t *testin
 		Dir:     dir,
 		Program: tmux.Exec(helper, "-report", unrelatedReport, "-hold", "300s"),
 		Size:    tmux.Size{Width: 100, Height: 30},
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -94,7 +94,7 @@ func TestSessionMarkerSurvivesInitialProcessExitAndRename(t *testing.T) {
 		Program: tmux.Exec(helper, "-report", filepath.Join(dir, "initial.report"), "-hold", "2s"),
 		TmuxEnv: map[string]string{sessionMarker: sessionToken},
 		Size:    tmux.Size{Width: 100, Height: 30},
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -168,7 +168,7 @@ func TestWindowAndPaneNativeEnvironmentIsOneShotAndProcessLocal(t *testing.T) {
 		Program: tmux.Exec("sleep", "300"),
 		TmuxEnv: map[string]string{sessionMarker: sessionToken},
 		Size:    tmux.Size{Width: 120, Height: 40},
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -214,7 +214,7 @@ func TestWindowAndPaneNativeEnvironmentIsOneShotAndProcessLocal(t *testing.T) {
 	splitReport := filepath.Join(dir, "split.report")
 
 	if _, err = pane.Split(t.Context(), tmux.SplitOptions{
-		Direction: tmux.Vertical,
+		Direction: tmux.DirectionVertical,
 		Size:      tmux.SplitSize{Cells: 10},
 		Dir:       dir,
 		Program:   tmux.Exec(helper, "-report", splitReport, "-hold", "300s"),
@@ -232,7 +232,7 @@ func TestWindowAndPaneNativeEnvironmentIsOneShotAndProcessLocal(t *testing.T) {
 	secondSplitReport := filepath.Join(dir, "second-split.report")
 
 	if _, err = pane.Split(t.Context(), tmux.SplitOptions{
-		Direction: tmux.Vertical,
+		Direction: tmux.DirectionVertical,
 		Size:      tmux.SplitSize{Cells: 10},
 		Dir:       dir,
 		Program:   tmux.Exec(helper, "-report", secondSplitReport, "-hold", "300s"),
@@ -337,7 +337,7 @@ func TestFailedCreationLeaksNoMarkerAndReportsNoIdentity(t *testing.T) {
 		Name:    "duplicate-slot",
 		Program: tmux.Exec("sleep", "300"),
 		TmuxEnv: map[string]string{sessionMarker: sessionToken},
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -352,7 +352,7 @@ func TestFailedCreationLeaksNoMarkerAndReportsNoIdentity(t *testing.T) {
 		Name:    "duplicate-slot",
 		Program: tmux.Exec("sleep", "300"),
 		TmuxEnv: map[string]string{sessionMarker: refused},
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err == nil {
 		t.Fatal("creating a duplicate session name succeeded")

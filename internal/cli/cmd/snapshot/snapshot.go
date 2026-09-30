@@ -1,4 +1,4 @@
-package cmdsnapshot
+package snapshot
 
 import (
 	"context"
@@ -56,12 +56,12 @@ type snapshotSaveResultJSON struct {
 	Status     string `json:"status"`
 }
 
-type SnapshotListResultJSON struct {
+type ListResultJSON struct {
 	Generation string                `json:"generation"`
 	Sessions   []snapshotSessionJSON `json:"sessions"`
 }
 
-type snapshotListResultJSON = SnapshotListResultJSON
+type snapshotListResultJSON = ListResultJSON
 
 type snapshotSessionJSON struct {
 	ID        string `json:"id"`
@@ -70,13 +70,13 @@ type snapshotSessionJSON struct {
 	Windows   int    `json:"windows"`
 }
 
-type SnapshotHistoryResultJSON struct {
+type HistoryResultJSON struct {
 	Current     string                   `json:"current"`
 	Attempts    []snapshotAttemptJSON    `json:"attempts"`
 	Generations []snapshotGenerationJSON `json:"generations"`
 }
 
-type snapshotHistoryResultJSON = SnapshotHistoryResultJSON
+type snapshotHistoryResultJSON = HistoryResultJSON
 
 type snapshotAttemptJSON struct {
 	ID             string `json:"id"`
@@ -106,7 +106,7 @@ type snapshotRestoreResultJSON struct {
 	MissingRequirements []snapshotEvidenceJSON `json:"missingRequirements"`
 }
 
-type SnapshotVerifyResultJSON struct {
+type VerifyResultJSON struct {
 	Generation             string                 `json:"generation"`
 	ByteIntegrity          bool                   `json:"byteIntegrity"`
 	SourceEvidenceComplete bool                   `json:"sourceEvidenceComplete"`
@@ -120,7 +120,7 @@ type SnapshotVerifyResultJSON struct {
 	Evidence               []snapshotEvidenceJSON `json:"evidence"`
 }
 
-type snapshotVerifyResultJSON = SnapshotVerifyResultJSON
+type snapshotVerifyResultJSON = VerifyResultJSON
 
 type snapshotEvidenceJSON struct {
 	Domain string `json:"domain"`

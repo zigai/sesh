@@ -51,7 +51,7 @@ type WorkflowOptions struct {
 	Hooks       config.HookConfig
 	HookRunner  *HookRunner
 	Getenv      func(string) string
-	Streams     gotmux.TerminalStreams
+	Streams     gotmux.Streams
 	Source      string
 	// DeferSwitchHistory leaves recording a completed switch to the caller, which records
 	// SwitchHistoryIdentity after its own follow-up work.
@@ -66,7 +66,7 @@ type Workflow struct {
 	hooks              config.HookConfig
 	hookRunner         *HookRunner
 	getenv             func(string) string
-	streams            gotmux.TerminalStreams
+	streams            gotmux.Streams
 	source             string
 	deferSwitchHistory bool
 }
@@ -132,7 +132,7 @@ func NewWorkflow(server *gotmux.Server, repo *store.Repository, historyPath stri
 		},
 		HookRunner:         nil,
 		Getenv:             nil,
-		Streams:            gotmux.TerminalStreams{In: nil, Out: nil, Err: nil},
+		Streams:            gotmux.Streams{In: nil, Out: nil, Err: nil},
 		Source:             "",
 		DeferSwitchHistory: false,
 	})

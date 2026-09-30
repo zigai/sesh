@@ -24,7 +24,7 @@ func createScratchSessions(t *testing.T, ctx context.Context, server *tmux.Serve
 		if _, err := server.NewSession(ctx, tmux.NewSessionOptions{
 			Name:    "scratch-" + strconv.Itoa(index),
 			Program: tmux.Exec("sleep", "300"),
-			Start:   tmux.ExistingOnly,
+			Start:   tmux.StartPolicyExistingOnly,
 		}); err != nil {
 			t.Fatalf("creating scratch session failed: %v", err)
 		}
@@ -150,7 +150,7 @@ func setupTargetWithUnrelatedSession(t *testing.T, ctx context.Context, targetSe
 	unrelated, err := targetServer.NewSession(ctx, tmux.NewSessionOptions{
 		Name:    "unrelated-target-sess",
 		Program: tmux.Exec("sleep", "300"),
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -203,7 +203,7 @@ func newAgentSession(t *testing.T, ctx context.Context, server *gotmux.Server, n
 		Env:     nil,
 		TmuxEnv: nil,
 		Size:    gotmux.Size{Width: 120, Height: 40},
-		Start:   gotmux.ExistingOnly,
+		Start:   gotmux.StartPolicyExistingOnly,
 		Group:   "",
 	})
 	if err != nil {
@@ -234,7 +234,7 @@ func TestAgentNavigationFocusesNamedAgentPane(t *testing.T) {
 		Env:     nil,
 		TmuxEnv: nil,
 		Size:    gotmux.Size{Width: 120, Height: 40},
-		Start:   gotmux.ExistingOnly,
+		Start:   gotmux.StartPolicyExistingOnly,
 		Group:   "",
 	})
 	if err != nil {
@@ -287,7 +287,7 @@ func TestAgentNavigationLeavesUnrelatedClientsUntouched(t *testing.T) {
 		Env:     nil,
 		TmuxEnv: nil,
 		Size:    gotmux.Size{Width: 100, Height: 30},
-		Start:   gotmux.ExistingOnly,
+		Start:   gotmux.StartPolicyExistingOnly,
 		Group:   "",
 	})
 	if err != nil {
@@ -305,7 +305,7 @@ func TestAgentNavigationLeavesUnrelatedClientsUntouched(t *testing.T) {
 		Env:     nil,
 		TmuxEnv: nil,
 		Size:    gotmux.Size{Width: 120, Height: 40},
-		Start:   gotmux.ExistingOnly,
+		Start:   gotmux.StartPolicyExistingOnly,
 		Group:   "",
 	})
 	if err != nil {
@@ -441,7 +441,7 @@ func TestAgentNavigationFocusesSharedWindowInRequestedSession(t *testing.T) {
 		Env:     nil,
 		TmuxEnv: nil,
 		Size:    gotmux.Size{Width: 100, Height: 30},
-		Start:   gotmux.ExistingOnly,
+		Start:   gotmux.StartPolicyExistingOnly,
 		Group:   primaryInfo.Name,
 	})
 	if err != nil {
@@ -620,7 +620,7 @@ func TestAgentNavigationTwoClientsIndependentHistory(t *testing.T) {
 		Env:     nil,
 		TmuxEnv: nil,
 		Size:    gotmux.Size{Width: 100, Height: 30},
-		Start:   gotmux.ExistingOnly,
+		Start:   gotmux.StartPolicyExistingOnly,
 		Group:   "",
 	})
 	if err != nil {

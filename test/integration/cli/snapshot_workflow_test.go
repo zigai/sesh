@@ -18,9 +18,9 @@ import (
 )
 
 type (
-	snapshotListResultJSON    = cmdsnapshot.SnapshotListResultJSON
-	snapshotHistoryResultJSON = cmdsnapshot.SnapshotHistoryResultJSON
-	snapshotVerifyResultJSON  = cmdsnapshot.SnapshotVerifyResultJSON
+	snapshotListResultJSON    = cmdsnapshot.ListResultJSON
+	snapshotHistoryResultJSON = cmdsnapshot.HistoryResultJSON
+	snapshotVerifyResultJSON  = cmdsnapshot.VerifyResultJSON
 )
 
 func TestSnapshotSaveListHistoryVerifyWorkflow(t *testing.T) {
@@ -59,7 +59,7 @@ func TestSnapshotSaveListHistoryVerifyWorkflow(t *testing.T) {
 func testSaveWorkflow(t *testing.T, repoDir, socket, leaseDir, sessionID string) (string, string) {
 	t.Helper()
 
-	exec := executeJSON(
+	execution := executeJSON(
 		t,
 		actionCmd, "snapshot-save",
 		testRepositoryFlag, repoDir,
@@ -69,19 +69,19 @@ func testSaveWorkflow(t *testing.T, repoDir, socket, leaseDir, sessionID string)
 		testJSONFlag,
 	)
 
-	if !exec.envelope.OK {
-		t.Fatalf("save expected practical success, got: %s", exec.stdout)
+	if !execution.envelope.OK {
+		t.Fatalf("save expected practical success, got: %s", execution.stdout)
 	}
 
-	if exec.envelope.Command != "action.snapshot-save" {
-		t.Fatalf("command = %q, want snapshot.save", exec.envelope.Command)
+	if execution.envelope.Command != "action.snapshot-save" {
+		t.Fatalf("command = %q, want snapshot.save", execution.envelope.Command)
 	}
 
-	if exec.envelope.Error != nil {
-		t.Fatalf("save returned unexpected error: %#v", exec.envelope.Error)
+	if execution.envelope.Error != nil {
+		t.Fatalf("save returned unexpected error: %#v", execution.envelope.Error)
 	}
 
-	res := decodeJSONPayload[snapshotSaveResultJSON](t, exec.envelope.Result)
+	res := decodeJSONPayload[snapshotSaveResultJSON](t, execution.envelope.Result)
 	if res.Attempt == "" || res.Generation == "" {
 		t.Fatalf("missing attempt or generation in save result: %#v", res)
 	}
@@ -91,7 +91,7 @@ func testSaveWorkflow(t *testing.T, repoDir, socket, leaseDir, sessionID string)
 	}
 
 	var raw map[string]any
-	if err := json.Unmarshal([]byte(exec.stdout), &raw); err != nil {
+	if err := json.Unmarshal([]byte(execution.stdout), &raw); err != nil {
 		t.Fatalf("unmarshaling stdout: %v", err)
 	}
 
@@ -103,7 +103,7 @@ func testSaveWorkflow(t *testing.T, repoDir, socket, leaseDir, sessionID string)
 func testActionSaveParity(t *testing.T, repoDir, socket, leaseDir, sessionID string) {
 	t.Helper()
 
-	exec := executeJSON(
+	execution := executeJSON(
 		t,
 		"action", "snapshot-save",
 		testRepositoryFlag, repoDir,
@@ -113,19 +113,19 @@ func testActionSaveParity(t *testing.T, repoDir, socket, leaseDir, sessionID str
 		testJSONFlag,
 	)
 
-	if !exec.envelope.OK {
-		t.Fatalf("action save expected practical success, got: %s", exec.stdout)
+	if !execution.envelope.OK {
+		t.Fatalf("action save expected practical success, got: %s", execution.stdout)
 	}
 
-	if exec.envelope.Command != "action.snapshot-save" {
-		t.Fatalf("command = %q, want action.snapshot-save", exec.envelope.Command)
+	if execution.envelope.Command != "action.snapshot-save" {
+		t.Fatalf("command = %q, want action.snapshot-save", execution.envelope.Command)
 	}
 
-	if exec.envelope.Error != nil {
-		t.Fatalf("action save returned unexpected error: %#v", exec.envelope.Error)
+	if execution.envelope.Error != nil {
+		t.Fatalf("action save returned unexpected error: %#v", execution.envelope.Error)
 	}
 
-	res := decodeJSONPayload[snapshotSaveResultJSON](t, exec.envelope.Result)
+	res := decodeJSONPayload[snapshotSaveResultJSON](t, execution.envelope.Result)
 	if res.Status != "best_effort" {
 		t.Fatalf("status = %q, want best_effort", res.Status)
 	}
@@ -225,22 +225,22 @@ func testListWorkflow(t *testing.T, repoDir, savedGen, sessionName string) {
 func testHistoryWorkflow(t *testing.T, repoDir string) {
 	t.Helper()
 
-	exec := executeJSON(
+	execution := executeJSON(
 		t,
 		snapshotCmd, "history",
 		testRepositoryFlag, repoDir,
 		testJSONFlag,
 	)
 
-	if !exec.envelope.OK {
-		t.Fatalf("history failed: %s", exec.stderr)
+	if !execution.envelope.OK {
+		t.Fatalf("history failed: %s", execution.stderr)
 	}
 
-	if exec.envelope.Command != "snapshot.history" {
-		t.Fatalf("command = %q, want snapshot.history", exec.envelope.Command)
+	if execution.envelope.Command != "snapshot.history" {
+		t.Fatalf("command = %q, want snapshot.history", execution.envelope.Command)
 	}
 
-	histRes := decodeJSONPayload[snapshotHistoryResultJSON](t, exec.envelope.Result)
+	histRes := decodeJSONPayload[snapshotHistoryResultJSON](t, execution.envelope.Result)
 	if len(histRes.Attempts) == 0 || len(histRes.Generations) == 0 {
 		t.Fatalf("expected attempts and generations in history: %#v", histRes)
 	}
@@ -329,7 +329,7 @@ func TestSnapshotVerifyReportsCorruptedArtifacts(t *testing.T) {
 
 	sessionID := string(sessions[0].ID)
 
-	exec := executeJSON(
+	execution := executeJSON(
 		t,
 		actionCmd, "snapshot-save",
 		testRepositoryFlag, repoDir,
@@ -339,11 +339,11 @@ func TestSnapshotVerifyReportsCorruptedArtifacts(t *testing.T) {
 		testJSONFlag,
 	)
 
-	if !exec.envelope.OK || exec.envelope.Error != nil {
-		t.Fatalf("save failed: %s", exec.stderr)
+	if !execution.envelope.OK || execution.envelope.Error != nil {
+		t.Fatalf("save failed: %s", execution.stderr)
 	}
 
-	saveRes := decodeJSONPayload[snapshotSaveResultJSON](t, exec.envelope.Result)
+	saveRes := decodeJSONPayload[snapshotSaveResultJSON](t, execution.envelope.Result)
 	genID := saveRes.Generation
 	corruptFirstArtifact(t, repoDir, genID)
 
@@ -490,7 +490,7 @@ func TestSnapshotVerifyCompleteNativeFixture(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	exec := executeJSON(
+	execution := executeJSON(
 		t,
 		snapshotCmd, "verify",
 		testRepositoryFlag, repoDir,
@@ -498,11 +498,11 @@ func TestSnapshotVerifyCompleteNativeFixture(t *testing.T) {
 		testJSONFlag,
 	)
 
-	if !exec.envelope.OK {
-		t.Fatalf("verify failed: %s", exec.stderr)
+	if !execution.envelope.OK {
+		t.Fatalf("verify failed: %s", execution.stderr)
 	}
 
-	verRes := decodeJSONPayload[snapshotVerifyResultJSON](t, exec.envelope.Result)
+	verRes := decodeJSONPayload[snapshotVerifyResultJSON](t, execution.envelope.Result)
 	if !verRes.ByteIntegrity {
 		t.Fatal("expected byteIntegrity true")
 	}
@@ -578,7 +578,7 @@ func TestRecoveryBarrierLatestSaveRecoveryRequired(t *testing.T) {
 
 	sessionID := string(sessions[0].ID)
 
-	exec := executeJSON(
+	execution := executeJSON(
 		t,
 		actionCmd, "snapshot-save",
 		testRepositoryFlag, repoDir,
@@ -588,11 +588,11 @@ func TestRecoveryBarrierLatestSaveRecoveryRequired(t *testing.T) {
 		testJSONFlag,
 	)
 
-	if !exec.envelope.OK || exec.envelope.Error != nil {
-		t.Fatalf("save failed: %s", exec.stderr)
+	if !execution.envelope.OK || execution.envelope.Error != nil {
+		t.Fatalf("save failed: %s", execution.stderr)
 	}
 
-	saveRes := decodeJSONPayload[snapshotSaveResultJSON](t, exec.envelope.Result)
+	saveRes := decodeJSONPayload[snapshotSaveResultJSON](t, execution.envelope.Result)
 	committedGen := saveRes.Generation
 
 	appendFailedAttemptToCatalog(t, repoDir)

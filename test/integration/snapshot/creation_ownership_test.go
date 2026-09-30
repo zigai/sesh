@@ -23,7 +23,7 @@ func TestCreationMarkerReconciliationIsNecessaryButNotUnique(t *testing.T) {
 		Program: tmux.Exec("sleep", "300"),
 		TmuxEnv: map[string]string{sessionMarker: sessionToken},
 		Size:    tmux.Size{Width: 100, Height: 30},
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +60,7 @@ func TestCreationMarkerReconciliationIsNecessaryButNotUnique(t *testing.T) {
 	decoy, err := server.NewSession(t.Context(), tmux.NewSessionOptions{
 		Name:    "adopt-decoy",
 		Program: tmux.Exec("sleep", "300"),
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -82,7 +82,7 @@ func TestRemovedMarkerReturnsTheWrongCandidate(t *testing.T) {
 		Name:    "adopt-slot",
 		Program: tmux.Exec("sleep", "300"),
 		TmuxEnv: map[string]string{sessionMarker: sessionToken},
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -91,7 +91,7 @@ func TestRemovedMarkerReturnsTheWrongCandidate(t *testing.T) {
 	decoy, err := server.NewSession(t.Context(), tmux.NewSessionOptions{
 		Name:    "adopt-decoy",
 		Program: tmux.Exec("sleep", "300"),
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -120,7 +120,7 @@ func TestIncarnationReuseLeavesTheStaleCreationHandleRejected(t *testing.T) {
 		Name:    name,
 		Program: tmux.Exec("sleep", "300"),
 		TmuxEnv: map[string]string{sessionMarker: sessionToken},
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -135,7 +135,7 @@ func TestIncarnationReuseLeavesTheStaleCreationHandleRejected(t *testing.T) {
 	replacement, err := server.NewSession(t.Context(), tmux.NewSessionOptions{
 		Name:    name,
 		Program: tmux.Exec("sleep", "300"),
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -151,7 +151,7 @@ func TestIncarnationReuseLeavesTheStaleCreationHandleRejected(t *testing.T) {
 		t.Fatalf("stale session handle rename returned %v, want ErrNotFound", err)
 	}
 
-	staleValue, staleErr := owner.Environment().Get(t.Context(), sessionMarker, false)
+	staleValue, staleErr := owner.Environment().Get(t.Context(), sessionMarker)
 
 	if value, present := staleValue.Value.Get(); present {
 		t.Fatalf("stale session handle read %s=%q from a dead session", sessionMarker, value)
@@ -167,7 +167,7 @@ func TestIncarnationReuseLeavesTheStaleCreationHandleRejected(t *testing.T) {
 
 	if !errors.Is(staleErr, tmux.ErrNotFound) {
 		var staleOperation *tmux.OperationError
-		if !errors.As(staleErr, &staleOperation) || staleOperation.Operation != "Environment.Get" {
+		if !errors.As(staleErr, &staleOperation) || staleOperation.Operation != "EnvironmentScope.Get" {
 			t.Fatalf("stale session read returned %v, want ErrNotFound or Environment.Get OperationError", staleErr)
 		}
 
@@ -187,7 +187,7 @@ func TestGroupSessionsShareWindowsButNotSessionEnvironment(t *testing.T) {
 		Program: tmux.Exec("sleep", "300"),
 		TmuxEnv: map[string]string{sessionMarker: sessionToken},
 		Size:    tmux.Size{Width: 100, Height: 30},
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -196,7 +196,7 @@ func TestGroupSessionsShareWindowsButNotSessionEnvironment(t *testing.T) {
 	member, err := server.NewSession(t.Context(), tmux.NewSessionOptions{
 		Name:  "group-member",
 		Group: "group-owner",
-		Start: tmux.ExistingOnly,
+		Start: tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -338,7 +338,7 @@ func TestDaemonRestartInvalidatesCreationHandles(t *testing.T) {
 		Name:    name,
 		Program: tmux.Exec("sleep", "300"),
 		TmuxEnv: map[string]string{sessionMarker: sessionToken},
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -354,7 +354,7 @@ func TestDaemonRestartInvalidatesCreationHandles(t *testing.T) {
 		t.Fatalf("stale handle rename returned %v, want ErrServerChanged", err)
 	}
 
-	if _, err = session.Environment().Get(t.Context(), sessionMarker, false); !errors.Is(err, tmux.ErrServerChanged) {
+	if _, err = session.Environment().Get(t.Context(), sessionMarker); !errors.Is(err, tmux.ErrServerChanged) {
 		t.Fatalf("stale handle environment read returned %v, want ErrServerChanged", err)
 	}
 
@@ -395,7 +395,7 @@ func TestRestartCannotProveCreationContinuity(t *testing.T) {
 		Name:    name,
 		Program: tmux.Exec("sleep", "300"),
 		TmuxEnv: map[string]string{sessionMarker: sessionToken},
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -409,7 +409,7 @@ func TestRestartCannotProveCreationContinuity(t *testing.T) {
 		Name:    name,
 		Program: tmux.Exec("sleep", "300"),
 		TmuxEnv: map[string]string{sessionMarker: sessionToken},
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -434,7 +434,7 @@ func TestRestartCannotProveCreationContinuity(t *testing.T) {
 		t.Logf("replacement daemon reused session ID %s for a different session; stale handle correctly rejected despite ID collision", identity)
 	}
 
-	if recreated.Identity().Equal(original.Identity()) {
+	if recreated.ServerIdentity().Equal(original.ServerIdentity()) {
 		t.Fatal("recreated session reports the previous daemon identity")
 	}
 

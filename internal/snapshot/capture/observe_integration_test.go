@@ -143,7 +143,7 @@ func scriptedSessionFixture(t *testing.T, server *tmux.Server, name string, widt
 	session, err := server.NewSession(t.Context(), tmux.NewSessionOptions{
 		Name:    name,
 		Program: tmux.Exec("sh", "-c", script),
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 		Size:    tmux.Size{Width: width, Height: 5},
 	})
 	if err != nil {
@@ -212,7 +212,7 @@ func mutatePane(t *testing.T, pane tmux.Pane, mutation string) {
 func captureSessionFixture(t *testing.T, server *tmux.Server, name string) (tmux.Session, tmux.Pane) {
 	t.Helper()
 
-	session, err := server.NewSession(t.Context(), tmux.NewSessionOptions{Name: name, Program: tmux.Exec("sleep", "300"), Start: tmux.ExistingOnly, Size: tmux.Size{Width: 100, Height: 35}})
+	session, err := server.NewSession(t.Context(), tmux.NewSessionOptions{Name: name, Program: tmux.Exec("sleep", "300"), Start: tmux.StartPolicyExistingOnly, Size: tmux.Size{Width: 100, Height: 35}})
 	if err != nil {
 		t.Fatal(err)
 	}

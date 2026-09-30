@@ -28,7 +28,7 @@ func testLifecycleSignal(owner, name string, preparing bool) *dbus.Signal {
 func TestLifecycleInhibitorsUseSeparateDelayActions(t *testing.T) {
 	t.Parallel()
 
-	got := LifecycleInhibitors()
+	got := Inhibitors()
 	want := [2]InhibitorSpec{
 		{
 			What: LogindShutdownInhibitorWhat,

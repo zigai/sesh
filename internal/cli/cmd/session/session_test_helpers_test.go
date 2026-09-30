@@ -1,4 +1,4 @@
-package cmdsession_test
+package session_test
 
 import (
 	"fmt"

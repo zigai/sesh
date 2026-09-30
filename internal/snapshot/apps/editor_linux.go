@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	process "github.com/zigai/sesh/internal/integration/process"
+	"github.com/zigai/sesh/internal/integration/process"
 	"github.com/zigai/sesh/internal/snapshot/model"
 )
 

@@ -620,12 +620,12 @@ func TestRestoreCrashWorker(t *testing.T) {
 func refusalSessions(t *testing.T, ctx context.Context, server *tmux.Server) (tmux.Session, tmux.Session) {
 	t.Helper()
 
-	first, err := server.NewSession(ctx, tmux.NewSessionOptions{Name: "refusal-first", Start: tmux.ExistingOnly})
+	first, err := server.NewSession(ctx, tmux.NewSessionOptions{Name: "refusal-first", Start: tmux.StartPolicyExistingOnly})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
 
-	second, err := server.NewSession(ctx, tmux.NewSessionOptions{Name: "refusal-second", Start: tmux.ExistingOnly})
+	second, err := server.NewSession(ctx, tmux.NewSessionOptions{Name: "refusal-second", Start: tmux.StartPolicyExistingOnly})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -641,12 +641,12 @@ func TestRefusedCommandWithStderrPreservesUnknown(t *testing.T) {
 
 	first, second := refusalSessions(t, ctx, server)
 
-	_, dupErr := server.NewSession(ctx, tmux.NewSessionOptions{Name: "refusal-first", Start: tmux.ExistingOnly})
+	_, dupErr := server.NewSession(ctx, tmux.NewSessionOptions{Name: "refusal-first", Start: tmux.StartPolicyExistingOnly})
 	if dupErr == nil {
 		t.Fatal("expected duplicate session creation to fail")
 	}
 
-	if outcome := classifyMutation(dupErr); outcome.Effect != tmux.Unknown {
+	if outcome := classifyMutation(dupErr); outcome.Effect != tmux.EffectUnknown {
 		t.Fatalf("duplicate session must preserve library unknown, got %s", outcome.Effect)
 	}
 
@@ -663,7 +663,7 @@ func TestRefusedCommandWithStderrPreservesUnknown(t *testing.T) {
 		t.Fatal("expected linking onto an occupied slot to fail")
 	}
 
-	if outcome := classifyMutation(linkErr); outcome.Effect != tmux.Unknown {
+	if outcome := classifyMutation(linkErr); outcome.Effect != tmux.EffectUnknown {
 		t.Fatalf("occupied slot link must preserve library unknown, got %s", outcome.Effect)
 	}
 }
@@ -683,7 +683,7 @@ func TestPreDispatchTypedRefusalIsClassifiedNotSent(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			outcome := classifyMutation(tc.err)
-			if outcome.Effect != tmux.NotSent {
+			if outcome.Effect != tmux.EffectNotSent {
 				t.Fatalf("expected pre-dispatch error to be not-sent, got %s", outcome.Effect)
 			}
 		})
@@ -697,14 +697,14 @@ func TestJoinedCancellationPreservesUncertainty(t *testing.T) {
 	joined := errors.Join(notSentErr, uncertainErr)
 
 	outcome := classifyMutation(joined)
-	if outcome.Effect != tmux.Unknown {
+	if outcome.Effect != tmux.EffectUnknown {
 		t.Fatalf("joined error with uncertain branch must be Unknown, got %s", outcome.Effect)
 	}
 
 	joinedWithCancel := errors.Join(notSentErr, context.Canceled)
 
 	outcomeCancel := classifyMutation(joinedWithCancel)
-	if outcomeCancel.Effect != tmux.Unknown {
+	if outcomeCancel.Effect != tmux.EffectUnknown {
 		t.Fatalf("joined cancellation after dispatch must be Unknown, got %s", outcomeCancel.Effect)
 	}
 }
@@ -716,7 +716,7 @@ func TestCompositePartiallyAppliedMutationPreservesReceipt(t *testing.T) {
 	}
 
 	outcome := classifyMutation(applied)
-	if outcome.Effect != tmux.Unknown {
+	if outcome.Effect != tmux.EffectUnknown {
 		t.Fatalf("partially applied composite mutation must be Unknown, got %s", outcome.Effect)
 	}
 
@@ -796,5 +796,30 @@ func assertResumedAttemptAdoptsAndPreservesPanes(
 
 	if panesAfter := windowPaneCount(t, ctx, linksBefore); panesAfter != panesBefore {
 		t.Fatalf("resumed execution changed pane count: %d -> %d", panesBefore, panesAfter)
+	}
+}
+
+func TestExecutorJournalsUnspecifiedEffectAsUnknown(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+	step := &CreateSessionStep{id: "create-session"}
+	journal := newMemoryJournal()
+	executor := NewExecutor(nil, model.Manifest{}, DefaultExecuteConfig())
+	effect := stepEffect{run: func(context.Context) (string, error) {
+		return "", &tmux.OperationError{Outcome: tmux.Outcome{}}
+	}}
+
+	_, err := executor.dispatch(ctx, step, effect, journal)
+	if !errors.Is(err, ErrExecutionUncertain) {
+		t.Fatalf("dispatch error = %v, want uncertain execution", err)
+	}
+
+	if state := journal.state(step.ID()); state.State != StateUnknown || state.RuntimeID != "" {
+		t.Fatalf("journal state = %+v, want unknown without a runtime identity", state)
+	}
+
+	if err := journal.Intent(ctx, step); !errors.Is(err, errJournalOrder) {
+		t.Fatalf("repeated intent = %v, want refusal after unknown effect", err)
 	}
 }

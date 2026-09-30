@@ -1,6 +1,6 @@
 //go:build linux || darwin
 
-package cmdpicker
+package picker
 
 import (
 	"context"
@@ -315,8 +315,8 @@ func TestPickerServicesAHTStorePathRouting(t *testing.T) {
 			filepath.Join(dirs, "leases1"),
 			filepath.Join(dirs, "history1.json"),
 			"/explicit/aht.json",
-			gotmux.TerminalStreams{},
-			PickerRemoteServices{},
+			gotmux.Streams{},
+			RemoteServices{},
 		)
 		if err != nil {
 			t.Fatalf("newPickerServices failed: %v", err)
@@ -341,8 +341,8 @@ func TestPickerServicesAHTStorePathRouting(t *testing.T) {
 			filepath.Join(dirs, "leases2"),
 			filepath.Join(dirs, "history2.json"),
 			"",
-			gotmux.TerminalStreams{},
-			PickerRemoteServices{},
+			gotmux.Streams{},
+			RemoteServices{},
 		)
 		if err != nil {
 			t.Fatalf("newPickerServices failed: %v", err)
@@ -371,8 +371,8 @@ func TestPickerServicesSnapshotSessionRejectsInvalidEnv(t *testing.T) {
 		filepath.Join(dirs, "leases"),
 		filepath.Join(dirs, "history.json"),
 		"",
-		gotmux.TerminalStreams{},
-		PickerRemoteServices{},
+		gotmux.Streams{},
+		RemoteServices{},
 	)
 	if err != nil {
 		t.Fatalf("newPickerServices failed: %v", err)
@@ -412,8 +412,8 @@ func TestPickerServicesSnapshotSessionRejectsExcessiveEnv(t *testing.T) {
 		filepath.Join(dirs, "leases"),
 		filepath.Join(dirs, "history.json"),
 		"",
-		gotmux.TerminalStreams{},
-		PickerRemoteServices{},
+		gotmux.Streams{},
+		RemoteServices{},
 	)
 	if err != nil {
 		t.Fatalf("newPickerServices failed: %v", err)

@@ -1,4 +1,4 @@
-package cmdagent_test
+package agent_test
 
 import (
 	"encoding/json"

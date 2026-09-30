@@ -335,9 +335,9 @@ func applyAgentSummaryToSession(
 	row.AgentIdleSince = summary.IdleSince
 	row.AgentWaitingSince = summary.WaitingSince
 	row.AgentActivityChangedAt = summary.ActivityChangedAt
-	agents := slices.Clone(summary.Agents)
-	retainAgentPositions(agents, row.Agents)
-	row.Agents = agents
+	agentSessions := slices.Clone(summary.Agents)
+	retainAgentPositions(agentSessions, row.Agents)
+	row.Agents = agentSessions
 	slices.SortStableFunc(row.Agents, compareAgentSessions)
 }
 

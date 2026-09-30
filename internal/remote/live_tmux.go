@@ -46,7 +46,7 @@ func (live *GotmuxLiveServer) Create(ctx context.Context, name, directory string
 		Env:     nil,
 		TmuxEnv: nil,
 		Size:    gotmux.Size{Width: 0, Height: 0},
-		Start:   gotmux.ExistingOnly,
+		Start:   gotmux.StartPolicyExistingOnly,
 		Group:   "",
 	})
 	if err != nil {
@@ -96,10 +96,10 @@ func (live *GotmuxLiveServer) Attach(ctx context.Context, sessionID string, stre
 		return err
 	}
 
-	if err := handle.Attach(ctx, gotmux.TerminalStreams{In: streams.In, Out: streams.Out, Err: streams.Err}, gotmux.AttachOptions{
+	if err := handle.Attach(ctx, gotmux.Streams{In: streams.In, Out: streams.Out, Err: streams.Err}, gotmux.AttachOptions{
 		ReadOnly:            false,
 		PreserveEnvironment: false,
-		Detach:              gotmux.DetachNone,
+		Detach:              gotmux.DetachModeNone,
 		Dir:                 "",
 		Flags:               nil,
 	}); err != nil {

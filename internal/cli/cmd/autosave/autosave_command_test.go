@@ -1,4 +1,4 @@
-package cmdautosave_test
+package autosave_test
 
 import (
 	"os"

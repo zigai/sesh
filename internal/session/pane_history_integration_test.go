@@ -58,12 +58,12 @@ func setupAlphaBetaPanes(t *testing.T, ctx context.Context, server *gotmux.Serve
 	}
 
 	paneHandle := panesA[0].Handle()
-	if _, err := paneHandle.Split(ctx, gotmux.SplitOptions{Direction: gotmux.Vertical}); err != nil {
+	if _, err := paneHandle.Split(ctx, gotmux.SplitOptions{Direction: gotmux.DirectionVertical}); err != nil {
 		t.Fatalf("splitting pane in alpha: %v", err)
 	}
 }
 
-func verifyAlphaBetaSummaries(t *testing.T, summaries []session.SessionHistorySummary) {
+func verifyAlphaBetaSummaries(t *testing.T, summaries []session.HistorySummary) {
 	t.Helper()
 
 	var foundAlpha, foundBeta bool

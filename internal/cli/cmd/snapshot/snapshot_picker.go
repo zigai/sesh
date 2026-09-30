@@ -1,6 +1,6 @@
 //go:build linux || darwin
 
-package cmdsnapshot
+package snapshot
 
 import (
 	"context"
@@ -52,7 +52,7 @@ func validateSnapshotRestorePicker(cmd *cobra.Command) error {
 		}
 	}
 
-	if !cmdpicker.PickerHasTerminal(cmd) {
+	if !cmdpicker.HasTerminal(cmd) {
 		return clibase.NewExitError(clibase.ExitCodeUsage, errSnapshotPickerTerminalRequired)
 	}
 
@@ -183,7 +183,7 @@ func runSnapshotPickerProgram(
 	options := []tea.ProgramOption{
 		tea.WithContext(ctx),
 		tea.WithInput(cmd.InOrStdin()),
-		tea.WithOutput(cmdpicker.PickerProgramOutput(cmd.OutOrStdout())),
+		tea.WithOutput(cmdpicker.ProgramOutput(cmd.OutOrStdout())),
 		tea.WithoutSignalHandler(),
 	}
 	if output, ok := cmd.OutOrStdout().(fileDescriptor); ok {

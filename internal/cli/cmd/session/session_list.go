@@ -1,4 +1,4 @@
-package cmdsession
+package session
 
 import (
 	"context"

@@ -70,7 +70,7 @@ func newStartedDaemon(t *testing.T, ctx context.Context, config gotmux.Config, s
 	if _, err := server.NewSession(ctx, gotmux.NewSessionOptions{
 		Name:    sessionName,
 		Program: gotmux.Exec("sleep", "300"),
-		Start:   gotmux.AllowStart,
+		Start:   gotmux.StartPolicyAllowStart,
 	}); err != nil {
 		t.Fatalf("start disposable tmux daemon: %v", err)
 	}

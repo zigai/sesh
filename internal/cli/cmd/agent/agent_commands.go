@@ -1,4 +1,4 @@
-package cmdagent
+package agent
 
 import (
 	"context"
@@ -107,15 +107,15 @@ func resolveAgentStatePath(cmd *cobra.Command) (string, error) {
 func resolveAgentTarget(cmd *cobra.Command) agents.CurrentTarget {
 	pane, _ := cmd.Flags().GetString("pane")
 	client, _ := cmd.Flags().GetString("client")
-	session, _ := cmd.Flags().GetString("session")
+	sessionTarget, _ := cmd.Flags().GetString("session")
 
 	target := agents.CurrentTarget{PaneID: pane, Client: client, SessionID: "", Session: ""}
 
-	if session != "" {
-		if strings.HasPrefix(session, "$") {
-			target.SessionID = session
+	if sessionTarget != "" {
+		if strings.HasPrefix(sessionTarget, "$") {
+			target.SessionID = sessionTarget
 		} else {
-			target.Session = session
+			target.Session = sessionTarget
 		}
 	}
 

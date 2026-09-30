@@ -221,7 +221,7 @@ func listLive(ctx context.Context, server *gotmux.Server, currentPane, currentSe
 		return nil, nil
 	}
 
-	identity := sessionInfos[0].Handle().Identity()
+	identity := sessionInfos[0].Handle().ServerIdentity()
 
 	currentSession, invokingPane, currentErr := catalogInvokingPane(ctx, server, currentPane, currentSessionID)
 
@@ -320,7 +320,7 @@ func serverAbsent(err error) bool {
 	}
 
 	command, classified := errors.AsType[*gotmux.CommandError](err)
-	if classified && command.Timeout != gotmux.NoTimeout {
+	if classified && command.Timeout != gotmux.TimeoutSourceNone {
 		return false
 	}
 

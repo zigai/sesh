@@ -1,6 +1,6 @@
 //go:build linux
 
-package cmddaemon
+package daemon
 
 import (
 	"context"
@@ -185,7 +185,7 @@ func newDaemonScheduler(
 				reporter.Update(daemon.RuntimePhaseFinalSave)
 			}
 
-			return executeDaemonFinalSave(cmd, env, ctx)
+			return executeDaemonFinalSave(ctx, cmd, env)
 		},
 		Now: time.Now,
 	})
@@ -247,9 +247,9 @@ func runDaemonLifecycle(
 	return nil
 }
 
-func executeDaemonFinalSave(cmd *cobra.Command, env autosaveEnv, ctx context.Context) (automation.AttemptResult, error) {
+func executeDaemonFinalSave(ctx context.Context, cmd *cobra.Command, env autosaveEnv) (automation.AttemptResult, error) {
 	started := time.Now()
-	outcome, status, saveErr := executeFinalSave(cmd, env, ctx)
+	outcome, status, saveErr := executeFinalSave(ctx, cmd, env)
 	status.StartedAtUnix = started.Unix()
 	status.CompletedAtUnix = time.Now().Unix()
 	status.DurationMS = time.Since(started).Milliseconds()
@@ -269,9 +269,9 @@ func executeDaemonFinalSave(cmd *cobra.Command, env autosaveEnv, ctx context.Con
 
 //nolint:cyclop // Inlined final save execution logic retained from autosave
 func executeFinalSave(
+	ctx context.Context,
 	cmd *cobra.Command,
 	env autosaveEnv,
-	ctx context.Context,
 ) (daemonAutosaveOutcome, automation.FinalSaveStatus, error) {
 	var outcome daemonAutosaveOutcome
 
@@ -348,7 +348,7 @@ func executeFinalSave(
 		)
 	}
 
-	selected, err := resolveAutosaveSelection(cmd, ctx, server)
+	selected, err := resolveAutosaveSelection(ctx, cmd, server)
 	if err != nil {
 		status.Result = automation.FinalSaveIncomplete
 		status.Reason = "selection_failed"
@@ -641,7 +641,7 @@ func resolveAgentStatePath(cmd *cobra.Command) string {
 	return abs
 }
 
-func resolveAutosaveSelection(cmd *cobra.Command, ctx context.Context, server *gotmux.Server) ([]gotmux.SessionID, error) {
+func resolveAutosaveSelection(ctx context.Context, cmd *cobra.Command, server *gotmux.Server) ([]gotmux.SessionID, error) {
 	flags, _ := cmd.Flags().GetStringSlice("session")
 
 	selected := make([]gotmux.SessionID, 0, len(flags))

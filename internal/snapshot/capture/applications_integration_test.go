@@ -212,7 +212,7 @@ func applicationCaptureFixture(
 
 	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{
 		Name: name, Dir: workingDir,
-		Program: gotmux.Exec(bashPath, "--noprofile", "--norc"), Start: gotmux.ExistingOnly,
+		Program: gotmux.Exec(bashPath, "--noprofile", "--norc"), Start: gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("create application session: %v", err)
@@ -394,7 +394,7 @@ func TestCapturePreservesDeadPaneAlongsideHealthyPane(t *testing.T) {
 
 	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{
 		Name: "dead-and-healthy", Dir: workingDir,
-		Program: gotmux.Exec(bashPath, "--noprofile", "--norc"), Start: gotmux.ExistingOnly,
+		Program: gotmux.Exec(bashPath, "--noprofile", "--norc"), Start: gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("create session: %v", err)
@@ -527,7 +527,7 @@ func TestCapturePreservesPaneWithDeletedExecutable(t *testing.T) {
 
 	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{
 		Name: "deleted-exe", Dir: workingDir,
-		Program: gotmux.Exec(tempBin, "300"), Start: gotmux.ExistingOnly,
+		Program: gotmux.Exec(tempBin, "300"), Start: gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("create session: %v", err)
@@ -597,7 +597,7 @@ func TestCapturePreservesPaneWithDeletedWorkingDirectory(t *testing.T) {
 
 	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{
 		Name: "deleted-cwd", Dir: workingDir,
-		Program: gotmux.Exec(sleepPath, "300"), Start: gotmux.ExistingOnly,
+		Program: gotmux.Exec(sleepPath, "300"), Start: gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("create session: %v", err)
@@ -662,7 +662,7 @@ func TestCaptureRetriesAndPreservesPaneAcrossProcessReplacement(t *testing.T) {
 
 	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{
 		Name: "process-replacement", Dir: workingDir,
-		Program: gotmux.Exec(sleepPath, "300"), Start: gotmux.ExistingOnly,
+		Program: gotmux.Exec(sleepPath, "300"), Start: gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("create session: %v", err)
@@ -738,7 +738,7 @@ func TestCaptureFailsWhenProcessReplacementNeverSettles(t *testing.T) {
 
 	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{
 		Name: "continuous-churn", Dir: workingDir,
-		Program: gotmux.Exec(sleepPath, "300"), Start: gotmux.ExistingOnly,
+		Program: gotmux.Exec(sleepPath, "300"), Start: gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("create session: %v", err)

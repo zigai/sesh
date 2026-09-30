@@ -1,6 +1,6 @@
 //go:build linux || darwin
 
-package cmdpicker
+package picker
 
 import (
 	"context"
@@ -365,8 +365,8 @@ func TestPickerServiceRejectsReplacementSessionBeforeMutation(t *testing.T) {
 		filepath.Join(dirs, "leases"),
 		filepath.Join(dirs, "history.json"),
 		filepath.Join(dirs, "agents.json"),
-		gotmux.TerminalStreams{},
-		PickerRemoteServices{},
+		gotmux.Streams{},
+		RemoteServices{},
 	)
 	if err != nil {
 		t.Fatalf("new picker services: %v", err)

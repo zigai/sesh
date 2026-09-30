@@ -33,10 +33,10 @@ func attachTestClient(t *testing.T, ctx context.Context, server *gotmux.Server, 
 	done := make(chan error, 1)
 
 	go func() {
-		done <- session.Attach(attachCtx, gotmux.TerminalStreams{In: slave, Out: slave, Err: slave}, gotmux.AttachOptions{
+		done <- session.Attach(attachCtx, gotmux.Streams{In: slave, Out: slave, Err: slave}, gotmux.AttachOptions{
 			ReadOnly:            true,
 			PreserveEnvironment: true,
-			Detach:              gotmux.DetachNone,
+			Detach:              gotmux.DetachModeNone,
 			Dir:                 "",
 			Flags:               nil,
 		})

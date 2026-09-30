@@ -148,9 +148,9 @@ func (m *Model) formattedSessionLine(
 	agent session.AgentSession,
 	hasAgent bool,
 	isLastAgent bool,
-	layout sessionTableLayout,
+	tableLayout sessionTableLayout,
 ) display.Line {
-	template, values := m.sessionRowFormatter(row, agent, hasAgent, isLastAgent, layout)
+	template, values := m.sessionRowFormatter(row, agent, hasAgent, isLastAgent, tableLayout)
 	return template.Render(values)
 }
 
@@ -159,7 +159,7 @@ func (m *Model) sessionRowFormatter(
 	agent session.AgentSession,
 	hasAgent bool,
 	isLastAgent bool,
-	layout sessionTableLayout,
+	tableLayout sessionTableLayout,
 ) (display.Template, sessionFormatValues) {
 	template := m.sessionFormats.seshSession
 	if m.displayMode == displayModeAgents {
@@ -176,17 +176,17 @@ func (m *Model) sessionRowFormatter(
 		hasAgent:     hasAgent,
 		isLastAgent:  isLastAgent,
 		isActivePane: hasAgent && row.ActivePaneID != "" && row.ActivePaneID == agent.PaneID,
-		ageWidth:     layout.agentAgeWidth,
-		contextWidth: layout.rightWidth,
-		now:          layout.now,
+		ageWidth:     tableLayout.agentAgeWidth,
+		contextWidth: tableLayout.rightWidth,
+		now:          tableLayout.now,
 	}
 }
 
-func (m *Model) sessionFormatRightColumnWidth(layout sessionTableLayout) int {
+func (m *Model) sessionFormatRightColumnWidth(tableLayout sessionTableLayout) int {
 	width := 0
 
 	for _, row := range m.filtered {
-		template, values := m.sessionRowFormatter(row, emptyAgentSession(), false, false, layout)
+		template, values := m.sessionRowFormatter(row, emptyAgentSession(), false, false, tableLayout)
 		width = max(width, display.MeasureRight(template, values, lipgloss.Width))
 	}
 

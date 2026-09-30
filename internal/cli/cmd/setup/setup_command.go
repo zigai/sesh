@@ -1,4 +1,4 @@
-package cmdsetup
+package setup
 
 import (
 	"context"
@@ -246,7 +246,7 @@ func registerSetupBindings(
 }
 
 func existingBindingKeys(ctx context.Context, server *gotmux.Server, table string) (map[string]bool, error) {
-	bindings, err := server.BindingsWith(ctx, gotmux.BindingsOptions{
+	bindings, err := server.FindBindings(ctx, gotmux.BindingsOptions{
 		Table:      gotmux.KeyTable(table),
 		Key:        "",
 		FirstMatch: false,

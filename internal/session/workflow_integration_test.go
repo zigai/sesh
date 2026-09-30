@@ -69,7 +69,7 @@ func (f *workflowFixture) workflow(getenv func(string) string, repo *store.Repos
 		Hooks:       hooks,
 		HookRunner:  nil,
 		Getenv:      getenv,
-		Streams:     gotmux.TerminalStreams{},
+		Streams:     gotmux.Streams{},
 		Source:      "test",
 	})
 }
@@ -110,7 +110,7 @@ func (f *workflowFixture) newLiveSession(t *testing.T, name string) gotmux.Sessi
 	sess, err := f.server.NewSession(t.Context(), gotmux.NewSessionOptions{
 		Name:    name,
 		Program: gotmux.Exec("/bin/sh"),
-		Start:   gotmux.ExistingOnly,
+		Start:   gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("creating session %s: %v", name, err)
@@ -168,10 +168,10 @@ func (f *workflowFixture) attachClient(t *testing.T, sessionID gotmux.SessionID)
 	done := make(chan error, 1)
 
 	go func() {
-		done <- handle.Attach(attachCtx, gotmux.TerminalStreams{In: slave, Out: slave, Err: slave}, gotmux.AttachOptions{
+		done <- handle.Attach(attachCtx, gotmux.Streams{In: slave, Out: slave, Err: slave}, gotmux.AttachOptions{
 			ReadOnly:            false,
 			PreserveEnvironment: true,
-			Detach:              gotmux.DetachNone,
+			Detach:              gotmux.DetachModeNone,
 			Dir:                 "",
 			Flags:               nil,
 		})
@@ -563,7 +563,7 @@ func TestWorkflow_EnterExistingSessionOutsideTmuxAttaches(t *testing.T) {
 		Hooks:       config.HookConfig{},
 		HookRunner:  nil,
 		Getenv:      func(string) string { return "" },
-		Streams:     gotmux.TerminalStreams{In: slave, Out: slave, Err: slave},
+		Streams:     gotmux.Streams{In: slave, Out: slave, Err: slave},
 		Source:      "test",
 	})
 
@@ -926,7 +926,7 @@ func TestWorkflow_AttachRequiresTerminalStreams(t *testing.T) {
 		Hooks:       config.HookConfig{},
 		HookRunner:  nil,
 		Getenv:      func(string) string { return "" },
-		Streams:     gotmux.TerminalStreams{In: reader, Out: writer, Err: writer},
+		Streams:     gotmux.Streams{In: reader, Out: writer, Err: writer},
 		Source:      "test",
 	})
 
@@ -957,7 +957,7 @@ func TestWorkflow_AttachPreHookFailurePreventsAttach(t *testing.T) {
 		Hooks:       hooks,
 		HookRunner:  nil,
 		Getenv:      func(string) string { return "" },
-		Streams:     gotmux.TerminalStreams{In: slave, Out: slave, Err: slave},
+		Streams:     gotmux.Streams{In: slave, Out: slave, Err: slave},
 		Source:      "test",
 	})
 
@@ -995,7 +995,7 @@ func TestWorkflow_AttachPostHookRunsAfterClientStart(t *testing.T) {
 		Hooks:       hooks,
 		HookRunner:  nil,
 		Getenv:      func(string) string { return "" },
-		Streams:     gotmux.TerminalStreams{In: slave, Out: slave, Err: slave},
+		Streams:     gotmux.Streams{In: slave, Out: slave, Err: slave},
 		Source:      "test",
 	})
 
@@ -1499,7 +1499,7 @@ func TestWorkflow_RenamePropagatesHistoryFailure(t *testing.T) {
 		Hooks:       config.HookConfig{},
 		HookRunner:  nil,
 		Getenv:      nil,
-		Streams:     gotmux.TerminalStreams{},
+		Streams:     gotmux.Streams{},
 		Source:      "test",
 	})
 
@@ -1692,7 +1692,7 @@ func TestWorkflow_DeleteEndpointLeaseExcludesConcurrentOperation(t *testing.T) {
 		Hooks:       config.HookConfig{},
 		HookRunner:  nil,
 		Getenv:      nil,
-		Streams:     gotmux.TerminalStreams{In: nil, Out: nil, Err: nil},
+		Streams:     gotmux.Streams{In: nil, Out: nil, Err: nil},
 		Source:      "test",
 	})
 
@@ -1784,7 +1784,7 @@ func TestWorkflow_DeleteRevalidatesAttachedClientBeforeLiveKill(t *testing.T) {
 		Hooks:       config.HookConfig{},
 		HookRunner:  nil,
 		Getenv:      nil,
-		Streams:     gotmux.TerminalStreams{In: nil, Out: nil, Err: nil},
+		Streams:     gotmux.Streams{In: nil, Out: nil, Err: nil},
 		Source:      "test",
 	})
 
@@ -1820,7 +1820,7 @@ func TestWorkflow_DeleteCancellationBeforeLeasePreservesLiveAndSavedState(t *tes
 		Hooks:       config.HookConfig{},
 		HookRunner:  nil,
 		Getenv:      nil,
-		Streams:     gotmux.TerminalStreams{In: nil, Out: nil, Err: nil},
+		Streams:     gotmux.Streams{In: nil, Out: nil, Err: nil},
 		Source:      "test",
 	})
 

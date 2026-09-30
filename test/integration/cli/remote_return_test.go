@@ -152,7 +152,7 @@ func TestRemoteReturnTerminalHelper(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := handle.Attach(t.Context(), gotmux.TerminalStreams{In: os.Stdin, Out: os.Stdout, Err: os.Stderr}, gotmux.AttachOptions{}); err != nil {
+	if err := handle.Attach(t.Context(), gotmux.Streams{In: os.Stdin, Out: os.Stdout, Err: os.Stderr}, gotmux.AttachOptions{}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -184,7 +184,7 @@ func publishRemoteReturnCatalog(t *testing.T, fixture remoteSSHFixture, peer *go
 		Snapshot: remote.Snapshot{Sessions: rows, Health: remote.UnavailableHealth()},
 	}
 
-	cachePath, err := remote.RemoteDir(fixture.cacheHome)
+	cachePath, err := remote.Dir(fixture.cacheHome)
 	if err != nil {
 		t.Fatal(err)
 	}

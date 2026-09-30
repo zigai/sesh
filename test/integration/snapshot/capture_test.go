@@ -18,7 +18,7 @@ import (
 func TestCaptureNativeObservation(t *testing.T) {
 	server := tmuxtest.NewServer(t)
 
-	session, err := server.NewSession(t.Context(), tmux.NewSessionOptions{Name: "observed", Program: tmux.Exec("/bin/sh", "-c", "printf 'OBSERVATION_READY'; exec sleep 300"), Size: tmux.Size{Width: 100, Height: 35}, Start: tmux.ExistingOnly})
+	session, err := server.NewSession(t.Context(), tmux.NewSessionOptions{Name: "observed", Program: tmux.Exec("/bin/sh", "-c", "printf 'OBSERVATION_READY'; exec sleep 300"), Size: tmux.Size{Width: 100, Height: 35}, Start: tmux.StartPolicyExistingOnly})
 	if err != nil {
 		t.Fatal(err)
 	}

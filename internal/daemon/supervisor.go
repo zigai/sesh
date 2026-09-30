@@ -113,7 +113,7 @@ func NewTmuxSupervisor(binary, socket, configFile string, stopGrace time.Duratio
 		UTF8:             gotmux.UTF8Default,
 		Colors256:        false,
 		TerminalFeatures: nil,
-		LogLevel:         gotmux.LogNone,
+		LogLevel:         gotmux.LogLevelNone,
 		LoginShell:       false,
 	})
 	if err != nil {

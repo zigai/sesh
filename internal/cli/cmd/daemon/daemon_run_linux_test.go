@@ -1,6 +1,6 @@
 //go:build linux
 
-package cmddaemon
+package daemon
 
 import (
 	"context"

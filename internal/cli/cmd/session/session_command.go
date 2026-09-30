@@ -1,4 +1,4 @@
-package cmdsession
+package session
 
 import (
 	"github.com/spf13/cobra"

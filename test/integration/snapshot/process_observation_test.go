@@ -58,7 +58,7 @@ func TestProcessObservationExactLaunchFacts(t *testing.T) {
 		Program: tmux.Exec(helper, testArgs...),
 		TmuxEnv: sessionEnv,
 		Size:    tmux.Size{Width: 100, Height: 30},
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -238,7 +238,7 @@ func TestProcessObservationPreservesPaneWithDeletedExecutable(t *testing.T) {
 		Dir:     tempDir,
 		Program: tmux.Exec(disposableHelper, testArgs...),
 		Size:    tmux.Size{Width: 100, Height: 30},
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -280,7 +280,7 @@ func TestProcessObservationPreservesPaneWithDeletedDirectory(t *testing.T) {
 		Dir:     disposableDir,
 		Program: tmux.Exec(helper, testArgs...),
 		Size:    tmux.Size{Width: 100, Height: 30},
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -316,7 +316,7 @@ func TestProcessObservationPreservesExitedAndUnaffectedPanes(t *testing.T) {
 		Dir:     dir,
 		Program: tmux.Exec("sleep", "300"),
 		Size:    tmux.Size{Width: 100, Height: 30},
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -469,7 +469,7 @@ func TestProcessObservationMultiplePanesInClosure(t *testing.T) {
 		Program: tmux.Exec(helper, "-report", report1, "-hold", "300s", "pane1_arg"),
 		TmuxEnv: map[string]string{"PANE_TAG": "one"},
 		Size:    tmux.Size{Width: 120, Height: 40},
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -486,7 +486,7 @@ func TestProcessObservationMultiplePanesInClosure(t *testing.T) {
 	}
 
 	_, err = firstPane.Split(t.Context(), tmux.SplitOptions{
-		Direction: tmux.Vertical,
+		Direction: tmux.DirectionVertical,
 		Program:   tmux.Exec(helper, "-report", report2, "-hold", "300s", "pane2_arg"),
 		TmuxEnv:   map[string]string{"PANE_TAG": "two"},
 	})
@@ -530,7 +530,7 @@ func TestProcessObservationSaveLoggingPrivacyAndIsolation(t *testing.T) {
 		Dir:     dir,
 		Program: tmux.Exec(helper, "-report", reportPath, "-hold", "300s", "CUSTOM_ARG_VALUE_9988"),
 		TmuxEnv: map[string]string{"CUSTOM_ENV_KEY": "CUSTOM_ENV_VALUE_7766"},
-		Start:   tmux.ExistingOnly,
+		Start:   tmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -350,7 +350,7 @@ func setupHistoryTotalsFixture(t *testing.T, ctx context.Context, server *gotmux
 		t.Fatalf("getting panes: %v", err)
 	}
 
-	if _, err := panesA[0].Handle().Split(ctx, gotmux.SplitOptions{Direction: gotmux.Vertical}); err != nil {
+	if _, err := panesA[0].Handle().Split(ctx, gotmux.SplitOptions{Direction: gotmux.DirectionVertical}); err != nil {
 		t.Fatalf("splitting pane: %v", err)
 	}
 }
@@ -442,7 +442,7 @@ func TestCLIIntegrationHistoryPanesDetail(t *testing.T) {
 		t.Fatalf("getting panes: %v", err)
 	}
 
-	if _, err := panes[0].Handle().Split(ctx, gotmux.SplitOptions{Direction: gotmux.Vertical}); err != nil {
+	if _, err := panes[0].Handle().Split(ctx, gotmux.SplitOptions{Direction: gotmux.DirectionVertical}); err != nil {
 		t.Fatalf("splitting pane: %v", err)
 	}
 
@@ -777,7 +777,7 @@ func (f *cliSessionFixture) assertNoDefaultLeaseRoot(t *testing.T) {
 	}
 }
 
-func (f *cliSessionFixture) setAmbientTmux(t *testing.T, session gotmux.SessionInfo) {
+func (f *cliSessionFixture) setAmbientTmux(t *testing.T, liveSession gotmux.SessionInfo) {
 	t.Helper()
 
 	probe, err := f.server.Probe(t.Context())
@@ -785,12 +785,12 @@ func (f *cliSessionFixture) setAmbientTmux(t *testing.T, session gotmux.SessionI
 		t.Fatal(err)
 	}
 
-	panes, err := session.Handle().Panes(t.Context())
+	panes, err := liveSession.Handle().Panes(t.Context())
 	if err != nil || len(panes) == 0 {
 		t.Fatalf("session panes: %v", err)
 	}
 
-	t.Setenv("TMUX", f.socket+","+strconv.Itoa(probe.Identity.PID)+","+strings.TrimPrefix(string(session.ID), "$"))
+	t.Setenv("TMUX", f.socket+","+strconv.Itoa(probe.Identity.PID)+","+strings.TrimPrefix(string(liveSession.ID), "$"))
 	t.Setenv("TMUX_PANE", string(panes[0].ID))
 }
 
@@ -809,9 +809,9 @@ func (f *cliSessionFixture) fixtureSession(t *testing.T) gotmux.SessionInfo {
 		t.Fatal(err)
 	}
 
-	for _, session := range sessions {
-		if session.Name == "fixture" {
-			return session
+	for _, liveSession := range sessions {
+		if liveSession.Name == "fixture" {
+			return liveSession
 		}
 	}
 
@@ -823,16 +823,16 @@ func (f *cliSessionFixture) fixtureSession(t *testing.T) gotmux.SessionInfo {
 func (f *cliSessionFixture) newLiveSession(t *testing.T, name string) gotmux.SessionInfo {
 	t.Helper()
 
-	session, err := f.server.NewSession(t.Context(), gotmux.NewSessionOptions{
+	liveSession, err := f.server.NewSession(t.Context(), gotmux.NewSessionOptions{
 		Name:    name,
 		Program: gotmux.Exec("/bin/sh"),
-		Start:   gotmux.ExistingOnly,
+		Start:   gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	info, err := session.Info(t.Context())
+	info, err := liveSession.Info(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -942,10 +942,10 @@ func (f *cliSessionFixture) attachCLIClient(tb testing.TB, id gotmux.SessionID) 
 	done := make(chan error, 1)
 
 	go func() {
-		done <- handle.Attach(attachCtx, gotmux.TerminalStreams{In: slave, Out: slave, Err: slave}, gotmux.AttachOptions{
+		done <- handle.Attach(attachCtx, gotmux.Streams{In: slave, Out: slave, Err: slave}, gotmux.AttachOptions{
 			ReadOnly:            false,
 			PreserveEnvironment: true,
-			Detach:              gotmux.DetachNone,
+			Detach:              gotmux.DetachModeNone,
 			Dir:                 "",
 			Flags:               nil,
 		})
@@ -1019,8 +1019,8 @@ func (f *cliSessionFixture) clientDisplayedSession(t *testing.T, name string) go
 func TestCLIIntegrationSessionSwitchWithoutClientFailsClosed(t *testing.T) {
 	fixture := newCLISessionFixture(t)
 
-	session := fixture.fixtureSession(t)
-	fixture.setAmbientTmux(t, session)
+	liveSession := fixture.fixtureSession(t)
+	fixture.setAmbientTmux(t, liveSession)
 
 	target := fixture.newLiveSession(t, "switch-target")
 
@@ -1203,10 +1203,10 @@ func TestCLIIntegrationSessionNewInteractiveOutsideTmuxFailsBeforeCreate(t *test
 func TestCLIIntegrationSessionDeleteRemovesLiveAndSavedState(t *testing.T) {
 	fixture := newCLISessionFixture(t)
 
-	session := fixture.fixtureSession(t)
+	liveSession := fixture.fixtureSession(t)
 
 	fixture.newLiveSession(t, "keep-alive")
-	fixture.saveLiveSession(t, session.ID)
+	fixture.saveLiveSession(t, liveSession.ID)
 
 	if names := fixture.savedGenerationNames(t); !containsString(names, "fixture") {
 		t.Fatalf("fixture session was not saved: %v", names)
@@ -1234,9 +1234,9 @@ func TestCLIIntegrationSessionDeleteRemovesLiveAndSavedState(t *testing.T) {
 func TestCLIIntegrationSessionDeleteRetainsRecoveryBarrier(t *testing.T) {
 	fixture := newCLISessionFixture(t)
 
-	session := fixture.fixtureSession(t)
+	liveSession := fixture.fixtureSession(t)
 	fixture.newLiveSession(t, "keep-alive")
-	fixture.saveLiveSession(t, session.ID)
+	fixture.saveLiveSession(t, liveSession.ID)
 	fixture.beginPendingSave(t)
 
 	exec := executeJSON(t, append([]string{sessionCmd, "delete", "fixture", testRepositoryFlag, fixture.repository}, append(fixture.deleteArgs(), testJSONFlag)...)...)
@@ -1269,11 +1269,11 @@ func TestCLIIntegrationSessionDeleteRetainsRecoveryBarrier(t *testing.T) {
 func TestCLIIntegrationSessionDeleteRequiresForceForAttachedSession(t *testing.T) {
 	fixture := newCLISessionFixture(t)
 
-	session := fixture.fixtureSession(t)
+	liveSession := fixture.fixtureSession(t)
 	fixture.newLiveSession(t, "keep-alive")
-	fixture.saveLiveSession(t, session.ID)
+	fixture.saveLiveSession(t, liveSession.ID)
 
-	fixture.attachCLIClient(t, session.ID)
+	fixture.attachCLIClient(t, liveSession.ID)
 
 	refused := executeJSON(t, append([]string{sessionCmd, "delete", "fixture", testRepositoryFlag, fixture.repository}, append(fixture.deleteArgs(), testJSONFlag)...)...)
 	if refused.err == nil {
@@ -1331,7 +1331,7 @@ func TestCLIIntegrationSessionDeleteRemovesFromDefaultXDGRepository(t *testing.T
 
 	defaultRepoPath := filepath.Join(xdgDir, "sesh", "snapshots")
 
-	session := fixture.fixtureSession(t)
+	liveSession := fixture.fixtureSession(t)
 	fixture.newLiveSession(t, "keep-alive")
 
 	saveExec := executeJSON(
@@ -1340,7 +1340,7 @@ func TestCLIIntegrationSessionDeleteRemovesFromDefaultXDGRepository(t *testing.T
 		testRepositoryFlag, defaultRepoPath,
 		testSocketFlag, fixture.socket,
 		testLeaseRootFlag, fixture.leaseRoot,
-		testSessionFlag, string(session.ID),
+		testSessionFlag, string(liveSession.ID),
 		testNoConfigFlag,
 		testJSONFlag,
 	)

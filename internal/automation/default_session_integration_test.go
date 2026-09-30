@@ -24,7 +24,7 @@ func newNumberedSession(t *testing.T, server *gotmux.Server, name string) gotmux
 		Env:     nil,
 		TmuxEnv: nil,
 		Size:    gotmux.Size{Width: 100, Height: 30},
-		Start:   gotmux.ExistingOnly,
+		Start:   gotmux.StartPolicyExistingOnly,
 		Group:   "",
 	})
 	if err != nil {
@@ -45,7 +45,7 @@ func newBootstrapSession(t *testing.T, server *gotmux.Server, name string) (gotm
 		Env:     nil,
 		TmuxEnv: nil,
 		Size:    gotmux.Size{Width: 100, Height: 30},
-		Start:   gotmux.ExistingOnly,
+		Start:   gotmux.StartPolicyExistingOnly,
 		Group:   "",
 	})
 	if err != nil {

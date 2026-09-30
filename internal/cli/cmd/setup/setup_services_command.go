@@ -1,4 +1,4 @@
-package cmdsetup
+package setup
 
 import (
 	"context"
@@ -138,7 +138,7 @@ func runSetupAgents(cmd *cobra.Command, args []string) error {
 	if statusOnly {
 		result, err = setup.AgentStatus(ctx, request)
 	} else {
-		result, err = setup.SetupAgents(ctx, request)
+		result, err = setup.Agents(ctx, request)
 	}
 
 	if err != nil {

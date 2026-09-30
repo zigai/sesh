@@ -57,7 +57,7 @@ type AgentResult struct {
 	TrackerOp string
 }
 
-func SetupAgents(ctx context.Context, request AgentRequest) (AgentResult, error) {
+func Agents(ctx context.Context, request AgentRequest) (AgentResult, error) {
 	harnesses, err := resolveHarnesses(request.Agents)
 	if err != nil {
 		return AgentResult{}, oops.In("setup").Code("setup_agent_failed").With("operation", "setup_agents").Wrap(err)

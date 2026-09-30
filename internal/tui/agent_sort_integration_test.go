@@ -21,12 +21,12 @@ func TestAgentPositionRefreshTracksLivePaneSwapsAndMoves(t *testing.T) {
 	source := newPositionSession(t, server, "sort")
 	left := positionSessionPane(t, source)
 
-	right, err := left.Split(t.Context(), gotmux.SplitOptions{Direction: gotmux.Horizontal})
+	right, err := left.Split(t.Context(), gotmux.SplitOptions{Direction: gotmux.DirectionHorizontal})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	bottom, err := left.Split(t.Context(), gotmux.SplitOptions{Direction: gotmux.Vertical})
+	bottom, err := left.Split(t.Context(), gotmux.SplitOptions{Direction: gotmux.DirectionVertical})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func TestAgentPositionRefreshTracksLivePaneSwapsAndMoves(t *testing.T) {
 		t.Fatalf("selected agent = %q, want %q", selected.agentID, left.ID())
 	}
 
-	if err := left.Swap(t.Context(), right, false); err != nil {
+	if err := left.Swap(t.Context(), right, gotmux.SwapPaneOptions{Select: false}); err != nil {
 		t.Fatal(err)
 	}
 
