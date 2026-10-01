@@ -115,6 +115,25 @@ func redirectPanesToMissingDirectory(t *testing.T, manifest *model.Manifest, ses
 	}
 }
 
+// observeSessionAtMissingDirectory commits a generation whose panes point at a directory that
+// does not exist, so a restore registers its operation and then fails after admission.
+func observeSessionAtMissingDirectory(t *testing.T, ctx context.Context, source *gotmux.Server, repoDir string, session gotmux.Session) string {
+	t.Helper()
+
+	observation, err := capture.Observe(ctx, source, []gotmux.SessionID{session.ID()})
+	if err != nil {
+		t.Fatalf("capture.Observe failed: %v", err)
+	}
+
+	redirectPanesToMissingDirectory(t, &observation.Manifest, observation.Manifest.Sessions[0].ID, filepath.Join(t.TempDir(), "missing"))
+
+	if err := observation.Manifest.Validate(); err != nil {
+		t.Fatalf("manifest validation failed: %v", err)
+	}
+
+	return commitCapture(t, ctx, repoDir, observation)
+}
+
 func openFixture(t *testing.T, ctx context.Context, repoDir string) *store.Repository {
 	t.Helper()
 
@@ -374,14 +393,11 @@ func TestEngineRestoreRefusesDispatchedButUnconfirmedEffect(t *testing.T) {
 
 	disableSourceWindowRename(t, ctx, live)
 
-	generation := observeSession(t, ctx, server, repoDir, live)
+	generation := observeSessionAtMissingDirectory(t, ctx, server, repoDir, live)
 
-	blocker, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "collision-source", Start: gotmux.StartPolicyExistingOnly})
-	if err == nil {
-		t.Fatal("expected a duplicate session name to be refused by tmux")
+	if err := live.Kill(ctx); err != nil {
+		t.Fatalf("Kill failed: %v", err)
 	}
-
-	_ = blocker
 
 	repo := openFixture(t, ctx, repoDir)
 
@@ -393,8 +409,8 @@ func TestEngineRestoreRefusesDispatchedButUnconfirmedEffect(t *testing.T) {
 		LaunchProcesses:        false,
 		AllowMissingWorkingDir: false,
 	})
-	if !errors.Is(err, restore.ErrSessionCollision) {
-		t.Fatalf("expected ErrSessionCollision, got %v", err)
+	if !errors.Is(err, restore.ErrWorkingDirNotFound) {
+		t.Fatalf("expected ErrWorkingDirNotFound, got %v", err)
 	}
 
 	if result.OperationID == "" {
@@ -407,10 +423,6 @@ func TestEngineRestoreRefusesDispatchedButUnconfirmedEffect(t *testing.T) {
 
 	if err := repo.Transition(ctx, result.OperationID, restore.ActionID(firstStep.ID()), "planned", "issued", nil); err != nil {
 		t.Fatalf("Transition failed: %v", err)
-	}
-
-	if err := live.Kill(ctx); err != nil {
-		t.Fatalf("Kill failed: %v", err)
 	}
 
 	_, err = engine.Restore(ctx, repo, server, engine.RestoreConfig{
@@ -461,14 +473,15 @@ func TestEngineRestoreRefusesRestartedDaemonTarget(t *testing.T) {
 	repoDir := filepath.Join(t.TempDir(), "repo")
 	leaseRoot := filepath.Join(t.TempDir(), "leases")
 
-	generation := observeSession(t, ctx, first, repoDir, source)
+	generation := observeSessionAtMissingDirectory(t, ctx, first, repoDir, source)
 
-	blocker, err := first.NewSession(ctx, gotmux.NewSessionOptions{Name: "restart-source", Start: gotmux.StartPolicyAllowStart})
-	if err == nil {
-		t.Fatal("expected a duplicate session name to be refused by tmux")
+	if _, err := first.NewSession(ctx, gotmux.NewSessionOptions{Name: "restart-keepalive", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly}); err != nil {
+		t.Fatalf("keepalive session failed: %v", err)
 	}
 
-	_ = blocker
+	if err := source.Kill(ctx); err != nil {
+		t.Fatalf("Kill failed: %v", err)
+	}
 
 	repo := openFixture(t, ctx, repoDir)
 
@@ -480,8 +493,8 @@ func TestEngineRestoreRefusesRestartedDaemonTarget(t *testing.T) {
 		LaunchProcesses:        false,
 		AllowMissingWorkingDir: false,
 	})
-	if !errors.Is(err, restore.ErrSessionCollision) {
-		t.Fatalf("expected ErrSessionCollision, got %v", err)
+	if !errors.Is(err, restore.ErrWorkingDirNotFound) {
+		t.Fatalf("expected ErrWorkingDirNotFound, got %v", err)
 	}
 
 	if result.OperationID == "" {
@@ -993,8 +1006,12 @@ func TestEngineRestoreRefusesConfigMismatchOnSameOperationID(t *testing.T) {
 
 	disableSourceWindowRename(t, ctx, live)
 
-	generation := observeSession(t, ctx, server, repoDir, live)
+	generation := observeSessionAtMissingDirectory(t, ctx, server, repoDir, live)
 	repo := openFixture(t, ctx, repoDir)
+
+	if err := live.Kill(ctx); err != nil {
+		t.Fatalf("Kill failed: %v", err)
+	}
 
 	cfgOriginal := engine.RestoreConfig{
 		LeaseRoot:              leaseRoot,
@@ -1006,8 +1023,8 @@ func TestEngineRestoreRefusesConfigMismatchOnSameOperationID(t *testing.T) {
 	}
 
 	result, err := engine.Restore(ctx, repo, server, cfgOriginal)
-	if !errors.Is(err, restore.ErrSessionCollision) {
-		t.Fatalf("expected ErrSessionCollision, got %v", err)
+	if !errors.Is(err, restore.ErrWorkingDirNotFound) {
+		t.Fatalf("expected ErrWorkingDirNotFound, got %v", err)
 	}
 
 	if result.OperationID == "" {

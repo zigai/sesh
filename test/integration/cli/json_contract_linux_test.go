@@ -5,8 +5,11 @@ package cli_test
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
+
+	gotmux "github.com/zigai/gotmux/tmux"
 
 	integration "github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/snapshot/restore"
@@ -117,7 +120,13 @@ func TestJSONRemoteActionAndLookupSuccessContracts(t *testing.T) {
 func TestJSONSnapshotActionsAndAbandonSuccessContracts(t *testing.T) {
 	home := isolateJSONContractHome(t)
 	server := newCaptureCLIServer(t)
-	source := newAutosaveSession(t, server)
+	sourceDir := filepath.Join(home, "source-directory")
+
+	if err := os.Mkdir(sourceDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	source := newAutosaveSessionAt(t, server, sourceDir)
 	socket := server.Endpoint().SocketPath
 	repository := filepath.Join(home, "repository")
 	lease := filepath.Join(home, "leases")
@@ -129,11 +138,21 @@ func TestJSONSnapshotActionsAndAbandonSuccessContracts(t *testing.T) {
 		t.Fatal("action save omitted durable identities")
 	}
 
+	// A restore that fails after admission leaves a pending operation to inspect and abandon.
+	// A refused collision leaves none: it is refused before any intent is registered.
+	if err := source.Kill(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.RemoveAll(sourceDir); err != nil {
+		t.Fatal(err)
+	}
+
 	operation := store.NewOperationID()
 
 	failed := executeJSON(t, actionCmd, "snapshot-restore", testSocketFlag, socket, testRepositoryFlag, repository, testLeaseRootFlag, lease, testGenerationFlag, generation, "--operation", operation, "--no-processes", testNoConfigFlag, testJSONFlag)
-	if !errors.Is(failed.err, restore.ErrSessionCollision) {
-		t.Fatalf("expected source-name collision before abandonment: %v", failed.err)
+	if !errors.Is(failed.err, restore.ErrWorkingDirNotFound) {
+		t.Fatalf("expected a missing working directory failure after admission: %v", failed.err)
 	}
 
 	pending := runJSONContract(t, "snapshot.recover.restore.show", snapshotCmd, "recover", "restore", "show", operation, testRepositoryFlag, repository)
@@ -143,15 +162,12 @@ func TestJSONSnapshotActionsAndAbandonSuccessContracts(t *testing.T) {
 	_ = contractJSONValue[string](t, abandoned, "target")
 
 	_ = contractJSONValue[[]any](t, abandoned, "actions")
-	if live, err := server.FindSession(t.Context(), "autosave-alpha"); err != nil || live.ID() != source.ID() {
-		t.Fatalf("abandonment changed the colliding live session: %v", err)
+
+	if _, err := server.FindSession(t.Context(), "autosave-alpha"); !errors.Is(err, gotmux.ErrNotFound) {
+		t.Fatalf("a failed restore and its abandonment must not leave a session behind: %v", err)
 	}
 
-	if err := source.Kill(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-
-	restored := runJSONContract(t, "action.snapshot-restore", actionCmd, "snapshot-restore", testSocketFlag, socket, testRepositoryFlag, repository, testLeaseRootFlag, lease, testGenerationFlag, generation, "--no-processes")
+	restored := runJSONContract(t, "action.snapshot-restore", actionCmd, "snapshot-restore", testSocketFlag, socket, testRepositoryFlag, repository, testLeaseRootFlag, lease, testGenerationFlag, generation, "--no-processes", "--allow-missing-dir")
 	assertJSONContractFields(t, restored, map[string]any{"generation": generation, contractStatusField: "best_effort", "verified": true, "uncertain": false})
 
 	if contractJSONValue[string](t, restored, "operationId") == "" {

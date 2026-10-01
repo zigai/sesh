@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/zigai/sesh/internal/cli"
@@ -140,4 +141,29 @@ func captureRemovedSession(t *testing.T, name string) (string, string, string) {
 	}
 
 	return repoPath, leasePath, generation
+}
+
+func TestApplicationRestoreTablePrintsSkippedSessionsOnStdoutWhenItExitsNonZero(t *testing.T) {
+	home := isolateJSONContractHome(t)
+	server := newCaptureCLIServer(t)
+
+	kept := newAutosaveSession(t, server)
+	socket := server.Endpoint().SocketPath
+	repository := filepath.Join(home, "repository")
+	lease := filepath.Join(home, "leases")
+
+	saved := runJSONContract(t, "action.snapshot-save", actionCmd, "snapshot-save", testSocketFlag, socket, testRepositoryFlag, repository, testLeaseRootFlag, lease, testSessionFlag, string(kept.ID()))
+	generation := contractJSONValue[string](t, saved, "generation")
+
+	// The saved session is still live, so restoring everything must skip it by name.
+	stdout, stderr, err := executeCommand(t, actionCmd, "snapshot-restore", testSocketFlag, socket, testRepositoryFlag, repository, testLeaseRootFlag, lease, testGenerationFlag, generation, "--no-processes", testNoConfigFlag)
+	if err == nil {
+		t.Fatalf("a restore that created nothing must exit non-zero, stdout=%q", stdout)
+	}
+
+	for _, want := range []string{"Skipped Sessions:", `"autosave-alpha" reason=name_in_use`} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("the result table must reach stdout even when the command fails; missing %q in stdout=%q stderr=%q", want, stdout, stderr)
+		}
+	}
 }

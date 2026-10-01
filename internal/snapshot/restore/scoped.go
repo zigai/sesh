@@ -101,6 +101,7 @@ func ObserveScopedStateConflicts(ctx context.Context, server *tmux.Server, plan 
 		Panes:         0,
 		Links:         0,
 		Mismatches:    nil,
+		Advisories:    nil,
 		VerifiedSteps: nil,
 		RuntimePanes:  nil,
 	}

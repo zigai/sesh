@@ -38,6 +38,7 @@ var restoreFailureClasses = []struct {
 	{"operation_uncertain", "prior_effect_conflicted", []error{restore.ErrPriorConflict}},
 	{"restore_failed", "journal_unavailable", []error{restore.ErrJournalRequired, restore.ErrJournalIncomplete}},
 	{"restore_conflict", "daemon_identity_changed", []error{integration.ErrDaemonIdentityChanged}},
+	{"restore_no_server", "no_server", []error{ErrNoServerRunning, gotmux.ErrNoServer}},
 	{"restore_failed", "daemon_identity_unavailable", []error{integration.ErrDaemonIdentityUnavailable}},
 	{"operation_canceled", "canceled", []error{context.Canceled}},
 	{"operation_timed_out", "timeout", []error{context.DeadlineExceeded}},
@@ -73,19 +74,22 @@ type RestoreConfig struct {
 	OperationID            string
 	LaunchProcesses        bool
 	AllowMissingWorkingDir bool
+	OnCollision            CollisionPolicy
 	Profile                RecoveryProfile
 }
 
 type RestoreResult struct {
-	OperationID         string                       `json:"operationId"`
-	Generation          string                       `json:"generation"`
-	Status              string                       `json:"status"`
-	Reason              string                       `json:"reason"`
-	SessionsRestored    []string                     `json:"sessionsRestored"`
-	Verified            bool                         `json:"verified"`
-	Uncertain           bool                         `json:"uncertain"`
-	MissingRequirements []restore.MissingRequirement `json:"missingRequirements"`
-	Panes               []restore.PaneResult         `json:"panes,omitempty"`
+	OperationID         string                         `json:"operationId"`
+	Generation          string                         `json:"generation"`
+	Status              string                         `json:"status"`
+	Reason              string                         `json:"reason"`
+	SessionsRestored    []string                       `json:"sessionsRestored"`
+	Verified            bool                           `json:"verified"`
+	Uncertain           bool                           `json:"uncertain"`
+	MissingRequirements []restore.MissingRequirement   `json:"missingRequirements"`
+	Panes               []restore.PaneResult           `json:"panes,omitempty"`
+	SessionsSkipped     []SkippedSession               `json:"sessionsSkipped"`
+	Advisories          []restore.VerificationMismatch `json:"advisories"`
 }
 
 type ActionStatus struct {
@@ -112,7 +116,7 @@ func (i restoreDaemonIdentity) Equal(other restoreDaemonIdentity) bool {
 func (e *verificationError) Error() string {
 	codes := make([]string, 0, len(e.report.Mismatches))
 	for _, mismatch := range e.report.Mismatches {
-		codes = append(codes, mismatch.Domain+"/"+mismatch.Reason)
+		codes = append(codes, mismatch.Domain+"/"+mismatch.Entity+"/"+mismatch.Reason)
 	}
 
 	return fmt.Sprintf("independent verification failed with %d mismatches: %s", len(codes), strings.Join(codes, ", "))
@@ -129,6 +133,8 @@ func Restore(ctx context.Context, repository *store.Repository, server *gotmux.S
 		Uncertain:           false,
 		MissingRequirements: nil,
 		Panes:               nil,
+		SessionsSkipped:     nil,
+		Advisories:          nil,
 	}
 
 	if cfg.LeaseRoot == "" {
@@ -148,6 +154,12 @@ func Restore(ctx context.Context, repository *store.Repository, server *gotmux.S
 		Str("operation", "restore").
 		Str("status", "started").
 		Msg("snapshot restore started")
+
+	if _, probeErr := server.Probe(ctx); errors.Is(probeErr, gotmux.ErrNoServer) {
+		result.Reason = "no_server"
+
+		return result, restoreFailure(ctx, "admission", ErrNoServerRunning)
+	}
 
 	lease, err := integration.AcquireLease(ctx, cfg.LeaseRoot, server.Endpoint().SocketPath)
 	if err != nil {
@@ -294,14 +306,19 @@ func executeRestore(
 		Uncertain:           false,
 		MissingRequirements: nil,
 		Panes:               nil,
+		SessionsSkipped:     nil,
+		Advisories:          nil,
 	}
 
-	plan, generation, err := prepareRestorePlan(ctx, repository, cfg)
+	plan, generation, skipped, err := prepareRestorePlan(ctx, repository, server, cfg)
+	result.Generation = generation
+	result.SessionsSkipped = skipped
+
 	if err != nil {
+		result.Reason = planFailureReason(result.Reason, err)
+
 		return result, closeWith(ctx, lease, "plan", err)
 	}
-
-	result.Generation = generation
 
 	daemon, op, ledger, admissionPhase, err := establishRestoreIntent(ctx, repository, server, cfg, generation, plan)
 	if op.ID != "" {
@@ -339,6 +356,8 @@ func executeRestore(
 	)
 
 	result.MissingRequirements = mergeRequirements(result.MissingRequirements, scopedMissing)
+	result.Advisories = verification.Advisories
+
 	if err != nil {
 		result.Uncertain = isUncertain(err)
 		if result.Uncertain {
@@ -541,14 +560,19 @@ func restoredSessionReceipts(plan restore.Plan, receipts map[string]string) []st
 	return ids
 }
 
-func prepareRestorePlan(ctx context.Context, repository *store.Repository, cfg RestoreConfig) (restore.Plan, string, error) {
+func prepareRestorePlan(
+	ctx context.Context,
+	repository *store.Repository,
+	server *gotmux.Server,
+	cfg RestoreConfig,
+) (restore.Plan, string, []SkippedSession, error) {
 	genID, manifest, err := readGeneration(ctx, repository, cfg.Generation)
 	if err != nil {
-		return restore.Plan{}, genID, err
+		return restore.Plan{}, genID, nil, err
 	}
 
 	if err := manifest.Validate(); err != nil {
-		return restore.Plan{}, genID, fmt.Errorf("validate manifest: %w", err)
+		return restore.Plan{}, genID, nil, fmt.Errorf("validate manifest: %w", err)
 	}
 
 	selected := cfg.Sessions
@@ -559,16 +583,16 @@ func prepareRestorePlan(ctx context.Context, repository *store.Repository, cfg R
 		}
 	}
 
-	plan, err := restore.BuildPlan(manifest, selected)
+	plan, skipped, err := planSelection(ctx, repository, server, manifest, selected, cfg)
 	if err != nil {
-		return restore.Plan{}, genID, fmt.Errorf("build restore plan: %w", err)
+		return restore.Plan{}, genID, skipped, err
 	}
 
 	if _, err := restore.PlanActions(plan); err != nil {
-		return restore.Plan{}, genID, fmt.Errorf("build restore actions: %w", err)
+		return restore.Plan{}, genID, nil, fmt.Errorf("build restore actions: %w", err)
 	}
 
-	return plan, genID, nil
+	return plan, genID, skipped, nil
 }
 
 func readManifest(plan restore.Plan) model.Manifest {
@@ -676,6 +700,7 @@ func finishRestore(
 
 			result.Status = "best_effort"
 			result.Reason = "fidelity_limited"
+			markSkippedSessions(result)
 			logRestoreSuccess(ctx, *result)
 
 			return *result, nil
@@ -705,9 +730,23 @@ func finishRestore(
 	result.Status = "complete"
 	result.Reason = "ok"
 
+	markSkippedSessions(result)
 	logRestoreSuccess(ctx, *result)
 
 	return *result, nil
+}
+
+// markSkippedSessions downgrades a finished restore that declined some sessions to partial, so
+// the exit status and the log both say the saved set was not fully brought back.
+func markSkippedSessions(result *RestoreResult) {
+	if len(result.SessionsSkipped) == 0 {
+		return
+	}
+
+	if result.Status == "complete" || result.Status == "best_effort" {
+		result.Status = "partial"
+		result.Reason = "sessions_skipped"
+	}
 }
 
 func restoreTarget(endpoint string, daemon restoreDaemonIdentity, cfg RestoreConfig) ([]byte, error) {
@@ -1110,6 +1149,7 @@ func logRestoreSuccess(ctx context.Context, result RestoreResult) {
 		Str("status", result.Status).
 		Str("reason", result.Reason).
 		Int("sessions", len(result.SessionsRestored)).
+		Int("skipped", len(result.SessionsSkipped)).
 		Bool("verified", result.Verified).
 		Msg("snapshot restored")
 }

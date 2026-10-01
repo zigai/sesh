@@ -414,6 +414,51 @@ func TestPaneIndexesRestoreAcrossTargetDefaults(t *testing.T) {
 	assertPaneIndexVerification(t, ctx, targetServer, plan, report.Receipts)
 }
 
+func TestVerifyReportsPaneTitleRewrittenByRunningProgramAsAdvisory(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+
+	sourceServer := tmuxtest.NewServer(t)
+	source, _ := createTwoPaneSession(t, ctx, sourceServer, "title-advisory-source")
+
+	observation, err := capture.Observe(ctx, sourceServer, []tmux.SessionID{source.ID()})
+	if err != nil {
+		t.Fatalf("capture.Observe failed: %v", err)
+	}
+
+	plan, err := BuildPlan(observation.Manifest, []string{sessionIDByName(t, observation.Manifest, "title-advisory-source")})
+	if err != nil {
+		t.Fatalf("BuildPlan failed: %v", err)
+	}
+
+	targetServer := tmuxtest.NewServer(t)
+	report, restoredWindow := restorePaneIndexPlan(t, ctx, targetServer, observation, plan)
+
+	pane, err := restoredWindow.ActivePane(ctx)
+	if err != nil {
+		t.Fatalf("ActivePane failed: %v", err)
+	}
+
+	if err := pane.SetTitle(ctx, "title rewritten by a program after launch"); err != nil {
+		t.Fatalf("SetTitle failed: %v", err)
+	}
+
+	verification, err := Verify(ctx, targetServer, plan, report.Receipts)
+	if err != nil {
+		t.Fatalf("Verify failed: %v", err)
+	}
+
+	if !verification.Verified || len(verification.Mismatches) != 0 {
+		t.Fatalf("a rewritten title must not fail verification: %+v", verification)
+	}
+
+	if !slices.ContainsFunc(verification.Advisories, func(entry VerificationMismatch) bool {
+		return entry.Domain == MismatchPane && entry.Reason == "pane_title_changed"
+	}) {
+		t.Fatalf("rewritten title was not reported as an advisory: %+v", verification.Advisories)
+	}
+}
+
 const inheritedChildEnvironment = "source-global\nsource-local\n\n\n\nunset\nunset\n" //nolint:dupword // reason: both hidden variables must independently report unset in child output
 
 func observeInheritedSource(t *testing.T, ctx context.Context, server *tmux.Server) capture.Observation {

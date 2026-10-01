@@ -33,6 +33,12 @@ const (
 	colWidthDirectory = 20
 )
 
+// historyParityNote explains the one reason every observed save carries: tmux can be observed
+// coherently but not checkpointed atomically, so no save is ever marked complete.
+const historyParityNote = "incomplete/parity_incomplete: a tmux observation is not an atomic application checkpoint, so no save is marked complete; the current generation is still restorable for practical recovery."
+
+var errInvalidCollisionPolicy = errors.New("invalid --on-collision value: expected skip or fail")
+
 var (
 	ErrPartialSnapshot = clibase.ErrPartialSnapshot
 	errPartialSnapshot = clibase.ErrPartialSnapshot
@@ -42,13 +48,7 @@ var (
 
 type SaveBoundaryError = clibase.SaveBoundaryError
 
-type (
-	RestoreBoundaryError = clibase.RestoreBoundaryError
-	commandResultError   = CommandResultError
-	CommandResultError   struct{ error }
-)
-
-func (e *CommandResultError) Unwrap() error { return e.error }
+type RestoreBoundaryError = clibase.RestoreBoundaryError
 
 type snapshotSaveResultJSON struct {
 	Attempt    string `json:"attempt"`
@@ -95,15 +95,17 @@ type snapshotGenerationJSON struct {
 }
 
 type snapshotRestoreResultJSON struct {
-	OperationID         string                 `json:"operationId"`
-	Generation          string                 `json:"generation"`
-	Status              string                 `json:"status"`
-	Reason              string                 `json:"reason"`
-	SessionsRestored    []string               `json:"sessionsRestored"`
-	Panes               []restore.PaneResult   `json:"panes,omitempty"`
-	Verified            bool                   `json:"verified"`
-	Uncertain           bool                   `json:"uncertain"`
-	MissingRequirements []snapshotEvidenceJSON `json:"missingRequirements"`
+	OperationID         string                         `json:"operationId"`
+	Generation          string                         `json:"generation"`
+	Status              string                         `json:"status"`
+	Reason              string                         `json:"reason"`
+	SessionsRestored    []string                       `json:"sessionsRestored"`
+	Panes               []restore.PaneResult           `json:"panes,omitempty"`
+	Verified            bool                           `json:"verified"`
+	Uncertain           bool                           `json:"uncertain"`
+	MissingRequirements []snapshotEvidenceJSON         `json:"missingRequirements"`
+	SessionsSkipped     []engine.SkippedSession        `json:"sessionsSkipped"`
+	Advisories          []restore.VerificationMismatch `json:"advisories"`
 }
 
 type VerifyResultJSON struct {
@@ -395,6 +397,8 @@ func newSnapshotRestoreCommand() *cobra.Command {
 	cmd.Flags().Bool("pick", false, "Interactively select an immutable generation from the snapshot timeline")
 	cmd.Flags().Bool("no-processes", false, "Disable launching processes recorded in launch context")
 	cmd.Flags().Bool("allow-missing-dir", false, "Allow falling back if saved working directory does not exist")
+	cmd.Flags().String("on-collision", "", "Handle saved sessions whose names are already live; unset, restoring all sessions skips them and naming --session fails")
+	clibase.SetFlagChoices(cmd, "on-collision", string(engine.CollisionPolicySkip), string(engine.CollisionPolicyFail))
 	clibase.AddJSONFlag(cmd)
 
 	return cmd
@@ -425,6 +429,11 @@ func parseRestoreInput(cmd *cobra.Command, args []string) (string, string, engin
 	noProcesses, _ := cmd.Flags().GetBool("no-processes")
 	allowMissingDir, _ := cmd.Flags().GetBool("allow-missing-dir")
 
+	onCollision, err := parseCollisionPolicy(cmd)
+	if err != nil {
+		return "", "", engine.RestoreConfig{}, err
+	}
+
 	cfg := engine.RestoreConfig{
 		LeaseRoot:              leaseRoot,
 		Generation:             generation,
@@ -432,10 +441,22 @@ func parseRestoreInput(cmd *cobra.Command, args []string) (string, string, engin
 		Sessions:               allSessions,
 		LaunchProcesses:        !noProcesses,
 		AllowMissingWorkingDir: allowMissingDir,
+		OnCollision:            onCollision,
 		Profile:                engine.RecoveryPractical,
 	}
 
 	return absRepoPath, socketPath, cfg, nil
+}
+
+func parseCollisionPolicy(cmd *cobra.Command) (engine.CollisionPolicy, error) {
+	value, _ := cmd.Flags().GetString("on-collision")
+
+	switch engine.CollisionPolicy(value) {
+	case engine.CollisionPolicyDefault, engine.CollisionPolicySkip, engine.CollisionPolicyFail:
+		return engine.CollisionPolicy(value), nil
+	default:
+		return engine.CollisionPolicyDefault, clibase.NewExitError(clibase.ExitCodeUsage, errInvalidCollisionPolicy)
+	}
 }
 
 func runSnapshotRestore(cmd *cobra.Command, args []string) error {
@@ -498,16 +519,16 @@ func renderRestoreOutcome(cmd *cobra.Command, res engine.RestoreResult, restoreE
 	}
 
 	if restoreErr != nil {
-		if clibase.JSONOutputEnabled(cmd) && res.OperationID != "" {
+		if clibase.JSONOutputEnabled(cmd) && (res.OperationID != "" || len(res.SessionsSkipped) > 0) {
 			return clibase.WriteJSONResultError(cmd, restoreJSONResult(res), restoreErr)
 		}
 
-		if res.OperationID != "" {
+		if res.OperationID != "" || len(res.SessionsSkipped) > 0 {
 			if writeErr := renderRestoreTable(cmd, res); writeErr != nil {
 				return errors.Join(restoreErr, writeErr)
 			}
 
-			return &commandResultError{error: restoreErr}
+			return clibase.NewCommandResultError(restoreErr)
 		}
 
 		return restoreErr
@@ -544,7 +565,25 @@ func restoreJSONResult(res engine.RestoreResult) snapshotRestoreResultJSON {
 		Verified:            res.Verified,
 		Uncertain:           res.Uncertain,
 		MissingRequirements: missing,
+		SessionsSkipped:     nonNilSkipped(res.SessionsSkipped),
+		Advisories:          nonNilAdvisories(res.Advisories),
 	}
+}
+
+func nonNilSkipped(skipped []engine.SkippedSession) []engine.SkippedSession {
+	if skipped == nil {
+		return []engine.SkippedSession{}
+	}
+
+	return skipped
+}
+
+func nonNilAdvisories(advisories []restore.VerificationMismatch) []restore.VerificationMismatch {
+	if advisories == nil {
+		return []restore.VerificationMismatch{}
+	}
+
+	return advisories
 }
 
 func renderRestoreTable(cmd *cobra.Command, res engine.RestoreResult) error {
@@ -579,7 +618,27 @@ func renderRestoreTable(cmd *cobra.Command, res engine.RestoreResult) error {
 		fmt.Fprintf(&out, "Missing Parity:     %d unverified or observational requirements\n", len(res.MissingRequirements))
 	}
 
+	writeSkippedSessions(&out, res.SessionsSkipped)
+
+	if count := len(res.Advisories); count > 0 {
+		fmt.Fprintf(&out, "Observed Changes:   %d values differ from the snapshot after launch (for example pane titles that applications rewrite)\n", count)
+	}
+
 	return clibase.WriteOutput(cmd, "%s", out.String())
+}
+
+func writeSkippedSessions(out *strings.Builder, skipped []engine.SkippedSession) {
+	if len(skipped) == 0 {
+		return
+	}
+
+	out.WriteString("Skipped Sessions:\n")
+
+	for _, session := range skipped {
+		fmt.Fprintf(out, "  %s %q reason=%s\n", session.ID, session.Name, session.Reason)
+	}
+
+	out.WriteString("  Rename or close the live session using the name, then run: sesh snapshot restore --session <id>\n")
 }
 
 func newSnapshotListCommand() *cobra.Command {
@@ -767,11 +826,7 @@ func renderHistoryJSON(cmd *cobra.Command, catalog store.Catalog) error {
 	})
 }
 
-func renderHistoryTable(cmd *cobra.Command, catalog store.Catalog, full bool) error {
-	if len(catalog.Attempts) == 0 && len(catalog.Generations) == 0 {
-		return clibase.WriteLine(cmd, "No snapshot history found.")
-	}
-
+func historyRows(catalog store.Catalog, full bool) []prettytable.Row {
 	var currentSeq uint64
 
 	for _, g := range catalog.Generations {
@@ -804,6 +859,16 @@ func renderHistoryTable(cmd *cobra.Command, catalog store.Catalog, full bool) er
 		})
 	}
 
+	return rows
+}
+
+func renderHistoryTable(cmd *cobra.Command, catalog store.Catalog, full bool) error {
+	if len(catalog.Attempts) == 0 && len(catalog.Generations) == 0 {
+		return clibase.WriteLine(cmd, "No snapshot history found.")
+	}
+
+	rows := historyRows(catalog, full)
+
 	columns := []clibase.TableColumn{
 		{Heading: "Sequence", Fixed: true, MinWidth: colWidthID, Wrap: nil},
 		{Heading: "Attempt", Fixed: false, MinWidth: colWidthSession, Wrap: clibase.WrapIdentifier},
@@ -813,7 +878,15 @@ func renderHistoryTable(cmd *cobra.Command, catalog store.Catalog, full bool) er
 		{Heading: "Digest", Fixed: false, MinWidth: colWidthDigest, Wrap: clibase.WrapIdentifier},
 	}
 
-	return clibase.WriteResponsiveTable(cmd, columns, rows, full)
+	if err := clibase.WriteResponsiveTable(cmd, columns, rows, full); err != nil {
+		return err
+	}
+
+	if slices.ContainsFunc(catalog.Attempts, func(a store.Attempt) bool { return a.Reason == "parity_incomplete" }) {
+		return clibase.WriteLine(cmd, historyParityNote)
+	}
+
+	return nil
 }
 
 func runSnapshotHistory(cmd *cobra.Command, _ []string) error {

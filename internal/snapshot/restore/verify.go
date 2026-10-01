@@ -40,6 +40,7 @@ type VerificationReport struct {
 	Panes         int                    `json:"panes"`
 	Links         int                    `json:"links"`
 	Mismatches    []VerificationMismatch `json:"mismatches"`
+	Advisories    []VerificationMismatch `json:"advisories"`
 	VerifiedSteps []string               `json:"verifiedSteps"`
 	RuntimePanes  map[string]string      `json:"-"`
 }
@@ -86,6 +87,16 @@ func (r *VerificationReport) mismatch(domain, entity, reason string) {
 	r.Mismatches = append(r.Mismatches, VerificationMismatch{Domain: domain, Entity: entity, Reason: reason})
 }
 
+// advisory records an observed difference in state that applications own after launch. It never
+// fails verification and never claims the observed value equals the saved one.
+func (r *VerificationReport) advisory(domain, entity, reason string) {
+	if len(r.Advisories) >= maxVerificationMismatches {
+		return
+	}
+
+	r.Advisories = append(r.Advisories, VerificationMismatch{Domain: domain, Entity: entity, Reason: reason})
+}
+
 func Verify(ctx context.Context, server *tmux.Server, plan Plan, receipts map[string]string) (VerificationReport, error) {
 	report := VerificationReport{
 		Verified:      false,
@@ -94,6 +105,7 @@ func Verify(ctx context.Context, server *tmux.Server, plan Plan, receipts map[st
 		Panes:         0,
 		Links:         0,
 		Mismatches:    nil,
+		Advisories:    nil,
 		VerifiedSteps: nil,
 		RuntimePanes:  nil,
 	}
@@ -427,14 +439,25 @@ func verifyWindowPanes(
 			report.mismatch(MismatchPane, pane.ID, "pane_index_mismatch")
 		}
 
-		titleOK := observedPane.Title == string(pane.Title)
-		if !titleOK {
-			report.mismatch(MismatchPane, pane.ID, "pane_title_mismatch")
+		// Titles belong to the programs running in the pane: shells and agents rewrite them as soon
+		// as they start, so a later difference is advisory and equality is never claimed.
+		if observedPane.Title != string(pane.Title) {
+			report.advisory(MismatchPane, pane.ID, "pane_title_changed")
 		}
 
 		state.pane[pane.ID] = paneOK
-		state.title[pane.ID] = titleOK
+		state.title[pane.ID] = paneOK
 	}
+}
+
+func windowNameIsAutomatic(window model.Window) bool {
+	for _, option := range window.Options {
+		if string(option.Name) == "automatic-rename" && option.Present {
+			return string(option.Value) == "on"
+		}
+	}
+
+	return false
 }
 
 func verifyWindowIdentity(
@@ -453,9 +476,15 @@ func verifyWindowIdentity(
 	ok := true
 
 	if info.Name != string(window.Name) {
-		report.mismatch(MismatchWindow, window.ID, "window_name_mismatch")
+		if windowNameIsAutomatic(window) {
+			// With automatic-rename on, tmux renames the window to its running program, so the
+			// name is the program's to change after restore, not a restored fact.
+			report.advisory(MismatchWindow, window.ID, "window_name_changed")
+		} else {
+			report.mismatch(MismatchWindow, window.ID, "window_name_mismatch")
 
-		ok = false
+			ok = false
+		}
 	}
 
 	if info.Width != window.Width || info.Height != window.Height {

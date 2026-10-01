@@ -13,6 +13,7 @@ import (
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/snapshot/engine"
 	"github.com/zigai/sesh/internal/snapshot/restore"
+	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
 type restoreTestEnvelope struct {
@@ -265,5 +266,101 @@ func TestRestoreJSONProjectionExposesPanes(t *testing.T) {
 
 	if len(envelopeNoPanes.Result.Panes) != 0 {
 		t.Fatalf("expected empty panes, got %+v", envelopeNoPanes.Result.Panes)
+	}
+}
+
+func TestRestoreRefusedForCollisionNamesSessionsWithoutAnOperation(t *testing.T) {
+	t.Parallel()
+
+	result := engine.RestoreResult{
+		Status: "failed",
+		Reason: "collision",
+		SessionsSkipped: []engine.SkippedSession{
+			{ID: "s38", Name: "0", Reason: restore.CollisionNameInUse},
+		},
+	}
+
+	cmd := newSnapshotRestoreCommand()
+
+	var stdout bytes.Buffer
+	cmd.SetOut(&stdout)
+
+	err := renderRestoreOutcome(cmd, result, clibase.NewRestoreBoundaryError(restore.ErrSessionCollision))
+	if !errors.Is(err, restore.ErrSessionCollision) {
+		t.Fatalf("expected the collision error to be preserved, got %v", err)
+	}
+
+	for _, want := range []string{"Skipped Sessions:", `s38 "0" reason=name_in_use`, "sesh snapshot restore --session <id>"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("expected %q in output:\n%s", want, stdout.String())
+		}
+	}
+}
+
+func TestRestoreJSONReportsSkippedSessionsAndAdvisories(t *testing.T) {
+	t.Parallel()
+
+	result := engine.RestoreResult{
+		OperationID:      "op-1",
+		Generation:       "gen-1",
+		Status:           "partial",
+		Reason:           "sessions_skipped",
+		SessionsRestored: []string{"s1"},
+		Verified:         true,
+		SessionsSkipped:  []engine.SkippedSession{{ID: "s38", Name: "0", Reason: restore.CollisionNameInUse}},
+		Advisories:       []restore.VerificationMismatch{{Domain: restore.MismatchPane, Entity: "p1", Reason: "pane_title_changed"}},
+	}
+
+	envelope, err := renderRestoreJSONForTest(t, result, nil)
+	if !errors.Is(err, errPartialRestore) {
+		t.Fatalf("a restore that skipped sessions must exit as partial, got %v", err)
+	}
+
+	if len(envelope.Result.SessionsSkipped) != 1 || envelope.Result.SessionsSkipped[0].Name != "0" {
+		t.Fatalf("skipped sessions missing from JSON: %+v", envelope.Result)
+	}
+
+	if len(envelope.Result.Advisories) != 1 || envelope.Result.Advisories[0].Reason != "pane_title_changed" {
+		t.Fatalf("advisories missing from JSON: %+v", envelope.Result)
+	}
+}
+
+func TestRestoreRejectsUnknownCollisionPolicy(t *testing.T) {
+	t.Parallel()
+
+	cmd := newSnapshotRestoreCommand()
+	if err := cmd.Flags().Set("on-collision", "replace"); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := parseCollisionPolicy(cmd)
+	if err == nil || clibase.ExitCode(err) != clibase.ExitCodeUsage {
+		t.Fatalf("expected a usage error for an unknown policy, got %v", err)
+	}
+}
+
+func TestHistoryTableExplainsParityIncompleteOnlyWhenPresent(t *testing.T) {
+	t.Parallel()
+
+	render := func(reason string) string {
+		cmd := newSnapshotHistoryCommand()
+
+		var stdout bytes.Buffer
+		cmd.SetOut(&stdout)
+
+		catalog := store.Catalog{Attempts: []store.Attempt{{ID: "a1", Sequence: 1, State: "incomplete", Reason: reason}}}
+		if err := renderHistoryTable(cmd, catalog, false); err != nil {
+			t.Fatal(err)
+		}
+
+		return stdout.String()
+	}
+
+	if out := render("parity_incomplete"); !strings.Contains(out, "not an atomic application checkpoint") || !strings.Contains(out, "restorable for practical recovery") {
+		t.Fatalf("expected the parity explanation, got:\n%s", out)
+	}
+
+	if out := render("save_failed"); strings.Contains(out, "atomic application checkpoint") {
+		t.Fatalf("the explanation applies only to parity_incomplete attempts:\n%s", out)
 	}
 }

@@ -251,6 +251,7 @@ func executeStartupRestore(cmd *cobra.Command, env autosaveEnv) error {
 		Sessions:               nil,
 		LaunchProcesses:        true,
 		AllowMissingWorkingDir: false,
+		OnCollision:            engine.CollisionPolicyDefault,
 		Profile:                engine.RecoveryPractical,
 	})
 

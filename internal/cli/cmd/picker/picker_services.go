@@ -328,6 +328,7 @@ func (s *pickerServices) RestoreAndEnterSession(ctx context.Context, target sess
 		OperationID:            "",
 		LaunchProcesses:        true,
 		AllowMissingWorkingDir: false,
+		OnCollision:            engine.CollisionPolicyDefault,
 		Profile:                engine.RecoveryPractical,
 	})
 	if err != nil {

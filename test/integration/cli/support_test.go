@@ -350,17 +350,33 @@ func assertRuntimeLogFields(t *testing.T, record map[string]any) {
 	for key := range record {
 		switch key {
 		case "time", "level", "component", "operation", "status", "message", "reason", "phase", "code", "sessions", "windows", "panes", "error_code":
-		case "verified":
-			if _, ok := record[key].(bool); !ok || record["operation"] != "restore" || record["component"] != "snapshot" {
-				t.Fatalf("invalid verification field: %#v", record)
-			}
-		case "terminal_text_omitted":
-			if _, ok := record[key].(float64); !ok || record["operation"] != "save" || record["component"] != "snapshot" {
-				t.Fatalf("invalid terminal text count: %#v", record)
-			}
+		case "verified", "skipped", "terminal_text_omitted":
+			assertOperationLogField(t, record, key)
 		default:
 			t.Fatalf("unexpected log field: %s", key)
 		}
+	}
+}
+
+// assertOperationLogField checks the fields that only one operation may emit, and their type.
+func assertOperationLogField(t *testing.T, record map[string]any, key string) {
+	t.Helper()
+
+	operation := "restore"
+	if key == "terminal_text_omitted" {
+		operation = "save"
+	}
+
+	_, isBool := record[key].(bool)
+	_, isCount := record[key].(float64)
+
+	typed := isCount
+	if key == "verified" {
+		typed = isBool
+	}
+
+	if !typed || record["operation"] != operation || record["component"] != "snapshot" {
+		t.Fatalf("invalid %s field: %#v", key, record)
 	}
 }
 

@@ -89,11 +89,17 @@ func disableFixtureRename(t *testing.T, server *gotmux.Server) {
 func newAutosaveSession(t *testing.T, server *gotmux.Server) gotmux.Session {
 	t.Helper()
 
+	return newAutosaveSessionAt(t, server, "")
+}
+
+func newAutosaveSessionAt(t *testing.T, server *gotmux.Server, dir string) gotmux.Session {
+	t.Helper()
+
 	ctx := t.Context()
 
 	sess, err := server.NewSession(ctx, gotmux.NewSessionOptions{
 		Name:    "autosave-alpha",
-		Dir:     "",
+		Dir:     dir,
 		Window:  "main",
 		Program: gotmux.Exec("sleep", "300"),
 		Env:     nil,
