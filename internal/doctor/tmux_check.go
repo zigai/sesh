@@ -17,7 +17,8 @@ const (
 	minTmuxMinor = 6
 )
 
-func (s *Service) checkTmux(ctx context.Context) Result {
+// checkTmux also returns the server pid when one answered, for checks that follow the server.
+func (s *Service) checkTmux(ctx context.Context) (Result, int) {
 	if s.server == nil {
 		return Result{
 			Check:   CheckTmux,
@@ -25,12 +26,12 @@ func (s *Service) checkTmux(ctx context.Context) Result {
 			Reason:  ReasonNotConfigured,
 			Message: "no explicit tmux server endpoint selected",
 			Fix:     "Specify an explicit tmux server endpoint",
-		}
+		}, 0
 	}
 
 	info, err := s.server.Probe(ctx)
 	if err != nil {
-		return classifyTmuxProbeError(err)
+		return classifyTmuxProbeError(err), 0
 	}
 
 	if !info.Version.AtLeast(minTmuxMajor, minTmuxMinor) {
@@ -40,7 +41,7 @@ func (s *Service) checkTmux(ctx context.Context) Result {
 			Reason:  ReasonIncompatible,
 			Message: fmt.Sprintf("tmux version %s is unsupported (requires 3.6+)", info.Version.String()),
 			Fix:     "Upgrade tmux to 3.6 or later",
-		}
+		}, info.Identity.PID
 	}
 
 	return Result{
@@ -49,7 +50,7 @@ func (s *Service) checkTmux(ctx context.Context) Result {
 		Reason:  "",
 		Message: fmt.Sprintf("tmux %s (server pid %d)", info.Version.String(), info.Identity.PID),
 		Fix:     "",
-	}
+	}, info.Identity.PID
 }
 
 func classifyTmuxProbeError(err error) Result {

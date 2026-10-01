@@ -1,0 +1,58 @@
+//go:build linux
+
+package doctor
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path"
+	"strings"
+	"time"
+)
+
+const oomPolicyQueryTimeout = 3 * time.Second
+
+var errNoServiceUnit = errors.New("process is not in a service unit cgroup")
+
+// serviceUnitOf names the systemd service whose cgroup directly holds pid.
+func serviceUnitOf(pid int) (string, error) {
+	data, err := os.ReadFile(fmt.Sprintf("/proc/%d/cgroup", pid))
+	if err != nil {
+		return "", fmt.Errorf("read process cgroup: %w", err)
+	}
+
+	return unitFromCgroup(data)
+}
+
+// unitFromCgroup reads the unified-hierarchy entry. Only the leaf counts: a server started from a
+// terminal sits in a scope under the user manager, whose own service must not be mistaken for it.
+func unitFromCgroup(data []byte) (string, error) {
+	for line := range bytes.SplitSeq(bytes.TrimSpace(data), []byte("\n")) {
+		_, cgroupPath, found := strings.Cut(string(line), "::")
+		if !found {
+			continue
+		}
+
+		if name := path.Base(cgroupPath); strings.HasSuffix(name, ".service") {
+			return name, nil
+		}
+	}
+
+	return "", errNoServiceUnit
+}
+
+func serviceOOMPolicyOf(ctx context.Context, unit string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, oomPolicyQueryTimeout)
+	defer cancel()
+
+	output, err := exec.CommandContext(ctx, "systemctl", "--user", "show", "--property=OOMPolicy", "--value", unit).Output()
+	if err != nil {
+		return "", fmt.Errorf("query unit oom policy: %w", err)
+	}
+
+	return strings.TrimSpace(string(output)), nil
+}

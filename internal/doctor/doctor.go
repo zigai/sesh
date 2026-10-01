@@ -47,6 +47,8 @@ const (
 	CheckRestoreCapability  = "restore-capability"
 	CheckAutosave           = "autosave"
 	CheckDaemonRuntime      = "daemon-runtime"
+	CheckRestorableSnapshot = "restorable-snapshot"
+	CheckServiceOOMPolicy   = "service-oom-policy"
 )
 
 type Result struct {
@@ -75,6 +77,8 @@ type Service struct {
 	daemonPhase       string
 	inhibitorsHeld    bool
 	logindDelayMillis int64
+	unitOf            func(pid int) (string, error)
+	oomPolicyOf       func(ctx context.Context, unit string) (string, error)
 }
 
 type outcomeLoggedError struct{ error }
@@ -92,6 +96,8 @@ func NewService(opts Options) *Service {
 		daemonPhase:       opts.DaemonPhase,
 		inhibitorsHeld:    opts.InhibitorsHeld,
 		logindDelayMillis: opts.LogindDelayMillis,
+		unitOf:            serviceUnitOf,
+		oomPolicyOf:       serviceOOMPolicyOf,
 	}
 }
 
@@ -114,7 +120,9 @@ func (s *Service) Run(ctx context.Context) ([]Result, error) {
 
 	var cleanupErr error
 
-	results = append(results, s.checkTmux(ctx))
+	tmuxRes, serverPID := s.checkTmux(ctx)
+	results = append(results, tmuxRes)
+
 	if err := ctx.Err(); err != nil {
 		runErr := errors.Join(cleanupErr, err)
 		logDoctorCompleted(ctx, results, runErr)
@@ -156,6 +164,9 @@ func (s *Service) Run(ctx context.Context) ([]Result, error) {
 		s.checkDaemonRuntime(),
 		checkAutosaveCapability(),
 	)
+
+	results = append(results, s.checkRestorable(ctx, tmuxRes)...)
+	results = append(results, s.checkServiceOOMPolicy(ctx, serverPID)...)
 
 	var runErr error
 	if cleanupErr != nil {
