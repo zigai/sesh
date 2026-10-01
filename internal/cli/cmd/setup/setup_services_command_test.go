@@ -314,8 +314,8 @@ func TestSetupServicesApplyWritesManagedTmuxService(t *testing.T) {
 	}
 
 	result := clitest.DecodePayload[setupServicesResultJSON](t, exec.Envelope.Result)
-	if !result.Applied || result.Written != 4 {
-		t.Fatalf("result = %+v, want 4 written definitions including tmux service", result)
+	if !result.Applied || result.Written != 5 {
+		t.Fatalf("result = %+v, want 5 written definitions including the tmux and restore services", result)
 	}
 
 	assertWrittenManagedUnits(t, directory)
@@ -360,7 +360,7 @@ func createFakeTmuxExecutable(t *testing.T) string {
 func assertWrittenManagedUnits(t *testing.T, directory string) {
 	t.Helper()
 
-	for _, name := range []string{setup.AutosaveServiceName, setup.AutosaveTimerName, setup.TmuxServiceName} {
+	for _, name := range []string{setup.AutosaveServiceName, setup.AutosaveTimerName, setup.TmuxServiceName, setup.RestoreServiceName} {
 		content, err := os.ReadFile(filepath.Join(directory, name))
 		if err != nil {
 			t.Fatalf("reading %s failed: %v", name, err)

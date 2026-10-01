@@ -254,8 +254,8 @@ func TestBlockedDefinitionIsNeverWrittenEvenWhenForced(t *testing.T) {
 		t.Fatalf("ApplyDefinitions failed: %v", err)
 	}
 
-	if len(result.BlockedNames) != 1 {
-		t.Fatalf("blocked = %v, want the tmux service", result.BlockedNames)
+	if len(result.BlockedNames) != 2 {
+		t.Fatalf("blocked = %v, want the tmux service and the restore service that follows it", result.BlockedNames)
 	}
 
 	if _, err := os.Stat(filepath.Join(root, setup.TmuxServiceName)); err == nil {

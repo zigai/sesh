@@ -233,23 +233,14 @@ func agentStatusLine(item setup.AgentHarnessResult) string {
 func newSetupServicesCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:         "services",
-		Short:       "Render or apply the owned service definitions",
+		Short:       "Set up automatic saves for your tmux sessions",
 		Annotations: map[string]string{clibase.AnnotationOperation: "refresh"},
-		Long: "Render or apply the owned service definitions.\n\n" +
-			"The periodic autosave timer and the remote monitor are always rendered. --with-tmux-service adds a managed " +
-			"foreground tmux server (daemon tmux) whose stop step runs one bounded final save while tmux is still alive. " +
-			"--with-coordinator adds the sleep and shutdown save coordinator (daemon coordinator), which holds logind delay " +
-			"inhibitors; unit ordering alone does not provide that.\n\n" +
-			"Without --apply the plan is printed and nothing is written. Existing files that sesh does not own are reported and " +
-			"left untouched. On Linux, --apply reloads the user service manager and refreshes an already running autosave timer " +
-			"and remote monitor. Stopped services stay stopped, enabled state is preserved, and the tmux server and in-flight " +
-			"autosave are never restarted. An explicit --dir writes definitions only and does not contact the service manager.",
-		Args: clibase.UsageArgs(cobra.NoArgs),
-		RunE: runSetupServices,
+		Args:        clibase.UsageArgs(cobra.NoArgs),
+		RunE:        runSetupServices,
 	}
 
 	addServiceSetupFlags(cmd)
-	cmd.Flags().Bool("with-tmux-service", false, "Also render the managed tmux server definition")
+	cmd.Flags().Bool("with-tmux-service", false, "Advanced: add a managed tmux server")
 	cmd.Flags().Bool("with-coordinator", false, "Also render the sleep and shutdown save coordinator definition")
 	cmd.Flags().Bool("verify-tmux", false, "Verify the target tmux version through the given socket before rendering the tmux service")
 
@@ -514,7 +505,11 @@ func applySetupDefinitionsWithManager(
 		return errors.Join(err, outcomeErr)
 	}
 
-	return outcomeErr
+	if outcomeErr != nil {
+		return outcomeErr
+	}
+
+	return renderSetupServiceNextSteps(cmd, payload)
 }
 
 func applyServiceChanges(
@@ -593,6 +588,31 @@ func renderSetupServices(cmd *cobra.Command, payload setupServicesResultJSON, op
 	}
 
 	return renderSetupServiceRefresh(cmd, payload.Manager)
+}
+
+func renderSetupServiceNextSteps(cmd *cobra.Command, payload setupServicesResultJSON) error {
+	if !payload.Applied {
+		return clibase.WriteOutput(cmd, "\nTo install, repeat this command with --apply.\n")
+	}
+
+	if payload.Platform != setup.PlatformLinux || payload.Manager == nil || !payload.Manager.Reloaded {
+		return nil
+	}
+
+	units := []string{}
+
+	for _, service := range payload.Services {
+		switch service.Name {
+		case setup.AutosaveTimerName, setup.CoordinatorServiceName, setup.TmuxServiceName:
+			units = append(units, service.Name)
+		}
+	}
+
+	if len(units) == 0 {
+		return nil
+	}
+
+	return clibase.WriteOutput(cmd, "\nTo start automatic saves:\n  systemctl --user enable --now %s\n", strings.Join(units, " "))
 }
 
 func renderSetupServiceRefresh(cmd *cobra.Command, result *setup.ServiceRefreshResult) error {

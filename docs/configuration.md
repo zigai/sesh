@@ -89,7 +89,7 @@ connections = []
 [autosave]
 enabled = true
 interval = "3m"
-restore_last_on_start = true
+restore_last_on_start = true # restore the newest snapshot when the managed tmux service starts (see docs/integrations.md)
 
 [snapshot]
 retention_days = 14 # 0 disables age limit

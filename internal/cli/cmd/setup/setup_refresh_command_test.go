@@ -17,6 +17,61 @@ import (
 
 const fakeSystemctlFailureExit = 3
 
+func TestSetupServicesShowsStartCommandForSelectedFeatures(t *testing.T) {
+	for _, feature := range []string{"autosave", "coordinator", "managed-tmux"} {
+		t.Run(feature, func(t *testing.T) {
+			setupRefreshHome(t)
+			fake := setupRefreshManager(t, "")
+			args := []string{"setup", "services", "--apply", testNoConfigFlag}
+			want := "systemctl --user enable --now sesh-autosave.timer"
+
+			switch feature {
+			case "coordinator":
+				args = append(args, "--with-coordinator")
+				want += " sesh-coordinator.service"
+			case "managed-tmux":
+				args = append(args, "--with-tmux-service", "--tmux", createFakeTmuxExecutable(t))
+				want += " sesh-tmux.service"
+			}
+
+			stdout, stderr, err := executeCommand(t, args...)
+			if err != nil || stderr != "" || !strings.Contains(stdout, "To start automatic saves:\n  "+want+"\n") {
+				t.Fatalf("setup did not explain how to start the selected features: stdout=%q stderr=%q err=%v", stdout, stderr, err)
+			}
+
+			if !slices.Equal(fake.commands(t), []string{"daemon-reload"}) {
+				t.Fatalf("setup must leave enabling and starting to the user: %v", fake.commands(t))
+			}
+		})
+	}
+}
+
+func TestSetupServicesDoesNotSuggestStartingAfterFailedRefresh(t *testing.T) {
+	setupRefreshHome(t)
+	setupRefreshManager(t, "daemon-reload")
+
+	stdout, _, err := executeCommand(t, "setup", "services", "--apply", testNoConfigFlag)
+	if err == nil || strings.Contains(stdout, "To start automatic saves:") {
+		t.Fatalf("failed setup must not suggest starting: stdout=%q err=%v", stdout, err)
+	}
+}
+
+func TestSetupServicesExplainsPreviewAndKeepsCustomDirectoryOffline(t *testing.T) {
+	setupRefreshHome(t)
+	directory := filepath.Join(t.TempDir(), "units")
+	fake := setupRefreshManager(t, "")
+
+	stdout, _, err := executeCommand(t, "setup", "services", "--dir", directory, testNoConfigFlag)
+	if err != nil || !strings.Contains(stdout, "To install, repeat this command with --apply.") || strings.Contains(stdout, "To start automatic saves:") {
+		t.Fatalf("preview must explain installation: stdout=%q err=%v", stdout, err)
+	}
+
+	stdout, _, err = executeCommand(t, "setup", "services", "--apply", "--dir", directory, testNoConfigFlag)
+	if err != nil || strings.Contains(stdout, "To start automatic saves:") || len(fake.commands(t)) != 0 {
+		t.Fatalf("custom-directory setup must stay offline: stdout=%q err=%v commands=%v", stdout, err, fake.commands(t))
+	}
+}
+
 // executeSetupServices runs the production pipeline against a fake systemctl on PATH.
 func executeSetupServices(t *testing.T, arguments ...string) commandExecution {
 	t.Helper()

@@ -4,32 +4,22 @@
 
 ## Systemd services (Linux)
 
-Install user service units for automated background saves:
+Enable autosave for your existing tmux server:
 
 ```sh
-# Preview, then write the autosave timer, remote monitor and sleep/shutdown coordinator
-sesh setup services --with-coordinator
-sesh setup services --with-coordinator --apply
-
-# Enable
+sesh setup services --apply
 systemctl --user enable --now sesh-autosave.timer
-systemctl --user enable --now sesh-coordinator.service
 ```
 
-| Unit | Purpose |
-| --- | --- |
-| `sesh-autosave.timer` | Triggers background save every 3 minutes |
-| `sesh-autosave.service` | Runs `sesh action autosave-save-if-due` |
-| `sesh-coordinator.service` | Runs `sesh daemon coordinator`, which holds logind delay inhibitors for sleep and shutdown |
-| `sesh-remote-monitor.service` | Runs `sesh daemon remote-monitor` |
+Saves run every 3 minutes by default. Use `--socket` for a custom server. Add `--with-coordinator` and enable `sesh-coordinator.service` for saves before sleep and shutdown.
 
-After upgrading sesh, run `sesh setup services --apply` again (with the same `--with-*` flags) so the units call the current commands.
-
-Inspect status:
+To recover, start tmux on the same socket and run:
 
 ```sh
-sesh autosave status --json
+sesh snapshot restore
 ```
+
+Live sessions stay untouched; conflicting names are skipped.
 
 ## Coding agents
 

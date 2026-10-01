@@ -31,6 +31,7 @@ const (
 	TmuxServiceName        = "sesh-tmux.service"
 	RemoteServiceName      = "sesh-remote-monitor.service"
 	CoordinatorServiceName = "sesh-coordinator.service"
+	RestoreServiceName     = "sesh-restore.service"
 	AutosaveAgentName      = "com.zigai.sesh.autosave.plist"
 	TmuxAgentName          = "com.zigai.sesh.tmux.plist"
 	RemoteAgentName        = "com.zigai.sesh.remote-monitor.plist"
@@ -38,6 +39,13 @@ const (
 )
 
 const ForegroundServerTmuxMinor = 7
+
+const (
+	restoreStartTimeout = "10min"
+
+	// supervisorStopExitStatus is the status the CLI maps cancellation to, which a stop request causes.
+	supervisorStopExitStatus = 130
+)
 
 const (
 	stopBudgetGrace  = 5 * time.Second
@@ -379,7 +387,8 @@ func renderSystemdTmuxService(inputs ServiceInputs) string {
 	content.WriteString(managedComment())
 	content.WriteString("[Unit]\n")
 	content.WriteString("Description=sesh-managed foreground tmux server\n")
-	content.WriteString("Documentation=man:sesh(1)\n\n")
+	content.WriteString("Documentation=man:sesh(1)\n")
+	content.WriteString("Wants=" + RestoreServiceName + "\n\n")
 	content.WriteString("[Service]\n")
 	content.WriteString("Type=exec\n")
 	content.WriteString("ExecStart=" + systemdCommand(inputs.Program, daemonArgs(inputs)) + "\n")
@@ -387,11 +396,43 @@ func renderSystemdTmuxService(inputs ServiceInputs) string {
 	content.WriteString("ExecStop=" + systemdCommand(inputs.Program, finalSaveArgs(inputs)) + "\n")
 	content.WriteString("TimeoutStopSec=" + strconv.FormatInt(int64(stopBudget/time.Second), 10) + "s\n")
 	content.WriteString("KillMode=control-group\n")
+	// One OOM-killed process must cost that process, not the server and every pane with it.
+	content.WriteString("OOMPolicy=continue\n")
+	// A stop request cancels the supervisor, which exits with the cancellation status.
+	content.WriteString("SuccessExitStatus=" + strconv.Itoa(supervisorStopExitStatus) + "\n")
 	content.WriteString("Restart=no\n\n")
 	content.WriteString("[Install]\n")
 	content.WriteString("WantedBy=default.target\n")
 
 	return content.String()
+}
+
+// renderSystemdRestoreService restores the newest snapshot once the managed tmux server is up. It
+// is a separate oneshot so a long restore never delays or times out the server's own start.
+func renderSystemdRestoreService(inputs ServiceInputs) string {
+	var content strings.Builder
+
+	content.WriteString(managedComment())
+	content.WriteString("[Unit]\n")
+	content.WriteString("Description=sesh restore the newest snapshot after tmux starts\n")
+	content.WriteString("Documentation=man:sesh(1)\n")
+	content.WriteString("After=" + TmuxServiceName + "\n\n")
+	content.WriteString("[Service]\n")
+	content.WriteString("Type=oneshot\n")
+	content.WriteString("ExecStart=" + systemdCommand(inputs.Program, restoreOnStartArgs(inputs)) + "\n")
+	content.WriteString("TimeoutStartSec=" + restoreStartTimeout + "\n")
+
+	return content.String()
+}
+
+func restoreOnStartArgs(inputs ServiceInputs) []string {
+	return []string{
+		"action", "autosave-restore-on-start",
+		"--socket", inputs.SocketPath,
+		"--repository", inputs.RepositoryPath,
+		"--lease-root", inputs.LeaseRootPath,
+		"--history", inputs.HistoryPath,
+	}
 }
 
 func launchdDefinitions(root string, inputs ServiceInputs) ([]ServiceDefinition, error) {
@@ -627,7 +668,14 @@ func systemdDefinitions(root string, inputs ServiceInputs) ([]ServiceDefinition,
 			Requires: requires,
 		}
 
-		definitions = append(definitions, definition)
+		definitions = append(definitions, definition, ServiceDefinition{
+			Name:     RestoreServiceName,
+			Kind:     KindSystemdService,
+			Purpose:  "restore the newest snapshot once the managed tmux server starts",
+			Path:     filepath.Join(root, RestoreServiceName),
+			Content:  renderSystemdRestoreService(inputs),
+			Requires: requires,
+		})
 	}
 
 	if inputs.WithCoordinator {

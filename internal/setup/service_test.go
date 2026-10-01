@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -195,6 +196,53 @@ func TestSystemdTmuxServiceRunsBoundedFinalSave(t *testing.T) {
 	assertTmuxServiceApply(t, definitions)
 }
 
+func TestSystemdRestoreServiceRunsStartupRestoreAfterTmuxWithoutBlockingIt(t *testing.T) {
+	t.Parallel()
+
+	inputs := linuxInputs(t)
+	inputs.WithTmuxService = true
+	inputs.RequiresTmuxForeground = true
+	inputs.TmuxForegroundVerified = true
+
+	definitions, err := setup.Definitions(inputs)
+	if err != nil {
+		t.Fatalf("Definitions failed: %v", err)
+	}
+
+	restore := findServiceDefinition(t, definitions, setup.RestoreServiceName)
+
+	for _, want := range []string{
+		"After=" + setup.TmuxServiceName + "\n",
+		"Type=oneshot\n",
+		"ExecStart=/usr/local/bin/sesh action autosave-restore-on-start --socket /run/user/1000/sesh/tmux.sock",
+		"TimeoutStartSec=10min\n",
+	} {
+		if !strings.Contains(restore.Content, want) {
+			t.Fatalf("restore service is missing %q:\n%s", want, restore.Content)
+		}
+	}
+
+	tmux := findServiceDefinition(t, definitions, setup.TmuxServiceName)
+	if strings.Contains(tmux.Content, "autosave-restore-on-start") {
+		t.Fatalf("the tmux service must not run the restore itself, it would delay and time out the server start:\n%s", tmux.Content)
+	}
+}
+
+func TestSystemdUnitsForUserTmuxServerRenderNoRestoreService(t *testing.T) {
+	t.Parallel()
+
+	definitions, err := setup.Definitions(linuxInputs(t))
+	if err != nil {
+		t.Fatalf("Definitions failed: %v", err)
+	}
+
+	for _, definition := range definitions {
+		if definition.Name == setup.RestoreServiceName {
+			t.Fatalf("a user-run tmux server has no managed start to restore after:\n%s", definition.Content)
+		}
+	}
+}
+
 func findServiceDefinition(t *testing.T, definitions []setup.ServiceDefinition, name string) setup.ServiceDefinition {
 	t.Helper()
 
@@ -219,6 +267,9 @@ func assertTmuxServiceContent(t *testing.T, content string) {
 		"--deadline 20s",
 		"--status-file /home/user/.local/state/sesh/autosave-status.json",
 		"TimeoutStopSec=25s",
+		"OOMPolicy=continue\n",
+		"SuccessExitStatus=130\n",
+		"Wants=" + setup.RestoreServiceName + "\n",
 	} {
 		if !strings.Contains(content, want) {
 			t.Fatalf("tmux service is missing %q:\n%s", want, content)
@@ -252,8 +303,8 @@ func assertTmuxServiceApply(t *testing.T, definitions []setup.ServiceDefinition)
 		t.Fatalf("ApplyDefinitions failed: %v", err)
 	}
 
-	if result.Written != 3 {
-		t.Fatalf("written = %d, want 3 definitions including tmux service", result.Written)
+	if result.Written != 4 {
+		t.Fatalf("written = %d, want 4 definitions including the tmux and restore services", result.Written)
 	}
 
 	data, err := os.ReadFile(filepath.Join(root, setup.TmuxServiceName))
@@ -309,8 +360,8 @@ func TestUnverifiedForegroundSupportBlocksTmuxService(t *testing.T) {
 		t.Fatalf("wrote %d files, want the two unblocked definitions", result.Written)
 	}
 
-	if len(result.BlockedNames) != 1 || result.BlockedNames[0] != setup.TmuxServiceName {
-		t.Fatalf("blocked = %v, want %s", result.BlockedNames, setup.TmuxServiceName)
+	if !slices.Equal(result.BlockedNames, []string{setup.TmuxServiceName, setup.RestoreServiceName}) {
+		t.Fatalf("blocked = %v, want the tmux service and the restore service that follows it", result.BlockedNames)
 	}
 
 	if _, err := os.Stat(filepath.Join(root, setup.TmuxServiceName)); !errors.Is(err, os.ErrNotExist) {
