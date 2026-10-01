@@ -512,7 +512,7 @@ func TestSameServerSocketComparesFullPaths(t *testing.T) {
 	}
 }
 
-func TestObservedCodexInitialIdleIsDistinctFromCompletedIdle(t *testing.T) {
+func TestObservedInitialIdleIsDistinctFromCompletedIdle(t *testing.T) {
 	at := time.Unix(500, 0)
 
 	tests := []struct {
@@ -527,7 +527,9 @@ func TestObservedCodexInitialIdleIsDistinctFromCompletedIdle(t *testing.T) {
 		{name: "running compaction", harness: aht.HarnessCodex, activity: aht.ActivityRunning, native: &registry.NativeObservation{Event: "SessionStart", Activity: new(registry.ActivityRunning)}},
 		{name: "no native evidence", harness: aht.HarnessCodex, activity: aht.ActivityIdle},
 		{name: "unknown native activity", harness: aht.HarnessCodex, activity: aht.ActivityIdle, native: &registry.NativeObservation{Event: "SessionStart"}},
-		{name: "other harness", harness: aht.HarnessClaude, activity: aht.ActivityIdle, native: &registry.NativeObservation{Event: "SessionStart", Activity: new(registry.ActivityIdle)}},
+		{name: "claude session start", harness: aht.HarnessClaude, activity: aht.ActivityIdle, native: &registry.NativeObservation{Event: "SessionStart", Activity: new(registry.ActivityIdle)}, want: true},
+		{name: "omp session start", harness: aht.HarnessOmp, activity: aht.ActivityIdle, native: &registry.NativeObservation{Event: "session_start", Activity: new(registry.ActivityIdle)}, want: true},
+		{name: "claude completed response", harness: aht.HarnessClaude, activity: aht.ActivityIdle, native: &registry.NativeObservation{Event: "Stop", Activity: new(registry.ActivityIdle)}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

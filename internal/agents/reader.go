@@ -99,7 +99,7 @@ func agentSessionFromRegistry(session aht.Session) AgentSession {
 		Harness:          string(session.Harness),
 		Presence:         string(session.Presence()),
 		Activity:         activity,
-		InitialIdle:      codexInitialIdle(session),
+		InitialIdle:      initialIdle(session),
 		Attention:        AttentionFor(activity),
 		ServerSocket:     NormalizeServerSocket(session.Location.ServerID),
 		SessionID:        session.Location.SessionID,
@@ -155,12 +155,20 @@ func agentSessionFromRegistry(session aht.Session) AgentSession {
 	return agent
 }
 
-func codexInitialIdle(session aht.Session) bool {
+// initialIdle reports an idle that comes from a session start with no turn since. A freshly
+// started or resumed agent has nothing to read yet, which includes agents that were reopened by a
+// snapshot restore.
+func initialIdle(session aht.Session) bool {
 	activity := session.Activity()
 	native := session.Observations.Native
 
-	return session.Harness == aht.HarnessCodex && activity != nil && *activity == aht.ActivityIdle &&
-		native != nil && native.Event == "SessionStart" && native.Activity != nil && *native.Activity == aht.ActivityIdle
+	return activity != nil && *activity == aht.ActivityIdle &&
+		native != nil && sessionStartEvent(native.Event) && native.Activity != nil && *native.Activity == aht.ActivityIdle
+}
+
+// sessionStartEvent matches the session start event names that the supported harnesses emit.
+func sessionStartEvent(event string) bool {
+	return event == "SessionStart" || event == "session_start"
 }
 
 func agentDetailReasons(activity aht.Activity, detail aht.StateDetail) (string, string) {
