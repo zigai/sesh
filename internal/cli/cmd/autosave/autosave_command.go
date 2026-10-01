@@ -25,8 +25,9 @@ const (
 	autosaveStatusDegraded = "degraded"
 	autosaveStatusFailed   = "failed"
 
-	autosaveReasonLockBusy       = "lock_busy"
-	autosaveReasonTmuxNotRunning = "tmux_not_running"
+	autosaveReasonLockBusy           = "lock_busy"
+	autosaveReasonTmuxNotRunning     = "tmux_not_running"
+	autosaveReasonRestorableSessions = "restorable_sessions"
 
 	autosaveHistoryRecorded    = "recorded"
 	autosaveHistoryNeverRun    = "never_run"
@@ -68,6 +69,7 @@ type autosaveOutcome struct {
 	defaultFrom    string
 	defaultTo      string
 	recorded       bool
+	restorable     int
 	daemonState    string
 	daemonStatus   daemon.RuntimeStatus
 }
@@ -96,6 +98,7 @@ func newAutosaveOutcome(status, reason string) autosaveOutcome {
 		defaultFrom:    "",
 		defaultTo:      "",
 		recorded:       false,
+		restorable:     0,
 		daemonState:    autosaveDaemonUnselected,
 		daemonStatus:   emptyDaemonRuntimeStatus(),
 	}

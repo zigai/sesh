@@ -290,11 +290,17 @@ func executeFinalSave(
 
 	selected, err := resolveAutosaveSelection(ctx, cmd, server)
 	if err != nil {
+		reason := "selection_failed"
+		if errors.Is(err, gotmux.ErrNoServer) {
+			// A stop that arrives after the server died has nothing left to observe.
+			reason = "server_gone"
+		}
+
 		return finalSaveFailure(
 			outcome,
 			status,
 			automation.FinalSaveIncomplete,
-			"selection_failed",
+			reason,
 			errors.Join(err, wrapCloseError(repo.Close()), lock.Release()),
 		)
 	}
@@ -493,11 +499,13 @@ func maintainAutosaveRepository(ctx context.Context, repo *store.Repository, sna
 // skipAutosaveWithoutServer reports a skipped save when no tmux server is running on the target
 // socket, such as a timer firing after login before tmux starts: there is no state to observe.
 func skipAutosaveWithoutServer(ctx context.Context, cmd *cobra.Command, env autosaveEnv, repo *store.Repository) error {
+	restorable := reportRestorableSessions(ctx, env, repo)
 	closeErr := wrapCloseError(repo.Close())
 
 	idle := newAutosaveOutcome(autosaveStatusSkipped, autosaveReasonTmuxNotRunning)
 	idle.history = autosaveHistoryState(env)
 	idle.repository = autosaveRepositoryState(ctx, cmd, env)
+	idle.restorable = restorable
 
 	return errors.Join(renderAutosaveResult(cmd, env, idle), closeErr)
 }

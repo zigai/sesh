@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	prettytable "github.com/jedib0t/go-pretty/v6/table"
@@ -15,6 +16,8 @@ import (
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/session"
+	"github.com/zigai/sesh/internal/snapshot/engine"
+	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
 const (
@@ -162,7 +165,47 @@ func renderListOutput(cmd *cobra.Command, sessions []session.Session, listErr er
 		return err
 	}
 
+	if listErr == nil && len(sessions) == 0 {
+		hintSavedSessions(cmd)
+	}
+
 	return listErr
+}
+
+func hintSavedSessions(cmd *cobra.Command) {
+	repoPath, err := clibase.ResolveRepository(cmd)
+	if err != nil {
+		return
+	}
+
+	repo, err := store.OpenExisting(cmd.Context(), repoPath)
+	if err != nil {
+		return
+	}
+
+	count := engine.RestorableSessionCount(cmd.Context(), repo)
+
+	if err := repo.Close(); err != nil || count == 0 {
+		return
+	}
+
+	noun := "sessions"
+	if count == 1 {
+		noun = "session"
+	}
+
+	quote := func(value string) string {
+		return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
+	}
+
+	restoreCommand := "sesh snapshot restore --socket " + quote(clibase.ResolveSocket(cmd)) + " --repository " + quote(repoPath)
+	if noConfig, _ := cmd.Flags().GetBool("no-config"); noConfig {
+		restoreCommand += " --no-config"
+	} else if configPath, _ := cmd.Flags().GetString("config"); configPath != "" {
+		restoreCommand += " --config " + quote(configPath)
+	}
+
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%d saved %s available. If tmux stopped, start it on the same socket first.\nRestore with: %s\n", count, noun, restoreCommand)
 }
 
 func renderSessionListTable(cmd *cobra.Command, sessions []session.Session, full bool) error {

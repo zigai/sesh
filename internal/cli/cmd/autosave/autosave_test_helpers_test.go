@@ -30,6 +30,7 @@ type autosaveResultJSON struct {
 	DefaultFrom      string `json:"defaultSessionFrom,omitempty"`
 	DefaultTo        string `json:"defaultSessionTo,omitempty"`
 	Recorded         bool   `json:"recorded"`
+	Restorable       int    `json:"restorableSessions,omitempty"`
 	ElapsedSec       int64  `json:"elapsedSeconds"`
 	IntervalM        int    `json:"intervalMinutes"`
 	DaemonState      string `json:"daemonState"`

@@ -3,6 +3,7 @@ package autosave
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"time"
 
@@ -28,6 +29,7 @@ type autosaveResultJSON struct {
 	DefaultFrom      string `json:"defaultSessionFrom,omitempty"`
 	DefaultTo        string `json:"defaultSessionTo,omitempty"`
 	Recorded         bool   `json:"recorded"`
+	Restorable       int    `json:"restorableSessions,omitempty"`
 	ElapsedSec       int64  `json:"elapsedSeconds"`
 	IntervalM        int    `json:"intervalMinutes"`
 	DaemonState      string `json:"daemonState"`
@@ -213,7 +215,7 @@ func renderAutosaveResult(cmd *cobra.Command, env autosaveEnv, outcome autosaveO
 
 	return clibase.WriteOutput(
 		cmd,
-		"Autosave:   %s (reason: %s)\nInterval:   %dm\nElapsed:    %s\nHistory:    %s\nRepository: %s\nAttempt:    %s\nGeneration: %s\nSnapshot:   %s\nRecorded:   %t\nDaemon:     %s\nPhase:      %s\nInhibitors: %t\n",
+		"Autosave:   %s (reason: %s)\nInterval:   %dm\nElapsed:    %s\nHistory:    %s\nRepository: %s\nAttempt:    %s\nGeneration: %s\nSnapshot:   %s\nRecorded:   %t\nDaemon:     %s\nPhase:      %s\nInhibitors: %t\n%s",
 		outcome.status,
 		outcome.reason,
 		int(env.interval.Minutes()),
@@ -227,7 +229,16 @@ func renderAutosaveResult(cmd *cobra.Command, env autosaveEnv, outcome autosaveO
 		outcome.daemonState,
 		outcome.daemonStatus.Phase,
 		outcome.daemonStatus.InhibitorsHeld,
+		restorableLine(outcome.restorable),
 	)
+}
+
+func restorableLine(count int) string {
+	if count == 0 {
+		return ""
+	}
+
+	return fmt.Sprintf("Restorable: %d sessions are saved and no tmux server is running; restore with: sesh snapshot restore\n", count)
 }
 
 func autosavePayload(env autosaveEnv, outcome autosaveOutcome) autosaveResultJSON {
@@ -244,6 +255,7 @@ func autosavePayload(env autosaveEnv, outcome autosaveOutcome) autosaveResultJSO
 		DefaultFrom:      outcome.defaultFrom,
 		DefaultTo:        outcome.defaultTo,
 		Recorded:         outcome.recorded,
+		Restorable:       outcome.restorable,
 		ElapsedSec:       int64(env.decision.Elapsed.Seconds()),
 		IntervalM:        int(env.interval.Minutes()),
 		DaemonState:      outcome.daemonState,
