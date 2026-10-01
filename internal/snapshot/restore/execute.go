@@ -22,6 +22,7 @@ const (
 	defaultWindowWidth  = 80
 	defaultWindowHeight = 24
 	environmentProgram  = "/usr/bin/env"
+	resumeShellProgram  = "/bin/sh"
 )
 
 var (
@@ -1583,9 +1584,7 @@ func (e *Executor) preparePaneLaunch(pane model.Pane, ownerSessionID string) (pa
 		return result, nil
 	}
 
-	executable := string(launch.Executable)
-
-	if !executableAvailable(executable) {
+	if !executableAvailable(string(launch.Executable)) {
 		e.note("launch", model.ReasonApprovedLaunchUnavailable)
 
 		result := disabledPaneLaunch()
@@ -1601,12 +1600,7 @@ func (e *Executor) preparePaneLaunch(pane model.Pane, ownerSessionID string) (pa
 
 	environment, removed := launchEnvironment(e.effectivePaneLaunchEnvironment(pane, ownerSessionID))
 
-	arguments := make([]string, 0, len(launch.Arguments)-1)
-	for _, argument := range launch.Arguments[1:] {
-		arguments = append(arguments, string(argument))
-	}
-
-	program, ok := literalLaunchProgram(executable, arguments, removed)
+	program, ok := e.approvedLaunchProgram(launch, ownerSessionID, environment, removed)
 	if !ok {
 		e.note("launch", model.ReasonApprovedLaunchUnavailable)
 
@@ -1618,6 +1612,47 @@ func (e *Executor) preparePaneLaunch(pane model.Pane, ownerSessionID string) (pa
 	}
 
 	return paneLaunch{program: program, directory: directory, environment: environment, enabled: true, cwdFallback: cwdFallback, reason: ""}, nil
+}
+
+func (e *Executor) approvedLaunchProgram(launch model.Launch, ownerSessionID string, environment map[string]string, removed []string) (tmux.Program, bool) {
+	executable := string(launch.Executable)
+
+	arguments := make([]string, 0, len(launch.Arguments)-1)
+	for _, argument := range launch.Arguments[1:] {
+		arguments = append(arguments, string(argument))
+	}
+
+	if launch.Recovery == model.RecoveryResume {
+		if !executableAvailable(resumeShellProgram) {
+			return tmux.Program{}, false
+		}
+
+		arguments = append([]string{
+			"-m",
+			"-c",
+			`trap ':' INT QUIT; "$@"; trap - INT QUIT; exec "$0" -i`,
+			e.resumeShell(ownerSessionID, environment),
+			executable,
+		}, arguments...)
+		executable = resumeShellProgram
+	}
+
+	return literalLaunchProgram(executable, arguments, removed)
+}
+
+func (e *Executor) resumeShell(ownerSessionID string, environment map[string]string) string {
+	session := e.index.sessionsByID[ownerSessionID]
+	for _, option := range e.manifest.EffectiveSessionOptions(session) {
+		if string(option.Name) == "default-shell" && option.Present && executableAvailable(string(option.Value)) {
+			return string(option.Value)
+		}
+	}
+
+	if shell := environment["SHELL"]; executableAvailable(shell) {
+		return shell
+	}
+
+	return resumeShellProgram
 }
 
 func (e *Executor) effectivePaneLaunchEnvironment(pane model.Pane, ownerSessionID string) []model.Variable {
