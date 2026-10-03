@@ -3,11 +3,14 @@ package setup
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
 
@@ -50,6 +53,10 @@ type setupServicesResultJSON struct {
 	Blocked  []string                    `json:"blocked,omitempty"`
 	Services []setupServiceJSON          `json:"services"`
 	Manager  *setup.ServiceRefreshResult `json:"manager,omitempty"`
+	// Units is the state of the services that make automatic saves work, read after a refresh.
+	Units []setup.UnitState `json:"units,omitempty"`
+
+	applyFailed bool
 }
 
 type setupAgentResultJSON struct {
@@ -92,8 +99,9 @@ func newSetupAgentsCommand() *cobra.Command {
 		Long: "Configure coding-agent integrations and the background tracker.\n\n" +
 			"Agent hooks, shims and the tracker service are owned and installed by AHT; sesh never duplicates hook installation. " +
 			"Without agent names every supported harness is selected.",
-		Args: clibase.UsageArgs(cobra.ArbitraryArgs),
-		RunE: runSetupAgents,
+		Args:        clibase.UsageArgs(cobra.ArbitraryArgs),
+		RunE:        runSetupAgents,
+		Annotations: map[string]string{clibase.AnnotationOperation: "setup_agents"},
 	}
 
 	cmd.Flags().Bool("dry-run", false, "Show changes without writing")
@@ -469,13 +477,15 @@ func applySetupDefinitionsWithManager(
 	}
 
 	payload := setupServicesResultJSON{
-		Platform: inputsPlatform(definitions),
-		Applied:  withContent,
-		Written:  result.Written,
-		Skipped:  planSkippedNames(plans, force),
-		Blocked:  planBlockedNames(plans),
-		Services: make([]setupServiceJSON, 0, len(definitions)),
-		Manager:  refreshed,
+		Platform:    inputsPlatform(definitions),
+		Applied:     withContent,
+		Written:     result.Written,
+		Skipped:     planSkippedNames(plans, force),
+		Blocked:     planBlockedNames(plans),
+		Services:    make([]setupServiceJSON, 0, len(definitions)),
+		Manager:     refreshed,
+		Units:       nil,
+		applyFailed: err != nil,
 	}
 
 	for index, definition := range definitions {
@@ -493,6 +503,10 @@ func applySetupDefinitionsWithManager(
 		}
 
 		payload.Services = append(payload.Services, entry)
+	}
+
+	if withContent && err == nil {
+		payload.Units = automaticSaveStates(cmd.Context(), manager, definitions, refreshed)
 	}
 
 	outcomeErr := errors.Join(err, setupServiceOutcome(payload))
@@ -554,40 +568,142 @@ func setupServiceOutcome(payload setupServicesResultJSON) error {
 	}
 }
 
-func renderSetupServices(cmd *cobra.Command, payload setupServicesResultJSON, operation string) error {
-	verb := "Planned"
-	count := len(payload.Services)
+func renderSetupServices(cmd *cobra.Command, payload setupServicesResultJSON, _ string) error {
+	var out strings.Builder
 
-	if payload.Applied {
-		verb = "Wrote"
-		count = payload.Written
+	directory := ""
+	if len(payload.Services) > 0 {
+		directory = filepath.Dir(payload.Services[0].Path)
 	}
 
-	if err := clibase.WriteOutput(cmd, "%s %d service definition(s) for %s (%s).\n", verb, count, operation, payload.Platform); err != nil {
-		return err
+	if payload.Applied {
+		fmt.Fprintf(&out, "Service files in %s:\n", directory)
+	} else {
+		fmt.Fprintf(&out, "Service files for %s (preview; nothing written):\n", directory)
+	}
+
+	width := 0
+	for _, service := range payload.Services {
+		width = max(width, len(service.Name))
 	}
 
 	for _, service := range payload.Services {
-		if err := clibase.WriteOutput(cmd, "  %s [%s] %s\n", service.Name, service.State, service.Path); err != nil {
-			return err
-		}
+		fmt.Fprintf(&out, "  %-*s  %s\n", width, service.Name, serviceFileOutcome(service, payload))
 
 		for _, requirement := range service.Requires {
-			if err := clibase.WriteOutput(cmd, "    unmet: %s\n", requirement); err != nil {
-				return err
-			}
+			fmt.Fprintf(&out, "    needs: %s\n", requirement)
 		}
 	}
 
 	if !payload.Applied {
 		for _, service := range payload.Services {
-			if err := clibase.WriteOutput(cmd, "\n# %s\n%s", service.Name, service.Content); err != nil {
-				return err
-			}
+			fmt.Fprintf(&out, "\n# %s\n%s", service.Name, service.Content)
 		}
 	}
 
-	return renderSetupServiceRefresh(cmd, payload.Manager)
+	writeSetupServiceRefresh(&out, payload.Manager)
+
+	return clibase.WriteOutput(cmd, "%s", out.String())
+}
+
+// serviceFileOutcome says what happened, or would happen, to one service file.
+func serviceFileOutcome(service setupServiceJSON, payload setupServicesResultJSON) string {
+	written := payload.Applied && !payload.applyFailed
+
+	switch {
+	case len(service.Requires) > 0:
+		return "not written: prerequisites missing"
+	case slices.Contains(payload.Skipped, service.Name):
+		return "left alone: not written by sesh (--force replaces it)"
+	case service.State == string(setup.ArtifactCurrent):
+		return "unchanged"
+	case service.State == string(setup.ArtifactMissing) && written:
+		return "created"
+	case service.State == string(setup.ArtifactMissing):
+		return "will be created"
+	case service.State == string(setup.ArtifactForeign) && written:
+		return "replaced"
+	case written:
+		return "updated"
+	default:
+		return "will be updated"
+	}
+}
+
+func writeSetupServiceRefresh(out *strings.Builder, result *setup.ServiceRefreshResult) {
+	if result == nil {
+		return
+	}
+
+	if result.Reloaded {
+		out.WriteString("Reloaded systemd.\n")
+	}
+
+	if len(result.Restarted) > 0 {
+		fmt.Fprintf(out, "Restarted %s to pick up the new definition and sesh binary.\n", strings.Join(result.Restarted, ", "))
+	}
+
+	if len(result.Recovered) > 0 {
+		fmt.Fprintf(out, "Started %s again; it had failed.\n", strings.Join(result.Recovered, ", "))
+	}
+
+	if len(result.RestartRequired) > 0 {
+		out.WriteString("Tmux startup changes take full effect the next time its server starts; live sessions were preserved.\n")
+	}
+}
+
+// automaticSaveStates reads the automatic-save units' state after systemd reloaded them. Without
+// the states the next steps fall back to the full start command.
+func automaticSaveStates(
+	ctx context.Context,
+	manager setup.ServiceManager,
+	definitions []setup.ServiceDefinition,
+	refreshed *setup.ServiceRefreshResult,
+) []setup.UnitState {
+	if refreshed == nil || !refreshed.Reloaded {
+		return nil
+	}
+
+	states, err := setup.UnitStates(ctx, manager, automaticSaveUnits(definitions))
+	if err != nil {
+		zerolog.Ctx(ctx).Warn().Str("component", "setup").Str("operation", "inspect_autosave_services").
+			Str("status", "degraded").Str("reason", "service_state_unavailable").Msg("automatic save service readiness could not be verified")
+
+		return nil
+	}
+
+	failed := 0
+
+	for _, state := range states {
+		if state.Active == "failed" {
+			failed++
+		}
+	}
+
+	if failed > 0 {
+		zerolog.Ctx(ctx).Warn().Str("component", "setup").Str("operation", "inspect_autosave_services").
+			Str("status", "degraded").Str("reason", "service_failed").Int("failed", failed).
+			Msg("automatic save services are failing")
+	}
+
+	return states
+}
+
+// automaticSaveUnits are the units that must be enabled and running for automatic saves.
+func automaticSaveUnits(definitions []setup.ServiceDefinition) []string {
+	units := []string{}
+
+	for _, definition := range definitions {
+		if isAutomaticSaveUnit(definition.Name) {
+			units = append(units, definition.Name)
+		}
+	}
+
+	return units
+}
+
+func isAutomaticSaveUnit(name string) bool {
+	return name == setup.AutosaveTimerName || name == setup.CoordinatorServiceName || name == setup.TmuxServiceName
 }
 
 func renderSetupServiceNextSteps(cmd *cobra.Command, payload setupServicesResultJSON) error {
@@ -599,44 +715,55 @@ func renderSetupServiceNextSteps(cmd *cobra.Command, payload setupServicesResult
 		return nil
 	}
 
-	units := []string{}
+	var units []string
 
 	for _, service := range payload.Services {
-		switch service.Name {
-		case setup.AutosaveTimerName, setup.CoordinatorServiceName, setup.TmuxServiceName:
+		if isAutomaticSaveUnit(service.Name) {
 			units = append(units, service.Name)
 		}
 	}
 
+	return writeAutomaticSaveReadiness(cmd, units, payload.Units)
+}
+
+// writeAutomaticSaveReadiness tells the reader whether automatic saves are on, which units still
+// need starting and how to see why a failing unit failed.
+func writeAutomaticSaveReadiness(cmd *cobra.Command, units []string, states []setup.UnitState) error {
 	if len(units) == 0 {
 		return nil
 	}
 
-	return clibase.WriteOutput(cmd, "\nTo start automatic saves:\n  systemctl --user enable --now %s\n", strings.Join(units, " "))
-}
-
-func renderSetupServiceRefresh(cmd *cobra.Command, result *setup.ServiceRefreshResult) error {
-	if result == nil {
-		return nil
+	if states == nil {
+		return clibase.WriteOutput(cmd, "\nTo start automatic saves:\n  systemctl --user enable --now %s\n", strings.Join(units, " "))
 	}
 
-	if result.Reloaded {
-		if err := clibase.WriteOutput(cmd, "Reloaded the user service manager.\n"); err != nil {
-			return err
+	var (
+		out     strings.Builder
+		pending []string
+		failing []string
+	)
+
+	for _, unit := range states {
+		switch {
+		case unit.Active == "failed":
+			failing = append(failing, unit.Name)
+		case !unit.Running() || !unit.EnabledAtLogin():
+			pending = append(pending, unit.Name)
 		}
 	}
 
-	for _, name := range result.Restarted {
-		if err := clibase.WriteOutput(cmd, "Refreshed the running %s.\n", name); err != nil {
-			return err
-		}
+	for _, name := range failing {
+		fmt.Fprintf(&out, "\n%s is failing; see why with:\n  journalctl --user -u %s -n 20\n", name, name)
 	}
 
-	if len(result.RestartRequired) > 0 {
-		return clibase.WriteOutput(cmd, "Tmux startup changes take full effect the next time its server starts; live sessions were preserved.\n")
+	switch {
+	case len(failing) == 0 && len(pending) == 0:
+		fmt.Fprintf(&out, "\nAutomatic saves are on: %s enabled and running.\n", strings.Join(units, ", "))
+	case len(pending) > 0:
+		fmt.Fprintf(&out, "\nTo start automatic saves:\n  systemctl --user enable --now %s\n", strings.Join(pending, " "))
 	}
 
-	return nil
+	return clibase.WriteOutput(cmd, "%s", out.String())
 }
 
 func resolveSetupServiceDirectory(cmd *cobra.Command) (string, error) {

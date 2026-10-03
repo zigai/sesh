@@ -28,14 +28,24 @@ type ServiceManager struct {
 }
 
 type ServiceRefreshResult struct {
-	Reloaded        bool     `json:"reloaded"`
-	Restarted       []string `json:"restarted,omitempty"`
+	Reloaded  bool     `json:"reloaded"`
+	Restarted []string `json:"restarted,omitempty"`
+	// Recovered lists failed services started again on their refreshed definition.
+	Recovered       []string `json:"recovered,omitempty"`
 	RestartRequired []string `json:"restartRequired,omitempty"`
+}
+
+// UnitState is what the service manager reports for one unit.
+type UnitState struct {
+	Name    string `json:"name"`
+	Active  string `json:"active"`
+	Enabled string `json:"enabled"`
 }
 
 type serviceRefreshPlan struct {
 	reload          bool
 	restart         []string
+	recover         []string
 	restartRequired []string
 }
 
@@ -43,6 +53,11 @@ type serviceInspectionOutput struct {
 	buffer   bytes.Buffer
 	overflow bool
 }
+
+// Running reports whether the unit is active, and Enabled whether it starts with the session.
+func (u UnitState) Running() bool { return u.Active == "active" || u.Active == "reloading" }
+
+func (u UnitState) EnabledAtLogin() bool { return u.Enabled == "enabled" || u.Enabled == "static" }
 
 func RefreshDefinitions(
 	ctx context.Context,
@@ -90,7 +105,45 @@ func RefreshDefinitions(
 		refreshed.Restarted = append(refreshed.Restarted, name)
 	}
 
+	// A failed service was started and then crashed, often on the very definition this refresh
+	// replaced. Starting it again restores the state its user chose instead of leaving it down.
+	for _, name := range prepared.recover {
+		if err := manager.run(ctx, "--user", "reset-failed", name); err != nil {
+			return applied, refreshed, enrichServiceRefresh("recover", errors.Join(ErrServiceRestart, err))
+		}
+
+		if err := manager.run(ctx, "--user", "restart", name); err != nil {
+			return applied, refreshed, enrichServiceRefresh("recover", errors.Join(ErrServiceRestart, err))
+		}
+
+		refreshed.Recovered = append(refreshed.Recovered, name)
+	}
+
 	return applied, refreshed, nil
+}
+
+// UnitStates reports the active and enabled state of each named unit.
+func UnitStates(ctx context.Context, manager ServiceManager, names []string) ([]UnitState, error) {
+	ctx, cancel := context.WithTimeout(ctx, serviceRefreshTimeout)
+	defer cancel()
+
+	states := make([]UnitState, 0, len(names))
+
+	for _, name := range names {
+		active, err := manager.property(ctx, name, "ActiveState")
+		if err != nil {
+			return states, err
+		}
+
+		enabled, err := manager.property(ctx, name, "UnitFileState")
+		if err != nil {
+			return states, err
+		}
+
+		states = append(states, UnitState{Name: name, Active: active, Enabled: enabled})
+	}
+
+	return states, nil
 }
 
 func prepareServiceRefresh(
@@ -166,13 +219,16 @@ func inspectRefreshDefinition(
 			prepared.restartRequired = append(prepared.restartRequired, definition.Name)
 		}
 	case AutosaveTimerName, RemoteServiceName, CoordinatorServiceName:
-		running, err := manager.running(ctx, definition.Name)
+		state, err := manager.activeState(ctx, definition.Name)
 		if err != nil {
 			return err
 		}
 
-		if running {
+		switch state {
+		case "active", "reloading":
 			prepared.restart = append(prepared.restart, definition.Name)
+		case "failed":
+			prepared.recover = append(prepared.recover, definition.Name)
 		}
 	}
 
@@ -192,25 +248,34 @@ func systemdStartupDefinition(content string) string {
 	return startup.String()
 }
 
-func (manager ServiceManager) running(ctx context.Context, name string) (bool, error) {
+// activeState returns a unit's ActiveState, refusing a transitional state whose outcome a
+// refresh cannot predict.
+func (manager ServiceManager) activeState(ctx context.Context, name string) (string, error) {
+	state, err := manager.property(ctx, name, "ActiveState")
+	if err != nil {
+		return "", err
+	}
+
+	switch state {
+	case "active", "reloading", "inactive", "failed":
+		return state, nil
+	default:
+		return "", ErrServiceInspect
+	}
+}
+
+func (manager ServiceManager) property(ctx context.Context, name, property string) (string, error) {
 	inspect := manager.Inspect
 	if inspect == nil {
 		inspect = inspectServiceCommand
 	}
 
-	output, err := inspect(ctx, "systemctl", "--user", "show", "--property=ActiveState", "--value", name)
+	output, err := inspect(ctx, "systemctl", "--user", "show", "--property="+property, "--value", name)
 	if err != nil {
-		return false, errors.Join(ErrServiceInspect, err)
+		return "", errors.Join(ErrServiceInspect, err)
 	}
 
-	switch strings.TrimSpace(output) {
-	case "active", "reloading":
-		return true, nil
-	case "inactive", "failed":
-		return false, nil
-	default:
-		return false, ErrServiceInspect
-	}
+	return strings.TrimSpace(output), nil
 }
 
 func (manager ServiceManager) run(ctx context.Context, arguments ...string) error {

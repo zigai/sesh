@@ -16,7 +16,7 @@ import (
 
 var errTestServiceManager = errors.New("private service manager failure")
 
-func TestRefreshDefinitionsPreservesRunningAndEnabledState(t *testing.T) {
+func TestRefreshDefinitionsPreservesStateAndRecoversFailedServices(t *testing.T) {
 	t.Parallel()
 
 	for _, state := range []string{"active", "reloading", "inactive", "failed"} {
@@ -33,7 +33,7 @@ func TestRefreshDefinitionsPreservesRunningAndEnabledState(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				assertServiceRefreshResult(t, result, state == "active" || state == "reloading")
+				assertServiceRefreshResult(t, result, state)
 				assertRefreshPreservesServiceState(t, *calls)
 
 				if applied.Written != 0 && applied.Written != len(definitions) {
@@ -46,16 +46,20 @@ func TestRefreshDefinitionsPreservesRunningAndEnabledState(t *testing.T) {
 	}
 }
 
-func assertServiceRefreshResult(t *testing.T, result ServiceRefreshResult, running bool) {
+func assertServiceRefreshResult(t *testing.T, result ServiceRefreshResult, state string) {
 	t.Helper()
 
-	wantRestarts := []string(nil)
-	if running {
+	var wantRestarts, wantRecovered []string
+
+	switch state {
+	case "active", "reloading":
 		wantRestarts = []string{AutosaveTimerName, RemoteServiceName}
+	case "failed":
+		wantRecovered = []string{AutosaveTimerName, RemoteServiceName}
 	}
 
-	if !result.Reloaded || !slices.Equal(result.Restarted, wantRestarts) {
-		t.Fatalf("refresh = %+v, want restarted %v", result, wantRestarts)
+	if !result.Reloaded || !slices.Equal(result.Restarted, wantRestarts) || !slices.Equal(result.Recovered, wantRecovered) {
+		t.Fatalf("refresh = %+v, want restarted %v and recovered %v", result, wantRestarts, wantRecovered)
 	}
 }
 
@@ -67,7 +71,8 @@ func assertRefreshPreservesServiceState(t *testing.T, calls []string) {
 			t.Fatalf("changed enabled state or started a service: %s", call)
 		}
 
-		if strings.Contains(call, "try-restart") && !strings.HasSuffix(call, AutosaveTimerName) && !strings.HasSuffix(call, RemoteServiceName) {
+		restarts := strings.Contains(call, "restart") || strings.Contains(call, "reset-failed")
+		if restarts && !strings.HasSuffix(call, AutosaveTimerName) && !strings.HasSuffix(call, RemoteServiceName) {
 			t.Fatalf("restarted tmux or an in-flight autosave: %s", call)
 		}
 	}

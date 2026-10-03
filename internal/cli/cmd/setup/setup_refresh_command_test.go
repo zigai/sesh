@@ -192,7 +192,7 @@ if [ %[4]q = "$*" ]; then exit %[3]d; fi
 exit 0
 `, callsPath, failing, fakeSystemctlFailureExit, "--user "+failing)
 
-	if err := os.WriteFile(filepath.Join(binDir, "systemctl"), []byte(script), 0o700); err != nil { //nolint:gosec // reason: the stub must be executable.
+	if err := os.WriteFile(filepath.Join(binDir, "systemctl"), []byte(script), 0o700); err != nil { //nolint:gosec // the stub must be executable.
 		t.Fatal(err)
 	}
 
@@ -334,4 +334,129 @@ func assertDefinitionOnlyRefresh(t *testing.T, preview bool, directory string, r
 	if !result.Applied || result.Written != 3 {
 		t.Fatalf("definition-only apply = %+v", result)
 	}
+}
+
+// setupStatefulManager puts a systemctl stub first on PATH that reports active for every unit
+// except those in failed, and the same UnitFileState for all of them. It records every call.
+func setupStatefulManager(t *testing.T, failed []string, unitFileState string) fakeSystemctl {
+	t.Helper()
+
+	binDir := t.TempDir()
+	callsPath := filepath.Join(t.TempDir(), "calls")
+
+	var failedCases strings.Builder
+	for _, name := range failed {
+		fmt.Fprintf(&failedCases, "\"--user show --property=ActiveState --value %s\") echo failed; exit 0;;\n", name)
+	}
+
+	script := fmt.Sprintf(`#!/bin/sh
+printf '%%s\n' "$*" >> %[1]q
+case "$*" in
+%[2]s"--user show --property=ActiveState --value "*) echo active; exit 0;;
+"--user show --property=UnitFileState --value "*) echo %[3]s; exit 0;;
+esac
+exit 0
+`, callsPath, failedCases.String(), unitFileState)
+
+	if err := os.WriteFile(filepath.Join(binDir, "systemctl"), []byte(script), 0o700); err != nil { //nolint:gosec // the stub must be executable.
+		t.Fatal(err)
+	}
+
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	return fakeSystemctl{callsPath: callsPath}
+}
+
+func seedSetupCoordinator(t *testing.T) {
+	t.Helper()
+
+	directory := seedSetupRefreshServices(t)
+	if err := os.WriteFile(filepath.Join(directory, setup.CoordinatorServiceName), []byte("# "+setup.ManagedMarker+"\nExecStart=/old/sesh daemon run\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSetupServicesStartsAFailedServiceAgainAfterFixingIt(t *testing.T) {
+	setupRefreshHome(t)
+	seedSetupCoordinator(t)
+	fake := setupStatefulManager(t, []string{setup.CoordinatorServiceName}, "enabled")
+
+	stdout, stderr, err := executeCommand(t, "setup", "services", "--with-coordinator", "--apply", testNoConfigFlag)
+	if err != nil || stderr != "" {
+		t.Fatalf("setup failed: %v\nstderr: %s", err, stderr)
+	}
+
+	assertServiceFileLabel(t, stdout, setup.CoordinatorServiceName, "updated")
+
+	for _, want := range []string{"Reloaded systemd.", "Started " + setup.CoordinatorServiceName + " again; it had failed."} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("output is missing %q:\n%s", want, stdout)
+		}
+	}
+
+	commands := fake.commands(t)
+	if !slices.Contains(commands, "reset-failed "+setup.CoordinatorServiceName) || !slices.Contains(commands, "restart "+setup.CoordinatorServiceName) {
+		t.Fatalf("the failed coordinator was not started again: %v", commands)
+	}
+
+	for _, command := range commands {
+		if strings.HasPrefix(command, "enable") || strings.Contains(command, setup.TmuxServiceName) {
+			t.Fatalf("setup changed enablement or touched tmux: %v", commands)
+		}
+	}
+}
+
+func TestSetupServicesSaysWhenAutomaticSavesAreAlreadyOn(t *testing.T) {
+	setupRefreshHome(t)
+	seedSetupCoordinator(t)
+	setupStatefulManager(t, nil, "enabled")
+
+	stdout, _, err := executeCommand(t, "setup", "services", "--with-coordinator", "--apply", testNoConfigFlag)
+	if err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
+
+	if !strings.Contains(stdout, "Automatic saves are on: sesh-autosave.timer, sesh-coordinator.service enabled and running.") ||
+		strings.Contains(stdout, "enable --now") {
+		t.Fatalf("setup must report that nothing is left to start:\n%s", stdout)
+	}
+}
+
+func TestSetupServicesLabelsEachFileByWhatHappened(t *testing.T) {
+	setupRefreshHome(t)
+	seedSetupRefreshServices(t)
+	setupStatefulManager(t, nil, "disabled")
+
+	stdout, _, err := executeCommand(t, "setup", "services", "--apply", testNoConfigFlag)
+	if err != nil {
+		t.Fatalf("setup failed: %v", err)
+	}
+
+	assertServiceFileLabel(t, stdout, setup.AutosaveTimerName, "updated")
+	assertServiceFileLabel(t, stdout, setup.AutosaveServiceName, "created")
+
+	if !strings.Contains(stdout, "To start automatic saves:\n  systemctl --user enable --now sesh-autosave.timer\n") {
+		t.Fatalf("output must say how to start the disabled timer:\n%s", stdout)
+	}
+
+	if strings.Contains(stdout, "[stale]") || strings.Contains(stdout, "[current]") {
+		t.Fatalf("output must not use internal plan states:\n%s", stdout)
+	}
+}
+
+// assertServiceFileLabel checks the outcome printed for one service file, ignoring column padding.
+func assertServiceFileLabel(t *testing.T, stdout, name, label string) {
+	t.Helper()
+
+	for line := range strings.SplitSeq(stdout, "\n") {
+		if fields := strings.Fields(line); len(fields) >= 2 && fields[0] == name {
+			if got := strings.Join(fields[1:], " "); got != label {
+				t.Fatalf("%s is labeled %q, want %q:\n%s", name, got, label, stdout)
+			}
+
+			return
+		}
+	}
+
+	t.Fatalf("no line for %s:\n%s", name, stdout)
 }

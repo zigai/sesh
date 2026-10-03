@@ -43,7 +43,7 @@ const ForegroundServerTmuxMinor = 7
 const (
 	restoreStartTimeout = "10min"
 
-	// supervisorStopExitStatus is the status the CLI maps cancellation to, which a stop request causes.
+	// supervisorStopExitStatus is the CLI's exit status for cancellation, which a stop request causes.
 	supervisorStopExitStatus = 130
 )
 
@@ -398,7 +398,6 @@ func renderSystemdTmuxService(inputs ServiceInputs) string {
 	content.WriteString("KillMode=control-group\n")
 	// One OOM-killed process must cost that process, not the server and every pane with it.
 	content.WriteString("OOMPolicy=continue\n")
-	// A stop request cancels the supervisor, which exits with the cancellation status.
 	content.WriteString("SuccessExitStatus=" + strconv.Itoa(supervisorStopExitStatus) + "\n")
 	content.WriteString("Restart=no\n\n")
 	content.WriteString("[Install]\n")
