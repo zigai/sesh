@@ -34,12 +34,10 @@ func TestLogsCommandFormatsStructuredRecordsWithoutSelfLogging(t *testing.T) {
 	}
 
 	want := "" +
-		"2026-08-06 15:45:52  WARN   doctor          " +
-		"doctor check non-ok" + strings.Repeat(" ", 19) +
-		"status=warning, reason=save_failed, check=continuum-shutdown-save\n" +
-		"2026-08-06 15:46:01  INFO   resurrect       " +
-		"resurrect save completed" + strings.Repeat(" ", 14) +
-		"command=continuum.tick, operation=save, status=ok, duration=5.0s\n"
+		"2026-08-06 15:45:52 WARN  doctor: doctor check non-ok " +
+		"status=warning reason=save_failed check=continuum-shutdown-save\n" +
+		"2026-08-06 15:46:01 INFO  resurrect: resurrect save completed " +
+		"command=continuum.tick operation=save status=ok duration=5.0s\n"
 	if output != want {
 		t.Fatalf("logs output =\n%q\nwant:\n%q", output, want)
 	}
@@ -269,7 +267,7 @@ func TestFormattedLogsOmitCorruptRecordsAndContinue(t *testing.T) {
 	}
 
 	for _, want := range []string{
-		"resurrect       active",
+		"resurrect: active",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("logs output = %q, want containing %q", output, want)

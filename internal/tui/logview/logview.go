@@ -21,14 +21,12 @@ import (
 )
 
 const (
-	logTimeLayout              = "2006-01-02 15:04:05"
-	logLevelAlignmentWidth     = 5
-	logComponentAlignmentWidth = 14
-	logMessageAlignmentWidth   = 36
-	DefaultLogLines            = 50
-	defaultLogLines            = DefaultLogLines
-	MaxLogRecordBytes          = 4 << 20
-	maxLogRecordBytes          = MaxLogRecordBytes
+	logTimeLayout          = "2006-01-02 15:04:05"
+	logLevelAlignmentWidth = 5
+	DefaultLogLines        = 50
+	defaultLogLines        = DefaultLogLines
+	MaxLogRecordBytes      = 4 << 20
+	maxLogRecordBytes      = MaxLogRecordBytes
 
 	oneSecondMs         = 1000
 	oneMinuteMs         = 60_000
@@ -180,42 +178,26 @@ func RenderLogLine(line []byte, styles Styles) (string, error) {
 	}
 
 	paddedLevel := padShortLogLevel(level)
-	paddedComponent := padShortLogComponent(component)
 
 	levelStyle := logLevelStyle(styles, level)
 	styledLevel := levelStyle.Render(paddedLevel)
-	styledComponent := styles.component.Render(paddedComponent)
+	styledComponent := styles.component.Render(component + ":")
 
 	fields := renderLogFields(record, styles)
-	messagePadding := ""
-
-	if fields != "" {
-		msgPad := max(logMessageAlignmentWidth-lipgloss.Width(message), 0)
-		messagePadding = strings.Repeat(" ", msgPad)
-	}
-
-	styledMessage := message
-
-	switch level {
-	case "WARN", "WARNING":
-		styledMessage = styles.warn.Render(message)
-	case "ERROR", "FATAL", "PANIC":
-		styledMessage = styles.error.Render(message)
-	}
 
 	sections := []string{
 		styles.timestamp.Render(paddedTimestamp),
 		styledLevel,
 		styledComponent,
-		styledMessage + messagePadding,
+		message,
 	}
 
-	content := strings.Join(sections, "  ")
+	content := strings.Join(sections, " ")
 	if fields == "" {
 		return content, nil
 	}
 
-	return content + "  " + fields, nil
+	return content + " " + fields, nil
 }
 
 func NewLogStyles(color bool, extra ...any) Styles {
@@ -264,19 +246,16 @@ func NewLogStyles(color bool, extra ...any) Styles {
 
 	return Styles{
 		timestamp: lipgloss.NewStyle().Foreground(lipgloss.Color("243")),
-		trace:     lipgloss.NewStyle().Foreground(lipgloss.Color("245")),
-		debug:     lipgloss.NewStyle().Foreground(lipgloss.Color("39")),
-		info:      lipgloss.NewStyle().Foreground(lipgloss.Color("38")),
-		warn:      lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Bold(true),
-		error:     lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true),
-		critical: lipgloss.NewStyle().
-			Foreground(lipgloss.Color("231")).
-			Background(lipgloss.Color("196")).
-			Bold(true),
-		component: lipgloss.NewStyle().Foreground(lipgloss.Color("75")),
-		fieldKey:  lipgloss.NewStyle().Foreground(lipgloss.Color("245")),
-		fieldVal:  lipgloss.NewStyle().Foreground(lipgloss.Color("252")),
-		dim:       lipgloss.NewStyle().Foreground(lipgloss.Color("239")),
+		trace:     lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Bold(true),
+		debug:     lipgloss.NewStyle().Foreground(lipgloss.Color("63")).Bold(true),
+		info:      lipgloss.NewStyle().Foreground(lipgloss.Color("86")).Bold(true),
+		warn:      lipgloss.NewStyle().Foreground(lipgloss.Color("192")).Bold(true),
+		error:     lipgloss.NewStyle().Foreground(lipgloss.Color("204")).Bold(true),
+		critical:  lipgloss.NewStyle().Foreground(lipgloss.Color("134")).Bold(true),
+		component: lipgloss.NewStyle().Bold(true).Faint(true),
+		fieldKey:  lipgloss.NewStyle().Faint(true),
+		fieldVal:  lipgloss.NewStyle(),
+		dim:       lipgloss.NewStyle().Faint(true),
 		dimCyan:   lipgloss.NewStyle().Foreground(lipgloss.Color("37")),
 		verbose:   isVerbose,
 		relative:  isRelative,
@@ -415,12 +394,6 @@ func padShortLogLevel(level string) string {
 	padding := max(logLevelAlignmentWidth-lipgloss.Width(level), 0)
 
 	return level + strings.Repeat(" ", padding)
-}
-
-func padShortLogComponent(component string) string {
-	padding := max(logComponentAlignmentWidth-lipgloss.Width(component), 0)
-
-	return component + strings.Repeat(" ", padding)
 }
 
 func humanizeDuration(ms int64) string {
@@ -646,9 +619,7 @@ func renderLogFields(record map[string]any, styles Styles) string {
 		fields = append(fields, styles.fieldKey.Render(displayKey)+eq+valStyle.Render(displayVal))
 	}
 
-	sep := styles.dim.Render(", ")
-
-	return strings.Join(fields, sep)
+	return strings.Join(fields, " ")
 }
 
 func orderedLogFieldKeys(record map[string]any) []string {

@@ -35,7 +35,7 @@ func writeLogsTestFile(t *testing.T, content string) string {
 	return path
 }
 
-func TestLogRendererAlignsShortComponentsWithoutPaddingStructuredFields(t *testing.T) {
+func TestLogRendererUsesCompactComponentPrefixesAndFields(t *testing.T) {
 	popupStartedRecord := []byte(`{"time":"2026-08-06T16:36:09Z","level":"info","component":"popup","command":"popup","message":"popup operation started"}` + "\n")
 	popupCompletedRecord := []byte(`{"time":"2026-08-06T16:36:09Z","level":"info","component":"popup","command":"popup","message":"popup operation completed"}` + "\n")
 	commandRecord := []byte(`{"time":"2026-08-06T16:36:09Z","level":"info","component":"command","command":"popup","message":"command completed"}` + "\n")
@@ -46,51 +46,27 @@ func TestLogRendererAlignsShortComponentsWithoutPaddingStructuredFields(t *testi
 	commandLine := renderLogTestLine(t, commandRecord)
 	resurrectLine := renderLogTestLine(t, resurrectRecord)
 
-	messageColumns := []int{
-		strings.Index(popupStartedLine, "popup operation started"),
-		strings.Index(popupCompletedLine, "popup operation completed"),
-		strings.Index(commandLine, "command completed"),
-		strings.Index(resurrectLine, "resurrect save started"),
-	}
-	for _, column := range messageColumns[1:] {
-		if column != messageColumns[0] {
-			t.Fatalf("message column misalignment: got %v", messageColumns)
-		}
-	}
-
-	fieldColumns := []int{
-		strings.Index(popupStartedLine, "command=popup"),
-		strings.Index(popupCompletedLine, "command=popup"),
-		strings.Index(commandLine, "command=popup"),
-		strings.Index(resurrectLine, "command=continuum.tick"),
-	}
-	for _, column := range fieldColumns[1:] {
-		if column != fieldColumns[0] {
-			t.Fatalf("field column misalignment: got %v", fieldColumns)
-		}
-	}
-
-	startedFragment := "popup" + "           popup operation started               command=popup"
+	startedFragment := "popup: popup operation started command=popup"
 	if !strings.Contains(popupStartedLine, startedFragment) {
-		t.Fatalf("popup started line = %q, want aligned message", popupStartedLine)
+		t.Fatalf("popup started line = %q, want compact message", popupStartedLine)
 	}
 
-	completedFragment := "popup" + "           popup operation completed             command=popup"
+	completedFragment := "popup: popup operation completed command=popup"
 	if !strings.Contains(popupCompletedLine, completedFragment) {
-		t.Fatalf("popup completed line = %q, want aligned message", popupCompletedLine)
+		t.Fatalf("popup completed line = %q, want compact message", popupCompletedLine)
 	}
 
-	commandFragment := "command" + "         command completed                     command=popup"
+	commandFragment := "command: command completed command=popup"
 	if !strings.Contains(commandLine, commandFragment) {
-		t.Fatalf("command line = %q, want aligned message", commandLine)
+		t.Fatalf("command line = %q, want compact message", commandLine)
 	}
 
-	resurrectFragment := "resurrect" + "       resurrect save started                command=continuum.tick"
+	resurrectFragment := "resurrect: resurrect save started command=continuum.tick"
 	if !strings.Contains(resurrectLine, resurrectFragment) {
-		t.Fatalf("resurrect line = %q, want aligned message", resurrectLine)
+		t.Fatalf("resurrect line = %q, want compact message", resurrectLine)
 	}
 
-	longMessage := strings.Repeat("x", logMessageAlignmentWidth+1)
+	longMessage := strings.Repeat("x", 100)
 	longRecord := strings.Replace(
 		string(commandRecord),
 		`"message":"command completed"`,
@@ -100,8 +76,8 @@ func TestLogRendererAlignsShortComponentsWithoutPaddingStructuredFields(t *testi
 
 	longLine := renderLogTestLine(t, []byte(longRecord))
 
-	if !strings.Contains(longLine, longMessage+"  command=popup") {
-		t.Fatalf("long message line = %q, want intact message and two-space field gap", longLine)
+	if !strings.Contains(longLine, longMessage+" command=popup") {
+		t.Fatalf("long message line = %q, want intact message and single-space field gap", longLine)
 	}
 }
 
@@ -189,11 +165,10 @@ func TestLogRendererAppliesStylesAndEscapesTerminalControlCharacters(t *testing.
 
 	wantStyledParts := []string{
 		lipgloss.NewStyle().Foreground(lipgloss.Color("243")).Render("2026-08-06 15:45:52"),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Bold(true).Render("WARN "),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("75")).Render("doctor        "),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render("reason") +
-			lipgloss.NewStyle().Foreground(lipgloss.Color("239")).Render("=") +
-			lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Render("save_failed"),
+		lipgloss.NewStyle().Foreground(lipgloss.Color("192")).Bold(true).Render("WARN "),
+		lipgloss.NewStyle().Bold(true).Faint(true).Render("doctor:"),
+		lipgloss.NewStyle().Faint(true).Render("reason") +
+			lipgloss.NewStyle().Faint(true).Render("=") + "save_failed",
 	}
 	for _, part := range wantStyledParts {
 		if !strings.Contains(colored, part) {
