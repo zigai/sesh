@@ -248,7 +248,7 @@ func (s *pickerServices) LoadCatalog(ctx context.Context) (session.CatalogResult
 		return s.listCatalog(ctx, nil)
 	}
 
-	// An unreadable repository leaves saved rows out, as the durable open did before.
+	// An unreadable repository leaves saved rows out.
 	view, err := store.OpenView(ctx, s.repositoryPath)
 	if err != nil {
 		return s.listCatalog(ctx, nil)
@@ -870,8 +870,8 @@ func (s *pickerServices) performSwitch(ctx context.Context, target session.Sessi
 	return s.performSwitchValidated(ctx, target, paneID, clientName, originSessionID, nil)
 }
 
-// performSwitchValidated skips the duplicate catalog pass after a fresh handoff lookup. The
-// switch and pane focus come first; history, which fsyncs, is recorded once afterwards.
+// performSwitchValidated switches to a target the handoff already validated, skipping a second
+// catalog pass. History, which fsyncs, is recorded once after the switch and pane focus.
 func (s *pickerServices) performSwitchValidated(
 	ctx context.Context,
 	target session.Session,

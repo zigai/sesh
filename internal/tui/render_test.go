@@ -816,11 +816,10 @@ func TestStatusMinimalBadgeRenderingAndInteractions(t *testing.T) {
 		{Name: "sess-2"},
 	}
 
-	// Degraded status
 	model.setDegradedSource(degradedSourceCatalog, "Session list is incomplete: some sources could not be read")
 
 	view := stripANSI(viewString(model.View()))
-	// Verify it does NOT render as a full-width line between input prompt and list
+
 	lines := strings.Split(view, "\n")
 	for i, line := range lines {
 		if strings.Contains(line, ">") && i+1 < len(lines) {
@@ -830,12 +829,10 @@ func TestStatusMinimalBadgeRenderingAndInteractions(t *testing.T) {
 		}
 	}
 
-	// Verify minimal warning badge is in the view (in the footer)
 	if !strings.Contains(view, "⚠") {
 		t.Fatalf("view does not contain minimal warning badge: %q", view)
 	}
 
-	// Error status
 	model.setErrorStatus("command execution failed")
 
 	errorView := stripANSI(viewString(model.View()))
@@ -843,7 +840,6 @@ func TestStatusMinimalBadgeRenderingAndInteractions(t *testing.T) {
 		t.Fatalf("view does not contain minimal error badge: %q", errorView)
 	}
 
-	// Help overlay displays status message
 	model.showHelp = true
 
 	helpView := stripANSI(viewString(model.View()))
@@ -853,7 +849,6 @@ func TestStatusMinimalBadgeRenderingAndInteractions(t *testing.T) {
 
 	model.showHelp = false
 
-	// Mouse click on badge dismisses status
 	layout := model.popupMouseLayout()
 	badgeX := layout.bodyX + max(layout.layout.bodyWidth-lipgloss.Width(model.renderFooterBadges()), 0)
 

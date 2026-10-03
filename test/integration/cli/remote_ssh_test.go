@@ -87,7 +87,7 @@ func newRemoteSSHFixture(t *testing.T) remoteSSHFixture {
 		t.Fatal(err)
 	}
 
-	root, err := os.MkdirTemp("", "sesh-ssh-") //nolint:usetesting // Unix forwarding requires short paths; t.TempDir includes the long test name. Cleanup is registered below.
+	root, err := os.MkdirTemp("", "sesh-ssh-") //nolint:usetesting // Unix socket paths need a short name; cleanup is registered below.
 	if err != nil {
 		t.Fatal(err)
 	}

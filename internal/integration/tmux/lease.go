@@ -21,14 +21,6 @@ import (
 	"github.com/zigai/sesh/internal/privatefs"
 )
 
-// Lock ordering:
-// Callers coordinating tmux mutations must acquire the target endpoint lease
-// before acquiring any repository lock. Target leases coordinate mutations of an
-// explicit tmux endpoint across all repositories and processes. Repository
-// operations never acquire a target lease for repository-only changes. A process
-// holding a repository lock must never attempt to acquire a target lease, as
-// this would invert lock ordering and risk deadlocks.
-
 var (
 	ErrEndpointAlias = errors.New("tmux endpoint path must be canonical without symlinks, aliases, or hard-links")
 	ErrLeaseRoot     = errors.New("an explicit private lease root directory is required")
@@ -42,6 +34,8 @@ type Lease struct {
 	closed   bool
 }
 
+// AcquireLease takes the target endpoint lease. Acquire it before any repository lock, and never
+// while holding one, or lock ordering inverts and can deadlock.
 func AcquireLease(ctx context.Context, leaseRoot string, socket string) (*Lease, error) {
 	return acquireLease(ctx, leaseRoot, socket, nil)
 }

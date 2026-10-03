@@ -294,8 +294,7 @@ func (d *pinnedDir) CreateExclusive(name string, data []byte) error {
 		return err
 	}
 
-	// Linkat provides atomic no-clobber publication: fails with EEXIST if destination already exists.
-	// Never fallback to rename: another creator's valid configuration must not be overwritten.
+	// No-clobber publish; never fall back to rename, which could overwrite another creator's config.
 	linkErr := unix.Linkat(d.fd, tmpName, d.fd, name, 0)
 	unlinkErr := unix.Unlinkat(d.fd, tmpName, 0)
 

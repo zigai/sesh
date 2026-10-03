@@ -12,8 +12,7 @@ import (
 	"github.com/zigai/sesh/internal/cli/clibase"
 )
 
-// metavarMarker ends the placeholder that flagUsages prepends to a flag's usage so that
-// pflag's inline copy of the placeholder can be removed after rendering.
+// metavarMarker ends the placeholder flagUsages prepends to a flag's usage.
 const metavarMarker = "\x01"
 
 var flagMetavars = map[string]string{
@@ -136,9 +135,8 @@ func writeUsageHelpTopics(out *strings.Builder, cmd *cobra.Command) {
 	}
 }
 
-// flagUsages renders flags with pflag's layout. pflag takes a back-quoted word in the usage
-// as the placeholder but also keeps it in the description, so each copy gets the placeholder
-// followed by metavarMarker, and that inline copy is removed from the rendered text.
+// flagUsages renders flags with pflag's layout. pflag also keeps a back-quoted placeholder in the
+// description, so each copy is marked with metavarMarker and the inline copy is removed.
 func flagUsages(flags *pflag.FlagSet) string {
 	rendered := pflag.NewFlagSet(flags.Name(), pflag.ContinueOnError)
 	rendered.SortFlags = flags.SortFlags

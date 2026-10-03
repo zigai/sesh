@@ -155,9 +155,8 @@ func agentSessionFromRegistry(session aht.Session) AgentSession {
 	return agent
 }
 
-// initialIdle reports an idle that comes from a session start with no turn since. A freshly
-// started or resumed agent has nothing to read yet, which includes agents that were reopened by a
-// snapshot restore.
+// initialIdle reports an idle from a session start with no turn since, such as an agent just
+// reopened by a snapshot restore.
 func initialIdle(session aht.Session) bool {
 	activity := session.Activity()
 	native := session.Observations.Native

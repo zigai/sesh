@@ -30,13 +30,11 @@ func TestLookupPresets(t *testing.T) {
 		}
 	}
 
-	// Empty defaults to dracula
 	p, ok := config.LookupPreset("")
 	if !ok || p.Name != "dracula" {
 		t.Fatalf("LookupPreset(\"\") = (%+v, %v), want dracula", p, ok)
 	}
 
-	// Unknown preset
 	_, ok = config.LookupPreset("nonexistent")
 	if ok {
 		t.Fatal("LookupPreset(\"nonexistent\") = true, want false")

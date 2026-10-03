@@ -24,8 +24,8 @@ const (
 
 var errPickerHandoffInvalid = errors.New("invalid popup switch handoff")
 
-// pickerSwitchHandoff carries a popup's result to the invoking process: the selected session,
-// when there is one, and the agent views the popup deferred recording.
+// pickerSwitchHandoff carries a popup's result to the invoking process: the selected session, if
+// any, and the agent views whose recording the popup deferred.
 type pickerSwitchHandoff struct {
 	SessionID        string                  `json:"sessionId,omitempty"`
 	SessionName      string                  `json:"sessionName,omitempty"`

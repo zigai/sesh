@@ -831,10 +831,8 @@ func pickerProgramOutput(output io.Writer) io.Writer {
 	return pickerTerminalOutput{Writer: output, fd: terminal.Fd()}
 }
 
-// pickerColorProfile returns the color profile of a picker running inside tmux, and false
-// outside tmux. tmux converts RGB colors for each client's terminal, so every color-capable
-// profile is TrueColor there; deciding it from the environment keeps bubbletea's detection
-// from running `tmux info` before the first frame.
+// pickerColorProfile returns the profile inside tmux, and false outside it. tmux converts RGB per
+// client, so TrueColor is safe and skips bubbletea running `tmux info` before the first frame.
 func pickerColorProfile(environ []string) (colorprofile.Profile, bool) {
 	inside := slices.ContainsFunc(environ, func(entry string) bool {
 		value, ok := strings.CutPrefix(entry, "TMUX=")
