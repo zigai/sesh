@@ -13,13 +13,13 @@ systemctl --user enable --now sesh-autosave.timer
 
 Saves run every 3 minutes by default. Use `--socket` for a custom server. Add `--with-coordinator` and enable `sesh-coordinator.service` for saves before sleep and shutdown.
 
+The command ends by saying whether automatic saves are on, or which `systemctl --user enable --now` command still starts them. Rerunning it restarts running units on the new definition and starts failed ones again.
+
 To recover, start tmux on the same socket and run:
 
 ```sh
 sesh snapshot restore
 ```
-
-Live sessions stay untouched; conflicting names are skipped.
 
 ## Coding agents
 
