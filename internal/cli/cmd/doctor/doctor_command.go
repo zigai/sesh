@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/samber/oops"
@@ -16,6 +18,7 @@ import (
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/doctor"
 	integration "github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/setup"
 )
 
 const (
@@ -72,6 +75,9 @@ func resolveDoctorOptions(cmd *cobra.Command) (doctor.Options, error) {
 		DaemonPhase:       "",
 		InhibitorsHeld:    false,
 		LogindDelayMillis: 0,
+		ServiceDir:        "",
+		Executable:        "",
+		ValidateCommand:   nil,
 	}
 
 	if _, err := clibase.LoadCommandConfig(cmd.Context(), cmd); err != nil {
@@ -96,6 +102,8 @@ func resolveDoctorOptions(cmd *cobra.Command) (doctor.Options, error) {
 		return opts, err
 	}
 
+	resolveServiceCommandCheck(cmd, &opts)
+
 	historyPath, _ := cmd.Flags().GetString("history")
 	if historyPath != "" {
 		absHistory, err := filepath.Abs(historyPath)
@@ -110,6 +118,26 @@ func resolveDoctorOptions(cmd *cobra.Command) (doctor.Options, error) {
 	}
 
 	return opts, nil
+}
+
+// resolveServiceCommandCheck points the service-commands check at the systemd user unit
+// directory. Launchd agents are not checked.
+func resolveServiceCommandCheck(cmd *cobra.Command, opts *doctor.Options) {
+	if runtime.GOOS != setup.PlatformLinux {
+		return
+	}
+
+	dir, err := setup.ServiceDirectory(setup.PlatformLinux)
+	if err != nil {
+		return
+	}
+
+	opts.ServiceDir = dir
+	opts.ValidateCommand = commandLineValidator(cmd.Root())
+
+	if executable, err := os.Executable(); err == nil {
+		opts.Executable = executable
+	}
 }
 
 func runDoctor(cmd *cobra.Command, _ []string) error {

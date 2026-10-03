@@ -9,7 +9,7 @@ func checkCaptureGuarantee() Result {
 		Check:   CheckCaptureGuarantee,
 		Status:  StatusWarning,
 		Reason:  ReasonObservational,
-		Message: "capture revalidates the tmux graph and foreground processes for practical recovery; it is an observational result, not an atomic application checkpoint or full runtime equivalent, and RAM, shell-local jobs, pipelines, and terminal microstate are outside release scope while captured scrollback is retained but not replayed",
+		Message: "saves record tmux and its running programs, not a checkpoint: program memory, shell jobs and pipelines are not saved, and scrollback is kept but not replayed",
 		Fix:     "",
 	}
 }
@@ -19,15 +19,15 @@ func checkRestoreCapability() Result {
 		Check:   CheckRestoreCapability,
 		Status:  StatusWarning,
 		Reason:  ReasonIncomplete,
-		Message: "restore executes practical structural plans with durable dispatch-confirmed supported restart and native resume evidence; application recovery requires an independent native receipt, captured scrollback is not replayed, and atomic checkpoints, RAM, shell-local jobs, pipelines, and terminal microstate are outside release scope",
+		Message: "restore rebuilds sessions and relaunches or resumes supported programs, but cannot confirm a program recovered; scrollback is not replayed",
 		Fix:     "",
 	}
 }
 
 func checkAutosaveCapability() Result {
-	message := "scheduled and final saves are available, but native lifecycle integration and real OS shutdown validation remain incomplete"
+	message := "saves run on a timer and before shutdown, but native lifecycle integration and shutdown validation are incomplete on this platform"
 	if runtime.GOOS == "linux" {
-		message = "scheduled and final saves use Linux logind integration; limited guest validation observed ordinary reboot, suspend, and a 3-second inhibitor timeout ending in an incomplete final-save result after 8 seconds, while actual daemon runtime status is checked independently and no universal lifecycle guarantee is claimed"
+		message = "saves run on a timer and before shutdown and sleep; a save cut short by shutdown is recorded as incomplete and restore uses the newest finished save"
 	}
 
 	return Result{

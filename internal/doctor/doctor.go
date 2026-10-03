@@ -36,6 +36,7 @@ const (
 	ReasonInhibitorReleased = "inhibitor_released"
 	ReasonLifecycleActive   = "lifecycle_active"
 	ReasonInitializing      = "initializing"
+	ReasonSaveUnfinished    = "latest_save_unfinished"
 )
 
 const (
@@ -49,6 +50,8 @@ const (
 	CheckDaemonRuntime      = "daemon-runtime"
 	CheckRestorableSnapshot = "restorable-snapshot"
 	CheckServiceOOMPolicy   = "service-oom-policy"
+	CheckServiceCommands    = "service-commands"
+	CheckActiveRestores     = "active-restores"
 )
 
 type Result struct {
@@ -67,6 +70,15 @@ type Options struct {
 	DaemonPhase       string
 	InhibitorsHeld    bool
 	LogindDelayMillis int64
+	// ServiceDir is the systemd user unit directory whose sesh command lines are checked; empty
+	// skips the check.
+	ServiceDir string
+	// Executable is the running sesh executable, recognized in unit command lines besides any
+	// program named sesh.
+	Executable string
+	// ValidateCommand reports whether this sesh accepts a command line, given without the program;
+	// nil skips the check.
+	ValidateCommand func(args []string) error
 }
 
 type Service struct {
@@ -77,6 +89,9 @@ type Service struct {
 	daemonPhase       string
 	inhibitorsHeld    bool
 	logindDelayMillis int64
+	serviceDir        string
+	executable        string
+	validateCommand   func(args []string) error
 	unitOf            func(pid int) (string, error)
 	oomPolicyOf       func(ctx context.Context, unit string) (string, error)
 }
@@ -96,6 +111,9 @@ func NewService(opts Options) *Service {
 		daemonPhase:       opts.DaemonPhase,
 		inhibitorsHeld:    opts.InhibitorsHeld,
 		logindDelayMillis: opts.LogindDelayMillis,
+		serviceDir:        opts.ServiceDir,
+		executable:        opts.Executable,
+		validateCommand:   opts.ValidateCommand,
 		unitOf:            serviceUnitOf,
 		oomPolicyOf:       serviceOOMPolicyOf,
 	}
@@ -167,6 +185,8 @@ func (s *Service) Run(ctx context.Context) ([]Result, error) {
 
 	results = append(results, s.checkRestorable(ctx, tmuxRes)...)
 	results = append(results, s.checkServiceOOMPolicy(ctx, serverPID)...)
+	results = append(results, s.checkServiceCommands()...)
+	results = append(results, s.checkActiveRestores(ctx)...)
 
 	var runErr error
 	if cleanupErr != nil {

@@ -146,7 +146,7 @@ func resolveCurrentSnapshot(ctx context.Context, repo currentSnapshotReader) (Re
 			continue
 		}
 
-		return manifestResult(candidate, candidateManifest), nil
+		return practicalCandidateResult(after, candidate, candidateManifest), nil
 	}
 
 	return Result{
@@ -158,8 +158,7 @@ func resolveCurrentSnapshot(ctx context.Context, repo currentSnapshotReader) (Re
 	}, nil
 }
 
-// failedSaveResult reports a recovery barrier left by a save that failed. Repeating the
-// same save cannot clear it until the cause the save reports is resolved.
+// failedSaveResult reports the recovery barrier a failed save leaves until its cause is fixed.
 func failedSaveResult() Result {
 	return Result{
 		Check:   CheckSnapshotCurrent,
@@ -167,6 +166,37 @@ func failedSaveResult() Result {
 		Reason:  ReasonRecoveryRequired,
 		Message: "current snapshot requires recovery (latest save failed)",
 		Fix:     "Run 'sesh snapshot save --json' and resolve the reported error code",
+	}
+}
+
+// practicalCandidateResult reports the generation practical recovery uses.
+func practicalCandidateResult(catalog store.Catalog, genID string, manifest model.Manifest) Result {
+	if catalog.LatestSaveUnfinished() && len(manifest.Sessions) > 0 {
+		return unfinishedSaveResult(genID, len(manifest.Sessions), latestSaveAttempt(catalog).State == "failed")
+	}
+
+	return manifestResult(genID, manifest)
+}
+
+// unfinishedSaveResult reports that practical recovery falls back to the newest saved generation
+// because the latest save failed or never finished.
+func unfinishedSaveResult(genID string, sessions int, failed bool) Result {
+	if failed {
+		return Result{
+			Check:   CheckSnapshotCurrent,
+			Status:  StatusWarning,
+			Reason:  ReasonSaveUnfinished,
+			Message: fmt.Sprintf("latest save failed; restore uses generation %s, the newest saved (%d sessions)", genID, sessions),
+			Fix:     "Run 'sesh snapshot save --json' and resolve the reported error code",
+		}
+	}
+
+	return Result{
+		Check:   CheckSnapshotCurrent,
+		Status:  StatusWarning,
+		Reason:  ReasonSaveUnfinished,
+		Message: fmt.Sprintf("latest save did not finish; restore uses generation %s, the newest saved (%d sessions)", genID, sessions),
+		Fix:     "Run 'sesh snapshot save' to record a newer generation",
 	}
 }
 
@@ -416,7 +446,7 @@ func manifestResult(genID string, manifest model.Manifest) Result {
 			Check:   CheckSnapshotCurrent,
 			Status:  StatusWarning,
 			Reason:  ReasonObservational,
-			Message: fmt.Sprintf("snapshot generation %s was verified for practical recovery (%d sessions); this observational result does not establish current automatic selection or full runtime parity", genID, sessionCount),
+			Message: fmt.Sprintf("snapshot %s is restorable (%d sessions); like every save it records tmux, not a checkpoint", genID, sessionCount),
 			Fix:     "",
 		}
 	}
@@ -455,22 +485,26 @@ func practicalCurrentGeneration(catalog store.Catalog) (string, bool) {
 		}
 	}
 
+	index := slices.IndexFunc(catalog.Generations, func(gen store.Generation) bool { return gen.ID == catalog.Current })
+	if index < 0 {
+		return "", false
+	}
+
 	latestSave := latestSaveAttempt(catalog)
-	if latestSave.State != "incomplete" {
-		return "", false
-	}
 
-	if currentRewriteDescendant(catalog, latestSave.ID) != catalog.Current {
-		return "", false
-	}
-
-	for _, gen := range catalog.Generations {
-		if gen.ID == catalog.Current {
-			return catalog.Current, !gen.Complete
+	switch latestSave.State {
+	case "incomplete":
+		if currentRewriteDescendant(catalog, latestSave.ID) != catalog.Current {
+			return "", false
 		}
-	}
 
-	return "", false
+		return catalog.Current, !catalog.Generations[index].Complete
+	case "pending", "failed":
+		// The latest save produced no generation, so the current one is the newest saved state.
+		return catalog.Current, true
+	default:
+		return "", false
+	}
 }
 
 func latestSaveAttempt(catalog store.Catalog) store.Attempt {

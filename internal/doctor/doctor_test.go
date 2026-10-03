@@ -113,19 +113,17 @@ func TestCaptureAndRestoreChecksDescribeImplementedBoundaries(t *testing.T) {
 
 	capture := findCheck(results, doctor.CheckCaptureGuarantee)
 	if capture.Reason != doctor.ReasonObservational ||
-		!strings.Contains(capture.Message, "revalidates the tmux graph") ||
-		!strings.Contains(capture.Message, "not an atomic application checkpoint or full runtime equivalent") ||
-		!strings.Contains(capture.Message, "shell-local jobs, pipelines") ||
-		!strings.Contains(capture.Message, "captured scrollback is retained but not replayed") {
+		!strings.Contains(capture.Message, "not a checkpoint") ||
+		!strings.Contains(capture.Message, "shell jobs and pipelines are not saved") ||
+		!strings.Contains(capture.Message, "scrollback is kept but not replayed") {
 		t.Fatalf("capture capability is inaccurate: %#v", capture)
 	}
 
 	restore := findCheck(results, doctor.CheckRestoreCapability)
 	if restore.Reason != doctor.ReasonIncomplete ||
-		!strings.Contains(restore.Message, "executes practical structural plans") ||
-		!strings.Contains(restore.Message, "dispatch-confirmed supported restart and native resume evidence") ||
-		!strings.Contains(restore.Message, "independent native receipt") ||
-		!strings.Contains(restore.Message, "captured scrollback is not replayed") {
+		!strings.Contains(restore.Message, "relaunches or resumes supported programs") ||
+		!strings.Contains(restore.Message, "cannot confirm a program recovered") ||
+		!strings.Contains(restore.Message, "scrollback is not replayed") {
 		t.Fatalf("restore capability is inaccurate: %#v", restore)
 	}
 }
@@ -143,21 +141,16 @@ func TestAutosaveCapabilityDescribesCurrentPlatform(t *testing.T) {
 		t.Fatalf("autosave capability is inaccurate: %#v", autosave)
 	}
 
-	requireMessageContains(t, autosave, "scheduled and final saves")
+	requireMessageContains(t, autosave, "saves run on a timer and before shutdown")
 
 	if runtime.GOOS != "linux" {
 		return
 	}
 
 	requireMessageContains(t, autosave,
-		"limited guest validation",
-		"Linux logind integration",
-		"ordinary reboot",
-		"suspend",
-		"3-second inhibitor timeout",
-		"incomplete final-save result after 8 seconds",
-		"actual daemon runtime status is checked independently",
-		"no universal lifecycle guarantee",
+		"before shutdown and sleep",
+		"a save cut short by shutdown is recorded as incomplete",
+		"restore uses the newest finished save",
 	)
 
 	if strings.Contains(autosave.Message, "macOS") {
@@ -501,8 +494,8 @@ func TestSnapshotRepository_PracticalObservationalSnapshot(t *testing.T) {
 		t.Fatalf("expected observational warning for practical snapshot, got %#v", curRes)
 	}
 
-	if !strings.Contains(curRes.Message, "verified for practical recovery") ||
-		!strings.Contains(curRes.Message, "does not establish current automatic selection or full runtime parity") {
+	if !strings.Contains(curRes.Message, "is restorable (1 sessions)") ||
+		!strings.Contains(curRes.Message, "not a checkpoint") {
 		t.Fatalf("expected practical recovery message, got %q", curRes.Message)
 	}
 
@@ -511,18 +504,18 @@ func TestSnapshotRepository_PracticalObservationalSnapshot(t *testing.T) {
 	}
 }
 
-func TestSnapshotRepository_NewerSaveAttemptBlocksPracticalGeneration(t *testing.T) {
+func TestSnapshotRepository_UnfinishedSaveReportsNewestGeneration(t *testing.T) {
 	t.Parallel()
 
 	for _, terminalState := range []string{"pending", "failed"} {
 		t.Run(terminalState, func(t *testing.T) {
 			t.Parallel()
-			assertNewerAttemptBlocksPracticalGeneration(t, terminalState)
+			assertUnfinishedSaveReportsNewestGeneration(t, terminalState)
 		})
 	}
 }
 
-func assertNewerAttemptBlocksPracticalGeneration(t *testing.T, terminalState string) {
+func assertUnfinishedSaveReportsNewestGeneration(t *testing.T, terminalState string) {
 	t.Helper()
 
 	repoDir := filepath.Join(t.TempDir(), "repository")
@@ -555,13 +548,17 @@ func assertNewerAttemptBlocksPracticalGeneration(t *testing.T, terminalState str
 	}
 
 	curRes := findCheck(results, doctor.CheckSnapshotCurrent)
-	if curRes.Status != doctor.StatusError || curRes.Reason != doctor.ReasonRecoveryRequired {
-		t.Fatalf("newer %s attempt did not preserve recovery barrier: %#v", terminalState, curRes)
+	if curRes.Status != doctor.StatusWarning || curRes.Reason != doctor.ReasonSaveUnfinished {
+		t.Fatalf("newer %s attempt did not report the newest saved generation: %#v", terminalState, curRes)
+	}
+
+	if !strings.Contains(curRes.Message, "the newest saved (1 sessions)") {
+		t.Fatalf("unfinished save message = %q", curRes.Message)
 	}
 
 	failed := strings.Contains(curRes.Message, "latest save failed") && strings.Contains(curRes.Fix, "--json")
 	if failed != (terminalState == "failed") {
-		t.Fatalf("newer %s attempt reported the wrong barrier cause: %#v", terminalState, curRes)
+		t.Fatalf("newer %s attempt reported the wrong unfinished-save cause: %#v", terminalState, curRes)
 	}
 }
 
@@ -666,7 +663,7 @@ func TestSnapshotRepository_CorruptArtifact(t *testing.T) {
 	}
 }
 
-func TestSnapshotRepository_PendingSaveBarrier(t *testing.T) {
+func TestSnapshotRepository_PendingSaveAfterCompleteGenerationReportsIt(t *testing.T) {
 	t.Parallel()
 
 	repoDir := filepath.Join(t.TempDir(), "repo")
@@ -696,8 +693,8 @@ func TestSnapshotRepository_PendingSaveBarrier(t *testing.T) {
 	}
 
 	curRes := findCheck(results, doctor.CheckSnapshotCurrent)
-	if curRes.Status != doctor.StatusError || curRes.Reason != doctor.ReasonRecoveryRequired {
-		t.Fatalf("expected recovery_required error on pending save barrier, got %#v", curRes)
+	if curRes.Status != doctor.StatusWarning || curRes.Reason != doctor.ReasonSaveUnfinished {
+		t.Fatalf("expected latest_save_unfinished warning after a pending save, got %#v", curRes)
 	}
 }
 
