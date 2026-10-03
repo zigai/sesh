@@ -167,6 +167,7 @@ type Model struct {
 	remoteCatalog                RemoteCatalog
 	originRows                   []session.Session
 	originObservation            uint64
+	originLoadErr                error
 	remoteCatalogWatchDelivered  bool
 	remoteCatalogObservation     uint64
 	switchAfterQuit              string
@@ -328,6 +329,7 @@ func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps
 		remoteCatalog:                RemoteCatalog{GeneratedAt: time.Time{}, Connections: nil},
 		originRows:                   nil,
 		originObservation:            0,
+		originLoadErr:                nil,
 		remoteCatalogWatchDelivered:  false,
 		remoteCatalogObservation:     0,
 		switchAfterQuit:              "",

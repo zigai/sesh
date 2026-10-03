@@ -368,6 +368,7 @@ func (m *Model) logSessionActionResult(msg sessionActionResultMsg) {
 			return
 		case tuiOperationLoadCatalog,
 			tuiOperationLoadRemoteCatalog,
+			tuiOperationLoadOriginSessions,
 			tuiOperationLoadAgentSummaries,
 			tuiOperationRestoreSavedSession,
 			tuiOperationRenameSession,

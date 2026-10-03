@@ -43,7 +43,7 @@ func newAttentionAction(action attentionAction, name, short, long string) *cobra
 		Use: name, Short: short, Long: long,
 		Args:        clibase.UsageArgs(cobra.NoArgs),
 		RunE:        func(cmd *cobra.Command, _ []string) error { return runAttentionAction(cmd, action) },
-		Annotations: map[string]string{clibase.AnnotationOperation: name, clibase.AnnotationSuccessOwned: annotationOwnedValue},
+		Annotations: map[string]string{clibase.AnnotationOperation: name},
 	}
 	addAgentNavigationFlags(cmd)
 	cmd.Flags().Bool("local", false, "Only consider panes in the current tmux session")

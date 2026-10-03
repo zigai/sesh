@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/samber/oops"
 
 	"github.com/zigai/sesh/internal/automation"
@@ -34,7 +35,7 @@ type lifecycleCoordinator struct {
 	draining  bool
 }
 
-func (c *lifecycleCoordinator) handleCanceled() error {
+func (c *lifecycleCoordinator) handleCanceled(ctx context.Context) error {
 	if !c.draining {
 		return nil
 	}
@@ -43,8 +44,7 @@ func (c *lifecycleCoordinator) handleCanceled() error {
 		return oops.In("daemon").Code("lifecycle_failed").With("operation", "run_lifecycle").Wrap(ErrNewSchedulerNil)
 	}
 
-	// A scheduler runs one shutdown save, so a canceled sleep or shutdown needs a fresh one. Its
-	// periodic loop stays stopped: periodic saves belong to the autosave timer.
+	// A scheduler runs one shutdown save, so a canceled sleep or shutdown needs a fresh one.
 	replacement, err := c.cfg.NewScheduler()
 	if err != nil {
 		return oops.In("daemon").Code("lifecycle_failed").With("operation", "run_lifecycle").Wrap(err)
@@ -57,11 +57,17 @@ func (c *lifecycleCoordinator) handleCanceled() error {
 		c.cfg.Reporter.Update(RuntimePhaseRunning)
 	}
 
+	zerolog.Ctx(ctx).Info().Str("component", "daemon").Str("operation", "run_lifecycle").
+		Str("status", "recovered").Str("reason", "lifecycle_canceled").Msg("lifecycle coordinator resumed")
+
 	return nil
 }
 
 func (c *lifecycleCoordinator) handleDraining(eventCtx context.Context) error {
 	c.draining = true
+
+	zerolog.Ctx(eventCtx).Info().Str("component", "daemon").Str("operation", "run_lifecycle").
+		Str("status", "started").Str("phase", "final_save").Msg("lifecycle final save started")
 
 	if c.cfg.Reporter != nil {
 		c.cfg.Reporter.Update(RuntimePhaseDraining)
@@ -73,6 +79,10 @@ func (c *lifecycleCoordinator) handleDraining(eventCtx context.Context) error {
 
 	_, shutdownErr := c.scheduler.Shutdown(eventCtx)
 	if errors.Is(shutdownErr, ErrFinalRecorded) || (c.cfg.IsFinalRecorded != nil && c.cfg.IsFinalRecorded(shutdownErr)) {
+		zerolog.Ctx(eventCtx).Warn().Str("component", "daemon").Str("operation", "run_lifecycle").
+			Str("status", "degraded").Str("reason", "final_save_incomplete").
+			Bool("recorded", true).Msg("lifecycle final save failure recorded")
+
 		return nil
 	}
 
@@ -85,7 +95,7 @@ func (c *lifecycleCoordinator) handleDraining(eventCtx context.Context) error {
 
 func (c *lifecycleCoordinator) handleEvent(eventCtx context.Context, event lifecycle.Event) error {
 	if event.Canceled {
-		return c.handleCanceled()
+		return c.handleCanceled(eventCtx)
 	}
 
 	return c.handleDraining(eventCtx)
@@ -97,6 +107,9 @@ func RunLifecycle(ctx context.Context, cfg CoordinatorConfig) error {
 		scheduler: cfg.Scheduler,
 		draining:  false,
 	}
+
+	zerolog.Ctx(ctx).Info().Str("component", "daemon").Str("operation", "run_lifecycle").
+		Str("status", "ok").Str("phase", "running").Msg("lifecycle coordinator ready")
 
 	runErr := lifecycle.RunLogind(ctx, cfg.Runtime, func(eventCtx context.Context, event lifecycle.Event) error {
 		return c.handleEvent(eventCtx, event)

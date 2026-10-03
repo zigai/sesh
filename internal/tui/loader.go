@@ -428,6 +428,9 @@ func agentSummaryServerLookupKeys(server string) []string {
 
 func (m *Model) applySessionRows(result sessionLoadResultMsg) []agentViewStateUpdate {
 	selected := m.selectionBeforeCatalogLoad()
+	if result.originQueried {
+		m.observeOriginLoad(result.originErr)
+	}
 
 	if result.originQueried && result.originErr == nil {
 		m.originObservation++
@@ -521,7 +524,13 @@ func nonOriginSessionRows(rows []session.Session) []session.Session {
 }
 
 func (m *Model) handleOriginSessions(msg originSessionsMsg) {
-	if msg.err != nil || msg.observation != m.originObservation {
+	if msg.observation != m.originObservation {
+		return
+	}
+
+	m.observeOriginLoad(msg.err)
+
+	if msg.err != nil {
 		return
 	}
 
@@ -532,6 +541,11 @@ func (m *Model) handleOriginSessions(msg originSessionsMsg) {
 	m.refreshDisplaySessions()
 	m.filterSessions()
 	m.restoreSelectedSession(selected)
+}
+
+func (m *Model) observeOriginLoad(err error) {
+	logTUILoadTransition(m.operationContext(), tuiOperationLoadOriginSessions, m.originLoadErr, err, tuiLogOutcomeDegradation)
+	m.originLoadErr = err
 }
 
 func (m *Model) startRemoteCatalogWatchCommand() tea.Cmd {

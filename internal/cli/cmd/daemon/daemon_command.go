@@ -21,8 +21,8 @@ const (
 
 var errDaemonSocketRequired = errors.New("--socket must be an explicit absolute path")
 
-// NewCommand returns the group of long-running processes a service manager starts and stops.
-// Other packages contribute their own processes through processes.
+// NewCommand returns the group of long-running processes a service manager starts and stops,
+// including those other packages contribute.
 func NewCommand(processes ...*cobra.Command) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "daemon",
@@ -67,9 +67,10 @@ func newDaemonTmuxCommand() *cobra.Command {
 
 func newDaemonWaitReadyCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "wait-ready",
-		Short: "Wait for an explicitly selected tmux server to answer",
-		Args:  clibase.UsageArgs(cobra.NoArgs),
+		Use:         "wait-ready",
+		Short:       "Wait for an explicitly selected tmux server to answer",
+		Args:        clibase.UsageArgs(cobra.NoArgs),
+		Annotations: map[string]string{clibase.AnnotationOperation: "daemon_wait_ready"},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			socket, _ := cmd.Flags().GetString("socket")
 			timeout, _ := cmd.Flags().GetDuration("timeout")

@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
 	"github.com/zigai/gotmux/tmux"
@@ -129,6 +130,10 @@ func newRemotePeerCommand() *cobra.Command {
 		{Use: "attach-prepare", Args: clibase.UsageArgs(cobra.NoArgs), Annotations: remoteLiveAnnotations("remote_peer_attach_prepare"), RunE: runRemotePeerAttachPrepare},
 		{Use: "attach <attachment-id>", Args: clibase.UsageArgs(cobra.ExactArgs(1)), Annotations: remoteLiveAnnotations("remote_peer_attach"), RunE: runRemotePeerAttach},
 	} {
+		if child.Name() == "action" {
+			child.Annotations[clibase.AnnotationSuccessOwned] = "true"
+		}
+
 		cmd.AddCommand(child)
 	}
 
@@ -229,7 +234,7 @@ func runRemoteMonitor(cmd *cobra.Command, _ []string) (resultErr error) {
 	}))
 }
 
-func readRemoteInput(reader io.Reader, limit int) ([]byte, error) { //nolint:unparam // Action and bootstrap protocols retain independent limits even while their current bounds are equal.
+func readRemoteInput(reader io.Reader, limit int) ([]byte, error) { //nolint:unparam // Action and bootstrap protocols keep independent limits.
 	content, err := io.ReadAll(io.LimitReader(reader, int64(limit)+1))
 	if err != nil {
 		return nil, remoteCLIError("read_remote_input", err)
@@ -401,8 +406,27 @@ func runRemotePeerAction(cmd *cobra.Command, _ []string) (resultErr error) {
 		},
 		Live: runtime.live, Saved: runtime.saved, Now: nil,
 	}, request)
+	logPeerActionResult(clibase.CommandContext(cmd), result)
 
 	return remoteCLIError("write_remote_action_result", remote.WriteActionResult(cmd.OutOrStdout(), result))
+}
+
+func logPeerActionResult(ctx context.Context, result remote.ActionResult) {
+	level, status, reason := zerolog.InfoLevel, "ok", ""
+	if !result.OK {
+		level, status, reason = zerolog.ErrorLevel, "failed", result.Code
+		if reason == remote.ActionCodePartial || reason == remote.ActionCodeUnknownOutcome {
+			level, status = zerolog.WarnLevel, "degraded"
+		}
+	}
+
+	event := zerolog.Ctx(ctx).WithLevel(level).Str("component", "remote").
+		Str("operation", "remote_peer_action").Str("status", status).Str("phase", "receipt")
+	if reason != "" {
+		event.Str("reason", reason)
+	}
+
+	event.Msg("remote action receipt resolved")
 }
 
 func decodeRemoteAttachBootstrap(cmd *cobra.Command) (remote.AttachBootstrap, error) {

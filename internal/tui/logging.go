@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/samber/oops"
 	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/session"
@@ -16,6 +15,7 @@ import (
 const (
 	tuiOperationLoadCatalog             tuiLogOperation = "load_catalog"
 	tuiOperationLoadRemoteCatalog       tuiLogOperation = "load_remote_catalog"
+	tuiOperationLoadOriginSessions      tuiLogOperation = "load_origin_sessions"
 	tuiOperationLoadAgentSummaries      tuiLogOperation = "load_agent_summaries"
 	tuiOperationEnterLiveSession        tuiLogOperation = "enter_live_session"
 	tuiOperationRestoreSavedSession     tuiLogOperation = "restore_saved_session"
@@ -70,6 +70,7 @@ func knownTUIOperation(operation tuiLogOperation) bool {
 	switch operation {
 	case tuiOperationLoadCatalog,
 		tuiOperationLoadRemoteCatalog,
+		tuiOperationLoadOriginSessions,
 		tuiOperationLoadAgentSummaries,
 		tuiOperationEnterLiveSession,
 		tuiOperationRestoreSavedSession,
@@ -91,12 +92,6 @@ func knownTUIOperation(operation tuiLogOperation) bool {
 func classifyTUIErrorCode(err error) string {
 	if err == nil {
 		return tuiErrorOperationFailed
-	}
-
-	if oopsErr, ok := oops.AsOops(err); ok {
-		if code, ok := oopsErr.Code().(string); ok && code != "" {
-			return code
-		}
 	}
 
 	if code, ok := sentinelErrorCode(err); ok {
@@ -159,17 +154,6 @@ func logTUIFailure(ctx context.Context, operation tuiLogOperation, err error) {
 		Str("status", "failed").
 		Str("error_code", classifyTUIErrorCode(err))
 
-	if oopsErr, ok := oops.AsOops(err); ok {
-		contextMap := oopsErr.Context()
-		if phase, ok := contextMap["phase"].(string); ok && phase != "" {
-			event.Str("phase", phase)
-		}
-
-		if action, ok := contextMap["action"].(string); ok && action != "" {
-			event.Str("action", action)
-		}
-	}
-
 	event.Msg("tui operation failed")
 }
 
@@ -194,12 +178,14 @@ func logTUIEvent(ctx context.Context, operation tuiLogOperation, outcome tuiLogO
 			Str("component", "tui").
 			Str("operation", string(operation)).
 			Str("status", "degraded").
+			Str("reason", "dependency_unavailable").
 			Msg("tui dependency degraded")
 	case tuiLogOutcomeRecovery:
 		logger.Info().
 			Str("component", "tui").
 			Str("operation", string(operation)).
 			Str("status", "recovered").
+			Str("reason", "dependency_available").
 			Msg("tui dependency recovered")
 	}
 }

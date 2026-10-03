@@ -131,7 +131,7 @@ func TestMonitorStateTransitionLogging(t *testing.T) {
 	state.storeAcceptedFrame(ctx, connectionID, ConnectionState{ID: connectionID, Connected: true, Snapshot: Snapshot{Health: healthyHealth()}}, false, FrameSnapshot, nil)
 
 	records = decodeLogRecords(t, logs.String())
-	if len(records) != 1 || records[0]["status"] != "recovered" {
+	if len(records) != 1 || records[0]["status"] != "recovered" || records[0]["reason"] != "connection_available" || records[0]["level"] != "info" {
 		t.Fatalf("recovered records = %#v, want one recovery boundary", records)
 	}
 

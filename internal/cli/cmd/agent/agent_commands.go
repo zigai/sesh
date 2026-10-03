@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
 
@@ -19,8 +20,6 @@ import (
 	integration "github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/session"
 )
-
-const annotationOwnedValue = "true"
 
 type agentNavResultJSON struct {
 	TargetPaneID string `json:"targetPaneId"`
@@ -79,9 +78,13 @@ func recordNavigatedAgentView(ctx context.Context, cmd *cobra.Command, target ag
 		Name:             target.SessionName,
 	}
 
-	_, _ = session.UpdateState(ctx, historyPath, func(st *session.State) {
+	_, err := session.UpdateState(ctx, historyPath, func(st *session.State) {
 		st.RecordAgentView(ident, target.PaneID)
 	})
+	if err != nil {
+		zerolog.Ctx(ctx).Warn().Str("component", "agents").Str("operation", "record_view").
+			Str("status", "degraded").Str("reason", "history_update_failed").Msg("agent navigation history was not recorded")
+	}
 }
 
 // resolveAgentStatePath returns --state, else [agent_status].store_path, else "" so AHT uses
@@ -157,7 +160,7 @@ func newAgentNextCommand() *cobra.Command {
 		Args:  clibase.UsageArgs(cobra.NoArgs),
 		RunE:  runAgentNext,
 	}
-	cmd.Annotations = map[string]string{clibase.AnnotationOperation: "next", clibase.AnnotationSuccessOwned: annotationOwnedValue}
+	cmd.Annotations = map[string]string{clibase.AnnotationOperation: "next"}
 
 	addAgentNavigationFlags(cmd)
 	cmd.Flags().Bool("local", false, "Only consider panes in the current tmux session")
@@ -201,7 +204,7 @@ func newAgentBackCommand() *cobra.Command {
 		Args:  clibase.UsageArgs(cobra.NoArgs),
 		RunE:  runAgentBack,
 	}
-	cmd.Annotations = map[string]string{clibase.AnnotationOperation: "back", clibase.AnnotationSuccessOwned: annotationOwnedValue}
+	cmd.Annotations = map[string]string{clibase.AnnotationOperation: "back"}
 
 	addAgentNavigationFlags(cmd)
 	clibase.AddJSONFlag(cmd)
@@ -216,7 +219,7 @@ func NewActionLatestCommand() *cobra.Command {
 		Long:        "Focus the live coding agent pane with the most recent recorded transition to idle. Idle can include startup and does not confirm completed work.",
 		Args:        clibase.UsageArgs(cobra.NoArgs),
 		RunE:        runAgentLatest,
-		Annotations: map[string]string{clibase.AnnotationOperation: "latest", clibase.AnnotationSuccessOwned: annotationOwnedValue},
+		Annotations: map[string]string{clibase.AnnotationOperation: "latest"},
 	}
 	addAgentNavigationFlags(cmd)
 	cmd.Flags().Bool("local", false, "Only consider panes in the current tmux session")
@@ -278,7 +281,7 @@ func newAgentFocusCommand() *cobra.Command {
 		Args:  clibase.UsageArgs(cobra.NoArgs),
 		RunE:  runAgentFocus,
 	}
-	cmd.Annotations = map[string]string{clibase.AnnotationOperation: "focus", clibase.AnnotationSuccessOwned: annotationOwnedValue}
+	cmd.Annotations = map[string]string{clibase.AnnotationOperation: "focus"}
 
 	addAgentNavigationFlags(cmd)
 	cmd.Flags().String("target-pane", "", "Pane ID to focus, for example %1")
@@ -375,11 +378,12 @@ func runAgentStatus(cmd *cobra.Command, _ []string) error {
 
 func newAgentStatusRunCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "run",
-		Short: "Run the agent window status tracker in the foreground",
-		Long:  "Run the realtime agent window status tracker until interrupted. The tracker streams AHT state and styles tmux windows needing attention.",
-		Args:  clibase.UsageArgs(cobra.NoArgs),
-		RunE:  runAgentStatusRun,
+		Use:         "run",
+		Short:       "Run the agent window status tracker in the foreground",
+		Long:        "Run the realtime agent window status tracker until interrupted. The tracker streams AHT state and styles tmux windows needing attention.",
+		Args:        clibase.UsageArgs(cobra.NoArgs),
+		RunE:        runAgentStatusRun,
+		Annotations: map[string]string{clibase.AnnotationOperation: "agent_status_run"},
 	}
 
 	addAgentRegistryFlags(cmd)
@@ -455,11 +459,12 @@ func agentStatusWatchOptions(resolved config.AgentStatusConfig, quiet bool) agen
 
 func newAgentStatusClearCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "clear",
-		Short: "Clear window status styles applied by sesh",
-		Long:  "Restore every window status style sesh applied, leaving styles owned by other tools untouched.",
-		Args:  clibase.UsageArgs(cobra.NoArgs),
-		RunE:  runAgentStatusClear,
+		Use:         "clear",
+		Short:       "Clear window status styles applied by sesh",
+		Long:        "Restore every window status style sesh applied, leaving styles owned by other tools untouched.",
+		Args:        clibase.UsageArgs(cobra.NoArgs),
+		RunE:        runAgentStatusClear,
+		Annotations: map[string]string{clibase.AnnotationOperation: "clear_styles"},
 	}
 
 	clibase.AddSocketFlag(cmd)

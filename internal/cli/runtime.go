@@ -259,6 +259,10 @@ func (r *commandRuntime) setupLogging(cmd *cobra.Command) error {
 		return nil
 	}
 
+	if quietAgentTracker(cmd, cfg, r.operation) && level < zerolog.WarnLevel {
+		level = zerolog.WarnLevel
+	}
+
 	logPath, err := config.GetLogFile(cfg)
 	if err != nil {
 		return oops.In("cli").With("operation", "configure_logging").Wrap(err)
@@ -279,15 +283,14 @@ func (r *commandRuntime) setupLogging(cmd *cobra.Command) error {
 	cmd.SetContext(logger.WithContext(cmd.Context()))
 
 	if r.operation != "save" && r.operation != "restore" {
-		msg := "snapshot command started"
-		if cmd.Parent() == cmd.Root() {
-			msg = "command started"
-		}
-
-		zerolog.Ctx(cmd.Context()).Info().Str("component", "cli").Str("operation", r.operation).Str("status", "started").Msg(msg)
+		zerolog.Ctx(cmd.Context()).Info().Str("component", "cli").Str("operation", r.operation).Str("status", "started").Msg("command started")
 	}
 
 	return nil
+}
+
+func quietAgentTracker(cmd *cobra.Command, cfg *config.Config, operation string) bool {
+	return operation == "agent_status_run" && (getBoolFlag(cmd, "quiet") || cfg.ResolvedAgentStatus().Quiet)
 }
 
 func loadCommandConfig(ctx context.Context, cmd *cobra.Command) (*config.Config, error) {
@@ -322,18 +325,10 @@ func (r *commandRuntime) finish(ctx context.Context, err error) error {
 	ctx = logger.WithContext(ctx)
 
 	if r.ownsOutcome(err) {
-		failMsg := "snapshot command failed"
-		okMsg := "snapshot command finished"
-
-		if r.cmd != nil && r.cmd.Parent() == r.cmd.Root() {
-			failMsg = "command failed"
-			okMsg = "command finished"
-		}
-
 		if err != nil {
-			zerolog.Ctx(ctx).Error().Str("component", "cli").Str("operation", r.operation).Str("status", "failed").Str("reason", jsonErrorCode(err)).Msg(failMsg)
+			zerolog.Ctx(ctx).Error().Str("component", "cli").Str("operation", r.operation).Str("status", "failed").Str("reason", jsonErrorCode(err)).Msg("command failed")
 		} else {
-			zerolog.Ctx(ctx).Info().Str("component", "cli").Str("operation", r.operation).Str("status", "ok").Msg(okMsg)
+			zerolog.Ctx(ctx).Info().Str("component", "cli").Str("operation", r.operation).Str("status", "ok").Msg("command finished")
 		}
 	}
 

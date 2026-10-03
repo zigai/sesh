@@ -206,11 +206,12 @@ func newHooksListCommand(use, short string, validate bool) *cobra.Command {
 
 func newHooksRunCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "run <event>",
-		Short: "Run the hooks configured for one lifecycle event",
-		Long:  "Run the hooks configured for one lifecycle event.\n\nEach hook has its own deadline; a failing hook is reported and does not silently stop the remaining ones. Cancellation stops subsequent hooks.",
-		Args:  usageArgs(cobra.ExactArgs(1)),
-		RunE:  runHooksRun,
+		Use:         "run <event>",
+		Short:       "Run the hooks configured for one lifecycle event",
+		Long:        "Run the hooks configured for one lifecycle event.\n\nEach hook has its own deadline; a failing hook is reported and does not silently stop the remaining ones. Cancellation stops subsequent hooks.",
+		Args:        usageArgs(cobra.ExactArgs(1)),
+		RunE:        runHooksRun,
+		Annotations: map[string]string{annotationOperation: "execute_hooks"},
 	}
 
 	cmd.Flags().String("session", "", "Session name passed to the hook environment")
@@ -296,6 +297,7 @@ func runHooksRun(cmd *cobra.Command, args []string) error {
 	}
 
 	result, runErr := session.RunHooks(ctx, hookConfig, event)
+	cmd.Annotations[annotationSuccessOwned] = "true"
 
 	if runErr == nil && (result.Failed > 0 || result.TimedOut > 0) {
 		runErr = result.Err()

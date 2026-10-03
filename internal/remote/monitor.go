@@ -455,6 +455,7 @@ func (state *monitorState) storeAcceptedFrame(ctx context.Context, connectionID 
 				Str("component", "remote_monitor").
 				Str("operation", "connection").
 				Str("status", "recovered").
+				Str("reason", "connection_available").
 				Msg("remote monitor connection recovered")
 		}
 	case hidden && acceptErr == nil:

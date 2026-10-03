@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	gotmux "github.com/zigai/gotmux/tmux"
@@ -202,7 +203,7 @@ func TestBridgeRemoteMonitorReloadsCoalescesFailuresAndKeepsOutputPrivate(t *tes
 
 	want := config.DefaultConfig().Remote
 
-	want.SSHPath = "recovered"
+	want.SSHPath = "PRIVATE_SSH_PATH"
 	observed <- remote.ConfigReload{Remote: want}
 
 	close(observed)
@@ -216,8 +217,8 @@ func TestBridgeRemoteMonitorReloadsCoalescesFailuresAndKeepsOutputPrivate(t *tes
 	}
 
 	records := decodeRemoteReloadLogRecords(t, logs.String())
-	if len(records) != 1 {
-		t.Fatalf("reload warning records = %#v, want one", records)
+	if len(records) != 2 {
+		t.Fatalf("reload transition records = %#v, want two", records)
 	}
 
 	record := records[0]
@@ -227,8 +228,22 @@ func TestBridgeRemoteMonitorReloadsCoalescesFailuresAndKeepsOutputPrivate(t *tes
 		t.Fatalf("reload warning = %#v", record)
 	}
 
+	assertReloadRecovery(t, records[1])
+
 	if strings.Contains(logs.String(), errPrivateReloadFailure.Error()) || strings.Contains(logs.String(), want.SSHPath) {
 		t.Fatalf("reload warning leaked private data: %s", logs.String())
+	}
+}
+
+func assertReloadRecovery(t *testing.T, record map[string]any) {
+	t.Helper()
+
+	want := map[string]any{
+		"level": "info", "component": "remote_monitor", "operation": "reload_config",
+		"status": "recovered", "reason": "configuration_valid", "message": "remote monitor configuration reload recovered",
+	}
+	if diff := cmp.Diff(want, record); diff != "" {
+		t.Fatalf("incorrect reload recovery: %s", diff)
 	}
 }
 

@@ -103,6 +103,37 @@ func loggingTestModel(t *testing.T, output *bytes.Buffer) *Model {
 	return model
 }
 
+func TestOriginSessionLoadsLogDegradationAndRecoveryAcrossInitialAndRefreshLoads(t *testing.T) {
+	var logs bytes.Buffer
+
+	model := loggingTestModel(t, &logs)
+	model.applySessionRows(sessionLoadResultMsg{originQueried: true, originErr: errLoggingTestRemoteFailure})
+	model.handleOriginSessions(originSessionsMsg{observation: model.originObservation, err: errLoggingTestRemoteFailure})
+	model.handleOriginSessions(originSessionsMsg{observation: model.originObservation + 1, err: nil})
+	model.handleOriginSessions(originSessionsMsg{observation: model.originObservation, err: nil})
+	model.handleOriginSessions(originSessionsMsg{observation: model.originObservation, err: nil})
+
+	records := loggingTestRecords(t, &logs)
+	if len(records) != 2 {
+		t.Fatalf("expected one degradation and recovery: %s", logs.String())
+	}
+
+	assertLoggingTestRecord(t, records[0], tuiOperationLoadOriginSessions, "warn", "degraded", "tui dependency degraded")
+	assertLoggingTestRecord(t, records[1], tuiOperationLoadOriginSessions, "info", "recovered", "tui dependency recovered")
+}
+
+func TestOriginSessionLoadsKeepHealthyAndStaleResultsSilent(t *testing.T) {
+	var logs bytes.Buffer
+
+	model := loggingTestModel(t, &logs)
+	model.applySessionRows(sessionLoadResultMsg{originQueried: true, originErr: nil})
+	model.handleOriginSessions(originSessionsMsg{observation: model.originObservation + 1, err: errLoggingTestRemoteFailure})
+
+	if logs.Len() != 0 {
+		t.Fatalf("healthy or stale origin load logged: %s", logs.String())
+	}
+}
+
 func assertLoggingTestRecord(
 	t *testing.T,
 	record map[string]any,
@@ -126,6 +157,14 @@ func assertLoggingTestRecord(
 	}
 	if status == "failed" {
 		want["error_code"] = tuiErrorOperationFailed
+	}
+
+	if status == "degraded" {
+		want["reason"] = "dependency_unavailable"
+	}
+
+	if status == "recovered" {
+		want["reason"] = "dependency_available"
 	}
 
 	if len(record) != len(want) {
@@ -986,14 +1025,12 @@ func TestSnapshotActionLoggingUsesFixedPrivateSchema(t *testing.T) {
 func TestLogTUIFailureClassification(t *testing.T) {
 	tests := []failureClassificationCase{
 		{
-			name: "oops with code and phase action",
+			name: "oops metadata does not enter logs",
 			err: oops.In("tui").
-				Code("sessionNotFound").
-				With("phase", "navigation", "action", "jump").
+				Code(loggingTestPrivacySentinel).
+				With("phase", loggingTestPrivacySentinel, "action", loggingTestPrivacySentinel).
 				Wrap(errLoggingTestSecretDetails),
-			wantCode:   "sessionNotFound",
-			wantPhase:  "navigation",
-			wantAction: "jump",
+			wantCode: tuiErrorOperationFailed,
 		},
 		{
 			name:     "session attached sentinel",
@@ -1120,7 +1157,7 @@ func checkFailureClassification(t *testing.T, tt failureClassificationCase) {
 
 	assertClassificationContext(t, record, tt)
 
-	if strings.Contains(output.String(), "secret details") {
+	if strings.Contains(output.String(), "secret details") || strings.Contains(output.String(), loggingTestPrivacySentinel) {
 		t.Fatalf("log contains raw error: %s", output.String())
 	}
 }

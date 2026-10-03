@@ -120,6 +120,11 @@ func bridgeRemoteMonitorReloads(
 			continue
 		}
 
+		if failed {
+			zerolog.Ctx(ctx).Info().Str("component", "remote_monitor").Str("operation", "reload_config").
+				Str("status", "recovered").Str("reason", "configuration_valid").Msg("remote monitor configuration reload recovered")
+		}
+
 		failed = false
 
 		enqueueRemoteConfig(ctx, configs, reload.Remote)

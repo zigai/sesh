@@ -60,11 +60,12 @@ func NewCommand() *cobra.Command {
 
 func newSetupTmuxCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "tmux",
-		Short: "Print or apply the sesh tmux key bindings",
-		Long:  "Print or apply the sesh tmux key bindings.\n\nWithout --apply, the configuration block is printed and no tmux server is contacted. With --apply, the same bindings are registered through tmux, skipping keys that are already bound unless --force is given.",
-		Args:  clibase.UsageArgs(cobra.NoArgs),
-		RunE:  runSetupTmux,
+		Use:         "tmux",
+		Short:       "Print or apply the sesh tmux key bindings",
+		Long:        "Print or apply the sesh tmux key bindings.\n\nWithout --apply, the configuration block is printed and no tmux server is contacted. With --apply, the same bindings are registered through tmux, skipping keys that are already bound unless --force is given.",
+		Args:        clibase.UsageArgs(cobra.NoArgs),
+		RunE:        runSetupTmux,
+		Annotations: map[string]string{clibase.AnnotationOperation: "setup_tmux"},
 	}
 
 	cmd.Flags().Bool("apply", false, "Register the bindings on the target tmux server")

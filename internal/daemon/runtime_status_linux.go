@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/samber/oops"
 	"golang.org/x/sys/unix"
 
@@ -346,6 +347,15 @@ func (r *RuntimeReporter) serve(ctx context.Context) {
 	for {
 		connection, err := r.listener.AcceptUnix()
 		if err != nil {
+			r.mu.RLock()
+			stopping := r.status.Phase == RuntimePhaseStopping
+			r.mu.RUnlock()
+
+			if !stopping {
+				zerolog.Ctx(ctx).Error().Str("component", "daemon").Str("operation", "serve_runtime_status").
+					Str("status", "failed").Str("reason", "listener_failed").Msg("runtime status listener stopped unexpectedly")
+			}
+
 			return
 		}
 

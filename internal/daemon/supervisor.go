@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/samber/oops"
 	gotmux "github.com/zigai/gotmux/tmux"
 )
@@ -180,6 +181,10 @@ func (s *Supervisor) Run(ctx context.Context) error {
 
 		return nil
 	case <-timer.C:
+		zerolog.Ctx(ctx).Warn().Str("component", "daemon").Str("operation", "stop").
+			Str("status", "degraded").Str("reason", "stop_grace_exceeded").
+			Msg("foreground tmux server requires forced stop")
+
 		killErr := process.Kill()
 		waitErr := <-waited
 

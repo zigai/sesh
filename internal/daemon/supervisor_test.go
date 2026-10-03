@@ -1,13 +1,17 @@
 package daemon
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 var errFakeKilled = errors.New("fake process killed")
@@ -203,7 +207,9 @@ func TestSupervisorReportsForcedStopIncomplete(t *testing.T) {
 		t.Fatalf("NewSupervisor failed: %v", err)
 	}
 
-	ctx, cancel := context.WithCancel(t.Context())
+	var logs bytes.Buffer
+
+	ctx, cancel := context.WithCancel(zerolog.New(&logs).WithContext(t.Context()))
 
 	done := make(chan error, 1)
 	go func() { done <- supervisor.Run(ctx) }()
@@ -234,6 +240,30 @@ func TestSupervisorReportsForcedStopIncomplete(t *testing.T) {
 
 	if err := <-done; !errors.Is(err, ErrStopIncomplete) {
 		t.Fatalf("Run error = %v, want ErrStopIncomplete", err)
+	}
+
+	var record map[string]any
+
+	if bytes.Count(logs.Bytes(), []byte("\n")) != 1 {
+		t.Fatalf("expected one forced-stop warning: %s", logs.String())
+	}
+
+	if err := json.Unmarshal(logs.Bytes(), &record); err != nil {
+		t.Fatal(err)
+	}
+
+	want := map[string]any{
+		"component": "daemon", "operation": "stop", "status": "degraded", "level": "warn",
+		"reason": "stop_grace_exceeded", "message": "foreground tmux server requires forced stop",
+	}
+	if len(record) != len(want) {
+		t.Fatalf("unexpected forced-stop schema: %s", logs.String())
+	}
+
+	for key, value := range want {
+		if record[key] != value {
+			t.Fatalf("incorrect forced-stop %s: %s", key, logs.String())
+		}
 	}
 }
 
