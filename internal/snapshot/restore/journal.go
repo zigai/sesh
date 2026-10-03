@@ -14,11 +14,9 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/model"
 )
 
-// Durable journal states for one plan step, mirroring the repository action states.
-// The only safe dispatch sequence is planned (or not-sent) -> issued -> effect ->
-// confirmed. An effect is attempted only after its intent is durable, so "planned"
-// proves the effect was never attempted and "issued" or "unknown" never authorize a
-// redispatch.
+// Durable journal states for one plan step, mirroring the repository action states. Intent is
+// durable before dispatch, so only "planned" proves nothing was sent; "issued" and "unknown"
+// never authorize a redispatch.
 const (
 	StatePlanned   = model.ActionStatePlanned
 	StateIssued    = model.ActionStateIssued

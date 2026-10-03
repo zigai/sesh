@@ -161,7 +161,7 @@ func TestApplicationRestoreTablePrintsSkippedSessionsOnStdoutWhenItExitsNonZero(
 		t.Fatalf("a restore that created nothing must exit non-zero, stdout=%q", stdout)
 	}
 
-	for _, want := range []string{"Skipped Sessions:", `"autosave-alpha" reason=name_in_use`} {
+	for _, want := range []string{"Skipped:", "autosave-alpha (", "a live session already uses this name"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("the result table must reach stdout even when the command fails; missing %q in stdout=%q stderr=%q", want, stdout, stderr)
 		}

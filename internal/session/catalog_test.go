@@ -317,7 +317,7 @@ func TestListSavedListsLatestObservationOnlySave(t *testing.T) {
 	assertSavedSessionProperties(t, sessions[0], "observed", "/work", gen.ID, repoPath, 1)
 }
 
-func TestListSavedPreservesRecoveryBarriers(t *testing.T) {
+func TestListSavedListsNewestGenerationAfterUnfinishedSave(t *testing.T) {
 	repoPath := filepath.Join(t.TempDir(), "repo")
 
 	repo, err := store.Open(t.Context(), repoPath)
@@ -339,13 +339,13 @@ func TestListSavedPreservesRecoveryBarriers(t *testing.T) {
 	}
 	defer func() { _ = reopened.Close() }()
 
-	_, err = ListSaved(t.Context(), reopened, repoPath, "")
-	if err == nil {
-		t.Fatal("expected error on pending attempt barrier, got nil")
+	sessions, err := ListSaved(t.Context(), reopened, repoPath, "")
+	if err != nil {
+		t.Fatalf("ListSaved after an unfinished save = %v, want the newest saved generation", err)
 	}
 
-	if !errors.Is(err, store.ErrRecoveryRequired) {
-		t.Fatalf("expected store.ErrRecoveryRequired, got %v", err)
+	if len(sessions) != 1 || sessions[0].Name != "good" {
+		t.Fatalf("sessions = %+v, want the session from the newest saved generation", sessions)
 	}
 }
 

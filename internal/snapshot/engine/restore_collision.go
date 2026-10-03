@@ -46,9 +46,9 @@ func planFailureReason(current string, err error) string {
 	return current
 }
 
-// planSelection builds the plan for the selected sessions. A resumed operation keeps the session
-// set it registered, so the executor's adoption-aware guard decides which live sessions are its
-// own. A new operation is planned around live collisions instead.
+// planSelection keeps a resumed operation's registered session set, leaving the executor's
+// adoption-aware guard to decide which live sessions are its own, and plans a new operation
+// around live collisions.
 func planSelection(
 	ctx context.Context,
 	repository *store.Repository,
@@ -98,9 +98,8 @@ func restoreOperationExists(ctx context.Context, repository *store.Repository, o
 	return slices.ContainsFunc(catalog.Operations, func(op store.Operation) bool { return op.ID == operationID }), nil
 }
 
-// planAroundCollisions builds the restore plan for the selected sessions. A session whose name or
-// group is already live, or that is linked to one that is, is skipped under the skip policy and
-// reported under the fail policy. Nothing is created or removed on the live server.
+// planAroundCollisions skips, or under the fail policy reports, sessions whose name or group is
+// already live or that are linked to one that is. It never mutates the live server.
 func planAroundCollisions(
 	ctx context.Context,
 	server *gotmux.Server,

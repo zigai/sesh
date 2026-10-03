@@ -26,7 +26,7 @@ var (
 	ErrRepositoryRequired = errors.New("--repository is required")
 	ErrLeaseRootRequired  = errors.New("--lease-root is required")
 	ErrPartialSnapshot    = errors.New("parity-incomplete save")
-	ErrPartialRestore     = errors.New("parity-incomplete restore")
+	ErrPartialRestore     = errors.New("restore incomplete: sessions were skipped or not verified")
 	ErrDoctorChecksFailed = errors.New("doctor checks failed")
 	ErrSubcommandRequired = errors.New("subcommand required")
 	RawArgsContextKey     = rawArgsKey{}

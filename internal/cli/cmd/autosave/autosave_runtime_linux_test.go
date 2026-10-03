@@ -21,7 +21,7 @@ func autosaveRuntimeFixture(t *testing.T) (string, string) {
 	t.Helper()
 	isolatedAutosaveHome(t)
 
-	runtimeDir, err := os.MkdirTemp("/tmp", "sesh-runtime-") //nolint:usetesting // reason: Unix socket paths need a short name; t.Cleanup removes this private fixture.
+	runtimeDir, err := os.MkdirTemp("/tmp", "sesh-runtime-") //nolint:usetesting // Unix socket paths need a short name; t.Cleanup removes this private fixture.
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -29,7 +29,7 @@ var (
 		{gotmux.ErrOutputLimit, "outputLimitExceeded", "tmux command output exceeded its byte limit"},
 		{config.ErrConfigExists, "configExists", "configuration already exists; use --force to replace it"},
 		{config.ErrConfigSymlink, "configSymlink", "configuration target must not be a symbolic link"},
-		{errPartialRestore, "partialRestore", "parity-incomplete restore"},
+		{errPartialRestore, "partialRestore", "restore incomplete: sessions were skipped or not verified; see the summary"},
 		{remote.ErrActionPartial, "partialRemoteAction", "remote action completed with incomplete recovery"},
 		{remote.ErrActionFailed, "remoteActionFailed", "remote action failed"},
 		{restore.ErrPriorConflict, "priorEffectConflicted", "previous restore effects conflict with recorded state; explicit reconciliation required"},

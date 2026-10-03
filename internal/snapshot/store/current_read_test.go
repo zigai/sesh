@@ -206,14 +206,48 @@ func TestReadPracticalCurrentAdmitsLatestObservation(t *testing.T) {
 	if err != nil || got != observation || manifest.Complete() || len(manifest.Sessions) != 1 {
 		t.Fatalf("practical current view = %v, %v", got, err)
 	}
+}
+
+func TestReadPracticalCurrentUsesNewestGenerationAfterUnfinishedSave(t *testing.T) {
+	r := openRepository(t, filepath.Join(t.TempDir(), "repository"))
+	observation := commitFixture(t, r)
 
 	attempt, err := r.Begin(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, _, err := r.ReadPracticalCurrent(t.Context()); !errors.Is(err, ErrRecoveryRequired) {
-		t.Fatalf("pending latest save must keep its barrier: %v", err)
+	assertPracticalCurrentAfterUnfinishedSave(t, r, observation, "pending")
+
+	if err := r.Fail(t.Context(), attempt.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	assertPracticalCurrentAfterUnfinishedSave(t, r, observation, "failed")
+}
+
+func TestReadPracticalCurrentUsesCompleteGenerationAfterFailedSave(t *testing.T) {
+	r := openRepository(t, filepath.Join(t.TempDir(), "repository"))
+	generation := commitCompleteFixture(t, r)
+
+	attempt, err := r.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.Fail(t.Context(), attempt.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	assertPracticalCurrentAfterUnfinishedSave(t, r, generation, "failed")
+}
+
+func TestReadPracticalCurrentWithoutAnyGenerationKeepsBarrier(t *testing.T) {
+	r := openRepository(t, filepath.Join(t.TempDir(), "repository"))
+
+	attempt, err := r.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	if err := r.Fail(t.Context(), attempt.ID); err != nil {
@@ -221,7 +255,29 @@ func TestReadPracticalCurrentAdmitsLatestObservation(t *testing.T) {
 	}
 
 	if _, _, err := r.ReadPracticalCurrent(t.Context()); !errors.Is(err, ErrRecoveryRequired) {
-		t.Fatalf("failed latest save must not fall back to an older generation: %v", err)
+		t.Fatalf("failed first save has no generation to use: %v", err)
+	}
+}
+
+func assertPracticalCurrentAfterUnfinishedSave(t *testing.T, r *Repository, want Generation, state string) {
+	t.Helper()
+
+	if _, _, err := r.ReadCurrent(t.Context()); !errors.Is(err, ErrRecoveryRequired) {
+		t.Fatalf("strict current view after %s save: %v", state, err)
+	}
+
+	got, _, err := r.ReadPracticalCurrent(t.Context())
+	if err != nil || got.ID != want.ID {
+		t.Fatalf("practical current view after %s save = %v, %v; want newest generation %s", state, got.ID, err, want.ID)
+	}
+
+	catalog, err := r.Inspect(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !catalog.LatestSaveUnfinished() {
+		t.Fatalf("LatestSaveUnfinished() = false after %s save", state)
 	}
 }
 

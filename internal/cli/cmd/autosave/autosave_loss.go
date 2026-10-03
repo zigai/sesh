@@ -10,10 +10,8 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
-// reportRestorableSessions says, once per autosave episode, that tmux is gone while the newest
-// snapshot still holds sessions. It returns the session count when it reported, so the caller can
-// show it, and zero in every silent case: no recorded autosave to follow, an already reported
-// loss, nothing saved, or marker state that cannot be read or written.
+// reportRestorableSessions reports once per episode that tmux is gone but the newest snapshot
+// has sessions. It returns the session count, or zero when nothing was reported.
 func reportRestorableSessions(ctx context.Context, env autosaveEnv, repo *store.Repository) int {
 	if env.historyPath == "" || env.lastSavedUnix <= 0 {
 		return 0
@@ -21,7 +19,7 @@ func reportRestorableSessions(ctx context.Context, env autosaveEnv, repo *store.
 
 	markerPath := automation.ServerLossMarkerPath(env.historyPath)
 
-	unreported, err := automation.ServerLossUnreported(markerPath, env.lastSavedUnix)
+	unreported, err := automation.EpisodeUnreported(markerPath, env.lastSavedUnix)
 	if err != nil || !unreported {
 		return 0
 	}
@@ -31,7 +29,7 @@ func reportRestorableSessions(ctx context.Context, env autosaveEnv, repo *store.
 		return 0
 	}
 
-	if err := automation.RecordServerLossReported(markerPath, env.lastSavedUnix); err != nil {
+	if err := automation.RecordEpisodeReported(markerPath, env.lastSavedUnix); err != nil {
 		return 0
 	}
 

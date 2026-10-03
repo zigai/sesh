@@ -114,6 +114,10 @@ func executeAutosaveSave(ctx context.Context, cmd *cobra.Command, env autosaveEn
 		return errors.Join(err, wrapCloseError(repo.Close()))
 	}
 
+	if pending := findPendingRestore(ctx, cmd, server, repo); pending.sessions > 0 {
+		return skipAutosaveWhileRestorePending(ctx, cmd, env, repo, pending)
+	}
+
 	lock, err := automation.TryAcquireSaveLock(ctx, automation.SaveLockPath())
 	if err != nil {
 		return handleAutosaveLockError(ctx, cmd, env, repo, err)
@@ -126,6 +130,9 @@ func executeAutosaveSave(ctx context.Context, cmd *cobra.Command, env autosaveEn
 		AgentSource:            agents.NewAHTStore(agentStatePath),
 		Profile:                engine.RecoveryPractical,
 	})
+	if saveErr == nil {
+		cmd.Annotations[clibase.AnnotationSuccessOwned] = "true"
+	}
 
 	decision := automation.EvaluateSaveCompletion(automation.SaveCompletion{
 		Attempt:    result.Attempt,
@@ -157,22 +164,8 @@ func executeAutosaveSave(ctx context.Context, cmd *cobra.Command, env autosaveEn
 	outcome.history = autosaveHistoryState(env)
 
 	var bookkeepingErr error
-
 	if decision.Record {
-		bookkeepingCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), autosaveBookkeepingTimeout)
-		bookkeepingErr = recordAutosave(bookkeepingCtx, env.historyPath, time.Now().Unix())
-
-		cancel()
-
-		outcome.recorded = bookkeepingErr == nil
-
-		if outcome.recorded {
-			outcome.history = autosaveHistoryRecorded
-		}
-	}
-
-	if bookkeepingErr != nil {
-		bookkeepingErr = clibase.NewExitError(clibase.ExitCodeGeneral, errors.Join(errAutosaveBookkeeping, bookkeepingErr))
+		bookkeepingErr = recordCompletedAutosave(ctx, env, &outcome)
 	}
 
 	renderErr := renderAutosaveResult(cmd, env, outcome)
@@ -187,8 +180,9 @@ func NewFinalSaveCommand() *cobra.Command {
 		Long: "Run one bounded high-priority save for shutdown ordering.\n\n" +
 			"The save runs even when the configured interval has not elapsed, respects the provided deadline and records an " +
 			"incomplete result instead of reporting success. It never stops tmux, kills sessions or removes snapshots.",
-		Args: clibase.UsageArgs(cobra.NoArgs),
-		RunE: runAutosaveFinalSave,
+		Args:        clibase.UsageArgs(cobra.NoArgs),
+		RunE:        runAutosaveFinalSave,
+		Annotations: map[string]string{clibase.AnnotationOperation: "final-save"},
 	}
 
 	cmd.Flags().Duration("deadline", defaultFinalSaveDeadline, "Bounded time budget for the final save")
@@ -277,25 +271,8 @@ func executeFinalSave(
 		return finalSaveLockFailure(outcome, status, repo, err)
 	}
 
-	server, err := integration.Open(socketPath)
+	server, selected, reason, err := openFinalSaveTarget(ctx, cmd, socketPath)
 	if err != nil {
-		return finalSaveFailure(
-			outcome,
-			status,
-			automation.FinalSaveIncomplete,
-			"server_unavailable",
-			errors.Join(oops.In("cli").With("operation", "open_tmux").Wrap(err), wrapCloseError(repo.Close()), lock.Release()),
-		)
-	}
-
-	selected, err := resolveAutosaveSelection(ctx, cmd, server)
-	if err != nil {
-		reason := "selection_failed"
-		if errors.Is(err, gotmux.ErrNoServer) {
-			// A stop that arrives after the server died has nothing left to observe.
-			reason = "server_gone"
-		}
-
 		return finalSaveFailure(
 			outcome,
 			status,
@@ -305,6 +282,17 @@ func executeFinalSave(
 		)
 	}
 
+	if pending := findPendingRestore(ctx, cmd, server, repo); pending.sessions > 0 {
+		// Saving the unrestored server would make it what the next start restores.
+		reportPendingRestore(ctx, env, pending)
+
+		status.Result, status.Reason = automation.FinalSaveIncomplete, autosaveReasonRestorePending
+		status.Incomplete, status.Bookkeeping = true, false
+		outcome.status, outcome.reason, outcome.restorable = autosaveStatusSkipped, autosaveReasonRestorePending, pending.sessions
+
+		return outcome, status, errors.Join(wrapCloseError(repo.Close()), lock.Release())
+	}
+
 	result, saveErr := engine.SaveObservation(ctx, repo, server, selected, engine.SaveConfig{
 		LeaseRoot:              leaseRoot,
 		ProcessEnrichment:      true,
@@ -312,6 +300,9 @@ func executeFinalSave(
 		AgentSource:            agents.NewAHTStore(agentStatePath),
 		Profile:                engine.RecoveryPractical,
 	})
+	if saveErr == nil {
+		cmd.Annotations[clibase.AnnotationSuccessOwned] = "true"
+	}
 
 	closeErr := repo.Close()
 	lockErr := lock.Release()
@@ -357,6 +348,27 @@ func executeFinalSave(
 	}
 
 	return outcome, status, errors.Join(bookkeepingErr, wrapCloseError(closeErr), lockErr)
+}
+
+// openFinalSaveTarget opens the tmux server and selects the sessions a final save observes. On
+// failure it also returns the fixed reason the final save status records.
+func openFinalSaveTarget(ctx context.Context, cmd *cobra.Command, socketPath string) (*gotmux.Server, []gotmux.SessionID, string, error) {
+	server, err := integration.Open(socketPath)
+	if err != nil {
+		return nil, nil, "server_unavailable", oops.In("cli").With("operation", "open_tmux").Wrap(err)
+	}
+
+	selected, err := resolveAutosaveSelection(ctx, cmd, server)
+	if errors.Is(err, gotmux.ErrNoServer) {
+		// A stop that arrives after the server died has nothing left to observe.
+		return nil, nil, "server_gone", err
+	}
+
+	if err != nil {
+		return nil, nil, "selection_failed", err
+	}
+
+	return server, selected, "", nil
 }
 
 func finalSaveFailure(
@@ -481,9 +493,7 @@ func maintainAfterAutosave(ctx context.Context, repo *store.Repository, env auto
 	maintainAutosaveRepository(ctx, repo, env.cfg.Snapshot)
 }
 
-// maintainAutosaveRepository applies the configured snapshot retention and reclaims the
-// generations it retires. It runs with the first recorded save of each day, so retention costs
-// one pass per day instead of one per save. The engine records each outcome, and maintenance
+// maintainAutosaveRepository applies snapshot retention and reclaims retired generations. It
 // never fails the save that preceded it.
 func maintainAutosaveRepository(ctx context.Context, repo *store.Repository, snapshot config.SnapshotConfig) {
 	policy := store.RetentionPolicy{
@@ -508,6 +518,37 @@ func skipAutosaveWithoutServer(ctx context.Context, cmd *cobra.Command, env auto
 	idle.restorable = restorable
 
 	return errors.Join(renderAutosaveResult(cmd, env, idle), closeErr)
+}
+
+// recordCompletedAutosave durably records the time of a saved autosave, even after the save's
+// own cancellation, and marks the outcome recorded when it succeeds.
+func recordCompletedAutosave(ctx context.Context, env autosaveEnv, outcome *autosaveOutcome) error {
+	bookkeepingCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), autosaveBookkeepingTimeout)
+	defer cancel()
+
+	if err := recordAutosave(bookkeepingCtx, env.historyPath, time.Now().Unix()); err != nil {
+		return clibase.NewExitError(clibase.ExitCodeGeneral, errors.Join(errAutosaveBookkeeping, err))
+	}
+
+	outcome.recorded = true
+	outcome.history = autosaveHistoryRecorded
+
+	return nil
+}
+
+// skipAutosaveWhileRestorePending holds back a save while the live server lacks saved sessions
+// it was started without, so the scratch state never replaces them as the newest snapshot.
+func skipAutosaveWhileRestorePending(ctx context.Context, cmd *cobra.Command, env autosaveEnv, repo *store.Repository, pending pendingRestore) error {
+	reportPendingRestore(ctx, env, pending)
+
+	skipped := newAutosaveOutcome(autosaveStatusSkipped, autosaveReasonRestorePending)
+	skipped.history = autosaveHistoryState(env)
+	skipped.repository = autosaveRepositoryState(ctx, cmd, env)
+	skipped.restorable = pending.sessions
+
+	closeErr := wrapCloseError(repo.Close())
+
+	return errors.Join(renderAutosaveResult(cmd, env, skipped), closeErr)
 }
 
 func handleAutosaveLockError(ctx context.Context, cmd *cobra.Command, env autosaveEnv, repo *store.Repository, err error) error {

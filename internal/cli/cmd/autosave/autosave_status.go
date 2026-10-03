@@ -3,10 +3,9 @@ package autosave
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
-	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"golang.org/x/sys/unix"
 
@@ -30,6 +29,7 @@ type autosaveResultJSON struct {
 	DefaultTo        string `json:"defaultSessionTo,omitempty"`
 	Recorded         bool   `json:"recorded"`
 	Restorable       int    `json:"restorableSessions,omitempty"`
+	Abandoned        int    `json:"abandonedRestores,omitempty"`
 	ElapsedSec       int64  `json:"elapsedSeconds"`
 	IntervalM        int    `json:"intervalMinutes"`
 	DaemonState      string `json:"daemonState"`
@@ -89,15 +89,19 @@ func runAutosaveStatus(cmd *cobra.Command, _ []string) error {
 		outcome.status = autosaveStatusDegraded
 		outcome.reason = automation.ReasonHistoryUnavailable
 
-		return renderAutosaveDegraded(
-			cmd,
-			env,
-			outcome,
-			clibase.NewExitError(clibase.ExitCodeGeneral, errors.Join(errAutosaveHistoryUnavailable, env.historyErr)),
-		)
+		err := clibase.NewExitError(clibase.ExitCodeGeneral, errors.Join(errAutosaveHistoryUnavailable, env.historyErr))
+		if clibase.JSONOutputEnabled(cmd) {
+			return clibase.WriteJSONResultError(cmd, autosavePayload(env, outcome), err)
+		}
+
+		return errors.Join(clibase.WriteOutput(cmd, "%s", autosaveStatusSummary(env, outcome)), err)
 	}
 
-	return renderAutosaveResult(cmd, env, outcome)
+	if clibase.JSONOutputEnabled(cmd) {
+		return clibase.WriteJSONResult(cmd, autosavePayload(env, outcome))
+	}
+
+	return clibase.WriteOutput(cmd, "%s", autosaveStatusSummary(env, outcome))
 }
 
 func DaemonRuntimeState(ctx context.Context, cmd *cobra.Command) (string, daemon.RuntimeStatus) {
@@ -209,36 +213,40 @@ func autosaveDecisionStatus(decision automation.DueDecision) string {
 }
 
 func renderAutosaveResult(cmd *cobra.Command, env autosaveEnv, outcome autosaveOutcome) error {
+	logAutosaveSkip(cmd, outcome)
+
 	if clibase.JSONOutputEnabled(cmd) {
 		return clibase.WriteJSONResult(cmd, autosavePayload(env, outcome))
 	}
 
-	return clibase.WriteOutput(
-		cmd,
-		"Autosave:   %s (reason: %s)\nInterval:   %dm\nElapsed:    %s\nHistory:    %s\nRepository: %s\nAttempt:    %s\nGeneration: %s\nSnapshot:   %s\nRecorded:   %t\nDaemon:     %s\nPhase:      %s\nInhibitors: %t\n%s",
-		outcome.status,
-		outcome.reason,
-		int(env.interval.Minutes()),
-		env.decision.Elapsed.Round(time.Second),
-		outcome.history,
-		outcome.repository,
-		outcome.attempt,
-		outcome.generation,
-		outcome.snapshot,
-		outcome.recorded,
-		outcome.daemonState,
-		outcome.daemonStatus.Phase,
-		outcome.daemonStatus.InhibitorsHeld,
-		restorableLine(outcome.restorable),
-	)
+	return clibase.WriteOutput(cmd, "%s", autosaveSummary(env, outcome))
 }
 
-func restorableLine(count int) string {
-	if count == 0 {
-		return ""
+func logAutosaveSkip(cmd *cobra.Command, outcome autosaveOutcome) {
+	if outcome.status != autosaveStatusSkipped && outcome.reason != automation.ReasonDisabled && outcome.reason != automation.ReasonNotDue {
+		return
 	}
 
-	return fmt.Sprintf("Restorable: %d sessions are saved and no tmux server is running; restore with: sesh snapshot restore\n", count)
+	switch outcome.reason {
+	case automation.ReasonDisabled, automation.ReasonNotDue, automation.ReasonRepositoryMissing,
+		autosaveReasonLockBusy, autosaveReasonTmuxNotRunning, autosaveReasonRestorePending:
+	default:
+		return
+	}
+
+	if cmd.Annotations == nil {
+		cmd.Annotations = make(map[string]string)
+	}
+
+	cmd.Annotations[clibase.AnnotationSuccessOwned] = "true"
+
+	if outcome.reason == autosaveReasonRestorePending {
+		return
+	}
+
+	zerolog.Ctx(clibase.CommandContext(cmd)).Info().Str("component", "snapshot").
+		Str("operation", cmd.Annotations[clibase.AnnotationOperation]).Str("status", autosaveStatusSkipped).
+		Str("reason", outcome.reason).Msg("automatic snapshot operation skipped")
 }
 
 func autosavePayload(env autosaveEnv, outcome autosaveOutcome) autosaveResultJSON {
@@ -256,6 +264,7 @@ func autosavePayload(env autosaveEnv, outcome autosaveOutcome) autosaveResultJSO
 		DefaultTo:        outcome.defaultTo,
 		Recorded:         outcome.recorded,
 		Restorable:       outcome.restorable,
+		Abandoned:        outcome.abandoned,
 		ElapsedSec:       int64(env.decision.Elapsed.Seconds()),
 		IntervalM:        int(env.interval.Minutes()),
 		DaemonState:      outcome.daemonState,

@@ -44,10 +44,8 @@ func (r *Repository) ReadCurrent(ctx context.Context) (Generation, model.Manifes
 	return generation, manifest, nil
 }
 
-// ReadPracticalCurrent reads the generation used for practical recovery. Besides everything
-// ReadCurrent admits, it admits a current generation that the latest save recorded as an
-// observation, the normal result of a capture that is not an atomic checkpoint. A failed,
-// pending or rewrite-blocked latest save still requires explicit recovery.
+// ReadPracticalCurrent reads the generation used for practical recovery: everything ReadCurrent
+// admits plus what [Catalog.PracticalCurrentAdmissible] allows.
 func (r *Repository) ReadPracticalCurrent(ctx context.Context) (Generation, model.Manifest, error) {
 	lock, err := r.root.Lock(ctx, "repository.lock")
 	if err != nil {
@@ -83,21 +81,12 @@ func (r *Repository) practicalCurrentLocked(ctx context.Context) (Generation, mo
 	return current, manifest, err
 }
 
-// PracticalCurrentAdmissible reports whether the current generation is the latest save's
-// observation-only result with no pending rewrite of it.
+// PracticalCurrentAdmissible reports whether practical recovery may read the current generation:
+// the latest save's observation-only result, or the newest saved generation when the latest save
+// produced none because it failed or never finished. A pending rewrite of the current generation
+// blocks either way, so a saved-session deletion in progress is never undone.
 func (c Catalog) PracticalCurrentAdmissible() bool {
 	if c.Current == "" || len(c.Attempts) == 0 {
-		return false
-	}
-
-	latest := c.Attempts[0]
-	for _, attempt := range c.Attempts[1:] {
-		if attempt.Sequence > latest.Sequence {
-			latest = attempt
-		}
-	}
-
-	if latest.State != attemptStateIncomplete || latest.ID != c.Current {
 		return false
 	}
 
@@ -108,8 +97,43 @@ func (c Catalog) PracticalCurrentAdmissible() bool {
 	}
 
 	index := c.generationIndex(c.Current)
+	if index < 0 {
+		return false
+	}
 
-	return index >= 0 && !c.Generations[index].Complete
+	latest := c.latestAttempt()
+
+	switch latest.State {
+	case attemptStateIncomplete:
+		return latest.ID == c.Current && !c.Generations[index].Complete
+	case attemptStatePending, attemptStateFailed:
+		return true
+	default:
+		return false
+	}
+}
+
+// LatestSaveUnfinished reports whether the latest save attempt failed or never finished, so the
+// current generation, if any, predates it.
+func (c Catalog) LatestSaveUnfinished() bool {
+	if len(c.Attempts) == 0 {
+		return false
+	}
+
+	state := c.latestAttempt().State
+
+	return state == attemptStatePending || state == attemptStateFailed
+}
+
+func (c Catalog) latestAttempt() Attempt {
+	latest := c.Attempts[0]
+	for _, attempt := range c.Attempts[1:] {
+		if attempt.Sequence > latest.Sequence {
+			latest = attempt
+		}
+	}
+
+	return latest
 }
 
 func (r *Repository) currentLocked(ctx context.Context) (Generation, model.Manifest, error) {

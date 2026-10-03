@@ -115,7 +115,7 @@ func TestSnapshotRestorePickerCleansTerminalBeforeRestoringSelectedGeneration(t 
 		t.Fatal("restore silently fell back to the current generation")
 	}
 
-	if bytes.Contains(childOutput, []byte("Generation:         "+currentGeneration)) || !bytes.Contains(childOutput, []byte("Generation:         "+selectedGeneration)) {
+	if bytes.Contains(childOutput, []byte("from generation "+currentGeneration[:8])) || !bytes.Contains(childOutput, []byte("from generation "+selectedGeneration[:8])) {
 		t.Fatalf("restore receipt does not identify the exact selected generation: %q", childOutput)
 	}
 }

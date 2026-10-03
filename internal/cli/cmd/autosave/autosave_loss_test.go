@@ -181,11 +181,23 @@ func TestNothingSavedDoesNotConsumeTheEpisode(t *testing.T) {
 func TestRestorableLineIsOnlyShownWhenSessionsAreWaiting(t *testing.T) {
 	t.Parallel()
 
-	if restorableLine(0) != "" {
+	idle := newAutosaveOutcome(autosaveStatusSkipped, autosaveReasonTmuxNotRunning)
+	if restorableLine(idle) != "" {
 		t.Fatal("no waiting sessions must add no output")
 	}
 
-	if line := restorableLine(3); !strings.Contains(line, "3 sessions") || !strings.Contains(line, "sesh snapshot restore") {
+	idle.restorable = 3
+	if line := restorableLine(idle); !strings.Contains(line, "3 saved sessions can be restored") || !strings.Contains(line, "Start tmux") ||
+		!strings.Contains(line, "sesh snapshot restore") {
 		t.Fatalf("unexpected line: %q", line)
+	}
+
+	pending := newAutosaveOutcome(autosaveStatusSkipped, autosaveReasonRestorePending)
+	pending.restorable = 2
+
+	line := restorableLine(pending)
+	if !strings.Contains(line, "2 saved sessions are not running") || !strings.Contains(line, "sesh snapshot restore") ||
+		!strings.Contains(line, "sesh snapshot save") {
+		t.Fatalf("unexpected restore-pending line: %q", line)
 	}
 }

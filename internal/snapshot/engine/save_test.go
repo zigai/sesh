@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/samber/oops"
@@ -59,8 +60,23 @@ func TestSaveBoundaryLogging(t *testing.T) {
 				t.Fatalf("unexpected result: %#v, %v", result, saveErr)
 			}
 
+			assertSaveFailureOwnership(t, saveErr)
+
 			assertSaveRecords(t, output.Bytes(), scenario)
 		})
+	}
+}
+
+func assertSaveFailureOwnership(t *testing.T, err error) {
+	t.Helper()
+
+	if err == nil {
+		return
+	}
+
+	owner, ok := errors.AsType[*saveOutcomeError](err)
+	if !ok || !owner.OutcomeLogged() {
+		t.Fatal("save failure lost its logging owner")
 	}
 }
 
@@ -261,7 +277,7 @@ func validateLogSchema(t *testing.T, fields map[string]jsontext.Value) {
 	}
 }
 
-func TestInterruptedCapturePreservesAttemptAndPriorSource(t *testing.T) {
+func TestInterruptedCaptureRecordsFailedAttemptAndKeepsPriorSource(t *testing.T) {
 	r := testRepository(t)
 	leaseRoot, socketPath := testLeaseEndpoint(t)
 
@@ -292,20 +308,58 @@ func TestInterruptedCapturePreservesAttemptAndPriorSource(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(catalog.Attempts) != 2 || catalog.Attempts[1].ID != result.Attempt || catalog.Attempts[1].State != "pending" {
-		t.Fatal("unacknowledged failure was forgotten")
+	if len(catalog.Attempts) != 2 || catalog.Attempts[1].ID != result.Attempt || catalog.Attempts[1].State != "failed" {
+		t.Fatalf("interrupted capture was not recorded as failed: %+v", catalog.Attempts)
 	}
 
 	if catalog.Current != prior.Generation || len(catalog.Generations) != 1 {
 		t.Fatal("interruption changed committed source")
 	}
 
-	if _, err := r.Read(t.Context(), prior.Generation); err != nil {
+	assertPriorGenerationRecovers(t, r, prior.Generation)
+}
+
+// assertPriorGenerationRecovers checks that after an interrupted save the prior generation stays
+// readable and is what practical recovery uses, while the strict current view still refuses it.
+func assertPriorGenerationRecovers(t *testing.T, r *store.Repository, prior string) {
+	t.Helper()
+
+	if _, err := r.Read(t.Context(), prior); err != nil {
 		t.Fatal("lost prior recovery source", err)
 	}
 
 	if _, err := r.Current(t.Context()); !errors.Is(err, store.ErrRecoveryRequired) {
-		t.Fatal("silently recovered past interrupted save", err)
+		t.Fatal("strict current view recovered past interrupted save", err)
+	}
+
+	practical, _, err := r.ReadPracticalCurrent(t.Context())
+	if err != nil || practical.ID != prior {
+		t.Fatalf("practical recovery after interrupted save = %v, %v; want prior generation", practical.ID, err)
+	}
+}
+
+func TestCaptureDeadlineRecordsFailedAttempt(t *testing.T) {
+	r := testRepository(t)
+	leaseRoot, socketPath := testLeaseEndpoint(t)
+
+	ctx, cancel := context.WithTimeout(t.Context(), time.Hour)
+	defer cancel()
+
+	result, err := save(ctx, r, leaseRoot, socketPath, func(context.Context) (capture.Observation, error) {
+		cancel()
+		return capture.Observation{}, context.DeadlineExceeded
+	})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("save error = %v, want the capture deadline", err)
+	}
+
+	catalog, err := r.Inspect(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(catalog.Attempts) != 1 || catalog.Attempts[0].ID != result.Attempt || catalog.Attempts[0].State != "failed" {
+		t.Fatalf("expired capture was not recorded as failed: %+v", catalog.Attempts)
 	}
 }
 

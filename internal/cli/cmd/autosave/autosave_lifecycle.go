@@ -26,8 +26,9 @@ func NewActionAdoptStartupSessionCommand() *cobra.Command {
 		Long: "Adopt a fresh numbered startup session as the default session.\n\n" +
 			"Only the exact session shown by an attached client is considered, and only when it was created moments ago with a single " +
 			"window and pane. Unrelated sessions are never renamed or killed.",
-		Args: clibase.UsageArgs(cobra.NoArgs),
-		RunE: runAdoptStartupSession,
+		Args:        clibase.UsageArgs(cobra.NoArgs),
+		RunE:        runAdoptStartupSession,
+		Annotations: map[string]string{clibase.AnnotationOperation: "adopt_startup_session"},
 	}
 
 	addAutosaveFlags(cmd.Flags())
@@ -158,8 +159,8 @@ func currentAttachedClient(ctx context.Context, server *gotmux.Server) (gotmux.C
 func NewRestoreOnStartCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:         "restore-on-start",
-		Short:       "Restore the newest committed snapshot when explicitly configured",
-		Long:        "Restore the newest committed snapshot when explicitly configured.\n\nA pending, failed or incomplete newest attempt keeps its recovery barrier and refuses automatic restoration.",
+		Short:       "Restore the newest saved snapshot when explicitly configured",
+		Long:        "Restore the newest saved snapshot when explicitly configured.\n\nWhen the latest save failed or never finished, the newest saved generation is restored and reported. A pending saved-session deletion or an active restore operation refuses automatic restoration.",
 		Args:        clibase.UsageArgs(cobra.NoArgs),
 		RunE:        runAutosaveRestoreOnStart,
 		Annotations: map[string]string{clibase.AnnotationOperation: "restore-on-start"},
@@ -207,10 +208,19 @@ func executeStartupRestore(cmd *cobra.Command, env autosaveEnv) error {
 		return oops.In("cli").With("operation", "open_repository").Wrap(err)
 	}
 
+	// Restores aimed at a vanished server, e.g. one interrupted by a reboot, can never resume
+	// and must not block this start's restore.
+	settled, settleErr := engine.SettleDeadRestores(ctx, repo)
+	if settleErr != nil {
+		return errors.Join(oops.In("cli").With("operation", "settle_dead_restores").Wrap(settleErr), wrapCloseError(repo.Close()))
+	}
+
 	state, stateErr := automation.InspectStartupState(ctx, repo)
 	if stateErr != nil {
 		return errors.Join(oops.In("cli").With("operation", "inspect_startup_state").Wrap(stateErr), wrapCloseError(repo.Close()))
 	}
+
+	state.Abandoned = len(settled)
 
 	state.Enabled = env.cfg.Autosave.RestoreLastOnStart
 	state.Practical = true
@@ -266,12 +276,18 @@ func executeStartupRestore(cmd *cobra.Command, env autosaveEnv) error {
 		)
 	}
 
+	cmd.Annotations[clibase.AnnotationSuccessOwned] = "true"
+
 	restored := newAutosaveOutcome(result.Status, result.Reason)
 	restored.attempt = result.OperationID
 	restored.generation = result.Generation
 	restored.snapshot = result.Status
 	restored.repository = autosaveRepositoryState(ctx, cmd, env)
 	restored.history = autosaveHistoryState(env)
+	restored.abandoned = state.Abandoned
+	restored.restore = true
+	restored.restored = len(result.SessionsRestored)
+	restored.skipped = len(result.SessionsSkipped)
 
 	renderErr := renderAutosaveResult(cmd, env, restored)
 
@@ -289,6 +305,7 @@ func renderDeniedStartupRestore(
 	outcome.generation = admission.Generation
 	outcome.repository = autosaveRepositoryFromState(state)
 	outcome.history = autosaveHistoryState(env)
+	outcome.abandoned = state.Abandoned
 
 	renderErr := renderAutosaveResult(cmd, env, outcome)
 	closeErr := wrapCloseError(repo.Close())
@@ -297,9 +314,25 @@ func renderDeniedStartupRestore(
 	case automation.ReasonRestoreDisabled, automation.ReasonRepositoryMissing:
 		return errors.Join(renderErr, closeErr)
 	default:
-		refusal := clibase.NewExitError(clibase.ExitCodeGeneral, oops.In("cli").Code("startup_refused").With("operation", "restore_on_start", "reason", admission.Reason).Wrap(errAutosaveStartupRefused))
+		refusal := clibase.NewExitError(clibase.ExitCodeGeneral, oops.In("cli").Code("startup_refused").With("operation", "restore_on_start", "reason", admission.Reason).
+			Wrap(errors.Join(errAutosaveStartupRefused, startupRefusalCause(admission.Reason, state))))
 
 		return errors.Join(renderErr, refusal, closeErr)
+	}
+}
+
+// startupRefusalCause says why a startup restore was refused and how to clear it, so the
+// journal line is actionable on its own.
+func startupRefusalCause(reason string, state automation.StartupState) error {
+	switch reason {
+	case automation.ReasonPendingOperation:
+		return &automation.ActiveRestoresError{Operations: state.ActiveOperations}
+	case automation.ReasonRecoveryRequired:
+		return errStartupNeedsRecovery
+	case automation.ReasonObservationOnly:
+		return errStartupNothingSaved
+	default:
+		return nil
 	}
 }
 

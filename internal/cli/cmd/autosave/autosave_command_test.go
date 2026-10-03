@@ -247,7 +247,7 @@ func TestAutosaveSaveIfDueRejectsInvalidEnvironmentKeys(t *testing.T) {
 	}
 }
 
-func TestAutosaveStatusTextReportsIntervalInMinutes(t *testing.T) {
+func TestAutosaveStatusTextSummarizesScheduleSnapshotsAndShutdownSaves(t *testing.T) {
 	isolatedAutosaveHome(t)
 
 	stdout, stderr, err := executeCommand(t, "autosave", "status", testNoConfigFlag)
@@ -255,7 +255,19 @@ func TestAutosaveStatusTextReportsIntervalInMinutes(t *testing.T) {
 		t.Fatalf("autosave-status failed: %v\nstderr: %s", err, stderr)
 	}
 
-	if !strings.Contains(stdout, "Interval:   3m\n") {
-		t.Fatalf("status output does not report the default 3 minute interval:\n%s", stdout)
+	for _, want := range []string{
+		"Autosave:        on, every 3m; no save recorded yet\n",
+		"Snapshots:       none saved yet\n",
+		"Before shutdown: ",
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("status output is missing %q:\n%s", want, stdout)
+		}
+	}
+
+	for _, internal := range []string{"reason:", "Inhibitors", "Phase", "Recorded"} {
+		if strings.Contains(stdout, internal) {
+			t.Fatalf("status output must not show %q:\n%s", internal, stdout)
+		}
 	}
 }

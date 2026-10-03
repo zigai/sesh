@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/samber/oops"
@@ -17,6 +18,9 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/capture"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
+
+// failRecordTimeout bounds recording a failed attempt once the save's own deadline has passed.
+const failRecordTimeout = 2 * time.Second
 
 var (
 	ErrLeaseRootRequired  = errors.New("explicit shared lease root required")
@@ -36,6 +40,8 @@ type SaveResult struct {
 	Generation string
 	Status     string
 }
+
+type saveOutcomeError struct{ error }
 
 func SaveObservation(ctx context.Context, repository *store.Repository, server *gotmux.Server, selected []gotmux.SessionID, cfg SaveConfig) (SaveResult, error) {
 	if cfg.LeaseRoot == "" {
@@ -89,7 +95,7 @@ func saveWithProfile(ctx context.Context, repository *store.Repository, leaseRoo
 
 	observation, err := observe(ctx)
 	if err != nil {
-		failErr := repository.Fail(ctx, attempt.ID)
+		failErr := recordFailedAttempt(ctx, repository, attempt.ID)
 		closeErr := lease.Close()
 
 		return result, saveFailure(ctx, "capture", errors.Join(err, failErr, closeErr))
@@ -104,8 +110,16 @@ func saveWithProfile(ctx context.Context, repository *store.Repository, leaseRoo
 	result.Generation = generation.ID
 
 	if err != nil {
+		// An uncertain publication may have committed the generation, so only a commit known to
+		// have published nothing is recorded as failed.
+		var failErr error
+		if !errors.Is(err, store.ErrUncertain) {
+			failErr = recordFailedAttempt(ctx, repository, attempt.ID)
+		}
+
 		closeErr := lease.Close()
-		return result, saveFailure(ctx, "commit", errors.Join(err, closeErr))
+
+		return result, saveFailure(ctx, "commit", errors.Join(err, failErr, closeErr))
 	}
 
 	if closeErr := lease.Close(); closeErr != nil {
@@ -132,6 +146,19 @@ func saveWithProfile(ctx context.Context, repository *store.Repository, leaseRoo
 	return result, nil
 }
 
+// recordFailedAttempt durably marks an attempt that published nothing as failed. It outlives the
+// save's own cancellation, so a save cut short by shutdown does not stay pending.
+func recordFailedAttempt(ctx context.Context, repository *store.Repository, id string) error {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), failRecordTimeout)
+	defer cancel()
+
+	if err := repository.Fail(ctx, id); err != nil {
+		return oops.In("snapshot").With("operation", "record_failed_attempt").Wrapf(err, "record failed save attempt")
+	}
+
+	return nil
+}
+
 func saveFailure(ctx context.Context, phase string, err error) error {
 	reason := "save_failed"
 
@@ -154,7 +181,10 @@ func saveFailure(ctx context.Context, phase string, err error) error {
 		Str("reason", reason).
 		Msg("snapshot save failed")
 
-	return oops.In("snapshot").Code(reason).
+	return &saveOutcomeError{error: oops.In("snapshot").Code(reason).
 		With("operation", "save", "phase", phase).
-		Wrapf(err, "save snapshot observation")
+		Wrapf(err, "save snapshot observation")}
 }
+
+func (e *saveOutcomeError) Unwrap() error       { return e.error }
+func (e *saveOutcomeError) OutcomeLogged() bool { return true }

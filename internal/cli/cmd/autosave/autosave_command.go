@@ -50,6 +50,8 @@ const (
 
 var (
 	errAutosaveStartupRefused      = errors.New("startup restore refused")
+	errStartupNeedsRecovery        = errors.New("the snapshot repository needs recovery before it can restore; run 'sesh doctor' for the cause and fix")
+	errStartupNothingSaved         = errors.New("no saved snapshot to restore yet")
 	errAutosaveHistoryUnavailable  = errors.New("autosave history state is unavailable")
 	errAutosaveBookkeeping         = errors.New("autosave bookkeeping did not complete")
 	errAutosaveIncomplete          = errors.New("autosave did not complete within its deadline")
@@ -70,8 +72,13 @@ type autosaveOutcome struct {
 	defaultTo      string
 	recorded       bool
 	restorable     int
+	abandoned      int
 	daemonState    string
 	daemonStatus   daemon.RuntimeStatus
+	// restore marks a restore-on-start result; restored and skipped count its sessions.
+	restore  bool
+	restored int
+	skipped  int
 }
 
 type autosaveEnv struct {
@@ -99,8 +106,12 @@ func newAutosaveOutcome(status, reason string) autosaveOutcome {
 		defaultTo:      "",
 		recorded:       false,
 		restorable:     0,
+		abandoned:      0,
 		daemonState:    autosaveDaemonUnselected,
 		daemonStatus:   emptyDaemonRuntimeStatus(),
+		restore:        false,
+		restored:       0,
+		skipped:        0,
 	}
 }
 

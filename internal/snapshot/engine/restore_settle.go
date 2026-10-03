@@ -1,0 +1,132 @@
+//go:build linux || darwin
+
+package engine
+
+import (
+	"context"
+	"errors"
+	"strconv"
+	"strings"
+
+	"github.com/samber/oops"
+
+	"github.com/zigai/sesh/internal/integration/process"
+	"github.com/zigai/sesh/internal/snapshot/store"
+)
+
+const (
+	restoreTargetBirthPrefix = "birth="
+	// restoreTargetPIDIndex is the line holding the daemon PID in a restore target after its
+	// format prefix, following the endpoint line.
+	restoreTargetPIDIndex = 1
+)
+
+// ActiveRestores lists the restore operations a repository still records as active, the ones that
+// hold back automatic saves and startup restores until they finish or are abandoned.
+func ActiveRestores(ctx context.Context, repository *store.Repository) ([]OperationStatus, error) {
+	if repository == nil {
+		return nil, oops.In("snapshot").Code("repository_required").With("operation", "list_active_restores").Wrap(ErrRepositoryRequired)
+	}
+
+	catalog, err := repository.Inspect(ctx)
+	if err != nil {
+		return nil, oops.In("snapshot").Code("inspect_failed").With("operation", "list_active_restores").Wrap(err)
+	}
+
+	var active []OperationStatus
+
+	for _, op := range catalog.Operations {
+		if op.State == "active" && validateRestoreOperation(op) == nil {
+			active = append(active, operationStatus(op))
+		}
+	}
+
+	return active, nil
+}
+
+// SettleDeadRestores abandons every active restore whose target tmux daemon is provably gone:
+// the daemon recorded at admission no longer runs, because the machine rebooted or the process
+// exited or was replaced. Such a restore can never resume, since resuming requires that exact
+// daemon. Abandonment is bookkeeping only: no tmux object is touched and nothing is rolled back.
+// A restore whose daemon may still run, or whose daemon cannot be checked, stays active. It
+// returns the abandoned operations.
+func SettleDeadRestores(ctx context.Context, repository *store.Repository) ([]OperationStatus, error) {
+	active, err := ActiveRestores(ctx, repository)
+	if err != nil {
+		return nil, err
+	}
+
+	var settled []OperationStatus
+
+	for _, op := range active {
+		if !op.TargetDaemonGone(ctx) {
+			continue
+		}
+
+		status, abandonErr := abandonRestore(ctx, repository, op.OperationID, "target_daemon_gone")
+		if abandonErr != nil {
+			return settled, abandonErr
+		}
+
+		settled = append(settled, status)
+	}
+
+	return settled, nil
+}
+
+// TargetDaemonGone reports whether the tmux daemon this restore targeted provably no longer runs,
+// so the restore can never resume. SettleDeadRestores abandons exactly these.
+func (s OperationStatus) TargetDaemonGone(ctx context.Context) bool {
+	return restoreTargetDaemonGone(ctx, s.Target)
+}
+
+// restoreTargetDaemonGone reports whether a restore target names a daemon that provably no longer
+// runs. Only a recorded birth identity proves it; without one, or when the process cannot be
+// read for any other reason, the daemon is treated as possibly alive.
+func restoreTargetDaemonGone(ctx context.Context, target string) bool {
+	pid, birth, ok := parseRestoreTargetDaemon(target)
+	if !ok {
+		return false
+	}
+
+	recorded, err := process.ParseIdentity(birth)
+	if err != nil {
+		return false
+	}
+
+	current, err := process.ReadIdentity(ctx, pid)
+	if errors.Is(err, process.ErrProcessVanished) || errors.Is(err, process.ErrProcessZombie) {
+		return true
+	}
+
+	if err != nil {
+		return false
+	}
+
+	return current != recorded
+}
+
+func parseRestoreTargetDaemon(target string) (int, string, bool) {
+	rest, ok := strings.CutPrefix(target, restoreTargetPrefix)
+	if !ok {
+		return 0, "", false
+	}
+
+	lines := strings.Split(rest, "\n")
+	if len(lines) <= restoreTargetPIDIndex {
+		return 0, "", false
+	}
+
+	pid, err := strconv.Atoi(lines[restoreTargetPIDIndex])
+	if err != nil || pid <= 0 {
+		return 0, "", false
+	}
+
+	for _, line := range lines {
+		if birth, found := strings.CutPrefix(line, restoreTargetBirthPrefix); found {
+			return pid, birth, true
+		}
+	}
+
+	return 0, "", false
+}

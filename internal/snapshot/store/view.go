@@ -18,12 +18,9 @@ import (
 // generation, while a view reads it.
 const viewReadAttempts = 4
 
-// View reads a repository's published catalog without taking the repository lock and
-// without confirming directory durability. Display listings use it so they never wait
-// on a concurrent save's commit or on fsync. Catalog publication is an atomic rename
-// and every manifest is checked against its catalog digest, so a view observes one
-// consistent publication, but a crash can still roll that publication back. Restore,
-// deletion, and every other mutation or recovery decision must use Open or OpenExisting.
+// View reads the published catalog without the repository lock or fsync, so display listings
+// never wait on a concurrent save. It sees one consistent publication that a crash may still roll
+// back, so mutations and recovery decisions must use Open or OpenExisting.
 type View struct {
 	repository Repository
 }
@@ -55,8 +52,8 @@ func (v *View) Close() error {
 	return v.repository.Close()
 }
 
-// ReadPracticalCurrent reads the generation ReadPracticalCurrent would admit from the
-// latest published catalog.
+// ReadPracticalCurrent reads the generation [Repository.ReadPracticalCurrent] would admit from
+// the latest published catalog.
 func (v *View) ReadPracticalCurrent(ctx context.Context) (Generation, model.Manifest, error) {
 	var (
 		generation Generation

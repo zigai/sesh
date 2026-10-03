@@ -14,13 +14,9 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/model"
 )
 
-// RetentionPolicy specifies snapshot retention rules.
-// Invariant safeguards are permanently enforced regardless of configuration:
-//   - The newest five generations by sequence are permanently retained.
-//   - Sequence order, NOT wall-clock ordering, defines newest-five protection.
-//   - The current generation (catalog HEAD) is permanently retained.
-//   - Every active recovery pin (in-flight restore operation source) is permanently retained.
-//   - Latest attempt safeguards (pending, failed, incomplete) remain intact.
+// RetentionPolicy specifies snapshot retention rules. Regardless of configuration, it always
+// keeps the five newest generations by sequence (not wall clock), the current generation, every
+// active restore's source, and never alters the latest save attempt.
 type RetentionPolicy struct {
 	MaxAge   time.Duration
 	MaxCount int

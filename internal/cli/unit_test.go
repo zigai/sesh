@@ -38,12 +38,12 @@ func TestHelpAndIncompleteParityNotice(t *testing.T) {
 			},
 		},
 		{
-			name: "snapshot history help states incomplete parity",
+			name: "snapshot history help says saves are not checkpoints",
 			args: []string{snapshotCmd, "history", "--help"},
 			want: []string{
-				"exact completeness",
-				"practical recovery observations",
-				testRepositoryFlag, "--full",
+				"which one restore uses",
+				"not an atomic checkpoint",
+				testRepositoryFlag, "--full", "--limit", "--all",
 			},
 		},
 		{

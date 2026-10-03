@@ -151,7 +151,7 @@ func queryLiveSessions(ctx context.Context, server *gotmux.Server, currentPane s
 	return sessions, nil
 }
 
-func renderListOutput(cmd *cobra.Command, sessions []session.Session, listErr error, full bool) error {
+func renderListOutput(cmd *cobra.Command, server *gotmux.Server, sessions []session.Session, listErr error, full bool) error {
 	if clibase.JSONOutputEnabled(cmd) {
 		res := newSessionListJSONResult(sessions)
 		if listErr != nil {
@@ -165,14 +165,16 @@ func renderListOutput(cmd *cobra.Command, sessions []session.Session, listErr er
 		return err
 	}
 
-	if listErr == nil && len(sessions) == 0 {
-		hintSavedSessions(cmd)
+	if listErr == nil {
+		hintSavedSessions(cmd, server, len(sessions) == 0)
 	}
 
 	return listErr
 }
 
-func hintSavedSessions(cmd *cobra.Command) {
+// hintSavedSessions points at the newest snapshot on stderr when some of its sessions are not
+// running, as after a reboot before anything was restored.
+func hintSavedSessions(cmd *cobra.Command, server *gotmux.Server, empty bool) {
 	repoPath, err := clibase.ResolveRepository(cmd)
 	if err != nil {
 		return
@@ -183,29 +185,47 @@ func hintSavedSessions(cmd *cobra.Command) {
 		return
 	}
 
-	count := engine.RestorableSessionCount(cmd.Context(), repo)
+	var (
+		count   int
+		missing []string
+	)
 
-	if err := repo.Close(); err != nil || count == 0 {
+	if empty {
+		count = engine.RestorableSessionCount(cmd.Context(), repo)
+	} else {
+		missing = engine.FindUnrestored(cmd.Context(), server, repo).Sessions
+	}
+
+	if err := repo.Close(); err != nil {
 		return
 	}
 
-	noun := "sessions"
-	if count == 1 {
-		noun = "session"
-	}
+	switch {
+	case count > 0:
+		noun := "sessions"
+		if count == 1 {
+			noun = "session"
+		}
 
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%d saved %s available. If tmux stopped, start it on the same socket first.\nRestore with: %s\n", count, noun, restoreCommand(cmd, repoPath))
+	case len(missing) > 0:
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Saved sessions not running: %s\ntmux started after the newest snapshot, so they were not restored.\nRestore with: %s\n", strings.Join(missing, ", "), restoreCommand(cmd, repoPath))
+	}
+}
+
+func restoreCommand(cmd *cobra.Command, repoPath string) string {
 	quote := func(value string) string {
 		return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
 	}
 
-	restoreCommand := "sesh snapshot restore --socket " + quote(clibase.ResolveSocket(cmd)) + " --repository " + quote(repoPath)
+	command := "sesh snapshot restore --socket " + quote(clibase.ResolveSocket(cmd)) + " --repository " + quote(repoPath)
 	if noConfig, _ := cmd.Flags().GetBool("no-config"); noConfig {
-		restoreCommand += " --no-config"
+		command += " --no-config"
 	} else if configPath, _ := cmd.Flags().GetString("config"); configPath != "" {
-		restoreCommand += " --config " + quote(configPath)
+		command += " --config " + quote(configPath)
 	}
 
-	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%d saved %s available. If tmux stopped, start it on the same socket first.\nRestore with: %s\n", count, noun, restoreCommand)
+	return command
 }
 
 func renderSessionListTable(cmd *cobra.Command, sessions []session.Session, full bool) error {
@@ -256,5 +276,5 @@ func runList(cmd *cobra.Command, _ []string) error {
 	sessions, listErr := queryLiveSessions(cmd.Context(), server, currentPane)
 	session.SortSessions(sessions, st)
 
-	return renderListOutput(cmd, sessions, listErr, full)
+	return renderListOutput(cmd, server, sessions, listErr, full)
 }

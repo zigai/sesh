@@ -459,7 +459,7 @@ func TestVerifyReportsPaneTitleRewrittenByRunningProgramAsAdvisory(t *testing.T)
 	}
 }
 
-const inheritedChildEnvironment = "source-global\nsource-local\n\n\n\nunset\nunset\n" //nolint:dupword // reason: both hidden variables must independently report unset in child output
+const inheritedChildEnvironment = "source-global\nsource-local\n\n\n\nunset\nunset\n" //nolint:dupword // both hidden variables must independently report unset in child output
 
 func observeInheritedSource(t *testing.T, ctx context.Context, server *tmux.Server) capture.Observation {
 	t.Helper()

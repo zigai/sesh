@@ -13,7 +13,6 @@ import (
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/snapshot/engine"
 	"github.com/zigai/sesh/internal/snapshot/restore"
-	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
 type restoreTestEnvelope struct {
@@ -35,7 +34,7 @@ func renderRestoreJSONForTest(t *testing.T, result engine.RestoreResult, cause e
 		t.Fatal(err)
 	}
 
-	resultErr := renderRestoreOutcome(cmd, result, cause)
+	resultErr := renderRestoreOutcome(cmd, result, restoreLabels{}, nil, cause)
 	if err := clibase.WriteCommandError(cmd, resultErr); err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +126,7 @@ func TestRestoreJSONEnvelopeOmitsCompensation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := renderRestoreOutcome(cmd, result, nil); err != nil {
+	if err := renderRestoreOutcome(cmd, result, restoreLabels{}, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -243,11 +242,14 @@ func TestRestoreJSONProjectionExposesPanes(t *testing.T) {
 	}
 
 	cmd := newSnapshotRestoreCommand()
+	if err := cmd.Flags().Set("verbose", "true"); err != nil {
+		t.Fatal(err)
+	}
 
 	var stdout bytes.Buffer
 	cmd.SetOut(&stdout)
 
-	if err := renderRestoreTable(cmd, result); err != nil {
+	if err := renderRestoreTable(cmd, result, restoreLabels{}, nil); err != nil {
 		t.Fatalf("renderRestoreTable failed: %v", err)
 	}
 
@@ -285,12 +287,12 @@ func TestRestoreRefusedForCollisionNamesSessionsWithoutAnOperation(t *testing.T)
 	var stdout bytes.Buffer
 	cmd.SetOut(&stdout)
 
-	err := renderRestoreOutcome(cmd, result, clibase.NewRestoreBoundaryError(restore.ErrSessionCollision))
+	err := renderRestoreOutcome(cmd, result, restoreLabels{}, nil, clibase.NewRestoreBoundaryError(restore.ErrSessionCollision))
 	if !errors.Is(err, restore.ErrSessionCollision) {
 		t.Fatalf("expected the collision error to be preserved, got %v", err)
 	}
 
-	for _, want := range []string{"Skipped Sessions:", `s38 "0" reason=name_in_use`, "sesh snapshot restore --session <id>"} {
+	for _, want := range []string{"Skipped:", "0 (s38): a live session already uses this name", `tmux rename-session -t "0"`, "sesh snapshot restore --session s38"} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("expected %q in output:\n%s", want, stdout.String())
 		}
@@ -336,31 +338,5 @@ func TestRestoreRejectsUnknownCollisionPolicy(t *testing.T) {
 	_, err := parseCollisionPolicy(cmd)
 	if err == nil || clibase.ExitCode(err) != clibase.ExitCodeUsage {
 		t.Fatalf("expected a usage error for an unknown policy, got %v", err)
-	}
-}
-
-func TestHistoryTableExplainsParityIncompleteOnlyWhenPresent(t *testing.T) {
-	t.Parallel()
-
-	render := func(reason string) string {
-		cmd := newSnapshotHistoryCommand()
-
-		var stdout bytes.Buffer
-		cmd.SetOut(&stdout)
-
-		catalog := store.Catalog{Attempts: []store.Attempt{{ID: "a1", Sequence: 1, State: "incomplete", Reason: reason}}}
-		if err := renderHistoryTable(cmd, catalog, false); err != nil {
-			t.Fatal(err)
-		}
-
-		return stdout.String()
-	}
-
-	if out := render("parity_incomplete"); !strings.Contains(out, "not an atomic application checkpoint") || !strings.Contains(out, "restorable for practical recovery") {
-		t.Fatalf("expected the parity explanation, got:\n%s", out)
-	}
-
-	if out := render("save_failed"); strings.Contains(out, "atomic application checkpoint") {
-		t.Fatalf("the explanation applies only to parity_incomplete attempts:\n%s", out)
 	}
 }

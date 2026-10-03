@@ -48,6 +48,8 @@ var restoreFailureClasses = []struct {
 	{"snapshot_version_unsupported", "version_unsupported", []error{model.ErrVersion}},
 }
 
+type restoreOutcomeError struct{ error }
+
 type actionLedger struct {
 	repository *store.Repository
 	operation  string
@@ -186,7 +188,13 @@ func ReconcileRestore(ctx context.Context, repository *store.Repository, operati
 	return operationStatus(op), nil
 }
 
+// AbandonRestore explicitly abandons an active restore operation and releases its recovery
+// source pin. Existing tmux objects are retained and nothing is rolled back.
 func AbandonRestore(ctx context.Context, repository *store.Repository, operationID string) (OperationStatus, error) {
+	return abandonRestore(ctx, repository, operationID, "explicit_abandonment")
+}
+
+func abandonRestore(ctx context.Context, repository *store.Repository, operationID, reason string) (OperationStatus, error) {
 	if repository == nil {
 		return OperationStatus{}, oops.In("snapshot").Code("repository_required").With("operation", "abandon_restore").Wrap(ErrRepositoryRequired)
 	}
@@ -221,7 +229,7 @@ func AbandonRestore(ctx context.Context, repository *store.Repository, operation
 		Str("component", "snapshot").
 		Str("operation", "restore").
 		Str("status", "abandoned").
-		Str("reason", "explicit_abandonment").
+		Str("reason", reason).
 		Int("uncertain", len(status.Uncertain)).
 		Msg("snapshot restore abandoned")
 
@@ -1165,11 +1173,14 @@ func restoreFailure(ctx context.Context, phase string, err error) error {
 		Str("reason", reason).
 		Msg("snapshot restore failed")
 
-	return oops.In("snapshot").
+	return &restoreOutcomeError{error: oops.In("snapshot").
 		Code(code).
 		With("operation", "restore", "phase", phase, "reason", reason).
-		Wrap(err)
+		Wrap(err)}
 }
+
+func (e *restoreOutcomeError) Unwrap() error       { return e.error }
+func (e *restoreOutcomeError) OutcomeLogged() bool { return true }
 
 func classifyRestoreFailure(err error) (string, string) {
 	for _, class := range restoreFailureClasses {

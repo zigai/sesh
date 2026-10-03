@@ -12,14 +12,10 @@ const (
 	scopeWindow        = "window"
 )
 
-// Captured option lists record only what the global options cannot supply. A session or window
-// option that tmux reports as inherited, with the same value as the global option it inherits,
-// is omitted; EffectiveSessionOptions and EffectiveWindowOptions restore it. tmux reports every
-// built-in option as inherited at session and window scope but never a user option, so user
-// options (names starting with "@") are not restored. Pane lists stay complete: a pane lists
-// only pane options, a subset of what its window supplies, so they cannot be rebuilt.
-
-// CompactInheritedOptions returns a copy without the option entries the global options supply.
+// CompactInheritedOptions returns a copy without session and window options that tmux reports as
+// inherited with the global value; EffectiveSessionOptions and EffectiveWindowOptions restore
+// them. User ("@") options are never reported as inherited, so they are kept. Pane lists stay
+// complete because they cannot be rebuilt from the window.
 func (m Manifest) CompactInheritedOptions() Manifest {
 	compact := m
 

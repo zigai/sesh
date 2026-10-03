@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	cursorColorOption       = "cursor-colour"        //nolint:misspell // reason: exact tmux option spelling
-	promptCursorColorOption = "prompt-cursor-colour" //nolint:misspell // reason: exact tmux option spelling
+	cursorColorOption       = "cursor-colour"        //nolint:misspell // exact tmux option spelling
+	promptCursorColorOption = "prompt-cursor-colour" //nolint:misspell // exact tmux option spelling
 )
 
 type optionScope interface {

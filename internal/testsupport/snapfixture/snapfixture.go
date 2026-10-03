@@ -6,10 +6,12 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"testing"
 
 	"github.com/zigai/sesh/internal/snapshot/model"
+	"github.com/zigai/sesh/internal/snapshot/restore"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
@@ -53,6 +55,46 @@ func CommitOneSession(t *testing.T, repoPath string) {
 	if _, err := repo.Commit(t.Context(), attempt.ID, manifest, map[string]io.Reader{"a0": bytes.NewReader(content)}); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// RegisterRestore records the active restore an interrupted restore leaves behind, from the
+// current generation and aimed at the daemon with pid and birth identity (empty records none).
+// It returns the operation ID.
+func RegisterRestore(t *testing.T, repoPath string, pid int, birth string) string {
+	t.Helper()
+
+	repo, err := store.Open(t.Context(), repoPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		if err := repo.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	catalog, err := repo.Inspect(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	target := fmt.Sprintf("restore-v1\n/tmp/fixture.sock\n%d\n%d\nlaunch=true\nallow_missing_dir=false\ncompensate=false\nprofile=practical", pid, fixtureStarted)
+	if birth != "" {
+		target += "\nbirth=" + birth
+	}
+
+	actions := []store.Action{
+		{ID: restore.ImportStateActionID, Kind: restore.KindConfigure, State: "planned", RuntimeID: nil},
+		{ID: restore.VerifyActionID, Kind: restore.KindVerify, State: "planned", RuntimeID: nil},
+	}
+
+	id := store.NewOperationID()
+	if _, err := repo.RegisterOperation(t.Context(), id, catalog.Current, model.Bytes(target), actions); err != nil {
+		t.Fatal(err)
+	}
+
+	return id
 }
 
 func fixtureManifest(digest string, length int64) model.Manifest {

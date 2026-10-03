@@ -8,26 +8,26 @@ import (
 	"testing"
 )
 
-func TestServerLossIsUnreportedUntilRecordedForThatAutosave(t *testing.T) {
+func TestEpisodeIsUnreportedUntilRecordedForItsStamp(t *testing.T) {
 	t.Parallel()
 
 	path := ServerLossMarkerPath(filepath.Join(t.TempDir(), "state", "history.json"))
 
-	unreported, err := ServerLossUnreported(path, 100)
+	unreported, err := EpisodeUnreported(path, 100)
 	if err != nil || !unreported {
 		t.Fatalf("a loss after an autosave must start unreported, got %v, %v", unreported, err)
 	}
 
-	if err := RecordServerLossReported(path, 100); err != nil {
-		t.Fatalf("RecordServerLossReported failed: %v", err)
+	if err := RecordEpisodeReported(path, 100); err != nil {
+		t.Fatalf("RecordEpisodeReported failed: %v", err)
 	}
 
-	unreported, err = ServerLossUnreported(path, 100)
+	unreported, err = EpisodeUnreported(path, 100)
 	if err != nil || unreported {
 		t.Fatalf("the reported loss must stay reported, got %v, %v", unreported, err)
 	}
 
-	unreported, err = ServerLossUnreported(path, 200)
+	unreported, err = EpisodeUnreported(path, 200)
 	if err != nil || !unreported {
 		t.Fatalf("a later autosave starts a new episode, got %v, %v", unreported, err)
 	}
@@ -42,20 +42,20 @@ func TestServerLossIsUnreportedUntilRecordedForThatAutosave(t *testing.T) {
 	}
 }
 
-func TestServerLossNeedsARecordedAutosave(t *testing.T) {
+func TestEpisodeNeedsAPositiveStamp(t *testing.T) {
 	t.Parallel()
 
 	path := ServerLossMarkerPath(filepath.Join(t.TempDir(), "history.json"))
 
 	for _, stamp := range []int64{0, -1} {
-		unreported, err := ServerLossUnreported(path, stamp)
+		unreported, err := EpisodeUnreported(path, stamp)
 		if err != nil || unreported {
 			t.Fatalf("stamp %d has nothing to lose, got %v, %v", stamp, unreported, err)
 		}
 	}
 }
 
-func TestServerLossRejectsACorruptMarker(t *testing.T) {
+func TestEpisodeMarkerRejectsCorruptContent(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
@@ -71,7 +71,7 @@ func TestServerLossRejectsACorruptMarker(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if _, err := ServerLossUnreported(path, 10); err == nil {
+		if _, err := EpisodeUnreported(path, 10); err == nil {
 			t.Fatalf("%s must be rejected, not treated as an unreported loss", name)
 		}
 	}

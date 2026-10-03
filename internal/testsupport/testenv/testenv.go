@@ -18,17 +18,13 @@ import (
 // isolated environment; their SESH_ variables are fixture signals from the parent test.
 const isolatedMarker = "SESH_TESTENV_ISOLATED"
 
-// goToolchainVariables keep go subprocesses, such as tests building the sesh binary, on the
-// developer's module cache, build cache, and go env settings. Their defaults derive from $HOME
-// and the XDG directories, so isolation would otherwise download a fresh read-only module cache
-// into the isolated home on every run.
+// goToolchainVariables keep go subprocesses on the developer's caches and settings, which would
+// otherwise move into the isolated home and re-download modules on every run.
 var goToolchainVariables = []string{"GOPATH", "GOMODCACHE", "GOCACHE", "GOENV"}
 
-// RunIsolated runs the package tests inside a private home: $HOME, the XDG base directories,
-// $XDG_RUNTIME_DIR, and $TMUX_TMPDIR point at a temporary directory, $TMUX and every SESH_
-// variable are cleared. Commands that fall back to the ambient tmux server, tmux's default
-// socket, or the configured data directory therefore never reach live state. The go toolchain
-// keeps its module cache, build cache, and settings.
+// RunIsolated runs the package tests with $HOME, the XDG directories, and $TMUX_TMPDIR in a
+// temporary directory and $TMUX and every SESH_ variable cleared, so no fallback reaches the
+// live tmux server or sesh data.
 func RunIsolated(m *testing.M) int {
 	if os.Getenv(isolatedMarker) == "1" {
 		return m.Run()

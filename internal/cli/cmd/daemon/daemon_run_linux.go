@@ -151,8 +151,8 @@ func runDaemonRuntime(cmd *cobra.Command, _ []string) (resultErr error) {
 		return newDaemonScheduler(cmd, env, attemptTimeout, drainGrace, reporter)
 	}
 
-	// The coordinator never starts the scheduler's periodic loop: periodic saves belong to the
-	// autosave timer, and the coordinator only runs the sleep and shutdown saves logind announces.
+	// The coordinator only runs the sleep and shutdown saves logind announces; periodic saves
+	// belong to the autosave timer.
 	scheduler, err := newScheduler()
 	if err != nil {
 		return clibase.NewExitError(clibase.ExitCodeUsage, err)
@@ -211,14 +211,21 @@ func ensureDaemonRepositoryReady(ctx context.Context, cmd *cobra.Command, env au
 		return oops.In("cli").With("operation", "open_daemon_repository").Wrap(err)
 	}
 
+	// Restores aimed at a vanished server can never resume and must not block saving.
+	_, settleErr := engine.SettleDeadRestores(ctx, repository)
+
 	state, inspectErr := automation.InspectStartupState(ctx, repository)
 	closeErr := repository.Close()
 
-	if inspectErr != nil || closeErr != nil {
-		return errors.Join(inspectErr, closeErr)
+	if err := errors.Join(settleErr, inspectErr, closeErr); err != nil {
+		return err
 	}
 
-	if state.PendingOperations > 0 || state.RecoveryRequired {
+	if state.PendingOperations > 0 {
+		return errors.Join(errDaemonRecoveryBarrier, &automation.ActiveRestoresError{Operations: state.ActiveOperations})
+	}
+
+	if state.RecoveryRequired {
 		return errDaemonRecoveryBarrier
 	}
 

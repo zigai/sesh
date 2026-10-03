@@ -259,7 +259,7 @@ func testHistoryWorkflow(t *testing.T, repoDir string) {
 		t.Fatalf("history table error: %v\nstderr: %s", err, stderr)
 	}
 
-	if !strings.Contains(stdout, "Attempt") || !strings.Contains(stdout, "Sequence") {
+	if !strings.Contains(stdout, "Saved") || !strings.Contains(stdout, "Result") || !strings.Contains(stdout, "saved") {
 		t.Fatalf("history output missing headers:\n%s", stdout)
 	}
 }
@@ -564,7 +564,7 @@ func appendFailedAttemptToCatalog(t *testing.T, repoDir string) {
 	}
 }
 
-func TestRecoveryBarrierLatestSaveRecoveryRequired(t *testing.T) {
+func TestFailedLatestSaveFallsBackToNewestFinishedGeneration(t *testing.T) {
 	server := newCaptureCLIServer(t)
 	socket := server.Endpoint().SocketPath
 
@@ -598,21 +598,21 @@ func TestRecoveryBarrierLatestSaveRecoveryRequired(t *testing.T) {
 	appendFailedAttemptToCatalog(t, repoDir)
 
 	listExec := executeJSON(t, snapshotCmd, "list", testRepositoryFlag, repoDir, testJSONFlag)
-	if listExec.envelope.OK {
-		t.Fatalf("expected list to fail with recoveryRequired, got ok=true")
+	if !listExec.envelope.OK {
+		t.Fatalf("a failed latest save must not block list: %s", listExec.stderr)
 	}
 
-	if listExec.envelope.Error.Code != "recoveryRequired" {
-		t.Fatalf("list error.code = %q, want recoveryRequired", listExec.envelope.Error.Code)
+	if listed := decodeJSONPayload[snapshotListResultJSON](t, listExec.envelope.Result); listed.Generation != committedGen {
+		t.Fatalf("list generation = %q, want the newest finished save %q", listed.Generation, committedGen)
 	}
 
 	verifyExec := executeJSON(t, snapshotCmd, "verify", testRepositoryFlag, repoDir, testJSONFlag)
-	if verifyExec.envelope.OK {
-		t.Fatalf("expected verify to fail with recoveryRequired, got ok=true")
+	if !verifyExec.envelope.OK {
+		t.Fatalf("a failed latest save must not block verify: %s", verifyExec.stderr)
 	}
 
-	if verifyExec.envelope.Error.Code != "recoveryRequired" {
-		t.Fatalf("verify error.code = %q, want recoveryRequired", verifyExec.envelope.Error.Code)
+	if verified := decodeJSONPayload[snapshotVerifyResultJSON](t, verifyExec.envelope.Result); verified.Generation != committedGen {
+		t.Fatalf("verify generation = %q, want the newest finished save %q", verified.Generation, committedGen)
 	}
 
 	explicitList := executeJSON(
