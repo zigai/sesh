@@ -59,7 +59,7 @@ func executeCommand(t *testing.T, args ...string) (string, string, error) {
 	return exec.Stdout, exec.Stderr, exec.Err
 }
 
-func isolatedAutosaveHome(t *testing.T) {
+func isolatedAutosaveHome(t *testing.T) string {
 	t.Helper()
 
 	t.Setenv("TMUX", "")
@@ -69,12 +69,14 @@ func isolatedAutosaveHome(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", home)
 	t.Setenv("XDG_RUNTIME_DIR", home)
+
+	return home
 }
 
-func writeCorruptHistoryState(t *testing.T) {
+func writeCorruptHistoryState(t *testing.T, stateHome string) {
 	t.Helper()
 
-	path := filepath.Join(filepath.Clean(os.Getenv("XDG_STATE_HOME")), "sesh", "history.json")
+	path := filepath.Join(stateHome, "sesh", "history.json")
 
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		t.Fatal(err)

@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -18,31 +17,11 @@ import (
 
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/session"
+	"github.com/zigai/sesh/internal/testsupport/testenv"
 )
 
 func TestMain(m *testing.M) {
-	_ = os.Unsetenv("TMUX_POPUP")
-
-	directory, err := os.MkdirTemp("", "sesh-tui-tests-")
-	if err != nil {
-		panic(err)
-	}
-
-	for name, value := range map[string]string{
-		"HOME": directory, "XDG_CACHE_HOME": filepath.Join(directory, "cache"),
-	} {
-		if err := os.Setenv(name, value); err != nil {
-			panic(err)
-		}
-	}
-
-	code := m.Run()
-
-	if err := os.RemoveAll(directory); err != nil {
-		panic(err)
-	}
-
-	os.Exit(code)
+	os.Exit(testenv.RunIsolated(m))
 }
 
 var ansiPattern = regexp.MustCompile(`\x1b\[[0-9;]*m`)

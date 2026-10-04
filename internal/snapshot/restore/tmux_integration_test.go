@@ -24,6 +24,7 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/capture"
 	"github.com/zigai/sesh/internal/snapshot/model"
 	"github.com/zigai/sesh/internal/snapshot/store"
+	"github.com/zigai/sesh/internal/testsupport/testenv"
 )
 
 func TestPlannedSplitsConstructExactRectangles(t *testing.T) {
@@ -2078,6 +2079,7 @@ func runRoundtripWorkerSubprocess(t *testing.T, ctx context.Context, repoDir, ge
 
 	cmd := exec.CommandContext(ctx, selfExe, "-test.run=^TestStructuralRoundtripWorker$")
 	cmd.Env = []string{
+		testenv.IsolatedMarker + "=1",
 		"SESH_STRUCTURAL_ROUNDTRIP_WORKER=1",
 		"SESH_REPO_ROOT=" + repoDir,
 		"SESH_GEN_ID=" + genID,

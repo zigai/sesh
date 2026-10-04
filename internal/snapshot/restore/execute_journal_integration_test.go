@@ -17,6 +17,7 @@ import (
 
 	"github.com/zigai/sesh/internal/snapshot/model"
 	"github.com/zigai/sesh/internal/snapshot/store"
+	"github.com/zigai/sesh/internal/testsupport/testenv"
 )
 
 var (
@@ -537,6 +538,7 @@ func runCrashWorker(t *testing.T, ctx context.Context, repoDir, generation, oper
 
 	cmd := exec.CommandContext(ctx, self, "-test.run=^TestRestoreCrashWorker$")
 	cmd.Env = []string{
+		testenv.IsolatedMarker + "=1",
 		crashWorkerFlag + "=1",
 		crashWorkerRepo + "=" + repoDir,
 		crashWorkerGeneration + "=" + generation,

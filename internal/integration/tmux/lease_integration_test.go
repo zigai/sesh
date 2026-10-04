@@ -22,6 +22,7 @@ import (
 	"github.com/zigai/gotmux/tmuxtest"
 
 	"github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/testsupport/testenv"
 )
 
 const (
@@ -151,6 +152,7 @@ func spawnHelper(t *testing.T, leaseRoot string, socket string, mode string) *he
 	cmd := exec.CommandContext(ctx, selfExe, "-test.run=^TestHelperProcess$")
 
 	cmd.Env = []string{
+		testenv.IsolatedMarker + "=1",
 		envHelperFlag + "=1",
 		envHelperSocket + "=" + socket,
 		envHelperRoot + "=" + leaseRoot,

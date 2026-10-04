@@ -16,6 +16,7 @@ import (
 
 	"github.com/zigai/sesh/internal/snapshot/capture"
 	"github.com/zigai/sesh/internal/snapshot/store"
+	"github.com/zigai/sesh/internal/testsupport/testenv"
 )
 
 func TestSaveOutputIsolation(t *testing.T) {
@@ -30,6 +31,7 @@ func TestSaveOutputIsolation(t *testing.T) {
 			leaseDir := filepath.Join(t.TempDir(), "leases")
 			socketPath := filepath.Join(t.TempDir(), "test.sock")
 			cmd.Env = []string{
+				testenv.IsolatedMarker + "=1",
 				"SESH_OUTPUT_WORKER=" + scenario,
 				"SESH_OUTPUT_ROOT=" + filepath.Join(t.TempDir(), "repository"),
 				"SESH_OUTPUT_LEASE_ROOT=" + leaseDir,

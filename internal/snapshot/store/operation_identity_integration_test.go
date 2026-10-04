@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/zigai/sesh/internal/snapshot/model"
+	"github.com/zigai/sesh/internal/testsupport/testenv"
 )
 
 func TestProcessDeathAtOperationRegistrationBoundaries(t *testing.T) {
@@ -49,6 +50,7 @@ func operationWorker(t *testing.T, mode, path, id, source, phase string) *exec.C
 
 	cmd := exec.CommandContext(ctx, program, "-test.run=^TestOperationIdentityWorker$")
 	cmd.Env = []string{
+		testenv.IsolatedMarker + "=1",
 		"SESH_TEST_OP_WORKER=" + mode,
 		"SESH_TEST_OP_ROOT=" + path,
 		"SESH_TEST_OP_ID=" + id,

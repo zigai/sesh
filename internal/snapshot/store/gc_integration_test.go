@@ -13,6 +13,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/zigai/sesh/internal/testsupport/testenv"
 )
 
 func TestProcessDeathAtCollectionBoundaries(t *testing.T) {
@@ -151,6 +153,7 @@ func collectionWorker(t *testing.T, mode, path, generation, phase string) *exec.
 
 	cmd := exec.CommandContext(ctx, program, "-test.run=^TestCollectionWorker$")
 	cmd.Env = []string{
+		testenv.IsolatedMarker + "=1",
 		"SESH_TEST_WORKER=" + mode,
 		"SESH_TEST_ROOT=" + path,
 		"SESH_TEST_GENERATION=" + generation,

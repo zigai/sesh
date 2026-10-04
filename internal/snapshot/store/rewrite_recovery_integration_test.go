@@ -21,6 +21,7 @@ import (
 
 	"github.com/zigai/sesh/internal/privatefs"
 	"github.com/zigai/sesh/internal/snapshot/model"
+	"github.com/zigai/sesh/internal/testsupport/testenv"
 )
 
 const (
@@ -128,6 +129,7 @@ func resumeWorkerCmd(t *testing.T, mode, path, id, source, boundary string) *exe
 
 	cmd := exec.CommandContext(ctx, program, "-test.run=^TestResumeRewriteWorker$")
 	cmd.Env = []string{
+		testenv.IsolatedMarker + "=1",
 		"SESH_TEST_RESUME_WORKER=" + mode,
 		"SESH_TEST_RESUME_ROOT=" + path,
 		"SESH_TEST_RESUME_ID=" + id,

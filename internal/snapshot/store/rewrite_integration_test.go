@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/zigai/sesh/internal/snapshot/model"
+	"github.com/zigai/sesh/internal/testsupport/testenv"
 )
 
 const (
@@ -78,6 +79,7 @@ func rewriteWorker(t *testing.T, mode, path, id, source, boundary, kind string) 
 
 	cmd := exec.CommandContext(ctx, program, "-test.run=^TestRewriteWorker$")
 	cmd.Env = []string{
+		testenv.IsolatedMarker + "=1",
 		"SESH_TEST_REWRITE_WORKER=" + mode,
 		"SESH_TEST_REWRITE_ROOT=" + path,
 		"SESH_TEST_REWRITE_ID=" + id,

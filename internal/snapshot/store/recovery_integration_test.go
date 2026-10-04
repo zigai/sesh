@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/zigai/sesh/internal/snapshot/model"
+	"github.com/zigai/sesh/internal/testsupport/testenv"
 )
 
 func TestProcessDeathAtPublicationBoundaries(t *testing.T) {
@@ -53,7 +54,7 @@ func repositoryWorker(t *testing.T, mode, path, attempt, phase string) *exec.Cmd
 	t.Cleanup(cancel)
 
 	cmd := exec.CommandContext(ctx, program, "-test.run=^TestRepositoryWorker$")
-	cmd.Env = []string{"SESH_TEST_WORKER=" + mode, "SESH_TEST_ROOT=" + path, "SESH_TEST_ATTEMPT=" + attempt, "SESH_TEST_PHASE=" + phase}
+	cmd.Env = []string{testenv.IsolatedMarker + "=1", "SESH_TEST_WORKER=" + mode, "SESH_TEST_ROOT=" + path, "SESH_TEST_ATTEMPT=" + attempt, "SESH_TEST_PHASE=" + phase}
 
 	return cmd
 }

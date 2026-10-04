@@ -25,6 +25,7 @@ import (
 
 	"github.com/zigai/sesh/internal/integration/process"
 	"github.com/zigai/sesh/internal/snapshot/model"
+	"github.com/zigai/sesh/internal/testsupport/testenv"
 )
 
 const (
@@ -511,7 +512,7 @@ func spawnBinaryHelper(t *testing.T, binary string) *exec.Cmd {
 	t.Helper()
 
 	cmd := exec.CommandContext(t.Context(), binary, "-test.run=^TestHelperProcess$", "--")
-	cmd.Env = []string{envHelperFlag + "=1", "PATH=/usr/bin:/bin"}
+	cmd.Env = []string{testenv.IsolatedMarker + "=1", envHelperFlag + "=1", "PATH=/usr/bin:/bin"}
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {

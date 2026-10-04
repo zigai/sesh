@@ -114,8 +114,8 @@ func TestAutosaveSaveIfDueSkipsWhenDefaultTmuxServerIsNotRunning(t *testing.T) {
 }
 
 func TestAutosaveStatusReportsHistoryUnavailable(t *testing.T) {
-	isolatedAutosaveHome(t)
-	writeCorruptHistoryState(t)
+	stateHome := isolatedAutosaveHome(t)
+	writeCorruptHistoryState(t, stateHome)
 
 	status := executeJSON(t, "autosave", "status", testNoConfigFlag, testJSONFlag)
 	if status.Err == nil {
@@ -141,8 +141,8 @@ func TestAutosaveStatusReportsHistoryUnavailable(t *testing.T) {
 }
 
 func TestAutosaveSaveIfDueRefusesWhenHistoryUnavailable(t *testing.T) {
-	isolatedAutosaveHome(t)
-	writeCorruptHistoryState(t)
+	stateHome := isolatedAutosaveHome(t)
+	writeCorruptHistoryState(t, stateHome)
 
 	save := executeJSON(t, actionCmd, "autosave-save-if-due", testNoConfigFlag, testJSONFlag)
 	if save.Err == nil {

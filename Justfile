@@ -3,6 +3,7 @@ _:
 
 binary := "sesh"
 prefix := env_var_or_default("SESH_INSTALL_PREFIX", env_var("HOME") + "/.local/bin")
+integration_env := "TMUX_INTEGRATION_REQUIRED=1 SESH_APPLICATION_INTEGRATION_REQUIRED=1 SESH_LIFECYCLE_INTEGRATION_REQUIRED=1 SESH_TERMINAL_INTEGRATION_REQUIRED=1"
 
 # List available commands
 help:
@@ -12,17 +13,27 @@ help:
 test:
     go test ./...
 
-# Exercise disposable tmux servers and actual process-death recovery
+# Run unit and integration tests against disposable tmux servers, applications, terminals and buses
 integration:
-    TMUX_INTEGRATION_REQUIRED=1 go test -tags=integration ./...
+    {{ integration_env }} go test -tags=integration ./...
 
 # Run application integration workflow tests against disposable tmux
 integration-app:
     SESH_APPLICATION_INTEGRATION_REQUIRED=1 TMUX_INTEGRATION_REQUIRED=1 go test -tags=integration ./test/integration/application/...
 
-# Check data races in the native persistence and integration suites
+# Run unit and integration tests with the race detector
 race:
-    TMUX_INTEGRATION_REQUIRED=1 go test -race -tags=integration ./...
+    {{ integration_env }} go test -race -tags=integration ./...
+
+# Require every test package to run in an isolated home and tmux environment
+test-isolation:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    missing=$(for tags in "" integration; do go list -tags="$tags" -f '{{{{if or .TestGoFiles .XTestGoFiles}}{{{{.Dir}}{{{{end}}' ./...; done | sort -u | while read -r dir; do grep -q 'RunIsolated(m)' "$dir"/*_test.go || echo "$dir"; done)
+    if [ -n "$missing" ]; then
+        printf 'Test packages without testenv.RunIsolated:\n%s\n' "$missing" >&2
+        exit 1
+    fi
 
 # Check strict native codec properties and repository state transitions
 model:
@@ -77,8 +88,8 @@ fix:
 lint:
     golangci-lint run
 
-# Run all non-mutating quality checks
-check: mod-check test lint
+# Run all non-mutating quality checks and every local test suite
+check: mod-check lint test-isolation race
     golangci-lint fmt --diff
 
 # Build the binary

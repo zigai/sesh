@@ -13,6 +13,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/zigai/sesh/internal/testsupport/testenv"
 )
 
 func TestProcessDeathAtInitializationBoundaries(t *testing.T) {
@@ -144,6 +146,7 @@ func initWorker(t *testing.T, mode, path, phase string) *exec.Cmd {
 
 	cmd := exec.CommandContext(ctx, program, "-test.run=^TestInitializationWorker$")
 	cmd.Env = []string{
+		testenv.IsolatedMarker + "=1",
 		"SESH_TEST_INIT_WORKER=" + mode,
 		"SESH_TEST_INIT_ROOT=" + path,
 		"SESH_TEST_INIT_PHASE=" + phase,
