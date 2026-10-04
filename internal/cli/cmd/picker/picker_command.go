@@ -1175,12 +1175,11 @@ func pickerPiSessionID(filename string) string {
 
 	stem := strings.TrimSuffix(filename, filepath.Ext(filename))
 
-	separator := strings.LastIndexByte(stem, '_')
-	if separator < 0 {
+	_, id, ok := strings.CutLast(stem, "_")
+	if !ok {
 		return ""
 	}
 
-	id := stem[separator+1:]
 	if len(id) != len(uuidFormat) {
 		return ""
 	}

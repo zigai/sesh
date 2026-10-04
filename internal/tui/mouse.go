@@ -72,9 +72,12 @@ func (m *Model) handleMouseWheel(mouse tea.Mouse) func() (tea.Model, tea.Cmd) {
 		}
 
 		return func() (tea.Model, tea.Cmd) { return m, nil }
-	default:
+	case tea.MouseNone, tea.MouseLeft, tea.MouseMiddle, tea.MouseRight, tea.MouseWheelLeft, tea.MouseWheelRight,
+		tea.MouseBackward, tea.MouseForward, tea.MouseButton10, tea.MouseButton11:
 		return nil
 	}
+
+	return nil
 }
 
 func (m *Model) handleMouseMotion(mouse tea.Mouse) func() (tea.Model, tea.Cmd) {

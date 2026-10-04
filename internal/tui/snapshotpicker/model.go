@@ -218,9 +218,12 @@ func snapshotWheelDelta(button tea.MouseButton) int {
 		return -wheelStepDelta
 	case tea.MouseWheelDown:
 		return wheelStepDelta
-	default:
+	case tea.MouseNone, tea.MouseLeft, tea.MouseMiddle, tea.MouseRight, tea.MouseWheelLeft, tea.MouseWheelRight,
+		tea.MouseBackward, tea.MouseForward, tea.MouseButton10, tea.MouseButton11:
 		return 0
 	}
+
+	return 0
 }
 
 func (m *Model) moveSnapshotCursor(delta int) {

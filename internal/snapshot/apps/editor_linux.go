@@ -360,12 +360,12 @@ func processParentPID(pid int) (int, error) {
 		return 0, err
 	}
 
-	closeParen := bytes.LastIndex(data, []byte(") "))
-	if closeParen < 0 {
+	_, after, ok := bytes.CutLast(data, []byte(") "))
+	if !ok {
 		return 0, ErrEditorIdentityChanged
 	}
 
-	fields := bytes.Fields(data[closeParen+2:])
+	fields := bytes.Fields(after)
 	if len(fields) < minEditorStatFields {
 		return 0, ErrEditorIdentityChanged
 	}

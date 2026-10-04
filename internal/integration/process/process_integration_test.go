@@ -788,9 +788,9 @@ func TestObserve_LiveProcess_ZombieProcess(t *testing.T) {
 	for time.Now().Before(deadline) {
 		statData, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
 		if err == nil {
-			end := bytes.LastIndex(statData, []byte(") "))
-			if end >= 0 {
-				fields := bytes.Fields(statData[end+2:])
+			_, after, ok := bytes.CutLast(statData, []byte(") "))
+			if ok {
+				fields := bytes.Fields(after)
 				if len(fields) > 0 && len(fields[0]) == 1 && fields[0][0] == 'Z' {
 					zombieReady = true
 
