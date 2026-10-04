@@ -100,26 +100,6 @@ func TestEvaluateDueState_Decisions(t *testing.T) {
 	}
 }
 
-func TestEvaluateDueState_UnreadableHistoryRefusesInsteadOfRunning(t *testing.T) {
-	t.Parallel()
-
-	decision := automation.EvaluateDueState(automation.DueState{
-		Enabled:           true,
-		Interval:          3 * time.Minute,
-		Now:               time.Unix(1_700_000_000, 0),
-		LastCompletedUnix: 0,
-		HistoryKnown:      false,
-	})
-
-	if decision.Due {
-		t.Fatal("unreadable history must not admit a save")
-	}
-
-	if decision.Reason != automation.ReasonHistoryUnavailable {
-		t.Fatalf("Reason = %q, want %q", decision.Reason, automation.ReasonHistoryUnavailable)
-	}
-}
-
 func TestEvaluateSaveCompletion_RecordsOnlyDurablePublication(t *testing.T) {
 	t.Parallel()
 

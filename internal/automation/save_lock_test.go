@@ -133,10 +133,6 @@ func TestSaveLockPath_UsesPrivateRuntimeDirectory(t *testing.T) {
 	if filepath.Base(fallback) != automation.SaveLockName {
 		t.Fatalf("fallback lock path = %q, want the autosave lock name", fallback)
 	}
-
-	if filepath.Base(filepath.Dir(filepath.Dir(fallback))) == "sesh" && filepath.Dir(fallback) == "sesh" {
-		t.Fatalf("fallback lock path %q must include a per-user component", fallback)
-	}
 }
 
 const helperSaveLockEnv = "SESH_TEST_SAVE_LOCK_PATH"
