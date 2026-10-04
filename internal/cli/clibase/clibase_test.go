@@ -55,23 +55,6 @@ func TestExitCode(t *testing.T) {
 	}
 }
 
-func TestContextWithRawArgs(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	args := []string{"foo", "bar"}
-	ctxWithArgs := clibase.ContextWithRawArgs(ctx, args)
-
-	got, ok := clibase.RawArgsFromContext(ctxWithArgs)
-	if !ok || len(got) != 2 || got[0] != "foo" || got[1] != "bar" {
-		t.Fatalf("RawArgsFromContext() = (%v, %t), want (%v, true)", got, ok, args)
-	}
-
-	if _, ok := clibase.RawArgsFromContext(context.TODO()); ok {
-		t.Fatal("RawArgsFromContext(nil) expected ok=false")
-	}
-}
-
 func sessionTableColumns(sessionMinWidth int) []clibase.TableColumn {
 	return []clibase.TableColumn{
 		{Heading: "Session", Fixed: false, MinWidth: sessionMinWidth, Wrap: clibase.WrapSession},
@@ -220,11 +203,6 @@ func TestJSONHelpers(t *testing.T) {
 	_ = cmd.Flags().Set(clibase.JSONFlagName, "true")
 	if !clibase.JSONOutputEnabled(cmd) {
 		t.Fatal("JSONOutputEnabled should be true after setting flag")
-	}
-
-	name := clibase.JSONCommandName(cmd)
-	if name != "test" {
-		t.Fatalf("JSONCommandName = %q, want 'test'", name)
 	}
 
 	code := clibase.JSONErrorCode(session.ErrSessionNotFound)

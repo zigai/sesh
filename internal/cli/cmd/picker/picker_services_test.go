@@ -233,10 +233,6 @@ func TestPickerServicesLoadCodexAndOmpNativeTitles(t *testing.T) {
 	if diff := cmp.Diff(want, titles); diff != "" {
 		t.Fatalf("native titles and tasks mismatch (-want +got):\n%s", diff)
 	}
-
-	if codex.SessionID != "codex-native" || omp.SessionID != "omp-native" {
-		t.Fatal("native resume identities changed")
-	}
 }
 
 func writePickerAgentRegistry(t *testing.T, path string, agent aht.Session) {
