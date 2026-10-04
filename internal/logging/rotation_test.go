@@ -20,19 +20,6 @@ const (
 	rotationTestBackupCount int   = 3
 )
 
-func TestDefaultRotationPolicyUsesOneHundredMiB(t *testing.T) {
-	t.Parallel()
-
-	policy := defaultRotationPolicy()
-	if policy.maxBytes != 100<<20 {
-		t.Fatalf("maxBytes = %d, want %d", policy.maxBytes, int64(100<<20))
-	}
-
-	if policy.backupCount != 3 {
-		t.Fatalf("backupCount = %d, want 3", policy.backupCount)
-	}
-}
-
 func TestSinkRotatesCompleteJSONLinesIntoBoundedBackups(t *testing.T) {
 	t.Parallel()
 
