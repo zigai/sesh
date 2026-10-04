@@ -31,7 +31,7 @@ bash scripts/bootstrap.sh
 TERMTRACE_BUILD_REVISION=$revision \
 TERMTRACE_GHOSTTY_PREFIX="$source_dir/vendor/ghostty/zig-out" \
 CARGO_TARGET_DIR="$source_dir/target" \
-    cargo +1.97.1 build --locked --release --bin termtrace
+    cargo +1.99.0 build --locked --release --bin termtrace
 
 install -d "$prefix/bin"
 install -m 0755 target/release/termtrace "$prefix/bin/termtrace"

@@ -20,4 +20,5 @@ jobs:
           git diff --exit-code -- go.mod go.sum
       - uses: golangci/golangci-lint-action@v9
         with:
+          version: v2.14.0
           args: --timeout=3m

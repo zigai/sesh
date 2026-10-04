@@ -224,6 +224,7 @@ linters:
         - G301 # directory perms
         - G302 # file perms
         - G304 # file path from variable
+        - G703 # path traversal taint on paths from variables, same as G304
     exhaustruct_v5:
       ignore-patterns:
         - "github.com/urfave/cli/v3\\..*"

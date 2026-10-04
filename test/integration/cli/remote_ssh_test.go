@@ -197,7 +197,7 @@ func writeRemoteSSHConfigs(t *testing.T, username, sshDir, root, clientKey, host
 	}
 
 	authorized := filepath.Join(root, "authorized_keys")
-	if err := os.WriteFile(authorized, clientPublic, 0o600); err != nil { //nolint:gosec // path is rooted in t.TempDir and never accepts external input.
+	if err := os.WriteFile(authorized, clientPublic, 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -221,7 +221,7 @@ func writeRemoteSSHConfigs(t *testing.T, username, sshDir, root, clientKey, host
 	knownHosts := filepath.Join(sshDir, "known_hosts")
 
 	knownHost := fmt.Sprintf("[127.0.0.1]:%d %s %s\n", port, hostFields[0], hostFields[1])
-	if err := os.WriteFile(knownHosts, []byte(knownHost), 0o600); err != nil { //nolint:gosec // path is rooted in t.TempDir and never accepts external input.
+	if err := os.WriteFile(knownHosts, []byte(knownHost), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
