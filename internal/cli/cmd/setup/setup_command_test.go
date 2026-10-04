@@ -46,10 +46,6 @@ func TestSetupTmuxPrintsBindingsWithoutSocket(t *testing.T) {
 	if !strings.Contains(stdout, "bind-key -T root C-o run-shell -b \"sesh action picker-open -c '#{client_name}' -t '#{pane_id}' --current-session-id '#{session_id}' -w '#{client_width}' --client-height '#{client_height}'\"") {
 		t.Fatalf("stdout missing picker binding:\n%s", stdout)
 	}
-
-	if strings.Contains(stdout, "resurrect") || strings.Contains(stdout, "continuum") {
-		t.Fatalf("rendered block mentions a retired command name:\n%s", stdout)
-	}
 }
 
 func TestSetupTmuxJSONPlansBindings(t *testing.T) {

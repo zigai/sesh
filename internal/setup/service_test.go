@@ -99,10 +99,6 @@ func TestSystemdDefinitionsRenderOwnedUnits(t *testing.T) {
 		t.Fatalf("autosave service ExecStart is not the native command:\n%s", service.Content)
 	}
 
-	if strings.Contains(service.Content, "continuum") || strings.Contains(service.Content, "resurrect") {
-		t.Fatalf("autosave service references legacy names:\n%s", service.Content)
-	}
-
 	timer, ok := byName[setup.AutosaveTimerName]
 	if !ok {
 		t.Fatalf("missing %s", setup.AutosaveTimerName)

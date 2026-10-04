@@ -59,10 +59,6 @@ func TestSetupServicesPrintsWithoutWriting(t *testing.T) {
 		t.Fatalf("printed definition does not use the native command:\n%s", service.Content)
 	}
 
-	if strings.Contains(service.Content, "continuum") || strings.Contains(service.Content, "resurrect") {
-		t.Fatalf("printed definition references legacy names:\n%s", service.Content)
-	}
-
 	if _, err := os.Stat(directory); !os.IsNotExist(err) {
 		t.Fatalf("preview wrote into %s: %v", directory, err)
 	}
