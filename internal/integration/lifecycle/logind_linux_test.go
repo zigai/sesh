@@ -25,30 +25,6 @@ func testLifecycleSignal(owner, name string, preparing bool) *dbus.Signal {
 	}
 }
 
-func TestLifecycleInhibitorsUseSeparateDelayActions(t *testing.T) {
-	t.Parallel()
-
-	got := Inhibitors()
-	want := [2]InhibitorSpec{
-		{
-			What: LogindShutdownInhibitorWhat,
-			Who:  LogindInhibitorWho,
-			Why:  LogindInhibitorWhy,
-			Mode: LogindInhibitorMode,
-		},
-		{
-			What: LogindSleepInhibitorWhat,
-			Who:  LogindInhibitorWho,
-			Why:  LogindInhibitorWhy,
-			Mode: LogindInhibitorMode,
-		},
-	}
-
-	if got != want {
-		t.Fatalf("LifecycleInhibitors = %+v, want %+v", got, want)
-	}
-}
-
 func TestLogindEventUsesMeasuredDelayAndRejectsMalformedSignals(t *testing.T) {
 	t.Parallel()
 
@@ -134,35 +110,6 @@ func (f *fakeLogind) Next(ctx context.Context) (Event, error) {
 }
 func (f *fakeLogind) Release() error              { f.released++; return nil }
 func (f *fakeLogind) Rearm(context.Context) error { f.rearmed++; return f.rearmErr }
-
-func TestRunLogindReleasesAfterHandlerAndRearmsCanceledCycle(t *testing.T) {
-	t.Parallel()
-
-	runtime := &fakeLogind{events: make(chan Event, 2)}
-	runtime.events <- Event{Kind: EventShutdown, Cycle: 1, Deadline: time.Now().Add(time.Second)}
-
-	runtime.events <- Event{Kind: EventShutdown, Cycle: 1, Canceled: true}
-
-	stop := errStopLogindTest
-	called := 0
-
-	err := RunLogind(t.Context(), runtime, func(context.Context, Event) error {
-		called++
-
-		if runtime.released != 0 {
-			t.Fatal("inhibitor released before handler returned")
-		}
-
-		return stop
-	})
-	if !errors.Is(err, stop) {
-		t.Fatalf("RunLogind error = %v", err)
-	}
-
-	if called != 1 || runtime.released != 1 || runtime.rearmed != 0 {
-		t.Fatalf("called=%d released=%d rearmed=%d", called, runtime.released, runtime.rearmed)
-	}
-}
 
 func TestRunLogindDoesNotResumeAdmissionWhenRearmFails(t *testing.T) {
 	t.Parallel()

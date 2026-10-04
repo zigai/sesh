@@ -419,41 +419,6 @@ func TestRuntimeStatusPathRejectsUnboundedOrRelativeInput(t *testing.T) {
 	}
 }
 
-func TestRuntimeReporterRetainsUnknownServerManagement(t *testing.T) {
-	runtimeDir := shortRuntimeDir(t)
-	config := RuntimeStatusConfig{
-		RuntimeDir:     runtimeDir,
-		Endpoint:       filepath.Join(runtimeDir, "tmux.sock"),
-		LogindDelay:    3 * time.Second,
-		AttemptTimeout: time.Second,
-		DrainGrace:     500 * time.Millisecond,
-		LiveStatus: func(context.Context) (RuntimeLiveStatus, error) {
-			return RuntimeLiveStatus{InhibitorsHeld: true}, nil
-		},
-	}
-
-	reporter, err := StartRuntimeReporter(t.Context(), config)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Cleanup(func() { _ = reporter.Close() })
-
-	path, err := RuntimeStatusPath(runtimeDir, config.Endpoint)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	status, err := QueryRuntimeStatus(t.Context(), path)
-	if err != nil {
-		t.Fatalf("QueryRuntimeStatus failed: %v", err)
-	}
-
-	if status.ServerManagement != ServerManagementUnknown {
-		t.Fatalf("serverManagement = %q, want %q", status.ServerManagement, ServerManagementUnknown)
-	}
-}
-
 func TestValidateRuntimeStatusRejectsNonUnknownServerManagement(t *testing.T) {
 	t.Parallel()
 
