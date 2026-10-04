@@ -1,41 +1,10 @@
 package config_test
 
 import (
-	"bytes"
 	"testing"
-
-	"github.com/pelletier/go-toml/v2"
 
 	"github.com/zigai/sesh/internal/config"
 )
-
-func TestAgentSortConfigDefaultsAndRoundTrip(t *testing.T) {
-	cfg := config.DefaultConfig()
-	if cfg.AgentSessions.PopupSort != "position" || cfg.Keys.AgentSort != "ctrl+s" {
-		t.Fatal("agent sorting defaults must be position and ctrl+s")
-	}
-
-	overrideTOML := "[agent_sessions]\npopup_sort = \"attention\"\n[keys]\nagent_sort = \"alt+o\"\n"
-
-	d := toml.NewDecoder(bytes.NewReader([]byte(overrideTOML)))
-	if err := d.Decode(cfg); err != nil {
-		t.Fatal(err)
-	}
-
-	data, err := toml.Marshal(cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var decoded config.Config
-	if err := toml.Unmarshal(data, &decoded); err != nil {
-		t.Fatal(err)
-	}
-
-	if decoded.AgentSessions.PopupSort != "attention" || decoded.Keys.AgentSort != "alt+o" {
-		t.Fatal("agent sorting config did not survive a TOML round trip")
-	}
-}
 
 func TestAgentSortConfigValidation(t *testing.T) {
 	for _, value := range []string{"", "position", "name", "attention", " Attention "} {

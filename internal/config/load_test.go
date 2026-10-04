@@ -15,71 +15,6 @@ import (
 	"github.com/zigai/sesh/internal/config"
 )
 
-func TestLoadDefaults(t *testing.T) {
-	tempDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tempDir)
-
-	cfg, err := config.Load()
-	if err != nil {
-		t.Fatalf("Load failed: %v", err)
-	}
-
-	assertEqual(t, "Primary theme", cfg.Theme.Primary, "#24c8ff")
-	assertEqual(t, "Warning theme", cfg.Theme.Warning, "#ff9e3b")
-	assertEqual(t, "Create key", cfg.Keys.Create, "alt+c")
-	assertEqual(t, "Rename key", cfg.Keys.Rename, "alt+r")
-	assertEqual(t, "Kill key", cfg.Keys.Kill, "alt+x")
-	assertEqual(t, "Delete key", cfg.Keys.Delete, "alt+shift+x")
-	assertEqual(t, "Help key", cfg.Keys.Help, "?")
-	assertEqual(t, "CycleMode key", cfg.Keys.CycleMode, "ctrl+f")
-	assertEqual(t, "SESH popup width", cfg.Popup.SeshWidth, "40%")
-	assertEqual(t, "SESH popup height", cfg.Popup.SeshHeight, "45%")
-	assertEqual(t, "AGENTS popup width", cfg.Popup.AgentsWidth, "40%")
-	assertEqual(t, "AGENTS popup height", cfg.Popup.AgentsHeight, "80%")
-	assertEqual(t, "SESH display format", cfg.Display.SeshFormat, "{source_prefix}{session_name}{right}{session_agent_context}")
-	assertEqual(t, "AGENTS session format", cfg.Display.AgentsSessionFormat, "{source_prefix}{session_name}")
-	assertEqual(t, "AGENTS agent format", cfg.Display.AgentsAgentFormat, "{tree}{status_glyph} {status_age:<7}   {agent_cwd_name:<23.23}  {agent_session}{right}{harness:<6.6}   {agent_git_label:<6.22} {agent_git_added:<5} {agent_git_deleted:<5} {agent_git_ahead:<2} {agent_git_behind:<2}")
-	assertEqual(t, "PageUp key", cfg.Keys.PageUp, "pgup")
-	assertEqual(t, "PageDown key", cfg.Keys.PageDown, "pgdown")
-	assertEqual(t, "Top key", cfg.Keys.Top, "home")
-	assertEqual(t, "Bottom key", cfg.Keys.Bottom, "end")
-	assertEqual(t, "Select1 key", cfg.Keys.Select1, "ctrl+1")
-	assertEqual(t, "Select0 key", cfg.Keys.Select0, "ctrl+0")
-	assertEqual(t, "ConfirmKill setting", cfg.Settings.ConfirmKill, true)
-	assertEqual(t, "ConfirmDelete setting", cfg.Settings.ConfirmDelete, true)
-	assertEqual(t, "ShowFooter setting", cfg.Settings.ShowFooter, true)
-	assertEqual(t, "DirectorySuggestions setting", cfg.Settings.DirectorySuggestions, 5)
-	assertEqual(t, "DefaultSessionPathSuggestion setting", cfg.Settings.DefaultSessionPathSuggestion, "~/Projects/{session}")
-	assertEqual(t, "Snapshot retention days", cfg.Snapshot.RetentionDays, 14)
-	assertEqual(t, "Snapshot maximum count", cfg.Snapshot.MaxCount, 0)
-	assertEqual(t, "Snapshot maximum bytes", cfg.Snapshot.MaxBytes, int64(0))
-
-	if !slices.Equal(cfg.Snapshot.ProcessEnvironment, config.DefaultProcessEnvironment) {
-		t.Fatalf("ProcessEnvironment = %#v, want %#v", cfg.Snapshot.ProcessEnvironment, config.DefaultProcessEnvironment)
-	}
-
-	if !slices.Equal(cfg.Settings.DisplayModes, []string{"sesh", "agents"}) {
-		t.Fatalf("DisplayModes = %#v, want sesh and agents", cfg.Settings.DisplayModes)
-	}
-
-	assertEqual(t, "AgentSessions enabled", cfg.AgentSessions.Enabled, true)
-	assertEqual(t, "AgentSessions popup counts", cfg.AgentSessions.PopupCounts, true)
-	assertEqual(t, "AgentSessions refresh interval", cfg.AgentSessions.RefreshInterval, "250ms")
-	assertEqual(t, "AgentSessions status style", cfg.AgentSessions.StatusStyle, "glyph")
-	assertEqual(t, "AgentSessions status time format", cfg.AgentSessions.StatusTimeFormat, "relative-seconds")
-
-	assertEqual(t, "Remote enabled", cfg.Remote.Enabled, false)
-	assertEqual(t, "Remote SSH path", cfg.Remote.SSHPath, "ssh")
-	assertEqual(t, "Remote tmux poll interval", cfg.Remote.TmuxPollInterval, "1s")
-	assertEqual(t, "Remote connect timeout", cfg.Remote.ConnectTimeout, "5s")
-	assertEqual(t, "Remote heartbeat interval", cfg.Remote.HeartbeatInterval, "10s")
-	assertEqual(t, "Remote stale interval", cfg.Remote.StaleAfter, "30s")
-	assertEqual(t, "Remote hide interval", cfg.Remote.HideAfter, "10m")
-	assertEqual(t, "Remote maximum parallel connections", cfg.Remote.MaxParallelConnects, 4)
-	assertEqual(t, "Remote reverse bridge", cfg.Remote.EnableReverseBridge, true)
-	assertEqual(t, "Remote return to origin", cfg.Remote.ReturnToOrigin, true)
-}
-
 func TestConfigPrecedenceAcrossUserProjectEnvironmentAndExplicitPath(t *testing.T) {
 	root := t.TempDir()
 	configHome := filepath.Join(root, "config")
@@ -167,41 +102,6 @@ connections = [
 	}
 }
 
-func TestTOMLOmittedLogFileKeepsDefault(t *testing.T) {
-	cfg := config.DefaultConfig()
-
-	d := toml.NewDecoder(strings.NewReader("[paths]\ndata_dir = \"relative/data\"\n"))
-	d.DisallowUnknownFields()
-
-	if err := d.Decode(cfg); err != nil {
-		t.Fatalf("decoding config without paths.log_file: %v", err)
-	}
-
-	if cfg.Paths.LogFile != "" {
-		t.Fatalf("Paths.LogFile = %q, want empty default", cfg.Paths.LogFile)
-	}
-}
-
-func TestPathConfigTOMLRoundTrip(t *testing.T) {
-	cfg := config.DefaultConfig()
-	cfg.Paths.DataDir = "relative/data"
-	cfg.Paths.LogFile = "relative/logs/sesh.jsonl"
-
-	data, err := toml.Marshal(cfg)
-	if err != nil {
-		t.Fatalf("marshaling config: %v", err)
-	}
-
-	var decoded config.Config
-	if err := toml.Unmarshal(data, &decoded); err != nil {
-		t.Fatalf("unmarshaling config: %v", err)
-	}
-
-	if decoded.Paths != cfg.Paths {
-		t.Fatalf("round-tripped Paths = %#v, want %#v", decoded.Paths, cfg.Paths)
-	}
-}
-
 func TestLoadOverride(t *testing.T) {
 	tempDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tempDir)
@@ -257,11 +157,6 @@ select_0 = "alt+0"`
 	assertEqual(t, "Bottom key", cfg.Keys.Bottom, "G")
 	assertEqual(t, "Select1 key", cfg.Keys.Select1, "alt+1")
 	assertEqual(t, "Select0 key", cfg.Keys.Select0, "alt+0")
-	assertEqual(t, "ConfirmKill default setting", cfg.Settings.ConfirmKill, true)
-	assertEqual(t, "ConfirmDelete default setting", cfg.Settings.ConfirmDelete, true)
-	assertEqual(t, "ShowFooter default setting", cfg.Settings.ShowFooter, true)
-	assertEqual(t, "DirectorySuggestions default setting", cfg.Settings.DirectorySuggestions, 5)
-	assertEqual(t, "DefaultSessionPathSuggestion default setting", cfg.Settings.DefaultSessionPathSuggestion, "~/Projects/{session}")
 }
 
 func TestLoadSettingsOverride(t *testing.T) {

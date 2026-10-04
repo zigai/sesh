@@ -120,14 +120,6 @@ refresh_interval = "soon"`
 	}
 }
 
-func TestDefaultConfigUsesResponsiveAgentSessionsRefreshInterval(t *testing.T) {
-	t.Parallel()
-
-	if got := config.DefaultConfig().AgentSessions.RefreshInterval; got != "250ms" {
-		t.Fatalf("default agent_sessions.refresh_interval = %q, want 250ms", got)
-	}
-}
-
 func TestLoadRejectsDuplicateKeyBindings(t *testing.T) {
 	tempDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tempDir)

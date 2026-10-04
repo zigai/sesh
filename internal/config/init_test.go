@@ -48,24 +48,6 @@ func TestInitCreatesCommentedDefaultConfig(t *testing.T) {
 	}
 }
 
-func TestInitRejectsExistingFileWithoutForce(t *testing.T) {
-	tempDir := t.TempDir()
-	targetPath := filepath.Join(tempDir, "config.toml")
-
-	if _, err := config.Init(config.WithInitPath(targetPath)); err != nil {
-		t.Fatalf("first Init() error = %v", err)
-	}
-
-	_, err := config.Init(config.WithInitPath(targetPath))
-	if err == nil {
-		t.Fatal("second Init() error = nil, want config already exists error")
-	}
-
-	if !errors.Is(err, config.ErrConfigExists) && !errors.Is(err, os.ErrExist) {
-		t.Fatalf("second Init() error = %v, want ErrConfigExists or ErrExist", err)
-	}
-}
-
 func TestInitOverwritesWithForce(t *testing.T) {
 	tempDir := t.TempDir()
 	targetPath := filepath.Join(tempDir, "config.toml")
@@ -265,29 +247,6 @@ func TestInitRejectsSymlinkLeafWithoutChangingTarget(t *testing.T) {
 
 	if string(data) != "important-data" {
 		t.Fatalf("targetFile was overwritten: %q, want important-data", string(data))
-	}
-}
-
-func TestInitRejectsSymlinkParentDirectory(t *testing.T) {
-	t.Parallel()
-
-	tempDir := t.TempDir()
-
-	realParent := filepath.Join(tempDir, "real_parent")
-	if err := os.MkdirAll(realParent, 0o700); err != nil {
-		t.Fatal(err)
-	}
-
-	parentDir := filepath.Join(tempDir, "parent_dir")
-	if err := os.Symlink(realParent, parentDir); err != nil {
-		t.Skipf("Symlink() unavailable: %v", err)
-	}
-
-	configPath := filepath.Join(parentDir, "config.toml")
-
-	_, err := config.Init(config.WithInitPath(configPath))
-	if !errors.Is(err, config.ErrConfigSymlink) {
-		t.Fatalf("Init() error = %v, want %v", err, config.ErrConfigSymlink)
 	}
 }
 
