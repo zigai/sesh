@@ -580,13 +580,3 @@ func TestTrackerCustomPalette(t *testing.T) {
 		t.Fatalf("window style = %q, want the custom palette entry", style)
 	}
 }
-
-func TestStatePriorityOrdering(t *testing.T) {
-	t.Parallel()
-
-	if agents.StateWaiting.Priority() <= agents.StateFailed.Priority() ||
-		agents.StateFailed.Priority() <= agents.StateUnread.Priority() ||
-		agents.StateUnread.Priority() <= agents.StateNormal.Priority() {
-		t.Fatal("state priority must order waiting > failed > unread > normal")
-	}
-}

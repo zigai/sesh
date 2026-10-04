@@ -4,7 +4,6 @@ package agents_test
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -370,25 +369,32 @@ func TestAgentNavigationBackSkipsVanishedHistory(t *testing.T) {
 		t.Fatalf("session handle: %v", err)
 	}
 
+	vanished := newAgentWindow(t, ctx, server, session, "vanished")
 	previous := newAgentWindow(t, ctx, server, session, "previous")
 
 	statePath := writeRegistry(t,
 		paneFixture(current, string(aht.ActivityIdle)),
+		paneFixture(vanished, string(aht.ActivityIdle)),
 		paneFixture(previous, string(aht.ActivityWaiting)),
 	)
-	navigator := newTestNavigator(t, server, statePath, agents.CurrentTarget{PaneID: current.PaneID})
 
-	moved, err := navigator.NextIdle(ctx, agents.NavigationGlobal)
+	if _, err := newTestNavigator(t, server, statePath, agents.CurrentTarget{PaneID: current.PaneID}).
+		Focus(ctx, agents.FocusTarget{PaneID: vanished.PaneID}); err != nil {
+		t.Fatalf("focusing the pane that will vanish: %v", err)
+	}
+
+	if _, err := newTestNavigator(t, server, statePath, agents.CurrentTarget{PaneID: vanished.PaneID}).
+		Focus(ctx, agents.FocusTarget{PaneID: previous.PaneID}); err != nil {
+		t.Fatalf("focusing the previous pane: %v", err)
+	}
+
+	vanishedPane, err := server.Pane(ctx, gotmux.PaneID(vanished.PaneID))
 	if err != nil {
-		t.Fatalf("NextIdle failed: %v", err)
+		t.Fatalf("pane handle: %v", err)
 	}
 
-	if moved.PaneID != previous.PaneID {
-		t.Fatalf("moved pane = %q, want %q", moved.PaneID, previous.PaneID)
-	}
-
-	if err := setNavigationHistory(ctx, server, []string{"%9999", current.PaneID}); err != nil {
-		t.Fatalf("setting history: %v", err)
+	if err := vanishedPane.Kill(ctx); err != nil {
+		t.Fatalf("killing the history pane: %v", err)
 	}
 
 	backNavigator := newTestNavigator(t, server, statePath, agents.CurrentTarget{PaneID: previous.PaneID})
@@ -491,19 +497,6 @@ func mustActivePane(t *testing.T, ctx context.Context, session gotmux.Session) g
 	}
 
 	return pane.ID()
-}
-
-func setNavigationHistory(ctx context.Context, server *gotmux.Server, history []string) error {
-	encoded, err := json.Marshal(history)
-	if err != nil {
-		return fmt.Errorf("encoding navigation history: %w", err)
-	}
-
-	if err := server.GlobalSessionOptions().SetUser(ctx, "@sesh-agent-navigation-history", string(encoded)); err != nil {
-		return fmt.Errorf("writing navigation history: %w", err)
-	}
-
-	return nil
 }
 
 func selectWindowByID(ctx context.Context, server *gotmux.Server, sessionID string, windowID string) error {
