@@ -1,4 +1,4 @@
-//go:build integration
+//go:build (linux || darwin) && integration
 
 package restore
 
@@ -20,7 +20,6 @@ import (
 	"github.com/zigai/gotmux/tmux"
 	"github.com/zigai/gotmux/tmuxtest"
 
-	itmux "github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/snapshot/capture"
 	"github.com/zigai/sesh/internal/snapshot/model"
 	"github.com/zigai/sesh/internal/snapshot/store"
@@ -51,24 +50,20 @@ func runPlannedSplitsAtBase(t *testing.T, base int) {
 		t.Fatal(err)
 	}
 
-	plan, err := BuildPlan(nestedLayoutFixture(), []string{"s0"})
+	manifest := nestedLayoutFixture()
+
+	plan, err := BuildPlan(manifest, []string{"s0"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	target := newStructuralFixture(server)
-
-	for _, step := range plan.Steps {
+	assertAroundLayout := func(step Step, resolve func() *restoredTarget) {
 		if _, ok := step.(*ApplyLayoutStep); ok {
-			target.assertRectangles(t, ctx)
-		}
-
-		target.apply(t, ctx, step)
-
-		if _, ok := step.(*ApplyLayoutStep); ok {
-			target.assertRectangles(t, ctx)
+			resolve().assertRectangles(t, ctx)
 		}
 	}
+
+	target := executeRestorePlan(t, ctx, server, manifest, plan, assertAroundLayout, assertAroundLayout)
 
 	target.assertRectangles(t, ctx)
 
@@ -129,10 +124,7 @@ func testNativeGroupAtBase(t *testing.T, base int) {
 		t.Fatalf("ValidatePlan failed: %v", err)
 	}
 
-	target := newStructuralFixture(server, plan)
-	for _, step := range plan.Steps {
-		target.apply(t, ctx, step)
-	}
+	target := executeRestorePlan(t, ctx, server, m, plan, nil, nil)
 
 	verifyNativeGroupState(t, ctx, target, unrelatedID, uLinksBefore, unrelated)
 }
@@ -178,7 +170,7 @@ func buildNativeGroupManifest() model.Manifest {
 	return m
 }
 
-func verifyNativeGroupState(t *testing.T, ctx context.Context, target *structuralFixture, unrelatedID tmux.SessionID, uLinksBefore []tmux.WindowLinkInfo, unrelated tmux.Session) {
+func verifyNativeGroupState(t *testing.T, ctx context.Context, target *restoredTarget, unrelatedID tmux.SessionID, uLinksBefore []tmux.WindowLinkInfo, unrelated tmux.Session) {
 	t.Helper()
 
 	leadSess := target.sessions["s0"]
@@ -305,15 +297,15 @@ func TestPreflightCheckGroupCollisionRejectsExistingSessionAndGroup(t *testing.T
 		t.Fatal(err)
 	}
 
-	if err := preflightCheckGroupCollision(ctx, server, "existing-session"); err == nil {
+	if err := PreflightCheckGroupCollision(ctx, server, "existing-session"); err == nil {
 		t.Fatal("expected collision error for existing session name, got nil")
 	}
 
-	if err := preflightCheckGroupCollision(ctx, server, "existing-group"); err == nil {
+	if err := PreflightCheckGroupCollision(ctx, server, "existing-group"); err == nil {
 		t.Fatal("expected collision error for existing group name, got nil")
 	}
 
-	if err := preflightCheckGroupCollision(ctx, server, "fresh-group"); err != nil {
+	if err := PreflightCheckGroupCollision(ctx, server, "fresh-group"); err != nil {
 		t.Fatalf("expected fresh group to succeed, got %v", err)
 	}
 }
@@ -376,10 +368,7 @@ func TestSharedWindowsAcrossUnrelatedSessionsAndMultipleGroups(t *testing.T) {
 		t.Fatalf("ValidatePlan failed: %v", err)
 	}
 
-	target := newStructuralFixture(server, plan)
-	for _, step := range plan.Steps {
-		target.apply(t, ctx, step)
-	}
+	target := executeRestorePlan(t, ctx, server, m, plan, nil, nil)
 
 	expectedSharedID := target.windows["w-shared"].ID()
 
@@ -455,15 +444,12 @@ func TestSparseSlotRepeatedLinksAndSharedOnlyOwners(t *testing.T) {
 		t.Fatalf("ValidatePlan failed: %v", err)
 	}
 
-	target := newStructuralFixture(server)
-	for _, step := range plan.Steps {
-		target.apply(t, ctx, step)
-	}
+	target := executeRestorePlan(t, ctx, server, m, plan, nil, nil)
 
 	assertSparseRepeatedAndSharedLinks(t, ctx, target)
 }
 
-func assertSparseRepeatedAndSharedLinks(t *testing.T, ctx context.Context, target *structuralFixture) {
+func assertSparseRepeatedAndSharedLinks(t *testing.T, ctx context.Context, target *restoredTarget) {
 	t.Helper()
 
 	_, rLinks, err := target.sessions["s-repeat"].WindowInfos(ctx)
@@ -531,19 +517,13 @@ func verifyDeepLayoutAtBorder(t *testing.T, border tmux.PaneBorderStatus) {
 		"p8": {101, 39, 20, 2},
 	}
 
-	target := newStructuralFixture(server)
-
-	for _, step := range plan.Steps {
+	assertAroundLayout := func(step Step, resolve func() *restoredTarget) {
 		if _, ok := step.(*ApplyLayoutStep); ok {
-			target.assertPaneRectangles(t, ctx, wantRects)
-		}
-
-		target.apply(t, ctx, step)
-
-		if _, ok := step.(*ApplyLayoutStep); ok {
-			target.assertPaneRectangles(t, ctx, wantRects)
+			resolve().assertPaneRectangles(t, ctx, wantRects)
 		}
 	}
+
+	target := executeRestorePlan(t, ctx, server, m, plan, assertAroundLayout, assertAroundLayout)
 
 	win := target.windows["w0"]
 	if err := win.Options().SetPaneBorderStatus(ctx, border); err != nil {
@@ -578,7 +558,7 @@ func computeExpectedBorderRectangles(wantRects map[string][4]int, border tmux.Pa
 	return expectedRects
 }
 
-func verifyDeepLayoutGeometry(t *testing.T, ctx context.Context, win tmux.Window, p3Pane tmux.Pane, target *structuralFixture, expectedRects map[string][4]int) {
+func verifyDeepLayoutGeometry(t *testing.T, ctx context.Context, win tmux.Window, p3Pane tmux.Pane, target *restoredTarget, expectedRects map[string][4]int) {
 	t.Helper()
 
 	winInfo, err := win.Info(ctx)
@@ -626,15 +606,14 @@ func TestPlannedConstructionWindowResizeContract(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	plan, err := BuildPlan(nestedLayoutFixture(), []string{"s0"})
+	manifest := nestedLayoutFixture()
+
+	plan, err := BuildPlan(manifest, []string{"s0"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	target := newStructuralFixture(server)
-	for _, step := range plan.Steps {
-		target.apply(t, ctx, step)
-	}
+	target := executeRestorePlan(t, ctx, server, manifest, plan, nil, nil)
 
 	win := target.windows["w0"]
 
@@ -812,13 +791,12 @@ func TestAdversarialTopologicalSchedulingPreservesPrerequisites(t *testing.T) {
 		t.Fatalf("ValidatePlan failed: %v", err)
 	}
 
-	target := newStructuralFixture(server)
-	target.applyAdversarial(t, ctx, plan)
+	target := executeRestorePlan(t, ctx, server, m, adversarialStepOrder(t, plan), nil, nil)
 
 	assertAdversarialResults(t, ctx, target)
 }
 
-func assertAdversarialResults(t *testing.T, ctx context.Context, target *structuralFixture) {
+func assertAdversarialResults(t *testing.T, ctx context.Context, target *restoredTarget) {
 	t.Helper()
 
 	leadSess := target.sessions["s0"]
@@ -901,15 +879,14 @@ func TestUnrelatedFixturesPreservedAcrossTargetOptions(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			plan, err := BuildPlan(nestedLayoutFixture(), []string{"s0"})
+			manifest := nestedLayoutFixture()
+
+			plan, err := BuildPlan(manifest, []string{"s0"})
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			target := newStructuralFixture(server)
-			for _, step := range plan.Steps {
-				target.apply(t, ctx, step)
-			}
+			executeRestorePlan(t, ctx, server, manifest, plan, nil, nil)
 
 			verifyUnrelatedSessionsIntact(t, ctx, u1, u2, base)
 		})
@@ -940,108 +917,188 @@ func verifyUnrelatedSessionsIntact(t *testing.T, ctx context.Context, u1, u2 tmu
 	}
 }
 
-type structuralFixture struct {
-	server            *tmux.Server
-	sessions          map[string]tmux.Session
-	sessionNames      map[string]string
-	followersByLeader map[string][]string
-	bootstraps        map[string]tmux.WindowLink
-	windows           map[string]tmux.Window
-	panes             map[string]tmux.Pane
+type restoredTarget struct {
+	sessions map[string]tmux.Session
+	windows  map[string]tmux.Window
+	panes    map[string]tmux.Pane
 }
 
-func newStructuralFixture(server *tmux.Server, plans ...Plan) *structuralFixture {
-	f := &structuralFixture{server: server}
-	f.ensureMaps()
+type restoreObserver func(step Step, resolve func() *restoredTarget)
 
-	for _, p := range plans {
-		f.indexPlan(p)
-	}
+func executeRestorePlan(
+	t *testing.T,
+	ctx context.Context,
+	server *tmux.Server,
+	manifest model.Manifest,
+	plan Plan,
+	beforeStep, afterStep restoreObserver,
+) *restoredTarget {
+	t.Helper()
 
-	return f
-}
+	journal := newMemoryJournal()
 
-func (f *structuralFixture) indexPlan(plan Plan) {
-	if f.followersByLeader == nil {
-		f.followersByLeader = make(map[string][]string)
-	}
+	if beforeStep != nil {
+		journal.beforeIntent = func(step Step) error {
+			beforeStep(step, func() *restoredTarget { return resolveRestoredTarget(t, ctx, server, plan, journal) })
 
-	for _, step := range plan.Steps {
-		if cs, ok := step.(*CreateSessionStep); ok && cs.GroupLeaderSessionID != "" {
-			f.followersByLeader[cs.GroupLeaderSessionID] = append(f.followersByLeader[cs.GroupLeaderSessionID], cs.SessionID)
+			return nil
 		}
 	}
+
+	if afterStep != nil {
+		journal.beforeConfirmed = func(step Step) error {
+			afterStep(step, func() *restoredTarget { return resolveRestoredTarget(t, ctx, server, plan, journal) })
+
+			return nil
+		}
+	}
+
+	if _, err := NewExecutor(server, manifest, DefaultExecuteConfig()).Execute(ctx, plan, journal); err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	return resolveRestoredTarget(t, ctx, server, plan, journal)
 }
 
-func (f *structuralFixture) ensureMaps() {
-	if f.sessions == nil {
-		f.sessions = make(map[string]tmux.Session)
-	}
-
-	if f.sessionNames == nil {
-		f.sessionNames = make(map[string]string)
-	}
-
-	if f.followersByLeader == nil {
-		f.followersByLeader = make(map[string][]string)
-	}
-
-	if f.bootstraps == nil {
-		f.bootstraps = make(map[string]tmux.WindowLink)
-	}
-
-	if f.windows == nil {
-		f.windows = make(map[string]tmux.Window)
-	}
-
-	if f.panes == nil {
-		f.panes = make(map[string]tmux.Pane)
-	}
+type initialPaneSource struct {
+	window string
+	pane   string
 }
 
-func (f *structuralFixture) apply(t *testing.T, ctx context.Context, step Step) {
+func resolveRestoredTarget(t *testing.T, ctx context.Context, server *tmux.Server, plan Plan, journal *memoryJournal) *restoredTarget {
 	t.Helper()
-	f.ensureMaps()
+
+	target := &restoredTarget{
+		sessions: make(map[string]tmux.Session),
+		windows:  make(map[string]tmux.Window),
+		panes:    make(map[string]tmux.Pane),
+	}
+	splitPanes := make(map[tmux.PaneID]bool)
+
+	var initialPanes []initialPaneSource
+
+	for _, step := range plan.Steps {
+		if initial, ok := target.recordStep(t, ctx, server, step, journal.state(step.ID()).RuntimeID, splitPanes); ok {
+			initialPanes = append(initialPanes, initial)
+		}
+	}
+
+	for _, initial := range initialPanes {
+		if window, ok := target.windows[initial.window]; ok {
+			target.panes[initial.pane] = resolveInitialPane(t, ctx, server, window, splitPanes)
+		}
+	}
+
+	return target
+}
+
+func (target *restoredTarget) recordStep(
+	t *testing.T,
+	ctx context.Context,
+	server *tmux.Server,
+	step Step,
+	runtimeID string,
+	splitPanes map[tmux.PaneID]bool,
+) (initialPaneSource, bool) {
+	t.Helper()
 
 	switch s := step.(type) {
 	case *CreateSessionStep:
-		f.createSessionStep(t, ctx, *s)
+		if runtimeID != "" {
+			target.sessions[s.SessionID] = resolveRuntimeSession(t, ctx, server, runtimeID)
+		}
+
+		return initialPaneSource{window: s.InitialWindowID, pane: s.InitialPaneID}, s.InitialWindowID != ""
 	case *PlaceInitialWindowStep:
-		f.placeInitialWindowStep(t, ctx, *s)
+		if runtimeID != "" && s.WindowID != "" {
+			target.windows[s.WindowID] = resolveRuntimeWindow(t, ctx, server, runtimeID)
+		}
 	case *CreateWindowStep:
-		f.createWindowStep(t, ctx, *s)
+		if runtimeID != "" {
+			target.windows[s.WindowID] = resolveRuntimeWindow(t, ctx, server, runtimeID)
+		}
+
+		return initialPaneSource{window: s.WindowID, pane: s.InitialPaneID}, true
 	case *SplitPaneStep:
-		f.splitPaneStep(t, ctx, *s)
-	case *LinkWindowStep:
-		f.linkWindowStep(t, ctx, *s)
-	case *CloseBootstrapWindowStep:
-		f.closeBootstrapStep(t, ctx, *s)
-	case *ApplyLayoutStep:
-		f.applyLayoutStep(t, ctx, *s)
-	case *SelectPaneStep:
-		f.selectPaneStep(t, ctx, *s)
-	case *ApplyZoomStep:
-		f.applyZoomStep(t, ctx, *s)
-	case *SelectWindowStep:
-		f.selectWindowStep(t, ctx, *s)
-	case *SetPaneTitleStep:
-		f.setPaneTitleStep(t, ctx, *s)
+		if runtimeID != "" {
+			target.panes[s.PaneID] = resolveRuntimePane(t, ctx, server, tmux.PaneID(runtimeID))
+			splitPanes[tmux.PaneID(runtimeID)] = true
+		}
 	}
+
+	return initialPaneSource{}, false
 }
 
-func (f *structuralFixture) applyAdversarial(t *testing.T, ctx context.Context, plan Plan) {
+func resolveRuntimeSession(t *testing.T, ctx context.Context, server *tmux.Server, runtimeID string) tmux.Session {
 	t.Helper()
-	f.indexPlan(plan)
 
-	steps := append([]Step(nil), plan.Steps...)
-	completed := make(map[string]bool)
+	session, err := server.Session(ctx, tmux.SessionID(runtimeID))
+	if err != nil {
+		t.Fatalf("restored session %s: %v", runtimeID, err)
+	}
 
-	for len(steps) != 0 {
+	return session
+}
+
+func resolveRuntimeWindow(t *testing.T, ctx context.Context, server *tmux.Server, runtimeID string) tmux.Window {
+	t.Helper()
+
+	window, err := server.Window(ctx, tmux.WindowID(runtimeID))
+	if err != nil {
+		t.Fatalf("restored window %s: %v", runtimeID, err)
+	}
+
+	return window
+}
+
+func resolveRuntimePane(t *testing.T, ctx context.Context, server *tmux.Server, runtimeID tmux.PaneID) tmux.Pane {
+	t.Helper()
+
+	pane, err := server.Pane(ctx, runtimeID)
+	if err != nil {
+		t.Fatalf("restored pane %s: %v", runtimeID, err)
+	}
+
+	return pane
+}
+
+func resolveInitialPane(t *testing.T, ctx context.Context, server *tmux.Server, window tmux.Window, splitPanes map[tmux.PaneID]bool) tmux.Pane {
+	t.Helper()
+
+	panes, err := window.Panes(ctx)
+	if err != nil {
+		t.Fatalf("restored window %s panes: %v", window.ID(), err)
+	}
+
+	var initial []tmux.PaneID
+
+	for _, pane := range panes {
+		if !splitPanes[pane.ID] {
+			initial = append(initial, pane.ID)
+		}
+	}
+
+	if len(initial) != 1 {
+		t.Fatalf("restored window %s has initial panes %v, want exactly one", window.ID(), initial)
+	}
+
+	return resolveRuntimePane(t, ctx, server, initial[0])
+}
+
+func adversarialStepOrder(t *testing.T, plan Plan) Plan {
+	t.Helper()
+
+	remaining := slices.Clone(plan.Steps)
+	completed := make(map[string]bool, len(remaining))
+	ordered := make([]Step, 0, len(remaining))
+
+	for len(remaining) != 0 {
 		chosen := -1
 
-		for i, step := range slices.Backward(steps) {
+		for i, step := range slices.Backward(remaining) {
 			if dependenciesComplete(step, completed) {
 				chosen = i
+
 				break
 			}
 		}
@@ -1050,420 +1107,34 @@ func (f *structuralFixture) applyAdversarial(t *testing.T, ctx context.Context, 
 			t.Fatal("deadlock: no schedulable step in plan DAG")
 		}
 
-		step := steps[chosen]
-		f.apply(t, ctx, step)
+		step := remaining[chosen]
+		ordered = append(ordered, step)
 		completed[step.ID()] = true
-
-		steps = append(steps[:chosen], steps[chosen+1:]...)
+		remaining = slices.Delete(remaining, chosen, chosen+1)
 	}
+
+	reordered := plan
+	reordered.Steps = ordered
+
+	return reordered
 }
 
-func (f *structuralFixture) createSessionStep(t *testing.T, ctx context.Context, step CreateSessionStep) {
+func (target *restoredTarget) assertRectangles(t *testing.T, ctx context.Context) {
 	t.Helper()
 
-	if step.GroupLeaderSessionID != "" {
-		f.createGroupFollowerSession(t, ctx, step)
-		return
-	}
-
-	f.createLeaderOrStandaloneSession(t, ctx, step)
-}
-
-func (f *structuralFixture) createGroupFollowerSession(t *testing.T, ctx context.Context, step CreateSessionStep) {
-	t.Helper()
-
-	if step.GroupLeaderSessionID == "" {
-		t.Fatalf("follower session %s has empty GroupLeaderSessionID", step.SessionID)
-	}
-
-	leader, ok := f.sessions[step.GroupLeaderSessionID]
-	if !ok {
-		t.Fatalf("group leader session %s not found in fixture", step.GroupLeaderSessionID)
-	}
-
-	groupTarget := string(step.GroupName)
-	if groupTarget == "" {
-		groupTarget = f.sessionNames[step.GroupLeaderSessionID]
-		if groupTarget == "" {
-			groupTarget = string(step.Name)
-		}
-	}
-
-	session, err := f.server.NewSession(ctx, tmux.NewSessionOptions{
-		Name:  string(step.Name),
-		Group: groupTarget,
-		Start: tmux.StartPolicyExistingOnly,
-	})
-	if err != nil {
-		t.Fatalf("NewSession for group follower %s failed: %v", step.SessionID, err)
-	}
-
-	targetLeaderName := f.sessionNames[step.GroupLeaderSessionID]
-	if targetLeaderName != "" && targetLeaderName != groupTarget {
-		if err := leader.Rename(ctx, targetLeaderName); err != nil {
-			t.Fatalf("rename leader session %s to %s failed: %v", step.GroupLeaderSessionID, targetLeaderName, err)
-		}
-	}
-
-	f.sessions[step.SessionID] = session
-	f.sessionNames[step.SessionID] = string(step.Name)
-}
-
-func preflightCheckGroupCollision(ctx context.Context, server *tmux.Server, groupName string) error {
-	return PreflightCheckGroupCollision(ctx, server, groupName)
-}
-
-func (f *structuralFixture) createLeaderOrStandaloneSession(t *testing.T, ctx context.Context, step CreateSessionStep) {
-	t.Helper()
-
-	opts := f.leaderSessionOptions(t, ctx, step)
-
-	f.sessionNames[step.SessionID] = string(step.Name)
-
-	session, err := f.server.NewSession(ctx, opts)
-	if err != nil {
-		t.Fatalf("NewSession for %s failed: %v", step.SessionID, err)
-	}
-
-	f.sessions[step.SessionID] = session
-
-	_, links, err := session.WindowInfos(ctx)
-	if err != nil || len(links) != 1 {
-		t.Fatalf("bootstrap links for session %s: %v, %v", step.SessionID, links, err)
-	}
-
-	bootLink := links[0].Handle()
-	f.bootstraps[step.SessionID] = bootLink
-
-	if step.InitialWindowID != "" {
-		f.configureInitialWindow(t, ctx, links[0].Handle().Window(), opts.Size, step.InitialWindowID, step.InitialWindowName, step.InitialPaneID)
-	}
-}
-
-// leaderSessionOptions builds the tmux options for a standalone session or a group leader. A
-// leader with followers takes the group name, and a grouped session starts with no program.
-func (f *structuralFixture) leaderSessionOptions(t *testing.T, ctx context.Context, step CreateSessionStep) tmux.NewSessionOptions {
-	t.Helper()
-
-	size := tmux.Size{Width: 80, Height: 24}
-	if step.Width > 0 && step.Height > 0 {
-		size = tmux.Size{Width: step.Width, Height: step.Height}
-	}
-
-	hasFollowers := len(f.followersByLeader[step.SessionID]) > 0
-
-	sessionName := string(step.Name)
-	if hasFollowers && len(step.GroupName) > 0 && string(step.GroupName) != string(step.Name) {
-		sessionName = string(step.GroupName)
-	}
-
-	opts := tmux.NewSessionOptions{
-		Name:  sessionName,
-		Size:  size,
-		Start: tmux.StartPolicyExistingOnly,
-	}
-
-	if len(step.GroupName) == 0 {
-		if len(step.InitialWindowName) > 0 {
-			opts.Window = string(step.InitialWindowName)
-		}
-
-		opts.Program = tmux.Exec("sleep", "300")
-
-		return opts
-	}
-
-	if err := preflightCheckGroupCollision(ctx, f.server, string(step.GroupName)); err != nil {
-		t.Fatalf("group preflight check failed: %v", err)
-	}
-
-	opts.Program = tmux.Program{}
-
-	return opts
-}
-
-func (f *structuralFixture) configureInitialWindow(t *testing.T, ctx context.Context, win tmux.Window, size tmux.Size, winID string, winName model.Bytes, paneID string) {
-	t.Helper()
-
-	if err := win.Resize(ctx, size); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := win.Rename(ctx, string(winName)); err != nil {
-		t.Fatalf("rename initial window %s failed: %v", winID, err)
-	}
-
-	f.windows[winID] = win
-
-	pane, err := win.ActivePane(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	f.panes[paneID] = pane
-}
-
-func (f *structuralFixture) placeInitialWindowStep(t *testing.T, ctx context.Context, step PlaceInitialWindowStep) {
-	t.Helper()
-
-	session, ok := f.sessions[step.SessionID]
-	if !ok {
-		t.Fatalf("session %s not found for initial window placement", step.SessionID)
-	}
-
-	bootLink, ok := f.bootstraps[step.SessionID]
-	if !ok {
-		t.Fatalf("bootstrap link for session %s not found", step.SessionID)
-	}
-
-	info, err := bootLink.Info(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if info.Index == step.Index {
-		return
-	}
-
-	moved, err := bootLink.Move(ctx, session, tmux.LinkOptions{Index: &step.Index})
-	if err != nil {
-		t.Fatalf("moving initial window to %d failed: %v", step.Index, err)
-	}
-
-	f.bootstraps[step.SessionID] = moved
-}
-
-func (f *structuralFixture) createWindowStep(t *testing.T, ctx context.Context, step CreateWindowStep) {
-	t.Helper()
-
-	session, ok := f.sessions[step.OwnerSessionID]
-	if !ok {
-		t.Fatalf("owner session %s not found for window %s", step.OwnerSessionID, step.WindowID)
-	}
-
-	idx := step.Index
-
-	link, err := session.NewWindow(ctx, tmux.NewWindowOptions{
-		Name:    string(step.Name),
-		Index:   &idx,
-		Program: tmux.Exec("sleep", "300"),
-	})
-	if err != nil {
-		t.Fatalf("CreateWindow %s in session %s failed: %v", step.WindowID, step.OwnerSessionID, err)
-	}
-
-	win := link.Window()
-
-	size := tmux.Size{Width: 80, Height: 24}
-	if step.Width > 0 && step.Height > 0 {
-		size = tmux.Size{Width: step.Width, Height: step.Height}
-	}
-
-	if err := win.Resize(ctx, size); err != nil {
-		t.Fatalf("Resize window %s to %v failed: %v", step.WindowID, size, err)
-	}
-
-	if err := win.Rename(ctx, string(step.Name)); err != nil {
-		t.Fatalf("rename window %s failed: %v", step.WindowID, err)
-	}
-
-	f.windows[step.WindowID] = win
-
-	pane, err := win.ActivePane(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	f.panes[step.InitialPaneID] = pane
-}
-
-func (f *structuralFixture) splitPaneStep(t *testing.T, ctx context.Context, step SplitPaneStep) {
-	t.Helper()
-
-	targetPane, ok := f.panes[step.TargetPaneID]
-	if !ok {
-		t.Fatalf("target pane %s not found for split %s", step.TargetPaneID, step.PaneID)
-	}
-
-	direction, cells := tmux.DirectionHorizontal, step.SubtreeWidth
-	if step.Axis == "y" {
-		direction, cells = tmux.DirectionVertical, step.SubtreeHeight
-	}
-
-	newPane, err := targetPane.Split(ctx, tmux.SplitOptions{
-		Direction: direction,
-		Size:      tmux.SplitSize{Cells: cells},
-		Program:   tmux.Exec("sleep", "300"),
-	})
-	if err != nil {
-		t.Fatalf("Split for pane %s failed: %v", step.PaneID, err)
-	}
-
-	if err := newPane.SetTitle(ctx, string(step.Title)); err != nil {
-		t.Fatalf("SetTitle for split pane %s failed: %v", step.PaneID, err)
-	}
-
-	f.panes[step.PaneID] = newPane
-}
-
-func (f *structuralFixture) setPaneTitleStep(t *testing.T, ctx context.Context, step SetPaneTitleStep) {
-	t.Helper()
-
-	pane, ok := f.panes[step.PaneID]
-	if !ok {
-		t.Fatalf("pane %s not found for set-pane-title", step.PaneID)
-	}
-
-	if err := pane.SetTitle(ctx, string(step.Title)); err != nil {
-		t.Fatalf("SetTitle for pane %s failed: %v", step.PaneID, err)
-	}
-}
-
-func (f *structuralFixture) closeBootstrapStep(t *testing.T, ctx context.Context, step CloseBootstrapWindowStep) {
-	t.Helper()
-
-	bootLink, ok := f.bootstraps[step.SessionID]
-	if !ok {
-		t.Fatalf("bootstrap link for session %s not found to close", step.SessionID)
-	}
-
-	if err := bootLink.UnlinkWith(ctx, tmux.UnlinkOptions{Force: true}); err != nil {
-		t.Fatalf("closing bootstrap window for %s failed: %v", step.SessionID, err)
-	}
-
-	delete(f.bootstraps, step.SessionID)
-}
-
-func (f *structuralFixture) linkWindowStep(t *testing.T, ctx context.Context, step LinkWindowStep) {
-	t.Helper()
-
-	session, ok := f.sessions[step.SessionID]
-	if !ok {
-		t.Fatalf("session %s not found for link window %s", step.SessionID, step.WindowID)
-	}
-
-	win, ok := f.windows[step.WindowID]
-	if !ok {
-		t.Fatalf("window %s not found for link to session %s", step.WindowID, step.SessionID)
-	}
-
-	idx := step.Index
-	if _, err := win.Link(ctx, session, tmux.LinkOptions{Index: &idx}); err != nil {
-		t.Fatalf("LinkWindow %s to %s:%d failed: %v", step.WindowID, step.SessionID, idx, err)
-	}
-}
-
-func (f *structuralFixture) applyLayoutStep(t *testing.T, ctx context.Context, step ApplyLayoutStep) {
-	t.Helper()
-
-	win, ok := f.windows[step.WindowID]
-	if !ok {
-		t.Fatalf("window %s not found for apply-layout", step.WindowID)
-	}
-
-	paneMap := make(map[string]tmux.PaneID, len(f.panes))
-	for id, pane := range f.panes {
-		paneMap[id] = pane.ID()
-	}
-
-	encoded, err := itmux.EncodeLayout(step.Layout, paneMap)
-	if err != nil {
-		t.Fatalf("EncodeLayout failed for window %s: %v", step.WindowID, err)
-	}
-
-	if err := win.SelectLayout(ctx, encoded); err != nil {
-		t.Fatalf("SelectLayout for window %s failed with %q: %v", step.WindowID, encoded, err)
-	}
-}
-
-func (f *structuralFixture) selectPaneStep(t *testing.T, ctx context.Context, step SelectPaneStep) {
-	t.Helper()
-
-	pane, ok := f.panes[step.PaneID]
-	if !ok {
-		t.Fatalf("pane %s not found for select-pane", step.PaneID)
-	}
-
-	if err := pane.Select(ctx); err != nil {
-		t.Fatalf("Select pane %s failed: %v", step.PaneID, err)
-	}
-}
-
-func (f *structuralFixture) applyZoomStep(t *testing.T, ctx context.Context, step ApplyZoomStep) {
-	t.Helper()
-
-	pane, ok := f.panes[step.PaneID]
-	if !ok {
-		t.Fatalf("pane %s not found for zoom", step.PaneID)
-	}
-
-	if err := pane.ToggleZoom(ctx); err != nil {
-		t.Fatalf("ToggleZoom for pane %s failed: %v", step.PaneID, err)
-	}
-}
-
-func (f *structuralFixture) selectWindowStep(t *testing.T, ctx context.Context, step SelectWindowStep) {
-	t.Helper()
-
-	session, ok := f.sessions[step.SessionID]
-	if !ok {
-		t.Fatalf("session %s not found for select-window", step.SessionID)
-	}
-
-	_, links, err := session.WindowInfos(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if step.LastWindowID != "" && step.LastIndex >= 0 {
-		for _, link := range links {
-			if link.Index == step.LastIndex {
-				if err := link.Handle().Select(ctx); err != nil {
-					t.Fatalf("select last window %d failed: %v", step.LastIndex, err)
-				}
-
-				break
-			}
-		}
-	}
-
-	for _, link := range links {
-		if link.Index == step.ActiveIndex {
-			if err := link.Handle().Select(ctx); err != nil {
-				t.Fatalf("select active window %d failed: %v", step.ActiveIndex, err)
-			}
-
-			break
-		}
-	}
-}
-
-func (f *structuralFixture) assertRectangles(t *testing.T, ctx context.Context) {
-	t.Helper()
-
-	for id, want := range map[string][4]int{
+	target.assertPaneRectangles(t, ctx, map[string][4]int{
 		"p0": {0, 0, 39, 8}, "p1": {0, 9, 39, 15},
 		"p2": {40, 0, 40, 17}, "p3": {40, 18, 40, 6},
-	} {
-		info, err := f.panes[id].Info(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		got := [4]int{info.Left, info.Top, info.Width, info.Height}
-		if got != want {
-			t.Fatalf("pane %s: got rectangle %v, want %v", id, got, want)
-		}
-	}
+	})
 }
 
-func (f *structuralFixture) assertPaneRectangles(t *testing.T, ctx context.Context, want map[string][4]int) {
+func (target *restoredTarget) assertPaneRectangles(t *testing.T, ctx context.Context, want map[string][4]int) {
 	t.Helper()
 
 	for id, expected := range want {
-		pane, ok := f.panes[id]
+		pane, ok := target.panes[id]
 		if !ok {
-			t.Fatalf("pane %s missing from fixture", id)
+			t.Fatalf("pane %s was not restored", id)
 		}
 
 		info, err := pane.Info(ctx)
@@ -2114,11 +1785,13 @@ func TestStructuralRoundtripWorker(t *testing.T) {
 		t.Fatalf("worker: store.Open failed: %v", err)
 	}
 
-	defer func() { _ = repo.Close() }()
-
 	manifest, err := repo.Read(ctx, genID)
 	if err != nil {
 		t.Fatalf("worker: repo.Read(%s) failed: %v", genID, err)
+	}
+
+	if err := repo.Close(); err != nil {
+		t.Fatalf("worker: repo.Close failed: %v", err)
 	}
 
 	selectedIDs := make([]string, 0, len(selectedNames))
@@ -2144,10 +1817,7 @@ func TestStructuralRoundtripWorker(t *testing.T) {
 		t.Fatalf("worker: tmux.New failed: %v", err)
 	}
 
-	target := newStructuralFixture(targetServer, plan)
-	for _, step := range plan.Steps {
-		target.apply(t, ctx, step)
-	}
+	executeAndVerifyOnTarget(t, ctx, targetServer, repoRoot, genID, manifest, plan)
 }
 
 func TestActualSourceDestructionRoundtrip(t *testing.T) {

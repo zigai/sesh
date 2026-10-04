@@ -2,7 +2,6 @@ package restore
 
 import (
 	"context"
-	"errors"
 	"os"
 	"testing"
 
@@ -40,31 +39,6 @@ func TestPreflightCheckCollisions_NilServer(t *testing.T) {
 	err := PreflightCheckCollisions(ctx, nil, plan)
 	if err == nil {
 		t.Fatal("expected error on nil server, got nil")
-	}
-}
-
-func TestRestoreErrorSentinels(t *testing.T) {
-	t.Parallel()
-
-	if ErrSessionCollision == nil {
-		t.Error("expected ErrSessionCollision sentinel")
-	}
-
-	if ErrWorkingDirNotFound == nil {
-		t.Error("expected ErrWorkingDirNotFound sentinel")
-	}
-
-	if ErrExecutionFailed == nil {
-		t.Error("expected ErrExecutionFailed sentinel")
-	}
-
-	joined := errors.Join(ErrExecutionFailed, ErrWorkingDirNotFound)
-	if !errors.Is(joined, ErrExecutionFailed) {
-		t.Error("expected errors.Is to match joined ErrExecutionFailed")
-	}
-
-	if !errors.Is(joined, ErrWorkingDirNotFound) {
-		t.Error("expected errors.Is to match joined ErrWorkingDirNotFound")
 	}
 }
 

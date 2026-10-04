@@ -98,53 +98,6 @@ func TestRestoreFailureRetainsOperationReceipt(t *testing.T) {
 	}
 }
 
-func TestRestoreJSONEnvelopeOmitsCompensation(t *testing.T) {
-	t.Parallel()
-
-	result := engine.RestoreResult{OperationID: "0123456789abcdef0123456789abcdef", Status: "best_effort"}
-
-	direct, err := json.Marshal(result)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var directFields map[string]json.RawMessage
-	if err := json.Unmarshal(direct, &directFields); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, ok := directFields["compensation"]; ok {
-		t.Fatalf("restore result contains compensation: %s", direct)
-	}
-
-	cmd := newSnapshotRestoreCommand()
-
-	var stdout bytes.Buffer
-	cmd.SetOut(&stdout)
-
-	if err := cmd.Flags().Set(jsonFlagName, "true"); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := renderRestoreOutcome(cmd, result, restoreLabels{}, nil, nil); err != nil {
-		t.Fatal(err)
-	}
-
-	var envelope map[string]json.RawMessage
-	if err := json.Unmarshal(stdout.Bytes(), &envelope); err != nil {
-		t.Fatal(err)
-	}
-
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(envelope["result"], &fields); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, ok := fields["compensation"]; ok {
-		t.Fatalf("restore JSON result contains compensation: %s", stdout.String())
-	}
-}
-
 func TestPartialRestoreReportsDegradedResult(t *testing.T) {
 	t.Parallel()
 

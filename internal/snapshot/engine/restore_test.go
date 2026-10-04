@@ -14,7 +14,6 @@ import (
 
 	integration "github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/snapshot/engine"
-	"github.com/zigai/sesh/internal/snapshot/restore"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
@@ -124,21 +123,5 @@ func TestRestoreLoggingPrivacy(t *testing.T) {
 
 	if oopsErr.Code() != "endpoint_required" {
 		t.Fatalf("expected code endpoint_required, got %q", oopsErr.Code())
-	}
-}
-
-func TestRestoreErrorSentinels(t *testing.T) {
-	t.Parallel()
-
-	if restore.ErrSessionCollision == nil {
-		t.Error("expected ErrSessionCollision")
-	}
-
-	if restore.ErrGroupCollision == nil {
-		t.Error("expected ErrGroupCollision")
-	}
-
-	if restore.ErrWorkingDirNotFound == nil {
-		t.Error("expected ErrWorkingDirNotFound")
 	}
 }

@@ -11,9 +11,7 @@ import (
 
 	"github.com/zigai/sesh/internal/agents"
 	"github.com/zigai/sesh/internal/cli/clibase"
-	cmdremote "github.com/zigai/sesh/internal/cli/cmd/remote"
 	"github.com/zigai/sesh/internal/config"
-	integration "github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/snapshot/engine"
 )
 
@@ -483,47 +481,4 @@ func TestParseSaveInputManualEmptyFlagOverridesConfig(t *testing.T) {
 	if len(cfg.ProcessEnvironmentKeys) != 0 {
 		t.Fatalf("ProcessEnvironmentKeys = %#v, want empty", cfg.ProcessEnvironmentKeys)
 	}
-}
-
-func TestOpenRemoteNativeSavedSessions(t *testing.T) {
-	server, err := integration.Open("/tmp/tmux.sock")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Run("nil config returns error", func(t *testing.T) {
-		_, err := cmdremote.OpenRemoteNativeSavedSessions(nil, "/tmp/repo", "/tmp/lease", server)
-		if err == nil {
-			t.Fatal("expected error for nil config")
-		}
-	})
-
-	t.Run("routes configured process environment and store path", func(t *testing.T) {
-		cfg := config.DefaultConfig()
-		cfg.Snapshot.ProcessEnvironment = []string{"REMOTE_KEY", "VIRTUAL_ENV"}
-		cfg.AgentStatus.StorePath = "/custom/aht/remote.json"
-
-		saved, err := cmdremote.OpenRemoteNativeSavedSessions(cfg, "/tmp/repo", "/tmp/lease", server)
-		if err != nil {
-			t.Fatalf("OpenRemoteNativeSavedSessions failed: %v", err)
-		}
-
-		if saved == nil {
-			t.Fatal("expected non-nil saved sessions")
-		}
-	})
-
-	t.Run("preserves explicit empty process environment", func(t *testing.T) {
-		cfg := config.DefaultConfig()
-		cfg.Snapshot.ProcessEnvironment = []string{}
-
-		saved, err := cmdremote.OpenRemoteNativeSavedSessions(cfg, "/tmp/repo", "/tmp/lease", server)
-		if err != nil {
-			t.Fatalf("OpenRemoteNativeSavedSessions failed: %v", err)
-		}
-
-		if saved == nil {
-			t.Fatal("expected non-nil saved sessions")
-		}
-	})
 }

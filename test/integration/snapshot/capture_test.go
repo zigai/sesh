@@ -4,9 +4,11 @@ package snapshot_test
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/zigai/gotmux/tmux"
 	"github.com/zigai/gotmux/tmuxtest"
@@ -163,5 +165,32 @@ func assertCapturedClosure(t *testing.T, server *tmux.Server, first, second, thi
 
 	if !slices.ContainsFunc(m.Links, func(l model.Link) bool { return l.Index == 9 }) {
 		t.Fatal("lost sparse link")
+	}
+}
+
+func waitForCapture(t *testing.T, pane tmux.Pane, marker []byte) []byte {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		data, err := pane.Capture(ctx, tmux.CaptureOptions{IncludeEscapes: true, PreserveSpaces: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if bytes.Contains(data, marker) {
+			return data
+		}
+
+		select {
+		case <-ctx.Done():
+			t.Fatal("terminal helper did not become ready")
+		case <-ticker.C:
+		}
 	}
 }

@@ -158,3 +158,28 @@ func TestCaptureSharedWindowsAndGroupClosure(t *testing.T) {
 
 	assertCapturedClosure(t, server, first, second, third)
 }
+
+type observedPane struct {
+	Index  int
+	Width  int
+	Height int
+	Left   int
+	Top    int
+	Active bool
+}
+
+func observePanes(t *testing.T, window tmux.Window) []observedPane {
+	t.Helper()
+
+	panes, err := window.Panes(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result := make([]observedPane, 0, len(panes))
+	for _, pane := range panes {
+		result = append(result, observedPane{pane.Index, pane.Width, pane.Height, pane.Left, pane.Top, pane.Active})
+	}
+
+	return result
+}
