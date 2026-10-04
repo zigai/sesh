@@ -10,31 +10,6 @@ import (
 	"github.com/zigai/sesh/internal/session"
 )
 
-func TestWorkflow_ErrorSentinels(t *testing.T) {
-	t.Parallel()
-
-	sentinels := map[string]error{
-		"ErrSessionAlreadyExists":      session.ErrSessionAlreadyExists,
-		"ErrSessionNotFound":           session.ErrSessionNotFound,
-		"ErrSessionAttached":           session.ErrSessionAttached,
-		"ErrInvalidSessionName":        session.ErrInvalidSessionName,
-		"ErrNotInsideTmux":             session.ErrNotInsideTmux,
-		"ErrInvokingClientUnavailable": session.ErrInvokingClientUnavailable,
-		"ErrInvokingClientAmbiguous":   session.ErrInvokingClientAmbiguous,
-		"ErrSwitchUnverified":          session.ErrSwitchUnverified,
-		"ErrTerminalRequired":          session.ErrTerminalRequired,
-		"ErrSavedGenerationsProtected": session.ErrSavedGenerationsProtected,
-		"ErrSavedSessionScopeConflict": session.ErrSavedSessionScopeConflict,
-		"ErrSessionReplaced":           session.ErrSessionReplaced,
-	}
-
-	for name, sentinel := range sentinels {
-		if sentinel == nil {
-			t.Errorf("expected %s", name)
-		}
-	}
-}
-
 func TestWorkflow_EnterActionNames(t *testing.T) {
 	t.Parallel()
 

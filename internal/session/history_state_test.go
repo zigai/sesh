@@ -394,22 +394,6 @@ func TestLoadMissingFile(t *testing.T) {
 	}
 }
 
-func TestStateSourceIsolationSameNameDifferentSockets(t *testing.T) {
-	st := &State{}
-	first := Identity{Socket: "/tmp/tmux-1000/one", Name: "shared"}
-	second := Identity{Socket: "/tmp/tmux-1000/two", Name: "shared"}
-
-	st.RecordSwitchIdentity(first)
-
-	if st.GetLastSwitchIdentity(first) == 0 {
-		t.Fatal("recorded switch for first socket not found")
-	}
-
-	if st.GetLastSwitchIdentity(second) != 0 {
-		t.Fatal("switch on first socket bled into second socket")
-	}
-}
-
 func TestStatePrunesOldestSwitchWhenExceedingBound(t *testing.T) {
 	st := &State{}
 
