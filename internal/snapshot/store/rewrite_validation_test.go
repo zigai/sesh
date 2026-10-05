@@ -363,12 +363,12 @@ func checkRewriteCapacity(t *testing.T, empty bool) {
 		t.Fatal(err)
 	}
 
-	for len(catalog.Attempts)+len(catalog.Generations) < maxEntries-1 {
+	for len(catalog.Attempts) < maxEntries {
 		catalog.Sequence++
 		catalog.Attempts = append(catalog.Attempts, Attempt{ID: fmt.Sprintf("%032x", catalog.Sequence), Sequence: catalog.Sequence, State: "pending", Reason: "capture_pending"})
 	}
 
-	if err := r.publish(catalog); err != nil {
+	if err := r.publish(t.Context(), catalog, nil); err != nil {
 		t.Fatal(err)
 	}
 

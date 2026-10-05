@@ -145,7 +145,7 @@ func (r *Repository) removeSessionsLocked(ctx context.Context, id, source string
 }
 
 func (r *Repository) validateRewritePreconditions(catalog Catalog, source string) (Generation, error) {
-	if len(catalog.Attempts)+len(catalog.Generations)+len(catalog.Operations)+len(catalog.Rewrites)+1 > maxEntries {
+	if len(catalog.Rewrites)+1 > maxEntries {
 		return Generation{}, ErrCorrupt
 	}
 

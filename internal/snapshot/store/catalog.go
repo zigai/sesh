@@ -83,7 +83,8 @@ type Action struct {
 }
 
 func (c Catalog) validate() error {
-	if c.Version != catalogVersion || len(c.Attempts)+len(c.Generations)+len(c.Operations)+len(c.Rewrites) > maxEntries {
+	if c.Version != catalogVersion || len(c.Attempts) > maxEntries || len(c.Generations) > maxEntries ||
+		len(c.Operations) > maxEntries || len(c.Rewrites) > maxEntries {
 		return ErrCorrupt
 	}
 
