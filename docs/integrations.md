@@ -23,7 +23,7 @@ sesh snapshot restore
 
 ## Coding agents
 
-`sesh` tracks live coding agent panes using the Agent Host Tool (`aht`) registry.
+The picker displays live coding agent panes from the Agent Host Tool (`aht`) registry, preserving manual scroll position during updates.
 
 Install AHT v2.0.5 and enable the sesh integration:
 

@@ -1,8 +1,8 @@
 package tui
 
 import (
+	"bytes"
 	"context"
-	"io"
 	"strings"
 	"sync"
 	"testing"
@@ -10,6 +10,8 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/colorprofile"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/session"
@@ -31,6 +33,27 @@ func (m popupStartupTestModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	_, command := m.Model.Update(msg)
 
 	return m, command
+}
+
+type popupStartupOutput struct {
+	mu     sync.Mutex
+	buffer bytes.Buffer
+}
+
+func (o *popupStartupOutput) Write(p []byte) (int, error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	n, _ := o.buffer.Write(p)
+
+	return n, nil
+}
+
+func (o *popupStartupOutput) String() string {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	return o.buffer.String()
 }
 
 func TestPopupStartupShowsLoadingWhileInitialLoadIsBlocked(t *testing.T) {
@@ -60,8 +83,12 @@ func TestPopupStartupShowsLoadingWhileInitialLoadIsBlocked(t *testing.T) {
 			},
 		})
 		model.mode = modePopup
-		program := tea.NewProgram(popupStartupTestModel{Model: model}, tea.WithInput(nil), tea.WithOutput(io.Discard),
-			tea.WithoutRenderer(), tea.WithoutSignalHandler(), tea.WithWindowSize(80, 20))
+
+		var output popupStartupOutput
+
+		program := tea.NewProgram(popupStartupTestModel{Model: model}, tea.WithInput(nil), tea.WithOutput(&output),
+			tea.WithColorProfile(colorprofile.TrueColor), tea.WithEnvironment([]string{}),
+			tea.WithoutSignalHandler(), tea.WithWindowSize(80, 20))
 		done := make(chan error, 1)
 
 		go func() {
@@ -91,11 +118,19 @@ func TestPopupStartupShowsLoadingWhileInitialLoadIsBlocked(t *testing.T) {
 
 		synctest.Wait()
 
-		if view := readView(); view != "" {
-			t.Fatalf("initial popup view = %q, want blank during fast startup", view)
+		time.Sleep(20 * time.Millisecond)
+		synctest.Wait()
+
+		clears := strings.Count(output.String(), ansi.EraseEntireScreen)
+
+		time.Sleep(20 * time.Millisecond)
+		synctest.Wait()
+
+		if got := strings.Count(output.String(), ansi.EraseEntireScreen); got != clears {
+			t.Fatalf("unchanged startup cleared the screen again: %d clears, previously %d", got, clears)
 		}
 
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(160 * time.Millisecond)
 		synctest.Wait()
 
 		view := readView()
