@@ -203,7 +203,7 @@ func TestResolvePopupClientSelection(t *testing.T) {
 
 	origin := pickerOriginSession(t, server)
 
-	conn, err := server.OpenControl(ctx, origin.Handle(), gotmux.ControlOptions{})
+	conn, err := server.OpenControl(ctx, origin.Handle().ID(), gotmux.ControlOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

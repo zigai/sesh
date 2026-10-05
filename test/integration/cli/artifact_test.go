@@ -22,8 +22,8 @@ import (
 )
 
 const (
-	artifactExpectedGotmuxVersion = "v0.6.0"
-	artifactExpectedGotmuxSum     = "h1:IlJDh5mmJFjeAM/PenK5y8fDQFA5fTdxwqcyXEtUJoE="
+	artifactExpectedGotmuxVersion = "v0.7.0"
+	artifactExpectedGotmuxSum     = "h1:6iHXMIetYWfc64XtGfHavAPlHPOJZuhJeB2Ht7f8AAU="
 	exitCodeGeneral               = 1
 	jsonSchemaVersion             = 1
 )

@@ -244,7 +244,7 @@ func TestAutosaveEnsureDefaultSessionAdoptsScratchSession(t *testing.T) {
 		t.Fatalf("CreateBootstrapSession failed: %v", err)
 	}
 
-	connection, err := server.OpenControl(t.Context(), scratch, gotmux.ControlOptions{})
+	connection, err := server.OpenControl(t.Context(), scratch.ID(), gotmux.ControlOptions{})
 	if err != nil {
 		t.Fatalf("OpenControl failed: %v", err)
 	}
@@ -282,7 +282,7 @@ func TestAutosaveEnsureDefaultSessionProtectsUserNumberedSession(t *testing.T) {
 	server := tmuxtest.NewServer(t)
 	userSession := newNumberedSession(t, server, "1")
 
-	connection, err := server.OpenControl(t.Context(), userSession, gotmux.ControlOptions{})
+	connection, err := server.OpenControl(t.Context(), userSession.ID(), gotmux.ControlOptions{})
 	if err != nil {
 		t.Fatalf("OpenControl failed: %v", err)
 	}
