@@ -290,3 +290,173 @@ func TestReadPracticalCurrentPrefersCompleteCurrent(t *testing.T) {
 		t.Fatalf("practical current view = %v, %v", got, err)
 	}
 }
+
+func assertListingMatchesPracticalCurrent(t *testing.T, r *Repository, path string) {
+	t.Helper()
+
+	var want Listing
+
+	generation, manifest, wantErr := r.ReadPracticalCurrent(t.Context())
+	if wantErr == nil {
+		want = listingFromManifest(generation, manifest)
+	}
+
+	view := openView(t, path)
+	for name, read := range map[string]func(context.Context) (Listing, error){
+		"repository": r.ReadCurrentListing,
+		"view":       view.ReadCurrentListing,
+	} {
+		got, err := read(t.Context())
+		for _, class := range []error{ErrUnavailable, ErrRecoveryRequired, ErrCorrupt} {
+			if errors.Is(wantErr, class) != errors.Is(err, class) {
+				t.Fatalf("%s listing error = %v, practical current error = %v", name, err, wantErr)
+			}
+		}
+
+		if (wantErr == nil) != (err == nil) {
+			t.Fatalf("%s listing error = %v, practical current error = %v", name, err, wantErr)
+		}
+
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Fatalf("%s listing differs from practical current:\n%s", name, diff)
+		}
+	}
+}
+
+func TestCurrentListingFollowsEveryCatalogTransition(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "repository")
+	r := openRepository(t, path)
+	assertListingMatchesPracticalCurrent(t, r, path)
+
+	commitFixture(t, r)
+	assertListingMatchesPracticalCurrent(t, r, path)
+
+	attempt, err := r.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertListingMatchesPracticalCurrent(t, r, path)
+
+	if err := r.Fail(t.Context(), attempt.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	assertListingMatchesPracticalCurrent(t, r, path)
+
+	source := commitMultiSessionFixture(t, r)
+	assertListingMatchesPracticalCurrent(t, r, path)
+
+	if _, err := r.RemoveSessions(t.Context(), newID(), source.ID, []string{"s0"}); err != nil {
+		t.Fatal(err)
+	}
+
+	assertListingMatchesPracticalCurrent(t, r, path)
+
+	complete := commitCompleteFixture(t, r)
+	assertListingMatchesPracticalCurrent(t, r, path)
+
+	if _, err := r.Begin(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	assertListingMatchesPracticalCurrent(t, r, path)
+
+	if _, err := r.RemoveSessions(t.Context(), newID(), complete.ID, []string{"s0"}); err != nil {
+		t.Fatal(err)
+	}
+
+	assertListingMatchesPracticalCurrent(t, r, path)
+}
+
+func TestOpenRepairsCurrentStateInterruptedAfterCatalogPublication(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "repository")
+	r := openRepository(t, path)
+	prior := commitFixture(t, r)
+
+	attempt, err := r.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r.fault = func(phase string) error {
+		if phase == faultCatalogReplaced {
+			return errInjected
+		}
+
+		return nil
+	}
+
+	m, artifacts := snapshotFixture()
+	if _, err := r.Commit(t.Context(), attempt.ID, m, artifacts); !errors.Is(err, errInjected) {
+		t.Fatalf("commit = %v, want injected fault", err)
+	}
+
+	r.fault = nil
+
+	stale, err := openView(t, path).ReadCurrentListing(t.Context())
+	if err != nil || stale.Generation != prior {
+		t.Fatalf("interrupted publication listing = %v, %v; want the prior generation %v", stale.Generation, err, prior)
+	}
+
+	assertListingMatchesPracticalCurrent(t, openRepository(t, path), path)
+}
+
+func TestOpenRestoresMissingOrDamagedCurrentState(t *testing.T) {
+	unavailable := `{"version":1,"status":"unavailable","listing":{"generation":{"id":"","sequence":0,"manifestSha256":"","complete":false},"started":0,"finished":0,"sessions":[]}}`
+
+	for name, damage := range map[string]func(string) error{
+		"missing":   os.Remove,
+		"truncated": func(file string) error { return os.WriteFile(file, []byte(`{"version":1,`), 0o600) },
+		"stale":     func(file string) error { return os.WriteFile(file, []byte(unavailable), 0o600) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "repository")
+			r := openRepository(t, path)
+			generation := commitFixture(t, r)
+
+			if err := damage(filepath.Join(path, currentStateName)); err != nil {
+				t.Fatal(err)
+			}
+
+			if listing, err := openView(t, path).ReadCurrentListing(t.Context()); err == nil && listing.Generation == generation {
+				t.Fatal("damage did not change the published current state")
+			}
+
+			assertListingMatchesPracticalCurrent(t, openRepository(t, path), path)
+		})
+	}
+}
+
+func TestUnreadableCurrentGenerationDoesNotBlockSaves(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "repository")
+	r := openRepository(t, path)
+	generation := commitFixture(t, r)
+
+	corruptArtifact(t, filepath.Join(path, "generations", generation.ID, "artifacts", "a0.bin.gz"), "tampered")
+
+	if err := os.Remove(filepath.Join(path, currentStateName)); err != nil {
+		t.Fatal(err)
+	}
+
+	reopened := openRepository(t, path)
+	if _, err := openView(t, path).ReadCurrentListing(t.Context()); !errors.Is(err, ErrCorrupt) {
+		t.Fatalf("unreadable current generation listing: %v, want ErrCorrupt", err)
+	}
+
+	attempt, err := reopened.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := reopened.Fail(t.Context(), attempt.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	next := commitFixture(t, reopened)
+
+	listing, err := openView(t, path).ReadCurrentListing(t.Context())
+	if err != nil || listing.Generation != next {
+		t.Fatalf("listing after a new save = %v, %v; want %v", listing.Generation, err, next)
+	}
+}

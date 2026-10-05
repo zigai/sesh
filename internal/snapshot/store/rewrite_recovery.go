@@ -127,7 +127,7 @@ func (r *Repository) resumeRetiredRewriteLocked(ctx context.Context, catalog Cat
 		return emptyRewriteResult(existing.ID, existing.Source, existing.State), errors.Join(ErrRecoveryRequired, err)
 	}
 
-	if err := r.publish(committed); err != nil {
+	if err := r.publish(ctx, committed, nil); err != nil {
 		return emptyRewriteResult(existing.ID, existing.Source, ""), errors.Join(ErrRecoveryRequired, err)
 	}
 
@@ -162,7 +162,7 @@ func (r *Repository) resumeReplacementRewriteLocked(ctx context.Context, catalog
 		return emptyRewriteResult(existing.ID, existing.Source, rewriteStatePending), errors.Join(ErrRecoveryRequired, err)
 	}
 
-	if err := r.publish(committed); err != nil {
+	if err := r.publish(ctx, committed, nil); err != nil {
 		return emptyRewriteResult(existing.ID, existing.Source, ""), errors.Join(ErrRecoveryRequired, err)
 	}
 

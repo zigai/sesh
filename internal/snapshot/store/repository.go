@@ -179,7 +179,7 @@ func (r *Repository) change(ctx context.Context, change func(*Catalog) error) er
 		return oops.In("snapshot.store").With("operation", "publish_catalog").Wrapf(err, "publish catalog")
 	}
 
-	return r.publish(catalog)
+	return r.publish(ctx, catalog, nil)
 }
 
 func (r *Repository) catalog() (Catalog, error) {
@@ -200,8 +200,13 @@ func (r *Repository) catalog() (Catalog, error) {
 	return catalog, nil
 }
 
-func (r *Repository) publish(catalog Catalog) error {
+func (r *Repository) publish(ctx context.Context, catalog Catalog, committed *Listing) error {
 	data, err := encodeCatalog(catalog)
+	if err != nil {
+		return err
+	}
+
+	current, err := r.stageCurrentState(ctx, catalog, committed)
 	if err != nil {
 		return err
 	}
@@ -221,6 +226,16 @@ func (r *Repository) publish(catalog Catalog) error {
 
 	if err := r.boundary("catalog_replaced"); err != nil {
 		return errors.Join(ErrUncertain, err)
+	}
+
+	if current != "" {
+		if err := r.root.Rename(current, r.root, currentStateName); err != nil {
+			return errors.Join(ErrUncertain, oops.In("snapshot.store").With("operation", "publish_current_state").Wrapf(err, "publish current state"))
+		}
+
+		if err := r.boundary("current_replaced"); err != nil {
+			return errors.Join(ErrUncertain, err)
+		}
 	}
 
 	if err := r.root.Sync(); err != nil {

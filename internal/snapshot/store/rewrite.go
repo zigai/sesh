@@ -190,7 +190,7 @@ func (r *Repository) executeRewrite(ctx context.Context, catalog Catalog, id, so
 		return emptyRewriteResult(id, source, ""), err
 	}
 
-	if err := r.publish(catalog); err != nil {
+	if err := r.publish(ctx, catalog, nil); err != nil {
 		return emptyRewriteResult(id, source, ""), err
 	}
 
@@ -208,7 +208,7 @@ func (r *Repository) executeRewrite(ctx context.Context, catalog Catalog, id, so
 		return emptyRewriteResult(id, source, rewriteStatePending), errors.Join(ErrRecoveryRequired, err)
 	}
 
-	if err := r.publish(committed); err != nil {
+	if err := r.publish(ctx, committed, nil); err != nil {
 		return emptyRewriteResult(id, source, ""), errors.Join(ErrRecoveryRequired, err)
 	}
 

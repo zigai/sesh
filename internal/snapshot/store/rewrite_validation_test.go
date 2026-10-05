@@ -184,7 +184,7 @@ func TestRewriteSequenceExhaustionHasNoEffects(t *testing.T) {
 	}
 
 	catalog.Sequence = ^uint64(0)
-	if err := r.publish(catalog); err != nil {
+	if err := r.publish(t.Context(), catalog, nil); err != nil {
 		t.Fatal(err)
 	}
 

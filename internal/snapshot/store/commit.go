@@ -80,7 +80,8 @@ func (r *Repository) commitLocked(ctx context.Context, id string, manifest model
 		catalog.Current = id
 	}
 
-	if err := r.publish(catalog); err != nil {
+	listing := listingFromManifest(generation, manifest)
+	if err := r.publish(ctx, catalog, &listing); err != nil {
 		return generation, err
 	}
 

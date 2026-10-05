@@ -193,6 +193,47 @@ func TestCatalogPrefersInvokingPaneForCurrentAgentSelection(t *testing.T) {
 	t.Fatal("current session missing from catalog")
 }
 
+func TestCatalogIgnoresInvokingPaneFromAnotherSession(t *testing.T) {
+	server := tmuxtest.NewServer(t)
+	ctx := t.Context()
+
+	first, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "first"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	second, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "second"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	firstPanes, err := first.Panes(ctx)
+	if err != nil || len(firstPanes) == 0 {
+		t.Fatalf("first panes: %v", err)
+	}
+
+	foreign := string(firstPanes[0].ID)
+
+	result, err := session.ListCatalog(ctx, session.CatalogOptions{
+		Server: server, CurrentPane: foreign, CurrentSessionID: string(second.ID()),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, row := range result.Sessions {
+		if row.ID == string(second.ID()) {
+			if !row.IsCurrent || row.ActivePaneID == foreign {
+				t.Fatalf("current row = %+v, want hinted session without foreign pane %s", row, foreign)
+			}
+
+			return
+		}
+	}
+
+	t.Fatal("hinted session missing from catalog")
+}
+
 func TestCatalogLiveObservationKilledServer(t *testing.T) {
 	server := tmuxtest.NewServer(t)
 

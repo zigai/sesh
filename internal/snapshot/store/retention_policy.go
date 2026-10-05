@@ -123,7 +123,7 @@ func (r *Repository) retainPolicyLocked(ctx context.Context, now time.Time, poli
 		return RetentionResult{}, oops.In("snapshot.store").With("operation", "publish_catalog").Wrapf(err, "publish catalog")
 	}
 
-	if err := r.publish(catalog); err != nil {
+	if err := r.publish(ctx, catalog, nil); err != nil {
 		return RetentionResult{}, err
 	}
 
