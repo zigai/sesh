@@ -55,6 +55,10 @@ type CatalogSource interface {
 	LoadCatalog(ctx context.Context) (session.CatalogResult, error)
 }
 
+type InitialLoadFinisher interface {
+	FinishInitialLoad()
+}
+
 type TmuxDetector interface {
 	TmuxIsInsideTmux() bool
 }
@@ -90,14 +94,20 @@ type SnapshotService interface {
 	SnapshotSession(ctx context.Context, target session.Session) error
 }
 
+type AgentSnapshot struct {
+	Summaries     []session.AgentSummary
+	Panes         []PaneLocation
+	PanesObserved bool
+}
+
 type AgentSource interface {
-	LoadAgentSummaries(ctx context.Context) ([]session.AgentSummary, error)
+	LoadAgentSummaries(ctx context.Context) (AgentSnapshot, error)
 }
 
 type AgentWatcher interface {
 	WatchAgentSummaries(
 		ctx context.Context,
-		publish func(revision uint64, summaries []session.AgentSummary, err error) error,
+		publish func(revision uint64, snapshot AgentSnapshot, err error) error,
 	) error
 }
 

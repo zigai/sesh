@@ -526,7 +526,7 @@ func (m *Model) Init() tea.Cmd {
 	}
 
 	if m.config.AgentSessions.Enabled && m.config.AgentSessions.PopupCounts {
-		commands = append(commands, m.loadAgentSummariesCommand(), m.agentSummaryTickCommand())
+		commands = append(commands, m.agentSummaryTickCommand())
 	}
 
 	commands = append(commands, m.agentClockTickCommand(), m.agentGitTickCommand())

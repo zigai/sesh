@@ -17,6 +17,7 @@ import (
 	"github.com/samber/oops"
 	"github.com/zigai/aht/v2/pkg/aht"
 	gotmux "github.com/zigai/gotmux/tmux"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/zigai/sesh/internal/agents"
 	"github.com/zigai/sesh/internal/config"
@@ -59,6 +60,9 @@ type pickerServices struct {
 	historyPath      string
 	agentStore       agents.SnapshotSource
 	sessionNames     pickerTranscriptNameCache
+	titles           pickerTitleCache
+	panes            singleflight.Group
+	initialReads     *pickerInitialReads
 	workflow         *session.Workflow
 	remote           RemoteServices
 	viewsMu          sync.Mutex
@@ -167,6 +171,9 @@ func newPickerServices(
 		historyPath:      historyPath,
 		agentStore:       agents.NewAHTStore(resolvedAgentStatePath),
 		sessionNames:     pickerTranscriptNameCache{mu: sync.Mutex{}, cache: nil},
+		titles:           pickerTitleCache{mu: sync.Mutex{}, cache: nil, inflight: singleflight.Group{}},
+		panes:            singleflight.Group{},
+		initialReads:     nil,
 		workflow:         workflow,
 		remote:           remote,
 		viewsMu:          sync.Mutex{},
@@ -175,6 +182,37 @@ func newPickerServices(
 }
 
 func (s *pickerServices) Close() error {
+	var readsErr error
+	if s.initialReads != nil {
+		readsErr = s.initialReads.finish()
+	}
+
+	return errors.Join(readsErr, s.closeRepository())
+}
+
+func (s *pickerServices) startInitialReads(ctx context.Context) {
+	if s.currentSessionID == "" {
+		return
+	}
+
+	s.initialReads = openPickerInitialReads(ctx, s.server, s.currentSessionID)
+}
+
+func (s *pickerServices) FinishInitialLoad() {
+	if s.initialReads != nil {
+		s.initialReads.release()
+	}
+}
+
+func (s *pickerServices) readTmux(ctx context.Context, query func(*gotmux.Server) error) error {
+	if s.initialReads == nil {
+		return query(s.server)
+	}
+
+	return s.initialReads.read(ctx, s.server, query)
+}
+
+func (s *pickerServices) closeRepository() error {
 	s.repoMu.Lock()
 	defer s.repoMu.Unlock()
 
@@ -263,13 +301,21 @@ func (s *pickerServices) LoadCatalog(ctx context.Context) (session.CatalogResult
 }
 
 func (s *pickerServices) listCatalog(ctx context.Context, saved session.SavedSnapshots) (session.CatalogResult, error) {
-	result, err := session.ListCatalog(ctx, session.CatalogOptions{
-		Server:           s.server,
-		Repository:       saved,
-		RepositorySource: s.repositoryPath,
-		GenerationID:     "",
-		CurrentPane:      s.currentPane,
-		CurrentSessionID: s.currentSessionID,
+	var result session.CatalogResult
+
+	err := s.readTmux(ctx, func(server *gotmux.Server) error {
+		var listErr error
+
+		result, listErr = session.ListCatalog(ctx, session.CatalogOptions{
+			Server:           server,
+			Repository:       saved,
+			RepositorySource: s.repositoryPath,
+			GenerationID:     "",
+			CurrentPane:      s.currentPane,
+			CurrentSessionID: s.currentSessionID,
+		})
+
+		return listErr
 	})
 	if err != nil {
 		// Partial results keep live sessions visible when the saved repository cannot be read.
@@ -483,7 +529,28 @@ func (s *pickerServices) activatePane(ctx context.Context, target session.Sessio
 }
 
 func (s *pickerServices) TmuxPaneLocations(ctx context.Context) ([]tui.PaneLocation, error) {
-	panes, err := agents.ObservePanes(ctx, s.server)
+	value, err, _ := s.panes.Do("panes", func() (any, error) {
+		return s.observePaneLocations(ctx)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	locations, _ := value.([]tui.PaneLocation)
+
+	return locations, nil
+}
+
+func (s *pickerServices) observePaneLocations(ctx context.Context) ([]tui.PaneLocation, error) {
+	var panes []agents.PaneLocation
+
+	err := s.readTmux(ctx, func(server *gotmux.Server) error {
+		var observeErr error
+
+		panes, observeErr = agents.ObservePanes(ctx, server)
+
+		return observeErr
+	})
 	if err != nil {
 		return nil, oops.In("cli").With("operation", "observe_picker_panes").Wrap(err)
 	}
@@ -549,38 +616,54 @@ func (s *pickerServices) SnapshotSession(ctx context.Context, target session.Ses
 	return nil
 }
 
-func (s *pickerServices) LoadAgentSummaries(ctx context.Context) ([]session.AgentSummary, error) {
+func (s *pickerServices) LoadAgentSummaries(ctx context.Context) (tui.AgentSnapshot, error) {
 	observed, err := agents.LoadLiveAgents(ctx, s.agentStore)
 	if err != nil {
-		return nil, oops.In("cli").With("operation", "load_picker_agents").Wrap(err)
+		return tui.AgentSnapshot{}, oops.In("cli").With("operation", "load_picker_agents").Wrap(err)
 	}
 
-	summaries := pickerAgentSummaries(observed)
-	s.sessionNames.annotateInventory(ctx, summaries)
-	annotatePickerNativeTitles(ctx, observed, summaries)
-
-	return summaries, nil
+	return s.agentSnapshot(ctx, observed), nil
 }
 
 func (s *pickerServices) WatchAgentSummaries(
 	ctx context.Context,
-	publish func(revision uint64, summaries []session.AgentSummary, err error) error,
+	publish func(revision uint64, snapshot tui.AgentSnapshot, err error) error,
 ) error {
 	var filter aht.Filter
 
 	err := s.agentStore.Watch(ctx, filter, func(snapshot aht.StateSnapshot) error {
-		observed := agents.ObservedAgentSessions(snapshot.Sessions)
-		summaries := pickerAgentSummaries(observed)
-		s.sessionNames.annotateInventory(ctx, summaries)
-		annotatePickerNativeTitles(ctx, observed, summaries)
-
-		return publish(snapshot.Revision, summaries, nil)
+		return publish(snapshot.Revision, s.agentSnapshot(ctx, agents.ObservedAgentSessions(snapshot.Sessions)), nil)
 	})
 	if err != nil {
 		return oops.In("cli").With("operation", "watch_picker_agents").Wrap(err)
 	}
 
 	return nil
+}
+
+func (s *pickerServices) agentSnapshot(ctx context.Context, observed []agents.AgentSession) tui.AgentSnapshot {
+	var (
+		panes    []tui.PaneLocation
+		panesErr error
+		observer sync.WaitGroup
+	)
+
+	if len(observed) > 0 {
+		observer.Go(func() {
+			paneCtx, cancel := context.WithTimeout(ctx, time.Second)
+			defer cancel()
+
+			panes, panesErr = s.TmuxPaneLocations(paneCtx)
+		})
+	}
+
+	summaries := pickerAgentSummaries(observed)
+	s.sessionNames.annotateInventory(ctx, summaries)
+	s.titles.annotate(ctx, observed, summaries)
+
+	observer.Wait()
+
+	return tui.AgentSnapshot{Summaries: summaries, Panes: panes, PanesObserved: len(observed) > 0 && panesErr == nil}
 }
 
 func pickerAgentSummaries(observed []agents.AgentSession) []session.AgentSummary {

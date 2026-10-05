@@ -325,15 +325,39 @@ func (adapter *testServiceAdapter) SnapshotSession(ctx context.Context, target s
 	return nil
 }
 
-func (adapter *testServiceAdapter) LoadAgentSummaries(ctx context.Context) ([]session.AgentSummary, error) {
-	return adapter.deps.LoadAgentSummaries(ctx)
+func (adapter *testServiceAdapter) LoadAgentSummaries(ctx context.Context) (AgentSnapshot, error) {
+	summaries, err := adapter.deps.LoadAgentSummaries(ctx)
+	if err != nil {
+		return AgentSnapshot{Summaries: nil, Panes: nil, PanesObserved: false}, err
+	}
+
+	return adapter.agentSnapshot(ctx, summaries), nil
 }
 
 func (adapter *testServiceAdapter) WatchAgentSummaries(
 	ctx context.Context,
-	yield func(uint64, []session.AgentSummary, error) error,
+	yield func(uint64, AgentSnapshot, error) error,
 ) error {
-	return adapter.deps.WatchAgentSummaries(ctx, yield)
+	return adapter.deps.WatchAgentSummaries(ctx, func(revision uint64, summaries []session.AgentSummary, err error) error {
+		if err != nil {
+			return yield(revision, AgentSnapshot{Summaries: summaries, Panes: nil, PanesObserved: false}, err)
+		}
+
+		return yield(revision, adapter.agentSnapshot(ctx, summaries), nil)
+	})
+}
+
+func (adapter *testServiceAdapter) agentSnapshot(ctx context.Context, summaries []session.AgentSummary) AgentSnapshot {
+	snapshot := AgentSnapshot{Summaries: summaries, Panes: nil, PanesObserved: false}
+	if len(summaries) == 0 || adapter.deps.OmitPanes {
+		return snapshot
+	}
+
+	panes, err := adapter.deps.TmuxPaneLocations(ctx)
+	snapshot.Panes = panes
+	snapshot.PanesObserved = err == nil
+
+	return snapshot
 }
 
 func (adapter *testServiceAdapter) LoadRemoteCatalog() (RemoteCatalog, error) {

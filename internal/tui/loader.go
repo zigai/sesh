@@ -208,28 +208,20 @@ func loadAgentSummaries(
 		return nil, nil
 	}
 
-	summaries, err := deps.Agents.LoadAgentSummaries(ctx)
+	snapshot, err := deps.Agents.LoadAgentSummaries(ctx)
 	if err != nil {
 		return nil, oops.In("tui").Code("load_agents_failed").With("operation", "load_agent_summaries").Wrap(err)
 	}
 
-	return observeAgentSummaryPanes(ctx, deps, summaries), nil
+	return liveAgentSummaries(snapshot), nil
 }
 
-func observeAgentSummaryPanes(ctx context.Context, deps Services, summaries []session.AgentSummary) []session.AgentSummary {
-	if len(summaries) == 0 || deps.Panes == nil {
-		return summaries
+func liveAgentSummaries(snapshot AgentSnapshot) []session.AgentSummary {
+	if len(snapshot.Summaries) == 0 || !snapshot.PanesObserved {
+		return snapshot.Summaries
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, time.Second)
-	defer cancel()
-
-	panes, err := deps.Panes.TmuxPaneLocations(ctx)
-	if err != nil {
-		return summaries
-	}
-
-	return pruneAgentsWithVanishedPanes(summaries, panes)
+	return pruneAgentsWithVanishedPanes(snapshot.Summaries, snapshot.Panes)
 }
 
 func agentSummariesEnabled(cfg *config.Config, deps Services) bool {
@@ -812,6 +804,9 @@ func (m *Model) loadInitialSessionsCommand() tea.Cmd {
 		defer m.lifecycle.EndWorker()
 
 		result := loadInitialSessionRows(ctx, cfg, deps)
+		if finisher, ok := deps.Catalog.(InitialLoadFinisher); ok {
+			finisher.FinishInitialLoad()
+		}
 
 		result.remoteObservation = remoteObservation
 
@@ -877,7 +872,6 @@ func (m *Model) startAgentSummaryWatchCommand() tea.Cmd {
 
 	m.agentSummaryWatchStarted = true
 	watcher := m.deps.AgentWatcher
-	deps := m.deps
 	updates := m.agentSummaryUpdates
 	ctx := m.operationContext()
 	pollAvailable := m.agentSummaryRefreshEnabled()
@@ -888,9 +882,10 @@ func (m *Model) startAgentSummaryWatchCommand() tea.Cmd {
 		}
 		defer m.lifecycle.EndWorker()
 
-		watchErr := watcher.WatchAgentSummaries(ctx, func(revision uint64, summaries []session.AgentSummary, err error) error {
+		watchErr := watcher.WatchAgentSummaries(ctx, func(revision uint64, snapshot AgentSnapshot, err error) error {
+			summaries := snapshot.Summaries
 			if err == nil {
-				summaries = observeAgentSummaryPanes(ctx, deps, summaries)
+				summaries = liveAgentSummaries(snapshot)
 			}
 
 			select {
