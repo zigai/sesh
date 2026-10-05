@@ -28,8 +28,10 @@ func TestAgentRowsUseCompactStatusAcrossWholeColumn(t *testing.T) {
 
 	var specs []rowlayout.ColumnSpec
 
+	var values sessionFormatValues
+
 	for _, agent := range row.Agents {
-		left, _, values := model.agentLayoutCells(table, row, agent, false)
+		left, _ := model.agentLayoutCells(table, row, agent, false, &values)
 		if specs == nil {
 			specs = agentColumnSpecs(left)
 		}
@@ -65,7 +67,9 @@ func TestAgentRowsPreserveProviderStyleRole(t *testing.T) {
 		},
 	})
 
-	left, _, values := model.agentLayoutCells(sessionTableLayout{now: time.Unix(1, 0)}, row, agent, true)
+	var values sessionFormatValues
+
+	left, _ := model.agentLayoutCells(sessionTableLayout{now: time.Unix(1, 0)}, row, agent, true, &values)
 
 	cells := agentCells(values, left)
 	if len(cells) != 1 || cells[0].Text != "failing" || cells[0].Role != "error" {
@@ -85,14 +89,16 @@ func TestSpinnerTracksAgentStatusAcrossStatusStyles(t *testing.T) {
 			row := session.Session{Agents: []session.AgentSession{agent}}
 			table := sessionTableLayout{now: time.Unix(1, 0)}
 
-			left, _, _ := model.agentLayoutCells(table, row, agent, true)
+			var values sessionFormatValues
+
+			left, _ := model.agentLayoutCells(table, row, agent, true, &values)
 			if len(left) != 1 || left[0].Value == "" || left[0].State != rowlayout.Present {
 				t.Fatalf("running spinner = %+v", left)
 			}
 
 			agent.Status = session.AgentStatusIdle
 
-			left, _, _ = model.agentLayoutCells(table, row, agent, true)
+			left, _ = model.agentLayoutCells(table, row, agent, true, &values)
 			if len(left) != 1 || left[0].Value != "" || left[0].State != rowlayout.Absent {
 				t.Fatalf("idle spinner = %+v", left)
 			}

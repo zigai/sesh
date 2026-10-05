@@ -149,8 +149,12 @@ func (m *Model) formattedSessionLine(
 	hasAgent bool,
 	isLastAgent bool,
 	tableLayout sessionTableLayout,
+	values *sessionFormatValues,
 ) display.Line {
-	template, values := m.sessionRowFormatter(row, agent, hasAgent, isLastAgent, tableLayout)
+	var template display.Template
+
+	template, *values = m.sessionRowFormatter(row, agent, hasAgent, isLastAgent, tableLayout)
+
 	return template.Render(values)
 }
 
@@ -185,9 +189,13 @@ func (m *Model) sessionRowFormatter(
 func (m *Model) sessionFormatRightColumnWidth(tableLayout sessionTableLayout) int {
 	width := 0
 
+	var template display.Template
+
+	var values sessionFormatValues
+
 	for _, row := range m.filtered {
-		template, values := m.sessionRowFormatter(row, emptyAgentSession(), false, false, tableLayout)
-		width = max(width, display.MeasureRight(template, values, lipgloss.Width))
+		template, values = m.sessionRowFormatter(row, emptyAgentSession(), false, false, tableLayout)
+		width = max(width, display.MeasureRight(template, &values, lipgloss.Width))
 	}
 
 	return width

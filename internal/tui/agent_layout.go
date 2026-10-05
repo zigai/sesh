@@ -52,11 +52,17 @@ func (m *Model) measureAgentRows(table sessionTableLayout) agentRowMeasurements 
 
 	var rows [][]rowlayout.Cell
 
+	var values *sessionFormatValues
+
 	rightStart := 0
 
 	for _, row := range m.filtered {
 		for index, agent := range row.Agents {
-			left, right, values := m.agentLayoutCells(table, row, agent, index == len(row.Agents)-1)
+			if values == nil {
+				values = new(sessionFormatValues)
+			}
+
+			left, right := m.agentLayoutCells(table, row, agent, index == len(row.Agents)-1, values)
 			if len(rows) == 0 {
 				specs = append(specs, agentColumnSpecs(left)...)
 				specs = append(specs, agentSpacerSpec())
@@ -64,9 +70,9 @@ func (m *Model) measureAgentRows(table sessionTableLayout) agentRowMeasurements 
 				rightStart = len(left) + 1
 			}
 
-			cells := agentCells(values, left)
+			cells := agentCells(*values, left)
 			cells = append(cells, rowlayout.Cell{Text: " ", Role: "", Variants: nil, State: rowlayout.Present})
-			cells = append(cells, agentCells(values, right)...)
+			cells = append(cells, agentCells(*values, right)...)
 			rows = append(rows, cells)
 		}
 	}
@@ -94,13 +100,16 @@ func (m *Model) planAgentRows(table sessionTableLayout, measured agentRowMeasure
 	return agentTableLayout{plan: plan, theme: m.agentLayoutTheme(), rightStart: measured.rightStart, valid: true}
 }
 
-func (m *Model) agentLayoutCells(table sessionTableLayout, row session.Session, agent session.AgentSession, last bool) ([]display.Part, []display.Part, sessionFormatValues) {
+func (m *Model) agentLayoutCells(table sessionTableLayout, row session.Session, agent session.AgentSession, last bool, values *sessionFormatValues) ([]display.Part, []display.Part) {
 	table.rightWidth = 0
 	table.agentAgeWidth = 0
-	template, values := m.sessionRowFormatter(row, agent, true, last, table)
+
+	var template display.Template
+
+	template, *values = m.sessionRowFormatter(row, agent, true, last, table)
 	line := template.Render(values)
 
-	return line.Left, line.Right, values
+	return line.Left, line.Right
 }
 
 func agentColumnSpecs(parts []display.Part) []rowlayout.ColumnSpec {
@@ -296,11 +305,11 @@ func isGitPart(part display.Part) bool {
 	return ok && info.Provider == display.ProviderGit
 }
 
-func (m *Model) writePlannedAgentRow(out *strings.Builder, table sessionTableLayout, styles sessionRowStyles, row session.Session, agent session.AgentSession, last, selected bool) {
-	leftParts, rightParts, values := m.agentLayoutCells(table, row, agent, last)
-	cells := agentCells(values, leftParts)
+func (m *Model) writePlannedAgentRow(out *strings.Builder, table sessionTableLayout, styles sessionRowStyles, row session.Session, agent session.AgentSession, last, selected bool, values *sessionFormatValues) {
+	leftParts, rightParts := m.agentLayoutCells(table, row, agent, last, values)
+	cells := agentCells(*values, leftParts)
 	cells = append(cells, rowlayout.Cell{Text: " ", Role: "", Variants: nil, State: rowlayout.Present})
-	cells = append(cells, agentCells(values, rightParts)...)
+	cells = append(cells, agentCells(*values, rightParts)...)
 	painted, _ := rowlayout.PaintColumns(table.agentRows.plan, cells, table.agentRows.theme)
 	left := strings.Join(painted[:table.agentRows.rightStart], "")
 	right := strings.Join(painted[table.agentRows.rightStart:], "")
