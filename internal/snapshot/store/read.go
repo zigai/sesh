@@ -6,9 +6,11 @@ import (
 	"context"
 	"errors"
 	"io"
+	"runtime"
 	"slices"
 
 	"github.com/samber/oops"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/zigai/sesh/internal/privatefs"
 	"github.com/zigai/sesh/internal/snapshot/model"
@@ -61,24 +63,32 @@ func (r *Repository) ReadPracticalCurrent(ctx context.Context) (Generation, mode
 }
 
 func (r *Repository) practicalCurrentLocked(ctx context.Context) (Generation, model.Manifest, error) {
-	generation, manifest, err := r.currentLocked(ctx)
+	catalog, err := r.catalog()
+	if err != nil {
+		return Generation{}, model.Manifest{}, err
+	}
+
+	generation, err := catalog.practicalCurrentGeneration()
+	if err != nil {
+		return Generation{}, model.Manifest{}, err
+	}
+
+	manifest, err := r.readGeneration(ctx, generation)
+
+	return generation, manifest, err
+}
+
+func (c Catalog) practicalCurrentGeneration() (Generation, error) {
+	generation, err := c.currentGeneration()
 	if !errors.Is(err, ErrRecoveryRequired) {
-		return generation, manifest, err
+		return generation, err
 	}
 
-	catalog, catalogErr := r.catalog()
-	if catalogErr != nil {
-		return Generation{}, model.Manifest{}, catalogErr
+	if !c.PracticalCurrentAdmissible() {
+		return Generation{}, ErrRecoveryRequired
 	}
 
-	if !catalog.PracticalCurrentAdmissible() {
-		return Generation{}, model.Manifest{}, ErrRecoveryRequired
-	}
-
-	current := catalog.Generations[catalog.generationIndex(catalog.Current)]
-	manifest, err = r.readGeneration(ctx, current)
-
-	return current, manifest, err
+	return c.Generations[c.generationIndex(c.Current)], nil
 }
 
 // PracticalCurrentAdmissible reports whether practical recovery may read the current generation:
@@ -142,38 +152,46 @@ func (r *Repository) currentLocked(ctx context.Context) (Generation, model.Manif
 		return Generation{}, model.Manifest{}, err
 	}
 
-	for _, rewrite := range catalog.Rewrites {
-		if rewrite.State == rewriteStatePending && rewrite.Source == catalog.Current {
-			return Generation{}, model.Manifest{}, ErrRecoveryRequired
-		}
+	generation, err := catalog.currentGeneration()
+	if err != nil {
+		return Generation{}, model.Manifest{}, err
 	}
 
-	if len(catalog.Attempts) == 0 {
-		return Generation{}, model.Manifest{}, ErrUnavailable
-	}
-
-	latest := catalog.latestSaveAttempt()
-	if catalog.Current == "" && collectionRetiredState(latest.State) {
-		return Generation{}, model.Manifest{}, ErrUnavailable
-	}
-
-	if latest.State != "committed" {
-		return Generation{}, model.Manifest{}, ErrRecoveryRequired
-	}
-
-	index := catalog.generationIndex(catalog.Current)
-	if index < 0 {
-		return Generation{}, model.Manifest{}, ErrCorrupt
-	}
-
-	if !catalog.Generations[index].Complete {
-		return Generation{}, model.Manifest{}, ErrRecoveryRequired
-	}
-
-	generation := catalog.Generations[index]
 	manifest, err := r.readGeneration(ctx, generation)
 
 	return generation, manifest, err
+}
+
+func (c Catalog) currentGeneration() (Generation, error) {
+	for _, rewrite := range c.Rewrites {
+		if rewrite.State == rewriteStatePending && rewrite.Source == c.Current {
+			return Generation{}, ErrRecoveryRequired
+		}
+	}
+
+	if len(c.Attempts) == 0 {
+		return Generation{}, ErrUnavailable
+	}
+
+	latest := c.latestSaveAttempt()
+	if c.Current == "" && collectionRetiredState(latest.State) {
+		return Generation{}, ErrUnavailable
+	}
+
+	if latest.State != "committed" {
+		return Generation{}, ErrRecoveryRequired
+	}
+
+	index := c.generationIndex(c.Current)
+	if index < 0 {
+		return Generation{}, ErrCorrupt
+	}
+
+	if !c.Generations[index].Complete {
+		return Generation{}, ErrRecoveryRequired
+	}
+
+	return c.Generations[index], nil
 }
 
 func (r *Repository) readLocked(ctx context.Context, id string) (model.Manifest, error) {
@@ -239,8 +257,23 @@ func readManifest(ctx context.Context, dir *privatefs.Dir, expected string) (mod
 }
 
 func verifyArtifacts(ctx context.Context, dir *privatefs.Dir, descriptors []model.Artifact) error {
-	for _, descriptor := range descriptors {
-		if err := verifyArtifact(ctx, dir, descriptor, io.Discard); err != nil {
+	errs := make([]error, len(descriptors))
+
+	var verifiers errgroup.Group
+	verifiers.SetLimit(runtime.GOMAXPROCS(0))
+
+	for index, descriptor := range descriptors {
+		verifiers.Go(func() error {
+			errs[index] = verifyArtifact(ctx, dir, descriptor, io.Discard)
+
+			return nil
+		})
+	}
+
+	_ = verifiers.Wait()
+
+	for _, err := range errs {
+		if err != nil {
 			return err
 		}
 	}

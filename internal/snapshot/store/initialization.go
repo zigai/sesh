@@ -22,7 +22,11 @@ func (r *Repository) initializeLocked(ctx context.Context) error {
 
 	catalog, err := r.catalog()
 	if err == nil {
-		return r.finalizeInitialization(ctx, catalog)
+		if err := r.finalizeInitialization(ctx, catalog); err != nil {
+			return err
+		}
+
+		return r.repairCurrentState(ctx, catalog)
 	}
 
 	if !errors.Is(err, os.ErrNotExist) {
@@ -56,7 +60,7 @@ func (r *Repository) initializeLocked(ctx context.Context) error {
 	}
 
 	catalog = Catalog{Version: catalogVersion, Sequence: 0, Current: "", Attempts: nil, Generations: nil, Operations: nil, Rewrites: nil}
-	if err := r.publish(catalog); err != nil {
+	if err := r.publish(ctx, catalog, nil); err != nil {
 		return err
 	}
 
@@ -92,12 +96,12 @@ func (r *Repository) prepareInitialization() error {
 func (r *Repository) validateInitialization(names []string) error {
 	for _, name := range names {
 		switch {
-		case name == "repository.lock", name == "catalog.json":
+		case name == "repository.lock", name == "catalog.json", name == currentStateName:
 		case name == initializationMarker, name == "generations", name == "staging":
 			if err := r.verifyEmptyDirectory(name); err != nil {
 				return err
 			}
-		case strings.HasPrefix(name, ".catalog-") && validID(strings.TrimPrefix(name, ".catalog-")):
+		case stagedRepositoryFile(name):
 			file, err := r.root.File(name, unix.O_RDONLY)
 			if err != nil {
 				return errors.Join(ErrCorrupt, err)
@@ -164,6 +168,16 @@ func (r *Repository) removeInitializationMarker(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func stagedRepositoryFile(name string) bool {
+	for _, prefix := range []string{".catalog-", currentStatePrefix} {
+		if id, ok := strings.CutPrefix(name, prefix); ok && validID(id) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (r *Repository) validatePublishedInitialization(catalog Catalog, names []string) error {

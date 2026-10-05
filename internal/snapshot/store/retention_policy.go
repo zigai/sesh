@@ -67,6 +67,10 @@ func (r *Repository) RetainPolicy(ctx context.Context, now time.Time, policy Ret
 	}
 
 	result, retainErr := r.retainPolicyLocked(ctx, now, policy)
+	if retainErr == nil {
+		retainErr = r.compactHistory(ctx)
+	}
+
 	closeErr := lock.Close()
 
 	if err := errors.Join(retainErr, closeErr); err != nil {
@@ -123,7 +127,7 @@ func (r *Repository) retainPolicyLocked(ctx context.Context, now time.Time, poli
 		return RetentionResult{}, oops.In("snapshot.store").With("operation", "publish_catalog").Wrapf(err, "publish catalog")
 	}
 
-	if err := r.publish(catalog); err != nil {
+	if err := r.publish(ctx, catalog, nil); err != nil {
 		return RetentionResult{}, err
 	}
 

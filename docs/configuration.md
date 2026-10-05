@@ -42,7 +42,7 @@ agents_width = "40%"
 agents_height = "80%"
 
 [display]
-# Row templates supporting {field} substitutions and {right} alignment.
+# Row templates: {field} substitutions; {right} and agent columns align across filtered rows.
 sesh_format = "{source_prefix}{session_name}{right}{session_agent_context}"
 agents_session_format = "{source_prefix}{session_name}"
 agents_agent_format = "{tree}{status_glyph} {status_age:<7}   {agent_cwd_name:<23.23}  {agent_session}{right}{harness:<6.6}   {agent_git_label:<6.22} {agent_git_added:<5} {agent_git_deleted:<5} {agent_git_ahead:<2} {agent_git_behind:<2}"

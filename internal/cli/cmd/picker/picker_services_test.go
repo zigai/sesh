@@ -21,6 +21,7 @@ import (
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/integration/process"
 	"github.com/zigai/sesh/internal/session"
+	"github.com/zigai/sesh/internal/tui"
 )
 
 func TestPickerServicesLoadAndWatchPiConversationNames(t *testing.T) {
@@ -54,10 +55,12 @@ func TestPickerServicesLoadAndWatchPiConversationNames(t *testing.T) {
 
 	services := &pickerServices{agentStore: agents.NewAHTStore(statePath)}
 
-	summaries, err := services.LoadAgentSummaries(t.Context())
+	snapshot, err := services.LoadAgentSummaries(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	summaries := snapshot.Summaries
 
 	assertPickerServiceName(t, summaries, "Loaded name")
 	appendPickerNameFixture(t, transcript, `{"type":"session_info","name":"Watched name"}`+"\n")
@@ -67,10 +70,12 @@ func TestPickerServicesLoadAndWatchPiConversationNames(t *testing.T) {
 
 	published := 0
 
-	err = services.WatchAgentSummaries(t.Context(), func(_ uint64, summaries []session.AgentSummary, publishErr error) error {
+	err = services.WatchAgentSummaries(t.Context(), func(_ uint64, snapshot tui.AgentSnapshot, publishErr error) error {
 		if publishErr != nil {
 			return publishErr
 		}
+
+		summaries := snapshot.Summaries
 
 		want := "Watched name"
 		if published > 0 {
@@ -133,20 +138,24 @@ func TestPickerServicesLoadAndWatchClaudeNativeTitles(t *testing.T) {
 		}
 	}
 
-	summaries, err := services.LoadAgentSummaries(t.Context())
+	snapshot, err := services.LoadAgentSummaries(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	summaries := snapshot.Summaries
 
 	assertTitle(summaries, "Generated title")
 	appendPickerNameFixture(t, transcript, `{"type":"custom-title","sessionId":"claude-native","customTitle":"Manual title"}`+"\n")
 
 	published := 0
 
-	err = services.WatchAgentSummaries(t.Context(), func(_ uint64, summaries []session.AgentSummary, publishErr error) error {
+	err = services.WatchAgentSummaries(t.Context(), func(_ uint64, snapshot tui.AgentSnapshot, publishErr error) error {
 		if publishErr != nil {
 			return publishErr
 		}
+
+		summaries := snapshot.Summaries
 
 		assertTitle(summaries, "Manual title")
 
@@ -213,10 +222,12 @@ func TestPickerServicesLoadCodexAndOmpNativeTitles(t *testing.T) {
 
 	services := &pickerServices{agentStore: pickerNameWatchSource{sessions: []aht.Session{codex, omp}}}
 
-	summaries, err := services.LoadAgentSummaries(t.Context())
+	snapshot, err := services.LoadAgentSummaries(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	summaries := snapshot.Summaries
 
 	titles := make(map[string][2]string)
 

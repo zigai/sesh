@@ -11,7 +11,6 @@ import (
 	"github.com/samber/oops"
 
 	"github.com/zigai/sesh/internal/privatefs"
-	"github.com/zigai/sesh/internal/snapshot/model"
 )
 
 // viewReadAttempts bounds retries when a save replaces the catalog, or collection removes a
@@ -52,44 +51,41 @@ func (v *View) Close() error {
 	return v.repository.Close()
 }
 
-// ReadPracticalCurrent reads the generation [Repository.ReadPracticalCurrent] would admit from
-// the latest published catalog.
-func (v *View) ReadPracticalCurrent(ctx context.Context) (Generation, model.Manifest, error) {
-	var (
-		generation Generation
-		manifest   model.Manifest
-	)
+func (v *View) ReadCurrentListing(ctx context.Context) (Listing, error) {
+	var listing Listing
 
 	err := v.read(ctx, func() error {
-		var readErr error
+		state, readErr := v.repository.readCurrentState()
+		if readErr != nil {
+			return readErr
+		}
 
-		generation, manifest, readErr = v.repository.practicalCurrentLocked(ctx)
+		listing, readErr = state.listing()
 
 		return readErr
 	})
 	if err != nil {
-		return Generation{}, model.Manifest{}, repositoryError("view_current", err)
+		return Listing{}, repositoryError("view_current_listing", err)
 	}
 
-	return generation, manifest, nil
+	return listing, nil
 }
 
-// Read reads one generation listed by the latest published catalog.
-func (v *View) Read(ctx context.Context, id string) (model.Manifest, error) {
-	var manifest model.Manifest
+func (v *View) ReadListing(ctx context.Context, id string) (Listing, error) {
+	var listing Listing
 
 	err := v.read(ctx, func() error {
 		var readErr error
 
-		manifest, readErr = v.repository.readLocked(ctx, id)
+		listing, readErr = v.repository.listingLocked(ctx, id)
 
 		return readErr
 	})
 	if err != nil {
-		return model.Manifest{}, repositoryError("view_read", err)
+		return Listing{}, repositoryError("view_listing", err)
 	}
 
-	return manifest, nil
+	return listing, nil
 }
 
 func (v *View) read(ctx context.Context, read func() error) error {

@@ -71,7 +71,7 @@ func (r *Repository) registerOperationLocked(ctx context.Context, candidate Oper
 		return r.confirmExistingOperationLocked(ctx, catalog.Operations[index], candidate)
 	}
 
-	if len(catalog.Attempts)+len(catalog.Generations)+len(catalog.Operations)+len(catalog.Rewrites)+1 > maxEntries {
+	if len(catalog.Operations)+1 > maxEntries {
 		return Operation{}, ErrCorrupt
 	}
 
@@ -96,7 +96,7 @@ func (r *Repository) registerOperationLocked(ctx context.Context, candidate Oper
 
 	catalog.Operations = append(catalog.Operations, candidate)
 
-	if err := r.publish(catalog); err != nil {
+	if err := r.publish(ctx, catalog, nil); err != nil {
 		return Operation{}, err
 	}
 

@@ -16,7 +16,6 @@ import (
 	"github.com/samber/oops"
 	gotmux "github.com/zigai/gotmux/tmux"
 
-	"github.com/zigai/sesh/internal/snapshot/model"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
@@ -40,8 +39,8 @@ type CatalogStatus string
 // SavedSnapshots reads the generations a catalog lists saved sessions from. Both a durable
 // *store.Repository and a lock-free *store.View satisfy it.
 type SavedSnapshots interface {
-	ReadPracticalCurrent(ctx context.Context) (store.Generation, model.Manifest, error)
-	Read(ctx context.Context, id string) (model.Manifest, error)
+	ReadCurrentListing(ctx context.Context) (store.Listing, error)
+	ReadListing(ctx context.Context, id string) (store.Listing, error)
 }
 
 type CatalogOptions struct {
@@ -129,27 +128,23 @@ func ListSaved(ctx context.Context, repo SavedSnapshots, source, generationID st
 		return nil, oops.In("session").Code("catalog_failed").With("operation", "list_saved").Wrap(ErrEmptyRepositorySource)
 	}
 
-	manifest, genID, err := loadSavedManifest(ctx, repo, generationID)
+	listing, err := loadSavedListing(ctx, repo, generationID)
 	if err != nil {
 		return nil, oops.In("session").Code("catalog_failed").With("operation", "list_saved").Wrap(err)
 	}
 
-	windowCounts := make(map[string]int, len(manifest.Sessions))
-	for _, link := range manifest.Links {
-		windowCounts[link.Session]++
-	}
-
-	limitHit := len(manifest.Sessions) > maxCatalogInventory
-	count := min(len(manifest.Sessions), maxCatalogInventory)
+	genID := listing.Generation.ID
+	limitHit := len(listing.Sessions) > maxCatalogInventory
+	count := min(len(listing.Sessions), maxCatalogInventory)
 	result := make([]Session, 0, count)
 
-	activityTime := time.Unix(0, manifest.Finished)
-	if manifest.Finished == 0 && manifest.Started != 0 {
-		activityTime = time.Unix(0, manifest.Started)
+	activityTime := time.Unix(0, listing.Finished)
+	if listing.Finished == 0 && listing.Started != 0 {
+		activityTime = time.Unix(0, listing.Started)
 	}
 
 	for i := range count {
-		ms := manifest.Sessions[i]
+		ms := listing.Sessions[i]
 		sess := Session{
 			ID:                     ms.ID,
 			Name:                   string(ms.Name),
@@ -162,7 +157,7 @@ func ListSaved(ctx context.Context, repo SavedSnapshots, source, generationID st
 			PathRaw:                RawBytes(slices.Clone(ms.Directory)),
 			RuntimeIdentity:        zeroRuntimeIdentity(),
 			RemoteStatus:           RemoteStatusAvailable,
-			WindowCount:            windowCounts[ms.ID],
+			WindowCount:            ms.Windows,
 			Attached:               false,
 			Activity:               activityTime,
 			IsCurrent:              false,
@@ -471,42 +466,31 @@ func resolveCurrentSession(ctx context.Context, server *gotmux.Server, currentPa
 }
 
 func paneLinkedToSession(ctx context.Context, server *gotmux.Server, paneID, sessionID string) bool {
-	pane, err := server.Pane(ctx, gotmux.PaneID(paneID))
-	if err != nil {
-		return false
-	}
-
-	window, err := pane.Window(ctx)
-	if err != nil {
-		return false
-	}
-
-	links, err := window.Links(ctx)
-	if err != nil {
-		return false
-	}
-
-	return slices.ContainsFunc(links, func(link gotmux.WindowLink) bool {
-		return string(link.Session().ID()) == sessionID
+	records, err := server.QueryRecords(ctx, gotmux.RecordQuery{
+		Kind:   gotmux.ObjectKindPane,
+		Fields: []string{"pane_id"},
+		Filter: gotmux.Format("#{&&:#{==:#{pane_id}," + paneID + "},#{==:#{session_id}," + sessionID + "}}"),
 	})
+
+	return err == nil && len(records.Rows) > 0
 }
 
-func loadSavedManifest(ctx context.Context, repo SavedSnapshots, generationID string) (model.Manifest, string, error) {
+func loadSavedListing(ctx context.Context, repo SavedSnapshots, generationID string) (store.Listing, error) {
 	if generationID == "" {
-		gen, manifest, err := repo.ReadPracticalCurrent(ctx)
+		listing, err := repo.ReadCurrentListing(ctx)
 		if err != nil {
-			return model.Manifest{}, "", fmt.Errorf("read current generation: %w", err)
+			return store.Listing{}, fmt.Errorf("read current generation: %w", err)
 		}
 
-		return manifest, gen.ID, nil
+		return listing, nil
 	}
 
-	manifest, err := repo.Read(ctx, generationID)
+	listing, err := repo.ReadListing(ctx, generationID)
 	if err != nil {
-		return model.Manifest{}, "", fmt.Errorf("read generation: %w", err)
+		return store.Listing{}, fmt.Errorf("read generation: %w", err)
 	}
 
-	return manifest, generationID, nil
+	return listing, nil
 }
 
 func zeroRuntimeIdentity() RuntimeIdentity {

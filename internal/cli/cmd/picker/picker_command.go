@@ -329,6 +329,7 @@ func runPickerInteractive(
 	handoffPath, _ := cmd.Flags().GetString("switch-handoff")
 	services.popupChild = handoffPath != ""
 	services.currentSessionID, _ = cmd.Flags().GetString("current-session-id")
+	services.startInitialReads(ctx)
 
 	model, err := buildPickerModel(ctx, presentation, runtime.cfg, runtime.state, services.TUIServices())
 	if err != nil {

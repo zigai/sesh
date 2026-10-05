@@ -35,7 +35,7 @@ func TestViewOfMissingRepositoryListsNothingAndCreatesNothing(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "missing")
 
 	view := openView(t, path)
-	if _, _, err := view.ReadPracticalCurrent(t.Context()); !errors.Is(err, ErrUnavailable) {
+	if _, err := view.ReadCurrentListing(t.Context()); !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("missing repository: %v, want ErrUnavailable", err)
 	}
 
@@ -61,7 +61,7 @@ func TestViewLeavesInterruptedInitializationForDurableOpen(t *testing.T) {
 	before := repositoryEntries(t, path)
 
 	view := openView(t, path)
-	if _, _, err := view.ReadPracticalCurrent(t.Context()); !errors.Is(err, ErrUnavailable) {
+	if _, err := view.ReadCurrentListing(t.Context()); !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("interrupted initialization: %v, want ErrUnavailable", err)
 	}
 
@@ -87,12 +87,12 @@ func TestViewReadsCurrentWhileRepositoryLockIsHeld(t *testing.T) {
 
 	view := openView(t, path)
 
-	got, manifest, err := view.ReadPracticalCurrent(ctx)
-	if err != nil || got != generation || len(manifest.Sessions) == 0 {
-		t.Fatalf("view current under a held lock = %v, %v; want generation %v", got, err, generation)
+	got, err := view.ReadCurrentListing(ctx)
+	if err != nil || got.Generation != generation || len(got.Sessions) == 0 {
+		t.Fatalf("view current under a held lock = %v, %v; want generation %v", got.Generation, err, generation)
 	}
 
-	if _, err := view.Read(ctx, generation.ID); err != nil {
+	if _, err := view.ReadListing(ctx, generation.ID); err != nil {
 		t.Fatalf("view read under a held lock: %v", err)
 	}
 }
@@ -123,7 +123,7 @@ func TestViewPairsGenerationWithManifestDuringSaves(t *testing.T) {
 	defer workers.Wait()
 
 	for range 40 {
-		generation, manifest, err := view.ReadPracticalCurrent(t.Context())
+		listing, err := view.ReadCurrentListing(t.Context())
 		if errors.Is(err, ErrRecoveryRequired) {
 			continue
 		}
@@ -132,7 +132,7 @@ func TestViewPairsGenerationWithManifestDuringSaves(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if string(manifest.Sessions[0].Name) != generation.ID {
+		if string(listing.Sessions[0].Name) != listing.Generation.ID {
 			t.Fatal("generation and bytes came from different catalog publications")
 		}
 	}

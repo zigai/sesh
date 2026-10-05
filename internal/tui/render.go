@@ -336,12 +336,14 @@ func (m *Model) renderList(width, height int) string {
 
 		rowCount = 1
 	} else {
+		var values sessionFormatValues
+
 		for _, listRow := range m.visibleListRows(height) {
 			if rowCount > 0 {
 				out.WriteByte('\n')
 			}
 
-			m.writePopupListRow(&out, layout, styles, listRow)
+			m.writePopupListRow(&out, layout, styles, listRow, &values)
 
 			rowCount++
 		}
@@ -383,12 +385,14 @@ func (m *Model) writeListFramedSection(
 
 		rowCount = 1
 	} else {
+		var values sessionFormatValues
+
 		for _, listRow := range m.visibleListRows(height) {
 			out.WriteByte('\n')
 			out.WriteString(leftBorder)
 			out.WriteByte(' ')
 
-			m.writePopupListRow(out, layout, styles, listRow)
+			m.writePopupListRow(out, layout, styles, listRow, &values)
 
 			out.WriteByte(' ')
 			out.WriteString(rightBorder)
@@ -407,6 +411,7 @@ func (m *Model) writePopupListRow(
 	layout sessionTableLayout,
 	styles sessionRowStyles,
 	listRow popupListRow,
+	values *sessionFormatValues,
 ) {
 	if listRow.isSeparator() {
 		m.writeSeparatorRow(out, layout, styles)
@@ -417,7 +422,7 @@ func (m *Model) writePopupListRow(
 
 	isSelected := listRow.equal(m.selectedListRow())
 	if !listRow.isAgent() {
-		m.writeSessionRowWithStyles(out, layout, styles, row, isSelected)
+		m.writeSessionRowWithStyles(out, layout, styles, row, isSelected, values)
 		return
 	}
 
@@ -430,6 +435,7 @@ func (m *Model) writePopupListRow(
 		true,
 		listRow.agentIndex == len(row.Agents)-1,
 		isSelected,
+		values,
 	)
 }
 
@@ -594,9 +600,11 @@ func (m *Model) renderSessionRowWithStyles(
 	s session.Session,
 	isSelected bool,
 ) string {
+	var values sessionFormatValues
+
 	var out strings.Builder
 	out.Grow(layout.width)
-	m.writeSessionRowWithStyles(&out, layout, styles, s, isSelected)
+	m.writeSessionRowWithStyles(&out, layout, styles, s, isSelected, &values)
 
 	return out.String()
 }
@@ -607,6 +615,7 @@ func (m *Model) writeSessionRowWithStyles(
 	styles sessionRowStyles,
 	s session.Session,
 	isSelected bool,
+	values *sessionFormatValues,
 ) {
 	m.writeFormattedSessionRow(
 		out,
@@ -617,6 +626,7 @@ func (m *Model) writeSessionRowWithStyles(
 		false,
 		false,
 		isSelected,
+		values,
 	)
 }
 
@@ -627,6 +637,8 @@ func (m *Model) FormatSessionRow(row session.Session) string {
 
 func (m *Model) FormatAgentRow(row session.Session, agent session.AgentSession) string {
 	layout := m.calcSessionLayout(max(m.contentWidth()-statusWidthInset, defaultSessionMinWidth))
+
+	var values sessionFormatValues
 
 	var out strings.Builder
 	out.Grow(layout.width)
@@ -639,6 +651,7 @@ func (m *Model) FormatAgentRow(row session.Session, agent session.AgentSession) 
 		true,
 		false,
 		false,
+		&values,
 	)
 
 	return out.String()
@@ -657,13 +670,14 @@ func (m *Model) writeFormattedSessionRow(
 	hasAgent bool,
 	isLastAgent bool,
 	isSelected bool,
+	values *sessionFormatValues,
 ) {
 	if hasAgent && layout.agentRows.valid {
-		m.writePlannedAgentRow(out, layout, styles, row, agent, isLastAgent, isSelected)
+		m.writePlannedAgentRow(out, layout, styles, row, agent, isLastAgent, isSelected, values)
 		return
 	}
 
-	line := m.formattedSessionLine(row, agent, hasAgent, isLastAgent, layout)
+	line := m.formattedSessionLine(row, agent, hasAgent, isLastAgent, layout, values)
 
 	left := fitSessionFormatParts(line.Left, layout.leftWidth)
 	if leftWidth := lipgloss.Width(left); leftWidth < layout.leftWidth {
