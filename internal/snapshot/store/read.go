@@ -6,9 +6,11 @@ import (
 	"context"
 	"errors"
 	"io"
+	"runtime"
 	"slices"
 
 	"github.com/samber/oops"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/zigai/sesh/internal/privatefs"
 	"github.com/zigai/sesh/internal/snapshot/model"
@@ -255,8 +257,23 @@ func readManifest(ctx context.Context, dir *privatefs.Dir, expected string) (mod
 }
 
 func verifyArtifacts(ctx context.Context, dir *privatefs.Dir, descriptors []model.Artifact) error {
-	for _, descriptor := range descriptors {
-		if err := verifyArtifact(ctx, dir, descriptor, io.Discard); err != nil {
+	errs := make([]error, len(descriptors))
+
+	var verifiers errgroup.Group
+	verifiers.SetLimit(runtime.GOMAXPROCS(0))
+
+	for index, descriptor := range descriptors {
+		verifiers.Go(func() error {
+			errs[index] = verifyArtifact(ctx, dir, descriptor, io.Discard)
+
+			return nil
+		})
+	}
+
+	_ = verifiers.Wait()
+
+	for _, err := range errs {
+		if err != nil {
 			return err
 		}
 	}

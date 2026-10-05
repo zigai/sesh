@@ -127,14 +127,16 @@ func (c Catalog) validateAttempts() error {
 }
 
 func (c Catalog) validateGenerations() error {
+	attemptIndexes := c.attemptIndexes()
 	seen := make(map[string]bool)
+
 	for _, generation := range c.Generations {
 		if !validID(generation.ID) || seen[generation.ID] || !validDigest(generation.ManifestSHA256) {
 			return ErrCorrupt
 		}
 
-		index := c.attemptIndex(generation.ID)
-		if index < 0 {
+		index, exists := attemptIndexes[generation.ID]
+		if !exists {
 			return ErrCorrupt
 		}
 
@@ -219,6 +221,17 @@ func validAttemptOutcome(state, reason string) bool {
 
 func (c Catalog) attemptIndex(id string) int {
 	return slices.IndexFunc(c.Attempts, func(a Attempt) bool { return a.ID == id })
+}
+
+func (c Catalog) attemptIndexes() map[string]int {
+	indexes := make(map[string]int, len(c.Attempts))
+	for index, attempt := range c.Attempts {
+		if _, exists := indexes[attempt.ID]; !exists {
+			indexes[attempt.ID] = index
+		}
+	}
+
+	return indexes
 }
 
 func (c Catalog) generationIndex(id string) int {
