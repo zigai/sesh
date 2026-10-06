@@ -20,7 +20,8 @@ func TestTmuxSupervisorOwnsDisposableForegroundServer(t *testing.T) {
 		t.Skip("set TMUX_INTEGRATION_REQUIRED=1 to run disposable tmux integration tests")
 	}
 
-	socket := filepath.Join(t.TempDir(), "supervised.sock")
+	parent := filepath.Join(t.TempDir(), "runtime", "sesh")
+	socket := filepath.Join(parent, "supervised.sock")
 
 	supervisor, err := daemon.NewTmuxSupervisor("tmux", socket, "/dev/null", 2*time.Second)
 	if err != nil {
@@ -61,6 +62,8 @@ func TestTmuxSupervisorOwnsDisposableForegroundServer(t *testing.T) {
 		t.Fatalf("WaitReady failed: %v", err)
 	}
 
+	state := checkSupervisorSocketAndWriteState(t, parent, socket)
+
 	if _, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{
 		Name:    "supervisor-fixture",
 		Program: gotmux.Exec("sleep", "30"),
@@ -83,5 +86,49 @@ func TestTmuxSupervisorOwnsDisposableForegroundServer(t *testing.T) {
 
 	if _, err := server.Probe(t.Context()); !errors.Is(err, gotmux.ErrNoServer) {
 		t.Fatalf("Probe after join = %v, want ErrNoServer", err)
+	}
+
+	checkSupervisorStateRetained(t, state)
+}
+
+func checkSupervisorSocketAndWriteState(t *testing.T, parent, socket string) string {
+	t.Helper()
+
+	parentInfo, err := os.Stat(parent)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if parentInfo.Mode().Perm() != 0o700 {
+		t.Fatalf("socket parent permissions = %v, want 0700", parentInfo.Mode().Perm())
+	}
+
+	socketInfo, err := os.Stat(socket)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if socketInfo.Mode()&os.ModeSocket == 0 || socketInfo.Mode().Perm()&0o077 != 0 {
+		t.Fatalf("socket mode = %v, want private Unix socket", socketInfo.Mode())
+	}
+
+	state := filepath.Join(parent, "state")
+	if err := os.WriteFile(state, []byte("retained"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	return state
+}
+
+func checkSupervisorStateRetained(t *testing.T, state string) {
+	t.Helper()
+
+	data, err := os.ReadFile(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if string(data) != "retained" {
+		t.Fatalf("runtime state after stop = %q, want retained", data)
 	}
 }

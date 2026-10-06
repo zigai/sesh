@@ -122,6 +122,10 @@ func NewTmuxSupervisor(binary, socket, configFile string, stopGrace time.Duratio
 	}
 
 	return NewSupervisor(func(ctx context.Context) (Process, error) {
+		if err := os.MkdirAll(filepath.Dir(socket), 0o700); err != nil {
+			return nil, oops.In("daemon").Code("supervisor_failed").With("operation", "prepare_tmux_socket_directory").Wrap(err)
+		}
+
 		command, err := server.PrepareForegroundServer(context.WithoutCancel(ctx))
 		if err != nil {
 			return nil, oops.In("daemon").Code("supervisor_failed").With("operation", "prepare_tmux_server").Wrap(err)

@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -273,4 +275,141 @@ func TestTmuxSupervisorRequiresExplicitSocket(t *testing.T) {
 	if _, err := NewTmuxSupervisor("tmux", "relative.sock", "/dev/null", time.Second); !errors.Is(err, ErrSocketRequired) {
 		t.Fatalf("NewTmuxSupervisor error = %v, want ErrSocketRequired", err)
 	}
+}
+
+func TestTmuxSupervisorCreatesPrivateSocketParents(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	parent := filepath.Join(root, "runtime", "sesh")
+	socket := filepath.Join(parent, "tmux.sock")
+
+	binary := createSupervisorExecutable(t, root)
+
+	supervisor, err := NewTmuxSupervisor(binary, socket, "/dev/null", time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.Remove(binary); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := supervisor.Run(t.Context()); !errors.Is(err, ErrStart) || !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("Run error = %v, want ErrStart and os.ErrNotExist", err)
+	}
+
+	for _, path := range []string{filepath.Join(root, "runtime"), parent} {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !info.IsDir() || info.Mode().Perm() != 0o700 {
+			t.Fatalf("socket parent mode = %v, want directory with 0700 permissions", info.Mode())
+		}
+	}
+}
+
+func TestTmuxSupervisorPreservesExistingSocketParent(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	parent := filepath.Join(root, "runtime")
+
+	if err := os.Mkdir(parent, 0o750); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.Chmod(parent, 0o750); err != nil {
+		t.Fatal(err)
+	}
+
+	state := filepath.Join(parent, "state")
+	if err := os.WriteFile(state, []byte("retained"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	binary := createSupervisorExecutable(t, root)
+
+	supervisor, err := NewTmuxSupervisor(binary, filepath.Join(parent, "tmux.sock"), "/dev/null", time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.Remove(binary); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := supervisor.Run(t.Context()); !errors.Is(err, ErrStart) {
+		t.Fatalf("Run error = %v, want ErrStart", err)
+	}
+
+	info, err := os.Stat(parent)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if info.Mode().Perm() != 0o750 {
+		t.Fatalf("existing parent permissions = %v, want 0750", info.Mode().Perm())
+	}
+
+	data, err := os.ReadFile(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if string(data) != "retained" {
+		t.Fatalf("existing state = %q, want retained", data)
+	}
+}
+
+func TestTmuxSupervisorPropagatesSocketParentFailure(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	parent := filepath.Join(root, "blocked")
+
+	if err := os.WriteFile(parent, []byte("retained"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	binary, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	supervisor, err := NewTmuxSupervisor(binary, filepath.Join(parent, "sesh", "tmux.sock"), "/dev/null", time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = supervisor.Run(t.Context())
+	if !errors.Is(err, ErrPrepare) || !errors.Is(err, syscall.ENOTDIR) || errors.Is(err, ErrStart) {
+		t.Fatalf("Run error = %v, want ErrPrepare and ENOTDIR without ErrStart", err)
+	}
+
+	data, err := os.ReadFile(parent)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if string(data) != "retained" {
+		t.Fatalf("blocking file = %q, want retained", data)
+	}
+}
+
+func createSupervisorExecutable(t *testing.T, root string) string {
+	t.Helper()
+
+	binary := filepath.Join(root, "tmux")
+	if err := os.WriteFile(binary, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.Chmod(binary, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	return binary
 }

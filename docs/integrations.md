@@ -15,6 +15,8 @@ Saves run every 3 minutes by default. Use `--socket` for a custom server. Add `-
 
 The command ends by saying whether automatic saves are on, or which `systemctl --user enable --now` command still starts them. Rerunning it restarts running units on the new definition and starts failed ones again.
 
+Use `--with-tmux-service` to manage a foreground tmux server. Its daemon creates missing socket parent directories with private `0700` permissions before starting tmux, including when run directly with `sesh daemon tmux --socket /absolute/path/to/tmux.sock`. Existing parent permissions and unrelated runtime state are left unchanged; stopping the service does not remove the socket directory.
+
 To recover, start tmux on the same socket and run:
 
 ```sh
