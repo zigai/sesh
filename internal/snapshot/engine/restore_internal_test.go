@@ -3,9 +3,15 @@
 package engine
 
 import (
+	"bytes"
 	"context"
+	"encoding/json/v2"
 	"errors"
 	"testing"
+	"time"
+
+	"github.com/rs/zerolog"
+	"github.com/samber/oops"
 
 	integration "github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/snapshot/restore"
@@ -108,5 +114,114 @@ func TestExecutionMayHaveDispatchedUsesCurrentAttemptReceipts(t *testing.T) {
 				t.Fatalf("executionMayHaveDispatched() = %t, want %t", got, tt.want)
 			}
 		})
+	}
+}
+
+var errSecretRestoreCause = errors.New("secret /secret/path cause")
+
+func restoreRecord(t *testing.T, data []byte) map[string]any {
+	t.Helper()
+
+	if lines := bytes.Count(data, []byte{'\n'}); lines != 1 {
+		t.Fatalf("expected one record, got %d: %s", lines, data)
+	}
+
+	if bytes.Contains(bytes.ToLower(data), []byte("secret")) {
+		t.Fatalf("record leaked private details: %s", data)
+	}
+
+	var record map[string]any
+	if err := json.Unmarshal(data, &record); err != nil {
+		t.Fatal(err)
+	}
+
+	for key := range record {
+		switch key {
+		case "level", "component", "operation", "status", "message", "reason", "phase", "sessions", "skipped", "verified",
+			"mismatches", "mismatch_reasons", "failed_step", "step_reason", "duration_ms",
+			"resumed_panes", "restarted_panes", "shell_panes", "unrecovered_panes", "directory_fallback_panes":
+		default:
+			t.Fatalf("unexpected restore log field %s", key)
+		}
+	}
+
+	if duration, ok := record["duration_ms"].(float64); !ok || duration < 0 {
+		t.Fatalf("duration_ms = %v, want a non-negative number", record["duration_ms"])
+	}
+
+	return record
+}
+
+func TestRestoreFailureRecordSummarizesVerificationDifferences(t *testing.T) {
+	var output bytes.Buffer
+
+	ctx := context.WithValue(zerolog.New(&output).WithContext(t.Context()), restoreStartedKey{}, time.Now())
+
+	report := restore.VerificationReport{Mismatches: []restore.VerificationMismatch{
+		{Domain: restore.MismatchOption, Entity: "s1", Reason: "local_option_mismatch"},
+		{Domain: restore.MismatchOption, Entity: "s2", Reason: "local_option_mismatch"},
+		{Domain: restore.MismatchEnvironment, Entity: "s6", Reason: "scope_unreadable"},
+	}}
+
+	_ = restoreFailure(ctx, "verify", &verificationError{report: report})
+
+	record := restoreRecord(t, output.Bytes())
+	if record["level"] != "error" || record["phase"] != "verify" || record["mismatches"] != float64(3) ||
+		record["mismatch_reasons"] != "environment/scope_unreadable,option/local_option_mismatch" {
+		t.Fatalf("verification failure record = %v", record)
+	}
+
+	if bytes.Contains(output.Bytes(), []byte(`"s1"`)) || bytes.Contains(output.Bytes(), []byte(`"s6"`)) {
+		t.Fatalf("record names restored entities: %s", output.Bytes())
+	}
+}
+
+func TestRestoreFailureRecordNamesTheFailedStep(t *testing.T) {
+	var output bytes.Buffer
+
+	ctx := context.WithValue(zerolog.New(&output).WithContext(t.Context()), restoreStartedKey{}, time.Now())
+
+	optionErr := oops.In("snapshot.restore").Code("operation_uncertain").
+		With("operation", "import_options", "reason", "option_set_outcome_unknown").Wrap(errSecretRestoreCause)
+
+	_ = restoreFailure(ctx, "import", scopedImportFailure(optionErr, nil))
+
+	record := restoreRecord(t, output.Bytes())
+	if record["failed_step"] != "import_options" || record["step_reason"] != "option_set_outcome_unknown" {
+		t.Fatalf("failed step = %v / %v, want import_options / option_set_outcome_unknown", record["failed_step"], record["step_reason"])
+	}
+
+	if _, ok := record["mismatches"]; ok {
+		t.Fatal("a failure without verification must not report mismatches")
+	}
+}
+
+func TestRestoreSuccessRecordCountsProgramOutcomes(t *testing.T) {
+	var output bytes.Buffer
+
+	ctx := context.WithValue(zerolog.New(&output).WithContext(t.Context()), restoreStartedKey{}, time.Now())
+
+	logRestoreSuccess(ctx, RestoreResult{
+		Status: "best_effort", Reason: "fidelity_limited", SessionsRestored: []string{"$1", "$2"}, Verified: true,
+		Panes: []restore.PaneResult{
+			{PaneID: "p0", Outcome: restore.PaneOutcomeNativeResumeDispatch},
+			{PaneID: "p1", Outcome: restore.PaneOutcomeNativeResumeDispatch, CWDFallback: true},
+			{PaneID: "p2", Outcome: restore.PaneOutcomeRestartDispatch},
+			{PaneID: "p3", Outcome: restore.PaneOutcomeDefaultShell},
+			{PaneID: "p4", Outcome: restore.PaneOutcomeUnsupported},
+		},
+	})
+
+	record := restoreRecord(t, output.Bytes())
+
+	want := map[string]float64{"resumed_panes": 2, "restarted_panes": 1, "shell_panes": 1, "unrecovered_panes": 1, "directory_fallback_panes": 1, "sessions": 2}
+	for field, value := range want {
+		if record[field] != value {
+			t.Fatalf("%s = %v, want %v", field, record[field], value)
+		}
+	}
+
+	if record["level"] != "warn" || record["status"] != "best_effort" {
+		t.Fatalf("restore success record = %v", record)
 	}
 }

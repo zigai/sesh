@@ -123,3 +123,28 @@ func mustEncode(t *testing.T, m Manifest) []byte {
 
 	return data
 }
+
+func TestEffectiveSessionOptionsLetLocalArraysMaskGlobalElements(t *testing.T) {
+	m := fixture()
+	m.Source.Options = []Option{
+		option("global-session", "client-attached[1]", "run-shell true", false),
+		option("global-session", "update-environment[0]", "DISPLAY", false),
+		option("global-session", "update-environment[1]", "SSH_AUTH_SOCK", false),
+		option("global-session", "status", "on", false),
+	}
+
+	session := Session{ID: "s9", Name: Bytes("masked"), Options: []Option{
+		{Scope: "session", Name: Bytes("client-attached"), Present: false, Inherited: false},
+		option("session", "update-environment[0]", "TERM", false),
+	}}
+
+	want := []Option{
+		{Scope: "session", Name: Bytes("client-attached"), Present: false, Inherited: false},
+		option("session", "update-environment[0]", "TERM", false),
+		option("session", "status", "on", true),
+	}
+
+	if diff := cmp.Diff(want, m.EffectiveSessionOptions(session)); diff != "" {
+		t.Fatalf("effective session options (-want +got):\n%s", diff)
+	}
+}

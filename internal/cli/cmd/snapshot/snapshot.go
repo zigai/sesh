@@ -102,6 +102,7 @@ type snapshotRestoreResultJSON struct {
 	MissingRequirements []snapshotEvidenceJSON         `json:"missingRequirements"`
 	SessionsSkipped     []engine.SkippedSession        `json:"sessionsSkipped"`
 	Advisories          []restore.VerificationMismatch `json:"advisories"`
+	Mismatches          []restore.VerificationMismatch `json:"mismatches"`
 }
 
 type VerifyResultJSON struct {
@@ -565,7 +566,8 @@ func restoreJSONResult(res engine.RestoreResult) snapshotRestoreResultJSON {
 		Uncertain:           res.Uncertain,
 		MissingRequirements: missing,
 		SessionsSkipped:     nonNilSkipped(res.SessionsSkipped),
-		Advisories:          nonNilAdvisories(res.Advisories),
+		Advisories:          nonNilMismatches(res.Advisories),
+		Mismatches:          nonNilMismatches(res.Mismatches),
 	}
 }
 
@@ -577,12 +579,12 @@ func nonNilSkipped(skipped []engine.SkippedSession) []engine.SkippedSession {
 	return skipped
 }
 
-func nonNilAdvisories(advisories []restore.VerificationMismatch) []restore.VerificationMismatch {
-	if advisories == nil {
+func nonNilMismatches(mismatches []restore.VerificationMismatch) []restore.VerificationMismatch {
+	if mismatches == nil {
 		return []restore.VerificationMismatch{}
 	}
 
-	return advisories
+	return mismatches
 }
 
 func renderRestoreTable(cmd *cobra.Command, res engine.RestoreResult, labels restoreLabels, requested []string) error {

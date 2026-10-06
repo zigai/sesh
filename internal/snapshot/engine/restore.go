@@ -14,6 +14,7 @@ import (
 	"github.com/samber/oops"
 	gotmux "github.com/zigai/gotmux/tmux"
 
+	"github.com/zigai/sesh/internal/errorstep"
 	"github.com/zigai/sesh/internal/integration/process"
 	integration "github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/snapshot/model"
@@ -92,6 +93,7 @@ type RestoreResult struct {
 	Panes               []restore.PaneResult           `json:"panes,omitempty"`
 	SessionsSkipped     []SkippedSession               `json:"sessionsSkipped"`
 	Advisories          []restore.VerificationMismatch `json:"advisories"`
+	Mismatches          []restore.VerificationMismatch `json:"mismatches"`
 }
 
 type ActionStatus struct {
@@ -110,6 +112,12 @@ type OperationStatus struct {
 	Uncertain   []string       `json:"uncertain"`
 	Settled     bool           `json:"settled"`
 }
+
+type restoredPaneTally struct {
+	resumed, restarted, shell, unrecovered, directoryFallback int
+}
+
+type restoreStartedKey struct{}
 
 func (i restoreDaemonIdentity) Equal(other restoreDaemonIdentity) bool {
 	return i.Server.Equal(other.Server) && i.Birth == other.Birth
@@ -137,7 +145,10 @@ func Restore(ctx context.Context, repository *store.Repository, server *gotmux.S
 		Panes:               nil,
 		SessionsSkipped:     nil,
 		Advisories:          nil,
+		Mismatches:          nil,
 	}
+
+	ctx = context.WithValue(ctx, restoreStartedKey{}, time.Now())
 
 	if cfg.LeaseRoot == "" {
 		return result, restoreFailure(ctx, "admission", ErrLeaseRootRequired)
@@ -316,6 +327,7 @@ func executeRestore(
 		Panes:               nil,
 		SessionsSkipped:     nil,
 		Advisories:          nil,
+		Mismatches:          nil,
 	}
 
 	plan, generation, skipped, err := prepareRestorePlan(ctx, repository, server, cfg)
@@ -377,6 +389,8 @@ func executeRestore(
 	}
 
 	if !verification.Verified {
+		result.Mismatches = verification.Mismatches
+
 		return result, closeWith(ctx, lease, "verify", reportVerificationFailure(verification))
 	}
 
@@ -511,6 +525,8 @@ func reinspectVerifiedRestore(
 	}
 
 	if !verification.Verified {
+		result.Mismatches = verification.Mismatches
+
 		return *result, true, closeWith(ctx, lease, "reinspect", reportVerificationFailure(verification))
 	}
 
@@ -1151,6 +1167,8 @@ func logRestoreSuccess(ctx context.Context, result RestoreResult) {
 		level = zerolog.WarnLevel
 	}
 
+	outcomes := tallyRestoredPanes(result.Panes)
+
 	zerolog.Ctx(ctx).WithLevel(level).
 		Str("component", "snapshot").
 		Str("operation", "restore").
@@ -1159,19 +1177,71 @@ func logRestoreSuccess(ctx context.Context, result RestoreResult) {
 		Int("sessions", len(result.SessionsRestored)).
 		Int("skipped", len(result.SessionsSkipped)).
 		Bool("verified", result.Verified).
+		Int("resumed_panes", outcomes.resumed).
+		Int("restarted_panes", outcomes.restarted).
+		Int("shell_panes", outcomes.shell).
+		Int("unrecovered_panes", outcomes.unrecovered).
+		Int("directory_fallback_panes", outcomes.directoryFallback).
+		Int64("duration_ms", restoreDuration(ctx)).
 		Msg("snapshot restored")
+}
+
+func tallyRestoredPanes(panes []restore.PaneResult) restoredPaneTally {
+	var tally restoredPaneTally
+
+	for _, pane := range panes {
+		switch pane.Outcome {
+		case restore.PaneOutcomeNativeResumeDispatch:
+			tally.resumed++
+		case restore.PaneOutcomeRestartDispatch:
+			tally.restarted++
+		case restore.PaneOutcomeDefaultShell:
+			tally.shell++
+		default:
+			tally.unrecovered++
+		}
+
+		if pane.CWDFallback {
+			tally.directoryFallback++
+		}
+	}
+
+	return tally
+}
+
+func restoreDuration(ctx context.Context) int64 {
+	started, ok := ctx.Value(restoreStartedKey{}).(time.Time)
+	if !ok {
+		return 0
+	}
+
+	return time.Since(started).Milliseconds()
 }
 
 func restoreFailure(ctx context.Context, phase string, err error) error {
 	code, reason := classifyRestoreFailure(err)
 
-	zerolog.Ctx(ctx).Error().
+	event := zerolog.Ctx(ctx).Error().
 		Str("component", "snapshot").
 		Str("operation", "restore").
 		Str("status", "failed").
 		Str("phase", phase).
 		Str("reason", reason).
-		Msg("snapshot restore failed")
+		Int64("duration_ms", restoreDuration(ctx))
+
+	if verification, ok := errors.AsType[*verificationError](err); ok {
+		event = event.Int("mismatches", len(verification.report.Mismatches)).
+			Str("mismatch_reasons", mismatchReasons(verification.report.Mismatches))
+	}
+
+	if step, ok := errorstep.Owned(err, "snapshot.restore"); ok {
+		event = event.Str("failed_step", step.Operation)
+		if step.Reason != "" {
+			event = event.Str("step_reason", step.Reason)
+		}
+	}
+
+	event.Msg("snapshot restore failed")
 
 	return &restoreOutcomeError{error: oops.In("snapshot").
 		Code(code).
@@ -1181,6 +1251,18 @@ func restoreFailure(ctx context.Context, phase string, err error) error {
 
 func (e *restoreOutcomeError) Unwrap() error       { return e.error }
 func (e *restoreOutcomeError) OutcomeLogged() bool { return true }
+
+// mismatchReasons lists the distinct fixed mismatch reasons, without the entities they name.
+func mismatchReasons(mismatches []restore.VerificationMismatch) string {
+	reasons := make([]string, 0, len(mismatches))
+	for _, mismatch := range mismatches {
+		reasons = append(reasons, mismatch.Domain+"/"+mismatch.Reason)
+	}
+
+	slices.Sort(reasons)
+
+	return strings.Join(slices.Compact(reasons), ",")
+}
 
 func classifyRestoreFailure(err error) (string, string) {
 	for _, class := range restoreFailureClasses {

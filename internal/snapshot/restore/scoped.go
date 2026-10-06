@@ -333,16 +333,9 @@ func applyWantedOptions(ctx context.Context, scope optionScope, wanted, live map
 			continue
 		}
 
-		var err error
-		if shape.present {
-			err = scope.Set(ctx, name, shape.value)
-		} else {
-			err = scope.SetWith(ctx, name, tmux.SetOptionOptions{
-				Value: tmux.UnavailableValue[string](), Append: false, ExpandFormat: false, OnlyIfUnset: false,
-			})
-		}
-
-		if err != nil {
+		// tmux lists a valueless local option only for an empty array, and setting an array to the
+		// empty string is the command that recreates one.
+		if err := scope.Set(ctx, name, shape.value); err != nil {
 			return applied, oops.In("snapshot.restore").
 				Code("operation_uncertain").
 				With("operation", "import_options", "reason", "option_set_outcome_unknown").

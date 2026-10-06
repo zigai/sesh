@@ -3,6 +3,7 @@ package model
 import (
 	"bytes"
 	"slices"
+	"strings"
 )
 
 const (
@@ -94,16 +95,18 @@ func withoutSuppliedOptions(options []Option, parent map[string]Option) []Option
 	return kept
 }
 
+// withSuppliedOptions adds the parent options a scope inherits. A local array option, even an
+// empty one, replaces the whole parent array, so no parent element of that array is inherited.
 func withSuppliedOptions(options []Option, parent map[string]Option, scope string) []Option {
 	result := cloneOptions(options)
 	local := make(map[string]bool, len(options))
 
 	for _, option := range options {
-		local[string(option.Name)] = true
+		local[arrayName(string(option.Name))] = true
 	}
 
 	for name, supplied := range parent {
-		if local[name] {
+		if local[arrayName(name)] {
 			continue
 		}
 
@@ -120,6 +123,12 @@ func withSuppliedOptions(options []Option, parent map[string]Option, scope strin
 	slices.SortFunc(appended, func(left, right Option) int { return bytes.Compare(left.Name, right.Name) })
 
 	return result
+}
+
+func arrayName(name string) string {
+	base, _, _ := strings.Cut(name, "[")
+
+	return base
 }
 
 func sameSetting(option, supplied Option) bool {

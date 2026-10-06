@@ -126,7 +126,7 @@ func writeRestoreSummary(out *strings.Builder, res engine.RestoreResult, labels 
 		fmt.Fprintf(out, "Restored %s from generation %s.\n", sessionCount(len(res.SessionsRestored)), generation)
 	}
 
-	if len(res.SessionsRestored) > 0 && !res.Verified {
+	if len(res.Mismatches) > 0 {
 		out.WriteString("The restored layout does not fully match the snapshot; run with --verbose for the differences.\n")
 	}
 
@@ -290,6 +290,14 @@ func writeRestoreDetails(out *strings.Builder, res engine.RestoreResult) {
 
 		for _, session := range res.SessionsSkipped {
 			fmt.Fprintf(out, "  %s %q reason=%s\n", session.ID, session.Name, session.Reason)
+		}
+	}
+
+	if len(res.Mismatches) > 0 {
+		out.WriteString("Differences:\n")
+
+		for _, mismatch := range res.Mismatches {
+			fmt.Fprintf(out, "  %s %s reason=%s\n", mismatch.Domain, mismatch.Entity, mismatch.Reason)
 		}
 	}
 

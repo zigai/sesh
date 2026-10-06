@@ -119,3 +119,34 @@ func TestRestoreSummaryOffersSafeResumeWhenEffectsAreUncertain(t *testing.T) {
 		t.Fatalf("an uncertain restore must say how to continue it safely:\n%s", got)
 	}
 }
+
+func TestRestoreSummaryListsLayoutDifferencesWhenVerbose(t *testing.T) {
+	t.Parallel()
+
+	res := summaryResult()
+	res.Verified = false
+	res.Mismatches = []restore.VerificationMismatch{{Domain: restore.MismatchPane, Entity: "p2", Reason: "pane_geometry_mismatch"}}
+
+	summary := renderSummary(t, res, newRestoreLabels(summaryManifest()), false)
+	if !strings.Contains(summary, "does not fully match the snapshot") {
+		t.Fatalf("a mismatched restore must say so:\n%s", summary)
+	}
+
+	verbose := renderSummary(t, res, newRestoreLabels(summaryManifest()), true)
+	if !strings.Contains(verbose, "Differences:\n  pane p2 reason=pane_geometry_mismatch\n") {
+		t.Fatalf("verbose output must list each difference:\n%s", verbose)
+	}
+}
+
+func TestRestoreSummaryDoesNotReportDifferencesBeforeVerification(t *testing.T) {
+	t.Parallel()
+
+	res := summaryResult()
+	res.Verified = false
+	res.Uncertain = true
+
+	got := renderSummary(t, res, newRestoreLabels(summaryManifest()), true)
+	if strings.Contains(got, "does not fully match") || strings.Contains(got, "Differences:") {
+		t.Fatalf("a restore that never verified must not claim layout differences:\n%s", got)
+	}
+}

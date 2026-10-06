@@ -223,6 +223,161 @@ func TestExecutorNeverMutatesGlobalScopes(t *testing.T) {
 	}
 }
 
+func TestExecutorRestoresEmptySessionHookArray(t *testing.T) {
+	sourceServer := tmuxtest.NewServer(t)
+	targetServer := tmuxtest.NewServer(t)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+
+	if err := sourceServer.GlobalSessionOptions().Set(ctx, "client-attached[1]", "run-shell true"); err != nil {
+		t.Fatalf("setting global hook failed: %v", err)
+	}
+
+	source, err := sourceServer.NewSession(ctx, tmux.NewSessionOptions{Name: "hook-source", Program: tmux.Exec("sleep", "300"), Start: tmux.StartPolicyExistingOnly})
+	if err != nil {
+		t.Fatalf("NewSession failed: %v", err)
+	}
+
+	disableAutomaticRename(t, ctx, source)
+
+	if err := source.Options().Set(ctx, "client-attached", ""); err != nil {
+		t.Fatalf("emptying session hook failed: %v", err)
+	}
+
+	plan, receipts := restoreSessionWithScopedState(t, ctx, sourceServer, targetServer, source, "hook-source")
+
+	target, err := targetServer.FindSession(ctx, "hook-source")
+	if err != nil {
+		t.Fatalf("FindSession failed: %v", err)
+	}
+
+	entries, err := target.Options().ListWith(ctx, tmux.ListOptionOptions{Inherited: false, Hooks: true})
+	if err != nil {
+		t.Fatalf("listing target hooks failed: %v", err)
+	}
+
+	hooks := slices.DeleteFunc(slices.Clone(entries), func(entry tmux.OptionEntry) bool {
+		return !strings.HasPrefix(entry.Name, "client-attached")
+	})
+	if len(hooks) != 1 || hooks[0].Name != "client-attached" || hooks[0].Value.State() == tmux.ValueStatePresent {
+		t.Fatalf("target session hooks = %+v, want only the empty client-attached array", hooks)
+	}
+
+	assertRestoreVerified(t, ctx, targetServer, plan, receipts)
+}
+
+func TestRestoreOfWindowWithFloatingPaneVerifies(t *testing.T) {
+	sourceServer := tmuxtest.NewServer(t)
+	targetServer := tmuxtest.NewServer(t)
+
+	requireFloatingPanes(t, sourceServer)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+
+	source, err := sourceServer.NewSession(ctx, tmux.NewSessionOptions{Name: "floating-source", Program: tmux.Exec("sleep", "300"), Start: tmux.StartPolicyExistingOnly, Size: tmux.Size{Width: 100, Height: 35}})
+	if err != nil {
+		t.Fatalf("NewSession failed: %v", err)
+	}
+
+	disableAutomaticRename(t, ctx, source)
+
+	windows, _, err := source.WindowInfos(ctx)
+	if err != nil {
+		t.Fatalf("WindowInfos failed: %v", err)
+	}
+
+	first, err := windows[0].Handle().ActivePane(ctx)
+	if err != nil {
+		t.Fatalf("ActivePane failed: %v", err)
+	}
+
+	if _, err := first.Split(ctx, tmux.SplitOptions{Program: tmux.Exec("sleep", "300")}); err != nil {
+		t.Fatalf("Split failed: %v", err)
+	}
+
+	if _, err := first.NewPane(ctx, tmux.NewPaneOptions{Width: "20", Height: "5", X: "3", Y: "3", Program: tmux.Exec("sleep", "300"), Select: true}); err != nil {
+		t.Fatalf("NewPane failed: %v", err)
+	}
+
+	plan, receipts := restoreSessionWithScopedState(t, ctx, sourceServer, targetServer, source, "floating-source")
+
+	assertRestoreVerified(t, ctx, targetServer, plan, receipts)
+
+	target, err := targetServer.FindSession(ctx, "floating-source")
+	if err != nil {
+		t.Fatalf("FindSession failed: %v", err)
+	}
+
+	targetWindows, _, err := target.WindowInfos(ctx)
+	if err != nil {
+		t.Fatalf("WindowInfos failed: %v", err)
+	}
+
+	panes, err := targetWindows[0].Handle().Panes(ctx)
+	if err != nil {
+		t.Fatalf("Panes failed: %v", err)
+	}
+
+	if len(panes) != 2 {
+		t.Fatalf("restored window has %d panes, want the 2 tiled panes", len(panes))
+	}
+}
+
+// restoreSessionWithScopedState saves the named source session, restores it onto the target and
+// imports its scoped state, returning the plan and runtime receipts for verification.
+func restoreSessionWithScopedState(t *testing.T, ctx context.Context, sourceServer, targetServer *tmux.Server, source tmux.Session, name string) (Plan, map[string]string) {
+	t.Helper()
+
+	observation, err := capture.Observe(ctx, sourceServer, []tmux.SessionID{source.ID()})
+	if err != nil {
+		t.Fatalf("capture.Observe failed: %v", err)
+	}
+
+	repoDir := filepath.Join(t.TempDir(), "repo")
+	generation := commitObservationToRepo(t, ctx, repoDir, observation)
+
+	plan, err := BuildPlan(observation.Manifest, []string{sessionIDByName(t, observation.Manifest, name)})
+	if err != nil {
+		t.Fatalf("BuildPlan failed: %v", err)
+	}
+
+	repo, err := store.Open(ctx, repoDir)
+	if err != nil {
+		t.Fatalf("store.Open failed: %v", err)
+	}
+
+	t.Cleanup(func() { _ = repo.Close() })
+
+	operation := registerPlanOperation(t, ctx, repo, name, generation, targetServer.Endpoint().SocketPath, plan)
+
+	report, err := NewExecutor(targetServer, observation.Manifest, DefaultExecuteConfig()).
+		Execute(ctx, plan, newPlanJournal(t, ctx, repo, operation))
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	if _, err := ImportScopedState(ctx, targetServer, plan, report.Receipts); err != nil {
+		t.Fatalf("ImportScopedState failed: %v", err)
+	}
+
+	return plan, report.Receipts
+}
+
+func assertRestoreVerified(t *testing.T, ctx context.Context, server *tmux.Server, plan Plan, receipts map[string]string) {
+	t.Helper()
+
+	verification, err := Verify(ctx, server, plan, receipts)
+	if err != nil {
+		t.Fatalf("Verify failed: %v", err)
+	}
+
+	if !verification.Verified {
+		t.Fatalf("verification failed: %+v", verification.Mismatches)
+	}
+}
+
 func TestInheritedDefaultsAreMaterializedOnOwnedScopes(t *testing.T) {
 	sourceServer := tmuxtest.NewServer(t)
 	targetServer := tmuxtest.NewServer(t)
@@ -1608,5 +1763,18 @@ func tamperAndAssertScopedConflict(
 
 	if !found {
 		t.Fatalf("expected local_option_mismatch, got %+v", mismatches)
+	}
+}
+
+func requireFloatingPanes(t *testing.T, server *tmux.Server) {
+	t.Helper()
+
+	info, err := server.Probe(t.Context())
+	if err != nil {
+		t.Fatalf("Probe failed: %v", err)
+	}
+
+	if !info.Version.AtLeast(3, 7) {
+		t.Skipf("floating panes need tmux 3.7 or newer, test server runs %s", info.Version)
 	}
 }
