@@ -17,6 +17,7 @@ type foregroundFixtureProcess struct {
 	pid, parent, group, foregroundGroup int
 	startTime                           uint64
 	children                            []int
+	exited                              bool
 }
 
 func TestSelectLinuxForegroundUsesUniqueProcessGroupRoot(t *testing.T) {
@@ -51,6 +52,23 @@ func TestSelectLinuxForegroundUsesUniqueProcessGroupRoot(t *testing.T) {
 				{pid: 30, parent: 20, group: 30, foregroundGroup: 30, startTime: 300},
 			},
 			wantPID: 30,
+		},
+		{
+			name: "exited descendant is skipped",
+			processes: []foregroundFixtureProcess{
+				{pid: 10, parent: 1, group: 10, foregroundGroup: 20, startTime: 100, children: []int{20}},
+				{pid: 20, parent: 10, group: 20, foregroundGroup: 20, startTime: 200, children: []int{30}},
+				{pid: 30, parent: 20, group: 30, foregroundGroup: 0, startTime: 300, exited: true},
+			},
+			wantPID: 20,
+		},
+		{
+			name: "exited foreground child is unavailable",
+			processes: []foregroundFixtureProcess{
+				{pid: 10, parent: 1, group: 10, foregroundGroup: 20, startTime: 100, children: []int{20}},
+				{pid: 20, parent: 10, group: 20, foregroundGroup: 20, startTime: 200, exited: true},
+			},
+			wantErr: ErrForegroundUnavailable,
 		},
 		{
 			name: "pipeline is ambiguous",
@@ -179,8 +197,13 @@ func writeForegroundProcFixture(t *testing.T, processes []foregroundFixtureProce
 }
 
 func foregroundStatContent(process foregroundFixtureProcess) []byte {
+	state := "S"
+	if process.exited {
+		state = "Z"
+	}
+
 	return []byte(fmt.Sprintf(
-		"%d (fixture) S %d %d 10 34816 %d 0 0 0 0 0 0 0 0 0 20 0 1 0 %d 0\n",
-		process.pid, process.parent, process.group, process.foregroundGroup, process.startTime,
+		"%d (fixture) %s %d %d 10 34816 %d 0 0 0 0 0 0 0 0 0 20 0 1 0 %d 0\n",
+		process.pid, state, process.parent, process.group, process.foregroundGroup, process.startTime,
 	))
 }

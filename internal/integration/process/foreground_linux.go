@@ -240,7 +240,7 @@ func appendLinuxDescendants(
 func readLinuxDescendant(ctx context.Context, procRoot string, pid int) (linuxForegroundProcess, bool, error) {
 	process, err := readLinuxForegroundProcess(ctx, procRoot, pid)
 	if err != nil {
-		if isProcessGone(err) {
+		if isProcessGone(err) || errors.Is(err, ErrProcessZombie) {
 			return zeroLinuxForegroundProcess(), false, nil
 		}
 
