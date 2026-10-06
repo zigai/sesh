@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
@@ -24,6 +25,7 @@ type autosaveResultJSON struct {
 	HistoryState     string `json:"historyState,omitempty"`
 	RepositoryState  string `json:"repositoryState,omitempty"`
 	FinalSaveState   string `json:"finalSaveState,omitempty"`
+	FinalSaveAt      int64  `json:"finalSaveCompletedAt,omitempty"`
 	DefaultAction    string `json:"defaultSessionAction,omitempty"`
 	DefaultFrom      string `json:"defaultSessionFrom,omitempty"`
 	DefaultTo        string `json:"defaultSessionTo,omitempty"`
@@ -82,8 +84,12 @@ func runAutosaveStatus(cmd *cobra.Command, _ []string) error {
 	outcome := newAutosaveOutcome(autosaveDecisionStatus(env.decision), env.decision.Reason)
 	outcome.history = autosaveHistoryState(env)
 	outcome.repository = autosaveRepositoryState(ctx, cmd, env)
-	outcome.finalSave = autosaveFinalSaveState(cmd, env)
 	outcome.daemonState, outcome.daemonStatus = autosaveDaemonRuntimeState(ctx, cmd)
+
+	outcome.finalSave, outcome.finalSaveAt = autosaveFinalSaveState(cmd, env)
+	if outcome.finalSaveAt > 0 {
+		outcome.finalSaveAge = time.Since(time.Unix(outcome.finalSaveAt, 0))
+	}
 
 	if env.historyErr != nil {
 		outcome.status = autosaveStatusDegraded
@@ -174,8 +180,6 @@ func autosaveRepositoryState(ctx context.Context, cmd *cobra.Command, env autosa
 	switch {
 	case state.RecoveryRequired:
 		return autosaveRepositoryRecovery
-	case state.ObservationOnly:
-		return autosaveRepositoryObservation
 	case state.Generation == "":
 		return autosaveRepositoryEmpty
 	default:
@@ -183,17 +187,17 @@ func autosaveRepositoryState(ctx context.Context, cmd *cobra.Command, env autosa
 	}
 }
 
-func autosaveFinalSaveState(cmd *cobra.Command, _ autosaveEnv) string {
+func autosaveFinalSaveState(cmd *cobra.Command, _ autosaveEnv) (string, int64) {
 	status, err := automation.ReadFinalSaveStatus(resolveAutosaveStatusPath(cmd))
 	if err != nil {
-		return ""
+		return "", 0
 	}
 
 	if status.Incomplete {
-		return automation.FinalSaveIncomplete
+		return automation.FinalSaveIncomplete, status.CompletedAtUnix
 	}
 
-	return status.Result
+	return status.Result, status.CompletedAtUnix
 }
 
 func autosaveDecisionStatus(decision automation.DueDecision) string {
@@ -259,6 +263,7 @@ func autosavePayload(env autosaveEnv, outcome autosaveOutcome) autosaveResultJSO
 		HistoryState:     outcome.history,
 		RepositoryState:  outcome.repository,
 		FinalSaveState:   outcome.finalSave,
+		FinalSaveAt:      outcome.finalSaveAt,
 		DefaultAction:    outcome.defaultSession,
 		DefaultFrom:      outcome.defaultFrom,
 		DefaultTo:        outcome.defaultTo,

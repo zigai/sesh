@@ -76,11 +76,12 @@ func TestAutosaveStatusSummaryShowsScheduleSnapshotsAndShutdownSaves(t *testing.
 	outcome.repository = autosaveRepositoryReady
 	outcome.daemonState = autosaveDaemonReady
 	outcome.finalSave = automation.FinalSaveIncomplete
+	outcome.finalSaveAge = 50 * time.Hour
 
 	want := "Autosave:        on, every 3m; last save 1m20s ago\n" +
 		"Snapshots:       ready to restore\n" +
 		"Before shutdown: saves run before sleep and shutdown\n" +
-		"Last final save: cut short; restore uses the newest finished save\n"
+		"Last final save: cut short 2d2h ago; restore uses the newest finished save\n"
 	if got := autosaveStatusSummary(summaryEnv(), outcome); got != want {
 		t.Fatalf("status:\n%s\nwant:\n%s", got, want)
 	}
@@ -108,6 +109,8 @@ func TestShortDurationReadsLikeSpeech(t *testing.T) {
 		{2*time.Hour + 5*time.Minute, "2h5m"},
 		{2 * time.Hour, "2h"},
 		{1500 * time.Millisecond, "2s"},
+		{24 * time.Hour, "1d"},
+		{3*24*time.Hour + 5*time.Hour + 20*time.Minute, "3d5h"},
 	}
 
 	for _, tc := range tests {

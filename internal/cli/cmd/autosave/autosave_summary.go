@@ -2,6 +2,7 @@ package autosave
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -107,7 +108,7 @@ func autosaveStatusSummary(env autosaveEnv, outcome autosaveOutcome) string {
 		fmt.Fprintf(&out, "%-17s%s\n", "Before shutdown:", state)
 	}
 
-	if state := lastFinalSaveState(outcome.finalSave); state != "" {
+	if state := lastFinalSaveState(outcome.finalSave, outcome.finalSaveAge); state != "" {
 		fmt.Fprintf(&out, "%-17s%s\n", "Last final save:", state)
 	}
 
@@ -137,8 +138,6 @@ func snapshotsState(repository string) string {
 		return "ready to restore"
 	case autosaveRepositoryEmpty, autosaveRepositoryMissing:
 		return "none saved yet"
-	case autosaveRepositoryObservation:
-		return "no finished save yet"
 	case autosaveRepositoryRecovery:
 		return "a restore is unfinished; run sesh doctor"
 	default:
@@ -163,18 +162,25 @@ func shutdownSaveState(daemonState string) string {
 	}
 }
 
-func lastFinalSaveState(finalSave string) string {
+func lastFinalSaveState(finalSave string, age time.Duration) string {
+	when := ""
+	if age > 0 {
+		when = " " + shortDuration(age) + " ago"
+	}
+
 	switch finalSave {
+	case "":
+		return ""
 	case automation.FinalSaveSaved:
-		return "finished"
+		return "finished" + when
 	case automation.FinalSaveIncomplete:
-		return "cut short; restore uses the newest finished save"
+		return "cut short" + when + "; restore uses the newest finished save"
 	case automation.FinalSaveFailed:
-		return "failed"
+		return "failed" + when
 	case automation.FinalSaveUncertain:
-		return "may or may not have finished"
+		return "may or may not have finished" + when
 	default:
-		return finalSave
+		return finalSave + when
 	}
 }
 
@@ -216,6 +222,19 @@ func shortGeneration(generation string) string {
 
 // shortDuration writes a duration the way a reader says it: 3m, 1m20s, 2h5m.
 func shortDuration(duration time.Duration) string {
+	const day = 24 * time.Hour
+
+	if duration >= day {
+		hours := duration.Round(time.Hour)
+		text := strconv.FormatInt(int64(hours/day), 10) + "d"
+
+		if rest := hours % day; rest > 0 {
+			text += strconv.FormatInt(int64(rest/time.Hour), 10) + "h"
+		}
+
+		return text
+	}
+
 	text := duration.Round(time.Second).String()
 	if strings.HasSuffix(text, "m0s") {
 		text = strings.TrimSuffix(text, "0s")

@@ -183,6 +183,8 @@ func runAutosaveRestoreOnStart(cmd *cobra.Command, _ []string) error {
 func executeStartupRestore(cmd *cobra.Command, env autosaveEnv) error {
 	ctx := clibase.CommandContext(cmd)
 
+	reportUnsavedShutdownSinceBoot(ctx, cmd, env)
+
 	socketPath := clibase.ResolveSocket(cmd)
 
 	leaseRoot, err := resolveAutosaveLeaseRoot(cmd, env.cfg)
@@ -340,8 +342,6 @@ func autosaveRepositoryFromState(state automation.StartupState) string {
 	switch {
 	case state.RecoveryRequired:
 		return autosaveRepositoryRecovery
-	case state.ObservationOnly:
-		return autosaveRepositoryObservation
 	case state.Generation == "":
 		return autosaveRepositoryEmpty
 	default:

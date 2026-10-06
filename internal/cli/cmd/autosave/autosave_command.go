@@ -33,11 +33,10 @@ const (
 	autosaveHistoryNeverRun    = "never_run"
 	autosaveHistoryUnavailable = "unavailable"
 
-	autosaveRepositoryMissing     = "missing"
-	autosaveRepositoryEmpty       = "empty"
-	autosaveRepositoryObservation = "observation_incomplete"
-	autosaveRepositoryRecovery    = "recovery_required"
-	autosaveRepositoryReady       = "ready"
+	autosaveRepositoryMissing  = "missing"
+	autosaveRepositoryEmpty    = "empty"
+	autosaveRepositoryRecovery = "recovery_required"
+	autosaveRepositoryReady    = "ready"
 
 	AutosaveDaemonUnselected   = "unselected"
 	autosaveDaemonUnselected   = AutosaveDaemonUnselected
@@ -67,6 +66,8 @@ type autosaveOutcome struct {
 	history        string
 	repository     string
 	finalSave      string
+	finalSaveAt    int64
+	finalSaveAge   time.Duration
 	defaultSession string
 	defaultFrom    string
 	defaultTo      string
@@ -101,6 +102,8 @@ func newAutosaveOutcome(status, reason string) autosaveOutcome {
 		history:        "",
 		repository:     "",
 		finalSave:      "",
+		finalSaveAt:    0,
+		finalSaveAge:   0,
 		defaultSession: "",
 		defaultFrom:    "",
 		defaultTo:      "",

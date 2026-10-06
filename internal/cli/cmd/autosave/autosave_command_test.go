@@ -9,6 +9,7 @@ import (
 	"github.com/zigai/sesh/internal/automation"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/testsupport/clitest"
+	"github.com/zigai/sesh/internal/testsupport/snapfixture"
 )
 
 func TestAutosaveCommandHelp(t *testing.T) {
@@ -178,6 +179,23 @@ func TestAutosaveStatusReportsDurableState(t *testing.T) {
 
 	if result.RepositoryState != "missing" {
 		t.Fatalf("repositoryState = %q, want missing", result.RepositoryState)
+	}
+}
+
+func TestAutosaveStatusReportsBestEffortSaveAsRestorable(t *testing.T) {
+	isolatedAutosaveHome(t)
+
+	repoPath := filepath.Join(t.TempDir(), "snapshots")
+	snapfixture.CommitOneSession(t, repoPath)
+
+	exec := executeJSON(t, "autosave", "status", testNoConfigFlag, testJSONFlag, "--repository", repoPath)
+	if !exec.Envelope.OK {
+		t.Fatalf("autosave status failed: %s", exec.Stderr)
+	}
+
+	result := clitest.DecodePayload[autosaveResultJSON](t, exec.Envelope.Result)
+	if result.RepositoryState != "ready" {
+		t.Fatalf("repositoryState = %q, want ready for a best-effort save", result.RepositoryState)
 	}
 }
 

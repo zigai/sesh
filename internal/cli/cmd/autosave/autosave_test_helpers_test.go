@@ -26,6 +26,7 @@ type autosaveResultJSON struct {
 	HistoryState     string `json:"historyState,omitempty"`
 	RepositoryState  string `json:"repositoryState,omitempty"`
 	FinalSaveState   string `json:"finalSaveState,omitempty"`
+	FinalSaveAt      int64  `json:"finalSaveCompletedAt,omitempty"`
 	DefaultAction    string `json:"defaultSessionAction,omitempty"`
 	DefaultFrom      string `json:"defaultSessionFrom,omitempty"`
 	DefaultTo        string `json:"defaultSessionTo,omitempty"`
