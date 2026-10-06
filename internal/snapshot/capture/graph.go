@@ -2,6 +2,7 @@ package capture
 
 import (
 	"errors"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -19,15 +20,17 @@ var (
 	ErrProcessDeleted = errors.New("process executable or working directory was deleted")
 )
 
-func graph(snapshot gotmux.Snapshot, selected []gotmux.SessionID) (model.Manifest, error) {
+// graph projects the selected sessions into a manifest. Floating panes are left out because the
+// snapshot format models only the tiled layout; the count of omitted panes is returned.
+func graph(snapshot gotmux.Snapshot, selected []gotmux.SessionID) (model.Manifest, int, error) {
 	var m model.Manifest
 	if snapshot.Consistency != gotmux.ConsistencyComplete {
-		return m, ErrChanged
+		return m, 0, ErrChanged
 	}
 
 	wanted, err := closure(snapshot, selected)
 	if err != nil {
-		return m, err
+		return m, 0, err
 	}
 
 	groups := make(map[string]int)
@@ -56,7 +59,30 @@ func graph(snapshot gotmux.Snapshot, selected []gotmux.SessionID) (model.Manifes
 	return graphWindows(snapshot, wanted, m)
 }
 
-func graphWindows(snapshot gotmux.Snapshot, wanted map[gotmux.SessionID]bool, m model.Manifest) (model.Manifest, error) {
+func graphWindows(snapshot gotmux.Snapshot, wanted map[gotmux.SessionID]bool, m model.Manifest) (model.Manifest, int, error) {
+	windows := graphLinks(snapshot, wanted, &m)
+
+	layouts, floating, err := graphLayouts(snapshot, windows, &m)
+	if err != nil {
+		return m, 0, err
+	}
+
+	for _, info := range snapshot.Panes() {
+		if windows[info.WindowID] && !floating[ref("p", string(info.ID))] {
+			m.Panes = append(m.Panes, paneObservation(info))
+		}
+	}
+
+	for window, layout := range layouts {
+		if len(layout.Floating) > 0 {
+			retileWindowPanes(snapshot, m.Panes, window, layout)
+		}
+	}
+
+	return m, len(floating), nil
+}
+
+func graphLinks(snapshot gotmux.Snapshot, wanted map[gotmux.SessionID]bool, m *model.Manifest) map[gotmux.WindowID]bool {
 	windows := make(map[gotmux.WindowID]bool)
 
 	for _, info := range snapshot.Links() {
@@ -68,16 +94,22 @@ func graphWindows(snapshot gotmux.Snapshot, wanted map[gotmux.SessionID]bool, m 
 		m.Links = append(m.Links, model.Link{Session: ref("s", string(info.SessionID)), Window: ref("w", string(info.WindowID)), Index: info.Index, Active: info.Active, Last: strings.Contains(info.Flags, "-"), Flags: model.Bytes(info.Flags)})
 	}
 
+	return windows
+}
+
+// graphLayouts records each selected window with its tiled layout and returns the decoded layouts
+// with the set of floating panes they exclude.
+func graphLayouts(snapshot gotmux.Snapshot, windows map[gotmux.WindowID]bool, m *model.Manifest) (map[string]integration.WindowLayout, map[string]bool, error) {
 	panes := make(map[string]string)
 
 	for _, info := range snapshot.Panes() {
-		if !windows[info.WindowID] {
-			continue
+		if windows[info.WindowID] {
+			panes[string(info.ID)] = ref("p", string(info.ID))
 		}
-
-		panes[string(info.ID)] = ref("p", string(info.ID))
-		m.Panes = append(m.Panes, paneObservation(info))
 	}
+
+	layouts := make(map[string]integration.WindowLayout)
+	floating := make(map[string]bool)
 
 	for _, info := range snapshot.Windows() {
 		if !windows[info.ID] {
@@ -86,16 +118,74 @@ func graphWindows(snapshot gotmux.Snapshot, wanted map[gotmux.SessionID]bool, m 
 
 		layout, err := integration.DecodeLayout(info.Layout, panes)
 		if err != nil {
-			return m, oops.In("snapshot.capture").
+			return nil, nil, oops.In("snapshot.capture").
 				Code("capture_unsupported").
 				With("operation", "decode_layout", "domain", "S03", "reason", "layout_decode").
 				Wrap(ErrUnsupported)
 		}
 
-		m.Windows = append(m.Windows, model.Window{ID: ref("w", string(info.ID)), Name: model.Bytes(info.Name), Width: info.Width, Height: info.Height, Layout: layout, Zoomed: info.Zoomed, Options: nil})
+		id := ref("w", string(info.ID))
+		layouts[id] = layout
+
+		for _, pane := range layout.Floating {
+			floating[pane] = true
+		}
+
+		m.Windows = append(m.Windows, model.Window{ID: id, Name: model.Bytes(info.Name), Width: info.Width, Height: info.Height, Layout: layout.Tiled, Zoomed: info.Zoomed, Options: nil})
 	}
 
-	return m, nil
+	return layouts, floating, nil
+}
+
+// retileWindowPanes renumbers a window's tiled panes as tmux numbers them once its floating
+// panes are gone, and moves the active flag to the tiled pane used most recently when a
+// floating pane was active.
+func retileWindowPanes(snapshot gotmux.Snapshot, panes []model.Pane, window string, layout integration.WindowLayout) {
+	base := -1
+
+	for _, info := range snapshot.Panes() {
+		if ref("w", string(info.WindowID)) == window && (base < 0 || info.Index < base) {
+			base = info.Index
+		}
+	}
+
+	var tiled []int
+
+	for index := range panes {
+		if panes[index].Window == window {
+			tiled = append(tiled, index)
+		}
+	}
+
+	slices.SortFunc(tiled, func(left, right int) int { return panes[left].Index - panes[right].Index })
+
+	active := false
+
+	for rank, index := range tiled {
+		panes[index].Index = base + rank
+		active = active || panes[index].Active
+	}
+
+	if active {
+		return
+	}
+
+	recent := layout.Recent
+	if recent == "" {
+		recent = firstLayoutPane(layout.Tiled)
+	}
+
+	for _, index := range tiled {
+		panes[index].Active = panes[index].ID == recent
+	}
+}
+
+func firstLayoutPane(node model.Layout) string {
+	for node.Pane == "" && len(node.Children) > 0 {
+		node = node.Children[0]
+	}
+
+	return node.Pane
 }
 
 func paneObservation(info gotmux.PaneInfo) model.Pane {

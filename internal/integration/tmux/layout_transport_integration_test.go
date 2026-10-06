@@ -99,10 +99,12 @@ func TestCliServerLayoutsDecode(t *testing.T) {
 	leafs, branches := 0, 0
 
 	for _, info := range before.Windows() {
-		node, err := itmux.DecodeLayout(info.Layout, references)
+		decoded, err := itmux.DecodeLayout(info.Layout, references)
 		if err != nil {
 			t.Fatalf("window %s layout %q failed to decode: %v", info.ID, info.Layout, err)
 		}
+
+		node := decoded.Tiled
 
 		assertRootGeometry(t, node, info)
 

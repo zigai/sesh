@@ -5,6 +5,7 @@ package capture
 import (
 	"bytes"
 	"context"
+	"slices"
 	"testing"
 	"time"
 
@@ -137,6 +138,73 @@ func TestObserveOmitsTerminalTextBeyondOutputLimit(t *testing.T) {
 	}
 }
 
+func TestObserveOmitsFloatingPanes(t *testing.T) {
+	server := tmuxtest.NewServer(t)
+	requireFloatingPanes(t, server)
+
+	session, first, second := floatingPaneFixture(t, server)
+
+	observation, err := Observe(t.Context(), server, []tmux.SessionID{session.ID()})
+	if err != nil {
+		t.Fatalf("observation with a floating pane failed: %v", err)
+	}
+
+	if observation.FloatingPanesOmitted != 1 {
+		t.Fatalf("floating panes omitted = %d, want 1", observation.FloatingPanesOmitted)
+	}
+
+	panes := observation.Manifest.Panes
+	if len(panes) != 2 || panes[0].ID != ref("p", string(first.ID())) || panes[1].ID != ref("p", string(second.ID())) {
+		t.Fatalf("saved panes = %+v, want only the two tiled panes", panes)
+	}
+
+	if panes[1].Index != panes[0].Index+1 {
+		t.Fatalf("tiled pane indexes = %d, %d, want consecutive", panes[0].Index, panes[1].Index)
+	}
+
+	if panes[0].Active == panes[1].Active {
+		t.Fatal("exactly one tiled pane must take over from the active floating pane")
+	}
+
+	layoutEvidence := observation.Manifest.Evidence[slices.IndexFunc(observation.Manifest.Evidence, func(e model.Evidence) bool { return e.Domain == "S03" })]
+	if layoutEvidence.Reason != string(model.ReasonFloatingPanesOmitted) {
+		t.Fatalf("layout evidence = %+v, want floating panes omitted", layoutEvidence)
+	}
+}
+
+// floatingPaneFixture opens an active floating pane between two tiled panes, so the floating
+// pane takes the middle pane index.
+func floatingPaneFixture(t *testing.T, server *tmux.Server) (tmux.Session, tmux.Pane, tmux.Pane) {
+	t.Helper()
+
+	session, first := captureSessionFixture(t, server, "floating")
+
+	second, err := first.Split(t.Context(), tmux.SplitOptions{Program: tmux.Exec("sleep", "300")})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := second.Select(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	floating, err := first.NewPane(t.Context(), tmux.NewPaneOptions{Width: "20", Height: "5", X: "3", Y: "3", Program: tmux.Exec("sleep", "300"), Select: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	info, err := floating.Info(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !info.Active {
+		t.Fatal("floating pane fixture is not active")
+	}
+
+	return session, first, second
+}
+
 func scriptedSessionFixture(t *testing.T, server *tmux.Server, name string, width int, script string) (tmux.Session, tmux.Pane) {
 	t.Helper()
 
@@ -238,10 +306,23 @@ func captureBaseline(t *testing.T, server *tmux.Server, session tmux.Session) (t
 		t.Fatal(err)
 	}
 
-	m, err := graph(before, []tmux.SessionID{session.ID()})
+	m, _, err := graph(before, []tmux.SessionID{session.ID()})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	return before, m
+}
+
+func requireFloatingPanes(t *testing.T, server *tmux.Server) {
+	t.Helper()
+
+	info, err := server.Probe(t.Context())
+	if err != nil {
+		t.Fatalf("Probe failed: %v", err)
+	}
+
+	if !info.Version.AtLeast(3, 7) {
+		t.Skipf("floating panes need tmux 3.7 or newer, test server runs %s", info.Version)
+	}
 }

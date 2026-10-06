@@ -111,6 +111,7 @@ func validEvidence(e Evidence) bool {
 	return slices.Contains([]Reason{
 		ReasonNotCaptured, ReasonCaptureNotAtomic, ReasonTerminalCheckpointUnavailable,
 		ReasonApplicationCheckpointUnavailable, ReasonOwnershipUnverified, ReasonObservedOnly,
+		ReasonFloatingPanesOmitted,
 	}, Reason(e.Reason))
 }
 

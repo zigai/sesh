@@ -31,6 +31,8 @@ var beforeCompareGraphHook func()
 type Observation struct {
 	Manifest  model.Manifest
 	Artifacts map[string][]byte
+	// FloatingPanesOmitted counts floating panes left out of the manifest.
+	FloatingPanesOmitted int
 }
 
 type paneProcessRecord struct {
@@ -137,12 +139,12 @@ func observeOnce(ctx context.Context, server *gotmux.Server, selected []gotmux.S
 		return Observation{}, err
 	}
 
-	m, err := graph(before, selected)
+	m, floating, err := graph(before, selected)
 	if err != nil {
 		return Observation{}, err
 	}
 
-	result := Observation{Manifest: m, Artifacts: make(map[string][]byte)}
+	result := Observation{Manifest: m, Artifacts: make(map[string][]byte), FloatingPanesOmitted: floating}
 	if err := result.collect(ctx, server, before); err != nil {
 		return Observation{}, err
 	}
@@ -188,7 +190,7 @@ func (o *Observation) finalize(info gotmux.ServerInfo, started int64, endpoint s
 	}
 
 	o.Manifest.Source.EndpointScope = endpointScope
-	o.Manifest.Evidence = observationEvidence(enriched)
+	o.Manifest.Evidence = observationEvidence(enriched, o.FloatingPanesOmitted > 0)
 	o.Manifest = o.Manifest.CompactInheritedOptions()
 
 	if err := o.Manifest.Validate(); err != nil {
@@ -388,7 +390,7 @@ func compareGraph(ctx context.Context, server *gotmux.Server, before gotmux.Snap
 		return err
 	}
 
-	initial, err := graph(before, selected)
+	initial, _, err := graph(before, selected)
 	if err != nil {
 		return err
 	}
@@ -398,7 +400,7 @@ func compareGraph(ctx context.Context, server *gotmux.Server, before gotmux.Snap
 		return err
 	}
 
-	projected, err := graph(after, selected)
+	projected, _, err := graph(after, selected)
 	if err != nil {
 		return err
 	}
@@ -550,13 +552,17 @@ func compareSelectedProcesses(before, after gotmux.Snapshot, projected model.Man
 	return nil
 }
 
-func observationEvidence(enriched bool) []model.Evidence {
+func observationEvidence(enriched, floatingOmitted bool) []model.Evidence {
 	domains := []string{"S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10"}
 
 	result := make([]model.Evidence, 0, len(domains))
 	for _, domain := range domains {
 		evidence := model.Evidence{Domain: domain, Status: "observed", Reason: "observed_only"}
 		switch domain {
+		case "S03":
+			if floatingOmitted {
+				evidence.Reason = string(model.ReasonFloatingPanesOmitted)
+			}
 		case "S06":
 			evidence.Reason = "terminal_checkpoint_unavailable"
 		case "S07":

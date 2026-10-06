@@ -50,7 +50,7 @@ func TestLayoutRemappingPreservesExactGeometry(t *testing.T) {
 		t.Fatal("fixture lacks a geometric difference")
 	}
 
-	remapped, err := integration.EncodeLayout(layout, map[string]tmux.PaneID{"left": replacements[0].ID(), "right": replacements[1].ID()})
+	remapped, err := integration.EncodeLayout(layout.Tiled, map[string]tmux.PaneID{"left": replacements[0].ID(), "right": replacements[1].ID()})
 	if err != nil {
 		t.Fatal(err)
 	}

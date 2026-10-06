@@ -1,6 +1,8 @@
 package tmux
 
 import (
+	"reflect"
+	"slices"
 	"testing"
 
 	gotmux "github.com/zigai/gotmux/tmux"
@@ -17,10 +19,12 @@ const typedLeafSample = `{"V":2,"L":{"t":"p","w":80,"h":24,"x":0,"y":0,"a":true,
 func TestDecodeTypedLayoutSplit(t *testing.T) {
 	panes := map[string]string{"%0": "p-0", "%2": "p-2"}
 
-	node, err := DecodeLayout(gotmux.Layout(typedSplitSample), panes)
+	decoded, err := DecodeLayout(gotmux.Layout(typedSplitSample), panes)
 	if err != nil {
 		t.Fatalf("DecodeLayout failed: %v", err)
 	}
+
+	node := decoded.Tiled
 
 	if node.Axis != "x" {
 		t.Fatalf("axis = %q, want x", node.Axis)
@@ -57,10 +61,12 @@ func assertSplitChildren(t *testing.T, children []model.Layout) {
 }
 
 func TestDecodeTypedLayoutLeaf(t *testing.T) {
-	node, err := DecodeLayout(gotmux.Layout(typedLeafSample), map[string]string{"%1": "p-1"})
+	decoded, err := DecodeLayout(gotmux.Layout(typedLeafSample), map[string]string{"%1": "p-1"})
 	if err != nil {
 		t.Fatalf("DecodeLayout failed: %v", err)
 	}
+
+	node := decoded.Tiled
 
 	if node.Pane != "p-1" || node.Axis != "" || len(node.Children) != 0 {
 		t.Fatalf("node = %#v, want single leaf pane p-1", node)
@@ -86,6 +92,8 @@ func TestDecodeTypedLayoutRejections(t *testing.T) {
 		"not a document":       `{"L":{"t":"p","w":80,"h":24,"x":0,"y":0,"I":"%0"}}`,
 		"malformed json":       `{"V":2,"L":`,
 		"branch without child": `{"V":2,"L":{"t":"h","w":80,"h":24,"x":0,"y":0}}`,
+		"only floating panes": `{"V":2,"L":{"t":"v","w":80,"h":24,"x":0,"y":0,"c":[` +
+			`{"t":"p","w":20,"h":5,"x":1,"y":1,"i":1,"z":0,"I":"%0"},{"t":"p","w":20,"h":5,"x":30,"y":10,"a":true,"i":2,"z":1,"I":"%2"}]}}`,
 	}
 
 	for name, value := range cases {
@@ -101,10 +109,12 @@ func TestDecodeNativeLayoutUnchanged(t *testing.T) {
 	body := "80x24,0,0{40x24,0,0,0,39x24,41,0,2}"
 	value := gotmux.Layout(layoutChecksum(body) + "," + body)
 
-	node, err := DecodeLayout(value, map[string]string{"%0": "p-0", "%2": "p-2"})
+	decoded, err := DecodeLayout(value, map[string]string{"%0": "p-0", "%2": "p-2"})
 	if err != nil {
 		t.Fatalf("native decode failed: %v", err)
 	}
+
+	node := decoded.Tiled
 
 	if node.Axis != "x" || len(node.Children) != 2 {
 		t.Fatalf("native node = %#v, want x branch with 2 children", node)
@@ -112,5 +122,91 @@ func TestDecodeNativeLayoutUnchanged(t *testing.T) {
 
 	if node.Children[1].Pane != "p-2" || node.Children[1].Left != 41 {
 		t.Fatalf("native child = %#v, want pane p-2 at left 41", node.Children[1])
+	}
+}
+
+func TestDecodeTypedLayoutSeparatesFloatingPanes(t *testing.T) {
+	panes := map[string]string{"%0": "p-0", "%1": "p-1", "%2": "p-2", "%3": "p-3"}
+
+	tests := []struct {
+		name         string
+		layout       string
+		wantTiled    model.Layout
+		wantFloating []string
+		wantRecent   string
+	}{
+		{
+			name: "floating pane over a single tiled pane",
+			layout: `{"V":2,"L":{"t":"v","w":80,"h":24,"x":0,"y":0,"c":[` +
+				`{"t":"p","w":80,"h":24,"x":0,"y":0,"a":true,"i":1,"I":"%0"},` +
+				`{"t":"p","w":1,"h":1,"x":40,"y":20,"l":0,"i":2,"z":0,"I":"%1"}]}}`,
+			wantTiled:    model.Layout{Width: 80, Height: 24, Pane: "p-0"},
+			wantFloating: []string{"p-1"},
+			wantRecent:   "p-0",
+		},
+		{
+			name: "nested floating pane collapses its split",
+			layout: `{"V":2,"L":{"t":"h","w":80,"h":24,"x":0,"y":0,"c":[` +
+				`{"t":"v","w":40,"h":24,"x":0,"y":0,"c":[` +
+				`{"t":"p","w":40,"h":24,"x":0,"y":0,"l":1,"i":1,"I":"%0"},` +
+				`{"t":"p","w":30,"h":10,"x":5,"y":5,"a":true,"i":2,"z":0,"I":"%1"}]},` +
+				`{"t":"p","w":39,"h":24,"x":41,"y":0,"l":0,"i":3,"I":"%2"}]}}`,
+			wantTiled: model.Layout{Width: 80, Height: 24, Axis: "x", Children: []model.Layout{
+				{Width: 40, Height: 24, Pane: "p-0"},
+				{Width: 39, Height: 24, Left: 41, Pane: "p-2"},
+			}},
+			wantFloating: []string{"p-1"},
+			wantRecent:   "p-2",
+		},
+		{
+			name: "several floating panes keep stacking order",
+			layout: `{"V":2,"L":{"t":"h","w":80,"h":24,"x":0,"y":0,"c":[` +
+				`{"t":"p","w":40,"h":24,"x":0,"y":0,"a":true,"i":1,"I":"%0"},` +
+				`{"t":"p","w":10,"h":5,"x":2,"y":2,"i":2,"z":1,"I":"%3"},` +
+				`{"t":"p","w":39,"h":24,"x":41,"y":0,"l":0,"i":3,"I":"%2"},` +
+				`{"t":"p","w":10,"h":5,"x":50,"y":2,"i":4,"z":0,"I":"%1"}]}}`,
+			wantTiled: model.Layout{Width: 80, Height: 24, Axis: "x", Children: []model.Layout{
+				{Width: 40, Height: 24, Pane: "p-0"},
+				{Width: 39, Height: 24, Left: 41, Pane: "p-2"},
+			}},
+			wantFloating: []string{"p-3", "p-1"},
+			wantRecent:   "p-0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			decoded, err := DecodeLayout(gotmux.Layout(tt.layout), panes)
+			if err != nil {
+				t.Fatalf("DecodeLayout failed: %v", err)
+			}
+
+			if !reflect.DeepEqual(decoded.Tiled, tt.wantTiled) {
+				t.Fatalf("tiled layout = %#v, want %#v", decoded.Tiled, tt.wantTiled)
+			}
+
+			if !slices.Equal(decoded.Floating, tt.wantFloating) {
+				t.Fatalf("floating panes = %v, want %v", decoded.Floating, tt.wantFloating)
+			}
+
+			if decoded.Recent != tt.wantRecent {
+				t.Fatalf("recent pane = %q, want %q", decoded.Recent, tt.wantRecent)
+			}
+		})
+	}
+}
+
+func TestDecodeNativeLayoutSeparatesFloatingPanes(t *testing.T) {
+	body := "80x24,0,0[80x24,0,0,0,20x5,3,3,1]<20x5,3,3,1>"
+	value := gotmux.Layout(layoutChecksum(body) + "," + body)
+
+	decoded, err := DecodeLayout(value, map[string]string{"%0": "p-0", "%1": "p-1"})
+	if err != nil {
+		t.Fatalf("native decode failed: %v", err)
+	}
+
+	want := model.Layout{Width: 80, Height: 24, Pane: "p-0"}
+	if !reflect.DeepEqual(decoded.Tiled, want) || !slices.Equal(decoded.Floating, []string{"p-1"}) {
+		t.Fatalf("decoded = %#v, want tiled %#v and floating [p-1]", decoded, want)
 	}
 }

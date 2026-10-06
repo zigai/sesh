@@ -8,6 +8,7 @@ const (
 	ReasonOwnershipUnverified                         Reason = "ownership_unverified"
 	ReasonObservedOnly                                Reason = "observed_only"
 	ReasonPaneDead                                    Reason = "pane_dead"
+	ReasonFloatingPanesOmitted                        Reason = "floating_panes_omitted"
 	ReasonExecutableDeleted                           Reason = "executable_deleted"
 	ReasonWorkingDirectoryDeleted                     Reason = "working_directory_deleted"
 	ReasonAtomicRestoreTransactionUnavailable         Reason = "atomic_restore_transaction_unavailable"

@@ -545,7 +545,7 @@ func verifyWindowLayout(
 	}
 
 	actual := make([]layoutLeaf, 0, len(expected))
-	collectLayoutLeaves(observed, &actual)
+	collectLayoutLeaves(observed.Tiled, &actual)
 
 	sortLayoutLeaves(expected)
 	sortLayoutLeaves(actual)

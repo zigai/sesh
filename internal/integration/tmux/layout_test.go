@@ -35,7 +35,7 @@ func FuzzLayout(f *testing.F) {
 			return
 		}
 
-		encoded, err := EncodeLayout(layout, map[string]gotmux.PaneID{"p0": "%0", "p1": "%1"})
+		encoded, err := EncodeLayout(layout.Tiled, map[string]gotmux.PaneID{"p0": "%0", "p1": "%1"})
 		if err != nil {
 			t.Fatal(err)
 		}

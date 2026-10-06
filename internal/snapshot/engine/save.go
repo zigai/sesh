@@ -14,8 +14,10 @@ import (
 	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/agents"
+	"github.com/zigai/sesh/internal/integration/process"
 	integration "github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/snapshot/capture"
+	"github.com/zigai/sesh/internal/snapshot/model"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
@@ -44,16 +46,18 @@ type SaveResult struct {
 type saveOutcomeError struct{ error }
 
 func SaveObservation(ctx context.Context, repository *store.Repository, server *gotmux.Server, selected []gotmux.SessionID, cfg SaveConfig) (SaveResult, error) {
+	started := time.Now()
+
 	if cfg.LeaseRoot == "" {
-		return SaveResult{Attempt: "", Generation: "", Status: "failed"}, saveFailure(ctx, "admission", ErrLeaseRootRequired)
+		return SaveResult{Attempt: "", Generation: "", Status: "failed"}, saveFailure(ctx, "admission", started, ErrLeaseRootRequired)
 	}
 
 	if server == nil || server.Endpoint().SocketPath == "" {
-		return SaveResult{Attempt: "", Generation: "", Status: "failed"}, saveFailure(ctx, "admission", integration.ErrEndpoint)
+		return SaveResult{Attempt: "", Generation: "", Status: "failed"}, saveFailure(ctx, "admission", started, integration.ErrEndpoint)
 	}
 
 	if repository == nil {
-		return SaveResult{Attempt: "", Generation: "", Status: "failed"}, saveFailure(ctx, "admission", ErrRepositoryRequired)
+		return SaveResult{Attempt: "", Generation: "", Status: "failed"}, saveFailure(ctx, "admission", started, ErrRepositoryRequired)
 	}
 
 	observe := func(ctx context.Context) (capture.Observation, error) {
@@ -68,21 +72,23 @@ func SaveObservation(ctx context.Context, repository *store.Repository, server *
 }
 
 func saveWithProfile(ctx context.Context, repository *store.Repository, leaseRoot string, socketPath string, profile RecoveryProfile, observe func(context.Context) (capture.Observation, error)) (SaveResult, error) {
+	started := time.Now()
+
 	zerolog.Ctx(ctx).Info().Str("component", "snapshot").Str("operation", "save").Str("status", "started").Msg("snapshot save started")
 
 	result := SaveResult{Attempt: "", Generation: "", Status: "failed"}
 
 	if leaseRoot == "" {
-		return result, saveFailure(ctx, "admission", ErrLeaseRootRequired)
+		return result, saveFailure(ctx, "admission", started, ErrLeaseRootRequired)
 	}
 
 	if socketPath == "" {
-		return result, saveFailure(ctx, "admission", integration.ErrEndpoint)
+		return result, saveFailure(ctx, "admission", started, integration.ErrEndpoint)
 	}
 
 	lease, err := integration.AcquireLease(ctx, leaseRoot, socketPath)
 	if err != nil {
-		return result, saveFailure(ctx, "lease", err)
+		return result, saveFailure(ctx, "lease", started, err)
 	}
 
 	attempt, err := repository.Begin(ctx)
@@ -90,7 +96,7 @@ func saveWithProfile(ctx context.Context, repository *store.Repository, leaseRoo
 
 	if err != nil {
 		closeErr := lease.Close()
-		return result, saveFailure(ctx, "register", errors.Join(err, closeErr))
+		return result, saveFailure(ctx, "register", started, errors.Join(err, closeErr))
 	}
 
 	observation, err := observe(ctx)
@@ -98,7 +104,7 @@ func saveWithProfile(ctx context.Context, repository *store.Repository, leaseRoo
 		failErr := recordFailedAttempt(ctx, repository, attempt.ID)
 		closeErr := lease.Close()
 
-		return result, saveFailure(ctx, "capture", errors.Join(err, failErr, closeErr))
+		return result, saveFailure(ctx, "capture", started, errors.Join(err, failErr, closeErr))
 	}
 
 	artifacts := make(map[string]io.Reader, len(observation.Artifacts))
@@ -119,11 +125,11 @@ func saveWithProfile(ctx context.Context, repository *store.Repository, leaseRoo
 
 		closeErr := lease.Close()
 
-		return result, saveFailure(ctx, "commit", errors.Join(err, failErr, closeErr))
+		return result, saveFailure(ctx, "commit", started, errors.Join(err, failErr, closeErr))
 	}
 
 	if closeErr := lease.Close(); closeErr != nil {
-		return result, saveFailure(ctx, "finalize", closeErr)
+		return result, saveFailure(ctx, "finalize", started, closeErr)
 	}
 
 	status, reason := "partial", "parity_incomplete"
@@ -133,6 +139,17 @@ func saveWithProfile(ctx context.Context, repository *store.Repository, leaseRoo
 
 	result.Status = status
 
+	logSaveSuccess(ctx, observation, status, reason, started)
+
+	return result, nil
+}
+
+func logSaveSuccess(ctx context.Context, observation capture.Observation, status, reason string, started time.Time) {
+	recovery := make(map[model.Recovery]int, len(observation.Manifest.Panes))
+	for _, pane := range observation.Manifest.Panes {
+		recovery[pane.Launch.Recovery]++
+	}
+
 	zerolog.Ctx(ctx).Warn().
 		Str("component", "snapshot").
 		Str("operation", "save").
@@ -141,9 +158,13 @@ func saveWithProfile(ctx context.Context, repository *store.Repository, leaseRoo
 		Int("sessions", len(observation.Manifest.Sessions)).
 		Int("panes", len(observation.Manifest.Panes)).
 		Int("terminal_text_omitted", observation.OmittedTerminalText()).
+		Int("floating_panes_omitted", observation.FloatingPanesOmitted).
+		Int("restart_panes", recovery[model.RecoveryRestart]).
+		Int("resume_panes", recovery[model.RecoveryResume]).
+		Int("unverified_panes", recovery[model.RecoveryUnverified]).
+		Int("nonrestartable_panes", recovery[model.RecoveryNonrestartable]).
+		Int64("duration_ms", time.Since(started).Milliseconds()).
 		Msg("snapshot observation saved")
-
-	return result, nil
 }
 
 // recordFailedAttempt durably marks an attempt that published nothing as failed. It outlives the
@@ -159,7 +180,7 @@ func recordFailedAttempt(ctx context.Context, repository *store.Repository, id s
 	return nil
 }
 
-func saveFailure(ctx context.Context, phase string, err error) error {
+func saveFailure(ctx context.Context, phase string, started time.Time, err error) error {
 	reason := "save_failed"
 
 	switch {
@@ -171,19 +192,48 @@ func saveFailure(ctx context.Context, phase string, err error) error {
 		reason = "operation_timed_out"
 	case errors.Is(err, gotmux.ErrOutputLimit):
 		reason = "output_limit_exceeded"
+	case errors.Is(err, capture.ErrChanged):
+		reason = "capture_changed"
+	case errors.Is(err, capture.ErrUnsupported), errors.Is(err, process.ErrUnsupported):
+		reason = "capture_unsupported"
+	case errors.Is(err, model.ErrInvalid):
+		reason = "snapshot_invalid"
+	case processFailureCode(err) != "":
+		reason = "process_observation_failed"
 	}
 
-	zerolog.Ctx(ctx).Error().
+	event := zerolog.Ctx(ctx).Error().
 		Str("component", "snapshot").
 		Str("operation", "save").
 		Str("status", "failed").
 		Str("phase", phase).
 		Str("reason", reason).
-		Msg("snapshot save failed")
+		Int64("duration_ms", time.Since(started).Milliseconds())
+
+	if code := processFailureCode(err); code != "" {
+		event = event.Str("process_code", code)
+	}
+
+	event.Msg("snapshot save failed")
 
 	return &saveOutcomeError{error: oops.In("snapshot").Code(reason).
 		With("operation", "save", "phase", phase).
 		Wrapf(err, "save snapshot observation")}
+}
+
+// processFailureCode returns the process layer's fixed error code when a process observation
+// failed, and the empty string otherwise.
+func processFailureCode(err error) string {
+	diagnostic, ok := oops.AsOops(err)
+	if !ok || diagnostic.Domain() != process.Domain {
+		return ""
+	}
+
+	if code, ok := diagnostic.Code().(string); ok && code != "" {
+		return code
+	}
+
+	return process.CodeFailed
 }
 
 func (e *saveOutcomeError) Unwrap() error       { return e.error }

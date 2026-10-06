@@ -19,6 +19,7 @@ import (
 	"github.com/samber/oops"
 	gotmux "github.com/zigai/gotmux/tmux"
 
+	"github.com/zigai/sesh/internal/integration/process"
 	integration "github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/snapshot/capture"
 	"github.com/zigai/sesh/internal/snapshot/model"
@@ -116,9 +117,9 @@ func assertSaveOutcomeRecord(t *testing.T, fields map[string]jsontext.Value, sce
 	t.Helper()
 
 	// The fixture pane has no terminal text artifact; failures report no count.
-	wantLevel, wantStatus, wantOmitted := `"error"`, `"failed"`, ""
+	wantLevel, wantStatus, wantOmitted, wantFloating := `"error"`, `"failed"`, "", ""
 	if scenario == "partial" {
-		wantLevel, wantStatus, wantOmitted = `"warn"`, `"partial"`, "1"
+		wantLevel, wantStatus, wantOmitted, wantFloating = `"warn"`, `"partial"`, "1", "0"
 	}
 
 	if string(fields["level"]) != wantLevel || string(fields["status"]) != wantStatus {
@@ -131,6 +132,31 @@ func assertSaveOutcomeRecord(t *testing.T, fields map[string]jsontext.Value, sce
 
 	if omitted := string(fields["terminal_text_omitted"]); omitted != wantOmitted {
 		t.Fatalf("terminal_text_omitted = %q, want %q", omitted, wantOmitted)
+	}
+
+	if floating := string(fields["floating_panes_omitted"]); floating != wantFloating {
+		t.Fatalf("floating_panes_omitted = %q, want %q", floating, wantFloating)
+	}
+
+	if scenario == "partial" {
+		for field, want := range map[string]string{"restart_panes": "0", "resume_panes": "0", "unverified_panes": "1", "nonrestartable_panes": "0"} {
+			if got := string(fields[field]); got != want {
+				t.Fatalf("%s = %q, want %q", field, got, want)
+			}
+		}
+	}
+
+	if scenario != "canceled" {
+		assertDurationField(t, fields)
+	}
+}
+
+func assertDurationField(t *testing.T, fields map[string]jsontext.Value) {
+	t.Helper()
+
+	var duration int64
+	if err := json.Unmarshal(fields["duration_ms"], &duration); err != nil || duration < 0 {
+		t.Fatalf("duration_ms = %s, want a non-negative integer", fields["duration_ms"])
 	}
 }
 
@@ -159,7 +185,7 @@ func TestUncertainPublicationReasonAndPrivacy(t *testing.T) {
 		With("operation", "SECRET_COMMAND", "phase", "secret-phase", "path", "/secret/path").
 		Wrap(errors.Join(store.ErrUncertain, os.ErrPermission, context.Canceled))
 
-	err := saveFailure(logger.WithContext(t.Context()), "commit", cause)
+	err := saveFailure(logger.WithContext(t.Context()), "commit", time.Now(), cause)
 	if !errors.Is(err, store.ErrUncertain) || !errors.Is(err, os.ErrPermission) || !errors.Is(err, context.Canceled) {
 		t.Fatal("lost joined failure identities")
 	}
@@ -168,30 +194,71 @@ func TestUncertainPublicationReasonAndPrivacy(t *testing.T) {
 	assertPrivateFailureRecord(t, output.Bytes())
 }
 
-func TestOutputLimitFailureHasFixedReason(t *testing.T) {
-	var output bytes.Buffer
+var errUnclassifiedSecret = errors.New("secret failure")
 
-	logger := zerolog.New(&output)
+func TestCaptureFailureHasFixedReason(t *testing.T) {
+	tests := []struct {
+		name        string
+		cause       error
+		reason      string
+		processCode string
+	}{
+		{name: "output limit", cause: fmt.Errorf("capture /secret/path: %w", gotmux.ErrOutputLimit), reason: "output_limit_exceeded"},
+		{name: "changed state", cause: fmt.Errorf("capture /secret/path: %w", capture.ErrChanged), reason: "capture_changed"},
+		{name: "unsupported state", cause: fmt.Errorf("capture /secret/path: %w", capture.ErrUnsupported), reason: "capture_unsupported"},
+		{name: "invalid observation", cause: oops.In("snapshot.capture").With("path", "/secret/path").Wrap(model.ErrInvalid), reason: "snapshot_invalid"},
+		{
+			name:        "process observation",
+			cause:       oops.In(process.Domain).Code(process.CodeProcessZombie).With("path", "/secret/path").Wrap(process.ErrProcessZombie),
+			reason:      "process_observation_failed",
+			processCode: process.CodeProcessZombie,
+		},
+		{name: "unclassified", cause: errUnclassifiedSecret, reason: "save_failed"},
+	}
 
-	err := saveFailure(logger.WithContext(t.Context()), "capture", fmt.Errorf("capture /secret/path: %w", gotmux.ErrOutputLimit))
-	if !errors.Is(err, gotmux.ErrOutputLimit) {
-		t.Fatal("lost output limit identity")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var output bytes.Buffer
+
+			logger := zerolog.New(&output)
+
+			err := saveFailure(logger.WithContext(t.Context()), "capture", time.Now(), tt.cause)
+			if !errors.Is(err, tt.cause) {
+				t.Fatal("lost failure identity")
+			}
+
+			assertCaptureFailureRecord(t, output.Bytes(), tt.reason, tt.processCode)
+
+			if bytes.Contains(bytes.ToLower(output.Bytes()), []byte("secret")) {
+				t.Fatal("error metadata leaked")
+			}
+		})
+	}
+}
+
+func assertCaptureFailureRecord(t *testing.T, data []byte, reason, processCode string) {
+	t.Helper()
+
+	if lines := bytes.Count(data, []byte{'\n'}); lines != 1 {
+		t.Fatalf("failure produced %d records", lines)
 	}
 
 	var fields map[string]jsontext.Value
-	if err := json.Unmarshal(output.Bytes(), &fields); err != nil {
+	if err := json.Unmarshal(data, &fields); err != nil {
 		t.Fatal(err)
 	}
 
 	validateLogSchema(t, fields)
 
-	if string(fields["reason"]) != `"output_limit_exceeded"` || string(fields["phase"]) != `"capture"` || string(fields["level"]) != `"error"` {
-		t.Fatalf("incorrect output limit record: %s", output.Bytes())
+	if string(fields["reason"]) != `"`+reason+`"` || string(fields["phase"]) != `"capture"` || string(fields["level"]) != `"error"` {
+		t.Fatalf("incorrect failure record: %s", data)
 	}
 
-	if bytes.Contains(output.Bytes(), []byte("secret")) {
-		t.Fatal("error metadata leaked")
+	if code, logged := fields["process_code"]; logged != (processCode != "") || (logged && string(code) != `"`+processCode+`"`) {
+		t.Fatalf("process_code = %s, want %q", code, processCode)
 	}
+
+	assertDurationField(t, fields)
 }
 
 func assertSaveDiagnostic(t *testing.T, err error) {
@@ -223,7 +290,7 @@ func assertPrivateFailureRecord(t *testing.T, data []byte) {
 		t.Fatal("failure produced duplicate records")
 	}
 
-	var fields map[string]string
+	var fields map[string]any
 	if err := json.Unmarshal(data, &fields); err != nil {
 		t.Fatal(err)
 	}
@@ -266,7 +333,8 @@ func validateLogSchema(t *testing.T, fields map[string]jsontext.Value) {
 
 	for key := range fields {
 		switch key {
-		case "level", "component", "operation", "status", "message", "reason", "phase", "sessions", "panes", "terminal_text_omitted":
+		case "level", "component", "operation", "status", "message", "reason", "phase", "sessions", "panes", "terminal_text_omitted", "floating_panes_omitted",
+			"restart_panes", "resume_panes", "unverified_panes", "nonrestartable_panes", "duration_ms", "process_code":
 		default:
 			t.Fatalf("unexpected log field %s", key)
 		}

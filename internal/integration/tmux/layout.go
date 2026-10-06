@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/bits"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -16,6 +17,7 @@ const (
 	maxLayoutDepth     = 64
 	typedLayoutVersion = 2
 	minBranchChildren  = 2
+	activeRank         = -1
 )
 
 type layoutReader struct {
@@ -24,7 +26,24 @@ type layoutReader struct {
 	panes    map[string]string
 }
 
-func DecodeLayout(value gotmux.Layout, panes map[string]string) (model.Layout, error) {
+// WindowLayout is a window's tiled layout and the floating panes drawn over it. Floating panes
+// take no space in the tiled layout, so they are reported separately.
+type WindowLayout struct {
+	Tiled    model.Layout
+	Floating []string
+	// Recent is the tiled pane that is active or was used most recently, empty when the layout
+	// does not record pane use.
+	Recent string
+}
+
+type typedDecoder struct {
+	panes      map[string]string
+	floating   []string
+	recent     string
+	recentRank int
+}
+
+func DecodeLayout(value gotmux.Layout, panes map[string]string) (WindowLayout, error) {
 	text := string(value)
 	if strings.HasPrefix(strings.TrimSpace(text), "{") {
 		return decodeTypedLayout(text, panes)
@@ -32,17 +51,31 @@ func DecodeLayout(value gotmux.Layout, panes map[string]string) (model.Layout, e
 
 	checksum, body, ok := strings.Cut(text, ",")
 	if !ok || checksum != layoutChecksum(body) {
-		return model.Layout{}, model.ErrInvalid
+		return WindowLayout{}, model.ErrInvalid
 	}
 
 	reader := layoutReader{text: body, position: 0, panes: panes}
 
 	node, err := reader.node(0)
-	if err != nil || reader.position != len(body) {
-		return model.Layout{}, model.ErrInvalid
+	if err != nil {
+		return WindowLayout{}, model.ErrInvalid
 	}
 
-	return node, nil
+	floating, err := reader.floating()
+	if err != nil || reader.position != len(body) {
+		return WindowLayout{}, model.ErrInvalid
+	}
+
+	if len(floating) == 0 {
+		return WindowLayout{Tiled: node, Floating: nil, Recent: ""}, nil
+	}
+
+	tiled, present := withoutPanes(node, floating)
+	if !present {
+		return WindowLayout{}, model.ErrInvalid
+	}
+
+	return WindowLayout{Tiled: tiled, Floating: floating, Recent: ""}, nil
 }
 
 func EncodeLayout(node model.Layout, panes map[string]gotmux.PaneID) (gotmux.Layout, error) {
@@ -150,6 +183,33 @@ func (r *layoutReader) branch(node model.Layout, depth int) (model.Layout, error
 	}
 }
 
+// floating reads the optional "<cell,...>" suffix in which tmux lists floating panes in stacking
+// order. The same cells also appear inside the tiled tree.
+func (r *layoutReader) floating() ([]string, error) {
+	if !r.consume('<') {
+		return nil, nil
+	}
+
+	var panes []string
+
+	for {
+		cell, err := r.node(0)
+		if err != nil || cell.Pane == "" {
+			return nil, model.ErrInvalid
+		}
+
+		panes = append(panes, cell.Pane)
+
+		if r.consume('>') {
+			return panes, nil
+		}
+
+		if !r.consume(',') {
+			return nil, model.ErrInvalid
+		}
+	}
+}
+
 func appendLayout(out *strings.Builder, node model.Layout, panes map[string]gotmux.PaneID, depth int) error {
 	if depth > maxLayoutDepth {
 		return model.ErrInvalid
@@ -197,6 +257,35 @@ func appendLayout(out *strings.Builder, node model.Layout, panes map[string]gotm
 	return nil
 }
 
+// withoutPanes removes the given leaves and collapses splits left with a single child. It reports
+// false when no leaf remains.
+func withoutPanes(node model.Layout, removed []string) (model.Layout, bool) {
+	if node.Pane != "" {
+		return node, !slices.Contains(removed, node.Pane)
+	}
+
+	children := make([]model.Layout, 0, len(node.Children))
+
+	for _, child := range node.Children {
+		if kept, present := withoutPanes(child, removed); present {
+			children = append(children, kept)
+		}
+	}
+
+	switch len(children) {
+	case 0:
+		var none model.Layout
+
+		return none, false
+	case 1:
+		return children[0], true
+	default:
+		node.Children = children
+
+		return node, true
+	}
+}
+
 func layoutChecksum(value string) string {
 	var checksum uint16
 	for index := range len(value) {
@@ -207,39 +296,52 @@ func layoutChecksum(value string) string {
 	return fmt.Sprintf("%04x", checksum)
 }
 
-func decodeTypedLayout(text string, panes map[string]string) (model.Layout, error) {
+func decodeTypedLayout(text string, panes map[string]string) (WindowLayout, error) {
 	var document map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(text), &document); err != nil {
-		return model.Layout{}, model.ErrInvalid
+		return WindowLayout{}, model.ErrInvalid
 	}
 
 	version, ok := typedInt(document, "V")
 	if !ok || version != typedLayoutVersion {
-		return model.Layout{}, model.ErrInvalid
+		return WindowLayout{}, model.ErrInvalid
 	}
 
 	root, ok := document["L"]
 	if !ok {
-		return model.Layout{}, model.ErrInvalid
+		return WindowLayout{}, model.ErrInvalid
 	}
 
-	return decodeTypedNode(root, panes, 0)
+	decoder := typedDecoder{panes: panes, floating: nil, recent: "", recentRank: 0}
+
+	tiled, present, err := decoder.node(root, 0)
+	if err != nil {
+		return WindowLayout{}, err
+	}
+
+	if !present {
+		return WindowLayout{}, model.ErrInvalid
+	}
+
+	return WindowLayout{Tiled: tiled, Floating: decoder.floating, Recent: decoder.recent}, nil
 }
 
-func decodeTypedNode(raw json.RawMessage, panes map[string]string, depth int) (model.Layout, error) {
+// node decodes one cell. A floating pane is recorded and reported as absent so its parent
+// lays out only the tiled cells.
+func (d *typedDecoder) node(raw json.RawMessage, depth int) (model.Layout, bool, error) {
 	var node map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &node); err != nil {
-		return model.Layout{}, model.ErrInvalid
+		return model.Layout{}, false, model.ErrInvalid
 	}
 
 	kind, ok := typedString(node, "t")
 	if !ok {
-		return model.Layout{}, model.ErrInvalid
+		return model.Layout{}, false, model.ErrInvalid
 	}
 
 	geometry, err := decodeTypedGeometry(node, depth)
 	if err != nil {
-		return model.Layout{}, err
+		return model.Layout{}, false, err
 	}
 
 	switch kind {
@@ -249,11 +351,11 @@ func decodeTypedNode(raw json.RawMessage, panes map[string]string, depth int) (m
 			geometry.Axis = "y"
 		}
 
-		return decodeTypedBranch(node, geometry, panes, depth)
+		return d.branch(node, geometry, depth)
 	case "p":
-		return decodeTypedLeaf(node, geometry, panes)
+		return d.leaf(node, geometry)
 	default:
-		return model.Layout{}, model.ErrInvalid
+		return model.Layout{}, false, model.ErrInvalid
 	}
 }
 
@@ -282,42 +384,76 @@ func decodeTypedGeometry(node map[string]json.RawMessage, depth int) (model.Layo
 	}, nil
 }
 
-func decodeTypedBranch(node map[string]json.RawMessage, result model.Layout, panes map[string]string, depth int) (model.Layout, error) {
+func (d *typedDecoder) branch(node map[string]json.RawMessage, result model.Layout, depth int) (model.Layout, bool, error) {
 	var children []json.RawMessage
 	if err := json.Unmarshal(node["c"], &children); err != nil || len(children) < minBranchChildren {
-		return model.Layout{}, model.ErrInvalid
+		return model.Layout{}, false, model.ErrInvalid
 	}
 
 	for _, child := range children {
-		decoded, err := decodeTypedNode(child, panes, depth+1)
+		decoded, present, err := d.node(child, depth+1)
 		if err != nil {
-			return model.Layout{}, err
+			return model.Layout{}, false, err
 		}
 
-		result.Children = append(result.Children, decoded)
+		if present {
+			result.Children = append(result.Children, decoded)
+		}
 	}
 
-	return result, nil
+	switch len(result.Children) {
+	case 0:
+		var none model.Layout
+
+		return none, false, nil
+	case 1:
+		return result.Children[0], true, nil
+	default:
+		return result, true, nil
+	}
 }
 
-func decodeTypedLeaf(node map[string]json.RawMessage, result model.Layout, panes map[string]string) (model.Layout, error) {
+func (d *typedDecoder) leaf(node map[string]json.RawMessage, result model.Layout) (model.Layout, bool, error) {
 	if len(node["c"]) != 0 {
-		return model.Layout{}, model.ErrInvalid
+		return model.Layout{}, false, model.ErrInvalid
 	}
 
 	paneID, ok := typedString(node, "I")
 	if !ok {
-		return model.Layout{}, model.ErrInvalid
+		return model.Layout{}, false, model.ErrInvalid
 	}
 
-	reference := panes[paneID]
+	reference := d.panes[paneID]
 	if reference == "" {
-		return model.Layout{}, model.ErrInvalid
+		return model.Layout{}, false, model.ErrInvalid
 	}
+
+	if _, floating := node["z"]; floating {
+		d.floating = append(d.floating, reference)
+
+		var none model.Layout
+
+		return none, false, nil
+	}
+
+	d.noteUse(node, reference)
 
 	result.Pane = reference
 
-	return result, nil
+	return result, true, nil
+}
+
+func (d *typedDecoder) noteUse(node map[string]json.RawMessage, reference string) {
+	rank, used := typedInt(node, "l")
+
+	var active bool
+	if raw, ok := node["a"]; ok && json.Unmarshal(raw, &active) == nil && active {
+		rank, used = activeRank, true
+	}
+
+	if used && (d.recent == "" || rank < d.recentRank) {
+		d.recent, d.recentRank = reference, rank
+	}
 }
 
 func typedInt(node map[string]json.RawMessage, key string) (int, bool) {
