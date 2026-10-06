@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/samber/oops"
@@ -20,6 +21,7 @@ import (
 	cmdsession "github.com/zigai/sesh/internal/cli/cmd/session"
 	cmdsnapshot "github.com/zigai/sesh/internal/cli/cmd/snapshot"
 	"github.com/zigai/sesh/internal/config"
+	"github.com/zigai/sesh/internal/errorstep"
 	"github.com/zigai/sesh/internal/logging"
 )
 
@@ -52,6 +54,7 @@ type commandRuntime struct {
 	operation   string
 	output      *commandBuffer
 	diagnostics *commandBuffer
+	started     time.Time
 }
 
 type (
@@ -130,7 +133,7 @@ func ExecuteApplication(ctx context.Context, args []string, input io.Reader, std
 	root.SetOut(&output)
 	root.SetErr(&diagnostics)
 
-	runtime := commandRuntime{cmd: root, sink: nil, operation: "", output: &output, diagnostics: &diagnostics}
+	runtime := commandRuntime{cmd: root, sink: nil, operation: "", output: &output, diagnostics: &diagnostics, started: time.Time{}}
 	root.PersistentPreRunE = runtime.prepare
 	ctx = clibase.ContextWithRawArgs(ctx, args)
 
@@ -282,6 +285,8 @@ func (r *commandRuntime) setupLogging(cmd *cobra.Command) error {
 	logger := r.sink.Logger()
 	cmd.SetContext(logger.WithContext(cmd.Context()))
 
+	r.started = time.Now()
+
 	if r.operation != "save" && r.operation != "restore" {
 		zerolog.Ctx(cmd.Context()).Info().Str("component", "cli").Str("operation", r.operation).Str("status", "started").Msg("command started")
 	}
@@ -325,11 +330,7 @@ func (r *commandRuntime) finish(ctx context.Context, err error) error {
 	ctx = logger.WithContext(ctx)
 
 	if r.ownsOutcome(err) {
-		if err != nil {
-			zerolog.Ctx(ctx).Error().Str("component", "cli").Str("operation", r.operation).Str("status", "failed").Str("reason", jsonErrorCode(err)).Msg("command failed")
-		} else {
-			zerolog.Ctx(ctx).Info().Str("component", "cli").Str("operation", r.operation).Str("status", "ok").Msg("command finished")
-		}
+		r.logOutcome(ctx, err)
 	}
 
 	if closeErr := r.sink.Close(); closeErr != nil {
@@ -337,6 +338,30 @@ func (r *commandRuntime) finish(ctx context.Context, err error) error {
 	}
 
 	return nil
+}
+
+func (r *commandRuntime) logOutcome(ctx context.Context, err error) {
+	duration := time.Since(r.started).Milliseconds()
+
+	if err == nil {
+		zerolog.Ctx(ctx).Info().Str("component", "cli").Str("operation", r.operation).Str("status", "ok").
+			Int64("duration_ms", duration).Msg("command finished")
+
+		return
+	}
+
+	event := zerolog.Ctx(ctx).Error().Str("component", "cli").Str("operation", r.operation).Str("status", "failed").
+		Str("reason", jsonErrorCode(err)).Int64("duration_ms", duration)
+
+	if step, ok := errorstep.Owned(err, "cli"); ok {
+		event = event.Str("failed_step", step.Operation)
+	}
+
+	if step, ok := errorstep.Owned(err, "snapshot.store"); ok {
+		event = event.Str("store_step", step.Operation)
+	}
+
+	event.Msg("command failed")
 }
 
 func (r *commandRuntime) ownsOutcome(err error) bool {

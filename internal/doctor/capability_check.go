@@ -9,7 +9,7 @@ func checkCaptureGuarantee() Result {
 		Check:   CheckCaptureGuarantee,
 		Status:  StatusWarning,
 		Reason:  ReasonObservational,
-		Message: "saves record tmux and its running programs, not a checkpoint: program memory, shell jobs and pipelines are not saved, and scrollback is kept but not replayed",
+		Message: "saves record tmux and its running programs, not a checkpoint: program memory, shell jobs, pipelines and floating panes are not saved, and scrollback is kept but not replayed",
 		Fix:     "",
 	}
 }

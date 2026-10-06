@@ -208,7 +208,10 @@ func assertRuntimeLogFields(t *testing.T, record map[string]any) {
 
 	for key := range record {
 		switch key {
-		case "time", "level", "component", "operation", "status", "message", "reason", "phase", "code", "sessions", "windows", "panes", "error_code":
+		case "time", "level", "component", "operation", "status", "message", "reason", "phase", "code", "sessions", "windows", "panes", "error_code",
+			"duration_ms", "failed_step", "store_step", "step_reason", "mismatches", "mismatch_reasons", "floating_panes_omitted",
+			"restart_panes", "resume_panes", "unverified_panes", "nonrestartable_panes",
+			"resumed_panes", "restarted_panes", "shell_panes", "unrecovered_panes", "directory_fallback_panes":
 		case "verified":
 			if _, ok := record[key].(bool); !ok || record["operation"] != "restore" || record["component"] != "snapshot" {
 				t.Fatalf("invalid verification field: %#v", record)

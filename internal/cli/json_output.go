@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/pflag"
 	gotmux "github.com/zigai/gotmux/tmux"
 
+	"github.com/zigai/sesh/internal/automation"
 	"github.com/zigai/sesh/internal/cli/clibase"
 
 	"github.com/zigai/sesh/internal/integration/process"
@@ -451,6 +452,10 @@ func jsonErrorCode(err error) string {
 
 	if contract, ok := matchCommandError(err, workflowCommandErrors); ok {
 		return contract.code
+	}
+
+	if errors.Is(err, automation.ErrActiveRestores) {
+		return "activeRestores"
 	}
 
 	return generalErrorCode(err)

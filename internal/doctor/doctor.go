@@ -5,6 +5,8 @@ package doctor
 import (
 	"context"
 	"errors"
+	"slices"
+	"strings"
 
 	"github.com/rs/zerolog"
 	"github.com/samber/oops"
@@ -284,15 +286,38 @@ func logDoctorCompleted(ctx context.Context, results []Result, runErr error) {
 		level = zerolog.WarnLevel
 	}
 
-	logger.WithLevel(level).
+	event := logger.WithLevel(level).
 		Str("component", "doctor").
 		Str("operation", "run").
 		Str("status", status).
 		Str("reason", reason).
 		Int("check_count", len(results)).
 		Int("warning_count", warningCount).
-		Int("error_count", errorCount).
-		Msg("doctor completed")
+		Int("error_count", errorCount)
+
+	if errorCount > 0 {
+		event = event.Str("error_checks", checksWithStatus(results, StatusError))
+	}
+
+	if warningCount > 0 {
+		event = event.Str("warning_checks", checksWithStatus(results, StatusWarning))
+	}
+
+	event.Msg("doctor completed")
+}
+
+func checksWithStatus(results []Result, status string) string {
+	checks := make([]string, 0, len(results))
+
+	for _, result := range results {
+		if result.Status == status {
+			checks = append(checks, result.Check)
+		}
+	}
+
+	slices.Sort(checks)
+
+	return strings.Join(slices.Compact(checks), ",")
 }
 
 func countResults(results []Result) (int, int) {

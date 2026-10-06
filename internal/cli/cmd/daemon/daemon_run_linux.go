@@ -226,7 +226,7 @@ func ensureDaemonRepositoryReady(ctx context.Context, cmd *cobra.Command, env au
 	}
 
 	if state.RecoveryRequired {
-		return errDaemonRecoveryBarrier
+		return errors.Join(errDaemonRecoveryBarrier, store.ErrRecoveryRequired)
 	}
 
 	return nil

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -134,6 +135,18 @@ func TestOriginSessionLoadsKeepHealthyAndStaleResultsSilent(t *testing.T) {
 	}
 }
 
+func TestOriginSessionDegradationNamesItsCause(t *testing.T) {
+	var logs bytes.Buffer
+
+	model := loggingTestModel(t, &logs)
+	model.applySessionRows(sessionLoadResultMsg{originQueried: true, originErr: fmt.Errorf("origin: %w", gotmux.ErrNoServer)})
+
+	records := loggingTestRecords(t, &logs)
+	if len(records) != 1 || records[0]["status"] != "degraded" || records[0]["error_code"] != tuiErrorNoServer {
+		t.Fatalf("degradation record = %s, want one record with error_code %q", logs.String(), tuiErrorNoServer)
+	}
+}
+
 func assertLoggingTestRecord(
 	t *testing.T,
 	record map[string]any,
@@ -161,6 +174,7 @@ func assertLoggingTestRecord(
 
 	if status == "degraded" {
 		want["reason"] = "dependency_unavailable"
+		want["error_code"] = tuiErrorOperationFailed
 	}
 
 	if status == "recovered" {
@@ -1061,6 +1075,11 @@ func TestLogTUIFailureClassification(t *testing.T) {
 			name:     "canceled operation",
 			err:      context.Canceled,
 			wantCode: tuiErrorCanceled,
+		},
+		{
+			name:     "timed out operation",
+			err:      context.DeadlineExceeded,
+			wantCode: tuiErrorTimedOut,
 		},
 		{
 			name:     "os not exist sentinel",

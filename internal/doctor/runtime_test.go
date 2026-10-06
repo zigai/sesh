@@ -5,6 +5,8 @@ package doctor_test
 import (
 	"bytes"
 	"encoding/json"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -55,12 +57,12 @@ func TestDaemonRuntimeCheckRequiresRunningPhaseAndHeldInhibitors(t *testing.T) {
 				t.Fatalf("runtime check = %+v, want %s/%s", check, test.wantStatus, test.wantReason)
 			}
 
-			assertRuntimeDoctorLog(t, logs.Bytes())
+			assertRuntimeDoctorLog(t, logs.Bytes(), test.wantStatus == doctor.StatusWarning)
 		})
 	}
 }
 
-func assertRuntimeDoctorLog(t *testing.T, data []byte) {
+func assertRuntimeDoctorLog(t *testing.T, data []byte, runtimeWarns bool) {
 	t.Helper()
 
 	lines := bytes.Split(bytes.TrimSpace(data), []byte{'\n'})
@@ -68,7 +70,7 @@ func assertRuntimeDoctorLog(t *testing.T, data []byte) {
 		t.Fatalf("runtime diagnostic duplicated outcome records: %s", data)
 	}
 
-	for index, line := range lines {
+	for _, line := range lines {
 		var record map[string]any
 		if err := json.Unmarshal(line, &record); err != nil {
 			t.Fatal(err)
@@ -80,14 +82,30 @@ func assertRuntimeDoctorLog(t *testing.T, data []byte) {
 
 		for key := range record {
 			switch key {
-			case "component", "operation", "status", "reason", "level", "message", "check_count", "error_count", "warning_count":
+			case "component", "operation", "status", "reason", "level", "message", "check_count", "error_count", "warning_count", "warning_checks":
 			default:
 				t.Fatalf("unexpected potentially private field %q: %s", key, line)
 			}
 		}
+	}
 
-		if index == 1 && (record["level"] != "warn" || record["reason"] != "checks_degraded") {
-			t.Fatalf("capability warnings lost their diagnostic level/reason: %s", line)
-		}
+	assertDoctorDegradedCompletion(t, lines[1], runtimeWarns)
+}
+
+func assertDoctorDegradedCompletion(t *testing.T, line []byte, runtimeWarns bool) {
+	t.Helper()
+
+	var record map[string]any
+	if err := json.Unmarshal(line, &record); err != nil {
+		t.Fatal(err)
+	}
+
+	if record["level"] != "warn" || record["reason"] != "checks_degraded" {
+		t.Fatalf("capability warnings lost their diagnostic level/reason: %s", line)
+	}
+
+	warned, _ := record["warning_checks"].(string)
+	if slices.Contains(strings.Split(warned, ","), doctor.CheckDaemonRuntime) != runtimeWarns {
+		t.Fatalf("warning_checks disagrees with the daemon-runtime warning: %s", line)
 	}
 }

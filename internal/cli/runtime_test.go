@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -105,6 +106,48 @@ func testReadBoundaryLogging(t *testing.T, missing bool) {
 	}
 
 	assertRuntimeLog(t, logPath, "cli", "history", level, status, repoPath, cfg)
+}
+
+func TestCorruptRepositoryFailureNamesTheStoreStep(t *testing.T) {
+	cfg, logPath := runtimeConfig(t, "info")
+
+	repoPath := filepath.Join(t.TempDir(), "private-repository-canary")
+
+	repo, err := store.Open(t.Context(), repoPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := repo.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(filepath.Join(repoPath, "catalog.json"), []byte("{not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+
+	args := []string{"snapshot", "list", testRepositoryFlag, repoPath, testConfigFlag, cfg, testJSONFlag}
+	if err := ExecuteApplication(t.Context(), args, nil, &stdout, &stderr); err == nil {
+		t.Fatal("listing a corrupt repository must fail")
+	}
+
+	assertRuntimeLog(t, logPath, "cli", "list", "error", "failed", repoPath, cfg)
+
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var record map[string]any
+	if err := json.Unmarshal(bytes.Split(bytes.TrimSpace(data), []byte("\n"))[1], &record); err != nil {
+		t.Fatal(err)
+	}
+
+	if record["reason"] != "repositoryCorrupt" || record["store_step"] == nil {
+		t.Fatalf("corruption record = %v, want reason repositoryCorrupt with the store step", record)
+	}
 }
 
 func TestApplicationDisabledLogging(t *testing.T) {
@@ -319,30 +362,59 @@ func assertRuntimeRecord(t *testing.T, line []byte, component, operation, level,
 		t.Fatalf("wrong event: %s", line)
 	}
 
-	if status != "started" && status != "ok" && record["reason"] == nil && record["phase"] == nil && record["code"] == nil {
+	assertRuntimeOutcomeContext(t, line, record)
+	assertRuntimeLogFields(t, record)
+}
+
+func assertRuntimeOutcomeContext(t *testing.T, line []byte, record map[string]any) {
+	t.Helper()
+
+	if record["status"] == "started" {
+		return
+	}
+
+	if record["status"] != "ok" && record["reason"] == nil && record["phase"] == nil && record["code"] == nil {
 		t.Fatalf("missing fixed reason: %s", line)
 	}
 
-	assertRuntimeLogFields(t, record)
+	if record["component"] == "cli" && record["duration_ms"] == nil {
+		t.Fatalf("command outcome lacks its duration: %s", line)
+	}
+}
+
+var runtimePlainLogFields = []string{
+	"time", "level", "component", "operation", "status", "message", "reason", "phase", "code", "sessions", "windows", "panes", "error_code",
+	"skipped", "mismatches", "mismatch_reasons", "step_reason",
+	"restart_panes", "resume_panes", "unverified_panes", "nonrestartable_panes",
+	"resumed_panes", "restarted_panes", "shell_panes", "unrecovered_panes", "directory_fallback_panes",
 }
 
 func assertRuntimeLogFields(t *testing.T, record map[string]any) {
 	t.Helper()
 
-	for key := range record {
-		switch key {
-		case "time", "level", "component", "operation", "status", "message", "reason", "phase", "code", "sessions", "windows", "panes", "error_code":
-		case "verified":
-			if _, ok := record[key].(bool); !ok || record["operation"] != "restore" || record["component"] != "snapshot" {
-				t.Fatalf("invalid verification field: %#v", record)
-			}
-		case "terminal_text_omitted":
-			if _, ok := record[key].(float64); !ok || record["operation"] != "save" || record["component"] != "snapshot" {
-				t.Fatalf("invalid terminal text count: %#v", record)
-			}
-		default:
-			t.Fatalf("unexpected log field: %s", key)
+	for key, value := range record {
+		if !slices.Contains(runtimePlainLogFields, key) && !runtimeTypedLogFieldValid(key, value, record) {
+			t.Fatalf("unexpected or invalid log field %s: %#v", key, record)
 		}
+	}
+}
+
+func runtimeTypedLogFieldValid(key string, value any, record map[string]any) bool {
+	switch key {
+	case "duration_ms":
+		duration, ok := value.(float64)
+		return ok && duration >= 0
+	case "failed_step", "store_step":
+		_, ok := value.(string)
+		return ok
+	case "verified":
+		_, ok := value.(bool)
+		return ok && record["operation"] == "restore" && record["component"] == "snapshot"
+	case "terminal_text_omitted", "floating_panes_omitted":
+		_, ok := value.(float64)
+		return ok && record["operation"] == "save" && record["component"] == "snapshot"
+	default:
+		return false
 	}
 }
 

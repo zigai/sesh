@@ -49,6 +49,7 @@ const (
 	tuiErrorInvalidSessionName   = "invalid_session_name"
 	tuiErrorUncertainOutcome     = "uncertain_outcome"
 	tuiErrorCanceled             = "canceled"
+	tuiErrorTimedOut             = "timed_out"
 	tuiErrorNotFound             = "not_found"
 	tuiErrorNoServer             = "no_server"
 	tuiErrorUnsupported          = "unsupported"
@@ -107,8 +108,25 @@ func classifyTUIErrorCode(err error) string {
 
 func sentinelErrorCode(err error) (string, bool) {
 	switch {
-	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+	case errors.Is(err, context.DeadlineExceeded):
+		return tuiErrorTimedOut, true
+	case errors.Is(err, context.Canceled):
 		return tuiErrorCanceled, true
+	}
+
+	if code, ok := sessionErrorCode(err); ok {
+		return code, true
+	}
+
+	if errors.Is(err, os.ErrNotExist) {
+		return tuiErrorNotFound, true
+	}
+
+	return tmuxErrorCode(err)
+}
+
+func sessionErrorCode(err error) (string, bool) {
+	switch {
 	case errors.Is(err, session.ErrSessionAttached):
 		return tuiErrorSessionAttached, true
 	case errors.Is(err, session.ErrSessionAlreadyExists):
@@ -119,8 +137,13 @@ func sentinelErrorCode(err error) (string, bool) {
 		return tuiErrorInvalidSessionName, true
 	case errors.Is(err, session.ErrUncertain):
 		return tuiErrorUncertainOutcome, true
-	case errors.Is(err, os.ErrNotExist):
-		return tuiErrorNotFound, true
+	default:
+		return "", false
+	}
+}
+
+func tmuxErrorCode(err error) (string, bool) {
+	switch {
 	case errors.Is(err, gotmux.ErrNoServer):
 		return tuiErrorNoServer, true
 	case errors.Is(err, gotmux.ErrNotFound):
@@ -157,6 +180,20 @@ func logTUIFailure(ctx context.Context, operation tuiLogOperation, err error) {
 	event.Msg("tui operation failed")
 }
 
+func logTUIDegradation(ctx context.Context, operation tuiLogOperation, err error) {
+	if !knownTUIOperation(operation) {
+		return
+	}
+
+	zerolog.Ctx(ctx).Warn().
+		Str("component", "tui").
+		Str("operation", string(operation)).
+		Str("status", "degraded").
+		Str("reason", "dependency_unavailable").
+		Str("error_code", classifyTUIErrorCode(err)).
+		Msg("tui dependency degraded")
+}
+
 func logTUIEvent(ctx context.Context, operation tuiLogOperation, outcome tuiLogOutcome) {
 	if !knownTUIOperation(operation) {
 		return
@@ -174,12 +211,7 @@ func logTUIEvent(ctx context.Context, operation tuiLogOperation, outcome tuiLogO
 	case tuiLogOutcomeFailure:
 		logTUIFailure(ctx, operation, nil)
 	case tuiLogOutcomeDegradation:
-		logger.Warn().
-			Str("component", "tui").
-			Str("operation", string(operation)).
-			Str("status", "degraded").
-			Str("reason", "dependency_unavailable").
-			Msg("tui dependency degraded")
+		logTUIDegradation(ctx, operation, nil)
 	case tuiLogOutcomeRecovery:
 		logger.Info().
 			Str("component", "tui").
@@ -234,9 +266,12 @@ func logTUILoadTransition(
 ) {
 	switch {
 	case previous == nil && current != nil:
-		if failureOutcome == tuiLogOutcomeFailure {
+		switch failureOutcome {
+		case tuiLogOutcomeFailure:
 			logTUIFailure(ctx, operation, current)
-		} else {
+		case tuiLogOutcomeDegradation:
+			logTUIDegradation(ctx, operation, current)
+		case tuiLogOutcomeSuccess, tuiLogOutcomeRecovery:
 			logTUIEvent(ctx, operation, failureOutcome)
 		}
 	case previous != nil && current == nil:

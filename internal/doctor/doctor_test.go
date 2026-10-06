@@ -114,7 +114,7 @@ func TestCaptureAndRestoreChecksDescribeImplementedBoundaries(t *testing.T) {
 	capture := findCheck(results, doctor.CheckCaptureGuarantee)
 	if capture.Reason != doctor.ReasonObservational ||
 		!strings.Contains(capture.Message, "not a checkpoint") ||
-		!strings.Contains(capture.Message, "shell jobs and pipelines are not saved") ||
+		!strings.Contains(capture.Message, "shell jobs, pipelines and floating panes are not saved") ||
 		!strings.Contains(capture.Message, "scrollback is kept but not replayed") {
 		t.Fatalf("capture capability is inaccurate: %#v", capture)
 	}
@@ -962,6 +962,7 @@ type schemaLevelCase struct {
 	wantStatus    string
 	wantReason    string
 	wantRecords   int
+	errorChecks   string
 }
 
 func TestLogging_SchemaAndLevels(t *testing.T) {
@@ -978,6 +979,7 @@ func TestLogging_SchemaAndLevels(t *testing.T) {
 			wantStatus:    "degraded",
 			wantReason:    "checks_degraded",
 			wantRecords:   2,
+			errorChecks:   "",
 		},
 		{
 			name: "failed_checks_level",
@@ -994,6 +996,7 @@ func TestLogging_SchemaAndLevels(t *testing.T) {
 			wantStatus:    "failed",
 			wantReason:    "checks_failed",
 			wantRecords:   2,
+			errorChecks:   doctor.CheckHistoryState,
 		},
 		{
 			name: "operational_cancellation_level",
@@ -1005,6 +1008,7 @@ func TestLogging_SchemaAndLevels(t *testing.T) {
 			wantStatus:    "failed",
 			wantReason:    "operation_canceled",
 			wantRecords:   1,
+			errorChecks:   "",
 		},
 	}
 
@@ -1060,6 +1064,11 @@ func runSchemaLevelTest(t *testing.T, tt schemaLevelCase) {
 
 	if lastRecord["reason"] != tt.wantReason {
 		t.Fatalf("expected reason %q, got %q", tt.wantReason, lastRecord["reason"])
+	}
+
+	errorChecks, _ := lastRecord["error_checks"].(string)
+	if errorChecks != tt.errorChecks {
+		t.Fatalf("expected error_checks %q, got %q", tt.errorChecks, errorChecks)
 	}
 }
 
