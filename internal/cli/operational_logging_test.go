@@ -21,7 +21,6 @@ func TestOperationalCommandsPersistFailuresWithoutPrivateDetails(t *testing.T) {
 		operation string
 	}{
 		{[]string{actionCmd, "autosave-final-save"}, "final-save"},
-		{[]string{actionCmd, "session-adopt-startup"}, "adopt_startup_session"},
 		{[]string{actionCmd, "tmux-wait-ready"}, "daemon_wait_ready"},
 		{[]string{"daemon", "agent-window-status"}, "agent_status_run"},
 		{[]string{actionCmd, "agent-window-status-clear"}, "clear_styles"},

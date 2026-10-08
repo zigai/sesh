@@ -39,9 +39,6 @@ func TestAutosaveSummarySaysWhatHappenedInOneLine(t *testing.T) {
 	partial := newAutosaveOutcome("partial", "sessions_skipped")
 	partial.restore, partial.restored, partial.skipped, partial.generation = true, 1, 1, "d879e6dc156d244c6e807b18d070d558"
 
-	renamed := newAutosaveOutcome(autosaveStatusSaved, automation.ReasonAdmitted)
-	renamed.defaultSession, renamed.defaultFrom, renamed.defaultTo = automation.DefaultSessionRenamed, "3", "0"
-
 	tests := []struct {
 		name    string
 		outcome autosaveOutcome
@@ -57,7 +54,6 @@ func TestAutosaveSummarySaysWhatHappenedInOneLine(t *testing.T) {
 		{"restored", restored, "Restored 2 sessions from generation d879e6dc.\n"},
 		{"partly restored", partial, "Restored 1 session from generation d879e6dc.\n" +
 			"Skipped 1 session whose names are already in use; sesh snapshot restore shows them and how to restore them.\n"},
-		{"default session", renamed, "Renamed the startup session \"3\" to \"0\".\n"},
 		{"unknown skip", newAutosaveOutcome(autosaveStatusSkipped, "clients_attached"), "Skipped (clients_attached).\n"},
 	}
 

@@ -26,9 +26,6 @@ type autosaveResultJSON struct {
 	RepositoryState  string `json:"repositoryState,omitempty"`
 	FinalSaveState   string `json:"finalSaveState,omitempty"`
 	FinalSaveAt      int64  `json:"finalSaveCompletedAt,omitempty"`
-	DefaultAction    string `json:"defaultSessionAction,omitempty"`
-	DefaultFrom      string `json:"defaultSessionFrom,omitempty"`
-	DefaultTo        string `json:"defaultSessionTo,omitempty"`
 	Recorded         bool   `json:"recorded"`
 	Restorable       int    `json:"restorableSessions,omitempty"`
 	Abandoned        int    `json:"abandonedRestores,omitempty"`
@@ -264,9 +261,6 @@ func autosavePayload(env autosaveEnv, outcome autosaveOutcome) autosaveResultJSO
 		RepositoryState:  outcome.repository,
 		FinalSaveState:   outcome.finalSave,
 		FinalSaveAt:      outcome.finalSaveAt,
-		DefaultAction:    outcome.defaultSession,
-		DefaultFrom:      outcome.defaultFrom,
-		DefaultTo:        outcome.defaultTo,
 		Recorded:         outcome.recorded,
 		Restorable:       outcome.restorable,
 		Abandoned:        outcome.abandoned,

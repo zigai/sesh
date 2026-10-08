@@ -66,16 +66,6 @@ func autosaveHeadline(env autosaveEnv, outcome autosaveOutcome) string {
 }
 
 func savedHeadline(outcome autosaveOutcome) string {
-	switch outcome.defaultSession {
-	case "":
-	case automation.DefaultSessionRenamed:
-		return fmt.Sprintf("Renamed the startup session %q to %q.", outcome.defaultFrom, outcome.defaultTo)
-	case automation.DefaultSessionSwitched:
-		return fmt.Sprintf("Switched from the startup session %q to %q.", outcome.defaultFrom, outcome.defaultTo)
-	default:
-		return "Default session unchanged."
-	}
-
 	if outcome.generation == "" {
 		return "Saved."
 	}

@@ -50,7 +50,6 @@ func newActionCommand(ctx context.Context) *cobra.Command {
 		cmdautosave.NewActionSaveIfDueCommand(),
 		cmdautosave.NewActionRestoreOnStartCommand(),
 		cmdautosave.NewActionFinalSaveCommand(),
-		cmdautosave.NewActionAdoptStartupSessionCommand(),
 		cmddaemon.NewActionWaitReadyCommand(),
 	)
 

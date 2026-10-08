@@ -34,7 +34,7 @@ func TestAutosaveCommandHelp(t *testing.T) {
 func TestActionAutosaveCommandsHelp(t *testing.T) {
 	t.Parallel()
 
-	actions := []string{"autosave-save-if-due", "autosave-restore-on-start", "autosave-final-save", "session-adopt-startup"}
+	actions := []string{"autosave-save-if-due", "autosave-restore-on-start", "autosave-final-save"}
 
 	for _, actionName := range actions {
 		t.Run(actionName, func(t *testing.T) {
