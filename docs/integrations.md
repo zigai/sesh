@@ -27,10 +27,10 @@ sesh snapshot restore
 
 `sesh` tracks live coding agent panes using the Agent Host Tool (`aht`) registry.
 
-Install AHT v2.0.5 and enable the sesh integration:
+Install AHT v2.5.0 and enable the sesh integration:
 
 ```sh
-go install github.com/zigai/aht/v2@v2.0.5
+go install github.com/zigai/aht/v2@v2.5.0
 sesh setup agents
 ```
 
