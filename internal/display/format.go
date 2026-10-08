@@ -10,7 +10,6 @@ import (
 	"unicode"
 
 	"github.com/charmbracelet/x/ansi"
-	"github.com/rivo/uniseg"
 	"github.com/samber/oops"
 
 	"github.com/zigai/sesh/internal/display/layout"
@@ -953,7 +952,7 @@ func applyTokenTransforms(value string, transforms []pipe) string {
 				value = transform.value
 			}
 		case "upper":
-			value = strings.ToUpper(value)
+			value = upperText(value)
 		case "path_short":
 			if value != "" {
 				value = path.Base(value)
@@ -1033,32 +1032,32 @@ func truncateLeft(value string, width int) string {
 		return value
 	}
 
-	if width <= 1 {
-		return "…"
+	return layout.TruncateLeftWithMark(value, width, "…")
+}
+
+func upperText(value string) string {
+	if !strings.Contains(value, "\x1b") {
+		return strings.ToUpper(value)
 	}
 
-	remaining := width - 1
-	graphemes := uniseg.NewGraphemes(value)
+	var (
+		b     strings.Builder
+		state byte
+	)
 
-	parts := make([]string, 0, len(value))
-	for graphemes.Next() {
-		parts = append(parts, graphemes.Str())
-	}
+	for value != "" {
+		seq, _, n, newState := ansi.DecodeSequence(value, state, nil)
+		state = newState
+		value = value[n:]
 
-	selected := make([]string, 0, len(parts))
-	for _, part := range slices.Backward(parts) {
-		partWidth := ansi.StringWidth(part)
-		if partWidth > remaining {
-			break
+		if strings.HasPrefix(seq, "\x1b") {
+			b.WriteString(seq)
+		} else {
+			b.WriteString(strings.ToUpper(seq))
 		}
-
-		selected = append(selected, part)
-		remaining -= partWidth
 	}
 
-	slices.Reverse(selected)
-
-	return "…" + strings.Join(selected, "")
+	return b.String()
 }
 
 func allowedFields(kind FormatKind) (map[string]struct{}, error) {

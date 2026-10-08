@@ -272,6 +272,22 @@ func TestCompileRejectsUnknownField(t *testing.T) {
 	}
 }
 
+func TestPipesKeepColoredValuesValid(t *testing.T) {
+	template, err := Compile(FormatKindSession, "{session_name|upper} {source|trunc_left:3}")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	line := template.Render(testResolver{FieldSessionName: "\x1b[31mok\x1b[0m", FieldSource: "\x1b[32mabc\x1b[1mdef"})
+	if line.Left[0].Value != "\x1b[31mOK\x1b[0m" {
+		t.Fatalf("upper = %q", line.Left[0].Value)
+	}
+
+	if line.Left[2].Value != "…\x1b[32m\x1b[1mef\x1b[m" {
+		t.Fatalf("trunc_left = %q", line.Left[2].Value)
+	}
+}
+
 func TestCompileAllowsStatusGlyphAndTextFields(t *testing.T) {
 	for _, kind := range []FormatKind{FormatKindSession, FormatKindAgentsSession} {
 		if _, err := Compile(kind, "{session_name} {agent_status_glyph} {agent_status_text}"); err != nil {
