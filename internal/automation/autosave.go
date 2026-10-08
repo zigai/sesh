@@ -15,6 +15,7 @@ const (
 	ReasonIntervalElapsed    = "interval_elapsed"
 	ReasonNotDue             = "not_due"
 	ReasonHistoryUnavailable = "history_unavailable"
+	ReasonShutdownAdmit      = "shutdown_priority"
 )
 
 const (

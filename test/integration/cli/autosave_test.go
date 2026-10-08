@@ -33,8 +33,6 @@ type autosaveResultJSON struct {
 	DaemonPhase      string `json:"daemonPhase,omitempty"`
 	InhibitorsHeld   bool   `json:"inhibitorsHeld"`
 	LogindDelayMS    int64  `json:"logindDelayMillis,omitempty"`
-	AttemptTimeoutMS int64  `json:"attemptTimeoutMillis,omitempty"`
-	DrainGraceMS     int64  `json:"drainGraceMillis,omitempty"`
 	ServerManagement string `json:"serverManagement,omitempty"`
 }
 

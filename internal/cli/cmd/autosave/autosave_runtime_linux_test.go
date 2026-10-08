@@ -58,7 +58,7 @@ func TestAutosaveRuntimeStatusTracksReadinessAndLiveProbeFailure(t *testing.T) {
 
 	reporter, err := daemon.StartRuntimeReporter(t.Context(), daemon.RuntimeStatusConfig{
 		RuntimeDir: runtimeDir, Endpoint: endpoint,
-		LogindDelay: 5 * time.Second, AttemptTimeout: 3 * time.Second, DrainGrace: time.Second,
+		LogindDelay: 5 * time.Second,
 		LiveStatus: func(context.Context) (daemon.RuntimeLiveStatus, error) {
 			if unavailable.Load() {
 				return daemon.RuntimeLiveStatus{}, daemon.ErrRuntimeStatusUnavailable
@@ -86,7 +86,7 @@ func TestAutosaveRuntimeStatusTracksReadinessAndLiveProbeFailure(t *testing.T) {
 	}{
 		{"initializing", daemon.RuntimePhaseInitializing, true, false, "not_ready"},
 		{"running", daemon.RuntimePhaseRunning, true, false, "ready"},
-		{"draining", daemon.RuntimePhaseDraining, true, false, "not_ready"},
+		{"final_save", daemon.RuntimePhaseFinalSave, true, false, "not_ready"},
 		{"released", daemon.RuntimePhaseFinalSave, false, false, "not_ready"},
 		{"owner_lost", daemon.RuntimePhaseRunning, true, true, "unverifiable"},
 	}
@@ -125,7 +125,7 @@ func assertAutosaveRuntimeFacts(t *testing.T, result autosaveResultJSON, state s
 	}
 
 	if result.DaemonPhase != string(phase) || result.InhibitorsHeld != held ||
-		result.LogindDelayMS != 5000 || result.AttemptTimeoutMS != 3000 || result.DrainGraceMS != 1000 ||
+		result.LogindDelayMS != 5000 ||
 		result.ServerManagement != "unknown" {
 		t.Fatalf("unexpected runtime result: %+v", result)
 	}

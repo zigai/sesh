@@ -210,19 +210,7 @@ func runAutosaveFinalSave(cmd *cobra.Command, _ []string) error {
 	ctx, cancel := context.WithTimeout(clibase.CommandContext(cmd), deadline)
 	defer cancel()
 
-	started := time.Now()
-
-	outcome, status, saveErr := executeFinalSave(ctx, cmd, env)
-
-	status.StartedAtUnix = started.Unix()
-	status.CompletedAtUnix = time.Now().Unix()
-	status.DurationMS = time.Since(started).Milliseconds()
-
-	statusErr := automation.WriteFinalSaveStatus(resolveAutosaveStatusPath(cmd), status)
-	if statusErr != nil {
-		statusErr = oops.In("cli").With("operation", "write_final_save_status").Wrap(statusErr)
-	}
-
+	outcome, saveErr, statusErr := runFinalSave(ctx, cmd, env)
 	if saveErr != nil {
 		return errors.Join(
 			renderAutosaveDegraded(cmd, env, outcome, errors.Join(saveErr, statusErr)),
@@ -237,6 +225,25 @@ func runAutosaveFinalSave(cmd *cobra.Command, _ []string) error {
 	}
 
 	return nil
+}
+
+// runFinalSave runs one final save within ctx and records its outcome in the final save status
+// file. It returns the save's error and the status write's error separately.
+func runFinalSave(ctx context.Context, cmd *cobra.Command, env autosaveEnv) (autosaveOutcome, error, error) {
+	started := time.Now()
+
+	outcome, status, saveErr := executeFinalSave(ctx, cmd, env)
+
+	status.StartedAtUnix = started.Unix()
+	status.CompletedAtUnix = time.Now().Unix()
+	status.DurationMS = time.Since(started).Milliseconds()
+
+	statusErr := automation.WriteFinalSaveStatus(resolveAutosaveStatusPath(cmd), status)
+	if statusErr != nil {
+		statusErr = oops.In("cli").With("operation", "write_final_save_status").Wrap(statusErr)
+	}
+
+	return outcome, saveErr, statusErr
 }
 
 func executeFinalSave(
