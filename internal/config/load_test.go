@@ -15,7 +15,7 @@ import (
 	"github.com/zigai/sesh/internal/config"
 )
 
-func TestConfigPrecedenceAcrossUserProjectEnvironmentAndExplicitPath(t *testing.T) {
+func TestConfigPrecedenceAcrossUserEnvironmentAndExplicitPathIgnoresWorkingDirectory(t *testing.T) {
 	root := t.TempDir()
 	configHome := filepath.Join(root, "config")
 	project := filepath.Join(root, "project")
@@ -55,7 +55,7 @@ func TestConfigPrecedenceAcrossUserProjectEnvironmentAndExplicitPath(t *testing.
 		}
 	}
 
-	check("13s")
+	check("11s")
 	t.Setenv("SESH_HOOKS_TIMEOUT", "17s")
 	check("17s")
 
