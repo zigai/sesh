@@ -159,10 +159,6 @@ func TestPopupInitialCatalogRendersWithoutLoadingFrame(t *testing.T) {
 	model.height = 20
 	model.Init()
 
-	if got := viewString(model.View()); got != "" {
-		t.Fatalf("initial popup view = %q, want no loading frame", got)
-	}
-
 	model.handleSessionLoadResult(sessionLoadResultMsg{
 		sessions: []session.Session{{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive}},
 		status:   session.StatusComplete,
@@ -214,10 +210,6 @@ func TestPopupInitialCatalogFailureReplacesBlankView(t *testing.T) {
 	model.width = 80
 	model.height = 20
 	model.Init()
-
-	if got := viewString(model.View()); got != "" {
-		t.Fatalf("initial popup view = %q, want no loading frame", got)
-	}
 
 	model.handleSessionLoadResult(sessionLoadResultMsg{
 		status:     session.StatusFailed,

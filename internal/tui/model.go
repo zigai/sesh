@@ -558,7 +558,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) View() tea.View {
-	content := ""
+	content := "\n"
 	if m.popupStartup != popupStartupWaiting {
 		content = m.viewContent()
 	}

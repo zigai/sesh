@@ -178,23 +178,36 @@ func TestMouseWheelAfterHoverScrollsFromPresentedViewport(t *testing.T) {
 	assertHoverVisibleRows(t, model, []string{hoverEarlierProject, "earlier-first", "earlier-second", "earlier-third", hoverMiddleProject})
 }
 
-func TestMouseWheelUpAfterHoveringFirstChildRevealsEarlierGroup(t *testing.T) {
+func TestMouseWheelDownKeepsViewportThroughAgentRefreshAndHover(t *testing.T) {
 	model := crowdedHoverTestModel()
-	model.listTop = 4
-	model.cursor = 1
+	model.listTop = 0
 	model.agentCursor = parentAgentIndex
 	layout := model.popupMouseLayout()
 	model.View()
 
-	model = updateTestModel(t, model, mouseMotion(layout.bodyX, layout.listY+1))
-	if model.cursor != 1 || model.agentCursor != 0 {
-		t.Fatalf("hover selected %d/%d, want middle session's first child 1/0", model.cursor, model.agentCursor)
+	model = updateTestModel(t, model, mouseWheel(layout.bodyX, layout.listY, tea.MouseWheelDown))
+	assertHoverVisibleRows(t, model, []string{"earlier-third", hoverMiddleProject, "middle-first", "middle-second", "middle-third"})
+
+	summaries := make([]session.AgentSummary, 0, len(model.sessions))
+	for _, row := range model.sessions {
+		summaries = append(summaries, session.AgentSummary{
+			TmuxSessionName: row.Name,
+			Total:           len(row.Agents),
+			Agents:          row.Agents,
+		})
 	}
 
-	assertHoverVisibleRows(t, model, []string{hoverMiddleProject, "middle-first", "middle-second", "middle-third", hoverLaterProject})
+	model = updateTestModel(t, model, agentSummariesMsg{summaries: summaries})
+	assertHoverVisibleRows(t, model, []string{"earlier-third", hoverMiddleProject, "middle-first", "middle-second", "middle-third"})
 
-	model = updateTestModel(t, model, mouseWheel(layout.bodyX, layout.listY, tea.MouseWheelUp))
-	assertHoverVisibleRows(t, model, []string{hoverEarlierProject, "earlier-first", "earlier-second", "earlier-third", hoverMiddleProject})
+	model = updateTestModel(t, model, mouseMotion(layout.bodyX, layout.listY+1))
+	assertHoverVisibleRows(t, model, []string{"earlier-third", hoverMiddleProject, "middle-first", "middle-second", "middle-third"})
+	model = updateTestModel(t, model, mouseWheel(layout.bodyX, layout.listY, tea.MouseWheelDown))
+	assertHoverVisibleRows(t, model, []string{"middle-second", "middle-third", hoverLaterProject, "later-first", "later-second"})
+
+	model = updateTestModel(t, model, mouseMotion(layout.bodyX, layout.listY))
+	model = updateTestModel(t, model, mouseWheel(layout.bodyX, layout.listY, tea.MouseWheelDown))
+	assertHoverVisibleRows(t, model, []string{"middle-third", hoverLaterProject, "later-first", "later-second", "later-third"})
 }
 
 func crowdedHoverTestModel() *Model {
