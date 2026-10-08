@@ -12,10 +12,8 @@ import (
 	"github.com/spf13/cobra"
 	gotmux "github.com/zigai/gotmux/tmux"
 
+	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/cli/clibase"
-	"github.com/zigai/sesh/internal/config"
-	integration "github.com/zigai/sesh/internal/integration/tmux"
-	"github.com/zigai/sesh/internal/privatefs"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
@@ -242,50 +240,26 @@ func jsonTimestamp(value time.Time) *string {
 	return &formatted
 }
 
-func openSessionRepository(ctx context.Context, cmd *cobra.Command, cfg *config.Config) (*store.Repository, bool, error) {
-	repoFlag, _ := cmd.Flags().GetString("repository")
-	if repoFlag != "" {
-		absRepo, err := filepath.Abs(repoFlag)
-		if err != nil {
-			return nil, false, oops.In("cli").With("operation", "resolve_repository_path").Wrap(err)
-		}
-
-		repo, err := store.OpenExisting(ctx, absRepo)
-		if err != nil {
-			return nil, false, oops.In("cli").With("operation", "open_repository").Wrapf(err, "open repository")
-		}
-
+func openSessionRepository(ctx context.Context, cmd *cobra.Command, workspace app.Workspace) (*store.Repository, bool, error) {
+	repo, err := workspace.OpenExistingRepository(ctx)
+	if err == nil {
 		return repo, true, nil
 	}
 
-	dataDir, err := config.GetDataDir(cfg)
-	if err != nil {
-		return nil, false, oops.In("cli").With("operation", "resolve_data_dir").Wrap(err)
+	if repoFlag, _ := cmd.Flags().GetString("repository"); repoFlag == "" && errors.Is(err, os.ErrNotExist) {
+		return nil, false, nil
 	}
 
-	defaultRepoPath := filepath.Join(dataDir, "snapshots")
-
-	repo, err := store.OpenExisting(ctx, defaultRepoPath)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil, false, nil
-		}
-
-		return nil, false, oops.In("cli").With("operation", "open_repository").Wrapf(err, "open repository")
-	}
-
-	return repo, true, nil
+	return nil, false, err
 }
 
 func openSessionRuntime(cmd *cobra.Command) (*sessionRuntime, error) {
-	socketPath := clibase.ResolveSocket(cmd)
-
-	server, err := integration.Open(socketPath)
+	workspace, err := clibase.ResolveWorkspace(cmd)
 	if err != nil {
-		return nil, oops.In("cli").With("operation", "open_tmux").Wrap(err)
+		return nil, err
 	}
 
-	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
+	server, err := workspace.OpenTmux()
 	if err != nil {
 		return nil, err
 	}
@@ -298,28 +272,24 @@ func openSessionRuntime(cmd *cobra.Command) (*sessionRuntime, error) {
 	)
 
 	if cmd.Flags().Lookup("repository") != nil {
-		var (
-			repoErr  error
-			leaseErr error
-		)
-
-		repo, _, repoErr = openSessionRepository(ctx, cmd, cfg)
-		if repoErr != nil {
-			return nil, repoErr
+		repo, _, err = openSessionRepository(ctx, cmd, workspace)
+		if err != nil {
+			return nil, err
 		}
 
-		leaseRoot, leaseErr = resolveSessionLeaseRoot(cmd, cfg)
-		if leaseErr != nil {
-			return nil, errors.Join(leaseErr, closeRepository(repo))
+		if err := workspace.EnsureLeaseRoot(); err != nil {
+			return nil, errors.Join(err, closeRepository(repo))
 		}
+
+		leaseRoot = workspace.LeaseRoot
 	}
 
 	wf := session.NewWorkflowWithOptions(session.WorkflowOptions{
 		Server:             server,
 		Repository:         repo,
 		LeaseRoot:          leaseRoot,
-		HistoryPath:        resolveHistoryPath(cmd),
-		Hooks:              cfg.Hooks,
+		HistoryPath:        workspace.History,
+		Hooks:              workspace.Config.Hooks,
 		HookRunner:         nil,
 		Getenv:             nil,
 		Streams:            commandTerminalStreams(cmd),
@@ -328,20 +298,6 @@ func openSessionRuntime(cmd *cobra.Command) (*sessionRuntime, error) {
 	})
 
 	return &sessionRuntime{workflow: wf, repo: repo}, nil
-}
-
-func resolveHistoryPath(cmd *cobra.Command) string {
-	historyPath, _ := cmd.Flags().GetString("history")
-	if historyPath != "" {
-		absHist, err := filepath.Abs(historyPath)
-		if err == nil {
-			return absHist
-		}
-	}
-
-	xdg := config.GetXDGPaths()
-
-	return filepath.Join(xdg.StateHome, "sesh", "history.json")
 }
 
 func resolveSessionDirectory(cmd *cobra.Command) (string, error) {
@@ -371,45 +327,6 @@ func resolveSessionDirectory(cmd *cobra.Command) (string, error) {
 	}
 
 	return cleanDir, nil
-}
-
-func resolveSessionLeaseRoot(cmd *cobra.Command, cfg *config.Config) (string, error) {
-	leaseFlag, _ := cmd.Flags().GetString("lease-root")
-	if leaseFlag != "" {
-		abs, err := filepath.Abs(leaseFlag)
-		if err != nil {
-			return "", oops.In("cli").With("operation", "resolve_lease_root").Wrap(err)
-		}
-
-		dir, err := privatefs.Ensure(abs)
-		if err != nil {
-			return "", oops.In("cli").With("operation", "ensure_lease_root").Wrap(err)
-		}
-
-		if err := dir.Close(); err != nil {
-			return "", oops.In("cli").With("operation", "close_lease_root").Wrap(err)
-		}
-
-		return abs, nil
-	}
-
-	dataDir, err := config.GetDataDir(cfg)
-	if err != nil {
-		return "", oops.In("cli").With("operation", "resolve_data_dir").Wrap(err)
-	}
-
-	defaultLeaseRoot := filepath.Join(dataDir, "leases")
-
-	dir, err := privatefs.Ensure(defaultLeaseRoot)
-	if err != nil {
-		return "", oops.In("cli").With("operation", "ensure_lease_root").Wrap(err)
-	}
-
-	if err := dir.Close(); err != nil {
-		return "", oops.In("cli").With("operation", "close_lease_root").Wrap(err)
-	}
-
-	return defaultLeaseRoot, nil
 }
 
 func runSessionDelete(cmd *cobra.Command, args []string) error {

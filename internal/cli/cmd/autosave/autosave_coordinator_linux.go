@@ -16,7 +16,6 @@ import (
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/daemon"
 	"github.com/zigai/sesh/internal/integration/lifecycle"
-	integration "github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/snapshot/engine"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
@@ -46,13 +45,13 @@ func NewDaemonCoordinatorCommand() *cobra.Command {
 }
 
 func runCoordinator(cmd *cobra.Command, _ []string) (resultErr error) {
-	env, err := resolveAutosaveEnv(cmd)
+	env, err := ResolveEnv(cmd)
 	if err != nil {
 		return err
 	}
 
-	socket := clibase.ResolveSocket(cmd)
-	if _, err := integration.Open(socket); err != nil {
+	socket := env.workspace.Socket
+	if _, err := env.workspace.OpenTmux(); err != nil {
 		return clibase.NewExitError(
 			clibase.ExitCodeUsage,
 			oops.In("cli").With("operation", "validate_daemon_socket").Wrap(err),
@@ -75,7 +74,7 @@ func runCoordinator(cmd *cobra.Command, _ []string) (resultErr error) {
 
 	defer func() { resultErr = errors.Join(resultErr, logind.Close()) }()
 
-	if err := ensureCoordinatorRepositoryReady(ctx, cmd, env); err != nil {
+	if err := ensureCoordinatorRepositoryReady(ctx, env); err != nil {
 		return oops.In("cli").With("operation", "inspect_daemon_repository").Wrap(err)
 	}
 
@@ -114,7 +113,7 @@ func runCoordinator(cmd *cobra.Command, _ []string) (resultErr error) {
 
 // coordinatorFinalSave marks a failed final save as recorded when its status file was written, so
 // the failure is reported through that file instead of stopping the coordinator.
-func coordinatorFinalSave(ctx context.Context, cmd *cobra.Command, env autosaveEnv) error {
+func coordinatorFinalSave(ctx context.Context, cmd *cobra.Command, env Env) error {
 	_, saveErr, statusErr := runFinalSave(ctx, cmd, env)
 	if saveErr != nil && statusErr == nil {
 		saveErr = errors.Join(daemon.ErrFinalRecorded, saveErr)
@@ -123,13 +122,8 @@ func coordinatorFinalSave(ctx context.Context, cmd *cobra.Command, env autosaveE
 	return errors.Join(saveErr, statusErr)
 }
 
-func ensureCoordinatorRepositoryReady(ctx context.Context, cmd *cobra.Command, env autosaveEnv) error {
-	repositoryPath, err := resolveAutosaveRepository(cmd, env.cfg)
-	if err != nil {
-		return err
-	}
-
-	repository, err := store.OpenExisting(ctx, repositoryPath)
+func ensureCoordinatorRepositoryReady(ctx context.Context, env Env) error {
+	repository, err := env.workspace.OpenExistingRepository(ctx)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil

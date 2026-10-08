@@ -3,20 +3,18 @@ package autosave
 import (
 	"context"
 	"errors"
-	"path/filepath"
 	"time"
 
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/automation"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/daemon"
-	"github.com/zigai/sesh/internal/integration/process"
 	"github.com/zigai/sesh/internal/session"
-	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
 const (
@@ -79,9 +77,8 @@ type autosaveOutcome struct {
 	skipped  int
 }
 
-type autosaveEnv struct {
-	cfg           *config.Config
-	historyPath   string
+type Env struct {
+	workspace     app.Workspace
 	interval      time.Duration
 	historyKnown  bool
 	historyErr    error
@@ -166,19 +163,17 @@ func NewActionFinalSaveCommand() *cobra.Command {
 	return cmd
 }
 
-func resolveAutosaveEnv(cmd *cobra.Command) (autosaveEnv, error) {
-	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
+func ResolveEnv(cmd *cobra.Command) (Env, error) {
+	workspace, err := clibase.ResolveWorkspace(cmd)
 	if err != nil {
-		return autosaveEnv{}, err
+		return Env{}, err
 	}
 
-	historyPath := resolveAutosaveHistoryPath(cmd)
+	cfg := workspace.Config
+	lastCompleted, historyErr := loadAutosaveHistory(workspace.History)
 
-	lastCompleted, historyErr := loadAutosaveHistory(historyPath)
-
-	env := autosaveEnv{
-		cfg:           cfg,
-		historyPath:   historyPath,
+	env := Env{
+		workspace:     workspace,
 		interval:      automation.EffectiveInterval(config.AutosaveInterval(cfg)),
 		historyKnown:  historyErr == nil,
 		historyErr:    historyErr,
@@ -197,6 +192,14 @@ func resolveAutosaveEnv(cmd *cobra.Command) (autosaveEnv, error) {
 	return env, nil
 }
 
+func (e Env) Interval() time.Duration {
+	return e.interval
+}
+
+func (e Env) Workspace() app.Workspace {
+	return e.workspace
+}
+
 func loadAutosaveHistory(path string) (int64, error) {
 	state, err := session.LoadState(path)
 	if err != nil {
@@ -208,66 +211,6 @@ func loadAutosaveHistory(path string) (int64, error) {
 	}
 
 	return state.LastAutosaveTimestamp, nil
-}
-
-func resolveAutosaveRepository(cmd *cobra.Command, cfg *config.Config) (string, error) {
-	repoPath, _ := cmd.Flags().GetString("repository")
-	if repoPath != "" {
-		abs, err := filepath.Abs(repoPath)
-		if err != nil {
-			return "", oops.In("cli").With("operation", "resolve_repository_path").Wrapf(err, "resolve repository path")
-		}
-
-		return abs, nil
-	}
-
-	dataDir, err := config.GetDataDir(cfg)
-	if err != nil {
-		return "", oops.In("cli").With("operation", "resolve_data_dir").Wrap(err)
-	}
-
-	return filepath.Join(dataDir, "snapshots"), nil
-}
-
-func resolveAutosaveHistoryPath(cmd *cobra.Command) string {
-	historyPath, _ := cmd.Flags().GetString("history")
-	if historyPath != "" {
-		if abs, err := filepath.Abs(historyPath); err == nil {
-			return abs
-		}
-	}
-
-	return filepath.Join(config.GetXDGPaths().StateHome, "sesh", "history.json")
-}
-
-func resolveAutosaveStatusPath(cmd *cobra.Command) string {
-	statusPath, _ := cmd.Flags().GetString("status-file")
-	if statusPath != "" {
-		if abs, err := filepath.Abs(statusPath); err == nil {
-			return abs
-		}
-	}
-
-	return filepath.Join(config.GetXDGPaths().StateHome, "sesh", automation.FinalSaveStatusName)
-}
-
-func resolveAutosaveLeaseRoot(cmd *cobra.Command, cfg *config.Config) (string, error) {
-	leaseRoot, _ := cmd.Flags().GetString("lease-root")
-	if leaseRoot != "" {
-		abs, err := filepath.Abs(leaseRoot)
-		if err != nil {
-			return "", oops.In("cli").With("operation", "resolve_lease_root").Wrapf(err, "resolve lease root")
-		}
-
-		return abs, nil
-	}
-
-	dataDir, err := config.GetDataDir(cfg)
-	if err != nil {
-		return "", oops.In("cli").With("operation", "resolve_data_dir").Wrap(err)
-	}
-
-	return filepath.Join(dataDir, "leases"), nil
 }
 
 func recordAutosave(ctx context.Context, historyPath string, stamp int64) error {
@@ -285,60 +228,10 @@ func recordAutosave(ctx context.Context, historyPath string, stamp int64) error 
 	return nil
 }
 
-func openAutosaveRepository(ctx context.Context, cmd *cobra.Command, cfg *config.Config) (*store.Repository, error) {
-	repoPath, err := resolveAutosaveRepository(cmd, cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	repo, err := store.Open(ctx, repoPath)
-	if err != nil {
-		return nil, oops.In("cli").With("operation", "open_repository").Wrap(err)
-	}
-
-	return repo, nil
-}
-
 func wrapCloseError(err error) error {
 	if err == nil {
 		return nil
 	}
 
 	return oops.In("cli").With("operation", "close_repository").Wrap(err)
-}
-
-func resolveAutosaveProcessEnv(cmd *cobra.Command, cfg *config.Config) ([]string, string, error) {
-	var processEnv []string
-	if cfg != nil {
-		processEnv = cfg.Snapshot.ProcessEnvironment
-	} else {
-		processEnv = config.DefaultProcessEnvironment
-	}
-
-	if err := process.ValidateEnvironmentKeys(processEnv); err != nil {
-		return nil, "", oops.In("cli").With("operation", "autosave_validate_env").Wrap(err)
-	}
-
-	filteredEnv := config.FilterProcessEnvironmentKeys(processEnv)
-
-	agentPath := resolveAgentStatePath(cmd)
-	if agentPath == "" && cfg != nil && cfg.AgentStatus.StorePath != "" {
-		agentPath = cfg.AgentStatus.StorePath
-	}
-
-	return filteredEnv, agentPath, nil
-}
-
-func resolveAgentStatePath(cmd *cobra.Command) string {
-	statePath, _ := cmd.Flags().GetString("state")
-	if statePath == "" {
-		return ""
-	}
-
-	abs, err := filepath.Abs(statePath)
-	if err != nil {
-		return statePath
-	}
-
-	return abs
 }

@@ -145,6 +145,7 @@ func (m *Model) refreshDisplaySessions() {
 	}
 
 	m.displaySessions = displayed
+	m.markCustomFieldsDirty()
 }
 
 func compareAgentSessionRows(left session.Session, right session.Session) int {

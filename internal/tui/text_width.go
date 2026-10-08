@@ -39,6 +39,49 @@ func SanitizeTerminalText(s string) string {
 	return b.String()
 }
 
+func SanitizeTerminalTextKeepSGR(s string) string {
+	var (
+		b     strings.Builder
+		state byte
+	)
+
+	b.Grow(len(s))
+
+	for len(s) > 0 {
+		seq, _, n, newState := ansi.DecodeSequence(s, state, nil)
+		state = newState
+		s = s[n:]
+
+		if isSGRSequence(seq) {
+			b.WriteString(seq)
+			continue
+		}
+
+		if len(seq) == 0 || seq[0] < 0x20 || (seq[0] >= 0x7f && seq[0] < 0xc0) {
+			continue
+		}
+
+		for _, r := range seq {
+			if !isBidiOrDangerousControl(r) && (unicode.IsPrint(r) || r == '\u200c' || r == '\u200d') {
+				b.WriteRune(r)
+			}
+		}
+	}
+
+	return b.String()
+}
+
+func isSGRSequence(seq string) bool {
+	params, ok := strings.CutPrefix(seq, "\x1b[")
+	if !ok {
+		return false
+	}
+
+	params, ok = strings.CutSuffix(params, "m")
+
+	return ok && strings.Trim(params, "0123456789;:") == ""
+}
+
 func formatAgentAgeAt(t time.Time, now time.Time) string {
 	diff := now.Sub(t)
 	if diff < time.Hour {

@@ -4,13 +4,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/automation"
 )
 
-func summaryEnv() autosaveEnv {
-	return autosaveEnv{
-		cfg:           nil,
-		historyPath:   "",
+func summaryEnv() Env {
+	return Env{
+		workspace:     app.Workspace{},
 		interval:      3 * time.Minute,
 		historyKnown:  true,
 		historyErr:    nil,

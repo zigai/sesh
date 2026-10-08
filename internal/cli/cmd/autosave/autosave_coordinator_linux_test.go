@@ -23,7 +23,12 @@ func coordinatorGate(t *testing.T, repoPath string) error {
 		t.Fatalf("set repository flag: %v", err)
 	}
 
-	return ensureCoordinatorRepositoryReady(t.Context(), cmd, autosaveEnv{})
+	env, err := ResolveEnv(cmd)
+	if err != nil {
+		t.Fatalf("resolve autosave env: %v", err)
+	}
+
+	return ensureCoordinatorRepositoryReady(t.Context(), env)
 }
 
 func operationState(t *testing.T, repoPath, id string) string {
@@ -116,7 +121,12 @@ func TestCoordinatorRefusesUnresolvedSave(t *testing.T) {
 		t.Fatalf("set repository flag: %v", err)
 	}
 
-	err = ensureCoordinatorRepositoryReady(t.Context(), cmd, autosaveEnv{})
+	env, err := ResolveEnv(cmd)
+	if err != nil {
+		t.Fatalf("resolve autosave env: %v", err)
+	}
+
+	err = ensureCoordinatorRepositoryReady(t.Context(), env)
 	if !errors.Is(err, errCoordinatorRecoveryBarrier) {
 		t.Fatalf("ensureCoordinatorRepositoryReady error = %v, want recovery barrier", err)
 	}

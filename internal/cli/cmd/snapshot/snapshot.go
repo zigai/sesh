@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/cobra"
 	gotmux "github.com/zigai/gotmux/tmux"
 
-	"github.com/zigai/sesh/internal/agents"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/integration/process"
@@ -195,14 +194,7 @@ func newSnapshotSaveCommand() *cobra.Command {
 }
 
 func parseSaveInput(cmd *cobra.Command, args []string) (string, string, []gotmux.SessionID, engine.SaveConfig, error) {
-	absRepoPath, err := clibase.ResolveRepository(cmd)
-	if err != nil {
-		return "", "", nil, engine.SaveConfig{LeaseRoot: "", ProcessEnrichment: false, ProcessEnvironmentKeys: nil, AgentSource: nil, Profile: engine.RecoveryExact}, err
-	}
-
-	socketPath := clibase.ResolveSocket(cmd)
-
-	leaseRoot, err := clibase.ResolveLeaseRoot(cmd)
+	workspace, err := clibase.ResolveWorkspace(cmd)
 	if err != nil {
 		return "", "", nil, engine.SaveConfig{LeaseRoot: "", ProcessEnrichment: false, ProcessEnvironmentKeys: nil, AgentSource: nil, Profile: engine.RecoveryExact}, err
 	}
@@ -228,41 +220,30 @@ func parseSaveInput(cmd *cobra.Command, args []string) (string, string, []gotmux
 
 	processEnrichment, _ := cmd.Flags().GetBool("process-enrichment")
 
-	cmdCfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
-	if err != nil {
-		return "", "", nil, engine.SaveConfig{LeaseRoot: "", ProcessEnrichment: false, ProcessEnvironmentKeys: nil, AgentSource: nil, Profile: engine.RecoveryExact}, err
-	}
-
-	filteredEnv, agentStatePath, envErr := resolveSaveEnvironment(cmd, cmdCfg, processEnrichment)
+	filteredEnv, envErr := resolveSaveEnvironment(cmd, workspace.Config, processEnrichment)
 	if envErr != nil {
 		return "", "", nil, engine.SaveConfig{LeaseRoot: "", ProcessEnrichment: false, ProcessEnvironmentKeys: nil, AgentSource: nil, Profile: engine.RecoveryExact}, envErr
 	}
 
 	cfg := engine.SaveConfig{
-		LeaseRoot:              leaseRoot,
+		LeaseRoot:              workspace.LeaseRoot,
 		ProcessEnrichment:      processEnrichment,
 		ProcessEnvironmentKeys: filteredEnv,
-		AgentSource:            agents.NewAHTStore(agentStatePath),
+		AgentSource:            workspace.AgentSource(),
 		Profile:                engine.RecoveryPractical,
 	}
 
-	return absRepoPath, socketPath, selected, cfg, nil
+	return workspace.Repository, workspace.Socket, selected, cfg, nil
 }
 
-func resolveSaveEnvironment(cmd *cobra.Command, cmdCfg *config.Config, enrichment bool) ([]string, string, error) {
-	var processEnv []string
-
-	switch {
-	case cmd.Flags().Changed("process-env"):
+func resolveSaveEnvironment(cmd *cobra.Command, cmdCfg *config.Config, enrichment bool) ([]string, error) {
+	processEnv := slices.Clone(cmdCfg.Snapshot.ProcessEnvironment)
+	if cmd.Flags().Changed("process-env") {
 		processEnv, _ = cmd.Flags().GetStringSlice("process-env")
-	case cmdCfg != nil:
-		processEnv = slices.Clone(cmdCfg.Snapshot.ProcessEnvironment)
-	default:
-		processEnv = slices.Clone(config.DefaultProcessEnvironment)
 	}
 
 	if err := process.ValidateEnvironmentKeys(processEnv); err != nil {
-		return nil, "", clibase.NewExitError(clibase.ExitCodeUsage, err)
+		return nil, clibase.NewExitError(clibase.ExitCodeUsage, err)
 	}
 
 	filteredEnv := config.FilterProcessEnvironmentKeys(processEnv)
@@ -270,12 +251,7 @@ func resolveSaveEnvironment(cmd *cobra.Command, cmdCfg *config.Config, enrichmen
 		filteredEnv = nil
 	}
 
-	agentPath := resolveAgentStatePath(cmd)
-	if agentPath == "" && cmdCfg != nil && cmdCfg.AgentStatus.StorePath != "" {
-		agentPath = cmdCfg.AgentStatus.StorePath
-	}
-
-	return filteredEnv, agentPath, nil
+	return filteredEnv, nil
 }
 
 func executeSave(ctx context.Context, repoPath, socketPath string, selected []gotmux.SessionID, cfg engine.SaveConfig) (engine.SaveResult, error) {
@@ -407,14 +383,7 @@ func parseRestoreInput(cmd *cobra.Command, args []string) (string, string, engin
 		return "", "", engine.RestoreConfig{}, err
 	}
 
-	absRepoPath, err := clibase.ResolveRepository(cmd)
-	if err != nil {
-		return "", "", engine.RestoreConfig{}, err
-	}
-
-	socketPath := clibase.ResolveSocket(cmd)
-
-	leaseRoot, err := clibase.ResolveLeaseRoot(cmd)
+	workspace, err := clibase.ResolveWorkspace(cmd)
 	if err != nil {
 		return "", "", engine.RestoreConfig{}, err
 	}
@@ -433,7 +402,7 @@ func parseRestoreInput(cmd *cobra.Command, args []string) (string, string, engin
 	}
 
 	cfg := engine.RestoreConfig{
-		LeaseRoot:              leaseRoot,
+		LeaseRoot:              workspace.LeaseRoot,
 		Generation:             generation,
 		OperationID:            operationID,
 		Sessions:               allSessions,
@@ -443,7 +412,7 @@ func parseRestoreInput(cmd *cobra.Command, args []string) (string, string, engin
 		Profile:                engine.RecoveryPractical,
 	}
 
-	return absRepoPath, socketPath, cfg, nil
+	return workspace.Repository, workspace.Socket, cfg, nil
 }
 
 func parseCollisionPolicy(cmd *cobra.Command) (engine.CollisionPolicy, error) {
@@ -687,7 +656,7 @@ func renderListTable(cmd *cobra.Command, manifest model.Manifest, windowCount ma
 }
 
 func runSnapshotList(cmd *cobra.Command, _ []string) error {
-	absRepoPath, err := clibase.ResolveRepository(cmd)
+	workspace, err := clibase.ResolveWorkspace(cmd)
 	if err != nil {
 		return err
 	}
@@ -697,7 +666,7 @@ func runSnapshotList(cmd *cobra.Command, _ []string) error {
 		ctx = context.Background()
 	}
 
-	repo, err := store.OpenExisting(ctx, absRepoPath)
+	repo, err := workspace.OpenExistingRepository(ctx)
 	if err != nil {
 		return oops.In("cli").With("operation", "open_repository").Wrap(err)
 	}
@@ -788,7 +757,7 @@ func renderHistoryJSON(cmd *cobra.Command, catalog store.Catalog) error {
 }
 
 func runSnapshotHistory(cmd *cobra.Command, _ []string) error {
-	absRepoPath, err := clibase.ResolveRepository(cmd)
+	workspace, err := clibase.ResolveWorkspace(cmd)
 	if err != nil {
 		return err
 	}
@@ -798,7 +767,7 @@ func runSnapshotHistory(cmd *cobra.Command, _ []string) error {
 		ctx = context.Background()
 	}
 
-	repo, err := store.OpenExisting(ctx, absRepoPath)
+	repo, err := workspace.OpenExistingRepository(ctx)
 	if err != nil {
 		return oops.In("cli").With("operation", "open_repository").Wrap(err)
 	}
@@ -939,7 +908,7 @@ func practicalRestoreReason(ready bool) string {
 }
 
 func runSnapshotVerify(cmd *cobra.Command, _ []string) error {
-	absRepoPath, err := clibase.ResolveRepository(cmd)
+	workspace, err := clibase.ResolveWorkspace(cmd)
 	if err != nil {
 		return err
 	}
@@ -949,7 +918,7 @@ func runSnapshotVerify(cmd *cobra.Command, _ []string) error {
 		ctx = context.Background()
 	}
 
-	repo, err := store.OpenExisting(ctx, absRepoPath)
+	repo, err := workspace.OpenExistingRepository(ctx)
 	if err != nil {
 		return oops.In("cli").With("operation", "open_repository").Wrap(err)
 	}
@@ -992,15 +961,6 @@ func runSnapshotVerify(cmd *cobra.Command, _ []string) error {
 	}
 
 	return renderVerifyTable(cmd, targetGen, manifest)
-}
-
-func resolveAgentStatePath(cmd *cobra.Command) string {
-	statePath, _ := cmd.Flags().GetString("state")
-	if statePath == "" {
-		return ""
-	}
-
-	return statePath
 }
 
 func getBoolFlag(cmd *cobra.Command, name string) bool {

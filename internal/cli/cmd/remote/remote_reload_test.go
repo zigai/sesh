@@ -19,6 +19,7 @@ import (
 	"github.com/spf13/cobra"
 	gotmux "github.com/zigai/gotmux/tmux"
 
+	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/config"
 	integration "github.com/zigai/sesh/internal/integration/tmux"
@@ -67,19 +68,17 @@ func TestOpenRemoteNativeSavedSessions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Run("nil config returns error", func(t *testing.T) {
-		_, err := OpenRemoteNativeSavedSessions(nil, "/tmp/repo", "/tmp/lease", server)
-		if err == nil {
-			t.Fatal("expected error for nil config")
-		}
-	})
-
 	t.Run("routes configured process environment and store path", func(t *testing.T) {
 		cfg := config.DefaultConfig()
 		cfg.Snapshot.ProcessEnvironment = []string{"REMOTE_KEY", "VIRTUAL_ENV"}
 		cfg.AgentStatus.StorePath = "/custom/aht/remote.json"
 
-		saved, err := OpenRemoteNativeSavedSessions(cfg, "/tmp/repo", "/tmp/lease", server)
+		workspace, err := app.Resolve(cfg, app.Locations{Repository: "/tmp/repo", LeaseRoot: "/tmp/lease"})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		saved, err := openRemoteNativeSavedSessions(workspace, server)
 		if err != nil {
 			t.Fatalf("OpenRemoteNativeSavedSessions failed: %v", err)
 		}
@@ -93,7 +92,12 @@ func TestOpenRemoteNativeSavedSessions(t *testing.T) {
 		cfg := config.DefaultConfig()
 		cfg.Snapshot.ProcessEnvironment = []string{}
 
-		saved, err := OpenRemoteNativeSavedSessions(cfg, "/tmp/repo", "/tmp/lease", server)
+		workspace, err := app.Resolve(cfg, app.Locations{Repository: "/tmp/repo", LeaseRoot: "/tmp/lease"})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		saved, err := openRemoteNativeSavedSessions(workspace, server)
 		if err != nil {
 			t.Fatalf("OpenRemoteNativeSavedSessions failed: %v", err)
 		}

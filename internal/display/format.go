@@ -10,7 +10,6 @@ import (
 	"unicode"
 
 	"github.com/charmbracelet/x/ansi"
-	"github.com/rivo/uniseg"
 	"github.com/samber/oops"
 
 	"github.com/zigai/sesh/internal/display/layout"
@@ -237,6 +236,22 @@ func (t Template) UsesAny(fields ...string) bool {
 	return tokensUseAny(t.left, fields) || tokensUseAny(t.right, fields)
 }
 
+func (t Template) CustomFields() []string {
+	var names []string
+
+	for _, item := range slices.Concat(t.left, t.right) {
+		for _, field := range []string{item.field, item.fallback} {
+			if name, ok := CustomFieldName(field); ok && !slices.Contains(names, name) {
+				names = append(names, name)
+			}
+		}
+	}
+
+	slices.Sort(names)
+
+	return names
+}
+
 func (t Template) UsesWidget(widget string) bool {
 	for _, item := range t.left {
 		if item.widget == widget {
@@ -440,10 +455,8 @@ func parseExtendedExpression(expression string, allowed map[string]struct{}) (to
 	item.field, item.role = field, role
 	item.alignment, item.width, item.maxWidth, item.hasMaxWidth = spec.alignment, spec.width, spec.maxWidth, spec.hasMaxWidth
 
-	if field != rightField {
-		if _, ok := allowed[field]; !ok {
-			return token{}, fmt.Errorf("%w %q for this row", ErrUnknownField, field)
-		}
+	if field != rightField && !fieldAllowed(allowed, field) {
+		return token{}, fmt.Errorf("%w %q for this row", ErrUnknownField, field)
 	}
 
 	for _, segment := range segments[1:] {
@@ -472,7 +485,7 @@ func applyTokenPipe(item *token, segment string, allowed map[string]struct{}) er
 		return fmt.Errorf("%w for %q", ErrInvalidFieldSpec, item.field)
 	}
 
-	if _, ok := allowed[segment]; !ok {
+	if !fieldAllowed(allowed, segment) {
 		return fmt.Errorf("%w %q for this row", ErrUnknownField, segment)
 	}
 
@@ -953,7 +966,7 @@ func applyTokenTransforms(value string, transforms []pipe) string {
 				value = transform.value
 			}
 		case "upper":
-			value = strings.ToUpper(value)
+			value = upperText(value)
 		case "path_short":
 			if value != "" {
 				value = path.Base(value)
@@ -1033,32 +1046,42 @@ func truncateLeft(value string, width int) string {
 		return value
 	}
 
-	if width <= 1 {
-		return "…"
+	return layout.TruncateLeftWithMark(value, width, "…")
+}
+
+func upperText(value string) string {
+	if !strings.Contains(value, "\x1b") {
+		return strings.ToUpper(value)
 	}
 
-	remaining := width - 1
-	graphemes := uniseg.NewGraphemes(value)
+	var (
+		b     strings.Builder
+		state byte
+	)
 
-	parts := make([]string, 0, len(value))
-	for graphemes.Next() {
-		parts = append(parts, graphemes.Str())
-	}
+	for value != "" {
+		seq, _, n, newState := ansi.DecodeSequence(value, state, nil)
+		state = newState
+		value = value[n:]
 
-	selected := make([]string, 0, len(parts))
-	for _, part := range slices.Backward(parts) {
-		partWidth := ansi.StringWidth(part)
-		if partWidth > remaining {
-			break
+		if strings.HasPrefix(seq, "\x1b") {
+			b.WriteString(seq)
+		} else {
+			b.WriteString(strings.ToUpper(seq))
 		}
-
-		selected = append(selected, part)
-		remaining -= partWidth
 	}
 
-	slices.Reverse(selected)
+	return b.String()
+}
 
-	return "…" + strings.Join(selected, "")
+func fieldAllowed(allowed map[string]struct{}, field string) bool {
+	if _, ok := allowed[field]; ok {
+		return true
+	}
+
+	_, ok := CustomFieldName(field)
+
+	return ok
 }
 
 func allowedFields(kind FormatKind) (map[string]struct{}, error) {

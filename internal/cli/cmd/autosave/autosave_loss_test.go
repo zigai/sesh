@@ -10,6 +10,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/automation"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
@@ -18,7 +19,7 @@ type lossFixture struct {
 	repo        *store.Repository
 	historyPath string
 	buffer      *bytes.Buffer
-	env         autosaveEnv
+	env         Env
 }
 
 func newLossFixture(t *testing.T, committed bool) *lossFixture {
@@ -41,7 +42,7 @@ func newLossFixture(t *testing.T, committed bool) *lossFixture {
 		repo:        repo,
 		historyPath: historyPath,
 		buffer:      &bytes.Buffer{},
-		env:         autosaveEnv{historyPath: historyPath, lastSavedUnix: 1_000},
+		env:         Env{workspace: app.Workspace{History: historyPath}, lastSavedUnix: 1_000},
 	}
 }
 
@@ -131,7 +132,7 @@ func TestMissingServerStaysSilentWithoutAnythingToRestore(t *testing.T) {
 
 	t.Run("no history path", func(t *testing.T) {
 		fixture := newLossFixture(t, true)
-		fixture.env.historyPath = ""
+		fixture.env.workspace.History = ""
 
 		if count := fixture.report(t); count != 0 || fixture.buffer.Len() != 0 {
 			t.Fatalf("expected silence, got %d and %q", count, fixture.buffer.String())

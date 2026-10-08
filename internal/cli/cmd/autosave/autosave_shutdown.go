@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/rs/zerolog"
-	"github.com/spf13/cobra"
 
 	"github.com/zigai/sesh/internal/automation"
 )
@@ -17,13 +16,13 @@ func previousShutdownUnsaved(lastSavedUnix, finalSaveUnix, bootUnix int64) bool 
 	return lastSavedUnix > 0 && lastSavedUnix < bootUnix && finalSaveUnix < lastSavedUnix
 }
 
-func reportUnsavedShutdownSinceBoot(ctx context.Context, cmd *cobra.Command, env autosaveEnv) {
+func reportUnsavedShutdownSinceBoot(ctx context.Context, env Env) {
 	bootUnix, err := bootTimeUnix()
 	if err != nil {
 		return
 	}
 
-	reportUnsavedShutdown(ctx, resolveAutosaveStatusPath(cmd), env.lastSavedUnix, bootUnix)
+	reportUnsavedShutdown(ctx, env.workspace.FinalSaveStatus, env.lastSavedUnix, bootUnix)
 }
 
 func reportUnsavedShutdown(ctx context.Context, statusPath string, lastSavedUnix, bootUnix int64) {

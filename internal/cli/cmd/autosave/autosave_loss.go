@@ -12,12 +12,12 @@ import (
 
 // reportRestorableSessions reports once per episode that tmux is gone but the newest snapshot
 // has sessions. It returns the session count, or zero when nothing was reported.
-func reportRestorableSessions(ctx context.Context, env autosaveEnv, repo *store.Repository) int {
-	if env.historyPath == "" || env.lastSavedUnix <= 0 {
+func reportRestorableSessions(ctx context.Context, env Env, repo *store.Repository) int {
+	if env.workspace.History == "" || env.lastSavedUnix <= 0 {
 		return 0
 	}
 
-	markerPath := automation.ServerLossMarkerPath(env.historyPath)
+	markerPath := automation.ServerLossMarkerPath(env.workspace.History)
 
 	unreported, err := automation.EpisodeUnreported(markerPath, env.lastSavedUnix)
 	if err != nil || !unreported {

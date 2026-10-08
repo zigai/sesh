@@ -64,22 +64,25 @@ func TestDefaultTmuxSocketIgnoresRelativeTmuxTmpdir(t *testing.T) {
 	}
 }
 
-func TestResolveRepositoryPathsDefaultToDataDirectory(t *testing.T) {
+func TestResolveWorkspacePathsDefaultToDataDirectory(t *testing.T) {
 	dataHome := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", dataHome)
 
-	repository, err := clibase.ResolveRepository(endpointCommand(t))
-	if err != nil || repository != filepath.Join(dataHome, "sesh", "snapshots") {
-		t.Fatalf("default repository = %q, %v", repository, err)
+	workspace, err := clibase.ResolveWorkspace(endpointCommand(t))
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	leaseRoot, err := clibase.ResolveLeaseRoot(endpointCommand(t))
-	if err != nil || leaseRoot != filepath.Join(dataHome, "sesh", "leases") {
-		t.Fatalf("default lease root = %q, %v", leaseRoot, err)
+	if workspace.Repository != filepath.Join(dataHome, "sesh", "snapshots") {
+		t.Fatalf("default repository = %q", workspace.Repository)
 	}
 
-	explicit, err := clibase.ResolveRepository(endpointCommand(t, "--repository", "relative/repo"))
-	if err != nil || !filepath.IsAbs(explicit) || filepath.Base(explicit) != "repo" {
-		t.Fatalf("explicit repository = %q, %v", explicit, err)
+	if workspace.LeaseRoot != filepath.Join(dataHome, "sesh", "leases") {
+		t.Fatalf("default lease root = %q", workspace.LeaseRoot)
+	}
+
+	explicit, err := clibase.ResolveWorkspace(endpointCommand(t, "--repository", "relative/repo"))
+	if err != nil || !filepath.IsAbs(explicit.Repository) || filepath.Base(explicit.Repository) != "repo" {
+		t.Fatalf("explicit repository = %q, %v", explicit.Repository, err)
 	}
 }

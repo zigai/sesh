@@ -30,6 +30,9 @@ var (
 	errHookCommandEmpty                     = errors.New("command cannot be empty")
 	errHookCommandAmbiguousFormat           = errors.New("use either a shell command string or command object")
 	errHookTimeoutNotPositive               = errors.New("timeout must be positive")
+	errFieldUndefined                       = errors.New("undefined custom field")
+	errFieldNameInvalid                     = errors.New("field names may only contain a-z, 0-9 and _")
+	errFieldRefreshInvalid                  = errors.New("refresh must be a positive duration")
 	errDuplicateKeyBinding                  = errors.New("duplicate key binding")
 	errDisplayModesEmpty                    = errors.New("display modes cannot be empty")
 	errDisplayModeInvalid                   = errors.New("invalid display mode")
@@ -153,8 +156,44 @@ func ValidateDisplayConfig(disp DisplayConfig) error {
 	}
 
 	for _, candidate := range formats {
-		if _, err := display.Compile(candidate.kind, candidate.format); err != nil {
+		template, err := display.Compile(candidate.kind, candidate.format)
+		if err != nil {
 			return fmt.Errorf("invalid display.%s %q: %w", candidate.name, candidate.format, err)
+		}
+
+		for _, name := range template.CustomFields() {
+			if _, ok := disp.Fields[name]; !ok {
+				return fmt.Errorf("invalid display.%s: %w: custom.%s has no display.fields.%s entry", candidate.name, errFieldUndefined, name, name)
+			}
+		}
+	}
+
+	for name, command := range disp.Fields {
+		if err := ValidateFieldCommand(name, command); err != nil {
+			return fmt.Errorf("invalid display.fields.%s: %w", name, err)
+		}
+	}
+
+	return nil
+}
+
+func ValidateFieldCommand(name string, command FieldCommand) error {
+	if !display.ValidCustomFieldName(name) {
+		return errFieldNameInvalid
+	}
+
+	if strings.TrimSpace(command.ShellCommand) == "" && strings.TrimSpace(command.Command) == "" {
+		return errHookCommandEmpty
+	}
+
+	if command.ShellCommand != "" && command.Command != "" {
+		return errHookCommandAmbiguousFormat
+	}
+
+	if command.Refresh != "" {
+		refresh, err := time.ParseDuration(command.Refresh)
+		if err != nil || refresh <= 0 {
+			return fmt.Errorf("%w: %q", errFieldRefreshInvalid, command.Refresh)
 		}
 	}
 
