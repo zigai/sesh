@@ -1,6 +1,7 @@
 package setup_test
 
 import (
+	"encoding/xml"
 	"errors"
 	"os"
 	"path/filepath"
@@ -420,6 +421,114 @@ func TestLaunchdDefinitionsRenderOwnedAgents(t *testing.T) {
 	if len(agent.Requires) == 0 {
 		t.Fatal("launchd rendering must record that logout and shutdown ordering is not established")
 	}
+}
+
+func TestLaunchdAgentActivation(t *testing.T) {
+	t.Parallel()
+
+	inputs := linuxInputs(t)
+	inputs.Platform = setup.PlatformDarwin
+	inputs.Interval = 75 * time.Second
+
+	status, err := setup.AgentStatusDefinition(inputs)
+	if err != nil {
+		t.Fatalf("AgentStatusDefinition failed: %v", err)
+	}
+
+	definitions, err := setup.Definitions(inputs)
+	if err != nil {
+		t.Fatalf("Definitions failed: %v", err)
+	}
+
+	cases := []struct {
+		name          string
+		definition    setup.ServiceDefinition
+		runAtLoad     string
+		intervalType  string
+		startInterval string
+		arguments     []string
+	}{
+		{
+			name:       "agent status starts on load",
+			definition: status,
+			runAtLoad:  "true",
+			arguments:  []string{"/usr/local/bin/sesh", "daemon", "agent-window-status", "--socket", "/run/user/1000/sesh/tmux.sock"},
+		},
+		{
+			name:          "autosave starts only periodically",
+			definition:    findServiceDefinition(t, definitions, setup.AutosaveAgentName),
+			runAtLoad:     "false",
+			intervalType:  "integer",
+			startInterval: "75",
+			arguments: []string{
+				"/usr/local/bin/sesh", "action", "autosave-save-if-due",
+				"--socket", "/run/user/1000/sesh/tmux.sock",
+				"--repository", "/home/user/.local/share/sesh/snapshots",
+				"--lease-root", "/home/user/.local/share/sesh/leases",
+				"--history", "/home/user/.local/state/sesh/history.json",
+			},
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			values := decodeLaunchdPlist(t, testCase.definition.Content)
+
+			if got := values["RunAtLoad"].XMLName.Local; got != testCase.runAtLoad {
+				t.Errorf("RunAtLoad = %q, want %q", got, testCase.runAtLoad)
+			}
+
+			interval := values["StartInterval"]
+			if interval.XMLName.Local != testCase.intervalType || interval.Text != testCase.startInterval {
+				t.Errorf("StartInterval = %+v, want type %q and value %q", interval, testCase.intervalType, testCase.startInterval)
+			}
+
+			if keepAlive, ok := values["KeepAlive"]; ok && keepAlive.XMLName.Local != "false" {
+				t.Errorf("unexpected continuous restart trigger: %+v", keepAlive)
+			}
+
+			arguments := values["ProgramArguments"]
+			if arguments.XMLName.Local != "array" || !slices.Equal(arguments.Strings, testCase.arguments) {
+				t.Errorf("ProgramArguments = %+v, want %v", arguments, testCase.arguments)
+			}
+		})
+	}
+}
+
+type launchdPlistElement struct {
+	XMLName xml.Name `xml:""`
+	Text    string   `xml:",chardata"`
+	Strings []string `xml:"string"`
+}
+
+func decodeLaunchdPlist(t *testing.T, content string) map[string]launchdPlistElement {
+	t.Helper()
+
+	var plist struct {
+		XMLName xml.Name `xml:"plist"`
+		Dict    struct {
+			Elements []launchdPlistElement `xml:",any"`
+		} `xml:"dict"`
+	}
+
+	if err := xml.Unmarshal([]byte(content), &plist); err != nil {
+		t.Fatalf("decode generated plist: %v", err)
+	}
+
+	values := make(map[string]launchdPlistElement)
+
+	for index := 0; index < len(plist.Dict.Elements); index += 2 {
+		key := plist.Dict.Elements[index]
+		if key.XMLName.Local != "key" || index+1 >= len(plist.Dict.Elements) {
+			t.Fatalf("invalid plist dictionary entry: %+v", key)
+		}
+
+		values[key.Text] = plist.Dict.Elements[index+1]
+	}
+
+	return values
 }
 
 func TestRemoteMonitorDefinitionIsGatedOnTheEntryPoint(t *testing.T) {

@@ -209,6 +209,7 @@ func RemoteMonitorDefinition(inputs ServiceInputs, available bool) (ServiceDefin
 			inputs.Program,
 			RemoteMonitorArgs(inputs),
 			0,
+			false,
 		)
 	default:
 		return ServiceDefinition{}, oops.In("setup").Code("setup_service_failed").With("operation", "render_remote_definition").Wrap(ErrUnsupportedPlatform)
@@ -261,6 +262,7 @@ func AgentStatusDefinition(inputs ServiceInputs) (ServiceDefinition, error) {
 			inputs.Program,
 			AgentStatusArgs(inputs),
 			0,
+			true,
 		)
 	default:
 		return ServiceDefinition{}, oops.In("setup").Code("setup_service_failed").With("operation", "render_agent_status_definition").Wrap(ErrUnsupportedPlatform)
@@ -321,6 +323,7 @@ func CoordinatorDefinition(inputs ServiceInputs) (ServiceDefinition, error) {
 			inputs.Program,
 			CoordinatorArgs(inputs),
 			0,
+			false,
 		)
 		definition.Requires = append(definition.Requires, coordinatorDarwinRequirement)
 	default:
@@ -514,6 +517,7 @@ func launchdDefinitions(root string, inputs ServiceInputs) ([]ServiceDefinition,
 			inputs.Program,
 			autosaveArgs(inputs),
 			int(inputs.Interval/time.Second),
+			false,
 		),
 		Requires: []string{
 			"launchd supervision only: logout, sleep and shutdown ordering for the saved processes is not established",
@@ -534,6 +538,7 @@ func launchdDefinitions(root string, inputs ServiceInputs) ([]ServiceDefinition,
 				inputs.Program,
 				daemonArgs(inputs),
 				0,
+				false,
 			),
 			Requires: []string{
 				tmuxDarwinRuntimeRequirement,
@@ -556,7 +561,7 @@ func launchdDefinitions(root string, inputs ServiceInputs) ([]ServiceDefinition,
 	return definitions, nil
 }
 
-func renderLaunchdAgent(label, description, program string, args []string, intervalSeconds int) string {
+func renderLaunchdAgent(label, description, program string, args []string, intervalSeconds int, runAtLoad bool) string {
 	var content strings.Builder
 
 	content.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
@@ -578,7 +583,7 @@ func renderLaunchdAgent(label, description, program string, args []string, inter
 		content.WriteString("\t<key>StartInterval</key>\n\t<integer>" + strconv.Itoa(intervalSeconds) + "</integer>\n")
 	}
 
-	content.WriteString("\t<key>RunAtLoad</key>\n\t<false/>\n")
+	content.WriteString("\t<key>RunAtLoad</key>\n\t<" + strconv.FormatBool(runAtLoad) + "/>\n")
 	content.WriteString("\t<key>Description</key>\n\t<string>" + xmlEscape(description) + "</string>\n")
 	content.WriteString("</dict>\n")
 	content.WriteString("</plist>\n")
