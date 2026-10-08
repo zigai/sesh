@@ -248,9 +248,8 @@ start_daemon() {
   local history=$3
   local status_file=$4
   local tmux_unit=${5:-sesh-tmux.service}
-  local attempt_timeout=${6:-20s}
 
-  guest_ssh "sudo systemd-run --unit=$unit --property=User=sesh --property=Group=sesh --property=After=$tmux_unit --property=Requires=$tmux_unit --property=RuntimeDirectory=sesh-guest --property=RuntimeDirectoryMode=0700 --property=RuntimeDirectoryPreserve=yes --property=TimeoutStopSec=30s --setenv=HOME=/home/sesh --setenv=PATH=/opt/tmux-3.7c/bin:/usr/local/bin:/usr/bin:/bin --setenv=XDG_RUNTIME_DIR=/run/sesh-guest --setenv=XDG_DATA_HOME=/var/lib/sesh-guest/data --setenv=XDG_STATE_HOME=/var/lib/sesh-guest/state /opt/sesh --no-config daemon coordinator --socket /run/sesh-guest/tmux.sock --repository $repository --lease-root /var/lib/sesh-guest/leases --history $history --status-file $status_file --attempt-timeout $attempt_timeout --drain-grace 2s"
+  guest_ssh "sudo systemd-run --unit=$unit --property=User=sesh --property=Group=sesh --property=After=$tmux_unit --property=Requires=$tmux_unit --property=RuntimeDirectory=sesh-guest --property=RuntimeDirectoryMode=0700 --property=RuntimeDirectoryPreserve=yes --property=TimeoutStopSec=30s --setenv=HOME=/home/sesh --setenv=PATH=/opt/tmux-3.7c/bin:/usr/local/bin:/usr/bin:/bin --setenv=XDG_RUNTIME_DIR=/run/sesh-guest --setenv=XDG_DATA_HOME=/var/lib/sesh-guest/data --setenv=XDG_STATE_HOME=/var/lib/sesh-guest/state /opt/sesh --no-config daemon coordinator --socket /run/sesh-guest/tmux.sock --repository $repository --lease-root /var/lib/sesh-guest/leases --history $history --status-file $status_file"
 }
 
 assert_daemon_runtime_status() {

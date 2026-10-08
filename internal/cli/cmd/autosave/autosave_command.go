@@ -56,24 +56,21 @@ var (
 )
 
 type autosaveOutcome struct {
-	status         string
-	reason         string
-	attempt        string
-	generation     string
-	snapshot       string
-	history        string
-	repository     string
-	finalSave      string
-	finalSaveAt    int64
-	finalSaveAge   time.Duration
-	defaultSession string
-	defaultFrom    string
-	defaultTo      string
-	recorded       bool
-	restorable     int
-	abandoned      int
-	daemonState    string
-	daemonStatus   daemon.RuntimeStatus
+	status       string
+	reason       string
+	attempt      string
+	generation   string
+	snapshot     string
+	history      string
+	repository   string
+	finalSave    string
+	finalSaveAt  int64
+	finalSaveAge time.Duration
+	recorded     bool
+	restorable   int
+	abandoned    int
+	daemonState  string
+	daemonStatus daemon.RuntimeStatus
 	// restore marks a restore-on-start result; restored and skipped count its sessions.
 	restore  bool
 	restored int
@@ -91,27 +88,24 @@ type Env struct {
 
 func newAutosaveOutcome(status, reason string) autosaveOutcome {
 	return autosaveOutcome{
-		status:         status,
-		reason:         reason,
-		attempt:        "",
-		generation:     "",
-		snapshot:       "",
-		history:        "",
-		repository:     "",
-		finalSave:      "",
-		finalSaveAt:    0,
-		finalSaveAge:   0,
-		defaultSession: "",
-		defaultFrom:    "",
-		defaultTo:      "",
-		recorded:       false,
-		restorable:     0,
-		abandoned:      0,
-		daemonState:    autosaveDaemonUnselected,
-		daemonStatus:   emptyDaemonRuntimeStatus(),
-		restore:        false,
-		restored:       0,
-		skipped:        0,
+		status:       status,
+		reason:       reason,
+		attempt:      "",
+		generation:   "",
+		snapshot:     "",
+		history:      "",
+		repository:   "",
+		finalSave:    "",
+		finalSaveAt:  0,
+		finalSaveAge: 0,
+		recorded:     false,
+		restorable:   0,
+		abandoned:    0,
+		daemonState:  autosaveDaemonUnselected,
+		daemonStatus: emptyDaemonRuntimeStatus(),
+		restore:      false,
+		restored:     0,
+		skipped:      0,
 	}
 }
 

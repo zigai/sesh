@@ -25,7 +25,7 @@ func TestAutomaticSnapshotSkipsLogOnlyFixedReasonsWithoutPrivateOutcomeFields(t 
 			cmd.SetContext(zerolog.New(&logs).WithContext(t.Context()))
 
 			outcome := newAutosaveOutcome(autosaveStatusSkipped, reason)
-			outcome.generation, outcome.attempt, outcome.defaultFrom = "PRIVATE_GENERATION", "PRIVATE_ATTEMPT", "PRIVATE_SESSION"
+			outcome.generation, outcome.attempt = "PRIVATE_GENERATION", "PRIVATE_ATTEMPT"
 			logAutosaveSkip(cmd, outcome)
 
 			var record map[string]any

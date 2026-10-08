@@ -202,7 +202,7 @@ func runAutosaveFinalSave(cmd *cobra.Command, _ []string) error {
 	ctx, cancel := context.WithTimeout(clibase.CommandContext(cmd), deadline)
 	defer cancel()
 
-	outcome, saveErr, statusErr := recordFinalSave(ctx, cmd, env)
+	outcome, saveErr, statusErr := runFinalSave(ctx, cmd, env)
 	if saveErr != nil {
 		return errors.Join(
 			renderAutosaveDegraded(cmd, env, outcome, errors.Join(saveErr, statusErr)),
@@ -221,26 +221,9 @@ func runAutosaveFinalSave(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-type FinalSaveResult struct {
-	Attempt        automation.AttemptResult
-	StatusRecorded bool
-}
-
-func FinalSave(ctx context.Context, cmd *cobra.Command, env Env) (FinalSaveResult, error) {
-	outcome, saveErr, statusErr := recordFinalSave(ctx, cmd, env)
-
-	return FinalSaveResult{
-		Attempt: automation.AttemptResult{
-			Attempt:    outcome.attempt,
-			Generation: outcome.generation,
-			Status:     outcome.snapshot,
-			Recorded:   outcome.recorded,
-		},
-		StatusRecorded: statusErr == nil,
-	}, errors.Join(saveErr, statusErr)
-}
-
-func recordFinalSave(ctx context.Context, cmd *cobra.Command, env Env) (autosaveOutcome, error, error) {
+// runFinalSave runs one final save within ctx and records its outcome in the final save status
+// file. It returns the save's error and the status write's error separately.
+func runFinalSave(ctx context.Context, cmd *cobra.Command, env Env) (autosaveOutcome, error, error) {
 	started := time.Now()
 
 	outcome, status, saveErr := executeFinalSave(ctx, cmd, env)
@@ -277,7 +260,7 @@ func executeFinalSave(
 		return finalSaveFailure(outcome, status, automation.FinalSaveFailed, "repository_unavailable", err)
 	}
 
-	lock, err := automation.TryAcquireSaveLock(ctx, automation.SaveLockPath())
+	lock, err := acquireFinalSaveLock(ctx)
 	if err != nil {
 		return finalSaveLockFailure(outcome, status, repo, err)
 	}
@@ -394,6 +377,17 @@ func finalSaveFailure(
 	outcome.reason = reason
 
 	return outcome, status, err
+}
+
+// acquireFinalSaveLock waits for a save in progress to finish instead of skipping the final save,
+// and reports the lock as busy when the save's deadline ends the wait.
+func acquireFinalSaveLock(ctx context.Context) (*automation.SaveLock, error) {
+	lock, _, err := automation.AcquireSaveLock(ctx, automation.SaveLockPath(), automation.SaveLockBlocking)
+	if err != nil && ctx.Err() != nil {
+		return nil, errors.Join(automation.ErrSaveLockBusy, err)
+	}
+
+	return lock, err
 }
 
 func finalSaveLockFailure(

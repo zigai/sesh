@@ -30,7 +30,7 @@ func NewCommand(processes ...*cobra.Command) *cobra.Command {
 		Args:  clibase.UsageArgs(cobra.NoArgs),
 		RunE:  clibase.RequireSubcommand,
 	}
-	cmd.AddCommand(newDaemonTmuxCommand(), newDaemonCoordinatorCommand())
+	cmd.AddCommand(newDaemonTmuxCommand())
 	cmd.AddCommand(processes...)
 
 	return cmd

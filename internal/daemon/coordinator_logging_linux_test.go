@@ -9,12 +9,10 @@ import (
 	"errors"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/rs/zerolog"
 
-	"github.com/zigai/sesh/internal/automation"
 	"github.com/zigai/sesh/internal/integration/lifecycle"
 )
 
@@ -56,23 +54,9 @@ func TestLifecycleLogsReadinessDrainRecordedFailureAndRecovery(t *testing.T) {
 			var logs bytes.Buffer
 
 			ctx := zerolog.New(&logs).WithContext(t.Context())
-			newScheduler := func() (*automation.Scheduler, error) {
-				return automation.NewScheduler(automation.SchedulerConfig{
-					Interval: time.Hour, AttemptTimeout: time.Second, DrainGrace: time.Second,
-					Attempt: func(context.Context, automation.Trigger) (automation.AttemptResult, error) {
-						return automation.AttemptResult{}, tc.failure
-					},
-				})
-			}
-
-			scheduler, err := newScheduler()
-			if err != nil {
-				t.Fatal(err)
-			}
-
 			if err := RunLifecycle(ctx, CoordinatorConfig{
-				Runtime: &loggingLifecycleRuntime{events: tc.events}, Scheduler: scheduler,
-				NewScheduler: newScheduler, DrainGrace: time.Second,
+				Runtime:   &loggingLifecycleRuntime{events: tc.events},
+				FinalSave: func(context.Context) error { return tc.failure },
 			}); err != nil {
 				t.Fatal(err)
 			}

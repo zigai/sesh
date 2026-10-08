@@ -17,7 +17,6 @@ const (
 const (
 	RuntimePhaseInitializing RuntimePhase = "initializing"
 	RuntimePhaseRunning      RuntimePhase = "running"
-	RuntimePhaseDraining     RuntimePhase = "draining"
 	RuntimePhaseFinalSave    RuntimePhase = "final_save"
 	RuntimePhaseStopping     RuntimePhase = "stopping"
 )
@@ -33,28 +32,24 @@ var (
 type RuntimePhase string
 
 type RuntimeStatus struct {
-	Protocol             int          `json:"protocol"`
-	Phase                RuntimePhase `json:"phase"`
-	InhibitorsHeld       bool         `json:"inhibitorsHeld"`
-	LogindDelayMillis    int64        `json:"logindDelayMillis"`
-	AttemptTimeoutMillis int64        `json:"attemptTimeoutMillis"`
-	DrainGraceMillis     int64        `json:"drainGraceMillis"`
-	ServerManagement     string       `json:"serverManagement"`
-	EndpointID           string       `json:"endpointId"`
-	PID                  int          `json:"pid"`
-	BootID               string       `json:"bootId"`
-	ProcessStartTicks    uint64       `json:"processStartTicks"`
+	Protocol          int          `json:"protocol"`
+	Phase             RuntimePhase `json:"phase"`
+	InhibitorsHeld    bool         `json:"inhibitorsHeld"`
+	LogindDelayMillis int64        `json:"logindDelayMillis"`
+	ServerManagement  string       `json:"serverManagement"`
+	EndpointID        string       `json:"endpointId"`
+	PID               int          `json:"pid"`
+	BootID            string       `json:"bootId"`
+	ProcessStartTicks uint64       `json:"processStartTicks"`
 }
 
 type RuntimeLiveStatus struct{ InhibitorsHeld bool }
 
 type RuntimeStatusConfig struct {
-	RuntimeDir     string
-	Endpoint       string
-	LogindDelay    time.Duration
-	AttemptTimeout time.Duration
-	DrainGrace     time.Duration
-	LiveStatus     func(context.Context) (RuntimeLiveStatus, error)
+	RuntimeDir  string
+	Endpoint    string
+	LogindDelay time.Duration
+	LiveStatus  func(context.Context) (RuntimeLiveStatus, error)
 }
 
 type RuntimeReporter struct{}

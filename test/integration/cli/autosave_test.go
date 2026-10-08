@@ -3,8 +3,6 @@
 package cli_test
 
 import (
-	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -28,9 +26,6 @@ type autosaveResultJSON struct {
 	HistoryState     string `json:"historyState,omitempty"`
 	RepositoryState  string `json:"repositoryState,omitempty"`
 	FinalSaveState   string `json:"finalSaveState,omitempty"`
-	DefaultAction    string `json:"defaultSessionAction,omitempty"`
-	DefaultFrom      string `json:"defaultSessionFrom,omitempty"`
-	DefaultTo        string `json:"defaultSessionTo,omitempty"`
 	Recorded         bool   `json:"recorded"`
 	ElapsedSec       int64  `json:"elapsedSeconds"`
 	IntervalM        int    `json:"intervalMinutes"`
@@ -38,8 +33,6 @@ type autosaveResultJSON struct {
 	DaemonPhase      string `json:"daemonPhase,omitempty"`
 	InhibitorsHeld   bool   `json:"inhibitorsHeld"`
 	LogindDelayMS    int64  `json:"logindDelayMillis,omitempty"`
-	AttemptTimeoutMS int64  `json:"attemptTimeoutMillis,omitempty"`
-	DrainGraceMS     int64  `json:"drainGraceMillis,omitempty"`
 	ServerManagement string `json:"serverManagement,omitempty"`
 }
 
@@ -226,115 +219,6 @@ func assertExplicitRestore(t *testing.T, socketPath, generation string, server *
 	}
 }
 
-func TestAutosaveEnsureDefaultSessionAdoptsScratchSession(t *testing.T) {
-	server := tmuxtest.NewServer(t)
-
-	scratch, _, err := automation.CreateBootstrapSession(t.Context(), server, gotmux.NewSessionOptions{
-		Name:    "9",
-		Dir:     "",
-		Window:  "main",
-		Program: gotmux.Exec("sleep", "300"),
-		Env:     nil,
-		TmuxEnv: nil,
-		Size:    gotmux.Size{Width: 100, Height: 30},
-		Start:   gotmux.StartPolicyExistingOnly,
-		Group:   "",
-	})
-	if err != nil {
-		t.Fatalf("CreateBootstrapSession failed: %v", err)
-	}
-
-	connection, err := server.OpenControl(t.Context(), scratch.ID(), gotmux.ControlOptions{})
-	if err != nil {
-		t.Fatalf("OpenControl failed: %v", err)
-	}
-
-	t.Cleanup(func() {
-		if err := connection.Close(); err != nil && !errors.Is(err, context.Canceled) {
-			t.Errorf("control connection close failed: %v", err)
-		}
-	})
-
-	socketPath := server.Endpoint().SocketPath
-
-	isolateAutosaveEnv(t)
-
-	exec := executeJSON(t, actionCmd, "session-adopt-startup", testSocketFlag, socketPath, testNoConfigFlag, testJSONFlag)
-	if !exec.envelope.OK {
-		t.Fatalf("session-adopt-startup failed: %+v\nstderr: %s", exec.err, exec.stderr)
-	}
-
-	result := decodeJSONPayload[autosaveResultJSON](t, exec.envelope.Result)
-	if result.DefaultAction != automation.DefaultSessionRenamed {
-		t.Fatalf("defaultSessionAction = %q, want %q", result.DefaultAction, automation.DefaultSessionRenamed)
-	}
-
-	if result.DefaultFrom != "9" || result.DefaultTo != automation.DefaultSessionName {
-		t.Fatalf("adoption = %s -> %s, want 9 -> 0", result.DefaultFrom, result.DefaultTo)
-	}
-
-	if _, err := server.FindSession(t.Context(), automation.DefaultSessionName); err != nil {
-		t.Fatalf("default session missing after adoption: %v", err)
-	}
-}
-
-func TestAutosaveEnsureDefaultSessionProtectsUserNumberedSession(t *testing.T) {
-	server := tmuxtest.NewServer(t)
-	userSession := newNumberedSession(t, server, "1")
-
-	connection, err := server.OpenControl(t.Context(), userSession.ID(), gotmux.ControlOptions{})
-	if err != nil {
-		t.Fatalf("OpenControl failed: %v", err)
-	}
-
-	t.Cleanup(func() {
-		if err := connection.Close(); err != nil && !errors.Is(err, context.Canceled) {
-			t.Errorf("control connection close failed: %v", err)
-		}
-	})
-
-	socketPath := server.Endpoint().SocketPath
-
-	isolateAutosaveEnv(t)
-
-	exec := executeJSON(t, actionCmd, "session-adopt-startup", testSocketFlag, socketPath, testNoConfigFlag, testJSONFlag)
-	if !exec.envelope.OK {
-		t.Fatalf("session-adopt-startup failed: %+v\nstderr: %s", exec.err, exec.stderr)
-	}
-
-	result := decodeJSONPayload[autosaveResultJSON](t, exec.envelope.Result)
-	if result.DefaultAction != automation.DefaultSessionUnsupported {
-		t.Fatalf("defaultSessionAction = %q, want unsupported for unverified user session", result.DefaultAction)
-	}
-
-	if _, err := server.FindSession(t.Context(), "1"); err != nil {
-		t.Fatalf("user session missing or killed: %v", err)
-	}
-}
-
-func TestAutosaveEnsureDefaultSessionWithoutClientKeepsSessions(t *testing.T) {
-	server := tmuxtest.NewServer(t)
-	newNumberedSession(t, server, "4")
-
-	socketPath := server.Endpoint().SocketPath
-
-	isolateAutosaveEnv(t)
-
-	exec := executeJSON(t, actionCmd, "session-adopt-startup", testSocketFlag, socketPath, testNoConfigFlag, testJSONFlag)
-	if !exec.envelope.OK {
-		t.Fatalf("session-adopt-startup failed: %+v\nstderr: %s", exec.err, exec.stderr)
-	}
-
-	result := decodeJSONPayload[autosaveResultJSON](t, exec.envelope.Result)
-	if result.DefaultAction != automation.DefaultSessionUnchanged {
-		t.Fatalf("defaultSessionAction = %q, want unchanged", result.DefaultAction)
-	}
-
-	if _, err := server.FindSession(t.Context(), "4"); err != nil {
-		t.Fatalf("unrelated session was changed: %v", err)
-	}
-}
-
 func TestAutosaveSaveIfDueAndRestoreOnStart(t *testing.T) {
 	server := tmuxtest.NewServer(t)
 	sess := newAutosaveSession(t, server)
@@ -478,25 +362,4 @@ func TestAutosaveFinalSaveReportsAnUnavailableServer(t *testing.T) {
 	if !status.Incomplete {
 		t.Fatalf("status artifact = %#v, want an incomplete result", status)
 	}
-}
-
-func newNumberedSession(t *testing.T, server *gotmux.Server, name string) gotmux.Session {
-	t.Helper()
-
-	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{
-		Name:    name,
-		Dir:     "",
-		Window:  "main",
-		Program: gotmux.Exec("sleep", "300"),
-		Env:     nil,
-		TmuxEnv: nil,
-		Size:    gotmux.Size{Width: 100, Height: 30},
-		Start:   gotmux.StartPolicyExistingOnly,
-		Group:   "",
-	})
-	if err != nil {
-		t.Fatalf("NewSession(%s) failed: %v", name, err)
-	}
-
-	return session
 }

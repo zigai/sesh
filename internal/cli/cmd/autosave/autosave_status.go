@@ -25,9 +25,6 @@ type autosaveResultJSON struct {
 	RepositoryState  string `json:"repositoryState,omitempty"`
 	FinalSaveState   string `json:"finalSaveState,omitempty"`
 	FinalSaveAt      int64  `json:"finalSaveCompletedAt,omitempty"`
-	DefaultAction    string `json:"defaultSessionAction,omitempty"`
-	DefaultFrom      string `json:"defaultSessionFrom,omitempty"`
-	DefaultTo        string `json:"defaultSessionTo,omitempty"`
 	Recorded         bool   `json:"recorded"`
 	Restorable       int    `json:"restorableSessions,omitempty"`
 	Abandoned        int    `json:"abandonedRestores,omitempty"`
@@ -37,24 +34,20 @@ type autosaveResultJSON struct {
 	DaemonPhase      string `json:"daemonPhase,omitempty"`
 	InhibitorsHeld   bool   `json:"inhibitorsHeld"`
 	LogindDelayMS    int64  `json:"logindDelayMillis,omitempty"`
-	AttemptTimeoutMS int64  `json:"attemptTimeoutMillis,omitempty"`
-	DrainGraceMS     int64  `json:"drainGraceMillis,omitempty"`
 	ServerManagement string `json:"serverManagement,omitempty"`
 }
 
 func emptyDaemonRuntimeStatus() daemon.RuntimeStatus {
 	return daemon.RuntimeStatus{
-		Protocol:             0,
-		Phase:                "",
-		InhibitorsHeld:       false,
-		LogindDelayMillis:    0,
-		AttemptTimeoutMillis: 0,
-		DrainGraceMillis:     0,
-		ServerManagement:     "",
-		EndpointID:           "",
-		PID:                  0,
-		BootID:               "",
-		ProcessStartTicks:    0,
+		Protocol:          0,
+		Phase:             "",
+		InhibitorsHeld:    false,
+		LogindDelayMillis: 0,
+		ServerManagement:  "",
+		EndpointID:        "",
+		PID:               0,
+		BootID:            "",
+		ProcessStartTicks: 0,
 	}
 }
 
@@ -252,9 +245,6 @@ func autosavePayload(env Env, outcome autosaveOutcome) autosaveResultJSON {
 		RepositoryState:  outcome.repository,
 		FinalSaveState:   outcome.finalSave,
 		FinalSaveAt:      outcome.finalSaveAt,
-		DefaultAction:    outcome.defaultSession,
-		DefaultFrom:      outcome.defaultFrom,
-		DefaultTo:        outcome.defaultTo,
 		Recorded:         outcome.recorded,
 		Restorable:       outcome.restorable,
 		Abandoned:        outcome.abandoned,
@@ -264,8 +254,6 @@ func autosavePayload(env Env, outcome autosaveOutcome) autosaveResultJSON {
 		DaemonPhase:      string(outcome.daemonStatus.Phase),
 		InhibitorsHeld:   outcome.daemonStatus.InhibitorsHeld,
 		LogindDelayMS:    outcome.daemonStatus.LogindDelayMillis,
-		AttemptTimeoutMS: outcome.daemonStatus.AttemptTimeoutMillis,
-		DrainGraceMS:     outcome.daemonStatus.DrainGraceMillis,
 		ServerManagement: outcome.daemonStatus.ServerManagement,
 	}
 }

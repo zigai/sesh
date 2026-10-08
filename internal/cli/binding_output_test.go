@@ -15,7 +15,6 @@ func TestBindingReportsDoNotReachTmuxRunShellOutput(t *testing.T) {
 		{actionCmd, "autosave-save-if-due"},
 		{actionCmd, "autosave-final-save"},
 		{actionCmd, "autosave-restore-on-start"},
-		{actionCmd, "session-adopt-startup"},
 		{"hooks", "run"},
 	}
 

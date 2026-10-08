@@ -46,8 +46,8 @@ func TestSetupServicesPrintsWithoutWriting(t *testing.T) {
 		t.Fatal("preview must not report an applied result")
 	}
 
-	if len(result.Services) != 3 {
-		t.Fatalf("services = %d, want the autosave service, timer and remote monitor", len(result.Services))
+	if len(result.Services) != 4 {
+		t.Fatalf("services = %d, want the autosave service, timer, remote monitor and agent status tracker", len(result.Services))
 	}
 
 	service := result.Services[0]
@@ -79,11 +79,11 @@ func TestSetupServicesApplyWritesOwnedDefinitions(t *testing.T) {
 	}
 
 	result := clitest.DecodePayload[setupServicesResultJSON](t, exec.Envelope.Result)
-	if !result.Applied || result.Written != 3 {
-		t.Fatalf("result = %+v, want three written definitions", result)
+	if !result.Applied || result.Written != 4 {
+		t.Fatalf("result = %+v, want four written definitions", result)
 	}
 
-	for _, name := range []string{setup.AutosaveServiceName, setup.AutosaveTimerName, setup.RemoteServiceName} {
+	for _, name := range []string{setup.AutosaveServiceName, setup.AutosaveTimerName, setup.RemoteServiceName, setup.AgentStatusServiceName} {
 		content, err := os.ReadFile(filepath.Join(directory, name))
 		if err != nil {
 			t.Fatalf("reading %s failed: %v", name, err)
@@ -310,8 +310,8 @@ func TestSetupServicesApplyWritesManagedTmuxService(t *testing.T) {
 	}
 
 	result := clitest.DecodePayload[setupServicesResultJSON](t, exec.Envelope.Result)
-	if !result.Applied || result.Written != 5 {
-		t.Fatalf("result = %+v, want 5 written definitions including the tmux and restore services", result)
+	if !result.Applied || result.Written != 6 {
+		t.Fatalf("result = %+v, want 6 written definitions including the tmux and restore services", result)
 	}
 
 	assertWrittenManagedUnits(t, directory)
@@ -588,11 +588,11 @@ func TestSetupServicesWithCoordinatorApplyWritesAllDefinitions(t *testing.T) {
 	}
 
 	result := clitest.DecodePayload[setupServicesResultJSON](t, exec.Envelope.Result)
-	if !result.Applied || result.Written != 4 {
-		t.Fatalf("result = %+v, want 4 written definitions", result)
+	if !result.Applied || result.Written != 5 {
+		t.Fatalf("result = %+v, want 5 written definitions", result)
 	}
 
-	for _, name := range []string{setup.AutosaveServiceName, setup.AutosaveTimerName, setup.RemoteServiceName, setup.CoordinatorServiceName} {
+	for _, name := range []string{setup.AutosaveServiceName, setup.AutosaveTimerName, setup.RemoteServiceName, setup.AgentStatusServiceName, setup.CoordinatorServiceName} {
 		content, err := os.ReadFile(filepath.Join(directory, name))
 		if err != nil {
 			t.Fatalf("expected %s to exist: %v", name, err)

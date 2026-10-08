@@ -93,7 +93,7 @@ func TestSetupServicesApplyReloadsAndPreservesActiveServices(t *testing.T) {
 	}
 
 	result := clitest.DecodePayload[setupServicesResultJSON](t, execution.Envelope.Result)
-	if !result.Applied || result.Written != 3 || result.Manager == nil || !result.Manager.Reloaded {
+	if !result.Applied || result.Written != 4 || result.Manager == nil || !result.Manager.Reloaded {
 		t.Fatalf("refresh result = %+v", result)
 	}
 
@@ -232,7 +232,7 @@ func TestSetupServicesManagerFailureRetainsPartialJSONAndOneErrorRecord(t *testi
 
 			if phase == "inspect" {
 				assertRefreshInspectionDidNotWrite(t, directory, result)
-			} else if result.Written != 3 {
+			} else if result.Written != 4 {
 				t.Fatalf("lost completed definition writes: %+v", result)
 			}
 
@@ -331,7 +331,7 @@ func assertDefinitionOnlyRefresh(t *testing.T, preview bool, directory string, r
 		return
 	}
 
-	if !result.Applied || result.Written != 3 {
+	if !result.Applied || result.Written != 4 {
 		t.Fatalf("definition-only apply = %+v", result)
 	}
 }
