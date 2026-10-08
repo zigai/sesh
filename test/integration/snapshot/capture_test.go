@@ -59,6 +59,30 @@ func TestCaptureNativeObservation(t *testing.T) {
 	}
 }
 
+func TestCaptureRejectsUnknownSession(t *testing.T) {
+	server := tmuxtest.NewServer(t)
+
+	session, err := server.NewSession(t.Context(), tmux.NewSessionOptions{Name: "present", Program: tmux.Exec("/bin/sh", "-c", "exec sleep 300"), Start: tmux.StartPolicyExistingOnly})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = capture.Observe(t.Context(), server, []tmux.SessionID{session.ID(), "missing"})
+
+	notFound, ok := errors.AsType[*capture.SessionNotFoundError](err)
+	if !ok {
+		t.Fatalf("Observe error = %v, want session not found", err)
+	}
+
+	if notFound.ID != "missing" {
+		t.Fatalf("not found ID = %q, want %q", notFound.ID, "missing")
+	}
+
+	if errors.Is(err, capture.ErrSelection) {
+		t.Fatal("unknown session reported as missing selection")
+	}
+}
+
 func setCaptureSettings(t *testing.T, session tmux.Session) {
 	t.Helper()
 

@@ -532,6 +532,10 @@ func matchErrorContract(err error, contracts []commandErrorContract) (commandErr
 }
 
 func sessionErrorCode(err error) (string, bool) {
+	if _, ok := errors.AsType[*capture.SessionNotFoundError](err); ok {
+		return "sessionNotFound", true
+	}
+
 	switch {
 	case errors.Is(err, session.ErrCurrentSessionAmbiguous):
 		return "currentSessionAmbiguous", true
@@ -547,6 +551,10 @@ func sessionErrorCode(err error) (string, bool) {
 }
 
 func sessionSentinelMessage(err error) (string, bool) {
+	if notFound, ok := errors.AsType[*capture.SessionNotFoundError](err); ok {
+		return notFound.Error(), true
+	}
+
 	switch {
 	case errors.Is(err, session.ErrCurrentSessionAmbiguous):
 		return "current pane belongs to multiple sessions", true

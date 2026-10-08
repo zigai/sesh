@@ -20,6 +20,14 @@ var (
 	ErrProcessDeleted = errors.New("process executable or working directory was deleted")
 )
 
+type SessionNotFoundError struct {
+	ID gotmux.SessionID
+}
+
+func (e *SessionNotFoundError) Error() string {
+	return "no tmux session has ID " + string(e.ID)
+}
+
 // graph projects the selected sessions into a manifest. Floating panes are left out because the
 // snapshot format models only the tiled layout; the count of omitted panes is returned.
 func graph(snapshot gotmux.Snapshot, selected []gotmux.SessionID) (model.Manifest, int, error) {
@@ -228,7 +236,7 @@ func closure(snapshot gotmux.Snapshot, selected []gotmux.SessionID) (map[gotmux.
 
 	for _, id := range selected {
 		if _, found := snapshot.Session(id); !found {
-			return nil, ErrSelection
+			return nil, &SessionNotFoundError{ID: id}
 		}
 
 		wanted[id] = true
