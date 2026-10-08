@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/cli"
 
 	gotmux "github.com/zigai/gotmux/tmux"
@@ -62,26 +63,25 @@ type paneHistoryJSONResult struct {
 	Panes []paneHistoryJSON `json:"panes"`
 }
 
-type sessionNewJSONResult struct {
-	Session   string `json:"session"`
-	Directory string `json:"directory"`
-	Created   bool   `json:"created"`
+type sessionRefJSON struct {
+	Kind string `json:"kind"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
-type sessionKillJSONResult struct {
-	Session string `json:"session"`
-	Killed  bool   `json:"killed"`
+type sessionCreateJSONResult struct {
+	Session   sessionRefJSON `json:"session"`
+	Directory string         `json:"directory"`
 }
 
 type sessionDeleteJSONResult struct {
-	Session      string `json:"session"`
+	Name         string `json:"name"`
 	LiveKilled   bool   `json:"liveKilled"`
 	SavedDeleted bool   `json:"savedDeleted"`
 }
 
 type sessionSwitchJSONResult struct {
-	Session  string `json:"session"`
-	Switched bool   `json:"switched"`
+	Session sessionRefJSON `json:"session"`
 }
 
 func TestCLIIntegrationListLiveSessions(t *testing.T) {
@@ -845,15 +845,15 @@ func (f *cliSessionFixture) saveLiveSession(t *testing.T, id gotmux.SessionID) {
 
 	exec := executeJSON(
 		t,
-		actionCmd, "snapshot-save",
+		"snapshot", "save",
 		testRepositoryFlag, f.repository,
 		testSocketFlag, f.socket,
 		testLeaseRootFlag, f.leaseRoot,
-		testSessionFlag, string(id),
+		string(id),
 		testNoConfigFlag,
 		testJSONFlag,
 	)
-	if exec.err != nil && !errors.Is(exec.err, cli.ErrPartialSnapshot) {
+	if exec.err != nil && !errors.Is(exec.err, app.ErrPartialSnapshot) {
 		t.Fatalf("snapshot save failed: %v", exec.err)
 	}
 
@@ -1034,8 +1034,8 @@ func TestCLIIntegrationSessionSwitchWithoutClientFailsClosed(t *testing.T) {
 	}
 
 	result := decodeJSONPayload[sessionSwitchJSONResult](t, exec.envelope.Result)
-	if result.Switched {
-		t.Fatal("partial result claimed a switch that never happened")
+	if result.Session.ID != string(target.ID) {
+		t.Fatalf("failed switch reported target %+v, want %s", result.Session, target.ID)
 	}
 
 	if _, err := fixture.server.FindSession(t.Context(), target.Name); err != nil {
@@ -1063,8 +1063,8 @@ func TestCLIIntegrationSessionSwitchSwitchesInvokingClient(t *testing.T) {
 	}
 
 	result := decodeJSONPayload[sessionSwitchJSONResult](t, exec.envelope.Result)
-	if !result.Switched {
-		t.Fatal("verified switch was not reported")
+	if result.Session.ID != string(target.ID) {
+		t.Fatalf("switch reported target %+v, want %s", result.Session, target.ID)
 	}
 
 	if displayed := fixture.clientDisplayedSession(t, client); displayed != target.ID {
@@ -1090,8 +1090,8 @@ func TestCLIIntegrationSessionSwitchUsesAmbientSocket(t *testing.T) {
 	}
 
 	result := decodeJSONPayload[sessionSwitchJSONResult](t, exec.envelope.Result)
-	if !result.Switched {
-		t.Fatal("ambient switch was not reported")
+	if result.Session.ID != string(target.ID) {
+		t.Fatalf("ambient switch reported target %+v, want %s", result.Session, target.ID)
 	}
 
 	if displayed := fixture.clientDisplayedSession(t, client); displayed != target.ID {
@@ -1099,7 +1099,7 @@ func TestCLIIntegrationSessionSwitchUsesAmbientSocket(t *testing.T) {
 	}
 }
 
-func TestCLIIntegrationSessionNewCreatesWithoutAttachInJSONMode(t *testing.T) {
+func TestCLIIntegrationSessionCreateDoesNotAttach(t *testing.T) {
 	fixture := newCLISessionFixture(t)
 
 	origin := fixture.fixtureSession(t)
@@ -1107,14 +1107,14 @@ func TestCLIIntegrationSessionNewCreatesWithoutAttachInJSONMode(t *testing.T) {
 
 	client := fixture.attachCLIClient(t, origin.ID)
 
-	created := executeJSON(t, append([]string{sessionCmd, "new", "created-session", "--dir", "/tmp"}, append(fixture.sessionArgs(), testJSONFlag)...)...)
+	created := executeJSON(t, append([]string{sessionCmd, "create", "created-session", "--dir", "/tmp"}, append(fixture.sessionArgs(), testJSONFlag)...)...)
 	if created.err != nil || !created.envelope.OK {
-		t.Fatalf("session new failed: %v / %+v", created.err, created.envelope)
+		t.Fatalf("session create failed: %v / %+v", created.err, created.envelope)
 	}
 
-	result := decodeJSONPayload[sessionNewJSONResult](t, created.envelope.Result)
-	if !result.Created {
-		t.Fatal("new session was not reported as created")
+	result := decodeJSONPayload[sessionCreateJSONResult](t, created.envelope.Result)
+	if result.Session.Name != "created-session" || result.Directory != "/tmp" {
+		t.Fatalf("create result = %+v, want created-session in /tmp", result)
 	}
 
 	if _, err := fixture.server.FindSession(t.Context(), "created-session"); err != nil {
@@ -1122,16 +1122,16 @@ func TestCLIIntegrationSessionNewCreatesWithoutAttachInJSONMode(t *testing.T) {
 	}
 
 	if displayed := fixture.clientDisplayedSession(t, client); displayed != origin.ID {
-		t.Fatalf("client displays %s, want origin %s for create-only --json", displayed, origin.ID)
+		t.Fatalf("client displays %s, want origin %s after create", displayed, origin.ID)
 	}
 
-	again := executeJSON(t, append([]string{sessionCmd, "new", "created-session", "--dir", "/tmp"}, append(fixture.sessionArgs(), testJSONFlag)...)...)
+	again := executeJSON(t, append([]string{sessionCmd, "create", "created-session", "--dir", "/tmp"}, append(fixture.sessionArgs(), testJSONFlag)...)...)
 	if again.err == nil || again.envelope.OK {
-		t.Fatal("expected already-exists failure for duplicate create-only new")
+		t.Fatal("expected already-exists failure for a duplicate create")
 	}
 
-	if again.envelope.Error == nil || again.envelope.Error.Code != "sessionAlreadyExists" {
-		t.Fatalf("error code = %v, want sessionAlreadyExists", again.envelope.Error)
+	if again.envelope.Error == nil || again.envelope.Error.Code != "alreadyExists" {
+		t.Fatalf("error code = %v, want alreadyExists", again.envelope.Error)
 	}
 
 	fixture.assertNoDefaultLeaseRoot(t)
@@ -1159,19 +1159,19 @@ func TestCLIIntegrationSessionNewInteractiveEnters(t *testing.T) {
 	fixture.assertNoDefaultLeaseRoot(t)
 }
 
-func TestCLIIntegrationSessionNewOutsideTmuxCreatesWithoutAttach(t *testing.T) {
+func TestCLIIntegrationSessionCreateOutsideTmux(t *testing.T) {
 	fixture := newCLISessionFixture(t)
 
 	clearAmbientTmux(t)
 
-	exec := executeJSON(t, append([]string{sessionCmd, "new", "scripted-session", "--dir", "/tmp"}, append(fixture.sessionArgs(), testJSONFlag)...)...)
+	exec := executeJSON(t, append([]string{sessionCmd, "create", "scripted-session", "--dir", "/tmp"}, append(fixture.sessionArgs(), testJSONFlag)...)...)
 	if exec.err != nil || !exec.envelope.OK {
-		t.Fatalf("create-only new --json outside tmux failed: %v / %+v", exec.err, exec.envelope)
+		t.Fatalf("session create outside tmux failed: %v / %+v", exec.err, exec.envelope)
 	}
 
-	result := decodeJSONPayload[sessionNewJSONResult](t, exec.envelope.Result)
-	if !result.Created {
-		t.Fatal("session was not reported as created")
+	result := decodeJSONPayload[sessionCreateJSONResult](t, exec.envelope.Result)
+	if result.Session.Name != "scripted-session" {
+		t.Fatalf("create result = %+v, want scripted-session", result)
 	}
 
 	if _, err := fixture.server.FindSession(t.Context(), "scripted-session"); err != nil {
@@ -1248,8 +1248,8 @@ func TestCLIIntegrationSessionDeleteRetainsRecoveryBarrier(t *testing.T) {
 		t.Fatalf("envelope reported success: %+v", exec.envelope)
 	}
 
-	if exec.envelope.Error.Code != "recoveryRequired" {
-		t.Fatalf("error code = %q, want recoveryRequired", exec.envelope.Error.Code)
+	if exec.envelope.Error.Code != "conflict" {
+		t.Fatalf("error code = %q, want conflict", exec.envelope.Error.Code)
 	}
 
 	result := decodeJSONPayload[sessionDeleteJSONResult](t, exec.envelope.Result)
@@ -1313,9 +1313,8 @@ func TestCLIIntegrationSessionKillReportsMissingSession(t *testing.T) {
 		t.Fatalf("envelope reported success: %+v", exec.envelope)
 	}
 
-	result := decodeJSONPayload[sessionKillJSONResult](t, exec.envelope.Result)
-	if result.Killed {
-		t.Fatal("partial result claimed a kill that never happened")
+	if string(exec.envelope.Result) != "null" || exec.envelope.Error == nil || exec.envelope.Error.Code != "notFound" {
+		t.Fatalf("missing session envelope = %+v, want notFound without a result", exec.envelope)
 	}
 }
 
@@ -1336,15 +1335,15 @@ func TestCLIIntegrationSessionDeleteRemovesFromDefaultXDGRepository(t *testing.T
 
 	saveExec := executeJSON(
 		t,
-		actionCmd, "snapshot-save",
+		"snapshot", "save",
 		testRepositoryFlag, defaultRepoPath,
 		testSocketFlag, fixture.socket,
 		testLeaseRootFlag, fixture.leaseRoot,
-		testSessionFlag, string(liveSession.ID),
+		string(liveSession.ID),
 		testNoConfigFlag,
 		testJSONFlag,
 	)
-	if saveExec.err != nil && !errors.Is(saveExec.err, cli.ErrPartialSnapshot) {
+	if saveExec.err != nil && !errors.Is(saveExec.err, app.ErrPartialSnapshot) {
 		t.Fatalf("saving to default repository failed: %v", saveExec.err)
 	}
 

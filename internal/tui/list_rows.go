@@ -67,10 +67,6 @@ func (m *Model) selectListRow(row popupListRow) {
 	}
 }
 
-func (m *Model) selectedRowIsAgent() bool {
-	return m.selectedListRow().isAgent()
-}
-
 func selectedVisualIndex(rows []popupListRow, selected popupListRow) int {
 	for index, row := range rows {
 		if row.equal(selected) {

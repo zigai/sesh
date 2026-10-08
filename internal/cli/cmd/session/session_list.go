@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	gotmux "github.com/zigai/gotmux/tmux"
 
+	"github.com/zigai/sesh/internal/cli/actioncli"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/session"
@@ -32,7 +33,7 @@ type sessionListJSONResult struct {
 }
 
 func LoadHistoryState(cmd *cobra.Command) (*session.State, error) {
-	st, err := session.LoadState(resolveHistoryPath(cmd))
+	st, err := session.LoadState(actioncli.HistoryPath(cmd))
 	if err != nil {
 		return nil, oops.In("cli").With("operation", "load_state").Wrap(err)
 	}

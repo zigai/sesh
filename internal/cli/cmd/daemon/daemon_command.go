@@ -30,16 +30,8 @@ func NewCommand(processes ...*cobra.Command) *cobra.Command {
 		Args:  clibase.UsageArgs(cobra.NoArgs),
 		RunE:  clibase.RequireSubcommand,
 	}
-	cmd.AddCommand(newDaemonTmuxCommand(), newDaemonCoordinatorCommand())
+	cmd.AddCommand(newDaemonTmuxCommand(), newDaemonCoordinatorCommand(), newDaemonWaitReadyCommand())
 	cmd.AddCommand(processes...)
-
-	return cmd
-}
-
-// NewActionWaitReadyCommand returns the service start step that waits for a tmux server.
-func NewActionWaitReadyCommand() *cobra.Command {
-	cmd := newDaemonWaitReadyCommand()
-	cmd.Use = "tmux-wait-ready"
 
 	return cmd
 }

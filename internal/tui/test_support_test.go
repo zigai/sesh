@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/testsupport/testenv"
@@ -43,57 +45,48 @@ var (
 	errSaveFailed             = errors.New("save failed")
 	errWorkingDirectoryFailed = errors.New("cwd failed")
 	errSnapshotFailed         = errors.New("snapshot failed")
+	errUnexpectedTestAction   = errors.New("unexpected test action")
 )
 
 type Dependencies struct {
 	OmitEnterer        bool
-	OmitRenamer        bool
-	OmitKiller         bool
-	OmitDeleter        bool
+	OmitActions        bool
 	OmitPanes          bool
 	OmitTerminalAttach bool
-	OmitSnapshots      bool
-	OmitRemoteActions  bool
 	OmitRemoteAttach   bool
 	OmitOriginBridge   bool
 	DeferSwitch        bool
 	DeferAttach        bool
 
-	LoadCatalog             func(context.Context) (session.CatalogResult, error)
-	EnterSession            func(context.Context, session.Session) (EnterOutcome, error)
-	CreateAndEnterSession   func(context.Context, string, string) (EnterOutcome, error)
-	RestoreAndEnterSession  func(context.Context, session.Session) (EnterOutcome, error)
-	RenameSession           func(context.Context, session.Session, string) error
-	KillSession             func(context.Context, session.Session) error
-	DeleteSessionEverywhere func(context.Context, session.Session, bool) (DeleteResult, error)
-	AttachSession           func(context.Context, session.Session) (tea.ExecCommand, error)
-	SnapshotSessionTarget   func(context.Context, session.Session) error
-	TmuxActivatePaneTarget  func(context.Context, session.Session, string) error
+	LoadCatalog            func(context.Context) (session.CatalogResult, error)
+	EnterSession           func(context.Context, session.Session) (EnterOutcome, error)
+	RunAction              func(context.Context, action.Invocation) (any, error)
+	AcceptsAction          func(action.Location, action.ID) bool
+	AttachSession          func(context.Context, session.Session) (tea.ExecCommand, error)
+	TmuxActivatePaneTarget func(context.Context, session.Session, string) error
 
-	TmuxSessionExists       func(context.Context, string) (bool, error)
-	TmuxCreateSession       func(context.Context, string, string) error
-	TmuxSwitchSession       func(context.Context, string) error
-	TmuxAttachCommand       func(context.Context, string) *exec.Cmd
-	TmuxActivatePane        func(context.Context, string, string) error
-	TmuxRenameSession       func(context.Context, string, string) error
-	TmuxKillSession         func(context.Context, string) error
-	TmuxIsInsideTmux        func() bool
-	LoadAgentSummaries      func(context.Context) ([]session.AgentSummary, error)
-	WatchAgentSummaries     func(context.Context, func(uint64, []session.AgentSummary, error) error) error
-	TmuxPaneLocations       func(context.Context) ([]PaneLocation, error)
-	LoadRemoteCatalog       func() (RemoteCatalog, error)
-	WatchRemoteCatalog      func(context.Context, func(RemoteCatalog, error)) error
-	RunRemoteAction         func(context.Context, *config.Config, session.Session, RemoteActionRequest) error
-	IsRemoteActionPermitted func(*config.Config, session.Session, string) bool
-	AttachRemoteSession     func(context.Context, session.Session, string) (tea.ExecCommand, error)
-	LoadOriginSessions      func(context.Context) (string, []session.Session, error)
-	RequestOriginSwitch     func(context.Context, session.Session) error
-	DeleteSavedSession      func(context.Context, string) (int, error)
-	RestoreSavedSession     func(context.Context, string) error
-	SnapshotSession         func(context.Context, string) error
-	GetWorkingDirectory     func() (string, error)
-	SaveModelState          func(*session.State) error
-	UpdateModelStateBlock   func()
+	TmuxSessionExists     func(context.Context, string) (bool, error)
+	TmuxCreateSession     func(context.Context, string, string) error
+	TmuxSwitchSession     func(context.Context, string) error
+	TmuxAttachCommand     func(context.Context, string) *exec.Cmd
+	TmuxActivatePane      func(context.Context, string, string) error
+	TmuxRenameSession     func(context.Context, string, string) error
+	TmuxKillSession       func(context.Context, string) error
+	TmuxIsInsideTmux      func() bool
+	LoadAgentSummaries    func(context.Context) ([]session.AgentSummary, error)
+	WatchAgentSummaries   func(context.Context, func(uint64, []session.AgentSummary, error) error) error
+	TmuxPaneLocations     func(context.Context) ([]PaneLocation, error)
+	LoadRemoteCatalog     func() (RemoteCatalog, error)
+	WatchRemoteCatalog    func(context.Context, func(RemoteCatalog, error)) error
+	AttachRemoteSession   func(context.Context, session.Session, string) (tea.ExecCommand, error)
+	LoadOriginSessions    func(context.Context) (string, []session.Session, error)
+	RequestOriginSwitch   func(context.Context, session.Session) error
+	DeleteSavedSession    func(context.Context, string) (int, error)
+	RestoreSavedSession   func(context.Context, string) error
+	SnapshotSession       func(context.Context, string) error
+	GetWorkingDirectory   func() (string, error)
+	SaveModelState        func(*session.State) error
+	UpdateModelStateBlock func()
 }
 
 type testServiceAdapter struct {
@@ -167,119 +160,204 @@ func (adapter *testServiceAdapter) EnterSession(ctx context.Context, target sess
 	return EnterOutcome{SessionName: target.Name, Action: EnterCompleted, Restored: false}, nil
 }
 
-func (adapter *testServiceAdapter) CreateAndEnterSession(ctx context.Context, name, dir string) (EnterOutcome, error) {
-	if adapter.deps.CreateAndEnterSession != nil {
-		return adapter.deps.CreateAndEnterSession(ctx, name, dir)
+func (adapter *testServiceAdapter) Accepts(at action.Location, id action.ID) bool {
+	if adapter.deps.AcceptsAction != nil {
+		return adapter.deps.AcceptsAction(at, id)
 	}
 
-	if err := adapter.ensureSessionCreated(ctx, name, dir); err != nil {
-		return EnterOutcome{SessionName: name, Action: EnterCompleted, Restored: false}, err
+	if at.Kind == action.LocationOrigin {
+		return id == action.SessionSwitch.ID && (adapter.deps.RequestOriginSwitch != nil || adapter.deps.LoadOriginSessions != nil)
 	}
 
-	if adapter.isPopup() {
-		return EnterOutcome{SessionName: name, Action: EnterNeedsSwitch, Restored: false}, nil
-	}
-
-	if adapter.deps.TmuxSwitchSession != nil {
-		_ = adapter.deps.TmuxSwitchSession(ctx, name)
-	}
-
-	return EnterOutcome{SessionName: name, Action: EnterCompleted, Restored: false}, nil
+	return true
 }
 
-func (adapter *testServiceAdapter) ensureSessionCreated(ctx context.Context, name string, dir string) error {
-	if adapter.deps.TmuxSessionExists == nil {
-		if adapter.deps.TmuxCreateSession == nil {
-			return nil
+// Dispatch runs actions against the fake tmux hooks, so tests describe effects the way they
+// did before actions existed.
+func (adapter *testServiceAdapter) Dispatch(ctx context.Context, invocation action.Invocation) (any, error) {
+	if adapter.deps.RunAction != nil {
+		return adapter.deps.RunAction(ctx, invocation)
+	}
+
+	output, err := adapter.dispatchFake(ctx, invocation)
+	if err != nil {
+		return output, action.Wrap(testActionCode(err), err)
+	}
+
+	return output, nil
+}
+
+func (adapter *testServiceAdapter) dispatchFake(ctx context.Context, invocation action.Invocation) (any, error) {
+	switch input := invocation.Input.(type) {
+	case action.CreateSession:
+		return adapter.fakeCreate(ctx, input)
+	case action.RenameSession:
+		return adapter.fakeRename(ctx, input)
+	case action.KillSession:
+		return action.KilledSession{Session: input.Session}, adapter.fakeKill(ctx, input.Session.Name)
+	case action.DeleteSession:
+		return adapter.fakeDelete(ctx, input)
+	case action.SaveSnapshot:
+		return adapter.fakeSave(ctx, input)
+	case action.RestoreSnapshot:
+		return adapter.fakeRestore(ctx, invocation, input)
+	case action.SwitchSession:
+		if adapter.deps.RequestOriginSwitch == nil {
+			return action.SwitchedSession(input), nil
 		}
 
-		return adapter.deps.TmuxCreateSession(ctx, name, dir)
+		return action.SwitchedSession(input), adapter.deps.RequestOriginSwitch(ctx, input.Session.Session(invocation.At))
+	default:
+		return nil, errUnexpectedTestAction
 	}
-
-	exists, err := adapter.deps.TmuxSessionExists(ctx, name)
-	if err != nil || exists || adapter.deps.TmuxCreateSession == nil {
-		return err
-	}
-
-	return adapter.deps.TmuxCreateSession(ctx, name, dir)
 }
 
-func (adapter *testServiceAdapter) RestoreAndEnterSession(ctx context.Context, target session.Session) (EnterOutcome, error) {
-	if adapter.deps.RestoreAndEnterSession != nil {
-		return adapter.deps.RestoreAndEnterSession(ctx, target)
-	}
+func (adapter *testServiceAdapter) fakeCreate(ctx context.Context, input action.CreateSession) (action.CreatedSession, error) {
+	created := action.CreatedSession{Session: testLiveRef("$created", input.Name), Directory: input.Directory}
 
 	if adapter.deps.TmuxSessionExists != nil {
-		exists, err := adapter.deps.TmuxSessionExists(ctx, target.Name)
+		exists, err := adapter.deps.TmuxSessionExists(ctx, input.Name)
 		if err != nil {
-			return EnterOutcome{SessionName: target.Name, Action: EnterCompleted, Restored: false}, err
+			return created, err
 		}
 
 		if exists {
-			return EnterOutcome{SessionName: target.Name, Action: EnterCompleted, Restored: false}, session.ErrSessionAlreadyExists
+			return created, session.ErrSessionAlreadyExists
 		}
 	}
 
-	if adapter.deps.RestoreSavedSession != nil {
-		if err := adapter.deps.RestoreSavedSession(ctx, target.Name); err != nil {
-			return EnterOutcome{SessionName: target.Name, Action: EnterCompleted, Restored: false}, err
-		}
+	if adapter.deps.TmuxCreateSession != nil {
+		return created, adapter.deps.TmuxCreateSession(ctx, input.Name, input.Directory)
 	}
 
-	if adapter.isPopup() {
-		return EnterOutcome{SessionName: target.Name, Action: EnterNeedsSwitch, Restored: true}, nil
-	}
-
-	if adapter.deps.TmuxSwitchSession != nil {
-		_ = adapter.deps.TmuxSwitchSession(ctx, target.Name)
-	}
-
-	return EnterOutcome{SessionName: target.Name, Action: EnterCompleted, Restored: true}, nil
+	return created, nil
 }
 
-func (adapter *testServiceAdapter) RenameSession(ctx context.Context, target session.Session, newName string) error {
-	if adapter.deps.RenameSession != nil {
-		return adapter.deps.RenameSession(ctx, target, newName)
-	}
-
+func (adapter *testServiceAdapter) fakeRename(ctx context.Context, input action.RenameSession) (action.RenamedSession, error) {
+	renamed := action.RenamedSession{PreviousName: input.Session.Name, Name: input.Name, HistoryUpdated: false}
 	if adapter.deps.TmuxRenameSession != nil {
-		return adapter.deps.TmuxRenameSession(ctx, target.Name, newName)
+		return renamed, adapter.deps.TmuxRenameSession(ctx, input.Session.Name, input.Name)
 	}
 
-	return nil
+	return renamed, nil
 }
 
-func (adapter *testServiceAdapter) KillSession(ctx context.Context, target session.Session) error {
-	if adapter.deps.KillSession != nil {
-		return adapter.deps.KillSession(ctx, target)
-	}
-
+func (adapter *testServiceAdapter) fakeKill(ctx context.Context, name string) error {
 	if adapter.deps.TmuxKillSession != nil {
-		return adapter.deps.TmuxKillSession(ctx, target.Name)
+		return adapter.deps.TmuxKillSession(ctx, name)
 	}
 
 	return nil
 }
 
-func (adapter *testServiceAdapter) DeleteSessionEverywhere(ctx context.Context, target session.Session, force bool) (DeleteResult, error) {
-	if adapter.deps.DeleteSessionEverywhere != nil {
-		return adapter.deps.DeleteSessionEverywhere(ctx, target, force)
+func (adapter *testServiceAdapter) fakeDelete(ctx context.Context, input action.DeleteSession) (action.DeletedSession, error) {
+	deleted := action.DeletedSession{
+		Name: input.Session.Name, LiveKilled: false, SavedDeleted: false, SavedGenerations: 0, SavedSessions: 0,
+		PreservedGenerations: []string{}, PendingRewrites: []string{},
 	}
 
-	liveKilled := false
-	savedDeleted := false
+	if !input.Session.Saved() {
+		if err := adapter.fakeKill(ctx, input.Session.Name); err != nil {
+			return deleted, err
+		}
 
-	if adapter.deps.TmuxKillSession != nil && !target.IsSaved() {
-		_ = adapter.deps.TmuxKillSession(ctx, target.Name)
-		liveKilled = true
+		deleted.LiveKilled = true
 	}
 
 	if adapter.deps.DeleteSavedSession != nil {
-		_, _ = adapter.deps.DeleteSavedSession(ctx, target.Name)
-		savedDeleted = true
+		count, err := adapter.deps.DeleteSavedSession(ctx, input.Session.Name)
+		if err != nil {
+			return deleted, err
+		}
+
+		deleted.SavedDeleted, deleted.SavedGenerations = count > 0, count
 	}
 
-	return DeleteResult{LiveKilled: liveKilled, SavedDeleted: savedDeleted}, nil
+	return deleted, nil
+}
+
+func (adapter *testServiceAdapter) fakeSave(ctx context.Context, input action.SaveSnapshot) (action.SavedSnapshot, error) {
+	saved := action.SavedSnapshot{Attempt: "attempt", Generation: "generation", Status: "complete"}
+
+	for _, ref := range input.Sessions {
+		if adapter.deps.SnapshotSession != nil {
+			if err := adapter.deps.SnapshotSession(ctx, ref.Name); err != nil {
+				return saved, err
+			}
+		}
+	}
+
+	return saved, nil
+}
+
+func (adapter *testServiceAdapter) fakeRestore(ctx context.Context, invocation action.Invocation, input action.RestoreSnapshot) (action.RestoredSnapshot, error) {
+	restored := action.RestoredSnapshot{
+		OperationID: "operation", Generation: input.Generation, Status: "complete", Reason: "", Sessions: []action.SessionRef{},
+		Panes: []action.RestoredPane{}, Verified: true, Uncertain: false, MissingRequirements: []action.Requirement{},
+		SessionsSkipped: []action.SkippedSession{}, Advisories: []action.Mismatch{}, Mismatches: []action.Mismatch{},
+	}
+
+	for _, name := range adapter.restoredNames(invocation, input) {
+		if adapter.deps.TmuxSessionExists != nil {
+			exists, err := adapter.deps.TmuxSessionExists(ctx, name)
+			if err != nil {
+				return restored, err
+			}
+
+			if exists {
+				return restored, session.ErrSessionAlreadyExists
+			}
+		}
+
+		if adapter.deps.RestoreSavedSession != nil {
+			if err := adapter.deps.RestoreSavedSession(ctx, name); err != nil {
+				return restored, err
+			}
+		}
+
+		restored.Sessions = append(restored.Sessions, testLiveRef("$restored", name))
+	}
+
+	return restored, nil
+}
+
+// restoredNames maps saved session IDs back to the names of the rows the model shows.
+func (adapter *testServiceAdapter) restoredNames(invocation action.Invocation, input action.RestoreSnapshot) []string {
+	names := make([]string, 0, len(input.Sessions))
+
+	for _, id := range input.Sessions {
+		name := id
+
+		if adapter.model != nil {
+			for _, row := range slices.Concat(adapter.model.sessions, adapter.model.filtered) {
+				if row.IsSaved() && row.ID == id && action.LocationOf(row) == invocation.At {
+					name = row.Name
+				}
+			}
+		}
+
+		names = append(names, name)
+	}
+
+	return names
+}
+
+func testLiveRef(id, name string) action.SessionRef {
+	return action.SessionRef{
+		Kind: session.KindLive, ID: id, Name: name, Socket: "", ServerPID: 0,
+		ServerStartedAt: time.Time{}, CreatedAt: time.Time{}, Generation: "",
+	}
+}
+
+func testActionCode(err error) action.Code {
+	switch {
+	case errors.Is(err, session.ErrSessionAlreadyExists):
+		return action.CodeAlreadyExists
+	case errors.Is(err, session.ErrSessionNotFound):
+		return action.CodeNotFound
+	default:
+		return action.CodeFailed
+	}
 }
 
 func (adapter *testServiceAdapter) AttachSession(ctx context.Context, target session.Session) (tea.ExecCommand, error) {
@@ -311,18 +389,6 @@ func (adapter *testServiceAdapter) TmuxActivatePane(ctx context.Context, target 
 
 func (adapter *testServiceAdapter) TmuxPaneLocations(ctx context.Context) ([]PaneLocation, error) {
 	return adapter.deps.TmuxPaneLocations(ctx)
-}
-
-func (adapter *testServiceAdapter) SnapshotSession(ctx context.Context, target session.Session) error {
-	if adapter.deps.SnapshotSessionTarget != nil {
-		return adapter.deps.SnapshotSessionTarget(ctx, target)
-	}
-
-	if adapter.deps.SnapshotSession != nil {
-		return adapter.deps.SnapshotSession(ctx, target.Name)
-	}
-
-	return nil
 }
 
 func (adapter *testServiceAdapter) LoadAgentSummaries(ctx context.Context) (AgentSnapshot, error) {
@@ -371,22 +437,6 @@ func (adapter *testServiceAdapter) WatchRemoteCatalog(
 	return adapter.deps.WatchRemoteCatalog(ctx, yield)
 }
 
-func (adapter *testServiceAdapter) RunRemoteAction(ctx context.Context, cfg *config.Config, target session.Session, request RemoteActionRequest) error {
-	if adapter.deps.RunRemoteAction != nil {
-		return adapter.deps.RunRemoteAction(ctx, cfg, target, request)
-	}
-
-	return nil
-}
-
-func (adapter *testServiceAdapter) IsActionPermitted(cfg *config.Config, target session.Session, action string) bool {
-	if adapter.deps.IsRemoteActionPermitted != nil {
-		return adapter.deps.IsRemoteActionPermitted(cfg, target, action)
-	}
-
-	return true
-}
-
 func (adapter *testServiceAdapter) AttachRemoteSession(ctx context.Context, target session.Session, paneID string) (tea.ExecCommand, error) {
 	if adapter.deps.AttachRemoteSession != nil {
 		return adapter.deps.AttachRemoteSession(ctx, target, paneID)
@@ -401,14 +451,6 @@ func (adapter *testServiceAdapter) LoadOriginSessions(ctx context.Context) (stri
 	}
 
 	return "", nil, nil
-}
-
-func (adapter *testServiceAdapter) RequestOriginSwitch(ctx context.Context, target session.Session) error {
-	if adapter.deps.RequestOriginSwitch != nil {
-		return adapter.deps.RequestOriginSwitch(ctx, target)
-	}
-
-	return nil
 }
 
 func (adapter *testServiceAdapter) GetWorkingDirectory() (string, error) {
@@ -451,17 +493,13 @@ func defaultTestServices(adapter *testServiceAdapter) Services {
 		Catalog:          adapter,
 		Detector:         adapter,
 		Enterer:          adapter,
-		Renamer:          adapter,
-		Killer:           adapter,
-		Deleter:          adapter,
+		Actions:          adapter,
 		Panes:            adapter,
 		TerminalAttach:   adapter,
 		Agents:           adapter,
 		AgentWatcher:     nil,
-		Snapshots:        nil,
 		Remote:           adapter,
 		RemoteWatcher:    nil,
-		RemoteActions:    nil,
 		RemoteAttach:     nil,
 		OriginBridge:     nil,
 		WorkingDirectory: adapter,
@@ -474,16 +512,8 @@ func omitTestServices(services *Services, deps Dependencies) {
 		services.Enterer = nil
 	}
 
-	if deps.OmitRenamer {
-		services.Renamer = nil
-	}
-
-	if deps.OmitKiller {
-		services.Killer = nil
-	}
-
-	if deps.OmitDeleter {
-		services.Deleter = nil
+	if deps.OmitActions {
+		services.Actions = nil
 	}
 
 	if deps.OmitPanes {
@@ -500,20 +530,12 @@ func addOptionalTestServices(services *Services, deps Dependencies, adapter *tes
 		services.TerminalAttach = adapter
 	}
 
-	if deps.SnapshotSession != nil || deps.SnapshotSessionTarget != nil {
-		services.Snapshots = adapter
-	}
-
 	if deps.WatchAgentSummaries != nil {
 		services.AgentWatcher = adapter
 	}
 
 	if deps.WatchRemoteCatalog != nil {
 		services.RemoteWatcher = adapter
-	}
-
-	if deps.RunRemoteAction != nil {
-		services.RemoteActions = adapter
 	}
 
 	if deps.AttachRemoteSession != nil {
@@ -805,4 +827,96 @@ func newModelWithContext(
 	}
 
 	return model, nil
+}
+
+// actionTrace is what running a picker action produced: action results the model handled, the
+// session entry it ended in, and whether it asked to quit.
+type actionTrace struct {
+	results []actionResultMsg
+	entered *sessionActionResultMsg
+	quit    bool
+}
+
+// runActionTrace runs a command the way the program would, feeding action results back into
+// the model until the action settles. Refresh and entry messages are recorded, not followed.
+func runActionTrace(t *testing.T, model *Model, cmd tea.Cmd) actionTrace {
+	t.Helper()
+
+	var trace actionTrace
+
+	queue := []tea.Cmd{cmd}
+	for len(queue) > 0 {
+		next := queue[0]
+		queue = queue[1:]
+
+		if next == nil {
+			continue
+		}
+
+		switch msg := next().(type) {
+		case tea.BatchMsg:
+			queue = append(queue, msg...)
+		case tea.QuitMsg:
+			trace.quit = true
+		case actionResultMsg:
+			trace.results = append(trace.results, msg)
+
+			_, follow := model.Update(msg)
+			queue = append(queue, follow)
+		case sessionActionResultMsg:
+			trace.entered = &msg
+		case nil:
+		default:
+			model.Update(msg)
+		}
+	}
+
+	return trace
+}
+
+// invokeTestAction starts an action from the picker and runs whatever it starts.
+func invokeTestAction(t *testing.T, model *Model, id action.ID) actionTrace {
+	t.Helper()
+
+	handler := model.invokeAction(id, nil)
+	if handler == nil {
+		t.Fatalf("invokeAction(%s) returned nil", id)
+	}
+
+	_, cmd := handler()
+
+	return runActionTrace(t, model, cmd)
+}
+
+// pressTestKey sends a key to the model and runs the action it starts.
+func pressTestKey(t *testing.T, model *Model, key tea.KeyPressMsg) actionTrace {
+	t.Helper()
+
+	_, cmd := model.Update(key)
+
+	return runActionTrace(t, model, cmd)
+}
+
+func setActionConfirm(cfg *config.Config, id action.ID, confirm bool) {
+	if cfg.Actions == nil {
+		cfg.Actions = config.ActionsConfig{}
+	}
+
+	if cfg.Actions[id.Group()] == nil {
+		cfg.Actions[id.Group()] = map[string]config.ActionConfig{}
+	}
+
+	cfg.Actions[id.Group()][id.Verb()] = config.ActionConfig{Confirm: &confirm, AllowRemote: nil}
+}
+
+func openTestKillConfirm(model *Model) {
+	values := action.Values{}
+
+	model.pending = &pendingAction{
+		entry:   action.SessionKill,
+		subject: action.SubjectOf(model.filtered[model.cursor]),
+		values:  values,
+		param:   emptyParam(),
+	}
+	model.dialog = dialogConfirm
 }

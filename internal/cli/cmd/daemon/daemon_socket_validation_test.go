@@ -51,7 +51,7 @@ func TestTmuxWaitReadyRequiresExplicitSocket(t *testing.T) {
 	t.Parallel()
 
 	for _, socket := range []string{"relative.sock", "/tmp/../tmp/unclean.sock"} {
-		exec := clitest.Execute(t, "action", "tmux-wait-ready", testSocketFlag, socket, "--no-config")
+		exec := clitest.Execute(t, "daemon", "wait-ready", testSocketFlag, socket, "--no-config")
 		requireSocketUsageError(t, exec.Err)
 	}
 }
@@ -60,12 +60,12 @@ func TestTmuxWaitReadyTimesOutWithoutServer(t *testing.T) {
 	t.Parallel()
 
 	exec := clitest.Execute(t,
-		"action", "tmux-wait-ready",
+		"daemon", "wait-ready",
 		testSocketFlag, filepath.Join(t.TempDir(), "nonexistent.sock"),
 		"--timeout", "50ms",
 		"--no-config",
 	)
 	if !errors.Is(exec.Err, context.DeadlineExceeded) {
-		t.Fatalf("tmux-wait-ready error = %v, want the readiness deadline", exec.Err)
+		t.Fatalf("wait-ready error = %v, want the readiness deadline", exec.Err)
 	}
 }

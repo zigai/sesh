@@ -20,7 +20,7 @@ import (
 )
 
 type agentNavResultJSON struct {
-	TargetPaneID string `json:"targetPaneId"`
+	TargetPaneID string `json:"pane"`
 }
 
 func writeAgentRegistry(t *testing.T, sessions ...string) string {
@@ -154,7 +154,7 @@ func activeWindow(t *testing.T, ctx context.Context, server *gotmux.Server, sess
 func runAgentNavigation(t *testing.T, action string, args ...string) agentNavResultJSON {
 	t.Helper()
 
-	stdout, stderr, err := executeCommand(t, append([]string{actionCmd, action}, args...)...)
+	stdout, stderr, err := executeCommand(t, append([]string{"agent", action}, args...)...)
 	if err != nil {
 		t.Fatalf("%s failed: %v\nstderr: %s", action, err, stderr)
 	}
@@ -180,8 +180,8 @@ func TestCLIAgentNextActivatesAgentWindow(t *testing.T) {
 
 	historyPath := filepath.Join(historyDir, "history.json")
 
-	result := runAgentNavigation(t, "agent-next",
-		testNoConfigFlag, testSocketFlag, fixture.socket, "--state", fixture.statePath,
+	result := runAgentNavigation(t, "next",
+		testNoConfigFlag, testSocketFlag, fixture.socket, "--agent-state", fixture.statePath,
 		"--pane", fixture.current.PaneID, "--history", historyPath, testJSONFlag)
 
 	if result.TargetPaneID != fixture.target.PaneID {
@@ -198,16 +198,16 @@ func TestCLIAgentNextActivatesAgentWindow(t *testing.T) {
 
 	st, err := session.LoadState(historyPath)
 	if err != nil {
-		t.Fatalf("loading state after agent-next: %v", err)
+		t.Fatalf("loading state after agent next: %v", err)
 	}
 
 	ident := session.Identity{Origin: "local", Socket: fixture.target.ServerSocket, Name: fixture.target.SessionName}
 	if got := st.GetLastAgentView(ident, fixture.target.PaneID); got == 0 {
-		t.Fatal("agent-next did not record agent view in history")
+		t.Fatal("agent next did not record agent view in history")
 	}
 
-	result = runAgentNavigation(t, "agent-back",
-		testNoConfigFlag, testSocketFlag, fixture.socket, "--state", fixture.statePath, "--pane", fixture.target.PaneID, testJSONFlag)
+	result = runAgentNavigation(t, "back",
+		testNoConfigFlag, testSocketFlag, fixture.socket, "--agent-state", fixture.statePath, "--pane", fixture.target.PaneID, testJSONFlag)
 
 	if result.TargetPaneID != fixture.current.PaneID {
 		t.Fatalf("back target pane = %q, want %q", result.TargetPaneID, fixture.current.PaneID)
@@ -224,9 +224,9 @@ func TestCLIAgentFocusActivatesNamedPane(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
 	defer cancel()
 
-	_, stderr, err := executeCommand(t, actionCmd, "agent-focus",
-		testNoConfigFlag, testSocketFlag, fixture.socket, "--state", fixture.statePath,
-		"--pane", fixture.current.PaneID, "--target-pane", fixture.target.PaneID)
+	_, stderr, err := executeCommand(t, "agent", "focus",
+		testNoConfigFlag, testSocketFlag, fixture.socket, "--agent-state", fixture.statePath,
+		"--pane", fixture.current.PaneID, fixture.target.PaneID)
 	if err != nil {
 		t.Fatalf("agent focus failed: %v\nstderr: %s", err, stderr)
 	}
@@ -241,7 +241,7 @@ func TestCLIAgentFocusActivatesNamedPane(t *testing.T) {
 }
 
 func TestAgentNavigationActionsSucceedWithoutTerminalOutput(t *testing.T) {
-	for _, action := range []string{"agent-next", "agent-next-local", "agent-latest", "agent-waiting", "agent-failed", "agent-unread", "agent-toggle", "agent-back", "agent-focus"} {
+	for _, action := range []string{"next", "next-local", "latest", "waiting", "failed", "unread", "toggle", "back", "focus"} {
 		t.Run(action, func(t *testing.T) {
 			fixture := newAgentIntegrationFixture(t)
 			args, want := quietAgentNavigation(t, fixture, action)
@@ -277,32 +277,32 @@ func quietAgentNavigation(t *testing.T, fixture agentIntegrationFixture, action 
 	var extra []string
 
 	switch action {
-	case "agent-latest", "agent-unread":
+	case "latest", "unread":
 		fixture.statePath = writeAgentRegistry(t, agentRegistrySessionForPane(fixture.target, "idle"))
-	case "agent-failed":
+	case "failed":
 		fixture.statePath = writeAgentRegistry(t, agentRegistrySessionForPane(fixture.target, "failed"))
-	case "agent-toggle":
-		runAgentNavigation(t, "agent-focus", testNoConfigFlag, testSocketFlag, fixture.socket,
-			"--state", fixture.statePath, "--pane", paneID, "--target-pane", fixture.target.PaneID,
+	case "toggle":
+		runAgentNavigation(t, "focus", testNoConfigFlag, testSocketFlag, fixture.socket,
+			"--agent-state", fixture.statePath, "--pane", paneID, fixture.target.PaneID,
 			"--history", historyPath, testJSONFlag)
 		paneID = fixture.target.PaneID
 		want = fixture.current
-	case "agent-next-local":
-		command = "agent-next"
+	case "next-local":
+		command = "next"
 		extra = []string{"--local"}
-	case "agent-back":
-		runAgentNavigation(t, "agent-next", testNoConfigFlag, testSocketFlag, fixture.socket,
-			"--state", fixture.statePath, "--pane", paneID, "--history", historyPath, testJSONFlag)
+	case "back":
+		runAgentNavigation(t, "next", testNoConfigFlag, testSocketFlag, fixture.socket,
+			"--agent-state", fixture.statePath, "--pane", paneID, "--history", historyPath, testJSONFlag)
 		paneID = fixture.target.PaneID
 		want = fixture.current
-	case "agent-focus":
-		extra = []string{"--target-pane", fixture.target.PaneID}
+	case "focus":
+		extra = []string{fixture.target.PaneID}
 	}
 
 	args := make([]string, 0, 11+len(extra))
 	args = append(args,
-		actionCmd, command, testNoConfigFlag, testSocketFlag, fixture.socket,
-		"--state", fixture.statePath, "--pane", paneID, "--history", historyPath,
+		"agent", command, testNoConfigFlag, testSocketFlag, fixture.socket,
+		"--agent-state", fixture.statePath, "--pane", paneID, "--history", historyPath,
 	)
 
 	return append(args, extra...), want
@@ -315,8 +315,8 @@ func TestCLIAgentAttentionRanksActivityTransitions(t *testing.T) {
 		current  string
 		target   string
 	}{
-		{action: "agent-waiting", activity: "waiting", current: "2026-09-20T12:00:00Z", target: "2026-09-20T09:00:00Z"},
-		{action: "agent-failed", activity: "failed", current: "2026-09-20T09:00:00Z", target: "2026-09-20T12:00:00Z"},
+		{action: "waiting", activity: "waiting", current: "2026-09-20T12:00:00Z", target: "2026-09-20T09:00:00Z"},
+		{action: "failed", activity: "failed", current: "2026-09-20T09:00:00Z", target: "2026-09-20T12:00:00Z"},
 	} {
 		t.Run(tc.action, func(t *testing.T) {
 			fixture := newAgentIntegrationFixture(t)
@@ -326,7 +326,7 @@ func TestCLIAgentAttentionRanksActivityTransitions(t *testing.T) {
 			historyPath := privateAgentHistoryPath(t)
 
 			result := runAgentNavigation(t, tc.action, testNoConfigFlag, testSocketFlag, fixture.socket,
-				"--state", fixture.statePath, "--pane", fixture.current.PaneID,
+				"--agent-state", fixture.statePath, "--pane", fixture.current.PaneID,
 				"--history", historyPath, "--local", testJSONFlag)
 			if result.TargetPaneID != fixture.target.PaneID {
 				t.Fatalf("target = %q, want %q", result.TargetPaneID, fixture.target.PaneID)
@@ -350,8 +350,8 @@ func TestCLIAgentUnreadAdvancesAndAcknowledgesObservedOrigin(t *testing.T) {
 
 	current := fixture.current
 	for _, want := range []agents.PaneLocation{fixture.target, older} {
-		result := runAgentNavigation(t, "agent-unread", testNoConfigFlag, testSocketFlag, fixture.socket,
-			"--state", fixture.statePath, "--pane", current.PaneID, "--history", historyPath, testJSONFlag)
+		result := runAgentNavigation(t, "unread", testNoConfigFlag, testSocketFlag, fixture.socket,
+			"--agent-state", fixture.statePath, "--pane", current.PaneID, "--history", historyPath, testJSONFlag)
 		if result.TargetPaneID != want.PaneID {
 			t.Fatalf("unread target = %q, want %q", result.TargetPaneID, want.PaneID)
 		}
@@ -363,8 +363,8 @@ func TestCLIAgentUnreadAdvancesAndAcknowledgesObservedOrigin(t *testing.T) {
 		current = want
 	}
 
-	expectAgentNoTarget(t, "agent-unread", testNoConfigFlag, testSocketFlag, fixture.socket,
-		"--state", fixture.statePath, "--pane", older.PaneID, "--history", historyPath, testJSONFlag)
+	expectAgentNoTarget(t, "unread", testNoConfigFlag, testSocketFlag, fixture.socket,
+		"--agent-state", fixture.statePath, "--pane", older.PaneID, "--history", historyPath, testJSONFlag)
 
 	if got := activeWindow(t, t.Context(), fixture.server, older.SessionID); got != older.WindowID {
 		t.Fatalf("exhausted unread changed active window to %q", got)
@@ -378,8 +378,8 @@ func TestCLIAgentUnreadAdvancesAndAcknowledgesObservedOrigin(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result := runAgentNavigation(t, "agent-unread", testNoConfigFlag, testSocketFlag, fixture.socket,
-		"--state", fixture.statePath, "--pane", older.PaneID, "--history", historyPath, testJSONFlag)
+	result := runAgentNavigation(t, "unread", testNoConfigFlag, testSocketFlag, fixture.socket,
+		"--agent-state", fixture.statePath, "--pane", older.PaneID, "--history", historyPath, testJSONFlag)
 	if result.TargetPaneID != fixture.target.PaneID {
 		t.Fatalf("renewed idle transition = %q, want %q", result.TargetPaneID, fixture.target.PaneID)
 	}
@@ -424,26 +424,26 @@ func privateAgentHistoryPath(t *testing.T) string {
 }
 
 func TestCLIAgentToggleRepeatedlyReturnsToWorkingAndAgentPanes(t *testing.T) {
-	for _, action := range []string{"agent-focus", "agent-latest"} {
+	for _, action := range []string{"focus", "latest"} {
 		t.Run(action, func(t *testing.T) {
 			fixture := newAgentIntegrationFixture(t)
 			fixture.statePath = writeAgentRegistry(t, agentRegistrySessionForPane(fixture.target, "idle"))
 			historyPath := privateAgentHistoryPath(t)
 
 			args := []string{
-				testNoConfigFlag, testSocketFlag, fixture.socket, "--state", fixture.statePath,
+				testNoConfigFlag, testSocketFlag, fixture.socket, "--agent-state", fixture.statePath,
 				"--pane", fixture.current.PaneID, "--history", historyPath, testJSONFlag,
 			}
-			if action == "agent-focus" {
-				args = append(args, "--target-pane", fixture.target.PaneID)
+			if action == "focus" {
+				args = append(args, fixture.target.PaneID)
 			}
 
 			runAgentNavigation(t, action, args...)
 
 			current := fixture.target
 			for _, want := range []agents.PaneLocation{fixture.current, fixture.target, fixture.current, fixture.target} {
-				result := runAgentNavigation(t, "agent-toggle", testNoConfigFlag, testSocketFlag, fixture.socket,
-					"--state", fixture.statePath, "--pane", current.PaneID, "--history", historyPath, "--local", testJSONFlag)
+				result := runAgentNavigation(t, "toggle", testNoConfigFlag, testSocketFlag, fixture.socket,
+					"--agent-state", fixture.statePath, "--pane", current.PaneID, "--history", historyPath, "--local", testJSONFlag)
 				if result.TargetPaneID != want.PaneID {
 					t.Fatalf("toggle target = %q, want %q", result.TargetPaneID, want.PaneID)
 				}
@@ -455,8 +455,8 @@ func TestCLIAgentToggleRepeatedlyReturnsToWorkingAndAgentPanes(t *testing.T) {
 				current = want
 			}
 
-			back := runAgentNavigation(t, "agent-back", testNoConfigFlag, testSocketFlag, fixture.socket,
-				"--state", fixture.statePath, "--pane", current.PaneID, testJSONFlag)
+			back := runAgentNavigation(t, "back", testNoConfigFlag, testSocketFlag, fixture.socket,
+				"--agent-state", fixture.statePath, "--pane", current.PaneID, testJSONFlag)
 			if back.TargetPaneID != fixture.current.PaneID {
 				t.Fatalf("back after toggle = %q, want %q", back.TargetPaneID, fixture.current.PaneID)
 			}
@@ -467,8 +467,8 @@ func TestCLIAgentToggleRepeatedlyReturnsToWorkingAndAgentPanes(t *testing.T) {
 func TestCLIAgentToggleWithoutRememberedAgentPreservesActiveWindow(t *testing.T) {
 	fixture := newAgentIntegrationFixture(t)
 
-	expectAgentNoTarget(t, "agent-toggle", testNoConfigFlag,
-		testSocketFlag, fixture.socket, "--state", fixture.statePath, "--pane", fixture.current.PaneID, testJSONFlag)
+	expectAgentNoTarget(t, "toggle", testNoConfigFlag,
+		testSocketFlag, fixture.socket, "--agent-state", fixture.statePath, "--pane", fixture.current.PaneID, testJSONFlag)
 
 	if got := activeWindow(t, t.Context(), fixture.server, fixture.current.SessionID); got != fixture.current.WindowID {
 		t.Fatalf("toggle without history changed active window to %q", got)
@@ -492,17 +492,17 @@ func TestCLIAgentToggleKeepsEachClientsLastAgent(t *testing.T) {
 		client string
 		target agents.PaneLocation
 	}{{client: first, target: fixture.target}, {client: second, target: other}} {
-		runAgentNavigation(t, "agent-focus", testNoConfigFlag, testSocketFlag, fixture.socket,
-			"--state", fixture.statePath, "--pane", fixture.current.PaneID,
-			"--client", tc.client, "--target-pane", tc.target.PaneID, "--history", historyPath, testJSONFlag)
+		runAgentNavigation(t, "focus", testNoConfigFlag, testSocketFlag, fixture.socket,
+			"--agent-state", fixture.statePath, "--pane", fixture.current.PaneID,
+			"--client", tc.client, tc.target.PaneID, "--history", historyPath, testJSONFlag)
 	}
 
 	for _, tc := range []struct {
 		client string
 		target agents.PaneLocation
 	}{{client: first, target: fixture.target}, {client: second, target: other}} {
-		result := runAgentNavigation(t, "agent-toggle", testNoConfigFlag, testSocketFlag, fixture.socket,
-			"--state", fixture.statePath, "--pane", fixture.current.PaneID,
+		result := runAgentNavigation(t, "toggle", testNoConfigFlag, testSocketFlag, fixture.socket,
+			"--agent-state", fixture.statePath, "--pane", fixture.current.PaneID,
 			"--client", tc.client, "--history", historyPath, testJSONFlag)
 		if result.TargetPaneID != tc.target.PaneID {
 			t.Fatalf("client toggle = %q, want %q", result.TargetPaneID, tc.target.PaneID)
@@ -517,10 +517,10 @@ func TestCLIAgentToggleKeepsEachClientsLastAgent(t *testing.T) {
 func TestCLIAgentFocusRejectsInvalidExplicitClientBeforeMovingPane(t *testing.T) {
 	fixture := newAgentIntegrationFixture(t)
 
-	stdout, stderr, err := executeCommand(t, actionCmd, "agent-focus", testNoConfigFlag,
-		testSocketFlag, fixture.socket, "--state", fixture.statePath,
+	stdout, stderr, err := executeCommand(t, "agent", "focus", testNoConfigFlag,
+		testSocketFlag, fixture.socket, "--agent-state", fixture.statePath,
 		"--pane", fixture.current.PaneID, "--client", "/dev/invalid-client",
-		"--target-pane", fixture.target.PaneID, "--history", privateAgentHistoryPath(t), testJSONFlag)
+		fixture.target.PaneID, "--history", privateAgentHistoryPath(t), testJSONFlag)
 	if err == nil || stdout != "" {
 		t.Fatalf("invalid client focus = %q, %q, %v", stdout, stderr, err)
 	}
@@ -538,9 +538,9 @@ func TestCLIAgentFocusRejectsInvalidExplicitClientBeforeMovingPane(t *testing.T)
 		t.Fatalf("invalid client focus changed active window to %q", got)
 	}
 
-	result := runAgentNavigation(t, "agent-focus", testNoConfigFlag, testSocketFlag, fixture.socket,
-		"--state", fixture.statePath, "--pane", fixture.current.PaneID,
-		"--target-pane", fixture.target.PaneID, "--history", privateAgentHistoryPath(t), testJSONFlag)
+	result := runAgentNavigation(t, "focus", testNoConfigFlag, testSocketFlag, fixture.socket,
+		"--agent-state", fixture.statePath, "--pane", fixture.current.PaneID,
+		fixture.target.PaneID, "--history", privateAgentHistoryPath(t), testJSONFlag)
 	if result.TargetPaneID != fixture.target.PaneID {
 		t.Fatalf("valid focus = %q, want %q", result.TargetPaneID, fixture.target.PaneID)
 	}
@@ -553,11 +553,11 @@ func TestCLIAgentFocusRejectsInvalidExplicitClientBeforeMovingPane(t *testing.T)
 func TestCLIAgentToggleRejectsVanishedAgentAndKeepsWorkingPane(t *testing.T) {
 	fixture := newAgentIntegrationFixture(t)
 	historyPath := privateAgentHistoryPath(t)
-	runAgentNavigation(t, "agent-focus", testNoConfigFlag, testSocketFlag, fixture.socket,
-		"--state", fixture.statePath, "--pane", fixture.current.PaneID,
-		"--target-pane", fixture.target.PaneID, "--history", historyPath, testJSONFlag)
-	runAgentNavigation(t, "agent-toggle", testNoConfigFlag, testSocketFlag, fixture.socket,
-		"--state", fixture.statePath, "--pane", fixture.target.PaneID, "--history", historyPath, testJSONFlag)
+	runAgentNavigation(t, "focus", testNoConfigFlag, testSocketFlag, fixture.socket,
+		"--agent-state", fixture.statePath, "--pane", fixture.current.PaneID,
+		fixture.target.PaneID, "--history", historyPath, testJSONFlag)
+	runAgentNavigation(t, "toggle", testNoConfigFlag, testSocketFlag, fixture.socket,
+		"--agent-state", fixture.statePath, "--pane", fixture.target.PaneID, "--history", historyPath, testJSONFlag)
 
 	window, err := fixture.server.Window(t.Context(), gotmux.WindowID(fixture.target.WindowID))
 	if err != nil {
@@ -568,8 +568,8 @@ func TestCLIAgentToggleRejectsVanishedAgentAndKeepsWorkingPane(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectAgentNoTarget(t, "agent-toggle", testNoConfigFlag,
-		testSocketFlag, fixture.socket, "--state", fixture.statePath, "--pane", fixture.current.PaneID,
+	expectAgentNoTarget(t, "toggle", testNoConfigFlag,
+		testSocketFlag, fixture.socket, "--agent-state", fixture.statePath, "--pane", fixture.current.PaneID,
 		"--history", historyPath, testJSONFlag)
 
 	if got := activeWindow(t, t.Context(), fixture.server, fixture.current.SessionID); got != fixture.current.WindowID {
@@ -580,7 +580,7 @@ func TestCLIAgentToggleRejectsVanishedAgentAndKeepsWorkingPane(t *testing.T) {
 func expectAgentNoTarget(t *testing.T, action string, args ...string) {
 	t.Helper()
 
-	stdout, stderr, err := executeCommand(t, append([]string{actionCmd, action}, args...)...)
+	stdout, stderr, err := executeCommand(t, append([]string{"agent", action}, args...)...)
 	if err == nil || stdout != "" {
 		t.Fatalf("%s without target = %q, %q, %v", action, stdout, stderr, err)
 	}
@@ -590,7 +590,7 @@ func expectAgentNoTarget(t *testing.T, action string, args ...string) {
 		t.Fatal(err)
 	}
 
-	if envelope.OK || envelope.Error == nil || envelope.Error.Code != "agentPaneNotFound" {
+	if envelope.OK || envelope.Error == nil || envelope.Error.Code != "notFound" {
 		t.Fatalf("%s missing target error = %+v", action, envelope)
 	}
 }
@@ -598,7 +598,7 @@ func expectAgentNoTarget(t *testing.T, action string, args ...string) {
 func TestCLIAgentStatusReadsRegistry(t *testing.T) {
 	fixture := newAgentIntegrationFixture(t)
 
-	stdout, stderr, err := executeCommand(t, actionCmd, "agent-status", testNoConfigFlag, "--state", fixture.statePath)
+	stdout, stderr, err := executeCommand(t, "agent", "status", testNoConfigFlag, "--agent-state", fixture.statePath)
 	if err != nil {
 		t.Fatalf("agent status failed: %v\nstderr: %s", err, stderr)
 	}
@@ -616,8 +616,8 @@ func TestCLIAgentLatestActivatesNewestIdleAndReturnsThroughHistory(t *testing.T)
 
 	historyPath := privateAgentHistoryPath(t)
 	for _, pane := range []agents.PaneLocation{fixture.current, fixture.target} {
-		stdout, stderr, err := executeCommand(t, actionCmd, "agent-latest", testNoConfigFlag,
-			testSocketFlag, fixture.socket, "--state", fixture.statePath, "--pane", pane.PaneID,
+		stdout, stderr, err := executeCommand(t, "agent", "latest", testNoConfigFlag,
+			testSocketFlag, fixture.socket, "--agent-state", fixture.statePath, "--pane", pane.PaneID,
 			"--history", historyPath, "--local", testJSONFlag)
 		if err != nil || stderr != "" {
 			t.Fatalf("latest failed: %v, stderr = %q", err, stderr)
@@ -642,8 +642,8 @@ func TestCLIAgentLatestActivatesNewestIdleAndReturnsThroughHistory(t *testing.T)
 		}
 	}
 
-	result := runAgentNavigation(t, "agent-back", testNoConfigFlag, testSocketFlag, fixture.socket,
-		"--state", fixture.statePath, "--pane", fixture.target.PaneID, testJSONFlag)
+	result := runAgentNavigation(t, "back", testNoConfigFlag, testSocketFlag, fixture.socket,
+		"--agent-state", fixture.statePath, "--pane", fixture.target.PaneID, testJSONFlag)
 	if result.TargetPaneID != fixture.current.PaneID {
 		t.Fatalf("back target = %q", result.TargetPaneID)
 	}
@@ -663,8 +663,8 @@ func TestCLIAgentLatestNoTargetPreservesActiveWindow(t *testing.T) {
 	t.Setenv("SESH_PATHS_LOG_FILE", logPath)
 	t.Setenv("SESH_SETTINGS_LOG_LEVEL", "info")
 
-	stdout, stderr, err := executeCommand(t, actionCmd, "agent-latest", testNoConfigFlag,
-		testSocketFlag, fixture.socket, "--state", fixture.statePath, "--pane", fixture.current.PaneID, testJSONFlag)
+	stdout, stderr, err := executeCommand(t, "agent", "latest", testNoConfigFlag,
+		testSocketFlag, fixture.socket, "--agent-state", fixture.statePath, "--pane", fixture.current.PaneID, testJSONFlag)
 	if err == nil {
 		t.Fatal("waiting agent was accepted as idle")
 	}
@@ -679,7 +679,7 @@ func TestCLIAgentLatestNoTargetPreservesActiveWindow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if envelope.OK || envelope.Error == nil || envelope.Error.Code != "agentPaneNotFound" {
+	if envelope.OK || envelope.Error == nil || envelope.Error.Code != "notFound" {
 		t.Fatalf("envelope = %+v", envelope)
 	}
 
@@ -705,7 +705,7 @@ func assertAgentLatestFailureLog(t *testing.T, logPath string, privateValues ...
 
 	expected := []map[string]any{
 		{"level": "info", "component": "cli", "operation": "latest", "status": "started"},
-		{"level": "error", "component": "cli", "operation": "latest", "status": "failed", "reason": "agentPaneNotFound"},
+		{"level": "error", "component": "cli", "operation": "latest", "status": "failed", "reason": "notFound"},
 	}
 	for index, fields := range expected {
 		var record map[string]any

@@ -36,17 +36,17 @@ sesh setup agents
 
 AHT v2 uses registry schema 3. `sesh` does not import older AHT registry files.
 
-Navigate agent panes. These are actions meant for key bindings; `sesh setup tmux` prints the bindings:
+Navigate agent panes. These commands are meant for key bindings; `sesh setup tmux` prints the bindings:
 
 ```sh
 # Focus next agent needing input
-sesh action agent-next
+sesh agent next
 
 # Focus previous agent
-sesh action agent-back
+sesh agent back
 
 # Jump to specific pane
-sesh action agent-focus --target-pane '%4'
+sesh agent focus '%4'
 ```
 
 Supported agents: Claude, Codex, Cursor, Copilot, Cline, Kimi, Grok, Goose, Pi, OMP, OpenCode, Agy, Kilo, Droid, Hermes.

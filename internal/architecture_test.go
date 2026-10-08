@@ -48,7 +48,7 @@ func TestProductionImportBoundaries(t *testing.T) {
 func architectureBoundaries() []importBoundary {
 	core := []string{"internal/snapshot/model", "internal/snapshot/store", "internal/integration"}
 
-	workflows := []string{"agents", "automation", "cli", "config", "daemon", "doctor", "remote", "session", "setup", "tui"}
+	workflows := []string{"action", "agents", "app", "automation", "cli", "config", "daemon", "doctor", "remote", "session", "setup", "tui"}
 	for index := range workflows {
 		workflows[index] = nativeModule + "internal/" + workflows[index]
 	}
@@ -73,6 +73,14 @@ func architectureBoundaries() []importBoundary {
 			forbidden: []string{nativeModule + "internal/snapshot", nativeModule + "internal/integration", "github.com/zigai/gotmux"},
 			allowed:   []string{nativeModule + "internal/snapshot/model", nativeModule + "internal/snapshot/store"},
 			reason:    "snapshot storage must not depend on capture, restore or runtime adapters",
+		},
+		{
+			sources: []string{"internal/action"},
+			forbidden: []string{
+				nativeModule + "internal/app", nativeModule + "internal/cli", nativeModule + "internal/tui", nativeModule + "internal/remote",
+				nativeModule + "internal/snapshot", nativeModule + "internal/integration",
+			},
+			reason: "action contracts must not depend on the surfaces that invoke them or the services that run them",
 		},
 		{
 			sources:   []string{"internal/integration"},
@@ -195,6 +203,8 @@ func TestImportBoundariesRejectForbiddenDependencies(t *testing.T) {
 		{"windows to session", "internal/integration/process/read_windows.go", nativeModule + "internal/session", "application workflows"},
 		{"adapter to engine", "internal/integration/tmux/target.go", nativeModule + "internal/snapshot/engine", "snapshot orchestration"},
 		{"generated production", "internal/integration/tmux/generated.go", nativeModule + "internal/snapshot/restore", "snapshot orchestration"},
+		{"action to app", "internal/action/session.go", nativeModule + "internal/app", "action contracts"},
+		{"action to engine", "internal/action/snapshot.go", nativeModule + "internal/snapshot/engine", "action contracts"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

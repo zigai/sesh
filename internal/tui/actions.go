@@ -4,17 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/samber/oops"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/session"
 )
 
 var (
-	errSavedSessionAlreadyLive  = errors.New("saved session is already live")
 	errSelectedAgentPaneMissing = errors.New("selected agent has no live tmux pane")
 	errPaneServiceUnavailable   = errors.New("pane service unavailable")
 	errRemoteActionUnsupported  = errors.New("remote sessions are read-only in this build")
@@ -175,71 +174,6 @@ func (m *Model) runAgentSessionAction(target session.Session, agent session.Agen
 	}
 }
 
-func (m *Model) runSessionActionWithCreateDir(sessionName string, dir string) tea.Cmd {
-	var runtimeIdentity session.RuntimeIdentity
-
-	target := session.Session{
-		ID:                     "",
-		Name:                   sessionName,
-		TmuxServerSocket:       "",
-		Kind:                   session.KindLive,
-		Origin:                 session.OriginLocal,
-		Generation:             "",
-		RepositorySource:       "",
-		NameRaw:                nil,
-		PathRaw:                nil,
-		RuntimeIdentity:        runtimeIdentity,
-		RemoteStatus:           session.RemoteStatusAvailable,
-		WindowCount:            0,
-		Attached:               false,
-		Activity:               time.Time{},
-		IsCurrent:              false,
-		ActivePaneID:           "",
-		ActiveWindowName:       "",
-		ActiveWindowIndex:      "",
-		ActivePanePath:         dir,
-		ActivePaneCommand:      "",
-		ActivePaneTitle:        "",
-		AgentTotal:             0,
-		AgentActive:            0,
-		AgentWaiting:           0,
-		AgentFailed:            0,
-		AgentInterrupted:       0,
-		AgentUnknown:           0,
-		AgentIdleSince:         time.Time{},
-		AgentWaitingSince:      time.Time{},
-		AgentActivityChangedAt: time.Time{},
-		Agents:                 nil,
-	}
-
-	return m.sessionActionCommand(tuiOperationEnterOrCreateSession, target, func(ctx context.Context) (EnterOutcome, error) {
-		if m.deps.Enterer == nil {
-			return EnterOutcome{SessionName: sessionName, Action: EnterCompleted, Restored: false, Target: target}, errEnterUnavailable
-		}
-
-		return m.deps.Enterer.CreateAndEnterSession(ctx, sessionName, dir)
-	})
-}
-
-func (m *Model) runSavedSessionAction(target session.Session) tea.Cmd {
-	return m.sessionActionCommand(tuiOperationRestoreSavedSession, target, func(ctx context.Context) (EnterOutcome, error) {
-		if m.deps.Enterer == nil {
-			return EnterOutcome{SessionName: target.Name, Action: EnterCompleted, Restored: false, Target: target}, errEnterUnavailable
-		}
-
-		outcome, err := m.deps.Enterer.RestoreAndEnterSession(ctx, target)
-		if errors.Is(err, session.ErrSessionAlreadyExists) {
-			return EnterOutcome{SessionName: target.Name, Action: EnterCompleted, Restored: false, Target: target}, oops.In("tui").Code("session_already_live").With("operation", "restore_saved_session", "action", "restore_saved", "session", target.Name).Wrap(errSavedSessionAlreadyLive)
-		}
-
-		if err != nil {
-			return EnterOutcome{SessionName: target.Name, Action: EnterCompleted, Restored: false, Target: target}, oops.In("tui").With("operation", "restore_saved_session").Wrap(err)
-		}
-
-		return outcome, nil
-	})
-}
-
 func (m *Model) sessionActionCommand(
 	operation tuiLogOperation,
 	target session.Session,
@@ -352,8 +286,7 @@ func (m *Model) persistSessionState(ctx context.Context, target session.Session,
 
 func (m *Model) logSessionActionResult(msg sessionActionResultMsg) {
 	if msg.err != nil {
-		var owned OutcomeOwnedError
-		if errors.As(msg.err, &owned) && owned.PickerOutcomeOwned() {
+		if outcomeLogged(msg.err) {
 			return
 		}
 
@@ -364,20 +297,22 @@ func (m *Model) logSessionActionResult(msg sessionActionResultMsg) {
 
 	if msg.deferred {
 		switch msg.operation {
-		case tuiOperationEnterLiveSession, tuiOperationEnterOrCreateSession, tuiOperationActivateAgentPane:
+		case tuiOperationEnterLiveSession, tuiOperationActivateAgentPane:
 			return
 		case tuiOperationLoadCatalog,
 			tuiOperationLoadRemoteCatalog,
 			tuiOperationLoadOriginSessions,
 			tuiOperationLoadAgentSummaries,
 			tuiOperationRestoreSavedSession,
+			tuiOperationCreateSession,
 			tuiOperationRenameSession,
 			tuiOperationKillSession,
 			tuiOperationDeleteSession,
 			tuiOperationResolveWorkingDirectory,
 			tuiOperationSaveState,
 			tuiOperationSnapshotSession,
-			tuiOperationAgentGitScan:
+			tuiOperationAgentGitScan,
+			tuiOperationRunAction:
 		}
 	}
 
@@ -392,13 +327,7 @@ func (m *Model) handleSessionActionResult(msg sessionActionResultMsg) (tea.Model
 	m.logSessionActionResult(msg)
 
 	if msg.err != nil {
-		var degraded DegradedOutcomeError
-		if errors.As(msg.err, &degraded) && degraded.PickerDegradedOutcome() {
-			m.statusMessage = fmt.Sprintf("%v", msg.err)
-			m.statusLevel = statusDegraded
-		} else {
-			m.setErrorStatusf("%v", msg.err)
-		}
+		m.setErrorStatusf("%v", msg.err)
 
 		return m, nil
 	}
@@ -523,7 +452,7 @@ func (m *Model) handleEnter() func() (tea.Model, tea.Cmd) {
 	}
 
 	if selectedSession.Origin == session.OriginBridge {
-		return m.handleOriginBridgeEnter(selectedSession)
+		return m.runAction(action.SessionSwitch, action.SubjectOf(selectedSession), action.Values{})
 	}
 
 	if selected.isAgent() {
@@ -536,37 +465,10 @@ func (m *Model) handleEnter() func() (tea.Model, tea.Cmd) {
 
 	return func() (tea.Model, tea.Cmd) {
 		if selectedSession.IsSaved() {
-			return m, m.runSavedSessionAction(selectedSession)
+			return m.runAction(action.SnapshotRestore, action.SubjectOf(selectedSession), action.Values{})()
 		}
 
 		return m, m.runLiveSessionAction(selectedSession)
-	}
-}
-
-func (m *Model) handleOriginBridgeEnter(
-	selectedSession session.Session,
-) func() (tea.Model, tea.Cmd) {
-	if m.deps.OriginBridge == nil {
-		m.setErrorStatusf("Enter is not supported on origin sessions: %v", errOriginBridgeDisabled)
-
-		return func() (tea.Model, tea.Cmd) { return m, nil }
-	}
-
-	return func() (tea.Model, tea.Cmd) {
-		return m, func() tea.Msg {
-			if !m.lifecycle.BeginWorker() {
-				return nil
-			}
-			defer m.lifecycle.EndWorker()
-
-			err := m.deps.OriginBridge.RequestOriginSwitch(m.operationContext(), selectedSession)
-
-			return sessionActionResultMsg{
-				operation: tuiOperationEnterLiveSession, deferred: true,
-				target: selectedSession, sessionName: selectedSession.Name, err: err, quit: err == nil,
-				attach: false, switchSession: "", switchPane: "", refresh: false, statePersisted: false, agentView: nil,
-			}
-		}
 	}
 }
 
@@ -575,23 +477,7 @@ func (m *Model) handleRemoteEnter(
 	selectedRow popupListRow,
 ) func() (tea.Model, tea.Cmd) {
 	if target.IsSaved() {
-		if m.deps.RemoteActions == nil {
-			m.setErrorStatusf("Remote restore is not available: remote action service not configured")
-
-			return func() (tea.Model, tea.Cmd) { return m, nil }
-		}
-
-		if !m.deps.RemoteActions.IsActionPermitted(m.config, target, "restore") {
-			m.setErrorStatusf("Remote restore is disabled by remote permissions")
-
-			return func() (tea.Model, tea.Cmd) { return m, nil }
-		}
-
-		return func() (tea.Model, tea.Cmd) {
-			return m, m.runRemoteAction(tuiOperationRestoreSavedSession, target, RemoteActionRequest{
-				Action: "restore", NewName: "", Directory: "",
-			})
-		}
+		return m.runAction(action.SnapshotRestore, action.SubjectOf(target), action.Values{})
 	}
 
 	paneID := ""
@@ -620,387 +506,10 @@ func (m *Model) handleRemoteEnter(
 	return func() (tea.Model, tea.Cmd) { return m, tea.Quit }
 }
 
-func (m *Model) runRemoteAction(operation tuiLogOperation, target session.Session, request RemoteActionRequest) tea.Cmd {
-	return func() tea.Msg {
-		if !m.lifecycle.BeginWorker() {
-			return nil
-		}
-		defer m.lifecycle.EndWorker()
-
-		if m.deps.RemoteActions == nil {
-			return sessionActionResultMsg{
-				operation:      operation,
-				deferred:       false,
-				attach:         false,
-				err:            oops.In("tui").Code("remote_actions_disabled").With("operation", "run_remote_action", "action", request.Action).Wrap(errRemoteActionsDisabled),
-				sessionName:    target.Name,
-				target:         target,
-				switchSession:  "",
-				switchPane:     "",
-				quit:           false,
-				refresh:        false,
-				statePersisted: false,
-				agentView:      nil,
-			}
-		}
-
-		err := m.deps.RemoteActions.RunRemoteAction(m.operationContext(), m.config, target, request)
-
-		return sessionActionResultMsg{
-			operation:      operation,
-			deferred:       false,
-			attach:         false,
-			err:            err,
-			sessionName:    target.Name,
-			target:         target,
-			switchSession:  "",
-			switchPane:     "",
-			quit:           false,
-			refresh:        err == nil,
-			statePersisted: false,
-			agentView:      nil,
-		}
-	}
-}
-
-func (m *Model) rejectRemoteAction(action string) func() (tea.Model, tea.Cmd) {
-	m.setErrorStatusf("%s is not supported for remote sessions: %v", action, errRemoteActionUnsupported)
+func (m *Model) rejectRemoteAction(operation string) func() (tea.Model, tea.Cmd) {
+	m.setErrorStatusf("%s is not supported for remote sessions: %v", operation, errRemoteActionUnsupported)
 
 	return func() (tea.Model, tea.Cmd) { return m, nil }
-}
-
-func (m *Model) handleCreate() func() (tea.Model, tea.Cmd) {
-	query := strings.TrimSpace(m.textInput.Value())
-	if query == "" {
-		return nil
-	}
-
-	cwd, err := m.deps.WorkingDirectory.GetWorkingDirectory()
-	if err != nil {
-		logTUIFailure(m.operationContext(), tuiOperationResolveWorkingDirectory, err)
-		m.setErrorStatusf("getting current directory: %v", err)
-
-		return func() (tea.Model, tea.Cmd) { return m, nil }
-	}
-
-	m.createSession = query
-	m.dialog = dialogInputCreateDir
-	m.textInput.Blur()
-	m.setCreateDirInputValue(session.DefaultCreateSessionDirectory(cwd, query, m.config.Settings.DefaultSessionPathSuggestion))
-	m.refreshCreateDirSuggestions()
-
-	return func() (tea.Model, tea.Cmd) {
-		return m, m.createDirInput.Focus()
-	}
-}
-
-func (m *Model) handleRename() func() (tea.Model, tea.Cmd) {
-	if m.cursor >= len(m.filtered) {
-		return nil
-	}
-
-	selected := m.filtered[m.cursor]
-	if selected.IsSaved() {
-		m.setErrorStatusf("Rename unavailable for saved sessions")
-
-		return func() (tea.Model, tea.Cmd) { return m, nil }
-	}
-
-	if selected.Origin == session.OriginBridge {
-		m.setErrorStatusf("Rename is not supported on origin sessions")
-
-		return func() (tea.Model, tea.Cmd) { return m, nil }
-	}
-
-	if selected.Origin == session.OriginSSH {
-		if m.deps.RemoteActions == nil {
-			return m.rejectRemoteAction("Rename")
-		}
-
-		if !m.deps.RemoteActions.IsActionPermitted(m.config, selected, "rename") {
-			m.setErrorStatusf("Remote rename is disabled by remote permissions")
-
-			return func() (tea.Model, tea.Cmd) { return m, nil }
-		}
-	}
-
-	if m.deps.Renamer == nil {
-		logTUIFailure(m.operationContext(), tuiOperationRenameSession, errRenameUnavailable)
-		m.setErrorStatusf("Rename failed: %v", errRenameUnavailable)
-
-		return func() (tea.Model, tea.Cmd) { return m, nil }
-	}
-
-	m.renameTarget = selected
-	m.dialog = dialogInputRename
-	m.textInput.Blur()
-	m.renameInput.SetValue("")
-
-	return func() (tea.Model, tea.Cmd) { return m, m.renameInput.Focus() }
-}
-
-func (m *Model) handleKill() func() (tea.Model, tea.Cmd) {
-	if m.cursor >= len(m.filtered) {
-		return nil
-	}
-
-	selected := m.filtered[m.cursor]
-	if selected.IsSaved() {
-		m.setErrorStatusf("Kill unavailable for saved sessions")
-
-		return func() (tea.Model, tea.Cmd) { return m, nil }
-	}
-
-	if selected.Attached {
-		m.setErrorStatusf("Kill unavailable for attached sessions")
-
-		return func() (tea.Model, tea.Cmd) { return m, nil }
-	}
-
-	if selected.Origin == session.OriginBridge {
-		m.setErrorStatusf("Kill is not supported on origin sessions")
-
-		return func() (tea.Model, tea.Cmd) { return m, nil }
-	}
-
-	if selected.Origin == session.OriginSSH {
-		return m.prepareRemoteConfirmedAction(
-			selected,
-			"kill",
-			"Kill",
-			tuiOperationKillSession,
-			m.config.Settings.ConfirmKill,
-			dialogConfirmKill,
-		)
-	}
-
-	if m.deps.Killer == nil {
-		logTUIFailure(m.operationContext(), tuiOperationKillSession, errKillUnavailable)
-		m.setErrorStatusf("Kill failed: %v", errKillUnavailable)
-
-		return func() (tea.Model, tea.Cmd) { return m, nil }
-	}
-
-	m.killTarget = selected
-	m.confirmCommand = nil
-	m.confirmAction = func() error {
-		if err := m.deps.Killer.KillSession(m.operationContext(), selected); err != nil {
-			return oops.In("tui").With("operation", "kill_session").Wrap(err)
-		}
-
-		return nil
-	}
-
-	if !m.config.Settings.ConfirmKill {
-		return m.runConfirmedAction("Kill failed", tuiOperationKillSession)
-	}
-
-	m.confirmYes = false
-	m.dialog = dialogConfirmKill
-
-	return func() (tea.Model, tea.Cmd) { return m, nil }
-}
-
-func (m *Model) handleDelete() func() (tea.Model, tea.Cmd) {
-	if m.selectedRowIsAgent() {
-		m.setErrorStatusf("Delete unavailable for agent rows")
-
-		return func() (tea.Model, tea.Cmd) { return m, nil }
-	}
-
-	if m.cursor >= len(m.filtered) {
-		return nil
-	}
-
-	selected := m.filtered[m.cursor]
-	if !selected.IsSaved() && selected.Attached {
-		m.setErrorStatusf("Delete unavailable for attached sessions")
-
-		return func() (tea.Model, tea.Cmd) { return m, nil }
-	}
-
-	if selected.Origin == session.OriginBridge {
-		m.setErrorStatusf("Delete is not supported on origin sessions")
-
-		return func() (tea.Model, tea.Cmd) { return m, nil }
-	}
-
-	if selected.Origin == session.OriginSSH {
-		return m.prepareRemoteConfirmedAction(
-			selected,
-			"delete",
-			"Delete",
-			tuiOperationDeleteSession,
-			m.config.Settings.ConfirmDelete,
-			dialogConfirmDelete,
-		)
-	}
-
-	if m.deps.Deleter == nil {
-		logTUIFailure(m.operationContext(), tuiOperationDeleteSession, errDeleteUnavailable)
-		m.setErrorStatusf("Delete failed: %v", errDeleteUnavailable)
-
-		return func() (tea.Model, tea.Cmd) { return m, nil }
-	}
-
-	m.deleteTarget = selected
-	m.configureLocalDeleteAction(selected)
-
-	if !m.config.Settings.ConfirmDelete {
-		return m.runConfirmedAction("Delete failed", tuiOperationDeleteSession)
-	}
-
-	m.confirmYes = false
-	m.dialog = dialogConfirmDelete
-
-	return func() (tea.Model, tea.Cmd) { return m, nil }
-}
-
-func (m *Model) prepareRemoteConfirmedAction(
-	target session.Session,
-	action string,
-	actionLabel string,
-	operation tuiLogOperation,
-	confirm bool,
-	dialog dialogState,
-) func() (tea.Model, tea.Cmd) {
-	if m.deps.RemoteActions == nil {
-		return m.rejectRemoteAction(actionLabel)
-	}
-
-	if !m.deps.RemoteActions.IsActionPermitted(m.config, target, action) {
-		m.setErrorStatusf("Remote %s is disabled by remote permissions", action)
-
-		return func() (tea.Model, tea.Cmd) { return m, nil }
-	}
-
-	m.confirmAction = nil
-	m.confirmCommand = m.runRemoteAction(operation, target, RemoteActionRequest{
-		Action: action, NewName: "", Directory: "",
-	})
-
-	if !confirm {
-		return m.runConfirmedAction(actionLabel+" failed", operation)
-	}
-
-	m.confirmYes = false
-	m.dialog = dialog
-
-	return func() (tea.Model, tea.Cmd) { return m, nil }
-}
-
-func (m *Model) configureLocalDeleteAction(target session.Session) {
-	m.confirmCommand = nil
-	m.confirmAction = func() error {
-		result, err := m.deps.Deleter.DeleteSessionEverywhere(
-			m.operationContext(),
-			target,
-			true,
-		)
-		if err != nil {
-			return oops.In("tui").With("operation", "delete_session", "live_killed", result.LiveKilled, "saved_deleted", result.SavedDeleted).Wrap(err)
-		}
-
-		if !result.LiveKilled && !result.SavedDeleted {
-			return oops.In("tui").Code("session_not_found").With("operation", "delete_session").Wrap(session.ErrSessionNotFound)
-		}
-
-		if err := m.updateState(m.operationContext(), func(current *session.State) {
-			current.DeleteSessionIdentity(target.SemanticIdentity())
-		}); err != nil {
-			return oops.In("tui").With("operation", "save_state").Wrap(err)
-		}
-
-		m.moveCursorToPreviousRow()
-
-		return nil
-	}
-}
-
-func (m *Model) handleSnapshot() func() (tea.Model, tea.Cmd) {
-	if m.cursor >= len(m.filtered) {
-		return nil
-	}
-
-	selected := m.filtered[m.cursor]
-	if selected.IsSaved() {
-		m.setErrorStatusf("Snapshot unavailable for saved sessions")
-
-		return func() (tea.Model, tea.Cmd) { return m, nil }
-	}
-
-	if selected.Origin == session.OriginSSH {
-		if m.deps.RemoteActions == nil {
-			return m.rejectRemoteAction("Snapshot")
-		}
-
-		if !m.deps.RemoteActions.IsActionPermitted(m.config, selected, "snapshot") {
-			m.setErrorStatusf("Remote snapshot is disabled by remote permissions")
-
-			return func() (tea.Model, tea.Cmd) { return m, nil }
-		}
-
-		return func() (tea.Model, tea.Cmd) {
-			return m, m.runRemoteAction(tuiOperationSnapshotSession, selected, RemoteActionRequest{
-				Action: "snapshot", NewName: "", Directory: "",
-			})
-		}
-	}
-
-	if selected.Origin != session.OriginLocal {
-		return m.rejectRemoteAction("Snapshot")
-	}
-
-	if m.deps.Snapshots == nil {
-		logTUIFailure(m.operationContext(), tuiOperationSnapshotSession, errSnapshotUnavailable)
-		m.setErrorStatusf("Snapshot is not available: no snapshot service")
-
-		return func() (tea.Model, tea.Cmd) { return m, nil }
-	}
-
-	target := selected
-	ctx := m.operationContext()
-
-	return func() (tea.Model, tea.Cmd) {
-		return m, func() tea.Msg {
-			if !m.lifecycle.BeginWorker() {
-				return nil
-			}
-			defer m.lifecycle.EndWorker()
-
-			if err := m.deps.Snapshots.SnapshotSession(ctx, target); err != nil {
-				return sessionActionResultMsg{
-					operation:      tuiOperationSnapshotSession,
-					deferred:       false,
-					attach:         false,
-					err:            err,
-					sessionName:    target.Name,
-					target:         target,
-					switchSession:  "",
-					switchPane:     "",
-					quit:           false,
-					refresh:        false,
-					statePersisted: false,
-					agentView:      nil,
-				}
-			}
-
-			return sessionActionResultMsg{
-				operation:      tuiOperationSnapshotSession,
-				deferred:       false,
-				attach:         false,
-				err:            nil,
-				sessionName:    target.Name,
-				target:         target,
-				switchSession:  "",
-				switchPane:     "",
-				quit:           false,
-				refresh:        true,
-				statePersisted: false,
-				agentView:      nil,
-			}
-		}
-	}
 }
 
 func (m *Model) moveCursorToPreviousRow() {

@@ -150,7 +150,7 @@ func TestDecodeCatalogRejectsUnsafeContent(t *testing.T) {
 	}
 
 	tests := map[string][]byte{
-		"unsupported version": []byte(strings.Replace(string(encoded), `"version":1`, `"version":2`, 1)),
+		"unsupported version": []byte(strings.Replace(string(encoded), `"version":2`, `"version":1`, 1)),
 		"unknown member":      []byte(strings.Replace(string(encoded), `"connections"`, `"forged":1,"connections"`, 1)),
 		"duplicate member":    []byte(strings.Replace(string(encoded), `"connections"`, `"connections":null,"connections"`, 1)),
 		"trailing content":    append(append([]byte{}, encoded...), []byte(`{}`)...),

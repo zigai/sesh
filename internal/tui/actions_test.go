@@ -123,7 +123,7 @@ func TestSessionActionCommandDefersWorkflowUntilCommandRuns(t *testing.T) {
 		Agents:                 nil,
 	}
 
-	command := model.sessionActionCommand(tuiOperationEnterOrCreateSession, target, func(context.Context) (EnterOutcome, error) {
+	command := model.sessionActionCommand(tuiOperationEnterLiveSession, target, func(context.Context) (EnterOutcome, error) {
 		called = true
 
 		return EnterOutcome{SessionName: testSupportSessionDevName, Action: EnterCompleted, Restored: false}, nil

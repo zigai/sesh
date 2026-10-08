@@ -12,10 +12,12 @@ import (
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/rs/zerolog"
 	"github.com/samber/oops"
 	gotmux "github.com/zigai/gotmux/tmux"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/session"
 )
@@ -265,7 +267,7 @@ func TestLogTUIEventSupportsOnlyClosedOperations(t *testing.T) {
 		tuiOperationLoadAgentSummaries,
 		tuiOperationEnterLiveSession,
 		tuiOperationRestoreSavedSession,
-		tuiOperationEnterOrCreateSession,
+		tuiOperationCreateSession,
 		tuiOperationActivateAgentPane,
 		tuiOperationRenameSession,
 		tuiOperationKillSession,
@@ -274,6 +276,7 @@ func TestLogTUIEventSupportsOnlyClosedOperations(t *testing.T) {
 		tuiOperationSaveState,
 		tuiOperationSnapshotSession,
 		tuiOperationAgentGitScan,
+		tuiOperationRunAction,
 	}
 
 	var output bytes.Buffer
@@ -374,7 +377,6 @@ func TestSessionActionLoggingDefersOnlyPendingPopupOperations(t *testing.T) {
 
 	for _, operation := range []tuiLogOperation{
 		tuiOperationEnterLiveSession,
-		tuiOperationEnterOrCreateSession,
 		tuiOperationActivateAgentPane,
 	} {
 		model.logSessionActionResult(sessionActionResultMsg{operation: operation, deferred: true})
@@ -416,24 +418,14 @@ func TestPopupSavedRestoreLogsCompletionWithDeferredSwitch(t *testing.T) {
 		return nil
 	}
 
-	action := model.handleEnter()
-	if action == nil {
-		t.Fatal("handleEnter() returned nil")
+	_, command := model.handleEnter()()
+	trace := runActionTrace(t, model, command)
+
+	if trace.entered == nil || !trace.entered.deferred || trace.entered.switchSession != loggingTestPrivacySentinel {
+		t.Fatalf("popup restore entry = %+v, want a deferred switch to the restored session", trace.entered)
 	}
 
-	_, command := action()
-	if command == nil {
-		t.Fatal("handleEnter() returned nil command")
-	}
-
-	message, ok := command().(sessionActionResultMsg)
-	if !ok ||
-		message.operation != tuiOperationRestoreSavedSession ||
-		!message.deferred {
-		t.Fatalf("popup restore result = %#v/%v, want typed deferred restore", message, ok)
-	}
-
-	model.handleSessionActionResult(message)
+	model.handleSessionActionResult(*trace.entered)
 
 	records := loggingTestRecords(t, &output)
 	if len(records) != 1 {
@@ -471,6 +463,10 @@ func checkEnterOrCreateCase(t *testing.T, test enterOrCreateCase) {
 		model.mode = modePopup
 	}
 
+	if test.exists {
+		model.sessions = []session.Session{{Name: loggingTestPrivacySentinel, Kind: session.KindLive, Origin: session.OriginLocal}}
+	}
+
 	dependenciesForTest(model).TmuxSessionExists = func(context.Context, string) (bool, error) {
 		return test.exists, nil
 	}
@@ -482,19 +478,12 @@ func checkEnterOrCreateCase(t *testing.T, test enterOrCreateCase) {
 		return nil
 	}
 
-	message, ok := model.runSessionActionWithCreateDir(
-		loggingTestPrivacySentinel,
-		"/TOP_SECRET_PATH",
-	)().(sessionActionResultMsg)
-	if !ok ||
-		message.operation != tuiOperationEnterOrCreateSession ||
-		message.deferred != test.wantDeferred {
-		t.Fatalf(
-			"enter-or-create result = %#v/%v, want composite operation with deferred=%v",
-			message,
-			ok,
-			test.wantDeferred,
-		)
+	openTestCreateDirectoryPrompt(model, loggingTestPrivacySentinel)
+	model.pathInput.SetValue("/TOP_SECRET_PATH")
+
+	trace := pressTestKey(t, model, keyCode(tea.KeyEnter))
+	if trace.entered == nil || trace.entered.deferred != test.wantDeferred {
+		t.Fatalf("create entry = %+v, want an entry with deferred=%v", trace.entered, test.wantDeferred)
 	}
 
 	wantCreateCalls := 1
@@ -506,22 +495,20 @@ func checkEnterOrCreateCase(t *testing.T, test enterOrCreateCase) {
 		t.Fatalf("create calls = %d, want %d", createCalls, wantCreateCalls)
 	}
 
-	if test.wantDeferred {
-		model.handleSessionActionResult(message)
-
-		records := loggingTestRecords(t, &output)
-		if len(records) != 0 {
-			t.Fatalf("deferred create logged premature completion: %#v", records)
-		}
+	records := loggingTestRecords(t, &output)
+	if len(records) != 1 {
+		t.Fatalf("create log count = %d, want one create outcome: %#v", len(records), records)
 	}
+
+	assertLoggingTestRecord(t, records[0], tuiOperationCreateSession, "info", "ok", "tui operation completed")
 
 	if strings.Contains(output.String(), loggingTestPrivacySentinel) ||
 		strings.Contains(output.String(), "TOP_SECRET_PATH") {
-		t.Fatalf("enter-or-create log contains session identity or path: %s", output.String())
+		t.Fatalf("create log contains session identity or path: %s", output.String())
 	}
 }
 
-func TestEnterOrCreateResultUsesCompositeOperationForCreateAndReuse(t *testing.T) {
+func TestCreateLogsOneOutcomeForCreateAndReuse(t *testing.T) {
 	tests := []enterOrCreateCase{
 		{name: "create"},
 		{name: "reuse", exists: true},
@@ -539,7 +526,6 @@ func TestSessionActionLoggingMapsSuccessAndConsumedFailure(t *testing.T) {
 	operations := []tuiLogOperation{
 		tuiOperationEnterLiveSession,
 		tuiOperationRestoreSavedSession,
-		tuiOperationEnterOrCreateSession,
 		tuiOperationActivateAgentPane,
 		tuiOperationRenameSession,
 		tuiOperationKillSession,
@@ -881,37 +867,28 @@ func TestDialogActionsLogTypedSuccessOperations(t *testing.T) {
 		Kind:   session.KindLive,
 		Origin: session.OriginLocal,
 	}}
-	dependenciesForTest(model).TmuxSessionExists = func(context.Context, string) (bool, error) {
-		return false, nil
-	}
 
-	model.renameInput.SetValue("TOP_SECRET_RENAMED_SESSION")
+	invokeTestAction(t, model, action.SessionRename.ID)
+	model.textParamInput.SetValue("TOP_SECRET_RENAMED_SESSION")
+	pressTestKey(t, model, keyCode(tea.KeyEnter))
 
-	if action := model.submitRename(); action == nil {
-		t.Fatal("submitRename() returned nil")
-	}
-
-	model.config.Settings.ConfirmKill = false
+	setActionConfirm(model.config, action.SessionKill.ID, false)
 
 	model.filtered = []session.Session{{
 		Name:   loggingTestPrivacySentinel,
 		Kind:   session.KindLive,
 		Origin: session.OriginLocal,
 	}}
-	if action := model.handleKill(); action == nil {
-		t.Fatal("handleKill() returned nil")
-	}
+	invokeTestAction(t, model, action.SessionKill.ID)
 
-	model.config.Settings.ConfirmDelete = false
+	setActionConfirm(model.config, action.SessionDelete.ID, false)
 
 	model.filtered = []session.Session{{
 		Name:   loggingTestPrivacySentinel,
 		Kind:   session.KindSaved,
 		Origin: session.OriginLocal,
 	}}
-	if action := model.handleDelete(); action == nil {
-		t.Fatal("handleDelete() returned nil")
-	}
+	invokeTestAction(t, model, action.SessionDelete.ID)
 
 	records := loggingTestRecords(t, &output)
 
@@ -942,12 +919,7 @@ func TestCreateDirectoryAndStateSaveLoggingBoundaries(t *testing.T) {
 		return "", errLoggingTestWorkingDirectory
 	}
 
-	action := model.handleCreate()
-	if action == nil {
-		t.Fatal("handleCreate() returned nil")
-	}
-
-	action()
+	invokeTestAction(t, model, action.SessionCreate.ID)
 
 	dependenciesForTest(model).SaveModelState = func(*session.State) error {
 		return errLoggingTestStateSaveFailure
@@ -979,34 +951,26 @@ func TestCreateDirectoryAndStateSaveLoggingBoundaries(t *testing.T) {
 	}
 }
 
-func TestRunConfirmedActionWithoutActionDoesNotLogSuccess(t *testing.T) {
+func TestConfirmWithoutPendingActionDoesNotLogSuccess(t *testing.T) {
 	var output bytes.Buffer
 
 	model := loggingTestModel(t, &output)
-	model.dialog = dialogConfirmKill
-	model.statusMessage = "existing status"
-	model.statusLevel = statusError
-	model.confirmAction = nil
-	model.confirmCommand = nil
+	model.dialog = dialogConfirm
+	model.pending = nil
 
-	handler := model.runConfirmedAction("Kill failed", tuiOperationKillSession)
+	handler := model.confirmPending()
 	if handler == nil {
-		t.Fatal("runConfirmedAction() returned nil")
+		t.Fatal("confirmPending() returned nil")
 	}
 
-	handler()
+	_, cmd := handler()
 
-	if output.Len() != 0 {
-		t.Fatalf("nil confirmed action logged success: %s", output.String())
+	if output.Len() != 0 || cmd != nil {
+		t.Fatalf("confirming nothing logged %q and returned command %v, want neither", output.String(), cmd)
 	}
 
-	if model.dialog != dialogNone || model.statusMessage != "" || model.statusLevel != statusNone {
-		t.Fatalf(
-			"no-op UI result = dialog %v/status %q/level %v, want cleared",
-			model.dialog,
-			model.statusMessage,
-			model.statusLevel,
-		)
+	if model.dialog != dialogNone {
+		t.Fatalf("dialog after confirming nothing = %v, want closed", model.dialog)
 	}
 }
 

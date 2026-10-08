@@ -9,10 +9,12 @@ import (
 	"io/fs"
 	"os"
 	"reflect"
+	"slices"
 	"time"
 
 	"github.com/samber/oops"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/privatefs"
 	"github.com/zigai/sesh/internal/session"
 )
@@ -38,6 +40,7 @@ type InventoryOptions struct {
 	Sessions          func(ctx context.Context) ([]session.Session, error)
 	Agents            func(ctx context.Context) ([]session.AgentSummary, error)
 	SavedSessions     func(ctx context.Context) ([]session.Session, error)
+	Actions           []action.ID
 }
 
 type streamPublisher struct {
@@ -385,6 +388,7 @@ func (state *streamState) snapshot() (Snapshot, error) {
 	return Snapshot{
 		GeneratedAt: time.Now().UTC(),
 		Sessions:    sessions,
+		Actions:     slices.Clone(state.options.Actions),
 		Health:      state.health,
 	}, nil
 }

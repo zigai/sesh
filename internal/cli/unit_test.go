@@ -17,7 +17,7 @@ func TestHelpAndIncompleteParityNotice(t *testing.T) {
 		{
 			name: "root help shows subcommands",
 			args: []string{"--help"},
-			want: []string{snapshotCmd, actionCmd, "Usage:", "sesh [command]"},
+			want: []string{snapshotCmd, "agent", "Usage:", "sesh [command]"},
 		},
 		{
 			name: "snapshot help states incomplete parity",
@@ -56,8 +56,8 @@ func TestHelpAndIncompleteParityNotice(t *testing.T) {
 			},
 		},
 		{
-			name: "action snapshot-save help states incomplete parity",
-			args: []string{"action", "snapshot-save", "--help"},
+			name: "snapshot save help states incomplete parity",
+			args: []string{snapshotCmd, "save", "--help"},
 			want: []string{
 				"practical recovery observations",
 				"not atomic checkpoints",
@@ -89,7 +89,7 @@ func TestHelpAndIncompleteParityNotice(t *testing.T) {
 func TestBareCommandsPrintHelp(t *testing.T) {
 	for _, cmdPath := range [][]string{
 		{snapshotCmd},
-		{"action"},
+		{"agent"},
 	} {
 		t.Run(strings.Join(cmdPath, " "), func(t *testing.T) {
 			stdout, stderr, err := executeCommand(t, cmdPath...)
@@ -116,11 +116,11 @@ func TestUnknownCommandsAndFlagsExitCodeUsage(t *testing.T) {
 	}{
 		{"root unknown command", []string{"unknowncmd"}, "unknown command"},
 		{"snapshot unknown command", []string{snapshotCmd, "badsub"}, "unknown command"},
-		{"action unknown command", []string{"action", "badact"}, "unknown command"},
+		{"agent unknown command", []string{"agent", "badact"}, "unknown command"},
 		{"root unknown flag", []string{"--nonexistent"}, "unknown flag"},
 		{"root global json rejected", []string{testJSONFlag}, "unknown flag"},
 		{"snapshot unknown flag", []string{snapshotCmd, "--bogus"}, "unknown flag"},
-		{"action snapshot-save unknown flag", []string{"action", "snapshot-save", "--bogus"}, "unknown flag"},
+		{"snapshot save unknown flag", []string{snapshotCmd, "save", "--bogus"}, "unknown flag"},
 	}
 
 	for _, tc := range cases {

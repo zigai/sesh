@@ -50,7 +50,9 @@ func invokedByTmuxBinding(cmd *cobra.Command, stdout, stderr io.Writer) bool {
 		return false
 	}
 
-	if cmd.Parent().Name() != actionCmd && (cmd.Parent().Name() != "hooks" || cmd.Name() != "run") {
+	bindable := cmd.Annotations[clibase.AnnotationAction] != "" ||
+		(cmd.Parent().Name() == "hooks" && cmd.Name() == "run")
+	if !bindable {
 		return false
 	}
 

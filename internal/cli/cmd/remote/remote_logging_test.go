@@ -5,36 +5,38 @@ package remote
 import (
 	"bytes"
 	"encoding/json"
+	"encoding/json/jsontext"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/rs/zerolog"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/remote"
 )
 
 func TestPeerActionLogsReceiptOutcomeWithoutIdentities(t *testing.T) {
 	cases := []struct {
-		code   string
+		code   action.Code
 		level  string
 		status string
 	}{
 		{"", "info", "ok"},
-		{remote.ActionCodeForbidden, "error", "failed"},
-		{remote.ActionCodeUnavailable, "error", "failed"},
-		{remote.ActionCodePartial, "warn", "degraded"},
-		{remote.ActionCodeUnknownOutcome, "warn", "degraded"},
+		{action.CodeForbidden, "error", "failed"},
+		{action.CodeUnavailable, "error", "failed"},
+		{action.CodePartial, "warn", "degraded"},
+		{action.CodeUncertain, "warn", "degraded"},
 	}
 	for _, tc := range cases {
-		t.Run(tc.status+tc.code, func(t *testing.T) {
+		t.Run(tc.status+string(tc.code), func(t *testing.T) {
 			var logs bytes.Buffer
 
 			ctx := zerolog.New(&logs).WithContext(t.Context())
 			logPeerActionResult(ctx, remote.ActionResult{
-				InvocationID: "PRIVATE_INVOCATION", DurableOperationID: "PRIVATE_OPERATION",
-				OK: tc.code == "", Code: tc.code,
+				InvocationID: "PRIVATE_INVOCATION", Action: action.SessionKill.ID,
+				OK: tc.code == "", Code: tc.code, Output: jsontext.Value(`{"name":"PRIVATE_NAME"}`),
 			})
 
 			if bytes.Count(logs.Bytes(), []byte("\n")) != 1 || strings.Contains(logs.String(), "PRIVATE_") {
@@ -47,11 +49,11 @@ func TestPeerActionLogsReceiptOutcomeWithoutIdentities(t *testing.T) {
 			}
 
 			want := map[string]any{
-				"component": "remote", "operation": "remote_peer_action", "level": tc.level,
+				"component": "remote", "operation": "remote_peer_action", "action": "session.kill", "level": tc.level,
 				"status": tc.status, "phase": "receipt", "message": "remote action receipt resolved",
 			}
 			if tc.code != "" {
-				want["reason"] = tc.code
+				want["reason"] = string(tc.code)
 			}
 
 			if diff := cmp.Diff(want, record); diff != "" {

@@ -29,32 +29,23 @@ func TestSnapshotRestorePickerRejectsConflictsBeforeRepositoryAccess(t *testing.
 		{name: "json", flag: jsonFlagName, value: "true", want: errSnapshotPickerJSONConflict},
 		{name: "generation", flag: "generation", value: "selected", want: errSnapshotPickerGenerationConflict},
 		{name: "operation", flag: "operation", value: "selected", want: errSnapshotPickerOperationConflict},
+		{name: "connection", flag: "connection", value: "peer", want: errSnapshotPickerConnectionConflict},
 	}
 
-	for _, action := range []bool{false, true} {
-		surface := "snapshot"
-		if action {
-			surface = "action"
-		}
-
-		for _, test := range tests {
-			t.Run(surface+"/"+test.name, func(t *testing.T) {
-				t.Parallel()
-				testSnapshotRestorePickerConflict(t, action, test)
-			})
-		}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			testSnapshotRestorePickerConflict(t, test)
+		})
 	}
 }
 
-func testSnapshotRestorePickerConflict(t *testing.T, action bool, test snapshotPickerConflictCase) {
+func testSnapshotRestorePickerConflict(t *testing.T, test snapshotPickerConflictCase) {
 	t.Helper()
 
 	repository := filepath.Join(t.TempDir(), "must-not-exist")
 
 	cmd := newSnapshotRestoreCommand()
-	if action {
-		cmd = NewActionRestoreCommand()
-	}
 
 	cmd.SetIn(&bytes.Buffer{})
 	cmd.SetOut(&bytes.Buffer{})
@@ -71,13 +62,9 @@ func testSnapshotRestorePickerConflict(t *testing.T, action bool, test snapshotP
 		}
 	}
 
-	repositoryPath, socketPath, cfg, err := parseRestoreInput(cmd, nil)
+	err := ValidateSnapshotCommand(cmd, nil)
 	if !errors.Is(err, test.want) || clibase.ExitCode(err) != clibase.ExitCodeUsage {
-		t.Fatalf("parse error = %v, want %v", err, test.want)
-	}
-
-	if repositoryPath != "" || socketPath != "" || cfg.Generation != "" {
-		t.Fatalf("conflict rejection returned restore input: %q %q %+v", repositoryPath, socketPath, cfg)
+		t.Fatalf("validation error = %v, want %v", err, test.want)
 	}
 
 	if _, err := os.Stat(repository); !errors.Is(err, os.ErrNotExist) {
@@ -88,28 +75,9 @@ func testSnapshotRestorePickerConflict(t *testing.T, action bool, test snapshotP
 func TestSnapshotRestorePickerRejectsNonTerminalBeforeRepositoryAccess(t *testing.T) {
 	t.Parallel()
 
-	for _, action := range []bool{false, true} {
-		name := "snapshot"
-		if action {
-			name = "action"
-		}
-
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			testSnapshotRestorePickerNonTerminal(t, action)
-		})
-	}
-}
-
-func testSnapshotRestorePickerNonTerminal(t *testing.T, action bool) {
-	t.Helper()
-
 	repository := filepath.Join(t.TempDir(), "must-not-exist")
 
 	cmd := newSnapshotRestoreCommand()
-	if action {
-		cmd = NewActionRestoreCommand()
-	}
 
 	cmd.SetIn(&bytes.Buffer{})
 	cmd.SetOut(&bytes.Buffer{})
@@ -125,13 +93,9 @@ func testSnapshotRestorePickerNonTerminal(t *testing.T, action bool) {
 		}
 	}
 
-	repositoryPath, socketPath, cfg, err := parseRestoreInput(cmd, nil)
+	err := ValidateSnapshotCommand(cmd, nil)
 	if !errors.Is(err, errSnapshotPickerTerminalRequired) || clibase.ExitCode(err) != clibase.ExitCodeUsage {
 		t.Fatalf("non-terminal error = %v, want %v", err, errSnapshotPickerTerminalRequired)
-	}
-
-	if repositoryPath != "" || socketPath != "" || cfg.Generation != "" {
-		t.Fatalf("non-terminal rejection returned restore input: %q %q %+v", repositoryPath, socketPath, cfg)
 	}
 
 	if _, err := os.Stat(repository); !errors.Is(err, os.ErrNotExist) {

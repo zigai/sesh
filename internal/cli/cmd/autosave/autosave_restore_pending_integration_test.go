@@ -51,7 +51,7 @@ func newPendingRestoreFixture(t *testing.T) pendingRestoreFixture {
 func (f pendingRestoreFixture) autosave(t *testing.T) autosaveResultJSON {
 	t.Helper()
 
-	exec := executeJSON(t, actionCmd, "autosave-save-if-due",
+	exec := executeJSON(t, "autosave", "save-if-due",
 		testSocketFlag, f.socket, "--repository", f.repoPath, "--history", f.history, "--lease-root", f.leaseRoot,
 		testNoConfigFlag, testJSONFlag)
 	if exec.Err != nil || !exec.Envelope.OK {
@@ -122,7 +122,7 @@ func TestExplicitSaveKeepsTheLiveStateAndResumesAutosave(t *testing.T) {
 		t.Fatalf("list the scratch session: %v, %d sessions", err, len(live))
 	}
 
-	explicit := executeJSON(t, "snapshot", "save", "--session", string(live[0].ID),
+	explicit := executeJSON(t, "snapshot", "save", string(live[0].ID),
 		testSocketFlag, fixture.socket, "--repository", fixture.repoPath, "--lease-root", fixture.leaseRoot,
 		testNoConfigFlag, testJSONFlag)
 	if explicit.Err != nil || !explicit.Envelope.OK {
@@ -138,7 +138,7 @@ func TestExplicitSaveKeepsTheLiveStateAndResumesAutosave(t *testing.T) {
 func TestFinalSaveDoesNotReplaceUnrestoredSessions(t *testing.T) {
 	fixture := newPendingRestoreFixture(t)
 
-	exec := executeJSON(t, actionCmd, "autosave-final-save",
+	exec := executeJSON(t, "autosave", "final-save",
 		testSocketFlag, fixture.socket, "--repository", fixture.repoPath, "--history", fixture.history,
 		"--lease-root", fixture.leaseRoot, "--status-file", fixture.statusPath, "--deadline", "20s",
 		testNoConfigFlag, testJSONFlag)

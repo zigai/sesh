@@ -24,12 +24,12 @@ func TestBindingActionFailureIsShownOnInvokingClient(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	err := cli.ExecuteApplication(t.Context(), []string{"action", "agent-focus", "--client", client, "--no-config"}, nil, &stdout, &stderr)
+	err := cli.ExecuteApplication(t.Context(), []string{"agent", "focus", "--client", client, "--no-config"}, nil, &stdout, &stderr)
 	if err != nil {
 		t.Fatalf("reported binding failure = %v, want success so tmux adds no exit-status message", err)
 	}
 
-	want := "sesh: --target-pane is required"
+	want := "sesh: accepts 1 arg(s), received 0"
 	deadline := time.Now().Add(5 * time.Second)
 
 	for {
@@ -56,16 +56,15 @@ func TestBindingActionFailureKeepsExitStatusOutsideTmux(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	err := cli.ExecuteApplication(t.Context(), []string{"action", "agent-focus", "--socket", fixture.socket, "--no-config"}, nil, &stdout, &stderr)
-	if cli.ExitCode(err) != 2 || !strings.Contains(stderr.String(), "--target-pane is required") {
+	err := cli.ExecuteApplication(t.Context(), []string{"agent", "focus", "--socket", fixture.socket, "--no-config"}, nil, &stdout, &stderr)
+	if cli.ExitCode(err) != 2 || !strings.Contains(stderr.String(), "accepts 1 arg(s), received 0") {
 		t.Fatalf("failure outside tmux = %v / %q, want usage exit and stderr diagnostic", err, stderr.String())
 	}
 }
 
 func TestBindingActionsKeepReportsOutOfTmuxOutput(t *testing.T) {
 	for _, args := range [][]string{
-		{"action", "agent-window-status-clear", "--no-config"},
-		{"action", "autosave-save-if-due", "--no-config"},
+		{"agent", "window-status-clear", "--no-config"},
 		{"hooks", "run", "session_switch_pre"},
 	} {
 		t.Run(strings.Join(args[:2], "_"), func(t *testing.T) {
@@ -79,7 +78,7 @@ func testBindingActionReports(t *testing.T, args []string) {
 	fixture := newCLISessionFixture(t)
 	fixture.setAmbientTmux(t, fixture.fixtureSession(t))
 
-	if args[0] == "action" {
+	if args[0] != "hooks" {
 		args = append(args, "--socket", fixture.socket)
 	} else {
 		configPath := filepath.Join(t.TempDir(), "config.toml")
@@ -116,7 +115,7 @@ func TestBindingJSONFailureKeepsMachineExitStatus(t *testing.T) {
 	fixture := newCLISessionFixture(t)
 	fixture.setAmbientTmux(t, fixture.fixtureSession(t))
 
-	stdout, stderr, err := executeCommand(t, "action", "agent-focus", "--no-config", "--json")
+	stdout, stderr, err := executeCommand(t, "agent", "focus", "--no-config", "--json")
 	if cli.ExitCode(err) != 2 || !json.Valid([]byte(stderr)) || stdout != "" {
 		t.Fatalf("JSON failure = %q / %q / %v, want JSON on stderr and usage exit", stdout, stderr, err)
 	}

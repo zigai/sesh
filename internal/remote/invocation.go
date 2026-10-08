@@ -5,6 +5,7 @@ package remote
 import (
 	"bytes"
 	"context"
+	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"errors"
 	"io/fs"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/samber/oops"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/privatefs"
 )
 
@@ -24,7 +26,7 @@ const (
 	invocationDirName       = "receipts"
 	invocationLockName      = "receipts.lock"
 	invocationFileSuffix    = ".json"
-	maxInvocationBytes      = 4 << 10
+	maxInvocationBytes      = 64 << 10
 	maxInvocationRecords    = 4096
 	invocationPruneFraction = 3
 	outcomeOK               = "ok"
@@ -40,23 +42,30 @@ type ReplayFence struct {
 	Tombstones map[string]Tombstone `json:"tombstones"`
 }
 
+// Tombstone keeps the outcome of a retired invocation so its ID cannot run again. The output is
+// not kept.
 type Tombstone struct {
-	IntentDigest       string    `json:"intentDigest"`
-	Operation          Action    `json:"operation"`
-	Outcome            string    `json:"outcome"`
-	DurableOperationID string    `json:"durableOperationId"`
-	RetiredAt          time.Time `json:"retiredAt"`
+	IntentDigest string    `json:"intentDigest"`
+	Action       action.ID `json:"action"`
+	Outcome      string    `json:"outcome"`
+	RetiredAt    time.Time `json:"retiredAt"`
 }
 
+// Invocation is the durable receipt of one admitted action. Outcome is empty until the action
+// finishes, then "ok" or the failure code. Output is kept when it fits the receipt.
 type Invocation struct {
-	Version            int       `json:"version"`
-	ID                 string    `json:"id"`
-	IntentDigest       string    `json:"intentDigest"`
-	Operation          Action    `json:"operation"`
-	AdmittedAt         time.Time `json:"admittedAt"`
-	Outcome            string    `json:"outcome"`
-	ResolvedAt         time.Time `json:"resolvedAt"`
-	DurableOperationID string    `json:"durableOperationId"`
+	Version      int            `json:"version"`
+	ID           string         `json:"id"`
+	IntentDigest string         `json:"intentDigest"`
+	Action       action.ID      `json:"action"`
+	AdmittedAt   time.Time      `json:"admittedAt"`
+	Outcome      string         `json:"outcome"`
+	ResolvedAt   time.Time      `json:"resolvedAt"`
+	Output       jsontext.Value `json:"output,omitzero"`
+}
+
+type recordVersion struct {
+	Version int `json:"version"`
 }
 
 func (invocation Invocation) Unresolved() bool {
@@ -64,39 +73,60 @@ func (invocation Invocation) Unresolved() bool {
 }
 
 func (invocation Invocation) IsUncertain() bool {
-	return invocation.Outcome == "" || invocation.Outcome == ActionCodeUnknownOutcome
+	return invocation.Outcome == "" || invocation.Outcome == string(action.CodeUncertain)
 }
 
 func (invocation Invocation) Result() ActionResult {
 	if invocation.Unresolved() {
-		return ActionResult{InvocationID: invocation.ID, OK: false, Code: ActionCodeUnknownOutcome, DurableOperationID: ""}
+		return ActionResult{InvocationID: invocation.ID, Action: invocation.Action, OK: false, Code: action.CodeUncertain, Output: nil}
 	}
 
 	if invocation.Outcome == outcomeOK {
-		return ActionResult{
-			InvocationID:       invocation.ID,
-			OK:                 true,
-			Code:               "",
-			DurableOperationID: invocation.DurableOperationID,
-		}
+		return ActionResult{InvocationID: invocation.ID, Action: invocation.Action, OK: true, Code: "", Output: invocation.Output}
 	}
 
-	return ActionResult{
-		InvocationID:       invocation.ID,
-		OK:                 false,
-		Code:               invocation.Outcome,
-		DurableOperationID: invocation.DurableOperationID,
-	}
+	return ActionResult{InvocationID: invocation.ID, Action: invocation.Action, OK: false, Code: action.Code(invocation.Outcome), Output: invocation.Output}
 }
 
 func (invocation Invocation) Validate() error {
 	if invocation.Version != ProtocolVersion || !ValidInvocationID(invocation.ID) ||
-		!validIntentDigest(invocation.IntentDigest) || !validAction(invocation.Operation) ||
+		!validIntentDigest(invocation.IntentDigest) || !invocation.Action.Valid() ||
 		invocation.AdmittedAt.IsZero() || !validOutcome(invocation.Outcome) {
 		return ErrInvalidFrame
 	}
 
-	return validateInvocationOutcome(invocation.Outcome, invocation.DurableOperationID, invocation.ResolvedAt)
+	if len(invocation.Output) > 0 && !invocation.Output.IsValid() {
+		return ErrInvalidFrame
+	}
+
+	return invocation.validateResolution()
+}
+
+// validateResolution requires a resolved invocation to record when it resolved, and an
+// unresolved one to carry no resolution.
+func (invocation Invocation) validateResolution() error {
+	if invocation.Outcome == "" {
+		if !invocation.ResolvedAt.IsZero() || len(invocation.Output) > 0 {
+			return ErrInvalidFrame
+		}
+
+		return nil
+	}
+
+	if invocation.ResolvedAt.IsZero() {
+		return ErrInvalidFrame
+	}
+
+	return nil
+}
+
+// OutcomeOf is the receipt outcome of an action result.
+func OutcomeOf(result ActionResult) string {
+	if result.OK {
+		return outcomeOK
+	}
+
+	return string(result.Code)
 }
 
 func InvocationDir(stateHome string) (string, error) {
@@ -119,7 +149,7 @@ func InvocationPath(stateHome string) (string, error) {
 
 func AdmitInvocation(ctx context.Context, dir *privatefs.Dir, request ActionRequest, now time.Time) (Invocation, bool, error) {
 	if !ValidInvocationID(request.InvocationID) || !validIntentDigest(request.IntentDigest) ||
-		!validAction(request.Operation) {
+		!request.Action.Valid() {
 		return Invocation{}, false, oops.In("remote").With("operation", "admit_invocation").Wrap(ErrInvalidFrame)
 	}
 
@@ -142,7 +172,9 @@ func AdmitInvocation(ctx context.Context, dir *privatefs.Dir, request ActionRequ
 	return invocation, admitted, closeErr
 }
 
-func ResolveInvocation(ctx context.Context, dir *privatefs.Dir, id, outcome, durableOperationID string, now time.Time) error {
+// ResolveInvocation records an invocation's outcome. An output too large for the receipt is
+// dropped; the outcome is always kept.
+func ResolveInvocation(ctx context.Context, dir *privatefs.Dir, id, outcome string, output jsontext.Value, now time.Time) error {
 	if !ValidInvocationID(id) || !validOutcome(outcome) || outcome == "" {
 		return oops.In("remote").With("operation", "resolve_invocation").Wrap(ErrInvalidFrame)
 	}
@@ -152,7 +184,7 @@ func ResolveInvocation(ctx context.Context, dir *privatefs.Dir, id, outcome, dur
 		return oops.In("remote").With("operation", "resolve_invocation").Wrap(err)
 	}
 
-	resolveErr := resolveInvocationLocked(dir, id, outcome, durableOperationID, now)
+	resolveErr := resolveInvocationLocked(dir, id, outcome, output, now)
 
 	closeErr := lock.Close()
 	if closeErr != nil {
@@ -186,16 +218,20 @@ func LookupInvocation(dir *privatefs.Dir, id string) (Invocation, error) {
 		return Invocation{}, fs.ErrNotExist
 	}
 
+	return tombstone.invocation(id), nil
+}
+
+func (tombstone Tombstone) invocation(id string) Invocation {
 	return Invocation{
-		Version:            ProtocolVersion,
-		ID:                 id,
-		IntentDigest:       tombstone.IntentDigest,
-		Operation:          tombstone.Operation,
-		AdmittedAt:         tombstone.RetiredAt,
-		Outcome:            tombstone.Outcome,
-		ResolvedAt:         tombstone.RetiredAt,
-		DurableOperationID: tombstone.DurableOperationID,
-	}, nil
+		Version:      ProtocolVersion,
+		ID:           id,
+		IntentDigest: tombstone.IntentDigest,
+		Action:       tombstone.Action,
+		AdmittedAt:   tombstone.RetiredAt,
+		Outcome:      tombstone.Outcome,
+		ResolvedAt:   tombstone.RetiredAt,
+		Output:       nil,
+	}
 }
 
 func admitInvocationLocked(dir *privatefs.Dir, request ActionRequest, now time.Time) (Invocation, bool, error) {
@@ -203,7 +239,7 @@ func admitInvocationLocked(dir *privatefs.Dir, request ActionRequest, now time.T
 
 	switch {
 	case err == nil:
-		if existing.IntentDigest != request.IntentDigest || existing.Operation != request.Operation {
+		if existing.IntentDigest != request.IntentDigest || existing.Action != request.Action {
 			return existing, false, ErrInvocationConflict
 		}
 
@@ -218,29 +254,11 @@ func admitInvocationLocked(dir *privatefs.Dir, request ActionRequest, now time.T
 	}
 
 	if tombstone, ok := fence.Tombstones[request.InvocationID]; ok {
-		if tombstone.IntentDigest != request.IntentDigest || tombstone.Operation != request.Operation {
-			return Invocation{
-				Version:            ProtocolVersion,
-				ID:                 request.InvocationID,
-				IntentDigest:       tombstone.IntentDigest,
-				Operation:          tombstone.Operation,
-				AdmittedAt:         tombstone.RetiredAt,
-				Outcome:            tombstone.Outcome,
-				ResolvedAt:         tombstone.RetiredAt,
-				DurableOperationID: tombstone.DurableOperationID,
-			}, false, ErrInvocationConflict
+		if tombstone.IntentDigest != request.IntentDigest || tombstone.Action != request.Action {
+			return tombstone.invocation(request.InvocationID), false, ErrInvocationConflict
 		}
 
-		return Invocation{
-			Version:            ProtocolVersion,
-			ID:                 request.InvocationID,
-			IntentDigest:       tombstone.IntentDigest,
-			Operation:          tombstone.Operation,
-			AdmittedAt:         tombstone.RetiredAt,
-			Outcome:            tombstone.Outcome,
-			ResolvedAt:         tombstone.RetiredAt,
-			DurableOperationID: tombstone.DurableOperationID,
-		}, false, nil
+		return tombstone.invocation(request.InvocationID), false, nil
 	}
 
 	if err := pruneInvocations(dir, maxInvocationRecords, now); err != nil {
@@ -248,14 +266,14 @@ func admitInvocationLocked(dir *privatefs.Dir, request ActionRequest, now time.T
 	}
 
 	invocation := Invocation{
-		Version:            ProtocolVersion,
-		ID:                 request.InvocationID,
-		IntentDigest:       request.IntentDigest,
-		Operation:          request.Operation,
-		AdmittedAt:         now.UTC(),
-		Outcome:            "",
-		ResolvedAt:         time.Time{},
-		DurableOperationID: "",
+		Version:      ProtocolVersion,
+		ID:           request.InvocationID,
+		IntentDigest: request.IntentDigest,
+		Action:       request.Action,
+		AdmittedAt:   now.UTC(),
+		Outcome:      "",
+		ResolvedAt:   time.Time{},
+		Output:       nil,
 	}
 
 	if err := writeInvocation(dir, invocation); err != nil {
@@ -265,14 +283,14 @@ func admitInvocationLocked(dir *privatefs.Dir, request ActionRequest, now time.T
 	return invocation, true, nil
 }
 
-func resolveInvocationLocked(dir *privatefs.Dir, id, outcome, durableOperationID string, now time.Time) error {
+func resolveInvocationLocked(dir *privatefs.Dir, id, outcome string, output jsontext.Value, now time.Time) error {
 	invocation, err := readInvocation(dir, id)
 	if err != nil {
 		return err
 	}
 
 	if !invocation.Unresolved() {
-		if invocation.Outcome == outcome && invocation.DurableOperationID == durableOperationID {
+		if invocation.Outcome == outcome {
 			return nil
 		}
 
@@ -281,9 +299,16 @@ func resolveInvocationLocked(dir *privatefs.Dir, id, outcome, durableOperationID
 
 	invocation.Outcome = outcome
 	invocation.ResolvedAt = now.UTC()
-	invocation.DurableOperationID = durableOperationID
+	invocation.Output = output
 
-	return writeInvocation(dir, invocation)
+	err = writeInvocation(dir, invocation)
+	if errors.Is(err, ErrFrameTooLarge) {
+		invocation.Output = nil
+
+		return writeInvocation(dir, invocation)
+	}
+
+	return err
 }
 
 func readInvocation(dir *privatefs.Dir, id string) (Invocation, error) {
@@ -354,9 +379,17 @@ func pruneInvocations(dir *privatefs.Dir, limit int, now time.Time) error {
 			continue
 		}
 
+		invocation, readErr := readInvocation(dir, id)
+		if readErr != nil && staleRecord(dir, name) {
+			if err := removeFile(dir, name); err != nil {
+				return err
+			}
+
+			continue
+		}
+
 		recordCount++
 
-		invocation, readErr := readInvocation(dir, id)
 		if readErr != nil {
 			continue
 		}
@@ -409,11 +442,10 @@ func retireOldestResolvedInvocations(dir *privatefs.Dir, resolved []Invocation, 
 
 	for _, invocation := range toRemove {
 		fence.Tombstones[invocation.ID] = Tombstone{
-			IntentDigest:       invocation.IntentDigest,
-			Operation:          invocation.Operation,
-			Outcome:            invocation.Outcome,
-			DurableOperationID: invocation.DurableOperationID,
-			RetiredAt:          now.UTC(),
+			IntentDigest: invocation.IntentDigest,
+			Action:       invocation.Action,
+			Outcome:      invocation.Outcome,
+			RetiredAt:    now.UTC(),
 		}
 	}
 
@@ -443,6 +475,10 @@ func readReplayFence(dir *privatefs.Dir) (ReplayFence, error) {
 
 	if err != nil {
 		return ReplayFence{Version: 0, Tombstones: nil}, oops.In("remote").With("operation", "read_replay_fence").Wrap(err)
+	}
+
+	if version, ok := contentVersion(content); ok && version != ProtocolVersion {
+		return ReplayFence{Version: ProtocolVersion, Tombstones: make(map[string]Tombstone)}, nil
 	}
 
 	fence, err := decodeStrict[ReplayFence](bytes.TrimSpace(content))
@@ -501,25 +537,27 @@ func validOutcome(outcome string) bool {
 		return true
 	}
 
-	return validActionCode(outcome)
+	return action.Code(outcome).Valid()
 }
 
-func validateInvocationOutcome(outcome, durableID string, resolvedAt time.Time) error {
-	if outcome == "" {
-		if !resolvedAt.IsZero() || durableID != "" {
-			return ErrInvalidFrame
-		}
-
-		return nil
+// staleRecord reports a receipt written by another protocol version. Its invocation cannot be
+// retried with this protocol, so it only takes space.
+func staleRecord(dir *privatefs.Dir, name string) bool {
+	content, err := dir.Read(name, int64(maxInvocationBytes))
+	if err != nil {
+		return false
 	}
 
-	if resolvedAt.IsZero() {
-		return ErrInvalidFrame
+	version, ok := contentVersion(content)
+
+	return ok && version != ProtocolVersion
+}
+
+func contentVersion(content []byte) (int, bool) {
+	var probe recordVersion
+	if err := json.Unmarshal(bytes.TrimSpace(content), &probe); err != nil {
+		return 0, false
 	}
 
-	if durableID != "" && !ValidInvocationID(durableID) {
-		return ErrInvalidFrame
-	}
-
-	return nil
+	return probe.Version, true
 }

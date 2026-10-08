@@ -2,28 +2,22 @@ package agent
 
 import (
 	"context"
-	"errors"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/agents"
+	"github.com/zigai/sesh/internal/cli/actioncli"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/config"
 	integration "github.com/zigai/sesh/internal/integration/tmux"
-	"github.com/zigai/sesh/internal/session"
 )
-
-type agentNavResultJSON struct {
-	TargetPaneID string `json:"targetPaneId"`
-}
 
 type agentStatusResultJSON struct {
 	Total   int `json:"total"`
@@ -34,63 +28,59 @@ type agentStatusResultJSON struct {
 	Idle    int `json:"idle"`
 }
 
-var errTargetPaneRequired = errors.New("--target-pane is required")
+const agentStateFlag = "agent-state"
 
-func addAgentNavigationFlags(cmd *cobra.Command) {
-	clibase.AddSocketFlag(cmd)
-	cmd.Flags().String("state", "", "AHT agent registry file [default: agent_status.store_path setting, else AHT's default registry]")
-	cmd.Flags().String("client", "", "Explicit tmux client terminal to navigate")
-	cmd.Flags().String("pane", "", "Explicit invoking pane ID, for example %1")
-	cmd.Flags().String("session", "", "Explicit invoking session name or ID")
-	cmd.Flags().String("history", "", clibase.HistoryFlagUsage)
+// NewCommand returns the group of commands that navigate and report on coding agents.
+func NewCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "agent",
+		Short: "Navigate between coding agents",
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return nil
+			}
+
+			return clibase.UnknownCommandError(cmd, args[0])
+		},
+		RunE: clibase.RequireSubcommand,
+	}
+
+	cmd.AddCommand(
+		navigationCommand(action.AgentNext),
+		navigationCommand(action.AgentLatest),
+		navigationCommand(action.AgentWaiting),
+		navigationCommand(action.AgentUnread),
+		navigationCommand(action.AgentFailed),
+		navigationCommand(action.AgentToggle),
+		actioncli.Command(action.AgentBack, actioncli.Options[action.ReturnToAgent, action.FocusedPane]{
+			Operation: "", SuccessOwned: false, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
+		}),
+		actioncli.Command(action.AgentFocus, actioncli.Options[action.FocusAgent, action.FocusedPane]{
+			Operation: "", SuccessOwned: false, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
+		}),
+		actioncli.Command(action.AgentWindowStatusClear, actioncli.Options[action.ClearWindowStatus, action.ClearedWindowStatus]{
+			Operation: "", SuccessOwned: false, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
+		}),
+		newAgentStatusCommand(),
+	)
+
+	return cmd
+}
+
+func navigationCommand(definition *action.Definition[action.NavigateAgents, action.FocusedPane]) *cobra.Command {
+	return actioncli.Command(definition, actioncli.Options[action.NavigateAgents, action.FocusedPane]{
+		Operation: "", SuccessOwned: false, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
+	})
 }
 
 func addAgentRegistryFlags(cmd *cobra.Command) {
-	cmd.Flags().String("state", "", "AHT agent registry file [default: agent_status.store_path setting, else AHT's default registry]")
+	cmd.Flags().String(agentStateFlag, "", "AHT agent registry file [default: agent_status.store_path setting, else AHT's default registry]")
 }
 
-func resolveAgentHistoryPath(cmd *cobra.Command) string {
-	historyPath, _ := cmd.Flags().GetString("history")
-	if historyPath != "" {
-		if abs, err := filepath.Abs(historyPath); err == nil {
-			return abs
-		}
-	}
-
-	return filepath.Join(config.GetXDGPaths().StateHome, "sesh", "history.json")
-}
-
-func recordNavigatedAgentView(ctx context.Context, cmd *cobra.Command, target agents.PaneLocation) {
-	if target.SessionName == "" || target.PaneID == "" {
-		return
-	}
-
-	historyPath := resolveAgentHistoryPath(cmd)
-	if historyPath == "" {
-		return
-	}
-
-	ident := session.Identity{
-		Origin:           "local",
-		ConnectionID:     "",
-		Socket:           target.ServerSocket,
-		RepositorySource: "",
-		Name:             target.SessionName,
-	}
-
-	_, err := session.UpdateState(ctx, historyPath, func(st *session.State) {
-		st.RecordAgentView(ident, target.PaneID)
-	})
-	if err != nil {
-		zerolog.Ctx(ctx).Warn().Str("component", "agents").Str("operation", "record_view").
-			Str("status", "degraded").Str("reason", "history_update_failed").Msg("agent navigation history was not recorded")
-	}
-}
-
-// resolveAgentStatePath returns --state, else [agent_status].store_path, else "" so AHT uses
-// its default registry.
+// resolveAgentStatePath returns --agent-state, else [agent_status].store_path, else "" so AHT
+// uses its default registry.
 func resolveAgentStatePath(cmd *cobra.Command) (string, error) {
-	statePath, _ := cmd.Flags().GetString("state")
+	statePath, _ := cmd.Flags().GetString(agentStateFlag)
 	if statePath == "" {
 		cfg, err := clibase.LoadCommandConfig(commandContextOrBackground(cmd), cmd)
 		if err != nil {
@@ -105,226 +95,6 @@ func resolveAgentStatePath(cmd *cobra.Command) (string, error) {
 	}
 
 	return statePath, nil
-}
-
-func resolveAgentTarget(cmd *cobra.Command) agents.CurrentTarget {
-	pane, _ := cmd.Flags().GetString("pane")
-	client, _ := cmd.Flags().GetString("client")
-	sessionTarget, _ := cmd.Flags().GetString("session")
-
-	target := agents.CurrentTarget{PaneID: pane, Client: client, SessionID: "", Session: ""}
-
-	if sessionTarget != "" {
-		if strings.HasPrefix(sessionTarget, "$") {
-			target.SessionID = sessionTarget
-		} else {
-			target.Session = sessionTarget
-		}
-	}
-
-	return target
-}
-
-func resolveAgentServer(cmd *cobra.Command) (*agents.Navigator, error) {
-	socketPath := clibase.ResolveSocket(cmd)
-
-	server, err := integration.Open(socketPath)
-	if err != nil {
-		return nil, oops.In("cli").With("operation", "open_tmux").Wrap(err)
-	}
-
-	statePath, err := resolveAgentStatePath(cmd)
-	if err != nil {
-		return nil, err
-	}
-
-	navigator, err := agents.NewNavigator(agents.NavigatorOptions{
-		Server:     server,
-		StatePath:  statePath,
-		Target:     resolveAgentTarget(cmd),
-		Controller: nil,
-		Source:     nil,
-	})
-	if err != nil {
-		return nil, oops.In("cli").With("operation", "agent_navigation").Wrap(err)
-	}
-
-	return navigator, nil
-}
-
-func newAgentNextCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "next",
-		Short: "Switch to next coding agent needing attention",
-		Long:  "Switch to the next coding agent pane needing attention (waiting, failed, or idle) and activate its window, session, and pane.",
-		Args:  clibase.UsageArgs(cobra.NoArgs),
-		RunE:  runAgentNext,
-	}
-	cmd.Annotations = map[string]string{clibase.AnnotationOperation: "next"}
-
-	addAgentNavigationFlags(cmd)
-	cmd.Flags().Bool("local", false, "Only consider panes in the current tmux session")
-	clibase.AddJSONFlag(cmd)
-
-	return cmd
-}
-
-func runAgentNext(cmd *cobra.Command, _ []string) error {
-	navigator, err := resolveAgentServer(cmd)
-	if err != nil {
-		return err
-	}
-
-	localOnly, _ := cmd.Flags().GetBool("local")
-
-	scope := agents.NavigationGlobal
-	if localOnly {
-		scope = agents.NavigationCurrentSession
-	}
-
-	target, navErr := navigator.NextIdle(commandContextOrBackground(cmd), scope)
-	if navErr != nil {
-		return oops.In("cli").With("operation", "agent_next").Wrap(navErr)
-	}
-
-	recordNavigatedAgentView(commandContextOrBackground(cmd), cmd, target)
-
-	if clibase.JSONOutputEnabled(cmd) {
-		return clibase.WriteJSONResult(cmd, agentNavResultJSON{TargetPaneID: target.PaneID})
-	}
-
-	return nil
-}
-
-func newAgentBackCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "back",
-		Short: "Return through agent navigation history",
-		Long:  "Return through the agent navigation history stack to the previous pane.",
-		Args:  clibase.UsageArgs(cobra.NoArgs),
-		RunE:  runAgentBack,
-	}
-	cmd.Annotations = map[string]string{clibase.AnnotationOperation: "back"}
-
-	addAgentNavigationFlags(cmd)
-	clibase.AddJSONFlag(cmd)
-
-	return cmd
-}
-
-func NewActionLatestCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:         "agent-latest",
-		Short:       "Focus the coding agent that most recently became idle",
-		Long:        "Focus the live coding agent pane with the most recent recorded transition to idle. Idle can include startup and does not confirm completed work.",
-		Args:        clibase.UsageArgs(cobra.NoArgs),
-		RunE:        runAgentLatest,
-		Annotations: map[string]string{clibase.AnnotationOperation: "latest"},
-	}
-	addAgentNavigationFlags(cmd)
-	cmd.Flags().Bool("local", false, "Only consider panes in the current tmux session")
-	clibase.AddJSONFlag(cmd)
-
-	return cmd
-}
-
-func runAgentLatest(cmd *cobra.Command, _ []string) error {
-	navigator, err := resolveAgentServer(cmd)
-	if err != nil {
-		return err
-	}
-
-	localOnly, _ := cmd.Flags().GetBool("local")
-
-	scope := agents.NavigationGlobal
-	if localOnly {
-		scope = agents.NavigationCurrentSession
-	}
-
-	target, err := navigator.LatestIdle(commandContextOrBackground(cmd), scope)
-	if err != nil {
-		return oops.In("cli").With("operation", "agent_latest").Wrap(err)
-	}
-
-	recordNavigatedAgentView(commandContextOrBackground(cmd), cmd, target)
-
-	if clibase.JSONOutputEnabled(cmd) {
-		return clibase.WriteJSONResult(cmd, agentNavResultJSON{TargetPaneID: target.PaneID})
-	}
-
-	return nil
-}
-
-func runAgentBack(cmd *cobra.Command, _ []string) error {
-	navigator, err := resolveAgentServer(cmd)
-	if err != nil {
-		return err
-	}
-
-	target, navErr := navigator.Back(commandContextOrBackground(cmd))
-	if navErr != nil {
-		return oops.In("cli").With("operation", "agent_back").Wrap(navErr)
-	}
-
-	if clibase.JSONOutputEnabled(cmd) {
-		return clibase.WriteJSONResult(cmd, agentNavResultJSON{TargetPaneID: target.PaneID})
-	}
-
-	return nil
-}
-
-func newAgentFocusCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "focus",
-		Short: "Focus one coding agent pane",
-		Long:  "Focus a specific pane, activating its window and session for the invoking client.",
-		Args:  clibase.UsageArgs(cobra.NoArgs),
-		RunE:  runAgentFocus,
-	}
-	cmd.Annotations = map[string]string{clibase.AnnotationOperation: "focus"}
-
-	addAgentNavigationFlags(cmd)
-	cmd.Flags().String("target-pane", "", "Pane ID to focus, for example %1")
-	cmd.Flags().String("target-session", "", "Session name or ID expected to hold the pane")
-	clibase.AddJSONFlag(cmd)
-
-	return cmd
-}
-
-func runAgentFocus(cmd *cobra.Command, _ []string) error {
-	navigator, err := resolveAgentServer(cmd)
-	if err != nil {
-		return err
-	}
-
-	paneID, _ := cmd.Flags().GetString("target-pane")
-	if paneID == "" {
-		return clibase.NewExitError(clibase.ExitCodeUsage, oops.In("cli").Code("usage_invalid").With("operation", "agent_focus").Wrap(errTargetPaneRequired))
-	}
-
-	targetSession, _ := cmd.Flags().GetString("target-session")
-
-	focus := agents.FocusTarget{PaneID: paneID, SessionID: "", SessionName: ""}
-
-	switch {
-	case strings.HasPrefix(targetSession, "$"):
-		focus.SessionID = targetSession
-	case targetSession != "":
-		focus.SessionName = targetSession
-	}
-
-	target, focusErr := navigator.Focus(commandContextOrBackground(cmd), focus)
-	if focusErr != nil {
-		return oops.In("cli").With("operation", "agent_focus").Wrap(focusErr)
-	}
-
-	recordNavigatedAgentView(commandContextOrBackground(cmd), cmd, target)
-
-	if clibase.JSONOutputEnabled(cmd) {
-		return clibase.WriteJSONResult(cmd, agentNavResultJSON{TargetPaneID: target.PaneID})
-	}
-
-	return nil
 }
 
 func newAgentStatusCommand() *cobra.Command {
@@ -457,82 +227,8 @@ func agentStatusWatchOptions(resolved config.AgentStatusConfig, quiet bool) agen
 	return opts
 }
 
-func newAgentStatusClearCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:         "clear",
-		Short:       "Clear window status styles applied by sesh",
-		Long:        "Restore every window status style sesh applied, leaving styles owned by other tools untouched.",
-		Args:        clibase.UsageArgs(cobra.NoArgs),
-		RunE:        runAgentStatusClear,
-		Annotations: map[string]string{clibase.AnnotationOperation: "clear_styles"},
-	}
-
-	clibase.AddSocketFlag(cmd)
-	clibase.AddJSONFlag(cmd)
-
-	return cmd
-}
-
-func runAgentStatusClear(cmd *cobra.Command, _ []string) error {
-	socketPath := clibase.ResolveSocket(cmd)
-
-	server, err := integration.Open(socketPath)
-	if err != nil {
-		return oops.In("cli").With("operation", "open_tmux").Wrap(err)
-	}
-
-	styles := agents.NewTmuxStyleController(server, true, true)
-
-	if err := styles.ClearOwned(commandContextOrBackground(cmd)); err != nil {
-		return oops.In("cli").With("operation", "agent_status_clear").Wrap(err)
-	}
-
-	if clibase.JSONOutputEnabled(cmd) {
-		return clibase.WriteJSONResult(cmd, struct {
-			Cleared bool `json:"cleared"`
-		}{Cleared: true})
-	}
-
-	return clibase.WriteOutput(cmd, "Cleared agent window styles\n")
-}
-
 func commandContextOrBackground(cmd *cobra.Command) context.Context {
 	return clibase.CommandContext(cmd)
-}
-
-func NewActionNextCommand() *cobra.Command {
-	cmd := newAgentNextCommand()
-	cmd.Use = "agent-next"
-
-	return cmd
-}
-
-func NewActionBackCommand() *cobra.Command {
-	cmd := newAgentBackCommand()
-	cmd.Use = "agent-back"
-
-	return cmd
-}
-
-func NewActionFocusCommand() *cobra.Command {
-	cmd := newAgentFocusCommand()
-	cmd.Use = "agent-focus"
-
-	return cmd
-}
-
-func NewActionStatusCommand() *cobra.Command {
-	cmd := newAgentStatusCommand()
-	cmd.Use = "agent-status"
-
-	return cmd
-}
-
-func NewActionWindowStatusClearCommand() *cobra.Command {
-	cmd := newAgentStatusClearCommand()
-	cmd.Use = "agent-window-status-clear"
-
-	return cmd
 }
 
 func NewDaemonWindowStatusCommand() *cobra.Command {

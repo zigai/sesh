@@ -18,7 +18,7 @@ const (
 func (m *Model) handleActionKeys(msg tea.KeyPressMsg) func() (tea.Model, tea.Cmd) {
 	pressed := keyPressFromMsg(msg)
 
-	keys := newActionKeyMap(m.config.Keys)
+	keys := newActionKeyMap(m.config)
 	if handler, matched := m.handleDisplayActionKeys(pressed, keys); matched {
 		return handler
 	}
@@ -30,25 +30,16 @@ func (m *Model) handleActionKeys(msg tea.KeyPressMsg) func() (tea.Model, tea.Cmd
 	case m.matchesVisibleSessionShortcut(pressed, keys.selectKeys):
 		return m.handleVisibleSessionShortcut(pressed, keys.selectKeys)
 
-	case bubbleskey.Matches(pressed, keys.create):
-		return m.handleCreate()
-
-	case bubbleskey.Matches(pressed, keys.rename):
-		return m.handleRename()
-
-	case bubbleskey.Matches(pressed, keys.kill):
-		return m.handleKill()
-
-	case bubbleskey.Matches(pressed, keys.delete):
-		return m.handleDelete()
-
-	case bubbleskey.Matches(pressed, keys.snapshot):
-		return m.handleSnapshot()
-
 	case bubbleskey.Matches(pressed, keys.help):
 		m.showHelp = true
 
 		return func() (tea.Model, tea.Cmd) { return m, nil }
+	}
+
+	for _, bound := range keys.actions {
+		if bubbleskey.Matches(pressed, bound.key) {
+			return m.invokeAction(bound.binding.Action, bound.binding.Values)
+		}
 	}
 
 	return nil
@@ -174,7 +165,7 @@ func (m *Model) visibleShortcutRows() []popupListRow {
 }
 
 func (m *Model) visibleSessionShortcutLabel() string {
-	bindings := newActionKeyMap(m.config.Keys).selectKeys
+	bindings := newActionKeyMap(m.config).selectKeys
 
 	labels := make([]string, 0, len(bindings))
 	for _, binding := range bindings {

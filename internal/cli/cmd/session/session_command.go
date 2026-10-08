@@ -24,6 +24,7 @@ func NewCommand() *cobra.Command {
 	cmd.AddCommand(
 		newListCommand(),
 		newSessionNewCommand(),
+		newSessionCreateCommand(),
 		newSessionSwitchCommand(),
 		newSessionRenameCommand(),
 		newSessionKillCommand(),

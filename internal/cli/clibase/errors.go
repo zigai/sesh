@@ -11,6 +11,8 @@ import (
 	"github.com/charmbracelet/x/term"
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
+
+	"github.com/zigai/sesh/internal/action"
 )
 
 const (
@@ -25,8 +27,6 @@ var (
 	ErrSocketRequired     = errors.New("--socket is required")
 	ErrRepositoryRequired = errors.New("--repository is required")
 	ErrLeaseRootRequired  = errors.New("--lease-root is required")
-	ErrPartialSnapshot    = errors.New("parity-incomplete save")
-	ErrPartialRestore     = errors.New("restore incomplete: sessions were skipped or not verified")
 	ErrDoctorChecksFailed = errors.New("doctor checks failed")
 	ErrSubcommandRequired = errors.New("subcommand required")
 	RawArgsContextKey     = rawArgsKey{}
@@ -91,6 +91,10 @@ func ExitCode(err error) int {
 
 	if exitErr, ok := errors.AsType[*ExitError](err); ok {
 		return exitErr.code
+	}
+
+	if action.CodeOf(err) == action.CodeInvalidArgument {
+		return ExitCodeUsage
 	}
 
 	if errors.Is(err, ErrUnknownCommand) || IsCobraUsageError(err) {
@@ -217,6 +221,10 @@ func IsUncertaintyError(err error) bool {
 		if errors.Is(err, contract.cause) {
 			return true
 		}
+	}
+
+	if classified, ok := errors.AsType[*action.Error](err); ok && classified.Code == action.CodeUncertain {
+		return true
 	}
 
 	type uncertainDetector interface {

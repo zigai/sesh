@@ -8,20 +8,20 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/cobra"
-
+	"github.com/zigai/sesh/internal/action"
+	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/cli/clibase"
-	"github.com/zigai/sesh/internal/snapshot/engine"
+	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/snapshot/restore"
 )
 
 type restoreTestEnvelope struct {
 	OK     bool                      `json:"ok"`
-	Result snapshotRestoreResultJSON `json:"result"`
+	Result action.RestoredSnapshot   `json:"result"`
 	Error  *clibase.JSONErrorPayload `json:"error"`
 }
 
-func renderRestoreJSONForTest(t *testing.T, result engine.RestoreResult, cause error) (restoreTestEnvelope, error) {
+func renderRestoreJSONForTest(t *testing.T, result action.RestoredSnapshot, cause error) (restoreTestEnvelope, error) {
 	t.Helper()
 
 	cmd := newSnapshotRestoreCommand()
@@ -34,7 +34,7 @@ func renderRestoreJSONForTest(t *testing.T, result engine.RestoreResult, cause e
 		t.Fatal(err)
 	}
 
-	resultErr := renderRestoreOutcome(cmd, result, restoreLabels{}, nil, cause)
+	resultErr := renderSnapshotRestore(cmd, result, cause)
 	if err := clibase.WriteCommandError(cmd, resultErr); err != nil {
 		t.Fatal(err)
 	}
@@ -58,16 +58,13 @@ func renderRestoreJSONForTest(t *testing.T, result engine.RestoreResult, cause e
 func TestRestoreFailureRetainsOperationReceipt(t *testing.T) {
 	t.Parallel()
 
-	result := engine.RestoreResult{
-		OperationID:         "0123456789abcdef0123456789abcdef",
-		Generation:          "abcdef0123456789abcdef0123456789",
-		Status:              "uncertain",
-		Reason:              "effect_outcome_uncertain",
-		SessionsRestored:    nil,
-		Verified:            false,
-		Uncertain:           true,
-		MissingRequirements: nil,
-		Panes:               nil,
+	result := action.RestoredSnapshot{
+		OperationID: "0123456789abcdef0123456789abcdef",
+		Generation:  "abcdef0123456789abcdef0123456789",
+		Status:      "uncertain",
+		Reason:      "effect_outcome_uncertain",
+		Verified:    false,
+		Uncertain:   true,
 	}
 
 	cases := []struct {
@@ -75,8 +72,8 @@ func TestRestoreFailureRetainsOperationReceipt(t *testing.T) {
 		cause error
 		code  string
 	}{
-		{"effect", errors.Join(restore.ErrExecutionUncertain, context.Canceled), "operationUncertain"},
-		{"close", errSensitiveRaw, "operationFailed"},
+		{"effect", action.Wrap(action.CodeUncertain, errors.Join(restore.ErrExecutionUncertain, context.Canceled)), "uncertain"},
+		{"close", action.Wrap(action.CodeFailed, errSensitiveRaw), "operationFailed"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -101,24 +98,22 @@ func TestRestoreFailureRetainsOperationReceipt(t *testing.T) {
 func TestPartialRestoreReportsDegradedResult(t *testing.T) {
 	t.Parallel()
 
-	result := engine.RestoreResult{
+	result := action.RestoredSnapshot{
 		OperationID:         "0123456789abcdef0123456789abcdef",
 		Generation:          "abcdef0123456789abcdef0123456789",
 		Status:              "partial",
 		Reason:              "parity_incomplete",
-		SessionsRestored:    []string{"restored"},
+		Sessions:            []action.SessionRef{{Kind: session.KindLive, ID: "$1", Name: "restored"}},
 		Verified:            true,
-		Uncertain:           false,
-		MissingRequirements: []restore.MissingRequirement{{Domain: "terminal", Status: "unsupported", Reason: "terminal_checkpoint_unavailable"}},
-		Panes:               nil,
+		MissingRequirements: []action.Requirement{{Domain: "terminal", Status: "unsupported", Reason: "terminal_checkpoint_unavailable"}},
 	}
 
-	envelope, err := renderRestoreJSONForTest(t, result, nil)
-	if !errors.Is(err, errPartialRestore) || clibase.ExitCode(err) != clibase.ExitCodeGeneral {
+	envelope, err := renderRestoreJSONForTest(t, result, action.Wrap(action.CodePartial, app.ErrPartialRestore))
+	if !errors.Is(err, app.ErrPartialRestore) || clibase.ExitCode(err) != clibase.ExitCodeGeneral {
 		t.Fatalf("partial restore was reported as success: %v", err)
 	}
 
-	if envelope.OK || envelope.Error == nil || envelope.Error.Code != "partialRestore" {
+	if envelope.OK || envelope.Error == nil || envelope.Error.Code != "partial" {
 		t.Fatalf("expected one degraded envelope: %+v", envelope)
 	}
 
@@ -127,54 +122,28 @@ func TestPartialRestoreReportsDegradedResult(t *testing.T) {
 	}
 }
 
-func TestRestoreOperationFlagSelectsOperationAndKeepsSessionArguments(t *testing.T) {
-	t.Parallel()
-
-	for _, cmd := range []*cobra.Command{newSnapshotRestoreCommand(), NewActionRestoreCommand()} {
-		for name, value := range map[string]string{
-			"repository": t.TempDir(),
-			"socket":     "/tmp/selected-test-server",
-			"lease-root": t.TempDir(),
-			"operation":  "0123456789abcdef0123456789abcdef",
-		} {
-			if err := cmd.Flags().Set(name, value); err != nil {
-				t.Fatal(err)
-			}
-		}
-
-		_, _, cfg, err := parseRestoreInput(cmd, []string{"$1"})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if cfg.OperationID != "0123456789abcdef0123456789abcdef" || len(cfg.Sessions) != 1 || cfg.Sessions[0] != "$1" {
-			t.Fatalf("%s config = operation %q sessions %v, want the operation and session $1", cmd.Name(), cfg.OperationID, cfg.Sessions)
-		}
-	}
-}
-
 func TestRestoreJSONProjectionExposesPanes(t *testing.T) {
 	t.Parallel()
 
-	paneResult := restore.PaneResult{
+	paneResult := action.RestoredPane{
 		PaneID:      "source-pane-1",
 		RuntimeID:   "%7",
 		Outcome:     restore.PaneOutcomeAllowedCWDFallback,
 		Reason:      restore.PaneReasonWorkingDirFallback,
 		AppVerified: false,
 		CWDFallback: true,
+		Location:    "work:0.0",
+		Program:     "",
 	}
 
-	result := engine.RestoreResult{
-		OperationID:         "0123456789abcdef0123456789abcdef",
-		Generation:          "abcdef0123456789abcdef0123456789",
-		Status:              "complete",
-		Reason:              "restored",
-		SessionsRestored:    []string{"session-1"},
-		Panes:               []restore.PaneResult{paneResult},
-		Verified:            true,
-		Uncertain:           false,
-		MissingRequirements: nil,
+	result := action.RestoredSnapshot{
+		OperationID: "0123456789abcdef0123456789abcdef",
+		Generation:  "abcdef0123456789abcdef0123456789",
+		Status:      "complete",
+		Reason:      "restored",
+		Sessions:    []action.SessionRef{{Kind: session.KindLive, ID: "$1", Name: "work"}},
+		Panes:       []action.RestoredPane{paneResult},
+		Verified:    true,
 	}
 
 	envelope, err := renderRestoreJSONForTest(t, result, nil)
@@ -202,8 +171,8 @@ func TestRestoreJSONProjectionExposesPanes(t *testing.T) {
 	var stdout bytes.Buffer
 	cmd.SetOut(&stdout)
 
-	if err := renderRestoreTable(cmd, result, restoreLabels{}, nil); err != nil {
-		t.Fatalf("renderRestoreTable failed: %v", err)
+	if err := renderSnapshotRestore(cmd, result, nil); err != nil {
+		t.Fatalf("renderSnapshotRestore failed: %v", err)
 	}
 
 	wantPaneLine := "  source-pane-1 runtime=\"%7\" outcome=allowed_cwd_fallback reason=\"saved_working_directory_missing\" app-verified=false cwd-fallback=true\n"
@@ -227,10 +196,10 @@ func TestRestoreJSONProjectionExposesPanes(t *testing.T) {
 func TestRestoreRefusedForCollisionNamesSessionsWithoutAnOperation(t *testing.T) {
 	t.Parallel()
 
-	result := engine.RestoreResult{
+	result := action.RestoredSnapshot{
 		Status: "failed",
 		Reason: "collision",
-		SessionsSkipped: []engine.SkippedSession{
+		SessionsSkipped: []action.SkippedSession{
 			{ID: "s38", Name: "0", Reason: restore.CollisionNameInUse},
 		},
 	}
@@ -240,12 +209,12 @@ func TestRestoreRefusedForCollisionNamesSessionsWithoutAnOperation(t *testing.T)
 	var stdout bytes.Buffer
 	cmd.SetOut(&stdout)
 
-	err := renderRestoreOutcome(cmd, result, restoreLabels{}, nil, clibase.NewRestoreBoundaryError(restore.ErrSessionCollision))
+	err := renderSnapshotRestore(cmd, result, action.Wrap(action.CodeAlreadyExists, restore.ErrSessionCollision))
 	if !errors.Is(err, restore.ErrSessionCollision) {
 		t.Fatalf("expected the collision error to be preserved, got %v", err)
 	}
 
-	for _, want := range []string{"Skipped:", "0 (s38): a live session already uses this name", `tmux rename-session -t "0"`, "sesh snapshot restore --session s38"} {
+	for _, want := range []string{"Skipped:", "0 (s38): a live session already uses this name", `tmux rename-session -t "0"`, "sesh snapshot restore s38"} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("expected %q in output:\n%s", want, stdout.String())
 		}
@@ -255,19 +224,19 @@ func TestRestoreRefusedForCollisionNamesSessionsWithoutAnOperation(t *testing.T)
 func TestRestoreJSONReportsSkippedSessionsAndAdvisories(t *testing.T) {
 	t.Parallel()
 
-	result := engine.RestoreResult{
-		OperationID:      "op-1",
-		Generation:       "gen-1",
-		Status:           "partial",
-		Reason:           "sessions_skipped",
-		SessionsRestored: []string{"s1"},
-		Verified:         true,
-		SessionsSkipped:  []engine.SkippedSession{{ID: "s38", Name: "0", Reason: restore.CollisionNameInUse}},
-		Advisories:       []restore.VerificationMismatch{{Domain: restore.MismatchPane, Entity: "p1", Reason: "pane_title_changed"}},
+	result := action.RestoredSnapshot{
+		OperationID:     "op-1",
+		Generation:      "gen-1",
+		Status:          "partial",
+		Reason:          "sessions_skipped",
+		Sessions:        []action.SessionRef{{Kind: session.KindLive, ID: "$1", Name: "kept"}},
+		Verified:        true,
+		SessionsSkipped: []action.SkippedSession{{ID: "s38", Name: "0", Reason: restore.CollisionNameInUse}},
+		Advisories:      []action.Mismatch{{Domain: restore.MismatchPane, Entity: "p1", Reason: "pane_title_changed"}},
 	}
 
-	envelope, err := renderRestoreJSONForTest(t, result, nil)
-	if !errors.Is(err, errPartialRestore) {
+	envelope, err := renderRestoreJSONForTest(t, result, action.Wrap(action.CodePartial, app.ErrPartialRestore))
+	if !errors.Is(err, app.ErrPartialRestore) {
 		t.Fatalf("a restore that skipped sessions must exit as partial, got %v", err)
 	}
 
@@ -277,19 +246,5 @@ func TestRestoreJSONReportsSkippedSessionsAndAdvisories(t *testing.T) {
 
 	if len(envelope.Result.Advisories) != 1 || envelope.Result.Advisories[0].Reason != "pane_title_changed" {
 		t.Fatalf("advisories missing from JSON: %+v", envelope.Result)
-	}
-}
-
-func TestRestoreRejectsUnknownCollisionPolicy(t *testing.T) {
-	t.Parallel()
-
-	cmd := newSnapshotRestoreCommand()
-	if err := cmd.Flags().Set("on-collision", "replace"); err != nil {
-		t.Fatal(err)
-	}
-
-	_, err := parseCollisionPolicy(cmd)
-	if err == nil || clibase.ExitCode(err) != clibase.ExitCodeUsage {
-		t.Fatalf("expected a usage error for an unknown policy, got %v", err)
 	}
 }

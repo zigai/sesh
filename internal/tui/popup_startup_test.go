@@ -163,9 +163,9 @@ func TestPopupStartupKeepsHiddenRowsInactiveUntilLoadingCompletes(t *testing.T) 
 				t.Fatalf("completed popup did not allow opening origin row: filtered=%#v status=%q query=%q bridge=%T", model.filtered, model.statusMessage, model.textInput.Value(), model.deps.OriginBridge)
 			}
 
-			result, ok := cmd().(sessionActionResultMsg)
-			if !ok || result.target.Name != "hidden-origin-session" || !result.quit {
-				t.Fatalf("completed row action = %#v, want origin session activation", result)
+			trace := runActionTrace(t, model, cmd)
+			if len(trace.results) != 1 || trace.results[0].request.subject.Sessions[0].Name != "hidden-origin-session" || !trace.quit {
+				t.Fatalf("completed row action = %+v, want origin session activation", trace)
 			}
 		})
 	}

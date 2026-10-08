@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/cli/clibase"
 
 	cmdagent "github.com/zigai/sesh/internal/cli/cmd/agent"
@@ -146,6 +147,7 @@ func newRootCommand(ctx context.Context) *cobra.Command {
 		cmdpicker.NewPickCommand(ctx, cmdremote.DefaultPickerRemoteFactory),
 		cmdsession.NewCommand(),
 		cmdsnapshot.NewCommand(),
+		cmdagent.NewCommand(),
 		cmdautosave.NewCommand(),
 		cmdremote.NewCommand(),
 		newKeysCommand(),
@@ -154,7 +156,6 @@ func newRootCommand(ctx context.Context) *cobra.Command {
 		cmdconfig.NewCommand(),
 		cmdsetup.NewCommand(),
 		cmddaemon.NewCommand(cmdremote.NewDaemonMonitorCommand(), cmdagent.NewDaemonWindowStatusCommand()),
-		newActionCommand(ctx),
 		cmddoctor.NewCommand(),
 	)
 	rootCommand.InitDefaultHelpCmd()
@@ -307,8 +308,8 @@ func runHooksRun(cmd *cobra.Command, args []string) error {
 }
 
 func prepareHookRun(cmd *cobra.Command, eventName string) (config.HookConfig, session.HookEvent, error) {
-	action, phase := session.HookEventDefaults(eventName)
-	if action == "" {
+	hookAction, phase := session.HookEventDefaults(eventName)
+	if hookAction == "" {
 		return config.HookConfig{}, session.HookEvent{}, NewExitError(exitCodeUsage, errUnknownHookEvent)
 	}
 
@@ -325,7 +326,7 @@ func prepareHookRun(cmd *cobra.Command, eventName string) (config.HookConfig, se
 		return config.HookConfig{}, session.HookEvent{}, NewExitError(exitCodeGeneral, errNoHooksConfigured)
 	}
 
-	return cfg.Hooks, hookEventFromFlags(cmd, eventName, action, phase), nil
+	return cfg.Hooks, hookEventFromFlags(cmd, eventName, hookAction, phase), nil
 }
 
 func renderHookRun(cmd *cobra.Command, eventName string, result session.HookResult, runErr error) error {
@@ -362,7 +363,7 @@ func renderHookRun(cmd *cobra.Command, eventName string, result session.HookResu
 	return writeOutput(cmd, "%s", summary)
 }
 
-func hookEventFromFlags(cmd *cobra.Command, eventName, action, phase string) session.HookEvent {
+func hookEventFromFlags(cmd *cobra.Command, eventName, hookAction, phase string) session.HookEvent {
 	sessionName, _ := cmd.Flags().GetString("session")
 	prevSession, _ := cmd.Flags().GetString("prev-session")
 	source, _ := cmd.Flags().GetString("source")
@@ -370,7 +371,7 @@ func hookEventFromFlags(cmd *cobra.Command, eventName, action, phase string) ses
 	return session.HookEvent{
 		Name:          eventName,
 		Phase:         phase,
-		Action:        action,
+		Action:        hookAction,
 		PrevSession:   prevSession,
 		Session:       sessionName,
 		PrevSessionID: "",
@@ -405,15 +406,10 @@ func newKeysCommand() *cobra.Command {
 	return cmd
 }
 
-func keyBindings(cfg *config.Config) []keyBindingJSON {
+func keyBindings(cfg *config.Config) ([]keyBindingJSON, error) {
 	keys := cfg.Keys
 
 	bindings := []keyBindingJSON{
-		{Name: "create", Bind: keys.Create},
-		{Name: "rename", Bind: keys.Rename},
-		{Name: "kill", Bind: keys.Kill},
-		{Name: "delete", Bind: keys.Delete},
-		{Name: "snapshot", Bind: keys.Snapshot},
 		{Name: "help", Bind: keys.Help},
 		{Name: "cycle_mode", Bind: keys.CycleMode},
 		{Name: "agent_sort", Bind: keys.AgentSort},
@@ -433,9 +429,18 @@ func keyBindings(cfg *config.Config) []keyBindingJSON {
 		{Name: "select_0", Bind: keys.Select0},
 	}
 
-	sort.Slice(bindings, func(i, j int) bool { return bindings[i].Name < bindings[j].Name })
+	actions, err := action.Bindings(cfg)
+	if err != nil {
+		return nil, err
+	}
 
-	return bindings
+	for _, binding := range action.SurfaceBindings(actions, action.SurfacePicker) {
+		bindings = append(bindings, keyBindingJSON{Name: string(binding.Action), Bind: binding.Key})
+	}
+
+	sort.SliceStable(bindings, func(i, j int) bool { return bindings[i].Name < bindings[j].Name })
+
+	return bindings, nil
 }
 
 func runKeysList(cmd *cobra.Command) error {
@@ -444,7 +449,10 @@ func runKeysList(cmd *cobra.Command) error {
 		return err
 	}
 
-	bindings := keyBindings(cfg)
+	bindings, err := keyBindings(cfg)
+	if err != nil {
+		return err
+	}
 
 	if jsonOutputEnabled(cmd) {
 		return writeJSONResult(cmd, struct {
@@ -452,10 +460,15 @@ func runKeysList(cmd *cobra.Command) error {
 		}{Bindings: bindings})
 	}
 
+	width := 0
+	for _, binding := range bindings {
+		width = max(width, len(binding.Name))
+	}
+
 	var out []byte
 
 	for _, binding := range bindings {
-		out = append(out, fmt.Sprintf("%-14s %s\n", binding.Name, binding.Bind)...)
+		out = append(out, fmt.Sprintf("%-*s %s\n", width, binding.Name, binding.Bind)...)
 	}
 
 	return writeOutput(cmd, "%s", string(out))

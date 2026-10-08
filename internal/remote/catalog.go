@@ -89,6 +89,26 @@ func Dir(cacheHome string) (string, error) {
 	return path, nil
 }
 
+// ReadCatalog reads the catalog the remote monitor keeps under cacheHome.
+func ReadCatalog(cacheHome string) (Catalog, error) {
+	path, err := Dir(cacheHome)
+	if err != nil {
+		return Catalog{}, err
+	}
+
+	dir, err := privatefs.Ensure(path)
+	if err != nil {
+		return Catalog{}, oops.In("remote").With("operation", "open_catalog").Wrap(err)
+	}
+
+	catalog, err := LoadCatalog(dir)
+	if closeErr := dir.Close(); closeErr != nil {
+		err = errors.Join(err, oops.In("remote").With("operation", "close_catalog").Wrap(closeErr))
+	}
+
+	return catalog, err
+}
+
 func EmptyCatalog() Catalog {
 	return Catalog{Version: ProtocolVersion, GeneratedAt: time.Time{}, Connections: make(map[string]ConnectionState)}
 }
@@ -321,7 +341,8 @@ func validCatalogConnection(id string, state ConnectionState) bool {
 	if id != state.ID || !ValidIdentifier(id) || !ValidText(state.Label) ||
 		!ValidIdentifier(state.ConfigDigest) || !ValidText(state.PeerID) ||
 		!ValidText(state.StreamInstance) || !validConnectionErrorCode(state.LastError) ||
-		len(state.Snapshot.Sessions) > MaxSessions || !ValidSourceHealth(state.Snapshot.Health) {
+		len(state.Snapshot.Sessions) > MaxSessions || !validActionIDs(state.Snapshot.Actions) ||
+		!ValidSourceHealth(state.Snapshot.Health) {
 		return false
 	}
 

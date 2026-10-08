@@ -5,6 +5,7 @@ package remote_test
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -12,12 +13,22 @@ import (
 	gotmux "github.com/zigai/gotmux/tmux"
 	"github.com/zigai/gotmux/tmuxtest"
 
+	"github.com/zigai/sesh/internal/action"
+	"github.com/zigai/sesh/internal/agents"
+	"github.com/zigai/sesh/internal/app"
+	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/privatefs"
 	"github.com/zigai/sesh/internal/remote"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/snapshot/model"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
+
+type peerHarness struct {
+	server     *gotmux.Server
+	options    remote.PeerActionOptions
+	repository string
+}
 
 func openReceipts(t *testing.T) *privatefs.Dir {
 	t.Helper()
@@ -34,39 +45,101 @@ func openReceipts(t *testing.T) *privatefs.Dir {
 	return dir
 }
 
-func liveActionRequest(t *testing.T, target session.Session, operation remote.Action, newName string) remote.ActionRequest {
+// newPeerHarness runs invocations the way `sesh remote peer action` does: through this
+// machine's own action runner against a disposable tmux server.
+func newPeerHarness(t *testing.T) peerHarness {
 	t.Helper()
 
+	server := tmuxtest.NewServer(t)
+	root := t.TempDir()
+	repositoryPath := filepath.Join(root, "repository")
+
+	historyDir := filepath.Join(root, "history")
+	if err := os.Mkdir(historyDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	repository := app.NewRepository(repositoryPath)
+
+	t.Cleanup(func() { _ = repository.Close() })
+
+	local := app.NewLocal(app.LocalOptions{
+		Config:             config.DefaultConfig(),
+		Server:             server,
+		Repository:         repository,
+		LeaseRoot:          filepath.Join(root, "leases"),
+		HistoryPath:        filepath.Join(historyDir, "history.json"),
+		AgentSource:        agents.NewAHTStore(filepath.Join(root, "agents")),
+		Streams:            gotmux.Streams{In: nil, Out: nil, Err: nil},
+		Source:             "remote",
+		DeferSwitchHistory: false,
+	})
+
+	return peerHarness{
+		server: server,
+		options: remote.PeerActionOptions{
+			PeerID:     "peer",
+			Receipts:   openReceipts(t),
+			Allowed:    func(action.ID) bool { return true },
+			Dispatcher: local,
+			Now:        nil,
+		},
+		repository: repositoryPath,
+	}
+}
+
+func (harness peerHarness) request(t *testing.T, id action.ID, input any) remote.ActionRequest {
+	t.Helper()
+
+	entry, ok := action.Lookup(id)
+	if !ok {
+		t.Fatalf("action %s is not registered", id)
+	}
+
+	encoded, err := entry.EncodeInput(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	invocationID, err := remote.NewInvocationID()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	request := remote.ActionRequest{
-		Operation:           operation,
-		ConnectionID:        "work",
-		ConfigDigest:        "digest",
-		PeerID:              "peer",
-		Kind:                string(session.KindLive),
-		TmuxServerSocket:    target.TmuxServerSocket,
-		TmuxServerPID:       target.RuntimeIdentity.TmuxServerPID,
-		TmuxServerStartedAt: target.RuntimeIdentity.TmuxServerStartedAt,
-		SessionID:           target.ID,
-		SessionName:         target.Name,
-		SessionCreatedAt:    target.RuntimeIdentity.TmuxSessionCreatedAt,
-		NewName:             newName,
+		InvocationID: invocationID,
+		IntentDigest: "",
+		Action:       id,
+		ConnectionID: "work",
+		ConfigDigest: "digest",
+		PeerID:       "peer",
+		Socket:       harness.server.Endpoint().SocketPath,
+		Input:        encoded,
 	}
 
-	id, err := remote.NewInvocationID()
+	request.IntentDigest, err = remote.IntentDigest(request)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	request.InvocationID = id
-
-	digest, err := remote.IntentDigest(request)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	request.IntentDigest = digest
 
 	return request
+}
+
+func (harness peerHarness) run(t *testing.T, ctx context.Context, id action.ID, input any) remote.ActionResult {
+	t.Helper()
+
+	return remote.ExecutePeerAction(ctx, harness.options, harness.request(t, id, input))
+}
+
+func (harness peerHarness) liveRef(t *testing.T, ctx context.Context, name string) action.SessionRef {
+	t.Helper()
+
+	rows, err := session.ListLive(ctx, harness.server, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return action.RefOf(findSession(t, rows, name))
 }
 
 func findSession(t *testing.T, sessions []session.Session, name string) session.Session {
@@ -83,203 +156,140 @@ func findSession(t *testing.T, sessions []session.Session, name string) session.
 	return session.Session{}
 }
 
-func TestGotmuxLiveServerSessionLifecycle(t *testing.T) {
-	server := tmuxtest.NewServer(t)
-
-	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
-	defer cancel()
-
-	live := remote.NewGotmuxLiveServer(server)
-
-	directory := t.TempDir()
-
-	if err := live.Create(ctx, "peer-created", directory); err != nil {
-		t.Fatalf("Create() error = %v", err)
-	}
-
-	sessions, err := live.Sessions(ctx)
-	if err != nil {
-		t.Fatalf("Sessions() error = %v", err)
-	}
-
-	created := findSession(t, sessions, "peer-created")
-	assertCreatedSession(t, ctx, server, created)
-
-	if err := live.Rename(ctx, created.ID, "peer-renamed"); err != nil {
-		t.Fatalf("Rename() error = %v", err)
-	}
-
-	assertRenamedSession(t, ctx, server, created.ID)
-
-	if err := live.Kill(ctx, created.ID); err != nil {
-		t.Fatalf("Kill() error = %v", err)
-	}
-
-	if _, err := server.Session(ctx, gotmux.SessionID(created.ID)); err == nil {
-		t.Fatal("killed session is still present")
-	}
-}
-
-func assertCreatedSession(t *testing.T, ctx context.Context, server *gotmux.Server, created session.Session) {
+func killSession(t *testing.T, ctx context.Context, server *gotmux.Server, id string) {
 	t.Helper()
 
-	if created.RuntimeIdentity.TmuxServerPID <= 0 || created.RuntimeIdentity.TmuxSessionCreatedAt.IsZero() {
-		t.Fatalf("observed session = %#v, want a tmux incarnation", created)
-	}
-
-	observed, err := server.Session(ctx, gotmux.SessionID(created.ID))
-	if err != nil {
-		t.Fatalf("gotmux lookup error = %v", err)
-	}
-
-	info, err := observed.Info(ctx)
+	handle, err := server.Session(ctx, gotmux.SessionID(id))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if info.Name != "peer-created" {
-		t.Fatalf("tmux session name = %q, want peer-created", info.Name)
-	}
-}
-
-func assertRenamedSession(t *testing.T, ctx context.Context, server *gotmux.Server, sessionID string) {
-	t.Helper()
-
-	renamed, err := server.Session(ctx, gotmux.SessionID(sessionID))
-	if err != nil {
+	if err := handle.Kill(ctx); err != nil {
 		t.Fatal(err)
-	}
-
-	renamedInfo, err := renamed.Info(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if renamedInfo.Name != "peer-renamed" {
-		t.Fatalf("renamed session = %q, want peer-renamed", renamedInfo.Name)
 	}
 }
 
 func TestPeerActionAgainstDisposableServer(t *testing.T) {
-	server := tmuxtest.NewServer(t)
+	harness := newPeerHarness(t)
 
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 
-	live := remote.NewGotmuxLiveServer(server)
-
-	options := remote.PeerActionOptions{
-		PeerID:   "peer",
-		Receipts: openReceipts(t),
-		Policy:   remote.PeerPolicy{Create: true, Rename: true, Kill: true, Delete: false, Snapshot: false, Restore: false, Sockets: nil},
-		Live:     live,
-		Saved:    nil,
-		Now:      nil,
-	}
-
-	renamed := assertCreateAndRenameTarget(t, ctx, options, live, t.TempDir())
-	assertStaleTargetRefused(t, ctx, options, server, renamed)
-	assertKillAndReplayOutcome(t, ctx, options, server, renamed)
+	renamed := createAndRenameThroughPeer(t, ctx, harness)
+	refuseStaleKill(t, ctx, harness, renamed)
+	killAndReplay(t, ctx, harness, renamed)
 }
 
-func assertCreateAndRenameTarget(t *testing.T, ctx context.Context, options remote.PeerActionOptions, live remote.LiveServer, directory string) session.Session {
+func createAndRenameThroughPeer(t *testing.T, ctx context.Context, harness peerHarness) action.SessionRef {
 	t.Helper()
 
-	create := remote.ActionRequest{
-		InvocationID:        "",
-		IntentDigest:        "",
-		Operation:           remote.ActionCreate,
-		ConnectionID:        "work",
-		ConfigDigest:        "digest",
-		PeerID:              "peer",
-		Kind:                "",
-		TmuxServerSocket:    "",
-		TmuxServerPID:       0,
-		TmuxServerStartedAt: time.Time{},
-		SessionID:           "",
-		SessionName:         "peer-target",
-		SessionCreatedAt:    time.Time{},
-		NewName:             "",
-		Directory:           directory,
+	created := harness.run(t, ctx, action.SessionCreate.ID, action.CreateSession{Name: "peer-target", Directory: t.TempDir()})
+	if !created.OK {
+		t.Fatalf("create result = %#v, want success", created)
 	}
 
-	id, err := remote.NewInvocationID()
-	if err != nil {
-		t.Fatal(err)
+	output, err := action.SessionCreate.DecodeOutput(created.Output)
+	if createdSession, ok := output.(action.CreatedSession); err != nil || !ok || createdSession.Session.Name != "peer-target" {
+		t.Fatalf("create output = %s, %v; want the created session", created.Output, err)
 	}
 
-	create.InvocationID = id
-
-	digest, err := remote.IntentDigest(create)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	create.IntentDigest = digest
-
-	if result := remote.ExecutePeerAction(ctx, options, create); !result.OK {
-		t.Fatalf("create result = %#v, want success", result)
-	}
-
-	sessions, err := live.Sessions(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	target := findSession(t, sessions, "peer-target")
-	rename := liveActionRequest(t, target, remote.ActionRename, "peer-target-renamed")
-
-	if result := remote.ExecutePeerAction(ctx, options, rename); !result.OK {
+	target := harness.liveRef(t, ctx, "peer-target")
+	if result := harness.run(t, ctx, action.SessionRename.ID, action.RenameSession{Session: target, Name: "peer-renamed"}); !result.OK {
 		t.Fatalf("rename result = %#v, want success", result)
 	}
 
-	sessions, err = live.Sessions(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return findSession(t, sessions, "peer-target-renamed")
+	return harness.liveRef(t, ctx, "peer-renamed")
 }
 
-func assertStaleTargetRefused(t *testing.T, ctx context.Context, options remote.PeerActionOptions, server *gotmux.Server, renamed session.Session) {
+func refuseStaleKill(t *testing.T, ctx context.Context, harness peerHarness, target action.SessionRef) {
 	t.Helper()
 
-	stale := liveActionRequest(t, renamed, remote.ActionKill, "")
-	stale.TmuxServerPID++
+	stale := target
+	stale.ServerPID++
 
-	digest, err := remote.IntentDigest(stale)
-	if err != nil {
-		t.Fatal(err)
+	if result := harness.run(t, ctx, action.SessionKill.ID, action.KillSession{Session: stale, Force: false}); result.Code != action.CodeTargetChanged {
+		t.Fatalf("stale kill result = %#v, want %s", result, action.CodeTargetChanged)
 	}
 
-	stale.IntentDigest = digest
-
-	if result := remote.ExecutePeerAction(ctx, options, stale); result.Code != remote.ActionCodeTargetChanged {
-		t.Fatalf("stale kill result = %#v, want %s", result, remote.ActionCodeTargetChanged)
-	}
-
-	if _, err := server.Session(ctx, gotmux.SessionID(renamed.ID)); err != nil {
+	if _, err := harness.server.Session(ctx, gotmux.SessionID(target.ID)); err != nil {
 		t.Fatalf("stale target mutation reached tmux: %v", err)
 	}
 }
 
-func assertKillAndReplayOutcome(t *testing.T, ctx context.Context, options remote.PeerActionOptions, server *gotmux.Server, renamed session.Session) {
+func killAndReplay(t *testing.T, ctx context.Context, harness peerHarness, target action.SessionRef) {
 	t.Helper()
 
-	kill := liveActionRequest(t, renamed, remote.ActionKill, "")
+	kill := harness.request(t, action.SessionKill.ID, action.KillSession{Session: target, Force: false})
 
-	first := remote.ExecutePeerAction(ctx, options, kill)
+	first := remote.ExecutePeerAction(ctx, harness.options, kill)
 	if !first.OK {
 		t.Fatalf("kill result = %#v, want success", first)
 	}
 
-	if _, err := server.Session(ctx, gotmux.SessionID(renamed.ID)); err == nil {
+	if _, err := harness.server.Session(ctx, gotmux.SessionID(target.ID)); err == nil {
 		t.Fatal("killed session is still present")
 	}
 
-	replayed := remote.ExecutePeerAction(ctx, options, kill)
-	if !replayed.OK || replayed.InvocationID != first.InvocationID {
+	replayed := remote.ExecutePeerAction(ctx, harness.options, kill)
+	if !replayed.OK || replayed.InvocationID != first.InvocationID || string(replayed.Output) != string(first.Output) {
 		t.Fatalf("replayed result = %#v, want the recorded outcome", replayed)
+	}
+}
+
+func TestPeerDeleteRefusesSameNameReplacement(t *testing.T) {
+	harness := newPeerHarness(t)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
+	defer cancel()
+
+	if _, err := harness.server.NewSession(ctx, gotmux.NewSessionOptions{Name: "replacement-target", Dir: t.TempDir()}); err != nil {
+		t.Fatal(err)
+	}
+
+	original := harness.liveRef(t, ctx, "replacement-target")
+	killSession(t, ctx, harness.server, original.ID)
+
+	if _, err := harness.server.NewSession(ctx, gotmux.NewSessionOptions{Name: "replacement-target", Dir: t.TempDir()}); err != nil {
+		t.Fatal(err)
+	}
+
+	replacement := harness.liveRef(t, ctx, "replacement-target")
+
+	result := harness.run(t, ctx, action.SessionDelete.ID, action.DeleteSession{Session: original, Force: false})
+	if result.Code != action.CodeTargetChanged {
+		t.Fatalf("delete result = %#v, want %s", result, action.CodeTargetChanged)
+	}
+
+	if _, err := harness.server.Session(ctx, gotmux.SessionID(replacement.ID)); err != nil {
+		t.Fatalf("replacement session was deleted: %v", err)
+	}
+}
+
+func TestPeerSavedDeleteRefusesToKillALiveNamesake(t *testing.T) {
+	harness := newPeerHarness(t)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+
+	if _, err := harness.server.NewSession(ctx, gotmux.NewSessionOptions{Name: "saved-delete-target", Dir: t.TempDir()}); err != nil {
+		t.Fatal(err)
+	}
+
+	live := harness.liveRef(t, ctx, "saved-delete-target")
+	generation, savedID := commitSavedDeleteFixture(t, ctx, harness.repository, harness.server.Endpoint().SocketPath, live.Name)
+
+	saved := action.SessionRef{
+		Kind: session.KindSaved, ID: savedID, Name: live.Name, Socket: "", ServerPID: 0,
+		ServerStartedAt: time.Time{}, CreatedAt: time.Time{}, Generation: generation,
+	}
+
+	result := harness.run(t, ctx, action.SessionDelete.ID, action.DeleteSession{Session: saved, Force: false})
+	if result.Code != action.CodeTargetChanged {
+		t.Fatalf("saved delete result = %#v, want %s", result, action.CodeTargetChanged)
+	}
+
+	if _, err := harness.server.Session(ctx, gotmux.SessionID(live.ID)); err != nil {
+		t.Fatalf("saved-only deletion killed the live session: %v", err)
 	}
 }
 
@@ -291,8 +301,8 @@ func TestPeerAttachValidationAgainstDisposableServer(t *testing.T) {
 
 	live := remote.NewGotmuxLiveServer(server)
 
-	if err := live.Create(ctx, "attach-target", t.TempDir()); err != nil {
-		t.Fatalf("Create() error = %v", err)
+	if _, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "attach-target", Dir: t.TempDir()}); err != nil {
+		t.Fatalf("NewSession() error = %v", err)
 	}
 
 	sessions, err := live.Sessions(ctx)
@@ -329,9 +339,7 @@ func TestPeerAttachValidationAgainstDisposableServer(t *testing.T) {
 		}
 	}
 
-	if err := live.Kill(ctx, target.ID); err != nil {
-		t.Fatal(err)
-	}
+	killSession(t, ctx, server, target.ID)
 
 	fresh, err := live.Sessions(ctx)
 	if err != nil {
@@ -340,194 +348,6 @@ func TestPeerAttachValidationAgainstDisposableServer(t *testing.T) {
 
 	if _, err := remote.ValidateAttachTarget(attachTarget, fresh); !errors.Is(err, remote.ErrTargetChanged) {
 		t.Fatalf("ValidateAttachTarget(fresh inventory) error = %v, want %v", err, remote.ErrTargetChanged)
-	}
-}
-
-func TestPeerPolicyAgainstDisposableServerRefusesUnpermittedMutations(t *testing.T) {
-	server := tmuxtest.NewServer(t)
-
-	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
-	defer cancel()
-
-	live := remote.NewGotmuxLiveServer(server)
-
-	if err := live.Create(ctx, "policy-target", t.TempDir()); err != nil {
-		t.Fatal(err)
-	}
-
-	sessions, err := live.Sessions(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	target := findSession(t, sessions, "policy-target")
-
-	options := remote.PeerActionOptions{
-		PeerID:   "peer",
-		Receipts: openReceipts(t),
-		Policy:   remote.PeerPolicy{Sockets: []string{"/tmp/other.sock"}},
-		Live:     live,
-	}
-
-	kill := liveActionRequest(t, target, remote.ActionKill, "")
-
-	if result := remote.ExecutePeerAction(ctx, options, kill); result.Code != remote.ActionCodeForbidden {
-		t.Fatalf("kill result = %#v, want %s", result, remote.ActionCodeForbidden)
-	}
-
-	if _, err := server.Session(ctx, gotmux.SessionID(target.ID)); err != nil {
-		t.Fatalf("refused mutation reached tmux: %v", err)
-	}
-}
-
-func TestNativeCompoundDeleteRefusesSameNameReplacement(t *testing.T) {
-	server := tmuxtest.NewServer(t)
-	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
-
-	defer cancel()
-
-	live := remote.NewGotmuxLiveServer(server)
-	if err := live.Create(ctx, "replacement-target", t.TempDir()); err != nil {
-		t.Fatal(err)
-	}
-
-	original := findSession(t, mustLiveSessions(t, ctx, live), "replacement-target")
-	if err := live.Kill(ctx, original.ID); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := live.Create(ctx, "replacement-target", t.TempDir()); err != nil {
-		t.Fatal(err)
-	}
-
-	replacement := findSession(t, mustLiveSessions(t, ctx, live), "replacement-target")
-
-	leaseRoot := filepath.Join(t.TempDir(), "leases")
-
-	leaseDir, err := privatefs.Ensure(leaseRoot)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := leaseDir.Close(); err != nil {
-		t.Fatal(err)
-	}
-
-	service, err := remote.NewNativeSavedSessions(remote.NativeSavedConfig{
-		Repository: filepath.Join(t.TempDir(), "missing-repository"),
-		LeaseRoot:  leaseRoot,
-		Server:     server,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := service.DeleteLiveAndSaved(ctx, original, live); !errors.Is(err, session.ErrSessionReplaced) {
-		t.Fatalf("DeleteLiveAndSaved() error = %v, want ErrSessionReplaced", err)
-	}
-
-	if _, err := server.Session(ctx, gotmux.SessionID(replacement.ID)); err != nil {
-		t.Fatalf("replacement session was deleted: %v", err)
-	}
-}
-
-func TestNativeRestoreRefusesGenerationFromAnotherEndpoint(t *testing.T) {
-	sourceServer := tmuxtest.NewServer(t)
-	targetServer := tmuxtest.NewServer(t)
-	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
-
-	defer cancel()
-
-	sourceLive := remote.NewGotmuxLiveServer(sourceServer)
-	if err := sourceLive.Create(ctx, "scoped-saved-target", t.TempDir()); err != nil {
-		t.Fatal(err)
-	}
-
-	savedTarget := findSession(t, mustLiveSessions(t, ctx, sourceLive), "scoped-saved-target")
-
-	leaseRoot := filepath.Join(t.TempDir(), "leases")
-
-	leaseDir, err := privatefs.Ensure(leaseRoot)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := leaseDir.Close(); err != nil {
-		t.Fatal(err)
-	}
-
-	repository := filepath.Join(t.TempDir(), "repository")
-
-	sourceService, err := remote.NewNativeSavedSessions(remote.NativeSavedConfig{
-		Repository: repository,
-		LeaseRoot:  leaseRoot,
-		Server:     sourceServer,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	generation, _ := sourceService.Snapshot(ctx, sourceServer.Endpoint().SocketPath)
-	if generation == "" {
-		t.Fatal("snapshot did not preserve its durable generation ID")
-	}
-
-	targetService, err := remote.NewNativeSavedSessions(remote.NativeSavedConfig{
-		Repository: repository,
-		LeaseRoot:  leaseRoot,
-		Server:     targetServer,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := targetService.Restore(ctx, targetServer.Endpoint().SocketPath, generation, savedTarget.ID); !errors.Is(err, remote.ErrTargetChanged) {
-		t.Fatalf("Restore() error = %v, want ErrTargetChanged", err)
-	}
-}
-
-func TestNativeSavedDeleteReturnsRewriteReceiptWithoutKillingLive(t *testing.T) {
-	server := tmuxtest.NewServer(t)
-	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
-
-	defer cancel()
-
-	live := remote.NewGotmuxLiveServer(server)
-	if err := live.Create(ctx, "saved-delete-target", t.TempDir()); err != nil {
-		t.Fatal(err)
-	}
-
-	target := findSession(t, mustLiveSessions(t, ctx, live), "saved-delete-target")
-
-	leaseRoot := filepath.Join(t.TempDir(), "leases")
-
-	leaseDir, err := privatefs.Ensure(leaseRoot)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := leaseDir.Close(); err != nil {
-		t.Fatal(err)
-	}
-
-	repository := filepath.Join(t.TempDir(), "repository")
-
-	service, err := remote.NewNativeSavedSessions(remote.NativeSavedConfig{
-		Repository: repository, LeaseRoot: leaseRoot, Server: server,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	generation, savedID := commitSavedDeleteFixture(t, ctx, repository, server.Endpoint().SocketPath, target.Name)
-
-	rewriteID, err := service.Delete(ctx, generation, savedID)
-	if err != nil || rewriteID == "" {
-		t.Fatalf("Delete() = %q, %v, want durable rewrite receipt", rewriteID, err)
-	}
-
-	if _, err := server.Session(ctx, gotmux.SessionID(target.ID)); err != nil {
-		t.Fatalf("saved-only deletion killed the live session: %v", err)
 	}
 }
 
@@ -590,15 +410,4 @@ func savedDeleteEvidence() []model.Evidence {
 	}
 
 	return evidence
-}
-
-func mustLiveSessions(t *testing.T, ctx context.Context, live *remote.GotmuxLiveServer) []session.Session {
-	t.Helper()
-
-	rows, err := live.Sessions(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return rows
 }

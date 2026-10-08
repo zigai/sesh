@@ -59,7 +59,7 @@ func emptyDaemonRuntimeStatus() daemon.RuntimeStatus {
 	}
 }
 
-func NewStatusCommand() *cobra.Command {
+func newStatusCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:         "status",
 		Short:       "Report autosave configuration, durable state and due state",

@@ -19,7 +19,6 @@ var (
 		{store.ErrUncertain, "publicationUncertain", "snapshot publication durability uncertain"},
 		{restore.ErrExecutionUncertain, "operationUncertain", "restore effect outcome uncertain"},
 		{restore.ErrPriorUncertainty, "priorEffectUncertain", "previous attempt left an uncertain effect; explicit reconciliation required"},
-		{remote.ErrActionUncertain, "remoteOutcomeUncertain", "remote action outcome is uncertain; reconcile the original invocation"},
 	}
 
 	workflowCommandErrors = []commandErrorContract{
@@ -30,7 +29,6 @@ var (
 		{config.ErrConfigExists, "configExists", "configuration already exists; use --force to replace it"},
 		{config.ErrConfigSymlink, "configSymlink", "configuration target must not be a symbolic link"},
 		{errPartialRestore, "partialRestore", "restore incomplete: sessions were skipped or not verified; see the summary"},
-		{remote.ErrActionPartial, "partialRemoteAction", "remote action completed with incomplete recovery"},
 		{remote.ErrActionFailed, "remoteActionFailed", "remote action failed"},
 		{restore.ErrPriorConflict, "priorEffectConflicted", "previous restore effects conflict with recorded state; explicit reconciliation required"},
 		{restore.ErrJournalRequired, "journalUnavailable", "restore journal unavailable"},
@@ -51,7 +49,7 @@ var (
 		{agents.ErrRegistryUnavailable, "agentRegistryUnavailable", "agent registry is unavailable"},
 		{agents.ErrRegistryTooLarge, "agentRegistryTooLarge", "agent registry exceeds its size limit"},
 		{agents.ErrStyleOwnershipCorrupt, "agentStyleOwnershipCorrupt", "agent style ownership record is corrupt"},
-		{agents.ErrCurrentContextUnknown, "agentContextUnknown", "current tmux context could not be determined; pass --pane, --client, or --session"},
+		{agents.ErrCurrentContextUnknown, "agentContextUnknown", "current tmux context could not be determined; pass --pane, --client, or --client-session"},
 		{agents.ErrCurrentPaneNotLive, "agentPaneNotLive", "agent pane is not a live tmux pane"},
 		{agents.ErrPaneNotLive, "agentPaneNotLive", "agent pane is not a live tmux pane"},
 		{agents.ErrNoTargetPane, "agentPaneNotFound", "no agent pane needs attention"},
@@ -100,39 +98,4 @@ func commandOutcomeLogged(err error) bool {
 	}
 
 	return commandOutcomeLogged(errors.Unwrap(err))
-}
-
-func restoreOutcomeLogged(err error) bool {
-	if err == nil {
-		return true
-	}
-
-	if owner, ok := err.(interface{ RestoreOutcomeLogged() bool }); ok {
-		return owner.RestoreOutcomeLogged()
-	}
-
-	if owner, ok := err.(interface{ restoreOutcomeLogged() bool }); ok {
-		return owner.restoreOutcomeLogged()
-	}
-
-	if joined, ok := err.(interface{ Unwrap() []error }); ok {
-		causes := joined.Unwrap()
-		if len(causes) == 0 {
-			return false
-		}
-
-		for _, cause := range causes {
-			if !restoreOutcomeLogged(cause) {
-				return false
-			}
-		}
-
-		return true
-	}
-
-	if cause := errors.Unwrap(err); cause != nil {
-		return restoreOutcomeLogged(cause)
-	}
-
-	return errors.Is(err, errPartialRestore)
 }

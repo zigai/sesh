@@ -10,12 +10,6 @@
 # Core popup and session behavior.
 [settings]
 
-# Ask before killing a live tmux session.
-# confirm_kill = true
-
-# Ask before deleting both live and saved session data.
-# confirm_delete = true
-
 # Show key hints at the bottom of the popup.
 # show_footer = true
 
@@ -73,12 +67,6 @@
 
 # Fallback agent-state refresh rate when the realtime broker is unavailable.
 # refresh_interval = "250ms"
-
-# Agent key preferences used by `sesh setup tmux`. Explicit --next-key,
-# --local-next-key, and --back-key flags override these values.
-# next_idle_key = "F24"
-# next_idle_local_key = "M-F24"
-# navigation_back_key = "F13"
 
 # State representation style: "glyph" (default: colored UTF circles) or "text" (WORKING, IDLE, etc.).
 # status_style = "glyph"
@@ -145,7 +133,6 @@
 # hide_after = "10m"
 # Concurrent connection attempts (1..128; at most 128 configured connections).
 # max_parallel_connects = 4
-# permissions = { create = true, rename = true, kill = false, delete = false, snapshot = true, restore = true }
 # enable_reverse_bridge = true
 # return_to_origin = true
 #
@@ -158,7 +145,7 @@
 # Preview service definitions with `sesh setup services --socket /absolute/path/to/tmux.sock`.
 # Run the foreground monitor with `sesh daemon remote-monitor`.
 # The popup reads the local cache: entries become stale after stale_after and
-# disappear after hide_after. Remote mutations are checked against peer permissions.
+# disappear after hide_after. Peers run only the actions their [actions] policy allows remotely.
 # Snapshot and restore retain the native engine's partial-recovery limitations.
 
 # Automatic snapshots.
@@ -189,12 +176,7 @@
 # Keys handled while the popup is focused.
 [keys]
 
-# Session actions and help.
-# create = "alt+c"
-# rename = "alt+r"
-# kill = "alt+x"
-# delete = "alt+shift+x"
-# snapshot = "alt+s"
+# Help.
 # help = "?"
 
 # Mode and list navigation.
@@ -253,3 +235,18 @@
 # session_attach_pre = []
 # session_attach_post = []
 # tmux_startup_post = []
+
+# Per-action policy, keyed by action ID. confirm asks before the popup runs the action;
+# allow_remote lets remote peers run it on this machine. session.kill and session.delete
+# confirm and refuse remote use by default; session.switch never runs remotely.
+#   [actions.session.kill]
+#   confirm = false
+#   allow_remote = true
+
+# Key bindings that run actions in the picker (in = "picker") or a tmux key table
+# (in = "tmux", rendered by `sesh setup tmux`). An entry replaces the default binding of the
+# same key; an entry without an action removes it.
+#   [[keys.bind]]
+#   key = "ctrl+g"
+#   action = "session.create"
+#   in = "picker"

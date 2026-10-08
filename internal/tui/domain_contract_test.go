@@ -13,6 +13,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/rs/zerolog"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/session"
 )
@@ -22,7 +23,7 @@ var (
 	errTestMockError       = errors.New("domain mutation error")
 )
 
-func TestDeleteSessionFailsClosedWhenHandlerMissing(t *testing.T) {
+func TestDeleteSessionFailsClosedWhenDispatcherMissing(t *testing.T) {
 	killed := false
 	deletedSaved := false
 
@@ -35,7 +36,7 @@ func TestDeleteSessionFailsClosedWhenHandlerMissing(t *testing.T) {
 	}
 
 	model := newTestModelWithDeps(Dependencies{
-		OmitDeleter: true,
+		OmitActions: true,
 		TmuxKillSession: func(context.Context, string) error {
 			killed = true
 			return nil
@@ -48,27 +49,22 @@ func TestDeleteSessionFailsClosedWhenHandlerMissing(t *testing.T) {
 	model.filtered = []session.Session{target}
 	model.cursor = 0
 
-	handler := model.handleDelete()
-	if handler == nil {
-		t.Fatal("handleDelete() returned nil")
-	}
-
-	handler()
+	invokeTestAction(t, model, action.SessionDelete.ID)
 
 	if killed {
-		t.Fatal("kill was executed when session deleter was unconfigured")
+		t.Fatal("kill was executed without an action dispatcher")
 	}
 
 	if deletedSaved {
-		t.Fatal("saved deletion was executed when session deleter was unconfigured")
+		t.Fatal("saved deletion was executed without an action dispatcher")
 	}
 
-	if model.statusLevel != statusError || !strings.Contains(model.statusMessage, "no session deleter configured") {
+	if model.statusLevel != statusError || !strings.Contains(model.statusMessage, "no action dispatcher configured") {
 		t.Fatalf("status = (%v, %q), want fail-closed unconfigured error", model.statusLevel, model.statusMessage)
 	}
 }
 
-func TestDeleteSessionPreservesDomainPartialReceipt(t *testing.T) {
+func TestDeleteSessionReportsDomainFailures(t *testing.T) {
 	target := session.Session{
 		ID:               "$1",
 		Name:             "work",
@@ -77,66 +73,39 @@ func TestDeleteSessionPreservesDomainPartialReceipt(t *testing.T) {
 		TmuxServerSocket: "/tmp/tmux/test",
 	}
 
-	t.Run("protected preflight failure causes no kill", func(t *testing.T) {
-		dispatched := 0
-		model := newTestModelWithDeps(Dependencies{
-			DeleteSessionEverywhere: func(_ context.Context, s session.Session, _ bool) (DeleteResult, error) {
-				dispatched++
+	for name, cause := range map[string]error{
+		"protected preflight failure": errProtectedGeneration,
+		"failure after partial work":  errTestMockError,
+	} {
+		t.Run(name, func(t *testing.T) {
+			dispatched := 0
+			model := newTestModelWithDeps(Dependencies{
+				RunAction: func(_ context.Context, invocation action.Invocation) (any, error) {
+					dispatched++
 
-				if s.ID != target.ID || s.Name != target.Name {
-					t.Fatalf("received session = %+v, want target %+v", s, target)
-				}
+					input, ok := invocation.Input.(action.DeleteSession)
+					if !ok || input.Session.ID != target.ID || input.Session.Name != target.Name {
+						t.Fatalf("received input = %+v, want target %+v", invocation.Input, target)
+					}
 
-				return DeleteResult{LiveKilled: false, SavedDeleted: false}, errProtectedGeneration
-			},
+					return action.DeletedSession{Name: target.Name, LiveKilled: errors.Is(cause, errTestMockError)}, action.Wrap(action.CodeFailed, cause)
+				},
+			})
+			model.filtered = []session.Session{target}
+			model.cursor = 0
+			setActionConfirm(model.config, action.SessionDelete.ID, false)
+
+			invokeTestAction(t, model, action.SessionDelete.ID)
+
+			if dispatched != 1 {
+				t.Fatalf("dispatches = %d, want exactly 1", dispatched)
+			}
+
+			if model.statusLevel != statusError || !strings.Contains(model.statusMessage, cause.Error()) {
+				t.Fatalf("status = (%v, %q), want %q", model.statusLevel, model.statusMessage, cause)
+			}
 		})
-		model.filtered = []session.Session{target}
-		model.cursor = 0
-		model.config.Settings.ConfirmDelete = false
-
-		handler := model.handleDelete()
-		if handler == nil {
-			t.Fatal("handleDelete() returned nil")
-		}
-
-		handler()
-
-		if dispatched != 1 {
-			t.Fatalf("dispatches = %d, want exactly 1", dispatched)
-		}
-
-		if model.statusLevel != statusError || !strings.Contains(model.statusMessage, "cannot delete protected generation") {
-			t.Fatalf("status = (%v, %q), want protected generation error", model.statusLevel, model.statusMessage)
-		}
-	})
-
-	t.Run("partial receipt preserved on domain failure", func(t *testing.T) {
-		dispatched := 0
-		model := newTestModelWithDeps(Dependencies{
-			DeleteSessionEverywhere: func(_ context.Context, _ session.Session, _ bool) (DeleteResult, error) {
-				dispatched++
-				return DeleteResult{LiveKilled: true, SavedDeleted: false}, errTestMockError
-			},
-		})
-		model.filtered = []session.Session{target}
-		model.cursor = 0
-		model.config.Settings.ConfirmDelete = false
-
-		handler := model.handleDelete()
-		if handler == nil {
-			t.Fatal("handleDelete() returned nil")
-		}
-
-		handler()
-
-		if dispatched != 1 {
-			t.Fatalf("dispatches = %d, want exactly 1", dispatched)
-		}
-
-		if model.statusLevel != statusError || !strings.Contains(model.statusMessage, "domain mutation error") {
-			t.Fatalf("status = (%v, %q), want domain mutation error", model.statusLevel, model.statusMessage)
-		}
-	})
+	}
 }
 
 func TestDeleteSessionDispatchesExactlyOnce(t *testing.T) {
@@ -149,33 +118,26 @@ func TestDeleteSessionDispatchesExactlyOnce(t *testing.T) {
 	}
 
 	var (
-		dispatches     int
-		receivedTarget session.Session
-		receivedForce  bool
+		dispatches int
+		received   action.DeleteSession
 	)
 
 	model := newTestModelWithDeps(Dependencies{
-		DeleteSessionEverywhere: func(_ context.Context, s session.Session, force bool) (DeleteResult, error) {
+		RunAction: func(_ context.Context, invocation action.Invocation) (any, error) {
 			dispatches++
-			receivedTarget = s
-			receivedForce = force
+			received, _ = invocation.Input.(action.DeleteSession)
 
-			return DeleteResult{LiveKilled: true, SavedDeleted: true}, nil
+			return action.DeletedSession{Name: target.Name, LiveKilled: true, SavedDeleted: true}, nil
 		},
 	})
 	model.filtered = []session.Session{target}
 	model.cursor = 0
-	model.config.Settings.ConfirmDelete = true
+	setActionConfirm(model.config, action.SessionDelete.ID, true)
 
-	handler := model.handleDelete()
-	if handler == nil {
-		t.Fatal("handleDelete() returned nil")
-	}
+	invokeTestAction(t, model, action.SessionDelete.ID)
 
-	handler()
-
-	if model.dialog != dialogConfirmDelete {
-		t.Fatalf("dialog = %v, want dialogConfirmDelete", model.dialog)
+	if model.dialog != dialogConfirm {
+		t.Fatalf("dialog = %v, want confirmation", model.dialog)
 	}
 
 	if dispatches != 0 {
@@ -183,24 +145,14 @@ func TestDeleteSessionDispatchesExactlyOnce(t *testing.T) {
 	}
 
 	model.confirmYes = true
-
-	confirmHandler := model.handleConfirmActionKeys(keyText("enter"), "Delete failed", tuiOperationDeleteSession)
-	if confirmHandler == nil {
-		t.Fatal("handleConfirmActionKeys returned nil")
-	}
-
-	confirmHandler()
+	pressTestKey(t, model, keyCode(tea.KeyEnter))
 
 	if dispatches != 1 {
 		t.Fatalf("dispatches after confirmation = %d, want exactly 1", dispatches)
 	}
 
-	if receivedTarget.ID != target.ID || receivedTarget.TmuxServerSocket != target.TmuxServerSocket {
-		t.Fatalf("dispatched target = %+v, want %+v", receivedTarget, target)
-	}
-
-	if !receivedForce {
-		t.Fatal("dispatched force = false, want true after explicit user confirmation")
+	if received.Session.ID != target.ID || received.Session.Socket != target.TmuxServerSocket {
+		t.Fatalf("dispatched target = %+v, want %+v", received.Session, target)
 	}
 }
 
@@ -501,73 +453,49 @@ func TestActionsPreserveImmutableTargetIdentityDuringConcurrentRefresh(t *testin
 	}
 }
 
-func TestRemoteKillDispatchesToRemoteActionService(t *testing.T) {
-	testRemoteActionDispatch(t, "kill")
+func TestRemoteKillDispatchesToPeer(t *testing.T) {
+	testRemoteActionDispatch(t, action.SessionKill.ID)
 }
 
-func TestRemoteDeleteDispatchesToRemoteActionService(t *testing.T) {
-	testRemoteActionDispatch(t, "delete")
+func TestRemoteDeleteDispatchesToPeer(t *testing.T) {
+	testRemoteActionDispatch(t, action.SessionDelete.ID)
 }
 
-func testRemoteActionDispatch(t *testing.T, action string) {
+func testRemoteActionDispatch(t *testing.T, id action.ID) {
 	t.Helper()
 
 	target := session.Session{
-		ID:     "remote-$1",
-		Name:   "remote-sess",
-		Kind:   session.KindLive,
-		Origin: session.OriginSSH,
+		ID:              "remote-$1",
+		Name:            "remote-sess",
+		Kind:            session.KindLive,
+		Origin:          session.OriginSSH,
+		RuntimeIdentity: session.RuntimeIdentity{ConnectionID: "peer-a"},
 	}
 
-	var (
-		actionDispatched string
-		targetReceived   session.Session
-	)
+	var dispatched action.Invocation
 
 	model := newTestModelWithDeps(Dependencies{
-		RunRemoteAction: func(_ context.Context, _ *config.Config, received session.Session, request RemoteActionRequest) error {
-			actionDispatched = request.Action
-			targetReceived = received
+		RunAction: func(_ context.Context, invocation action.Invocation) (any, error) {
+			dispatched = invocation
 
-			return nil
-		},
-		IsRemoteActionPermitted: func(_ *config.Config, _ session.Session, _ string) bool {
-			return true
+			switch invocation.Input.(type) {
+			case action.KillSession:
+				return action.KilledSession{Session: action.RefOf(target)}, nil
+			default:
+				return action.DeletedSession{Name: target.Name, LiveKilled: true}, nil
+			}
 		},
 	})
 	model.filtered = []session.Session{target}
 	model.cursor = 0
-	model.config.Settings.ConfirmKill = false
-	model.config.Settings.ConfirmDelete = false
+	setActionConfirm(model.config, id, false)
 
-	var handler func() (tea.Model, tea.Cmd)
-
-	switch action {
-	case "kill":
-		handler = model.handleKill()
-	case "delete":
-		handler = model.handleDelete()
-	default:
-		t.Fatalf("unsupported test action %q", action)
+	trace := invokeTestAction(t, model, id)
+	if len(trace.results) != 1 || trace.results[0].err != nil {
+		t.Fatalf("results = %+v, want one successful remote %s", trace.results, id)
 	}
 
-	if handler == nil {
-		t.Fatalf("handle %s returned nil", action)
-	}
-
-	_, cmd := handler()
-	if cmd == nil {
-		t.Fatalf("handle %s returned nil command", action)
-	}
-
-	rawMsg := cmd()
-
-	msg, ok := rawMsg.(sessionActionResultMsg)
-	if !ok || msg.err != nil {
-		t.Fatalf("msg = %#v, want successful remote %s", rawMsg, action)
-	}
-
-	if actionDispatched != action || targetReceived.ID != target.ID {
-		t.Fatalf("action = %q target = %+v, want %s on target", actionDispatched, targetReceived, action)
+	if dispatched.Action != id || dispatched.At != action.Peer("peer-a") {
+		t.Fatalf("dispatched %s at %+v, want %s at the peer", dispatched.Action, dispatched.At, id)
 	}
 }

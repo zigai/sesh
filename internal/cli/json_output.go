@@ -16,8 +16,10 @@ import (
 	"github.com/spf13/pflag"
 	gotmux "github.com/zigai/gotmux/tmux"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/automation"
 	"github.com/zigai/sesh/internal/cli/clibase"
+	"github.com/zigai/sesh/internal/remote"
 
 	"github.com/zigai/sesh/internal/integration/process"
 	integration "github.com/zigai/sesh/internal/integration/tmux"
@@ -30,7 +32,7 @@ import (
 
 const (
 	jsonFlagName      = "json"
-	jsonSchemaVersion = 1
+	jsonSchemaVersion = 2
 )
 
 type jsonEnvelope struct {
@@ -277,6 +279,10 @@ func safeCommandErrorMessage(err error) string {
 }
 
 func sentinelErrorMessage(err error) (string, bool) {
+	if peerErr, ok := errors.AsType[*remote.PeerError](err); ok {
+		return peerErr.Error(), true
+	}
+
 	if contract, ok := matchCommandError(err, uncertainCommandErrors); ok {
 		return contract.message, true
 	}
@@ -306,7 +312,7 @@ func sentinelErrorMessage(err error) (string, bool) {
 
 func sessionSentinelMessage(err error) (string, bool) {
 	switch {
-	case errors.Is(err, gotmux.ErrNoServer):
+	case errors.Is(err, gotmux.ErrNoServer), errors.Is(err, engine.ErrNoServerRunning):
 		return "no tmux server is running on the selected socket; start tmux or pass --socket", true
 	case errors.Is(err, session.ErrCurrentSessionAmbiguous):
 		return "current pane belongs to multiple sessions", true
@@ -429,7 +435,13 @@ func cobraErrorMessage(err error) string {
 	return "operation failed"
 }
 
+// jsonErrorCode reports an action failure by its action code. An action failure without a
+// more specific code keeps the detailed code of its cause.
 func jsonErrorCode(err error) string {
+	if classified, ok := errors.AsType[*action.Error](err); ok && classified.Code != action.CodeFailed {
+		return string(classified.Code)
+	}
+
 	if contract, ok := matchCommandError(err, uncertainCommandErrors); ok {
 		return contract.code
 	}
@@ -522,7 +534,7 @@ func captureErrorCode(err error) (string, bool) {
 
 func generalErrorCode(err error) string {
 	switch {
-	case errors.Is(err, gotmux.ErrNoServer):
+	case errors.Is(err, gotmux.ErrNoServer), errors.Is(err, engine.ErrNoServerRunning):
 		return "tmuxServerUnavailable"
 	case errors.Is(err, context.DeadlineExceeded):
 		return "timeout"

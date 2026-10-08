@@ -17,11 +17,9 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
-	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/config"
-	integration "github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/privatefs"
 	"github.com/zigai/sesh/internal/remote"
 )
@@ -43,7 +41,7 @@ func TestNewCommand(t *testing.T) {
 		subcommands[sub.Name()] = true
 	}
 
-	for _, expected := range []string{"peer", "action", "lookup", "attach"} {
+	for _, expected := range []string{"peer", "lookup", "attach"} {
 		if !subcommands[expected] {
 			t.Errorf("missing subcommand %q in NewCommand()", expected)
 		}
@@ -59,51 +57,6 @@ func TestDaemonMonitorCommandRunsForeground(t *testing.T) {
 	if cmd.Name() != "remote-monitor" || cmd.Annotations[clibase.AnnotationLiveIO] != "true" {
 		t.Fatalf("monitor command = %q live-io %q, want foreground remote-monitor", cmd.Name(), cmd.Annotations[clibase.AnnotationLiveIO])
 	}
-}
-
-func TestOpenRemoteNativeSavedSessions(t *testing.T) {
-	server, err := integration.Open("/tmp/tmux.sock")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Run("nil config returns error", func(t *testing.T) {
-		_, err := OpenRemoteNativeSavedSessions(nil, "/tmp/repo", "/tmp/lease", server)
-		if err == nil {
-			t.Fatal("expected error for nil config")
-		}
-	})
-
-	t.Run("routes configured process environment and store path", func(t *testing.T) {
-		cfg := config.DefaultConfig()
-		cfg.Snapshot.ProcessEnvironment = []string{"REMOTE_KEY", "VIRTUAL_ENV"}
-		cfg.AgentStatus.StorePath = "/custom/aht/remote.json"
-
-		saved, err := OpenRemoteNativeSavedSessions(cfg, "/tmp/repo", "/tmp/lease", server)
-		if err != nil {
-			t.Fatalf("OpenRemoteNativeSavedSessions failed: %v", err)
-		}
-
-		if saved == nil {
-			t.Fatal("expected non-nil saved sessions")
-		}
-	})
-
-	t.Run("preserves explicit empty process environment", func(t *testing.T) {
-		cfg := config.DefaultConfig()
-		cfg.Snapshot.ProcessEnvironment = []string{}
-
-		saved, err := OpenRemoteNativeSavedSessions(cfg, "/tmp/repo", "/tmp/lease", server)
-		if err != nil {
-			t.Fatalf("OpenRemoteNativeSavedSessions failed: %v", err)
-		}
-
-		if saved == nil {
-			t.Fatal("expected non-nil saved sessions")
-		}
-	})
-
-	_ = gotmux.SessionID("")
 }
 
 func TestRemoteMonitorReloadSourceDisablesRereadForStdinAndNoConfig(t *testing.T) {

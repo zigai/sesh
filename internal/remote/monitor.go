@@ -502,7 +502,7 @@ func newConnectionState(connection config.RemoteConnectionConfig, digest string)
 		LastError:      "",
 		LastAttempt:    time.Time{},
 		LastErrorAt:    time.Time{},
-		Snapshot:       Snapshot{GeneratedAt: time.Time{}, Sessions: nil, Health: UnavailableHealth()},
+		Snapshot:       Snapshot{GeneratedAt: time.Time{}, Sessions: nil, Actions: nil, Health: UnavailableHealth()},
 	}
 }
 

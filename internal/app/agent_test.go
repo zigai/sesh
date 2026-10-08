@@ -1,4 +1,6 @@
-package agent
+//go:build linux || darwin
+
+package app
 
 import (
 	"bytes"
@@ -19,19 +21,14 @@ func TestAgentViewHistoryFailureLogsDegradationWithoutIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cmd := NewActionFocusCommand()
-	if err := cmd.Flags().Set("history", path); err != nil {
-		t.Fatal(err)
-	}
+	local := &Local{historyPath: path}
 
-	var logs, stdout, stderr bytes.Buffer
-	cmd.SetOut(&stdout)
-	cmd.SetErr(&stderr)
+	var logs bytes.Buffer
 
 	ctx := zerolog.New(&logs).WithContext(t.Context())
-	recordNavigatedAgentView(ctx, cmd, agents.PaneLocation{SessionName: "PRIVATE_SESSION", PaneID: "PRIVATE_PANE", ServerSocket: "PRIVATE_SOCKET"})
+	local.recordAgentView(ctx, agents.PaneLocation{SessionName: "PRIVATE_SESSION", PaneID: "PRIVATE_PANE", ServerSocket: "PRIVATE_SOCKET"})
 
-	if bytes.Count(logs.Bytes(), []byte("\n")) != 1 || strings.Contains(logs.String(), "PRIVATE_") || stdout.Len() != 0 || stderr.Len() != 0 {
+	if bytes.Count(logs.Bytes(), []byte("\n")) != 1 || strings.Contains(logs.String(), "PRIVATE_") {
 		t.Fatalf("incorrect history logging: %s", logs.String())
 	}
 
@@ -55,7 +52,7 @@ func TestAgentViewHistoryFailureLogsDegradationWithoutIdentity(t *testing.T) {
 	}
 
 	logs.Reset()
-	recordNavigatedAgentView(ctx, cmd, agents.PaneLocation{})
+	local.recordAgentView(ctx, agents.PaneLocation{})
 
 	if logs.Len() != 0 {
 		t.Fatal("absent navigation target should be silent")

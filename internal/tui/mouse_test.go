@@ -216,7 +216,7 @@ func TestMouseHoverFooterShortcutHighlightsButton(t *testing.T) {
 	}
 
 	output := viewString(model.View())
-	if !strings.Contains(output, ansiFooterHoverKey+model.config.Keys.Create) {
+	if !strings.Contains(output, ansiFooterHoverKey+"alt+c") {
 		t.Fatalf("footer output = %q, expected hovered create key", output)
 	}
 

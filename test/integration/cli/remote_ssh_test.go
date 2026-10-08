@@ -11,15 +11,16 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/privatefs"
 	"github.com/zigai/sesh/internal/remote"
-	"github.com/zigai/sesh/internal/session"
 )
 
 type remoteSSHFixture struct {
@@ -35,16 +36,19 @@ func TestRemoteActionCrossesDisposableOpenSSHServer(t *testing.T) {
 	remoteConfig := config.DefaultConfig().Remote
 	remoteConfig.Enabled = true
 	remoteConfig.SSHPath = fixture.sshWrapper
-	remoteConfig.Permissions.Create = true
 	remoteConfig.Connections = []config.RemoteConnectionConfig{fixture.connection}
 	state := remote.ConnectionState{
 		ID: fixture.connection.ID, ConfigDigest: remote.ConnectionDigest(fixture.connection),
 		PeerID: fixture.peerID, Connected: true,
 	}
 	options := remote.ActionOriginOptions{Remote: remoteConfig, Connection: fixture.connection, State: state}
-	target := session.Session{Name: "over-ssh", Kind: session.KindLive, TmuxServerSocket: fixture.connection.TmuxSocket}
 
-	request, err := remote.NewActionRequest(options, target, remote.ActionCreate, "", fixture.root)
+	input, err := action.SessionCreate.EncodeInput(action.CreateSession{Name: "over-ssh", Directory: fixture.root})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	request, err := remote.NewActionRequest(options, action.SessionCreate.ID, input)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +64,7 @@ func TestRemoteActionCrossesDisposableOpenSSHServer(t *testing.T) {
 	}
 
 	result2, err := remote.RunAction(t.Context(), options, request)
-	if err != nil || result2 != result {
+	if err != nil || !reflect.DeepEqual(result2, result) {
 		t.Fatalf("replay = %#v, %v; want %#v", result2, err, result)
 	}
 
@@ -70,7 +74,7 @@ func TestRemoteActionCrossesDisposableOpenSSHServer(t *testing.T) {
 	}
 
 	lookedUp, err := remote.RunInvocationLookup(t.Context(), options, lookup)
-	if err != nil || lookedUp != result {
+	if err != nil || !reflect.DeepEqual(lookedUp, result) {
 		t.Fatalf("lookup = %#v, %v; want %#v", lookedUp, err, result)
 	}
 
@@ -117,7 +121,7 @@ func newRemoteSSHFixture(t *testing.T) remoteSSHFixture {
 	}
 
 	configPath := filepath.Join(fixture.configHome, "sesh", "config.toml")
-	if err := os.WriteFile(configPath, []byte("[remote.permissions]\ncreate = true\n"), 0o600); err != nil {
+	if err := os.WriteFile(configPath, []byte(""), 0o600); err != nil {
 		t.Fatal(err)
 	}
 

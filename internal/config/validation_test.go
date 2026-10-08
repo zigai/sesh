@@ -120,59 +120,6 @@ refresh_interval = "soon"`
 	}
 }
 
-func TestLoadRejectsDuplicateKeyBindings(t *testing.T) {
-	tempDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tempDir)
-
-	configDir := filepath.Join(tempDir, "sesh")
-	if err := os.MkdirAll(configDir, 0o755); err != nil {
-		t.Fatalf("mkdir failed: %v", err)
-	}
-
-	configContent := `[keys]
-create = "alt+r"
-rename = "alt+r"`
-
-	configPath := filepath.Join(configDir, "config.toml")
-	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
-		t.Fatalf("write config failed: %v", err)
-	}
-
-	_, err := config.Load()
-	if err == nil {
-		t.Fatal("Load() error = nil, want duplicate key error")
-	}
-
-	if !strings.Contains(err.Error(), "duplicate key binding") ||
-		!strings.Contains(err.Error(), "alt+r") {
-		t.Fatalf("Load() error = %v, want duplicate binding context", err)
-	}
-}
-
-func TestLoadRejectsDuplicateAgentNavigationBindings(t *testing.T) {
-	tempDir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", tempDir)
-
-	configDir := filepath.Join(tempDir, "sesh")
-	if err := os.MkdirAll(configDir, 0o755); err != nil {
-		t.Fatalf("mkdir failed: %v", err)
-	}
-
-	configContent := `[agent_sessions]
-next_idle_key = "M-]"
-next_idle_local_key = "M-]"`
-
-	configPath := filepath.Join(configDir, "config.toml")
-	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
-		t.Fatalf("write config failed: %v", err)
-	}
-
-	_, err := config.Load()
-	if err == nil || !strings.Contains(err.Error(), "duplicate agent_sessions key binding") {
-		t.Fatalf("Load() error = %v, want duplicate agent navigation binding error", err)
-	}
-}
-
 func TestLoadRejectsCycleModeKeyCollision(t *testing.T) {
 	tempDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tempDir)
@@ -584,17 +531,6 @@ func TestLoadRejectsRemoteConcurrencyAboveConnectionLimit(t *testing.T) {
 				t.Fatalf("Load() error = %v, want bounded remote concurrency error", err)
 			}
 		})
-	}
-}
-
-func TestDefaultRemotePermissionsDisableDestructiveActions(t *testing.T) {
-	permissions := config.DefaultConfig().Remote.Permissions
-	if !permissions.Create || !permissions.Rename || !permissions.Snapshot || !permissions.Restore {
-		t.Fatalf("non-destructive remote permissions = %#v, want enabled", permissions)
-	}
-
-	if permissions.Kill || permissions.Delete {
-		t.Fatalf("destructive remote permissions = %#v, want disabled", permissions)
 	}
 }
 

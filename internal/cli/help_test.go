@@ -153,7 +153,7 @@ func defaultsUseOneForm(usage string) bool {
 }
 
 func TestHelpRendersLiteralDefaultsInDescriptionForm(t *testing.T) {
-	for _, args := range [][]string{{"pick", "--help"}, {"logs", "--help"}, {"daemon", "coordinator", "--help"}, {"setup", "tmux", "--help"}} {
+	for _, args := range [][]string{{"pick", "--help"}, {"logs", "--help"}, {"daemon", "coordinator", "--help"}} {
 		stdout, _, err := executeCommand(t, args...)
 		if err != nil {
 			t.Fatalf("%v: %v", args, err)
@@ -168,7 +168,6 @@ func TestHelpRendersLiteralDefaultsInDescriptionForm(t *testing.T) {
 		"pick":               "Picker layout [choices: auto, popup, inline, fullscreen] [default: auto]",
 		"logs":               "[default: 50]",
 		"daemon coordinator": "[default: 30s]",
-		"setup tmux":         "[default: C-o]",
 		"setup agents":       "Tracker operation [choices: enable, disable, status] [default: enable]",
 	} {
 		stdout, _, err := executeCommand(t, append(strings.Fields(args), "--help")...)

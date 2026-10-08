@@ -16,6 +16,8 @@ import (
 
 	gotmux "github.com/zigai/gotmux/tmux"
 
+	"github.com/zigai/sesh/internal/action"
+	"github.com/zigai/sesh/internal/config"
 	integration "github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/privatefs"
 	"github.com/zigai/sesh/internal/remote"
@@ -181,7 +183,7 @@ func publishRemoteReturnCatalog(t *testing.T, fixture remoteSSHFixture, peer *go
 	catalog.Connections[fixture.connection.ID] = remote.ConnectionState{
 		ID: fixture.connection.ID, Label: fixture.connection.Label, ConfigDigest: remote.ConnectionDigest(fixture.connection),
 		PeerID: fixture.peerID, Connected: true, Sequence: 1, LastSeen: time.Now(), BridgeDir: bridgeDir,
-		Snapshot: remote.Snapshot{Sessions: rows, Health: remote.UnavailableHealth()},
+		Snapshot: remote.Snapshot{Sessions: rows, Actions: defaultRemoteActions(), Health: remote.UnavailableHealth()},
 	}
 
 	cachePath, err := remote.Dir(fixture.cacheHome)
@@ -199,6 +201,19 @@ func publishRemoteReturnCatalog(t *testing.T, fixture remoteSSHFixture, peer *go
 	if err := remote.WriteCatalog(dir, catalog); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// defaultRemoteActions lists the actions a peer with default configuration advertises.
+func defaultRemoteActions() []action.ID {
+	ids := make([]action.ID, 0)
+
+	for _, entry := range action.All() {
+		if action.PolicyFor(config.DefaultConfig(), entry.Describe()).AllowRemote {
+			ids = append(ids, entry.Describe().ID)
+		}
+	}
+
+	return ids
 }
 
 func assertRemoteReturnCleanup(t *testing.T, fixture remoteSSHFixture, peer *gotmux.Server) {

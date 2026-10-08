@@ -13,7 +13,6 @@ const (
 	testJSONFlag     = "--json"
 	testConfigFlag   = "--config"
 	testNoConfigFlag = "--no-config"
-	actionCmd        = "action"
 )
 
 // autosaveResultJSON is the autosave wire contract decoded from --json output.

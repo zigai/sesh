@@ -12,6 +12,17 @@ import (
 	"github.com/zigai/sesh/internal/cli/clibase"
 )
 
+func writeSetupConfig(t *testing.T, text string) string {
+	t.Helper()
+
+	configPath := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(configPath, []byte(text), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	return configPath
+}
+
 func TestSetupTmuxHelp(t *testing.T) {
 	t.Parallel()
 
@@ -20,7 +31,7 @@ func TestSetupTmuxHelp(t *testing.T) {
 		t.Fatalf("setup tmux --help failed: %v\nstderr: %s", err, stderr)
 	}
 
-	for _, flag := range []string{"--apply", "--force", testSocketFlag, "--table", "--next-key", "--back-key", "--picker-key"} {
+	for _, flag := range []string{"--apply", "--force", testSocketFlag} {
 		if !strings.Contains(stdout, flag) {
 			t.Fatalf("help missing %s: %s", flag, stdout)
 		}
@@ -35,16 +46,17 @@ func TestSetupTmuxPrintsBindingsWithoutSocket(t *testing.T) {
 		t.Fatalf("setup tmux failed: %v\nstderr: %s", err, stderr)
 	}
 
-	if !strings.Contains(stdout, "bind-key -T root S-F12 run-shell -b \"sesh action agent-next\"") {
-		t.Fatalf("stdout missing next-agent binding:\n%s", stdout)
-	}
+	caller := " --client '#{client_name}' --pane '#{pane_id}' --client-session '#{session_id}' --client-width '#{client_width}' --client-height '#{client_height}'"
 
-	if !strings.Contains(stdout, "bind-key -T root S-F1 run-shell -b \"sesh action agent-back\"") {
-		t.Fatalf("stdout missing back binding:\n%s", stdout)
-	}
-
-	if !strings.Contains(stdout, "bind-key -T root C-o run-shell -b \"sesh action picker-open -c '#{client_name}' -t '#{pane_id}' --current-session-id '#{session_id}' -w '#{client_width}' --client-height '#{client_height}'\"") {
-		t.Fatalf("stdout missing picker binding:\n%s", stdout)
+	for _, want := range []string{
+		"bind-key -T root S-F12 run-shell -b \"sesh agent next" + caller + "\"",
+		"bind-key -T root M-S-F12 run-shell -b \"sesh agent next --local=true" + caller + "\"",
+		"bind-key -T root S-F1 run-shell -b \"sesh agent back" + caller + "\"",
+		"bind-key -T root C-o run-shell -b \"sesh pick popup" + caller + "\"",
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("stdout missing %q:\n%s", want, stdout)
+		}
 	}
 }
 
@@ -56,61 +68,64 @@ func TestSetupTmuxJSONPlansBindings(t *testing.T) {
 		t.Fatalf("setup tmux --json failed: %v\nstderr: %s", err, stderr)
 	}
 
-	if !strings.Contains(stdout, `"table": "root"`) {
-		t.Fatalf("stdout missing table: %s", stdout)
-	}
-
-	if !strings.Contains(stdout, `"status": "planned"`) {
-		t.Fatalf("stdout missing planned bindings: %s", stdout)
+	for _, want := range []string{`"table": "root"`, `"action": "pick.popup"`, `"status": "planned"`} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("stdout missing %s: %s", want, stdout)
+		}
 	}
 }
 
-func TestSetupTmuxCustomKeysAndTable(t *testing.T) {
+func TestSetupTmuxRendersConfiguredBindings(t *testing.T) {
 	t.Setenv("TMUX", "")
 
-	stdout, stderr, err := executeCommand(
-		t, "setup", "tmux",
-		"--table", "prefix",
-		"--next-key", "C-n",
-		"--local-next-key", "C-l",
-		"--back-key", "C-b",
-		"--picker-key", "C-p",
-		testNoConfigFlag,
-	)
+	configPath := writeSetupConfig(t, `[[keys.bind]]
+key = "F20"
+action = "agent.latest"
+in = "tmux"
+
+[[keys.bind]]
+key = "C-o"
+in = "tmux"
+
+[[keys.bind]]
+key = "M-s"
+action = "snapshot.save"
+in = "tmux"
+table = "prefix"
+`)
+
+	stdout, stderr, err := executeCommand(t, "setup", "tmux", testConfigFlag, configPath)
 	if err != nil {
-		t.Fatalf("setup tmux custom keys failed: %v\nstderr: %s", err, stderr)
+		t.Fatalf("setup tmux with configured bindings failed: %v\nstderr: %s", err, stderr)
 	}
 
-	if !strings.Contains(stdout, "bind-key -T prefix C-n ") {
-		t.Fatalf("stdout missing custom table/key binding:\n%s", stdout)
+	for _, want := range []string{
+		"bind-key -T root S-F8 run-shell -b \"sesh agent latest ",
+		"bind-key -T prefix M-s run-shell -b \"sesh snapshot save '#{session_id}'\"",
+		"bind-key -T root S-F12 ",
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("stdout missing %q:\n%s", want, stdout)
+		}
 	}
 
-	if !strings.Contains(stdout, "bind-key -T prefix C-p ") {
-		t.Fatalf("stdout missing custom picker binding:\n%s", stdout)
+	if strings.Contains(stdout, " C-o ") {
+		t.Fatalf("unbound C-o is still rendered:\n%s", stdout)
 	}
 }
 
-func TestSetupTmuxRejectsInvalidKeyAndTable(t *testing.T) {
+func TestSetupTmuxRejectsBindingsTmuxCannotRun(t *testing.T) {
 	t.Setenv("TMUX", "")
 
-	cases := []struct {
-		name string
-		args []string
-	}{
-		{name: "invalid key", args: []string{"setup", "tmux", "--next-key", "not a key", testNoConfigFlag}},
-		{name: "invalid table", args: []string{"setup", "tmux", "--table", "bad table", testNoConfigFlag}},
-		{name: "duplicate key", args: []string{"setup", "tmux", "--back-key", setupDefaultPickerKey, testNoConfigFlag}},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			_, _, err := executeCommand(t, tc.args...)
-			if err == nil {
-				t.Fatal("expected usage failure, got nil")
-			}
-
-			if clibase.ExitCode(err) != clibase.ExitCodeUsage {
-				t.Fatalf("exit code = %d, want %d", clibase.ExitCode(err), clibase.ExitCodeUsage)
+	for name, text := range map[string]string{
+		"invalid key":    "[[keys.bind]]\nkey = \"not a key\"\naction = \"agent.back\"\nin = \"tmux\"\n",
+		"invalid table":  "[[keys.bind]]\nkey = \"M-b\"\naction = \"agent.back\"\nin = \"tmux\"\ntable = \"bad table\"\n",
+		"missing params": "[[keys.bind]]\nkey = \"M-c\"\naction = \"session.create\"\nin = \"tmux\"\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, _, err := executeCommand(t, "setup", "tmux", testConfigFlag, writeSetupConfig(t, text))
+			if clibase.ExitCode(err) != clibase.ExitCodeGeneral {
+				t.Fatalf("exit code = %d (%v), want the configuration error status %d", clibase.ExitCode(err), err, clibase.ExitCodeGeneral)
 			}
 		})
 	}
@@ -124,49 +139,3 @@ func TestSetupTmuxApplyTargetsAmbientServerWithoutSocket(t *testing.T) {
 		t.Fatalf("error = %v, want the stopped ambient server to report no tmux server", err)
 	}
 }
-
-func TestSetupTmuxUsesConfiguredKeysUnlessFlagsOverrideThem(t *testing.T) {
-	t.Setenv("TMUX", "")
-
-	configPath := filepath.Join(t.TempDir(), "config.toml")
-
-	configText := `[agent_sessions]
-next_idle_key = "F20"
-next_idle_local_key = "M-F21"
-navigation_back_key = "F22"
-`
-	if err := os.WriteFile(configPath, []byte(configText), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	stdout, stderr, err := executeCommand(t, "setup", "tmux", testConfigFlag, configPath)
-	if err != nil {
-		t.Fatalf("setup tmux with configured keys failed: %v\nstderr: %s", err, stderr)
-	}
-
-	for _, key := range []string{"S-F8", "M-S-F9", "S-F10"} {
-		if !strings.Contains(stdout, "bind-key -T root "+key+" ") {
-			t.Fatalf("stdout missing configured key %q:\n%s", key, stdout)
-		}
-	}
-
-	stdout, stderr, err = executeCommand(
-		t, "setup", "tmux", testConfigFlag, configPath,
-		"--next-key", "C-n",
-	)
-	if err != nil {
-		t.Fatalf("setup tmux with flag override failed: %v\nstderr: %s", err, stderr)
-	}
-
-	if !strings.Contains(stdout, "bind-key -T root C-n ") {
-		t.Fatalf("stdout missing explicit next-key override:\n%s", stdout)
-	}
-
-	for _, key := range []string{"M-S-F9", "S-F10"} {
-		if !strings.Contains(stdout, "bind-key -T root "+key+" ") {
-			t.Fatalf("stdout missing non-overridden configured key %q:\n%s", key, stdout)
-		}
-	}
-}
-
-const setupDefaultPickerKey = "C-o"

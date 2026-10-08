@@ -1,0 +1,79 @@
+//go:build linux || darwin
+
+package app
+
+import (
+	"context"
+	"errors"
+
+	gotmux "github.com/zigai/gotmux/tmux"
+
+	"github.com/zigai/sesh/internal/action"
+	"github.com/zigai/sesh/internal/agents"
+	"github.com/zigai/sesh/internal/session"
+	"github.com/zigai/sesh/internal/snapshot/capture"
+	"github.com/zigai/sesh/internal/snapshot/engine"
+	"github.com/zigai/sesh/internal/snapshot/restore"
+	"github.com/zigai/sesh/internal/snapshot/store"
+)
+
+// classifications map domain sentinels to action codes. The first match wins, so uncertain
+// outcomes are checked before the failures that may accompany them.
+var classifications = []classification{
+	{context.Canceled, action.CodeCanceled},
+	{store.ErrUncertain, action.CodeUncertain},
+	{session.ErrUncertain, action.CodeUncertain},
+	{restore.ErrExecutionUncertain, action.CodeUncertain},
+	{restore.ErrPriorUncertainty, action.CodeUncertain},
+	{session.ErrSwitchUnverified, action.CodeUncertain},
+	{session.ErrSessionNotFound, action.CodeNotFound},
+	{session.ErrSessionAlreadyExists, action.CodeAlreadyExists},
+	{restore.ErrSessionCollision, action.CodeAlreadyExists},
+	{restore.ErrGroupCollision, action.CodeAlreadyExists},
+	{session.ErrSessionAttached, action.CodeAttached},
+	{session.ErrSessionReplaced, action.CodeTargetChanged},
+	{session.ErrServerIdentityChanged, action.CodeTargetChanged},
+	{capture.ErrChanged, action.CodeTargetChanged},
+	{gotmux.ErrServerChanged, action.CodeTargetChanged},
+	{session.ErrInvalidSessionName, action.CodeInvalidArgument},
+	{capture.ErrSelection, action.CodeInvalidArgument},
+	{session.ErrSavedGenerationsProtected, action.CodeConflict},
+	{session.ErrSavedSessionScopeConflict, action.CodeConflict},
+	{store.ErrConflict, action.CodeConflict},
+	{store.ErrRecoveryRequired, action.CodeConflict},
+	{restore.ErrPriorConflict, action.CodeConflict},
+	{session.ErrNotInsideTmux, action.CodeUnavailable},
+	{session.ErrInvokingClientUnavailable, action.CodeUnavailable},
+	{session.ErrInvokingClientAmbiguous, action.CodeUnavailable},
+	{session.ErrTerminalRequired, action.CodeUnavailable},
+	{store.ErrUnavailable, action.CodeUnavailable},
+	{agents.ErrCurrentContextUnknown, action.CodeUnavailable},
+	{agents.ErrCurrentPaneNotLive, action.CodeUnavailable},
+	{agents.ErrRegistryUnavailable, action.CodeUnavailable},
+	{agents.ErrNoTargetPane, action.CodeNotFound},
+	{agents.ErrEmptyNavigationHistory, action.CodeNotFound},
+	{agents.ErrPaneNotLive, action.CodeNotFound},
+	{gotmux.ErrNoServer, action.CodeUnavailable},
+	{engine.ErrNoServerRunning, action.CodeUnavailable},
+	{gotmux.ErrNotFound, action.CodeNotFound},
+}
+
+type classification struct {
+	cause error
+	code  action.Code
+}
+
+// classify assigns an action code to a failure from the services behind an action.
+func classify(err error) action.Code {
+	if classified, ok := errors.AsType[*action.Error](err); ok {
+		return classified.Code
+	}
+
+	for _, entry := range classifications {
+		if errors.Is(err, entry.cause) {
+			return entry.code
+		}
+	}
+
+	return action.CodeFailed
+}

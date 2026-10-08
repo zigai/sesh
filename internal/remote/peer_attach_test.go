@@ -3,11 +3,13 @@
 package remote
 
 import (
+	"context"
 	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -89,8 +91,8 @@ func TestRunPeerAttachPreparePublishesPrivateCapability(t *testing.T) {
 		t.Fatalf("prepare result = %#v, want the confirmed attachment", result)
 	}
 
-	if created, killed, attached := live.counts(); created != 0 || killed != 0 || attached != 0 {
-		t.Fatal("prepare performed a workspace mutation or attachment")
+	if attached := live.attachCount(); attached != 0 {
+		t.Fatal("prepare attached before the terminal was handed over")
 	}
 
 	assertStoredCapabilityRecord(t, bridgePath, bootstrap, options.Now())
@@ -352,5 +354,60 @@ func TestPrepareAttachmentKeepsSecretsOutOfArguments(t *testing.T) {
 
 	if !strings.Contains(strings.Join(attach.Args, " "), "-R "+bootstrap.BridgeSocket+":"+bootstrap.Capability.OriginSocket) {
 		t.Fatalf("attach argv = %#v, want the scoped reverse forward", attach.Args)
+	}
+}
+
+type fakeLiveServer struct {
+	mu          sync.Mutex
+	sessions    []session.Session
+	sessionsErr error
+	attachErr   error
+	paneOwners  map[string]string
+	attached    []string
+}
+
+func (server *fakeLiveServer) Sessions(context.Context) ([]session.Session, error) {
+	server.mu.Lock()
+	defer server.mu.Unlock()
+
+	return append([]session.Session(nil), server.sessions...), server.sessionsErr
+}
+
+func (server *fakeLiveServer) Attach(_ context.Context, sessionID string, _ AttachStreams) error {
+	server.mu.Lock()
+	defer server.mu.Unlock()
+
+	server.attached = append(server.attached, sessionID)
+
+	return server.attachErr
+}
+
+func (server *fakeLiveServer) PaneSession(_ context.Context, paneID string) (string, error) {
+	server.mu.Lock()
+	defer server.mu.Unlock()
+
+	owner, ok := server.paneOwners[paneID]
+	if !ok {
+		return "", ErrTargetChanged
+	}
+
+	return owner, nil
+}
+
+func (server *fakeLiveServer) attachCount() int {
+	server.mu.Lock()
+	defer server.mu.Unlock()
+
+	return len(server.attached)
+}
+
+func liveTargetSession() session.Session {
+	return session.Session{
+		ID: "$1", Name: testSessionName, Kind: session.KindLive, TmuxServerSocket: "/tmp/tmux.sock",
+		RuntimeIdentity: session.RuntimeIdentity{
+			TmuxServerPID:        42,
+			TmuxServerStartedAt:  time.Unix(100, 0).UTC(),
+			TmuxSessionCreatedAt: time.Unix(200, 0).UTC(),
+		},
 	}
 }

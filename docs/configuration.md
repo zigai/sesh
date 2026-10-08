@@ -26,8 +26,6 @@ Override via environment: `SESH_<SECTION>_<KEY>`, for example `SESH_SETTINGS_LOG
 
 ```toml
 [settings]
-confirm_kill = true
-confirm_delete = true
 show_footer = true
 directory_suggestions = 5
 default_session_path_suggestion = "~/Projects/{session}"
@@ -54,9 +52,6 @@ popup_counts = true
 refresh_interval = "250ms"
 status_style = "glyph" # glyph, text
 status_time_format = "relative" # relative, relative-seconds, clock, hh:mm
-next_idle_key = "F24"
-next_idle_local_key = "M-F24"
-navigation_back_key = "F13"
 
 [agent_status]
 enabled = true
@@ -79,7 +74,6 @@ action_timeout = "2m"
 max_parallel_connects = 4
 enable_reverse_bridge = true
 return_to_origin = true
-permissions = { create = true, rename = true, kill = false, delete = false, snapshot = true, restore = true }
 connections = []
 # Example peer connection:
 # connections = [
@@ -98,11 +92,6 @@ max_bytes = 0       # 0 disables size limit
 process_environment = ["PATH", "VIRTUAL_ENV", "CONDA_PREFIX", "CONDA_DEFAULT_ENV", "PYTHONPATH", "NODE_PATH"]
 
 [keys]
-create = "alt+c"
-rename = "alt+r"
-kill = "alt+x"
-delete = "alt+shift+x"
-snapshot = "alt+s"
 help = "?"
 cycle_mode = "ctrl+f"
 agent_sort = "ctrl+s"
@@ -138,4 +127,37 @@ session_switch_post = []
 session_attach_pre = []
 session_attach_post = []
 tmux_startup_post = []
+```
+
+## Actions
+
+Per-action policy is keyed by action ID. `confirm` asks before the popup runs the action; `allow_remote` lets remote peers run it on this machine. `session.kill` and `session.delete` confirm and refuse remote use by default; `session.switch` never runs remotely.
+
+```toml
+[actions.session.kill]
+confirm = false
+allow_remote = true
+```
+
+## Key bindings
+
+`[[keys.bind]]` binds a key to an action in the picker (`in = "picker"`) or in a tmux key table (`in = "tmux"`, rendered by `sesh setup tmux`). An entry replaces the default binding of the same key, and an entry without an action removes it. `params` sets action parameters. Tmux bindings pass the current session or pane as the action's subject. Picker bindings cannot use the picker's own navigation keys or keys that type into its search field.
+
+Defaults: in the picker `alt+c` session.create, `alt+r` session.rename, `alt+x` session.kill, `alt+X` session.delete, `alt+s` snapshot.save; in tmux table `root` `S-F12` agent.next, `M-S-F12` agent.next with `local = true`, `S-F1` agent.back, `C-o` pick.popup.
+
+```toml
+[[keys.bind]]
+key = "ctrl+g"
+action = "session.create"
+in = "picker"
+
+[[keys.bind]]
+key = "alt+c"
+in = "picker"
+
+[[keys.bind]]
+key = "M-s"
+action = "snapshot.save"
+in = "tmux"
+table = "prefix"
 ```

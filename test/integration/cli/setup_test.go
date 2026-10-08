@@ -3,6 +3,10 @@
 package cli_test
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	gotmux "github.com/zigai/gotmux/tmux"
@@ -11,6 +15,8 @@ import (
 
 type setupBindingJSON struct {
 	Key      string   `json:"key"`
+	Table    string   `json:"table"`
+	Action   string   `json:"action"`
 	Purpose  string   `json:"purpose"`
 	Program  []string `json:"program"`
 	Status   string   `json:"status"`
@@ -19,7 +25,6 @@ type setupBindingJSON struct {
 }
 
 type setupApplyResultJSON struct {
-	Table    string             `json:"table"`
 	Applied  int                `json:"applied"`
 	Skipped  int                `json:"skipped"`
 	Bindings []setupBindingJSON `json:"bindings"`
@@ -99,6 +104,50 @@ func TestSetupTmuxApplySkipsExistingAndForceOverwrites(t *testing.T) {
 	assertBound(t, server, []string{"S-F12", "M-S-F12", "S-F1", "C-o"})
 }
 
+func TestSetupTmuxApplySkipsAKeyBoundUnderAnotherSpelling(t *testing.T) {
+	server := tmuxtest.NewServer(t)
+	socketPath := server.Endpoint().SocketPath
+
+	isolateAutosaveEnv(t)
+
+	first := executeJSON(t, "setup", "tmux", "--apply", testSocketFlag, socketPath, testConfigFlag, writeSetupBindings(t, "C-M-F1"), testJSONFlag)
+	if !first.envelope.OK {
+		t.Fatalf("first apply failed: %+v\nstderr: %s", first.err, first.stderr)
+	}
+
+	second := executeJSON(t, "setup", "tmux", "--apply", testSocketFlag, socketPath, testConfigFlag, writeSetupBindings(t, "M-C-F1"), testJSONFlag)
+	if second.err == nil {
+		t.Fatal("apply of M-C-F1 over the bound C-M-F1 must report a conflict, got nil error")
+	}
+
+	if result := decodeJSONPayload[setupApplyResultJSON](t, second.envelope.Result); result.Applied != 0 || result.Skipped != 1 {
+		t.Fatalf("applied/skipped = %d/%d, want 0/1", result.Applied, result.Skipped)
+	}
+}
+
+// writeSetupBindings writes a configuration that binds the given tmux keys in the sesh-test
+// table and removes the default bindings.
+func writeSetupBindings(t *testing.T, keys ...string) string {
+	t.Helper()
+
+	var text strings.Builder
+
+	for _, key := range []string{"S-F12", "M-S-F12", "S-F1", "C-o"} {
+		fmt.Fprintf(&text, "[[keys.bind]]\nkey = %q\nin = \"tmux\"\n\n", key)
+	}
+
+	for _, key := range keys {
+		fmt.Fprintf(&text, "[[keys.bind]]\nkey = %q\naction = \"agent.back\"\nin = \"tmux\"\ntable = \"sesh-test\"\n\n", key)
+	}
+
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(text.String()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	return path
+}
+
 func TestSetupTmuxApplyTargetsOnlyExplicitSocket(t *testing.T) {
 	target := tmuxtest.NewServer(t)
 	ambient := tmuxtest.NewServer(t)
@@ -109,57 +158,34 @@ func TestSetupTmuxApplyTargetsOnlyExplicitSocket(t *testing.T) {
 	exec := executeJSON(
 		t, "setup", "tmux", "--apply",
 		testSocketFlag, target.Endpoint().SocketPath,
-		"--table", "sesh-test",
-		"--next-key", "C-F1",
-		"--local-next-key", "C-F2",
-		"--back-key", "C-F3",
-		"--picker-key", "C-F4",
-		testNoConfigFlag, testJSONFlag,
+		testConfigFlag, writeSetupBindings(t, "C-F1", "C-F2"), testJSONFlag,
 	)
 	if !exec.envelope.OK {
 		t.Fatalf("setup tmux --apply failed: %+v\nstderr: %s", exec.err, exec.stderr)
 	}
 
-	assertBoundInTable(t, target, "sesh-test", []string{"C-F1", "C-F2", "C-F3", "C-F4"})
+	assertBoundInTable(t, target, "sesh-test", []string{"C-F1", "C-F2"})
 
 	if got := boundKeys(t, ambient, "sesh-test"); len(got) != 0 {
 		t.Fatalf("ambient server was mutated: %v", got)
 	}
 }
 
-func TestSetupTmuxRejectsInvalidOrDuplicateKeysBeforeMutation(t *testing.T) {
-	cases := []struct {
-		name      string
-		pickerKey string
-		nextKey   string
-	}{
-		{name: "invalid", nextKey: "not a key", pickerKey: "C-F4"},
-		{name: "duplicate", nextKey: "C-F1", pickerKey: "C-F3"},
+func TestSetupTmuxRejectsInvalidKeysBeforeMutation(t *testing.T) {
+	server := tmuxtest.NewServer(t)
+	isolateAutosaveEnv(t)
+
+	exec := executeJSON(
+		t, "setup", "tmux", "--apply",
+		testSocketFlag, server.Endpoint().SocketPath,
+		testConfigFlag, writeSetupBindings(t, "C-F1", "not a key"), testJSONFlag,
+	)
+	if exec.err == nil || ExitCode(exec.err) != exitCodeGeneral {
+		t.Fatalf("error = %v (exit %d), want a configuration failure", exec.err, ExitCode(exec.err))
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			server := tmuxtest.NewServer(t)
-			isolateAutosaveEnv(t)
-
-			exec := executeJSON(
-				t, "setup", "tmux", "--apply",
-				testSocketFlag, server.Endpoint().SocketPath,
-				"--table", "sesh-test",
-				"--next-key", tc.nextKey,
-				"--local-next-key", "C-F2",
-				"--back-key", "C-F3",
-				"--picker-key", tc.pickerKey,
-				testNoConfigFlag, testJSONFlag,
-			)
-			if exec.err == nil || ExitCode(exec.err) != exitCodeUsage {
-				t.Fatalf("error = %v (exit %d), want usage failure", exec.err, ExitCode(exec.err))
-			}
-
-			if got := boundKeys(t, server, "sesh-test"); len(got) != 0 {
-				t.Fatalf("server mutated before validation failure: %v", got)
-			}
-		})
+	if got := boundKeys(t, server, "sesh-test"); len(got) != 0 {
+		t.Fatalf("server mutated before validation failure: %v", got)
 	}
 }
 

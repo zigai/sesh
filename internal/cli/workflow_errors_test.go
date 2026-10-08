@@ -10,8 +10,8 @@ import (
 
 	"github.com/samber/oops"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/agents"
-	cmdsnapshot "github.com/zigai/sesh/internal/cli/cmd/snapshot"
 	"github.com/zigai/sesh/internal/remote"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/snapshot/restore"
@@ -47,7 +47,6 @@ func TestWorkflowErrorsPreservePublicClassification(t *testing.T) {
 		{agents.ErrEmptyNavigationHistory, "agentHistoryEmpty"},
 		{restore.ErrPriorConflict, "priorEffectConflicted"},
 		{restore.ErrJournalRequired, "journalUnavailable"},
-		{remote.ErrActionPartial, "partialRemoteAction"},
 		{remote.ErrActionFailed, "remoteActionFailed"},
 	}
 
@@ -75,7 +74,7 @@ func TestRestoreUncertaintySurvivesJoinedCancellationAndExitCode(t *testing.T) {
 		{restore.ErrExecutionUncertain, "operationUncertain"},
 		{restore.ErrPriorUncertainty, "priorEffectUncertain"},
 		{store.ErrUncertain, "publicationUncertain"},
-		{remote.ErrActionUncertain, "remoteOutcomeUncertain"},
+		{action.Wrap(action.CodeUncertain, &remote.PeerError{Code: action.CodeUncertain, InvocationID: "0123456789abcdef0123456789abcdef", Err: nil}), "uncertain"},
 	}
 
 	for _, tc := range cases {
@@ -92,7 +91,7 @@ func TestRestoreUncertaintySurvivesJoinedCancellationAndExitCode(t *testing.T) {
 func assertWorkflowErrorEnvelope(t *testing.T, err error, code string) {
 	t.Helper()
 
-	cmd := cmdsnapshot.NewActionRestoreCommand()
+	cmd := findTestCommand(t, snapshotCmd, "restore")
 
 	var stdout, stderr bytes.Buffer
 	cmd.SetOut(&stdout)

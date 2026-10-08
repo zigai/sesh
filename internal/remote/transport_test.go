@@ -381,35 +381,3 @@ func TestFinishCommandJoinsOwnedProcessCleanup(t *testing.T) {
 		t.Fatal("FinishCommand() did not wait for the owned process")
 	}
 }
-
-func TestPeerPolicyRefusesUnpermittedOperations(t *testing.T) {
-	policy := PeerPolicy{Create: true, Kill: false, Sockets: []string{"/tmp/tmux-work"}}
-
-	if err := policy.Check(ActionCreate, "/tmp/tmux-work"); err != nil {
-		t.Fatalf("Check(create) error = %v", err)
-	}
-
-	if err := policy.Check(ActionKill, "/tmp/tmux-work"); !errors.Is(err, ErrPeerForbidden) {
-		t.Fatalf("Check(kill) error = %v, want %v", err, ErrPeerForbidden)
-	}
-
-	if err := policy.Check(ActionCreate, "/tmp/tmux-other"); !errors.Is(err, ErrPeerForbidden) {
-		t.Fatalf("Check(create on other socket) error = %v, want %v", err, ErrPeerForbidden)
-	}
-
-	if err := policy.Check(Action("push"), "/tmp/tmux-work"); !errors.Is(err, ErrPeerUnsupported) {
-		t.Fatalf("Check(unknown) error = %v, want %v", err, ErrPeerUnsupported)
-	}
-}
-
-func TestPermissionsAllowMirrorsOriginPolicy(t *testing.T) {
-	permissions := config.RemotePermissionConfig{Create: true, Rename: true, Kill: false, Delete: false, Snapshot: true, Restore: false}
-
-	if !PermissionsAllow(permissions, ActionCreate) || !PermissionsAllow(permissions, ActionSnapshot) {
-		t.Fatal("PermissionsAllow() refused a permitted operation")
-	}
-
-	if PermissionsAllow(permissions, ActionKill) || PermissionsAllow(permissions, ActionRestore) || PermissionsAllow(permissions, Action("push")) {
-		t.Fatal("PermissionsAllow() admitted a refused operation")
-	}
-}

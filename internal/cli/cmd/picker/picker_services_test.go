@@ -5,7 +5,6 @@ package picker
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -19,7 +18,6 @@ import (
 
 	"github.com/zigai/sesh/internal/agents"
 	"github.com/zigai/sesh/internal/config"
-	"github.com/zigai/sesh/internal/integration/process"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/tui"
 )
@@ -361,81 +359,4 @@ func TestPickerServicesAHTStorePathRouting(t *testing.T) {
 			t.Fatalf("StorePath = %q, want /config/fallback/aht.json", path)
 		}
 	})
-}
-
-func TestPickerServicesSnapshotSessionRejectsInvalidEnv(t *testing.T) {
-	ctx := t.Context()
-	dirs := t.TempDir()
-
-	cfg := config.DefaultConfig()
-	cfg.Snapshot.ProcessEnvironment = []string{"INVALID=KEY"}
-
-	services, err := newPickerServices(
-		ctx,
-		cfg,
-		filepath.Join(dirs, "tmux.sock"),
-		filepath.Join(dirs, "repo"),
-		filepath.Join(dirs, "leases"),
-		filepath.Join(dirs, "history.json"),
-		"",
-		gotmux.Streams{},
-		RemoteServices{},
-	)
-	if err != nil {
-		t.Fatalf("newPickerServices failed: %v", err)
-	}
-
-	t.Cleanup(func() { _ = services.Close() })
-
-	target := session.Session{ID: "0", Name: "test"}
-
-	err = services.SnapshotSession(ctx, target)
-	if err == nil {
-		t.Fatal("expected SnapshotSession to reject invalid environment key")
-	}
-
-	if !errors.Is(err, process.ErrInvalidVariableName) {
-		t.Fatalf("expected ErrInvalidVariableName, got: %v", err)
-	}
-}
-
-func TestPickerServicesSnapshotSessionRejectsExcessiveEnv(t *testing.T) {
-	ctx := t.Context()
-	dirs := t.TempDir()
-
-	keys := make([]string, 257)
-	for i := range keys {
-		keys[i] = fmt.Sprintf("K%d", i)
-	}
-
-	cfg := config.DefaultConfig()
-	cfg.Snapshot.ProcessEnvironment = keys
-
-	services, err := newPickerServices(
-		ctx,
-		cfg,
-		filepath.Join(dirs, "tmux.sock"),
-		filepath.Join(dirs, "repo"),
-		filepath.Join(dirs, "leases"),
-		filepath.Join(dirs, "history.json"),
-		"",
-		gotmux.Streams{},
-		RemoteServices{},
-	)
-	if err != nil {
-		t.Fatalf("newPickerServices failed: %v", err)
-	}
-
-	t.Cleanup(func() { _ = services.Close() })
-
-	target := session.Session{ID: "0", Name: "test"}
-
-	err = services.SnapshotSession(ctx, target)
-	if err == nil {
-		t.Fatal("expected SnapshotSession to reject excessive environment keys")
-	}
-
-	if !errors.Is(err, process.ErrEnvironmentLimitExceeded) {
-		t.Fatalf("expected ErrEnvironmentLimitExceeded, got: %v", err)
-	}
 }

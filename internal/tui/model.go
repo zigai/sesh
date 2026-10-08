@@ -30,10 +30,9 @@ const (
 
 const (
 	dialogNone dialogState = iota
-	dialogConfirmKill
-	dialogConfirmDelete
-	dialogInputRename
-	dialogInputCreateDir
+	dialogConfirm
+	dialogInputText
+	dialogInputPath
 )
 
 const (
@@ -146,16 +145,14 @@ type Model struct {
 	agentSort                    agentSort
 	sessionFormats               sessionRowFormats
 	textInput                    textinput.Model
-	renameInput                  textinput.Model
-	createDirInput               textinput.Model
+	textParamInput               textinput.Model
+	pathInput                    textinput.Model
 	dialog                       dialogState
-	confirmAction                func() error
-	confirmCommand               tea.Cmd
+	pending                      *pendingAction
 	confirmYes                   bool
-	createSession                string
-	createDirSuggestions         []string
-	createDirSuggestionIndex     int
-	createDirSuggestionTop       int
+	pathSuggestions              []string
+	pathSuggestionIndex          int
+	pathSuggestionTop            int
 	statusMessage                string
 	statusLevel                  statusLevel
 	degradedSources              map[string]string
@@ -200,9 +197,6 @@ type Model struct {
 	hasDeferredRemoteAttach      bool
 	remoteAttachPane             string
 	originDetachAfterQuit        bool
-	renameTarget                 session.Session
-	killTarget                   session.Session
-	deleteTarget                 session.Session
 	lifecycle                    *lifecycle
 	logger                       zerolog.Logger
 	deps                         Services
@@ -274,8 +268,8 @@ func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps
 	textInput := newTextInput(textInputStyles)
 	textInput.Focus()
 
-	createDirInput := newTextInput(textInputStyles)
-	renameInput := newTextInput(textInputStyles)
+	pathInput := newTextInput(textInputStyles)
+	textParamInput := newTextInput(textInputStyles)
 
 	displayModes := configuredDisplayModes(cfg)
 	displayMode := initialDisplayMode(st.PopupDisplayMode, displayModes)
@@ -308,16 +302,14 @@ func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps
 		agentSort:                    parseAgentSort(cfg.AgentSessions.PopupSort),
 		sessionFormats:               formats,
 		textInput:                    textInput,
-		renameInput:                  renameInput,
-		createDirInput:               createDirInput,
+		textParamInput:               textParamInput,
+		pathInput:                    pathInput,
 		dialog:                       dialogNone,
-		confirmAction:                nil,
-		confirmCommand:               nil,
+		pending:                      nil,
 		confirmYes:                   false,
-		createSession:                "",
-		createDirSuggestions:         nil,
-		createDirSuggestionIndex:     0,
-		createDirSuggestionTop:       0,
+		pathSuggestions:              nil,
+		pathSuggestionIndex:          0,
+		pathSuggestionTop:            0,
 		statusMessage:                "",
 		statusLevel:                  statusNone,
 		degradedSources:              nil,
@@ -362,9 +354,6 @@ func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps
 		hasDeferredRemoteAttach:      false,
 		remoteAttachPane:             "",
 		originDetachAfterQuit:        false,
-		renameTarget:                 emptySession(),
-		killTarget:                   emptySession(),
-		deleteTarget:                 emptySession(),
 		lifecycle:                    newLifecycle(ctx),
 		logger:                       *zerolog.Ctx(ctx),
 		deps:                         deps,
@@ -765,10 +754,20 @@ func (m *Model) handleModelMessage(msg tea.Msg) func() (tea.Model, tea.Cmd) {
 
 			return m, m.waitRemoteCatalogUpdateCommand()
 		}
+	}
 
+	return m.handleResultMessage(msg)
+}
+
+func (m *Model) handleResultMessage(msg tea.Msg) func() (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
 	case sessionActionResultMsg:
 		return func() (tea.Model, tea.Cmd) {
 			return m.handleSessionActionResult(msg)
+		}
+	case actionResultMsg:
+		return func() (tea.Model, tea.Cmd) {
+			return m.handleActionResult(msg)
 		}
 	case stateUpdateResultMsg:
 		return func() (tea.Model, tea.Cmd) {
@@ -779,9 +778,9 @@ func (m *Model) handleModelMessage(msg tea.Msg) func() (tea.Model, tea.Cmd) {
 
 			return m, nil
 		}
+	default:
+		return nil
 	}
-
-	return nil
 }
 
 func (m *Model) handlePopupStartupDeadline() (tea.Model, tea.Cmd) {

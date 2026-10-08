@@ -19,9 +19,9 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
-func NewActionAdoptStartupSessionCommand() *cobra.Command {
+func newAdoptStartupCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "session-adopt-startup",
+		Use:   "adopt-startup",
 		Short: "Adopt a fresh numbered startup session as the default session",
 		Long: "Adopt a fresh numbered startup session as the default session.\n\n" +
 			"Only the exact session shown by an attached client is considered, and only when it was created moments ago with a single " +
@@ -31,7 +31,6 @@ func NewActionAdoptStartupSessionCommand() *cobra.Command {
 		Annotations: map[string]string{clibase.AnnotationOperation: "adopt_startup_session"},
 	}
 
-	addAutosaveFlags(cmd.Flags())
 	clibase.AddJSONFlag(cmd)
 
 	return cmd
@@ -156,7 +155,7 @@ func currentAttachedClient(ctx context.Context, server *gotmux.Server) (gotmux.C
 	return client, sessionID, nil
 }
 
-func NewRestoreOnStartCommand() *cobra.Command {
+func newRestoreOnStartCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:         "restore-on-start",
 		Short:       "Restore the newest saved snapshot when explicitly configured",

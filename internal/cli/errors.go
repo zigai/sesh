@@ -7,6 +7,7 @@ import (
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
 
+	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/cli/clibase"
 )
 
@@ -19,10 +20,8 @@ const (
 
 var (
 	errUnknownCommand     = errors.New("unknown command")
-	ErrPartialSnapshot    = clibase.ErrPartialSnapshot
-	errPartialSnapshot    = ErrPartialSnapshot
-	ErrPartialRestore     = clibase.ErrPartialRestore
-	errPartialRestore     = ErrPartialRestore
+	errPartialSnapshot    = app.ErrPartialSnapshot
+	errPartialRestore     = app.ErrPartialRestore
 	errSocketRequired     = clibase.ErrSocketRequired
 	errRepositoryRequired = clibase.ErrRepositoryRequired
 	errLeaseRootRequired  = clibase.ErrLeaseRootRequired

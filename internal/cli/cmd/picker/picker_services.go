@@ -5,7 +5,6 @@ package picker
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -19,30 +18,25 @@ import (
 	gotmux "github.com/zigai/gotmux/tmux"
 	"golang.org/x/sync/singleflight"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/agents"
+	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/config"
-	"github.com/zigai/sesh/internal/integration/process"
 	integration "github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/session"
-	"github.com/zigai/sesh/internal/snapshot/engine"
 	"github.com/zigai/sesh/internal/snapshot/store"
 	"github.com/zigai/sesh/internal/tui"
 )
 
-var (
-	errPickerTargetChanged                               = errors.New("selected session changed since it was observed")
-	errPickerPartialSave                                 = errors.New("snapshot capture completed without full parity")
-	errPickerPartialRestore                              = errors.New("snapshot restore completed without full parity")
-	errPickerRepositoryRequired                          = errors.New("repository is not configured")
-	_                           tui.DegradedOutcomeError = (*pickerRestoreOutcomeError)(nil)
-)
+var errPickerTargetChanged = errors.New("selected session changed since it was observed")
 
 type RemoteServices struct {
 	Catalog      tui.RemoteCatalogSource
 	Watcher      tui.RemoteCatalogWatcher
-	Actions      tui.RemoteActionService
+	Peer         action.Dispatcher
 	Attach       tui.RemoteAttacher
 	OriginBridge tui.OriginBridgeService
+	Origin       action.Dispatcher
 }
 
 type RemoteFactory func(context.Context, *config.Config, string) (RemoteServices, error)
@@ -53,10 +47,8 @@ type pickerServices struct {
 	currentPane      string
 	currentSessionID string
 	popupChild       bool
-	repoMu           sync.Mutex
-	repository       *store.Repository
+	repository       *app.Repository
 	repositoryPath   string
-	leaseRoot        string
 	historyPath      string
 	agentStore       agents.SnapshotSource
 	sessionNames     pickerTranscriptNameCache
@@ -64,64 +56,14 @@ type pickerServices struct {
 	panes            singleflight.Group
 	initialReads     *pickerInitialReads
 	workflow         *session.Workflow
+	actions          action.Router
 	remote           RemoteServices
 	viewsMu          sync.Mutex
 	deferredViews    []tui.AgentView
 }
 
-type pickerRestoreOutcomeError struct {
-	result engine.RestoreResult
-	cause  error
-}
-
 func AgentSummaries(observed []agents.AgentSession) []session.AgentSummary {
 	return pickerAgentSummaries(observed)
-}
-
-func (e *pickerRestoreOutcomeError) Error() string {
-	details := make([]string, 0, len(e.result.MissingRequirements))
-	for _, requirement := range e.result.MissingRequirements {
-		details = append(details, requirement.Domain+"/"+requirement.Status+"/"+string(requirement.Reason))
-	}
-
-	message := fmt.Sprintf(
-		"restore %s; operation %s; reason %s",
-		e.result.Status,
-		e.result.OperationID,
-		e.result.Reason,
-	)
-	if len(details) != 0 {
-		message += "; missing " + strings.Join(details, ",")
-	}
-
-	if e.cause != nil {
-		message += ": " + e.cause.Error()
-	}
-
-	return message
-}
-
-func (e *pickerRestoreOutcomeError) Unwrap() error { return e.cause }
-
-func (*pickerRestoreOutcomeError) PickerOutcomeOwned() bool { return true }
-
-func (e *pickerRestoreOutcomeError) PickerDegradedOutcome() bool {
-	return e.result.Status == "partial" || (e.cause == nil && len(e.result.MissingRequirements) != 0)
-}
-
-func newPickerRestoreOutcomeError(result engine.RestoreResult, cause error) error {
-	if result.OperationID == "" && len(result.MissingRequirements) == 0 {
-		return cause
-	}
-
-	return &pickerRestoreOutcomeError{result: cloneRestoreResult(result), cause: cause}
-}
-
-func cloneRestoreResult(result engine.RestoreResult) engine.RestoreResult {
-	result.SessionsRestored = slices.Clone(result.SessionsRestored)
-	result.MissingRequirements = slices.Clone(result.MissingRequirements)
-
-	return result
 }
 
 func newPickerServices(
@@ -140,23 +82,24 @@ func newPickerServices(
 		return nil, oops.In("cli").With("operation", "open_tmux").Wrap(err)
 	}
 
-	workflow := session.NewWorkflowWithOptions(session.WorkflowOptions{
-		Server:             server,
-		Repository:         nil,
-		LeaseRoot:          leaseRoot,
-		HistoryPath:        historyPath,
-		Hooks:              cfg.Hooks,
-		HookRunner:         nil,
-		Getenv:             nil,
-		Streams:            streams,
-		Source:             "picker",
-		DeferSwitchHistory: true,
-	})
-
 	resolvedAgentStatePath := agentStatePath
 	if resolvedAgentStatePath == "" && cfg != nil && cfg.AgentStatus.StorePath != "" {
 		resolvedAgentStatePath = cfg.AgentStatus.StorePath
 	}
+
+	agentStore := agents.NewAHTStore(resolvedAgentStatePath)
+	repository := app.NewRepository(repositoryPath)
+	local := app.NewLocal(app.LocalOptions{
+		Config:             cfg,
+		Server:             server,
+		Repository:         repository,
+		LeaseRoot:          leaseRoot,
+		HistoryPath:        historyPath,
+		AgentSource:        agentStore,
+		Streams:            streams,
+		Source:             "picker",
+		DeferSwitchHistory: true,
+	})
 
 	return &pickerServices{
 		cfg:              cfg,
@@ -164,17 +107,16 @@ func newPickerServices(
 		currentPane:      "",
 		currentSessionID: "",
 		popupChild:       false,
-		repoMu:           sync.Mutex{},
-		repository:       nil,
+		repository:       repository,
 		repositoryPath:   repositoryPath,
-		leaseRoot:        leaseRoot,
 		historyPath:      historyPath,
-		agentStore:       agents.NewAHTStore(resolvedAgentStatePath),
+		agentStore:       agentStore,
 		sessionNames:     pickerTranscriptNameCache{mu: sync.Mutex{}, cache: nil},
 		titles:           pickerTitleCache{mu: sync.Mutex{}, cache: nil, inflight: singleflight.Group{}},
 		panes:            singleflight.Group{},
 		initialReads:     nil,
-		workflow:         workflow,
+		workflow:         local.Workflow(),
+		actions:          action.Router{Local: local, Peer: remote.Peer, Origin: remote.Origin},
 		remote:           remote,
 		viewsMu:          sync.Mutex{},
 		deferredViews:    nil,
@@ -187,7 +129,12 @@ func (s *pickerServices) Close() error {
 		readsErr = s.initialReads.finish()
 	}
 
-	return errors.Join(readsErr, s.closeRepository())
+	repositoryErr := s.repository.Close()
+	if repositoryErr != nil {
+		repositoryErr = oops.In("cli").With("operation", "close_repository").Wrap(repositoryErr)
+	}
+
+	return errors.Join(readsErr, repositoryErr)
 }
 
 func (s *pickerServices) startInitialReads(ctx context.Context) {
@@ -212,65 +159,18 @@ func (s *pickerServices) readTmux(ctx context.Context, query func(*gotmux.Server
 	return s.initialReads.read(ctx, s.server, query)
 }
 
-func (s *pickerServices) closeRepository() error {
-	s.repoMu.Lock()
-	defer s.repoMu.Unlock()
-
-	if s == nil || s.repository == nil {
-		return nil
-	}
-
-	err := s.repository.Close()
-	s.repository = nil
-
-	if err != nil {
-		return oops.In("cli").With("operation", "close_repository").Wrap(err)
-	}
-
-	return nil
-}
-
-func (s *pickerServices) getRepository(ctx context.Context) (*store.Repository, error) {
-	s.repoMu.Lock()
-	defer s.repoMu.Unlock()
-
-	if s.repository != nil {
-		return s.repository, nil
-	}
-
-	if s.repositoryPath == "" {
-		return nil, errPickerRepositoryRequired
-	}
-
-	repo, err := store.Open(ctx, s.repositoryPath)
-	if err != nil {
-		return nil, oops.In("cli").With("operation", "open_repository").Wrap(err)
-	}
-
-	s.repository = repo
-	if s.workflow != nil {
-		s.workflow.SetRepository(repo)
-	}
-
-	return s.repository, nil
-}
-
 func (s *pickerServices) TUIServices() tui.Services {
 	return tui.Services{
 		Catalog:          s,
 		Detector:         s,
 		Enterer:          s,
-		Renamer:          s,
-		Killer:           s,
-		Deleter:          s,
+		Actions:          s.actions,
 		Panes:            s,
 		TerminalAttach:   nil,
 		Agents:           s,
 		AgentWatcher:     s,
-		Snapshots:        s,
 		Remote:           s.remote.Catalog,
 		RemoteWatcher:    s.remote.Watcher,
-		RemoteActions:    s.remote.Actions,
 		RemoteAttach:     s.remote.Attach,
 		OriginBridge:     s.remote.OriginBridge,
 		WorkingDirectory: s,
@@ -280,7 +180,7 @@ func (s *pickerServices) TUIServices() tui.Services {
 
 // LoadCatalog lists saved sessions through a lock-free repository view: the picker's first
 // frame must not wait on a concurrent save's commit or on the durable open's fsync. Actions
-// that act on a saved session reopen the repository durably through getRepository.
+// that act on a saved session open the repository durably.
 func (s *pickerServices) LoadCatalog(ctx context.Context) (session.CatalogResult, error) {
 	if s.repositoryPath == "" {
 		return s.listCatalog(ctx, nil)
@@ -340,66 +240,10 @@ func (s *pickerServices) EnterSession(ctx context.Context, target session.Sessio
 	return outcome, nil
 }
 
-func (s *pickerServices) CreateAndEnterSession(ctx context.Context, name, dir string) (tui.EnterOutcome, error) {
-	created, err := s.workflow.CreateSession(ctx, name, dir)
-	if err != nil {
-		return s.enterExistingPickerSession(ctx, name, err)
-	}
-
-	live, err := findPickerLiveTarget(ctx, s.server, string(created.ID()), name)
-	if err != nil {
-		return pickerEnterOutcome(name, tui.EnterCompleted, false), err
-	}
-
-	outcome := pickerEnterOutcome(name, pickerDeferredEnterAction(s.TmuxIsInsideTmux()), false)
-	outcome.Target = live
-
-	return outcome, nil
-}
-
-func (s *pickerServices) RestoreAndEnterSession(ctx context.Context, target session.Session) (tui.EnterOutcome, error) {
-	if target.Kind != session.KindSaved || target.Origin != session.OriginLocal || target.ID == "" || target.Generation == "" {
-		return pickerEnterOutcome(target.Name, tui.EnterCompleted, false), errPickerTargetChanged
-	}
-
-	repo, err := s.getRepository(ctx)
-	if err != nil {
-		return pickerEnterOutcome(target.Name, tui.EnterCompleted, false), err
-	}
-
-	result, err := engine.Restore(ctx, repo, s.server, engine.RestoreConfig{
-		LeaseRoot:              s.leaseRoot,
-		Generation:             target.Generation,
-		Sessions:               []string{target.ID},
-		OperationID:            "",
-		LaunchProcesses:        true,
-		AllowMissingWorkingDir: false,
-		OnCollision:            engine.CollisionPolicyDefault,
-		Profile:                engine.RecoveryPractical,
-	})
-	if err != nil {
-		return pickerEnterOutcome(target.Name, tui.EnterCompleted, false), newPickerRestoreOutcomeError(result, err)
-	}
-
-	if (result.Status != "complete" && result.Status != "best_effort") || !result.Verified || result.Uncertain {
-		return pickerEnterOutcome(target.Name, tui.EnterCompleted, false), newPickerRestoreOutcomeError(result, errPickerPartialRestore)
-	}
-
-	live, err := findPickerLiveTarget(ctx, s.server, "", target.Name)
-	if err != nil {
-		return pickerEnterOutcome(target.Name, tui.EnterCompleted, true), err
-	}
-
-	outcome := pickerEnterOutcome(target.Name, pickerDeferredEnterAction(s.TmuxIsInsideTmux()), true)
-	outcome.Target = live
-
-	return outcome, nil
-}
-
-func pickerEnterOutcome(name string, action tui.EnterAction, restored bool) tui.EnterOutcome {
+func pickerEnterOutcome(name string, enterAction tui.EnterAction, restored bool) tui.EnterOutcome {
 	var target session.Session
 
-	return tui.EnterOutcome{SessionName: name, Action: action, Restored: restored, Target: target}
+	return tui.EnterOutcome{SessionName: name, Action: enterAction, Restored: restored, Target: target}
 }
 
 func pickerDeferredEnterAction(insideTmux bool) tui.EnterAction {
@@ -408,54 +252,6 @@ func pickerDeferredEnterAction(insideTmux bool) tui.EnterAction {
 	}
 
 	return tui.EnterNeedsAttach
-}
-
-func (s *pickerServices) RenameSession(ctx context.Context, target session.Session, newName string) error {
-	if err := revalidatePickerLiveTarget(ctx, s.server, target); err != nil {
-		return err
-	}
-
-	if err := s.workflow.RenameSessionTarget(ctx, target.Name, newName, target.ID); err != nil {
-		return oops.In("cli").With("operation", "rename_picker_session").Wrap(err)
-	}
-
-	return nil
-}
-
-func (s *pickerServices) KillSession(ctx context.Context, target session.Session) error {
-	if err := revalidatePickerLiveTarget(ctx, s.server, target); err != nil {
-		return err
-	}
-
-	if err := s.workflow.KillSessionTarget(ctx, target.Name, target.ID, false); err != nil {
-		return oops.In("cli").With("operation", "kill_picker_session").Wrap(err)
-	}
-
-	return nil
-}
-
-func (s *pickerServices) DeleteSessionEverywhere(ctx context.Context, target session.Session, force bool) (tui.DeleteResult, error) {
-	if target.Kind == session.KindLive {
-		if err := revalidatePickerLiveTarget(ctx, s.server, target); err != nil {
-			return tui.DeleteResult{}, err
-		}
-	}
-
-	expectedID := ""
-	if target.Kind == session.KindLive {
-		expectedID = target.ID
-	}
-
-	_, _ = s.getRepository(ctx)
-
-	outcome, err := s.workflow.DeleteSessionTargetEverywhere(ctx, target.Name, expectedID, force)
-
-	result := tui.DeleteResult{LiveKilled: outcome.LiveKilled, SavedDeleted: outcome.SavedDeleted}
-	if err != nil {
-		return result, oops.In("cli").With("operation", "delete_picker_session").Wrap(err)
-	}
-
-	return result, nil
 }
 
 func revalidatePickerLiveTarget(ctx context.Context, server *gotmux.Server, target session.Session) error {
@@ -573,47 +369,6 @@ func (s *pickerServices) observePaneLocations(ctx context.Context) ([]tui.PaneLo
 	}
 
 	return result, nil
-}
-
-func (s *pickerServices) SnapshotSession(ctx context.Context, target session.Session) error {
-	var processEnv []string
-	if s.cfg != nil {
-		processEnv = s.cfg.Snapshot.ProcessEnvironment
-	} else {
-		processEnv = config.DefaultProcessEnvironment
-	}
-
-	if err := process.ValidateEnvironmentKeys(processEnv); err != nil {
-		return oops.In("cli").With("operation", "snapshot_picker_session").Wrap(err)
-	}
-
-	processEnv = config.FilterProcessEnvironmentKeys(processEnv)
-
-	if err := revalidatePickerLiveTarget(ctx, s.server, target); err != nil {
-		return err
-	}
-
-	repo, err := s.getRepository(ctx)
-	if err != nil {
-		return err
-	}
-
-	result, err := engine.SaveObservation(ctx, repo, s.server, []gotmux.SessionID{gotmux.SessionID(target.ID)}, engine.SaveConfig{
-		LeaseRoot:              s.leaseRoot,
-		ProcessEnrichment:      true,
-		ProcessEnvironmentKeys: processEnv,
-		AgentSource:            s.agentStore,
-		Profile:                engine.RecoveryPractical,
-	})
-	if err != nil {
-		return oops.In("cli").With("operation", "snapshot_picker_session").Wrap(err)
-	}
-
-	if result.Status != "complete" && result.Status != "best_effort" {
-		return errPickerPartialSave
-	}
-
-	return nil
 }
 
 func (s *pickerServices) LoadAgentSummaries(ctx context.Context) (tui.AgentSnapshot, error) {
@@ -868,27 +623,6 @@ func (s *pickerServices) takeDeferredAgentViews() []tui.AgentView {
 	s.deferredViews = nil
 
 	return views
-}
-
-func (s *pickerServices) enterExistingPickerSession(ctx context.Context, name string, createErr error) (tui.EnterOutcome, error) {
-	if !errors.Is(createErr, session.ErrSessionAlreadyExists) {
-		return pickerEnterOutcome(name, tui.EnterCompleted, false), createErr
-	}
-
-	target, err := s.server.FindSession(ctx, name)
-	if err != nil {
-		return pickerEnterOutcome(name, tui.EnterCompleted, false), errors.Join(createErr, err)
-	}
-
-	live, err := findPickerLiveTarget(ctx, s.server, string(target.ID()), name)
-	if err != nil {
-		return pickerEnterOutcome(name, tui.EnterCompleted, false), err
-	}
-
-	outcome := pickerEnterOutcome(name, pickerDeferredEnterAction(s.TmuxIsInsideTmux()), false)
-	outcome.Target = live
-
-	return outcome, nil
 }
 
 func pickerPaths(cfg *config.Config, repository, leaseRoot, history string) (string, string, string, error) {

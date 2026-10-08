@@ -426,7 +426,7 @@ func renderSystemdRestoreService(inputs ServiceInputs) string {
 
 func restoreOnStartArgs(inputs ServiceInputs) []string {
 	return []string{
-		"action", "autosave-restore-on-start",
+		"autosave", "restore-on-start",
 		"--socket", inputs.SocketPath,
 		"--repository", inputs.RepositoryPath,
 		"--lease-root", inputs.LeaseRootPath,
@@ -594,7 +594,7 @@ func validateServiceInputs(inputs ServiceInputs) error {
 
 func autosaveArgs(inputs ServiceInputs) []string {
 	return []string{
-		"action", "autosave-save-if-due",
+		"autosave", "save-if-due",
 		"--socket", inputs.SocketPath,
 		"--repository", inputs.RepositoryPath,
 		"--lease-root", inputs.LeaseRootPath,
@@ -604,7 +604,7 @@ func autosaveArgs(inputs ServiceInputs) []string {
 
 func finalSaveArgs(inputs ServiceInputs) []string {
 	args := []string{
-		"action", "autosave-final-save",
+		"autosave", "final-save",
 		"--socket", inputs.SocketPath,
 		"--repository", inputs.RepositoryPath,
 		"--lease-root", inputs.LeaseRootPath,
@@ -629,7 +629,7 @@ func daemonArgs(inputs ServiceInputs) []string {
 }
 
 func daemonReadyArgs(inputs ServiceInputs) []string {
-	return []string{"action", "tmux-wait-ready", "--socket", inputs.SocketPath, "--timeout", stopBudgetGrace.String()}
+	return []string{"daemon", "wait-ready", "--socket", inputs.SocketPath, "--timeout", stopBudgetGrace.String()}
 }
 
 func systemdDefinitions(root string, inputs ServiceInputs) ([]ServiceDefinition, error) {

@@ -30,7 +30,7 @@ func TestStartupRestoreAbandonsARestoreFromAnEarlierBootAndRestores(t *testing.T
 		t.Fatalf("create the session to save: %v", err)
 	}
 
-	saved := executeJSON(t, "snapshot", "save", "--session", string(work.ID()),
+	saved := executeJSON(t, "snapshot", "save", string(work.ID()),
 		testSocketFlag, source.Endpoint().SocketPath, "--repository", repoPath, "--lease-root", leaseRoot,
 		testNoConfigFlag, testJSONFlag)
 	if saved.Err != nil || !saved.Envelope.OK {
@@ -41,7 +41,7 @@ func TestStartupRestoreAbandonsARestoreFromAnEarlierBootAndRestores(t *testing.T
 
 	server := tmuxtest.NewServer(t)
 
-	exec := executeJSON(t, actionCmd, "autosave-restore-on-start",
+	exec := executeJSON(t, "autosave", "restore-on-start",
 		testSocketFlag, server.Endpoint().SocketPath, "--repository", repoPath,
 		"--lease-root", leaseRoot, "--history", filepath.Join(root, "state", "history.json"),
 		testNoConfigFlag, testJSONFlag)

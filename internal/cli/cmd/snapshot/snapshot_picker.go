@@ -13,6 +13,7 @@ import (
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
 
+	"github.com/zigai/sesh/internal/cli/actioncli"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	cmdpicker "github.com/zigai/sesh/internal/cli/cmd/picker"
 	"github.com/zigai/sesh/internal/snapshot/store"
@@ -23,6 +24,7 @@ var (
 	errSnapshotPickerJSONConflict       = errors.New("--pick cannot be combined with --json")
 	errSnapshotPickerGenerationConflict = errors.New("--pick cannot be combined with --generation")
 	errSnapshotPickerOperationConflict  = errors.New("--pick cannot be combined with --operation")
+	errSnapshotPickerConnectionConflict = errors.New("--pick selects generations on this machine and cannot be combined with --connection")
 	errSnapshotPickerTerminalRequired   = errors.New("--pick requires an interactive terminal")
 )
 
@@ -46,6 +48,7 @@ func validateSnapshotRestorePicker(cmd *cobra.Command) error {
 		{flag: clibase.JSONFlagName, err: errSnapshotPickerJSONConflict},
 		{flag: "generation", err: errSnapshotPickerGenerationConflict},
 		{flag: "operation", err: errSnapshotPickerOperationConflict},
+		{flag: actioncli.ConnectionFlag, err: errSnapshotPickerConnectionConflict},
 	} {
 		if cmd.Flags().Changed(conflict.flag) {
 			return clibase.NewExitError(clibase.ExitCodeUsage, conflict.err)

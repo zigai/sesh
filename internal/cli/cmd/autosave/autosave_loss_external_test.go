@@ -24,7 +24,7 @@ func TestAutosaveSkipReportsSavedSessionsOnceWhenNoServerIsRunning(t *testing.T)
 	}
 
 	run := func() autosaveResultJSON {
-		exec := executeJSON(t, actionCmd, "autosave-save-if-due",
+		exec := executeJSON(t, "autosave", "save-if-due",
 			testSocketFlag, filepath.Join(root, "absent.sock"),
 			"--repository", repoPath, "--history", historyPath,
 			testNoConfigFlag, testJSONFlag)
@@ -55,7 +55,7 @@ func TestFinalSaveAfterTheServerDiedRecordsServerGoneNotAGenericFailure(t *testi
 
 	snapfixture.CommitOneSession(t, repoPath)
 
-	exec := executeJSON(t, actionCmd, "autosave-final-save",
+	exec := executeJSON(t, "autosave", "final-save",
 		testSocketFlag, filepath.Join(root, "absent.sock"),
 		"--repository", repoPath, "--history", filepath.Join(root, "state", "history.json"),
 		"--status-file", statusPath, "--deadline", "5s",

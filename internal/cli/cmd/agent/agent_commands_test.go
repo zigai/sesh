@@ -64,16 +64,16 @@ func TestAgentCommandsHelp(t *testing.T) {
 	t.Parallel()
 
 	commands := [][]string{
-		{"action", "agent-next"},
-		{"action", "agent-latest"},
-		{"action", "agent-waiting"},
-		{"action", "agent-failed"},
-		{"action", "agent-unread"},
-		{"action", "agent-toggle"},
-		{"action", "agent-back"},
-		{"action", "agent-focus"},
-		{"action", "agent-status"},
-		{"action", "agent-window-status-clear"},
+		{"agent", "next"},
+		{"agent", "latest"},
+		{"agent", "waiting"},
+		{"agent", "failed"},
+		{"agent", "unread"},
+		{"agent", "toggle"},
+		{"agent", "back"},
+		{"agent", "focus"},
+		{"agent", "status"},
+		{"agent", "window-status-clear"},
 		{"daemon", "agent-window-status"},
 	}
 
@@ -94,11 +94,11 @@ func TestAgentCommandsHelp(t *testing.T) {
 }
 
 func TestAgentNavigationWithoutSocketTargetsDefaultTmuxServer(t *testing.T) {
-	for _, action := range []string{"agent-next", "agent-latest", "agent-back"} {
-		t.Run(action, func(t *testing.T) {
+	for _, verb := range []string{"next", "latest", "back"} {
+		t.Run(verb, func(t *testing.T) {
 			t.Setenv("TMUX", "")
 
-			_, _, err := executeCommand(t, "action", action, "--no-config")
+			_, _, err := executeCommand(t, "agent", verb, "--no-config")
 			if !errors.Is(err, gotmux.ErrNoServer) {
 				t.Fatalf("error = %v, want the isolated default socket to report no tmux server", err)
 			}
@@ -113,7 +113,7 @@ func TestAgentNavigationWithoutSocketTargetsDefaultTmuxServer(t *testing.T) {
 func TestAgentFocusRequiresTargetPane(t *testing.T) {
 	t.Setenv("TMUX", "")
 
-	_, _, err := executeCommand(t, "action", "agent-focus", "--no-config", "--socket", "/tmp/does-not-exist.sock")
+	_, _, err := executeCommand(t, "agent", "focus", "--no-config", "--socket", "/tmp/does-not-exist.sock")
 	if err == nil {
 		t.Fatal("expected usage error without a target pane, got nil")
 	}
@@ -133,7 +133,7 @@ func TestAgentStatusSummaryJSON(t *testing.T) {
 		agentRegistrySession("idle-agent", "idle", "%3"),
 	)
 
-	stdout, stderr, err := executeCommand(t, "action", "agent-status", "--no-config", "--state", statePath, "--json")
+	stdout, stderr, err := executeCommand(t, "agent", "status", "--no-config", "--agent-state", statePath, "--json")
 	if err != nil {
 		t.Fatalf("agent status failed: %v\nstderr: %s", err, stderr)
 	}
@@ -167,7 +167,7 @@ func TestAgentStatusSummaryText(t *testing.T) {
 
 	statePath := writeAgentRegistry(t, agentRegistrySession("waiting-agent", "waiting", "%1"))
 
-	stdout, stderr, err := executeCommand(t, "action", "agent-status", "--no-config", "--state", statePath)
+	stdout, stderr, err := executeCommand(t, "agent", "status", "--no-config", "--agent-state", statePath)
 	if err != nil {
 		t.Fatalf("agent status failed: %v\nstderr: %s", err, stderr)
 	}
@@ -185,7 +185,7 @@ func TestAgentStatusReportsUnsupportedRegistry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, _, err := executeCommand(t, "action", "agent-status", "--no-config", "--state", statePath)
+	_, _, err := executeCommand(t, "agent", "status", "--no-config", "--agent-state", statePath)
 	if err == nil {
 		t.Fatal("expected failure on an unsupported registry schema")
 	}
@@ -205,7 +205,7 @@ func writeAgentStoreConfig(t *testing.T, storePath string) string {
 func agentStatusTotal(t *testing.T, args ...string) int {
 	t.Helper()
 
-	stdout, stderr, err := executeCommand(t, append([]string{"action", "agent-status", "--json"}, args...)...)
+	stdout, stderr, err := executeCommand(t, append([]string{"agent", "status", "--json"}, args...)...)
 	if err != nil {
 		t.Fatalf("agent status failed: %v\nstderr: %s", err, stderr)
 	}
@@ -241,7 +241,7 @@ func TestAgentStatusStateFlagOverridesConfiguredRegistry(t *testing.T) {
 		agentRegistrySession("third-agent", "failed", "%3"),
 	)
 
-	if total := agentStatusTotal(t, "--config", writeAgentStoreConfig(t, configured), "--state", explicit); total != 3 {
-		t.Fatalf("status total = %d, want 3 agents from --state", total)
+	if total := agentStatusTotal(t, "--config", writeAgentStoreConfig(t, configured), "--agent-state", explicit); total != 3 {
+		t.Fatalf("status total = %d, want 3 agents from --agent-state", total)
 	}
 }

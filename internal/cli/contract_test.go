@@ -36,32 +36,32 @@ func TestJSONEnvelopeFormatAndTaxonomy(t *testing.T) {
 	}{
 		{
 			name:         "usage error unknown flag",
-			args:         []string{actionCmd, "snapshot-save", testJSONFlag, "--unknown"},
+			args:         []string{snapshotCmd, "save", testJSONFlag, "--unknown"},
 			wantCode:     "usageError",
 			wantExitCode: exitCodeUsage,
 			wantSubstr:   "unknown flag",
 		},
 		{
-			name: "selection required empty selection",
+			name: "empty selection is a usage error",
 			args: []string{
-				actionCmd, "snapshot-save",
+				snapshotCmd, "save",
 				testRepositoryFlag, tempDir,
 				testSocketFlag, "/tmp/nonexistent.sock",
 				testLeaseRootFlag, filepath.Join(tempDir, "lease"),
 				testJSONFlag,
 			},
-			wantCode:     "selectionRequired",
-			wantExitCode: exitCodeGeneral,
-			wantSubstr:   "explicit session selection required",
+			wantCode:     "usageError",
+			wantExitCode: exitCodeUsage,
+			wantSubstr:   "invalid command usage",
 		},
 		{
 			name: "endpoint required invalid socket",
 			args: []string{
-				actionCmd, "snapshot-save",
+				snapshotCmd, "save",
 				testRepositoryFlag, tempDir,
 				testSocketFlag, "relative/socket/path",
 				testLeaseRootFlag, filepath.Join(tempDir, "lease"),
-				testSessionFlag, "$0",
+				"$0",
 				testJSONFlag,
 			},
 			wantCode:     "endpointRequired",
@@ -103,8 +103,8 @@ func assertErrorEnvelopeFields(t *testing.T, exec commandExecution, wantCode str
 		t.Fatalf("expected error envelope (ok=false), got ok=true: %s", exec.stdout)
 	}
 
-	if exec.envelope.SchemaVersion != 1 {
-		t.Fatalf("schemaVersion = %d, want 1", exec.envelope.SchemaVersion)
+	if exec.envelope.SchemaVersion != 2 {
+		t.Fatalf("schemaVersion = %d, want 2", exec.envelope.SchemaVersion)
 	}
 
 	if exec.envelope.Error == nil {
@@ -254,19 +254,19 @@ func TestJsonErrorCodeTaxonomyMappings(t *testing.T) {
 
 func TestJSONFlagDetectionFollowsFinalParsedValue(t *testing.T) {
 	t.Run("json flag as string value produces plain text", func(t *testing.T) {
-		assertPlainTextErrorOutput(t, actionCmd, "snapshot-save", testRepositoryFlag, testJSONFlag)
+		assertPlainTextErrorOutput(t, snapshotCmd, "save", testRepositoryFlag, testJSONFlag)
 	})
 
 	t.Run("json flag after terminator produces plain text", func(t *testing.T) {
-		assertPlainTextErrorOutput(t, actionCmd, "snapshot-save", "--", testJSONFlag)
+		assertPlainTextErrorOutput(t, snapshotCmd, "save", "--", testJSONFlag)
 	})
 
 	t.Run("repeated boolean false wins produces plain text", func(t *testing.T) {
-		assertPlainTextErrorOutput(t, actionCmd, "snapshot-save", testJSONFlag, "--json=false", "--unknown")
+		assertPlainTextErrorOutput(t, snapshotCmd, "save", testJSONFlag, "--json=false", "--unknown")
 	})
 
 	t.Run("repeated boolean true wins produces json", func(t *testing.T) {
-		exec := executeJSON(t, actionCmd, "snapshot-save", "--json=false", testJSONFlag, "--unknown")
+		exec := executeJSON(t, snapshotCmd, "save", "--json=false", testJSONFlag, "--unknown")
 		if !strings.Contains(exec.stderr, "schemaVersion") {
 			t.Fatalf("expected JSON error when --json is last, got:\n%s", exec.stderr)
 		}
@@ -277,7 +277,7 @@ func TestJSONFlagDetectionFollowsFinalParsedValue(t *testing.T) {
 	})
 
 	t.Run("unknown flag before json produces json error", func(t *testing.T) {
-		exec := executeJSON(t, actionCmd, "snapshot-save", "--unknown", testJSONFlag)
+		exec := executeJSON(t, snapshotCmd, "save", "--unknown", testJSONFlag)
 		if !strings.Contains(exec.stderr, "schemaVersion") {
 			t.Fatalf("expected JSON error when --unknown is before --json, got:\n%s", exec.stderr)
 		}
