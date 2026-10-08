@@ -173,4 +173,4 @@ Each run gets the row as one JSON line on stdin, with `schemaVersion`, `field`, 
 
 A command starts in the row's directory when the row is local and the directory exists.
 
-The value is everything the command writes to stdout until stdout closes, so redirect the output of background jobs. Line breaks become spaces. Color and style escape sequences are kept; other escape sequences are removed. Empty output hides the field and any `[...]` group around it. When a command fails, the field keeps its previous value and the failure goes to the log with the command's stderr.
+The value is everything the command writes to stdout until stdout closes, so redirect the output of background jobs. Line breaks become spaces. Color and style escape sequences are kept; other escape sequences are removed. Empty output hides the field and any `[...]` group around it. When a command fails, the field keeps its previous value and the failure goes to the log with fixed reason and error codes and the exit code, without command output.

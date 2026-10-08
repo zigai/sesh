@@ -48,20 +48,21 @@ func SanitizeTerminalTextKeepSGR(s string) string {
 	b.Grow(len(s))
 
 	for len(s) > 0 {
-		seq, width, n, newState := ansi.DecodeSequence(s, state, nil)
+		seq, _, n, newState := ansi.DecodeSequence(s, state, nil)
 		state = newState
 		s = s[n:]
 
-		if width == 0 {
-			if isSGRSequence(seq) {
-				b.WriteString(seq)
-			}
+		if isSGRSequence(seq) {
+			b.WriteString(seq)
+			continue
+		}
 
+		if len(seq) == 0 || seq[0] < 0x20 || (seq[0] >= 0x7f && seq[0] < 0xc0) {
 			continue
 		}
 
 		for _, r := range seq {
-			if !isBidiOrDangerousControl(r) && (unicode.IsPrint(r) || r == ' ') {
+			if !isBidiOrDangerousControl(r) && (unicode.IsPrint(r) || r == '\u200c' || r == '\u200d') {
 				b.WriteRune(r)
 			}
 		}

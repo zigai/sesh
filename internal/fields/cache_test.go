@@ -16,7 +16,7 @@ func TestCacheRoundTripsEntries(t *testing.T) {
 		"%12":        {ChangeKey: "a1", Text: "\x1b[32mok\x1b[0m", At: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)},
 		"session:$1": {ChangeKey: "b2", Text: "", At: time.Date(2026, 1, 2, 3, 4, 6, 0, time.UTC)},
 	}
-	if err := fields.WriteCache(path, entries); err != nil {
+	if err := fields.MergeCache(t.Context(), path, entries); err != nil {
 		t.Fatal(err)
 	}
 
@@ -29,12 +29,12 @@ func TestCacheRoundTripsEntries(t *testing.T) {
 		t.Fatalf("ReadCache() = %#v, want %#v", got, entries)
 	}
 
-	if err := fields.WriteCache(path, map[string]fields.CacheEntry{}); err != nil {
+	if err := fields.MergeCache(t.Context(), path, map[string]fields.CacheEntry{}); err != nil {
 		t.Fatal(err)
 	}
 
-	if got, err := fields.ReadCache(path); err != nil || len(got) != 0 {
-		t.Fatalf("ReadCache() after replace = %#v, %v", got, err)
+	if got, err := fields.ReadCache(path); err != nil || !maps.Equal(got, entries) {
+		t.Fatalf("ReadCache() after empty update = %#v, %v, want %#v", got, err, entries)
 	}
 }
 
@@ -45,7 +45,7 @@ func TestReadCacheRejectsMissingCorruptAndOtherVersions(t *testing.T) {
 		t.Fatalf("missing cache = %#v, %v", got, err)
 	}
 
-	if err := fields.WriteCache(path, nil); err != nil {
+	if err := fields.MergeCache(t.Context(), path, nil); err != nil {
 		t.Fatal(err)
 	}
 

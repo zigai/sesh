@@ -48,9 +48,6 @@ func Run(ctx context.Context, command config.FieldCommand, input Context) Result
 
 	processAttr.Setpgid = true
 	cmd.SysProcAttr = &processAttr
-	cmd.Cancel = func() error {
-		return killProcessGroup(cmd.Process.Pid)
-	}
 
 	stdout, stderr, runErr := runCapturing(ctx, cmd, stdin)
 
@@ -116,8 +113,14 @@ func runCapturing(ctx context.Context, cmd *exec.Cmd, input []byte) ([]byte, []b
 		return nil, nil, errors.Join(fmt.Errorf("start field command: %w", startErr), childEndsErr, closePipes(pipes))
 	}
 
+	cleanupDone := make(chan struct{})
+
+	var cleanupErr error
+
 	stopUnblock := context.AfterFunc(ctx, func() {
-		_ = closePipes(pipes)
+		cleanupErr = errors.Join(killProcessGroup(cmd.Process.Pid), closePipes(pipes))
+
+		close(cleanupDone)
 	})
 
 	var (
@@ -151,16 +154,28 @@ func runCapturing(ctx context.Context, cmd *exec.Cmd, input []byte) ([]byte, []b
 	group.Go(func() { collect(&output, stdout.read) })
 	group.Go(func() { collect(&errorOutput, stderr.read) })
 
-	waitErr := cmd.Wait()
+	exitErr := waitForFieldExit(cmd.Process.Pid)
+	if exitErr != nil {
+		if !errors.Is(exitErr, syscall.ECHILD) {
+			exitErr = errors.Join(exitErr, killProcessGroup(cmd.Process.Pid))
+		}
 
-	group.Wait()
-	stopUnblock()
-
-	if ctxErr := ctx.Err(); ctxErr != nil {
-		waitErr = ctxErr
+		exitErr = errors.Join(exitErr, closePipes(pipes))
 	}
 
-	ioErr := errors.Join(childEndsErr, readErr, closePipes(pipes))
+	group.Wait()
+
+	if !stopUnblock() {
+		<-cleanupDone
+	}
+
+	waitErr := errors.Join(exitErr, cmd.Wait())
+
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		waitErr = errors.Join(ctxErr, waitErr)
+	}
+
+	ioErr := errors.Join(childEndsErr, readErr, cleanupErr, closePipes(pipes))
 	if waitErr != nil {
 		return output, errorOutput, fmt.Errorf("run field command: %w", errors.Join(waitErr, ioErr))
 	}

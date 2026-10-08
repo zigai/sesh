@@ -406,6 +406,7 @@ func (m *Model) Close() {
 		return
 	}
 
+	m.flushCustomFieldCaches()
 	m.providerRunner.Close()
 	m.lifecycle.Close()
 }
@@ -729,7 +730,11 @@ func (m *Model) handleProviderModelMessage(msg tea.Msg) func() (tea.Model, tea.C
 	case ghResultMsg:
 		return func() (tea.Model, tea.Cmd) { return m, m.handleGH(msg) }
 	case customFieldResultMsg:
-		return func() (tea.Model, tea.Cmd) { return m, m.handleCustomFieldResult(msg) }
+		return func() (tea.Model, tea.Cmd) {
+			m.handleCustomFieldResult(msg)
+
+			return m, nil
+		}
 	case customFieldTickMsg:
 		return func() (tea.Model, tea.Cmd) { return m, m.handleCustomFieldTick(msg) }
 	default:

@@ -110,6 +110,9 @@ func TestSanitizeTerminalTextKeepSGRKeepsOnlyStyles(t *testing.T) {
 		input string
 		want  string
 	}{
+		"combining accent":    {input: "e\u0301clair", want: "e\u0301clair"},
+		"styled accent":       {input: "e\x1b[31m\u0301", want: "e\x1b[31m\u0301"},
+		"joined emoji":        {input: "👩\u200d💻", want: "👩\u200d💻"},
 		"plain":               {input: "main ✓ 漢字", want: "main ✓ 漢字"}, //nolint:gosmopolitan // Test checks that wide Han runes pass through the sanitizer.
 		"sgr":                 {input: "\x1b[1;38;2;255;0:0mok\x1b[0m \x1b[m", want: "\x1b[1;38;2;255;0:0mok\x1b[0m \x1b[m"},
 		"cursor movement":     {input: "a\x1b[2Jb\x1b[10;3Hc\x1b[?25l", want: "abc"},

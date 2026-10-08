@@ -1,11 +1,14 @@
 package fields
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"maps"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -45,6 +48,25 @@ func ReadCache(path string) (map[string]CacheEntry, error) {
 		return nil, err
 	}
 
+	return decodeCache(data)
+}
+
+func MergeCache(ctx context.Context, path string, updates map[string]CacheEntry) error {
+	dir, err := privatefs.Ensure(filepath.Dir(path))
+	if err != nil {
+		return fmt.Errorf("create field cache directory: %w", err)
+	}
+
+	name := filepath.Base(path)
+	lock, err := dir.Lock(ctx, name+".lock")
+	if err != nil {
+		return errors.Join(fmt.Errorf("lock field cache: %w", err), dir.Close())
+	}
+
+	return errors.Join(mergeCache(dir, name, updates), lock.Close(), dir.Close())
+}
+
+func decodeCache(data []byte) (map[string]CacheEntry, error) {
 	var cache cacheFile
 	if err := json.Unmarshal(data, &cache); err != nil {
 		return nil, fmt.Errorf("decode field cache: %w", err)
@@ -57,18 +79,35 @@ func ReadCache(path string) (map[string]CacheEntry, error) {
 	return cache.Entries, nil
 }
 
-func WriteCache(path string, entries map[string]CacheEntry) error {
-	data, err := json.Marshal(cacheFile{Version: cacheVersion, Entries: entries})
+func mergeCache(dir *privatefs.Dir, name string, updates map[string]CacheEntry) error {
+	entries := make(map[string]CacheEntry)
+
+	data, err := readPrivateFile(dir, name)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	if err == nil {
+		cached, err := decodeCache(data)
+		if err != nil {
+			return err
+		}
+
+		maps.Copy(entries, cached)
+	}
+
+	for row, entry := range updates {
+		if current, ok := entries[row]; !ok || !entry.At.Before(current.At) {
+			entries[row] = entry
+		}
+	}
+
+	data, err = json.Marshal(cacheFile{Version: cacheVersion, Entries: entries})
 	if err != nil {
 		return fmt.Errorf("encode field cache: %w", err)
 	}
 
-	dir, err := privatefs.Ensure(filepath.Dir(path))
-	if err != nil {
-		return fmt.Errorf("create field cache directory: %w", err)
-	}
-
-	return errors.Join(publishCache(dir, filepath.Base(path), data), dir.Close())
+	return publishCache(dir, name, data)
 }
 
 func readPrivateFile(dir *privatefs.Dir, name string) ([]byte, error) {

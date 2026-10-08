@@ -6,6 +6,7 @@ import (
 	"maps"
 	"os/exec"
 	"slices"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -35,13 +36,14 @@ type customFieldCell struct {
 }
 
 type customFieldState struct {
-	commands map[string]config.FieldCommand
-	cells    map[customFieldKey]*customFieldCell
-	cache    map[string]map[string]fields.CacheEntry
-	unsaved  map[string]bool
-	ticking  map[string]bool
-	requests uint64
-	dirty    bool
+	commands    map[string]config.FieldCommand
+	cells       map[customFieldKey]*customFieldCell
+	cache       map[string]map[string]fields.CacheEntry
+	unsaved     map[string]map[string]fields.CacheEntry
+	writeErrors map[string]error
+	ticking     map[string]bool
+	requests    uint64
+	dirty       bool
 }
 
 type customFieldTarget struct {
@@ -86,13 +88,14 @@ func newCustomFieldState(formats sessionRowFormats, definitions config.FieldComm
 	}
 
 	return customFieldState{
-		commands: commands,
-		cells:    make(map[customFieldKey]*customFieldCell),
-		cache:    make(map[string]map[string]fields.CacheEntry),
-		unsaved:  make(map[string]bool),
-		ticking:  make(map[string]bool),
-		requests: 0,
-		dirty:    false,
+		commands:    commands,
+		cells:       make(map[customFieldKey]*customFieldCell),
+		cache:       make(map[string]map[string]fields.CacheEntry),
+		unsaved:     make(map[string]map[string]fields.CacheEntry),
+		writeErrors: make(map[string]error),
+		ticking:     make(map[string]bool),
+		requests:    0,
+		dirty:       false,
 	}, nil
 }
 
@@ -211,22 +214,22 @@ func cancelCustomFieldRun(cell *customFieldCell) {
 	}
 }
 
-func (m *Model) handleCustomFieldResult(msg customFieldResultMsg) tea.Cmd {
+func (m *Model) handleCustomFieldResult(msg customFieldResultMsg) {
 	cell, ok := m.customFields.cells[msg.key]
 	if !ok || cell.request != msg.request {
-		return nil
+		return
 	}
 
 	cancelCustomFieldRun(cell)
 
 	if msg.result.Failed() {
 		if !errors.Is(msg.result.Err, context.Canceled) {
-			logCustomFieldFailure(m.operationContext(), msg.key.field, msg.result)
+			logCustomFieldFailure(m.operationContext(), msg.result)
 		}
 
 		cell.state = layout.Pending
 
-		return m.saveCustomFieldCacheCommand(msg.key.field)
+		return
 	}
 
 	cell.text = SanitizeTerminalTextKeepSGR(msg.result.Text)
@@ -242,45 +245,52 @@ func (m *Model) handleCustomFieldResult(msg customFieldResultMsg) tea.Cmd {
 		m.customFields.cache[msg.key.field] = entries
 	}
 
-	entries[msg.key.row] = fields.CacheEntry{ChangeKey: msg.changeKey, Text: cell.text, At: msg.at}
-	m.customFields.unsaved[msg.key.field] = true
+	entry := fields.CacheEntry{ChangeKey: msg.changeKey, Text: cell.text, At: msg.at}
+	entries[msg.key.row] = entry
 
-	return m.saveCustomFieldCacheCommand(msg.key.field)
+	updates := m.customFields.unsaved[msg.key.field]
+	if updates == nil {
+		updates = make(map[string]fields.CacheEntry)
+		m.customFields.unsaved[msg.key.field] = updates
+	}
+
+	updates[msg.key.row] = entry
+	m.saveCustomFieldCache(msg.key.field)
 }
 
-func (m *Model) saveCustomFieldCacheCommand(name string) tea.Cmd {
-	if !m.customFields.unsaved[name] {
-		return nil
+func (m *Model) saveCustomFieldCache(name string) {
+	updates := m.customFields.unsaved[name]
+	if len(updates) == 0 {
+		return
 	}
 
-	rows := make(map[string]fields.CacheEntry)
-
-	for key, cell := range m.customFields.cells {
-		if key.field != name {
-			continue
+	ctx := context.WithoutCancel(m.operationContext())
+	if err := fields.MergeCache(ctx, fields.CachePath(name), updates); err != nil {
+		if m.customFields.writeErrors[name] == nil {
+			zerolog.Ctx(ctx).Error().
+				Str("component", "tui").
+				Str("operation", "custom_field_cache_write").
+				Str("status", "failed").
+				Str("reason", "cache_write_failed").
+				Str("error_code", classifyTUIErrorCode(err)).
+				Msg("custom field cache write failed")
 		}
 
-		if cell.cancel != nil {
-			return nil
-		}
+		m.customFields.writeErrors[name] = oops.In("tui").
+			Code("custom_field_cache_write_failed").
+			With("operation", "custom_field_cache_write").
+			Wrap(err)
 
-		if entry, ok := m.customFields.cache[name][key.row]; ok {
-			rows[key.row] = entry
-		}
+		return
 	}
 
-	m.customFields.unsaved[name] = false
-	path := fields.CachePath(name)
+	delete(m.customFields.unsaved, name)
+	delete(m.customFields.writeErrors, name)
+}
 
-	return func() tea.Msg {
-		if !m.lifecycle.BeginWorker() {
-			return nil
-		}
-		defer m.lifecycle.EndWorker()
-
-		_ = fields.WriteCache(path, rows)
-
-		return nil
+func (m *Model) flushCustomFieldCaches() {
+	for _, name := range m.customFieldNames() {
+		m.saveCustomFieldCache(name)
 	}
 }
 
@@ -358,7 +368,7 @@ func appendCustomFieldTargets(targets []customFieldTarget, names []string, row s
 
 func customFieldSessionRowKey(row session.Session) string {
 	if row.IsSaved() {
-		return "saved:" + row.Name
+		return row.EntityKey()
 	}
 
 	return row.RuntimeIdentity.ConnectionID + "|session:" + row.ID
@@ -417,17 +427,21 @@ func (v sessionFormatValues) resolveCustomCell(field string) (string, layout.Sta
 		return "", layout.Pending
 	}
 
-	return cell.text, cell.state
+	text := cell.text
+	if strings.Contains(text, "\x1b[") {
+		text += ansiReset
+	}
+
+	return text, cell.state
 }
 
-func logCustomFieldFailure(ctx context.Context, field string, result fields.Result) {
+func logCustomFieldFailure(ctx context.Context, result fields.Result) {
 	zerolog.Ctx(ctx).Error().
 		Str("component", "tui").
 		Str("operation", string(tuiOperationCustomFieldRun)).
 		Str("status", "failed").
-		Str("field", field).
+		Str("reason", "command_failed").
 		Int("exit_code", result.ExitCode).
-		Str("stderr", result.Stderr).
 		Str("error_code", classifyTUIErrorCode(result.Err)).
 		Msg("custom field command failed")
 }
