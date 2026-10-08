@@ -273,7 +273,7 @@ func executeFinalSave(
 		return finalSaveFailure(outcome, status, automation.FinalSaveFailed, "repository_unavailable", err)
 	}
 
-	lock, err := automation.TryAcquireSaveLock(ctx, automation.SaveLockPath())
+	lock, err := acquireFinalSaveLock(ctx)
 	if err != nil {
 		return finalSaveLockFailure(outcome, status, repo, err)
 	}
@@ -393,6 +393,17 @@ func finalSaveFailure(
 	outcome.reason = reason
 
 	return outcome, status, err
+}
+
+// acquireFinalSaveLock waits for a save in progress to finish instead of skipping the final save,
+// and reports the lock as busy when the save's deadline ends the wait.
+func acquireFinalSaveLock(ctx context.Context) (*automation.SaveLock, error) {
+	lock, _, err := automation.AcquireSaveLock(ctx, automation.SaveLockPath(), automation.SaveLockBlocking)
+	if err != nil && ctx.Err() != nil {
+		return nil, errors.Join(automation.ErrSaveLockBusy, err)
+	}
+
+	return lock, err
 }
 
 func finalSaveLockFailure(
