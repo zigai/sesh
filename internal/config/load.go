@@ -148,19 +148,17 @@ func loadConfigFiles(options *loadOptions) ([][]byte, error) {
 }
 
 func loadDiscoveredConfigFiles() ([][]byte, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, oops.In("config").Code("config_invalid_path").With("operation", "load", "reason", "resolve_cwd").Wrap(err)
-	}
-
 	var files [][]byte
 
 	userPath := DefaultConfigPath()
 
-	for _, source := range []string{"/etc/sesh/config.toml", userPath, filepath.Join(cwd, ".sesh.toml")} {
-		var data []byte
+	for _, source := range []string{"/etc/sesh/config.toml", userPath} {
+		var (
+			data    []byte
+			hasFile bool
+			err     error
+		)
 
-		var hasFile bool
 		if source == userPath {
 			data, hasFile, err = readConfigFile("", nil)
 		} else {

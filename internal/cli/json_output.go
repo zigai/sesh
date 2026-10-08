@@ -99,10 +99,14 @@ func WriteCommandError(cmd *cobra.Command, err error) error {
 	return nil
 }
 
-// humanErrorMessage is the terminal diagnostic: mapped sentinels keep their wording, other
-// causes are reported verbatim so the reader can act on them. JSON envelopes keep the
+// humanErrorMessage is the terminal diagnostic: mapped sentinels keep their wording, configuration
+// errors add their cause, and other causes are reported verbatim so the reader can act on them. JSON envelopes keep the
 // sanitized message from safeCommandErrorMessage.
 func humanErrorMessage(err error) string {
+	if msg, ok := clibase.HumanConfigurationErrorMessage(err); ok {
+		return msg
+	}
+
 	if msg, ok := sentinelErrorMessage(err); ok {
 		return msg
 	}

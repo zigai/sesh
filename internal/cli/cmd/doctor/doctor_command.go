@@ -75,11 +75,16 @@ func resolveDoctorOptions(cmd *cobra.Command) (doctor.Options, error) {
 		ServiceDir:        "",
 		Executable:        "",
 		ValidateCommand:   nil,
+		CustomFields:      nil,
 	}
 
 	workspace, err := clibase.ResolveWorkspace(cmd)
 	if err != nil {
 		return opts, err
+	}
+
+	for _, name := range workspace.Config.Display.UsedFieldNames() {
+		opts.CustomFields = append(opts.CustomFields, doctor.CustomField{Name: name, Command: workspace.Config.Display.Fields[name].Command})
 	}
 
 	server, err := workspace.OpenTmux()

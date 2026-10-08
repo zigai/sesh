@@ -377,7 +377,8 @@ func (m *Model) logSessionActionResult(msg sessionActionResultMsg) {
 			tuiOperationResolveWorkingDirectory,
 			tuiOperationSaveState,
 			tuiOperationSnapshotSession,
-			tuiOperationAgentGitScan:
+			tuiOperationAgentGitScan,
+			tuiOperationCustomFieldRun:
 		}
 	}
 

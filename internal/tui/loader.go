@@ -14,6 +14,7 @@ import (
 	"github.com/zigai/sesh/internal/agents"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/display"
+	"github.com/zigai/sesh/internal/fields"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/tui/providers"
 )
@@ -39,6 +40,7 @@ type sessionLoadResultMsg struct {
 	agentSummaries    []session.AgentSummary
 	agentObservation  uint64
 	agentGit          map[string]agentGitCacheEntry
+	customFieldCache  map[string]map[string]fields.CacheEntry
 	remoteCatalog     RemoteCatalog
 	remoteErr         error
 	remoteObservation uint64
@@ -147,6 +149,7 @@ func loadSessionRows(ctx context.Context, cfg *config.Config, deps Services) ses
 			agentSummaries:    nil,
 			agentObservation:  0,
 			agentGit:          nil,
+			customFieldCache:  nil,
 			remoteCatalog:     RemoteCatalog{GeneratedAt: time.Time{}, Connections: nil},
 			remoteErr:         nil,
 			remoteObservation: 0,
@@ -171,6 +174,7 @@ func loadSessionRows(ctx context.Context, cfg *config.Config, deps Services) ses
 		agentSummaries:    agentSummaries,
 		agentObservation:  0,
 		agentGit:          nil,
+		customFieldCache:  nil,
 		remoteCatalog:     remoteCatalog,
 		remoteErr:         remoteErr,
 		remoteObservation: 0,
@@ -794,6 +798,7 @@ func (m *Model) loadInitialSessionsCommand() tea.Cmd {
 	deps := m.deps
 	gitEnabled := m.agentGitEnabled()
 	cachePath := agentGitCachePath()
+	customFieldNames := m.customFieldNames()
 	remoteObservation := m.remoteCatalogObservation
 	agentObservation := m.agentSummaryObservation
 
@@ -814,6 +819,8 @@ func (m *Model) loadInitialSessionsCommand() tea.Cmd {
 		if gitEnabled {
 			result.agentGit = readAgentGitCache(cachePath)
 		}
+
+		result.customFieldCache = readCustomFieldCaches(customFieldNames)
 
 		return result
 	}
@@ -985,6 +992,8 @@ func (m *Model) handleSessionLoadResult(msg sessionLoadResultMsg) tea.Cmd {
 	}
 
 	cachedGit := m.loadingSessions && msg.agentGit != nil
+
+	m.seedCustomFieldCaches(msg.customFieldCache)
 
 	views := m.applySessionRows(msg)
 	if cachedGit {

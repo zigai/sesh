@@ -320,10 +320,14 @@ func WriteCommandError(cmd *cobra.Command, err error) error {
 	return nil
 }
 
-// humanErrorMessage is the terminal diagnostic: mapped sentinels keep their wording, other
-// causes are reported verbatim so the reader can act on them. JSON envelopes keep the
+// humanErrorMessage is the terminal diagnostic: mapped sentinels keep their wording, configuration
+// errors add their cause, and other causes are reported verbatim so the reader can act on them. JSON envelopes keep the
 // sanitized message from SafeCommandErrorMessage.
 func humanErrorMessage(err error) string {
+	if msg, ok := HumanConfigurationErrorMessage(err); ok {
+		return msg
+	}
+
 	if msg, ok := sentinelErrorMessage(err); ok {
 		return msg
 	}
@@ -333,6 +337,31 @@ func humanErrorMessage(err error) string {
 	}
 
 	return "operation failed"
+}
+
+func HumanConfigurationErrorMessage(err error) (string, bool) {
+	cfgErr, ok := errors.AsType[*ConfigurationError](err)
+	if !ok {
+		return "", false
+	}
+
+	message := configurationErrorMessage(cfgErr.err)
+	if tomlDocumentError(cfgErr.err) {
+		return message, true
+	}
+
+	if detail := strings.TrimSpace(cfgErr.Error()); detail != "" {
+		message += ": " + detail
+	}
+
+	return message, true
+}
+
+func tomlDocumentError(err error) bool {
+	_, strict := errors.AsType[*toml.StrictMissingError](err)
+	_, decode := errors.AsType[*toml.DecodeError](err)
+
+	return strict || decode
 }
 
 func humanCommandErrorMessage(cmd *cobra.Command, err error) string {
