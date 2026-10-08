@@ -2,28 +2,24 @@ package tui
 
 import (
 	"errors"
-	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/zigai/sesh/internal/session"
 )
 
-const minDirSuggestions = 1
+const minPathSuggestions = 1
 
 func (m *Model) handleDialogKeys(msg tea.KeyPressMsg) func() (tea.Model, tea.Cmd) {
 	switch m.dialog {
-	case dialogConfirmKill:
-		return m.handleConfirmActionKeys(msg, "Kill failed", tuiOperationKillSession)
+	case dialogConfirm:
+		return m.handleConfirmKeys(msg)
 
-	case dialogConfirmDelete:
-		return m.handleConfirmActionKeys(msg, "Delete failed", tuiOperationDeleteSession)
+	case dialogInputText:
+		return m.handleTextDialogKeys(msg)
 
-	case dialogInputRename:
-		return m.handleRenameDialogKeys(msg)
-
-	case dialogInputCreateDir:
-		return m.handleCreateDirDialogKeys(msg)
+	case dialogInputPath:
+		return m.handlePathDialogKeys(msg)
 
 	case dialogNone:
 		return nil
@@ -32,18 +28,12 @@ func (m *Model) handleDialogKeys(msg tea.KeyPressMsg) func() (tea.Model, tea.Cmd
 	return nil
 }
 
-func (m *Model) handleConfirmActionKeys(
-	msg tea.KeyPressMsg,
-	errorPrefix string,
-	operation tuiLogOperation,
-) func() (tea.Model, tea.Cmd) {
+func (m *Model) handleConfirmKeys(msg tea.KeyPressMsg) func() (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "y", "Y":
-		return m.runConfirmedAction(errorPrefix, operation)
+		return m.confirmPending()
 	case "n", "N", "esc", "ctrl+c":
-		m.dialog = dialogNone
-
-		return func() (tea.Model, tea.Cmd) { return m, nil }
+		return m.cancelAction()
 	case "left", "h":
 		m.confirmYes = true
 
@@ -58,333 +48,176 @@ func (m *Model) handleConfirmActionKeys(
 		return func() (tea.Model, tea.Cmd) { return m, nil }
 	case "enter":
 		if m.confirmYes {
-			return m.runConfirmedAction(errorPrefix, operation)
+			return m.confirmPending()
 		}
 
-		m.dialog = dialogNone
-
-		return func() (tea.Model, tea.Cmd) { return m, nil }
+		return m.cancelAction()
 	default:
 		return func() (tea.Model, tea.Cmd) { return m, nil }
 	}
 }
 
-func (m *Model) runConfirmedAction(
-	errorPrefix string,
-	operation tuiLogOperation,
-) func() (tea.Model, tea.Cmd) {
-	if m.confirmCommand != nil {
-		command := m.confirmCommand
-		m.confirmCommand = nil
-		m.confirmAction = nil
-		m.dialog = dialogNone
-		m.clearStatus()
-
-		return func() (tea.Model, tea.Cmd) { return m, command }
-	}
-
-	if m.confirmAction != nil {
-		if err := m.confirmAction(); err != nil {
-			logTUIFailure(m.operationContext(), operation, err)
-			m.setErrorStatusf("%s: %v", errorPrefix, err)
-			m.dialog = dialogNone
-
-			return func() (tea.Model, tea.Cmd) { return m, nil }
-		}
-
-		logTUIEvent(m.operationContext(), operation, tuiLogOutcomeSuccess)
-	}
-
-	m.dialog = dialogNone
-	m.clearStatus()
-
-	return func() (tea.Model, tea.Cmd) { return m, m.refreshSessions() }
-}
-
-func (m *Model) handleRenameDialogKeys(msg tea.KeyPressMsg) func() (tea.Model, tea.Cmd) {
+func (m *Model) handleTextDialogKeys(msg tea.KeyPressMsg) func() (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
-		return m.submitRename()
+		return m.submitParam(m.textParamInput.Value())
 	case "esc", "ctrl+c":
-		m.dialog = dialogNone
-		m.renameInput.SetValue("")
-		m.renameInput.Blur()
-
-		return func() (tea.Model, tea.Cmd) { return m, m.textInput.Focus() }
+		return m.cancelAction()
 	default:
 		var cmd tea.Cmd
 
-		m.renameInput, cmd = m.renameInput.Update(msg)
+		m.textParamInput, cmd = m.textParamInput.Update(msg)
 
 		return func() (tea.Model, tea.Cmd) { return m, cmd }
 	}
 }
 
-func (m *Model) submitRename() func() (tea.Model, tea.Cmd) {
-	newName := strings.TrimSpace(m.renameInput.Value())
-	if newName == "" {
-		m.setErrorStatusf("Rename failed: new session name cannot be empty")
-
-		return func() (tea.Model, tea.Cmd) { return m, nil }
-	}
-
-	target := m.renameTarget
-	if target.Name == "" {
-		if m.cursor >= len(m.filtered) {
-			m.setErrorStatusf("Rename failed: no session selected")
-
-			return func() (tea.Model, tea.Cmd) { return m, nil }
-		}
-
-		target = m.filtered[m.cursor]
-	}
-
-	if target.IsSaved() {
-		m.setErrorStatusf("Rename unavailable for saved sessions")
-
-		return func() (tea.Model, tea.Cmd) { return m, nil }
-	}
-
-	if target.Origin == session.OriginSSH {
-		if m.deps.RemoteActions == nil {
-			m.setErrorStatusf("Remote rename is not available: remote action service not configured")
-
-			return func() (tea.Model, tea.Cmd) { return m, nil }
-		}
-
-		if !m.deps.RemoteActions.IsActionPermitted(m.config, target, "rename") {
-			m.setErrorStatusf("Remote rename is disabled by remote permissions")
-
-			return func() (tea.Model, tea.Cmd) { return m, nil }
-		}
-
-		request := RemoteActionRequest{Action: "rename", NewName: newName, Directory: ""}
-
-		m.clearStatus()
-		m.dialog = dialogNone
-		m.renameInput.SetValue("")
-		m.renameInput.Blur()
-
-		return func() (tea.Model, tea.Cmd) {
-			return m, tea.Batch(m.textInput.Focus(), m.runRemoteAction(tuiOperationRenameSession, target, request))
-		}
-	}
-
-	if m.deps.Renamer == nil {
-		logTUIFailure(m.operationContext(), tuiOperationRenameSession, errRenameUnavailable)
-		m.setErrorStatusf("Rename failed: %v", errRenameUnavailable)
-
-		return func() (tea.Model, tea.Cmd) { return m, nil }
-	}
-
-	if err := m.deps.Renamer.RenameSession(m.operationContext(), target, newName); err != nil {
-		logTUIFailure(m.operationContext(), tuiOperationRenameSession, err)
-		m.setErrorStatusf("Rename failed: %v", err)
-
-		return func() (tea.Model, tea.Cmd) { return m, nil }
-	}
-
-	oldIdent := target.SemanticIdentity()
-	newIdent := oldIdent
-	newIdent.Name = newName
-	_ = m.updateState(m.operationContext(), func(current *session.State) {
-		current.RenameSessionIdentity(oldIdent, newIdent)
-	})
-
-	logTUIEvent(m.operationContext(), tuiOperationRenameSession, tuiLogOutcomeSuccess)
-
-	m.clearStatus()
-
-	m.dialog = dialogNone
-	m.renameInput.SetValue("")
-	m.renameInput.Blur()
-
-	return func() (tea.Model, tea.Cmd) {
-		return m, tea.Batch(m.textInput.Focus(), m.refreshSessions())
-	}
-}
-
-func (m *Model) handleCreateDirDialogKeys(msg tea.KeyPressMsg) func() (tea.Model, tea.Cmd) {
+func (m *Model) handlePathDialogKeys(msg tea.KeyPressMsg) func() (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
-		m.applySelectedCreateDirSuggestion()
-		return m.submitCreateDir()
-	case "esc", "ctrl+c":
-		m.cancelCreateDir()
+		m.applySelectedPathSuggestion()
 
-		return func() (tea.Model, tea.Cmd) { return m, nil }
+		return m.submitParam(m.pathInput.Value())
+	case "esc", "ctrl+c":
+		return m.cancelAction()
 	case "tab":
-		m.completeCreateDir(1)
+		m.completePath(1)
 
 		return func() (tea.Model, tea.Cmd) { return m, nil }
 	case "shift+tab":
-		m.completeCreateDir(-1)
+		m.completePath(-1)
 
 		return func() (tea.Model, tea.Cmd) { return m, nil }
 	case "down", "ctrl+n":
-		m.moveCreateDirSuggestion(1)
+		m.movePathSuggestion(1)
 
 		return func() (tea.Model, tea.Cmd) { return m, nil }
 	case "up", "ctrl+p":
-		m.moveCreateDirSuggestion(-1)
+		m.movePathSuggestion(-1)
 
 		return func() (tea.Model, tea.Cmd) { return m, nil }
 	case "ctrl+w", "alt+backspace":
-		m.deleteCreateDirNodeBackward()
+		m.deletePathInputNodeBackward()
 
 		return func() (tea.Model, tea.Cmd) { return m, nil }
 	default:
-		previous := m.createDirInput.Value()
+		previous := m.pathInput.Value()
 
 		var cmd tea.Cmd
 
-		m.createDirInput, cmd = m.createDirInput.Update(msg)
-		if m.createDirInput.Value() != previous {
-			m.refreshCreateDirSuggestions()
+		m.pathInput, cmd = m.pathInput.Update(msg)
+		if m.pathInput.Value() != previous {
+			m.refreshPathSuggestions()
 		}
 
 		return func() (tea.Model, tea.Cmd) { return m, cmd }
 	}
 }
 
-func (m *Model) submitCreateDir() func() (tea.Model, tea.Cmd) {
-	sessionName := m.createSession
-	dir := strings.TrimSpace(m.createDirInput.Value())
-
-	m.dialog = dialogNone
-	m.createSession = ""
-	m.createDirSuggestions = nil
-	m.createDirSuggestionIndex = 0
-	m.createDirSuggestionTop = 0
-	m.createDirInput.Blur()
-	m.textInput.Focus()
-	m.filterSessions()
-	m.clearStatus()
-
-	return func() (tea.Model, tea.Cmd) {
-		return m, m.runSessionActionWithCreateDir(sessionName, dir)
-	}
-}
-
-func (m *Model) cancelCreateDir() {
-	sessionName := m.createSession
-
-	m.dialog = dialogNone
-	m.createSession = ""
-	m.createDirSuggestions = nil
-	m.createDirSuggestionIndex = 0
-	m.createDirSuggestionTop = 0
-	m.createDirInput.Blur()
-	m.textInput.SetValue(sessionName)
-	m.textInput.CursorEnd()
-	m.textInput.Focus()
-	m.filterSessions()
-}
-
-func (m *Model) completeCreateDir(direction int) {
-	if len(m.createDirSuggestions) == 0 {
+func (m *Model) completePath(direction int) {
+	if len(m.pathSuggestions) == 0 {
 		return
 	}
 
 	if direction < 0 {
-		m.moveCreateDirSuggestion(-1)
+		m.movePathSuggestion(-1)
 	}
 
-	m.setCreateDirInputValue(m.createDirSuggestions[m.createDirSuggestionIndex])
-	m.refreshCreateDirSuggestions()
+	m.setPathInputValue(m.pathSuggestions[m.pathSuggestionIndex])
+	m.refreshPathSuggestions()
 }
 
-func (m *Model) applySelectedCreateDirSuggestion() {
-	if len(m.createDirSuggestions) == 0 || m.createDirSuggestionIndex < 0 || m.createDirSuggestionIndex >= len(m.createDirSuggestions) {
+func (m *Model) applySelectedPathSuggestion() {
+	if len(m.pathSuggestions) == 0 || m.pathSuggestionIndex < 0 || m.pathSuggestionIndex >= len(m.pathSuggestions) {
 		return
 	}
 
-	m.setCreateDirInputValue(m.createDirSuggestions[m.createDirSuggestionIndex])
+	m.setPathInputValue(m.pathSuggestions[m.pathSuggestionIndex])
 }
 
-func (m *Model) moveCreateDirSuggestion(direction int) {
-	if len(m.createDirSuggestions) == 0 || direction == 0 {
+func (m *Model) movePathSuggestion(direction int) {
+	if len(m.pathSuggestions) == 0 || direction == 0 {
 		return
 	}
 
-	m.createDirSuggestionIndex = (m.createDirSuggestionIndex + direction) % len(m.createDirSuggestions)
-	if m.createDirSuggestionIndex < 0 {
-		m.createDirSuggestionIndex = len(m.createDirSuggestions) - 1
+	m.pathSuggestionIndex = (m.pathSuggestionIndex + direction) % len(m.pathSuggestions)
+	if m.pathSuggestionIndex < 0 {
+		m.pathSuggestionIndex = len(m.pathSuggestions) - 1
 	}
 
-	m.scrollCreateDirSuggestions()
+	m.scrollPathSuggestions()
 }
 
-func (m *Model) deleteCreateDirNodeBackward() {
-	value, cursor := deletePathNodeBackward(m.createDirInput.Value(), m.createDirInput.Position())
-	m.createDirInput.SetValue(value)
-	m.createDirInput.SetCursor(cursor)
-	m.refreshCreateDirSuggestions()
+func (m *Model) deletePathInputNodeBackward() {
+	value, cursor := deletePathNodeBackward(m.pathInput.Value(), m.pathInput.Position())
+	m.pathInput.SetValue(value)
+	m.pathInput.SetCursor(cursor)
+	m.refreshPathSuggestions()
 }
 
-func (m *Model) refreshCreateDirSuggestions() {
+func (m *Model) refreshPathSuggestions() {
 	cwd, err := m.deps.WorkingDirectory.GetWorkingDirectory()
 	if err != nil {
-		m.createDirSuggestions = nil
-		m.createDirSuggestionIndex = 0
+		m.pathSuggestions = nil
+		m.pathSuggestionIndex = 0
 
 		return
 	}
 
-	suggestions, err := session.DirectoryPathSuggestions(m.operationContext(), m.createDirInput.Value(), cwd)
+	suggestions, err := session.DirectoryPathSuggestions(m.operationContext(), m.pathInput.Value(), cwd)
 	if err != nil {
 		if !errors.Is(err, session.ErrDirectoryLimit) {
 			logTUIFailure(m.operationContext(), tuiOperationResolveWorkingDirectory, err)
 		}
 
-		m.createDirSuggestions = suggestions
-		m.createDirSuggestionIndex = 0
-		m.scrollCreateDirSuggestions()
+		m.pathSuggestions = suggestions
+		m.pathSuggestionIndex = 0
+		m.scrollPathSuggestions()
 
 		return
 	}
 
-	m.createDirSuggestions = suggestions
-	m.createDirSuggestionIndex = 0
-	m.scrollCreateDirSuggestions()
+	m.pathSuggestions = suggestions
+	m.pathSuggestionIndex = 0
+	m.scrollPathSuggestions()
 }
 
-func (m *Model) setCreateDirInputValue(value string) {
-	m.createDirInput.SetValue(value)
-	m.createDirInput.CursorEnd()
+func (m *Model) setPathInputValue(value string) {
+	m.pathInput.SetValue(value)
+	m.pathInput.CursorEnd()
 }
 
-func (m *Model) scrollCreateDirSuggestions() {
-	if len(m.createDirSuggestions) == 0 {
-		m.createDirSuggestionIndex = 0
-		m.createDirSuggestionTop = 0
+func (m *Model) scrollPathSuggestions() {
+	if len(m.pathSuggestions) == 0 {
+		m.pathSuggestionIndex = 0
+		m.pathSuggestionTop = 0
 
 		return
 	}
 
-	if m.createDirSuggestionIndex < 0 {
-		m.createDirSuggestionIndex = 0
+	if m.pathSuggestionIndex < 0 {
+		m.pathSuggestionIndex = 0
 	}
 
-	if m.createDirSuggestionIndex >= len(m.createDirSuggestions) {
-		m.createDirSuggestionIndex = len(m.createDirSuggestions) - 1
+	if m.pathSuggestionIndex >= len(m.pathSuggestions) {
+		m.pathSuggestionIndex = len(m.pathSuggestions) - 1
 	}
 
-	if m.createDirSuggestionTop > m.createDirSuggestionIndex {
-		m.createDirSuggestionTop = m.createDirSuggestionIndex
+	if m.pathSuggestionTop > m.pathSuggestionIndex {
+		m.pathSuggestionTop = m.pathSuggestionIndex
 	}
 
-	visibleSuggestions := m.visibleDirSuggestions()
-	if m.createDirSuggestionIndex >= m.createDirSuggestionTop+visibleSuggestions {
-		m.createDirSuggestionTop = m.createDirSuggestionIndex - visibleSuggestions + 1
+	visibleSuggestions := m.visiblePathSuggestions()
+	if m.pathSuggestionIndex >= m.pathSuggestionTop+visibleSuggestions {
+		m.pathSuggestionTop = m.pathSuggestionIndex - visibleSuggestions + 1
 	}
 
-	maxTop := max(len(m.createDirSuggestions)-visibleSuggestions, 0)
-	if m.createDirSuggestionTop > maxTop {
-		m.createDirSuggestionTop = maxTop
+	maxTop := max(len(m.pathSuggestions)-visibleSuggestions, 0)
+	if m.pathSuggestionTop > maxTop {
+		m.pathSuggestionTop = maxTop
 	}
 }
 
-func (m *Model) visibleDirSuggestions() int {
-	return max(m.config.Settings.DirectorySuggestions, minDirSuggestions)
+func (m *Model) visiblePathSuggestions() int {
+	return max(m.config.Settings.DirectorySuggestions, minPathSuggestions)
 }

@@ -54,9 +54,9 @@ func testTmuxPopupSelectionSwitchesOpeningClient(t *testing.T, newerSession bool
 	defer cancel()
 
 	command := exec.CommandContext(ctx, artifact.binary,
-		"action", "picker-open", "--no-config", "--socket", fixture.socket,
-		"--client", clientName, "--target-pane", string(panes[0].ID),
-		"--current-session-id", string(origin.ID), "--history", fixture.historyPath,
+		"pick", "popup", "--no-config", "--socket", fixture.socket,
+		"--client", clientName, "--pane", string(panes[0].ID),
+		"--client-session", string(origin.ID), "--history", fixture.historyPath,
 		"--repository", fixture.repository, "--lease-root", fixture.leaseRoot,
 	)
 	command.Dir = artifact.workDir
@@ -153,9 +153,9 @@ func TestTmuxAgentsPopupShowsLoadingWhileRegistryIsLocked(t *testing.T) {
 	defer cancel()
 
 	command := exec.CommandContext(ctx, artifact.binary,
-		"action", "picker-open", "--no-config", "--socket", fixture.socket,
-		"--client", clientName, "--target-pane", string(secondInfo.ID),
-		"--current-session-id", string(origin.ID), "--agent-state", registryPath,
+		"pick", "popup", "--no-config", "--socket", fixture.socket,
+		"--client", clientName, "--pane", string(secondInfo.ID),
+		"--client-session", string(origin.ID), "--agent-state", registryPath,
 		"--history", fixture.historyPath, "--repository", fixture.repository,
 		"--lease-root", fixture.leaseRoot,
 	)
@@ -228,8 +228,8 @@ func TestTmuxPopupSelectsInvokingAgentWithLinkedWindow(t *testing.T) {
 	defer cancel()
 
 	command := exec.CommandContext(ctx, artifact.binary,
-		"action", "picker-open", "--no-config", "--socket", fixture.socket,
-		"--client", clientName, "--target-pane", string(secondInfo.ID),
+		"pick", "popup", "--no-config", "--socket", fixture.socket,
+		"--client", clientName, "--pane", string(secondInfo.ID),
 		"--agent-state", registryPath, "--history", fixture.historyPath,
 		"--repository", fixture.repository, "--lease-root", fixture.leaseRoot,
 	)

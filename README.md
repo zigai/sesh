@@ -23,7 +23,7 @@ sesh session new work --dir ~/Projects/work
 sesh session switch work
 
 # Save and restore snapshots
-sesh snapshot save --session '$1'
+sesh snapshot save '$1'
 sesh snapshot restore --pick
 ```
 

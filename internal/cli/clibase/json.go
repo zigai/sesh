@@ -16,7 +16,9 @@ import (
 
 	gotmux "github.com/zigai/gotmux/tmux"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/agents"
+	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/integration/process"
 	"github.com/zigai/sesh/internal/integration/tmux"
@@ -31,7 +33,7 @@ import (
 
 const (
 	JSONFlagName      = "json"
-	JSONSchemaVersion = 1
+	JSONSchemaVersion = 2
 )
 
 var (
@@ -39,7 +41,6 @@ var (
 		{store.ErrUncertain, "publicationUncertain", "snapshot publication durability uncertain"},
 		{restore.ErrExecutionUncertain, "operationUncertain", "restore effect outcome uncertain"},
 		{restore.ErrPriorUncertainty, "priorEffectUncertain", "previous attempt left an uncertain effect; explicit reconciliation required"},
-		{remote.ErrActionUncertain, "remoteOutcomeUncertain", "remote action outcome is uncertain; reconcile the original invocation"},
 	}
 
 	workflowErrors = []commandErrorContract{
@@ -49,9 +50,8 @@ var (
 		{gotmux.ErrOutputLimit, "outputLimitExceeded", "tmux command output exceeded its byte limit"},
 		{config.ErrConfigExists, "configExists", "configuration already exists; use --force to replace it"},
 		{config.ErrConfigSymlink, "configSymlink", "configuration target must not be a symbolic link"},
-		{ErrPartialSnapshot, "partialSnapshot", "parity-incomplete save"},
-		{ErrPartialRestore, "partialRestore", "restore incomplete: sessions were skipped or not verified; see the summary"},
-		{remote.ErrActionPartial, "partialRemoteAction", "remote action completed with incomplete recovery"},
+		{app.ErrPartialSnapshot, "partialSnapshot", "parity-incomplete save"},
+		{app.ErrPartialRestore, "partialRestore", "restore incomplete: sessions were skipped or not verified; see the summary"},
 		{remote.ErrActionFailed, "remoteActionFailed", "remote action failed"},
 		{restore.ErrPriorConflict, "priorEffectConflicted", "previous restore effects conflict with recorded state; explicit reconciliation required"},
 		{restore.ErrJournalRequired, "journalUnavailable", "restore journal unavailable"},
@@ -72,7 +72,7 @@ var (
 		{agents.ErrRegistryUnavailable, "agentRegistryUnavailable", "agent registry is unavailable"},
 		{agents.ErrRegistryTooLarge, "agentRegistryTooLarge", "agent registry exceeds its size limit"},
 		{agents.ErrStyleOwnershipCorrupt, "agentStyleOwnershipCorrupt", "agent style ownership record is corrupt"},
-		{agents.ErrCurrentContextUnknown, "agentContextUnknown", "current tmux context could not be determined; pass --pane, --client, or --session"},
+		{agents.ErrCurrentContextUnknown, "agentContextUnknown", "current tmux context could not be determined; pass --pane, --client, or --client-session"},
 		{agents.ErrCurrentPaneNotLive, "agentPaneNotLive", "agent pane is not a live tmux pane"},
 		{agents.ErrPaneNotLive, "agentPaneNotLive", "agent pane is not a live tmux pane"},
 		{agents.ErrNoTargetPane, "agentPaneNotFound", "no agent pane needs attention"},
@@ -173,7 +173,13 @@ func JSONCommandName(cmd *cobra.Command) string {
 	return strings.Join(parts, ".")
 }
 
+// JSONErrorCode reports an action failure by its action code. An action failure without a
+// more specific code keeps the detailed code of its cause.
 func JSONErrorCode(err error) string {
+	if classified, ok := errors.AsType[*action.Error](err); ok && classified.Code != action.CodeFailed {
+		return string(classified.Code)
+	}
+
 	if contract, ok := matchErrorContract(err, uncertainErrors); ok {
 		return contract.code
 	}
@@ -504,7 +510,7 @@ func configurationErrorMessage(err error) string {
 
 func generalErrorCode(err error) string {
 	switch {
-	case errors.Is(err, gotmux.ErrNoServer):
+	case errors.Is(err, gotmux.ErrNoServer), errors.Is(err, engine.ErrNoServerRunning):
 		return "tmuxServerUnavailable"
 	case errors.Is(err, context.DeadlineExceeded):
 		return "timeout"
@@ -525,7 +531,7 @@ func generalErrorCode(err error) string {
 
 func generalSentinelMessage(err error) (string, bool) {
 	switch {
-	case errors.Is(err, gotmux.ErrNoServer):
+	case errors.Is(err, gotmux.ErrNoServer), errors.Is(err, engine.ErrNoServerRunning):
 		return "no tmux server is running on the selected socket; start tmux or pass --socket", true
 	case errors.Is(err, ErrRepositoryRequired):
 		return "--repository is required", true
@@ -645,6 +651,10 @@ func writeJSONEnvelope(output io.Writer, envelope JSONEnvelope) error {
 }
 
 func sentinelErrorMessage(err error) (string, bool) {
+	if peerErr, ok := errors.AsType[*remote.PeerError](err); ok {
+		return peerErr.Error(), true
+	}
+
 	if contract, ok := matchErrorContract(err, uncertainErrors); ok {
 		return contract.message, true
 	}

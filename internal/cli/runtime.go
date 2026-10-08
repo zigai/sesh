@@ -16,6 +16,7 @@ import (
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	cmdlogs "github.com/zigai/sesh/internal/cli/cmd/logs"
 	cmdsession "github.com/zigai/sesh/internal/cli/cmd/session"
@@ -57,10 +58,7 @@ type commandRuntime struct {
 	started     time.Time
 }
 
-type (
-	saveBoundaryError  = clibase.SaveBoundaryError
-	commandResultError = clibase.CommandResultError
-)
+type commandResultError = clibase.CommandResultError
 
 type configurationError = clibase.ConfigurationError
 
@@ -203,14 +201,7 @@ func commandUsesLiveIO(cmd *cobra.Command) bool {
 		return false
 	}
 
-	switch cmd.Name() {
-	case "restore":
-		return cmd.Parent().Name() == "snapshot"
-	case "snapshot-restore":
-		return cmd.Parent().Name() == "action"
-	default:
-		return false
-	}
+	return cmd.Name() == "restore" && cmd.Parent().Name() == "snapshot"
 }
 
 func (r *commandRuntime) prepareStreaming(cmd *cobra.Command) error {
@@ -312,6 +303,10 @@ func loadCommandConfig(ctx context.Context, cmd *cobra.Command) (*config.Config,
 	}
 
 	cfg, err := config.Load(options...)
+	if err == nil {
+		err = action.ValidateConfig(cfg)
+	}
+
 	if err != nil {
 		return nil, clibase.NewConfigurationError(oops.In("cli").Code("config_failed").With("operation", "load_configuration").Wrap(err))
 	}
@@ -365,24 +360,11 @@ func (r *commandRuntime) logOutcome(ctx context.Context, err error) {
 }
 
 func (r *commandRuntime) ownsOutcome(err error) bool {
-	if r.operation == "restore" && restoreOutcomeLogged(err) {
-		return false
-	}
-
 	if err == nil && r.cmd != nil && r.cmd.Annotations[annotationSuccessOwned] == "true" {
 		return false
 	}
 
-	if commandOutcomeLogged(err) {
-		return false
-	}
-
-	if r.operation == "save" {
-		_, saveOwned := errors.AsType[*saveBoundaryError](err)
-		return err != nil && !saveOwned && !errors.Is(err, errPartialSnapshot)
-	}
-
-	return true
+	return !commandOutcomeLogged(err)
 }
 
 func commandOperation(cmd *cobra.Command) string {
@@ -457,7 +439,7 @@ func copyStagedBuffers(output, diagnostics *commandBuffer, stdout, stderr io.Wri
 	var outputErr error
 
 	_, hasResult := errors.AsType[*commandResultError](runErr)
-	if !output.failed && !output.streaming && (runErr == nil || commandErrorWasRendered(runErr) || errors.Is(runErr, errPartialSnapshot) || errors.Is(runErr, clibase.ErrSubcommandRequired) || hasResult) {
+	if !output.failed && !output.streaming && (runErr == nil || commandErrorWasRendered(runErr) || errors.Is(runErr, clibase.ErrSubcommandRequired) || hasResult) {
 		_, outputErr = io.Copy(stdout, bytes.NewReader(output.Bytes()))
 	}
 

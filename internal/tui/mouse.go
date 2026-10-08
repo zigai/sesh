@@ -445,21 +445,15 @@ func (m *Model) footerPartAt(x int, width int) (footerPart, bool) {
 }
 
 func (m *Model) resolveFooterAction(part footerPart) func() (tea.Model, tea.Cmd) {
+	if part.binding.Action != "" {
+		return m.invokeAction(part.binding.Action, part.binding.Values)
+	}
+
 	switch part.desc {
 	case "select":
 		return m.handleEnter()
-	case "create":
-		return m.handleCreate()
 	case "cancel":
 		return func() (tea.Model, tea.Cmd) { return m, tea.Quit }
-	case "rename":
-		return m.handleRename()
-	case "kill":
-		return m.handleKill()
-	case "delete":
-		return m.handleDelete()
-	case "snapshot":
-		return m.handleSnapshot()
 	case "help":
 		m.showHelp = true
 

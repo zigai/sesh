@@ -195,10 +195,15 @@ type snapshotRestoreResultJSON struct {
 	Generation          string                 `json:"generation"`
 	Status              string                 `json:"status"`
 	Reason              string                 `json:"reason"`
-	SessionsRestored    []string               `json:"sessionsRestored"`
+	Sessions            []snapshotSessionJSON  `json:"sessions"`
 	Verified            bool                   `json:"verified"`
 	Uncertain           bool                   `json:"uncertain"`
 	MissingRequirements []snapshotEvidenceJSON `json:"missingRequirements"`
+}
+
+type snapshotSessionJSON struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 type snapshotEvidenceJSON struct {
@@ -495,11 +500,11 @@ func executeSave(
 ) snapshotSaveResultJSON {
 	t.Helper()
 
-	stdout := fixture.runSuccess(t, ctx, "action", "snapshot-save",
+	stdout := fixture.runSuccess(t, ctx, "snapshot", "save",
 		"--repository", fixture.repoDir,
 		"--socket", server.Endpoint().SocketPath,
 		"--lease-root", fixture.leaseDir,
-		"--session", string(session.ID()),
+		string(session.ID()),
 		"--no-config",
 		"--json",
 	)
@@ -646,7 +651,7 @@ func executeRestore(
 ) snapshotRestoreResultJSON {
 	t.Helper()
 
-	stdout := fixture.runSuccess(t, ctx, "action", "snapshot-restore",
+	stdout := fixture.runSuccess(t, ctx, "snapshot", "restore",
 		"--repository", fixture.repoDir,
 		"--socket", target.Endpoint().SocketPath,
 		"--lease-root", fixture.leaseDir,
@@ -662,8 +667,8 @@ func executeRestore(
 		t.Fatalf("unexpected restore result payload: %+v", result)
 	}
 
-	if len(result.SessionsRestored) != 1 {
-		t.Fatalf("restored sessions count = %d, want 1", len(result.SessionsRestored))
+	if len(result.Sessions) != 1 {
+		t.Fatalf("restored sessions count = %d, want 1", len(result.Sessions))
 	}
 
 	var foundUnsupportedApp bool

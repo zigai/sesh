@@ -7,9 +7,9 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/display"
-	"github.com/zigai/sesh/internal/session"
 )
 
 const (
@@ -18,13 +18,13 @@ const (
 	titleHorizontalPadding  = 2
 	boxHorizontalPadding    = 2
 	extraHelpLines          = 2
-	maxCreateDirDialogWidth = 72
-	minCreateDirDialogWidth = 42
-	createDirBorderPadding  = 4
+	maxPathDialogWidth      = 72
+	minPathDialogWidth      = 42
+	pathDialogBorderPadding = 4
 	confirmButtonWidth      = 8
 	defaultDialogWidth      = 48
 	helpWidthMargin         = 8
-	createDirWidthMargin    = 10
+	pathDialogWidthMargin   = 10
 	dialogWidthMargin       = 6
 	centerDivisor           = 2
 	innerFrameMargin        = 2
@@ -33,10 +33,6 @@ const (
 type helpBinding struct {
 	key  string
 	desc string
-}
-
-func (m *Model) selectedRowIsSaved() bool {
-	return m.cursor < len(m.filtered) && m.filtered[m.cursor].IsSaved()
 }
 
 func (m *Model) helpBindings(keys actionKeyMap) []helpBinding {
@@ -64,23 +60,8 @@ func (m *Model) helpBindings(keys actionKeyMap) []helpBinding {
 		)
 	}
 
-	if !m.selectedRowIsSaved() {
-		bindings = append(bindings,
-			helpBinding{keys.rename.Help().Key, keys.rename.Help().Desc},
-			helpBinding{keys.kill.Help().Key, keys.kill.Help().Desc},
-		)
-	}
-
-	if m.cursor < len(m.filtered) &&
-		m.filtered[m.cursor].Origin == session.OriginSSH &&
-		!m.filtered[m.cursor].IsSaved() &&
-		!m.selectedRowIsAgent() {
-		bindings = append(bindings, helpBinding{keys.snapshot.Help().Key, keys.snapshot.Help().Desc})
-	}
-
-	bindings = append(bindings, helpBinding{keys.create.Help().Key, keys.create.Help().Desc})
-	if !m.selectedRowIsAgent() {
-		bindings = append(bindings, helpBinding{keys.delete.Help().Key, keys.delete.Help().Desc})
+	for _, bound := range m.availableActions(keys) {
+		bindings = append(bindings, helpBinding{bound.key.Help().Key, bound.key.Help().Desc})
 	}
 
 	bindings = append(bindings,
@@ -94,7 +75,7 @@ func (m *Model) helpBindings(keys actionKeyMap) []helpBinding {
 func (m *Model) renderHelpOverlay() string {
 	contentWidth := m.contentWidth()
 	width := min(max(contentWidth-helpWidthMargin, minHelpOverlayWidth), maxHelpOverlayWidth)
-	keys := newActionKeyMap(m.config.Keys)
+	keys := newActionKeyMap(m.config)
 
 	title := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(m.config.Theme.Primary)).
@@ -169,15 +150,24 @@ func (m *Model) renderHelpStatusLine(width int) string {
 }
 
 func (m *Model) renderDialog() string {
+	if m.pending == nil {
+		return ""
+	}
+
+	descriptor := m.pending.entry.Describe()
+
 	switch m.dialog {
-	case dialogConfirmKill:
-		return renderConfirmDialog(m.width, m.height, "Confirm Kill", "Kill this session?", m.confirmYes, m.config)
-	case dialogConfirmDelete:
-		return renderConfirmDialog(m.width, m.height, "Confirm Delete", "Delete this session?", m.confirmYes, m.config)
-	case dialogInputRename:
-		return renderDialog(m.width, m.height, "Rename Session", "New name: "+m.renameInput.View(), m.config)
-	case dialogInputCreateDir:
-		return m.renderCreateDirDialog()
+	case dialogConfirm:
+		question := descriptor.Title + "?"
+		if names := subjectNames(m.pending.subject); names != "" {
+			question = descriptor.Title + " " + names + "?"
+		}
+
+		return renderConfirmDialog(m.width, m.height, "Confirm", question, m.confirmYes, m.config)
+	case dialogInputText:
+		return renderDialog(m.width, m.height, descriptor.Title, m.pending.param.Usage+": "+m.textParamInput.View(), m.config)
+	case dialogInputPath:
+		return m.renderPathDialog(descriptor, *m.pending)
 	case dialogNone:
 		return ""
 	}
@@ -185,36 +175,57 @@ func (m *Model) renderDialog() string {
 	return ""
 }
 
-func (m *Model) renderCreateDirDialog() string {
-	width := min(max(m.contentWidth()-createDirWidthMargin, minCreateDirDialogWidth), maxCreateDirDialogWidth)
-	inputWidth := max(width-createDirBorderPadding, minSearchWidth)
-	originalWidth := m.createDirInput.Width()
-	m.createDirInput.SetWidth(inputWidth)
-	input := m.createDirInput.View()
-	m.createDirInput.SetWidth(originalWidth)
-
-	lines := []string{
-		"Session: " + SanitizeTerminalText(m.createSession),
-		"",
-		"Directory:",
-		input,
-		"",
+func subjectNames(subject action.Subject) string {
+	names := make([]string, 0, len(subject.Sessions))
+	for _, target := range subject.Sessions {
+		names = append(names, SanitizeTerminalText(target.Name))
 	}
 
-	start := min(m.createDirSuggestionTop, len(m.createDirSuggestions))
+	return strings.Join(names, ", ")
+}
 
-	end := min(start+m.visibleDirSuggestions(), len(m.createDirSuggestions))
-	for i := start; i < start+m.visibleDirSuggestions(); i++ {
+// enteredValues lists the values already given for a pending action, so a later prompt shows
+// what it continues from.
+func enteredValues(descriptor action.Descriptor, request pendingAction) []string {
+	lines := make([]string, 0, len(descriptor.Params))
+	for _, param := range descriptor.Params {
+		if param.Name != request.param.Name && request.values.Has(param.Name) {
+			lines = append(lines, param.Usage+": "+SanitizeTerminalText(request.values.String(param.Name)))
+		}
+	}
+
+	return lines
+}
+
+func (m *Model) renderPathDialog(descriptor action.Descriptor, request pendingAction) string {
+	width := min(max(m.contentWidth()-pathDialogWidthMargin, minPathDialogWidth), maxPathDialogWidth)
+	inputWidth := max(width-pathDialogBorderPadding, minSearchWidth)
+	originalWidth := m.pathInput.Width()
+	m.pathInput.SetWidth(inputWidth)
+	input := m.pathInput.View()
+	m.pathInput.SetWidth(originalWidth)
+
+	lines := enteredValues(descriptor, request)
+	if len(lines) > 0 {
+		lines = append(lines, "")
+	}
+
+	lines = append(lines, request.param.Usage+":", input, "")
+
+	start := min(m.pathSuggestionTop, len(m.pathSuggestions))
+
+	end := min(start+m.visiblePathSuggestions(), len(m.pathSuggestions))
+	for i := start; i < start+m.visiblePathSuggestions(); i++ {
 		if i >= end {
 			lines = append(lines, strings.Repeat(" ", inputWidth))
 			continue
 		}
 
-		suggestion := m.createDirSuggestions[i]
+		suggestion := m.pathSuggestions[i]
 		prefix := "  "
 		style := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 
-		if i == m.createDirSuggestionIndex {
+		if i == m.pathSuggestionIndex {
 			prefix = "> "
 			style = style.
 				Foreground(lipgloss.Color("0")).
@@ -235,7 +246,7 @@ func (m *Model) renderCreateDirDialog() string {
 		Foreground(lipgloss.Color(m.config.Theme.Primary)).
 		Bold(true)
 
-	return box.Render(titleStyle.Render("Create Session") + "\n\n" + strings.Join(lines, "\n"))
+	return box.Render(titleStyle.Render(descriptor.Title) + "\n\n" + strings.Join(lines, "\n"))
 }
 
 func renderDialog(width, height int, title, content string, cfg *config.Config) string {

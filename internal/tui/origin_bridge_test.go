@@ -107,22 +107,16 @@ func TestOriginSwitchLogsOnlyItsPrivateFailureBoundary(t *testing.T) {
 
 	model := loggingTestModel(t, &output)
 	target := session.Session{ID: "$secret", Name: loggingTestPrivacySentinel, Origin: session.OriginBridge, Kind: session.KindLive}
-	model.deps.OriginBridge = &testServiceAdapter{deps: &Dependencies{
-		RequestOriginSwitch: func(context.Context, session.Session) error { return errLoggingTestActionFailure },
-	}}
+	deps := dependenciesForTest(model)
+	deps.RequestOriginSwitch = func(context.Context, session.Session) error { return errLoggingTestActionFailure }
+	model.sessions = []session.Session{target}
+	model.filtered = model.sessions
 
 	leaked := loggingTestWithCapturedStdStreams(t, func() {
-		_, command := model.handleOriginBridgeEnter(target)()
-
-		result, ok := command().(sessionActionResultMsg)
-		if !ok {
-			t.Fatal("origin command returned no result")
+		trace := pressTestKey(t, model, keyCode(tea.KeyEnter))
+		if len(trace.results) != 1 || trace.quit || model.DeferredOriginDetach() {
+			t.Fatalf("failed origin switch trace = %+v, detach %t", trace, model.DeferredOriginDetach())
 		}
-
-		model.handleSessionActionResult(result)
-		result.err = nil
-		result.quit = true
-		model.handleSessionActionResult(result)
 	})
 	if leaked != "" || strings.Contains(output.String(), loggingTestPrivacySentinel) {
 		t.Fatal("origin boundary leaked into streams or diagnostic fields")
@@ -130,7 +124,7 @@ func TestOriginSwitchLogsOnlyItsPrivateFailureBoundary(t *testing.T) {
 
 	records := loggingTestRecords(t, &output)
 	if len(records) != 1 {
-		t.Fatalf("origin outcome record count = %d, want1", len(records))
+		t.Fatalf("origin outcome record count = %d, want 1", len(records))
 	}
 
 	assertLoggingTestRecord(t, records[0], tuiOperationEnterLiveSession, "error", "failed", "tui operation failed")
@@ -170,19 +164,17 @@ func TestOriginSelectionRequestsExactIdentityBeforeDetach(t *testing.T) {
 func checkOriginSelectionOutcome(t *testing.T, refused bool) {
 	t.Helper()
 
-	model := newTestModel()
-	t.Cleanup(model.Close)
-
 	target := session.Session{
 		ID: "$7", Name: "notes", Kind: session.KindLive, Origin: session.OriginBridge,
 		RuntimeIdentity: session.RuntimeIdentity{ConnectionID: "origin", TmuxServerPID: 123},
 	}
 	calls := 0
-	model.deps.OriginBridge = &testServiceAdapter{deps: &Dependencies{
+	model := newTestModelWithDeps(Dependencies{
 		RequestOriginSwitch: func(_ context.Context, selected session.Session) error {
 			calls++
 
-			if selected.ID != target.ID || selected.RuntimeIdentity != target.RuntimeIdentity {
+			if selected.ID != target.ID || selected.Name != target.Name ||
+				selected.RuntimeIdentity.TmuxServerPID != target.RuntimeIdentity.TmuxServerPID {
 				t.Fatal("origin selection discarded observed identity")
 			}
 
@@ -192,29 +184,25 @@ func checkOriginSelectionOutcome(t *testing.T, refused bool) {
 
 			return nil
 		},
-	}}
-	_, command := model.handleOriginBridgeEnter(target)()
+	})
+	t.Cleanup(model.Close)
+
+	model.sessions = []session.Session{target}
+	model.filtered = model.sessions
+
+	_, command := model.Update(keyCode(tea.KeyEnter))
 
 	if calls != 0 {
 		t.Fatal("origin request blocked the model update")
 	}
 
-	result, ok := command().(sessionActionResultMsg)
-	if !ok {
-		t.Fatal("origin command returned no action result")
+	trace := runActionTrace(t, model, command)
+	if calls != 1 || model.DeferredOriginDetach() == refused || trace.quit == refused {
+		t.Fatalf("calls = %d, detach = %t, quit = %t", calls, model.DeferredOriginDetach(), trace.quit)
 	}
 
-	_, command = model.handleSessionActionResult(result)
-	if calls != 1 || model.DeferredOriginDetach() == refused {
-		t.Fatalf("calls = %d, detach = %t", calls, model.DeferredOriginDetach())
-	}
-
-	if refused {
-		if command != nil || model.statusLevel != statusError {
-			t.Fatal("rejected request quit the picker")
-		}
-	} else if _, ok := command().(tea.QuitMsg); !ok {
-		t.Fatal("confirmed switch did not release the picker")
+	if refused && model.statusLevel != statusError {
+		t.Fatal("rejected request did not report an error")
 	}
 }
 

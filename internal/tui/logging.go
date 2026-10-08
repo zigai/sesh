@@ -19,7 +19,7 @@ const (
 	tuiOperationLoadAgentSummaries      tuiLogOperation = "load_agent_summaries"
 	tuiOperationEnterLiveSession        tuiLogOperation = "enter_live_session"
 	tuiOperationRestoreSavedSession     tuiLogOperation = "restore_saved_session"
-	tuiOperationEnterOrCreateSession    tuiLogOperation = "enter_or_create_session"
+	tuiOperationCreateSession           tuiLogOperation = "create_session"
 	tuiOperationActivateAgentPane       tuiLogOperation = "activate_agent_pane"
 	tuiOperationRenameSession           tuiLogOperation = "rename_session"
 	tuiOperationKillSession             tuiLogOperation = "kill_session"
@@ -28,6 +28,7 @@ const (
 	tuiOperationSaveState               tuiLogOperation = "save_state"
 	tuiOperationSnapshotSession         tuiLogOperation = "snapshot_session"
 	tuiOperationAgentGitScan            tuiLogOperation = "agent_git_scan"
+	tuiOperationRunAction               tuiLogOperation = "run_action"
 	tuiOperationCustomFieldRun          tuiLogOperation = "custom_field_run"
 )
 
@@ -76,7 +77,7 @@ func knownTUIOperation(operation tuiLogOperation) bool {
 		tuiOperationLoadAgentSummaries,
 		tuiOperationEnterLiveSession,
 		tuiOperationRestoreSavedSession,
-		tuiOperationEnterOrCreateSession,
+		tuiOperationCreateSession,
 		tuiOperationActivateAgentPane,
 		tuiOperationRenameSession,
 		tuiOperationKillSession,
@@ -85,6 +86,7 @@ func knownTUIOperation(operation tuiLogOperation) bool {
 		tuiOperationSaveState,
 		tuiOperationSnapshotSession,
 		tuiOperationAgentGitScan,
+		tuiOperationRunAction,
 		tuiOperationCustomFieldRun:
 		return true
 	default:

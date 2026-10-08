@@ -23,7 +23,6 @@ import (
 )
 
 const (
-	actionCmd                 = "action"
 	snapshotCmd               = "snapshot"
 	sessionCmd                = "session"
 	testConfigPathFlag        = "--path"
@@ -42,7 +41,6 @@ const (
 	pickerClientEnvironment   = "SESH_TMUX_CLIENT"
 	terminalAvailabilityProbe = "SESH_TEST_TERMINAL_AVAILABILITY"
 )
-const exitCodeUsage = 2
 
 func ExitCode(err error) int {
 	return cli.ExitCode(err)
@@ -200,7 +198,7 @@ func assertJSONContractSuccess(t *testing.T, command string, execution commandEx
 	}
 
 	assertJSONContractFields(t, fields, map[string]any{
-		"schemaVersion": float64(1), "command": command, "ok": true, "error": nil,
+		"schemaVersion": float64(2), "command": command, "ok": true, "error": nil,
 	})
 	assertAllKeysCamelCase(t, fields, "$")
 

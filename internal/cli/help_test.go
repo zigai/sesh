@@ -153,7 +153,7 @@ func defaultsUseOneForm(usage string) bool {
 }
 
 func TestHelpRendersLiteralDefaultsInDescriptionForm(t *testing.T) {
-	for _, args := range [][]string{{"pick", "--help"}, {"logs", "--help"}, {"action", "autosave-final-save", "--help"}, {"setup", "tmux", "--help"}} {
+	for _, args := range [][]string{{"pick", "--help"}, {"logs", "--help"}, {"autosave", "final-save", "--help"}} {
 		stdout, _, err := executeCommand(t, args...)
 		if err != nil {
 			t.Fatalf("%v: %v", args, err)
@@ -165,11 +165,10 @@ func TestHelpRendersLiteralDefaultsInDescriptionForm(t *testing.T) {
 	}
 
 	for args, want := range map[string]string{
-		"pick":                       "Picker layout [choices: auto, popup, inline, fullscreen] [default: auto]",
-		"logs":                       "[default: 50]",
-		"action autosave-final-save": "[default: 20s]",
-		"setup tmux":                 "[default: C-o]",
-		"setup agents":               "Tracker operation [choices: enable, disable, status] [default: enable]",
+		"pick":                "Picker layout [choices: auto, popup, inline, fullscreen] [default: auto]",
+		"logs":                "[default: 50]",
+		"autosave final-save": "[default: 20s]",
+		"setup agents":        "Tracker operation [choices: enable, disable, status] [default: enable]",
 	} {
 		stdout, _, err := executeCommand(t, append(strings.Fields(args), "--help")...)
 		if err != nil || !strings.Contains(stdout, want) {

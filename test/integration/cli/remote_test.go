@@ -6,10 +6,12 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/zigai/gotmux/tmux"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/cli"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	cmdremote "github.com/zigai/sesh/internal/cli/cmd/remote"
@@ -17,7 +19,7 @@ import (
 	"github.com/zigai/sesh/internal/remote"
 )
 
-func remotePeerActionFixture(t *testing.T) (*tmux.Server, []byte, string) {
+func remotePeerActionFixture(t *testing.T, peerConfig string) (*tmux.Server, []byte, string) {
 	t.Helper()
 
 	server := newCaptureCLIServer(t)
@@ -50,13 +52,18 @@ func remotePeerActionFixture(t *testing.T) (*tmux.Server, []byte, string) {
 	}
 
 	configPath := filepath.Join(t.TempDir(), "config.toml")
-	if err := os.WriteFile(configPath, []byte("[remote.permissions]\ncreate = true\n"), 0o600); err != nil {
+	if err := os.WriteFile(configPath, []byte(peerConfig), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	input, err := action.SessionCreate.EncodeInput(action.CreateSession{Name: "remote-created", Directory: t.TempDir()})
+	if err != nil {
 		t.Fatal(err)
 	}
 
 	request := remote.ActionRequest{
-		Operation: remote.ActionCreate, ConnectionID: "origin", ConfigDigest: "digest",
-		PeerID: peerID, TmuxServerSocket: server.Endpoint().SocketPath, SessionName: "remote-created", Directory: t.TempDir(),
+		InvocationID: "", IntentDigest: "", Action: action.SessionCreate.ID, ConnectionID: "origin", ConfigDigest: "digest",
+		PeerID: peerID, Socket: server.Endpoint().SocketPath, Input: input,
 	}
 
 	request.InvocationID, err = remote.NewInvocationID()
@@ -96,13 +103,39 @@ func runRemotePeerActionEntrypoint(t *testing.T, payload []byte, configPath stri
 }
 
 func TestRemotePeerActionEntrypointCreatesAndReplaysOnDisposableServer(t *testing.T) {
-	server, payload, configPath := remotePeerActionFixture(t)
+	server, payload, configPath := remotePeerActionFixture(t, "")
 	first := runRemotePeerActionEntrypoint(t, payload, configPath)
 
 	second := runRemotePeerActionEntrypoint(t, payload, configPath)
-	if !first.OK || second != first {
+	if !first.OK || !reflect.DeepEqual(second, first) {
 		t.Fatalf("first=%#v second=%#v", first, second)
 	}
+
+	created, err := action.SessionCreate.DecodeOutput(first.Output)
+	if createdSession, ok := created.(action.CreatedSession); err != nil || !ok || createdSession.Session.Name != "remote-created" {
+		t.Fatalf("create output = %s, %v; want the created session", first.Output, err)
+	}
+
+	if count := countSessionsNamed(t, server, "remote-created"); count != 1 {
+		t.Fatalf("created session count = %d, want 1", count)
+	}
+}
+
+func TestRemotePeerActionEntrypointHonorsThePeersPolicy(t *testing.T) {
+	server, payload, configPath := remotePeerActionFixture(t, "[actions.session.create]\nallow_remote = false\n")
+
+	result := runRemotePeerActionEntrypoint(t, payload, configPath)
+	if result.OK || result.Code != action.CodeForbidden {
+		t.Fatalf("result = %#v, want forbidden", result)
+	}
+
+	if count := countSessionsNamed(t, server, "remote-created"); count != 0 {
+		t.Fatalf("forbidden action created %d sessions", count)
+	}
+}
+
+func countSessionsNamed(t *testing.T, server *tmux.Server, name string) int {
+	t.Helper()
 
 	sessions, err := server.Sessions(t.Context())
 	if err != nil {
@@ -112,14 +145,12 @@ func TestRemotePeerActionEntrypointCreatesAndReplaysOnDisposableServer(t *testin
 	count := 0
 
 	for _, candidate := range sessions {
-		if candidate.Name == "remote-created" {
+		if candidate.Name == name {
 			count++
 		}
 	}
 
-	if count != 1 {
-		t.Fatalf("created session count = %d, want 1", count)
-	}
+	return count
 }
 
 func TestRemoteCommandTreeMarksProtocolChannelsLive(t *testing.T) {

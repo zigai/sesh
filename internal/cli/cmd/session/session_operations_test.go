@@ -66,8 +66,8 @@ func TestSessionCommandsWithoutSocketTargetDefaultTmuxServer(t *testing.T) {
 		name string
 		args []string
 	}{
-		{name: "new", args: []string{"session", "new", "dev"}},
-		{name: "rename", args: []string{"session", "rename", "renamed", "--session", "dev"}},
+		{name: "create", args: []string{"session", "create", "dev"}},
+		{name: "rename", args: []string{"session", "rename", "dev", "renamed"}},
 		{name: "kill", args: []string{"session", "kill", "dev"}},
 		{name: "delete", args: []string{"session", "delete", "dev"}},
 		{name: "switch", args: []string{"session", "switch", "dev"}},
@@ -89,12 +89,12 @@ func TestSessionCommandsWithoutSocketTargetDefaultTmuxServer(t *testing.T) {
 	}
 }
 
-func TestSessionNewRejectsMissingDirectoryBeforeTmuxWork(t *testing.T) {
+func TestSessionCreateRejectsMissingDirectoryBeforeTmuxWork(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "missing")
 
 	exec := executeJSON(
 		t,
-		"session", "new", "dev",
+		"session", "create", "dev",
 		testSocketFlag, "/tmp/sesh-cli-unit-socket",
 		"--dir", missing,
 		testNoConfigFlag,

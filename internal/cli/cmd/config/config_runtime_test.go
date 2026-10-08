@@ -80,10 +80,10 @@ func TestCommandConfigurationSnapshotProcessEnvironmentIsNotChangedByCallers(t *
 }
 
 func TestSeparateInvocationsResolveTheirOwnConfiguration(t *testing.T) {
-	for _, key := range []string{"F20", "F21"} {
+	for _, key := range []string{"f2", "f3"} {
 		root := newRootCommand(t.Context())
 		root.SetContext(t.Context())
-		root.SetIn(bytes.NewBufferString(fmt.Sprintf("[agent_sessions]\nnext_idle_key = %q\n", key)))
+		root.SetIn(bytes.NewBufferString(fmt.Sprintf("[keys]\nhelp = %q\n", key)))
 
 		if err := root.ParseFlags([]string{testConfigFlag, "-"}); err != nil {
 			t.Fatal(err)
@@ -94,8 +94,8 @@ func TestSeparateInvocationsResolveTheirOwnConfiguration(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if cfg.AgentSessions.NextIdleKey != key {
-			t.Fatalf("resolved key = %q, want %q", cfg.AgentSessions.NextIdleKey, key)
+		if cfg.Keys.Help != key {
+			t.Fatalf("resolved key = %q, want %q", cfg.Keys.Help, key)
 		}
 	}
 }

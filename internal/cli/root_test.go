@@ -78,8 +78,8 @@ func TestRootHelpOrdersCoreCommandsFirstWithDoctorBeforeHelp(t *testing.T) {
 	}
 
 	want := []string{
-		"pick", "session", "snapshot", "autosave", "remote",
-		"keys", "logs", "hooks", "config", "setup", "daemon", "action", "doctor", "help",
+		"pick", "session", "snapshot", "agent", "autosave", "remote",
+		"keys", "logs", "hooks", "config", "setup", "daemon", "doctor", "help",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("command order = %v, want %v", names, want)
@@ -91,7 +91,7 @@ func TestRootHelpOrdersCoreCommandsFirstWithDoctorBeforeHelp(t *testing.T) {
 }
 
 func TestHelpAndVersionShorthands(t *testing.T) {
-	for _, args := range [][]string{{"-h"}, {"snapshot", "-h"}, {"logs", "-h"}} {
+	for _, args := range [][]string{{"-h"}, {snapshotCmd, "-h"}, {"logs", "-h"}} {
 		stdout, _, err := executeCommand(t, args...)
 		if ExitCode(err) != exitCodeUsage || stdout != "" {
 			t.Fatalf("%v returned code %d and stdout %q", args, ExitCode(err), stdout)
@@ -344,9 +344,18 @@ command = "false"
 func TestKeysCommandListsBindings(t *testing.T) {
 	isolatedToolsHome(t)
 
-	cfgPath := writeToolsConfig(t, `[keys]
-create = "alt+c"
-snapshot = "alt+s"
+	cfgPath := writeToolsConfig(t, `[[keys.bind]]
+key = "ctrl+g"
+action = "session.create"
+in = "picker"
+
+[[keys.bind]]
+key = "alt+c"
+in = "picker"
+
+[[keys.bind]]
+key = "alt+s"
+in = "picker"
 `)
 
 	exec := executeJSON(t, "keys", testConfigFlag, cfgPath, testJSONFlag)
@@ -363,16 +372,16 @@ snapshot = "alt+s"
 		byName[binding.Name] = binding.Bind
 	}
 
-	if byName["create"] != "alt+c" {
-		t.Fatalf("create binding = %q, want alt+c", byName["create"])
+	if byName["session.create"] != "ctrl+g" {
+		t.Fatalf("session.create binding = %q, want ctrl+g", byName["session.create"])
 	}
 
-	if byName["snapshot"] != "alt+s" {
-		t.Fatalf("snapshot binding = %q, want alt+s", byName["snapshot"])
+	if bind, ok := byName["snapshot.save"]; ok {
+		t.Fatalf("unbound snapshot.save is still bound to %q", bind)
 	}
 
-	if len(payload.Bindings) != 22 {
-		t.Fatalf("bindings = %d, want 22", len(payload.Bindings))
+	if len(payload.Bindings) != 21 {
+		t.Fatalf("bindings = %d, want 21", len(payload.Bindings))
 	}
 }
 
@@ -380,7 +389,7 @@ func TestKeysCommandPlainOutput(t *testing.T) {
 	isolatedToolsHome(t)
 
 	cfgPath := writeToolsConfig(t, `[keys]
-kill = "alt+x"
+help = "f1"
 `)
 
 	stdout, stderr, err := executeCommand(t, "keys", testConfigFlag, cfgPath)
@@ -388,7 +397,9 @@ kill = "alt+x"
 		t.Fatalf("keys failed: %v\nstderr: %s", err, stderr)
 	}
 
-	if !strings.Contains(stdout, "kill           alt+x") {
-		t.Fatalf("stdout missing kill binding:\n%s", stdout)
+	for _, want := range [][]string{{"help", "f1"}, {"session.kill", "alt+x"}} {
+		if !slices.ContainsFunc(strings.Split(stdout, "\n"), func(line string) bool { return slices.Equal(strings.Fields(line), want) }) {
+			t.Fatalf("stdout missing %s binding:\n%s", want[0], stdout)
+		}
 	}
 }

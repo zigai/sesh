@@ -27,7 +27,7 @@ func TestApplicationRestoreReportsBestEffortWithSettledReceipt(t *testing.T) {
 
 	operationID := "0123456789abcdef0123456789abcdef"
 
-	err := cli.ExecuteApplication(t.Context(), []string{actionCmd, "snapshot-restore", testRepositoryFlag, repoPath, testLeaseRootFlag, leasePath, testSocketFlag, target.Endpoint().SocketPath, testGenerationFlag, generation, "--operation", operationID, "--no-processes", testConfigFlag, cfg, testJSONFlag}, nil, &stdout, &stderr)
+	err := cli.ExecuteApplication(t.Context(), []string{"snapshot", "restore", testRepositoryFlag, repoPath, testLeaseRootFlag, leasePath, testSocketFlag, target.Endpoint().SocketPath, testGenerationFlag, generation, "--operation", operationID, "--no-processes", testConfigFlag, cfg, testJSONFlag}, nil, &stdout, &stderr)
 	if err != nil {
 		t.Fatalf("expected practical restore: %v / %s", err, stderr.String())
 	}
@@ -130,7 +130,7 @@ func captureRemovedSession(t *testing.T, name string) (string, string, string) {
 	repoPath := filepath.Join(t.TempDir(), "repo")
 	leasePath := filepath.Join(t.TempDir(), "leases")
 
-	saved := executeJSON(t, actionCmd, "snapshot-save", testRepositoryFlag, repoPath, testLeaseRootFlag, leasePath, testSocketFlag, source.Endpoint().SocketPath, testSessionFlag, string(sessions[0].ID), testNoConfigFlag, testJSONFlag)
+	saved := executeJSON(t, "snapshot", "save", testRepositoryFlag, repoPath, testLeaseRootFlag, leasePath, testSocketFlag, source.Endpoint().SocketPath, string(sessions[0].ID), testNoConfigFlag, testJSONFlag)
 	if saved.err != nil || !saved.envelope.OK {
 		t.Fatalf("save: %v", saved.err)
 	}
@@ -152,11 +152,11 @@ func TestApplicationRestoreTablePrintsSkippedSessionsOnStdoutWhenItExitsNonZero(
 	repository := filepath.Join(home, "repository")
 	lease := filepath.Join(home, "leases")
 
-	saved := runJSONContract(t, "action.snapshot-save", actionCmd, "snapshot-save", testSocketFlag, socket, testRepositoryFlag, repository, testLeaseRootFlag, lease, testSessionFlag, string(kept.ID()))
+	saved := runJSONContract(t, "snapshot.save", "snapshot", "save", testSocketFlag, socket, testRepositoryFlag, repository, testLeaseRootFlag, lease, string(kept.ID()))
 	generation := contractJSONValue[string](t, saved, "generation")
 
 	// The saved session is still live, so restoring everything must skip it by name.
-	stdout, stderr, err := executeCommand(t, actionCmd, "snapshot-restore", testSocketFlag, socket, testRepositoryFlag, repository, testLeaseRootFlag, lease, testGenerationFlag, generation, "--no-processes", testNoConfigFlag)
+	stdout, stderr, err := executeCommand(t, "snapshot", "restore", testSocketFlag, socket, testRepositoryFlag, repository, testLeaseRootFlag, lease, testGenerationFlag, generation, "--no-processes", testNoConfigFlag)
 	if err == nil {
 		t.Fatalf("a restore that created nothing must exit non-zero, stdout=%q", stdout)
 	}

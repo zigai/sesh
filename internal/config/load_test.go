@@ -169,7 +169,6 @@ agents_width = "55%"
 agents_height = "75%"
 
 [keys]
-create = "ctrl+g"
 help = "f1"
 cycle_mode = "ctrl+e"
 page_up = "ctrl+b"
@@ -177,7 +176,13 @@ page_down = "ctrl+f"
 top = "g"
 bottom = "G"
 select_1 = "alt+1"
-select_0 = "alt+0"`
+select_0 = "alt+0"
+
+[[keys.bind]]
+key = "M-n"
+action = "agent.next"
+in = "tmux"
+params = { local = true }`
 
 	configPath := filepath.Join(configDir, "config.toml")
 	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
@@ -191,7 +196,12 @@ select_0 = "alt+0"`
 
 	assertEqual(t, "Primary theme", cfg.Theme.Primary, "#ff0000")
 	assertEqual(t, "Warning theme", cfg.Theme.Warning, "#ff8800")
-	assertEqual(t, "Create key", cfg.Keys.Create, "ctrl+g")
+
+	if len(cfg.Keys.Bind) != 1 || cfg.Keys.Bind[0].Key != "M-n" || cfg.Keys.Bind[0].Action != "agent.next" ||
+		cfg.Keys.Bind[0].In != "tmux" || cfg.Keys.Bind[0].Params["local"] != true {
+		t.Fatalf("Keys.Bind = %#v, want the configured tmux binding", cfg.Keys.Bind)
+	}
+
 	assertEqual(t, "Help key", cfg.Keys.Help, "f1")
 	assertEqual(t, "CycleMode key", cfg.Keys.CycleMode, "ctrl+e")
 	assertEqual(t, "SESH popup width", cfg.Popup.SeshWidth, "42%")
@@ -216,8 +226,6 @@ func TestLoadSettingsOverride(t *testing.T) {
 	}
 
 	configContent := `[settings]
-confirm_kill = false
-confirm_delete = false
 show_footer = false
 directory_suggestions = 8
 default_session_path_suggestion = "~/src/{session}"
@@ -233,8 +241,8 @@ display_modes = ["agents"]`
 		t.Fatalf("Load failed: %v", err)
 	}
 
-	if cfg.Settings.ConfirmKill || cfg.Settings.ConfirmDelete || cfg.Settings.ShowFooter {
-		t.Fatalf("settings = %#v, want confirmations disabled", cfg.Settings)
+	if cfg.Settings.ShowFooter {
+		t.Fatalf("settings = %#v, want footer disabled", cfg.Settings)
 	}
 
 	assertEqual(t, "DirectorySuggestions setting", cfg.Settings.DirectorySuggestions, 8)

@@ -248,28 +248,6 @@ func ValidateAgentSessionsConfig(agentSessions AgentSessionsConfig) error {
 		}
 	}
 
-	keys := []struct {
-		name string
-		key  string
-	}{
-		{"next_idle_key", TmuxKeyName(agentSessions.NextIdleKey)},
-		{"next_idle_local_key", TmuxKeyName(agentSessions.NextIdleLocalKey)},
-		{"navigation_back_key", TmuxKeyName(agentSessions.NavigationBackKey)},
-	}
-
-	seen := make(map[string]string, len(keys))
-	for _, entry := range keys {
-		if entry.key == "" {
-			continue
-		}
-
-		if previous, ok := seen[entry.key]; ok {
-			return fmt.Errorf("duplicate agent_sessions key binding %q for %s and %s: %w", entry.key, previous, entry.name, errDuplicateKeyBinding)
-		}
-
-		seen[entry.key] = entry.name
-	}
-
 	return nil
 }
 
@@ -379,11 +357,6 @@ func ValidateKeyConfig(keys KeyConfig) error {
 		name string
 		key  string
 	}{
-		{"create", keys.Create},
-		{"rename", keys.Rename},
-		{"kill", keys.Kill},
-		{"delete", keys.Delete},
-		{"snapshot", keys.Snapshot},
 		{"help", keys.Help},
 		{"cycle_mode", keys.CycleMode},
 		{"agent_sort", keys.AgentSort},
@@ -404,7 +377,7 @@ func ValidateKeyConfig(keys KeyConfig) error {
 	}
 
 	for _, entry := range keyEntries {
-		normalized := normalizeConfigKey(entry.key)
+		normalized := PickerKeyName(entry.key)
 		if normalized == "" {
 			continue
 		}
@@ -723,15 +696,6 @@ func validateHookTimeout(label string, value string) error {
 	}
 
 	return nil
-}
-
-func normalizeConfigKey(key string) string {
-	key = strings.TrimSpace(key)
-	if strings.Contains(key, "+") || len(key) > 1 {
-		return strings.ToLower(key)
-	}
-
-	return key
 }
 
 func validateAgentSessionStatusFormats(agentSessions AgentSessionsConfig) error {

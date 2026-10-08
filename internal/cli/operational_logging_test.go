@@ -20,10 +20,10 @@ func TestOperationalCommandsPersistFailuresWithoutPrivateDetails(t *testing.T) {
 		args      []string
 		operation string
 	}{
-		{[]string{actionCmd, "autosave-final-save"}, "final-save"},
-		{[]string{actionCmd, "tmux-wait-ready"}, "daemon_wait_ready"},
+		{[]string{"autosave", "final-save"}, "final-save"},
+		{[]string{"daemon", "wait-ready"}, "daemon_wait_ready"},
 		{[]string{"daemon", "agent-window-status"}, "agent_status_run"},
-		{[]string{actionCmd, "agent-window-status-clear"}, "clear_styles"},
+		{[]string{"agent", "window-status-clear"}, "window-status-clear"},
 		{[]string{"setup", "tmux"}, "setup_tmux"},
 		{[]string{"setup", "agents"}, "setup_agents"},
 		{[]string{"hooks", "run", "session_switch_pre"}, "execute_hooks"},
@@ -146,7 +146,7 @@ func TestDisabledAutosaveLogsItsReasonAndKeepsJSONSeparate(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	args := []string{actionCmd, "autosave-save-if-due", testConfigFlag, cfg, testJSONFlag}
+	args := []string{"autosave", "save-if-due", testConfigFlag, cfg, testJSONFlag}
 	if err := ExecuteApplication(t.Context(), args, nil, &stdout, &stderr); err != nil {
 		t.Fatal(err)
 	}
@@ -198,23 +198,24 @@ func TestAgentTrackerQuietPreservesFailureAndSuppressesInformationalRecords(t *t
 }
 
 func TestAgentNavigationCommandsPersistTheirSuccessOutcome(t *testing.T) {
-	cases := map[string]string{
-		"agent-next": "next", "agent-back": "back", "agent-latest": "latest", "agent-focus": "focus",
-		"agent-waiting": "agent-waiting", "agent-failed": "agent-failed", "agent-unread": "agent-unread", "agent-toggle": "agent-toggle",
-	}
-	for action, operation := range cases {
-		t.Run(action, func(t *testing.T) {
+	for _, operation := range []string{"next", "back", "latest", "focus", "waiting", "failed", "unread", "toggle"} {
+		t.Run(operation, func(t *testing.T) {
 			cfg, path := runtimeConfig(t, "info")
 			root := newRootCommand(t.Context())
 
-			cmd, _, err := root.Find([]string{actionCmd, action})
+			cmd, _, err := root.Find([]string{"agent", operation})
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			cmd.RunE = func(*cobra.Command, []string) error { return nil }
 
-			root.SetArgs([]string{actionCmd, action, testConfigFlag, cfg})
+			args := []string{"agent", operation, testConfigFlag, cfg}
+			if operation == "focus" {
+				args = append(args, "%1")
+			}
+
+			root.SetArgs(args)
 
 			var stdout, stderr bytes.Buffer
 			root.SetOut(&stdout)

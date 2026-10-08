@@ -43,7 +43,7 @@ func newFinalSaveStatus() automation.FinalSaveStatus {
 	}
 }
 
-func NewSaveIfDueCommand() *cobra.Command {
+func newSaveIfDueCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:         "save-if-due",
 		Short:       "Save a snapshot when the configured autosave interval has elapsed",
@@ -165,7 +165,7 @@ func executeAutosaveSave(ctx context.Context, cmd *cobra.Command, env Env) error
 	return errors.Join(renderErr, bookkeepingErr, wrapCloseError(closeErr), lockErr)
 }
 
-func NewFinalSaveCommand() *cobra.Command {
+func newFinalSaveCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "final-save",
 		Short: "Run one bounded high-priority save for shutdown ordering",

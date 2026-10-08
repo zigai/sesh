@@ -36,7 +36,7 @@ func TestRestoreRefusedByAnUnfinishedRestoreLogsWhy(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
 	args := []string{
-		actionCmd, "autosave-restore-on-start", testConfigFlag, cfg,
+		"autosave", "restore-on-start", testConfigFlag, cfg,
 		testSocketFlag, filepath.Join(base, "absent.sock"), testRepositoryFlag, repoPath,
 		"--history", filepath.Join(base, "state", "history.json"),
 	}

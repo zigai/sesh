@@ -370,7 +370,7 @@ func testLogsPathJSONEnvelope(t *testing.T, path string) {
 		t.Fatalf("unexpected stderr: %s", stderr)
 	}
 
-	if !strings.Contains(out, `"schemaVersion": 1`) || !strings.Contains(out, `"command": "logs"`) || !strings.Contains(out, `"ok": true`) || !strings.Contains(out, path) {
+	if !strings.Contains(out, `"schemaVersion": 2`) || !strings.Contains(out, `"command": "logs"`) || !strings.Contains(out, `"ok": true`) || !strings.Contains(out, path) {
 		t.Fatalf("unexpected envelope for --path: %s", out)
 	}
 }
@@ -387,7 +387,7 @@ func testLogsClearJSONEnvelope(t *testing.T, path string) {
 		t.Fatalf("unexpected stderr: %s", stderr)
 	}
 
-	if !strings.Contains(out, `"schemaVersion": 1`) || !strings.Contains(out, `"command": "logs"`) || !strings.Contains(out, `"cleared": true`) || !strings.Contains(out, path) {
+	if !strings.Contains(out, `"schemaVersion": 2`) || !strings.Contains(out, `"command": "logs"`) || !strings.Contains(out, `"cleared": true`) || !strings.Contains(out, path) {
 		t.Fatalf("unexpected envelope for --clear: %s", out)
 	}
 }

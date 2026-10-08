@@ -4,31 +4,30 @@ package remote
 
 import (
 	"bytes"
+	"encoding/json/jsontext"
 	"errors"
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/zigai/sesh/internal/session"
+	"github.com/zigai/sesh/internal/action"
 )
+
+const testKillInput = `{"session":{"kind":"live","id":"$1","name":"work","socket":"/tmp/tmux.sock","serverPid":42,` +
+	`"serverStartedAt":"1970-01-01T00:01:40Z","createdAt":"1970-01-01T00:03:20Z","generation":""},"force":false}`
 
 func liveActionRequest(t *testing.T) ActionRequest {
 	t.Helper()
 
 	request := ActionRequest{
-		Operation:           ActionRename,
-		ConnectionID:        testConnectionID,
-		ConfigDigest:        testConfigDigest,
-		PeerID:              testPeerID,
-		Kind:                string(session.KindLive),
-		TmuxServerSocket:    "/tmp/tmux.sock",
-		TmuxServerPID:       42,
-		TmuxServerStartedAt: time.Unix(100, 0).UTC(),
-		SessionID:           "$1",
-		SessionName:         testSessionName,
-		SessionCreatedAt:    time.Unix(200, 0).UTC(),
-		NewName:             "api",
+		InvocationID: "",
+		IntentDigest: "",
+		Action:       action.SessionKill.ID,
+		ConnectionID: testConnectionID,
+		ConfigDigest: testConfigDigest,
+		PeerID:       testPeerID,
+		Socket:       "/tmp/tmux.sock",
+		Input:        jsontext.Value(testKillInput),
 	}
 
 	id, err := NewInvocationID()
@@ -36,144 +35,19 @@ func liveActionRequest(t *testing.T) ActionRequest {
 		t.Fatal(err)
 	}
 
+	request.InvocationID = id
+
 	digest, err := IntentDigest(request)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	request.InvocationID = id
 	request.IntentDigest = digest
 
 	return request
 }
 
-func TestActionRequestRoundTripPreservesLiveIncarnation(t *testing.T) {
-	request := liveActionRequest(t)
-
-	payload, err := EncodeActionRequest(request)
-	if err != nil {
-		t.Fatalf("EncodeActionRequest() error = %v", err)
-	}
-
-	decoded, err := DecodeActionRequest(payload)
-	if err != nil {
-		t.Fatalf("DecodeActionRequest() error = %v", err)
-	}
-
-	if !reflect.DeepEqual(decoded, request) {
-		t.Fatalf("action request round trip = %#v, want %#v", decoded, request)
-	}
-}
-
-func TestSavedActionRequestCarriesOnlyStableSavedIdentity(t *testing.T) {
-	request := ActionRequest{
-		Operation:        ActionRestore,
-		ConnectionID:     testConnectionID,
-		ConfigDigest:     testConfigDigest,
-		PeerID:           testPeerID,
-		Kind:             string(session.KindSaved),
-		TmuxServerSocket: "/tmp/tmux.sock",
-		SessionID:        "saved-session",
-		SessionName:      testSessionName,
-		Generation:       "saved-generation",
-	}
-
-	digest, err := IntentDigest(request)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	request.InvocationID = strings.Repeat("a", 32)
-	request.IntentDigest = digest
-
-	payload, err := EncodeActionRequest(request)
-	if err != nil {
-		t.Fatalf("EncodeActionRequest() error = %v", err)
-	}
-
-	decoded, err := DecodeActionRequest(payload)
-	if err != nil {
-		t.Fatalf("DecodeActionRequest() error = %v", err)
-	}
-
-	if !reflect.DeepEqual(decoded, request) {
-		t.Fatalf("saved action request = %#v, want %#v", decoded, request)
-	}
-}
-
-func TestActionRequestRejectsInvalidOperationShape(t *testing.T) {
-	base := liveActionRequest(t)
-
-	tests := map[string]func(*ActionRequest){
-		"unsupported operation": func(r *ActionRequest) { r.Operation = Action("push") },
-		"missing invocation":    func(r *ActionRequest) { r.InvocationID = "" },
-		"short invocation":      func(r *ActionRequest) { r.InvocationID = "abc" },
-		"saved with session id": func(r *ActionRequest) {
-			r.Operation = ActionRestore
-			r.Kind = string(session.KindSaved)
-		},
-		"live without incarnation": func(r *ActionRequest) { r.TmuxServerStartedAt = time.Time{} },
-		"live without session id":  func(r *ActionRequest) { r.SessionID = "" },
-		"rename without new name":  func(r *ActionRequest) { r.NewName = "" },
-		"kill with new name":       func(r *ActionRequest) { r.Operation = ActionKill },
-		"negative pid":             func(r *ActionRequest) { r.TmuxServerPID = -1 },
-		"directory on live target": func(r *ActionRequest) { r.Directory = "/work" },
-		"control character":        func(r *ActionRequest) { r.SessionName = "dev\x1b[31m" },
-	}
-
-	for name, mutate := range tests {
-		t.Run(name, func(t *testing.T) {
-			request := base
-			mutate(&request)
-
-			if _, err := EncodeActionRequest(request); !errors.Is(err, ErrInvalidFrame) {
-				t.Fatalf("EncodeActionRequest() error = %v, want invalid frame", err)
-			}
-		})
-	}
-}
-
-func TestCreateActionRequiresDirectoryWithoutLiveIdentity(t *testing.T) {
-	valid := ActionRequest{
-		Operation:    ActionCreate,
-		ConnectionID: testConnectionID,
-		ConfigDigest: testConfigDigest,
-		PeerID:       testPeerID,
-		SessionName:  "new",
-		Directory:    "/work",
-	}
-
-	digest, err := IntentDigest(valid)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	valid.InvocationID = strings.Repeat("f", 32)
-	valid.IntentDigest = digest
-
-	if _, err := EncodeActionRequest(valid); err != nil {
-		t.Fatalf("EncodeActionRequest(valid) error = %v", err)
-	}
-
-	withoutDirectory := valid
-	withoutDirectory.Directory = ""
-
-	if _, err := EncodeActionRequest(withoutDirectory); !errors.Is(err, ErrInvalidFrame) {
-		t.Fatalf("EncodeActionRequest(no directory) error = %v, want invalid frame", err)
-	}
-
-	withLiveIdentity := valid
-	withLiveIdentity.SessionID = "$1"
-	withLiveIdentity.TmuxServerPID = 42
-	withLiveIdentity.TmuxServerStartedAt = time.Unix(100, 0).UTC()
-	withLiveIdentity.SessionCreatedAt = time.Unix(200, 0).UTC()
-
-	if _, err := EncodeActionRequest(withLiveIdentity); !errors.Is(err, ErrInvalidFrame) {
-		t.Fatalf("EncodeActionRequest(live identity) error = %v, want invalid frame", err)
-	}
-}
-
-func TestDecodeActionRequestRejectsTamperedIntent(t *testing.T) {
+func TestActionRequestRoundTripPreservesInput(t *testing.T) {
 	request := liveActionRequest(t)
 
 	encoded, err := EncodeActionRequest(request)
@@ -181,113 +55,124 @@ func TestDecodeActionRequestRejectsTamperedIntent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tampered := bytes.Replace(encoded, []byte(`"newName":"api"`), []byte(`"newName":"other"`), 1)
-	if bytes.Equal(tampered, encoded) {
-		t.Fatal("fixture did not tamper the request")
-	}
-
-	decoded, err := DecodeActionRequest(tampered)
+	decoded, err := DecodeActionRequest(encoded)
 	if err != nil {
 		t.Fatalf("DecodeActionRequest() error = %v", err)
 	}
 
-	if err := VerifyIntentDigest(decoded); !errors.Is(err, ErrInvocationConflict) {
-		t.Fatalf("VerifyIntentDigest() error = %v, want conflict", err)
+	if !reflect.DeepEqual(decoded, request) {
+		t.Fatalf("round trip = %#v, want %#v", decoded, request)
+	}
+
+	if err := VerifyIntentDigest(decoded); err != nil {
+		t.Fatalf("decoded request lost its intent: %v", err)
 	}
 }
 
-func TestIntentDigestExcludesTransportIdentity(t *testing.T) {
-	request := liveActionRequest(t)
+func TestDecodeActionRequestRejectsMalformedRequests(t *testing.T) {
+	tests := map[string]func(*ActionRequest){
+		"unregistered action shape": func(request *ActionRequest) { request.Action = "kill" },
+		"short invocation":          func(request *ActionRequest) { request.InvocationID = "short" },
+		"short digest":              func(request *ActionRequest) { request.IntentDigest = "short" },
+		"missing peer":              func(request *ActionRequest) { request.PeerID = "" },
+		"input is not an object":    func(request *ActionRequest) { request.Input = jsontext.Value(`["$1"]`) },
+		"missing input":             func(request *ActionRequest) { request.Input = nil },
+	}
 
-	digest, err := IntentDigest(request)
+	for name, mutate := range tests {
+		t.Run(name, func(t *testing.T) {
+			request := liveActionRequest(t)
+			mutate(&request)
+
+			if err := ValidateActionRequest(request); !errors.Is(err, ErrInvalidFrame) {
+				t.Fatalf("ValidateActionRequest() error = %v, want %v", err, ErrInvalidFrame)
+			}
+		})
+	}
+
+	encoded, err := EncodeActionRequest(liveActionRequest(t))
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	for name, payload := range map[string][]byte{
+		"unknown member": bytes.Replace(encoded, []byte(`"socket"`), []byte(`"extra":1,"socket"`), 1),
+		"oversized":      bytes.Repeat([]byte{' '}, MaxActionBytes+1),
+		"empty":          nil,
+	} {
+		if _, err := DecodeActionRequest(payload); !errors.Is(err, ErrInvalidFrame) {
+			t.Fatalf("DecodeActionRequest(%s) error = %v, want %v", name, err, ErrInvalidFrame)
+		}
+	}
+}
+
+func TestIntentDigestBindsActionPeerServerAndInput(t *testing.T) {
+	request := liveActionRequest(t)
+
+	for name, mutate := range map[string]func(*ActionRequest){
+		"action": func(request *ActionRequest) { request.Action = action.SessionDelete.ID },
+		"peer":   func(request *ActionRequest) { request.PeerID = "other-peer" },
+		"socket": func(request *ActionRequest) { request.Socket = "/tmp/other.sock" },
+		"input": func(request *ActionRequest) {
+			request.Input = jsontext.Value(strings.Replace(testKillInput, `"$1"`, `"$2"`, 1))
+		},
+	} {
+		changed := request
+		mutate(&changed)
+
+		if err := VerifyIntentDigest(changed); !errors.Is(err, ErrInvocationConflict) {
+			t.Fatalf("changing the %s kept the intent digest: %v", name, err)
+		}
 	}
 
 	retried := request
-	retried.InvocationID = strings.Repeat("b", 32)
-	retried.ConnectionID = "other-connection"
-	retried.ConfigDigest = "other-digest"
+	retried.ConnectionID = "renamed-connection"
 
-	retriedDigest, err := IntentDigest(retried)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if digest != retriedDigest {
-		t.Fatalf("intent digest changed across transport identity: %q != %q", digest, retriedDigest)
-	}
-
-	mutated := request
-	mutated.SessionID = "$2"
-
-	mutatedDigest, err := IntentDigest(mutated)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if digest == mutatedDigest {
-		t.Fatal("intent digest ignored a target change")
+	if err := VerifyIntentDigest(retried); err != nil {
+		t.Fatalf("the local connection name changed the intent: %v", err)
 	}
 }
 
 func TestDecodeActionResultRejectsUnboundedOrUnknownResponses(t *testing.T) {
-	valid := `{"invocationId":"` + strings.Repeat("a", 32) + `","ok":true,"code":""}`
+	id := strings.Repeat("a", 32)
+	valid := `{"invocationId":"` + id + `","action":"session.kill","ok":true,"code":""}`
 
 	for _, output := range [][]byte{
 		nil,
-		[]byte(`{"invocationId":"` + strings.Repeat("a", 32) + `","ok":false,"code":"raw remote failure"}`),
-		[]byte(`{"invocationId":"` + strings.Repeat("a", 32) + `","ok":true,"code":"unavailable"}`),
-		[]byte(`{"invocationId":"` + strings.Repeat("a", 32) + `","ok":false}`),
-		[]byte(`{"ok":true,"code":""}`),
-		[]byte(strings.Replace(valid, `"ok":true`, `"ok":true,"ok":true`, 1)),
+		[]byte(`{"invocationId":"` + id + `","action":"session.kill","ok":false,"code":"raw remote failure"}`),
+		[]byte(`{"invocationId":"` + id + `","action":"session.kill","ok":true,"code":"unavailable"}`),
+		[]byte(`{"invocationId":"` + id + `","action":"","ok":true,"code":""}`),
+		[]byte(`{"invocationId":"` + id + `","action":"session.kill","ok":false}`),
+		[]byte(`{"action":"session.kill","ok":true,"code":""}`),
+		[]byte(strings.Replace(valid, `"code":""`, `"code":"","output":{"name":`, 1)),
 		[]byte(strings.Replace(valid, `"code":""`, `"code":"","extra":1`, 1)),
-		bytes.Repeat([]byte{'x'}, MaxActionBytes+1),
+		bytes.Repeat([]byte{'x'}, MaxResultBytes+1),
 	} {
 		if _, err := DecodeActionResult(output); !errors.Is(err, ErrInvalidFrame) {
-			t.Fatalf("DecodeActionResult(%q) error = %v, want invalid frame", output, err)
+			t.Fatalf("DecodeActionResult(%.80q) error = %v, want invalid frame", output, err)
 		}
 	}
 }
 
-func TestActionResultAcceptsClosedOutcomeVocabulary(t *testing.T) {
-	id := strings.Repeat("c", 32)
-
-	for _, code := range []string{
-		ActionCodeInvalidRequest, ActionCodeForbidden, ActionCodeUnsupported,
-		ActionCodeConflict, ActionCodeInvocationConflict, ActionCodeTargetChanged,
-		ActionCodeUnavailable, ActionCodePartial, ActionCodeUnknownOutcome, ActionCodeNotFound,
+func TestActionResultRoundTripPreservesOutput(t *testing.T) {
+	for _, result := range []ActionResult{
+		{InvocationID: strings.Repeat("d", 32), Action: action.SessionKill.ID, OK: true, Code: "", Output: jsontext.Value(`{"session":{"id":"$1"}}`)},
+		{InvocationID: strings.Repeat("d", 32), Action: action.SnapshotRestore.ID, OK: false, Code: action.CodePartial, Output: jsontext.Value(`{"status":"partial"}`)},
+		{InvocationID: strings.Repeat("d", 32), Action: "", OK: false, Code: action.CodeInvalidArgument, Output: nil},
 	} {
-		result := ActionResult{InvocationID: id, OK: false, Code: code}
-		if err := ValidateActionResult(result); err != nil {
-			t.Fatalf("ValidateActionResult(%q) error = %v", code, err)
+		var output bytes.Buffer
+		if err := WriteActionResult(&output, result); err != nil {
+			t.Fatal(err)
 		}
-	}
 
-	if err := ValidateActionResult(ActionResult{InvocationID: id, OK: true}); err != nil {
-		t.Fatalf("ValidateActionResult(success) error = %v", err)
-	}
-}
+		decoded, err := DecodeActionResult(output.Bytes())
+		if err != nil {
+			t.Fatal(err)
+		}
 
-func TestActionResultRoundTripPreservesDurableOperation(t *testing.T) {
-	result := ActionResult{
-		InvocationID:       strings.Repeat("d", 32),
-		OK:                 true,
-		DurableOperationID: strings.Repeat("e", 32),
-	}
-
-	var output bytes.Buffer
-	if err := WriteActionResult(&output, result); err != nil {
-		t.Fatal(err)
-	}
-
-	decoded, err := DecodeActionResult(output.Bytes())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !reflect.DeepEqual(decoded, result) {
-		t.Fatalf("action result round trip = %#v, want %#v", decoded, result)
+		if !reflect.DeepEqual(decoded, result) {
+			t.Fatalf("action result round trip = %#v, want %#v", decoded, result)
+		}
 	}
 }
 

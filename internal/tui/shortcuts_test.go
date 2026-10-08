@@ -6,6 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/session"
 )
 
@@ -246,8 +247,8 @@ func TestVisibleSessionShortcutNoopsWhenSlotMissing(t *testing.T) {
 
 func TestDefaultAltManagementKeysTriggerActions(t *testing.T) {
 	model := newTestModel()
-	model.sessions = []session.Session{{Name: "dev"}}
-	model.filtered = []session.Session{{Name: "dev"}}
+	model.sessions = []session.Session{{Name: "dev", Kind: session.KindLive}}
+	model.filtered = []session.Session{{Name: "dev", Kind: session.KindLive}}
 
 	if cmd := model.handleActionKeys(keyAlt("r")); cmd == nil {
 		t.Fatal("handleActionKeys(alt+r) returned nil")
@@ -255,20 +256,23 @@ func TestDefaultAltManagementKeysTriggerActions(t *testing.T) {
 		cmd()
 	}
 
-	if model.dialog != dialogInputRename {
+	if model.dialog != dialogInputText || model.pending.entry.Describe().ID != action.SessionRename.ID {
 		t.Fatalf("dialog after alt+r = %v, want rename dialog", model.dialog)
 	}
 
-	model.dialog = dialogNone
+	model.cancelAction()
+
 	if cmd := model.handleActionKeys(keyAlt("x")); cmd == nil {
 		t.Fatal("handleActionKeys(alt+x) returned nil")
 	} else {
 		cmd()
 	}
 
-	if model.dialog != dialogConfirmKill {
+	if model.dialog != dialogConfirm || model.pending.entry.Describe().ID != action.SessionKill.ID {
 		t.Fatalf("dialog after alt+x = %v, want confirm kill dialog", model.dialog)
 	}
+
+	model.cancelAction()
 
 	if cmd := model.handleActionKeys(keyAlt("X")); cmd == nil {
 		t.Fatal("handleActionKeys(alt+shift+x) returned nil")
@@ -276,7 +280,7 @@ func TestDefaultAltManagementKeysTriggerActions(t *testing.T) {
 		cmd()
 	}
 
-	if model.dialog != dialogConfirmDelete {
+	if model.dialog != dialogConfirm || model.pending.entry.Describe().ID != action.SessionDelete.ID {
 		t.Fatalf("dialog after alt+shift+x = %v, want confirm delete dialog", model.dialog)
 	}
 }

@@ -55,7 +55,7 @@ func TestSetupServicesPrintsWithoutWriting(t *testing.T) {
 		t.Fatalf("printed definition is missing the ownership marker:\n%s", service.Content)
 	}
 
-	if !strings.Contains(service.Content, "action autosave-save-if-due") {
+	if !strings.Contains(service.Content, "autosave save-if-due") {
 		t.Fatalf("printed definition does not use the native command:\n%s", service.Content)
 	}
 
@@ -374,8 +374,8 @@ func assertWrittenManagedUnits(t *testing.T, directory string) {
 
 	for _, want := range []string{
 		"daemon tmux",
-		"action tmux-wait-ready",
-		"action autosave-final-save",
+		"daemon wait-ready",
+		"autosave final-save",
 		"TimeoutStopSec=25s",
 	} {
 		if !strings.Contains(string(tmuxContent), want) {

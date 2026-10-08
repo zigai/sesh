@@ -4,7 +4,6 @@ package picker
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -21,6 +20,7 @@ import (
 	gotmux "github.com/zigai/gotmux/tmux"
 	"github.com/zigai/gotmux/tmuxtest"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/agents"
 	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/cli/clibase"
@@ -38,7 +38,7 @@ func newTestRootCommand(ctx context.Context) *cobra.Command {
 	rootCommand.PersistentFlags().String("config", "", "Explicit native TOML configuration file")
 	rootCommand.PersistentFlags().Bool("no-config", false, "Use built-in settings without reading configuration files")
 
-	rootCommand.AddCommand(NewPickCommand(ctx), NewPickerOpenCommand(ctx))
+	rootCommand.AddCommand(NewPickCommand(ctx))
 
 	return rootCommand
 }
@@ -95,29 +95,21 @@ func TestPickHidesPopupChildFlagsAndOmitsLauncherFlags(t *testing.T) {
 	}
 }
 
-func TestPickerOpenExposesInvokingClientFlags(t *testing.T) {
-	t.Parallel()
+func pickPopupCommand(t *testing.T) *cobra.Command {
+	t.Helper()
 
-	cmd := NewPickerOpenCommand(t.Context())
-
-	for name, shorthand := range map[string]string{
-		"client": "c", "target-pane": "t", "current-session-id": "", "client-width": "w", "client-height": "H",
-	} {
-		flag := cmd.Flags().Lookup(name)
-		if flag == nil || flag.Hidden || flag.Shorthand != shorthand {
-			t.Fatalf("--%s flag = %#v, want visible with shorthand %q", name, flag, shorthand)
-		}
+	cmd, _, err := newTestRootCommand(t.Context()).Find([]string{"pick", "popup"})
+	if err != nil || cmd.Name() != "popup" {
+		t.Fatalf("pick popup = %v, %v", cmd, err)
 	}
 
-	if flag := cmd.Flags().Lookup("ui"); flag != nil {
-		t.Fatal("picker-open registers --ui")
-	}
+	return cmd
 }
 
 func TestPopupChildReceivesInvokingPaneSessionAndRepository(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewPickerOpenCommand(t.Context())
+	cmd := pickPopupCommand(t)
 
 	if err := cmd.Flags().Set("repository", "/private/repository"); err != nil {
 		t.Fatal(err)
@@ -134,7 +126,7 @@ func TestPopupChildReceivesInvokingPaneSessionAndRepository(t *testing.T) {
 		t.Fatalf("popup child arguments = %#v", arguments)
 	}
 
-	if slices.Contains(arguments, "picker-open") || slices.Contains(arguments, "--client") {
+	if slices.Contains(arguments, "--client") {
 		t.Fatalf("popup child arguments carry launcher arguments: %#v", arguments)
 	}
 
@@ -191,7 +183,7 @@ func TestPopupChildAcceptsOnlyRecentLaunchTimes(t *testing.T) {
 func TestPickerCommandsExposeLiveInteractiveSurface(t *testing.T) {
 	t.Parallel()
 
-	for _, cmd := range []*cobra.Command{NewPickCommand(t.Context()), NewPickerOpenCommand(t.Context())} {
+	for _, cmd := range []*cobra.Command{NewPickCommand(t.Context()), pickPopupCommand(t)} {
 		t.Run(cmd.Name(), func(t *testing.T) {
 			t.Parallel()
 
@@ -399,8 +391,10 @@ func TestPickerServiceRejectsReplacementSessionBeforeMutation(t *testing.T) {
 		t.Fatalf("create replacement: %v", err)
 	}
 
-	err = services.KillSession(ctx, selected)
-	if !errors.Is(err, errPickerTargetChanged) {
+	_, err = action.Run(ctx, services.actions, action.SessionKill, action.Local(),
+		action.Caller{Client: "", Pane: "", Session: "", Width: "", Height: ""},
+		action.KillSession{Session: action.RefOf(selected), Force: false})
+	if action.CodeOf(err) != action.CodeTargetChanged {
 		t.Fatalf("kill stale target error = %v, want target changed", err)
 	}
 

@@ -6,6 +6,7 @@ import (
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/config"
 )
 
@@ -19,14 +20,6 @@ type CommandResultError struct {
 	error
 }
 
-type SaveBoundaryError struct {
-	err error
-}
-
-type RestoreBoundaryError struct {
-	err error
-}
-
 func (e *ConfigurationError) Error() string {
 	return e.err.Error()
 }
@@ -38,26 +31,6 @@ func (e *ConfigurationError) Unwrap() error {
 func (e *CommandResultError) Unwrap() error { return e.error }
 
 func (e *CommandResultError) CommandResultError() bool { return true }
-
-func (e *SaveBoundaryError) Error() string {
-	return e.err.Error()
-}
-
-func (e *SaveBoundaryError) Unwrap() error {
-	return e.err
-}
-
-func (e *RestoreBoundaryError) Error() string {
-	return e.err.Error()
-}
-
-func (e *RestoreBoundaryError) Unwrap() error {
-	return e.err
-}
-
-func (e *RestoreBoundaryError) RestoreOutcomeLogged() bool {
-	return true
-}
 
 func NewCommandResultError(err error) error {
 	if err == nil {
@@ -73,22 +46,6 @@ func NewConfigurationError(err error) error {
 	}
 
 	return &ConfigurationError{err: err}
-}
-
-func NewSaveBoundaryError(err error) error {
-	if err == nil {
-		return nil
-	}
-
-	return &SaveBoundaryError{err: err}
-}
-
-func NewRestoreBoundaryError(err error) error {
-	if err == nil {
-		return nil
-	}
-
-	return &RestoreBoundaryError{err: err}
 }
 
 func CommandContext(cmd *cobra.Command) context.Context {
@@ -118,6 +75,10 @@ func LoadCommandConfig(ctx context.Context, cmd *cobra.Command) (*config.Config,
 	}
 
 	cfg, err := config.Load(options...)
+	if err == nil {
+		err = action.ValidateConfig(cfg)
+	}
+
 	if err != nil {
 		return nil, &ConfigurationError{err: oops.In("cli").Code("config_failed").With("operation", "load_configuration").Wrap(err)}
 	}

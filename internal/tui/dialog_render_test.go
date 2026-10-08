@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -8,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/session"
 )
 
@@ -15,13 +17,12 @@ func TestRenderCreateDirDialogShowsInputAndSuggestions(t *testing.T) {
 	model := newTestModel()
 	model.width = 90
 	model.height = 24
-	model.dialog = dialogInputCreateDir
-	model.createSession = testSupportNewSessionName
-	model.createDirInput.SetValue("/work/")
-	model.createDirSuggestions = []string{"/work/api/", "/work/web/"}
+	openTestCreateDirectoryPrompt(model, testSupportNewSessionName)
+	model.pathInput.SetValue("/work/")
+	model.pathSuggestions = []string{"/work/api/", "/work/web/"}
 
 	output := stripANSI(model.renderDialog())
-	for _, want := range []string{"Create Session", "Session: new-session", "Directory:", "/work/", "/work/api/", "/work/web/"} {
+	for _, want := range []string{"Create session", "Session name: new-session", "Initial working directory:", "/work/", "/work/api/", "/work/web/"} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("create dir dialog = %q, expected %q", output, want)
 		}
@@ -31,15 +32,13 @@ func TestRenderCreateDirDialogShowsInputAndSuggestions(t *testing.T) {
 func TestHelpOverlayRendersConfiguredKeysAndDismisses(t *testing.T) {
 	model := newTestModel()
 	model.width = 80
-	model.height = 24
+	model.height = 26
 	model.config.Keys.Help = "f1"
 
 	model.filtered = make([]session.Session, 20)
 	for i := range model.filtered {
 		model.filtered[i] = session.Session{Name: fmt.Sprintf("session-%02d", i)}
 	}
-
-	model.filtered[len(model.filtered)-1].Name = "session-visible"
 
 	if cmd := model.handleActionKeys(keyCode(tea.KeyF1)); cmd == nil {
 		t.Fatal("handleActionKeys(help) returned nil")
@@ -58,7 +57,7 @@ func TestHelpOverlayRendersConfiguredKeysAndDismisses(t *testing.T) {
 		}
 	}
 
-	if !strings.Contains(output, "session-visible") {
+	if !strings.Contains(output, "session-00") {
 		t.Fatalf("help overlay = %q, expected underlying session list to remain visible", output)
 	}
 
@@ -93,11 +92,11 @@ func TestDialogRendersOverPopupContent(t *testing.T) {
 	model := newTestModel()
 	model.width = 80
 	model.height = 20
-	model.filtered = []session.Session{{Name: testSupportSessionDevName}}
-	model.dialog = dialogConfirmKill
+	model.filtered = []session.Session{{Name: testSupportSessionDevName, Kind: session.KindLive}}
+	invokeTestAction(t, model, action.SessionKill.ID)
 
 	output := stripANSI(viewString(model.View()))
-	for _, needle := range []string{testSupportSessionDevName, "Confirm Kill", "Kill this session?", "Yes", "No"} {
+	for _, needle := range []string{testSupportSessionDevName, "Confirm", "Kill session dev?", "Yes", "No"} {
 		if !strings.Contains(output, needle) {
 			t.Fatalf("dialog overlay = %q, expected %q", output, needle)
 		}
@@ -114,15 +113,18 @@ func TestDialogStaysInsideConfiguredNarrowPopupWidth(t *testing.T) {
 	model := newTestModel()
 	model.width = 48
 	model.height = 20
-	model.dialog = dialogInputRename
-	model.renameInput.SetValue("test-rename")
+	model.filtered = []session.Session{{Name: testSupportSessionDevName, Kind: session.KindLive}}
+
+	invokeTestAction(t, model, action.SessionRename.ID)
+	model.textParamInput.SetValue("test-rename")
 
 	dialog := model.renderDialog()
 	if width := lipgloss.Width(dialog); width > model.width {
 		t.Fatalf("rename dialog width = %d, want <= popup width %d", width, model.width)
 	}
 
-	model.dialog = dialogConfirmKill
+	model.cancelAction()
+	invokeTestAction(t, model, action.SessionKill.ID)
 
 	dialog = model.renderDialog()
 	if width := lipgloss.Width(dialog); width > model.width {
@@ -136,23 +138,17 @@ func TestDeleteDialogUsesShortPromptAndButtons(t *testing.T) {
 	model.height = 20
 	model.filtered = []session.Session{{Name: "archive", Kind: session.KindSaved}}
 
-	if cmd := model.handleDelete(); cmd == nil {
-		t.Fatal("handleDelete() returned nil")
-	} else {
-		cmd()
-	}
+	invokeTestAction(t, model, action.SessionDelete.ID)
 
 	output := stripANSI(viewString(model.View()))
-	for _, needle := range []string{"Confirm Delete", "Delete this session?", "Yes", "No"} {
+	for _, needle := range []string{"Confirm", "Delete session archive?", "Yes", "No"} {
 		if !strings.Contains(output, needle) {
 			t.Fatalf("delete dialog = %q, expected %q", output, needle)
 		}
 	}
 
-	for _, unexpected := range []string{"Delete this session everywhere?", "(y/n)"} {
-		if strings.Contains(output, unexpected) {
-			t.Fatalf("delete dialog = %q, should not contain %q", output, unexpected)
-		}
+	if strings.Contains(output, "(y/n)") {
+		t.Fatalf("delete dialog = %q, should not contain a y/n prompt", output)
 	}
 }
 
@@ -171,41 +167,49 @@ func TestConfirmButtonsRenderCompactSingleLine(t *testing.T) {
 }
 
 func TestConfirmDialogEnterUsesSelectedButtonAndShortcutsStillWork(t *testing.T) {
-	model := newTestModel()
-
 	confirmed := 0
-	model.dialog = dialogConfirmDelete
-	model.confirmAction = func() error {
-		confirmed++
-		return nil
-	}
 
-	model = updateTestModel(t, model, keyCode(tea.KeyEnter))
+	model := newTestModelWithDeps(Dependencies{
+		RunAction: func(context.Context, action.Invocation) (any, error) {
+			confirmed++
+
+			return action.KilledSession{Session: testLiveRef("$1", testSupportSessionDevName)}, nil
+		},
+		LoadCatalog: func(context.Context) (session.CatalogResult, error) {
+			return session.CatalogResult{
+				Sessions: []session.Session{{Name: testSupportSessionDevName, Kind: session.KindLive}},
+				Status:   session.StatusComplete,
+			}, nil
+		},
+	})
+	model.filtered = []session.Session{{Name: testSupportSessionDevName, Kind: session.KindLive}}
+
+	invokeTestAction(t, model, action.SessionKill.ID)
+	pressTestKey(t, model, keyCode(tea.KeyEnter))
+
 	if confirmed != 0 {
 		t.Fatalf("enter on default No confirmed %d times, want 0", confirmed)
 	}
 
-	model.dialog = dialogConfirmDelete
-	model.confirmYes = false
-	model = updateTestModel(t, model, keyCode(tea.KeyLeft))
+	invokeTestAction(t, model, action.SessionKill.ID)
+	pressTestKey(t, model, keyCode(tea.KeyLeft))
+	pressTestKey(t, model, keyCode(tea.KeyEnter))
 
-	model = updateTestModel(t, model, keyCode(tea.KeyEnter))
 	if confirmed != 1 {
 		t.Fatalf("enter on selected Yes confirmed %d times, want 1", confirmed)
 	}
 
-	model.dialog = dialogConfirmDelete
-	model.confirmYes = false
+	invokeTestAction(t, model, action.SessionKill.ID)
+	pressTestKey(t, model, keyText("y"))
 
-	model = updateTestModel(t, model, keyText("y"))
 	if confirmed != 2 {
 		t.Fatalf("y shortcut confirmed %d times, want 2", confirmed)
 	}
 
-	model.dialog = dialogConfirmDelete
+	invokeTestAction(t, model, action.SessionKill.ID)
 	model.confirmYes = true
+	pressTestKey(t, model, keyText("n"))
 
-	model = updateTestModel(t, model, keyText("n"))
 	if model.dialog != dialogNone {
 		t.Fatalf("n shortcut left dialog = %v, want none", model.dialog)
 	}
@@ -223,13 +227,13 @@ func TestHelpOverlayOmitsLiveOnlyActionsForSavedRows(t *testing.T) {
 	model.showHelp = true
 
 	output := stripANSI(model.renderHelpOverlay())
-	for _, unwanted := range []string{"Rename selected session", "Kill detached selected session"} {
+	for _, unwanted := range []string{"Rename session", "Kill session"} {
 		if strings.Contains(output, unwanted) {
 			t.Fatalf("help overlay = %q, should omit %q for saved rows", output, unwanted)
 		}
 	}
 
-	for _, want := range []string{"Popup Keys", "Delete selected session everywhere"} {
+	for _, want := range []string{"Popup Keys", "Delete session"} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("help overlay = %q, expected %q", output, want)
 		}
@@ -253,8 +257,8 @@ func TestHelpOverlayExplainsAgentAndTmuxGroupNavigation(t *testing.T) {
 	for _, want := range []string{
 		"Move between agents",
 		"Move between tmux sessions",
-		"Rename selected session",
-		"Kill detached selected session",
+		"Rename session",
+		"Kill session",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("agent help = %q, want %q", output, want)

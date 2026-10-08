@@ -61,24 +61,23 @@ func ResolveWorkspace(cmd *cobra.Command) (app.Workspace, error) {
 		return app.Workspace{}, err
 	}
 
-	agentStore := definedStringFlag(cmd, "state")
-	if agentStore == "" {
-		agentStore = definedStringFlag(cmd, "agent-state")
-	}
-
-	workspace, err := app.Resolve(cfg, app.Locations{
-		Socket:          ResolveSocket(cmd),
-		Repository:      definedStringFlag(cmd, "repository"),
-		LeaseRoot:       definedStringFlag(cmd, "lease-root"),
-		History:         definedStringFlag(cmd, "history"),
-		FinalSaveStatus: definedStringFlag(cmd, "status-file"),
-		AgentStore:      agentStore,
-	})
+	workspace, err := app.Resolve(cfg, CommandLocations(cmd))
 	if err != nil {
 		return app.Workspace{}, oops.In("cli").With("operation", "resolve_workspace").Wrap(err)
 	}
 
 	return workspace, nil
+}
+
+func CommandLocations(cmd *cobra.Command) app.Locations {
+	return app.Locations{
+		Socket:          ResolveSocket(cmd),
+		Repository:      definedStringFlag(cmd, "repository"),
+		LeaseRoot:       definedStringFlag(cmd, "lease-root"),
+		History:         definedStringFlag(cmd, "history"),
+		FinalSaveStatus: definedStringFlag(cmd, "status-file"),
+		AgentStore:      definedStringFlag(cmd, "agent-state"),
+	}
 }
 
 func definedStringFlag(cmd *cobra.Command, name string) string {

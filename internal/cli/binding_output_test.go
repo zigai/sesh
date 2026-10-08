@@ -8,13 +8,12 @@ import (
 
 func TestBindingReportsDoNotReachTmuxRunShellOutput(t *testing.T) {
 	commands := [][]string{
-		{actionCmd, "agent-window-status-clear"},
-		{actionCmd, "agent-status"},
-		{actionCmd, "snapshot-save"},
-		{actionCmd, "snapshot-restore"},
-		{actionCmd, "autosave-save-if-due"},
-		{actionCmd, "autosave-final-save"},
-		{actionCmd, "autosave-restore-on-start"},
+		{"agent", "window-status-clear"},
+		{"agent", "next"},
+		{snapshotCmd, "save"},
+		{snapshotCmd, "restore"},
+		{"session", "kill"},
+		{"pick", "popup"},
 		{"hooks", "run"},
 	}
 
@@ -80,7 +79,7 @@ func TestBindingPartialSnapshotKeepsFailureWithoutPrintingReport(t *testing.T) {
 	t.Setenv("TMUX", "/tmp/test-binding/socket,1,0")
 	root := newRootCommand(t.Context())
 
-	cmd, _, err := root.Find([]string{actionCmd, "snapshot-save"})
+	cmd, _, err := root.Find([]string{snapshotCmd, "save"})
 	if err != nil {
 		t.Fatal(err)
 	}

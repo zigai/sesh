@@ -1,7 +1,8 @@
+//go:build linux || darwin
+
 package session
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -10,55 +11,20 @@ import (
 
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
-	gotmux "github.com/zigai/gotmux/tmux"
 
-	"github.com/zigai/sesh/internal/app"
+	"github.com/zigai/sesh/internal/action"
+	"github.com/zigai/sesh/internal/cli/actioncli"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/session"
-	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
 const annotationOwnedValue = "true"
 
 var (
-	errNoSessionSpecified = errors.New("no session specified")
 	errInvalidSessionName = errors.New("invalid session name")
 	errDirectoryNotFound  = errors.New("directory does not exist")
 	errDirectoryNotDir    = errors.New("path is not a directory")
 )
-
-type sessionRuntime struct {
-	workflow *session.Workflow
-	repo     *store.Repository
-}
-
-type sessionNewJSONResult struct {
-	Session   string `json:"session"`
-	Directory string `json:"directory"`
-	Created   bool   `json:"created"`
-}
-
-type sessionRenameJSONResult struct {
-	PreviousName string `json:"previousName"`
-	Name         string `json:"name"`
-	Renamed      bool   `json:"renamed"`
-}
-
-type sessionKillJSONResult struct {
-	Session string `json:"session"`
-	Killed  bool   `json:"killed"`
-}
-
-type sessionDeleteJSONResult struct {
-	Session      string `json:"session"`
-	LiveKilled   bool   `json:"liveKilled"`
-	SavedDeleted bool   `json:"savedDeleted"`
-}
-
-type sessionSwitchJSONResult struct {
-	Session  string `json:"session"`
-	Switched bool   `json:"switched"`
-}
 
 type sessionJSON struct {
 	ID          string           `json:"id"`
@@ -85,58 +51,34 @@ type paneHistoryJSON struct {
 	LineCount   int              `json:"lineCount"`
 }
 
-func (rt *sessionRuntime) close() error {
-	if rt == nil || rt.repo == nil {
-		return nil
-	}
-
-	if err := rt.repo.Close(); err != nil {
-		return oops.In("cli").With("operation", "close_repository").Wrap(err)
-	}
-
-	return nil
+func newSessionCreateCommand() *cobra.Command {
+	return actioncli.Command(action.SessionCreate, actioncli.Options[action.CreateSession, action.CreatedSession]{
+		Operation: "create", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
+	})
 }
 
-func newSessionDeleteCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "delete [session]",
-		Short: "Delete a session from live tmux and snapshot repository",
-		Long: "Delete a session from live tmux and snapshot repository.\n\n" +
-			"When [session] is omitted, deletes the invoking session. If attached, refuses unless --force\n" +
-			"is specified. When --json is specified, delete outcomes are finite and machine-readable.\n" +
-			"Live state is killed first to prevent concurrent saves from re-creating deleted sessions;\n" +
-			"attachments or save races are revalidated before destruction.",
-		Args: clibase.UsageArgs(cobra.MaximumNArgs(1)),
-		RunE: runSessionDelete,
-	}
-	cmd.Annotations = map[string]string{clibase.AnnotationOperation: "delete", clibase.AnnotationSuccessOwned: annotationOwnedValue}
-
-	clibase.AddSocketFlag(cmd)
-	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
-	cmd.Flags().String("lease-root", "", clibase.LeaseRootFlagUsage)
-	cmd.Flags().BoolP("force", "f", false, "Delete even if session has attached clients")
-	cmd.Flags().String("history", "", clibase.HistoryFlagUsage)
-	clibase.AddJSONFlag(cmd)
-
-	return cmd
+func newSessionRenameCommand() *cobra.Command {
+	return actioncli.Command(action.SessionRename, actioncli.Options[action.RenameSession, action.RenamedSession]{
+		Operation: "rename", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
+	})
 }
 
 func newSessionKillCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "kill [session]",
-		Short: "Kill a live tmux session",
-		Long:  "Kill a live tmux session. Refuses if attached unless --force is specified.",
-		Args:  clibase.UsageArgs(cobra.MaximumNArgs(1)),
-		RunE:  runSessionKill,
-	}
-	cmd.Annotations = map[string]string{clibase.AnnotationOperation: "kill", clibase.AnnotationSuccessOwned: annotationOwnedValue}
+	return actioncli.Command(action.SessionKill, actioncli.Options[action.KillSession, action.KilledSession]{
+		Operation: "kill", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
+	})
+}
 
-	clibase.AddSocketFlag(cmd)
-	cmd.Flags().BoolP("force", "f", false, "Kill even if session has attached clients")
-	cmd.Flags().String("history", "", clibase.HistoryFlagUsage)
-	clibase.AddJSONFlag(cmd)
+func newSessionDeleteCommand() *cobra.Command {
+	return actioncli.Command(action.SessionDelete, actioncli.Options[action.DeleteSession, action.DeletedSession]{
+		Operation: "delete", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: renderSessionDelete,
+	})
+}
 
-	return cmd
+func newSessionSwitchCommand() *cobra.Command {
+	return actioncli.Command(action.SessionSwitch, actioncli.Options[action.SwitchSession, action.SwitchedSession]{
+		Operation: "switch", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
+	})
 }
 
 func newSessionNewCommand() *cobra.Command {
@@ -144,90 +86,48 @@ func newSessionNewCommand() *cobra.Command {
 		Use:   "new <name>",
 		Short: "Create or enter a live tmux session",
 		Long: "Create or enter a live tmux session in the specified or current directory.\n\n" +
-			"In interactive use, an existing session is entered without modification: inside tmux\n" +
-			"the invoking client is switched and verified; outside tmux the caller's terminal is\n" +
-			"attached. Terminal stream validation prevents creating a session when interactive attach\n" +
-			"cannot succeed. When --json is specified, session creation is finite and create-only,\n" +
-			"never interleaving terminal bytes into JSON output.",
+			"An existing session is entered without modification: inside tmux the invoking client is\n" +
+			"switched and verified; outside tmux the caller's terminal is attached. Terminal stream\n" +
+			"validation prevents creating a session when interactive attach cannot succeed. Use\n" +
+			"'sesh session create' to create a session without entering it.",
 		Args: clibase.UsageArgs(cobra.ExactArgs(1)),
 		RunE: runSessionNew,
 	}
 	cmd.Annotations = map[string]string{clibase.AnnotationOperation: "new", clibase.AnnotationSuccessOwned: annotationOwnedValue}
 
-	clibase.AddSocketFlag(cmd)
+	actioncli.AddEnvironmentFlags(cmd)
 	cmd.Flags().StringP("dir", "d", "", "Initial working directory for the session")
-	cmd.Flags().String("history", "", clibase.HistoryFlagUsage)
-	clibase.AddJSONFlag(cmd)
 
 	return cmd
 }
 
-func newSessionRenameCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "rename <new-name>",
-		Short: "Rename a live tmux session",
-		Long:  "Rename a live tmux session and update history state.",
-		Args:  clibase.UsageArgs(cobra.ExactArgs(1)),
-		RunE:  runSessionRename,
-	}
-	cmd.Annotations = map[string]string{clibase.AnnotationOperation: "rename", clibase.AnnotationSuccessOwned: annotationOwnedValue}
-
-	clibase.AddSocketFlag(cmd)
-	cmd.Flags().StringP("session", "s", "", "Session to rename [default: the current session]")
-	cmd.Flags().String("history", "", clibase.HistoryFlagUsage)
-	clibase.AddJSONFlag(cmd)
-
-	return cmd
-}
-
-func newSessionSwitchCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "switch <session>",
-		Short: "Switch the invoking tmux client to a live session",
-		Long: "Switch the invoking tmux client to a live session and record switch history.\n\n" +
-			"The invoking client is selected explicitly: it must be the single attached client\n" +
-			"displaying the session that owns the caller's pane. The switch is verified before it is\n" +
-			"reported as successful.",
-		Args: clibase.UsageArgs(cobra.ExactArgs(1)),
-		RunE: runSessionSwitch,
-	}
-	cmd.Annotations = map[string]string{clibase.AnnotationOperation: "switch", clibase.AnnotationSuccessOwned: annotationOwnedValue}
-
-	clibase.AddSocketFlag(cmd)
-	cmd.Flags().String("history", "", clibase.HistoryFlagUsage)
-	clibase.AddJSONFlag(cmd)
-
-	return cmd
-}
-
-func closeRepository(repo *store.Repository) error {
-	if repo == nil {
-		return nil
+func renderSessionDelete(cmd *cobra.Command, output action.DeletedSession, err error) error {
+	if clibase.JSONOutputEnabled(cmd) {
+		return clibase.WriteJSONResultError(cmd, output, err)
 	}
 
-	if err := repo.Close(); err != nil {
-		return oops.In("cli").With("operation", "close_repository").Wrap(err)
+	if err == nil {
+		return clibase.WriteOutput(cmd, "%s\n", action.SessionDelete.Report(output))
 	}
 
-	return nil
-}
-
-func commandTerminalStreams(cmd *cobra.Command) gotmux.Streams {
-	var streams gotmux.Streams
-
-	if in, ok := cmd.InOrStdin().(*os.File); ok {
-		streams.In = in
+	if !output.LiveKilled && output.SavedGenerations == 0 && len(output.PreservedGenerations) == 0 {
+		return err
 	}
 
-	if out, ok := cmd.OutOrStdout().(*os.File); ok {
-		streams.Out = out
+	_, writeErr := fmt.Fprintf(
+		cmd.ErrOrStderr(),
+		"Partial deletion of session %s: live killed %t, saved generations %d, saved sessions %d, preserved generations %d\n",
+		output.Name,
+		output.LiveKilled,
+		output.SavedGenerations,
+		output.SavedSessions,
+		len(output.PreservedGenerations),
+	)
+	if writeErr != nil {
+		return errors.Join(err, oops.In("cli").With("operation", "write_partial_delete_summary").Wrap(writeErr))
 	}
 
-	if errFile, ok := cmd.ErrOrStderr().(*os.File); ok {
-		streams.Err = errFile
-	}
-
-	return streams
+	return err
 }
 
 func jsonTimestamp(value time.Time) *string {
@@ -238,66 +138,6 @@ func jsonTimestamp(value time.Time) *string {
 	formatted := value.UTC().Format(time.RFC3339Nano)
 
 	return &formatted
-}
-
-func openSessionRepository(ctx context.Context, cmd *cobra.Command, workspace app.Workspace) (*store.Repository, bool, error) {
-	repo, err := workspace.OpenExistingRepository(ctx)
-	if err == nil {
-		return repo, true, nil
-	}
-
-	if repoFlag, _ := cmd.Flags().GetString("repository"); repoFlag == "" && errors.Is(err, os.ErrNotExist) {
-		return nil, false, nil
-	}
-
-	return nil, false, err
-}
-
-func openSessionRuntime(cmd *cobra.Command) (*sessionRuntime, error) {
-	workspace, err := clibase.ResolveWorkspace(cmd)
-	if err != nil {
-		return nil, err
-	}
-
-	server, err := workspace.OpenTmux()
-	if err != nil {
-		return nil, err
-	}
-
-	ctx := clibase.CommandContext(cmd)
-
-	var (
-		repo      *store.Repository
-		leaseRoot string
-	)
-
-	if cmd.Flags().Lookup("repository") != nil {
-		repo, _, err = openSessionRepository(ctx, cmd, workspace)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := workspace.EnsureLeaseRoot(); err != nil {
-			return nil, errors.Join(err, closeRepository(repo))
-		}
-
-		leaseRoot = workspace.LeaseRoot
-	}
-
-	wf := session.NewWorkflowWithOptions(session.WorkflowOptions{
-		Server:             server,
-		Repository:         repo,
-		LeaseRoot:          leaseRoot,
-		HistoryPath:        workspace.History,
-		Hooks:              workspace.Config.Hooks,
-		HookRunner:         nil,
-		Getenv:             nil,
-		Streams:            commandTerminalStreams(cmd),
-		Source:             "cli",
-		DeferSwitchHistory: false,
-	})
-
-	return &sessionRuntime{workflow: wf, repo: repo}, nil
 }
 
 func resolveSessionDirectory(cmd *cobra.Command) (string, error) {
@@ -329,87 +169,6 @@ func resolveSessionDirectory(cmd *cobra.Command) (string, error) {
 	return cleanDir, nil
 }
 
-func runSessionDelete(cmd *cobra.Command, args []string) error {
-	var target string
-	if len(args) > 0 {
-		target = args[0]
-	}
-
-	rt, err := openSessionRuntime(cmd)
-	if err != nil {
-		return err
-	}
-
-	if target == "" {
-		return clibase.NewExitError(clibase.ExitCodeUsage, errNoSessionSpecified)
-	}
-
-	force, _ := cmd.Flags().GetBool("force")
-
-	outcome, deleteErr := rt.workflow.DeleteSessionEverywhere(clibase.CommandContext(cmd), target, force)
-	closeErr := rt.close()
-
-	result := sessionDeleteJSONResult{
-		Session:      target,
-		LiveKilled:   outcome.LiveKilled,
-		SavedDeleted: outcome.SavedGenerations > 0,
-	}
-
-	if err := errors.Join(deleteErr, closeErr); err != nil {
-		if clibase.JSONOutputEnabled(cmd) {
-			return clibase.WriteJSONResultError(cmd, result, err)
-		}
-
-		if err := writePartialDeleteSummary(cmd, target, outcome); err != nil {
-			return errors.Join(deleteErr, closeErr, err)
-		}
-
-		return errors.Join(deleteErr, closeErr)
-	}
-
-	if clibase.JSONOutputEnabled(cmd) {
-		return clibase.WriteJSONResult(cmd, result)
-	}
-
-	return clibase.WriteOutput(cmd, "Deleted session %s (live killed: %t, saved generations: %d)\n",
-		target, outcome.LiveKilled, outcome.SavedGenerations)
-}
-
-func runSessionKill(cmd *cobra.Command, args []string) error {
-	var target string
-	if len(args) > 0 {
-		target = args[0]
-	}
-
-	rt, err := openSessionRuntime(cmd)
-	if err != nil {
-		return err
-	}
-
-	if target == "" {
-		return clibase.NewExitError(clibase.ExitCodeUsage, errNoSessionSpecified)
-	}
-
-	force, _ := cmd.Flags().GetBool("force")
-
-	killErr := rt.workflow.KillSession(clibase.CommandContext(cmd), target, force)
-	closeErr := rt.close()
-
-	if err := errors.Join(killErr, closeErr); err != nil {
-		if clibase.JSONOutputEnabled(cmd) {
-			return clibase.WriteJSONResultError(cmd, sessionKillJSONResult{Session: target, Killed: false}, err)
-		}
-
-		return err
-	}
-
-	if clibase.JSONOutputEnabled(cmd) {
-		return clibase.WriteJSONResult(cmd, sessionKillJSONResult{Session: target, Killed: true})
-	}
-
-	return clibase.WriteOutput(cmd, "Killed session %s\n", target)
-}
-
 func runSessionNew(cmd *cobra.Command, args []string) error {
 	name := args[0]
 	if name == "" {
@@ -421,36 +180,18 @@ func runSessionNew(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	rt, err := openSessionRuntime(cmd)
+	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
 	if err != nil {
 		return err
 	}
 
-	ctx := clibase.CommandContext(cmd)
-
-	if clibase.JSONOutputEnabled(cmd) {
-		sess, createErr := rt.workflow.CreateSession(ctx, name, dir)
-		closeErr := rt.close()
-
-		result := sessionNewJSONResult{
-			Session:   name,
-			Directory: dir,
-			Created:   createErr == nil,
-		}
-
-		if err := errors.Join(createErr, closeErr); err != nil {
-			return clibase.WriteJSONResultError(cmd, result, err)
-		}
-
-		_ = sess
-
-		return clibase.WriteJSONResult(cmd, result)
+	runtime, err := actioncli.OpenRuntime(cmd, cfg)
+	if err != nil {
+		return err
 	}
 
-	outcome, enterErr := rt.workflow.EnterOrCreateSession(ctx, name, dir)
-	closeErr := rt.close()
-
-	if err := errors.Join(enterErr, closeErr); err != nil {
+	outcome, enterErr := runtime.Local.Workflow().EnterOrCreateSession(clibase.CommandContext(cmd), name, dir)
+	if err := errors.Join(enterErr, runtime.Close()); err != nil {
 		return err
 	}
 
@@ -459,96 +200,4 @@ func runSessionNew(cmd *cobra.Command, args []string) error {
 	}
 
 	return clibase.WriteOutput(cmd, "Created session %s (%s) in %s\n", name, outcome.SessionID, dir)
-}
-
-func runSessionRename(cmd *cobra.Command, args []string) error {
-	newName := args[0]
-	oldName, _ := cmd.Flags().GetString("session")
-
-	if oldName == "" {
-		return clibase.NewExitError(clibase.ExitCodeUsage, errNoSessionSpecified)
-	}
-
-	rt, err := openSessionRuntime(cmd)
-	if err != nil {
-		return err
-	}
-
-	outcome, renameErr := rt.workflow.RenameSessionOutcome(clibase.CommandContext(cmd), oldName, newName)
-	closeErr := rt.close()
-
-	result := sessionRenameJSONResult{
-		PreviousName: oldName,
-		Name:         newName,
-		Renamed:      outcome.Renamed,
-	}
-
-	if err := errors.Join(renameErr, closeErr); err != nil {
-		if clibase.JSONOutputEnabled(cmd) {
-			return clibase.WriteJSONResultError(cmd, result, err)
-		}
-
-		return err
-	}
-
-	if clibase.JSONOutputEnabled(cmd) {
-		return clibase.WriteJSONResult(cmd, result)
-	}
-
-	return clibase.WriteOutput(cmd, "Renamed session %s to %s\n", oldName, newName)
-}
-
-func runSessionSwitch(cmd *cobra.Command, args []string) error {
-	target := args[0]
-	if target == "" {
-		return clibase.NewExitError(clibase.ExitCodeUsage, errNoSessionSpecified)
-	}
-
-	rt, err := openSessionRuntime(cmd)
-	if err != nil {
-		return err
-	}
-
-	outcome, switchErr := rt.workflow.SwitchSessionOutcome(clibase.CommandContext(cmd), target)
-	closeErr := rt.close()
-
-	result := sessionSwitchJSONResult{
-		Session:  target,
-		Switched: outcome.Started,
-	}
-
-	if err := errors.Join(switchErr, closeErr); err != nil {
-		if clibase.JSONOutputEnabled(cmd) {
-			return clibase.WriteJSONResultError(cmd, result, err)
-		}
-
-		return err
-	}
-
-	if clibase.JSONOutputEnabled(cmd) {
-		return clibase.WriteJSONResult(cmd, result)
-	}
-
-	return clibase.WriteOutput(cmd, "Switched to session %s\n", target)
-}
-
-func writePartialDeleteSummary(cmd *cobra.Command, target string, outcome session.DeleteOutcome) error {
-	if !outcome.LiveKilled && outcome.SavedGenerations == 0 && len(outcome.PreservedGenerations) == 0 {
-		return nil
-	}
-
-	_, err := fmt.Fprintf(
-		cmd.ErrOrStderr(),
-		"Partial deletion of session %s: live killed %t, saved generations %d, saved sessions %d, preserved generations %d\n",
-		target,
-		outcome.LiveKilled,
-		outcome.SavedGenerations,
-		outcome.SavedSessions,
-		len(outcome.PreservedGenerations),
-	)
-	if err != nil {
-		return oops.In("cli").With("operation", "write_partial_delete_summary").Wrap(err)
-	}
-
-	return nil
 }

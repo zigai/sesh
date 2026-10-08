@@ -1,141 +1,53 @@
 package snapshot
 
 import (
-	"context"
 	"fmt"
-	"path/filepath"
-	"slices"
 	"strings"
 
-	"github.com/zigai/sesh/internal/snapshot/engine"
-	"github.com/zigai/sesh/internal/snapshot/model"
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/snapshot/restore"
-	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
 const shortGenerationID = 8
 
-// restoreLabels maps the snapshot IDs in a restore result to what a reader recognizes: session
-// names, and each pane's location and program. Zero labels fall back to IDs.
-type restoreLabels struct {
-	sessions     map[string]string
-	sessionOrder []string
-	panes        map[string]paneLabel
-}
-
-type paneLabel struct {
-	location string
-	program  string
-}
-
-func newRestoreLabels(manifest model.Manifest) restoreLabels {
-	labels := restoreLabels{
-		sessions:     make(map[string]string, len(manifest.Sessions)),
-		sessionOrder: make([]string, 0, len(manifest.Sessions)),
-		panes:        make(map[string]paneLabel, len(manifest.Panes)),
-	}
-
-	for _, session := range manifest.Sessions {
-		labels.sessions[session.ID] = string(session.Name)
-		labels.sessionOrder = append(labels.sessionOrder, session.ID)
-	}
-
-	links := make(map[string]model.Link, len(manifest.Links))
-	for _, link := range manifest.Links {
-		if _, seen := links[link.Window]; !seen {
-			links[link.Window] = link
-		}
-	}
-
-	for _, pane := range manifest.Panes {
-		label := paneLabel{location: pane.ID, program: filepath.Base(string(pane.Launch.Executable))}
-		if link, ok := links[pane.Window]; ok {
-			label.location = fmt.Sprintf("%s:%d.%d", labels.sessions[link.Session], link.Index, pane.Index)
-		}
-
-		if len(pane.Launch.Executable) == 0 {
-			label.program = ""
-		}
-
-		labels.panes[pane.ID] = label
-	}
-
-	return labels
-}
-
-// restoredSessionNames names the restored sessions when they can be told apart from the
-// requested and skipped ones; otherwise it returns nil and the summary shows a count.
-func (l restoreLabels) restoredSessionNames(requested []string, res engine.RestoreResult) []string {
-	if len(l.sessionOrder) == 0 {
-		return nil
-	}
-
-	skipped := make(map[string]bool, len(res.SessionsSkipped))
-	for _, session := range res.SessionsSkipped {
-		skipped[session.ID] = true
-	}
-
-	var names []string
-
-	for _, id := range l.sessionOrder {
-		if !skipped[id] && (len(requested) == 0 || slices.Contains(requested, id)) {
-			names = append(names, l.sessions[id])
-		}
-	}
-
-	if len(names) != len(res.SessionsRestored) {
-		return nil
-	}
-
-	return names
-}
-
-// readRestoreLabels labels a restore summary from the restored generation. The labels only make
-// the summary readable, so when the manifest cannot be read the summary shows IDs instead.
-func readRestoreLabels(ctx context.Context, repo *store.Repository, generation string) restoreLabels {
-	manifest, err := repo.Read(ctx, generation)
-	if err != nil {
-		return restoreLabels{sessions: nil, sessionOrder: nil, panes: nil}
-	}
-
-	return newRestoreLabels(manifest)
-}
-
-func (l restoreLabels) pane(id string) paneLabel {
-	if label, ok := l.panes[id]; ok {
-		return label
-	}
-
-	return paneLabel{location: id, program: ""}
-}
-
 // writeRestoreSummary writes what a restore did in terms a reader can act on: which sessions
 // came back, what happened to their programs, what was skipped and what to do next.
-func writeRestoreSummary(out *strings.Builder, res engine.RestoreResult, labels restoreLabels, requested []string) {
+func writeRestoreSummary(out *strings.Builder, res action.RestoredSnapshot) {
 	generation := res.Generation
 	if len(generation) > shortGenerationID {
 		generation = generation[:shortGenerationID]
 	}
 
-	switch names := labels.restoredSessionNames(requested, res); {
-	case len(res.SessionsRestored) == 0:
+	switch names := restoredNames(res.Sessions); {
+	case len(res.Sessions) == 0:
 		fmt.Fprintf(out, "No sessions restored from generation %s.\n", generation)
-	case len(names) > 0:
-		fmt.Fprintf(out, "Restored %s from generation %s: %s\n", sessionCount(len(res.SessionsRestored)), generation, strings.Join(names, ", "))
+	case len(names) == len(res.Sessions):
+		fmt.Fprintf(out, "Restored %s from generation %s: %s\n", sessionCount(len(res.Sessions)), generation, strings.Join(names, ", "))
 	default:
-		fmt.Fprintf(out, "Restored %s from generation %s.\n", sessionCount(len(res.SessionsRestored)), generation)
+		fmt.Fprintf(out, "Restored %s from generation %s.\n", sessionCount(len(res.Sessions)), generation)
 	}
 
 	if len(res.Mismatches) > 0 {
 		out.WriteString("The restored layout does not fully match the snapshot; run with --verbose for the differences.\n")
 	}
 
-	writeProgramSummary(out, res.Panes, labels)
+	writeProgramSummary(out, res.Panes)
 	writeSkippedSummary(out, res)
 
 	if res.Uncertain && res.OperationID != "" {
 		fmt.Fprintf(out, "Some steps may or may not have happened. Continue without repeating them:\n  sesh snapshot restore --generation %s --operation %s\n", res.Generation, res.OperationID)
 	}
+}
+
+func restoredNames(sessions []action.SessionRef) []string {
+	names := make([]string, 0, len(sessions))
+	for _, restored := range sessions {
+		if restored.Name != "" {
+			names = append(names, restored.Name)
+		}
+	}
+
+	return names
 }
 
 func sessionCount(count int) string {
@@ -148,10 +60,10 @@ func sessionCount(count int) string {
 
 // tallyPaneOutcomes counts resumed and restarted programs and collects the panes a reader must
 // look at: programs not brought back and panes started outside their saved directory.
-func tallyPaneOutcomes(panes []restore.PaneResult) (int, int, []restore.PaneResult) {
+func tallyPaneOutcomes(panes []action.RestoredPane) (int, int, []action.RestoredPane) {
 	var resumed, restarted int
 
-	var attention []restore.PaneResult
+	var attention []action.RestoredPane
 
 	for _, pane := range panes {
 		needsAttention := pane.CWDFallback
@@ -174,7 +86,7 @@ func tallyPaneOutcomes(panes []restore.PaneResult) (int, int, []restore.PaneResu
 	return resumed, restarted, attention
 }
 
-func writeProgramSummary(out *strings.Builder, panes []restore.PaneResult, labels restoreLabels) {
+func writeProgramSummary(out *strings.Builder, panes []action.RestoredPane) {
 	resumed, restarted, attention := tallyPaneOutcomes(panes)
 	if resumed+restarted+len(attention) == 0 {
 		return
@@ -196,14 +108,12 @@ func writeProgramSummary(out *strings.Builder, panes []restore.PaneResult, label
 	fmt.Fprintf(out, "Programs: %s\n", strings.Join(parts, ", "))
 
 	for _, pane := range attention {
-		label := labels.pane(pane.PaneID)
-
 		program := ""
-		if label.program != "" {
-			program = label.program + ": "
+		if pane.Program != "" {
+			program = pane.Program + ": "
 		}
 
-		fmt.Fprintf(out, "  %s  %s%s\n", label.location, program, paneOutcomeAdvice(pane))
+		fmt.Fprintf(out, "  %s  %s%s\n", pane.Location, program, paneOutcomeAdvice(pane))
 	}
 
 	if resumed+restarted > 0 {
@@ -212,7 +122,7 @@ func writeProgramSummary(out *strings.Builder, panes []restore.PaneResult, label
 }
 
 // paneOutcomeAdvice explains a pane whose program was not brought back, and what to do about it.
-func paneOutcomeAdvice(pane restore.PaneResult) string {
+func paneOutcomeAdvice(pane action.RestoredPane) string {
 	if pane.Outcome == restore.PaneOutcomeAllowedCWDFallback || pane.CWDFallback {
 		return "started in a fallback directory because the saved one no longer exists"
 	}
@@ -235,7 +145,7 @@ func paneOutcomeAdvice(pane restore.PaneResult) string {
 	}
 }
 
-func writeSkippedSummary(out *strings.Builder, res engine.RestoreResult) {
+func writeSkippedSummary(out *strings.Builder, res action.RestoredSnapshot) {
 	if len(res.SessionsSkipped) == 0 {
 		return
 	}
@@ -259,16 +169,16 @@ func writeSkippedSummary(out *strings.Builder, res engine.RestoreResult) {
 	}
 
 	fmt.Fprintf(out, "  To restore one, rename the live session (tmux rename-session -t %q <new-name>), then run:\n"+
-		"    sesh snapshot restore%s --session %s\n", first.Name, generationFlag, first.ID)
+		"    sesh snapshot restore%s %s\n", first.Name, generationFlag, first.ID)
 }
 
 // writeRestoreDetails writes the per-pane evidence and verification state behind the summary.
-func writeRestoreDetails(out *strings.Builder, res engine.RestoreResult) {
+func writeRestoreDetails(out *strings.Builder, res action.RestoredSnapshot) {
 	fmt.Fprintf(out, "Operation:          %s\n", res.OperationID)
 	fmt.Fprintf(out, "Generation:         %s\n", res.Generation)
 	fmt.Fprintf(out, "Status:             %s\n", res.Status)
 	fmt.Fprintf(out, "Reason:             %s\n", res.Reason)
-	fmt.Fprintf(out, "Sessions Restored:  %s\n", strings.Join(res.SessionsRestored, ", "))
+	fmt.Fprintf(out, "Sessions Restored:  %s\n", strings.Join(restoredIDs(res.Sessions), ", "))
 	fmt.Fprintf(out, "Verified:           %t\n", res.Verified)
 	fmt.Fprintf(out, "Uncertain:          %t\n", res.Uncertain)
 
@@ -304,4 +214,13 @@ func writeRestoreDetails(out *strings.Builder, res engine.RestoreResult) {
 	if count := len(res.Advisories); count > 0 {
 		fmt.Fprintf(out, "Observed Changes:   %d values differ from the snapshot after launch (for example pane titles that applications rewrite)\n", count)
 	}
+}
+
+func restoredIDs(sessions []action.SessionRef) []string {
+	ids := make([]string, 0, len(sessions))
+	for _, restored := range sessions {
+		ids = append(ids, restored.ID)
+	}
+
+	return ids
 }

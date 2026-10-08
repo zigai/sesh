@@ -1,126 +1,118 @@
+//go:build linux || darwin
+
 package setup_test
 
 import (
 	"errors"
+	"os/exec"
 	"strings"
 	"testing"
 
+	"github.com/zigai/sesh/internal/action"
+	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/setup"
 )
 
-func TestBindingsDefaults(t *testing.T) {
-	t.Parallel()
+func tmuxBinding(key, table string, id action.ID, values action.Values) action.Binding {
+	return action.Binding{Key: key, Action: id, In: action.SurfaceTmux, Table: table, Values: values}
+}
 
-	bindings, err := setup.Bindings(defaultKeys())
+// shellWords runs the words of a rendered command through the shell run-shell uses, after tmux
+// expanded its formats.
+func shellWords(t *testing.T, command string) []string {
+	t.Helper()
+
+	expanded := strings.NewReplacer("#{session_id}", "$1", "#{pane_id}", "%1", "##", "#").Replace(command)
+
+	output, err := exec.CommandContext(t.Context(), "sh", "-c", `set -- `+expanded+`; printf '%s\0' "$@"`).Output()
 	if err != nil {
-		t.Fatalf("Bindings failed: %v", err)
+		t.Fatalf("shell rejected %q: %v", command, err)
 	}
 
-	if len(bindings) != 4 {
-		t.Fatalf("bindings = %d, want 4", len(bindings))
-	}
-
-	wantKeys := []string{setup.DefaultNextKey, setup.DefaultLocalNextKey, setup.DefaultBackKey, setup.DefaultPickerKey}
-
-	for index, binding := range bindings {
-		if binding.Key != wantKeys[index] {
-			t.Fatalf("binding %d key = %q, want %q", index, binding.Key, wantKeys[index])
-		}
-
-		if binding.Purpose == "" {
-			t.Fatalf("binding %d has no purpose", index)
-		}
-
-		if _, err := binding.CommandSequence(); err != nil {
-			t.Fatalf("binding %d command sequence failed: %v", index, err)
-		}
-	}
-
-	if got := bindings[0].Program[2]; got != "sesh action agent-next" {
-		t.Fatalf("next program = %q, want the native flat action", got)
-	}
-
-	if got := bindings[1].Program[2]; got != "sesh action agent-next --local" {
-		t.Fatalf("local-next program = %q", got)
-	}
-
-	if got := bindings[2].Program[2]; got != "sesh action agent-back" {
-		t.Fatalf("back program = %q", got)
-	}
-
-	if got := bindings[3].Program[2]; got != "sesh action picker-open -c '#{client_name}' -t '#{pane_id}' --current-session-id '#{session_id}' -w '#{client_width}' --client-height '#{client_height}'" {
-		t.Fatalf("picker program = %q", got)
-	}
+	return strings.Split(strings.TrimSuffix(string(output), "\x00"), "\x00")
 }
 
-func TestBindingsRejectsInvalidKey(t *testing.T) {
+func TestBindingsPassTheCurrentSessionOrPaneAsTheSubject(t *testing.T) {
 	t.Parallel()
 
-	keys := defaultKeys()
-	keys.Next = "not a key"
-
-	if _, err := setup.Bindings(keys); !errors.Is(err, setup.ErrInvalidKey) {
-		t.Fatalf("error = %v, want ErrInvalidKey", err)
-	}
-}
-
-func TestBindingsRejectsDuplicateKeys(t *testing.T) {
-	t.Parallel()
-
-	keys := defaultKeys()
-	keys.Back = keys.Picker
-
-	if _, err := setup.Bindings(keys); !errors.Is(err, setup.ErrDuplicateKey) {
-		t.Fatalf("error = %v, want ErrDuplicateKey", err)
-	}
-}
-
-func TestBindingsRejectsInvalidTable(t *testing.T) {
-	t.Parallel()
-
-	for _, table := range []string{"", "has space", "has\ttab"} {
-		if err := setup.ValidateTable(table); !errors.Is(err, setup.ErrInvalidTable) {
-			t.Fatalf("ValidateTable(%q) = %v, want ErrInvalidTable", table, err)
-		}
-	}
-
-	if err := setup.ValidateTable("custom-table"); err != nil {
-		t.Fatalf("custom table rejected: %v", err)
-	}
-
-	if err := setup.ValidateTable(setup.DefaultTable); err != nil {
-		t.Fatalf("default table rejected: %v", err)
-	}
-}
-
-func TestRenderBlockQuotesArgumentsWithSpaces(t *testing.T) {
-	t.Parallel()
-
-	bindings, err := setup.Bindings(defaultKeys())
+	rendered, err := setup.Bindings([]action.Binding{
+		tmuxBinding("M-s", "root", action.SnapshotSave.ID, action.Values{}),
+		tmuxBinding("M-f", "root", action.AgentFocus.ID, action.Values{}),
+		tmuxBinding("M-r", "root", action.SnapshotRestore.ID, action.Values{}),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	block := setup.RenderBlock(bindings, setup.DefaultTable)
-
-	lines := strings.Split(strings.TrimSpace(block), "\n")
-	if len(lines) != len(bindings)+1 {
-		t.Fatalf("rendered %d lines, want %d", len(lines), len(bindings)+1)
+	want := [][]string{
+		{"sesh", "snapshot", "save", "$1"},
+		{"sesh", "agent", "focus", "%1"},
+		{"sesh", "snapshot", "restore"},
 	}
 
-	if !strings.HasPrefix(lines[0], "#") {
-		t.Fatalf("first line must be a comment, got %q", lines[0])
-	}
-
-	for index, binding := range bindings {
-		line := lines[index+1]
-
-		if !strings.Contains(line, "bind-key -T root "+binding.Key+" run-shell -b ") {
-			t.Fatalf("line %d = %q, want a root-table run-shell binding", index, line)
+	for index, binding := range rendered {
+		words := shellWords(t, binding.Program[2])
+		if strings.Join(words[:min(len(words), len(want[index]))], " ") != strings.Join(want[index], " ") {
+			t.Fatalf("%s runs %q, want it to start with %q", binding.Action, words, want[index])
 		}
+	}
+}
 
-		if !strings.Contains(line, `"`+binding.Program[2]+`"`) {
-			t.Fatalf("line %d = %q, want the quoted program", index, line)
+func TestBindingsQuoteParamsForTheShell(t *testing.T) {
+	t.Parallel()
+
+	name := `it's "$HOME" #1; echo injected`
+
+	rendered, err := setup.Bindings([]action.Binding{
+		tmuxBinding("M-c", "root", action.SessionCreate.ID, action.Values{"name": {name}, "dir": {"/srv/a b"}}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	words := shellWords(t, rendered[0].Program[2])
+	if len(words) != 6 || words[3] != name || words[4] != "--dir" || words[5] != "/srv/a b" {
+		t.Fatalf("shell words = %q, want the name and directory verbatim", words)
+	}
+}
+
+func TestBindingsRejectKeysAndTablesTmuxRefuses(t *testing.T) {
+	t.Parallel()
+
+	if _, err := setup.Bindings([]action.Binding{tmuxBinding("not a key", "root", action.AgentBack.ID, action.Values{})}); !errors.Is(err, setup.ErrInvalidKey) {
+		t.Fatalf("invalid key error = %v, want ErrInvalidKey", err)
+	}
+
+	for _, table := range []string{"has space", "has\ttab"} {
+		if _, err := setup.Bindings([]action.Binding{tmuxBinding("M-b", table, action.AgentBack.ID, action.Values{})}); !errors.Is(err, setup.ErrInvalidTable) {
+			t.Fatalf("table %q error = %v, want ErrInvalidTable", table, err)
+		}
+	}
+}
+
+func TestRenderBlockBindsEachKeyInItsTable(t *testing.T) {
+	t.Parallel()
+
+	bindings, err := action.Bindings(config.DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bindings = append(bindings, tmuxBinding("M-s", "prefix", action.SnapshotSave.ID, action.Values{}))
+
+	rendered, err := setup.Bindings(bindings)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(setup.RenderBlock(rendered)), "\n")
+	if len(lines) != len(rendered)+1 || !strings.HasPrefix(lines[0], "#") {
+		t.Fatalf("block = %q, want a comment and one line per binding", lines)
+	}
+
+	for index, binding := range rendered {
+		if !strings.HasPrefix(lines[index+1], "bind-key -T "+binding.Table+" "+binding.Key+" run-shell -b ") {
+			t.Fatalf("line %q, want %s bound in table %s", lines[index+1], binding.Key, binding.Table)
 		}
 	}
 }
@@ -128,24 +120,9 @@ func TestRenderBlockQuotesArgumentsWithSpaces(t *testing.T) {
 func TestBindingTextQuotesShellMetacharacters(t *testing.T) {
 	t.Parallel()
 
-	binding := setup.Binding{
-		Key:     "F1",
-		Purpose: "test",
-		Program: []string{"run-shell", "-b", `echo "$HOME"`},
-	}
+	binding := setup.Binding{Key: "F1", Table: "root", Action: "", Purpose: "test", Program: []string{"run-shell", "-b", `echo "$HOME"`}}
 
-	text := binding.Text(setup.DefaultTable)
-
-	if !strings.Contains(text, `"echo \"$HOME\""`) {
+	if text := binding.Text(); !strings.Contains(text, `"echo \"\$HOME\""`) {
 		t.Fatalf("text = %q, want an escaped quoted argument", text)
-	}
-}
-
-func defaultKeys() setup.Keys {
-	return setup.Keys{
-		Next:      setup.DefaultNextKey,
-		LocalNext: setup.DefaultLocalNextKey,
-		Back:      setup.DefaultBackKey,
-		Picker:    setup.DefaultPickerKey,
 	}
 }

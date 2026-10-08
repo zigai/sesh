@@ -9,6 +9,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/display"
 	"github.com/zigai/sesh/internal/session"
@@ -96,9 +97,10 @@ type sessionRowStyles struct {
 }
 
 type footerPart struct {
-	key   string
-	desc  string
-	width int
+	key     string
+	desc    string
+	width   int
+	binding action.Binding
 }
 
 func (m *Model) viewContent() string {
@@ -1219,7 +1221,7 @@ func inputGutterWidth() int {
 
 func (m *Model) renderEmptyState(width int) string {
 	emptyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.Theme.Muted))
-	keys := newActionKeyMap(m.config.Keys)
+	keys := newActionKeyMap(m.config)
 
 	message := "No sessions found"
 	if m.displayMode == displayModeAgents {
@@ -1239,7 +1241,10 @@ func (m *Model) renderEmptyState(width int) string {
 		if m.displayMode == displayModeAgents {
 			message = fmt.Sprintf("No agent sessions match %q", query)
 		} else {
-			message = fmt.Sprintf("No matches. Press %s to create %q", keys.create.Help().Key, query)
+			message = fmt.Sprintf("No matches for %q", query)
+			if key := keys.actionKey(action.SessionCreate.ID); key != "" {
+				message = fmt.Sprintf("No matches. Press %s to create %q", key, query)
+			}
 		}
 	}
 
@@ -1335,7 +1340,7 @@ func (m *Model) modeFooterHintWidth(width int) int {
 
 func (m *Model) footerParts(width int) []footerPart {
 	footerWidth := max(width, 1)
-	keys := newActionKeyMap(m.config.Keys)
+	keys := newActionKeyMap(m.config)
 
 	if footerWidth < minFullFooterWidth {
 		return []footerPart{newFooterPart(keys.help.Help().Key, "help")}
@@ -1347,17 +1352,12 @@ func (m *Model) footerParts(width int) []footerPart {
 
 	parts := m.baseFooterParts()
 	parts = append(parts, newFooterPart(keys.enter.Help().Key, "select"))
-	parts = m.appendSelectedActionFooterParts(parts, keys)
 
-	parts = append(parts,
-		newFooterPart(keys.create.Help().Key, "create"),
-		newFooterPart("esc", "cancel"),
-	)
-
-	if !m.selectedRowIsAgent() {
-		parts = append(parts, newFooterPart(keys.delete.Help().Key, "delete"))
+	for _, bound := range m.availableActions(keys) {
+		parts = append(parts, newActionFooterPart(bound))
 	}
 
+	parts = append(parts, newFooterPart("esc", "cancel"))
 	parts = append(parts, newFooterPart(keys.help.Help().Key, "help"))
 
 	for len(parts) > 0 && footerPartsWidth(parts) > footerWidth {
@@ -1377,24 +1377,6 @@ func (m *Model) baseFooterParts() []footerPart {
 	}
 
 	return append(parts, newFooterPart("↑/↓", "sessions"))
-}
-
-func (m *Model) appendSelectedActionFooterParts(parts []footerPart, keys actionKeyMap) []footerPart {
-	if !m.selectedRowIsSaved() {
-		parts = append(parts,
-			newFooterPart(keys.rename.Help().Key, "rename"),
-			newFooterPart(keys.kill.Help().Key, "kill"),
-		)
-	}
-
-	if m.cursor < len(m.filtered) &&
-		m.filtered[m.cursor].Origin == session.OriginSSH &&
-		!m.filtered[m.cursor].IsSaved() &&
-		!m.selectedRowIsAgent() {
-		parts = append(parts, newFooterPart(keys.snapshot.Help().Key, "snapshot"))
-	}
-
-	return parts
 }
 
 func (m *Model) compactAgentFooterParts(keys actionKeyMap, width int) []footerPart {
@@ -1417,10 +1399,24 @@ func (m *Model) compactAgentFooterParts(keys actionKeyMap, width int) []footerPa
 
 func newFooterPart(key string, desc string) footerPart {
 	return footerPart{
-		key:   key,
-		desc:  desc,
-		width: lipgloss.Width(key) + 1 + lipgloss.Width(desc),
+		key:     key,
+		desc:    desc,
+		width:   lipgloss.Width(key) + 1 + lipgloss.Width(desc),
+		binding: action.Binding{Key: "", Action: "", In: "", Table: "", Values: nil},
 	}
+}
+
+// newActionFooterPart labels an action binding with the first word of the action's title.
+func newActionFooterPart(bound boundAction) footerPart {
+	label := string(bound.binding.Action)
+	if entry, ok := action.Lookup(bound.binding.Action); ok {
+		label, _, _ = strings.Cut(strings.ToLower(entry.Describe().Title), " ")
+	}
+
+	part := newFooterPart(bound.key.Help().Key, label)
+	part.binding = bound.binding
+
+	return part
 }
 
 func footerPartsWidth(parts []footerPart) int {

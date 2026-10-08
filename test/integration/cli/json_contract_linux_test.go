@@ -7,11 +7,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	gotmux "github.com/zigai/gotmux/tmux"
 
 	integration "github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/remote"
 	"github.com/zigai/sesh/internal/snapshot/restore"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
@@ -23,8 +25,8 @@ func TestJSONSnapshotWorkflowSuccessContracts(t *testing.T) {
 	socket := server.Endpoint().SocketPath
 	repository := filepath.Join(home, "repository")
 	lease := filepath.Join(home, "leases")
-	args := []string{actionCmd, "snapshot-save", testSocketFlag, socket, testRepositoryFlag, repository, testLeaseRootFlag, lease, testSessionFlag, string(source.ID())}
-	saved := runJSONContract(t, "action.snapshot-save", args...)
+	args := []string{"snapshot", "save", testSocketFlag, socket, testRepositoryFlag, repository, testLeaseRootFlag, lease, string(source.ID())}
+	saved := runJSONContract(t, "snapshot.save", args...)
 	assertJSONContractFields(t, saved, map[string]any{contractStatusField: "best_effort"})
 	generation := contractJSONValue[string](t, saved, "generation")
 
@@ -40,9 +42,9 @@ func TestJSONSnapshotWorkflowSuccessContracts(t *testing.T) {
 	}
 
 	operation := store.NewOperationID()
-	restored := runJSONContract(t, "action.snapshot-restore", actionCmd, "snapshot-restore", testSocketFlag, socket, testRepositoryFlag, repository, testLeaseRootFlag, lease, testGenerationFlag, generation, "--operation", operation, "--no-processes")
+	restored := runJSONContract(t, "snapshot.restore", "snapshot", "restore", testSocketFlag, socket, testRepositoryFlag, repository, testLeaseRootFlag, lease, testGenerationFlag, generation, "--operation", operation, "--no-processes")
 	assertJSONContractFields(t, restored, map[string]any{"generation": generation, "operationId": operation, contractStatusField: "best_effort", "verified": true, "uncertain": false})
-	_ = contractJSONValue[[]any](t, restored, "sessionsRestored")
+	_ = contractJSONItem(t, contractJSONValue[[]any](t, restored, "sessions"), "name", "autosave-alpha")
 	_ = contractJSONValue[[]any](t, restored, "missingRequirements")
 	reconciled := runJSONContract(t, "snapshot.recover.restore.show", snapshotCmd, "recover", "restore", "show", operation, testRepositoryFlag, repository)
 	assertJSONContractFields(t, reconciled, map[string]any{"operationId": operation, "state": "complete", "settled": true})
@@ -90,7 +92,7 @@ func TestJSONRemoteActionAndLookupSuccessContracts(t *testing.T) {
 	}
 
 	configPath := filepath.Join(fixture.configHome, "sesh", "config.toml")
-	writeTestConfig(t, configPath, fmt.Sprintf("[remote]\nenabled = true\nssh_path = %q\n\n[remote.permissions]\ncreate = true\n", fixture.sshWrapper)+
+	writeTestConfig(t, configPath, fmt.Sprintf("[remote]\nenabled = true\nssh_path = %q\n\n", fixture.sshWrapper)+
 		remoteConnectionsTOML(fixture.connection))
 
 	peer, err := integration.Open(fixture.connection.TmuxSocket)
@@ -99,22 +101,36 @@ func TestJSONRemoteActionAndLookupSuccessContracts(t *testing.T) {
 	}
 
 	publishRemoteReturnCatalog(t, fixture, peer)
-	execution := executeJSON(t, "remote", actionCmd, "create", fixture.connection.ID, "json-ssh-session", "--dir", fixture.root, testConfigFlag, configPath, testJSONFlag)
-	result := assertJSONContractSuccess(t, "remote.action", execution)
-	assertJSONContractFields(t, result, map[string]any{"ok": true})
-
-	invocation := contractJSONValue[string](t, result, "invocationId")
-	if invocation == "" {
-		t.Fatal("remote action omitted receipt identity")
-	}
+	execution := executeJSON(t, sessionCmd, "create", "json-ssh-session", "--dir", fixture.root, "--connection", fixture.connection.ID, testConfigFlag, configPath, testJSONFlag)
+	result := assertJSONContractSuccess(t, "session.create", execution)
+	assertJSONContractFields(t, contractJSONValue[map[string]any](t, result, "session"), map[string]any{"kind": "live", "name": "json-ssh-session"})
 
 	if _, err := peer.FindSession(t.Context(), "json-ssh-session"); err != nil {
 		t.Fatalf("successful remote action did not create session: %v", err)
 	}
 
+	invocation := peerReceiptID(t, fixture.stateHome)
 	lookup := executeJSON(t, "remote", "lookup", fixture.connection.ID, invocation, testConfigFlag, configPath, testJSONFlag)
 	lookedUp := assertJSONContractSuccess(t, "remote.lookup", lookup)
-	assertJSONContractFields(t, lookedUp, map[string]any{"ok": true, "invocationId": invocation})
+	assertJSONContractFields(t, lookedUp, map[string]any{"ok": true, "invocationId": invocation, "action": "session.create"})
+	assertJSONContractFields(t, contractJSONValue[map[string]any](t, lookedUp, "output"), map[string]any{"directory": fixture.root})
+}
+
+// peerReceiptID returns the one invocation the peer recorded.
+func peerReceiptID(t *testing.T, stateHome string) string {
+	t.Helper()
+
+	receipts, err := remote.InvocationPath(stateHome)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	matches, err := filepath.Glob(filepath.Join(receipts, "*.json"))
+	if err != nil || len(matches) != 1 {
+		t.Fatalf("peer receipts = %v, %v; want one", matches, err)
+	}
+
+	return strings.TrimSuffix(filepath.Base(matches[0]), ".json")
 }
 
 func TestJSONSnapshotActionsAndAbandonSuccessContracts(t *testing.T) {
@@ -130,7 +146,7 @@ func TestJSONSnapshotActionsAndAbandonSuccessContracts(t *testing.T) {
 	socket := server.Endpoint().SocketPath
 	repository := filepath.Join(home, "repository")
 	lease := filepath.Join(home, "leases")
-	saved := runJSONContract(t, "action.snapshot-save", actionCmd, "snapshot-save", testSocketFlag, socket, testRepositoryFlag, repository, testLeaseRootFlag, lease, testSessionFlag, string(source.ID()))
+	saved := runJSONContract(t, "snapshot.save", "snapshot", "save", testSocketFlag, socket, testRepositoryFlag, repository, testLeaseRootFlag, lease, string(source.ID()))
 	assertJSONContractFields(t, saved, map[string]any{contractStatusField: "best_effort"})
 
 	generation := contractJSONValue[string](t, saved, "generation")
@@ -150,7 +166,7 @@ func TestJSONSnapshotActionsAndAbandonSuccessContracts(t *testing.T) {
 
 	operation := store.NewOperationID()
 
-	failed := executeJSON(t, actionCmd, "snapshot-restore", testSocketFlag, socket, testRepositoryFlag, repository, testLeaseRootFlag, lease, testGenerationFlag, generation, "--operation", operation, "--no-processes", testNoConfigFlag, testJSONFlag)
+	failed := executeJSON(t, "snapshot", "restore", testSocketFlag, socket, testRepositoryFlag, repository, testLeaseRootFlag, lease, testGenerationFlag, generation, "--operation", operation, "--no-processes", testNoConfigFlag, testJSONFlag)
 	if !errors.Is(failed.err, restore.ErrWorkingDirNotFound) {
 		t.Fatalf("expected a missing working directory failure after admission: %v", failed.err)
 	}
@@ -167,7 +183,7 @@ func TestJSONSnapshotActionsAndAbandonSuccessContracts(t *testing.T) {
 		t.Fatalf("a failed restore and its abandonment must not leave a session behind: %v", err)
 	}
 
-	restored := runJSONContract(t, "action.snapshot-restore", actionCmd, "snapshot-restore", testSocketFlag, socket, testRepositoryFlag, repository, testLeaseRootFlag, lease, testGenerationFlag, generation, "--no-processes", "--allow-missing-dir")
+	restored := runJSONContract(t, "snapshot.restore", "snapshot", "restore", testSocketFlag, socket, testRepositoryFlag, repository, testLeaseRootFlag, lease, testGenerationFlag, generation, "--no-processes", "--allow-missing-dir")
 	assertJSONContractFields(t, restored, map[string]any{"generation": generation, contractStatusField: "best_effort", "verified": true, "uncertain": false})
 
 	if contractJSONValue[string](t, restored, "operationId") == "" {

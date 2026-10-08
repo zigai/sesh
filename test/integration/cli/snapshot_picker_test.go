@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/cli"
 
 	"github.com/charmbracelet/x/term"
@@ -50,7 +51,7 @@ func TestSnapshotRestorePickerCleansTerminalBeforeRestoringSelectedGeneration(t 
 	}
 
 	arguments := []string{
-		actionCmd, "snapshot-restore", "--pick", "--no-processes", "--no-config",
+		"snapshot", "restore", "--pick", "--no-processes", "--no-config",
 		"--repository", repository,
 		"--lease-root", leaseRoot,
 		"--socket", target.Endpoint().SocketPath,
@@ -121,7 +122,7 @@ func TestSnapshotRestorePickerCleansTerminalBeforeRestoringSelectedGeneration(t 
 }
 
 func TestSnapshotRestorePickerCancellationLeavesRepositoryAndTmuxUntouched(t *testing.T) {
-	assertSnapshotRestorePickerCancellation(t, []string{actionCmd, "snapshot-restore"}, "action")
+	assertSnapshotRestorePickerCancellation(t, []string{"snapshot", "restore"}, "action")
 }
 
 func assertSnapshotRestorePickerCancellation(t *testing.T, command []string, aliasKind string) {
@@ -242,11 +243,11 @@ func captureSnapshotPickerTimeline(t *testing.T, selectedName, currentName strin
 	save := func() string {
 		result := executeJSON(
 			t,
-			actionCmd, "snapshot-save",
+			"snapshot", "save",
 			testRepositoryFlag, repository,
 			testLeaseRootFlag, leaseRoot,
 			testSocketFlag, source.Endpoint().SocketPath,
-			testSessionFlag, string(sessions[0].ID),
+			string(sessions[0].ID),
 			testNoConfigFlag,
 			testJSONFlag,
 		)
@@ -302,7 +303,7 @@ func TestSnapshotPickerApplicationHelper(t *testing.T) {
 
 	_, _ = fmt.Fprint(os.Stdout, "snapshot-picker-terminal-restored")
 
-	if runErr != nil && !errors.Is(runErr, cli.ErrPartialRestore) {
+	if runErr != nil && !errors.Is(runErr, app.ErrPartialRestore) {
 		os.Exit(ExitCode(runErr))
 	}
 

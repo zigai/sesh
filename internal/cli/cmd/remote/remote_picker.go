@@ -13,10 +13,10 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/samber/oops"
 	"github.com/spf13/cobra"
 	gotmux "github.com/zigai/gotmux/tmux"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	cmdpicker "github.com/zigai/sesh/internal/cli/cmd/picker"
 	"github.com/zigai/sesh/internal/config"
@@ -28,26 +28,16 @@ import (
 )
 
 const (
-	remoteActionArgCount     = 3
 	remoteAttachArgCount     = 2
 	remoteAttachmentLifetime = 24 * time.Hour
 )
 
-var (
-	errUnsupportedRemoteAction = errors.New("unsupported remote action")
-	errOriginSocketNotAbsolute = errors.New("origin socket must be an absolute tmux socket")
-)
-
-type remoteActionOutput struct {
-	InvocationID       string `json:"invocationId"`
-	OK                 bool   `json:"ok"`
-	Code               string `json:"code,omitempty"`
-	DurableOperationID string `json:"durableOperationId,omitempty"`
-}
+var errOriginSocketNotAbsolute = errors.New("origin socket must be an absolute tmux socket")
 
 type remotePickerAdapter struct {
 	cfg          *config.Config
 	originSocket string
+	peer         *remote.Peer
 }
 
 type remoteAttachExec struct {
@@ -60,21 +50,23 @@ type originPickerAdapter struct{ socket string }
 
 func DefaultPickerRemoteFactory(_ context.Context, cfg *config.Config, socket string) (cmdpicker.RemoteServices, error) {
 	if cfg == nil {
-		return cmdpicker.RemoteServices{Catalog: nil, Watcher: nil, Actions: nil, Attach: nil, OriginBridge: nil}, nil
+		return cmdpicker.RemoteServices{Catalog: nil, Watcher: nil, Peer: nil, Attach: nil, OriginBridge: nil, Origin: nil}, nil
 	}
 
-	services := cmdpicker.RemoteServices{Catalog: nil, Watcher: nil, Actions: nil, Attach: nil, OriginBridge: nil}
+	services := cmdpicker.RemoteServices{Catalog: nil, Watcher: nil, Peer: nil, Attach: nil, OriginBridge: nil, Origin: nil}
+
 	if cfg.Remote.EnableReverseBridge {
-		services.OriginBridge = &originPickerAdapter{socket: socket}
+		origin := &originPickerAdapter{socket: socket}
+		services.OriginBridge, services.Origin = origin, origin
 	}
 
 	if !cfg.Remote.Enabled {
 		return services, nil
 	}
 
-	adapter := &remotePickerAdapter{cfg: cfg.Clone(), originSocket: socket}
+	adapter := &remotePickerAdapter{cfg: cfg.Clone(), originSocket: socket, peer: remote.NewCatalogPeer(cfg.Remote, config.GetXDGPaths().CacheHome)}
 
-	services.Catalog, services.Watcher, services.Actions, services.Attach = adapter, adapter, adapter, adapter
+	services.Catalog, services.Watcher, services.Attach, services.Peer = adapter, adapter, adapter, adapter.peer
 
 	return services, nil
 }
@@ -88,6 +80,8 @@ func (adapter *remotePickerAdapter) LoadRemoteCatalog() (tui.RemoteCatalog, erro
 	if err != nil {
 		return tui.RemoteCatalog{}, remoteCLIError("load_remote_catalog", err)
 	}
+
+	adapter.peer.Observe(catalog)
 
 	return pickerCatalog(catalog), nil
 }
@@ -106,7 +100,12 @@ func (adapter *remotePickerAdapter) WatchRemoteCatalog(ctx context.Context, publ
 	defer func() { resultErr = errors.Join(resultErr, dir.Close()) }()
 
 	err = remote.WatchCatalog(ctx, dir, remoteWatchInterval, func(catalog remote.Catalog, watchErr error) error {
+		if watchErr == nil {
+			adapter.peer.Observe(catalog)
+		}
+
 		publish(pickerCatalog(catalog), watchErr)
+
 		return nil
 	})
 
@@ -139,79 +138,6 @@ func pickerCatalog(catalog remote.Catalog) tui.RemoteCatalog {
 	})
 
 	return tui.RemoteCatalog{GeneratedAt: catalog.GeneratedAt, Connections: connections}
-}
-
-func (adapter *remotePickerAdapter) IsActionPermitted(cfg *config.Config, target session.Session, action string) bool {
-	parsed, err := parseRemoteAction(action)
-
-	return err == nil && cfg != nil && cfg.Remote.Enabled && target.Origin == session.OriginSSH &&
-		parsed != remote.ActionCreate && remote.PermissionsAllow(cfg.Remote.Permissions, parsed)
-}
-
-func (adapter *remotePickerAdapter) RunRemoteAction(ctx context.Context, cfg *config.Config, target session.Session, request tui.RemoteActionRequest) error {
-	options, actionRequest, err := prepareRemotePickerAction(adapter, cfg, target, request)
-	if err != nil {
-		return err
-	}
-
-	result, err := remote.RunAction(ctx, options, actionRequest)
-	if err != nil {
-		return remoteCLIError("run_remote_picker_action", err)
-	}
-
-	if !result.OK {
-		return &remote.ActionOutcomeError{Result: result}
-	}
-
-	return nil
-}
-
-func prepareRemotePickerAction(
-	adapter *remotePickerAdapter,
-	cfg *config.Config,
-	target session.Session,
-	request tui.RemoteActionRequest,
-) (remote.ActionOriginOptions, remote.ActionRequest, error) {
-	parsed, err := parseRemoteAction(request.Action)
-	if err != nil {
-		return remote.ActionOriginOptions{}, remote.ActionRequest{}, err
-	}
-
-	if !adapter.IsActionPermitted(cfg, target, request.Action) {
-		return remote.ActionOriginOptions{}, remote.ActionRequest{}, remoteCLIError("check_remote_action_permitted", remote.ErrRemoteDisabled)
-	}
-
-	connection, err := remote.FindConnection(cfg.Remote, target.RuntimeIdentity.ConnectionID)
-	if err != nil {
-		return remote.ActionOriginOptions{}, remote.ActionRequest{}, remoteCLIError("find_remote_picker_connection", err)
-	}
-
-	catalog, dir, err := loadRemoteCatalog()
-	if dir != nil {
-		defer func() { _ = dir.Close() }()
-	}
-
-	if err != nil {
-		return remote.ActionOriginOptions{}, remote.ActionRequest{}, err
-	}
-
-	state, fresh, err := resolveRemoteTarget(catalog, connection.ID, target.ID)
-	if err != nil {
-		return remote.ActionOriginOptions{}, remote.ActionRequest{}, err
-	}
-
-	if fresh.ID != target.ID || fresh.Name != target.Name || fresh.RuntimeIdentity != target.RuntimeIdentity {
-		return remote.ActionOriginOptions{}, remote.ActionRequest{}, remoteCLIError("check_remote_target", remote.ErrTargetChanged)
-	}
-
-	options := remote.ActionOriginOptions{Remote: cfg.Remote, Connection: connection, State: state}
-
-	remoteRequest, err := remote.NewActionRequest(options, fresh, parsed, request.NewName, request.Directory)
-	if err != nil {
-		return remote.ActionOriginOptions{}, remote.ActionRequest{}, remoteCLIError("build_remote_picker_action", err)
-	}
-
-	return options, remoteRequest, nil
 }
 
 func (adapter *remotePickerAdapter) AttachRemoteSession(ctx context.Context, target session.Session, paneID string) (tea.ExecCommand, error) {
@@ -368,7 +294,7 @@ func originReturnAction(ctx context.Context, socket string) (func(remote.OriginS
 		}
 
 		for _, row := range rows {
-			if !sameOriginTarget(row, requested) {
+			if !sameOriginTarget(action.RefOf(row), requested) {
 				continue
 			}
 
@@ -426,32 +352,40 @@ func (adapter *originPickerAdapter) LoadOriginSessions(ctx context.Context) (str
 	return catalog.OriginLabel, rows, nil
 }
 
-func (adapter *originPickerAdapter) RequestOriginSwitch(ctx context.Context, target session.Session) error {
-	if target.Origin != session.OriginBridge || target.Kind != session.KindLive {
-		return remote.ErrTargetChanged
+// Accepts lets the picker on a peer switch the origin client that attached to it.
+func (adapter *originPickerAdapter) Accepts(at action.Location, id action.ID) bool {
+	return at.Kind == action.LocationOrigin && id == action.SessionSwitch.ID
+}
+
+func (adapter *originPickerAdapter) Dispatch(ctx context.Context, invocation action.Invocation) (any, error) {
+	if !adapter.Accepts(invocation.At, invocation.Action) {
+		return nil, action.Wrap(action.CodeUnsupported, action.ErrLocationRejected)
 	}
+
+	input, err := action.SessionSwitch.Input(invocation.Input)
+	if err != nil {
+		return nil, action.Wrap(action.CodeInvalidArgument, err)
+	}
+
+	output := action.SwitchedSession(input)
 
 	client, err := adapter.client(ctx)
 	if err != nil {
-		return err
-	}
-
-	if client == nil {
-		return remote.ErrBridgeSocketRequired
+		return output, action.Wrap(action.CodeUnavailable, err)
 	}
 
 	catalog, err := client.GetCatalog(ctx)
 	if err != nil {
-		return remoteCLIError("refresh_origin_switch_catalog", err)
+		return output, action.Wrap(action.CodeUnavailable, remoteCLIError("refresh_origin_switch_catalog", err))
 	}
 
 	for _, candidate := range catalog.Sessions {
-		if catalog.OriginID == target.RuntimeIdentity.ConnectionID && sameOriginTarget(target, candidate) {
-			return remoteCLIError("request_origin_switch", client.RequestSwitch(ctx, catalog.CatalogGeneration, candidate))
+		if sameOriginTarget(input.Session, candidate) {
+			return output, remoteCLIError("request_origin_switch", client.RequestSwitch(ctx, catalog.CatalogGeneration, candidate))
 		}
 	}
 
-	return remoteCLIError("request_origin_switch", remote.ErrTargetChanged)
+	return output, action.Wrap(action.CodeTargetChanged, remoteCLIError("request_origin_switch", remote.ErrTargetChanged))
 }
 
 func (adapter *originPickerAdapter) client(ctx context.Context) (*remote.BridgeClient, error) {
@@ -504,28 +438,11 @@ func (adapter *originPickerAdapter) client(ctx context.Context) (*remote.BridgeC
 	return remote.NewBridgeClient(record.BridgeSocket, record.Grant.Token), nil
 }
 
-func sameOriginTarget(row session.Session, target remote.OriginSession) bool {
-	return row.ID == target.ID && row.Name == target.Name &&
-		row.RuntimeIdentity.TmuxServerPID == target.TmuxServerPID &&
-		row.RuntimeIdentity.TmuxServerStartedAt.Equal(target.TmuxServerStartedAt) &&
-		row.RuntimeIdentity.TmuxSessionCreatedAt.Equal(target.SessionCreatedAt)
-}
-
-func newRemoteActionCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "action <operation> <connection> <session>",
-		Short: "Run one permission-gated mutation against a cached remote target",
-		Args:  clibase.UsageArgs(cobra.ExactArgs(remoteActionArgCount)),
-		Annotations: map[string]string{
-			clibase.AnnotationOperation: "remote_action",
-		},
-		RunE: runRemoteAction,
-	}
-	cmd.Flags().String("new-name", "", "New session name for rename")
-	cmd.Flags().String("dir", "", "Initial directory for create")
-	clibase.AddJSONFlag(cmd)
-
-	return cmd
+func sameOriginTarget(ref action.SessionRef, target remote.OriginSession) bool {
+	return ref.ID == target.ID && ref.Name == target.Name &&
+		ref.ServerPID == target.TmuxServerPID &&
+		ref.ServerStartedAt.Equal(target.TmuxServerStartedAt) &&
+		ref.CreatedAt.Equal(target.SessionCreatedAt)
 }
 
 func newRemoteAttachCommand() *cobra.Command {
@@ -572,111 +489,6 @@ func resolveRemoteTarget(catalog remote.Catalog, connectionID, selector string) 
 	}
 
 	return remote.ConnectionState{}, session.Session{}, remoteCLIError("resolve_remote_target", errRemoteTargetMissing)
-}
-
-func parseRemoteAction(value string) (remote.Action, error) {
-	switch remote.Action(value) {
-	case remote.ActionCreate, remote.ActionRename, remote.ActionKill, remote.ActionDelete, remote.ActionSnapshot, remote.ActionRestore:
-		return remote.Action(value), nil
-	default:
-		return "", oops.In("cli").With("operation", "parse_remote_action").With("action", value).Wrap(errUnsupportedRemoteAction)
-	}
-}
-
-func resolveRemoteActionTarget(
-	action remote.Action,
-	catalog remote.Catalog,
-	connection config.RemoteConnectionConfig,
-	connectionID string,
-	selector string,
-) (remote.ConnectionState, session.Session, error) {
-	if action != remote.ActionCreate {
-		return resolveRemoteTarget(catalog, connectionID, selector)
-	}
-
-	state := catalog.Connections[connectionID]
-	if !state.Connected {
-		return remote.ConnectionState{}, session.Session{}, remoteCLIError("resolve_remote_action_target", errRemoteTargetMissing)
-	}
-
-	var target session.Session
-
-	target.Name = selector
-	target.Kind = session.KindLive
-	target.TmuxServerSocket = connection.TmuxSocket
-
-	return state, target, nil
-}
-
-func remoteActionResultError(result remote.ActionResult, runErr error) error {
-	if result.OK || result.InvocationID == "" {
-		return remoteCLIError("run_remote_action", runErr)
-	}
-
-	outcomeErr := &remote.ActionOutcomeError{Result: result}
-
-	return errors.Join(outcomeErr, remoteCLIError("run_remote_action", runErr))
-}
-
-func publishRemoteActionResult(cmd *cobra.Command, output remoteActionOutput, result remote.ActionResult, runErr error) error {
-	resultErr := remoteActionResultError(result, runErr)
-	if resultErr != nil {
-		if clibase.JSONOutputEnabled(cmd) {
-			return clibase.WriteJSONResultError(cmd, output, resultErr)
-		}
-
-		return resultErr
-	}
-
-	if clibase.JSONOutputEnabled(cmd) {
-		return clibase.WriteJSONResult(cmd, output)
-	}
-
-	return clibase.WriteOutput(cmd, "Remote action accepted (invocation %s)\n", result.InvocationID)
-}
-
-func runRemoteAction(cmd *cobra.Command, args []string) (resultErr error) {
-	action, err := parseRemoteAction(args[0])
-	if err != nil {
-		return clibase.NewExitError(clibase.ExitCodeUsage, err)
-	}
-
-	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
-	if err != nil {
-		return err
-	}
-
-	connection, err := remote.FindConnection(cfg.Remote, args[1])
-	if err != nil {
-		return remoteCLIError("find_remote_connection", err)
-	}
-
-	catalog, dir, err := loadRemoteCatalog()
-	if dir != nil {
-		defer func() { resultErr = errors.Join(resultErr, dir.Close()) }()
-	}
-
-	if err != nil {
-		return err
-	}
-
-	state, target, err := resolveRemoteActionTarget(action, catalog, connection, args[1], args[2])
-	if err != nil {
-		return err
-	}
-
-	newName, _ := cmd.Flags().GetString("new-name")
-	directory, _ := cmd.Flags().GetString("dir")
-
-	request, err := remote.NewActionRequest(remote.ActionOriginOptions{Remote: cfg.Remote, Connection: connection, State: state}, target, action, newName, directory)
-	if err != nil {
-		return remoteCLIError("build_remote_action", err)
-	}
-
-	result, err := remote.RunAction(clibase.CommandContext(cmd), remote.ActionOriginOptions{Remote: cfg.Remote, Connection: connection, State: state}, request)
-	output := remoteActionOutput{InvocationID: result.InvocationID, OK: result.OK, Code: result.Code, DurableOperationID: result.DurableOperationID}
-
-	return publishRemoteActionResult(cmd, output, result, err)
 }
 
 func remoteAttachTarget(state remote.ConnectionState, target session.Session, paneID string) remote.AttachTarget {

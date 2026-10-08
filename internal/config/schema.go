@@ -60,6 +60,16 @@ type Config struct {
 	AgentSessions AgentSessionsConfig `toml:"agent_sessions"`
 	AgentStatus   AgentStatusConfig   `toml:"agent_status"`
 	Remote        RemoteConfig        `toml:"remote"`
+	Actions       ActionsConfig       `toml:"actions"`
+}
+
+// ActionsConfig overrides per-action policy, keyed by action group then verb: [actions.session.kill].
+type ActionsConfig map[string]map[string]ActionConfig
+
+// ActionConfig overrides one action's defaults; unset fields keep the action's own default.
+type ActionConfig struct {
+	Confirm     *bool `toml:"confirm"`
+	AllowRemote *bool `toml:"allow_remote"`
 }
 
 type PopupConfig struct {
@@ -100,28 +110,34 @@ type ThemeConfig struct {
 }
 
 type KeyConfig struct {
-	Create    string `toml:"create"`
-	Rename    string `toml:"rename"`
-	Kill      string `toml:"kill"`
-	Delete    string `toml:"delete"`
-	Snapshot  string `toml:"snapshot"`
-	Help      string `toml:"help"`
-	CycleMode string `toml:"cycle_mode"`
-	AgentSort string `toml:"agent_sort"`
-	PageUp    string `toml:"page_up"`
-	PageDown  string `toml:"page_down"`
-	Top       string `toml:"top"`
-	Bottom    string `toml:"bottom"`
-	Select1   string `toml:"select_1"`
-	Select2   string `toml:"select_2"`
-	Select3   string `toml:"select_3"`
-	Select4   string `toml:"select_4"`
-	Select5   string `toml:"select_5"`
-	Select6   string `toml:"select_6"`
-	Select7   string `toml:"select_7"`
-	Select8   string `toml:"select_8"`
-	Select9   string `toml:"select_9"`
-	Select0   string `toml:"select_0"`
+	Bind      []KeyBindConfig `toml:"bind"`
+	Help      string          `toml:"help"`
+	CycleMode string          `toml:"cycle_mode"`
+	AgentSort string          `toml:"agent_sort"`
+	PageUp    string          `toml:"page_up"`
+	PageDown  string          `toml:"page_down"`
+	Top       string          `toml:"top"`
+	Bottom    string          `toml:"bottom"`
+	Select1   string          `toml:"select_1"`
+	Select2   string          `toml:"select_2"`
+	Select3   string          `toml:"select_3"`
+	Select4   string          `toml:"select_4"`
+	Select5   string          `toml:"select_5"`
+	Select6   string          `toml:"select_6"`
+	Select7   string          `toml:"select_7"`
+	Select8   string          `toml:"select_8"`
+	Select9   string          `toml:"select_9"`
+	Select0   string          `toml:"select_0"`
+}
+
+// KeyBindConfig binds a key in the picker or a tmux key table to an action. It replaces the
+// default binding of the same key; an empty action removes that default.
+type KeyBindConfig struct {
+	Key    string         `toml:"key"`
+	Action string         `toml:"action"`
+	In     string         `toml:"in"`
+	Table  string         `toml:"table"`
+	Params map[string]any `toml:"params"`
 }
 
 type PathConfig struct {
@@ -130,8 +146,6 @@ type PathConfig struct {
 }
 
 type SettingsConfig struct {
-	ConfirmKill                  bool     `toml:"confirm_kill"`
-	ConfirmDelete                bool     `toml:"confirm_delete"`
 	ShowFooter                   bool     `toml:"show_footer"`
 	DirectorySuggestions         int      `toml:"directory_suggestions"`
 	DefaultSessionPathSuggestion string   `toml:"default_session_path_suggestion"`
@@ -154,17 +168,14 @@ type SnapshotConfig struct {
 }
 
 type AgentSessionsConfig struct {
-	PopupSort         string             `toml:"popup_sort"`
-	Enabled           bool               `toml:"enabled"`
-	PopupCounts       bool               `toml:"popup_counts"`
-	RefreshInterval   string             `toml:"refresh_interval"`
-	NextIdleKey       string             `toml:"next_idle_key"`
-	NextIdleLocalKey  string             `toml:"next_idle_local_key"`
-	NavigationBackKey string             `toml:"navigation_back_key"`
-	StatusStyle       string             `toml:"status_style,omitempty"`
-	StatusTimeFormat  string             `toml:"status_time_format,omitempty"`
-	StatusTimeStyle   string             `toml:"status_time_style,omitempty"`
-	Status            *AgentStatusConfig `toml:"status,omitempty"`
+	PopupSort        string             `toml:"popup_sort"`
+	Enabled          bool               `toml:"enabled"`
+	PopupCounts      bool               `toml:"popup_counts"`
+	RefreshInterval  string             `toml:"refresh_interval"`
+	StatusStyle      string             `toml:"status_style,omitempty"`
+	StatusTimeFormat string             `toml:"status_time_format,omitempty"`
+	StatusTimeStyle  string             `toml:"status_time_style,omitempty"`
+	Status           *AgentStatusConfig `toml:"status,omitempty"`
 }
 
 type AgentStatusConfig struct {
@@ -219,19 +230,9 @@ type RemoteConfig struct {
 	StaleAfter          string                   `toml:"stale_after"`
 	HideAfter           string                   `toml:"hide_after"`
 	MaxParallelConnects int                      `toml:"max_parallel_connects"`
-	Permissions         RemotePermissionConfig   `toml:"permissions"`
 	Connections         []RemoteConnectionConfig `toml:"connections"`
 	EnableReverseBridge bool                     `toml:"enable_reverse_bridge"`
 	ReturnToOrigin      bool                     `toml:"return_to_origin"`
-}
-
-type RemotePermissionConfig struct {
-	Create   bool `toml:"create"`
-	Rename   bool `toml:"rename"`
-	Kill     bool `toml:"kill"`
-	Delete   bool `toml:"delete"`
-	Snapshot bool `toml:"snapshot"`
-	Restore  bool `toml:"restore"`
 }
 
 type RemoteConnectionConfig struct {
@@ -311,6 +312,8 @@ func (c *Config) Clone() *Config {
 	}
 
 	cp.Remote.Connections = slices.Clone(c.Remote.Connections)
+	cp.Actions = c.Actions.Clone()
+	cp.Keys.Bind = cloneKeyBinds(c.Keys.Bind)
 
 	cp.AgentStatus = c.AgentStatus.Clone()
 	if c.Theme.AgentStatus != nil {
@@ -319,6 +322,19 @@ func (c *Config) Clone() *Config {
 	}
 
 	return &cp
+}
+
+func (a ActionsConfig) Clone() ActionsConfig {
+	if a == nil {
+		return nil
+	}
+
+	cloned := make(ActionsConfig, len(a))
+	for group, verbs := range a {
+		cloned[group] = maps.Clone(verbs)
+	}
+
+	return cloned
 }
 
 func (c *AgentStatusConfig) Clone() AgentStatusConfig {
@@ -389,11 +405,7 @@ func DefaultConfig() *Config {
 	return &Config{
 		Theme: DefaultThemeConfig(),
 		Keys: KeyConfig{
-			Create:    "alt+c",
-			Rename:    "alt+r",
-			Kill:      "alt+x",
-			Delete:    "alt+shift+x",
-			Snapshot:  "alt+s",
+			Bind:      nil,
 			Help:      "?",
 			CycleMode: "ctrl+f",
 			AgentSort: "ctrl+s",
@@ -429,8 +441,6 @@ func DefaultConfig() *Config {
 			LogFile: "",
 		},
 		Settings: SettingsConfig{
-			ConfirmKill:                  true,
-			ConfirmDelete:                true,
 			ShowFooter:                   true,
 			DirectorySuggestions:         defaultDirectorySuggestions,
 			DefaultSessionPathSuggestion: "~/Projects/{session}",
@@ -458,17 +468,14 @@ func DefaultConfig() *Config {
 			TmuxStartupPost:   nil,
 		},
 		AgentSessions: AgentSessionsConfig{
-			PopupSort:         "position",
-			Enabled:           true,
-			PopupCounts:       true,
-			RefreshInterval:   defaultAgentSessionsRefreshInterval.String(),
-			NextIdleKey:       "F24",
-			NextIdleLocalKey:  "M-F24",
-			NavigationBackKey: "F13",
-			StatusStyle:       "glyph",
-			StatusTimeFormat:  "relative-seconds",
-			StatusTimeStyle:   "",
-			Status:            nil,
+			PopupSort:        "position",
+			Enabled:          true,
+			PopupCounts:      true,
+			RefreshInterval:  defaultAgentSessionsRefreshInterval.String(),
+			StatusStyle:      "glyph",
+			StatusTimeFormat: "relative-seconds",
+			StatusTimeStyle:  "",
+			Status:           nil,
 		},
 		Remote: RemoteConfig{
 			Enabled:             false,
@@ -480,18 +487,11 @@ func DefaultConfig() *Config {
 			StaleAfter:          "30s",
 			HideAfter:           "10m",
 			MaxParallelConnects: defaultMaxParallelConnects,
-			Permissions: RemotePermissionConfig{
-				Create:   true,
-				Rename:   true,
-				Kill:     false,
-				Delete:   false,
-				Snapshot: true,
-				Restore:  true,
-			},
 			Connections:         []RemoteConnectionConfig{},
 			EnableReverseBridge: true,
 			ReturnToOrigin:      true,
 		},
+		Actions: nil,
 		AgentStatus: AgentStatusConfig{
 			Enabled:                  true,
 			StorePath:                "",
@@ -1058,4 +1058,18 @@ func cloneHookCommands(cmds []HookCommand) []HookCommand {
 	}
 
 	return out
+}
+
+func cloneKeyBinds(binds []KeyBindConfig) []KeyBindConfig {
+	if binds == nil {
+		return nil
+	}
+
+	cloned := make([]KeyBindConfig, len(binds))
+	for index, bind := range binds {
+		bind.Params = maps.Clone(bind.Params)
+		cloned[index] = bind
+	}
+
+	return cloned
 }

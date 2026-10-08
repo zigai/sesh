@@ -7,10 +7,12 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/session"
 )
 
@@ -58,14 +60,14 @@ func TestFrameRoundTrip(t *testing.T) {
 }
 
 func TestFrameReadRejectsClosedContractViolations(t *testing.T) {
-	valid := `{"version":1,"type":"hello","peerId":"peer","streamInstance":"stream","sequence":1,` +
+	valid := `{"version":2,"type":"hello","peerId":"peer","streamInstance":"stream","sequence":1,` +
 		`"hello":{"peerId":"peer","streamInstance":"stream","hostname":"host","bridgeDir":"","startedAt":"0001-01-01T00:00:00Z"}}`
 
 	tests := map[string]string{
 		"unknown member":      strings.Replace(valid, `"sequence":1`, `"sequence":1,"forged":true`, 1),
 		"duplicate member":    strings.Replace(valid, `"sequence":1`, `"sequence":1,"sequence":2`, 1),
 		"trailing content":    valid + `{}`,
-		"unsupported version": strings.Replace(valid, `"version":1`, `"version":2`, 1),
+		"unsupported version": strings.Replace(valid, `"version":2`, `"version":1`, 1),
 		"zero sequence":       strings.Replace(valid, `"sequence":1`, `"sequence":0`, 1),
 		"peer mismatch":       strings.Replace(valid, `"peerId":"peer","streamInstance"`, `"peerId":"other","streamInstance"`, 1),
 		"payload exclusivity": strings.Replace(valid, `"startedAt":"0001-01-01T00:00:00Z"}`, `"startedAt":"0001-01-01T00:00:00Z"},"health":{"observedAt":"0001-01-01T00:00:00Z","sources":{"tmux":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"},"agents":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"},"snapshots":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"}}}`, 1),
@@ -279,6 +281,20 @@ func TestSnapshotRejectsSavedSessionsCarryingAgents(t *testing.T) {
 	}
 	if err := ValidateFrame(frame); !errors.Is(err, ErrInvalidFrame) {
 		t.Fatalf("ValidateFrame() error = %v, want %v", err, ErrInvalidFrame)
+	}
+}
+
+func TestSnapshotRejectsMalformedActionOffers(t *testing.T) {
+	for name, offers := range map[string][]action.ID{
+		"malformed id": {"session.kill", "Session Kill"},
+		"too many":     slices.Repeat([]action.ID{action.SessionKill.ID}, MaxActions+1),
+	} {
+		frame := snapshotFrameWithSession(session.Session{ID: "$1", Name: "dev", Kind: session.KindLive})
+		frame.Snapshot.Actions = offers
+
+		if err := ValidateFrame(frame); !errors.Is(err, ErrInvalidFrame) {
+			t.Fatalf("ValidateFrame(%s) error = %v, want %v", name, err, ErrInvalidFrame)
+		}
 	}
 }
 

@@ -12,6 +12,12 @@ import (
 	"github.com/zigai/sesh/internal/session"
 )
 
+// LiveServer is the peer's tmux server as remote attach sees it.
+type LiveServer interface {
+	Sessions(ctx context.Context) ([]session.Session, error)
+	Attach(ctx context.Context, sessionID string, streams AttachStreams) error
+}
+
 type GotmuxLiveServer struct {
 	server *gotmux.Server
 }
@@ -31,63 +37,6 @@ func (live *GotmuxLiveServer) Sessions(ctx context.Context) ([]session.Session, 
 	}
 
 	return sessions, nil
-}
-
-func (live *GotmuxLiveServer) Create(ctx context.Context, name, directory string) error {
-	if live == nil || live.server == nil {
-		return oops.In("remote").Code("remote_tmux_failed").With("operation", "create_session").Wrap(ErrIncompleteDependencies)
-	}
-
-	_, err := live.server.NewSession(ctx, gotmux.NewSessionOptions{
-		Name:    name,
-		Dir:     directory,
-		Window:  "",
-		Program: gotmux.Program{},
-		Env:     nil,
-		TmuxEnv: nil,
-		Size:    gotmux.Size{Width: 0, Height: 0},
-		Start:   gotmux.StartPolicyExistingOnly,
-		Group:   "",
-	})
-	if err != nil {
-		return oops.In("remote").Code("remote_tmux_failed").With("operation", "create_session").Wrap(err)
-	}
-
-	return nil
-}
-
-func (live *GotmuxLiveServer) Rename(ctx context.Context, sessionID, name string) error {
-	handle, err := live.session(ctx, sessionID)
-	if err != nil {
-		return err
-	}
-
-	if err := handle.Rename(ctx, name); err != nil {
-		if errors.Is(err, gotmux.ErrServerChanged) {
-			return oops.In("remote").Code("remote_tmux_failed").With("operation", "rename_session").Wrap(errors.Join(ErrTargetChanged, err))
-		}
-
-		return oops.In("remote").Code("remote_tmux_failed").With("operation", "rename_session").Wrap(err)
-	}
-
-	return nil
-}
-
-func (live *GotmuxLiveServer) Kill(ctx context.Context, sessionID string) error {
-	handle, err := live.session(ctx, sessionID)
-	if err != nil {
-		return err
-	}
-
-	if err := handle.Kill(ctx); err != nil {
-		if errors.Is(err, gotmux.ErrServerChanged) {
-			return oops.In("remote").Code("remote_tmux_failed").With("operation", "kill_session").Wrap(errors.Join(ErrTargetChanged, err))
-		}
-
-		return oops.In("remote").Code("remote_tmux_failed").With("operation", "kill_session").Wrap(err)
-	}
-
-	return nil
 }
 
 func (live *GotmuxLiveServer) Attach(ctx context.Context, sessionID string, streams AttachStreams) error {

@@ -5,7 +5,6 @@ package picker
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -20,7 +19,6 @@ import (
 	"github.com/zigai/sesh/internal/agents"
 	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/config"
-	"github.com/zigai/sesh/internal/integration/process"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/tui"
 )
@@ -307,6 +305,17 @@ func assertPickerServiceName(t *testing.T, summaries []session.AgentSummary, wan
 	}
 }
 
+func resolvePickerTestWorkspace(t *testing.T, cfg *config.Config, locations app.Locations) app.Workspace {
+	t.Helper()
+
+	workspace, err := app.Resolve(cfg, locations)
+	if err != nil {
+		t.Fatalf("resolve workspace: %v", err)
+	}
+
+	return workspace
+}
+
 func TestPickerServicesAHTStorePathRouting(t *testing.T) {
 	ctx := t.Context()
 	dirs := t.TempDir()
@@ -332,7 +341,8 @@ func TestPickerServicesAHTStorePathRouting(t *testing.T) {
 
 	t.Run("falls back to configured agent status store path", func(t *testing.T) {
 		cfg := config.DefaultConfig()
-		cfg.AgentStatus.StorePath = "/config/fallback/aht.json"
+		cfg.AgentStatus.StorePath = "/config/base/aht.json"
+		cfg.AgentSessions.Status = &config.AgentStatusConfig{StorePath: "/config/fallback/aht.json"}
 
 		services, err := newPickerServices(ctx, resolvePickerTestWorkspace(t, cfg, app.Locations{
 			Socket: filepath.Join(dirs, "tmux.sock"), Repository: filepath.Join(dirs, "repo2"), LeaseRoot: filepath.Join(dirs, "leases2"),
@@ -348,78 +358,4 @@ func TestPickerServicesAHTStorePathRouting(t *testing.T) {
 			t.Fatalf("StorePath = %q, want /config/fallback/aht.json", path)
 		}
 	})
-}
-
-func TestPickerServicesSnapshotSessionRejectsInvalidEnv(t *testing.T) {
-	ctx := t.Context()
-	dirs := t.TempDir()
-
-	cfg := config.DefaultConfig()
-	cfg.Snapshot.ProcessEnvironment = []string{"INVALID=KEY"}
-
-	services, err := newPickerServices(ctx, resolvePickerTestWorkspace(t, cfg, app.Locations{
-		Socket: filepath.Join(dirs, "tmux.sock"), Repository: filepath.Join(dirs, "repo"), LeaseRoot: filepath.Join(dirs, "leases"),
-		History: filepath.Join(dirs, "history.json"), FinalSaveStatus: "", AgentStore: "",
-	}), gotmux.Streams{}, RemoteServices{})
-	if err != nil {
-		t.Fatalf("newPickerServices failed: %v", err)
-	}
-
-	t.Cleanup(func() { _ = services.Close() })
-
-	target := session.Session{ID: "0", Name: "test"}
-
-	err = services.SnapshotSession(ctx, target)
-	if err == nil {
-		t.Fatal("expected SnapshotSession to reject invalid environment key")
-	}
-
-	if !errors.Is(err, process.ErrInvalidVariableName) {
-		t.Fatalf("expected ErrInvalidVariableName, got: %v", err)
-	}
-}
-
-func TestPickerServicesSnapshotSessionRejectsExcessiveEnv(t *testing.T) {
-	ctx := t.Context()
-	dirs := t.TempDir()
-
-	keys := make([]string, 257)
-	for i := range keys {
-		keys[i] = fmt.Sprintf("K%d", i)
-	}
-
-	cfg := config.DefaultConfig()
-	cfg.Snapshot.ProcessEnvironment = keys
-
-	services, err := newPickerServices(ctx, resolvePickerTestWorkspace(t, cfg, app.Locations{
-		Socket: filepath.Join(dirs, "tmux.sock"), Repository: filepath.Join(dirs, "repo"), LeaseRoot: filepath.Join(dirs, "leases"),
-		History: filepath.Join(dirs, "history.json"), FinalSaveStatus: "", AgentStore: "",
-	}), gotmux.Streams{}, RemoteServices{})
-	if err != nil {
-		t.Fatalf("newPickerServices failed: %v", err)
-	}
-
-	t.Cleanup(func() { _ = services.Close() })
-
-	target := session.Session{ID: "0", Name: "test"}
-
-	err = services.SnapshotSession(ctx, target)
-	if err == nil {
-		t.Fatal("expected SnapshotSession to reject excessive environment keys")
-	}
-
-	if !errors.Is(err, process.ErrEnvironmentLimitExceeded) {
-		t.Fatalf("expected ErrEnvironmentLimitExceeded, got: %v", err)
-	}
-}
-
-func resolvePickerTestWorkspace(t *testing.T, cfg *config.Config, locations app.Locations) app.Workspace {
-	t.Helper()
-
-	workspace, err := app.Resolve(cfg, locations)
-	if err != nil {
-		t.Fatalf("resolve workspace: %v", err)
-	}
-
-	return workspace
 }

@@ -33,7 +33,7 @@ func (m *Model) showsAgentSortIndicator() bool {
 }
 
 func (m *Model) renderAgentSortBadge() string {
-	key := newActionKeyMap(m.config.Keys).agentSort.Help().Key
+	key := newActionKeyMap(m.config).agentSort.Help().Key
 	desc := "sort: " + m.agentSort.label()
 
 	if key == "" {

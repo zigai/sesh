@@ -110,7 +110,7 @@ func TestViewFrameKeepsRightBorderAcrossStates(t *testing.T) {
 			name: "dialog overlay",
 			setup: func(model *Model) {
 				model.filtered = []session.Session{{Name: testSupportSessionDevName}}
-				model.dialog = dialogConfirmKill
+				openTestKillConfirm(model)
 			},
 		},
 	}
@@ -512,7 +512,7 @@ func TestRenderAgentsFooterKeepsSessionActionsForSelectedChild(t *testing.T) {
 	model.filtered = []session.Session{{
 		Name:   "project",
 		Kind:   session.KindLive,
-		Agents: []session.AgentSession{{RegistryID: "agent-1"}},
+		Agents: []session.AgentSession{{RegistryID: "agent-1", PaneID: "%1"}},
 	}}
 	model.agentCursor = 0
 

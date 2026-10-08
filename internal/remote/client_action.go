@@ -5,14 +5,18 @@ package remote
 import (
 	"bytes"
 	"context"
+	"encoding/json/jsontext"
 	"errors"
-	"time"
+	"slices"
+	"sync"
 
 	"github.com/samber/oops"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/config"
-	"github.com/zigai/sesh/internal/session"
 )
+
+var ErrActionNotOffered = errors.New("remote peer does not accept this action")
 
 type ActionOriginOptions struct {
 	Remote     config.RemoteConfig
@@ -20,8 +24,119 @@ type ActionOriginOptions struct {
 	State      ConnectionState
 }
 
-func NewActionRequest(options ActionOriginOptions, target session.Session, action Action, newName, directory string) (ActionRequest, error) {
-	if !options.Remote.Enabled || !PermissionsAllow(options.Remote.Permissions, action) {
+// Peer dispatches actions to configured remote connections over SSH. It offers the actions each
+// peer advertised in its last observed inventory and checks the current catalog before sending.
+type Peer struct {
+	remote config.RemoteConfig
+	load   func() (Catalog, error)
+	mu     sync.Mutex
+	offers map[string][]action.ID
+}
+
+func NewPeer(remote config.RemoteConfig, load func() (Catalog, error)) *Peer {
+	return &Peer{remote: remote, load: load, mu: sync.Mutex{}, offers: map[string][]action.ID{}}
+}
+
+// NewCatalogPeer dispatches through the catalog the remote monitor keeps under cacheHome.
+func NewCatalogPeer(remote config.RemoteConfig, cacheHome string) *Peer {
+	return NewPeer(remote, func() (Catalog, error) { return ReadCatalog(cacheHome) })
+}
+
+// Observe records the actions each connected peer accepts.
+func (peer *Peer) Observe(catalog Catalog) {
+	offers := make(map[string][]action.ID, len(catalog.Connections))
+	for id, state := range catalog.Connections {
+		if state.Connected {
+			offers[id] = slices.Clone(state.Snapshot.Actions)
+		}
+	}
+
+	peer.mu.Lock()
+	peer.offers = offers
+	peer.mu.Unlock()
+}
+
+func (peer *Peer) Accepts(at action.Location, id action.ID) bool {
+	if at.Kind != action.LocationPeer || !peer.remote.Enabled {
+		return false
+	}
+
+	peer.mu.Lock()
+	defer peer.mu.Unlock()
+
+	return slices.Contains(peer.offers[at.Connection], id)
+}
+
+func (peer *Peer) Dispatch(ctx context.Context, invocation action.Invocation) (any, error) {
+	entry, ok := action.Lookup(invocation.Action)
+	if !ok {
+		return nil, action.Wrap(action.CodeUnsupported, action.ErrUnknownAction)
+	}
+
+	if invocation.At.Kind != action.LocationPeer {
+		return nil, action.Wrap(action.CodeUnsupported, action.ErrLocationRejected)
+	}
+
+	options, err := peer.originOptions(invocation.At.Connection)
+	if err != nil {
+		return nil, err
+	}
+
+	if !slices.Contains(options.State.Snapshot.Actions, invocation.Action) {
+		return nil, action.Wrap(action.CodeForbidden, ErrActionNotOffered)
+	}
+
+	input, err := entry.EncodeInput(invocation.Input)
+	if err != nil {
+		return nil, action.Wrap(action.CodeInvalidArgument, err)
+	}
+
+	request, err := NewActionRequest(options, invocation.Action, input)
+	if err != nil {
+		return nil, action.Wrap(action.CodeUnavailable, err)
+	}
+
+	result, err := RunAction(ctx, options, request)
+	if err != nil {
+		return nil, action.Wrap(action.CodeUncertain, &PeerError{Code: action.CodeUncertain, InvocationID: request.InvocationID, Err: err})
+	}
+
+	var output any
+	if len(result.Output) > 0 {
+		output, err = entry.DecodeOutput(result.Output)
+		if err != nil {
+			output = nil
+		}
+	}
+
+	if result.OK {
+		return output, nil
+	}
+
+	return output, action.Wrap(result.Code, &PeerError{Code: result.Code, InvocationID: result.InvocationID, Err: nil})
+}
+
+func (peer *Peer) originOptions(connectionID string) (ActionOriginOptions, error) {
+	connection, err := FindConnection(peer.remote, connectionID)
+	if err != nil {
+		return ActionOriginOptions{}, action.Wrap(action.CodeNotFound, err)
+	}
+
+	catalog, err := peer.load()
+	if err != nil {
+		return ActionOriginOptions{}, action.Wrap(action.CodeUnavailable, err)
+	}
+
+	state, ok := catalog.Connections[connection.ID]
+	if !ok {
+		return ActionOriginOptions{}, action.Wrap(action.CodeUnavailable, ErrConnectionChanged)
+	}
+
+	return ActionOriginOptions{Remote: peer.remote, Connection: connection, State: state}, nil
+}
+
+func NewActionRequest(options ActionOriginOptions, id action.ID, input jsontext.Value) (ActionRequest, error) {
+	if !options.Remote.Enabled {
 		return ActionRequest{}, ErrRemoteDisabled
 	}
 
@@ -30,38 +145,20 @@ func NewActionRequest(options ActionOriginOptions, target session.Session, actio
 		return ActionRequest{}, ErrConnectionChanged
 	}
 
-	id, err := NewInvocationID()
+	invocationID, err := NewInvocationID()
 	if err != nil {
 		return ActionRequest{}, err
 	}
 
 	request := ActionRequest{
-		InvocationID: id, IntentDigest: "", Operation: action,
-		ConnectionID: options.Connection.ID, ConfigDigest: options.State.ConfigDigest,
-		PeerID: options.State.PeerID, Kind: string(target.Kind),
-		TmuxServerSocket:    target.TmuxServerSocket,
-		TmuxServerPID:       target.RuntimeIdentity.TmuxServerPID,
-		TmuxServerStartedAt: target.RuntimeIdentity.TmuxServerStartedAt,
-		SessionID:           target.ID, SessionName: target.Name,
-		Generation:       target.Generation,
-		SessionCreatedAt: target.RuntimeIdentity.TmuxSessionCreatedAt,
-		NewName:          newName, Directory: directory,
-	}
-	if action == ActionCreate {
-		request.Kind = ""
-		request.TmuxServerSocket = options.Connection.TmuxSocket
-		request.TmuxServerPID = 0
-		request.TmuxServerStartedAt = time.Time{}
-		request.SessionID = ""
-		request.Generation = ""
-		request.SessionCreatedAt = time.Time{}
-	}
-
-	if target.Kind == session.KindSaved {
-		request.TmuxServerSocket = options.Connection.TmuxSocket
-		request.TmuxServerPID = 0
-		request.TmuxServerStartedAt = time.Time{}
-		request.SessionCreatedAt = time.Time{}
+		InvocationID: invocationID,
+		IntentDigest: "",
+		Action:       id,
+		ConnectionID: options.Connection.ID,
+		ConfigDigest: options.State.ConfigDigest,
+		PeerID:       options.State.PeerID,
+		Socket:       options.Connection.TmuxSocket,
+		Input:        input,
 	}
 
 	request.IntentDigest, err = IntentDigest(request)
@@ -69,15 +166,17 @@ func NewActionRequest(options ActionOriginOptions, target session.Session, actio
 		return ActionRequest{}, err
 	}
 
-	if err := ValidateActionRequest(request, false); err != nil {
+	if err := ValidateActionRequest(request); err != nil {
 		return ActionRequest{}, err
 	}
 
 	return request, nil
 }
 
+// RunAction sends one invocation over SSH. When the answer is lost the outcome is unknown, and
+// `sesh remote lookup` reads the receipt the peer kept.
 func RunAction(ctx context.Context, options ActionOriginOptions, request ActionRequest) (ActionResult, error) {
-	if err := ValidateActionRequest(request, false); err != nil {
+	if err := ValidateActionRequest(request); err != nil {
 		return ActionResult{}, oops.In("remote").With("operation", "run_action").Wrap(err)
 	}
 
@@ -108,23 +207,22 @@ func RunAction(ctx context.Context, options ActionOriginOptions, request ActionR
 	diagnostics := NewDiagnosticsBuffer(maxDiagnosticsBytes)
 	command.Stderr = diagnostics
 
+	uncertain := ActionResult{InvocationID: request.InvocationID, Action: request.Action, OK: false, Code: action.CodeUncertain, Output: nil}
+
 	output, runErr := command.Output()
 	if runErr != nil {
 		cause := ClassifySSHFailure(actionCtx.Err(), diagnostics.String())
 
-		return ActionResult{InvocationID: request.InvocationID, OK: false, Code: ActionCodeUnknownOutcome, DurableOperationID: ""},
-			errors.Join(cause, oops.In("remote").With("operation", "run_action").Wrap(runErr))
+		return uncertain, errors.Join(cause, oops.In("remote").With("operation", "run_action").With("invocation", request.InvocationID).Wrap(runErr))
 	}
 
 	result, err := DecodeActionResult(output)
 	if err != nil {
-		return ActionResult{InvocationID: request.InvocationID, OK: false, Code: ActionCodeUnknownOutcome, DurableOperationID: ""},
-			oops.In("remote").With("operation", "run_action").Wrap(err)
+		return uncertain, oops.In("remote").With("operation", "run_action").With("invocation", request.InvocationID).Wrap(err)
 	}
 
-	if result.InvocationID != request.InvocationID {
-		return ActionResult{InvocationID: request.InvocationID, OK: false, Code: ActionCodeUnknownOutcome, DurableOperationID: ""},
-			oops.In("remote").With("operation", "run_action").Wrap(ErrInvocationConflict)
+	if result.InvocationID != request.InvocationID || result.Action != request.Action {
+		return uncertain, oops.In("remote").With("operation", "run_action").With("invocation", request.InvocationID).Wrap(ErrInvocationConflict)
 	}
 
 	return result, nil

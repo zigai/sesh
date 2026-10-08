@@ -13,17 +13,20 @@ import (
 
 	"github.com/samber/oops"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/session"
 )
 
 const (
-	ProtocolVersion    = 1
+	ProtocolVersion    = 2
 	MaxFrameBytes      = 1 << 20
 	MaxSessions        = 4096
 	MaxAgents          = 16384
 	MaxStringBytes     = 16 << 10
 	MaxIdentifierBytes = 256
 	MaxActionBytes     = 64 << 10
+	MaxResultBytes     = 1 << 20
+	MaxActions         = 256
 	MaxBootstrapBytes  = 64 << 10
 	MaxCapabilityBytes = 4 << 10
 	MaxStreamFrames    = 1 << 20
@@ -79,9 +82,12 @@ type Hello struct {
 	StartedAt      time.Time `json:"startedAt"`
 }
 
+// Snapshot is a peer's inventory. Actions lists the actions the peer accepts from this
+// machine, so callers can offer only those.
 type Snapshot struct {
 	GeneratedAt time.Time         `json:"generatedAt"`
 	Sessions    []session.Session `json:"sessions"`
+	Actions     []action.ID       `json:"actions"`
 	Health      SourceHealth      `json:"health"`
 }
 
@@ -312,7 +318,21 @@ func validSnapshotFrame(frame Frame) bool {
 		}
 	}
 
-	return ValidSourceHealth(frame.Snapshot.Health)
+	return validActionIDs(frame.Snapshot.Actions) && ValidSourceHealth(frame.Snapshot.Health)
+}
+
+func validActionIDs(ids []action.ID) bool {
+	if len(ids) > MaxActions {
+		return false
+	}
+
+	for _, id := range ids {
+		if !id.Valid() {
+			return false
+		}
+	}
+
+	return true
 }
 
 func validRemoteSession(value session.Session) bool {

@@ -126,7 +126,7 @@ func NewCommand() *cobra.Command {
 
 	addAutosaveFlags(cmd.PersistentFlags())
 
-	cmd.AddCommand(NewStatusCommand())
+	cmd.AddCommand(newStatusCommand(), newSaveIfDueCommand(), newRestoreOnStartCommand(), newFinalSaveCommand())
 
 	return cmd
 }
@@ -137,30 +137,6 @@ func addAutosaveFlags(flags *pflag.FlagSet) {
 	flags.String("lease-root", "", clibase.LeaseRootFlagUsage)
 	flags.String("history", "", clibase.HistoryFlagUsage)
 	flags.StringSlice("session", nil, "Explicit selected session IDs")
-}
-
-func NewActionSaveIfDueCommand() *cobra.Command {
-	cmd := NewSaveIfDueCommand()
-	cmd.Use = "autosave-save-if-due"
-	addAutosaveFlags(cmd.Flags())
-
-	return cmd
-}
-
-func NewActionRestoreOnStartCommand() *cobra.Command {
-	cmd := NewRestoreOnStartCommand()
-	cmd.Use = "autosave-restore-on-start"
-	addAutosaveFlags(cmd.Flags())
-
-	return cmd
-}
-
-func NewActionFinalSaveCommand() *cobra.Command {
-	cmd := NewFinalSaveCommand()
-	cmd.Use = "autosave-final-save"
-	addAutosaveFlags(cmd.Flags())
-
-	return cmd
 }
 
 func ResolveEnv(cmd *cobra.Command) (Env, error) {

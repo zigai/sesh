@@ -1,31 +1,65 @@
 package config
 
 import (
-	"slices"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
-const fKeyOffset = 12
+const (
+	fKeyOffset        = 12
+	firstExtendedFKey = 13
+	lastExtendedFKey  = 24
+	tmuxModifierOrder = "CMS"
+)
 
+// TmuxKeyName writes a tmux key the way tmux lists it, so differently written forms of one key
+// compare equal: modifiers in C-M-S order, ^x as C-x, and F13 to F24 as shifted F1 to F12.
 func TmuxKeyName(key string) string {
-	key = strings.TrimSpace(key)
-	parts := strings.Split(key, "-")
+	held, base := splitTmuxModifiers(strings.TrimSpace(key))
 
-	functionKey := parts[len(parts)-1]
-	if len(functionKey) < 2 || (functionKey[0] != 'F' && functionKey[0] != 'f') {
-		return key
+	if number, ok := extendedFunctionKey(base); ok {
+		held['S'] = true
+		base = "F" + strconv.Itoa(number-fKeyOffset)
 	}
 
-	number, err := strconv.Atoi(functionKey[1:])
-	if err != nil || number < 13 || number > 24 {
-		return key
+	var name strings.Builder
+
+	for _, modifier := range tmuxModifierOrder {
+		if held[modifier] {
+			name.WriteRune(modifier)
+			name.WriteString("-")
+		}
 	}
 
-	modifiers := parts[:len(parts)-1]
-	if !slices.Contains(modifiers, "S") {
-		modifiers = append(modifiers, "S")
+	name.WriteString(base)
+
+	return name.String()
+}
+
+func splitTmuxModifiers(key string) (map[rune]bool, string) {
+	held := make(map[rune]bool, len(tmuxModifierOrder))
+
+	for {
+		switch {
+		case len(key) > 2 && key[1] == '-' && strings.ContainsRune(tmuxModifierOrder, unicode.ToUpper(rune(key[0]))):
+			held[unicode.ToUpper(rune(key[0]))] = true
+			key = key[2:]
+		case len(key) > 1 && key[0] == '^':
+			held['C'] = true
+			key = key[1:]
+		default:
+			return held, key
+		}
+	}
+}
+
+func extendedFunctionKey(key string) (int, bool) {
+	if len(key) < 2 || (key[0] != 'F' && key[0] != 'f') {
+		return 0, false
 	}
 
-	return strings.Join(append(modifiers, "F"+strconv.Itoa(number-fKeyOffset)), "-")
+	number, err := strconv.Atoi(key[1:])
+
+	return number, err == nil && number >= firstExtendedFKey && number <= lastExtendedFKey
 }

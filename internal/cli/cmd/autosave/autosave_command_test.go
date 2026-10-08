@@ -16,7 +16,7 @@ import (
 func TestAutosaveCommandHelp(t *testing.T) {
 	t.Parallel()
 
-	subcommands := []string{"status"}
+	subcommands := []string{"status", "save-if-due", "restore-on-start", "final-save"}
 
 	for _, sub := range subcommands {
 		t.Run(sub, func(t *testing.T) {
@@ -27,25 +27,6 @@ func TestAutosaveCommandHelp(t *testing.T) {
 
 			if !strings.Contains(stdout, sub) {
 				t.Fatalf("stdout missing %s in help: %s", sub, stdout)
-			}
-		})
-	}
-}
-
-func TestActionAutosaveCommandsHelp(t *testing.T) {
-	t.Parallel()
-
-	actions := []string{"autosave-save-if-due", "autosave-restore-on-start", "autosave-final-save"}
-
-	for _, actionName := range actions {
-		t.Run(actionName, func(t *testing.T) {
-			stdout, stderr, err := executeCommand(t, actionCmd, actionName, "--help")
-			if err != nil {
-				t.Fatalf("action %s --help failed: %v\nstderr: %s", actionName, err, stderr)
-			}
-
-			if !strings.Contains(stdout, actionName) {
-				t.Fatalf("stdout missing %s in help: %s", actionName, stdout)
 			}
 		})
 	}
@@ -82,7 +63,7 @@ func TestAutosaveDisabledIsANoOpWithoutSocket(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, command := range [][]string{{"autosave", "status"}, {actionCmd, "autosave-save-if-due"}} {
+	for _, command := range [][]string{{"autosave", "status"}, {"autosave", "save-if-due"}} {
 		t.Run(strings.Join(command, " "), func(t *testing.T) {
 			exec := executeJSON(t, append(command, testConfigFlag, cfgPath, testJSONFlag)...)
 			if !exec.Envelope.OK {
@@ -100,7 +81,7 @@ func TestAutosaveDisabledIsANoOpWithoutSocket(t *testing.T) {
 func TestAutosaveSaveIfDueSkipsWhenDefaultTmuxServerIsNotRunning(t *testing.T) {
 	isolatedAutosaveHome(t)
 
-	exec := executeJSON(t, actionCmd, "autosave-save-if-due", testNoConfigFlag, testJSONFlag)
+	exec := executeJSON(t, "autosave", "save-if-due", testNoConfigFlag, testJSONFlag)
 	if exec.Err != nil || !exec.Envelope.OK {
 		t.Fatalf("save-if-due without a running tmux server failed: %v\nstderr: %s", exec.Err, exec.Stderr)
 	}
@@ -146,7 +127,7 @@ func TestAutosaveSaveIfDueRefusesWhenHistoryUnavailable(t *testing.T) {
 	stateHome := isolatedAutosaveHome(t)
 	writeCorruptHistoryState(t, stateHome)
 
-	save := executeJSON(t, actionCmd, "autosave-save-if-due", testNoConfigFlag, testJSONFlag)
+	save := executeJSON(t, "autosave", "save-if-due", testNoConfigFlag, testJSONFlag)
 	if save.Err == nil {
 		t.Fatal("save-if-due with an unreadable history must refuse")
 	}
@@ -204,7 +185,7 @@ func TestAutosaveFinalSaveRequiresPositiveDeadline(t *testing.T) {
 	isolatedAutosaveHome(t)
 
 	deadline := executeJSON(
-		t, actionCmd, "autosave-final-save",
+		t, "autosave", "final-save",
 		testNoConfigFlag, testJSONFlag,
 		testSocketFlag, filepath.Join(os.Getenv("XDG_RUNTIME_DIR"), "sesh.sock"),
 		"--deadline", "0s",
@@ -243,7 +224,7 @@ func TestAutosaveFinalSaveWaitsForASaveInProgress(t *testing.T) {
 			})
 
 			executeJSON(
-				t, actionCmd, "autosave-final-save",
+				t, "autosave", "final-save",
 				testNoConfigFlag, testJSONFlag,
 				testSocketFlag, filepath.Join(home, "absent.sock"),
 				"--status-file", statusPath,
@@ -275,7 +256,7 @@ func TestAutosaveFinalSaveRejectsInvalidEnvironmentKeys(t *testing.T) {
 	socket := filepath.Join(os.Getenv("XDG_RUNTIME_DIR"), "sesh.sock")
 
 	exec := executeJSON(
-		t, actionCmd, "autosave-final-save",
+		t, "autosave", "final-save",
 		testConfigFlag, cfgPath,
 		testSocketFlag, socket,
 		testJSONFlag,
@@ -303,7 +284,7 @@ func TestAutosaveSaveIfDueRejectsInvalidEnvironmentKeys(t *testing.T) {
 	socket := filepath.Join(os.Getenv("XDG_RUNTIME_DIR"), "sesh.sock")
 
 	exec := executeJSON(
-		t, actionCmd, "autosave-save-if-due",
+		t, "autosave", "save-if-due",
 		testConfigFlag, cfgPath,
 		testSocketFlag, socket,
 		testJSONFlag,

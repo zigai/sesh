@@ -9,7 +9,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/cli/clibase"
+	"github.com/zigai/sesh/internal/config"
 )
 
 func endpointCommand(t *testing.T, args ...string) *cobra.Command {
@@ -21,6 +23,7 @@ func endpointCommand(t *testing.T, args ...string) *cobra.Command {
 	clibase.AddSocketFlag(cmd)
 	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
 	cmd.Flags().String("lease-root", "", clibase.LeaseRootFlagUsage)
+	cmd.Flags().String("agent-state", "", "")
 	cmd.SetContext(context.Background())
 
 	if err := cmd.ParseFlags(args); err != nil {
@@ -61,6 +64,42 @@ func TestDefaultTmuxSocketIgnoresRelativeTmuxTmpdir(t *testing.T) {
 
 	if got := clibase.DefaultTmuxSocket(); got != want {
 		t.Fatalf("DefaultTmuxSocket() = %q, want %q", got, want)
+	}
+}
+
+func TestWorkspaceAgentStoreRouting(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.AgentStatus.StorePath = "base.json"
+	cfg.AgentSessions.Status = &config.AgentStatusConfig{StorePath: "nested.json"}
+
+	for _, test := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"nested config", nil, "nested.json"},
+		{"explicit flag", []string{"--agent-state", "explicit.json"}, "explicit.json"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			workspace, err := app.Resolve(cfg, clibase.CommandLocations(endpointCommand(t, test.args...)))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			want, err := filepath.Abs(test.want)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if workspace.AgentStore != want || workspace.AgentSource().StorePath() != want {
+				t.Fatalf("agent store = %q, want %q", workspace.AgentStore, want)
+			}
+		})
+	}
+
+	workspace, err := app.Resolve(config.DefaultConfig(), clibase.CommandLocations(endpointCommand(t)))
+	if err != nil || workspace.AgentStore != "" {
+		t.Fatalf("default agent store = %q, %v; want empty for AHT's default", workspace.AgentStore, err)
 	}
 }
 

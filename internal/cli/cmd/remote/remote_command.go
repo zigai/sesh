@@ -4,10 +4,13 @@ package remote
 
 import (
 	"context"
+	"encoding/json/jsontext"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -15,6 +18,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/zigai/gotmux/tmux"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/agents"
 	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/cli/clibase"
@@ -34,6 +38,16 @@ const (
 
 var errRemoteTargetMissing = errors.New("remote target is not present in the cached catalog")
 
+// remoteLookupOutput is a receipt as `remote lookup` reports it. Output is the action's own
+// result.
+type remoteLookupOutput struct {
+	InvocationID string         `json:"invocationId"`
+	Action       action.ID      `json:"action"`
+	OK           bool           `json:"ok"`
+	Code         action.Code    `json:"code,omitempty"`
+	Output       jsontext.Value `json:"output,omitzero"`
+}
+
 type remoteLookupRuntime struct {
 	peerID   string
 	receipts *privatefs.Dir
@@ -41,24 +55,9 @@ type remoteLookupRuntime struct {
 
 type remotePeerRuntime struct {
 	peerID, bridgeDir string
+	server            *tmux.Server
 	live              *remote.GotmuxLiveServer
-	saved             *remote.NativeSavedSessions
 	receipts          *privatefs.Dir
-}
-
-func openRemoteNativeSavedSessions(workspace app.Workspace, server *tmux.Server) (*remote.NativeSavedSessions, error) {
-	saved, err := remote.NewNativeSavedSessions(remote.NativeSavedConfig{
-		Repository:         workspace.Repository,
-		LeaseRoot:          workspace.LeaseRoot,
-		Server:             server,
-		ProcessEnvironment: workspace.Config.Snapshot.ProcessEnvironment,
-		AgentSource:        workspace.AgentSource(),
-	})
-	if err != nil {
-		return nil, oops.In("cli").With("operation", "open_remote_saved_sessions").Wrap(err)
-	}
-
-	return saved, nil
 }
 
 func NewCommand() *cobra.Command {
@@ -74,7 +73,6 @@ func newRemoteCommand() *cobra.Command {
 	}
 	cmd.AddCommand(
 		newRemoteAttachCommand(),
-		newRemoteActionCommand(),
 		newRemoteLookupCommand(),
 		newRemotePeerCommand(),
 	)
@@ -130,6 +128,38 @@ func remoteLiveAnnotations(operation string) map[string]string {
 		clibase.AnnotationLiveIO:    "true",
 		clibase.AnnotationOperation: operation,
 	}
+}
+
+// newPeerLocal runs actions on this peer against its own snapshot repository and leases.
+func newPeerLocal(workspace app.Workspace, server *tmux.Server) (*app.Local, *app.Repository) {
+	repository := app.NewRepository(workspace.Repository)
+	local := app.NewLocal(app.LocalOptions{
+		Config:             workspace.Config,
+		Server:             server,
+		Repository:         repository,
+		LeaseRoot:          workspace.LeaseRoot,
+		HistoryPath:        workspace.History,
+		AgentSource:        workspace.AgentSource(),
+		Streams:            tmux.Streams{In: nil, Out: nil, Err: nil},
+		Source:             "remote",
+		DeferSwitchHistory: false,
+	})
+
+	return local, repository
+}
+
+// remoteActions lists the actions this peer accepts from other machines.
+func remoteActions(cfg *config.Config) []action.ID {
+	ids := make([]action.ID, 0)
+
+	for _, entry := range action.All() {
+		descriptor := entry.Describe()
+		if action.PolicyFor(cfg, descriptor).AllowRemote {
+			ids = append(ids, descriptor.ID)
+		}
+	}
+
+	return ids
 }
 
 func openRemotePrivate(path string) (*privatefs.Dir, error) {
@@ -212,7 +242,7 @@ func readRemoteInput(reader io.Reader, limit int) ([]byte, error) { //nolint:unp
 	return content, nil
 }
 
-func openRemotePeerRuntime(cmd *cobra.Command, socket string, needSaved, needReceipts bool) (*remotePeerRuntime, error) {
+func openRemotePeerRuntime(socket string, needReceipts bool) (*remotePeerRuntime, error) {
 	server, err := integration.Open(socket)
 	if err != nil {
 		return nil, remoteCLIError("open_remote_tmux", err)
@@ -248,14 +278,9 @@ func openRemotePeerRuntime(cmd *cobra.Command, socket string, needSaved, needRec
 	runtime := &remotePeerRuntime{
 		peerID:    peerID,
 		bridgeDir: bridgeDir,
+		server:    server,
 		live:      remote.NewGotmuxLiveServer(server),
-		saved:     nil,
 		receipts:  nil,
-	}
-	if needSaved {
-		if err := runtime.openSaved(cmd, server); err != nil {
-			return nil, err
-		}
 	}
 
 	if needReceipts {
@@ -265,24 +290,6 @@ func openRemotePeerRuntime(cmd *cobra.Command, socket string, needSaved, needRec
 	}
 
 	return runtime, nil
-}
-
-func (runtime *remotePeerRuntime) openSaved(cmd *cobra.Command, server *tmux.Server) error {
-	workspace, err := clibase.ResolveWorkspace(cmd)
-	if err != nil {
-		return err
-	}
-
-	if err := workspace.EnsureLeaseRoot(); err != nil {
-		return remoteCLIError("ensure_remote_lease_root", err)
-	}
-
-	runtime.saved, err = openRemoteNativeSavedSessions(workspace, server)
-	if err != nil {
-		return remoteCLIError("open_remote_saved_sessions", err)
-	}
-
-	return nil
 }
 
 func (runtime *remotePeerRuntime) openReceipts(stateHome string) error {
@@ -320,7 +327,9 @@ func runRemotePeerStream(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	runtime, err := openRemotePeerRuntime(cmd, bootstrap.TmuxSocket, false, false)
+	workspace.Socket = bootstrap.TmuxSocket
+
+	runtime, err := openRemotePeerRuntime(workspace.Socket, false)
 	if err != nil {
 		return err
 	}
@@ -336,6 +345,7 @@ func runRemotePeerStream(cmd *cobra.Command, _ []string) error {
 			return remotePeerAgentSummaries(ctx, workspace)
 		},
 		SavedSessions: func(ctx context.Context) ([]session.Session, error) { return remotePeerSavedSessions(ctx, workspace) },
+		Actions:       remoteActions(workspace.Config),
 	}, cmd.OutOrStdout()))
 }
 
@@ -350,27 +360,33 @@ func runRemotePeerAction(cmd *cobra.Command, _ []string) (resultErr error) {
 		return remoteCLIError("decode_remote_action", err)
 	}
 
-	runtime, err := openRemotePeerRuntime(cmd, request.TmuxServerSocket, true, true)
+	workspace, err := clibase.ResolveWorkspace(cmd)
+	if err != nil {
+		return err
+	}
+
+	workspace.Socket = request.Socket
+
+	runtime, err := openRemotePeerRuntime(workspace.Socket, true)
 	if err != nil {
 		return err
 	}
 
 	defer func() { resultErr = errors.Join(resultErr, runtime.close()) }()
 
-	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
-	if err != nil {
-		return err
-	}
+	local, repository := newPeerLocal(workspace, runtime.server)
 
-	permissions := cfg.Remote.Permissions
+	defer func() {
+		resultErr = errors.Join(resultErr, remoteCLIError("close_remote_repository", repository.Close()))
+	}()
+
+	allowed := remoteActions(workspace.Config)
 	result := remote.ExecutePeerAction(clibase.CommandContext(cmd), remote.PeerActionOptions{
-		PeerID: runtime.peerID, Receipts: runtime.receipts,
-		Policy: remote.PeerPolicy{
-			Create: permissions.Create, Rename: permissions.Rename, Kill: permissions.Kill,
-			Delete: permissions.Delete, Snapshot: permissions.Snapshot, Restore: permissions.Restore,
-			Sockets: nil,
-		},
-		Live: runtime.live, Saved: runtime.saved, Now: nil,
+		PeerID:     runtime.peerID,
+		Receipts:   runtime.receipts,
+		Allowed:    func(id action.ID) bool { return slices.Contains(allowed, id) },
+		Dispatcher: local,
+		Now:        nil,
 	}, request)
 	logPeerActionResult(clibase.CommandContext(cmd), result)
 
@@ -380,14 +396,14 @@ func runRemotePeerAction(cmd *cobra.Command, _ []string) (resultErr error) {
 func logPeerActionResult(ctx context.Context, result remote.ActionResult) {
 	level, status, reason := zerolog.InfoLevel, "ok", ""
 	if !result.OK {
-		level, status, reason = zerolog.ErrorLevel, "failed", result.Code
-		if reason == remote.ActionCodePartial || reason == remote.ActionCodeUnknownOutcome {
+		level, status, reason = zerolog.ErrorLevel, "failed", string(result.Code)
+		if result.Code == action.CodePartial || result.Code == action.CodeUncertain {
 			level, status = zerolog.WarnLevel, "degraded"
 		}
 	}
 
 	event := zerolog.Ctx(ctx).WithLevel(level).Str("component", "remote").
-		Str("operation", "remote_peer_action").Str("status", status).Str("phase", "receipt")
+		Str("operation", "remote_peer_action").Str("action", string(result.Action)).Str("status", status).Str("phase", "receipt")
 	if reason != "" {
 		event.Str("reason", reason)
 	}
@@ -412,7 +428,7 @@ func runRemotePeerAttachPrepare(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	runtime, err := openRemotePeerRuntime(cmd, bootstrap.Target.TmuxServerSocket, false, false)
+	runtime, err := openRemotePeerRuntime(bootstrap.Target.TmuxServerSocket, false)
 	if err != nil {
 		return err
 	}
@@ -451,7 +467,7 @@ func runRemotePeerAttach(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	runtime, err := openRemotePeerRuntime(cmd, record.Target.TmuxServerSocket, false, false)
+	runtime, err := openRemotePeerRuntime(record.Target.TmuxServerSocket, false)
 	if err != nil {
 		return err
 	}
@@ -572,7 +588,7 @@ func runRemotePeerLookup(cmd *cobra.Command, _ []string) (resultErr error) {
 	}
 
 	result := remote.ActionResult{
-		InvocationID: request.InvocationID, OK: false, Code: remote.ActionCodeNotFound, DurableOperationID: "",
+		InvocationID: request.InvocationID, Action: "", OK: false, Code: action.CodeNotFound, Output: nil,
 	}
 	if runtime.receipts != nil {
 		result = remote.ExecutePeerLookup(runtime.receipts, runtime.peerID, request)
@@ -651,8 +667,8 @@ func runRemoteLookup(cmd *cobra.Command, args []string) (resultErr error) {
 	}
 
 	result, runErr := remote.RunInvocationLookup(clibase.CommandContext(cmd), options, request)
-	output := remoteActionOutput{
-		InvocationID: result.InvocationID, OK: result.OK, Code: result.Code, DurableOperationID: result.DurableOperationID,
+	output := remoteLookupOutput{
+		InvocationID: result.InvocationID, Action: result.Action, OK: result.OK, Code: result.Code, Output: result.Output,
 	}
 
 	if runErr != nil {
@@ -667,10 +683,26 @@ func runRemoteLookup(cmd *cobra.Command, args []string) (resultErr error) {
 		return clibase.WriteJSONResult(cmd, output)
 	}
 
-	status := result.Code
+	return clibase.WriteOutput(cmd, "%s\n", lookupReport(result))
+}
+
+func lookupReport(result remote.ActionResult) string {
+	status := string(result.Code)
 	if result.OK {
 		status = "complete"
 	}
 
-	return clibase.WriteOutput(cmd, "Remote invocation %s: %s\n", result.InvocationID, status)
+	report := fmt.Sprintf("Remote invocation %s: %s", result.InvocationID, status)
+
+	entry, ok := action.Lookup(result.Action)
+	if !ok || !result.OK || len(result.Output) == 0 {
+		return report
+	}
+
+	output, err := entry.DecodeOutput(result.Output)
+	if err != nil {
+		return report
+	}
+
+	return report + "\n" + entry.ReportAny(output)
 }

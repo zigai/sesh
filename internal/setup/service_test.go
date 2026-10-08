@@ -96,7 +96,7 @@ func TestSystemdDefinitionsRenderOwnedUnits(t *testing.T) {
 		t.Fatalf("autosave service is missing the ownership marker:\n%s", service.Content)
 	}
 
-	if !strings.Contains(service.Content, "ExecStart=/usr/local/bin/sesh action autosave-save-if-due --socket /run/user/1000/sesh/tmux.sock") {
+	if !strings.Contains(service.Content, "ExecStart=/usr/local/bin/sesh autosave save-if-due --socket /run/user/1000/sesh/tmux.sock") {
 		t.Fatalf("autosave service ExecStart is not the native command:\n%s", service.Content)
 	}
 
@@ -211,7 +211,7 @@ func TestSystemdRestoreServiceRunsStartupRestoreAfterTmuxWithoutBlockingIt(t *te
 	for _, want := range []string{
 		"After=" + setup.TmuxServiceName + "\n",
 		"Type=oneshot\n",
-		"ExecStart=/usr/local/bin/sesh action autosave-restore-on-start --socket /run/user/1000/sesh/tmux.sock",
+		"ExecStart=/usr/local/bin/sesh autosave restore-on-start --socket /run/user/1000/sesh/tmux.sock",
 		"TimeoutStartSec=10min\n",
 	} {
 		if !strings.Contains(restore.Content, want) {
@@ -259,8 +259,8 @@ func assertTmuxServiceContent(t *testing.T, content string) {
 
 	for _, want := range []string{
 		"ExecStart=/usr/local/bin/sesh daemon tmux --socket /run/user/1000/sesh/tmux.sock --tmux /usr/bin/tmux --stop-grace 5s",
-		"ExecStartPost=/usr/local/bin/sesh action tmux-wait-ready --socket /run/user/1000/sesh/tmux.sock --timeout 5s",
-		"action autosave-final-save",
+		"ExecStartPost=/usr/local/bin/sesh daemon wait-ready --socket /run/user/1000/sesh/tmux.sock --timeout 5s",
+		"autosave final-save",
 		"--deadline 20s",
 		"--status-file /home/user/.local/state/sesh/autosave-status.json",
 		"TimeoutStopSec=25s",

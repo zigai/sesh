@@ -6,7 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/zigai/sesh/internal/config"
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/session"
 )
 
@@ -17,14 +17,8 @@ const (
 )
 
 var (
-	errIncompleteServices    = errors.New("incomplete TUI services")
-	errDeleteUnavailable     = errors.New("delete session is unavailable: no session deleter configured")
-	errRenameUnavailable     = errors.New("rename session is unavailable: no session renamer configured")
-	errKillUnavailable       = errors.New("kill session is unavailable: no session killer configured")
-	errEnterUnavailable      = errors.New("enter session is unavailable: no session enterer configured")
-	errSnapshotUnavailable   = errors.New("snapshot session is unavailable: no snapshot service configured")
-	errRemoteActionsDisabled = errors.New("remote actions are not available: no remote action service configured")
-	errOriginBridgeDisabled  = errors.New("origin bridge is not available: no origin bridge service configured")
+	errIncompleteServices = errors.New("incomplete TUI services")
+	errEnterUnavailable   = errors.New("enter session is unavailable: no session enterer configured")
 )
 
 type EnterAction uint8
@@ -34,21 +28,6 @@ type EnterOutcome struct {
 	Action      EnterAction
 	Restored    bool
 	Target      session.Session
-}
-
-type DeleteResult struct {
-	LiveKilled   bool
-	SavedDeleted bool
-}
-
-type OutcomeOwnedError interface {
-	error
-	PickerOutcomeOwned() bool
-}
-
-type DegradedOutcomeError interface {
-	OutcomeOwnedError
-	PickerDegradedOutcome() bool
 }
 
 type CatalogSource interface {
@@ -65,20 +44,6 @@ type TmuxDetector interface {
 
 type SessionEnterer interface {
 	EnterSession(ctx context.Context, target session.Session) (EnterOutcome, error)
-	CreateAndEnterSession(ctx context.Context, name, dir string) (EnterOutcome, error)
-	RestoreAndEnterSession(ctx context.Context, target session.Session) (EnterOutcome, error)
-}
-
-type SessionRenamer interface {
-	RenameSession(ctx context.Context, target session.Session, newName string) error
-}
-
-type SessionKiller interface {
-	KillSession(ctx context.Context, target session.Session) error
-}
-
-type SessionDeleter interface {
-	DeleteSessionEverywhere(ctx context.Context, target session.Session, force bool) (DeleteResult, error)
 }
 
 type TerminalAttacher interface {
@@ -88,10 +53,6 @@ type TerminalAttacher interface {
 type PaneService interface {
 	TmuxActivatePane(ctx context.Context, target session.Session, paneID string) error
 	TmuxPaneLocations(ctx context.Context) ([]PaneLocation, error)
-}
-
-type SnapshotService interface {
-	SnapshotSession(ctx context.Context, target session.Session) error
 }
 
 type AgentSnapshot struct {
@@ -119,24 +80,12 @@ type RemoteCatalogWatcher interface {
 	WatchRemoteCatalog(ctx context.Context, publish func(RemoteCatalog, error)) error
 }
 
-type RemoteActionService interface {
-	RunRemoteAction(ctx context.Context, cfg *config.Config, target session.Session, request RemoteActionRequest) error
-	IsActionPermitted(cfg *config.Config, target session.Session, action string) bool
-}
-
-type RemoteActionRequest struct {
-	Action    string
-	NewName   string
-	Directory string
-}
-
 type RemoteAttacher interface {
 	AttachRemoteSession(ctx context.Context, target session.Session, paneID string) (tea.ExecCommand, error)
 }
 
 type OriginBridgeService interface {
 	LoadOriginSessions(ctx context.Context) (originLabel string, sessions []session.Session, err error)
-	RequestOriginSwitch(ctx context.Context, target session.Session) error
 }
 
 type WorkingDirectoryService interface {
@@ -164,17 +113,13 @@ type Services struct {
 	Catalog          CatalogSource
 	Detector         TmuxDetector
 	Enterer          SessionEnterer
-	Renamer          SessionRenamer
-	Killer           SessionKiller
-	Deleter          SessionDeleter
+	Actions          action.Dispatcher
 	Panes            PaneService
 	TerminalAttach   TerminalAttacher
 	Agents           AgentSource
 	AgentWatcher     AgentWatcher
-	Snapshots        SnapshotService
 	Remote           RemoteCatalogSource
 	RemoteWatcher    RemoteCatalogWatcher
-	RemoteActions    RemoteActionService
 	RemoteAttach     RemoteAttacher
 	OriginBridge     OriginBridgeService
 	WorkingDirectory WorkingDirectoryService

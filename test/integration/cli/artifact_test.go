@@ -25,7 +25,7 @@ const (
 	artifactExpectedGotmuxVersion = "v0.7.0"
 	artifactExpectedGotmuxSum     = "h1:6iHXMIetYWfc64XtGfHavAPlHPOJZuhJeB2Ht7f8AAU="
 	exitCodeGeneral               = 1
-	jsonSchemaVersion             = 1
+	jsonSchemaVersion             = 2
 )
 
 type snapshotSaveResultJSON struct {
@@ -286,11 +286,11 @@ func saveThroughArtifact(
 	t.Helper()
 
 	stdout, stderr := fixture.runSuccess(t,
-		actionCmd, "snapshot-save",
+		"snapshot", "save",
 		testRepositoryFlag, repository,
 		testLeaseRootFlag, leaseRoot,
 		testSocketFlag, server.Endpoint().SocketPath,
-		testSessionFlag, string(session.ID()),
+		string(session.ID()),
 		testNoConfigFlag,
 		testJSONFlag,
 	)
@@ -301,7 +301,7 @@ func saveThroughArtifact(
 	envelope := decodeArtifactEnvelope(t, stdout)
 
 	result := decodeJSONPayload[snapshotSaveResultJSON](t, envelope.Result)
-	if envelope.Command != "action.snapshot-save" || !envelope.OK || envelope.Error != nil || result.Status != "best_effort" || result.Generation == "" || result.Attempt == "" {
+	if envelope.Command != "snapshot.save" || !envelope.OK || envelope.Error != nil || result.Status != "best_effort" || result.Generation == "" || result.Attempt == "" {
 		t.Fatalf("artifact save lost practical receipt: envelope=%+v result=%+v", envelope, result)
 	}
 
@@ -318,7 +318,7 @@ func restoreThroughArtifact(
 	t.Helper()
 
 	stdout, stderr := fixture.runSuccess(t,
-		actionCmd, "snapshot-restore",
+		"snapshot", "restore",
 		testRepositoryFlag, repository,
 		testLeaseRootFlag, leaseRoot,
 		testSocketFlag, target.Endpoint().SocketPath,
@@ -334,7 +334,7 @@ func restoreThroughArtifact(
 	envelope := decodeArtifactEnvelope(t, stdout)
 
 	result := decodeJSONPayload[snapshotRestoreResultJSON](t, envelope.Result)
-	if envelope.Command != "action.snapshot-restore" || !envelope.OK || envelope.Error != nil || result.OperationID == "" || result.Generation != generation || result.Status != "best_effort" || !result.Verified {
+	if envelope.Command != "snapshot.restore" || !envelope.OK || envelope.Error != nil || result.OperationID == "" || result.Generation != generation || result.Status != "best_effort" || !result.Verified {
 		t.Fatalf("artifact restore lost practical operation receipt: envelope=%+v result=%+v", envelope, result)
 	}
 
@@ -359,7 +359,7 @@ func rejectCorruptRepositoryWithoutTargetMutation(
 	before := artifactServerIdentity(t, target)
 
 	stdout, stderr := fixture.runExitOne(t,
-		actionCmd, "snapshot-restore",
+		"snapshot", "restore",
 		testRepositoryFlag, repository,
 		testLeaseRootFlag, leaseRoot,
 		testSocketFlag, target.Endpoint().SocketPath,
@@ -373,7 +373,7 @@ func rejectCorruptRepositoryWithoutTargetMutation(
 	}
 
 	envelope := decodeArtifactEnvelope(t, stderr)
-	if envelope.Command != "action.snapshot-restore" || envelope.OK || envelope.Error == nil || envelope.Error.Code != "repositoryCorrupt" || envelope.Error.ExitCode != exitCodeGeneral {
+	if envelope.Command != "snapshot.restore" || envelope.OK || envelope.Error == nil || envelope.Error.Code != "repositoryCorrupt" || envelope.Error.ExitCode != exitCodeGeneral {
 		t.Fatalf("corrupt repository was not rejected: %+v", envelope)
 	}
 

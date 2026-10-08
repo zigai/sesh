@@ -300,7 +300,7 @@ func testBinaryPathJSON(t *testing.T, binaryPath, configPath, logPath string) {
 		t.Fatalf("unmarshal envelope: %v\noutput: %s", err, stdout.String())
 	}
 
-	if !env.OK || env.Command != testLogsCmd || env.SchemaVersion != 1 {
+	if !env.OK || env.Command != testLogsCmd || env.SchemaVersion != 2 {
 		t.Fatalf("unexpected envelope: %+v", env)
 	}
 
@@ -335,7 +335,7 @@ func testBinaryClearJSON(t *testing.T, binaryPath, configPath, logPath string) {
 		t.Fatalf("unmarshal envelope: %v\noutput: %s", err, stdout.String())
 	}
 
-	if !env.OK || env.Command != testLogsCmd || env.SchemaVersion != 1 {
+	if !env.OK || env.Command != testLogsCmd || env.SchemaVersion != 2 {
 		t.Fatalf("unexpected envelope: %+v", env)
 	}
 

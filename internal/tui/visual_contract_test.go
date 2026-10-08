@@ -68,13 +68,13 @@ func TestPickerRichAgentDialogsPreserveUnderlyingVisualContract(t *testing.T) {
 	model.showHelp = true
 	help := viewString(model.View())
 	assertVisualViewport(t, help, 80, 24)
-	assertVisualText(t, stripANSI(help), "Popup Keys", "Open selected", "Rename selected", "Kill detached", "Create session")
+	assertVisualText(t, stripANSI(help), "Popup Keys", "Open selected", "Rename session", "Kill session", "Create session")
 
 	model.showHelp = false
-	model.dialog = dialogConfirmKill
+	openTestKillConfirm(model)
 	confirm := viewString(model.View())
 	assertVisualViewport(t, confirm, 80, 24)
-	assertVisualText(t, stripANSI(confirm), "Confirm Kill", "Kill this session?", "Yes", "No")
+	assertVisualText(t, stripANSI(confirm), "Confirm", "Kill session", "Yes", "No")
 }
 
 func TestWritePickerVisualEvidence(t *testing.T) {
@@ -99,22 +99,27 @@ func TestWritePickerVisualEvidence(t *testing.T) {
 
 	model := newRichAgentVisualModel(t)
 	fixtures := []struct {
-		name   string
-		width  int
-		height int
-		dialog dialogState
-		help   bool
+		name    string
+		width   int
+		height  int
+		confirm bool
+		help    bool
 	}{
 		{name: "picker-agents-160x45.ansi", width: 160, height: 45},
 		{name: "picker-agents-80x24.ansi", width: 80, height: 24},
 		{name: "picker-help-80x24.ansi", width: 80, height: 24, help: true},
-		{name: "picker-kill-80x24.ansi", width: 80, height: 24, dialog: dialogConfirmKill},
+		{name: "picker-kill-80x24.ansi", width: 80, height: 24, confirm: true},
 	}
 
 	for _, fixture := range fixtures {
 		model.width = fixture.width
 		model.height = fixture.height
-		model.dialog = fixture.dialog
+		model.closeActionDialog()
+
+		if fixture.confirm {
+			openTestKillConfirm(model)
+		}
+
 		model.showHelp = fixture.help
 
 		if err := root.WriteFile(fixture.name, []byte(viewString(model.View())), 0o600); err != nil {

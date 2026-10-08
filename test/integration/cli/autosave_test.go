@@ -114,7 +114,7 @@ func runDueSave(t *testing.T, socketPath, sessionID string) autosaveResultJSON {
 	t.Helper()
 
 	exec := executeJSON(
-		t, actionCmd, "autosave-save-if-due",
+		t, "autosave", "save-if-due",
 		testSocketFlag, socketPath,
 		testSessionFlag, sessionID,
 		testNoConfigFlag, testJSONFlag,
@@ -142,7 +142,7 @@ func runDueSave(t *testing.T, socketPath, sessionID string) autosaveResultJSON {
 func runSecondSave(t *testing.T, socketPath string) {
 	t.Helper()
 
-	exec := executeJSON(t, actionCmd, "autosave-save-if-due", testSocketFlag, socketPath, testNoConfigFlag, testJSONFlag)
+	exec := executeJSON(t, "autosave", "save-if-due", testSocketFlag, socketPath, testNoConfigFlag, testJSONFlag)
 	if !exec.envelope.OK {
 		t.Fatalf("second autosave failed: %s", exec.stderr)
 	}
@@ -160,7 +160,7 @@ func runSecondSave(t *testing.T, socketPath string) {
 func assertAutomaticPracticalRestore(t *testing.T, socketPath string, server *gotmux.Server) {
 	t.Helper()
 
-	exec := executeJSON(t, actionCmd, "autosave-restore-on-start", testSocketFlag, socketPath, testNoConfigFlag, testJSONFlag)
+	exec := executeJSON(t, "autosave", "restore-on-start", testSocketFlag, socketPath, testNoConfigFlag, testJSONFlag)
 	if exec.err != nil || !exec.envelope.OK {
 		t.Fatalf("automatic practical restore failed: %v, %s", exec.err, exec.stderr)
 	}
@@ -183,7 +183,7 @@ func assertExplicitRestore(t *testing.T, socketPath, generation string, server *
 	t.Helper()
 
 	exec := executeJSON(
-		t, actionCmd, "snapshot-restore",
+		t, "snapshot", "restore",
 		testRepositoryFlag, filepath.Join(dataHome(t), "sesh", "snapshots"),
 		testSocketFlag, socketPath,
 		testLeaseRootFlag, filepath.Join(dataHome(t), "sesh", "leases"),
@@ -259,7 +259,7 @@ func TestAutosaveFinalSaveRecordsPracticalRecovery(t *testing.T) {
 	statusPath := filepath.Join(dataHome(t), "final-save-status.json")
 
 	exec := executeJSON(
-		t, actionCmd, "autosave-final-save",
+		t, "autosave", "final-save",
 		testSocketFlag, socketPath,
 		testSessionFlag, string(sess.ID()),
 		testNoConfigFlag, testJSONFlag,
@@ -315,7 +315,7 @@ func assertPracticalFinalSaveStatus(t *testing.T, statusPath, generation string)
 func assertAutosaveNotDueAfterFinalSave(t *testing.T, socketPath string) {
 	t.Helper()
 
-	due := executeJSON(t, actionCmd, "autosave-save-if-due", testSocketFlag, socketPath, testNoConfigFlag, testJSONFlag)
+	due := executeJSON(t, "autosave", "save-if-due", testSocketFlag, socketPath, testNoConfigFlag, testJSONFlag)
 	if !due.envelope.OK {
 		t.Fatalf("save-if-due failed: %s", due.stderr)
 	}
@@ -339,7 +339,7 @@ func TestAutosaveFinalSaveReportsAnUnavailableServer(t *testing.T) {
 	statusPath := filepath.Join(dataHome(t), "final-save-status.json")
 
 	exec := executeJSON(
-		t, actionCmd, "autosave-final-save",
+		t, "autosave", "final-save",
 		testSocketFlag, socketPath,
 		testNoConfigFlag, testJSONFlag,
 		"--deadline", "5s",

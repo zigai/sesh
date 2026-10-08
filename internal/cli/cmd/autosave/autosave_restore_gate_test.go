@@ -27,7 +27,7 @@ func TestStartupRestoreRefusalNamesTheBlockingRestoreAndItsFix(t *testing.T) {
 
 	live := snapfixture.RegisterRestore(t, repoPath, os.Getpid(), self.String())
 
-	exec := clitest.Execute(t, actionCmd, "autosave-restore-on-start",
+	exec := clitest.Execute(t, "autosave", "restore-on-start",
 		testSocketFlag, filepath.Join(root, "absent.sock"), "--repository", repoPath,
 		"--history", filepath.Join(root, "state", "history.json"), testNoConfigFlag)
 	if exec.Err == nil {

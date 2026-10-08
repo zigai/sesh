@@ -28,6 +28,7 @@ import (
 	gotmux "github.com/zigai/gotmux/tmux"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/config"
@@ -161,28 +162,7 @@ func NewPickCommand(ctx context.Context, remote ...RemoteFactory) *cobra.Command
 		_ = cmd.Flags().MarkHidden(name)
 	}
 
-	return cmd
-}
-
-// NewPickerOpenCommand returns the key-binding launcher that opens the picker in a tmux popup
-// sized for the invoking client.
-func NewPickerOpenCommand(ctx context.Context) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:         "picker-open",
-		Short:       "Open the session picker in a tmux popup for a key binding",
-		Args:        clibase.UsageArgs(cobra.NoArgs),
-		Annotations: map[string]string{clibase.AnnotationLiveIO: pickerAnnotationEnabled, clibase.AnnotationOperation: "picker"},
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runPickerOpenCommand(pickerExecutionContext(ctx, cmd), cmd)
-		},
-	}
-
-	addPickerPathFlags(cmd)
-	cmd.Flags().StringP("client", "c", "", "Target tmux client, by name or tty [default: the invoking client]")
-	cmd.Flags().StringP("target-pane", "t", "", "Target tmux pane [default: $TMUX_PANE]")
-	cmd.Flags().String("current-session-id", "", "Invoking tmux session ID")
-	cmd.Flags().IntP("client-width", "w", 0, "Client width override [default: the client's width]")
-	cmd.Flags().IntP("client-height", "H", 0, "Client height override [default: the client's height]")
+	cmd.AddCommand(newPickPopupCommand())
 
 	return cmd
 }
@@ -243,17 +223,6 @@ func remoteCLIError(operation string, err error) error {
 	}
 
 	return oops.In("cli").With("operation", operation).Wrap(err)
-}
-
-func runPickerOpenCommand(ctx context.Context, cmd *cobra.Command) error {
-	launchedAt := time.Now()
-
-	runtime, err := preparePickerCommand(cmd)
-	if err != nil {
-		return err
-	}
-
-	return openPickerPopup(ctx, cmd, runtime, launchedAt)
 }
 
 func runPickCommand(ctx context.Context, cmd *cobra.Command, remoteFactory RemoteFactory) error {
@@ -410,7 +379,7 @@ func configurePickerRemote(
 ) (RemoteServices, error) {
 	if remoteFactory == nil {
 		return RemoteServices{
-			Catalog: nil, Watcher: nil, Actions: nil, Attach: nil, OriginBridge: nil,
+			Catalog: nil, Watcher: nil, Peer: nil, Attach: nil, OriginBridge: nil, Origin: nil,
 		}, nil
 	}
 
@@ -440,18 +409,18 @@ func pickerCurrentPane(cmd *cobra.Command) string {
 	return os.Getenv("TMUX_PANE")
 }
 
-func applyClientDimensionOverrides(cmd *cobra.Command, client *gotmux.ClientInfo) {
-	if w, _ := cmd.Flags().GetInt("client-width"); w > 0 {
-		client.Width = w
+func applyClientDimensionOverrides(caller action.Caller, client *gotmux.ClientInfo) {
+	if width, err := strconv.Atoi(caller.Width); err == nil && width > 0 {
+		client.Width = width
 	}
 
-	if h, _ := cmd.Flags().GetInt("client-height"); h > 0 {
-		client.Height = h
+	if height, err := strconv.Atoi(caller.Height); err == nil && height > 0 {
+		client.Height = height
 	}
 }
 
-func resolvePopupClient(ctx context.Context, cmd *cobra.Command, server *gotmux.Server) (gotmux.ClientInfo, error) {
-	targetClient, _ := cmd.Flags().GetString("client")
+func resolvePopupClient(ctx context.Context, caller action.Caller, server *gotmux.Server) (gotmux.ClientInfo, error) {
+	targetClient := caller.Client
 	if targetClient == "" {
 		targetClient = os.Getenv(pickerClientEnvironment)
 	}
@@ -464,7 +433,7 @@ func resolvePopupClient(ctx context.Context, cmd *cobra.Command, server *gotmux.
 	if targetClient != "" {
 		for _, c := range clients {
 			if string(c.Name) == targetClient && !c.Control {
-				applyClientDimensionOverrides(cmd, &c)
+				applyClientDimensionOverrides(caller, &c)
 
 				return c, nil
 			}
@@ -486,7 +455,7 @@ func resolvePopupClient(ctx context.Context, cmd *cobra.Command, server *gotmux.
 	}
 
 	if len(eligible) == 1 {
-		applyClientDimensionOverrides(cmd, &eligible[0])
+		applyClientDimensionOverrides(caller, &eligible[0])
 
 		return eligible[0], nil
 	}
@@ -496,12 +465,12 @@ func resolvePopupClient(ctx context.Context, cmd *cobra.Command, server *gotmux.
 		return gotmux.ClientInfo{}, err
 	}
 
-	applyClientDimensionOverrides(cmd, &invoked)
+	applyClientDimensionOverrides(caller, &invoked)
 
 	return invoked, nil
 }
 
-func openPickerPopup(ctx context.Context, cmd *cobra.Command, runtime pickerCommandRuntime, launchedAt time.Time) error {
+func openPickerPopup(ctx context.Context, cmd *cobra.Command, runtime pickerCommandRuntime, caller action.Caller, launchedAt time.Time) error {
 	server, err := integration.OpenInteractive(runtime.workspace.Socket)
 	if err != nil {
 		return oops.In("cli").With("operation", "open_tmux").Wrap(err)
@@ -512,7 +481,7 @@ func openPickerPopup(ctx context.Context, cmd *cobra.Command, runtime pickerComm
 		return oops.In("cli").With("operation", "resolve_executable").Wrap(err)
 	}
 
-	client, err := resolvePopupClient(ctx, cmd, server)
+	client, err := resolvePopupClient(ctx, caller, server)
 	if err != nil {
 		return oops.In("cli").With("operation", "resolve_popup_client").Wrap(err)
 	}
@@ -522,8 +491,8 @@ func openPickerPopup(ctx context.Context, cmd *cobra.Command, runtime pickerComm
 		return session.ErrInvokingClientUnavailable
 	}
 
-	if expected, _ := cmd.Flags().GetString("current-session-id"); expected != "" && expected != string(originSessionID) {
-		return session.ErrInvokingClientUnavailable
+	if err := checkPopupClientSession(ctx, server, caller.Session, string(originSessionID)); err != nil {
+		return err
 	}
 
 	handoffPath, cleanup, err := createPickerSwitchHandoff()
@@ -532,7 +501,11 @@ func openPickerPopup(ctx context.Context, cmd *cobra.Command, runtime pickerComm
 	}
 	defer cleanup()
 
-	targetPane := pickerCurrentPane(cmd)
+	targetPane := caller.Pane
+	if targetPane == "" {
+		targetPane = os.Getenv("TMUX_PANE")
+	}
+
 	width, height := pickerPopupDimensions(runtime.workspace.Config, runtime.state, gotmux.Size{Width: client.Width, Height: client.Height})
 	options := pickerPopupOptions(
 		gotmux.Exec(executable, pickerPopupArguments(cmd, runtime.workspace.Socket, string(originSessionID), targetPane, handoffPath, launchedAt)...),
@@ -542,7 +515,7 @@ func openPickerPopup(ctx context.Context, cmd *cobra.Command, runtime pickerComm
 	)
 
 	services, err := newPickerServices(ctx, runtime.workspace, gotmux.Streams{In: nil, Out: nil, Err: nil},
-		RemoteServices{Catalog: nil, Watcher: nil, Actions: nil, Attach: nil, OriginBridge: nil})
+		RemoteServices{Catalog: nil, Watcher: nil, Peer: nil, Attach: nil, OriginBridge: nil, Origin: nil})
 	if err != nil {
 		return err
 	}

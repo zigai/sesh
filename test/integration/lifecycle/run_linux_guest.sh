@@ -267,7 +267,7 @@ assert_daemon_runtime_status() {
 ensure_tmux_ready() {
   if ! guest_ssh 'systemctl is-active --quiet sesh-tmux.service' >/dev/null 2>&1; then
     guest_ssh 'sudo systemd-run --unit=sesh-tmux --property=User=sesh --property=Group=sesh --property=RuntimeDirectory=sesh-guest --property=RuntimeDirectoryMode=0700 --property=RuntimeDirectoryPreserve=yes --setenv=HOME=/home/sesh --setenv=PATH=/opt/tmux-3.7c/bin:/usr/local/bin:/usr/bin:/bin --setenv=XDG_RUNTIME_DIR=/run/sesh-guest /opt/sesh --no-config daemon tmux --socket /run/sesh-guest/tmux.sock --tmux /opt/tmux-3.7c/bin/tmux'
-    guest_ssh '/opt/sesh --no-config action tmux-wait-ready --socket /run/sesh-guest/tmux.sock --timeout 20s'
+    guest_ssh '/opt/sesh --no-config daemon wait-ready --socket /run/sesh-guest/tmux.sock --timeout 20s'
     guest_ssh '/opt/sesh-fixture /run/sesh-guest/tmux.sock'
   fi
 }
@@ -322,7 +322,7 @@ guest_ssh 'sudo install -d -o sesh -g sesh -m 0700 /run/sesh-guest /var/lib/sesh
 guest_ssh 'timeout 5 systemd-inhibit --what=shutdown --who=sesh --why=fixture-readiness --mode=delay true'
 guest_ssh 'timeout 5 systemd-inhibit --what=sleep --who=sesh --why=fixture-readiness --mode=delay true'
 guest_ssh 'sudo systemd-run --unit=sesh-tmux --property=User=sesh --property=Group=sesh --property=RuntimeDirectory=sesh-guest --property=RuntimeDirectoryMode=0700 --property=RuntimeDirectoryPreserve=yes --setenv=HOME=/home/sesh --setenv=PATH=/opt/tmux-3.7c/bin:/usr/local/bin:/usr/bin:/bin --setenv=XDG_RUNTIME_DIR=/run/sesh-guest /opt/sesh --no-config daemon tmux --socket /run/sesh-guest/tmux.sock --tmux /opt/tmux-3.7c/bin/tmux'
-guest_ssh '/opt/sesh --no-config action tmux-wait-ready --socket /run/sesh-guest/tmux.sock --timeout 20s'
+guest_ssh '/opt/sesh --no-config daemon wait-ready --socket /run/sesh-guest/tmux.sock --timeout 20s'
 guest_ssh '/opt/sesh-fixture /run/sesh-guest/tmux.sock'
 
 start_daemon \
@@ -404,7 +404,7 @@ if [[ ${SESH_GUEST_LIFECYCLE_SUITE:-} == extended ]]; then
   # Seed a valid repository, make every repository inode read-only, then ask
   # real logind to reboot. The writable status path must retain the failure.
   echo 'extended phase: read-only repository reboot'
-  if guest_ssh '/opt/sesh --no-config action autosave-final-save --socket /run/sesh-guest/tmux.sock --repository /var/lib/sesh-guest/readonly-repository --lease-root /var/lib/sesh-guest/leases --history /var/lib/sesh-guest/readonly-seed-history.json --status-file /var/lib/sesh-guest/readonly-seed-status.json --deadline 5s --json' >"$work_dir/readonly-seed.json"; then
+  if guest_ssh '/opt/sesh --no-config autosave final-save --socket /run/sesh-guest/tmux.sock --repository /var/lib/sesh-guest/readonly-repository --lease-root /var/lib/sesh-guest/leases --history /var/lib/sesh-guest/readonly-seed-history.json --status-file /var/lib/sesh-guest/readonly-seed-status.json --deadline 5s --json' >"$work_dir/readonly-seed.json"; then
     readonly_seed_exit=0
   else
     readonly_seed_exit=$?
@@ -462,9 +462,9 @@ if [[ ${SESH_GUEST_LIFECYCLE_SUITE:-} == extended ]]; then
   # stall the complete owned tmux service cgroup during another real reboot.
   echo 'extended phase: stalled tmux during reboot'
   guest_ssh 'sudo systemd-run --unit=sesh-tmux-budget --property=User=sesh --property=Group=sesh --property=RuntimeDirectory=sesh-guest --property=RuntimeDirectoryMode=0700 --property=RuntimeDirectoryPreserve=yes --setenv=HOME=/home/sesh --setenv=PATH=/opt/tmux-3.7c/bin:/usr/local/bin:/usr/bin:/bin --setenv=XDG_RUNTIME_DIR=/run/sesh-guest /opt/sesh --no-config daemon tmux --socket /run/sesh-guest/tmux.sock --tmux /opt/tmux-3.7c/bin/tmux'
-  guest_ssh '/opt/sesh --no-config action tmux-wait-ready --socket /run/sesh-guest/tmux.sock --timeout 20s'
+  guest_ssh '/opt/sesh --no-config daemon wait-ready --socket /run/sesh-guest/tmux.sock --timeout 20s'
   guest_ssh '/opt/sesh-fixture /run/sesh-guest/tmux.sock'
-  if guest_ssh '/opt/sesh --no-config action autosave-final-save --socket /run/sesh-guest/tmux.sock --repository /var/lib/sesh-guest/budget-repository --lease-root /var/lib/sesh-guest/leases --history /var/lib/sesh-guest/budget-seed-history.json --status-file /var/lib/sesh-guest/budget-seed-status.json --deadline 5s --json' >"$work_dir/budget-seed.json"; then
+  if guest_ssh '/opt/sesh --no-config autosave final-save --socket /run/sesh-guest/tmux.sock --repository /var/lib/sesh-guest/budget-repository --lease-root /var/lib/sesh-guest/leases --history /var/lib/sesh-guest/budget-seed-history.json --status-file /var/lib/sesh-guest/budget-seed-status.json --deadline 5s --json' >"$work_dir/budget-seed.json"; then
     budget_seed_exit=0
   else
     budget_seed_exit=$?
@@ -525,7 +525,7 @@ if [[ ${SESH_GUEST_LIFECYCLE_SUITE:-} == extended ]]; then
   echo 'extended phase: enospc repository save'
   ensure_tmux_ready
   guest_ssh 'sudo dd if=/dev/zero of=/var/lib/sesh-guest/enospc.img bs=1M count=10 && sudo mkfs.ext4 -F /var/lib/sesh-guest/enospc.img && sudo mkdir -p /var/lib/sesh-guest/enospc-mnt && sudo mount -o loop /var/lib/sesh-guest/enospc.img /var/lib/sesh-guest/enospc-mnt && sudo chown -R sesh:sesh /var/lib/sesh-guest/enospc-mnt'
-  if guest_ssh '/opt/sesh --no-config action autosave-final-save --socket /run/sesh-guest/tmux.sock --repository /var/lib/sesh-guest/enospc-mnt/repo --lease-root /var/lib/sesh-guest/leases --history /var/lib/sesh-guest/enospc-mnt/seed-history.json --status-file /var/lib/sesh-guest/enospc-mnt/seed-status.json --deadline 5s --json' >"$work_dir/enospc-seed.json"; then
+  if guest_ssh '/opt/sesh --no-config autosave final-save --socket /run/sesh-guest/tmux.sock --repository /var/lib/sesh-guest/enospc-mnt/repo --lease-root /var/lib/sesh-guest/leases --history /var/lib/sesh-guest/enospc-mnt/seed-history.json --status-file /var/lib/sesh-guest/enospc-mnt/seed-status.json --deadline 5s --json' >"$work_dir/enospc-seed.json"; then
     enospc_seed_exit=0
   else
     enospc_seed_exit=$?
@@ -543,7 +543,7 @@ if [[ ${SESH_GUEST_LIFECYCLE_SUITE:-} == extended ]]; then
   guest_ssh 'df -h /var/lib/sesh-guest/enospc-mnt' >"$work_dir/enospc-df.txt"
 
   enospc_save_exit=0
-  guest_ssh '/opt/sesh --no-config action autosave-final-save --socket /run/sesh-guest/tmux.sock --repository /var/lib/sesh-guest/enospc-mnt/repo --lease-root /var/lib/sesh-guest/leases --history /var/lib/sesh-guest/failed-history.json --status-file /var/lib/sesh-guest/enospc-failed-status.json --deadline 5s --json' >"$work_dir/enospc-failed-output.json" 2>&1 || enospc_save_exit=$?
+  guest_ssh '/opt/sesh --no-config autosave final-save --socket /run/sesh-guest/tmux.sock --repository /var/lib/sesh-guest/enospc-mnt/repo --lease-root /var/lib/sesh-guest/leases --history /var/lib/sesh-guest/failed-history.json --status-file /var/lib/sesh-guest/enospc-failed-status.json --deadline 5s --json' >"$work_dir/enospc-failed-output.json" 2>&1 || enospc_save_exit=$?
   test $enospc_save_exit -ne 0 || jq -e '.ok == false or .result.status != "saved"' "$work_dir/enospc-failed-output.json" >/dev/null
 
   guest_ssh 'rm -f /var/lib/sesh-guest/enospc-mnt/filler; sync'
@@ -570,7 +570,7 @@ Description=sesh user teardown test
 [Service]
 Type=exec
 ExecStart=/bin/sleep 300
-ExecStop=/opt/sesh --no-config action autosave-final-save --socket /run/sesh-guest/tmux.sock --repository /var/lib/sesh-guest/user-teardown-repo --lease-root /var/lib/sesh-guest/leases --history /var/lib/sesh-guest/user-teardown-history.json --status-file /var/lib/sesh-guest/user-teardown-status.json --deadline 5s --json
+ExecStop=/opt/sesh --no-config autosave final-save --socket /run/sesh-guest/tmux.sock --repository /var/lib/sesh-guest/user-teardown-repo --lease-root /var/lib/sesh-guest/leases --history /var/lib/sesh-guest/user-teardown-history.json --status-file /var/lib/sesh-guest/user-teardown-status.json --deadline 5s --json
 TimeoutStopSec=10s
 EOF'
   guest_ssh 'systemctl --user daemon-reload'
@@ -599,7 +599,7 @@ EOF'
   # and verify that the committed generation survived intact.
   echo 'extended phase: abrupt guest power cut'
   ensure_tmux_ready
-  if guest_ssh '/opt/sesh --no-config action autosave-final-save --socket /run/sesh-guest/tmux.sock --repository /var/lib/sesh-guest/powercut-repository --lease-root /var/lib/sesh-guest/leases --history /var/lib/sesh-guest/powercut-history.json --status-file /var/lib/sesh-guest/powercut-status.json --deadline 5s --json' >"$work_dir/powercut-seed.json"; then
+  if guest_ssh '/opt/sesh --no-config autosave final-save --socket /run/sesh-guest/tmux.sock --repository /var/lib/sesh-guest/powercut-repository --lease-root /var/lib/sesh-guest/leases --history /var/lib/sesh-guest/powercut-history.json --status-file /var/lib/sesh-guest/powercut-status.json --deadline 5s --json' >"$work_dir/powercut-seed.json"; then
     powercut_seed_exit=0
   else
     powercut_seed_exit=$?
@@ -706,9 +706,9 @@ guest_ssh 'sudo journalctl -b -1 -u sesh-daemon.service -u sesh-tmux.service --n
 
 echo 'phase: postboot practical application restore'
 guest_ssh 'sudo systemd-run --unit=sesh-tmux-restore --property=User=sesh --property=Group=sesh --property=RuntimeDirectory=sesh-guest --property=RuntimeDirectoryMode=0700 --property=RuntimeDirectoryPreserve=yes --setenv=HOME=/home/sesh --setenv=PATH=/opt/tmux-3.7c/bin:/usr/local/bin:/usr/bin:/bin --setenv=XDG_RUNTIME_DIR=/run/sesh-guest /opt/sesh --no-config daemon tmux --socket /run/sesh-guest/restore-tmux.sock --tmux /opt/tmux-3.7c/bin/tmux'
-guest_ssh '/opt/sesh --no-config action tmux-wait-ready --socket /run/sesh-guest/restore-tmux.sock --timeout 20s'
+guest_ssh '/opt/sesh --no-config daemon wait-ready --socket /run/sesh-guest/restore-tmux.sock --timeout 20s'
 
-guest_ssh "/opt/sesh --no-config action snapshot-restore --socket /run/sesh-guest/restore-tmux.sock --repository /var/lib/sesh-guest/repository --lease-root /var/lib/sesh-guest/leases --generation $expected_generation --json" >"$work_dir/postboot-restore.json"
+guest_ssh "/opt/sesh --no-config snapshot restore --socket /run/sesh-guest/restore-tmux.sock --repository /var/lib/sesh-guest/repository --lease-root /var/lib/sesh-guest/leases --generation $expected_generation --json" >"$work_dir/postboot-restore.json"
 jq -e '.ok == true and (.result.status == "best_effort" or .result.status == "exact")' "$work_dir/postboot-restore.json" >/dev/null
 
   # Verify restored windows and panes through gotmux in fixture (zero direct tmux subprocess calls)

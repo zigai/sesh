@@ -61,11 +61,11 @@ func testSaveWorkflow(t *testing.T, repoDir, socket, leaseDir, sessionID string)
 
 	execution := executeJSON(
 		t,
-		actionCmd, "snapshot-save",
+		"snapshot", "save",
 		testRepositoryFlag, repoDir,
 		testSocketFlag, socket,
 		testLeaseRootFlag, leaseDir,
-		testSessionFlag, sessionID,
+		sessionID,
 		testJSONFlag,
 	)
 
@@ -73,7 +73,7 @@ func testSaveWorkflow(t *testing.T, repoDir, socket, leaseDir, sessionID string)
 		t.Fatalf("save expected practical success, got: %s", execution.stdout)
 	}
 
-	if execution.envelope.Command != "action.snapshot-save" {
+	if execution.envelope.Command != "snapshot.save" {
 		t.Fatalf("command = %q, want snapshot.save", execution.envelope.Command)
 	}
 
@@ -105,11 +105,11 @@ func testActionSaveParity(t *testing.T, repoDir, socket, leaseDir, sessionID str
 
 	execution := executeJSON(
 		t,
-		"action", "snapshot-save",
+		"snapshot", "save",
 		testRepositoryFlag, repoDir,
 		testSocketFlag, socket,
 		testLeaseRootFlag, leaseDir,
-		testSessionFlag, sessionID,
+		sessionID,
 		testJSONFlag,
 	)
 
@@ -117,8 +117,8 @@ func testActionSaveParity(t *testing.T, repoDir, socket, leaseDir, sessionID str
 		t.Fatalf("action save expected practical success, got: %s", execution.stdout)
 	}
 
-	if execution.envelope.Command != "action.snapshot-save" {
-		t.Fatalf("command = %q, want action.snapshot-save", execution.envelope.Command)
+	if execution.envelope.Command != "snapshot.save" {
+		t.Fatalf("command = %q, want snapshot.save", execution.envelope.Command)
 	}
 
 	if execution.envelope.Error != nil {
@@ -140,11 +140,11 @@ func testSavePlainText(t *testing.T, repoDir, socket, leaseDir, sessionID string
 
 	stdout, stderr, err := executeCommand(
 		t,
-		actionCmd, "snapshot-save",
+		"snapshot", "save",
 		testRepositoryFlag, repoDir,
 		testSocketFlag, socket,
 		testLeaseRootFlag, leaseDir,
-		testSessionFlag, sessionID,
+		sessionID,
 	)
 	if err != nil {
 		t.Fatalf("save plain text failed: %v", err)
@@ -331,11 +331,11 @@ func TestSnapshotVerifyReportsCorruptedArtifacts(t *testing.T) {
 
 	execution := executeJSON(
 		t,
-		actionCmd, "snapshot-save",
+		"snapshot", "save",
 		testRepositoryFlag, repoDir,
 		testSocketFlag, socket,
 		testLeaseRootFlag, leaseDir,
-		testSessionFlag, sessionID,
+		sessionID,
 		testJSONFlag,
 	)
 
@@ -580,11 +580,11 @@ func TestFailedLatestSaveFallsBackToNewestFinishedGeneration(t *testing.T) {
 
 	execution := executeJSON(
 		t,
-		actionCmd, "snapshot-save",
+		"snapshot", "save",
 		testRepositoryFlag, repoDir,
 		testSocketFlag, socket,
 		testLeaseRootFlag, leaseDir,
-		testSessionFlag, sessionID,
+		sessionID,
 		testJSONFlag,
 	)
 

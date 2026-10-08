@@ -75,7 +75,7 @@ func TestDoctorReportsUnitsRunningRemovedCommandsAndFlags(t *testing.T) {
 	units := map[string]string{
 		"old-coordinator.service": "[Service]\nExecStart=/opt/bin/sesh daemon run --socket /tmp/s\n",
 		"tmux.service": "[Service]\nExecStart=/usr/bin/tmux -D\n" +
-			"ExecStop=-/opt/bin/sesh action autosave-final-save --socket \"/tmp/a b\" \\\n  --deadline 20s --no-such-flag\n",
+			"ExecStop=-/opt/bin/sesh autosave final-save --socket \"/tmp/a b\" \\\n  --deadline 20s --no-such-flag\n",
 		"unrelated.service": "[Service]\nExecStart=/usr/bin/true --socket x\n",
 	}
 

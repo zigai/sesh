@@ -17,6 +17,7 @@ import (
 	"github.com/zigai/gotmux/tmuxtest"
 	"golang.org/x/sys/unix"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/session"
@@ -167,7 +168,7 @@ func TestPopupHandoffSwitchesOnlyOpeningClientAfterPopupSelection(t *testing.T) 
 	}
 
 	services, err := newPickerServices(ctx, runtime.workspace, gotmux.Streams{In: nil, Out: nil, Err: nil},
-		RemoteServices{Catalog: nil, Watcher: nil, Actions: nil, Attach: nil, OriginBridge: nil})
+		RemoteServices{Catalog: nil, Watcher: nil, Peer: nil, Attach: nil, OriginBridge: nil})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,18 +223,11 @@ func TestResolvePopupClientSelection(t *testing.T) {
 	assertPopupClientRejected(t, server, "/dev/pts/nonexistent-client-id", "unknown explicit client")
 }
 
-// resolvePopupClientFlag resolves the popup client, passing --client only when flag is set.
+// resolvePopupClientFlag resolves the popup client, naming the invoking client only when flag is set.
 func resolvePopupClientFlag(t *testing.T, server *gotmux.Server, flag string) (gotmux.ClientInfo, error) {
 	t.Helper()
 
-	cmd := NewPickerOpenCommand(t.Context())
-	if flag != "" {
-		if err := cmd.Flags().Set("client", flag); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	return resolvePopupClient(t.Context(), cmd, server)
+	return resolvePopupClient(t.Context(), action.Caller{Client: flag, Pane: "", Session: "", Width: "", Height: ""}, server)
 }
 
 func assertPopupClientResolves(t *testing.T, server *gotmux.Server, flag, want string) {

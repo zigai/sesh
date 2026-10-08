@@ -10,6 +10,7 @@ import (
 
 	"github.com/samber/oops"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/privatefs"
 )
 
@@ -77,16 +78,16 @@ func DecodeInvocationLookupRequest(payload []byte) (InvocationLookupRequest, err
 
 func ExecutePeerLookup(dir *privatefs.Dir, peerID string, request InvocationLookupRequest) ActionResult {
 	if err := ValidateInvocationLookupRequest(request); err != nil || request.PeerID != peerID {
-		return ActionResult{InvocationID: request.InvocationID, OK: false, Code: ActionCodeTargetChanged, DurableOperationID: ""}
+		return ActionResult{InvocationID: request.InvocationID, Action: "", OK: false, Code: action.CodeTargetChanged, Output: nil}
 	}
 
 	result, err := LookupPeerInvocation(dir, request.InvocationID)
 	if errors.Is(err, ErrInvocationNotFound) {
-		return ActionResult{InvocationID: request.InvocationID, OK: false, Code: ActionCodeNotFound, DurableOperationID: ""}
+		return ActionResult{InvocationID: request.InvocationID, Action: "", OK: false, Code: action.CodeNotFound, Output: nil}
 	}
 
 	if err != nil {
-		return ActionResult{InvocationID: request.InvocationID, OK: false, Code: ActionCodeUnavailable, DurableOperationID: ""}
+		return ActionResult{InvocationID: request.InvocationID, Action: "", OK: false, Code: action.CodeUnavailable, Output: nil}
 	}
 
 	return result
@@ -125,7 +126,7 @@ func RunInvocationLookup(ctx context.Context, options ActionOriginOptions, reque
 	if runErr != nil {
 		cause := ClassifySSHFailure(lookupCtx.Err(), diagnostics.String())
 
-		return ActionResult{InvocationID: request.InvocationID, OK: false, Code: ActionCodeUnavailable, DurableOperationID: ""},
+		return ActionResult{InvocationID: request.InvocationID, Action: "", OK: false, Code: action.CodeUnavailable, Output: nil},
 			errors.Join(cause, oops.In("remote").With("operation", "run_invocation_lookup").Wrap(runErr))
 	}
 

@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -17,7 +18,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
-	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/cli/clibase"
@@ -28,6 +28,43 @@ import (
 )
 
 var errPrivateReloadFailure = errors.New("private reload failure")
+
+func TestPeerLocalWorkspaceRouting(t *testing.T) {
+	for _, environment := range [][]string{{"REMOTE_KEY", "VIRTUAL_ENV"}, {}} {
+		cfg := config.DefaultConfig()
+		cfg.Snapshot.ProcessEnvironment = environment
+		cfg.AgentStatus.StorePath = "/custom/aht/remote.json"
+		cfg.AgentSessions.Status = &config.AgentStatusConfig{StorePath: "/custom/aht/nested.json"}
+
+		workspace, err := app.Resolve(cfg, app.Locations{Socket: filepath.Join(t.TempDir(), "absent.sock")})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		server, err := integration.Open(workspace.Socket)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		local, repository := newPeerLocal(workspace, server)
+		if local.Server() != server || local.Workflow() == nil {
+			t.Fatal("peer local did not retain its workspace server and workflow")
+		}
+
+		if err := repository.Close(); err != nil {
+			t.Fatal(err)
+		}
+
+		keys, err := workspace.ProcessEnvironment()
+		if err != nil || !slices.Equal(keys, environment) {
+			t.Fatalf("process environment = %#v, %v; want %#v", keys, err, environment)
+		}
+
+		if workspace.AgentSource().StorePath() != "/custom/aht/nested.json" {
+			t.Fatalf("peer source did not use the resolved nested store path: %q", workspace.AgentStore)
+		}
+	}
+}
 
 func TestNewCommand(t *testing.T) {
 	cmd := NewCommand()
@@ -44,7 +81,7 @@ func TestNewCommand(t *testing.T) {
 		subcommands[sub.Name()] = true
 	}
 
-	for _, expected := range []string{"peer", "action", "lookup", "attach"} {
+	for _, expected := range []string{"peer", "lookup", "attach"} {
 		if !subcommands[expected] {
 			t.Errorf("missing subcommand %q in NewCommand()", expected)
 		}
@@ -60,54 +97,6 @@ func TestDaemonMonitorCommandRunsForeground(t *testing.T) {
 	if cmd.Name() != "remote-monitor" || cmd.Annotations[clibase.AnnotationLiveIO] != "true" {
 		t.Fatalf("monitor command = %q live-io %q, want foreground remote-monitor", cmd.Name(), cmd.Annotations[clibase.AnnotationLiveIO])
 	}
-}
-
-func TestOpenRemoteNativeSavedSessions(t *testing.T) {
-	server, err := integration.Open("/tmp/tmux.sock")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Run("routes configured process environment and store path", func(t *testing.T) {
-		cfg := config.DefaultConfig()
-		cfg.Snapshot.ProcessEnvironment = []string{"REMOTE_KEY", "VIRTUAL_ENV"}
-		cfg.AgentStatus.StorePath = "/custom/aht/remote.json"
-
-		workspace, err := app.Resolve(cfg, app.Locations{Repository: "/tmp/repo", LeaseRoot: "/tmp/lease"})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		saved, err := openRemoteNativeSavedSessions(workspace, server)
-		if err != nil {
-			t.Fatalf("OpenRemoteNativeSavedSessions failed: %v", err)
-		}
-
-		if saved == nil {
-			t.Fatal("expected non-nil saved sessions")
-		}
-	})
-
-	t.Run("preserves explicit empty process environment", func(t *testing.T) {
-		cfg := config.DefaultConfig()
-		cfg.Snapshot.ProcessEnvironment = []string{}
-
-		workspace, err := app.Resolve(cfg, app.Locations{Repository: "/tmp/repo", LeaseRoot: "/tmp/lease"})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		saved, err := openRemoteNativeSavedSessions(workspace, server)
-		if err != nil {
-			t.Fatalf("OpenRemoteNativeSavedSessions failed: %v", err)
-		}
-
-		if saved == nil {
-			t.Fatal("expected non-nil saved sessions")
-		}
-	})
-
-	_ = gotmux.SessionID("")
 }
 
 func TestRemoteMonitorReloadSourceDisablesRereadForStdinAndNoConfig(t *testing.T) {

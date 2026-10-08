@@ -17,7 +17,7 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
-func NewRestoreOnStartCommand() *cobra.Command {
+func newRestoreOnStartCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:         "restore-on-start",
 		Short:       "Restore the newest saved snapshot when explicitly configured",

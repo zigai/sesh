@@ -117,7 +117,7 @@ func TestStrataRejectsDuplicateKey(t *testing.T) {
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "config.toml")
 
-	err := os.WriteFile(configPath, []byte("[settings]\nconfirm_kill = true\nconfirm_kill = false\n"), 0o600)
+	err := os.WriteFile(configPath, []byte("[settings]\nshow_footer = true\nshow_footer = false\n"), 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,8 +142,8 @@ func TestStrataRejectsDuplicateKey(t *testing.T) {
 	}
 
 	decodeErr, ok := errors.AsType[*toml.DecodeError](err)
-	if !ok || strings.Join(decodeErr.Key(), ".") != "confirm_kill" {
-		t.Errorf("typed parse cause does not preserve duplicate field confirm_kill: %v", err)
+	if !ok || strings.Join(decodeErr.Key(), ".") != "show_footer" {
+		t.Errorf("typed parse cause does not preserve duplicate field show_footer: %v", err)
 	}
 }
 
@@ -205,7 +205,7 @@ func TestStrataPreservesUnsetVsExplicitFalseAndZeroAndEmpty(t *testing.T) {
 
 	tomlData := `
 [settings]
-confirm_kill = false
+show_footer = false
 directory_suggestions = 0
 display_modes = ["agents"]
 `
@@ -218,16 +218,12 @@ display_modes = ["agents"]
 		t.Fatalf("Load() error = %v", err)
 	}
 
-	if cfg.Settings.ConfirmKill {
-		t.Errorf("ConfirmKill = true, want explicit false")
+	if cfg.Settings.ShowFooter {
+		t.Errorf("ShowFooter = true, want explicit false")
 	}
 
-	if !cfg.Settings.ConfirmDelete {
-		t.Errorf("ConfirmDelete = false, want default true preserved")
-	}
-
-	if !cfg.Settings.ShowFooter {
-		t.Errorf("ShowFooter = false, want default true preserved")
+	if !cfg.Autosave.Enabled {
+		t.Errorf("Autosave.Enabled = false, want default true preserved")
 	}
 
 	if cfg.Settings.DirectorySuggestions != 0 {
@@ -242,8 +238,8 @@ display_modes = ["agents"]
 		t.Errorf("Theme.Primary = %q, want default #24c8ff", cfg.Theme.Primary)
 	}
 
-	if cfg.Keys.Create != "alt+c" {
-		t.Errorf("Keys.Create = %q, want default alt+c", cfg.Keys.Create)
+	if cfg.Keys.Help != "?" {
+		t.Errorf("Keys.Help = %q, want default ?", cfg.Keys.Help)
 	}
 }
 
