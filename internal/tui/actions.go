@@ -312,7 +312,8 @@ func (m *Model) logSessionActionResult(msg sessionActionResultMsg) {
 			tuiOperationSaveState,
 			tuiOperationSnapshotSession,
 			tuiOperationAgentGitScan,
-			tuiOperationRunAction:
+			tuiOperationRunAction,
+			tuiOperationCustomFieldRun:
 		}
 	}
 

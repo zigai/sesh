@@ -14,16 +14,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/samber/oops"
 	"github.com/spf13/cobra"
 	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/action"
-	"github.com/zigai/sesh/internal/agents"
 	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/config"
-	integration "github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/remote"
 	"github.com/zigai/sesh/internal/session"
 )
@@ -152,62 +149,30 @@ func CallerOf(cmd *cobra.Command) action.Caller {
 // OpenRuntime opens the tmux server and lazily opened repository selected by the environment
 // flags.
 func OpenRuntime(cmd *cobra.Command, cfg *config.Config) (*Runtime, error) {
-	server, err := integration.Open(clibase.ResolveSocket(cmd))
-	if err != nil {
-		return nil, oops.In("cli").With("operation", "open_tmux").Wrap(err)
-	}
-
-	repositoryPath, err := clibase.ResolveRepository(cmd)
+	workspace, err := app.Resolve(cfg, clibase.CommandLocations(cmd))
 	if err != nil {
 		return nil, err
 	}
 
-	leaseRoot, err := clibase.ResolveLeaseRoot(cmd)
+	server, err := workspace.OpenTmux()
 	if err != nil {
 		return nil, err
 	}
 
-	repository := app.NewRepository(repositoryPath)
+	repository := app.NewRepository(workspace.Repository)
 	local := app.NewLocal(app.LocalOptions{
-		Config:             cfg,
+		Config:             workspace.Config,
 		Server:             server,
 		Repository:         repository,
-		LeaseRoot:          leaseRoot,
-		HistoryPath:        HistoryPath(cmd),
-		AgentSource:        agents.NewAHTStore(agentStatePath(cmd, cfg)),
+		LeaseRoot:          workspace.LeaseRoot,
+		HistoryPath:        workspace.History,
+		AgentSource:        workspace.AgentSource(),
 		Streams:            TerminalStreams(cmd),
 		Source:             "cli",
 		DeferSwitchHistory: false,
 	})
 
 	return &Runtime{Local: local, Repository: repository, Router: action.Router{Local: local, Peer: nil, Origin: nil}}, nil
-}
-
-// agentStatePath returns --agent-state as an absolute path, else the configured registry.
-func agentStatePath(cmd *cobra.Command, cfg *config.Config) string {
-	statePath, _ := cmd.Flags().GetString("agent-state")
-	if statePath == "" {
-		return cfg.ResolvedAgentStatus().StorePath
-	}
-
-	if absolute, err := filepath.Abs(statePath); err == nil {
-		return absolute
-	}
-
-	return statePath
-}
-
-// HistoryPath returns --history as an absolute path, else the default history file.
-func HistoryPath(cmd *cobra.Command) string {
-	if cmd.Flags().Lookup("history") != nil {
-		if historyPath, _ := cmd.Flags().GetString("history"); historyPath != "" {
-			if absolute, err := filepath.Abs(historyPath); err == nil {
-				return absolute
-			}
-		}
-	}
-
-	return filepath.Join(config.GetXDGPaths().StateHome, "sesh", "history.json")
 }
 
 // TerminalStreams returns the command's streams when they are terminal files.

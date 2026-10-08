@@ -29,6 +29,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/zigai/sesh/internal/action"
+	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/config"
 	integration "github.com/zigai/sesh/internal/integration/tmux"
@@ -91,12 +92,8 @@ type fileDescriptor interface {
 }
 
 type pickerCommandRuntime struct {
-	cfg            *config.Config
-	state          *session.State
-	socketPath     string
-	repositoryPath string
-	leaseRoot      string
-	historyPath    string
+	workspace app.Workspace
+	state     *session.State
 }
 
 type pickerTerminalOutput struct {
@@ -236,7 +233,7 @@ func runPickCommand(ctx context.Context, cmd *cobra.Command, remoteFactory Remot
 		return err
 	}
 
-	runtime, err := preparePickerCommand(ctx, cmd)
+	runtime, err := preparePickerCommand(cmd)
 	if err != nil {
 		return err
 	}
@@ -279,17 +276,12 @@ func runPickerInteractive(
 	runtime pickerCommandRuntime,
 	remoteFactory RemoteFactory,
 ) error {
-	remote, err := configurePickerRemote(ctx, runtime.cfg, runtime.socketPath, remoteFactory)
+	remote, err := configurePickerRemote(ctx, runtime.workspace.Config, runtime.workspace.Socket, remoteFactory)
 	if err != nil {
 		return err
 	}
 
-	agentStatePath, _ := cmd.Flags().GetString("agent-state")
-
-	services, err := newPickerServices(
-		ctx, runtime.cfg, runtime.socketPath, runtime.repositoryPath, runtime.leaseRoot,
-		runtime.historyPath, agentStatePath, commandTerminalStreams(cmd), remote,
-	)
+	services, err := newPickerServices(ctx, runtime.workspace, commandTerminalStreams(cmd), remote)
 	if err != nil {
 		return err
 	}
@@ -300,7 +292,7 @@ func runPickerInteractive(
 	services.currentSessionID, _ = cmd.Flags().GetString("current-session-id")
 	services.startInitialReads(ctx)
 
-	model, err := buildPickerModel(ctx, presentation, runtime.cfg, runtime.state, services.TUIServices())
+	model, err := buildPickerModel(ctx, presentation, runtime.workspace.Config, runtime.state, services.TUIServices())
 	if err != nil {
 		return errors.Join(oops.In("cli").With("operation", "construct_picker").Wrap(err), services.Close())
 	}
@@ -365,32 +357,18 @@ func finishPickerInteractive(ctx context.Context, cmd *cobra.Command, finalModel
 	return errors.Join(runErr, deferredErr, closeErr)
 }
 
-func preparePickerCommand(ctx context.Context, cmd *cobra.Command) (pickerCommandRuntime, error) {
-	cfg, err := clibase.LoadCommandConfig(ctx, cmd)
+func preparePickerCommand(cmd *cobra.Command) (pickerCommandRuntime, error) {
+	workspace, err := clibase.ResolveWorkspace(cmd)
 	if err != nil {
 		return pickerCommandRuntime{}, err
 	}
 
-	socketPath := clibase.ResolveSocket(cmd)
-
-	repositoryFlag, _ := cmd.Flags().GetString("repository")
-	leaseFlag, _ := cmd.Flags().GetString("lease-root")
-	historyFlag, _ := cmd.Flags().GetString("history")
-
-	repositoryPath, leaseRoot, historyPath, err := pickerPaths(cfg, repositoryFlag, leaseFlag, historyFlag)
-	if err != nil {
-		return pickerCommandRuntime{}, oops.In("cli").With("operation", "resolve_picker_paths").Wrap(err)
-	}
-
-	state, err := session.LoadState(historyPath)
+	state, err := session.LoadState(workspace.History)
 	if err != nil {
 		return pickerCommandRuntime{}, oops.In("cli").With("operation", "load_history").Wrap(err)
 	}
 
-	return pickerCommandRuntime{
-		cfg: cfg, state: state, socketPath: socketPath, repositoryPath: repositoryPath,
-		leaseRoot: leaseRoot, historyPath: historyPath,
-	}, nil
+	return pickerCommandRuntime{workspace: workspace, state: state}, nil
 }
 
 func configurePickerRemote(
@@ -493,7 +471,7 @@ func resolvePopupClient(ctx context.Context, caller action.Caller, server *gotmu
 }
 
 func openPickerPopup(ctx context.Context, cmd *cobra.Command, runtime pickerCommandRuntime, caller action.Caller, launchedAt time.Time) error {
-	server, err := integration.OpenInteractive(runtime.socketPath)
+	server, err := integration.OpenInteractive(runtime.workspace.Socket)
 	if err != nil {
 		return oops.In("cli").With("operation", "open_tmux").Wrap(err)
 	}
@@ -528,16 +506,15 @@ func openPickerPopup(ctx context.Context, cmd *cobra.Command, runtime pickerComm
 		targetPane = os.Getenv("TMUX_PANE")
 	}
 
-	width, height := pickerPopupDimensions(runtime.cfg, runtime.state, gotmux.Size{Width: client.Width, Height: client.Height})
+	width, height := pickerPopupDimensions(runtime.workspace.Config, runtime.state, gotmux.Size{Width: client.Width, Height: client.Height})
 	options := pickerPopupOptions(
-		gotmux.Exec(executable, pickerPopupArguments(cmd, runtime.socketPath, string(originSessionID), targetPane, handoffPath, launchedAt)...),
+		gotmux.Exec(executable, pickerPopupArguments(cmd, runtime.workspace.Socket, string(originSessionID), targetPane, handoffPath, launchedAt)...),
 		width,
 		height,
-		runtime.cfg.Theme.Background,
+		runtime.workspace.Config.Theme.Background,
 	)
 
-	services, err := newPickerServices(ctx, runtime.cfg, runtime.socketPath, runtime.repositoryPath,
-		runtime.leaseRoot, runtime.historyPath, "", gotmux.Streams{In: nil, Out: nil, Err: nil},
+	services, err := newPickerServices(ctx, runtime.workspace, gotmux.Streams{In: nil, Out: nil, Err: nil},
 		RemoteServices{Catalog: nil, Watcher: nil, Peer: nil, Attach: nil, OriginBridge: nil, Origin: nil})
 	if err != nil {
 		return err
@@ -549,7 +526,7 @@ func openPickerPopup(ctx context.Context, cmd *cobra.Command, runtime pickerComm
 
 	return errors.Join(
 		completePickerSwitchHandoff(ctx, services, handoffPath, string(client.Name), string(originSessionID)),
-		replayPickerKey(ctx, handoffPath, runtime.socketPath, string(client.Name)),
+		replayPickerKey(ctx, handoffPath, runtime.workspace.Socket, string(client.Name)),
 		services.Close(),
 	)
 }

@@ -26,9 +26,6 @@ type autosaveResultJSON struct {
 	RepositoryState  string `json:"repositoryState,omitempty"`
 	FinalSaveState   string `json:"finalSaveState,omitempty"`
 	FinalSaveAt      int64  `json:"finalSaveCompletedAt,omitempty"`
-	DefaultAction    string `json:"defaultSessionAction,omitempty"`
-	DefaultFrom      string `json:"defaultSessionFrom,omitempty"`
-	DefaultTo        string `json:"defaultSessionTo,omitempty"`
 	Recorded         bool   `json:"recorded"`
 	Restorable       int    `json:"restorableSessions,omitempty"`
 	Abandoned        int    `json:"abandonedRestores,omitempty"`
@@ -38,8 +35,6 @@ type autosaveResultJSON struct {
 	DaemonPhase      string `json:"daemonPhase,omitempty"`
 	InhibitorsHeld   bool   `json:"inhibitorsHeld"`
 	LogindDelayMS    int64  `json:"logindDelayMillis,omitempty"`
-	AttemptTimeoutMS int64  `json:"attemptTimeoutMillis,omitempty"`
-	DrainGraceMS     int64  `json:"drainGraceMillis,omitempty"`
 	ServerManagement string `json:"serverManagement,omitempty"`
 }
 

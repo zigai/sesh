@@ -242,6 +242,15 @@ func TestLoadRejectsInvalidDisplayFormats(t *testing.T) {
 		{name: "unclosed field", content: "[display]\nagents_agent_format = \"{status\"", want: "unclosed field"},
 		{name: "multiple right markers", content: "[display]\nsesh_format = \"x{right}y{right}z\"", want: "at most one {right}"},
 		{name: "invalid field alignment", content: "[display]\nsesh_format = \"{session_name:>wide}\"", want: "invalid field format"},
+		{name: "undefined custom field", content: "[display]\nsesh_format = \"{custom.weather}\"", want: "custom.weather has no display.fields.weather entry"},
+		{name: "undefined custom fallback", content: "[display]\nagents_agent_format = \"{status|custom.ci}\"", want: "display.agents_agent_format"},
+		{name: "custom field name", content: "[display.fields]\nBad-Name = \"date\"", want: "invalid display.fields.Bad-Name"},
+		{name: "empty custom command", content: "[display.fields]\nx = \" \"", want: "invalid display.fields.x: command cannot be empty"},
+		{name: "custom refresh", content: "[display.fields]\nx = { command = \"date\", refresh = \"0s\" }", want: "refresh must be a positive duration"},
+		{name: "custom refresh syntax", content: "[display.fields]\nx = { command = \"date\", refresh = \"soon\" }", want: "refresh must be a positive duration"},
+		{name: "custom unknown key", content: "[display.fields]\nx = { command = \"date\", timeout = \"1s\" }", want: "unknown field key: timeout"},
+		{name: "custom args type", content: "[display.fields]\nx = { command = \"date\", args = [1] }", want: "field args must be strings"},
+		{name: "custom value type", content: "[display.fields]\nx = 3", want: "field must be a shell command string or table"},
 	}
 
 	for _, tt := range tests {

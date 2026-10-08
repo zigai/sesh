@@ -5,7 +5,6 @@ import (
 	"errors"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
@@ -13,147 +12,10 @@ import (
 
 	"github.com/zigai/sesh/internal/automation"
 	"github.com/zigai/sesh/internal/cli/clibase"
-	integration "github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/snapshot/engine"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
-
-func newAdoptStartupCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "adopt-startup",
-		Short: "Adopt a fresh numbered startup session as the default session",
-		Long: "Adopt a fresh numbered startup session as the default session.\n\n" +
-			"Only the exact session shown by an attached client is considered, and only when it was created moments ago with a single " +
-			"window and pane. Unrelated sessions are never renamed or killed.",
-		Args:        clibase.UsageArgs(cobra.NoArgs),
-		RunE:        runAdoptStartupSession,
-		Annotations: map[string]string{clibase.AnnotationOperation: "adopt_startup_session"},
-	}
-
-	clibase.AddJSONFlag(cmd)
-
-	return cmd
-}
-
-func runAdoptStartupSession(cmd *cobra.Command, _ []string) error {
-	env, err := resolveAutosaveEnv(cmd)
-	if err != nil {
-		return err
-	}
-
-	ctx := clibase.CommandContext(cmd)
-
-	socketPath := clibase.ResolveSocket(cmd)
-
-	server, err := integration.Open(socketPath)
-	if err != nil {
-		return oops.In("cli").With("operation", "open_tmux").Wrap(err)
-	}
-
-	client, currentSession, err := currentAttachedClient(ctx, server)
-	if err != nil {
-		return err
-	}
-
-	receipt := resolveBootstrapReceipt(ctx, server, currentSession)
-
-	result, err := automation.EnsureDefaultSession(ctx, server, automation.DefaultSessionRequest{
-		Current: currentSession,
-		Client:  client,
-		Receipt: receipt,
-		Now:     time.Now(),
-	})
-	if err != nil {
-		return oops.In("cli").With("operation", "ensure_default_session").Wrap(err)
-	}
-
-	outcome := newAutosaveOutcome(autosaveStatusSaved, automation.ReasonAdmitted)
-	outcome.defaultSession = result.Action
-	outcome.defaultFrom = result.FromSession
-	outcome.defaultTo = result.ToSession
-	outcome.history = autosaveHistoryState(env)
-
-	return renderAutosaveResult(cmd, env, outcome)
-}
-
-func resolveBootstrapReceipt(ctx context.Context, server *gotmux.Server, sessionID gotmux.SessionID) automation.BootstrapReceipt {
-	if sessionID == "" {
-		return emptyBootstrapReceipt()
-	}
-
-	sessionHandle, err := server.Session(ctx, sessionID)
-	if err != nil {
-		return emptyBootstrapReceipt()
-	}
-
-	optVal, err := sessionHandle.Options().User(ctx, automation.BootstrapOption)
-	if err != nil {
-		return emptyBootstrapReceipt()
-	}
-
-	token, ok := optVal.Local.Get()
-	if !ok {
-		token, ok = optVal.Effective.Get()
-	}
-
-	if !ok || token == "" {
-		return emptyBootstrapReceipt()
-	}
-
-	receipt, err := automation.ParseBootstrapReceipt(token)
-	if err != nil {
-		return emptyBootstrapReceipt()
-	}
-
-	return receipt
-}
-
-func emptyBootstrapReceipt() automation.BootstrapReceipt {
-	return automation.BootstrapReceipt{
-		ServerIdentity: "",
-		SessionID:      "",
-		PaneID:         "",
-		PanePID:        0,
-		InitialCommand: "",
-	}
-}
-
-func currentAttachedClient(ctx context.Context, server *gotmux.Server) (gotmux.Client, gotmux.SessionID, error) {
-	clients, err := server.Clients(ctx)
-	if err != nil {
-		return gotmux.Client{}, "", oops.In("cli").With("operation", "list_clients").Wrap(err)
-	}
-
-	var (
-		best  gotmux.ClientInfo
-		found bool
-	)
-
-	for _, candidate := range clients {
-		sessionID, ok := candidate.SessionID.Get()
-		if !ok || sessionID == "" {
-			continue
-		}
-
-		if !found || candidate.Activity.After(best.Activity) || (candidate.Activity.Equal(best.Activity) && candidate.Name < best.Name) {
-			best, found = candidate, true
-		}
-	}
-
-	if !found {
-		return gotmux.Client{}, "", nil
-	}
-
-	client, err := server.Client(ctx, best.Name)
-	if err != nil {
-		return gotmux.Client{}, "", oops.In("cli").With("operation", "resolve_client").Wrap(err)
-	}
-
-	sessionID, _ := best.SessionID.Get()
-
-	return client, sessionID, nil
-}
 
 func newRestoreOnStartCommand() *cobra.Command {
 	cmd := &cobra.Command{
@@ -171,7 +33,7 @@ func newRestoreOnStartCommand() *cobra.Command {
 }
 
 func runAutosaveRestoreOnStart(cmd *cobra.Command, _ []string) error {
-	env, err := resolveAutosaveEnv(cmd)
+	env, err := ResolveEnv(cmd)
 	if err != nil {
 		return err
 	}
@@ -179,24 +41,12 @@ func runAutosaveRestoreOnStart(cmd *cobra.Command, _ []string) error {
 	return executeStartupRestore(cmd, env)
 }
 
-func executeStartupRestore(cmd *cobra.Command, env autosaveEnv) error {
+func executeStartupRestore(cmd *cobra.Command, env Env) error {
 	ctx := clibase.CommandContext(cmd)
 
-	reportUnsavedShutdownSinceBoot(ctx, cmd, env)
+	reportUnsavedShutdownSinceBoot(ctx, env)
 
-	socketPath := clibase.ResolveSocket(cmd)
-
-	leaseRoot, err := resolveAutosaveLeaseRoot(cmd, env.cfg)
-	if err != nil {
-		return err
-	}
-
-	repoPath, err := resolveAutosaveRepository(cmd, env.cfg)
-	if err != nil {
-		return err
-	}
-
-	repo, err := store.OpenExisting(ctx, repoPath)
+	repo, err := env.workspace.OpenExistingRepository(ctx)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			missing := newAutosaveOutcome(autosaveStatusSkipped, automation.ReasonRepositoryMissing)
@@ -206,7 +56,7 @@ func executeStartupRestore(cmd *cobra.Command, env autosaveEnv) error {
 			return renderAutosaveResult(cmd, env, missing)
 		}
 
-		return oops.In("cli").With("operation", "open_repository").Wrap(err)
+		return err
 	}
 
 	// Restores aimed at a vanished server, e.g. one interrupted by a reboot, can never resume
@@ -223,7 +73,7 @@ func executeStartupRestore(cmd *cobra.Command, env autosaveEnv) error {
 
 	state.Abandoned = len(settled)
 
-	state.Enabled = env.cfg.Autosave.RestoreLastOnStart
+	state.Enabled = env.workspace.Config.Autosave.RestoreLastOnStart
 	state.Practical = true
 
 	admission := automation.EvaluateStartupRestore(state)
@@ -246,18 +96,14 @@ func executeStartupRestore(cmd *cobra.Command, env autosaveEnv) error {
 		return errors.Join(oops.In("cli").With("operation", "acquire_autosave_lock").Wrap(err), closeErr)
 	}
 
-	server, err := integration.Open(socketPath)
+	server, err := env.workspace.OpenTmux()
 	if err != nil {
-		return errors.Join(
-			oops.In("cli").With("operation", "open_tmux").Wrap(err),
-			wrapCloseError(repo.Close()),
-			lock.Release(),
-		)
+		return errors.Join(err, wrapCloseError(repo.Close()), lock.Release())
 	}
 
 	result, restoreErr := engine.Restore(ctx, repo, server, engine.RestoreConfig{
 		OperationID:            "",
-		LeaseRoot:              leaseRoot,
+		LeaseRoot:              env.workspace.LeaseRoot,
 		Generation:             admission.Generation,
 		Sessions:               nil,
 		LaunchProcesses:        true,
@@ -283,7 +129,7 @@ func executeStartupRestore(cmd *cobra.Command, env autosaveEnv) error {
 	restored.attempt = result.OperationID
 	restored.generation = result.Generation
 	restored.snapshot = result.Status
-	restored.repository = autosaveRepositoryState(ctx, cmd, env)
+	restored.repository = autosaveRepositoryState(ctx, env)
 	restored.history = autosaveHistoryState(env)
 	restored.abandoned = state.Abandoned
 	restored.restore = true
@@ -297,7 +143,7 @@ func executeStartupRestore(cmd *cobra.Command, env autosaveEnv) error {
 
 func renderDeniedStartupRestore(
 	cmd *cobra.Command,
-	env autosaveEnv,
+	env Env,
 	admission automation.RestoreAdmission,
 	state automation.StartupState,
 	repo *store.Repository,

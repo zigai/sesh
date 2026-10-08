@@ -31,6 +31,7 @@ const (
 const (
 	Decay              = 30 * time.Second
 	centerPaddingSides = 2
+	sgrReset           = "\x1b[m"
 	wideEllipsisWidth  = 3
 )
 
@@ -89,6 +90,12 @@ type Span struct {
 
 type Theme map[string]string
 
+type textToken struct {
+	text   string
+	width  int
+	escape bool
+}
+
 type RatchetState struct {
 	columns []ratchetColumn
 }
@@ -118,9 +125,9 @@ func Measure(specs []ColumnSpec, rows [][]Cell) [][]CellWidths {
 				continue
 			}
 
-			measured[i][j].Natural = boundedWidth(spec, ansi.StringWidth(ansi.Strip(row[j].Text)))
+			measured[i][j].Natural = boundedWidth(spec, ansi.StringWidth(row[j].Text))
 			if len(row[j].Variants) > 0 {
-				measured[i][j].Compact = boundedWidth(spec, ansi.StringWidth(ansi.Strip(row[j].Variants[0])))
+				measured[i][j].Compact = boundedWidth(spec, ansi.StringWidth(row[j].Variants[0]))
 			} else {
 				measured[i][j].Compact = measured[i][j].Natural
 			}
@@ -240,6 +247,14 @@ func PaintColumns(plan ColumnPlan, cells []Cell, theme Theme) ([]string, []Span)
 	return parts, spans
 }
 
+func TruncateLeftWithMark(value string, width int, mark string) string {
+	if width <= ansi.StringWidth(mark) {
+		return mark
+	}
+
+	return mark + keepSuffix(textTokens(value), width-ansi.StringWidth(mark))
+}
+
 func measureColumn(spec ColumnSpec, measured [][]CellWidths, index int) (int, int) {
 	natural := max(spec.Reserve, spec.Min, 0)
 	compact := max(spec.Reserve, 0)
@@ -336,14 +351,19 @@ func paintColumn(plan ColumnPlan, cells []Cell, index int, theme Theme) string {
 	var out strings.Builder
 	out.WriteString(strings.Repeat(" ", left))
 
+	styled := strings.Contains(value, "\x1b")
+
 	if color := theme[cell.Role]; color != "" && value != "" {
-		out.WriteString("\x1b[")
-		out.WriteString(color)
-		out.WriteByte('m')
-		out.WriteString(value)
-		out.WriteString("\x1b[m")
+		open := "\x1b[" + color + "m"
+		out.WriteString(open)
+		writeWithBaseStyle(&out, value, open)
+		out.WriteString(sgrReset)
 	} else {
 		out.WriteString(value)
+
+		if styled {
+			out.WriteString(sgrReset)
+		}
 	}
 
 	out.WriteString(strings.Repeat(" ", padding-left))
@@ -370,10 +390,10 @@ func cellText(plan ColumnPlan, cells []Cell, index int) string {
 	}
 
 	if plan.Columns[index].Compact && len(cell.Variants) > 0 {
-		return ansi.Strip(cell.Variants[0])
+		return cell.Variants[0]
 	}
 
-	return ansi.Strip(cell.Text)
+	return cell.Text
 }
 
 func groupHasPresentField(plan ColumnPlan, cells []Cell, group string) bool {
@@ -400,52 +420,135 @@ func truncate(value string, width int, side TruncateSide) string {
 		return mark
 	}
 
-	graphemes := uniseg.NewGraphemes(value)
-
-	parts := make([]string, 0, len(value))
-	for graphemes.Next() {
-		parts = append(parts, graphemes.Str())
-	}
-
-	remaining := width - ansi.StringWidth(mark)
-
-	var result strings.Builder
-
 	if side == TruncateLeft {
-		selected := make([]string, 0, len(parts))
-		for _, part := range slices.Backward(parts) {
-			partWidth := ansi.StringWidth(part)
-			if partWidth > remaining {
-				break
-			}
-
-			selected = append(selected, part)
-			remaining -= partWidth
-		}
-
-		result.WriteString(mark)
-
-		for _, s := range slices.Backward(selected) {
-			result.WriteString(s)
-		}
-
-		return result.String()
+		return TruncateLeftWithMark(value, width, mark)
 	}
 
-	for _, part := range parts {
-		partWidth := ansi.StringWidth(part)
-		if partWidth > remaining {
+	return keepPrefix(textTokens(value), width-ansi.StringWidth(mark)) + mark
+}
+
+func textTokens(value string) []textToken {
+	tokens := make([]textToken, 0, len(value))
+
+	var (
+		state byte
+		plain strings.Builder
+	)
+
+	flushPlain := func() {
+		graphemes := uniseg.NewGraphemes(plain.String())
+		for graphemes.Next() {
+			tokens = append(tokens, textToken{text: graphemes.Str(), width: ansi.StringWidth(graphemes.Str()), escape: false})
+		}
+
+		plain.Reset()
+	}
+
+	for value != "" {
+		seq, _, n, newState := ansi.DecodeSequence(value, state, nil)
+		state = newState
+		value = value[n:]
+
+		if !strings.HasPrefix(seq, "\x1b") {
+			plain.WriteString(seq)
+			continue
+		}
+
+		flushPlain()
+
+		tokens = append(tokens, textToken{text: seq, width: 0, escape: true})
+	}
+
+	flushPlain()
+
+	return tokens
+}
+
+func keepPrefix(tokens []textToken, remaining int) string {
+	var (
+		result strings.Builder
+		styled bool
+	)
+
+	for _, token := range tokens {
+		if !token.escape && token.width > remaining {
 			break
 		}
 
-		result.WriteString(part)
+		result.WriteString(token.text)
 
-		remaining -= partWidth
+		remaining -= token.width
+		styled = styled || token.escape
 	}
 
-	result.WriteString(mark)
+	if styled {
+		result.WriteString(sgrReset)
+	}
 
 	return result.String()
+}
+
+func keepSuffix(tokens []textToken, remaining int) string {
+	start := len(tokens)
+
+	for i, token := range slices.Backward(tokens) {
+		if token.escape {
+			continue
+		}
+
+		if token.width > remaining {
+			break
+		}
+
+		remaining -= token.width
+		start = i
+	}
+
+	var (
+		result strings.Builder
+		styled bool
+	)
+
+	for i, token := range tokens {
+		if i >= start || token.escape {
+			result.WriteString(token.text)
+			styled = styled || token.escape
+		}
+	}
+
+	if styled {
+		result.WriteString(sgrReset)
+	}
+
+	return result.String()
+}
+
+func writeWithBaseStyle(out *strings.Builder, value, base string) {
+	for value != "" {
+		index := strings.Index(value, "\x1b[")
+		if index < 0 {
+			out.WriteString(value)
+			return
+		}
+
+		out.WriteString(value[:index])
+		value = value[index:]
+
+		end := strings.IndexByte(value, 'm')
+		if end < 0 {
+			out.WriteString(value)
+			return
+		}
+
+		seq := value[:end+1]
+		value = value[end+1:]
+
+		out.WriteString(seq)
+
+		if seq == sgrReset || seq == "\x1b[0m" {
+			out.WriteString(base)
+		}
+	}
 }
 
 func separatorPresent(plan ColumnPlan, cells []Cell, index int) bool {

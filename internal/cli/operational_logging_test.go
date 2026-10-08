@@ -21,7 +21,6 @@ func TestOperationalCommandsPersistFailuresWithoutPrivateDetails(t *testing.T) {
 		operation string
 	}{
 		{[]string{"autosave", "final-save"}, "final-save"},
-		{[]string{"autosave", "adopt-startup"}, "adopt_startup_session"},
 		{[]string{"daemon", "wait-ready"}, "daemon_wait_ready"},
 		{[]string{"daemon", "agent-window-status"}, "agent_status_run"},
 		{[]string{"agent", "window-status-clear"}, "window-status-clear"},

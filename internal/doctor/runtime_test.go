@@ -27,7 +27,6 @@ func TestDaemonRuntimeCheckRequiresRunningPhaseAndHeldInhibitors(t *testing.T) {
 		{"initializing", "not_ready", "initializing", true, doctor.StatusWarning, doctor.ReasonInitializing},
 		{"contradictory_ready_phase", "ready", "initializing", true, doctor.StatusWarning, doctor.ReasonInitializing},
 		{"contradictory_ready_locks", "ready", "running", false, doctor.StatusWarning, doctor.ReasonInhibitorReleased},
-		{"draining", "not_ready", "draining", true, doctor.StatusWarning, doctor.ReasonLifecycleActive},
 		{"final_save", "not_ready", "final_save", true, doctor.StatusWarning, doctor.ReasonLifecycleActive},
 		{"stopping", "not_ready", "stopping", true, doctor.StatusWarning, doctor.ReasonLifecycleActive},
 		{"absent", "absent", "", false, doctor.StatusWarning, doctor.ReasonNotRunning},

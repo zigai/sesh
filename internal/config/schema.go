@@ -80,9 +80,10 @@ type PopupConfig struct {
 }
 
 type DisplayConfig struct {
-	SeshFormat          string `toml:"sesh_format"`
-	AgentsSessionFormat string `toml:"agents_session_format"`
-	AgentsAgentFormat   string `toml:"agents_agent_format"`
+	SeshFormat          string        `toml:"sesh_format"`
+	AgentsSessionFormat string        `toml:"agents_session_format"`
+	AgentsAgentFormat   string        `toml:"agents_agent_format"`
+	Fields              FieldCommands `toml:"fields,omitempty"`
 }
 
 type AgentStatusThemeConfig struct {
@@ -296,6 +297,7 @@ func (c *Config) Clone() *Config {
 
 	cp := *c
 	cp.Settings.DisplayModes = slices.Clone(c.Settings.DisplayModes)
+	cp.Display.Fields = c.Display.Fields.Clone()
 	cp.Snapshot.ProcessEnvironment = slices.Clone(c.Snapshot.ProcessEnvironment)
 
 	cp.Hooks.SessionSwitchPre = cloneHookCommands(c.Hooks.SessionSwitchPre)
@@ -432,6 +434,7 @@ func DefaultConfig() *Config {
 			SeshFormat:          DefaultSeshFormat,
 			AgentsSessionFormat: DefaultAgentsSessionFormat,
 			AgentsAgentFormat:   DefaultAgentsAgentFormat,
+			Fields:              nil,
 		},
 		Paths: PathConfig{
 			DataDir: "",

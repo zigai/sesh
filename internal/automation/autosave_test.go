@@ -9,9 +9,8 @@ import (
 )
 
 var (
-	errSaveFailed        = errors.New("save failed")
-	errUncertainPublish  = errors.New("publication uncertain")
-	errUnexpectedTrigger = errors.New("unexpected trigger")
+	errSaveFailed       = errors.New("save failed")
+	errUncertainPublish = errors.New("publication uncertain")
 )
 
 func TestEvaluateDueState_Decisions(t *testing.T) {

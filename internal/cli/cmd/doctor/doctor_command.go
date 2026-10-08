@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -15,9 +14,7 @@ import (
 
 	"github.com/zigai/sesh/internal/cli/clibase"
 	cmdautosave "github.com/zigai/sesh/internal/cli/cmd/autosave"
-	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/doctor"
-	integration "github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/setup"
 )
 
@@ -78,44 +75,34 @@ func resolveDoctorOptions(cmd *cobra.Command) (doctor.Options, error) {
 		ServiceDir:        "",
 		Executable:        "",
 		ValidateCommand:   nil,
+		CustomFields:      nil,
 	}
 
-	if _, err := clibase.LoadCommandConfig(cmd.Context(), cmd); err != nil {
+	workspace, err := clibase.ResolveWorkspace(cmd)
+	if err != nil {
 		return opts, err
 	}
 
-	server, err := integration.Open(clibase.ResolveSocket(cmd))
+	for _, name := range workspace.Config.Display.UsedFieldNames() {
+		opts.CustomFields = append(opts.CustomFields, doctor.CustomField{Name: name, Command: workspace.Config.Display.Fields[name].Command})
+	}
+
+	server, err := workspace.OpenTmux()
 	if err != nil {
-		return opts, oops.In("cli").With("operation", "open_tmux").Wrap(err)
+		return opts, err
 	}
 
 	opts.Server = server
 
-	runtimeState, runtimeStatus := cmdautosave.DaemonRuntimeState(cmd.Context(), cmd)
+	runtimeState, runtimeStatus := cmdautosave.DaemonRuntimeState(cmd.Context(), workspace.Socket)
 	opts.DaemonState = runtimeState
 	opts.DaemonPhase = string(runtimeStatus.Phase)
 	opts.InhibitorsHeld = runtimeStatus.InhibitorsHeld
 	opts.LogindDelayMillis = runtimeStatus.LogindDelayMillis
-
-	opts.SnapshotDir, err = clibase.ResolveRepository(cmd)
-	if err != nil {
-		return opts, err
-	}
+	opts.SnapshotDir = workspace.Repository
+	opts.HistoryPath = workspace.History
 
 	resolveServiceCommandCheck(cmd, &opts)
-
-	historyPath, _ := cmd.Flags().GetString("history")
-	if historyPath != "" {
-		absHistory, err := filepath.Abs(historyPath)
-		if err != nil {
-			return opts, oops.In("cli").With("operation", "read_history_flag").Wrap(err)
-		}
-
-		opts.HistoryPath = absHistory
-	} else {
-		xdg := config.GetXDGPaths()
-		opts.HistoryPath = filepath.Join(xdg.StateHome, "sesh", "history.json")
-	}
 
 	return opts, nil
 }

@@ -44,7 +44,7 @@ func (frontend popupFrontend) Accepts(at action.Location, id action.ID) bool {
 func (frontend popupFrontend) Dispatch(ctx context.Context, invocation action.Invocation) (any, error) {
 	launchedAt := time.Now()
 
-	runtime, err := preparePickerCommand(ctx, frontend.cmd)
+	runtime, err := preparePickerCommand(frontend.cmd)
 	if err != nil {
 		return nil, err
 	}

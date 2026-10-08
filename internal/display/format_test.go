@@ -272,6 +272,64 @@ func TestCompileRejectsUnknownField(t *testing.T) {
 	}
 }
 
+func TestCompileAcceptsCustomFieldsInEveryRowKind(t *testing.T) {
+	for _, kind := range []FormatKind{FormatKindSession, FormatKindAgentsSession, FormatKindAgentsAgent} {
+		template, err := Compile(kind, "{custom.weather:<8.12@warn}{right}{session_name|custom.git_sha}")
+		if err != nil {
+			t.Fatalf("Compile(%s) error = %v", kind, err)
+		}
+
+		line := template.Render(testResolver{"custom.weather": "sunny", "custom.git_sha": "abc123"})
+		if line.Left[0].Value != "sunny" || line.Left[0].Role != "warn" || line.Right[0].Value != "abc123" {
+			t.Fatalf("Render(%s) = %+v", kind, line)
+		}
+	}
+}
+
+func TestPipesKeepColoredValuesValid(t *testing.T) {
+	template, err := Compile(FormatKindSession, "{session_name|upper} {source|trunc_left:3}")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	line := template.Render(testResolver{FieldSessionName: "\x1b[31mok\x1b[0m", FieldSource: "\x1b[32mabc\x1b[1mdef"})
+	if line.Left[0].Value != "\x1b[31mOK\x1b[0m" {
+		t.Fatalf("upper = %q", line.Left[0].Value)
+	}
+
+	if line.Left[2].Value != "…\x1b[32m\x1b[1mef\x1b[m" {
+		t.Fatalf("trunc_left = %q", line.Left[2].Value)
+	}
+}
+
+func TestCompileRejectsMalformedCustomFieldNames(t *testing.T) {
+	for _, source := range []string{"{custom.}", "{custom.Bad-Name}", "{custom.a.b}", "{session_name|custom.}"} {
+		if _, err := Compile(FormatKindSession, source); !errors.Is(err, ErrUnknownField) {
+			t.Fatalf("Compile(%q) error = %v, want ErrUnknownField", source, err)
+		}
+	}
+}
+
+func TestTemplateCustomFieldsListsFallbacksOnce(t *testing.T) {
+	template, err := Compile(FormatKindAgentsAgent, "{custom.zeta} {status|custom.alpha}{right}{custom.zeta:>4}")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := template.CustomFields(); !slices.Equal(got, []string{"alpha", "zeta"}) {
+		t.Fatalf("CustomFields() = %q", got)
+	}
+
+	plain, err := Compile(FormatKindSession, "{session_name}")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := plain.CustomFields(); len(got) != 0 {
+		t.Fatalf("CustomFields() without custom fields = %q", got)
+	}
+}
+
 func TestCompileAllowsStatusGlyphAndTextFields(t *testing.T) {
 	for _, kind := range []FormatKind{FormatKindSession, FormatKindAgentsSession} {
 		if _, err := Compile(kind, "{session_name} {agent_status_glyph} {agent_status_text}"); err != nil {

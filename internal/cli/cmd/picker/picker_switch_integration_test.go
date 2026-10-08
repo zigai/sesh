@@ -18,6 +18,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/zigai/sesh/internal/action"
+	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/tui"
@@ -48,9 +49,10 @@ func TestPickerAgentSelectionSwitchesClientAndFocusesPane(t *testing.T) {
 	root := t.TempDir()
 	historyPath := pickerHistoryPath(t, root)
 
-	services, err := newPickerServices(ctx, config.DefaultConfig(), server.Endpoint().SocketPath,
-		filepath.Join(root, "repository"), filepath.Join(root, "leases"), historyPath,
-		filepath.Join(root, "agents.json"), gotmux.Streams{}, RemoteServices{})
+	services, err := newPickerServices(ctx, resolvePickerTestWorkspace(t, config.DefaultConfig(), app.Locations{
+		Socket: server.Endpoint().SocketPath, Repository: filepath.Join(root, "repository"), LeaseRoot: filepath.Join(root, "leases"),
+		History: historyPath, FinalSaveStatus: "", AgentStore: filepath.Join(root, "agents.json"),
+	}), gotmux.Streams{}, RemoteServices{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,13 +161,13 @@ func TestPopupHandoffSwitchesOnlyOpeningClientAfterPopupSelection(t *testing.T) 
 	}
 
 	runtime := pickerCommandRuntime{
-		cfg: config.DefaultConfig(), socketPath: server.Endpoint().SocketPath,
-		repositoryPath: filepath.Join(root, "repository"), leaseRoot: filepath.Join(root, "leases"),
-		historyPath: pickerHistoryPath(t, root),
+		workspace: resolvePickerTestWorkspace(t, config.DefaultConfig(), app.Locations{
+			Socket: server.Endpoint().SocketPath, Repository: filepath.Join(root, "repository"),
+			LeaseRoot: filepath.Join(root, "leases"), History: pickerHistoryPath(t, root), FinalSaveStatus: "", AgentStore: "",
+		}),
 	}
 
-	services, err := newPickerServices(ctx, runtime.cfg, runtime.socketPath, runtime.repositoryPath,
-		runtime.leaseRoot, runtime.historyPath, "", gotmux.Streams{In: nil, Out: nil, Err: nil},
+	services, err := newPickerServices(ctx, runtime.workspace, gotmux.Streams{In: nil, Out: nil, Err: nil},
 		RemoteServices{Catalog: nil, Watcher: nil, Peer: nil, Attach: nil, OriginBridge: nil})
 	if err != nil {
 		t.Fatal(err)
@@ -181,7 +183,7 @@ func TestPopupHandoffSwitchesOnlyOpeningClientAfterPopupSelection(t *testing.T) 
 	assertPickerClientDisplays(t, server, otherClient, origin.ID)
 
 	// The invoking process records the switch and the popup's deferred views together.
-	st, err := session.LoadState(runtime.historyPath)
+	st, err := session.LoadState(runtime.workspace.History)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -14,6 +14,8 @@ import (
 	"github.com/samber/oops"
 	gotmux "github.com/zigai/gotmux/tmux"
 
+	"github.com/zigai/sesh/internal/action"
+	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/snapshot/capture"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
@@ -22,6 +24,38 @@ var (
 	errSensitiveRaw         = errors.New("sensitive raw internal path: /private/secret/key")
 	errUnmappedHistoryCause = errors.New("open private history dir: unsafe private storage entry")
 )
+
+func TestSessionNotFoundErrorBoundary(t *testing.T) {
+	t.Parallel()
+
+	missing := &capture.SessionNotFoundError{ID: "missing"}
+	for _, test := range []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"raw capture", missing, "sessionNotFound"},
+		{"typed action", action.Wrap(action.CodeNotFound, missing), "notFound"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := jsonErrorCode(test.err); got != test.want {
+				t.Fatalf("root error code = %q, want %q", got, test.want)
+			}
+
+			if got := clibase.JSONErrorCode(test.err); got != test.want {
+				t.Fatalf("command error code = %q, want %q", got, test.want)
+			}
+
+			if message := safeCommandErrorMessage(test.err); message != missing.Error() {
+				t.Fatalf("root diagnostic = %q, want %q", message, missing.Error())
+			}
+
+			if message := clibase.SafeCommandErrorMessage(test.err); message != missing.Error() {
+				t.Fatalf("command diagnostic = %q, want %q", message, missing.Error())
+			}
+		})
+	}
+}
 
 func TestJSONEnvelopeFormatAndTaxonomy(t *testing.T) {
 	tempDir := t.TempDir()

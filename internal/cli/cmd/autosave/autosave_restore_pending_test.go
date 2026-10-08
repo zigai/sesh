@@ -10,9 +10,11 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+
+	"github.com/zigai/sesh/internal/app"
 )
 
-func reportPendingRestoreRecords(t *testing.T, env autosaveEnv, pending pendingRestore, runs int) []map[string]any {
+func reportPendingRestoreRecords(t *testing.T, env Env, pending pendingRestore, runs int) []map[string]any {
 	t.Helper()
 
 	var buffer bytes.Buffer
@@ -42,7 +44,7 @@ func reportPendingRestoreRecords(t *testing.T, env autosaveEnv, pending pendingR
 
 func TestPendingRestoreIsReportedOncePerServerStart(t *testing.T) {
 	historyPath := filepath.Join(t.TempDir(), "state", "history.json")
-	env := autosaveEnv{historyPath: historyPath}
+	env := Env{workspace: app.Workspace{History: historyPath}}
 	pending := pendingRestore{sessions: 8, serverStarted: time.Unix(2_000, 0)}
 
 	records := reportPendingRestoreRecords(t, env, pending, 3)
@@ -83,7 +85,7 @@ func assertPendingRestoreRecord(t *testing.T, record map[string]any, historyPath
 func TestPendingRestoreStaysSilentWithoutHistoryPath(t *testing.T) {
 	pending := pendingRestore{sessions: 1, serverStarted: time.Unix(2_000, 0)}
 
-	if records := reportPendingRestoreRecords(t, autosaveEnv{historyPath: ""}, pending, 2); len(records) != 0 {
+	if records := reportPendingRestoreRecords(t, Env{}, pending, 2); len(records) != 0 {
 		t.Fatalf("without a marker location the report must stay silent, got %+v", records)
 	}
 }

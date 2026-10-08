@@ -79,12 +79,12 @@ func newRecoverOperationCommand(name, short, long, operation string, run func(*c
 		Args:        clibase.UsageArgs(cobra.ExactArgs(1)),
 		Annotations: map[string]string{clibase.AnnotationOperation: operation},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			path, err := clibase.ResolveRepository(cmd)
+			workspace, err := clibase.ResolveWorkspace(cmd)
 			if err != nil {
 				return err
 			}
 
-			repo, err := store.OpenExisting(cmd.Context(), path)
+			repo, err := workspace.OpenExistingRepository(cmd.Context())
 			if err != nil {
 				return oops.In("cli").With("operation", "open_repository").Wrap(err)
 			}

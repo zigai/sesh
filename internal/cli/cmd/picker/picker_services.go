@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"os"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -22,7 +21,6 @@ import (
 	"github.com/zigai/sesh/internal/agents"
 	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/config"
-	integration "github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/snapshot/store"
 	"github.com/zigai/sesh/internal/tui"
@@ -42,14 +40,12 @@ type RemoteServices struct {
 type RemoteFactory func(context.Context, *config.Config, string) (RemoteServices, error)
 
 type pickerServices struct {
-	cfg              *config.Config
+	workspace        app.Workspace
 	server           *gotmux.Server
 	currentPane      string
 	currentSessionID string
 	popupChild       bool
 	repository       *app.Repository
-	repositoryPath   string
-	historyPath      string
 	agentStore       agents.SnapshotSource
 	sessionNames     pickerTranscriptNameCache
 	titles           pickerTitleCache
@@ -68,8 +64,7 @@ func AgentSummaries(observed []agents.AgentSession) []session.AgentSummary {
 
 func newPickerServices(
 	ctx context.Context,
-	cfg *config.Config,
-	socketPath, repositoryPath, leaseRoot, historyPath, agentStatePath string,
+	workspace app.Workspace,
 	streams gotmux.Streams,
 	remote RemoteServices,
 ) (*pickerServices, error) {
@@ -77,24 +72,19 @@ func newPickerServices(
 		return nil, err
 	}
 
-	server, err := integration.Open(socketPath)
+	server, err := workspace.OpenTmux()
 	if err != nil {
-		return nil, oops.In("cli").With("operation", "open_tmux").Wrap(err)
+		return nil, err
 	}
 
-	resolvedAgentStatePath := agentStatePath
-	if resolvedAgentStatePath == "" && cfg != nil && cfg.AgentStatus.StorePath != "" {
-		resolvedAgentStatePath = cfg.AgentStatus.StorePath
-	}
-
-	agentStore := agents.NewAHTStore(resolvedAgentStatePath)
-	repository := app.NewRepository(repositoryPath)
+	agentStore := workspace.AgentSource()
+	repository := app.NewRepository(workspace.Repository)
 	local := app.NewLocal(app.LocalOptions{
-		Config:             cfg,
+		Config:             workspace.Config,
 		Server:             server,
 		Repository:         repository,
-		LeaseRoot:          leaseRoot,
-		HistoryPath:        historyPath,
+		LeaseRoot:          workspace.LeaseRoot,
+		HistoryPath:        workspace.History,
 		AgentSource:        agentStore,
 		Streams:            streams,
 		Source:             "picker",
@@ -102,14 +92,12 @@ func newPickerServices(
 	})
 
 	return &pickerServices{
-		cfg:              cfg,
+		workspace:        workspace,
 		server:           server,
 		currentPane:      "",
 		currentSessionID: "",
 		popupChild:       false,
 		repository:       repository,
-		repositoryPath:   repositoryPath,
-		historyPath:      historyPath,
 		agentStore:       agentStore,
 		sessionNames:     pickerTranscriptNameCache{mu: sync.Mutex{}, cache: nil},
 		titles:           pickerTitleCache{mu: sync.Mutex{}, cache: nil, inflight: singleflight.Group{}},
@@ -182,12 +170,12 @@ func (s *pickerServices) TUIServices() tui.Services {
 // frame must not wait on a concurrent save's commit or on the durable open's fsync. Actions
 // that act on a saved session open the repository durably.
 func (s *pickerServices) LoadCatalog(ctx context.Context) (session.CatalogResult, error) {
-	if s.repositoryPath == "" {
+	if s.workspace.Repository == "" {
 		return s.listCatalog(ctx, nil)
 	}
 
 	// An unreadable repository leaves saved rows out.
-	view, err := store.OpenView(ctx, s.repositoryPath)
+	view, err := store.OpenView(ctx, s.workspace.Repository)
 	if err != nil {
 		return s.listCatalog(ctx, nil)
 	}
@@ -209,7 +197,7 @@ func (s *pickerServices) listCatalog(ctx context.Context, saved session.SavedSna
 		result, listErr = session.ListCatalog(ctx, session.CatalogOptions{
 			Server:           server,
 			Repository:       saved,
-			RepositorySource: s.repositoryPath,
+			RepositorySource: s.workspace.Repository,
 			GenerationID:     "",
 			CurrentPane:      s.currentPane,
 			CurrentSessionID: s.currentSessionID,
@@ -579,7 +567,7 @@ func (*pickerServices) GetWorkingDirectory() (string, error) {
 }
 
 func (s *pickerServices) UpdateModelState(ctx context.Context, update session.StateUpdate) error {
-	_, err := session.UpdateState(ctx, s.historyPath, update)
+	_, err := session.UpdateState(ctx, s.workspace.History, update)
 	if err != nil {
 		return oops.In("cli").With("operation", "update_picker_state").Wrap(err)
 	}
@@ -623,47 +611,6 @@ func (s *pickerServices) takeDeferredAgentViews() []tui.AgentView {
 	s.deferredViews = nil
 
 	return views
-}
-
-func pickerPaths(cfg *config.Config, repository, leaseRoot, history string) (string, string, string, error) {
-	dataDir, err := config.GetDataDir(cfg)
-	if err != nil {
-		return "", "", "", oops.In("cli").With("operation", "resolve_picker_data_directory").Wrap(err)
-	}
-
-	resolve := func(value, fallback string) (string, error) {
-		if value == "" {
-			value = fallback
-		}
-
-		absolute, err := filepath.Abs(value)
-		if err != nil {
-			return "", oops.In("cli").With("operation", "resolve_picker_path").Wrap(err)
-		}
-
-		return absolute, nil
-	}
-
-	repository, err = resolve(repository, filepath.Join(dataDir, "snapshots"))
-	if err != nil {
-		return "", "", "", err
-	}
-
-	leaseRoot, err = resolve(leaseRoot, filepath.Join(dataDir, "leases"))
-	if err != nil {
-		return "", "", "", err
-	}
-
-	if history == "" {
-		history = filepath.Join(config.GetXDGPaths().StateHome, "sesh", "history.json")
-	}
-
-	history, err = resolve(history, history)
-	if err != nil {
-		return "", "", "", err
-	}
-
-	return repository, leaseRoot, history, nil
 }
 
 func clonePickerTarget(target session.Session) session.Session {
@@ -731,11 +678,11 @@ func (s *pickerServices) performSwitchValidated(
 // in one history update.
 func (s *pickerServices) recordPickerHistory(ctx context.Context, switched string, views []tui.AgentView) error {
 	identity, recordSwitch := s.workflow.SwitchHistoryIdentity(switched)
-	if s.historyPath == "" || (!recordSwitch && len(views) == 0) {
+	if s.workspace.History == "" || (!recordSwitch && len(views) == 0) {
 		return nil
 	}
 
-	_, err := session.UpdateState(ctx, s.historyPath, func(st *session.State) {
+	_, err := session.UpdateState(ctx, s.workspace.History, func(st *session.State) {
 		if recordSwitch {
 			st.RecordSwitch(identity)
 		}
@@ -762,8 +709,8 @@ func (s *pickerServices) performDeferredAttach(ctx context.Context, target sessi
 		return oops.In("cli").With("operation", "attach_picker_session").Wrap(err)
 	}
 
-	if target.ActivePaneID != "" && s.historyPath != "" {
-		_, _ = session.UpdateState(ctx, s.historyPath, func(st *session.State) {
+	if target.ActivePaneID != "" && s.workspace.History != "" {
+		_, _ = session.UpdateState(ctx, s.workspace.History, func(st *session.State) {
 			st.RecordAgentView(target.SemanticIdentity(), target.ActivePaneID)
 		})
 	}

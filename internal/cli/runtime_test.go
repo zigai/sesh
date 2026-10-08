@@ -241,6 +241,37 @@ func TestApplicationConfigurationUsesProvidedInput(t *testing.T) {
 	assertRuntimeLog(t, logPath, "cli", "history", "error", "failed", logPath)
 }
 
+func TestApplicationHumanConfigDiagnostics(t *testing.T) {
+	tests := map[string]struct {
+		config string
+		want   string
+	}{
+		"validation reason": {
+			config: "[display]\nsesh_format = \"{session_name} {custom.weather}\"\n",
+			want:   "configuration could not be loaded: invalid display.sesh_format: undefined custom field: custom.weather has no display.fields.weather entry\n",
+		},
+		"toml location only": {
+			config: "[settings]\nsecret_private_key = 1\n",
+			want:   "invalid configuration at line 2, column 1\n",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+
+			err := ExecuteApplication(t.Context(), []string{"snapshot", "history", testRepositoryFlag, filepath.Join(t.TempDir(), "missing"), testConfigFlag, "-"}, strings.NewReader(tt.config), &stdout, &stderr)
+			if err == nil {
+				t.Fatal("invalid config accepted")
+			}
+
+			if got := stderr.String(); got != tt.want {
+				t.Fatalf("stderr = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestApplicationConfigDiagnosticsRetainLocationWithoutPrivateValues(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 

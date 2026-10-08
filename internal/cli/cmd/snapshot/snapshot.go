@@ -204,7 +204,7 @@ func renderListTable(cmd *cobra.Command, manifest model.Manifest, windowCount ma
 }
 
 func runSnapshotList(cmd *cobra.Command, _ []string) error {
-	absRepoPath, err := clibase.ResolveRepository(cmd)
+	workspace, err := clibase.ResolveWorkspace(cmd)
 	if err != nil {
 		return err
 	}
@@ -214,7 +214,7 @@ func runSnapshotList(cmd *cobra.Command, _ []string) error {
 		ctx = context.Background()
 	}
 
-	repo, err := store.OpenExisting(ctx, absRepoPath)
+	repo, err := workspace.OpenExistingRepository(ctx)
 	if err != nil {
 		return oops.In("cli").With("operation", "open_repository").Wrap(err)
 	}
@@ -305,7 +305,7 @@ func renderHistoryJSON(cmd *cobra.Command, catalog store.Catalog) error {
 }
 
 func runSnapshotHistory(cmd *cobra.Command, _ []string) error {
-	absRepoPath, err := clibase.ResolveRepository(cmd)
+	workspace, err := clibase.ResolveWorkspace(cmd)
 	if err != nil {
 		return err
 	}
@@ -315,7 +315,7 @@ func runSnapshotHistory(cmd *cobra.Command, _ []string) error {
 		ctx = context.Background()
 	}
 
-	repo, err := store.OpenExisting(ctx, absRepoPath)
+	repo, err := workspace.OpenExistingRepository(ctx)
 	if err != nil {
 		return oops.In("cli").With("operation", "open_repository").Wrap(err)
 	}
@@ -456,7 +456,7 @@ func practicalRestoreReason(ready bool) string {
 }
 
 func runSnapshotVerify(cmd *cobra.Command, _ []string) error {
-	absRepoPath, err := clibase.ResolveRepository(cmd)
+	workspace, err := clibase.ResolveWorkspace(cmd)
 	if err != nil {
 		return err
 	}
@@ -466,7 +466,7 @@ func runSnapshotVerify(cmd *cobra.Command, _ []string) error {
 		ctx = context.Background()
 	}
 
-	repo, err := store.OpenExisting(ctx, absRepoPath)
+	repo, err := workspace.OpenExistingRepository(ctx)
 	if err != nil {
 		return oops.In("cli").With("operation", "open_repository").Wrap(err)
 	}

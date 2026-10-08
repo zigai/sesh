@@ -9,7 +9,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/cli/clibase"
+	"github.com/zigai/sesh/internal/config"
 )
 
 func endpointCommand(t *testing.T, args ...string) *cobra.Command {
@@ -21,6 +23,7 @@ func endpointCommand(t *testing.T, args ...string) *cobra.Command {
 	clibase.AddSocketFlag(cmd)
 	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
 	cmd.Flags().String("lease-root", "", clibase.LeaseRootFlagUsage)
+	cmd.Flags().String("agent-state", "", "")
 	cmd.SetContext(context.Background())
 
 	if err := cmd.ParseFlags(args); err != nil {
@@ -64,22 +67,61 @@ func TestDefaultTmuxSocketIgnoresRelativeTmuxTmpdir(t *testing.T) {
 	}
 }
 
-func TestResolveRepositoryPathsDefaultToDataDirectory(t *testing.T) {
+func TestWorkspaceAgentStoreRouting(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.AgentStatus.StorePath = "base.json"
+	cfg.AgentSessions.Status = &config.AgentStatusConfig{StorePath: "nested.json"}
+
+	for _, test := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"nested config", nil, "nested.json"},
+		{"explicit flag", []string{"--agent-state", "explicit.json"}, "explicit.json"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			workspace, err := app.Resolve(cfg, clibase.CommandLocations(endpointCommand(t, test.args...)))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			want, err := filepath.Abs(test.want)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if workspace.AgentStore != want || workspace.AgentSource().StorePath() != want {
+				t.Fatalf("agent store = %q, want %q", workspace.AgentStore, want)
+			}
+		})
+	}
+
+	workspace, err := app.Resolve(config.DefaultConfig(), clibase.CommandLocations(endpointCommand(t)))
+	if err != nil || workspace.AgentStore != "" {
+		t.Fatalf("default agent store = %q, %v; want empty for AHT's default", workspace.AgentStore, err)
+	}
+}
+
+func TestResolveWorkspacePathsDefaultToDataDirectory(t *testing.T) {
 	dataHome := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", dataHome)
 
-	repository, err := clibase.ResolveRepository(endpointCommand(t))
-	if err != nil || repository != filepath.Join(dataHome, "sesh", "snapshots") {
-		t.Fatalf("default repository = %q, %v", repository, err)
+	workspace, err := clibase.ResolveWorkspace(endpointCommand(t))
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	leaseRoot, err := clibase.ResolveLeaseRoot(endpointCommand(t))
-	if err != nil || leaseRoot != filepath.Join(dataHome, "sesh", "leases") {
-		t.Fatalf("default lease root = %q, %v", leaseRoot, err)
+	if workspace.Repository != filepath.Join(dataHome, "sesh", "snapshots") {
+		t.Fatalf("default repository = %q", workspace.Repository)
 	}
 
-	explicit, err := clibase.ResolveRepository(endpointCommand(t, "--repository", "relative/repo"))
-	if err != nil || !filepath.IsAbs(explicit) || filepath.Base(explicit) != "repo" {
-		t.Fatalf("explicit repository = %q, %v", explicit, err)
+	if workspace.LeaseRoot != filepath.Join(dataHome, "sesh", "leases") {
+		t.Fatalf("default lease root = %q", workspace.LeaseRoot)
+	}
+
+	explicit, err := clibase.ResolveWorkspace(endpointCommand(t, "--repository", "relative/repo"))
+	if err != nil || !filepath.IsAbs(explicit.Repository) || filepath.Base(explicit.Repository) != "repo" {
+		t.Fatalf("explicit repository = %q, %v", explicit.Repository, err)
 	}
 }

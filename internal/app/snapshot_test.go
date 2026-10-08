@@ -3,12 +3,14 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"testing"
 
 	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/config"
+	"github.com/zigai/sesh/internal/integration/process"
 )
 
 func TestSaveEnvironmentSelectsCapturedKeys(t *testing.T) {
@@ -67,6 +69,35 @@ func TestSaveEnvironmentRejectsInvalidKeys(t *testing.T) {
 			_, err := local.saveEnvironment(saveInput(true, keys, true))
 			if action.CodeOf(err) != action.CodeInvalidArgument {
 				t.Fatalf("error = %v (code %q), want invalid argument", err, action.CodeOf(err))
+			}
+		})
+	}
+}
+
+func TestSaveEnvironmentRejectsInvalidConfiguredKeys(t *testing.T) {
+	t.Parallel()
+
+	tooMany := make([]string, 257)
+	for index := range tooMany {
+		tooMany[index] = fmt.Sprintf("K%d", index)
+	}
+
+	for _, test := range []struct {
+		name string
+		keys []string
+		want error
+	}{
+		{"invalid key", []string{"INVALID=KEY"}, process.ErrInvalidVariableName},
+		{"excessive keys", tooMany, process.ErrEnvironmentLimitExceeded},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cfg := config.DefaultConfig()
+			cfg.Snapshot.ProcessEnvironment = test.keys
+			local := &Local{cfg: cfg}
+
+			_, err := local.saveEnvironment(saveInput(true, nil, false))
+			if !errors.Is(err, test.want) || action.CodeOf(err) != action.CodeInvalidArgument {
+				t.Fatalf("error = %v (code %q), want %v classified invalid argument", err, action.CodeOf(err), test.want)
 			}
 		})
 	}

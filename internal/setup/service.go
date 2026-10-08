@@ -30,11 +30,13 @@ const (
 	AutosaveTimerName      = "sesh-autosave.timer"
 	TmuxServiceName        = "sesh-tmux.service"
 	RemoteServiceName      = "sesh-remote-monitor.service"
+	AgentStatusServiceName = "sesh-agent-status.service"
 	CoordinatorServiceName = "sesh-coordinator.service"
 	RestoreServiceName     = "sesh-restore.service"
 	AutosaveAgentName      = "com.zigai.sesh.autosave.plist"
 	TmuxAgentName          = "com.zigai.sesh.tmux.plist"
 	RemoteAgentName        = "com.zigai.sesh.remote-monitor.plist"
+	AgentStatusAgentName   = "com.zigai.sesh.agent-status.plist"
 	CoordinatorAgentName   = "com.zigai.sesh.coordinator.plist"
 )
 
@@ -207,6 +209,7 @@ func RemoteMonitorDefinition(inputs ServiceInputs, available bool) (ServiceDefin
 			inputs.Program,
 			RemoteMonitorArgs(inputs),
 			0,
+			false,
 		)
 	default:
 		return ServiceDefinition{}, oops.In("setup").Code("setup_service_failed").With("operation", "render_remote_definition").Wrap(ErrUnsupportedPlatform)
@@ -214,6 +217,55 @@ func RemoteMonitorDefinition(inputs ServiceInputs, available bool) (ServiceDefin
 
 	if !available {
 		definition.Requires = append(definition.Requires, remoteEntryRequirement)
+	}
+
+	return definition, nil
+}
+
+func AgentStatusArgs(inputs ServiceInputs) []string {
+	return []string{"daemon", "agent-window-status", "--socket", inputs.SocketPath}
+}
+
+func AgentStatusDefinition(inputs ServiceInputs) (ServiceDefinition, error) {
+	if inputs.Platform == "" {
+		inputs.Platform = runtime.GOOS
+	}
+
+	if err := validateServiceInputs(inputs); err != nil {
+		return ServiceDefinition{}, oops.In("setup").Code("setup_service_failed").With("operation", "render_agent_status_definition").Wrap(err)
+	}
+
+	root, err := ServiceDirectory(inputs.Platform)
+	if err != nil {
+		return ServiceDefinition{}, oops.In("setup").Code("setup_service_failed").With("operation", "render_agent_status_definition").Wrap(err)
+	}
+
+	definition := ServiceDefinition{
+		Name:     AgentStatusServiceName,
+		Kind:     KindSystemdService,
+		Purpose:  "agent window status tracker",
+		Path:     filepath.Join(root, AgentStatusServiceName),
+		Content:  "",
+		Requires: nil,
+	}
+
+	switch inputs.Platform {
+	case PlatformLinux:
+		definition.Content = renderSystemdAgentStatus(inputs)
+	case PlatformDarwin:
+		definition.Kind = KindLaunchdAgent
+		definition.Name = AgentStatusAgentName
+		definition.Path = filepath.Join(root, AgentStatusAgentName)
+		definition.Content = renderLaunchdAgent(
+			"com.zigai.sesh.agent-status",
+			"sesh agent window status tracker",
+			inputs.Program,
+			AgentStatusArgs(inputs),
+			0,
+			true,
+		)
+	default:
+		return ServiceDefinition{}, oops.In("setup").Code("setup_service_failed").With("operation", "render_agent_status_definition").Wrap(ErrUnsupportedPlatform)
 	}
 
 	return definition, nil
@@ -271,6 +323,7 @@ func CoordinatorDefinition(inputs ServiceInputs) (ServiceDefinition, error) {
 			inputs.Program,
 			CoordinatorArgs(inputs),
 			0,
+			false,
 		)
 		definition.Requires = append(definition.Requires, coordinatorDarwinRequirement)
 	default:
@@ -309,6 +362,24 @@ func renderSystemdRemoteMonitor(inputs ServiceInputs) string {
 	content.WriteString("[Service]\n")
 	content.WriteString("Type=exec\n")
 	content.WriteString("ExecStart=" + systemdCommand(inputs.Program, RemoteMonitorArgs(inputs)) + "\n")
+	content.WriteString("Restart=on-failure\n\n")
+	content.WriteString("[Install]\n")
+	content.WriteString("WantedBy=default.target\n")
+
+	return content.String()
+}
+
+func renderSystemdAgentStatus(inputs ServiceInputs) string {
+	var content strings.Builder
+
+	content.WriteString(managedComment())
+	content.WriteString("[Unit]\n")
+	content.WriteString("Description=sesh agent window status tracker\n")
+	content.WriteString("Documentation=man:sesh(1)\n")
+	content.WriteString(managedTmuxOrdering(inputs, false) + "\n")
+	content.WriteString("[Service]\n")
+	content.WriteString("Type=exec\n")
+	content.WriteString("ExecStart=" + systemdCommand(inputs.Program, AgentStatusArgs(inputs)) + "\n")
 	content.WriteString("Restart=on-failure\n\n")
 	content.WriteString("[Install]\n")
 	content.WriteString("WantedBy=default.target\n")
@@ -446,6 +517,7 @@ func launchdDefinitions(root string, inputs ServiceInputs) ([]ServiceDefinition,
 			inputs.Program,
 			autosaveArgs(inputs),
 			int(inputs.Interval/time.Second),
+			false,
 		),
 		Requires: []string{
 			"launchd supervision only: logout, sleep and shutdown ordering for the saved processes is not established",
@@ -466,6 +538,7 @@ func launchdDefinitions(root string, inputs ServiceInputs) ([]ServiceDefinition,
 				inputs.Program,
 				daemonArgs(inputs),
 				0,
+				false,
 			),
 			Requires: []string{
 				tmuxDarwinRuntimeRequirement,
@@ -488,7 +561,7 @@ func launchdDefinitions(root string, inputs ServiceInputs) ([]ServiceDefinition,
 	return definitions, nil
 }
 
-func renderLaunchdAgent(label, description, program string, args []string, intervalSeconds int) string {
+func renderLaunchdAgent(label, description, program string, args []string, intervalSeconds int, runAtLoad bool) string {
 	var content strings.Builder
 
 	content.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
@@ -510,7 +583,7 @@ func renderLaunchdAgent(label, description, program string, args []string, inter
 		content.WriteString("\t<key>StartInterval</key>\n\t<integer>" + strconv.Itoa(intervalSeconds) + "</integer>\n")
 	}
 
-	content.WriteString("\t<key>RunAtLoad</key>\n\t<false/>\n")
+	content.WriteString("\t<key>RunAtLoad</key>\n\t<" + strconv.FormatBool(runAtLoad) + "/>\n")
 	content.WriteString("\t<key>Description</key>\n\t<string>" + xmlEscape(description) + "</string>\n")
 	content.WriteString("</dict>\n")
 	content.WriteString("</plist>\n")

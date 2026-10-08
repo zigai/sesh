@@ -28,11 +28,9 @@ func TestRuntimeReporterReturnsVerifiedLiveState(t *testing.T) {
 	held.Store(true)
 
 	reporter, err := StartRuntimeReporter(t.Context(), RuntimeStatusConfig{
-		RuntimeDir:     runtimeDir,
-		Endpoint:       endpoint,
-		LogindDelay:    3 * time.Second,
-		AttemptTimeout: 2 * time.Second,
-		DrainGrace:     time.Second,
+		RuntimeDir:  runtimeDir,
+		Endpoint:    endpoint,
+		LogindDelay: 3 * time.Second,
 		LiveStatus: func(context.Context) (RuntimeLiveStatus, error) {
 			return RuntimeLiveStatus{InhibitorsHeld: held.Load()}, nil
 		},
@@ -152,11 +150,9 @@ func TestRuntimeReporterDoesNotUnlinkReplacementSocket(t *testing.T) {
 	runtimeDir := shortRuntimeDir(t)
 	endpoint := filepath.Join(runtimeDir, "tmux.sock")
 	config := RuntimeStatusConfig{
-		RuntimeDir:     runtimeDir,
-		Endpoint:       endpoint,
-		LogindDelay:    time.Second,
-		AttemptTimeout: time.Second,
-		DrainGrace:     time.Second,
+		RuntimeDir:  runtimeDir,
+		Endpoint:    endpoint,
+		LogindDelay: time.Second,
 		LiveStatus: func(context.Context) (RuntimeLiveStatus, error) {
 			return RuntimeLiveStatus{}, nil
 		},
@@ -304,12 +300,10 @@ func validRuntimeConfig(
 	}
 
 	return RuntimeStatusConfig{
-		RuntimeDir:     runtimeDir,
-		Endpoint:       endpoint,
-		LogindDelay:    time.Second,
-		AttemptTimeout: time.Second,
-		DrainGrace:     time.Second,
-		LiveStatus:     live,
+		RuntimeDir:  runtimeDir,
+		Endpoint:    endpoint,
+		LogindDelay: time.Second,
+		LiveStatus:  live,
 	}
 }
 
@@ -372,17 +366,15 @@ func TestQueryRuntimeStatusRejectsInvalidBudget(t *testing.T) {
 	}
 
 	response, err := json.Marshal(RuntimeStatus{
-		Protocol:             runtimeStatusProtocol,
-		Phase:                RuntimePhaseRunning,
-		InhibitorsHeld:       true,
-		LogindDelayMillis:    -1,
-		AttemptTimeoutMillis: 1000,
-		DrainGraceMillis:     1000,
-		ServerManagement:     ServerManagementUnknown,
-		EndpointID:           runtimeEndpointID(endpoint),
-		PID:                  identity.pid,
-		BootID:               identity.bootID,
-		ProcessStartTicks:    identity.startTicks,
+		Protocol:          runtimeStatusProtocol,
+		Phase:             RuntimePhaseRunning,
+		InhibitorsHeld:    true,
+		LogindDelayMillis: -1,
+		ServerManagement:  ServerManagementUnknown,
+		EndpointID:        runtimeEndpointID(endpoint),
+		PID:               identity.pid,
+		BootID:            identity.bootID,
+		ProcessStartTicks: identity.startTicks,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -423,15 +415,13 @@ func TestValidateRuntimeStatusRejectsNonUnknownServerManagement(t *testing.T) {
 	t.Parallel()
 
 	validStatus := RuntimeStatus{
-		Protocol:             runtimeStatusProtocol,
-		Phase:                RuntimePhaseRunning,
-		InhibitorsHeld:       true,
-		LogindDelayMillis:    1000,
-		AttemptTimeoutMillis: 1000,
-		DrainGraceMillis:     1000,
-		ServerManagement:     ServerManagementUnknown,
-		EndpointID:           strings.Repeat("a", runtimeStatusSocketBytes*2),
-		PID:                  1234,
+		Protocol:          runtimeStatusProtocol,
+		Phase:             RuntimePhaseRunning,
+		InhibitorsHeld:    true,
+		LogindDelayMillis: 1000,
+		ServerManagement:  ServerManagementUnknown,
+		EndpointID:        strings.Repeat("a", runtimeStatusSocketBytes*2),
+		PID:               1234,
 	}
 
 	if err := validateRuntimeStatus(validStatus, 1234, validStatus.EndpointID); err != nil {

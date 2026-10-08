@@ -25,16 +25,18 @@ sesh snapshot restore
 
 ## Coding agents
 
-`sesh` tracks live coding agent panes using the Agent Host Tool (`aht`) registry.
+The picker displays live coding agent panes from the Agent Host Tool (`aht`) registry, preserving manual scroll position during updates.
 
-Install AHT v2.0.5 and enable the sesh integration:
+Install AHT v2.5.0 and enable the sesh integration:
 
 ```sh
-go install github.com/zigai/aht/v2@v2.0.5
+go install github.com/zigai/aht/v2@v2.5.0
 sesh setup agents
 ```
 
 AHT v2 uses registry schema 3. `sesh` does not import older AHT registry files.
+
+`sesh setup services` also writes `sesh-agent-status.service`, which styles tmux windows whose agent needs attention. Enable it with `systemctl --user enable --now sesh-agent-status.service`.
 
 Navigate agent panes. These commands are meant for key bindings; `sesh setup tmux` prints the bindings:
 

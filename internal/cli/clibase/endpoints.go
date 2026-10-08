@@ -9,7 +9,7 @@ import (
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
 
-	"github.com/zigai/sesh/internal/config"
+	"github.com/zigai/sesh/internal/app"
 )
 
 const (
@@ -55,40 +55,37 @@ func DefaultTmuxSocket() string {
 	return filepath.Join(dir, "tmux-"+strconv.Itoa(os.Getuid()), "default")
 }
 
-// ResolveRepository returns --repository as an absolute path, else the configured snapshot repository.
-func ResolveRepository(cmd *cobra.Command) (string, error) {
-	return resolveDataPath(cmd, "repository", "snapshots")
-}
-
-// ResolveLeaseRoot returns --lease-root as an absolute path, else the configured lease directory.
-func ResolveLeaseRoot(cmd *cobra.Command) (string, error) {
-	return resolveDataPath(cmd, "lease-root", "leases")
-}
-
-func resolveDataPath(cmd *cobra.Command, flag, defaultName string) (string, error) {
-	value := ""
-	if cmd.Flags().Lookup(flag) != nil {
-		value, _ = cmd.Flags().GetString(flag)
-	}
-
-	if value == "" {
-		cfg, err := LoadCommandConfig(cmd.Context(), cmd)
-		if err != nil {
-			return "", err
-		}
-
-		dataDir, err := config.GetDataDir(cfg)
-		if err != nil {
-			return "", oops.In("cli").With("operation", "resolve_data_dir").Wrap(err)
-		}
-
-		value = filepath.Join(dataDir, defaultName)
-	}
-
-	absolute, err := filepath.Abs(value)
+func ResolveWorkspace(cmd *cobra.Command) (app.Workspace, error) {
+	cfg, err := LoadCommandConfig(CommandContext(cmd), cmd)
 	if err != nil {
-		return "", oops.In("cli").With("operation", "resolve_data_path").Wrap(err)
+		return app.Workspace{}, err
 	}
 
-	return absolute, nil
+	workspace, err := app.Resolve(cfg, CommandLocations(cmd))
+	if err != nil {
+		return app.Workspace{}, oops.In("cli").With("operation", "resolve_workspace").Wrap(err)
+	}
+
+	return workspace, nil
+}
+
+func CommandLocations(cmd *cobra.Command) app.Locations {
+	return app.Locations{
+		Socket:          ResolveSocket(cmd),
+		Repository:      definedStringFlag(cmd, "repository"),
+		LeaseRoot:       definedStringFlag(cmd, "lease-root"),
+		History:         definedStringFlag(cmd, "history"),
+		FinalSaveStatus: definedStringFlag(cmd, "status-file"),
+		AgentStore:      definedStringFlag(cmd, "agent-state"),
+	}
+}
+
+func definedStringFlag(cmd *cobra.Command, name string) string {
+	if cmd.Flags().Lookup(name) == nil {
+		return ""
+	}
+
+	value, _ := cmd.Flags().GetString(name)
+
+	return value
 }

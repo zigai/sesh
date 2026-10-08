@@ -75,5 +75,9 @@ func classify(err error) action.Code {
 		}
 	}
 
+	if _, ok := errors.AsType[*capture.SessionNotFoundError](err); ok {
+		return action.CodeNotFound
+	}
+
 	return action.CodeFailed
 }

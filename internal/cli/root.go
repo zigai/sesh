@@ -155,7 +155,7 @@ func newRootCommand(ctx context.Context) *cobra.Command {
 		newHooksCommand(),
 		cmdconfig.NewCommand(),
 		cmdsetup.NewCommand(),
-		cmddaemon.NewCommand(cmdremote.NewDaemonMonitorCommand(), cmdagent.NewDaemonWindowStatusCommand()),
+		cmddaemon.NewCommand(cmdautosave.NewDaemonCoordinatorCommand(), cmdremote.NewDaemonMonitorCommand(), cmdagent.NewDaemonWindowStatusCommand()),
 		cmddoctor.NewCommand(),
 	)
 	rootCommand.InitDefaultHelpCmd()

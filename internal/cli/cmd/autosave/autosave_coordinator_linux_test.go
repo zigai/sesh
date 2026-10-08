@@ -1,6 +1,6 @@
 //go:build linux
 
-package daemon
+package autosave
 
 import (
 	"errors"
@@ -18,12 +18,17 @@ import (
 func coordinatorGate(t *testing.T, repoPath string) error {
 	t.Helper()
 
-	cmd := newDaemonCoordinatorCommand()
+	cmd := NewDaemonCoordinatorCommand()
 	if err := cmd.Flags().Set("repository", repoPath); err != nil {
 		t.Fatalf("set repository flag: %v", err)
 	}
 
-	return ensureDaemonRepositoryReady(t.Context(), cmd, autosaveEnv{})
+	env, err := ResolveEnv(cmd)
+	if err != nil {
+		t.Fatalf("resolve autosave env: %v", err)
+	}
+
+	return ensureCoordinatorRepositoryReady(t.Context(), env)
 }
 
 func operationState(t *testing.T, repoPath, id string) string {
@@ -77,7 +82,7 @@ func TestCoordinatorNamesARestoreThatMayStillRun(t *testing.T) {
 	live := snapfixture.RegisterRestore(t, repoPath, os.Getpid(), self.String())
 
 	err = coordinatorGate(t, repoPath)
-	if !errors.Is(err, errDaemonRecoveryBarrier) || !errors.Is(err, automation.ErrActiveRestores) {
+	if !errors.Is(err, errCoordinatorRecoveryBarrier) || !errors.Is(err, automation.ErrActiveRestores) {
 		t.Fatalf("gate error = %v, want the active-restore barrier", err)
 	}
 
@@ -87,5 +92,42 @@ func TestCoordinatorNamesARestoreThatMayStillRun(t *testing.T) {
 
 	if state := operationState(t, repoPath, live); state != "active" {
 		t.Fatalf("a restore whose server may still run must stay active, got %q", state)
+	}
+}
+
+func TestCoordinatorRefusesUnresolvedSave(t *testing.T) {
+	repositoryPath := filepath.Join(t.TempDir(), "repository")
+
+	repository, err := store.Open(t.Context(), repositoryPath)
+	if err != nil {
+		t.Fatalf("store.Open failed: %v", err)
+	}
+
+	attempt, err := repository.Begin(t.Context())
+	if err != nil {
+		t.Fatalf("Begin failed: %v", err)
+	}
+
+	if err := repository.Fail(t.Context(), attempt.ID); err != nil {
+		t.Fatalf("Fail failed: %v", err)
+	}
+
+	if err := repository.Close(); err != nil {
+		t.Fatalf("Close failed: %v", err)
+	}
+
+	cmd := NewDaemonCoordinatorCommand()
+	if err := cmd.Flags().Set("repository", repositoryPath); err != nil {
+		t.Fatalf("set repository flag: %v", err)
+	}
+
+	env, err := ResolveEnv(cmd)
+	if err != nil {
+		t.Fatalf("resolve autosave env: %v", err)
+	}
+
+	err = ensureCoordinatorRepositoryReady(t.Context(), env)
+	if !errors.Is(err, errCoordinatorRecoveryBarrier) {
+		t.Fatalf("ensureCoordinatorRepositoryReady error = %v, want recovery barrier", err)
 	}
 }

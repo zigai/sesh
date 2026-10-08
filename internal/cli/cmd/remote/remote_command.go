@@ -10,7 +10,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"path/filepath"
 	"slices"
 	"time"
 
@@ -29,7 +28,6 @@ import (
 	"github.com/zigai/sesh/internal/privatefs"
 	"github.com/zigai/sesh/internal/remote"
 	"github.com/zigai/sesh/internal/session"
-	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
 const (
@@ -38,10 +36,7 @@ const (
 	remoteLookupArgCount    = 2
 )
 
-var (
-	errRemoteTargetMissing      = errors.New("remote target is not present in the cached catalog")
-	errRemotePeerConfigRequired = errors.New("remote peer configuration is required")
-)
+var errRemoteTargetMissing = errors.New("remote target is not present in the cached catalog")
 
 // remoteLookupOutput is a receipt as `remote lookup` reports it. Output is the action's own
 // result.
@@ -136,26 +131,21 @@ func remoteLiveAnnotations(operation string) map[string]string {
 }
 
 // newPeerLocal runs actions on this peer against its own snapshot repository and leases.
-func newPeerLocal(cfg *config.Config, server *tmux.Server) (*app.Local, *app.Repository, error) {
-	dataDir, err := config.GetDataDir(cfg)
-	if err != nil {
-		return nil, nil, remoteCLIError("resolve_remote_data_dir", err)
-	}
-
-	repository := app.NewRepository(filepath.Join(dataDir, "snapshots"))
+func newPeerLocal(workspace app.Workspace, server *tmux.Server) (*app.Local, *app.Repository) {
+	repository := app.NewRepository(workspace.Repository)
 	local := app.NewLocal(app.LocalOptions{
-		Config:             cfg,
+		Config:             workspace.Config,
 		Server:             server,
 		Repository:         repository,
-		LeaseRoot:          filepath.Join(dataDir, "leases"),
-		HistoryPath:        filepath.Join(config.GetXDGPaths().StateHome, "sesh", "history.json"),
-		AgentSource:        agents.NewAHTStore(cfg.AgentStatus.StorePath),
+		LeaseRoot:          workspace.LeaseRoot,
+		HistoryPath:        workspace.History,
+		AgentSource:        workspace.AgentSource(),
 		Streams:            tmux.Streams{In: nil, Out: nil, Err: nil},
 		Source:             "remote",
 		DeferSwitchHistory: false,
 	})
 
-	return local, repository, nil
+	return local, repository
 }
 
 // remoteActions lists the actions this peer accepts from other machines.
@@ -332,12 +322,14 @@ func runRemotePeerStream(cmd *cobra.Command, _ []string) error {
 		return remoteCLIError("decode_remote_stream_bootstrap", err)
 	}
 
-	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
+	workspace, err := clibase.ResolveWorkspace(cmd)
 	if err != nil {
 		return err
 	}
 
-	runtime, err := openRemotePeerRuntime(bootstrap.TmuxSocket, false)
+	workspace.Socket = bootstrap.TmuxSocket
+
+	runtime, err := openRemotePeerRuntime(workspace.Socket, false)
 	if err != nil {
 		return err
 	}
@@ -349,9 +341,11 @@ func runRemotePeerStream(cmd *cobra.Command, _ []string) error {
 		PollInterval:      remote.ParsedDuration(bootstrap.PollInterval, time.Second),
 		HeartbeatInterval: remote.ParsedDuration(bootstrap.HeartbeatInterval, remoteHeartbeatInterval),
 		Sessions:          runtime.live.Sessions,
-		Agents:            func(ctx context.Context) ([]session.AgentSummary, error) { return remotePeerAgentSummaries(ctx, cfg) },
-		SavedSessions:     func(ctx context.Context) ([]session.Session, error) { return remotePeerSavedSessions(ctx, cfg) },
-		Actions:           remoteActions(cfg),
+		Agents: func(ctx context.Context) ([]session.AgentSummary, error) {
+			return remotePeerAgentSummaries(ctx, workspace)
+		},
+		SavedSessions: func(ctx context.Context) ([]session.Session, error) { return remotePeerSavedSessions(ctx, workspace) },
+		Actions:       remoteActions(workspace.Config),
 	}, cmd.OutOrStdout()))
 }
 
@@ -366,28 +360,27 @@ func runRemotePeerAction(cmd *cobra.Command, _ []string) (resultErr error) {
 		return remoteCLIError("decode_remote_action", err)
 	}
 
-	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
+	workspace, err := clibase.ResolveWorkspace(cmd)
 	if err != nil {
 		return err
 	}
 
-	runtime, err := openRemotePeerRuntime(request.Socket, true)
+	workspace.Socket = request.Socket
+
+	runtime, err := openRemotePeerRuntime(workspace.Socket, true)
 	if err != nil {
 		return err
 	}
 
 	defer func() { resultErr = errors.Join(resultErr, runtime.close()) }()
 
-	local, repository, err := newPeerLocal(cfg, runtime.server)
-	if err != nil {
-		return err
-	}
+	local, repository := newPeerLocal(workspace, runtime.server)
 
 	defer func() {
 		resultErr = errors.Join(resultErr, remoteCLIError("close_remote_repository", repository.Close()))
 	}()
 
-	allowed := remoteActions(cfg)
+	allowed := remoteActions(workspace.Config)
 	result := remote.ExecutePeerAction(clibase.CommandContext(cmd), remote.PeerActionOptions{
 		PeerID:     runtime.peerID,
 		Receipts:   runtime.receipts,
@@ -524,12 +517,8 @@ func remoteOutputFile(writer io.Writer) (*os.File, bool) {
 	return nil, false
 }
 
-func remotePeerAgentSummaries(ctx context.Context, cfg *config.Config) ([]session.AgentSummary, error) {
-	if cfg == nil {
-		return nil, oops.In("cli").With("operation", "load_remote_agents").Wrap(errRemotePeerConfigRequired)
-	}
-
-	observed, err := agents.LoadLiveAgents(ctx, agents.NewAHTStore(cfg.AgentStatus.StorePath))
+func remotePeerAgentSummaries(ctx context.Context, workspace app.Workspace) ([]session.AgentSummary, error) {
+	observed, err := agents.LoadLiveAgents(ctx, workspace.AgentSource())
 	if err != nil {
 		return nil, oops.In("cli").With("operation", "load_remote_agents").Wrap(err)
 	}
@@ -537,17 +526,8 @@ func remotePeerAgentSummaries(ctx context.Context, cfg *config.Config) ([]sessio
 	return cmdpicker.AgentSummaries(observed), nil
 }
 
-func remotePeerSavedSessions(ctx context.Context, cfg *config.Config) ([]session.Session, error) {
-	if cfg == nil {
-		return nil, oops.In("cli").With("operation", "load_remote_saved_sessions").Wrap(errRemotePeerConfigRequired)
-	}
-
-	dataDir, err := config.GetDataDir(cfg)
-	if err != nil {
-		return nil, oops.In("cli").With("operation", "resolve_remote_repository").Wrap(err)
-	}
-
-	repository, err := store.OpenExisting(ctx, filepath.Join(dataDir, "snapshots"))
+func remotePeerSavedSessions(ctx context.Context, workspace app.Workspace) ([]session.Session, error) {
+	repository, err := workspace.OpenExistingRepository(ctx)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}

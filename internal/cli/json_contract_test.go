@@ -23,7 +23,7 @@ func TestJSONCommandTreeRequiresExplicitOutputContract(t *testing.T) {
 	contracts := map[string][]string{
 		"envelope": {
 			"agent back", "agent failed", "agent focus", "agent latest", "agent next", "agent status", "agent toggle", "agent unread", "agent waiting", "agent window-status-clear",
-			"autosave adopt-startup", "autosave final-save", "autosave restore-on-start", "autosave save-if-due",
+			"autosave final-save", "autosave restore-on-start", "autosave save-if-due",
 			"autosave status", "config init", "doctor", "hooks list", "hooks run", "hooks validate", "keys",
 			"pick popup", "remote lookup",
 			"session create", "session delete", "session kill", "session list", "session rename", "session scrollback", "session switch",

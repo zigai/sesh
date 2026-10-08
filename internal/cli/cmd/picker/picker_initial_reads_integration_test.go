@@ -11,6 +11,7 @@ import (
 	gotmux "github.com/zigai/gotmux/tmux"
 	"github.com/zigai/gotmux/tmuxtest"
 
+	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/tui"
@@ -160,9 +161,10 @@ func newPickerInitialReadsServices(t *testing.T, server *gotmux.Server, sessionI
 
 	root := t.TempDir()
 
-	services, err := newPickerServices(t.Context(), config.DefaultConfig(), server.Endpoint().SocketPath,
-		"", filepath.Join(root, "leases"), filepath.Join(root, "history.json"),
-		filepath.Join(root, "agents.json"), gotmux.Streams{}, RemoteServices{})
+	services, err := newPickerServices(t.Context(), resolvePickerTestWorkspace(t, config.DefaultConfig(), app.Locations{
+		Socket: server.Endpoint().SocketPath, Repository: "", LeaseRoot: filepath.Join(root, "leases"),
+		History: filepath.Join(root, "history.json"), FinalSaveStatus: "", AgentStore: filepath.Join(root, "agents.json"),
+	}), gotmux.Streams{}, RemoteServices{})
 	if err != nil {
 		t.Fatal(err)
 	}

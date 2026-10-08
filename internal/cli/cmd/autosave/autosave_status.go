@@ -13,7 +13,6 @@ import (
 	"github.com/zigai/sesh/internal/automation"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/daemon"
-	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
 type autosaveResultJSON struct {
@@ -26,9 +25,6 @@ type autosaveResultJSON struct {
 	RepositoryState  string `json:"repositoryState,omitempty"`
 	FinalSaveState   string `json:"finalSaveState,omitempty"`
 	FinalSaveAt      int64  `json:"finalSaveCompletedAt,omitempty"`
-	DefaultAction    string `json:"defaultSessionAction,omitempty"`
-	DefaultFrom      string `json:"defaultSessionFrom,omitempty"`
-	DefaultTo        string `json:"defaultSessionTo,omitempty"`
 	Recorded         bool   `json:"recorded"`
 	Restorable       int    `json:"restorableSessions,omitempty"`
 	Abandoned        int    `json:"abandonedRestores,omitempty"`
@@ -38,24 +34,20 @@ type autosaveResultJSON struct {
 	DaemonPhase      string `json:"daemonPhase,omitempty"`
 	InhibitorsHeld   bool   `json:"inhibitorsHeld"`
 	LogindDelayMS    int64  `json:"logindDelayMillis,omitempty"`
-	AttemptTimeoutMS int64  `json:"attemptTimeoutMillis,omitempty"`
-	DrainGraceMS     int64  `json:"drainGraceMillis,omitempty"`
 	ServerManagement string `json:"serverManagement,omitempty"`
 }
 
 func emptyDaemonRuntimeStatus() daemon.RuntimeStatus {
 	return daemon.RuntimeStatus{
-		Protocol:             0,
-		Phase:                "",
-		InhibitorsHeld:       false,
-		LogindDelayMillis:    0,
-		AttemptTimeoutMillis: 0,
-		DrainGraceMillis:     0,
-		ServerManagement:     "",
-		EndpointID:           "",
-		PID:                  0,
-		BootID:               "",
-		ProcessStartTicks:    0,
+		Protocol:          0,
+		Phase:             "",
+		InhibitorsHeld:    false,
+		LogindDelayMillis: 0,
+		ServerManagement:  "",
+		EndpointID:        "",
+		PID:               0,
+		BootID:            "",
+		ProcessStartTicks: 0,
 	}
 }
 
@@ -74,7 +66,7 @@ func newStatusCommand() *cobra.Command {
 }
 
 func runAutosaveStatus(cmd *cobra.Command, _ []string) error {
-	env, err := resolveAutosaveEnv(cmd)
+	env, err := ResolveEnv(cmd)
 	if err != nil {
 		return err
 	}
@@ -83,10 +75,10 @@ func runAutosaveStatus(cmd *cobra.Command, _ []string) error {
 
 	outcome := newAutosaveOutcome(autosaveDecisionStatus(env.decision), env.decision.Reason)
 	outcome.history = autosaveHistoryState(env)
-	outcome.repository = autosaveRepositoryState(ctx, cmd, env)
-	outcome.daemonState, outcome.daemonStatus = autosaveDaemonRuntimeState(ctx, cmd)
+	outcome.repository = autosaveRepositoryState(ctx, env)
+	outcome.daemonState, outcome.daemonStatus = DaemonRuntimeState(ctx, env.workspace.Socket)
 
-	outcome.finalSave, outcome.finalSaveAt = autosaveFinalSaveState(cmd, env)
+	outcome.finalSave, outcome.finalSaveAt = autosaveFinalSaveState(env)
 	if outcome.finalSaveAt > 0 {
 		outcome.finalSaveAge = time.Since(time.Unix(outcome.finalSaveAt, 0))
 	}
@@ -110,14 +102,8 @@ func runAutosaveStatus(cmd *cobra.Command, _ []string) error {
 	return clibase.WriteOutput(cmd, "%s", autosaveStatusSummary(env, outcome))
 }
 
-func DaemonRuntimeState(ctx context.Context, cmd *cobra.Command) (string, daemon.RuntimeStatus) {
-	return autosaveDaemonRuntimeState(ctx, cmd)
-}
-
-func autosaveDaemonRuntimeState(ctx context.Context, cmd *cobra.Command) (string, daemon.RuntimeStatus) {
-	endpoint := clibase.ResolveSocket(cmd)
-
-	path, err := daemon.RuntimeStatusPath(os.Getenv("XDG_RUNTIME_DIR"), endpoint)
+func DaemonRuntimeState(ctx context.Context, socket string) (string, daemon.RuntimeStatus) {
+	path, err := daemon.RuntimeStatusPath(os.Getenv("XDG_RUNTIME_DIR"), socket)
 	if err != nil {
 		return autosaveDaemonUnverifiable, emptyDaemonRuntimeStatus()
 	}
@@ -142,7 +128,7 @@ func autosaveDaemonRuntimeState(ctx context.Context, cmd *cobra.Command) (string
 	return autosaveDaemonUnverifiable, emptyDaemonRuntimeStatus()
 }
 
-func autosaveHistoryState(env autosaveEnv) string {
+func autosaveHistoryState(env Env) string {
 	if !env.historyKnown {
 		return autosaveHistoryUnavailable
 	}
@@ -154,13 +140,8 @@ func autosaveHistoryState(env autosaveEnv) string {
 	return autosaveHistoryRecorded
 }
 
-func autosaveRepositoryState(ctx context.Context, cmd *cobra.Command, env autosaveEnv) string {
-	repoPath, err := resolveAutosaveRepository(cmd, env.cfg)
-	if err != nil {
-		return ""
-	}
-
-	repository, err := store.OpenExisting(ctx, repoPath)
+func autosaveRepositoryState(ctx context.Context, env Env) string {
+	repository, err := env.workspace.OpenExistingRepository(ctx)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return autosaveRepositoryMissing
@@ -187,8 +168,8 @@ func autosaveRepositoryState(ctx context.Context, cmd *cobra.Command, env autosa
 	}
 }
 
-func autosaveFinalSaveState(cmd *cobra.Command, _ autosaveEnv) (string, int64) {
-	status, err := automation.ReadFinalSaveStatus(resolveAutosaveStatusPath(cmd))
+func autosaveFinalSaveState(env Env) (string, int64) {
+	status, err := automation.ReadFinalSaveStatus(env.workspace.FinalSaveStatus)
 	if err != nil {
 		return "", 0
 	}
@@ -216,7 +197,7 @@ func autosaveDecisionStatus(decision automation.DueDecision) string {
 	return "not_due"
 }
 
-func renderAutosaveResult(cmd *cobra.Command, env autosaveEnv, outcome autosaveOutcome) error {
+func renderAutosaveResult(cmd *cobra.Command, env Env, outcome autosaveOutcome) error {
 	logAutosaveSkip(cmd, outcome)
 
 	if clibase.JSONOutputEnabled(cmd) {
@@ -253,7 +234,7 @@ func logAutosaveSkip(cmd *cobra.Command, outcome autosaveOutcome) {
 		Str("reason", outcome.reason).Msg("automatic snapshot operation skipped")
 }
 
-func autosavePayload(env autosaveEnv, outcome autosaveOutcome) autosaveResultJSON {
+func autosavePayload(env Env, outcome autosaveOutcome) autosaveResultJSON {
 	return autosaveResultJSON{
 		Status:           outcome.status,
 		Reason:           outcome.reason,
@@ -264,9 +245,6 @@ func autosavePayload(env autosaveEnv, outcome autosaveOutcome) autosaveResultJSO
 		RepositoryState:  outcome.repository,
 		FinalSaveState:   outcome.finalSave,
 		FinalSaveAt:      outcome.finalSaveAt,
-		DefaultAction:    outcome.defaultSession,
-		DefaultFrom:      outcome.defaultFrom,
-		DefaultTo:        outcome.defaultTo,
 		Recorded:         outcome.recorded,
 		Restorable:       outcome.restorable,
 		Abandoned:        outcome.abandoned,
@@ -276,13 +254,11 @@ func autosavePayload(env autosaveEnv, outcome autosaveOutcome) autosaveResultJSO
 		DaemonPhase:      string(outcome.daemonStatus.Phase),
 		InhibitorsHeld:   outcome.daemonStatus.InhibitorsHeld,
 		LogindDelayMS:    outcome.daemonStatus.LogindDelayMillis,
-		AttemptTimeoutMS: outcome.daemonStatus.AttemptTimeoutMillis,
-		DrainGraceMS:     outcome.daemonStatus.DrainGraceMillis,
 		ServerManagement: outcome.daemonStatus.ServerManagement,
 	}
 }
 
-func renderAutosaveDegraded(cmd *cobra.Command, env autosaveEnv, outcome autosaveOutcome, err error) error {
+func renderAutosaveDegraded(cmd *cobra.Command, env Env, outcome autosaveOutcome, err error) error {
 	if clibase.JSONOutputEnabled(cmd) {
 		return clibase.WriteJSONResultError(cmd, autosavePayload(env, outcome), err)
 	}

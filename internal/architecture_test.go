@@ -53,7 +53,13 @@ func architectureBoundaries() []importBoundary {
 		workflows[index] = nativeModule + "internal/" + workflows[index]
 	}
 
+	services := []string{"internal/agents", "internal/automation", "internal/config", "internal/daemon", "internal/doctor", "internal/remote", "internal/session", "internal/setup", "internal/tui"}
+
 	return []importBoundary{
+		{
+			sources: services, forbidden: []string{nativeModule + "internal/app"},
+			reason: "services are built from the workspace by the command line, not by each other",
+		},
 		{
 			forbidden: []string{"testing", "github.com/zigai/gotmux/tmuxtest", nativeModule + "internal/testsupport", nativeModule + "test"},
 			reason:    "production must not depend on test support",

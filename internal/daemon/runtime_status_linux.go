@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	runtimeStatusProtocol      = 1
+	runtimeStatusProtocol      = 2
 	runtimeStatusSocketBytes   = 16
 	runtimeStatusMaximumBytes  = 4 * 1024
 	runtimeStatusProbeTimeout  = 250 * time.Millisecond
@@ -36,7 +36,6 @@ const (
 const (
 	RuntimePhaseInitializing RuntimePhase = "initializing"
 	RuntimePhaseRunning      RuntimePhase = "running"
-	RuntimePhaseDraining     RuntimePhase = "draining"
 	RuntimePhaseFinalSave    RuntimePhase = "final_save"
 	RuntimePhaseStopping     RuntimePhase = "stopping"
 )
@@ -56,26 +55,22 @@ var (
 type RuntimePhase string
 
 type RuntimeStatus struct {
-	Protocol             int          `json:"protocol"`
-	Phase                RuntimePhase `json:"phase"`
-	InhibitorsHeld       bool         `json:"inhibitorsHeld"`
-	LogindDelayMillis    int64        `json:"logindDelayMillis"`
-	AttemptTimeoutMillis int64        `json:"attemptTimeoutMillis"`
-	DrainGraceMillis     int64        `json:"drainGraceMillis"`
-	ServerManagement     string       `json:"serverManagement"`
-	EndpointID           string       `json:"endpointId"`
-	PID                  int          `json:"pid"`
-	BootID               string       `json:"bootId"`
-	ProcessStartTicks    uint64       `json:"processStartTicks"`
+	Protocol          int          `json:"protocol"`
+	Phase             RuntimePhase `json:"phase"`
+	InhibitorsHeld    bool         `json:"inhibitorsHeld"`
+	LogindDelayMillis int64        `json:"logindDelayMillis"`
+	ServerManagement  string       `json:"serverManagement"`
+	EndpointID        string       `json:"endpointId"`
+	PID               int          `json:"pid"`
+	BootID            string       `json:"bootId"`
+	ProcessStartTicks uint64       `json:"processStartTicks"`
 }
 
 type RuntimeStatusConfig struct {
-	RuntimeDir     string
-	Endpoint       string
-	LogindDelay    time.Duration
-	AttemptTimeout time.Duration
-	DrainGrace     time.Duration
-	LiveStatus     func(context.Context) (RuntimeLiveStatus, error)
+	RuntimeDir  string
+	Endpoint    string
+	LogindDelay time.Duration
+	LiveStatus  func(context.Context) (RuntimeLiveStatus, error)
 }
 
 type RuntimeLiveStatus struct {
@@ -167,17 +162,15 @@ func StartRuntimeReporter(ctx context.Context, config RuntimeStatusConfig) (*Run
 		mu:       sync.RWMutex{},
 		live:     config.LiveStatus,
 		status: RuntimeStatus{
-			Protocol:             runtimeStatusProtocol,
-			Phase:                RuntimePhaseInitializing,
-			InhibitorsHeld:       false,
-			LogindDelayMillis:    config.LogindDelay.Milliseconds(),
-			AttemptTimeoutMillis: config.AttemptTimeout.Milliseconds(),
-			DrainGraceMillis:     config.DrainGrace.Milliseconds(),
-			ServerManagement:     ServerManagementUnknown,
-			EndpointID:           runtimeEndpointID(config.Endpoint),
-			PID:                  identity.pid,
-			BootID:               identity.bootID,
-			ProcessStartTicks:    identity.startTicks,
+			Protocol:          runtimeStatusProtocol,
+			Phase:             RuntimePhaseInitializing,
+			InhibitorsHeld:    false,
+			LogindDelayMillis: config.LogindDelay.Milliseconds(),
+			ServerManagement:  ServerManagementUnknown,
+			EndpointID:        runtimeEndpointID(config.Endpoint),
+			PID:               identity.pid,
+			BootID:            identity.bootID,
+			ProcessStartTicks: identity.startTicks,
 		},
 		version: 1,
 	}
@@ -541,12 +534,12 @@ func validateRuntimeStatus(status RuntimeStatus, peerPID int, expectedEndpoint s
 	}
 
 	switch status.Phase {
-	case RuntimePhaseInitializing, RuntimePhaseRunning, RuntimePhaseDraining, RuntimePhaseFinalSave, RuntimePhaseStopping:
+	case RuntimePhaseInitializing, RuntimePhaseRunning, RuntimePhaseFinalSave, RuntimePhaseStopping:
 	default:
 		return ErrRuntimeStatusIdentity
 	}
 
-	if status.LogindDelayMillis <= 0 || status.AttemptTimeoutMillis <= 0 || status.DrainGraceMillis <= 0 {
+	if status.LogindDelayMillis <= 0 {
 		return ErrRuntimeStatusIdentity
 	}
 

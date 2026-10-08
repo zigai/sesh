@@ -22,6 +22,7 @@ import (
 
 	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/agents"
+	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/session"
@@ -349,17 +350,10 @@ func TestPickerServiceRejectsReplacementSessionBeforeMutation(t *testing.T) {
 	dirs := t.TempDir()
 	cfg := config.DefaultConfig()
 
-	services, err := newPickerServices(
-		ctx,
-		cfg,
-		server.Endpoint().SocketPath,
-		filepath.Join(dirs, "repository"),
-		filepath.Join(dirs, "leases"),
-		filepath.Join(dirs, "history.json"),
-		filepath.Join(dirs, "agents.json"),
-		gotmux.Streams{},
-		RemoteServices{},
-	)
+	services, err := newPickerServices(ctx, resolvePickerTestWorkspace(t, cfg, app.Locations{
+		Socket: server.Endpoint().SocketPath, Repository: filepath.Join(dirs, "repository"), LeaseRoot: filepath.Join(dirs, "leases"),
+		History: filepath.Join(dirs, "history.json"), FinalSaveStatus: "", AgentStore: filepath.Join(dirs, "agents.json"),
+	}), gotmux.Streams{}, RemoteServices{})
 	if err != nil {
 		t.Fatalf("new picker services: %v", err)
 	}

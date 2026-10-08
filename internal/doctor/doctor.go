@@ -54,6 +54,7 @@ const (
 	CheckServiceOOMPolicy   = "service-oom-policy"
 	CheckServiceCommands    = "service-commands"
 	CheckActiveRestores     = "active-restores"
+	CheckCustomField        = "custom-field"
 )
 
 type Result struct {
@@ -81,6 +82,7 @@ type Options struct {
 	// ValidateCommand reports whether this sesh accepts a command line, given without the program;
 	// nil skips the check.
 	ValidateCommand func(args []string) error
+	CustomFields    []CustomField
 }
 
 type Service struct {
@@ -94,6 +96,7 @@ type Service struct {
 	serviceDir        string
 	executable        string
 	validateCommand   func(args []string) error
+	customFields      []CustomField
 	unitOf            func(pid int) (string, error)
 	oomPolicyOf       func(ctx context.Context, unit string) (string, error)
 }
@@ -116,6 +119,7 @@ func NewService(opts Options) *Service {
 		serviceDir:        opts.ServiceDir,
 		executable:        opts.Executable,
 		validateCommand:   opts.ValidateCommand,
+		customFields:      opts.CustomFields,
 		unitOf:            serviceUnitOf,
 		oomPolicyOf:       serviceOOMPolicyOf,
 	}
@@ -189,6 +193,7 @@ func (s *Service) Run(ctx context.Context) ([]Result, error) {
 	results = append(results, s.checkServiceOOMPolicy(ctx, serverPID)...)
 	results = append(results, s.checkServiceCommands()...)
 	results = append(results, s.checkActiveRestores(ctx)...)
+	results = append(results, checkCustomFields(s.customFields)...)
 
 	var runErr error
 	if cleanupErr != nil {

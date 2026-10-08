@@ -103,6 +103,40 @@ func TestNilOptionsOrderAndDefaults(t *testing.T) {
 	}
 }
 
+func TestCustomFieldChecksReportMissingCommands(t *testing.T) {
+	t.Parallel()
+
+	missing := filepath.Join(t.TempDir(), "weather")
+
+	results, err := doctor.Run(t.Context(), doctor.Options{
+		CustomFields: []doctor.CustomField{
+			{Name: "sha", Command: ""},
+			{Name: "today", Command: "date"},
+			{Name: "weather", Command: missing},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected run error: %v", err)
+	}
+
+	var fields []doctor.Result
+
+	for _, result := range results {
+		if result.Check == doctor.CheckCustomField {
+			fields = append(fields, result)
+		}
+	}
+
+	if len(fields) != 3 || fields[0].Status != doctor.StatusOK || fields[1].Status != doctor.StatusOK {
+		t.Fatalf("custom field results = %#v", fields)
+	}
+
+	if fields[2].Status != doctor.StatusError || fields[2].Reason != doctor.ReasonNotFound ||
+		!strings.Contains(fields[2].Message, "custom.weather") || !strings.Contains(fields[2].Fix, "display.fields.weather.command") {
+		t.Fatalf("missing command result = %#v", fields[2])
+	}
+}
+
 func TestCaptureAndRestoreChecksDescribeImplementedBoundaries(t *testing.T) {
 	t.Parallel()
 

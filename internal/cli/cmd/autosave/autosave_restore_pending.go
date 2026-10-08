@@ -39,12 +39,12 @@ func findPendingRestore(ctx context.Context, cmd *cobra.Command, server *gotmux.
 // reportPendingRestore warns once per tmux server start that saves are held back until the saved
 // sessions are restored or an explicit save keeps the live state. Without a history path, or when
 // the marker cannot be read or written, it stays silent rather than warn on every interval.
-func reportPendingRestore(ctx context.Context, env autosaveEnv, pending pendingRestore) {
-	if env.historyPath == "" {
+func reportPendingRestore(ctx context.Context, env Env, pending pendingRestore) {
+	if env.workspace.History == "" {
 		return
 	}
 
-	markerPath := automation.RestorePendingMarkerPath(env.historyPath)
+	markerPath := automation.RestorePendingMarkerPath(env.workspace.History)
 	stamp := pending.serverStarted.Unix()
 
 	unreported, err := automation.EpisodeUnreported(markerPath, stamp)

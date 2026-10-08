@@ -200,7 +200,6 @@ func (m *Model) scrollListBy(delta int) bool {
 	}
 
 	m.listTop = next
-	m.listViewportPolicy = listViewportFollowSelection
 
 	selected := selectedVisualIndex(rows, m.selectedListRow())
 	if selected < next || selected >= next+height {
@@ -209,11 +208,7 @@ func (m *Model) scrollListBy(delta int) bool {
 		}
 	}
 
-	if delta < 0 && m.visibleListStart(rows, height) >= previous {
-		if target, ok := m.scrollTargetRow(rows, next, height, 1); ok {
-			m.selectListRow(target)
-		}
-	}
+	m.listViewportPolicy = listViewportPreserveTop
 
 	return true
 }

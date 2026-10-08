@@ -3,10 +3,8 @@ package lifecycle
 import "time"
 
 const (
-	EventShutdown  EventKind = "shutdown"
-	EventSleep     EventKind = "sleep"
-	EventLogout    EventKind = "logout"
-	EventTerminate EventKind = "terminate"
+	EventShutdown EventKind = "shutdown"
+	EventSleep    EventKind = "sleep"
 )
 
 type EventKind string

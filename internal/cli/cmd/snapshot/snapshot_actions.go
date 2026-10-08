@@ -62,12 +62,12 @@ func prepareSnapshotRestore(ctx context.Context, cmd *cobra.Command, values acti
 		return true, nil
 	}
 
-	repositoryPath, err := clibase.ResolveRepository(cmd)
+	workspace, err := clibase.ResolveWorkspace(cmd)
 	if err != nil {
 		return false, err
 	}
 
-	generation, selected, err := selectSnapshotRestoreGeneration(ctx, cmd, repositoryPath)
+	generation, selected, err := selectSnapshotRestoreGeneration(ctx, cmd, workspace.Repository)
 	if err != nil || !selected {
 		return false, err
 	}

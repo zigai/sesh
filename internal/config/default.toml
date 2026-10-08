@@ -51,6 +51,11 @@
 # Selectable agent rows in AGENTS mode.
 # agents_agent_format = "{tree}{status_glyph} {status_age:<7}   {agent_cwd_name:<23.23}  {agent_session}{right}{harness:<6.6}   {agent_git_label:<6.22} {agent_git_added:<5} {agent_git_deleted:<5} {agent_git_ahead:<2} {agent_git_behind:<2}"
 
+# {custom.NAME} shows the output of the command defined as display.fields.NAME, for example:
+#   [display.fields]
+#   git_sha = "git rev-parse --short HEAD"
+#   weather = { command = "/usr/local/bin/weather", args = ["--short"], refresh = "10m" }
+
 # Coding-agent integration and tmux navigation bindings.
 # Requires the aht runtime and `sesh setup agents`.
 [agent_sessions]

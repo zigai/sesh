@@ -27,7 +27,7 @@ var skippedHeadlines = map[string]string{
 
 // autosaveSummary is the human form of a save, skip or startup restore: one line saying what
 // happened, then only what needs the reader's attention. --json keeps every field.
-func autosaveSummary(env autosaveEnv, outcome autosaveOutcome) string {
+func autosaveSummary(env Env, outcome autosaveOutcome) string {
 	var out strings.Builder
 
 	out.WriteString(autosaveHeadline(env, outcome))
@@ -38,7 +38,7 @@ func autosaveSummary(env autosaveEnv, outcome autosaveOutcome) string {
 	return out.String()
 }
 
-func autosaveHeadline(env autosaveEnv, outcome autosaveOutcome) string {
+func autosaveHeadline(env Env, outcome autosaveOutcome) string {
 	if outcome.restore {
 		return restoredHeadline(outcome)
 	}
@@ -66,16 +66,6 @@ func autosaveHeadline(env autosaveEnv, outcome autosaveOutcome) string {
 }
 
 func savedHeadline(outcome autosaveOutcome) string {
-	switch outcome.defaultSession {
-	case "":
-	case automation.DefaultSessionRenamed:
-		return fmt.Sprintf("Renamed the startup session %q to %q.", outcome.defaultFrom, outcome.defaultTo)
-	case automation.DefaultSessionSwitched:
-		return fmt.Sprintf("Switched from the startup session %q to %q.", outcome.defaultFrom, outcome.defaultTo)
-	default:
-		return "Default session unchanged."
-	}
-
 	if outcome.generation == "" {
 		return "Saved."
 	}
@@ -98,7 +88,7 @@ func restoredHeadline(outcome autosaveOutcome) string {
 
 // autosaveStatusSummary is the human form of autosave status: whether saves run, whether there is
 // something to restore and whether saves happen before sleep and shutdown.
-func autosaveStatusSummary(env autosaveEnv, outcome autosaveOutcome) string {
+func autosaveStatusSummary(env Env, outcome autosaveOutcome) string {
 	var out strings.Builder
 
 	fmt.Fprintf(&out, "%-17s%s\n", "Autosave:", autosaveScheduleState(env, outcome))
@@ -115,7 +105,7 @@ func autosaveStatusSummary(env autosaveEnv, outcome autosaveOutcome) string {
 	return out.String()
 }
 
-func autosaveScheduleState(env autosaveEnv, outcome autosaveOutcome) string {
+func autosaveScheduleState(env Env, outcome autosaveOutcome) string {
 	every := "on, every " + shortDuration(env.interval)
 
 	switch {

@@ -30,6 +30,8 @@ func captureError(err error) error {
 		code = "capture_changed"
 	case errors.Is(err, ErrSelection):
 		code = "selection_required"
+	case isSessionNotFound(err):
+		code = "session_not_found"
 	case errors.Is(err, ErrUnsupported), errors.Is(err, process.ErrUnsupported):
 		code = "capture_unsupported"
 	case errors.Is(err, integration.ErrEndpoint):
@@ -39,4 +41,10 @@ func captureError(err error) error {
 	}
 
 	return oops.In("snapshot.capture").Code(code).With("operation", "observe").Wrap(err)
+}
+
+func isSessionNotFound(err error) bool {
+	_, ok := errors.AsType[*SessionNotFoundError](err)
+
+	return ok
 }

@@ -208,9 +208,17 @@ func agentBaseCell(values sessionFormatValues, parts []display.Part, index int, 
 	}
 
 	return rowlayout.Cell{
-		Text: ansi.Strip(part.Value), Role: values.model.agentCellRole(values.row, values.agent, part),
+		Text: agentCellText(part), Role: values.model.agentCellRole(values.row, values.agent, part),
 		Variants: nil, State: state,
 	}
+}
+
+func agentCellText(part display.Part) string {
+	if info, ok := display.FieldInfo(part.Field); ok && info.Provider == display.ProviderCustom {
+		return part.Value
+	}
+
+	return ansi.Strip(part.Value)
 }
 
 func agentReportedCell(values sessionFormatValues, part display.Part, cell rowlayout.Cell) rowlayout.Cell {
@@ -255,7 +263,7 @@ func agentProviderID(field string) providers.ID {
 		return providers.Resource
 	case display.ProviderGH:
 		return providers.GH
-	case display.ProviderSession, display.ProviderAgent:
+	case display.ProviderSession, display.ProviderAgent, display.ProviderCustom:
 		return ""
 	}
 
