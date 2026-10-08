@@ -236,6 +236,22 @@ func (t Template) UsesAny(fields ...string) bool {
 	return tokensUseAny(t.left, fields) || tokensUseAny(t.right, fields)
 }
 
+func (t Template) CustomFields() []string {
+	var names []string
+
+	for _, item := range slices.Concat(t.left, t.right) {
+		for _, field := range []string{item.field, item.fallback} {
+			if name, ok := CustomFieldName(field); ok && !slices.Contains(names, name) {
+				names = append(names, name)
+			}
+		}
+	}
+
+	slices.Sort(names)
+
+	return names
+}
+
 func (t Template) UsesWidget(widget string) bool {
 	for _, item := range t.left {
 		if item.widget == widget {
@@ -439,10 +455,8 @@ func parseExtendedExpression(expression string, allowed map[string]struct{}) (to
 	item.field, item.role = field, role
 	item.alignment, item.width, item.maxWidth, item.hasMaxWidth = spec.alignment, spec.width, spec.maxWidth, spec.hasMaxWidth
 
-	if field != rightField {
-		if _, ok := allowed[field]; !ok {
-			return token{}, fmt.Errorf("%w %q for this row", ErrUnknownField, field)
-		}
+	if field != rightField && !fieldAllowed(allowed, field) {
+		return token{}, fmt.Errorf("%w %q for this row", ErrUnknownField, field)
 	}
 
 	for _, segment := range segments[1:] {
@@ -471,7 +485,7 @@ func applyTokenPipe(item *token, segment string, allowed map[string]struct{}) er
 		return fmt.Errorf("%w for %q", ErrInvalidFieldSpec, item.field)
 	}
 
-	if _, ok := allowed[segment]; !ok {
+	if !fieldAllowed(allowed, segment) {
 		return fmt.Errorf("%w %q for this row", ErrUnknownField, segment)
 	}
 
@@ -1058,6 +1072,16 @@ func upperText(value string) string {
 	}
 
 	return b.String()
+}
+
+func fieldAllowed(allowed map[string]struct{}, field string) bool {
+	if _, ok := allowed[field]; ok {
+		return true
+	}
+
+	_, ok := CustomFieldName(field)
+
+	return ok
 }
 
 func allowedFields(kind FormatKind) (map[string]struct{}, error) {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -67,6 +68,52 @@ func TestConfigPrecedenceAcrossUserEnvironmentAndExplicitPathIgnoresWorkingDirec
 	check("11s")
 	check("19s", config.WithExplicitPath(explicitPath))
 	check("30s", config.WithoutConfig())
+}
+
+func TestLoadDecodesDisplayFieldCommands(t *testing.T) {
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("SESH_CONFIG", "")
+	t.Setenv("SESH_DISPLAY_SESH_FORMAT", "{session_name}{right}{custom.weather}")
+
+	if err := os.MkdirAll(filepath.Join(configHome, "sesh"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	source := `[display]
+sesh_format = "{session_name} {custom.sha}"
+
+[display.fields]
+sha = "git rev-parse --short HEAD"
+weather = { command = "/opt/bin/weather", args = ["--short", "x y"], refresh = "10m" }
+`
+	if err := os.WriteFile(filepath.Join(configHome, "sesh", "config.toml"), []byte(source), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := config.FieldCommands{
+		"sha":     {ShellCommand: "git rev-parse --short HEAD", Command: "", Args: nil, Refresh: ""},
+		"weather": {ShellCommand: "", Command: "/opt/bin/weather", Args: []string{"--short", "x y"}, Refresh: "10m"},
+	}
+	if !reflect.DeepEqual(cfg.Display.Fields, want) {
+		t.Fatalf("Display.Fields = %#v, want %#v", cfg.Display.Fields, want)
+	}
+
+	if cfg.Display.SeshFormat != "{session_name}{right}{custom.weather}" {
+		t.Fatalf("SeshFormat = %q, want environment override", cfg.Display.SeshFormat)
+	}
+
+	cloned := cfg.Clone()
+	cloned.Display.Fields["weather"].Args[0] = "--long"
+
+	if cfg.Display.Fields["weather"].Args[0] != "--short" {
+		t.Fatal("Clone() shares field args with the original")
+	}
 }
 
 func TestRemoteConfigTOMLDecodesConnections(t *testing.T) {

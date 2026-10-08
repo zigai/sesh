@@ -55,6 +55,8 @@ func (v sessionFormatValues) ResolveSessionFormatCell(field string) (string, lay
 			return v.resolveGHCell(field)
 		case display.ProviderAHT:
 			return v.resolveAHTCell(field)
+		case display.ProviderCustom:
+			return v.resolveCustomCell(field)
 		case display.ProviderSession, display.ProviderAgent, display.ProviderClock, display.ProviderGit:
 		}
 	}

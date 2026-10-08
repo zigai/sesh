@@ -183,6 +183,7 @@ type Model struct {
 	resourceSample               providers.ResourceSample
 	resourceProcRoot             string
 	ghEntries                    map[ghKey]ghEntry
+	customFields                 customFieldState
 	agentGit                     map[string]agentGitCacheEntry
 	gitScan                      gitScanner
 	remoteCatalogUpdates         chan remoteCatalogMsg
@@ -285,6 +286,11 @@ func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps
 		return nil, err
 	}
 
+	customFields, err := newCustomFieldState(formats, cfg.Display.Fields)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Model{
 		sessions:                     []session.Session{},
 		displaySessions:              []session.Session{},
@@ -345,6 +351,7 @@ func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps
 		resourceSample:               providers.ResourceSample{At: time.Time{}, Processes: nil},
 		resourceProcRoot:             "",
 		ghEntries:                    nil,
+		customFields:                 customFields,
 		agentGit:                     map[string]agentGitCacheEntry{},
 		gitScan:                      scanGitMetadata,
 		remoteCatalogUpdates:         make(chan remoteCatalogMsg, 1),
@@ -427,6 +434,7 @@ func (m *Model) SetInitialSessions(sessions []session.Session) {
 		agentSummaries:    nil,
 		agentObservation:  0,
 		agentGit:          m.agentGit,
+		customFieldCache:  nil,
 		remoteCatalog:     RemoteCatalog{GeneratedAt: time.Time{}, Connections: nil},
 		remoteErr:         nil,
 		remoteObservation: 0,
@@ -539,22 +547,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if handler := m.handleModelMessage(msg); handler != nil {
-		return handler()
+	model, command := m.update(msg)
+	if sync := m.syncCustomFields(); sync != nil {
+		command = tea.Batch(command, sync)
 	}
 
-	switch msg := msg.(type) {
-	case tea.KeyPressMsg:
-		return m.handleKeyPressMsg(msg)
-	case tea.MouseClickMsg:
-		return m.handleMouseClickMsg(msg)
-	case tea.MouseWheelMsg:
-		return m.handleMouseWheelMsg(msg)
-	case tea.MouseMotionMsg:
-		return m.handleMouseMotionMsg(msg)
-	default:
-		return m.updateTextInput(msg)
-	}
+	return model, command
 }
 
 func (m *Model) View() tea.View {
@@ -571,6 +569,25 @@ func (m *Model) View() tea.View {
 	}
 
 	return view
+}
+
+func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if handler := m.handleModelMessage(msg); handler != nil {
+		return handler()
+	}
+
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		return m.handleKeyPressMsg(msg)
+	case tea.MouseClickMsg:
+		return m.handleMouseClickMsg(msg)
+	case tea.MouseWheelMsg:
+		return m.handleMouseWheelMsg(msg)
+	case tea.MouseMotionMsg:
+		return m.handleMouseMotionMsg(msg)
+	default:
+		return m.updateTextInput(msg)
+	}
 }
 
 func (m *Model) operationContext() context.Context {
@@ -711,6 +728,10 @@ func (m *Model) handleProviderModelMessage(msg tea.Msg) func() (tea.Model, tea.C
 		return func() (tea.Model, tea.Cmd) { return m, m.loadGHCommand() }
 	case ghResultMsg:
 		return func() (tea.Model, tea.Cmd) { return m, m.handleGH(msg) }
+	case customFieldResultMsg:
+		return func() (tea.Model, tea.Cmd) { return m, m.handleCustomFieldResult(msg) }
+	case customFieldTickMsg:
+		return func() (tea.Model, tea.Cmd) { return m, m.handleCustomFieldTick(msg) }
 	default:
 		return nil
 	}

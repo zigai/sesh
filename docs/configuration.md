@@ -21,6 +21,7 @@ Override via environment: `SESH_<SECTION>_<KEY>`, for example `SESH_SETTINGS_LOG
 | Snapshots | `$XDG_DATA_HOME/sesh/snapshots` |
 | Logs | `$XDG_STATE_HOME/sesh/sesh.log` |
 | History | `$XDG_STATE_HOME/sesh/history.json` |
+| Custom field cache | `$XDG_CACHE_HOME/sesh/fields` |
 
 ## Default configuration
 
@@ -139,3 +140,37 @@ session_attach_pre = []
 session_attach_post = []
 tmux_startup_post = []
 ```
+
+## Custom fields
+
+`{custom.NAME}` in a row format shows the output of the command defined under `[display.fields]`:
+
+```toml
+[display]
+sesh_format = "{source_prefix}{session_name}{right}{custom.git_sha}"
+
+[display.fields]
+git_sha = "git rev-parse --short HEAD"
+weather = { command = "/usr/local/bin/weather", args = ["--short"], refresh = "10m" }
+```
+
+A string runs with `/bin/sh -c`. A table runs `command` with `args`, for example `{ command = "zsh", args = ["-c", "..."] }` for another shell. Names use `a-z`, `0-9` and `_`.
+
+The popup runs a field for each row when it opens and again when that row changes. `refresh` also reruns it on an interval. Rows run at the same time. Closing the popup stops running commands.
+
+Each run gets the row as one JSON line on stdin, with `schemaVersion`, `field`, `row`, `session`, and `agent` on agent rows. It also gets these environment variables:
+
+| Variable | Value |
+| --- | --- |
+| `SESH_FIELD` | Field name |
+| `SESH_ROW` | `session` or `agent` |
+| `SESH_SESSION`, `SESH_SESSION_ID` | Session name and ID |
+| `SESH_SESSION_KIND` | `live` or `saved` |
+| `SESH_SESSION_PATH` | Session directory |
+| `SESH_ORIGIN`, `SESH_CONNECTION_ID` | `local`, `ssh` or `bridge`, and the remote connection |
+| `SESH_PANE_ID` | Agent pane on agent rows, active pane on session rows |
+| `SESH_AGENT_HARNESS`, `SESH_AGENT_STATUS`, `SESH_AGENT_CWD`, `SESH_AGENT_PROJECT_ROOT`, `SESH_AGENT_GIT_BRANCH`, `SESH_AGENT_PID` | Agent details, empty on session rows |
+
+A command starts in the row's directory when the row is local and the directory exists.
+
+The value is everything the command writes to stdout until stdout closes, so redirect the output of background jobs. Line breaks become spaces. Color and style escape sequences are kept; other escape sequences are removed. Empty output hides the field and any `[...]` group around it. When a command fails, the field keeps its previous value and the failure goes to the log with the command's stderr.

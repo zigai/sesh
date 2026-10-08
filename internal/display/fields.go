@@ -1,6 +1,9 @@
 package display
 
-import "slices"
+import (
+	"slices"
+	"strings"
+)
 
 const (
 	ProviderSession     FieldProvider = "session"
@@ -10,6 +13,8 @@ const (
 	ProviderAHT         FieldProvider = "aht"
 	ProviderResource    FieldProvider = "resource"
 	ProviderGH          FieldProvider = "gh"
+	ProviderCustom      FieldProvider = "custom"
+	CustomFieldPrefix                 = "custom."
 	markerCellWidth                   = 2
 	compactAgeCellWidth               = 3
 )
@@ -29,8 +34,29 @@ type FieldMetadata struct {
 }
 
 func FieldInfo(field string) (FieldMetadata, bool) {
+	if _, ok := CustomFieldName(field); ok {
+		return FieldMetadata{
+			Provider: ProviderCustom, WidthBound: 0, TruncateLeft: false,
+			Flexible: false, SessionRows: true, AgentRows: true, Compact: "",
+		}, true
+	}
+
 	info, ok := fieldRegistry[field]
+
 	return info, ok
+}
+
+func CustomFieldName(field string) (string, bool) {
+	name, ok := strings.CutPrefix(field, CustomFieldPrefix)
+	if !ok || !ValidCustomFieldName(name) {
+		return "", false
+	}
+
+	return name, true
+}
+
+func ValidCustomFieldName(name string) bool {
+	return validIdentifier(name)
 }
 
 func FieldsByProvider(provider FieldProvider) []string {
