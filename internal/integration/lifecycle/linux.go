@@ -2,17 +2,12 @@
 
 package lifecycle
 
-import (
-	"time"
-)
-
 const (
-	LogindDefaultInhibitDelayMax = 5 * time.Second
-	LogindShutdownInhibitorWhat  = "shutdown"
-	LogindSleepInhibitorWhat     = "sleep"
-	LogindInhibitorMode          = "delay"
-	LogindInhibitorWho           = "sesh"
-	LogindInhibitorWhy           = "run one bounded final tmux snapshot save before shutdown or sleep"
+	LogindShutdownInhibitorWhat = "shutdown"
+	LogindSleepInhibitorWhat    = "sleep"
+	LogindInhibitorMode         = "delay"
+	LogindInhibitorWho          = "sesh"
+	LogindInhibitorWhy          = "run one bounded final tmux snapshot save before shutdown or sleep"
 )
 
 const (
