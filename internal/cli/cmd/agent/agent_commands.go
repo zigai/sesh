@@ -5,7 +5,6 @@ import (
 	"errors"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -49,26 +48,17 @@ func addAgentRegistryFlags(cmd *cobra.Command) {
 	cmd.Flags().String("state", "", "AHT agent registry file [default: agent_status.store_path setting, else AHT's default registry]")
 }
 
-func resolveAgentHistoryPath(cmd *cobra.Command) string {
-	historyPath, _ := cmd.Flags().GetString("history")
-	if historyPath != "" {
-		if abs, err := filepath.Abs(historyPath); err == nil {
-			return abs
-		}
-	}
-
-	return filepath.Join(config.GetXDGPaths().StateHome, "sesh", "history.json")
-}
-
 func recordNavigatedAgentView(ctx context.Context, cmd *cobra.Command, target agents.PaneLocation) {
 	if target.SessionName == "" || target.PaneID == "" {
 		return
 	}
 
-	historyPath := resolveAgentHistoryPath(cmd)
-	if historyPath == "" {
+	workspace, err := clibase.ResolveWorkspace(cmd)
+	if err != nil {
 		return
 	}
+
+	historyPath := workspace.History
 
 	ident := session.Identity{
 		Origin:           "local",
@@ -78,33 +68,13 @@ func recordNavigatedAgentView(ctx context.Context, cmd *cobra.Command, target ag
 		Name:             target.SessionName,
 	}
 
-	_, err := session.UpdateState(ctx, historyPath, func(st *session.State) {
+	_, err = session.UpdateState(ctx, historyPath, func(st *session.State) {
 		st.RecordAgentView(ident, target.PaneID)
 	})
 	if err != nil {
 		zerolog.Ctx(ctx).Warn().Str("component", "agents").Str("operation", "record_view").
 			Str("status", "degraded").Str("reason", "history_update_failed").Msg("agent navigation history was not recorded")
 	}
-}
-
-// resolveAgentStatePath returns --state, else [agent_status].store_path, else "" so AHT uses
-// its default registry.
-func resolveAgentStatePath(cmd *cobra.Command) (string, error) {
-	statePath, _ := cmd.Flags().GetString("state")
-	if statePath == "" {
-		cfg, err := clibase.LoadCommandConfig(commandContextOrBackground(cmd), cmd)
-		if err != nil {
-			return "", err
-		}
-
-		return cfg.ResolvedAgentStatus().StorePath, nil
-	}
-
-	if abs, err := filepath.Abs(statePath); err == nil {
-		return abs, nil
-	}
-
-	return statePath, nil
 }
 
 func resolveAgentTarget(cmd *cobra.Command) agents.CurrentTarget {
@@ -126,21 +96,19 @@ func resolveAgentTarget(cmd *cobra.Command) agents.CurrentTarget {
 }
 
 func resolveAgentServer(cmd *cobra.Command) (*agents.Navigator, error) {
-	socketPath := clibase.ResolveSocket(cmd)
-
-	server, err := integration.Open(socketPath)
+	workspace, err := clibase.ResolveWorkspace(cmd)
 	if err != nil {
-		return nil, oops.In("cli").With("operation", "open_tmux").Wrap(err)
+		return nil, err
 	}
 
-	statePath, err := resolveAgentStatePath(cmd)
+	server, err := workspace.OpenTmux()
 	if err != nil {
 		return nil, err
 	}
 
 	navigator, err := agents.NewNavigator(agents.NavigatorOptions{
 		Server:     server,
-		StatePath:  statePath,
+		StatePath:  workspace.AgentStore,
 		Target:     resolveAgentTarget(cmd),
 		Controller: nil,
 		Source:     nil,
@@ -344,12 +312,12 @@ func newAgentStatusCommand() *cobra.Command {
 }
 
 func runAgentStatus(cmd *cobra.Command, _ []string) error {
-	statePath, err := resolveAgentStatePath(cmd)
+	workspace, err := clibase.ResolveWorkspace(cmd)
 	if err != nil {
 		return err
 	}
 
-	summary, err := agents.Status(commandContextOrBackground(cmd), statePath)
+	summary, err := agents.Status(commandContextOrBackground(cmd), workspace.AgentStore)
 	if err != nil {
 		return oops.In("cli").With("operation", "agent_status").Wrap(err)
 	}
@@ -394,35 +362,29 @@ func newAgentStatusRunCommand() *cobra.Command {
 }
 
 func runAgentStatusRun(cmd *cobra.Command, _ []string) error {
-	socketPath := clibase.ResolveSocket(cmd)
-
-	server, err := integration.Open(socketPath)
-	if err != nil {
-		return oops.In("cli").With("operation", "open_tmux").Wrap(err)
-	}
-
-	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
+	workspace, err := clibase.ResolveWorkspace(cmd)
 	if err != nil {
 		return err
 	}
 
+	server, err := workspace.OpenTmux()
+	if err != nil {
+		return err
+	}
+
+	cfg := workspace.Config
 	quiet, _ := cmd.Flags().GetBool("quiet")
 	resolved := cfg.ResolvedAgentStatus()
 
 	styles := agents.NewTmuxStyleController(server, resolved.SetWindowStatusStyle, resolved.SetWindowStatusBellStyle)
 	tracker := agents.NewTracker(styles, agentStatusTrackerOptions(cfg, resolved))
 
-	statePath, err := resolveAgentStatePath(cmd)
-	if err != nil {
-		return err
-	}
-
 	ctx, stop := signal.NotifyContext(commandContextOrBackground(cmd), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	watchOptions := agentStatusWatchOptions(resolved, quiet)
 
-	if err := agents.RunStatusTracker(ctx, agents.NewAHTStore(statePath), tracker, watchOptions, resolved.ClearOnShutdown); err != nil {
+	if err := agents.RunStatusTracker(ctx, workspace.AgentSource(), tracker, watchOptions, resolved.ClearOnShutdown); err != nil {
 		return oops.In("cli").With("operation", "agent_status_run").Wrap(err)
 	}
 

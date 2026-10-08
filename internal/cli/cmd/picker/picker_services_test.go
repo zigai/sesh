@@ -18,6 +18,7 @@ import (
 	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/agents"
+	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/integration/process"
 	"github.com/zigai/sesh/internal/session"
@@ -314,17 +315,10 @@ func TestPickerServicesAHTStorePathRouting(t *testing.T) {
 		cfg := config.DefaultConfig()
 		cfg.AgentStatus.StorePath = "/config/aht.json"
 
-		services, err := newPickerServices(
-			ctx,
-			cfg,
-			filepath.Join(dirs, "tmux.sock"),
-			filepath.Join(dirs, "repo1"),
-			filepath.Join(dirs, "leases1"),
-			filepath.Join(dirs, "history1.json"),
-			"/explicit/aht.json",
-			gotmux.Streams{},
-			RemoteServices{},
-		)
+		services, err := newPickerServices(ctx, resolvePickerTestWorkspace(t, cfg, app.Locations{
+			Socket: filepath.Join(dirs, "tmux.sock"), Repository: filepath.Join(dirs, "repo1"), LeaseRoot: filepath.Join(dirs, "leases1"),
+			History: filepath.Join(dirs, "history1.json"), FinalSaveStatus: "", AgentStore: "/explicit/aht.json",
+		}), gotmux.Streams{}, RemoteServices{})
 		if err != nil {
 			t.Fatalf("newPickerServices failed: %v", err)
 		}
@@ -340,17 +334,10 @@ func TestPickerServicesAHTStorePathRouting(t *testing.T) {
 		cfg := config.DefaultConfig()
 		cfg.AgentStatus.StorePath = "/config/fallback/aht.json"
 
-		services, err := newPickerServices(
-			ctx,
-			cfg,
-			filepath.Join(dirs, "tmux.sock"),
-			filepath.Join(dirs, "repo2"),
-			filepath.Join(dirs, "leases2"),
-			filepath.Join(dirs, "history2.json"),
-			"",
-			gotmux.Streams{},
-			RemoteServices{},
-		)
+		services, err := newPickerServices(ctx, resolvePickerTestWorkspace(t, cfg, app.Locations{
+			Socket: filepath.Join(dirs, "tmux.sock"), Repository: filepath.Join(dirs, "repo2"), LeaseRoot: filepath.Join(dirs, "leases2"),
+			History: filepath.Join(dirs, "history2.json"), FinalSaveStatus: "", AgentStore: "",
+		}), gotmux.Streams{}, RemoteServices{})
 		if err != nil {
 			t.Fatalf("newPickerServices failed: %v", err)
 		}
@@ -370,17 +357,10 @@ func TestPickerServicesSnapshotSessionRejectsInvalidEnv(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Snapshot.ProcessEnvironment = []string{"INVALID=KEY"}
 
-	services, err := newPickerServices(
-		ctx,
-		cfg,
-		filepath.Join(dirs, "tmux.sock"),
-		filepath.Join(dirs, "repo"),
-		filepath.Join(dirs, "leases"),
-		filepath.Join(dirs, "history.json"),
-		"",
-		gotmux.Streams{},
-		RemoteServices{},
-	)
+	services, err := newPickerServices(ctx, resolvePickerTestWorkspace(t, cfg, app.Locations{
+		Socket: filepath.Join(dirs, "tmux.sock"), Repository: filepath.Join(dirs, "repo"), LeaseRoot: filepath.Join(dirs, "leases"),
+		History: filepath.Join(dirs, "history.json"), FinalSaveStatus: "", AgentStore: "",
+	}), gotmux.Streams{}, RemoteServices{})
 	if err != nil {
 		t.Fatalf("newPickerServices failed: %v", err)
 	}
@@ -411,17 +391,10 @@ func TestPickerServicesSnapshotSessionRejectsExcessiveEnv(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Snapshot.ProcessEnvironment = keys
 
-	services, err := newPickerServices(
-		ctx,
-		cfg,
-		filepath.Join(dirs, "tmux.sock"),
-		filepath.Join(dirs, "repo"),
-		filepath.Join(dirs, "leases"),
-		filepath.Join(dirs, "history.json"),
-		"",
-		gotmux.Streams{},
-		RemoteServices{},
-	)
+	services, err := newPickerServices(ctx, resolvePickerTestWorkspace(t, cfg, app.Locations{
+		Socket: filepath.Join(dirs, "tmux.sock"), Repository: filepath.Join(dirs, "repo"), LeaseRoot: filepath.Join(dirs, "leases"),
+		History: filepath.Join(dirs, "history.json"), FinalSaveStatus: "", AgentStore: "",
+	}), gotmux.Streams{}, RemoteServices{})
 	if err != nil {
 		t.Fatalf("newPickerServices failed: %v", err)
 	}
@@ -438,4 +411,15 @@ func TestPickerServicesSnapshotSessionRejectsExcessiveEnv(t *testing.T) {
 	if !errors.Is(err, process.ErrEnvironmentLimitExceeded) {
 		t.Fatalf("expected ErrEnvironmentLimitExceeded, got: %v", err)
 	}
+}
+
+func resolvePickerTestWorkspace(t *testing.T, cfg *config.Config, locations app.Locations) app.Workspace {
+	t.Helper()
+
+	workspace, err := app.Resolve(cfg, locations)
+	if err != nil {
+		t.Fatalf("resolve workspace: %v", err)
+	}
+
+	return workspace
 }

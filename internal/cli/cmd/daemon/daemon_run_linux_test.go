@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/zigai/sesh/internal/automation"
+	cmdautosave "github.com/zigai/sesh/internal/cli/cmd/autosave"
 	"github.com/zigai/sesh/internal/daemon"
 	"github.com/zigai/sesh/internal/integration/lifecycle"
 	"github.com/zigai/sesh/internal/snapshot/store"
@@ -21,6 +22,7 @@ var (
 	errUnexpectedDaemonTrigger  = errors.New("unexpected daemon scheduler trigger")
 	errDaemonLifecycleUncertain = errors.New("daemon lifecycle outcome is uncertain")
 	errTestUnrecordedStatus     = errors.New("unrecorded status failure")
+	errAutosaveIncomplete       = errors.New("autosave did not complete within its deadline")
 )
 
 type daemonLifecycleRuntime struct {
@@ -210,7 +212,12 @@ func TestDaemonRepositoryGateRefusesUnresolvedSave(t *testing.T) {
 		t.Fatalf("set repository flag: %v", err)
 	}
 
-	err = ensureDaemonRepositoryReady(t.Context(), cmd, autosaveEnv{})
+	env, err := cmdautosave.ResolveEnv(cmd)
+	if err != nil {
+		t.Fatalf("resolve autosave env: %v", err)
+	}
+
+	err = ensureDaemonRepositoryReady(t.Context(), env)
 	if !errors.Is(err, errDaemonRecoveryBarrier) {
 		t.Fatalf("ensureDaemonRepositoryReady error = %v, want recovery barrier", err)
 	}

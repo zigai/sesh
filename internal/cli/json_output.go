@@ -309,6 +309,10 @@ func sentinelErrorMessage(err error) (string, bool) {
 }
 
 func sessionSentinelMessage(err error) (string, bool) {
+	if notFound, ok := errors.AsType[*capture.SessionNotFoundError](err); ok {
+		return notFound.Error(), true
+	}
+
 	switch {
 	case errors.Is(err, gotmux.ErrNoServer):
 		return "no tmux server is running on the selected socket; start tmux or pass --socket", true
@@ -466,6 +470,10 @@ func jsonErrorCode(err error) string {
 }
 
 func sessionErrorCode(err error) (string, bool) {
+	if _, ok := errors.AsType[*capture.SessionNotFoundError](err); ok {
+		return "sessionNotFound", true
+	}
+
 	switch {
 	case errors.Is(err, session.ErrCurrentSessionAmbiguous):
 		return "currentSessionAmbiguous", true

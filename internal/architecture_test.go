@@ -48,12 +48,18 @@ func TestProductionImportBoundaries(t *testing.T) {
 func architectureBoundaries() []importBoundary {
 	core := []string{"internal/snapshot/model", "internal/snapshot/store", "internal/integration"}
 
-	workflows := []string{"agents", "automation", "cli", "config", "daemon", "doctor", "remote", "session", "setup", "tui"}
+	workflows := []string{"agents", "app", "automation", "cli", "config", "daemon", "doctor", "remote", "session", "setup", "tui"}
 	for index := range workflows {
 		workflows[index] = nativeModule + "internal/" + workflows[index]
 	}
 
+	services := []string{"internal/agents", "internal/automation", "internal/config", "internal/daemon", "internal/doctor", "internal/remote", "internal/session", "internal/setup", "internal/tui"}
+
 	return []importBoundary{
+		{
+			sources: services, forbidden: []string{nativeModule + "internal/app"},
+			reason: "services are built from the workspace by the command line, not by each other",
+		},
 		{
 			forbidden: []string{"testing", "github.com/zigai/gotmux/tmuxtest", nativeModule + "internal/testsupport", nativeModule + "test"},
 			reason:    "production must not depend on test support",

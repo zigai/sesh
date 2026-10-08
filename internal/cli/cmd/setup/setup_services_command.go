@@ -14,7 +14,6 @@ import (
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
 
-	"github.com/zigai/sesh/internal/automation"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/config"
 	integration "github.com/zigai/sesh/internal/integration/tmux"
@@ -83,13 +82,6 @@ type setupAgentStateJSON struct {
 	Running   bool   `json:"running"`
 	Changed   bool   `json:"changed"`
 	Message   string `json:"message,omitempty"`
-}
-
-type serviceDurablePaths struct {
-	repository string
-	leaseRoot  string
-	history    string
-	status     string
 }
 
 func newSetupAgentsCommand() *cobra.Command {
@@ -272,10 +264,12 @@ func addServiceSetupFlags(cmd *cobra.Command) {
 }
 
 func resolveServiceInputs(cmd *cobra.Command, withTmux bool) (setup.ServiceInputs, error) {
-	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
+	workspace, err := clibase.ResolveWorkspace(cmd)
 	if err != nil {
 		return setup.ServiceInputs{}, err
 	}
+
+	cfg := workspace.Config
 
 	program, err := resolveSetupProgram(cmd)
 	if err != nil {
@@ -283,11 +277,6 @@ func resolveServiceInputs(cmd *cobra.Command, withTmux bool) (setup.ServiceInput
 	}
 
 	socketPath, err := resolveSetupServiceSocket(cmd, withTmux)
-	if err != nil {
-		return setup.ServiceInputs{}, err
-	}
-
-	durable, err := resolveServiceDurablePaths(cmd, cfg)
 	if err != nil {
 		return setup.ServiceInputs{}, err
 	}
@@ -301,10 +290,10 @@ func resolveServiceInputs(cmd *cobra.Command, withTmux bool) (setup.ServiceInput
 		Program:                program,
 		Tmux:                   "",
 		SocketPath:             socketPath,
-		RepositoryPath:         durable.repository,
-		LeaseRootPath:          durable.leaseRoot,
-		HistoryPath:            durable.history,
-		StatusPath:             durable.status,
+		RepositoryPath:         workspace.Repository,
+		LeaseRootPath:          workspace.LeaseRoot,
+		HistoryPath:            workspace.History,
+		StatusPath:             workspace.FinalSaveStatus,
 		Interval:               interval,
 		FinalSaveDeadline:      deadline,
 		Platform:               "",
@@ -324,48 +313,6 @@ func resolveServiceInputs(cmd *cobra.Command, withTmux bool) (setup.ServiceInput
 	}
 
 	return inputs, nil
-}
-
-func resolveServiceDurablePaths(cmd *cobra.Command, cfg *config.Config) (serviceDurablePaths, error) {
-	repoPath, err := resolveSetupServicePath(cmd, "repository", "")
-	if err != nil {
-		return serviceDurablePaths{}, err
-	}
-
-	leaseRoot, err := resolveSetupServicePath(cmd, "lease-root", "")
-	if err != nil {
-		return serviceDurablePaths{}, err
-	}
-
-	dataDir, err := config.GetDataDir(cfg)
-	if err != nil {
-		return serviceDurablePaths{}, oops.In("cli").With("operation", "resolve_data_dir").Wrap(err)
-	}
-
-	if repoPath == "" {
-		repoPath = filepath.Join(dataDir, "snapshots")
-	}
-
-	if leaseRoot == "" {
-		leaseRoot = filepath.Join(dataDir, "leases")
-	}
-
-	historyPath, err := resolveSetupServicePath(cmd, "history", filepath.Join(config.GetXDGPaths().StateHome, "sesh", "history.json"))
-	if err != nil {
-		return serviceDurablePaths{}, err
-	}
-
-	statusPath, err := resolveSetupServicePath(cmd, "status-file", filepath.Join(config.GetXDGPaths().StateHome, "sesh", automation.FinalSaveStatusName))
-	if err != nil {
-		return serviceDurablePaths{}, err
-	}
-
-	return serviceDurablePaths{
-		repository: repoPath,
-		leaseRoot:  leaseRoot,
-		history:    historyPath,
-		status:     statusPath,
-	}, nil
 }
 
 func resolveServiceTiming(cmd *cobra.Command, cfg *config.Config) (time.Duration, time.Duration, error) {
@@ -839,24 +786,6 @@ func resolveSetupServiceSocket(cmd *cobra.Command, withTmux bool) (string, error
 	abs, err := filepath.Abs(socketPath)
 	if err != nil {
 		return "", oops.In("cli").With("operation", "resolve_socket_path").Wrap(err)
-	}
-
-	return abs, nil
-}
-
-func resolveSetupServicePath(cmd *cobra.Command, flag, fallback string) (string, error) {
-	value, _ := cmd.Flags().GetString(flag)
-	if value == "" {
-		value = fallback
-	}
-
-	if value == "" {
-		return "", nil
-	}
-
-	abs, err := filepath.Abs(value)
-	if err != nil {
-		return "", oops.In("cli").With("operation", "resolve_service_path").Wrap(err)
 	}
 
 	return abs, nil

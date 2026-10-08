@@ -222,12 +222,12 @@ func collectionBudget(cmd *cobra.Command) (store.CollectionBudget, error) {
 }
 
 func openMaintenanceRepository(cmd *cobra.Command) (*store.Repository, error) {
-	absPath, err := clibase.ResolveRepository(cmd)
+	workspace, err := clibase.ResolveWorkspace(cmd)
 	if err != nil {
 		return nil, err
 	}
 
-	repository, err := store.OpenExisting(cmd.Context(), absPath)
+	repository, err := workspace.OpenExistingRepository(cmd.Context())
 	if err != nil {
 		return nil, oops.In("cli").With("operation", "open_repository").Wrap(err)
 	}

@@ -8,7 +8,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -17,6 +16,7 @@ import (
 	"github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/agents"
+	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	cmdpicker "github.com/zigai/sesh/internal/cli/cmd/picker"
 	"github.com/zigai/sesh/internal/config"
@@ -24,7 +24,6 @@ import (
 	"github.com/zigai/sesh/internal/privatefs"
 	"github.com/zigai/sesh/internal/remote"
 	"github.com/zigai/sesh/internal/session"
-	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
 const (
@@ -33,10 +32,7 @@ const (
 	remoteLookupArgCount    = 2
 )
 
-var (
-	errRemoteTargetMissing      = errors.New("remote target is not present in the cached catalog")
-	errRemotePeerConfigRequired = errors.New("remote peer configuration is required")
-)
+var errRemoteTargetMissing = errors.New("remote target is not present in the cached catalog")
 
 type remoteLookupRuntime struct {
 	peerID   string
@@ -50,24 +46,13 @@ type remotePeerRuntime struct {
 	receipts          *privatefs.Dir
 }
 
-func OpenRemoteNativeSavedSessions(cfg *config.Config, repository, leaseRoot string, server *tmux.Server) (*remote.NativeSavedSessions, error) {
-	if cfg == nil {
-		return nil, oops.In("cli").With("operation", "open_remote_saved_sessions").Wrap(errRemotePeerConfigRequired)
-	}
-
-	var processEnv []string
-	if cfg.Snapshot.ProcessEnvironment != nil {
-		processEnv = cfg.Snapshot.ProcessEnvironment
-	} else {
-		processEnv = config.DefaultProcessEnvironment
-	}
-
+func openRemoteNativeSavedSessions(workspace app.Workspace, server *tmux.Server) (*remote.NativeSavedSessions, error) {
 	saved, err := remote.NewNativeSavedSessions(remote.NativeSavedConfig{
-		Repository:         repository,
-		LeaseRoot:          leaseRoot,
+		Repository:         workspace.Repository,
+		LeaseRoot:          workspace.LeaseRoot,
 		Server:             server,
-		ProcessEnvironment: processEnv,
-		AgentSource:        agents.NewAHTStore(cfg.AgentStatus.StorePath),
+		ProcessEnvironment: workspace.Config.Snapshot.ProcessEnvironment,
+		AgentSource:        workspace.AgentSource(),
 	})
 	if err != nil {
 		return nil, oops.In("cli").With("operation", "open_remote_saved_sessions").Wrap(err)
@@ -145,26 +130,6 @@ func remoteLiveAnnotations(operation string) map[string]string {
 		clibase.AnnotationLiveIO:    "true",
 		clibase.AnnotationOperation: operation,
 	}
-}
-
-func remoteRuntimePaths(cfg *config.Config) (string, string, error) {
-	dataDir, err := config.GetDataDir(cfg)
-	if err != nil {
-		return "", "", remoteCLIError("resolve_remote_data_dir", err)
-	}
-
-	leaseRoot := filepath.Join(dataDir, "leases")
-
-	dir, err := privatefs.Ensure(leaseRoot)
-	if err != nil {
-		return "", "", remoteCLIError("ensure_remote_lease_root", err)
-	}
-
-	if err := dir.Close(); err != nil {
-		return "", "", remoteCLIError("close_remote_lease_root", err)
-	}
-
-	return filepath.Join(dataDir, "snapshots"), leaseRoot, nil
 }
 
 func openRemotePrivate(path string) (*privatefs.Dir, error) {
@@ -303,17 +268,16 @@ func openRemotePeerRuntime(cmd *cobra.Command, socket string, needSaved, needRec
 }
 
 func (runtime *remotePeerRuntime) openSaved(cmd *cobra.Command, server *tmux.Server) error {
-	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
+	workspace, err := clibase.ResolveWorkspace(cmd)
 	if err != nil {
 		return err
 	}
 
-	repository, leaseRoot, err := remoteRuntimePaths(cfg)
-	if err != nil {
-		return err
+	if err := workspace.EnsureLeaseRoot(); err != nil {
+		return remoteCLIError("ensure_remote_lease_root", err)
 	}
 
-	runtime.saved, err = OpenRemoteNativeSavedSessions(cfg, repository, leaseRoot, server)
+	runtime.saved, err = openRemoteNativeSavedSessions(workspace, server)
 	if err != nil {
 		return remoteCLIError("open_remote_saved_sessions", err)
 	}
@@ -351,7 +315,7 @@ func runRemotePeerStream(cmd *cobra.Command, _ []string) error {
 		return remoteCLIError("decode_remote_stream_bootstrap", err)
 	}
 
-	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
+	workspace, err := clibase.ResolveWorkspace(cmd)
 	if err != nil {
 		return err
 	}
@@ -368,8 +332,10 @@ func runRemotePeerStream(cmd *cobra.Command, _ []string) error {
 		PollInterval:      remote.ParsedDuration(bootstrap.PollInterval, time.Second),
 		HeartbeatInterval: remote.ParsedDuration(bootstrap.HeartbeatInterval, remoteHeartbeatInterval),
 		Sessions:          runtime.live.Sessions,
-		Agents:            func(ctx context.Context) ([]session.AgentSummary, error) { return remotePeerAgentSummaries(ctx, cfg) },
-		SavedSessions:     func(ctx context.Context) ([]session.Session, error) { return remotePeerSavedSessions(ctx, cfg) },
+		Agents: func(ctx context.Context) ([]session.AgentSummary, error) {
+			return remotePeerAgentSummaries(ctx, workspace)
+		},
+		SavedSessions: func(ctx context.Context) ([]session.Session, error) { return remotePeerSavedSessions(ctx, workspace) },
 	}, cmd.OutOrStdout()))
 }
 
@@ -535,12 +501,8 @@ func remoteOutputFile(writer io.Writer) (*os.File, bool) {
 	return nil, false
 }
 
-func remotePeerAgentSummaries(ctx context.Context, cfg *config.Config) ([]session.AgentSummary, error) {
-	if cfg == nil {
-		return nil, oops.In("cli").With("operation", "load_remote_agents").Wrap(errRemotePeerConfigRequired)
-	}
-
-	observed, err := agents.LoadLiveAgents(ctx, agents.NewAHTStore(cfg.AgentStatus.StorePath))
+func remotePeerAgentSummaries(ctx context.Context, workspace app.Workspace) ([]session.AgentSummary, error) {
+	observed, err := agents.LoadLiveAgents(ctx, workspace.AgentSource())
 	if err != nil {
 		return nil, oops.In("cli").With("operation", "load_remote_agents").Wrap(err)
 	}
@@ -548,17 +510,8 @@ func remotePeerAgentSummaries(ctx context.Context, cfg *config.Config) ([]sessio
 	return cmdpicker.AgentSummaries(observed), nil
 }
 
-func remotePeerSavedSessions(ctx context.Context, cfg *config.Config) ([]session.Session, error) {
-	if cfg == nil {
-		return nil, oops.In("cli").With("operation", "load_remote_saved_sessions").Wrap(errRemotePeerConfigRequired)
-	}
-
-	dataDir, err := config.GetDataDir(cfg)
-	if err != nil {
-		return nil, oops.In("cli").With("operation", "resolve_remote_repository").Wrap(err)
-	}
-
-	repository, err := store.OpenExisting(ctx, filepath.Join(dataDir, "snapshots"))
+func remotePeerSavedSessions(ctx context.Context, workspace app.Workspace) ([]session.Session, error) {
+	repository, err := workspace.OpenExistingRepository(ctx)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}
