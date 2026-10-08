@@ -99,9 +99,12 @@ func navigateAttentionAction(ctx context.Context, cmd *cobra.Command, navigator 
 }
 
 func navigateUnread(ctx context.Context, cmd *cobra.Command, navigator *agents.Navigator, scope agents.NavigationScope) (agents.PaneLocation, error) {
-	path := resolveAgentHistoryPath(cmd)
+	workspace, err := clibase.ResolveWorkspace(cmd)
+	if err != nil {
+		return agents.PaneLocation{}, err
+	}
 
-	state, err := session.LoadState(path)
+	state, err := session.LoadState(workspace.History)
 	if err != nil {
 		return agents.PaneLocation{}, oops.In("cli").Code("history_read_failed").With("operation", "agent_unread").Wrap(err)
 	}
@@ -120,7 +123,7 @@ func navigateUnread(ctx context.Context, cmd *cobra.Command, navigator *agents.N
 		return agents.PaneLocation{}, navErr
 	}
 
-	writeErr := acknowledgeUnread(ctx, path, visit)
+	writeErr := acknowledgeUnread(ctx, workspace.History, visit)
 
 	return visit.Pane, errors.Join(navErr, writeErr)
 }

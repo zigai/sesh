@@ -13,11 +13,11 @@ import (
 	"github.com/spf13/cobra"
 	gotmux "github.com/zigai/gotmux/tmux"
 
+	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/snapshot/engine"
-	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
 const (
@@ -32,7 +32,12 @@ type sessionListJSONResult struct {
 }
 
 func LoadHistoryState(cmd *cobra.Command) (*session.State, error) {
-	st, err := session.LoadState(resolveHistoryPath(cmd))
+	workspace, err := clibase.ResolveWorkspace(cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	st, err := session.LoadState(workspace.History)
 	if err != nil {
 		return nil, oops.In("cli").With("operation", "load_state").Wrap(err)
 	}
@@ -175,12 +180,12 @@ func renderListOutput(cmd *cobra.Command, server *gotmux.Server, sessions []sess
 // hintSavedSessions points at the newest snapshot on stderr when some of its sessions are not
 // running, as after a reboot before anything was restored.
 func hintSavedSessions(cmd *cobra.Command, server *gotmux.Server, empty bool) {
-	repoPath, err := clibase.ResolveRepository(cmd)
+	workspace, err := clibase.ResolveWorkspace(cmd)
 	if err != nil {
 		return
 	}
 
-	repo, err := store.OpenExisting(cmd.Context(), repoPath)
+	repo, err := workspace.OpenExistingRepository(cmd.Context())
 	if err != nil {
 		return
 	}
@@ -207,18 +212,18 @@ func hintSavedSessions(cmd *cobra.Command, server *gotmux.Server, empty bool) {
 			noun = "session"
 		}
 
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%d saved %s available. If tmux stopped, start it on the same socket first.\nRestore with: %s\n", count, noun, restoreCommand(cmd, repoPath))
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%d saved %s available. If tmux stopped, start it on the same socket first.\nRestore with: %s\n", count, noun, restoreCommand(cmd, workspace))
 	case len(missing) > 0:
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Saved sessions not running: %s\ntmux started after the newest snapshot, so they were not restored.\nRestore with: %s\n", strings.Join(missing, ", "), restoreCommand(cmd, repoPath))
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Saved sessions not running: %s\ntmux started after the newest snapshot, so they were not restored.\nRestore with: %s\n", strings.Join(missing, ", "), restoreCommand(cmd, workspace))
 	}
 }
 
-func restoreCommand(cmd *cobra.Command, repoPath string) string {
+func restoreCommand(cmd *cobra.Command, workspace app.Workspace) string {
 	quote := func(value string) string {
 		return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
 	}
 
-	command := "sesh snapshot restore --socket " + quote(clibase.ResolveSocket(cmd)) + " --repository " + quote(repoPath)
+	command := "sesh snapshot restore --socket " + quote(workspace.Socket) + " --repository " + quote(workspace.Repository)
 	if noConfig, _ := cmd.Flags().GetBool("no-config"); noConfig {
 		command += " --no-config"
 	} else if configPath, _ := cmd.Flags().GetString("config"); configPath != "" {
@@ -261,10 +266,6 @@ func runList(cmd *cobra.Command, _ []string) error {
 
 	server, currentPane, full, err := parseListOptions(cmd)
 	if err != nil {
-		return err
-	}
-
-	if _, err := clibase.LoadCommandConfig(cmd.Context(), cmd); err != nil {
 		return err
 	}
 

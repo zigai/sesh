@@ -12,6 +12,7 @@ import (
 
 	"github.com/samber/oops"
 
+	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/tui"
 )
@@ -260,8 +261,8 @@ func TestCompletePickerHandoffRecordsDeferredViewsAfterCancel(t *testing.T) {
 
 	historyPath := filepath.Join(historyDir, "history.json")
 	services := &pickerServices{
-		historyPath: historyPath,
-		workflow:    session.NewWorkflow(nil, nil, historyPath),
+		workspace: app.Workspace{History: historyPath},
+		workflow:  session.NewWorkflow(nil, nil, historyPath),
 	}
 
 	if err := completePickerSwitchHandoff(t.Context(), services, path, "", ""); err != nil {

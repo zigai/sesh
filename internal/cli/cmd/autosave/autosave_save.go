@@ -10,11 +10,10 @@ import (
 	"github.com/spf13/cobra"
 	gotmux "github.com/zigai/gotmux/tmux"
 
-	"github.com/zigai/sesh/internal/agents"
+	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/automation"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/config"
-	integration "github.com/zigai/sesh/internal/integration/tmux"
 	"github.com/zigai/sesh/internal/snapshot/engine"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
@@ -60,7 +59,7 @@ func NewSaveIfDueCommand() *cobra.Command {
 }
 
 func runAutosaveSaveIfDue(cmd *cobra.Command, _ []string) error {
-	env, err := resolveAutosaveEnv(cmd)
+	env, err := ResolveEnv(cmd)
 	if err != nil {
 		return err
 	}
@@ -82,27 +81,20 @@ func runAutosaveSaveIfDue(cmd *cobra.Command, _ []string) error {
 	return executeAutosaveSave(clibase.CommandContext(cmd), cmd, env)
 }
 
-func executeAutosaveSave(ctx context.Context, cmd *cobra.Command, env autosaveEnv) error {
-	socketPath := clibase.ResolveSocket(cmd)
-
-	processEnv, agentStatePath, envErr := resolveAutosaveProcessEnv(cmd, env.cfg)
+func executeAutosaveSave(ctx context.Context, cmd *cobra.Command, env Env) error {
+	processEnv, envErr := env.workspace.ProcessEnvironment()
 	if envErr != nil {
 		return envErr
 	}
 
-	leaseRoot, err := resolveAutosaveLeaseRoot(cmd, env.cfg)
+	repo, err := env.workspace.OpenRepository(ctx)
 	if err != nil {
 		return err
 	}
 
-	repo, err := openAutosaveRepository(ctx, cmd, env.cfg)
+	server, err := env.workspace.OpenTmux()
 	if err != nil {
-		return err
-	}
-
-	server, err := integration.Open(socketPath)
-	if err != nil {
-		return errors.Join(oops.In("cli").With("operation", "open_tmux").Wrap(err), wrapCloseError(repo.Close()))
+		return errors.Join(err, wrapCloseError(repo.Close()))
 	}
 
 	selected, err := resolveAutosaveSelection(ctx, cmd, server)
@@ -124,10 +116,10 @@ func executeAutosaveSave(ctx context.Context, cmd *cobra.Command, env autosaveEn
 	}
 
 	result, saveErr := engine.SaveObservation(ctx, repo, server, selected, engine.SaveConfig{
-		LeaseRoot:              leaseRoot,
+		LeaseRoot:              env.workspace.LeaseRoot,
 		ProcessEnrichment:      true,
 		ProcessEnvironmentKeys: processEnv,
-		AgentSource:            agents.NewAHTStore(agentStatePath),
+		AgentSource:            env.workspace.AgentSource(),
 		Profile:                engine.RecoveryPractical,
 	})
 	if saveErr == nil {
@@ -193,7 +185,7 @@ func NewFinalSaveCommand() *cobra.Command {
 }
 
 func runAutosaveFinalSave(cmd *cobra.Command, _ []string) error {
-	env, err := resolveAutosaveEnv(cmd)
+	env, err := ResolveEnv(cmd)
 	if err != nil {
 		return err
 	}
@@ -210,25 +202,15 @@ func runAutosaveFinalSave(cmd *cobra.Command, _ []string) error {
 	ctx, cancel := context.WithTimeout(clibase.CommandContext(cmd), deadline)
 	defer cancel()
 
-	started := time.Now()
-
-	outcome, status, saveErr := executeFinalSave(ctx, cmd, env)
-
-	status.StartedAtUnix = started.Unix()
-	status.CompletedAtUnix = time.Now().Unix()
-	status.DurationMS = time.Since(started).Milliseconds()
-
-	statusErr := automation.WriteFinalSaveStatus(resolveAutosaveStatusPath(cmd), status)
-	if statusErr != nil {
-		statusErr = oops.In("cli").With("operation", "write_final_save_status").Wrap(statusErr)
-	}
-
+	outcome, saveErr, statusErr := recordFinalSave(ctx, cmd, env)
 	if saveErr != nil {
 		return errors.Join(
 			renderAutosaveDegraded(cmd, env, outcome, errors.Join(saveErr, statusErr)),
 			statusErr,
 		)
 	}
+
+	cmd.Annotations[clibase.AnnotationSuccessOwned] = "true"
 
 	renderErr := renderAutosaveResult(cmd, env, outcome)
 
@@ -239,29 +221,58 @@ func runAutosaveFinalSave(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
+type FinalSaveResult struct {
+	Attempt        automation.AttemptResult
+	StatusRecorded bool
+}
+
+func FinalSave(ctx context.Context, cmd *cobra.Command, env Env) (FinalSaveResult, error) {
+	outcome, saveErr, statusErr := recordFinalSave(ctx, cmd, env)
+
+	return FinalSaveResult{
+		Attempt: automation.AttemptResult{
+			Attempt:    outcome.attempt,
+			Generation: outcome.generation,
+			Status:     outcome.snapshot,
+			Recorded:   outcome.recorded,
+		},
+		StatusRecorded: statusErr == nil,
+	}, errors.Join(saveErr, statusErr)
+}
+
+func recordFinalSave(ctx context.Context, cmd *cobra.Command, env Env) (autosaveOutcome, error, error) {
+	started := time.Now()
+
+	outcome, status, saveErr := executeFinalSave(ctx, cmd, env)
+
+	status.StartedAtUnix = started.Unix()
+	status.CompletedAtUnix = time.Now().Unix()
+	status.DurationMS = time.Since(started).Milliseconds()
+
+	statusErr := automation.WriteFinalSaveStatus(env.workspace.FinalSaveStatus, status)
+	if statusErr != nil {
+		statusErr = oops.In("cli").With("operation", "write_final_save_status").Wrap(statusErr)
+	}
+
+	return outcome, saveErr, statusErr
+}
+
 func executeFinalSave(
 	ctx context.Context,
 	cmd *cobra.Command,
-	env autosaveEnv,
+	env Env,
 ) (autosaveOutcome, automation.FinalSaveStatus, error) {
 	outcome := newAutosaveOutcome(autosaveStatusSaved, automation.ReasonShutdownAdmit)
 	outcome.history = autosaveHistoryState(env)
 
 	status := newFinalSaveStatus()
 
-	socketPath := clibase.ResolveSocket(cmd)
-
-	processEnv, agentStatePath, envErr := resolveAutosaveProcessEnv(cmd, env.cfg)
+	processEnv, envErr := env.workspace.ProcessEnvironment()
 	if envErr != nil {
 		return finalSaveFailure(outcome, status, automation.FinalSaveFailed, "invalid_environment_keys", envErr)
 	}
 
-	leaseRoot, err := resolveAutosaveLeaseRoot(cmd, env.cfg)
-	if err != nil {
-		return finalSaveFailure(outcome, status, automation.FinalSaveFailed, "lease_root_unresolved", err)
-	}
-
-	repo, err := openAutosaveRepository(ctx, cmd, env.cfg)
+	repo, err := env.workspace.OpenRepository(ctx)
 	if err != nil {
 		return finalSaveFailure(outcome, status, automation.FinalSaveFailed, "repository_unavailable", err)
 	}
@@ -271,7 +282,7 @@ func executeFinalSave(
 		return finalSaveLockFailure(outcome, status, repo, err)
 	}
 
-	server, selected, reason, err := openFinalSaveTarget(ctx, cmd, socketPath)
+	server, selected, reason, err := openFinalSaveTarget(ctx, cmd, env.workspace)
 	if err != nil {
 		return finalSaveFailure(
 			outcome,
@@ -294,15 +305,12 @@ func executeFinalSave(
 	}
 
 	result, saveErr := engine.SaveObservation(ctx, repo, server, selected, engine.SaveConfig{
-		LeaseRoot:              leaseRoot,
+		LeaseRoot:              env.workspace.LeaseRoot,
 		ProcessEnrichment:      true,
 		ProcessEnvironmentKeys: processEnv,
-		AgentSource:            agents.NewAHTStore(agentStatePath),
+		AgentSource:            env.workspace.AgentSource(),
 		Profile:                engine.RecoveryPractical,
 	})
-	if saveErr == nil {
-		cmd.Annotations[clibase.AnnotationSuccessOwned] = "true"
-	}
 
 	closeErr := repo.Close()
 	lockErr := lock.Release()
@@ -352,10 +360,10 @@ func executeFinalSave(
 
 // openFinalSaveTarget opens the tmux server and selects the sessions a final save observes. On
 // failure it also returns the fixed reason the final save status records.
-func openFinalSaveTarget(ctx context.Context, cmd *cobra.Command, socketPath string) (*gotmux.Server, []gotmux.SessionID, string, error) {
-	server, err := integration.Open(socketPath)
+func openFinalSaveTarget(ctx context.Context, cmd *cobra.Command, workspace app.Workspace) (*gotmux.Server, []gotmux.SessionID, string, error) {
+	server, err := workspace.OpenTmux()
 	if err != nil {
-		return nil, nil, "server_unavailable", oops.In("cli").With("operation", "open_tmux").Wrap(err)
+		return nil, nil, "server_unavailable", err
 	}
 
 	selected, err := resolveAutosaveSelection(ctx, cmd, server)
@@ -416,7 +424,7 @@ func finalSaveLockFailure(
 	)
 }
 
-func failedSaveOutcome(env autosaveEnv, result engine.SaveResult, saveErr error) autosaveOutcome {
+func failedSaveOutcome(env Env, result engine.SaveResult, saveErr error) autosaveOutcome {
 	outcome := newAutosaveOutcome(autosaveStatusFailed, automation.ReasonSaveFailed)
 	outcome.attempt = result.Attempt
 	outcome.generation = result.Generation
@@ -460,12 +468,12 @@ func handleFinalSaveError(
 
 func recordFinalSaveBookkeeping(
 	ctx context.Context,
-	env autosaveEnv,
+	env Env,
 	outcome *autosaveOutcome,
 	status *automation.FinalSaveStatus,
 ) error {
 	bookkeepingCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), autosaveBookkeepingTimeout)
-	bookkeepingErr := recordAutosave(bookkeepingCtx, env.historyPath, time.Now().Unix())
+	bookkeepingErr := recordAutosave(bookkeepingCtx, env.workspace.History, time.Now().Unix())
 
 	cancel()
 
@@ -485,12 +493,12 @@ func recordFinalSaveBookkeeping(
 }
 
 // maintainAfterAutosave runs repository maintenance with the first recorded save of each day.
-func maintainAfterAutosave(ctx context.Context, repo *store.Repository, env autosaveEnv, decision automation.CompletionDecision, saveErr error) {
+func maintainAfterAutosave(ctx context.Context, repo *store.Repository, env Env, decision automation.CompletionDecision, saveErr error) {
 	if saveErr != nil || !decision.Record || !automation.MaintenanceDue(env.lastSavedUnix, time.Now()) {
 		return
 	}
 
-	maintainAutosaveRepository(ctx, repo, env.cfg.Snapshot)
+	maintainAutosaveRepository(ctx, repo, env.workspace.Config.Snapshot)
 }
 
 // maintainAutosaveRepository applies snapshot retention and reclaims retired generations. It
@@ -508,13 +516,13 @@ func maintainAutosaveRepository(ctx context.Context, repo *store.Repository, sna
 
 // skipAutosaveWithoutServer reports a skipped save when no tmux server is running on the target
 // socket, such as a timer firing after login before tmux starts: there is no state to observe.
-func skipAutosaveWithoutServer(ctx context.Context, cmd *cobra.Command, env autosaveEnv, repo *store.Repository) error {
+func skipAutosaveWithoutServer(ctx context.Context, cmd *cobra.Command, env Env, repo *store.Repository) error {
 	restorable := reportRestorableSessions(ctx, env, repo)
 	closeErr := wrapCloseError(repo.Close())
 
 	idle := newAutosaveOutcome(autosaveStatusSkipped, autosaveReasonTmuxNotRunning)
 	idle.history = autosaveHistoryState(env)
-	idle.repository = autosaveRepositoryState(ctx, cmd, env)
+	idle.repository = autosaveRepositoryState(ctx, env)
 	idle.restorable = restorable
 
 	return errors.Join(renderAutosaveResult(cmd, env, idle), closeErr)
@@ -522,11 +530,11 @@ func skipAutosaveWithoutServer(ctx context.Context, cmd *cobra.Command, env auto
 
 // recordCompletedAutosave durably records the time of a saved autosave, even after the save's
 // own cancellation, and marks the outcome recorded when it succeeds.
-func recordCompletedAutosave(ctx context.Context, env autosaveEnv, outcome *autosaveOutcome) error {
+func recordCompletedAutosave(ctx context.Context, env Env, outcome *autosaveOutcome) error {
 	bookkeepingCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), autosaveBookkeepingTimeout)
 	defer cancel()
 
-	if err := recordAutosave(bookkeepingCtx, env.historyPath, time.Now().Unix()); err != nil {
+	if err := recordAutosave(bookkeepingCtx, env.workspace.History, time.Now().Unix()); err != nil {
 		return clibase.NewExitError(clibase.ExitCodeGeneral, errors.Join(errAutosaveBookkeeping, err))
 	}
 
@@ -538,12 +546,12 @@ func recordCompletedAutosave(ctx context.Context, env autosaveEnv, outcome *auto
 
 // skipAutosaveWhileRestorePending holds back a save while the live server lacks saved sessions
 // it was started without, so the scratch state never replaces them as the newest snapshot.
-func skipAutosaveWhileRestorePending(ctx context.Context, cmd *cobra.Command, env autosaveEnv, repo *store.Repository, pending pendingRestore) error {
+func skipAutosaveWhileRestorePending(ctx context.Context, cmd *cobra.Command, env Env, repo *store.Repository, pending pendingRestore) error {
 	reportPendingRestore(ctx, env, pending)
 
 	skipped := newAutosaveOutcome(autosaveStatusSkipped, autosaveReasonRestorePending)
 	skipped.history = autosaveHistoryState(env)
-	skipped.repository = autosaveRepositoryState(ctx, cmd, env)
+	skipped.repository = autosaveRepositoryState(ctx, env)
 	skipped.restorable = pending.sessions
 
 	closeErr := wrapCloseError(repo.Close())
@@ -551,13 +559,13 @@ func skipAutosaveWhileRestorePending(ctx context.Context, cmd *cobra.Command, en
 	return errors.Join(renderAutosaveResult(cmd, env, skipped), closeErr)
 }
 
-func handleAutosaveLockError(ctx context.Context, cmd *cobra.Command, env autosaveEnv, repo *store.Repository, err error) error {
+func handleAutosaveLockError(ctx context.Context, cmd *cobra.Command, env Env, repo *store.Repository, err error) error {
 	closeErr := wrapCloseError(repo.Close())
 
 	if errors.Is(err, automation.ErrSaveLockBusy) {
 		busy := newAutosaveOutcome(autosaveStatusSkipped, autosaveReasonLockBusy)
 		busy.history = autosaveHistoryState(env)
-		busy.repository = autosaveRepositoryState(ctx, cmd, env)
+		busy.repository = autosaveRepositoryState(ctx, env)
 
 		return errors.Join(renderAutosaveResult(cmd, env, busy), closeErr)
 	}

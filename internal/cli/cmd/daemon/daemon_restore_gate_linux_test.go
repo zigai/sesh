@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/zigai/sesh/internal/automation"
+	cmdautosave "github.com/zigai/sesh/internal/cli/cmd/autosave"
 	"github.com/zigai/sesh/internal/integration/process"
 	"github.com/zigai/sesh/internal/snapshot/store"
 	"github.com/zigai/sesh/internal/testsupport/snapfixture"
@@ -23,7 +24,12 @@ func coordinatorGate(t *testing.T, repoPath string) error {
 		t.Fatalf("set repository flag: %v", err)
 	}
 
-	return ensureDaemonRepositoryReady(t.Context(), cmd, autosaveEnv{})
+	env, err := cmdautosave.ResolveEnv(cmd)
+	if err != nil {
+		t.Fatalf("resolve autosave env: %v", err)
+	}
+
+	return ensureDaemonRepositoryReady(t.Context(), env)
 }
 
 func operationState(t *testing.T, repoPath, id string) string {
