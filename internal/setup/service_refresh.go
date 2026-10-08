@@ -218,7 +218,7 @@ func inspectRefreshDefinition(
 		if systemdStartupDefinition(previous.Content) != systemdStartupDefinition(definition.Content) {
 			prepared.restartRequired = append(prepared.restartRequired, definition.Name)
 		}
-	case AutosaveTimerName, RemoteServiceName, CoordinatorServiceName:
+	case AutosaveTimerName, RemoteServiceName, AgentStatusServiceName, CoordinatorServiceName:
 		state, err := manager.activeState(ctx, definition.Name)
 		if err != nil {
 			return err

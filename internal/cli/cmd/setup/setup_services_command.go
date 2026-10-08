@@ -435,7 +435,12 @@ func runSetupServicesWithManager(cmd *cobra.Command, manager setup.ServiceManage
 		return clibase.NewExitError(clibase.ExitCodeUsage, err)
 	}
 
-	definitions = append(definitions, remoteDefinition)
+	agentStatusDefinition, err := setup.AgentStatusDefinition(inputs)
+	if err != nil {
+		return clibase.NewExitError(clibase.ExitCodeUsage, err)
+	}
+
+	definitions = append(definitions, remoteDefinition, agentStatusDefinition)
 
 	return applySetupDefinitionsWithManager(cmd, definitions, "refresh", manager)
 }

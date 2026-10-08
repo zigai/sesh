@@ -36,6 +36,8 @@ sesh setup agents
 
 AHT v2 uses registry schema 3. `sesh` does not import older AHT registry files.
 
+`sesh setup services` also writes `sesh-agent-status.service`, which styles tmux windows whose agent needs attention. Enable it with `systemctl --user enable --now sesh-agent-status.service`.
+
 Navigate agent panes. These are actions meant for key bindings; `sesh setup tmux` prints the bindings:
 
 ```sh
