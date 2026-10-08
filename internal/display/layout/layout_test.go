@@ -252,6 +252,49 @@ func TestStyledPaintStripsToUnstyledPaint(t *testing.T) {
 	})
 }
 
+func TestColoredCellsPaintLikePlainCellsAndCloseTheirStyles(t *testing.T) {
+	rapid.Check(t, func(t *rapid.T) {
+		words := rapid.SliceOfN(rapid.StringMatching(`[a-zé漢]{0,4}`), 1, 5).Draw(t, "words") //nolint:gosmopolitan // Generator mixes wide Han runes into colored cells to test width.
+		styles := rapid.SliceOfN(rapid.SampledFrom([]string{"\x1b[31m", "\x1b[1;38;5;208m", "\x1b[0m", "\x1b[m", ""}), len(words), len(words)).Draw(t, "styles")
+		width := rapid.IntRange(1, 16).Draw(t, "width")
+		side := rapid.SampledFrom([]TruncateSide{TruncateRight, TruncateLeft}).Draw(t, "side")
+		role := rapid.SampledFrom([]string{"", "success"}).Draw(t, "role")
+
+		var colored strings.Builder
+		for i, word := range words {
+			colored.WriteString(styles[i])
+			colored.WriteString(word)
+		}
+
+		specs := []ColumnSpec{{ID: "value", Min: width, Max: width, TruncateSide: side}, {ID: "next", Min: 4, Max: 4}}
+		next := Cell{Text: "next", State: Present}
+		coloredRow := []Cell{{Text: colored.String(), Role: role, State: Present}, next}
+		plainRow := []Cell{{Text: ansi.Strip(colored.String()), Role: role, State: Present}, next}
+		plan := Plan(specs, Measure(specs, [][]Cell{coloredRow}), width+4, nil, time.Time{})
+
+		plain, _ := PaintColumns(plan, plainRow, Theme{"success": "32"})
+		painted, _ := PaintColumns(plan, coloredRow, Theme{"success": "32"})
+
+		if ansi.Strip(painted[0]) != ansi.Strip(plain[0]) || ansi.StringWidth(painted[0]) != width {
+			t.Fatalf("colored paint %q differs from plain paint %q", painted[0], plain[0])
+		}
+
+		if last := strings.LastIndex(painted[0], "\x1b["); last >= 0 && !strings.HasPrefix(painted[0][last:], "\x1b[m") {
+			t.Fatalf("colored cell leaves a style open: %q", painted[0])
+		}
+	})
+}
+
+func TestRoleColorResumesAfterCellReset(t *testing.T) {
+	specs := []ColumnSpec{{ID: "value", Min: 8, Max: 8}}
+	cells := []Cell{{Text: "\x1b[31mred\x1b[0m tail", Role: "success", State: Present}}
+
+	painted, _ := Paint(Plan(specs, Measure(specs, [][]Cell{cells}), 8, nil, time.Time{}), cells, Theme{"success": "32"})
+	if want := "\x1b[32m\x1b[31mred\x1b[0m\x1b[32m tail\x1b[m"; painted != want {
+		t.Fatalf("painted = %q, want %q", painted, want)
+	}
+}
+
 func TestSameSnapshotsPaintIdenticallyRegardlessOfArrivalOrder(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		specs, rows, width := generatedTable(t)

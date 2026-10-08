@@ -78,10 +78,16 @@ func resolveDoctorOptions(cmd *cobra.Command) (doctor.Options, error) {
 		ServiceDir:        "",
 		Executable:        "",
 		ValidateCommand:   nil,
+		CustomFields:      nil,
 	}
 
-	if _, err := clibase.LoadCommandConfig(cmd.Context(), cmd); err != nil {
+	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
+	if err != nil {
 		return opts, err
+	}
+
+	for _, name := range cfg.Display.UsedFieldNames() {
+		opts.CustomFields = append(opts.CustomFields, doctor.CustomField{Name: name, Command: cfg.Display.Fields[name].Command})
 	}
 
 	server, err := integration.Open(clibase.ResolveSocket(cmd))

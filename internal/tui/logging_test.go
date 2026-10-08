@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +19,7 @@ import (
 	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/config"
+	"github.com/zigai/sesh/internal/fields"
 	"github.com/zigai/sesh/internal/session"
 )
 
@@ -102,6 +105,131 @@ func loggingTestModel(t *testing.T, output *bytes.Buffer) *Model {
 	t.Cleanup(model.Close)
 
 	return model
+}
+
+func TestCustomFieldFailureLoggingIsPrivateAndIsolated(t *testing.T) {
+	var logs bytes.Buffer
+
+	model := customFieldTestModel(t, "{session_name} {custom.probe}", config.FieldCommands{
+		"probe": shellFieldCommand("printf private-stdout; printf private-stderr >&2; exit 3"),
+	})
+	model.logger = *zerolog.Ctx(loggingTestContext(&logs))
+	row := liveTestSession("$1", "private-session")
+	model.SetInitialSessions([]session.Session{row})
+	results := collectCustomFieldResults(model.syncCustomFields())
+
+	captured := loggingTestWithCapturedStdStreams(t, func() {
+		if _, err := fmt.Fprint(os.Stdout, "{\"value\":\"public\"}\n"); err != nil {
+			t.Fatal(err)
+		}
+
+		for _, result := range results {
+			model.Update(result)
+		}
+	})
+	if captured != "{\"value\":\"public\"}\n" {
+		t.Fatalf("stdout/stderr JSON changed: %q", captured)
+	}
+
+	records := loggingTestRecords(t, &logs)
+
+	want := map[string]any{
+		"command": "tui.test", "version": "test-version", "commit": "test-commit", "pid": float64(4242),
+		"component": "tui", "operation": "custom_field_run", "level": zerolog.ErrorLevel.String(), "status": "failed",
+		"reason": "command_failed", "error_code": "operation_failed", "exit_code": float64(3),
+		"message": "custom field command failed",
+	}
+	if len(records) != 1 || !maps.Equal(records[0], want) {
+		t.Fatalf("failure records = %#v, want exactly %#v", records, want)
+	}
+
+	for _, secret := range []string{"private-stdout", "private-stderr", "private-session", loggingTestPrivacySentinel} {
+		if strings.Contains(logs.String(), secret) {
+			t.Errorf("logs contain private value %q", secret)
+		}
+	}
+}
+
+func TestCustomFieldCacheFailureIsRetainedAndCloseFlushesAcceptedValue(t *testing.T) {
+	var logs bytes.Buffer
+
+	model := customFieldTestModel(t, "{session_name} {custom.blocked}", config.FieldCommands{
+		"blocked": shellFieldCommand("printf private-value"),
+	})
+	model.logger = *zerolog.Ctx(loggingTestContext(&logs))
+
+	path := fields.CachePath("blocked")
+	if err := os.MkdirAll(path, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	row := liveTestSession("$1", "alpha")
+	model.SetInitialSessions([]session.Session{row})
+
+	captured := loggingTestWithCapturedStdStreams(t, func() {
+		runCustomFieldCommands(t, model, model.syncCustomFields())
+	})
+	if captured != "" {
+		t.Fatalf("cache failure wrote stdout/stderr: %q", captured)
+	}
+
+	records := loggingTestRecords(t, &logs)
+
+	want := map[string]any{
+		"command": "tui.test", "version": "test-version", "commit": "test-commit", "pid": float64(4242),
+		"component": "tui", "operation": "custom_field_cache_write", "level": zerolog.ErrorLevel.String(), "status": "failed",
+		"reason": "cache_write_failed", "error_code": "operation_failed",
+		"message": "custom field cache write failed",
+	}
+	if len(records) != 1 || !maps.Equal(records[0], want) {
+		t.Fatalf("cache failure records = %#v, want exactly %#v", records, want)
+	}
+
+	for _, secret := range []string{"private-value", path, filepath.Dir(path), loggingTestPrivacySentinel} {
+		if strings.Contains(logs.String(), secret) {
+			t.Errorf("cache failure logs contain private value %q", secret)
+		}
+	}
+
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+
+	model.Close()
+
+	entries, err := fields.ReadCache(path)
+	if err != nil || entries[customFieldSessionRowKey(row)].Text != "private-value" {
+		t.Fatalf("accepted value after close flush = %#v, %v", entries, err)
+	}
+
+	if len(loggingTestRecords(t, &logs)) != 1 {
+		t.Fatalf("successful flush logged another failure: %s", logs.String())
+	}
+}
+
+func TestCustomFieldCanceledSuccessfulAndStaleResultsAreSilent(t *testing.T) {
+	var logs bytes.Buffer
+
+	model := customFieldTestModel(t, "{session_name} {custom.quiet}", config.FieldCommands{
+		"quiet": shellFieldCommand("printf ok"),
+	})
+	model.logger = *zerolog.Ctx(loggingTestContext(&logs))
+	row := liveTestSession("$1", "alpha")
+	model.SetInitialSessions([]session.Session{row})
+	result := collectCustomFieldResults(model.syncCustomFields())[0]
+	result.result = fields.Result{Err: context.Canceled, Stderr: loggingTestPrivacySentinel, ExitCode: -1}
+	model.Update(result)
+	result.request++
+	result.result.Err = errLoggingTestActionFailure
+	model.Update(result)
+
+	row.WindowCount++
+	model.SetInitialSessions([]session.Session{row})
+	runCustomFieldCommands(t, model, model.syncCustomFields())
+
+	if logs.Len() != 0 {
+		t.Fatalf("silent branches logged: %s", logs.String())
+	}
 }
 
 func TestOriginSessionLoadsLogDegradationAndRecoveryAcrossInitialAndRefreshLoads(t *testing.T) {

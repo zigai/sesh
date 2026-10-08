@@ -105,6 +105,36 @@ func TestFormatAgentStatusHoursMinutes(t *testing.T) {
 	}
 }
 
+func TestSanitizeTerminalTextKeepSGRKeepsOnlyStyles(t *testing.T) {
+	tests := map[string]struct {
+		input string
+		want  string
+	}{
+		"combining accent":    {input: "e\u0301clair", want: "e\u0301clair"},
+		"styled accent":       {input: "e\x1b[31m\u0301", want: "e\x1b[31m\u0301"},
+		"joined emoji":        {input: "👩\u200d💻", want: "👩\u200d💻"},
+		"plain":               {input: "main ✓ 漢字", want: "main ✓ 漢字"}, //nolint:gosmopolitan // Test checks that wide Han runes pass through the sanitizer.
+		"sgr":                 {input: "\x1b[1;38;2;255;0:0mok\x1b[0m \x1b[m", want: "\x1b[1;38;2;255;0:0mok\x1b[0m \x1b[m"},
+		"cursor movement":     {input: "a\x1b[2Jb\x1b[10;3Hc\x1b[?25l", want: "abc"},
+		"osc hyperlink":       {input: "\x1b]8;;https://example.com\x1b\\link\x1b]8;;\x1b\\", want: "link"},
+		"osc clipboard":       {input: "x\x1b]52;c;aGFja2Vk\ay", want: "xy"},
+		"dcs":                 {input: "a\x1bPq#0;2;0;0;0\x1b\\b", want: "ab"},
+		"private sgr":         {input: "\x1b[>4;2mx", want: "x"},
+		"c0 and c1 controls":  {input: "a\tb\rc\x07d\u0085e", want: "abcde"},
+		"bidi overrides":      {input: "a\u202ecba\u2066x\u2069", want: "acbax"},
+		"bare escape":         {input: "a\x1bb", want: "a"},
+		"eight bit csi bytes": {input: "a\x9b31mb", want: "ab"},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := SanitizeTerminalTextKeepSGR(tt.input); got != tt.want {
+				t.Fatalf("SanitizeTerminalTextKeepSGR(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestTruncateStyledWidthPreservesANSIAndGraphemeClusters(t *testing.T) {
 	input := "\x1b[31mA👩‍💻B\x1b[0m"
 
