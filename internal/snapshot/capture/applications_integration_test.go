@@ -773,3 +773,186 @@ func TestCaptureFailsWhenProcessReplacementNeverSettles(t *testing.T) {
 		t.Fatalf("expected ErrChanged for continuous churn, got: %v", err)
 	}
 }
+
+func TestCaptureRestartsAShellWhoseExecutableWasReplacedInPlace(t *testing.T) {
+	observation := observeShellAfterReplacingItsExecutable(t, 0o700)
+
+	pane := observation.Manifest.Panes[0]
+	if pane.Launch.Recovery != model.RecoveryRestart {
+		t.Fatalf("recovery = %q (reason %q), want restart from the upgraded executable", pane.Launch.Recovery, pane.Launch.Reason)
+	}
+}
+
+func TestCaptureKeepsAPaneNonrestartableWhenItsExecutablePathHoldsNoExecutable(t *testing.T) {
+	observation := observeShellAfterReplacingItsExecutable(t, 0o600)
+
+	assertDeletedExecutablePane(t, observation)
+}
+
+// observeShellAfterReplacingItsExecutable runs a shell from a private copy, renames a new file with
+// the given mode over that copy, as a package upgrade does, and captures the pane.
+func observeShellAfterReplacingItsExecutable(t *testing.T, replacementMode os.FileMode) Observation {
+	t.Helper()
+
+	shellPath := requireApplicationExecutable(t, "sh")
+	server := tmuxtest.NewServer(t)
+	workingDir := t.TempDir()
+	binDir := filepath.Join(workingDir, "bin")
+
+	if err := os.Mkdir(binDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	installed := filepath.Join(binDir, "sh")
+	if err := exec.CommandContext(t.Context(), "cp", shellPath, installed).Run(); err != nil {
+		t.Fatalf("install shell copy: %v", err)
+	}
+
+	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{
+		Name: "replaced-exe", Dir: workingDir,
+		Program: gotmux.Exec(installed), Start: gotmux.StartPolicyExistingOnly,
+	})
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+
+	windows, _, err := session.WindowInfos(t.Context())
+	if err != nil {
+		t.Fatalf("read window: %v", err)
+	}
+
+	pane, err := windows[0].Handle().ActivePane(t.Context())
+	if err != nil {
+		t.Fatalf("read pane: %v", err)
+	}
+
+	waitForApplicationForeground(t, pane, "sh")
+
+	replacement := filepath.Join(binDir, "sh.new")
+	if err := exec.CommandContext(t.Context(), "cp", shellPath, replacement).Run(); err != nil {
+		t.Fatalf("write replacement: %v", err)
+	}
+
+	if err := os.Chmod(replacement, replacementMode); err != nil {
+		t.Fatalf("set replacement mode: %v", err)
+	}
+
+	if err := os.Rename(replacement, installed); err != nil {
+		t.Fatalf("replace shell copy: %v", err)
+	}
+
+	observation, err := ObserveWithApplicationRecovery(
+		t.Context(), server, []gotmux.SessionID{session.ID()}, []string{"HOME"}, nil,
+	)
+	if err != nil {
+		t.Fatalf("ObserveWithApplicationRecovery failed: %v", err)
+	}
+
+	if len(observation.Manifest.Panes) != 1 {
+		t.Fatalf("captured %d panes, want 1", len(observation.Manifest.Panes))
+	}
+
+	return observation
+}
+
+func TestCaptureResumesAnAgentWhoseRunningVersionWasRemovedByAnUpdate(t *testing.T) {
+	launch, link := captureAgentAfterUpdate(t, true)
+
+	if launch.Recovery != model.RecoveryResume || string(launch.Executable) != link ||
+		!equalLaunchArguments(launch.Arguments, []string{"codex", "resume", "exact-session"}) {
+		t.Fatalf("agent launch after its running version was removed = %#v, want a resume through %s", launch, link)
+	}
+}
+
+func TestCaptureKeepsAnAgentNonrestartableWhenNoVersionIsInstalled(t *testing.T) {
+	launch, _ := captureAgentAfterUpdate(t, false)
+
+	if launch.Recovery != model.RecoveryNonrestartable || launch.Reason != string(model.ReasonExecutableDeleted) {
+		t.Fatalf("agent launch with no installed version = %#v, want nonrestartable executable_deleted", launch)
+	}
+}
+
+// captureAgentAfterUpdate runs an agent through a "codex" symlink to a versioned binary, removes
+// that version as a self-update does, optionally points the symlink at a newer version, and
+// captures the pane with the agent's resume evidence.
+func captureAgentAfterUpdate(t *testing.T, installNewer bool) (model.Launch, string) {
+	t.Helper()
+
+	sleepPath := requireApplicationExecutable(t, "sleep")
+	cpPath := requireApplicationExecutable(t, "cp")
+	server, session, pane, _ := applicationCaptureFixture(t, "agent-update")
+	fixtureDir := t.TempDir()
+	versions := filepath.Join(fixtureDir, "versions")
+	link := filepath.Join(fixtureDir, "codex")
+
+	if err := os.Mkdir(versions, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	install := func(version string) {
+		t.Helper()
+
+		target := filepath.Join(versions, version)
+		if err := exec.CommandContext(t.Context(), cpPath, sleepPath, target).Run(); err != nil {
+			t.Fatalf("install version %s: %v", version, err)
+		}
+
+		if err := os.Remove(link); err != nil && !errors.Is(err, os.ErrNotExist) {
+			t.Fatal(err)
+		}
+
+		if err := os.Symlink(target, link); err != nil {
+			t.Fatalf("link version %s: %v", version, err)
+		}
+	}
+
+	install("1.0")
+	t.Setenv("PATH", fixtureDir)
+
+	if err := pane.Submit(t.Context(), link+" 300"); err != nil {
+		t.Fatalf("start agent fixture: %v", err)
+	}
+
+	waitForApplicationForeground(t, pane, "1.0")
+
+	if err := os.Remove(filepath.Join(versions, "1.0")); err != nil {
+		t.Fatal(err)
+	}
+
+	if installNewer {
+		install("2.0")
+	} else if err := os.Remove(link); err != nil {
+		t.Fatal(err)
+	}
+
+	info, err := pane.Info(t.Context())
+	if err != nil {
+		t.Fatalf("read pane identity: %v", err)
+	}
+
+	registrySession := aht.Session{
+		SchemaVersion: 3,
+		ID:            "updated-agent",
+		Harness:       aht.HarnessCodex,
+		Liveness:      aht.Live{Activity: aht.ActivityRunning},
+		SessionID:     "exact-session",
+		ResumeCommand: []string{"codex", "resume", "exact-session"},
+		Location: aht.Location{
+			Kind:      aht.MultiplexerTmux,
+			ServerID:  server.Endpoint().SocketPath,
+			SessionID: string(session.ID()),
+			PaneID:    string(info.ID),
+			PanePID:   info.PID,
+		},
+	}
+
+	observation, err := ObserveWithApplicationRecovery(
+		t.Context(), server, []gotmux.SessionID{session.ID()}, nil,
+		applicationAgentSource{sessions: []aht.Session{registrySession}},
+	)
+	if err != nil {
+		t.Fatalf("capture updated agent: %v", err)
+	}
+
+	return singleApplicationLaunch(t, observation), link
+}
