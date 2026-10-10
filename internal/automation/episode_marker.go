@@ -20,8 +20,8 @@ import (
 // reported once.
 const ServerLossMarkerName = "server-loss.json"
 
-// RestorePendingMarkerName records the server start a restore-pending report was made for, so
-// each unrestored server is reported once.
+// RestorePendingMarkerName records the server start a restore-pending report or late restore was
+// made for, so each unrestored server is handled once.
 const RestorePendingMarkerName = "restore-pending.json"
 
 const maxEpisodeMarkerBytes = 4096

@@ -106,8 +106,8 @@ func executeAutosaveSave(ctx context.Context, cmd *cobra.Command, env Env) error
 		return errors.Join(err, wrapCloseError(repo.Close()))
 	}
 
-	if pending := findPendingRestore(ctx, cmd, server, repo); pending.sessions > 0 {
-		return skipAutosaveWhileRestorePending(ctx, cmd, env, repo, pending)
+	if handled, err := resolvePendingRestore(ctx, cmd, env, server, repo); handled {
+		return err
 	}
 
 	lock, err := automation.TryAcquireSaveLock(ctx, automation.SaveLockPath())
@@ -536,6 +536,31 @@ func recordCompletedAutosave(ctx context.Context, env Env, outcome *outcome) err
 	outcome.history = historyRecorded
 
 	return nil
+}
+
+// resolvePendingRestore handles a server that started after the newest snapshot and lacks some of
+// its saved sessions. It reports whether it finished the command; otherwise the save goes ahead.
+func resolvePendingRestore(ctx context.Context, cmd *cobra.Command, env Env, server *gotmux.Server, repo *store.Repository) (bool, error) {
+	pending := findPendingRestore(ctx, cmd, server, repo)
+	if pending.sessions == 0 {
+		return false, nil
+	}
+
+	switch decidePendingRestore(ctx, env, server, repo, pending) {
+	case pendingRestoreSave:
+		reportRestoreIncomplete(ctx, env, pending)
+
+		return false, nil
+	case pendingRestoreRun:
+		if err := wrapCloseError(repo.Close()); err != nil {
+			return true, err
+		}
+
+		return true, executeStartupRestore(cmd, env, func() bool { return claimPendingEpisode(env, pending) })
+	case pendingRestoreHold:
+	}
+
+	return true, skipAutosaveWhileRestorePending(ctx, cmd, env, repo, pending)
 }
 
 // skipAutosaveWhileRestorePending holds back a save while the live server lacks saved sessions
