@@ -97,7 +97,7 @@ var validHtopSortFields = map[string]struct{}{
 	"WCHAR":              {},
 }
 
-func isValidHtopSort(sortField string) bool {
+func validHtopSort(sortField string) bool {
 	_, ok := validHtopSortFields[sortField]
 
 	return ok
@@ -207,7 +207,7 @@ func consumeTopToggle(args []string, i int, argv *[]string) (bool, int) {
 
 func consumeTopUser(args []string, i int, argv *[]string, hasEUser, hasAnyUser *bool) (bool, int, bool) {
 	if val, nextI, matched, ok := matchFlagValue(args, i, "-u", "--filter-only-euser"); matched {
-		if !ok || *hasAnyUser || !isValidTopUser(val) {
+		if !ok || *hasAnyUser || !validTopUser(val) {
 			return true, i, false
 		}
 
@@ -219,7 +219,7 @@ func consumeTopUser(args []string, i int, argv *[]string, hasEUser, hasAnyUser *
 	}
 
 	if val, nextI, matched, ok := matchFlagValue(args, i, "-U", "--filter-any-user"); matched {
-		if !ok || *hasEUser || !isValidTopUser(val) {
+		if !ok || *hasEUser || !validTopUser(val) {
 			return true, i, false
 		}
 
@@ -235,7 +235,7 @@ func consumeTopUser(args []string, i int, argv *[]string, hasEUser, hasAnyUser *
 
 func consumeTopParam(args []string, i int, argv *[]string) (bool, int, bool) {
 	if val, nextI, matched, ok := matchFlagValue(args, i, "-d", "--delay"); matched {
-		if !ok || !isValidTopDelay(val) {
+		if !ok || !validTopDelay(val) {
 			return true, i, false
 		}
 
@@ -245,7 +245,7 @@ func consumeTopParam(args []string, i int, argv *[]string) (bool, int, bool) {
 	}
 
 	if val, nextI, matched, ok := matchFlagValue(args, i, "-o", "--sort-override"); matched {
-		if !ok || !isValidTopSort(val) {
+		if !ok || !validTopSort(val) {
 			return true, i, false
 		}
 
@@ -263,7 +263,7 @@ func consumeTopParam(args []string, i int, argv *[]string) (bool, int, bool) {
 
 func consumeTopScale(args []string, i int, argv *[]string) (bool, int, bool) {
 	if val, nextI, matched, ok := matchFlagValue(args, i, "-E", "--scale-summary-mem"); matched {
-		if !ok || !isValidTopScaleSummary(val) {
+		if !ok || !validTopScaleSummary(val) {
 			return true, i, false
 		}
 
@@ -273,7 +273,7 @@ func consumeTopScale(args []string, i int, argv *[]string) (bool, int, bool) {
 	}
 
 	if val, nextI, matched, ok := matchFlagValue(args, i, "-e", "--scale-task-mem"); matched {
-		if !ok || !isValidTopScaleTask(val) {
+		if !ok || !validTopScaleTask(val) {
 			return true, i, false
 		}
 
@@ -297,7 +297,7 @@ func isTopToggle(arg string) bool {
 func consumeTopWidth(args []string, i int, argv *[]string) (bool, int, bool) {
 	arg := args[i]
 	if arg == "-w" || arg == "--width" {
-		if i+1 < len(args) && isValidTopWidth(args[i+1]) {
+		if i+1 < len(args) && validTopWidth(args[i+1]) {
 			*argv = append(*argv, arg, args[i+1])
 
 			const flagAndValueOffset = 2
@@ -311,7 +311,7 @@ func consumeTopWidth(args []string, i int, argv *[]string) (bool, int, bool) {
 	}
 
 	if val, nextI, matched, ok := matchFlagValue(args, i, "-w", "--width"); matched {
-		if !ok || !isValidTopWidth(val) {
+		if !ok || !validTopWidth(val) {
 			return true, i, false
 		}
 
@@ -323,32 +323,32 @@ func consumeTopWidth(args []string, i int, argv *[]string) (bool, int, bool) {
 	return false, i, false
 }
 
-func isValidTopWidth(width string) bool {
+func validTopWidth(width string) bool {
 	n, err := strconv.Atoi(width)
 
 	return err == nil && n >= 1 && n <= 512
 }
 
-func isValidTopDelay(delay string) bool {
+func validTopDelay(delay string) bool {
 	f, err := strconv.ParseFloat(delay, 64)
 
 	return err == nil && f > 0 && f <= 3600
 }
 
-func isValidTopUser(user string) bool {
+func validTopUser(user string) bool {
 	target := strings.TrimPrefix(user, "!")
 
-	return isValidUsernameOrUID(target)
+	return validUsernameOrUID(target)
 }
 
-func isValidTopSort(sortField string) bool {
+func validTopSort(sortField string) bool {
 	field := strings.TrimPrefix(strings.TrimPrefix(sortField, "+"), "-")
 	_, ok := validTopSortFields[field]
 
 	return ok
 }
 
-func isValidTopScaleSummary(scale string) bool {
+func validTopScaleSummary(scale string) bool {
 	if len(scale) != 1 {
 		return false
 	}
@@ -356,7 +356,7 @@ func isValidTopScaleSummary(scale string) bool {
 	return strings.ContainsRune("kmgtpeKMGTPE", rune(scale[0]))
 }
 
-func isValidTopScaleTask(scale string) bool {
+func validTopScaleTask(scale string) bool {
 	if len(scale) != 1 {
 		return false
 	}
@@ -416,7 +416,7 @@ func consumeHtopToggle(args []string, i int, argv *[]string) (bool, int) {
 
 func consumeHtopParam(args []string, i int, argv *[]string) (bool, int, bool) {
 	if val, nextI, matched, ok := matchFlagValue(args, i, "-d", "--delay"); matched {
-		if !ok || !isValidHtopDelay(val) {
+		if !ok || !validHtopDelay(val) {
 			return true, i, false
 		}
 
@@ -440,7 +440,7 @@ func consumeHtopParam(args []string, i int, argv *[]string) (bool, int, bool) {
 
 func consumeHtopFilterUser(args []string, i int, argv *[]string) (bool, int, bool) {
 	if val, nextI, matched, ok := matchFlagValue(args, i, "-u", "--user"); matched {
-		if !ok || !isValidUsernameOrUID(val) {
+		if !ok || !validUsernameOrUID(val) {
 			return true, i, false
 		}
 
@@ -450,7 +450,7 @@ func consumeHtopFilterUser(args []string, i int, argv *[]string) (bool, int, boo
 	}
 
 	if val, nextI, matched, ok := matchFlagValue(args, i, "-s", "--sort-key"); matched {
-		if !ok || !isValidHtopSort(val) {
+		if !ok || !validHtopSort(val) {
 			return true, i, false
 		}
 
@@ -500,7 +500,7 @@ func consumeHtopTree(args []string, i int, argv *[]string) (bool, int, bool) {
 	}
 
 	if val, nextI, matched, ok := matchFlagValue(args, i, "-t", "--tree"); matched {
-		if !ok || !isValidTreeMode(val) {
+		if !ok || !validTreeMode(val) {
 			return true, nextI, false
 		}
 
@@ -533,7 +533,7 @@ func consumeHtopHighlight(args []string, i int, argv *[]string) (bool, int, bool
 	return false, i, false
 }
 
-func isValidHtopDelay(delay string) bool {
+func validHtopDelay(delay string) bool {
 	n, err := strconv.Atoi(delay)
 
 	return err == nil && n > 0 && n <= 36000
@@ -563,7 +563,7 @@ func stepBtopArgument(args []string, i int, argv *[]string) (int, bool) {
 	}
 
 	if val, nextI, matched, ok := matchFlagValue(args, i, "-p", "--preset"); matched {
-		if !ok || !isValidPreset(val) {
+		if !ok || !validPreset(val) {
 			return i, false
 		}
 
@@ -583,7 +583,7 @@ func stepBtopArgument(args []string, i int, argv *[]string) (int, bool) {
 	}
 
 	if val, nextI, matched, ok := matchFlagValue(args, i, "-u", "--update"); matched {
-		if !ok || !isValidUpdateRate(val) {
+		if !ok || !validUpdateRate(val) {
 			return i, false
 		}
 
@@ -653,7 +653,7 @@ func isSafeFilterText(text string) bool {
 	return true
 }
 
-func isValidUsernameOrUID(user string) bool {
+func validUsernameOrUID(user string) bool {
 	if user == "" || len(user) > 32 {
 		return false
 	}
@@ -671,13 +671,13 @@ func isUserChar(b byte) bool {
 	return isAlphaNum(b) || b == '_' || b == '-' || b == '.'
 }
 
-func isValidTreeMode(mode string) bool {
+func validTreeMode(mode string) bool {
 	lower := strings.ToLower(mode)
 
 	return slices.Contains([]string{"classic", "soft", "hard"}, lower)
 }
 
-func isValidPreset(preset string) bool {
+func validPreset(preset string) bool {
 	if len(preset) != 1 {
 		return false
 	}
@@ -685,7 +685,7 @@ func isValidPreset(preset string) bool {
 	return preset[0] >= '0' && preset[0] <= '9'
 }
 
-func isValidUpdateRate(rate string) bool {
+func validUpdateRate(rate string) bool {
 	n, err := strconv.Atoi(rate)
 
 	return err == nil && n >= 100 && n <= 60000

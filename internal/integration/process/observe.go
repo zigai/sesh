@@ -55,7 +55,7 @@ func ValidateEnvironmentKeys(keys []string) error {
 	totalKeyBytes := 0
 
 	for _, key := range keys {
-		if !isValidEnvironmentKey(key) {
+		if !validEnvironmentKey(key) {
 			return ErrInvalidVariableName
 		}
 
@@ -88,6 +88,6 @@ func validateRequest(req Request) error {
 	return ValidateEnvironmentKeys(req.EnvironmentKeys)
 }
 
-func isValidEnvironmentKey(key string) bool {
+func validEnvironmentKey(key string) bool {
 	return len(key) > 0 && !strings.ContainsAny(key, "=\x00")
 }

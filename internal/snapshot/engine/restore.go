@@ -16,7 +16,7 @@ import (
 
 	"github.com/zigai/sesh/internal/errorstep"
 	"github.com/zigai/sesh/internal/integration/process"
-	integration "github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/integration/tmuxserver"
 	"github.com/zigai/sesh/internal/snapshot/model"
 	"github.com/zigai/sesh/internal/snapshot/restore"
 	"github.com/zigai/sesh/internal/snapshot/store"
@@ -33,14 +33,14 @@ var restoreFailureClasses = []struct {
 	reason string
 	causes []error
 }{
-	{"endpoint_required", "admission_failed", []error{ErrLeaseRootRequired, integration.ErrEndpoint, ErrRepositoryRequired}},
+	{"endpoint_required", "admission_failed", []error{ErrLeaseRootRequired, tmuxserver.ErrEndpoint, ErrRepositoryRequired}},
 	{"operation_uncertain", "effect_outcome_uncertain", []error{restore.ErrExecutionUncertain}},
 	{"operation_uncertain", "prior_effect_uncertain", []error{restore.ErrPriorUncertainty}},
 	{"operation_uncertain", "prior_effect_conflicted", []error{restore.ErrPriorConflict}},
 	{"restore_failed", "journal_unavailable", []error{restore.ErrJournalRequired, restore.ErrJournalIncomplete}},
-	{"restore_conflict", "daemon_identity_changed", []error{integration.ErrDaemonIdentityChanged}},
+	{"restore_conflict", "daemon_identity_changed", []error{tmuxserver.ErrDaemonIdentityChanged}},
 	{"restore_no_server", "no_server", []error{ErrNoServerRunning, gotmux.ErrNoServer}},
-	{"restore_failed", "daemon_identity_unavailable", []error{integration.ErrDaemonIdentityUnavailable}},
+	{"restore_failed", "daemon_identity_unavailable", []error{tmuxserver.ErrDaemonIdentityUnavailable}},
 	{"operation_canceled", "canceled", []error{context.Canceled}},
 	{"operation_timed_out", "timeout", []error{context.DeadlineExceeded}},
 	{"restore_conflict", "collision", []error{restore.ErrSessionCollision, restore.ErrGroupCollision}},
@@ -155,7 +155,7 @@ func Restore(ctx context.Context, repository *store.Repository, server *gotmux.S
 	}
 
 	if server == nil || server.Endpoint().SocketPath == "" {
-		return result, restoreFailure(ctx, "admission", integration.ErrEndpoint)
+		return result, restoreFailure(ctx, "admission", tmuxserver.ErrEndpoint)
 	}
 
 	if repository == nil {
@@ -174,7 +174,7 @@ func Restore(ctx context.Context, repository *store.Repository, server *gotmux.S
 		return result, restoreFailure(ctx, "admission", ErrNoServerRunning)
 	}
 
-	lease, err := integration.AcquireLease(ctx, cfg.LeaseRoot, server.Endpoint().SocketPath)
+	lease, err := tmuxserver.AcquireLease(ctx, cfg.LeaseRoot, server.Endpoint().SocketPath)
 	if err != nil {
 		return result, restoreFailure(ctx, "lease", err)
 	}
@@ -312,7 +312,7 @@ func executeRestore(
 	ctx context.Context,
 	repository *store.Repository,
 	server *gotmux.Server,
-	lease *integration.Lease,
+	lease *tmuxserver.Lease,
 	cfg RestoreConfig,
 ) (RestoreResult, error) {
 	result := RestoreResult{
@@ -491,7 +491,7 @@ func reinspectVerifiedRestore(
 	ctx context.Context,
 	repository *store.Repository,
 	server *gotmux.Server,
-	lease *integration.Lease,
+	lease *tmuxserver.Lease,
 	daemon restoreDaemonIdentity,
 	operation string,
 	cfg RestoreConfig,
@@ -706,7 +706,7 @@ func reportVerificationFailure(verification restore.VerificationReport) error {
 func finishRestore(
 	ctx context.Context,
 	repository *store.Repository,
-	lease *integration.Lease,
+	lease *tmuxserver.Lease,
 	operation string,
 	profile RecoveryProfile,
 	result *RestoreResult,
@@ -776,12 +776,12 @@ func markSkippedSessions(result *RestoreResult) {
 func restoreTarget(endpoint string, daemon restoreDaemonIdentity, cfg RestoreConfig) ([]byte, error) {
 	identity := daemon.Server
 	if endpoint == "" || identity.PID <= 0 || identity.Started.IsZero() || identity.ReportedSocket == "" {
-		return nil, oops.In("snapshot").Code("endpoint_required").With("operation", "restore_target").Wrap(integration.ErrEndpoint)
+		return nil, oops.In("snapshot").Code("endpoint_required").With("operation", "restore_target").Wrap(tmuxserver.ErrEndpoint)
 	}
 
 	if daemon.Birth != "" {
 		if _, err := process.ParseIdentity(daemon.Birth); err != nil {
-			return nil, oops.In("snapshot").Code("daemon_identity_unavailable").With("operation", "restore_target").Wrap(integration.ErrDaemonIdentityUnavailable)
+			return nil, oops.In("snapshot").Code("daemon_identity_unavailable").With("operation", "restore_target").Wrap(tmuxserver.ErrDaemonIdentityUnavailable)
 		}
 	}
 
@@ -792,7 +792,7 @@ func restoreTarget(endpoint string, daemon restoreDaemonIdentity, cfg RestoreCon
 	target += restoreDaemonTargetAppendix(daemon)
 
 	if len(target) > maxRestoreTargetBytes {
-		return nil, oops.In("snapshot").Code("endpoint_required").With("operation", "restore_target", "reason", "target_too_long").Wrap(integration.ErrEndpoint)
+		return nil, oops.In("snapshot").Code("endpoint_required").With("operation", "restore_target", "reason", "target_too_long").Wrap(tmuxserver.ErrEndpoint)
 	}
 
 	return []byte(target), nil
@@ -801,7 +801,7 @@ func restoreTarget(endpoint string, daemon restoreDaemonIdentity, cfg RestoreCon
 func requireRestoreDaemonIdentity(ctx context.Context, server *gotmux.Server, expected restoreDaemonIdentity, effectsPossible bool) error {
 	observed, err := observeRestoreDaemonIdentity(ctx, server)
 	if err == nil && !expected.Equal(observed) {
-		err = integration.ErrDaemonIdentityChanged
+		err = tmuxserver.ErrDaemonIdentityChanged
 	}
 
 	if err == nil {
@@ -838,7 +838,7 @@ func joinPhaseIdentityFailure(phaseErr, identityErr error, effectsPossible bool)
 	return errors.Join(phaseErr, identityErr)
 }
 
-func closeWith(ctx context.Context, lease *integration.Lease, phase string, err error) error {
+func closeWith(ctx context.Context, lease *tmuxserver.Lease, phase string, err error) error {
 	return restoreFailure(ctx, phase, errors.Join(err, lease.Close()))
 }
 

@@ -13,7 +13,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/samber/oops"
 
-	integration "github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/integration/tmuxserver"
 	"github.com/zigai/sesh/internal/snapshot/restore"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
@@ -46,19 +46,19 @@ func TestDaemonIdentityFailureClassificationPreservesUncertainty(t *testing.T) {
 	}{
 		{
 			name:       "changed before effects",
-			err:        integration.ErrDaemonIdentityChanged,
+			err:        tmuxserver.ErrDaemonIdentityChanged,
 			wantCode:   "restore_conflict",
 			wantReason: "daemon_identity_changed",
 		},
 		{
 			name:       "unavailable before effects",
-			err:        integration.ErrDaemonIdentityUnavailable,
+			err:        tmuxserver.ErrDaemonIdentityUnavailable,
 			wantCode:   "restore_failed",
 			wantReason: "daemon_identity_unavailable",
 		},
 		{
 			name:       "changed after effects",
-			err:        errors.Join(restore.ErrExecutionUncertain, integration.ErrDaemonIdentityChanged),
+			err:        errors.Join(restore.ErrExecutionUncertain, tmuxserver.ErrDaemonIdentityChanged),
 			wantCode:   "operation_uncertain",
 			wantReason: "effect_outcome_uncertain",
 		},
@@ -76,7 +76,7 @@ func TestDaemonIdentityFailureClassificationPreservesUncertainty(t *testing.T) {
 
 func TestPostPhaseIdentityFailureAddsUncertaintyOnlyAfterDispatch(t *testing.T) {
 	phaseErr := errPhaseTest
-	identityErr := integration.ErrDaemonIdentityChanged
+	identityErr := tmuxserver.ErrDaemonIdentityChanged
 
 	beforeDispatch := joinPhaseIdentityFailure(phaseErr, identityErr, false)
 	if !errors.Is(beforeDispatch, phaseErr) || !errors.Is(beforeDispatch, identityErr) {

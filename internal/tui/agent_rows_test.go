@@ -79,7 +79,7 @@ func TestDefaultAgentFormatMaintainsStatusAlignmentAcrossAges(t *testing.T) {
 	model.filtered = []session.Session{{
 		Name:         testSupportSessionProjectName,
 		ActivePaneID: "%1",
-		IsCurrent:    true,
+		Current:      true,
 		AgentTotal:   4,
 		AgentActive:  1,
 		Agents: []session.AgentSession{
@@ -125,7 +125,7 @@ func TestAgentFormatSupportsClockStatusTimeFormat(t *testing.T) {
 	model.filtered = []session.Session{{
 		Name:         testSupportSessionProjectName,
 		ActivePaneID: "%1",
-		IsCurrent:    true,
+		Current:      true,
 		AgentTotal:   3,
 		AgentActive:  1,
 		Agents: []session.AgentSession{
@@ -231,7 +231,7 @@ func TestCurrentActiveIdleAgentIsAlreadyViewed(t *testing.T) {
 	model.displayMode = displayModeAgents
 	model.filtered = []session.Session{{
 		Name:         testSupportSessionProjectName,
-		IsCurrent:    true,
+		Current:      true,
 		ActivePaneID: "%7",
 		AgentTotal:   1,
 		Agents: []session.AgentSession{{
@@ -254,7 +254,7 @@ func TestCurrentActiveIdleAgentRecordsViewAndSurvivesSessionChange(t *testing.T)
 	model = updateTestModel(t, model, sessionLoadResultMsg{sessions: []session.Session{{
 		ID:           "$1",
 		Name:         testSupportSessionProjectName,
-		IsCurrent:    true,
+		Current:      true,
 		ActivePaneID: "%7",
 		AgentTotal:   1,
 		Agents: []session.AgentSession{{
@@ -275,7 +275,7 @@ func TestCurrentActiveIdleAgentRecordsViewAndSurvivesSessionChange(t *testing.T)
 		t.Fatal("current active idle agent did not record viewed state in history")
 	}
 
-	model.filtered[0].IsCurrent = false
+	model.filtered[0].Current = false
 	model.filtered[0].ActivePaneID = "%99"
 
 	outputAfterSwitch := stripANSI(model.renderList(60, 2))
@@ -310,7 +310,7 @@ func TestDeferringStateStoreTakesAgentViewsWithoutHistoryWrite(t *testing.T) {
 	model = updateTestModel(t, model, sessionLoadResultMsg{sessions: []session.Session{{
 		ID:           "$1",
 		Name:         testSupportSessionProjectName,
-		IsCurrent:    true,
+		Current:      true,
 		ActivePaneID: "%7",
 		AgentTotal:   1,
 		Agents: []session.AgentSession{{
@@ -345,7 +345,7 @@ func TestActiveIdleAgentAutoRecordsViewOnLoadAndSurvivesSessionChange(t *testing
 	model = updateTestModel(t, model, sessionLoadResultMsg{sessions: []session.Session{{
 		ID:           "$1",
 		Name:         testSupportSessionProjectName,
-		IsCurrent:    true,
+		Current:      true,
 		ActivePaneID: "%7",
 		AgentTotal:   1,
 		Agents: []session.AgentSession{{
@@ -359,7 +359,7 @@ func TestActiveIdleAgentAutoRecordsViewOnLoadAndSurvivesSessionChange(t *testing
 		t.Fatal("current active idle agent view was not automatically recorded on session load")
 	}
 
-	model.filtered[0].IsCurrent = false
+	model.filtered[0].Current = false
 	model.filtered[0].ActivePaneID = "%99"
 
 	outputAfterSwitch := stripANSI(model.renderList(60, 2))
@@ -375,7 +375,7 @@ func TestMultiAgentSessionSwitchingPaneKeepsViewedAgentVisited(t *testing.T) {
 	model = updateTestModel(t, model, sessionLoadResultMsg{sessions: []session.Session{{
 		ID:           "$1",
 		Name:         testSupportSessionProjectName,
-		IsCurrent:    true,
+		Current:      true,
 		ActivePaneID: "%7",
 		AgentTotal:   2,
 		Agents: []session.AgentSession{
@@ -421,7 +421,7 @@ func TestIdleAgentWithSessionActivityAfterIdleIsViewed(t *testing.T) {
 	model = updateTestModel(t, model, sessionLoadResultMsg{sessions: []session.Session{{
 		ID:           "$1",
 		Name:         testSupportSessionProjectName,
-		IsCurrent:    false,
+		Current:      false,
 		ActivePaneID: "%7",
 		Activity:     now.Add(-30 * time.Second),
 		AgentTotal:   1,
@@ -449,7 +449,7 @@ func TestIdleAgentWithSessionSwitchAfterIdleIsViewed(t *testing.T) {
 	row := session.Session{
 		ID:           "$1",
 		Name:         testSupportSessionProjectName,
-		IsCurrent:    false,
+		Current:      false,
 		ActivePaneID: "%7",
 		AgentTotal:   1,
 		Agents: []session.AgentSession{{
@@ -461,8 +461,8 @@ func TestIdleAgentWithSessionSwitchAfterIdleIsViewed(t *testing.T) {
 
 	state := testState()
 	state.SwitchHistory = append(state.SwitchHistory, session.SwitchHistoryEntry{
-		Session:    row.SemanticIdentity(),
-		LastSwitch: now.Add(-20 * time.Second).Unix(),
+		Session:        row.SemanticIdentity(),
+		LastSwitchUnix: now.Add(-20 * time.Second).Unix(),
 	})
 
 	model, err := newModelWithDeps(config.DefaultConfig(), state, Dependencies{})

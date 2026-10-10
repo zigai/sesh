@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/zigai/gotmux/tmux"
+	gotmux "github.com/zigai/gotmux/tmux"
 	"github.com/zigai/gotmux/tmuxtest"
 
 	"github.com/zigai/sesh/internal/integration/process"
@@ -96,7 +96,7 @@ func configuredRestoredLaunchFixture(t *testing.T, placement string) restoredLau
 	return restoredLaunchFixture{manifest: manifest, paneIndex: paneIndex, directory: directory, ready: ready, exited: exited, usable: usable, shellMarker: shellMarker}
 }
 
-func executeRestoredLaunch(t *testing.T, ctx context.Context, server *tmux.Server, fixture restoredLaunchFixture) tmux.Pane {
+func executeRestoredLaunch(t *testing.T, ctx context.Context, server *gotmux.Server, fixture restoredLaunchFixture) gotmux.Pane {
 	t.Helper()
 
 	plan, err := BuildPlan(fixture.manifest, []string{"s0"})
@@ -117,7 +117,7 @@ func executeRestoredLaunch(t *testing.T, ctx context.Context, server *tmux.Serve
 		}
 	}
 
-	pane, err := server.Pane(ctx, tmux.PaneID(runtimeID))
+	pane, err := server.Pane(ctx, gotmux.PaneID(runtimeID))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +125,7 @@ func executeRestoredLaunch(t *testing.T, ctx context.Context, server *tmux.Serve
 	return pane
 }
 
-func exitRestoredProgram(t *testing.T, ctx context.Context, pane tmux.Pane, fixture restoredLaunchFixture, interrupt bool) {
+func exitRestoredProgram(t *testing.T, ctx context.Context, pane gotmux.Pane, fixture restoredLaunchFixture, interrupt bool) {
 	t.Helper()
 
 	if got := waitForLaunchMarker(t, ctx, fixture.ready); got != "ready" {
@@ -134,9 +134,9 @@ func exitRestoredProgram(t *testing.T, ctx context.Context, pane tmux.Pane, fixt
 
 	assertRestoredProgramForeground(t, ctx, pane, fixture)
 
-	exitKey := tmux.KeyEnter
+	exitKey := gotmux.KeyEnter
 	if interrupt {
-		exitKey = tmux.KeyCtrlC
+		exitKey = gotmux.KeyCtrlC
 	}
 
 	if err := pane.SendKeys(ctx, exitKey); err != nil {
@@ -148,7 +148,7 @@ func exitRestoredProgram(t *testing.T, ctx context.Context, pane tmux.Pane, fixt
 	}
 }
 
-func assertRestoredShellUsable(t *testing.T, ctx context.Context, pane tmux.Pane, fixture restoredLaunchFixture) {
+func assertRestoredShellUsable(t *testing.T, ctx context.Context, pane gotmux.Pane, fixture restoredLaunchFixture) {
 	t.Helper()
 
 	if got := waitForLaunchMarker(t, ctx, fixture.shellMarker); got != "configured" {
@@ -160,7 +160,7 @@ func assertRestoredShellUsable(t *testing.T, ctx context.Context, pane tmux.Pane
 		t.Fatalf("restored pane disappeared after program exit: %v", err)
 	}
 
-	if err := pane.SendKeys(ctx, tmux.KeyEnter); err != nil {
+	if err := pane.SendKeys(ctx, gotmux.KeyEnter); err != nil {
 		t.Fatal(err)
 	}
 
@@ -214,7 +214,7 @@ func restoredLaunchManifest(placement string) (model.Manifest, int) {
 	return manifest, paneIndex
 }
 
-func assertRestoredProgramForeground(t *testing.T, ctx context.Context, pane tmux.Pane, fixture restoredLaunchFixture) {
+func assertRestoredProgramForeground(t *testing.T, ctx context.Context, pane gotmux.Pane, fixture restoredLaunchFixture) {
 	t.Helper()
 
 	info, err := pane.Info(ctx)

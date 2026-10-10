@@ -160,7 +160,7 @@ func ListSaved(ctx context.Context, repo SavedSnapshots, source, generationID st
 			WindowCount:            ms.Windows,
 			Attached:               false,
 			Activity:               activityTime,
-			IsCurrent:              false,
+			Current:                false,
 			ActivePaneID:           "",
 			ActiveWindowName:       "",
 			ActiveWindowIndex:      "",
@@ -271,7 +271,7 @@ func buildLiveRows(infos []gotmux.SessionInfo, socket string, identity gotmux.Se
 	result := make([]Session, 0, len(infos))
 	for _, info := range infos {
 		row := buildLiveSession(info, socket, identity, currentSession)
-		if row.IsCurrent && invokingPane != "" {
+		if row.Current && invokingPane != "" {
 			row.ActivePaneID = invokingPane
 		}
 
@@ -534,7 +534,7 @@ func buildLiveSession(
 		pathRaw = slices.Clone(panePath)
 	}
 
-	isCurrent := currentSession != "" && string(s.ID) == currentSession
+	current := currentSession != "" && string(s.ID) == currentSession
 
 	return Session{
 		ID:               string(s.ID),
@@ -561,7 +561,7 @@ func buildLiveSession(
 		WindowCount:            s.WindowCount,
 		Attached:               s.Attached > 0,
 		Activity:               s.Activity,
-		IsCurrent:              isCurrent,
+		Current:                current,
 		ActivePaneID:           string(paneID),
 		ActiveWindowName:       string(windowName),
 		ActiveWindowIndex:      string(windowIndex),

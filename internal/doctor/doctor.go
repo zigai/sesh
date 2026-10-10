@@ -10,7 +10,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/samber/oops"
-	"github.com/zigai/gotmux/tmux"
+	gotmux "github.com/zigai/gotmux/tmux"
 )
 
 const (
@@ -66,7 +66,7 @@ type Result struct {
 }
 
 type Options struct {
-	Server            *tmux.Server
+	Server            *gotmux.Server
 	SnapshotDir       string
 	HistoryPath       string
 	DaemonState       string
@@ -86,7 +86,7 @@ type Options struct {
 }
 
 type Service struct {
-	server            *tmux.Server
+	server            *gotmux.Server
 	snapshotDir       string
 	historyPath       string
 	daemonState       string

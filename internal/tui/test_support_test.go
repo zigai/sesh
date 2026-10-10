@@ -330,7 +330,7 @@ func (adapter *testServiceAdapter) restoredNames(invocation action.Invocation, i
 
 		if adapter.model != nil {
 			for _, row := range slices.Concat(adapter.model.sessions, adapter.model.filtered) {
-				if row.IsSaved() && row.ID == id && action.LocationOf(row) == invocation.At {
+				if row.Saved() && row.ID == id && action.LocationOf(row) == invocation.At {
 					name = row.Name
 				}
 			}

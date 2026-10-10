@@ -49,7 +49,7 @@ func remoteSessions(connection RemoteConnection) []session.Session {
 
 	for _, row := range connection.Sessions {
 		row.Origin = session.OriginSSH
-		row.IsCurrent = false
+		row.Current = false
 		row.RemoteStatus = session.RemoteStatusAvailable
 		row.RuntimeIdentity.ConnectionID = connection.ID
 		row.RuntimeIdentity.ConnectionLabel = connection.Label

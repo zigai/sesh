@@ -13,7 +13,7 @@ import (
 	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/cli/clibase"
-	integration "github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/integration/tmuxserver"
 )
 
 const (
@@ -34,7 +34,7 @@ func reportBindingFailure(cmd *cobra.Command, err error, stdout, stderr io.Write
 		return false
 	}
 
-	server, openErr := integration.Open(clibase.ResolveSocket(cmd))
+	server, openErr := tmuxserver.Open(clibase.ResolveSocket(cmd))
 	if openErr != nil {
 		return false
 	}

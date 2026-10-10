@@ -231,7 +231,7 @@ func TestCycleDisplayModeSelectsCurrentSessionActiveAgent(t *testing.T) {
 			ID:           "$2",
 			Name:         "current",
 			Kind:         session.KindLive,
-			IsCurrent:    true,
+			Current:      true,
 			ActivePaneID: "%8",
 			Agents: []session.AgentSession{
 				{RegistryID: "agent-1", PaneID: "%7"},
@@ -509,7 +509,7 @@ func TestAgentsModeInitialSelectionFocusesCurrentSessionAndActivePane(t *testing
 		},
 		{
 			Name:         "current-session",
-			IsCurrent:    true,
+			Current:      true,
 			ActivePaneID: "%3",
 			Agents: []session.AgentSession{
 				{RegistryID: "current-agent-1", PaneID: "%2"},
@@ -540,8 +540,8 @@ func TestAgentsModeInitialSelectionWhenActiveSessionHasNoAgents(t *testing.T) {
 			},
 		},
 		{
-			Name:      "current-regular-session",
-			IsCurrent: true,
+			Name:    "current-regular-session",
+			Current: true,
 		},
 	}
 
@@ -559,7 +559,7 @@ func TestAgentsModeInitialSelectionWhenNoPaneMatchesActivePaneID(t *testing.T) {
 	model.filtered = []session.Session{
 		{
 			Name:         "current-session",
-			IsCurrent:    true,
+			Current:      true,
 			ActivePaneID: "%99",
 			Agents: []session.AgentSession{
 				{RegistryID: "agent-1", PaneID: "%1"},

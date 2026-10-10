@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zigai/gotmux/tmux"
+	gotmux "github.com/zigai/gotmux/tmux"
 	"github.com/zigai/gotmux/tmuxtest"
 
 	"github.com/zigai/sesh/internal/integration/process"
@@ -357,43 +357,43 @@ func createTestApplicationFiles(t *testing.T, workDir string) (string, string) {
 func setupSourceSession(
 	t *testing.T,
 	ctx context.Context,
-	server *tmux.Server,
+	server *gotmux.Server,
 	sessionName, workDir, bashPath, topPath, nvimPath, nodePath, noteFile, nodeScript string,
-) tmux.Session {
+) gotmux.Session {
 	t.Helper()
 
-	session, err := server.NewSession(ctx, tmux.NewSessionOptions{
+	session, err := server.NewSession(ctx, gotmux.NewSessionOptions{
 		Name:    sessionName,
 		Dir:     workDir,
 		Window:  "shell-win",
-		Program: tmux.Exec(bashPath, "--norc", "--noprofile"),
-		Size:    tmux.Size{Width: 120, Height: 40},
-		Start:   tmux.StartPolicyExistingOnly,
+		Program: gotmux.Exec(bashPath, "--norc", "--noprofile"),
+		Size:    gotmux.Size{Width: 120, Height: 40},
+		Start:   gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("creating source session: %v", err)
 	}
 
-	if _, err = session.NewWindow(ctx, tmux.NewWindowOptions{
+	if _, err = session.NewWindow(ctx, gotmux.NewWindowOptions{
 		Name:    "monitor-win",
 		Dir:     workDir,
-		Program: tmux.Exec(topPath, "-d", "100"),
+		Program: gotmux.Exec(topPath, "-d", "100"),
 	}); err != nil {
 		t.Fatalf("creating monitor window: %v", err)
 	}
 
-	if _, err = session.NewWindow(ctx, tmux.NewWindowOptions{
+	if _, err = session.NewWindow(ctx, gotmux.NewWindowOptions{
 		Name:    "editor-win",
 		Dir:     workDir,
-		Program: tmux.Exec(nvimPath, noteFile),
+		Program: gotmux.Exec(nvimPath, noteFile),
 	}); err != nil {
 		t.Fatalf("creating editor window: %v", err)
 	}
 
-	if _, err = session.NewWindow(ctx, tmux.NewWindowOptions{
+	if _, err = session.NewWindow(ctx, gotmux.NewWindowOptions{
 		Name:    "script-win",
 		Dir:     workDir,
-		Program: tmux.Exec(nodePath, nodeScript),
+		Program: gotmux.Exec(nodePath, nodeScript),
 	}); err != nil {
 		t.Fatalf("creating script window: %v", err)
 	}
@@ -418,7 +418,7 @@ func setupSourceSession(
 	return session
 }
 
-func waitForSourceApplicationsReady(t *testing.T, ctx context.Context, session tmux.Session) {
+func waitForSourceApplicationsReady(t *testing.T, ctx context.Context, session gotmux.Session) {
 	t.Helper()
 
 	deadline := time.Now().Add(fixturePollTimeout)
@@ -434,7 +434,7 @@ func waitForSourceApplicationsReady(t *testing.T, ctx context.Context, session t
 	t.Fatal("source session applications did not reach observable readiness within deadline")
 }
 
-func checkSourceApplicationsReady(ctx context.Context, session tmux.Session) bool {
+func checkSourceApplicationsReady(ctx context.Context, session gotmux.Session) bool {
 	windows, _, err := session.WindowInfos(ctx)
 	if err != nil || len(windows) < 4 {
 		return false
@@ -495,8 +495,8 @@ func executeSave(
 	t *testing.T,
 	ctx context.Context,
 	fixture applicationTestFixture,
-	server *tmux.Server,
-	session tmux.Session,
+	server *gotmux.Server,
+	session gotmux.Session,
 ) snapshotSaveResultJSON {
 	t.Helper()
 
@@ -630,7 +630,7 @@ func assertNvimLaunchContainsFile(t *testing.T, arguments []model.Bytes, noteFil
 	t.Errorf("nvim arguments %v do not contain noteFile %q", arguments, noteFile)
 }
 
-func destroySourceServer(t *testing.T, ctx context.Context, server *tmux.Server) {
+func destroySourceServer(t *testing.T, ctx context.Context, server *gotmux.Server) {
 	t.Helper()
 
 	if err := server.Kill(ctx); err != nil {
@@ -646,7 +646,7 @@ func executeRestore(
 	t *testing.T,
 	ctx context.Context,
 	fixture applicationTestFixture,
-	target *tmux.Server,
+	target *gotmux.Server,
 	generation string,
 ) snapshotRestoreResultJSON {
 	t.Helper()
@@ -691,7 +691,7 @@ func executeRestore(
 func assertRestoredTargetSession(
 	t *testing.T,
 	ctx context.Context,
-	targetServer *tmux.Server,
+	targetServer *gotmux.Server,
 	sessionName, noteFile string,
 	restoreResult snapshotRestoreResultJSON,
 	env []string,

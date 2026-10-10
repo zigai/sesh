@@ -145,7 +145,7 @@ func newRichAgentVisualModel(t *testing.T) *Model {
 			ID:           "$1",
 			Name:         "0",
 			Kind:         session.KindLive,
-			IsCurrent:    true,
+			Current:      true,
 			ActivePaneID: "%1",
 			AgentTotal:   2,
 			AgentActive:  1,

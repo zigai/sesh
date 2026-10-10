@@ -71,7 +71,7 @@ type Session struct {
 	WindowCount            int             `json:"windowCount"`
 	Attached               bool            `json:"attached"`
 	Activity               time.Time       `json:"activity"`
-	IsCurrent              bool            `json:"-"`
+	Current                bool            `json:"-"`
 	ActivePaneID           string          `json:"activePaneId,omitempty"`
 	ActiveWindowName       string          `json:"activeWindowName,omitempty"`
 	ActiveWindowIndex      string          `json:"activeWindowIndex,omitempty"`
@@ -157,7 +157,7 @@ func (s AgentStatus) DisplayStatus() AgentStatus {
 	return s
 }
 
-func (s Session) IsSaved() bool {
+func (s Session) Saved() bool {
 	return s.Kind == KindSaved
 }
 

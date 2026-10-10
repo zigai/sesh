@@ -135,13 +135,13 @@ func (peer *Peer) originOptions(connectionID string) (ActionOriginOptions, error
 	return ActionOriginOptions{Remote: peer.remote, Connection: connection, State: state}, nil
 }
 
-func NewActionRequest(options ActionOriginOptions, id action.ID, input jsontext.Value) (ActionRequest, error) {
-	if !options.Remote.Enabled {
+func NewActionRequest(opts ActionOriginOptions, id action.ID, input jsontext.Value) (ActionRequest, error) {
+	if !opts.Remote.Enabled {
 		return ActionRequest{}, ErrRemoteDisabled
 	}
 
-	if options.Connection.ID != options.State.ID ||
-		ConnectionDigest(options.Connection) != options.State.ConfigDigest || !options.State.Connected {
+	if opts.Connection.ID != opts.State.ID ||
+		ConnectionDigest(opts.Connection) != opts.State.ConfigDigest || !opts.State.Connected {
 		return ActionRequest{}, ErrConnectionChanged
 	}
 
@@ -154,10 +154,10 @@ func NewActionRequest(options ActionOriginOptions, id action.ID, input jsontext.
 		InvocationID: invocationID,
 		IntentDigest: "",
 		Action:       id,
-		ConnectionID: options.Connection.ID,
-		ConfigDigest: options.State.ConfigDigest,
-		PeerID:       options.State.PeerID,
-		Socket:       options.Connection.TmuxSocket,
+		ConnectionID: opts.Connection.ID,
+		ConfigDigest: opts.State.ConfigDigest,
+		PeerID:       opts.State.PeerID,
+		Socket:       opts.Connection.TmuxSocket,
 		Input:        input,
 	}
 
@@ -175,13 +175,13 @@ func NewActionRequest(options ActionOriginOptions, id action.ID, input jsontext.
 
 // RunAction sends one invocation over SSH. When the answer is lost the outcome is unknown, and
 // `sesh remote lookup` reads the receipt the peer kept.
-func RunAction(ctx context.Context, options ActionOriginOptions, request ActionRequest) (ActionResult, error) {
+func RunAction(ctx context.Context, opts ActionOriginOptions, request ActionRequest) (ActionResult, error) {
 	if err := ValidateActionRequest(request); err != nil {
 		return ActionResult{}, oops.In("remote").With("operation", "run_action").Wrap(err)
 	}
 
-	if request.ConnectionID != options.Connection.ID || request.ConfigDigest != options.State.ConfigDigest ||
-		request.PeerID != options.State.PeerID || ConnectionDigest(options.Connection) != options.State.ConfigDigest {
+	if request.ConnectionID != opts.Connection.ID || request.ConfigDigest != opts.State.ConfigDigest ||
+		request.PeerID != opts.State.PeerID || ConnectionDigest(opts.Connection) != opts.State.ConfigDigest {
 		return ActionResult{}, oops.In("remote").With("operation", "run_action").Wrap(ErrConnectionChanged)
 	}
 
@@ -190,14 +190,14 @@ func RunAction(ctx context.Context, options ActionOriginOptions, request ActionR
 		return ActionResult{}, oops.In("remote").With("operation", "run_action").Wrap(err)
 	}
 
-	actionCtx, cancel := context.WithTimeout(ctx, ParsedDuration(options.Remote.ActionTimeout, defaultAction))
+	actionCtx, cancel := context.WithTimeout(ctx, ParsedDuration(opts.Remote.ActionTimeout, defaultAction))
 	defer cancel()
 
-	command, err := NewSSHCommand(actionCtx, options.Remote, options.Connection, SSHCommandOptions{
+	command, err := NewSSHCommand(actionCtx, opts.Remote, opts.Connection, SSHCommandOptions{
 		Interactive: false,
 		Forward:     nil,
 		Command:     nil,
-	}, PeerEntryPoint(options.Connection, ChannelAction)...)
+	}, PeerEntryPoint(opts.Connection, ChannelAction)...)
 	if err != nil {
 		return ActionResult{}, oops.In("remote").With("operation", "run_action").Wrap(err)
 	}

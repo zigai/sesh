@@ -103,18 +103,18 @@ func (o Options) toLoggingFilter() logging.FilterOptions {
 	}
 }
 
-func DisplayRetainedLogs(ctx context.Context, output, diagnostics io.Writer, path string, options Options) error {
+func DisplayRetainedLogs(ctx context.Context, output, diagnostics io.Writer, path string, opts Options) error {
 	readOpts := logging.ReadOptions{
-		Lines:  options.Lines,
-		Follow: options.Watch,
-		Filter: options.toLoggingFilter(),
+		Lines:  opts.Lines,
+		Follow: opts.Watch,
+		Filter: opts.toLoggingFilter(),
 	}
 
-	if !options.Watch && options.Lines > 0 && !options.Relative && !options.Raw {
-		return displayBoundedRetainedLogs(ctx, output, diagnostics, path, readOpts, options)
+	if !opts.Watch && opts.Lines > 0 && !opts.Relative && !opts.Raw {
+		return displayBoundedRetainedLogs(ctx, output, diagnostics, path, readOpts, opts)
 	}
 
-	return StreamRetainedLogs(ctx, output, diagnostics, path, readOpts, options)
+	return StreamRetainedLogs(ctx, output, diagnostics, path, readOpts, opts)
 }
 
 func StreamRetainedLogs(ctx context.Context, output, diagnostics io.Writer, path string, readOpts logging.ReadOptions, options Options) error {
@@ -128,11 +128,11 @@ func StreamRetainedLogs(ctx context.Context, output, diagnostics io.Writer, path
 	return nil
 }
 
-func NewLogStreamWriter(output, diagnostics io.Writer, options Options, styles Styles) *LogStreamWriter {
+func NewLogStreamWriter(output, diagnostics io.Writer, opts Options, styles Styles) *LogStreamWriter {
 	return &LogStreamWriter{
 		output:      output,
 		diagnostics: diagnostics,
-		options:     options,
+		options:     opts,
 		styles:      styles,
 		lineNumber:  0,
 	}

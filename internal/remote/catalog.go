@@ -276,7 +276,7 @@ func CatalogSessions(state ConnectionState) []session.Session {
 
 	for _, row := range state.Snapshot.Sessions {
 		row.Origin = session.OriginSSH
-		row.IsCurrent = false
+		row.Current = false
 		row.RemoteStatus = state.remoteStatus()
 		row.RuntimeIdentity.ConnectionID = state.ID
 		row.RuntimeIdentity.ConnectionLabel = state.Label

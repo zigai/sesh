@@ -106,7 +106,7 @@ func parseStat(data []byte) (byte, uint64, error) {
 	}
 
 	pidPrefix := bytes.TrimSpace(data[:openParen])
-	if !isValidPIDPrefix(pidPrefix) {
+	if !validPIDPrefix(pidPrefix) {
 		return 0, 0, ErrMalformedStat
 	}
 
@@ -133,7 +133,7 @@ func parseStat(data []byte) (byte, uint64, error) {
 	return stateField[0], startTime, nil
 }
 
-func isValidPIDPrefix(b []byte) bool {
+func validPIDPrefix(b []byte) bool {
 	if len(b) == 0 || b[0] == '0' {
 		return false
 	}

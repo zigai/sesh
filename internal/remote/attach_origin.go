@@ -37,20 +37,20 @@ type AttachCommandOptions struct {
 	Command func(ctx context.Context, executable string, arguments ...string) *exec.Cmd
 }
 
-func PrepareAttachment(options AttachOriginOptions) (AttachBootstrap, error) {
-	if !options.Remote.Enabled {
+func PrepareAttachment(opts AttachOriginOptions) (AttachBootstrap, error) {
+	if !opts.Remote.Enabled {
 		return AttachBootstrap{}, ErrRemoteDisabled
 	}
 
-	if err := options.Target.Validate(); err != nil {
+	if err := opts.Target.Validate(); err != nil {
 		return AttachBootstrap{}, err
 	}
 
-	if options.Connection.ID == "" || options.Target.PeerID == "" {
+	if opts.Connection.ID == "" || opts.Target.PeerID == "" {
 		return AttachBootstrap{}, ErrIncompleteDependencies
 	}
 
-	if !validSocketPath(options.OriginSocket) || !validSocketPath(options.BridgeDir) {
+	if !validSocketPath(opts.OriginSocket) || !validSocketPath(opts.BridgeDir) {
 		return AttachBootstrap{}, ErrUnsafePath
 	}
 
@@ -64,29 +64,29 @@ func PrepareAttachment(options AttachOriginOptions) (AttachBootstrap, error) {
 		return AttachBootstrap{}, err
 	}
 
-	bridgeSocket, err := BridgeSocketPath(options.BridgeDir, attachmentID)
+	bridgeSocket, err := BridgeSocketPath(opts.BridgeDir, attachmentID)
 	if err != nil {
 		return AttachBootstrap{}, err
 	}
 
-	now := options.Now
+	now := opts.Now
 	if now == nil {
 		now = time.Now
 	}
 
-	timeout := positiveDuration(options.Timeout, defaultAttachTimeout)
+	timeout := positiveDuration(opts.Timeout, defaultAttachTimeout)
 
 	return AttachBootstrap{
 		Version: ProtocolVersion,
 		Channel: ChannelAttachPrepare,
-		Target:  options.Target,
+		Target:  opts.Target,
 		Capability: BridgeGrant{
 			Version:      ProtocolVersion,
 			AttachmentID: attachmentID,
-			PeerID:       options.Target.PeerID,
+			PeerID:       opts.Target.PeerID,
 			Token:        token,
-			OriginSocket: options.OriginSocket,
-			OriginLabel:  options.OriginLabel,
+			OriginSocket: opts.OriginSocket,
+			OriginLabel:  opts.OriginLabel,
 			ExpiresAt:    now().Add(timeout).UTC(),
 		},
 		BridgeSocket:  bridgeSocket,
@@ -94,7 +94,7 @@ func PrepareAttachment(options AttachOriginOptions) (AttachBootstrap, error) {
 	}, nil
 }
 
-func NewAttachPrepareCommand(ctx context.Context, remote config.RemoteConfig, connection config.RemoteConnectionConfig, bootstrap AttachBootstrap, options AttachCommandOptions) (*exec.Cmd, error) {
+func NewAttachPrepareCommand(ctx context.Context, remote config.RemoteConfig, connection config.RemoteConnectionConfig, bootstrap AttachBootstrap, opts AttachCommandOptions) (*exec.Cmd, error) {
 	payload, err := EncodeAttachBootstrap(bootstrap)
 	if err != nil {
 		return nil, err
@@ -103,7 +103,7 @@ func NewAttachPrepareCommand(ctx context.Context, remote config.RemoteConfig, co
 	command, err := NewSSHCommand(ctx, remote, connection, SSHCommandOptions{
 		Interactive: false,
 		Forward:     nil,
-		Command:     options.Command,
+		Command:     opts.Command,
 	}, PeerEntryPoint(connection, ChannelAttachPrepare)...)
 	if err != nil {
 		return nil, err
@@ -114,12 +114,12 @@ func NewAttachPrepareCommand(ctx context.Context, remote config.RemoteConfig, co
 	return command, nil
 }
 
-func NewAttachCommand(ctx context.Context, remote config.RemoteConfig, connection config.RemoteConnectionConfig, bootstrap AttachBootstrap, options AttachCommandOptions) (*exec.Cmd, error) {
+func NewAttachCommand(ctx context.Context, remote config.RemoteConfig, connection config.RemoteConnectionConfig, bootstrap AttachBootstrap, opts AttachCommandOptions) (*exec.Cmd, error) {
 	if err := bootstrap.Validate(); err != nil {
 		return nil, err
 	}
 
-	if options.Streams.In == nil || options.Streams.Out == nil || options.Streams.Err == nil {
+	if opts.Streams.In == nil || opts.Streams.Out == nil || opts.Streams.Err == nil {
 		return nil, errNilAttachStreams
 	}
 
@@ -131,24 +131,24 @@ func NewAttachCommand(ctx context.Context, remote config.RemoteConfig, connectio
 			RemotePath: bootstrap.BridgeSocket,
 			LocalPath:  bootstrap.Capability.OriginSocket,
 		}},
-		Command: options.Command,
+		Command: opts.Command,
 	}, arguments...)
 	if err != nil {
 		return nil, err
 	}
 
-	command.Stdin = options.Streams.In
-	command.Stdout = options.Streams.Out
-	command.Stderr = options.Streams.Err
+	command.Stdin = opts.Streams.In
+	command.Stdout = opts.Streams.Out
+	command.Stderr = opts.Streams.Err
 
 	return command, nil
 }
 
-func RunAttachPrepare(ctx context.Context, remote config.RemoteConfig, connection config.RemoteConnectionConfig, bootstrap AttachBootstrap, options AttachCommandOptions) (AttachPrepareResult, error) {
+func RunAttachPrepare(ctx context.Context, remote config.RemoteConfig, connection config.RemoteConnectionConfig, bootstrap AttachBootstrap, opts AttachCommandOptions) (AttachPrepareResult, error) {
 	prepareContext, cancel := context.WithTimeout(ctx, ParsedDuration(remote.ConnectTimeout, defaultConnect)+attachResultGrace)
 	defer cancel()
 
-	command, err := NewAttachPrepareCommand(prepareContext, remote, connection, bootstrap, options)
+	command, err := NewAttachPrepareCommand(prepareContext, remote, connection, bootstrap, opts)
 	if err != nil {
 		return AttachPrepareResult{}, err
 	}

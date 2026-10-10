@@ -63,30 +63,30 @@ type handler func(ctx context.Context, caller action.Caller, input any) (any, er
 // NewLocal wires every registered action to its handler. A registered action without a
 // handler is a programming error, so construction panics instead of failing at dispatch.
 // Interactive actions belong to the front end that owns the invoking client.
-func NewLocal(options LocalOptions) *Local {
-	cfg := options.Config
+func NewLocal(opts LocalOptions) *Local {
+	cfg := opts.Config
 	if cfg == nil {
 		cfg = config.DefaultConfig()
 	}
 
 	local := &Local{
 		cfg:         cfg,
-		server:      options.Server,
-		repository:  options.Repository,
-		leaseRoot:   options.LeaseRoot,
-		historyPath: options.HistoryPath,
-		agentSource: options.AgentSource,
+		server:      opts.Server,
+		repository:  opts.Repository,
+		leaseRoot:   opts.LeaseRoot,
+		historyPath: opts.HistoryPath,
+		agentSource: opts.AgentSource,
 		workflow: session.NewWorkflowWithOptions(session.WorkflowOptions{
-			Server:             options.Server,
+			Server:             opts.Server,
 			Repository:         nil,
-			LeaseRoot:          options.LeaseRoot,
-			HistoryPath:        options.HistoryPath,
+			LeaseRoot:          opts.LeaseRoot,
+			HistoryPath:        opts.HistoryPath,
 			Hooks:              cfg.Hooks,
 			HookRunner:         nil,
 			Getenv:             nil,
-			Streams:            options.Streams,
-			Source:             options.Source,
-			DeferSwitchHistory: options.DeferSwitchHistory,
+			Streams:            opts.Streams,
+			Source:             opts.Source,
+			DeferSwitchHistory: opts.DeferSwitchHistory,
 		}),
 		attachRepo: sync.Once{},
 		handlers:   make(map[action.ID]handler),

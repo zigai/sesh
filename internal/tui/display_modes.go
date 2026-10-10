@@ -128,11 +128,11 @@ func (m *Model) refreshDisplaySessions() {
 
 		switch m.displayMode {
 		case displayModeSesh:
-			if !row.IsCurrent {
+			if !row.Current {
 				displayed = append(displayed, row)
 			}
 		case displayModeAgents:
-			if !row.IsSaved() {
+			if !row.Saved() {
 				displayed = append(displayed, row)
 			}
 		default:
@@ -274,7 +274,7 @@ func (m *Model) restoreCurrentSession() bool {
 		return false
 	}
 
-	currentIndex := slices.IndexFunc(m.filtered, func(s session.Session) bool { return s.IsCurrent })
+	currentIndex := slices.IndexFunc(m.filtered, func(s session.Session) bool { return s.Current })
 	if currentIndex < 0 {
 		return false
 	}
@@ -310,7 +310,7 @@ func (m *Model) settleInitialAgentSelection() {
 		return
 	}
 
-	currentIndex := slices.IndexFunc(m.filtered, func(row session.Session) bool { return row.IsCurrent })
+	currentIndex := slices.IndexFunc(m.filtered, func(row session.Session) bool { return row.Current })
 	if currentIndex < 0 || len(m.filtered[currentIndex].Agents) == 0 || m.cursor != currentIndex {
 		return
 	}

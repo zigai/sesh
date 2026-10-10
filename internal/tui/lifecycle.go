@@ -70,7 +70,7 @@ func (l *lifecycle) EndWorker() {
 	l.wg.Done()
 }
 
-func (l *lifecycle) IsClosed() bool {
+func (l *lifecycle) Closed() bool {
 	if l == nil {
 		return true
 	}

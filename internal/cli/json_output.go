@@ -22,7 +22,7 @@ import (
 	"github.com/zigai/sesh/internal/remote"
 
 	"github.com/zigai/sesh/internal/integration/process"
-	integration "github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/integration/tmuxserver"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/snapshot/capture"
 	"github.com/zigai/sesh/internal/snapshot/engine"
@@ -376,7 +376,7 @@ func captureSentinelMessage(err error) (string, bool) {
 		return "explicit session selection required", true
 	case errors.Is(err, capture.ErrUnsupported) || errors.Is(err, process.ErrUnsupported):
 		return "state cannot be represented faithfully by published API", true
-	case errors.Is(err, integration.ErrEndpoint):
+	case errors.Is(err, tmuxserver.ErrEndpoint):
 		return "an explicit absolute tmux socket is required", true
 	case errors.Is(err, capture.ErrProcessDeleted):
 		return "process executable or working directory was deleted", true
@@ -527,7 +527,7 @@ func captureErrorCode(err error) (string, bool) {
 		return "selectionRequired", true
 	case errors.Is(err, capture.ErrUnsupported) || errors.Is(err, process.ErrUnsupported):
 		return "captureUnsupported", true
-	case errors.Is(err, integration.ErrEndpoint):
+	case errors.Is(err, tmuxserver.ErrEndpoint):
 		return "endpointRequired", true
 	case errors.Is(err, capture.ErrProcessDeleted):
 		return "captureFailed", true

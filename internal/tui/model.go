@@ -533,7 +533,7 @@ func (m *Model) Init() tea.Cmd {
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if m.lifecycle.IsClosed() {
+	if m.lifecycle.Closed() {
 		return m, nil
 	}
 
@@ -590,7 +590,7 @@ func (m *Model) setErrorStatus(message string) {
 }
 
 func (m *Model) updateState(ctx context.Context, update session.StateUpdate) error {
-	if m.lifecycle.IsClosed() || ctx.Err() != nil {
+	if m.lifecycle.Closed() || ctx.Err() != nil {
 		return errModelClosed
 	}
 

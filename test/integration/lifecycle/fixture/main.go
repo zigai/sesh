@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zigai/gotmux/tmux"
+	gotmux "github.com/zigai/gotmux/tmux"
 
-	integration "github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/integration/tmuxserver"
 )
 
 const (
@@ -80,9 +80,9 @@ type fixtureParams struct {
 }
 
 type windowSet struct {
-	editor  tmux.Window
-	monitor tmux.Window
-	sleep   tmux.Window
+	editor  gotmux.Window
+	monitor gotmux.Window
+	sleep   gotmux.Window
 	names   []string
 }
 
@@ -177,8 +177,8 @@ func main() {
 	}
 }
 
-func openVerifiedServer(ctx context.Context, socket string) (*tmux.Server, error) {
-	server, err := integration.Open(socket)
+func openVerifiedServer(ctx context.Context, socket string) (*gotmux.Server, error) {
+	server, err := tmuxserver.Open(socket)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", errOpenServer, err)
 	}
@@ -229,15 +229,15 @@ func runCreate(socket, sessionName string) error {
 		return err
 	}
 
-	session, err := server.NewSession(ctx, tmux.NewSessionOptions{
+	session, err := server.NewSession(ctx, gotmux.NewSessionOptions{
 		Name:    sessionName,
 		Dir:     homeDir,
 		Window:  "editor",
-		Program: tmux.Exec("nvim", "--", alphaFile, betaFile),
+		Program: gotmux.Exec("nvim", "--", alphaFile, betaFile),
 		Env:     nil,
 		TmuxEnv: nil,
-		Size:    tmux.Size{Width: terminalWidth, Height: terminalHeight},
-		Start:   tmux.StartPolicyExistingOnly,
+		Size:    gotmux.Size{Width: terminalWidth, Height: terminalHeight},
+		Start:   gotmux.StartPolicyExistingOnly,
 		Group:   "",
 	})
 	if err != nil {
@@ -255,11 +255,11 @@ func runCreate(socket, sessionName string) error {
 	return waitForFixtureProcesses(ctx, session)
 }
 
-func addFixtureWindows(ctx context.Context, session tmux.Session, homeDir string) error {
-	optsMonitor := tmux.NewWindowOptions{
+func addFixtureWindows(ctx context.Context, session gotmux.Session, homeDir string) error {
+	optsMonitor := gotmux.NewWindowOptions{
 		Name:    "monitor",
 		Dir:     homeDir,
-		Program: tmux.Exec("top"),
+		Program: gotmux.Exec("top"),
 		Env:     nil,
 		TmuxEnv: nil,
 		Index:   nil,
@@ -271,10 +271,10 @@ func addFixtureWindows(ctx context.Context, session tmux.Session, homeDir string
 		return fmt.Errorf("%w (monitor): %w", errCreateWindow, err)
 	}
 
-	optsSleep := tmux.NewWindowOptions{
+	optsSleep := gotmux.NewWindowOptions{
 		Name:    "sleep",
 		Dir:     homeDir,
-		Program: tmux.Exec("sleep", "600"),
+		Program: gotmux.Exec("sleep", "600"),
 		Env:     nil,
 		TmuxEnv: nil,
 		Index:   nil,
@@ -289,7 +289,7 @@ func addFixtureWindows(ctx context.Context, session tmux.Session, homeDir string
 	return nil
 }
 
-func waitForFixtureProcesses(ctx context.Context, session tmux.Session) error {
+func waitForFixtureProcesses(ctx context.Context, session gotmux.Session) error {
 	pollDeadline := time.Now().Add(createPollBudget)
 	for !checkProcessesRunning(ctx, session) {
 		if time.Now().After(pollDeadline) {
@@ -302,7 +302,7 @@ func waitForFixtureProcesses(ctx context.Context, session tmux.Session) error {
 	return nil
 }
 
-func checkProcessesRunning(ctx context.Context, session tmux.Session) bool {
+func checkProcessesRunning(ctx context.Context, session gotmux.Session) bool {
 	panes, err := session.Panes(ctx)
 	if err != nil || len(panes) < 3 {
 		return false
@@ -390,7 +390,7 @@ func outputVerification(report RestoreVerification, sessionName string) error {
 	return nil
 }
 
-func locateWindows(ctx context.Context, session tmux.Session) (windowSet, error) {
+func locateWindows(ctx context.Context, session gotmux.Session) (windowSet, error) {
 	links, err := session.Windows(ctx)
 	if err != nil {
 		return windowSet{}, fmt.Errorf("list session windows: %w", err)
@@ -438,7 +438,7 @@ func locateWindows(ctx context.Context, session tmux.Session) (windowSet, error)
 	return res, nil
 }
 
-func verifyEditorPane(ctx context.Context, win tmux.Window, alphaFile, betaFile string) (VerifiedPane, error) {
+func verifyEditorPane(ctx context.Context, win gotmux.Window, alphaFile, betaFile string) (VerifiedPane, error) {
 	panes, err := win.Panes(ctx)
 	if err != nil || len(panes) == 0 {
 		return VerifiedPane{}, fmt.Errorf("%w: %w", errEditorPaneMissing, err)
@@ -477,7 +477,7 @@ func verifyEditorPane(ctx context.Context, win tmux.Window, alphaFile, betaFile 
 	}, nil
 }
 
-func verifyMonitorPane(ctx context.Context, win tmux.Window) (VerifiedPane, error) {
+func verifyMonitorPane(ctx context.Context, win gotmux.Window) (VerifiedPane, error) {
 	panes, err := win.Panes(ctx)
 	if err != nil || len(panes) == 0 {
 		return VerifiedPane{}, fmt.Errorf("%w: %w", errMonitorPaneMissing, err)
@@ -500,7 +500,7 @@ func verifyMonitorPane(ctx context.Context, win tmux.Window) (VerifiedPane, erro
 	}, nil
 }
 
-func verifySleepPane(ctx context.Context, win tmux.Window) (VerifiedPane, error) {
+func verifySleepPane(ctx context.Context, win gotmux.Window) (VerifiedPane, error) {
 	panes, err := win.Panes(ctx)
 	if err != nil || len(panes) == 0 {
 		return VerifiedPane{}, fmt.Errorf("%w: %w", errSleepPaneMissing, err)
@@ -527,7 +527,7 @@ func verifySleepPane(ctx context.Context, win tmux.Window) (VerifiedPane, error)
 	}, nil
 }
 
-func verifySessionState(ctx context.Context, session tmux.Session, alphaFile, betaFile string) (RestoreVerification, error) {
+func verifySessionState(ctx context.Context, session gotmux.Session, alphaFile, betaFile string) (RestoreVerification, error) {
 	ws, err := locateWindows(ctx, session)
 	if err != nil {
 		return RestoreVerification{}, err

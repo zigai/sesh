@@ -392,7 +392,7 @@ func ValidateKeyConfig(keys KeyConfig) error {
 	return nil
 }
 
-func IsValidStatusTimeFormat(format string) bool {
+func ValidStatusTimeFormat(format string) bool {
 	switch strings.ToLower(strings.TrimSpace(format)) {
 	case "relative", "relative-seconds", "compact", "human", "default", "age", "hh:mm",
 		"clock", "duration", "hms", "hh:mm:ss", "00:00:00", "00:01:23", "timer", "stopwatch", "elapsed":
@@ -708,13 +708,13 @@ func validateAgentSessionStatusFormats(agentSessions AgentSessionsConfig) error 
 	}
 
 	if agentSessions.StatusTimeFormat != "" {
-		if !IsValidStatusTimeFormat(agentSessions.StatusTimeFormat) {
+		if !ValidStatusTimeFormat(agentSessions.StatusTimeFormat) {
 			return fmt.Errorf("%w %q: expected relative, relative-seconds, clock (00:01:23), or hh:mm (00:01)", errAgentStatusTimeFormatInvalid, agentSessions.StatusTimeFormat)
 		}
 	}
 
 	if agentSessions.StatusTimeStyle != "" {
-		if !IsValidStatusTimeFormat(agentSessions.StatusTimeStyle) {
+		if !ValidStatusTimeFormat(agentSessions.StatusTimeStyle) {
 			return fmt.Errorf("%w %q: expected relative, clock (00:01:23), or hh:mm (00:01)", errAgentStatusTimeStyleInvalid, agentSessions.StatusTimeStyle)
 		}
 	}

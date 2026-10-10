@@ -34,18 +34,18 @@ func actionOriginFixture() (ActionOriginOptions, action.SessionRef) {
 	return ActionOriginOptions{Remote: remoteConfig, Connection: connection, State: state}, target
 }
 
-func fixturePeer(options ActionOriginOptions) *Peer {
-	catalog := Catalog{Version: ProtocolVersion, GeneratedAt: time.Time{}, Connections: map[string]ConnectionState{options.State.ID: options.State}}
-	peer := NewPeer(options.Remote, func() (Catalog, error) { return catalog, nil })
+func fixturePeer(opts ActionOriginOptions) *Peer {
+	catalog := Catalog{Version: ProtocolVersion, GeneratedAt: time.Time{}, Connections: map[string]ConnectionState{opts.State.ID: opts.State}}
+	peer := NewPeer(opts.Remote, func() (Catalog, error) { return catalog, nil })
 	peer.Observe(catalog)
 
 	return peer
 }
 
-func killInvocation(options ActionOriginOptions, target action.SessionRef) action.Invocation {
+func killInvocation(opts ActionOriginOptions, target action.SessionRef) action.Invocation {
 	return action.Invocation{
 		Action: action.SessionKill.ID,
-		At:     action.Peer(options.Connection.ID),
+		At:     action.Peer(opts.Connection.ID),
 		Caller: action.Caller{Client: "", Pane: "", Session: "", Width: "", Height: ""},
 		Input:  action.KillSession{Session: target, Force: false},
 	}
@@ -86,9 +86,9 @@ func TestNewActionRequestBindsCachedPeerAndServer(t *testing.T) {
 
 func TestNewActionRequestRefusesStaleOrDisabledConnections(t *testing.T) {
 	for name, mutate := range map[string]func(*ActionOriginOptions){
-		"connection changed": func(options *ActionOriginOptions) { options.Connection.Host = "replacement.example" },
-		"disconnected":       func(options *ActionOriginOptions) { options.State.Connected = false },
-		"remote disabled":    func(options *ActionOriginOptions) { options.Remote.Enabled = false },
+		"connection changed": func(opts *ActionOriginOptions) { opts.Connection.Host = "replacement.example" },
+		"disconnected":       func(opts *ActionOriginOptions) { opts.State.Connected = false },
+		"remote disabled":    func(opts *ActionOriginOptions) { opts.Remote.Enabled = false },
 	} {
 		t.Run(name, func(t *testing.T) {
 			options, _ := actionOriginFixture()

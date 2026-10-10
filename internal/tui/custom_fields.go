@@ -367,7 +367,7 @@ func appendCustomFieldTargets(targets []customFieldTarget, names []string, row s
 }
 
 func customFieldSessionRowKey(row session.Session) string {
-	if row.IsSaved() {
+	if row.Saved() {
 		return row.EntityKey()
 	}
 

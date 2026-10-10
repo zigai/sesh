@@ -1,0 +1,361 @@
+//go:build linux || darwin
+
+package picker
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/zigai/aht/v2/pkg/aht"
+	"github.com/zigai/aht/v2/pkg/registry"
+	gotmux "github.com/zigai/gotmux/tmux"
+
+	"github.com/zigai/sesh/internal/agents"
+	"github.com/zigai/sesh/internal/app"
+	"github.com/zigai/sesh/internal/config"
+	"github.com/zigai/sesh/internal/session"
+	"github.com/zigai/sesh/internal/tui"
+)
+
+func TestPickerServicesLoadAndWatchPiConversationNames(t *testing.T) {
+	dir := t.TempDir()
+	transcript := filepath.Join(dir, "conversation.jsonl")
+	writePickerNameFixture(t, transcript, `{"type":"session_info","name":"Loaded name"}`+"\n")
+
+	statePath := filepath.Join(dir, "state.json")
+	now := time.Now().UTC()
+	identity := registry.ProcessIdentity{PID: 42, StartIdentity: "fixture:42"}
+	agent := aht.Session{
+		SchemaVersion: 3,
+		ID:            "registry-id", Harness: aht.HarnessPi,
+		Liveness:  aht.Live{Activity: aht.ActivityIdle},
+		SessionID: "native-resume-id", SessionPath: transcript, Process: &identity,
+		ResumeCommand: []string{"pi", "--resume", "native-resume-id"},
+		Location: aht.Location{
+			Kind:        aht.MultiplexerTmux,
+			ServerID:    "/tmp/tmux.sock",
+			SessionID:   "$1",
+			SessionName: "workspace",
+			PaneID:      "%1",
+			PanePID:     42,
+		},
+		Observations: registry.Observations{Native: &registry.NativeObservation{
+			Process: identity, Attributes: map[string]string{"aht_interaction_mode": "tui"}, ObservedAt: now,
+		}},
+		CreatedAt: now, UpdatedAt: now, PresenceChangedAt: now, ActivityChangedAt: now,
+	}
+	writePickerAgentRegistry(t, statePath, agent)
+
+	services := &services{agentStore: agents.NewAHTStore(statePath)}
+
+	snapshot, err := services.LoadAgentSummaries(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	summaries := snapshot.Summaries
+
+	assertPickerServiceName(t, summaries, "Loaded name")
+	appendPickerNameFixture(t, transcript, `{"type":"session_info","name":"Watched name"}`+"\n")
+
+	store := services.agentStore
+	services.agentStore = nameWatchSource{sessions: []aht.Session{agent}}
+
+	published := 0
+
+	err = services.WatchAgentSummaries(t.Context(), func(_ uint64, snapshot tui.AgentSnapshot, publishErr error) error {
+		if publishErr != nil {
+			return publishErr
+		}
+
+		summaries := snapshot.Summaries
+
+		want := "Watched name"
+		if published > 0 {
+			want = "Later name"
+		}
+
+		assertPickerServiceName(t, summaries, want)
+
+		published++
+
+		appendPickerNameFixture(t, transcript, `{"type":"session_info","name":"Later name"}`+"\n")
+
+		return nil
+	})
+	if err != nil || published != 2 {
+		t.Fatalf("watch result: published=%d err=%v", published, err)
+	}
+
+	stored, err := store.List(t.Context(), aht.Filter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(stored) != 1 || stored[0].SessionID != "native-resume-id" || stored[0].ResumeCommand[2] != "native-resume-id" {
+		t.Fatalf("native resume metadata changed: %#v", stored)
+	}
+
+	if services.sessionNames.cache[transcript].offset == 0 {
+		t.Fatal("picker did not retain transcript progress between load and watch")
+	}
+}
+
+func TestPickerServicesLoadAndWatchClaudeNativeTitles(t *testing.T) {
+	transcript := filepath.Join(t.TempDir(), "claude.jsonl")
+	writePickerNameFixture(t, transcript, `{"type":"ai-title","sessionId":"claude-native","aiTitle":"Generated title"}`+"\n")
+
+	source := nameWatchSource{sessions: []aht.Session{{
+		SchemaVersion: 3,
+		ID:            "claude-registry",
+		Harness:       aht.HarnessClaude,
+		Liveness:      aht.Live{Activity: aht.ActivityIdle},
+		SessionID:     "claude-native",
+		SessionPath:   transcript,
+		ResumeCommand: []string{"claude", "--resume", "claude-native"},
+		Location: aht.Location{
+			Kind:        aht.MultiplexerTmux,
+			ServerID:    "/tmp/tmux.sock",
+			SessionID:   "$1",
+			SessionName: "workspace",
+			PaneID:      "%1",
+		},
+	}}}
+	services := &services{agentStore: source}
+	assertTitle := func(summaries []session.AgentSummary, want string) {
+		t.Helper()
+		assertPickerServiceName(t, summaries, want)
+
+		if got := summaries[0].Agents[0].Task; got != want {
+			t.Fatalf("picker task = %q, want %q", got, want)
+		}
+	}
+
+	snapshot, err := services.LoadAgentSummaries(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	summaries := snapshot.Summaries
+
+	assertTitle(summaries, "Generated title")
+	appendPickerNameFixture(t, transcript, `{"type":"custom-title","sessionId":"claude-native","customTitle":"Manual title"}`+"\n")
+
+	published := 0
+
+	err = services.WatchAgentSummaries(t.Context(), func(_ uint64, snapshot tui.AgentSnapshot, publishErr error) error {
+		if publishErr != nil {
+			return publishErr
+		}
+
+		summaries := snapshot.Summaries
+
+		assertTitle(summaries, "Manual title")
+
+		if published == 0 {
+			appendPickerNameFixture(t, transcript, `{"type":"ai-title","sessionId":"claude-native","aiTitle":"Later generated title"}`+"\n")
+		}
+
+		published++
+
+		return nil
+	})
+	if err != nil || published != 2 {
+		t.Fatalf("watch result: published=%d err=%v", published, err)
+	}
+
+	stored, err := services.agentStore.List(t.Context(), aht.Filter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(stored) != 1 || stored[0].SessionID != "claude-native" {
+		t.Fatalf("native resume identity changed: %#v", stored)
+	}
+
+	if diff := cmp.Diff([]string{"claude", "--resume", "claude-native"}, stored[0].ResumeCommand); diff != "" {
+		t.Fatalf("native resume command changed (-want +got):\n%s", diff)
+	}
+}
+
+func TestPickerServicesLoadCodexAndOmpNativeTitles(t *testing.T) {
+	root := t.TempDir()
+
+	codexHome := filepath.Join(root, "codex")
+	if err := os.MkdirAll(codexHome, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(filepath.Join(codexHome, "session_index.jsonl"), []byte(`{"id":"codex-native","thread_name":"Codex project plan"}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	ompPath := filepath.Join(root, "omp.jsonl")
+	if err := os.WriteFile(ompPath, []byte(`{"type":"title","title":"OMP design review"}`+"\n"+`{"type":"session","id":"omp-native"}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	base := aht.Session{
+		SchemaVersion: 3,
+		Liveness:      aht.Live{Activity: aht.ActivityIdle},
+		Location: aht.Location{
+			Kind:        aht.MultiplexerTmux,
+			ServerID:    "/tmp/tmux.sock",
+			SessionID:   "$1",
+			SessionName: "workspace",
+			PaneID:      "%1",
+		},
+	}
+	codex := base
+	codex.ID, codex.Harness, codex.SessionID = "codex-registry", aht.HarnessCodex, "codex-native"
+	codex.SessionPath = filepath.Join(codexHome, "sessions", "2026", "rollout.jsonl")
+	omp := base
+	omp.ID, omp.Harness, omp.SessionID, omp.SessionPath = "omp-registry", aht.HarnessOmp, "omp-native", ompPath
+	omp.Location.PaneID = "%2"
+
+	services := &services{agentStore: nameWatchSource{sessions: []aht.Session{codex, omp}}}
+
+	snapshot, err := services.LoadAgentSummaries(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	summaries := snapshot.Summaries
+
+	titles := make(map[string][2]string)
+
+	for _, summary := range summaries {
+		for _, agent := range summary.Agents {
+			titles[agent.RegistryID] = [2]string{agent.HarnessSession, agent.Task}
+		}
+	}
+
+	want := map[string][2]string{
+		"codex-registry": {"Codex project plan", "Codex project plan"},
+		"omp-registry":   {"OMP design review", "OMP design review"},
+	}
+	if diff := cmp.Diff(want, titles); diff != "" {
+		t.Fatalf("native titles and tasks mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func writePickerAgentRegistry(t *testing.T, path string, agent aht.Session) {
+	t.Helper()
+
+	document := map[string]any{"schema_version": 3, "sessions": map[string]aht.Session{agent.ID: agent}}
+
+	encoded, err := json.Marshal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(path, encoded, 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+type nameWatchSource struct {
+	sessions []aht.Session
+}
+
+func (s nameWatchSource) List(context.Context, aht.Filter) ([]aht.Session, error) {
+	return s.sessions, nil
+}
+
+func (s nameWatchSource) Watch(
+	ctx context.Context,
+	_ aht.Filter,
+	publish func(aht.StateSnapshot) error,
+) error {
+	for revision := range uint64(2) {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("watch fixture canceled: %w", err)
+		}
+
+		if err := publish(aht.StateSnapshot{Revision: revision + 1, Sessions: s.sessions}); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func servicesStorePath(t *testing.T, services *services) string {
+	t.Helper()
+
+	store, ok := services.agentStore.(*agents.AHTStore)
+	if !ok {
+		t.Fatalf("picker source is %T, want AHT store", services.agentStore)
+	}
+
+	return store.StorePath()
+}
+
+func assertPickerServiceName(t *testing.T, summaries []session.AgentSummary, want string) {
+	t.Helper()
+
+	if len(summaries) != 1 || len(summaries[0].Agents) != 1 || summaries[0].Agents[0].HarnessSession != want {
+		t.Fatalf("picker summaries = %#v, want one agent named %q", summaries, want)
+	}
+}
+
+func resolvePickerTestWorkspace(t *testing.T, cfg *config.Config, locations app.Locations) app.Workspace {
+	t.Helper()
+
+	workspace, err := app.Resolve(cfg, locations)
+	if err != nil {
+		t.Fatalf("resolve workspace: %v", err)
+	}
+
+	return workspace
+}
+
+func TestPickerServicesAHTStorePathRouting(t *testing.T) {
+	ctx := t.Context()
+	dirs := t.TempDir()
+
+	t.Run("explicit agent state path takes precedence", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.AgentStatus.StorePath = "/config/aht.json"
+
+		services, err := newServices(ctx, resolvePickerTestWorkspace(t, cfg, app.Locations{
+			Socket: filepath.Join(dirs, "tmux.sock"), Repository: filepath.Join(dirs, "repo1"), LeaseRoot: filepath.Join(dirs, "leases1"),
+			History: filepath.Join(dirs, "history1.json"), FinalSaveStatus: "", AgentStore: "/explicit/aht.json",
+		}), gotmux.Streams{}, RemoteServices{})
+		if err != nil {
+			t.Fatalf("newServices failed: %v", err)
+		}
+
+		t.Cleanup(func() { _ = services.Close() })
+
+		if path := servicesStorePath(t, services); path != "/explicit/aht.json" {
+			t.Fatalf("StorePath = %q, want /explicit/aht.json", path)
+		}
+	})
+
+	t.Run("falls back to configured agent status store path", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.AgentStatus.StorePath = "/config/base/aht.json"
+		cfg.AgentSessions.Status = &config.AgentStatusConfig{StorePath: "/config/fallback/aht.json"}
+
+		services, err := newServices(ctx, resolvePickerTestWorkspace(t, cfg, app.Locations{
+			Socket: filepath.Join(dirs, "tmux.sock"), Repository: filepath.Join(dirs, "repo2"), LeaseRoot: filepath.Join(dirs, "leases2"),
+			History: filepath.Join(dirs, "history2.json"), FinalSaveStatus: "", AgentStore: "",
+		}), gotmux.Streams{}, RemoteServices{})
+		if err != nil {
+			t.Fatalf("newServices failed: %v", err)
+		}
+
+		t.Cleanup(func() { _ = services.Close() })
+
+		if path := servicesStorePath(t, services); path != "/config/fallback/aht.json" {
+			t.Fatalf("StorePath = %q, want /config/fallback/aht.json", path)
+		}
+	})
+}

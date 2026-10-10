@@ -303,10 +303,10 @@ func (t *Tracker) reconcileSingleWindow(ctx context.Context, windowID string, pa
 		}
 	}
 
-	isActive := isWindowActive(windowID, activePanes)
-	reapply := t.windowWasActive[windowID] && !isActive
+	active := isWindowActive(windowID, activePanes)
+	reapply := t.windowWasActive[windowID] && !active
 
-	t.windowWasActive[windowID] = isActive
+	t.windowWasActive[windowID] = active
 
 	if highestState != StateNormal {
 		return t.applyTargetStyle(ctx, windowID, StyleFor(t.opts.Palette, highestState), reapply)

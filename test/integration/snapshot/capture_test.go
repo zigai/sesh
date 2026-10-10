@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zigai/gotmux/tmux"
+	gotmux "github.com/zigai/gotmux/tmux"
 	"github.com/zigai/gotmux/tmuxtest"
 
 	"github.com/zigai/sesh/internal/snapshot/capture"
@@ -20,7 +20,7 @@ import (
 func TestCaptureNativeObservation(t *testing.T) {
 	server := tmuxtest.NewServer(t)
 
-	session, err := server.NewSession(t.Context(), tmux.NewSessionOptions{Name: "observed", Program: tmux.Exec("/bin/sh", "-c", "printf 'OBSERVATION_READY'; exec sleep 300"), Size: tmux.Size{Width: 100, Height: 35}, Start: tmux.StartPolicyExistingOnly})
+	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{Name: "observed", Program: gotmux.Exec("/bin/sh", "-c", "printf 'OBSERVATION_READY'; exec sleep 300"), Size: gotmux.Size{Width: 100, Height: 35}, Start: gotmux.StartPolicyExistingOnly})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +38,7 @@ func TestCaptureNativeObservation(t *testing.T) {
 	waitForCapture(t, pane, []byte("OBSERVATION_READY"))
 	setCaptureSettings(t, session)
 
-	result, err := capture.Observe(t.Context(), server, []tmux.SessionID{session.ID()})
+	result, err := capture.Observe(t.Context(), server, []gotmux.SessionID{session.ID()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,12 +62,12 @@ func TestCaptureNativeObservation(t *testing.T) {
 func TestCaptureRejectsUnknownSession(t *testing.T) {
 	server := tmuxtest.NewServer(t)
 
-	session, err := server.NewSession(t.Context(), tmux.NewSessionOptions{Name: "present", Program: tmux.Exec("/bin/sh", "-c", "exec sleep 300"), Start: tmux.StartPolicyExistingOnly})
+	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{Name: "present", Program: gotmux.Exec("/bin/sh", "-c", "exec sleep 300"), Start: gotmux.StartPolicyExistingOnly})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = capture.Observe(t.Context(), server, []tmux.SessionID{session.ID(), "missing"})
+	_, err = capture.Observe(t.Context(), server, []gotmux.SessionID{session.ID(), "missing"})
 
 	notFound, ok := errors.AsType[*capture.SessionNotFoundError](err)
 	if !ok {
@@ -83,7 +83,7 @@ func TestCaptureRejectsUnknownSession(t *testing.T) {
 	}
 }
 
-func setCaptureSettings(t *testing.T, session tmux.Session) {
+func setCaptureSettings(t *testing.T, session gotmux.Session) {
 	t.Helper()
 
 	for name, value := range map[string]string{"SESH_MULTILINE": "first\nsecond\t \xff", "SESH_EMPTY": ""} {
@@ -159,10 +159,10 @@ func assertNativeObservation(t *testing.T, result capture.Observation) {
 	}
 }
 
-func assertCapturedClosure(t *testing.T, server *tmux.Server, first, second, third tmux.Session) {
+func assertCapturedClosure(t *testing.T, server *gotmux.Server, first, second, third gotmux.Session) {
 	t.Helper()
 
-	result, err := capture.Observe(t.Context(), server, []tmux.SessionID{first.ID()})
+	result, err := capture.Observe(t.Context(), server, []gotmux.SessionID{first.ID()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +172,7 @@ func assertCapturedClosure(t *testing.T, server *tmux.Server, first, second, thi
 		t.Fatalf("incorrect graph closure: %d sessions, %d windows, %d panes, %d groups, %d links", len(m.Sessions), len(m.Windows), len(m.Panes), len(m.Groups), len(m.Links))
 	}
 
-	for _, session := range []tmux.Session{first, second, third} {
+	for _, session := range []gotmux.Session{first, second, third} {
 		info, err := session.Info(t.Context())
 		if err != nil {
 			t.Fatal(err)
@@ -192,7 +192,7 @@ func assertCapturedClosure(t *testing.T, server *tmux.Server, first, second, thi
 	}
 }
 
-func waitForCapture(t *testing.T, pane tmux.Pane, marker []byte) []byte {
+func waitForCapture(t *testing.T, pane gotmux.Pane, marker []byte) []byte {
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
@@ -202,7 +202,7 @@ func waitForCapture(t *testing.T, pane tmux.Pane, marker []byte) []byte {
 	defer ticker.Stop()
 
 	for {
-		data, err := pane.Capture(ctx, tmux.CaptureOptions{IncludeEscapes: true, PreserveSpaces: true})
+		data, err := pane.Capture(ctx, gotmux.CaptureOptions{IncludeEscapes: true, PreserveSpaces: true})
 		if err != nil {
 			t.Fatal(err)
 		}

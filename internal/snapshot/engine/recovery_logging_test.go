@@ -12,7 +12,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/rs/zerolog"
 
-	integration "github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/integration/tmuxserver"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
@@ -57,7 +57,7 @@ func TestRestorableSessionInspectionWarnsWhenRepositoryCannotBeRead(t *testing.T
 func TestUnrestoredSessionInspectionWarnsWhenSelectedServerCannotBeProbed(t *testing.T) {
 	r := testRepository(t)
 
-	server, err := integration.Open(filepath.Join(t.TempDir(), "PRIVATE_SOCKET"))
+	server, err := tmuxserver.Open(filepath.Join(t.TempDir(), "PRIVATE_SOCKET"))
 	if err != nil {
 		t.Fatal(err)
 	}

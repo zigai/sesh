@@ -34,7 +34,7 @@ func TestProductionImportBoundaries(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, pkg := range []string{"cmd/sesh", "internal/snapshot/model", "internal/snapshot/store", "internal/integration/tmux", "internal/integration/process", "internal/integration/lifecycle"} {
+	for _, pkg := range []string{"cmd/sesh", "internal/snapshot/model", "internal/snapshot/store", "internal/integration/tmuxserver", "internal/integration/process", "internal/integration/lifecycle"} {
 		if scan.packages[pkg] == 0 {
 			t.Errorf("architecture scan found no production source in %s", pkg)
 		}
@@ -207,8 +207,8 @@ func TestImportBoundariesRejectForbiddenDependencies(t *testing.T) {
 		{"linux to cli", "internal/integration/process/read_linux.go", nativeModule + "internal/cli", "application workflows"},
 		{"darwin to tui", "internal/integration/process/read_darwin.go", nativeModule + "internal/tui/whichkey", "application workflows"},
 		{"windows to session", "internal/integration/process/read_windows.go", nativeModule + "internal/session", "application workflows"},
-		{"adapter to engine", "internal/integration/tmux/target.go", nativeModule + "internal/snapshot/engine", "snapshot orchestration"},
-		{"generated production", "internal/integration/tmux/generated.go", nativeModule + "internal/snapshot/restore", "snapshot orchestration"},
+		{"adapter to engine", "internal/integration/tmuxserver/target.go", nativeModule + "internal/snapshot/engine", "snapshot orchestration"},
+		{"generated production", "internal/integration/tmuxserver/generated.go", nativeModule + "internal/snapshot/restore", "snapshot orchestration"},
 		{"action to app", "internal/action/session.go", nativeModule + "internal/app", "action contracts"},
 		{"action to engine", "internal/action/snapshot.go", nativeModule + "internal/snapshot/engine", "action contracts"},
 	}
@@ -236,12 +236,12 @@ func TestImportBoundariesRejectForbiddenDependencies(t *testing.T) {
 
 func TestImportBoundariesAllowDomainDependenciesAndTestFixtures(t *testing.T) {
 	source := fstest.MapFS{
-		"cmd/sesh/main.go":                           {Data: []byte("package main\nimport `github.com/zigai/sesh/internal/cli`")},
-		"internal/snapshot/model/codec.go":           {Data: []byte("package model\nimport \"github.com/zigai/sesh/internal/strictjson\"")},
-		"internal/snapshot/store/repository.go":      {Data: []byte("package store\nimport (\"github.com/zigai/sesh/internal/snapshot/model\"; \"github.com/zigai/sesh/internal/privatefs\")")},
-		"internal/integration/tmux/target_darwin.go": {Data: []byte("package tmux\nimport (\"github.com/zigai/sesh/internal/snapshot/model\"; \"github.com/zigai/sesh/internal/integration/process\"; \"github.com/zigai/gotmux/tmux\")")},
-		"internal/snapshot/capture/capture.go":       {Data: []byte("package capture\nimport \"github.com/zigai/sesh/internal/agents\"")},
-		"internal/cli/command.go":                    {Data: []byte("package cli\nimport (\"example.com/testing/client\"; \"github.com/zigai/sesh/internal/testsupporting\")")},
+		"cmd/sesh/main.go":                                 {Data: []byte("package main\nimport `github.com/zigai/sesh/internal/cli`")},
+		"internal/snapshot/model/codec.go":                 {Data: []byte("package model\nimport \"github.com/zigai/sesh/internal/strictjson\"")},
+		"internal/snapshot/store/repository.go":            {Data: []byte("package store\nimport (\"github.com/zigai/sesh/internal/snapshot/model\"; \"github.com/zigai/sesh/internal/privatefs\")")},
+		"internal/integration/tmuxserver/target_darwin.go": {Data: []byte("package tmuxserver\nimport (\"github.com/zigai/sesh/internal/snapshot/model\"; \"github.com/zigai/sesh/internal/integration/process\"; \"github.com/zigai/gotmux/tmux\")")},
+		"internal/snapshot/capture/capture.go":             {Data: []byte("package capture\nimport \"github.com/zigai/sesh/internal/agents\"")},
+		"internal/cli/command.go":                          {Data: []byte("package cli\nimport (\"example.com/testing/client\"; \"github.com/zigai/sesh/internal/testsupporting\")")},
 	}
 	for _, filename := range []string{"internal/cli/command_test.go", "internal/cli/testdata/bad.go", "internal/testsupport/fixture.go", "test/integration/fixture/main.go", "vendor/dependency/main.go", ".agents/reference/main.go", "dist/source/main.go"} {
 		source[filename] = &fstest.MapFile{Data: []byte("not Go source; fixture must not be parsed")}

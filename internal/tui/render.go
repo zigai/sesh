@@ -422,9 +422,9 @@ func (m *Model) writePopupListRow(
 
 	row := m.filtered[listRow.sessionIndex]
 
-	isSelected := listRow.equal(m.selectedListRow())
+	selected := listRow.equal(m.selectedListRow())
 	if !listRow.isAgent() {
-		m.writeSessionRowWithStyles(out, layout, styles, row, isSelected, values)
+		m.writeSessionRowWithStyles(out, layout, styles, row, selected, values)
 		return
 	}
 
@@ -436,7 +436,7 @@ func (m *Model) writePopupListRow(
 		row.Agents[listRow.agentIndex],
 		true,
 		listRow.agentIndex == len(row.Agents)-1,
-		isSelected,
+		selected,
 		values,
 	)
 }
@@ -509,8 +509,8 @@ func (m *Model) calcSessionLayout(width int) sessionTableLayout {
 	return layout
 }
 
-func (m *Model) renderSessionRow(layout sessionTableLayout, s session.Session, isSelected bool) string {
-	return m.renderSessionRowWithStyles(layout, m.sessionRowStyles(layout), s, isSelected)
+func (m *Model) renderSessionRow(layout sessionTableLayout, s session.Session, selected bool) string {
+	return m.renderSessionRowWithStyles(layout, m.sessionRowStyles(layout), s, selected)
 }
 
 func (m *Model) sessionRowStyles(layout sessionTableLayout) sessionRowStyles {
@@ -600,13 +600,13 @@ func (m *Model) renderSessionRowWithStyles(
 	layout sessionTableLayout,
 	styles sessionRowStyles,
 	s session.Session,
-	isSelected bool,
+	selected bool,
 ) string {
 	var values sessionFormatValues
 
 	var out strings.Builder
 	out.Grow(layout.width)
-	m.writeSessionRowWithStyles(&out, layout, styles, s, isSelected, &values)
+	m.writeSessionRowWithStyles(&out, layout, styles, s, selected, &values)
 
 	return out.String()
 }
@@ -616,7 +616,7 @@ func (m *Model) writeSessionRowWithStyles(
 	layout sessionTableLayout,
 	styles sessionRowStyles,
 	s session.Session,
-	isSelected bool,
+	selected bool,
 	values *sessionFormatValues,
 ) {
 	m.writeFormattedSessionRow(
@@ -627,7 +627,7 @@ func (m *Model) writeSessionRowWithStyles(
 		emptyAgentSession(),
 		false,
 		false,
-		isSelected,
+		selected,
 		values,
 	)
 }
@@ -671,11 +671,11 @@ func (m *Model) writeFormattedSessionRow(
 	agent session.AgentSession,
 	hasAgent bool,
 	isLastAgent bool,
-	isSelected bool,
+	selected bool,
 	values *sessionFormatValues,
 ) {
 	if hasAgent && layout.agentRows.valid {
-		m.writePlannedAgentRow(out, layout, styles, row, agent, isLastAgent, isSelected, values)
+		m.writePlannedAgentRow(out, layout, styles, row, agent, isLastAgent, selected, values)
 		return
 	}
 
@@ -687,19 +687,19 @@ func (m *Model) writeFormattedSessionRow(
 	}
 
 	prefix := styles.blankPrefix
-	if isSelected {
+	if selected {
 		prefix = styles.selectedBar
 	}
 
 	out.WriteString(prefix)
 
 	if hasAgent {
-		m.writeAgentText(out, left, isSelected, styles)
+		m.writeAgentText(out, left, selected, styles)
 	} else {
-		m.writePrimarySessionText(out, left, isSelected, styles)
+		m.writePrimarySessionText(out, left, selected, styles)
 	}
 
-	m.writeSessionFormatRight(out, line, layout, hasAgent, isSelected, styles)
+	m.writeSessionFormatRight(out, line, layout, hasAgent, selected, styles)
 }
 
 func (m *Model) shortcutDigitForRow(row popupListRow, shortcuts []popupListRow) string {
@@ -751,12 +751,12 @@ func shortcutKeyDigit(slot int, keys config.KeyConfig) string {
 func (m *Model) writePrimarySessionText(
 	out *strings.Builder,
 	value string,
-	isSelected bool,
+	selected bool,
 	styles sessionRowStyles,
 ) {
 	if styles.fastDefaultTheme {
 		style := ansiDefaultName
-		if isSelected {
+		if selected {
 			style = ansiDefaultSelected
 		}
 
@@ -766,7 +766,7 @@ func (m *Model) writePrimarySessionText(
 	}
 
 	styleSeq := styles.nameSeq
-	if isSelected {
+	if selected {
 		styleSeq = styles.selectedNameSeq
 	}
 
@@ -778,7 +778,7 @@ func (m *Model) writeSessionFormatRight(
 	line display.Line,
 	layout sessionTableLayout,
 	isAgent bool,
-	isSelected bool,
+	selected bool,
 	styles sessionRowStyles,
 ) {
 	if layout.rightWidth <= 0 {
@@ -792,7 +792,7 @@ func (m *Model) writeSessionFormatRight(
 
 	value := " " + right
 
-	if isSelected {
+	if selected {
 		writeStyledWithBackground(out, value, styles.selectedBgSeq)
 
 		return
@@ -850,7 +850,7 @@ func (m *Model) hasActiveAgentView(row session.Session, agent session.AgentSessi
 		return false
 	}
 
-	if row.IsCurrent {
+	if row.Current {
 		return true
 	}
 
@@ -1031,10 +1031,10 @@ func capitalizedHarness(value string) string {
 func (m *Model) writeAgentText(
 	out *strings.Builder,
 	value string,
-	isSelected bool,
+	selected bool,
 	styles sessionRowStyles,
 ) {
-	if !isSelected {
+	if !selected {
 		m.writeMutedAgentText(out, value)
 		return
 	}

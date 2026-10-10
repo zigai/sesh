@@ -80,15 +80,15 @@ func StreamBootstrapFor(remote config.RemoteConfig, connection config.RemoteConn
 	}
 }
 
-func Stream(ctx context.Context, options StreamOptions) error {
-	if options.Yield == nil {
+func Stream(ctx context.Context, opts StreamOptions) error {
+	if opts.Yield == nil {
 		return oops.In("remote").With("operation", "stream").Wrap(errNilStreamYield)
 	}
 
 	backoff := streamBackoffMin
 
 	for ctx.Err() == nil {
-		if err := options.Yield(Frame{
+		if err := opts.Yield(Frame{
 			Version:        0,
 			Type:           "",
 			PeerID:         "",
@@ -103,7 +103,7 @@ func Stream(ctx context.Context, options StreamOptions) error {
 
 		var pending sync.WaitGroup
 
-		streamErr, acceptedSnapshot := runStreamAttempt(ctx, options, &pending)
+		streamErr, acceptedSnapshot := runStreamAttempt(ctx, opts, &pending)
 
 		if ctx.Err() != nil {
 			pending.Wait()
@@ -115,7 +115,7 @@ func Stream(ctx context.Context, options StreamOptions) error {
 			backoff = streamBackoffMin
 		}
 
-		yieldErr := options.Yield(Frame{
+		yieldErr := opts.Yield(Frame{
 			Version:        0,
 			Type:           "",
 			PeerID:         "",
@@ -153,20 +153,20 @@ func Stream(ctx context.Context, options StreamOptions) error {
 	return oops.In("remote").With("operation", "stream").Wrapf(ctx.Err(), "running remote stream")
 }
 
-func runStreamAttempt(ctx context.Context, options StreamOptions, pending *sync.WaitGroup) (error, bool) {
+func runStreamAttempt(ctx context.Context, opts StreamOptions, pending *sync.WaitGroup) (error, bool) {
 	attemptContext, cancelAttempt := context.WithCancel(ctx)
 	defer cancelAttempt()
 
-	bootstrap, err := EncodeStreamBootstrap(options.Bootstrap)
+	bootstrap, err := EncodeStreamBootstrap(opts.Bootstrap)
 	if err != nil {
 		return err, false
 	}
 
-	command, cmdErr := NewSSHCommand(attemptContext, options.Remote, options.Connection, SSHCommandOptions{
+	command, cmdErr := NewSSHCommand(attemptContext, opts.Remote, opts.Connection, SSHCommandOptions{
 		Interactive: false,
 		Forward:     nil,
-		Command:     options.Command,
-	}, PeerEntryPoint(options.Connection, ChannelStream)...)
+		Command:     opts.Command,
+	}, PeerEntryPoint(opts.Connection, ChannelStream)...)
 	if cmdErr != nil {
 		return cmdErr, false
 	}
@@ -197,10 +197,10 @@ func runStreamAttempt(ctx context.Context, options StreamOptions, pending *sync.
 	}
 
 	helloExpired := watchHelloDeadline(attemptContext, helloAccepted, cancelAttempt,
-		positiveDuration(options.HelloTimeout, defaultConnect))
+		positiveDuration(opts.HelloTimeout, defaultConnect))
 
-	streamErr, acceptedSnapshot := consumeFrames(attemptContext, NewFrameReader(stdout), stdout, options.Yield, markReady,
-		positiveDuration(options.FrameTimeout, streamFrameGrace), pending)
+	streamErr, acceptedSnapshot := consumeFrames(attemptContext, NewFrameReader(stdout), stdout, opts.Yield, markReady,
+		positiveDuration(opts.FrameTimeout, streamFrameGrace), pending)
 
 	finishErr := FinishCommand(ctx, command, stdout, diagnostics)
 

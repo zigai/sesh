@@ -81,16 +81,16 @@ type monitorState struct {
 	configApplied     bool
 }
 
-func RunMonitor(ctx context.Context, options MonitorOptions) (resultErr error) {
-	if options.CatalogDir == nil {
+func RunMonitor(ctx context.Context, opts MonitorOptions) (resultErr error) {
+	if opts.CatalogDir == nil {
 		return ErrIncompleteDependencies
 	}
 
-	if err := config.ValidateRemoteConfig(options.Remote); err != nil {
+	if err := config.ValidateRemoteConfig(opts.Remote); err != nil {
 		return oops.In("remote").With("operation", "run_monitor").Wrapf(err, "validating remote monitor configuration")
 	}
 
-	ownerLock, err := AcquireCatalogOwner(options.CatalogDir)
+	ownerLock, err := AcquireCatalogOwner(opts.CatalogDir)
 	if err != nil {
 		return err
 	}
@@ -99,26 +99,26 @@ func RunMonitor(ctx context.Context, options MonitorOptions) (resultErr error) {
 		resultErr = errors.Join(resultErr, ownerLock.Close())
 	}()
 
-	catalog, loadErr := LoadCatalog(options.CatalogDir)
+	catalog, loadErr := LoadCatalog(opts.CatalogDir)
 
 	recovered := loadErr != nil
 	if recovered {
 		catalog = EmptyCatalog()
 	}
 
-	now := options.Now
+	now := opts.Now
 	if now == nil {
 		now = time.Now
 	}
 
 	updates := make(chan workerUpdate)
 
-	supervisor := newStreamSupervisor(updates, options.Command)
+	supervisor := newStreamSupervisor(updates, opts.Command)
 
 	defer supervisor.stop()
 
 	state := &monitorState{
-		dir:               options.CatalogDir,
+		dir:               opts.CatalogDir,
 		now:               now,
 		catalog:           catalog,
 		configured:        make(map[string]ConnectionState),
@@ -130,13 +130,13 @@ func RunMonitor(ctx context.Context, options MonitorOptions) (resultErr error) {
 		configApplied:     false,
 	}
 
-	state.applyConfig(ctx, options.Remote, supervisor)
+	state.applyConfig(ctx, opts.Remote, supervisor)
 
 	if err := state.flush(); err != nil {
 		return err
 	}
 
-	return state.run(ctx, options, updates, supervisor)
+	return state.run(ctx, opts, updates, supervisor)
 }
 
 func (state *monitorState) applyConfig(ctx context.Context, remote config.RemoteConfig, supervisor *streamSupervisor) {
@@ -263,7 +263,7 @@ func (state *monitorState) reconcileHidden(connections []config.RemoteConnection
 
 func (state *monitorState) run(
 	ctx context.Context,
-	options MonitorOptions,
+	opts MonitorOptions,
 	updates <-chan workerUpdate,
 	supervisor *streamSupervisor,
 ) error {
@@ -273,7 +273,7 @@ func (state *monitorState) run(
 	defer reconcileTicker.Stop()
 	defer writeTicker.Stop()
 
-	reloadChannel := options.Reloads
+	reloadChannel := opts.Reloads
 	reloadFailed := false
 
 	for {

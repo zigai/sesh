@@ -355,7 +355,7 @@ func (m *Model) recoverActionFailure(msg actionResultMsg) (tea.Cmd, bool) {
 
 	name := msg.request.values.String("name")
 	for _, row := range m.sessions {
-		if !row.IsSaved() && row.Name == name && action.LocationOf(row) == msg.request.subject.At {
+		if !row.Saved() && row.Name == name && action.LocationOf(row) == msg.request.subject.At {
 			logTUIEvent(m.operationContext(), tuiOperationCreateSession, tuiLogOutcomeSuccess)
 
 			return m.runLiveSessionAction(row), true

@@ -6,10 +6,10 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/zigai/gotmux/tmux"
+	gotmux "github.com/zigai/gotmux/tmux"
 	"github.com/zigai/gotmux/tmuxtest"
 
-	integration "github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/integration/tmuxserver"
 	"github.com/zigai/sesh/internal/snapshot/capture"
 )
 
@@ -23,7 +23,7 @@ func TestLayoutRemappingPreservesExactGeometry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	layout, err := integration.DecodeLayout(info.Layout, map[string]string{string(panes[0].ID()): "left", string(panes[1].ID()): "right"})
+	layout, err := tmuxserver.DecodeLayout(info.Layout, map[string]string{string(panes[0].ID()): "left", string(panes[1].ID()): "right"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +37,7 @@ func TestLayoutRemappingPreservesExactGeometry(t *testing.T) {
 	}
 
 	target := tmuxtest.NewServer(t)
-	if _, err := target.NewSession(t.Context(), tmux.NewSessionOptions{Name: "unrelated", Program: tmux.Exec("sleep", "300"), Start: tmux.StartPolicyExistingOnly}); err != nil {
+	if _, err := target.NewSession(t.Context(), gotmux.NewSessionOptions{Name: "unrelated", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -50,7 +50,7 @@ func TestLayoutRemappingPreservesExactGeometry(t *testing.T) {
 		t.Fatal("fixture lacks a geometric difference")
 	}
 
-	remapped, err := integration.EncodeLayout(layout.Tiled, map[string]tmux.PaneID{"left": replacements[0].ID(), "right": replacements[1].ID()})
+	remapped, err := tmuxserver.EncodeLayout(layout.Tiled, map[string]gotmux.PaneID{"left": replacements[0].ID(), "right": replacements[1].ID()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,12 +65,12 @@ func TestLayoutRemappingPreservesExactGeometry(t *testing.T) {
 }
 
 func TestCapturePaneBordersAndZoom(t *testing.T) {
-	for _, border := range []tmux.PaneBorderStatus{"off", "top", "bottom"} {
+	for _, border := range []gotmux.PaneBorderStatus{"off", "top", "bottom"} {
 		t.Run(string(border), func(t *testing.T) {
 			server := tmuxtest.NewServer(t)
 
 			session, window, panes := layoutFixture(t, server, "borders", 29)
-			if _, err := panes[0].Split(t.Context(), tmux.SplitOptions{Direction: tmux.DirectionVertical, Size: tmux.SplitSize{Cells: 11}, Program: tmux.Exec("sleep", "300")}); err != nil {
+			if _, err := panes[0].Split(t.Context(), gotmux.SplitOptions{Direction: gotmux.DirectionVertical, Size: gotmux.SplitSize{Cells: 11}, Program: gotmux.Exec("sleep", "300")}); err != nil {
 				t.Fatal(err)
 			}
 
@@ -93,11 +93,11 @@ func TestCapturePaneBordersAndZoom(t *testing.T) {
 	}
 }
 
-func assertCaptureGeometry(t *testing.T, server *tmux.Server, session tmux.Session, window tmux.Window) {
+func assertCaptureGeometry(t *testing.T, server *gotmux.Server, session gotmux.Session, window gotmux.Window) {
 	t.Helper()
 	want := observePanes(t, window)
 
-	result, err := capture.Observe(t.Context(), server, []tmux.SessionID{session.ID()})
+	result, err := capture.Observe(t.Context(), server, []gotmux.SessionID{session.ID()})
 	if err != nil {
 		t.Fatalf("capture geometry %v: %v", want, err)
 	}
@@ -112,10 +112,10 @@ func assertCaptureGeometry(t *testing.T, server *tmux.Server, session tmux.Sessi
 	}
 }
 
-func layoutFixture(t *testing.T, server *tmux.Server, name string, rightWidth int) (tmux.Session, tmux.Window, []tmux.Pane) {
+func layoutFixture(t *testing.T, server *gotmux.Server, name string, rightWidth int) (gotmux.Session, gotmux.Window, []gotmux.Pane) {
 	t.Helper()
 
-	session, err := server.NewSession(t.Context(), tmux.NewSessionOptions{Name: name, Program: tmux.Exec("sleep", "300"), Size: tmux.Size{Width: 121, Height: 41}, Start: tmux.StartPolicyExistingOnly})
+	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{Name: name, Program: gotmux.Exec("sleep", "300"), Size: gotmux.Size{Width: 121, Height: 41}, Start: gotmux.StartPolicyExistingOnly})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,19 +132,19 @@ func layoutFixture(t *testing.T, server *tmux.Server, name string, rightWidth in
 		t.Fatal(err)
 	}
 
-	second, err := first.Split(t.Context(), tmux.SplitOptions{Direction: tmux.DirectionHorizontal, Size: tmux.SplitSize{Cells: rightWidth}, Program: tmux.Exec("sleep", "300")})
+	second, err := first.Split(t.Context(), gotmux.SplitOptions{Direction: gotmux.DirectionHorizontal, Size: gotmux.SplitSize{Cells: rightWidth}, Program: gotmux.Exec("sleep", "300")})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return session, window, []tmux.Pane{first, second}
+	return session, window, []gotmux.Pane{first, second}
 }
 
 func TestCaptureSharedWindowsAndGroupClosure(t *testing.T) {
 	server := tmuxtest.NewServer(t)
 	first, window, _ := layoutFixture(t, server, "group-first", 29)
 
-	second, err := server.NewSession(t.Context(), tmux.NewSessionOptions{Name: "group-second", Group: "group-first", Start: tmux.StartPolicyExistingOnly})
+	second, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{Name: "group-second", Group: "group-first", Start: gotmux.StartPolicyExistingOnly})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +152,7 @@ func TestCaptureSharedWindowsAndGroupClosure(t *testing.T) {
 	third, _, _ := layoutFixture(t, server, "linked-third", 29)
 
 	index := 9
-	if _, err := window.Link(t.Context(), third, tmux.LinkOptions{Index: &index}); err != nil {
+	if _, err := window.Link(t.Context(), third, gotmux.LinkOptions{Index: &index}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -168,7 +168,7 @@ type observedPane struct {
 	Active bool
 }
 
-func observePanes(t *testing.T, window tmux.Window) []observedPane {
+func observePanes(t *testing.T, window gotmux.Window) []observedPane {
 	t.Helper()
 
 	panes, err := window.Panes(t.Context())

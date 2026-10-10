@@ -42,20 +42,20 @@ type rawThemePresetProbe struct {
 }
 
 func WithInput(r io.Reader) LoadOption {
-	return func(o *loadOptions) {
-		o.input = r
+	return func(opts *loadOptions) {
+		opts.input = r
 	}
 }
 
 func WithExplicitPath(path string) LoadOption {
-	return func(o *loadOptions) {
-		o.explicitPath = path
+	return func(opts *loadOptions) {
+		opts.explicitPath = path
 	}
 }
 
 func WithoutConfig() LoadOption {
-	return func(o *loadOptions) {
-		o.withoutConfig = true
+	return func(opts *loadOptions) {
+		opts.withoutConfig = true
 	}
 }
 
@@ -125,18 +125,18 @@ func LoadInto(target *Config, opts ...LoadOption) error {
 	return nil
 }
 
-func loadConfigFiles(options *loadOptions) ([][]byte, error) {
-	if options.withoutConfig {
+func loadConfigFiles(opts *loadOptions) ([][]byte, error) {
+	if opts.withoutConfig {
 		return nil, nil
 	}
 
-	path := options.explicitPath
+	path := opts.explicitPath
 	if path == "" {
 		path = os.Getenv("SESH_CONFIG")
 	}
 
 	if path != "" {
-		data, _, err := readConfigFile(path, options.input)
+		data, _, err := readConfigFile(path, opts.input)
 		if err != nil {
 			return nil, err
 		}

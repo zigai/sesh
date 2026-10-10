@@ -8,13 +8,13 @@ import (
 	"github.com/samber/oops"
 	gotmux "github.com/zigai/gotmux/tmux"
 
-	integration "github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/integration/tmuxserver"
 )
 
 const readinessPollInterval = 20 * time.Millisecond
 
 func WaitReady(ctx context.Context, socket string) error {
-	server, err := integration.Open(socket)
+	server, err := tmuxserver.Open(socket)
 	if err != nil {
 		return oops.In("daemon").Code("readiness_failed").With("operation", "wait_ready").Wrap(err)
 	}

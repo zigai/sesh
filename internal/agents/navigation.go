@@ -37,20 +37,20 @@ type Navigator struct {
 	source     SessionSource
 }
 
-func NewNavigator(options NavigatorOptions) (*Navigator, error) {
-	controller := options.Controller
+func NewNavigator(opts NavigatorOptions) (*Navigator, error) {
+	controller := opts.Controller
 
 	if controller == nil {
-		if options.Server == nil {
+		if opts.Server == nil {
 			return nil, oops.In("agents").Code("endpoint_required").With("operation", "new_navigator").Wrap(ErrServerRequired)
 		}
 
-		controller = NewTmuxController(options.Server, options.Target)
+		controller = NewTmuxController(opts.Server, opts.Target)
 	}
 
-	source := options.Source
+	source := opts.Source
 	if source == nil {
-		source = NewAHTStore(options.StatePath)
+		source = NewAHTStore(opts.StatePath)
 	}
 
 	return &Navigator{controller: controller, source: source}, nil

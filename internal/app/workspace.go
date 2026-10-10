@@ -11,7 +11,7 @@ import (
 	"github.com/zigai/sesh/internal/automation"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/integration/process"
-	integration "github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/integration/tmuxserver"
 	"github.com/zigai/sesh/internal/privatefs"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
@@ -89,7 +89,7 @@ func Resolve(cfg *config.Config, locations Locations) (Workspace, error) {
 }
 
 func (w Workspace) OpenTmux() (*gotmux.Server, error) {
-	server, err := integration.Open(w.Socket)
+	server, err := tmuxserver.Open(w.Socket)
 	if err != nil {
 		return nil, oops.In("app").With("operation", "open_tmux").Wrap(err)
 	}

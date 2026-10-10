@@ -12,9 +12,9 @@ import (
 	"sort"
 
 	"github.com/samber/oops"
-	"github.com/zigai/gotmux/tmux"
+	gotmux "github.com/zigai/gotmux/tmux"
 
-	itmux "github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/integration/tmuxserver"
 	"github.com/zigai/sesh/internal/snapshot/model"
 )
 
@@ -48,7 +48,7 @@ type stepEffect struct {
 }
 
 type paneLaunch struct {
-	program     tmux.Program
+	program     gotmux.Program
 	directory   string
 	environment map[string]string
 	enabled     bool
@@ -68,15 +68,15 @@ type planIndex struct {
 }
 
 type Executor struct {
-	server   *tmux.Server
+	server   *gotmux.Server
 	manifest model.Manifest
 	cfg      ExecuteConfig
 	index    planIndex
 
-	sessions   map[string]tmux.Session
-	bootstraps map[string]tmux.WindowLink
-	windows    map[string]tmux.Window
-	panes      map[string]tmux.Pane
+	sessions   map[string]gotmux.Session
+	bootstraps map[string]gotmux.WindowLink
+	windows    map[string]gotmux.Window
+	panes      map[string]gotmux.Pane
 
 	receipts    map[string]string
 	sessionLog  []string
@@ -102,7 +102,7 @@ func DefaultExecuteConfig() ExecuteConfig {
 	}
 }
 
-func NewExecutor(server *tmux.Server, manifest model.Manifest, cfg ExecuteConfig) *Executor {
+func NewExecutor(server *gotmux.Server, manifest model.Manifest, cfg ExecuteConfig) *Executor {
 	panesByID := make(map[string]model.Pane, len(manifest.Panes))
 	for _, p := range manifest.Panes {
 		panesByID[p.ID] = p
@@ -122,10 +122,10 @@ func NewExecutor(server *tmux.Server, manifest model.Manifest, cfg ExecuteConfig
 			sessionsByID:         map[string]model.Session{},
 			followersByLeader:    map[string][]string{},
 		},
-		sessions:    map[string]tmux.Session{},
-		bootstraps:  map[string]tmux.WindowLink{},
-		windows:     map[string]tmux.Window{},
-		panes:       map[string]tmux.Pane{},
+		sessions:    map[string]gotmux.Session{},
+		bootstraps:  map[string]gotmux.WindowLink{},
+		windows:     map[string]gotmux.Window{},
+		panes:       map[string]gotmux.Pane{},
 		receipts:    map[string]string{},
 		sessionLog:  nil,
 		missing:     nil,
@@ -133,13 +133,13 @@ func NewExecutor(server *tmux.Server, manifest model.Manifest, cfg ExecuteConfig
 	}
 }
 
-func PreflightCheckCollisions(ctx context.Context, server *tmux.Server, plan Plan) error {
+func PreflightCheckCollisions(ctx context.Context, server *gotmux.Server, plan Plan) error {
 	return PreflightCheckCollisionsExcluding(ctx, server, plan, nil)
 }
 
-func PreflightCheckCollisionsExcluding(ctx context.Context, server *tmux.Server, plan Plan, adoptedSessions map[string]bool) error {
+func PreflightCheckCollisionsExcluding(ctx context.Context, server *gotmux.Server, plan Plan, adoptedSessions map[string]bool) error {
 	if server == nil {
-		return oops.In("snapshot.restore").Code("endpoint_required").Wrap(itmux.ErrEndpoint)
+		return oops.In("snapshot.restore").Code("endpoint_required").Wrap(tmuxserver.ErrEndpoint)
 	}
 
 	liveSessions, err := server.Sessions(ctx)
@@ -154,7 +154,7 @@ func PreflightCheckCollisionsExcluding(ctx context.Context, server *tmux.Server,
 	return checkGroupCollisions(ctx, server, plan, adoptedSessions)
 }
 
-func PreflightCheckGroupCollision(ctx context.Context, server *tmux.Server, groupName string) error {
+func PreflightCheckGroupCollision(ctx context.Context, server *gotmux.Server, groupName string) error {
 	sessions, err := server.Sessions(ctx)
 	if err != nil {
 		return oops.In("snapshot.restore").
@@ -180,7 +180,7 @@ func PreflightCheckGroupCollision(ctx context.Context, server *tmux.Server, grou
 	}
 
 	if _, err := server.FindSession(ctx, groupName); err != nil {
-		if !errors.Is(err, tmux.ErrNotFound) {
+		if !errors.Is(err, gotmux.ErrNotFound) {
 			return oops.In("snapshot.restore").
 				Code("restore_conflict").
 				With("operation", "preflight_collisions", "phase", "group", "group_name", groupName).
@@ -196,7 +196,7 @@ func PreflightCheckGroupCollision(ctx context.Context, server *tmux.Server, grou
 	return nil
 }
 
-func checkSessionCollisions(liveSessions []tmux.SessionInfo, plan Plan, adoptedSessions map[string]bool) error {
+func checkSessionCollisions(liveSessions []gotmux.SessionInfo, plan Plan, adoptedSessions map[string]bool) error {
 	sessionNames := make(map[string]string, len(plan.SourceGraph.Sessions))
 	for _, s := range plan.SourceGraph.Sessions {
 		sessionNames[s.ID] = string(s.Name)
@@ -225,7 +225,7 @@ func checkSessionCollisions(liveSessions []tmux.SessionInfo, plan Plan, adoptedS
 	return nil
 }
 
-func checkGroupCollisions(ctx context.Context, server *tmux.Server, plan Plan, adoptedSessions map[string]bool) error {
+func checkGroupCollisions(ctx context.Context, server *gotmux.Server, plan Plan, adoptedSessions map[string]bool) error {
 	for _, step := range plan.Steps {
 		create, ok := step.(*CreateSessionStep)
 		if !ok || len(create.GroupName) == 0 {
@@ -576,9 +576,9 @@ func (e *Executor) handleFailedEffect(ctx context.Context, step Step, journal Jo
 	outcome := classifyMutation(runErr)
 
 	switch outcome.Effect {
-	case tmux.EffectConfirmed:
+	case gotmux.EffectConfirmed:
 		return "", e.uncertain(ctx, step, journal, runErr)
-	case tmux.EffectNotSent:
+	case gotmux.EffectNotSent:
 		recordCtx, cancel := detach(ctx)
 		defer cancel()
 
@@ -587,7 +587,7 @@ func (e *Executor) handleFailedEffect(ctx context.Context, step Step, journal Jo
 		}
 
 		return "", &mutationError{step: step.ID(), err: runErr}
-	case tmux.EffectUnspecified, tmux.EffectUnknown, tmux.EffectRejected:
+	case gotmux.EffectUnspecified, gotmux.EffectUnknown, gotmux.EffectRejected:
 		return "", e.uncertain(ctx, step, journal, runErr)
 	}
 
@@ -647,7 +647,7 @@ func (e *Executor) installStep(ctx context.Context, step Step, runtimeID string)
 }
 
 func (e *Executor) installSession(ctx context.Context, step CreateSessionStep, runtimeID string) error {
-	session, err := e.server.Session(ctx, tmux.SessionID(runtimeID))
+	session, err := e.server.Session(ctx, gotmux.SessionID(runtimeID))
 	if err != nil {
 		return oops.In("snapshot.restore").
 			Code("operation_uncertain").
@@ -694,21 +694,21 @@ func (e *Executor) installSession(ctx context.Context, step CreateSessionStep, r
 	return nil
 }
 
-func (e *Executor) sessionInitialLink(ctx context.Context, step CreateSessionStep) (tmux.WindowLink, bool, error) {
+func (e *Executor) sessionInitialLink(ctx context.Context, step CreateSessionStep) (gotmux.WindowLink, bool, error) {
 	session := e.sessions[step.SessionID]
 
 	placement, ok := e.index.placeStepBySession[step.SessionID]
 	if !ok {
-		return tmux.WindowLink{}, false, oops.In("snapshot.restore").
+		return gotmux.WindowLink{}, false, oops.In("snapshot.restore").
 			Code("restore_failed").
 			With("operation", "install_session", "reason", "initial_placement_missing").
 			Wrapf(errInitialPlacementNotFound, "%s", step.SessionID)
 	}
 
 	if windowID := e.receipts[placement.ID()]; windowID != "" {
-		link, err := e.linkAt(ctx, session, placement.Index, tmux.WindowID(windowID))
+		link, err := e.linkAt(ctx, session, placement.Index, gotmux.WindowID(windowID))
 		if err != nil && step.InitialWindowID == "" && errors.Is(err, errRuntimeHandleUnusable) {
-			return tmux.WindowLink{}, false, nil
+			return gotmux.WindowLink{}, false, nil
 		}
 
 		return link, err == nil, err
@@ -717,17 +717,17 @@ func (e *Executor) sessionInitialLink(ctx context.Context, step CreateSessionSte
 	return e.unplacedInitialLink(ctx, session)
 }
 
-func (e *Executor) unplacedInitialLink(ctx context.Context, session tmux.Session) (tmux.WindowLink, bool, error) {
+func (e *Executor) unplacedInitialLink(ctx context.Context, session gotmux.Session) (gotmux.WindowLink, bool, error) {
 	_, links, err := session.WindowInfos(ctx)
 	if err != nil {
-		return tmux.WindowLink{}, false, oops.In("snapshot.restore").
+		return gotmux.WindowLink{}, false, oops.In("snapshot.restore").
 			Code("operation_uncertain").
 			With("operation", "resolve_link").
 			Wrap(err)
 	}
 
 	if len(links) != 1 {
-		return tmux.WindowLink{}, false, oops.In("snapshot.restore").
+		return gotmux.WindowLink{}, false, oops.In("snapshot.restore").
 			Code("operation_uncertain").
 			With("operation", "install_session", "reason", "initial_window_ambiguous").
 			Wrapf(errBootstrapNotFound, "session %s", session.ID())
@@ -745,7 +745,7 @@ func (e *Executor) installInitialPlacement(ctx context.Context, step PlaceInitia
 			Wrapf(errInitialPlacementNotFound, "%s", step.SessionID)
 	}
 
-	link, err := e.linkAt(ctx, session, step.Index, tmux.WindowID(runtimeID))
+	link, err := e.linkAt(ctx, session, step.Index, gotmux.WindowID(runtimeID))
 	if err != nil {
 		if step.WindowID == "" && errors.Is(err, errRuntimeHandleUnusable) {
 			return nil
@@ -759,10 +759,10 @@ func (e *Executor) installInitialPlacement(ctx context.Context, step PlaceInitia
 	return nil
 }
 
-func (e *Executor) linkAt(ctx context.Context, session tmux.Session, index int, windowID tmux.WindowID) (tmux.WindowLink, error) {
+func (e *Executor) linkAt(ctx context.Context, session gotmux.Session, index int, windowID gotmux.WindowID) (gotmux.WindowLink, error) {
 	_, links, err := session.WindowInfos(ctx)
 	if err != nil {
-		return tmux.WindowLink{}, oops.In("snapshot.restore").
+		return gotmux.WindowLink{}, oops.In("snapshot.restore").
 			Code("operation_uncertain").
 			With("operation", "resolve_link").
 			Wrap(err)
@@ -774,14 +774,14 @@ func (e *Executor) linkAt(ctx context.Context, session tmux.Session, index int, 
 		}
 	}
 
-	return tmux.WindowLink{}, oops.In("snapshot.restore").
+	return gotmux.WindowLink{}, oops.In("snapshot.restore").
 		Code("operation_uncertain").
 		With("operation", "resolve_link", "reason", "recorded_link_unavailable").
 		Wrapf(errRuntimeHandleUnusable, "session %s index %d", session.ID(), index)
 }
 
 func (e *Executor) installWindow(ctx context.Context, step CreateWindowStep, runtimeID string) error {
-	window, err := e.server.Window(ctx, tmux.WindowID(runtimeID))
+	window, err := e.server.Window(ctx, gotmux.WindowID(runtimeID))
 	if err != nil {
 		return oops.In("snapshot.restore").
 			Code("operation_uncertain").
@@ -802,7 +802,7 @@ func (e *Executor) installWindow(ctx context.Context, step CreateWindowStep, run
 }
 
 func (e *Executor) installPane(ctx context.Context, step SplitPaneStep, runtimeID string) error {
-	pane, err := e.server.Pane(ctx, tmux.PaneID(runtimeID))
+	pane, err := e.server.Pane(ctx, gotmux.PaneID(runtimeID))
 	if err != nil {
 		return oops.In("snapshot.restore").
 			Code("operation_uncertain").
@@ -815,33 +815,33 @@ func (e *Executor) installPane(ctx context.Context, step SplitPaneStep, runtimeI
 	return nil
 }
 
-func (e *Executor) initialPaneFromConfirmedSplits(ctx context.Context, windowID string, window tmux.Window) (tmux.Pane, error) {
+func (e *Executor) initialPaneFromConfirmedSplits(ctx context.Context, windowID string, window gotmux.Window) (gotmux.Pane, error) {
 	produced := e.confirmedSplitPaneIDs(windowID)
 
 	paneID, err := initialPaneIDOf(ctx, window, windowID, produced)
 	if err != nil {
-		return tmux.Pane{}, err
+		return gotmux.Pane{}, err
 	}
 
 	return e.paneHandle(ctx, paneID)
 }
 
-func (e *Executor) confirmedSplitPaneIDs(windowID string) map[tmux.PaneID]bool {
-	produced := map[tmux.PaneID]bool{}
+func (e *Executor) confirmedSplitPaneIDs(windowID string) map[gotmux.PaneID]bool {
+	produced := map[gotmux.PaneID]bool{}
 
 	for _, step := range e.index.splitStepsByWindow[windowID] {
 		if id := e.receipts[step.ID()]; id != "" {
-			produced[tmux.PaneID(id)] = true
+			produced[gotmux.PaneID(id)] = true
 		}
 	}
 
 	return produced
 }
 
-func (e *Executor) paneHandle(ctx context.Context, id tmux.PaneID) (tmux.Pane, error) {
+func (e *Executor) paneHandle(ctx context.Context, id gotmux.PaneID) (gotmux.Pane, error) {
 	pane, err := e.server.Pane(ctx, id)
 	if err != nil {
-		return tmux.Pane{}, oops.In("snapshot.restore").
+		return gotmux.Pane{}, oops.In("snapshot.restore").
 			Code("operation_uncertain").
 			With("operation", "resolve_pane", "reason", "recorded_pane_unavailable").
 			Wrap(err)
@@ -907,15 +907,15 @@ func (e *Executor) prepareFollowerSession(step CreateSessionStep) (stepEffect, e
 		}
 	}
 
-	options := tmux.NewSessionOptions{
+	options := gotmux.NewSessionOptions{
 		Name:    string(step.Name),
 		Dir:     "",
 		Window:  "",
-		Program: tmux.Program{},
+		Program: gotmux.Program{},
 		Env:     nil,
 		TmuxEnv: nil,
-		Size:    tmux.Size{Width: 0, Height: 0},
-		Start:   tmux.StartPolicyExistingOnly,
+		Size:    gotmux.Size{Width: 0, Height: 0},
+		Start:   gotmux.StartPolicyExistingOnly,
 		Group:   groupTarget,
 	}
 
@@ -971,10 +971,10 @@ func (e *Executor) prepareStandaloneSession(step CreateSessionStep) (stepEffect,
 	}, nil
 }
 
-func (e *Executor) standaloneSessionOptions(step CreateSessionStep) (tmux.NewSessionOptions, paneLaunch, bool, error) {
-	size := tmux.Size{Width: defaultWindowWidth, Height: defaultWindowHeight}
+func (e *Executor) standaloneSessionOptions(step CreateSessionStep) (gotmux.NewSessionOptions, paneLaunch, bool, error) {
+	size := gotmux.Size{Width: defaultWindowWidth, Height: defaultWindowHeight}
 	if step.Width > 0 && step.Height > 0 {
-		size = tmux.Size{Width: step.Width, Height: step.Height}
+		size = gotmux.Size{Width: step.Width, Height: step.Height}
 	}
 
 	hasFollowers := len(e.index.followersByLeader[step.SessionID]) > 0
@@ -984,15 +984,15 @@ func (e *Executor) standaloneSessionOptions(step CreateSessionStep) (tmux.NewSes
 		sessionName = string(step.GroupName)
 	}
 
-	options := tmux.NewSessionOptions{
+	options := gotmux.NewSessionOptions{
 		Name:    sessionName,
 		Dir:     "",
 		Window:  "",
-		Program: tmux.Program{},
+		Program: gotmux.Program{},
 		Env:     nil,
 		TmuxEnv: nil,
 		Size:    size,
-		Start:   tmux.StartPolicyExistingOnly,
+		Start:   gotmux.StartPolicyExistingOnly,
 		Group:   "",
 	}
 
@@ -1006,14 +1006,14 @@ func (e *Executor) standaloneSessionOptions(step CreateSessionStep) (tmux.NewSes
 	if hasPane {
 		dir, cwdFallback, err := e.resolveWorkingDir(paneInfo)
 		if err != nil {
-			return tmux.NewSessionOptions{}, disabledPaneLaunch(), false, err
+			return gotmux.NewSessionOptions{}, disabledPaneLaunch(), false, err
 		}
 
 		options.Dir = dir
 
 		launch, err = e.preparePaneLaunch(paneInfo, step.SessionID)
 		if err != nil {
-			return tmux.NewSessionOptions{}, disabledPaneLaunch(), false, err
+			return gotmux.NewSessionOptions{}, disabledPaneLaunch(), false, err
 		}
 
 		launch.cwdFallback = launch.cwdFallback || cwdFallback
@@ -1022,7 +1022,7 @@ func (e *Executor) standaloneSessionOptions(step CreateSessionStep) (tmux.NewSes
 	return options, launch, hasPane, nil
 }
 
-func (e *Executor) alignInitialWindow(ctx context.Context, session tmux.Session, step CreateSessionStep, windowName string) error {
+func (e *Executor) alignInitialWindow(ctx context.Context, session gotmux.Session, step CreateSessionStep, windowName string) error {
 	if step.InitialWindowID == "" {
 		return nil
 	}
@@ -1077,7 +1077,7 @@ func (e *Executor) preparePlaceInitialWindow(step PlaceInitialWindowStep) (stepE
 
 			idx := step.Index
 
-			moved, err := bootLink.Move(ctx, session, tmux.LinkOptions{
+			moved, err := bootLink.Move(ctx, session, gotmux.LinkOptions{
 				Index:   &idx,
 				Select:  false,
 				Replace: false,
@@ -1114,13 +1114,13 @@ func (e *Executor) prepareCreateWindow(step CreateWindowStep) (stepEffect, error
 	}, nil
 }
 
-func (e *Executor) newWindowOptions(step CreateWindowStep) (tmux.NewWindowOptions, tmux.Size, paneLaunch, error) {
+func (e *Executor) newWindowOptions(step CreateWindowStep) (gotmux.NewWindowOptions, gotmux.Size, paneLaunch, error) {
 	idx := step.Index
 
-	options := tmux.NewWindowOptions{
+	options := gotmux.NewWindowOptions{
 		Name:    string(step.Name),
 		Dir:     "",
-		Program: tmux.Program{},
+		Program: gotmux.Program{},
 		Env:     nil,
 		TmuxEnv: nil,
 		Index:   &idx,
@@ -1135,22 +1135,22 @@ func (e *Executor) newWindowOptions(step CreateWindowStep) (tmux.NewWindowOption
 	if hasPane {
 		dir, cwdFallback, err := e.resolveWorkingDir(paneInfo)
 		if err != nil {
-			return tmux.NewWindowOptions{}, tmux.Size{}, paneLaunch{}, err
+			return gotmux.NewWindowOptions{}, gotmux.Size{}, paneLaunch{}, err
 		}
 
 		options.Dir = dir
 
 		launch, err = e.preparePaneLaunch(paneInfo, step.OwnerSessionID)
 		if err != nil {
-			return tmux.NewWindowOptions{}, tmux.Size{}, paneLaunch{}, err
+			return gotmux.NewWindowOptions{}, gotmux.Size{}, paneLaunch{}, err
 		}
 
 		launch.cwdFallback = launch.cwdFallback || cwdFallback
 	}
 
-	size := tmux.Size{Width: defaultWindowWidth, Height: defaultWindowHeight}
+	size := gotmux.Size{Width: defaultWindowWidth, Height: defaultWindowHeight}
 	if step.Width > 0 && step.Height > 0 {
-		size = tmux.Size{Width: step.Width, Height: step.Height}
+		size = gotmux.Size{Width: step.Width, Height: step.Height}
 	}
 
 	return options, size, launch, nil
@@ -1158,14 +1158,14 @@ func (e *Executor) newWindowOptions(step CreateWindowStep) (tmux.NewWindowOption
 
 func (e *Executor) createWindow(
 	ctx context.Context,
-	session tmux.Session,
+	session gotmux.Session,
 	step CreateWindowStep,
-	options tmux.NewWindowOptions,
-	size tmux.Size,
+	opts gotmux.NewWindowOptions,
+	size gotmux.Size,
 	windowName string,
 	launch paneLaunch,
 ) (string, error) {
-	link, err := session.NewWindow(ctx, options)
+	link, err := session.NewWindow(ctx, opts)
 	if err != nil {
 		return "", fmt.Errorf("new window %s in session %s: %w", step.WindowID, step.OwnerSessionID, err)
 	}
@@ -1216,19 +1216,19 @@ func (e *Executor) prepareSplitPane(step SplitPaneStep) (stepEffect, error) {
 			Wrapf(errTargetPaneNotFound, "%s", step.TargetPaneID)
 	}
 
-	direction := tmux.DirectionHorizontal
+	direction := gotmux.DirectionHorizontal
 	cells := step.SubtreeWidth
 
 	if step.Axis == "y" {
-		direction = tmux.DirectionVertical
+		direction = gotmux.DirectionVertical
 		cells = step.SubtreeHeight
 	}
 
-	options := tmux.SplitOptions{
+	options := gotmux.SplitOptions{
 		Direction:           direction,
-		Size:                tmux.SplitSize{Cells: cells, Percent: 0},
+		Size:                gotmux.SplitSize{Cells: cells, Percent: 0},
 		Dir:                 "",
-		Program:             tmux.Program{},
+		Program:             gotmux.Program{},
 		Env:                 nil,
 		TmuxEnv:             nil,
 		Select:              false,
@@ -1322,7 +1322,7 @@ func (e *Executor) prepareCloseBootstrap(step CloseBootstrapWindowStep) (stepEff
 
 	return stepEffect{
 		run: func(ctx context.Context) (string, error) {
-			if err := bootLink.UnlinkWith(ctx, tmux.UnlinkOptions{Force: true}); err != nil {
+			if err := bootLink.UnlinkWith(ctx, gotmux.UnlinkOptions{Force: true}); err != nil {
 				return "", fmt.Errorf("close bootstrap window for %s: %w", step.SessionID, err)
 			}
 
@@ -1352,7 +1352,7 @@ func (e *Executor) prepareLinkWindow(step LinkWindowStep) (stepEffect, error) {
 
 	return stepEffect{
 		run: func(ctx context.Context) (string, error) {
-			if _, err := window.Link(ctx, session, tmux.LinkOptions{
+			if _, err := window.Link(ctx, session, gotmux.LinkOptions{
 				Index:   &idx,
 				Select:  false,
 				Replace: false,
@@ -1374,12 +1374,12 @@ func (e *Executor) prepareApplyLayout(step ApplyLayoutStep) (stepEffect, error) 
 			Wrapf(errWindowNotFound, "%s", step.WindowID)
 	}
 
-	paneMap := make(map[string]tmux.PaneID, len(e.panes))
+	paneMap := make(map[string]gotmux.PaneID, len(e.panes))
 	for id, pane := range e.panes {
 		paneMap[id] = pane.ID()
 	}
 
-	encoded, err := itmux.EncodeLayout(step.Layout, paneMap)
+	encoded, err := tmuxserver.EncodeLayout(step.Layout, paneMap)
 	if err != nil {
 		return stepEffect{}, oops.In("snapshot.restore").
 			Code("restore_failed").
@@ -1458,7 +1458,7 @@ func (e *Executor) prepareSelectWindow(step SelectWindowStep) (stepEffect, error
 	}, nil
 }
 
-func (e *Executor) selectWindows(ctx context.Context, session tmux.Session, step SelectWindowStep) error {
+func (e *Executor) selectWindows(ctx context.Context, session gotmux.Session, step SelectWindowStep) error {
 	_, links, err := session.WindowInfos(ctx)
 	if err != nil {
 		return fmt.Errorf("window infos for session %s: %w", step.SessionID, err)
@@ -1473,7 +1473,7 @@ func (e *Executor) selectWindows(ctx context.Context, session tmux.Session, step
 	return selectWindowAt(ctx, links, step.ActiveIndex, "active")
 }
 
-func selectWindowAt(ctx context.Context, links []tmux.WindowLinkInfo, index int, kind string) error {
+func selectWindowAt(ctx context.Context, links []gotmux.WindowLinkInfo, index int, kind string) error {
 	for _, link := range links {
 		if link.Index != index {
 			continue
@@ -1614,7 +1614,7 @@ func (e *Executor) preparePaneLaunch(pane model.Pane, ownerSessionID string) (pa
 	return paneLaunch{program: program, directory: directory, environment: environment, enabled: true, cwdFallback: cwdFallback, reason: ""}, nil
 }
 
-func (e *Executor) approvedLaunchProgram(launch model.Launch, ownerSessionID string, environment map[string]string, removed []string) (tmux.Program, bool) {
+func (e *Executor) approvedLaunchProgram(launch model.Launch, ownerSessionID string, environment map[string]string, removed []string) (gotmux.Program, bool) {
 	executable := string(launch.Executable)
 
 	arguments := make([]string, 0, len(launch.Arguments)-1)
@@ -1624,7 +1624,7 @@ func (e *Executor) approvedLaunchProgram(launch model.Launch, ownerSessionID str
 
 	if launch.Recovery == model.RecoveryResume {
 		if !executableAvailable(resumeShellProgram) {
-			return tmux.Program{}, false
+			return gotmux.Program{}, false
 		}
 
 		arguments = append([]string{
@@ -1677,7 +1677,7 @@ func (e *Executor) effectivePaneLaunchEnvironment(pane model.Pane, ownerSessionI
 }
 
 func disabledPaneLaunch() paneLaunch {
-	return paneLaunch{program: tmux.Program{}, directory: "", environment: nil, enabled: false, cwdFallback: false, reason: ""}
+	return paneLaunch{program: gotmux.Program{}, directory: "", environment: nil, enabled: false, cwdFallback: false, reason: ""}
 }
 
 func executableAvailable(path string) bool {
@@ -1706,13 +1706,13 @@ func launchEnvironment(variables []model.Variable) (map[string]string, []string)
 	return environment, removed
 }
 
-func literalLaunchProgram(executable string, arguments, removed []string) (tmux.Program, bool) {
+func literalLaunchProgram(executable string, arguments, removed []string) (gotmux.Program, bool) {
 	if len(removed) == 0 {
-		return tmux.Exec(executable, arguments...), true
+		return gotmux.Exec(executable, arguments...), true
 	}
 
 	if !executableAvailable(environmentProgram) {
-		return tmux.Program{}, false
+		return gotmux.Program{}, false
 	}
 
 	slices.Sort(removed)
@@ -1725,7 +1725,7 @@ func literalLaunchProgram(executable string, arguments, removed []string) (tmux.
 	envArguments = append(envArguments, "--", executable)
 	envArguments = append(envArguments, arguments...)
 
-	return tmux.Exec(environmentProgram, envArguments...), true
+	return gotmux.Exec(environmentProgram, envArguments...), true
 }
 
 func (e *Executor) resolveLaunchWorkingDir(pane model.Pane) (string, bool, error) {
@@ -1737,7 +1737,7 @@ func (e *Executor) resolveLaunchWorkingDir(pane model.Pane) (string, bool, error
 	return e.resolveWorkingDir(launchPane)
 }
 
-func (e *Executor) launchSessionInitialPane(ctx context.Context, session tmux.Session, sessionID string, launch paneLaunch) (string, error) {
+func (e *Executor) launchSessionInitialPane(ctx context.Context, session gotmux.Session, sessionID string, launch paneLaunch) (string, error) {
 	_, links, err := session.WindowInfos(ctx)
 	if err != nil {
 		return "", fmt.Errorf("resolve initial window for session %s: %w", sessionID, err)
@@ -1761,12 +1761,12 @@ func (e *Executor) launchSessionInitialPane(ctx context.Context, session tmux.Se
 	return string(pane.ID()), nil
 }
 
-func respawnPane(ctx context.Context, pane tmux.Pane, launch paneLaunch) error {
+func respawnPane(ctx context.Context, pane gotmux.Pane, launch paneLaunch) error {
 	if !launch.enabled {
 		return nil
 	}
 
-	err := pane.Respawn(ctx, tmux.RespawnOptions{
+	err := pane.Respawn(ctx, gotmux.RespawnOptions{
 		Program:             launch.program,
 		Dir:                 launch.directory,
 		Env:                 launch.environment,

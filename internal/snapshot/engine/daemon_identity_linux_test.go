@@ -10,7 +10,7 @@ import (
 
 	gotmux "github.com/zigai/gotmux/tmux"
 
-	integration "github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/integration/tmuxserver"
 	"github.com/zigai/sesh/internal/snapshot/restore"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
@@ -88,7 +88,7 @@ func TestRestoreTargetRejectsMalformedKernelBirth(t *testing.T) {
 		Birth: "11111111-2222-3333-4444-555555555555:1\ninjected=true",
 	}
 
-	if _, err := restoreTarget(endpoint, daemon, RestoreConfig{}); !errors.Is(err, integration.ErrDaemonIdentityUnavailable) {
+	if _, err := restoreTarget(endpoint, daemon, RestoreConfig{}); !errors.Is(err, tmuxserver.ErrDaemonIdentityUnavailable) {
 		t.Fatalf("malformed kernel birth error = %v, want daemon identity unavailable", err)
 	}
 }
@@ -103,7 +103,7 @@ func TestApplyAndVerifyRejectsZeroDaemonIdentity(t *testing.T) {
 		nil,
 		false,
 	)
-	if !errors.Is(err, integration.ErrDaemonIdentityUnavailable) {
+	if !errors.Is(err, tmuxserver.ErrDaemonIdentityUnavailable) {
 		t.Fatalf("zero daemon identity error = %v, want daemon identity unavailable", err)
 	}
 }

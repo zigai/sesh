@@ -233,7 +233,7 @@ func (descriptor Descriptor) matchSessions(sessions []session.Session) error {
 	}
 
 	for _, candidate := range sessions {
-		saved := candidate.IsSaved()
+		saved := candidate.Saved()
 		if (descriptor.Subject == SubjectLiveSession && saved) || (descriptor.Subject == SubjectSavedSession && !saved) {
 			return Wrap(CodeInvalidArgument, ErrSubjectMismatch)
 		}

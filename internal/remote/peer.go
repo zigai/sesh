@@ -152,12 +152,12 @@ func LoadPeerID(dir *privatefs.Dir) (string, error) {
 	return peerID, nil
 }
 
-func RunInventoryStream(ctx context.Context, options InventoryOptions, output io.Writer) error {
+func RunInventoryStream(ctx context.Context, opts InventoryOptions, output io.Writer) error {
 	if output == nil {
 		return oops.In("remote").With("operation", "inventory_stream").Wrap(errNilStreamOutput)
 	}
 
-	if !ValidIdentifier(options.PeerID) || options.Sessions == nil {
+	if !ValidIdentifier(opts.PeerID) || opts.Sessions == nil {
 		return oops.In("remote").With("operation", "inventory_stream").Wrap(ErrIncompleteDependencies)
 	}
 
@@ -168,18 +168,18 @@ func RunInventoryStream(ctx context.Context, options InventoryOptions, output io
 
 	publisher := &streamPublisher{
 		writer:         NewFrameWriter(output),
-		peerID:         options.PeerID,
+		peerID:         opts.PeerID,
 		streamInstance: streamInstance,
 		sequence:       1,
 		lastPublished:  nil,
 	}
 
-	if err := publisher.writeHello(streamHostname(options.Hostname), options.BridgeDir); err != nil {
+	if err := publisher.writeHello(streamHostname(opts.Hostname), opts.BridgeDir); err != nil {
 		return err
 	}
 
 	state := streamState{
-		options:       options,
+		options:       opts,
 		sessions:      nil,
 		savedSessions: nil,
 		agents:        nil,
@@ -192,7 +192,7 @@ func RunInventoryStream(ctx context.Context, options InventoryOptions, output io
 		return err
 	}
 
-	return runStreamLoop(ctx, options, &state, publisher)
+	return runStreamLoop(ctx, opts, &state, publisher)
 }
 
 func (publisher *streamPublisher) writeHello(hostname, bridgeDir string) error {
@@ -272,9 +272,9 @@ func (publisher *streamPublisher) writeHealth(observedAt time.Time, health Sourc
 	return nil
 }
 
-func runStreamLoop(ctx context.Context, options InventoryOptions, state *streamState, publisher *streamPublisher) error {
-	pollTicker := time.NewTicker(positiveDuration(options.PollInterval, defaultPoll))
-	heartbeatTicker := time.NewTicker(positiveDuration(options.HeartbeatInterval, defaultHeartbeat))
+func runStreamLoop(ctx context.Context, opts InventoryOptions, state *streamState, publisher *streamPublisher) error {
+	pollTicker := time.NewTicker(positiveDuration(opts.PollInterval, defaultPoll))
+	heartbeatTicker := time.NewTicker(positiveDuration(opts.HeartbeatInterval, defaultHeartbeat))
 
 	defer pollTicker.Stop()
 	defer heartbeatTicker.Stop()

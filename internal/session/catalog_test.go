@@ -536,7 +536,7 @@ func assertSavedSessionProperties(t *testing.T, s Session, wantName, wantDir, wa
 		t.Error("Attached should be false for saved sessions")
 	}
 
-	if s.IsCurrent {
-		t.Error("IsCurrent should be false for saved sessions")
+	if s.Current {
+		t.Error("Current should be false for saved sessions")
 	}
 }

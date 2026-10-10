@@ -764,16 +764,16 @@ func TestHistoryState_Valid(t *testing.T) {
 	validState := &session.State{
 		Version: session.CurrentHistoryVersion,
 		SwitchHistory: []session.SwitchHistoryEntry{
-			{Session: session.Identity{Name: "dev"}, LastSwitch: 12345},
+			{Session: session.Identity{Name: "dev"}, LastSwitchUnix: 12345},
 		},
 		RemoteSwitchHistory: []session.RemoteSwitchHistoryEntry{
-			{Session: session.Identity{Name: "remote-box"}, LastSwitch: 67890},
+			{Session: session.Identity{Name: "remote-box"}, LastSwitchUnix: 67890},
 		},
 		AgentViewHistory: []session.AgentViewHistoryEntry{
-			{Session: session.Identity{Name: "agent-sess"}, PaneID: "%1", ViewedAt: 11111},
+			{Session: session.Identity{Name: "agent-sess"}, PaneID: "%1", ViewedAtUnixNano: 11111},
 		},
-		LastAutosaveTimestamp: 0,
-		PopupDisplayMode:      "",
+		LastAutosaveUnix: 0,
+		PopupDisplayMode: "",
 	}
 
 	if err := session.SaveState(t.Context(), historyPath, validState); err != nil {
@@ -922,12 +922,12 @@ func TestHistoryState_BytesUntouched(t *testing.T) {
 	validState := &session.State{
 		Version: session.CurrentHistoryVersion,
 		SwitchHistory: []session.SwitchHistoryEntry{
-			{Session: session.Identity{Name: "important-project"}, LastSwitch: 999999},
+			{Session: session.Identity{Name: "important-project"}, LastSwitchUnix: 999999},
 		},
-		RemoteSwitchHistory:   nil,
-		AgentViewHistory:      nil,
-		LastAutosaveTimestamp: 0,
-		PopupDisplayMode:      "",
+		RemoteSwitchHistory: nil,
+		AgentViewHistory:    nil,
+		LastAutosaveUnix:    0,
+		PopupDisplayMode:    "",
 	}
 
 	if err := session.SaveState(t.Context(), historyPath, validState); err != nil {

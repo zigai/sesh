@@ -283,7 +283,7 @@ func (v sessionFormatValues) resolveAHTCell(field string) (string, layout.State)
 func (v sessionFormatValues) resolveSessionTmuxField(field string) (string, bool) {
 	switch field {
 	case display.FieldCurrentMarker:
-		if v.row.IsCurrent {
+		if v.row.Current {
 			return "* ", true
 		}
 
@@ -338,7 +338,7 @@ func (v sessionFormatValues) resolveSessionIdentityField(field string) (string, 
 	case display.FieldAttached:
 		return formatPresence(v.row.Attached, "attached"), true
 	case display.FieldCurrent:
-		return formatPresence(v.row.IsCurrent, "current"), true
+		return formatPresence(v.row.Current, "current"), true
 	default:
 		return "", false
 	}

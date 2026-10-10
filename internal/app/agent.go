@@ -68,7 +68,7 @@ func (local *Local) unreadAgent(ctx context.Context, caller action.Caller, input
 		}
 
 		visits = append(visits, agents.PaneVisit{
-			ServerSocket: entry.Session.Socket, SessionName: entry.Session.Name, PaneID: entry.PaneID, ViewedAt: time.Unix(0, entry.ViewedAt),
+			ServerSocket: entry.Session.Socket, SessionName: entry.Session.Name, PaneID: entry.PaneID, ViewedAt: time.Unix(0, entry.ViewedAtUnixNano),
 		})
 	}
 

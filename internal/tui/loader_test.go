@@ -147,8 +147,8 @@ func TestLoadSessionRowsSortsLocalCatalogByNativeIdentityHistoryAndActivity(t *t
 		{ID: "$3", Name: "visited", Kind: session.KindLive, Activity: now.Add(-3 * time.Hour)},
 	}
 	state := &session.State{SwitchHistory: []session.SwitchHistoryEntry{{
-		Session:    rows[2].SemanticIdentity(),
-		LastSwitch: now.Unix(),
+		Session:        rows[2].SemanticIdentity(),
+		LastSwitchUnix: now.Unix(),
 	}}}
 	model := newTestModelWithDeps(Dependencies{LoadCatalog: func(context.Context) (session.CatalogResult, error) {
 		return session.CatalogResult{Sessions: rows, Status: session.StatusComplete}, nil
@@ -609,7 +609,7 @@ func TestCurrentTmuxSessionIsHiddenInSeshAndVisibleInAgents(t *testing.T) {
 		LoadCatalog: func(context.Context) (session.CatalogResult, error) {
 			return session.CatalogResult{
 				Sessions: []session.Session{
-					{ID: "$1", Name: "current", Kind: session.KindLive, IsCurrent: true, ActivePaneID: "%7"},
+					{ID: "$1", Name: "current", Kind: session.KindLive, Current: true, ActivePaneID: "%7"},
 					{ID: "$2", Name: "other", Kind: session.KindLive},
 				},
 				Status: session.StatusComplete,
@@ -657,7 +657,7 @@ func TestAgentsModeSelectsCurrentAgentWhenInventoryArrivesAfterSessions(t *testi
 
 	model.applySessionRows(sessionLoadResultMsg{
 		sessions: []session.Session{
-			{ID: "$1", Name: "current", Kind: session.KindLive, IsCurrent: true, ActivePaneID: "%8"},
+			{ID: "$1", Name: "current", Kind: session.KindLive, Current: true, ActivePaneID: "%8"},
 			{ID: "$2", Name: "other", Kind: session.KindLive},
 		},
 		status: session.StatusComplete,
@@ -688,7 +688,7 @@ func TestAgentsModeKeepsUserSelectionWhenInventoryArrives(t *testing.T) {
 
 	model.applySessionRows(sessionLoadResultMsg{
 		sessions: []session.Session{
-			{ID: "$1", Name: "current", Kind: session.KindLive, IsCurrent: true, ActivePaneID: "%8"},
+			{ID: "$1", Name: "current", Kind: session.KindLive, Current: true, ActivePaneID: "%8"},
 			{ID: "$2", Name: "other", Kind: session.KindLive},
 		},
 		status: session.StatusComplete,
@@ -718,14 +718,14 @@ func TestAgentsModeSelectsCurrentAgentWhenOriginLoadsFirst(t *testing.T) {
 	})
 	model.applySessionRows(sessionLoadResultMsg{
 		sessions: []session.Session{{
-			ID: "$1", Name: "current", Kind: session.KindLive, IsCurrent: true, ActivePaneID: "%8",
+			ID: "$1", Name: "current", Kind: session.KindLive, Current: true, ActivePaneID: "%8",
 			Agents: []session.AgentSession{{RegistryID: "active", PaneID: "%8"}},
 		}},
 		status: session.StatusComplete,
 	})
 
 	selected := model.selectedListRow()
-	if !selected.isAgent() || !model.filtered[selected.sessionIndex].IsCurrent ||
+	if !selected.isAgent() || !model.filtered[selected.sessionIndex].Current ||
 		model.filtered[selected.sessionIndex].Agents[selected.agentIndex].PaneID != "%8" {
 		t.Fatalf("selection after local catalog = %#v, want current agent", selected)
 	}

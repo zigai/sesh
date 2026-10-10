@@ -17,9 +17,9 @@ func TestSessionSorter(t *testing.T) {
 
 	st := &State{
 		SwitchHistory: []SwitchHistoryEntry{
-			{Session: Identity{Name: "recent-switch"}, LastSwitch: now.Add(-5 * time.Minute).Unix()},
-			{Session: Identity{Name: "older-switch"}, LastSwitch: now.Add(-1 * time.Hour).Unix()},
-			{Session: Identity{Name: "newer-activity"}, LastSwitch: now.Add(-15 * time.Minute).Unix()},
+			{Session: Identity{Name: "recent-switch"}, LastSwitchUnix: now.Add(-5 * time.Minute).Unix()},
+			{Session: Identity{Name: "older-switch"}, LastSwitchUnix: now.Add(-1 * time.Hour).Unix()},
+			{Session: Identity{Name: "newer-activity"}, LastSwitchUnix: now.Add(-15 * time.Minute).Unix()},
 		},
 	}
 
@@ -83,8 +83,8 @@ func TestSessionSortUsesConnectionScopedSemanticKeys(t *testing.T) {
 	}
 	st := &State{
 		RemoteSwitchHistory: []RemoteSwitchHistoryEntry{{
-			Session:    Identity{Origin: "ssh", ConnectionID: "two", Name: historyTestSessionName},
-			LastSwitch: now.Add(time.Minute).Unix(),
+			Session:        Identity{Origin: "ssh", ConnectionID: "two", Name: historyTestSessionName},
+			LastSwitchUnix: now.Add(time.Minute).Unix(),
 		}},
 	}
 
@@ -117,7 +117,7 @@ func TestSessionSortIsolatesSameNameOnDifferentSockets(t *testing.T) {
 					Socket: "/tmp/tmux-1000/active",
 					Name:   "work",
 				},
-				LastSwitch: now.Unix(),
+				LastSwitchUnix: now.Unix(),
 			},
 		},
 	}

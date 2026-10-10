@@ -9,7 +9,7 @@ import (
 	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/integration/process"
-	integration "github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/integration/tmuxserver"
 )
 
 func captureError(err error) error {
@@ -34,7 +34,7 @@ func captureError(err error) error {
 		code = "session_not_found"
 	case errors.Is(err, ErrUnsupported), errors.Is(err, process.ErrUnsupported):
 		code = "capture_unsupported"
-	case errors.Is(err, integration.ErrEndpoint):
+	case errors.Is(err, tmuxserver.ErrEndpoint):
 		code = "endpoint_required"
 	case errors.Is(err, ErrProcessDeleted):
 		code = "capture_failed"

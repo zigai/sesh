@@ -291,7 +291,7 @@ func (t Template) HasRight() bool {
 	return len(t.right) > 0
 }
 
-func (t Template) IsEmpty() bool {
+func (t Template) Empty() bool {
 	return len(t.left) == 0 && len(t.right) == 0
 }
 

@@ -12,7 +12,7 @@ import (
 	"github.com/samber/oops"
 	gotmux "github.com/zigai/gotmux/tmux"
 
-	integration "github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/integration/tmuxserver"
 	"github.com/zigai/sesh/internal/snapshot/model"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
@@ -419,7 +419,7 @@ func (w *Workflow) applySavedDelete(ctx context.Context, plan []deleteStep, out 
 	return nil
 }
 
-func closeLease(lease *integration.Lease) error {
+func closeLease(lease *tmuxserver.Lease) error {
 	if lease == nil {
 		return nil
 	}
@@ -431,16 +431,16 @@ func closeLease(lease *integration.Lease) error {
 	return nil
 }
 
-func (w *Workflow) acquireDeleteLease(ctx context.Context) (*integration.Lease, error) {
+func (w *Workflow) acquireDeleteLease(ctx context.Context) (*tmuxserver.Lease, error) {
 	if w.server == nil {
 		return nil, oops.In("session").Code("endpoint_required").With("operation", "acquire_lease").Wrap(errServerRequired)
 	}
 
 	if w.leaseRoot == "" {
-		return nil, oops.In("session").Code("lease_failed").With("operation", "acquire_lease").Wrap(integration.ErrLeaseRoot)
+		return nil, oops.In("session").Code("lease_failed").With("operation", "acquire_lease").Wrap(tmuxserver.ErrLeaseRoot)
 	}
 
-	lease, err := integration.AcquireLease(ctx, w.leaseRoot, w.server.Endpoint().SocketPath)
+	lease, err := tmuxserver.AcquireLease(ctx, w.leaseRoot, w.server.Endpoint().SocketPath)
 	if err != nil {
 		return nil, oops.In("session").Code("lease_failed").With("operation", "acquire_lease").Wrap(err)
 	}

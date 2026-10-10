@@ -241,7 +241,7 @@ func refuseAgentPaneOrAttached(subject Subject) error {
 
 func refuseAttached(subject Subject) error {
 	for _, target := range subject.Sessions {
-		if !target.IsSaved() && target.Attached {
+		if !target.Saved() && target.Attached {
 			return Wrap(CodeAttached, ErrSessionAttached)
 		}
 	}

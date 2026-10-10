@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/samber/oops"
-	"github.com/zigai/gotmux/tmux"
+	gotmux "github.com/zigai/gotmux/tmux"
 )
 
 func TestSelectionErrorNeedsNoServerEffects(t *testing.T) {
@@ -26,8 +26,8 @@ func TestSelectionErrorNeedsNoServerEffects(t *testing.T) {
 }
 
 func TestOutputLimitErrorHasStableCode(t *testing.T) {
-	err := captureError(fmt.Errorf("list options: %w", tmux.ErrOutputLimit))
-	if !errors.Is(err, tmux.ErrOutputLimit) {
+	err := captureError(fmt.Errorf("list options: %w", gotmux.ErrOutputLimit))
+	if !errors.Is(err, gotmux.ErrOutputLimit) {
 		t.Fatal("lost output limit identity")
 	}
 
