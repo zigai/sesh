@@ -10,7 +10,9 @@ import "time"
 // sessions. A snapshot finished after the server started, such as an explicit save, shows the live
 // state was kept on purpose, so it names nothing.
 func UnrestoredSessions(serverStarted, snapshotFinished time.Time, saved, live []string) []string {
-	if serverStarted.IsZero() || snapshotFinished.IsZero() || !snapshotFinished.Before(serverStarted) {
+	// tmux reports its start in whole seconds, so a snapshot finished within the server's start
+	// second, as a stop-time save just before a restart is, counts as older than the server.
+	if serverStarted.IsZero() || snapshotFinished.IsZero() || snapshotFinished.Truncate(time.Second).After(serverStarted) {
 		return nil
 	}
 

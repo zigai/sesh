@@ -35,7 +35,6 @@ func TestUnrestoredSessionsIgnoresSnapshotsSavedOnTheLiveServer(t *testing.T) {
 
 	for name, finished := range map[string]time.Time{
 		"after start":    time.Unix(2_001, 0),
-		"same instant":   started,
 		"unknown finish": {},
 	} {
 		if got := UnrestoredSessions(started, finished, []string{"work"}, nil); len(got) != 0 {
@@ -45,5 +44,16 @@ func TestUnrestoredSessionsIgnoresSnapshotsSavedOnTheLiveServer(t *testing.T) {
 
 	if got := UnrestoredSessions(time.Time{}, time.Unix(1_000, 0), []string{"work"}, nil); len(got) != 0 {
 		t.Fatalf("unknown server start: UnrestoredSessions = %q, want none", got)
+	}
+}
+
+func TestUnrestoredSessionsTreatsASaveInTheServerStartSecondAsOlder(t *testing.T) {
+	t.Parallel()
+
+	started := time.Unix(2_000, 0)
+	finished := time.Unix(2_000, 400_000_000)
+
+	if got := UnrestoredSessions(started, finished, []string{"work"}, []string{"scratch"}); !slices.Equal(got, []string{"work"}) {
+		t.Fatalf("UnrestoredSessions = %q, want the saved session missing from a server restarted in the same second", got)
 	}
 }
