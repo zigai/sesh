@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -531,6 +532,92 @@ func TestEngineRestoreRefusesRestartedDaemonTarget(t *testing.T) {
 
 	if !errors.Is(err, store.ErrConflict) {
 		t.Fatalf("expected a target identity conflict, got %v", err)
+	}
+}
+
+func TestSettleDeadRestoresAbandonsARestoreWhoseServerExited(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+
+	server := tmuxtest.NewServer(t)
+	repo, operationID := interruptRestoreAtMissingDirectory(t, ctx, server)
+
+	if settled, err := engine.SettleDeadRestores(ctx, repo); err != nil || len(settled) != 0 {
+		t.Fatalf("settle while the server runs = %d settled, %v; want the restore kept", len(settled), err)
+	}
+
+	probe, err := server.Probe(ctx)
+	if err != nil {
+		t.Fatalf("probe the target server: %v", err)
+	}
+
+	if err := server.Kill(ctx); err != nil {
+		t.Fatalf("kill the target server: %v", err)
+	}
+
+	waitForProcessExit(t, ctx, probe.Identity.PID)
+
+	settled, err := engine.SettleDeadRestores(ctx, repo)
+	if err != nil {
+		t.Fatalf("SettleDeadRestores failed: %v", err)
+	}
+
+	if len(settled) != 1 || settled[0].OperationID != operationID {
+		t.Fatalf("settled = %+v, want the interrupted restore abandoned", settled)
+	}
+
+	active, err := engine.ActiveRestores(ctx, repo)
+	if err != nil || len(active) != 0 {
+		t.Fatalf("active restores after settling = %d, %v; want none", len(active), err)
+	}
+}
+
+// interruptRestoreAtMissingDirectory leaves an admitted restore active against server, as a restore
+// cut short by a shutdown does.
+func interruptRestoreAtMissingDirectory(t *testing.T, ctx context.Context, server *gotmux.Server) (*store.Repository, string) {
+	t.Helper()
+
+	source, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "exited-source", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly})
+	if err != nil {
+		t.Fatalf("NewSession failed: %v", err)
+	}
+
+	disableSourceWindowRename(t, ctx, source)
+
+	repoDir := filepath.Join(t.TempDir(), "repo")
+	generation := observeSessionAtMissingDirectory(t, ctx, server, repoDir, source)
+
+	if err := source.Kill(ctx); err != nil {
+		t.Fatalf("Kill failed: %v", err)
+	}
+
+	repo := openFixture(t, ctx, repoDir)
+
+	interrupted, err := engine.Restore(ctx, repo, server, engine.RestoreConfig{
+		LeaseRoot:         filepath.Join(t.TempDir(), "leases"),
+		Generation:        generation,
+		Sessions:          nil,
+		OperationID:       "",
+		LaunchProcesses:   false,
+		MissingWorkingDir: restore.MissingWorkingDirFail,
+	})
+	if !errors.Is(err, restore.ErrWorkingDirNotFound) || interrupted.OperationID == "" {
+		t.Fatalf("restore = %q, %v; want an admitted restore stopped by the missing directory", interrupted.OperationID, err)
+	}
+
+	return repo, interrupted.OperationID
+}
+
+// waitForProcessExit waits for a process to be gone, which kill-server does not wait for.
+func waitForProcessExit(t *testing.T, ctx context.Context, pid int) {
+	t.Helper()
+
+	for syscall.Kill(pid, 0) == nil {
+		select {
+		case <-ctx.Done():
+			t.Fatalf("process %d still runs: %v", pid, ctx.Err())
+		case <-time.After(10 * time.Millisecond):
+		}
 	}
 }
 
