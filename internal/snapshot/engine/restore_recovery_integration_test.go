@@ -225,12 +225,12 @@ func TestEnginePartialRestoreKeepsPinUntilExplicitAbandon(t *testing.T) {
 	}
 
 	result, err := engine.Restore(ctx, repo, server, engine.RestoreConfig{
-		LeaseRoot:              leaseRoot,
-		Generation:             generation,
-		Sessions:               nil,
-		OperationID:            "",
-		LaunchProcesses:        false,
-		AllowMissingWorkingDir: false,
+		LeaseRoot:         leaseRoot,
+		Generation:        generation,
+		Sessions:          nil,
+		OperationID:       "",
+		LaunchProcesses:   false,
+		MissingWorkingDir: restore.MissingWorkingDirFail,
 	})
 	assertPartialRestoreResult(t, result, err, "")
 
@@ -245,12 +245,12 @@ func TestEnginePartialRestoreKeepsPinUntilExplicitAbandon(t *testing.T) {
 	}
 
 	resumed, err := engine.Restore(ctx, repo, server, engine.RestoreConfig{
-		LeaseRoot:              leaseRoot,
-		Generation:             generation,
-		Sessions:               nil,
-		OperationID:            result.OperationID,
-		LaunchProcesses:        false,
-		AllowMissingWorkingDir: false,
+		LeaseRoot:         leaseRoot,
+		Generation:        generation,
+		Sessions:          nil,
+		OperationID:       result.OperationID,
+		LaunchProcesses:   false,
+		MissingWorkingDir: restore.MissingWorkingDirFail,
 	})
 	assertPartialRestoreResult(t, resumed, err, result.OperationID)
 	assertReinspectedNoProcessPanes(t, resumed.Panes)
@@ -306,7 +306,7 @@ func TestEnginePracticalRestoreSettlesVerifiedFidelityLimits(t *testing.T) {
 
 	result, err := engine.Restore(ctx, repo, server, engine.RestoreConfig{
 		LeaseRoot: leaseRoot, Generation: generation, Sessions: nil, OperationID: "",
-		LaunchProcesses: false, AllowMissingWorkingDir: false,
+		LaunchProcesses: false, MissingWorkingDir: restore.MissingWorkingDirFail,
 		Profile: engine.RecoveryPractical,
 	})
 	if err != nil {
@@ -402,12 +402,12 @@ func TestEngineRestoreRefusesDispatchedButUnconfirmedEffect(t *testing.T) {
 	repo := openFixture(t, ctx, repoDir)
 
 	result, err := engine.Restore(ctx, repo, server, engine.RestoreConfig{
-		LeaseRoot:              leaseRoot,
-		Generation:             generation,
-		Sessions:               nil,
-		OperationID:            "",
-		LaunchProcesses:        false,
-		AllowMissingWorkingDir: false,
+		LeaseRoot:         leaseRoot,
+		Generation:        generation,
+		Sessions:          nil,
+		OperationID:       "",
+		LaunchProcesses:   false,
+		MissingWorkingDir: restore.MissingWorkingDirFail,
 	})
 	if !errors.Is(err, restore.ErrWorkingDirNotFound) {
 		t.Fatalf("expected ErrWorkingDirNotFound, got %v", err)
@@ -426,12 +426,12 @@ func TestEngineRestoreRefusesDispatchedButUnconfirmedEffect(t *testing.T) {
 	}
 
 	_, err = engine.Restore(ctx, repo, server, engine.RestoreConfig{
-		LeaseRoot:              leaseRoot,
-		Generation:             generation,
-		Sessions:               nil,
-		OperationID:            result.OperationID,
-		LaunchProcesses:        false,
-		AllowMissingWorkingDir: false,
+		LeaseRoot:         leaseRoot,
+		Generation:        generation,
+		Sessions:          nil,
+		OperationID:       result.OperationID,
+		LaunchProcesses:   false,
+		MissingWorkingDir: restore.MissingWorkingDirFail,
 	})
 	if !errors.Is(err, restore.ErrPriorUncertainty) {
 		t.Fatalf("expected ErrPriorUncertainty, got %v", err)
@@ -486,12 +486,12 @@ func TestEngineRestoreRefusesRestartedDaemonTarget(t *testing.T) {
 	repo := openFixture(t, ctx, repoDir)
 
 	result, err := engine.Restore(ctx, repo, first, engine.RestoreConfig{
-		LeaseRoot:              leaseRoot,
-		Generation:             generation,
-		Sessions:               nil,
-		OperationID:            "",
-		LaunchProcesses:        false,
-		AllowMissingWorkingDir: false,
+		LeaseRoot:         leaseRoot,
+		Generation:        generation,
+		Sessions:          nil,
+		OperationID:       "",
+		LaunchProcesses:   false,
+		MissingWorkingDir: restore.MissingWorkingDirFail,
 	})
 	if !errors.Is(err, restore.ErrWorkingDirNotFound) {
 		t.Fatalf("expected ErrWorkingDirNotFound, got %v", err)
@@ -518,12 +518,12 @@ func TestEngineRestoreRefusesRestartedDaemonTarget(t *testing.T) {
 	killDaemonOnCleanup(t, second, replacement.ServerIdentity())
 
 	_, err = engine.Restore(ctx, repo, second, engine.RestoreConfig{
-		LeaseRoot:              leaseRoot,
-		Generation:             generation,
-		Sessions:               nil,
-		OperationID:            result.OperationID,
-		LaunchProcesses:        false,
-		AllowMissingWorkingDir: false,
+		LeaseRoot:         leaseRoot,
+		Generation:        generation,
+		Sessions:          nil,
+		OperationID:       result.OperationID,
+		LaunchProcesses:   false,
+		MissingWorkingDir: restore.MissingWorkingDirFail,
 	})
 	if err == nil {
 		t.Fatal("expected resumption against a restarted daemon to be refused")
@@ -580,12 +580,12 @@ func TestEngineRestoreLogSchema(t *testing.T) {
 	repo := openFixture(t, ctx, repoDir)
 
 	if _, err := engine.Restore(logCtx, repo, server, engine.RestoreConfig{
-		LeaseRoot:              leaseRoot,
-		Generation:             generation,
-		Sessions:               nil,
-		OperationID:            "",
-		LaunchProcesses:        false,
-		AllowMissingWorkingDir: false,
+		LeaseRoot:         leaseRoot,
+		Generation:        generation,
+		Sessions:          nil,
+		OperationID:       "",
+		LaunchProcesses:   false,
+		MissingWorkingDir: restore.MissingWorkingDirFail,
 	}); err != nil {
 		t.Fatalf("Restore failed: %v", err)
 	}
@@ -734,12 +734,12 @@ func runFailingRestoreOnMissingDir(
 	t.Helper()
 
 	result, err := engine.Restore(ctx, repo, server, engine.RestoreConfig{
-		LeaseRoot:              leaseRoot,
-		Generation:             generation,
-		Sessions:               nil,
-		OperationID:            "",
-		LaunchProcesses:        false,
-		AllowMissingWorkingDir: false,
+		LeaseRoot:         leaseRoot,
+		Generation:        generation,
+		Sessions:          nil,
+		OperationID:       "",
+		LaunchProcesses:   false,
+		MissingWorkingDir: restore.MissingWorkingDirFail,
 	})
 	if err == nil {
 		t.Fatal("expected the restore to fail on the missing working directory")
@@ -850,12 +850,12 @@ func assertFailureRetainedPinAndExplicitAbandonment(
 	}
 
 	_, err = engine.Restore(ctx, repo, server, engine.RestoreConfig{
-		LeaseRoot:              leaseRoot,
-		Generation:             generation,
-		Sessions:               nil,
-		OperationID:            operationID,
-		LaunchProcesses:        false,
-		AllowMissingWorkingDir: false,
+		LeaseRoot:         leaseRoot,
+		Generation:        generation,
+		Sessions:          nil,
+		OperationID:       operationID,
+		LaunchProcesses:   false,
+		MissingWorkingDir: restore.MissingWorkingDirFail,
 	})
 	if !errors.Is(err, restore.ErrWorkingDirNotFound) {
 		t.Fatalf("expected retained operation to resume without replay and fail at the same missing directory, got %v", err)
@@ -950,12 +950,12 @@ func runFailingRestoreForLogging(t *testing.T, logCtx context.Context, repo *sto
 	t.Helper()
 
 	_, err := engine.Restore(logCtx, repo, server, engine.RestoreConfig{
-		LeaseRoot:              leaseRoot,
-		Generation:             "00000000000000000000000000000000",
-		Sessions:               nil,
-		OperationID:            "",
-		LaunchProcesses:        false,
-		AllowMissingWorkingDir: false,
+		LeaseRoot:         leaseRoot,
+		Generation:        "00000000000000000000000000000000",
+		Sessions:          nil,
+		OperationID:       "",
+		LaunchProcesses:   false,
+		MissingWorkingDir: restore.MissingWorkingDirFail,
 	})
 	if err == nil {
 		t.Fatal("expected restoring a missing generation to fail")
@@ -1014,12 +1014,12 @@ func TestEngineRestoreRefusesConfigMismatchOnSameOperationID(t *testing.T) {
 	}
 
 	cfgOriginal := engine.RestoreConfig{
-		LeaseRoot:              leaseRoot,
-		Generation:             generation,
-		Sessions:               nil,
-		OperationID:            "",
-		LaunchProcesses:        false,
-		AllowMissingWorkingDir: false,
+		LeaseRoot:         leaseRoot,
+		Generation:        generation,
+		Sessions:          nil,
+		OperationID:       "",
+		LaunchProcesses:   false,
+		MissingWorkingDir: restore.MissingWorkingDirFail,
 	}
 
 	result, err := engine.Restore(ctx, repo, server, cfgOriginal)
@@ -1033,7 +1033,7 @@ func TestEngineRestoreRefusesConfigMismatchOnSameOperationID(t *testing.T) {
 
 	cfgModified := cfgOriginal
 	cfgModified.OperationID = result.OperationID
-	cfgModified.AllowMissingWorkingDir = true
+	cfgModified.MissingWorkingDir = restore.MissingWorkingDirLaunch
 
 	_, err = engine.Restore(ctx, repo, server, cfgModified)
 	if err == nil {
@@ -1083,12 +1083,12 @@ func TestEngineRestoreVerificationFailureSingleOwningErrorRecord(t *testing.T) {
 	logCtx := logger.WithContext(ctx)
 
 	_, err = engine.Restore(logCtx, repo, server, engine.RestoreConfig{
-		LeaseRoot:              leaseRoot,
-		Generation:             generation,
-		Sessions:               nil,
-		OperationID:            "",
-		LaunchProcesses:        false,
-		AllowMissingWorkingDir: false,
+		LeaseRoot:         leaseRoot,
+		Generation:        generation,
+		Sessions:          nil,
+		OperationID:       "",
+		LaunchProcesses:   false,
+		MissingWorkingDir: restore.MissingWorkingDirFail,
 	})
 	if err == nil {
 		t.Fatal("expected verification to fail on slot mismatch")

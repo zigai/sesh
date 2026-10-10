@@ -70,11 +70,11 @@ func TestEngineRestore_FullRoundtrip(t *testing.T) {
 	}
 
 	restoreRes, err := engine.Restore(ctx, repo, server, engine.RestoreConfig{
-		LeaseRoot:              leaseRoot,
-		Generation:             saveRes.Generation,
-		Sessions:               nil,
-		LaunchProcesses:        false,
-		AllowMissingWorkingDir: true,
+		LeaseRoot:         leaseRoot,
+		Generation:        saveRes.Generation,
+		Sessions:          nil,
+		LaunchProcesses:   false,
+		MissingWorkingDir: restore.MissingWorkingDirLaunch,
 	})
 	if err != nil {
 		oopsErr, _ := oops.AsOops(err)
@@ -140,11 +140,11 @@ func TestEngineRestore_SessionCollision(t *testing.T) {
 	}
 
 	_, err = engine.Restore(ctx, repo, server, engine.RestoreConfig{
-		LeaseRoot:              leaseRoot,
-		Generation:             saveRes.Generation,
-		Sessions:               nil,
-		LaunchProcesses:        false,
-		AllowMissingWorkingDir: true,
+		LeaseRoot:         leaseRoot,
+		Generation:        saveRes.Generation,
+		Sessions:          nil,
+		LaunchProcesses:   false,
+		MissingWorkingDir: restore.MissingWorkingDirLaunch,
 	})
 	if err == nil {
 		t.Fatal("expected error for collision, got nil")

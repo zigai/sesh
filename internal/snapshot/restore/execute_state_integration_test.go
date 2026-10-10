@@ -1358,7 +1358,7 @@ func TestExecutorWorkingDirFallbackIsExplicitlyPartial(t *testing.T) {
 	operation := registerPlanOperation(t, ctx, repo, "directory-fallback", generation, server.Endpoint().SocketPath, plan)
 
 	cfg := DefaultExecuteConfig()
-	cfg.AllowMissingWorkingDir = true
+	cfg.MissingWorkingDir = MissingWorkingDirLaunch
 
 	report, err := NewExecutor(server, manifest, cfg).Execute(ctx, plan, newPlanJournal(t, ctx, repo, operation))
 	if err != nil {

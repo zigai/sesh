@@ -14,6 +14,7 @@ import (
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/snapshot/engine"
+	"github.com/zigai/sesh/internal/snapshot/restore"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
@@ -102,14 +103,14 @@ func executeStartupRestore(cmd *cobra.Command, env Env) error {
 	}
 
 	result, restoreErr := engine.Restore(ctx, repo, server, engine.RestoreConfig{
-		OperationID:            "",
-		LeaseRoot:              env.workspace.LeaseRoot,
-		Generation:             admission.Generation,
-		Sessions:               nil,
-		LaunchProcesses:        true,
-		AllowMissingWorkingDir: false,
-		OnCollision:            engine.CollisionPolicyDefault,
-		Profile:                engine.RecoveryPractical,
+		OperationID:       "",
+		LeaseRoot:         env.workspace.LeaseRoot,
+		Generation:        admission.Generation,
+		Sessions:          nil,
+		LaunchProcesses:   true,
+		MissingWorkingDir: restore.MissingWorkingDirShell,
+		OnCollision:       engine.CollisionPolicyDefault,
+		Profile:           engine.RecoveryPractical,
 	})
 
 	closeErr := repo.Close()

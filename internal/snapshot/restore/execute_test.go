@@ -17,8 +17,8 @@ func TestDefaultExecuteConfig(t *testing.T) {
 		t.Error("expected process launches to be disabled by default")
 	}
 
-	if cfg.AllowMissingWorkingDir {
-		t.Error("expected AllowMissingWorkingDir to be false by default")
+	if cfg.MissingWorkingDir != MissingWorkingDirFail {
+		t.Errorf("default missing working directory policy = %q, want %q", cfg.MissingWorkingDir, MissingWorkingDirFail)
 	}
 }
 
@@ -102,8 +102,8 @@ func TestPaneOutcomeClassification(t *testing.T) {
 	}
 
 	executor := NewExecutor(nil, manifest, ExecuteConfig{
-		LaunchProcesses:        true,
-		AllowMissingWorkingDir: true,
+		LaunchProcesses:   true,
+		MissingWorkingDir: MissingWorkingDirLaunch,
 	})
 
 	for _, p := range manifest.Panes {

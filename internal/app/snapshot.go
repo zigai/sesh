@@ -167,14 +167,14 @@ func (local *Local) restoreSnapshot(ctx context.Context, _ action.Caller, input 
 	}
 
 	result, err = engine.Restore(ctx, repo, local.server, engine.RestoreConfig{
-		LeaseRoot:              local.leaseRoot,
-		Generation:             generation,
-		Sessions:               slices.Clone(input.Sessions),
-		OperationID:            input.Operation,
-		LaunchProcesses:        input.LaunchProcesses,
-		AllowMissingWorkingDir: input.AllowMissingDir,
-		OnCollision:            engine.CollisionPolicy(input.OnCollision),
-		Profile:                engine.RecoveryPractical,
+		LeaseRoot:         local.leaseRoot,
+		Generation:        generation,
+		Sessions:          slices.Clone(input.Sessions),
+		OperationID:       input.Operation,
+		LaunchProcesses:   input.LaunchProcesses,
+		MissingWorkingDir: missingWorkingDir(input.AllowMissingDir),
+		OnCollision:       engine.CollisionPolicy(input.OnCollision),
+		Profile:           engine.RecoveryPractical,
 	})
 
 	output := restoredSnapshot(result, readManifest(ctx, repo, generation))
@@ -319,4 +319,12 @@ func mismatches(values []restore.VerificationMismatch) []action.Mismatch {
 	}
 
 	return converted
+}
+
+func missingWorkingDir(allowMissing bool) restore.MissingWorkingDir {
+	if allowMissing {
+		return restore.MissingWorkingDirLaunch
+	}
+
+	return restore.MissingWorkingDirFail
 }

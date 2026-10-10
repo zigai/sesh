@@ -54,3 +54,58 @@ func TestStartupRestoreAbandonsARestoreFromAnEarlierBootAndRestores(t *testing.T
 		t.Fatalf("startup restore = %#v, want the stale restore abandoned and the snapshot restored", result)
 	}
 }
+
+func TestStartupRestoreRestoresEverySessionWhenASavedDirectoryIsGone(t *testing.T) {
+	isolatedAutosaveHome(t)
+
+	root := t.TempDir()
+	repoPath := filepath.Join(root, "snapshots")
+	leaseRoot := filepath.Join(root, "leases")
+	removed := filepath.Join(root, "removed-worktree")
+
+	if err := os.Mkdir(removed, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	source := tmuxtest.NewServer(t)
+
+	saved := make([]string, 0, 3)
+
+	for _, session := range []struct{ name, dir string }{{"alpha", root}, {"beta", removed}, {"gamma", root}} {
+		created, err := source.NewSession(t.Context(), gotmux.NewSessionOptions{
+			Name: session.name, Dir: session.dir, Program: gotmux.Exec("/bin/sh"), Start: gotmux.StartPolicyExistingOnly,
+		})
+		if err != nil {
+			t.Fatalf("create %s: %v", session.name, err)
+		}
+
+		saved = append(saved, string(created.ID()))
+	}
+
+	save := executeJSON(t, append(append([]string{"snapshot", "save"}, saved...),
+		testSocketFlag, source.Endpoint().SocketPath, "--repository", repoPath, "--lease-root", leaseRoot,
+		testNoConfigFlag, testJSONFlag)...)
+	if save.Err != nil || !save.Envelope.OK {
+		t.Fatalf("save the source sessions: %v\nstderr: %s", save.Err, save.Stderr)
+	}
+
+	if err := os.Remove(removed); err != nil {
+		t.Fatal(err)
+	}
+
+	server := tmuxtest.NewServer(t)
+
+	exec := executeJSON(t, "autosave", "restore-on-start",
+		testSocketFlag, server.Endpoint().SocketPath, "--repository", repoPath,
+		"--lease-root", leaseRoot, "--history", filepath.Join(root, "state", "history.json"),
+		testNoConfigFlag, testJSONFlag)
+	if exec.Err != nil || !exec.Envelope.OK {
+		t.Fatalf("startup restore failed: %v\nstderr: %s", exec.Err, exec.Stderr)
+	}
+
+	for _, name := range []string{"alpha", "beta", "gamma"} {
+		if _, err := server.FindSession(t.Context(), name); err != nil {
+			t.Errorf("session %s after startup restore: %v", name, err)
+		}
+	}
+}
