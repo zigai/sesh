@@ -27,6 +27,7 @@ const (
 	ReasonTargetEnvironmentMaskedLocally              Reason = "target_environment_masked_locally"
 	ReasonTargetInheritedOptionsUnmasked              Reason = "target_inherited_options_unmasked"
 	ReasonTargetEnvironmentUnmasked                   Reason = "target_environment_unmasked"
+	ReasonTargetOptionUnsupported                     Reason = "target_option_unsupported"
 )
 
 type Reason string

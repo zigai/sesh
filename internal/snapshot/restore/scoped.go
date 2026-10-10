@@ -123,6 +123,10 @@ func ScopedStateRequirements(plan Plan) []MissingRequirement {
 		}
 	}
 
+	if plan.UnsupportedOptions > 0 {
+		report.note("options", model.ReasonTargetOptionUnsupported)
+	}
+
 	for _, variable := range plan.SourceGraph.Source.Environment {
 		if variable.State == "set" || variable.State == "removed" || variable.State == "absent" {
 			report.note("environment", model.ReasonGlobalScopeEnvironmentMaterializedLocally)

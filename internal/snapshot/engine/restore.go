@@ -599,6 +599,13 @@ func prepareRestorePlan(
 		return restore.Plan{}, genID, nil, fmt.Errorf("validate manifest: %w", err)
 	}
 
+	target, err := restore.ReadTargetOptions(ctx, server)
+	if err != nil {
+		return restore.Plan{}, genID, nil, fmt.Errorf("read target options: %w", err)
+	}
+
+	manifest, unsupportedOptions := target.Adapt(manifest)
+
 	selected := cfg.Sessions
 	if len(selected) == 0 {
 		selected = make([]string, 0, len(manifest.Sessions))
@@ -615,6 +622,8 @@ func prepareRestorePlan(
 	if _, err := restore.PlanActions(plan); err != nil {
 		return restore.Plan{}, genID, nil, fmt.Errorf("build restore actions: %w", err)
 	}
+
+	plan.UnsupportedOptions = unsupportedOptions
 
 	return plan, genID, skipped, nil
 }
