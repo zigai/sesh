@@ -13,7 +13,10 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
-const reasonRestorePending = "restore_pending"
+const (
+	reasonRestorePending    = "restore_pending"
+	reasonRestoreIncomplete = "restore_incomplete"
+)
 
 // pendingRestore is a live tmux server that started after the newest snapshot and still lacks
 // some of its saved sessions.
@@ -36,23 +39,74 @@ func findPendingRestore(ctx context.Context, cmd *cobra.Command, server *gotmux.
 	return pendingRestore{sessions: len(unrestored.Sessions), serverStarted: unrestored.ServerStarted}
 }
 
-// reportPendingRestore warns once per tmux server start that saves are held back until the saved
-// sessions are restored or an explicit save keeps the live state. Without a history path, or when
-// the marker cannot be read or written, it stays silent rather than warn on every interval.
-func reportPendingRestore(ctx context.Context, env Env, pending pendingRestore) {
+type pendingRestoreAction int
+
+const (
+	pendingRestoreHold pendingRestoreAction = iota
+	pendingRestoreRun
+	pendingRestoreSave
+)
+
+// decidePendingRestore chooses what an automatic save does on a server that lacks saved sessions.
+// A server a restore already targeted is saved again, since a second restore would bring back
+// sessions closed since and holding back would stop every later save. A server no restore reached
+// gets the startup restore once, when it is configured; otherwise the save is held back.
+func decidePendingRestore(ctx context.Context, env Env, server *gotmux.Server, repo *store.Repository, pending pendingRestore) pendingRestoreAction {
+	targeted, err := engine.RestoreTargetedServer(ctx, repo, server)
+
+	switch {
+	case err != nil:
+		return pendingRestoreHold
+	case targeted:
+		return pendingRestoreSave
+	case env.workspace.Config.Autosave.RestoreLastOnStart && pendingEpisodeUnhandled(env, pending):
+		return pendingRestoreRun
+	default:
+		return pendingRestoreHold
+	}
+}
+
+func pendingEpisodeUnhandled(env Env, pending pendingRestore) bool {
 	if env.workspace.History == "" {
+		return false
+	}
+
+	unhandled, err := automation.EpisodeUnreported(automation.RestorePendingMarkerPath(env.workspace.History), pending.serverStarted.Unix())
+
+	return err == nil && unhandled
+}
+
+// claimPendingEpisode marks this server start handled and reports whether this call was the one
+// that did, so each unrestored server is warned about or late-restored once. Without a history
+// path, or when the marker cannot be read or written, it claims nothing.
+func claimPendingEpisode(env Env, pending pendingRestore) bool {
+	if !pendingEpisodeUnhandled(env, pending) {
+		return false
+	}
+
+	return automation.RecordEpisodeReported(automation.RestorePendingMarkerPath(env.workspace.History), pending.serverStarted.Unix()) == nil
+}
+
+// reportRestoreIncomplete warns once per tmux server start that automatic saves resumed although a
+// restore left saved sessions missing.
+func reportRestoreIncomplete(ctx context.Context, env Env, pending pendingRestore) {
+	if !claimPendingEpisode(env, pending) {
 		return
 	}
 
-	markerPath := automation.RestorePendingMarkerPath(env.workspace.History)
-	stamp := pending.serverStarted.Unix()
+	zerolog.Ctx(ctx).Warn().
+		Str("component", "snapshot").
+		Str("operation", "autosave").
+		Str("status", statusDegraded).
+		Str("reason", reasonRestoreIncomplete).
+		Int("sessions", pending.sessions).
+		Msg("autosave resumed after a restore with saved sessions missing")
+}
 
-	unreported, err := automation.EpisodeUnreported(markerPath, stamp)
-	if err != nil || !unreported {
-		return
-	}
-
-	if err := automation.RecordEpisodeReported(markerPath, stamp); err != nil {
+// reportPendingRestore warns once per tmux server start that saves are held back until the saved
+// sessions are restored or an explicit save keeps the live state.
+func reportPendingRestore(ctx context.Context, env Env, pending pendingRestore) {
+	if !claimPendingEpisode(env, pending) {
 		return
 	}
 

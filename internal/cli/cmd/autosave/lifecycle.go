@@ -14,6 +14,7 @@ import (
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/snapshot/engine"
+	"github.com/zigai/sesh/internal/snapshot/restore"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
@@ -38,10 +39,13 @@ func runAutosaveRestoreOnStart(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	return executeStartupRestore(cmd, env)
+	return executeStartupRestore(cmd, env, func() bool { return true })
 }
 
-func executeStartupRestore(cmd *cobra.Command, env Env) error {
+// executeStartupRestore restores the newest snapshot under the save lock. claim runs once the lock
+// is held and before admission, so a busy lock leaves a late restore free to run at the next
+// interval while a refused one is not retried.
+func executeStartupRestore(cmd *cobra.Command, env Env, claim func() bool) error {
 	ctx := clibase.CommandContext(cmd)
 
 	reportUnsavedShutdownSinceBoot(ctx, env)
@@ -59,16 +63,37 @@ func executeStartupRestore(cmd *cobra.Command, env Env) error {
 		return err
 	}
 
+	lock, err := automation.TryAcquireSaveLock(ctx, automation.SaveLockPath())
+	if err != nil {
+		closeErr := wrapCloseError(repo.Close())
+
+		if errors.Is(err, automation.ErrSaveLockBusy) {
+			busy := newOutcome(statusSkipped, reasonLockBusy)
+			busy.history = historyState(env)
+
+			return errors.Join(renderAutosaveResult(cmd, env, busy), closeErr)
+		}
+
+		return errors.Join(oops.In("cli").With("operation", "acquire_autosave_lock").Wrap(err), closeErr)
+	}
+
+	if !claim() {
+		held := newOutcome(statusSkipped, reasonRestorePending)
+		held.history = historyState(env)
+
+		return errors.Join(renderAutosaveResult(cmd, env, held), wrapCloseError(repo.Close()), lock.Release())
+	}
+
 	// Restores aimed at a vanished server, e.g. one interrupted by a reboot, can never resume
 	// and must not block this start's restore.
 	settled, settleErr := engine.SettleDeadRestores(ctx, repo)
 	if settleErr != nil {
-		return errors.Join(oops.In("cli").With("operation", "settle_dead_restores").Wrap(settleErr), wrapCloseError(repo.Close()))
+		return errors.Join(oops.In("cli").With("operation", "settle_dead_restores").Wrap(settleErr), wrapCloseError(repo.Close()), lock.Release())
 	}
 
 	state, stateErr := automation.InspectStartupState(ctx, repo)
 	if stateErr != nil {
-		return errors.Join(oops.In("cli").With("operation", "inspect_startup_state").Wrap(stateErr), wrapCloseError(repo.Close()))
+		return errors.Join(oops.In("cli").With("operation", "inspect_startup_state").Wrap(stateErr), wrapCloseError(repo.Close()), lock.Release())
 	}
 
 	state.Abandoned = len(settled)
@@ -78,22 +103,7 @@ func executeStartupRestore(cmd *cobra.Command, env Env) error {
 
 	admission := automation.EvaluateStartupRestore(state)
 	if !admission.Allowed {
-		return renderDeniedStartupRestore(cmd, env, admission, state, repo)
-	}
-
-	lock, err := automation.TryAcquireSaveLock(ctx, automation.SaveLockPath())
-	if err != nil {
-		closeErr := wrapCloseError(repo.Close())
-
-		if errors.Is(err, automation.ErrSaveLockBusy) {
-			busy := newOutcome(statusSkipped, reasonLockBusy)
-			busy.generation = admission.Generation
-			busy.history = historyState(env)
-
-			return errors.Join(renderAutosaveResult(cmd, env, busy), closeErr)
-		}
-
-		return errors.Join(oops.In("cli").With("operation", "acquire_autosave_lock").Wrap(err), closeErr)
+		return errors.Join(renderDeniedStartupRestore(cmd, env, admission, state, repo), lock.Release())
 	}
 
 	server, err := env.workspace.OpenTmux()
@@ -102,14 +112,14 @@ func executeStartupRestore(cmd *cobra.Command, env Env) error {
 	}
 
 	result, restoreErr := engine.Restore(ctx, repo, server, engine.RestoreConfig{
-		OperationID:            "",
-		LeaseRoot:              env.workspace.LeaseRoot,
-		Generation:             admission.Generation,
-		Sessions:               nil,
-		LaunchProcesses:        true,
-		AllowMissingWorkingDir: false,
-		OnCollision:            engine.CollisionPolicyDefault,
-		Profile:                engine.RecoveryPractical,
+		OperationID:       "",
+		LeaseRoot:         env.workspace.LeaseRoot,
+		Generation:        admission.Generation,
+		Sessions:          nil,
+		LaunchProcesses:   true,
+		MissingWorkingDir: restore.MissingWorkingDirShell,
+		OnCollision:       engine.CollisionPolicyDefault,
+		Profile:           engine.RecoveryPractical,
 	})
 
 	closeErr := repo.Close()

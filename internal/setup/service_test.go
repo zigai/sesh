@@ -461,7 +461,7 @@ func TestLaunchdAgentActivation(t *testing.T) {
 			intervalType:  "integer",
 			startInterval: "75",
 			arguments: []string{
-				"/usr/local/bin/sesh", "action", "autosave-save-if-due",
+				"/usr/local/bin/sesh", "autosave", "save-if-due",
 				"--socket", "/run/user/1000/sesh/tmux.sock",
 				"--repository", "/home/user/.local/share/sesh/snapshots",
 				"--lease-root", "/home/user/.local/share/sesh/leases",

@@ -71,14 +71,14 @@ type restoreDaemonIdentity struct {
 }
 
 type RestoreConfig struct {
-	LeaseRoot              string
-	Generation             string
-	Sessions               []string
-	OperationID            string
-	LaunchProcesses        bool
-	AllowMissingWorkingDir bool
-	OnCollision            CollisionPolicy
-	Profile                RecoveryProfile
+	LeaseRoot         string
+	Generation        string
+	Sessions          []string
+	OperationID       string
+	LaunchProcesses   bool
+	MissingWorkingDir restore.MissingWorkingDir
+	OnCollision       CollisionPolicy
+	Profile           RecoveryProfile
 }
 
 type RestoreResult struct {
@@ -441,8 +441,8 @@ func executeRestorePlan(
 	dispatchCandidates := restoreDispatchCandidates(plan, ledger)
 
 	executor := restore.NewExecutor(server, readManifest(plan), restore.ExecuteConfig{
-		LaunchProcesses:        cfg.LaunchProcesses,
-		AllowMissingWorkingDir: cfg.AllowMissingWorkingDir,
+		LaunchProcesses:   cfg.LaunchProcesses,
+		MissingWorkingDir: cfg.MissingWorkingDir,
 	})
 
 	report, err := executor.Execute(ctx, plan, &stepJournal{ledger: ledger})
@@ -599,6 +599,13 @@ func prepareRestorePlan(
 		return restore.Plan{}, genID, nil, fmt.Errorf("validate manifest: %w", err)
 	}
 
+	target, err := restore.ReadTargetOptions(ctx, server)
+	if err != nil {
+		return restore.Plan{}, genID, nil, fmt.Errorf("read target options: %w", err)
+	}
+
+	manifest, unsupportedOptions := target.Adapt(manifest)
+
 	selected := cfg.Sessions
 	if len(selected) == 0 {
 		selected = make([]string, 0, len(manifest.Sessions))
@@ -615,6 +622,8 @@ func prepareRestorePlan(
 	if _, err := restore.PlanActions(plan); err != nil {
 		return restore.Plan{}, genID, nil, fmt.Errorf("build restore actions: %w", err)
 	}
+
+	plan.UnsupportedOptions = unsupportedOptions
 
 	return plan, genID, skipped, nil
 }
@@ -785,10 +794,10 @@ func restoreTarget(endpoint string, daemon restoreDaemonIdentity, cfg RestoreCon
 		}
 	}
 
-	target := fmt.Sprintf("%s%s\n%d\n%d\nlaunch=%t\nallow_missing_dir=%t\ncompensate=false\nprofile=%s",
+	target := fmt.Sprintf("%s%s\n%d\n%d\nlaunch=%t\nmissing_working_dir=%s\ncompensate=false\nprofile=%s",
 		restoreTargetPrefix,
 		endpoint, identity.PID, identity.Started.UnixNano(),
-		cfg.LaunchProcesses, cfg.AllowMissingWorkingDir, cfg.Profile)
+		cfg.LaunchProcesses, cfg.MissingWorkingDir, cfg.Profile)
 	target += restoreDaemonTargetAppendix(daemon)
 
 	if len(target) > maxRestoreTargetBytes {

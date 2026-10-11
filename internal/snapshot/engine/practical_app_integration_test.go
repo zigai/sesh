@@ -59,7 +59,7 @@ func TestEnginePracticalRestoreRestartsForegroundMonitorOnce(t *testing.T) {
 
 	cfg := engine.RestoreConfig{
 		LeaseRoot: leaseRoot, Generation: saved.Generation, LaunchProcesses: true,
-		AllowMissingWorkingDir: false, Profile: engine.RecoveryPractical,
+		MissingWorkingDir: restore.MissingWorkingDirFail, Profile: engine.RecoveryPractical,
 	}
 	restored := restorePracticalSnapshot(t, ctx, repo, target, cfg)
 
@@ -373,11 +373,11 @@ func TestEnginePracticalRestoreNvimReopensFilesAfterSourceDestruction(t *testing
 	}
 
 	cfg := engine.RestoreConfig{
-		LeaseRoot:              leaseRoot,
-		Generation:             saved.Generation,
-		LaunchProcesses:        true,
-		AllowMissingWorkingDir: false,
-		Profile:                engine.RecoveryPractical,
+		LeaseRoot:         leaseRoot,
+		Generation:        saved.Generation,
+		LaunchProcesses:   true,
+		MissingWorkingDir: restore.MissingWorkingDirFail,
+		Profile:           engine.RecoveryPractical,
 	}
 	restored := restorePracticalSnapshot(t, ctx, repo, target, cfg)
 
@@ -635,11 +635,11 @@ func TestEnginePracticalRestorePaneOutcomesEvidence(t *testing.T) {
 	}
 
 	cfg := engine.RestoreConfig{
-		LeaseRoot:              leaseRoot,
-		Generation:             gen.ID,
-		LaunchProcesses:        true,
-		AllowMissingWorkingDir: true,
-		Profile:                engine.RecoveryPractical,
+		LeaseRoot:         leaseRoot,
+		Generation:        gen.ID,
+		LaunchProcesses:   true,
+		MissingWorkingDir: restore.MissingWorkingDirLaunch,
+		Profile:           engine.RecoveryPractical,
 	}
 	restored := restorePracticalSnapshot(t, ctx, repo, target, cfg)
 
@@ -836,11 +836,11 @@ func TestEnginePracticalRestoreMixedHealthyAndNonrestartablePanes(t *testing.T) 
 	}
 
 	cfg := engine.RestoreConfig{
-		LeaseRoot:              leaseRoot,
-		Generation:             gen.ID,
-		LaunchProcesses:        true,
-		AllowMissingWorkingDir: false,
-		Profile:                engine.RecoveryPractical,
+		LeaseRoot:         leaseRoot,
+		Generation:        gen.ID,
+		LaunchProcesses:   true,
+		MissingWorkingDir: restore.MissingWorkingDirFail,
+		Profile:           engine.RecoveryPractical,
 	}
 	restored := restorePracticalSnapshot(t, ctx, repo, target, cfg)
 
@@ -961,21 +961,148 @@ func assertLiveMissingDirectoryFails(
 	}
 
 	cfgLiveMissing := engine.RestoreConfig{
-		LeaseRoot:              leaseRoot,
-		Generation:             genLiveMissingDir.ID,
-		LaunchProcesses:        true,
-		AllowMissingWorkingDir: false,
-		Profile:                engine.RecoveryPractical,
+		LeaseRoot:         leaseRoot,
+		Generation:        genLiveMissingDir.ID,
+		LaunchProcesses:   true,
+		MissingWorkingDir: restore.MissingWorkingDirFail,
+		Profile:           engine.RecoveryPractical,
 	}
 
 	target2 := tmuxtest.NewServer(t)
 
 	_, err = engine.Restore(ctx, repo, target2, cfgLiveMissing)
 	if err == nil {
-		t.Fatal("expected live pane with missing directory to fail restore when AllowMissingWorkingDir is false")
+		t.Fatal("expected live pane with missing directory to fail restore under the fail policy")
 	}
 
 	if !errors.Is(err, restore.ErrWorkingDirNotFound) {
 		t.Fatalf("expected ErrWorkingDirNotFound for live pane, got %v", err)
+	}
+}
+
+func TestEnginePracticalRestoreStartsAShellForAPaneWhoseDirectoryIsGone(t *testing.T) {
+	shPath := requireFixtureExecutable(t, "sh")
+	topPath := requirePracticalTop(t)
+	tempDir := t.TempDir()
+	t.Setenv("HOME", tempDir)
+
+	source := tmuxtest.NewServer(t)
+	target := tmuxtest.NewServer(t)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 45*time.Second)
+	defer cancel()
+
+	sourceSession := startTopAndShellSession(t, ctx, source, topPath, shPath)
+	repo := openFixture(t, ctx, filepath.Join(tempDir, "repo"))
+	leaseRoot := filepath.Join(tempDir, "leases")
+
+	saved := savePracticalObservation(t, ctx, repo, source, sourceSession, engine.SaveConfig{
+		LeaseRoot:         leaseRoot,
+		ProcessEnrichment: true,
+		Profile:           engine.RecoveryPractical,
+	})
+
+	generation, manifest := commitWithRemovedDirectory(t, ctx, repo, saved.Generation, filepath.Join(tempDir, "removed-worktree"))
+
+	restored := restorePracticalSnapshot(t, ctx, repo, target, engine.RestoreConfig{
+		LeaseRoot:         leaseRoot,
+		Generation:        generation,
+		LaunchProcesses:   true,
+		MissingWorkingDir: restore.MissingWorkingDirShell,
+		Profile:           engine.RecoveryPractical,
+	})
+
+	assertPracticalOperationSettled(t, ctx, repo, restored.OperationID)
+	assertRemovedDirectoryOutcomes(t, restored, manifest.Panes[0].ID, manifest.Panes[1].ID)
+}
+
+func startTopAndShellSession(t *testing.T, ctx context.Context, source *gotmux.Server, topPath, shPath string) gotmux.Session {
+	t.Helper()
+
+	session, err := source.NewSession(ctx, gotmux.NewSessionOptions{
+		Name:    "missing-dir-source",
+		Program: gotmux.Exec(topPath, "-d", "100"),
+		Start:   gotmux.StartPolicyExistingOnly,
+	})
+	if err != nil {
+		t.Fatalf("new session: %v", err)
+	}
+
+	disableSourceWindowRename(t, ctx, session)
+
+	windows, _, err := session.WindowInfos(ctx)
+	if err != nil || len(windows) != 1 {
+		t.Fatalf("read windows: %v", err)
+	}
+
+	topPane, err := windows[0].Handle().ActivePane(ctx)
+	if err != nil {
+		t.Fatalf("active pane: %v", err)
+	}
+
+	if _, err := topPane.Split(ctx, gotmux.SplitOptions{Direction: gotmux.DirectionHorizontal, Program: gotmux.Exec(shPath)}); err != nil {
+		t.Fatalf("split shell pane: %v", err)
+	}
+
+	waitForPracticalTop(t, ctx, session)
+
+	return session
+}
+
+// commitWithRemovedDirectory commits a copy of a saved generation whose first pane works in a
+// directory that no longer exists.
+func commitWithRemovedDirectory(t *testing.T, ctx context.Context, repo *store.Repository, saved, removed string) (string, model.Manifest) {
+	t.Helper()
+
+	manifest, err := repo.Read(ctx, saved)
+	if err != nil {
+		t.Fatalf("read saved manifest: %v", err)
+	}
+
+	if len(manifest.Panes) != 2 || manifest.Panes[0].Launch.Recovery != model.RecoveryRestart || manifest.Panes[1].Launch.Recovery != model.RecoveryRestart {
+		t.Fatalf("saved panes = %+v, want two restartable panes", manifest.Panes)
+	}
+
+	manifest.Panes[0].Directory = model.Bytes(removed)
+	manifest.Panes[0].Launch.Directory = model.Bytes(removed)
+
+	manifest.Artifacts = nil
+	for i := range manifest.Panes {
+		manifest.Panes[i].Terminal.Artifact = ""
+	}
+
+	attempt, err := repo.Begin(ctx)
+	if err != nil {
+		t.Fatalf("register attempt: %v", err)
+	}
+
+	generation, err := repo.Commit(ctx, attempt.ID, manifest, nil)
+	if err != nil {
+		t.Fatalf("commit manifest with a removed directory: %v", err)
+	}
+
+	return generation.ID, manifest
+}
+
+func assertRemovedDirectoryOutcomes(t *testing.T, restored engine.RestoreResult, removedPaneID, healthyPaneID string) {
+	t.Helper()
+
+	outcomes := map[string]restore.PaneResult{}
+	for _, pane := range restored.Panes {
+		outcomes[pane.PaneID] = pane
+	}
+
+	gone := outcomes[removedPaneID]
+	if gone.Outcome != restore.PaneOutcomeAllowedCWDFallback || gone.Reason != restore.PaneReasonWorkingDirFallback || !gone.CWDFallback {
+		t.Errorf("pane with the removed directory = %+v, want a shell in the fallback directory", gone)
+	}
+
+	if healthy := outcomes[healthyPaneID]; healthy.Outcome != restore.PaneOutcomeRestartDispatch {
+		t.Errorf("pane with its directory = %+v, want restart_dispatch", healthy)
+	}
+
+	note := restore.MissingRequirement{Domain: "directory", Status: "partial", Reason: model.ReasonSavedWorkingDirectoryMissing}
+	if !slices.Contains(restored.MissingRequirements, note) {
+		t.Errorf("missing requirements %v lack the removed directory note", restored.MissingRequirements)
 	}
 }

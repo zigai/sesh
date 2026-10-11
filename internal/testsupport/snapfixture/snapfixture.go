@@ -79,7 +79,7 @@ func RegisterRestore(t *testing.T, repoPath string, pid int, birth string) strin
 		t.Fatal(err)
 	}
 
-	target := fmt.Sprintf("restore-v1\n/tmp/fixture.sock\n%d\n%d\nlaunch=true\nallow_missing_dir=false\ncompensate=false\nprofile=practical", pid, fixtureStarted)
+	target := fmt.Sprintf("restore-v1\n/tmp/fixture.sock\n%d\n%d\nlaunch=true\nmissing_working_dir=fail\ncompensate=false\nprofile=practical", pid, fixtureStarted)
 	if birth != "" {
 		target += "\nbirth=" + birth
 	}

@@ -198,11 +198,11 @@ func TestSnapshotRestore_MultiWindowFidelity(t *testing.T) {
 	}
 
 	restoreRes, err := engine.Restore(ctx, repo, server, engine.RestoreConfig{
-		LeaseRoot:              leaseRoot,
-		Generation:             saveRes.Generation,
-		Sessions:               nil,
-		LaunchProcesses:        false,
-		AllowMissingWorkingDir: true,
+		LeaseRoot:         leaseRoot,
+		Generation:        saveRes.Generation,
+		Sessions:          nil,
+		LaunchProcesses:   false,
+		MissingWorkingDir: restore.MissingWorkingDirLaunch,
 	})
 	if err != nil {
 		t.Fatalf("Restore failed: %v", err)
@@ -216,11 +216,11 @@ func TestSnapshotRestore_MultiWindowFidelity(t *testing.T) {
 	verifyOperationInCatalog(t, ctx, repo, restoreRes.OperationID)
 
 	_, err = engine.Restore(ctx, repo, server, engine.RestoreConfig{
-		LeaseRoot:              leaseRoot,
-		Generation:             saveRes.Generation,
-		Sessions:               nil,
-		LaunchProcesses:        false,
-		AllowMissingWorkingDir: true,
+		LeaseRoot:         leaseRoot,
+		Generation:        saveRes.Generation,
+		Sessions:          nil,
+		LaunchProcesses:   false,
+		MissingWorkingDir: restore.MissingWorkingDirLaunch,
 	})
 	if err == nil {
 		t.Fatal("expected collision error on repeat restore, got nil")

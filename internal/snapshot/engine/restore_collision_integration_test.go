@@ -76,14 +76,14 @@ func newCollisionFixture(t *testing.T, ctx context.Context) collisionFixture {
 
 func (f collisionFixture) config(sessions []string, policy engine.CollisionPolicy) engine.RestoreConfig {
 	return engine.RestoreConfig{
-		LeaseRoot:              f.leaseRoot,
-		Generation:             f.generation,
-		Sessions:               sessions,
-		OperationID:            "",
-		LaunchProcesses:        false,
-		AllowMissingWorkingDir: true,
-		OnCollision:            policy,
-		Profile:                engine.RecoveryPractical,
+		LeaseRoot:         f.leaseRoot,
+		Generation:        f.generation,
+		Sessions:          sessions,
+		OperationID:       "",
+		LaunchProcesses:   false,
+		MissingWorkingDir: restore.MissingWorkingDirLaunch,
+		OnCollision:       policy,
+		Profile:           engine.RecoveryPractical,
 	}
 }
 

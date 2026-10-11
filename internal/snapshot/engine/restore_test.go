@@ -14,6 +14,7 @@ import (
 
 	"github.com/zigai/sesh/internal/integration/tmuxserver"
 	"github.com/zigai/sesh/internal/snapshot/engine"
+	"github.com/zigai/sesh/internal/snapshot/restore"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
@@ -42,11 +43,11 @@ func TestRestoreAdmissionChecks(t *testing.T) {
 	}
 
 	_, err = engine.Restore(ctx, repo, server, engine.RestoreConfig{
-		LeaseRoot:              "",
-		Generation:             "",
-		Sessions:               nil,
-		LaunchProcesses:        false,
-		AllowMissingWorkingDir: false,
+		LeaseRoot:         "",
+		Generation:        "",
+		Sessions:          nil,
+		LaunchProcesses:   false,
+		MissingWorkingDir: restore.MissingWorkingDirFail,
 	})
 	if err == nil {
 		t.Fatal("expected error on missing lease root, got nil")
@@ -57,11 +58,11 @@ func TestRestoreAdmissionChecks(t *testing.T) {
 	}
 
 	_, err = engine.Restore(ctx, repo, nil, engine.RestoreConfig{
-		LeaseRoot:              t.TempDir(),
-		Generation:             "",
-		Sessions:               nil,
-		LaunchProcesses:        false,
-		AllowMissingWorkingDir: false,
+		LeaseRoot:         t.TempDir(),
+		Generation:        "",
+		Sessions:          nil,
+		LaunchProcesses:   false,
+		MissingWorkingDir: restore.MissingWorkingDirFail,
 	})
 	if err == nil {
 		t.Fatal("expected error on nil server, got nil")
@@ -72,11 +73,11 @@ func TestRestoreAdmissionChecks(t *testing.T) {
 	}
 
 	_, err = engine.Restore(ctx, nil, server, engine.RestoreConfig{
-		LeaseRoot:              t.TempDir(),
-		Generation:             "",
-		Sessions:               nil,
-		LaunchProcesses:        false,
-		AllowMissingWorkingDir: false,
+		LeaseRoot:         t.TempDir(),
+		Generation:        "",
+		Sessions:          nil,
+		LaunchProcesses:   false,
+		MissingWorkingDir: restore.MissingWorkingDirFail,
 	})
 	if err == nil {
 		t.Fatal("expected error on nil repository, got nil")
@@ -96,11 +97,11 @@ func TestRestoreLoggingPrivacy(t *testing.T) {
 	ctx := logger.WithContext(t.Context())
 
 	_, err := engine.Restore(ctx, nil, nil, engine.RestoreConfig{
-		LeaseRoot:              "",
-		Generation:             "",
-		Sessions:               nil,
-		LaunchProcesses:        false,
-		AllowMissingWorkingDir: false,
+		LeaseRoot:         "",
+		Generation:        "",
+		Sessions:          nil,
+		LaunchProcesses:   false,
+		MissingWorkingDir: restore.MissingWorkingDirFail,
 	})
 	if err == nil {
 		t.Fatal("expected error, got nil")

@@ -5,10 +5,12 @@ package engine
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/samber/oops"
+	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/integration/process"
 	"github.com/zigai/sesh/internal/snapshot/store"
@@ -42,6 +44,36 @@ func ActiveRestores(ctx context.Context, repository *store.Repository) ([]Operat
 	}
 
 	return active, nil
+}
+
+// RestoreTargetedServer reports whether a restore operation, in any state, was admitted against
+// the tmux daemon now serving server. The socket, daemon PID and daemon start time recorded in a
+// restore target identify one server instance.
+func RestoreTargetedServer(ctx context.Context, repository *store.Repository, server *gotmux.Server) (bool, error) {
+	if repository == nil {
+		return false, oops.In("snapshot").Code("repository_required").With("operation", "find_server_restore").Wrap(ErrRepositoryRequired)
+	}
+
+	live, err := observeRestoreDaemonIdentity(ctx, server)
+	if err != nil {
+		return false, oops.In("snapshot").Code("daemon_identity_unavailable").With("operation", "find_server_restore").Wrap(err)
+	}
+
+	catalog, err := repository.Inspect(ctx)
+	if err != nil {
+		return false, oops.In("snapshot").Code("inspect_failed").With("operation", "find_server_restore").Wrap(err)
+	}
+
+	instance := fmt.Sprintf("%s%s\n%d\n%d\n",
+		restoreTargetPrefix, server.Endpoint().SocketPath, live.Server.PID, live.Server.Started.UnixNano())
+
+	for _, op := range catalog.Operations {
+		if validateRestoreOperation(op) == nil && strings.HasPrefix(string(op.Target), instance) {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 // SettleDeadRestores abandons every active restore whose target tmux daemon is provably gone:

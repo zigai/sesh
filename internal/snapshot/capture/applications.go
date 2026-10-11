@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -47,18 +48,14 @@ func captureProcessLaunch(ctx context.Context, pid int, keys []string, agent *ap
 		return launch, record, err
 	}
 
+	if observed.ExecutableDeleted && replacedInPlace(observed.Executable) {
+		observed.ExecutableDeleted = false
+	}
+
 	if observed.ExecutableDeleted || observed.DirectoryDeleted {
 		record = paneProcessRecord{pid: pid, birth: birth, foreground: observed, dead: false}
-		launch = processLaunch(observed)
-		launch.Recovery = model.RecoveryNonrestartable
 
-		if observed.ExecutableDeleted {
-			launch.Reason = string(model.ReasonExecutableDeleted)
-		} else {
-			launch.Reason = string(model.ReasonWorkingDirectoryDeleted)
-		}
-
-		return launch, record, nil
+		return deletedPathLaunch(observed, unsupported, agent), record, nil
 	}
 
 	record = paneProcessRecord{pid: pid, birth: birth, foreground: nil, dead: false}
@@ -72,6 +69,39 @@ func captureProcessLaunch(ctx context.Context, pid int, keys []string, agent *ap
 	launch, err = prepareApplication(ctx, observed, agent)
 
 	return launch, record, err
+}
+
+// replacedInPlace reports whether the path of a running program's deleted executable holds an
+// executable again, as after a package upgrade replaced the file. Relaunching from that path runs
+// the upgraded program.
+func replacedInPlace(executable []byte) bool {
+	info, err := os.Stat(string(executable))
+
+	return err == nil && info.Mode().IsRegular() && info.Mode().Perm()&0o111 != 0
+}
+
+// deletedPathLaunch classifies a program running from a deleted executable or working directory.
+// An agent stays resumable when only its binary was deleted, as an agent's self-update removes old
+// versions, while its resume command still resolves to a live executable for the same harness; the
+// resume then launches that executable. Anything else cannot be relaunched as it ran.
+func deletedPathLaunch(observed *process.Observation, unsupported bool, agent *apps.AgentResume) model.Launch {
+	if !observed.DirectoryDeleted && !unsupported && agent != nil && agent.Executable != "" {
+		launch, reason := apps.Prepare(processLaunch(observed), agent)
+		if reason == apps.ReasonAgentResume && launch.Recovery == model.RecoveryResume {
+			return launch
+		}
+	}
+
+	launch := processLaunch(observed)
+	launch.Recovery = model.RecoveryNonrestartable
+
+	if observed.ExecutableDeleted {
+		launch.Reason = string(model.ReasonExecutableDeleted)
+	} else {
+		launch.Reason = string(model.ReasonWorkingDirectoryDeleted)
+	}
+
+	return launch
 }
 
 func sameProcessObservation(left, right *process.Observation) bool {

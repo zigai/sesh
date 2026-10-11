@@ -261,7 +261,7 @@ func TestExecutor_MissingWorkingDirPolicy(t *testing.T) {
 	}
 
 	cfgFailClosed := DefaultExecuteConfig()
-	cfgFailClosed.AllowMissingWorkingDir = false
+	cfgFailClosed.MissingWorkingDir = MissingWorkingDirFail
 	cfgFailClosed.LaunchProcesses = false
 
 	executor := NewExecutor(server, manifest, cfgFailClosed)
@@ -276,7 +276,7 @@ func TestExecutor_MissingWorkingDirPolicy(t *testing.T) {
 	}
 
 	cfgAllow := DefaultExecuteConfig()
-	cfgAllow.AllowMissingWorkingDir = true
+	cfgAllow.MissingWorkingDir = MissingWorkingDirLaunch
 	cfgAllow.LaunchProcesses = false
 
 	allowServer := tmuxtest.NewServer(t)
@@ -284,7 +284,7 @@ func TestExecutor_MissingWorkingDirPolicy(t *testing.T) {
 
 	report, err := executorAllow.Execute(ctx, plan, newMemoryJournal())
 	if err != nil {
-		t.Fatalf("expected success with AllowMissingWorkingDir=true, got %v", err)
+		t.Fatalf("expected success under the launch policy, got %v", err)
 	}
 
 	if len(report.SessionsCreated) != 1 {

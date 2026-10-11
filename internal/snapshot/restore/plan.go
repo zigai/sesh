@@ -34,6 +34,7 @@ type Plan struct {
 	Steps               []Step               `json:"steps"`
 	MissingRequirements []MissingRequirement `json:"missingRequirements"`
 	Summary             PlanSummary          `json:"summary"`
+	UnsupportedOptions  int                  `json:"unsupportedOptions"`
 }
 
 func (p Plan) SourceEvidenceComplete() bool {
@@ -82,6 +83,7 @@ func BuildPlan(m model.Manifest, selected []string) (Plan, error) {
 		Steps:               steps,
 		MissingRequirements: missing,
 		Summary:             summary,
+		UnsupportedOptions:  0,
 	}
 
 	if err := ValidatePlan(plan); err != nil {

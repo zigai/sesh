@@ -19,6 +19,16 @@ import (
 )
 
 const (
+	MissingWorkingDirFail MissingWorkingDir = "fail"
+	// MissingWorkingDirLaunch starts the pane, and relaunches its program, in tmux's fallback
+	// directory.
+	MissingWorkingDirLaunch MissingWorkingDir = "launch_in_fallback"
+	// MissingWorkingDirShell starts the pane in tmux's fallback directory with its default shell
+	// and does not relaunch its program, which would run outside the directory it belongs to.
+	MissingWorkingDirShell MissingWorkingDir = "shell_in_fallback"
+)
+
+const (
 	defaultWindowWidth  = 80
 	defaultWindowHeight = 24
 	environmentProgram  = "/usr/bin/env"
@@ -38,9 +48,13 @@ var (
 	errAdoptedLayoutUnresolved  = errors.New("adopted window has no identifiable initial pane")
 )
 
+// MissingWorkingDir selects what restore does with a pane whose saved working directory no
+// longer exists. Any value other than launch or shell fails the restore.
+type MissingWorkingDir string
+
 type ExecuteConfig struct {
-	LaunchProcesses        bool
-	AllowMissingWorkingDir bool
+	LaunchProcesses   bool
+	MissingWorkingDir MissingWorkingDir
 }
 
 type stepEffect struct {
@@ -95,10 +109,14 @@ type ExecutionReport struct {
 	Panes           []PaneResult         `json:"panes,omitempty"`
 }
 
+func (m MissingWorkingDir) fallsBack() bool {
+	return m == MissingWorkingDirLaunch || m == MissingWorkingDirShell
+}
+
 func DefaultExecuteConfig() ExecuteConfig {
 	return ExecuteConfig{
-		LaunchProcesses:        false,
-		AllowMissingWorkingDir: false,
+		LaunchProcesses:   false,
+		MissingWorkingDir: MissingWorkingDirFail,
 	}
 }
 
@@ -1530,7 +1548,7 @@ func (e *Executor) resolveWorkingDir(pane model.Pane) (string, bool, error) {
 	}
 
 	if statErr := statSavedWorkingDirectory(dir); statErr != nil {
-		if !e.cfg.AllowMissingWorkingDir {
+		if !e.cfg.MissingWorkingDir.fallsBack() {
 			return "", false, oops.In("snapshot.restore").
 				Code("working_directory_missing").
 				With("operation", "resolve_working_dir", "pane_id", pane.ID, "dir", dir).
@@ -1566,22 +1584,26 @@ func savedWorkingDir(pane model.Pane) string {
 	return string(pane.Launch.Directory)
 }
 
+func (e *Executor) unlaunchedPane(pane model.Pane) (paneLaunch, error) {
+	result := disabledPaneLaunch()
+
+	_, cwdFallback, err := e.resolveWorkingDir(pane)
+	if err != nil {
+		return result, err
+	}
+
+	result.cwdFallback = cwdFallback
+	if !e.cfg.LaunchProcesses && (pane.Launch.Recovery == model.RecoveryRestart || pane.Launch.Recovery == model.RecoveryResume) {
+		result.reason = PaneReasonProcessLaunchDisabled
+	}
+
+	return result, nil
+}
+
 func (e *Executor) preparePaneLaunch(pane model.Pane, ownerSessionID string) (paneLaunch, error) {
 	launch := pane.Launch
 	if !e.cfg.LaunchProcesses || (launch.Recovery != model.RecoveryRestart && launch.Recovery != model.RecoveryResume) {
-		result := disabledPaneLaunch()
-
-		_, cwdFallback, err := e.resolveWorkingDir(pane)
-		if err != nil {
-			return result, err
-		}
-
-		result.cwdFallback = cwdFallback
-		if !e.cfg.LaunchProcesses && (launch.Recovery == model.RecoveryRestart || launch.Recovery == model.RecoveryResume) {
-			result.reason = PaneReasonProcessLaunchDisabled
-		}
-
-		return result, nil
+		return e.unlaunchedPane(pane)
 	}
 
 	if !executableAvailable(string(launch.Executable)) {
@@ -1596,6 +1618,14 @@ func (e *Executor) preparePaneLaunch(pane model.Pane, ownerSessionID string) (pa
 	directory, cwdFallback, err := e.resolveLaunchWorkingDir(pane)
 	if err != nil {
 		return disabledPaneLaunch(), err
+	}
+
+	if cwdFallback && e.cfg.MissingWorkingDir == MissingWorkingDirShell {
+		result := disabledPaneLaunch()
+		result.cwdFallback = true
+		result.reason = PaneReasonWorkingDirFallback
+
+		return result, nil
 	}
 
 	environment, removed := launchEnvironment(e.effectivePaneLaunchEnvironment(pane, ownerSessionID))
@@ -1781,8 +1811,12 @@ func respawnPane(ctx context.Context, pane gotmux.Pane, launch paneLaunch) error
 	return nil
 }
 
-func (e *Executor) runnableLaunchOutcome(recovery model.Recovery, enabled bool) string {
-	if !enabled {
+func (e *Executor) runnableLaunchOutcome(recovery model.Recovery, launch paneLaunch) string {
+	if !launch.enabled && launch.cwdFallback {
+		return PaneOutcomeAllowedCWDFallback
+	}
+
+	if !launch.enabled {
 		return PaneOutcomeMissingExecutable
 	}
 
@@ -1816,7 +1850,7 @@ func (e *Executor) paneLaunchOutcome(pane model.Pane, launch paneLaunch) string 
 
 		return PaneOutcomeUnsupported
 	case model.RecoveryRestart, model.RecoveryResume:
-		return e.runnableLaunchOutcome(pane.Launch.Recovery, launch.enabled)
+		return e.runnableLaunchOutcome(pane.Launch.Recovery, launch)
 	default:
 		if launch.cwdFallback {
 			return PaneOutcomeAllowedCWDFallback
