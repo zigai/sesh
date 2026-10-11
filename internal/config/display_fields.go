@@ -139,12 +139,17 @@ func parseFieldArgs(value any) ([]string, error) {
 func (d DisplayConfig) UsedFieldNames() []string {
 	var names []string
 
-	for kind, format := range map[display.FormatKind]string{
-		display.FormatKindSession:       d.SeshFormat,
-		display.FormatKindAgentsSession: d.AgentsSessionFormat,
-		display.FormatKindAgentsAgent:   d.AgentsAgentFormat,
+	for _, format := range []struct {
+		kind   display.FormatKind
+		format string
+	}{
+		{display.FormatKindSession, d.SeshFormat},
+		{display.FormatKindAgentsSession, d.AgentsSessionFormat},
+		{display.FormatKindAgentsAgent, d.AgentsAgentFormat},
+		{display.FormatKindAgentsSession, d.WorkSectionFormat},
+		{display.FormatKindAgentsAgent, d.WorkTaskFormat},
 	} {
-		template, err := display.Compile(kind, format)
+		template, err := display.Compile(format.kind, format.format)
 		if err != nil {
 			continue
 		}

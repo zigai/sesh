@@ -7,14 +7,18 @@ var PickPopup = define(Descriptor{
 	Help:        "Open the session picker in a tmux popup sized for the invoking client, then act on the choice made in it.",
 	Subject:     SubjectNone,
 	Arity:       ArityOne,
-	Params:      nil,
+	Params:      []Param{newParam("mode", ParamChoice, "Display mode to open the picker in").withChoices("sesh", "agents", "work")},
 	NeedsClient: true,
 	Interactive: true,
 	Destructive: false,
 	Remote:      RemoteNever,
 	check:       nil,
-}, func(Subject, Values) (OpenPicker, error) { return OpenPicker{}, nil }, func(ClosedPicker) string { return "" })
+}, func(_ Subject, values Values) (OpenPicker, error) {
+	return OpenPicker{Mode: values.String("mode")}, nil
+}, func(ClosedPicker) string { return "" })
 
-type OpenPicker struct{}
+type OpenPicker struct {
+	Mode string `json:"mode"`
+}
 
 type ClosedPicker struct{}

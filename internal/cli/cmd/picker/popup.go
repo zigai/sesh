@@ -49,7 +49,12 @@ func (frontend popupFrontend) Dispatch(ctx context.Context, invocation action.In
 		return nil, err
 	}
 
-	if err := openPickerPopup(ctx, frontend.cmd, runtime, invocation.Caller, launchedAt); err != nil {
+	open, _ := invocation.Input.(action.OpenPicker)
+	if open.Mode != "" {
+		runtime.state.PopupDisplayMode = open.Mode
+	}
+
+	if err := openPickerPopup(ctx, frontend.cmd, runtime, invocation.Caller, open.Mode, launchedAt); err != nil {
 		return nil, err
 	}
 

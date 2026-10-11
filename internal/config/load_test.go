@@ -70,6 +70,43 @@ func TestConfigPrecedenceAcrossUserEnvironmentAndExplicitPathIgnoresWorkingDirec
 	check("30s", config.WithoutConfig())
 }
 
+func TestLoadedConfigPreservesItsSourceAcrossDirectoryChangesAndCloning(t *testing.T) {
+	root := t.TempDir()
+
+	path := filepath.Join(root, "selected.toml")
+	if err := os.WriteFile(path, []byte("[tasks]\npopup_socket = 'selected'\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Chdir(root)
+	t.Setenv("SESH_CONFIG", path)
+
+	input := "[tasks]\npopup_socket = 'stdin'\n"
+
+	for _, test := range []struct {
+		options []config.LoadOption
+		source  config.Source
+	}{
+		{[]config.LoadOption{config.WithExplicitPath("selected.toml")}, config.Source{Path: path}},
+		{nil, config.Source{Path: path}},
+		{[]config.LoadOption{config.WithoutConfig()}, config.Source{WithoutConfig: true}},
+		{[]config.LoadOption{config.WithExplicitPath("-"), config.WithInput(strings.NewReader(input))}, config.Source{Path: "-", Input: input}},
+	} {
+		cfg, err := config.Load(test.options...)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		t.Chdir(t.TempDir())
+
+		if source := cfg.Clone().Source(); source != test.source {
+			t.Fatalf("cloned config source = %+v, want %+v", source, test.source)
+		}
+
+		t.Chdir(root)
+	}
+}
+
 func TestLoadDecodesDisplayFieldCommands(t *testing.T) {
 	configHome := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", configHome)

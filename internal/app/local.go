@@ -36,6 +36,8 @@ type LocalOptions struct {
 	Streams            gotmux.Streams
 	Source             string
 	DeferSwitchHistory bool
+	TaskLedger         string
+	WorktreeDir        string
 }
 
 // Local runs actions against this machine's tmux server and snapshot repository.
@@ -46,6 +48,8 @@ type Local struct {
 	leaseRoot   string
 	historyPath string
 	agentSource agents.SnapshotSource
+	taskLedger  string
+	worktreeDir string
 	workflow    *session.Workflow
 	attachRepo  sync.Once
 	handlers    map[action.ID]handler
@@ -76,6 +80,8 @@ func NewLocal(opts LocalOptions) *Local {
 		leaseRoot:   opts.LeaseRoot,
 		historyPath: opts.HistoryPath,
 		agentSource: opts.AgentSource,
+		taskLedger:  opts.TaskLedger,
+		worktreeDir: opts.WorktreeDir,
 		workflow: session.NewWorkflowWithOptions(session.WorkflowOptions{
 			Server:             opts.Server,
 			Repository:         nil,
@@ -95,6 +101,8 @@ func NewLocal(opts LocalOptions) *Local {
 	local.registerSessionHandlers()
 	local.registerSnapshotHandlers()
 	local.registerAgentHandlers()
+	local.registerTaskHandlers()
+	local.registerProjectHandlers()
 
 	for _, entry := range action.All() {
 		descriptor := entry.Describe()

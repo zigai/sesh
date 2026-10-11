@@ -34,6 +34,7 @@ func TestConcurrentActionsShareTheRepository(t *testing.T) {
 	local := NewLocal(LocalOptions{
 		Config: nil, Server: nil, Repository: repository, LeaseRoot: "", HistoryPath: "",
 		AgentSource: nil, Streams: gotmux.Streams{In: nil, Out: nil, Err: nil}, Source: "test", DeferSwitchHistory: false,
+		TaskLedger: "", WorktreeDir: "",
 	})
 
 	var group sync.WaitGroup

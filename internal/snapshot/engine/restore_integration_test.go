@@ -5,6 +5,7 @@ package engine_test
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -355,4 +356,175 @@ func assertLocalOption(t *testing.T, ctx context.Context, scope optionReader, na
 	if got, ok := value.Local.Get(); !ok || got != want {
 		t.Fatalf("%s = %q (set %v), want %q", name, got, ok, want)
 	}
+}
+
+// recordingOverrides replaces every pane's launch with a script that leaves a marker, and records
+// which panes each commit received and whether any marker existed at that point.
+type recordingOverrides struct {
+	script    string
+	marker    string
+	committed []string
+	launched  bool
+	unchanged bool
+}
+
+func TestEngineRestoreCommitsPlannedPanesWithoutLaunchOverrides(t *testing.T) {
+	server := tmuxtest.NewServer(t)
+	dir := t.TempDir()
+	repo := openFixture(t, t.Context(), filepath.Join(dir, "repo"))
+	leaseRoot := filepath.Join(dir, "leases")
+	restored := startSleepingSession(t, t.Context(), server, "state-restored")
+	kept := startSleepingSession(t, t.Context(), server, "state-kept")
+
+	saved, err := engine.SaveObservation(t.Context(), repo, server, []gotmux.SessionID{restored.ID(), kept.ID()}, engine.SaveConfig{
+		LeaseRoot: leaseRoot, ProcessEnrichment: true, Profile: engine.RecoveryPractical,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := restored.Kill(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	overrides := &recordingOverrides{unchanged: true}
+
+	result, err := engine.Restore(t.Context(), repo, server, engine.RestoreConfig{
+		LeaseRoot: leaseRoot, Generation: saved.Generation, LaunchProcesses: true,
+		Profile: engine.RecoveryPractical, Launches: overrides,
+	})
+	if err != nil || !result.Verified {
+		t.Fatalf("Restore() = %+v, %v; want a verified restore", result, err)
+	}
+
+	if len(result.SessionsSkipped) != 1 || len(result.Panes) != 1 {
+		t.Fatalf("restore result = %+v, want one session skipped and one pane restored", result)
+	}
+
+	if !slices.Equal(overrides.committed, []string{result.Panes[0].PaneID}) {
+		t.Fatalf("committed panes = %v, want only restored pane %s", overrides.committed, result.Panes[0].PaneID)
+	}
+}
+
+func TestEngineRestoreLaunchesOverriddenPanesAndCommitsOnlyPlannedOnesFirst(t *testing.T) {
+	server := tmuxtest.NewServer(t)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+
+	dir := t.TempDir()
+	repo := openFixture(t, ctx, filepath.Join(dir, "repo"))
+	leaseRoot := filepath.Join(dir, "leases")
+
+	restored := startSleepingSession(t, ctx, server, "override-restored")
+	kept := startSleepingSession(t, ctx, server, "override-kept")
+
+	saved, err := engine.SaveObservation(ctx, repo, server, []gotmux.SessionID{restored.ID(), kept.ID()}, engine.SaveConfig{
+		LeaseRoot: leaseRoot, ProcessEnrichment: true, Profile: engine.RecoveryPractical,
+	})
+	if err != nil {
+		t.Fatalf("SaveObservation failed: %v", err)
+	}
+
+	if err := restored.Kill(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	overrides := &recordingOverrides{script: writeMarkerScript(t, dir), marker: filepath.Join(dir, "marker")}
+
+	result, err := engine.Restore(ctx, repo, server, engine.RestoreConfig{
+		LeaseRoot: leaseRoot, Generation: saved.Generation, LaunchProcesses: true,
+		Profile: engine.RecoveryPractical, Launches: overrides,
+	})
+	if err != nil || !result.Verified {
+		t.Fatalf("Restore() = %+v, %v; want a verified restore", result, err)
+	}
+
+	if len(result.SessionsSkipped) != 1 || len(result.Panes) != 1 {
+		t.Fatalf("restore result = %+v, want the live session skipped and one pane restored", result)
+	}
+
+	if !slices.Equal(overrides.committed, []string{result.Panes[0].PaneID}) {
+		t.Fatalf("committed panes = %v, want only the restored pane %s", overrides.committed, result.Panes[0].PaneID)
+	}
+
+	if overrides.launched {
+		t.Fatal("overrides committed after a pane was launched")
+	}
+
+	waitForMarker(t, overrides.marker)
+}
+
+func (o *recordingOverrides) Override(_ context.Context, manifest model.Manifest) (map[string]model.Launch, error) {
+	launches := make(map[string]model.Launch, len(manifest.Panes))
+	if o.unchanged {
+		return launches, nil
+	}
+
+	for _, pane := range manifest.Panes {
+		launches[pane.ID] = model.Launch{
+			Executable:  model.Bytes(o.script),
+			Arguments:   []model.Bytes{model.Bytes("marker"), model.Bytes(o.marker)},
+			Directory:   pane.Directory,
+			Environment: nil,
+			Birth:       nil,
+			Recovery:    model.RecoveryRestart,
+			Reason:      "",
+		}
+	}
+
+	return launches, nil
+}
+
+func (o *recordingOverrides) Commit(_ context.Context, panes []string) error {
+	o.committed = append(o.committed, panes...)
+	_, err := os.Stat(o.marker)
+	o.launched = err == nil
+
+	return nil
+}
+
+func startSleepingSession(t *testing.T, ctx context.Context, server *gotmux.Server, name string) gotmux.Session {
+	t.Helper()
+
+	session, err := server.NewSession(ctx, gotmux.NewSessionOptions{
+		Name: name, Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly,
+	})
+	if err != nil {
+		t.Fatalf("NewSession failed: %v", err)
+	}
+
+	disableWindowRename(t, ctx, session)
+
+	return session
+}
+
+func writeMarkerScript(t *testing.T, dir string) string {
+	t.Helper()
+
+	script := filepath.Join(dir, "marker.sh")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\necho launched > \"$1\"\nexec sleep 300\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.Chmod(script, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	return script
+}
+
+func waitForMarker(t *testing.T, path string) {
+	t.Helper()
+
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if data, err := os.ReadFile(path); err == nil && len(data) > 0 {
+			return
+		}
+
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	t.Fatal("overridden launch did not run")
 }

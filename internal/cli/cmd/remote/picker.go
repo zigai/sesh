@@ -44,6 +44,7 @@ type attachExec struct {
 	command *exec.Cmd
 	bridge  *remote.BridgeServer
 	finish  func(remote.OriginSession) error
+	mark    func() (func() error, error)
 }
 
 type originPickerAdapter struct{ socket string }
@@ -122,6 +123,7 @@ func pickerCatalog(catalog remote.Catalog) tui.RemoteCatalog {
 			LastError: state.LastError, LastErrorAt: state.LastErrorAt,
 			HealthTmux: string(state.Snapshot.Health.Tmux.Status), HealthAgents: string(state.Snapshot.Health.Agents.Status),
 			HealthSnapshots: string(state.Snapshot.Health.Snapshots.Status), Sessions: remote.CatalogSessions(state),
+			Tasks: remote.CatalogTasks(state),
 		})
 	}
 
@@ -180,14 +182,53 @@ func (command *attachExec) Run() error {
 		return remote.ErrIncompleteDependencies
 	}
 
+	unmark, err := command.mark()
+	if err != nil {
+		return errors.Join(err, command.bridge.Close())
+	}
+
 	runErr := command.command.Run()
+	unmarkErr := unmark()
+
 	if target, requested := command.bridge.SwitchTarget(); requested && runErr == nil && command.finish != nil {
 		runErr = command.finish(target)
 	}
 
 	closeErr := command.bridge.Close()
 
-	return errors.Join(runErr, closeErr)
+	return errors.Join(runErr, unmarkErr, closeErr)
+}
+
+// markAttachmentPane tags the local tmux pane the attachment runs in, when it runs in one, until
+// the returned function clears the tag, so sesh keys pressed there go on to the remote tmux.
+func markAttachmentPane(ctx context.Context, socket string) (func() error, error) {
+	paneID := os.Getenv("TMUX_PANE")
+	if paneID == "" || os.Getenv("TMUX") == "" {
+		return func() error { return nil }, nil
+	}
+
+	server, err := tmuxserver.Open(socket)
+	if err != nil {
+		return nil, cliError("open_attachment_pane_endpoint", err)
+	}
+
+	pane, err := server.Pane(ctx, gotmux.PaneID(paneID))
+	if err != nil {
+		return nil, cliError("find_attachment_pane", err)
+	}
+
+	if err := pane.Options().SetUser(ctx, remote.AttachmentPaneOption, "1"); err != nil {
+		return nil, cliError("mark_attachment_pane", err)
+	}
+
+	return func() error {
+		err := pane.Options().UnsetUser(context.WithoutCancel(ctx), remote.AttachmentPaneOption)
+		if errors.Is(err, gotmux.ErrNotFound) || errors.Is(err, gotmux.ErrNoServer) {
+			return nil
+		}
+
+		return cliError("clear_attachment_pane", err)
+	}, nil
 }
 
 func prepareRemoteAttachExec(
@@ -267,7 +308,9 @@ func prepareRemoteAttachExec(
 		}
 	}
 
-	return &attachExec{command: attach, bridge: bridge, finish: finish}, nil
+	mark := func() (func() error, error) { return markAttachmentPane(ctx, originSocket) }
+
+	return &attachExec{command: attach, bridge: bridge, finish: finish, mark: mark}, nil
 }
 
 func originReturnAction(ctx context.Context, socket string) (func(remote.OriginSession) error, error) {
@@ -521,7 +564,8 @@ func originSessions(ctx context.Context, socket string) ([]remote.OriginSession,
 				active++
 			case session.AgentStatusWaiting:
 				waiting++
-			case session.AgentStatusIdle, session.AgentStatusFailed, session.AgentStatusInterrupted, session.AgentStatusUnknown:
+			case session.AgentStatusIdle, session.AgentStatusFailed, session.AgentStatusInterrupted, session.AgentStatusUnknown,
+				session.AgentStatusSleeping, session.AgentStatusDone:
 			}
 		}
 
@@ -644,8 +688,14 @@ func runRemoteAttachSession(
 		return cliError("build_remote_attach", err)
 	}
 
-	if err := attach.Run(); err != nil {
-		return cliError("run_remote_attach", err)
+	unmark, err := markAttachmentPane(clibase.CommandContext(cmd), originSocket)
+	if err != nil {
+		return err
+	}
+
+	runErr := attach.Run()
+	if err := errors.Join(cliError("run_remote_attach", runErr), unmark()); err != nil {
+		return err
 	}
 
 	requested, ok := bridge.SwitchTarget()

@@ -13,7 +13,7 @@ import (
 
 func (m *Model) publishAHTCells(now time.Time) {
 	definition, _ := providers.DefinitionFor(providers.AHT)
-	if !m.sessionFormats.agentsAgent.UsesAny(definition.Fields...) {
+	if !m.sessionFormats.agentRowsUseAny(definition.Fields...) {
 		return
 	}
 

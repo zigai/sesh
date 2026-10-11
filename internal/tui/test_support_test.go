@@ -497,6 +497,7 @@ func defaultTestServices(adapter *testServiceAdapter) Services {
 		Panes:            adapter,
 		TerminalAttach:   adapter,
 		Agents:           adapter,
+		Tasks:            nil,
 		AgentWatcher:     nil,
 		Remote:           adapter,
 		RemoteWatcher:    nil,

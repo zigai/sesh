@@ -3,6 +3,7 @@ package action
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 
@@ -69,6 +70,8 @@ func Bindings(cfg *config.Config) ([]Binding, error) {
 		}
 	}
 
+	bindings = append(bindings, taskActionBindings(cfg, bindings)...)
+
 	if err := checkPickerKeys(cfg.Keys, bindings); err != nil {
 		return nil, err
 	}
@@ -96,11 +99,48 @@ func defaultBindings() []Binding {
 		picker("alt+x", SessionKill),
 		picker(config.PickerKeyName("alt+shift+x"), SessionDelete),
 		picker("alt+s", SnapshotSave),
+		picker("alt+z", TaskSleep),
+		picker(config.PickerKeyName("alt+shift+z"), TaskWake),
+		picker("alt+f", TaskFinish),
 		tmux("S-F12", AgentNext, Values{}),
 		tmux("M-S-F12", AgentNext, Values{"local": {"true"}}),
 		tmux("S-F1", AgentBack, Values{}),
 		tmux("C-o", PickPopup, Values{}),
+		tmux("M-w", PickPopup, Values{"mode": {"work"}}),
+		tmux("C-t", TaskMenu, Values{}),
+		tmux("M-n", ProjectPick, Values{}),
 	}
+}
+
+// taskActionBindings binds the picker keys of configured task actions to task.run. A key that an
+// action binding already uses stays with that action.
+func taskActionBindings(cfg *config.Config, existing []Binding) []Binding {
+	keys := make(map[string]string)
+
+	for name, configured := range cfg.TaskActions {
+		if configured.Key != "" {
+			keys[config.PickerKeyName(configured.Key)] = name
+		}
+	}
+
+	for _, project := range cfg.Projects.Overrides {
+		for name, configured := range project.TaskActions {
+			if configured.Key != "" {
+				keys[config.PickerKeyName(configured.Key)] = name
+			}
+		}
+	}
+
+	bindings := make([]Binding, 0, len(keys))
+
+	for _, key := range slices.Sorted(maps.Keys(keys)) {
+		binding := Binding{Key: key, Action: TaskRun.ID, In: SurfacePicker, Table: "", Values: Values{"action": {keys[key]}}}
+		if !slices.ContainsFunc(existing, binding.sameKey) {
+			bindings = append(bindings, binding)
+		}
+	}
+
+	return bindings
 }
 
 func (binding Binding) sameKey(other Binding) bool {

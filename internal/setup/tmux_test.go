@@ -51,7 +51,7 @@ func TestBindingsPassTheCurrentSessionOrPaneAsTheSubject(t *testing.T) {
 	}
 
 	for index, binding := range rendered {
-		words := shellWords(t, binding.Program[2])
+		words := shellWords(t, binding.Command)
 		if strings.Join(words[:min(len(words), len(want[index]))], " ") != strings.Join(want[index], " ") {
 			t.Fatalf("%s runs %q, want it to start with %q", binding.Action, words, want[index])
 		}
@@ -70,7 +70,7 @@ func TestBindingsQuoteParamsForTheShell(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	words := shellWords(t, rendered[0].Program[2])
+	words := shellWords(t, rendered[0].Command)
 	if len(words) != 6 || words[3] != name || words[4] != "--dir" || words[5] != "/srv/a b" {
 		t.Fatalf("shell words = %q, want the name and directory verbatim", words)
 	}
@@ -111,7 +111,7 @@ func TestRenderBlockBindsEachKeyInItsTable(t *testing.T) {
 	}
 
 	for index, binding := range rendered {
-		if !strings.HasPrefix(lines[index+1], "bind-key -T "+binding.Table+" "+binding.Key+" run-shell -b ") {
+		if !strings.HasPrefix(lines[index+1], "bind-key -T "+binding.Table+" "+binding.Key+" ") {
 			t.Fatalf("line %q, want %s bound in table %s", lines[index+1], binding.Key, binding.Table)
 		}
 	}
@@ -120,7 +120,7 @@ func TestRenderBlockBindsEachKeyInItsTable(t *testing.T) {
 func TestBindingTextQuotesShellMetacharacters(t *testing.T) {
 	t.Parallel()
 
-	binding := setup.Binding{Key: "F1", Table: "root", Action: "", Purpose: "test", Program: []string{"run-shell", "-b", `echo "$HOME"`}}
+	binding := setup.Binding{Key: "F1", Table: "root", Action: "", Purpose: "test", Command: "", Program: []string{"run-shell", "-b", `echo "$HOME"`}}
 
 	if text := binding.Text(); !strings.Contains(text, `"echo \"\$HOME\""`) {
 		t.Fatalf("text = %q, want an escaped quoted argument", text)

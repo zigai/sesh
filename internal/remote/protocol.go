@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	ProtocolVersion    = 2
+	ProtocolVersion    = 3
 	MaxFrameBytes      = 1 << 20
 	MaxSessions        = 4096
 	MaxAgents          = 16384
@@ -87,6 +87,7 @@ type Hello struct {
 type Snapshot struct {
 	GeneratedAt time.Time         `json:"generatedAt"`
 	Sessions    []session.Session `json:"sessions"`
+	Tasks       []TaskRow         `json:"tasks"`
 	Actions     []action.ID       `json:"actions"`
 	Health      SourceHealth      `json:"health"`
 }
@@ -318,7 +319,7 @@ func validSnapshotFrame(frame Frame) bool {
 		}
 	}
 
-	return validActionIDs(frame.Snapshot.Actions) && ValidSourceHealth(frame.Snapshot.Health)
+	return validTaskRows(frame.Snapshot.Tasks) && validActionIDs(frame.Snapshot.Actions) && ValidSourceHealth(frame.Snapshot.Health)
 }
 
 func validActionIDs(ids []action.ID) bool {
@@ -426,10 +427,16 @@ func validRemoteAgent(agent session.AgentSession) bool {
 		}
 	}
 
-	switch agent.Status {
+	return validRemoteAgentStatus(agent.Status)
+}
+
+func validRemoteAgentStatus(status session.AgentStatus) bool {
+	switch status {
 	case "", session.AgentStatusRunning, session.AgentStatusWaiting, session.AgentStatusFailed,
 		session.AgentStatusInterrupted, session.AgentStatusIdle, session.AgentStatusUnknown:
 		return true
+	case session.AgentStatusSleeping, session.AgentStatusDone:
+		return false
 	default:
 		return false
 	}

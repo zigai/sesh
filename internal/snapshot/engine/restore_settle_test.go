@@ -69,7 +69,7 @@ func (f settleFixture) register(t *testing.T, pid int, birth string) string {
 		Birth: birth,
 	}
 
-	target, err := restoreTarget(endpoint, daemon, RestoreConfig{})
+	target, err := restoreTarget(endpoint, daemon, RestoreConfig{}, "")
 	if err != nil {
 		t.Fatalf("encode restore target: %v", err)
 	}

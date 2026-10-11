@@ -915,3 +915,144 @@ func TestFilterProcessEnvironmentKeys(t *testing.T) {
 		t.Fatal("FilterProcessEnvironmentKeys(all excluded) != nil")
 	}
 }
+
+func TestLoadReadsProjectsAndTasks(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.toml")
+
+	content := `[projects]
+roots = ["~/code", "/srv/repos"]
+extra = ["~/notes"]
+
+[tasks]
+editor = ["hx"]
+popup_socket = "popup"
+popup_config = "~/.config/tmux/popup.conf"
+
+[[tasks.harness]]
+name = "codex"
+command = ["codex", "--yolo"]
+
+[[tasks.harness]]
+name = "claude"
+command = ["claude"]
+`
+	if err := os.WriteFile(configPath, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(config.WithExplicitPath(configPath))
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if !slices.Equal(cfg.Projects.Roots, []string{"~/code", "/srv/repos"}) || !slices.Equal(cfg.Projects.Extra, []string{"~/notes"}) {
+		t.Errorf("Projects = %+v", cfg.Projects)
+	}
+
+	if !slices.Equal(cfg.Tasks.Editor, []string{"hx"}) || cfg.Tasks.PopupSocket != "popup" || cfg.Tasks.PopupConfig != "~/.config/tmux/popup.conf" {
+		t.Errorf("Tasks = %+v", cfg.Tasks)
+	}
+
+	if len(cfg.Tasks.Harness) != 2 || cfg.Tasks.Harness[0].Name != "codex" || !slices.Equal(cfg.Tasks.Harness[0].Command, []string{"codex", "--yolo"}) {
+		t.Errorf("Tasks.Harness = %+v, want codex first with its arguments", cfg.Tasks.Harness)
+	}
+}
+
+func TestLoadAcceptsSupportedHarnessesByNameAlone(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.toml")
+
+	content := "[[tasks.harness]]\nname = \"pi\"\n\n[[tasks.harness]]\nname = \"claude\"\n"
+	if err := os.WriteFile(configPath, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(config.WithExplicitPath(configPath))
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if len(cfg.Tasks.Harness) != 2 || cfg.Tasks.Harness[0].Name != "pi" || len(cfg.Tasks.Harness[0].Command) != 0 {
+		t.Fatalf("Tasks.Harness = %+v, want pi then claude without commands", cfg.Tasks.Harness)
+	}
+}
+
+func TestLoadRejectsInvalidProjectsAndTasks(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+	}{
+		{name: "relative root", content: "[projects]\nroots = [\"Projects\"]"},
+		{name: "relative extra folder", content: "[projects]\nextra = [\"notes\"]"},
+		{name: "empty editor", content: "[tasks]\neditor = []"},
+		{name: "socket path", content: "[tasks]\npopup_socket = \"/tmp/popup\""},
+		{name: "relative popup config", content: "[tasks]\npopup_config = \"popup.conf\""},
+		{name: "reserved harness name", content: "[[tasks.harness]]\nname = \"tab\"\ncommand = [\"bash\"]"},
+		{name: "unknown harness without command", content: "[[tasks.harness]]\nname = \"myagent\"\ncommand = []"},
+		{name: "harness with empty program", content: "[[tasks.harness]]\nname = \"claude\"\ncommand = [\" \"]"},
+		{name: "harness name with spaces", content: "[[tasks.harness]]\nname = \"my agent\"\ncommand = [\"agent\"]"},
+		{
+			name:    "duplicate harness",
+			content: "[[tasks.harness]]\nname = \"pi\"\ncommand = [\"pi\"]\n[[tasks.harness]]\nname = \"pi\"\ncommand = [\"pi\", \"--fast\"]",
+		},
+		{name: "wake on restore word", content: "[tasks]\nwake_on_restore = \"all\""},
+		{name: "wake on restore zero", content: "[tasks]\nwake_on_restore = \"0\""},
+		{name: "task action without run", content: "[task_actions.ship]\nprompt = \"ship it\""},
+		{name: "task action unknown variable", content: "[task_actions.ship]\nrun = [\"claude\", \"-p\"]\nprompt = \"ship {repo}\""},
+		{name: "task action prompt and file", content: "[task_actions.ship]\nrun = [\"claude\"]\nprompt = \"a\"\nprompt_file = \"b.md\""},
+		{name: "project override of a missing action", content: "[projects.overrides.shop.task_actions.ship]\nprompt = \"ship\""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			configPath := filepath.Join(t.TempDir(), "config.toml")
+			if err := os.WriteFile(configPath, []byte(tt.content), 0o600); err != nil {
+				t.Fatal(err)
+			}
+
+			if _, err := config.Load(config.WithExplicitPath(configPath)); err == nil {
+				t.Fatal("Load() error = nil, want rejection")
+			}
+		})
+	}
+}
+
+func TestTaskActionsForAppliesProjectOverridesFieldByField(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.toml")
+
+	content := `[task_actions.ship]
+key = "alt+p"
+run = ["claude", "-p"]
+prompt = "ship {branch}"
+link_pr = true
+
+[task_actions.review]
+run = ["codex", "exec"]
+
+[projects.overrides.shop.task_actions.ship]
+prompt_file = ".agents/ship.md"
+link_pr = false
+`
+	if err := os.WriteFile(configPath, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(config.WithExplicitPath(configPath))
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	shop := cfg.TaskActionsFor("shop")["ship"]
+	if shop.Key != "alt+p" || !slices.Equal(shop.Run, []string{"claude", "-p"}) || shop.Prompt != "" ||
+		shop.PromptFile != ".agents/ship.md" || shop.LinksPR() {
+		t.Errorf("shop ship = %+v, want the global action with the override's prompt file and no PR link", shop)
+	}
+
+	other := cfg.TaskActionsFor("other")["ship"]
+	if other.Prompt != "ship {branch}" || other.PromptFile != "" || !other.LinksPR() {
+		t.Errorf("other ship = %+v, want the global action", other)
+	}
+
+	if _, found := cfg.TaskActionsFor("shop")["review"]; !found {
+		t.Error("shop lost the review action it does not override")
+	}
+}

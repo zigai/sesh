@@ -30,7 +30,7 @@ func (m *Model) handleNavigationKeys(msg tea.KeyPressMsg) func() (tea.Model, tea
 }
 
 func (m *Model) handleAgentGroupNavigation(pressed keyPressSpec, keys actionKeyMap) bool {
-	if m.displayMode != displayModeAgents {
+	if !m.displayMode.tree() {
 		return false
 	}
 
@@ -160,11 +160,15 @@ func (m *Model) moveSelectionByPage(direction int) {
 }
 
 func (m *Model) moveAgentGroup(direction int) {
-	if m.displayMode != displayModeAgents || len(m.filtered) == 0 || direction == 0 {
+	if !m.displayMode.tree() || len(m.filtered) == 0 || direction == 0 {
 		return
 	}
 
 	m.cursor = (m.cursor + direction + len(m.filtered)) % len(m.filtered)
 	m.listViewportPolicy = listViewportFollowSelection
+
 	m.agentCursor = parentAgentIndex
+	if m.displayMode == displayModeWork {
+		m.agentCursor = 0
+	}
 }

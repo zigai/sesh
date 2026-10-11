@@ -20,7 +20,7 @@ var errUnresolvableSubject = errors.New("action subject cannot be selected by na
 // the command line: sessions by name or ID, or an agent pane by pane ID. Saved sessions come
 // from generation, or the current one when empty.
 func (local *Local) ResolveSubject(ctx context.Context, kind action.SubjectKind, generation string, selectors []string) (action.Subject, error) {
-	subject := action.Subject{At: action.Local(), Sessions: nil, Pane: ""}
+	subject := action.Subject{At: action.Local(), Sessions: nil, Pane: "", Task: ""}
 
 	switch kind {
 	case action.SubjectNone:
@@ -38,6 +38,15 @@ func (local *Local) ResolveSubject(ctx context.Context, kind action.SubjectKind,
 		subject.Sessions, subject.Pane = []session.Session{owner}, selectors[0]
 
 		return subject, nil
+	case action.SubjectTask:
+		if len(selectors) != 1 {
+			return subject, action.Wrap(action.CodeInvalidArgument, action.ErrSubjectMismatch)
+		}
+
+		task, err := local.selectTask(ctx, selectors[0])
+		subject.Task = task
+
+		return subject, err
 	case action.SubjectLiveSession, action.SubjectSavedSession, action.SubjectSession:
 	}
 
@@ -88,7 +97,7 @@ func (local *Local) resolveSession(ctx context.Context, kind action.SubjectKind,
 		}
 
 		return local.resolveSaved(ctx, generation, selector)
-	case action.SubjectNone, action.SubjectAgentPane:
+	case action.SubjectNone, action.SubjectAgentPane, action.SubjectTask:
 		return session.Session{}, action.Wrap(action.CodeInvalidArgument, errUnresolvableSubject)
 	default:
 		return session.Session{}, action.Wrap(action.CodeInvalidArgument, errUnresolvableSubject)

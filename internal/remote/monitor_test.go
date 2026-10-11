@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -496,7 +497,7 @@ func TestStreamSupervisorLimitsConcurrentConnects(t *testing.T) {
 func monitorScript(t *testing.T, markerPath string, frames ...Frame) string {
 	t.Helper()
 
-	health := `{"version":2,"type":"health","peerId":"peer","streamInstance":"stream","sequence":%d,` +
+	health := `{"version":` + strconv.Itoa(ProtocolVersion) + `,"type":"health","peerId":"peer","streamInstance":"stream","sequence":%d,` +
 		`"health":{"observedAt":"1970-01-01T00:00:01Z","sources":{` +
 		`"tmux":{"status":"ok","reason":"none","checkedAt":"1970-01-01T00:00:00Z"},` +
 		`"agents":{"status":"ok","reason":"none","checkedAt":"1970-01-01T00:00:00Z"},` +

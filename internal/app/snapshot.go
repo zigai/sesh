@@ -152,17 +152,17 @@ func (local *Local) restoreSnapshot(ctx context.Context, _ action.Caller, input 
 		return restoredSnapshot(result, nil), action.Wrap(action.CodeNotFound, ErrRepositoryMissing)
 	}
 
-	generation := input.Generation
-	if generation == "" {
-		current, _, readErr := repo.ReadPracticalCurrent(ctx)
-		if readErr != nil {
-			return restoredSnapshot(result, nil), oops.In("app").With("operation", "read_current_generation").Wrap(readErr)
-		}
-
-		generation = current.ID
+	generation, err := restoreGeneration(ctx, repo, input.Generation)
+	if err != nil {
+		return restoredSnapshot(result, nil), err
 	}
 
 	if err := local.ensureLeaseRoot(); err != nil {
+		return restoredSnapshot(result, nil), err
+	}
+
+	launches, err := TaskRestoreLaunches(local.taskLedger, local.cfg.Tasks)
+	if err != nil {
 		return restoredSnapshot(result, nil), err
 	}
 
@@ -175,6 +175,7 @@ func (local *Local) restoreSnapshot(ctx context.Context, _ action.Caller, input 
 		MissingWorkingDir: missingWorkingDir(input.AllowMissingDir),
 		OnCollision:       engine.CollisionPolicy(input.OnCollision),
 		Profile:           engine.RecoveryPractical,
+		Launches:          launches,
 	})
 
 	output := restoredSnapshot(result, readManifest(ctx, repo, generation))
@@ -190,6 +191,21 @@ func (local *Local) restoreSnapshot(ctx context.Context, _ action.Caller, input 
 	default:
 		return output, nil
 	}
+}
+
+// restoreGeneration is the generation a restore uses: the requested one, else the current
+// practical generation.
+func restoreGeneration(ctx context.Context, repo *store.Repository, requested string) (string, error) {
+	if requested != "" {
+		return requested, nil
+	}
+
+	current, _, err := repo.ReadPracticalCurrent(ctx)
+	if err != nil {
+		return "", oops.In("app").With("operation", "read_current_generation").Wrap(err)
+	}
+
+	return current.ID, nil
 }
 
 // readManifest reads the restored generation to name its sessions and panes. The names only

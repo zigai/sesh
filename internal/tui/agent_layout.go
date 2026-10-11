@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -232,6 +233,12 @@ func agentReportedCell(values sessionFormatValues, part display.Part, cell rowla
 		}
 	}
 
+	if part.Field == display.FieldAgentPR && cell.State != rowlayout.Present {
+		if number := values.model.recordedTaskPR(values.row, values.agent.PaneID); number != 0 {
+			cell.Text, cell.State = "#"+strconv.Itoa(number), rowlayout.Present
+		}
+	}
+
 	return cell
 }
 
@@ -272,7 +279,7 @@ func agentProviderID(field string) providers.ID {
 
 func (m *Model) publishClockCells(now time.Time) {
 	definition, _ := providers.DefinitionFor(providers.Clock)
-	if !m.sessionFormats.agentsAgent.UsesAny(definition.Fields...) {
+	if !m.sessionFormats.agentRowsUseAny(definition.Fields...) {
 		return
 	}
 

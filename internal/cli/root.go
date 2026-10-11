@@ -24,10 +24,12 @@ import (
 	cmddoctor "github.com/zigai/sesh/internal/cli/cmd/doctor"
 	cmdlogs "github.com/zigai/sesh/internal/cli/cmd/logs"
 	cmdpicker "github.com/zigai/sesh/internal/cli/cmd/picker"
+	cmdproject "github.com/zigai/sesh/internal/cli/cmd/project"
 	cmdremote "github.com/zigai/sesh/internal/cli/cmd/remote"
 	cmdsession "github.com/zigai/sesh/internal/cli/cmd/session"
 	cmdsetup "github.com/zigai/sesh/internal/cli/cmd/setup"
 	cmdsnapshot "github.com/zigai/sesh/internal/cli/cmd/snapshot"
+	cmdtask "github.com/zigai/sesh/internal/cli/cmd/task"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/session"
 )
@@ -148,6 +150,8 @@ func newRootCommand(ctx context.Context) *cobra.Command {
 		cmdsession.NewCommand(),
 		cmdsnapshot.NewCommand(),
 		cmdagent.NewCommand(),
+		cmdproject.NewCommand(),
+		cmdtask.NewCommand(),
 		cmdautosave.NewCommand(),
 		cmdremote.NewCommand(),
 		newKeysCommand(),
@@ -224,7 +228,7 @@ func newHooksRunCommand() *cobra.Command {
 }
 
 func loadHookConfig(cmd *cobra.Command) (*config.Config, error) {
-	cfg, err := loadCommandConfig(cmd.Context(), cmd)
+	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -444,7 +448,7 @@ func keyBindings(cfg *config.Config) ([]keyBindingJSON, error) {
 }
 
 func runKeysList(cmd *cobra.Command) error {
-	cfg, err := loadCommandConfig(cmd.Context(), cmd)
+	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
 	if err != nil {
 		return err
 	}

@@ -165,7 +165,7 @@ func TestSingleSeshModeMakesCycleKeyNoOp(t *testing.T) {
 }
 
 func TestCycleDisplayModeFiltersAgentsWrapsAndPersists(t *testing.T) {
-	savedModes := make([]string, 0, 2)
+	savedModes := make([]string, 0, 3)
 
 	model, err := newModelWithDeps(config.DefaultConfig(), &session.State{}, Dependencies{
 		SaveModelState: func(st *session.State) error {
@@ -205,6 +205,9 @@ func TestCycleDisplayModeFiltersAgentsWrapsAndPersists(t *testing.T) {
 	}
 
 	model = updateTestModelWithCommand(t, model, keyCtrl('f'))
+	assertDisplayModeState(t, model, displayModeWork, "work")
+
+	model = updateTestModelWithCommand(t, model, keyCtrl('f'))
 	assertDisplayModeState(t, model, displayModeSesh, "sesh")
 
 	wrapped := struct {
@@ -218,8 +221,8 @@ func TestCycleDisplayModeFiltersAgentsWrapsAndPersists(t *testing.T) {
 		t.Fatalf("wrapped rows/selection = %#v, want %#v", wrapped, want)
 	}
 
-	if got := strings.Join(savedModes, ","); got != "agents,sesh" {
-		t.Fatalf("saved modes = %q, want agents,sesh", got)
+	if got := strings.Join(savedModes, ","); got != "agents,work,sesh" {
+		t.Fatalf("saved modes = %q, want agents,work,sesh", got)
 	}
 }
 

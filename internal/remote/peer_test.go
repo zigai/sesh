@@ -14,6 +14,7 @@ import (
 
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/session"
+	"github.com/zigai/sesh/internal/task"
 )
 
 func TestLoadOrCreatePeerIDPersistsIdentity(t *testing.T) {
@@ -204,6 +205,39 @@ func TestInventoryStreamPublishesHelloAndInventory(t *testing.T) {
 
 	if err := <-harness.done; !errors.Is(err, context.Canceled) {
 		t.Fatalf("RunInventoryStream() error = %v, want cancellation", err)
+	}
+}
+
+func TestInventoryStreamPublishesTasksWithoutTheirResumeCommand(t *testing.T) {
+	record := task.EmptyRecord()
+	record.ID, record.Kind, record.State, record.Harness = "t3", task.KindProject, task.StateSleeping, "pi"
+	record.Resume = task.Resume{Harness: "pi", Session: "s1", Command: []string{"pi", "--session", "s1"}}
+	live := task.Live{
+		Record: record, Present: true, SessionID: "$1", SessionName: testSessionName, WindowID: "@2", WindowIndex: 2,
+		WindowName: "3", AgentPane: "%4", AgentPID: 0,
+	}
+
+	harness := startInventoryStream(t, InventoryOptions{
+		PeerID: testPeerID, Hostname: "remote-host", BridgeDir: "", TmuxSocket: "/tmp/tmux-work",
+		PollInterval: 10 * time.Millisecond, HeartbeatInterval: time.Hour,
+		Sessions: func(context.Context) ([]session.Session, error) { return nil, nil },
+		Tasks:    func(context.Context) ([]TaskRow, error) { return []TaskRow{NewTaskRow(live)}, nil },
+	})
+
+	harness.next(t)
+	snapshot := harness.next(t).Snapshot
+
+	if snapshot == nil || len(snapshot.Tasks) != 1 {
+		t.Fatalf("snapshot = %+v, want the peer's task", snapshot)
+	}
+
+	row := snapshot.Tasks[0]
+	if row.Record.ID != "t3" || row.Record.State != task.StateSleeping || row.AgentPane != "%4" || row.WindowID != "@2" {
+		t.Fatalf("task row = %+v, want t3 asleep in pane %%4", row)
+	}
+
+	if len(row.Record.Resume.Command) != 0 {
+		t.Fatalf("task row carries the resume command %q", row.Record.Resume.Command)
 	}
 }
 

@@ -13,6 +13,7 @@ import (
 const (
 	displayModeSesh        displayMode = "sesh"
 	displayModeAgents      displayMode = "agents"
+	displayModeWork        displayMode = "work"
 	minDisplayModesToCycle             = 2
 )
 
@@ -34,11 +35,22 @@ func emptySessionIdentity() sessionIdentity {
 }
 
 func parseDisplayMode(value string) displayMode {
-	if strings.EqualFold(strings.TrimSpace(value), string(displayModeAgents)) {
-		return displayModeAgents
-	}
+	value = strings.TrimSpace(value)
 
-	return displayModeSesh
+	switch {
+	case strings.EqualFold(value, string(displayModeAgents)):
+		return displayModeAgents
+	case strings.EqualFold(value, string(displayModeWork)):
+		return displayModeWork
+	default:
+		return displayModeSesh
+	}
+}
+
+// tree reports whether the mode lists groups with agent rows below them: sessions in AGENTS,
+// sections in WORK.
+func (mode displayMode) tree() bool {
+	return mode == displayModeAgents || mode == displayModeWork
 }
 
 func (mode displayMode) label() string {
@@ -47,21 +59,27 @@ func (mode displayMode) label() string {
 
 func configuredDisplayModes(cfg *config.Config) []displayMode {
 	if cfg == nil {
-		return []displayMode{displayModeSesh, displayModeAgents}
+		return displayModesFrom(nil)
 	}
 
-	modes := make([]displayMode, 0, len(cfg.Settings.DisplayModes))
-	for _, value := range cfg.Settings.DisplayModes {
+	return displayModesFrom(cfg.Settings.DisplayModes)
+}
+
+func displayModesFrom(values []string) []displayMode {
+	modes := make([]displayMode, 0, len(values))
+	for _, value := range values {
 		switch strings.ToLower(strings.TrimSpace(value)) {
 		case string(displayModeSesh):
 			modes = append(modes, displayModeSesh)
 		case string(displayModeAgents):
 			modes = append(modes, displayModeAgents)
+		case string(displayModeWork):
+			modes = append(modes, displayModeWork)
 		}
 	}
 
 	if len(modes) == 0 {
-		return []displayMode{displayModeSesh, displayModeAgents}
+		return []displayMode{displayModeSesh, displayModeAgents, displayModeWork}
 	}
 
 	return modes
@@ -95,6 +113,11 @@ func (m *Model) cycleDisplayMode() bool {
 		}
 	}
 
+	if selected.empty() {
+		selected = m.carriedSelection
+	}
+
+	m.carriedSelection = selected
 	m.displayMode = m.displayModes[(current+1)%len(m.displayModes)]
 
 	if m.state != nil {
@@ -120,6 +143,13 @@ func (m *Model) showsDisplayModeIndicator() bool {
 }
 
 func (m *Model) refreshDisplaySessions() {
+	if m.displayMode == displayModeWork {
+		m.displaySessions = m.workSessions()
+		m.markCustomFieldsDirty()
+
+		return
+	}
+
 	displayed := make([]session.Session, 0, len(m.sessions))
 	for _, row := range m.sessions {
 		row.Agents = slices.Clone(row.Agents)
@@ -135,7 +165,7 @@ func (m *Model) refreshDisplaySessions() {
 			if !row.Saved() {
 				displayed = append(displayed, row)
 			}
-		default:
+		case displayModeWork:
 			displayed = append(displayed, row)
 		}
 	}
@@ -225,10 +255,21 @@ func (m *Model) selectedSessionIdentity() sessionIdentity {
 		return emptySessionIdentity()
 	}
 
+	selected := m.selectedListRow()
+	if found, ok := m.workTaskAt(selected); ok {
+		return sessionIdentity{
+			runtimeKey: found.owner.RuntimeKey(),
+			id:         found.owner.ID,
+			name:       found.owner.Name,
+			kind:       found.owner.Kind,
+			agentID:    found.agent.RegistryID,
+			paneID:     string(found.live.AgentPane),
+		}
+	}
+
 	row := m.filtered[m.cursor]
 	agentID := ""
 	paneID := ""
-	selected := m.selectedListRow()
 
 	if selected.isAgent() && selected.agentIndex < len(row.Agents) {
 		agentID = row.Agents[selected.agentIndex].RegistryID
@@ -251,6 +292,11 @@ func (m *Model) restoreSelectedSession(selected sessionIdentity) {
 		return
 	}
 
+	if m.displayMode == displayModeWork {
+		m.restoreSelectedTask(selected)
+		return
+	}
+
 	index := slices.IndexFunc(m.filtered, selected.matchesSession)
 	if index < 0 {
 		m.normalizeFilteredCursor()
@@ -260,9 +306,26 @@ func (m *Model) restoreSelectedSession(selected sessionIdentity) {
 	m.cursor = index
 
 	m.agentCursor = parentAgentIndex
-	if m.displayMode == displayModeAgents {
+	if m.displayMode.tree() {
 		m.agentCursor = selectedAgentIndex(m.filtered[index].Agents, selected)
 	}
+}
+
+func (m *Model) restoreSelectedTask(selected sessionIdentity) {
+	for index, section := range m.filtered {
+		agentIndex := slices.IndexFunc(section.Agents, func(agent session.AgentSession) bool {
+			return (selected.paneID != "" && agent.PaneID == selected.paneID) ||
+				(selected.agentID != "" && agent.RegistryID == selected.agentID)
+		})
+		if agentIndex >= 0 {
+			m.cursor = index
+			m.agentCursor = agentIndex
+
+			return
+		}
+	}
+
+	m.normalizeFilteredCursor()
 }
 
 func (selected sessionIdentity) empty() bool {

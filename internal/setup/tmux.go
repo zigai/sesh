@@ -13,7 +13,10 @@ import (
 	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/action"
+	"github.com/zigai/sesh/internal/remote"
 )
+
+const rootTable = "root"
 
 var (
 	ErrInvalidKey   = errors.New("invalid tmux key")
@@ -30,12 +33,14 @@ var callerFormats = []string{
 	"--client-height", "'#{client_height}'",
 }
 
-// Binding is one tmux key binding that runs an action's command.
+// Binding is one tmux key binding that runs an action's command. Command is the shell command
+// the binding runs; Program is the tmux command bound to the key.
 type Binding struct {
 	Key     string   `json:"key"`
 	Table   string   `json:"table"`
 	Action  string   `json:"action"`
 	Purpose string   `json:"purpose"`
+	Command string   `json:"command"`
 	Program []string `json:"program"`
 }
 
@@ -87,12 +92,14 @@ func Bindings(bindings []action.Binding) ([]Binding, error) {
 		}
 
 		descriptor := entry.Describe()
+		command := actionCommand(descriptor, binding.Values)
 		rendered = append(rendered, Binding{
 			Key:     binding.Key,
 			Table:   binding.Table,
 			Action:  string(binding.Action),
 			Purpose: purpose(descriptor, binding.Values),
-			Program: []string{"run-shell", "-b", actionCommand(descriptor, binding.Values)},
+			Command: command,
+			Program: bindingProgram(binding.Key, binding.Table, command),
 		})
 	}
 
@@ -120,12 +127,36 @@ func RenderBlock(bindings []Binding) string {
 	return out.String()
 }
 
+// ShellWord quotes a value for the shell run-shell starts, doubling '#' so tmux does not
+// expand it as a format.
+func ShellWord(value string) string {
+	value = strings.ReplaceAll(value, "#", "##")
+	if value != "" && strings.Trim(value, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_./:=@%+-") == "" {
+		return value
+	}
+
+	return "'" + strings.ReplaceAll(value, "'", `'\''`) + "'"
+}
+
+// bindingProgram runs the action's command, except that a root key pressed in a pane showing a
+// remote attachment goes on to the remote tmux, so the remote sesh acts on its own host as it
+// does when the attachment runs in a popup.
+func bindingProgram(key, table, command string) []string {
+	if table != rootTable {
+		return []string{"run-shell", "-b", command}
+	}
+
+	return []string{"if-shell", "-F", "#{" + remote.AttachmentPaneOption + "}", "send-keys " + quote(key), "run-shell -b " + quote(command)}
+}
+
 func actionCommand(descriptor action.Descriptor, values action.Values) string {
 	words := []string{"sesh", descriptor.ID.Group(), descriptor.ID.Verb()}
 
 	switch {
 	case descriptor.Subject == action.SubjectAgentPane:
 		words = append(words, "'#{pane_id}'")
+	case descriptor.Subject == action.SubjectTask:
+		words = append(words, "'#{@sesh_task}'")
 	case descriptor.Subject != action.SubjectNone && descriptor.Arity != action.ArityOptional:
 		words = append(words, "'#{session_id}'")
 	}
@@ -145,7 +176,7 @@ func paramWords(params []action.Param, values action.Values) []string {
 
 	for _, param := range params {
 		if param.Positional && values.Has(param.Name) {
-			words = append(words, shellWord(values.String(param.Name)))
+			words = append(words, ShellWord(values.String(param.Name)))
 		}
 	}
 
@@ -159,10 +190,10 @@ func paramWords(params []action.Param, values action.Values) []string {
 			words = append(words, "--"+param.Name+"="+values.String(param.Name))
 		case action.ParamList:
 			for _, item := range values.Strings(param.Name) {
-				words = append(words, "--"+param.Name, shellWord(item))
+				words = append(words, "--"+param.Name, ShellWord(item))
 			}
 		case action.ParamText, action.ParamPath, action.ParamChoice:
-			words = append(words, "--"+param.Name, shellWord(values.String(param.Name)))
+			words = append(words, "--"+param.Name, ShellWord(values.String(param.Name)))
 		}
 	}
 
@@ -182,17 +213,6 @@ func purpose(descriptor action.Descriptor, values action.Values) string {
 	}
 
 	return descriptor.Summary + " (" + strings.Join(settings, ", ") + ")"
-}
-
-// shellWord quotes a value for the shell run-shell starts, doubling '#' so tmux does not
-// expand it as a format.
-func shellWord(value string) string {
-	value = strings.ReplaceAll(value, "#", "##")
-	if value != "" && strings.Trim(value, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_./:=@%+-") == "" {
-		return value
-	}
-
-	return "'" + strings.ReplaceAll(value, "'", `'\''`) + "'"
 }
 
 func quote(argument string) string {

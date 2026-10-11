@@ -89,6 +89,25 @@ func ExpandHomePath(path string) (string, bool) {
 	return filepath.Join(home, strings.TrimPrefix(path, "~"+separator)), true
 }
 
+// ShortenHomePath writes a path under the home directory with a leading ~, the inverse of
+// ExpandHomePath.
+func ShortenHomePath(path string) string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return path
+	}
+
+	if path == home {
+		return "~"
+	}
+
+	if rest, found := strings.CutPrefix(path, home+string(os.PathSeparator)); found {
+		return "~" + string(os.PathSeparator) + rest
+	}
+
+	return path
+}
+
 func sortDirectoryMatches(matches []string) {
 	slices.SortFunc(matches, func(left, right string) int {
 		leftBase := strings.TrimSuffix(filepath.Base(left), string(os.PathSeparator))

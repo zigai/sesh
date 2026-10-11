@@ -1,0 +1,77 @@
+package task
+
+import (
+	"slices"
+
+	"github.com/zigai/aht/v2/pkg/harness"
+	"github.com/zigai/aht/v2/pkg/registry"
+
+	"github.com/zigai/sesh/internal/config"
+)
+
+// Harness is an agent a task can start with: a menu label, the command that launches it, and the
+// arguments that pass it a titled task's first prompt.
+type Harness struct {
+	Name       string
+	Command    []string
+	PromptArgs []string
+}
+
+// Harnesses returns the harnesses offered for new tasks, in menu order. Configured harnesses are
+// the offer, in order: one with a command runs it, and one without runs the installed executable
+// of the AHT harness it names, or is left out when that harness is not installed. Without
+// configuration, every harness AHT supports whose executable lookPath finds is offered under its
+// AHT name.
+func Harnesses(cfg config.TasksConfig, lookPath func(string) (string, error)) []Harness {
+	if len(cfg.Harness) == 0 {
+		offered := make([]Harness, 0)
+
+		for _, id := range harness.Supported() {
+			if command, found := installed(id, lookPath); found && config.ValidHarnessName(string(id)) {
+				offered = append(offered, Harness{Name: string(id), Command: command, PromptArgs: nil})
+			}
+		}
+
+		return offered
+	}
+
+	offered := make([]Harness, 0, len(cfg.Harness))
+
+	for _, configured := range cfg.Harness {
+		command := slices.Clone(configured.Command)
+		if len(command) == 0 {
+			resolved, found := installed(registry.Harness(configured.Name), lookPath)
+			if !found {
+				continue
+			}
+
+			command = resolved
+		}
+
+		offered = append(offered, Harness{Name: configured.Name, Command: command, PromptArgs: slices.Clone(configured.PromptArgs)})
+	}
+
+	return offered
+}
+
+// Find returns the offered harness called name.
+func Find(harnesses []Harness, name string) (Harness, bool) {
+	index := slices.IndexFunc(harnesses, func(h Harness) bool { return h.Name == name })
+	if index < 0 {
+		return Harness{Name: "", Command: nil, PromptArgs: nil}, false
+	}
+
+	return harnesses[index], true
+}
+
+// installed returns the command line that starts an AHT harness: the first of its executables
+// lookPath finds.
+func installed(id registry.Harness, lookPath func(string) (string, error)) ([]string, bool) {
+	for _, executable := range harness.ProcessNames(id) {
+		if _, err := lookPath(executable); err == nil {
+			return []string{executable}, true
+		}
+	}
+
+	return nil, false
+}

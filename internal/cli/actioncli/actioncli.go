@@ -170,6 +170,8 @@ func OpenRuntime(cmd *cobra.Command, cfg *config.Config) (*Runtime, error) {
 		Streams:            TerminalStreams(cmd),
 		Source:             "cli",
 		DeferSwitchHistory: false,
+		TaskLedger:         workspace.Tasks,
+		WorktreeDir:        workspace.WorktreeDir,
 	})
 
 	return &Runtime{Local: local, Repository: repository, Router: action.Router{Local: local, Peer: nil, Origin: nil}}, nil
@@ -326,7 +328,7 @@ func executeRemote[In, Out any](
 	peer := remote.NewCatalogPeer(cfg.Remote, cacheHome)
 	peer.Observe(catalog)
 
-	subject := action.Subject{At: action.Peer(connection), Sessions: nil, Pane: ""}
+	subject := action.Subject{At: action.Peer(connection), Sessions: nil, Pane: "", Task: ""}
 	if !peer.Accepts(subject.At, definition.ID) {
 		return zero, false, action.Wrap(action.CodeForbidden, remote.ErrActionNotOffered)
 	}
@@ -384,7 +386,7 @@ func peerSessions(rows []session.Session, kind action.SubjectKind, selectors []s
 			if action.CodeOf(err) == action.CodeNotFound {
 				target, err = action.SelectSession(saved, selector)
 			}
-		case action.SubjectNone, action.SubjectAgentPane:
+		case action.SubjectNone, action.SubjectAgentPane, action.SubjectTask:
 			err = action.Wrap(action.CodeInvalidArgument, action.ErrSubjectMismatch)
 		default:
 			err = action.Wrap(action.CodeInvalidArgument, action.ErrSubjectMismatch)
@@ -547,6 +549,8 @@ func subjectName(kind action.SubjectKind) string {
 	switch kind {
 	case action.SubjectAgentPane:
 		return "pane"
+	case action.SubjectTask:
+		return "task"
 	case action.SubjectNone, action.SubjectLiveSession, action.SubjectSavedSession, action.SubjectSession:
 		return "session"
 	default:

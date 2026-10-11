@@ -16,6 +16,8 @@ const (
 	DefaultSeshFormat            = "{source_prefix}{session_name}{right}{session_agent_context}"
 	DefaultAgentsSessionFormat   = "{source_prefix}{session_name}"
 	DefaultAgentsAgentFormat     = "{tree}{status_glyph} {status_age:<7}   {agent_cwd_name:<23.23}  {agent_session}{right}{harness:<6.6}   {agent_git_label:<6.22} {agent_git_added:<5} {agent_git_deleted:<5} {agent_git_ahead:<2} {agent_git_behind:<2}"
+	DefaultWorkSectionFormat     = "{session_name}"
+	DefaultWorkTaskFormat        = "{tree}{status_glyph} {status_age:<7}   {agent_project_name:<16.16}  {agent_session}{right}{harness:<6.6}   {agent_git_label:<6.22} {agent_git_added:<5} {agent_git_deleted:<5} {agent_pr:<6}"
 	defaultDirectorySuggestions  = 5
 	defaultAutosaveInterval      = "3m"
 	defaultSnapshotRetentionDays = 14
@@ -48,19 +50,23 @@ var DefaultProcessEnvironment = []string{
 }
 
 type Config struct {
-	Theme         ThemeConfig         `toml:"theme"`
-	Keys          KeyConfig           `toml:"keys"`
-	Popup         PopupConfig         `toml:"popup"`
-	Display       DisplayConfig       `toml:"display"`
-	Paths         PathConfig          `toml:"paths"`
-	Settings      SettingsConfig      `toml:"settings"`
-	Autosave      AutosaveConfig      `toml:"autosave"`
-	Snapshot      SnapshotConfig      `toml:"snapshot"`
-	Hooks         HookConfig          `toml:"hooks"`
-	AgentSessions AgentSessionsConfig `toml:"agent_sessions"`
-	AgentStatus   AgentStatusConfig   `toml:"agent_status"`
-	Remote        RemoteConfig        `toml:"remote"`
-	Actions       ActionsConfig       `toml:"actions"`
+	source        Source
+	Theme         ThemeConfig                 `toml:"theme"`
+	Keys          KeyConfig                   `toml:"keys"`
+	Popup         PopupConfig                 `toml:"popup"`
+	Display       DisplayConfig               `toml:"display"`
+	Paths         PathConfig                  `toml:"paths"`
+	Settings      SettingsConfig              `toml:"settings"`
+	Autosave      AutosaveConfig              `toml:"autosave"`
+	Snapshot      SnapshotConfig              `toml:"snapshot"`
+	Hooks         HookConfig                  `toml:"hooks"`
+	AgentSessions AgentSessionsConfig         `toml:"agent_sessions"`
+	AgentStatus   AgentStatusConfig           `toml:"agent_status"`
+	Remote        RemoteConfig                `toml:"remote"`
+	Actions       ActionsConfig               `toml:"actions"`
+	Projects      ProjectsConfig              `toml:"projects"`
+	Tasks         TasksConfig                 `toml:"tasks"`
+	TaskActions   map[string]TaskActionConfig `toml:"task_actions"`
 }
 
 // ActionsConfig overrides per-action policy, keyed by action group then verb: [actions.session.kill].
@@ -83,6 +89,8 @@ type DisplayConfig struct {
 	SeshFormat          string        `toml:"sesh_format"`
 	AgentsSessionFormat string        `toml:"agents_session_format"`
 	AgentsAgentFormat   string        `toml:"agents_agent_format"`
+	WorkSectionFormat   string        `toml:"work_section_format"`
+	WorkTaskFormat      string        `toml:"work_task_format"`
 	Fields              FieldCommands `toml:"fields,omitempty"`
 }
 
@@ -290,6 +298,10 @@ func FilterProcessEnvironmentKeys(keys []string) []string {
 	return filtered
 }
 
+func (c *Config) Source() Source {
+	return c.source
+}
+
 func (c *Config) Clone() *Config {
 	if c == nil {
 		return nil
@@ -313,6 +325,9 @@ func (c *Config) Clone() *Config {
 
 	cp.Remote.Connections = slices.Clone(c.Remote.Connections)
 	cp.Actions = c.Actions.Clone()
+	cp.Projects = c.Projects.Clone()
+	cp.Tasks = c.Tasks.Clone()
+	cp.TaskActions = cloneTaskActions(c.TaskActions)
 	cp.Keys.Bind = cloneKeyBinds(c.Keys.Bind)
 
 	cp.AgentStatus = c.AgentStatus.Clone()
@@ -403,7 +418,8 @@ func (h *HookConfig) UnmarshalTOML(data []byte) error {
 
 func DefaultConfig() *Config {
 	return &Config{
-		Theme: DefaultThemeConfig(),
+		source: Source{Path: "", WithoutConfig: false, Input: ""},
+		Theme:  DefaultThemeConfig(),
 		Keys: KeyConfig{
 			Bind:      nil,
 			Help:      "?",
@@ -434,6 +450,8 @@ func DefaultConfig() *Config {
 			SeshFormat:          DefaultSeshFormat,
 			AgentsSessionFormat: DefaultAgentsSessionFormat,
 			AgentsAgentFormat:   DefaultAgentsAgentFormat,
+			WorkSectionFormat:   DefaultWorkSectionFormat,
+			WorkTaskFormat:      DefaultWorkTaskFormat,
 			Fields:              nil,
 		},
 		Paths: PathConfig{
@@ -444,7 +462,7 @@ func DefaultConfig() *Config {
 			ShowFooter:                   true,
 			DirectorySuggestions:         defaultDirectorySuggestions,
 			DefaultSessionPathSuggestion: "~/Projects/{session}",
-			DisplayModes:                 []string{"sesh", "agents"},
+			DisplayModes:                 []string{"sesh", "agents", "work"},
 			LogLevel:                     "info",
 			ShortcutStyle:                "none",
 		},
@@ -491,7 +509,10 @@ func DefaultConfig() *Config {
 			EnableReverseBridge: true,
 			ReturnToOrigin:      true,
 		},
-		Actions: nil,
+		Actions:     nil,
+		Projects:    DefaultProjectsConfig(),
+		Tasks:       DefaultTasksConfig(),
+		TaskActions: nil,
 		AgentStatus: AgentStatusConfig{
 			Enabled:                  true,
 			StorePath:                "",

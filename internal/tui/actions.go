@@ -448,6 +448,10 @@ func (m *Model) handleEnter() func() (tea.Model, tea.Cmd) {
 	selectedSession := m.filtered[m.cursor]
 	selected := m.selectedListRow()
 
+	if m.displayMode == displayModeWork {
+		return m.handleTaskEnter(selected)
+	}
+
 	if selectedSession.Origin == session.OriginSSH {
 		return m.handleRemoteEnter(selectedSession, selected)
 	}

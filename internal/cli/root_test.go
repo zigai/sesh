@@ -78,7 +78,7 @@ func TestRootHelpOrdersCoreCommandsFirstWithDoctorBeforeHelp(t *testing.T) {
 	}
 
 	want := []string{
-		"pick", "session", "snapshot", "agent", "autosave", "remote",
+		"pick", "session", "snapshot", "agent", "project", "task", "autosave", "remote",
 		"keys", "logs", "hooks", "config", "setup", "daemon", "doctor", "help",
 	}
 	if !slices.Equal(names, want) {
@@ -380,8 +380,8 @@ in = "picker"
 		t.Fatalf("unbound snapshot.save is still bound to %q", bind)
 	}
 
-	if len(payload.Bindings) != 21 {
-		t.Fatalf("bindings = %d, want 21", len(payload.Bindings))
+	if len(payload.Bindings) != 24 {
+		t.Fatalf("bindings = %d, want 24", len(payload.Bindings))
 	}
 }
 

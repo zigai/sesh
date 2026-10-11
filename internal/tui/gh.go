@@ -67,7 +67,7 @@ func ghCell(text, role string, state layout.State) layout.Cell {
 
 func (m *Model) ghEnabled() bool {
 	definition, _ := providers.DefinitionFor(providers.GH)
-	return agentSummariesEnabled(m.config, m.deps) && m.sessionFormats.agentsAgent.UsesAny(definition.Fields...)
+	return agentSummariesEnabled(m.config, m.deps) && m.sessionFormats.agentRowsUseAny(definition.Fields...)
 }
 
 func (m *Model) ghTickCommand() tea.Cmd {

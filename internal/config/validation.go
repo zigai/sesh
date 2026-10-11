@@ -153,6 +153,8 @@ func ValidateDisplayConfig(disp DisplayConfig) error {
 		{name: "sesh_format", kind: display.FormatKindSession, format: disp.SeshFormat},
 		{name: "agents_session_format", kind: display.FormatKindAgentsSession, format: disp.AgentsSessionFormat},
 		{name: "agents_agent_format", kind: display.FormatKindAgentsAgent, format: disp.AgentsAgentFormat},
+		{name: "work_section_format", kind: display.FormatKindAgentsSession, format: disp.WorkSectionFormat},
+		{name: "work_task_format", kind: display.FormatKindAgentsAgent, format: disp.WorkTaskFormat},
 	}
 
 	for _, candidate := range formats {
@@ -444,6 +446,9 @@ func validateConfig(cfg *Config) error {
 		func() error { return ValidateAgentSessionsConfig(cfg.AgentSessions) },
 		func() error { return ValidateAgentStatusConfig(cfg.AgentStatus) },
 		func() error { return ValidateRemoteConfig(cfg.Remote) },
+		func() error { return ValidateProjectsConfig(cfg.Projects) },
+		func() error { return ValidateTasksConfig(cfg.Tasks) },
+		func() error { return ValidateTaskActions(cfg) },
 	}
 	for _, v := range validators {
 		if err := v(); err != nil {
@@ -648,8 +653,8 @@ func validateDisplayModes(modes []string) error {
 	seen := make(map[string]bool, len(modes))
 	for _, mode := range modes {
 		normalized := strings.ToLower(strings.TrimSpace(mode))
-		if normalized != "sesh" && normalized != "agents" {
-			return fmt.Errorf("%w %q: expected sesh or agents", errDisplayModeInvalid, mode)
+		if normalized != "sesh" && normalized != "agents" && normalized != "work" {
+			return fmt.Errorf("%w %q: expected sesh, agents or work", errDisplayModeInvalid, mode)
 		}
 
 		if seen[normalized] {

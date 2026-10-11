@@ -23,6 +23,7 @@ import (
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/snapshot/store"
+	"github.com/zigai/sesh/internal/task"
 	"github.com/zigai/sesh/internal/tui"
 )
 
@@ -53,6 +54,7 @@ type services struct {
 	initialReads     *initialReads
 	workflow         *session.Workflow
 	actions          action.Router
+	local            *app.Local
 	remote           RemoteServices
 	viewsMu          sync.Mutex
 	deferredViews    []tui.AgentView
@@ -89,6 +91,8 @@ func newServices(
 		Streams:            streams,
 		Source:             "picker",
 		DeferSwitchHistory: true,
+		TaskLedger:         workspace.Tasks,
+		WorktreeDir:        workspace.WorktreeDir,
 	})
 
 	return &services{
@@ -105,6 +109,7 @@ func newServices(
 		initialReads:     nil,
 		workflow:         local.Workflow(),
 		actions:          action.Router{Local: local, Peer: remote.Peer, Origin: remote.Origin},
+		local:            local,
 		remote:           remote,
 		viewsMu:          sync.Mutex{},
 		deferredViews:    nil,
@@ -156,6 +161,7 @@ func (s *services) TUIServices() tui.Services {
 		Panes:            s,
 		TerminalAttach:   nil,
 		Agents:           s,
+		Tasks:            s,
 		AgentWatcher:     s,
 		Remote:           s.remote.Catalog,
 		RemoteWatcher:    s.remote.Watcher,
@@ -164,6 +170,34 @@ func (s *services) TUIServices() tui.Services {
 		WorkingDirectory: s,
 		State:            s,
 	}
+}
+
+// LoadTasks lists the recorded tasks with their tagged windows.
+func (s *services) LoadTasks(ctx context.Context) ([]task.Live, error) {
+	var live []task.Live
+
+	err := s.readTmux(ctx, func(server *gotmux.Server) error {
+		var inventoryErr error
+
+		live, inventoryErr = task.Inventory(ctx, server, task.NewStore(s.workspace.Tasks))
+
+		return inventoryErr
+	})
+	if err != nil {
+		return nil, oops.In("cli").With("operation", "load_tasks").Wrap(err)
+	}
+
+	return live, nil
+}
+
+// SyncTasks refreshes the pull requests and window titles of the recorded tasks.
+func (s *services) SyncTasks(ctx context.Context, titles map[string]string) (bool, error) {
+	changed, err := s.local.SyncTasks(ctx, titles)
+	if err != nil {
+		return changed, oops.In("cli").With("operation", "sync_tasks").Wrap(err)
+	}
+
+	return changed, nil
 }
 
 // LoadCatalog lists saved sessions through a lock-free repository view: the picker's first
@@ -459,7 +493,7 @@ func agentSummaries(observed []agents.AgentSession) []session.AgentSummary {
 			summary.IdleSince = earlierNonZero(summary.IdleSince, agent.StatusSince)
 		case session.AgentStatusIdle:
 			summary.IdleSince = earlierNonZero(summary.IdleSince, agent.StatusSince)
-		case session.AgentStatusUnknown:
+		case session.AgentStatusUnknown, session.AgentStatusSleeping, session.AgentStatusDone:
 			summary.Unknown++
 		}
 	}

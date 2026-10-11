@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	gotmux "github.com/zigai/gotmux/tmux"
 
+	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/automation"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/session"
@@ -111,6 +112,11 @@ func executeStartupRestore(cmd *cobra.Command, env Env, claim func() bool) error
 		return errors.Join(err, wrapCloseError(repo.Close()), lock.Release())
 	}
 
+	launches, err := app.TaskRestoreLaunches(env.workspace.Tasks, env.workspace.Config.Tasks)
+	if err != nil {
+		return errors.Join(err, wrapCloseError(repo.Close()), lock.Release())
+	}
+
 	result, restoreErr := engine.Restore(ctx, repo, server, engine.RestoreConfig{
 		OperationID:       "",
 		LeaseRoot:         env.workspace.LeaseRoot,
@@ -120,6 +126,7 @@ func executeStartupRestore(cmd *cobra.Command, env Env, claim func() bool) error
 		MissingWorkingDir: restore.MissingWorkingDirShell,
 		OnCollision:       engine.CollisionPolicyDefault,
 		Profile:           engine.RecoveryPractical,
+		Launches:          launches,
 	})
 
 	closeErr := repo.Close()

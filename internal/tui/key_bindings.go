@@ -79,7 +79,12 @@ func pickerActions(cfg *config.Config) []boundAction {
 			continue
 		}
 
-		bound = append(bound, boundAction{key: newActionBinding(binding.Key, entry.Describe().Title), binding: binding})
+		description := entry.Describe().Title
+		if name := binding.Values.String("action"); binding.Action == action.TaskRun.ID && name != "" {
+			description = name
+		}
+
+		bound = append(bound, boundAction{key: newActionBinding(binding.Key, description), binding: binding})
 	}
 
 	return bound
