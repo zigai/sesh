@@ -80,7 +80,7 @@ func TestSleepRefusesAnAgentThatIsNotIdle(t *testing.T) {
 
 func TestSleepRefusesAHarnessWhoseStopIsNotVerified(t *testing.T) {
 	f := newSleepFixture(t)
-	f.agents.harness = "claude"
+	f.agents.harness = "cursor"
 
 	assertSleepRefused(t, f, task.ErrSleepUnsupported)
 }

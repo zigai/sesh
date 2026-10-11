@@ -66,7 +66,10 @@ var agentArgumentPrefixes = map[aht.Harness][]string{
 // resume: the signal that ends the harness after it has saved its session. A harness missing
 // here cannot sleep.
 var agentStopSignals = map[aht.Harness]syscall.Signal{
-	aht.HarnessPi: syscall.SIGTERM,
+	aht.HarnessClaude: syscall.SIGTERM,
+	aht.HarnessCodex:  syscall.SIGTERM,
+	aht.HarnessOmp:    syscall.SIGTERM,
+	aht.HarnessPi:     syscall.SIGTERM,
 }
 
 type Reason string
