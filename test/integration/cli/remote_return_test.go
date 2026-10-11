@@ -18,7 +18,7 @@ import (
 
 	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/config"
-	integration "github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/integration/tmuxserver"
 	"github.com/zigai/sesh/internal/privatefs"
 	"github.com/zigai/sesh/internal/remote"
 	"github.com/zigai/sesh/internal/session"
@@ -37,7 +37,7 @@ func TestRemotePickerReturnsAcrossSSH(t *testing.T) {
 	t.Setenv("SESH_TMUX_CLIENT", "")
 	t.Setenv("TERM", "xterm-256color")
 
-	peer, err := integration.Open(fixture.connection.TmuxSocket)
+	peer, err := tmuxserver.Open(fixture.connection.TmuxSocket)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +144,7 @@ func TestRemoteReturnTerminalHelper(t *testing.T) {
 		return
 	}
 
-	server, err := integration.Open(os.Getenv("SESH_RETURN_SOCKET"))
+	server, err := tmuxserver.Open(os.Getenv("SESH_RETURN_SOCKET"))
 	if err != nil {
 		t.Fatal(err)
 	}

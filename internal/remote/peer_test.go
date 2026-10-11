@@ -103,7 +103,7 @@ type inventoryHarness struct {
 	cancel context.CancelFunc
 }
 
-func startInventoryStream(t *testing.T, options InventoryOptions) *inventoryHarness {
+func startInventoryStream(t *testing.T, opts InventoryOptions) *inventoryHarness {
 	t.Helper()
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -119,7 +119,7 @@ func startInventoryStream(t *testing.T, options InventoryOptions) *inventoryHarn
 	go func() {
 		defer close(harness.done)
 
-		err := RunInventoryStream(ctx, options, writer)
+		err := RunInventoryStream(ctx, opts, writer)
 		_ = writer.Close()
 
 		harness.done <- err

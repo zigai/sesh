@@ -118,8 +118,8 @@ func TestExecutePeerActionRefusesBeforeRunning(t *testing.T) {
 		code   action.Code
 	}{
 		"not allowed by the peer": {
-			mutate: func(options *PeerActionOptions, _ *ActionRequest) {
-				options.Allowed = func(action.ID) bool { return false }
+			mutate: func(opts *PeerActionOptions, _ *ActionRequest) {
+				opts.Allowed = func(action.ID) bool { return false }
 			},
 			code: action.CodeForbidden,
 		},
@@ -138,7 +138,7 @@ func TestExecutePeerActionRefusesBeforeRunning(t *testing.T) {
 			code:   action.CodeTargetChanged,
 		},
 		"no receipts": {
-			mutate: func(options *PeerActionOptions, _ *ActionRequest) { options.Receipts = nil },
+			mutate: func(opts *PeerActionOptions, _ *ActionRequest) { opts.Receipts = nil },
 			code:   action.CodeUnavailable,
 		},
 	}

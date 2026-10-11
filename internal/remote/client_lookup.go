@@ -20,17 +20,17 @@ type InvocationLookupRequest struct {
 	InvocationID string `json:"invocationId"`
 }
 
-func NewInvocationLookupRequest(options ActionOriginOptions, invocationID string) (InvocationLookupRequest, error) {
-	if !options.Remote.Enabled {
+func NewInvocationLookupRequest(opts ActionOriginOptions, invocationID string) (InvocationLookupRequest, error) {
+	if !opts.Remote.Enabled {
 		return InvocationLookupRequest{}, ErrRemoteDisabled
 	}
 
-	if options.Connection.ID != options.State.ID ||
-		ConnectionDigest(options.Connection) != options.State.ConfigDigest || !ValidIdentifier(options.State.PeerID) {
+	if opts.Connection.ID != opts.State.ID ||
+		ConnectionDigest(opts.Connection) != opts.State.ConfigDigest || !ValidIdentifier(opts.State.PeerID) {
 		return InvocationLookupRequest{}, ErrConnectionChanged
 	}
 
-	request := InvocationLookupRequest{Version: ProtocolVersion, PeerID: options.State.PeerID, InvocationID: invocationID}
+	request := InvocationLookupRequest{Version: ProtocolVersion, PeerID: opts.State.PeerID, InvocationID: invocationID}
 	if err := ValidateInvocationLookupRequest(request); err != nil {
 		return InvocationLookupRequest{}, err
 	}
@@ -93,13 +93,13 @@ func ExecutePeerLookup(dir *privatefs.Dir, peerID string, request InvocationLook
 	return result
 }
 
-func RunInvocationLookup(ctx context.Context, options ActionOriginOptions, request InvocationLookupRequest) (ActionResult, error) {
+func RunInvocationLookup(ctx context.Context, opts ActionOriginOptions, request InvocationLookupRequest) (ActionResult, error) {
 	if err := ValidateInvocationLookupRequest(request); err != nil {
 		return ActionResult{}, oops.In("remote").With("operation", "run_invocation_lookup").Wrap(err)
 	}
 
-	if request.PeerID != options.State.PeerID || options.Connection.ID != options.State.ID ||
-		ConnectionDigest(options.Connection) != options.State.ConfigDigest {
+	if request.PeerID != opts.State.PeerID || opts.Connection.ID != opts.State.ID ||
+		ConnectionDigest(opts.Connection) != opts.State.ConfigDigest {
 		return ActionResult{}, oops.In("remote").With("operation", "run_invocation_lookup").Wrap(ErrConnectionChanged)
 	}
 
@@ -108,12 +108,12 @@ func RunInvocationLookup(ctx context.Context, options ActionOriginOptions, reque
 		return ActionResult{}, oops.In("remote").With("operation", "run_invocation_lookup").Wrap(err)
 	}
 
-	lookupCtx, cancel := context.WithTimeout(ctx, ParsedDuration(options.Remote.ActionTimeout, defaultAction))
+	lookupCtx, cancel := context.WithTimeout(ctx, ParsedDuration(opts.Remote.ActionTimeout, defaultAction))
 	defer cancel()
 
-	command, err := NewSSHCommand(lookupCtx, options.Remote, options.Connection, SSHCommandOptions{
+	command, err := NewSSHCommand(lookupCtx, opts.Remote, opts.Connection, SSHCommandOptions{
 		Interactive: false, Forward: nil, Command: nil,
-	}, PeerEntryPoint(options.Connection, ChannelLookup)...)
+	}, PeerEntryPoint(opts.Connection, ChannelLookup)...)
 	if err != nil {
 		return ActionResult{}, oops.In("remote").With("operation", "run_invocation_lookup").Wrap(err)
 	}

@@ -109,7 +109,7 @@ func TestCatalogKeepsLiveRowsWhenInvokingPaneDisappears(t *testing.T) {
 	found := map[string]bool{}
 	for _, row := range result.Sessions {
 		found[row.Name] = true
-		if row.IsCurrent {
+		if row.Current {
 			t.Fatalf("stale pane marked %q as current", row.Name)
 		}
 	}
@@ -140,8 +140,8 @@ func TestCatalogUsesInvokingSessionHintWithoutPaneLookup(t *testing.T) {
 	}
 
 	for _, row := range result.Sessions {
-		if row.IsCurrent != (row.ID == string(first.ID())) {
-			t.Fatalf("session hint marked %q (%s) current = %t", row.Name, row.ID, row.IsCurrent)
+		if row.Current != (row.ID == string(first.ID())) {
+			t.Fatalf("session hint marked %q (%s) current = %t", row.Name, row.ID, row.Current)
 		}
 	}
 }
@@ -182,7 +182,7 @@ func TestCatalogPrefersInvokingPaneForCurrentAgentSelection(t *testing.T) {
 
 	for _, row := range result.Sessions {
 		if row.ID == string(origin.ID) {
-			if !row.IsCurrent || row.ActivePaneID != string(invoking.ID()) {
+			if !row.Current || row.ActivePaneID != string(invoking.ID()) {
 				t.Fatalf("current row = %+v, want invoking pane %s", row, invoking.ID())
 			}
 
@@ -223,7 +223,7 @@ func TestCatalogIgnoresInvokingPaneFromAnotherSession(t *testing.T) {
 
 	for _, row := range result.Sessions {
 		if row.ID == string(second.ID()) {
-			if !row.IsCurrent || row.ActivePaneID == foreign {
+			if !row.Current || row.ActivePaneID == foreign {
 				t.Fatalf("current row = %+v, want hinted session without foreign pane %s", row, foreign)
 			}
 
@@ -387,7 +387,7 @@ func verifyLiveSessionsResult(t *testing.T, sessions []session.Session, activePa
 		if s.Name == "project-alpha" {
 			foundAlpha = true
 
-			if !s.IsCurrent {
+			if !s.Current {
 				t.Error("project-alpha should be marked current")
 			}
 
@@ -553,7 +553,7 @@ func TestCatalogSharedPaneDoesNotGuessCurrentSession(t *testing.T) {
 	}
 
 	for _, item := range result.Sessions {
-		if item.IsCurrent {
+		if item.Current {
 			t.Fatal("guessed current session from shared pane")
 		}
 	}

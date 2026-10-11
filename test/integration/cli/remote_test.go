@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/zigai/gotmux/tmux"
+	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/cli"
@@ -19,7 +19,7 @@ import (
 	"github.com/zigai/sesh/internal/remote"
 )
 
-func remotePeerActionFixture(t *testing.T, peerConfig string) (*tmux.Server, []byte, string) {
+func remotePeerActionFixture(t *testing.T, peerConfig string) (*gotmux.Server, []byte, string) {
 	t.Helper()
 
 	server := newCaptureCLIServer(t)
@@ -134,7 +134,7 @@ func TestRemotePeerActionEntrypointHonorsThePeersPolicy(t *testing.T) {
 	}
 }
 
-func countSessionsNamed(t *testing.T, server *tmux.Server, name string) int {
+func countSessionsNamed(t *testing.T, server *gotmux.Server, name string) int {
 	t.Helper()
 
 	sessions, err := server.Sessions(t.Context())

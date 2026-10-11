@@ -510,8 +510,8 @@ func TestCompileBothSides(t *testing.T) {
 
 func TestCompileEmptyTemplate(t *testing.T) {
 	var emptyTmpl Template
-	if !emptyTmpl.IsEmpty() {
-		t.Fatal("expected empty template to report IsEmpty() == true")
+	if !emptyTmpl.Empty() {
+		t.Fatal("expected empty template to report Empty() == true")
 	}
 
 	if emptyTmpl.HasRight() {

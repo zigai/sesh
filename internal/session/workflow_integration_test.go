@@ -22,7 +22,7 @@ import (
 	"github.com/zigai/gotmux/tmuxtest"
 
 	"github.com/zigai/sesh/internal/config"
-	integration "github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/integration/tmuxserver"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/snapshot/model"
 	"github.com/zigai/sesh/internal/snapshot/store"
@@ -1675,7 +1675,7 @@ func TestWorkflow_DeleteEndpointLeaseExcludesConcurrentOperation(t *testing.T) {
 
 	leaseRoot := filepath.Join(t.TempDir(), "leases")
 
-	heldLease, err := integration.AcquireLease(t.Context(), leaseRoot, fixture.server.Endpoint().SocketPath)
+	heldLease, err := tmuxserver.AcquireLease(t.Context(), leaseRoot, fixture.server.Endpoint().SocketPath)
 	if err != nil {
 		t.Fatalf("acquiring helper lease: %v", err)
 	}
@@ -1724,7 +1724,7 @@ func TestWorkflow_DeleteSavedStateRequiresSharedEndpointLease(t *testing.T) {
 	})
 
 	outcome, err := wf.DeleteSessionEverywhere(t.Context(), "fixture", false)
-	if !errors.Is(err, integration.ErrLeaseRoot) {
+	if !errors.Is(err, tmuxserver.ErrLeaseRoot) {
 		t.Fatalf("DeleteSessionEverywhere error = %v, want ErrLeaseRoot", err)
 	}
 

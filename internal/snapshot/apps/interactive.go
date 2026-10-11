@@ -266,7 +266,7 @@ func classifyLessArg(arg string, endOfOptions *bool, flags, files *[]string) boo
 	}
 
 	if !*endOfOptions && strings.HasPrefix(arg, "-") {
-		if !isValidLessFlag(arg) {
+		if !validLessFlag(arg) {
 			return false
 		}
 
@@ -295,7 +295,7 @@ func parseManArguments(args []string) ([]string, bool) {
 
 	if len(args) == 1 {
 		page := args[0]
-		if !isValidManPage(page) {
+		if !validManPage(page) {
 			return nil, false
 		}
 
@@ -305,14 +305,14 @@ func parseManArguments(args []string) ([]string, bool) {
 	section := args[0]
 	page := args[1]
 
-	if !isValidManSection(section) || !isValidManPage(page) {
+	if !validManSection(section) || !validManPage(page) {
 		return nil, false
 	}
 
 	return []string{"man", section, page}, true
 }
 
-func isValidLessFlag(flag string) bool {
+func validLessFlag(flag string) bool {
 	if len(flag) < 2 || flag[0] != '-' {
 		return false
 	}
@@ -327,7 +327,7 @@ func isValidLessFlag(flag string) bool {
 	return true
 }
 
-func isValidManSection(sec string) bool {
+func validManSection(sec string) bool {
 	if len(sec) < 1 || len(sec) > 4 {
 		return false
 	}
@@ -345,7 +345,7 @@ func isValidManSection(sec string) bool {
 	return true
 }
 
-func isValidManPage(page string) bool {
+func validManPage(page string) bool {
 	if page == "" || len(page) > 64 || page[0] == '-' {
 		return false
 	}

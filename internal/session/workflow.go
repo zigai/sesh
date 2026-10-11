@@ -12,7 +12,7 @@ import (
 	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/config"
-	integration "github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/integration/tmuxserver"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
@@ -315,7 +315,7 @@ func clientSentinelReason(err error) (string, bool) {
 		return "switch_unverified", true
 	case errors.Is(err, ErrTerminalRequired):
 		return "terminal_required", true
-	case errors.Is(err, integration.ErrLeaseRoot):
+	case errors.Is(err, tmuxserver.ErrLeaseRoot):
 		return "endpoint_required", true
 	default:
 		return "", false

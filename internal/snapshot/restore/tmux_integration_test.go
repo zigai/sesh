@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/zigai/gotmux/tmux"
+	gotmux "github.com/zigai/gotmux/tmux"
 	"github.com/zigai/gotmux/tmuxtest"
 
 	"github.com/zigai/sesh/internal/snapshot/capture"
@@ -97,10 +97,10 @@ func testNativeGroupAtBase(t *testing.T, base int) {
 		t.Fatal(err)
 	}
 
-	unrelated, err := server.NewSession(ctx, tmux.NewSessionOptions{
+	unrelated, err := server.NewSession(ctx, gotmux.NewSessionOptions{
 		Name:    "unrelated-fixture",
-		Program: tmux.Exec("sleep", "300"),
-		Start:   tmux.StartPolicyExistingOnly,
+		Program: gotmux.Exec("sleep", "300"),
+		Start:   gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -170,7 +170,7 @@ func buildNativeGroupManifest() model.Manifest {
 	return m
 }
 
-func verifyNativeGroupState(t *testing.T, ctx context.Context, target *restoredTarget, unrelatedID tmux.SessionID, uLinksBefore []tmux.WindowLinkInfo, unrelated tmux.Session) {
+func verifyNativeGroupState(t *testing.T, ctx context.Context, target *restoredTarget, unrelatedID gotmux.SessionID, uLinksBefore []gotmux.WindowLinkInfo, unrelated gotmux.Session) {
 	t.Helper()
 
 	leadSess := target.sessions["s0"]
@@ -186,7 +186,7 @@ func verifyNativeGroupState(t *testing.T, ctx context.Context, target *restoredT
 	assertUnrelatedFixtureUnchanged(t, ctx, unrelated, unrelatedID, uLinksBefore)
 }
 
-func assertNativeGroupCommonGroup(t *testing.T, ctx context.Context, leadSess, foll1Sess, foll2Sess tmux.Session, wantGroupName string) {
+func assertNativeGroupCommonGroup(t *testing.T, ctx context.Context, leadSess, foll1Sess, foll2Sess gotmux.Session, wantGroupName string) {
 	t.Helper()
 
 	leadInfo, err := leadSess.Info(ctx)
@@ -217,7 +217,7 @@ func assertNativeGroupCommonGroup(t *testing.T, ctx context.Context, leadSess, f
 	}
 }
 
-func assertNativeGroupSharedWindows(t *testing.T, ctx context.Context, leadSess, foll1Sess, foll2Sess tmux.Session) {
+func assertNativeGroupSharedWindows(t *testing.T, ctx context.Context, leadSess, foll1Sess, foll2Sess gotmux.Session) {
 	t.Helper()
 
 	_, links0, err := leadSess.WindowInfos(ctx)
@@ -254,7 +254,7 @@ func assertNativeGroupSharedWindows(t *testing.T, ctx context.Context, leadSess,
 	assertActiveAndLast(t, links2, 5, 1, "s2")
 }
 
-func assertUnrelatedFixtureUnchanged(t *testing.T, ctx context.Context, unrelated tmux.Session, unrelatedID tmux.SessionID, uLinksBefore []tmux.WindowLinkInfo) {
+func assertUnrelatedFixtureUnchanged(t *testing.T, ctx context.Context, unrelated gotmux.Session, unrelatedID gotmux.SessionID, uLinksBefore []gotmux.WindowLinkInfo) {
 	t.Helper()
 
 	uInfoAfter, err := unrelated.Info(ctx)
@@ -274,25 +274,25 @@ func TestPreflightCheckGroupCollisionRejectsExistingSessionAndGroup(t *testing.T
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
 
-	if _, err := server.NewSession(ctx, tmux.NewSessionOptions{
+	if _, err := server.NewSession(ctx, gotmux.NewSessionOptions{
 		Name:    "existing-session",
-		Program: tmux.Exec("sleep", "300"),
-		Start:   tmux.StartPolicyExistingOnly,
+		Program: gotmux.Exec("sleep", "300"),
+		Start:   gotmux.StartPolicyExistingOnly,
 	}); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := server.NewSession(ctx, tmux.NewSessionOptions{
+	if _, err := server.NewSession(ctx, gotmux.NewSessionOptions{
 		Name:  "existing-group",
-		Start: tmux.StartPolicyExistingOnly,
+		Start: gotmux.StartPolicyExistingOnly,
 	}); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := server.NewSession(ctx, tmux.NewSessionOptions{
+	if _, err := server.NewSession(ctx, gotmux.NewSessionOptions{
 		Name:  "group-leader",
 		Group: "existing-group",
-		Start: tmux.StartPolicyExistingOnly,
+		Start: gotmux.StartPolicyExistingOnly,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -476,14 +476,14 @@ func assertSparseRepeatedAndSharedLinks(t *testing.T, ctx context.Context, targe
 }
 
 func TestDeepAsymmetricLayoutTinyCellsBordersAndZoom(t *testing.T) {
-	for _, border := range []tmux.PaneBorderStatus{tmux.PaneBorderStatusOff, tmux.PaneBorderStatusTop, tmux.PaneBorderStatusBottom} {
+	for _, border := range []gotmux.PaneBorderStatus{gotmux.PaneBorderStatusOff, gotmux.PaneBorderStatusTop, gotmux.PaneBorderStatusBottom} {
 		t.Run(string(border), func(t *testing.T) {
 			verifyDeepLayoutAtBorder(t, border)
 		})
 	}
 }
 
-func verifyDeepLayoutAtBorder(t *testing.T, border tmux.PaneBorderStatus) {
+func verifyDeepLayoutAtBorder(t *testing.T, border gotmux.PaneBorderStatus) {
 	t.Helper()
 	server := tmuxtest.NewServer(t)
 
@@ -534,22 +534,22 @@ func verifyDeepLayoutAtBorder(t *testing.T, border tmux.PaneBorderStatus) {
 	verifyDeepLayoutGeometry(t, ctx, win, target.panes["p3"], target, expectedRects)
 }
 
-func computeExpectedBorderRectangles(wantRects map[string][4]int, border tmux.PaneBorderStatus) map[string][4]int {
+func computeExpectedBorderRectangles(wantRects map[string][4]int, border gotmux.PaneBorderStatus) map[string][4]int {
 	expectedRects := make(map[string][4]int, len(wantRects))
 	for id, rect := range wantRects {
 		left, top, width, height := rect[0], rect[1], rect[2], rect[3]
 
 		switch border {
-		case tmux.PaneBorderStatusTop:
+		case gotmux.PaneBorderStatusTop:
 			if top == 0 {
 				top++
 				height--
 			}
-		case tmux.PaneBorderStatusBottom:
+		case gotmux.PaneBorderStatusBottom:
 			if top+height == 41 {
 				height--
 			}
-		case tmux.PaneBorderStatusOff:
+		case gotmux.PaneBorderStatusOff:
 		}
 
 		expectedRects[id] = [4]int{left, top, width, height}
@@ -558,7 +558,7 @@ func computeExpectedBorderRectangles(wantRects map[string][4]int, border tmux.Pa
 	return expectedRects
 }
 
-func verifyDeepLayoutGeometry(t *testing.T, ctx context.Context, win tmux.Window, p3Pane tmux.Pane, target *restoredTarget, expectedRects map[string][4]int) {
+func verifyDeepLayoutGeometry(t *testing.T, ctx context.Context, win gotmux.Window, p3Pane gotmux.Pane, target *restoredTarget, expectedRects map[string][4]int) {
 	t.Helper()
 
 	winInfo, err := win.Info(ctx)
@@ -619,22 +619,22 @@ func TestPlannedConstructionWindowResizeContract(t *testing.T) {
 
 	target.assertRectangles(t, ctx)
 
-	originalIDs := map[string]tmux.PaneID{
+	originalIDs := map[string]gotmux.PaneID{
 		"p0": target.panes["p0"].ID(),
 		"p1": target.panes["p1"].ID(),
 		"p2": target.panes["p2"].ID(),
 		"p3": target.panes["p3"].ID(),
 	}
 
-	verifyResizePanes(t, ctx, win, tmux.Size{Width: 120, Height: 40}, originalIDs)
+	verifyResizePanes(t, ctx, win, gotmux.Size{Width: 120, Height: 40}, originalIDs)
 
-	verifyResizePanes(t, ctx, win, tmux.Size{Width: 60, Height: 20}, originalIDs)
+	verifyResizePanes(t, ctx, win, gotmux.Size{Width: 60, Height: 20}, originalIDs)
 }
 
-func assertPanesMatchOriginalIDs(t *testing.T, panes []tmux.PaneInfo, originalIDs map[string]tmux.PaneID) {
+func assertPanesMatchOriginalIDs(t *testing.T, panes []gotmux.PaneInfo, originalIDs map[string]gotmux.PaneID) {
 	t.Helper()
 
-	liveIDs := make(map[tmux.PaneID]bool, len(panes))
+	liveIDs := make(map[gotmux.PaneID]bool, len(panes))
 	for _, p := range panes {
 		liveIDs[p.ID] = true
 	}
@@ -646,7 +646,7 @@ func assertPanesMatchOriginalIDs(t *testing.T, panes []tmux.PaneInfo, originalID
 	}
 }
 
-func assertLeftColumnNestedGeometry(t *testing.T, p0, p1 tmux.PaneInfo, height int) {
+func assertLeftColumnNestedGeometry(t *testing.T, p0, p1 gotmux.PaneInfo, height int) {
 	t.Helper()
 
 	if p0.Left != 0 || p0.Top != 0 {
@@ -667,7 +667,7 @@ func assertLeftColumnNestedGeometry(t *testing.T, p0, p1 tmux.PaneInfo, height i
 	}
 }
 
-func assertRightColumnNestedGeometry(t *testing.T, p2, p3 tmux.PaneInfo, leftColWidth, width, height int) {
+func assertRightColumnNestedGeometry(t *testing.T, p2, p3 gotmux.PaneInfo, leftColWidth, width, height int) {
 	t.Helper()
 
 	wantRightLeft := leftColWidth + 1
@@ -694,10 +694,10 @@ func assertRightColumnNestedGeometry(t *testing.T, p2, p3 tmux.PaneInfo, leftCol
 	}
 }
 
-func assertFourPaneNestedGeometryAndDividers(t *testing.T, panes []tmux.PaneInfo, size tmux.Size, originalIDs map[string]tmux.PaneID) {
+func assertFourPaneNestedGeometryAndDividers(t *testing.T, panes []gotmux.PaneInfo, size gotmux.Size, originalIDs map[string]gotmux.PaneID) {
 	t.Helper()
 
-	byID := make(map[tmux.PaneID]tmux.PaneInfo, len(panes))
+	byID := make(map[gotmux.PaneID]gotmux.PaneInfo, len(panes))
 	for _, p := range panes {
 		byID[p.ID] = p
 	}
@@ -720,7 +720,7 @@ func assertFourPaneNestedGeometryAndDividers(t *testing.T, panes []tmux.PaneInfo
 	}
 }
 
-func verifyResizePanes(t *testing.T, ctx context.Context, win tmux.Window, size tmux.Size, originalIDs map[string]tmux.PaneID) {
+func verifyResizePanes(t *testing.T, ctx context.Context, win gotmux.Window, size gotmux.Size, originalIDs map[string]gotmux.PaneID) {
 	t.Helper()
 
 	if err := win.Resize(ctx, size); err != nil {
@@ -865,15 +865,15 @@ func TestUnrelatedFixturesPreservedAcrossTargetOptions(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			u1, err := server.NewSession(ctx, tmux.NewSessionOptions{
-				Name: "unrelated-one", Program: tmux.Exec("sleep", "300"), Start: tmux.StartPolicyExistingOnly,
+			u1, err := server.NewSession(ctx, gotmux.NewSessionOptions{
+				Name: "unrelated-one", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly,
 			})
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			u2, err := server.NewSession(ctx, tmux.NewSessionOptions{
-				Name: "unrelated-two", Program: tmux.Exec("sleep", "300"), Start: tmux.StartPolicyExistingOnly,
+			u2, err := server.NewSession(ctx, gotmux.NewSessionOptions{
+				Name: "unrelated-two", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly,
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -893,7 +893,7 @@ func TestUnrelatedFixturesPreservedAcrossTargetOptions(t *testing.T) {
 	}
 }
 
-func verifyUnrelatedSessionsIntact(t *testing.T, ctx context.Context, u1, u2 tmux.Session, base int) {
+func verifyUnrelatedSessionsIntact(t *testing.T, ctx context.Context, u1, u2 gotmux.Session, base int) {
 	t.Helper()
 
 	u1Info, err := u1.Info(ctx)
@@ -918,9 +918,9 @@ func verifyUnrelatedSessionsIntact(t *testing.T, ctx context.Context, u1, u2 tmu
 }
 
 type restoredTarget struct {
-	sessions map[string]tmux.Session
-	windows  map[string]tmux.Window
-	panes    map[string]tmux.Pane
+	sessions map[string]gotmux.Session
+	windows  map[string]gotmux.Window
+	panes    map[string]gotmux.Pane
 }
 
 type restoreObserver func(step Step, resolve func() *restoredTarget)
@@ -928,7 +928,7 @@ type restoreObserver func(step Step, resolve func() *restoredTarget)
 func executeRestorePlan(
 	t *testing.T,
 	ctx context.Context,
-	server *tmux.Server,
+	server *gotmux.Server,
 	manifest model.Manifest,
 	plan Plan,
 	beforeStep, afterStep restoreObserver,
@@ -965,15 +965,15 @@ type initialPaneSource struct {
 	pane   string
 }
 
-func resolveRestoredTarget(t *testing.T, ctx context.Context, server *tmux.Server, plan Plan, journal *memoryJournal) *restoredTarget {
+func resolveRestoredTarget(t *testing.T, ctx context.Context, server *gotmux.Server, plan Plan, journal *memoryJournal) *restoredTarget {
 	t.Helper()
 
 	target := &restoredTarget{
-		sessions: make(map[string]tmux.Session),
-		windows:  make(map[string]tmux.Window),
-		panes:    make(map[string]tmux.Pane),
+		sessions: make(map[string]gotmux.Session),
+		windows:  make(map[string]gotmux.Window),
+		panes:    make(map[string]gotmux.Pane),
 	}
-	splitPanes := make(map[tmux.PaneID]bool)
+	splitPanes := make(map[gotmux.PaneID]bool)
 
 	var initialPanes []initialPaneSource
 
@@ -995,10 +995,10 @@ func resolveRestoredTarget(t *testing.T, ctx context.Context, server *tmux.Serve
 func (target *restoredTarget) recordStep(
 	t *testing.T,
 	ctx context.Context,
-	server *tmux.Server,
+	server *gotmux.Server,
 	step Step,
 	runtimeID string,
-	splitPanes map[tmux.PaneID]bool,
+	splitPanes map[gotmux.PaneID]bool,
 ) (initialPaneSource, bool) {
 	t.Helper()
 
@@ -1021,18 +1021,18 @@ func (target *restoredTarget) recordStep(
 		return initialPaneSource{window: s.WindowID, pane: s.InitialPaneID}, true
 	case *SplitPaneStep:
 		if runtimeID != "" {
-			target.panes[s.PaneID] = resolveRuntimePane(t, ctx, server, tmux.PaneID(runtimeID))
-			splitPanes[tmux.PaneID(runtimeID)] = true
+			target.panes[s.PaneID] = resolveRuntimePane(t, ctx, server, gotmux.PaneID(runtimeID))
+			splitPanes[gotmux.PaneID(runtimeID)] = true
 		}
 	}
 
 	return initialPaneSource{}, false
 }
 
-func resolveRuntimeSession(t *testing.T, ctx context.Context, server *tmux.Server, runtimeID string) tmux.Session {
+func resolveRuntimeSession(t *testing.T, ctx context.Context, server *gotmux.Server, runtimeID string) gotmux.Session {
 	t.Helper()
 
-	session, err := server.Session(ctx, tmux.SessionID(runtimeID))
+	session, err := server.Session(ctx, gotmux.SessionID(runtimeID))
 	if err != nil {
 		t.Fatalf("restored session %s: %v", runtimeID, err)
 	}
@@ -1040,10 +1040,10 @@ func resolveRuntimeSession(t *testing.T, ctx context.Context, server *tmux.Serve
 	return session
 }
 
-func resolveRuntimeWindow(t *testing.T, ctx context.Context, server *tmux.Server, runtimeID string) tmux.Window {
+func resolveRuntimeWindow(t *testing.T, ctx context.Context, server *gotmux.Server, runtimeID string) gotmux.Window {
 	t.Helper()
 
-	window, err := server.Window(ctx, tmux.WindowID(runtimeID))
+	window, err := server.Window(ctx, gotmux.WindowID(runtimeID))
 	if err != nil {
 		t.Fatalf("restored window %s: %v", runtimeID, err)
 	}
@@ -1051,7 +1051,7 @@ func resolveRuntimeWindow(t *testing.T, ctx context.Context, server *tmux.Server
 	return window
 }
 
-func resolveRuntimePane(t *testing.T, ctx context.Context, server *tmux.Server, runtimeID tmux.PaneID) tmux.Pane {
+func resolveRuntimePane(t *testing.T, ctx context.Context, server *gotmux.Server, runtimeID gotmux.PaneID) gotmux.Pane {
 	t.Helper()
 
 	pane, err := server.Pane(ctx, runtimeID)
@@ -1062,7 +1062,7 @@ func resolveRuntimePane(t *testing.T, ctx context.Context, server *tmux.Server, 
 	return pane
 }
 
-func resolveInitialPane(t *testing.T, ctx context.Context, server *tmux.Server, window tmux.Window, splitPanes map[tmux.PaneID]bool) tmux.Pane {
+func resolveInitialPane(t *testing.T, ctx context.Context, server *gotmux.Server, window gotmux.Window, splitPanes map[gotmux.PaneID]bool) gotmux.Pane {
 	t.Helper()
 
 	panes, err := window.Panes(ctx)
@@ -1070,7 +1070,7 @@ func resolveInitialPane(t *testing.T, ctx context.Context, server *tmux.Server, 
 		t.Fatalf("restored window %s panes: %v", window.ID(), err)
 	}
 
-	var initial []tmux.PaneID
+	var initial []gotmux.PaneID
 
 	for _, pane := range panes {
 		if !splitPanes[pane.ID] {
@@ -1149,7 +1149,7 @@ func (target *restoredTarget) assertPaneRectangles(t *testing.T, ctx context.Con
 	}
 }
 
-func assertActiveAndLast(t *testing.T, links []tmux.WindowLinkInfo, wantActive, wantLast int, sessionLabel string) {
+func assertActiveAndLast(t *testing.T, links []gotmux.WindowLinkInfo, wantActive, wantLast int, sessionLabel string) {
 	t.Helper()
 
 	foundActive := false
@@ -1174,7 +1174,7 @@ func assertActiveAndLast(t *testing.T, links []tmux.WindowLinkInfo, wantActive, 
 	}
 }
 
-func assertSlotWindowID(t *testing.T, ctx context.Context, sess tmux.Session, index int, wantWindowID tmux.WindowID, label string) {
+func assertSlotWindowID(t *testing.T, ctx context.Context, sess gotmux.Session, index int, wantWindowID gotmux.WindowID, label string) {
 	t.Helper()
 
 	_, links, err := sess.WindowInfos(ctx)
@@ -1321,21 +1321,21 @@ type independentSessionState struct {
 type independentSourceState struct {
 	Sessions      map[string]independentSessionState
 	Windows       map[string]independentWindowState
-	SourceSessIDs map[string]tmux.SessionID
-	SourceWinIDs  map[string]tmux.WindowID
-	SourcePaneIDs map[string]tmux.PaneID
+	SourceSessIDs map[string]gotmux.SessionID
+	SourceWinIDs  map[string]gotmux.WindowID
+	SourcePaneIDs map[string]gotmux.PaneID
 	SourcePIDs    map[string]int
 }
 
-func readIndependentSourceState(t *testing.T, ctx context.Context, server *tmux.Server, sessionNames []string) *independentSourceState {
+func readIndependentSourceState(t *testing.T, ctx context.Context, server *gotmux.Server, sessionNames []string) *independentSourceState {
 	t.Helper()
 
 	state := &independentSourceState{
 		Sessions:      make(map[string]independentSessionState),
 		Windows:       make(map[string]independentWindowState),
-		SourceSessIDs: make(map[string]tmux.SessionID),
-		SourceWinIDs:  make(map[string]tmux.WindowID),
-		SourcePaneIDs: make(map[string]tmux.PaneID),
+		SourceSessIDs: make(map[string]gotmux.SessionID),
+		SourceWinIDs:  make(map[string]gotmux.WindowID),
+		SourcePaneIDs: make(map[string]gotmux.PaneID),
 		SourcePIDs:    make(map[string]int),
 	}
 
@@ -1361,7 +1361,7 @@ func readIndependentSourceState(t *testing.T, ctx context.Context, server *tmux.
 	return state
 }
 
-func readSessionLinks(t *testing.T, ctx context.Context, sess tmux.Session, name, groupName string, state *independentSourceState) independentSessionState {
+func readSessionLinks(t *testing.T, ctx context.Context, sess gotmux.Session, name, groupName string, state *independentSourceState) independentSessionState {
 	t.Helper()
 
 	_, links, err := sess.WindowInfos(ctx)
@@ -1405,7 +1405,7 @@ func readSessionLinks(t *testing.T, ctx context.Context, sess tmux.Session, name
 	return sessState
 }
 
-func readIndependentWindowState(t *testing.T, ctx context.Context, win tmux.Window, wInfo tmux.WindowInfo, state *independentSourceState) independentWindowState {
+func readIndependentWindowState(t *testing.T, ctx context.Context, win gotmux.Window, wInfo gotmux.WindowInfo, state *independentSourceState) independentWindowState {
 	t.Helper()
 
 	panes, err := win.Panes(ctx)
@@ -1474,7 +1474,7 @@ func readIndependentWindowState(t *testing.T, ctx context.Context, win tmux.Wind
 	return winState
 }
 
-func createSourceGroup(t *testing.T, ctx context.Context, server *tmux.Server) (tmux.Session, tmux.Session, tmux.Window) {
+func createSourceGroup(t *testing.T, ctx context.Context, server *gotmux.Server) (gotmux.Session, gotmux.Session, gotmux.Window) {
 	t.Helper()
 
 	if err := server.GlobalSessionOptions().SetBaseIndex(ctx, 2); err != nil {
@@ -1485,10 +1485,10 @@ func createSourceGroup(t *testing.T, ctx context.Context, server *tmux.Server) (
 		t.Fatal(err)
 	}
 
-	leadSess, err := server.NewSession(ctx, tmux.NewSessionOptions{
+	leadSess, err := server.NewSession(ctx, gotmux.NewSessionOptions{
 		Name:  "src-group",
-		Size:  tmux.Size{Width: 80, Height: 24},
-		Start: tmux.StartPolicyExistingOnly,
+		Size:  gotmux.Size{Width: 80, Height: 24},
+		Start: gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("create source-lead session: %v", err)
@@ -1513,10 +1513,10 @@ func createSourceGroup(t *testing.T, ctx context.Context, server *tmux.Server) (
 		t.Fatalf("SetTitle initPane: %v", err)
 	}
 
-	follSess, err := server.NewSession(ctx, tmux.NewSessionOptions{
+	follSess, err := server.NewSession(ctx, gotmux.NewSessionOptions{
 		Name:  "source-foll",
 		Group: "src-group",
-		Start: tmux.StartPolicyExistingOnly,
+		Start: gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("create source-foll session: %v", err)
@@ -1529,22 +1529,22 @@ func createSourceGroup(t *testing.T, ctx context.Context, server *tmux.Server) (
 	return leadSess, follSess, initWin
 }
 
-func createSourceNestedWindow(t *testing.T, ctx context.Context, leadSess tmux.Session) tmux.WindowLink {
+func createSourceNestedWindow(t *testing.T, ctx context.Context, leadSess gotmux.Session) gotmux.WindowLink {
 	t.Helper()
 
 	slot5 := 5
 
-	nestedLink, err := leadSess.NewWindow(ctx, tmux.NewWindowOptions{
+	nestedLink, err := leadSess.NewWindow(ctx, gotmux.NewWindowOptions{
 		Name:    "win-nested",
 		Index:   &slot5,
-		Program: tmux.Exec("sleep", "300"),
+		Program: gotmux.Exec("sleep", "300"),
 	})
 	if err != nil {
 		t.Fatalf("create win-nested: %v", err)
 	}
 
 	nestedWin := nestedLink.Window()
-	if err := nestedWin.Resize(ctx, tmux.Size{Width: 120, Height: 40}); err != nil {
+	if err := nestedWin.Resize(ctx, gotmux.Size{Width: 120, Height: 40}); err != nil {
 		t.Fatalf("resize win-nested: %v", err)
 	}
 
@@ -1557,10 +1557,10 @@ func createSourceNestedWindow(t *testing.T, ctx context.Context, leadSess tmux.S
 		t.Fatal(err)
 	}
 
-	nestedP1, err := nestedP0.Split(ctx, tmux.SplitOptions{
-		Direction: tmux.DirectionHorizontal,
-		Size:      tmux.SplitSize{Cells: 50},
-		Program:   tmux.Exec("sleep", "300"),
+	nestedP1, err := nestedP0.Split(ctx, gotmux.SplitOptions{
+		Direction: gotmux.DirectionHorizontal,
+		Size:      gotmux.SplitSize{Cells: 50},
+		Program:   gotmux.Exec("sleep", "300"),
 	})
 	if err != nil {
 		t.Fatalf("split horizontal: %v", err)
@@ -1570,10 +1570,10 @@ func createSourceNestedWindow(t *testing.T, ctx context.Context, leadSess tmux.S
 		t.Fatal(err)
 	}
 
-	nestedP2, err := nestedP1.Split(ctx, tmux.SplitOptions{
-		Direction: tmux.DirectionVertical,
-		Size:      tmux.SplitSize{Cells: 15},
-		Program:   tmux.Exec("sleep", "300"),
+	nestedP2, err := nestedP1.Split(ctx, gotmux.SplitOptions{
+		Direction: gotmux.DirectionVertical,
+		Size:      gotmux.SplitSize{Cells: 15},
+		Program:   gotmux.Exec("sleep", "300"),
 	})
 	if err != nil {
 		t.Fatalf("split vertical: %v", err)
@@ -1594,7 +1594,7 @@ func createSourceNestedWindow(t *testing.T, ctx context.Context, leadSess tmux.S
 	return nestedLink
 }
 
-func selectSlot(t *testing.T, ctx context.Context, sess tmux.Session, slot int) {
+func selectSlot(t *testing.T, ctx context.Context, sess gotmux.Session, slot int) {
 	t.Helper()
 
 	_, links, err := sess.WindowInfos(ctx)
@@ -1615,7 +1615,7 @@ func selectSlot(t *testing.T, ctx context.Context, sess tmux.Session, slot int) 
 	t.Fatalf("slot %d not found in session", slot)
 }
 
-func configureGroupNavigation(t *testing.T, ctx context.Context, leadSess, follSess tmux.Session, nestedLink tmux.WindowLink) {
+func configureGroupNavigation(t *testing.T, ctx context.Context, leadSess, follSess gotmux.Session, nestedLink gotmux.WindowLink) {
 	t.Helper()
 
 	if err := nestedLink.Select(ctx); err != nil {
@@ -1627,26 +1627,26 @@ func configureGroupNavigation(t *testing.T, ctx context.Context, leadSess, follS
 	selectSlot(t, ctx, follSess, 5)
 }
 
-func createSourceRepeatSession(t *testing.T, ctx context.Context, server *tmux.Server, initWin tmux.Window) tmux.Session {
+func createSourceRepeatSession(t *testing.T, ctx context.Context, server *gotmux.Server, initWin gotmux.Window) gotmux.Session {
 	t.Helper()
 
-	repeatSess, err := server.NewSession(ctx, tmux.NewSessionOptions{
+	repeatSess, err := server.NewSession(ctx, gotmux.NewSessionOptions{
 		Name:    "src-repeat",
-		Size:    tmux.Size{Width: 80, Height: 24},
-		Program: tmux.Exec("sleep", "300"),
-		Start:   tmux.StartPolicyExistingOnly,
+		Size:    gotmux.Size{Width: 80, Height: 24},
+		Program: gotmux.Exec("sleep", "300"),
+		Start:   gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("create src-repeat session: %v", err)
 	}
 
 	slot3 := 3
-	if _, err := initWin.Link(ctx, repeatSess, tmux.LinkOptions{Index: &slot3}); err != nil {
+	if _, err := initWin.Link(ctx, repeatSess, gotmux.LinkOptions{Index: &slot3}); err != nil {
 		t.Fatalf("link win-shared to src-repeat:3: %v", err)
 	}
 
 	slot8 := 8
-	if _, err := initWin.Link(ctx, repeatSess, tmux.LinkOptions{Index: &slot8}); err != nil {
+	if _, err := initWin.Link(ctx, repeatSess, gotmux.LinkOptions{Index: &slot8}); err != nil {
 		t.Fatalf("link win-shared to src-repeat:8: %v", err)
 	}
 
@@ -1657,7 +1657,7 @@ func createSourceRepeatSession(t *testing.T, ctx context.Context, server *tmux.S
 
 	for _, l := range rLinks {
 		if l.Index != 3 && l.Index != 8 {
-			if err := l.Handle().UnlinkWith(ctx, tmux.UnlinkOptions{Force: true}); err != nil {
+			if err := l.Handle().UnlinkWith(ctx, gotmux.UnlinkOptions{Force: true}); err != nil {
 				t.Fatalf("unlink bootstrap window in repeat: %v", err)
 			}
 
@@ -1671,7 +1671,7 @@ func createSourceRepeatSession(t *testing.T, ctx context.Context, server *tmux.S
 	return repeatSess
 }
 
-func createActualSourceFixture(t *testing.T, ctx context.Context, server *tmux.Server) (tmux.Session, tmux.Session, tmux.Session) {
+func createActualSourceFixture(t *testing.T, ctx context.Context, server *gotmux.Server) (gotmux.Session, gotmux.Session, gotmux.Session) {
 	t.Helper()
 
 	leadSess, follSess, initWin := createSourceGroup(t, ctx, server)
@@ -1682,7 +1682,7 @@ func createActualSourceFixture(t *testing.T, ctx context.Context, server *tmux.S
 	return leadSess, follSess, repeatSess
 }
 
-func findWindowIDAtSlot(t *testing.T, links []tmux.WindowLinkInfo, slot int) tmux.WindowID {
+func findWindowIDAtSlot(t *testing.T, links []gotmux.WindowLinkInfo, slot int) gotmux.WindowID {
 	t.Helper()
 
 	for _, l := range links {
@@ -1696,7 +1696,7 @@ func findWindowIDAtSlot(t *testing.T, links []tmux.WindowLinkInfo, slot int) tmu
 	return ""
 }
 
-func findWindowHandle(t *testing.T, links []tmux.WindowLinkInfo, slot int) tmux.Window {
+func findWindowHandle(t *testing.T, links []gotmux.WindowLinkInfo, slot int) gotmux.Window {
 	t.Helper()
 
 	for _, l := range links {
@@ -1707,7 +1707,7 @@ func findWindowHandle(t *testing.T, links []tmux.WindowLinkInfo, slot int) tmux.
 
 	t.Fatalf("slot %d not found in links: %v", slot, links)
 
-	return tmux.Window{}
+	return gotmux.Window{}
 }
 
 func commitObservationToRepo(t *testing.T, ctx context.Context, repoDir string, obs capture.Observation) string {
@@ -1812,7 +1812,7 @@ func TestStructuralRoundtripWorker(t *testing.T) {
 		t.Fatalf("worker: ValidatePlan failed: %v", err)
 	}
 
-	targetServer, err := tmux.New(tmux.Config{SocketPath: targetSocket})
+	targetServer, err := gotmux.New(gotmux.Config{SocketPath: targetSocket})
 	if err != nil {
 		t.Fatalf("worker: tmux.New failed: %v", err)
 	}
@@ -1835,28 +1835,28 @@ func TestActualSourceDestructionRoundtrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	scratch0, err := targetServer.NewSession(ctx, tmux.NewSessionOptions{
+	scratch0, err := targetServer.NewSession(ctx, gotmux.NewSessionOptions{
 		Name:    "scratch-pre-alloc-0",
-		Program: tmux.Exec("sleep", "300"),
-		Start:   tmux.StartPolicyExistingOnly,
+		Program: gotmux.Exec("sleep", "300"),
+		Start:   gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	scratch1, err := targetServer.NewSession(ctx, tmux.NewSessionOptions{
+	scratch1, err := targetServer.NewSession(ctx, gotmux.NewSessionOptions{
 		Name:    "scratch-pre-alloc-1",
-		Program: tmux.Exec("sleep", "300"),
-		Start:   tmux.StartPolicyExistingOnly,
+		Program: gotmux.Exec("sleep", "300"),
+		Start:   gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	unrelatedSess, err := targetServer.NewSession(ctx, tmux.NewSessionOptions{
+	unrelatedSess, err := targetServer.NewSession(ctx, gotmux.NewSessionOptions{
 		Name:    "unrelated-target-sess",
-		Program: tmux.Exec("sleep", "300"),
-		Start:   tmux.StartPolicyExistingOnly,
+		Program: gotmux.Exec("sleep", "300"),
+		Start:   gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -1877,7 +1877,7 @@ func TestActualSourceDestructionRoundtrip(t *testing.T) {
 	sessionNames := []string{"source-lead", "source-foll", "src-repeat"}
 	expected := readIndependentSourceState(t, ctx, sourceServer, sessionNames)
 
-	obs, err := capture.Observe(ctx, sourceServer, []tmux.SessionID{leadSess.ID(), follSess.ID(), repeatSess.ID()})
+	obs, err := capture.Observe(ctx, sourceServer, []gotmux.SessionID{leadSess.ID(), follSess.ID(), repeatSess.ID()})
 	if err != nil {
 		t.Fatalf("capture.Observe failed: %v", err)
 	}
@@ -1898,14 +1898,14 @@ func TestActualSourceDestructionRoundtrip(t *testing.T) {
 	_ = scratch1.Kill(ctx)
 }
 
-func createEmptyNameAndTitleSourceSession(t *testing.T, ctx context.Context, server *tmux.Server) tmux.Session {
+func createEmptyNameAndTitleSourceSession(t *testing.T, ctx context.Context, server *gotmux.Server) gotmux.Session {
 	t.Helper()
 
-	srcSess, err := server.NewSession(ctx, tmux.NewSessionOptions{
+	srcSess, err := server.NewSession(ctx, gotmux.NewSessionOptions{
 		Name:    "source-empty",
-		Size:    tmux.Size{Width: 80, Height: 24},
-		Start:   tmux.StartPolicyExistingOnly,
-		Program: tmux.Exec("sleep", "300"),
+		Size:    gotmux.Size{Width: 80, Height: 24},
+		Start:   gotmux.StartPolicyExistingOnly,
+		Program: gotmux.Exec("sleep", "300"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -1930,10 +1930,10 @@ func createEmptyNameAndTitleSourceSession(t *testing.T, ctx context.Context, ser
 		t.Fatalf("set title to empty: %v", err)
 	}
 
-	splitPane, err := initPane.Split(ctx, tmux.SplitOptions{
-		Direction: tmux.DirectionHorizontal,
-		Size:      tmux.SplitSize{Cells: 40},
-		Program:   tmux.Exec("sleep", "300"),
+	splitPane, err := initPane.Split(ctx, gotmux.SplitOptions{
+		Direction: gotmux.DirectionHorizontal,
+		Size:      gotmux.SplitSize{Cells: 40},
+		Program:   gotmux.Exec("sleep", "300"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -1946,7 +1946,7 @@ func createEmptyNameAndTitleSourceSession(t *testing.T, ctx context.Context, ser
 	return srcSess
 }
 
-func assertEmptyNameAndTitleTargetState(t *testing.T, ctx context.Context, targetServer *tmux.Server, expected *independentSourceState) {
+func assertEmptyNameAndTitleTargetState(t *testing.T, ctx context.Context, targetServer *gotmux.Server, expected *independentSourceState) {
 	t.Helper()
 
 	targetSess, err := targetServer.FindSession(ctx, "source-empty")
@@ -2015,7 +2015,7 @@ func TestActualSourceDestructionEmptyNameAndTitleFixture(t *testing.T) {
 	sessionNames := []string{"source-empty"}
 	expected := readIndependentSourceState(t, ctx, sourceServer, sessionNames)
 
-	obs, err := capture.Observe(ctx, sourceServer, []tmux.SessionID{srcSess.ID()})
+	obs, err := capture.Observe(ctx, sourceServer, []gotmux.SessionID{srcSess.ID()})
 	if err != nil {
 		t.Fatalf("capture.Observe failed: %v", err)
 	}
@@ -2031,7 +2031,7 @@ func TestActualSourceDestructionEmptyNameAndTitleFixture(t *testing.T) {
 	assertEmptyNameAndTitleTargetState(t, ctx, targetServer, expected)
 }
 
-func getFirstPaneInfo(t *testing.T, ctx context.Context, win tmux.Window) tmux.PaneInfo {
+func getFirstPaneInfo(t *testing.T, ctx context.Context, win gotmux.Window) gotmux.PaneInfo {
 	t.Helper()
 
 	panes, err := win.Panes(ctx)
@@ -2042,7 +2042,7 @@ func getFirstPaneInfo(t *testing.T, ctx context.Context, win tmux.Window) tmux.P
 	return panes[0]
 }
 
-func verifyUnrelatedTargetIntact(t *testing.T, ctx context.Context, server *tmux.Server, beforeID tmux.SessionID, beforeLinks []tmux.WindowLinkInfo, beforePane tmux.PaneInfo) {
+func verifyUnrelatedTargetIntact(t *testing.T, ctx context.Context, server *gotmux.Server, beforeID gotmux.SessionID, beforeLinks []gotmux.WindowLinkInfo, beforePane gotmux.PaneInfo) {
 	t.Helper()
 
 	sess, err := server.FindSession(ctx, "unrelated-target-sess")
@@ -2067,7 +2067,7 @@ func verifyUnrelatedTargetIntact(t *testing.T, ctx context.Context, server *tmux
 	assertUnrelatedPaneIntact(t, ctx, win, beforePane)
 }
 
-func assertUnrelatedPaneIntact(t *testing.T, ctx context.Context, win tmux.Window, beforePane tmux.PaneInfo) {
+func assertUnrelatedPaneIntact(t *testing.T, ctx context.Context, win gotmux.Window, beforePane gotmux.PaneInfo) {
 	t.Helper()
 
 	panes, err := win.Panes(ctx)
@@ -2091,7 +2091,7 @@ func assertUnrelatedPaneIntact(t *testing.T, ctx context.Context, win tmux.Windo
 	}
 }
 
-func assertTargetSessionAndGroupParity(t *testing.T, ctx context.Context, server *tmux.Server, expected *independentSourceState) (tmux.Session, tmux.Session, tmux.Session) {
+func assertTargetSessionAndGroupParity(t *testing.T, ctx context.Context, server *gotmux.Server, expected *independentSourceState) (gotmux.Session, gotmux.Session, gotmux.Session) {
 	t.Helper()
 
 	leadSess, err := server.FindSession(ctx, "source-lead")
@@ -2131,7 +2131,7 @@ func assertTargetSessionAndGroupParity(t *testing.T, ctx context.Context, server
 	return leadSess, follSess, repeatSess
 }
 
-func assertDisjointSessionIDs(t *testing.T, leadSess, follSess, repeatSess tmux.Session, expected *independentSourceState) {
+func assertDisjointSessionIDs(t *testing.T, leadSess, follSess, repeatSess gotmux.Session, expected *independentSourceState) {
 	t.Helper()
 
 	if leadSess.ID() == expected.SourceSessIDs["source-lead"] {
@@ -2147,7 +2147,7 @@ func assertDisjointSessionIDs(t *testing.T, leadSess, follSess, repeatSess tmux.
 	}
 }
 
-func assertTargetWindowSharingAndSlots(t *testing.T, ctx context.Context, leadSess, follSess, repeatSess tmux.Session, expected *independentSourceState) ([]tmux.WindowLinkInfo, []tmux.WindowLinkInfo) {
+func assertTargetWindowSharingAndSlots(t *testing.T, ctx context.Context, leadSess, follSess, repeatSess gotmux.Session, expected *independentSourceState) ([]gotmux.WindowLinkInfo, []gotmux.WindowLinkInfo) {
 	t.Helper()
 
 	_, lLinks, err := leadSess.WindowInfos(ctx)
@@ -2181,7 +2181,7 @@ func assertTargetWindowSharingAndSlots(t *testing.T, ctx context.Context, leadSe
 	return lLinks, fLinks
 }
 
-func assertSharedWindowIDs(t *testing.T, leadSlot2, leadSlot5, follSlot2, follSlot5, repeatSlot3, repeatSlot8 tmux.WindowID, expected *independentSourceState) {
+func assertSharedWindowIDs(t *testing.T, leadSlot2, leadSlot5, follSlot2, follSlot5, repeatSlot3, repeatSlot8 gotmux.WindowID, expected *independentSourceState) {
 	t.Helper()
 
 	if leadSlot2 != follSlot2 {
@@ -2209,7 +2209,7 @@ func assertSharedWindowIDs(t *testing.T, leadSlot2, leadSlot5, follSlot2, follSl
 	}
 }
 
-func assertTargetNestedPanesGeometry(t *testing.T, ctx context.Context, winNested tmux.Window, activeNested tmux.Pane, expected *independentSourceState) {
+func assertTargetNestedPanesGeometry(t *testing.T, ctx context.Context, winNested gotmux.Window, activeNested gotmux.Pane, expected *independentSourceState) {
 	t.Helper()
 
 	if err := activeNested.ToggleZoom(ctx); err != nil {
@@ -2257,7 +2257,7 @@ func assertTargetNestedPanesGeometry(t *testing.T, ctx context.Context, winNeste
 	}
 }
 
-func assertTargetWindowGeometryAndTitles(t *testing.T, ctx context.Context, lLinks []tmux.WindowLinkInfo, expected *independentSourceState) {
+func assertTargetWindowGeometryAndTitles(t *testing.T, ctx context.Context, lLinks []gotmux.WindowLinkInfo, expected *independentSourceState) {
 	t.Helper()
 
 	winShared := findWindowHandle(t, lLinks, 2)
@@ -2290,7 +2290,7 @@ func assertTargetWindowGeometryAndTitles(t *testing.T, ctx context.Context, lLin
 	assertTargetNestedPanesGeometry(t, ctx, winNested, activeNested, expected)
 }
 
-func assertTargetSharedWindow(t *testing.T, ctx context.Context, winShared tmux.Window, expected *independentSourceState) {
+func assertTargetSharedWindow(t *testing.T, ctx context.Context, winShared gotmux.Window, expected *independentSourceState) {
 	t.Helper()
 
 	wSharedInfo, err := winShared.Info(ctx)
@@ -2313,10 +2313,10 @@ func assertTargetSharedWindow(t *testing.T, ctx context.Context, winShared tmux.
 	}
 }
 
-func assertWindowResizeContract(t *testing.T, ctx context.Context, winShared tmux.Window) {
+func assertWindowResizeContract(t *testing.T, ctx context.Context, winShared gotmux.Window) {
 	t.Helper()
 
-	if err := winShared.Resize(ctx, tmux.Size{Width: 100, Height: 30}); err != nil {
+	if err := winShared.Resize(ctx, gotmux.Size{Width: 100, Height: 30}); err != nil {
 		t.Fatalf("resize winShared to 100x30 failed: %v", err)
 	}
 
@@ -2326,7 +2326,7 @@ func assertWindowResizeContract(t *testing.T, ctx context.Context, winShared tmu
 	}
 }
 
-func assertNestedWindowActivePane(t *testing.T, ctx context.Context, winNested tmux.Window) tmux.Pane {
+func assertNestedWindowActivePane(t *testing.T, ctx context.Context, winNested gotmux.Window) gotmux.Pane {
 	t.Helper()
 
 	activeNested, err := winNested.ActivePane(ctx)
@@ -2347,7 +2347,7 @@ func assertNestedWindowActivePane(t *testing.T, ctx context.Context, winNested t
 	return activeNested
 }
 
-func verifyTargetStructuralParity(t *testing.T, ctx context.Context, server *tmux.Server, expected *independentSourceState) {
+func verifyTargetStructuralParity(t *testing.T, ctx context.Context, server *gotmux.Server, expected *independentSourceState) {
 	t.Helper()
 
 	leadSess, follSess, repeatSess := assertTargetSessionAndGroupParity(t, ctx, server, expected)

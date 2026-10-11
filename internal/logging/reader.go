@@ -141,16 +141,16 @@ func Truncate(ctx context.Context, path string) (retErr error) {
 	return truncateInParent(ctx, parentFile, baseName)
 }
 
-func LineMatchesFilter(line []byte, filter FilterOptions) bool {
-	if filter.isZero() {
+func LineMatchesFilter(line []byte, opts FilterOptions) bool {
+	if opts.isZero() {
 		return true
 	}
 
-	if filter.Grep != nil && !filter.Grep.Match(line) {
+	if opts.Grep != nil && !opts.Grep.Match(line) {
 		return false
 	}
 
-	if !filter.hasRecordFilter() {
+	if !opts.hasRecordFilter() {
 		return true
 	}
 
@@ -164,7 +164,7 @@ func LineMatchesFilter(line []byte, filter FilterOptions) bool {
 		return false
 	}
 
-	return matchesRecordFilters(record, filter)
+	return matchesRecordFilters(record, opts)
 }
 
 func StreamLogs(ctx context.Context, path string, opts ReadOptions, out io.Writer) error {
@@ -447,8 +447,8 @@ func (f FilterOptions) hasRecordFilter() bool {
 	return f.HasLevel || f.Component != "" || f.HasSince || f.HasUntil
 }
 
-func matchesRecordFilters(record map[string]any, filter FilterOptions) bool {
-	if filter.HasLevel {
+func matchesRecordFilters(record map[string]any, opts FilterOptions) bool {
+	if opts.HasLevel {
 		levelStr, _ := record["level"].(string)
 
 		recLevel, err := zerolog.ParseLevel(levelStr)
@@ -456,23 +456,23 @@ func matchesRecordFilters(record map[string]any, filter FilterOptions) bool {
 			recLevel = zerolog.InfoLevel
 		}
 
-		if recLevel < filter.Level {
+		if recLevel < opts.Level {
 			return false
 		}
 	}
 
-	if filter.Component != "" {
+	if opts.Component != "" {
 		compStr, _ := record["component"].(string)
-		if !strings.EqualFold(compStr, filter.Component) {
+		if !strings.EqualFold(compStr, opts.Component) {
 			return false
 		}
 	}
 
-	return matchesTimeFilters(record, filter)
+	return matchesTimeFilters(record, opts)
 }
 
-func matchesTimeFilters(record map[string]any, filter FilterOptions) bool {
-	if !filter.HasSince && !filter.HasUntil {
+func matchesTimeFilters(record map[string]any, opts FilterOptions) bool {
+	if !opts.HasSince && !opts.HasUntil {
 		return true
 	}
 
@@ -483,11 +483,11 @@ func matchesTimeFilters(record map[string]any, filter FilterOptions) bool {
 		return true
 	}
 
-	if filter.HasSince && recTime.Before(filter.Since) {
+	if opts.HasSince && recTime.Before(opts.Since) {
 		return false
 	}
 
-	if filter.HasUntil && recTime.After(filter.Until) {
+	if opts.HasUntil && recTime.After(opts.Until) {
 		return false
 	}
 
@@ -646,7 +646,7 @@ func handleDrainError(ctx context.Context, err error, opts ReadOptions, state *f
 	return errors.Join(err, closeErr)
 }
 
-func readInitialLogs(ctx context.Context, paths []string, filter FilterOptions, out io.Writer) (*followState, error) {
+func readInitialLogs(ctx context.Context, paths []string, opts FilterOptions, out io.Writer) (*followState, error) {
 	state := &followState{file: nil, reader: nil, partial: nil, lastSize: 0}
 
 	for index, path := range paths {
@@ -664,7 +664,7 @@ func readInitialLogs(ctx context.Context, paths []string, filter FilterOptions, 
 		}
 
 		state.file, state.reader = file, bufio.NewReader(file)
-		if err := state.drain(ctx, filter, out); err != nil {
+		if err := state.drain(ctx, opts, out); err != nil {
 			return nil, errors.Join(err, state.close())
 		}
 
@@ -695,7 +695,7 @@ func finishInitialLogs(ctx context.Context, state *followState, path string, opt
 	return errors.Join(followErr, closeErr)
 }
 
-func followLogFile(ctx context.Context, path string, filter FilterOptions, out io.Writer, state *followState) error {
+func followLogFile(ctx context.Context, path string, opts FilterOptions, out io.Writer, state *followState) error {
 	const watchInterval = 50 * time.Millisecond
 
 	ticker := time.NewTicker(watchInterval)
@@ -710,7 +710,7 @@ func followLogFile(ctx context.Context, path string, filter FilterOptions, out i
 				return nil
 			}
 
-			if err := state.step(ctx, path, filter, out); err != nil {
+			if err := state.step(ctx, path, opts, out); err != nil {
 				if isCleanCancellation(ctx, err) {
 					return nil
 				}
@@ -791,7 +791,7 @@ func (s *followState) close() error {
 	return nil
 }
 
-func (s *followState) drain(ctx context.Context, filter FilterOptions, out io.Writer) error {
+func (s *followState) drain(ctx context.Context, opts FilterOptions, out io.Writer) error {
 	if err := ctx.Err(); err != nil {
 		return wrapErr(err, "log_read_failed", "inspect log reader")
 	}
@@ -810,7 +810,7 @@ func (s *followState) drain(ctx context.Context, filter FilterOptions, out io.Wr
 		s.partial = nil
 	}
 
-	partial, err := drainFollowLines(ctx, s.reader, filter, out, s.partial)
+	partial, err := drainFollowLines(ctx, s.reader, opts, out, s.partial)
 	if err != nil {
 		return err
 	}
@@ -827,13 +827,13 @@ func (s *followState) drain(ctx context.Context, filter FilterOptions, out io.Wr
 	return nil
 }
 
-func (s *followState) step(ctx context.Context, path string, filter FilterOptions, out io.Writer) error {
+func (s *followState) step(ctx context.Context, path string, opts FilterOptions, out io.Writer) error {
 	if err := ctx.Err(); err != nil {
 		return wrapErr(err, "log_read_failed", "step follow reader")
 	}
 
 	if s.file != nil {
-		if err := s.drain(ctx, filter, out); err != nil {
+		if err := s.drain(ctx, opts, out); err != nil {
 			return err
 		}
 	}
@@ -850,7 +850,7 @@ func (s *followState) step(ctx context.Context, path string, filter FilterOption
 		return nil
 	}
 
-	return s.drain(ctx, filter, out)
+	return s.drain(ctx, opts, out)
 }
 
 func (s *followState) refresh(path string) error {
@@ -902,7 +902,7 @@ func writeLogRecord(out io.Writer, line []byte) error {
 	return nil
 }
 
-func drainFollowLines(ctx context.Context, reader *bufio.Reader, filter FilterOptions, out io.Writer, partial []byte) ([]byte, error) {
+func drainFollowLines(ctx context.Context, reader *bufio.Reader, opts FilterOptions, out io.Writer, partial []byte) ([]byte, error) {
 	for {
 		if err := ctx.Err(); err != nil {
 			return partial, wrapErr(err, "log_read_failed", "read log stream")
@@ -915,7 +915,7 @@ func drainFollowLines(ctx context.Context, reader *bufio.Reader, filter FilterOp
 			return nil, wrapErr(err, "log_read_failed", "read log stream")
 		}
 
-		if len(line) > 0 && LineMatchesFilter(line, filter) {
+		if len(line) > 0 && LineMatchesFilter(line, opts) {
 			if err := ctx.Err(); err != nil {
 				return partial, wrapErr(err, "log_read_failed", "read log stream")
 			}

@@ -63,8 +63,8 @@ type Runtime struct {
 
 // Command builds the command for an action. Positional arguments are the subject followed by
 // positional parameters; other parameters become flags.
-func Command[In, Out any](definition *action.Definition[In, Out], options Options[In, Out]) *cobra.Command {
-	operation := options.Operation
+func Command[In, Out any](definition *action.Definition[In, Out], opts Options[In, Out]) *cobra.Command {
+	operation := opts.Operation
 	if operation == "" {
 		operation = definition.ID.Verb()
 	}
@@ -75,12 +75,12 @@ func Command[In, Out any](definition *action.Definition[In, Out], options Option
 		Long:  long(definition.Descriptor),
 		Args:  clibase.UsageArgs(argumentCount(definition.Descriptor)),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd, args, definition, options)
+			return run(cmd, args, definition, opts)
 		},
 		Annotations: map[string]string{clibase.AnnotationOperation: operation, clibase.AnnotationAction: string(definition.ID)},
 	}
 
-	if options.SuccessOwned {
+	if opts.SuccessOwned {
 		cmd.Annotations[clibase.AnnotationSuccessOwned] = ownedValue
 	}
 
@@ -100,8 +100,8 @@ func Command[In, Out any](definition *action.Definition[In, Out], options Option
 
 	clibase.AddJSONFlag(cmd)
 
-	if options.Configure != nil {
-		options.Configure(cmd)
+	if opts.Configure != nil {
+		opts.Configure(cmd)
 	}
 
 	return cmd
@@ -202,7 +202,7 @@ func (runtime *Runtime) Close() error {
 	return runtime.Repository.Close()
 }
 
-func run[In, Out any](cmd *cobra.Command, args []string, definition *action.Definition[In, Out], options Options[In, Out]) error {
+func run[In, Out any](cmd *cobra.Command, args []string, definition *action.Definition[In, Out], opts Options[In, Out]) error {
 	ctx := clibase.CommandContext(cmd)
 
 	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
@@ -215,20 +215,20 @@ func run[In, Out any](cmd *cobra.Command, args []string, definition *action.Defi
 		return err
 	}
 
-	if options.Prepare != nil {
-		proceed, prepareErr := options.Prepare(ctx, cmd, values)
+	if opts.Prepare != nil {
+		proceed, prepareErr := opts.Prepare(ctx, cmd, values)
 		if prepareErr != nil || !proceed {
 			return prepareErr
 		}
 	}
 
-	output, ran, runErr := dispatch(ctx, cmd, cfg, definition, options, subjectArgs, values)
+	output, ran, runErr := dispatch(ctx, cmd, cfg, definition, opts, subjectArgs, values)
 	if !ran || (runErr != nil && reflect.ValueOf(&output).Elem().IsZero()) {
 		return runErr
 	}
 
-	if options.Render != nil {
-		return options.Render(cmd, output, runErr)
+	if opts.Render != nil {
+		return opts.Render(cmd, output, runErr)
 	}
 
 	return Render(cmd, definition, output, runErr)
@@ -240,7 +240,7 @@ func dispatch[In, Out any](
 	cmd *cobra.Command,
 	cfg *config.Config,
 	definition *action.Definition[In, Out],
-	options Options[In, Out],
+	opts Options[In, Out],
 	subjectArgs []string,
 	values action.Values,
 ) (Out, bool, error) {
@@ -255,8 +255,8 @@ func dispatch[In, Out any](
 		return zero, false, err
 	}
 
-	if options.Frontend != nil {
-		runtime.Router.Local = action.Dispatchers{runtime.Local, options.Frontend(cmd)}
+	if opts.Frontend != nil {
+		runtime.Router.Local = action.Dispatchers{runtime.Local, opts.Frontend(cmd)}
 	}
 
 	output, ran, err := execute(ctx, runtime, definition, CallerOf(cmd), subjectArgs, values)
@@ -363,8 +363,8 @@ func Connection(cmd *cobra.Command) string {
 }
 
 func peerSessions(rows []session.Session, kind action.SubjectKind, selectors []string) ([]session.Session, error) {
-	live := slices.DeleteFunc(slices.Clone(rows), session.Session.IsSaved)
-	saved := slices.DeleteFunc(slices.Clone(rows), func(row session.Session) bool { return !row.IsSaved() })
+	live := slices.DeleteFunc(slices.Clone(rows), session.Session.Saved)
+	saved := slices.DeleteFunc(slices.Clone(rows), func(row session.Session) bool { return !row.Saved() })
 
 	selected := make([]session.Session, 0, len(selectors))
 

@@ -41,28 +41,28 @@ var (
 )
 
 type SwitchHistoryEntry struct {
-	Session    Identity `json:"session"`
-	LastSwitch int64    `json:"lastSwitch"`
+	Session        Identity `json:"session"`
+	LastSwitchUnix int64    `json:"lastSwitch"`
 }
 
 type RemoteSwitchHistoryEntry struct {
-	Session    Identity `json:"session"`
-	LastSwitch int64    `json:"lastSwitch"`
+	Session        Identity `json:"session"`
+	LastSwitchUnix int64    `json:"lastSwitch"`
 }
 
 type AgentViewHistoryEntry struct {
-	Session  Identity `json:"session"`
-	PaneID   string   `json:"paneId"`
-	ViewedAt int64    `json:"viewedAt"`
+	Session          Identity `json:"session"`
+	PaneID           string   `json:"paneId"`
+	ViewedAtUnixNano int64    `json:"viewedAt"`
 }
 
 type State struct {
-	Version               int                        `json:"version"`
-	SwitchHistory         []SwitchHistoryEntry       `json:"switchHistory"`
-	RemoteSwitchHistory   []RemoteSwitchHistoryEntry `json:"remoteSwitchHistory"`
-	AgentViewHistory      []AgentViewHistoryEntry    `json:"agentViewHistory"`
-	LastAutosaveTimestamp int64                      `json:"lastAutosaveTimestamp"`
-	PopupDisplayMode      string                     `json:"popupDisplayMode"`
+	Version             int                        `json:"version"`
+	SwitchHistory       []SwitchHistoryEntry       `json:"switchHistory"`
+	RemoteSwitchHistory []RemoteSwitchHistoryEntry `json:"remoteSwitchHistory"`
+	AgentViewHistory    []AgentViewHistoryEntry    `json:"agentViewHistory"`
+	LastAutosaveUnix    int64                      `json:"lastAutosaveTimestamp"`
+	PopupDisplayMode    string                     `json:"popupDisplayMode"`
 }
 
 type ServiceDeps struct {
@@ -98,7 +98,7 @@ func (s *State) Validate() error {
 		return errors.Join(strictjson.ErrInvalid, ErrHistoryBoundExceeded)
 	}
 
-	if s.LastAutosaveTimestamp < 0 || !utf8.ValidString(s.PopupDisplayMode) {
+	if s.LastAutosaveUnix < 0 || !utf8.ValidString(s.PopupDisplayMode) {
 		return strictjson.ErrInvalid
 	}
 
@@ -330,12 +330,12 @@ func (s *Service) loadStateFromDir(dir *privatefs.Dir, fileName string) (*State,
 
 func encodeState(current *State) ([]byte, error) {
 	toWrite := State{
-		Version:               CurrentHistoryVersion,
-		SwitchHistory:         cloneSwitchHistory(current.SwitchHistory),
-		RemoteSwitchHistory:   cloneRemoteSwitchHistory(current.RemoteSwitchHistory),
-		AgentViewHistory:      cloneAgentViewHistory(current.AgentViewHistory),
-		LastAutosaveTimestamp: current.LastAutosaveTimestamp,
-		PopupDisplayMode:      current.PopupDisplayMode,
+		Version:             CurrentHistoryVersion,
+		SwitchHistory:       cloneSwitchHistory(current.SwitchHistory),
+		RemoteSwitchHistory: cloneRemoteSwitchHistory(current.RemoteSwitchHistory),
+		AgentViewHistory:    cloneAgentViewHistory(current.AgentViewHistory),
+		LastAutosaveUnix:    current.LastAutosaveUnix,
+		PopupDisplayMode:    current.PopupDisplayMode,
 	}
 
 	if toWrite.SwitchHistory == nil {
@@ -479,12 +479,12 @@ func validatePath(path string) (string, string, error) {
 
 func defaultState() *State {
 	return &State{
-		Version:               CurrentHistoryVersion,
-		SwitchHistory:         []SwitchHistoryEntry{},
-		RemoteSwitchHistory:   []RemoteSwitchHistoryEntry{},
-		AgentViewHistory:      []AgentViewHistoryEntry{},
-		LastAutosaveTimestamp: 0,
-		PopupDisplayMode:      "",
+		Version:             CurrentHistoryVersion,
+		SwitchHistory:       []SwitchHistoryEntry{},
+		RemoteSwitchHistory: []RemoteSwitchHistoryEntry{},
+		AgentViewHistory:    []AgentViewHistoryEntry{},
+		LastAutosaveUnix:    0,
+		PopupDisplayMode:    "",
 	}
 }
 
@@ -554,20 +554,20 @@ func (s *State) RecordSwitchIdentity(ident Identity) {
 
 	for index := range s.SwitchHistory {
 		if s.SwitchHistory[index].Session == ident {
-			s.SwitchHistory[index].LastSwitch = now
+			s.SwitchHistory[index].LastSwitchUnix = now
 			return
 		}
 	}
 
 	s.SwitchHistory = append(s.SwitchHistory, SwitchHistoryEntry{
-		Session:    ident,
-		LastSwitch: now,
+		Session:        ident,
+		LastSwitchUnix: now,
 	})
 
 	if len(s.SwitchHistory) > maxSwitchHistory {
 		oldest := 0
 		for index := 1; index < len(s.SwitchHistory); index++ {
-			if s.SwitchHistory[index].LastSwitch < s.SwitchHistory[oldest].LastSwitch {
+			if s.SwitchHistory[index].LastSwitchUnix < s.SwitchHistory[oldest].LastSwitchUnix {
 				oldest = index
 			}
 		}
@@ -587,13 +587,13 @@ func (s *State) GetLastSwitchIdentity(ident Identity) int64 {
 
 	for _, entry := range s.SwitchHistory {
 		if entry.Session == ident {
-			return entry.LastSwitch
+			return entry.LastSwitchUnix
 		}
 	}
 
 	for _, entry := range s.RemoteSwitchHistory {
 		if entry.Session == ident {
-			return entry.LastSwitch
+			return entry.LastSwitchUnix
 		}
 	}
 
@@ -609,7 +609,7 @@ func (s *State) RecordRemoteSwitch(ident Identity) {
 
 	for index := range s.RemoteSwitchHistory {
 		if s.RemoteSwitchHistory[index].Session == ident {
-			s.RemoteSwitchHistory[index].LastSwitch = now
+			s.RemoteSwitchHistory[index].LastSwitchUnix = now
 			s.RecordSwitchIdentity(ident)
 
 			return
@@ -617,14 +617,14 @@ func (s *State) RecordRemoteSwitch(ident Identity) {
 	}
 
 	s.RemoteSwitchHistory = append(s.RemoteSwitchHistory, RemoteSwitchHistoryEntry{
-		Session:    ident,
-		LastSwitch: now,
+		Session:        ident,
+		LastSwitchUnix: now,
 	})
 
 	if len(s.RemoteSwitchHistory) > maxRemoteSwitchHistory {
 		oldest := 0
 		for index := 1; index < len(s.RemoteSwitchHistory); index++ {
-			if s.RemoteSwitchHistory[index].LastSwitch < s.RemoteSwitchHistory[oldest].LastSwitch {
+			if s.RemoteSwitchHistory[index].LastSwitchUnix < s.RemoteSwitchHistory[oldest].LastSwitchUnix {
 				oldest = index
 			}
 		}
@@ -642,7 +642,7 @@ func (s *State) GetLastRemoteSwitch(ident Identity) int64 {
 
 	for _, entry := range s.RemoteSwitchHistory {
 		if entry.Session == ident {
-			return entry.LastSwitch
+			return entry.LastSwitchUnix
 		}
 	}
 
@@ -663,8 +663,8 @@ func (s *State) RecordAgentViewAt(ident Identity, paneID string, viewedAt time.T
 	for index := range s.AgentViewHistory {
 		entry := &s.AgentViewHistory[index]
 		if entry.Session == ident && entry.PaneID == paneID {
-			if timestamp > entry.ViewedAt {
-				entry.ViewedAt = timestamp
+			if timestamp > entry.ViewedAtUnixNano {
+				entry.ViewedAtUnixNano = timestamp
 			}
 
 			return
@@ -672,15 +672,15 @@ func (s *State) RecordAgentViewAt(ident Identity, paneID string, viewedAt time.T
 	}
 
 	s.AgentViewHistory = append(s.AgentViewHistory, AgentViewHistoryEntry{
-		Session:  ident,
-		PaneID:   paneID,
-		ViewedAt: timestamp,
+		Session:          ident,
+		PaneID:           paneID,
+		ViewedAtUnixNano: timestamp,
 	})
 
 	if len(s.AgentViewHistory) > maxAgentViewHistory {
 		oldest := 0
 		for index := 1; index < len(s.AgentViewHistory); index++ {
-			if s.AgentViewHistory[index].ViewedAt < s.AgentViewHistory[oldest].ViewedAt {
+			if s.AgentViewHistory[index].ViewedAtUnixNano < s.AgentViewHistory[oldest].ViewedAtUnixNano {
 				oldest = index
 			}
 		}
@@ -696,7 +696,7 @@ func (s *State) GetLastAgentView(ident Identity, paneID string) int64 {
 
 	for _, entry := range s.AgentViewHistory {
 		if entry.Session == ident && entry.PaneID == paneID {
-			return entry.ViewedAt
+			return entry.ViewedAtUnixNano
 		}
 	}
 
@@ -710,9 +710,9 @@ func (s *State) LastUsedSession() string {
 	)
 
 	for _, entry := range s.SwitchHistory {
-		if entry.LastSwitch > timestamp {
+		if entry.LastSwitchUnix > timestamp {
 			selected = entry.Session.Name
-			timestamp = entry.LastSwitch
+			timestamp = entry.LastSwitchUnix
 		}
 	}
 
@@ -778,12 +778,12 @@ func cloneState(s *State) *State {
 	}
 
 	return &State{
-		Version:               s.Version,
-		SwitchHistory:         cloneSwitchHistory(s.SwitchHistory),
-		RemoteSwitchHistory:   cloneRemoteSwitchHistory(s.RemoteSwitchHistory),
-		AgentViewHistory:      cloneAgentViewHistory(s.AgentViewHistory),
-		LastAutosaveTimestamp: s.LastAutosaveTimestamp,
-		PopupDisplayMode:      s.PopupDisplayMode,
+		Version:             s.Version,
+		SwitchHistory:       cloneSwitchHistory(s.SwitchHistory),
+		RemoteSwitchHistory: cloneRemoteSwitchHistory(s.RemoteSwitchHistory),
+		AgentViewHistory:    cloneAgentViewHistory(s.AgentViewHistory),
+		LastAutosaveUnix:    s.LastAutosaveUnix,
+		PopupDisplayMode:    s.PopupDisplayMode,
 	}
 }
 
@@ -828,7 +828,7 @@ func validateSwitchHistory(entries []SwitchHistoryEntry) error {
 			return errors.Join(strictjson.ErrInvalid, err)
 		}
 
-		if entry.LastSwitch < 0 {
+		if entry.LastSwitchUnix < 0 {
 			return strictjson.ErrInvalid
 		}
 
@@ -850,7 +850,7 @@ func validateRemoteSwitchHistory(entries []RemoteSwitchHistoryEntry) error {
 			return errors.Join(strictjson.ErrInvalid, err)
 		}
 
-		if entry.LastSwitch < 0 {
+		if entry.LastSwitchUnix < 0 {
 			return strictjson.ErrInvalid
 		}
 
@@ -877,7 +877,7 @@ func validateAgentViewHistory(entries []AgentViewHistoryEntry) error {
 			return errors.Join(strictjson.ErrInvalid, err)
 		}
 
-		if entry.PaneID == "" || !utf8.ValidString(entry.PaneID) || entry.ViewedAt < 0 {
+		if entry.PaneID == "" || !utf8.ValidString(entry.PaneID) || entry.ViewedAtUnixNano < 0 {
 			return strictjson.ErrInvalid
 		}
 

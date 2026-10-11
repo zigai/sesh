@@ -20,7 +20,7 @@ import (
 	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/integration/process"
-	integration "github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/integration/tmuxserver"
 	"github.com/zigai/sesh/internal/snapshot/capture"
 	"github.com/zigai/sesh/internal/snapshot/model"
 	"github.com/zigai/sesh/internal/snapshot/store"
@@ -452,7 +452,7 @@ func TestSaveObservationAdmissionValidation(t *testing.T) {
 		t.Fatal("expected error for nil server")
 	}
 
-	server, err := integration.Open(filepath.Join(t.TempDir(), "absent.sock"))
+	server, err := tmuxserver.Open(filepath.Join(t.TempDir(), "absent.sock"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zigai/gotmux/tmux"
+	gotmux "github.com/zigai/gotmux/tmux"
 	"github.com/zigai/gotmux/tmuxtest"
 
 	"github.com/zigai/sesh/internal/snapshot/capture"
@@ -17,14 +17,14 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
-func createScratchSessions(t *testing.T, ctx context.Context, server *tmux.Server, count int) {
+func createScratchSessions(t *testing.T, ctx context.Context, server *gotmux.Server, count int) {
 	t.Helper()
 
 	for index := range count {
-		if _, err := server.NewSession(ctx, tmux.NewSessionOptions{
+		if _, err := server.NewSession(ctx, gotmux.NewSessionOptions{
 			Name:    "scratch-" + strconv.Itoa(index),
-			Program: tmux.Exec("sleep", "300"),
-			Start:   tmux.StartPolicyExistingOnly,
+			Program: gotmux.Exec("sleep", "300"),
+			Start:   gotmux.StartPolicyExistingOnly,
 		}); err != nil {
 			t.Fatalf("creating scratch session failed: %v", err)
 		}
@@ -66,7 +66,7 @@ func TestProductionExecutorResumeAfterPartialFailure(t *testing.T) {
 	sessionNames := []string{"source-lead", "source-foll", "src-repeat"}
 	expected := readIndependentSourceState(t, ctx, sourceServer, sessionNames)
 
-	observation, err := capture.Observe(ctx, sourceServer, []tmux.SessionID{leadSess.ID(), follSess.ID(), repeatSess.ID()})
+	observation, err := capture.Observe(ctx, sourceServer, []gotmux.SessionID{leadSess.ID(), follSess.ID(), repeatSess.ID()})
 	if err != nil {
 		t.Fatalf("capture.Observe failed: %v", err)
 	}
@@ -134,7 +134,7 @@ func TestProductionExecutorResumeAfterPartialFailure(t *testing.T) {
 	verifyTargetStructuralParity(t, ctx, targetServer, expected)
 }
 
-func setupTargetWithUnrelatedSession(t *testing.T, ctx context.Context, targetServer *tmux.Server) (tmux.Session, []tmux.WindowLinkInfo, tmux.PaneInfo) {
+func setupTargetWithUnrelatedSession(t *testing.T, ctx context.Context, targetServer *gotmux.Server) (gotmux.Session, []gotmux.WindowLinkInfo, gotmux.PaneInfo) {
 	t.Helper()
 
 	if err := targetServer.GlobalSessionOptions().SetBaseIndex(ctx, 2); err != nil {
@@ -147,10 +147,10 @@ func setupTargetWithUnrelatedSession(t *testing.T, ctx context.Context, targetSe
 
 	createScratchSessions(t, ctx, targetServer, 2)
 
-	unrelated, err := targetServer.NewSession(ctx, tmux.NewSessionOptions{
+	unrelated, err := targetServer.NewSession(ctx, gotmux.NewSessionOptions{
 		Name:    "unrelated-target-sess",
-		Program: tmux.Exec("sleep", "300"),
-		Start:   tmux.StartPolicyExistingOnly,
+		Program: gotmux.Exec("sleep", "300"),
+		Start:   gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -169,7 +169,7 @@ func setupTargetWithUnrelatedSession(t *testing.T, ctx context.Context, targetSe
 func captureAndDestroySource(
 	t *testing.T,
 	ctx context.Context,
-	sourceServer *tmux.Server,
+	sourceServer *gotmux.Server,
 	repoDir string,
 	sessionNames []string,
 ) (string, model.Manifest, *independentSourceState) {
@@ -178,7 +178,7 @@ func captureAndDestroySource(
 	leadSess, follSess, repeatSess := createActualSourceFixture(t, ctx, sourceServer)
 	expected := readIndependentSourceState(t, ctx, sourceServer, sessionNames)
 
-	observation, err := capture.Observe(ctx, sourceServer, []tmux.SessionID{leadSess.ID(), follSess.ID(), repeatSess.ID()})
+	observation, err := capture.Observe(ctx, sourceServer, []gotmux.SessionID{leadSess.ID(), follSess.ID(), repeatSess.ID()})
 	if err != nil {
 		t.Fatalf("capture.Observe failed: %v", err)
 	}
@@ -211,7 +211,7 @@ func buildPlanForNames(t *testing.T, manifest model.Manifest, names []string) Pl
 func executeAndVerifyOnTarget(
 	t *testing.T,
 	ctx context.Context,
-	targetServer *tmux.Server,
+	targetServer *gotmux.Server,
 	repoDir, generation string,
 	manifest model.Manifest,
 	plan Plan,

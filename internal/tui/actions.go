@@ -465,7 +465,7 @@ func (m *Model) handleEnter() func() (tea.Model, tea.Cmd) {
 	}
 
 	return func() (tea.Model, tea.Cmd) {
-		if selectedSession.IsSaved() {
+		if selectedSession.Saved() {
 			return m.runAction(action.SnapshotRestore, action.SubjectOf(selectedSession), action.Values{})()
 		}
 
@@ -477,7 +477,7 @@ func (m *Model) handleRemoteEnter(
 	target session.Session,
 	selectedRow popupListRow,
 ) func() (tea.Model, tea.Cmd) {
-	if target.IsSaved() {
+	if target.Saved() {
 		return m.runAction(action.SnapshotRestore, action.SubjectOf(target), action.Values{})
 	}
 

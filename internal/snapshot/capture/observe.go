@@ -17,7 +17,7 @@ import (
 
 	"github.com/zigai/sesh/internal/agents"
 	"github.com/zigai/sesh/internal/integration/process"
-	integration "github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/integration/tmuxserver"
 	"github.com/zigai/sesh/internal/snapshot/model"
 )
 
@@ -129,7 +129,7 @@ func observeOnce(ctx context.Context, server *gotmux.Server, selected []gotmux.S
 	}
 
 	if server == nil || server.Endpoint().SocketPath == "" {
-		return Observation{}, integration.ErrEndpoint
+		return Observation{}, tmuxserver.ErrEndpoint
 	}
 
 	started := time.Now().UnixNano()
@@ -179,7 +179,7 @@ func (o *Observation) finalize(info gotmux.ServerInfo, started int64, endpoint s
 	o.Manifest.Format, o.Manifest.Version = "sesh", model.Schema
 	o.Manifest.Started, o.Manifest.Finished = started, time.Now().UnixNano()
 	o.Manifest.Source.TmuxVersion = fmt.Sprint(info.Version)
-	o.Manifest.Source.LibraryVersion, o.Manifest.Source.Consistency = integration.LibraryVersion, "observed"
+	o.Manifest.Source.LibraryVersion, o.Manifest.Source.Consistency = tmuxserver.LibraryVersion, "observed"
 
 	endpointScope, err := model.EndpointScope(endpoint)
 	if err != nil {

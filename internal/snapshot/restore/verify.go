@@ -7,9 +7,9 @@ import (
 	"maps"
 	"sort"
 
-	"github.com/zigai/gotmux/tmux"
+	gotmux "github.com/zigai/gotmux/tmux"
 
-	itmux "github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/integration/tmuxserver"
 	"github.com/zigai/sesh/internal/snapshot/model"
 )
 
@@ -97,7 +97,7 @@ func (r *VerificationReport) advisory(domain, entity, reason string) {
 	r.Advisories = append(r.Advisories, VerificationMismatch{Domain: domain, Entity: entity, Reason: reason})
 }
 
-func Verify(ctx context.Context, server *tmux.Server, plan Plan, receipts map[string]string) (VerificationReport, error) {
+func Verify(ctx context.Context, server *gotmux.Server, plan Plan, receipts map[string]string) (VerificationReport, error) {
 	report := VerificationReport{
 		Verified:      false,
 		Sessions:      0,
@@ -165,7 +165,7 @@ func expectedSlotsBySession(plan Plan) map[string]map[int]slotExpectation {
 
 func verifySessions(
 	ctx context.Context,
-	server *tmux.Server,
+	server *gotmux.Server,
 	plan Plan,
 	identities RuntimeIdentities,
 	state *verifiedState,
@@ -208,7 +208,7 @@ func verifySessions(
 
 func verifySessionIdentity(
 	ctx context.Context,
-	handle tmux.Session,
+	handle gotmux.Session,
 	session model.Session,
 	groupNames map[string]string,
 	report *VerificationReport,
@@ -249,7 +249,7 @@ func verifySessionIdentity(
 
 func verifySessionLinks(
 	ctx context.Context,
-	handle tmux.Session,
+	handle gotmux.Session,
 	identities RuntimeIdentities,
 	expected map[int]slotExpectation,
 	session string,
@@ -263,7 +263,7 @@ func verifySessionLinks(
 		return false
 	}
 
-	observed := make(map[int]tmux.WindowLinkInfo, len(links))
+	observed := make(map[int]gotmux.WindowLinkInfo, len(links))
 	for _, link := range links {
 		observed[link.Index] = link
 	}
@@ -341,7 +341,7 @@ func containsFlag(flags string, flag byte) bool {
 
 func verifyWindows(
 	ctx context.Context,
-	server *tmux.Server,
+	server *gotmux.Server,
 	plan Plan,
 	identities RuntimeIdentities,
 	state *verifiedState,
@@ -360,7 +360,7 @@ func verifyWindows(
 
 func verifyWindow(
 	ctx context.Context,
-	server *tmux.Server,
+	server *gotmux.Server,
 	window model.Window,
 	expectedPanes []model.Pane,
 	identities RuntimeIdentities,
@@ -406,13 +406,13 @@ func verifyWindow(
 }
 
 func verifyWindowPanes(
-	observedPanes []tmux.PaneInfo,
+	observedPanes []gotmux.PaneInfo,
 	expectedPanes []model.Pane,
 	identities RuntimeIdentities,
 	state *verifiedState,
 	report *VerificationReport,
 ) {
-	observedByID := make(map[tmux.PaneID]tmux.PaneInfo, len(observedPanes))
+	observedByID := make(map[gotmux.PaneID]gotmux.PaneInfo, len(observedPanes))
 	for _, pane := range observedPanes {
 		observedByID[pane.ID] = pane
 	}
@@ -462,7 +462,7 @@ func windowNameIsAutomatic(window model.Window) bool {
 
 func verifyWindowIdentity(
 	ctx context.Context,
-	handle tmux.Window,
+	handle gotmux.Window,
 	window model.Window,
 	report *VerificationReport,
 ) (bool, bool) {
@@ -505,10 +505,10 @@ func verifyWindowIdentity(
 
 func verifyWindowLayout(
 	ctx context.Context,
-	handle tmux.Window,
+	handle gotmux.Window,
 	window model.Window,
 	identities RuntimeIdentities,
-	observedPanes []tmux.PaneInfo,
+	observedPanes []gotmux.PaneInfo,
 	report *VerificationReport,
 ) bool {
 	info, err := handle.Info(ctx)
@@ -523,7 +523,7 @@ func verifyWindowLayout(
 		paneNames[string(pane.ID)] = string(pane.ID)
 	}
 
-	observed, err := itmux.DecodeLayout(info.Layout, paneNames)
+	observed, err := tmuxserver.DecodeLayout(info.Layout, paneNames)
 	if err != nil {
 		report.mismatch(MismatchGeometry, window.ID, "window_layout_undecodable")
 
@@ -601,7 +601,7 @@ func sortLayoutLeaves(leaves []layoutLeaf) {
 
 func verifyActivePane(
 	ctx context.Context,
-	handle tmux.Window,
+	handle gotmux.Window,
 	expectedPanes []model.Pane,
 	identities RuntimeIdentities,
 	report *VerificationReport,
@@ -645,7 +645,7 @@ func verifyActivePane(
 
 func verifyScopedState(
 	ctx context.Context,
-	server *tmux.Server,
+	server *gotmux.Server,
 	plan Plan,
 	identities RuntimeIdentities,
 	state *verifiedState,
@@ -717,7 +717,7 @@ func verifyScopedState(
 func verifySessionScope(
 	ctx context.Context,
 	targetGlobal map[environmentKey]environmentShape,
-	handle tmux.Session,
+	handle gotmux.Session,
 	expectedGlobal []model.Variable,
 	session model.Session,
 	report *VerificationReport,
@@ -753,7 +753,7 @@ func verifyOptions(
 	entity string,
 	report *VerificationReport,
 ) bool {
-	live, err := scope.ListWith(ctx, tmux.ListOptionOptions{Inherited: true, Hooks: true})
+	live, err := scope.ListWith(ctx, gotmux.ListOptionOptions{Inherited: true, Hooks: true})
 	if err != nil {
 		report.mismatch(MismatchOption, entity, "scope_unreadable")
 

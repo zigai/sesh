@@ -9,7 +9,7 @@ import (
 	"github.com/samber/oops"
 	gotmux "github.com/zigai/gotmux/tmux"
 
-	integration "github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/integration/tmuxserver"
 	"github.com/zigai/sesh/internal/snapshot/model"
 )
 
@@ -107,7 +107,7 @@ func graphLinks(snapshot gotmux.Snapshot, wanted map[gotmux.SessionID]bool, m *m
 
 // graphLayouts records each selected window with its tiled layout and returns the decoded layouts
 // with the set of floating panes they exclude.
-func graphLayouts(snapshot gotmux.Snapshot, windows map[gotmux.WindowID]bool, m *model.Manifest) (map[string]integration.WindowLayout, map[string]bool, error) {
+func graphLayouts(snapshot gotmux.Snapshot, windows map[gotmux.WindowID]bool, m *model.Manifest) (map[string]tmuxserver.WindowLayout, map[string]bool, error) {
 	panes := make(map[string]string)
 
 	for _, info := range snapshot.Panes() {
@@ -116,7 +116,7 @@ func graphLayouts(snapshot gotmux.Snapshot, windows map[gotmux.WindowID]bool, m 
 		}
 	}
 
-	layouts := make(map[string]integration.WindowLayout)
+	layouts := make(map[string]tmuxserver.WindowLayout)
 	floating := make(map[string]bool)
 
 	for _, info := range snapshot.Windows() {
@@ -124,7 +124,7 @@ func graphLayouts(snapshot gotmux.Snapshot, windows map[gotmux.WindowID]bool, m 
 			continue
 		}
 
-		layout, err := integration.DecodeLayout(info.Layout, panes)
+		layout, err := tmuxserver.DecodeLayout(info.Layout, panes)
 		if err != nil {
 			return nil, nil, oops.In("snapshot.capture").
 				Code("capture_unsupported").
@@ -148,7 +148,7 @@ func graphLayouts(snapshot gotmux.Snapshot, windows map[gotmux.WindowID]bool, m 
 // retileWindowPanes renumbers a window's tiled panes as tmux numbers them once its floating
 // panes are gone, and moves the active flag to the tiled pane used most recently when a
 // floating pane was active.
-func retileWindowPanes(snapshot gotmux.Snapshot, panes []model.Pane, window string, layout integration.WindowLayout) {
+func retileWindowPanes(snapshot gotmux.Snapshot, panes []model.Pane, window string, layout tmuxserver.WindowLayout) {
 	base := -1
 
 	for _, info := range snapshot.Panes() {

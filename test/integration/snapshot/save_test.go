@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zigai/gotmux/tmux"
+	gotmux "github.com/zigai/gotmux/tmux"
 	"github.com/zigai/gotmux/tmuxtest"
 
-	tmuxintegration "github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/integration/tmuxserver"
 	"github.com/zigai/sesh/internal/snapshot/engine"
 	"github.com/zigai/sesh/internal/snapshot/model"
 	"github.com/zigai/sesh/internal/snapshot/store"
@@ -48,7 +48,7 @@ func TestSaveUsesExplicitServerAndExactSession(t *testing.T) {
 		LeaseRoot: filepath.Join(t.TempDir(), "leases"),
 	}
 
-	result, err := engine.SaveObservation(t.Context(), r, source, []tmux.SessionID{selected.ID()}, cfg)
+	result, err := engine.SaveObservation(t.Context(), r, source, []gotmux.SessionID{selected.ID()}, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +67,7 @@ func TestSaveUsesExplicitServerAndExactSession(t *testing.T) {
 	assertPaneUnchanged(t, foreign, foreignInfo)
 }
 
-func assertSavedSelection(t *testing.T, saved model.Manifest, pane tmux.Pane, dir string) {
+func assertSavedSelection(t *testing.T, saved model.Manifest, pane gotmux.Pane, dir string) {
 	t.Helper()
 
 	if len(saved.Sessions) != 1 || string(saved.Sessions[0].Name) != "1" || len(saved.Panes) != 1 {
@@ -84,10 +84,10 @@ func assertSavedSelection(t *testing.T, saved model.Manifest, pane tmux.Pane, di
 	}
 }
 
-func saveSessionFixture(t *testing.T, server *tmux.Server, name, dir, marker string) (tmux.Session, tmux.Pane) {
+func saveSessionFixture(t *testing.T, server *gotmux.Server, name, dir, marker string) (gotmux.Session, gotmux.Pane) {
 	t.Helper()
 
-	session, err := server.NewSession(t.Context(), tmux.NewSessionOptions{Name: name, Dir: dir, Program: tmux.Exec("/bin/sh", "-c", `printf '%s' "$1"; exec sleep 300`, "sh", marker), Start: tmux.StartPolicyExistingOnly, Size: tmux.Size{Width: 100, Height: 35}})
+	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{Name: name, Dir: dir, Program: gotmux.Exec("/bin/sh", "-c", `printf '%s' "$1"; exec sleep 300`, "sh", marker), Start: gotmux.StartPolicyExistingOnly, Size: gotmux.Size{Width: 100, Height: 35}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +128,7 @@ func openSaveRepository(t *testing.T) *store.Repository {
 	return r
 }
 
-func assertPaneUnchanged(t *testing.T, pane tmux.Pane, before tmux.PaneInfo) {
+func assertPaneUnchanged(t *testing.T, pane gotmux.Pane, before gotmux.PaneInfo) {
 	t.Helper()
 
 	after, err := pane.Info(t.Context())
@@ -151,7 +151,7 @@ func TestSaveLeaseContentionLeavesRepositoryUnchanged(t *testing.T) {
 	r2 := openSaveRepository(t)
 	cfg := engine.SaveConfig{LeaseRoot: leaseRoot}
 
-	res1, err := engine.SaveObservation(t.Context(), r1, server, []tmux.SessionID{selected.ID()}, cfg)
+	res1, err := engine.SaveObservation(t.Context(), r1, server, []gotmux.SessionID{selected.ID()}, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestSaveLeaseContentionLeavesRepositoryUnchanged(t *testing.T) {
 		t.Fatalf("unexpected status: %s", res1.Status)
 	}
 
-	heldLease, err := tmuxintegration.AcquireLease(t.Context(), leaseRoot, server.Endpoint().SocketPath)
+	heldLease, err := tmuxserver.AcquireLease(t.Context(), leaseRoot, server.Endpoint().SocketPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +168,7 @@ func TestSaveLeaseContentionLeavesRepositoryUnchanged(t *testing.T) {
 	timeoutCtx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
 	defer cancel()
 
-	_, saveErr := engine.SaveObservation(timeoutCtx, r2, server, []tmux.SessionID{selected.ID()}, cfg)
+	_, saveErr := engine.SaveObservation(timeoutCtx, r2, server, []gotmux.SessionID{selected.ID()}, cfg)
 	if !errors.Is(saveErr, context.DeadlineExceeded) {
 		t.Fatalf("expected save to fail with deadline exceeded, got: %v", saveErr)
 	}
@@ -186,7 +186,7 @@ func TestSaveLeaseContentionLeavesRepositoryUnchanged(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := engine.SaveObservation(t.Context(), r2, server, []tmux.SessionID{selected.ID()}, cfg)
+	result, err := engine.SaveObservation(t.Context(), r2, server, []gotmux.SessionID{selected.ID()}, cfg)
 	if err != nil {
 		t.Fatalf("expected save to succeed after lease release: %v", err)
 	}
@@ -217,12 +217,12 @@ func TestSaveDistinctEndpointsProceedConcurrently(t *testing.T) {
 	go func() {
 		defer g.Done()
 
-		_, errs[0] = engine.SaveObservation(t.Context(), r1, server1, []tmux.SessionID{sess1.ID()}, cfg)
+		_, errs[0] = engine.SaveObservation(t.Context(), r1, server1, []gotmux.SessionID{sess1.ID()}, cfg)
 	}()
 	go func() {
 		defer g.Done()
 
-		_, errs[1] = engine.SaveObservation(t.Context(), r2, server2, []tmux.SessionID{sess2.ID()}, cfg)
+		_, errs[1] = engine.SaveObservation(t.Context(), r2, server2, []gotmux.SessionID{sess2.ID()}, cfg)
 	}()
 
 	g.Wait()
@@ -244,7 +244,7 @@ func TestSaveCanceledAdmissionLeavesRepositoryUnchanged(t *testing.T) {
 	leaseRoot := filepath.Join(t.TempDir(), "shared-leases")
 	r := openSaveRepository(t)
 
-	heldLease, err := tmuxintegration.AcquireLease(t.Context(), leaseRoot, server.Endpoint().SocketPath)
+	heldLease, err := tmuxserver.AcquireLease(t.Context(), leaseRoot, server.Endpoint().SocketPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,7 +255,7 @@ func TestSaveCanceledAdmissionLeavesRepositoryUnchanged(t *testing.T) {
 
 	cfg := engine.SaveConfig{LeaseRoot: leaseRoot}
 
-	_, err = engine.SaveObservation(ctx, r, server, []tmux.SessionID{selected.ID()}, cfg)
+	_, err = engine.SaveObservation(ctx, r, server, []gotmux.SessionID{selected.ID()}, cfg)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected context.Canceled, got %v", err)
 	}
@@ -279,14 +279,14 @@ func TestSaveLeaseReleasedOnCaptureFailure(t *testing.T) {
 	r := openSaveRepository(t)
 	cfg := engine.SaveConfig{LeaseRoot: leaseRoot}
 
-	invalidSession := tmux.SessionID("$999999")
+	invalidSession := gotmux.SessionID("$999999")
 
-	_, err := engine.SaveObservation(t.Context(), r, server, []tmux.SessionID{invalidSession}, cfg)
+	_, err := engine.SaveObservation(t.Context(), r, server, []gotmux.SessionID{invalidSession}, cfg)
 	if err == nil {
 		t.Fatal("expected save to fail for non-existent session")
 	}
 
-	result, err := engine.SaveObservation(t.Context(), r, server, []tmux.SessionID{selected.ID()}, cfg)
+	result, err := engine.SaveObservation(t.Context(), r, server, []gotmux.SessionID{selected.ID()}, cfg)
 	if err != nil {
 		t.Fatalf("expected save to succeed after capture failure release: %v", err)
 	}

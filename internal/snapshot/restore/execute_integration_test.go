@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/samber/oops"
-	"github.com/zigai/gotmux/tmux"
+	gotmux "github.com/zigai/gotmux/tmux"
 	"github.com/zigai/gotmux/tmuxtest"
 
 	"github.com/zigai/sesh/internal/snapshot/model"
@@ -137,9 +137,9 @@ func TestExecutor_PreflightSessionCollision(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
 
-	preExisting, err := server.NewSession(ctx, tmux.NewSessionOptions{
+	preExisting, err := server.NewSession(ctx, gotmux.NewSessionOptions{
 		Name:  "alpha",
-		Start: tmux.StartPolicyExistingOnly,
+		Start: gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("pre-creating session failed: %v", err)
@@ -179,18 +179,18 @@ func TestExecutor_PreflightGroupCollision(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
 
-	leader, err := server.NewSession(ctx, tmux.NewSessionOptions{
+	leader, err := server.NewSession(ctx, gotmux.NewSessionOptions{
 		Name:  "grp-shared",
-		Start: tmux.StartPolicyExistingOnly,
+		Start: gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("pre-creating group leader failed: %v", err)
 	}
 
-	follower, err := server.NewSession(ctx, tmux.NewSessionOptions{
+	follower, err := server.NewSession(ctx, gotmux.NewSessionOptions{
 		Name:  "live-follower",
 		Group: "grp-shared",
-		Start: tmux.StartPolicyExistingOnly,
+		Start: gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("pre-creating group follower failed: %v", err)

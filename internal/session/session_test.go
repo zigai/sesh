@@ -159,8 +159,8 @@ func TestSavedSessionSemanticIdentity(t *testing.T) {
 		t.Fatalf("ident.Name = %q, want my-project", ident.Name)
 	}
 
-	if !s.IsSaved() {
-		t.Fatal("IsSaved() should be true for KindSaved")
+	if !s.Saved() {
+		t.Fatal("Saved() should be true for KindSaved")
 	}
 }
 

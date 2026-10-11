@@ -134,8 +134,8 @@ func TestUpdateStatePreservesGeneratedSwitchHistory(t *testing.T) {
 		entries := make([]SwitchHistoryEntry, 0, len(switches))
 		for name, lastSwitch := range switches {
 			entries = append(entries, SwitchHistoryEntry{
-				Session:    Identity{Name: name},
-				LastSwitch: lastSwitch,
+				Session:        Identity{Name: name},
+				LastSwitchUnix: lastSwitch,
 			})
 		}
 
@@ -284,12 +284,12 @@ func TestAgentViewAcknowledgmentPreservesNewerPersistedTimestamp(t *testing.T) {
 func TestStateRenameSession(t *testing.T) {
 	st := &State{
 		SwitchHistory: []SwitchHistoryEntry{
-			{Session: Identity{Name: "old"}, LastSwitch: 123},
+			{Session: Identity{Name: "old"}, LastSwitchUnix: 123},
 		},
 		AgentViewHistory: []AgentViewHistoryEntry{{
-			Session:  Identity{Name: "old"},
-			PaneID:   "%7",
-			ViewedAt: 456,
+			Session:          Identity{Name: "old"},
+			PaneID:           "%7",
+			ViewedAtUnixNano: 456,
 		}},
 	}
 	oldIdent := Identity{Name: "old"}
@@ -308,12 +308,12 @@ func TestStateRenameSession(t *testing.T) {
 func TestStateDeleteSession(t *testing.T) {
 	st := &State{
 		SwitchHistory: []SwitchHistoryEntry{
-			{Session: Identity{Name: historyTestSessionName}, LastSwitch: 123},
-			{Session: Identity{Name: "keep"}, LastSwitch: 456},
+			{Session: Identity{Name: historyTestSessionName}, LastSwitchUnix: 123},
+			{Session: Identity{Name: "keep"}, LastSwitchUnix: 456},
 		},
 		AgentViewHistory: []AgentViewHistoryEntry{
-			{Session: Identity{Name: historyTestSessionName}, PaneID: "%7", ViewedAt: 789},
-			{Session: Identity{Name: "keep"}, PaneID: "%8", ViewedAt: 999},
+			{Session: Identity{Name: historyTestSessionName}, PaneID: "%7", ViewedAtUnixNano: 789},
+			{Session: Identity{Name: "keep"}, PaneID: "%8", ViewedAtUnixNano: 999},
 		},
 	}
 	st.DeleteSession(Identity{Name: historyTestSessionName})
@@ -340,16 +340,16 @@ func TestSaveAndLoad(t *testing.T) {
 	st := &State{
 		Version: CurrentHistoryVersion,
 		SwitchHistory: []SwitchHistoryEntry{
-			{Session: Identity{Name: "session1"}, LastSwitch: 1234567890},
+			{Session: Identity{Name: "session1"}, LastSwitchUnix: 1234567890},
 		},
 		RemoteSwitchHistory: []RemoteSwitchHistoryEntry{{
-			Session:    Identity{Origin: "ssh", ConnectionID: "work", Name: historyTestSessionName},
-			LastSwitch: 1234567891,
+			Session:        Identity{Origin: "ssh", ConnectionID: "work", Name: historyTestSessionName},
+			LastSwitchUnix: 1234567891,
 		}},
 		AgentViewHistory: []AgentViewHistoryEntry{{
-			Session:  Identity{Name: "session1"},
-			PaneID:   "%7",
-			ViewedAt: 1234567892,
+			Session:          Identity{Name: "session1"},
+			PaneID:           "%7",
+			ViewedAtUnixNano: 1234567892,
 		}},
 		PopupDisplayMode: "agents",
 	}

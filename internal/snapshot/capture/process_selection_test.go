@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zigai/gotmux/tmux"
+	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/integration/process"
 	"github.com/zigai/sesh/internal/snapshot/model"
@@ -28,7 +28,7 @@ func TestProcessSelectionBoundsBeforeServerAccess(t *testing.T) {
 
 	for name, keys := range cases {
 		t.Run(name, func(t *testing.T) {
-			_, err := ObserveWithProcessEnrichment(t.Context(), nil, []tmux.SessionID{"$0"}, keys)
+			_, err := ObserveWithProcessEnrichment(t.Context(), nil, []gotmux.SessionID{"$0"}, keys)
 			if !errors.Is(err, process.ErrEnvironmentLimitExceeded) {
 				t.Fatalf("expected bounded selection rejection before server access: %v", err)
 			}
@@ -65,7 +65,7 @@ func TestTerminalActivityDoesNotInvalidateStructuralObservation(t *testing.T) {
 
 func TestProcessSelectionInvalidNamesBeforeServerAccess(t *testing.T) {
 	for _, key := range []string{"", "NAME=value", "NA\x00ME"} {
-		_, err := ObserveWithProcessEnrichment(t.Context(), nil, []tmux.SessionID{"$0"}, []string{key})
+		_, err := ObserveWithProcessEnrichment(t.Context(), nil, []gotmux.SessionID{"$0"}, []string{key})
 		if !errors.Is(err, process.ErrInvalidVariableName) {
 			t.Fatalf("expected invalid name rejection before server access: %v", err)
 		}

@@ -12,7 +12,7 @@ import (
 	"github.com/samber/oops"
 	gotmux "github.com/zigai/gotmux/tmux"
 
-	integration "github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/integration/tmuxserver"
 	"github.com/zigai/sesh/internal/snapshot/engine"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
@@ -67,7 +67,7 @@ func TestRestoreAdmissionChecks(t *testing.T) {
 		t.Fatal("expected error on nil server, got nil")
 	}
 
-	if !errors.Is(err, integration.ErrEndpoint) {
+	if !errors.Is(err, tmuxserver.ErrEndpoint) {
 		t.Fatalf("expected ErrEndpoint, got %v", err)
 	}
 

@@ -152,14 +152,14 @@ func PeerEntryPoint(connection config.RemoteConnectionConfig, channel Channel) [
 	return []string{connection.ResolvedSeshPath(), channelCommand, peerCommand, string(channel)}
 }
 
-func NewSSHCommand(ctx context.Context, remote config.RemoteConfig, connection config.RemoteConnectionConfig, options SSHCommandOptions, remoteCommand ...string) (*exec.Cmd, error) {
+func NewSSHCommand(ctx context.Context, remote config.RemoteConfig, connection config.RemoteConnectionConfig, opts SSHCommandOptions, remoteCommand ...string) (*exec.Cmd, error) {
 	if strings.HasPrefix(connection.Host, "-") || strings.TrimSpace(connection.Host) == "" {
 		return nil, oops.In("remote").With("operation", "new_ssh_command").With("host", connection.Host).Wrap(ErrInvalidFrame)
 	}
 
 	arguments := make([]string, 0, defaultSSHArgCapacity)
 
-	if options.Interactive {
+	if opts.Interactive {
 		arguments = append(arguments, "-t")
 	} else {
 		arguments = append(arguments, "-T", "-o", "BatchMode=yes")
@@ -175,7 +175,7 @@ func NewSSHCommand(ctx context.Context, remote config.RemoteConfig, connection c
 		"-o", "ServerAliveCountMax=3",
 	)
 
-	if len(options.Forward) == 0 {
+	if len(opts.Forward) == 0 {
 		arguments = append(arguments, "-o", "ClearAllForwardings=yes")
 	} else {
 		arguments = append(
@@ -184,7 +184,7 @@ func NewSSHCommand(ctx context.Context, remote config.RemoteConfig, connection c
 			"-o", "StreamLocalBindUnlink=no",
 		)
 
-		for _, forward := range options.Forward {
+		for _, forward := range opts.Forward {
 			if !validSocketPath(forward.RemotePath) || !validSocketPath(forward.LocalPath) {
 				return nil, oops.In("remote").With("operation", "new_ssh_command").Wrap(ErrUnsafePath)
 			}
@@ -195,7 +195,7 @@ func NewSSHCommand(ctx context.Context, remote config.RemoteConfig, connection c
 
 	arguments = append(arguments, "--", connection.Host, ShellJoin(remoteCommand))
 
-	command := options.Command
+	command := opts.Command
 	if command == nil {
 		command = exec.CommandContext
 	}

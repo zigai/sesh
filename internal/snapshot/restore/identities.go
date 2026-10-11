@@ -6,22 +6,22 @@ import (
 	"context"
 
 	"github.com/samber/oops"
-	"github.com/zigai/gotmux/tmux"
+	gotmux "github.com/zigai/gotmux/tmux"
 )
 
 type RuntimeIdentities struct {
-	Sessions map[string]tmux.SessionID
-	Windows  map[string]tmux.WindowID
-	Panes    map[string]tmux.PaneID
+	Sessions map[string]gotmux.SessionID
+	Windows  map[string]gotmux.WindowID
+	Panes    map[string]gotmux.PaneID
 }
 
-func ResolveRuntimeIdentities(ctx context.Context, server *tmux.Server, plan Plan, receipts map[string]string) (RuntimeIdentities, error) {
+func ResolveRuntimeIdentities(ctx context.Context, server *gotmux.Server, plan Plan, receipts map[string]string) (RuntimeIdentities, error) {
 	index := indexPlan(plan)
 
 	identities := RuntimeIdentities{
-		Sessions: make(map[string]tmux.SessionID, len(plan.SourceGraph.Sessions)),
-		Windows:  make(map[string]tmux.WindowID, len(plan.SourceGraph.Windows)),
-		Panes:    make(map[string]tmux.PaneID, len(plan.SourceGraph.Panes)),
+		Sessions: make(map[string]gotmux.SessionID, len(plan.SourceGraph.Sessions)),
+		Windows:  make(map[string]gotmux.WindowID, len(plan.SourceGraph.Windows)),
+		Panes:    make(map[string]gotmux.PaneID, len(plan.SourceGraph.Panes)),
 	}
 
 	produced, err := resolvePaneIdentities(plan, receipts, &identities)
@@ -40,7 +40,7 @@ func ResolveRuntimeIdentities(ctx context.Context, server *tmux.Server, plan Pla
 	return identities, nil
 }
 
-func InitialPaneID(ctx context.Context, server *tmux.Server, windowID string, runtimeID tmux.WindowID, produced map[tmux.PaneID]bool) (tmux.PaneID, error) {
+func InitialPaneID(ctx context.Context, server *gotmux.Server, windowID string, runtimeID gotmux.WindowID, produced map[gotmux.PaneID]bool) (gotmux.PaneID, error) {
 	window, err := server.Window(ctx, runtimeID)
 	if err != nil {
 		return "", oops.In("snapshot.restore").
@@ -52,8 +52,8 @@ func InitialPaneID(ctx context.Context, server *tmux.Server, windowID string, ru
 	return initialPaneIDOf(ctx, window, windowID, produced)
 }
 
-func resolvePaneIdentities(plan Plan, receipts map[string]string, identities *RuntimeIdentities) (map[string]map[tmux.PaneID]bool, error) {
-	produced := map[string]map[tmux.PaneID]bool{}
+func resolvePaneIdentities(plan Plan, receipts map[string]string, identities *RuntimeIdentities) (map[string]map[gotmux.PaneID]bool, error) {
+	produced := map[string]map[gotmux.PaneID]bool{}
 
 	for _, step := range plan.Steps {
 		split, ok := step.(*SplitPaneStep)
@@ -63,7 +63,7 @@ func resolvePaneIdentities(plan Plan, receipts map[string]string, identities *Ru
 
 		windowID := split.WindowID
 		if produced[windowID] == nil {
-			produced[windowID] = map[tmux.PaneID]bool{}
+			produced[windowID] = map[gotmux.PaneID]bool{}
 		}
 
 		id := receipts[split.ID()]
@@ -71,8 +71,8 @@ func resolvePaneIdentities(plan Plan, receipts map[string]string, identities *Ru
 			return nil, missingReceipt(split.ID())
 		}
 
-		produced[windowID][tmux.PaneID(id)] = true
-		identities.Panes[split.PaneID] = tmux.PaneID(id)
+		produced[windowID][gotmux.PaneID(id)] = true
+		identities.Panes[split.PaneID] = gotmux.PaneID(id)
 	}
 
 	return produced, nil
@@ -91,7 +91,7 @@ func resolveStructuralIdentities(plan Plan, index planIndex, receipts map[string
 				return missingReceipt(step.ID())
 			}
 
-			identities.Windows[step.WindowID] = tmux.WindowID(id)
+			identities.Windows[step.WindowID] = gotmux.WindowID(id)
 		case *PlaceInitialWindowStep, *SplitPaneStep, *LinkWindowStep, *CloseBootstrapWindowStep,
 			*ApplyLayoutStep, *SelectPaneStep, *ApplyZoomStep, *SelectWindowStep, *SetPaneTitleStep:
 		}
@@ -106,7 +106,7 @@ func resolveCreatedSession(step *CreateSessionStep, index planIndex, receipts ma
 		return missingReceipt(step.ID())
 	}
 
-	identities.Sessions[step.SessionID] = tmux.SessionID(id)
+	identities.Sessions[step.SessionID] = gotmux.SessionID(id)
 
 	if step.GroupLeaderSessionID != "" || step.InitialWindowID == "" {
 		return nil
@@ -122,17 +122,17 @@ func resolveCreatedSession(step *CreateSessionStep, index planIndex, receipts ma
 		return missingReceipt(placement.ID())
 	}
 
-	identities.Windows[step.InitialWindowID] = tmux.WindowID(windowID)
+	identities.Windows[step.InitialWindowID] = gotmux.WindowID(windowID)
 
 	return nil
 }
 
 func resolveInitialPaneIdentities(
 	ctx context.Context,
-	server *tmux.Server,
+	server *gotmux.Server,
 	plan Plan,
 	index planIndex,
-	produced map[string]map[tmux.PaneID]bool,
+	produced map[string]map[gotmux.PaneID]bool,
 	identities *RuntimeIdentities,
 ) error {
 	for _, window := range plan.SourceGraph.Windows {
@@ -157,7 +157,7 @@ func resolveInitialPaneIdentities(
 	return nil
 }
 
-func initialPaneIDOf(ctx context.Context, window tmux.Window, windowID string, produced map[tmux.PaneID]bool) (tmux.PaneID, error) {
+func initialPaneIDOf(ctx context.Context, window gotmux.Window, windowID string, produced map[gotmux.PaneID]bool) (gotmux.PaneID, error) {
 	panes, err := window.Panes(ctx)
 	if err != nil {
 		return "", oops.In("snapshot.restore").
@@ -166,7 +166,7 @@ func initialPaneIDOf(ctx context.Context, window tmux.Window, windowID string, p
 			Wrap(err)
 	}
 
-	var candidate tmux.PaneID
+	var candidate gotmux.PaneID
 
 	found := 0
 

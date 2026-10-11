@@ -7,9 +7,9 @@ import (
 	"sort"
 
 	"github.com/samber/oops"
-	"github.com/zigai/gotmux/tmux"
+	gotmux "github.com/zigai/gotmux/tmux"
 
-	itmux "github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/integration/tmuxserver"
 )
 
 const (
@@ -26,9 +26,9 @@ type Collision struct {
 
 // FindCollisions reports every session in the plan's closure that collides with a live session.
 // It only observes: the executor still refuses to create anything over a collision.
-func FindCollisions(ctx context.Context, server *tmux.Server, plan Plan) ([]Collision, error) {
+func FindCollisions(ctx context.Context, server *gotmux.Server, plan Plan) ([]Collision, error) {
 	if server == nil {
-		return nil, oops.In("snapshot.restore").Code("endpoint_required").Wrap(itmux.ErrEndpoint)
+		return nil, oops.In("snapshot.restore").Code("endpoint_required").Wrap(tmuxserver.ErrEndpoint)
 	}
 
 	live, err := server.Sessions(ctx)
@@ -50,7 +50,7 @@ func FindCollisions(ctx context.Context, server *tmux.Server, plan Plan) ([]Coll
 	return collisions, nil
 }
 
-func liveSessionNamespaces(live []tmux.SessionInfo) (map[string]bool, map[string]bool) {
+func liveSessionNamespaces(live []gotmux.SessionInfo) (map[string]bool, map[string]bool) {
 	names := make(map[string]bool, len(live))
 	groups := make(map[string]bool, len(live))
 

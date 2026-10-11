@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zigai/gotmux/tmux"
+	gotmux "github.com/zigai/gotmux/tmux"
 	"github.com/zigai/gotmux/tmuxtest"
 
 	"github.com/zigai/sesh/internal/snapshot/model"
@@ -33,7 +33,7 @@ func TestTitleChangesDoNotInvalidateObservation(t *testing.T) {
 		t.Fatalf("title fixture not applied: %q", info.Title)
 	}
 
-	if err := compareGraph(t.Context(), server, before, []tmux.SessionID{session.ID()}, &baseline, nil); err != nil {
+	if err := compareGraph(t.Context(), server, before, []gotmux.SessionID{session.ID()}, &baseline, nil); err != nil {
 		t.Fatal("title-only change prevented saving", err)
 	}
 
@@ -52,7 +52,7 @@ func TestUnrelatedPaneExitDoesNotInvalidateSelection(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := compareGraph(t.Context(), server, before, []tmux.SessionID{session.ID()}, &baseline, nil); err != nil {
+	if err := compareGraph(t.Context(), server, before, []gotmux.SessionID{session.ID()}, &baseline, nil); err != nil {
 		t.Fatal("unrelated work invalidated explicit selection", err)
 	}
 }
@@ -65,7 +65,7 @@ func TestSelectedMutationRejectsObservation(t *testing.T) {
 			before, baseline := captureBaseline(t, server, session)
 			mutatePane(t, pane, mutation)
 
-			if err := compareGraph(t.Context(), server, before, []tmux.SessionID{session.ID()}, &baseline, nil); err == nil {
+			if err := compareGraph(t.Context(), server, before, []gotmux.SessionID{session.ID()}, &baseline, nil); err == nil {
 				t.Fatal("accepted changed selected pane")
 			}
 		})
@@ -78,7 +78,7 @@ func TestObservePreservesStyledTrailingEmptyCells(t *testing.T) {
 
 	waitForPaneText(t, pane, []byte("anchor"))
 
-	observation, err := Observe(t.Context(), server, []tmux.SessionID{session.ID()})
+	observation, err := Observe(t.Context(), server, []gotmux.SessionID{session.ID()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,12 +112,12 @@ func TestObserveOmitsTerminalTextBeyondOutputLimit(t *testing.T) {
 	waitForPaneText(t, smallPane, []byte("small-marker"))
 	waitForPaneText(t, largePane, []byte("large-marker"))
 
-	server, err := tmux.New(tmux.Config{SocketPath: fixture.Endpoint().SocketPath, ConfigFile: "/dev/null", Limits: tmux.Limits{OutputBytes: 64 << 10}})
+	server, err := gotmux.New(gotmux.Config{SocketPath: fixture.Endpoint().SocketPath, ConfigFile: "/dev/null", Limits: gotmux.Limits{OutputBytes: 64 << 10}})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	observation, err := Observe(t.Context(), server, []tmux.SessionID{small.ID(), large.ID()})
+	observation, err := Observe(t.Context(), server, []gotmux.SessionID{small.ID(), large.ID()})
 	if err != nil {
 		t.Fatal("oversized terminal text failed the observation:", err)
 	}
@@ -144,7 +144,7 @@ func TestObserveOmitsFloatingPanes(t *testing.T) {
 
 	session, first, second := floatingPaneFixture(t, server)
 
-	observation, err := Observe(t.Context(), server, []tmux.SessionID{session.ID()})
+	observation, err := Observe(t.Context(), server, []gotmux.SessionID{session.ID()})
 	if err != nil {
 		t.Fatalf("observation with a floating pane failed: %v", err)
 	}
@@ -174,12 +174,12 @@ func TestObserveOmitsFloatingPanes(t *testing.T) {
 
 // floatingPaneFixture opens an active floating pane between two tiled panes, so the floating
 // pane takes the middle pane index.
-func floatingPaneFixture(t *testing.T, server *tmux.Server) (tmux.Session, tmux.Pane, tmux.Pane) {
+func floatingPaneFixture(t *testing.T, server *gotmux.Server) (gotmux.Session, gotmux.Pane, gotmux.Pane) {
 	t.Helper()
 
 	session, first := captureSessionFixture(t, server, "floating")
 
-	second, err := first.Split(t.Context(), tmux.SplitOptions{Program: tmux.Exec("sleep", "300")})
+	second, err := first.Split(t.Context(), gotmux.SplitOptions{Program: gotmux.Exec("sleep", "300")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +188,7 @@ func floatingPaneFixture(t *testing.T, server *tmux.Server) (tmux.Session, tmux.
 		t.Fatal(err)
 	}
 
-	floating, err := first.NewPane(t.Context(), tmux.NewPaneOptions{Width: "20", Height: "5", X: "3", Y: "3", Program: tmux.Exec("sleep", "300"), Select: true})
+	floating, err := first.NewPane(t.Context(), gotmux.NewPaneOptions{Width: "20", Height: "5", X: "3", Y: "3", Program: gotmux.Exec("sleep", "300"), Select: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,14 +205,14 @@ func floatingPaneFixture(t *testing.T, server *tmux.Server) (tmux.Session, tmux.
 	return session, first, second
 }
 
-func scriptedSessionFixture(t *testing.T, server *tmux.Server, name string, width int, script string) (tmux.Session, tmux.Pane) {
+func scriptedSessionFixture(t *testing.T, server *gotmux.Server, name string, width int, script string) (gotmux.Session, gotmux.Pane) {
 	t.Helper()
 
-	session, err := server.NewSession(t.Context(), tmux.NewSessionOptions{
+	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{
 		Name:    name,
-		Program: tmux.Exec("sh", "-c", script),
-		Start:   tmux.StartPolicyExistingOnly,
-		Size:    tmux.Size{Width: width, Height: 5},
+		Program: gotmux.Exec("sh", "-c", script),
+		Start:   gotmux.StartPolicyExistingOnly,
+		Size:    gotmux.Size{Width: width, Height: 5},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -231,7 +231,7 @@ func scriptedSessionFixture(t *testing.T, server *tmux.Server, name string, widt
 	return session, pane
 }
 
-func waitForPaneText(t *testing.T, pane tmux.Pane, marker []byte) {
+func waitForPaneText(t *testing.T, pane gotmux.Pane, marker []byte) {
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
@@ -241,7 +241,7 @@ func waitForPaneText(t *testing.T, pane tmux.Pane, marker []byte) {
 	defer ticker.Stop()
 
 	for {
-		data, err := pane.Capture(ctx, tmux.CaptureOptions{PreserveSpaces: true})
+		data, err := pane.Capture(ctx, gotmux.CaptureOptions{PreserveSpaces: true})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -258,16 +258,16 @@ func waitForPaneText(t *testing.T, pane tmux.Pane, marker []byte) {
 	}
 }
 
-func mutatePane(t *testing.T, pane tmux.Pane, mutation string) {
+func mutatePane(t *testing.T, pane gotmux.Pane, mutation string) {
 	t.Helper()
 
 	var err error
 
 	switch mutation {
 	case "split":
-		_, err = pane.Split(t.Context(), tmux.SplitOptions{Program: tmux.Exec("sleep", "300")})
+		_, err = pane.Split(t.Context(), gotmux.SplitOptions{Program: gotmux.Exec("sleep", "300")})
 	case "respawn":
-		err = pane.Respawn(t.Context(), tmux.RespawnOptions{KillRunning: true, Program: tmux.Exec("sleep", "300")})
+		err = pane.Respawn(t.Context(), gotmux.RespawnOptions{KillRunning: true, Program: gotmux.Exec("sleep", "300")})
 	case "kill":
 		err = pane.Kill(t.Context())
 	}
@@ -277,10 +277,10 @@ func mutatePane(t *testing.T, pane tmux.Pane, mutation string) {
 	}
 }
 
-func captureSessionFixture(t *testing.T, server *tmux.Server, name string) (tmux.Session, tmux.Pane) {
+func captureSessionFixture(t *testing.T, server *gotmux.Server, name string) (gotmux.Session, gotmux.Pane) {
 	t.Helper()
 
-	session, err := server.NewSession(t.Context(), tmux.NewSessionOptions{Name: name, Program: tmux.Exec("sleep", "300"), Start: tmux.StartPolicyExistingOnly, Size: tmux.Size{Width: 100, Height: 35}})
+	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{Name: name, Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly, Size: gotmux.Size{Width: 100, Height: 35}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -298,7 +298,7 @@ func captureSessionFixture(t *testing.T, server *tmux.Server, name string) (tmux
 	return session, pane
 }
 
-func captureBaseline(t *testing.T, server *tmux.Server, session tmux.Session) (tmux.Snapshot, model.Manifest) {
+func captureBaseline(t *testing.T, server *gotmux.Server, session gotmux.Session) (gotmux.Snapshot, model.Manifest) {
 	t.Helper()
 
 	before, err := server.Snapshot(t.Context())
@@ -306,7 +306,7 @@ func captureBaseline(t *testing.T, server *tmux.Server, session tmux.Session) (t
 		t.Fatal(err)
 	}
 
-	m, _, err := graph(before, []tmux.SessionID{session.ID()})
+	m, _, err := graph(before, []gotmux.SessionID{session.ID()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -314,7 +314,7 @@ func captureBaseline(t *testing.T, server *tmux.Server, session tmux.Session) (t
 	return before, m
 }
 
-func requireFloatingPanes(t *testing.T, server *tmux.Server) {
+func requireFloatingPanes(t *testing.T, server *gotmux.Server) {
 	t.Helper()
 
 	info, err := server.Probe(t.Context())

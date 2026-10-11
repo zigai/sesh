@@ -9,7 +9,7 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/zigai/gotmux/tmux"
+	gotmux "github.com/zigai/gotmux/tmux"
 )
 
 const (
@@ -71,7 +71,7 @@ func classifyTmuxProbeError(err error) Result {
 			Message: "tmux server probe timed out",
 			Fix:     "",
 		}
-	case errors.Is(err, tmux.ErrNoServer):
+	case errors.Is(err, gotmux.ErrNoServer):
 		return Result{
 			Check:   CheckTmux,
 			Status:  StatusError,
@@ -89,7 +89,7 @@ func classifyTmuxProbeError(err error) Result {
 		}
 	}
 
-	if unsupportedErr, ok := errors.AsType[*tmux.UnsupportedError](err); ok {
+	if unsupportedErr, ok := errors.AsType[*gotmux.UnsupportedError](err); ok {
 		return Result{
 			Check:   CheckTmux,
 			Status:  StatusError,

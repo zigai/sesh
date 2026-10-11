@@ -14,7 +14,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/zigai/gotmux/tmux"
+	gotmux "github.com/zigai/gotmux/tmux"
 	"github.com/zigai/gotmux/tmuxtest"
 
 	"github.com/zigai/sesh/internal/integration/process"
@@ -52,13 +52,13 @@ func TestProcessObservationExactLaunchFacts(t *testing.T) {
 		"TMUX_PANE":              "%99",
 	}
 
-	session, err := server.NewSession(t.Context(), tmux.NewSessionOptions{
+	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{
 		Name:    "proc-facts",
 		Dir:     dir,
-		Program: tmux.Exec(helper, testArgs...),
+		Program: gotmux.Exec(helper, testArgs...),
 		TmuxEnv: sessionEnv,
-		Size:    tmux.Size{Width: 100, Height: 30},
-		Start:   tmux.StartPolicyExistingOnly,
+		Size:    gotmux.Size{Width: 100, Height: 30},
+		Start:   gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -68,7 +68,7 @@ func TestProcessObservationExactLaunchFacts(t *testing.T) {
 
 	envKeys := []string{"SELECTED_VAR", "EMPTY_VAR", "ABSENT_VAR", "TMUX", "TMUX_PANE"}
 
-	observation, err := capture.ObserveWithProcessEnrichment(t.Context(), server, []tmux.SessionID{session.ID()}, envKeys)
+	observation, err := capture.ObserveWithProcessEnrichment(t.Context(), server, []gotmux.SessionID{session.ID()}, envKeys)
 	if err != nil {
 		t.Fatalf("observe with process enrichment failed: %v", err)
 	}
@@ -199,7 +199,7 @@ func TestProcessObservationDirectForegroundBirth(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	obs, err := capture.ObserveWithProcessEnrichment(t.Context(), server, []tmux.SessionID{session.ID()}, nil)
+	obs, err := capture.ObserveWithProcessEnrichment(t.Context(), server, []gotmux.SessionID{session.ID()}, nil)
 	if err != nil {
 		t.Fatalf("observation failed: %v", err)
 	}
@@ -233,12 +233,12 @@ func TestProcessObservationPreservesPaneWithDeletedExecutable(t *testing.T) {
 		"-hold", "300s",
 	}
 
-	session, err := server.NewSession(t.Context(), tmux.NewSessionOptions{
+	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{
 		Name:    "del-exe",
 		Dir:     tempDir,
-		Program: tmux.Exec(disposableHelper, testArgs...),
-		Size:    tmux.Size{Width: 100, Height: 30},
-		Start:   tmux.StartPolicyExistingOnly,
+		Program: gotmux.Exec(disposableHelper, testArgs...),
+		Size:    gotmux.Size{Width: 100, Height: 30},
+		Start:   gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -250,7 +250,7 @@ func TestProcessObservationPreservesPaneWithDeletedExecutable(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	observation, err := capture.ObserveWithProcessEnrichment(t.Context(), server, []tmux.SessionID{session.ID()}, nil)
+	observation, err := capture.ObserveWithProcessEnrichment(t.Context(), server, []gotmux.SessionID{session.ID()}, nil)
 	if err != nil {
 		t.Fatalf("observe pane with deleted executable: %v", err)
 	}
@@ -275,12 +275,12 @@ func TestProcessObservationPreservesPaneWithDeletedDirectory(t *testing.T) {
 		"-hold", "300s",
 	}
 
-	session, err := server.NewSession(t.Context(), tmux.NewSessionOptions{
+	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{
 		Name:    "del-dir",
 		Dir:     disposableDir,
-		Program: tmux.Exec(helper, testArgs...),
-		Size:    tmux.Size{Width: 100, Height: 30},
-		Start:   tmux.StartPolicyExistingOnly,
+		Program: gotmux.Exec(helper, testArgs...),
+		Size:    gotmux.Size{Width: 100, Height: 30},
+		Start:   gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -292,7 +292,7 @@ func TestProcessObservationPreservesPaneWithDeletedDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	observation, err := capture.ObserveWithProcessEnrichment(t.Context(), server, []tmux.SessionID{session.ID()}, nil)
+	observation, err := capture.ObserveWithProcessEnrichment(t.Context(), server, []gotmux.SessionID{session.ID()}, nil)
 	if err != nil {
 		t.Fatalf("observe pane with deleted directory: %v", err)
 	}
@@ -311,25 +311,25 @@ func TestProcessObservationPreservesExitedAndUnaffectedPanes(t *testing.T) {
 		"-hold", "150ms",
 	}
 
-	session, err := server.NewSession(t.Context(), tmux.NewSessionOptions{
+	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{
 		Name:    "churn",
 		Dir:     dir,
-		Program: tmux.Exec("sleep", "300"),
-		Size:    tmux.Size{Width: 100, Height: 30},
-		Start:   tmux.StartPolicyExistingOnly,
+		Program: gotmux.Exec("sleep", "300"),
+		Size:    gotmux.Size{Width: 100, Height: 30},
+		Start:   gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := server.GlobalWindowOptions().SetRemainOnExit(t.Context(), tmux.RemainOn); err != nil {
+	if err := server.GlobalWindowOptions().SetRemainOnExit(t.Context(), gotmux.RemainOn); err != nil {
 		t.Fatal(err)
 	}
 
-	ephemeralWin, err := session.NewWindow(t.Context(), tmux.NewWindowOptions{
+	ephemeralWin, err := session.NewWindow(t.Context(), gotmux.NewWindowOptions{
 		Name:    "ephemeral",
 		Dir:     dir,
-		Program: tmux.Exec(helper, testArgs...),
+		Program: gotmux.Exec(helper, testArgs...),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -344,7 +344,7 @@ func TestProcessObservationPreservesExitedAndUnaffectedPanes(t *testing.T) {
 
 	_ = awaitPaneDead(t, ephemeralWin.Window(), pane.ID())
 
-	observation, err := capture.ObserveWithProcessEnrichment(t.Context(), server, []tmux.SessionID{session.ID()}, nil)
+	observation, err := capture.ObserveWithProcessEnrichment(t.Context(), server, []gotmux.SessionID{session.ID()}, nil)
 	if err != nil {
 		t.Fatalf("observe session with exited pane: %v", err)
 	}
@@ -463,13 +463,13 @@ func TestProcessObservationMultiplePanesInClosure(t *testing.T) {
 	report1 := filepath.Join(dir, "pane1.report")
 	report2 := filepath.Join(dir, "pane2.report")
 
-	session, err := server.NewSession(t.Context(), tmux.NewSessionOptions{
+	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{
 		Name:    "multi-pane",
 		Dir:     dir,
-		Program: tmux.Exec(helper, "-report", report1, "-hold", "300s", "pane1_arg"),
+		Program: gotmux.Exec(helper, "-report", report1, "-hold", "300s", "pane1_arg"),
 		TmuxEnv: map[string]string{"PANE_TAG": "one"},
-		Size:    tmux.Size{Width: 120, Height: 40},
-		Start:   tmux.StartPolicyExistingOnly,
+		Size:    gotmux.Size{Width: 120, Height: 40},
+		Start:   gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -485,9 +485,9 @@ func TestProcessObservationMultiplePanesInClosure(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = firstPane.Split(t.Context(), tmux.SplitOptions{
-		Direction: tmux.DirectionVertical,
-		Program:   tmux.Exec(helper, "-report", report2, "-hold", "300s", "pane2_arg"),
+	_, err = firstPane.Split(t.Context(), gotmux.SplitOptions{
+		Direction: gotmux.DirectionVertical,
+		Program:   gotmux.Exec(helper, "-report", report2, "-hold", "300s", "pane2_arg"),
 		TmuxEnv:   map[string]string{"PANE_TAG": "two"},
 	})
 	if err != nil {
@@ -507,7 +507,7 @@ func TestProcessObservationMultiplePanesInClosure(t *testing.T) {
 		panePIDs["p"+strings.TrimPrefix(string(pane.ID), "%")] = pane.PID
 	}
 
-	obs, err := capture.ObserveWithProcessEnrichment(t.Context(), server, []tmux.SessionID{session.ID()}, []string{"PANE_TAG"})
+	obs, err := capture.ObserveWithProcessEnrichment(t.Context(), server, []gotmux.SessionID{session.ID()}, []string{"PANE_TAG"})
 	if err != nil {
 		t.Fatalf("observation failed: %v", err)
 	}
@@ -525,12 +525,12 @@ func TestProcessObservationSaveLoggingPrivacyAndIsolation(t *testing.T) {
 	dir := t.TempDir()
 	reportPath := filepath.Join(dir, "log_privacy.report")
 
-	session, err := server.NewSession(t.Context(), tmux.NewSessionOptions{
+	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{
 		Name:    "log-priv",
 		Dir:     dir,
-		Program: tmux.Exec(helper, "-report", reportPath, "-hold", "300s", "CUSTOM_ARG_VALUE_9988"),
+		Program: gotmux.Exec(helper, "-report", reportPath, "-hold", "300s", "CUSTOM_ARG_VALUE_9988"),
 		TmuxEnv: map[string]string{"CUSTOM_ENV_KEY": "CUSTOM_ENV_VALUE_7766"},
-		Start:   tmux.StartPolicyExistingOnly,
+		Start:   gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -552,7 +552,7 @@ func TestProcessObservationSaveLoggingPrivacyAndIsolation(t *testing.T) {
 		ProcessEnvironmentKeys: []string{"CUSTOM_ENV_KEY"},
 	}
 
-	result, err := engine.SaveObservation(ctx, r, server, []tmux.SessionID{session.ID()}, cfg)
+	result, err := engine.SaveObservation(ctx, r, server, []gotmux.SessionID{session.ID()}, cfg)
 	if err != nil {
 		t.Fatalf("save failed: %v", err)
 	}

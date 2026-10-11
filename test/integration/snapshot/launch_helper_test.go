@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zigai/gotmux/tmux"
+	gotmux "github.com/zigai/gotmux/tmux"
 )
 
 const (
@@ -201,7 +201,7 @@ func parseProcessReport(t *testing.T, path string, data []byte) processReport {
 	return report
 }
 
-func awaitPaneDead(t *testing.T, window tmux.Window, id tmux.PaneID) tmux.PaneInfo {
+func awaitPaneDead(t *testing.T, window gotmux.Window, id gotmux.PaneID) gotmux.PaneInfo {
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)

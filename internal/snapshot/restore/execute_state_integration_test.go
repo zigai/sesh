@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zigai/gotmux/tmux"
+	gotmux "github.com/zigai/gotmux/tmux"
 	"github.com/zigai/gotmux/tmuxtest"
 
 	"github.com/zigai/sesh/internal/snapshot/capture"
@@ -29,7 +29,7 @@ type observedScopeState struct {
 	Environment    map[environmentKey]environmentShape
 }
 
-func readScopeState(t *testing.T, ctx context.Context, session tmux.Session) observedScopeState {
+func readScopeState(t *testing.T, ctx context.Context, session gotmux.Session) observedScopeState {
 	t.Helper()
 
 	state := observedScopeState{
@@ -97,7 +97,7 @@ func TestExecutorImportsScopedStateFaithfully(t *testing.T) {
 
 	source, sourceState := setupScopedStateSourceSession(t, ctx, sourceServer)
 
-	observation, err := capture.Observe(ctx, sourceServer, []tmux.SessionID{source.ID()})
+	observation, err := capture.Observe(ctx, sourceServer, []gotmux.SessionID{source.ID()})
 	if err != nil {
 		t.Fatalf("capture.Observe failed: %v", err)
 	}
@@ -164,14 +164,14 @@ func TestExecutorNeverMutatesGlobalScopes(t *testing.T) {
 		t.Fatalf("setting source global option failed: %v", err)
 	}
 
-	source, err := sourceServer.NewSession(ctx, tmux.NewSessionOptions{Name: "global-source", Program: tmux.Exec("sleep", "300"), Start: tmux.StartPolicyExistingOnly})
+	source, err := sourceServer.NewSession(ctx, gotmux.NewSessionOptions{Name: "global-source", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
 
 	disableAutomaticRename(t, ctx, source)
 
-	observation, err := capture.Observe(ctx, sourceServer, []tmux.SessionID{source.ID()})
+	observation, err := capture.Observe(ctx, sourceServer, []gotmux.SessionID{source.ID()})
 	if err != nil {
 		t.Fatalf("capture.Observe failed: %v", err)
 	}
@@ -234,7 +234,7 @@ func TestExecutorRestoresEmptySessionHookArray(t *testing.T) {
 		t.Fatalf("setting global hook failed: %v", err)
 	}
 
-	source, err := sourceServer.NewSession(ctx, tmux.NewSessionOptions{Name: "hook-source", Program: tmux.Exec("sleep", "300"), Start: tmux.StartPolicyExistingOnly})
+	source, err := sourceServer.NewSession(ctx, gotmux.NewSessionOptions{Name: "hook-source", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -252,15 +252,15 @@ func TestExecutorRestoresEmptySessionHookArray(t *testing.T) {
 		t.Fatalf("FindSession failed: %v", err)
 	}
 
-	entries, err := target.Options().ListWith(ctx, tmux.ListOptionOptions{Inherited: false, Hooks: true})
+	entries, err := target.Options().ListWith(ctx, gotmux.ListOptionOptions{Inherited: false, Hooks: true})
 	if err != nil {
 		t.Fatalf("listing target hooks failed: %v", err)
 	}
 
-	hooks := slices.DeleteFunc(slices.Clone(entries), func(entry tmux.OptionEntry) bool {
+	hooks := slices.DeleteFunc(slices.Clone(entries), func(entry gotmux.OptionEntry) bool {
 		return !strings.HasPrefix(entry.Name, "client-attached")
 	})
-	if len(hooks) != 1 || hooks[0].Name != "client-attached" || hooks[0].Value.State() == tmux.ValueStatePresent {
+	if len(hooks) != 1 || hooks[0].Name != "client-attached" || hooks[0].Value.State() == gotmux.ValueStatePresent {
 		t.Fatalf("target session hooks = %+v, want only the empty client-attached array", hooks)
 	}
 
@@ -276,7 +276,7 @@ func TestRestoreOfWindowWithFloatingPaneVerifies(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 
-	source, err := sourceServer.NewSession(ctx, tmux.NewSessionOptions{Name: "floating-source", Program: tmux.Exec("sleep", "300"), Start: tmux.StartPolicyExistingOnly, Size: tmux.Size{Width: 100, Height: 35}})
+	source, err := sourceServer.NewSession(ctx, gotmux.NewSessionOptions{Name: "floating-source", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly, Size: gotmux.Size{Width: 100, Height: 35}})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -293,11 +293,11 @@ func TestRestoreOfWindowWithFloatingPaneVerifies(t *testing.T) {
 		t.Fatalf("ActivePane failed: %v", err)
 	}
 
-	if _, err := first.Split(ctx, tmux.SplitOptions{Program: tmux.Exec("sleep", "300")}); err != nil {
+	if _, err := first.Split(ctx, gotmux.SplitOptions{Program: gotmux.Exec("sleep", "300")}); err != nil {
 		t.Fatalf("Split failed: %v", err)
 	}
 
-	if _, err := first.NewPane(ctx, tmux.NewPaneOptions{Width: "20", Height: "5", X: "3", Y: "3", Program: tmux.Exec("sleep", "300"), Select: true}); err != nil {
+	if _, err := first.NewPane(ctx, gotmux.NewPaneOptions{Width: "20", Height: "5", X: "3", Y: "3", Program: gotmux.Exec("sleep", "300"), Select: true}); err != nil {
 		t.Fatalf("NewPane failed: %v", err)
 	}
 
@@ -327,10 +327,10 @@ func TestRestoreOfWindowWithFloatingPaneVerifies(t *testing.T) {
 
 // restoreSessionWithScopedState saves the named source session, restores it onto the target and
 // imports its scoped state, returning the plan and runtime receipts for verification.
-func restoreSessionWithScopedState(t *testing.T, ctx context.Context, sourceServer, targetServer *tmux.Server, source tmux.Session, name string) (Plan, map[string]string) {
+func restoreSessionWithScopedState(t *testing.T, ctx context.Context, sourceServer, targetServer *gotmux.Server, source gotmux.Session, name string) (Plan, map[string]string) {
 	t.Helper()
 
-	observation, err := capture.Observe(ctx, sourceServer, []tmux.SessionID{source.ID()})
+	observation, err := capture.Observe(ctx, sourceServer, []gotmux.SessionID{source.ID()})
 	if err != nil {
 		t.Fatalf("capture.Observe failed: %v", err)
 	}
@@ -365,7 +365,7 @@ func restoreSessionWithScopedState(t *testing.T, ctx context.Context, sourceServ
 	return plan, report.Receipts
 }
 
-func assertRestoreVerified(t *testing.T, ctx context.Context, server *tmux.Server, plan Plan, receipts map[string]string) {
+func assertRestoreVerified(t *testing.T, ctx context.Context, server *gotmux.Server, plan Plan, receipts map[string]string) {
 	t.Helper()
 
 	verification, err := Verify(ctx, server, plan, receipts)
@@ -414,7 +414,7 @@ func TestInheritedDefaultsAreMaterializedOnOwnedScopes(t *testing.T) {
 	}
 }
 
-func windowPaneIndexes(t *testing.T, ctx context.Context, window tmux.Window) []int {
+func windowPaneIndexes(t *testing.T, ctx context.Context, window gotmux.Window) []int {
 	t.Helper()
 
 	panes, err := window.Panes(ctx)
@@ -443,13 +443,13 @@ func requirePaneIndexes(t *testing.T, got, want []int) {
 func createTwoPaneSession(
 	t *testing.T,
 	ctx context.Context,
-	server *tmux.Server,
+	server *gotmux.Server,
 	name string,
-) (tmux.Session, tmux.Window) {
+) (gotmux.Session, gotmux.Window) {
 	t.Helper()
 
-	session, err := server.NewSession(ctx, tmux.NewSessionOptions{
-		Name: name, Program: tmux.Exec("sleep", "300"), Start: tmux.StartPolicyExistingOnly,
+	session, err := server.NewSession(ctx, gotmux.NewSessionOptions{
+		Name: name, Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("creating %s failed: %v", name, err)
@@ -469,7 +469,7 @@ func createTwoPaneSession(
 		t.Fatalf("%s ActivePane failed: %v", name, err)
 	}
 
-	if _, err := pane.Split(ctx, tmux.SplitOptions{Program: tmux.Exec("sleep", "300")}); err != nil {
+	if _, err := pane.Split(ctx, gotmux.SplitOptions{Program: gotmux.Exec("sleep", "300")}); err != nil {
 		t.Fatalf("%s Split failed: %v", name, err)
 	}
 
@@ -479,10 +479,10 @@ func createTwoPaneSession(
 func restorePaneIndexPlan(
 	t *testing.T,
 	ctx context.Context,
-	server *tmux.Server,
+	server *gotmux.Server,
 	observation capture.Observation,
 	plan Plan,
-) (ExecutionReport, tmux.Window) {
+) (ExecutionReport, gotmux.Window) {
 	t.Helper()
 
 	report, err := NewExecutor(server, observation.Manifest, DefaultExecuteConfig()).Execute(ctx, plan, newMemoryJournal())
@@ -507,7 +507,7 @@ func restorePaneIndexPlan(
 	return report, window
 }
 
-func assertPaneIndexVerification(t *testing.T, ctx context.Context, server *tmux.Server, plan Plan, receipts map[string]string) {
+func assertPaneIndexVerification(t *testing.T, ctx context.Context, server *gotmux.Server, plan Plan, receipts map[string]string) {
 	t.Helper()
 
 	verified, err := Verify(ctx, server, plan, receipts)
@@ -543,7 +543,7 @@ func TestPaneIndexesRestoreAcrossTargetDefaults(t *testing.T) {
 	source, sourceWindow := createTwoPaneSession(t, ctx, sourceServer, "pane-index-source")
 	requirePaneIndexes(t, windowPaneIndexes(t, ctx, sourceWindow), []int{7, 8})
 
-	observation, err := capture.Observe(ctx, sourceServer, []tmux.SessionID{source.ID()})
+	observation, err := capture.Observe(ctx, sourceServer, []gotmux.SessionID{source.ID()})
 	if err != nil {
 		t.Fatalf("capture.Observe failed: %v", err)
 	}
@@ -576,7 +576,7 @@ func TestVerifyReportsPaneTitleRewrittenByRunningProgramAsAdvisory(t *testing.T)
 	sourceServer := tmuxtest.NewServer(t)
 	source, _ := createTwoPaneSession(t, ctx, sourceServer, "title-advisory-source")
 
-	observation, err := capture.Observe(ctx, sourceServer, []tmux.SessionID{source.ID()})
+	observation, err := capture.Observe(ctx, sourceServer, []gotmux.SessionID{source.ID()})
 	if err != nil {
 		t.Fatalf("capture.Observe failed: %v", err)
 	}
@@ -616,12 +616,12 @@ func TestVerifyReportsPaneTitleRewrittenByRunningProgramAsAdvisory(t *testing.T)
 
 const inheritedChildEnvironment = "source-global\nsource-local\n\n\n\nunset\nunset\n" //nolint:dupword // both hidden variables must independently report unset in child output
 
-func observeInheritedSource(t *testing.T, ctx context.Context, server *tmux.Server) capture.Observation {
+func observeInheritedSource(t *testing.T, ctx context.Context, server *gotmux.Server) capture.Observation {
 	t.Helper()
 	setInheritedFixture(t, ctx, server, "source")
 
-	source, err := server.NewSession(ctx, tmux.NewSessionOptions{
-		Name: "inherited-source", Program: tmux.Exec("sleep", "300"), Start: tmux.StartPolicyExistingOnly,
+	source, err := server.NewSession(ctx, gotmux.NewSessionOptions{
+		Name: "inherited-source", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
@@ -637,7 +637,7 @@ func observeInheritedSource(t *testing.T, ctx context.Context, server *tmux.Serv
 		t.Fatalf("removing source session environment failed: %v", err)
 	}
 
-	observation, err := capture.Observe(ctx, server, []tmux.SessionID{source.ID()})
+	observation, err := capture.Observe(ctx, server, []gotmux.SessionID{source.ID()})
 	if err != nil {
 		t.Fatalf("capture.Observe failed: %v", err)
 	}
@@ -645,7 +645,7 @@ func observeInheritedSource(t *testing.T, ctx context.Context, server *tmux.Serv
 	return observation
 }
 
-func setupInheritedTarget(t *testing.T, ctx context.Context, server *tmux.Server) tmux.Session {
+func setupInheritedTarget(t *testing.T, ctx context.Context, server *gotmux.Server) gotmux.Session {
 	t.Helper()
 	setInheritedFixture(t, ctx, server, "target")
 
@@ -657,8 +657,8 @@ func setupInheritedTarget(t *testing.T, ctx context.Context, server *tmux.Server
 		t.Fatalf("setting hidden target-only environment failed: %v", err)
 	}
 
-	unrelated, err := server.NewSession(ctx, tmux.NewSessionOptions{
-		Name: "unrelated-inherited", Program: tmux.Exec("sleep", "300"), Start: tmux.StartPolicyExistingOnly,
+	unrelated, err := server.NewSession(ctx, gotmux.NewSessionOptions{
+		Name: "unrelated-inherited", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("creating unrelated session failed: %v", err)
@@ -670,7 +670,7 @@ func setupInheritedTarget(t *testing.T, ctx context.Context, server *tmux.Server
 func executeInheritedRestore(
 	t *testing.T,
 	ctx context.Context,
-	server *tmux.Server,
+	server *gotmux.Server,
 	observation capture.Observation,
 ) (Plan, map[string]string) {
 	t.Helper()
@@ -711,7 +711,7 @@ func executeInheritedRestore(
 	return plan, report.Receipts
 }
 
-func findSession(t *testing.T, ctx context.Context, server *tmux.Server, name string) tmux.Session {
+func findSession(t *testing.T, ctx context.Context, server *gotmux.Server, name string) gotmux.Session {
 	t.Helper()
 
 	session, err := server.FindSession(ctx, name)
@@ -725,9 +725,9 @@ func findSession(t *testing.T, ctx context.Context, server *tmux.Server, name st
 func assertInheritedRestoreState(
 	t *testing.T,
 	ctx context.Context,
-	server *tmux.Server,
+	server *gotmux.Server,
 	restored,
-	unrelated tmux.Session,
+	unrelated gotmux.Session,
 ) {
 	t.Helper()
 	assertOptionValue(t, ctx, restored.Options(), "status-left", "source", true)
@@ -754,7 +754,7 @@ func assertInheritedRestoreState(
 		t.Fatalf("target-only global environment was not locally masked: %+v %v", targetOnly, err)
 	}
 
-	hidden, err := restored.Environment().GetWith(ctx, "SESH_HIDDEN", tmux.GetEnvironmentOptions{Hidden: true})
+	hidden, err := restored.Environment().GetWith(ctx, "SESH_HIDDEN", gotmux.GetEnvironmentOptions{Hidden: true})
 
 	hiddenValue, hiddenPresent := hidden.Value.Get()
 	if err != nil || !hiddenPresent || hiddenValue != "source-hidden" || hidden.Unset {
@@ -789,8 +789,8 @@ func TestEnvironmentReinspectionPreservesMultilineValues(t *testing.T) {
 	t.Run("session", func(t *testing.T) {
 		server := tmuxtest.NewServer(t)
 
-		session, err := server.NewSession(ctx, tmux.NewSessionOptions{
-			Name: "multiline-session", Program: tmux.Exec("sleep", "300"), Start: tmux.StartPolicyExistingOnly,
+		session, err := server.NewSession(ctx, gotmux.NewSessionOptions{
+			Name: "multiline-session", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly,
 		})
 		if err != nil {
 			t.Fatalf("NewSession failed: %v", err)
@@ -815,7 +815,7 @@ func TestEnvironmentReinspectionPreservesMultilineValues(t *testing.T) {
 	})
 }
 
-func setInheritedFixture(t *testing.T, ctx context.Context, server *tmux.Server, value string) {
+func setInheritedFixture(t *testing.T, ctx context.Context, server *gotmux.Server, value string) {
 	t.Helper()
 
 	fixture := inheritedFixtureValuesFor(value)
@@ -849,7 +849,7 @@ func inheritedFixtureValuesFor(value string) inheritedFixtureValues {
 	}
 }
 
-func setInheritedOptions(t *testing.T, ctx context.Context, server *tmux.Server, fixture inheritedFixtureValues) {
+func setInheritedOptions(t *testing.T, ctx context.Context, server *gotmux.Server, fixture inheritedFixtureValues) {
 	t.Helper()
 
 	if err := server.GlobalSessionOptions().Set(ctx, "status-left", fixture.statusLeft); err != nil {
@@ -869,7 +869,7 @@ func setInheritedOptions(t *testing.T, ctx context.Context, server *tmux.Server,
 	}
 }
 
-func setInheritedEnvironment(t *testing.T, ctx context.Context, server *tmux.Server, fixture inheritedFixtureValues) {
+func setInheritedEnvironment(t *testing.T, ctx context.Context, server *gotmux.Server, fixture inheritedFixtureValues) {
 	t.Helper()
 
 	for name, content := range map[string]string{
@@ -889,7 +889,7 @@ func setInheritedEnvironment(t *testing.T, ctx context.Context, server *tmux.Ser
 func assertOptionValue(t *testing.T, ctx context.Context, scope optionScope, name, want string, local bool) {
 	t.Helper()
 
-	entries, err := scope.ListWith(ctx, tmux.ListOptionOptions{Inherited: true})
+	entries, err := scope.ListWith(ctx, gotmux.ListOptionOptions{Inherited: true})
 	if err != nil {
 		t.Fatalf("listing options failed: %v", err)
 	}
@@ -908,13 +908,13 @@ func assertOptionValue(t *testing.T, ctx context.Context, scope optionScope, nam
 	t.Fatalf("option %q missing", name)
 }
 
-func assertChildEnvironment(t *testing.T, ctx context.Context, session tmux.Session, want string) {
+func assertChildEnvironment(t *testing.T, ctx context.Context, session gotmux.Session, want string) {
 	t.Helper()
 	output := filepath.Join(t.TempDir(), "child-env")
 
-	_, err := session.NewWindow(ctx, tmux.NewWindowOptions{
+	_, err := session.NewWindow(ctx, gotmux.NewWindowOptions{
 		Name:    "environment-probe",
-		Program: tmux.Exec("sh", "-c", `printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "$SESH_GLOBAL" "$SESH_OVERRIDE" "${SESH_REMOVED-}" "$SESH_EMPTY" "${SESH_TARGET_ONLY-}" "${SESH_HIDDEN-unset}" "${SESH_TARGET_ONLY_HIDDEN-unset}" > "$1"`, "sh", output),
+		Program: gotmux.Exec("sh", "-c", `printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "$SESH_GLOBAL" "$SESH_OVERRIDE" "${SESH_REMOVED-}" "$SESH_EMPTY" "${SESH_TARGET_ONLY-}" "${SESH_HIDDEN-unset}" "${SESH_TARGET_ONLY_HIDDEN-unset}" > "$1"`, "sh", output),
 	})
 	if err != nil {
 		t.Fatalf("creating environment probe failed: %v", err)
@@ -959,7 +959,7 @@ func sessionIDByName(t *testing.T, manifest model.Manifest, name string) string 
 	return ""
 }
 
-func disableAutomaticRename(t *testing.T, ctx context.Context, session tmux.Session) {
+func disableAutomaticRename(t *testing.T, ctx context.Context, session gotmux.Session) {
 	t.Helper()
 
 	_, links, err := session.WindowInfos(ctx)
@@ -1370,10 +1370,10 @@ func TestExecutorWorkingDirFallbackIsExplicitlyPartial(t *testing.T) {
 	}
 }
 
-func setupScopedStateSourceSession(t *testing.T, ctx context.Context, server *tmux.Server) (tmux.Session, observedScopeState) {
+func setupScopedStateSourceSession(t *testing.T, ctx context.Context, server *gotmux.Server) (gotmux.Session, observedScopeState) {
 	t.Helper()
 
-	source, err := server.NewSession(ctx, tmux.NewSessionOptions{Name: "state-source", Program: tmux.Exec("sleep", "300"), Start: tmux.StartPolicyExistingOnly})
+	source, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "state-source", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -1438,10 +1438,10 @@ func assertTargetScopedOptionsAndEnv(t *testing.T, sourceState, targetState obse
 	}
 }
 
-func setupUnrelatedLiveSession(t *testing.T, ctx context.Context, server *tmux.Server) (tmux.Session, []tmux.WindowLinkInfo, tmux.PaneInfo) {
+func setupUnrelatedLiveSession(t *testing.T, ctx context.Context, server *gotmux.Server) (gotmux.Session, []gotmux.WindowLinkInfo, gotmux.PaneInfo) {
 	t.Helper()
 
-	unrelated, err := server.NewSession(ctx, tmux.NewSessionOptions{Name: "unrelated-live", Start: tmux.StartPolicyExistingOnly})
+	unrelated, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "unrelated-live", Start: gotmux.StartPolicyExistingOnly})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -1467,10 +1467,10 @@ func setupUnrelatedLiveSession(t *testing.T, ctx context.Context, server *tmux.S
 func assertUnrelatedLiveSessionIntact(
 	t *testing.T,
 	ctx context.Context,
-	server *tmux.Server,
-	unrelated tmux.Session,
-	unrelatedLinks []tmux.WindowLinkInfo,
-	unrelatedPaneInfo tmux.PaneInfo,
+	server *gotmux.Server,
+	unrelated gotmux.Session,
+	unrelatedLinks []gotmux.WindowLinkInfo,
+	unrelatedPaneInfo gotmux.PaneInfo,
 ) {
 	t.Helper()
 
@@ -1538,7 +1538,7 @@ func TestExecutorFailureRetainsSessionWithForeignWork(t *testing.T) {
 
 			idx := 42
 
-			if _, winErr := sess.NewWindow(ctx, tmux.NewWindowOptions{Name: "foreign-window", Index: &idx}); winErr != nil {
+			if _, winErr := sess.NewWindow(ctx, gotmux.NewWindowOptions{Name: "foreign-window", Index: &idx}); winErr != nil {
 				return fmt.Errorf("new window: %w", winErr)
 			}
 
@@ -1564,9 +1564,9 @@ func TestExecutorFailureRetainsSessionWithForeignWork(t *testing.T) {
 	}
 }
 
-type externalMutation func(context.Context, *testing.T, tmux.Session)
+type externalMutation func(context.Context, *testing.T, gotmux.Session)
 
-func soleWindowLink(t *testing.T, ctx context.Context, session tmux.Session) tmux.WindowLinkInfo {
+func soleWindowLink(t *testing.T, ctx context.Context, session gotmux.Session) gotmux.WindowLinkInfo {
 	t.Helper()
 
 	_, links, err := session.WindowInfos(ctx)
@@ -1577,7 +1577,7 @@ func soleWindowLink(t *testing.T, ctx context.Context, session tmux.Session) tmu
 	return links[0]
 }
 
-func replaceSolePane(ctx context.Context, t *testing.T, session tmux.Session) {
+func replaceSolePane(ctx context.Context, t *testing.T, session gotmux.Session) {
 	t.Helper()
 
 	pane, err := soleWindowLink(t, ctx, session).Handle().Window().ActivePane(ctx)
@@ -1585,7 +1585,7 @@ func replaceSolePane(ctx context.Context, t *testing.T, session tmux.Session) {
 		t.Fatalf("ActivePane failed: %v", err)
 	}
 
-	if _, err := pane.Split(ctx, tmux.SplitOptions{Program: tmux.Exec("sleep", "300")}); err != nil {
+	if _, err := pane.Split(ctx, gotmux.SplitOptions{Program: gotmux.Exec("sleep", "300")}); err != nil {
 		t.Fatalf("Split failed: %v", err)
 	}
 
@@ -1594,11 +1594,11 @@ func replaceSolePane(ctx context.Context, t *testing.T, session tmux.Session) {
 	}
 }
 
-func replaceSoleWindow(ctx context.Context, t *testing.T, session tmux.Session) {
+func replaceSoleWindow(ctx context.Context, t *testing.T, session gotmux.Session) {
 	t.Helper()
 
 	original := soleWindowLink(t, ctx, session)
-	if _, err := session.NewWindow(ctx, tmux.NewWindowOptions{Name: "replacement", Program: tmux.Exec("sleep", "300")}); err != nil {
+	if _, err := session.NewWindow(ctx, gotmux.NewWindowOptions{Name: "replacement", Program: gotmux.Exec("sleep", "300")}); err != nil {
 		t.Fatalf("NewWindow failed: %v", err)
 	}
 
@@ -1607,7 +1607,7 @@ func replaceSoleWindow(ctx context.Context, t *testing.T, session tmux.Session) 
 	}
 }
 
-func changeLiveProcess(ctx context.Context, t *testing.T, session tmux.Session) {
+func changeLiveProcess(ctx context.Context, t *testing.T, session gotmux.Session) {
 	t.Helper()
 
 	pane, err := soleWindowLink(t, ctx, session).Handle().Window().ActivePane(ctx)
@@ -1615,7 +1615,7 @@ func changeLiveProcess(ctx context.Context, t *testing.T, session tmux.Session) 
 		t.Fatalf("ActivePane failed: %v", err)
 	}
 
-	if err := pane.Respawn(ctx, tmux.RespawnOptions{Program: tmux.Exec("sleep", "300"), KillRunning: true}); err != nil {
+	if err := pane.Respawn(ctx, gotmux.RespawnOptions{Program: gotmux.Exec("sleep", "300"), KillRunning: true}); err != nil {
 		t.Fatalf("Respawn failed: %v", err)
 	}
 }
@@ -1688,7 +1688,7 @@ func TestResumedExternallyChangedScopedStateSurfacesConflict(t *testing.T) {
 	source, sourceState := setupScopedStateSourceSession(t, ctx, server)
 	_ = sourceState
 
-	obs, err := capture.Observe(ctx, server, []tmux.SessionID{source.ID()})
+	obs, err := capture.Observe(ctx, server, []gotmux.SessionID{source.ID()})
 	if err != nil {
 		t.Fatalf("capture.Observe failed: %v", err)
 	}
@@ -1727,7 +1727,7 @@ func TestResumedExternallyChangedScopedStateSurfacesConflict(t *testing.T) {
 func tamperAndAssertScopedConflict(
 	t *testing.T,
 	ctx context.Context,
-	targetServer *tmux.Server,
+	targetServer *gotmux.Server,
 	plan Plan,
 	receipts map[string]string,
 ) {
@@ -1766,7 +1766,7 @@ func tamperAndAssertScopedConflict(
 	}
 }
 
-func requireFloatingPanes(t *testing.T, server *tmux.Server) {
+func requireFloatingPanes(t *testing.T, server *gotmux.Server) {
 	t.Helper()
 
 	info, err := server.Probe(t.Context())

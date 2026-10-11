@@ -355,7 +355,7 @@ func TestSessionFrameRoundTripPreservesSharedModel(t *testing.T) {
 func TestSessionFrameExcludesLocalState(t *testing.T) {
 	row := session.Session{
 		ID: "$1", Name: "dev", Kind: session.KindLive, TmuxServerSocket: "/remote/tmux.sock",
-		Origin: session.OriginSSH, IsCurrent: true, RemoteStatus: session.RemoteStatusStale,
+		Origin: session.OriginSSH, Current: true, RemoteStatus: session.RemoteStatusStale,
 		RuntimeIdentity: session.RuntimeIdentity{
 			ConnectionID: "PRIVATE_CONNECTION", ConnectionLabel: "PRIVATE_LABEL", ConfigDigest: "PRIVATE_CONFIG",
 			PeerID: "PRIVATE_PEER", StreamInstance: "PRIVATE_STREAM", TmuxServerSocket: "PRIVATE_SOCKET",
@@ -377,7 +377,7 @@ func TestSessionFrameExcludesLocalState(t *testing.T) {
 	}
 
 	got := frame.Snapshot.Sessions[0]
-	if got.Origin != "" || got.IsCurrent || got.RemoteStatus != "" || got.RuntimeIdentity != (session.RuntimeIdentity{}) {
+	if got.Origin != "" || got.Current || got.RemoteStatus != "" || got.RuntimeIdentity != (session.RuntimeIdentity{}) {
 		t.Fatalf("local state survived the wire: %#v", got)
 	}
 }

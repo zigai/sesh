@@ -22,14 +22,14 @@ type initOptions struct {
 }
 
 func WithInitPath(path string) InitOption {
-	return func(o *initOptions) {
-		o.path = path
+	return func(opts *initOptions) {
+		opts.path = path
 	}
 }
 
 func WithInitForce(force bool) InitOption {
-	return func(o *initOptions) {
-		o.force = force
+	return func(opts *initOptions) {
+		opts.force = force
 	}
 }
 

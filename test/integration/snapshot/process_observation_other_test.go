@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/zigai/gotmux/tmux"
+	gotmux "github.com/zigai/gotmux/tmux"
 	"github.com/zigai/gotmux/tmuxtest"
 
 	"github.com/zigai/sesh/internal/snapshot/capture"
@@ -19,7 +19,7 @@ func TestProcessObservationUnsupportedOnNonLinux(t *testing.T) {
 	dir := t.TempDir()
 	session, _ := saveSessionFixture(t, server, "unsupported-non-linux", dir, "NON_LINUX_MARKER")
 
-	_, err := capture.ObserveWithProcessEnrichment(t.Context(), server, []tmux.SessionID{session.ID()}, []string{"PATH"})
+	_, err := capture.ObserveWithProcessEnrichment(t.Context(), server, []gotmux.SessionID{session.ID()}, []string{"PATH"})
 	if err == nil {
 		t.Fatal("expected ObserveWithProcessEnrichment to fail on non-Linux")
 	}
@@ -33,7 +33,7 @@ func TestProcessObservationUnsupportedOnNonLinux(t *testing.T) {
 		ProcessEnrichment: true,
 	}
 
-	_, saveErr := engine.SaveObservation(t.Context(), r, server, []tmux.SessionID{session.ID()}, cfg)
+	_, saveErr := engine.SaveObservation(t.Context(), r, server, []gotmux.SessionID{session.ID()}, cfg)
 	if saveErr == nil {
 		t.Fatal("expected SaveObservation with ProcessEnrichment to fail on non-Linux")
 	}

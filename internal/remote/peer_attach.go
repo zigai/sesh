@@ -109,18 +109,18 @@ func DecodeAttachPrepareResult(payload []byte) (AttachPrepareResult, error) {
 	return result, nil
 }
 
-func RunPeerAttachPrepare(ctx context.Context, options PeerAttachOptions, bootstrap AttachBootstrap) (AttachPrepareResult, error) {
-	now := options.Now
+func RunPeerAttachPrepare(ctx context.Context, opts PeerAttachOptions, bootstrap AttachBootstrap) (AttachPrepareResult, error) {
+	now := opts.Now
 	if now == nil {
 		now = time.Now
 	}
 
-	socketPath, err := validateAttachPreflight(options, bootstrap, now())
+	socketPath, err := validateAttachPreflight(opts, bootstrap, now())
 	if err != nil {
 		return AttachPrepareResult{}, err
 	}
 
-	dir, err := openPrivateDir(options.BridgeDir, true)
+	dir, err := openPrivateDir(opts.BridgeDir, true)
 	if err != nil {
 		return AttachPrepareResult{}, err
 	}
@@ -130,7 +130,7 @@ func RunPeerAttachPrepare(ctx context.Context, options PeerAttachOptions, bootst
 		return AttachPrepareResult{}, err
 	}
 
-	if err := validateTargetAndPane(ctx, options, bootstrap.Target); err != nil {
+	if err := validateTargetAndPane(ctx, opts, bootstrap.Target); err != nil {
 		return AttachPrepareResult{}, err
 	}
 
@@ -153,12 +153,12 @@ func RunPeerAttachPrepare(ctx context.Context, options PeerAttachOptions, bootst
 	}, nil
 }
 
-func RunPeerAttach(ctx context.Context, options PeerAttachOptions, attachmentID string, streams AttachStreams) (resultErr error) {
+func RunPeerAttach(ctx context.Context, opts PeerAttachOptions, attachmentID string, streams AttachStreams) (resultErr error) {
 	if !ValidAttachmentID(attachmentID) {
 		return oops.In("remote").With("operation", "run_peer_attach").Wrap(ErrInvalidFrame)
 	}
 
-	if options.Live == nil {
+	if opts.Live == nil {
 		return oops.In("remote").With("operation", "run_peer_attach").Wrap(ErrIncompleteDependencies)
 	}
 
@@ -166,12 +166,12 @@ func RunPeerAttach(ctx context.Context, options PeerAttachOptions, attachmentID 
 		return oops.In("remote").With("operation", "run_peer_attach").Wrap(errNilAttachStreams)
 	}
 
-	now := options.Now
+	now := opts.Now
 	if now == nil {
 		now = time.Now
 	}
 
-	dir, err := openPrivateDir(options.BridgeDir, false)
+	dir, err := openPrivateDir(opts.BridgeDir, false)
 	if err != nil {
 		return oops.In("remote").With("operation", "run_peer_attach").Wrap(err)
 	}
@@ -185,11 +185,11 @@ func RunPeerAttach(ctx context.Context, options PeerAttachOptions, attachmentID 
 		return oops.In("remote").With("operation", "run_peer_attach").Wrap(err)
 	}
 
-	if record.Grant.PeerID != options.PeerID {
+	if record.Grant.PeerID != opts.PeerID {
 		return oops.In("remote").With("operation", "peer_attach").With("observed_peer_id", record.Grant.PeerID).Wrap(ErrPeerMismatch)
 	}
 
-	if err := validateTargetAndPane(ctx, options, record.Target); err != nil {
+	if err := validateTargetAndPane(ctx, opts, record.Target); err != nil {
 		return oops.In("remote").With("operation", "run_peer_attach").Wrap(err)
 	}
 
@@ -197,7 +197,7 @@ func RunPeerAttach(ctx context.Context, options PeerAttachOptions, attachmentID 
 		resultErr = errors.Join(resultErr, RemoveCapability(dir, attachmentID))
 	}()
 
-	if attachErr := attachPeerTerminal(ctx, options.Live, record, streams); attachErr != nil {
+	if attachErr := attachPeerTerminal(ctx, opts.Live, record, streams); attachErr != nil {
 		return oops.In("remote").With("operation", "run_peer_attach").Wrap(attachErr)
 	}
 
@@ -292,16 +292,16 @@ func validatePaneOwnership(ctx context.Context, owner PaneOwner, validated sessi
 	return oops.In("remote").With("operation", "validate_pane_ownership").Wrap(ErrTargetChanged)
 }
 
-func validateAttachPreflight(options PeerAttachOptions, bootstrap AttachBootstrap, now time.Time) (string, error) {
+func validateAttachPreflight(opts PeerAttachOptions, bootstrap AttachBootstrap, now time.Time) (string, error) {
 	if err := bootstrap.Validate(); err != nil {
 		return "", err
 	}
 
-	if bootstrap.Target.PeerID != options.PeerID {
+	if bootstrap.Target.PeerID != opts.PeerID {
 		return "", oops.In("remote").With("operation", "validate_attach_preflight").With("observed_peer_id", bootstrap.Target.PeerID).Wrap(ErrPeerMismatch)
 	}
 
-	if options.Live == nil {
+	if opts.Live == nil {
 		return "", oops.In("remote").With("operation", "validate_attach_preflight").Wrap(ErrIncompleteDependencies)
 	}
 
@@ -309,11 +309,11 @@ func validateAttachPreflight(options PeerAttachOptions, bootstrap AttachBootstra
 		return "", err
 	}
 
-	return peerBridgeSocketPath(options.BridgeDir, bootstrap)
+	return peerBridgeSocketPath(opts.BridgeDir, bootstrap)
 }
 
-func validateTargetAndPane(ctx context.Context, options PeerAttachOptions, target AttachTarget) error {
-	sessions, err := options.Live.Sessions(ctx)
+func validateTargetAndPane(ctx context.Context, opts PeerAttachOptions, target AttachTarget) error {
+	sessions, err := opts.Live.Sessions(ctx)
 	if err != nil {
 		return oops.In("remote").With("operation", "validate_target_and_pane").Wrap(err)
 	}
@@ -323,5 +323,5 @@ func validateTargetAndPane(ctx context.Context, options PeerAttachOptions, targe
 		return err
 	}
 
-	return validatePaneOwnership(ctx, options.PaneOwner, validated, target.PaneID)
+	return validatePaneOwnership(ctx, opts.PaneOwner, validated, target.PaneID)
 }

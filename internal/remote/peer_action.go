@@ -25,22 +25,22 @@ type PeerActionOptions struct {
 
 // ExecutePeerAction runs one invocation at most once. A repeated invocation ID returns the
 // recorded result instead of running the action again.
-func ExecutePeerAction(ctx context.Context, options PeerActionOptions, request ActionRequest) ActionResult {
+func ExecutePeerAction(ctx context.Context, opts PeerActionOptions, request ActionRequest) ActionResult {
 	refused := func(code action.Code) ActionResult {
 		return ActionResult{InvocationID: request.InvocationID, Action: knownAction(request.Action), OK: false, Code: code, Output: nil}
 	}
 
-	entry, input, code := acceptRequest(options, request)
+	entry, input, code := acceptRequest(opts, request)
 	if code != "" {
 		return refused(code)
 	}
 
-	now := options.Now
+	now := opts.Now
 	if now == nil {
 		now = time.Now
 	}
 
-	invocation, admitted, err := AdmitInvocation(ctx, options.Receipts, request, now())
+	invocation, admitted, err := AdmitInvocation(ctx, opts.Receipts, request, now())
 	if err != nil {
 		return refused(admissionCode(err))
 	}
@@ -49,9 +49,9 @@ func ExecutePeerAction(ctx context.Context, options PeerActionOptions, request A
 		return invocation.Result()
 	}
 
-	result := runPeerAction(ctx, options.Dispatcher, entry, request, input)
+	result := runPeerAction(ctx, opts.Dispatcher, entry, request, input)
 
-	if err := ResolveInvocation(ctx, options.Receipts, invocation.ID, OutcomeOf(result), result.Output, now()); err != nil {
+	if err := ResolveInvocation(ctx, opts.Receipts, invocation.ID, OutcomeOf(result), result.Output, now()); err != nil {
 		return ActionResult{InvocationID: invocation.ID, Action: request.Action, OK: false, Code: action.CodeUncertain, Output: result.Output}
 	}
 
@@ -73,21 +73,21 @@ func LookupPeerInvocation(dir *privatefs.Dir, invocationID string) (ActionResult
 
 // acceptRequest decodes a request this peer will run, or reports the code that refuses it. A
 // request is checked before it is admitted, so a refused request leaves no receipt.
-func acceptRequest(options PeerActionOptions, request ActionRequest) (action.Entry, any, action.Code) {
+func acceptRequest(opts PeerActionOptions, request ActionRequest) (action.Entry, any, action.Code) {
 	if ValidateActionRequest(request) != nil || VerifyIntentDigest(request) != nil {
 		return nil, nil, action.CodeInvalidArgument
 	}
 
-	if request.PeerID != options.PeerID {
+	if request.PeerID != opts.PeerID {
 		return nil, nil, action.CodeTargetChanged
 	}
 
 	entry, ok := action.Lookup(request.Action)
-	if !ok || options.Dispatcher == nil {
+	if !ok || opts.Dispatcher == nil {
 		return nil, nil, action.CodeUnsupported
 	}
 
-	if options.Allowed == nil || !options.Allowed(request.Action) {
+	if opts.Allowed == nil || !opts.Allowed(request.Action) {
 		return nil, nil, action.CodeForbidden
 	}
 
@@ -96,7 +96,7 @@ func acceptRequest(options PeerActionOptions, request ActionRequest) (action.Ent
 		return nil, nil, action.CodeInvalidArgument
 	}
 
-	if options.Receipts == nil {
+	if opts.Receipts == nil {
 		return nil, nil, action.CodeUnavailable
 	}
 

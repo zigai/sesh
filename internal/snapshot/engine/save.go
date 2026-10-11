@@ -15,7 +15,7 @@ import (
 
 	"github.com/zigai/sesh/internal/agents"
 	"github.com/zigai/sesh/internal/integration/process"
-	integration "github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/integration/tmuxserver"
 	"github.com/zigai/sesh/internal/snapshot/capture"
 	"github.com/zigai/sesh/internal/snapshot/model"
 	"github.com/zigai/sesh/internal/snapshot/store"
@@ -53,7 +53,7 @@ func SaveObservation(ctx context.Context, repository *store.Repository, server *
 	}
 
 	if server == nil || server.Endpoint().SocketPath == "" {
-		return SaveResult{Attempt: "", Generation: "", Status: "failed"}, saveFailure(ctx, "admission", started, integration.ErrEndpoint)
+		return SaveResult{Attempt: "", Generation: "", Status: "failed"}, saveFailure(ctx, "admission", started, tmuxserver.ErrEndpoint)
 	}
 
 	if repository == nil {
@@ -83,10 +83,10 @@ func saveWithProfile(ctx context.Context, repository *store.Repository, leaseRoo
 	}
 
 	if socketPath == "" {
-		return result, saveFailure(ctx, "admission", started, integration.ErrEndpoint)
+		return result, saveFailure(ctx, "admission", started, tmuxserver.ErrEndpoint)
 	}
 
-	lease, err := integration.AcquireLease(ctx, leaseRoot, socketPath)
+	lease, err := tmuxserver.AcquireLease(ctx, leaseRoot, socketPath)
 	if err != nil {
 		return result, saveFailure(ctx, "lease", started, err)
 	}

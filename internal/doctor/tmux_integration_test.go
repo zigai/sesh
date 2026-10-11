@@ -109,12 +109,12 @@ func TestTmuxLiveProbe_FullSystemIntegration(t *testing.T) {
 	st := &session.State{
 		Version: session.CurrentHistoryVersion,
 		SwitchHistory: []session.SwitchHistoryEntry{
-			{Session: session.Identity{Name: "live-session"}, LastSwitch: time.Now().Unix()},
+			{Session: session.Identity{Name: "live-session"}, LastSwitchUnix: time.Now().Unix()},
 		},
-		RemoteSwitchHistory:   nil,
-		AgentViewHistory:      nil,
-		LastAutosaveTimestamp: 0,
-		PopupDisplayMode:      "",
+		RemoteSwitchHistory: nil,
+		AgentViewHistory:    nil,
+		LastAutosaveUnix:    0,
+		PopupDisplayMode:    "",
 	}
 	if err := session.SaveState(ctx, historyPath, st); err != nil {
 		t.Fatalf("failed to save state: %v", err)

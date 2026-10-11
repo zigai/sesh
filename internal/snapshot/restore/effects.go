@@ -7,7 +7,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/zigai/gotmux/tmux"
+	gotmux "github.com/zigai/gotmux/tmux"
 )
 
 const (
@@ -15,7 +15,7 @@ const (
 )
 
 type mutationOutcome struct {
-	Effect    tmux.Effect
+	Effect    gotmux.Effect
 	RuntimeID string
 }
 
@@ -69,28 +69,28 @@ func (e *uncertainError) Unwrap() error {
 // Exit status and stderr diagnostics are never used to downgrade library Unknown.
 func classifyMutation(err error) mutationOutcome {
 	if err == nil {
-		return mutationOutcome{Effect: tmux.EffectConfirmed, RuntimeID: ""}
+		return mutationOutcome{Effect: gotmux.EffectConfirmed, RuntimeID: ""}
 	}
 
 	evidence := collectEvidence(err)
 
 	if evidence.hasUnknown || evidence.unrecognized {
-		return mutationOutcome{Effect: tmux.EffectUnknown, RuntimeID: evidence.runtimeID}
+		return mutationOutcome{Effect: gotmux.EffectUnknown, RuntimeID: evidence.runtimeID}
 	}
 
 	if evidence.runtimeID != "" || evidence.hasConfirmed {
-		return mutationOutcome{Effect: tmux.EffectConfirmed, RuntimeID: evidence.runtimeID}
+		return mutationOutcome{Effect: gotmux.EffectConfirmed, RuntimeID: evidence.runtimeID}
 	}
 
 	if evidence.hasRejected {
-		return mutationOutcome{Effect: tmux.EffectRejected, RuntimeID: ""}
+		return mutationOutcome{Effect: gotmux.EffectRejected, RuntimeID: ""}
 	}
 
 	if evidence.hasNotSent && !evidence.hasUnknown && !evidence.unrecognized {
-		return mutationOutcome{Effect: tmux.EffectNotSent, RuntimeID: ""}
+		return mutationOutcome{Effect: gotmux.EffectNotSent, RuntimeID: ""}
 	}
 
-	return mutationOutcome{Effect: tmux.EffectUnknown, RuntimeID: evidence.runtimeID}
+	return mutationOutcome{Effect: gotmux.EffectUnknown, RuntimeID: evidence.runtimeID}
 }
 
 func collectEvidence(err error) collectedEvidence {
@@ -142,13 +142,13 @@ func inspectErrorNode(curr error, ev *collectedEvidence) {
 		}
 
 		switch outcome.Effect {
-		case tmux.EffectNotSent:
+		case gotmux.EffectNotSent:
 			ev.hasNotSent = true
-		case tmux.EffectUnspecified, tmux.EffectUnknown:
+		case gotmux.EffectUnspecified, gotmux.EffectUnknown:
 			ev.hasUnknown = true
-		case tmux.EffectConfirmed:
+		case gotmux.EffectConfirmed:
 			ev.hasConfirmed = true
-		case tmux.EffectRejected:
+		case gotmux.EffectRejected:
 			ev.hasRejected = true
 		default:
 			ev.unrecognized = true
@@ -160,28 +160,28 @@ func inspectErrorNode(curr error, ev *collectedEvidence) {
 	}
 }
 
-func extractOutcome(err error) (tmux.Outcome, bool) {
-	if op, ok := errors.AsType[*tmux.OperationError](err); ok {
+func extractOutcome(err error) (gotmux.Outcome, bool) {
+	if op, ok := errors.AsType[*gotmux.OperationError](err); ok {
 		return op.Outcome, true
 	}
 
-	if cmd, ok := errors.AsType[*tmux.CommandError](err); ok {
+	if cmd, ok := errors.AsType[*gotmux.CommandError](err); ok {
 		return cmd.Outcome, true
 	}
 
-	return tmux.Outcome{Effect: tmux.EffectNotSent, Steps: nil, Created: nil}, false
+	return gotmux.Outcome{Effect: gotmux.EffectNotSent, Steps: nil, Created: nil}, false
 }
 
 func isPreDispatchRefusal(err error) bool {
 	return errors.Is(err, ErrWorkingDirNotFound) ||
 		errors.Is(err, ErrSessionCollision) ||
 		errors.Is(err, ErrGroupCollision) ||
-		errors.Is(err, tmux.ErrInvalidHandle) ||
-		errors.Is(err, tmux.ErrInvalidArgument) ||
-		errors.Is(err, tmux.ErrNotInsideTmux)
+		errors.Is(err, gotmux.ErrInvalidHandle) ||
+		errors.Is(err, gotmux.ErrInvalidArgument) ||
+		errors.Is(err, gotmux.ErrNotInsideTmux)
 }
 
-func firstCreatedID(created []tmux.CreatedObject) string {
+func firstCreatedID(created []gotmux.CreatedObject) string {
 	for _, object := range created {
 		if object.RawID != "" {
 			return object.RawID

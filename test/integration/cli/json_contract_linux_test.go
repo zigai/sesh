@@ -12,7 +12,7 @@ import (
 
 	gotmux "github.com/zigai/gotmux/tmux"
 
-	integration "github.com/zigai/sesh/internal/integration/tmux"
+	"github.com/zigai/sesh/internal/integration/tmuxserver"
 	"github.com/zigai/sesh/internal/remote"
 	"github.com/zigai/sesh/internal/snapshot/restore"
 	"github.com/zigai/sesh/internal/snapshot/store"
@@ -95,7 +95,7 @@ func TestJSONRemoteActionAndLookupSuccessContracts(t *testing.T) {
 	writeTestConfig(t, configPath, fmt.Sprintf("[remote]\nenabled = true\nssh_path = %q\n\n", fixture.sshWrapper)+
 		remoteConnectionsTOML(fixture.connection))
 
-	peer, err := integration.Open(fixture.connection.TmuxSocket)
+	peer, err := tmuxserver.Open(fixture.connection.TmuxSocket)
 	if err != nil {
 		t.Fatal(err)
 	}

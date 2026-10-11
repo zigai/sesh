@@ -419,7 +419,7 @@ func (s *Sink) SetLevel(level zerolog.Level) {
 }
 
 func (s *Sink) Write(p []byte) (int, error) {
-	if !isValidJSONEvent(p) {
+	if !validJSONEvent(p) {
 		err := wrapErr(ErrLogInvalidRecord, "log_write_failed", "invalid or partial JSON log event")
 
 		s.mu.Lock()
@@ -449,7 +449,7 @@ func (s *Sink) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func isValidJSONEvent(p []byte) bool {
+func validJSONEvent(p []byte) bool {
 	if len(p) < 3 || p[len(p)-1] != '\n' {
 		return false
 	}

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zigai/gotmux/tmux"
+	gotmux "github.com/zigai/gotmux/tmux"
 	"github.com/zigai/gotmux/tmuxtest"
 
 	"github.com/zigai/sesh/internal/snapshot/model"
@@ -104,7 +104,7 @@ const (
 	restoredSessionName = "alpha"
 )
 
-func restoredSessionCount(t *testing.T, ctx context.Context, server *tmux.Server) int {
+func restoredSessionCount(t *testing.T, ctx context.Context, server *gotmux.Server) int {
 	t.Helper()
 
 	sessions, err := server.Sessions(ctx)
@@ -123,15 +123,15 @@ func restoredSessionCount(t *testing.T, ctx context.Context, server *tmux.Server
 	return count
 }
 
-func requireRestoredSessionAbsent(t *testing.T, ctx context.Context, server *tmux.Server) {
+func requireRestoredSessionAbsent(t *testing.T, ctx context.Context, server *gotmux.Server) {
 	t.Helper()
 
-	if _, err := server.FindSession(ctx, restoredSessionName); !errors.Is(err, tmux.ErrNotFound) {
+	if _, err := server.FindSession(ctx, restoredSessionName); !errors.Is(err, gotmux.ErrNotFound) {
 		t.Fatalf("expected session %q to be absent, got %v", restoredSessionName, err)
 	}
 }
 
-func requireFixtureIntact(t *testing.T, ctx context.Context, server *tmux.Server) {
+func requireFixtureIntact(t *testing.T, ctx context.Context, server *gotmux.Server) {
 	t.Helper()
 
 	if _, err := server.FindSession(ctx, fixtureSessionName); err != nil {
@@ -281,7 +281,7 @@ func TestExecutorResumeAdoptsConfirmedStepsWithoutDuplicates(t *testing.T) {
 	assertResumedAttemptAdoptsAndPreservesPanes(t, ctx, server, manifest, cfg, plan, repo, operation, panesBefore, linksBefore)
 }
 
-func windowPaneCount(t *testing.T, ctx context.Context, links []tmux.WindowLinkInfo) int {
+func windowPaneCount(t *testing.T, ctx context.Context, links []gotmux.WindowLinkInfo) int {
 	t.Helper()
 
 	total := 0
@@ -301,7 +301,7 @@ func windowPaneCount(t *testing.T, ctx context.Context, links []tmux.WindowLinkI
 func assertCanceledReceiptOutcome(
 	t *testing.T,
 	ctx context.Context,
-	server *tmux.Server,
+	server *gotmux.Server,
 	repo *store.Repository,
 	operation string,
 	createStep Step,
@@ -452,7 +452,7 @@ func TestExecutorCrashAfterEffectNeverDuplicates(t *testing.T) {
 func requireCrashedCreationSurvived(
 	t *testing.T,
 	ctx context.Context,
-	server *tmux.Server,
+	server *gotmux.Server,
 	repo *store.Repository,
 	operation string,
 	createStep Step,
@@ -480,7 +480,7 @@ func requireCrashedCreationSurvived(
 func requireRefusedRetryWithoutDuplicates(
 	t *testing.T,
 	ctx context.Context,
-	server *tmux.Server,
+	server *gotmux.Server,
 	repo *store.Repository,
 	operation string,
 	plan Plan,
@@ -600,7 +600,7 @@ func TestRestoreCrashWorker(t *testing.T) {
 		t.Fatalf("worker: BuildPlan failed: %v", err)
 	}
 
-	server, err := tmux.New(tmux.Config{SocketPath: socket, ConfigFile: "/dev/null"})
+	server, err := gotmux.New(gotmux.Config{SocketPath: socket, ConfigFile: "/dev/null"})
 	if err != nil {
 		t.Fatalf("worker: tmux.New failed: %v", err)
 	}
@@ -619,15 +619,15 @@ func TestRestoreCrashWorker(t *testing.T) {
 	_, _ = NewExecutor(server, manifest, DefaultExecuteConfig()).Execute(ctx, plan, journal)
 }
 
-func refusalSessions(t *testing.T, ctx context.Context, server *tmux.Server) (tmux.Session, tmux.Session) {
+func refusalSessions(t *testing.T, ctx context.Context, server *gotmux.Server) (gotmux.Session, gotmux.Session) {
 	t.Helper()
 
-	first, err := server.NewSession(ctx, tmux.NewSessionOptions{Name: "refusal-first", Start: tmux.StartPolicyExistingOnly})
+	first, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "refusal-first", Start: gotmux.StartPolicyExistingOnly})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
 
-	second, err := server.NewSession(ctx, tmux.NewSessionOptions{Name: "refusal-second", Start: tmux.StartPolicyExistingOnly})
+	second, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "refusal-second", Start: gotmux.StartPolicyExistingOnly})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -643,12 +643,12 @@ func TestRefusedCommandWithStderrPreservesUnknown(t *testing.T) {
 
 	first, second := refusalSessions(t, ctx, server)
 
-	_, dupErr := server.NewSession(ctx, tmux.NewSessionOptions{Name: "refusal-first", Start: tmux.StartPolicyExistingOnly})
+	_, dupErr := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "refusal-first", Start: gotmux.StartPolicyExistingOnly})
 	if dupErr == nil {
 		t.Fatal("expected duplicate session creation to fail")
 	}
 
-	if outcome := classifyMutation(dupErr); outcome.Effect != tmux.EffectUnknown {
+	if outcome := classifyMutation(dupErr); outcome.Effect != gotmux.EffectUnknown {
 		t.Fatalf("duplicate session must preserve library unknown, got %s", outcome.Effect)
 	}
 
@@ -660,12 +660,12 @@ func TestRefusedCommandWithStderrPreservesUnknown(t *testing.T) {
 	window := links[0].Handle().Window()
 	index := links[0].Index
 
-	_, linkErr := window.Link(ctx, first, tmux.LinkOptions{Index: &index})
+	_, linkErr := window.Link(ctx, first, gotmux.LinkOptions{Index: &index})
 	if linkErr == nil {
 		t.Fatal("expected linking onto an occupied slot to fail")
 	}
 
-	if outcome := classifyMutation(linkErr); outcome.Effect != tmux.EffectUnknown {
+	if outcome := classifyMutation(linkErr); outcome.Effect != gotmux.EffectUnknown {
 		t.Fatalf("occupied slot link must preserve library unknown, got %s", outcome.Effect)
 	}
 }
@@ -678,14 +678,14 @@ func TestPreDispatchTypedRefusalIsClassifiedNotSent(t *testing.T) {
 		{"working_dir_not_found", ErrWorkingDirNotFound},
 		{"session_collision", ErrSessionCollision},
 		{"group_collision", ErrGroupCollision},
-		{"invalid_handle", tmux.ErrInvalidHandle},
-		{"invalid_argument", tmux.ErrInvalidArgument},
+		{"invalid_handle", gotmux.ErrInvalidHandle},
+		{"invalid_argument", gotmux.ErrInvalidArgument},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			outcome := classifyMutation(tc.err)
-			if outcome.Effect != tmux.EffectNotSent {
+			if outcome.Effect != gotmux.EffectNotSent {
 				t.Fatalf("expected pre-dispatch error to be not-sent, got %s", outcome.Effect)
 			}
 		})
@@ -699,14 +699,14 @@ func TestJoinedCancellationPreservesUncertainty(t *testing.T) {
 	joined := errors.Join(notSentErr, uncertainErr)
 
 	outcome := classifyMutation(joined)
-	if outcome.Effect != tmux.EffectUnknown {
+	if outcome.Effect != gotmux.EffectUnknown {
 		t.Fatalf("joined error with uncertain branch must be Unknown, got %s", outcome.Effect)
 	}
 
 	joinedWithCancel := errors.Join(notSentErr, context.Canceled)
 
 	outcomeCancel := classifyMutation(joinedWithCancel)
-	if outcomeCancel.Effect != tmux.EffectUnknown {
+	if outcomeCancel.Effect != gotmux.EffectUnknown {
 		t.Fatalf("joined cancellation after dispatch must be Unknown, got %s", outcomeCancel.Effect)
 	}
 }
@@ -718,7 +718,7 @@ func TestCompositePartiallyAppliedMutationPreservesReceipt(t *testing.T) {
 	}
 
 	outcome := classifyMutation(applied)
-	if outcome.Effect != tmux.EffectUnknown {
+	if outcome.Effect != gotmux.EffectUnknown {
 		t.Fatalf("partially applied composite mutation must be Unknown, got %s", outcome.Effect)
 	}
 
@@ -730,13 +730,13 @@ func TestCompositePartiallyAppliedMutationPreservesReceipt(t *testing.T) {
 func runFirstAttemptAndCountPanes(
 	t *testing.T,
 	ctx context.Context,
-	server *tmux.Server,
+	server *gotmux.Server,
 	manifest model.Manifest,
 	cfg ExecuteConfig,
 	plan Plan,
 	repo *store.Repository,
 	operation string,
-) (int, []tmux.WindowLinkInfo) {
+) (int, []gotmux.WindowLinkInfo) {
 	t.Helper()
 
 	first, err := NewExecutor(server, manifest, cfg).Execute(ctx, plan, newPlanJournal(t, ctx, repo, operation))
@@ -764,14 +764,14 @@ func runFirstAttemptAndCountPanes(
 func assertResumedAttemptAdoptsAndPreservesPanes(
 	t *testing.T,
 	ctx context.Context,
-	server *tmux.Server,
+	server *gotmux.Server,
 	manifest model.Manifest,
 	cfg ExecuteConfig,
 	plan Plan,
 	repo *store.Repository,
 	operation string,
 	panesBefore int,
-	linksBefore []tmux.WindowLinkInfo,
+	linksBefore []gotmux.WindowLinkInfo,
 ) {
 	t.Helper()
 
@@ -809,7 +809,7 @@ func TestExecutorJournalsUnspecifiedEffectAsUnknown(t *testing.T) {
 	journal := newMemoryJournal()
 	executor := NewExecutor(nil, model.Manifest{}, DefaultExecuteConfig())
 	effect := stepEffect{run: func(context.Context) (string, error) {
-		return "", &tmux.OperationError{Outcome: tmux.Outcome{}}
+		return "", &gotmux.OperationError{Outcome: gotmux.Outcome{}}
 	}}
 
 	_, err := executor.dispatch(ctx, step, effect, journal)

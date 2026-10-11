@@ -351,6 +351,6 @@ func (w *logWatchTestWriter) String() string {
 	return w.buf.String()
 }
 
-func lineMatchesFilter(line []byte, options Options) bool {
-	return logging.LineMatchesFilter(line, options.toLoggingFilter())
+func lineMatchesFilter(line []byte, opts Options) bool {
+	return logging.LineMatchesFilter(line, opts.toLoggingFilter())
 }

@@ -49,7 +49,7 @@ func TestSaveRenameFailureLeavesOriginalFile(t *testing.T) {
 	err := svc.SaveState(t.Context(), statePath, &State{
 		Version: CurrentHistoryVersion,
 		SwitchHistory: []SwitchHistoryEntry{
-			{Session: Identity{Name: "new"}, LastSwitch: 2},
+			{Session: Identity{Name: "new"}, LastSwitchUnix: 2},
 		},
 	})
 	if !errors.Is(err, errInjectedFault) {
@@ -113,7 +113,7 @@ func TestSaveSyncDirFailureReportsErrUncertain(t *testing.T) {
 	err := svc.SaveState(t.Context(), statePath, &State{
 		Version: CurrentHistoryVersion,
 		SwitchHistory: []SwitchHistoryEntry{
-			{Session: Identity{Name: historyTestSessionName}, LastSwitch: 100},
+			{Session: Identity{Name: historyTestSessionName}, LastSwitchUnix: 100},
 		},
 	})
 	if !errors.Is(err, ErrUncertain) {
@@ -147,7 +147,7 @@ func TestSaveWriteFailureCleansUpTempFileAndPreservesOriginal(t *testing.T) {
 	err := svc.SaveState(t.Context(), statePath, &State{
 		Version: CurrentHistoryVersion,
 		SwitchHistory: []SwitchHistoryEntry{
-			{Session: Identity{Name: historyTestSessionName}, LastSwitch: 1},
+			{Session: Identity{Name: historyTestSessionName}, LastSwitchUnix: 1},
 		},
 	})
 	if !errors.Is(err, errInjectedFault) {

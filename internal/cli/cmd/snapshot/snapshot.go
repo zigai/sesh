@@ -25,13 +25,11 @@ const (
 )
 
 type ListResultJSON struct {
-	Generation string                `json:"generation"`
-	Sessions   []snapshotSessionJSON `json:"sessions"`
+	Generation string        `json:"generation"`
+	Sessions   []sessionJSON `json:"sessions"`
 }
 
-type snapshotListResultJSON = ListResultJSON
-
-type snapshotSessionJSON struct {
+type sessionJSON struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
 	Directory string `json:"directory"`
@@ -39,14 +37,12 @@ type snapshotSessionJSON struct {
 }
 
 type HistoryResultJSON struct {
-	Current     string                   `json:"current"`
-	Attempts    []snapshotAttemptJSON    `json:"attempts"`
-	Generations []snapshotGenerationJSON `json:"generations"`
+	Current     string           `json:"current"`
+	Attempts    []attemptJSON    `json:"attempts"`
+	Generations []generationJSON `json:"generations"`
 }
 
-type snapshotHistoryResultJSON = HistoryResultJSON
-
-type snapshotAttemptJSON struct {
+type attemptJSON struct {
 	ID             string `json:"id"`
 	Sequence       uint64 `json:"sequence"`
 	State          string `json:"state"`
@@ -54,7 +50,7 @@ type snapshotAttemptJSON struct {
 	ManifestSHA256 string `json:"manifestSha256"`
 }
 
-type snapshotGenerationJSON struct {
+type generationJSON struct {
 	ID             string `json:"id"`
 	Sequence       uint64 `json:"sequence"`
 	Complete       bool   `json:"complete"`
@@ -63,22 +59,20 @@ type snapshotGenerationJSON struct {
 }
 
 type VerifyResultJSON struct {
-	Generation             string                 `json:"generation"`
-	ByteIntegrity          bool                   `json:"byteIntegrity"`
-	SourceEvidenceComplete bool                   `json:"sourceEvidenceComplete"`
-	RestoreReady           bool                   `json:"restoreReady"`
-	RestoreReason          string                 `json:"restoreReason"`
-	Consistency            string                 `json:"consistency"`
-	Sessions               int                    `json:"sessions"`
-	Windows                int                    `json:"windows"`
-	Panes                  int                    `json:"panes"`
-	Artifacts              int                    `json:"artifacts"`
-	Evidence               []snapshotEvidenceJSON `json:"evidence"`
+	Generation             string         `json:"generation"`
+	ByteIntegrity          bool           `json:"byteIntegrity"`
+	SourceEvidenceComplete bool           `json:"sourceEvidenceComplete"`
+	RestoreReady           bool           `json:"restoreReady"`
+	RestoreReason          string         `json:"restoreReason"`
+	Consistency            string         `json:"consistency"`
+	Sessions               int            `json:"sessions"`
+	Windows                int            `json:"windows"`
+	Panes                  int            `json:"panes"`
+	Artifacts              int            `json:"artifacts"`
+	Evidence               []evidenceJSON `json:"evidence"`
 }
 
-type snapshotVerifyResultJSON = VerifyResultJSON
-
-type snapshotEvidenceJSON struct {
+type evidenceJSON struct {
 	Domain string `json:"domain"`
 	Status string `json:"status"`
 	Reason string `json:"reason"`
@@ -162,9 +156,9 @@ func practicalGeneration(ctx context.Context, repo *store.Repository, requested 
 }
 
 func renderListJSON(cmd *cobra.Command, manifest model.Manifest, genID string, windowCount map[string]int) error {
-	items := make([]snapshotSessionJSON, 0, len(manifest.Sessions))
+	items := make([]sessionJSON, 0, len(manifest.Sessions))
 	for _, s := range manifest.Sessions {
-		items = append(items, snapshotSessionJSON{
+		items = append(items, sessionJSON{
 			ID:        s.ID,
 			Name:      string(s.Name),
 			Directory: string(s.Directory),
@@ -172,7 +166,7 @@ func renderListJSON(cmd *cobra.Command, manifest model.Manifest, genID string, w
 		})
 	}
 
-	return clibase.WriteJSONResult(cmd, snapshotListResultJSON{
+	return clibase.WriteJSONResult(cmd, ListResultJSON{
 		Generation: genID,
 		Sessions:   items,
 	})
@@ -230,9 +224,9 @@ func runSnapshotList(cmd *cobra.Command, _ []string) error {
 	if combinedErr := errors.Join(readErr, closeErr); combinedErr != nil {
 		if errors.Is(combinedErr, store.ErrUnavailable) && genID == "" {
 			if clibase.JSONOutputEnabled(cmd) {
-				return clibase.WriteJSONResult(cmd, snapshotListResultJSON{
+				return clibase.WriteJSONResult(cmd, ListResultJSON{
 					Generation: "",
-					Sessions:   []snapshotSessionJSON{},
+					Sessions:   []sessionJSON{},
 				})
 			}
 
@@ -275,9 +269,9 @@ func newSnapshotHistoryCommand() *cobra.Command {
 }
 
 func renderHistoryJSON(cmd *cobra.Command, catalog store.Catalog) error {
-	attempts := make([]snapshotAttemptJSON, 0, len(catalog.Attempts))
+	attempts := make([]attemptJSON, 0, len(catalog.Attempts))
 	for _, a := range catalog.Attempts {
-		attempts = append(attempts, snapshotAttemptJSON{
+		attempts = append(attempts, attemptJSON{
 			ID:             a.ID,
 			Sequence:       a.Sequence,
 			State:          a.State,
@@ -286,9 +280,9 @@ func renderHistoryJSON(cmd *cobra.Command, catalog store.Catalog) error {
 		})
 	}
 
-	generations := make([]snapshotGenerationJSON, 0, len(catalog.Generations))
+	generations := make([]generationJSON, 0, len(catalog.Generations))
 	for _, g := range catalog.Generations {
-		generations = append(generations, snapshotGenerationJSON{
+		generations = append(generations, generationJSON{
 			ID:             g.ID,
 			Sequence:       g.Sequence,
 			Complete:       g.Complete,
@@ -297,7 +291,7 @@ func renderHistoryJSON(cmd *cobra.Command, catalog store.Catalog) error {
 		})
 	}
 
-	return clibase.WriteJSONResult(cmd, snapshotHistoryResultJSON{
+	return clibase.WriteJSONResult(cmd, HistoryResultJSON{
 		Current:     catalog.Current,
 		Attempts:    attempts,
 		Generations: generations,
@@ -396,17 +390,17 @@ func renderVerifyJSON(cmd *cobra.Command, targetGen string, manifest model.Manif
 	sourceEvidenceComplete := manifest.Complete()
 	practicalReady := manifest.PracticalRecoveryReady()
 
-	evidenceList := make([]snapshotEvidenceJSON, 0, len(manifest.Evidence))
+	evidenceList := make([]evidenceJSON, 0, len(manifest.Evidence))
 
 	for _, e := range manifest.Evidence {
-		evidenceList = append(evidenceList, snapshotEvidenceJSON{
+		evidenceList = append(evidenceList, evidenceJSON{
 			Domain: e.Domain,
 			Status: e.Status,
 			Reason: e.Reason,
 		})
 	}
 
-	return clibase.WriteJSONResult(cmd, snapshotVerifyResultJSON{
+	return clibase.WriteJSONResult(cmd, VerifyResultJSON{
 		Generation:             targetGen,
 		ByteIntegrity:          true,
 		SourceEvidenceComplete: sourceEvidenceComplete,
@@ -486,7 +480,7 @@ func runSnapshotVerify(cmd *cobra.Command, _ []string) error {
 		}
 
 		if clibase.JSONOutputEnabled(cmd) {
-			return clibase.WriteJSONResultError(cmd, snapshotVerifyResultJSON{
+			return clibase.WriteJSONResultError(cmd, VerifyResultJSON{
 				Generation:             targetGen,
 				ByteIntegrity:          false,
 				SourceEvidenceComplete: false,
@@ -497,7 +491,7 @@ func runSnapshotVerify(cmd *cobra.Command, _ []string) error {
 				Windows:                0,
 				Panes:                  0,
 				Artifacts:              0,
-				Evidence:               []snapshotEvidenceJSON{},
+				Evidence:               []evidenceJSON{},
 			}, combinedErr)
 		}
 
