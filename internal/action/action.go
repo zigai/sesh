@@ -17,6 +17,7 @@ const (
 	SubjectSavedSession
 	SubjectSession
 	SubjectAgentPane
+	SubjectTask
 )
 
 const (
@@ -47,6 +48,7 @@ var (
 	ErrOutputTypeMismatch   = errors.New("action returned an unexpected output type")
 	ErrSessionAttached      = errors.New("session is attached")
 	ErrWholeSessionRequired = errors.New("action applies to a whole session, not an agent pane")
+	ErrTaskRequired         = errors.New("action applies to a task")
 
 	registry = make(map[ID]Entry)
 	order    []ID
@@ -81,6 +83,8 @@ type Subject struct {
 	At       Location
 	Sessions []session.Session
 	Pane     string
+	// Task is the selected task, for actions on a task.
+	Task string
 }
 
 // Env tells availability checks what the dispatcher can run.
@@ -218,6 +222,12 @@ func (descriptor Descriptor) matchSubject(subject Subject) error {
 		}
 
 		return nil
+	case SubjectTask:
+		if subject.Task == "" {
+			return Wrap(CodeInvalidArgument, ErrTaskRequired)
+		}
+
+		return nil
 	case SubjectLiveSession, SubjectSavedSession, SubjectSession:
 		return descriptor.matchSessions(subject.Sessions)
 	default:
@@ -278,7 +288,7 @@ func SubjectOf(sessions ...session.Session) Subject {
 		at = LocationOf(sessions[0])
 	}
 
-	return Subject{At: at, Sessions: sessions, Pane: ""}
+	return Subject{At: at, Sessions: sessions, Pane: "", Task: ""}
 }
 
 // SelectSession finds the session a person named: an exact ID first, then a name.

@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 
 	"github.com/zigai/aht/v2/pkg/aht"
 	"github.com/zigai/aht/v2/pkg/harness"
@@ -24,6 +25,7 @@ const (
 	ReasonPagerRestart       Reason = "pager_restart"
 	ReasonGitTUIRestart      Reason = "git_tui_restart"
 	ReasonFileManagerRestart Reason = "file_manager_restart"
+	ReasonTaskPlaceholder    Reason = "task_placeholder"
 
 	ReasonUnsupportedApplication Reason = "unsupported_application"
 	ReasonUnsafeArguments        Reason = "unsafe_arguments"
@@ -60,6 +62,16 @@ var agentArgumentPrefixes = map[aht.Harness][]string{
 	aht.HarnessHermes:   {"--resume"},
 }
 
+// agentStopSignals lists the harnesses whose sleep was verified with a real stop and native
+// resume: the signal that ends the harness after it has saved its session. A harness missing
+// here cannot sleep.
+var agentStopSignals = map[aht.Harness]syscall.Signal{
+	aht.HarnessClaude: syscall.SIGTERM,
+	aht.HarnessCodex:  syscall.SIGTERM,
+	aht.HarnessOmp:    syscall.SIGTERM,
+	aht.HarnessPi:     syscall.SIGTERM,
+}
+
 type Reason string
 
 type AgentResume struct {
@@ -73,7 +85,8 @@ type AgentResume struct {
 func (r Reason) Supported() bool {
 	return r == ReasonShellRestart || r == ReasonEditorRestart || r == ReasonEditorReopen ||
 		r == ReasonMonitorRestart || r == ReasonAgentResume ||
-		r == ReasonPagerRestart || r == ReasonGitTUIRestart || r == ReasonFileManagerRestart
+		r == ReasonPagerRestart || r == ReasonGitTUIRestart || r == ReasonFileManagerRestart ||
+		r == ReasonTaskPlaceholder
 }
 
 func Prepare(observed model.Launch, agent *AgentResume) (model.Launch, Reason) {
@@ -81,16 +94,42 @@ func Prepare(observed model.Launch, agent *AgentResume) (model.Launch, Reason) {
 	fallback.Recovery = RecoveryUnverified
 	fallback.Reason = ""
 
+	executable := string(observed.Executable)
+	clean := cleanAbsolute(executable) && cleanAbsolute(string(observed.Directory))
+	name := executableName(executable)
+
+	// A sleeping task's agent pane may still carry the stopped agent's record.
+	if clean && name == seshName {
+		return preparePlaceholder(fallback)
+	}
+
 	if agent != nil {
 		return prepareAgent(fallback, agent)
 	}
 
-	executable := string(observed.Executable)
-	if !cleanAbsolute(executable) || !cleanAbsolute(string(observed.Directory)) {
+	if !clean {
 		return fallback, ReasonUnsupportedApplication
 	}
 
-	name := executableName(executable)
+	return prepareApplication(observed, fallback, name)
+}
+
+// RunsHarness reports whether launch is a process of the named agent harness.
+func RunsHarness(launch model.Launch, harnessName string) bool {
+	observed, ok := observedAgentHarness(launch)
+
+	return ok && observed == aht.Harness(harnessName)
+}
+
+// StopSignal returns the signal that stops harness so that it can be resumed, if its stop was
+// verified.
+func StopSignal(harnessName string) (syscall.Signal, bool) {
+	signal, ok := agentStopSignals[aht.Harness(harnessName)]
+
+	return signal, ok
+}
+
+func prepareApplication(observed, fallback model.Launch, name string) (model.Launch, Reason) {
 	switch {
 	case isShell(name):
 		return restartLaunch(observed, []string{name}), ReasonShellRestart

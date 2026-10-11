@@ -138,7 +138,7 @@ func recountAgentSummary(summary *session.AgentSummary) {
 		case session.AgentStatusInterrupted:
 			summary.Interrupted++
 			summary.IdleSince = earlierAgentStatus(summary.IdleSince, agent.StatusSince)
-		case session.AgentStatusUnknown:
+		case session.AgentStatusUnknown, session.AgentStatusSleeping, session.AgentStatusDone:
 			summary.Unknown++
 		default:
 			summary.Unknown++

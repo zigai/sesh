@@ -117,6 +117,7 @@ type Services struct {
 	Panes            PaneService
 	TerminalAttach   TerminalAttacher
 	Agents           AgentSource
+	Tasks            TaskSource
 	AgentWatcher     AgentWatcher
 	Remote           RemoteCatalogSource
 	RemoteWatcher    RemoteCatalogWatcher

@@ -28,6 +28,7 @@ import (
 	"github.com/zigai/sesh/internal/privatefs"
 	"github.com/zigai/sesh/internal/remote"
 	"github.com/zigai/sesh/internal/session"
+	"github.com/zigai/sesh/internal/task"
 )
 
 const (
@@ -143,6 +144,8 @@ func newPeerLocal(workspace app.Workspace, server *gotmux.Server) (*app.Local, *
 		Streams:            gotmux.Streams{In: nil, Out: nil, Err: nil},
 		Source:             "remote",
 		DeferSwitchHistory: false,
+		TaskLedger:         workspace.Tasks,
+		WorktreeDir:        workspace.WorktreeDir,
 	})
 
 	return local, repository
@@ -345,8 +348,25 @@ func runRemotePeerStream(cmd *cobra.Command, _ []string) error {
 			return peerAgentSummaries(ctx, workspace)
 		},
 		SavedSessions: func(ctx context.Context) ([]session.Session, error) { return peerSavedSessions(ctx, workspace) },
-		Actions:       actions(workspace.Config),
+		Tasks: func(ctx context.Context) ([]remote.TaskRow, error) {
+			return peerTasks(ctx, runtime.server, workspace.Tasks)
+		},
+		Actions: actions(workspace.Config),
 	}, cmd.OutOrStdout()))
+}
+
+func peerTasks(ctx context.Context, server *gotmux.Server, ledger string) ([]remote.TaskRow, error) {
+	tasks, err := task.Inventory(ctx, server, task.NewStore(ledger))
+	if err != nil {
+		return nil, cliError("list_remote_tasks", err)
+	}
+
+	rows := make([]remote.TaskRow, 0, len(tasks))
+	for _, live := range tasks {
+		rows = append(rows, remote.NewTaskRow(live))
+	}
+
+	return rows, nil
 }
 
 func runRemotePeerAction(cmd *cobra.Command, _ []string) (resultErr error) {

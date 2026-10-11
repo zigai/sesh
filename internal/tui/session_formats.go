@@ -31,6 +31,9 @@ type sessionRowFormats struct {
 	seshSession   display.Template
 	agentsSession display.Template
 	agentsAgent   display.Template
+	workSection   display.Template
+	workTask      display.Template
+	work          bool
 }
 
 type sessionFormatValues struct {
@@ -87,15 +90,12 @@ func compileSessionRowFormats(displayCfg config.DisplayConfig, settings config.S
 	seshFormat := displayCfg.SeshFormat
 	agentsSessionFormat := displayCfg.AgentsSessionFormat
 	agentsAgentFormat := displayCfg.AgentsAgentFormat
+	workTaskFormat := displayCfg.WorkTaskFormat
 
 	if settings.NormalizedShortcutStyle() == "right" {
-		if seshFormat == config.DefaultSeshFormat || seshFormat == "" {
-			seshFormat += "  {shortcut_badge:>3}"
-		}
-
-		if agentsAgentFormat == config.DefaultAgentsAgentFormat || agentsAgentFormat == "" {
-			agentsAgentFormat += "  {shortcut_badge:>3}"
-		}
+		seshFormat = withShortcutBadge(seshFormat, config.DefaultSeshFormat)
+		agentsAgentFormat = withShortcutBadge(agentsAgentFormat, config.DefaultAgentsAgentFormat)
+		workTaskFormat = withShortcutBadge(workTaskFormat, config.DefaultWorkTaskFormat)
 	}
 
 	seshSession, err := compileSessionRowFormat(
@@ -125,11 +125,43 @@ func compileSessionRowFormats(displayCfg config.DisplayConfig, settings config.S
 		return sessionRowFormats{}, err
 	}
 
+	workSection, err := compileSessionRowFormat("display.work_section_format", display.FormatKindAgentsSession, displayCfg.WorkSectionFormat)
+	if err != nil {
+		return sessionRowFormats{}, err
+	}
+
+	workTask, err := compileSessionRowFormat("display.work_task_format", display.FormatKindAgentsAgent, workTaskFormat)
+	if err != nil {
+		return sessionRowFormats{}, err
+	}
+
 	return sessionRowFormats{
 		seshSession:   seshSession,
 		agentsSession: agentsSession,
 		agentsAgent:   agentsAgent,
+		workSection:   workSection,
+		workTask:      workTask,
+		work:          slices.Contains(displayModesFrom(settings.DisplayModes), displayModeWork),
 	}, nil
+}
+
+// agentRowsUseAny reports whether an agent row of any enabled mode shows one of the fields.
+func (formats sessionRowFormats) agentRowsUseAny(fields ...string) bool {
+	return formats.agentsAgent.UsesAny(fields...) || (formats.work && formats.workTask.UsesAny(fields...))
+}
+
+func (formats sessionRowFormats) agentRowsUseWidget(widget string) bool {
+	return formats.agentsAgent.UsesWidget(widget) || (formats.work && formats.workTask.UsesWidget(widget))
+}
+
+// withShortcutBadge appends the right-aligned shortcut badge to a default row format; a custom
+// format places the badge itself.
+func withShortcutBadge(format, defaultFormat string) string {
+	if format == defaultFormat || format == "" {
+		return format + "  {shortcut_badge:>3}"
+	}
+
+	return format
 }
 
 func compileSessionRowFormat(
@@ -168,11 +200,19 @@ func (m *Model) sessionRowFormatter(
 	tableLayout sessionTableLayout,
 ) (display.Template, sessionFormatValues) {
 	template := m.sessionFormats.seshSession
-	if m.displayMode == displayModeAgents {
+
+	switch m.displayMode {
+	case displayModeAgents:
 		template = m.sessionFormats.agentsSession
 		if hasAgent {
 			template = m.sessionFormats.agentsAgent
 		}
+	case displayModeWork:
+		template = m.sessionFormats.workSection
+		if hasAgent {
+			template = m.sessionFormats.workTask
+		}
+	case displayModeSesh:
 	}
 
 	return template, sessionFormatValues{
@@ -256,7 +296,16 @@ func (v sessionFormatValues) resolveResourceSummaryCell(field string) (string, l
 }
 
 func (v sessionFormatValues) resolveGHCell(field string) (string, layout.State) {
+	recorded := 0
+	if field == display.FieldAgentPR {
+		recorded = v.model.recordedTaskPR(v.row, v.agent.PaneID)
+	}
+
 	if v.row.Origin == session.OriginSSH || v.row.Origin == session.OriginBridge {
+		if recorded != 0 {
+			return "#" + strconv.Itoa(recorded), layout.Present
+		}
+
 		return "", layout.Unsupported
 	}
 
@@ -265,6 +314,9 @@ func (v sessionFormatValues) resolveGHCell(field string) (string, layout.State) 
 	}
 
 	cell := v.model.providerRunner.Cell(providers.GH, v.agent.PaneID, field)
+	if recorded != 0 && cell.State != layout.Present {
+		return "#" + strconv.Itoa(recorded), layout.Present
+	}
 
 	return cell.Text, cell.State
 }

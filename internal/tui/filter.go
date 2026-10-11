@@ -50,7 +50,7 @@ func (m *Model) normalizeFilteredCursor() {
 }
 
 func (m *Model) normalizeFilteredAgentCursor() {
-	if m.displayMode != displayModeAgents {
+	if !m.displayMode.tree() {
 		m.agentCursor = parentAgentIndex
 		return
 	}
@@ -87,7 +87,7 @@ func (m *Model) filterSessionWithQuery(query string, row session.Session) (sessi
 		return row, sessionMatches(query, row)
 	}
 
-	if m.displayMode != displayModeAgents {
+	if !m.displayMode.tree() {
 		return row, sessionMatches(query, row) || anyAgentMatches(query, row.Agents)
 	}
 
@@ -115,7 +115,7 @@ func filterMatchingAgents(query string, agents []session.AgentSession) []session
 }
 
 func (m *Model) rankFilteredSessions(query string, filtered []session.Session) []session.Session {
-	if m.displayMode == displayModeAgents || len(filtered) <= 1 {
+	if m.displayMode.tree() || len(filtered) <= 1 {
 		return filtered
 	}
 
@@ -257,6 +257,10 @@ func agentStatusMatches(query string, status session.AgentStatus) bool {
 		return fuzzyMatchAny(query, "paused", "stopped", "cancelled", "canceled") //nolint:misspell // British spelling is an intentional search alias.
 	case session.AgentStatusIdle:
 		return fuzzyMatch(query, "offline")
+	case session.AgentStatusSleeping:
+		return fuzzyMatchAny(query, "asleep", "parked")
+	case session.AgentStatusDone:
+		return fuzzyMatchAny(query, "merged", "closed", "finished")
 	case session.AgentStatusUnknown:
 		return false
 	}

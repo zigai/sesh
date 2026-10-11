@@ -58,11 +58,11 @@ func TestSetupTmuxApplyRegistersBindings(t *testing.T) {
 	}
 
 	result := decodeJSONPayload[setupApplyResultJSON](t, exec.envelope.Result)
-	if result.Applied != 4 || result.Skipped != 0 {
-		t.Fatalf("applied/skipped = %d/%d, want 4/0", result.Applied, result.Skipped)
+	if result.Applied != 7 || result.Skipped != 0 {
+		t.Fatalf("applied/skipped = %d/%d, want 7/0", result.Applied, result.Skipped)
 	}
 
-	assertBound(t, server, []string{"S-F12", "M-S-F12", "S-F1", "C-o"})
+	assertBound(t, server, []string{"S-F12", "M-S-F12", "S-F1", "C-o", "M-w", "C-t", "M-n"})
 
 	if got := boundKeys(t, server, "root")["S-F12"]; got == "" {
 		t.Fatal("S-F12 binding has an empty payload")
@@ -97,11 +97,11 @@ func TestSetupTmuxApplySkipsExistingAndForceOverwrites(t *testing.T) {
 	}
 
 	forcedResult := decodeJSONPayload[setupApplyResultJSON](t, forced.envelope.Result)
-	if forcedResult.Applied != 4 || forcedResult.Skipped != 0 {
-		t.Fatalf("forced applied/skipped = %d/%d, want 4/0", forcedResult.Applied, forcedResult.Skipped)
+	if forcedResult.Applied != 7 || forcedResult.Skipped != 0 {
+		t.Fatalf("forced applied/skipped = %d/%d, want 7/0", forcedResult.Applied, forcedResult.Skipped)
 	}
 
-	assertBound(t, server, []string{"S-F12", "M-S-F12", "S-F1", "C-o"})
+	assertBound(t, server, []string{"S-F12", "M-S-F12", "S-F1", "C-o", "M-w", "C-t", "M-n"})
 }
 
 func TestSetupTmuxApplySkipsAKeyBoundUnderAnotherSpelling(t *testing.T) {
@@ -132,7 +132,7 @@ func writeSetupBindings(t *testing.T, keys ...string) string {
 
 	var text strings.Builder
 
-	for _, key := range []string{"S-F12", "M-S-F12", "S-F1", "C-o"} {
+	for _, key := range []string{"S-F12", "M-S-F12", "S-F1", "C-o", "M-w", "C-t", "M-n"} {
 		fmt.Fprintf(&text, "[[keys.bind]]\nkey = %q\nin = \"tmux\"\n\n", key)
 	}
 
@@ -197,8 +197,8 @@ func assertDegradedConflictEnvelope(t *testing.T, exec commandExecution) {
 	}
 
 	conflict := decodeJSONPayload[setupApplyResultJSON](t, exec.envelope.Result)
-	if conflict.Applied != 0 || conflict.Skipped != 4 {
-		t.Fatalf("applied/skipped = %d/%d, want 0/4", conflict.Applied, conflict.Skipped)
+	if conflict.Applied != 0 || conflict.Skipped != 7 {
+		t.Fatalf("applied/skipped = %d/%d, want 0/7", conflict.Applied, conflict.Skipped)
 	}
 
 	conflicted := 0
@@ -209,8 +209,8 @@ func assertDegradedConflictEnvelope(t *testing.T, exec commandExecution) {
 		}
 	}
 
-	if conflicted != 4 {
-		t.Fatalf("conflicting bindings = %d, want 4", conflicted)
+	if conflicted != 7 {
+		t.Fatalf("conflicting bindings = %d, want 7", conflicted)
 	}
 }
 

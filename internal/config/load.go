@@ -18,6 +18,12 @@ var errSourceFilePathRequired = errors.New("configuration source requires an exp
 
 type LoadOption func(*loadOptions)
 
+type Source struct {
+	Path          string
+	WithoutConfig bool
+	Input         string
+}
+
 type loadOptions struct {
 	explicitPath  string
 	withoutConfig bool
@@ -120,9 +126,46 @@ func LoadInto(target *Config, opts ...LoadOption) error {
 		return err
 	}
 
+	source, err := loadedSource(options, files)
+	if err != nil {
+		return err
+	}
+
+	stagingCfg.source = source
 	*target = *stagingCfg.Clone()
 
 	return nil
+}
+
+func loadedSource(opts *loadOptions, files [][]byte) (Source, error) {
+	source := Source{Path: "", WithoutConfig: opts.withoutConfig, Input: ""}
+	if opts.withoutConfig {
+		return source, nil
+	}
+
+	source.Path = opts.explicitPath
+	if source.Path == "" {
+		source.Path = os.Getenv("SESH_CONFIG")
+	}
+
+	if source.Path == "" {
+		return source, nil
+	}
+
+	if source.Path == "-" {
+		source.Input = string(files[0])
+
+		return source, nil
+	}
+
+	path, err := filepath.Abs(source.Path)
+	if err != nil {
+		return source, oops.In("config").Code("config_invalid_path").Wrap(err)
+	}
+
+	source.Path = path
+
+	return source, nil
 }
 
 func loadConfigFiles(opts *loadOptions) ([][]byte, error) {

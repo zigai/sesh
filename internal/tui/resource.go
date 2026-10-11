@@ -24,7 +24,7 @@ type resourceResultMsg struct {
 
 func (m *Model) resourceEnabled() bool {
 	definition, _ := providers.DefinitionFor(providers.Resource)
-	return agentSummariesEnabled(m.config, m.deps) && m.sessionFormats.agentsAgent.UsesAny(definition.Fields...)
+	return agentSummariesEnabled(m.config, m.deps) && m.sessionFormats.agentRowsUseAny(definition.Fields...)
 }
 
 func (m *Model) resourceTickCommand() tea.Cmd {

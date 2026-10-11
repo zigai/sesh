@@ -4,6 +4,7 @@ package cli_test
 
 import (
 	"bytes"
+	"context"
 	"debug/buildinfo"
 	"encoding/json"
 	"errors"
@@ -15,15 +16,19 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	gotmux "github.com/zigai/gotmux/tmux"
 	"github.com/zigai/gotmux/tmuxtest"
+
+	"github.com/zigai/sesh/internal/integration/tmuxserver"
+	"github.com/zigai/sesh/internal/task"
 )
 
 const (
-	artifactExpectedGotmuxVersion = "v0.7.0"
-	artifactExpectedGotmuxSum     = "h1:6iHXMIetYWfc64XtGfHavAPlHPOJZuhJeB2Ht7f8AAU="
+	artifactExpectedGotmuxVersion = "v0.7.2"
+	artifactExpectedGotmuxSum     = "h1:nNhJVExjRRZbBgELsHptGDKuvcKIrhcfBSGjfTaIJzs="
 	exitCodeGeneral               = 1
 	jsonSchemaVersion             = 2
 )
@@ -86,6 +91,153 @@ func TestBuiltArtifactSavesRestoresAndRejectsCorruptNativeRepository(t *testing.
 	target := tmuxtest.NewServer(t)
 	restoreThroughArtifact(t, fixture, repository, leaseRoot, generation, target, wantStructure)
 	rejectCorruptRepositoryWithoutTargetMutation(t, fixture, repository, leaseRoot, generation)
+}
+
+func TestBuiltArtifactTaskActionReloadsSelectedConfig(t *testing.T) {
+	fixture, server, popup, store := newTaskActionArtifactFixture(t)
+
+	for _, selection := range []string{"absolute", "relative", "stdin"} {
+		t.Run(selection, func(t *testing.T) {
+			runConfiguredTaskAction(t, fixture, server, popup, store, selection)
+		})
+	}
+}
+
+func newTaskActionArtifactFixture(t *testing.T) (artifactBinaryFixture, *gotmux.Server, *gotmux.Server, task.Store) {
+	t.Helper()
+
+	fixture := newArtifactBinaryFixture(t)
+	server := tmuxtest.NewServer(t)
+	tmuxDir := filepath.Dir(server.Endpoint().SocketPath)
+	t.Setenv("TMUX_TMPDIR", tmuxDir)
+	fixture.env = append(fixture.env, "TMUX_TMPDIR="+tmuxDir, "SHELL=/bin/sh")
+
+	for _, entry := range fixture.env {
+		name, value, _ := strings.Cut(entry, "=")
+		t.Setenv(name, value)
+	}
+
+	popup, err := tmuxserver.OpenNamed(server.Endpoint().SocketPath, "actions", "/dev/null")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := popup.Kill(ctx); err != nil && !errors.Is(err, gotmux.ErrNoServer) {
+			t.Errorf("kill task action popup: %v", err)
+		}
+	})
+
+	if _, err := popup.NewSession(t.Context(), gotmux.NewSessionOptions{
+		Name: "fixture", Dir: fixture.workDir, Program: gotmux.Exec("sleep", "300"),
+		Start: gotmux.StartPolicyAllowStart,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := popup.GlobalSessionOptions().SetDefaultShell(t.Context(), "/bin/sh"); err != nil {
+		t.Fatal(err)
+	}
+
+	var stateHome string
+
+	for _, entry := range fixture.env {
+		if value, ok := strings.CutPrefix(entry, "XDG_STATE_HOME="); ok {
+			stateHome = value
+		}
+	}
+
+	store := task.NewStore(filepath.Join(stateHome, "sesh", "tasks.json"))
+
+	return fixture, server, popup, store
+}
+
+func runConfiguredTaskAction(t *testing.T, fixture artifactBinaryFixture, server, popup *gotmux.Server, store task.Store, selection string) {
+	t.Helper()
+
+	directory := t.TempDir()
+	marker := filepath.Join(directory, "action-marker")
+	configPath := filepath.Join(fixture.workDir, selection+" config.toml")
+
+	source := fmt.Sprintf("[tasks]\npopup_socket = 'actions'\n[task_actions.mark]\nrun = ['/bin/sh', '-c', 'printf selected > \"$1\"', 'mark', %q]\n", marker)
+	if err := os.WriteFile(configPath, []byte(source), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	switch selection {
+	case "relative":
+		configPath = filepath.Base(configPath)
+	case "stdin":
+		configPath = "-"
+	}
+
+	record := task.EmptyRecord()
+	record.ID, record.Kind, record.State, record.Directory = "t1", task.KindLoose, task.StateActive, directory
+
+	if _, err := store.Update(t.Context(), func(ledger *task.Ledger) error {
+		ledger.Put(record)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	command := exec.CommandContext(t.Context(), fixture.binary, "task", "run", record.ID, "mark", "--socket", server.Endpoint().SocketPath, "--config", configPath)
+
+	command.Dir, command.Env, command.Stdin = fixture.workDir, fixture.env, strings.NewReader(source)
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("start task action: %v\n%s", err, output)
+	}
+
+	waitForTaskActionResult(t, popup, store, record, marker)
+}
+
+func waitForTaskActionResult(t *testing.T, popup *gotmux.Server, store task.Store, record task.Record, marker string) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+
+	ticker := time.NewTicker(20 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		ledger, err := store.Load(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		finished, _ := ledger.Find(record.ID)
+		if len(finished.Runs) == 1 && finished.Runs[0].Status == task.RunOK {
+			content, err := os.ReadFile(marker)
+			if err != nil || string(content) != "selected" {
+				t.Fatalf("action marker = %q, error = %v; want selected", content, err)
+			}
+
+			if finished.Runs[0].ExitCode != 0 {
+				t.Fatalf("action exit code = %d, want 0", finished.Runs[0].ExitCode)
+			}
+
+			return
+		}
+
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			panes, _ := popup.Panes(t.Context())
+
+			var output []byte
+
+			for _, pane := range panes {
+				captured, _ := pane.Handle().Capture(t.Context(), gotmux.CaptureOptions{})
+				output = append(output, captured...)
+			}
+
+			t.Fatalf("spawned task action did not finish: runs=%+v; popup output:\n%s", finished.Runs, output)
+		}
+	}
 }
 
 func newArtifactBinaryFixture(t *testing.T) artifactBinaryFixture {

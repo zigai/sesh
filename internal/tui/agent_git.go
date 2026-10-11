@@ -23,7 +23,7 @@ func (m *Model) agentGitEnabled() bool {
 	definition, _ := providers.DefinitionFor(providers.Git)
 
 	return m.mode == modePopup && agentSummariesEnabled(m.config, m.deps) &&
-		m.sessionFormats.agentsAgent.UsesAny(definition.Fields...)
+		m.sessionFormats.agentRowsUseAny(definition.Fields...)
 }
 
 func (m *Model) agentGitTickCommand() tea.Cmd {
@@ -149,6 +149,12 @@ func (m *Model) agentGitDirectories() []string {
 			if directory := agentGitDirectory(agent); directory != "" {
 				directories = append(directories, directory)
 			}
+		}
+	}
+
+	for _, live := range m.tasks {
+		if live.Record.Directory != "" {
+			directories = append(directories, live.Record.Directory)
 		}
 	}
 

@@ -21,6 +21,7 @@ import (
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/privatefs"
 	"github.com/zigai/sesh/internal/remote"
+	"github.com/zigai/sesh/internal/task"
 )
 
 type remoteSSHFixture struct {
@@ -79,6 +80,73 @@ func TestRemoteActionCrossesDisposableOpenSSHServer(t *testing.T) {
 	}
 
 	assertRemoteRequestOffArgv(t, fixture.argumentLog, request)
+}
+
+func TestRemoteTaskFinishRunsOnThePeerOnlyWhenThePeerAllowsIt(t *testing.T) {
+	fixture := newRemoteSSHFixture(t)
+	remoteConfig := config.DefaultConfig().Remote
+	remoteConfig.Enabled = true
+	remoteConfig.SSHPath = fixture.sshWrapper
+	remoteConfig.Connections = []config.RemoteConnectionConfig{fixture.connection}
+	state := remote.ConnectionState{
+		ID: fixture.connection.ID, ConfigDigest: remote.ConnectionDigest(fixture.connection),
+		PeerID: fixture.peerID, Connected: true,
+	}
+	options := remote.ActionOriginOptions{Remote: remoteConfig, Connection: fixture.connection, State: state}
+
+	ledger := task.NewStore(filepath.Join(fixture.stateHome, "sesh", "tasks.json"))
+	if _, err := ledger.Update(t.Context(), func(l *task.Ledger) error {
+		record := task.EmptyRecord()
+		record.ID, record.Kind, record.State, record.Directory = l.NextID(), task.KindLoose, task.StateActive, fixture.root
+		l.Put(record)
+
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("XDG_STATE_HOME", fixture.stateHome)
+	t.Setenv("XDG_CACHE_HOME", fixture.cacheHome)
+	t.Setenv("XDG_DATA_HOME", fixture.dataHome)
+	t.Setenv("XDG_CONFIG_HOME", fixture.configHome)
+
+	finish := func() remote.ActionResult {
+		input, err := action.TaskFinish.EncodeInput(action.FinishTask{Task: "t1", Discard: false})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		request, err := remote.NewActionRequest(options, action.TaskFinish.ID, input)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		result, _ := remote.RunAction(t.Context(), options, request)
+
+		return result
+	}
+
+	if result := finish(); result.OK || result.Code != action.CodeForbidden {
+		t.Fatalf("finish without the peer's consent = %+v, want it refused", result)
+	}
+
+	peerConfig := fmt.Sprintf("[tasks]\npopup_socket = %q\n\n[actions.task.finish]\nallow_remote = true\n", "popup-"+filepath.Base(fixture.root))
+	if err := os.WriteFile(filepath.Join(fixture.configHome, "sesh", "config.toml"), []byte(peerConfig), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if result := finish(); !result.OK {
+		t.Fatalf("finish allowed by the peer = %+v, want success", result)
+	}
+
+	remaining, err := ledger.Load(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, found := remaining.Find("t1"); found {
+		t.Fatal("the peer kept the finished task")
+	}
 }
 
 func newRemoteSSHFixture(t *testing.T) remoteSSHFixture {

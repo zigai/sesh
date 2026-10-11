@@ -35,6 +35,10 @@ const (
 	AgentStatusFailed      AgentStatus = "failed"
 	AgentStatusInterrupted AgentStatus = "interrupted"
 	AgentStatusUnknown     AgentStatus = "unknown"
+	// AgentStatusSleeping and AgentStatusDone describe task rows whose agent sesh stopped or
+	// whose pull request was merged or closed.
+	AgentStatusSleeping AgentStatus = "sleeping"
+	AgentStatusDone     AgentStatus = "done"
 )
 
 type (

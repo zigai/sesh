@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 
 	"github.com/samber/oops"
@@ -15,6 +16,9 @@ import (
 	"github.com/zigai/sesh/internal/privatefs"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
+
+// worktreeDirEnvironment names the directory that holds task worktrees, one folder per project.
+const worktreeDirEnvironment = "WORKTREE_DIR"
 
 type Locations struct {
 	Socket          string
@@ -33,6 +37,8 @@ type Workspace struct {
 	History         string
 	FinalSaveStatus string
 	AgentStore      string
+	Tasks           string
+	WorktreeDir     string
 }
 
 func Resolve(cfg *config.Config, locations Locations) (Workspace, error) {
@@ -55,6 +61,8 @@ func Resolve(cfg *config.Config, locations Locations) (Workspace, error) {
 		History:         "",
 		FinalSaveStatus: "",
 		AgentStore:      "",
+		Tasks:           filepath.Join(stateDir, "tasks.json"),
+		WorktreeDir:     os.Getenv(worktreeDirEnvironment),
 	}
 
 	for _, path := range []struct {

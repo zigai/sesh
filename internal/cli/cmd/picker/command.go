@@ -48,6 +48,7 @@ const (
 	clientEnvironment = "SESH_TMUX_CLIENT"
 	launchedAtFlag    = "launched-at"
 	uiFlag            = "ui"
+	modeFlag          = "mode"
 	uiAuto            = "auto"
 	launchMaxAge      = time.Minute
 )
@@ -153,6 +154,8 @@ func NewPickCommand(ctx context.Context, remote ...RemoteFactory) *cobra.Command
 	addPickerPathFlags(cmd)
 	cmd.Flags().String(uiFlag, uiAuto, "Picker layout")
 	clibase.SetFlagChoices(cmd, uiFlag, uiAuto, "popup", "inline", "fullscreen")
+	cmd.Flags().String(modeFlag, "", "Display mode to open in")
+	clibase.SetFlagChoices(cmd, modeFlag, "sesh", "agents", "work")
 	cmd.Flags().String("switch-handoff", "", "Popup switch handoff file")
 	cmd.Flags().Int64(launchedAtFlag, 0, "Popup launch time")
 	cmd.Flags().String("target-pane", "", "Invoking tmux pane")
@@ -236,6 +239,10 @@ func runPickCommand(ctx context.Context, cmd *cobra.Command, remoteFactory Remot
 	runtime, err := preparePickerCommand(cmd)
 	if err != nil {
 		return err
+	}
+
+	if mode, _ := cmd.Flags().GetString(modeFlag); mode != "" {
+		runtime.state.PopupDisplayMode = mode
 	}
 
 	if !hasTerminal(cmd) {
@@ -470,7 +477,14 @@ func resolvePopupClient(ctx context.Context, caller action.Caller, server *gotmu
 	return invoked, nil
 }
 
-func openPickerPopup(ctx context.Context, cmd *cobra.Command, runtime commandRuntime, caller action.Caller, launchedAt time.Time) error {
+func openPickerPopup(
+	ctx context.Context,
+	cmd *cobra.Command,
+	runtime commandRuntime,
+	caller action.Caller,
+	mode string,
+	launchedAt time.Time,
+) error {
 	server, err := tmuxserver.OpenInteractive(runtime.workspace.Socket)
 	if err != nil {
 		return oops.In("cli").With("operation", "open_tmux").Wrap(err)
@@ -508,7 +522,7 @@ func openPickerPopup(ctx context.Context, cmd *cobra.Command, runtime commandRun
 
 	width, height := popupDimensions(runtime.workspace.Config, runtime.state, gotmux.Size{Width: client.Width, Height: client.Height})
 	options := popupOptions(
-		gotmux.Exec(executable, popupArguments(cmd, runtime.workspace.Socket, string(originSessionID), targetPane, handoffPath, launchedAt)...),
+		gotmux.Exec(executable, popupArguments(cmd, runtime.workspace.Socket, string(originSessionID), targetPane, handoffPath, mode, launchedAt)...),
 		width,
 		height,
 		runtime.workspace.Config.Theme.Background,
@@ -556,8 +570,12 @@ func popupOptions(program gotmux.Program, width, height, background string) gotm
 	return opts
 }
 
-func popupArguments(cmd *cobra.Command, socketPath, sessionID, paneID, handoffPath string, launchedAt time.Time) []string {
+func popupArguments(cmd *cobra.Command, socketPath, sessionID, paneID, handoffPath, mode string, launchedAt time.Time) []string {
 	arguments := []string{"pick", "--" + uiFlag, "popup", "--socket", socketPath}
+
+	if mode != "" {
+		arguments = append(arguments, "--"+modeFlag, mode)
+	}
 
 	if !launchedAt.IsZero() {
 		arguments = append(arguments, "--"+launchedAtFlag, strconv.FormatInt(launchedAt.UnixNano(), 10))
@@ -575,22 +593,11 @@ func popupArguments(cmd *cobra.Command, socketPath, sessionID, paneID, handoffPa
 		arguments = append(arguments, "--current-session-id", sessionID)
 	}
 
-	for _, flag := range []string{"config", "repository", "lease-root", "history", "agent-state"} {
-		value, _ := cmd.Flags().GetString(flag)
-		if value != "" {
-			arguments = append(arguments, "--"+flag, value)
-		}
-	}
-
-	if noConfig, _ := cmd.Flags().GetBool("no-config"); noConfig {
-		arguments = append(arguments, "--no-config")
-	}
-
-	return arguments
+	return append(arguments, forwardedConfigFlags(cmd)...)
 }
 
 func popupDimensions(cfg *config.Config, state *session.State, available gotmux.Size) (string, string) {
-	agentsMode := effectivePickerPopupMode(cfg, state) == "agents"
+	agentsMode := effectivePickerPopupMode(cfg, state) != "sesh"
 	width, height := cfg.Popup.SeshWidth, cfg.Popup.SeshHeight
 
 	if agentsMode {
@@ -598,8 +605,10 @@ func popupDimensions(cfg *config.Config, state *session.State, available gotmux.
 	}
 
 	useAgentsBounds := agentsMode
+
 	for _, mode := range cfg.Settings.DisplayModes {
-		useAgentsBounds = useAgentsBounds || strings.EqualFold(strings.TrimSpace(mode), "agents")
+		mode = strings.ToLower(strings.TrimSpace(mode))
+		useAgentsBounds = useAgentsBounds || mode == "agents" || mode == "work"
 	}
 
 	minimum := gotmux.Size{Width: popupSeshMinWidth, Height: popupSeshMinHeight}
@@ -615,8 +624,12 @@ func popupDimensions(cfg *config.Config, state *session.State, available gotmux.
 
 func effectivePickerPopupMode(cfg *config.Config, state *session.State) string {
 	selected := "sesh"
-	if state != nil && strings.EqualFold(strings.TrimSpace(state.PopupDisplayMode), "agents") {
-		selected = "agents"
+
+	if state != nil {
+		switch persisted := strings.ToLower(strings.TrimSpace(state.PopupDisplayMode)); persisted {
+		case "agents", "work":
+			selected = persisted
+		}
 	}
 
 	for _, mode := range cfg.Settings.DisplayModes {
@@ -625,8 +638,11 @@ func effectivePickerPopupMode(cfg *config.Config, state *session.State) string {
 		}
 	}
 
-	if len(cfg.Settings.DisplayModes) > 0 && strings.EqualFold(strings.TrimSpace(cfg.Settings.DisplayModes[0]), "agents") {
-		return "agents"
+	if len(cfg.Settings.DisplayModes) > 0 {
+		switch first := strings.ToLower(strings.TrimSpace(cfg.Settings.DisplayModes[0])); first {
+		case "agents", "work":
+			return first
+		}
 	}
 
 	return "sesh"

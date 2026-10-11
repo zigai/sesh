@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	LibraryVersion            = "v0.7.0"
+	LibraryVersion            = "v0.7.2"
 	interactiveCommandTimeout = 24 * time.Hour
 
 	// OutputBytes bounds stdout and stderr of one tmux command. It matches the snapshot
@@ -33,6 +33,29 @@ func Open(socket string) (*gotmux.Server, error) {
 	config.ConfigFile = "/dev/null"
 	config.Limits = gotmux.DefaultLimits()
 	config.Limits.OutputBytes = OutputBytes
+
+	server, err := gotmux.New(config)
+	if err != nil {
+		return nil, oops.In("tmux").With("operation", "open_tmux_endpoint").Wrapf(err, "open tmux endpoint")
+	}
+
+	return server, nil
+}
+
+// OpenNamed opens the server on the named socket with configFile, running the same tmux build as
+// the server at socket so both answer to the same features.
+func OpenNamed(socket, name, configFile string) (*gotmux.Server, error) {
+	if !filepath.IsAbs(socket) || filepath.Clean(socket) != socket {
+		return nil, oops.In("tmux").Code("endpoint_required").With("operation", "open_named").Wrap(ErrEndpoint)
+	}
+
+	var config gotmux.Config
+
+	config.Binary = serverBinary(socket)
+	config.SocketName = name
+	config.ConfigFile = configFile
+	config.Limits = gotmux.DefaultLimits()
+	config.Limits.CommandTimeout = interactiveCommandTimeout
 
 	server, err := gotmux.New(config)
 	if err != nil {

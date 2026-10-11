@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
@@ -16,6 +15,7 @@ import (
 	"github.com/zigai/sesh/internal/display"
 	"github.com/zigai/sesh/internal/fields"
 	"github.com/zigai/sesh/internal/session"
+	"github.com/zigai/sesh/internal/task"
 	"github.com/zigai/sesh/internal/tui/providers"
 )
 
@@ -39,6 +39,9 @@ type sessionLoadResultMsg struct {
 	agentSummaryErr   error
 	agentSummaries    []session.AgentSummary
 	agentObservation  uint64
+	tasks             []task.Live
+	tasksLoaded       bool
+	tasksErr          error
 	agentGit          map[string]agentGitCacheEntry
 	customFieldCache  map[string]map[string]fields.CacheEntry
 	remoteCatalog     RemoteCatalog
@@ -102,7 +105,11 @@ func loadSessionRows(ctx context.Context, cfg *config.Config, deps Services) ses
 		remoteErr       error
 		originRows      []session.Session
 		originErr       error
+		tasks           []task.Live
+		tasksErr        error
 	)
+
+	tasksLoaded := workModeEnabled(cfg) && deps.Tasks != nil
 
 	var (
 		loaders sync.WaitGroup
@@ -120,6 +127,12 @@ func loadSessionRows(ctx context.Context, cfg *config.Config, deps Services) ses
 		agentSummaries, agentSummaryErr = loadAgentSummaries(ctx, cfg, deps)
 		timing.agents = time.Since(started)
 	})
+
+	if tasksLoaded {
+		loaders.Go(func() {
+			tasks, tasksErr = deps.Tasks.LoadTasks(ctx)
+		})
+	}
 
 	if remoteSessionsEnabled(cfg, deps) {
 		loaders.Go(func() {
@@ -148,6 +161,9 @@ func loadSessionRows(ctx context.Context, cfg *config.Config, deps Services) ses
 			agentSummaryErr:   nil,
 			agentSummaries:    nil,
 			agentObservation:  0,
+			tasks:             nil,
+			tasksLoaded:       false,
+			tasksErr:          nil,
 			agentGit:          nil,
 			customFieldCache:  nil,
 			remoteCatalog:     RemoteCatalog{GeneratedAt: time.Time{}, Connections: nil},
@@ -173,6 +189,9 @@ func loadSessionRows(ctx context.Context, cfg *config.Config, deps Services) ses
 		agentSummaryErr:   agentSummaryErr,
 		agentSummaries:    agentSummaries,
 		agentObservation:  0,
+		tasks:             tasks,
+		tasksLoaded:       tasksLoaded,
+		tasksErr:          tasksErr,
 		agentGit:          nil,
 		customFieldCache:  nil,
 		remoteCatalog:     remoteCatalog,
@@ -262,7 +281,7 @@ func agentDisplayModeEnabled(modes []string) bool {
 	}
 
 	for _, mode := range modes {
-		if strings.EqualFold(strings.TrimSpace(mode), string(displayModeAgents)) {
+		if parseDisplayMode(mode).tree() {
 			return true
 		}
 	}
@@ -459,6 +478,8 @@ func (m *Model) applySessionRows(result sessionLoadResultMsg) []agentViewStateUp
 		m.sessions = applyAgentSummaries(m.sessions, m.agentSummaries)
 	}
 
+	m.applyLoadedTasks(result)
+
 	session.SortSessions(m.sessions, m.state)
 
 	for index := range m.sessions {
@@ -478,6 +499,17 @@ func (m *Model) applySessionRows(result sessionLoadResultMsg) []agentViewStateUp
 	views := m.recordActiveAgentViews()
 
 	return views
+}
+
+func (m *Model) applyLoadedTasks(result sessionLoadResultMsg) {
+	if !result.tasksLoaded {
+		return
+	}
+
+	m.tasksErr = result.tasksErr
+	if result.tasksErr == nil {
+		m.tasks = result.tasks
+	}
 }
 
 func (m *Model) selectionBeforeCatalogLoad() sessionIdentity {
@@ -1005,6 +1037,7 @@ func (m *Model) handleSessionLoadResult(msg sessionLoadResultMsg) tea.Cmd {
 		m.loadAgentGitCommand(),
 		m.loadResourceCommand(),
 		m.loadGHCommand(),
+		m.syncTasksCommand(),
 	}
 
 	if msg.agentSummaryErr != nil && m.acceptsLoadedAgents(msg) {
@@ -1062,9 +1095,9 @@ func (m *Model) agentSummaryTickCommand() tea.Cmd {
 func (m *Model) agentClockTickCommand() tea.Cmd {
 	definition, _ := providers.DefinitionFor(providers.Clock)
 	if !agentSummariesEnabled(m.config, m.deps) ||
-		(!m.sessionFormats.agentsAgent.UsesAny(definition.Fields...) &&
-			!m.sessionFormats.agentsAgent.UsesAny(display.FieldAgentPromptAge) &&
-			!m.sessionFormats.agentsAgent.UsesWidget("spinner")) {
+		(!m.sessionFormats.agentRowsUseAny(definition.Fields...) &&
+			!m.sessionFormats.agentRowsUseAny(display.FieldAgentPromptAge) &&
+			!m.sessionFormats.agentRowsUseWidget("spinner")) {
 		return nil
 	}
 
@@ -1105,4 +1138,8 @@ func (m *Model) applyAgentSummaryStatus(err error) {
 	}
 
 	m.setDegradedSource(degradedSourceAgents, "Agent status unavailable: inventory could not be read")
+}
+
+func workModeEnabled(cfg *config.Config) bool {
+	return slices.Contains(configuredDisplayModes(cfg), displayModeWork)
 }

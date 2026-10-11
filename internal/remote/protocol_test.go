@@ -8,12 +8,14 @@ import (
 	"errors"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/session"
+	"github.com/zigai/sesh/internal/task"
 )
 
 func TestFrameReaderRejectsOversizedFrame(t *testing.T) {
@@ -60,14 +62,15 @@ func TestFrameRoundTrip(t *testing.T) {
 }
 
 func TestFrameReadRejectsClosedContractViolations(t *testing.T) {
-	valid := `{"version":2,"type":"hello","peerId":"peer","streamInstance":"stream","sequence":1,` +
+	version := `"version":` + strconv.Itoa(ProtocolVersion)
+	valid := `{` + version + `,"type":"hello","peerId":"peer","streamInstance":"stream","sequence":1,` +
 		`"hello":{"peerId":"peer","streamInstance":"stream","hostname":"host","bridgeDir":"","startedAt":"0001-01-01T00:00:00Z"}}`
 
 	tests := map[string]string{
 		"unknown member":      strings.Replace(valid, `"sequence":1`, `"sequence":1,"forged":true`, 1),
 		"duplicate member":    strings.Replace(valid, `"sequence":1`, `"sequence":1,"sequence":2`, 1),
 		"trailing content":    valid + `{}`,
-		"unsupported version": strings.Replace(valid, `"version":2`, `"version":1`, 1),
+		"unsupported version": strings.Replace(valid, version, `"version":1`, 1),
 		"zero sequence":       strings.Replace(valid, `"sequence":1`, `"sequence":0`, 1),
 		"peer mismatch":       strings.Replace(valid, `"peerId":"peer","streamInstance"`, `"peerId":"other","streamInstance"`, 1),
 		"payload exclusivity": strings.Replace(valid, `"startedAt":"0001-01-01T00:00:00Z"}`, `"startedAt":"0001-01-01T00:00:00Z"},"health":{"observedAt":"0001-01-01T00:00:00Z","sources":{"tmux":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"},"agents":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"},"snapshots":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"}}}`, 1),
@@ -291,6 +294,41 @@ func TestSnapshotRejectsMalformedActionOffers(t *testing.T) {
 	} {
 		frame := snapshotFrameWithSession(session.Session{ID: "$1", Name: "dev", Kind: session.KindLive})
 		frame.Snapshot.Actions = offers
+
+		if err := ValidateFrame(frame); !errors.Is(err, ErrInvalidFrame) {
+			t.Fatalf("ValidateFrame(%s) error = %v, want %v", name, err, ErrInvalidFrame)
+		}
+	}
+}
+
+func TestSnapshotRejectsUnsafeTaskRows(t *testing.T) {
+	valid := func() TaskRow {
+		record := task.EmptyRecord()
+		record.ID, record.Kind, record.State, record.Title = "t1", task.KindProject, task.StateActive, "fix login"
+
+		return TaskRow{Record: record, Present: true, SessionID: "$1", WindowID: "@1", WindowName: "fix login", AgentPane: "%1"}
+	}
+
+	frame := snapshotFrameWithSession(session.Session{ID: "$1", Name: "dev", Kind: session.KindLive})
+	frame.Snapshot.Tasks = []TaskRow{valid()}
+
+	if err := ValidateFrame(frame); err != nil {
+		t.Fatalf("ValidateFrame(valid task) error = %v", err)
+	}
+
+	withResume, controlTitle, unknownState := valid(), valid(), valid()
+	withResume.Record.Resume.Command = []string{"pi", "--session", "secret"}
+	controlTitle.Record.Title = "fix\x1b]0;owned\x07"
+	unknownState.Record.State = "dreaming"
+
+	for name, rows := range map[string][]TaskRow{
+		"resume command": {withResume},
+		"control title":  {controlTitle},
+		"unknown state":  {unknownState},
+		"duplicate id":   {valid(), valid()},
+		"too many":       slices.Repeat([]TaskRow{valid()}, MaxTasks+1),
+	} {
+		frame.Snapshot.Tasks = rows
 
 		if err := ValidateFrame(frame); !errors.Is(err, ErrInvalidFrame) {
 			t.Fatalf("ValidateFrame(%s) error = %v, want %v", name, err, ErrInvalidFrame)

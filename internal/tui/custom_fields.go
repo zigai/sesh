@@ -324,8 +324,12 @@ func (m *Model) handleCustomFieldTick(msg customFieldTickMsg) tea.Cmd {
 
 func (m *Model) customFieldTargets() []customFieldTarget {
 	sessionFields, agentFields := m.sessionFormats.seshSession.CustomFields(), []string(nil)
-	if m.displayMode == displayModeAgents {
+	switch m.displayMode {
+	case displayModeAgents:
 		sessionFields, agentFields = m.sessionFormats.agentsSession.CustomFields(), m.sessionFormats.agentsAgent.CustomFields()
+	case displayModeWork:
+		sessionFields, agentFields = m.sessionFormats.workSection.CustomFields(), m.sessionFormats.workTask.CustomFields()
+	case displayModeSesh:
 	}
 
 	var targets []customFieldTarget

@@ -20,7 +20,7 @@
 # default_session_path_suggestion = "~/Projects/{session}"
 
 # Enabled popup modes, in cycle order. Use one entry to lock to one mode.
-# display_modes = ["sesh", "agents"]
+# display_modes = ["sesh", "agents", "work"]
 
 # Logging level (debug, info, warn, error, disabled).
 # log_level = "info"
@@ -50,6 +50,12 @@
 
 # Selectable agent rows in AGENTS mode.
 # agents_agent_format = "{tree}{status_glyph} {status_age:<7}   {agent_cwd_name:<23.23}  {agent_session}{right}{harness:<6.6}   {agent_git_label:<6.22} {agent_git_added:<5} {agent_git_deleted:<5} {agent_git_ahead:<2} {agent_git_behind:<2}"
+
+# Section headings in WORK mode.
+# work_section_format = "{session_name}"
+
+# Selectable task rows in WORK mode.
+# work_task_format = "{tree}{status_glyph} {status_age:<7}   {agent_project_name:<16.16}  {agent_session}{right}{harness:<6.6}   {agent_git_label:<6.22} {agent_git_added:<5} {agent_git_deleted:<5} {agent_pr:<6}"
 
 # {custom.NAME} shows the output of the command defined as display.fields.NAME, for example:
 #   [display.fields]
@@ -218,6 +224,48 @@
 # selected = "#2a2a2a"
 # background = ""
 # foreground = ""
+
+# Projects: git repositories one level below each root, plus extra registered folders.
+# A project has one tmux session; `sesh project pick` lists them.
+[projects]
+
+# roots = ["~/Projects"]
+# extra = []
+
+# Task windows: agent on top, editor below, one popup terminal per task.
+# Task worktrees are created under $WORKTREE_DIR/<project>/.
+[tasks]
+
+# editor = ["nvim"]
+
+# tmux server for task popups, and the config file it starts with. Without a config file,
+# sesh hides the status line, clears the prefix, and binds C-p to close the popup.
+# popup_socket = "sesh-popup"
+# popup_config = ""
+
+# Harnesses offered when a task starts, in menu order. Without entries, every supported
+# harness found on PATH is offered. Commands run in your interactive shell, so aliases and
+# functions apply. prompt_args are appended when the task has a title.
+#   [[tasks.harness]]
+#   name = "codex"
+#   prompt_args = ["{title}"]
+
+# Task agents after a snapshot restore: "previous" wakes the ones that were awake, "none"
+# leaves all asleep, and a count such as "3" wakes that many of the newest awake tasks.
+# wake_on_restore = "previous"
+
+# Show key hints at the bottom of the new task popup.
+# show_footer = false
+
+# Named task actions run headless in the task worktree, in a window of the task's popup
+# session. The prompt, if any, is the last argument; it can use {task}, {title}, {branch},
+# {base}, {project} and {worktree}. link_pr looks up the branch's pull request afterwards.
+# A [projects.overrides.<name>.task_actions.<action>] table overrides fields for one project.
+#   [task_actions.ship]
+#   key = "alt+p"
+#   run = ["claude", "-p", "--model", "sonnet"]
+#   prompt = "Commit, push and open a PR for {branch} against {base}."
+#   link_pr = true
 
 # State, metadata, and diagnostic log locations.
 [paths]

@@ -79,6 +79,7 @@ type RestoreConfig struct {
 	MissingWorkingDir restore.MissingWorkingDir
 	OnCollision       CollisionPolicy
 	Profile           RecoveryProfile
+	Launches          LaunchOverrides
 }
 
 type RestoreResult struct {
@@ -330,7 +331,7 @@ func executeRestore(
 		Mismatches:          nil,
 	}
 
-	plan, generation, skipped, err := prepareRestorePlan(ctx, repository, server, cfg)
+	plan, override, generation, skipped, err := prepareRestorePlan(ctx, repository, server, cfg)
 	result.Generation = generation
 	result.SessionsSkipped = skipped
 
@@ -340,7 +341,7 @@ func executeRestore(
 		return result, closeWith(ctx, lease, "plan", err)
 	}
 
-	daemon, op, ledger, admissionPhase, err := establishRestoreIntent(ctx, repository, server, cfg, generation, plan)
+	daemon, op, ledger, admissionPhase, err := establishRestoreIntent(ctx, repository, server, cfg, generation, plan, override)
 	if op.ID != "" {
 		result.OperationID = op.ID
 	}
@@ -408,19 +409,33 @@ func establishRestoreIntent(
 	cfg RestoreConfig,
 	generation string,
 	plan restore.Plan,
+	override launchOverride,
 ) (restoreDaemonIdentity, store.Operation, *actionLedger, string, error) {
 	daemon, err := observeRestoreDaemonIdentity(ctx, server)
 	if err != nil {
 		return restoreDaemonIdentity{}, store.Operation{}, nil, "identity", err
 	}
 
-	op, ledger, err := admitRestore(ctx, repository, server, daemon, cfg, generation, plan)
+	op, ledger, err := admitRestore(ctx, repository, server, daemon, cfg, generation, plan, override.digest)
 	if err != nil {
 		return daemon, op, nil, "pin", err
 	}
 
 	if err := requireRestoreDaemonIdentity(ctx, server, daemon, false); err != nil {
 		return daemon, op, ledger, "admission", err
+	}
+
+	if cfg.Launches != nil && len(plan.SourceGraph.Panes) > 0 {
+		panes := make([]string, len(plan.SourceGraph.Panes))
+		for index, pane := range plan.SourceGraph.Panes {
+			panes[index] = pane.ID
+		}
+
+		slices.Sort(panes)
+
+		if err := cfg.Launches.Commit(ctx, panes); err != nil {
+			return daemon, op, ledger, "admission", fmt.Errorf("commit launch overrides: %w", err)
+		}
 	}
 
 	return daemon, op, ledger, "", nil
@@ -589,19 +604,26 @@ func prepareRestorePlan(
 	repository *store.Repository,
 	server *gotmux.Server,
 	cfg RestoreConfig,
-) (restore.Plan, string, []SkippedSession, error) {
+) (restore.Plan, launchOverride, string, []SkippedSession, error) {
+	none := launchOverride{digest: ""}
+
 	genID, manifest, err := readGeneration(ctx, repository, cfg.Generation)
 	if err != nil {
-		return restore.Plan{}, genID, nil, err
+		return restore.Plan{}, none, genID, nil, err
 	}
 
 	if err := manifest.Validate(); err != nil {
-		return restore.Plan{}, genID, nil, fmt.Errorf("validate manifest: %w", err)
+		return restore.Plan{}, none, genID, nil, fmt.Errorf("validate manifest: %w", err)
+	}
+
+	manifest, override, err := overrideLaunches(ctx, cfg.Launches, manifest)
+	if err != nil {
+		return restore.Plan{}, none, genID, nil, err
 	}
 
 	target, err := restore.ReadTargetOptions(ctx, server)
 	if err != nil {
-		return restore.Plan{}, genID, nil, fmt.Errorf("read target options: %w", err)
+		return restore.Plan{}, none, genID, nil, fmt.Errorf("read target options: %w", err)
 	}
 
 	manifest, unsupportedOptions := target.Adapt(manifest)
@@ -616,16 +638,16 @@ func prepareRestorePlan(
 
 	plan, skipped, err := planSelection(ctx, repository, server, manifest, selected, cfg)
 	if err != nil {
-		return restore.Plan{}, genID, skipped, err
+		return restore.Plan{}, none, genID, skipped, err
 	}
 
 	if _, err := restore.PlanActions(plan); err != nil {
-		return restore.Plan{}, genID, nil, fmt.Errorf("build restore actions: %w", err)
+		return restore.Plan{}, none, genID, nil, fmt.Errorf("build restore actions: %w", err)
 	}
 
 	plan.UnsupportedOptions = unsupportedOptions
 
-	return plan, genID, skipped, nil
+	return plan, override, genID, skipped, nil
 }
 
 func readManifest(plan restore.Plan) model.Manifest {
@@ -640,8 +662,9 @@ func admitRestore(
 	cfg RestoreConfig,
 	generation string,
 	plan restore.Plan,
+	launches string,
 ) (store.Operation, *actionLedger, error) {
-	target, err := restoreTarget(server.Endpoint().SocketPath, daemon, cfg)
+	target, err := restoreTarget(server.Endpoint().SocketPath, daemon, cfg, launches)
 	if err != nil {
 		return store.Operation{}, nil, err
 	}
@@ -782,7 +805,7 @@ func markSkippedSessions(result *RestoreResult) {
 	}
 }
 
-func restoreTarget(endpoint string, daemon restoreDaemonIdentity, cfg RestoreConfig) ([]byte, error) {
+func restoreTarget(endpoint string, daemon restoreDaemonIdentity, cfg RestoreConfig, launches string) ([]byte, error) {
 	identity := daemon.Server
 	if endpoint == "" || identity.PID <= 0 || identity.Started.IsZero() || identity.ReportedSocket == "" {
 		return nil, oops.In("snapshot").Code("endpoint_required").With("operation", "restore_target").Wrap(tmuxserver.ErrEndpoint)
@@ -799,6 +822,10 @@ func restoreTarget(endpoint string, daemon restoreDaemonIdentity, cfg RestoreCon
 		endpoint, identity.PID, identity.Started.UnixNano(),
 		cfg.LaunchProcesses, cfg.MissingWorkingDir, cfg.Profile)
 	target += restoreDaemonTargetAppendix(daemon)
+
+	if launches != "" {
+		target += "\nlaunch_overrides=" + launches
+	}
 
 	if len(target) > maxRestoreTargetBytes {
 		return nil, oops.In("snapshot").Code("endpoint_required").With("operation", "restore_target", "reason", "target_too_long").Wrap(tmuxserver.ErrEndpoint)

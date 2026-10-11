@@ -19,6 +19,7 @@ import (
 	"github.com/zigai/sesh/internal/config"
 	rowlayout "github.com/zigai/sesh/internal/display/layout"
 	"github.com/zigai/sesh/internal/session"
+	"github.com/zigai/sesh/internal/task"
 	"github.com/zigai/sesh/internal/tui/providers"
 )
 
@@ -190,6 +191,11 @@ type Model struct {
 	agentSummaryRevision         uint64
 	agentSummaryObservation      uint64
 	agentSummaries               []session.AgentSummary
+	tasks                        []task.Live
+	tasksErr                     error
+	workTasks                    map[string]workTask
+	carriedSelection             sessionIdentity
+	tasksSynced                  bool
 	deferredSwitch               session.Session
 	hasDeferredSwitch            bool
 	deferredAttach               session.Session
@@ -353,6 +359,11 @@ func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps
 		agentSummaryRevision:         0,
 		agentSummaryObservation:      0,
 		agentSummaries:               nil,
+		tasks:                        nil,
+		tasksErr:                     nil,
+		workTasks:                    map[string]workTask{},
+		carriedSelection:             emptySessionIdentity(),
+		tasksSynced:                  false,
 		deferredSwitch:               emptySession(),
 		hasDeferredSwitch:            false,
 		deferredAttach:               emptySession(),
@@ -423,6 +434,9 @@ func (m *Model) SetInitialSessions(sessions []session.Session) {
 		agentSummaryErr:   nil,
 		agentSummaries:    nil,
 		agentObservation:  0,
+		tasks:             nil,
+		tasksLoaded:       false,
+		tasksErr:          nil,
 		agentGit:          m.agentGit,
 		customFieldCache:  nil,
 		remoteCatalog:     RemoteCatalog{GeneratedAt: time.Time{}, Connections: nil},
@@ -512,7 +526,7 @@ func (m *Model) Init() tea.Cmd {
 	}
 
 	if command := m.startRemoteCatalogWatchCommand(); command != nil {
-		commands = append(commands, command)
+		commands = append(commands, command, m.waitRemoteCatalogUpdateCommand())
 	}
 
 	if command := m.startAgentSummaryWatchCommand(); command != nil {
@@ -755,6 +769,10 @@ func (m *Model) handleModelMessage(msg tea.Msg) func() (tea.Model, tea.Cmd) {
 	case sessionLoadResultMsg:
 		return func() (tea.Model, tea.Cmd) {
 			return m, m.handleSessionLoadResult(msg)
+		}
+	case taskSyncMsg:
+		return func() (tea.Model, tea.Cmd) {
+			return m, m.handleTaskSync(msg)
 		}
 	case originSessionsMsg:
 		return func() (tea.Model, tea.Cmd) {

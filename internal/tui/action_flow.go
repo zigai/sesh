@@ -119,14 +119,31 @@ func (m *Model) actionAvailable(descriptor action.Descriptor, subject action.Sub
 // actions the selected agent's pane.
 func (m *Model) actionSubject(descriptor action.Descriptor) (action.Subject, bool) {
 	if descriptor.Subject == action.SubjectNone {
-		return action.Subject{At: action.Local(), Sessions: nil, Pane: ""}, true
+		return action.Subject{At: action.Local(), Sessions: nil, Pane: "", Task: ""}, true
 	}
 
 	if m.cursor >= len(m.filtered) {
-		return action.Subject{At: action.Local(), Sessions: nil, Pane: ""}, false
+		return action.Subject{At: action.Local(), Sessions: nil, Pane: "", Task: ""}, false
 	}
 
 	selected := m.filtered[m.cursor]
+
+	if m.displayMode == displayModeWork {
+		found, ok := m.workTaskAt(m.selectedListRow())
+		if ok && descriptor.Subject == action.SubjectTask {
+			return action.Subject{At: action.LocationOf(selected), Sessions: nil, Pane: string(found.live.AgentPane), Task: found.live.Record.ID}, true
+		}
+
+		if !ok || found.owner.ID == "" || found.live.AgentPane == "" {
+			return action.Subject{At: action.Local(), Sessions: nil, Pane: "", Task: ""}, false
+		}
+
+		subject := action.SubjectOf(found.owner)
+		subject.Pane = string(found.live.AgentPane)
+
+		return subject, true
+	}
+
 	subject := action.SubjectOf(selected)
 
 	if row := m.selectedListRow(); row.isAgent() && row.agentIndex < len(selected.Agents) {

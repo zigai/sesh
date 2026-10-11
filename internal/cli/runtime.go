@@ -16,7 +16,6 @@ import (
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
 
-	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	cmdlogs "github.com/zigai/sesh/internal/cli/cmd/logs"
 	cmdsession "github.com/zigai/sesh/internal/cli/cmd/session"
@@ -61,8 +60,6 @@ type commandRuntime struct {
 type commandResultError = clibase.CommandResultError
 
 type configurationError = clibase.ConfigurationError
-
-type commandConfigKey struct{}
 
 type commandBuffer struct {
 	buffer    bytes.Buffer
@@ -236,7 +233,7 @@ func getBoolFlag(cmd *cobra.Command, name string) bool {
 }
 
 func (r *commandRuntime) setupLogging(cmd *cobra.Command) error {
-	cfg, err := loadCommandConfig(cmd.Context(), cmd)
+	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
 	if err != nil {
 		return err
 	}
@@ -287,33 +284,6 @@ func (r *commandRuntime) setupLogging(cmd *cobra.Command) error {
 
 func quietAgentTracker(cmd *cobra.Command, cfg *config.Config, operation string) bool {
 	return operation == "agent_status_run" && (getBoolFlag(cmd, "quiet") || cfg.ResolvedAgentStatus().Quiet)
-}
-
-func loadCommandConfig(ctx context.Context, cmd *cobra.Command) (*config.Config, error) {
-	if cfg, ok := ctx.Value(commandConfigKey{}).(*config.Config); ok {
-		return cfg.Clone(), nil
-	}
-
-	path, _ := cmd.Flags().GetString("config")
-	noConfig, _ := cmd.Flags().GetBool("no-config")
-
-	options := []config.LoadOption{config.WithExplicitPath(path), config.WithInput(cmd.InOrStdin())}
-	if noConfig {
-		options = append(options, config.WithoutConfig())
-	}
-
-	cfg, err := config.Load(options...)
-	if err == nil {
-		err = action.ValidateConfig(cfg)
-	}
-
-	if err != nil {
-		return nil, clibase.NewConfigurationError(oops.In("cli").Code("config_failed").With("operation", "load_configuration").Wrap(err))
-	}
-
-	cmd.SetContext(context.WithValue(ctx, commandConfigKey{}, cfg.Clone()))
-
-	return cfg, nil
 }
 
 func (r *commandRuntime) finish(ctx context.Context, err error) error {

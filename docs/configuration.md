@@ -21,6 +21,8 @@ Override via environment: `SESH_<SECTION>_<KEY>`, for example `SESH_SETTINGS_LOG
 | Snapshots | `$XDG_DATA_HOME/sesh/snapshots` |
 | Logs | `$XDG_STATE_HOME/sesh/sesh.log` |
 | History | `$XDG_STATE_HOME/sesh/history.json` |
+| Tasks | `$XDG_STATE_HOME/sesh/tasks.json` |
+| Task worktrees | `$WORKTREE_DIR/<project>/` |
 | Custom field cache | `$XDG_CACHE_HOME/sesh/fields` |
 
 ## Default configuration
@@ -30,7 +32,7 @@ Override via environment: `SESH_<SECTION>_<KEY>`, for example `SESH_SETTINGS_LOG
 show_footer = true
 directory_suggestions = 5
 default_session_path_suggestion = "~/Projects/{session}"
-display_modes = ["sesh", "agents"]
+display_modes = ["sesh", "agents", "work"]
 log_level = "info" # trace, debug, info, warn, error, disabled
 shortcut_style = "none" # none, indent, right
 
@@ -45,6 +47,8 @@ agents_height = "80%"
 sesh_format = "{source_prefix}{session_name}{right}{session_agent_context}"
 agents_session_format = "{source_prefix}{session_name}"
 agents_agent_format = "{tree}{status_glyph} {status_age:<7}   {agent_cwd_name:<23.23}  {agent_session}{right}{harness:<6.6}   {agent_git_label:<6.22} {agent_git_added:<5} {agent_git_deleted:<5} {agent_git_ahead:<2} {agent_git_behind:<2}"
+work_section_format = "{session_name}"
+work_task_format = "{tree}{status_glyph} {status_age:<7}   {agent_project_name:<16.16}  {agent_session}{right}{harness:<6.6}   {agent_git_label:<6.22} {agent_git_added:<5} {agent_git_deleted:<5} {agent_pr:<6}"
 
 [agent_sessions]
 enabled = true
@@ -117,6 +121,17 @@ failed = "#ff5555"
 interrupted = "#ff9e3b"
 idle = "#6c7086"
 
+[projects]
+roots = ["~/Projects"]
+extra = []
+
+[tasks]
+editor = ["nvim"]
+popup_socket = "sesh-popup"
+popup_config = "" # without it, the popup server hides its status line and C-p closes it
+wake_on_restore = "previous" # after a restore: "previous" resumes the agents that were awake, "none" brings every task back asleep, "3" resumes only the 3 newest awake tasks
+harness = [] # the agents ctrl+t offers, in order; defaults to every supported harness found on PATH
+
 [paths]
 data_dir = "" # defaults to $XDG_DATA_HOME/sesh
 log_file = "" # defaults to $XDG_STATE_HOME/sesh/sesh.log
@@ -130,9 +145,47 @@ session_attach_post = []
 tmux_startup_post = []
 ```
 
+## Tasks
+
+`ctrl+t` opens a popup that starts a task. Its fields are the task's title (optional), where it works, and the agent; tab moves between them and enter starts the task. The title names the task window and a new branch (`wt/<title>`), and is passed to the agent through the harness's `prompt_args`. In a project session the list has these sections:
+
+- new worktrees on a new branch, from the default branch or the branch the pane is on; filtering also finds the other local branches
+- the main checkout and existing worktrees
+- local branches no worktree has checked out, and branches only a remote has, which get a local branch tracking them
+
+A checkout another task works in is shown with that task, and enter goes to it. Outside a project session the list is the pane's directory (a plain tab or a loose task) or another project, where the task starts in a new worktree. Finishing a task removes only the worktree and branch sesh created. A failed start is shown in the popup. `tasks.show_footer = true` shows key hints at its bottom.
+
+`[[tasks.harness]]` entries are the agents the popup offers, in order. A harness AHT supports needs only its name; any other entry needs `command`. Task commands run in your interactive shell (tmux's `default-shell`), so your aliases, functions and options apply as when you type them. `prompt_args` are appended to the command when the task has a title, with the task variables of task action prompts filled in.
+
+```toml
+[[tasks.harness]]
+name = "pi"
+
+[[tasks.harness]]
+name = "claude"
+prompt_args = ["{title}"]
+```
+
+## Task actions
+
+`[task_actions.<name>]` defines an action on a task. It runs `run` headless in the task worktree, in a window of the task's popup terminal named after the action, with `prompt` (or the contents of `prompt_file`, relative to the worktree) as its last argument. Prompts can use `{task}`, `{title}`, `{branch}`, `{base}`, `{project}` and `{worktree}`. `key` binds it in the picker; `link_pr` records the branch's pull request afterwards.
+
+```toml
+[task_actions.ship]
+key = "alt+p"
+run = ["claude", "-p", "--model", "sonnet"]
+prompt = "Commit, push and open a PR for {branch} against {base}."
+link_pr = true
+
+[projects.overrides.sesh.task_actions.ship]
+prompt_file = ".agents/ship.md"
+```
+
+`[projects.overrides.<name>.task_actions.<action>]` replaces fields of an action for the project with that directory name; a prompt or prompt file replaces both.
+
 ## Actions
 
-Per-action policy is keyed by action ID. `confirm` asks before the popup runs the action; `allow_remote` lets remote peers run it on this machine. `session.kill` and `session.delete` confirm and refuse remote use by default; `session.switch` never runs remotely.
+Per-action policy is keyed by action ID. `confirm` asks before the popup runs the action; `allow_remote` lets remote peers run it on this machine. `session.kill`, `session.delete` and `task.finish` confirm and refuse remote use by default; `task.sleep`, `task.wake` and `task.run` run remotely by default; `session.switch` never runs remotely.
 
 ```toml
 [actions.session.kill]
@@ -142,9 +195,9 @@ allow_remote = true
 
 ## Key bindings
 
-`[[keys.bind]]` binds a key to an action in the picker (`in = "picker"`) or in a tmux key table (`in = "tmux"`, rendered by `sesh setup tmux`). An entry replaces the default binding of the same key, and an entry without an action removes it. `params` sets action parameters. Tmux bindings pass the current session or pane as the action's subject. Picker bindings cannot use the picker's own navigation keys or keys that type into its search field.
+`[[keys.bind]]` binds a key to an action in the picker (`in = "picker"`) or in a tmux key table (`in = "tmux"`, rendered by `sesh setup tmux`). An entry replaces the default binding of the same key, and an entry without an action removes it. `params` sets action parameters. Tmux bindings pass the current session or pane as the action's subject; a root-table key pressed in a pane that shows a remote attachment goes to the remote tmux instead. Picker bindings cannot use the picker's own navigation keys or keys that type into its search field.
 
-Defaults: in the picker `alt+c` session.create, `alt+r` session.rename, `alt+x` session.kill, `alt+X` session.delete, `alt+s` snapshot.save; in tmux table `root` `S-F12` agent.next, `M-S-F12` agent.next with `local = true`, `S-F1` agent.back, `C-o` pick.popup.
+Defaults: in the picker `alt+c` session.create, `alt+r` session.rename, `alt+x` session.kill, `alt+X` session.delete, `alt+s` snapshot.save, `alt+z` task.sleep, `alt+Z` task.wake, `alt+f` task.finish; in tmux table `root` `S-F12` agent.next, `M-S-F12` agent.next with `local = true`, `S-F1` agent.back, `C-o` pick.popup, `M-w` pick.popup with `mode = "work"`, `C-t` task.menu, `M-n` project.pick.
 
 ```toml
 [[keys.bind]]

@@ -73,6 +73,8 @@ func newPeerHarness(t *testing.T) peerHarness {
 		Streams:            gotmux.Streams{In: nil, Out: nil, Err: nil},
 		Source:             "remote",
 		DeferSwitchHistory: false,
+		TaskLedger:         "",
+		WorktreeDir:        "",
 	})
 
 	return peerHarness{

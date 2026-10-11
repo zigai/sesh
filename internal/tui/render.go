@@ -7,6 +7,7 @@ import (
 	"time"
 	"unicode"
 
+	"charm.land/bubbles/v2/textinput"
 	"charm.land/lipgloss/v2"
 
 	"github.com/zigai/sesh/internal/action"
@@ -66,6 +67,7 @@ type popupLayout struct {
 	bodyWidth       int
 	bodyHeight      int
 	listHeight      int
+	detailRows      int
 	showFooter      bool
 	showFooterHints bool
 }
@@ -139,6 +141,10 @@ func (m *Model) renderFrame() string {
 
 	m.writeListFramedSection(&out, layout.bodyWidth, layout.listHeight, leftBorder, rightBorder)
 
+	for _, line := range m.renderWorkDetail(layout.bodyWidth, layout.detailRows) {
+		writeExactFramedLine(&out, line, leftBorder, rightBorder)
+	}
+
 	if layout.showFooter {
 		writeExactFramedSection(&out, m.renderModeFooter(layout.bodyWidth, layout.showFooterHints), leftBorder, rightBorder)
 	}
@@ -150,14 +156,18 @@ func (m *Model) renderFrame() string {
 }
 
 func (m *Model) renderFrameBorders(horizontal string) (string, string, string, string) {
-	if m.usesDefaultBorderTheme() {
+	return frameBorders(m.config, horizontal)
+}
+
+func frameBorders(cfg *config.Config, horizontal string) (string, string, string, string) {
+	if defaultBorderTheme(cfg) {
 		return ansiDefaultBorder + "┌" + horizontal + "┐" + ansiReset,
 			ansiDefaultBorder + "└" + horizontal + "┘" + ansiReset,
 			ansiDefaultVerticalBorder,
 			ansiDefaultVerticalBorder
 	}
 
-	borderStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.Theme.Border))
+	borderStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(cfg.Theme.Border))
 
 	return borderStyle.Render("┌" + horizontal + "┐"),
 		borderStyle.Render("└" + horizontal + "┘"),
@@ -235,30 +245,41 @@ func (m *Model) calcPopupLayout(_ bool) popupLayout {
 		reservedRows++
 	}
 
+	detailRows := 0
+	if m.displayMode == displayModeWork && bodyHeight-reservedRows-workDetailRows >= minWorkListRows {
+		detailRows = workDetailRows
+		reservedRows += detailRows
+	}
+
 	listHeight := max(bodyHeight-reservedRows, 1)
 
 	return popupLayout{
 		bodyWidth:       bodyWidth,
 		bodyHeight:      bodyHeight,
 		listHeight:      listHeight,
+		detailRows:      detailRows,
 		showFooter:      showFooter,
 		showFooterHints: showFooter && m.config.Settings.ShowFooter,
 	}
 }
 
 func (m *Model) renderInputBar(width int) string {
+	return inputBar(&m.textInput, width)
+}
+
+func inputBar(input *textinput.Model, width int) string {
 	promptWidth := inputGutterWidth()
 	prompt := ansiDefaultPrompt + ">" + ansiReset + strings.Repeat(" ", promptWidth-1)
 	inputWidth := max(width-promptWidth-1, 0)
 
-	originalWidth := m.textInput.Width()
-	m.textInput.SetWidth(inputWidth)
-	input := m.textInput.View()
-	m.textInput.SetWidth(originalWidth)
+	originalWidth := input.Width()
+	input.SetWidth(inputWidth)
+	view := input.View()
+	input.SetWidth(originalWidth)
 
-	line := prompt + input
+	line := prompt + view
 
-	lineWidth := promptWidth + lipgloss.Width(input)
+	lineWidth := promptWidth + lipgloss.Width(view)
 	if lineWidth > width {
 		return truncateStyled(line, width)
 	}
@@ -514,10 +535,14 @@ func (m *Model) renderSessionRow(layout sessionTableLayout, s session.Session, s
 }
 
 func (m *Model) sessionRowStyles(layout sessionTableLayout) sessionRowStyles {
-	blankPrefix := strings.Repeat(" ", layout.prefixWidth)
+	return rowStyles(m.config, layout.prefixWidth, layout.width)
+}
 
-	blankLine := strings.Repeat(" ", layout.width)
-	if m.usesDefaultRowTheme() {
+func rowStyles(cfg *config.Config, prefixWidth, width int) sessionRowStyles {
+	blankPrefix := strings.Repeat(" ", prefixWidth)
+
+	blankLine := strings.Repeat(" ", width)
+	if defaultRowTheme(cfg) {
 		return sessionRowStyles{
 			name:             lipgloss.Style{},
 			nameSeq:          ansiDefaultName,
@@ -535,9 +560,9 @@ func (m *Model) sessionRowStyles(layout sessionTableLayout) sessionRowStyles {
 		}
 	}
 
-	selectedBg := lipgloss.Color(m.config.Theme.Selected)
+	selectedBg := lipgloss.Color(cfg.Theme.Selected)
 
-	fg := m.config.Theme.Foreground
+	fg := cfg.Theme.Foreground
 	if fg == "" || strings.EqualFold(fg, "default") {
 		fg = "252"
 	}
@@ -548,7 +573,7 @@ func (m *Model) sessionRowStyles(layout sessionTableLayout) sessionRowStyles {
 		Background(selectedBg).
 		Bold(true)
 	selectedPad := lipgloss.NewStyle().Background(selectedBg)
-	mutedColor := lipgloss.Color(m.config.Theme.Muted)
+	mutedColor := lipgloss.Color(cfg.Theme.Muted)
 
 	return sessionRowStyles{
 		fastDefaultTheme: false,
@@ -575,25 +600,29 @@ func (m *Model) sessionRowStyles(layout sessionTableLayout) sessionRowStyles {
 	}
 }
 
-func (m *Model) usesDefaultRowTheme() bool {
-	if m.config == nil {
+func (m *Model) usesDefaultMutedTheme() bool {
+	return defaultMutedTheme(m.config)
+}
+
+func defaultRowTheme(cfg *config.Config) bool {
+	if cfg == nil {
 		return true
 	}
 
-	fg := m.config.Theme.Foreground
+	fg := cfg.Theme.Foreground
 	if fg != "" && !strings.EqualFold(fg, "default") && fg != "252" {
 		return false
 	}
 
-	return m.config.Theme.Secondary == "#ffdd57" && m.config.Theme.Selected == "#2a2a2a"
+	return cfg.Theme.Secondary == "#ffdd57" && cfg.Theme.Selected == "#2a2a2a"
 }
 
-func (m *Model) usesDefaultBorderTheme() bool {
-	return strings.EqualFold(m.config.Theme.Border, "#3a3d45")
+func defaultBorderTheme(cfg *config.Config) bool {
+	return strings.EqualFold(cfg.Theme.Border, "#3a3d45")
 }
 
-func (m *Model) usesDefaultMutedTheme() bool {
-	return strings.EqualFold(m.config.Theme.Muted, "#6c7086")
+func defaultMutedTheme(cfg *config.Config) bool {
+	return strings.EqualFold(cfg.Theme.Muted, "#6c7086")
 }
 
 func (m *Model) renderSessionRowWithStyles(
@@ -918,6 +947,10 @@ func agentStatusGlyphChar(status session.AgentStatus) string {
 		return "○"
 	case session.AgentStatusUnknown:
 		return "○"
+	case session.AgentStatusSleeping:
+		return "☾"
+	case session.AgentStatusDone:
+		return "✓"
 	default:
 		return "○"
 	}
@@ -937,8 +970,10 @@ func (m *Model) agentStatusColor(status session.AgentStatus) string {
 		return colors.Waiting
 	case session.AgentStatusFailed:
 		return colors.Failed
-	case session.AgentStatusIdle, session.AgentStatusInterrupted, session.AgentStatusUnknown:
+	case session.AgentStatusIdle, session.AgentStatusInterrupted, session.AgentStatusUnknown, session.AgentStatusSleeping:
 		return colors.Idle
+	case session.AgentStatusDone:
+		return m.config.Theme.Success
 	default:
 		return colors.Idle
 	}
@@ -1142,6 +1177,10 @@ func agentStatusLabel(status session.AgentStatus) string {
 		return "IDLE"
 	case session.AgentStatusUnknown:
 		return "UNKNOWN"
+	case session.AgentStatusSleeping:
+		return "SLEEPING"
+	case session.AgentStatusDone:
+		return "DONE"
 	default:
 		return "UNKNOWN"
 	}
@@ -1221,39 +1260,61 @@ func inputGutterWidth() int {
 
 func (m *Model) renderEmptyState(width int) string {
 	emptyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.Theme.Muted))
-	keys := newActionKeyMap(m.config)
 
-	message := "No sessions found"
-	if m.displayMode == displayModeAgents {
-		message = "No live agent sessions found"
-		if !m.config.AgentSessions.Enabled {
-			message = "Agent tracking is disabled"
-		} else if m.agentSummaryErr != nil {
-			message = fmt.Sprintf("Unable to load agent sessions: %v", m.agentSummaryErr)
-		}
-	}
-
-	if m.sessionLoadErr != nil && len(m.sessions) == 0 {
-		message = fmt.Sprintf("Failed to load sessions: %v", m.sessionLoadErr)
-	}
-
-	if query := strings.TrimSpace(m.textInput.Value()); query != "" {
-		if m.displayMode == displayModeAgents {
-			message = fmt.Sprintf("No agent sessions match %q", query)
-		} else {
-			message = fmt.Sprintf("No matches for %q", query)
-			if key := keys.actionKey(action.SessionCreate.ID); key != "" {
-				message = fmt.Sprintf("No matches. Press %s to create %q", key, query)
-			}
-		}
-	}
-
-	message = display.Truncate(message, width)
+	message := display.Truncate(m.emptyStateMessage(), width)
 	if messageWidth := lipgloss.Width(message); messageWidth < width {
 		message += strings.Repeat(" ", width-messageWidth)
 	}
 
 	return emptyStyle.Render(message)
+}
+
+func (m *Model) emptyStateMessage() string {
+	if query := strings.TrimSpace(m.textInput.Value()); query != "" {
+		return m.noMatchesMessage(query)
+	}
+
+	if m.sessionLoadErr != nil && len(m.sessions) == 0 {
+		return fmt.Sprintf("Failed to load sessions: %v", m.sessionLoadErr)
+	}
+
+	switch m.displayMode {
+	case displayModeWork:
+		if m.tasksErr != nil {
+			return fmt.Sprintf("Unable to load tasks: %v", m.tasksErr)
+		}
+
+		return "No tasks yet: ctrl+t in a project session starts one"
+	case displayModeAgents:
+		switch {
+		case !m.config.AgentSessions.Enabled:
+			return "Agent tracking is disabled"
+		case m.agentSummaryErr != nil:
+			return fmt.Sprintf("Unable to load agent sessions: %v", m.agentSummaryErr)
+		default:
+			return "No live agent sessions found"
+		}
+	case displayModeSesh:
+		return "No sessions found"
+	default:
+		return "No sessions found"
+	}
+}
+
+func (m *Model) noMatchesMessage(query string) string {
+	switch m.displayMode {
+	case displayModeWork:
+		return fmt.Sprintf("No tasks match %q", query)
+	case displayModeAgents:
+		return fmt.Sprintf("No agent sessions match %q", query)
+	case displayModeSesh:
+	}
+
+	if key := newActionKeyMap(m.config).actionKey(action.SessionCreate.ID); key != "" {
+		return fmt.Sprintf("No matches. Press %s to create %q", key, query)
+	}
+
+	return fmt.Sprintf("No matches for %q", query)
 }
 
 func (m *Model) renderFooter(width int) string {
@@ -1323,11 +1384,15 @@ func (m *Model) renderStatusHoverPrefix(width int) string {
 }
 
 func (m *Model) renderModeBadge() string {
+	return modeBadge(m.config, m.displayMode.label())
+}
+
+func modeBadge(cfg *config.Config, label string) string {
 	return lipgloss.NewStyle().
 		Foreground(lipgloss.Color("0")).
-		Background(lipgloss.Color(m.config.Theme.Primary)).
+		Background(lipgloss.Color(cfg.Theme.Primary)).
 		Bold(true).
-		Render(" " + m.displayMode.label() + " ")
+		Render(" " + label + " ")
 }
 
 func (m *Model) modeFooterHintWidth(width int) int {
@@ -1346,14 +1411,14 @@ func (m *Model) footerParts(width int) []footerPart {
 		return []footerPart{newFooterPart(keys.help.Help().Key, "help")}
 	}
 
-	if footerWidth < compactFooterMaxWidth && m.displayMode == displayModeAgents {
+	if footerWidth < compactFooterMaxWidth && m.displayMode.tree() {
 		return m.compactAgentFooterParts(keys, footerWidth)
 	}
 
 	parts := m.baseFooterParts()
 	parts = append(parts, newFooterPart(keys.enter.Help().Key, "select"))
 
-	for _, bound := range m.availableActions(keys) {
+	for _, bound := range m.footerActions(keys) {
 		parts = append(parts, newActionFooterPart(bound))
 	}
 
@@ -1373,6 +1438,13 @@ func (m *Model) baseFooterParts() []footerPart {
 		return append(parts,
 			newFooterPart("↑/↓", "agents"),
 			newFooterPart("ctrl+↑/↓", "sessions"),
+		)
+	}
+
+	if m.displayMode == displayModeWork {
+		return append(parts,
+			newFooterPart("↑/↓", "tasks"),
+			newFooterPart("ctrl+↑/↓", "sections"),
 		)
 	}
 
@@ -1411,6 +1483,10 @@ func newActionFooterPart(bound boundAction) footerPart {
 	label := string(bound.binding.Action)
 	if entry, ok := action.Lookup(bound.binding.Action); ok {
 		label, _, _ = strings.Cut(strings.ToLower(entry.Describe().Title), " ")
+	}
+
+	if name := bound.binding.Values.String("action"); bound.binding.Action == action.TaskRun.ID && name != "" {
+		label = name
 	}
 
 	part := newFooterPart(bound.key.Help().Key, label)

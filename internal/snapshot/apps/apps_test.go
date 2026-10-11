@@ -377,6 +377,39 @@ func TestPrepareRejectsStaleAgentMetadataForDifferentObservedApplication(t *test
 	}
 }
 
+func TestPrepareRestartsSleepingTaskPlaceholderEvenWithStaleAgentMetadata(t *testing.T) {
+	t.Parallel()
+
+	observed := launch("/home/user/.local/bin/sesh", "/home/user/.local/bin/sesh", "task", "placeholder", "t12")
+	stale := &apps.AgentResume{
+		Harness: "pi", SessionID: "pi-session", SessionPath: "", Executable: "",
+		Command: []string{"pi", "--session", "pi-session"},
+	}
+
+	for _, agent := range []*apps.AgentResume{nil, stale} {
+		prepared, reason := apps.Prepare(observed, agent)
+
+		assertPrepared(t, prepared, reason, apps.ReasonTaskPlaceholder, "/home/user/.local/bin/sesh",
+			[]string{"sesh", "task", "placeholder", "t12"}, apps.RecoveryRestart)
+	}
+}
+
+func TestPrepareRefusesOtherSeshCommands(t *testing.T) {
+	t.Parallel()
+
+	for _, arguments := range [][]string{
+		{"sesh", "task", "placeholder", "t12", "--socket", "/tmp/other"},
+		{"sesh", "task", "placeholder", "../t12"},
+		{"sesh", "task", "new"},
+		{"sesh", "pick"},
+	} {
+		prepared, reason := apps.Prepare(launch("/usr/bin/sesh", arguments...), nil)
+		if reason.Supported() || prepared.Recovery != apps.RecoveryUnverified {
+			t.Fatalf("Prepare(%q) = %#v, %q; want an unverified launch", arguments, prepared, reason)
+		}
+	}
+}
+
 func TestPrepareUnsupportedLaunchIsIsolatedAndUnverified(t *testing.T) {
 	t.Parallel()
 

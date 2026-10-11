@@ -133,7 +133,7 @@ func (m *Model) visibleSessionShortcutSlot(
 }
 
 func (m *Model) visibleShortcutRows() []popupListRow {
-	if m.displayMode != displayModeAgents {
+	if !m.displayMode.tree() {
 		height := m.calcPopupLayout(m.hasRenderedStatus()).listHeight
 
 		return m.visibleListRows(height)

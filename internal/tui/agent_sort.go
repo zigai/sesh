@@ -112,7 +112,7 @@ func agentAttentionRank(status session.AgentStatus) int {
 		return rankIdle
 	case session.AgentStatusRunning:
 		return rankRunning
-	case session.AgentStatusUnknown:
+	case session.AgentStatusUnknown, session.AgentStatusSleeping, session.AgentStatusDone:
 		return rankUnknown
 	default:
 		return rankUnknown

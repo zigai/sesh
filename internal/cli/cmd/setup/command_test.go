@@ -49,10 +49,10 @@ func TestSetupTmuxPrintsBindingsWithoutSocket(t *testing.T) {
 	caller := " --client '#{client_name}' --pane '#{pane_id}' --client-session '#{session_id}' --client-width '#{client_width}' --client-height '#{client_height}'"
 
 	for _, want := range []string{
-		"bind-key -T root S-F12 run-shell -b \"sesh agent next" + caller + "\"",
-		"bind-key -T root M-S-F12 run-shell -b \"sesh agent next --local=true" + caller + "\"",
-		"bind-key -T root S-F1 run-shell -b \"sesh agent back" + caller + "\"",
-		"bind-key -T root C-o run-shell -b \"sesh pick popup" + caller + "\"",
+		rootBinding("S-F12", "sesh agent next"+caller) + `\""`,
+		rootBinding("M-S-F12", "sesh agent next --local=true"+caller) + `\""`,
+		rootBinding("S-F1", "sesh agent back"+caller) + `\""`,
+		rootBinding("C-o", "sesh pick popup"+caller) + `\""`,
 	} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("stdout missing %q:\n%s", want, stdout)
@@ -100,7 +100,7 @@ table = "prefix"
 	}
 
 	for _, want := range []string{
-		"bind-key -T root S-F8 run-shell -b \"sesh agent latest ",
+		rootBinding("S-F8", "sesh agent latest "),
 		"bind-key -T prefix M-s run-shell -b \"sesh snapshot save '#{session_id}'\"",
 		"bind-key -T root S-F12 ",
 	} {
@@ -138,4 +138,10 @@ func TestSetupTmuxApplyTargetsAmbientServerWithoutSocket(t *testing.T) {
 	if !errors.Is(err, gotmux.ErrNoServer) {
 		t.Fatalf("error = %v, want the stopped ambient server to report no tmux server", err)
 	}
+}
+
+// rootBinding is the start of a rendered root-table binding: a key pressed in a remote attachment
+// goes on to the remote tmux, otherwise the command runs.
+func rootBinding(key, command string) string {
+	return `bind-key -T root ` + key + ` if-shell -F "#{@sesh_remote}" "send-keys ` + key + `" "run-shell -b \"` + command
 }

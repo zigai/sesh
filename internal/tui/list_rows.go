@@ -31,7 +31,7 @@ func (row popupListRow) equal(other popupListRow) bool {
 
 func (m *Model) selectedListRow() popupListRow {
 	row := popupListRow{sessionIndex: m.cursor, agentIndex: parentAgentIndex}
-	if m.displayMode != displayModeAgents || m.cursor < 0 || m.cursor >= len(m.filtered) {
+	if !m.displayMode.tree() || m.cursor < 0 || m.cursor >= len(m.filtered) {
 		return row
 	}
 
@@ -40,7 +40,7 @@ func (m *Model) selectedListRow() popupListRow {
 		return row
 	}
 
-	if m.agentCursor == parentAgentIndex {
+	if m.agentCursor == parentAgentIndex && m.displayMode != displayModeWork {
 		return row
 	}
 
@@ -80,7 +80,7 @@ func selectedVisualIndex(rows []popupListRow, selected popupListRow) int {
 func (m *Model) popupListRows() []popupListRow {
 	m.listRows = m.listRows[:0]
 
-	if m.displayMode != displayModeAgents {
+	if !m.displayMode.tree() {
 		for sessionIndex := range m.filtered {
 			m.listRows = append(m.listRows, popupListRow{
 				sessionIndex: sessionIndex,
@@ -132,7 +132,7 @@ func (m *Model) popupSelectableRows() []popupListRow {
 	m.selectableRows = m.selectableRows[:0]
 
 	for sessionIndex, row := range m.filtered {
-		if m.displayMode != displayModeAgents {
+		if !m.displayMode.tree() {
 			m.selectableRows = append(m.selectableRows, popupListRow{
 				sessionIndex: sessionIndex,
 				agentIndex:   parentAgentIndex,
@@ -168,7 +168,7 @@ func (m *Model) rowSelectable(row popupListRow) bool {
 
 	if row.sessionIndex >= 0 && row.sessionIndex < len(m.filtered) {
 		if !row.isAgent() {
-			return true
+			return m.displayMode != displayModeWork
 		}
 
 		return row.agentIndex < len(m.filtered[row.sessionIndex].Agents)

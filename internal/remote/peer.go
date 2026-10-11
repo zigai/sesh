@@ -40,6 +40,7 @@ type InventoryOptions struct {
 	Sessions          func(ctx context.Context) ([]session.Session, error)
 	Agents            func(ctx context.Context) ([]session.AgentSummary, error)
 	SavedSessions     func(ctx context.Context) ([]session.Session, error)
+	Tasks             func(ctx context.Context) ([]TaskRow, error)
 	Actions           []action.ID
 }
 
@@ -56,6 +57,7 @@ type streamState struct {
 	sessions      []session.Session
 	savedSessions []session.Session
 	agents        []session.AgentSummary
+	tasks         []TaskRow
 	health        SourceHealth
 }
 
@@ -183,6 +185,7 @@ func RunInventoryStream(ctx context.Context, opts InventoryOptions, output io.Wr
 		sessions:      nil,
 		savedSessions: nil,
 		agents:        nil,
+		tasks:         nil,
 		health:        UnavailableHealth(),
 	}
 
@@ -301,6 +304,19 @@ func (state *streamState) scan(ctx context.Context) {
 	state.scanSessions(ctx)
 	state.scanAgents(ctx)
 	state.scanSavedSessions(ctx)
+	state.scanTasks(ctx)
+}
+
+// scanTasks keeps the last tasks read when the ledger cannot be read, like sessions.
+func (state *streamState) scanTasks(ctx context.Context) {
+	if state.options.Tasks == nil {
+		return
+	}
+
+	rows, err := state.options.Tasks(ctx)
+	if err == nil && len(rows) <= MaxTasks {
+		state.tasks = rows
+	}
 }
 
 func (state *streamState) scanSessions(ctx context.Context) {
@@ -388,6 +404,7 @@ func (state *streamState) snapshot() (Snapshot, error) {
 	return Snapshot{
 		GeneratedAt: time.Now().UTC(),
 		Sessions:    sessions,
+		Tasks:       slices.Clone(state.tasks),
 		Actions:     slices.Clone(state.options.Actions),
 		Health:      state.health,
 	}, nil

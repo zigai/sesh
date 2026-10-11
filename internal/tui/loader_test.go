@@ -9,6 +9,8 @@ import (
 	"testing/synctest"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/zigai/sesh/internal/agents"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/session"
@@ -1515,6 +1517,79 @@ func TestRemoteWatchErrorFencesOutstandingRead(t *testing.T) {
 
 	if model.remoteCatalogErr != nil || model.degradedSources[degradedSourceRemote] != "" {
 		t.Fatal("a new successful read did not recover the failed watch")
+	}
+}
+
+func TestOpenPickerReceivesRemoteCatalogChanges(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.Remote.Enabled = true
+		cfg.Remote.Connections = []config.RemoteConnectionConfig{{ID: "host", Host: "host"}}
+		model := loaderTestModel(t, cfg, Dependencies{
+			WatchRemoteCatalog: func(_ context.Context, publish func(RemoteCatalog, error)) error {
+				publish(remoteCatalogWithSession("remote"), nil)
+
+				return nil
+			},
+		})
+
+		defer func() {
+			model.Close()
+			time.Sleep(time.Hour)
+		}()
+
+		catalog := settledRemoteCatalog(model.Init())
+
+		if catalog == nil {
+			t.Fatal("the opened picker never received the catalog change")
+		}
+
+		updateTestModel(t, model, *catalog)
+
+		if len(model.sessions) != 1 || model.sessions[0].Name != "remote" {
+			t.Fatalf("sessions = %+v, want the remote session from the catalog change", model.sessions)
+		}
+	})
+}
+
+// settledRemoteCatalog runs a command and every command it batches concurrently, as the program
+// does, and returns the remote catalog update they deliver once they settle.
+func settledRemoteCatalog(command tea.Cmd) *remoteCatalogMsg {
+	messages := make(chan tea.Msg, 64)
+
+	var run func(tea.Cmd)
+
+	run = func(command tea.Cmd) {
+		if command == nil {
+			return
+		}
+
+		go func() {
+			msg := command()
+			if batch, ok := msg.(tea.BatchMsg); ok {
+				for _, next := range batch {
+					run(next)
+				}
+
+				return
+			}
+
+			messages <- msg
+		}()
+	}
+
+	run(command)
+	synctest.Wait()
+
+	for {
+		select {
+		case msg := <-messages:
+			if update, ok := msg.(remoteCatalogMsg); ok {
+				return &update
+			}
+		default:
+			return nil
+		}
 	}
 }
 

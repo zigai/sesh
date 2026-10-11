@@ -30,12 +30,12 @@ func TestRestoreIntentConflictsWhenKernelBirthChanges(t *testing.T) {
 	secondDaemon := firstDaemon
 	secondDaemon.Birth = "11111111-2222-3333-4444-555555555555:1001"
 
-	firstTarget, err := restoreTarget(endpoint, firstDaemon, RestoreConfig{})
+	firstTarget, err := restoreTarget(endpoint, firstDaemon, RestoreConfig{}, "")
 	if err != nil {
 		t.Fatalf("encode first restore target: %v", err)
 	}
 
-	secondTarget, err := restoreTarget(endpoint, secondDaemon, RestoreConfig{})
+	secondTarget, err := restoreTarget(endpoint, secondDaemon, RestoreConfig{}, "")
 	if err != nil {
 		t.Fatalf("encode second restore target: %v", err)
 	}
@@ -88,7 +88,7 @@ func TestRestoreTargetRejectsMalformedKernelBirth(t *testing.T) {
 		Birth: "11111111-2222-3333-4444-555555555555:1\ninjected=true",
 	}
 
-	if _, err := restoreTarget(endpoint, daemon, RestoreConfig{}); !errors.Is(err, tmuxserver.ErrDaemonIdentityUnavailable) {
+	if _, err := restoreTarget(endpoint, daemon, RestoreConfig{}, ""); !errors.Is(err, tmuxserver.ErrDaemonIdentityUnavailable) {
 		t.Fatalf("malformed kernel birth error = %v, want daemon identity unavailable", err)
 	}
 }

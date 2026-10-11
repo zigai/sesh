@@ -19,7 +19,7 @@ func tmuxBindable(t *testing.T) []action.Binding {
 	t.Helper()
 
 	cfg := config.DefaultConfig()
-	keys := []string{"M-a", "M-b", "M-c", "M-d", "M-e", "M-f", "M-g", "M-h", "M-i", "M-j", "M-k", "M-l", "M-m", "M-n", "M-o", "M-p", "M-q", "M-r", "M-s", "M-t"}
+	keys := []string{"M-a", "M-b", "M-c", "M-d", "M-e", "M-f", "M-g", "M-h", "M-i", "M-j", "M-k", "M-l", "M-m", "M-n", "M-o", "M-p", "M-q", "M-r", "M-s", "M-t", "M-u", "M-v", "M-w", "M-x", "M-y", "M-z", "C-M-a", "C-M-b", "C-M-c", "C-M-d", "C-M-e", "C-M-f"}
 
 	for _, entry := range action.All() {
 		descriptor := entry.Describe()
@@ -53,7 +53,7 @@ func TestTmuxBindingsRunCommandsTheCLIAccepts(t *testing.T) {
 	)
 
 	for _, binding := range rendered {
-		command := formats.Replace(binding.Program[2])
+		command := formats.Replace(binding.Command)
 
 		output, err := exec.CommandContext(t.Context(), "sh", "-c", `set -- `+command+`; printf '%s\0' "$@"`).Output()
 		if err != nil {

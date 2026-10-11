@@ -10,11 +10,13 @@ import (
 
 	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/agents"
+	"github.com/zigai/sesh/internal/project"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/snapshot/capture"
 	"github.com/zigai/sesh/internal/snapshot/engine"
 	"github.com/zigai/sesh/internal/snapshot/restore"
 	"github.com/zigai/sesh/internal/snapshot/store"
+	"github.com/zigai/sesh/internal/task"
 )
 
 // classifications map domain sentinels to action codes. The first match wins, so uncertain
@@ -26,6 +28,7 @@ var classifications = []classification{
 	{restore.ErrExecutionUncertain, action.CodeUncertain},
 	{restore.ErrPriorUncertainty, action.CodeUncertain},
 	{session.ErrSwitchUnverified, action.CodeUncertain},
+	{task.ErrUncertain, action.CodeUncertain},
 	{session.ErrSessionNotFound, action.CodeNotFound},
 	{session.ErrSessionAlreadyExists, action.CodeAlreadyExists},
 	{restore.ErrSessionCollision, action.CodeAlreadyExists},
@@ -56,6 +59,33 @@ var classifications = []classification{
 	{gotmux.ErrNoServer, action.CodeUnavailable},
 	{engine.ErrNoServerRunning, action.CodeUnavailable},
 	{gotmux.ErrNotFound, action.CodeNotFound},
+	{task.ErrWorktreeDirUnset, action.CodeUnavailable},
+	{task.ErrUnknownHarness, action.CodeInvalidArgument},
+	{task.ErrNoBaseBranch, action.CodeConflict},
+	{task.ErrNoFreeNumber, action.CodeConflict},
+	{task.ErrPaneNotFound, action.CodeNotFound},
+	{task.ErrNotFound, action.CodeNotFound},
+	{task.ErrWindowMissing, action.CodeNotFound},
+	{task.ErrNotAwake, action.CodeConflict},
+	{task.ErrNotAsleep, action.CodeConflict},
+	{task.ErrNoAgent, action.CodeNotFound},
+	{task.ErrAgentBusy, action.CodeConflict},
+	{task.ErrNoResume, action.CodeUnsupported},
+	{task.ErrSleepUnsupported, action.CodeUnsupported},
+	{task.ErrAgentChanged, action.CodeTargetChanged},
+	{task.ErrAgentDidNotStop, action.CodeFailed},
+	{task.ErrWouldLoseWork, action.CodeConflict},
+	{task.ErrTaskStarting, action.CodeConflict},
+	{task.ErrGitHubFailed, action.CodeUnavailable},
+	{task.ErrGitHubResponse, action.CodeFailed},
+	{ErrUnknownTaskAction, action.CodeNotFound},
+	{ErrPromptFile, action.CodeInvalidArgument},
+	{project.ErrNotProject, action.CodeInvalidArgument},
+	{project.ErrNameInvalid, action.CodeInvalidArgument},
+	{project.ErrNameTaken, action.CodeAlreadyExists},
+	{project.ErrExists, action.CodeAlreadyExists},
+	{project.ErrNoRoot, action.CodeUnavailable},
+	{project.ErrSessionNotFound, action.CodeNotFound},
 }
 
 type classification struct {

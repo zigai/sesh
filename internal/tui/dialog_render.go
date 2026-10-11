@@ -37,8 +37,13 @@ type helpBinding struct {
 
 func (m *Model) helpBindings(keys actionKeyMap) []helpBinding {
 	moveDescription := "Move between sessions"
-	if m.displayMode == displayModeAgents {
+
+	switch m.displayMode {
+	case displayModeSesh:
+	case displayModeAgents:
 		moveDescription = "Move between agents"
+	case displayModeWork:
+		moveDescription = "Move between tasks"
 	}
 
 	bindings := []helpBinding{
@@ -53,11 +58,15 @@ func (m *Model) helpBindings(keys actionKeyMap) []helpBinding {
 		bindings = append([]helpBinding{{keys.cycleMode.Help().Key, keys.cycleMode.Help().Desc}}, bindings...)
 	}
 
-	if m.displayMode == displayModeAgents {
+	switch m.displayMode {
+	case displayModeSesh:
+	case displayModeAgents:
 		bindings = append(bindings,
 			helpBinding{keys.agentSort.Help().Key, keys.agentSort.Help().Desc},
 			helpBinding{"ctrl+↑/ctrl+↓", "Move between tmux sessions"},
 		)
+	case displayModeWork:
+		bindings = append(bindings, helpBinding{"ctrl+↑/ctrl+↓", "Move between sections"})
 	}
 
 	for _, bound := range m.availableActions(keys) {
@@ -159,7 +168,7 @@ func (m *Model) renderDialog() string {
 	switch m.dialog {
 	case dialogConfirm:
 		question := descriptor.Title + "?"
-		if names := subjectNames(m.pending.subject); names != "" {
+		if names := m.subjectNames(m.pending.subject); names != "" {
 			question = descriptor.Title + " " + names + "?"
 		}
 
@@ -175,7 +184,17 @@ func (m *Model) renderDialog() string {
 	return ""
 }
 
-func subjectNames(subject action.Subject) string {
+func (m *Model) subjectNames(subject action.Subject) string {
+	if subject.Task != "" {
+		for _, live := range m.tasks {
+			if live.Record.ID == subject.Task {
+				return SanitizeTerminalText(live.Record.Title)
+			}
+		}
+
+		return SanitizeTerminalText(subject.Task)
+	}
+
 	names := make([]string, 0, len(subject.Sessions))
 	for _, target := range subject.Sessions {
 		names = append(names, SanitizeTerminalText(target.Name))
