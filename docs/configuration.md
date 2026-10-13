@@ -126,7 +126,7 @@ roots = ["~/Projects"]
 extra = []
 
 [tasks]
-editor = ["nvim"]
+panes = [{ name = "editor", command = ["nvim"] }] # panes beside the agent; see Task windows
 popup_socket = "sesh-popup"
 popup_config = "" # without it, the popup server hides its status line and C-p closes it
 wake_on_restore = "previous" # after a restore: "previous" resumes the agents that were awake, "none" brings every task back asleep, "3" resumes only the 3 newest awake tasks
@@ -147,7 +147,7 @@ tmux_startup_post = []
 
 ## Tasks
 
-`ctrl+t` opens a popup that starts a task: a title (optional), the agent, and in a project session or a repository where it works. Left/right pick the agent, starting from the first; up/down pick where it works; typing goes to the title; enter starts the task. The title keeps its usual editing keys. The title names the task window and a new branch (`wt/<title>`), and is passed to the agent through the harness's `prompt_args`. The places are a new worktree on a new branch from the default branch, whose name the popup shows, the pane's checkout, and `existing branch…`, where enter expands the popup to list every location:
+`ctrl+t` opens a popup that starts a task: a title (optional), the agent, and in a project session or a repository where it works. Left/right pick the agent, starting from the first; up/down pick the checkout; typing goes to the title; enter starts the task. The title keeps its usual editing keys. The title names the task window and a new branch (`wt/<title>`), and is passed to the agent through the harness's `prompt_args`. The places are a new worktree on a new branch from the default branch, or `origin`'s when the local one is behind it, whose name the popup shows, the pane's checkout, and `existing branch…`, where enter expands the popup to list every location:
 
 - new worktrees on a new branch, from the default branch or the branch the pane is on; filtering also finds the other local branches
 - the main checkout and existing worktrees
@@ -166,6 +166,36 @@ name = "claude"
 prompt_args = ["{title}"]
 ```
 
+## Task windows
+
+A task window holds the agent and the panes in `[[tasks.panes]]`. A pane's `command` runs in your interactive shell in the task directory, or `dir` relative to it, and can use the task action variables; a pane without a command is a shell. `restart = true` on a pane with a command runs it again after a snapshot restore. Each pane is tagged with its name in `@sesh_role`; the agent's is `agent`.
+
+`[[tasks.layouts]]` arrange the window; the first whose `when` fits the new window applies. `when` can test `orientation` (`landscape` is at least twice as many columns as rows), `min_width`, `max_width`, `min_height`, `max_height` and `harness`. A layout either sets `arrange`, a tmux layout with the agent as the main pane (`main_size` sets its share, `panes` limits the panes), or `splits`, which place each pane by splitting the agent or an earlier pane `right`, `below`, `left` or `above`, with a size in cells or percent. `focus` picks the pane selected when the window opens. Without layouts, the agent sits beside the panes in a landscape window and above them otherwise.
+
+```toml
+[[tasks.panes]]
+name = "editor"
+command = ["nvim", "."]
+
+[[tasks.panes]]
+name = "shell"
+
+[[tasks.layouts]]
+name = "wide"
+when = { orientation = "landscape" }
+splits = [
+  { pane = "editor", of = "agent", direction = "right", size = "45%" },
+  { pane = "shell", of = "editor", direction = "below", size = "30%" },
+]
+
+[[tasks.layouts]]
+name = "tall"
+arrange = "main-horizontal"
+main_size = "60%"
+```
+
+`[[projects.overrides.<name>.task_panes]]` replaces or adds panes by name for one project, and `[[projects.overrides.<name>.task_layouts]]` replaces its layouts; an empty list keeps the defaults. `sesh task new --layout <name>` picks a layout by name. The `task.relayout` action lays the current task window out again for its current size, reopening panes the layout places that were closed and keeping other panes in the largest space; bind it with `[[keys.bind]]`.
+
 ## Task actions
 
 `[task_actions.<name>]` defines an action on a task. It runs `run` headless in the task worktree, in a window of the task's popup terminal named after the action, with `prompt` (or the contents of `prompt_file`, relative to the worktree) as its last argument. Prompts can use `{task}`, `{title}`, `{branch}`, `{base}`, `{project}` and `{worktree}`. `key` binds it in the picker; `link_pr` records the branch's pull request afterwards.
@@ -181,7 +211,7 @@ link_pr = true
 prompt_file = ".agents/ship.md"
 ```
 
-`[projects.overrides.<name>.task_actions.<action>]` replaces fields of an action for the project with that directory name; a prompt or prompt file replaces both.
+`[projects.overrides.<name>.task_actions.<action>]` replaces fields of an action for the project with that directory name, or at that path when `<name>` is a path such as `"~/work/api"`, which wins over the name; a prompt or prompt file replaces both.
 
 ## Actions
 
@@ -197,7 +227,7 @@ allow_remote = true
 
 `[[keys.bind]]` binds a key to an action in the picker (`in = "picker"`) or in a tmux key table (`in = "tmux"`, rendered by `sesh setup tmux`). An entry replaces the default binding of the same key, and an entry without an action removes it. `params` sets action parameters. Tmux bindings pass the current session or pane as the action's subject; a root-table key pressed in a pane that shows a remote attachment goes to the remote tmux instead. Picker bindings cannot use the picker's own navigation keys or keys that type into its search field.
 
-Defaults: in the picker `alt+c` session.create, `alt+r` session.rename, `alt+x` session.kill, `alt+X` session.delete, `alt+s` snapshot.save, `alt+z` task.sleep, `alt+Z` task.wake, `alt+f` task.finish; in tmux table `root` `S-F12` agent.next, `M-S-F12` agent.next with `local = true`, `S-F1` agent.back, `C-o` pick.popup, `M-w` pick.popup with `mode = "work"`, `C-t` task.menu, `M-n` project.pick.
+Defaults: in the picker `alt+c` session.create, `alt+r` session.rename, `alt+x` session.kill, `alt+X` session.delete, `alt+s` snapshot.save, `alt+z` task.sleep, `alt+Z` task.wake, `alt+f` task.finish, `alt+o` task.open; in tmux table `root` `S-F12` agent.next, `M-S-F12` agent.next with `local = true`, `S-F1` agent.back, `C-o` pick.popup, `M-w` pick.popup with `mode = "work"`, `C-t` task.menu, `M-n` project.pick.
 
 ```toml
 [[keys.bind]]

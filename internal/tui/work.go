@@ -151,7 +151,7 @@ func (m *Model) workHostSections(host workHost) [][]session.AgentSession {
 	sections := make([][]session.AgentSession, workSectionCount)
 
 	for _, live := range host.tasks {
-		if live.Record.State == task.StateCreating || live.Record.State == task.StateFinishing {
+		if (live.Record.State == task.StateCreating || live.Record.State == task.StateFinishing) && !live.Stalled {
 			continue
 		}
 
@@ -338,7 +338,7 @@ func taskAgent(live task.Live, agents map[string]session.AgentSession) session.A
 		agent.Status = session.AgentStatusDone
 	case record.State == task.StateSleeping || record.State == task.StateWaking:
 		agent.Status = session.AgentStatusSleeping
-	case record.State == task.StateFailed:
+	case record.State == task.StateFailed || live.Stalled:
 		agent.Status = session.AgentStatusFailed
 	}
 
@@ -405,13 +405,12 @@ func (m *Model) footerActions(keys actionKeyMap) []boundAction {
 	}
 
 	found, ok := m.workTaskAt(m.selectedListRow())
-	state := found.live.Record.State
 
 	tasks := make([]boundAction, 0, len(available))
 	others := make([]boundAction, 0, len(available))
 
 	for _, bound := range available {
-		taskAction, fits := taskActionFits(bound.binding.Action, state)
+		taskAction, fits := taskActionFits(bound.binding.Action, found.live)
 
 		switch {
 		case !taskAction:
@@ -426,12 +425,16 @@ func (m *Model) footerActions(keys actionKeyMap) []boundAction {
 
 // taskActionFits reports whether an action is one of a task's own and, if so, whether it fits a
 // task in the given state.
-func taskActionFits(id action.ID, state task.State) (bool, bool) {
+func taskActionFits(id action.ID, live task.Live) (bool, bool) {
+	state := live.Record.State
+
 	switch id {
 	case action.TaskSleep.ID:
 		return true, state == task.StateActive
 	case action.TaskWake.ID:
 		return true, state == task.StateSleeping || state == task.StateWaking
+	case action.TaskOpen.ID:
+		return true, !live.Present && !live.Stalled && state != task.StateCreating && state != task.StateFinishing
 	case action.TaskFinish.ID, action.TaskRun.ID:
 		return true, true
 	default:

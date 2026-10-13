@@ -20,6 +20,8 @@ type Live struct {
 	WindowName  string
 	AgentPane   gotmux.PaneID
 	AgentPID    int
+	// Stalled is set when the task is stuck creating or finishing; see Stalled.
+	Stalled bool
 }
 
 // Inventory returns every recorded task with its live location.
@@ -43,6 +45,7 @@ func Inventory(ctx context.Context, server *gotmux.Server, store Store) ([]Live,
 		}
 
 		entry.Record = record
+		entry.Stalled = Stalled(ctx, record)
 		live = append(live, entry)
 	}
 
@@ -92,6 +95,6 @@ func locateTasks(ctx context.Context, server *gotmux.Server) (map[string]Live, e
 func absent() Live {
 	return Live{
 		Record: EmptyRecord(), Present: false, SessionID: "", SessionName: "", WindowID: "", WindowIndex: 0,
-		WindowName: "", AgentPane: "", AgentPID: 0,
+		WindowName: "", AgentPane: "", AgentPID: 0, Stalled: false,
 	}
 }

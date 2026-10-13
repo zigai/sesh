@@ -3,6 +3,7 @@
 package app
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"os"
@@ -47,16 +48,19 @@ func (local *Local) registerTaskHandlers() {
 	handle(local, action.TaskNew, local.startTask)
 	handle(local, action.TaskTab, local.openTab)
 	handle(local, action.TaskPopup, local.openTaskPopup)
+	handle(local, action.TaskRelayout, local.relayoutTask)
 	handle(local, action.TaskSleep, local.sleepTask)
 	handle(local, action.TaskWake, local.wakeTask)
+	handle(local, action.TaskOpen, local.openTask)
 	handle(local, action.TaskFinish, local.finishTask)
 	handle(local, action.TaskRun, local.runTaskAction)
 }
 
-// TaskOffer lists what a new task can start with at the caller's pane.
-func (local *Local) TaskOffer(ctx context.Context, caller action.Caller) (TaskOffer, error) {
+// TaskOffer lists what a new task can start with at the caller's pane, with branch details when
+// describe is set.
+func (local *Local) TaskOffer(ctx context.Context, caller action.Caller, describe bool) (TaskOffer, error) {
 	offered := TaskOffer{Project: "", Offer: task.Offer{
-		Harnesses: nil, Project: "", Locations: nil, Current: -1, NextNumber: 0, Branches: nil,
+		Harnesses: nil, Project: "", Locations: nil, Current: -1, NextNumber: 0, Branches: nil, Refs: nil, Starts: nil,
 	}}
 
 	service, place, err := local.taskPlace(ctx, caller)
@@ -64,7 +68,7 @@ func (local *Local) TaskOffer(ctx context.Context, caller action.Caller) (TaskOf
 		return offered, err
 	}
 
-	offered.Offer, err = service.Offer(ctx, place)
+	offered.Offer, err = service.Offer(ctx, place, describe)
 	if err != nil {
 		return offered, oops.In("app").With("operation", "offer_task").Wrap(err)
 	}
@@ -92,12 +96,18 @@ func (local *Local) ShowTask(ctx context.Context, caller action.Caller, id strin
 		return oops.In("app").With("operation", "show_task").Wrap(err)
 	}
 
-	index := slices.IndexFunc(tasks, func(live task.Live) bool { return live.Record.ID == id && live.Present })
+	index := slices.IndexFunc(tasks, func(live task.Live) bool { return live.Record.ID == id })
 	if index < 0 {
 		return oops.In("app").With("operation", "show_task").Wrap(task.ErrNotFound)
 	}
 
 	live := tasks[index]
+	if !live.Present {
+		if live, err = local.reopenTask(ctx, caller, live.Record); err != nil {
+			return err
+		}
+	}
+
 	if _, err := navigator.Focus(ctx, agents.FocusTarget{
 		PaneID: string(live.AgentPane), SessionID: string(live.SessionID), SessionName: live.SessionName,
 	}); err != nil {
@@ -105,6 +115,64 @@ func (local *Local) ShowTask(ctx context.Context, caller action.Caller, id strin
 	}
 
 	return nil
+}
+
+func (local *Local) openTask(ctx context.Context, caller action.Caller, input action.OpenTask) (action.OpenedTask, error) {
+	tasks, err := task.Inventory(ctx, local.server, task.NewStore(local.taskLedger))
+	if err != nil {
+		return action.OpenedTask{ID: input.Task}, oops.In("app").With("operation", "open_task").Wrap(err)
+	}
+
+	index := slices.IndexFunc(tasks, func(live task.Live) bool { return live.Record.ID == input.Task })
+	if index < 0 {
+		return action.OpenedTask{ID: input.Task}, oops.In("app").With("operation", "open_task").Wrap(task.ErrNotFound)
+	}
+
+	if !tasks[index].Present {
+		_, err = local.reopenTask(ctx, caller, tasks[index].Record)
+	}
+
+	return action.OpenedTask{ID: input.Task}, err
+}
+
+// reopenTask opens the window of a task that has none: a project task's in its project session,
+// a loose task's in the caller's session. It returns where the window is.
+func (local *Local) reopenTask(ctx context.Context, caller action.Caller, record task.Record) (task.Live, error) {
+	service, err := local.taskService()
+	if err != nil {
+		return task.Live{}, err
+	}
+
+	place, err := local.reopenPlace(ctx, caller, record)
+	if err != nil {
+		return task.Live{}, err
+	}
+
+	if _, err := service.Reopen(ctx, place, record.ID); err != nil {
+		return task.Live{}, oops.In("app").With("operation", "open_task").Wrap(err)
+	}
+
+	tasks, err := task.Inventory(ctx, local.server, task.NewStore(local.taskLedger))
+	if err != nil {
+		return task.Live{}, oops.In("app").With("operation", "open_task").Wrap(err)
+	}
+
+	index := slices.IndexFunc(tasks, func(live task.Live) bool { return live.Record.ID == record.ID && live.Present })
+	if index < 0 {
+		return task.Live{}, oops.In("app").With("operation", "open_task").Wrap(task.ErrNotFound)
+	}
+
+	return tasks[index], nil
+}
+
+func (local *Local) reopenPlace(ctx context.Context, caller action.Caller, record task.Record) (task.Place, error) {
+	if record.Kind == task.KindLoose {
+		_, place, err := local.taskPlace(ctx, caller)
+
+		return place, err
+	}
+
+	return local.projectPlace(ctx, task.Place{Pane: gotmux.PaneID(cmp.Or(caller.Pane, os.Getenv(paneEnvironment))), Session: "", Dir: "", Project: "", Task: ""}, record.Project)
 }
 
 func (local *Local) startTask(ctx context.Context, caller action.Caller, input action.NewTask) (action.StartedTask, error) {
@@ -127,6 +195,7 @@ func (local *Local) startTask(ctx context.Context, caller action.Caller, input a
 			Where: task.Where(input.Where), Branch: input.Branch, Remote: input.Remote, Directory: input.Directory,
 			Task: "", TaskTitle: "",
 		},
+		Layout: input.Layout,
 	})
 	started := action.StartedTask{
 		ID: record.ID, Kind: string(record.Kind), Number: record.Number, Directory: record.Directory, Branch: record.Branch,
@@ -171,6 +240,23 @@ func (local *Local) openTab(ctx context.Context, caller action.Caller, _ action.
 	}
 
 	return action.OpenedTab{}, nil
+}
+
+func (local *Local) relayoutTask(ctx context.Context, caller action.Caller, input action.RelayoutTask) (action.RelaidOutTask, error) {
+	service, place, err := local.taskPlace(ctx, caller)
+	if err != nil {
+		return action.RelaidOutTask{Task: ""}, err
+	}
+
+	if place.Task == "" {
+		return action.RelaidOutTask{Task: ""}, action.Wrap(action.CodeUnsupported, ErrNotInTask)
+	}
+
+	if err := service.Relayout(ctx, place, input.Layout); err != nil {
+		return action.RelaidOutTask{Task: place.Task}, oops.In("app").With("operation", "relayout_task").Wrap(err)
+	}
+
+	return action.RelaidOutTask{Task: place.Task}, nil
 }
 
 func (local *Local) openTaskPopup(ctx context.Context, caller action.Caller, _ action.OpenTaskPopup) (action.ClosedTaskPopup, error) {

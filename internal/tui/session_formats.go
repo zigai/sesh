@@ -614,7 +614,7 @@ func (v sessionFormatValues) resolveAgentGitField(field string) (string, bool) {
 			return "", true
 		}
 
-		return "", true
+		return GitGlyph, true
 	case display.FieldAgentGitChanges:
 		return SanitizeTerminalText(v.agent.GitChanges), true
 	case display.FieldAgentGitInfo:

@@ -395,11 +395,14 @@ func newSleepFixtureWith(t *testing.T, prepare func(dir string)) sleepFixture {
 	}
 
 	cfg := config.DefaultTasksConfig()
-	cfg.Editor = []string{"sleep", "300"}
+	cfg.Panes = []config.TaskPaneConfig{{Name: "editor", Command: []string{"sleep", "300"}, Dir: "", Restart: false}}
 	cfg.Harness = []config.HarnessConfig{{Name: fakeHarnessName, Command: []string{"sh", "-c", `while [ ! -e ready ]; do sleep 0.05; done; exec "$0"`, harness}}}
 
+	full := config.DefaultConfig()
+	full.Tasks = cfg
+
 	f.service = task.NewService(task.Options{
-		Server: f.server, Store: f.store, Catalog: catalog, Config: cfg, WorktreeDir: f.worktreeDir,
+		Server: f.server, Store: f.store, Catalog: catalog, Config: cfg, Windows: full.TaskWindowFor, WorktreeDir: f.worktreeDir,
 		LookPath: exec.LookPath, Now: time.Now, Agents: agents,
 		Placeholder: func(string) []string {
 			return []string{"sh", "-c", "echo shown > " + placeholderMarker + "; exec sleep 300"}

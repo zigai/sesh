@@ -924,7 +924,6 @@ roots = ["~/code", "/srv/repos"]
 extra = ["~/notes"]
 
 [tasks]
-editor = ["hx"]
 popup_socket = "popup"
 popup_config = "~/.config/tmux/popup.conf"
 
@@ -949,7 +948,7 @@ command = ["claude"]
 		t.Errorf("Projects = %+v", cfg.Projects)
 	}
 
-	if !slices.Equal(cfg.Tasks.Editor, []string{"hx"}) || cfg.Tasks.PopupSocket != "popup" || cfg.Tasks.PopupConfig != "~/.config/tmux/popup.conf" {
+	if cfg.Tasks.PopupSocket != "popup" || cfg.Tasks.PopupConfig != "~/.config/tmux/popup.conf" {
 		t.Errorf("Tasks = %+v", cfg.Tasks)
 	}
 
@@ -983,7 +982,30 @@ func TestLoadRejectsInvalidProjectsAndTasks(t *testing.T) {
 	}{
 		{name: "relative root", content: "[projects]\nroots = [\"Projects\"]"},
 		{name: "relative extra folder", content: "[projects]\nextra = [\"notes\"]"},
-		{name: "empty editor", content: "[tasks]\neditor = []"},
+		{name: "pane named agent", content: "[[tasks.panes]]\nname = \"agent\""},
+		{name: "duplicate pane", content: "[[tasks.panes]]\nname = \"editor\"\n[[tasks.panes]]\nname = \"editor\""},
+		{name: "pane unknown variable", content: "[[tasks.panes]]\nname = \"logs\"\ncommand = [\"tail\", \"{repo}\"]"},
+		{name: "layout without arrangement", content: "[[tasks.layouts]]\nfocus = \"agent\""},
+		{name: "layout with arrange and splits", content: "[[tasks.layouts]]\narrange = \"tiled\"\nsplits = [{ pane = \"editor\", of = \"agent\", direction = \"right\" }]"},
+		{name: "unknown arrange", content: "[[tasks.layouts]]\narrange = \"spiral\""},
+		{name: "main size without main arrange", content: "[[tasks.layouts]]\narrange = \"tiled\"\nmain_size = \"60%\""},
+		{name: "main size of 100 percent", content: "[[tasks.layouts]]\narrange = \"main-vertical\"\nmain_size = \"100%\""},
+		{name: "arrange of an unknown pane", content: "[[tasks.layouts]]\narrange = \"tiled\"\npanes = [\"shell\"]"},
+		{name: "split of an unknown pane", content: "[[tasks.layouts]]\nsplits = [{ pane = \"shell\", of = \"agent\", direction = \"right\" }]"},
+		{name: "split of a later pane", content: "[[tasks.panes]]\nname = \"editor\"\n[[tasks.panes]]\nname = \"shell\"\n[[tasks.layouts]]\nsplits = [{ pane = \"shell\", of = \"editor\", direction = \"below\" }, { pane = \"editor\", of = \"agent\", direction = \"right\" }]"},
+		{name: "pane placed twice", content: "[[tasks.layouts]]\nsplits = [{ pane = \"editor\", of = \"agent\", direction = \"right\" }, { pane = \"editor\", of = \"agent\", direction = \"below\" }]"},
+		{name: "split direction", content: "[[tasks.layouts]]\nsplits = [{ pane = \"editor\", of = \"agent\", direction = \"up\" }]"},
+		{name: "split size", content: "[[tasks.layouts]]\nsplits = [{ pane = \"editor\", of = \"agent\", direction = \"right\", size = \"half\" }]"},
+		{name: "focus on an unplaced pane", content: "[[tasks.layouts]]\narrange = \"tiled\"\npanes = []\nfocus = \"editor\""},
+		{name: "orientation", content: "[[tasks.layouts]]\narrange = \"tiled\"\nwhen = { orientation = \"wide\" }"},
+		{name: "max width below min width", content: "[[tasks.layouts]]\narrange = \"tiled\"\nwhen = { min_width = 200, max_width = 100 }"},
+		{name: "duplicate layout name", content: "[[tasks.layouts]]\nname = \"a\"\narrange = \"tiled\"\n[[tasks.layouts]]\nname = \"a\"\narrange = \"tiled\""},
+		{name: "pane without a program", content: "[[tasks.panes]]\nname = \"logs\"\ncommand = [\" \", \"-f\"]"},
+		{name: "restart without a command", content: "[[tasks.panes]]\nname = \"shell\"\nrestart = true"},
+		{name: "duplicate project pane", content: "[[projects.overrides.shop.task_panes]]\nname = \"editor\"\n[[projects.overrides.shop.task_panes]]\nname = \"editor\""},
+		{name: "layout for a harness that is not offered", content: "[[tasks.harness]]\nname = \"pi\"\n[[tasks.layouts]]\narrange = \"tiled\"\nwhen = { harness = [\"claud\"] }"},
+		{name: "relative override path", content: "[[projects.overrides.\"work/api\".task_panes]]\nname = \"server\""},
+		{name: "project layout of a missing pane", content: "[[projects.overrides.shop.task_layouts]]\narrange = \"tiled\"\npanes = [\"server\"]"},
 		{name: "socket path", content: "[tasks]\npopup_socket = \"/tmp/popup\""},
 		{name: "relative popup config", content: "[tasks]\npopup_config = \"popup.conf\""},
 		{name: "reserved harness name", content: "[[tasks.harness]]\nname = \"tab\"\ncommand = [\"bash\"]"},
@@ -1041,18 +1063,192 @@ link_pr = false
 		t.Fatalf("Load() error = %v", err)
 	}
 
-	shop := cfg.TaskActionsFor("shop")["ship"]
+	shop := cfg.TaskActionsFor("/code/shop")["ship"]
 	if shop.Key != "alt+p" || !slices.Equal(shop.Run, []string{"claude", "-p"}) || shop.Prompt != "" ||
 		shop.PromptFile != ".agents/ship.md" || shop.LinksPR() {
 		t.Errorf("shop ship = %+v, want the global action with the override's prompt file and no PR link", shop)
 	}
 
-	other := cfg.TaskActionsFor("other")["ship"]
+	other := cfg.TaskActionsFor("/code/other")["ship"]
 	if other.Prompt != "ship {branch}" || other.PromptFile != "" || !other.LinksPR() {
 		t.Errorf("other ship = %+v, want the global action", other)
 	}
 
-	if _, found := cfg.TaskActionsFor("shop")["review"]; !found {
+	if _, found := cfg.TaskActionsFor("/code/shop")["review"]; !found {
 		t.Error("shop lost the review action it does not override")
+	}
+}
+
+func TestLoadReplacesTheDefaultTaskPanes(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.toml")
+
+	content := `[[tasks.panes]]
+name = "edit"
+command = ["hx", "."]
+restart = true
+
+[[tasks.layouts]]
+when = { orientation = "landscape", min_width = 200 }
+splits = [{ pane = "edit", of = "agent", direction = "right", size = "40%" }]
+`
+	if err := os.WriteFile(configPath, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(config.WithExplicitPath(configPath))
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if len(cfg.Tasks.Panes) != 1 || cfg.Tasks.Panes[0].Name != "edit" || !slices.Equal(cfg.Tasks.Panes[0].Command, []string{"hx", "."}) || !cfg.Tasks.Panes[0].Restart {
+		t.Errorf("Tasks.Panes = %+v, want only the configured pane", cfg.Tasks.Panes)
+	}
+
+	if len(cfg.Tasks.Layouts) != 1 || cfg.Tasks.Layouts[0].When.MinWidth != 200 || cfg.Tasks.Layouts[0].Splits[0].Size != "40%" {
+		t.Errorf("Tasks.Layouts = %+v", cfg.Tasks.Layouts)
+	}
+}
+
+func TestProjectTaskWindowReplacesPanesByNameAndLayoutsWhole(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.toml")
+
+	content := `[[tasks.panes]]
+name = "editor"
+command = ["nvim"]
+
+[[tasks.panes]]
+name = "shell"
+
+[[tasks.layouts]]
+name = "wide"
+arrange = "main-vertical"
+
+[[projects.overrides.shop.task_panes]]
+name = "editor"
+command = ["hx"]
+
+[[projects.overrides.shop.task_panes]]
+name = "server"
+command = ["npm", "run", "dev"]
+restart = true
+
+[[projects.overrides.shop.task_layouts]]
+name = "grid"
+arrange = "tiled"
+`
+	if err := os.WriteFile(configPath, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(config.WithExplicitPath(configPath))
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	shop := cfg.TaskWindowFor("/code/shop")
+
+	names := make([]string, 0, len(shop.Panes))
+	for _, pane := range shop.Panes {
+		names = append(names, pane.Name)
+	}
+
+	if !slices.Equal(names, []string{"editor", "shell", "server"}) || !slices.Equal(shop.Panes[0].Command, []string{"hx"}) {
+		t.Errorf("shop panes = %+v, want editor replaced, shell kept, server added", shop.Panes)
+	}
+
+	if len(shop.Layouts) != 1 || shop.Layouts[0].Name != "grid" {
+		t.Errorf("shop layouts = %+v, want only the project's", shop.Layouts)
+	}
+
+	other := cfg.TaskWindowFor("/code/other")
+	if len(other.Panes) != 2 || len(other.Layouts) != 1 || other.Layouts[0].Name != "wide" {
+		t.Errorf("other project window = %+v, want the global one", other)
+	}
+}
+
+func TestTaskLayoutWhenMatches(t *testing.T) {
+	tests := []struct {
+		name          string
+		when          config.TaskLayoutWhen
+		width, height int
+		harness       string
+		want          bool
+	}{
+		{name: "anything", when: config.TaskLayoutWhen{}, width: 10, height: 10, harness: "pi", want: true},
+		{name: "landscape at twice as wide", when: config.TaskLayoutWhen{Orientation: config.OrientationLandscape}, width: 200, height: 100, want: true},
+		{name: "landscape too narrow", when: config.TaskLayoutWhen{Orientation: config.OrientationLandscape}, width: 199, height: 100, want: false},
+		{name: "portrait", when: config.TaskLayoutWhen{Orientation: config.OrientationPortrait}, width: 120, height: 100, want: true},
+		{name: "below min width", when: config.TaskLayoutWhen{MinWidth: 160}, width: 159, height: 40, want: false},
+		{name: "above max height", when: config.TaskLayoutWhen{MaxHeight: 50}, width: 100, height: 51, want: false},
+		{name: "other harness", when: config.TaskLayoutWhen{Harness: []string{"claude"}}, width: 100, height: 50, harness: "pi", want: false},
+		{name: "listed harness", when: config.TaskLayoutWhen{Harness: []string{"claude", "pi"}}, width: 100, height: 50, harness: "pi", want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.when.Matches(tt.width, tt.height, tt.harness); got != tt.want {
+				t.Errorf("Matches(%d, %d, %q) = %v, want %v", tt.width, tt.height, tt.harness, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAProjectPathOverrideWinsOverItsDirectoryName(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.toml")
+	work := t.TempDir()
+
+	content := `[[projects.overrides.api.task_panes]]
+name = "server"
+command = ["make", "serve"]
+
+[[projects.overrides."` + filepath.Join(work, "api") + `".task_panes]]
+name = "server"
+command = ["npm", "start"]
+`
+	if err := os.WriteFile(configPath, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(config.WithExplicitPath(configPath))
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	server := func(root string) []string {
+		pane, _ := cfg.TaskWindowFor(root).Pane("server")
+
+		return pane.Command
+	}
+
+	if got := server(filepath.Join(work, "api")); !slices.Equal(got, []string{"npm", "start"}) {
+		t.Errorf("server pane of the api at the overridden path = %v, want npm start", got)
+	}
+
+	if got := server("/code/api"); !slices.Equal(got, []string{"make", "serve"}) {
+		t.Errorf("server pane of another api = %v, want the name override's make serve", got)
+	}
+}
+
+func TestAnEmptyProjectLayoutListUsesTheDefaultLayouts(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.toml")
+
+	content := `[[tasks.layouts]]
+name = "grid"
+arrange = "tiled"
+
+[projects.overrides.shop]
+task_layouts = []
+`
+	if err := os.WriteFile(configPath, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(config.WithExplicitPath(configPath))
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if got := cfg.TaskWindowFor("/code/shop").Layouts; len(got) != len(config.DefaultTaskLayouts()) || got[0].Name == "grid" {
+		t.Fatalf("shop layouts = %+v, want the default layouts", got)
 	}
 }

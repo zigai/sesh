@@ -25,14 +25,14 @@ var (
 		ID:      "task.new",
 		Title:   "New task",
 		Summary: "Start a task with an agent harness",
-		Help: "Start a task from the invoking pane, in a window with the agent above an editor. In a project " +
+		Help: "Start a task from the invoking pane, in a window with the agent and the configured panes, " +
+			"laid out by --layout or the first configured layout that fits the window. In a project " +
 			"session, a repository, or the project --project names, --where picks the task's checkout: new (a worktree " +
-			"on a new branch from --branch, by default the default branch), branch (a new worktree on " +
+			"on a new branch from --branch, by default the default branch, or origin's when the local one is behind), branch (a new worktree on " +
 			"--branch, a local branch or one only --remote has), worktree (the existing worktree --dir) " +
 			"or main (the main checkout). Sesh removes on finish only the worktree and branch it created. " +
 			"Elsewhere the task runs in the pane's directory. --title names the task and its new branch and " +
-			"is passed to the agent as configured by the harness's prompt_args. The harness \"none\" " +
-			"starts the task with a shell instead of an agent.",
+			"is passed to the agent as configured by the harness's prompt_args.",
 		Subject: SubjectNone,
 		Arity:   ArityOne,
 		Params: []Param{
@@ -43,6 +43,7 @@ var (
 			newParam("dir", ParamPath, "Existing worktree for --where worktree"),
 			newParam("title", ParamText, "What the task is about"),
 			newParam("project", ParamPath, "Project to start the task in instead of the pane's"),
+			newParam("layout", ParamText, "Named task layout for the window"),
 		},
 		NeedsClient: true,
 		Interactive: false,
@@ -53,7 +54,7 @@ var (
 		return NewTask{
 			Harness: values.String("harness"), Where: values.String("where"), Branch: values.String("branch"),
 			Remote: values.String("remote"), Directory: values.String("dir"), Title: values.String("title"),
-			Project: values.String("project"),
+			Project: values.String("project"), Layout: values.String("layout"),
 		}, nil
 	}, func(out StartedTask) string {
 		if out.Number == 0 {
@@ -93,6 +94,25 @@ var (
 		Remote:      RemoteNever,
 		check:       nil,
 	}, func(Subject, Values) (OpenTaskPopup, error) { return OpenTaskPopup{}, nil }, func(ClosedTaskPopup) string { return "" })
+
+	TaskRelayout = define(Descriptor{
+		ID:      "task.relayout",
+		Title:   "Relayout task window",
+		Summary: "Lay the task window out again for its current size",
+		Help: "Lay out the task window of the invoking pane again with --layout, or the first configured " +
+			"layout that fits the window's current size. Panes the layout places that the window lacks are " +
+			"opened again.",
+		Subject:     SubjectNone,
+		Arity:       ArityOne,
+		Params:      []Param{newParam("layout", ParamText, "Named task layout to apply")},
+		NeedsClient: true,
+		Interactive: false,
+		Destructive: false,
+		Remote:      RemoteNever,
+		check:       nil,
+	}, func(_ Subject, values Values) (RelayoutTask, error) {
+		return RelayoutTask{Layout: values.String("layout")}, nil
+	}, func(RelaidOutTask) string { return "" })
 
 	TaskSleep = define(Descriptor{
 		ID:      "task.sleep",
@@ -136,6 +156,25 @@ var (
 
 		return "Resumed task " + out.ID
 	})
+
+	TaskOpen = define(Descriptor{
+		ID:      "task.open",
+		Title:   "Open task window",
+		Summary: "Open again the window of a task that has none",
+		Help: "Open the window of a task whose window was closed or lost, with its project's panes and layout: " +
+			"a project task's in its project session, a loose task's next to the invoking window. A sleeping " +
+			"task's agent resumes through its native resume command; any other task starts a new agent.",
+		Subject:     SubjectTask,
+		Arity:       ArityOne,
+		Params:      nil,
+		NeedsClient: false,
+		Interactive: false,
+		Destructive: false,
+		Remote:      RemoteNever,
+		check:       nil,
+	}, func(subject Subject, _ Values) (OpenTask, error) {
+		return OpenTask{Task: subject.Task}, nil
+	}, func(out OpenedTask) string { return "Opened task " + out.ID })
 
 	TaskFinish = define(Descriptor{
 		ID:      "task.finish",
@@ -187,6 +226,7 @@ type NewTask struct {
 	Directory string `json:"directory"`
 	Title     string `json:"title"`
 	Project   string `json:"project"`
+	Layout    string `json:"layout"`
 }
 
 type StartedTask struct {
@@ -207,6 +247,14 @@ type ClosedTaskPopup struct {
 	Task string `json:"task"`
 }
 
+type RelayoutTask struct {
+	Layout string `json:"layout"`
+}
+
+type RelaidOutTask struct {
+	Task string `json:"task"`
+}
+
 type SleepTask struct {
 	Task string `json:"task"`
 }
@@ -222,6 +270,14 @@ type WakeTask struct {
 type WokenTask struct {
 	ID           string `json:"id"`
 	AlreadyAwake bool   `json:"alreadyAwake"`
+}
+
+type OpenTask struct {
+	Task string `json:"task"`
+}
+
+type OpenedTask struct {
+	ID string `json:"id"`
 }
 
 type FinishTask struct {

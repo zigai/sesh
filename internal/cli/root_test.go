@@ -380,8 +380,8 @@ in = "picker"
 		t.Fatalf("unbound snapshot.save is still bound to %q", bind)
 	}
 
-	if len(payload.Bindings) != 24 {
-		t.Fatalf("bindings = %d, want 24", len(payload.Bindings))
+	if len(payload.Bindings) != 25 {
+		t.Fatalf("bindings = %d, want 25", len(payload.Bindings))
 	}
 }
 

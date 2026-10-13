@@ -139,6 +139,7 @@ func (local *Local) taskService() (*task.Service, error) {
 
 	return task.NewService(task.Options{
 		Server: local.server, Store: task.NewStore(local.taskLedger), Catalog: catalog, Config: local.cfg.Tasks,
+		Windows:     local.cfg.TaskWindowFor,
 		WorktreeDir: local.worktreeDir, LookPath: exec.LookPath, Now: time.Now,
 		Agents: paneAgents{source: local.agentSource, socket: agents.NormalizeServerSocket(socket)},
 		Placeholder: func(id string) []string {

@@ -11,11 +11,32 @@ import (
 	"github.com/zigai/sesh/internal/display"
 )
 
+const (
+	SpanMuted SpanRole = iota
+	SpanPrimary
+	SpanSecondary
+	SpanSuccess
+	SpanError
+)
+
+// GitGlyph marks a git branch, as in agent rows.
+const GitGlyph = "\ue725"
+
 // Chrome draws the picker frame, query line, rows and footer for pickers outside the session
 // picker, with the same glyphs and theme.
 type Chrome struct {
 	cfg *config.Config
 }
+
+// Span is a part of a row's right column, colored by its role.
+type Span struct {
+	Text string
+	Role SpanRole
+}
+
+// SpanRole colors a span like the counts of an agent row: muted, or a theme color that draws the
+// eye to a count that is not zero.
+type SpanRole int
 
 // Hint is one key and what it does, shown in the footer.
 type Hint struct {
@@ -71,14 +92,20 @@ func (c Chrome) Row(name, right string, selected bool, width int) string {
 // TreeRow draws a list row whose name follows a muted tree prefix, like the agents under a
 // session.
 func (c Chrome) TreeRow(tree, name, right string, selected bool, width int) string {
+	return c.TreeRowSpans(tree, name, []Span{{Text: right, Role: SpanMuted}}, selected, width)
+}
+
+// TreeRowSpans draws a tree row whose right column is made of spans, each colored by its role,
+// like the git counts of an agent row.
+func (c Chrome) TreeRowSpans(tree, name string, spans []Span, selected bool, width int) string {
 	styles := rowStyles(c.cfg, inputGutterWidth(), width)
 	treeWidth := lipgloss.Width(tree)
 
-	rightWidth := lipgloss.Width(right)
+	rightWidth := SpansWidth(spans)
+
 	nameWidth := max(width-inputGutterWidth()-treeWidth-rightWidth-1, 1)
 
 	if rightWidth == 0 || nameWidth < minSearchWidth {
-		right = ""
 		rightWidth = 0
 		nameWidth = max(width-inputGutterWidth()-treeWidth, 1)
 	}
@@ -120,13 +147,23 @@ func (c Chrome) TreeRow(tree, name, right string, selected bool, width int) stri
 	gap := " "
 	if selected {
 		writeStyledWithBackground(&out, gap, styles.selectedBgSeq)
-		out.WriteString(c.selectedMuted(right))
 	} else {
 		out.WriteString(gap)
-		out.WriteString(c.Muted(right))
 	}
 
+	c.writeSpans(&out, spans, selected)
+
 	return out.String()
+}
+
+// SpansWidth is the width spans take on screen.
+func SpansWidth(spans []Span) int {
+	width := 0
+	for _, span := range spans {
+		width += lipgloss.Width(span.Text)
+	}
+
+	return width
 }
 
 // RowWidth is the width TreeRow needs to show tree, name and right in full.
@@ -254,4 +291,38 @@ func (c Chrome) selectedMuted(text string) string {
 		Foreground(lipgloss.Color(c.cfg.Theme.Muted)).
 		Background(lipgloss.Color(c.cfg.Theme.Selected)).
 		Render(text)
+}
+
+func (c Chrome) writeSpans(out *strings.Builder, spans []Span, selected bool) {
+	for _, span := range spans {
+		out.WriteString(c.span(span, selected))
+	}
+}
+
+func (c Chrome) span(span Span, selected bool) string {
+	var color string
+
+	switch span.Role {
+	case SpanMuted:
+		if selected {
+			return c.selectedMuted(span.Text)
+		}
+
+		return c.Muted(span.Text)
+	case SpanPrimary:
+		color = c.cfg.Theme.Primary
+	case SpanSecondary:
+		color = c.cfg.Theme.Secondary
+	case SpanSuccess:
+		color = c.cfg.Theme.Success
+	case SpanError:
+		color = c.cfg.Theme.Error
+	}
+
+	style := lipgloss.NewStyle().Foreground(lipgloss.Color(color))
+	if selected {
+		style = style.Background(lipgloss.Color(c.cfg.Theme.Selected))
+	}
+
+	return style.Render(span.Text)
 }

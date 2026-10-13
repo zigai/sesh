@@ -221,7 +221,7 @@ func TestFinishLeavesACheckoutSeshDidNotCreateWithItsWork(t *testing.T) {
 	}
 
 	record, err := f.service.Start(t.Context(), projectSessionPlace(t, f), task.Request{
-		Harness: "fake", Location: task.Location{Where: task.WhereWorktree, Directory: hand},
+		Harness: envHarness, Location: task.Location{Where: task.WhereWorktree, Directory: hand},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -246,7 +246,7 @@ func TestFinishOfABranchWorktreeRemovesTheWorktreeAndKeepsTheBranch(t *testing.T
 	runGit(t, f.repo, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-q", "--allow-empty", "-m", "main moves on")
 
 	record, err := f.service.Start(t.Context(), projectSessionPlace(t, f), task.Request{
-		Harness: "fake", Location: task.Location{Where: task.WhereBranch, Branch: "feature"},
+		Harness: envHarness, Location: task.Location{Where: task.WhereBranch, Branch: "feature"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -287,7 +287,7 @@ func TestFinishOfARemoteBranchTaskKeepsUnpushedWorkAndTheRemoteBranch(t *testing
 	addRemoteBranch(t, f.base, f.repo, "review")
 
 	record, err := f.service.Start(t.Context(), projectSessionPlace(t, f), task.Request{
-		Harness: "fake", Location: task.Location{Where: task.WhereBranch, Branch: "review", Remote: "origin"},
+		Harness: envHarness, Location: task.Location{Where: task.WhereBranch, Branch: "review", Remote: "origin"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -381,11 +381,14 @@ func newFinishFixture(t *testing.T) *finishFixture {
 	}
 
 	cfg := config.DefaultTasksConfig()
-	cfg.Editor = []string{"sleep", "300"}
-	cfg.Harness = []config.HarnessConfig{{Name: "fake", Command: []string{"sleep", "300"}, PromptArgs: nil}}
+	cfg.Panes = []config.TaskPaneConfig{{Name: "editor", Command: []string{"sleep", "300"}, Dir: "", Restart: false}}
+	cfg.Harness = []config.HarnessConfig{{Name: envHarness, Command: []string{"sleep", "300"}, PromptArgs: nil}}
+
+	full := config.DefaultConfig()
+	full.Tasks = cfg
 
 	f.service = task.NewService(task.Options{
-		Server: f.server, Store: f.store, Catalog: catalog, Config: cfg, WorktreeDir: f.worktreeDir,
+		Server: f.server, Store: f.store, Catalog: catalog, Config: cfg, Windows: full.TaskWindowFor, WorktreeDir: f.worktreeDir,
 		LookPath: exec.LookPath, Now: time.Now, Agents: nil, Placeholder: nil, PRs: f.prs,
 		ClosePopup: func(_ context.Context, id string) error {
 			f.closed = append(f.closed, id)
@@ -396,7 +399,7 @@ func newFinishFixture(t *testing.T) *finishFixture {
 
 	f.repo = initRepository(t, filepath.Join(f.base, "code", "shop"))
 
-	f.record, err = f.service.Start(t.Context(), projectPlace(t, f.fixture, f.repo), inNewWorktree("fake"))
+	f.record, err = f.service.Start(t.Context(), projectPlace(t, f.fixture, f.repo), inNewWorktree(envHarness))
 	if err != nil {
 		t.Fatalf("Start() error = %v", err)
 	}
@@ -511,4 +514,106 @@ func projectPlaceSession(t *testing.T, f *finishFixture) gotmux.SessionID {
 	t.Fatal("project session not found")
 
 	return ""
+}
+
+func TestATaskStartedFromOriginsNewerBaseFinishesWithNothingToLose(t *testing.T) {
+	f := newFinishFixture(t)
+	addRemoteBranch(t, f.base, f.repo, "shared")
+
+	upstream := filepath.Join(f.base, "upstream")
+	commitAt(t, upstream, "upstream moves on", "2026-02-01T00:00:00Z")
+	runGit(t, f.repo, "fetch", "-q", "origin")
+
+	record, err := f.service.Start(t.Context(), projectPlace(t, f.fixture, f.repo), inNewWorktree(envHarness))
+	if err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+
+	if got := gitOutput(t, record.Directory, "log", "-1", "--format=%s"); got != "upstream moves on" {
+		t.Fatalf("new branch starts at %q, want origin's newer main", got)
+	}
+
+	if _, err := f.service.Finish(t.Context(), record.ID, false); err != nil {
+		t.Fatalf("Finish() error = %v, want nothing to lose", err)
+	}
+}
+
+func TestATaskStartsFromTheLocalBaseWhenItHasCommitsOriginLacks(t *testing.T) {
+	f := newFinishFixture(t)
+	addRemoteBranch(t, f.base, f.repo, "shared")
+	commitAt(t, f.repo, "local work", "2026-02-01T00:00:00Z")
+
+	record, err := f.service.Start(t.Context(), projectPlace(t, f.fixture, f.repo), inNewWorktree(envHarness))
+	if err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+
+	if got := gitOutput(t, record.Directory, "log", "-1", "--format=%s"); got != "local work" {
+		t.Fatalf("new branch starts at %q, want the local main", got)
+	}
+}
+
+func TestFindPRSkipsPullRequestsFromForks(t *testing.T) {
+	bin := t.TempDir()
+	listing := `[{"number":7,"state":"CLOSED","url":"https://example.test/fork/7","headRefOid":"","isCrossRepository":true},` +
+		`{"number":5,"state":"OPEN","url":"https://example.test/pr/5","headRefOid":"","isCrossRepository":false}]`
+	writeFile(t, filepath.Join(bin, "gh"), "#!/bin/sh\nprintf '%s' '"+listing+"'\n")
+
+	if err := os.Chmod(filepath.Join(bin, "gh"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("PATH", bin)
+
+	pr, _, found, err := task.GitHub{}.FindPR(t.Context(), t.TempDir(), "feature")
+	if err != nil || !found || pr.Number != 5 {
+		t.Fatalf("FindPR() = %+v, %t, %v; want the repository's own pull request 5", pr, found, err)
+	}
+}
+
+func TestFinishRemovesATaskWhoseCreationStoppedWithItsProcess(t *testing.T) {
+	f := newFinishFixture(t)
+
+	running := task.Process{PID: os.Getpid(), Birth: ""}
+	setCreating(t, f, running)
+
+	if _, err := f.service.Finish(t.Context(), f.record.ID, false); !errors.Is(err, task.ErrTaskStarting) {
+		t.Fatalf("Finish() of a task its running process is creating error = %v, want ErrTaskStarting", err)
+	}
+
+	gone := exec.CommandContext(t.Context(), "true")
+	if err := gone.Run(); err != nil {
+		t.Fatal(err)
+	}
+
+	setCreating(t, f, task.Process{PID: gone.Process.Pid, Birth: "00000000-0000-0000-0000-000000000000:1"})
+
+	live, err := task.Inventory(t.Context(), f.server, f.store)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if index := slices.IndexFunc(live, func(l task.Live) bool { return l.Record.ID == f.record.ID }); index < 0 || !live[index].Stalled {
+		t.Fatal("Inventory() does not report the task as stalled")
+	}
+
+	if _, err := f.service.Finish(t.Context(), f.record.ID, false); err != nil {
+		t.Fatalf("Finish() error = %v", err)
+	}
+
+	assertTaskRemoved(t, f)
+}
+
+func setCreating(t *testing.T, f *finishFixture, owner task.Process) {
+	t.Helper()
+
+	if _, err := f.store.Update(t.Context(), func(ledger *task.Ledger) error {
+		record, _ := ledger.Find(f.record.ID)
+		record.State, record.Owner = task.StateCreating, owner
+		ledger.Put(record)
+
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
 }

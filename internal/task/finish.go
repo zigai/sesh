@@ -1,7 +1,6 @@
 package task
 
 import (
-	"cmp"
 	"context"
 	"encoding/hex"
 	"encoding/json"
@@ -21,6 +20,7 @@ const ghOutputLimit = 64 << 10
 
 var (
 	ErrWouldLoseWork   = errors.New("finishing the task would lose work")
+	ErrBaseMissing     = errors.New("the task's base branch no longer exists")
 	ErrTaskStarting    = errors.New("task is still being created")
 	ErrGitHubFailed    = errors.New("gh could not list pull requests")
 	ErrGitHubResponse  = errors.New("gh returned an unexpected pull request listing")
@@ -130,7 +130,7 @@ func (s *Service) Finish(ctx context.Context, id string, discard bool) (Record, 
 		return record, taskError("finish_task", err)
 	}
 
-	if record.State == StateCreating {
+	if record.State == StateCreating && !Stalled(ctx, record) {
 		return record, taskError("finish_task", ErrTaskStarting)
 	}
 
@@ -148,6 +148,8 @@ func (s *Service) Finish(ctx context.Context, id string, discard bool) (Record, 
 	}
 
 	record.State = StateFinishing
+	record.Owner = currentProcess(ctx)
+
 	if err := s.put(ctx, record); err != nil {
 		return record, taskError("finish_task", err)
 	}
@@ -199,15 +201,20 @@ func (s *Service) checkLoss(ctx context.Context, record Record, mergedHead strin
 }
 
 func unmergedCommitCount(ctx context.Context, record Record, mergedHead string) (int, error) {
-	base := cmp.Or(record.Upstream, record.Base)
+	bases, err := mergeTargets(ctx, record)
+	if err != nil {
+		return 0, err
+	}
 
-	count, err := git.Output(ctx, record.Project, "rev-list", "--count", base+".."+record.Branch)
+	count, err := git.Output(ctx, record.Project, append([]string{"rev-list", "--count", record.Branch, "--not"}, bases...)...)
 	if err != nil {
 		return 0, fmt.Errorf("count unmerged commits: %w", err)
 	}
 
 	if count != "0" && record.PR.State == PRMerged && validCommitOID(mergedHead) {
-		count, err = git.Output(ctx, record.Project, "rev-list", "--count", base+".."+record.Branch, "--not", mergedHead)
+		args := append([]string{"rev-list", "--count", record.Branch, "--not"}, bases...)
+
+		count, err = git.Output(ctx, record.Project, append(args, mergedHead)...)
 		if err != nil {
 			return 0, fmt.Errorf("count commits after pull request merge: %w", err)
 		}
@@ -219,6 +226,33 @@ func unmergedCommitCount(ctx context.Context, record Record, mergedHead string) 
 	}
 
 	return commits, nil
+}
+
+// mergeTargets are the branches a task's commits count as merged into: the remote branch it
+// tracks, or its base both locally and on origin, since a new task branch may start from either.
+func mergeTargets(ctx context.Context, record Record) ([]string, error) {
+	if record.Upstream != "" {
+		return []string{record.Upstream}, nil
+	}
+
+	var bases []string
+
+	for _, ref := range []string{"refs/heads/" + record.Base, "refs/remotes/origin/" + record.Base} {
+		exists, err := refExists(ctx, record.Project, ref)
+		if err != nil {
+			return nil, err
+		}
+
+		if exists {
+			bases = append(bases, ref)
+		}
+	}
+
+	if len(bases) == 0 {
+		return nil, fmt.Errorf("count unmerged commits: %w", ErrBaseMissing)
+	}
+
+	return bases, nil
 }
 
 func lossOf(loss LossError) error {
@@ -314,7 +348,7 @@ func (GitHub) FindPR(ctx context.Context, dir, branch string) (PullRequest, stri
 	}
 
 	command := exec.CommandContext(ctx, ghPath, "pr", "list", "--head", branch, "--state", "all",
-		"--json", "number,state,url,headRefOid", "--limit", "1")
+		"--json", "number,state,url,headRefOid,isCrossRepository")
 	command.Dir = dir
 
 	command.Env = append(os.Environ(), "GH_PROMPT_DISABLED=1", "GIT_TERMINAL_PROMPT=0", "NO_COLOR=1")
@@ -331,22 +365,27 @@ func (GitHub) FindPR(ctx context.Context, dir, branch string) (PullRequest, stri
 		State  string `json:"state"`
 		URL    string `json:"url"`
 		Head   string `json:"headRefOid"`
+		Fork   bool   `json:"isCrossRepository"`
 	}
 
 	if err := json.Unmarshal(output.Bytes(), &listed); err != nil {
 		return noPR(), "", false, errors.Join(ErrGitHubResponse, err)
 	}
 
-	if len(listed) == 0 {
-		return noPR(), "", false, nil
+	for _, pr := range listed {
+		if pr.Fork {
+			continue
+		}
+
+		state, err := prState(pr.State)
+		if err != nil || pr.Number <= 0 || (pr.Head != "" && !validCommitOID(pr.Head)) {
+			return noPR(), "", false, errors.Join(ErrGitHubResponse, err)
+		}
+
+		return PullRequest{Number: pr.Number, State: state, URL: pr.URL}, pr.Head, true, nil
 	}
 
-	state, err := prState(listed[0].State)
-	if err != nil || listed[0].Number <= 0 || (listed[0].Head != "" && !validCommitOID(listed[0].Head)) {
-		return noPR(), "", false, errors.Join(ErrGitHubResponse, err)
-	}
-
-	return PullRequest{Number: listed[0].Number, State: state, URL: listed[0].URL}, listed[0].Head, true, nil
+	return noPR(), "", false, nil
 }
 
 func validCommitOID(oid string) bool {

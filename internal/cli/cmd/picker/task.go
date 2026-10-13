@@ -8,6 +8,7 @@ import (
 	"os"
 	"slices"
 	"strconv"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/term"
@@ -20,7 +21,9 @@ import (
 	"github.com/zigai/sesh/internal/cli/actioncli"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/config"
+	"github.com/zigai/sesh/internal/git"
 	"github.com/zigai/sesh/internal/integration/tmuxserver"
+	"github.com/zigai/sesh/internal/task"
 	"github.com/zigai/sesh/internal/tui/taskpicker"
 )
 
@@ -113,6 +116,10 @@ func (frontend taskFrontend) Dispatch(ctx context.Context, invocation action.Inv
 // openTaskPicker opens the popup sized to what it offers, reopens it as often as it asks, then
 // goes to the task it names.
 func openTaskPicker(ctx context.Context, cmd *cobra.Command, cfg *config.Config, runtime *actioncli.Runtime, caller action.Caller) error {
+	if caller.Pane == "" {
+		caller.Pane = os.Getenv("TMUX_PANE")
+	}
+
 	workspace, err := app.Resolve(cfg, clibase.CommandLocations(cmd))
 	if err != nil {
 		return err
@@ -128,7 +135,7 @@ func openTaskPicker(ctx context.Context, cmd *cobra.Command, cfg *config.Config,
 		return oops.In("cli").With("operation", "resolve_popup_client").Wrap(err)
 	}
 
-	offered, err := runtime.Local.TaskOffer(ctx, caller)
+	offered, err := runtime.Local.TaskOffer(ctx, caller, false)
 	if err != nil {
 		return err
 	}
@@ -246,7 +253,7 @@ func runTaskPickerUI(cmd *cobra.Command, _ []string) error {
 func pickTask(
 	ctx context.Context, cmd *cobra.Command, cfg *config.Config, runtime *actioncli.Runtime, caller action.Caller, from taskHandoff,
 ) (taskpicker.Choice, bool, error) {
-	offered, err := runtime.Local.TaskOffer(ctx, caller)
+	offered, err := runtime.Local.TaskOffer(ctx, caller, from.Expanded)
 	if err != nil {
 		return taskpicker.Choice{}, false, err
 	}
@@ -261,15 +268,25 @@ func pickTask(
 		location := choice.Location
 		_, err := action.Run(ctx, runtime.Router, action.TaskNew, action.Local(), caller, action.NewTask{
 			Harness: choice.Harness, Where: string(location.Where), Branch: location.Branch, Remote: location.Remote,
-			Directory: location.Directory, Title: choice.Title, Project: "",
+			Directory: location.Directory, Title: choice.Title, Project: "", Layout: "",
 		})
 
 		return err
 	}
 
 	pickerOptions := taskPickerOptions(offered, start)
+
 	if from.Reopen {
 		pickerOptions.Expanded, pickerOptions.Title, pickerOptions.Agent = from.Expanded, from.Title, from.Agent
+	}
+
+	if pickerOptions.Expanded {
+		counting, stopCounting := context.WithCancel(ctx)
+		defer stopCounting()
+
+		pickerOptions.Changes = func() map[string]git.Diff {
+			return task.Changes(counting, checkoutDirectories(offered.Offer.Locations))
+		}
 	}
 
 	model := taskpicker.NewModel(cfg, pickerOptions)
@@ -304,6 +321,18 @@ func taskPickerOptions(offered app.TaskOffer, start func(taskpicker.Choice) erro
 	return taskpicker.Options{
 		Project: offered.Project, Locations: offered.Offer.Locations, Current: offered.Offer.Current,
 		NextNumber: offered.Offer.NextNumber, Branches: offered.Offer.Branches, Harnesses: names,
-		Agent: "", Title: "", Expanded: false, Start: start,
+		Agent: "", Title: "", Expanded: false, Refs: offered.Offer.Refs, Starts: offered.Offer.Starts, Now: time.Now(), Changes: nil, Start: start,
 	}
+}
+
+func checkoutDirectories(locations []task.Location) []string {
+	var directories []string
+
+	for _, location := range locations {
+		if location.Directory != "" && !slices.Contains(directories, location.Directory) {
+			directories = append(directories, location.Directory)
+		}
+	}
+
+	return directories
 }

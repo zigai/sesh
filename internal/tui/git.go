@@ -8,13 +8,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/zigai/sesh/internal/git"
 )
 
 const (
 	gitScanBudget      = time.Second
 	gitCommandBudget   = 200 * time.Millisecond
 	gitOutputLimit     = 64 * 1024
-	statFieldsCount    = 2
 	gitWaitDelay       = 50 * time.Millisecond
 	gitStatusCodeWidth = 2
 )
@@ -183,28 +184,12 @@ func readGitChanges(ctx context.Context, directory string) string {
 }
 
 func formatGitChanges(output string) string {
-	added, deleted := "0", "0"
-
-	for part := range strings.SplitSeq(output, ",") {
-		fields := strings.Fields(part)
-		if len(fields) != statFieldsCount {
-			continue
-		}
-
-		count, err := strconv.ParseUint(fields[0], 10, 64)
-		if err != nil {
-			return ""
-		}
-
-		switch fields[1] {
-		case "insertion(+)", "insertions(+)":
-			added = strconv.FormatUint(count, 10)
-		case "deletion(-)", "deletions(-)":
-			deleted = strconv.FormatUint(count, 10)
-		}
+	diff, ok := git.ParseShortStat(output)
+	if !ok {
+		return ""
 	}
 
-	return "+" + added + " -" + deleted
+	return "+" + strconv.Itoa(diff.Added) + " -" + strconv.Itoa(diff.Deleted)
 }
 
 func gitMetadataOutput(ctx context.Context, directory string, args ...string) (string, bool) {

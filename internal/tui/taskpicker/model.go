@@ -7,12 +7,14 @@ package taskpicker
 import (
 	"slices"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"github.com/sahilm/fuzzy"
 
 	"github.com/zigai/sesh/internal/config"
+	"github.com/zigai/sesh/internal/git"
 	"github.com/zigai/sesh/internal/task"
 	"github.com/zigai/sesh/internal/tui"
 )
@@ -46,8 +48,9 @@ const (
 // Options is what the picker offers. Project names the pane's project and is empty elsewhere;
 // Locations, the Current checkout's index in them, and NextNumber and Branches that name a new
 // worktree's branch come from the project's offer. Expanded lists every location of the project,
-// and Title and Agent fill in the title and agent, the first agent when empty. Start runs the
-// choice while the popup is still open, so a failure can be shown in it.
+// and Title and Agent fill in the title and agent, the first agent when empty. Refs describe the
+// branches as of Now, Starts names the ref each new worktree base starts from, and Changes counts the uncommitted changes of checkouts after the popup
+// opens. Start runs the choice while the popup is still open, so a failure can be shown in it.
 type Options struct {
 	Project    string
 	Locations  []task.Location
@@ -58,6 +61,10 @@ type Options struct {
 	Agent      string
 	Title      string
 	Expanded   bool
+	Refs       map[string]task.Ref
+	Starts     map[string]string
+	Now        time.Time
+	Changes    func() map[string]git.Diff
 	Start      func(Choice) error
 }
 
@@ -83,7 +90,7 @@ type where int
 
 type stage int
 
-// section is a group of list rows, listed in this order under a muted heading.
+// section is a group of list rows, listed in this order under a heading.
 type section int
 
 // row is one entry of the expanded list. A filterOnly row is listed only while filtering, so the
@@ -97,6 +104,8 @@ type row struct {
 type startedMsg struct {
 	err error
 }
+
+type changesMsg map[string]git.Diff
 
 type Model struct {
 	chrome     tui.Chrome
@@ -117,6 +126,7 @@ type Model struct {
 	chosen     Choice
 	done       bool
 	showFooter bool
+	changes    map[string]git.Diff
 }
 
 func NewModel(cfg *config.Config, opts Options) *Model {
@@ -125,7 +135,7 @@ func NewModel(cfg *config.Config, opts Options) *Model {
 		chrome: chrome, options: opts, all: rowsOf(opts), rows: nil, title: chrome.NewTextInput(),
 		filter: chrome.NewTextInput(), focus: fieldTitle, where: whereNew, cursor: 0, listTop: 0,
 		agent: opts.Agent, width: 0, height: 0, stage: stagePicking, failure: "", chosen: emptyChoice(),
-		done: false, showFooter: cfg.Tasks.ShowFooter,
+		done: false, showFooter: cfg.Tasks.ShowFooter, changes: nil,
 	}
 
 	m.title.CharLimit = maxTitleRunes
@@ -156,7 +166,11 @@ func (m *Model) Chosen() (Choice, bool) {
 }
 
 func (m *Model) Init() tea.Cmd {
-	return tea.RequestWindowSize
+	if m.options.Changes == nil {
+		return tea.RequestWindowSize
+	}
+
+	return tea.Batch(tea.RequestWindowSize, func() tea.Msg { return changesMsg(m.options.Changes()) })
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -167,6 +181,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.keepCursorVisible()
 	case startedMsg:
 		return m.finishStart(msg)
+	case changesMsg:
+		m.changes = msg
 	case tea.KeyPressMsg:
 		switch m.stage {
 		case stageStarting:
@@ -320,6 +336,10 @@ func (m *Model) cycleAgent(key string) {
 	}
 
 	agents := m.agents()
+	if len(agents) == 0 {
+		return
+	}
+
 	index := max(slices.Index(agents, m.agent), 0)
 	m.agent = agents[(index+delta+len(agents))%len(agents)]
 }
@@ -387,6 +407,13 @@ func (m *Model) choose() (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 
+	if m.agent == "" {
+		m.stage = stageFailed
+		m.failure = noAgentFailure
+
+		return m, nil
+	}
+
 	choice := emptyChoice()
 	choice.Harness = m.agent
 	choice.Title = strings.TrimSpace(m.title.Value())
@@ -425,14 +452,13 @@ func (m *Model) finishStart(msg startedMsg) (tea.Model, tea.Cmd) {
 	return m, tea.Quit
 }
 
-// agents are the agent choices: the agents, then a plain tab outside a project or a shell in a
-// project.
+// agents are the agent choices: the agents, then a plain tab outside a project.
 func (m *Model) agents() []string {
 	if m.options.Project == "" {
 		return append(slices.Clone(m.options.Harnesses), config.HarnessTab)
 	}
 
-	return append(slices.Clone(m.options.Harnesses), config.HarnessNone)
+	return slices.Clone(m.options.Harnesses)
 }
 
 // filterRows lists the rows whose label contains the filter first, then the other fuzzy
@@ -493,9 +519,15 @@ func (m *Model) step(delta int) {
 	m.keepCursorVisible()
 }
 
-// keepAgent keeps the chosen agent when it is offered, and otherwise picks the first agent.
+// keepAgent keeps the chosen agent when it is offered, and otherwise picks the first agent, or
+// none when no agent is offered.
 func (m *Model) keepAgent() {
-	if agents := m.agents(); !slices.Contains(agents, m.agent) {
+	agents := m.agents()
+
+	switch {
+	case len(agents) == 0:
+		m.agent = ""
+	case !slices.Contains(agents, m.agent):
 		m.agent = agents[0]
 	}
 }

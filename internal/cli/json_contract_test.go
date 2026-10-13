@@ -31,7 +31,7 @@ func TestJSONCommandTreeRequiresExplicitOutputContract(t *testing.T) {
 			"snapshot gc", "snapshot history", "snapshot list", "snapshot prune", "snapshot restore", "snapshot save", "snapshot verify",
 			"snapshot recover delete resume", "snapshot recover delete show",
 			"snapshot recover restore abandon", "snapshot recover restore show",
-			"task finish", "task menu", "task new", "task popup", "task run", "task sleep", "task tab", "task wake",
+			"task finish", "task menu", "task new", "task open", "task popup", "task relayout", "task run", "task sleep", "task tab", "task wake",
 		},
 		"log stream; path and clear use envelopes": {"logs"},
 		"interactive terminal":                     {"pick", "project pick-ui", "remote attach", "session new", "task action-run", "task pick-ui", "task placeholder", "task popup-attach"},

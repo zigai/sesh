@@ -64,7 +64,7 @@ func (local *Local) runTaskAction(ctx context.Context, _ action.Caller, input ac
 		return result, err
 	}
 
-	if _, found := local.cfg.TaskActionsFor(projectName(record))[input.Action]; !found {
+	if _, found := local.cfg.TaskActionsFor(record.Project)[input.Action]; !found {
 		return result, action.Wrap(action.CodeNotFound, ErrUnknownTaskAction)
 	}
 
@@ -119,7 +119,7 @@ func (local *Local) RunTaskAction(ctx context.Context, id, name string, streams 
 		return run, err
 	}
 
-	configured, found := local.cfg.TaskActionsFor(projectName(record))[name]
+	configured, found := local.cfg.TaskActionsFor(record.Project)[name]
 	if !found {
 		return run, action.Wrap(action.CodeNotFound, ErrUnknownTaskAction)
 	}
@@ -292,12 +292,4 @@ func runCommand(ctx context.Context, argv []string, record task.Record, streams 
 	}
 
 	return 0
-}
-
-func projectName(record task.Record) string {
-	if record.Kind != task.KindProject {
-		return ""
-	}
-
-	return filepath.Base(record.Project)
 }

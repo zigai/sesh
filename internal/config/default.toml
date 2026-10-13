@@ -232,11 +232,31 @@
 # roots = ["~/Projects"]
 # extra = []
 
-# Task windows: agent on top, editor below, one popup terminal per task.
+# Task windows: the agent and the panes beside it, one popup terminal per task.
 # Task worktrees are created under $WORKTREE_DIR/<project>/.
 [tasks]
 
-# editor = ["nvim"]
+# Panes a task window opens beside the agent. Commands run in your interactive shell in the
+# task directory, or dir relative to it, and can use the task action variables. A pane
+# without a command is a shell; restart = true reruns a pane's command after a restore.
+# panes = [{ name = "editor", command = ["nvim"] }]
+
+# Layouts, first match wins. Without any, the agent sits beside the panes in a landscape
+# window (at least twice as many columns as rows) and above them otherwise. when can test
+# orientation, min_width, max_width, min_height, max_height and harness. arrange applies a
+# tmux layout with the agent as its main pane; splits place panes one by one instead.
+#   [[tasks.layouts]]
+#   name = "wide"
+#   when = { orientation = "landscape", min_width = 200 }
+#   splits = [
+#     { pane = "editor", of = "agent", direction = "right", size = "45%" },
+#     { pane = "shell", of = "editor", direction = "below", size = "30%" },
+#   ]
+#
+#   [[tasks.layouts]]
+#   arrange = "main-horizontal"
+#   main_size = "60%"
+#   focus = "agent"
 
 # tmux server for task popups, and the config file it starts with. Without a config file,
 # sesh hides the status line, clears the prefix, and binds C-p to close the popup.
@@ -260,7 +280,9 @@
 # Named task actions run headless in the task worktree, in a window of the task's popup
 # session. The prompt, if any, is the last argument; it can use {task}, {title}, {branch},
 # {base}, {project} and {worktree}. link_pr looks up the branch's pull request afterwards.
-# A [projects.overrides.<name>.task_actions.<action>] table overrides fields for one project.
+# A [projects.overrides.<name>.task_actions.<action>] table overrides fields for one project,
+# task_panes there replace or add panes by name, and task_layouts replace the layouts. <name>
+# is the project's directory name or its path, such as "~/work/api".
 #   [task_actions.ship]
 #   key = "alt+p"
 #   run = ["claude", "-p", "--model", "sonnet"]

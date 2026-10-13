@@ -3,6 +3,9 @@ package task
 import (
 	"cmp"
 	"context"
+	"encoding/json"
+	"maps"
+	"path/filepath"
 	"slices"
 	"strconv"
 
@@ -42,12 +45,13 @@ func NewRestoreLaunches(store Store, policy, executable string) *RestoreLaunches
 }
 
 // Override replaces the native resume launch of each task agent that wake_on_restore keeps
-// asleep with the placeholder launch. It decides from the snapshot and the tasks' creation
-// times only, so a resumed restore decides the same way.
+// asleep with the placeholder launch, runs the command of each task pane configured to restart
+// again, and starts every launched pane of a task window with the task's environment. It decides
+// from the snapshot and the tasks' records only, so a resumed restore decides the same way.
 func (r *RestoreLaunches) Override(ctx context.Context, manifest model.Manifest) (map[string]model.Launch, error) {
 	r.restored = make(map[string]restoredTask)
 
-	launches := make(map[string]model.Launch)
+	launches := restartLaunches(manifest)
 	if !slices.ContainsFunc(manifest.Windows, func(window model.Window) bool {
 		_, found := ownOption(window.Options, OptionTask)
 
@@ -93,7 +97,57 @@ func (r *RestoreLaunches) Override(ctx context.Context, manifest model.Manifest)
 		}
 	}
 
+	addTaskEnvironment(manifest, ledger, launches)
+
 	return launches, nil
+}
+
+// addTaskEnvironment gives each pane of a task window that the restore launches the environment
+// its task's processes start with.
+func addTaskEnvironment(manifest model.Manifest, ledger Ledger, launches map[string]model.Launch) {
+	records := make(map[string]Record)
+
+	for _, window := range manifest.Windows {
+		if id, ok := ownOption(window.Options, OptionTask); ok {
+			if record, found := ledger.Find(id); found {
+				records[window.ID] = record
+			}
+		}
+	}
+
+	for _, pane := range manifest.Panes {
+		record, ok := records[pane.Window]
+		if !ok {
+			continue
+		}
+
+		launch, overridden := launches[pane.ID]
+		if !overridden {
+			launch = pane.Launch
+		}
+
+		if launch.Recovery != model.RecoveryRestart && launch.Recovery != model.RecoveryResume {
+			continue
+		}
+
+		launches[pane.ID] = withEnvironment(launch, Env(record))
+	}
+}
+
+func withEnvironment(launch model.Launch, env map[string]string) model.Launch {
+	environment := slices.DeleteFunc(slices.Clone(launch.Environment), func(variable model.Variable) bool {
+		_, replaced := env[string(variable.Name)]
+
+		return replaced
+	})
+
+	for _, name := range slices.Sorted(maps.Keys(env)) {
+		environment = append(environment, model.Variable{Name: model.Bytes(name), Value: model.Bytes(env[name]), State: "set", Hidden: false})
+	}
+
+	launch.Environment = environment
+
+	return launch
 }
 
 // Commit records each restored task's captured agent state and the resume command its
@@ -162,6 +216,43 @@ func capturedAgents(manifest model.Manifest, ledger Ledger) []restoredAgent {
 	}
 
 	return captured
+}
+
+// restartLaunches runs again the command recorded on each pane of a task window that restarts.
+func restartLaunches(manifest model.Manifest) map[string]model.Launch {
+	taskWindows := make(map[string]bool)
+
+	for _, window := range manifest.Windows {
+		if _, ok := ownOption(window.Options, OptionTask); ok {
+			taskWindows[window.ID] = true
+		}
+	}
+
+	launches := make(map[string]model.Launch)
+
+	for _, pane := range manifest.Panes {
+		value, ok := ownOption(pane.Options, OptionRestart)
+		if !taskWindows[pane.Window] || !ok {
+			continue
+		}
+
+		var command restartCommand
+		if err := json.Unmarshal([]byte(value), &command); err != nil || len(command.Argv) == 0 || !filepath.IsAbs(command.Argv[0]) || !filepath.IsAbs(command.Directory) {
+			continue
+		}
+
+		arguments := make([]model.Bytes, 0, len(command.Argv))
+		for _, argument := range command.Argv {
+			arguments = append(arguments, model.Bytes(argument))
+		}
+
+		launches[pane.ID] = model.Launch{
+			Executable: model.Bytes(command.Argv[0]), Arguments: arguments, Directory: model.Bytes(command.Directory),
+			Environment: slices.Clone(pane.Launch.Environment), Birth: nil, Recovery: model.RecoveryRestart, Reason: "",
+		}
+	}
+
+	return launches
 }
 
 func capturedTaskLaunch(launch model.Launch, id string) bool {

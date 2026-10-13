@@ -3,13 +3,16 @@ package taskpicker
 import (
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/zigai/sesh/internal/config"
+	"github.com/zigai/sesh/internal/display"
 	"github.com/zigai/sesh/internal/task"
 	"github.com/zigai/sesh/internal/tui"
 )
@@ -34,17 +37,42 @@ const (
 	// listGapRows are the blank line and the filter line above the expanded list.
 	listGapRows = 2
 	// placeColumns is the width of a place's name, before the branch it names.
-	placeColumns  = 16
-	minBodyWidth  = 36
-	maxBodyWidth  = 64
-	maxListRows   = 10
-	titleLabel    = "title"
-	agentLabel    = "agent"
-	popupTitle    = "new task"
-	noLocations   = "nothing to start in"
-	noMatch       = "nothing matches"
-	startingLabel = "starting…"
+	placeColumns   = 16
+	minBodyWidth   = 36
+	maxBodyWidth   = 64
+	maxListRows    = 10
+	titleLabel     = "title"
+	agentLabel     = "agent"
+	popupTitle     = "new task"
+	noLocations    = "nothing to start in"
+	noMatch        = "nothing matches"
+	noAgents       = "none available"
+	noAgentFailure = "no agent is available"
+	startingLabel  = "starting…"
+	columnGap      = "  "
+	// maxNameColumns caps the name column, so a long name leaves room for the subjects.
+	maxNameColumns    = 24
+	maxLabelColumns   = 22
+	minSubjectColumns = 8
+	ageGap            = "   "
+
+	day   = 24 * time.Hour
+	week  = 7 * day
+	month = 30 * day
+	year  = 365 * day
 )
+
+// columns are the widths of the parts of list rows, the widest of every row so they line up.
+type columns struct {
+	age, name, label, added, deleted, ahead, behind int
+}
+
+// rowParts are what a list row shows: like an agent row, the age and name, the subject of the
+// branch's latest commit or the task working there, and on the right its branch and counts.
+type rowParts struct {
+	age, name, subject, label, added, deleted, ahead, behind string
+	addedRole, deletedRole, aheadRole, behindRole            tui.SpanRole
+}
 
 // layout is where the parts of the body are, in body lines: the title, the agents, and then the
 // places to work or the filter and the expanded list. whereTop is -1 when the popup has no places,
@@ -175,6 +203,7 @@ func (m *Model) renderForm(geometry layout) []string {
 
 		for place := whereNew; place <= whereOther; place++ {
 			name, detail := m.place(place)
+			detail = tui.SanitizeTerminalText(detail)
 			padded := name + strings.Repeat(" ", max(placeColumns-lipgloss.Width(name), 1))
 			body = append(body, m.chrome.Row(padded+detail, "", place == m.where, geometry.bodyWidth))
 		}
@@ -249,17 +278,16 @@ func (m *Model) lines() []listLine {
 func (m *Model) renderLine(lines []listLine, index, width int) string {
 	switch {
 	case index < len(lines) && lines[index].row < 0:
-		return m.chrome.Muted(strings.Repeat(" ", rowGutter) + lines[index].section.label())
+		return strings.Repeat(" ", rowGutter) + lines[index].section.label()
 	case index < len(lines):
 		line := lines[index]
-		name, detail := label(m.all[m.rows[line.row]])
 
 		tree := treeBranch
 		if line.last {
 			tree = treeLast
 		}
 
-		return m.chrome.TreeRow(tree, name, detail, line.row == m.cursor, width)
+		return m.renderRow(m.all[m.rows[line.row]], tree, line.row == m.cursor, width)
 	case index > 0:
 		return ""
 	case len(m.all) == 0:
@@ -271,6 +299,10 @@ func (m *Model) renderLine(lines []listLine, index, width int) string {
 
 func (m *Model) renderAgents(geometry layout) []string {
 	agents := m.agents()
+	if len(agents) == 0 {
+		return []string{m.field(agentLabel, false, m.chrome.Muted(noAgents))}
+	}
+
 	selected := slices.Index(agents, m.agent)
 	lines := make([]string, 0, len(geometry.agentChoices))
 
@@ -319,7 +351,7 @@ func (m *Model) frame(body []string, bodyWidth int, footer string) string {
 
 	title := " " + popupTitle + " "
 	if m.options.Project != "" {
-		title = " " + popupTitle + m.chrome.Muted(" · "+m.options.Project) + " "
+		title = " " + popupTitle + m.chrome.Muted(" · "+tui.SanitizeTerminalText(m.options.Project)) + " "
 	}
 
 	if footer != "" {
@@ -339,6 +371,172 @@ func (m *Model) frame(body []string, bodyWidth int, footer string) string {
 	out.WriteString(m.chrome.Border(strings.Repeat("─", max(total-cornerColumns-lipgloss.Width(footer), 0)) + "┘"))
 
 	return out.String()
+}
+
+// parts describes a row: its branch's latest commit and how far the branch is from the default
+// branch, the branch a checkout has checked out or the remote a branch is on, and a checkout's
+// uncommitted changes once they are counted.
+func (m *Model) parts(entry row) rowParts {
+	location := entry.location
+	name, _ := label(entry)
+	parts := rowParts{
+		age: "", name: tui.SanitizeTerminalText(name), subject: "", label: "", added: "", deleted: "", ahead: "", behind: "",
+		addedRole: tui.SpanMuted, deletedRole: tui.SpanMuted, aheadRole: tui.SpanMuted, behindRole: tui.SpanMuted,
+	}
+
+	switch {
+	case location.Where == task.WhereBranch:
+		parts.label = tui.SanitizeTerminalText(location.Remote)
+	case location.Where != task.WhereNew && location.Branch != "":
+		parts.label = tui.GitGlyph + " " + tui.SanitizeTerminalText(location.Branch)
+	}
+
+	if diff, ok := m.changes[location.Directory]; ok && location.Directory != "" {
+		parts.added, parts.deleted = "+"+strconv.Itoa(diff.Added), "-"+strconv.Itoa(diff.Deleted)
+		parts.addedRole, parts.deletedRole = countRole(diff.Added, tui.SpanSuccess), countRole(diff.Deleted, tui.SpanError)
+	}
+
+	ref, ok := m.ref(location)
+
+	switch {
+	case location.Task != "":
+		parts.subject = tui.SanitizeTerminalText(taskName(location.TaskTitle))
+	case ok:
+		parts.subject = tui.SanitizeTerminalText(ref.Subject)
+	}
+
+	if !ok {
+		return parts
+	}
+
+	parts.age = age(time.Unix(ref.Time, 0), m.options.Now)
+	parts.ahead, parts.behind = "↑"+strconv.Itoa(ref.Ahead), "↓"+strconv.Itoa(ref.Behind)
+
+	parts.aheadRole, parts.behindRole = countRole(ref.Ahead, tui.SpanPrimary), countRole(ref.Behind, tui.SpanSecondary)
+
+	return parts
+}
+
+// countRole colors a count that is not zero, as agent rows do.
+func countRole(count int, role tui.SpanRole) tui.SpanRole {
+	if count == 0 {
+		return tui.SpanMuted
+	}
+
+	return role
+}
+
+func (m *Model) columns() columns {
+	var widths columns
+
+	for _, entry := range m.all {
+		parts := m.parts(entry)
+		widths.age = max(widths.age, lipgloss.Width(parts.age))
+		widths.name = max(widths.name, lipgloss.Width(parts.name))
+		widths.label = max(widths.label, lipgloss.Width(parts.label))
+		widths.added = max(widths.added, lipgloss.Width(parts.added))
+		widths.deleted = max(widths.deleted, lipgloss.Width(parts.deleted))
+		widths.ahead = max(widths.ahead, lipgloss.Width(parts.ahead))
+		widths.behind = max(widths.behind, lipgloss.Width(parts.behind))
+	}
+
+	widths.name = min(widths.name, maxNameColumns)
+	widths.label = min(widths.label, maxLabelColumns)
+
+	return widths
+}
+
+// renderRow lays a row out in aligned columns like an agent row. The subject takes the room left
+// between the name and the right column, and is left out when too little is left.
+func (m *Model) renderRow(entry row, tree string, selected bool, width int) string {
+	widths := m.columns()
+	parts := m.parts(entry)
+	spans := rightSpans(parts, widths)
+
+	left := pad(display.Truncate(parts.name, widths.name), widths.name)
+	if widths.age > 0 {
+		left = pad(parts.age, widths.age) + ageGap + left
+	}
+
+	room := width - m.chrome.RowWidth(tree, left, "") - len(columnGap) - 1 - tui.SpansWidth(spans)
+	if room >= minSubjectColumns && parts.subject != "" {
+		left += columnGap + display.Truncate(parts.subject, room)
+	}
+
+	return m.chrome.TreeRowSpans(tree, left, spans, selected, width)
+}
+
+// rightSpans are a row's right column: its branch or remote, its changes, and how far ahead and
+// behind it is, each padded to its column.
+func rightSpans(parts rowParts, widths columns) []tui.Span {
+	var spans []tui.Span
+
+	for _, column := range []struct {
+		text  string
+		width int
+		role  tui.SpanRole
+	}{
+		{display.Truncate(parts.label, widths.label), widths.label, tui.SpanMuted},
+		{parts.added, widths.added, parts.addedRole},
+		{parts.deleted, widths.deleted, parts.deletedRole},
+		{parts.ahead, widths.ahead, parts.aheadRole},
+		{parts.behind, widths.behind, parts.behindRole},
+	} {
+		if column.width == 0 {
+			continue
+		}
+
+		if len(spans) > 0 {
+			spans = append(spans, tui.Span{Text: " ", Role: tui.SpanMuted})
+		}
+
+		spans = append(spans, tui.Span{Text: pad(column.text, column.width), Role: column.role})
+	}
+
+	return spans
+}
+
+// ref describes a row's branch: a remote branch on its remote, and a new worktree's base where
+// the worktree starts from.
+func (m *Model) ref(location task.Location) (task.Ref, bool) {
+	name := "refs/heads/" + location.Branch
+
+	switch {
+	case location.Remote != "":
+		name = "refs/remotes/" + location.Remote + "/" + location.Branch
+	case location.Where == task.WhereNew && m.options.Starts[location.Branch] != "":
+		name = m.options.Starts[location.Branch]
+	}
+
+	ref, ok := m.options.Refs[name]
+
+	return ref, ok
+}
+
+func pad(text string, width int) string {
+	return text + strings.Repeat(" ", max(width-lipgloss.Width(text), 0))
+}
+
+// age is how long ago at was, in its largest whole unit.
+func age(at, now time.Time) string {
+	elapsed := now.Sub(at)
+
+	switch {
+	case elapsed < time.Minute:
+		return "now"
+	case elapsed < time.Hour:
+		return strconv.Itoa(int(elapsed/time.Minute)) + "m"
+	case elapsed < day:
+		return strconv.Itoa(int(elapsed/time.Hour)) + "h"
+	case elapsed < week:
+		return strconv.Itoa(int(elapsed/day)) + "d"
+	case elapsed < month:
+		return strconv.Itoa(int(elapsed/week)) + "w"
+	case elapsed < year:
+		return strconv.Itoa(int(elapsed/month)) + "mo"
+	default:
+		return strconv.Itoa(int(elapsed/year)) + "y"
+	}
 }
 
 // label names a list row and adds a short detail. Its section says what kind of place it is: a
@@ -396,7 +594,7 @@ func (m *Model) hints() []tui.Hint {
 	case m.focus == fieldList:
 		return []tui.Hint{agent, {Key: "↑↓", Desc: "select"}, enter, {Key: "esc", Desc: "back"}}
 	case m.hasWhere():
-		return []tui.Hint{agent, {Key: "↑↓", Desc: "where"}, enter}
+		return []tui.Hint{agent, {Key: "↑↓", Desc: "checkout"}, enter}
 	default:
 		return []tui.Hint{agent, enter}
 	}

@@ -86,6 +86,15 @@ type Record struct {
 	Resume Resume      `json:"resume"`
 	PR     PullRequest `json:"pr"`
 	Runs   []Run       `json:"runs"`
+	// Owner is the sesh process that put the task in its creating or finishing state; once it
+	// is gone the task is stalled there.
+	Owner Process `json:"owner"`
+}
+
+// Process identifies a process across PID reuse by its birth identity.
+type Process struct {
+	PID   int    `json:"pid"`
+	Birth string `json:"birth"`
 }
 
 // Resume is the native resume evidence of a sleeping agent: its AHT harness, the harness session
@@ -208,6 +217,7 @@ func EmptyRecord() Record {
 		ID: "", Kind: "", State: "", Project: "", Number: 0, Harness: "", Directory: "", Branch: "", Base: "",
 		OwnsWorktree: false, OwnsBranch: false, Upstream: "", CreatedAt: 0,
 		Title: "", Resume: Resume{Harness: "", Session: "", Command: []string{}}, PR: PullRequest{Number: 0, State: "", URL: ""}, Runs: []Run{},
+		Owner: Process{PID: 0, Birth: ""},
 	}
 }
 

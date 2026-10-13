@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
@@ -42,6 +44,8 @@ type TaskActionConfig struct {
 // ProjectConfig holds settings for one project.
 type ProjectConfig struct {
 	TaskActions map[string]TaskActionConfig `toml:"task_actions"`
+	TaskPanes   []TaskPaneConfig            `toml:"task_panes"`
+	TaskLayouts []TaskLayoutConfig          `toml:"task_layouts"`
 }
 
 func (a TaskActionConfig) Clone() TaskActionConfig {
@@ -61,16 +65,37 @@ func (a TaskActionConfig) LinksPR() bool {
 	return a.LinkPR != nil && *a.LinkPR
 }
 
-// TaskActionsFor returns the task actions of a project: the global ones with the project's
-// overrides applied field by field. An override that sets a prompt or prompt file replaces both.
-func (c *Config) TaskActionsFor(projectName string) map[string]TaskActionConfig {
+// TaskActionsFor returns the task actions of the project at root: the global ones with the
+// project's overrides applied field by field. An override that sets a prompt or prompt file
+// replaces both.
+func (c *Config) TaskActionsFor(root string) map[string]TaskActionConfig {
+	return c.taskActions(c.ProjectOverride(root))
+}
+
+// ProjectOverride returns the overrides of the project at root: those keyed by its path, else
+// those keyed by its directory name. A path key tells apart projects with the same name.
+func (c *Config) ProjectOverride(root string) ProjectConfig {
+	if root == "" {
+		return ProjectConfig{TaskActions: nil, TaskPanes: nil, TaskLayouts: nil}
+	}
+
+	for key, override := range c.Projects.Overrides {
+		if projectPathKey(key) && sameProjectPath(key, root) {
+			return override
+		}
+	}
+
+	return c.Projects.Overrides[filepath.Base(root)]
+}
+
+func (c *Config) taskActions(override ProjectConfig) map[string]TaskActionConfig {
 	actions := cloneTaskActions(c.TaskActions)
 	if actions == nil {
 		actions = make(map[string]TaskActionConfig)
 	}
 
-	for name, override := range c.Projects.Overrides[projectName].TaskActions {
-		actions[name] = mergeTaskAction(actions[name], override)
+	for name, configured := range override.TaskActions {
+		actions[name] = mergeTaskAction(actions[name], configured)
 	}
 
 	return actions
@@ -89,7 +114,7 @@ func ValidateTaskActions(cfg *Config) error {
 			return err
 		}
 
-		if err := validateTaskActionSet(prefix, cfg.TaskActionsFor(project), true); err != nil {
+		if err := validateTaskActionSet(prefix, cfg.taskActions(cfg.Projects.Overrides[project]), true); err != nil {
 			return err
 		}
 	}
@@ -157,6 +182,33 @@ func cloneTaskActions(actions map[string]TaskActionConfig) map[string]TaskAction
 	return clone
 }
 
+// projectPathKey reports whether an override key is a project path rather than a directory name.
+func projectPathKey(key string) bool {
+	return strings.HasPrefix(key, "/") || key == "~" || strings.HasPrefix(key, "~/")
+}
+
+func sameProjectPath(key, root string) bool {
+	path := key
+	if rest, home := strings.CutPrefix(key, "~"); home {
+		dir, err := os.UserHomeDir()
+		if err != nil {
+			return false
+		}
+
+		path = dir + rest
+	}
+
+	return resolvedPath(path) == resolvedPath(root)
+}
+
+func resolvedPath(path string) string {
+	if target, err := filepath.EvalSymlinks(path); err == nil {
+		return target
+	}
+
+	return filepath.Clean(path)
+}
+
 func cloneProjects(projects map[string]ProjectConfig) map[string]ProjectConfig {
 	if projects == nil {
 		return nil
@@ -164,7 +216,10 @@ func cloneProjects(projects map[string]ProjectConfig) map[string]ProjectConfig {
 
 	clone := make(map[string]ProjectConfig, len(projects))
 	for name, project := range projects {
-		clone[name] = ProjectConfig{TaskActions: cloneTaskActions(project.TaskActions)}
+		clone[name] = ProjectConfig{
+			TaskActions: cloneTaskActions(project.TaskActions), TaskPanes: cloneTaskPanes(project.TaskPanes),
+			TaskLayouts: cloneTaskLayouts(project.TaskLayouts),
+		}
 	}
 
 	return clone

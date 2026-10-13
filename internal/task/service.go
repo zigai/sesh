@@ -23,10 +23,9 @@ import (
 const (
 	// OptionTask is the window user option that ties a tmux window to its task record.
 	OptionTask = "@sesh_task"
-	// OptionRole marks the panes of a task window: the agent pane and the editor pane.
+	// OptionRole names the panes of a task window: the agent pane and the configured panes.
 	OptionRole = "@sesh_role"
-	RoleAgent  = "agent"
-	RoleEditor = "editor"
+	RoleAgent  = config.TaskPaneAgent
 
 	EnvTask     = "SESH_TASK"
 	EnvProject  = "SESH_PROJECT"
@@ -61,10 +60,13 @@ type Place struct {
 }
 
 type Options struct {
-	Server      *gotmux.Server
-	Store       Store
-	Catalog     project.Catalog
-	Config      config.TasksConfig
+	Server  *gotmux.Server
+	Store   Store
+	Catalog project.Catalog
+	Config  config.TasksConfig
+	// Windows returns the task window configuration of the project at a root, or of a loose task
+	// for an empty root.
+	Windows     func(project string) config.TaskWindow
 	WorktreeDir string
 	LookPath    func(string) (string, error)
 	Now         func() time.Time
@@ -82,6 +84,7 @@ type Service struct {
 	store       Store
 	catalog     project.Catalog
 	cfg         config.TasksConfig
+	windows     func(project string) config.TaskWindow
 	worktreeDir string
 	lookPath    func(string) (string, error)
 	now         func() time.Time
@@ -93,7 +96,7 @@ type Service struct {
 
 func NewService(opts Options) *Service {
 	return &Service{
-		server: opts.Server, store: opts.Store, catalog: opts.Catalog, cfg: opts.Config,
+		server: opts.Server, store: opts.Store, catalog: opts.Catalog, cfg: opts.Config, windows: opts.Windows,
 		worktreeDir: opts.WorktreeDir, lookPath: opts.LookPath, now: opts.Now, agents: opts.Agents,
 		placeholder: opts.Placeholder, prs: opts.PRs, closePopup: opts.ClosePopup,
 	}
@@ -126,8 +129,7 @@ func (s *Service) Locate(ctx context.Context, pane gotmux.PaneID) (Place, error)
 	return Place{Pane: info.ID, Session: session, Dir: info.CurrentPath, Project: string(projectRoot), Task: string(taskID)}, nil
 }
 
-// Start creates a task at place running the requested harness, or a plain shell for
-// config.HarnessNone. In a project session or a repository the task works in the requested
+// Start creates a task at place running the requested harness. In a project session or a repository the task works in the requested
 // location, one the project currently offers, with a window in the pane's session, next to the
 // current window outside a project session; elsewhere it is a loose task in the pane's directory,
 // next to the current window. A title names the task and is passed to the agent as its first
@@ -141,6 +143,10 @@ func (s *Service) Start(ctx context.Context, place Place, request Request) (Reco
 	root, err := s.projectOf(ctx, place)
 	if err != nil {
 		return Record{}, taskError("start_task", err)
+	}
+
+	if request.Layout != "" && !layoutNamed(s.windows(root), request.Layout) {
+		return Record{}, taskError("start_task", fmt.Errorf("%w: %s", ErrUnknownLayout, request.Layout))
 	}
 
 	if root == "" {
@@ -209,7 +215,7 @@ func (s *Service) startProject(ctx context.Context, place Place, root string, re
 		}
 	}
 
-	if err := s.openTaskWindow(ctx, place.Session, record, launchOf(offered, request, record), place.Project == ""); err != nil {
+	if err := s.openTaskWindow(ctx, place, record, launchOf(offered, request, record), request.Layout, place.Project == ""); err != nil {
 		return record, s.fail(ctx, record, err)
 	}
 
@@ -217,11 +223,14 @@ func (s *Service) startProject(ctx context.Context, place Place, root string, re
 }
 
 func (s *Service) startLoose(ctx context.Context, place Place, request Request, offered Harness) (Record, error) {
+	owner := currentProcess(ctx)
+
 	record, err := s.reserve(ctx, func(ledger *Ledger) (Record, error) {
 		record := EmptyRecord()
 		record.ID = ledger.NextID()
 		record.Kind = KindLoose
 		record.State = StateCreating
+		record.Owner = owner
 		record.Harness = request.Harness
 		record.Directory = place.Dir
 		record.Title = cmp.Or(request.Title, filepath.Base(place.Dir))
@@ -233,7 +242,7 @@ func (s *Service) startLoose(ctx context.Context, place Place, request Request, 
 		return Record{}, taskError("start_task", err)
 	}
 
-	if err := s.openTaskWindow(ctx, place.Session, record, launchOf(offered, request, record), true); err != nil {
+	if err := s.openTaskWindow(ctx, place, record, launchOf(offered, request, record), request.Layout, true); err != nil {
 		return record, s.fail(ctx, record, err)
 	}
 
@@ -263,6 +272,8 @@ func (s *Service) reserveProjectTask(ctx context.Context, p project.Project, req
 		base = branch
 	}
 
+	owner := currentProcess(ctx)
+
 	return s.reserve(ctx, func(ledger *Ledger) (Record, error) {
 		state := ledger.Project(p.Root)
 		number, directory := state.LastNumber+1, location.Directory
@@ -284,6 +295,7 @@ func (s *Service) reserveProjectTask(ctx context.Context, p project.Project, req
 		record.ID = ledger.NextID()
 		record.Kind = KindProject
 		record.State = StateCreating
+		record.Owner = owner
 		record.Project = p.Root
 		record.Number = number
 		record.Harness = request.Harness
@@ -361,7 +373,12 @@ func (s *Service) addWorktree(ctx context.Context, root string, record Record) e
 	case record.Upstream != "":
 		args = []string{"worktree", "add", "--track", "-b", record.Branch, record.Directory, record.Upstream}
 	case record.OwnsBranch:
-		args = []string{"worktree", "add", "-b", record.Branch, record.Directory, record.Base}
+		start, err := startPoint(ctx, root, record.Base)
+		if err != nil {
+			return err
+		}
+
+		args = []string{"worktree", "add", "--no-track", "-b", record.Branch, record.Directory, start}
 	}
 
 	if _, err := git.Output(ctx, root, args...); err != nil {
@@ -371,16 +388,25 @@ func (s *Service) addWorktree(ctx context.Context, root string, record Record) e
 	return nil
 }
 
+// openTaskWindow opens a task's window in place's session running launch, with the panes and
+// layout of its project. A session no client shows is laid out for the size of place's window,
+// the size the user is likely to see it at.
 func (s *Service) openTaskWindow(
 	ctx context.Context,
-	sessionID gotmux.SessionID,
+	place Place,
 	record Record,
 	launch []string,
+	layout string,
 	nextToCurrent bool,
 ) error {
-	session, err := s.server.Session(ctx, sessionID)
+	session, err := s.server.Session(ctx, place.Session)
 	if err != nil {
 		return fmt.Errorf("find task session: %w", err)
+	}
+
+	expected, err := s.expectedSize(ctx, session, place.Pane)
+	if err != nil {
+		return err
 	}
 
 	shell, err := defaultShell(ctx, s.server)
@@ -413,21 +439,38 @@ func (s *Service) openTaskWindow(
 		return fmt.Errorf("tag agent pane: %w", err)
 	}
 
-	editor, err := agent.Split(ctx, gotmux.SplitOptions{
-		Direction: gotmux.DirectionVertical, Size: gotmux.SplitSize{Cells: 0, Percent: 0}, Dir: record.Directory,
-		Program: shellProgram(shell, s.cfg.Editor), Env: nil, TmuxEnv: env, Select: false, Before: false,
-		FullSize: false, KillTarget: false, Zoom: false, Title: "", BorderLines: "", Style: "",
-		ActiveBorderStyle: "", InactiveBorderStyle: "", Message: "",
-	})
+	return s.arrange(ctx, window, record, layout, expected, true)
+}
+
+// expectedSize is the size of the window of pane when no client shows session, else zero.
+func (s *Service) expectedSize(ctx context.Context, session gotmux.Session, pane gotmux.PaneID) (gotmux.Size, error) {
+	none := gotmux.Size{Width: 0, Height: 0}
+
+	info, err := session.Info(ctx)
 	if err != nil {
-		return fmt.Errorf("split editor pane: %w", err)
+		return none, fmt.Errorf("inspect task session: %w", err)
 	}
 
-	if err := editor.Options().SetUser(ctx, OptionRole, RoleEditor); err != nil {
-		return fmt.Errorf("tag editor pane: %w", err)
+	if info.Attached > 0 || pane == "" {
+		return none, nil
 	}
 
-	return nil
+	caller, err := s.server.Pane(ctx, pane)
+	if err != nil {
+		return none, fmt.Errorf("find calling pane: %w", err)
+	}
+
+	window, err := caller.Window(ctx)
+	if err != nil {
+		return none, fmt.Errorf("find calling window: %w", err)
+	}
+
+	size, err := window.Info(ctx)
+	if err != nil {
+		return none, fmt.Errorf("inspect calling window: %w", err)
+	}
+
+	return gotmux.Size{Width: size.Width, Height: size.Height}, nil
 }
 
 func (s *Service) activate(ctx context.Context, record Record) (Record, error) {
@@ -451,10 +494,6 @@ func (s *Service) fail(ctx context.Context, record Record, cause error) error {
 }
 
 func (s *Service) harness(name string) (Harness, error) {
-	if name == config.HarnessNone {
-		return Harness{Name: name, Command: nil, PromptArgs: nil}, nil
-	}
-
 	offered, found := Find(Harnesses(s.cfg, s.lookPath), name)
 	if !found {
 		return offered, fmt.Errorf("%w: %s", ErrUnknownHarness, name)
@@ -525,12 +564,18 @@ func shellProgram(shell string, argv []string) gotmux.Program {
 		return gotmux.Program{}
 	}
 
+	command := shellArgv(shell, argv)
+
+	return gotmux.Exec(command[0], command[1:]...)
+}
+
+func shellArgv(shell string, argv []string) []string {
 	words := make([]string, 0, len(argv))
 	for _, argument := range argv {
 		words = append(words, shellQuote(argument))
 	}
 
-	return gotmux.Exec(launchShell, "-m", "-c", launchScript, shell, strings.Join(words, " "))
+	return []string{launchShell, "-m", "-c", launchScript, shell, strings.Join(words, " ")}
 }
 
 // shellQuote quotes an argument for sh, bash, zsh and fish: inside single quotes nothing is
@@ -559,13 +604,44 @@ func defaultBranch(ctx context.Context, root string) (string, error) {
 }
 
 func branchExists(ctx context.Context, root, branch string) (bool, error) {
-	_, err := git.Output(ctx, root, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch)
+	return refExists(ctx, root, "refs/heads/"+branch)
+}
+
+// startPoint is where a new branch from base starts: origin's base when the local base is
+// missing or behind it, and otherwise the local base. Nothing is fetched.
+func startPoint(ctx context.Context, root, base string) (string, error) {
+	local, remote := "refs/heads/"+base, "refs/remotes/origin/"+base
+
+	onRemote, err := refExists(ctx, root, remote)
+	if err != nil || !onRemote {
+		return local, err
+	}
+
+	isLocal, err := refExists(ctx, root, local)
+	if err != nil || !isLocal {
+		return remote, err
+	}
+
+	_, err = git.Output(ctx, root, "merge-base", "--is-ancestor", local, remote)
+	if _, diverged := errors.AsType[*git.CommandError](err); diverged {
+		return local, nil
+	}
+
+	if err != nil {
+		return "", fmt.Errorf("compare base with origin: %w", err)
+	}
+
+	return remote, nil
+}
+
+func refExists(ctx context.Context, root, ref string) (bool, error) {
+	_, err := git.Output(ctx, root, "rev-parse", "--verify", "--quiet", ref)
 	if _, missing := errors.AsType[*git.CommandError](err); missing {
 		return false, nil
 	}
 
 	if err != nil {
-		return false, fmt.Errorf("check task branch: %w", err)
+		return false, fmt.Errorf("check git ref: %w", err)
 	}
 
 	return true, nil

@@ -12,15 +12,14 @@ import (
 )
 
 const (
-	HarnessTab  = "tab"
-	HarnessNone = "none"
+	HarnessTab = "tab"
 
 	DefaultPopupSocket = "sesh-popup"
 )
 
 var (
 	errProjectPathInvalid   = errors.New("must be an absolute path or start with ~/")
-	errEditorEmpty          = errors.New("tasks.editor needs a command")
+	errOverrideKey          = errors.New("must be a project directory name, an absolute path, or start with ~/")
 	errPopupSocketInvalid   = errors.New("tasks.popup_socket must be a tmux socket name without slashes or spaces")
 	errPopupConfigInvalid   = errors.New("tasks.popup_config must be empty, an absolute path, or start with ~/")
 	errHarnessNameInvalid   = errors.New("harness names may only contain a-z, 0-9, _ and -")
@@ -38,14 +37,16 @@ type ProjectsConfig struct {
 	Overrides map[string]ProjectConfig `toml:"overrides"`
 }
 
-// TasksConfig configures task windows: the editor below the agent, the tmux server that hosts
-// task popups, and the harnesses offered when a task starts. Harness entries are the offer, in
-// order; without them, every supported harness installed on the host is offered.
+// TasksConfig configures task windows: the panes beside the agent and their layouts, the tmux
+// server that hosts task popups, and the harnesses offered when a task starts. Harness entries
+// are the offer, in order; without them, every supported harness installed on the host is
+// offered.
 type TasksConfig struct {
-	Editor      []string        `toml:"editor"`
-	PopupSocket string          `toml:"popup_socket"`
-	PopupConfig string          `toml:"popup_config"`
-	Harness     []HarnessConfig `toml:"harness"`
+	Panes       []TaskPaneConfig   `toml:"panes"`
+	Layouts     []TaskLayoutConfig `toml:"layouts"`
+	PopupSocket string             `toml:"popup_socket"`
+	PopupConfig string             `toml:"popup_config"`
+	Harness     []HarnessConfig    `toml:"harness"`
 	// WakeOnRestore selects which task agents are woken after a snapshot restore.
 	WakeOnRestore string `toml:"wake_on_restore"`
 	// ShowFooter shows key hints at the bottom of the new task popup.
@@ -67,7 +68,8 @@ func DefaultProjectsConfig() ProjectsConfig {
 
 func DefaultTasksConfig() TasksConfig {
 	return TasksConfig{
-		Editor: []string{"nvim"}, PopupSocket: DefaultPopupSocket, PopupConfig: "", Harness: nil,
+		Panes:   []TaskPaneConfig{{Name: "editor", Command: []string{"nvim"}, Dir: "", Restart: false}},
+		Layouts: nil, PopupSocket: DefaultPopupSocket, PopupConfig: "", Harness: nil,
 		WakeOnRestore: WakeOnRestorePrevious, ShowFooter: true,
 	}
 }
@@ -87,7 +89,7 @@ func (t TasksConfig) Clone() TasksConfig {
 	}
 
 	return TasksConfig{
-		Editor: slices.Clone(t.Editor), PopupSocket: t.PopupSocket, PopupConfig: t.PopupConfig, Harness: harnesses,
+		Panes: cloneTaskPanes(t.Panes), Layouts: cloneTaskLayouts(t.Layouts), PopupSocket: t.PopupSocket, PopupConfig: t.PopupConfig, Harness: harnesses,
 		WakeOnRestore: t.WakeOnRestore, ShowFooter: t.ShowFooter,
 	}
 }
@@ -104,14 +106,16 @@ func ValidateProjectsConfig(projects ProjectsConfig) error {
 		}
 	}
 
+	for key := range projects.Overrides {
+		if strings.Contains(key, "/") && !projectPathKey(key) || containsControlCharacter(key) {
+			return fmt.Errorf("invalid projects.overrides key %q: %w", key, errOverrideKey)
+		}
+	}
+
 	return nil
 }
 
 func ValidateTasksConfig(tasks TasksConfig) error {
-	if len(tasks.Editor) == 0 || strings.TrimSpace(tasks.Editor[0]) == "" {
-		return errEditorEmpty
-	}
-
 	socket := tasks.PopupSocket
 	if socket == "" || strings.ContainsAny(socket, "/ \t\n") || containsControlCharacter(socket) {
 		return errPopupSocketInvalid
@@ -167,7 +171,7 @@ func validateHarness(entry HarnessConfig) error {
 		return errHarnessNameInvalid
 	}
 
-	if entry.Name == HarnessTab || entry.Name == HarnessNone {
+	if entry.Name == HarnessTab {
 		return errHarnessNameReserved
 	}
 

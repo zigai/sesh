@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -15,6 +16,8 @@ import (
 const (
 	waitDelay   = time.Second
 	outputLimit = 1 << 20
+	// shortStatFields are a count and what it counts, such as "12 insertions(+)".
+	shortStatFields = 2
 )
 
 var ErrOutputTooLarge = errors.New("command output exceeds its limit")
@@ -25,6 +28,12 @@ type LimitedBuffer struct {
 	data     bytes.Buffer
 	limit    int
 	exceeded bool
+}
+
+// Diff counts the lines a change adds and deletes.
+type Diff struct {
+	Added   int
+	Deleted int
 }
 
 // CommandError reports a git command that ran and failed. Detail is git's first error line,
@@ -104,6 +113,33 @@ func (b *LimitedBuffer) Bytes() []byte {
 
 func (b *LimitedBuffer) String() string {
 	return b.data.String()
+}
+
+// ParseShortStat reads the output of git diff --shortstat; ok is false when a count cannot be
+// read.
+func ParseShortStat(output string) (Diff, bool) {
+	var diff Diff
+
+	for part := range strings.SplitSeq(output, ",") {
+		fields := strings.Fields(part)
+		if len(fields) != shortStatFields {
+			continue
+		}
+
+		count, err := strconv.Atoi(fields[0])
+		if err != nil || count < 0 {
+			return Diff{Added: 0, Deleted: 0}, false
+		}
+
+		switch fields[1] {
+		case "insertion(+)", "insertions(+)":
+			diff.Added = count
+		case "deletion(-)", "deletions(-)":
+			diff.Deleted = count
+		}
+	}
+
+	return diff, true
 }
 
 func subcommand(args []string) string {

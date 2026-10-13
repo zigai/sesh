@@ -45,10 +45,16 @@ func NewCommand() *cobra.Command {
 		actioncli.Command(action.TaskPopup, actioncli.Options[action.OpenTaskPopup, action.ClosedTaskPopup]{
 			Operation: "", SuccessOwned: false, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
 		}),
+		actioncli.Command(action.TaskRelayout, actioncli.Options[action.RelayoutTask, action.RelaidOutTask]{
+			Operation: "", SuccessOwned: false, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
+		}),
 		actioncli.Command(action.TaskSleep, actioncli.Options[action.SleepTask, action.SleptTask]{
 			Operation: "", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
 		}),
 		actioncli.Command(action.TaskWake, actioncli.Options[action.WakeTask, action.WokenTask]{
+			Operation: "", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
+		}),
+		actioncli.Command(action.TaskOpen, actioncli.Options[action.OpenTask, action.OpenedTask]{
 			Operation: "", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
 		}),
 		actioncli.Command(action.TaskFinish, actioncli.Options[action.FinishTask, action.FinishedTask]{

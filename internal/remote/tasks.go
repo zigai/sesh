@@ -22,12 +22,14 @@ type TaskRow struct {
 	WindowIndex int         `json:"windowIndex"`
 	WindowName  string      `json:"windowName"`
 	AgentPane   string      `json:"agentPane"`
+	Stalled     bool        `json:"stalled"`
 }
 
 // NewTaskRow describes a live task for the peer's inventory.
 func NewTaskRow(live task.Live) TaskRow {
 	record := live.Record
 	record.Resume = task.Resume{Harness: "", Session: "", Command: []string{}}
+	record.Owner = task.Process{PID: 0, Birth: ""}
 
 	return TaskRow{
 		Record:      record,
@@ -38,6 +40,7 @@ func NewTaskRow(live task.Live) TaskRow {
 		WindowIndex: live.WindowIndex,
 		WindowName:  live.WindowName,
 		AgentPane:   string(live.AgentPane),
+		Stalled:     live.Stalled,
 	}
 }
 
@@ -49,7 +52,7 @@ func CatalogTasks(state ConnectionState) []task.Live {
 		tasks = append(tasks, task.Live{
 			Record: row.Record, Present: row.Present, SessionID: gotmux.SessionID(row.SessionID),
 			SessionName: row.SessionName, WindowID: gotmux.WindowID(row.WindowID), WindowIndex: row.WindowIndex, WindowName: row.WindowName,
-			AgentPane: gotmux.PaneID(row.AgentPane), AgentPID: 0,
+			AgentPane: gotmux.PaneID(row.AgentPane), AgentPID: 0, Stalled: row.Stalled,
 		})
 	}
 

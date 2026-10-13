@@ -3,6 +3,7 @@ package task_test
 import (
 	"maps"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -25,8 +26,87 @@ func TestRestoreLaunchesKeepsCapturedLaunchesWhenWakingThePrevious(t *testing.T)
 	f := newRestoreFixture(t)
 
 	launches, err := task.NewRestoreLaunches(f.store, config.WakeOnRestorePrevious, seshBinary).Override(t.Context(), f.manifest)
-	if err != nil || len(launches) != 0 {
-		t.Fatalf("Override() = %v, %v; want no overrides", launches, err)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, pane := range f.manifest.Panes {
+		launch, ok := launches[pane.ID]
+		if !ok {
+			continue
+		}
+
+		launch.Environment = pane.Launch.Environment
+		if !reflect.DeepEqual(launch, pane.Launch) {
+			t.Errorf("launch of %s = %+v, want its captured launch %+v", pane.ID, launch, pane.Launch)
+		}
+	}
+}
+
+func TestRestoreLaunchesStartTaskPanesWithTheTaskEnvironment(t *testing.T) {
+	f := newRestoreFixture(t)
+	f.manifest.Panes[0].Launch.Environment = []model.Variable{
+		{Name: model.Bytes("PATH"), Value: model.Bytes("/bin"), State: "set", Hidden: false},
+		{Name: model.Bytes(task.EnvTask), Value: model.Bytes("stale"), State: "set", Hidden: false},
+	}
+
+	for _, policy := range []string{config.WakeOnRestorePrevious, config.WakeOnRestoreNone} {
+		launches, err := task.NewRestoreLaunches(f.store, policy, seshBinary).Override(t.Context(), f.manifest)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if got := slices.Sorted(maps.Keys(launches)); !slices.Equal(got, []string{"%1", "%2", "%3", "%5"}) {
+			t.Fatalf("%s: overridden panes = %v, want every launched task pane", policy, got)
+		}
+
+		env := environment(launches["%1"])
+		if env["PATH"] != "/bin" || env[task.EnvTask] != "t1" || env[task.EnvWorktree] != "/worktrees/t1" || env[task.EnvProject] == "" {
+			t.Errorf("%s: t1's agent environment = %v, want the captured one with t1's task variables", policy, env)
+		}
+
+		if env := environment(launches["%2"]); env[task.EnvTask] != "t1" {
+			t.Errorf("%s: t1's editor environment = %v, want t1's task variables", policy, env)
+		}
+	}
+}
+
+func TestRestoreLaunchesRunsTheRecordedCommandOfRestartingTaskPanesOnly(t *testing.T) {
+	f := newRestoreFixture(t)
+
+	restart := func(pane, value string) {
+		index := slices.IndexFunc(f.manifest.Panes, func(p model.Pane) bool { return p.ID == pane })
+		f.manifest.Panes[index].Options = append(f.manifest.Panes[index].Options, userOption("pane", task.OptionRestart, value)...)
+	}
+
+	restart("%2", `{"directory":"/worktrees/t1/web","argv":["/bin/sh","-c","npm run dev"]}`)
+	restart("%6", `{"directory":"/srv","argv":["/bin/sh","-c","serve"]}`)
+
+	launches, err := task.NewRestoreLaunches(f.store, config.WakeOnRestorePrevious, seshBinary).Override(t.Context(), f.manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, ok := launches["%6"]; ok {
+		t.Fatal("a pane outside any task window is overridden")
+	}
+
+	launch := launches["%2"]
+	if string(launch.Executable) != "/bin/sh" || !slices.Equal(arguments(launch), []string{"/bin/sh", "-c", "npm run dev"}) ||
+		string(launch.Directory) != "/worktrees/t1/web" || launch.Recovery != model.RecoveryRestart {
+		t.Fatalf("restarting pane launch = %+v, want its recorded command in its directory", launch)
+	}
+}
+
+func TestRestoreLaunchesIgnoresAnUnreadableRestartCommand(t *testing.T) {
+	for _, value := range []string{`not json`, `{"directory":"/w","argv":[]}`, `{"directory":"/w","argv":["sh"]}`, `{"directory":"w","argv":["/bin/sh"]}`} {
+		f := newRestoreFixture(t)
+		f.manifest.Panes[1].Options = append(f.manifest.Panes[1].Options, userOption("pane", task.OptionRestart, value)...)
+
+		launches, err := task.NewRestoreLaunches(f.store, config.WakeOnRestorePrevious, seshBinary).Override(t.Context(), f.manifest)
+		if launch := launches["%2"]; err != nil || !slices.Equal(arguments(launch), []string{"sh"}) {
+			t.Errorf("Override() with restart command %s = %+v, %v; want the captured launch", value, launch, err)
+		}
 	}
 }
 
@@ -38,8 +118,8 @@ func TestRestoreLaunchesBringsEveryTaskBackAsleepWithNone(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got := slices.Sorted(maps.Keys(launches)); !slices.Equal(got, []string{"%1", "%3", "%5"}) {
-		t.Fatalf("overridden panes = %v, want every agent pane", got)
+	if got := placeholders(launches); !slices.Equal(got, []string{"%1", "%3", "%5"}) {
+		t.Fatalf("panes behind a placeholder = %v, want every agent pane", got)
 	}
 
 	placeholder := launches["%3"]
@@ -62,8 +142,8 @@ func TestRestoreLaunchesResumesOnlyTheNewestTasksWithACount(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got := slices.Sorted(maps.Keys(launches)); !slices.Equal(got, []string{"%1"}) {
-		t.Fatalf("overridden panes = %v, want only the oldest task's agent", got)
+	if got := placeholders(launches); !slices.Equal(got, []string{"%1"}) {
+		t.Fatalf("panes behind a placeholder = %v, want only the oldest task's agent", got)
 	}
 }
 
@@ -184,7 +264,7 @@ func newRestoreFixture(t *testing.T) restoreFixture {
 	manifest := model.Manifest{}
 	panes := []struct{ id, window, role, task string }{
 		{"%1", "@1", task.RoleAgent, "t1"},
-		{"%2", "@1", task.RoleEditor, "t1"},
+		{"%2", "@1", "editor", "t1"},
 		{"%3", "@2", task.RoleAgent, "t2"},
 		{"%5", "@3", task.RoleAgent, "t3"},
 		{"%6", "@4", "", ""},
@@ -234,6 +314,27 @@ func arguments(launch model.Launch) []string {
 	values := make([]string, 0, len(launch.Arguments))
 	for _, argument := range launch.Arguments {
 		values = append(values, string(argument))
+	}
+
+	return values
+}
+
+func placeholders(launches map[string]model.Launch) []string {
+	var panes []string
+
+	for _, pane := range slices.Sorted(maps.Keys(launches)) {
+		if string(launches[pane].Executable) == seshBinary {
+			panes = append(panes, pane)
+		}
+	}
+
+	return panes
+}
+
+func environment(launch model.Launch) map[string]string {
+	values := make(map[string]string, len(launch.Environment))
+	for _, variable := range launch.Environment {
+		values[string(variable.Name)] = string(variable.Value)
 	}
 
 	return values

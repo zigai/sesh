@@ -5,11 +5,14 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
+	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/zigai/sesh/internal/config"
+	"github.com/zigai/sesh/internal/git"
 	"github.com/zigai/sesh/internal/task"
 	"github.com/zigai/sesh/internal/tui/taskpicker"
 )
@@ -63,10 +66,10 @@ func TestLeftAndRightPickTheAgentWhileTyping(t *testing.T) {
 	run(model, typed("ab")...)
 	run(model, key(tea.KeyRight))
 	run(model, typed("c")...)
-	run(model, key(tea.KeyRight), key(tea.KeyRight), key(tea.KeyLeft), key(tea.KeyEnter))
+	run(model, key(tea.KeyRight), key(tea.KeyLeft), key(tea.KeyEnter))
 
-	if len(started.choices) != 1 || started.choices[0].Title != "abc" || started.choices[0].Harness != config.HarnessNone {
-		t.Fatalf("started %+v, want title abc with none", started.choices)
+	if len(started.choices) != 1 || started.choices[0].Title != "abc" || started.choices[0].Harness != "claude" {
+		t.Fatalf("started %+v, want title abc with claude", started.choices)
 	}
 }
 
@@ -196,7 +199,7 @@ func TestEscapeInTheListClearsTheFilterAndThenAsksToCloseTheList(t *testing.T) {
 
 	run(model, key(tea.KeyLeft), key(tea.KeyEscape))
 
-	want := taskpicker.Choice{Reopen: true, Expanded: false, Title: "Fix login", Harness: config.HarnessNone}
+	want := taskpicker.Choice{Reopen: true, Expanded: false, Title: "Fix login", Harness: "claude"}
 	if choice, ok := model.Chosen(); !ok || choice != want || len(started.choices) != 0 {
 		t.Fatalf("Chosen() = %+v, %t; want %+v", choice, ok, want)
 	}
@@ -289,10 +292,27 @@ func TestAFailedStartShowsWhyAndGoesBackToTheForm(t *testing.T) {
 	}
 }
 
+func TestWithoutAnAvailableAgentEnterSaysSoInsteadOfStarting(t *testing.T) {
+	started := &starts{}
+	options := compactOptions(1, "pi", started.start)
+	options.Harnesses = nil
+	model := sized(options)
+
+	run(model, key(tea.KeyRight), key(tea.KeyEnter))
+
+	if view := plainView(model); !strings.Contains(view, "no agent is available") {
+		t.Fatalf("the missing agent is not shown:\n%s", view)
+	}
+
+	if len(started.choices) != 0 {
+		t.Fatalf("started %+v without an agent", started.choices)
+	}
+}
+
 func TestOutsideAProjectATaskOrTabStartsInThePanesDirectory(t *testing.T) {
 	model, started := looseModel(t)
 
-	if row := agentRow(t, model); !strings.Contains(row, "pi   claude   tab") || strings.Contains(row, "none") {
+	if row := agentRow(t, model); !strings.Contains(row, "pi   claude   tab") {
 		t.Fatalf("agent row = %q, want pi, claude, tab", row)
 	}
 
@@ -342,10 +362,10 @@ func TestClickingAPlaceAndAnAgentSelectsThem(t *testing.T) {
 	run(model, tea.MouseClickMsg(tea.Mouse{X: strings.Index(lines[row], "this checkout"), Y: row, Button: tea.MouseLeft}))
 
 	row = slicesIndex(lines, "agent")
-	run(model, tea.MouseClickMsg(tea.Mouse{X: strings.Index(lines[row], "none"), Y: row, Button: tea.MouseLeft}), key(tea.KeyEnter))
+	run(model, tea.MouseClickMsg(tea.Mouse{X: strings.Index(lines[row], "claude"), Y: row, Button: tea.MouseLeft}), key(tea.KeyEnter))
 
-	if len(started.choices) != 1 || started.choices[0].Harness != config.HarnessNone || started.choices[0].Location != hotfixTree {
-		t.Fatalf("started %+v, want none in the hotfix worktree", started.choices)
+	if len(started.choices) != 1 || started.choices[0].Harness != "claude" || started.choices[0].Location != hotfixTree {
+		t.Fatalf("started %+v, want claude in the hotfix worktree", started.choices)
 	}
 }
 
@@ -359,7 +379,7 @@ func TestPopupsFitTheirContentWithoutTruncating(t *testing.T) {
 		options taskpicker.Options
 		want    []string
 	}{
-		{options: compact, want: []string{"new task", "shop", "new worktree", "wt/main/4", "this checkout", "shop-hotfix", "existing branch", "pi", "none", "enter start"}},
+		{options: compact, want: []string{"new task", "shop", "new worktree", "wt/main/4", "this checkout", "shop-hotfix", "existing branch", "pi", "claude", "enter start"}},
 		{options: list, want: []string{"new worktree", "checkouts", "branches", "in use", "shop-hotfix", "feature", "review docs", "wt/fix-login-redirect", "esc back"}},
 		{options: taskpicker.Options{Harnesses: []string{"pi", "claude"}}, want: []string{"new task", "pi", "claude", "tab", "enter start"}},
 	} {
@@ -396,7 +416,7 @@ func TestTheListIsAsWideAsTheCompactPopup(t *testing.T) {
 func TestKeyHintsNameTheKeysAndCanBeTurnedOff(t *testing.T) {
 	model, _ := compactModel(t, 1, "")
 
-	if view := plainView(model); !strings.Contains(view, "←→ agent") || !strings.Contains(view, "↑↓ where") || !strings.Contains(view, "enter start") {
+	if view := plainView(model); !strings.Contains(view, "←→ agent") || !strings.Contains(view, "↑↓ checkout") || !strings.Contains(view, "enter start") {
 		t.Fatalf("the hints are wrong:\n%s", view)
 	}
 
@@ -614,4 +634,126 @@ func slicesContaining(lines []string, text string) int {
 	}
 
 	return -1
+}
+
+func TestListRowsShowEachBranchsLatestCommitDistanceAndAge(t *testing.T) {
+	now := time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
+	options := listOptions("", nil)
+	options.Now = now
+	options.Refs = map[string]task.Ref{
+		"refs/heads/main":    {Time: now.Add(-5 * time.Minute).Unix(), Subject: "ship it", Ahead: 0, Behind: 0},
+		"refs/heads/hotfix":  {Time: now.Add(-3 * time.Hour).Unix(), Subject: "fix the login redirect for expired sessions", Ahead: 2, Behind: 0},
+		"refs/heads/feature": {Time: now.Add(-15 * 24 * time.Hour).Unix(), Subject: "draft", Ahead: 1, Behind: 40},
+	}
+	model := sized(options)
+
+	hotfix := sectionRows(t, model, "checkouts")[1]
+	for _, part := range []string{"shop-hotfix", "fix the login", "...", "hotfix", "↑2 ↓0", "3h"} {
+		if !strings.Contains(hotfix, part) {
+			t.Errorf("hotfix row %q lacks %q", hotfix, part)
+		}
+	}
+
+	feature := sectionRows(t, model, "branches")[0]
+	if !strings.Contains(feature, "↑1 ↓40") || !strings.Contains(feature, "2w") || !strings.Contains(feature, "draft") {
+		t.Errorf("feature row %q, want its distance from main, age and subject", feature)
+	}
+
+	main := sectionRows(t, model, "checkouts")[0]
+	if !strings.Contains(main, "↑0 ↓0") || !strings.Contains(main, "5m") {
+		t.Errorf("main row %q, want an age and no distance from itself", main)
+	}
+
+	if column(hotfix, "3h") != column(main, "5m") {
+		t.Errorf("ages are not aligned:\n%s\n%s", main, hotfix)
+	}
+}
+
+func TestCheckoutsShowTheLinesTheirChangesAddAndDeleteOnceCounted(t *testing.T) {
+	options := listOptions("", nil)
+	options.Changes = func() map[string]git.Diff {
+		return map[string]git.Diff{"/code/shop-hotfix": {Added: 12, Deleted: 3}, "/code/shop": {Added: 0, Deleted: 0}}
+	}
+	model := sized(options)
+
+	if strings.Contains(plainView(model), "+0") {
+		t.Fatal("changes show before they are counted")
+	}
+
+	for _, msg := range collect(model.Init()) {
+		model.Update(msg)
+	}
+
+	rows := sectionRows(t, model, "checkouts")
+	if !strings.Contains(rows[1], "+12 -3") || !strings.Contains(rows[0], "+0  -0") {
+		t.Fatalf("checkout rows = %q, want +12 -3 in the hotfix worktree and +0 -0 in the clean main checkout", rows)
+	}
+}
+
+func TestANarrowListDropsTheSubjectButKeepsTheNames(t *testing.T) {
+	options := listOptions("", nil)
+	options.Refs = map[string]task.Ref{"refs/heads/hotfix": {Time: 1, Subject: "a subject that cannot fit", Ahead: 12, Behind: 340}}
+	model := taskpicker.NewModel(config.DefaultConfig(), options)
+	model.Update(tea.WindowSizeMsg{Width: 44, Height: 20})
+
+	row := sectionRows(t, model, "checkouts")[1]
+	if strings.Contains(row, "subject") || !strings.Contains(row, "shop-hotfix") {
+		t.Fatalf("narrow hotfix row = %q, want the name without the subject", row)
+	}
+}
+
+// column is the display column where part starts in line.
+func column(line, part string) int {
+	before, _, _ := strings.Cut(line, part)
+
+	return utf8.RuneCountInString(before)
+}
+
+// collect runs a command and the commands of a batch it returns, and returns their messages.
+func collect(cmd tea.Cmd) []tea.Msg {
+	if cmd == nil {
+		return nil
+	}
+
+	msg := cmd()
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		var msgs []tea.Msg
+		for _, inner := range batch {
+			msgs = append(msgs, collect(inner)...)
+		}
+
+		return msgs
+	}
+
+	return []tea.Msg{msg}
+}
+
+func TestCommitSubjectsCannotSendTerminalSequences(t *testing.T) {
+	options := listOptions("", nil)
+	options.Refs = map[string]task.Ref{"refs/heads/feature": {Time: 0, Subject: "\x1b]2;owned\x07draft \u202eevil", Ahead: 0, Behind: 0}}
+	model := sized(options)
+
+	view := model.View().Content
+	if strings.Contains(view, "\x1b]2;") || strings.Contains(view, "\u202e") {
+		t.Fatalf("view passes the subject's terminal sequences through: %q", view)
+	}
+
+	if feature := sectionRows(t, model, "branches")[0]; !strings.Contains(feature, "draft evil") {
+		t.Errorf("feature row %q, want the subject's text", feature)
+	}
+}
+
+func TestANewWorktreeRowShowsTheCommitTheWorktreeStartsFrom(t *testing.T) {
+	options := listOptions("", nil)
+	options.Refs = map[string]task.Ref{
+		"refs/heads/main":          {Time: 0, Subject: "local base", Ahead: 0, Behind: 0},
+		"refs/heads/origin/main":   {Time: 0, Subject: "a local branch named like the remote one", Ahead: 0, Behind: 0},
+		"refs/remotes/origin/main": {Time: 0, Subject: "remote base", Ahead: 0, Behind: 0},
+	}
+	options.Starts = map[string]string{"main": "refs/remotes/origin/main"}
+	model := sized(options)
+
+	if row := sectionRows(t, model, "new worktree")[0]; !strings.Contains(row, "remote base") {
+		t.Errorf("new worktree row %q, want origin's main commit", row)
+	}
 }

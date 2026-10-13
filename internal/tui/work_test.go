@@ -37,6 +37,12 @@ func workTestLive(record task.Record, pane string) task.Live {
 	}
 }
 
+func stalled(live task.Live) task.Live {
+	live.Stalled = true
+
+	return live
+}
+
 func newWorkTestModel(t *testing.T, tasks []task.Live, agents []session.AgentSession) *Model {
 	t.Helper()
 
@@ -77,6 +83,8 @@ func TestWorkSectionsFollowAgentStatusAndTaskState(t *testing.T) {
 		workTestLive(merged, "%6"),
 		workTestLive(workTestRecord("starting", task.StateCreating), "%7"),
 		workTestLive(workTestRecord("closing", task.StateFinishing), "%8"),
+		stalled(workTestLive(workTestRecord("stuck-starting", task.StateCreating), "")),
+		stalled(workTestLive(workTestRecord("stuck-closing", task.StateFinishing), "")),
 	}
 	agents := []session.AgentSession{
 		{PaneID: "%1", Status: session.AgentStatusRunning},
@@ -88,7 +96,7 @@ func TestWorkSectionsFollowAgentStatusAndTaskState(t *testing.T) {
 	got := workSectionsForTest(newWorkTestModel(t, tasks, agents))
 
 	want := map[string][]string{
-		"needs you": {"asking", "interrupted-wake"},
+		"needs you": {"asking", "interrupted-wake", "stuck-starting", "stuck-closing"},
 		"running":   {"busy"},
 		"your turn": {"idle"},
 		"sleeping":  {"asleep"},

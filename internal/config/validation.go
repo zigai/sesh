@@ -449,6 +449,7 @@ func validateConfig(cfg *Config) error {
 		func() error { return ValidateProjectsConfig(cfg.Projects) },
 		func() error { return ValidateTasksConfig(cfg.Tasks) },
 		func() error { return ValidateTaskActions(cfg) },
+		func() error { return ValidateTaskWindows(cfg) },
 	}
 	for _, v := range validators {
 		if err := v(); err != nil {
