@@ -127,21 +127,27 @@ func (s *Service) Locate(ctx context.Context, pane gotmux.PaneID) (Place, error)
 }
 
 // Start creates a task at place running the requested harness, or a plain shell for
-// config.HarnessNone. In a project session the task works in the requested location, one the
-// project currently offers, with a window in the project's session; elsewhere it is a loose task
-// in the pane's directory, next to the current window. A title names the task and is passed to
-// the agent as its first prompt when its harness says how.
+// config.HarnessNone. In a project session or a repository the task works in the requested
+// location, one the project currently offers, with a window in the pane's session, next to the
+// current window outside a project session; elsewhere it is a loose task in the pane's directory,
+// next to the current window. A title names the task and is passed to the agent as its first
+// prompt when its harness says how.
 func (s *Service) Start(ctx context.Context, place Place, request Request) (Record, error) {
 	offered, err := s.harness(request.Harness)
 	if err != nil {
 		return Record{}, taskError("start_task", err)
 	}
 
-	if place.Project == "" {
+	root, err := s.projectOf(ctx, place)
+	if err != nil {
+		return Record{}, taskError("start_task", err)
+	}
+
+	if root == "" {
 		return s.startLoose(ctx, place, request, offered)
 	}
 
-	return s.startProject(ctx, place, request, offered)
+	return s.startProject(ctx, place, root, request, offered)
 }
 
 // OpenTab opens a plain window in the pane's directory next to the current window.
@@ -159,8 +165,30 @@ func (s *Service) OpenTab(ctx context.Context, place Place) error {
 	return taskError("open_tab", err)
 }
 
-func (s *Service) startProject(ctx context.Context, place Place, request Request, offered Harness) (Record, error) {
-	p, err := s.catalog.Resolve(ctx, place.Project)
+// projectOf returns the root of the project a task started at place belongs to: the project
+// session's, else the repository the pane's directory is in, else none. A registered folder
+// outside a project session leaves the task loose, in the pane's directory.
+func (s *Service) projectOf(ctx context.Context, place Place) (string, error) {
+	if place.Project != "" {
+		return place.Project, nil
+	}
+
+	p, err := s.catalog.Resolve(ctx, place.Dir)
+
+	switch {
+	case errors.Is(err, project.ErrNotProject):
+		return "", nil
+	case err != nil:
+		return "", fmt.Errorf("resolve task project: %w", err)
+	case p.Kind != project.KindGit:
+		return "", nil
+	default:
+		return p.Root, nil
+	}
+}
+
+func (s *Service) startProject(ctx context.Context, place Place, root string, request Request, offered Harness) (Record, error) {
+	p, err := s.catalog.Resolve(ctx, root)
 	if err != nil {
 		return Record{}, taskError("start_task", err)
 	}
@@ -181,7 +209,7 @@ func (s *Service) startProject(ctx context.Context, place Place, request Request
 		}
 	}
 
-	if err := s.openTaskWindow(ctx, place.Session, record, launchOf(offered, request, record), false); err != nil {
+	if err := s.openTaskWindow(ctx, place.Session, record, launchOf(offered, request, record), place.Project == ""); err != nil {
 		return record, s.fail(ctx, record, err)
 	}
 
@@ -250,7 +278,7 @@ func (s *Service) reserveProjectTask(ctx context.Context, p project.Project, req
 			return Record{}, ErrLocationUnavailable
 		}
 
-		ledger.SetProject(ProjectState{Root: p.Root, LastNumber: number, LastHarness: request.Harness, LastWhere: string(location.Where)})
+		ledger.SetProject(ProjectState{Root: p.Root, LastNumber: number})
 
 		record := EmptyRecord()
 		record.ID = ledger.NextID()
@@ -270,7 +298,7 @@ func (s *Service) reserveProjectTask(ctx context.Context, p project.Project, req
 		switch {
 		case location.Where == WhereNew:
 			record.Base = location.Branch
-			record.Branch = newBranch(request.Title, location.Branch, number, local)
+			record.Branch = NewBranch(request.Title, location.Branch, number, local)
 		case location.Remote != "":
 			record.Upstream = location.Remote + "/" + location.Branch
 		}
@@ -407,12 +435,6 @@ func (s *Service) activate(ctx context.Context, record Record) (Record, error) {
 
 	_, err := s.store.Update(ctx, func(ledger *Ledger) error {
 		ledger.Put(record)
-
-		if record.Kind == KindLoose {
-			state := ledger.Project("")
-			state.LastHarness = record.Harness
-			ledger.SetProject(state)
-		}
 
 		return nil
 	})

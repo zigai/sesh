@@ -244,6 +244,10 @@ func TestOfferListsEveryCheckoutAndBranchAndMarksTheOnesTasksUse(t *testing.T) {
 		t.Fatalf("Offer() locations = %+v, want %+v: a missing worktree and checked-out branches left out, the task's worktree marked", offer.Locations, want)
 	}
 
+	if offer.Current != 1 || offer.NextNumber != 2 {
+		t.Fatalf("Offer() current = %d, next number = %d; want the main checkout the pane is in and number 2 after task 1", offer.Current, offer.NextNumber)
+	}
+
 	if _, err := f.service.Start(t.Context(), place, task.Request{
 		Harness: config.HarnessNone, Location: task.Location{Where: task.WhereWorktree, Directory: started.Directory},
 	}); !errors.Is(err, task.ErrLocationUnavailable) {
@@ -267,11 +271,15 @@ func TestOfferStartsANewWorktreeFromTheBranchThePaneIsOn(t *testing.T) {
 	if len(offer.Locations) < 2 || offer.Locations[1] != (task.Location{Where: task.WhereNew, Branch: "hand"}) {
 		t.Fatalf("Offer() locations = %+v, want a new worktree from hand right after the default branch", offer.Locations)
 	}
+
+	if current := offer.Current; current < 0 || offer.Locations[current].Directory != hand {
+		t.Fatalf("Offer() current = %d in %+v, want the hand worktree the pane is in", current, offer.Locations)
+	}
 }
 
-func TestOutsideAProjectOfferListsTheProjects(t *testing.T) {
+func TestOutsideARepositoryOfferHasNoProject(t *testing.T) {
 	f := newFixture(t, true)
-	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
+	initRepository(t, filepath.Join(f.base, "code", "shop"))
 	dir := mkdir(t, filepath.Join(f.base, "scratch"))
 	session := newSession(t, f.server, "scratch", dir)
 
@@ -280,8 +288,62 @@ func TestOutsideAProjectOfferListsTheProjects(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(offer.Projects) != 1 || offer.Projects[0].Root != repo || len(offer.Locations) != 0 {
-		t.Fatalf("Offer() = %+v, want the shop project and no locations", offer)
+	if offer.Project != "" || len(offer.Locations) != 0 {
+		t.Fatalf("Offer() = %+v, want no project and no locations", offer)
+	}
+}
+
+func TestInARepositoryOutsideAProjectSessionOfferIsTheRepositorys(t *testing.T) {
+	f := newFixture(t, true)
+	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
+	session := newSession(t, f.server, "work", repo)
+
+	offer, err := f.service.Offer(t.Context(), locate(t, f, sessionWindows(t, f.server, session.ID())[0].Window()))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if offer.Project != repo || len(offer.Locations) == 0 || offer.Locations[0] != (task.Location{Where: task.WhereNew, Branch: "main"}) {
+		t.Fatalf("Offer() = %+v, want the shop repository with a new worktree from main first", offer)
+	}
+}
+
+func TestInARepositoryOutsideAProjectSessionATaskGetsAWorktreeNextToTheCurrentWindow(t *testing.T) {
+	f := newFixture(t, true)
+	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
+	session := newSession(t, f.server, "work", repo)
+
+	for range 2 {
+		if _, err := session.NewWindow(t.Context(), plainWindow(repo)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	first := sessionWindows(t, f.server, session.ID())[0]
+	if err := first.Window().Select(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	record, err := f.service.Start(t.Context(), locate(t, f, first.Window()), inNewWorktree("fake"))
+	if err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+
+	if record.Kind != task.KindProject || record.Project != repo || record.Branch != "wt/main/1" || !record.OwnsWorktree {
+		t.Fatalf("Start() = %+v, want a project task on a new worktree", record)
+	}
+
+	if _, err := os.Stat(record.Directory); err != nil {
+		t.Fatalf("task worktree: %v", err)
+	}
+
+	second, err := sessionWindows(t, f.server, session.ID())[1].Window().Info(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if second.ID != taskWindow(t, f.server, session.ID(), record.ID).ID {
+		t.Fatal("task window is not right after the current window")
 	}
 }
 
@@ -505,16 +567,11 @@ func TestStartRefusesALocationTheProjectDoesNotOffer(t *testing.T) {
 	assertNoTasks(t, f, place)
 }
 
-func TestOfferKeepsTheHarnessOrderAndStartsOnTheLastChoices(t *testing.T) {
+func TestOfferKeepsTheHarnessOrder(t *testing.T) {
 	f := newFixture(t, true)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
-	place := projectPlace(t, f, repo)
 
-	if _, err := f.service.Start(t.Context(), place, task.Request{Harness: "other", Location: task.Location{Where: task.WhereMain}}); err != nil {
-		t.Fatal(err)
-	}
-
-	offer, err := f.service.Offer(t.Context(), place)
+	offer, err := f.service.Offer(t.Context(), projectPlace(t, f, repo))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -524,12 +581,8 @@ func TestOfferKeepsTheHarnessOrderAndStartsOnTheLastChoices(t *testing.T) {
 		names = append(names, harness.Name)
 	}
 
-	if !slices.Equal(names, []string{"fake", "other", "prompted", "function"}) || offer.LastHarness != "other" {
-		t.Fatalf("Offer() harnesses = %v, last %q; want the configured order and other last chosen", names, offer.LastHarness)
-	}
-
-	if offer.Locations[offer.Location].Where != task.WhereNew {
-		t.Fatalf("Offer() starts on %+v, want a new worktree once the main checkout is taken", offer.Locations[offer.Location])
+	if !slices.Equal(names, []string{"fake", "other", "prompted", "function"}) {
+		t.Fatalf("Offer() harnesses = %v, want the configured order", names)
 	}
 }
 

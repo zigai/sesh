@@ -37,11 +37,9 @@ var (
 )
 
 // TaskOffer is what the new task popup offers at the caller's pane: the harnesses and, in a project
-// session, the project's name and the locations a task can work in, else the projects. Dir is the
-// pane's directory.
+// session or a repository, the project's name and the locations a task can work in.
 type TaskOffer struct {
 	Project string
-	Dir     string
 	Offer   task.Offer
 }
 
@@ -57,8 +55,8 @@ func (local *Local) registerTaskHandlers() {
 
 // TaskOffer lists what a new task can start with at the caller's pane.
 func (local *Local) TaskOffer(ctx context.Context, caller action.Caller) (TaskOffer, error) {
-	offered := TaskOffer{Project: "", Dir: "", Offer: task.Offer{
-		Harnesses: nil, LastHarness: "", Locations: nil, Location: 0, Projects: nil,
+	offered := TaskOffer{Project: "", Offer: task.Offer{
+		Harnesses: nil, Project: "", Locations: nil, Current: -1, NextNumber: 0, Branches: nil,
 	}}
 
 	service, place, err := local.taskPlace(ctx, caller)
@@ -66,15 +64,13 @@ func (local *Local) TaskOffer(ctx context.Context, caller action.Caller) (TaskOf
 		return offered, err
 	}
 
-	offered.Dir = place.Dir
-
 	offered.Offer, err = service.Offer(ctx, place)
 	if err != nil {
 		return offered, oops.In("app").With("operation", "offer_task").Wrap(err)
 	}
 
-	if place.Project != "" {
-		offered.Project = filepath.Base(place.Project)
+	if offered.Offer.Project != "" {
+		offered.Project = filepath.Base(offered.Offer.Project)
 	}
 
 	return offered, nil

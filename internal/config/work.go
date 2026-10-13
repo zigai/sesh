@@ -68,7 +68,7 @@ func DefaultProjectsConfig() ProjectsConfig {
 func DefaultTasksConfig() TasksConfig {
 	return TasksConfig{
 		Editor: []string{"nvim"}, PopupSocket: DefaultPopupSocket, PopupConfig: "", Harness: nil,
-		WakeOnRestore: WakeOnRestorePrevious, ShowFooter: false,
+		WakeOnRestore: WakeOnRestorePrevious, ShowFooter: true,
 	}
 }
 

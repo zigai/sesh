@@ -147,13 +147,13 @@ tmux_startup_post = []
 
 ## Tasks
 
-`ctrl+t` opens a popup that starts a task. Its fields are the task's title (optional), where it works, and the agent; tab moves between them and enter starts the task. The title names the task window and a new branch (`wt/<title>`), and is passed to the agent through the harness's `prompt_args`. In a project session the list has these sections:
+`ctrl+t` opens a popup that starts a task: a title (optional), the agent, and in a project session or a repository where it works. Left/right pick the agent, starting from the first; up/down pick where it works; typing goes to the title; enter starts the task. The title keeps its usual editing keys. The title names the task window and a new branch (`wt/<title>`), and is passed to the agent through the harness's `prompt_args`. The places are a new worktree on a new branch from the default branch, whose name the popup shows, the pane's checkout, and `existing branch…`, where enter expands the popup to list every location:
 
 - new worktrees on a new branch, from the default branch or the branch the pane is on; filtering also finds the other local branches
 - the main checkout and existing worktrees
 - local branches no worktree has checked out, and branches only a remote has, which get a local branch tracking them
 
-A checkout another task works in is shown with that task, and enter goes to it. Outside a project session the list is the pane's directory (a plain tab or a loose task) or another project, where the task starts in a new worktree. Finishing a task removes only the worktree and branch sesh created. A failed start is shown in the popup. `tasks.show_footer = true` shows key hints at its bottom.
+A checkout another task works in is shown with that task, and enter goes to it. Outside a repository the task works in the pane's directory, and the agent row also offers a plain tab. The task window opens in the pane's session. Finishing a task removes only the worktree and branch sesh created. A failed start is shown in the popup. Key hints show at its bottom; `tasks.show_footer = false` hides them.
 
 `[[tasks.harness]]` entries are the agents the popup offers, in order. A harness AHT supports needs only its name; any other entry needs `command`. Task commands run in your interactive shell (tmux's `default-shell`), so your aliases, functions and options apply as when you type them. `prompt_args` are appended to the command when the task has a title, with the task variables of task action prompts filled in.
 

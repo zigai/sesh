@@ -27,11 +27,21 @@ import (
 const (
 	taskPickerUIVerb = "pick-ui"
 	taskPaneFlag     = "pane"
+	taskExpandedFlag = "expanded"
+	taskTitleFlag    = "title"
+	taskAgentFlag    = "agent"
+	// centered divides the space around a popup to center it.
+	centered = 2
 )
 
-// taskHandoff names the task the task picker popup hands to its opener to go to.
+// taskHandoff names the task the task picker popup hands to its opener to go to, or asks it to
+// reopen the popup, expanded or not, with the title and agent chosen so far.
 type taskHandoff struct {
-	Show string `json:"show"`
+	Show     string `json:"show"`
+	Reopen   bool   `json:"reopen"`
+	Expanded bool   `json:"expanded"`
+	Title    string `json:"title"`
+	Agent    string `json:"agent"`
 }
 
 // taskFrontend opens the task picker popup for task.menu. The popup starts the task or opens the
@@ -71,6 +81,9 @@ func NewTaskPickerUICommand() *cobra.Command {
 	actioncli.AddEnvironmentFlags(cmd)
 	cmd.Flags().String(projectHandoffFlag, "", "File the choice is written to")
 	cmd.Flags().String(taskPaneFlag, "", "Pane the task is started from")
+	cmd.Flags().Bool(taskExpandedFlag, false, "List every location of the project")
+	cmd.Flags().String(taskTitleFlag, "", "Title to start with")
+	cmd.Flags().String(taskAgentFlag, "", "Agent to start with")
 
 	return cmd
 }
@@ -97,7 +110,8 @@ func (frontend taskFrontend) Dispatch(ctx context.Context, invocation action.Inv
 	return action.OpenedTaskMenu{}, errors.Join(err, runtime.Close())
 }
 
-// openTaskPicker opens the popup sized to what it offers, then goes to the task it names.
+// openTaskPicker opens the popup sized to what it offers, reopens it as often as it asks, then
+// goes to the task it names.
 func openTaskPicker(ctx context.Context, cmd *cobra.Command, cfg *config.Config, runtime *actioncli.Runtime, caller action.Caller) error {
 	workspace, err := app.Resolve(cfg, clibase.CommandLocations(cmd))
 	if err != nil {
@@ -119,36 +133,71 @@ func openTaskPicker(ctx context.Context, cmd *cobra.Command, cfg *config.Config,
 		return err
 	}
 
+	handoff := taskHandoff{Show: "", Reopen: false, Expanded: false, Title: "", Agent: ""}
+
+	for {
+		next, chosen, err := showTaskPopup(ctx, cmd, cfg, workspace.Socket, client, caller, offered, handoff)
+		if err != nil || !chosen {
+			return err
+		}
+
+		if !next.Reopen {
+			return runtime.Local.ShowTask(ctx, caller, next.Show)
+		}
+
+		handoff = next
+	}
+}
+
+// showTaskPopup shows the task picker popup, expanded when from asks for it, and returns what it
+// handed back. In a project the popup keeps its top edge whether expanded or not, so expanding
+// grows it downwards.
+func showTaskPopup(
+	ctx context.Context, cmd *cobra.Command, cfg *config.Config, socket string, client gotmux.ClientInfo, caller action.Caller,
+	offered app.TaskOffer, from taskHandoff,
+) (taskHandoff, bool, error) {
 	executable, err := os.Executable()
 	if err != nil {
-		return oops.In("cli").With("operation", "resolve_executable").Wrap(err)
+		return taskHandoff{}, false, oops.In("cli").With("operation", "resolve_executable").Wrap(err)
 	}
 
 	handoffPath, cleanup, err := createPickerSwitchHandoff()
 	if err != nil {
-		return err
+		return taskHandoff{}, false, err
 	}
 	defer cleanup()
 
-	arguments := slices.Concat([]string{
-		"task", taskPickerUIVerb, "--socket", workspace.Socket, "--" + projectHandoffFlag, handoffPath,
-		"--" + taskPaneFlag, caller.Pane,
-	}, forwardedConfigFlags(cmd))
+	arguments := []string{
+		"task", taskPickerUIVerb, "--socket", socket, "--" + projectHandoffFlag, handoffPath, "--" + taskPaneFlag, caller.Pane,
+	}
 
-	width, height := taskpicker.Size(cfg, taskPickerOptions(offered, nil))
+	options := taskPickerOptions(offered, nil)
+
+	if from.Reopen {
+		arguments = append(arguments, "--"+taskExpandedFlag+"="+strconv.FormatBool(from.Expanded),
+			"--"+taskTitleFlag+"="+from.Title, "--"+taskAgentFlag+"="+from.Agent)
+		options.Expanded, options.Title, options.Agent = from.Expanded, from.Title, from.Agent
+	}
+
+	arguments = slices.Concat(arguments, forwardedConfigFlags(cmd))
+
+	width, height := taskpicker.Size(cfg, options)
 	width, height = min(width, client.Width), min(height, client.Height)
-	options := popupOptions(gotmux.Exec(executable, arguments...), strconv.Itoa(width), strconv.Itoa(height), cfg.Theme.Background)
+	popup := popupOptions(gotmux.Exec(executable, arguments...), strconv.Itoa(width), strconv.Itoa(height), cfg.Theme.Background)
 
-	if err := client.Handle().Popup(ctx, options); err != nil {
-		return oops.In("cli").With("operation", "open_task_picker").Wrap(err)
+	if offered.Project != "" {
+		expanded := options
+		expanded.Expanded = true
+		_, tallest := taskpicker.Size(cfg, expanded)
+		top := max(client.Height-min(tallest, client.Height), 0) / centered
+		popup.Y = strconv.Itoa(top + height)
 	}
 
-	handoff, chosen, err := readHandoff(handoffPath, func(handoff taskHandoff) bool { return handoff.Show != "" })
-	if err != nil || !chosen {
-		return err
+	if err := client.Handle().Popup(ctx, popup); err != nil {
+		return taskHandoff{}, false, oops.In("cli").With("operation", "open_task_picker").Wrap(err)
 	}
 
-	return runtime.Local.ShowTask(ctx, caller, handoff.Show)
+	return readHandoff(handoffPath, func(handoff taskHandoff) bool { return handoff.Show != "" || handoff.Reopen })
 }
 
 func runTaskPickerUI(cmd *cobra.Command, _ []string) error {
@@ -161,6 +210,9 @@ func runTaskPickerUI(cmd *cobra.Command, _ []string) error {
 
 	handoffPath, _ := cmd.Flags().GetString(projectHandoffFlag)
 	pane, _ := cmd.Flags().GetString(taskPaneFlag)
+	expanded, _ := cmd.Flags().GetBool(taskExpandedFlag)
+	title, _ := cmd.Flags().GetString(taskTitleFlag)
+	agent, _ := cmd.Flags().GetString(taskAgentFlag)
 
 	if handoffPath == "" || pane == "" {
 		return clibase.NewExitError(clibase.ExitCodeUsage, errPickerHandoffInvalid)
@@ -173,38 +225,54 @@ func runTaskPickerUI(cmd *cobra.Command, _ []string) error {
 
 	caller := action.Caller{Client: "", Pane: pane, Session: "", Width: "", Height: ""}
 
-	choice, chosen, err := pickTask(ctx, cmd, cfg, runtime, caller)
-	if err = errors.Join(err, runtime.Close()); err != nil || !chosen || choice.Show == "" {
+	from := taskHandoff{Show: "", Reopen: true, Expanded: expanded, Title: title, Agent: agent}
+
+	choice, chosen, err := pickTask(ctx, cmd, cfg, runtime, caller, from)
+	if err = errors.Join(err, runtime.Close()); err != nil || !chosen {
 		return err
 	}
 
-	return writeHandoff(handoffPath, taskHandoff{Show: choice.Show})
+	switch {
+	case choice.Reopen:
+		return writeHandoff(handoffPath, taskHandoff{Show: "", Reopen: true, Expanded: choice.Expanded, Title: choice.Title, Agent: choice.Harness})
+	case choice.Show != "":
+		return writeHandoff(handoffPath, taskHandoff{Show: choice.Show, Reopen: false, Expanded: false, Title: "", Agent: ""})
+	default:
+		return nil
+	}
 }
 
 // pickTask runs the picker, which starts the chosen task or tab through runtime before it closes.
-func pickTask(ctx context.Context, cmd *cobra.Command, cfg *config.Config, runtime *actioncli.Runtime, caller action.Caller) (taskpicker.Choice, bool, error) {
+func pickTask(
+	ctx context.Context, cmd *cobra.Command, cfg *config.Config, runtime *actioncli.Runtime, caller action.Caller, from taskHandoff,
+) (taskpicker.Choice, bool, error) {
 	offered, err := runtime.Local.TaskOffer(ctx, caller)
 	if err != nil {
 		return taskpicker.Choice{}, false, err
 	}
 
-	start := func(choice taskpicker.Choice) (string, error) {
+	start := func(choice taskpicker.Choice) error {
 		if choice.Tab {
 			_, err := action.Run(ctx, runtime.Router, action.TaskTab, action.Local(), caller, action.OpenTab{})
 
-			return "", err
+			return err
 		}
 
 		location := choice.Location
-		started, err := action.Run(ctx, runtime.Router, action.TaskNew, action.Local(), caller, action.NewTask{
+		_, err := action.Run(ctx, runtime.Router, action.TaskNew, action.Local(), caller, action.NewTask{
 			Harness: choice.Harness, Where: string(location.Where), Branch: location.Branch, Remote: location.Remote,
-			Directory: location.Directory, Title: choice.Title, Project: choice.Project,
+			Directory: location.Directory, Title: choice.Title, Project: "",
 		})
 
-		return started.ID, err
+		return err
 	}
 
-	model := taskpicker.NewModel(cfg, taskPickerOptions(offered, start))
+	pickerOptions := taskPickerOptions(offered, start)
+	if from.Reopen {
+		pickerOptions.Expanded, pickerOptions.Title, pickerOptions.Agent = from.Expanded, from.Title, from.Agent
+	}
+
+	model := taskpicker.NewModel(cfg, pickerOptions)
 
 	options := []tea.ProgramOption{
 		tea.WithContext(ctx),
@@ -227,17 +295,15 @@ func pickTask(ctx context.Context, cmd *cobra.Command, cfg *config.Config, runti
 	return choice, chosen, nil
 }
 
-func taskPickerOptions(offered app.TaskOffer, start func(taskpicker.Choice) (string, error)) taskpicker.Options {
+func taskPickerOptions(offered app.TaskOffer, start func(taskpicker.Choice) error) taskpicker.Options {
 	names := make([]string, 0, len(offered.Offer.Harnesses))
 	for _, harness := range offered.Offer.Harnesses {
 		names = append(names, harness.Name)
 	}
 
-	home, _ := os.UserHomeDir()
-
 	return taskpicker.Options{
-		Project: offered.Project, Dir: offered.Dir, Home: home, Locations: offered.Offer.Locations,
-		Location: offered.Offer.Location, Projects: offered.Offer.Projects, Harnesses: names,
-		LastHarness: offered.Offer.LastHarness, Start: start,
+		Project: offered.Project, Locations: offered.Offer.Locations, Current: offered.Offer.Current,
+		NextNumber: offered.Offer.NextNumber, Branches: offered.Offer.Branches, Harnesses: names,
+		Agent: "", Title: "", Expanded: false, Start: start,
 	}
 }

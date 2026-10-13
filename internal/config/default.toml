@@ -255,7 +255,7 @@
 # wake_on_restore = "previous"
 
 # Show key hints at the bottom of the new task popup.
-# show_footer = false
+# show_footer = true
 
 # Named task actions run headless in the task worktree, in a window of the task's popup
 # session. The prompt, if any, is the last argument; it can use {task}, {title}, {branch},

@@ -8,9 +8,9 @@ var (
 		Title:   "New task menu",
 		Summary: "Show the popup that starts a task or opens a tab",
 		Help: "Show a popup on the invoking client that starts a task.\n\n" +
-			"In a project session it picks where the task works (a new worktree, a new worktree on an " +
-			"existing branch, an existing worktree, or the main checkout) and which agent runs there. " +
-			"Elsewhere it offers a plain tab in the pane's directory or a loose task with an agent.",
+			"In a project session or a repository it picks whether the task works in a new worktree or " +
+			"the pane's checkout, or any other checkout or branch from the expanded list, and which agent " +
+			"runs there. Elsewhere it offers a plain tab or a loose task in the pane's directory.",
 		Subject:     SubjectNone,
 		Arity:       ArityOne,
 		Params:      nil,
@@ -26,7 +26,7 @@ var (
 		Title:   "New task",
 		Summary: "Start a task with an agent harness",
 		Help: "Start a task from the invoking pane, in a window with the agent above an editor. In a project " +
-			"session, or in the project --project names, --where picks the task's checkout: new (a worktree " +
+			"session, a repository, or the project --project names, --where picks the task's checkout: new (a worktree " +
 			"on a new branch from --branch, by default the default branch), branch (a new worktree on " +
 			"--branch, a local branch or one only --remote has), worktree (the existing worktree --dir) " +
 			"or main (the main checkout). Sesh removes on finish only the worktree and branch it created. " +

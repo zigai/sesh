@@ -56,15 +56,16 @@ type Request struct {
 	Location Location
 }
 
-// Offer is what a new task can start with at a place: the offered harnesses and locations, the
-// harness chosen there last time, and the index of the location to start on. Outside a project
-// Projects lists the projects a task can start in instead.
+// Offer is what a new task can start with at a place: the offered harnesses, the root of the
+// place's project with its locations, and the index of the checkout the place is in. NextNumber and Branches are what a new worktree's branch is named
+// from. Outside a project Project is empty and there are no locations.
 type Offer struct {
-	Harnesses   []Harness
-	LastHarness string
-	Locations   []Location
-	Location    int
-	Projects    []project.Project
+	Harnesses  []Harness
+	Project    string
+	Locations  []Location
+	Current    int
+	NextNumber int
+	Branches   []string
 }
 
 type worktree struct {
@@ -80,39 +81,47 @@ type branches struct {
 	remote [][2]string
 }
 
-// Offer lists the harnesses and, in a project session, the locations a new task can start with;
-// elsewhere it lists the projects. A directory holds at most one task, so a checkout a task works
-// in is offered only to go to that task.
+// Offer lists the harnesses and, in a project session or a repository, the locations a new task
+// can start with. A directory holds at most one task, so a checkout a task works in is offered
+// only to go to that task.
 func (s *Service) Offer(ctx context.Context, place Place) (Offer, error) {
 	ledger, err := s.store.Load(ctx)
 	if err != nil {
 		return emptyOffer(), taskError("offer_task", err)
 	}
 
-	state := ledger.Project(place.Project)
+	root, err := s.projectOf(ctx, place)
+	if err != nil {
+		return emptyOffer(), taskError("offer_task", err)
+	}
+
+	state := ledger.Project(root)
 	offer := emptyOffer()
 	offer.Harnesses = Harnesses(s.cfg, s.lookPath)
-	offer.LastHarness = state.LastHarness
+	offer.Project = root
 
-	if place.Project == "" {
-		offer.Projects, err = s.catalog.List()
-
-		return offer, taskError("offer_task", err)
+	if root == "" {
+		return offer, nil
 	}
 
-	p, err := s.catalog.Resolve(ctx, place.Project)
+	p, err := s.catalog.Resolve(ctx, root)
 	if err != nil {
 		return offer, taskError("offer_task", err)
 	}
 
-	offer.Locations, _, err = s.locations(ctx, p, ledger, place.Dir)
+	offer.Locations, offer.Branches, err = s.locations(ctx, p, ledger, place.Dir)
 	if err != nil {
 		return offer, taskError("offer_task", err)
 	}
 
-	offer.Location = max(slices.IndexFunc(offer.Locations, func(l Location) bool {
-		return l.Where == Where(state.LastWhere) && l.Task == ""
-	}), 0)
+	offer.Current = currentCheckout(offer.Locations, place.Dir)
+
+	if len(offer.Locations) > 0 && offer.Locations[0].Where == WhereNew && s.worktreeDir != "" {
+		offer.NextNumber, _, err = s.freeNumber(ctx, p, offer.Locations[0].Branch, state.LastNumber)
+		if err != nil {
+			return offer, taskError("offer_task", err)
+		}
+	}
 
 	return offer, nil
 }
@@ -209,10 +218,10 @@ func (l Location) names(requested Location) bool {
 	}
 }
 
-// newBranch is the branch a new worktree gets: wt/ and the title as a slug, or without a title
+// NewBranch is the branch a new worktree gets: wt/ and the title as a slug, or without a title
 // wt/, the base and the task number. A name taken by a local branch gets the lowest free numeric
 // suffix.
-func newBranch(title, base string, number int, taken []string) string {
+func NewBranch(title, base string, number int, taken []string) string {
 	name := taskBranch(base, number)
 	if slug := slug(title); slug != "" {
 		name = branchPrefix + slug
@@ -224,6 +233,28 @@ func newBranch(title, base string, number int, taken []string) string {
 	}
 
 	return candidate
+}
+
+// currentCheckout returns the index of the innermost checkout that holds dir, else the main
+// checkout's.
+func currentCheckout(locations []Location, dir string) int {
+	current, depth := -1, -1
+
+	for index, location := range locations {
+		if location.Where != WhereMain && location.Where != WhereWorktree {
+			continue
+		}
+
+		if within(dir, location.Directory) && len(location.Directory) > depth {
+			current, depth = index, len(location.Directory)
+		}
+	}
+
+	if current < 0 {
+		current = slices.IndexFunc(locations, func(l Location) bool { return l.Where == WhereMain })
+	}
+
+	return current
 }
 
 // slug turns a title into a branch name part: lower case letters and digits joined by single
@@ -326,7 +357,7 @@ func emptyLocation() Location {
 
 func emptyOffer() Offer {
 	return Offer{
-		Harnesses: nil, LastHarness: "", Locations: nil, Location: 0, Projects: nil,
+		Harnesses: nil, Project: "", Locations: nil, Current: -1, NextNumber: 0, Branches: nil,
 	}
 }
 

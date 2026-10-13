@@ -29,7 +29,7 @@ func TestUpdatePersistsRecordsAndProjectState(t *testing.T) {
 	_, err := store.Update(t.Context(), func(ledger *task.Ledger) error {
 		id := ledger.NextID()
 		ledger.Put(projectRecord(id))
-		ledger.SetProject(task.ProjectState{Root: "/code/shop", LastNumber: 3, LastHarness: "pi"})
+		ledger.SetProject(task.ProjectState{Root: "/code/shop", LastNumber: 3})
 
 		return nil
 	})
@@ -47,7 +47,7 @@ func TestUpdatePersistsRecordsAndProjectState(t *testing.T) {
 		t.Errorf("Find(t1) = %+v, %t", record, found)
 	}
 
-	if state := ledger.Project("/code/shop"); state.LastNumber != 3 || state.LastHarness != "pi" {
+	if state := ledger.Project("/code/shop"); state.LastNumber != 3 {
 		t.Errorf("Project() = %+v", state)
 	}
 }
@@ -90,7 +90,7 @@ func TestRejectedUpdateLeavesTheLedgerUnchanged(t *testing.T) {
 	store := task.NewStore(filepath.Join(t.TempDir(), "state", "tasks.json"))
 
 	if _, err := store.Update(t.Context(), func(ledger *task.Ledger) error {
-		ledger.SetProject(task.ProjectState{Root: "/code/shop", LastNumber: 1, LastHarness: "pi"})
+		ledger.SetProject(task.ProjectState{Root: "/code/shop", LastNumber: 1})
 
 		return nil
 	}); err != nil {
@@ -98,7 +98,7 @@ func TestRejectedUpdateLeavesTheLedgerUnchanged(t *testing.T) {
 	}
 
 	_, err := store.Update(t.Context(), func(ledger *task.Ledger) error {
-		ledger.SetProject(task.ProjectState{Root: "/code/shop", LastNumber: 2, LastHarness: "claude"})
+		ledger.SetProject(task.ProjectState{Root: "/code/shop", LastNumber: 2})
 
 		return errRejected
 	})
@@ -111,7 +111,7 @@ func TestRejectedUpdateLeavesTheLedgerUnchanged(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if state := ledger.Project("/code/shop"); state.LastNumber != 1 || state.LastHarness != "pi" {
+	if state := ledger.Project("/code/shop"); state.LastNumber != 1 {
 		t.Errorf("Project() = %+v, want the state before the rejected update", state)
 	}
 }

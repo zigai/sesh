@@ -1,6 +1,7 @@
-// Package taskpicker is the small popup that starts a task: what it is about, where it works and
-// which agent runs there. In a project session "where" lists the project's checkouts and branches;
-// elsewhere it is the pane's directory or another project.
+// Package taskpicker is the small popup that starts a task: what it is about, which agent runs it
+// and where. Left and right always pick the agent. In a repository the task works in a new
+// worktree, the pane's checkout, or an existing branch or checkout from the list the popup expands
+// to; elsewhere it works in the pane's directory.
 package taskpicker
 
 import (
@@ -12,7 +13,6 @@ import (
 	"github.com/sahilm/fuzzy"
 
 	"github.com/zigai/sesh/internal/config"
-	"github.com/zigai/sesh/internal/project"
 	"github.com/zigai/sesh/internal/task"
 	"github.com/zigai/sesh/internal/tui"
 )
@@ -21,9 +21,13 @@ const maxTitleRunes = 120
 
 const (
 	fieldTitle field = iota
-	fieldWhere
-	fieldAgent
-	fieldCount
+	fieldList
+)
+
+const (
+	whereNew where = iota
+	whereHere
+	whereOther
 )
 
 const (
@@ -33,91 +37,85 @@ const (
 )
 
 const (
-	rowLocation rowKind = iota
-	rowHere
-	rowProject
-)
-
-const (
 	sectionNew section = iota
 	sectionCheckout
 	sectionBranch
 	sectionInUse
-	sectionHere
-	sectionProjects
 )
 
-// Options is what the picker offers. Project names the project of a project session and is
-// empty elsewhere; Locations and Location to start on come from the project's offer, and
-// Projects lists the projects outside a project session. Start runs the choice while the popup
-// is still open, so a failure can be shown in it; it returns the started task's ID.
+// Options is what the picker offers. Project names the pane's project and is empty elsewhere;
+// Locations, the Current checkout's index in them, and NextNumber and Branches that name a new
+// worktree's branch come from the project's offer. Expanded lists every location of the project,
+// and Title and Agent fill in the title and agent, the first agent when empty. Start runs the
+// choice while the popup is still open, so a failure can be shown in it.
 type Options struct {
-	Project     string
-	Dir         string
-	Home        string
-	Locations   []task.Location
-	Location    int
-	Projects    []project.Project
-	Harnesses   []string
-	LastHarness string
-	Start       func(Choice) (string, error)
+	Project    string
+	Locations  []task.Location
+	Current    int
+	NextNumber int
+	Branches   []string
+	Harnesses  []string
+	Agent      string
+	Title      string
+	Expanded   bool
+	Start      func(Choice) error
 }
 
 // Choice is what the person picked: a plain tab, or a harness, a title and, in a project, the
-// location the task works in. Project is the root of another project to start the task in. Show
-// is a task to go to once the popup closes: one that already works in the chosen checkout, or a
-// task just started in another project's session.
+// location the task works in. Show is a task to go to once the popup closes, one that already
+// works in the chosen checkout. Reopen asks for the popup again, Expanded or not, keeping the title
+// and harness.
 type Choice struct {
+	Reopen   bool
+	Expanded bool
 	Tab      bool
 	Harness  string
 	Title    string
 	Location task.Location
-	Project  string
 	Show     string
 }
 
 type field int
 
+// where is where the task works: a new worktree, the checkout the pane is in, or an existing
+// branch or checkout picked from the expanded list.
+type where int
+
 type stage int
 
-type rowKind int
-
-// section is a group of where rows, listed in this order under a muted heading.
+// section is a group of list rows, listed in this order under a muted heading.
 type section int
 
-// row is one entry of the where list. A filterOnly row is listed only while filtering, so the
+// row is one entry of the expanded list. A filterOnly row is listed only while filtering, so the
 // list stays short.
 type row struct {
-	kind       rowKind
 	section    section
 	location   task.Location
-	project    project.Project
 	filterOnly bool
 }
 
 type startedMsg struct {
-	id  string
 	err error
 }
 
 type Model struct {
-	chrome  tui.Chrome
-	options Options
-	all     []row
-	rows    []int
-	title   textinput.Model
-	filter  textinput.Model
-	focus   field
-	cursor  int
-	listTop int
-	agent   string
-	width   int
-	height  int
-	stage   stage
-	failure string
-	chosen  Choice
-	done    bool
-	// showFooter shows key hints in the bottom edge.
+	chrome     tui.Chrome
+	options    Options
+	all        []row
+	rows       []int
+	title      textinput.Model
+	filter     textinput.Model
+	focus      field
+	where      where
+	cursor     int
+	listTop    int
+	agent      string
+	width      int
+	height     int
+	stage      stage
+	failure    string
+	chosen     Choice
+	done       bool
 	showFooter bool
 }
 
@@ -125,17 +123,26 @@ func NewModel(cfg *config.Config, opts Options) *Model {
 	chrome := tui.NewChrome(cfg)
 	m := &Model{
 		chrome: chrome, options: opts, all: rowsOf(opts), rows: nil, title: chrome.NewTextInput(),
-		filter: chrome.NewTextInput(), focus: fieldTitle, cursor: 0, listTop: 0, agent: opts.LastHarness,
-		width: 0, height: 0, stage: stagePicking, failure: "", chosen: emptyChoice(), done: false,
-		showFooter: cfg.Tasks.ShowFooter,
+		filter: chrome.NewTextInput(), focus: fieldTitle, where: whereNew, cursor: 0, listTop: 0,
+		agent: opts.Agent, width: 0, height: 0, stage: stagePicking, failure: "", chosen: emptyChoice(),
+		done: false, showFooter: cfg.Tasks.ShowFooter,
 	}
 
 	m.title.CharLimit = maxTitleRunes
-	m.title.Focus()
+	m.title.SetValue(opts.Title)
 	m.filterRows()
 
-	if opts.Project != "" {
-		m.cursor = max(slices.Index(m.rows, opts.Location), 0)
+	switch {
+	case !m.hasWhere():
+		m.where = whereHere
+	case opts.Expanded:
+		m.where = whereOther
+	}
+
+	m.focusField(fieldTitle)
+
+	if opts.Expanded {
+		m.focusField(fieldList)
 	}
 
 	m.keepAgent()
@@ -187,33 +194,86 @@ func (m *Model) View() tea.View {
 }
 
 func (m *Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
+	switch key := msg.String(); key {
 	case "ctrl+c":
 		return m, tea.Quit
 	case "esc":
-		if m.focus == fieldWhere && m.filter.Value() != "" {
-			m.filter.SetValue("")
-			m.filterRows()
-
-			return m, nil
-		}
-
-		return m, tea.Quit
+		return m.escape()
 	case "enter":
-		return m.choose()
-	case "tab":
-		return m, m.focusField((m.focus + 1) % fieldCount)
-	case "shift+tab":
-		return m, m.focusField((m.focus + fieldCount - 1) % fieldCount)
-	case "up", "ctrl+p", "ctrl+k":
-		m.step(-1)
-	case "down", "ctrl+n", "ctrl+j":
-		m.step(1)
-	default:
-		return m, m.updateField(msg)
+		return m.enter()
+	case "left", "right":
+		m.cycleAgent(key)
+
+		return m, nil
+	case "tab", "shift+tab":
+		return m, m.focusField(m.otherField())
+	case "up", "down":
+		m.moveVertically(key)
+
+		return m, nil
 	}
 
-	return m, nil
+	if m.focus == fieldList {
+		return m, m.updateFilter(msg)
+	}
+
+	title, cmd := m.title.Update(msg)
+	m.title = title
+
+	return m, cmd
+}
+
+// moveVertically moves the list's selection, or picks the place to work above or below the chosen
+// one, wrapping around. Typing still goes to the title or the filter.
+func (m *Model) moveVertically(key string) {
+	delta := 1
+	if key == "up" {
+		delta = -1
+	}
+
+	switch {
+	case m.options.Expanded:
+		m.step(delta)
+	case m.hasWhere():
+		m.where = (m.where + where(delta) + whereOther + 1) % (whereOther + 1)
+	}
+}
+
+// updateFilter edits the list's filter.
+func (m *Model) updateFilter(msg tea.KeyPressMsg) tea.Cmd {
+	before := m.filter.Value()
+	filter, cmd := m.filter.Update(msg)
+	m.filter = filter
+
+	if m.filter.Value() != before {
+		m.filterRows()
+	}
+
+	return cmd
+}
+
+// escape clears the list's filter, then closes the list, then the popup.
+func (m *Model) escape() (tea.Model, tea.Cmd) {
+	switch {
+	case m.focus == fieldList && m.filter.Value() != "":
+		m.filter.SetValue("")
+		m.filterRows()
+
+		return m, nil
+	case m.options.Expanded:
+		return m.reopen(false)
+	default:
+		return m, tea.Quit
+	}
+}
+
+// enter opens the list when other is chosen, and otherwise starts the task.
+func (m *Model) enter() (tea.Model, tea.Cmd) {
+	if m.where == whereOther && !m.options.Expanded {
+		return m.reopen(true)
+	}
+
+	return m.choose()
 }
 
 func (m *Model) updateFailedKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -228,36 +288,13 @@ func (m *Model) updateFailedKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// updateField sends a key to the focused field: text to the title or the filter. Left and right
-// always pick the agent; the title's cursor moves with the text input's other keys.
-func (m *Model) updateField(msg tea.KeyPressMsg) tea.Cmd {
-	if key := msg.String(); key == "left" || key == "right" {
-		delta := 1
-		if key == "left" {
-			delta = -1
-		}
-
-		m.cycleAgent(delta)
-
-		return nil
+// otherField is the field tab moves to: between the title and the expanded list's filter.
+func (m *Model) otherField() field {
+	if m.focus == fieldTitle && m.options.Expanded {
+		return fieldList
 	}
 
-	var cmd tea.Cmd
-
-	switch m.focus {
-	case fieldTitle:
-		m.title, cmd = m.title.Update(msg)
-	case fieldWhere:
-		before := m.filter.Value()
-		m.filter, cmd = m.filter.Update(msg)
-
-		if m.filter.Value() != before {
-			m.filterRows()
-		}
-	case fieldAgent, fieldCount:
-	}
-
-	return cmd
+	return fieldTitle
 }
 
 func (m *Model) focusField(next field) tea.Cmd {
@@ -268,36 +305,98 @@ func (m *Model) focusField(next field) tea.Cmd {
 	switch next {
 	case fieldTitle:
 		return m.title.Focus()
-	case fieldWhere:
+	case fieldList:
 		return m.filter.Focus()
-	case fieldAgent, fieldCount:
 	}
 
 	return nil
 }
 
-func (m *Model) cycleAgent(delta int) {
+// cycleAgent picks the agent left or right of the chosen one, wrapping around.
+func (m *Model) cycleAgent(key string) {
+	delta := 1
+	if key == "left" {
+		delta = -1
+	}
+
 	agents := m.agents()
 	index := max(slices.Index(agents, m.agent), 0)
 	m.agent = agents[(index+delta+len(agents))%len(agents)]
 }
 
-// choose goes to the task already working in the selected checkout, or starts the choice.
+// reopen asks for the popup again with the list open or closed, keeping the title and agent.
+func (m *Model) reopen(expanded bool) (tea.Model, tea.Cmd) {
+	m.chosen = emptyChoice()
+	m.chosen.Reopen = true
+	m.chosen.Expanded = expanded
+	m.chosen.Title = strings.TrimSpace(m.title.Value())
+	m.chosen.Harness = m.agent
+	m.done = true
+
+	return m, tea.Quit
+}
+
+// hasWhere reports whether the task can work somewhere other than the pane's checkout: in a
+// repository, whose first location is a new worktree.
+func (m *Model) hasWhere() bool {
+	return m.options.Project != "" && len(m.options.Locations) > 0 && m.options.Locations[0].Where == task.WhereNew
+}
+
+// current is the checkout the pane is in.
+func (m *Model) current() (task.Location, bool) {
+	if index := m.options.Current; index >= 0 && index < len(m.options.Locations) {
+		return m.options.Locations[index], true
+	}
+
+	return emptyLocation(), false
+}
+
+// location is where the task starts: the new worktree, the pane's checkout, the selected row of
+// the list, and outside a project the pane's directory, which needs no location.
+func (m *Model) location() (task.Location, bool) {
+	switch {
+	case m.options.Project == "":
+		return emptyLocation(), true
+	case m.options.Expanded:
+		if m.cursor >= len(m.rows) {
+			return emptyLocation(), false
+		}
+
+		return m.all[m.rows[m.cursor]].location, true
+	case m.where == whereNew:
+		return m.options.Locations[0], true
+	case m.where == whereHere:
+		return m.current()
+	default:
+		return emptyLocation(), false
+	}
+}
+
+// choose goes to the task already working in the chosen checkout, or starts the choice.
 func (m *Model) choose() (tea.Model, tea.Cmd) {
-	selected, ok := m.selected()
+	location, ok := m.location()
 	if !ok {
 		return m, nil
 	}
 
-	if selected.location.Task != "" {
+	if location.Task != "" {
 		m.chosen = emptyChoice()
-		m.chosen.Show = selected.location.Task
+		m.chosen.Show = location.Task
 		m.done = true
 
 		return m, tea.Quit
 	}
 
-	choice := m.choice(selected)
+	choice := emptyChoice()
+	choice.Harness = m.agent
+	choice.Title = strings.TrimSpace(m.title.Value())
+	choice.Location = location
+
+	if m.agent == config.HarnessTab {
+		choice.Tab = true
+		choice.Harness = ""
+	}
+
 	if m.options.Start == nil {
 		m.chosen, m.done = choice, true
 
@@ -309,9 +408,7 @@ func (m *Model) choose() (tea.Model, tea.Cmd) {
 	start := m.options.Start
 
 	return m, func() tea.Msg {
-		id, err := start(choice)
-
-		return startedMsg{id: id, err: err}
+		return startedMsg{err: start(choice)}
 	}
 }
 
@@ -323,54 +420,16 @@ func (m *Model) finishStart(msg startedMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if m.chosen.Project != "" {
-		m.chosen.Show = msg.id
-	}
-
 	m.done = true
 
 	return m, tea.Quit
 }
 
-func (m *Model) choice(selected row) Choice {
-	choice := emptyChoice()
-	choice.Harness = m.agent
-	choice.Title = strings.TrimSpace(m.title.Value())
-
-	switch selected.kind {
-	case rowHere:
-		if m.agent == config.HarnessTab {
-			choice.Tab = true
-			choice.Harness = ""
-		}
-	case rowProject:
-		choice.Project = selected.project.Root
-		if selected.project.Kind == project.KindFolder {
-			choice.Location.Where = task.WhereMain
-			choice.Location.Directory = selected.project.Root
-		} else {
-			choice.Location.Where = task.WhereNew
-		}
-	case rowLocation:
-		choice.Location = selected.location
-	}
-
-	return choice
-}
-
-func (m *Model) selected() (row, bool) {
-	if m.cursor >= len(m.rows) {
-		return row{kind: rowLocation, section: sectionNew, location: emptyLocation(), project: emptyProject(), filterOnly: false}, false
-	}
-
-	return m.all[m.rows[m.cursor]], true
-}
-
-// agents are the agent choices for the selected row: a plain tab first in the pane's directory,
-// and a shell after the agents in a project.
+// agents are the agent choices: the agents, then a plain tab outside a project or a shell in a
+// project.
 func (m *Model) agents() []string {
-	if selected, _ := m.selected(); selected.kind == rowHere {
-		return append([]string{config.HarnessTab}, m.options.Harnesses...)
+	if m.options.Project == "" {
+		return append(slices.Clone(m.options.Harnesses), config.HarnessTab)
 	}
 
 	return append(slices.Clone(m.options.Harnesses), config.HarnessNone)
@@ -391,7 +450,7 @@ func (m *Model) filterRows() {
 	} else {
 		labels := make([]string, len(m.all))
 		for index, entry := range m.all {
-			name, detail := m.label(entry)
+			name, detail := label(entry)
 			labels[index] = entry.section.label() + " " + name + " " + detail
 		}
 
@@ -412,21 +471,19 @@ func (m *Model) filterRows() {
 
 	m.cursor = 0
 	m.listTop = 0
-	m.keepAgent()
 }
 
 func (m *Model) move(delta int) {
-	if len(m.rows) == 0 {
+	if !m.options.Expanded || len(m.rows) == 0 {
 		return
 	}
 
 	m.cursor = min(max(m.cursor+delta, 0), len(m.rows)-1)
 	m.keepCursorVisible()
-	m.keepAgent()
 }
 
-// step moves the cursor by one row from the keyboard, wrapping from the last row to the first and
-// back.
+// step moves the list's selection by one row from the keyboard, wrapping from the last row to the
+// first and back.
 func (m *Model) step(delta int) {
 	if len(m.rows) == 0 {
 		return
@@ -434,11 +491,9 @@ func (m *Model) step(delta int) {
 
 	m.cursor = (m.cursor + delta + len(m.rows)) % len(m.rows)
 	m.keepCursorVisible()
-	m.keepAgent()
 }
 
-// keepAgent keeps the chosen agent when the selected row offers it, and otherwise picks the
-// first agent the row offers.
+// keepAgent keeps the chosen agent when it is offered, and otherwise picks the first agent.
 func (m *Model) keepAgent() {
 	if agents := m.agents(); !slices.Contains(agents, m.agent) {
 		m.agent = agents[0]
@@ -452,7 +507,7 @@ func (m *Model) keepCursorVisible() {
 	lines := m.lines()
 
 	target := slices.IndexFunc(lines, func(l listLine) bool { return l.row == m.cursor })
-	if target < 0 {
+	if target < 0 || rows <= 0 {
 		m.listTop = 0
 
 		return
@@ -485,7 +540,7 @@ func (m *Model) wheel(mouse tea.Mouse) {
 	}
 }
 
-// click selects the row or agent under the pointer.
+// click selects the choice or list row under the pointer.
 func (m *Model) click(mouse tea.Mouse) {
 	if mouse.Button != tea.MouseLeft || m.stage != stagePicking {
 		return
@@ -494,46 +549,47 @@ func (m *Model) click(mouse tea.Mouse) {
 	geometry := m.layout()
 	line, column := mouse.Y-1, mouse.X-bodyColumn
 
-	lines := m.lines()
-	if index := m.listTop + line - geometry.listTop; line >= geometry.listTop && line < geometry.listTop+geometry.listRows && index < len(lines) {
-		if lines[index].row >= 0 {
-			m.cursor = lines[index].row
-			m.keepAgent()
-		}
-
-		return
-	}
-
-	if row := line - geometry.agentTop; row >= 0 && row < len(geometry.choices) {
-		agents := m.agents()
-
-		for _, choice := range geometry.choices[row] {
-			if column >= choice.start && column < choice.end {
-				m.agent = agents[choice.index]
-			}
+	switch {
+	case geometry.whereTop >= 0 && line >= geometry.whereTop && line <= geometry.whereTop+int(whereOther):
+		m.where = where(line - geometry.whereTop)
+	case line >= geometry.listTop && line < geometry.listTop+geometry.listRows:
+		m.clickList(line - geometry.listTop)
+	case line >= geometry.agentTop && line < geometry.agentTop+len(geometry.agentChoices):
+		if index, found := choiceAt(geometry.agentChoices[line-geometry.agentTop], column); found {
+			m.agent = m.agents()[index]
 		}
 	}
 }
 
-// rowsOf lists the where rows: a project's locations, or the pane's directory and the projects.
-// New worktrees after the leading ones start from less likely bases and wait for a filter.
-func rowsOf(opts Options) []row {
-	if opts.Project != "" {
-		rows := make([]row, 0, len(opts.Locations))
-		leading := true
+// clickList selects the list row on the given line of the list.
+func (m *Model) clickList(line int) {
+	lines := m.lines()
+	if index := m.listTop + line; index < len(lines) && lines[index].row >= 0 {
+		m.cursor = lines[index].row
+	}
+}
 
-		for _, location := range opts.Locations {
-			leading = leading && location.Where == task.WhereNew
-			filterOnly := !leading && location.Where == task.WhereNew
-			rows = append(rows, row{kind: rowLocation, section: sectionOf(location), location: location, project: emptyProject(), filterOnly: filterOnly})
+// choiceAt returns the index of the choice that covers column.
+func choiceAt(choices []placed, column int) (int, bool) {
+	for _, choice := range choices {
+		if column >= choice.start && column < choice.end {
+			return choice.index, true
 		}
-
-		return rows
 	}
 
-	rows := []row{{kind: rowHere, section: sectionHere, location: emptyLocation(), project: emptyProject(), filterOnly: false}}
-	for _, p := range opts.Projects {
-		rows = append(rows, row{kind: rowProject, section: sectionProjects, location: emptyLocation(), project: p, filterOnly: false})
+	return 0, false
+}
+
+// rowsOf lists the rows of the expanded list: the project's locations. New worktrees after the
+// leading ones start from less likely bases and wait for a filter.
+func rowsOf(opts Options) []row {
+	rows := make([]row, 0, len(opts.Locations))
+	leading := true
+
+	for _, location := range opts.Locations {
+		leading = leading && location.Where == task.WhereNew
+		filterOnly := !leading && location.Where == task.WhereNew
+		rows = append(rows, row{section: sectionOf(location), location: location, filterOnly: filterOnly})
 	}
 
 	return rows
@@ -553,13 +609,9 @@ func sectionOf(location task.Location) section {
 }
 
 func emptyChoice() Choice {
-	return Choice{Tab: false, Harness: "", Title: "", Location: emptyLocation(), Project: "", Show: ""}
+	return Choice{Reopen: false, Expanded: false, Tab: false, Harness: "", Title: "", Location: emptyLocation(), Show: ""}
 }
 
 func emptyLocation() task.Location {
 	return task.Location{Where: "", Branch: "", Remote: "", Directory: "", Task: "", TaskTitle: ""}
-}
-
-func emptyProject() project.Project {
-	return project.Project{Root: "", Name: "", Kind: ""}
 }

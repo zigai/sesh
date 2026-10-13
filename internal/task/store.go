@@ -114,13 +114,10 @@ type Run struct {
 	FinishedAt int64     `json:"finishedAt"`
 }
 
-// ProjectState remembers per project the last task number handed out and the last harness and
-// kind of location chosen. Root is empty for loose tasks.
+// ProjectState remembers per project the last task number handed out.
 type ProjectState struct {
-	Root        string `json:"root"`
-	LastNumber  int    `json:"lastNumber"`
-	LastHarness string `json:"lastHarness"`
-	LastWhere   string `json:"lastWhere"`
+	Root       string `json:"root"`
+	LastNumber int    `json:"lastNumber"`
 }
 
 type Ledger struct {
@@ -250,7 +247,7 @@ func (l *Ledger) Project(root string) ProjectState {
 		}
 	}
 
-	return ProjectState{Root: root, LastNumber: 0, LastHarness: "", LastWhere: ""}
+	return ProjectState{Root: root, LastNumber: 0}
 }
 
 // NextID reserves the next task identifier.

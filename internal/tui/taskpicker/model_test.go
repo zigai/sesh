@@ -10,7 +10,6 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/zigai/sesh/internal/config"
-	"github.com/zigai/sesh/internal/project"
 	"github.com/zigai/sesh/internal/task"
 	"github.com/zigai/sesh/internal/tui/taskpicker"
 )
@@ -23,27 +22,32 @@ var (
 	hotfixTree   = task.Location{Where: task.WhereWorktree, Branch: "hotfix", Directory: "/code/shop-hotfix"}
 	featureBr    = task.Location{Where: task.WhereBranch, Branch: "feature"}
 	reviewTree   = task.Location{Where: task.WhereWorktree, Branch: "review", Directory: "/code/shop-review", Task: "t7", TaskTitle: "review docs"}
-	webProject   = project.Project{Root: "/code/web", Name: "web", Kind: project.KindGit}
 )
 
-// starts records what the picker asked to start and answers with fixed results.
+const (
+	hereCheckout = 2
+	busyCheckout = 4
+)
+
+// starts records what the picker asked to start and answers with a fixed result.
 type starts struct {
 	choices []taskpicker.Choice
 	err     error
 }
 
-func (s *starts) start(choice taskpicker.Choice) (string, error) {
+func (s *starts) start(choice taskpicker.Choice) error {
 	s.choices = append(s.choices, choice)
 
-	return "t9", s.err
+	return s.err
 }
 
-func TestEnterStartsWithTheLastChoices(t *testing.T) {
-	model, started := projectModel(t, 1, "claude")
+func TestEnterStartsTheFirstAgentInANewWorktreeWithTheTrimmedTitle(t *testing.T) {
+	model, started := compactModel(t, 1, "")
 
+	run(model, typed("  Fix login ")...)
 	run(model, key(tea.KeyEnter))
 
-	want := taskpicker.Choice{Harness: "claude", Location: mainCheckout}
+	want := taskpicker.Choice{Harness: "pi", Title: "Fix login", Location: newWorktree}
 	if len(started.choices) != 1 || started.choices[0] != want {
 		t.Fatalf("started %+v, want %+v", started.choices, want)
 	}
@@ -53,84 +57,107 @@ func TestEnterStartsWithTheLastChoices(t *testing.T) {
 	}
 }
 
-func TestTypedTitleIsPassedTrimmed(t *testing.T) {
-	model, started := projectModel(t, 0, "pi")
-
-	run(model, typed("  Fix login redirect ")...)
-	run(model, key(tea.KeyEnter))
-
-	if len(started.choices) != 1 || started.choices[0].Title != "Fix login redirect" {
-		t.Fatalf("started %+v, want the trimmed title", started.choices)
-	}
-}
-
-func TestNewWorktreesFromOtherBranchesAppearOnlyWhenFiltering(t *testing.T) {
-	options := projectOptions(0, "pi", nil)
-	fromFeature := task.Location{Where: task.WhereNew, Branch: "feature"}
-	options.Locations = append(options.Locations, fromFeature)
-	model := sized(options)
-
-	if rows := sectionRows(t, model, "new worktree"); len(rows) != 1 || !strings.Contains(rows[0], "main") {
-		t.Fatalf("new worktree rows = %q before filtering, want only main", rows)
-	}
-
-	started := &starts{}
-	options.Start = started.start
-	model = sized(options)
-
-	run(model, key(tea.KeyTab))
-	run(model, typed("new feat")...)
-	run(model, key(tea.KeyEnter))
-
-	if len(started.choices) != 1 || started.choices[0].Location != fromFeature {
-		t.Fatalf("started %+v, want a new worktree from feature", started.choices)
-	}
-}
-
-func TestLeftAndRightPickTheAgentFromEveryField(t *testing.T) {
-	model, started := projectModel(t, 0, "pi")
+func TestLeftAndRightPickTheAgentWhileTyping(t *testing.T) {
+	model, started := compactModel(t, 1, "")
 
 	run(model, typed("ab")...)
-	run(model, key(tea.KeyRight), key(tea.KeyTab), key(tea.KeyRight), key(tea.KeyEnter))
+	run(model, key(tea.KeyRight))
+	run(model, typed("c")...)
+	run(model, key(tea.KeyRight), key(tea.KeyRight), key(tea.KeyLeft), key(tea.KeyEnter))
 
-	if len(started.choices) != 1 || started.choices[0].Title != "ab" || started.choices[0].Harness != config.HarnessNone {
-		t.Fatalf("started %+v, want title ab with none", started.choices)
+	if len(started.choices) != 1 || started.choices[0].Title != "abc" || started.choices[0].Harness != config.HarnessNone {
+		t.Fatalf("started %+v, want title abc with none", started.choices)
 	}
 }
 
-func TestFilteringNarrowsTheLocations(t *testing.T) {
-	model, started := projectModel(t, 0, "pi")
+func TestTheTitleKeepsItsReadlineKeys(t *testing.T) {
+	model, started := compactModel(t, 1, "")
 
-	run(model, key(tea.KeyTab))
-	run(model, typed("feature")...)
+	run(model, typed("fix the bug")...)
+	run(model, ctrl('w'), ctrl('b'), ctrl('b'))
+	run(model, typed("X")...)
 	run(model, key(tea.KeyEnter))
 
-	if len(started.choices) != 1 || started.choices[0].Location != featureBr {
-		t.Fatalf("started %+v, want the feature branch", started.choices)
+	if len(started.choices) != 1 || started.choices[0].Title != "fix thXe" {
+		t.Fatalf("started %+v, want title %q", started.choices, "fix thXe")
 	}
 }
 
-func TestFilterPutsNamesContainingTheQueryBeforeScatteredMatches(t *testing.T) {
-	model, _ := projectModel(t, 0, "pi")
+func TestTheNewWorktreeLineNamesItsBranch(t *testing.T) {
+	model, _ := compactModel(t, 1, "")
 
-	run(model, key(tea.KeyTab))
-	run(model, typed("hot")...)
+	if line := placeLine(t, model, "new worktree"); !strings.Contains(line, "wt/main/4") {
+		t.Fatalf("new worktree line = %q, want the numbered branch", line)
+	}
 
-	if row := rowLines(t, model)[0]; !strings.Contains(row, "shop-hotfix") {
-		t.Fatalf("first row = %q, want the hotfix worktree before the scattered match in main checkout", row)
+	run(model, typed("Fix login")...)
+
+	if line := placeLine(t, model, "new worktree"); !strings.Contains(line, "wt/fix-login-2") {
+		t.Fatalf("new worktree line = %q, want the titled branch past the taken name", line)
 	}
 }
 
-func TestEscapeClearsTheFilterAndThenClosesWithoutAChoice(t *testing.T) {
-	model, started := projectModel(t, 0, "pi")
+func TestDownChoosesThePanesCheckout(t *testing.T) {
+	model, started := compactModel(t, hereCheckout, "")
 
-	run(model, key(tea.KeyTab))
-	run(model, typed("feature")...)
-	run(model, key(tea.KeyEscape))
-
-	if rows := rowLines(t, model); len(rows) != 5 || !strings.Contains(rows[0], "main") || !strings.Contains(rows[3], "feature") {
-		t.Fatalf("after esc the rows are %q, want every location back", rows)
+	if line := placeLine(t, model, "this checkout"); !strings.Contains(line, "shop-hotfix · hotfix") {
+		t.Fatalf("this checkout line = %q, want the hotfix checkout and its branch", line)
 	}
+
+	run(model, key(tea.KeyDown), key(tea.KeyEnter))
+
+	if len(started.choices) != 1 || started.choices[0].Location != hotfixTree {
+		t.Fatalf("started %+v, want the hotfix worktree", started.choices)
+	}
+}
+
+func TestEveryUpOrDownPicksAnotherPlaceAndTypingStillGoesToTheTitle(t *testing.T) {
+	model, started := compactModel(t, hereCheckout, "")
+
+	run(model, typed("x")...)
+	run(model, key(tea.KeyUp))
+
+	if line := placeLine(t, model, "existing branch"); !strings.Contains(line, "▌") {
+		t.Fatalf("up from the first place selects %q, want the last place", line)
+	}
+
+	run(model, key(tea.KeyDown), key(tea.KeyDown))
+	run(model, typed("y")...)
+	run(model, key(tea.KeyEnter))
+
+	if len(started.choices) != 1 || started.choices[0].Title != "xy" || started.choices[0].Location != hotfixTree {
+		t.Fatalf("started %+v, want title xy in the hotfix worktree", started.choices)
+	}
+}
+
+func TestABusyCheckoutGoesToItsTaskInsteadOfStartingOne(t *testing.T) {
+	model, started := compactModel(t, busyCheckout, "")
+
+	if line := placeLine(t, model, "this checkout"); !strings.Contains(line, "review docs") {
+		t.Fatalf("this checkout line = %q, want the task working there", line)
+	}
+
+	run(model, key(tea.KeyDown), key(tea.KeyEnter))
+
+	if choice, ok := model.Chosen(); !ok || choice.Show != "t7" || len(started.choices) != 0 {
+		t.Fatalf("Chosen() = %+v, %t, started %+v; want to go to t7 without starting", choice, ok, started.choices)
+	}
+}
+
+func TestEnterOnAnExistingBranchAsksForTheListKeepingTitleAndAgent(t *testing.T) {
+	model, started := compactModel(t, 1, "")
+
+	run(model, typed(" Fix login ")...)
+	run(model, key(tea.KeyRight), key(tea.KeyDown), key(tea.KeyDown), key(tea.KeyEnter))
+
+	want := taskpicker.Choice{Reopen: true, Expanded: true, Title: "Fix login", Harness: "claude"}
+	if choice, ok := model.Chosen(); !ok || choice != want || len(started.choices) != 0 {
+		t.Fatalf("Chosen() = %+v, %t, started %+v; want %+v", choice, ok, started.choices, want)
+	}
+}
+
+func TestEscapeClosesWithoutAChoice(t *testing.T) {
+	model, started := compactModel(t, 1, "")
 
 	run(model, key(tea.KeyEscape))
 
@@ -139,153 +166,75 @@ func TestEscapeClearsTheFilterAndThenClosesWithoutAChoice(t *testing.T) {
 	}
 }
 
-func TestACheckoutWithATaskGoesToThatTaskInsteadOfStartingOne(t *testing.T) {
-	model, started := projectModel(t, 4, "pi")
-
-	if rows := sectionRows(t, model, "in use"); len(rows) != 1 || !strings.Contains(rows[0], "shop-review") || !strings.Contains(rows[0], "review docs") {
-		t.Fatalf("in use rows = %q, want the busy checkout with its task", rows)
-	}
-
-	run(model, key(tea.KeyEnter))
-
-	if choice, ok := model.Chosen(); !ok || choice.Show != "t7" || len(started.choices) != 0 {
-		t.Fatalf("Chosen() = %+v, %t, started %+v; want to go to t7 without starting", choice, ok, started.choices)
-	}
-}
-
-func TestAFailedStartShowsWhyAndGoesBackToTheForm(t *testing.T) {
-	model, started := projectModel(t, 3, "pi")
-	started.err = errBranchTaken
-
-	run(model, key(tea.KeyEnter))
-
-	if view := plainView(model); !strings.Contains(view, "branch is already checked out") {
-		t.Fatalf("the failure is not shown:\n%s", view)
-	}
-
-	if _, ok := model.Chosen(); ok {
-		t.Fatal("Chosen() reports a choice after a failed start")
-	}
-
-	started.err = nil
-
-	run(model, key(tea.KeyEnter), key(tea.KeyUp), key(tea.KeyEnter))
-
-	if len(started.choices) != 2 || started.choices[1].Location != hotfixTree {
-		t.Fatalf("started %+v, want a retry in the hotfix worktree", started.choices)
-	}
-}
-
-func TestOutsideAProjectTheDirectoryOffersATabAndProjectsOfferAgents(t *testing.T) {
-	model, started := looseModel(t)
-
-	if row := agentRow(t, model); !strings.Contains(row, "tab   pi   claude") || strings.Contains(row, "none") {
-		t.Fatalf("agent row here = %q, want tab, pi, claude", row)
-	}
-
-	run(model, key(tea.KeyEnter))
-
-	if len(started.choices) != 1 || !started.choices[0].Tab {
-		t.Fatalf("started %+v, want a plain tab", started.choices)
-	}
-
-	model, started = looseModel(t)
-	run(model, key(tea.KeyDown))
-
-	if row := agentRow(t, model); strings.Contains(row, "tab") || !strings.Contains(row, "none") {
-		t.Fatalf("agent row for a project = %q, want the agents and none", row)
-	}
-
-	run(model, key(tea.KeyEnter))
-
-	choice, ok := model.Chosen()
-
-	if len(started.choices) != 1 || started.choices[0].Project != "/code/web" || started.choices[0].Harness != "pi" {
-		t.Fatalf("started %+v, want pi in the web project", started.choices)
-	}
-
-	if !ok || choice.Show != "t9" {
-		t.Fatalf("Chosen() = %+v, %t; want to go to the started task", choice, ok)
-	}
-}
-
-func TestSelectingARegisteredFolderStartsInItsMainDirectory(t *testing.T) {
+func TestTheListStartsWithTheTitleAndAgentItWasGiven(t *testing.T) {
 	started := &starts{}
-	folder := project.Project{Root: "/home/dev/notes", Name: "notes", Kind: project.KindFolder}
-	model := sized(taskpicker.Options{
-		Dir: "/home/dev/scratch", Home: "/home/dev", Projects: []project.Project{folder},
-		Harnesses: []string{"pi"}, LastHarness: "", Start: started.start,
-	})
+	options := listOptions("claude", started.start)
+	options.Title = "Fix login"
+	model := sized(options)
 
-	run(model, key(tea.KeyDown), key(tea.KeyEnter))
+	run(model, typed("feature")...)
+	run(model, key(tea.KeyEnter))
 
-	want := taskpicker.Choice{Project: folder.Root, Harness: "pi", Location: task.Location{Where: task.WhereMain, Directory: folder.Root}}
+	want := taskpicker.Choice{Harness: "claude", Title: "Fix login", Location: featureBr}
 	if len(started.choices) != 1 || started.choices[0] != want {
 		t.Fatalf("started %+v, want %+v", started.choices, want)
 	}
-
-	if choice, ok := model.Chosen(); !ok || choice.Show != "t9" {
-		t.Fatalf("Chosen() = %+v, %t; want to show the started task", choice, ok)
-	}
 }
 
-func TestClickingAnAgentSelectsIt(t *testing.T) {
-	model, started := projectModel(t, 0, "pi")
-	lines := strings.Split(plainView(model), "\n")
-	row := slicesIndex(lines, "agent")
-	column := strings.Index(lines[row], "none")
-
-	run(model, tea.MouseClickMsg(tea.Mouse{X: column, Y: row, Button: tea.MouseLeft}), key(tea.KeyEnter))
-
-	if len(started.choices) != 1 || started.choices[0].Harness != config.HarnessNone {
-		t.Fatalf("started %+v, want none", started.choices)
-	}
-}
-
-func TestPopupFitsEveryOfferWithoutTruncating(t *testing.T) {
-	options := projectOptions(0, "pi", nil)
-	options.Locations = append([]task.Location{{Where: task.WhereNew, Branch: "wt/fix-login-redirect"}}, options.Locations...)
+func TestEscapeInTheListClearsTheFilterAndThenAsksToCloseTheList(t *testing.T) {
+	started := &starts{}
+	options := listOptions("", started.start)
+	options.Title = "Fix login"
 	model := sized(options)
-	width, height := taskpicker.Size(config.DefaultConfig(), options)
-	view := plainView(model)
 
-	if lines := strings.Split(view, "\n"); len(lines) != height {
-		t.Fatalf("view has %d lines, want %d", len(lines), height)
+	run(model, typed("feature")...)
+	run(model, key(tea.KeyEscape))
+
+	if rows := rowLines(t, model); len(rows) != 5 {
+		t.Fatalf("after esc the rows are %q, want every location back", rows)
 	}
 
-	for line := range strings.SplitSeq(view, "\n") {
-		if lineWidth := ansi.StringWidth(line); lineWidth != width {
-			t.Fatalf("line %q is %d wide, want %d", line, lineWidth, width)
-		}
-	}
+	run(model, key(tea.KeyLeft), key(tea.KeyEscape))
 
-	for _, want := range []string{"new task", "shop", "new worktree", "checkouts", "branches", "in use", "shop-hotfix", "hotfix", "feature", "review docs", "wt/fix-login-redirect"} {
-		if !strings.Contains(view, want) {
-			t.Fatalf("view does not show %q:\n%s", want, view)
-		}
+	want := taskpicker.Choice{Reopen: true, Expanded: false, Title: "Fix login", Harness: config.HarnessNone}
+	if choice, ok := model.Chosen(); !ok || choice != want || len(started.choices) != 0 {
+		t.Fatalf("Chosen() = %+v, %t; want %+v", choice, ok, want)
 	}
 }
 
-func TestKeyHintsShowOnlyWhenTheFooterIsEnabled(t *testing.T) {
-	options := projectOptions(0, "pi", nil)
+func TestNewWorktreesFromOtherBranchesAppearOnlyWhenFiltering(t *testing.T) {
+	options := listOptions("", nil)
+	fromFeature := task.Location{Where: task.WhereNew, Branch: "feature"}
+	options.Locations = append(options.Locations, fromFeature)
 
-	if view := plainView(sized(options)); strings.Contains(view, "enter") {
-		t.Fatalf("the default popup shows key hints:\n%s", view)
+	if rows := sectionRows(t, sized(options), "new worktree"); len(rows) != 1 || !strings.Contains(rows[0], "main") {
+		t.Fatalf("new worktree rows = %q before filtering, want only main", rows)
 	}
 
-	cfg := config.DefaultConfig()
-	cfg.Tasks.ShowFooter = true
-	model := taskpicker.NewModel(cfg, options)
-	width, height := taskpicker.Size(cfg, options)
-	model.Update(tea.WindowSizeMsg{Width: width, Height: height})
+	started := &starts{}
+	options.Start = started.start
+	model := sized(options)
 
-	if view := plainView(model); !strings.Contains(view, "enter start") {
-		t.Fatalf("the popup with show_footer hides key hints:\n%s", view)
+	run(model, typed("new feat")...)
+	run(model, key(tea.KeyEnter))
+
+	if len(started.choices) != 1 || started.choices[0].Location != fromFeature {
+		t.Fatalf("started %+v, want a new worktree from feature", started.choices)
+	}
+}
+
+func TestFilterPutsNamesContainingTheQueryBeforeScatteredMatches(t *testing.T) {
+	model, _ := listModel(t, "")
+
+	run(model, typed("hot")...)
+
+	if row := rowLines(t, model)[0]; !strings.Contains(row, "shop-hotfix") {
+		t.Fatalf("first row = %q, want the hotfix worktree before the scattered match in main checkout", row)
 	}
 }
 
 func TestArrowKeysWrapAroundTheList(t *testing.T) {
-	model, started := projectModel(t, 0, "pi")
+	model, started := listModel(t, "")
 
 	run(model, key(tea.KeyUp), key(tea.KeyEnter))
 
@@ -293,16 +242,16 @@ func TestArrowKeysWrapAroundTheList(t *testing.T) {
 		t.Fatalf("up from the first row chose %+v, %t; want the last row, the busy checkout", choice, ok)
 	}
 
-	model, started = projectModel(t, 4, "pi")
-	run(model, key(tea.KeyDown), key(tea.KeyEnter))
+	model, started = listModel(t, "")
+	run(model, key(tea.KeyUp), key(tea.KeyDown), key(tea.KeyEnter))
 
 	if len(started.choices) != 1 || started.choices[0].Location != newWorktree {
 		t.Fatalf("down from the last row started %+v, want the first row", started.choices)
 	}
 }
 
-func TestLongLocationListsScrollToKeepTheSelectionVisible(t *testing.T) {
-	options := projectOptions(0, "pi", nil)
+func TestLongListsScrollToKeepTheSelectionVisible(t *testing.T) {
+	options := listOptions("", nil)
 	for index := range 20 {
 		options.Locations = append(options.Locations, task.Location{Where: task.WhereBranch, Branch: "branch-" + strconv.Itoa(index)})
 	}
@@ -317,12 +266,172 @@ func TestLongLocationListsScrollToKeepTheSelectionVisible(t *testing.T) {
 	}
 }
 
-func projectModel(t *testing.T, location int, lastHarness string) (*taskpicker.Model, *starts) {
+func TestAFailedStartShowsWhyAndGoesBackToTheForm(t *testing.T) {
+	model, started := compactModel(t, hereCheckout, "")
+	started.err = errBranchTaken
+
+	run(model, key(tea.KeyEnter))
+
+	if view := plainView(model); !strings.Contains(view, "branch is already checked out") {
+		t.Fatalf("the failure is not shown:\n%s", view)
+	}
+
+	if _, ok := model.Chosen(); ok {
+		t.Fatal("Chosen() reports a choice after a failed start")
+	}
+
+	started.err = nil
+
+	run(model, key(tea.KeyEnter), key(tea.KeyDown), key(tea.KeyEnter))
+
+	if len(started.choices) != 2 || started.choices[1].Location != hotfixTree {
+		t.Fatalf("started %+v, want a retry in the hotfix worktree", started.choices)
+	}
+}
+
+func TestOutsideAProjectATaskOrTabStartsInThePanesDirectory(t *testing.T) {
+	model, started := looseModel(t)
+
+	if row := agentRow(t, model); !strings.Contains(row, "pi   claude   tab") || strings.Contains(row, "none") {
+		t.Fatalf("agent row = %q, want pi, claude, tab", row)
+	}
+
+	if view := plainView(model); strings.Contains(view, "worktree") || strings.Contains(view, "checkout") {
+		t.Fatalf("the popup outside a project offers places to work:\n%s", view)
+	}
+
+	run(model, key(tea.KeyLeft), key(tea.KeyEnter))
+
+	if len(started.choices) != 1 || !started.choices[0].Tab {
+		t.Fatalf("started %+v, want a plain tab", started.choices)
+	}
+
+	model, started = looseModel(t)
+	run(model, typed("Fix login")...)
+	run(model, key(tea.KeyDown), key(tea.KeyEnter))
+
+	want := taskpicker.Choice{Harness: "pi", Title: "Fix login"}
+	if len(started.choices) != 1 || started.choices[0] != want {
+		t.Fatalf("started %+v, want %+v", started.choices, want)
+	}
+}
+
+func TestAFolderProjectWorksInItsDirectory(t *testing.T) {
+	started := &starts{}
+	folder := task.Location{Where: task.WhereMain, Directory: "/code/notes"}
+	model := sized(taskpicker.Options{
+		Project: "notes", Locations: []task.Location{folder}, Current: 0, Harnesses: []string{"pi"}, Start: started.start,
+	})
+
+	if view := plainView(model); strings.Contains(view, "worktree") {
+		t.Fatalf("a folder offers places to work:\n%s", view)
+	}
+
+	run(model, key(tea.KeyEnter))
+
+	if len(started.choices) != 1 || started.choices[0].Location != folder {
+		t.Fatalf("started %+v, want the folder", started.choices)
+	}
+}
+
+func TestClickingAPlaceAndAnAgentSelectsThem(t *testing.T) {
+	model, started := compactModel(t, hereCheckout, "")
+	lines := strings.Split(plainView(model), "\n")
+
+	row := slicesContaining(lines, "this checkout")
+	run(model, tea.MouseClickMsg(tea.Mouse{X: strings.Index(lines[row], "this checkout"), Y: row, Button: tea.MouseLeft}))
+
+	row = slicesIndex(lines, "agent")
+	run(model, tea.MouseClickMsg(tea.Mouse{X: strings.Index(lines[row], "none"), Y: row, Button: tea.MouseLeft}), key(tea.KeyEnter))
+
+	if len(started.choices) != 1 || started.choices[0].Harness != config.HarnessNone || started.choices[0].Location != hotfixTree {
+		t.Fatalf("started %+v, want none in the hotfix worktree", started.choices)
+	}
+}
+
+func TestPopupsFitTheirContentWithoutTruncating(t *testing.T) {
+	compact := compactOptions(hereCheckout, "", nil)
+	list := listOptions("", nil)
+	list.Locations = append([]task.Location{{Where: task.WhereNew, Branch: "wt/fix-login-redirect"}}, list.Locations...)
+	list.Current = 2
+
+	for _, tc := range []struct {
+		options taskpicker.Options
+		want    []string
+	}{
+		{options: compact, want: []string{"new task", "shop", "new worktree", "wt/main/4", "this checkout", "shop-hotfix", "existing branch", "pi", "none", "enter start"}},
+		{options: list, want: []string{"new worktree", "checkouts", "branches", "in use", "shop-hotfix", "feature", "review docs", "wt/fix-login-redirect", "esc back"}},
+		{options: taskpicker.Options{Harnesses: []string{"pi", "claude"}}, want: []string{"new task", "pi", "claude", "tab", "enter start"}},
+	} {
+		width, height := taskpicker.Size(config.DefaultConfig(), tc.options)
+		view := plainView(sized(tc.options))
+
+		if lines := strings.Split(view, "\n"); len(lines) != height {
+			t.Fatalf("view has %d lines, want %d:\n%s", len(lines), height, view)
+		}
+
+		for row := range strings.SplitSeq(view, "\n") {
+			if rowWidth := ansi.StringWidth(row); rowWidth != width {
+				t.Fatalf("line %q is %d wide, want %d", row, rowWidth, width)
+			}
+		}
+
+		for _, want := range tc.want {
+			if !strings.Contains(view, want) {
+				t.Fatalf("view does not show %q:\n%s", want, view)
+			}
+		}
+	}
+}
+
+func TestTheListIsAsWideAsTheCompactPopup(t *testing.T) {
+	compactWidth, _ := taskpicker.Size(config.DefaultConfig(), compactOptions(1, "", nil))
+	listWidth, _ := taskpicker.Size(config.DefaultConfig(), listOptions("", nil))
+
+	if compactWidth != listWidth {
+		t.Fatalf("compact width %d, list width %d; want the same", compactWidth, listWidth)
+	}
+}
+
+func TestKeyHintsNameTheKeysAndCanBeTurnedOff(t *testing.T) {
+	model, _ := compactModel(t, 1, "")
+
+	if view := plainView(model); !strings.Contains(view, "←→ agent") || !strings.Contains(view, "↑↓ where") || !strings.Contains(view, "enter start") {
+		t.Fatalf("the hints are wrong:\n%s", view)
+	}
+
+	run(model, key(tea.KeyUp))
+
+	if view := plainView(model); !strings.Contains(view, "enter branches") {
+		t.Fatalf("an existing branch does not say enter opens the branches:\n%s", view)
+	}
+
+	cfg := config.DefaultConfig()
+	cfg.Tasks.ShowFooter = false
+	options := compactOptions(1, "", nil)
+	hidden := taskpicker.NewModel(cfg, options)
+	width, height := taskpicker.Size(cfg, options)
+	hidden.Update(tea.WindowSizeMsg{Width: width, Height: height})
+
+	if view := plainView(hidden); strings.Contains(view, "enter") {
+		t.Fatalf("the popup with show_footer off shows key hints:\n%s", view)
+	}
+}
+
+func compactModel(t *testing.T, current int, agent string) (*taskpicker.Model, *starts) {
 	t.Helper()
 
 	started := &starts{}
 
-	return sized(projectOptions(location, lastHarness, started.start)), started
+	return sized(compactOptions(current, agent, started.start)), started
+}
+
+func listModel(t *testing.T, agent string) (*taskpicker.Model, *starts) {
+	t.Helper()
+
+	started := &starts{}
+
+	return sized(listOptions(agent, started.start)), started
 }
 
 func looseModel(t *testing.T) (*taskpicker.Model, *starts) {
@@ -330,22 +439,29 @@ func looseModel(t *testing.T) (*taskpicker.Model, *starts) {
 
 	started := &starts{}
 
-	return sized(taskpicker.Options{
-		Dir: "/home/dev/notes", Home: "/home/dev", Projects: []project.Project{webProject},
-		Harnesses: []string{"pi", "claude"}, LastHarness: "", Start: started.start,
-	}), started
+	return sized(taskpicker.Options{Harnesses: []string{"pi", "claude"}, Start: started.start}), started
 }
 
-func projectOptions(location int, lastHarness string, start func(taskpicker.Choice) (string, error)) taskpicker.Options {
+// compactOptions are the project popup's with the pane in the checkout at index current.
+func compactOptions(current int, agent string, start func(taskpicker.Choice) error) taskpicker.Options {
 	return taskpicker.Options{
-		Project:     "shop",
-		Home:        "/home/dev",
-		Locations:   []task.Location{newWorktree, mainCheckout, hotfixTree, featureBr, reviewTree},
-		Location:    location,
-		Harnesses:   []string{"pi", "claude"},
-		LastHarness: lastHarness,
-		Start:       start,
+		Project:    "shop",
+		Locations:  []task.Location{newWorktree, mainCheckout, hotfixTree, featureBr, reviewTree},
+		Current:    current,
+		NextNumber: 4,
+		Branches:   []string{"main", "hotfix", "feature", "review", "wt/fix-login"},
+		Harnesses:  []string{"pi", "claude"},
+		Agent:      agent,
+		Start:      start,
 	}
+}
+
+// listOptions are the expanded project popup's.
+func listOptions(agent string, start func(taskpicker.Choice) error) taskpicker.Options {
+	options := compactOptions(1, agent, start)
+	options.Expanded = true
+
+	return options
 }
 
 func sized(opts taskpicker.Options) *taskpicker.Model {
@@ -378,6 +494,10 @@ func key(code rune) tea.KeyPressMsg {
 	return tea.KeyPressMsg(tea.Key{Code: code})
 }
 
+func ctrl(code rune) tea.KeyPressMsg {
+	return tea.KeyPressMsg(tea.Key{Code: code, Mod: tea.ModCtrl})
+}
+
 func typed(text string) []tea.Msg {
 	messages := make([]tea.Msg, 0, len(text))
 	for _, r := range text {
@@ -391,37 +511,36 @@ func plainView(model *taskpicker.Model) string {
 	return ansi.Strip(model.View().Content)
 }
 
-// listLines are the lines of the where list: from below the title and filter lines to the blank
-// line above the agent row.
+// listLines are the lines of the expanded list: from below the filter line to the bottom border.
 func listLines(t *testing.T, model *taskpicker.Model) []string {
 	t.Helper()
 
 	lines := strings.Split(plainView(model), "\n")
+	start := slicesContaining(lines, "/") + 1
 
-	end := 3
-	for end < len(lines) && strings.TrimSpace(strings.Trim(lines[end], "│")) != "" {
-		end++
+	if start < 1 {
+		t.Fatalf("no list:\n%s", strings.Join(lines, "\n"))
 	}
 
-	return lines[3:end]
+	return lines[start : len(lines)-1]
 }
 
-// rowLines are the where rows, without the section headings.
+// rowLines are the list rows, without the section headings.
 func rowLines(t *testing.T, model *taskpicker.Model) []string {
 	t.Helper()
 
 	var rows []string
 
-	for _, line := range listLines(t, model) {
-		if strings.Contains(line, "─ ") {
-			rows = append(rows, line)
+	for _, row := range listLines(t, model) {
+		if strings.Contains(row, "─ ") {
+			rows = append(rows, row)
 		}
 	}
 
 	return rows
 }
 
-// sectionRows are the rows under the section heading label.
+// sectionRows are the list rows under the section heading label.
 func sectionRows(t *testing.T, model *taskpicker.Model, label string) []string {
 	t.Helper()
 
@@ -429,30 +548,67 @@ func sectionRows(t *testing.T, model *taskpicker.Model, label string) []string {
 
 	inside := false
 
-	for _, line := range listLines(t, model) {
+	for _, row := range listLines(t, model) {
 		switch {
-		case !strings.Contains(line, "─ "):
-			inside = strings.TrimSpace(strings.Trim(line, "│")) == label
+		case !strings.Contains(row, "─ "):
+			inside = strings.TrimSpace(strings.Trim(row, "│")) == label
 		case inside:
-			rows = append(rows, line)
+			rows = append(rows, row)
 		}
 	}
 
 	return rows
 }
 
-func agentRow(t *testing.T, model *taskpicker.Model) string {
+// line is the body line whose label is label.
+func line(t *testing.T, model *taskpicker.Model, label string) string {
 	t.Helper()
 
 	lines := strings.Split(plainView(model), "\n")
 
-	return lines[slicesIndex(lines, "agent")]
+	index := slicesIndex(lines, label)
+	if index < 0 {
+		t.Fatalf("no %s line:\n%s", label, strings.Join(lines, "\n"))
+	}
+
+	return lines[index]
+}
+
+// placeLine is the line of the place to work called name.
+func placeLine(t *testing.T, model *taskpicker.Model, name string) string {
+	t.Helper()
+
+	lines := strings.Split(plainView(model), "\n")
+
+	index := slicesContaining(lines, name)
+	if index < 0 {
+		t.Fatalf("no %s line:\n%s", name, strings.Join(lines, "\n"))
+	}
+
+	return lines[index]
+}
+
+func agentRow(t *testing.T, model *taskpicker.Model) string {
+	t.Helper()
+
+	return line(t, model, "agent")
 }
 
 // slicesIndex finds the body line that starts with label.
 func slicesIndex(lines []string, label string) int {
-	for index, line := range lines {
-		if strings.HasPrefix(strings.TrimPrefix(line, "│ "), label) {
+	for index, row := range lines {
+		if strings.HasPrefix(strings.TrimPrefix(row, "│ "), label+" ") {
+			return index
+		}
+	}
+
+	return -1
+}
+
+// slicesContaining finds the first line that contains text.
+func slicesContaining(lines []string, text string) int {
+	for index, row := range lines {
+		if strings.Contains(row, text) {
 			return index
 		}
 	}

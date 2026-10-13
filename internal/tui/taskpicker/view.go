@@ -2,6 +2,7 @@ package taskpicker
 
 import (
 	"path/filepath"
+	"slices"
 	"strings"
 	"unicode"
 
@@ -21,20 +22,23 @@ const (
 	choiceGap     = " "
 	choicePadding = 2
 	labelGap      = "  "
-	labelColumns  = 5
+	labelColumns  = 6
+	valueColumn   = labelColumns + len(labelGap)
+	// textColumn is where a value's text starts, after the space that pads each choice.
+	textColumn = valueColumn + 1
 	// bodyColumn is where the body starts, after the left border and the space beside it.
 	bodyColumn    = 2
 	frameColumns  = 2 * bodyColumn
 	frameRows     = 2
 	cornerColumns = 3
-	// fieldRows are the title line and the filter line above the where list; fixedRows adds the
-	// blank line between the list and the agents.
-	fieldRows     = 2
-	fixedRows     = fieldRows + 1
+	// listGapRows are the blank line and the filter line above the expanded list.
+	listGapRows = 2
+	// placeColumns is the width of a place's name, before the branch it names.
+	placeColumns  = 16
 	minBodyWidth  = 36
 	maxBodyWidth  = 64
-	maxListRows   = 14
-	titleLabel    = "task"
+	maxListRows   = 10
+	titleLabel    = "title"
 	agentLabel    = "agent"
 	popupTitle    = "new task"
 	noLocations   = "nothing to start in"
@@ -42,16 +46,19 @@ const (
 	startingLabel = "starting…"
 )
 
-// layout is where the parts of the body are, in body lines.
+// layout is where the parts of the body are, in body lines: the title, the agents, and then the
+// places to work or the filter and the expanded list. whereTop is -1 when the popup has no places,
+// and listRows is 0 when it has no list.
 type layout struct {
-	bodyWidth int
-	listTop   int
-	listRows  int
-	agentTop  int
-	choices   [][]placed
+	bodyWidth    int
+	agentTop     int
+	agentChoices [][]placed
+	whereTop     int
+	listTop      int
+	listRows     int
 }
 
-// listLine is one line of the where list: a section heading, with row -1, or the row at that
+// listLine is one line of the expanded list: a section heading, with row -1, or the row at that
 // position of the filtered rows. last marks the final row of its section.
 type listLine struct {
 	section section
@@ -59,7 +66,7 @@ type listLine struct {
 	last    bool
 }
 
-// placed is a choice of the agent row and the body columns it covers.
+// placed is a choice of a row of choices and the body columns it covers.
 type placed struct {
 	index int
 	start int
@@ -67,46 +74,54 @@ type placed struct {
 }
 
 // Size is the popup size that shows options without truncating them, up to the widest the
-// picker grows. A longer where list scrolls.
+// picker grows. In a repository it is the widest, so the branch named after a typed title fits
+// and the expanded popup is as wide; a longer list scrolls.
 func Size(cfg *config.Config, opts Options) (int, int) {
 	probe := NewModel(cfg, opts)
+	width := probe.bodyWidth()
+	rows := 1 + len(placeChoices(probe.agents(), valueColumn, width))
 
-	width := minBodyWidth
-	if cfg.Tasks.ShowFooter {
-		width = max(width, hintsWidth(hints())+len(labelGap))
+	switch {
+	case opts.Expanded:
+		rows += listGapRows + min(max(len(probe.lines()), 1), maxListRows)
+	case probe.hasWhere():
+		rows += 1 + int(whereOther) + 1
 	}
 
-	for _, entry := range probe.all {
-		name, detail := probe.label(entry)
-		width = max(width, probe.chrome.RowWidth(treeBranch, name, detail), rowGutter+lipgloss.Width(entry.section.label()))
+	return width + frameColumns, frameRows + rows
+}
+
+// bodyWidth fits the agents and the key hints, and is the widest in a repository.
+func (m *Model) bodyWidth() int {
+	if m.hasWhere() {
+		return maxBodyWidth
 	}
 
-	agentSets := [][]string{
-		append([]string{config.HarnessTab}, opts.Harnesses...),
-		append(append([]string{}, opts.Harnesses...), config.HarnessNone),
-	}
-	for _, agents := range agentSets {
-		width = max(width, labelColumns+len(labelGap)+choicesWidth(agents))
+	width := max(minBodyWidth, valueColumn+choicesWidth(m.agents()))
+	if m.showFooter {
+		width = max(width, hintsWidth(m.hints())+len(labelGap))
 	}
 
-	width = min(width, maxBodyWidth)
-
-	agentRows := 0
-	for _, agents := range agentSets {
-		agentRows = max(agentRows, len(placeChoices(agents, labelColumns+len(labelGap), width)))
-	}
-
-	listRows := min(max(len(probe.lines()), 1), maxListRows)
-
-	return width + frameColumns, frameRows + fixedRows + listRows + agentRows
+	return min(width, maxBodyWidth)
 }
 
 func (m *Model) layout() layout {
 	bodyWidth := max(m.width-frameColumns, 1)
-	choices := placeChoices(m.agents(), labelColumns+len(labelGap), bodyWidth)
-	listRows := max(m.height-frameRows-fixedRows-len(choices), 1)
+	agentChoices := placeChoices(m.agents(), valueColumn, bodyWidth)
+	below := 1 + len(agentChoices) + 1
+	geometry := layout{
+		bodyWidth: bodyWidth, agentTop: 1, agentChoices: agentChoices, whereTop: -1, listTop: 0, listRows: 0,
+	}
 
-	return layout{bodyWidth: bodyWidth, listTop: fieldRows, listRows: listRows, agentTop: fieldRows + listRows + 1, choices: choices}
+	switch {
+	case m.options.Expanded:
+		geometry.listTop = below + 1
+		geometry.listRows = max(m.height-frameRows-geometry.listTop, 1)
+	case m.hasWhere():
+		geometry.whereTop = below
+	}
+
+	return geometry
 }
 
 func (m *Model) render() string {
@@ -124,7 +139,7 @@ func (m *Model) render() string {
 	case stagePicking:
 	}
 
-	return m.frame(m.renderForm(geometry), geometry.bodyWidth, m.footer(hints()))
+	return m.frame(m.renderForm(geometry), geometry.bodyWidth, m.footer(m.hints()))
 }
 
 // footer draws key hints in the bottom edge when the footer is enabled.
@@ -136,38 +151,87 @@ func (m *Model) footer(hints []tui.Hint) string {
 	return m.chrome.Hints(hints)
 }
 
+// renderForm draws the title, the agents, and then the places to work or the expanded list.
 func (m *Model) renderForm(geometry layout) []string {
-	inputWidth := max(geometry.bodyWidth-labelColumns-len(labelGap)-1, 1)
+	inputWidth := max(geometry.bodyWidth-textColumn-1, 1)
 	m.title.SetWidth(inputWidth)
-	m.filter.SetWidth(inputWidth)
+	m.filter.SetWidth(max(inputWidth-len(filterLabel)-1, 1))
 
 	body := make([]string, 0, m.height-frameRows)
-	body = append(body, m.field(titleLabel, m.focus == fieldTitle, m.title.View()))
+	body = append(body, m.field(titleLabel, m.focus == fieldTitle, " "+m.title.View()))
+	body = append(body, m.renderAgents(geometry)...)
 
-	filter := ""
-	if m.focus == fieldWhere || m.filter.Value() != "" {
-		filter = m.field(filterLabel, m.focus == fieldWhere, m.filter.View())
+	switch {
+	case m.options.Expanded:
+		filter := m.chrome.Label(filterLabel, m.focus == fieldList) + " " + m.filter.View()
+		body = append(body, "", strings.Repeat(" ", rowGutter)+filter)
+
+		lines := m.lines()
+		for line := range geometry.listRows {
+			body = append(body, m.renderLine(lines, m.listTop+line, geometry.bodyWidth))
+		}
+	case m.hasWhere():
+		body = append(body, "")
+
+		for place := whereNew; place <= whereOther; place++ {
+			name, detail := m.place(place)
+			padded := name + strings.Repeat(" ", max(placeColumns-lipgloss.Width(name), 1))
+			body = append(body, m.chrome.Row(padded+detail, "", place == m.where, geometry.bodyWidth))
+		}
 	}
 
-	body = append(body, filter)
+	return body
+}
 
-	lines := m.lines()
-	for line := range geometry.listRows {
-		body = append(body, m.renderLine(lines, m.listTop+line, geometry.bodyWidth))
+// place names a place to work and the branch it works on: the new worktree's, the pane's
+// checkout's or the task already working there, and nothing for an existing branch, which the
+// expanded list picks.
+func (m *Model) place(place where) (string, string) {
+	switch place {
+	case whereNew:
+		location := m.options.Locations[0]
+		title := strings.TrimSpace(m.title.Value())
+
+		return "new worktree", task.NewBranch(title, location.Branch, m.options.NextNumber, m.options.Branches)
+	case whereHere:
+		current, ok := m.current()
+		if !ok {
+			return "this checkout", ""
+		}
+
+		if current.Task != "" {
+			return "this checkout", "task · " + taskName(current.TaskTitle)
+		}
+
+		return "this checkout", filepath.Base(current.Directory) + " · " + current.Branch
+	case whereOther:
 	}
 
-	body = append(body, "")
-
-	return append(body, m.renderAgents(geometry)...)
+	return "existing branch…", ""
 }
 
 func (m *Model) field(label string, focused bool, value string) string {
 	return m.chrome.Label(label, focused) + strings.Repeat(" ", labelColumns-lipgloss.Width(label)) + labelGap + value
 }
 
+// renderChoices draws a row of choices with the selected one highlighted.
+func (m *Model) renderChoices(choices []string, selected int) string {
+	var line strings.Builder
+
+	for index, choice := range choices {
+		if index > 0 {
+			line.WriteString(choiceGap)
+		}
+
+		line.WriteString(m.chrome.Choice(choice, index == selected))
+	}
+
+	return line.String()
+}
+
 // lines lays the filtered rows out under their section headings.
 func (m *Model) lines() []listLine {
-	lines := make([]listLine, 0, len(m.rows)+int(sectionProjects)+1)
+	lines := make([]listLine, 0, len(m.rows)+int(sectionInUse)+1)
 
 	for position, index := range m.rows {
 		current := m.all[index].section
@@ -188,7 +252,7 @@ func (m *Model) renderLine(lines []listLine, index, width int) string {
 		return m.chrome.Muted(strings.Repeat(" ", rowGutter) + lines[index].section.label())
 	case index < len(lines):
 		line := lines[index]
-		name, detail := m.label(m.all[m.rows[line.row]])
+		name, detail := label(m.all[m.rows[line.row]])
 
 		tree := treeBranch
 		if line.last {
@@ -207,27 +271,26 @@ func (m *Model) renderLine(lines []listLine, index, width int) string {
 
 func (m *Model) renderAgents(geometry layout) []string {
 	agents := m.agents()
-	indent := strings.Repeat(" ", labelColumns+len(labelGap))
-	lines := make([]string, 0, len(geometry.choices))
+	selected := slices.Index(agents, m.agent)
+	lines := make([]string, 0, len(geometry.agentChoices))
 
-	for row, choices := range geometry.choices {
-		var line strings.Builder
+	for row, choices := range geometry.agentChoices {
+		names := make([]string, 0, len(choices))
+		for _, choice := range choices {
+			names = append(names, agents[choice.index])
+		}
 
+		rowSelected := -1
+		if len(choices) > 0 {
+			rowSelected = selected - choices[0].index
+		}
+
+		line := strings.Repeat(" ", valueColumn) + m.renderChoices(names, rowSelected)
 		if row == 0 {
-			line.WriteString(m.field(agentLabel, m.focus == fieldAgent, ""))
-		} else {
-			line.WriteString(indent)
+			line = m.field(agentLabel, false, m.renderChoices(names, rowSelected))
 		}
 
-		for position, choice := range choices {
-			if position > 0 {
-				line.WriteString(choiceGap)
-			}
-
-			line.WriteString(m.chrome.Choice(agents[choice.index], agents[choice.index] == m.agent))
-		}
-
-		lines = append(lines, line.String())
+		lines = append(lines, line)
 	}
 
 	return lines
@@ -278,18 +341,10 @@ func (m *Model) frame(body []string, bodyWidth int, footer string) string {
 	return out.String()
 }
 
-// label names a where row and adds a short detail. Its section says what kind of place it is:
-// a new worktree is named by its base, a checkout by its directory with its branch, a branch only
-// a remote has by its remote, and a checkout in use by the task working there.
-func (m *Model) label(entry row) (string, string) {
-	switch entry.kind {
-	case rowHere:
-		return m.short(m.options.Dir), ""
-	case rowProject:
-		return entry.project.Name, ""
-	case rowLocation:
-	}
-
+// label names a list row and adds a short detail. Its section says what kind of place it is: a
+// new worktree is named by its base, a checkout by its directory with its branch, a branch only a
+// remote has by its remote, and a checkout in use by the task working there.
+func label(entry row) (string, string) {
 	location := entry.location
 
 	switch {
@@ -314,26 +369,9 @@ func (s section) label() string {
 		return "branches"
 	case sectionInUse:
 		return "in use"
-	case sectionHere:
-		return "here"
-	case sectionProjects:
-		return "projects"
 	default:
 		return ""
 	}
-}
-
-// short writes a path under the home directory with ~.
-func (m *Model) short(path string) string {
-	if m.options.Home == "" {
-		return path
-	}
-
-	if relative, found := strings.CutPrefix(path, m.options.Home); found && (relative == "" || strings.HasPrefix(relative, "/")) {
-		return "~" + relative
-	}
-
-	return path
 }
 
 // taskName shows an untitled task, whose title is its number, as task and the number.
@@ -345,8 +383,23 @@ func taskName(title string) string {
 	return title
 }
 
-func hints() []tui.Hint {
-	return []tui.Hint{{Key: "enter", Desc: "start"}, {Key: "tab", Desc: "next"}, {Key: "esc", Desc: "close"}}
+// hints are the keys that act from the focused row.
+func (m *Model) hints() []tui.Hint {
+	agent := tui.Hint{Key: "←→", Desc: "agent"}
+	enter := tui.Hint{Key: "enter", Desc: "start"}
+
+	if m.where == whereOther && !m.options.Expanded {
+		enter.Desc = "branches"
+	}
+
+	switch {
+	case m.focus == fieldList:
+		return []tui.Hint{agent, {Key: "↑↓", Desc: "select"}, enter, {Key: "esc", Desc: "back"}}
+	case m.hasWhere():
+		return []tui.Hint{agent, {Key: "↑↓", Desc: "where"}, enter}
+	default:
+		return []tui.Hint{agent, enter}
+	}
 }
 
 func failedHints() []tui.Hint {
@@ -403,14 +456,14 @@ func wrapWords(text string, width int) []string {
 	return lines
 }
 
-// placeChoices lays the agent choices out in rows after the label, wrapping before a choice
-// that would not fit.
-func placeChoices(agents []string, indent, width int) [][]placed {
+// placeChoices lays a row of choices out after the label, wrapping before a choice that would not
+// fit.
+func placeChoices(choices []string, indent, width int) [][]placed {
 	rows := [][]placed{{}}
 	column := indent
 
-	for index, agent := range agents {
-		choiceWidth := lipgloss.Width(agent) + choicePadding
+	for index, choice := range choices {
+		choiceWidth := lipgloss.Width(choice) + choicePadding
 		row := &rows[len(rows)-1]
 
 		if len(*row) > 0 {
@@ -430,15 +483,15 @@ func placeChoices(agents []string, indent, width int) [][]placed {
 	return rows
 }
 
-func choicesWidth(agents []string) int {
+func choicesWidth(choices []string) int {
 	width := 0
 
-	for index, agent := range agents {
+	for index, choice := range choices {
 		if index > 0 {
 			width += len(choiceGap)
 		}
 
-		width += lipgloss.Width(agent) + choicePadding
+		width += lipgloss.Width(choice) + choicePadding
 	}
 
 	return width
