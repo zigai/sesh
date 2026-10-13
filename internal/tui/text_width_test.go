@@ -79,6 +79,51 @@ func TestFormatAgentStatusAgeAt(t *testing.T) {
 	}
 }
 
+func TestFormatAgentStatusElapsedHoursWithoutMinutePadding(t *testing.T) {
+	now := time.Date(2026, time.September, 8, 12, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name string
+		age  time.Duration
+		want string
+	}{
+		{name: "whole hours", age: 5 * time.Hour, want: "5h 0m"},
+		{name: "single digit minutes", age: 5*time.Hour + 3*time.Minute, want: "5h 3m"},
+		{name: "double digit minutes", age: 5*time.Hour + 17*time.Minute, want: "5h 17m"},
+		{name: "before day boundary", age: 23*time.Hour + 59*time.Minute + 59*time.Second, want: "23h 59m"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := formatAgentStatusAgeAt(now.Add(-test.age), now, "relative-seconds"); got != test.want {
+				t.Fatalf("elapsed status age = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
+func TestFormatAgentStatusElapsedDaysWithoutHourPadding(t *testing.T) {
+	now := time.Date(2026, time.September, 8, 12, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name string
+		age  time.Duration
+		want string
+	}{
+		{name: "whole days", age: 48 * time.Hour, want: "2d 0h"},
+		{name: "single digit hours", age: 51 * time.Hour, want: "2d 3h"},
+		{name: "double digit hours", age: 71 * time.Hour, want: "2d 23h"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := formatAgentStatusAgeAt(now.Add(-test.age), now, "relative-seconds"); got != test.want {
+				t.Fatalf("elapsed status age = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
 func TestFormatAgentStatusHoursMinutes(t *testing.T) {
 	now := time.Date(2026, time.September, 8, 12, 0, 0, 0, time.UTC)
 
