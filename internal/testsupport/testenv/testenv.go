@@ -133,6 +133,28 @@ func setDirectories(root string, keepSet bool) error {
 		if err := os.Setenv(variable, dir); err != nil {
 			return fmt.Errorf("set %s: %w", variable, err)
 		}
+
+		if variable == "XDG_CONFIG_HOME" {
+			if err := disableGoTelemetry(dir); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// disableGoTelemetry turns go telemetry off in an isolated config directory. Its default local
+// mode starts a detached child that keeps writing there after the go command exits, racing the
+// removal of the isolated home.
+func disableGoTelemetry(configDir string) error {
+	dir := filepath.Join(configDir, "go", "telemetry")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("create go telemetry directory: %w", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(dir, "mode"), []byte("off"), 0o600); err != nil {
+		return fmt.Errorf("turn go telemetry off: %w", err)
 	}
 
 	return nil
