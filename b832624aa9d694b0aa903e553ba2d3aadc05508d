@@ -1,0 +1,6 @@
+- The merged tree exactly matches the locally verified merge candidate a34da0ede4d1fa9c1a02113a2cef76398bce8308.
+- go test ./internal/tui/... ./internal/cli/cmd/picker passes on the merged tree.
+- Module tidiness, golangci-lint, test isolation and formatter diff checks pass.
+- The full integration race run passes all packages except internal/remote; TestMonitorPublishesInventoryAndAppliesStaleLifecycle also fails on unchanged master 149c96a.
+- The built binary runs --version and --help outside the checkout.
+- GitHub reports PR 12 as merged; hosted checks cannot start because of account billing or spending limits.
