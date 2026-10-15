@@ -178,7 +178,7 @@ func TestLoadRejectsInvalidDisplayModes(t *testing.T) {
 
 func TestLoadValidatesShortcutStyle(t *testing.T) {
 	t.Run("valid styles", func(t *testing.T) {
-		for _, style := range []string{"none", "indent", "right", "numbers", "menu", "badge", "tree", "off"} {
+		for _, style := range []string{"none", "indent", "right"} {
 			checkValidShortcutStyle(t, style)
 		}
 	})

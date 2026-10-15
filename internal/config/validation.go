@@ -678,7 +678,7 @@ func validateShortcutStyle(style string) error {
 	}
 
 	switch trimmed {
-	case "none", "off", "tree", "indent", "numbers", "numbered-indent", "right", "menu", "badge":
+	case "none", "indent", "right":
 		return nil
 	default:
 		return fmt.Errorf("%w %q: expected none, indent, or right", errShortcutStyleInvalid, style)

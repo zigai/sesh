@@ -541,13 +541,9 @@ func DefaultConfig() *Config {
 }
 
 func (s SettingsConfig) NormalizedShortcutStyle() string {
-	switch strings.ToLower(strings.TrimSpace(s.ShortcutStyle)) {
-	case "indent", "numbers", "numbered-indent":
-		return "indent"
-	case "right", "menu", "badge":
-		return "right"
-	case "none", "off", "tree":
-		return "none"
+	switch style := strings.ToLower(strings.TrimSpace(s.ShortcutStyle)); style {
+	case "indent", "right":
+		return style
 	default:
 		return "none"
 	}
