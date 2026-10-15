@@ -160,7 +160,7 @@ func newRootCommand(ctx context.Context) *cobra.Command {
 		cmdconfig.NewCommand(),
 		cmdsetup.NewCommand(),
 		cmddaemon.NewCommand(cmdautosave.NewDaemonCoordinatorCommand(), cmdremote.NewDaemonMonitorCommand(), cmdagent.NewDaemonWindowStatusCommand()),
-		cmddoctor.NewCommand(),
+		cmddoctor.NewCommand(cmddoctor.Build{Version: version, Commit: commit, Date: date}),
 	)
 	rootCommand.InitDefaultHelpCmd()
 	rootCommand.InitDefaultCompletionCmd()

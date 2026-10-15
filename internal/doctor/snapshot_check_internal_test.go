@@ -45,12 +45,12 @@ func TestResolveCurrentSnapshotPreservesCanceledPracticalGenerationRead(t *testi
 		readErr:    context.Canceled,
 	}
 
-	result, err := resolveCurrentSnapshot(t.Context(), reader)
+	result, err := NewService(Options{}).resolveCurrentSnapshot(t.Context(), reader)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("error = %v, want context.Canceled", err)
 	}
 
-	if result != (Result{}) {
+	if result.ID != "" {
 		t.Fatalf("result = %#v, want empty result for canceled read", result)
 	}
 }
@@ -62,12 +62,12 @@ func TestInspectSnapshotPreservesCancellation(t *testing.T) {
 		inspectErr: context.Canceled,
 	}
 
-	repoRes, curRes, err := inspectSnapshot(t.Context(), reader)
+	repoRes, curRes, err := NewService(Options{}).inspectSnapshot(t.Context(), reader)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("error = %v, want context.Canceled", err)
 	}
 
-	if repoRes != (Result{}) || curRes != (Result{}) {
+	if repoRes.ID != "" || curRes.ID != "" {
 		t.Fatalf("results = (%#v, %#v), want zero results for canceled inspection", repoRes, curRes)
 	}
 }
@@ -79,17 +79,17 @@ func TestInspectSnapshotClassifiesCorruptCatalog(t *testing.T) {
 		inspectErr: store.ErrCorrupt,
 	}
 
-	repoRes, curRes, err := inspectSnapshot(t.Context(), reader)
+	repoRes, curRes, err := NewService(Options{}).inspectSnapshot(t.Context(), reader)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if repoRes.Status != StatusError || repoRes.Reason != ReasonCorrupt {
-		t.Fatalf("repoRes = (%v, %v), want (%v, %v)", repoRes.Status, repoRes.Reason, StatusError, ReasonCorrupt)
+	if repoRes.Status != StatusFail || repoRes.Reason != ReasonCorrupt || repoRes.Fix == nil {
+		t.Fatalf("repoRes = %+v, want a corrupt failure with a fix", repoRes)
 	}
 
-	if curRes.Status != StatusWarning || curRes.Reason != ReasonUnavailable {
-		t.Fatalf("curRes = (%v, %v), want (%v, %v)", curRes.Status, curRes.Reason, StatusWarning, ReasonUnavailable)
+	if curRes.Status != StatusSkip || curRes.Needs != CheckSnapshotRepository {
+		t.Fatalf("curRes = %+v, want a skip that needs %s", curRes, CheckSnapshotRepository)
 	}
 }
 

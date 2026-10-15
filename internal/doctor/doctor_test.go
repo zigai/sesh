@@ -10,14 +10,14 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
-	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/samber/oops"
 
 	"github.com/zigai/sesh/internal/doctor"
@@ -26,80 +26,45 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
-func TestResultSeverityHelpers(t *testing.T) {
+func TestRunReportsEveryCheckInGroupOrder(t *testing.T) {
 	t.Parallel()
 
-	okResults := []doctor.Result{
-		{Check: doctor.CheckTmux, Status: doctor.StatusOK, Reason: "", Message: "ok", Fix: ""},
-	}
-	if doctor.HasErrors(okResults) {
-		t.Fatal("expected no errors for ok results")
-	}
+	root := t.TempDir()
 
-	if doctor.HasWarnings(okResults) {
-		t.Fatal("expected no warnings for ok results")
-	}
-
-	warnResults := []doctor.Result{
-		{Check: doctor.CheckTmux, Status: doctor.StatusOK, Reason: "", Message: "ok", Fix: ""},
-		{Check: doctor.CheckAutosave, Status: doctor.StatusWarning, Reason: doctor.ReasonIncomplete, Message: "warn", Fix: ""},
-	}
-	if doctor.HasErrors(warnResults) {
-		t.Fatal("expected no errors for warn results")
-	}
-
-	if !doctor.HasWarnings(warnResults) {
-		t.Fatal("expected warnings for warn results")
-	}
-
-	errResults := []doctor.Result{
-		{Check: doctor.CheckTmux, Status: doctor.StatusError, Reason: doctor.ReasonUnavailable, Message: "err", Fix: ""},
-	}
-	if !doctor.HasErrors(errResults) {
-		t.Fatal("expected errors for err results")
-	}
-}
-
-func TestNilOptionsOrderAndDefaults(t *testing.T) {
-	t.Parallel()
-
-	ctx := t.Context()
-
-	results, err := doctor.Run(ctx, doctor.Options{
-		Server:      nil,
-		SnapshotDir: "",
-		HistoryPath: "",
+	results, err := doctor.Run(t.Context(), doctor.Options{
+		SnapshotDir:  filepath.Join(root, "snapshots"),
+		HistoryPath:  filepath.Join(root, "history.json"),
+		LogPath:      filepath.Join(root, "sesh.log"),
+		ServiceDirs:  []string{filepath.Join(root, "units")},
+		CustomFields: []doctor.CustomField{{Name: "weather", Command: ""}},
+		ValidateCommand: func([]string) error {
+			return nil
+		},
 	})
 	if err != nil {
 		t.Fatalf("unexpected run error: %v", err)
 	}
 
-	expectedChecks := []struct {
-		check  string
-		reason string
-	}{
-		{doctor.CheckTmux, doctor.ReasonNotConfigured},
-		{doctor.CheckSnapshotRepository, doctor.ReasonNotConfigured},
-		{doctor.CheckSnapshotCurrent, doctor.ReasonNotConfigured},
-		{doctor.CheckHistoryState, doctor.ReasonNotConfigured},
-		{doctor.CheckCaptureGuarantee, doctor.ReasonObservational},
-		{doctor.CheckRestoreCapability, doctor.ReasonIncomplete},
-		{doctor.CheckDaemonRuntime, doctor.ReasonNotConfigured},
-		{doctor.CheckAutosave, doctor.ReasonIncomplete},
-	}
+	ids := make([]string, 0, len(results))
+	for _, result := range results {
+		ids = append(ids, result.ID)
 
-	if len(results) != len(expectedChecks) {
-		t.Fatalf("expected %d results, got %d", len(expectedChecks), len(results))
-	}
-
-	for i, expected := range expectedChecks {
-		if results[i].Check != expected.check {
-			t.Fatalf("result[%d] check = %q, want %q", i, results[i].Check, expected.check)
+		if group, _, _ := strings.Cut(result.ID, "."); !strings.EqualFold(result.Group, group) {
+			t.Errorf("%s is listed under group %q", result.ID, result.Group)
 		}
 
-		if results[i].Reason != expected.reason || results[i].Status != doctor.StatusWarning {
-			t.Fatalf("result[%d] expected %q warning, got %#v", i, expected.reason, results[i])
+		if (result.Status == doctor.StatusWarn || result.Status == doctor.StatusFail) && result.Fix == nil {
+			t.Errorf("%s %s has no fix: %+v", result.ID, result.Status, result)
 		}
+	}
+
+	want := []string{
+		doctor.CheckInstallPath, doctor.CheckConfigFile, doctor.CheckTmuxClient, doctor.CheckTmuxServer, doctor.FieldCheck("weather"),
+		doctor.CheckSnapshotRepository, doctor.CheckSnapshotCurrent, doctor.CheckActiveRestores, doctor.CheckHistoryFile,
+		doctor.CheckLogFile, doctor.CheckServiceUnits, doctor.CheckServiceOOMPolicy, doctor.CheckAutosaveDaemon, doctor.CheckSmokeSessions,
+	}
+	if !slices.Equal(ids, want) {
+		t.Fatalf("checks = %q, want %q", ids, want)
 	}
 }
 
@@ -109,6 +74,7 @@ func TestCustomFieldChecksReportMissingCommands(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "weather")
 
 	results, err := doctor.Run(t.Context(), doctor.Options{
+		PathEnv: os.Getenv("PATH"),
 		CustomFields: []doctor.CustomField{
 			{Name: "sha", Command: ""},
 			{Name: "today", Command: "date"},
@@ -119,76 +85,178 @@ func TestCustomFieldChecksReportMissingCommands(t *testing.T) {
 		t.Fatalf("unexpected run error: %v", err)
 	}
 
-	var fields []doctor.Result
+	if sha := findCheck(results, doctor.FieldCheck("sha")); sha.Status != doctor.StatusOK {
+		t.Fatalf("shell command field = %#v", sha)
+	}
 
-	for _, result := range results {
-		if result.Check == doctor.CheckCustomField {
-			fields = append(fields, result)
+	if today := findCheck(results, doctor.FieldCheck("today")); today.Status != doctor.StatusOK || !strings.HasSuffix(today.Message, "/date") {
+		t.Fatalf("command on PATH = %#v", today)
+	}
+
+	weather := findCheck(results, doctor.FieldCheck("weather"))
+	if weather.Status != doctor.StatusFail || weather.Reason != doctor.ReasonNotFound ||
+		weather.Fix == nil || !strings.Contains(weather.Fix.Manual, "display.fields.weather.command") {
+		t.Fatalf("missing command result = %#v", weather)
+	}
+}
+
+func TestBrokenConfigFailsItsCheckAndSkipsTheFieldsItDefines(t *testing.T) {
+	t.Parallel()
+
+	results, err := doctor.Run(t.Context(), doctor.Options{
+		ConfigFiles: []doctor.ConfigFile{
+			{Path: "/etc/sesh/config.toml", Status: doctor.ConfigNotFound},
+			{Path: "/home/user/.config/sesh/config.toml", Status: doctor.ConfigNotLoaded},
+		},
+		ConfigError: "Invalid configuration at line 3, column 1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected run error: %v", err)
+	}
+
+	config := findCheck(results, doctor.CheckConfigFile)
+	if config.Status != doctor.StatusFail || config.Message != "Invalid configuration at line 3, column 1" ||
+		config.Fix == nil || config.Fix.Manual != "Correct the error in /home/user/.config/sesh/config.toml" {
+		t.Fatalf("config check = %#v", config)
+	}
+
+	if fields := findCheck(results, doctor.CheckFields); fields.Status != doctor.StatusSkip || fields.Needs != doctor.CheckConfigFile {
+		t.Fatalf("fields check = %#v, want a skip that needs %s", fields, doctor.CheckConfigFile)
+	}
+}
+
+func TestInstallPathListsEveryCopyOnPathOnce(t *testing.T) {
+	t.Parallel()
+
+	first, second, third := t.TempDir(), t.TempDir(), t.TempDir()
+	for _, dir := range []string{first, second} {
+		if err := os.WriteFile(filepath.Join(dir, "sesh"), []byte("#!/bin/sh\n"), 0o700); err != nil { //nolint:gosec // PATH lookup only finds executable files.
+			t.Fatal(err)
 		}
 	}
 
-	if len(fields) != 3 || fields[0].Status != doctor.StatusOK || fields[1].Status != doctor.StatusOK {
-		t.Fatalf("custom field results = %#v", fields)
+	if err := os.Symlink(filepath.Join(first, "sesh"), filepath.Join(third, "sesh")); err != nil {
+		t.Fatal(err)
 	}
 
-	if fields[2].Status != doctor.StatusError || fields[2].Reason != doctor.ReasonNotFound ||
-		!strings.Contains(fields[2].Message, "custom.weather") || !strings.Contains(fields[2].Fix, "display.fields.weather.command") {
-		t.Fatalf("missing command result = %#v", fields[2])
+	install := func(dirs ...string) doctor.Result {
+		results, err := doctor.Run(t.Context(), doctor.Options{PathEnv: strings.Join(dirs, string(os.PathListSeparator))})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		return findCheck(results, doctor.CheckInstallPath)
+	}
+
+	if result := install(first, third); result.Status != doctor.StatusOK {
+		t.Fatalf("a link to the same file is one copy: %#v", result)
+	}
+
+	if result := install(t.TempDir()); result.Status != doctor.StatusInfo {
+		t.Fatalf("sesh missing from PATH = %#v", result)
+	}
+
+	result := install(second, third, first)
+	if result.Status != doctor.StatusWarn || result.Fix == nil ||
+		!slices.Equal(result.Details, []string{filepath.Join(second, "sesh"), filepath.Join(third, "sesh")}) {
+		t.Fatalf("copies must be listed in PATH order: %#v", result)
 	}
 }
 
-func TestCaptureAndRestoreChecksDescribeImplementedBoundaries(t *testing.T) {
+func TestLogFileCheckNeedsAWritableLocation(t *testing.T) {
 	t.Parallel()
 
-	results, err := doctor.Run(t.Context(), doctor.Options{})
+	dir := t.TempDir()
+	existing := filepath.Join(dir, "sesh.log")
+
+	if err := os.WriteFile(existing, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	readOnly := filepath.Join(dir, "locked")
+	if err := os.Mkdir(readOnly, 0o500); err != nil {
+		t.Fatal(err)
+	}
+
+	for path, want := range map[string]doctor.Status{
+		existing: doctor.StatusOK,
+		filepath.Join(dir, "state", "sesh", "a.log"): doctor.StatusOK,
+		filepath.Join(readOnly, "sesh", "a.log"):     doctor.StatusFail,
+		filepath.Join(existing, "a.log"):             doctor.StatusFail,
+	} {
+		results, err := doctor.Run(t.Context(), doctor.Options{LogPath: path})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if result := findCheck(results, doctor.CheckLogFile); result.Status != want || (want == doctor.StatusFail && result.Fix == nil) {
+			t.Errorf("log %s = %#v, want %s", path, result, want)
+		}
+
+		if _, err := os.Stat(filepath.Join(dir, "state")); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("the check created the log directory: %v", err)
+		}
+	}
+}
+
+func TestFixCommandsRepeatTheDoctorsFlags(t *testing.T) {
+	t.Parallel()
+
+	repoDir := filepath.Join(t.TempDir(), "my repo")
+
+	r, err := store.Open(t.Context(), repoDir)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	capture := findCheck(results, doctor.CheckCaptureGuarantee)
-	if capture.Reason != doctor.ReasonObservational ||
-		!strings.Contains(capture.Message, "not a checkpoint") ||
-		!strings.Contains(capture.Message, "shell jobs, pipelines and floating panes are not saved") ||
-		!strings.Contains(capture.Message, "scrollback is kept but not replayed") {
-		t.Fatalf("capture capability is inaccurate: %#v", capture)
+	if err := r.Close(); err != nil {
+		t.Fatal(err)
 	}
 
-	restore := findCheck(results, doctor.CheckRestoreCapability)
-	if restore.Reason != doctor.ReasonIncomplete ||
-		!strings.Contains(restore.Message, "relaunches or resumes supported programs") ||
-		!strings.Contains(restore.Message, "cannot confirm a program recovered") ||
-		!strings.Contains(restore.Message, "scrollback is not replayed") {
-		t.Fatalf("restore capability is inaccurate: %#v", restore)
+	if err := os.WriteFile(filepath.Join(repoDir, "catalog.json"), []byte("NOT_JSON"), 0o600); err != nil {
+		t.Fatal(err)
 	}
-}
 
-func TestAutosaveCapabilityDescribesCurrentPlatform(t *testing.T) {
-	t.Parallel()
-
-	results, err := doctor.Run(t.Context(), doctor.Options{})
+	results, err := doctor.Run(t.Context(), doctor.Options{
+		SnapshotDir: repoDir,
+		Flags:       map[string]string{"--config": "/srv/sesh.toml", "--socket": "/tmp/s", "--repository": repoDir},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	autosave := findCheck(results, doctor.CheckAutosave)
-	if autosave.Reason != doctor.ReasonIncomplete {
-		t.Fatalf("autosave capability is inaccurate: %#v", autosave)
+	repo := findCheck(results, doctor.CheckSnapshotRepository)
+
+	want := "sesh snapshot verify --config /srv/sesh.toml --repository '" + repoDir + "'"
+	if repo.Status != doctor.StatusFail || repo.Fix == nil || repo.Fix.Command != want {
+		t.Fatalf("repository fix = %+v, want command %q", repo.Fix, want)
+	}
+}
+
+func TestResultJSONUsesReportFieldNames(t *testing.T) {
+	t.Parallel()
+
+	results, err := doctor.Run(t.Context(), doctor.Options{HistoryPath: filepath.Join(t.TempDir(), "history.json")})
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	requireMessageContains(t, autosave, "saves run on a timer and before shutdown")
-
-	if runtime.GOOS != "linux" {
-		return
+	data, err := json.Marshal(findCheck(results, doctor.CheckHistoryFile))
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	requireMessageContains(t, autosave,
-		"before shutdown and sleep",
-		"a save cut short by shutdown is recorded as incomplete",
-		"restore uses the newest finished save",
-	)
+	var parsed map[string]any
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Fatal(err)
+	}
 
-	if strings.Contains(autosave.Message, "macOS") {
-		t.Fatalf("autosave capability must describe Linux limits on Linux: %#v", autosave)
+	want := map[string]any{
+		"id": "history.file", "group": "History", "status": "info", "reason": "not_found",
+		"message": "Not created yet; switching sessions creates it", "fix": nil,
+	}
+	if !maps.Equal(parsed, want) {
+		t.Fatalf("JSON = %s, want %v", data, want)
 	}
 }
 
@@ -198,11 +266,7 @@ func TestDoctorContextCancellation(t *testing.T) {
 	canceledCtx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	results, err := doctor.Run(canceledCtx, doctor.Options{
-		Server:      nil,
-		SnapshotDir: "",
-		HistoryPath: "",
-	})
+	results, err := doctor.Run(canceledCtx, doctor.Options{})
 	if err == nil {
 		t.Fatal("expected error on canceled context, got nil")
 	}
@@ -223,11 +287,6 @@ func TestDoctorContextCancellation(t *testing.T) {
 	if results != nil {
 		t.Fatalf("expected nil results on pre-run cancellation, got %v", results)
 	}
-
-	owner, ok := err.(interface{ OutcomeLogged() bool })
-	if !ok || !owner.OutcomeLogged() {
-		t.Fatalf("terminal doctor error does not retain log ownership: %T", err)
-	}
 }
 
 func TestDoctorContextDeadline(t *testing.T) {
@@ -236,11 +295,7 @@ func TestDoctorContextDeadline(t *testing.T) {
 	deadlineCtx, cancel := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
 	defer cancel()
 
-	_, err := doctor.Run(deadlineCtx, doctor.Options{
-		Server:      nil,
-		SnapshotDir: "",
-		HistoryPath: "",
-	})
+	_, err := doctor.Run(deadlineCtx, doctor.Options{})
 	if err == nil {
 		t.Fatal("expected error on expired deadline, got nil")
 	}
@@ -265,22 +320,20 @@ func TestSnapshotRepository_NotFound(t *testing.T) {
 	nonExistent := filepath.Join(t.TempDir(), "does-not-exist")
 
 	results, err := doctor.Run(t.Context(), doctor.Options{
-		Server:      nil,
 		SnapshotDir: nonExistent,
-		HistoryPath: "",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	repoRes := findCheck(results, doctor.CheckSnapshotRepository)
-	if repoRes.Status != doctor.StatusWarning || repoRes.Reason != doctor.ReasonNotFound {
-		t.Fatalf("expected not_found warning, got %#v", repoRes)
+	if repoRes.Status != doctor.StatusInfo || repoRes.Reason != doctor.ReasonNotFound {
+		t.Fatalf("expected not_found info, got %#v", repoRes)
 	}
 
 	curRes := findCheck(results, doctor.CheckSnapshotCurrent)
-	if curRes.Status != doctor.StatusWarning || curRes.Reason != doctor.ReasonNotFound {
-		t.Fatalf("expected not_found warning for current snapshot, got %#v", curRes)
+	if curRes.Status != doctor.StatusSkip || curRes.Needs != doctor.CheckSnapshotRepository {
+		t.Fatalf("expected the current snapshot to skip on the missing repository, got %#v", curRes)
 	}
 }
 
@@ -290,16 +343,14 @@ func TestSnapshotRepository_Uninitialized(t *testing.T) {
 	emptyDir := testDir(t, "empty_repo")
 
 	results, err := doctor.Run(t.Context(), doctor.Options{
-		Server:      nil,
 		SnapshotDir: emptyDir,
-		HistoryPath: "",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	repoRes := findCheck(results, doctor.CheckSnapshotRepository)
-	if repoRes.Status != doctor.StatusWarning || repoRes.Reason != doctor.ReasonUninitialized {
+	if repoRes.Status != doctor.StatusWarn || repoRes.Reason != doctor.ReasonUninitialized {
 		t.Fatalf("expected uninitialized warning, got %#v", repoRes)
 	}
 }
@@ -316,16 +367,14 @@ func TestSnapshotRepository_UnsafeSymlink(t *testing.T) {
 	}
 
 	results, err := doctor.Run(t.Context(), doctor.Options{
-		Server:      nil,
 		SnapshotDir: symlinkPath,
-		HistoryPath: "",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	repoRes := findCheck(results, doctor.CheckSnapshotRepository)
-	if repoRes.Status != doctor.StatusError || repoRes.Reason != doctor.ReasonUnsafe {
+	if repoRes.Status != doctor.StatusFail || repoRes.Reason != doctor.ReasonUnsafe {
 		t.Fatalf("expected unsafe error for symlink, got %#v", repoRes)
 	}
 
@@ -346,16 +395,14 @@ func TestSnapshotRepository_InterruptedInitBarrier(t *testing.T) {
 	}
 
 	results, err := doctor.Run(t.Context(), doctor.Options{
-		Server:      nil,
 		SnapshotDir: repoDir,
-		HistoryPath: "",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	repoRes := findCheck(results, doctor.CheckSnapshotRepository)
-	if repoRes.Status != doctor.StatusError || repoRes.Reason != doctor.ReasonRecoveryRequired {
+	if repoRes.Status != doctor.StatusFail || repoRes.Reason != doctor.ReasonRecoveryRequired {
 		t.Fatalf("expected recovery_required error, got %#v", repoRes)
 	}
 
@@ -383,16 +430,14 @@ func TestSnapshotRepository_CorruptCatalog(t *testing.T) {
 	}
 
 	results, err := doctor.Run(t.Context(), doctor.Options{
-		Server:      nil,
 		SnapshotDir: repoDir,
-		HistoryPath: "",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	repoRes := findCheck(results, doctor.CheckSnapshotRepository)
-	if repoRes.Status != doctor.StatusError || repoRes.Reason != doctor.ReasonCorrupt {
+	if repoRes.Status != doctor.StatusFail || repoRes.Reason != doctor.ReasonCorrupt {
 		t.Fatalf("expected corrupt error for catalog, got %#v", repoRes)
 	}
 }
@@ -412,22 +457,20 @@ func TestSnapshotRepository_EmptyCommittedState(t *testing.T) {
 	}
 
 	results, err := doctor.Run(t.Context(), doctor.Options{
-		Server:      nil,
 		SnapshotDir: repoDir,
-		HistoryPath: "",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	repoRes := findCheck(results, doctor.CheckSnapshotRepository)
-	if repoRes.Status != doctor.StatusOK || !strings.Contains(repoRes.Message, "0 generations") {
+	if repoRes.Status != doctor.StatusOK || repoRes.Message != "0 generations" {
 		t.Fatalf("expected ok status with 0 generations, got %#v", repoRes)
 	}
 
 	curRes := findCheck(results, doctor.CheckSnapshotCurrent)
-	if curRes.Status != doctor.StatusWarning || curRes.Reason != doctor.ReasonNotFound {
-		t.Fatalf("expected not_found warning for empty repo, got %#v", curRes)
+	if curRes.Status != doctor.StatusInfo || curRes.Reason != doctor.ReasonNotFound {
+		t.Fatalf("expected not_found info for empty repo, got %#v", curRes)
 	}
 }
 
@@ -448,22 +491,20 @@ func TestSnapshotRepository_CompleteSnapshot(t *testing.T) {
 	}
 
 	results, err := doctor.Run(t.Context(), doctor.Options{
-		Server:      nil,
 		SnapshotDir: repoDir,
-		HistoryPath: "",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	repoRes := findCheck(results, doctor.CheckSnapshotRepository)
-	if repoRes.Status != doctor.StatusOK || !strings.Contains(repoRes.Message, "1 generations") {
+	if repoRes.Status != doctor.StatusOK || repoRes.Message != "1 generation" {
 		t.Fatalf("expected ok with 1 generation, got %#v", repoRes)
 	}
 
 	curRes := findCheck(results, doctor.CheckSnapshotCurrent)
-	if curRes.Status != doctor.StatusOK || !strings.Contains(curRes.Message, "verified") {
-		t.Fatalf("expected ok verified current snapshot, got %#v", curRes)
+	if curRes.Status != doctor.StatusOK || !strings.HasSuffix(curRes.Message, "restores 1 session") {
+		t.Fatalf("expected ok current snapshot, got %#v", curRes)
 	}
 }
 
@@ -484,16 +525,14 @@ func TestSnapshotRepository_PartialSnapshot(t *testing.T) {
 	}
 
 	results, err := doctor.Run(t.Context(), doctor.Options{
-		Server:      nil,
 		SnapshotDir: repoDir,
-		HistoryPath: "",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	curRes := findCheck(results, doctor.CheckSnapshotCurrent)
-	if curRes.Status != doctor.StatusWarning || curRes.Reason != doctor.ReasonIncomplete {
+	if curRes.Status != doctor.StatusWarn || curRes.Reason != doctor.ReasonIncomplete {
 		t.Fatalf("expected incomplete warning for partial snapshot, got %#v", curRes)
 	}
 }
@@ -515,26 +554,15 @@ func TestSnapshotRepository_PracticalObservationalSnapshot(t *testing.T) {
 	}
 
 	results, err := doctor.Run(t.Context(), doctor.Options{
-		Server:      nil,
 		SnapshotDir: repoDir,
-		HistoryPath: "",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	curRes := findCheck(results, doctor.CheckSnapshotCurrent)
-	if curRes.Status != doctor.StatusWarning || curRes.Reason != doctor.ReasonObservational {
-		t.Fatalf("expected observational warning for practical snapshot, got %#v", curRes)
-	}
-
-	if !strings.Contains(curRes.Message, "is restorable (1 sessions)") ||
-		!strings.Contains(curRes.Message, "not a checkpoint") {
-		t.Fatalf("expected practical recovery message, got %q", curRes.Message)
-	}
-
-	if curRes.Fix != "" {
-		t.Fatalf("expected empty fix for practical recovery snapshot, got %q", curRes.Fix)
+	if curRes.Status != doctor.StatusOK || curRes.Fix != nil || !strings.HasSuffix(curRes.Message, "restores 1 session") {
+		t.Fatalf("a restorable observed snapshot is healthy, got %#v", curRes)
 	}
 }
 
@@ -582,15 +610,15 @@ func assertUnfinishedSaveReportsNewestGeneration(t *testing.T, terminalState str
 	}
 
 	curRes := findCheck(results, doctor.CheckSnapshotCurrent)
-	if curRes.Status != doctor.StatusWarning || curRes.Reason != doctor.ReasonSaveUnfinished {
+	if curRes.Status != doctor.StatusWarn || curRes.Reason != doctor.ReasonSaveUnfinished {
 		t.Fatalf("newer %s attempt did not report the newest saved generation: %#v", terminalState, curRes)
 	}
 
-	if !strings.Contains(curRes.Message, "the newest saved (1 sessions)") {
-		t.Fatalf("unfinished save message = %q", curRes.Message)
+	if !strings.Contains(curRes.Message, "the newest saved generation (1 session)") || curRes.Fix == nil {
+		t.Fatalf("unfinished save result = %#v", curRes)
 	}
 
-	failed := strings.Contains(curRes.Message, "latest save failed") && strings.Contains(curRes.Fix, "--json")
+	failed := strings.Contains(curRes.Message, "Latest save failed")
 	if failed != (terminalState == "failed") {
 		t.Fatalf("newer %s attempt reported the wrong unfinished-save cause: %#v", terminalState, curRes)
 	}
@@ -622,7 +650,7 @@ func TestSnapshotRepository_CorruptPracticalGenerationArtifact(t *testing.T) {
 	}
 
 	curRes := findCheck(results, doctor.CheckSnapshotCurrent)
-	if curRes.Status != doctor.StatusError || curRes.Reason != doctor.ReasonCorrupt {
+	if curRes.Status != doctor.StatusFail || curRes.Reason != doctor.ReasonCorrupt {
 		t.Fatalf("corrupt practical artifact was downgraded: %#v", curRes)
 	}
 }
@@ -648,16 +676,14 @@ func TestSnapshotRepository_CorruptManifest(t *testing.T) {
 	}
 
 	results, err := doctor.Run(t.Context(), doctor.Options{
-		Server:      nil,
 		SnapshotDir: repoDir,
-		HistoryPath: "",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	curRes := findCheck(results, doctor.CheckSnapshotCurrent)
-	if curRes.Status != doctor.StatusError || curRes.Reason != doctor.ReasonCorrupt {
+	if curRes.Status != doctor.StatusFail || curRes.Reason != doctor.ReasonCorrupt {
 		t.Fatalf("expected corrupt error on corrupt manifest, got %#v", curRes)
 	}
 }
@@ -683,16 +709,14 @@ func TestSnapshotRepository_CorruptArtifact(t *testing.T) {
 	}
 
 	results, err := doctor.Run(t.Context(), doctor.Options{
-		Server:      nil,
 		SnapshotDir: repoDir,
-		HistoryPath: "",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	curRes := findCheck(results, doctor.CheckSnapshotCurrent)
-	if curRes.Status != doctor.StatusError || curRes.Reason != doctor.ReasonCorrupt {
+	if curRes.Status != doctor.StatusFail || curRes.Reason != doctor.ReasonCorrupt {
 		t.Fatalf("expected corrupt error on corrupt artifact, got %#v", curRes)
 	}
 }
@@ -718,16 +742,14 @@ func TestSnapshotRepository_PendingSaveAfterCompleteGenerationReportsIt(t *testi
 	}
 
 	results, err := doctor.Run(t.Context(), doctor.Options{
-		Server:      nil,
 		SnapshotDir: repoDir,
-		HistoryPath: "",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	curRes := findCheck(results, doctor.CheckSnapshotCurrent)
-	if curRes.Status != doctor.StatusWarning || curRes.Reason != doctor.ReasonSaveUnfinished {
+	if curRes.Status != doctor.StatusWarn || curRes.Reason != doctor.ReasonSaveUnfinished {
 		t.Fatalf("expected latest_save_unfinished warning after a pending save, got %#v", curRes)
 	}
 }
@@ -738,20 +760,15 @@ func TestHistoryState_MissingCleanFirstRun(t *testing.T) {
 	nonExistent := filepath.Join(t.TempDir(), "history.json")
 
 	results, err := doctor.Run(t.Context(), doctor.Options{
-		SnapshotDir: "",
 		HistoryPath: nonExistent,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	historyRes := findCheck(results, doctor.CheckHistoryState)
-	if historyRes.Status != doctor.StatusWarning || historyRes.Reason != doctor.ReasonNotFound {
-		t.Fatalf("expected not_found warning for clean first run, got %#v", historyRes)
-	}
-
-	if !strings.Contains(historyRes.Message, "first-run clean state") {
-		t.Fatalf("expected first-run message, got %q", historyRes.Message)
+	historyRes := findCheck(results, doctor.CheckHistoryFile)
+	if historyRes.Status != doctor.StatusInfo || historyRes.Reason != doctor.ReasonNotFound {
+		t.Fatalf("expected not_found info for clean first run, got %#v", historyRes)
 	}
 }
 
@@ -781,20 +798,18 @@ func TestHistoryState_Valid(t *testing.T) {
 	}
 
 	results, err := doctor.Run(t.Context(), doctor.Options{
-		Server:      nil,
-		SnapshotDir: "",
 		HistoryPath: historyPath,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	historyRes := findCheck(results, doctor.CheckHistoryState)
+	historyRes := findCheck(results, doctor.CheckHistoryFile)
 	if historyRes.Status != doctor.StatusOK || historyRes.Reason != "" {
 		t.Fatalf("expected ok status for valid history, got %#v", historyRes)
 	}
 
-	if !strings.Contains(historyRes.Message, "1 switch entries") {
+	if !strings.Contains(historyRes.Message, "1 switch entry,") {
 		t.Fatalf("expected switch count in message, got %q", historyRes.Message)
 	}
 }
@@ -817,16 +832,14 @@ func TestHistoryState_UnsafeSymlink(t *testing.T) {
 	}
 
 	results, err := doctor.Run(t.Context(), doctor.Options{
-		Server:      nil,
-		SnapshotDir: "",
 		HistoryPath: symlinkPath,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	historyRes := findCheck(results, doctor.CheckHistoryState)
-	if historyRes.Status != doctor.StatusError || historyRes.Reason != doctor.ReasonUnsafe {
+	historyRes := findCheck(results, doctor.CheckHistoryFile)
+	if historyRes.Status != doctor.StatusFail || historyRes.Reason != doctor.ReasonUnsafe {
 		t.Fatalf("expected unsafe error for history symlink, got %#v", historyRes)
 	}
 
@@ -847,16 +860,14 @@ func TestHistoryState_CorruptJSON(t *testing.T) {
 	}
 
 	results, err := doctor.Run(t.Context(), doctor.Options{
-		Server:      nil,
-		SnapshotDir: "",
 		HistoryPath: historyPath,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	historyRes := findCheck(results, doctor.CheckHistoryState)
-	if historyRes.Status != doctor.StatusError || historyRes.Reason != doctor.ReasonCorrupt {
+	historyRes := findCheck(results, doctor.CheckHistoryFile)
+	if historyRes.Status != doctor.StatusFail || historyRes.Reason != doctor.ReasonCorrupt {
 		t.Fatalf("expected corrupt error for invalid JSON, got %#v", historyRes)
 	}
 }
@@ -873,16 +884,14 @@ func TestHistoryState_InvalidVersion(t *testing.T) {
 	}
 
 	results, err := doctor.Run(t.Context(), doctor.Options{
-		Server:      nil,
-		SnapshotDir: "",
 		HistoryPath: historyPath,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	historyRes := findCheck(results, doctor.CheckHistoryState)
-	if historyRes.Status != doctor.StatusError || historyRes.Reason != doctor.ReasonIncompatible {
+	historyRes := findCheck(results, doctor.CheckHistoryFile)
+	if historyRes.Status != doctor.StatusFail || historyRes.Reason != doctor.ReasonIncompatible {
 		t.Fatalf("expected incompatible error for invalid version, got %#v", historyRes)
 	}
 }
@@ -899,16 +908,14 @@ func TestHistoryState_Oversized(t *testing.T) {
 	}
 
 	results, err := doctor.Run(t.Context(), doctor.Options{
-		Server:      nil,
-		SnapshotDir: "",
 		HistoryPath: historyPath,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	historyRes := findCheck(results, doctor.CheckHistoryState)
-	if historyRes.Status != doctor.StatusError || historyRes.Reason != doctor.ReasonCorrupt {
+	historyRes := findCheck(results, doctor.CheckHistoryFile)
+	if historyRes.Status != doctor.StatusFail || historyRes.Reason != doctor.ReasonCorrupt {
 		t.Fatalf("expected corrupt error for oversized file, got %#v", historyRes)
 	}
 }
@@ -942,8 +949,6 @@ func TestHistoryState_BytesUntouched(t *testing.T) {
 	beforeHash := sha256.Sum256(beforeBytes)
 
 	_, err = doctor.Run(t.Context(), doctor.Options{
-		Server:      nil,
-		SnapshotDir: "",
 		HistoryPath: historyPath,
 	})
 	if err != nil {
@@ -962,221 +967,14 @@ func TestHistoryState_BytesUntouched(t *testing.T) {
 	}
 }
 
-func TestResultJSONSerialization(t *testing.T) {
-	t.Parallel()
-
-	res := doctor.Result{
-		Check:   doctor.CheckTmux,
-		Status:  doctor.StatusOK,
-		Reason:  "",
-		Message: "tmux 3.6 (server pid 42)",
-		Fix:     "",
-	}
-
-	data, err := json.Marshal(res)
-	if err != nil {
-		t.Fatalf("marshal error: %v", err)
-	}
-
-	var parsed map[string]string
-	if err := json.Unmarshal(data, &parsed); err != nil {
-		t.Fatalf("unmarshal error: %v", err)
-	}
-
-	if parsed["check"] != doctor.CheckTmux || parsed["status"] != doctor.StatusOK || parsed["message"] != "tmux 3.6 (server pid 42)" {
-		t.Fatalf("unexpected JSON fields: %v", parsed)
-	}
-}
-
-type schemaLevelCase struct {
-	name          string
-	opts          func(t *testing.T) doctor.Options
-	cancelCtx     bool
-	wantCompLevel string
-	wantStatus    string
-	wantReason    string
-	wantRecords   int
-	errorChecks   string
-}
-
-func TestLogging_SchemaAndLevels(t *testing.T) {
-	t.Parallel()
-
-	tests := []schemaLevelCase{
-		{
-			name: "ok_with_no_server_is_degraded_due_to_capability_warnings",
-			opts: func(_ *testing.T) doctor.Options {
-				return doctor.Options{Server: nil, SnapshotDir: "", HistoryPath: ""}
-			},
-			cancelCtx:     false,
-			wantCompLevel: "warn",
-			wantStatus:    "degraded",
-			wantReason:    "checks_degraded",
-			wantRecords:   2,
-			errorChecks:   "",
-		},
-		{
-			name: "failed_checks_level",
-			opts: func(t *testing.T) doctor.Options {
-				t.Helper()
-				historyDir := testDir(t, "bad_history")
-				badPath := filepath.Join(historyDir, "bad.json")
-				_ = os.WriteFile(badPath, []byte("NOT_JSON"), 0o600)
-
-				return doctor.Options{Server: nil, SnapshotDir: "", HistoryPath: badPath}
-			},
-			cancelCtx:     false,
-			wantCompLevel: "error",
-			wantStatus:    "failed",
-			wantReason:    "checks_failed",
-			wantRecords:   2,
-			errorChecks:   doctor.CheckHistoryState,
-		},
-		{
-			name: "operational_cancellation_level",
-			opts: func(_ *testing.T) doctor.Options {
-				return doctor.Options{Server: nil, SnapshotDir: "", HistoryPath: ""}
-			},
-			cancelCtx:     true,
-			wantCompLevel: "error",
-			wantStatus:    "failed",
-			wantReason:    "operation_canceled",
-			wantRecords:   1,
-			errorChecks:   "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			runSchemaLevelTest(t, tt)
-		})
-	}
-}
-
-func runSchemaLevelTest(t *testing.T, tt schemaLevelCase) {
-	t.Helper()
-
-	var logBuf bytes.Buffer
-
-	logger := zerolog.New(&logBuf)
-	ctx := logger.WithContext(t.Context())
-
-	if tt.cancelCtx {
-		var cancel context.CancelFunc
-
-		ctx, cancel = context.WithCancel(ctx)
-		cancel()
-	}
-
-	opts := tt.opts(t)
-	_, _ = doctor.Run(ctx, opts)
-
-	logLines := bytes.Split(bytes.TrimSpace(logBuf.Bytes()), []byte{'\n'})
-	if len(logLines) != tt.wantRecords {
-		t.Fatalf("log record count = %d, want %d: %s", len(logLines), tt.wantRecords, logBuf.Bytes())
-	}
-
-	lastLine := logLines[len(logLines)-1]
-
-	var lastRecord map[string]any
-	if err := json.Unmarshal(lastLine, &lastRecord); err != nil {
-		t.Fatalf("invalid JSON log: %v, raw: %s", err, string(lastLine))
-	}
-
-	if lastRecord["component"] != "doctor" || lastRecord["operation"] != "run" {
-		t.Fatalf("unexpected component/operation: %v", lastRecord)
-	}
-
-	if lastRecord["level"] != tt.wantCompLevel {
-		t.Fatalf("expected level %q, got %q", tt.wantCompLevel, lastRecord["level"])
-	}
-
-	if lastRecord["status"] != tt.wantStatus {
-		t.Fatalf("expected status %q, got %q", tt.wantStatus, lastRecord["status"])
-	}
-
-	if lastRecord["reason"] != tt.wantReason {
-		t.Fatalf("expected reason %q, got %q", tt.wantReason, lastRecord["reason"])
-	}
-
-	errorChecks, _ := lastRecord["error_checks"].(string)
-	if errorChecks != tt.errorChecks {
-		t.Fatalf("expected error_checks %q, got %q", tt.errorChecks, errorChecks)
-	}
-}
-
-func TestLogging_Privacy(t *testing.T) {
-	t.Parallel()
-
-	const (
-		secretPath     = "TOP_SECRET_PATH_XYZ_123"
-		secretSession  = "SECRET_SESSION_NAME_999"
-		secretArtifact = "SECRET_ARTIFACT_TOKEN_444"
-	)
-
-	dir := filepath.Join(t.TempDir(), secretPath)
-	_ = os.MkdirAll(dir, 0o700)
-
-	var logBuf bytes.Buffer
-
-	logger := zerolog.New(&logBuf)
-	ctx := logger.WithContext(t.Context())
-
-	_, _ = doctor.Run(ctx, doctor.Options{
-		Server:      nil,
-		SnapshotDir: dir,
-		HistoryPath: filepath.Join(dir, secretSession),
-	})
-
-	logStr := logBuf.String()
-	for _, forbidden := range []string{secretPath, secretSession, secretArtifact} {
-		if strings.Contains(logStr, forbidden) {
-			t.Fatalf("privacy violation: log contains forbidden string %q:\n%s", forbidden, logStr)
-		}
-	}
-}
-
-func TestLogging_StdoutStderrIsolation(t *testing.T) {
-	t.Parallel()
-
-	var logBuf bytes.Buffer
-
-	logger := zerolog.New(&logBuf)
-	ctx := logger.WithContext(t.Context())
-
-	_, err := doctor.Run(ctx, doctor.Options{
-		Server:      nil,
-		SnapshotDir: "",
-		HistoryPath: "",
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if logBuf.Len() == 0 {
-		t.Fatal("expected logs in private sink buffer")
-	}
-}
-
-func findCheck(results []doctor.Result, check string) doctor.Result {
+func findCheck(results []doctor.Result, id string) doctor.Result {
 	for _, r := range results {
-		if r.Check == check {
+		if r.ID == id {
 			return r
 		}
 	}
 
 	return doctor.Result{}
-}
-
-func requireMessageContains(t *testing.T, result doctor.Result, fragments ...string) {
-	t.Helper()
-
-	for _, fragment := range fragments {
-		if !strings.Contains(result.Message, fragment) {
-			t.Fatalf("%s message does not contain %q: %#v", result.Check, fragment, result)
-		}
-	}
 }
 
 func commitTestFixture(t *testing.T, r *store.Repository, complete bool) store.Generation {

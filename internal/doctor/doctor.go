@@ -5,25 +5,25 @@ package doctor
 import (
 	"context"
 	"errors"
-	"slices"
 	"strings"
 
-	"github.com/rs/zerolog"
 	"github.com/samber/oops"
 	gotmux "github.com/zigai/gotmux/tmux"
 )
 
 const (
-	StatusOK      = "ok"
-	StatusWarning = "warning"
-	StatusError   = "error"
+	StatusOK   Status = "ok"
+	StatusInfo Status = "info"
+	StatusWarn Status = "warn"
+	StatusFail Status = "fail"
+	StatusSkip Status = "skip"
 )
 
 const (
 	ReasonUnavailable       = "unavailable"
 	ReasonIncompatible      = "incompatible"
-	ReasonNotConfigured     = "not_configured"
 	ReasonNotFound          = "not_found"
+	ReasonNotRunning        = "not_running"
 	ReasonUninitialized     = "uninitialized"
 	ReasonUnsafe            = "unsafe"
 	ReasonRecoveryRequired  = "recovery_required"
@@ -31,97 +31,231 @@ const (
 	ReasonIncomplete        = "incomplete"
 	ReasonEmpty             = "empty"
 	ReasonInspectionFailed  = "inspection_failed"
-	ReasonObservational     = "observational_only"
-	ReasonNotRunning        = "not_running"
 	ReasonStale             = "stale"
 	ReasonUnverifiable      = "unverifiable"
+	ReasonTimedOut          = "timed_out"
+	ReasonCanceled          = "canceled"
+	ReasonInvalid           = "invalid"
+	ReasonDuplicate         = "duplicate"
 	ReasonInhibitorReleased = "inhibitor_released"
-	ReasonLifecycleActive   = "lifecycle_active"
-	ReasonInitializing      = "initializing"
 	ReasonSaveUnfinished    = "latest_save_unfinished"
 )
 
 const (
-	CheckTmux               = "tmux"
-	CheckSnapshotRepository = "snapshot-repository"
-	CheckSnapshotCurrent    = "snapshot-current"
-	CheckHistoryState       = "history-state"
-	CheckCaptureGuarantee   = "capture-guarantee"
-	CheckRestoreCapability  = "restore-capability"
-	CheckAutosave           = "autosave"
-	CheckDaemonRuntime      = "daemon-runtime"
-	CheckRestorableSnapshot = "restorable-snapshot"
-	CheckServiceOOMPolicy   = "service-oom-policy"
-	CheckServiceCommands    = "service-commands"
-	CheckActiveRestores     = "active-restores"
-	CheckCustomField        = "custom-field"
+	CheckInstallPath        = "install.path"
+	CheckConfigFile         = "config.file"
+	CheckTmuxClient         = "tmux.client"
+	CheckTmuxServer         = "tmux.server"
+	CheckFields             = "fields.custom"
+	CheckSnapshotRepository = "snapshots.repository"
+	CheckSnapshotCurrent    = "snapshots.current"
+	CheckActiveRestores     = "snapshots.restores"
+	CheckHistoryFile        = "history.file"
+	CheckLogFile            = "logs.file"
+	CheckServiceUnits       = "services.units"
+	CheckServiceOOMPolicy   = "services.oom-policy"
+	CheckAutosaveDaemon     = "autosave.daemon"
+	CheckSmokeSessions      = "smoke.sessions"
 )
 
+const (
+	ConfigLoaded    = "loaded"
+	ConfigNotFound  = "not_found"
+	ConfigNotLoaded = "not_loaded"
+	ConfigSkipped   = "skipped"
+)
+
+const (
+	DaemonReady        = "ready"
+	DaemonNotReady     = "not_ready"
+	DaemonAbsent       = "absent"
+	DaemonStale        = "stale"
+	DaemonUnverifiable = "unverifiable"
+)
+
+const (
+	flagConfig     = "--config"
+	flagNoConfig   = "--no-config"
+	flagSocket     = "--socket"
+	flagRepository = "--repository"
+	flagHistory    = "--history"
+)
+
+// Statuses lists every status in the order the summary reports them.
+var Statuses = []Status{StatusOK, StatusInfo, StatusWarn, StatusFail, StatusSkip}
+
+var groups = map[string]string{
+	"install":   "Install",
+	"config":    "Config",
+	"tmux":      "Tmux",
+	"fields":    "Fields",
+	"snapshots": "Snapshots",
+	"history":   "History",
+	"logs":      "Logs",
+	"services":  "Services",
+	"autosave":  "Autosave",
+	"smoke":     "Smoke",
+}
+
+type Status string
+
+// Result is one check's finding. Every warn and fail result carries a Fix; Needs names the
+// check whose failure kept this one from running.
 type Result struct {
-	Check   string `json:"check"`
-	Status  string `json:"status"`
-	Reason  string `json:"reason"`
-	Message string `json:"message"`
-	Fix     string `json:"fix"`
+	ID      string   `json:"id"`
+	Group   string   `json:"group"`
+	Status  Status   `json:"status"`
+	Reason  string   `json:"reason,omitempty"`
+	Message string   `json:"message"`
+	Details []string `json:"details,omitempty"`
+	Needs   string   `json:"needs,omitempty"`
+	Fix     *Fix     `json:"fix"`
+}
+
+// Fix is either a command to run or, when no command can do it, a manual step.
+type Fix struct {
+	Command string `json:"command,omitempty"`
+	Manual  string `json:"manual,omitempty"`
+}
+
+type Summary struct {
+	OK   int `json:"ok"`
+	Info int `json:"info"`
+	Warn int `json:"warn"`
+	Fail int `json:"fail"`
+	Skip int `json:"skip"`
+}
+
+type CustomField struct {
+	Name    string
+	Command string
+}
+
+// ConfigFile is one configuration source in precedence order. Source names the flag or
+// environment variable that selected it.
+type ConfigFile struct {
+	Path   string `json:"path"`
+	Status string `json:"status"`
+	Source string `json:"source,omitempty"`
+}
+
+type Daemon struct {
+	State          string
+	Phase          string
+	InhibitorsHeld bool
+	// RuntimePath is the coordinator's runtime status socket for the selected tmux server.
+	RuntimePath string
 }
 
 type Options struct {
-	Server            *gotmux.Server
-	SnapshotDir       string
-	HistoryPath       string
-	DaemonState       string
-	DaemonPhase       string
-	InhibitorsHeld    bool
-	LogindDelayMillis int64
-	// ServiceDir is the systemd user unit directory whose sesh command lines are checked; empty
-	// skips the check.
-	ServiceDir string
-	// Executable is the running sesh executable, recognized in unit command lines besides any
-	// program named sesh.
+	// PathEnv is the PATH searched for copies of sesh, tmux and custom field commands.
+	PathEnv    string
 	Executable string
-	// ValidateCommand reports whether this sesh accepts a command line, given without the program;
-	// nil skips the check.
-	ValidateCommand func(args []string) error
+
+	ConfigFiles []ConfigFile
+	// ConfigError describes why the configuration failed to load; the other checks then run on
+	// built-in settings.
+	ConfigError     string
+	AutosaveEnabled bool
 	CustomFields    []CustomField
+
+	// Flags are the doctor's own configuration and location flags, by name, that fix commands
+	// repeat so they act on the same configuration, server and repository. A flag without a
+	// value is a switch.
+	Flags map[string]string
+
+	Socket string
+	// DefaultSocket is the socket a plain tmux command uses.
+	DefaultSocket string
+	Server        *gotmux.Server
+	// ServerError is why the tmux server handle could not be opened.
+	ServerError error
+
+	SnapshotDir string
+	HistoryPath string
+	LogPath     string
+
+	Daemon Daemon
+	// ServiceDirs is the systemd user unit search path, highest precedence first; nil skips the
+	// service checks.
+	ServiceDirs []string
+	// ValidateCommand reports whether this sesh accepts a command line, given without the
+	// program; nil skips the unit command check.
+	ValidateCommand func(args []string) error
 }
 
 type Service struct {
-	server            *gotmux.Server
-	snapshotDir       string
-	historyPath       string
-	daemonState       string
-	daemonPhase       string
-	inhibitorsHeld    bool
-	logindDelayMillis int64
-	serviceDir        string
-	executable        string
-	validateCommand   func(args []string) error
-	customFields      []CustomField
-	unitOf            func(pid int) (string, error)
-	oomPolicyOf       func(ctx context.Context, unit string) (string, error)
+	opts        Options
+	unitOf      func(pid int) (string, error)
+	oomPolicyOf func(ctx context.Context, unit string) (string, error)
+
+	serverPID    int
+	serverStatus Status
+	sessions     []string
+	listErr      error
+	repoStatus   Status
 }
 
-type outcomeLoggedError struct{ error }
+// FieldCheck returns the id of the check for the custom display field name.
+func FieldCheck(name string) string {
+	return "fields." + name
+}
 
-func (e *outcomeLoggedError) Unwrap() error { return e.error }
+// Name is the check id without its group, as shown under the group heading.
+func (r Result) Name() string {
+	_, name, _ := strings.Cut(r.ID, ".")
 
-func (e *outcomeLoggedError) OutcomeLogged() bool { return true }
+	return name
+}
+
+func Summarize(results []Result) Summary {
+	var summary Summary
+
+	for _, result := range results {
+		switch result.Status {
+		case StatusOK:
+			summary.OK++
+		case StatusInfo:
+			summary.Info++
+		case StatusWarn:
+			summary.Warn++
+		case StatusFail:
+			summary.Fail++
+		case StatusSkip:
+			summary.Skip++
+		}
+	}
+
+	return summary
+}
+
+func (s Summary) Count(status Status) int {
+	switch status {
+	case StatusOK:
+		return s.OK
+	case StatusInfo:
+		return s.Info
+	case StatusWarn:
+		return s.Warn
+	case StatusFail:
+		return s.Fail
+	case StatusSkip:
+		return s.Skip
+	default:
+		return 0
+	}
+}
 
 func NewService(opts Options) *Service {
 	return &Service{
-		server:            opts.Server,
-		snapshotDir:       opts.SnapshotDir,
-		historyPath:       opts.HistoryPath,
-		daemonState:       opts.DaemonState,
-		daemonPhase:       opts.DaemonPhase,
-		inhibitorsHeld:    opts.InhibitorsHeld,
-		logindDelayMillis: opts.LogindDelayMillis,
-		serviceDir:        opts.ServiceDir,
-		executable:        opts.Executable,
-		validateCommand:   opts.ValidateCommand,
-		customFields:      opts.CustomFields,
-		unitOf:            serviceUnitOf,
-		oomPolicyOf:       serviceOOMPolicyOf,
+		opts:         opts,
+		unitOf:       serviceUnitOf,
+		oomPolicyOf:  serviceOOMPolicyOf,
+		serverPID:    0,
+		serverStatus: "",
+		sessions:     nil,
+		listErr:      nil,
+		repoStatus:   "",
 	}
 }
 
@@ -129,107 +263,116 @@ func Run(ctx context.Context, opts Options) ([]Result, error) {
 	return NewService(opts).Run(ctx)
 }
 
+// Run executes every check in report order. It stops early only when ctx ends, returning the
+// results gathered so far.
 func (s *Service) Run(ctx context.Context) ([]Result, error) {
-	if err := ctx.Err(); err != nil {
-		logDoctorCompleted(ctx, nil, err)
-
-		return nil, doctorError(err)
+	steps := []func(context.Context) ([]Result, error){
+		func(context.Context) ([]Result, error) { return []Result{s.checkInstallPath()}, nil },
+		func(context.Context) ([]Result, error) { return []Result{s.checkConfig()}, nil },
+		s.checkTmux,
+		func(context.Context) ([]Result, error) { return s.checkCustomFields(), nil },
+		s.checkSnapshot,
+		func(ctx context.Context) ([]Result, error) { return []Result{s.checkActiveRestores(ctx)}, nil },
+		func(context.Context) ([]Result, error) { return []Result{s.checkHistory()}, nil },
+		func(context.Context) ([]Result, error) { return []Result{s.checkLogFile()}, nil },
+		func(context.Context) ([]Result, error) { return []Result{s.checkServiceUnits()}, nil },
+		func(ctx context.Context) ([]Result, error) { return []Result{s.checkServiceOOMPolicy(ctx)}, nil },
+		func(context.Context) ([]Result, error) { return []Result{s.checkDaemon()}, nil },
+		func(context.Context) ([]Result, error) { return []Result{s.checkSmoke()}, nil },
 	}
 
-	logDoctorStarted(ctx)
+	var results []Result
 
-	const expectedChecks = 8
-
-	results := make([]Result, 0, expectedChecks)
-
-	var cleanupErr error
-
-	tmuxRes, serverPID := s.checkTmux(ctx)
-	results = append(results, tmuxRes)
-
-	if err := ctx.Err(); err != nil {
-		runErr := errors.Join(cleanupErr, err)
-		logDoctorCompleted(ctx, results, runErr)
-
-		return results, doctorError(runErr)
-	}
-
-	repoRes, curRes, snapErr := s.checkSnapshot(ctx)
-	results = append(results, repoRes, curRes)
-
-	if snapErr != nil {
-		if errors.Is(snapErr, context.Canceled) || errors.Is(snapErr, context.DeadlineExceeded) {
-			logDoctorCompleted(ctx, results, snapErr)
-
-			return results, doctorError(snapErr)
+	for _, step := range steps {
+		if err := ctx.Err(); err != nil {
+			return results, doctorError(err)
 		}
 
-		cleanupErr = errors.Join(cleanupErr, snapErr)
+		stepResults, err := step(ctx)
+		results = append(results, stepResults...)
+
+		if err != nil {
+			return results, doctorError(err)
+		}
 	}
 
 	if err := ctx.Err(); err != nil {
-		runErr := errors.Join(cleanupErr, err)
-		logDoctorCompleted(ctx, results, runErr)
-
-		return results, doctorError(runErr)
+		return results, doctorError(err)
 	}
 
-	results = append(results, s.checkHistory(ctx))
-	if err := ctx.Err(); err != nil {
-		runErr := errors.Join(cleanupErr, err)
-		logDoctorCompleted(ctx, results, runErr)
-
-		return results, doctorError(runErr)
-	}
-
-	results = append(results,
-		checkCaptureGuarantee(),
-		checkRestoreCapability(),
-		s.checkDaemonRuntime(),
-		checkAutosaveCapability(),
-	)
-
-	results = append(results, s.checkRestorable(ctx, tmuxRes)...)
-	results = append(results, s.checkServiceOOMPolicy(ctx, serverPID)...)
-	results = append(results, s.checkServiceCommands()...)
-	results = append(results, s.checkActiveRestores(ctx)...)
-	results = append(results, checkCustomFields(s.customFields)...)
-
-	var runErr error
-	if cleanupErr != nil {
-		runErr = doctorError(cleanupErr)
-	}
-
-	logDoctorCompleted(ctx, results, runErr)
-
-	return results, runErr
+	return results, nil
 }
 
-func HasErrors(results []Result) bool {
-	for _, r := range results {
-		if r.Status == StatusError {
-			return true
-		}
-	}
-
-	return false
+func HasFailures(results []Result) bool {
+	return Summarize(results).Fail > 0
 }
 
-func HasWarnings(results []Result) bool {
-	for _, r := range results {
-		if r.Status == StatusWarning {
-			return true
+func newResult(id string, status Status, message string) Result {
+	group, _, _ := strings.Cut(id, ".")
+
+	return Result{ID: id, Group: groups[group], Status: status, Reason: "", Message: message, Details: nil, Needs: "", Fix: nil}
+}
+
+func (r Result) withReason(reason string) Result {
+	r.Reason = reason
+
+	return r
+}
+
+func (r Result) withCommand(command string) Result {
+	r.Fix = &Fix{Command: command, Manual: ""}
+
+	return r
+}
+
+func (r Result) withManual(step string) Result {
+	r.Fix = &Fix{Command: "", Manual: step}
+
+	return r
+}
+
+func (r Result) withDetails(details ...string) Result {
+	r.Details = append(r.Details, details...)
+
+	return r
+}
+
+func skipped(id, needs, message string) Result {
+	result := newResult(id, StatusSkip, message)
+	result.Needs = needs
+
+	return result
+}
+
+// seshCommand renders a sesh command line that repeats the configuration flags and the given
+// location flags the doctor ran with.
+func (s *Service) seshCommand(command string, flags []string, args ...string) string {
+	parts := []string{programName, command}
+
+	for _, name := range append([]string{flagConfig, flagNoConfig}, flags...) {
+		value, given := s.opts.Flags[name]
+		if !given {
+			continue
+		}
+
+		parts = append(parts, name)
+		if value != "" {
+			parts = append(parts, shellArg(value))
 		}
 	}
 
-	return false
+	for _, arg := range args {
+		parts = append(parts, shellArg(arg))
+	}
+
+	return strings.Join(parts, " ")
+}
+
+func (s *Service) doctorCommand() string {
+	return s.seshCommand("doctor", []string{flagSocket, flagRepository, flagHistory})
 }
 
 func doctorError(err error) error {
-	if err == nil {
-		return nil
-	}
-
 	code := "doctor_failed"
 
 	switch {
@@ -239,104 +382,5 @@ func doctorError(err error) error {
 		code = "operation_timed_out"
 	}
 
-	return &outcomeLoggedError{
-		error: oops.In("doctor").Code(code).With("operation", "run").Wrap(err),
-	}
-}
-
-func logDoctorStarted(ctx context.Context) {
-	zerolog.Ctx(ctx).Info().
-		Str("component", "doctor").
-		Str("operation", "run").
-		Str("status", "started").
-		Msg("doctor started")
-}
-
-func logDoctorCompleted(ctx context.Context, results []Result, runErr error) {
-	logger := zerolog.Ctx(ctx)
-	warningCount, errorCount := countResults(results)
-
-	if runErr != nil {
-		reason := "operation_failed"
-		if errors.Is(runErr, context.Canceled) {
-			reason = "operation_canceled"
-		} else if errors.Is(runErr, context.DeadlineExceeded) {
-			reason = "operation_timed_out"
-		}
-
-		logger.Error().
-			Str("component", "doctor").
-			Str("operation", "run").
-			Str("status", "failed").
-			Str("reason", reason).
-			Int("check_count", len(results)).
-			Int("warning_count", warningCount).
-			Int("error_count", errorCount).
-			Msg("doctor failed")
-
-		return
-	}
-
-	status := "ok"
-	reason := "ok"
-	level := zerolog.InfoLevel
-
-	if errorCount > 0 {
-		status = "failed"
-		reason = "checks_failed"
-		level = zerolog.ErrorLevel
-	} else if warningCount > 0 {
-		status = "degraded"
-		reason = "checks_degraded"
-		level = zerolog.WarnLevel
-	}
-
-	event := logger.WithLevel(level).
-		Str("component", "doctor").
-		Str("operation", "run").
-		Str("status", status).
-		Str("reason", reason).
-		Int("check_count", len(results)).
-		Int("warning_count", warningCount).
-		Int("error_count", errorCount)
-
-	if errorCount > 0 {
-		event = event.Str("error_checks", checksWithStatus(results, StatusError))
-	}
-
-	if warningCount > 0 {
-		event = event.Str("warning_checks", checksWithStatus(results, StatusWarning))
-	}
-
-	event.Msg("doctor completed")
-}
-
-func checksWithStatus(results []Result, status string) string {
-	checks := make([]string, 0, len(results))
-
-	for _, result := range results {
-		if result.Status == status {
-			checks = append(checks, result.Check)
-		}
-	}
-
-	slices.Sort(checks)
-
-	return strings.Join(slices.Compact(checks), ",")
-}
-
-func countResults(results []Result) (int, int) {
-	warningCount := 0
-	errorCount := 0
-
-	for _, result := range results {
-		switch result.Status {
-		case StatusWarning:
-			warningCount++
-		case StatusError:
-			errorCount++
-		}
-	}
-
-	return warningCount, errorCount
+	return oops.In("doctor").Code(code).With("operation", "run").Wrap(err)
 }

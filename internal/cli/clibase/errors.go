@@ -28,6 +28,7 @@ var (
 	ErrRepositoryRequired = errors.New("--repository is required")
 	ErrLeaseRootRequired  = errors.New("--lease-root is required")
 	ErrDoctorChecksFailed = errors.New("doctor checks failed")
+	ErrLogFileUnavailable = errors.New("log file cannot be opened")
 	ErrSubcommandRequired = errors.New("subcommand required")
 	RawArgsContextKey     = rawArgsKey{}
 )

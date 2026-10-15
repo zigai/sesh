@@ -57,7 +57,7 @@ func headline(env Env, outcome outcome) string {
 	case "disabled":
 		return "Autosave is off."
 	case automation.CompletionUncertain:
-		return "The save may or may not have finished; the next save or sesh doctor reconciles it."
+		return "The save may or may not have finished; the next save reconciles it."
 	case statusDegraded:
 		return "Autosave history could not be read."
 	default:

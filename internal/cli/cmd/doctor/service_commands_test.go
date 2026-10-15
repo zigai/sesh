@@ -38,14 +38,14 @@ func serviceCommandsCheck(t *testing.T) doctor.Result {
 		t.Fatalf("doctor produced no report: %v\nstderr: %s", exec.Err, exec.Stderr)
 	}
 
-	report := clitest.DecodePayload[cmddoctor.ResultJSON](t, exec.Envelope.Result)
+	report := clitest.DecodePayload[cmddoctor.Report](t, exec.Envelope.Result)
 	for _, check := range report.Checks {
-		if check.Check == doctor.CheckServiceCommands {
+		if check.ID == doctor.CheckServiceUnits {
 			return check
 		}
 	}
 
-	t.Fatalf("doctor report has no %s check: %+v", doctor.CheckServiceCommands, report.Checks)
+	t.Fatalf("doctor report has no %s check: %+v", doctor.CheckServiceUnits, report.Checks)
 
 	return doctor.Result{}
 }
@@ -86,37 +86,33 @@ func TestDoctorReportsUnitsRunningRemovedCommandsAndFlags(t *testing.T) {
 	}
 
 	check := serviceCommandsCheck(t)
-	if check.Status != doctor.StatusError || check.Reason != doctor.ReasonStale {
+	if check.Status != doctor.StatusFail || check.Reason != doctor.ReasonStale || !strings.HasPrefix(check.Message, "2 units ") {
 		t.Fatalf("stale units were not reported: %+v", check)
 	}
 
-	for _, want := range []string{"2 service units", "old-coordinator.service", "tmux.service", `unknown command "run"`} {
-		if !strings.Contains(check.Message, want) {
-			t.Fatalf("message %q does not mention %q", check.Message, want)
+	details := strings.Join(check.Details, "\n")
+	for _, want := range []string{
+		`old-coordinator.service: unknown command "run" for "sesh daemon"`, "old-coordinator.service:2)",
+		"tmux.service: unknown flag: --no-such-flag", "tmux.service:3)",
+	} {
+		if !strings.Contains(details, want) {
+			t.Fatalf("details %q do not mention %q", details, want)
 		}
 	}
 
-	if strings.Contains(check.Message, "unrelated.service") {
-		t.Fatalf("a unit that does not run sesh was reported: %q", check.Message)
+	if strings.Contains(details, "unrelated.service") {
+		t.Fatalf("a unit that does not run sesh was reported: %q", details)
 	}
 
-	if !strings.Contains(check.Fix, "sesh setup services --apply") {
-		t.Fatalf("fix does not say how to regenerate units: %q", check.Fix)
+	if check.Fix == nil || !strings.Contains(check.Fix.Manual, "sesh setup services --apply") {
+		t.Fatalf("fix does not say how to regenerate units: %+v", check.Fix)
 	}
 }
 
-func TestDoctorSkipsServiceCommandsWhenNoUnitRunsSesh(t *testing.T) {
+func TestDoctorNotesWhenNoUnitRunsSesh(t *testing.T) {
 	isolatedServiceHome(t)
 
-	root := t.TempDir()
-	exec := clitest.ExecuteJSON(t, "doctor",
-		"--socket", filepath.Join(root, "absent.sock"), "--repository", filepath.Join(root, "snapshots"),
-		"--no-config", "--json")
-
-	report := clitest.DecodePayload[cmddoctor.ResultJSON](t, exec.Envelope.Result)
-	for _, check := range report.Checks {
-		if check.Check == doctor.CheckServiceCommands {
-			t.Fatalf("no unit runs sesh, so the check must be omitted: %+v", check)
-		}
+	if check := serviceCommandsCheck(t); check.Status != doctor.StatusInfo {
+		t.Fatalf("no unit runs sesh, so the check is only a note: %+v", check)
 	}
 }

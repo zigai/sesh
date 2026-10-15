@@ -10,29 +10,21 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
-// checkRestorable adds a result only when no tmux server is reachable while the newest snapshot
-// still holds sessions, so a tmux server that died is not mistaken for sessions that never were.
-func (s *Service) checkRestorable(ctx context.Context, tmuxRes Result) []Result {
-	if tmuxRes.Status != StatusError || tmuxRes.Reason != ReasonUnavailable || s.snapshotDir == "" {
-		return nil
-	}
-
-	repo, err := store.OpenExisting(ctx, s.snapshotDir)
+// withRestorableSessions adds the sessions waiting in the newest snapshot to a result that says
+// no server runs, so a server that died is not mistaken for sessions that never were.
+func (s *Service) withRestorableSessions(ctx context.Context, result Result) Result {
+	repo, err := store.OpenExisting(ctx, s.opts.SnapshotDir)
 	if err != nil {
-		return nil
+		return result
 	}
 
 	count := engine.RestorableSessionCount(ctx, repo)
-
 	if closeErr := repo.Close(); closeErr != nil || count == 0 {
-		return nil
+		return result
 	}
 
-	return []Result{{
-		Check:   CheckRestorableSnapshot,
-		Status:  StatusWarning,
-		Reason:  ReasonNotRunning,
-		Message: fmt.Sprintf("no tmux server is running and the newest snapshot holds %d sessions", count),
-		Fix:     "Start tmux on the selected endpoint, then run 'sesh snapshot restore'",
-	}}
+	restore := s.seshCommand("snapshot restore", []string{flagSocket, flagRepository, flagHistory})
+	result.Details = append(result.Details, fmt.Sprintf("The newest snapshot holds %s; restore them with '%s' once tmux runs", plural(count, "session"), restore))
+
+	return result
 }

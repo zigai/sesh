@@ -25,22 +25,22 @@ func TestTmuxLiveProbe_HealthyServer(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
 
-	results, err := doctor.Run(ctx, doctor.Options{
-		Server:      server,
-		SnapshotDir: "",
-		HistoryPath: "",
-	})
+	results, err := doctor.Run(ctx, doctor.Options{PathEnv: os.Getenv("PATH"), Server: server})
 	if err != nil {
 		t.Fatalf("unexpected doctor run error: %v", err)
 	}
 
-	tmuxRes := findCheck(results, doctor.CheckTmux)
+	tmuxRes := findCheck(results, doctor.CheckTmuxServer)
 	if tmuxRes.Status != doctor.StatusOK || tmuxRes.Reason != "" {
 		t.Fatalf("expected ok status for healthy live tmux probe, got %#v", tmuxRes)
 	}
 
-	if !strings.Contains(tmuxRes.Message, "tmux ") || !strings.Contains(tmuxRes.Message, "server pid") {
+	if !strings.HasPrefix(tmuxRes.Message, "tmux ") || !strings.Contains(tmuxRes.Message, ", pid ") {
 		t.Fatalf("expected version and pid in message, got %q", tmuxRes.Message)
+	}
+
+	if smoke := findCheck(results, doctor.CheckSmokeSessions); smoke.Status != doctor.StatusOK {
+		t.Fatalf("expected the live sessions to list, got %#v", smoke)
 	}
 }
 
@@ -57,26 +57,22 @@ func TestTmuxProbe_NonRunningServerEndpoint(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
 
-	results, err := doctor.Run(ctx, doctor.Options{
-		Server:      server,
-		SnapshotDir: "",
-		HistoryPath: "",
-	})
+	results, err := doctor.Run(ctx, doctor.Options{PathEnv: os.Getenv("PATH"), Socket: socketPath, Server: server})
 	if err != nil {
 		t.Fatalf("unexpected doctor run error: %v", err)
 	}
 
-	tmuxRes := findCheck(results, doctor.CheckTmux)
-	if tmuxRes.Status != doctor.StatusError || tmuxRes.Reason != doctor.ReasonUnavailable {
-		t.Fatalf("expected error/unavailable for non-running server, got %#v", tmuxRes)
+	tmuxRes := findCheck(results, doctor.CheckTmuxServer)
+	if tmuxRes.Status != doctor.StatusFail || tmuxRes.Reason != doctor.ReasonNotRunning {
+		t.Fatalf("expected a not-running failure, got %#v", tmuxRes)
 	}
 
-	if tmuxRes.Message != "no running tmux daemon found on selected endpoint" {
-		t.Fatalf("expected no running tmux daemon message, got %q", tmuxRes.Message)
+	if want := "tmux -S " + socketPath + " new-session -d"; tmuxRes.Fix == nil || tmuxRes.Fix.Command != want {
+		t.Fatalf("expected fix %q, got %#v", want, tmuxRes.Fix)
 	}
 
-	if tmuxRes.Fix != "Start tmux on the target endpoint or specify an active socket" {
-		t.Fatalf("expected start tmux fix, got %q", tmuxRes.Fix)
+	if smoke := findCheck(results, doctor.CheckSmokeSessions); smoke.Status != doctor.StatusSkip || smoke.Needs != doctor.CheckTmuxServer {
+		t.Fatalf("the smoke test needs the server, got %#v", smoke)
 	}
 
 	if _, statErr := os.Stat(socketPath); !errors.Is(statErr, os.ErrNotExist) {
@@ -121,6 +117,7 @@ func TestTmuxLiveProbe_FullSystemIntegration(t *testing.T) {
 	}
 
 	results, err := doctor.Run(ctx, doctor.Options{
+		PathEnv:     os.Getenv("PATH"),
 		Server:      server,
 		SnapshotDir: repoDir,
 		HistoryPath: historyPath,
@@ -130,10 +127,13 @@ func TestTmuxLiveProbe_FullSystemIntegration(t *testing.T) {
 	}
 
 	for _, checkName := range []string{
-		doctor.CheckTmux,
+		doctor.CheckTmuxClient,
+		doctor.CheckTmuxServer,
 		doctor.CheckSnapshotRepository,
 		doctor.CheckSnapshotCurrent,
-		doctor.CheckHistoryState,
+		doctor.CheckActiveRestores,
+		doctor.CheckHistoryFile,
+		doctor.CheckSmokeSessions,
 	} {
 		res := findCheck(results, checkName)
 		if res.Status != doctor.StatusOK {
@@ -141,22 +141,7 @@ func TestTmuxLiveProbe_FullSystemIntegration(t *testing.T) {
 		}
 	}
 
-	for _, checkName := range []string{
-		doctor.CheckCaptureGuarantee,
-		doctor.CheckRestoreCapability,
-		doctor.CheckAutosave,
-	} {
-		res := findCheck(results, checkName)
-		if res.Status != doctor.StatusWarning {
-			t.Fatalf("expected capability check %s to be warning, got %#v", checkName, res)
-		}
-	}
-
-	if doctor.HasErrors(results) {
-		t.Fatal("expected no errors for full healthy system")
-	}
-
-	if !doctor.HasWarnings(results) {
-		t.Fatal("expected warnings for capabilities in full system")
+	if doctor.HasFailures(results) {
+		t.Fatalf("expected no failures for a healthy system: %#v", results)
 	}
 }

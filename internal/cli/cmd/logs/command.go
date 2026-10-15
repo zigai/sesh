@@ -2,13 +2,11 @@ package logs
 
 import (
 	"errors"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/x/term"
 	"github.com/rs/zerolog"
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
@@ -37,10 +35,6 @@ var (
 	errAllAndLinesExclusive  = errors.New("--all and --lines cannot be used together")
 	errInvalidGrepPattern    = errors.New("invalid grep pattern: regular expression compilation failed")
 )
-
-type fileDescriptor interface {
-	Fd() uintptr
-}
 
 func NewCommand() *cobra.Command {
 	return newLogsCommand()
@@ -306,20 +300,7 @@ func parseLogsColorOption(cmd *cobra.Command) (bool, error) {
 		return false, clibase.NewExitError(clibase.ExitCodeUsage, errInvalidColorChoice)
 	}
 
-	if os.Getenv("NO_COLOR") != "" || os.Getenv("NOCOLOR") != "" || os.Getenv("TERM") == "dumb" {
-		return false, nil
-	}
-
-	if os.Getenv("CLICOLOR_FORCE") != "" && os.Getenv("CLICOLOR_FORCE") != "0" {
-		return true, nil
-	}
-
-	output, ok := cmd.OutOrStdout().(fileDescriptor)
-	if !ok {
-		return false, nil
-	}
-
-	return term.IsTerminal(output.Fd()), nil
+	return clibase.ColorOutput(cmd), nil
 }
 
 func runLogs(cmd *cobra.Command, _ []string) error {

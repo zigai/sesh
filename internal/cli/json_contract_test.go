@@ -264,12 +264,14 @@ func TestJSONDoctorWarningReportSuccessContract(t *testing.T) {
 	home := isolateJSONContractHome(t)
 	socket := tmuxtest.NewServer(t).Endpoint().SocketPath
 	result := runJSONContract(t, "doctor", "doctor", testSocketFlag, socket, testRepositoryFlag, filepath.Join(home, "missing-repo"), "--history", filepath.Join(home, "missing-history"))
-	assertJSONContractFields(t, result, map[string]any{"hasErrors": false, "hasWarnings": true})
+	summary := contractJSONValue[map[string]any](t, result, "summary")
+	assertJSONContractFields(t, summary, map[string]any{"fail": float64(0)})
 
 	checks := contractJSONValue[[]any](t, result, "checks")
-	if len(checks) == 0 {
-		t.Fatal("doctor omitted its checks")
-	}
+	server := contractJSONItem(t, checks, "id", "tmux.server")
+	assertJSONContractFields(t, server, map[string]any{"group": "Tmux", "status": "ok"})
+	_ = contractJSONValue[string](t, result, "version")
+	_ = contractJSONValue[map[string]any](t, result, "paths")
 }
 
 func TestJSONAgentSetupPreviewContract(t *testing.T) {

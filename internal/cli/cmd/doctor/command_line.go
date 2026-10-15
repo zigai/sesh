@@ -21,7 +21,7 @@ func commandLineValidator(root *cobra.Command) func(args []string) error {
 	return func(args []string) error {
 		target, rest, err := root.Find(args)
 		if err != nil {
-			return fmt.Errorf("%w: %w", errUnknownCommand, err)
+			return fmt.Errorf("%w", err)
 		}
 
 		// A missing command explains a command line better than the flags it no longer has.
