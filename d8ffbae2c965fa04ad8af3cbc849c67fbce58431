@@ -1,0 +1,6 @@
+- In a real popup with 14 agents in one session, tab then e then d switches to that session's third agent
+- tab then a session letter opens a session with one agent straight in its agent pane
+- Session letters stay hidden until tab and appear in the first column without moving other rows
+- The cursor row draws its key as a blue block in place of the selection bar
+- Rows outside a focused session fade while its own rows stay at full brightness
+- just check passes
