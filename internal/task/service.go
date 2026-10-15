@@ -299,7 +299,7 @@ func (s *Service) reserveProjectTask(ctx context.Context, p project.Project, req
 		record.Base = base
 		record.OwnsWorktree = creates
 		record.OwnsBranch = location.Where == WhereNew || location.Remote != ""
-		record.Title = cmp.Or(request.Title, strconv.Itoa(number))
+		record.Title = cmp.Or(request.Title, filepath.Base(directory))
 		record.CreatedAt = s.now().Unix()
 
 		switch {

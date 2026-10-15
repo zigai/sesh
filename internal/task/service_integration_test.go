@@ -56,7 +56,7 @@ func TestStartCreatesAProjectTaskInItsOwnWorktreeAndWindow(t *testing.T) {
 	worktree := filepath.Join(f.worktreeDir, "shop", "main-1")
 	want := task.EmptyRecord()
 	want.ID, want.Kind, want.State, want.Project, want.Number = "t1", task.KindProject, task.StateActive, repo, 1
-	want.Harness, want.Directory, want.Branch, want.Base, want.Title = envHarness, worktree, "wt/main/1", "main", "1"
+	want.Harness, want.Directory, want.Branch, want.Base, want.Title = envHarness, worktree, "wt/main/1", "main", "main-1"
 	want.OwnsWorktree, want.OwnsBranch = true, true
 	want.CreatedAt = record.CreatedAt
 	want.Owner = task.Process{PID: os.Getpid(), Birth: record.Owner.Birth}
@@ -70,8 +70,8 @@ func TestStartCreatesAProjectTaskInItsOwnWorktreeAndWindow(t *testing.T) {
 	}
 
 	window := taskWindow(t, f.server, place.Session, "t1")
-	if window.Name != "1" || window.PaneCount != 2 {
-		t.Fatalf("task window = %+v, want name 1 with agent and editor panes", window)
+	if window.Name != "main-1" || window.PaneCount != 2 {
+		t.Fatalf("task window = %+v, want name main-1 with agent and editor panes", window)
 	}
 
 	panes := windowPanes(t, f.server, window.ID)
@@ -293,6 +293,22 @@ func TestStartOutsideAProjectCreatesALooseTaskNextToTheCurrentWindow(t *testing.
 	}
 }
 
+func TestStartOutsideAProjectNamesTheWindowAfterTheDirectory(t *testing.T) {
+	f := newFixture(t)
+	dir := mkdir(t, filepath.Join(f.base, "scratch"))
+	place := scratchPlace(t, f, dir)
+
+	record, err := f.service.Start(t.Context(), place, task.Request{Harness: envHarness})
+	if err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+
+	window := taskWindow(t, f.server, place.Session, record.ID)
+	if record.Title != "scratch" || window.Name != "scratch" {
+		t.Fatalf("task title = %q, window name = %q; want scratch", record.Title, window.Name)
+	}
+}
+
 func TestOfferListsEveryCheckoutAndBranchAndMarksTheOnesTasksUse(t *testing.T) {
 	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
@@ -322,7 +338,7 @@ func TestOfferListsEveryCheckoutAndBranchAndMarksTheOnesTasksUse(t *testing.T) {
 		{Where: task.WhereNew, Branch: "main"},
 		{Where: task.WhereMain, Branch: "main", Directory: repo},
 		{Where: task.WhereWorktree, Branch: "hand", Directory: hand},
-		{Where: task.WhereWorktree, Branch: "wt/main/1", Directory: started.Directory, Task: started.ID, TaskTitle: "1"},
+		{Where: task.WhereWorktree, Branch: "wt/main/1", Directory: started.Directory, Task: started.ID, TaskTitle: "main-1"},
 		{Where: task.WhereBranch, Branch: "feature"},
 		{Where: task.WhereNew, Branch: "feature"},
 		{Where: task.WhereNew, Branch: "gone"},
