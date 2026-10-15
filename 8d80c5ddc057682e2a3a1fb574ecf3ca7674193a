@@ -1,0 +1,5 @@
+- go test ./internal/tui/... ./internal/cli/cmd/picker exercises pasted titles, location and project filtering, search selection, prompt isolation, and directory suggestions
+- golangci-lint run ./internal/tui/... reports no findings
+- go build -o /home/zigai/.cache/agent-verify/sesh-paste/sesh ./cmd/sesh builds the CLI
+- Isolated terminal sessions accept bracketed paste and Ctrl+V clipboard responses in the task title, session search, rename and directory prompts, and project picker
+- Semantic terminal screenshots show pasted text, filtered results, and refreshed directory suggestions
