@@ -126,11 +126,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateClick(msg.Mouse())
 	}
 
-	var cmd tea.Cmd
-
-	m.input, cmd = m.input.Update(msg)
-
-	return m, cmd
+	return m.updateInput(msg)
 }
 
 func (m *Model) View() tea.View {
@@ -167,6 +163,10 @@ func (m *Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.choose(true)
 	}
 
+	return m.updateInput(msg)
+}
+
+func (m *Model) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 	query := m.input.Value()
 
 	var cmd tea.Cmd

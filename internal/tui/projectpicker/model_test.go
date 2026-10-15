@@ -51,6 +51,30 @@ func TestPickerOffersToCloneURLsAndCreateUnknownNames(t *testing.T) {
 	}
 }
 
+func TestPasteUpdatesTheProjectChoices(t *testing.T) {
+	for _, test := range []struct {
+		query string
+		want  projectpicker.Choice
+	}{
+		{"beta", projectpicker.Choice{Kind: projectpicker.ChoiceOpen, Value: "/code/beta"}},
+		{"https://example.com/team/widget.git", projectpicker.Choice{Kind: projectpicker.ChoiceClone, Value: "https://example.com/team/widget.git"}},
+		{"notebook", projectpicker.Choice{Kind: projectpicker.ChoiceCreate, Value: "notebook"}},
+	} {
+		t.Run(test.query, func(t *testing.T) {
+			model := newModel(t, []projectpicker.Entry{
+				{Root: "/code/alpha", Name: "alpha", Path: "~/code/alpha", Session: "", Taken: ""},
+				{Root: "/code/beta", Name: "beta", Path: "~/code/beta", Session: "", Taken: ""},
+			})
+
+			send(model, tea.PasteMsg{Content: test.query}, key(tea.KeyEnter))
+
+			if choice, ok := model.Chosen(); !ok || choice != test.want {
+				t.Fatalf("Chosen() = %+v, %t; want %+v", choice, ok, test.want)
+			}
+		})
+	}
+}
+
 func TestPickerDoesNotOfferToCreateAProjectThatExists(t *testing.T) {
 	model := newModel(t, []projectpicker.Entry{{Root: "/code/alpha", Name: "alpha", Path: "~/code/alpha", Session: "", Taken: ""}})
 	send(model, typed("alpha")...)

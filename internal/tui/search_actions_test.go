@@ -29,6 +29,29 @@ func TestSearchQueryChangeResetsCursorToFirstResult(t *testing.T) {
 	}
 }
 
+func TestPasteUpdatesSearchResultsAndResetsSelection(t *testing.T) {
+	model := newTestModel()
+	t.Cleanup(model.Close)
+	model.sessions = []session.Session{{Name: "alpha"}, {Name: "beta"}, {Name: "gamma"}}
+	model.refreshDisplaySessions()
+	model.filterSessions()
+	model.cursor = 2
+
+	model.Update(tea.PasteMsg{Content: "beta"})
+
+	if got := model.textInput.Value(); got != "beta" {
+		t.Fatalf("search input = %q, want beta", got)
+	}
+
+	if got := sessionNamesForTest(model.filtered); !slices.Equal(got, []string{"beta"}) {
+		t.Fatalf("filtered sessions = %v, want only beta", got)
+	}
+
+	if model.cursor != 0 {
+		t.Fatalf("cursor = %d, want first result", model.cursor)
+	}
+}
+
 func TestSearchUpdatesResultsWithoutClearingScreen(t *testing.T) {
 	for _, mode := range []uiMode{modePopup, modeFullscreen, modeInline} {
 		synctest.Test(t, func(t *testing.T) {
