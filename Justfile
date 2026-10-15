@@ -103,9 +103,24 @@ build-release:
     build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)
     CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X github.com/zigai/sesh/internal/cli.version=dev -X github.com/zigai/sesh/internal/cli.commit=$commit -X github.com/zigai/sesh/internal/cli.date=$build_date" -o {{ binary }} ./cmd/sesh
 
-install: install-binary
+install: install-binary restart-services
     @printf 'Installed %s\n' {{ quote(prefix + "/" + binary) }}
     @{{ quote(prefix + "/" + binary) }} --version
+
+# Restart running sesh daemons that still execute a replaced binary
+restart-services:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    [ "$(uname -s)" = Linux ] || exit 0
+    installed_path={{ quote(prefix + "/" + binary) }}
+    for unit in $(systemctl --user list-units 'sesh-*.service' --state=running --no-legend --plain | awk '{print $1}'); do
+        [ "$(systemctl --user show -p Type --value "$unit")" != oneshot ] || continue
+        pid=$(systemctl --user show -p MainPID --value "$unit")
+        if [ "$(readlink "/proc/$pid/exe")" = "$installed_path (deleted)" ]; then
+            systemctl --user restart "$unit"
+            printf 'Restarted %s\n' "$unit"
+        fi
+    done
 
 refresh-services:
     {{ quote(prefix + "/" + binary) }} setup services --apply
