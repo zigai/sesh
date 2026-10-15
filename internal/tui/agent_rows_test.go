@@ -653,18 +653,10 @@ func TestAgentVisualRowsMakeChildrenSelectable(t *testing.T) {
 	wantShortcuts := []popupListRow{
 		{sessionIndex: 0, agentIndex: 0},
 		{sessionIndex: 0, agentIndex: 1},
+		{sessionIndex: 1, agentIndex: 0},
 	}
 	if got := model.visibleShortcutRows(); !slices.Equal(got, wantShortcuts) {
 		t.Fatalf("visible shortcut rows = %#v, want %#v", got, wantShortcuts)
-	}
-
-	model.cursor = 1
-
-	wantSession1Shortcuts := []popupListRow{
-		{sessionIndex: 1, agentIndex: 0},
-	}
-	if got := model.visibleShortcutRows(); !slices.Equal(got, wantSession1Shortcuts) {
-		t.Fatalf("visible shortcut rows for session 1 = %#v, want %#v", got, wantSession1Shortcuts)
 	}
 
 	model.cursor = 0
@@ -1207,23 +1199,12 @@ func TestNumericShortcutsSkipSeparatorInAgentsMode(t *testing.T) {
 
 	shortcuts := model.visibleShortcutRows()
 
-	wantAgentShortcuts := []popupListRow{
+	want := []popupListRow{
 		{sessionIndex: 0, agentIndex: 0},
 		{sessionIndex: 0, agentIndex: 1},
 	}
-	if !slices.Equal(shortcuts, wantAgentShortcuts) {
-		t.Fatalf("visible shortcuts for agent session = %#v, want %#v", shortcuts, wantAgentShortcuts)
-	}
-
-	model.cursor = 1
-
-	regShortcuts := model.visibleShortcutRows()
-
-	wantRegShortcuts := []popupListRow{
-		{sessionIndex: 1, agentIndex: parentAgentIndex},
-	}
-	if !slices.Equal(regShortcuts, wantRegShortcuts) {
-		t.Fatalf("visible shortcuts for regular session = %#v, want %#v", regShortcuts, wantRegShortcuts)
+	if !slices.Equal(shortcuts, want) {
+		t.Fatalf("visible shortcuts = %#v, want %#v", shortcuts, want)
 	}
 }
 

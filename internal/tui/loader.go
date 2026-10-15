@@ -1038,6 +1038,7 @@ func (m *Model) handleSessionLoadResult(msg sessionLoadResultMsg) tea.Cmd {
 		m.loadResourceCommand(),
 		m.loadGHCommand(),
 		m.syncTasksCommand(),
+		m.assignLoadedSessionKeys(msg.catalogErr == nil && msg.status != session.StatusPartial),
 	}
 
 	if msg.agentSummaryErr != nil && m.acceptsLoadedAgents(msg) {

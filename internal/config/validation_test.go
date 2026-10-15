@@ -712,6 +712,29 @@ func TestValidateKeyConfigCaseInsensitiveDuplicates(t *testing.T) {
 	}
 }
 
+func TestValidateKeyConfigRejectsInvalidSessionKeys(t *testing.T) {
+	tests := map[string]config.KeyConfig{
+		"upper case letter":  {Sessions: map[string]string{"web": "W"}},
+		"digit":              {Sessions: map[string]string{"web": "1"}},
+		"two letters":        {Sessions: map[string]string{"web": "we"}},
+		"empty session name": {Sessions: map[string]string{"": "w"}},
+		"letter used twice":  {Sessions: map[string]string{"web": "w", "wiki": "w"}},
+		"navigation key":     {Select1: "alt+w", Sessions: map[string]string{"web": "w"}},
+	}
+
+	for name, keys := range tests {
+		t.Run(name, func(t *testing.T) {
+			if err := config.ValidateKeyConfig(keys); err == nil {
+				t.Fatalf("ValidateKeyConfig(%v) error = nil", keys.Sessions)
+			}
+		})
+	}
+
+	if err := config.ValidateKeyConfig(config.KeyConfig{Sessions: map[string]string{"web": "w", "api": "a"}}); err != nil {
+		t.Fatalf("ValidateKeyConfig() error = %v for valid session keys", err)
+	}
+}
+
 func TestValidateAutosaveConfig(t *testing.T) {
 	if err := config.ValidateAutosaveConfig(config.AutosaveConfig{Interval: "-1m"}); err == nil {
 		t.Fatal("ValidateAutosaveConfig() error = nil for negative interval")

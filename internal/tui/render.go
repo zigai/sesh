@@ -361,7 +361,14 @@ func (m *Model) renderList(width, height int) string {
 	} else {
 		var values sessionFormatValues
 
-		for _, listRow := range m.visibleListRows(height) {
+		visible := m.visibleListRows(height)
+
+		m.collectShortcutRows(visible)
+		m.shortcutRowsRendered = true
+
+		defer func() { m.shortcutRowsRendered = false }()
+
+		for _, listRow := range visible {
 			if rowCount > 0 {
 				out.WriteByte('\n')
 			}
@@ -710,9 +717,16 @@ func (m *Model) writeFormattedSessionRow(
 
 	line := m.formattedSessionLine(row, agent, hasAgent, isLastAgent, layout, values)
 
-	left := fitSessionFormatParts(line.Left, layout.leftWidth)
-	if leftWidth := lipgloss.Width(left); leftWidth < layout.leftWidth {
-		left += strings.Repeat(" ", layout.leftWidth-leftWidth)
+	gutter := ""
+	if !hasAgent && layout.leftWidth > sessionKeyGutterWidth {
+		gutter = m.sessionKeyGutter(row)
+	}
+
+	leftWidth := max(layout.leftWidth-lipgloss.Width(gutter), 0)
+
+	left := fitSessionFormatParts(line.Left, leftWidth)
+	if width := lipgloss.Width(left); width < leftWidth {
+		left += strings.Repeat(" ", leftWidth-width)
 	}
 
 	prefix := styles.blankPrefix
@@ -721,6 +735,10 @@ func (m *Model) writeFormattedSessionRow(
 	}
 
 	out.WriteString(prefix)
+
+	if gutter != "" {
+		m.writeSessionKeyGutter(out, gutter, selected, styles)
+	}
 
 	if hasAgent {
 		m.writeAgentText(out, left, selected, styles)
@@ -1418,12 +1436,17 @@ func (m *Model) footerParts(width int) []footerPart {
 	parts := m.baseFooterParts()
 	parts = append(parts, newFooterPart(keys.enter.Help().Key, "select"))
 
+	if m.showsSessionKeys() {
+		parts = append(parts, sessionKeyFooterPart())
+	}
+
 	for _, bound := range m.footerActions(keys) {
 		parts = append(parts, newActionFooterPart(bound))
 	}
 
 	parts = append(parts, newFooterPart("esc", "cancel"))
 	parts = append(parts, newFooterPart(keys.help.Help().Key, "help"))
+	parts = withoutSessionKeyHintWhenTooWide(parts, footerWidth)
 
 	for len(parts) > 0 && footerPartsWidth(parts) > footerWidth {
 		parts = parts[:len(parts)-1]
@@ -1458,9 +1481,15 @@ func (m *Model) compactAgentFooterParts(keys actionKeyMap, width int) []footerPa
 		newFooterPart(keys.enter.Help().Key, "select"),
 	}
 
+	if m.showsSessionKeys() {
+		parts = append(parts, sessionKeyFooterPart())
+	}
+
 	parts = append(parts,
 		newFooterPart(keys.help.Help().Key, "help"),
 	)
+
+	parts = withoutSessionKeyHintWhenTooWide(parts, width)
 
 	if footerPartsWidth(parts) > width {
 		parts = slices.Delete(parts, 1, sessionPartEndIndex)

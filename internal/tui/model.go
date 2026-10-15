@@ -130,8 +130,10 @@ type Model struct {
 	listRows                     []popupListRow
 	selectableRows               []popupListRow
 	shortcutRows                 []popupListRow
+	shortcutRowsRendered         bool
 	state                        *session.State
 	config                       *config.Config
+	sessionKeys                  sessionKeyRules
 	cursor                       int
 	agentCursor                  int
 	listTop                      int
@@ -298,8 +300,10 @@ func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps
 		listRows:                     []popupListRow{},
 		selectableRows:               []popupListRow{},
 		shortcutRows:                 []popupListRow{},
+		shortcutRowsRendered:         false,
 		state:                        st,
 		config:                       cfg,
+		sessionKeys:                  newSessionKeyRules(cfg),
 		cursor:                       0,
 		agentCursor:                  parentAgentIndex,
 		listTop:                      0,
@@ -812,6 +816,12 @@ func (m *Model) handleResultMessage(msg tea.Msg) func() (tea.Model, tea.Cmd) {
 	case actionResultMsg:
 		return func() (tea.Model, tea.Cmd) {
 			return m.handleActionResult(msg)
+		}
+	case sessionKeysSavedMsg:
+		return func() (tea.Model, tea.Cmd) {
+			m.handleSessionKeysSaved(msg)
+
+			return m, nil
 		}
 	case stateUpdateResultMsg:
 		return func() (tea.Model, tea.Cmd) {

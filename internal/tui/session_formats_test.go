@@ -514,6 +514,8 @@ func TestAgentOutsideGitHidesBranchIconAndGitColumns(t *testing.T) {
 	cfgRight.Settings.ShortcutStyle = "right"
 	modelRight := newTestModelWithConfig(t, cfgRight)
 	modelRight.displayMode = displayModeAgents
+	modelRight.width = 100
+	modelRight.height = 12
 	modelRight.filtered = []session.Session{{
 		Name:       "Projects",
 		AgentTotal: 1,

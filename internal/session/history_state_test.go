@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -557,7 +558,7 @@ func TestLoadRejectsMissingVersionAndDuplicateFields(t *testing.T) {
 	dir := testStateDir(t)
 
 	missingVerPath := filepath.Join(dir, "missing_ver.json")
-	if err := os.WriteFile(missingVerPath, []byte(`{"switchHistory":[],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":""}`), 0o600); err != nil {
+	if err := os.WriteFile(missingVerPath, []byte(`{"switchHistory":[],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":"","sessionKeys":[]}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -566,7 +567,7 @@ func TestLoadRejectsMissingVersionAndDuplicateFields(t *testing.T) {
 	}
 
 	unknownFieldPath := filepath.Join(dir, "unknown_field.json")
-	if err := os.WriteFile(unknownFieldPath, []byte(`{"version":1,"switchHistory":[],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":"","extraField":123}`), 0o600); err != nil {
+	if err := os.WriteFile(unknownFieldPath, []byte(`{"version":2,"switchHistory":[],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":"","sessionKeys":[],"extraField":123}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -575,7 +576,7 @@ func TestLoadRejectsMissingVersionAndDuplicateFields(t *testing.T) {
 	}
 
 	dupSwitchPath := filepath.Join(dir, "dup_switch.json")
-	if err := os.WriteFile(dupSwitchPath, []byte(`{"version":1,"switchHistory":[{"session":{"origin":"","connectionId":"","socket":"","repositorySource":"","name":"dev"},"lastSwitch":1},{"session":{"origin":"","connectionId":"","socket":"","repositorySource":"","name":"dev"},"lastSwitch":2}],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":""}`), 0o600); err != nil {
+	if err := os.WriteFile(dupSwitchPath, []byte(`{"version":2,"switchHistory":[{"session":{"origin":"","connectionId":"","socket":"","repositorySource":"","name":"dev"},"lastSwitch":1},{"session":{"origin":"","connectionId":"","socket":"","repositorySource":"","name":"dev"},"lastSwitch":2}],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":"","sessionKeys":[]}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -740,7 +741,7 @@ func TestHistoryRejectsInvalidNestedIdentitiesAndRemoteBounds(t *testing.T) {
 		`{"origin":"local","connectionId":"","socket":"","repositorySource":"","name":"dev","name":"other"}`,
 		`null`,
 	} {
-		data := []byte(`{"version":1,"switchHistory":[{"session":` + value + `,"lastSwitch":1}],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":""}`)
+		data := []byte(`{"version":2,"switchHistory":[{"session":` + value + `,"lastSwitch":1}],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":"","sessionKeys":[]}`)
 		if err := os.WriteFile(path, data, 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -778,5 +779,111 @@ func makeUnsafeHistoryEntry(t *testing.T, kind, path, target string) {
 
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestLoadRejectsStateWithoutSessionKeysAsOldVersion(t *testing.T) {
+	path := testStatePath(t)
+
+	data := []byte(`{"version":1,"switchHistory":[],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":""}`)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatalf("writing state: %v", err)
+	}
+
+	if _, err := LoadState(path); !errors.Is(err, ErrInvalidHistoryVersion) {
+		t.Fatalf("LoadState() error = %v, want %v", err, ErrInvalidHistoryVersion)
+	}
+}
+
+func TestSessionKeysSurviveSaveAndLoad(t *testing.T) {
+	path := testStatePath(t)
+	ident := Identity{Origin: string(OriginLocal), Name: "blog"}
+
+	if _, err := UpdateState(t.Context(), path, func(current *State) {
+		current.SessionKeys = []KeyAssignment{{Session: ident, Key: "w"}}
+	}); err != nil {
+		t.Fatalf("UpdateState() error = %v", err)
+	}
+
+	saved, err := LoadState(path)
+	if err != nil {
+		t.Fatalf("LoadState() error = %v", err)
+	}
+
+	if key, ok := saved.SessionKey(ident); !ok || key != "w" {
+		t.Fatalf("SessionKey() = %q, %v, want w", key, ok)
+	}
+}
+
+func TestStateRenameMovesAndDeleteKeepsSessionKeys(t *testing.T) {
+	live := Identity{Origin: string(OriginLocal), Socket: "/tmp/tmux-1000/default", Name: "blog"}
+	st := &State{SessionKeys: []KeyAssignment{
+		{Session: Identity{Origin: string(OriginLocal), Name: "blog"}, Key: "w"},
+		{Session: Identity{Origin: string(OriginLocal), Name: "api"}, Key: "a"},
+	}}
+
+	renamed := live
+	renamed.Name = "site"
+	st.RenameSessionIdentity(live, renamed)
+
+	if key, ok := st.SessionKey(Identity{Origin: string(OriginLocal), Name: "site"}); !ok || key != "w" {
+		t.Fatalf("key after rename = %q, %v, want w", key, ok)
+	}
+
+	if _, ok := st.SessionKey(Identity{Origin: string(OriginLocal), Name: "blog"}); ok {
+		t.Fatal("old name kept its key after rename")
+	}
+
+	st.DeleteSessionIdentity(Identity{Origin: string(OriginLocal), RepositorySource: "default", Name: "site"})
+
+	if key, ok := st.SessionKey(Identity{Origin: string(OriginLocal), Name: "site"}); !ok || key != "w" {
+		t.Fatalf("key after delete = %q, %v, want w kept for a session of the same name", key, ok)
+	}
+
+	if key, ok := st.SessionKey(Identity{Origin: string(OriginLocal), Name: "api"}); !ok || key != "a" {
+		t.Fatalf("unrelated key = %q, %v, want a", key, ok)
+	}
+}
+
+func TestStateRenameOntoKeyedNameKeepsRenamedKey(t *testing.T) {
+	st := &State{SessionKeys: []KeyAssignment{
+		{Session: Identity{Origin: string(OriginLocal), Name: "blog"}, Key: "w"},
+		{Session: Identity{Origin: string(OriginLocal), Name: "site"}, Key: "s"},
+	}}
+
+	st.RenameSessionIdentity(Identity{Origin: string(OriginLocal), Name: "blog"}, Identity{Origin: string(OriginLocal), Name: "site"})
+
+	want := []KeyAssignment{{Session: Identity{Origin: string(OriginLocal), Name: "site"}, Key: "w"}}
+	if !slices.Equal(st.SessionKeys, want) {
+		t.Fatalf("session keys = %#v, want %#v", st.SessionKeys, want)
+	}
+}
+
+func TestValidateRejectsInvalidSessionKeys(t *testing.T) {
+	tests := map[string][]KeyAssignment{
+		"duplicate key": {
+			{Session: Identity{Origin: string(OriginLocal), Name: "blog"}, Key: "w"},
+			{Session: Identity{Origin: string(OriginLocal), Name: "api"}, Key: "w"},
+		},
+		"duplicate session": {
+			{Session: Identity{Origin: string(OriginLocal), Name: "blog"}, Key: "w"},
+			{Session: Identity{Origin: string(OriginLocal), Name: "blog"}, Key: "e"},
+		},
+		"upper case key":   {{Session: Identity{Origin: string(OriginLocal), Name: "blog"}, Key: "W"}},
+		"digit key":        {{Session: Identity{Origin: string(OriginLocal), Name: "blog"}, Key: "1"}},
+		"two letters":      {{Session: Identity{Origin: string(OriginLocal), Name: "blog"}, Key: "we"}},
+		"socket in key id": {{Session: Identity{Origin: string(OriginLocal), Socket: "/tmp/s", Name: "blog"}, Key: "w"}},
+		"empty name":       {{Session: Identity{Origin: string(OriginLocal)}, Key: "w"}},
+	}
+
+	for name, entries := range tests {
+		t.Run(name, func(t *testing.T) {
+			st := defaultState()
+			st.SessionKeys = entries
+
+			if err := st.Validate(); !errors.Is(err, strictjson.ErrInvalid) {
+				t.Fatalf("Validate() error = %v, want invalid", err)
+			}
+		})
 	}
 }

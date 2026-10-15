@@ -136,6 +136,9 @@ type KeyConfig struct {
 	Select8   string          `toml:"select_8"`
 	Select9   string          `toml:"select_9"`
 	Select0   string          `toml:"select_0"`
+	// Sessions maps a local session name to the letter alt opens it with in the picker. Other
+	// sessions get a free letter assigned once and kept.
+	Sessions map[string]string `toml:"sessions"`
 }
 
 // KeyBindConfig binds a key in the picker or a tmux key table to an action. It replaces the
@@ -439,6 +442,7 @@ func DefaultConfig() *Config {
 			Select8:   "ctrl+8",
 			Select9:   "ctrl+9",
 			Select0:   "ctrl+0",
+			Sessions:  nil,
 		},
 		Popup: PopupConfig{
 			SeshWidth:    "40%",

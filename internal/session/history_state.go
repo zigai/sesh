@@ -16,11 +16,12 @@ import (
 	"github.com/samber/oops"
 	"golang.org/x/sys/unix"
 
+	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/privatefs"
 	"github.com/zigai/sesh/internal/strictjson"
 )
 
-const CurrentHistoryVersion = 1
+const CurrentHistoryVersion = 2
 
 const (
 	maxHistoryFileSize     = 1 << 20
@@ -38,6 +39,7 @@ var (
 	ErrUncertain             = errors.New("history publication durability uncertain")
 	ErrDuplicateHistoryEntry = errors.New("duplicate history entry")
 	ErrHistoryBoundExceeded  = errors.New("history bound exceeded")
+	ErrInvalidSessionKey     = errors.New("invalid session key")
 )
 
 type SwitchHistoryEntry struct {
@@ -56,6 +58,13 @@ type AgentViewHistoryEntry struct {
 	ViewedAtUnixNano int64    `json:"viewedAt"`
 }
 
+// KeyAssignment records the letter the picker opens a session with. Session is a key
+// identity (see Identity.KeyIdentity), so the key follows a session between live and saved.
+type KeyAssignment struct {
+	Session Identity `json:"session"`
+	Key     string   `json:"key"`
+}
+
 type State struct {
 	Version             int                        `json:"version"`
 	SwitchHistory       []SwitchHistoryEntry       `json:"switchHistory"`
@@ -63,6 +72,7 @@ type State struct {
 	AgentViewHistory    []AgentViewHistoryEntry    `json:"agentViewHistory"`
 	LastAutosaveUnix    int64                      `json:"lastAutosaveTimestamp"`
 	PopupDisplayMode    string                     `json:"popupDisplayMode"`
+	SessionKeys         []KeyAssignment            `json:"sessionKeys"`
 }
 
 type ServiceDeps struct {
@@ -110,7 +120,11 @@ func (s *State) Validate() error {
 		return err
 	}
 
-	return validateAgentViewHistory(s.AgentViewHistory)
+	if err := validateAgentViewHistory(s.AgentViewHistory); err != nil {
+		return err
+	}
+
+	return validateSessionKeys(s.SessionKeys)
 }
 
 func LoadState(path string) (*State, error) {
@@ -316,9 +330,9 @@ func (s *Service) loadStateFromDir(dir *privatefs.Dir, fileName string) (*State,
 		return nil, fmt.Errorf("read history file: %w", err)
 	}
 
-	state, err := strictjson.Decode[State](data)
+	state, err := decodeState(data)
 	if err != nil {
-		return nil, errors.Join(strictjson.ErrInvalid, err)
+		return nil, err
 	}
 
 	if err := state.Validate(); err != nil {
@@ -336,6 +350,11 @@ func encodeState(current *State) ([]byte, error) {
 		AgentViewHistory:    cloneAgentViewHistory(current.AgentViewHistory),
 		LastAutosaveUnix:    current.LastAutosaveUnix,
 		PopupDisplayMode:    current.PopupDisplayMode,
+		SessionKeys:         slices.Clone(current.SessionKeys),
+	}
+
+	if toWrite.SessionKeys == nil {
+		toWrite.SessionKeys = []KeyAssignment{}
 	}
 
 	if toWrite.SwitchHistory == nil {
@@ -477,6 +496,27 @@ func validatePath(path string) (string, string, error) {
 	return dirPath, fileName, nil
 }
 
+func decodeState(data []byte) (State, error) {
+	var header struct {
+		Version *int `json:"version"`
+	}
+
+	if err := json.Unmarshal(data, &header); err != nil {
+		return State{}, errors.Join(strictjson.ErrInvalid, err)
+	}
+
+	if header.Version != nil && *header.Version != CurrentHistoryVersion {
+		return State{}, ErrInvalidHistoryVersion
+	}
+
+	state, err := strictjson.Decode[State](data)
+	if err != nil {
+		return State{}, errors.Join(strictjson.ErrInvalid, err)
+	}
+
+	return state, nil
+}
+
 func defaultState() *State {
 	return &State{
 		Version:             CurrentHistoryVersion,
@@ -485,6 +525,7 @@ func defaultState() *State {
 		AgentViewHistory:    []AgentViewHistoryEntry{},
 		LastAutosaveUnix:    0,
 		PopupDisplayMode:    "",
+		SessionKeys:         []KeyAssignment{},
 	}
 }
 
@@ -770,6 +811,29 @@ func (s *State) RenameSessionIdentity(oldIdent Identity, newIdent Identity) {
 			entry.Session = newIdent
 		}
 	}
+
+	oldKeyIdent, newKeyIdent := oldIdent.KeyIdentity(), newIdent.KeyIdentity()
+	s.SessionKeys = slices.DeleteFunc(s.SessionKeys, func(entry KeyAssignment) bool {
+		return entry.Session == newKeyIdent
+	})
+
+	for index := range s.SessionKeys {
+		entry := &s.SessionKeys[index]
+		if entry.Session == oldKeyIdent {
+			entry.Session = newKeyIdent
+		}
+	}
+}
+
+// SessionKey returns the key recorded for the session with the key identity ident.
+func (s *State) SessionKey(ident Identity) (string, bool) {
+	for _, entry := range s.SessionKeys {
+		if entry.Session == ident {
+			return entry.Key, true
+		}
+	}
+
+	return "", false
 }
 
 func cloneState(s *State) *State {
@@ -784,6 +848,7 @@ func cloneState(s *State) *State {
 		AgentViewHistory:    cloneAgentViewHistory(s.AgentViewHistory),
 		LastAutosaveUnix:    s.LastAutosaveUnix,
 		PopupDisplayMode:    s.PopupDisplayMode,
+		SessionKeys:         slices.Clone(s.SessionKeys),
 	}
 }
 
@@ -887,6 +952,34 @@ func validateAgentViewHistory(entries []AgentViewHistoryEntry) error {
 		}
 
 		seenAgent[k] = struct{}{}
+	}
+
+	return nil
+}
+
+func validateSessionKeys(entries []KeyAssignment) error {
+	seenSessions := make(map[Identity]struct{}, len(entries))
+	seenKeys := make(map[string]struct{}, len(entries))
+
+	for _, entry := range entries {
+		if err := entry.Session.Validate(); err != nil {
+			return errors.Join(strictjson.ErrInvalid, err)
+		}
+
+		if entry.Session != entry.Session.KeyIdentity() || !config.ValidSessionKey(entry.Key) {
+			return errors.Join(strictjson.ErrInvalid, ErrInvalidSessionKey)
+		}
+
+		if _, exists := seenSessions[entry.Session]; exists {
+			return errors.Join(strictjson.ErrInvalid, ErrDuplicateHistoryEntry)
+		}
+
+		if _, exists := seenKeys[entry.Key]; exists {
+			return errors.Join(strictjson.ErrInvalid, ErrDuplicateHistoryEntry)
+		}
+
+		seenSessions[entry.Session] = struct{}{}
+		seenKeys[entry.Key] = struct{}{}
 	}
 
 	return nil

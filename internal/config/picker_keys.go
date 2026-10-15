@@ -75,9 +75,13 @@ func PickerSlotKeys(configured, digit string) []string {
 }
 
 // PickerReservedKeys returns every key the picker handles before action bindings: its fixed
-// keys, the configured navigation keys and the slot keys.
+// keys, the configured navigation keys, the slot keys and the configured session keys.
 func PickerReservedKeys(keys KeyConfig) []string {
 	reserved := []string{keys.Help, keys.CycleMode, keys.AgentSort, keys.PageUp, keys.PageDown, keys.Top, keys.Bottom}
+
+	for _, letter := range keys.Sessions {
+		reserved = append(reserved, PickerSessionKey(letter))
+	}
 
 	for _, fixed := range [][]string{
 		PickerSelectKeys, PickerCloseKeys, PickerHandoffKeys,
@@ -91,6 +95,16 @@ func PickerReservedKeys(keys KeyConfig) []string {
 	}
 
 	return reserved
+}
+
+// ValidSessionKey reports whether key is a single lowercase ASCII letter.
+func ValidSessionKey(key string) bool {
+	return len(key) == 1 && key[0] >= 'a' && key[0] <= 'z'
+}
+
+// PickerSessionKey returns the picker key that opens the session assigned letter.
+func PickerSessionKey(letter string) string {
+	return "alt+" + letter
 }
 
 // PickerKeyTypes reports whether a normalized picker key types into the search field, so binding

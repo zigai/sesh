@@ -110,6 +110,17 @@ func TestBindingsRejectBindingsTheirSurfaceCannotRun(t *testing.T) {
 	}
 }
 
+func TestPickerBindingRejectsConfiguredSessionKey(t *testing.T) {
+	t.Parallel()
+
+	cfg := configWithBinds(bind("picker", "alt+w", "session.create", nil))
+	cfg.Keys.Sessions = map[string]string{"web": "w"}
+
+	if _, err := action.Bindings(cfg); !errors.Is(err, action.ErrPickerKeyReserved) {
+		t.Fatalf("Bindings() error = %v, want %v", err, action.ErrPickerKeyReserved)
+	}
+}
+
 func TestTmuxBindingCarriesItsParams(t *testing.T) {
 	t.Parallel()
 

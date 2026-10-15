@@ -31,7 +31,7 @@ func TestSaveRenameFailureLeavesOriginalFile(t *testing.T) {
 	stateDir := testAtomicStateDir(t)
 	statePath := filepath.Join(stateDir, "state.json")
 
-	original := []byte(`{"version":1,"switchHistory":[{"session":{"origin":"","connectionId":"","socket":"","repositorySource":"","name":"old"},"lastSwitch":1}],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":""}`)
+	original := []byte(`{"version":2,"switchHistory":[{"session":{"origin":"","connectionId":"","socket":"","repositorySource":"","name":"old"},"lastSwitch":1}],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":"","sessionKeys":[]}`)
 	if err := os.WriteFile(statePath, original, 0o600); err != nil {
 		t.Fatalf("writing original state failed: %v", err)
 	}
@@ -129,7 +129,7 @@ func TestSaveWriteFailureCleansUpTempFileAndPreservesOriginal(t *testing.T) {
 	stateDir := testAtomicStateDir(t)
 	statePath := filepath.Join(stateDir, "state.json")
 
-	original := []byte(`{"version":1,"switchHistory":[],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":""}`)
+	original := []byte(`{"version":2,"switchHistory":[],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":"","sessionKeys":[]}`)
 	if err := os.WriteFile(statePath, original, 0o600); err != nil {
 		t.Fatalf("writing original state failed: %v", err)
 	}

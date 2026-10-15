@@ -887,6 +887,12 @@ func (v sessionFormatValues) resolveShortcutField(field string) (string, bool) {
 		}
 
 		return "^" + digit, true
+	case display.FieldSessionKey:
+		if v.model == nil {
+			return "", true
+		}
+
+		return v.model.sessionKey(v.row), true
 	default:
 		return "", false
 	}

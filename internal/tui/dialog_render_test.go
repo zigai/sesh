@@ -32,7 +32,7 @@ func TestRenderCreateDirDialogShowsInputAndSuggestions(t *testing.T) {
 func TestHelpOverlayRendersConfiguredKeysAndDismisses(t *testing.T) {
 	model := newTestModel()
 	model.width = 80
-	model.height = 26
+	model.height = 28
 	model.config.Keys.Help = "f1"
 
 	model.filtered = make([]session.Session, 20)

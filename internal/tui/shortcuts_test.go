@@ -85,7 +85,7 @@ func TestVisibleSessionShortcutZeroSwitchesTenthVisibleSlot(t *testing.T) {
 	}
 }
 
-func TestVisibleShortcutSelectsSessionWithoutAgents(t *testing.T) {
+func TestVisibleShortcutLeavesSessionsUnnumberedInAgentsMode(t *testing.T) {
 	model := newTestModel()
 	model.mode = modePopup
 	model.displayMode = displayModeAgents
@@ -100,16 +100,8 @@ func TestVisibleShortcutSelectsSessionWithoutAgents(t *testing.T) {
 		t.Fatal("handleActionKeys(ctrl+1) returned nil")
 	}
 
-	if model.cursor != 0 || model.agentCursor != parentAgentIndex {
-		t.Fatalf("shortcut selection = %d/%d, want session heading", model.cursor, model.agentCursor)
-	}
-
-	_, cmd := handler()
-
-	model.Update(cmd())
-
-	if model.DeferredSwitchSession() != "dev" || model.DeferredSwitchPane() != "" {
-		t.Fatalf("shortcut session target = %q/%q, want dev without pane", model.DeferredSwitchSession(), model.DeferredSwitchPane())
+	if _, cmd := handler(); cmd != nil {
+		t.Fatalf("ctrl+1 without agent rows = %T, want no action", cmd)
 	}
 }
 
@@ -169,17 +161,35 @@ func twoSessionAgentModel() *Model {
 	return model
 }
 
-func TestVisibleShortcutScopesToSelectedSessionInAgentsMode(t *testing.T) {
+func TestVisibleShortcutNumbersAgentsAcrossSessionsInAgentsMode(t *testing.T) {
 	model := twoSessionAgentModel()
 	model.cursor = 0
 
-	handler := model.handleActionKeys(keyCtrl('2'))
+	handler := model.handleActionKeys(keyCtrl('3'))
 	if handler == nil {
-		t.Fatal("handleActionKeys(ctrl+2) for session-a returned nil")
+		t.Fatal("handleActionKeys(ctrl+3) returned nil")
 	}
 
-	if model.cursor != 0 || model.agentCursor != 1 {
-		t.Fatalf("session-a selection = %d/%d, want 0/1", model.cursor, model.agentCursor)
+	if model.cursor != 1 || model.agentCursor != 0 {
+		t.Fatalf("selection = %d/%d, want 1/0", model.cursor, model.agentCursor)
+	}
+
+	_, cmd := handler()
+
+	model.Update(cmd())
+
+	if model.DeferredSwitchSession() != "session-b" || model.DeferredSwitchPane() != "%3" {
+		t.Fatalf("target = %q/%q, want session-b pane %%3", model.DeferredSwitchSession(), model.DeferredSwitchPane())
+	}
+}
+
+func TestVisibleShortcutIgnoresSelectedSessionInAgentsMode(t *testing.T) {
+	model := twoSessionAgentModel()
+	model.cursor = 1
+
+	handler := model.handleActionKeys(keyCtrl('2'))
+	if handler == nil {
+		t.Fatal("handleActionKeys(ctrl+2) returned nil")
 	}
 
 	_, cmd := handler()
@@ -187,34 +197,12 @@ func TestVisibleShortcutScopesToSelectedSessionInAgentsMode(t *testing.T) {
 	model.Update(cmd())
 
 	if model.DeferredSwitchSession() != "session-a" || model.DeferredSwitchPane() != "%2" {
-		t.Fatalf("session-a target = %q/%q, want session-a pane %%2", model.DeferredSwitchSession(), model.DeferredSwitchPane())
-	}
-}
-
-func TestVisibleShortcutSwitchesWithSessionCursorInAgentsMode(t *testing.T) {
-	model := twoSessionAgentModel()
-	model.cursor = 1
-
-	handlerB := model.handleActionKeys(keyCtrl('1'))
-	if handlerB == nil {
-		t.Fatal("handleActionKeys(ctrl+1) for session-b returned nil")
+		t.Fatalf("target = %q/%q, want session-a pane %%2", model.DeferredSwitchSession(), model.DeferredSwitchPane())
 	}
 
-	if model.cursor != 1 || model.agentCursor != 0 {
-		t.Fatalf("session-b selection = %d/%d, want 1/0", model.cursor, model.agentCursor)
-	}
-
-	_, cmdB := handlerB()
-
-	model.Update(cmdB())
-
-	if model.DeferredSwitchSession() != "session-b" || model.DeferredSwitchPane() != "%3" {
-		t.Fatalf("session-b target = %q/%q, want session-b pane %%3", model.DeferredSwitchSession(), model.DeferredSwitchPane())
-	}
-
-	handlerMissing := model.handleActionKeys(keyCtrl('2'))
+	handlerMissing := model.handleActionKeys(keyCtrl('4'))
 	if handlerMissing == nil {
-		t.Fatal("handleActionKeys(ctrl+2) for missing slot returned nil handler")
+		t.Fatal("handleActionKeys(ctrl+4) for missing slot returned nil handler")
 	}
 
 	_, cmdMissing := handlerMissing()
