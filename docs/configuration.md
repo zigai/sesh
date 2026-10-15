@@ -53,7 +53,7 @@ work_task_format = "{tree}{status_glyph} {status_age:<7}   {agent_project_name:<
 [agent_sessions]
 enabled = true
 popup_sort = "position" # position, name, attention
-popup_counts = true
+popup_counts = false
 refresh_interval = "250ms"
 status_style = "glyph" # glyph, text
 status_time_format = "relative" # relative, relative-seconds, clock, hh:mm

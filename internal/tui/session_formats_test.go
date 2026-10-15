@@ -169,6 +169,32 @@ func TestAgentTreeRemainsMutedWhenSelected(t *testing.T) {
 	}
 }
 
+func TestSeshAgentCountsDefaultAndOptIn(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		counts bool
+		want   string
+	}{
+		{name: "default", want: "▌ project"},
+		{name: "opt in", counts: true, want: "▌ project 1/2"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cfg := config.DefaultConfig()
+			if test.counts {
+				cfg.AgentSessions.PopupCounts = true
+			}
+
+			model := newTestModelWithConfig(t, cfg)
+			model.filtered = []session.Session{{Name: testSupportSessionProjectName, AgentTotal: 2, AgentActive: 1}}
+
+			line := strings.Join(strings.Fields(stripANSI(model.renderList(52, 1))), " ")
+			if line != test.want {
+				t.Fatalf("SESH row = %q, want %q", line, test.want)
+			}
+		})
+	}
+}
+
 func TestAgentCountPlaceholderRespectsPopupCounts(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.AgentSessions.PopupCounts = false

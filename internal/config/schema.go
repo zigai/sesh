@@ -488,7 +488,7 @@ func DefaultConfig() *Config {
 		AgentSessions: AgentSessionsConfig{
 			PopupSort:        "position",
 			Enabled:          true,
-			PopupCounts:      true,
+			PopupCounts:      false,
 			RefreshInterval:  defaultAgentSessionsRefreshInterval.String(),
 			StatusStyle:      "glyph",
 			StatusTimeFormat: "relative-seconds",

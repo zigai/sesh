@@ -74,7 +74,7 @@
 # enabled = true
 
 # Show agent counts in the default SESH row.
-# popup_counts = true
+# popup_counts = false
 
 # Fallback agent-state refresh rate when the realtime broker is unavailable.
 # refresh_interval = "250ms"
