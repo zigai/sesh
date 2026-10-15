@@ -13,22 +13,21 @@ import (
 type keyPressSpec string
 
 type actionKeyMap struct {
-	actions    []boundAction
-	help       bubbleskey.Binding
-	cycleMode  bubbleskey.Binding
-	agentSort  bubbleskey.Binding
-	pageUp     bubbleskey.Binding
-	pageDown   bubbleskey.Binding
-	top        bubbleskey.Binding
-	bottom     bubbleskey.Binding
-	selectKeys []bubbleskey.Binding
-	enter      bubbleskey.Binding
-	close      bubbleskey.Binding
-	handoff    bubbleskey.Binding
-	stepUp     bubbleskey.Binding
-	stepDown   bubbleskey.Binding
-	groupUp    bubbleskey.Binding
-	groupDown  bubbleskey.Binding
+	actions   []boundAction
+	help      bubbleskey.Binding
+	cycleMode bubbleskey.Binding
+	agentSort bubbleskey.Binding
+	pageUp    bubbleskey.Binding
+	pageDown  bubbleskey.Binding
+	top       bubbleskey.Binding
+	bottom    bubbleskey.Binding
+	enter     bubbleskey.Binding
+	close     bubbleskey.Binding
+	handoff   bubbleskey.Binding
+	stepUp    bubbleskey.Binding
+	stepDown  bubbleskey.Binding
+	groupUp   bubbleskey.Binding
+	groupDown bubbleskey.Binding
 }
 
 type boundAction struct {
@@ -44,22 +43,21 @@ func newActionKeyMap(cfg *config.Config) actionKeyMap {
 	keys := cfg.Keys
 
 	return actionKeyMap{
-		actions:    pickerActions(cfg),
-		help:       newActionBinding(keys.Help, "Show this help"),
-		cycleMode:  newActionBinding(keys.CycleMode, "Cycle display mode"),
-		agentSort:  newActionBinding(keys.AgentSort, "Cycle agent sort order"),
-		pageUp:     newActionBinding(keys.PageUp, "Page up"),
-		pageDown:   newActionBinding(keys.PageDown, "Page down"),
-		top:        newActionBinding(keys.Top, "Jump to top"),
-		bottom:     newActionBinding(keys.Bottom, "Jump to bottom"),
-		selectKeys: newSelectionBindings(keys),
-		enter:      newActionBindingSet(config.PickerSelectKeys, "enter", "Open selected session or agent"),
-		close:      newActionBindingSet(config.PickerCloseKeys, "esc, ctrl+c, ctrl+o", "Close popup"),
-		handoff:    newActionBindingSet(config.PickerHandoffKeys, "ctrl+p", "Open floating terminal"),
-		stepUp:     newActionBindingSet(config.PickerStepUpKeys, "↑", "Move selection up"),
-		stepDown:   newActionBindingSet(config.PickerStepDownKeys, "↓/ctrl+n", "Move selection down"),
-		groupUp:    newActionBindingSet(config.PickerGroupUpKeys, "ctrl+↑", "Move to previous tmux session"),
-		groupDown:  newActionBindingSet(config.PickerGroupDownKeys, "ctrl+↓", "Move to next tmux session"),
+		actions:   pickerActions(cfg),
+		help:      newActionBinding(keys.Help, "Show this help"),
+		cycleMode: newActionBinding(keys.CycleMode, "Cycle display mode"),
+		agentSort: newActionBinding(keys.AgentSort, "Cycle agent sort order"),
+		pageUp:    newActionBinding(keys.PageUp, "Page up"),
+		pageDown:  newActionBinding(keys.PageDown, "Page down"),
+		top:       newActionBinding(keys.Top, "Jump to top"),
+		bottom:    newActionBinding(keys.Bottom, "Jump to bottom"),
+		enter:     newActionBindingSet(config.PickerSelectKeys, "enter", "Open selected session or agent"),
+		close:     newActionBindingSet(config.PickerCloseKeys, "esc, ctrl+c, ctrl+o", "Close popup"),
+		handoff:   newActionBindingSet(config.PickerHandoffKeys, "ctrl+p", "Open floating terminal"),
+		stepUp:    newActionBindingSet(config.PickerStepUpKeys, "↑", "Move selection up"),
+		stepDown:  newActionBindingSet(config.PickerStepDownKeys, "↓/ctrl+n", "Move selection down"),
+		groupUp:   newActionBindingSet(config.PickerGroupUpKeys, "ctrl+↑", "Move to previous tmux session"),
+		groupDown: newActionBindingSet(config.PickerGroupDownKeys, "ctrl+↓", "Move to next tmux session"),
 	}
 }
 
@@ -120,36 +118,6 @@ func (k actionKeyMap) actionKey(id action.ID) string {
 	}
 
 	return ""
-}
-
-func newSelectionBindings(keys config.KeyConfig) []bubbleskey.Binding {
-	specs := []struct {
-		configured string
-		digit      string
-	}{
-		{keys.Select1, "1"},
-		{keys.Select2, "2"},
-		{keys.Select3, "3"},
-		{keys.Select4, "4"},
-		{keys.Select5, "5"},
-		{keys.Select6, "6"},
-		{keys.Select7, "7"},
-		{keys.Select8, "8"},
-		{keys.Select9, "9"},
-		{keys.Select0, "0"},
-	}
-
-	bindings := make([]bubbleskey.Binding, 0, len(specs))
-	for _, spec := range specs {
-		label := strings.TrimSpace(spec.configured)
-		if label == "" {
-			label = "ctrl+" + spec.digit
-		}
-
-		bindings = append(bindings, newActionBindingSet(config.PickerSlotKeys(spec.configured, spec.digit), label, "Open visible session or agent by slot"))
-	}
-
-	return bindings
 }
 
 func newActionBinding(spec string, description string) bubbleskey.Binding {

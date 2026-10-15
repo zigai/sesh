@@ -129,8 +129,8 @@ type Model struct {
 	filtered                     []session.Session
 	listRows                     []popupListRow
 	selectableRows               []popupListRow
-	shortcutRows                 []popupListRow
-	shortcutRowsRendered         bool
+	focusedSession               string
+	sessionPrefixPending         bool
 	state                        *session.State
 	config                       *config.Config
 	sessionKeys                  sessionKeyRules
@@ -299,8 +299,8 @@ func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps
 		filtered:                     []session.Session{},
 		listRows:                     []popupListRow{},
 		selectableRows:               []popupListRow{},
-		shortcutRows:                 []popupListRow{},
-		shortcutRowsRendered:         false,
+		focusedSession:               "",
+		sessionPrefixPending:         false,
 		state:                        st,
 		config:                       cfg,
 		sessionKeys:                  newSessionKeyRules(cfg),
@@ -640,6 +640,14 @@ func (m *Model) handleKeyPressMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.showHelp = false
 
 		return m, nil
+	}
+
+	if cmd := m.handleSessionPrefixKeys(msg); cmd != nil {
+		return cmd()
+	}
+
+	if cmd := m.handleSessionFocusKeys(msg); cmd != nil {
+		return cmd()
 	}
 
 	if cmd := m.handleNavigationKeys(msg); cmd != nil {

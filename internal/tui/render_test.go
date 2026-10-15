@@ -741,14 +741,11 @@ func TestRenderListDisplaysShortcutStyleNone(t *testing.T) {
 	if !strings.HasPrefix(lines[2], "  └─") {
 		t.Fatalf("agent 1 line = %q, want '  └─'", lines[2][:6])
 	}
-
-	if strings.Contains(output, "^1") {
-		t.Fatalf("output should not contain shortcut badge: %q", output)
-	}
 }
 
 func TestRenderListDisplaysShortcutStyleIndent(t *testing.T) {
 	model := createShortcutTestModel(t, "indent")
+	model.focusedSession = model.filtered[0].RuntimeKey()
 	output := stripANSI(model.renderList(60, 5))
 
 	lines := strings.Split(output, "\n")
@@ -756,21 +753,22 @@ func TestRenderListDisplaysShortcutStyleIndent(t *testing.T) {
 		t.Fatalf("renderList() lines count = %d, want 5", len(lines))
 	}
 
-	if !strings.HasPrefix(lines[1], "▌  1 ") {
-		t.Fatalf("agent 0 line = %q, want '▌  1 '", lines[1][:6])
+	if !strings.HasPrefix(lines[1], "a   ") {
+		t.Fatalf("agent 0 line = %q, want its key a in the first column", lines[1])
 	}
 
-	if !strings.HasPrefix(lines[2], "   2 ") {
-		t.Fatalf("agent 1 line = %q, want '   2 '", lines[2][:6])
+	if !strings.HasPrefix(lines[2], "s   ") {
+		t.Fatalf("agent 1 line = %q, want its key s in the first column", lines[2])
 	}
 
-	if !strings.HasPrefix(lines[4], "   3 ") {
-		t.Fatalf("other session agent line = %q, want '   3 '", lines[4][:5])
+	if !strings.HasPrefix(lines[4], "    ") {
+		t.Fatalf("unfocused session agent line = %q, want no key", lines[4])
 	}
 }
 
 func TestRenderListDisplaysShortcutStyleRight(t *testing.T) {
 	model := createShortcutTestModel(t, "right")
+	model.focusedSession = model.filtered[0].RuntimeKey()
 	output := stripANSI(model.renderList(60, 5))
 
 	lines := strings.Split(output, "\n")
@@ -778,24 +776,16 @@ func TestRenderListDisplaysShortcutStyleRight(t *testing.T) {
 		t.Fatalf("renderList() lines count = %d, want 5", len(lines))
 	}
 
-	if !strings.HasPrefix(lines[1], "▌ ├─") {
-		t.Fatalf("agent 0 line = %q, want '▌ ├─'", lines[1][:6])
+	if !strings.HasSuffix(strings.TrimRight(lines[1], " "), " a") {
+		t.Fatalf("agent 0 line missing right key a: %q", lines[1])
 	}
 
-	if !strings.HasPrefix(lines[2], "  └─") {
-		t.Fatalf("agent 1 line = %q, want '  └─'", lines[2][:6])
+	if !strings.HasSuffix(strings.TrimRight(lines[2], " "), " s") {
+		t.Fatalf("agent 1 line missing right key s: %q", lines[2])
 	}
 
-	if !strings.Contains(lines[1], "^1") {
-		t.Fatalf("agent 0 line missing ^1: %q", lines[1])
-	}
-
-	if !strings.Contains(lines[2], "^2") {
-		t.Fatalf("agent 1 line missing ^2: %q", lines[2])
-	}
-
-	if strings.Contains(lines[4], "^1") {
-		t.Fatalf("inactive session agent should not have badge: %q", lines[4])
+	if strings.ContainsAny(lines[4], "123") {
+		t.Fatalf("unfocused session agent should not have a number: %q", lines[4])
 	}
 }
 

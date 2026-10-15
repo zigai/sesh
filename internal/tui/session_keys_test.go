@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/display"
 	"github.com/zigai/sesh/internal/session"
@@ -21,6 +23,13 @@ func keyEntry(name, key string) session.KeyAssignment {
 
 func defaultSessionKeyRules() sessionKeyRules {
 	return newSessionKeyRules(config.DefaultConfig())
+}
+
+func altSessionKeyConfig() *config.Config {
+	cfg := config.DefaultConfig()
+	cfg.Keys.SessionPrefix = "alt"
+
+	return cfg
 }
 
 func keyOf(entries []session.KeyAssignment, name string) string {
@@ -49,12 +58,20 @@ func TestAssignSessionKeysPrefersLettersOfTheName(t *testing.T) {
 	}
 }
 
-func TestAssignSessionKeysSkipsLettersOfPickerActions(t *testing.T) {
-	assigned, _ := assignSessionKeys(nil, []session.Identity{localKeyIdentity("scratch")}, defaultSessionKeyRules(), true)
+func TestAssignSessionKeysSkipsLettersOfPickerActionsWithAlt(t *testing.T) {
+	assigned, _ := assignSessionKeys(nil, []session.Identity{localKeyIdentity("scratch")}, newSessionKeyRules(altSessionKeyConfig()), true)
 
 	// alt+s, alt+c and alt+r are default picker actions.
 	if got := keyOf(assigned, "scratch"); got != "a" {
 		t.Fatalf("key of scratch = %q, want a", got)
+	}
+}
+
+func TestAssignSessionKeysUsesLettersOfPickerActionsWithTab(t *testing.T) {
+	assigned, _ := assignSessionKeys(nil, []session.Identity{localKeyIdentity("scratch")}, defaultSessionKeyRules(), true)
+
+	if got := keyOf(assigned, "scratch"); got != "s" {
+		t.Fatalf("key of scratch = %q, want s", got)
 	}
 }
 
@@ -181,7 +198,7 @@ func TestAssignSessionKeysYieldsToOverrides(t *testing.T) {
 }
 
 func TestAssignSessionKeysReassignsKeysTakenByActions(t *testing.T) {
-	cfg := config.DefaultConfig()
+	cfg := altSessionKeyConfig()
 	cfg.Keys.Bind = []config.KeyBindConfig{{Key: "alt+w", Action: "session.create", In: "picker"}}
 
 	entries := []session.KeyAssignment{keyEntry("web", "w")}
@@ -218,6 +235,7 @@ func TestSessionKeyOpensSessionHiddenByFilter(t *testing.T) {
 	model.state.SessionKeys = []session.KeyAssignment{{Session: session.Identity{Name: "web"}, Key: "w"}}
 	model.sessions = []session.Session{{Name: "api", Kind: session.KindLive}, {Name: "web", Kind: session.KindLive}}
 	model.filtered = model.sessions[:1]
+	holdAltForSessionKeys(model)
 
 	handler := model.handleActionKeys(keyAlt("w"))
 	if handler == nil {
@@ -237,6 +255,7 @@ func TestSessionKeyRestoresSavedSession(t *testing.T) {
 	model := newTestModel()
 	model.state.SessionKeys = []session.KeyAssignment{{Session: session.Identity{Name: "archive"}, Key: "v"}}
 	model.sessions = []session.Session{{Name: "archive", Kind: session.KindSaved}}
+	holdAltForSessionKeys(model)
 
 	deps := dependenciesForTest(model)
 	deps.TmuxSessionExists = func(context.Context, string) (bool, error) { return false, nil }
@@ -323,8 +342,9 @@ func TestSessionKeyField(t *testing.T) {
 	}
 }
 
-func TestIndentShortcutStyleShowsSessionKeysOnTheLeft(t *testing.T) {
-	cfg := config.DefaultConfig()
+func indentKeyModel(t *testing.T, cfg *config.Config) *Model {
+	t.Helper()
+
 	cfg.Settings.ShortcutStyle = "indent"
 	model := newTestModelWithConfig(t, cfg)
 	model.width = 60
@@ -332,14 +352,34 @@ func TestIndentShortcutStyleShowsSessionKeysOnTheLeft(t *testing.T) {
 	model.state.SessionKeys = []session.KeyAssignment{{Session: session.Identity{Name: "web"}, Key: "w"}}
 	model.filtered = []session.Session{{Name: "web"}, {Name: "api"}}
 
-	lines := strings.Split(stripANSI(model.renderList(60, 2)), "\n")
+	return model
+}
 
-	if !strings.HasPrefix(lines[0], "▌ w  web") {
-		t.Errorf("keyed row = %q, want key before the name", lines[0])
+func TestIndentShortcutStyleShowsSessionKeysAfterTab(t *testing.T) {
+	model := indentKeyModel(t, config.DefaultConfig())
+
+	lines := strings.Split(stripANSI(model.renderList(60, 2)), "\n")
+	if !strings.HasPrefix(lines[0], "▌   web") {
+		t.Errorf("keyed row before tab = %q, want the selection bar and no key", lines[0])
 	}
 
-	if !strings.HasPrefix(lines[1], "     api") {
-		t.Errorf("row without key = %q, want blank gutter before the name", lines[1])
+	pressKey(model, keyCode(tea.KeyTab))
+
+	lines = strings.Split(stripANSI(model.renderList(60, 2)), "\n")
+	if !strings.HasPrefix(lines[0], "w   web") {
+		t.Errorf("keyed row after tab = %q, want the key in the first column", lines[0])
+	}
+
+	if !strings.HasPrefix(lines[1], "    api") {
+		t.Errorf("row without key = %q, want a blank first column", lines[1])
+	}
+}
+
+func TestIndentShortcutStyleShowsAltSessionKeysAlways(t *testing.T) {
+	model := indentKeyModel(t, altSessionKeyConfig())
+
+	if line := stripANSI(model.renderList(60, 2)); !strings.HasPrefix(line, "w   web") {
+		t.Errorf("keyed row = %q, want key before the name", line)
 	}
 }
 
@@ -358,7 +398,7 @@ func TestSessionKeysStayHiddenWithoutIndentStyle(t *testing.T) {
 func TestFooterNamesSessionKeysWhenTheyAreShown(t *testing.T) {
 	hasHint := func(model *Model) bool {
 		return slices.ContainsFunc(model.footerParts(120), func(part footerPart) bool {
-			return part.key == "alt+key" && part.desc == "open"
+			return part.key == "tab" && part.desc == "open"
 		})
 	}
 
@@ -366,10 +406,10 @@ func TestFooterNamesSessionKeysWhenTheyAreShown(t *testing.T) {
 	cfg.Settings.ShortcutStyle = "indent"
 
 	if !hasHint(newTestModelWithConfig(t, cfg)) {
-		t.Error("footer has no alt+key hint with indent shortcut style")
+		t.Error("footer has no tab hint with indent shortcut style")
 	}
 
 	if hasHint(newTestModel()) {
-		t.Error("footer shows alt+key hint while session keys are hidden")
+		t.Error("footer shows tab hint while session keys are hidden")
 	}
 }

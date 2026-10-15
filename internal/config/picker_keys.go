@@ -2,16 +2,12 @@ package config
 
 import (
 	"slices"
-	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 )
 
-const (
-	pickerSlotCount    = 10
-	pickerSlotKeyCount = 3
-)
+const sessionPrefixAlt = "alt"
 
 // The picker handles these keys itself, before any action binding.
 var (
@@ -57,30 +53,17 @@ func PickerKeyName(value string) string {
 	return name.String()
 }
 
-// PickerSlotKeys returns the keys that open the visible row of one slot: the configured key,
-// then alt and ctrl with the slot's digit.
-func PickerSlotKeys(configured, digit string) []string {
-	keys := make([]string, 0, pickerSlotKeyCount)
-	if configured = strings.TrimSpace(configured); configured != "" {
-		keys = append(keys, configured)
-	}
-
-	for _, key := range []string{"alt+" + digit, "ctrl+" + digit} {
-		if !strings.EqualFold(key, configured) {
-			keys = append(keys, key)
-		}
-	}
-
-	return keys
-}
-
 // PickerReservedKeys returns every key the picker handles before action bindings: its fixed
-// keys, the configured navigation keys, the slot keys and the configured session keys.
+// keys, the configured navigation keys and the configured session keys.
 func PickerReservedKeys(keys KeyConfig) []string {
 	reserved := []string{keys.Help, keys.CycleMode, keys.AgentSort, keys.PageUp, keys.PageDown, keys.Top, keys.Bottom}
 
-	for _, letter := range keys.Sessions {
-		reserved = append(reserved, PickerSessionKey(letter))
+	if keys.SessionKeysHoldAlt() {
+		for _, letter := range keys.Sessions {
+			reserved = append(reserved, keys.PickerSessionKey(letter))
+		}
+	} else {
+		reserved = append(reserved, keys.SessionPrefix)
 	}
 
 	for _, fixed := range [][]string{
@@ -88,10 +71,6 @@ func PickerReservedKeys(keys KeyConfig) []string {
 		PickerStepUpKeys, PickerStepDownKeys, PickerGroupUpKeys, PickerGroupDownKeys,
 	} {
 		reserved = append(reserved, fixed...)
-	}
-
-	for index, configured := range pickerSlotConfig(keys) {
-		reserved = append(reserved, PickerSlotKeys(configured, strconv.Itoa((index+1)%pickerSlotCount))...)
 	}
 
 	return reserved
@@ -102,9 +81,25 @@ func ValidSessionKey(key string) bool {
 	return len(key) == 1 && key[0] >= 'a' && key[0] <= 'z'
 }
 
-// PickerSessionKey returns the picker key that opens the session assigned letter.
-func PickerSessionKey(letter string) string {
-	return "alt+" + letter
+// SessionKeysHoldAlt reports whether session letters are typed with alt held instead of after the
+// session prefix key.
+func (keys KeyConfig) SessionKeysHoldAlt() bool {
+	return PickerKeyName(keys.SessionPrefix) == sessionPrefixAlt
+}
+
+// PickerSessionKey returns the keys that reach the session assigned letter: alt held with the
+// letter, or the prefix key followed by the letter.
+func (keys KeyConfig) PickerSessionKey(letter string) string {
+	if keys.SessionKeysHoldAlt() {
+		return sessionPrefixAlt + "+" + letter
+	}
+
+	return PickerKeyName(keys.SessionPrefix) + " " + letter
+}
+
+// ValidAgentKey reports whether key is a single lowercase ASCII letter or digit.
+func ValidAgentKey(key rune) bool {
+	return (key >= 'a' && key <= 'z') || (key >= '0' && key <= '9')
 }
 
 // PickerKeyTypes reports whether a normalized picker key types into the search field, so binding
@@ -117,13 +112,6 @@ func PickerKeyTypes(key string) bool {
 	character, size := utf8.DecodeRuneInString(key)
 
 	return size == len(key) && size > 0 && unicode.IsPrint(character)
-}
-
-func pickerSlotConfig(keys KeyConfig) []string {
-	return []string{
-		keys.Select1, keys.Select2, keys.Select3, keys.Select4, keys.Select5,
-		keys.Select6, keys.Select7, keys.Select8, keys.Select9, keys.Select0,
-	}
 }
 
 func splitPickerModifiers(value string) (map[string]bool, string) {

@@ -204,6 +204,34 @@ func TestLoadValidatesShortcutStyle(t *testing.T) {
 	})
 }
 
+func TestLoadValidatesSessionKeyAction(t *testing.T) {
+	for action, valid := range map[string]bool{"focus": true, "open": true, "jump": false, "": false} {
+		t.Run(action, func(t *testing.T) {
+			tempDir := t.TempDir()
+			t.Setenv("XDG_CONFIG_HOME", tempDir)
+
+			configDir := filepath.Join(tempDir, "sesh")
+			if err := os.MkdirAll(configDir, 0o755); err != nil {
+				t.Fatalf("mkdir failed: %v", err)
+			}
+
+			content := "[settings]\nsession_key_action = \"" + action + "\"\n"
+			if err := os.WriteFile(filepath.Join(configDir, "config.toml"), []byte(content), 0o600); err != nil {
+				t.Fatalf("write config failed: %v", err)
+			}
+
+			_, err := config.Load()
+			if valid && err != nil {
+				t.Fatalf("Load() rejected session_key_action %q: %v", action, err)
+			}
+
+			if !valid && (err == nil || !strings.Contains(err.Error(), "session_key_action")) {
+				t.Fatalf("Load() error = %v, want session_key_action error for %q", err, action)
+			}
+		})
+	}
+}
+
 func checkValidShortcutStyle(t *testing.T, style string) {
 	t.Helper()
 
@@ -712,15 +740,23 @@ func TestValidateKeyConfigCaseInsensitiveDuplicates(t *testing.T) {
 	}
 }
 
+func sessionKeyConfig(prefix string, sessions map[string]string) config.KeyConfig {
+	return config.KeyConfig{SessionPrefix: prefix, AgentKeys: "asdf", Sessions: sessions}
+}
+
 func TestValidateKeyConfigRejectsInvalidSessionKeys(t *testing.T) {
 	tests := map[string]config.KeyConfig{
-		"upper case letter":  {Sessions: map[string]string{"web": "W"}},
-		"digit":              {Sessions: map[string]string{"web": "1"}},
-		"two letters":        {Sessions: map[string]string{"web": "we"}},
-		"empty session name": {Sessions: map[string]string{"": "w"}},
-		"letter used twice":  {Sessions: map[string]string{"web": "w", "wiki": "w"}},
-		"navigation key":     {Select1: "alt+w", Sessions: map[string]string{"web": "w"}},
+		"upper case letter":          sessionKeyConfig("tab", map[string]string{"web": "W"}),
+		"digit":                      sessionKeyConfig("tab", map[string]string{"web": "1"}),
+		"two letters":                sessionKeyConfig("tab", map[string]string{"web": "we"}),
+		"empty session name":         sessionKeyConfig("tab", map[string]string{"": "w"}),
+		"letter used twice":          sessionKeyConfig("tab", map[string]string{"web": "w", "wiki": "w"}),
+		"letter used twice with alt": sessionKeyConfig("alt", map[string]string{"web": "w", "wiki": "w"}),
 	}
+
+	navigation := sessionKeyConfig("alt", map[string]string{"web": "w"})
+	navigation.Top = "alt+w"
+	tests["navigation key with alt"] = navigation
 
 	for name, keys := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -730,8 +766,65 @@ func TestValidateKeyConfigRejectsInvalidSessionKeys(t *testing.T) {
 		})
 	}
 
-	if err := config.ValidateKeyConfig(config.KeyConfig{Sessions: map[string]string{"web": "w", "api": "a"}}); err != nil {
-		t.Fatalf("ValidateKeyConfig() error = %v for valid session keys", err)
+	for _, prefix := range []string{"tab", "alt"} {
+		if err := config.ValidateKeyConfig(sessionKeyConfig(prefix, map[string]string{"web": "w", "api": "a"})); err != nil {
+			t.Fatalf("ValidateKeyConfig() error = %v for valid session keys with prefix %s", err, prefix)
+		}
+	}
+
+	tabbed := sessionKeyConfig("tab", map[string]string{"web": "w"})
+	tabbed.Top = "alt+w"
+
+	if err := config.ValidateKeyConfig(tabbed); err != nil {
+		t.Fatalf("ValidateKeyConfig() error = %v; alt+w is free when sessions use the tab prefix", err)
+	}
+}
+
+func TestValidateKeyConfigChecksSessionPrefix(t *testing.T) {
+	tests := map[string]string{
+		"empty":                 "",
+		"types into the search": "x",
+		"space":                 "space",
+		"closes the picker":     "esc",
+		"selects a row":         "enter",
+		"navigation key":        "home",
+	}
+
+	for name, prefix := range tests {
+		t.Run(name, func(t *testing.T) {
+			keys := sessionKeyConfig(prefix, nil)
+			keys.Top = "home"
+
+			if err := config.ValidateKeyConfig(keys); err == nil {
+				t.Fatalf("ValidateKeyConfig() accepted session_prefix %q", prefix)
+			}
+		})
+	}
+
+	for _, prefix := range []string{"tab", "alt", "ctrl+g", "f2"} {
+		if err := config.ValidateKeyConfig(sessionKeyConfig(prefix, nil)); err != nil {
+			t.Fatalf("ValidateKeyConfig() rejected session_prefix %q: %v", prefix, err)
+		}
+	}
+}
+
+func TestValidateKeyConfigChecksAgentKeys(t *testing.T) {
+	for _, agentKeys := range []string{"", "asa", "aS", "a;", "a b"} {
+		keys := sessionKeyConfig("tab", nil)
+		keys.AgentKeys = agentKeys
+
+		if err := config.ValidateKeyConfig(keys); err == nil {
+			t.Fatalf("ValidateKeyConfig() accepted agent_keys %q", agentKeys)
+		}
+	}
+
+	for _, agentKeys := range []string{"1234567890", "fjdksla", "q"} {
+		keys := sessionKeyConfig("tab", nil)
+		keys.AgentKeys = agentKeys
+
+		if err := config.ValidateKeyConfig(keys); err != nil {
+			t.Fatalf("ValidateKeyConfig() rejected agent_keys %q: %v", agentKeys, err)
+		}
 	}
 }
 

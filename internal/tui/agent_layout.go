@@ -329,12 +329,7 @@ func (m *Model) writePlannedAgentRow(out *strings.Builder, table sessionTableLay
 	left := strings.Join(painted[:table.agentRows.rightStart], "")
 	right := strings.Join(painted[table.agentRows.rightStart:], "")
 
-	prefix := styles.blankPrefix
-	if selected {
-		prefix = styles.selectedBar
-	}
-
-	out.WriteString(prefix)
+	out.WriteString(rowPrefix(styles, m.rowKey(row, agent, true), selected))
 	m.writeAgentText(out, left, selected, styles)
 
 	if selected {
@@ -358,7 +353,7 @@ func (m *Model) agentCellRole(row session.Session, agent session.AgentSession, p
 		return "status_" + string(agent.Status.DisplayStatus())
 	case display.FieldTree, display.FieldTreeBranch, display.FieldTreeIndent:
 		return "tree"
-	case display.FieldShortcut, display.FieldShortcutBadge, display.FieldSessionKey:
+	case display.FieldShortcut, display.FieldSessionKey:
 		return "muted"
 	case display.FieldAgentGitAdded, display.FieldAgentGitDeleted,
 		display.FieldAgentGitAhead, display.FieldAgentGitBehind:

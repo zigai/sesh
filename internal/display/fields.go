@@ -86,7 +86,7 @@ func buildFieldRegistry() map[string]FieldMetadata {
 		FieldAgentIdle, FieldAgentFailed, FieldAgentInterrupted, FieldAgentUnknown,
 		FieldAgentStatus, FieldAgentStatusGlyph, FieldAgentStatusText, FieldAgentAge,
 		FieldAgentDuration, FieldAgentClock, FieldSessionAgentContext, FieldShortcut,
-		FieldShortcutBadge, FieldSessionKey,
+		FieldSessionKey,
 	}
 	for _, field := range sessionFields {
 		registry[field] = FieldMetadata{

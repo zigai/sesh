@@ -212,8 +212,6 @@ page_up = "ctrl+b"
 page_down = "ctrl+f"
 top = "g"
 bottom = "G"
-select_1 = "alt+1"
-select_0 = "alt+0"
 
 [[keys.bind]]
 key = "M-n"
@@ -249,8 +247,6 @@ params = { local = true }`
 	assertEqual(t, "PageDown key", cfg.Keys.PageDown, "ctrl+f")
 	assertEqual(t, "Top key", cfg.Keys.Top, "g")
 	assertEqual(t, "Bottom key", cfg.Keys.Bottom, "G")
-	assertEqual(t, "Select1 key", cfg.Keys.Select1, "alt+1")
-	assertEqual(t, "Select0 key", cfg.Keys.Select0, "alt+0")
 }
 
 func TestLoadSettingsOverride(t *testing.T) {

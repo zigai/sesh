@@ -317,9 +317,8 @@ func TestSessionFormatValuesResolveAllDocumentedFields(t *testing.T) {
 		{field: display.FieldSessionAgentContext, want: ""},
 		{field: display.FieldTree, want: "└─ "},
 		{field: display.FieldTreeBranch, want: "└─ "},
-		{field: display.FieldTreeIndent, want: "   "},
+		{field: display.FieldTreeIndent, want: "  "},
 		{field: display.FieldShortcut, want: ""},
-		{field: display.FieldShortcutBadge, want: ""},
 		{field: display.FieldHarness, want: "Codex"},
 		{field: display.FieldHarnessRaw, want: "CODEX"},
 		{field: display.FieldAgentSession, want: "agent-1"},
@@ -385,6 +384,7 @@ func TestShortcutFieldResolution(t *testing.T) {
 	}
 	model.cursor = 0
 	model.agentCursor = 0
+	model.focusedSession = model.filtered[0].RuntimeKey()
 
 	values := sessionFormatValues{
 		model:        model,
@@ -395,16 +395,12 @@ func TestShortcutFieldResolution(t *testing.T) {
 		isActivePane: true,
 	}
 
-	if got := values.ResolveSessionFormatField(display.FieldShortcut); got != "1" {
-		t.Fatalf("FieldShortcut = %q, want 1", got)
+	if got := values.ResolveSessionFormatField(display.FieldShortcut); got != "a" {
+		t.Fatalf("FieldShortcut = %q, want a", got)
 	}
 
-	if got := values.ResolveSessionFormatField(display.FieldShortcutBadge); got != "^1" {
-		t.Fatalf("FieldShortcutBadge = %q, want ^1", got)
-	}
-
-	if got := values.ResolveSessionFormatField(display.FieldTreeIndent); got != " 1 " {
-		t.Fatalf("FieldTreeIndent = %q, want ' 1 '", got)
+	if got := values.ResolveSessionFormatField(display.FieldTreeIndent); got != "  " {
+		t.Fatalf("FieldTreeIndent = %q, want two spaces", got)
 	}
 
 	if got := values.ResolveSessionFormatField(display.FieldTreeBranch); got != "└─ " {
@@ -527,13 +523,14 @@ func TestAgentOutsideGitHidesBranchIconAndGitColumns(t *testing.T) {
 			},
 		},
 	}}
+	modelRight.focusedSession = modelRight.filtered[0].RuntimeKey()
 
 	outputRight := stripANSI(modelRight.renderList(100, 3))
 	if strings.Contains(outputRight, "") {
 		t.Fatalf("no-git agent with right shortcut showed git icon: %q", outputRight)
 	}
 
-	if !strings.Contains(outputRight, "1") {
+	if agentLine := strings.Split(outputRight, "\n")[1]; !strings.HasSuffix(strings.TrimRight(agentLine, " "), " a") {
 		t.Fatalf("no-git agent with right shortcut missing shortcut badge: %q", outputRight)
 	}
 }

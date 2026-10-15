@@ -2,7 +2,6 @@ package tui
 
 import (
 	"context"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -650,15 +649,6 @@ func TestAgentVisualRowsMakeChildrenSelectable(t *testing.T) {
 		t.Fatalf("visual rows = %#v, want two parents and three children", rows)
 	}
 
-	wantShortcuts := []popupListRow{
-		{sessionIndex: 0, agentIndex: 0},
-		{sessionIndex: 0, agentIndex: 1},
-		{sessionIndex: 1, agentIndex: 0},
-	}
-	if got := model.visibleShortcutRows(); !slices.Equal(got, wantShortcuts) {
-		t.Fatalf("visible shortcut rows = %#v, want %#v", got, wantShortcuts)
-	}
-
 	model.cursor = 0
 
 	layout := model.popupMouseLayout()
@@ -1182,29 +1172,6 @@ func TestSeparatorOmittedWhenOnlyAgentsOrOnlyRegularSessions(t *testing.T) {
 		if row.isSeparator() {
 			t.Fatal("separator unexpectedly present when only regular sessions exist")
 		}
-	}
-}
-
-func TestNumericShortcutsSkipSeparatorInAgentsMode(t *testing.T) {
-	model := newTestModel()
-	model.mode = modePopup
-	model.displayMode = displayModeAgents
-	model.width = 80
-	model.height = 10
-	model.filtered = []session.Session{
-		{Name: "agent-sess", Agents: []session.AgentSession{{Harness: "pi"}, {Harness: testSupportHarnessCodex}}},
-		{Name: "reg-1"},
-		{Name: "reg-2"},
-	}
-
-	shortcuts := model.visibleShortcutRows()
-
-	want := []popupListRow{
-		{sessionIndex: 0, agentIndex: 0},
-		{sessionIndex: 0, agentIndex: 1},
-	}
-	if !slices.Equal(shortcuts, want) {
-		t.Fatalf("visible shortcuts = %#v, want %#v", shortcuts, want)
 	}
 }
 

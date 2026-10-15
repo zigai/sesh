@@ -13,6 +13,7 @@ func (m *Model) handleSearchInput(msg tea.Msg) func() (tea.Model, tea.Cmd) {
 		m.filterSessions()
 		m.cursor = 0
 		m.agentCursor = parentAgentIndex
+		m.clearSessionFocus()
 		m.clearStatus()
 	}
 

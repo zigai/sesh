@@ -2,7 +2,6 @@ package tui
 
 import (
 	"cmp"
-	"fmt"
 	"slices"
 	"strings"
 
@@ -15,8 +14,8 @@ import (
 
 const (
 	sessionKeyLetters     = "abcdefghijklmnopqrstuvwxyz"
-	sessionKeyFooterKey   = "alt+key"
-	sessionKeyGutterWidth = 3
+	sessionKeyAltHint     = "alt+key"
+	sessionKeyGutterWidth = 2
 )
 
 type sessionKeysSavedMsg struct {
@@ -30,13 +29,28 @@ type sessionKeyRules struct {
 }
 
 func newSessionKeyRules(cfg *config.Config) sessionKeyRules {
+	blocked := make(map[string]bool)
+	if cfg.Keys.SessionKeysHoldAlt() {
+		blocked = altBlockedSessionKeys(cfg)
+	}
+
+	overrides := make(map[string]string, len(cfg.Keys.Sessions))
+	for name, letter := range cfg.Keys.Sessions {
+		overrides[name] = letter
+		delete(blocked, letter)
+	}
+
+	return sessionKeyRules{overrides: overrides, blocked: blocked}
+}
+
+func altBlockedSessionKeys(cfg *config.Config) map[string]bool {
 	keys := newActionKeyMap(cfg)
 	reserved := config.PickerReservedKeys(cfg.Keys)
 
 	blocked := make(map[string]bool)
 
 	for _, letter := range sessionKeyLetters {
-		key := config.PickerKeyName(config.PickerSessionKey(string(letter)))
+		key := cfg.Keys.PickerSessionKey(string(letter))
 
 		taken := slices.ContainsFunc(keys.actions, func(bound boundAction) bool {
 			return bubbleskey.Matches(keyPressSpec(key), bound.key)
@@ -50,13 +64,7 @@ func newSessionKeyRules(cfg *config.Config) sessionKeyRules {
 		}
 	}
 
-	overrides := make(map[string]string, len(cfg.Keys.Sessions))
-	for name, letter := range cfg.Keys.Sessions {
-		overrides[name] = letter
-		delete(blocked, letter)
-	}
-
-	return sessionKeyRules{overrides: overrides, blocked: blocked}
+	return blocked
 }
 
 func localSessionIdentity(ident session.Identity) bool {
@@ -202,44 +210,76 @@ func (m *Model) sessionKey(row session.Session) string {
 }
 
 func (m *Model) showsSessionKeys() bool {
-	return m.shortcutStyle() == "indent"
+	return m.shortcutStyle() == "indent" || m.sessionPrefixPending
 }
 
-func sessionKeyFooterPart() footerPart {
-	return newFooterPart(sessionKeyFooterKey, "open")
+func (m *Model) sessionKeyHint() string {
+	if m.config.Keys.SessionKeysHoldAlt() {
+		return sessionKeyAltHint
+	}
+
+	return config.PickerKeyName(m.config.Keys.SessionPrefix)
 }
 
-func withoutSessionKeyHintWhenTooWide(parts []footerPart, width int) []footerPart {
+func (m *Model) sessionKeyFooterPart() footerPart {
+	if m.focusesOnSessionKey() {
+		return newFooterPart(m.sessionKeyHint(), "focus")
+	}
+
+	return newFooterPart(m.sessionKeyHint(), "open")
+}
+
+func (m *Model) withoutSessionKeyHintWhenTooWide(parts []footerPart, width int) []footerPart {
 	if footerPartsWidth(parts) <= width {
 		return parts
 	}
 
-	return slices.DeleteFunc(parts, func(part footerPart) bool { return part.key == sessionKeyFooterKey })
+	hint := m.sessionKeyHint()
+
+	return slices.DeleteFunc(parts, func(part footerPart) bool { return part.key == hint })
 }
 
-func (m *Model) sessionKeyGutter(row session.Session) string {
-	if !m.showsSessionKeys() {
+func (m *Model) sessionKeyGutter() string {
+	if m.shortcutStyle() != "indent" {
 		return ""
 	}
 
-	return fmt.Sprintf("%-*s", sessionKeyGutterWidth, m.sessionKey(row))
+	return strings.Repeat(" ", sessionKeyGutterWidth)
 }
 
-func (m *Model) writeSessionKeyGutter(out *strings.Builder, gutter string, selected bool, styles sessionRowStyles) {
-	if selected {
-		writeStyledWithBackground(out, gutter, styles.selectedBgSeq)
+func (m *Model) rowKey(row session.Session, agent session.AgentSession, hasAgent bool) string {
+	if hasAgent {
+		if m.shortcutStyle() == "right" {
+			return ""
+		}
 
-		return
+		return m.focusedAgentKey(row, agent)
 	}
 
-	m.writeMutedAgentText(out, gutter)
+	if m.sessionPrefixPending || (m.config.Keys.SessionKeysHoldAlt() && m.shortcutStyle() == "indent") {
+		return m.sessionKey(row)
+	}
+
+	return ""
 }
 
-func (m *Model) sessionForKey(pressed keyPressSpec) (session.Session, bool) {
+func rowPrefix(styles sessionRowStyles, key string, selected bool) string {
+	switch {
+	case key == "" && selected:
+		return styles.selectedBar
+	case key == "":
+		return styles.blankPrefix
+	case selected:
+		return styles.keyChipSeq + key + ansiReset + styles.selectedBgSeq + " " + ansiReset
+	default:
+		return ansiBold + styles.sessionKeySeq + key + ansiReset + " "
+	}
+}
+
+func (m *Model) sessionForLetter(letter string) (session.Session, bool) {
 	var found session.Session
 
-	letter, ok := strings.CutPrefix(string(pressed), "alt+")
-	if !ok || !config.ValidSessionKey(letter) {
+	if !config.ValidSessionKey(letter) {
 		return found, false
 	}
 
@@ -261,14 +301,60 @@ func (m *Model) sessionForKey(pressed keyPressSpec) (session.Session, bool) {
 }
 
 func (m *Model) handleSessionKey(pressed keyPressSpec) func() (tea.Model, tea.Cmd) {
-	target, ok := m.sessionForKey(pressed)
+	letter, ok := strings.CutPrefix(string(pressed), "alt+")
+	if !ok || !m.config.Keys.SessionKeysHoldAlt() {
+		return nil
+	}
+
+	target, ok := m.sessionForLetter(letter)
 	if !ok {
 		return nil
 	}
 
 	m.clearStatus()
 
-	return m.openSession(target)
+	return m.focusOrOpenSession(target)
+}
+
+func (m *Model) handleSessionPrefixKeys(msg tea.KeyPressMsg) func() (tea.Model, tea.Cmd) {
+	if m.config.Keys.SessionKeysHoldAlt() {
+		return nil
+	}
+
+	pressed := string(keyPressFromMsg(msg))
+	stay := func() (tea.Model, tea.Cmd) { return m, nil }
+
+	if !m.sessionPrefixPending {
+		if config.PickerKeyName(pressed) != config.PickerKeyName(m.config.Keys.SessionPrefix) {
+			return nil
+		}
+
+		m.sessionPrefixPending = true
+
+		return stay
+	}
+
+	if pressed == focusCancelKey || config.PickerKeyName(pressed) == config.PickerKeyName(m.config.Keys.SessionPrefix) {
+		m.sessionPrefixPending = false
+
+		return stay
+	}
+
+	if !config.ValidSessionKey(pressed) {
+		m.sessionPrefixPending = false
+
+		return nil
+	}
+
+	target, ok := m.sessionForLetter(pressed)
+	if !ok {
+		return stay
+	}
+
+	m.sessionPrefixPending = false
+	m.clearStatus()
+
+	return m.focusOrOpenSession(target)
 }
 
 func sessionKeyIdentities(rows []session.Session) []session.Identity {

@@ -96,7 +96,6 @@ func TestBindingsRejectBindingsTheirSurfaceCannotRun(t *testing.T) {
 		},
 		"configured picker key":   {[]config.KeyBindConfig{bind("picker", "?", "session.create", nil)}, action.ErrPickerKeyReserved},
 		"fixed picker key":        {[]config.KeyBindConfig{bind("picker", "ctrl+n", "session.create", nil)}, action.ErrPickerKeyReserved},
-		"slot key":                {[]config.KeyBindConfig{bind("picker", "alt+1", "session.create", nil)}, action.ErrPickerKeyReserved},
 		"key types into search":   {[]config.KeyBindConfig{bind("picker", "x", "session.create", nil)}, action.ErrPickerKeyReserved},
 		"space types into search": {[]config.KeyBindConfig{bind("picker", "space", "session.create", nil)}, action.ErrPickerKeyReserved},
 	} {
@@ -114,7 +113,19 @@ func TestPickerBindingRejectsConfiguredSessionKey(t *testing.T) {
 	t.Parallel()
 
 	cfg := configWithBinds(bind("picker", "alt+w", "session.create", nil))
+	cfg.Keys.SessionPrefix = "alt"
 	cfg.Keys.Sessions = map[string]string{"web": "w"}
+
+	if _, err := action.Bindings(cfg); !errors.Is(err, action.ErrPickerKeyReserved) {
+		t.Fatalf("Bindings() error = %v, want %v", err, action.ErrPickerKeyReserved)
+	}
+}
+
+func TestPickerBindingRejectsSessionPrefix(t *testing.T) {
+	t.Parallel()
+
+	cfg := configWithBinds(bind("picker", "tab", "session.create", nil))
+	cfg.Keys.SessionPrefix = "tab"
 
 	if _, err := action.Bindings(cfg); !errors.Is(err, action.ErrPickerKeyReserved) {
 		t.Fatalf("Bindings() error = %v, want %v", err, action.ErrPickerKeyReserved)

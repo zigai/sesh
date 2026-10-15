@@ -34,7 +34,8 @@ directory_suggestions = 5
 default_session_path_suggestion = "~/Projects/{session}"
 display_modes = ["sesh", "agents", "work"]
 log_level = "info" # trace, debug, info, warn, error, disabled
-shortcut_style = "none" # none, indent (agent numbers and session keys on the left), right
+shortcut_style = "none" # none, indent (session keys and focused agent keys on the left), right
+session_key_action = "focus" # focus (then an agent key opens one of its agents), open
 
 [popup]
 sesh_width = "40%"
@@ -100,8 +101,10 @@ process_environment = ["PATH", "VIRTUAL_ENV", "CONDA_PREFIX", "CONDA_DEFAULT_ENV
 help = "?"
 cycle_mode = "ctrl+f"
 agent_sort = "ctrl+s"
+session_prefix = "tab" # pressed before a session letter; "alt" holds alt with the letter
+agent_keys = "asdfghjklqwertyuiopzxcvbnm" # handed out in order to a focused session's agents
 
-[keys.sessions] # alt+letter opens a session; other sessions get a free letter assigned once and kept
+[keys.sessions] # session_prefix then a letter opens a session, or focuses it in agents and work modes so an agent key opens one of its agents; other sessions get a free letter assigned once and kept
 dotfiles = "d"
 
 [theme]

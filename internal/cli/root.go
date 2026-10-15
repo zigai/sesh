@@ -421,20 +421,10 @@ func keyBindings(cfg *config.Config) ([]keyBindingJSON, error) {
 		{Name: "page_down", Bind: keys.PageDown},
 		{Name: "top", Bind: keys.Top},
 		{Name: "bottom", Bind: keys.Bottom},
-		{Name: "select_1", Bind: keys.Select1},
-		{Name: "select_2", Bind: keys.Select2},
-		{Name: "select_3", Bind: keys.Select3},
-		{Name: "select_4", Bind: keys.Select4},
-		{Name: "select_5", Bind: keys.Select5},
-		{Name: "select_6", Bind: keys.Select6},
-		{Name: "select_7", Bind: keys.Select7},
-		{Name: "select_8", Bind: keys.Select8},
-		{Name: "select_9", Bind: keys.Select9},
-		{Name: "select_0", Bind: keys.Select0},
 	}
 
 	for name, letter := range keys.Sessions {
-		bindings = append(bindings, keyBindingJSON{Name: "sessions." + name, Bind: config.PickerSessionKey(letter)})
+		bindings = append(bindings, keyBindingJSON{Name: "sessions." + name, Bind: keys.PickerSessionKey(letter)})
 	}
 
 	actions, err := action.Bindings(cfg)

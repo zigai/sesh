@@ -51,6 +51,9 @@ var (
 	errAgentStatusTimeStyleInvalid          = errors.New("invalid agent_sessions.status_time_style")
 	errInvalidLogLevel                      = errors.New("invalid settings.log_level")
 	errShortcutStyleInvalid                 = errors.New("invalid settings.shortcut_style")
+	errSessionKeyActionInvalid              = errors.New("invalid settings.session_key_action")
+	errSessionPrefixInvalid                 = errors.New("invalid keys.session_prefix")
+	errAgentKeysInvalid                     = errors.New("invalid keys.agent_keys")
 	errAutosaveIntervalEmpty                = errors.New("invalid autosave.interval: cannot be empty when autosave is enabled")
 	errAutosaveIntervalNotPositive          = errors.New("invalid autosave.interval: must be positive duration")
 	errAgentRefreshIntervalNotPositive      = errors.New("invalid agent_sessions.refresh_interval: must be positive duration")
@@ -369,16 +372,6 @@ func ValidateKeyConfig(keys KeyConfig) error {
 		{"page_down", keys.PageDown},
 		{"top", keys.Top},
 		{"bottom", keys.Bottom},
-		{"select_1", keys.Select1},
-		{"select_2", keys.Select2},
-		{"select_3", keys.Select3},
-		{"select_4", keys.Select4},
-		{"select_5", keys.Select5},
-		{"select_6", keys.Select6},
-		{"select_7", keys.Select7},
-		{"select_8", keys.Select8},
-		{"select_9", keys.Select9},
-		{"select_0", keys.Select0},
 	}
 
 	for _, entry := range keyEntries {
@@ -394,7 +387,15 @@ func ValidateKeyConfig(keys KeyConfig) error {
 		seen[normalized] = entry.name
 	}
 
-	return validateSessionKeys(keys.Sessions, seen)
+	if err := validateSessionPrefix(keys, seen); err != nil {
+		return err
+	}
+
+	if err := validateAgentKeys(keys.AgentKeys); err != nil {
+		return err
+	}
+
+	return validateSessionKeys(keys, seen)
 }
 
 func ValidStatusTimeFormat(format string) bool {
@@ -443,6 +444,7 @@ func validateConfig(cfg *Config) error {
 		func() error { return validateDisplayModes(cfg.Settings.DisplayModes) },
 		func() error { return validateLogLevel(cfg.Settings.LogLevel) },
 		func() error { return validateShortcutStyle(cfg.Settings.ShortcutStyle) },
+		func() error { return validateSessionKeyAction(cfg.Settings.SessionKeyAction) },
 		func() error { return ValidateDisplayConfig(cfg.Display) },
 		func() error { return ValidatePopupConfig(cfg.Popup) },
 		func() error { return ValidateSnapshotConfig(cfg.Snapshot) },
@@ -685,6 +687,15 @@ func validateShortcutStyle(style string) error {
 	}
 }
 
+func validateSessionKeyAction(sessionKeyAction string) error {
+	switch sessionKeyAction {
+	case "focus", "open":
+		return nil
+	default:
+		return fmt.Errorf("%w %q: expected focus or open", errSessionKeyActionInvalid, sessionKeyAction)
+	}
+}
+
 func validateLogLevel(level string) error {
 	switch strings.ToLower(strings.TrimSpace(level)) {
 	case "", "debug", "info", "warn", "error", "disabled":
@@ -744,14 +755,64 @@ func validatePositiveDuration(label, raw string, errNotPositive error) (time.Dur
 	return dur, nil
 }
 
-func validateSessionKeys(sessions map[string]string, seen map[string]string) error {
-	for _, name := range slices.Sorted(maps.Keys(sessions)) {
-		letter := sessions[name]
+func validateSessionPrefix(keys KeyConfig, seen map[string]string) error {
+	if keys.SessionKeysHoldAlt() {
+		return nil
+	}
+
+	prefix := PickerKeyName(keys.SessionPrefix)
+	if prefix == "" || PickerKeyTypes(prefix) {
+		return fmt.Errorf("%w %q: expected alt or a key that does not type into the search field", errSessionPrefixInvalid, keys.SessionPrefix)
+	}
+
+	for _, fixed := range [][]string{
+		PickerSelectKeys, PickerCloseKeys, PickerHandoffKeys,
+		PickerStepUpKeys, PickerStepDownKeys, PickerGroupUpKeys, PickerGroupDownKeys,
+	} {
+		if slices.Contains(fixed, prefix) {
+			return fmt.Errorf("%w %q: the picker already uses it", errSessionPrefixInvalid, keys.SessionPrefix)
+		}
+	}
+
+	if previous, exists := seen[prefix]; exists {
+		return fmt.Errorf("%w: %s and session_prefix both use %q", errDuplicateKeyBinding, previous, keys.SessionPrefix)
+	}
+
+	seen[prefix] = "session_prefix"
+
+	return nil
+}
+
+func validateAgentKeys(agentKeys string) error {
+	if agentKeys == "" {
+		return fmt.Errorf("%w: expected at least one key", errAgentKeysInvalid)
+	}
+
+	used := make(map[rune]bool, len(agentKeys))
+
+	for _, key := range agentKeys {
+		if !ValidAgentKey(key) {
+			return fmt.Errorf("%w %q: %q is not a lowercase letter or digit", errAgentKeysInvalid, agentKeys, key)
+		}
+
+		if used[key] {
+			return fmt.Errorf("%w %q: %q appears twice", errAgentKeysInvalid, agentKeys, key)
+		}
+
+		used[key] = true
+	}
+
+	return nil
+}
+
+func validateSessionKeys(keys KeyConfig, seen map[string]string) error {
+	for _, name := range slices.Sorted(maps.Keys(keys.Sessions)) {
+		letter := keys.Sessions[name]
 		if name == "" || !ValidSessionKey(letter) {
 			return fmt.Errorf("%w: sessions.%q = %q must be one lowercase letter", errInvalidSessionKey, name, letter)
 		}
 
-		key := PickerKeyName(PickerSessionKey(letter))
+		key := keys.PickerSessionKey(letter)
 		if previous, exists := seen[key]; exists {
 			return fmt.Errorf("%w: %s and sessions.%q both use %q", errDuplicateKeyBinding, previous, name, key)
 		}

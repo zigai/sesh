@@ -9,6 +9,7 @@ import (
 
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/config"
@@ -34,7 +35,6 @@ const (
 	listBufferPadding      = 48
 	separatorDashDivisor   = 2
 	minSeparatorDashes     = 2
-	maxNumberedDigits      = 10
 	minFullFooterWidth     = 42
 	compactFooterMaxWidth  = 70
 	initialFooterPartsCap  = 10
@@ -44,6 +44,7 @@ const (
 
 const (
 	ansiReset                   = "\x1b[0m"
+	ansiBold                    = "\x1b[1m"
 	ansiDefaultName             = "\x1b[38;5;252m"
 	ansiDefaultSelected         = "\x1b[1;38;5;255;48;2;42;42;42m"
 	ansiDefaultSelectedBg       = "\x1b[48;2;42;42;42m"
@@ -96,6 +97,9 @@ type sessionRowStyles struct {
 	blankLine        string
 	mutedStyle       lipgloss.Style
 	selectedMuted    lipgloss.Style
+	sessionKeySeq    string
+	keyChipSeq       string
+	fadedSeq         string
 }
 
 type footerPart struct {
@@ -363,11 +367,6 @@ func (m *Model) renderList(width, height int) string {
 
 		visible := m.visibleListRows(height)
 
-		m.collectShortcutRows(visible)
-		m.shortcutRowsRendered = true
-
-		defer func() { m.shortcutRowsRendered = false }()
-
 		for _, listRow := range visible {
 			if rowCount > 0 {
 				out.WriteByte('\n')
@@ -443,6 +442,31 @@ func (m *Model) writePopupListRow(
 	listRow popupListRow,
 	values *sessionFormatValues,
 ) {
+	selected := !listRow.isSeparator() && listRow.equal(m.selectedListRow())
+
+	switch {
+	case selected:
+		m.writeListRowContent(out, layout, styles, listRow, true, values)
+	case m.inFocusedSession(listRow):
+		m.writeListRowContent(out, layout, focusedRowStyles(styles, listRow.isAgent()), listRow, true, values)
+	case m.fadesListRow(listRow):
+		var rendered strings.Builder
+
+		m.writeListRowContent(&rendered, layout, styles, listRow, false, values)
+		writeStyledWithBackground(out, ansi.Strip(rendered.String()), styles.fadedSeq)
+	default:
+		m.writeListRowContent(out, layout, styles, listRow, false, values)
+	}
+}
+
+func (m *Model) writeListRowContent(
+	out *strings.Builder,
+	layout sessionTableLayout,
+	styles sessionRowStyles,
+	listRow popupListRow,
+	selected bool,
+	values *sessionFormatValues,
+) {
 	if listRow.isSeparator() {
 		m.writeSeparatorRow(out, layout, styles)
 		return
@@ -450,7 +474,6 @@ func (m *Model) writePopupListRow(
 
 	row := m.filtered[listRow.sessionIndex]
 
-	selected := listRow.equal(m.selectedListRow())
 	if !listRow.isAgent() {
 		m.writeSessionRowWithStyles(out, layout, styles, row, selected, values)
 		return
@@ -549,6 +572,8 @@ func rowStyles(cfg *config.Config, prefixWidth, width int) sessionRowStyles {
 	blankPrefix := strings.Repeat(" ", prefixWidth)
 
 	blankLine := strings.Repeat(" ", width)
+	keys := sessionKeyStyles(cfg)
+
 	if defaultRowTheme(cfg) {
 		return sessionRowStyles{
 			name:             lipgloss.Style{},
@@ -564,6 +589,9 @@ func rowStyles(cfg *config.Config, prefixWidth, width int) sessionRowStyles {
 			blankPrefix:      blankPrefix,
 			blankLine:        blankLine,
 			fastDefaultTheme: true,
+			sessionKeySeq:    keys.sessionKeySeq,
+			keyChipSeq:       keys.keyChipSeq,
+			fadedSeq:         keys.fadedSeq,
 		}
 	}
 
@@ -604,6 +632,9 @@ func rowStyles(cfg *config.Config, prefixWidth, width int) sessionRowStyles {
 		blankLine:     blankLine,
 		mutedStyle:    lipgloss.NewStyle().Foreground(mutedColor),
 		selectedMuted: lipgloss.NewStyle().Foreground(mutedColor).Background(selectedBg),
+		sessionKeySeq: keys.sessionKeySeq,
+		keyChipSeq:    keys.keyChipSeq,
+		fadedSeq:      keys.fadedSeq,
 	}
 }
 
@@ -719,7 +750,7 @@ func (m *Model) writeFormattedSessionRow(
 
 	gutter := ""
 	if !hasAgent && layout.leftWidth > sessionKeyGutterWidth {
-		gutter = m.sessionKeyGutter(row)
+		gutter = m.sessionKeyGutter()
 	}
 
 	leftWidth := max(layout.leftWidth-lipgloss.Width(gutter), 0)
@@ -729,15 +760,12 @@ func (m *Model) writeFormattedSessionRow(
 		left += strings.Repeat(" ", leftWidth-width)
 	}
 
-	prefix := styles.blankPrefix
-	if selected {
-		prefix = styles.selectedBar
-	}
+	out.WriteString(rowPrefix(styles, m.rowKey(row, agent, hasAgent), selected))
 
-	out.WriteString(prefix)
-
-	if gutter != "" {
-		m.writeSessionKeyGutter(out, gutter, selected, styles)
+	if gutter != "" && selected {
+		writeStyledWithBackground(out, gutter, styles.selectedBgSeq)
+	} else {
+		out.WriteString(gutter)
 	}
 
 	if hasAgent {
@@ -747,52 +775,6 @@ func (m *Model) writeFormattedSessionRow(
 	}
 
 	m.writeSessionFormatRight(out, line, layout, hasAgent, selected, styles)
-}
-
-func (m *Model) shortcutDigitForRow(row popupListRow, shortcuts []popupListRow) string {
-	for i, s := range shortcuts {
-		if i >= maxNumberedDigits {
-			break
-		}
-
-		if row.equal(s) {
-			return shortcutKeyDigit(i, m.config.Keys)
-		}
-	}
-
-	return ""
-}
-
-func shortcutKeyDigit(slot int, keys config.KeyConfig) string {
-	if slot < 0 || slot > 9 {
-		return ""
-	}
-
-	fallbacks := "1234567890"
-	fallback := string(fallbacks[slot])
-
-	configuredKeys := [...]string{
-		keys.Select1, keys.Select2, keys.Select3, keys.Select4, keys.Select5,
-		keys.Select6, keys.Select7, keys.Select8, keys.Select9, keys.Select0,
-	}
-
-	configured := strings.TrimSpace(configuredKeys[slot])
-	if configured == "" {
-		return fallback
-	}
-
-	if idx := strings.LastIndex(configured, "+"); idx >= 0 && idx < len(configured)-1 {
-		keyPart := configured[idx+1:]
-		if len([]rune(keyPart)) == 1 {
-			return keyPart
-		}
-	}
-
-	if len([]rune(configured)) == 1 {
-		return configured
-	}
-
-	return fallback
 }
 
 func (m *Model) writePrimarySessionText(
@@ -1429,6 +1411,14 @@ func (m *Model) footerParts(width int) []footerPart {
 		return []footerPart{newFooterPart(keys.help.Help().Key, "help")}
 	}
 
+	if parts := m.sessionKeyStepFooterParts(keys); parts != nil {
+		for len(parts) > 0 && footerPartsWidth(parts) > footerWidth {
+			parts = parts[:len(parts)-1]
+		}
+
+		return parts
+	}
+
 	if footerWidth < compactFooterMaxWidth && m.displayMode.tree() {
 		return m.compactAgentFooterParts(keys, footerWidth)
 	}
@@ -1437,7 +1427,7 @@ func (m *Model) footerParts(width int) []footerPart {
 	parts = append(parts, newFooterPart(keys.enter.Help().Key, "select"))
 
 	if m.showsSessionKeys() {
-		parts = append(parts, sessionKeyFooterPart())
+		parts = append(parts, m.sessionKeyFooterPart())
 	}
 
 	for _, bound := range m.footerActions(keys) {
@@ -1446,7 +1436,7 @@ func (m *Model) footerParts(width int) []footerPart {
 
 	parts = append(parts, newFooterPart("esc", "cancel"))
 	parts = append(parts, newFooterPart(keys.help.Help().Key, "help"))
-	parts = withoutSessionKeyHintWhenTooWide(parts, footerWidth)
+	parts = m.withoutSessionKeyHintWhenTooWide(parts, footerWidth)
 
 	for len(parts) > 0 && footerPartsWidth(parts) > footerWidth {
 		parts = parts[:len(parts)-1]
@@ -1482,14 +1472,14 @@ func (m *Model) compactAgentFooterParts(keys actionKeyMap, width int) []footerPa
 	}
 
 	if m.showsSessionKeys() {
-		parts = append(parts, sessionKeyFooterPart())
+		parts = append(parts, m.sessionKeyFooterPart())
 	}
 
 	parts = append(parts,
 		newFooterPart(keys.help.Help().Key, "help"),
 	)
 
-	parts = withoutSessionKeyHintWhenTooWide(parts, width)
+	parts = m.withoutSessionKeyHintWhenTooWide(parts, width)
 
 	if footerPartsWidth(parts) > width {
 		parts = slices.Delete(parts, 1, sessionPartEndIndex)

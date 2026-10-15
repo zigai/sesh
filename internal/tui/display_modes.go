@@ -101,6 +101,7 @@ func (m *Model) cycleDisplayMode() bool {
 
 	m.initialAgentSelectionPending = false
 	m.listViewportPolicy = listViewportFollowSelection
+	m.clearSessionFocus()
 
 	previousMode := m.displayMode
 	selected := m.selectedSessionIdentity()

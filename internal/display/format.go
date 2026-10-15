@@ -57,7 +57,6 @@ const (
 	FieldAgentClock          = "agent_clock"
 	FieldSessionAgentContext = "session_agent_context"
 	FieldShortcut            = "shortcut"
-	FieldShortcutBadge       = "shortcut_badge"
 	FieldSessionKey          = "session_key"
 	FieldTree                = "tree"
 	FieldTreeBranch          = "tree_branch"

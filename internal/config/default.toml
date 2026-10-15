@@ -25,9 +25,13 @@
 # Logging level (debug, info, warn, error, disabled).
 # log_level = "info"
 
-# Shortcut display style in the popup: "none" (default), "indent" (agent numbers and session
-# keys left of each row), or "right".
+# Shortcut display style in the popup: "none" (default), "indent" (session keys left of each
+# row, and agent keys in a focused session), or "right".
 # shortcut_style = "none"
+
+# What a session key does in the agents and work modes: "focus" (default) waits for an agent key,
+# "open" opens the session.
+# session_key_action = "focus"
 
 # Preferred popup dimensions. Values are terminal cells ("80"), percentages ("50%"), or "auto".
 # Tall/narrow preferences use balanced responsive sizing for the active popup mode.
@@ -199,20 +203,12 @@
 # top = "home"
 # bottom = "end"
 
-# Select one of the first ten visible rows.
-# select_1 = "ctrl+1"
-# select_2 = "ctrl+2"
-# select_3 = "ctrl+3"
-# select_4 = "ctrl+4"
-# select_5 = "ctrl+5"
-# select_6 = "ctrl+6"
-# select_7 = "ctrl+7"
-# select_8 = "ctrl+8"
-# select_9 = "ctrl+9"
-# select_0 = "ctrl+0"
-
-# Session keys: alt with a letter opens a session. Sessions get a free letter assigned once and
-# kept; a [keys.sessions] table picks the letter for a local session, as in dotfiles = "d".
+# Session keys: session_prefix and then a letter opens a session, or in the agents and work modes
+# focuses it so one of agent_keys opens one of its agents. "alt" holds alt with the letter instead.
+# Sessions get a free letter assigned once and kept; a [keys.sessions] table picks the letter for
+# a local session, as in dotfiles = "d".
+# session_prefix = "tab"
+# agent_keys = "asdfghjklqwertyuiopzxcvbnm"
 
 # TUI colors. Hex values and terminal color names are accepted.
 [theme]

@@ -154,11 +154,11 @@ func (formats sessionRowFormats) agentRowsUseWidget(widget string) bool {
 	return formats.agentsAgent.UsesWidget(widget) || (formats.work && formats.workTask.UsesWidget(widget))
 }
 
-// withShortcutBadge appends the right-aligned shortcut badge to a default row format; a custom
-// format places the badge itself.
+// withShortcutBadge appends the right-aligned shortcut number to a default row format; a custom
+// format places the number itself.
 func withShortcutBadge(format, defaultFormat string) string {
 	if format == defaultFormat || format == "" {
-		return format + "  {shortcut_badge:>3}"
+		return format + "  {shortcut:>3}"
 	}
 
 	return format
@@ -829,33 +829,12 @@ func (m *Model) shortcutStyle() string {
 	return m.config.Settings.NormalizedShortcutStyle()
 }
 
-func (v sessionFormatValues) shortcutDigit() string {
-	if v.model == nil {
+func (v sessionFormatValues) shortcutKey() string {
+	if v.model == nil || !v.hasAgent {
 		return ""
 	}
 
-	shortcuts := v.model.visibleShortcutRows()
-
-	sessionIndex := slices.IndexFunc(v.model.filtered, func(s session.Session) bool {
-		return s.RuntimeKey() == v.row.RuntimeKey()
-	})
-	if sessionIndex < 0 {
-		return ""
-	}
-
-	agentIndex := parentAgentIndex
-	if v.hasAgent {
-		agentIndex = slices.IndexFunc(v.row.Agents, func(a session.AgentSession) bool {
-			return a.RegistryID == v.agent.RegistryID && a.PaneID == v.agent.PaneID
-		})
-		if agentIndex < 0 {
-			return ""
-		}
-	}
-
-	listRow := popupListRow{sessionIndex: sessionIndex, agentIndex: agentIndex}
-
-	return v.model.shortcutDigitForRow(listRow, shortcuts)
+	return v.model.focusedAgentKey(v.row, v.agent)
 }
 
 func (v sessionFormatValues) treeBranch() string {
@@ -863,30 +842,18 @@ func (v sessionFormatValues) treeBranch() string {
 }
 
 func (v sessionFormatValues) treeIndent() string {
-	digit := v.shortcutDigit()
-	if digit != "" {
-		return " " + digit + " "
-	}
-
-	return "   "
+	return strings.Repeat(" ", sessionKeyGutterWidth)
 }
 
 func (v sessionFormatValues) resolveShortcutField(field string) (string, bool) {
 	switch field {
 	case display.FieldShortcut:
-		digit := v.shortcutDigit()
-		if digit == "" {
+		key := v.shortcutKey()
+		if key == "" {
 			return "", true
 		}
 
-		return digit, true
-	case display.FieldShortcutBadge:
-		digit := v.shortcutDigit()
-		if digit == "" {
-			return "", true
-		}
-
-		return "^" + digit, true
+		return key, true
 	case display.FieldSessionKey:
 		if v.model == nil {
 			return "", true

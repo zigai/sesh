@@ -126,18 +126,12 @@ type KeyConfig struct {
 	PageDown  string          `toml:"page_down"`
 	Top       string          `toml:"top"`
 	Bottom    string          `toml:"bottom"`
-	Select1   string          `toml:"select_1"`
-	Select2   string          `toml:"select_2"`
-	Select3   string          `toml:"select_3"`
-	Select4   string          `toml:"select_4"`
-	Select5   string          `toml:"select_5"`
-	Select6   string          `toml:"select_6"`
-	Select7   string          `toml:"select_7"`
-	Select8   string          `toml:"select_8"`
-	Select9   string          `toml:"select_9"`
-	Select0   string          `toml:"select_0"`
-	// Sessions maps a local session name to the letter alt opens it with in the picker. Other
-	// sessions get a free letter assigned once and kept.
+	// SessionPrefix is the key pressed before a session letter, or "alt" to hold alt with it.
+	SessionPrefix string `toml:"session_prefix"`
+	// AgentKeys are handed out in order to the agents of a focused session.
+	AgentKeys string `toml:"agent_keys"`
+	// Sessions maps a local session name to its letter in the picker. Other sessions get a free
+	// letter assigned once and kept.
 	Sessions map[string]string `toml:"sessions"`
 }
 
@@ -163,6 +157,7 @@ type SettingsConfig struct {
 	DisplayModes                 []string `toml:"display_modes"`
 	LogLevel                     string   `toml:"log_level"`
 	ShortcutStyle                string   `toml:"shortcut_style"`
+	SessionKeyAction             string   `toml:"session_key_action"`
 }
 
 type AutosaveConfig struct {
@@ -424,25 +419,17 @@ func DefaultConfig() *Config {
 		source: Source{Path: "", WithoutConfig: false, Input: ""},
 		Theme:  DefaultThemeConfig(),
 		Keys: KeyConfig{
-			Bind:      nil,
-			Help:      "?",
-			CycleMode: "ctrl+f",
-			AgentSort: "ctrl+s",
-			PageUp:    "pgup",
-			PageDown:  "pgdown",
-			Top:       "home",
-			Bottom:    "end",
-			Select1:   "ctrl+1",
-			Select2:   "ctrl+2",
-			Select3:   "ctrl+3",
-			Select4:   "ctrl+4",
-			Select5:   "ctrl+5",
-			Select6:   "ctrl+6",
-			Select7:   "ctrl+7",
-			Select8:   "ctrl+8",
-			Select9:   "ctrl+9",
-			Select0:   "ctrl+0",
-			Sessions:  nil,
+			Bind:          nil,
+			Help:          "?",
+			CycleMode:     "ctrl+f",
+			AgentSort:     "ctrl+s",
+			PageUp:        "pgup",
+			PageDown:      "pgdown",
+			Top:           "home",
+			Bottom:        "end",
+			SessionPrefix: "tab",
+			AgentKeys:     "asdfghjklqwertyuiopzxcvbnm",
+			Sessions:      nil,
 		},
 		Popup: PopupConfig{
 			SeshWidth:    "40%",
@@ -469,6 +456,7 @@ func DefaultConfig() *Config {
 			DisplayModes:                 []string{"sesh", "agents", "work"},
 			LogLevel:                     "info",
 			ShortcutStyle:                "none",
+			SessionKeyAction:             "focus",
 		},
 		Autosave: AutosaveConfig{
 			Enabled:            true,
