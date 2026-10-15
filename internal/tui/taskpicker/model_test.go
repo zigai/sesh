@@ -86,6 +86,32 @@ func TestTheTitleKeepsItsReadlineKeys(t *testing.T) {
 	}
 }
 
+func TestPasteInsertsIntoTheTaskTitleAtTheCursor(t *testing.T) {
+	model, started := compactModel(t, 1, "")
+
+	run(model, typed("fix issue")...)
+	run(model, ctrl('a'))
+	run(model, tea.PasteMsg{Content: "Please "}, key(tea.KeyEnter))
+
+	if len(started.choices) != 1 || started.choices[0].Title != "Please fix issue" {
+		t.Fatalf("started %+v, want the pasted title", started.choices)
+	}
+}
+
+func TestPasteFiltersTheTaskLocationsWithoutChangingTheTitle(t *testing.T) {
+	started := &starts{}
+	options := listOptions("", started.start)
+	options.Title = "Fix issue"
+	model := sized(options)
+
+	run(model, tea.PasteMsg{Content: "feature"}, key(tea.KeyEnter))
+
+	want := taskpicker.Choice{Harness: "pi", Title: "Fix issue", Location: featureBr}
+	if len(started.choices) != 1 || started.choices[0] != want {
+		t.Fatalf("started %+v, want %+v", started.choices, want)
+	}
+}
+
 func TestTheNewWorktreeLineNamesItsBranch(t *testing.T) {
 	model, _ := compactModel(t, 1, "")
 

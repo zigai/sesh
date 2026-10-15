@@ -2,7 +2,7 @@ package tui
 
 import tea "charm.land/bubbletea/v2"
 
-func (m *Model) handleSearchKeys(msg tea.KeyPressMsg) func() (tea.Model, tea.Cmd) {
+func (m *Model) handleSearchInput(msg tea.Msg) func() (tea.Model, tea.Cmd) {
 	previous := m.textInput.Value()
 
 	var tiCmd tea.Cmd

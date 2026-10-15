@@ -625,7 +625,7 @@ func (m *Model) handleKeyPressMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return cmd()
 		}
 
-		return m.handleSearchKeys(msg)()
+		return m.handleSearchInput(msg)()
 	}
 
 	if cmd := m.handleDialogKeys(msg); cmd != nil {
@@ -646,7 +646,7 @@ func (m *Model) handleKeyPressMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return cmd()
 	}
 
-	if cmd := m.handleSearchKeys(msg); cmd != nil {
+	if cmd := m.handleSearchInput(msg); cmd != nil {
 		return cmd()
 	}
 
@@ -678,11 +678,18 @@ func (m *Model) handleMouseMotionMsg(msg tea.MouseMotionMsg) (tea.Model, tea.Cmd
 }
 
 func (m *Model) updateTextInput(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
+	switch m.dialog {
+	case dialogInputText:
+		return m.handleTextDialogInput(msg)()
+	case dialogInputPath:
+		return m.handlePathDialogInput(msg)()
+	case dialogNone:
+		return m.handleSearchInput(msg)()
+	case dialogConfirm:
+		return m, nil
+	}
 
-	m.textInput, cmd = m.textInput.Update(msg)
-
-	return m, cmd
+	return m, nil
 }
 
 func (m *Model) handleTickModelMessage(msg tea.Msg) func() (tea.Model, tea.Cmd) {

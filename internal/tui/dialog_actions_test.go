@@ -153,7 +153,7 @@ func TestCreateDirDialogEditsDoNotChangeSearchInput(t *testing.T) {
 
 	cmdFn()
 
-	cmdFn = model.handlePathDialogKeys(keyText("x"))
+	cmdFn = model.handlePathDialogInput(keyText("x"))
 	if cmdFn == nil {
 		t.Fatal("handlePathDialogKeys(text) returned nil")
 	}
@@ -224,7 +224,7 @@ func TestSubmitCreateDirCreatesSessionWithEditedDirectory(t *testing.T) {
 		return nil
 	}
 
-	_, cmd := model.handlePathDialogKeys(keyCode(tea.KeyEnter))()
+	_, cmd := model.handlePathDialogInput(keyCode(tea.KeyEnter))()
 	trace := runActionTrace(t, model, cmd)
 
 	if trace.entered == nil || trace.entered.err != nil || !trace.entered.quit || trace.entered.deferred {
@@ -265,7 +265,7 @@ func TestSubmitCreateDirAllowsEmptyDirectory(t *testing.T) {
 		return nil
 	}
 
-	_, cmd := model.handlePathDialogKeys(keyCode(tea.KeyEnter))()
+	_, cmd := model.handlePathDialogInput(keyCode(tea.KeyEnter))()
 	trace := runActionTrace(t, model, cmd)
 
 	if trace.entered == nil || trace.entered.err != nil {
@@ -285,7 +285,7 @@ func TestCreateDirDialogCancelKeepsSearch(t *testing.T) {
 		model.pathInput.SetValue("/tmp")
 		model.pathSuggestions = []string{"/tmp/app/"}
 
-		cmdFn := model.handlePathDialogKeys(key)
+		cmdFn := model.handlePathDialogInput(key)
 		if cmdFn == nil {
 			t.Fatal("handlePathDialogKeys(cancel) returned nil")
 		}
@@ -322,7 +322,7 @@ func TestCreateDirDialogTabCompletesSuggestionAndRefreshesChildren(t *testing.T)
 		return cwd, nil
 	}
 
-	if cmd := model.handlePathDialogKeys(keyCode(tea.KeyTab)); cmd == nil {
+	if cmd := model.handlePathDialogInput(keyCode(tea.KeyTab)); cmd == nil {
 		t.Fatal("handlePathDialogKeys(tab) returned nil")
 	} else {
 		cmd()
@@ -353,7 +353,7 @@ func TestCreateDirDialogShiftTabCompletesPreviousSuggestion(t *testing.T) {
 	model.pathInput.SetValue("/work/")
 	model.pathSuggestions = []string{"/work/api/", "/work/web/"}
 
-	if cmd := model.handlePathDialogKeys(keyShiftTab()); cmd == nil {
+	if cmd := model.handlePathDialogInput(keyShiftTab()); cmd == nil {
 		t.Fatal("handlePathDialogKeys(shift+tab) returned nil")
 	} else {
 		cmd()
@@ -375,7 +375,7 @@ func TestCreateDirDialogArrowKeysSelectSuggestionAndTabCompletes(t *testing.T) {
 	model.pathInput.SetValue("/work/")
 	model.pathSuggestions = []string{"/work/api/", "/work/web/"}
 
-	if cmd := model.handlePathDialogKeys(keyCode(tea.KeyDown)); cmd == nil {
+	if cmd := model.handlePathDialogInput(keyCode(tea.KeyDown)); cmd == nil {
 		t.Fatal("handlePathDialogKeys(down) returned nil")
 	} else {
 		cmd()
@@ -389,7 +389,7 @@ func TestCreateDirDialogArrowKeysSelectSuggestionAndTabCompletes(t *testing.T) {
 		t.Fatalf("text input after down = %q, want unchanged path", got)
 	}
 
-	if cmd := model.handlePathDialogKeys(keyCode(tea.KeyTab)); cmd == nil {
+	if cmd := model.handlePathDialogInput(keyCode(tea.KeyTab)); cmd == nil {
 		t.Fatal("handlePathDialogKeys(tab) returned nil")
 	} else {
 		cmd()
@@ -403,7 +403,7 @@ func TestCreateDirDialogArrowKeysSelectSuggestionAndTabCompletes(t *testing.T) {
 		t.Fatalf("cursor after tab = %d, want end", got)
 	}
 
-	if cmd := model.handlePathDialogKeys(keyCode(tea.KeyUp)); cmd == nil {
+	if cmd := model.handlePathDialogInput(keyCode(tea.KeyUp)); cmd == nil {
 		t.Fatal("handlePathDialogKeys(up) returned nil")
 	} else {
 		cmd()
@@ -437,13 +437,13 @@ func TestCreateDirDialogEnterAppliesSelectedSuggestionBeforeSubmit(t *testing.T)
 		return nil
 	}
 
-	if cmd := model.handlePathDialogKeys(keyCode(tea.KeyDown)); cmd == nil {
+	if cmd := model.handlePathDialogInput(keyCode(tea.KeyDown)); cmd == nil {
 		t.Fatal("handlePathDialogKeys(down) returned nil")
 	} else {
 		cmd()
 	}
 
-	_, cmd := model.handlePathDialogKeys(keyCode(tea.KeyEnter))()
+	_, cmd := model.handlePathDialogInput(keyCode(tea.KeyEnter))()
 	trace := runActionTrace(t, model, cmd)
 
 	if trace.entered == nil || trace.entered.err != nil {
@@ -464,7 +464,7 @@ func TestCreateDirDialogSuggestionListScrolls(t *testing.T) {
 	model.pathSuggestions = []string{"/work/a/", "/work/b/", "/work/c/", "/work/d/", "/work/e/", "/work/f/", "/work/g/"}
 
 	for range 6 {
-		if cmd := model.handlePathDialogKeys(keyCode(tea.KeyDown)); cmd == nil {
+		if cmd := model.handlePathDialogInput(keyCode(tea.KeyDown)); cmd == nil {
 			t.Fatal("handlePathDialogKeys(down) returned nil")
 		} else {
 			cmd()
@@ -499,7 +499,7 @@ func TestCreateDirDialogSuggestionListUsesConfiguredVisibleCount(t *testing.T) {
 	model.pathSuggestions = []string{"/work/a/", "/work/b/", "/work/c/", "/work/d/", "/work/e/"}
 
 	for range 4 {
-		if cmd := model.handlePathDialogKeys(keyCode(tea.KeyDown)); cmd == nil {
+		if cmd := model.handlePathDialogInput(keyCode(tea.KeyDown)); cmd == nil {
 			t.Fatal("handlePathDialogKeys(down) returned nil")
 		} else {
 			cmd()
@@ -561,7 +561,7 @@ func TestCreateDirDialogCtrlWDeletesOnePathNode(t *testing.T) {
 		return cwd, nil
 	}
 
-	if cmd := model.handlePathDialogKeys(keyCtrl('w')); cmd == nil {
+	if cmd := model.handlePathDialogInput(keyCtrl('w')); cmd == nil {
 		t.Fatal("handlePathDialogKeys(ctrl+w) returned nil")
 	} else {
 		cmd()
@@ -578,13 +578,13 @@ func TestRenameDialogUsesCommonShellEditingKeys(t *testing.T) {
 	model.textParamInput.SetValue("alpha beta")
 	model.textParamInput.Focus()
 
-	if cmd := model.handleTextDialogKeys(keyCtrl('a')); cmd == nil {
+	if cmd := model.handleTextDialogInput(keyCtrl('a')); cmd == nil {
 		t.Fatal("handleTextDialogKeys(ctrl+a) returned nil")
 	} else {
 		cmd()
 	}
 
-	if cmd := model.handleTextDialogKeys(keyText("X")); cmd == nil {
+	if cmd := model.handleTextDialogInput(keyText("X")); cmd == nil {
 		t.Fatal("handleTextDialogKeys(rune) returned nil")
 	} else {
 		cmd()
@@ -594,13 +594,13 @@ func TestRenameDialogUsesCommonShellEditingKeys(t *testing.T) {
 		t.Fatalf("rename input after ctrl+a insert = %q, want Xalpha beta", got)
 	}
 
-	if cmd := model.handleTextDialogKeys(keyCtrl('e')); cmd == nil {
+	if cmd := model.handleTextDialogInput(keyCtrl('e')); cmd == nil {
 		t.Fatal("handleTextDialogKeys(ctrl+e) returned nil")
 	} else {
 		cmd()
 	}
 
-	if cmd := model.handleTextDialogKeys(keyCtrl('w')); cmd == nil {
+	if cmd := model.handleTextDialogInput(keyCtrl('w')); cmd == nil {
 		t.Fatal("handleTextDialogKeys(ctrl+w) returned nil")
 	} else {
 		cmd()
@@ -611,13 +611,86 @@ func TestRenameDialogUsesCommonShellEditingKeys(t *testing.T) {
 	}
 }
 
+func TestPasteEditsTheTextPromptWithoutChangingSearch(t *testing.T) {
+	model := newTestModel()
+	t.Cleanup(model.Close)
+	model.textInput.SetValue(testSupportSessionProjectName)
+	model.filtered = []session.Session{{Name: testSupportSessionProjectName, Kind: session.KindLive}}
+
+	handler := model.invokeAction(action.SessionRename.ID, nil)
+	if handler == nil {
+		t.Fatal("rename did not open a prompt")
+	}
+
+	handler()
+
+	model.Update(tea.PasteMsg{Content: "renamed"})
+
+	if got := model.textParamInput.Value(); got != "renamed" {
+		t.Fatalf("rename input = %q, want renamed", got)
+	}
+
+	if got := model.textInput.Value(); got != testSupportSessionProjectName {
+		t.Fatalf("search input = %q, want preserved project query", got)
+	}
+}
+
+func TestPasteEditsTheDirectoryPromptAndRefreshesSuggestions(t *testing.T) {
+	model := newTestModel()
+	t.Cleanup(model.Close)
+	model.textInput.SetValue(testSupportSessionProjectName)
+
+	cwd := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(cwd, "work", "api"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	dependenciesForTest(model).GetWorkingDirectory = func() (string, error) { return cwd, nil }
+
+	handler := model.invokeAction(action.SessionCreate.ID, nil)
+	if handler == nil {
+		t.Fatal("create did not open a prompt")
+	}
+
+	handler()
+	model.Update(keyCtrl('u'))
+	model.Update(tea.PasteMsg{Content: "work/"})
+
+	if got := model.pathInput.Value(); got != "work/" {
+		t.Fatalf("directory input = %q, want work/", got)
+	}
+
+	want := filepath.Join("work", "api") + string(os.PathSeparator)
+	if len(model.pathSuggestions) != 1 || model.pathSuggestions[0] != want {
+		t.Fatalf("directory suggestions = %v, want %q", model.pathSuggestions, want)
+	}
+
+	if got := model.textInput.Value(); got != testSupportSessionProjectName {
+		t.Fatalf("search input = %q, want preserved project query", got)
+	}
+}
+
+func TestPasteDoesNotEditSearchBehindAConfirmation(t *testing.T) {
+	model := newTestModel()
+	t.Cleanup(model.Close)
+	model.textInput.SetValue(testSupportSessionProjectName)
+	model.filtered = []session.Session{{Name: testSupportSessionProjectName, Kind: session.KindLive}}
+	openTestKillConfirm(model)
+
+	model.Update(tea.PasteMsg{Content: "ignored"})
+
+	if got := model.textInput.Value(); got != testSupportSessionProjectName {
+		t.Fatalf("search input = %q, want preserved project query", got)
+	}
+}
+
 func TestRenameDialogCtrlCCancels(t *testing.T) {
 	model := newTestModel()
 	model.dialog = dialogInputText
 	model.textParamInput.SetValue("renamed")
 	model.textParamInput.Focus()
 
-	handler := model.handleTextDialogKeys(keyCtrl('c'))
+	handler := model.handleTextDialogInput(keyCtrl('c'))
 	if handler == nil {
 		t.Fatal("handleTextDialogKeys(ctrl+c) returned nil")
 	}

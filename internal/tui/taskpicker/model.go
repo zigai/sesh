@@ -196,6 +196,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.wheel(msg.Mouse())
 	case tea.MouseClickMsg:
 		m.click(msg.Mouse())
+	default:
+		if m.stage == stagePicking {
+			return m.updateInput(msg)
+		}
 	}
 
 	return m, nil
@@ -229,6 +233,10 @@ func (m *Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	return m.updateInput(msg)
+}
+
+func (m *Model) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.focus == fieldList {
 		return m, m.updateFilter(msg)
 	}
@@ -256,7 +264,7 @@ func (m *Model) moveVertically(key string) {
 }
 
 // updateFilter edits the list's filter.
-func (m *Model) updateFilter(msg tea.KeyPressMsg) tea.Cmd {
+func (m *Model) updateFilter(msg tea.Msg) tea.Cmd {
 	before := m.filter.Value()
 	filter, cmd := m.filter.Update(msg)
 	m.filter = filter

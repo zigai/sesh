@@ -16,10 +16,10 @@ func (m *Model) handleDialogKeys(msg tea.KeyPressMsg) func() (tea.Model, tea.Cmd
 		return m.handleConfirmKeys(msg)
 
 	case dialogInputText:
-		return m.handleTextDialogKeys(msg)
+		return m.handleTextDialogInput(msg)
 
 	case dialogInputPath:
-		return m.handlePathDialogKeys(msg)
+		return m.handlePathDialogInput(msg)
 
 	case dialogNone:
 		return nil
@@ -57,61 +57,65 @@ func (m *Model) handleConfirmKeys(msg tea.KeyPressMsg) func() (tea.Model, tea.Cm
 	}
 }
 
-func (m *Model) handleTextDialogKeys(msg tea.KeyPressMsg) func() (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "enter":
-		return m.submitParam(m.textParamInput.Value())
-	case "esc", "ctrl+c":
-		return m.cancelAction()
-	default:
-		var cmd tea.Cmd
-
-		m.textParamInput, cmd = m.textParamInput.Update(msg)
-
-		return func() (tea.Model, tea.Cmd) { return m, cmd }
+func (m *Model) handleTextDialogInput(msg tea.Msg) func() (tea.Model, tea.Cmd) {
+	if key, ok := msg.(tea.KeyPressMsg); ok {
+		switch key.String() {
+		case "enter":
+			return m.submitParam(m.textParamInput.Value())
+		case "esc", "ctrl+c":
+			return m.cancelAction()
+		}
 	}
+
+	var cmd tea.Cmd
+
+	m.textParamInput, cmd = m.textParamInput.Update(msg)
+
+	return func() (tea.Model, tea.Cmd) { return m, cmd }
 }
 
-func (m *Model) handlePathDialogKeys(msg tea.KeyPressMsg) func() (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "enter":
-		m.applySelectedPathSuggestion()
+func (m *Model) handlePathDialogInput(msg tea.Msg) func() (tea.Model, tea.Cmd) {
+	if key, ok := msg.(tea.KeyPressMsg); ok {
+		switch key.String() {
+		case "enter":
+			m.applySelectedPathSuggestion()
 
-		return m.submitParam(m.pathInput.Value())
-	case "esc", "ctrl+c":
-		return m.cancelAction()
-	case "tab":
-		m.completePath(1)
+			return m.submitParam(m.pathInput.Value())
+		case "esc", "ctrl+c":
+			return m.cancelAction()
+		case "tab":
+			m.completePath(1)
 
-		return func() (tea.Model, tea.Cmd) { return m, nil }
-	case "shift+tab":
-		m.completePath(-1)
+			return func() (tea.Model, tea.Cmd) { return m, nil }
+		case "shift+tab":
+			m.completePath(-1)
 
-		return func() (tea.Model, tea.Cmd) { return m, nil }
-	case "down", "ctrl+n":
-		m.movePathSuggestion(1)
+			return func() (tea.Model, tea.Cmd) { return m, nil }
+		case "down", "ctrl+n":
+			m.movePathSuggestion(1)
 
-		return func() (tea.Model, tea.Cmd) { return m, nil }
-	case "up", "ctrl+p":
-		m.movePathSuggestion(-1)
+			return func() (tea.Model, tea.Cmd) { return m, nil }
+		case "up", "ctrl+p":
+			m.movePathSuggestion(-1)
 
-		return func() (tea.Model, tea.Cmd) { return m, nil }
-	case "ctrl+w", "alt+backspace":
-		m.deletePathInputNodeBackward()
+			return func() (tea.Model, tea.Cmd) { return m, nil }
+		case "ctrl+w", "alt+backspace":
+			m.deletePathInputNodeBackward()
 
-		return func() (tea.Model, tea.Cmd) { return m, nil }
-	default:
-		previous := m.pathInput.Value()
-
-		var cmd tea.Cmd
-
-		m.pathInput, cmd = m.pathInput.Update(msg)
-		if m.pathInput.Value() != previous {
-			m.refreshPathSuggestions()
+			return func() (tea.Model, tea.Cmd) { return m, nil }
 		}
-
-		return func() (tea.Model, tea.Cmd) { return m, cmd }
 	}
+
+	previous := m.pathInput.Value()
+
+	var cmd tea.Cmd
+
+	m.pathInput, cmd = m.pathInput.Update(msg)
+	if m.pathInput.Value() != previous {
+		m.refreshPathSuggestions()
+	}
+
+	return func() (tea.Model, tea.Cmd) { return m, cmd }
 }
 
 func (m *Model) completePath(direction int) {
