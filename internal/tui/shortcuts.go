@@ -42,7 +42,7 @@ func (m *Model) handleActionKeys(msg tea.KeyPressMsg) func() (tea.Model, tea.Cmd
 		}
 	}
 
-	return nil
+	return m.handleSessionKey(pressed)
 }
 
 func (m *Model) handleDisplayActionKeys(
@@ -133,35 +133,33 @@ func (m *Model) visibleSessionShortcutSlot(
 }
 
 func (m *Model) visibleShortcutRows() []popupListRow {
-	if !m.displayMode.tree() {
-		height := m.calcPopupLayout(m.hasRenderedStatus()).listHeight
-
-		return m.visibleListRows(height)
+	if m.shortcutRowsRendered {
+		return m.shortcutRows
 	}
 
+	height := m.calcPopupLayout(m.hasRenderedStatus()).listHeight
+
+	return m.collectShortcutRows(m.visibleListRows(height))
+}
+
+func (m *Model) collectShortcutRows(visible []popupListRow) []popupListRow {
 	m.shortcutRows = m.shortcutRows[:0]
-	if m.cursor < 0 || m.cursor >= len(m.filtered) {
-		return m.shortcutRows
-	}
-
-	selectedSession := m.filtered[m.cursor]
-	if len(selectedSession.Agents) == 0 {
-		m.shortcutRows = append(m.shortcutRows, popupListRow{
-			sessionIndex: m.cursor,
-			agentIndex:   parentAgentIndex,
-		})
-
-		return m.shortcutRows
-	}
-
-	for agentIndex := range selectedSession.Agents {
-		m.shortcutRows = append(m.shortcutRows, popupListRow{
-			sessionIndex: m.cursor,
-			agentIndex:   agentIndex,
-		})
+	for _, row := range visible {
+		if m.shortcutTarget(row) {
+			m.shortcutRows = append(m.shortcutRows, row)
+		}
 	}
 
 	return m.shortcutRows
+}
+
+func (m *Model) shortcutTarget(row popupListRow) bool {
+	if row.isSeparator() || row.sessionIndex < 0 || row.sessionIndex >= len(m.filtered) {
+		return false
+	}
+
+	// In tree modes sessions are opened by their letter keys, so numbers go to agents only.
+	return row.isAgent() || !m.displayMode.tree()
 }
 
 func (m *Model) visibleSessionShortcutLabel() string {

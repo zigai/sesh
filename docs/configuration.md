@@ -34,7 +34,7 @@ directory_suggestions = 5
 default_session_path_suggestion = "~/Projects/{session}"
 display_modes = ["sesh", "agents", "work"]
 log_level = "info" # trace, debug, info, warn, error, disabled
-shortcut_style = "none" # none, indent, right
+shortcut_style = "none" # none, indent (agent numbers and session keys on the left), right
 
 [popup]
 sesh_width = "40%"
@@ -100,6 +100,9 @@ process_environment = ["PATH", "VIRTUAL_ENV", "CONDA_PREFIX", "CONDA_DEFAULT_ENV
 help = "?"
 cycle_mode = "ctrl+f"
 agent_sort = "ctrl+s"
+
+[keys.sessions] # alt+letter opens a session; other sessions get a free letter assigned once and kept
+dotfiles = "d"
 
 [theme]
 preset = "dracula" # dracula, catppuccin, catppuccin-latte, tokyo-night, gruvbox, nord, terminal

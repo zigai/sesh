@@ -433,6 +433,10 @@ func keyBindings(cfg *config.Config) ([]keyBindingJSON, error) {
 		{Name: "select_0", Bind: keys.Select0},
 	}
 
+	for name, letter := range keys.Sessions {
+		bindings = append(bindings, keyBindingJSON{Name: "sessions." + name, Bind: config.PickerSessionKey(letter)})
+	}
+
 	actions, err := action.Bindings(cfg)
 	if err != nil {
 		return nil, err

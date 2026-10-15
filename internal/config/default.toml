@@ -25,7 +25,8 @@
 # Logging level (debug, info, warn, error, disabled).
 # log_level = "info"
 
-# Shortcut number display style in the popup: "none" (default), "indent", or "right".
+# Shortcut display style in the popup: "none" (default), "indent" (agent numbers and session
+# keys left of each row), or "right".
 # shortcut_style = "none"
 
 # Preferred popup dimensions. Values are terminal cells ("80"), percentages ("50%"), or "auto".
@@ -209,6 +210,9 @@
 # select_8 = "ctrl+8"
 # select_9 = "ctrl+9"
 # select_0 = "ctrl+0"
+
+# Session keys: alt with a letter opens a session. Sessions get a free letter assigned once and
+# kept; a [keys.sessions] table picks the letter for a local session, as in dotfiles = "d".
 
 # TUI colors. Hex values and terminal color names are accepted.
 [theme]

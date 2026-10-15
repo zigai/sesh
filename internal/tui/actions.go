@@ -456,11 +456,7 @@ func (m *Model) handleEnter() func() (tea.Model, tea.Cmd) {
 		return m.handleRemoteEnter(selectedSession, selected)
 	}
 
-	if selectedSession.Origin == session.OriginBridge {
-		return m.runAction(action.SessionSwitch, action.SubjectOf(selectedSession), action.Values{})
-	}
-
-	if selected.isAgent() {
+	if selected.isAgent() && selectedSession.Origin != session.OriginBridge {
 		agent := selectedSession.Agents[selected.agentIndex]
 
 		return func() (tea.Model, tea.Cmd) {
@@ -468,12 +464,24 @@ func (m *Model) handleEnter() func() (tea.Model, tea.Cmd) {
 		}
 	}
 
+	return m.openSession(selectedSession)
+}
+
+func (m *Model) openSession(target session.Session) func() (tea.Model, tea.Cmd) {
+	switch target.Origin {
+	case session.OriginSSH:
+		return m.handleRemoteEnter(target, popupListRow{sessionIndex: 0, agentIndex: parentAgentIndex})
+	case session.OriginBridge:
+		return m.runAction(action.SessionSwitch, action.SubjectOf(target), action.Values{})
+	case session.OriginLocal:
+	}
+
 	return func() (tea.Model, tea.Cmd) {
-		if selectedSession.Saved() {
-			return m.runAction(action.SnapshotRestore, action.SubjectOf(selectedSession), action.Values{})()
+		if target.Saved() {
+			return m.runAction(action.SnapshotRestore, action.SubjectOf(target), action.Values{})()
 		}
 
-		return m, m.runLiveSessionAction(selectedSession)
+		return m, m.runLiveSessionAction(target)
 	}
 }
 

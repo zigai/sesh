@@ -3,7 +3,9 @@ package config
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -34,6 +36,7 @@ var (
 	errFieldNameInvalid                     = errors.New("field names may only contain a-z, 0-9 and _")
 	errFieldRefreshInvalid                  = errors.New("refresh must be a positive duration")
 	errDuplicateKeyBinding                  = errors.New("duplicate key binding")
+	errInvalidSessionKey                    = errors.New("invalid session key")
 	errDisplayModesEmpty                    = errors.New("display modes cannot be empty")
 	errDisplayModeInvalid                   = errors.New("invalid display mode")
 	errDisplayModeDuplicate                 = errors.New("duplicate display mode")
@@ -391,7 +394,7 @@ func ValidateKeyConfig(keys KeyConfig) error {
 		seen[normalized] = entry.name
 	}
 
-	return nil
+	return validateSessionKeys(keys.Sessions, seen)
 }
 
 func ValidStatusTimeFormat(format string) bool {
@@ -739,4 +742,22 @@ func validatePositiveDuration(label, raw string, errNotPositive error) (time.Dur
 	}
 
 	return dur, nil
+}
+
+func validateSessionKeys(sessions map[string]string, seen map[string]string) error {
+	for _, name := range slices.Sorted(maps.Keys(sessions)) {
+		letter := sessions[name]
+		if name == "" || !ValidSessionKey(letter) {
+			return fmt.Errorf("%w: sessions.%q = %q must be one lowercase letter", errInvalidSessionKey, name, letter)
+		}
+
+		key := PickerKeyName(PickerSessionKey(letter))
+		if previous, exists := seen[key]; exists {
+			return fmt.Errorf("%w: %s and sessions.%q both use %q", errDuplicateKeyBinding, previous, name, key)
+		}
+
+		seen[key] = fmt.Sprintf("sessions.%q", name)
+	}
+
+	return nil
 }

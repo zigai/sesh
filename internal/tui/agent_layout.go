@@ -358,7 +358,7 @@ func (m *Model) agentCellRole(row session.Session, agent session.AgentSession, p
 		return "status_" + string(agent.Status.DisplayStatus())
 	case display.FieldTree, display.FieldTreeBranch, display.FieldTreeIndent:
 		return "tree"
-	case display.FieldShortcut, display.FieldShortcutBadge:
+	case display.FieldShortcut, display.FieldShortcutBadge, display.FieldSessionKey:
 		return "muted"
 	case display.FieldAgentGitAdded, display.FieldAgentGitDeleted,
 		display.FieldAgentGitAhead, display.FieldAgentGitBehind:

@@ -52,6 +52,7 @@ func (m *Model) helpBindings(keys actionKeyMap) []helpBinding {
 		{keys.top.Help().Key + "/" + keys.bottom.Help().Key, "Jump to top/bottom"},
 		{keys.enter.Help().Key, keys.enter.Help().Desc},
 		{m.visibleSessionShortcutLabel(), "Open visible session or agent by slot"},
+		{sessionKeyFooterKey, "Open session by its key"},
 	}
 
 	if m.showsDisplayModeIndicator() {

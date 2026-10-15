@@ -764,8 +764,8 @@ func TestRenderListDisplaysShortcutStyleIndent(t *testing.T) {
 		t.Fatalf("agent 1 line = %q, want '   2 '", lines[2][:6])
 	}
 
-	if !strings.HasPrefix(lines[4], "     ") {
-		t.Fatalf("inactive agent line = %q, want 5 spaces", lines[4][:5])
+	if !strings.HasPrefix(lines[4], "   3 ") {
+		t.Fatalf("other session agent line = %q, want '   3 '", lines[4][:5])
 	}
 }
 
