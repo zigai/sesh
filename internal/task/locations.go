@@ -141,7 +141,7 @@ func (s *Service) Offer(ctx context.Context, place Place, describe bool) (Offer,
 
 	offer.Current = currentCheckout(offer.Locations, place.Dir)
 
-	if len(offer.Locations) > 0 && offer.Locations[0].Where == WhereNew && s.worktreeDir != "" {
+	if len(offer.Locations) > 0 && offer.Locations[0].Where == WhereNew {
 		offer.NextNumber, _, err = s.freeNumber(ctx, p, offer.Locations[0].Branch, state.LastNumber)
 		if err != nil {
 			return offer, taskError("offer_task", err)

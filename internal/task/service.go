@@ -41,12 +41,11 @@ const (
 )
 
 var (
-	ErrWorktreeDirUnset = errors.New("WORKTREE_DIR is not set; task worktrees are created under it")
-	ErrUnknownHarness   = errors.New("harness is not offered for tasks")
-	ErrNoBaseBranch     = errors.New("project has no default branch to start a task from")
-	ErrNoFreeNumber     = errors.New("no free task number for project")
-	ErrPaneNotFound     = errors.New("pane not found")
-	ErrDefaultShell     = errors.New("tmux default-shell is not set")
+	ErrUnknownHarness = errors.New("harness is not offered for tasks")
+	ErrNoBaseBranch   = errors.New("project has no default branch to start a task from")
+	ErrNoFreeNumber   = errors.New("no free task number for project")
+	ErrPaneNotFound   = errors.New("pane not found")
+	ErrDefaultShell   = errors.New("tmux default-shell is not set")
 )
 
 // Place is where a task command was invoked: the pane, its session and directory, the project of
@@ -257,10 +256,6 @@ func (s *Service) startLoose(ctx context.Context, place Place, request Request, 
 // local branch tracking it, which sesh then owns.
 func (s *Service) reserveProjectTask(ctx context.Context, p project.Project, request Request, location Location, local []string) (Record, error) {
 	creates := location.Where == WhereNew || location.Where == WhereBranch
-	if creates && s.worktreeDir == "" {
-		return Record{}, ErrWorktreeDirUnset
-	}
-
 	base := ""
 
 	if p.Kind == project.KindGit {

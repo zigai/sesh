@@ -371,7 +371,7 @@ func newSleepFixture(t *testing.T) sleepFixture {
 func newSleepFixtureWith(t *testing.T, prepare func(dir string)) sleepFixture {
 	t.Helper()
 
-	f := newFixture(t, true)
+	f := newFixture(t)
 	harness := filepath.Join(f.base, "bin", fakeHarnessName)
 	mkdir(t, filepath.Dir(harness))
 

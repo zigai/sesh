@@ -59,7 +59,6 @@ var classifications = []classification{
 	{gotmux.ErrNoServer, action.CodeUnavailable},
 	{engine.ErrNoServerRunning, action.CodeUnavailable},
 	{gotmux.ErrNotFound, action.CodeNotFound},
-	{task.ErrWorktreeDirUnset, action.CodeUnavailable},
 	{task.ErrUnknownHarness, action.CodeInvalidArgument},
 	{task.ErrNoBaseBranch, action.CodeConflict},
 	{task.ErrNoFreeNumber, action.CodeConflict},

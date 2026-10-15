@@ -45,8 +45,7 @@ func TestTaskFailuresKeepLedgerUncertainty(t *testing.T) {
 		err  error
 		want action.Code
 	}{
-		{"failed start with an uncertain failure record", errors.Join(task.ErrWorktreeDirUnset, task.ErrUncertain), action.CodeUncertain},
-		{"missing worktree directory", fmt.Errorf("start: %w", task.ErrWorktreeDirUnset), action.CodeUnavailable},
+		{"failed start with an uncertain failure record", errors.Join(task.ErrNoBaseBranch, task.ErrUncertain), action.CodeUncertain},
 		{"name held by another session", fmt.Errorf("open: %w", project.ErrNameTaken), action.CodeAlreadyExists},
 	} {
 		t.Run(test.name, func(t *testing.T) {

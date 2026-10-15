@@ -233,7 +233,7 @@
 # extra = []
 
 # Task windows: the agent and the panes beside it, one popup terminal per task.
-# Task worktrees are created under $WORKTREE_DIR/<project>/.
+# Task worktrees are created under $WORKTREE_DIR/<project>/, or ~/Worktrees/<project>/.
 [tasks]
 
 # Panes a task window opens beside the agent. Commands run in your interactive shell in the

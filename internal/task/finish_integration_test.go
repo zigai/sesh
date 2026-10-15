@@ -371,7 +371,7 @@ func newFinishFixture(t *testing.T) *finishFixture {
 	t.Helper()
 
 	f := &finishFixture{
-		fixture: newFixture(t, true), prs: &pullRequests{pr: task.PullRequest{Number: 0, State: "", URL: ""}, head: "", found: false, err: nil},
+		fixture: newFixture(t), prs: &pullRequests{pr: task.PullRequest{Number: 0, State: "", URL: ""}, head: "", found: false, err: nil},
 		closed: nil, record: task.EmptyRecord(), repo: "",
 	}
 

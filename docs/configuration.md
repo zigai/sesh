@@ -22,7 +22,7 @@ Override via environment: `SESH_<SECTION>_<KEY>`, for example `SESH_SETTINGS_LOG
 | Logs | `$XDG_STATE_HOME/sesh/sesh.log` |
 | History | `$XDG_STATE_HOME/sesh/history.json` |
 | Tasks | `$XDG_STATE_HOME/sesh/tasks.json` |
-| Task worktrees | `$WORKTREE_DIR/<project>/` |
+| Task worktrees | `$WORKTREE_DIR/<project>/`, else `~/Worktrees/<project>/` |
 | Custom field cache | `$XDG_CACHE_HOME/sesh/fields` |
 
 ## Default configuration

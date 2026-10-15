@@ -44,7 +44,7 @@ type fixture struct {
 }
 
 func TestStartCreatesAProjectTaskInItsOwnWorktreeAndWindow(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
 	place := projectPlace(t, f, repo)
 
@@ -100,7 +100,7 @@ func TestStartCreatesAProjectTaskInItsOwnWorktreeAndWindow(t *testing.T) {
 }
 
 func TestReopenRebuildsALostTaskWindow(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
 	place := projectPlace(t, f, repo)
 
@@ -126,7 +126,7 @@ func TestReopenRebuildsALostTaskWindow(t *testing.T) {
 }
 
 func TestReopenResumesASleepingTasksAgent(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	dir := mkdir(t, filepath.Join(f.base, "scratch"))
 	resumed := filepath.Join(f.base, "resumed")
 	place := scratchPlace(t, f, dir)
@@ -157,7 +157,7 @@ func TestReopenResumesASleepingTasksAgent(t *testing.T) {
 }
 
 func TestReopenRefusesATaskWhoseDirectoryIsGone(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	dir := mkdir(t, filepath.Join(f.base, "scratch"))
 	place := scratchPlace(t, f, dir)
 
@@ -191,7 +191,7 @@ func closeTaskWindow(t *testing.T, f fixture, session gotmux.SessionID, id strin
 }
 
 func TestStartSkipsTaskNumbersWhoseBranchOrDirectoryExists(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
 	runGit(t, repo, "branch", "wt/main/1")
 	mkdir(t, filepath.Join(f.worktreeDir, "shop", "main-2"))
@@ -212,21 +212,8 @@ func TestStartSkipsTaskNumbersWhoseBranchOrDirectoryExists(t *testing.T) {
 	}
 }
 
-func TestStartWithoutWorktreeDirCreatesNothing(t *testing.T) {
-	f := newFixture(t, false)
-	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
-	place := projectPlace(t, f, repo)
-
-	_, err := f.service.Start(t.Context(), place, inNewWorktree(envHarness))
-	if !errors.Is(err, task.ErrWorktreeDirUnset) {
-		t.Fatalf("Start() error = %v, want ErrWorktreeDirUnset", err)
-	}
-
-	assertNoTasks(t, f, place)
-}
-
 func TestStartRejectsAHarnessThatIsNotOffered(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
 	place := projectPlace(t, f, repo)
 
@@ -239,7 +226,7 @@ func TestStartRejectsAHarnessThatIsNotOffered(t *testing.T) {
 }
 
 func TestStartRecordsAFailedTaskWhenTheWorktreeCannotBeCreated(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	repo := mkdir(t, filepath.Join(f.base, "code", "empty"))
 	runGit(t, repo, "init", "-q", "-b", "main")
 	place := projectPlace(t, f, repo)
@@ -264,7 +251,7 @@ func TestStartRecordsAFailedTaskWhenTheWorktreeCannotBeCreated(t *testing.T) {
 }
 
 func TestStartOutsideAProjectCreatesALooseTaskNextToTheCurrentWindow(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	dir := mkdir(t, filepath.Join(f.base, "scratch"))
 	session := newSession(t, f.server, "scratch", dir)
 
@@ -307,7 +294,7 @@ func TestStartOutsideAProjectCreatesALooseTaskNextToTheCurrentWindow(t *testing.
 }
 
 func TestOfferListsEveryCheckoutAndBranchAndMarksTheOnesTasksUse(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
 	hand := filepath.Join(f.base, "hand")
 	gone := filepath.Join(f.base, "gone")
@@ -358,7 +345,7 @@ func TestOfferListsEveryCheckoutAndBranchAndMarksTheOnesTasksUse(t *testing.T) {
 }
 
 func TestOfferDescribesEachBranchNewestFirst(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
 
 	runGit(t, repo, "switch", "-q", "-c", "older")
@@ -408,7 +395,7 @@ func localBranches(locations []task.Location) []string {
 }
 
 func TestChangesCountsTheLinesEachCheckoutsChangesAddAndDelete(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
 	notes := filepath.Join(repo, "notes.txt")
 
@@ -440,7 +427,7 @@ func writeFile(t *testing.T, path, content string) {
 }
 
 func TestOfferStartsANewWorktreeFromTheBranchThePaneIsOn(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
 	hand := filepath.Join(f.base, "hand")
 	runGit(t, repo, "worktree", "add", "-q", "-b", "hand", hand)
@@ -462,7 +449,7 @@ func TestOfferStartsANewWorktreeFromTheBranchThePaneIsOn(t *testing.T) {
 }
 
 func TestOutsideARepositoryOfferHasNoProject(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	initRepository(t, filepath.Join(f.base, "code", "shop"))
 	dir := mkdir(t, filepath.Join(f.base, "scratch"))
 	session := newSession(t, f.server, "scratch", dir)
@@ -478,7 +465,7 @@ func TestOutsideARepositoryOfferHasNoProject(t *testing.T) {
 }
 
 func TestInARepositoryOutsideAProjectSessionOfferIsTheRepositorys(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
 	session := newSession(t, f.server, "work", repo)
 
@@ -493,7 +480,7 @@ func TestInARepositoryOutsideAProjectSessionOfferIsTheRepositorys(t *testing.T) 
 }
 
 func TestInARepositoryOutsideAProjectSessionATaskGetsAWorktreeNextToTheCurrentWindow(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
 	session := newSession(t, f.server, "work", repo)
 
@@ -532,7 +519,7 @@ func TestInARepositoryOutsideAProjectSessionATaskGetsAWorktreeNextToTheCurrentWi
 }
 
 func TestStartWithATitleNamesTheTaskAndBranchAndPromptsTheAgent(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
 	place := projectPlace(t, f, repo)
 	request := task.Request{Harness: promptedHarness, Title: "Fix login: redirect!", Location: task.Location{Where: task.WhereNew}}
@@ -565,7 +552,7 @@ func TestStartWithATitleNamesTheTaskAndBranchAndPromptsTheAgent(t *testing.T) {
 }
 
 func TestStartRunsTheHarnessInTheUserShellWithItsFunctions(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
 
 	bash, err := exec.LookPath("bash")
@@ -602,7 +589,7 @@ func TestStartRunsTheHarnessInTheUserShellWithItsFunctions(t *testing.T) {
 }
 
 func TestStartWithoutATitlePassesNoPrompt(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
 
 	if _, err := f.service.Start(t.Context(), projectPlace(t, f, repo), inNewWorktree(promptedHarness)); err != nil {
@@ -615,7 +602,7 @@ func TestStartWithoutATitlePassesNoPrompt(t *testing.T) {
 }
 
 func TestStartANewWorktreeFromAnotherBranch(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
 	runGit(t, repo, "switch", "-q", "-c", "feature")
 	runGit(t, repo, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-q", "--allow-empty", "-m", "feature work")
@@ -639,7 +626,7 @@ func TestStartANewWorktreeFromAnotherBranch(t *testing.T) {
 }
 
 func TestStartFromARemoteBranchCreatesALocalBranchTrackingIt(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
 	addRemoteBranch(t, f.base, repo, "review")
 	place := projectPlace(t, f, repo)
@@ -669,7 +656,7 @@ func TestStartFromARemoteBranchCreatesALocalBranchTrackingIt(t *testing.T) {
 }
 
 func TestStartInAnExistingCheckoutLeavesGitAloneAndTakesTheCheckout(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
 	hand := filepath.Join(f.base, "hand")
 	runGit(t, repo, "worktree", "add", "-q", "-b", "hand", hand)
@@ -706,7 +693,7 @@ func TestStartInAnExistingCheckoutLeavesGitAloneAndTakesTheCheckout(t *testing.T
 }
 
 func TestStartFromABranchChecksItOutInANewWorktree(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
 	runGit(t, repo, "branch", "feature")
 	place := projectPlace(t, f, repo)
@@ -733,7 +720,7 @@ func TestStartFromABranchChecksItOutInANewWorktree(t *testing.T) {
 }
 
 func TestStartRefusesALocationTheProjectDoesNotOffer(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
 	place := projectPlace(t, f, repo)
 
@@ -752,7 +739,7 @@ func TestStartRefusesALocationTheProjectDoesNotOffer(t *testing.T) {
 }
 
 func TestOfferKeepsTheHarnessOrder(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
 
 	offer, err := f.service.Offer(t.Context(), projectPlace(t, f, repo), false)
@@ -771,7 +758,7 @@ func TestOfferKeepsTheHarnessOrder(t *testing.T) {
 }
 
 func TestOpenTabOpensAPlainWindowInThePaneDirectory(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	dir := mkdir(t, filepath.Join(f.base, "scratch"))
 	session := newSession(t, f.server, "scratch", dir)
 	place := locate(t, f, sessionWindows(t, f.server, session.ID())[0].Window())
@@ -795,7 +782,7 @@ func inNewWorktree(harness string) task.Request {
 	return task.Request{Harness: harness, Location: task.Location{Where: task.WhereNew}}
 }
 
-func newFixture(t *testing.T, withWorktreeDir bool) fixture {
+func newFixture(t *testing.T) fixture {
 	t.Helper()
 
 	base := realTempDir(t)
@@ -804,10 +791,7 @@ func newFixture(t *testing.T, withWorktreeDir bool) fixture {
 	envFile := filepath.Join(base, "agent-env")
 	promptFile := filepath.Join(base, "agent-prompt")
 
-	worktreeDir := ""
-	if withWorktreeDir {
-		worktreeDir = filepath.Join(base, "worktrees")
-	}
+	worktreeDir := filepath.Join(base, "worktrees")
 
 	catalog, err := project.NewCatalog(config.ProjectsConfig{Roots: []string{filepath.Join(base, "code")}, Extra: nil, Overrides: nil})
 	if err != nil {

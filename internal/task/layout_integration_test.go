@@ -20,7 +20,7 @@ import (
 type rect struct{ left, top, width, height int }
 
 func TestSplitsLayoutPlacesEachPaneWhereItsSplitPutsIt(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	dir := mkdir(t, filepath.Join(f.base, "scratch"))
 	mkdir(t, filepath.Join(dir, "docs"))
 
@@ -77,7 +77,7 @@ func TestSplitsLayoutPlacesEachPaneWhereItsSplitPutsIt(t *testing.T) {
 }
 
 func TestStartTakesTheFirstLayoutTheWindowAndHarnessFit(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	dir := mkdir(t, filepath.Join(f.base, "scratch"))
 	f.cfg.Tasks.Layouts = []config.TaskLayoutConfig{
 		{Name: "huge", When: config.TaskLayoutWhen{MinWidth: 1000}, Arrange: "even-horizontal"},
@@ -114,7 +114,7 @@ func TestStartTakesTheFirstLayoutTheWindowAndHarnessFit(t *testing.T) {
 }
 
 func TestMainSizeSetsTheAgentsShareOfAnArrangement(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	dir := mkdir(t, filepath.Join(f.base, "scratch"))
 	f.cfg.Tasks.Layouts = []config.TaskLayoutConfig{{Arrange: config.ArrangeMainVertical, MainSize: "60%"}}
 
@@ -131,7 +131,7 @@ func TestMainSizeSetsTheAgentsShareOfAnArrangement(t *testing.T) {
 }
 
 func TestRelayoutFitsTheWindowsNewSizeAndReopensClosedPanes(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	dir := mkdir(t, filepath.Join(f.base, "scratch"))
 	place := scratchPlace(t, f, dir)
 
@@ -167,7 +167,7 @@ func TestRelayoutFitsTheWindowsNewSizeAndReopensClosedPanes(t *testing.T) {
 }
 
 func TestRelayoutKeepsAPaneTheSplitsDoNotName(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	dir := mkdir(t, filepath.Join(f.base, "scratch"))
 	f.cfg.Tasks.Layouts = []config.TaskLayoutConfig{{Splits: []config.TaskSplitConfig{{Pane: "editor", Of: "agent", Direction: "right"}}}}
 	place := scratchPlace(t, f, dir)
@@ -204,7 +204,7 @@ func TestRelayoutKeepsAPaneTheSplitsDoNotName(t *testing.T) {
 }
 
 func TestSplitsLayoutPlacesPanesLeftOfAndAbove(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	dir := mkdir(t, filepath.Join(f.base, "scratch"))
 	f.cfg.Tasks.Panes = []config.TaskPaneConfig{
 		{Name: "editor", Command: nil, Dir: "", Restart: false},
@@ -233,7 +233,7 @@ func TestSplitsLayoutPlacesPanesLeftOfAndAbove(t *testing.T) {
 }
 
 func TestStartRefusesAPaneDirectoryThatDoesNotExist(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	dir := mkdir(t, filepath.Join(f.base, "scratch"))
 	f.cfg.Tasks.Panes = []config.TaskPaneConfig{{Name: "docs", Command: nil, Dir: "missing", Restart: false}}
 	place := scratchPlace(t, f, dir)
@@ -244,7 +244,7 @@ func TestStartRefusesAPaneDirectoryThatDoesNotExist(t *testing.T) {
 }
 
 func TestProjectTaskWindowsOpenTheProjectsPanes(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
 	f.cfg.Projects.Overrides = map[string]config.ProjectConfig{"shop": {
 		TaskPanes: []config.TaskPaneConfig{{Name: "server", Command: []string{"sleep", "300"}, Dir: "", Restart: false}},
@@ -263,7 +263,7 @@ func TestProjectTaskWindowsOpenTheProjectsPanes(t *testing.T) {
 }
 
 func TestARestartingPaneRunsAgainWithItsTaskAfterARestore(t *testing.T) {
-	f := newFixture(t, true)
+	f := newFixture(t)
 	dir := mkdir(t, filepath.Join(f.base, "scratch"))
 	marker := filepath.Join(f.base, "marker")
 	f.cfg.Tasks.Panes = []config.TaskPaneConfig{{

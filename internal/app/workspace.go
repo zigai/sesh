@@ -17,7 +17,7 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
-// worktreeDirEnvironment names the directory that holds task worktrees, one folder per project.
+// worktreeDirEnvironment overrides the directory that holds task worktrees, one folder per project.
 const worktreeDirEnvironment = "WORKTREE_DIR"
 
 type Locations struct {
@@ -53,6 +53,11 @@ func Resolve(cfg *config.Config, locations Locations) (Workspace, error) {
 
 	stateDir := filepath.Join(config.GetXDGPaths().StateHome, "sesh")
 
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return Workspace{}, oops.In("app").With("operation", "resolve_home_dir").Wrap(err)
+	}
+
 	workspace := Workspace{
 		Config:          cfg,
 		Socket:          locations.Socket,
@@ -62,7 +67,7 @@ func Resolve(cfg *config.Config, locations Locations) (Workspace, error) {
 		FinalSaveStatus: "",
 		AgentStore:      "",
 		Tasks:           filepath.Join(stateDir, "tasks.json"),
-		WorktreeDir:     os.Getenv(worktreeDirEnvironment),
+		WorktreeDir:     "",
 	}
 
 	for _, path := range []struct {
@@ -75,6 +80,7 @@ func Resolve(cfg *config.Config, locations Locations) (Workspace, error) {
 		{&workspace.History, locations.History, filepath.Join(stateDir, "history.json")},
 		{&workspace.FinalSaveStatus, locations.FinalSaveStatus, filepath.Join(stateDir, automation.FinalSaveStatusName)},
 		{&workspace.AgentStore, locations.AgentStore, cfg.ResolvedAgentStatus().StorePath},
+		{&workspace.WorktreeDir, os.Getenv(worktreeDirEnvironment), filepath.Join(home, "Worktrees")},
 	} {
 		value := path.value
 		if value == "" {
