@@ -42,6 +42,11 @@ var (
 	ErrInvalidSessionKey     = errors.New("invalid session key")
 )
 
+// HistoryVersionError reports a history file whose version is not CurrentHistoryVersion.
+type HistoryVersionError struct {
+	Version int
+}
+
 type SwitchHistoryEntry struct {
 	Session        Identity `json:"session"`
 	LastSwitchUnix int64    `json:"lastSwitch"`
@@ -286,6 +291,24 @@ func (s *Service) UpdateState(
 	return mutated, nil
 }
 
+func (e *HistoryVersionError) Error() string {
+	return fmt.Sprintf("history version %d, want %d", e.Version, CurrentHistoryVersion)
+}
+
+func (e *HistoryVersionError) Unwrap() error {
+	return ErrInvalidHistoryVersion
+}
+
+// HistoryUpgradeFilter returns the jq filter that converts a history file of version to
+// CurrentHistoryVersion, and false when no conversion exists.
+func HistoryUpgradeFilter(version int) (string, bool) {
+	if version == 1 {
+		return ".version = 2 | .sessionKeys = []", true
+	}
+
+	return "", false
+}
+
 func (s *Service) executeStateUpdate(
 	ctx context.Context,
 	dir *privatefs.Dir,
@@ -506,7 +529,7 @@ func decodeState(data []byte) (State, error) {
 	}
 
 	if header.Version != nil && *header.Version != CurrentHistoryVersion {
-		return State{}, ErrInvalidHistoryVersion
+		return State{}, &HistoryVersionError{Version: *header.Version}
 	}
 
 	state, err := strictjson.Decode[State](data)

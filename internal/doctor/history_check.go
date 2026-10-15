@@ -45,12 +45,32 @@ func (s *Service) checkHistory() Result {
 	case errors.Is(loadErr, strictjson.ErrInvalid):
 		return newResult(CheckHistoryFile, StatusFail, "Contains invalid JSON").withReason(ReasonCorrupt).withCommand(moveAside)
 	case errors.Is(loadErr, session.ErrInvalidHistoryVersion):
-		return newResult(CheckHistoryFile, StatusFail, "Has an unsupported schema version").withReason(ReasonIncompatible).withCommand(moveAside)
+		return incompatibleHistory(path, loadErr, moveAside)
 	default:
 		return newResult(CheckHistoryFile, StatusFail, "Cannot load: "+loadErr.Error()).
 			withReason(ReasonInspectionFailed).
 			withCommand("ls -l " + shellPath(path))
 	}
+}
+
+func incompatibleHistory(path string, loadErr error, moveAside string) Result {
+	versionErr, ok := errors.AsType[*session.HistoryVersionError](loadErr)
+	if !ok {
+		return newResult(CheckHistoryFile, StatusFail, "Has an unsupported schema version").withReason(ReasonIncompatible).withCommand(moveAside)
+	}
+
+	filter, ok := session.HistoryUpgradeFilter(versionErr.Version)
+	if !ok {
+		return newResult(CheckHistoryFile, StatusFail, fmt.Sprintf("Has unsupported schema version %d", versionErr.Version)).
+			withReason(ReasonIncompatible).
+			withCommand(moveAside)
+	}
+
+	file, temp := shellPath(path), shellPath(path+".tmp")
+
+	return newResult(CheckHistoryFile, StatusFail, fmt.Sprintf("Has schema version %d; convert it to version %d", versionErr.Version, session.CurrentHistoryVersion)).
+		withReason(ReasonIncompatible).
+		withCommand(fmt.Sprintf("jq %s %s > %s && chmod 600 %s && mv %s %s", shellArg(filter), file, temp, temp, temp, file))
 }
 
 func (s *Service) unsafeHistory() Result {
