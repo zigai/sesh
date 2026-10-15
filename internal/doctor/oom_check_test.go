@@ -14,8 +14,9 @@ var (
 	errTestSystemd = errors.New("systemctl missing")
 )
 
-func oomService(unit string, unitErr error, policy string, policyErr error) *Service {
-	service := NewService(Options{})
+func oomService(serverPID int, unit string, unitErr error, policy string, policyErr error) *Service {
+	service := NewService(Options{ServiceDirs: []string{}})
+	service.serverPID = serverPID
 	service.unitOf = func(int) (string, error) { return unit, unitErr }
 	service.oomPolicyOf = func(context.Context, string) (string, error) { return policy, policyErr }
 
@@ -25,13 +26,8 @@ func oomService(unit string, unitErr error, policy string, policyErr error) *Ser
 func TestServiceOOMPolicyWarnsWhenOneKilledProcessStopsTheWholeUnit(t *testing.T) {
 	t.Parallel()
 
-	results := oomService("tmux.service", nil, "stop", nil).checkServiceOOMPolicy(t.Context(), 4242)
-	if len(results) != 1 {
-		t.Fatalf("expected one warning, got %+v", results)
-	}
-
-	result := results[0]
-	if result.Check != CheckServiceOOMPolicy || result.Status != StatusWarning || result.Reason != ReasonUnsafe {
+	result := oomService(4242, "tmux.service", nil, "stop", nil).checkServiceOOMPolicy(t.Context())
+	if result.ID != CheckServiceOOMPolicy || result.Status != StatusWarn || result.Reason != ReasonUnsafe {
 		t.Fatalf("unexpected result: %+v", result)
 	}
 
@@ -41,26 +37,38 @@ func TestServiceOOMPolicyWarnsWhenOneKilledProcessStopsTheWholeUnit(t *testing.T
 		}
 	}
 
-	if !strings.Contains(result.Fix, "OOMPolicy=continue") || !strings.Contains(result.Fix, "systemctl --user edit tmux.service") {
-		t.Fatalf("the fix must name the directive and the unit: %s", result.Fix)
+	if result.Fix == nil || !strings.Contains(result.Fix.Manual, "OOMPolicy=continue") ||
+		!strings.Contains(result.Fix.Manual, "systemctl --user edit tmux.service") {
+		t.Fatalf("the fix must name the directive and the unit: %+v", result.Fix)
 	}
 }
 
-func TestServiceOOMPolicyStaysSilentWhenSafeOrUndeterminable(t *testing.T) {
+func TestServiceOOMPolicyPassesWhenOtherPoliciesKeepTheServer(t *testing.T) {
 	t.Parallel()
 
-	for name, service := range map[string]*Service{
-		"continue":          oomService("tmux.service", nil, "continue", nil),
-		"kill":              oomService("tmux.service", nil, "kill", nil),
-		"not in a service":  oomService("", errTestScope, "", nil),
-		"policy unreadable": oomService("tmux.service", nil, "", errTestSystemd),
-	} {
-		if results := service.checkServiceOOMPolicy(t.Context(), 4242); len(results) != 0 {
-			t.Fatalf("%s must add no result, got %+v", name, results)
+	for _, policy := range []string{"continue", "kill"} {
+		result := oomService(4242, "tmux.service", nil, policy, nil).checkServiceOOMPolicy(t.Context())
+		if result.Status != StatusOK || !strings.Contains(result.Message, "OOMPolicy="+policy) {
+			t.Fatalf("policy %s: %+v", policy, result)
 		}
 	}
+}
 
-	if results := oomService("tmux.service", nil, "stop", nil).checkServiceOOMPolicy(t.Context(), 0); len(results) != 0 {
-		t.Fatalf("no server pid means no unit to inspect, got %+v", results)
+func TestServiceOOMPolicySkipsWhenTheUnitCannotBeDetermined(t *testing.T) {
+	t.Parallel()
+
+	for name, tc := range map[string]struct {
+		service *Service
+		needs   string
+	}{
+		"not in a service":  {service: oomService(4242, "", errTestScope, "", nil)},
+		"policy unreadable": {service: oomService(4242, "tmux.service", nil, "", errTestSystemd)},
+		"no server":         {service: oomService(0, "tmux.service", nil, "stop", nil), needs: CheckTmuxServer},
+		"not systemd":       {service: NewService(Options{})},
+	} {
+		result := tc.service.checkServiceOOMPolicy(t.Context())
+		if result.Status != StatusSkip || result.Needs != tc.needs || result.Message == "" {
+			t.Fatalf("%s: want a skip with a reason, got %+v", name, result)
+		}
 	}
 }

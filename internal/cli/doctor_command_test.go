@@ -12,31 +12,17 @@ import (
 
 	"github.com/zigai/gotmux/tmuxtest"
 
-	"github.com/spf13/cobra"
-
 	"github.com/zigai/sesh/internal/doctor"
 
 	cmddoctor "github.com/zigai/sesh/internal/cli/cmd/doctor"
 )
 
-type doctorResultJSON = cmddoctor.ResultJSON
-
-func newDoctorCommand() *cobra.Command {
-	return cmddoctor.NewCommand()
-}
-
 type failedDoctorFixture struct {
 	stdout  []byte
 	stderr  []byte
-	logs    []byte
-	private []string
-	err     error
-}
-
-type doctorInvocation struct {
-	args    []string
 	logPath string
-	private []string
+	private string
+	err     error
 }
 
 func TestDoctorCommandHelp(t *testing.T) {
@@ -47,7 +33,7 @@ func TestDoctorCommandHelp(t *testing.T) {
 		t.Fatalf("doctor --help failed: %v\nstderr: %s", err, stderr)
 	}
 
-	if !strings.Contains(stdout, "Inspect tmux environment") {
+	if !strings.Contains(stdout, "Check tmux, configuration, snapshots and services") {
 		t.Fatalf("stdout missing doctor description: %s", stdout)
 	}
 
@@ -65,41 +51,67 @@ func TestDoctorCommandJSONOutput(t *testing.T) {
 		t.Fatalf("envelope.Command = %q, want doctor", exec.envelope.Command)
 	}
 
-	if !strings.Contains(exec.stdout, `"checks":`) {
-		t.Fatalf("stdout missing checks array: %s", exec.stdout)
+	report := decodeDoctorReport(t, exec.envelope.Result)
+	if len(report.Checks) == 0 || report.Version == "" || report.Paths.Socket.Path == "" {
+		t.Fatalf("report lacks checks or identity: %s", exec.stdout)
+	}
+
+	if config := report.Paths.Config; len(config) != 2 || config[0].Status != doctor.ConfigSkipped || config[1].Status != doctor.ConfigSkipped {
+		t.Fatalf("--no-config must mark every config file skipped: %+v", config)
 	}
 }
 
-func TestDoctorCommandPlainReportListsChecksAndSummary(t *testing.T) {
+func TestDoctorCommandPlainReportListsGroupsChecksAndVerdict(t *testing.T) {
 	t.Parallel()
 
-	stdout, _, _ := executeCommand(t, "doctor", testNoConfigFlag)
+	stdout, _, _ := executeCommand(t, "doctor", testNoConfigFlag, testSocketFlag, filepath.Join(t.TempDir(), "absent.sock"))
 
-	if !strings.Contains(stdout, "✗ tmux") || !strings.Contains(stdout, "checks: ") {
-		t.Fatalf("stdout missing check status markers or summary: %s", stdout)
-	}
-
-	if !strings.Contains(stdout, "tmux") || !strings.Contains(stdout, "snapshot-repository") {
-		t.Fatalf("stdout missing check names: %s", stdout)
+	for _, want := range []string{"\n  socket      ", "\nTmux\n", "\n  fail  server", "\nSnapshots\n", "need attention.\n", " ok, ", " fail, "} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("stdout missing %q:\n%s", want, stdout)
+		}
 	}
 }
 
 func TestDoctorCommandNonexistentSocketFails(t *testing.T) {
 	t.Parallel()
 
-	nonexistent := "/tmp/definitely-does-not-exist-" + t.Name() + ".sock"
-	exec := executeJSON(t, "doctor", "--socket", nonexistent, testNoConfigFlag, testJSONFlag)
+	nonexistent := filepath.Join(t.TempDir(), "absent.sock")
+	exec := executeJSON(t, "doctor", testSocketFlag, nonexistent, testNoConfigFlag, testJSONFlag)
 
-	if exec.err == nil {
-		t.Fatal("expected doctor error on nonexistent socket, got nil")
+	if exec.err == nil || ExitCode(exec.err) != exitCodeGeneral {
+		t.Fatalf("expected doctor to exit %d on a missing server, got %v", exitCodeGeneral, exec.err)
 	}
 
-	if !strings.Contains(exec.stdout, `"status":"error"`) && !strings.Contains(exec.stdout, `"unavailable"`) {
-		t.Fatalf("expected error/unavailable status in stdout: %s", exec.stdout)
+	server := findDoctorCheck(decodeDoctorReport(t, exec.envelope.Result).Checks, doctor.CheckTmuxServer)
+	if server.Status != doctor.StatusFail || server.Reason != doctor.ReasonNotRunning {
+		t.Fatalf("expected a not-running server failure: %+v", server)
 	}
 }
 
-func TestDoctorApplicationFailedChecksRetainJSONReportAndOwnOutcome(t *testing.T) {
+func TestDoctorSurvivesABrokenConfigAndReportsIt(t *testing.T) {
+	t.Parallel()
+
+	cfg := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(cfg, []byte("garbage = =\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	exec := executeJSON(t, "doctor", testConfigFlag, cfg, testSocketFlag, filepath.Join(t.TempDir(), "absent.sock"), testJSONFlag)
+
+	report := decodeDoctorReport(t, exec.envelope.Result)
+
+	config := findDoctorCheck(report.Checks, doctor.CheckConfigFile)
+	if config.Status != doctor.StatusFail || !strings.HasPrefix(config.Message, "Invalid configuration at line 1") {
+		t.Fatalf("broken config must fail its own check: %+v", config)
+	}
+
+	if len(report.Checks) < 10 || findDoctorCheck(report.Checks, doctor.CheckSnapshotRepository).ID == "" {
+		t.Fatalf("the remaining checks must still run: %+v", report.Checks)
+	}
+}
+
+func TestDoctorApplicationFailedChecksRetainJSONReport(t *testing.T) {
 	fixture := runFailedDoctorApplication(t, true)
 	if !errors.Is(fixture.err, errDoctorChecksFailed) || ExitCode(fixture.err) != exitCodeGeneral {
 		t.Fatalf("unexpected outcome: %v", fixture.err)
@@ -110,8 +122,7 @@ func TestDoctorApplicationFailedChecksRetainJSONReportAndOwnOutcome(t *testing.T
 	}
 
 	assertFailedDoctorEnvelope(t, fixture.stdout)
-	assertDoctorOutputPrivacy(t, fixture)
-	assertDoctorRuntimeLog(t, fixture.logs)
+	assertDoctorLeftNoTrace(t, fixture)
 }
 
 func TestDoctorApplicationFailedChecksRetainPlainReport(t *testing.T) {
@@ -121,19 +132,18 @@ func TestDoctorApplicationFailedChecksRetainPlainReport(t *testing.T) {
 	}
 
 	stdout := string(fixture.stdout)
-	if !strings.Contains(stdout, "✗ "+doctor.CheckHistoryState) || !strings.Contains(stdout, "checks: ") {
+	if !strings.Contains(stdout, "\nHistory\n  fail  file") || !strings.Contains(stdout, "need attention.\n") {
 		t.Fatalf("failed doctor report was not retained: %s", stdout)
 	}
 
-	if string(fixture.stderr) != "doctor checks failed\n" {
-		t.Fatalf("unexpected doctor diagnostic: %q", fixture.stderr)
+	if len(fixture.stderr) != 0 {
+		t.Fatalf("the report already states the failure, yet stderr got %q", fixture.stderr)
 	}
 
-	assertDoctorOutputPrivacy(t, fixture)
-	assertDoctorRuntimeLog(t, fixture.logs)
+	assertDoctorLeftNoTrace(t, fixture)
 }
 
-func TestDoctorApplicationWarningOnlyJSONOwnsDegradedOutcome(t *testing.T) {
+func TestDoctorApplicationWarningOnlyJSONSucceeds(t *testing.T) {
 	base := t.TempDir()
 	cfg, logPath := runtimeConfig(t, "info")
 
@@ -152,95 +162,55 @@ func TestDoctorApplicationWarningOnlyJSONOwnsDegradedOutcome(t *testing.T) {
 	}
 
 	envelope := singleRuntimeEnvelope(t, stdout.Bytes())
+	report := decodeDoctorReport(t, envelope.Result)
 
-	var result doctorResultJSON
-	if decodeErr := json.Unmarshal(envelope.Result, &result); decodeErr != nil {
-		t.Fatal(decodeErr)
-	}
-
-	if !envelope.OK || envelope.Error != nil || result.HasErrors || !result.HasWarnings {
+	if !envelope.OK || envelope.Error != nil || report.Summary.Fail != 0 || report.Summary.Warn == 0 {
 		t.Fatalf("invalid warning-only receipt: %s", stdout.String())
 	}
 
-	logs, readErr := os.ReadFile(logPath)
-	if readErr != nil {
-		t.Fatal(readErr)
+	if _, statErr := os.Stat(logPath); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("doctor opened its log file: %v", statErr)
 	}
-
-	assertDoctorRuntimeOutcome(t, logs, "warn", "degraded", "checks_degraded")
 }
 
-func TestDoctorOutcomeMarkerPreservesIndependentFailures(t *testing.T) {
-	t.Run("output", func(t *testing.T) {
-		invocation := newFailedDoctorInvocation(t, true)
+func TestDoctorOutputFailureKeepsTheChecksFailure(t *testing.T) {
+	fixture := newFailedDoctorArgs(t, true)
 
-		var stderr bytes.Buffer
+	var stderr bytes.Buffer
 
-		err := ExecuteApplication(t.Context(), invocation.args, nil, failingRuntimeWriter{}, &stderr)
-		if !errors.Is(err, errDoctorChecksFailed) || !errors.Is(err, io.ErrClosedPipe) {
-			t.Fatalf("output failure lost a cause: %v", err)
-		}
-
-		if stderr.Len() != 0 {
-			t.Fatalf("output failure leaked a second diagnostic: %q", stderr.String())
-		}
-	})
-
-	t.Run("finalization", testDoctorFinalizationFailure)
-}
-
-func testDoctorFinalizationFailure(t *testing.T) {
-	t.Helper()
-
-	cmd := newDoctorCommand()
-	if err := cmd.Flags().Set(jsonFlagName, "true"); err != nil {
-		t.Fatal(err)
+	err := ExecuteApplication(t.Context(), fixture, nil, failingRuntimeWriter{}, &stderr)
+	if !errors.Is(err, errDoctorChecksFailed) || !errors.Is(err, io.ErrClosedPipe) {
+		t.Fatalf("output failure lost a cause: %v", err)
 	}
 
-	var output, diagnostics commandBuffer
-	cmd.SetOut(&output)
-
-	doctorErr := loggedDoctorError{error: NewExitError(exitCodeGeneral, errDoctorChecksFailed)}
-	runErr := writeJSONResultError(cmd, doctorResultJSON{HasErrors: true}, doctorErr)
-	closeErr := io.ErrClosedPipe
-
-	var stdout, stderr bytes.Buffer
-
-	err := publishCommandOutput(cmd, &output, &diagnostics, &stdout, &stderr, runErr, closeErr)
-	if !errors.Is(err, errDoctorChecksFailed) || !errors.Is(err, closeErr) {
-		t.Fatalf("finalization failure lost a cause: %v", err)
-	}
-
-	envelope := singleRuntimeEnvelope(t, stdout.Bytes())
-	if envelope.OK || envelope.Error == nil || len(stderr.Bytes()) != 0 {
-		t.Fatalf("invalid finalization receipt: %s / %q", stdout.String(), stderr.String())
+	if stderr.Len() != 0 {
+		t.Fatalf("output failure leaked a second diagnostic: %q", stderr.String())
 	}
 }
 
 func runFailedDoctorApplication(t *testing.T, jsonOutput bool) failedDoctorFixture {
 	t.Helper()
 
-	invocation := newFailedDoctorInvocation(t, jsonOutput)
+	cfg, logPath := runtimeConfig(t, "info")
+	args := append(newFailedDoctorArgs(t, jsonOutput), testConfigFlag, cfg)
 
 	var stdout, stderr bytes.Buffer
 
-	err := ExecuteApplication(t.Context(), invocation.args, nil, &stdout, &stderr)
-
-	logs, readErr := os.ReadFile(invocation.logPath)
-	if readErr != nil {
-		t.Fatal(readErr)
-	}
+	err := ExecuteApplication(t.Context(), args, nil, &stdout, &stderr)
 
 	return failedDoctorFixture{
 		stdout:  bytes.Clone(stdout.Bytes()),
 		stderr:  bytes.Clone(stderr.Bytes()),
-		logs:    logs,
-		private: invocation.private,
+		logPath: logPath,
+		private: privateHistoryContent,
 		err:     err,
 	}
 }
 
-func newFailedDoctorInvocation(t *testing.T, jsonOutput bool) doctorInvocation {
+const privateHistoryContent = "private-history-content-canary"
+
+// newFailedDoctorArgs runs the doctor against a corrupt history file.
+func newFailedDoctorArgs(t *testing.T, jsonOutput bool) []string {
 	t.Helper()
 
 	base := t.TempDir()
@@ -248,55 +218,28 @@ func newFailedDoctorInvocation(t *testing.T, jsonOutput bool) doctorInvocation {
 		t.Fatal(err)
 	}
 
-	cfg, logPath := runtimeConfig(t, "info")
-	historyPath := filepath.Join(base, "private-history-canary.json")
-	repositoryPath := filepath.Join(base, "private-repository-canary")
-	privateContent := "private-history-content-canary"
-
-	if err := os.WriteFile(historyPath, []byte(privateContent), 0o600); err != nil {
+	historyPath := filepath.Join(base, "history.json")
+	if err := os.WriteFile(historyPath, []byte(privateHistoryContent), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
 	args := []string{
 		"doctor",
 		"--history", historyPath,
-		testRepositoryFlag, repositoryPath,
-		testConfigFlag, cfg,
+		testRepositoryFlag, filepath.Join(base, "repository"),
+		testSocketFlag, filepath.Join(base, "absent.sock"),
 	}
 	if jsonOutput {
 		args = append(args, testJSONFlag)
 	}
 
-	return doctorInvocation{
-		args:    args,
-		logPath: logPath,
-		private: []string{cfg, historyPath, repositoryPath, privateContent},
-	}
+	return args
 }
 
 func assertFailedDoctorEnvelope(t *testing.T, output []byte) {
 	t.Helper()
 
 	envelope := singleRuntimeEnvelope(t, output)
-	assertFailedDoctorErrorContract(t, envelope, output)
-
-	var result doctorResultJSON
-	if err := json.Unmarshal(envelope.Result, &result); err != nil {
-		t.Fatalf("decode doctor result: %v", err)
-	}
-
-	if !result.HasErrors || !result.HasWarnings || len(result.Checks) != 8 {
-		t.Fatalf("detailed result was not retained: %+v", result)
-	}
-
-	if !hasCorruptHistoryCheck(result.Checks) {
-		t.Fatalf("missing corrupt history check: %+v", result.Checks)
-	}
-}
-
-func assertFailedDoctorErrorContract(t *testing.T, envelope testJSONEnvelope, output []byte) {
-	t.Helper()
-
 	if envelope.Command != "doctor" || envelope.OK || envelope.Error == nil {
 		t.Fatalf("invalid failed doctor envelope: %s", output)
 	}
@@ -306,99 +249,50 @@ func assertFailedDoctorErrorContract(t *testing.T, envelope testJSONEnvelope, ou
 		envelope.Error.ExitCode != exitCodeGeneral {
 		t.Fatalf("unstable doctor error contract: %+v", envelope.Error)
 	}
+
+	report := decodeDoctorReport(t, envelope.Result)
+
+	history := findDoctorCheck(report.Checks, doctor.CheckHistoryFile)
+	if history.Status != doctor.StatusFail || history.Reason != doctor.ReasonCorrupt || history.Fix == nil {
+		t.Fatalf("missing corrupt history check: %+v", report.Checks)
+	}
+
+	if report.Summary.Fail == 0 {
+		t.Fatalf("summary does not count the failures: %+v", report.Summary)
+	}
 }
 
-func hasCorruptHistoryCheck(checks []doctor.Result) bool {
+// assertDoctorLeftNoTrace checks that the report did not echo file contents and that the run did
+// not open the configured log file.
+func assertDoctorLeftNoTrace(t *testing.T, fixture failedDoctorFixture) {
+	t.Helper()
+
+	if bytes.Contains(fixture.stdout, []byte(fixture.private)) || bytes.Contains(fixture.stderr, []byte(fixture.private)) {
+		t.Fatalf("private history content escaped the doctor")
+	}
+
+	if _, err := os.Stat(fixture.logPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("doctor opened its log file: %v", err)
+	}
+}
+
+func decodeDoctorReport(t *testing.T, data json.RawMessage) cmddoctor.Report {
+	t.Helper()
+
+	var report cmddoctor.Report
+	if err := json.Unmarshal(data, &report); err != nil {
+		t.Fatalf("decode doctor report %s: %v", data, err)
+	}
+
+	return report
+}
+
+func findDoctorCheck(checks []doctor.Result, id string) doctor.Result {
 	for _, check := range checks {
-		if check.Check == doctor.CheckHistoryState &&
-			check.Status == doctor.StatusError && check.Reason == doctor.ReasonCorrupt {
-			return true
+		if check.ID == id {
+			return check
 		}
 	}
 
-	return false
+	return doctor.Result{}
 }
-
-func assertDoctorOutputPrivacy(t *testing.T, fixture failedDoctorFixture) {
-	t.Helper()
-
-	for _, private := range fixture.private {
-		if bytes.Contains(fixture.stdout, []byte(private)) ||
-			bytes.Contains(fixture.stderr, []byte(private)) ||
-			bytes.Contains(fixture.logs, []byte(private)) {
-			t.Fatalf("private value %q escaped doctor boundaries", private)
-		}
-	}
-}
-
-func assertDoctorRuntimeLog(t *testing.T, data []byte) {
-	t.Helper()
-
-	assertDoctorRuntimeOutcome(t, data, "error", "failed", "checks_failed")
-}
-
-func assertDoctorRuntimeOutcome(t *testing.T, data []byte, level, status, reason string) {
-	t.Helper()
-
-	lines := bytes.Split(bytes.TrimSpace(data), []byte{'\n'})
-	if len(lines) != 3 {
-		t.Fatalf("expected CLI start, doctor start, and one doctor outcome: %s", data)
-	}
-
-	wants := []struct {
-		component string
-		operation string
-		level     string
-		status    string
-	}{
-		{component: "cli", operation: "doctor", level: "info", status: "started"},
-		{component: "doctor", operation: "run", level: "info", status: "started"},
-		{component: "doctor", operation: "run", level: level, status: status},
-	}
-
-	for i, line := range lines {
-		var record map[string]any
-		if err := json.Unmarshal(line, &record); err != nil {
-			t.Fatalf("decode log record %d: %v", i, err)
-		}
-
-		want := wants[i]
-		if record["component"] != want.component || record["operation"] != want.operation ||
-			record["level"] != want.level || record["status"] != want.status {
-			t.Fatalf("unexpected log record %d: %s", i, line)
-		}
-
-		if i == len(lines)-1 {
-			assertDoctorTerminalRecord(t, record, line, status, reason)
-		}
-	}
-}
-
-func assertDoctorTerminalRecord(
-	t *testing.T,
-	record map[string]any,
-	line []byte,
-	status string,
-	reason string,
-) {
-	t.Helper()
-
-	if record["reason"] != reason {
-		t.Fatalf("terminal doctor record has the wrong reason: %s", line)
-	}
-
-	if status == "failed" && record["error_count"] == float64(0) {
-		t.Fatalf("failed doctor record lacks the error count: %s", line)
-	}
-
-	if status == "degraded" && record["warning_count"] == float64(0) {
-		t.Fatalf("degraded doctor record lacks the warning count: %s", line)
-	}
-}
-
-// loggedDoctorError marks a doctor failure whose outcome was already logged.
-type loggedDoctorError struct{ error }
-
-func (e loggedDoctorError) Unwrap() error { return e.error }
-
-func (e loggedDoctorError) OutcomeLogged() bool { return true }

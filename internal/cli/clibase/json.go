@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/pelletier/go-toml/v2"
@@ -20,6 +21,7 @@ import (
 	"github.com/zigai/sesh/internal/agents"
 	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/config"
+	"github.com/zigai/sesh/internal/errorstep"
 	"github.com/zigai/sesh/internal/integration/process"
 	"github.com/zigai/sesh/internal/integration/tmuxserver"
 	"github.com/zigai/sesh/internal/remote"
@@ -45,6 +47,7 @@ var (
 
 	workflowErrors = []commandErrorContract{
 		{ErrDoctorChecksFailed, "doctorChecksFailed", "doctor checks failed"},
+		{ErrLogFileUnavailable, "logFileUnavailable", "log file cannot be opened; set paths.log_file to a file in a writable directory"},
 		{engine.ErrRetentionBudgetUnmet, "retentionBudgetUnmet", "protected snapshot bytes exceed retention budget"},
 		{engine.ErrCollectionQuarantined, "collectionQuarantined", "snapshot collection preserved contradictory evidence"},
 		{gotmux.ErrOutputLimit, "outputLimitExceeded", "tmux command output exceeded its byte limit"},
@@ -345,6 +348,30 @@ func humanErrorMessage(err error) string {
 	return "operation failed"
 }
 
+// NotExistMessage names what is missing: the snapshot repository when the store reported it,
+// otherwise a file or directory.
+func NotExistMessage(err error) string {
+	if _, ok := errorstep.Owned(err, "snapshot.store"); ok {
+		return "repository does not exist"
+	}
+
+	return "file or directory does not exist"
+}
+
+// EnvironmentError reports whether err comes from the environment sesh runs in rather than
+// from the command, so its diagnostic can point at the doctor.
+func EnvironmentError(err error) bool {
+	if _, ok := errors.AsType[*ConfigurationError](err); ok {
+		return true
+	}
+
+	if _, ok := errors.AsType[*gotmux.UnsupportedError](err); ok {
+		return true
+	}
+
+	return errors.Is(err, ErrLogFileUnavailable) || errors.Is(err, exec.ErrNotFound)
+}
+
 func HumanConfigurationErrorMessage(err error) (string, bool) {
 	cfgErr, ok := errors.AsType[*ConfigurationError](err)
 	if !ok {
@@ -372,6 +399,10 @@ func tomlDocumentError(err error) bool {
 
 func humanCommandErrorMessage(cmd *cobra.Command, err error) string {
 	message := humanErrorMessage(err)
+	if EnvironmentError(err) {
+		return message + "; run 'sesh doctor' for details"
+	}
+
 	if cmd == nil || ExitCode(err) != ExitCodeUsage {
 		return message
 	}
@@ -544,7 +575,7 @@ func generalSentinelMessage(err error) (string, bool) {
 	case errors.Is(err, context.Canceled):
 		return "operation canceled", true
 	case errors.Is(err, os.ErrNotExist):
-		return "repository does not exist", true
+		return NotExistMessage(err), true
 	case errors.Is(err, os.ErrPermission):
 		return "permission denied", true
 	case errors.Is(err, ErrUnknownCommand):

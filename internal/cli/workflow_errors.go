@@ -6,6 +6,7 @@ import (
 	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/agents"
+	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/remote"
 	"github.com/zigai/sesh/internal/session"
@@ -23,6 +24,7 @@ var (
 
 	workflowCommandErrors = []commandErrorContract{
 		{errDoctorChecksFailed, "doctorChecksFailed", "doctor checks failed"},
+		{clibase.ErrLogFileUnavailable, "logFileUnavailable", "log file cannot be opened; set paths.log_file to a file in a writable directory"},
 		{engine.ErrRetentionBudgetUnmet, "retentionBudgetUnmet", "protected snapshot bytes exceed retention budget"},
 		{engine.ErrCollectionQuarantined, "collectionQuarantined", "snapshot collection preserved contradictory evidence"},
 		{gotmux.ErrOutputLimit, "outputLimitExceeded", "tmux command output exceeded its byte limit"},

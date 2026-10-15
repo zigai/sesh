@@ -11,8 +11,6 @@ import (
 	"slices"
 	"syscall"
 
-	"github.com/samber/oops"
-
 	"github.com/zigai/sesh/internal/privatefs"
 	"github.com/zigai/sesh/internal/snapshot/model"
 	"github.com/zigai/sesh/internal/snapshot/store"
@@ -24,121 +22,88 @@ type currentSnapshotReader interface {
 	ReadCurrent(ctx context.Context) (store.Generation, model.Manifest, error)
 }
 
-func (s *Service) checkSnapshot(ctx context.Context) (Result, Result, error) {
-	if s.snapshotDir == "" {
-		repoRes := Result{
-			Check:   CheckSnapshotRepository,
-			Status:  StatusWarning,
-			Reason:  ReasonNotConfigured,
-			Message: "snapshot repository path not configured",
-			Fix:     "Configure [paths].snapshot_dir or run 'sesh snapshot save'",
-		}
-		curRes := Result{
-			Check:   CheckSnapshotCurrent,
-			Status:  StatusWarning,
-			Reason:  ReasonNotConfigured,
-			Message: "snapshot repository path not configured",
-			Fix:     "Configure [paths].snapshot_dir or run 'sesh snapshot save'",
-		}
-
-		return repoRes, curRes, nil
-	}
-
-	repo, openErr := store.OpenExisting(ctx, s.snapshotDir)
+func (s *Service) checkSnapshot(ctx context.Context) ([]Result, error) {
+	repo, openErr := store.OpenExisting(ctx, s.opts.SnapshotDir)
 	if openErr != nil {
-		return classifySnapshotOpenError(s.snapshotDir, openErr)
+		if isCanceled(openErr) {
+			return nil, fmt.Errorf("open the snapshot repository: %w", openErr)
+		}
+
+		repoRes := s.classifySnapshotOpenError(openErr)
+		s.repoStatus = repoRes.Status
+
+		return []Result{repoRes, skipped(CheckSnapshotCurrent, CheckSnapshotRepository, "repository is unusable")}, nil
 	}
 
-	repoRes, curRes, inspectErr := inspectSnapshot(ctx, repo)
+	repoRes, curRes, inspectErr := s.inspectSnapshot(ctx, repo)
+	if err := errors.Join(inspectErr, repo.Close()); err != nil {
+		return nil, err
+	}
 
-	return repoRes, curRes, errors.Join(inspectErr, repo.Close())
+	s.repoStatus = repoRes.Status
+
+	return []Result{repoRes, curRes}, nil
 }
 
-func inspectSnapshot(ctx context.Context, repo currentSnapshotReader) (Result, Result, error) {
+func (s *Service) inspectSnapshot(ctx context.Context, repo currentSnapshotReader) (Result, Result, error) {
 	catalog, inspectErr := repo.Inspect(ctx)
 	if inspectErr != nil {
-		if errors.Is(inspectErr, context.Canceled) || errors.Is(inspectErr, context.DeadlineExceeded) {
-			return Result{}, Result{}, oops.In("doctor").Code("operation_canceled").With("operation", "inspect_snapshot").Wrap(inspectErr)
+		if isCanceled(inspectErr) {
+			return Result{}, Result{}, fmt.Errorf("inspect the snapshot catalog: %w", inspectErr)
 		}
 
-		if errors.Is(inspectErr, store.ErrCorrupt) {
-			repoRes := Result{
-				Check:   CheckSnapshotRepository,
-				Status:  StatusError,
-				Reason:  ReasonCorrupt,
-				Message: "snapshot repository catalog is corrupt",
-				Fix:     "Inspect snapshot repository catalog and artifacts",
-			}
-			curRes := Result{
-				Check:   CheckSnapshotCurrent,
-				Status:  StatusWarning,
-				Reason:  ReasonUnavailable,
-				Message: "snapshot repository is corrupt; current snapshot cannot be read",
-				Fix:     "Inspect snapshot repository catalog and artifacts",
-			}
-
-			return repoRes, curRes, nil
+		repoRes := s.verifyFix(newResult(CheckSnapshotRepository, StatusFail, "Catalog is corrupt").withReason(ReasonCorrupt))
+		if !errors.Is(inspectErr, store.ErrCorrupt) {
+			repoRes = newResult(CheckSnapshotRepository, StatusFail, "Cannot read the catalog: "+inspectErr.Error()).
+				withReason(ReasonInspectionFailed).
+				withCommand("ls -ld " + shellPath(s.opts.SnapshotDir))
 		}
 
-		repoRes := Result{
-			Check:   CheckSnapshotRepository,
-			Status:  StatusError,
-			Reason:  ReasonInspectionFailed,
-			Message: "failed to inspect snapshot repository catalog",
-			Fix:     "Verify snapshot directory permissions and filesystem state",
-		}
-		curRes := Result{
-			Check:   CheckSnapshotCurrent,
-			Status:  StatusWarning,
-			Reason:  ReasonUnavailable,
-			Message: "snapshot repository inspection failed; current snapshot cannot be read",
-			Fix:     "Verify snapshot directory permissions and filesystem state",
-		}
-
-		return repoRes, curRes, nil
+		return repoRes, skipped(CheckSnapshotCurrent, CheckSnapshotRepository, "repository is unusable"), nil
 	}
 
-	repoRes := repositoryResultFromCatalog(catalog)
-	curRes, curErr := resolveCurrentSnapshot(ctx, repo)
+	repoRes := newResult(CheckSnapshotRepository, StatusOK, plural(len(catalog.Generations), "generation"))
+	curRes, curErr := s.resolveCurrentSnapshot(ctx, repo)
 
 	return repoRes, curRes, curErr
 }
 
-func resolveCurrentSnapshot(ctx context.Context, repo currentSnapshotReader) (Result, error) {
+func (s *Service) resolveCurrentSnapshot(ctx context.Context, repo currentSnapshotReader) (Result, error) {
 	const stableViewAttempts = 2
 
 	for range stableViewAttempts {
 		gen, manifest, readErr := repo.ReadCurrent(ctx)
 		if readErr == nil {
-			return manifestResult(gen.ID, manifest), nil
+			return s.manifestResult(gen.ID, manifest), nil
 		}
 
 		if !errors.Is(readErr, store.ErrRecoveryRequired) {
-			return classifyReadCurrentError(readErr)
+			return s.classifyReadCurrentError(readErr)
 		}
 
 		before, inspectErr := repo.Inspect(ctx)
 		if inspectErr != nil {
-			return classifyReadCurrentError(inspectErr)
+			return s.classifyReadCurrentError(inspectErr)
 		}
 
 		candidate, admissible := practicalCurrentGeneration(before)
 		if !admissible {
 			if latestSaveAttempt(before).State == "failed" {
-				return failedSaveResult(), nil
+				return s.saveFix(newResult(CheckSnapshotCurrent, StatusFail, "Latest save failed and no earlier generation can be restored").
+					withReason(ReasonRecoveryRequired)), nil
 			}
 
-			return classifyReadCurrentError(readErr)
+			return s.classifyReadCurrentError(readErr)
 		}
 
 		candidateManifest, candidateErr := repo.Read(ctx, candidate)
 		if candidateErr != nil {
-			return classifyReadCurrentError(candidateErr)
+			return s.classifyReadCurrentError(candidateErr)
 		}
 
 		after, inspectErr := repo.Inspect(ctx)
 		if inspectErr != nil {
-			return classifyReadCurrentError(inspectErr)
+			return s.classifyReadCurrentError(inspectErr)
 		}
 
 		afterCandidate, stillAdmissible := practicalCurrentGeneration(after)
@@ -146,317 +111,45 @@ func resolveCurrentSnapshot(ctx context.Context, repo currentSnapshotReader) (Re
 			continue
 		}
 
-		return practicalCandidateResult(after, candidate, candidateManifest), nil
+		return s.practicalCandidateResult(after, candidate, candidateManifest), nil
 	}
 
-	return Result{
-		Check:   CheckSnapshotCurrent,
-		Status:  StatusWarning,
-		Reason:  ReasonUnverifiable,
-		Message: "snapshot repository changed during inspection; current snapshot could not be verified",
-		Fix:     "Run 'sesh doctor' again after snapshot activity settles",
-	}, nil
+	return newResult(CheckSnapshotCurrent, StatusWarn, "Repository changed during inspection; the current snapshot was not verified").
+		withReason(ReasonUnverifiable).
+		withCommand(s.doctorCommand()), nil
 }
 
-// failedSaveResult reports the recovery barrier a failed save leaves until its cause is fixed.
-func failedSaveResult() Result {
-	return Result{
-		Check:   CheckSnapshotCurrent,
-		Status:  StatusError,
-		Reason:  ReasonRecoveryRequired,
-		Message: "current snapshot requires recovery (latest save failed)",
-		Fix:     "Run 'sesh snapshot save --json' and resolve the reported error code",
+// practicalCandidateResult reports the generation restore uses when the latest save failed or
+// never finished.
+func (s *Service) practicalCandidateResult(catalog store.Catalog, genID string, manifest model.Manifest) Result {
+	if !catalog.LatestSaveUnfinished() || len(manifest.Sessions) == 0 {
+		return s.manifestResult(genID, manifest)
 	}
+
+	sessions := plural(len(manifest.Sessions), "session")
+	if latestSaveAttempt(catalog).State == "failed" {
+		return s.saveFix(newResult(CheckSnapshotCurrent, StatusWarn,
+			fmt.Sprintf("Latest save failed; restore uses %s, the newest saved generation (%s)", genID, sessions)).
+			withReason(ReasonSaveUnfinished))
+	}
+
+	return s.saveFix(newResult(CheckSnapshotCurrent, StatusWarn,
+		fmt.Sprintf("Latest save did not finish; restore uses %s, the newest saved generation (%s)", genID, sessions)).
+		withReason(ReasonSaveUnfinished))
 }
 
-// practicalCandidateResult reports the generation practical recovery uses.
-func practicalCandidateResult(catalog store.Catalog, genID string, manifest model.Manifest) Result {
-	if catalog.LatestSaveUnfinished() && len(manifest.Sessions) > 0 {
-		return unfinishedSaveResult(genID, len(manifest.Sessions), latestSaveAttempt(catalog).State == "failed")
-	}
+func (s *Service) manifestResult(genID string, manifest model.Manifest) Result {
+	sessions := plural(len(manifest.Sessions), "session")
 
-	return manifestResult(genID, manifest)
-}
-
-// unfinishedSaveResult reports that practical recovery falls back to the newest saved generation
-// because the latest save failed or never finished.
-func unfinishedSaveResult(genID string, sessions int, failed bool) Result {
-	if failed {
-		return Result{
-			Check:   CheckSnapshotCurrent,
-			Status:  StatusWarning,
-			Reason:  ReasonSaveUnfinished,
-			Message: fmt.Sprintf("latest save failed; restore uses generation %s, the newest saved (%d sessions)", genID, sessions),
-			Fix:     "Run 'sesh snapshot save --json' and resolve the reported error code",
-		}
-	}
-
-	return Result{
-		Check:   CheckSnapshotCurrent,
-		Status:  StatusWarning,
-		Reason:  ReasonSaveUnfinished,
-		Message: fmt.Sprintf("latest save did not finish; restore uses generation %s, the newest saved (%d sessions)", genID, sessions),
-		Fix:     "Run 'sesh snapshot save' to record a newer generation",
-	}
-}
-
-func repositoryResultFromCatalog(catalog store.Catalog) Result {
-	genCount := len(catalog.Generations)
-	if genCount == 0 {
-		return Result{
-			Check:   CheckSnapshotRepository,
-			Status:  StatusOK,
-			Reason:  "",
-			Message: "snapshot repository initialized (empty, 0 generations)",
-			Fix:     "",
-		}
-	}
-
-	return Result{
-		Check:   CheckSnapshotRepository,
-		Status:  StatusOK,
-		Reason:  "",
-		Message: fmt.Sprintf("snapshot repository initialized (%d generations)", genCount),
-		Fix:     "",
-	}
-}
-
-func classifySnapshotOpenError(path string, err error) (Result, Result, error) {
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		return Result{}, Result{}, err
-	}
-
-	if isUnsafePathError(path, err) {
-		repoRes := Result{
-			Check:   CheckSnapshotRepository,
-			Status:  StatusError,
-			Reason:  ReasonUnsafe,
-			Message: "snapshot repository path has unsafe permissions or symlinks",
-			Fix:     "Ensure snapshot directory permissions are 0700 and not symlinked",
-		}
-		curRes := Result{
-			Check:   CheckSnapshotCurrent,
-			Status:  StatusWarning,
-			Reason:  ReasonUnavailable,
-			Message: "snapshot repository unavailable; current snapshot cannot be read",
-			Fix:     "Fix snapshot repository permissions",
-		}
-
-		return repoRes, curRes, nil
-	}
-
-	if errors.Is(err, store.ErrRecoveryRequired) {
-		repoRes := Result{
-			Check:   CheckSnapshotRepository,
-			Status:  StatusError,
-			Reason:  ReasonRecoveryRequired,
-			Message: "snapshot repository has an interrupted initialization or pending save barrier",
-			Fix:     "Run 'sesh snapshot save' to resume or recover repository",
-		}
-		curRes := Result{
-			Check:   CheckSnapshotCurrent,
-			Status:  StatusWarning,
-			Reason:  ReasonUnavailable,
-			Message: "snapshot repository requires recovery; current snapshot cannot be read",
-			Fix:     "Run 'sesh snapshot save' to resume or recover repository",
-		}
-
-		return repoRes, curRes, nil
-	}
-
-	if errors.Is(err, store.ErrCorrupt) {
-		repoRes := Result{
-			Check:   CheckSnapshotRepository,
-			Status:  StatusError,
-			Reason:  ReasonCorrupt,
-			Message: "snapshot repository catalog is corrupt",
-			Fix:     "Inspect snapshot repository catalog and artifacts",
-		}
-		curRes := Result{
-			Check:   CheckSnapshotCurrent,
-			Status:  StatusWarning,
-			Reason:  ReasonUnavailable,
-			Message: "snapshot repository is corrupt; current snapshot cannot be read",
-			Fix:     "Inspect snapshot repository catalog and artifacts",
-		}
-
-		return repoRes, curRes, nil
-	}
-
-	if errors.Is(err, os.ErrNotExist) {
-		return classifySnapshotNotExist(path)
-	}
-
-	repoRes := Result{
-		Check:   CheckSnapshotRepository,
-		Status:  StatusError,
-		Reason:  ReasonInspectionFailed,
-		Message: "failed to open snapshot repository",
-		Fix:     "Verify snapshot directory permissions and filesystem state",
-	}
-	curRes := Result{
-		Check:   CheckSnapshotCurrent,
-		Status:  StatusWarning,
-		Reason:  ReasonUnavailable,
-		Message: "snapshot repository unavailable; current snapshot cannot be read",
-		Fix:     "Verify snapshot directory permissions and filesystem state",
-	}
-
-	return repoRes, curRes, nil
-}
-
-func classifySnapshotNotExist(path string) (Result, Result, error) {
-	_, lstatErr := os.Lstat(path)
-	if lstatErr != nil && errors.Is(lstatErr, os.ErrNotExist) {
-		repoRes := Result{
-			Check:   CheckSnapshotRepository,
-			Status:  StatusWarning,
-			Reason:  ReasonNotFound,
-			Message: "snapshot repository directory does not exist",
-			Fix:     "Run 'sesh snapshot save' to initialize the repository",
-		}
-		curRes := Result{
-			Check:   CheckSnapshotCurrent,
-			Status:  StatusWarning,
-			Reason:  ReasonNotFound,
-			Message: "no snapshot generations found",
-			Fix:     "Run 'sesh snapshot save' to capture a snapshot",
-		}
-
-		return repoRes, curRes, nil
-	}
-
-	markerPath := filepath.Join(path, "init.marker")
-	if _, markerErr := os.Lstat(markerPath); markerErr == nil {
-		repoRes := Result{
-			Check:   CheckSnapshotRepository,
-			Status:  StatusError,
-			Reason:  ReasonRecoveryRequired,
-			Message: "snapshot repository has an interrupted initialization or pending save barrier",
-			Fix:     "Run 'sesh snapshot save' to resume or recover repository",
-		}
-		curRes := Result{
-			Check:   CheckSnapshotCurrent,
-			Status:  StatusWarning,
-			Reason:  ReasonUnavailable,
-			Message: "snapshot repository requires recovery; current snapshot cannot be read",
-			Fix:     "Run 'sesh snapshot save' to resume or recover repository",
-		}
-
-		return repoRes, curRes, nil
-	}
-
-	repoRes := Result{
-		Check:   CheckSnapshotRepository,
-		Status:  StatusWarning,
-		Reason:  ReasonUninitialized,
-		Message: "snapshot repository is uninitialized",
-		Fix:     "Run 'sesh snapshot save' to initialize the repository",
-	}
-	curRes := Result{
-		Check:   CheckSnapshotCurrent,
-		Status:  StatusWarning,
-		Reason:  ReasonNotFound,
-		Message: "no snapshot generations found",
-		Fix:     "Run 'sesh snapshot save' to capture a snapshot",
-	}
-
-	return repoRes, curRes, nil
-}
-
-func classifyReadCurrentError(err error) (Result, error) {
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		return Result{}, err
-	}
-
-	if errors.Is(err, store.ErrUnavailable) {
-		return Result{
-			Check:   CheckSnapshotCurrent,
-			Status:  StatusWarning,
-			Reason:  ReasonNotFound,
-			Message: "no snapshot generations found",
-			Fix:     "Run 'sesh snapshot save' to capture a snapshot",
-		}, nil
-	}
-
-	if errors.Is(err, store.ErrRecoveryRequired) {
-		return Result{
-			Check:   CheckSnapshotCurrent,
-			Status:  StatusError,
-			Reason:  ReasonRecoveryRequired,
-			Message: "current snapshot requires recovery (interrupted save or pending attempt barrier)",
-			Fix:     "Run 'sesh snapshot save' to resolve pending attempt",
-		}, nil
-	}
-
-	if errors.Is(err, store.ErrCorrupt) {
-		return Result{
-			Check:   CheckSnapshotCurrent,
-			Status:  StatusError,
-			Reason:  ReasonCorrupt,
-			Message: "current snapshot manifest or artifacts are corrupt",
-			Fix:     "Inspect snapshot generation files and artifacts",
-		}, nil
-	}
-
-	return Result{
-		Check:   CheckSnapshotCurrent,
-		Status:  StatusError,
-		Reason:  ReasonInspectionFailed,
-		Message: "failed to read current snapshot",
-		Fix:     "Verify snapshot generation files",
-	}, nil
-}
-
-func manifestResult(genID string, manifest model.Manifest) Result {
-	sessionCount := len(manifest.Sessions)
-
-	if manifest.Complete() {
-		if sessionCount == 0 {
-			return Result{
-				Check:   CheckSnapshotCurrent,
-				Status:  StatusWarning,
-				Reason:  ReasonEmpty,
-				Message: fmt.Sprintf("current snapshot %s contains no saved sessions", genID),
-				Fix:     "Run 'sesh snapshot save' with active sessions",
-			}
-		}
-
-		return Result{
-			Check:   CheckSnapshotCurrent,
-			Status:  StatusOK,
-			Reason:  "",
-			Message: fmt.Sprintf("current snapshot %s verified (%d sessions)", genID, sessionCount),
-			Fix:     "",
-		}
-	}
-
-	if sessionCount == 0 {
-		return Result{
-			Check:   CheckSnapshotCurrent,
-			Status:  StatusWarning,
-			Reason:  ReasonEmpty,
-			Message: fmt.Sprintf("current snapshot %s contains no saved sessions", genID),
-			Fix:     "Run 'sesh snapshot save' with active sessions",
-		}
-	}
-
-	if isObservationalSnapshot(manifest) && manifest.PracticalRecoveryReady() {
-		return Result{
-			Check:   CheckSnapshotCurrent,
-			Status:  StatusWarning,
-			Reason:  ReasonObservational,
-			Message: fmt.Sprintf("snapshot %s is restorable (%d sessions); like every save it records tmux, not a checkpoint", genID, sessionCount),
-			Fix:     "",
-		}
-	}
-
-	return Result{
-		Check:   CheckSnapshotCurrent,
-		Status:  StatusWarning,
-		Reason:  ReasonIncomplete,
-		Message: fmt.Sprintf("current snapshot %s is incomplete/partial (%d sessions)", genID, sessionCount),
-		Fix:     "Run 'sesh snapshot save' to capture a complete snapshot",
+	switch {
+	case len(manifest.Sessions) == 0:
+		return s.saveFix(newResult(CheckSnapshotCurrent, StatusWarn, fmt.Sprintf("Generation %s holds no sessions", genID)).
+			withReason(ReasonEmpty))
+	case manifest.Complete() || (isObservationalSnapshot(manifest) && manifest.PracticalRecoveryReady()):
+		return newResult(CheckSnapshotCurrent, StatusOK, fmt.Sprintf("Generation %s restores %s", genID, sessions))
+	default:
+		return s.saveFix(newResult(CheckSnapshotCurrent, StatusWarn, fmt.Sprintf("Generation %s is incomplete (%s)", genID, sessions)).
+			withReason(ReasonIncomplete))
 	}
 }
 
@@ -472,6 +165,68 @@ func isObservationalSnapshot(m model.Manifest) bool {
 	}
 
 	return false
+}
+
+func (s *Service) classifySnapshotOpenError(err error) Result {
+	dir := DisplayPath(s.opts.SnapshotDir)
+
+	switch {
+	case isUnsafePathError(s.opts.SnapshotDir, err):
+		return newResult(CheckSnapshotRepository, StatusFail, dir+" is a symlink or has unsafe permissions").
+			withReason(ReasonUnsafe).
+			withManual(fmt.Sprintf("Make %s a real directory owned by you with mode 0700 (chmod 700 %s)", dir, shellPath(s.opts.SnapshotDir)))
+	case errors.Is(err, store.ErrRecoveryRequired):
+		return s.saveFix(newResult(CheckSnapshotRepository, StatusFail, "Initialization or a save was interrupted").
+			withReason(ReasonRecoveryRequired))
+	case errors.Is(err, store.ErrCorrupt):
+		return s.verifyFix(newResult(CheckSnapshotRepository, StatusFail, "Catalog is corrupt").withReason(ReasonCorrupt))
+	case errors.Is(err, os.ErrNotExist):
+		return s.classifySnapshotNotExist()
+	default:
+		return newResult(CheckSnapshotRepository, StatusFail, "Cannot open the repository: "+err.Error()).
+			withReason(ReasonInspectionFailed).
+			withCommand("ls -ld " + shellPath(s.opts.SnapshotDir))
+	}
+}
+
+func (s *Service) classifySnapshotNotExist() Result {
+	if _, err := os.Lstat(s.opts.SnapshotDir); errors.Is(err, os.ErrNotExist) {
+		return newResult(CheckSnapshotRepository, StatusInfo, "No snapshots saved yet; the first save creates the repository").
+			withReason(ReasonNotFound)
+	}
+
+	if _, err := os.Lstat(filepath.Join(s.opts.SnapshotDir, "init.marker")); err == nil {
+		return s.saveFix(newResult(CheckSnapshotRepository, StatusFail, "Initialization was interrupted").
+			withReason(ReasonRecoveryRequired))
+	}
+
+	return s.saveFix(newResult(CheckSnapshotRepository, StatusWarn, "Directory exists but holds no repository; the next save initializes it").
+		withReason(ReasonUninitialized))
+}
+
+func (s *Service) classifyReadCurrentError(err error) (Result, error) {
+	switch {
+	case isCanceled(err):
+		return Result{}, err
+	case errors.Is(err, store.ErrUnavailable):
+		return newResult(CheckSnapshotCurrent, StatusInfo, "No generations saved yet").withReason(ReasonNotFound), nil
+	case errors.Is(err, store.ErrRecoveryRequired):
+		return s.saveFix(newResult(CheckSnapshotCurrent, StatusFail, "A save was interrupted and must finish before restores").
+			withReason(ReasonRecoveryRequired)), nil
+	case errors.Is(err, store.ErrCorrupt):
+		return s.verifyFix(newResult(CheckSnapshotCurrent, StatusFail, "Current generation is corrupt").withReason(ReasonCorrupt)), nil
+	default:
+		return s.verifyFix(newResult(CheckSnapshotCurrent, StatusFail, "Cannot read the current generation: "+err.Error()).
+			withReason(ReasonInspectionFailed)), nil
+	}
+}
+
+func (s *Service) verifyFix(result Result) Result {
+	return result.withCommand(s.seshCommand("snapshot verify", []string{flagRepository}))
+}
+
+func isCanceled(err error) bool {
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }
 
 func practicalCurrentGeneration(catalog store.Catalog) (string, bool) {
@@ -555,9 +310,6 @@ func isUnsafePathError(path string, err error) bool {
 	}
 
 	info, lstatErr := os.Lstat(path)
-	if lstatErr == nil && info.Mode()&os.ModeSymlink != 0 {
-		return true
-	}
 
-	return false
+	return lstatErr == nil && info.Mode()&os.ModeSymlink != 0
 }

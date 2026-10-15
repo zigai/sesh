@@ -2,53 +2,35 @@
 
 package doctor
 
-import (
-	"fmt"
-	"os/exec"
-)
+import "fmt"
 
-type CustomField struct {
-	Name    string
-	Command string
-}
+func (s *Service) checkCustomFields() []Result {
+	if s.opts.ConfigError != "" {
+		return []Result{skipped(CheckFields, CheckConfigFile, "configuration did not load")}
+	}
 
-func checkCustomFields(customFields []CustomField) []Result {
-	results := make([]Result, 0, len(customFields))
+	results := make([]Result, 0, len(s.opts.CustomFields))
 
-	for _, field := range customFields {
-		results = append(results, checkCustomField(field))
+	for _, field := range s.opts.CustomFields {
+		results = append(results, s.checkCustomField(field))
 	}
 
 	return results
 }
 
-func checkCustomField(field CustomField) Result {
+func (s *Service) checkCustomField(field CustomField) Result {
+	id := FieldCheck(field.Name)
+
 	if field.Command == "" {
-		return Result{
-			Check:   CheckCustomField,
-			Status:  StatusOK,
-			Reason:  "",
-			Message: fmt.Sprintf("custom.%s runs a shell command", field.Name),
-			Fix:     "",
-		}
+		return newResult(id, StatusOK, "Runs a shell command")
 	}
 
-	path, err := exec.LookPath(field.Command)
-	if err != nil {
-		return Result{
-			Check:   CheckCustomField,
-			Status:  StatusError,
-			Reason:  ReasonNotFound,
-			Message: fmt.Sprintf("custom.%s command %q was not found", field.Name, field.Command),
-			Fix:     fmt.Sprintf("install %s or change display.fields.%s.command", field.Command, field.Name),
-		}
+	path, found := lookPath(s.opts.PathEnv, field.Command)
+	if !found {
+		return newResult(id, StatusFail, fmt.Sprintf("Command %q is not on PATH", field.Command)).
+			withReason(ReasonNotFound).
+			withManual(fmt.Sprintf("Install %s or change display.fields.%s.command", field.Command, field.Name))
 	}
 
-	return Result{
-		Check:   CheckCustomField,
-		Status:  StatusOK,
-		Reason:  "",
-		Message: fmt.Sprintf("custom.%s runs %s", field.Name, path),
-		Fix:     "",
-	}
+	return newResult(id, StatusOK, "Runs "+DisplayPath(path))
 }

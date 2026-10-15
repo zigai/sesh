@@ -261,7 +261,7 @@ assert_daemon_runtime_status() {
   local doctor_exit=$?
   set -e
   [[ $doctor_exit == 0 || $doctor_exit == 1 ]]
-  jq -e '.result.checks[] | select(.check == "daemon-runtime" and .status == "ok")' "$output" >/dev/null
+  jq -e '.result.checks[] | select(.id == "autosave.daemon" and .status == "ok")' "$output" >/dev/null
 }
 
 ensure_tmux_ready() {

@@ -7,7 +7,7 @@ import (
 )
 
 func TestNewCommand(t *testing.T) {
-	cmd := cmddoctor.NewCommand()
+	cmd := cmddoctor.NewCommand(cmddoctor.Build{})
 	if cmd == nil || cmd.Use != "doctor" {
 		t.Fatalf("unexpected doctor command: %#v", cmd)
 	}

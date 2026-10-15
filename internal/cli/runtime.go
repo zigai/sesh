@@ -266,7 +266,7 @@ func (r *commandRuntime) setupLogging(cmd *cobra.Command) error {
 
 	r.sink, err = logging.Open(logPath)
 	if err != nil {
-		return oops.In("cli").Code("logging_failed").With("operation", "configure_logging").Wrap(err)
+		return oops.In("cli").Code("logging_failed").With("operation", "configure_logging").Wrap(fmt.Errorf("%w: %w", clibase.ErrLogFileUnavailable, err))
 	}
 
 	r.sink.SetLevel(level)

@@ -122,6 +122,10 @@ func humanErrorMessage(err error) string {
 
 func humanCommandErrorMessage(cmd *cobra.Command, err error) string {
 	message := humanErrorMessage(err)
+	if clibase.EnvironmentError(err) {
+		return message + "; run 'sesh doctor' for details"
+	}
+
 	if cmd == nil || ExitCode(err) != exitCodeUsage {
 		return message
 	}
@@ -406,7 +410,7 @@ func generalSentinelMessage(err error) (string, bool) {
 	case errors.Is(err, context.Canceled):
 		return "operation canceled", true
 	case errors.Is(err, os.ErrNotExist):
-		return "repository does not exist", true
+		return clibase.NotExistMessage(err), true
 	case errors.Is(err, os.ErrPermission):
 		return "permission denied", true
 	case errors.Is(err, errUnknownCommand):

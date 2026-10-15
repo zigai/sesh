@@ -3,7 +3,6 @@
 package doctor
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -14,110 +13,50 @@ import (
 	"github.com/zigai/sesh/internal/strictjson"
 )
 
-func (s *Service) checkHistory(_ context.Context) Result {
-	if s.historyPath == "" {
-		return Result{
-			Check:   CheckHistoryState,
-			Status:  StatusWarning,
-			Reason:  ReasonNotConfigured,
-			Message: "history state path not configured",
-			Fix:     "Configure [paths].history_file",
-		}
+func (s *Service) checkHistory() Result {
+	path := s.opts.HistoryPath
+	moveAside := "mv " + shellPath(path) + " " + shellPath(path+".bak")
+
+	info, err := os.Lstat(path)
+
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		return newResult(CheckHistoryFile, StatusInfo, "Not created yet; switching sessions creates it").withReason(ReasonNotFound)
+	case errors.Is(err, os.ErrPermission):
+		return newResult(CheckHistoryFile, StatusFail, "Permission denied reading "+DisplayPath(path)).
+			withReason(ReasonUnsafe).
+			withManual("Make the directory of " + DisplayPath(path) + " readable by you")
+	case err == nil && info.Mode()&os.ModeSymlink != 0:
+		return s.unsafeHistory()
 	}
 
-	info, lstatErr := os.Lstat(s.historyPath)
-	if lstatErr == nil && info.Mode()&os.ModeSymlink != 0 {
-		return Result{
-			Check:   CheckHistoryState,
-			Status:  StatusError,
-			Reason:  ReasonUnsafe,
-			Message: "history state path has unsafe permissions or is a symlink",
-			Fix:     "Ensure history state file and directory permissions are secure and not symlinked",
-		}
+	state, loadErr := session.LoadState(path)
+	if loadErr == nil {
+		return newResult(CheckHistoryFile, StatusOK, fmt.Sprintf("%s, %s, %s",
+			plural(len(state.SwitchHistory), "switch entry"), plural(len(state.RemoteSwitchHistory), "remote entry"),
+			plural(len(state.AgentViewHistory), "agent view entry")))
 	}
 
-	if lstatErr != nil {
-		if errors.Is(lstatErr, os.ErrNotExist) {
-			return Result{
-				Check:   CheckHistoryState,
-				Status:  StatusWarning,
-				Reason:  ReasonNotFound,
-				Message: "history state file does not exist (first-run clean state)",
-				Fix:     "",
-			}
-		}
-
-		if errors.Is(lstatErr, os.ErrPermission) {
-			return Result{
-				Check:   CheckHistoryState,
-				Status:  StatusError,
-				Reason:  ReasonUnsafe,
-				Message: "permission denied reading history state path",
-				Fix:     "Fix permissions for history state file",
-			}
-		}
-	}
-
-	state, loadErr := session.LoadState(s.historyPath)
-	if loadErr != nil {
-		return classifyHistoryLoadError(loadErr)
-	}
-
-	return Result{
-		Check:   CheckHistoryState,
-		Status:  StatusOK,
-		Reason:  "",
-		Message: fmt.Sprintf("history state verified (%d switch entries, %d remote entries, %d agent view entries)", len(state.SwitchHistory), len(state.RemoteSwitchHistory), len(state.AgentViewHistory)),
-		Fix:     "",
+	switch {
+	case errors.Is(loadErr, session.ErrHistoryOversized):
+		return newResult(CheckHistoryFile, StatusFail, "Larger than the 1 MiB limit").withReason(ReasonCorrupt).withCommand(moveAside)
+	case errors.Is(loadErr, privatefs.ErrUnsafe), errors.Is(loadErr, syscall.ELOOP):
+		return s.unsafeHistory()
+	case errors.Is(loadErr, strictjson.ErrInvalid):
+		return newResult(CheckHistoryFile, StatusFail, "Contains invalid JSON").withReason(ReasonCorrupt).withCommand(moveAside)
+	case errors.Is(loadErr, session.ErrInvalidHistoryVersion):
+		return newResult(CheckHistoryFile, StatusFail, "Has an unsupported schema version").withReason(ReasonIncompatible).withCommand(moveAside)
+	default:
+		return newResult(CheckHistoryFile, StatusFail, "Cannot load: "+loadErr.Error()).
+			withReason(ReasonInspectionFailed).
+			withCommand("ls -l " + shellPath(path))
 	}
 }
 
-func classifyHistoryLoadError(err error) Result {
-	if errors.Is(err, session.ErrHistoryOversized) {
-		return Result{
-			Check:   CheckHistoryState,
-			Status:  StatusError,
-			Reason:  ReasonCorrupt,
-			Message: "history state file exceeds maximum size limit (1 MiB)",
-			Fix:     "Reset or rotate history state file",
-		}
-	}
+func (s *Service) unsafeHistory() Result {
+	path := DisplayPath(s.opts.HistoryPath)
 
-	if errors.Is(err, privatefs.ErrUnsafe) || errors.Is(err, syscall.ELOOP) {
-		return Result{
-			Check:   CheckHistoryState,
-			Status:  StatusError,
-			Reason:  ReasonUnsafe,
-			Message: "history state path has unsafe permissions or is a symlink",
-			Fix:     "Ensure history state file and directory permissions are secure and not symlinked",
-		}
-	}
-
-	if errors.Is(err, strictjson.ErrInvalid) {
-		return Result{
-			Check:   CheckHistoryState,
-			Status:  StatusError,
-			Reason:  ReasonCorrupt,
-			Message: "history state contains corrupt or invalid JSON",
-			Fix:     "Reset or repair history state file",
-		}
-	}
-
-	if errors.Is(err, session.ErrInvalidHistoryVersion) {
-		return Result{
-			Check:   CheckHistoryState,
-			Status:  StatusError,
-			Reason:  ReasonIncompatible,
-			Message: "history state has unsupported schema version",
-			Fix:     "Reset or migrate history state file",
-		}
-	}
-
-	return Result{
-		Check:   CheckHistoryState,
-		Status:  StatusError,
-		Reason:  ReasonInspectionFailed,
-		Message: "failed to load history state",
-		Fix:     "Verify history state file permissions and contents",
-	}
+	return newResult(CheckHistoryFile, StatusFail, path+" is a symlink or has unsafe permissions").
+		withReason(ReasonUnsafe).
+		withManual(fmt.Sprintf("Make %s a regular file owned by you with mode 0600 in a directory only you can write", path))
 }

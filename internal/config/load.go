@@ -195,7 +195,7 @@ func loadDiscoveredConfigFiles() ([][]byte, error) {
 
 	userPath := DefaultConfigPath()
 
-	for _, source := range []string{"/etc/sesh/config.toml", userPath} {
+	for _, source := range []string{SystemConfigPath, userPath} {
 		var (
 			data    []byte
 			hasFile bool

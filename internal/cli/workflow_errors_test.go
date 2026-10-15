@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -12,6 +14,7 @@ import (
 
 	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/agents"
+	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/remote"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/snapshot/restore"
@@ -26,6 +29,7 @@ func TestWorkflowErrorsPreservePublicClassification(t *testing.T) {
 		code  string
 	}{
 		{errDoctorChecksFailed, "doctorChecksFailed"},
+		{fmt.Errorf("%w: %w", clibase.ErrLogFileUnavailable, os.ErrNotExist), "logFileUnavailable"},
 		{session.ErrNotInsideTmux, "notInsideTmux"},
 		{session.ErrInvokingClientUnavailable, "clientUnavailable"},
 		{session.ErrInvokingClientAmbiguous, "clientAmbiguous"},

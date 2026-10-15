@@ -52,6 +52,34 @@ func runtimeConfig(t *testing.T, level string) (string, string) {
 	return path, logPath
 }
 
+func TestUnopenableLogFileNamesTheSettingAndTheDoctor(t *testing.T) {
+	t.Parallel()
+
+	base := t.TempDir()
+
+	locked := filepath.Join(base, "locked")
+	if err := os.Mkdir(locked, 0o500); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := filepath.Join(base, "config.toml")
+	if err := os.WriteFile(cfg, fmt.Appendf(nil, "[paths]\nlog_file = %q\n", filepath.Join(locked, "state", "sesh.log")), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+
+	err := ExecuteApplication(t.Context(), []string{snapshotCmd, "history", testRepositoryFlag, filepath.Join(base, "repository"), testConfigFlag, cfg}, nil, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("a command whose log cannot open must fail")
+	}
+
+	want := "log file cannot be opened; set paths.log_file to a file in a writable directory; run 'sesh doctor' for details\n"
+	if stderr.String() != want {
+		t.Fatalf("stderr = %q, want %q", stderr.String(), want)
+	}
+}
+
 func TestApplicationReadBoundaryLogging(t *testing.T) {
 	for _, missing := range []bool{false, true} {
 		t.Run(strconv.FormatBool(missing), func(t *testing.T) { testReadBoundaryLogging(t, missing) })
@@ -248,11 +276,11 @@ func TestApplicationHumanConfigDiagnostics(t *testing.T) {
 	}{
 		"validation reason": {
 			config: "[display]\nsesh_format = \"{session_name} {custom.weather}\"\n",
-			want:   "configuration could not be loaded: invalid display.sesh_format: undefined custom field: custom.weather has no display.fields.weather entry\n",
+			want:   "configuration could not be loaded: invalid display.sesh_format: undefined custom field: custom.weather has no display.fields.weather entry; run 'sesh doctor' for details\n",
 		},
 		"toml location only": {
 			config: "[settings]\nsecret_private_key = 1\n",
-			want:   "invalid configuration at line 2, column 1\n",
+			want:   "invalid configuration at line 2, column 1; run 'sesh doctor' for details\n",
 		},
 	}
 
