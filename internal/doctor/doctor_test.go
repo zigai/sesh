@@ -12,6 +12,7 @@ import (
 	"io"
 	"maps"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -893,6 +894,41 @@ func TestHistoryState_InvalidVersion(t *testing.T) {
 	historyRes := findCheck(results, doctor.CheckHistoryFile)
 	if historyRes.Status != doctor.StatusFail || historyRes.Reason != doctor.ReasonIncompatible {
 		t.Fatalf("expected incompatible error for invalid version, got %#v", historyRes)
+	}
+}
+
+func TestHistoryState_VersionOneFixConvertsFile(t *testing.T) {
+	t.Parallel()
+
+	historyDir := testDir(t, "history")
+	historyPath := filepath.Join(historyDir, "history.json")
+
+	versionOneJSON := `{"version": 1, "switchHistory": [], "remoteSwitchHistory": [], "agentViewHistory": [], "lastAutosaveTimestamp": 0, "popupDisplayMode": ""}`
+	if err := os.WriteFile(historyPath, []byte(versionOneJSON), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	results, err := doctor.Run(t.Context(), doctor.Options{HistoryPath: historyPath})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	historyRes := findCheck(results, doctor.CheckHistoryFile)
+	if historyRes.Status != doctor.StatusFail || historyRes.Reason != doctor.ReasonIncompatible || historyRes.Fix == nil {
+		t.Fatalf("expected incompatible error with a fix, got %#v", historyRes)
+	}
+
+	if out, err := exec.CommandContext(t.Context(), "sh", "-c", historyRes.Fix.Command).CombinedOutput(); err != nil {
+		t.Fatalf("fix %q failed: %v\n%s", historyRes.Fix.Command, err, out)
+	}
+
+	results, err = doctor.Run(t.Context(), doctor.Options{HistoryPath: historyPath})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if historyRes := findCheck(results, doctor.CheckHistoryFile); historyRes.Status != doctor.StatusOK {
+		t.Fatalf("expected converted history to load, got %#v", historyRes)
 	}
 }
 
