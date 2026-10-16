@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -31,13 +32,22 @@ func TestRunReportsEveryCheckInGroupOrder(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
+	units := filepath.Join(root, "units")
+	if err := os.Mkdir(units, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(units, "sesh.service"), []byte("[Service]\nExecStart=sesh doctor\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 
 	results, err := doctor.Run(t.Context(), doctor.Options{
-		SnapshotDir:  filepath.Join(root, "snapshots"),
-		HistoryPath:  filepath.Join(root, "history.json"),
-		LogPath:      filepath.Join(root, "sesh.log"),
-		ServiceDirs:  []string{filepath.Join(root, "units")},
-		CustomFields: []doctor.CustomField{{Name: "weather", Command: ""}},
+		SnapshotDir:     filepath.Join(root, "snapshots"),
+		HistoryPath:     filepath.Join(root, "history.json"),
+		LogPath:         filepath.Join(root, "sesh.log"),
+		ServiceDirs:     []string{units},
+		AutosaveEnabled: true,
+		Daemon:          doctor.Daemon{State: doctor.DaemonAbsent},
+		CustomFields:    []doctor.CustomField{{Name: "weather", Command: ""}},
 		ValidateCommand: func([]string) error {
 			return nil
 		},
@@ -62,10 +72,43 @@ func TestRunReportsEveryCheckInGroupOrder(t *testing.T) {
 	want := []string{
 		doctor.CheckInstallPath, doctor.CheckConfigFile, doctor.CheckTmuxClient, doctor.CheckTmuxServer, doctor.FieldCheck("weather"),
 		doctor.CheckSnapshotRepository, doctor.CheckSnapshotCurrent, doctor.CheckActiveRestores, doctor.CheckHistoryFile,
-		doctor.CheckLogFile, doctor.CheckServiceUnits, doctor.CheckServiceOOMPolicy, doctor.CheckAutosaveDaemon, doctor.CheckSmokeSessions,
+		doctor.CheckLogFile,
 	}
+	if runtime.GOOS == "linux" {
+		want = append(want, doctor.CheckServiceUnits, doctor.CheckServiceOOMPolicy, doctor.CheckAutosaveDaemon)
+	}
+	want = append(want, doctor.CheckSmokeSessions)
 	if !slices.Equal(ids, want) {
 		t.Fatalf("checks = %q, want %q", ids, want)
+	}
+}
+
+func TestRunOmitsUnusedServiceAndCoordinatorChecks(test *testing.T) {
+	test.Parallel()
+
+	for _, dirs := range [][]string{nil, {test.TempDir()}} {
+		results, err := doctor.Run(test.Context(), doctor.Options{
+			ServiceDirs:     dirs,
+			Daemon:          doctor.Daemon{State: doctor.DaemonAbsent},
+			ValidateCommand: func([]string) error { return nil },
+		})
+		if err != nil {
+			test.Fatal(err)
+		}
+
+		for _, id := range []string{doctor.CheckServiceUnits, doctor.CheckAutosaveDaemon} {
+			if result := findCheck(results, id); result.ID != "" {
+				test.Errorf("unused check %s was collected: %+v", id, result)
+			}
+		}
+
+		if dirs == nil || runtime.GOOS != "linux" {
+			if result := findCheck(results, doctor.CheckServiceOOMPolicy); result.ID != "" {
+				test.Errorf("unsupported service OOM check was collected: %+v", result)
+			}
+		} else if result := findCheck(results, doctor.CheckServiceOOMPolicy); result.Status != doctor.StatusSkip || result.Needs != doctor.CheckTmuxServer {
+			test.Errorf("applicable OOM check lost its prerequisite skip: %+v", result)
+		}
 	}
 }
 

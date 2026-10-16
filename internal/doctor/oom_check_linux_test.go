@@ -2,7 +2,21 @@
 
 package doctor
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
+
+func TestUnitFromCgroupDistinguishesNonMembershipFromInspectionFailure(test *testing.T) {
+	test.Parallel()
+
+	for _, data := range []string{"", "malformed", "0::relative.scope", "1:name=systemd:/legacy.scope"} {
+		_, err := unitFromCgroup([]byte(data))
+		if err == nil || errors.Is(err, errNoServiceUnit) {
+			test.Errorf("uninspected cgroup %q was treated as known non-membership: %v", data, err)
+		}
+	}
+}
 
 func TestUnitFromCgroupNamesOnlyAServiceThatDirectlyHoldsTheProcess(t *testing.T) {
 	t.Parallel()

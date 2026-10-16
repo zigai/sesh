@@ -5,6 +5,8 @@ package doctor
 import (
 	"context"
 	"errors"
+	"fmt"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -23,52 +25,68 @@ func oomService(serverPID int, unit string, unitErr error, policy string, policy
 	return service
 }
 
-func TestServiceOOMPolicyWarnsWhenOneKilledProcessStopsTheWholeUnit(t *testing.T) {
-	t.Parallel()
+func TestServiceOOMPolicyReportsApplicablePoliciesAndInspectionErrors(test *testing.T) {
+	test.Parallel()
 
-	result := oomService(4242, "tmux.service", nil, "stop", nil).checkServiceOOMPolicy(t.Context())
-	if result.ID != CheckServiceOOMPolicy || result.Status != StatusWarn || result.Reason != ReasonUnsafe {
-		t.Fatalf("unexpected result: %+v", result)
-	}
-
-	for _, want := range []string{"tmux.service", "OOMPolicy=stop"} {
-		if !strings.Contains(result.Message, want) {
-			t.Fatalf("message missing %q: %s", want, result.Message)
-		}
-	}
-
-	if result.Fix == nil || !strings.Contains(result.Fix.Manual, "OOMPolicy=continue") ||
-		!strings.Contains(result.Fix.Manual, "systemctl --user edit tmux.service") {
-		t.Fatalf("the fix must name the directive and the unit: %+v", result.Fix)
-	}
-}
-
-func TestServiceOOMPolicyPassesWhenOtherPoliciesKeepTheServer(t *testing.T) {
-	t.Parallel()
-
-	for _, policy := range []string{"continue", "kill"} {
-		result := oomService(4242, "tmux.service", nil, policy, nil).checkServiceOOMPolicy(t.Context())
-		if result.Status != StatusOK || !strings.Contains(result.Message, "OOMPolicy="+policy) {
-			t.Fatalf("policy %s: %+v", policy, result)
-		}
-	}
-}
-
-func TestServiceOOMPolicySkipsWhenTheUnitCannotBeDetermined(t *testing.T) {
-	t.Parallel()
-
-	for name, tc := range map[string]struct {
+	for _, scenario := range []struct {
+		name    string
 		service *Service
+		status  Status
+		reason  string
 		needs   string
+		message string
+		fix     string
 	}{
-		"not in a service":  {service: oomService(4242, "", errTestScope, "", nil)},
-		"policy unreadable": {service: oomService(4242, "tmux.service", nil, "", errTestSystemd)},
-		"no server":         {service: oomService(0, "tmux.service", nil, "stop", nil), needs: CheckTmuxServer},
-		"not systemd":       {service: NewService(Options{})},
+		{"stops whole unit", oomService(4242, "tmux.service", nil, "stop", nil), StatusWarn, ReasonUnsafe, "", "tmux.service uses OOMPolicy=stop", "OOMPolicy=continue"},
+		{"continues", oomService(4242, "tmux.service", nil, "continue", nil), StatusOK, "", "", "tmux.service uses OOMPolicy=continue", ""},
+		{"kills", oomService(4242, "tmux.service", nil, "kill", nil), StatusOK, "", "", "tmux.service uses OOMPolicy=kill", ""},
+		{"membership error", oomService(4242, "", errTestScope, "", nil), StatusWarn, ReasonInspectionFailed, "", "could not be inspected", "cgroup"},
+		{"policy error", oomService(4242, "tmux.service", nil, "", errTestSystemd), StatusWarn, ReasonInspectionFailed, "", "unreadable", "systemctl --user show"},
+		{"no server", oomService(0, "tmux.service", nil, "stop", nil), StatusSkip, "", CheckTmuxServer, "unavailable", ""},
 	} {
-		result := tc.service.checkServiceOOMPolicy(t.Context())
-		if result.Status != StatusSkip || result.Needs != tc.needs || result.Message == "" {
-			t.Fatalf("%s: want a skip with a reason, got %+v", name, result)
+		test.Run(scenario.name, func(test *testing.T) {
+			test.Parallel()
+			results := scenario.service.checkServiceOOMPolicy(test.Context())
+			if runtime.GOOS != "linux" {
+				if len(results) != 0 {
+					test.Fatalf("unsupported OOM check collected: %+v", results)
+				}
+				return
+			}
+			if len(results) != 1 {
+				test.Fatalf("applicable OOM check omitted: %+v", results)
+			}
+			result := results[0]
+			if result.ID != CheckServiceOOMPolicy || result.Status != scenario.status || result.Reason != scenario.reason || result.Needs != scenario.needs || !strings.Contains(result.Message, scenario.message) {
+				test.Fatalf("unexpected OOM check: %+v", result)
+			}
+			if scenario.fix == "" {
+				if result.Fix != nil {
+					test.Fatalf("unexpected repair: %+v", result.Fix)
+				}
+			} else if result.Fix == nil || !strings.Contains(result.Fix.Command+result.Fix.Manual, scenario.fix) {
+				test.Fatalf("missing actionable repair %q: %+v", scenario.fix, result)
+			}
+			if scenario.reason == ReasonUnsafe && !strings.Contains(result.Fix.Manual, "systemctl --user edit tmux.service") {
+				test.Fatalf("unsafe OOM repair lost its unit: %+v", result.Fix)
+			}
+		})
+	}
+}
+
+func TestServiceOOMPolicyOmitsKnownNonMembershipAndUnsupportedServices(test *testing.T) {
+	test.Parallel()
+
+	for _, service := range []*Service{
+		oomService(4242, "", fmt.Errorf("membership: %w", errNoServiceUnit), "", nil),
+		NewService(Options{}),
+	} {
+		service.oomPolicyOf = func(context.Context, string) (string, error) {
+			test.Error("inapplicable OOM policy was queried")
+			return "", errTestSystemd
+		}
+		if results := service.checkServiceOOMPolicy(test.Context()); len(results) != 0 {
+			test.Fatalf("inapplicable OOM check was collected: %+v", results)
 		}
 	}
 }

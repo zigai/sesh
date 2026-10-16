@@ -192,6 +192,7 @@ func resolveDoctorOptions(ctx context.Context, cmd *cobra.Command) (doctor.Optio
 	opts.LogPath = logPath
 	opts.Daemon = daemonState(ctx, workspace.Socket)
 	opts.ServiceDirs = serviceSearchPath()
+	opts.UnitActiveState = unitActiveState
 	opts.ValidateCommand = commandLineValidator(cmd.Root())
 
 	if configErr == nil {
@@ -281,6 +282,15 @@ func daemonState(ctx context.Context, socket string) doctor.Daemon {
 	path, _ := daemon.RuntimeStatusPath(os.Getenv("XDG_RUNTIME_DIR"), socket)
 
 	return doctor.Daemon{State: state, Phase: string(status.Phase), InhibitorsHeld: status.InhibitorsHeld, RuntimePath: path}
+}
+
+func unitActiveState(ctx context.Context, unit string) (string, error) {
+	states, err := setup.UnitStates(ctx, setup.ServiceManager{Inspect: nil, Run: nil}, []string{unit})
+	if err != nil {
+		return "", oops.In("cli").With("operation", "inspect_unit_state").Wrap(err)
+	}
+
+	return states[0].Active, nil
 }
 
 // serviceSearchPath is the systemd user unit search path, highest precedence first. Launchd

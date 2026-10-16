@@ -12,6 +12,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 )
@@ -55,9 +56,12 @@ type execWords struct {
 // fails on every start or stop, which silently disables the saves and restores it was written
 // for. It reads units the way systemd resolves them: the first unit file of a name along the
 // search path, links followed, with its drop-ins applied.
-func (s *Service) checkServiceUnits() Result {
-	if s.opts.ServiceDirs == nil || s.opts.ValidateCommand == nil {
-		return newResult(CheckServiceUnits, StatusSkip, "Only systemd user units are checked")
+func (s *Service) checkServiceUnits() []Result {
+	if runtime.GOOS != "linux" || s.opts.ServiceDirs == nil {
+		return nil
+	}
+	if s.opts.ValidateCommand == nil {
+		return []Result{newResult(CheckServiceUnits, StatusSkip, "Service command validation is unavailable")}
 	}
 
 	units, unreadable := s.unitFiles()
@@ -92,29 +96,29 @@ func (s *Service) checkServiceUnits() Result {
 	return s.serviceUnitsResult(checked, stale, unreadable)
 }
 
-func (s *Service) serviceUnitsResult(checked int, stale, unreadable []string) Result {
+func (s *Service) serviceUnitsResult(checked int, stale, unreadable []string) []Result {
 	if len(stale) > 0 {
-		return newResult(CheckServiceUnits, StatusFail,
+		return []Result{newResult(CheckServiceUnits, StatusFail,
 			plural(len(stale), "unit")+" run sesh command lines this sesh rejects, so they fail on every start or stop").
 			withReason(ReasonStale).
 			withDetails(stale...).
 			withDetails(unreadable...).
 			withManual("Regenerate sesh-managed units with 'sesh setup services --apply' (add the flags you set them up with), " +
-				"update hand-maintained units to the current commands, then run 'systemctl --user daemon-reload'")
+				"update hand-maintained units to the current commands, then run 'systemctl --user daemon-reload'")}
 	}
 
 	if len(unreadable) > 0 {
-		return newResult(CheckServiceUnits, StatusWarn, plural(len(unreadable), "unit location")+" could not be read, so their sesh commands were not checked").
+		return []Result{newResult(CheckServiceUnits, StatusWarn, plural(len(unreadable), "unit location")+" could not be read, so their sesh commands were not checked").
 			withReason(ReasonInspectionFailed).
 			withDetails(unreadable...).
-			withManual("Make the listed files and directories readable by you")
+			withManual("Make the listed files and directories readable by you")}
 	}
 
 	if checked == 0 {
-		return newResult(CheckServiceUnits, StatusInfo, "No systemd user unit runs sesh")
+		return nil
 	}
 
-	return newResult(CheckServiceUnits, StatusOK, plural(checked, "unit")+" run sesh command lines this sesh accepts")
+	return []Result{newResult(CheckServiceUnits, StatusOK, plural(checked, "unit")+" run sesh command lines this sesh accepts")}
 }
 
 // unitFiles maps each service unit name to the file systemd loads for it: the first along the
@@ -146,7 +150,13 @@ func (s *Service) unitFiles() (map[string]string, []string) {
 			shadowed[name] = true
 
 			path := filepath.Join(dir, name)
-			if info, err := os.Stat(path); err == nil && info.Mode().IsRegular() {
+			info, err := os.Stat(path)
+			switch {
+			case errors.Is(err, fs.ErrNotExist):
+				continue
+			case err != nil:
+				unreadable = append(unreadable, fmt.Sprintf("%s: %v", DisplayPath(path), err))
+			case info.Mode().IsRegular():
 				units[name] = path
 			}
 		}
@@ -159,8 +169,12 @@ func (s *Service) unitFiles() (map[string]string, []string) {
 // Exec assignment clears the commands set before it, as in systemd.
 func (s *Service) unitCommands(name, path string) ([]unitCommand, error) {
 	execs := make(map[string][]unitCommand)
+	dropIns, err := s.dropIns(name)
+	if err != nil {
+		return nil, err
+	}
 
-	for _, file := range append([]string{path}, s.dropIns(name)...) {
+	for _, file := range append([]string{path}, dropIns...) {
 		lines, err := readUnitLines(file)
 		if err != nil {
 			return nil, err
@@ -197,12 +211,18 @@ func (s *Service) unitCommands(name, path string) ([]unitCommand, error) {
 
 // dropIns lists the drop-in files of a unit in the order systemd applies them: by file name,
 // with a name in an earlier search directory shadowing the same name in a later one.
-func (s *Service) dropIns(unit string) []string {
+func (s *Service) dropIns(unit string) ([]string, error) {
 	byName := make(map[string]string)
+	var inspectionErr error
 
 	for _, dir := range s.opts.ServiceDirs {
-		entries, err := os.ReadDir(filepath.Join(dir, unit+".d"))
+		path := filepath.Join(dir, unit+".d")
+		entries, err := os.ReadDir(path)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
 		if err != nil {
+			inspectionErr = errors.Join(inspectionErr, fmt.Errorf("%s: %w", DisplayPath(path), err))
 			continue
 		}
 
@@ -221,7 +241,7 @@ func (s *Service) dropIns(unit string) []string {
 		files = append(files, byName[name])
 	}
 
-	return files
+	return files, inspectionErr
 }
 
 func readUnitLines(path string) ([]unitLine, error) {

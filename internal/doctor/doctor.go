@@ -179,6 +179,9 @@ type Options struct {
 	// ServiceDirs is the systemd user unit search path, highest precedence first; nil skips the
 	// service checks.
 	ServiceDirs []string
+	// UnitActiveState returns the systemd ActiveState of a user unit. The daemon check needs it
+	// whenever the coordinator unit is installed.
+	UnitActiveState func(ctx context.Context, unit string) (string, error)
 	// ValidateCommand reports whether this sesh accepts a command line, given without the
 	// program; nil skips the unit command check.
 	ValidateCommand func(args []string) error
@@ -275,9 +278,9 @@ func (s *Service) Run(ctx context.Context) ([]Result, error) {
 		func(ctx context.Context) ([]Result, error) { return []Result{s.checkActiveRestores(ctx)}, nil },
 		func(context.Context) ([]Result, error) { return []Result{s.checkHistory()}, nil },
 		func(context.Context) ([]Result, error) { return []Result{s.checkLogFile()}, nil },
-		func(context.Context) ([]Result, error) { return []Result{s.checkServiceUnits()}, nil },
-		func(ctx context.Context) ([]Result, error) { return []Result{s.checkServiceOOMPolicy(ctx)}, nil },
-		func(context.Context) ([]Result, error) { return []Result{s.checkDaemon()}, nil },
+		func(context.Context) ([]Result, error) { return s.checkServiceUnits(), nil },
+		func(ctx context.Context) ([]Result, error) { return s.checkServiceOOMPolicy(ctx), nil },
+		func(ctx context.Context) ([]Result, error) { return s.checkDaemon(ctx), nil },
 		func(context.Context) ([]Result, error) { return []Result{s.checkSmoke()}, nil },
 	}
 

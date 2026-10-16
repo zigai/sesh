@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -103,7 +104,17 @@ func TestServiceUnitsAreReadTheWaySystemdResolvesThem(t *testing.T) {
 	writeUnit(t, filepath.Join(userDir, "shadow.service"), "[Service]\nExecStart=sesh daemon coordinator\n")
 	writeUnit(t, filepath.Join(dataDir, "shadow.service"), "[Service]\nExecStart=sesh old\n")
 
-	result := service.checkServiceUnits()
+	results := service.checkServiceUnits()
+	if runtime.GOOS != "linux" {
+		if len(results) != 0 {
+			t.Fatalf("unsupported unit checks collected: %+v", results)
+		}
+		return
+	}
+	if len(results) != 1 {
+		t.Fatalf("checks = %+v, want one unit check", results)
+	}
+	result := results[0]
 	if result.Status != StatusFail || result.Reason != ReasonStale || result.Fix == nil {
 		t.Fatalf("result = %+v, want a failure with a fix", result)
 	}
@@ -123,19 +134,74 @@ func TestServiceUnitsAreReadTheWaySystemdResolvesThem(t *testing.T) {
 	}
 }
 
-func TestServiceUnitsSkipMaskedUnitsAndReportWhenNoneRunSesh(t *testing.T) {
-	t.Parallel()
+func TestServiceUnitsRetainInspectionErrors(test *testing.T) {
+	test.Parallel()
 
-	service, userDir, dataDir := unitsService(t)
+	for _, kind := range []string{"search directory", "unit symlink", "drop-in directory"} {
+		test.Run(kind, func(test *testing.T) {
+			test.Parallel()
+			service, userDir, _ := unitsService(test)
+			switch kind {
+			case "search directory":
+				writeUnit(test, userDir, "not a directory")
+			case "unit symlink":
+				if err := os.MkdirAll(userDir, 0o700); err != nil {
+					test.Fatal(err)
+				}
+				if err := os.Symlink("loop.service", filepath.Join(userDir, "loop.service")); err != nil {
+					test.Fatal(err)
+				}
+			case "drop-in directory":
+				writeUnit(test, filepath.Join(userDir, "sesh.service"), "[Service]\nExecStart=sesh doctor\n")
+				writeUnit(test, filepath.Join(userDir, "sesh.service.d"), "not a directory")
+			}
+			results := service.checkServiceUnits()
+			if runtime.GOOS != "linux" {
+				if len(results) != 0 {
+					test.Fatalf("unsupported unit checks collected: %+v", results)
+				}
+				return
+			}
+			if len(results) != 1 {
+				test.Fatalf("inspection check omitted: %+v", results)
+			}
+			result := results[0]
+			if result.Status != StatusWarn || result.Reason != ReasonInspectionFailed || result.Fix == nil || len(result.Details) == 0 {
+				test.Fatalf("inspection error was omitted or claimed healthy: %+v", result)
+			}
+		})
+	}
+}
 
-	writeUnit(t, filepath.Join(dataDir, "masked.service"), "[Service]\nExecStart=sesh old\n")
-	writeUnit(t, filepath.Join(userDir, "other.service"), "[Service]\nExecStart=/usr/bin/true old\n")
+func TestServiceUnitsPreserveUnavailableValidationSkip(test *testing.T) {
+	test.Parallel()
+
+	service := NewService(Options{ServiceDirs: []string{test.TempDir()}})
+	results := service.checkServiceUnits()
+	if runtime.GOOS != "linux" {
+		if len(results) != 0 {
+			test.Fatalf("unsupported unit checks collected: %+v", results)
+		}
+		return
+	}
+	if len(results) != 1 || results[0].Status != StatusSkip {
+		test.Fatalf("unavailable command validation lost its skip: %+v", results)
+	}
+}
+
+func TestServiceUnitsOmitMaskedAndUnrelatedUnits(test *testing.T) {
+	test.Parallel()
+
+	service, userDir, dataDir := unitsService(test)
+
+	writeUnit(test, filepath.Join(dataDir, "masked.service"), "[Service]\nExecStart=sesh old\n")
+	writeUnit(test, filepath.Join(userDir, "other.service"), "[Service]\nExecStart=/usr/bin/true old\n")
 
 	if err := os.Symlink(os.DevNull, filepath.Join(userDir, "masked.service")); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
-	if result := service.checkServiceUnits(); result.Status != StatusInfo {
-		t.Fatalf("result = %+v, want info that no unit runs sesh", result)
+	if results := service.checkServiceUnits(); len(results) != 0 {
+		test.Fatalf("unused service unit checks were collected: %+v", results)
 	}
 }

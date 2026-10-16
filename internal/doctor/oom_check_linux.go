@@ -16,7 +16,7 @@ import (
 
 const oomPolicyQueryTimeout = 3 * time.Second
 
-var errNoServiceUnit = errors.New("process is not in a service unit cgroup")
+var errCgroupUninspected = errors.New("unified process cgroup could not be determined")
 
 // serviceUnitOf names the systemd service whose cgroup directly holds pid.
 func serviceUnitOf(pid int) (string, error) {
@@ -32,17 +32,19 @@ func serviceUnitOf(pid int) (string, error) {
 // terminal sits in a scope under the user manager, whose own service must not be mistaken for it.
 func unitFromCgroup(data []byte) (string, error) {
 	for line := range bytes.SplitSeq(bytes.TrimSpace(data), []byte("\n")) {
-		_, cgroupPath, found := strings.Cut(string(line), "::")
-		if !found {
+		cgroupPath, found := strings.CutPrefix(string(line), "0::")
+		if !found || !path.IsAbs(cgroupPath) {
 			continue
 		}
 
 		if name := path.Base(cgroupPath); strings.HasSuffix(name, ".service") {
 			return name, nil
 		}
+
+		return "", errNoServiceUnit
 	}
 
-	return "", errNoServiceUnit
+	return "", errCgroupUninspected
 }
 
 func serviceOOMPolicyOf(ctx context.Context, unit string) (string, error) {

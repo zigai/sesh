@@ -2,12 +2,7 @@
 
 package doctor
 
-import (
-	"context"
-	"errors"
-)
-
-var errNoServiceUnit = errors.New("service units are not available on this platform")
+import "context"
 
 func serviceUnitOf(int) (string, error) {
 	return "", errNoServiceUnit

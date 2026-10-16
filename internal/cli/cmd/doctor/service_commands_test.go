@@ -45,8 +45,6 @@ func serviceCommandsCheck(t *testing.T) doctor.Result {
 		}
 	}
 
-	t.Fatalf("doctor report has no %s check: %+v", doctor.CheckServiceUnits, report.Checks)
-
 	return doctor.Result{}
 }
 
@@ -109,10 +107,10 @@ func TestDoctorReportsUnitsRunningRemovedCommandsAndFlags(t *testing.T) {
 	}
 }
 
-func TestDoctorNotesWhenNoUnitRunsSesh(t *testing.T) {
-	isolatedServiceHome(t)
+func TestDoctorOmitsServiceCheckWhenNoUnitRunsSesh(test *testing.T) {
+	isolatedServiceHome(test)
 
-	if check := serviceCommandsCheck(t); check.Status != doctor.StatusInfo {
-		t.Fatalf("no unit runs sesh, so the check is only a note: %+v", check)
+	if check := serviceCommandsCheck(test); check.ID != "" {
+		test.Fatalf("no unit runs sesh, so the check must be omitted: %+v", check)
 	}
 }

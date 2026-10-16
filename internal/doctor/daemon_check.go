@@ -3,6 +3,9 @@
 package doctor
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -12,9 +15,9 @@ import (
 
 const daemonPhaseRunning = "running"
 
-func (s *Service) checkDaemon() Result {
+func (s *Service) checkDaemon(ctx context.Context) []Result {
 	if runtime.GOOS != setup.PlatformLinux {
-		return newResult(CheckAutosaveDaemon, StatusSkip, "The save coordinator runs only on Linux")
+		return nil
 	}
 
 	daemon := s.opts.Daemon
@@ -24,22 +27,22 @@ func (s *Service) checkDaemon() Result {
 	switch daemon.State {
 	case DaemonReady:
 		if daemon.Phase == daemonPhaseRunning && daemon.InhibitorsHeld {
-			return newResult(CheckAutosaveDaemon, StatusOK, "Coordinator runs and holds its shutdown and sleep inhibitors")
+			return []Result{newResult(CheckAutosaveDaemon, StatusOK, "Coordinator runs and holds its shutdown and sleep inhibitors")}
 		}
 
-		return s.busyDaemon(status)
+		return []Result{s.busyDaemon(status)}
 	case DaemonNotReady:
-		return s.busyDaemon(status)
+		return []Result{s.busyDaemon(status)}
 	case DaemonStale:
-		return newResult(CheckAutosaveDaemon, StatusWarn, "Runtime socket "+DisplayPath(daemon.RuntimePath)+" has no live owner").
+		return []Result{newResult(CheckAutosaveDaemon, StatusWarn, "Runtime socket "+DisplayPath(daemon.RuntimePath)+" has no live owner").
 			withReason(ReasonStale).
-			withCommand("rm " + shellPath(daemon.RuntimePath))
+			withCommand("rm " + shellPath(daemon.RuntimePath))}
 	case DaemonAbsent:
-		return s.absentDaemon(unit)
+		return s.absentDaemon(ctx, unit)
 	default:
-		return newResult(CheckAutosaveDaemon, StatusWarn, "Coordinator state at "+DisplayPath(daemon.RuntimePath)+" could not be verified").
+		return []Result{newResult(CheckAutosaveDaemon, StatusWarn, "Coordinator state at "+DisplayPath(daemon.RuntimePath)+" could not be verified").
 			withReason(ReasonUnverifiable).
-			withCommand(status)
+			withCommand(status)}
 	}
 }
 
@@ -56,29 +59,70 @@ func (s *Service) busyDaemon(status string) Result {
 	}
 }
 
-func (s *Service) absentDaemon(unit string) Result {
+func (s *Service) absentDaemon(ctx context.Context, unit string) []Result {
 	enable := "systemctl --user enable --now " + unit
+	installed, err := s.unitInstalled(unit)
 
 	switch {
-	case s.unitInstalled(unit):
-		return newResult(CheckAutosaveDaemon, StatusWarn, unit+" is installed but not running").
-			withReason(ReasonNotRunning).
-			withCommand(enable)
+	case err != nil:
+		return []Result{newResult(CheckAutosaveDaemon, StatusWarn, "Coordinator unit installation could not be inspected").
+			withReason(ReasonInspectionFailed).
+			withDetails(err.Error()).
+			withManual("Make the coordinator unit search locations readable and repair broken unit links")}
+	case installed:
+		return []Result{s.installedDaemon(ctx, unit, enable)}
 	case s.opts.AutosaveEnabled:
-		return newResult(CheckAutosaveDaemon, StatusWarn, "Coordinator is not installed, so no save runs before shutdown or sleep").
+		return []Result{newResult(CheckAutosaveDaemon, StatusWarn, "Coordinator is not installed, so no save runs before shutdown or sleep").
 			withReason(ReasonNotRunning).
-			withCommand(s.seshCommand("setup services --apply --with-coordinator", []string{flagSocket, flagRepository, flagHistory}) + " && " + enable)
+			withCommand(s.seshCommand("setup services --apply --with-coordinator", []string{flagSocket, flagRepository, flagHistory}) + " && " + enable)}
 	default:
-		return newResult(CheckAutosaveDaemon, StatusInfo, "Coordinator is not running; autosave is off").withReason(ReasonNotRunning)
+		return nil
 	}
 }
 
-func (s *Service) unitInstalled(unit string) bool {
-	for _, dir := range s.opts.ServiceDirs {
-		if _, err := os.Stat(filepath.Join(dir, unit)); err == nil {
-			return true
-		}
+// installedDaemon reports an installed coordinator that has no runtime status for the selected
+// tmux server. A running unit may be starting up or serving another server, so only a stopped or
+// failed unit is a warning.
+func (s *Service) installedDaemon(ctx context.Context, unit, enable string) Result {
+	state, err := s.opts.UnitActiveState(ctx, unit)
+	if err != nil {
+		return newResult(CheckAutosaveDaemon, StatusWarn, unit+" state could not be read").
+			withReason(ReasonInspectionFailed).
+			withDetails(err.Error()).
+			withCommand("systemctl --user status " + unit)
 	}
 
-	return false
+	switch state {
+	case "inactive":
+		return newResult(CheckAutosaveDaemon, StatusWarn, unit+" is installed but not running").
+			withReason(ReasonNotRunning).
+			withCommand(enable)
+	case "failed":
+		return newResult(CheckAutosaveDaemon, StatusWarn, unit+" failed and is not running").
+			withReason(ReasonNotRunning).
+			withCommand(enable)
+	case "active", "reloading":
+		return newResult(CheckAutosaveDaemon, StatusInfo, unit+" runs but has not published its status for this tmux server")
+	default:
+		return newResult(CheckAutosaveDaemon, StatusInfo, unit+" is "+state)
+	}
+}
+
+func (s *Service) unitInstalled(unit string) (bool, error) {
+	for _, dir := range s.opts.ServiceDirs {
+		path := filepath.Join(dir, unit)
+		_, err := os.Stat(path)
+		if err == nil {
+			return true, nil
+		}
+		if errors.Is(err, os.ErrNotExist) {
+			if _, linkErr := os.Lstat(path); errors.Is(linkErr, os.ErrNotExist) {
+				continue
+			}
+		}
+
+		return false, fmt.Errorf("%s: %w", DisplayPath(path), err)
+	}
+
+	return false, nil
 }
