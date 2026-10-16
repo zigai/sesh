@@ -246,4 +246,4 @@ linters:
         linters: [exhaustruct_v5]
 
       - path: ".*_test\\.go"
-        linters: [decorder, funcorder, exhaustruct_v5, unparam, contextcheck]
+        linters: [decorder, funcorder, exhaustruct_v5, unparam, contextcheck, cyclop, gocognit]
