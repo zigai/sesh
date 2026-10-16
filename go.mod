@@ -20,7 +20,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/zigai/aht/v2 v2.9.0
-	github.com/zigai/gotmux v0.7.2
+	github.com/zigai/gotmux v0.7.4
 	github.com/zigai/strata v0.4.0
 	golang.org/x/sync v0.23.0
 	golang.org/x/sys v0.49.0
