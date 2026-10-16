@@ -1,0 +1,3 @@
+- On a throwaway tmux server with a real pi agent, a save made with an empty agent registry keeps the agent resumable (resume_panes=1, carried_resume_panes=1); the previous binary saved it as unverified
+- A save made with a corrupt agent registry fails with agent_registry_failed instead of saving every agent as unverified
+- just check passes
