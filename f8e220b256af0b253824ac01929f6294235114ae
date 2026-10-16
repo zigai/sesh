@@ -1,0 +1,2 @@
+- The binary-level remote monitor test, interrupted with SIGINT, logs one finished record and no error; it fails on the previous code with the canceled error record
+- just check passes
