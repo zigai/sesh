@@ -659,3 +659,26 @@ func assertPlanUnchanged(t *testing.T, plans []setup.ArtifactPlan, name string) 
 		}
 	}
 }
+
+func TestSystemdLongRunningServicesTreatAStopAsSuccess(t *testing.T) {
+	t.Parallel()
+
+	inputs := linuxInputs(t)
+
+	render := map[string]func() (setup.ServiceDefinition, error){
+		setup.CoordinatorServiceName: func() (setup.ServiceDefinition, error) { return setup.CoordinatorDefinition(inputs) },
+		setup.RemoteServiceName:      func() (setup.ServiceDefinition, error) { return setup.RemoteMonitorDefinition(inputs, true) },
+		setup.AgentStatusServiceName: func() (setup.ServiceDefinition, error) { return setup.AgentStatusDefinition(inputs) },
+	}
+
+	for name, definition := range render {
+		rendered, err := definition()
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+
+		if !strings.Contains(rendered.Content, "SuccessExitStatus=130\n") {
+			t.Errorf("%s counts the CLI's stop exit status as a failure:\n%s", name, rendered.Content)
+		}
+	}
+}
