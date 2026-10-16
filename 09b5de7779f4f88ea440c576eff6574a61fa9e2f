@@ -1,0 +1,2 @@
+- The rendered coordinator, remote-monitor and agent-status units declare SuccessExitStatus=130
+- just check passes
