@@ -223,13 +223,20 @@ func runRemoteMonitor(cmd *cobra.Command, _ []string) (resultErr error) {
 
 	defer reloads.close()
 
-	return cliError("run_remote_monitor", remote.RunMonitor(clibase.CommandContext(cmd), remote.MonitorOptions{
+	ctx := clibase.CommandContext(cmd)
+
+	err = remote.RunMonitor(ctx, remote.MonitorOptions{
 		CatalogDir: dir,
 		Remote:     cfg.Remote,
 		Command:    nil,
 		Now:        nil,
 		Reloads:    reloads.configs,
-	}))
+	})
+	if ctx.Err() != nil && clibase.OnlyErrorCauses(err, context.Canceled) {
+		return nil
+	}
+
+	return cliError("run_remote_monitor", err)
 }
 
 func readRemoteInput(reader io.Reader, limit int) ([]byte, error) { //nolint:unparam // Action and bootstrap protocols keep independent limits.

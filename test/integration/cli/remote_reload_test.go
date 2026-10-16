@@ -71,11 +71,29 @@ func TestRemoteMonitorBinaryReloadRemovesObsoleteConnection(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	outcomes := 0
+
 	for line := range strings.SplitSeq(strings.TrimSpace(string(logData)), "\n") {
 		var record map[string]any
 		if err := json.Unmarshal([]byte(line), &record); err != nil {
 			t.Fatalf("monitor log is not JSON Lines: %v; line=%q", err, line)
 		}
+
+		if record["level"] == "error" {
+			t.Fatalf("interrupted monitor logged an error: %s", line)
+		}
+
+		if record["component"] == "cli" && record["operation"] == "remote_monitor" && record["status"] != "started" {
+			outcomes++
+
+			if record["level"] != "info" || record["status"] != "ok" {
+				t.Fatalf("interrupted monitor outcome = %s, want a finished record", line)
+			}
+		}
+	}
+
+	if outcomes != 1 {
+		t.Fatalf("monitor logged %d outcomes, want 1", outcomes)
 	}
 }
 
