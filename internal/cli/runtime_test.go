@@ -473,7 +473,7 @@ func assertRuntimeOutcomeContext(t *testing.T, line []byte, record map[string]an
 var runtimePlainLogFields = []string{
 	"time", "level", "component", "operation", "status", "message", "reason", "phase", "code", "sessions", "windows", "panes", "error_code",
 	"skipped", "mismatches", "mismatch_reasons", "step_reason",
-	"restart_panes", "resume_panes", "unverified_panes", "nonrestartable_panes",
+	"restart_panes", "resume_panes", "carried_resume_panes", "unverified_panes", "nonrestartable_panes",
 	"resumed_panes", "restarted_panes", "shell_panes", "unrecovered_panes", "directory_fallback_panes",
 }
 

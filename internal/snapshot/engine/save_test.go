@@ -205,6 +205,7 @@ func TestCaptureFailureHasFixedReason(t *testing.T) {
 	}{
 		{name: "output limit", cause: fmt.Errorf("capture /secret/path: %w", gotmux.ErrOutputLimit), reason: "output_limit_exceeded"},
 		{name: "changed state", cause: fmt.Errorf("capture /secret/path: %w", capture.ErrChanged), reason: "capture_changed"},
+		{name: "agent registry", cause: fmt.Errorf("read /secret/path: %w", capture.ErrAgentRegistry), reason: "agent_registry_failed"},
 		{name: "unsupported state", cause: fmt.Errorf("capture /secret/path: %w", capture.ErrUnsupported), reason: "capture_unsupported"},
 		{name: "invalid observation", cause: oops.In("snapshot.capture").With("path", "/secret/path").Wrap(model.ErrInvalid), reason: "snapshot_invalid"},
 		{
@@ -334,7 +335,7 @@ func validateLogSchema(t *testing.T, fields map[string]jsontext.Value) {
 	for key := range fields {
 		switch key {
 		case "level", "component", "operation", "status", "message", "reason", "phase", "sessions", "panes", "terminal_text_omitted", "floating_panes_omitted",
-			"restart_panes", "resume_panes", "unverified_panes", "nonrestartable_panes", "duration_ms", "process_code":
+			"restart_panes", "resume_panes", "carried_resume_panes", "unverified_panes", "nonrestartable_panes", "duration_ms", "process_code":
 		default:
 			t.Fatalf("unexpected log field %s", key)
 		}
@@ -465,4 +466,93 @@ func TestSaveObservationAdmissionValidation(t *testing.T) {
 
 func save(ctx context.Context, repository *store.Repository, leaseRoot string, socketPath string, observe func(context.Context) (capture.Observation, error)) (SaveResult, error) {
 	return saveWithProfile(ctx, repository, leaseRoot, socketPath, RecoveryExact, observe)
+}
+
+func agentObservation(birth string, recovery model.Recovery) capture.Observation {
+	arguments := []model.Bytes{model.Bytes("agent")}
+	if recovery == model.RecoveryResume {
+		arguments = append(arguments, model.Bytes("--resume"), model.Bytes("session-a"))
+	}
+
+	observation := observationFixture()
+	observation.Manifest.Panes[0].Launch = model.Launch{
+		Executable: model.Bytes("/usr/bin/agent"),
+		Arguments:  arguments,
+		Directory:  model.Bytes("/work"),
+		Birth:      model.Bytes(birth),
+		Recovery:   recovery,
+	}
+
+	return observation
+}
+
+func TestSaveKeepsResumeLaunchOfARunningAgentTheRegistryLost(t *testing.T) {
+	r := testRepository(t)
+	leaseRoot, socketPath := testLeaseEndpoint(t)
+
+	if _, err := save(t.Context(), r, leaseRoot, socketPath, func(context.Context) (capture.Observation, error) {
+		return agentObservation("boot-a:100", model.RecoveryResume), nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	for range 2 {
+		var output bytes.Buffer
+
+		logger := zerolog.New(&output)
+
+		result, err := save(logger.WithContext(t.Context()), r, leaseRoot, socketPath, func(context.Context) (capture.Observation, error) {
+			return agentObservation("boot-a:100", model.RecoveryUnverified), nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, current, err := r.ReadPracticalCurrent(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		launch := current.Panes[0].Launch
+		if launch.Recovery != model.RecoveryResume || len(launch.Arguments) != 3 || string(launch.Arguments[2]) != "session-a" {
+			t.Fatalf("generation %s launch = %+v, want the earlier resume launch", result.Generation, launch)
+		}
+
+		records := bytes.Split(bytes.TrimSpace(output.Bytes()), []byte{'\n'})
+
+		var fields map[string]jsontext.Value
+		if err := json.Unmarshal(records[len(records)-1], &fields); err != nil {
+			t.Fatal(err)
+		}
+
+		validateLogSchema(t, fields)
+
+		if string(fields["level"]) != `"warn"` || string(fields["carried_resume_panes"]) != "1" || string(fields["resume_panes"]) != "1" {
+			t.Fatalf("save record = %s, want one carried resume pane", records[len(records)-1])
+		}
+	}
+}
+
+func TestSaveAcceptsAgentPaneWhoseProcessChanged(t *testing.T) {
+	r := testRepository(t)
+	leaseRoot, socketPath := testLeaseEndpoint(t)
+
+	for _, observation := range []capture.Observation{
+		agentObservation("boot-a:100", model.RecoveryResume),
+		agentObservation("boot-a:100", model.RecoveryResume),
+		agentObservation("boot-a:200", model.RecoveryUnverified),
+	} {
+		if _, err := save(t.Context(), r, leaseRoot, socketPath, func(context.Context) (capture.Observation, error) { return observation, nil }); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	_, current, err := r.ReadPracticalCurrent(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if launch := current.Panes[0].Launch; launch.Recovery != model.RecoveryUnverified || string(launch.Birth) != "boot-a:200" {
+		t.Fatalf("current launch = %+v, want the replacement process", launch)
+	}
 }

@@ -45,6 +45,11 @@ type SaveResult struct {
 
 type saveOutcomeError struct{ error }
 
+type paneProcess struct {
+	pane  string
+	birth string
+}
+
 func SaveObservation(ctx context.Context, repository *store.Repository, server *gotmux.Server, selected []gotmux.SessionID, cfg SaveConfig) (SaveResult, error) {
 	started := time.Now()
 
@@ -99,7 +104,7 @@ func saveWithProfile(ctx context.Context, repository *store.Repository, leaseRoo
 		return result, saveFailure(ctx, "register", started, errors.Join(err, closeErr))
 	}
 
-	observation, err := observe(ctx)
+	observation, carried, err := observeCarryingResumeEvidence(ctx, repository, observe)
 	if err != nil {
 		failErr := recordFailedAttempt(ctx, repository, attempt.ID)
 		closeErr := lease.Close()
@@ -139,12 +144,59 @@ func saveWithProfile(ctx context.Context, repository *store.Repository, leaseRoo
 
 	result.Status = status
 
-	logSaveSuccess(ctx, observation, status, reason, started)
+	logSaveSuccess(ctx, observation, carried, status, reason, started)
 
 	return result, nil
 }
 
-func logSaveSuccess(ctx context.Context, observation capture.Observation, status, reason string, started time.Time) {
+func observeCarryingResumeEvidence(ctx context.Context, repository *store.Repository, observe func(context.Context) (capture.Observation, error)) (capture.Observation, int, error) {
+	baseline, err := resumeBaseline(ctx, repository)
+	if err != nil {
+		return capture.Observation{}, 0, err
+	}
+
+	observation, err := observe(ctx)
+	if err != nil {
+		return capture.Observation{}, 0, err
+	}
+
+	carried := 0
+
+	for i := range observation.Manifest.Panes {
+		pane := &observation.Manifest.Panes[i]
+
+		launch, ok := baseline[paneProcess{pane: pane.ID, birth: string(pane.Launch.Birth)}]
+		if ok && pane.Launch.Recovery != model.RecoveryResume {
+			pane.Launch = launch
+			carried++
+		}
+	}
+
+	return observation, carried, nil
+}
+
+func resumeBaseline(ctx context.Context, repository *store.Repository) (map[paneProcess]model.Launch, error) {
+	baseline := make(map[paneProcess]model.Launch)
+
+	_, manifest, err := repository.ReadPracticalCurrent(ctx)
+	if errors.Is(err, store.ErrUnavailable) || errors.Is(err, store.ErrRecoveryRequired) {
+		return baseline, nil
+	}
+
+	if err != nil {
+		return nil, oops.In("snapshot").With("operation", "read_resume_baseline").Wrapf(err, "read current snapshot")
+	}
+
+	for _, pane := range manifest.Panes {
+		if pane.Launch.Recovery == model.RecoveryResume && len(pane.Launch.Birth) > 0 {
+			baseline[paneProcess{pane: pane.ID, birth: string(pane.Launch.Birth)}] = pane.Launch
+		}
+	}
+
+	return baseline, nil
+}
+
+func logSaveSuccess(ctx context.Context, observation capture.Observation, carried int, status, reason string, started time.Time) {
 	recovery := make(map[model.Recovery]int, len(observation.Manifest.Panes))
 	for _, pane := range observation.Manifest.Panes {
 		recovery[pane.Launch.Recovery]++
@@ -161,6 +213,7 @@ func logSaveSuccess(ctx context.Context, observation capture.Observation, status
 		Int("floating_panes_omitted", observation.FloatingPanesOmitted).
 		Int("restart_panes", recovery[model.RecoveryRestart]).
 		Int("resume_panes", recovery[model.RecoveryResume]).
+		Int("carried_resume_panes", carried).
 		Int("unverified_panes", recovery[model.RecoveryUnverified]).
 		Int("nonrestartable_panes", recovery[model.RecoveryNonrestartable]).
 		Int64("duration_ms", time.Since(started).Milliseconds()).
@@ -194,6 +247,8 @@ func saveFailure(ctx context.Context, phase string, started time.Time, err error
 		reason = "output_limit_exceeded"
 	case errors.Is(err, capture.ErrChanged):
 		reason = "capture_changed"
+	case errors.Is(err, capture.ErrAgentRegistry):
+		reason = "agent_registry_failed"
 	case errors.Is(err, capture.ErrUnsupported), errors.Is(err, process.ErrUnsupported):
 		reason = "capture_unsupported"
 	case errors.Is(err, model.ErrInvalid):

@@ -25,6 +25,13 @@ func TestMissingAgentMetadataDoesNotPreventSessionCapture(t *testing.T) {
 	}
 }
 
+func TestUnreadableAgentRegistryFailsCapture(t *testing.T) {
+	live, err := recoveryAgents(t.Context(), unavailableAgentSource{err: agents.ErrRegistryCorrupt})
+	if !errors.Is(err, ErrAgentRegistry) || !errors.Is(err, agents.ErrRegistryCorrupt) || live != nil {
+		t.Fatalf("unreadable registry: agents=%d err=%v", len(live), err)
+	}
+}
+
 func TestAgentMetadataCancellationIsNotIgnored(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()

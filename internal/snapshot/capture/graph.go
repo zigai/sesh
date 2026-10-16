@@ -18,6 +18,7 @@ var (
 	ErrSelection      = errors.New("explicit session selection required")
 	ErrUnsupported    = errors.New("state cannot be represented faithfully by published API")
 	ErrProcessDeleted = errors.New("process executable or working directory was deleted")
+	ErrAgentRegistry  = errors.New("agent registry could not be read")
 )
 
 type SessionNotFoundError struct {

@@ -121,7 +121,11 @@ func recoveryAgents(ctx context.Context, source agents.SessionSource) ([]agents.
 			return nil, errors.Join(ctx.Err(), err)
 		}
 
-		return nil, nil
+		if errors.Is(err, agents.ErrRegistryUnavailable) {
+			return nil, nil
+		}
+
+		return nil, captureError(errors.Join(ErrAgentRegistry, err))
 	}
 
 	return live, nil

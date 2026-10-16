@@ -38,6 +38,8 @@ func captureError(err error) error {
 		code = "endpoint_required"
 	case errors.Is(err, ErrProcessDeleted):
 		code = "capture_failed"
+	case errors.Is(err, ErrAgentRegistry):
+		code = "agent_registry_failed"
 	}
 
 	return oops.In("snapshot.capture").Code(code).With("operation", "observe").Wrap(err)
