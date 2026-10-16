@@ -27,10 +27,10 @@ sesh snapshot restore
 
 The picker displays live coding agent panes from the Agent Host Tool (`aht`) registry, preserving manual scroll position during updates.
 
-Install AHT v2.5.0 and enable the sesh integration:
+Install AHT v2.9.0 and enable the sesh integration:
 
 ```sh
-go install github.com/zigai/aht/v2@v2.5.0
+go install github.com/zigai/aht/v2@v2.9.0
 sesh setup agents
 ```
 
