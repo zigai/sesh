@@ -45,24 +45,24 @@ func TestUnitLinesJoinContinuationsAndDropComments(t *testing.T) {
 	}
 }
 
-func writeUnit(t *testing.T, path, content string) {
-	t.Helper()
+func writeUnit(tb testing.TB, path, content string) {
+	tb.Helper()
 
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 }
 
 // unitsService checks units across a user directory and a lower-precedence data directory,
 // rejecting every sesh command line that runs "old".
-func unitsService(t *testing.T) (*Service, string, string) {
-	t.Helper()
+func unitsService(tb testing.TB) (*Service, string, string) {
+	tb.Helper()
 
-	root := t.TempDir()
+	root := tb.TempDir()
 	userDir := filepath.Join(root, "config", "systemd", "user")
 	dataDir := filepath.Join(root, "data", "systemd", "user")
 
@@ -109,11 +109,14 @@ func TestServiceUnitsAreReadTheWaySystemdResolvesThem(t *testing.T) {
 		if len(results) != 0 {
 			t.Fatalf("unsupported unit checks collected: %+v", results)
 		}
+
 		return
 	}
+
 	if len(results) != 1 {
 		t.Fatalf("checks = %+v, want one unit check", results)
 	}
+
 	result := results[0]
 	if result.Status != StatusFail || result.Reason != ReasonStale || result.Fix == nil {
 		t.Fatalf("result = %+v, want a failure with a fix", result)
@@ -140,31 +143,21 @@ func TestServiceUnitsRetainInspectionErrors(test *testing.T) {
 	for _, kind := range []string{"search directory", "unit symlink", "drop-in directory"} {
 		test.Run(kind, func(test *testing.T) {
 			test.Parallel()
-			service, userDir, _ := unitsService(test)
-			switch kind {
-			case "search directory":
-				writeUnit(test, userDir, "not a directory")
-			case "unit symlink":
-				if err := os.MkdirAll(userDir, 0o700); err != nil {
-					test.Fatal(err)
-				}
-				if err := os.Symlink("loop.service", filepath.Join(userDir, "loop.service")); err != nil {
-					test.Fatal(err)
-				}
-			case "drop-in directory":
-				writeUnit(test, filepath.Join(userDir, "sesh.service"), "[Service]\nExecStart=sesh doctor\n")
-				writeUnit(test, filepath.Join(userDir, "sesh.service.d"), "not a directory")
-			}
+			service := unreadableUnitsService(test, kind)
+
 			results := service.checkServiceUnits()
 			if runtime.GOOS != "linux" {
 				if len(results) != 0 {
 					test.Fatalf("unsupported unit checks collected: %+v", results)
 				}
+
 				return
 			}
+
 			if len(results) != 1 {
 				test.Fatalf("inspection check omitted: %+v", results)
 			}
+
 			result := results[0]
 			if result.Status != StatusWarn || result.Reason != ReasonInspectionFailed || result.Fix == nil || len(result.Details) == 0 {
 				test.Fatalf("inspection error was omitted or claimed healthy: %+v", result)
@@ -173,17 +166,44 @@ func TestServiceUnitsRetainInspectionErrors(test *testing.T) {
 	}
 }
 
+func unreadableUnitsService(tb testing.TB, kind string) *Service {
+	tb.Helper()
+
+	service, userDir, _ := unitsService(tb)
+
+	switch kind {
+	case "search directory":
+		writeUnit(tb, userDir, "not a directory")
+	case "unit symlink":
+		if err := os.MkdirAll(userDir, 0o700); err != nil {
+			tb.Fatal(err)
+		}
+
+		if err := os.Symlink("loop.service", filepath.Join(userDir, "loop.service")); err != nil {
+			tb.Fatal(err)
+		}
+	case "drop-in directory":
+		writeUnit(tb, filepath.Join(userDir, "sesh.service"), "[Service]\nExecStart=sesh doctor\n")
+		writeUnit(tb, filepath.Join(userDir, "sesh.service.d"), "not a directory")
+	}
+
+	return service
+}
+
 func TestServiceUnitsPreserveUnavailableValidationSkip(test *testing.T) {
 	test.Parallel()
 
 	service := NewService(Options{ServiceDirs: []string{test.TempDir()}})
+
 	results := service.checkServiceUnits()
 	if runtime.GOOS != "linux" {
 		if len(results) != 0 {
 			test.Fatalf("unsupported unit checks collected: %+v", results)
 		}
+
 		return
 	}
+
 	if len(results) != 1 || results[0].Status != StatusSkip {
 		test.Fatalf("unavailable command validation lost its skip: %+v", results)
 	}

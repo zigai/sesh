@@ -60,6 +60,7 @@ func (s *Service) checkServiceUnits() []Result {
 	if runtime.GOOS != "linux" || s.opts.ServiceDirs == nil {
 		return nil
 	}
+
 	if s.opts.ValidateCommand == nil {
 		return []Result{newResult(CheckServiceUnits, StatusSkip, "Service command validation is unavailable")}
 	}
@@ -150,6 +151,7 @@ func (s *Service) unitFiles() (map[string]string, []string) {
 			shadowed[name] = true
 
 			path := filepath.Join(dir, name)
+
 			info, err := os.Stat(path)
 			switch {
 			case errors.Is(err, fs.ErrNotExist):
@@ -169,6 +171,7 @@ func (s *Service) unitFiles() (map[string]string, []string) {
 // Exec assignment clears the commands set before it, as in systemd.
 func (s *Service) unitCommands(name, path string) ([]unitCommand, error) {
 	execs := make(map[string][]unitCommand)
+
 	dropIns, err := s.dropIns(name)
 	if err != nil {
 		return nil, err
@@ -213,14 +216,17 @@ func (s *Service) unitCommands(name, path string) ([]unitCommand, error) {
 // with a name in an earlier search directory shadowing the same name in a later one.
 func (s *Service) dropIns(unit string) ([]string, error) {
 	byName := make(map[string]string)
+
 	var inspectionErr error
 
 	for _, dir := range s.opts.ServiceDirs {
 		path := filepath.Join(dir, unit+".d")
+
 		entries, err := os.ReadDir(path)
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
+
 		if err != nil {
 			inspectionErr = errors.Join(inspectionErr, fmt.Errorf("%s: %w", DisplayPath(path), err))
 			continue

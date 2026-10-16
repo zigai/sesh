@@ -29,11 +29,14 @@ func (s *Service) checkServiceOOMPolicy(ctx context.Context) []Result {
 	if errors.Is(err, errNoServiceUnit) {
 		return nil
 	}
-	if err == nil && unit == "" {
-		err = errors.New("service unit was not returned")
-	}
-	if err != nil {
-		return []Result{newResult(CheckServiceOOMPolicy, StatusWarn, fmt.Sprintf("tmux server service membership could not be inspected: %v", err)).
+
+	if err != nil || unit == "" {
+		message := "tmux server service membership could not be inspected: service unit was not returned"
+		if err != nil {
+			message = fmt.Sprintf("tmux server service membership could not be inspected: %v", err)
+		}
+
+		return []Result{newResult(CheckServiceOOMPolicy, StatusWarn, message).
 			withReason(ReasonInspectionFailed).
 			withManual("Check that the tmux server process cgroup is readable, then run 'sesh doctor' again")}
 	}

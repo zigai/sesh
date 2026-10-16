@@ -46,31 +46,47 @@ func TestServiceOOMPolicyReportsApplicablePoliciesAndInspectionErrors(test *test
 	} {
 		test.Run(scenario.name, func(test *testing.T) {
 			test.Parallel()
+
 			results := scenario.service.checkServiceOOMPolicy(test.Context())
 			if runtime.GOOS != "linux" {
 				if len(results) != 0 {
 					test.Fatalf("unsupported OOM check collected: %+v", results)
 				}
+
 				return
 			}
+
 			if len(results) != 1 {
 				test.Fatalf("applicable OOM check omitted: %+v", results)
 			}
+
 			result := results[0]
 			if result.ID != CheckServiceOOMPolicy || result.Status != scenario.status || result.Reason != scenario.reason || result.Needs != scenario.needs || !strings.Contains(result.Message, scenario.message) {
 				test.Fatalf("unexpected OOM check: %+v", result)
 			}
-			if scenario.fix == "" {
-				if result.Fix != nil {
-					test.Fatalf("unexpected repair: %+v", result.Fix)
-				}
-			} else if result.Fix == nil || !strings.Contains(result.Fix.Command+result.Fix.Manual, scenario.fix) {
-				test.Fatalf("missing actionable repair %q: %+v", scenario.fix, result)
-			}
-			if scenario.reason == ReasonUnsafe && !strings.Contains(result.Fix.Manual, "systemctl --user edit tmux.service") {
-				test.Fatalf("unsafe OOM repair lost its unit: %+v", result.Fix)
-			}
+
+			assertOOMRepair(test, result, scenario.fix)
 		})
+	}
+}
+
+func assertOOMRepair(tb testing.TB, result Result, fix string) {
+	tb.Helper()
+
+	if fix == "" {
+		if result.Fix != nil {
+			tb.Fatalf("unexpected repair: %+v", result.Fix)
+		}
+
+		return
+	}
+
+	if result.Fix == nil || !strings.Contains(result.Fix.Command+result.Fix.Manual, fix) {
+		tb.Fatalf("missing actionable repair %q: %+v", fix, result)
+	}
+
+	if result.Reason == ReasonUnsafe && !strings.Contains(result.Fix.Manual, "systemctl --user edit tmux.service") {
+		tb.Fatalf("unsafe OOM repair lost its unit: %+v", result.Fix)
 	}
 }
 

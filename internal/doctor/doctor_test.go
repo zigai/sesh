@@ -32,10 +32,12 @@ func TestRunReportsEveryCheckInGroupOrder(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
+
 	units := filepath.Join(root, "units")
 	if err := os.Mkdir(units, 0o700); err != nil {
 		t.Fatal(err)
 	}
+
 	if err := os.WriteFile(filepath.Join(units, "sesh.service"), []byte("[Service]\nExecStart=sesh doctor\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -77,6 +79,7 @@ func TestRunReportsEveryCheckInGroupOrder(t *testing.T) {
 	if runtime.GOOS == "linux" {
 		want = append(want, doctor.CheckServiceUnits, doctor.CheckServiceOOMPolicy, doctor.CheckAutosaveDaemon)
 	}
+
 	want = append(want, doctor.CheckSmokeSessions)
 	if !slices.Equal(ids, want) {
 		t.Fatalf("checks = %q, want %q", ids, want)

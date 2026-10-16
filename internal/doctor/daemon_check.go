@@ -111,10 +111,12 @@ func (s *Service) installedDaemon(ctx context.Context, unit, enable string) Resu
 func (s *Service) unitInstalled(unit string) (bool, error) {
 	for _, dir := range s.opts.ServiceDirs {
 		path := filepath.Join(dir, unit)
+
 		_, err := os.Stat(path)
 		if err == nil {
 			return true, nil
 		}
+
 		if errors.Is(err, os.ErrNotExist) {
 			if _, linkErr := os.Lstat(path); errors.Is(linkErr, os.ErrNotExist) {
 				continue

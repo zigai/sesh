@@ -119,6 +119,7 @@ func TestAbsentDaemonRetainsUnitInspectionErrors(test *testing.T) {
 	test.Parallel()
 
 	dir := test.TempDir()
+
 	unit := filepath.Join(dir, "sesh-coordinator.service")
 	if err := os.Symlink(filepath.Base(unit), unit); err != nil {
 		test.Fatal(err)
