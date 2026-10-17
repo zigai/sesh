@@ -1,0 +1,10 @@
+- Opens the popup picker in a recorded terminal on an isolated tmux server with three pi tasks; the inbox shows done, unmerged, asleep and idle sections, and ctrl+g switches to project grouping (work, work@box).
+- Snoozes an idle task from the alt+m menu by picking 1h; it moves to snoozed with 'snoozed until Sat 22:55', and right-click then unsnooze returns it to idle.
+- Merges a task with one commit from the row menu; origin/main gets the commit, the task's window, worktree and branch are removed, and its row leaves the inbox within a second.
+- Shows merge in the menu only for a row with commits not on the base branch.
+- Lists an unreachable remote as one dimmed 'gone offline' line with no sessions divider.
+- Opens alt+t with a loopback remote 'box': the host row shows local and box, box offers its own next worktree, and a remote start opens the new remote window in a picker-sized popup; a failing remote shows 'box unavailable' and the popup stays open.
+- Lists remote tasks in the inbox with host 'box' and a menu of go and sleep.
+- Echoes a report with an Evidence section through pi; the row shows '3 ev', the detail row lists shot.png, notes.txt and the URL, and opening notes.txt pages it in less and returns to the picker.
+- Leaves no evidence warnings for an agent whose transcript does not exist yet.
+- Runs just check: lint reports 0 issues; race and integration suites pass.
