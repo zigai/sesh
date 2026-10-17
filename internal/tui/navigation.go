@@ -168,7 +168,7 @@ func (m *Model) moveAgentGroup(direction int) {
 	m.listViewportPolicy = listViewportFollowSelection
 
 	m.agentCursor = parentAgentIndex
-	if m.displayMode == displayModeWork {
+	if m.displayMode == displayModeInbox {
 		m.agentCursor = 0
 	}
 }

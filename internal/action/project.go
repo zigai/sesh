@@ -18,6 +18,7 @@ var (
 		Interactive: false,
 		Destructive: false,
 		Remote:      RemoteNever,
+		InPicker:    false,
 		check:       nil,
 	}, func(_ Subject, values Values) (OpenProject, error) {
 		return OpenProject{Directory: values.String("dir"), Adopt: values.Bool("adopt")}, nil
@@ -35,6 +36,7 @@ var (
 		Interactive: false,
 		Destructive: false,
 		Remote:      RemoteNever,
+		InPicker:    false,
 		check:       nil,
 	}, func(_ Subject, values Values) (CloneProject, error) {
 		return CloneProject{URL: values.String("url")}, nil
@@ -52,6 +54,7 @@ var (
 		Interactive: false,
 		Destructive: false,
 		Remote:      RemoteNever,
+		InPicker:    false,
 		check:       nil,
 	}, func(_ Subject, values Values) (CreateProject, error) {
 		return CreateProject{Name: values.String("name")}, nil
@@ -69,6 +72,7 @@ var (
 		Interactive: true,
 		Destructive: false,
 		Remote:      RemoteNever,
+		InPicker:    false,
 		check:       nil,
 	}, func(Subject, Values) (PickProject, error) { return PickProject{}, nil }, func(PickedProject) string { return "" })
 )

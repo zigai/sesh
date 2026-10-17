@@ -1134,10 +1134,20 @@ func TestLoadRejectsInvalidProjectsAndTasks(t *testing.T) {
 		},
 		{name: "wake on restore word", content: "[tasks]\nwake_on_restore = \"all\""},
 		{name: "wake on restore zero", content: "[tasks]\nwake_on_restore = \"0\""},
-		{name: "task action without run", content: "[task_actions.ship]\nprompt = \"ship it\""},
-		{name: "task action unknown variable", content: "[task_actions.ship]\nrun = [\"claude\", \"-p\"]\nprompt = \"ship {repo}\""},
-		{name: "task action prompt and file", content: "[task_actions.ship]\nrun = [\"claude\"]\nprompt = \"a\"\nprompt_file = \"b.md\""},
-		{name: "project override of a missing action", content: "[projects.overrides.shop.task_actions.ship]\nprompt = \"ship\""},
+		{name: "menu item without run", content: "[menu.items.ship]\nprompt = \"ship it\""},
+		{name: "menu item unknown variable", content: "[menu.items.ship]\nrun = [\"claude\", \"-p\"]\nprompt = \"ship {repo}\""},
+		{name: "menu item prompt and file", content: "[menu.items.ship]\nrun = [\"claude\"]\nprompt = \"a\"\nprompt_file = \"b.md\""},
+		{name: "project override of a missing item", content: "[projects.overrides.shop.menu_items.ship]\nprompt = \"ship\""},
+		{name: "menu entry that is no item", content: "[menu]\nagent = [\"go\", \"review\"]"},
+		{name: "session menu with an agent entry", content: "[menu]\nsession = [\"go\", \"snooze\"]"},
+		{name: "menu entry listed twice", content: "[menu]\nagent = [\"go\", \"go\"]"},
+		{name: "inbox group", content: "[inbox]\ngroup = \"host\""},
+		{name: "inbox unknown section", content: "[inbox]\nsections = [\"done\", \"later\"]"},
+		{name: "inbox no sections", content: "[inbox]\nsections = []"},
+		{name: "inbox label of unknown section", content: "[inbox.labels]\nlater = \"zzz\""},
+		{name: "inbox snooze word", content: "[inbox]\nsnooze = [\"soon\"]"},
+		{name: "inbox snooze negative", content: "[inbox]\nsnooze = [\"-1h\"]"},
+		{name: "inbox snooze tomorrow without time", content: "[inbox]\nsnooze = [\"tomorrow 2h\"]"},
 	}
 
 	for _, tt := range tests {
@@ -1154,19 +1164,19 @@ func TestLoadRejectsInvalidProjectsAndTasks(t *testing.T) {
 	}
 }
 
-func TestTaskActionsForAppliesProjectOverridesFieldByField(t *testing.T) {
+func TestMenuItemsForAppliesProjectOverridesFieldByField(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.toml")
 
-	content := `[task_actions.ship]
+	content := `[menu.items.ship]
 key = "alt+p"
 run = ["claude", "-p"]
 prompt = "ship {branch}"
 link_pr = true
 
-[task_actions.review]
+[menu.items.review]
 run = ["codex", "exec"]
 
-[projects.overrides.shop.task_actions.ship]
+[projects.overrides.shop.menu_items.ship]
 prompt_file = ".agents/ship.md"
 link_pr = false
 `
@@ -1179,18 +1189,18 @@ link_pr = false
 		t.Fatalf("Load() error = %v", err)
 	}
 
-	shop := cfg.TaskActionsFor("/code/shop")["ship"]
+	shop := cfg.MenuItemsFor("/code/shop")["ship"]
 	if shop.Key != "alt+p" || !slices.Equal(shop.Run, []string{"claude", "-p"}) || shop.Prompt != "" ||
 		shop.PromptFile != ".agents/ship.md" || shop.LinksPR() {
 		t.Errorf("shop ship = %+v, want the global action with the override's prompt file and no PR link", shop)
 	}
 
-	other := cfg.TaskActionsFor("/code/other")["ship"]
+	other := cfg.MenuItemsFor("/code/other")["ship"]
 	if other.Prompt != "ship {branch}" || other.PromptFile != "" || !other.LinksPR() {
 		t.Errorf("other ship = %+v, want the global action", other)
 	}
 
-	if _, found := cfg.TaskActionsFor("/code/shop")["review"]; !found {
+	if _, found := cfg.MenuItemsFor("/code/shop")["review"]; !found {
 		t.Error("shop lost the review action it does not override")
 	}
 }

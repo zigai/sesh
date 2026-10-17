@@ -107,7 +107,10 @@ type Descriptor struct {
 	Interactive bool
 	Destructive bool
 	Remote      RemoteAccess
-	check       func(Subject) error
+	// InPicker actions change only what the picker shows, so the picker runs them itself and only
+	// picker keys can bind them.
+	InPicker bool
+	check    func(Subject) error
 }
 
 // Entry is a registered action without its type parameters, for callers that select actions

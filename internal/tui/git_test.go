@@ -257,7 +257,7 @@ func TestAgentGitDisabledWithoutGitFormatFields(t *testing.T) {
 	cfg.AgentSessions.Enabled = true
 	cfg.AgentSessions.PopupCounts = true
 	cfg.Display.AgentsAgentFormat = "{tree}{harness}{right}{status}"
-	cfg.Display.WorkTaskFormat = "{tree}{harness}{right}{status}"
+	cfg.Display.InboxAgentFormat = "{tree}{harness}{right}{status}"
 
 	model, err := NewPopupModel(context.Background(), cfg, testState(), testServices(Dependencies{
 		LoadAgentSummaries: func(context.Context) ([]session.AgentSummary, error) { return nil, nil },

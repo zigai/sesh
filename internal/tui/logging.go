@@ -30,6 +30,9 @@ const (
 	tuiOperationAgentGitScan            tuiLogOperation = "agent_git_scan"
 	tuiOperationRunAction               tuiLogOperation = "run_action"
 	tuiOperationCustomFieldRun          tuiLogOperation = "custom_field_run"
+	tuiOperationSaveInbox               tuiLogOperation = "save_inbox"
+	tuiOperationOpen                    tuiLogOperation = "open"
+	tuiOperationLoadEvidence            tuiLogOperation = "load_evidence"
 )
 
 // tuiOperationFirstFrame names the once-per-popup timing record, which has its own schema
@@ -87,7 +90,10 @@ func knownTUIOperation(operation tuiLogOperation) bool {
 		tuiOperationSnapshotSession,
 		tuiOperationAgentGitScan,
 		tuiOperationRunAction,
-		tuiOperationCustomFieldRun:
+		tuiOperationCustomFieldRun,
+		tuiOperationSaveInbox,
+		tuiOperationOpen,
+		tuiOperationLoadEvidence:
 		return true
 	default:
 		return false

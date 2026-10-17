@@ -155,7 +155,7 @@ func NewPickCommand(ctx context.Context, remote ...RemoteFactory) *cobra.Command
 	cmd.Flags().String(uiFlag, uiAuto, "Picker layout")
 	clibase.SetFlagChoices(cmd, uiFlag, uiAuto, "popup", "inline", "fullscreen")
 	cmd.Flags().String(modeFlag, "", "Display mode to open in")
-	clibase.SetFlagChoices(cmd, modeFlag, "sesh", "agents", "work")
+	clibase.SetFlagChoices(cmd, modeFlag, "sesh", "agents", "inbox")
 	cmd.Flags().String("switch-handoff", "", "Popup switch handoff file")
 	cmd.Flags().Int64(launchedAtFlag, 0, "Popup launch time")
 	cmd.Flags().String("target-pane", "", "Invoking tmux pane")
@@ -608,7 +608,7 @@ func popupDimensions(cfg *config.Config, state *session.State, available gotmux.
 
 	for _, mode := range cfg.Settings.DisplayModes {
 		mode = strings.ToLower(strings.TrimSpace(mode))
-		useAgentsBounds = useAgentsBounds || mode == "agents" || mode == "work"
+		useAgentsBounds = useAgentsBounds || mode == "agents" || mode == "inbox"
 	}
 
 	minimum := gotmux.Size{Width: popupSeshMinWidth, Height: popupSeshMinHeight}
@@ -627,7 +627,7 @@ func effectivePickerPopupMode(cfg *config.Config, state *session.State) string {
 
 	if state != nil {
 		switch persisted := strings.ToLower(strings.TrimSpace(state.PopupDisplayMode)); persisted {
-		case "agents", "work":
+		case "agents", "inbox":
 			selected = persisted
 		}
 	}
@@ -640,7 +640,7 @@ func effectivePickerPopupMode(cfg *config.Config, state *session.State) string {
 
 	if len(cfg.Settings.DisplayModes) > 0 {
 		switch first := strings.ToLower(strings.TrimSpace(cfg.Settings.DisplayModes[0])); first {
-		case "agents", "work":
+		case "agents", "inbox":
 			return first
 		}
 	}

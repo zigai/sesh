@@ -3,6 +3,7 @@
 package picker
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"os"
@@ -23,7 +24,9 @@ import (
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/git"
 	"github.com/zigai/sesh/internal/integration/tmuxserver"
+	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/task"
+	"github.com/zigai/sesh/internal/tui"
 	"github.com/zigai/sesh/internal/tui/taskpicker"
 )
 
@@ -33,29 +36,48 @@ const (
 	taskExpandedFlag = "expanded"
 	taskTitleFlag    = "title"
 	taskAgentFlag    = "agent"
+	taskMachineFlag  = "machine"
+	thisMachine      = "local"
 	// centered divides the space around a popup to center it.
 	centered = 2
 )
 
+var errRemoteTaskSession = errors.New("the remote task's session is not in the remote catalog")
+
 // taskHandoff names the task the task picker popup hands to its opener to go to, or asks it to
-// reopen the popup, expanded or not, with the title and agent chosen so far.
+// reopen the popup on Machine, expanded or not, with the title and agent chosen so far. Machine
+// is a remote connection, empty for this machine.
 type taskHandoff struct {
 	Show     string `json:"show"`
 	Reopen   bool   `json:"reopen"`
 	Expanded bool   `json:"expanded"`
 	Title    string `json:"title"`
 	Agent    string `json:"agent"`
+	Machine  string `json:"machine"`
+	Session  string `json:"session"`
+	Pane     string `json:"pane"`
+}
+
+// taskChoices are what the popup offers on the chosen machine. machines are the connections of
+// the popup's machines, empty for this machine, and root is the project's directory on a remote
+// machine.
+type taskChoices struct {
+	options  taskpicker.Options
+	machines []string
+	root     string
+	remote   RemoteServices
 }
 
 // taskFrontend opens the task picker popup for task.menu. The popup starts the task or opens the
 // tab itself; the opener then moves the client to a task the popup names, which a popup cannot do
 // for its own client.
 type taskFrontend struct {
-	cmd *cobra.Command
+	cmd    *cobra.Command
+	remote RemoteFactory
 }
 
 // NewTaskMenuCommand is `sesh task menu`.
-func NewTaskMenuCommand() *cobra.Command {
+func NewTaskMenuCommand(remoteFactory RemoteFactory) *cobra.Command {
 	return actioncli.Command(action.TaskMenu, actioncli.Options[action.OpenTaskMenu, action.OpenedTaskMenu]{
 		Operation:    "task_picker",
 		SuccessOwned: false,
@@ -63,19 +85,21 @@ func NewTaskMenuCommand() *cobra.Command {
 			cmd.Annotations[clibase.AnnotationLiveIO] = annotationEnabled
 		},
 		Prepare:  nil,
-		Frontend: func(cmd *cobra.Command) action.Dispatcher { return taskFrontend{cmd: cmd} },
+		Frontend: func(cmd *cobra.Command) action.Dispatcher { return taskFrontend{cmd: cmd, remote: remoteFactory} },
 		Render:   nil,
 	})
 }
 
 // NewTaskPickerUICommand is the hidden command the task picker popup runs.
-func NewTaskPickerUICommand() *cobra.Command {
+func NewTaskPickerUICommand(remoteFactory RemoteFactory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:    taskPickerUIVerb,
 		Short:  "Run the task picker inside its popup",
 		Hidden: true,
 		Args:   clibase.UsageArgs(cobra.NoArgs),
-		RunE:   runTaskPickerUI,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runTaskPickerUI(cmd, args, remoteFactory)
+		},
 		Annotations: map[string]string{
 			clibase.AnnotationOperation: "task_picker", clibase.AnnotationLiveIO: annotationEnabled,
 		},
@@ -87,6 +111,7 @@ func NewTaskPickerUICommand() *cobra.Command {
 	cmd.Flags().Bool(taskExpandedFlag, false, "List every location of the project")
 	cmd.Flags().String(taskTitleFlag, "", "Title to start with")
 	cmd.Flags().String(taskAgentFlag, "", "Agent to start with")
+	cmd.Flags().String(taskMachineFlag, "", "Remote connection to start the task on")
 
 	return cmd
 }
@@ -108,14 +133,16 @@ func (frontend taskFrontend) Dispatch(ctx context.Context, invocation action.Inv
 		return action.OpenedTaskMenu{}, err
 	}
 
-	err = openTaskPicker(ctx, cmd, cfg, runtime, invocation.Caller)
+	err = openTaskPicker(ctx, cmd, cfg, runtime, invocation.Caller, frontend.remote)
 
 	return action.OpenedTaskMenu{}, errors.Join(err, runtime.Close())
 }
 
 // openTaskPicker opens the popup sized to what it offers, reopens it as often as it asks, then
 // goes to the task it names.
-func openTaskPicker(ctx context.Context, cmd *cobra.Command, cfg *config.Config, runtime *actioncli.Runtime, caller action.Caller) error {
+func openTaskPicker(
+	ctx context.Context, cmd *cobra.Command, cfg *config.Config, runtime *actioncli.Runtime, caller action.Caller, remoteFactory RemoteFactory,
+) error {
 	if caller.Pane == "" {
 		caller.Pane = os.Getenv("TMUX_PANE")
 	}
@@ -135,17 +162,21 @@ func openTaskPicker(ctx context.Context, cmd *cobra.Command, cfg *config.Config,
 		return oops.In("cli").With("operation", "resolve_popup_client").Wrap(err)
 	}
 
-	offered, err := runtime.Local.TaskOffer(ctx, caller, false)
-	if err != nil {
-		return err
-	}
-
-	handoff := taskHandoff{Show: "", Reopen: false, Expanded: false, Title: "", Agent: ""}
+	handoff := taskHandoff{Show: "", Reopen: false, Expanded: false, Title: "", Agent: "", Machine: "", Session: "", Pane: ""}
 
 	for {
-		next, chosen, err := showTaskPopup(ctx, cmd, cfg, workspace.Socket, client, caller, offered, handoff)
+		choices, err := loadTaskChoices(ctx, cfg, workspace.Socket, runtime, caller, remoteFactory, handoff.Machine, false)
+		if err != nil {
+			return err
+		}
+
+		next, chosen, err := showTaskPopup(ctx, cmd, cfg, workspace.Socket, client, caller, choices.options, handoff)
 		if err != nil || !chosen {
 			return err
+		}
+
+		if next.Session != "" {
+			return showRemoteAttachPopup(ctx, cmd, cfg, workspace.Socket, client, next)
 		}
 
 		if !next.Reopen {
@@ -161,7 +192,7 @@ func openTaskPicker(ctx context.Context, cmd *cobra.Command, cfg *config.Config,
 // grows it downwards.
 func showTaskPopup(
 	ctx context.Context, cmd *cobra.Command, cfg *config.Config, socket string, client gotmux.ClientInfo, caller action.Caller,
-	offered app.TaskOffer, from taskHandoff,
+	options taskpicker.Options, from taskHandoff,
 ) (taskHandoff, bool, error) {
 	executable, err := os.Executable()
 	if err != nil {
@@ -178,11 +209,9 @@ func showTaskPopup(
 		"task", taskPickerUIVerb, "--socket", socket, "--" + projectHandoffFlag, handoffPath, "--" + taskPaneFlag, caller.Pane,
 	}
 
-	options := taskPickerOptions(offered, nil)
-
 	if from.Reopen {
 		arguments = append(arguments, "--"+taskExpandedFlag+"="+strconv.FormatBool(from.Expanded),
-			"--"+taskTitleFlag+"="+from.Title, "--"+taskAgentFlag+"="+from.Agent)
+			"--"+taskTitleFlag+"="+from.Title, "--"+taskAgentFlag+"="+from.Agent, "--"+taskMachineFlag+"="+from.Machine)
 		options.Expanded, options.Title, options.Agent = from.Expanded, from.Title, from.Agent
 	}
 
@@ -192,7 +221,7 @@ func showTaskPopup(
 	width, height = min(width, client.Width), min(height, client.Height)
 	popup := popupOptions(gotmux.Exec(executable, arguments...), strconv.Itoa(width), strconv.Itoa(height), cfg.Theme.Background)
 
-	if offered.Project != "" {
+	if options.Project != "" {
 		expanded := options
 		expanded.Expanded = true
 		_, tallest := taskpicker.Size(cfg, expanded)
@@ -204,10 +233,44 @@ func showTaskPopup(
 		return taskHandoff{}, false, oops.In("cli").With("operation", "open_task_picker").Wrap(err)
 	}
 
-	return readHandoff(handoffPath, func(handoff taskHandoff) bool { return handoff.Show != "" || handoff.Reopen })
+	return readHandoff(handoffPath, func(handoff taskHandoff) bool { return handoff.Show != "" || handoff.Reopen || handoff.Session != "" })
 }
 
-func runTaskPickerUI(cmd *cobra.Command, _ []string) error {
+// showRemoteAttachPopup attaches to the remote session a task popup handed back, in a popup as
+// large as the picker's.
+func showRemoteAttachPopup(
+	ctx context.Context, cmd *cobra.Command, cfg *config.Config, socket string, client gotmux.ClientInfo, to taskHandoff,
+) error {
+	executable, err := os.Executable()
+	if err != nil {
+		return oops.In("cli").With("operation", "resolve_executable").Wrap(err)
+	}
+
+	arguments := []string{"remote", "attach", to.Machine, to.Session, "--origin-socket", socket}
+	if to.Pane != "" {
+		arguments = append(arguments, "--pane", to.Pane)
+	}
+
+	if path, _ := cmd.Flags().GetString("config"); path != "" {
+		arguments = append(arguments, "--config", path)
+	} else if noConfig, _ := cmd.Flags().GetBool("no-config"); noConfig {
+		arguments = append(arguments, "--no-config")
+	}
+
+	width, height := adaptivePickerPopupDimensions(cfg.Popup.AgentsWidth, cfg.Popup.AgentsHeight,
+		gotmux.Size{Width: client.Width, Height: client.Height},
+		gotmux.Size{Width: popupAgentsMinWidth, Height: popupAgentsMinHeight},
+		gotmux.Size{Width: popupAgentsDefaultWidth, Height: popupAgentsDefaultHeight})
+
+	popup := popupOptions(gotmux.Exec(executable, arguments...), width, height, cfg.Theme.Background)
+	if err := client.Handle().Popup(ctx, popup); err != nil {
+		return oops.In("cli").With("operation", "open_remote_attach").Wrap(err)
+	}
+
+	return nil
+}
+
+func runTaskPickerUI(cmd *cobra.Command, _ []string, remoteFactory RemoteFactory) error {
 	ctx := clibase.CommandContext(cmd)
 
 	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
@@ -220,6 +283,7 @@ func runTaskPickerUI(cmd *cobra.Command, _ []string) error {
 	expanded, _ := cmd.Flags().GetBool(taskExpandedFlag)
 	title, _ := cmd.Flags().GetString(taskTitleFlag)
 	agent, _ := cmd.Flags().GetString(taskAgentFlag)
+	machine, _ := cmd.Flags().GetString(taskMachineFlag)
 
 	if handoffPath == "" || pane == "" {
 		return clibase.NewExitError(clibase.ExitCodeUsage, errPickerHandoffInvalid)
@@ -232,60 +296,109 @@ func runTaskPickerUI(cmd *cobra.Command, _ []string) error {
 
 	caller := action.Caller{Client: "", Pane: pane, Session: "", Width: "", Height: ""}
 
-	from := taskHandoff{Show: "", Reopen: true, Expanded: expanded, Title: title, Agent: agent}
+	from := taskHandoff{Show: "", Reopen: true, Expanded: expanded, Title: title, Agent: agent, Machine: machine, Session: "", Pane: ""}
 
-	choice, chosen, err := pickTask(ctx, cmd, cfg, runtime, caller, from)
+	picked, chosen, err := pickTask(ctx, cmd, cfg, runtime, caller, remoteFactory, from)
 	if err = errors.Join(err, runtime.Close()); err != nil || !chosen {
 		return err
 	}
 
+	return finishTaskPicker(ctx, handoffPath, picked)
+}
+
+// finishTaskPicker hands the popup's choice to its opener: a local task to show, or the remote
+// session of the task the popup started or chose.
+func finishTaskPicker(ctx context.Context, handoffPath string, picked pickedTask) error {
+	choice := picked.choice
+
 	switch {
 	case choice.Reopen:
-		return writeHandoff(handoffPath, taskHandoff{Show: "", Reopen: true, Expanded: choice.Expanded, Title: choice.Title, Agent: choice.Harness})
+		return writeHandoff(handoffPath, taskHandoff{
+			Show: "", Reopen: true, Expanded: choice.Expanded, Title: choice.Title, Agent: choice.Harness,
+			Machine: picked.machines[choice.Machine], Session: "", Pane: "",
+		})
+	case picked.connection != "" && (choice.Show != "" || picked.session != ""):
+		return handOffRemoteTask(ctx, handoffPath, picked)
 	case choice.Show != "":
-		return writeHandoff(handoffPath, taskHandoff{Show: choice.Show, Reopen: false, Expanded: false, Title: "", Agent: ""})
+		return writeHandoff(handoffPath, taskHandoff{
+			Show: choice.Show, Reopen: false, Expanded: false, Title: "", Agent: "", Machine: "", Session: "", Pane: "",
+		})
 	default:
 		return nil
 	}
 }
 
-// pickTask runs the picker, which starts the chosen task or tab through runtime before it closes.
+// pickedTask is what the popup ended with: the choice, the popup's machines, and on a remote
+// connection the session the started task opened in.
+type pickedTask struct {
+	choice     taskpicker.Choice
+	machines   []string
+	connection string
+	session    string
+	remote     RemoteServices
+}
+
+// pickTask runs the picker, which starts the chosen task or tab through runtime, or on the chosen
+// remote connection, before it closes.
 func pickTask(
-	ctx context.Context, cmd *cobra.Command, cfg *config.Config, runtime *actioncli.Runtime, caller action.Caller, from taskHandoff,
-) (taskpicker.Choice, bool, error) {
-	offered, err := runtime.Local.TaskOffer(ctx, caller, from.Expanded)
+	ctx context.Context, cmd *cobra.Command, cfg *config.Config, runtime *actioncli.Runtime, caller action.Caller,
+	remoteFactory RemoteFactory, from taskHandoff,
+) (pickedTask, bool, error) {
+	picked := pickedTask{choice: emptyChoice(), machines: nil, connection: "", session: "", remote: emptyRemoteServices()}
+
+	workspace, err := app.Resolve(cfg, clibase.CommandLocations(cmd))
 	if err != nil {
-		return taskpicker.Choice{}, false, err
+		return picked, false, err
 	}
 
+	choices, err := loadTaskChoices(ctx, cfg, workspace.Socket, runtime, caller, remoteFactory, from.Machine, from.Expanded)
+	if err != nil {
+		return picked, false, err
+	}
+
+	picked.machines, picked.remote = choices.machines, choices.remote
+	picked.connection = choices.machines[choices.options.Machine]
+
 	start := func(choice taskpicker.Choice) error {
-		if choice.Tab {
+		location := choice.Location
+		input := action.NewTask{
+			Harness: choice.Harness, Where: string(location.Where), Branch: location.Branch, Remote: location.Remote,
+			Directory: location.Directory, Title: choice.Title, Project: "", Layout: "",
+		}
+
+		switch {
+		case picked.connection != "":
+			input.Project = choices.root
+			router := action.Router{Local: nil, Peer: choices.remote.Peer, Origin: nil}
+
+			started, err := action.Run(ctx, router, action.TaskNew, action.Peer(picked.connection), emptyCaller(), input)
+			picked.session = started.Session
+
+			return err
+		case choice.Tab:
 			_, err := action.Run(ctx, runtime.Router, action.TaskTab, action.Local(), caller, action.OpenTab{})
 
 			return err
+		default:
+			_, err := action.Run(ctx, runtime.Router, action.TaskNew, action.Local(), caller, input)
+
+			return err
 		}
-
-		location := choice.Location
-		_, err := action.Run(ctx, runtime.Router, action.TaskNew, action.Local(), caller, action.NewTask{
-			Harness: choice.Harness, Where: string(location.Where), Branch: location.Branch, Remote: location.Remote,
-			Directory: location.Directory, Title: choice.Title, Project: "", Layout: "",
-		})
-
-		return err
 	}
 
-	pickerOptions := taskPickerOptions(offered, start)
+	pickerOptions := choices.options
+	pickerOptions.Start = start
 
 	if from.Reopen {
 		pickerOptions.Expanded, pickerOptions.Title, pickerOptions.Agent = from.Expanded, from.Title, from.Agent
 	}
 
-	if pickerOptions.Expanded {
+	if pickerOptions.Expanded && picked.connection == "" {
 		counting, stopCounting := context.WithCancel(ctx)
 		defer stopCounting()
 
 		pickerOptions.Changes = func() map[string]git.Diff {
-			return task.Changes(counting, checkoutDirectories(offered.Offer.Locations))
+			return task.Changes(counting, checkoutDirectories(pickerOptions.Locations))
 		}
 	}
 
@@ -304,24 +417,226 @@ func pickTask(
 	}
 
 	if _, err := tea.NewProgram(model, options...).Run(); err != nil {
-		return taskpicker.Choice{}, false, oops.In("cli").With("operation", "execute_task_picker").Wrap(err)
+		return picked, false, oops.In("cli").With("operation", "execute_task_picker").Wrap(err)
 	}
 
 	choice, chosen := model.Chosen()
+	picked.choice = choice
 
-	return choice, chosen, nil
+	return picked, chosen, nil
 }
 
-func taskPickerOptions(offered app.TaskOffer, start func(taskpicker.Choice) error) taskpicker.Options {
-	names := make([]string, 0, len(offered.Offer.Harnesses))
-	for _, harness := range offered.Offer.Harnesses {
-		names = append(names, harness.Name)
+// loadTaskChoices lists what a new task can start with on machine, a remote connection or empty
+// for this machine. In a project, the connected remote machines are offered too; one whose sesh
+// cannot start tasks for others is listed but cannot be chosen, and one without the project
+// offers nothing.
+func loadTaskChoices(
+	ctx context.Context, cfg *config.Config, socket string, runtime *actioncli.Runtime, caller action.Caller,
+	remoteFactory RemoteFactory, machine string, describe bool,
+) (taskChoices, error) {
+	choices := taskChoices{options: taskPickerOptions("", emptyTaskOffered()), machines: []string{""}, root: "", remote: emptyRemoteServices()}
+
+	offered, err := runtime.Local.TaskOffer(ctx, caller, describe && machine == "")
+	if err != nil {
+		return choices, err
+	}
+
+	choices.options = taskPickerOptions(offered.Project, app.OfferedTask(offered.Offer))
+
+	if offered.Project == "" || remoteFactory == nil || !cfg.Remote.Enabled {
+		return choices, nil
+	}
+
+	choices.remote, err = remoteFactory(ctx, cfg, socket)
+	if err != nil {
+		return choices, oops.In("cli").With("operation", "configure_remote_task").Wrap(err)
+	}
+
+	if choices.remote.Catalog == nil || choices.remote.Peer == nil {
+		return choices, nil
+	}
+
+	machines, err := choices.listMachines()
+	if err != nil {
+		return choices, err
+	}
+
+	choices.options.Machines = machines
+
+	index := slices.Index(choices.machines, machine)
+	if index <= 0 || !machines[index].Usable {
+		return choices, nil
+	}
+
+	choices.useMachine(ctx, offered.Project, index, describe)
+
+	return choices, nil
+}
+
+// listMachines lists this machine and the connected remote machines, and keeps their connections.
+func (choices *taskChoices) listMachines() ([]taskpicker.Machine, error) {
+	catalog, err := choices.remote.Catalog.LoadRemoteCatalog()
+	if err != nil {
+		return nil, err
+	}
+
+	machines := []taskpicker.Machine{{Name: thisMachine, Usable: true}}
+
+	for _, connection := range catalog.Connections {
+		if !connection.Connected {
+			continue
+		}
+
+		at := action.Peer(connection.ID)
+		usable := choices.remote.Peer.Accepts(at, action.TaskOffer.ID) && choices.remote.Peer.Accepts(at, action.TaskNew.ID)
+		machines = append(machines, taskpicker.Machine{Name: cmp.Or(connection.Label, connection.ID), Usable: usable})
+		choices.machines = append(choices.machines, connection.ID)
+	}
+
+	return machines, nil
+}
+
+// useMachine replaces the choices with what the remote machine at index offers for project, or
+// with why it offers nothing.
+func (choices *taskChoices) useMachine(ctx context.Context, project string, index int, describe bool) {
+	machines := choices.options.Machines
+	router := action.Router{Local: nil, Peer: choices.remote.Peer, Origin: nil}
+	remoteOffer, err := action.Run(ctx, router, action.TaskOffer, action.Peer(choices.machines[index]), emptyCaller(),
+		action.OfferTask{Project: project, Describe: describe})
+
+	switch {
+	case action.CodeOf(err) == action.CodeNotFound:
+		choices.options = taskPickerOptions(project, emptyTaskOffered())
+		choices.options.Problem = "not on " + machines[index].Name
+	case err != nil:
+		choices.options = taskPickerOptions(project, emptyTaskOffered())
+		choices.options.Problem = machines[index].Name + " unavailable"
+	default:
+		choices.options = taskPickerOptions(project, remoteOffer)
+		choices.root = remoteOffer.Project
+	}
+
+	choices.options.Machines, choices.options.Machine = machines, index
+}
+
+func taskPickerOptions(project string, offered action.TaskOffered) taskpicker.Options {
+	locations := make([]task.Location, 0, len(offered.Locations))
+	for _, location := range offered.Locations {
+		locations = append(locations, task.Location{
+			Where: task.Where(location.Where), Branch: location.Branch, Remote: location.Remote,
+			Directory: location.Directory, Task: location.Task, TaskTitle: location.TaskTitle,
+		})
+	}
+
+	refs := make(map[string]task.Ref, len(offered.Refs))
+	for name, ref := range offered.Refs {
+		refs[name] = task.Ref{Time: ref.Time, Subject: ref.Subject, Ahead: ref.Ahead, Behind: ref.Behind}
 	}
 
 	return taskpicker.Options{
-		Project: offered.Project, Locations: offered.Offer.Locations, Current: offered.Offer.Current,
-		NextNumber: offered.Offer.NextNumber, Branches: offered.Offer.Branches, Harnesses: names,
-		Agent: "", Title: "", Expanded: false, Refs: offered.Offer.Refs, Starts: offered.Offer.Starts, Now: time.Now(), Changes: nil, Start: start,
+		Project: project, Locations: locations, Current: offered.Current,
+		NextNumber: offered.NextNumber, Branches: offered.Branches, Harnesses: offered.Harnesses,
+		Agent: "", Title: "", Expanded: false, Refs: refs, Starts: offered.Starts, Now: time.Now(), Changes: nil, Start: nil,
+		Machines: nil, Machine: 0, Problem: "",
+	}
+}
+
+// handOffRemoteTask hands the remote session of the task the popup started or chose to the
+// popup's opener, once the remote catalog lists it.
+func handOffRemoteTask(ctx context.Context, handoffPath string, picked pickedTask) error {
+	if picked.remote.Watcher == nil {
+		return oops.In("cli").With("operation", "attach_remote_task").Wrap(errRemoteAttachUnavailable)
+	}
+
+	sessionID, pane := picked.session, ""
+
+	target, err := waitRemoteTaskSession(ctx, picked, func(connection tui.RemoteConnection) (session.Session, bool) {
+		var none session.Session
+
+		if picked.choice.Show != "" {
+			index := slices.IndexFunc(connection.Tasks, func(live task.Live) bool { return live.Record.ID == picked.choice.Show })
+			if index < 0 {
+				return none, false
+			}
+
+			sessionID, pane = string(connection.Tasks[index].SessionID), string(connection.Tasks[index].AgentPane)
+		}
+
+		index := slices.IndexFunc(connection.Sessions, func(row session.Session) bool { return row.ID == sessionID })
+		if index < 0 {
+			return none, false
+		}
+
+		return connection.Sessions[index], true
+	})
+	if err != nil {
+		return err
+	}
+
+	return writeHandoff(handoffPath, taskHandoff{
+		Show: "", Reopen: false, Expanded: false, Title: "", Agent: "", Machine: picked.connection, Session: target.ID, Pane: pane,
+	})
+}
+
+// waitRemoteTaskSession waits until the remote catalog shows the session find looks for on the
+// picked connection. A new project session reaches the catalog with the peer's next inventory.
+func waitRemoteTaskSession(
+	ctx context.Context, picked pickedTask, find func(tui.RemoteConnection) (session.Session, bool),
+) (session.Session, error) {
+	watching, stop := context.WithCancel(ctx)
+	defer stop()
+
+	var (
+		found  session.Session
+		listed bool
+	)
+
+	err := picked.remote.Watcher.WatchRemoteCatalog(watching, func(catalog tui.RemoteCatalog, err error) {
+		if err != nil || listed {
+			return
+		}
+
+		for _, connection := range catalog.Connections {
+			if connection.ID == picked.connection && connection.Connected {
+				found, listed = find(connection)
+			}
+		}
+
+		if listed {
+			stop()
+		}
+	})
+
+	switch {
+	case listed:
+		return found, nil
+	case err != nil && ctx.Err() == nil:
+		return found, oops.In("cli").With("operation", "find_remote_task_session").Wrap(err)
+	default:
+		return found, oops.In("cli").With("operation", "find_remote_task_session").Wrap(errors.Join(errRemoteTaskSession, ctx.Err()))
+	}
+}
+
+func emptyChoice() taskpicker.Choice {
+	return taskpicker.Choice{
+		Reopen: false, Expanded: false, Machine: 0, Tab: false, Harness: "", Title: "", Location: task.Location{
+			Where: "", Branch: "", Remote: "", Directory: "", Task: "", TaskTitle: "",
+		},
+		Show: "",
+	}
+}
+
+func emptyCaller() action.Caller {
+	return action.Caller{Client: "", Pane: "", Session: "", Width: "", Height: ""}
+}
+
+func emptyRemoteServices() RemoteServices {
+	return RemoteServices{Catalog: nil, Watcher: nil, Peer: nil, Attach: nil, OriginBridge: nil, Origin: nil}
+}
+
+func emptyTaskOffered() action.TaskOffered {
+	return action.TaskOffered{
+		Project: "", Harnesses: nil, Locations: nil, Current: -1, NextNumber: 0, Branches: nil, Refs: nil, Starts: nil,
 	}
 }
 

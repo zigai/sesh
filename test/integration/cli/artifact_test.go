@@ -162,7 +162,7 @@ func runConfiguredTaskAction(t *testing.T, fixture artifactBinaryFixture, server
 	marker := filepath.Join(directory, "action-marker")
 	configPath := filepath.Join(fixture.workDir, selection+" config.toml")
 
-	source := fmt.Sprintf("[tasks]\npopup_socket = 'actions'\n[task_actions.mark]\nrun = ['/bin/sh', '-c', 'printf selected > \"$1\"', 'mark', %q]\n", marker)
+	source := fmt.Sprintf("[tasks]\npopup_socket = 'actions'\n[menu.items.mark]\nrun = ['/bin/sh', '-c', 'printf selected > \"$1\"', 'mark', %q]\n", marker)
 	if err := os.WriteFile(configPath, []byte(source), 0o600); err != nil {
 		t.Fatal(err)
 	}

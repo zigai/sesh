@@ -121,7 +121,7 @@ func TestPopupChildReceivesInvokingPaneSessionAndRepository(t *testing.T) {
 
 	launchedAt := time.Unix(0, 1790000000123456789)
 
-	arguments := popupArguments(cmd, "/private/tmux.sock", "$7", "%2", "/private/handoff", "work", launchedAt)
+	arguments := popupArguments(cmd, "/private/tmux.sock", "$7", "%2", "/private/handoff", "inbox", launchedAt)
 	if !slices.Equal(arguments[:min(len(arguments), 3)], []string{"pick", "--ui", "popup"}) {
 		t.Fatalf("popup child arguments = %#v", arguments)
 	}
@@ -132,7 +132,7 @@ func TestPopupChildReceivesInvokingPaneSessionAndRepository(t *testing.T) {
 
 	for _, required := range []string{
 		"--repository", "/private/repository", "--target-pane", "%2", "--current-session-id", "$7",
-		"--switch-handoff", "/private/handoff", "--launched-at", "1790000000123456789", "--mode", "work",
+		"--switch-handoff", "/private/handoff", "--launched-at", "1790000000123456789", "--mode", "inbox",
 	} {
 		if !slices.Contains(arguments, required) {
 			t.Fatalf("popup child arguments lack %q: %#v", required, arguments)

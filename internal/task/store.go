@@ -202,8 +202,8 @@ func (l *Ledger) Find(id string) (Record, bool) {
 	return EmptyRecord(), false
 }
 
-// Done reports whether the task's pull request was merged or closed.
-func (r Record) Done() bool {
+// PREnded reports whether the task's pull request was merged or closed.
+func (r Record) PREnded() bool {
 	return r.PR.State == PRMerged || r.PR.State == PRClosed
 }
 

@@ -33,6 +33,7 @@ var (
 		Interactive: false,
 		Destructive: false,
 		Remote:      RemoteNever,
+		InPicker:    false,
 		check:       nil,
 	}, func(Subject, Values) (ReturnToAgent, error) { return ReturnToAgent{}, nil }, reportFocusedPane)
 
@@ -48,6 +49,7 @@ var (
 		Interactive: false,
 		Destructive: false,
 		Remote:      RemoteNever,
+		InPicker:    false,
 		check:       nil,
 	}, func(subject Subject, _ Values) (FocusAgent, error) {
 		return FocusAgent{Session: RefOf(subject.Sessions[0]), Pane: subject.Pane}, nil
@@ -65,11 +67,34 @@ var (
 		Interactive: false,
 		Destructive: false,
 		Remote:      RemoteNever,
+		InPicker:    false,
 		check:       nil,
 	}, func(Subject, Values) (ClearWindowStatus, error) { return ClearWindowStatus{}, nil }, func(ClearedWindowStatus) string {
 		return "Cleared agent window styles"
 	})
 )
+
+// AgentMerge merges the branch an agent works on when it is not a sesh task.
+var AgentMerge = define(Descriptor{
+	ID:      "agent.merge",
+	Title:   "Merge branch",
+	Summary: "Rebase the agent's branch onto the default branch and push it there",
+	Help: "Put the branch checked out in the agent's directory on origin's default branch without a merge " +
+		"commit: refuse with uncommitted changes, fetch, rebase onto origin's default branch (a conflict aborts " +
+		"the rebase), run the project's merge check, and push to origin's default branch as a fast-forward. " +
+		"Nothing is removed afterwards.",
+	Subject:     SubjectAgentPane,
+	Arity:       ArityOne,
+	Params:      nil,
+	NeedsClient: false,
+	Interactive: false,
+	Destructive: true,
+	Remote:      RemoteNever,
+	InPicker:    false,
+	check:       nil,
+}, func(subject Subject, _ Values) (MergeAgentBranch, error) {
+	return MergeAgentBranch{Session: RefOf(subject.Sessions[0]), Pane: subject.Pane}, nil
+}, func(out MergedAgentBranch) string { return "Merged " + out.Branch + " into " + out.Base })
 
 type NavigateAgents struct {
 	Local bool `json:"local"`
@@ -93,6 +118,16 @@ type ClearWindowStatus struct{}
 
 type ClearedWindowStatus struct{}
 
+type MergeAgentBranch struct {
+	Session SessionRef `json:"session"`
+	Pane    string     `json:"pane"`
+}
+
+type MergedAgentBranch struct {
+	Branch string `json:"branch"`
+	Base   string `json:"base"`
+}
+
 func defineAgentNavigation(id ID, title, summary, help string) *Definition[NavigateAgents, FocusedPane] {
 	return define(Descriptor{
 		ID:          id,
@@ -106,6 +141,7 @@ func defineAgentNavigation(id ID, title, summary, help string) *Definition[Navig
 		Interactive: false,
 		Destructive: false,
 		Remote:      RemoteNever,
+		InPicker:    false,
 		check:       nil,
 	}, func(_ Subject, values Values) (NavigateAgents, error) {
 		return NavigateAgents{Local: values.Bool("local")}, nil

@@ -42,8 +42,8 @@ func (m *Model) helpBindings(keys actionKeyMap) []helpBinding {
 	case displayModeSesh:
 	case displayModeAgents:
 		moveDescription = "Move between agents"
-	case displayModeWork:
-		moveDescription = "Move between tasks"
+	case displayModeInbox:
+		moveDescription = "Move between agents"
 	}
 
 	bindings := []helpBinding{
@@ -65,9 +65,14 @@ func (m *Model) helpBindings(keys actionKeyMap) []helpBinding {
 			helpBinding{keys.agentSort.Help().Key, keys.agentSort.Help().Desc},
 			helpBinding{"ctrl+↑/ctrl+↓", "Move between tmux sessions"},
 		)
-	case displayModeWork:
-		bindings = append(bindings, helpBinding{"ctrl+↑/ctrl+↓", "Move between sections"})
+	case displayModeInbox:
+		bindings = append(bindings,
+			helpBinding{keys.inboxGroup.Help().Key, keys.inboxGroup.Help().Desc},
+			helpBinding{"ctrl+↑/ctrl+↓", "Move between groups"},
+		)
 	}
+
+	bindings = append(bindings, helpBinding{keys.menu.Help().Key + ", right-click", keys.menu.Help().Desc})
 
 	for _, bound := range m.availableActions(keys) {
 		bindings = append(bindings, helpBinding{bound.key.Help().Key, bound.key.Help().Desc})

@@ -95,7 +95,7 @@ func TestEnterNoMatchDoesNotCreateSession(t *testing.T) {
 
 func TestConfiguredCreateShortcutStartsCreateDialog(t *testing.T) {
 	model := newTestModel()
-	model.config.Keys.Bind = []config.KeyBindConfig{{Key: "ctrl+g", Action: "session.create", In: "picker", Table: "", Params: nil}}
+	model.config.Keys.Bind = []config.KeyBindConfig{{Key: "ctrl+t", Action: "session.create", In: "picker", Table: "", Params: nil}}
 	model.textInput.SetValue("new-session")
 
 	cwd := t.TempDir()
@@ -103,7 +103,7 @@ func TestConfiguredCreateShortcutStartsCreateDialog(t *testing.T) {
 		return cwd, nil
 	}
 
-	cmdFn := model.handleActionKeys(keyCtrl('g'))
+	cmdFn := model.handleActionKeys(keyCtrl('t'))
 	if cmdFn == nil {
 		t.Fatal("handleActionKeys(configured create) returned nil")
 	}

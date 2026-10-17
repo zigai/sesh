@@ -5,6 +5,7 @@ package picker
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"os"
 	"slices"
 	"strconv"
@@ -14,6 +15,8 @@ import (
 
 	"github.com/samber/oops"
 	"github.com/zigai/aht/v2/pkg/aht"
+	"github.com/zigai/aht/v2/pkg/history"
+	"github.com/zigai/aht/v2/pkg/registry"
 	gotmux "github.com/zigai/gotmux/tmux"
 	"golang.org/x/sync/singleflight"
 
@@ -21,6 +24,7 @@ import (
 	"github.com/zigai/sesh/internal/agents"
 	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/config"
+	"github.com/zigai/sesh/internal/inbox"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/snapshot/store"
 	"github.com/zigai/sesh/internal/task"
@@ -162,6 +166,8 @@ func (s *services) TUIServices() tui.Services {
 		TerminalAttach:   nil,
 		Agents:           s,
 		Tasks:            s,
+		Inbox:            s,
+		Evidence:         s,
 		AgentWatcher:     s,
 		Remote:           s.remote.Catalog,
 		RemoteWatcher:    s.remote.Watcher,
@@ -188,6 +194,46 @@ func (s *services) LoadTasks(ctx context.Context) ([]task.Live, error) {
 	}
 
 	return live, nil
+}
+
+// LoadInbox reads what the inbox remembers: snoozed rows and results marked unseen.
+func (s *services) LoadInbox(ctx context.Context) (inbox.State, error) {
+	state, err := inbox.NewStore(s.workspace.Inbox).Load(ctx)
+	if err != nil {
+		return state, oops.In("cli").With("operation", "load_inbox").Wrap(err)
+	}
+
+	return state, nil
+}
+
+// UpdateInbox changes what the inbox remembers.
+func (s *services) UpdateInbox(ctx context.Context, change func(*inbox.State) error) (inbox.State, error) {
+	state, err := inbox.NewStore(s.workspace.Inbox).Update(ctx, change)
+	if err != nil {
+		return state, oops.In("cli").With("operation", "update_inbox").Wrap(err)
+	}
+
+	return state, nil
+}
+
+// LastReport is the last assistant message in an agent's transcript, or empty when it has none.
+// A harness writes the transcript with the conversation's first message, so a missing one means
+// no report yet.
+func (s *services) LastReport(ctx context.Context, agent session.AgentSession) (string, error) {
+	if _, err := os.Stat(agent.SessionPath); errors.Is(err, fs.ErrNotExist) {
+		return "", nil
+	}
+
+	catalog := history.Catalog{
+		Sources: []history.Source{{Harness: registry.Harness(agent.Harness), Path: agent.SessionPath}}, IndexPath: "", Progress: nil,
+	}
+
+	message, _, err := catalog.LastMessage(ctx, agent.SessionID, "assistant")
+	if err != nil {
+		return "", oops.In("cli").With("operation", "read_last_report").Wrap(err)
+	}
+
+	return message.Text, nil
 }
 
 // SyncTasks refreshes the pull requests and window titles of the recorded tasks.
@@ -493,7 +539,7 @@ func agentSummaries(observed []agents.AgentSession) []session.AgentSummary {
 			summary.IdleSince = earlierNonZero(summary.IdleSince, agent.StatusSince)
 		case session.AgentStatusIdle:
 			summary.IdleSince = earlierNonZero(summary.IdleSince, agent.StatusSince)
-		case session.AgentStatusUnknown, session.AgentStatusSleeping, session.AgentStatusDone:
+		case session.AgentStatusUnknown, session.AgentStatusSleeping, session.AgentStatusMerged:
 			summary.Unknown++
 		}
 	}
@@ -510,6 +556,8 @@ func agentSession(item agents.AgentSession) session.AgentSession {
 		RegistryID:       item.ID,
 		Harness:          item.Harness,
 		HarnessSession:   item.HarnessSessionID,
+		SessionID:        item.HarnessSessionID,
+		Host:             "",
 		PaneID:           item.PaneID,
 		PanePID:          item.PanePID,
 		CWD:              item.CWD,
@@ -526,6 +574,7 @@ func agentSession(item agents.AgentSession) session.AgentSession {
 		GitStash:         0,
 		GitConflicts:     0,
 		GitDirty:         false,
+		GitUnmerged:      0,
 		SessionPath:      item.SessionPath,
 		Executable:       item.Command,
 		PID:              item.PanePID,

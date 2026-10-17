@@ -13,21 +13,23 @@ import (
 type keyPressSpec string
 
 type actionKeyMap struct {
-	actions   []boundAction
-	help      bubbleskey.Binding
-	cycleMode bubbleskey.Binding
-	agentSort bubbleskey.Binding
-	pageUp    bubbleskey.Binding
-	pageDown  bubbleskey.Binding
-	top       bubbleskey.Binding
-	bottom    bubbleskey.Binding
-	enter     bubbleskey.Binding
-	close     bubbleskey.Binding
-	handoff   bubbleskey.Binding
-	stepUp    bubbleskey.Binding
-	stepDown  bubbleskey.Binding
-	groupUp   bubbleskey.Binding
-	groupDown bubbleskey.Binding
+	actions    []boundAction
+	help       bubbleskey.Binding
+	cycleMode  bubbleskey.Binding
+	agentSort  bubbleskey.Binding
+	inboxGroup bubbleskey.Binding
+	menu       bubbleskey.Binding
+	pageUp     bubbleskey.Binding
+	pageDown   bubbleskey.Binding
+	top        bubbleskey.Binding
+	bottom     bubbleskey.Binding
+	enter      bubbleskey.Binding
+	close      bubbleskey.Binding
+	handoff    bubbleskey.Binding
+	stepUp     bubbleskey.Binding
+	stepDown   bubbleskey.Binding
+	groupUp    bubbleskey.Binding
+	groupDown  bubbleskey.Binding
 }
 
 type boundAction struct {
@@ -43,21 +45,23 @@ func newActionKeyMap(cfg *config.Config) actionKeyMap {
 	keys := cfg.Keys
 
 	return actionKeyMap{
-		actions:   pickerActions(cfg),
-		help:      newActionBinding(keys.Help, "Show this help"),
-		cycleMode: newActionBinding(keys.CycleMode, "Cycle display mode"),
-		agentSort: newActionBinding(keys.AgentSort, "Cycle agent sort order"),
-		pageUp:    newActionBinding(keys.PageUp, "Page up"),
-		pageDown:  newActionBinding(keys.PageDown, "Page down"),
-		top:       newActionBinding(keys.Top, "Jump to top"),
-		bottom:    newActionBinding(keys.Bottom, "Jump to bottom"),
-		enter:     newActionBindingSet(config.PickerSelectKeys, "enter", "Open selected session or agent"),
-		close:     newActionBindingSet(config.PickerCloseKeys, "esc, ctrl+c, ctrl+o", "Close popup"),
-		handoff:   newActionBindingSet(config.PickerHandoffKeys, "ctrl+p", "Open floating terminal"),
-		stepUp:    newActionBindingSet(config.PickerStepUpKeys, "↑", "Move selection up"),
-		stepDown:  newActionBindingSet(config.PickerStepDownKeys, "↓/ctrl+n", "Move selection down"),
-		groupUp:   newActionBindingSet(config.PickerGroupUpKeys, "ctrl+↑", "Move to previous tmux session"),
-		groupDown: newActionBindingSet(config.PickerGroupDownKeys, "ctrl+↓", "Move to next tmux session"),
+		actions:    pickerActions(cfg),
+		help:       newActionBinding(keys.Help, "Show this help"),
+		cycleMode:  newActionBinding(keys.CycleMode, "Cycle display mode"),
+		agentSort:  newActionBinding(keys.AgentSort, "Cycle agent sort order"),
+		inboxGroup: newActionBinding(keys.InboxGroup, "Group the inbox by state or project"),
+		menu:       newActionBinding(keys.Menu, "Open the menu of the selected row"),
+		pageUp:     newActionBinding(keys.PageUp, "Page up"),
+		pageDown:   newActionBinding(keys.PageDown, "Page down"),
+		top:        newActionBinding(keys.Top, "Jump to top"),
+		bottom:     newActionBinding(keys.Bottom, "Jump to bottom"),
+		enter:      newActionBindingSet(config.PickerSelectKeys, "enter", "Open selected session or agent"),
+		close:      newActionBindingSet(config.PickerCloseKeys, "esc, ctrl+c, ctrl+o", "Close popup"),
+		handoff:    newActionBindingSet(config.PickerHandoffKeys, "ctrl+p", "Open floating terminal"),
+		stepUp:     newActionBindingSet(config.PickerStepUpKeys, "↑", "Move selection up"),
+		stepDown:   newActionBindingSet(config.PickerStepDownKeys, "↓/ctrl+n", "Move selection down"),
+		groupUp:    newActionBindingSet(config.PickerGroupUpKeys, "ctrl+↑", "Move to previous tmux session"),
+		groupDown:  newActionBindingSet(config.PickerGroupDownKeys, "ctrl+↓", "Move to next tmux session"),
 	}
 }
 
@@ -99,6 +103,13 @@ func (m *Model) availableActions(keys actionKeyMap) []boundAction {
 		}
 
 		descriptor := entry.Describe()
+		if descriptor.InPicker {
+			if m.pickerActionError(descriptor.ID) == nil {
+				available = append(available, bound)
+			}
+
+			continue
+		}
 
 		subject, ok := m.actionSubject(descriptor)
 		if ok && m.actionAvailable(descriptor, subject) == nil {

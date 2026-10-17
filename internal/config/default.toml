@@ -20,7 +20,7 @@
 # default_session_path_suggestion = "~/Projects/{session}"
 
 # Enabled popup modes, in cycle order. Use one entry to lock to one mode.
-# display_modes = ["sesh", "agents", "work"]
+# display_modes = ["sesh", "agents", "inbox"]
 
 # Logging level (debug, info, warn, error, disabled).
 # log_level = "info"
@@ -29,7 +29,7 @@
 # row, and agent keys in a focused session), or "right".
 # shortcut_style = "none"
 
-# What a session key does in the agents and work modes: "focus" (default) waits for an agent key,
+# What a session key does in the agents and inbox modes: "focus" (default) waits for an agent key,
 # "open" opens the session.
 # session_key_action = "focus"
 
@@ -56,11 +56,11 @@
 # Selectable agent rows in AGENTS mode.
 # agents_agent_format = "{tree}{status_glyph} {status_age:<7}   {agent_cwd_name:<23.23}  {agent_session}{right}{harness:<6.6}   {agent_git_label:<6.22} {agent_git_added:<5} {agent_git_deleted:<5} {agent_git_ahead:<2} {agent_git_behind:<2}"
 
-# Section headings in WORK mode.
-# work_section_format = "{session_name}"
+# Group headings in INBOX mode.
+# inbox_group_format = "{session_name}"
 
-# Selectable task rows in WORK mode.
-# work_task_format = "{tree}{status_glyph} {status_age:<7}   {agent_project_name:<16.16}  {agent_session}{right}{harness:<6.6}   {agent_git_label:<6.22} {agent_git_added:<5} {agent_git_deleted:<5} {agent_pr:<6}"
+# Selectable rows in INBOX mode.
+# inbox_agent_format = "{tree}{status_glyph} {status_age:<7}   {agent_project_name:<16.16}  {agent_session}{right}{harness:<6.6}   {agent_git_label:<6.22} {agent_git_added:<5} {agent_git_deleted:<5} {agent_pr:<10} {evidence:<5} {host}"
 
 # {custom.NAME} shows the output of the command defined as display.fields.NAME, for example:
 #   [display.fields]
@@ -198,12 +198,14 @@
 # Mode and list navigation.
 # cycle_mode = "ctrl+f"
 # agent_sort = "ctrl+s"
+# inbox_group = "ctrl+g"
+# menu = "alt+m"
 # page_up = "pgup"
 # page_down = "pgdown"
 # top = "home"
 # bottom = "end"
 
-# Session keys: session_prefix and then a letter opens a session, or in the agents and work modes
+# Session keys: session_prefix and then a letter opens a session, or in the agents and inbox modes
 # focuses it so one of agent_keys opens one of its agents. "alt" holds alt with the letter instead.
 # Sessions get a free letter assigned once and kept; a [keys.sessions] table picks the letter for
 # a local session, as in dotfiles = "d".
@@ -277,17 +279,43 @@
 # Show key hints at the bottom of the new task popup.
 # show_footer = true
 
-# Named task actions run headless in the task worktree, in a window of the task's popup
-# session. The prompt, if any, is the last argument; it can use {task}, {title}, {branch},
-# {base}, {project} and {worktree}. link_pr looks up the branch's pull request afterwards.
-# A [projects.overrides.<name>.task_actions.<action>] table overrides fields for one project,
-# task_panes there replace or add panes by name, and task_layouts replace the layouts. <name>
-# is the project's directory name or its path, such as "~/work/api".
-#   [task_actions.ship]
+# A [projects.overrides.<name>] table changes one project: menu_items there override fields of
+# menu items, merge replaces [merge], task_panes replace or add panes by name, and task_layouts
+# replace the layouts. <name> is the project's directory name or its path, such as "~/work/api".
+
+# INBOX mode. group is "state" or "project". sections lists the shown sections in order; a
+# section left out is hidden. labels renames sections, as in labels = { done = "new" }. dim lists
+# sections with dimmed rows. snooze lists the snooze choices: a duration, a time of day such as
+# "18:00", "tomorrow 09:00", or "next message".
+[inbox]
+
+# group = "state"
+# sections = ["done", "waiting", "unmerged", "running", "snoozed", "asleep", "idle"]
+# dim = ["running", "snoozed", "asleep"]
+# snooze = ["next message", "1h", "4h", "tomorrow 09:00"]
+
+# Row menus, opened with a right-click or keys.menu. "-" is a divider, and "items" lists the
+# menu items not named elsewhere.
+[menu]
+
+# agent = ["go", "snooze", "unsnooze", "seen", "unseen", "evidence", "pr", "merge", "sleep", "wake", "open", "finish", "-", "items"]
+# session = ["go", "rename", "snapshot", "kill", "delete"]
+
+# Menu items run headless in the task worktree, in a window of the task's popup session. The
+# prompt, if any, is the last argument; it can use {task}, {title}, {branch}, {base}, {project}
+# and {worktree}. link_pr looks up the branch's pull request afterwards. key binds the item in
+# the picker; label names it in the menu.
+#   [menu.items.ship]
 #   key = "alt+p"
 #   run = ["claude", "-p", "--model", "sonnet"]
 #   prompt = "Commit, push and open a PR for {branch} against {base}."
 #   link_pr = true
+
+# The merge action rebases a branch onto its base, runs check when it is set, and pushes the
+# branch to the base on origin. For example check = ["just", "check"].
+[merge]
+
+# check = []
 
 # State, metadata, and diagnostic log locations.
 [paths]

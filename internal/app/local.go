@@ -106,7 +106,7 @@ func NewLocal(opts LocalOptions) *Local {
 
 	for _, entry := range action.All() {
 		descriptor := entry.Describe()
-		if _, ok := local.handlers[descriptor.ID]; !ok && !descriptor.Interactive {
+		if _, ok := local.handlers[descriptor.ID]; !ok && !descriptor.Interactive && !descriptor.InPicker {
 			panic("app: no local handler for action " + string(entry.Describe().ID))
 		}
 	}

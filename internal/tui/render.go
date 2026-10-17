@@ -128,6 +128,10 @@ func (m *Model) viewContent() string {
 		return m.insetPopupContent(overlayCentered(frame, dialogOverlay, m.contentWidth(), m.contentHeight()))
 	}
 
+	if m.menu != nil {
+		return m.insetPopupContent(m.renderMenu(frame))
+	}
+
 	return m.insetPopupContent(frame)
 }
 
@@ -145,7 +149,7 @@ func (m *Model) renderFrame() string {
 
 	m.writeListFramedSection(&out, layout.bodyWidth, layout.listHeight, leftBorder, rightBorder)
 
-	for _, line := range m.renderWorkDetail(layout.bodyWidth, layout.detailRows) {
+	for _, line := range m.renderInboxDetail(layout.bodyWidth, layout.detailRows) {
 		writeExactFramedLine(&out, line, leftBorder, rightBorder)
 	}
 
@@ -242,7 +246,7 @@ func (m *Model) calcPopupLayout(_ bool) popupLayout {
 
 	reservedRows := 1
 
-	wantsFooter := m.config.Settings.ShowFooter || m.showsDisplayModeIndicator() || m.showsAgentSortIndicator() || m.hasStatusBadge()
+	wantsFooter := m.config.Settings.ShowFooter || m.showsFooterBadges()
 
 	showFooter := wantsFooter && bodyHeight-reservedRows >= minFooterRows
 	if showFooter {
@@ -250,8 +254,8 @@ func (m *Model) calcPopupLayout(_ bool) popupLayout {
 	}
 
 	detailRows := 0
-	if m.displayMode == displayModeWork && bodyHeight-reservedRows-workDetailRows >= minWorkListRows {
-		detailRows = workDetailRows
+	if m.displayMode == displayModeInbox && bodyHeight-reservedRows-inboxDetailRows >= minInboxListRows {
+		detailRows = inboxDetailRows
 		reservedRows += detailRows
 	}
 
@@ -949,7 +953,7 @@ func agentStatusGlyphChar(status session.AgentStatus) string {
 		return "○"
 	case session.AgentStatusSleeping:
 		return "☾"
-	case session.AgentStatusDone:
+	case session.AgentStatusMerged:
 		return "✓"
 	default:
 		return "○"
@@ -972,7 +976,7 @@ func (m *Model) agentStatusColor(status session.AgentStatus) string {
 		return colors.Failed
 	case session.AgentStatusIdle, session.AgentStatusInterrupted, session.AgentStatusUnknown, session.AgentStatusSleeping:
 		return colors.Idle
-	case session.AgentStatusDone:
+	case session.AgentStatusMerged:
 		return m.config.Theme.Success
 	default:
 		return colors.Idle
@@ -1179,8 +1183,8 @@ func agentStatusLabel(status session.AgentStatus) string {
 		return "UNKNOWN"
 	case session.AgentStatusSleeping:
 		return "SLEEPING"
-	case session.AgentStatusDone:
-		return "DONE"
+	case session.AgentStatusMerged:
+		return "MERGED"
 	default:
 		return "UNKNOWN"
 	}
@@ -1279,12 +1283,8 @@ func (m *Model) emptyStateMessage() string {
 	}
 
 	switch m.displayMode {
-	case displayModeWork:
-		if m.tasksErr != nil {
-			return fmt.Sprintf("Unable to load tasks: %v", m.tasksErr)
-		}
-
-		return "No tasks yet: ctrl+t in a project session starts one"
+	case displayModeInbox:
+		return m.inboxEmptyMessage()
 	case displayModeAgents:
 		switch {
 		case !m.config.AgentSessions.Enabled:
@@ -1301,10 +1301,23 @@ func (m *Model) emptyStateMessage() string {
 	}
 }
 
+func (m *Model) inboxEmptyMessage() string {
+	switch {
+	case m.tasksErr != nil:
+		return fmt.Sprintf("Unable to load tasks: %v", m.tasksErr)
+	case m.inboxErr != nil:
+		return fmt.Sprintf("Unable to load inbox state: %v", m.inboxErr)
+	case !m.config.AgentSessions.Enabled:
+		return "Agent tracking is disabled"
+	default:
+		return "Inbox is empty"
+	}
+}
+
 func (m *Model) noMatchesMessage(query string) string {
 	switch m.displayMode {
-	case displayModeWork:
-		return fmt.Sprintf("No tasks match %q", query)
+	case displayModeInbox:
+		return fmt.Sprintf("No inbox rows match %q", query)
 	case displayModeAgents:
 		return fmt.Sprintf("No agent sessions match %q", query)
 	case displayModeSesh:
@@ -1328,7 +1341,7 @@ func (m *Model) renderModeFooter(width int, showHints bool) string {
 		return ""
 	}
 
-	if !m.showsDisplayModeIndicator() && !m.showsAgentSortIndicator() && !m.hasStatusBadge() {
+	if !m.showsFooterBadges() {
 		if showHints {
 			return m.renderFooter(width)
 		}
@@ -1396,7 +1409,7 @@ func modeBadge(cfg *config.Config, label string) string {
 }
 
 func (m *Model) modeFooterHintWidth(width int) int {
-	if !m.showsDisplayModeIndicator() && !m.showsAgentSortIndicator() && !m.hasStatusBadge() {
+	if !m.showsFooterBadges() {
 		return max(width, 0)
 	}
 
@@ -1454,10 +1467,10 @@ func (m *Model) baseFooterParts() []footerPart {
 		)
 	}
 
-	if m.displayMode == displayModeWork {
+	if m.displayMode == displayModeInbox {
 		return append(parts,
-			newFooterPart("↑/↓", "tasks"),
-			newFooterPart("ctrl+↑/↓", "sections"),
+			newFooterPart("↑/↓", "agents"),
+			newFooterPart(newActionKeyMap(m.config).menu.Help().Key, "menu"),
 		)
 	}
 

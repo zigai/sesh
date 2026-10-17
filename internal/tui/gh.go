@@ -13,7 +13,6 @@ import (
 
 	"github.com/zigai/sesh/internal/display"
 	"github.com/zigai/sesh/internal/display/layout"
-	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/tui/providers"
 )
 
@@ -121,7 +120,6 @@ func (m *Model) ghTargets() []ghTarget {
 	targets := make([]ghTarget, 0)
 
 	for _, row := range m.displaySessions {
-		remote := row.Origin == session.OriginSSH || row.Origin == session.OriginBridge
 		for _, agent := range row.Agents {
 			if agent.PaneID == "" {
 				continue
@@ -129,7 +127,7 @@ func (m *Model) ghTargets() []ghTarget {
 
 			targets = append(targets, ghTarget{
 				paneID: agent.PaneID, key: ghKey{repo: agent.GitRepo, branch: agent.GitBranch},
-				directory: agentGitDirectory(agent), remote: remote, hasRemote: agent.GitHasRemote,
+				directory: agentGitDirectory(agent), remote: remoteAgentRow(row, agent), hasRemote: agent.GitHasRemote,
 			})
 		}
 	}

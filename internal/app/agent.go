@@ -28,6 +28,7 @@ func (local *Local) registerAgentHandlers() {
 	handle(local, action.AgentBack, local.agentBack)
 	handle(local, action.AgentFocus, local.focusAgent)
 	handle(local, action.AgentWindowStatusClear, local.clearWindowStatus)
+	handle(local, action.AgentMerge, local.mergeAgentBranch)
 }
 
 func (local *Local) handleNavigation(definition *action.Definition[action.NavigateAgents, action.FocusedPane], navigate agentNavigation) {

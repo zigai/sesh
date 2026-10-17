@@ -151,7 +151,7 @@ func newRootCommand(ctx context.Context) *cobra.Command {
 		cmdsnapshot.NewCommand(),
 		cmdagent.NewCommand(),
 		cmdproject.NewCommand(),
-		cmdtask.NewCommand(),
+		cmdtask.NewCommand(cmdremote.DefaultPickerRemoteFactory),
 		cmdautosave.NewCommand(),
 		cmdremote.NewCommand(),
 		newKeysCommand(),

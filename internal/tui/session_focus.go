@@ -146,6 +146,10 @@ func (m *Model) fadesListRow(row popupListRow) bool {
 		return row.isAgent()
 	}
 
+	if m.inboxDims(row) {
+		return true
+	}
+
 	_, ok := m.focusedSessionIndex()
 
 	return ok && !m.inFocusedSession(row)

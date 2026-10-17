@@ -52,6 +52,18 @@ func (m *Model) handleDisplayActionKeys(
 		}
 
 		return func() (tea.Model, tea.Cmd) { return m, nil }, true
+	case bubbleskey.Matches(pressed, keys.inboxGroup) && m.displayMode == displayModeInbox:
+		if m.cycleInboxGroup() {
+			m.clearStatus()
+		}
+
+		return func() (tea.Model, tea.Cmd) { return m, nil }, true
+	case bubbleskey.Matches(pressed, keys.menu):
+		if handler := m.openRowMenu(); handler != nil {
+			return handler, true
+		}
+
+		return func() (tea.Model, tea.Cmd) { return m, nil }, true
 	default:
 		return nil, false
 	}

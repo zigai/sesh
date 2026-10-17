@@ -19,10 +19,14 @@ func tmuxBindable(t *testing.T) []action.Binding {
 	t.Helper()
 
 	cfg := config.DefaultConfig()
-	keys := []string{"M-a", "M-b", "M-c", "M-d", "M-e", "M-f", "M-g", "M-h", "M-i", "M-j", "M-k", "M-l", "M-m", "M-n", "M-o", "M-p", "M-q", "M-r", "M-s", "M-t", "M-u", "M-v", "M-w", "M-x", "M-y", "M-z", "C-M-a", "C-M-b", "C-M-c", "C-M-d", "C-M-e", "C-M-f"}
+	keys := []string{"M-a", "M-b", "M-c", "M-d", "M-e", "M-f", "M-g", "M-h", "M-i", "M-j", "M-k", "M-l", "M-m", "M-n", "M-o", "M-p", "M-q", "M-r", "M-s", "M-t", "M-u", "M-v", "M-w", "M-x", "M-y", "M-z", "C-M-a", "C-M-b", "C-M-c", "C-M-d", "C-M-e", "C-M-f", "C-M-g", "C-M-h", "C-M-i", "C-M-j", "C-M-k", "C-M-l"}
 
 	for _, entry := range action.All() {
 		descriptor := entry.Describe()
+		if descriptor.InPicker {
+			continue
+		}
+
 		bind := config.KeyBindConfig{Key: keys[len(cfg.Keys.Bind)], Action: string(descriptor.ID), In: "tmux", Table: "", Params: map[string]any{}}
 
 		for _, param := range descriptor.Params {

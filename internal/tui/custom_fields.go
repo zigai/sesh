@@ -327,8 +327,8 @@ func (m *Model) customFieldTargets() []customFieldTarget {
 	switch m.displayMode {
 	case displayModeAgents:
 		sessionFields, agentFields = m.sessionFormats.agentsSession.CustomFields(), m.sessionFormats.agentsAgent.CustomFields()
-	case displayModeWork:
-		sessionFields, agentFields = m.sessionFormats.workSection.CustomFields(), m.sessionFormats.workTask.CustomFields()
+	case displayModeInbox:
+		sessionFields, agentFields = m.sessionFormats.inboxGroup.CustomFields(), m.sessionFormats.inboxAgent.CustomFields()
 	case displayModeSesh:
 	}
 

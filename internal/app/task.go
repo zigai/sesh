@@ -33,8 +33,10 @@ const (
 )
 
 var (
-	ErrNotInTask      = errors.New("the invoking window is not a task window")
-	ErrLedgerRequired = errors.New("task ledger is not configured")
+	ErrNotInTask        = errors.New("the invoking window is not a task window")
+	ErrLedgerRequired   = errors.New("task ledger is not configured")
+	ErrProjectNotHere   = errors.New("no git project has that name on this machine")
+	ErrProjectAmbiguous = errors.New("several git projects have that name on this machine")
 )
 
 // TaskOffer is what the new task popup offers at the caller's pane: the harnesses and, in a project
@@ -46,6 +48,7 @@ type TaskOffer struct {
 
 func (local *Local) registerTaskHandlers() {
 	handle(local, action.TaskNew, local.startTask)
+	handle(local, action.TaskOffer, local.offerTask)
 	handle(local, action.TaskTab, local.openTab)
 	handle(local, action.TaskPopup, local.openTaskPopup)
 	handle(local, action.TaskRelayout, local.relayoutTask)
@@ -54,6 +57,7 @@ func (local *Local) registerTaskHandlers() {
 	handle(local, action.TaskOpen, local.openTask)
 	handle(local, action.TaskFinish, local.finishTask)
 	handle(local, action.TaskRun, local.runTaskAction)
+	handle(local, action.TaskMerge, local.mergeTask)
 }
 
 // TaskOffer lists what a new task can start with at the caller's pane, with branch details when
@@ -176,16 +180,11 @@ func (local *Local) reopenPlace(ctx context.Context, caller action.Caller, recor
 }
 
 func (local *Local) startTask(ctx context.Context, caller action.Caller, input action.NewTask) (action.StartedTask, error) {
-	service, place, err := local.taskPlace(ctx, caller)
-	if err != nil {
-		return action.StartedTask{ID: "", Kind: "", Number: 0, Directory: "", Branch: ""}, err
-	}
+	none := action.StartedTask{ID: "", Kind: "", Number: 0, Directory: "", Branch: "", Session: ""}
 
-	if input.Project != "" {
-		place, err = local.projectPlace(ctx, place, input.Project)
-		if err != nil {
-			return action.StartedTask{ID: "", Kind: "", Number: 0, Directory: "", Branch: ""}, err
-		}
+	service, place, err := local.startPlace(ctx, caller, input.Project)
+	if err != nil {
+		return none, err
 	}
 
 	record, err := service.Start(ctx, place, task.Request{
@@ -199,6 +198,7 @@ func (local *Local) startTask(ctx context.Context, caller action.Caller, input a
 	})
 	started := action.StartedTask{
 		ID: record.ID, Kind: string(record.Kind), Number: record.Number, Directory: record.Directory, Branch: record.Branch,
+		Session: string(place.Session),
 	}
 
 	if err != nil {
@@ -206,6 +206,99 @@ func (local *Local) startTask(ctx context.Context, caller action.Caller, input a
 	}
 
 	return started, nil
+}
+
+// startPlace is where a new task starts: the caller's pane, or the session of the project at
+// dir when one is named. Without an invoking pane, as for a remote connection, a project is
+// required.
+func (local *Local) startPlace(ctx context.Context, caller action.Caller, dir string) (*task.Service, task.Place, error) {
+	if dir == "" || caller.Pane != "" || os.Getenv(paneEnvironment) != "" {
+		service, place, err := local.taskPlace(ctx, caller)
+		if err != nil || dir == "" {
+			return service, place, err
+		}
+
+		place, err = local.projectPlace(ctx, place, dir)
+
+		return service, place, err
+	}
+
+	service, err := local.taskService()
+	if err != nil {
+		return nil, task.Place{}, err
+	}
+
+	place, err := local.projectPlace(ctx, task.Place{Pane: "", Session: "", Dir: "", Project: "", Task: ""}, dir)
+
+	return service, place, err
+}
+
+// offerTask lists what a new task can start with in the git project with the given name.
+func (local *Local) offerTask(ctx context.Context, _ action.Caller, input action.OfferTask) (action.TaskOffered, error) {
+	offered := action.TaskOffered{
+		Project: "", Harnesses: nil, Locations: nil, Current: -1, NextNumber: 0, Branches: nil, Refs: nil, Starts: nil,
+	}
+
+	catalog, err := local.projectCatalog()
+	if err != nil {
+		return offered, err
+	}
+
+	projects, err := catalog.List()
+	if err != nil {
+		return offered, oops.In("app").With("operation", "list_projects").Wrap(err)
+	}
+
+	projects = slices.DeleteFunc(projects, func(p project.Project) bool { return p.Kind != project.KindGit || p.Name != input.Project })
+
+	switch len(projects) {
+	case 0:
+		return offered, action.Wrap(action.CodeNotFound, ErrProjectNotHere)
+	case 1:
+	default:
+		return offered, action.Wrap(action.CodeInvalidArgument, ErrProjectAmbiguous)
+	}
+
+	service, err := local.taskService()
+	if err != nil {
+		return offered, err
+	}
+
+	root := projects[0].Root
+
+	offer, err := service.Offer(ctx, task.Place{Pane: "", Session: "", Dir: root, Project: root, Task: ""}, input.Describe)
+	if err != nil {
+		return offered, oops.In("app").With("operation", "offer_task").Wrap(err)
+	}
+
+	return OfferedTask(offer), nil
+}
+
+// OfferedTask describes a task offer for the new task popup of another machine.
+func OfferedTask(offer task.Offer) action.TaskOffered {
+	offered := action.TaskOffered{
+		Project: offer.Project, Harnesses: make([]string, 0, len(offer.Harnesses)),
+		Locations: make([]action.OfferedLocation, 0, len(offer.Locations)), Current: offer.Current,
+		NextNumber: offer.NextNumber, Branches: offer.Branches, Refs: make(map[string]action.OfferedRef, len(offer.Refs)),
+		Starts: offer.Starts,
+	}
+
+	for _, harness := range offer.Harnesses {
+		offered.Harnesses = append(offered.Harnesses, harness.Name)
+	}
+
+	for _, location := range offer.Locations {
+		offered.Locations = append(offered.Locations, action.OfferedLocation{
+			Where: string(location.Where), Branch: location.Branch, Remote: location.Remote,
+			Directory: location.Directory, Task: location.Task, TaskTitle: location.TaskTitle,
+		})
+	}
+
+	for name, ref := range offer.Refs {
+		offered.Refs[name] = action.OfferedRef{Time: ref.Time, Subject: ref.Subject, Ahead: ref.Ahead, Behind: ref.Behind}
+	}
+
+	return offered
 }
 
 // projectPlace opens the session of the project at dir, without moving any client to it, and

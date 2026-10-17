@@ -565,7 +565,7 @@ func originSessions(ctx context.Context, socket string) ([]remote.OriginSession,
 			case session.AgentStatusWaiting:
 				waiting++
 			case session.AgentStatusIdle, session.AgentStatusFailed, session.AgentStatusInterrupted, session.AgentStatusUnknown,
-				session.AgentStatusSleeping, session.AgentStatusDone:
+				session.AgentStatusSleeping, session.AgentStatusMerged:
 			}
 		}
 

@@ -205,7 +205,7 @@ func TestCycleDisplayModeFiltersAgentsWrapsAndPersists(t *testing.T) {
 	}
 
 	model = updateTestModelWithCommand(t, model, keyCtrl('f'))
-	assertDisplayModeState(t, model, displayModeWork, "work")
+	assertDisplayModeState(t, model, displayModeInbox, "inbox")
 
 	model = updateTestModelWithCommand(t, model, keyCtrl('f'))
 	assertDisplayModeState(t, model, displayModeSesh, "sesh")
@@ -221,8 +221,8 @@ func TestCycleDisplayModeFiltersAgentsWrapsAndPersists(t *testing.T) {
 		t.Fatalf("wrapped rows/selection = %#v, want %#v", wrapped, want)
 	}
 
-	if got := strings.Join(savedModes, ","); got != "agents,work,sesh" {
-		t.Fatalf("saved modes = %q, want agents,work,sesh", got)
+	if got := strings.Join(savedModes, ","); got != "agents,inbox,sesh" {
+		t.Fatalf("saved modes = %q, want agents,inbox,sesh", got)
 	}
 }
 

@@ -18,6 +18,7 @@ var (
 		Interactive: true,
 		Destructive: false,
 		Remote:      RemoteNever,
+		InPicker:    false,
 		check:       nil,
 	}, func(Subject, Values) (OpenTaskMenu, error) { return OpenTaskMenu{}, nil }, func(OpenedTaskMenu) string { return "" })
 
@@ -32,7 +33,8 @@ var (
 			"--branch, a local branch or one only --remote has), worktree (the existing worktree --dir) " +
 			"or main (the main checkout). Sesh removes on finish only the worktree and branch it created. " +
 			"Elsewhere the task runs in the pane's directory. --title names the task and its new branch and " +
-			"is passed to the agent as configured by the harness's prompt_args.",
+			"is passed to the agent as configured by the harness's prompt_args. Without an invoking pane, as on " +
+			"a remote connection, the task starts in the session of the project --project names.",
 		Subject: SubjectNone,
 		Arity:   ArityOne,
 		Params: []Param{
@@ -48,7 +50,8 @@ var (
 		NeedsClient: true,
 		Interactive: false,
 		Destructive: false,
-		Remote:      RemoteNever,
+		Remote:      RemoteOnByDefault,
+		InPicker:    false,
 		check:       nil,
 	}, func(_ Subject, values Values) (NewTask, error) {
 		return NewTask{
@@ -64,6 +67,29 @@ var (
 		return "Started task " + strconv.Itoa(out.Number)
 	})
 
+	TaskOffer = define(Descriptor{
+		ID:      "task.offer",
+		Title:   "Task choices",
+		Summary: "List what a new task can start with in a project",
+		Help: "List the agents and checkouts a new task can start with in the git project named --project, " +
+			"found by its directory name among the configured projects. With --describe the branches are " +
+			"described too. The new task popup uses it to start a task on a remote connection.",
+		Subject: SubjectNone,
+		Arity:   ArityOne,
+		Params: []Param{
+			newParam("project", ParamText, "Name of the project").required().positional(),
+			newParam("describe", ParamBool, "Describe the branches"),
+		},
+		NeedsClient: false,
+		Interactive: false,
+		Destructive: false,
+		Remote:      RemoteOnByDefault,
+		InPicker:    false,
+		check:       nil,
+	}, func(_ Subject, values Values) (OfferTask, error) {
+		return OfferTask{Project: values.String("project"), Describe: values.Bool("describe")}, nil
+	}, func(out TaskOffered) string { return out.Project })
+
 	TaskTab = define(Descriptor{
 		ID:          "task.tab",
 		Title:       "New tab",
@@ -76,6 +102,7 @@ var (
 		Interactive: false,
 		Destructive: false,
 		Remote:      RemoteNever,
+		InPicker:    false,
 		check:       nil,
 	}, func(Subject, Values) (OpenTab, error) { return OpenTab{}, nil }, func(OpenedTab) string { return "" })
 
@@ -92,6 +119,7 @@ var (
 		Interactive: false,
 		Destructive: false,
 		Remote:      RemoteNever,
+		InPicker:    false,
 		check:       nil,
 	}, func(Subject, Values) (OpenTaskPopup, error) { return OpenTaskPopup{}, nil }, func(ClosedTaskPopup) string { return "" })
 
@@ -109,6 +137,7 @@ var (
 		Interactive: false,
 		Destructive: false,
 		Remote:      RemoteNever,
+		InPicker:    false,
 		check:       nil,
 	}, func(_ Subject, values Values) (RelayoutTask, error) {
 		return RelayoutTask{Layout: values.String("layout")}, nil
@@ -128,6 +157,7 @@ var (
 		Interactive: false,
 		Destructive: false,
 		Remote:      RemoteOnByDefault,
+		InPicker:    false,
 		check:       nil,
 	}, func(subject Subject, _ Values) (SleepTask, error) {
 		return SleepTask{Task: subject.Task}, nil
@@ -146,6 +176,7 @@ var (
 		Interactive: false,
 		Destructive: false,
 		Remote:      RemoteOnByDefault,
+		InPicker:    false,
 		check:       nil,
 	}, func(subject Subject, _ Values) (WakeTask, error) {
 		return WakeTask{Task: subject.Task}, nil
@@ -171,6 +202,7 @@ var (
 		Interactive: false,
 		Destructive: false,
 		Remote:      RemoteNever,
+		InPicker:    false,
 		check:       nil,
 	}, func(subject Subject, _ Values) (OpenTask, error) {
 		return OpenTask{Task: subject.Task}, nil
@@ -190,10 +222,32 @@ var (
 		Interactive: false,
 		Destructive: true,
 		Remote:      RemoteOffByDefault,
+		InPicker:    false,
 		check:       nil,
 	}, func(subject Subject, values Values) (FinishTask, error) {
 		return FinishTask{Task: subject.Task, Discard: values.Bool("discard")}, nil
 	}, func(out FinishedTask) string { return "Finished task " + out.ID })
+
+	TaskMerge = define(Descriptor{
+		ID:      "task.merge",
+		Title:   "Merge task",
+		Summary: "Rebase a task's branch onto its base, push it there, and finish the task",
+		Help: "Put a task's branch on its base branch without a merge commit, in a window of the task's popup " +
+			"terminal: refuse with uncommitted changes, fetch, rebase onto origin's base (a conflict aborts the " +
+			"rebase and leaves the branch as it was), run the project's merge check, push to origin's base as a " +
+			"fast-forward, fast-forward the main checkout's base when it is clean, and then finish the task.",
+		Subject:     SubjectTask,
+		Arity:       ArityOne,
+		Params:      nil,
+		NeedsClient: false,
+		Interactive: false,
+		Destructive: true,
+		Remote:      RemoteOffByDefault,
+		InPicker:    false,
+		check:       nil,
+	}, func(subject Subject, _ Values) (MergeTask, error) {
+		return MergeTask{Task: subject.Task}, nil
+	}, func(out StartedTaskMerge) string { return "Merging task " + out.ID })
 
 	TaskRun = define(Descriptor{
 		ID:      "task.run",
@@ -208,6 +262,7 @@ var (
 		Interactive: false,
 		Destructive: false,
 		Remote:      RemoteOnByDefault,
+		InPicker:    false,
 		check:       nil,
 	}, func(subject Subject, values Values) (RunTaskAction, error) {
 		return RunTaskAction{Task: subject.Task, Action: values.String("action")}, nil
@@ -235,6 +290,41 @@ type StartedTask struct {
 	Number    int    `json:"number"`
 	Directory string `json:"directory"`
 	Branch    string `json:"branch"`
+	Session   string `json:"session"`
+}
+
+type OfferTask struct {
+	Project  string `json:"project"`
+	Describe bool   `json:"describe"`
+}
+
+// TaskOffered is what a new task can start with in a project: the project's root and the
+// choices the new task popup shows.
+type TaskOffered struct {
+	Project    string                `json:"project"`
+	Harnesses  []string              `json:"harnesses"`
+	Locations  []OfferedLocation     `json:"locations"`
+	Current    int                   `json:"current"`
+	NextNumber int                   `json:"nextNumber"`
+	Branches   []string              `json:"branches"`
+	Refs       map[string]OfferedRef `json:"refs"`
+	Starts     map[string]string     `json:"starts"`
+}
+
+type OfferedLocation struct {
+	Where     string `json:"where"`
+	Branch    string `json:"branch"`
+	Remote    string `json:"remote"`
+	Directory string `json:"directory"`
+	Task      string `json:"task"`
+	TaskTitle string `json:"taskTitle"`
+}
+
+type OfferedRef struct {
+	Time    int64  `json:"time"`
+	Subject string `json:"subject"`
+	Ahead   int    `json:"ahead"`
+	Behind  int    `json:"behind"`
 }
 
 type OpenTab struct{}
@@ -286,6 +376,14 @@ type FinishTask struct {
 }
 
 type FinishedTask struct {
+	ID string `json:"id"`
+}
+
+type MergeTask struct {
+	Task string `json:"task"`
+}
+
+type StartedTaskMerge struct {
 	ID string `json:"id"`
 }
 

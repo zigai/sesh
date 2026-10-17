@@ -13,7 +13,7 @@ import (
 const (
 	displayModeSesh        displayMode = "sesh"
 	displayModeAgents      displayMode = "agents"
-	displayModeWork        displayMode = "work"
+	displayModeInbox       displayMode = "inbox"
 	minDisplayModesToCycle             = 2
 )
 
@@ -26,6 +26,7 @@ type sessionIdentity struct {
 	kind       session.Kind
 	agentID    string
 	paneID     string
+	host       string
 }
 
 func emptySessionIdentity() sessionIdentity {
@@ -40,8 +41,8 @@ func parseDisplayMode(value string) displayMode {
 	switch {
 	case strings.EqualFold(value, string(displayModeAgents)):
 		return displayModeAgents
-	case strings.EqualFold(value, string(displayModeWork)):
-		return displayModeWork
+	case strings.EqualFold(value, string(displayModeInbox)):
+		return displayModeInbox
 	default:
 		return displayModeSesh
 	}
@@ -50,7 +51,7 @@ func parseDisplayMode(value string) displayMode {
 // tree reports whether the mode lists groups with agent rows below them: sessions in AGENTS,
 // sections in WORK.
 func (mode displayMode) tree() bool {
-	return mode == displayModeAgents || mode == displayModeWork
+	return mode == displayModeAgents || mode == displayModeInbox
 }
 
 func (mode displayMode) label() string {
@@ -73,13 +74,13 @@ func displayModesFrom(values []string) []displayMode {
 			modes = append(modes, displayModeSesh)
 		case string(displayModeAgents):
 			modes = append(modes, displayModeAgents)
-		case string(displayModeWork):
-			modes = append(modes, displayModeWork)
+		case string(displayModeInbox):
+			modes = append(modes, displayModeInbox)
 		}
 	}
 
 	if len(modes) == 0 {
-		return []displayMode{displayModeSesh, displayModeAgents, displayModeWork}
+		return []displayMode{displayModeSesh, displayModeAgents, displayModeInbox}
 	}
 
 	return modes
@@ -144,8 +145,8 @@ func (m *Model) showsDisplayModeIndicator() bool {
 }
 
 func (m *Model) refreshDisplaySessions() {
-	if m.displayMode == displayModeWork {
-		m.displaySessions = m.workSessions()
+	if m.displayMode == displayModeInbox {
+		m.displaySessions = m.inboxSessions()
 		m.markCustomFieldsDirty()
 
 		return
@@ -166,7 +167,7 @@ func (m *Model) refreshDisplaySessions() {
 			if !row.Saved() {
 				displayed = append(displayed, row)
 			}
-		case displayModeWork:
+		case displayModeInbox:
 			displayed = append(displayed, row)
 		}
 	}
@@ -257,14 +258,15 @@ func (m *Model) selectedSessionIdentity() sessionIdentity {
 	}
 
 	selected := m.selectedListRow()
-	if found, ok := m.workTaskAt(selected); ok {
+	if found, ok := m.inboxItemAt(selected); ok {
 		return sessionIdentity{
 			runtimeKey: found.owner.RuntimeKey(),
 			id:         found.owner.ID,
 			name:       found.owner.Name,
 			kind:       found.owner.Kind,
 			agentID:    found.agent.RegistryID,
-			paneID:     string(found.live.AgentPane),
+			paneID:     found.agent.PaneID,
+			host:       found.agent.Host,
 		}
 	}
 
@@ -272,9 +274,12 @@ func (m *Model) selectedSessionIdentity() sessionIdentity {
 	agentID := ""
 	paneID := ""
 
+	host := ""
+
 	if selected.isAgent() && selected.agentIndex < len(row.Agents) {
 		agentID = row.Agents[selected.agentIndex].RegistryID
 		paneID = row.Agents[selected.agentIndex].PaneID
+		host = row.Agents[selected.agentIndex].Host
 	}
 
 	return sessionIdentity{
@@ -284,6 +289,7 @@ func (m *Model) selectedSessionIdentity() sessionIdentity {
 		kind:       row.Kind,
 		agentID:    agentID,
 		paneID:     paneID,
+		host:       host,
 	}
 }
 
@@ -293,8 +299,8 @@ func (m *Model) restoreSelectedSession(selected sessionIdentity) {
 		return
 	}
 
-	if m.displayMode == displayModeWork {
-		m.restoreSelectedTask(selected)
+	if m.displayMode == displayModeInbox {
+		m.restoreSelectedInboxItem(selected)
 		return
 	}
 
@@ -312,11 +318,11 @@ func (m *Model) restoreSelectedSession(selected sessionIdentity) {
 	}
 }
 
-func (m *Model) restoreSelectedTask(selected sessionIdentity) {
-	for index, section := range m.filtered {
-		agentIndex := slices.IndexFunc(section.Agents, func(agent session.AgentSession) bool {
-			return (selected.paneID != "" && agent.PaneID == selected.paneID) ||
-				(selected.agentID != "" && agent.RegistryID == selected.agentID)
+func (m *Model) restoreSelectedInboxItem(selected sessionIdentity) {
+	for index, group := range m.filtered {
+		agentIndex := slices.IndexFunc(group.Agents, func(agent session.AgentSession) bool {
+			return agent.Host == selected.host && ((selected.paneID != "" && agent.PaneID == selected.paneID) ||
+				(selected.agentID != "" && agent.RegistryID == selected.agentID))
 		})
 		if agentIndex >= 0 {
 			m.cursor = index

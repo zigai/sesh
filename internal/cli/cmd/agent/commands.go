@@ -59,6 +59,9 @@ func NewCommand() *cobra.Command {
 		actioncli.Command(action.AgentWindowStatusClear, actioncli.Options[action.ClearWindowStatus, action.ClearedWindowStatus]{
 			Operation: "", SuccessOwned: false, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
 		}),
+		actioncli.Command(action.AgentMerge, actioncli.Options[action.MergeAgentBranch, action.MergedAgentBranch]{
+			Operation: "", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
+		}),
 		newAgentStatusCommand(),
 	)
 

@@ -40,7 +40,7 @@ func (m *Model) selectedListRow() popupListRow {
 		return row
 	}
 
-	if m.agentCursor == parentAgentIndex && m.displayMode != displayModeWork {
+	if m.agentCursor == parentAgentIndex && m.displayMode != displayModeInbox {
 		return row
 	}
 
@@ -110,7 +110,7 @@ func (m *Model) popupListRows() []popupListRow {
 				})
 			}
 		} else {
-			if hasAgentSessions && !separatorInserted {
+			if hasAgentSessions && !separatorInserted && m.displayMode != displayModeInbox {
 				m.listRows = append(m.listRows, popupListRow{
 					sessionIndex: sessionIndex,
 					agentIndex:   separatorAgentIndex,
@@ -168,7 +168,7 @@ func (m *Model) rowSelectable(row popupListRow) bool {
 
 	if row.sessionIndex >= 0 && row.sessionIndex < len(m.filtered) {
 		if !row.isAgent() {
-			return m.displayMode != displayModeWork
+			return m.displayMode != displayModeInbox
 		}
 
 		return row.agentIndex < len(m.filtered[row.sessionIndex].Agents)

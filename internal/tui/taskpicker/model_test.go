@@ -783,3 +783,82 @@ func TestANewWorktreeRowShowsTheCommitTheWorktreeStartsFrom(t *testing.T) {
 		t.Errorf("new worktree row %q, want origin's main commit", row)
 	}
 }
+
+func machineOptions(start func(taskpicker.Choice) error) taskpicker.Options {
+	options := compactOptions(1, "", start)
+	options.Machines = []taskpicker.Machine{{Name: "local", Usable: true}, {Name: "old", Usable: false}, {Name: "devbox", Usable: true}}
+
+	return options
+}
+
+func shift(code rune) tea.KeyPressMsg {
+	return tea.KeyPressMsg(tea.Key{Code: code, Mod: tea.ModShift})
+}
+
+func TestTheHostRowIsHiddenWithOnlyThisMachine(t *testing.T) {
+	options := compactOptions(1, "", nil)
+	options.Machines = []taskpicker.Machine{{Name: "local", Usable: true}}
+
+	if view := plainView(sized(options)); strings.Contains(view, "host") {
+		t.Fatalf("a popup with one machine shows a host row:\n%s", view)
+	}
+}
+
+func TestShiftArrowsPickTheNextUsableHostKeepingTitleAndAgent(t *testing.T) {
+	model := sized(machineOptions(nil))
+
+	if row := line(t, model, "host"); !strings.Contains(row, "local") || !strings.Contains(row, "old (update sesh)") || !strings.Contains(row, "devbox") {
+		t.Fatalf("host row = %q, want local, old (update sesh) and devbox", row)
+	}
+
+	run(model, typed("fix")...)
+	run(model, key(tea.KeyRight), shift(tea.KeyRight))
+
+	choice, ok := model.Chosen()
+	if want := (taskpicker.Choice{Reopen: true, Machine: 2, Title: "fix", Harness: "claude"}); !ok || choice != want {
+		t.Fatalf("chosen %+v, %v; want %+v", choice, ok, want)
+	}
+}
+
+func TestClickingAHostThatCannotStartTasksDoesNothing(t *testing.T) {
+	model := sized(machineOptions(nil))
+	lines := strings.Split(plainView(model), "\n")
+	row := slicesIndex(lines, "host")
+
+	run(model, tea.MouseClickMsg(tea.Mouse{X: strings.Index(lines[row], "old"), Y: row, Button: tea.MouseLeft}))
+
+	if _, ok := model.Chosen(); ok {
+		t.Fatal("clicking a host that needs a newer sesh chose it")
+	}
+
+	run(model, tea.MouseClickMsg(tea.Mouse{X: strings.Index(lines[row], "devbox"), Y: row, Button: tea.MouseLeft}))
+
+	if choice, ok := model.Chosen(); !ok || !choice.Reopen || choice.Machine != 2 {
+		t.Fatalf("chosen %+v, %v; want a reopen on devbox", choice, ok)
+	}
+}
+
+func TestAProjectMissingOnTheHostSaysSoAndStartsNothing(t *testing.T) {
+	started := &starts{}
+	options := taskpicker.Options{
+		Project: "shop", Current: -1, Start: started.start, Machine: 2, Problem: "not on devbox",
+		Machines: []taskpicker.Machine{{Name: "local", Usable: true}, {Name: "old", Usable: false}, {Name: "devbox", Usable: true}},
+	}
+	width, height := taskpicker.Size(config.DefaultConfig(), options)
+	model := sized(options)
+	view := plainView(model)
+
+	if !strings.Contains(view, "not on devbox") {
+		t.Fatalf("view does not say the project is missing:\n%s", view)
+	}
+
+	if lines := strings.Split(view, "\n"); len(lines) != height || ansi.StringWidth(lines[0]) != width {
+		t.Fatalf("view is not %dx%d:\n%s", width, height, view)
+	}
+
+	run(model, key(tea.KeyEnter))
+
+	if len(started.choices) != 0 {
+		t.Fatalf("started %+v on a host without the project", started.choices)
+	}
+}

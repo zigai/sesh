@@ -31,9 +31,9 @@ type sessionRowFormats struct {
 	seshSession   display.Template
 	agentsSession display.Template
 	agentsAgent   display.Template
-	workSection   display.Template
-	workTask      display.Template
-	work          bool
+	inboxGroup    display.Template
+	inboxAgent    display.Template
+	inbox         bool
 }
 
 type sessionFormatValues struct {
@@ -90,12 +90,12 @@ func compileSessionRowFormats(displayCfg config.DisplayConfig, settings config.S
 	seshFormat := displayCfg.SeshFormat
 	agentsSessionFormat := displayCfg.AgentsSessionFormat
 	agentsAgentFormat := displayCfg.AgentsAgentFormat
-	workTaskFormat := displayCfg.WorkTaskFormat
+	inboxAgentFormat := displayCfg.InboxAgentFormat
 
 	if settings.NormalizedShortcutStyle() == "right" {
 		seshFormat = withShortcutBadge(seshFormat, config.DefaultSeshFormat)
 		agentsAgentFormat = withShortcutBadge(agentsAgentFormat, config.DefaultAgentsAgentFormat)
-		workTaskFormat = withShortcutBadge(workTaskFormat, config.DefaultWorkTaskFormat)
+		inboxAgentFormat = withShortcutBadge(inboxAgentFormat, config.DefaultInboxAgentFormat)
 	}
 
 	seshSession, err := compileSessionRowFormat(
@@ -125,12 +125,12 @@ func compileSessionRowFormats(displayCfg config.DisplayConfig, settings config.S
 		return sessionRowFormats{}, err
 	}
 
-	workSection, err := compileSessionRowFormat("display.work_section_format", display.FormatKindAgentsSession, displayCfg.WorkSectionFormat)
+	inboxGroup, err := compileSessionRowFormat("display.inbox_group_format", display.FormatKindAgentsSession, displayCfg.InboxGroupFormat)
 	if err != nil {
 		return sessionRowFormats{}, err
 	}
 
-	workTask, err := compileSessionRowFormat("display.work_task_format", display.FormatKindAgentsAgent, workTaskFormat)
+	inboxAgent, err := compileSessionRowFormat("display.inbox_agent_format", display.FormatKindAgentsAgent, inboxAgentFormat)
 	if err != nil {
 		return sessionRowFormats{}, err
 	}
@@ -139,19 +139,19 @@ func compileSessionRowFormats(displayCfg config.DisplayConfig, settings config.S
 		seshSession:   seshSession,
 		agentsSession: agentsSession,
 		agentsAgent:   agentsAgent,
-		workSection:   workSection,
-		workTask:      workTask,
-		work:          slices.Contains(displayModesFrom(settings.DisplayModes), displayModeWork),
+		inboxGroup:    inboxGroup,
+		inboxAgent:    inboxAgent,
+		inbox:         slices.Contains(displayModesFrom(settings.DisplayModes), displayModeInbox),
 	}, nil
 }
 
 // agentRowsUseAny reports whether an agent row of any enabled mode shows one of the fields.
 func (formats sessionRowFormats) agentRowsUseAny(fields ...string) bool {
-	return formats.agentsAgent.UsesAny(fields...) || (formats.work && formats.workTask.UsesAny(fields...))
+	return formats.agentsAgent.UsesAny(fields...) || (formats.inbox && formats.inboxAgent.UsesAny(fields...))
 }
 
 func (formats sessionRowFormats) agentRowsUseWidget(widget string) bool {
-	return formats.agentsAgent.UsesWidget(widget) || (formats.work && formats.workTask.UsesWidget(widget))
+	return formats.agentsAgent.UsesWidget(widget) || (formats.inbox && formats.inboxAgent.UsesWidget(widget))
 }
 
 // withShortcutBadge appends the right-aligned shortcut number to a default row format; a custom
@@ -207,10 +207,10 @@ func (m *Model) sessionRowFormatter(
 		if hasAgent {
 			template = m.sessionFormats.agentsAgent
 		}
-	case displayModeWork:
-		template = m.sessionFormats.workSection
+	case displayModeInbox:
+		template = m.sessionFormats.inboxGroup
 		if hasAgent {
-			template = m.sessionFormats.workTask
+			template = m.sessionFormats.inboxAgent
 		}
 	case displayModeSesh:
 	}
@@ -260,7 +260,7 @@ func (v sessionFormatValues) ResolveSessionFormatField(field string) string {
 }
 
 func (v sessionFormatValues) resolveResourceCell(field string) (string, layout.State) {
-	if runtime.GOOS != "linux" || v.row.Origin == session.OriginSSH || v.row.Origin == session.OriginBridge {
+	if runtime.GOOS != "linux" || remoteAgentRow(v.row, v.agent) {
 		return "", layout.Unsupported
 	}
 
@@ -296,14 +296,14 @@ func (v sessionFormatValues) resolveResourceSummaryCell(field string) (string, l
 }
 
 func (v sessionFormatValues) resolveGHCell(field string) (string, layout.State) {
-	recorded := 0
+	recorded := ""
 	if field == display.FieldAgentPR {
-		recorded = v.model.recordedTaskPR(v.row, v.agent.PaneID)
+		recorded = v.model.recordedTaskPR(v.agent)
 	}
 
-	if v.row.Origin == session.OriginSSH || v.row.Origin == session.OriginBridge {
-		if recorded != 0 {
-			return "#" + strconv.Itoa(recorded), layout.Present
+	if remoteAgentRow(v.row, v.agent) {
+		if recorded != "" {
+			return recorded, layout.Present
 		}
 
 		return "", layout.Unsupported
@@ -314,15 +314,15 @@ func (v sessionFormatValues) resolveGHCell(field string) (string, layout.State) 
 	}
 
 	cell := v.model.providerRunner.Cell(providers.GH, v.agent.PaneID, field)
-	if recorded != 0 && cell.State != layout.Present {
-		return "#" + strconv.Itoa(recorded), layout.Present
+	if recorded != "" && cell.State != layout.Present {
+		return recorded, layout.Present
 	}
 
 	return cell.Text, cell.State
 }
 
 func (v sessionFormatValues) resolveAHTCell(field string) (string, layout.State) {
-	if v.agent.PaneID != "" && v.model.providerRunner.Version(providers.AHT) > 0 {
+	if v.agent.PaneID != "" && !remoteAgentRow(v.row, v.agent) && v.model.providerRunner.Version(providers.AHT) > 0 {
 		cell := v.model.providerRunner.Cell(providers.AHT, v.agent.PaneID, field)
 		return cell.Text, cell.State
 	}
@@ -421,6 +421,12 @@ func (v sessionFormatValues) resolveSessionSourceField(field string) (string, bo
 
 func isRemoteOrBridge(row session.Session) bool {
 	return row.Origin == session.OriginSSH || row.Origin == session.OriginBridge
+}
+
+// remoteAgentRow reports whether an agent row shows an agent of another machine, either under a
+// remote session or in a view that lists the agents of several machines.
+func remoteAgentRow(row session.Session, agent session.AgentSession) bool {
+	return isRemoteOrBridge(row) || agent.Host != ""
 }
 
 func resolveSourcePrefix(row session.Session) string {
@@ -536,6 +542,10 @@ func (v sessionFormatValues) resolveAgentDetailField(field string) string {
 		return value
 	}
 
+	if value, ok := v.resolveInboxField(field); ok {
+		return value
+	}
+
 	if value, ok := v.resolveAgentGitField(field); ok {
 		return value
 	}
@@ -568,6 +578,32 @@ func (v sessionFormatValues) resolveAgentIdentityField(field string) (string, bo
 	default:
 		return "", false
 	}
+}
+
+// resolveInboxField resolves the fields inbox rows add: the machine the agent runs on, and how
+// many evidence items its latest report lists.
+func (v sessionFormatValues) resolveInboxField(field string) (string, bool) {
+	switch field {
+	case display.FieldHost:
+		return v.host(), true
+	case display.FieldEvidence:
+		if v.model == nil {
+			return "", true
+		}
+
+		return v.model.evidenceCount(v.agent), true
+	default:
+		return "", false
+	}
+}
+
+// host names the machine the agent runs on, empty for this machine.
+func (v sessionFormatValues) host() string {
+	if v.model == nil {
+		return ""
+	}
+
+	return SanitizeTerminalText(v.model.hostLabel(v.agent.Host))
 }
 
 func (v sessionFormatValues) resolveAgentLocationField(field string) (string, bool) {

@@ -18,8 +18,9 @@ import (
 
 const popupAttachVerb = "popup-attach"
 
-// NewCommand returns the group of commands that start tasks.
-func NewCommand() *cobra.Command {
+// NewCommand returns the group of commands that start tasks. remoteFactory connects the new task
+// popup to the remote connections.
+func NewCommand(remoteFactory cmdpicker.RemoteFactory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "task",
 		Short: "Start tasks in their own windows and worktrees",
@@ -34,10 +35,13 @@ func NewCommand() *cobra.Command {
 	}
 
 	cmd.AddCommand(
-		cmdpicker.NewTaskMenuCommand(),
-		cmdpicker.NewTaskPickerUICommand(),
+		cmdpicker.NewTaskMenuCommand(remoteFactory),
+		cmdpicker.NewTaskPickerUICommand(remoteFactory),
 		actioncli.Command(action.TaskNew, actioncli.Options[action.NewTask, action.StartedTask]{
 			Operation: "", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
+		}),
+		actioncli.Command(action.TaskOffer, actioncli.Options[action.OfferTask, action.TaskOffered]{
+			Operation: "", SuccessOwned: false, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
 		}),
 		actioncli.Command(action.TaskTab, actioncli.Options[action.OpenTab, action.OpenedTab]{
 			Operation: "", SuccessOwned: false, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
@@ -63,9 +67,13 @@ func NewCommand() *cobra.Command {
 		actioncli.Command(action.TaskRun, actioncli.Options[action.RunTaskAction, action.StartedTaskAction]{
 			Operation: "", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
 		}),
+		actioncli.Command(action.TaskMerge, actioncli.Options[action.MergeTask, action.StartedTaskMerge]{
+			Operation: "", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
+		}),
 		newPopupAttachCommand(),
 		newPlaceholderCommand(),
 		newActionRunCommand(),
+		newMergeRunCommand(),
 	)
 
 	return cmd

@@ -313,7 +313,10 @@ func (m *Model) logSessionActionResult(msg sessionActionResultMsg) {
 			tuiOperationSnapshotSession,
 			tuiOperationAgentGitScan,
 			tuiOperationRunAction,
-			tuiOperationCustomFieldRun:
+			tuiOperationCustomFieldRun,
+			tuiOperationSaveInbox,
+			tuiOperationOpen,
+			tuiOperationLoadEvidence:
 		}
 	}
 
@@ -448,8 +451,8 @@ func (m *Model) handleEnter() func() (tea.Model, tea.Cmd) {
 	selectedSession := m.filtered[m.cursor]
 	selected := m.selectedListRow()
 
-	if m.displayMode == displayModeWork {
-		return m.handleTaskEnter(selected)
+	if m.displayMode == displayModeInbox {
+		return m.handleInboxEnter(selected)
 	}
 
 	if selectedSession.Origin == session.OriginSSH {
@@ -498,25 +501,22 @@ func (m *Model) handleRemoteEnter(
 		paneID = target.Agents[selectedRow.agentIndex].PaneID
 	}
 
-	if m.deps.RemoteAttach != nil {
-		return func() (tea.Model, tea.Cmd) {
-			m.deferredRemoteAttach = target
-			m.remoteAttachPane = paneID
-			m.hasDeferredRemoteAttach = true
+	return m.attachRemote(target, paneID)
+}
 
-			return m, tea.Quit
-		}
-	}
-
+// attachRemote closes the picker and attaches to a remote session, at paneID when it is set.
+func (m *Model) attachRemote(target session.Session, paneID string) func() (tea.Model, tea.Cmd) {
 	if m.deps.RemoteAttach == nil {
 		return m.rejectRemoteAction("Enter")
 	}
 
-	m.deferredRemoteAttach = target
-	m.remoteAttachPane = paneID
-	m.hasDeferredRemoteAttach = true
+	return func() (tea.Model, tea.Cmd) {
+		m.deferredRemoteAttach = target
+		m.remoteAttachPane = paneID
+		m.hasDeferredRemoteAttach = true
 
-	return func() (tea.Model, tea.Cmd) { return m, tea.Quit }
+		return m, tea.Quit
+	}
 }
 
 func (m *Model) rejectRemoteAction(operation string) func() (tea.Model, tea.Cmd) {

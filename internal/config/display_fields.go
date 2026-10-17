@@ -146,8 +146,8 @@ func (d DisplayConfig) UsedFieldNames() []string {
 		{display.FormatKindSession, d.SeshFormat},
 		{display.FormatKindAgentsSession, d.AgentsSessionFormat},
 		{display.FormatKindAgentsAgent, d.AgentsAgentFormat},
-		{display.FormatKindAgentsSession, d.WorkSectionFormat},
-		{display.FormatKindAgentsAgent, d.WorkTaskFormat},
+		{display.FormatKindAgentsSession, d.InboxGroupFormat},
+		{display.FormatKindAgentsAgent, d.InboxAgentFormat},
 	} {
 		template, err := display.Compile(format.kind, format.format)
 		if err != nil {

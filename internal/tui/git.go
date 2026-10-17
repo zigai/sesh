@@ -33,6 +33,7 @@ type agentGitCacheEntry struct {
 	GitStash         int    `json:"gitStash"`
 	GitConflicts     int    `json:"gitConflicts"`
 	GitDirty         bool   `json:"gitDirty"`
+	GitUnmerged      int    `json:"gitUnmerged"`
 }
 
 type gitTracking struct {
@@ -119,7 +120,25 @@ func readGitMetadata(ctx context.Context, directory string) agentGitCacheEntry {
 		GitStash:         readGitStashCount(commandCtx, paths[0]),
 		GitConflicts:     status.conflicts,
 		GitDirty:         status.dirty,
+		GitUnmerged:      readGitUnmerged(commandCtx, paths[0]),
 	}
+}
+
+// readGitUnmerged counts the commits of HEAD that origin's default branch lacks.
+func readGitUnmerged(ctx context.Context, directory string) int {
+	base, ok := gitMetadataOutput(ctx, directory, "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD")
+	if !ok || base == "" {
+		return 0
+	}
+
+	output, ok := gitMetadataOutput(ctx, directory, "rev-list", "--count", base+"..HEAD", "--")
+
+	count, err := strconv.Atoi(output)
+	if !ok || err != nil || count < 0 {
+		return 0
+	}
+
+	return count
 }
 
 func readGitStatus(ctx context.Context, directory string) gitStatus {

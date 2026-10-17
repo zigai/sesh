@@ -334,7 +334,7 @@ func validateTaskPane(pane TaskPaneConfig, seen map[string]bool) error {
 	case seen[pane.Name]:
 		return errTaskPaneDuplicate
 	case containsControlCharacter(pane.Dir):
-		return errTaskActionPromptPath
+		return errMenuItemPromptPath
 	case len(pane.Command) > 0 && strings.TrimSpace(pane.Command[0]) == "":
 		return errTaskPaneCommand
 	case pane.Restart && len(pane.Command) == 0:

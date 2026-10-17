@@ -16,8 +16,8 @@ const (
 	DefaultSeshFormat            = "{source_prefix}{session_name}{right}{session_agent_context}"
 	DefaultAgentsSessionFormat   = "{source_prefix}{session_name}"
 	DefaultAgentsAgentFormat     = "{tree}{status_glyph} {status_age:<7}   {agent_cwd_name:<23.23}  {agent_session}{right}{harness:<6.6}   {agent_git_label:<6.22} {agent_git_added:<5} {agent_git_deleted:<5} {agent_git_ahead:<2} {agent_git_behind:<2}"
-	DefaultWorkSectionFormat     = "{session_name}"
-	DefaultWorkTaskFormat        = "{tree}{status_glyph} {status_age:<7}   {agent_project_name:<16.16}  {agent_session}{right}{harness:<6.6}   {agent_git_label:<6.22} {agent_git_added:<5} {agent_git_deleted:<5} {agent_pr:<6}"
+	DefaultInboxGroupFormat      = "{session_name}"
+	DefaultInboxAgentFormat      = "{tree}{status_glyph} {status_age:<7}   {agent_project_name:<16.16}  {agent_session}{right}{harness:<6.6}   {agent_git_label:<6.22} {agent_git_added:<5} {agent_git_deleted:<5} {agent_pr:<10} {evidence:<5} {host}"
 	defaultDirectorySuggestions  = 5
 	defaultAutosaveInterval      = "3m"
 	defaultSnapshotRetentionDays = 14
@@ -51,22 +51,24 @@ var DefaultProcessEnvironment = []string{
 
 type Config struct {
 	source        Source
-	Theme         ThemeConfig                 `toml:"theme"`
-	Keys          KeyConfig                   `toml:"keys"`
-	Popup         PopupConfig                 `toml:"popup"`
-	Display       DisplayConfig               `toml:"display"`
-	Paths         PathConfig                  `toml:"paths"`
-	Settings      SettingsConfig              `toml:"settings"`
-	Autosave      AutosaveConfig              `toml:"autosave"`
-	Snapshot      SnapshotConfig              `toml:"snapshot"`
-	Hooks         HookConfig                  `toml:"hooks"`
-	AgentSessions AgentSessionsConfig         `toml:"agent_sessions"`
-	AgentStatus   AgentStatusConfig           `toml:"agent_status"`
-	Remote        RemoteConfig                `toml:"remote"`
-	Actions       ActionsConfig               `toml:"actions"`
-	Projects      ProjectsConfig              `toml:"projects"`
-	Tasks         TasksConfig                 `toml:"tasks"`
-	TaskActions   map[string]TaskActionConfig `toml:"task_actions"`
+	Theme         ThemeConfig         `toml:"theme"`
+	Keys          KeyConfig           `toml:"keys"`
+	Popup         PopupConfig         `toml:"popup"`
+	Display       DisplayConfig       `toml:"display"`
+	Paths         PathConfig          `toml:"paths"`
+	Settings      SettingsConfig      `toml:"settings"`
+	Autosave      AutosaveConfig      `toml:"autosave"`
+	Snapshot      SnapshotConfig      `toml:"snapshot"`
+	Hooks         HookConfig          `toml:"hooks"`
+	AgentSessions AgentSessionsConfig `toml:"agent_sessions"`
+	AgentStatus   AgentStatusConfig   `toml:"agent_status"`
+	Remote        RemoteConfig        `toml:"remote"`
+	Actions       ActionsConfig       `toml:"actions"`
+	Projects      ProjectsConfig      `toml:"projects"`
+	Tasks         TasksConfig         `toml:"tasks"`
+	Inbox         InboxConfig         `toml:"inbox"`
+	Menu          MenuConfig          `toml:"menu"`
+	Merge         MergeConfig         `toml:"merge"`
 }
 
 // ActionsConfig overrides per-action policy, keyed by action group then verb: [actions.session.kill].
@@ -89,8 +91,8 @@ type DisplayConfig struct {
 	SeshFormat          string        `toml:"sesh_format"`
 	AgentsSessionFormat string        `toml:"agents_session_format"`
 	AgentsAgentFormat   string        `toml:"agents_agent_format"`
-	WorkSectionFormat   string        `toml:"work_section_format"`
-	WorkTaskFormat      string        `toml:"work_task_format"`
+	InboxGroupFormat    string        `toml:"inbox_group_format"`
+	InboxAgentFormat    string        `toml:"inbox_agent_format"`
 	Fields              FieldCommands `toml:"fields,omitempty"`
 }
 
@@ -122,10 +124,13 @@ type KeyConfig struct {
 	Help      string          `toml:"help"`
 	CycleMode string          `toml:"cycle_mode"`
 	AgentSort string          `toml:"agent_sort"`
-	PageUp    string          `toml:"page_up"`
-	PageDown  string          `toml:"page_down"`
-	Top       string          `toml:"top"`
-	Bottom    string          `toml:"bottom"`
+	// InboxGroup cycles how the inbox groups its rows; Menu opens the menu of the selected row.
+	InboxGroup string `toml:"inbox_group"`
+	Menu       string `toml:"menu"`
+	PageUp     string `toml:"page_up"`
+	PageDown   string `toml:"page_down"`
+	Top        string `toml:"top"`
+	Bottom     string `toml:"bottom"`
 	// SessionPrefix is the key pressed before a session letter, or "alt" to hold alt with it.
 	SessionPrefix string `toml:"session_prefix"`
 	// AgentKeys are handed out in order to the agents of a focused session.
@@ -325,7 +330,9 @@ func (c *Config) Clone() *Config {
 	cp.Actions = c.Actions.Clone()
 	cp.Projects = c.Projects.Clone()
 	cp.Tasks = c.Tasks.Clone()
-	cp.TaskActions = cloneTaskActions(c.TaskActions)
+	cp.Inbox = c.Inbox.Clone()
+	cp.Menu = c.Menu.Clone()
+	cp.Merge = MergeConfig{Check: slices.Clone(c.Merge.Check)}
 	cp.Keys.Bind = cloneKeyBinds(c.Keys.Bind)
 
 	cp.AgentStatus = c.AgentStatus.Clone()
@@ -423,6 +430,8 @@ func DefaultConfig() *Config {
 			Help:          "?",
 			CycleMode:     "ctrl+f",
 			AgentSort:     "ctrl+s",
+			InboxGroup:    "ctrl+g",
+			Menu:          "alt+m",
 			PageUp:        "pgup",
 			PageDown:      "pgdown",
 			Top:           "home",
@@ -441,8 +450,8 @@ func DefaultConfig() *Config {
 			SeshFormat:          DefaultSeshFormat,
 			AgentsSessionFormat: DefaultAgentsSessionFormat,
 			AgentsAgentFormat:   DefaultAgentsAgentFormat,
-			WorkSectionFormat:   DefaultWorkSectionFormat,
-			WorkTaskFormat:      DefaultWorkTaskFormat,
+			InboxGroupFormat:    DefaultInboxGroupFormat,
+			InboxAgentFormat:    DefaultInboxAgentFormat,
 			Fields:              nil,
 		},
 		Paths: PathConfig{
@@ -453,7 +462,7 @@ func DefaultConfig() *Config {
 			ShowFooter:                   true,
 			DirectorySuggestions:         defaultDirectorySuggestions,
 			DefaultSessionPathSuggestion: "~/Projects/{session}",
-			DisplayModes:                 []string{"sesh", "agents", "work"},
+			DisplayModes:                 []string{"sesh", "agents", "inbox"},
 			LogLevel:                     "info",
 			ShortcutStyle:                "none",
 			SessionKeyAction:             "focus",
@@ -501,10 +510,12 @@ func DefaultConfig() *Config {
 			EnableReverseBridge: true,
 			ReturnToOrigin:      true,
 		},
-		Actions:     nil,
-		Projects:    DefaultProjectsConfig(),
-		Tasks:       DefaultTasksConfig(),
-		TaskActions: nil,
+		Actions:  nil,
+		Projects: DefaultProjectsConfig(),
+		Tasks:    DefaultTasksConfig(),
+		Inbox:    DefaultInboxConfig(),
+		Menu:     DefaultMenuConfig(),
+		Merge:    MergeConfig{Check: nil},
 		AgentStatus: AgentStatusConfig{
 			Enabled:                  true,
 			StorePath:                "",

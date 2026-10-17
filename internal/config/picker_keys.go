@@ -56,7 +56,9 @@ func PickerKeyName(value string) string {
 // PickerReservedKeys returns every key the picker handles before action bindings: its fixed
 // keys, the configured navigation keys and the configured session keys.
 func PickerReservedKeys(keys KeyConfig) []string {
-	reserved := []string{keys.Help, keys.CycleMode, keys.AgentSort, keys.PageUp, keys.PageDown, keys.Top, keys.Bottom}
+	reserved := []string{
+		keys.Help, keys.CycleMode, keys.AgentSort, keys.InboxGroup, keys.Menu, keys.PageUp, keys.PageDown, keys.Top, keys.Bottom,
+	}
 
 	if keys.SessionKeysHoldAlt() {
 		for _, letter := range keys.Sessions {

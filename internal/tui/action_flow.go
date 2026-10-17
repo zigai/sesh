@@ -65,11 +65,15 @@ func (m *Model) invokeAction(id action.ID, values action.Values) func() (tea.Mod
 	descriptor := entry.Describe()
 
 	subject, ok := m.actionSubject(descriptor)
-	if !ok {
-		return nil
-	}
+	if descriptor.InPicker {
+		if err := m.pickerActionError(id); err != nil {
+			m.setErrorStatusf("%s unavailable: %v", descriptor.Title, err)
 
-	if err := m.actionAvailable(descriptor, subject); err != nil {
+			return func() (tea.Model, tea.Cmd) { return m, nil }
+		}
+	} else if !ok {
+		return nil
+	} else if err := m.actionAvailable(descriptor, subject); err != nil {
 		m.setErrorStatusf("%s unavailable: %v", descriptor.Title, err)
 
 		return func() (tea.Model, tea.Cmd) { return m, nil }
@@ -117,6 +121,35 @@ func (m *Model) actionAvailable(descriptor action.Descriptor, subject action.Sub
 
 // actionSubject selects what an action applies to: the selected row's session, and for pane
 // actions the selected agent's pane.
+// inboxSubject is what an action applies to on the selected inbox row: its task on the row's
+// machine, or its agent pane in the session that owns it.
+func (m *Model) inboxSubject(descriptor action.Descriptor) (action.Subject, bool) {
+	none := action.Subject{At: action.Local(), Sessions: nil, Pane: "", Task: ""}
+
+	found, ok := m.selectedInboxItem()
+	if !ok || (descriptor.Subject == action.SubjectTask && !found.task) {
+		return none, false
+	}
+
+	if descriptor.Subject == action.SubjectTask {
+		at := action.Local()
+		if found.host.origin == session.OriginSSH {
+			at = action.Peer(found.host.identity.ConnectionID)
+		}
+
+		return action.Subject{At: at, Sessions: nil, Pane: string(found.live.AgentPane), Task: found.live.Record.ID}, true
+	}
+
+	if found.owner.ID == "" || (found.task && found.live.AgentPane == "") {
+		return none, false
+	}
+
+	subject := action.SubjectOf(found.owner)
+	subject.Pane = found.agent.PaneID
+
+	return subject, true
+}
+
 func (m *Model) actionSubject(descriptor action.Descriptor) (action.Subject, bool) {
 	if descriptor.Subject == action.SubjectNone {
 		return action.Subject{At: action.Local(), Sessions: nil, Pane: "", Task: ""}, true
@@ -128,20 +161,8 @@ func (m *Model) actionSubject(descriptor action.Descriptor) (action.Subject, boo
 
 	selected := m.filtered[m.cursor]
 
-	if m.displayMode == displayModeWork {
-		found, ok := m.workTaskAt(m.selectedListRow())
-		if ok && descriptor.Subject == action.SubjectTask {
-			return action.Subject{At: action.LocationOf(selected), Sessions: nil, Pane: string(found.live.AgentPane), Task: found.live.Record.ID}, true
-		}
-
-		if !ok || found.owner.ID == "" || found.live.AgentPane == "" {
-			return action.Subject{At: action.Local(), Sessions: nil, Pane: "", Task: ""}, false
-		}
-
-		subject := action.SubjectOf(found.owner)
-		subject.Pane = string(found.live.AgentPane)
-
-		return subject, true
+	if m.displayMode == displayModeInbox {
+		return m.inboxSubject(descriptor)
 	}
 
 	subject := action.SubjectOf(selected)
@@ -293,6 +314,9 @@ func (m *Model) closeActionDialog() {
 
 func (m *Model) dispatchAction(request pendingAction) func() (tea.Model, tea.Cmd) {
 	descriptor := request.entry.Describe()
+	if descriptor.InPicker {
+		return m.runPickerAction(request)
+	}
 
 	input, err := request.entry.BindAny(request.subject, request.values)
 	if err != nil {
@@ -413,6 +437,8 @@ func (m *Model) followAction(msg actionResultMsg) tea.Cmd {
 
 		m.recordActionState(func(current *session.State) { current.DeleteSessionIdentity(deleted) })
 		m.moveCursorToPreviousRow()
+	case action.StartedTaskMerge, action.StartedTaskAction:
+		return tea.Batch(m.refreshSessions(), m.taskRunTickCommand(true))
 	}
 
 	return m.refreshSessions()

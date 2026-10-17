@@ -51,6 +51,9 @@ const (
 // and Title and Agent fill in the title and agent, the first agent when empty. Refs describe the
 // branches as of Now, Starts names the ref each new worktree base starts from, and Changes counts the uncommitted changes of checkouts after the popup
 // opens. Start runs the choice while the popup is still open, so a failure can be shown in it.
+// Machines lists this machine and then the remote hosts a task can start on; the popup shows them
+// when there is more than one. Machine is the index of the chosen one, and Problem, when set, is
+// why no task can start on it, shown in place of the checkouts.
 type Options struct {
 	Project    string
 	Locations  []task.Location
@@ -66,15 +69,26 @@ type Options struct {
 	Now        time.Time
 	Changes    func() map[string]git.Diff
 	Start      func(Choice) error
+	Machines   []Machine
+	Machine    int
+	Problem    string
+}
+
+// Machine is a machine a task can start on. One whose sesh cannot start tasks for others is
+// listed but cannot be chosen.
+type Machine struct {
+	Name   string
+	Usable bool
 }
 
 // Choice is what the person picked: a plain tab, or a harness, a title and, in a project, the
 // location the task works in. Show is a task to go to once the popup closes, one that already
-// works in the chosen checkout. Reopen asks for the popup again, Expanded or not, keeping the title
-// and harness.
+// works in the chosen checkout. Reopen asks for the popup again on Machine, Expanded or not,
+// keeping the title and harness.
 type Choice struct {
 	Reopen   bool
 	Expanded bool
+	Machine  int
 	Tab      bool
 	Harness  string
 	Title    string
@@ -195,7 +209,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseWheelMsg:
 		m.wheel(msg.Mouse())
 	case tea.MouseClickMsg:
-		m.click(msg.Mouse())
+		return m.click(msg.Mouse())
 	default:
 		if m.stage == stagePicking {
 			return m.updateInput(msg)
@@ -225,6 +239,8 @@ func (m *Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.cycleAgent(key)
 
 		return m, nil
+	case "shift+left", "shift+right":
+		return m.cycleMachine(key)
 	case "tab", "shift+tab":
 		return m, m.focusField(m.otherField())
 	case "up", "down":
@@ -352,11 +368,51 @@ func (m *Model) cycleAgent(key string) {
 	m.agent = agents[(index+delta+len(agents))%len(agents)]
 }
 
+// cycleMachine asks for the popup again on the usable machine left or right of the chosen one,
+// wrapping around.
+func (m *Model) cycleMachine(key string) (tea.Model, tea.Cmd) {
+	delta := 1
+	if key == "shift+left" {
+		delta = -1
+	}
+
+	count := len(m.options.Machines)
+	if !m.showsMachines() {
+		return m, nil
+	}
+
+	for step := 1; step < count; step++ {
+		next := ((m.options.Machine+delta*step)%count + count) % count
+		if m.options.Machines[next].Usable {
+			return m.reopenOn(next)
+		}
+	}
+
+	return m, nil
+}
+
+// reopenOn asks for the popup again on another machine, keeping the title and agent.
+func (m *Model) reopenOn(machine int) (tea.Model, tea.Cmd) {
+	if machine == m.options.Machine || !m.options.Machines[machine].Usable {
+		return m, nil
+	}
+
+	model, cmd := m.reopen(false)
+	m.chosen.Machine = machine
+
+	return model, cmd
+}
+
+func (m *Model) showsMachines() bool {
+	return len(m.options.Machines) > 1
+}
+
 // reopen asks for the popup again with the list open or closed, keeping the title and agent.
 func (m *Model) reopen(expanded bool) (tea.Model, tea.Cmd) {
 	m.chosen = emptyChoice()
 	m.chosen.Reopen = true
 	m.chosen.Expanded = expanded
+	m.chosen.Machine = m.options.Machine
 	m.chosen.Title = strings.TrimSpace(m.title.Value())
 	m.chosen.Harness = m.agent
 	m.done = true
@@ -403,7 +459,7 @@ func (m *Model) location() (task.Location, bool) {
 // choose goes to the task already working in the chosen checkout, or starts the choice.
 func (m *Model) choose() (tea.Model, tea.Cmd) {
 	location, ok := m.location()
-	if !ok {
+	if !ok || m.options.Problem != "" {
 		return m, nil
 	}
 
@@ -581,24 +637,40 @@ func (m *Model) wheel(mouse tea.Mouse) {
 }
 
 // click selects the choice or list row under the pointer.
-func (m *Model) click(mouse tea.Mouse) {
+func (m *Model) click(mouse tea.Mouse) (tea.Model, tea.Cmd) {
 	if mouse.Button != tea.MouseLeft || m.stage != stagePicking {
-		return
+		return m, nil
 	}
 
 	geometry := m.layout()
 	line, column := mouse.Y-1, mouse.X-bodyColumn
+
+	if index, found := clickedChoice(geometry.machineChoices, geometry.machineTop, line, column); found {
+		return m.reopenOn(index)
+	}
 
 	switch {
 	case geometry.whereTop >= 0 && line >= geometry.whereTop && line <= geometry.whereTop+int(whereOther):
 		m.where = where(line - geometry.whereTop)
 	case line >= geometry.listTop && line < geometry.listTop+geometry.listRows:
 		m.clickList(line - geometry.listTop)
-	case line >= geometry.agentTop && line < geometry.agentTop+len(geometry.agentChoices):
-		if index, found := choiceAt(geometry.agentChoices[line-geometry.agentTop], column); found {
+	default:
+		if index, found := clickedChoice(geometry.agentChoices, geometry.agentTop, line, column); found {
 			m.agent = m.agents()[index]
 		}
 	}
+
+	return m, nil
+}
+
+// clickedChoice returns the index of the choice at line and column of rows of choices that start
+// on line top.
+func clickedChoice(rows [][]placed, top, line, column int) (int, bool) {
+	if line < top || line >= top+len(rows) {
+		return 0, false
+	}
+
+	return choiceAt(rows[line-top], column)
 }
 
 // clickList selects the list row on the given line of the list.
@@ -649,7 +721,7 @@ func sectionOf(location task.Location) section {
 }
 
 func emptyChoice() Choice {
-	return Choice{Reopen: false, Expanded: false, Tab: false, Harness: "", Title: "", Location: emptyLocation(), Show: ""}
+	return Choice{Reopen: false, Expanded: false, Machine: 0, Tab: false, Harness: "", Title: "", Location: emptyLocation(), Show: ""}
 }
 
 func emptyLocation() task.Location {

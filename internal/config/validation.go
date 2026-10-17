@@ -159,8 +159,8 @@ func ValidateDisplayConfig(disp DisplayConfig) error {
 		{name: "sesh_format", kind: display.FormatKindSession, format: disp.SeshFormat},
 		{name: "agents_session_format", kind: display.FormatKindAgentsSession, format: disp.AgentsSessionFormat},
 		{name: "agents_agent_format", kind: display.FormatKindAgentsAgent, format: disp.AgentsAgentFormat},
-		{name: "work_section_format", kind: display.FormatKindAgentsSession, format: disp.WorkSectionFormat},
-		{name: "work_task_format", kind: display.FormatKindAgentsAgent, format: disp.WorkTaskFormat},
+		{name: "inbox_group_format", kind: display.FormatKindAgentsSession, format: disp.InboxGroupFormat},
+		{name: "inbox_agent_format", kind: display.FormatKindAgentsAgent, format: disp.InboxAgentFormat},
 	}
 
 	for _, candidate := range formats {
@@ -368,6 +368,8 @@ func ValidateKeyConfig(keys KeyConfig) error {
 		{"help", keys.Help},
 		{"cycle_mode", keys.CycleMode},
 		{"agent_sort", keys.AgentSort},
+		{"inbox_group", keys.InboxGroup},
+		{"menu", keys.Menu},
 		{"page_up", keys.PageUp},
 		{"page_down", keys.PageDown},
 		{"top", keys.Top},
@@ -453,7 +455,9 @@ func validateConfig(cfg *Config) error {
 		func() error { return ValidateRemoteConfig(cfg.Remote) },
 		func() error { return ValidateProjectsConfig(cfg.Projects) },
 		func() error { return ValidateTasksConfig(cfg.Tasks) },
-		func() error { return ValidateTaskActions(cfg) },
+		func() error { return ValidateInboxConfig(cfg.Inbox) },
+		func() error { return ValidateMenu(cfg) },
+		func() error { return ValidateMerge(cfg) },
 		func() error { return ValidateTaskWindows(cfg) },
 	}
 	for _, v := range validators {
@@ -659,8 +663,8 @@ func validateDisplayModes(modes []string) error {
 	seen := make(map[string]bool, len(modes))
 	for _, mode := range modes {
 		normalized := strings.ToLower(strings.TrimSpace(mode))
-		if normalized != "sesh" && normalized != "agents" && normalized != "work" {
-			return fmt.Errorf("%w %q: expected sesh, agents or work", errDisplayModeInvalid, mode)
+		if normalized != "sesh" && normalized != "agents" && normalized != "inbox" {
+			return fmt.Errorf("%w %q: expected sesh, agents or inbox", errDisplayModeInvalid, mode)
 		}
 
 		if seen[normalized] {

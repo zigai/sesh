@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -224,7 +223,7 @@ func agentCellText(part display.Part) string {
 
 func agentReportedCell(values sessionFormatValues, part display.Part, cell rowlayout.Cell) rowlayout.Cell {
 	providerID := agentProviderID(part.Field)
-	if values.agent.PaneID != "" && providerID != "" && values.model.providerRunner.Version(providerID) > 0 {
+	if values.agent.PaneID != "" && !remoteAgentRow(values.row, values.agent) && providerID != "" && values.model.providerRunner.Version(providerID) > 0 {
 		reported := values.model.providerRunner.Cell(providerID, values.agent.PaneID, part.Field)
 
 		cell.Text, cell.State = reported.Text, reported.State
@@ -234,8 +233,8 @@ func agentReportedCell(values sessionFormatValues, part display.Part, cell rowla
 	}
 
 	if part.Field == display.FieldAgentPR && cell.State != rowlayout.Present {
-		if number := values.model.recordedTaskPR(values.row, values.agent.PaneID); number != 0 {
-			cell.Text, cell.State = "#"+strconv.Itoa(number), rowlayout.Present
+		if recorded := values.model.recordedTaskPR(values.agent); recorded != "" {
+			cell.Text, cell.State = recorded, rowlayout.Present
 		}
 	}
 

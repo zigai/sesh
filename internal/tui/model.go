@@ -18,6 +18,7 @@ import (
 
 	"github.com/zigai/sesh/internal/config"
 	rowlayout "github.com/zigai/sesh/internal/display/layout"
+	"github.com/zigai/sesh/internal/inbox"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/task"
 	"github.com/zigai/sesh/internal/tui/providers"
@@ -195,9 +196,16 @@ type Model struct {
 	agentSummaries               []session.AgentSummary
 	tasks                        []task.Live
 	tasksErr                     error
-	workTasks                    map[string]workTask
+	inboxItems                   map[string]inboxItem
+	menu                         *rowMenu
+	inbox                        inbox.State
+	inboxErr                     error
+	evidence                     map[string]evidenceEntry
+	evidenceLoading              bool
+	inboxGroup                   string
 	carriedSelection             sessionIdentity
 	tasksSynced                  bool
+	taskRunTickPending           bool
 	deferredSwitch               session.Session
 	hasDeferredSwitch            bool
 	deferredAttach               session.Session
@@ -365,9 +373,16 @@ func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps
 		agentSummaries:               nil,
 		tasks:                        nil,
 		tasksErr:                     nil,
-		workTasks:                    map[string]workTask{},
+		inboxItems:                   map[string]inboxItem{},
+		menu:                         nil,
+		inbox:                        inbox.State{Version: 0, Snoozes: nil, Unseen: nil},
+		inboxErr:                     nil,
+		evidence:                     map[string]evidenceEntry{},
+		evidenceLoading:              false,
+		inboxGroup:                   cfg.Inbox.Group,
 		carriedSelection:             emptySessionIdentity(),
 		tasksSynced:                  false,
+		taskRunTickPending:           false,
 		deferredSwitch:               emptySession(),
 		hasDeferredSwitch:            false,
 		deferredAttach:               emptySession(),
@@ -441,6 +456,9 @@ func (m *Model) SetInitialSessions(sessions []session.Session) {
 		tasks:             nil,
 		tasksLoaded:       false,
 		tasksErr:          nil,
+		inbox:             inbox.State{Version: 0, Snoozes: nil, Unseen: nil},
+		inboxLoaded:       false,
+		inboxErr:          nil,
 		agentGit:          m.agentGit,
 		customFieldCache:  nil,
 		remoteCatalog:     RemoteCatalog{GeneratedAt: time.Time{}, Connections: nil},
@@ -636,6 +654,10 @@ func (m *Model) handleKeyPressMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return cmd()
 	}
 
+	if cmd := m.handleMenuKeys(msg); cmd != nil {
+		return cmd()
+	}
+
 	if m.showHelp {
 		m.showHelp = false
 
@@ -740,7 +762,7 @@ func (m *Model) handleTickModelMessage(msg tea.Msg) func() (tea.Model, tea.Cmd) 
 func (m *Model) handleProviderModelMessage(msg tea.Msg) func() (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case agentGitTickMsg:
-		return func() (tea.Model, tea.Cmd) { return m, m.loadAgentGitCommand() }
+		return func() (tea.Model, tea.Cmd) { return m, tea.Batch(m.loadAgentGitCommand(), m.loadEvidenceCommand()) }
 	case agentGitResultMsg:
 		return func() (tea.Model, tea.Cmd) { return m, m.handleAgentGit(msg) }
 	case resourceTickMsg:
@@ -793,6 +815,12 @@ func (m *Model) handleModelMessage(msg tea.Msg) func() (tea.Model, tea.Cmd) {
 		return func() (tea.Model, tea.Cmd) {
 			return m, m.handleTaskSync(msg)
 		}
+	case taskRunTickMsg:
+		return func() (tea.Model, tea.Cmd) {
+			m.taskRunTickPending = false
+
+			return m, m.refreshSessions()
+		}
 	case originSessionsMsg:
 		return func() (tea.Model, tea.Cmd) {
 			m.handleOriginSessions(msg)
@@ -835,6 +863,24 @@ func (m *Model) handleResultMessage(msg tea.Msg) func() (tea.Model, tea.Cmd) {
 	case sessionKeysSavedMsg:
 		return func() (tea.Model, tea.Cmd) {
 			m.handleSessionKeysSaved(msg)
+
+			return m, nil
+		}
+	case inboxUpdatedMsg:
+		return func() (tea.Model, tea.Cmd) {
+			m.handleInboxUpdated(msg)
+
+			return m, nil
+		}
+	case evidenceResultMsg:
+		return func() (tea.Model, tea.Cmd) {
+			m.handleEvidence(msg)
+
+			return m, nil
+		}
+	case openedMsg:
+		return func() (tea.Model, tea.Cmd) {
+			m.handleOpened(msg)
 
 			return m, nil
 		}

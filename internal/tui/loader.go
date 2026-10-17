@@ -14,6 +14,7 @@ import (
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/display"
 	"github.com/zigai/sesh/internal/fields"
+	"github.com/zigai/sesh/internal/inbox"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/task"
 	"github.com/zigai/sesh/internal/tui/providers"
@@ -42,6 +43,9 @@ type sessionLoadResultMsg struct {
 	tasks             []task.Live
 	tasksLoaded       bool
 	tasksErr          error
+	inbox             inbox.State
+	inboxLoaded       bool
+	inboxErr          error
 	agentGit          map[string]agentGitCacheEntry
 	customFieldCache  map[string]map[string]fields.CacheEntry
 	remoteCatalog     RemoteCatalog
@@ -107,9 +111,12 @@ func loadSessionRows(ctx context.Context, cfg *config.Config, deps Services) ses
 		originErr       error
 		tasks           []task.Live
 		tasksErr        error
+		inboxState      inbox.State
+		inboxErr        error
 	)
 
-	tasksLoaded := workModeEnabled(cfg) && deps.Tasks != nil
+	tasksLoaded := inboxModeEnabled(cfg) && deps.Tasks != nil
+	inboxLoaded := inboxModeEnabled(cfg) && deps.Inbox != nil
 
 	var (
 		loaders sync.WaitGroup
@@ -131,6 +138,12 @@ func loadSessionRows(ctx context.Context, cfg *config.Config, deps Services) ses
 	if tasksLoaded {
 		loaders.Go(func() {
 			tasks, tasksErr = deps.Tasks.LoadTasks(ctx)
+		})
+	}
+
+	if inboxLoaded {
+		loaders.Go(func() {
+			inboxState, inboxErr = deps.Inbox.LoadInbox(ctx)
 		})
 	}
 
@@ -164,6 +177,9 @@ func loadSessionRows(ctx context.Context, cfg *config.Config, deps Services) ses
 			tasks:             nil,
 			tasksLoaded:       false,
 			tasksErr:          nil,
+			inbox:             inbox.State{Version: 0, Snoozes: nil, Unseen: nil},
+			inboxLoaded:       false,
+			inboxErr:          nil,
 			agentGit:          nil,
 			customFieldCache:  nil,
 			remoteCatalog:     RemoteCatalog{GeneratedAt: time.Time{}, Connections: nil},
@@ -192,6 +208,9 @@ func loadSessionRows(ctx context.Context, cfg *config.Config, deps Services) ses
 		tasks:             tasks,
 		tasksLoaded:       tasksLoaded,
 		tasksErr:          tasksErr,
+		inbox:             inboxState,
+		inboxLoaded:       inboxLoaded,
+		inboxErr:          inboxErr,
 		agentGit:          nil,
 		customFieldCache:  nil,
 		remoteCatalog:     remoteCatalog,
@@ -502,6 +521,13 @@ func (m *Model) applySessionRows(result sessionLoadResultMsg) []agentViewStateUp
 }
 
 func (m *Model) applyLoadedTasks(result sessionLoadResultMsg) {
+	if result.inboxLoaded {
+		m.inboxErr = result.inboxErr
+		if result.inboxErr == nil {
+			m.inbox = result.inbox
+		}
+	}
+
 	if !result.tasksLoaded {
 		return
 	}
@@ -1035,9 +1061,11 @@ func (m *Model) handleSessionLoadResult(msg sessionLoadResultMsg) tea.Cmd {
 	commands := []tea.Cmd{
 		m.persistAgentViewsCommand(views),
 		m.loadAgentGitCommand(),
+		m.loadEvidenceCommand(),
 		m.loadResourceCommand(),
 		m.loadGHCommand(),
 		m.syncTasksCommand(),
+		m.taskRunTickCommand(false),
 		m.assignLoadedSessionKeys(msg.catalogErr == nil && msg.status != session.StatusPartial),
 	}
 
@@ -1141,6 +1169,6 @@ func (m *Model) applyAgentSummaryStatus(err error) {
 	m.setDegradedSource(degradedSourceAgents, "Agent status unavailable: inventory could not be read")
 }
 
-func workModeEnabled(cfg *config.Config) bool {
-	return slices.Contains(configuredDisplayModes(cfg), displayModeWork)
+func inboxModeEnabled(cfg *config.Config) bool {
+	return slices.Contains(configuredDisplayModes(cfg), displayModeInbox)
 }

@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/zigai/sesh/internal/action"
+	"github.com/zigai/sesh/internal/inbox"
 	"github.com/zigai/sesh/internal/session"
 )
 
@@ -92,6 +93,12 @@ type WorkingDirectoryService interface {
 	GetWorkingDirectory() (string, error)
 }
 
+// InboxStore keeps what the inbox remembers between pickers: the rows the user snoozed.
+type InboxStore interface {
+	LoadInbox(ctx context.Context) (inbox.State, error)
+	UpdateInbox(ctx context.Context, change func(*inbox.State) error) (inbox.State, error)
+}
+
 type StateStore interface {
 	UpdateModelState(ctx context.Context, update session.StateUpdate) error
 }
@@ -118,6 +125,8 @@ type Services struct {
 	TerminalAttach   TerminalAttacher
 	Agents           AgentSource
 	Tasks            TaskSource
+	Inbox            InboxStore
+	Evidence         EvidenceSource
 	AgentWatcher     AgentWatcher
 	Remote           RemoteCatalogSource
 	RemoteWatcher    RemoteCatalogWatcher

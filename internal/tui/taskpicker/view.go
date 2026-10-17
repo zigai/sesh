@@ -43,6 +43,7 @@ const (
 	maxListRows    = 10
 	titleLabel     = "title"
 	agentLabel     = "agent"
+	machineLabel   = "host"
 	popupTitle     = "new task"
 	noLocations    = "nothing to start in"
 	noMatch        = "nothing matches"
@@ -78,12 +79,14 @@ type rowParts struct {
 // places to work or the filter and the expanded list. whereTop is -1 when the popup has no places,
 // and listRows is 0 when it has no list.
 type layout struct {
-	bodyWidth    int
-	agentTop     int
-	agentChoices [][]placed
-	whereTop     int
-	listTop      int
-	listRows     int
+	bodyWidth      int
+	agentTop       int
+	agentChoices   [][]placed
+	machineTop     int
+	machineChoices [][]placed
+	whereTop       int
+	listTop        int
+	listRows       int
 }
 
 // listLine is one line of the expanded list: a section heading, with row -1, or the row at that
@@ -107,9 +110,11 @@ type placed struct {
 func Size(cfg *config.Config, opts Options) (int, int) {
 	probe := NewModel(cfg, opts)
 	width := probe.bodyWidth()
-	rows := 1 + len(placeChoices(probe.agents(), valueColumn, width))
+	rows := 1 + len(placeChoices(probe.agents(), valueColumn, width)) + len(probe.machineChoices(width))
 
 	switch {
+	case opts.Problem != "":
+		rows += 2
 	case opts.Expanded:
 		rows += listGapRows + min(max(len(probe.lines()), 1), maxListRows)
 	case probe.hasWhere():
@@ -136,12 +141,15 @@ func (m *Model) bodyWidth() int {
 func (m *Model) layout() layout {
 	bodyWidth := max(m.width-frameColumns, 1)
 	agentChoices := placeChoices(m.agents(), valueColumn, bodyWidth)
-	below := 1 + len(agentChoices) + 1
+	machineChoices := m.machineChoices(bodyWidth)
+	below := 1 + len(agentChoices) + len(machineChoices) + 1
 	geometry := layout{
-		bodyWidth: bodyWidth, agentTop: 1, agentChoices: agentChoices, whereTop: -1, listTop: 0, listRows: 0,
+		bodyWidth: bodyWidth, agentTop: 1, agentChoices: agentChoices, machineTop: 1 + len(agentChoices),
+		machineChoices: machineChoices, whereTop: -1, listTop: 0, listRows: 0,
 	}
 
 	switch {
+	case m.options.Problem != "":
 	case m.options.Expanded:
 		geometry.listTop = below + 1
 		geometry.listRows = max(m.height-frameRows-geometry.listTop, 1)
@@ -188,8 +196,11 @@ func (m *Model) renderForm(geometry layout) []string {
 	body := make([]string, 0, m.height-frameRows)
 	body = append(body, m.field(titleLabel, m.focus == fieldTitle, " "+m.title.View()))
 	body = append(body, m.renderAgents(geometry)...)
+	body = append(body, m.renderChoiceRows(machineLabel, m.machineNames(), m.options.Machine, geometry.machineChoices)...)
 
 	switch {
+	case m.options.Problem != "":
+		body = append(body, "", m.chrome.Muted(strings.Repeat(" ", rowGutter)+tui.SanitizeTerminalText(m.options.Problem)))
 	case m.options.Expanded:
 		filter := m.chrome.Label(filterLabel, m.focus == fieldList) + " " + m.filter.View()
 		body = append(body, "", strings.Repeat(" ", rowGutter)+filter)
@@ -303,13 +314,47 @@ func (m *Model) renderAgents(geometry layout) []string {
 		return []string{m.field(agentLabel, false, m.chrome.Muted(noAgents))}
 	}
 
-	selected := slices.Index(agents, m.agent)
-	lines := make([]string, 0, len(geometry.agentChoices))
+	return m.renderChoiceRows(agentLabel, agents, slices.Index(agents, m.agent), geometry.agentChoices)
+}
 
-	for row, choices := range geometry.agentChoices {
-		names := make([]string, 0, len(choices))
+// machineChoices places the machine choices, none when the popup has only this machine.
+func (m *Model) machineChoices(width int) [][]placed {
+	if !m.showsMachines() {
+		return nil
+	}
+
+	return placeChoices(m.machineNames(), valueColumn, width)
+}
+
+// machineNames are the machine choices, empty when the popup has only this machine. One that
+// cannot be chosen says why.
+func (m *Model) machineNames() []string {
+	if !m.showsMachines() {
+		return nil
+	}
+
+	names := make([]string, 0, len(m.options.Machines))
+	for _, machine := range m.options.Machines {
+		name := tui.SanitizeTerminalText(machine.Name)
+		if !machine.Usable {
+			name += " (update sesh)"
+		}
+
+		names = append(names, name)
+	}
+
+	return names
+}
+
+// renderChoiceRows draws a labeled row of choices, wrapped as rows places them, with the
+// selected one highlighted.
+func (m *Model) renderChoiceRows(label string, names []string, selected int, rows [][]placed) []string {
+	lines := make([]string, 0, len(rows))
+
+	for row, choices := range rows {
+		shown := make([]string, 0, len(choices))
 		for _, choice := range choices {
-			names = append(names, agents[choice.index])
+			shown = append(shown, names[choice.index])
 		}
 
 		rowSelected := -1
@@ -317,9 +362,9 @@ func (m *Model) renderAgents(geometry layout) []string {
 			rowSelected = selected - choices[0].index
 		}
 
-		line := strings.Repeat(" ", valueColumn) + m.renderChoices(names, rowSelected)
+		line := strings.Repeat(" ", valueColumn) + m.renderChoices(shown, rowSelected)
 		if row == 0 {
-			line = m.field(agentLabel, false, m.renderChoices(names, rowSelected))
+			line = m.field(label, false, m.renderChoices(shown, rowSelected))
 		}
 
 		lines = append(lines, line)
@@ -590,14 +635,24 @@ func (m *Model) hints() []tui.Hint {
 		enter.Desc = "branches"
 	}
 
+	var hints []tui.Hint
+
 	switch {
+	case m.options.Problem != "":
+		hints = []tui.Hint{agent}
 	case m.focus == fieldList:
-		return []tui.Hint{agent, {Key: "↑↓", Desc: "select"}, enter, {Key: "esc", Desc: "back"}}
+		hints = []tui.Hint{agent, {Key: "↑↓", Desc: "select"}, enter, {Key: "esc", Desc: "back"}}
 	case m.hasWhere():
-		return []tui.Hint{agent, {Key: "↑↓", Desc: "checkout"}, enter}
+		hints = []tui.Hint{agent, {Key: "↑↓", Desc: "checkout"}, enter}
 	default:
-		return []tui.Hint{agent, enter}
+		hints = []tui.Hint{agent, enter}
 	}
+
+	if m.showsMachines() {
+		hints = append(hints, tui.Hint{Key: "⇧←→", Desc: machineLabel})
+	}
+
+	return hints
 }
 
 func failedHints() []tui.Hint {

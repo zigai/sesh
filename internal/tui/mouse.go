@@ -24,7 +24,19 @@ type popupMouseLayout struct {
 }
 
 func (m *Model) handleMouseClick(mouse tea.Mouse) func() (tea.Model, tea.Cmd) {
-	if !m.mouseInteractionsEnabled() || mouse.Button != tea.MouseLeft {
+	if !m.mouseInteractionsEnabled() {
+		return nil
+	}
+
+	if m.menu != nil {
+		return m.handleMenuMouse(mouse, true)
+	}
+
+	if mouse.Button == tea.MouseRight {
+		return m.handleRowRightClick(mouse)
+	}
+
+	if mouse.Button != tea.MouseLeft {
 		return nil
 	}
 
@@ -83,6 +95,10 @@ func (m *Model) handleMouseWheel(mouse tea.Mouse) func() (tea.Model, tea.Cmd) {
 func (m *Model) handleMouseMotion(mouse tea.Mouse) func() (tea.Model, tea.Cmd) {
 	if !m.mouseInteractionsEnabled() {
 		return nil
+	}
+
+	if m.menu != nil {
+		return m.handleMenuMouse(mouse, false)
 	}
 
 	if m.updateFooterHover(mouse) {
@@ -344,26 +360,15 @@ func (m *Model) handleFooterBadgeClick(mouse tea.Mouse, layout popupMouseLayout)
 
 	badgeX := layout.bodyX + max(layout.layout.bodyWidth-lipgloss.Width(m.renderFooterBadges()), 0)
 
-	if m.hasStatusBadge() {
-		statusBadgeWidth := lipgloss.Width(m.renderStatusBadge())
-		if mouse.X >= badgeX && mouse.X < badgeX+statusBadgeWidth {
-			m.dismissStatus()
+	for _, badge := range m.footerBadges() {
+		width := lipgloss.Width(badge.text)
+		if badge.click != nil && mouse.X >= badgeX && mouse.X < badgeX+width {
+			badge.click()
 
 			return func() (tea.Model, tea.Cmd) { return m, nil }, true
 		}
 
-		badgeX += statusBadgeWidth + footerPartSpacing
-	}
-
-	if m.showsAgentSortBadge() {
-		sortBadgeWidth := lipgloss.Width(m.renderAgentSortBadge())
-		if mouse.X >= badgeX && mouse.X < badgeX+sortBadgeWidth {
-			if m.cycleAgentSort() {
-				m.clearStatus()
-			}
-
-			return func() (tea.Model, tea.Cmd) { return m, nil }, true
-		}
+		badgeX += width + footerPartSpacing
 	}
 
 	return nil, false

@@ -38,6 +38,7 @@ type Workspace struct {
 	FinalSaveStatus string
 	AgentStore      string
 	Tasks           string
+	Inbox           string
 	WorktreeDir     string
 }
 
@@ -67,6 +68,7 @@ func Resolve(cfg *config.Config, locations Locations) (Workspace, error) {
 		FinalSaveStatus: "",
 		AgentStore:      "",
 		Tasks:           filepath.Join(stateDir, "tasks.json"),
+		Inbox:           filepath.Join(stateDir, "inbox.json"),
 		WorktreeDir:     "",
 	}
 

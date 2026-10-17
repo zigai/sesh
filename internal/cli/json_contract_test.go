@@ -22,7 +22,7 @@ const (
 func TestJSONCommandTreeRequiresExplicitOutputContract(t *testing.T) {
 	contracts := map[string][]string{
 		"envelope": {
-			"agent back", "agent failed", "agent focus", "agent latest", "agent next", "agent status", "agent toggle", "agent unread", "agent waiting", "agent window-status-clear",
+			"agent back", "agent failed", "agent focus", "agent latest", "agent merge", "agent next", "agent status", "agent toggle", "agent unread", "agent waiting", "agent window-status-clear",
 			"autosave final-save", "autosave restore-on-start", "autosave save-if-due",
 			"autosave status", "config init", "doctor", "hooks list", "hooks run", "hooks validate", "keys",
 			"pick popup", "project clone", "project create", "project open", "project pick", "remote lookup",
@@ -31,10 +31,10 @@ func TestJSONCommandTreeRequiresExplicitOutputContract(t *testing.T) {
 			"snapshot gc", "snapshot history", "snapshot list", "snapshot prune", "snapshot restore", "snapshot save", "snapshot verify",
 			"snapshot recover delete resume", "snapshot recover delete show",
 			"snapshot recover restore abandon", "snapshot recover restore show",
-			"task finish", "task menu", "task new", "task open", "task popup", "task relayout", "task run", "task sleep", "task tab", "task wake",
+			"task finish", "task menu", "task merge", "task new", "task offer", "task open", "task popup", "task relayout", "task run", "task sleep", "task tab", "task wake",
 		},
 		"log stream; path and clear use envelopes": {"logs"},
-		"interactive terminal":                     {"pick", "project pick-ui", "remote attach", "session new", "task action-run", "task pick-ui", "task placeholder", "task popup-attach"},
+		"interactive terminal":                     {"pick", "project pick-ui", "remote attach", "session new", "task action-run", "task merge-run", "task pick-ui", "task placeholder", "task popup-attach"},
 		"foreground service or readiness protocol": {
 			"daemon agent-window-status", "daemon coordinator", "daemon remote-monitor", "daemon tmux", "daemon wait-ready",
 		},

@@ -111,7 +111,7 @@ func buildFieldRegistry() map[string]FieldMetadata {
 		FieldAgentTodoTotal, FieldAgentSubagents, FieldSubagentCount, FieldAgentPromptAge,
 		FieldAgentPR, FieldAgentCI, FieldAgentGitStash, FieldAgentGitConflicts,
 		FieldAgentGitDirty, FieldPaneCPU, FieldPaneMem, FieldWindowCPU, FieldWindowMem,
-		FieldSessionCPU, FieldSessionMem,
+		FieldSessionCPU, FieldSessionMem, FieldHost, FieldEvidence,
 	}
 	for _, field := range agentFields {
 		registry[field] = FieldMetadata{

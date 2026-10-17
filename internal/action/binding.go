@@ -107,7 +107,7 @@ func defaultBindings() []Binding {
 		tmux("M-S-F12", AgentNext, Values{"local": {"true"}}),
 		tmux("S-F1", AgentBack, Values{}),
 		tmux("C-o", PickPopup, Values{}),
-		tmux("M-w", PickPopup, Values{"mode": {"work"}}),
+		tmux("M-w", PickPopup, Values{"mode": {"inbox"}}),
 		tmux("C-t", TaskMenu, Values{}),
 		tmux("M-n", ProjectPick, Values{}),
 	}
@@ -118,14 +118,14 @@ func defaultBindings() []Binding {
 func taskActionBindings(cfg *config.Config, existing []Binding) []Binding {
 	keys := make(map[string]string)
 
-	for name, configured := range cfg.TaskActions {
+	for name, configured := range cfg.Menu.Items {
 		if configured.Key != "" {
 			keys[config.PickerKeyName(configured.Key)] = name
 		}
 	}
 
 	for _, project := range cfg.Projects.Overrides {
-		for name, configured := range project.TaskActions {
+		for name, configured := range project.MenuItems {
 			if configured.Key != "" {
 				keys[config.PickerKeyName(configured.Key)] = name
 			}
@@ -206,6 +206,10 @@ func checkBindable(descriptor Descriptor, binding Binding) error {
 
 		return checkValues(descriptor.Params, binding.Values, false)
 	case SurfaceTmux:
+		if descriptor.InPicker {
+			return fmt.Errorf("%w: %s runs only in the picker", ErrBindingUnsupported, descriptor.ID)
+		}
+
 		if descriptor.Subject == SubjectSavedSession && descriptor.Arity != ArityOptional {
 			return fmt.Errorf("%w: %s needs a saved session", ErrBindingUnsupported, descriptor.ID)
 		}

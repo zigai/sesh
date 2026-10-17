@@ -108,6 +108,8 @@ const (
 	FieldSubagentCount       = "subagent_count"
 	FieldAgentPromptAge      = "agent_prompt_age"
 	FieldAgentPR             = "agent_pr"
+	FieldHost                = "host"
+	FieldEvidence            = "evidence"
 	FieldAgentCI             = "agent_ci"
 	FieldAgentGitStash       = "agent_git_stash"
 	FieldAgentGitConflicts   = "agent_git_conflicts"

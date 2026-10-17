@@ -398,7 +398,7 @@ func validRemoteAgent(agent session.AgentSession) bool {
 		return false
 	}
 
-	if agent.GitAhead < 0 || agent.GitBehind < 0 {
+	if agent.GitAhead < 0 || agent.GitBehind < 0 || agent.GitUnmerged < 0 {
 		return false
 	}
 
@@ -410,6 +410,7 @@ func validRemoteAgent(agent session.AgentSession) bool {
 		agent.RegistryID,
 		agent.Harness,
 		agent.HarnessSession,
+		agent.SessionID,
 		agent.PaneID,
 		agent.CWD,
 		agent.ProjectRoot,
@@ -435,7 +436,7 @@ func validRemoteAgentStatus(status session.AgentStatus) bool {
 	case "", session.AgentStatusRunning, session.AgentStatusWaiting, session.AgentStatusFailed,
 		session.AgentStatusInterrupted, session.AgentStatusIdle, session.AgentStatusUnknown:
 		return true
-	case session.AgentStatusSleeping, session.AgentStatusDone:
+	case session.AgentStatusSleeping, session.AgentStatusMerged:
 		return false
 	default:
 		return false

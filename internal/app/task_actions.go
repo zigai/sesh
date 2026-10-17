@@ -64,44 +64,11 @@ func (local *Local) runTaskAction(ctx context.Context, _ action.Caller, input ac
 		return result, err
 	}
 
-	if _, found := local.cfg.TaskActionsFor(record.Project)[input.Action]; !found {
+	if _, found := local.cfg.MenuItemsFor(record.Project)[input.Action]; !found {
 		return result, action.Wrap(action.CodeNotFound, ErrUnknownTaskAction)
 	}
 
-	popup, err := local.openPopupServer()
-	if err != nil {
-		return result, err
-	}
-
-	popupSession, err := task.EnsurePopupSession(ctx, popup, local.cfg.Tasks, record,
-		gotmux.Size{Width: defaultPopupWidth, Height: defaultPopupHeight})
-	if err != nil {
-		return result, oops.In("app").With("operation", "open_task_popup").Wrap(err)
-	}
-
-	executable, err := seshExecutable()
-	if err != nil {
-		return result, err
-	}
-
-	argv := []string{executable, "task", actionRunVerb, record.ID, input.Action, "--socket", local.server.Endpoint().SocketPath}
-
-	source := local.cfg.Source()
-	if source.WithoutConfig {
-		argv = append(argv, "--no-config")
-	} else if source.Path != "" {
-		argv = append(argv, "--config", source.Path)
-	}
-
-	if source.Path == "-" {
-		argv = append([]string{"/bin/sh", "-c", `config=$1; shift; printf '%s' "$config" | "$@"`, "task-action", source.Input}, argv...)
-	}
-
-	if err := task.OpenRunWindow(ctx, popup, popupSession, record, input.Action, argv); err != nil {
-		return result, oops.In("app").With("operation", "open_task_action").Wrap(err)
-	}
-
-	return result, nil
+	return result, local.openTaskRunWindow(ctx, record, input.Action, []string{"task", actionRunVerb, record.ID, input.Action})
 }
 
 // RunTaskAction runs a task action in the current terminal, records its run on the task, and
@@ -119,7 +86,7 @@ func (local *Local) RunTaskAction(ctx context.Context, id, name string, streams 
 		return run, err
 	}
 
-	configured, found := local.cfg.TaskActionsFor(record.Project)[name]
+	configured, found := local.cfg.MenuItemsFor(record.Project)[name]
 	if !found {
 		return run, action.Wrap(action.CodeNotFound, ErrUnknownTaskAction)
 	}
@@ -238,7 +205,7 @@ func (local *Local) closeTaskPopup(ctx context.Context, id string) error {
 
 // actionCommand is the command line of a task action: its run command and, when it has one,
 // its prompt rendered for the task as the last argument.
-func actionCommand(configured config.TaskActionConfig, record task.Record) ([]string, error) {
+func actionCommand(configured config.MenuItemConfig, record task.Record) ([]string, error) {
 	argv := append([]string{}, configured.Run...)
 
 	prompt := configured.Prompt

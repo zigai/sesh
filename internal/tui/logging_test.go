@@ -1301,3 +1301,45 @@ func assertClassificationContext(t *testing.T, record map[string]any, tt failure
 		assertAllowedFailureFields(t, record)
 	}
 }
+
+func TestInboxSaveAndOpenLogOnlyFailuresWithAFixedPrivateSchema(t *testing.T) {
+	var output bytes.Buffer
+
+	model := loggingTestModel(t, &output)
+
+	model.handleInboxUpdated(inboxUpdatedMsg{state: model.inbox, err: errLoggingTestActionFailure})
+	model.handleInboxUpdated(inboxUpdatedMsg{state: model.inbox, err: nil})
+	model.handleOpened(openedMsg{err: startOpener(t.Context(), t.TempDir(), filepath.Join(t.TempDir(), loggingTestPrivacySentinel))})
+	model.handleOpened(openedMsg{err: nil})
+
+	records := loggingTestRecords(t, &output)
+	if len(records) != 2 {
+		t.Fatalf("log count = %d, want one record per failure: %#v", len(records), records)
+	}
+
+	assertLoggingTestRecord(t, records[0], tuiOperationSaveInbox, "error", "failed", "tui operation failed")
+
+	if open := records[1]; open["operation"] != string(tuiOperationOpen) || open["level"] != "error" || open["error_code"] != "not_found" {
+		t.Fatalf("open failure record = %#v, want an error with code not_found", open)
+	}
+
+	if strings.Contains(output.String(), loggingTestPrivacySentinel) {
+		t.Fatalf("log contains a raw error or path: %s", output.String())
+	}
+}
+
+func TestUnreadableReportsLogOneDegradation(t *testing.T) {
+	var output bytes.Buffer
+
+	model := loggingTestModel(t, &output)
+
+	model.handleEvidence(evidenceResultMsg{entries: nil, err: errEvidenceUnreadable})
+	model.handleEvidence(evidenceResultMsg{entries: map[string]evidenceEntry{}, err: nil})
+
+	records := loggingTestRecords(t, &output)
+	if len(records) != 1 {
+		t.Fatalf("log count = %d, want one failure record: %#v", len(records), records)
+	}
+
+	assertLoggingTestRecord(t, records[0], tuiOperationLoadEvidence, "warn", "degraded", "tui dependency degraded")
+}

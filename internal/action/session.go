@@ -23,6 +23,7 @@ var (
 		Interactive: false,
 		Destructive: false,
 		Remote:      RemoteOnByDefault,
+		InPicker:    false,
 		check:       nil,
 	}, bindCreateSession, func(out CreatedSession) string {
 		return "Created session " + out.Session.Name
@@ -40,6 +41,7 @@ var (
 		Interactive: false,
 		Destructive: false,
 		Remote:      RemoteOnByDefault,
+		InPicker:    false,
 		check:       nil,
 	}, func(subject Subject, values Values) (RenameSession, error) {
 		return RenameSession{Session: RefOf(subject.Sessions[0]), Name: values.String("name")}, nil
@@ -59,6 +61,7 @@ var (
 		Interactive: false,
 		Destructive: true,
 		Remote:      RemoteOffByDefault,
+		InPicker:    false,
 		check:       refuseAttached,
 	}, func(subject Subject, values Values) (KillSession, error) {
 		return KillSession{Session: RefOf(subject.Sessions[0]), Force: values.Bool("force")}, nil
@@ -80,6 +83,7 @@ var (
 		Interactive: false,
 		Destructive: true,
 		Remote:      RemoteOffByDefault,
+		InPicker:    false,
 		check:       refuseAgentPaneOrAttached,
 	}, func(subject Subject, values Values) (DeleteSession, error) {
 		return DeleteSession{Session: RefOf(subject.Sessions[0]), Force: values.Bool("force")}, nil
@@ -101,6 +105,7 @@ var (
 		Interactive: false,
 		Destructive: false,
 		Remote:      RemoteNever,
+		InPicker:    false,
 		check:       nil,
 	}, func(subject Subject, _ Values) (SwitchSession, error) {
 		return SwitchSession{Session: RefOf(subject.Sessions[0])}, nil

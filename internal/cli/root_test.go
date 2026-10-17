@@ -345,7 +345,7 @@ func TestKeysCommandListsBindings(t *testing.T) {
 	isolatedToolsHome(t)
 
 	cfgPath := writeToolsConfig(t, `[[keys.bind]]
-key = "ctrl+g"
+key = "ctrl+t"
 action = "session.create"
 in = "picker"
 
@@ -372,8 +372,8 @@ in = "picker"
 		byName[binding.Name] = binding.Bind
 	}
 
-	if byName["session.create"] != "ctrl+g" {
-		t.Fatalf("session.create binding = %q, want ctrl+g", byName["session.create"])
+	if byName["session.create"] != "ctrl+t" {
+		t.Fatalf("session.create binding = %q, want ctrl+t", byName["session.create"])
 	}
 
 	if bind, ok := byName["snapshot.save"]; ok {

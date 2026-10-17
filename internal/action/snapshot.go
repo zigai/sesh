@@ -28,6 +28,7 @@ var (
 		Interactive: false,
 		Destructive: false,
 		Remote:      RemoteOnByDefault,
+		InPicker:    false,
 		check:       nil,
 	}, bindSaveSnapshot, func(out SavedSnapshot) string {
 		return fmt.Sprintf("Saved snapshot %s (%s)", out.Generation, out.Status)
@@ -54,6 +55,7 @@ var (
 		Interactive: false,
 		Destructive: false,
 		Remote:      RemoteOnByDefault,
+		InPicker:    false,
 		check:       nil,
 	}, bindRestoreSnapshot, func(out RestoredSnapshot) string {
 		return fmt.Sprintf("Restored %d of %d sessions (%s)", len(out.Sessions), len(out.Sessions)+len(out.SessionsSkipped), out.Status)

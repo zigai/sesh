@@ -201,4 +201,5 @@ func applyAgentGitMetadata(agent *session.AgentSession, metadata agentGitCacheEn
 	agent.GitStash = metadata.GitStash
 	agent.GitConflicts = metadata.GitConflicts
 	agent.GitDirty = metadata.GitDirty
+	agent.GitUnmerged = metadata.GitUnmerged
 }
