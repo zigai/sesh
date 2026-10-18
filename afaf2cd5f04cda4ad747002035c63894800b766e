@@ -1,0 +1,7 @@
+- Runs pi by hand in an untagged window on an isolated tmux server with the agent status daemon; work.json gets one item with title, branch main, project and the pi --session resume command
+- Closes pi and opens the inbox popup; the row shows in the closed section with go and archive in its menu
+- Presses Enter on the closed row; sesh opens the project session work and resumes the same pi conversation, and the inbox then shows only the live row
+- Archives the closed row; the inbox is empty and inbox.json records the archive with the last turn time
+- Lists a recorded conversation from a loopback remote box with the box marker; Enter resumes it on box and attaches once the remote catalog lists the new session
+- Seeds five closed conversations in one project; the inbox shows the three newest and 2 more, and Enter on 2 more shows all five
+- just check passes
