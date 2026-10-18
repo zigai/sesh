@@ -22,6 +22,7 @@ import (
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/task"
 	"github.com/zigai/sesh/internal/tui/providers"
+	"github.com/zigai/sesh/internal/work"
 )
 
 const (
@@ -196,6 +197,10 @@ type Model struct {
 	agentSummaries               []session.AgentSummary
 	tasks                        []task.Live
 	tasksErr                     error
+	work                         []work.Item
+	workSynced                   bool
+	pendingResume                *remoteResume
+	closedExpanded               map[string]bool
 	inboxItems                   map[string]inboxItem
 	menu                         *rowMenu
 	inbox                        inbox.State
@@ -373,9 +378,13 @@ func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps
 		agentSummaries:               nil,
 		tasks:                        nil,
 		tasksErr:                     nil,
+		work:                         nil,
+		workSynced:                   false,
+		pendingResume:                nil,
+		closedExpanded:               map[string]bool{},
 		inboxItems:                   map[string]inboxItem{},
 		menu:                         nil,
-		inbox:                        inbox.State{Version: 0, Snoozes: nil, Unseen: nil},
+		inbox:                        inbox.State{Version: 0, Snoozes: nil, Unseen: nil, Archived: nil},
 		inboxErr:                     nil,
 		evidence:                     map[string]evidenceEntry{},
 		evidenceLoading:              false,
@@ -456,7 +465,10 @@ func (m *Model) SetInitialSessions(sessions []session.Session) {
 		tasks:             nil,
 		tasksLoaded:       false,
 		tasksErr:          nil,
-		inbox:             inbox.State{Version: 0, Snoozes: nil, Unseen: nil},
+		work:              nil,
+		workLoaded:        false,
+		workErr:           nil,
+		inbox:             inbox.State{Version: 0, Snoozes: nil, Unseen: nil, Archived: nil},
 		inboxLoaded:       false,
 		inboxErr:          nil,
 		agentGit:          m.agentGit,
@@ -815,6 +827,10 @@ func (m *Model) handleModelMessage(msg tea.Msg) func() (tea.Model, tea.Cmd) {
 		return func() (tea.Model, tea.Cmd) {
 			return m, m.handleTaskSync(msg)
 		}
+	case workSyncMsg:
+		return func() (tea.Model, tea.Cmd) {
+			return m, m.handleTaskSync(taskSyncMsg(msg))
+		}
 	case taskRunTickMsg:
 		return func() (tea.Model, tea.Cmd) {
 			m.taskRunTickPending = false
@@ -843,7 +859,7 @@ func (m *Model) handleModelMessage(msg tea.Msg) func() (tea.Model, tea.Cmd) {
 		return func() (tea.Model, tea.Cmd) {
 			m.handleRemoteCatalog(msg)
 
-			return m, m.waitRemoteCatalogUpdateCommand()
+			return m, tea.Batch(m.waitRemoteCatalogUpdateCommand(), m.attachResumed())
 		}
 	}
 

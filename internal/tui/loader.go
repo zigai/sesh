@@ -18,6 +18,7 @@ import (
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/task"
 	"github.com/zigai/sesh/internal/tui/providers"
+	"github.com/zigai/sesh/internal/work"
 )
 
 const (
@@ -43,6 +44,9 @@ type sessionLoadResultMsg struct {
 	tasks             []task.Live
 	tasksLoaded       bool
 	tasksErr          error
+	work              []work.Item
+	workLoaded        bool
+	workErr           error
 	inbox             inbox.State
 	inboxLoaded       bool
 	inboxErr          error
@@ -111,12 +115,15 @@ func loadSessionRows(ctx context.Context, cfg *config.Config, deps Services) ses
 		originErr       error
 		tasks           []task.Live
 		tasksErr        error
+		workItems       []work.Item
+		workErr         error
 		inboxState      inbox.State
 		inboxErr        error
 	)
 
 	tasksLoaded := inboxModeEnabled(cfg) && deps.Tasks != nil
 	inboxLoaded := inboxModeEnabled(cfg) && deps.Inbox != nil
+	workLoaded := inboxModeEnabled(cfg) && deps.Work != nil
 
 	var (
 		loaders sync.WaitGroup
@@ -138,6 +145,12 @@ func loadSessionRows(ctx context.Context, cfg *config.Config, deps Services) ses
 	if tasksLoaded {
 		loaders.Go(func() {
 			tasks, tasksErr = deps.Tasks.LoadTasks(ctx)
+		})
+	}
+
+	if workLoaded {
+		loaders.Go(func() {
+			workItems, workErr = deps.Work.LoadWork(ctx)
 		})
 	}
 
@@ -177,7 +190,10 @@ func loadSessionRows(ctx context.Context, cfg *config.Config, deps Services) ses
 			tasks:             nil,
 			tasksLoaded:       false,
 			tasksErr:          nil,
-			inbox:             inbox.State{Version: 0, Snoozes: nil, Unseen: nil},
+			work:              nil,
+			workLoaded:        false,
+			workErr:           nil,
+			inbox:             inbox.State{Version: 0, Snoozes: nil, Unseen: nil, Archived: nil},
 			inboxLoaded:       false,
 			inboxErr:          nil,
 			agentGit:          nil,
@@ -208,6 +224,9 @@ func loadSessionRows(ctx context.Context, cfg *config.Config, deps Services) ses
 		tasks:             tasks,
 		tasksLoaded:       tasksLoaded,
 		tasksErr:          tasksErr,
+		work:              workItems,
+		workLoaded:        workLoaded,
+		workErr:           workErr,
 		inbox:             inboxState,
 		inboxLoaded:       inboxLoaded,
 		inboxErr:          inboxErr,
@@ -526,6 +545,10 @@ func (m *Model) applyLoadedTasks(result sessionLoadResultMsg) {
 		if result.inboxErr == nil {
 			m.inbox = result.inbox
 		}
+	}
+
+	if result.workLoaded && result.workErr == nil {
+		m.work = result.work
 	}
 
 	if !result.tasksLoaded {
@@ -1065,6 +1088,7 @@ func (m *Model) handleSessionLoadResult(msg sessionLoadResultMsg) tea.Cmd {
 		m.loadResourceCommand(),
 		m.loadGHCommand(),
 		m.syncTasksCommand(),
+		m.syncWorkCommand(),
 		m.taskRunTickCommand(false),
 		m.assignLoadedSessionKeys(msg.catalogErr == nil && msg.status != session.StatusPartial),
 	}

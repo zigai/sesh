@@ -22,7 +22,7 @@ const (
 func TestJSONCommandTreeRequiresExplicitOutputContract(t *testing.T) {
 	contracts := map[string][]string{
 		"envelope": {
-			"agent back", "agent failed", "agent focus", "agent latest", "agent merge", "agent next", "agent status", "agent toggle", "agent unread", "agent waiting", "agent window-status-clear",
+			"agent back", "agent failed", "agent focus", "agent latest", "agent merge", "agent next", "agent resume", "agent status", "agent toggle", "agent unread", "agent waiting", "agent window-status-clear",
 			"autosave final-save", "autosave restore-on-start", "autosave save-if-due",
 			"autosave status", "config init", "doctor", "hooks list", "hooks run", "hooks validate", "keys",
 			"pick popup", "project clone", "project create", "project open", "project pick", "remote lookup",

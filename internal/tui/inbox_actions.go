@@ -24,17 +24,18 @@ const (
 )
 
 var (
-	errNotInInbox      = errors.New("works on inbox rows")
-	errNoConversation  = errors.New("the agent reports no conversation ID")
-	errAlreadySnoozed  = errors.New("the row is already snoozed")
-	errNotSnoozed      = errors.New("the row is not snoozed")
-	errAlreadySeen     = errors.New("the agent's latest result is already seen")
-	errNotSeen         = errors.New("the agent's latest result is not seen yet")
-	errNoPullRequest   = errors.New("no pull request is known for the row")
-	errRemotePR        = errors.New("pull requests of other machines open there")
-	errInboxUnsaved    = errors.New("inbox state is not available")
-	errNoEvidence      = errors.New("the agent's latest report lists no evidence")
-	errUnknownInboxAct = errors.New("unknown inbox action")
+	errNotInInbox         = errors.New("works on inbox rows")
+	errNoConversation     = errors.New("the agent reports no conversation ID")
+	errAlreadySnoozed     = errors.New("the row is already snoozed")
+	errNotSnoozed         = errors.New("the row is not snoozed")
+	errAlreadySeen        = errors.New("the agent's latest result is already seen")
+	errNotSeen            = errors.New("the agent's latest result is not seen yet")
+	errNoPullRequest      = errors.New("no pull request is known for the row")
+	errRemotePR           = errors.New("pull requests of other machines open there")
+	errInboxUnsaved       = errors.New("inbox state is not available")
+	errNoEvidence         = errors.New("the agent's latest report lists no evidence")
+	errUnknownInboxAct    = errors.New("unknown inbox action")
+	errClosedConversation = errors.New("the conversation's agent is closed")
 )
 
 type inboxUpdatedMsg struct {
@@ -71,7 +72,7 @@ func (m *Model) snoozed(item inboxItem) bool {
 	case session.AgentStatusIdle, session.AgentStatusWaiting, session.AgentStatusFailed:
 		return item.agent.StatusSince.UnixNano() <= snooze.Since
 	case session.AgentStatusRunning, session.AgentStatusInterrupted, session.AgentStatusUnknown,
-		session.AgentStatusSleeping, session.AgentStatusMerged:
+		session.AgentStatusSleeping, session.AgentStatusMerged, session.AgentStatusClosed:
 		return true
 	}
 
@@ -120,6 +121,8 @@ func (m *Model) pickerActionError(id action.ID) error {
 		}
 
 		return nil
+	case action.InboxArchive.ID:
+		return m.archiveError(item)
 	default:
 		return errUnknownInboxAct
 	}
@@ -145,6 +148,8 @@ func (m *Model) snoozeError(id action.ID, item inboxItem) error {
 	_, snoozed := m.inbox.Find(conversationKey(item.agent))
 
 	switch {
+	case item.closed:
+		return errClosedConversation
 	case id == action.InboxSnooze.ID && item.section == config.InboxSnoozed:
 		return errAlreadySnoozed
 	case id == action.InboxUnsnooze.ID && !snoozed:
@@ -215,6 +220,10 @@ func (m *Model) runPickerAction(request pendingAction) func() (tea.Model, tea.Cm
 		return m.openPullRequest(item)
 	case action.InboxEvidence.ID:
 		return m.openEvidenceMenu(item)
+	case action.InboxArchive.ID:
+		archived := closedKey(item.host.identity.ConnectionID, item.work.ID)
+
+		return m.updateInbox(func(state *inbox.State) error { state.Archive(archived, item.work.TurnAt); return nil })
 	}
 
 	return func() (tea.Model, tea.Cmd) { return m, nil }

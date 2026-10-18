@@ -37,6 +37,7 @@ type LocalOptions struct {
 	Source             string
 	DeferSwitchHistory bool
 	TaskLedger         string
+	WorkState          string
 	WorktreeDir        string
 }
 
@@ -49,6 +50,7 @@ type Local struct {
 	historyPath string
 	agentSource agents.SnapshotSource
 	taskLedger  string
+	workState   string
 	worktreeDir string
 	workflow    *session.Workflow
 	attachRepo  sync.Once
@@ -81,6 +83,7 @@ func NewLocal(opts LocalOptions) *Local {
 		historyPath: opts.HistoryPath,
 		agentSource: opts.AgentSource,
 		taskLedger:  opts.TaskLedger,
+		workState:   opts.WorkState,
 		worktreeDir: opts.WorktreeDir,
 		workflow: session.NewWorkflowWithOptions(session.WorkflowOptions{
 			Server:             opts.Server,

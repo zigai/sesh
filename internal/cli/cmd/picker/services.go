@@ -29,6 +29,7 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/store"
 	"github.com/zigai/sesh/internal/task"
 	"github.com/zigai/sesh/internal/tui"
+	"github.com/zigai/sesh/internal/work"
 )
 
 var errPickerTargetChanged = errors.New("selected session changed since it was observed")
@@ -96,6 +97,7 @@ func newServices(
 		Source:             "picker",
 		DeferSwitchHistory: true,
 		TaskLedger:         workspace.Tasks,
+		WorkState:          workspace.Work,
 		WorktreeDir:        workspace.WorktreeDir,
 	})
 
@@ -166,6 +168,7 @@ func (s *services) TUIServices() tui.Services {
 		TerminalAttach:   nil,
 		Agents:           s,
 		Tasks:            s,
+		Work:             s,
 		Inbox:            s,
 		Evidence:         s,
 		AgentWatcher:     s,
@@ -194,6 +197,26 @@ func (s *services) LoadTasks(ctx context.Context) ([]task.Live, error) {
 	}
 
 	return live, nil
+}
+
+// LoadWork lists the conversations recorded on this machine.
+func (s *services) LoadWork(ctx context.Context) ([]work.Item, error) {
+	state, err := work.NewStore(s.workspace.Work).Load(ctx)
+	if err != nil {
+		return nil, oops.In("cli").With("operation", "load_work").Wrap(err)
+	}
+
+	return state.Items, nil
+}
+
+// SyncWork refreshes the branches and pull requests of the recorded conversations.
+func (s *services) SyncWork(ctx context.Context) (bool, error) {
+	changed, err := work.Sync(ctx, work.NewStore(s.workspace.Work))
+	if err != nil {
+		return changed, oops.In("cli").With("operation", "sync_work").Wrap(err)
+	}
+
+	return changed, nil
 }
 
 // LoadInbox reads what the inbox remembers: snoozed rows and results marked unseen.
@@ -539,7 +562,7 @@ func agentSummaries(observed []agents.AgentSession) []session.AgentSummary {
 			summary.IdleSince = earlierNonZero(summary.IdleSince, agent.StatusSince)
 		case session.AgentStatusIdle:
 			summary.IdleSince = earlierNonZero(summary.IdleSince, agent.StatusSince)
-		case session.AgentStatusUnknown, session.AgentStatusSleeping, session.AgentStatusMerged:
+		case session.AgentStatusUnknown, session.AgentStatusSleeping, session.AgentStatusMerged, session.AgentStatusClosed:
 			summary.Unknown++
 		}
 	}

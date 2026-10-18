@@ -74,6 +74,7 @@ func newPeerHarness(t *testing.T) peerHarness {
 		Source:             "remote",
 		DeferSwitchHistory: false,
 		TaskLedger:         "",
+		WorkState:          "",
 		WorktreeDir:        "",
 	})
 

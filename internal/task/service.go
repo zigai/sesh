@@ -170,6 +170,35 @@ func (s *Service) OpenTab(ctx context.Context, place Place) error {
 	return taskError("open_tab", err)
 }
 
+// RunWindow opens a window after the current one in a session that runs argv in dir through the
+// user's shell, which stays in the pane once argv exits, and returns the window's pane.
+func RunWindow(ctx context.Context, server *gotmux.Server, sessionID gotmux.SessionID, dir string, argv []string) (gotmux.PaneID, error) {
+	session, err := server.Session(ctx, sessionID)
+	if err != nil {
+		return "", fmt.Errorf("find session: %w", err)
+	}
+
+	shell, err := defaultShell(ctx, server)
+	if err != nil {
+		return "", err
+	}
+
+	link, err := session.NewWindow(ctx, gotmux.NewWindowOptions{
+		Name: "", Dir: dir, Program: shellProgram(shell, argv), Env: nil, TmuxEnv: nil,
+		Index: nil, Before: false, After: true, Select: true,
+	})
+	if err != nil {
+		return "", fmt.Errorf("open window: %w", err)
+	}
+
+	pane, err := link.Window().ActivePane(ctx)
+	if err != nil {
+		return "", fmt.Errorf("find window pane: %w", err)
+	}
+
+	return pane.ID(), nil
+}
+
 // projectOf returns the root of the project a task started at place belongs to: the project
 // session's, else the repository the pane's directory is in, else none. A registered folder
 // outside a project session leaves the task loose, in the pane's directory.

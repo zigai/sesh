@@ -9,6 +9,7 @@ import (
 	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/inbox"
 	"github.com/zigai/sesh/internal/session"
+	"github.com/zigai/sesh/internal/work"
 )
 
 const (
@@ -116,6 +117,13 @@ type AgentView struct {
 	PaneID  string
 }
 
+// WorkSource lists the conversations recorded on this machine and brings their branch and pull
+// request up to date, reporting whether anything changed.
+type WorkSource interface {
+	LoadWork(ctx context.Context) ([]work.Item, error)
+	SyncWork(ctx context.Context) (bool, error)
+}
+
 type Services struct {
 	Catalog          CatalogSource
 	Detector         TmuxDetector
@@ -125,6 +133,7 @@ type Services struct {
 	TerminalAttach   TerminalAttacher
 	Agents           AgentSource
 	Tasks            TaskSource
+	Work             WorkSource
 	Inbox            InboxStore
 	Evidence         EvidenceSource
 	AgentWatcher     AgentWatcher

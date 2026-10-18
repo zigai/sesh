@@ -22,6 +22,9 @@ var (
 	InboxEvidence = defineInboxAction("inbox.evidence", "Evidence", "List the evidence of the agent's final report",
 		"List the screenshots, recordings, files and links in the Evidence section of the selected agent's latest "+
 			"report. Choosing one opens it: a file or link with xdg-open, text in a pager.")
+
+	InboxArchive = defineInboxAction("inbox.archive", "Archive", "Hide a closed conversation until it gets a new turn",
+		"Hide the selected closed conversation from the inbox. It returns when the conversation gets a new turn.")
 )
 
 // InboxInput is the input of an inbox action: the picker applies it to the selected row.

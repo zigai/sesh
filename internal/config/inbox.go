@@ -18,6 +18,9 @@ const (
 	InboxSnoozed  = "snoozed"
 	InboxAsleep   = "asleep"
 	InboxIdle     = "idle"
+	InboxClosed   = "closed"
+
+	defaultClosedShown = 3
 )
 
 var (
@@ -29,20 +32,23 @@ var (
 	errInboxSnoozeEmpty    = errors.New("inbox.snooze must list at least one choice")
 	errInboxSnoozeTwice    = errors.New("inbox snooze choice is listed twice")
 	errInboxSnoozeInvalid  = errors.New("inbox snooze choice is not a duration, a time of day or next message")
-	inboxSectionNames      = []string{InboxDone, InboxWaiting, InboxUnmerged, InboxRunning, InboxSnoozed, InboxAsleep, InboxIdle}
-	defaultInboxDimmed     = []string{InboxRunning, InboxSnoozed, InboxAsleep}
+	errInboxClosedShown    = errors.New("inbox.closed_shown must not be negative")
+	inboxSectionNames      = []string{InboxDone, InboxWaiting, InboxUnmerged, InboxRunning, InboxSnoozed, InboxAsleep, InboxIdle, InboxClosed}
+	defaultInboxDimmed     = []string{InboxRunning, InboxSnoozed, InboxAsleep, InboxClosed}
 	defaultInboxSnoozeList = []string{SnoozeNextMessage, "1h", "4h", "tomorrow 09:00"}
 )
 
 // InboxConfig configures the inbox view. Sections lists the shown sections in order; a section
 // left out is hidden. Labels renames sections, Dim lists the sections whose rows are dimmed, and
-// Snooze lists the choices the snooze action offers.
+// Snooze lists the choices the snooze action offers. ClosedShown is how many closed rows a project
+// shows before a row that expands the rest; zero shows them all.
 type InboxConfig struct {
-	Group    string            `toml:"group"`
-	Sections []string          `toml:"sections"`
-	Labels   map[string]string `toml:"labels"`
-	Dim      []string          `toml:"dim"`
-	Snooze   []string          `toml:"snooze"`
+	Group       string            `toml:"group"`
+	Sections    []string          `toml:"sections"`
+	Labels      map[string]string `toml:"labels"`
+	Dim         []string          `toml:"dim"`
+	Snooze      []string          `toml:"snooze"`
+	ClosedShown int               `toml:"closed_shown"`
 }
 
 // InboxSections returns every inbox section name in the default order.
@@ -53,14 +59,14 @@ func InboxSections() []string {
 func DefaultInboxConfig() InboxConfig {
 	return InboxConfig{
 		Group: InboxGroupState, Sections: InboxSections(), Labels: nil,
-		Dim: slices.Clone(defaultInboxDimmed), Snooze: slices.Clone(defaultInboxSnoozeList),
+		Dim: slices.Clone(defaultInboxDimmed), Snooze: slices.Clone(defaultInboxSnoozeList), ClosedShown: defaultClosedShown,
 	}
 }
 
 func (c InboxConfig) Clone() InboxConfig {
 	return InboxConfig{
 		Group: c.Group, Sections: slices.Clone(c.Sections), Labels: maps.Clone(c.Labels),
-		Dim: slices.Clone(c.Dim), Snooze: slices.Clone(c.Snooze),
+		Dim: slices.Clone(c.Dim), Snooze: slices.Clone(c.Snooze), ClosedShown: c.ClosedShown,
 	}
 }
 
@@ -80,6 +86,10 @@ func ValidateInboxConfig(inbox InboxConfig) error {
 
 	if len(inbox.Sections) == 0 {
 		return errInboxSectionsEmpty
+	}
+
+	if inbox.ClosedShown < 0 {
+		return errInboxClosedShown
 	}
 
 	if err := validateInboxSectionList("inbox.sections", inbox.Sections); err != nil {

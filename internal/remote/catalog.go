@@ -341,7 +341,7 @@ func validCatalogConnection(id string, state ConnectionState) bool {
 	if id != state.ID || !ValidIdentifier(id) || !ValidText(state.Label) ||
 		!ValidIdentifier(state.ConfigDigest) || !ValidText(state.PeerID) ||
 		!ValidText(state.StreamInstance) || !validConnectionErrorCode(state.LastError) ||
-		len(state.Snapshot.Sessions) > MaxSessions || !validTaskRows(state.Snapshot.Tasks) || !validActionIDs(state.Snapshot.Actions) ||
+		len(state.Snapshot.Sessions) > MaxSessions || !validSnapshotRows(state.Snapshot) ||
 		!ValidSourceHealth(state.Snapshot.Health) {
 		return false
 	}

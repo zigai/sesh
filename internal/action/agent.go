@@ -96,6 +96,27 @@ var AgentMerge = define(Descriptor{
 	return MergeAgentBranch{Session: RefOf(subject.Sessions[0]), Pane: subject.Pane}, nil
 }, func(out MergedAgentBranch) string { return "Merged " + out.Branch + " into " + out.Base })
 
+// AgentResume resumes a closed agent conversation that the inbox lists.
+var AgentResume = define(Descriptor{
+	ID:      "agent.resume",
+	Title:   "Resume agent",
+	Summary: "Resume a closed agent conversation in a new window",
+	Help: "Open a window that runs the native resume command of a recorded agent conversation in its directory: " +
+		"in its project's session, else in the invoking pane's session. The agent status service records the " +
+		"conversations of interactive agents in panes outside task windows.",
+	Subject:     SubjectNone,
+	Arity:       ArityOne,
+	Params:      []Param{newParam("item", ParamText, "Recorded conversation to resume").required().positional()},
+	NeedsClient: false,
+	Interactive: false,
+	Destructive: false,
+	Remote:      RemoteOnByDefault,
+	InPicker:    false,
+	check:       nil,
+}, func(_ Subject, values Values) (ResumeAgent, error) {
+	return ResumeAgent{Item: values.String("item")}, nil
+}, func(out ResumedAgent) string { return "Resumed " + out.Item })
+
 type NavigateAgents struct {
 	Local bool `json:"local"`
 }
@@ -126,6 +147,17 @@ type MergeAgentBranch struct {
 type MergedAgentBranch struct {
 	Branch string `json:"branch"`
 	Base   string `json:"base"`
+}
+
+type ResumeAgent struct {
+	Item string `json:"item"`
+}
+
+// ResumedAgent is the window a resumed conversation runs in.
+type ResumedAgent struct {
+	Item    string     `json:"item"`
+	Session SessionRef `json:"session"`
+	Pane    string     `json:"pane"`
 }
 
 func defineAgentNavigation(id ID, title, summary, help string) *Definition[NavigateAgents, FocusedPane] {

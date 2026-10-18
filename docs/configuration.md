@@ -209,13 +209,14 @@ main_size = "60%"
 ```toml
 [inbox]
 group = "state" # state, project
-sections = ["done", "waiting", "unmerged", "running", "snoozed", "asleep", "idle"] # shown, in order
+sections = ["done", "waiting", "unmerged", "running", "snoozed", "asleep", "idle", "closed"] # shown, in order
 labels = { done = "new" }
-dim = ["running", "snoozed", "asleep"]
+dim = ["running", "snoozed", "asleep", "closed"]
 snooze = ["next message", "1h", "4h", "tomorrow 09:00"]
+closed_shown = 3 # closed rows per project before a "more" row; 0 shows all
 
 [menu]
-agent = ["go", "snooze", "unsnooze", "seen", "unseen", "evidence", "pr", "merge", "sleep", "wake", "open", "finish", "-", "items"]
+agent = ["go", "snooze", "unsnooze", "seen", "unseen", "evidence", "pr", "merge", "sleep", "wake", "open", "finish", "archive", "-", "items"]
 session = ["go", "rename", "snapshot", "kill", "delete"]
 
 [merge]
@@ -223,6 +224,8 @@ check = ["just", "check"] # runs after the rebase, before the push
 ```
 
 A menu lists only the entries that apply to the row. `-` is a divider; `items` lists the menu items not named elsewhere in the list.
+
+The `closed` section lists agent conversations that ran in your own panes, outside task windows, after their agent exits. The agent status service records them in `$XDG_STATE_HOME/sesh/work.json`. Enter resumes one in a new window of its project session (`agent.resume`). A row leaves when its branch's pull request is merged or closed, when its directory is gone, or when `archive` hides it until the conversation gets a new turn.
 
 ## Menu items
 

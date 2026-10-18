@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/signal"
 	"syscall"
@@ -9,12 +10,15 @@ import (
 
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
+	"github.com/zigai/aht/v2/pkg/aht"
 
 	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/agents"
 	"github.com/zigai/sesh/internal/cli/actioncli"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/config"
+	"github.com/zigai/sesh/internal/task"
+	"github.com/zigai/sesh/internal/work"
 )
 
 type statusResultJSON struct {
@@ -60,6 +64,9 @@ func NewCommand() *cobra.Command {
 			Operation: "", SuccessOwned: false, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
 		}),
 		actioncli.Command(action.AgentMerge, actioncli.Options[action.MergeAgentBranch, action.MergedAgentBranch]{
+			Operation: "", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
+		}),
+		actioncli.Command(action.AgentResume, actioncli.Options[action.ResumeAgent, action.ResumedAgent]{
 			Operation: "", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
 		}),
 		newAgentStatusCommand(),
@@ -161,13 +168,16 @@ func runAgentStatusRun(cmd *cobra.Command, _ []string) error {
 
 	styles := agents.NewTmuxStyleController(server, resolved.SetWindowStatusStyle, resolved.SetWindowStatusBellStyle)
 	tracker := agents.NewTracker(styles, statusTrackerOptions(cfg, resolved))
+	recorder := work.NewRecorder(work.NewStore(workspace.Work), func(ctx context.Context) (string, map[string]bool, error) {
+		return task.WindowPanes(ctx, server)
+	})
 
 	ctx, stop := signal.NotifyContext(commandContextOrBackground(cmd), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	watchOptions := statusWatchOptions(resolved, quiet)
 
-	if err := agents.RunStatusTracker(ctx, workspace.AgentSource(), tracker, watchOptions, resolved.ClearOnShutdown); err != nil {
+	if err := agents.RunStatusTracker(ctx, workspace.AgentSource(), recordingTracker{Tracker: tracker, recorder: recorder}, watchOptions, resolved.ClearOnShutdown); err != nil {
 		return oops.In("cli").With("operation", "agent_status_run").Wrap(err)
 	}
 
@@ -211,4 +221,16 @@ func NewDaemonWindowStatusCommand() *cobra.Command {
 	cmd.Use = "agent-window-status"
 
 	return cmd
+}
+
+// recordingTracker styles agent windows and records the conversations of the agents in the user's
+// own panes, so the inbox lists them after they exit.
+type recordingTracker struct {
+	*agents.Tracker
+
+	recorder *work.Recorder
+}
+
+func (t recordingTracker) HandleSnapshot(ctx context.Context, sessions []aht.Session) error {
+	return errors.Join(t.Tracker.HandleSnapshot(ctx, sessions), t.recorder.Record(ctx, sessions))
 }

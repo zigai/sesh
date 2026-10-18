@@ -1,5 +1,5 @@
-// Package inbox keeps what the inbox remembers between pickers: the rows the user snoozed and the
-// results the user marked as not seen.
+// Package inbox keeps what the inbox remembers between pickers: the rows the user snoozed or
+// archived and the results the user marked as not seen.
 package inbox
 
 import (
@@ -50,10 +50,18 @@ type Unseen struct {
 	At  int64  `json:"at"`
 }
 
+// Archive hides the closed conversation Key from the inbox while its latest turn is not after
+// TurnAt, in Unix seconds.
+type Archive struct {
+	Key    string `json:"key"`
+	TurnAt int64  `json:"turnAt"`
+}
+
 type State struct {
-	Version int      `json:"version"`
-	Snoozes []Snooze `json:"snoozes"`
-	Unseen  []Unseen `json:"unseen"`
+	Version  int       `json:"version"`
+	Snoozes  []Snooze  `json:"snoozes"`
+	Unseen   []Unseen  `json:"unseen"`
+	Archived []Archive `json:"archived"`
 }
 
 // Store reads and updates the inbox state file. Updates hold an exclusive lock, so concurrent sesh
@@ -108,6 +116,23 @@ func (s *State) MarkUnseen(key string, at time.Time) {
 // ClearUnseen removes the unseen mark of key.
 func (s *State) ClearUnseen(key string) {
 	s.Unseen = slices.DeleteFunc(s.Unseen, func(mark Unseen) bool { return mark.Key == key })
+}
+
+// Archive hides key until a turn after turnAt.
+func (s *State) Archive(key string, turnAt int64) {
+	s.Archived = slices.DeleteFunc(s.Archived, func(archive Archive) bool { return archive.Key == key })
+	s.Archived = append(s.Archived, Archive{Key: key, TurnAt: turnAt})
+}
+
+// IsArchived reports whether key is archived and has had no turn after turnAt since.
+func (s *State) IsArchived(key string, turnAt int64) bool {
+	for _, archive := range s.Archived {
+		if archive.Key == key {
+			return turnAt <= archive.TurnAt
+		}
+	}
+
+	return false
 }
 
 // Expire drops snoozes whose time has passed.
@@ -260,7 +285,8 @@ func (s *State) validate() error {
 		return ErrVersion
 	}
 
-	if len(s.Snoozes) > maxEntries || len(s.Unseen) > maxEntries || !s.validSnoozes() || !s.validUnseen() {
+	if len(s.Snoozes) > maxEntries || len(s.Unseen) > maxEntries || len(s.Archived) > maxEntries ||
+		!s.validSnoozes() || !s.validUnseen() || !s.validArchived() {
 		return ErrInvalid
 	}
 
@@ -295,8 +321,22 @@ func (s *State) validUnseen() bool {
 	return true
 }
 
+func (s *State) validArchived() bool {
+	keys := make(map[string]bool, len(s.Archived))
+
+	for _, archive := range s.Archived {
+		if archive.Key == "" || keys[archive.Key] || archive.TurnAt < 0 {
+			return false
+		}
+
+		keys[archive.Key] = true
+	}
+
+	return true
+}
+
 func emptyState() State {
-	return State{Version: Version, Snoozes: []Snooze{}, Unseen: []Unseen{}}
+	return State{Version: Version, Snoozes: []Snooze{}, Unseen: []Unseen{}, Archived: []Archive{}}
 }
 
 func storeError(operation string, err error) error {

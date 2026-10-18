@@ -439,6 +439,8 @@ func (m *Model) followAction(msg actionResultMsg) tea.Cmd {
 		m.moveCursorToPreviousRow()
 	case action.StartedTaskMerge, action.StartedTaskAction:
 		return tea.Batch(m.refreshSessions(), m.taskRunTickCommand(true))
+	case action.ResumedAgent:
+		return m.followResume(at, output)
 	}
 
 	return m.refreshSessions()

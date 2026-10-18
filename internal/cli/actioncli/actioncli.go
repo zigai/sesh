@@ -171,6 +171,7 @@ func OpenRuntime(cmd *cobra.Command, cfg *config.Config) (*Runtime, error) {
 		Source:             "cli",
 		DeferSwitchHistory: false,
 		TaskLedger:         workspace.Tasks,
+		WorkState:          workspace.Work,
 		WorktreeDir:        workspace.WorktreeDir,
 	})
 

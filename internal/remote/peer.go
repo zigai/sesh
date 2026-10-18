@@ -17,6 +17,7 @@ import (
 	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/privatefs"
 	"github.com/zigai/sesh/internal/session"
+	"github.com/zigai/sesh/internal/work"
 )
 
 const (
@@ -41,6 +42,7 @@ type InventoryOptions struct {
 	Agents            func(ctx context.Context) ([]session.AgentSummary, error)
 	SavedSessions     func(ctx context.Context) ([]session.Session, error)
 	Tasks             func(ctx context.Context) ([]TaskRow, error)
+	Work              func(ctx context.Context) ([]work.Item, error)
 	Actions           []action.ID
 }
 
@@ -58,6 +60,7 @@ type streamState struct {
 	savedSessions []session.Session
 	agents        []session.AgentSummary
 	tasks         []TaskRow
+	work          []work.Item
 	health        SourceHealth
 }
 
@@ -186,6 +189,7 @@ func RunInventoryStream(ctx context.Context, opts InventoryOptions, output io.Wr
 		savedSessions: nil,
 		agents:        nil,
 		tasks:         nil,
+		work:          nil,
 		health:        UnavailableHealth(),
 	}
 
@@ -305,6 +309,7 @@ func (state *streamState) scan(ctx context.Context) {
 	state.scanAgents(ctx)
 	state.scanSavedSessions(ctx)
 	state.scanTasks(ctx)
+	state.scanWork(ctx)
 }
 
 // scanTasks keeps the last tasks read when the ledger cannot be read, like sessions.
@@ -316,6 +321,18 @@ func (state *streamState) scanTasks(ctx context.Context) {
 	rows, err := state.options.Tasks(ctx)
 	if err == nil && len(rows) <= MaxTasks {
 		state.tasks = rows
+	}
+}
+
+// scanWork keeps the last work items read when the work state cannot be read, like tasks.
+func (state *streamState) scanWork(ctx context.Context) {
+	if state.options.Work == nil {
+		return
+	}
+
+	items, err := state.options.Work(ctx)
+	if err == nil {
+		state.work = NewWorkRows(items)
 	}
 }
 
@@ -405,6 +422,7 @@ func (state *streamState) snapshot() (Snapshot, error) {
 		GeneratedAt: time.Now().UTC(),
 		Sessions:    sessions,
 		Tasks:       slices.Clone(state.tasks),
+		Work:        slices.Clone(state.work),
 		Actions:     slices.Clone(state.options.Actions),
 		Health:      state.health,
 	}, nil

@@ -8,6 +8,8 @@ import (
 	gotmux "github.com/zigai/gotmux/tmux"
 )
 
+const socketPathField = "socket_path"
+
 // Live is a task record and where its window is in tmux. A task without a tagged window is
 // not Present; its record is kept and never matched to a window by guessing.
 type Live struct {
@@ -50,6 +52,33 @@ func Inventory(ctx context.Context, server *gotmux.Server, store Store) ([]Live,
 	}
 
 	return live, nil
+}
+
+// WindowPanes returns the socket of server and the panes of its task windows.
+func WindowPanes(ctx context.Context, server *gotmux.Server) (string, map[string]bool, error) {
+	panes, err := server.PanesWith(ctx, gotmux.QueryOptions{Filter: "", ExtraFields: []string{OptionTask, socketPathField}})
+	if errors.Is(err, gotmux.ErrNoServer) {
+		return "", map[string]bool{}, nil
+	}
+
+	if err != nil {
+		return "", nil, fmt.Errorf("list task panes: %w", err)
+	}
+
+	socket := ""
+	inTask := make(map[string]bool, len(panes))
+
+	for _, pane := range panes {
+		if path, _ := pane.Raw(socketPathField); len(path) > 0 {
+			socket = string(path)
+		}
+
+		if taskID, _ := pane.Raw(OptionTask); len(taskID) > 0 {
+			inTask[string(pane.ID)] = true
+		}
+	}
+
+	return socket, inTask, nil
 }
 
 func locateTasks(ctx context.Context, server *gotmux.Server) (map[string]Live, error) {

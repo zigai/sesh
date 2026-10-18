@@ -15,10 +15,11 @@ import (
 
 	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/session"
+	"github.com/zigai/sesh/internal/work"
 )
 
 const (
-	ProtocolVersion    = 3
+	ProtocolVersion    = 4
 	MaxFrameBytes      = 1 << 20
 	MaxSessions        = 4096
 	MaxAgents          = 16384
@@ -88,6 +89,7 @@ type Snapshot struct {
 	GeneratedAt time.Time         `json:"generatedAt"`
 	Sessions    []session.Session `json:"sessions"`
 	Tasks       []TaskRow         `json:"tasks"`
+	Work        []work.Item       `json:"work"`
 	Actions     []action.ID       `json:"actions"`
 	Health      SourceHealth      `json:"health"`
 }
@@ -319,7 +321,12 @@ func validSnapshotFrame(frame Frame) bool {
 		}
 	}
 
-	return validTaskRows(frame.Snapshot.Tasks) && validActionIDs(frame.Snapshot.Actions) && ValidSourceHealth(frame.Snapshot.Health)
+	return validSnapshotRows(*frame.Snapshot) && ValidSourceHealth(frame.Snapshot.Health)
+}
+
+// validSnapshotRows checks the tasks, work items and action IDs of a peer's inventory.
+func validSnapshotRows(snapshot Snapshot) bool {
+	return validTaskRows(snapshot.Tasks) && validWorkRows(snapshot.Work) && validActionIDs(snapshot.Actions)
 }
 
 func validActionIDs(ids []action.ID) bool {
@@ -436,7 +443,7 @@ func validRemoteAgentStatus(status session.AgentStatus) bool {
 	case "", session.AgentStatusRunning, session.AgentStatusWaiting, session.AgentStatusFailed,
 		session.AgentStatusInterrupted, session.AgentStatusIdle, session.AgentStatusUnknown:
 		return true
-	case session.AgentStatusSleeping, session.AgentStatusMerged:
+	case session.AgentStatusSleeping, session.AgentStatusMerged, session.AgentStatusClosed:
 		return false
 	default:
 		return false

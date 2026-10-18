@@ -123,7 +123,7 @@ func pickerCatalog(catalog remote.Catalog) tui.RemoteCatalog {
 			LastError: state.LastError, LastErrorAt: state.LastErrorAt,
 			HealthTmux: string(state.Snapshot.Health.Tmux.Status), HealthAgents: string(state.Snapshot.Health.Agents.Status),
 			HealthSnapshots: string(state.Snapshot.Health.Snapshots.Status), Sessions: remote.CatalogSessions(state),
-			Tasks: remote.CatalogTasks(state),
+			Tasks: remote.CatalogTasks(state), Work: state.Snapshot.Work,
 		})
 	}
 
@@ -565,7 +565,7 @@ func originSessions(ctx context.Context, socket string) ([]remote.OriginSession,
 			case session.AgentStatusWaiting:
 				waiting++
 			case session.AgentStatusIdle, session.AgentStatusFailed, session.AgentStatusInterrupted, session.AgentStatusUnknown,
-				session.AgentStatusSleeping, session.AgentStatusMerged:
+				session.AgentStatusSleeping, session.AgentStatusMerged, session.AgentStatusClosed:
 			}
 		}
 

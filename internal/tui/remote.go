@@ -7,6 +7,7 @@ import (
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/task"
+	"github.com/zigai/sesh/internal/work"
 )
 
 const (
@@ -39,6 +40,7 @@ type RemoteConnection struct {
 
 	Sessions []session.Session
 	Tasks    []task.Live
+	Work     []work.Item
 }
 
 type RemoteCatalog struct {

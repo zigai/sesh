@@ -40,6 +40,7 @@ var agentMenuActions = map[string]action.ID{
 	config.MenuWake:     action.TaskWake.ID,
 	config.MenuOpen:     action.TaskOpen.ID,
 	config.MenuFinish:   action.TaskFinish.ID,
+	config.MenuArchive:  action.InboxArchive.ID,
 }
 
 // rowMenu is a list of choices drawn over the picker: the actions of a row, or the choices of an

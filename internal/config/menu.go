@@ -30,6 +30,7 @@ const (
 	MenuWake     = "wake"
 	MenuOpen     = "open"
 	MenuFinish   = "finish"
+	MenuArchive  = "archive"
 	MenuRename   = "rename"
 	MenuSnapshot = "snapshot"
 	MenuKill     = "kill"
@@ -40,7 +41,7 @@ var (
 	// AgentMenuEntries are the built-in entries of the menu of an agent or task row.
 	AgentMenuEntries = []string{
 		MenuGo, MenuSnooze, MenuUnsnooze, MenuSeen, MenuUnseen, MenuEvidence, MenuPR, MenuMerge,
-		MenuSleep, MenuWake, MenuOpen, MenuFinish,
+		MenuSleep, MenuWake, MenuOpen, MenuFinish, MenuArchive,
 	}
 	// SessionMenuEntries are the built-in entries of the menu of a session row.
 	SessionMenuEntries = []string{MenuGo, MenuRename, MenuSnapshot, MenuKill, MenuDelete}

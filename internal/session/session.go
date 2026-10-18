@@ -39,6 +39,8 @@ const (
 	// whose pull request was merged or closed.
 	AgentStatusSleeping AgentStatus = "sleeping"
 	AgentStatusMerged   AgentStatus = "merged"
+	// AgentStatusClosed describes a recorded conversation whose agent no longer runs.
+	AgentStatusClosed AgentStatus = "closed"
 )
 
 type (

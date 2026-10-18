@@ -259,6 +259,8 @@ func agentStatusMatches(query string, status session.AgentStatus) bool {
 		return fuzzyMatch(query, "offline")
 	case session.AgentStatusSleeping:
 		return fuzzyMatchAny(query, "asleep")
+	case session.AgentStatusClosed:
+		return fuzzyMatchAny(query, "exited", "ended")
 	case session.AgentStatusMerged:
 		return fuzzyMatchAny(query, "merged", "closed", "finished")
 	case session.AgentStatusUnknown:

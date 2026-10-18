@@ -29,6 +29,7 @@ import (
 	"github.com/zigai/sesh/internal/remote"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/task"
+	"github.com/zigai/sesh/internal/work"
 )
 
 const (
@@ -145,6 +146,7 @@ func newPeerLocal(workspace app.Workspace, server *gotmux.Server) (*app.Local, *
 		Source:             "remote",
 		DeferSwitchHistory: false,
 		TaskLedger:         workspace.Tasks,
+		WorkState:          workspace.Work,
 		WorktreeDir:        workspace.WorktreeDir,
 	})
 
@@ -358,6 +360,7 @@ func runRemotePeerStream(cmd *cobra.Command, _ []string) error {
 		Tasks: func(ctx context.Context) ([]remote.TaskRow, error) {
 			return peerTasks(ctx, runtime.server, workspace.Tasks)
 		},
+		Work:    func(ctx context.Context) ([]work.Item, error) { return peerWork(ctx, workspace.Work) },
 		Actions: actions(workspace.Config),
 	}, cmd.OutOrStdout()))
 }
@@ -374,6 +377,21 @@ func peerTasks(ctx context.Context, server *gotmux.Server, ledger string) ([]rem
 	}
 
 	return rows, nil
+}
+
+// peerWork lists the recorded conversations that can still be resumed: those whose directory
+// exists.
+func peerWork(ctx context.Context, path string) ([]work.Item, error) {
+	state, err := work.NewStore(path).Load(ctx)
+	if err != nil {
+		return nil, cliError("list_remote_work", err)
+	}
+
+	return slices.DeleteFunc(state.Items, func(item work.Item) bool {
+		_, err := os.Stat(item.Directory)
+
+		return err != nil
+	}), nil
 }
 
 func runRemotePeerAction(cmd *cobra.Command, _ []string) (resultErr error) {

@@ -19,6 +19,7 @@ import (
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/task"
 	"github.com/zigai/sesh/internal/tui/providers"
+	"github.com/zigai/sesh/internal/work"
 )
 
 const (
@@ -50,16 +51,22 @@ type inboxHost struct {
 	identity session.RuntimeIdentity
 	label    string
 	tasks    []task.Live
+	work     []work.Item
 }
 
-// inboxItem is one row of the inbox: an agent, or a task whose agent is not running, with the live
-// session that owns its pane, the machine it runs on and the section it is listed in.
+// inboxItem is one row of the inbox: an agent, a task whose agent is not running, or a recorded
+// conversation whose agent closed, with the live session that owns its pane, the machine it runs on
+// and the section it is listed in.
 type inboxItem struct {
-	agent   session.AgentSession
-	owner   session.Session
-	host    inboxHost
-	live    task.Live
-	task    bool
+	agent  session.AgentSession
+	owner  session.Session
+	host   inboxHost
+	live   task.Live
+	task   bool
+	closed bool
+	work   work.Item
+	// more names the project whose further closed rows this row expands.
+	more    string
 	section string
 }
 
@@ -214,7 +221,7 @@ func (m *Model) inboxHosts() []inboxHost {
 		TmuxServerPID: 0, TmuxServerStartedAt: time.Time{}, TmuxSessionCreatedAt: time.Time{},
 	}
 
-	hosts := []inboxHost{{origin: session.OriginLocal, identity: local, label: "", tasks: m.tasks}}
+	hosts := []inboxHost{{origin: session.OriginLocal, identity: local, label: "", tasks: m.tasks, work: m.work}}
 	if !remoteSessionsEnabled(m.config, m.deps) {
 		return hosts
 	}
@@ -238,18 +245,20 @@ func (m *Model) inboxHosts() []inboxHost {
 			},
 			label: label,
 			tasks: connection.Tasks,
+			work:  connection.Work,
 		})
 	}
 
 	return hosts
 }
 
-// hostInboxItems lists every agent of a host, and the tasks of the host whose agent is not
-// running.
+// hostInboxItems lists every agent of a host, the tasks of the host whose agent is not running,
+// and its recorded conversations whose agent closed.
 func (m *Model) hostInboxItems(host inboxHost) []inboxItem {
 	agents := m.hostAgentsByPane(host)
+	items := append(m.hostAgentItems(host, agents), m.hostTaskItems(host, agents)...)
 
-	return append(m.hostAgentItems(host, agents), m.hostTaskItems(host, agents)...)
+	return append(items, m.hostClosedItems(host)...)
 }
 
 // hostAgentItems lists the agents of a host. An agent in a task's agent pane is that task's row.
@@ -326,7 +335,7 @@ func (m *Model) newInboxItem(host inboxHost, owner session.Session, agent sessio
 
 	agent.Host = host.identity.ConnectionID
 
-	item := inboxItem{agent: agent, owner: owner, host: host, live: live, task: isTask, section: ""}
+	item := inboxItem{agent: agent, owner: owner, host: host, live: live, task: isTask, closed: false, work: work.EmptyItem(), more: "", section: ""}
 	item.section = m.inboxSection(item)
 
 	return item
@@ -371,7 +380,8 @@ func statusSection(status session.AgentStatus) (string, bool) {
 		return config.InboxRunning, true
 	case session.AgentStatusMerged:
 		return config.InboxIdle, true
-	case session.AgentStatusIdle, session.AgentStatusInterrupted, session.AgentStatusUnknown, session.AgentStatusSleeping:
+	case session.AgentStatusIdle, session.AgentStatusInterrupted, session.AgentStatusUnknown, session.AgentStatusSleeping,
+		session.AgentStatusClosed:
 	}
 
 	return "", false
@@ -394,6 +404,10 @@ func (m *Model) unmergedItem(item inboxItem) bool {
 // inboxPR is the pull request of a row: the open one gh lists for its branch, else the one its
 // task records with that pull request's state when it is no longer open.
 func (m *Model) inboxPR(item inboxItem) string {
+	if item.closed {
+		return closedPR(item.work)
+	}
+
 	if item.agent.Host == "" && item.agent.PaneID != "" {
 		if cell := m.providerRunner.Cell(providers.GH, item.agent.PaneID, display.FieldAgentPR); cell.Text != "" {
 			return cell.Text
@@ -634,6 +648,14 @@ func (m *Model) handleInboxEnter(selected popupListRow) func() (tea.Model, tea.C
 		return m.invokeAction(action.TaskOpen.ID, action.Values{})
 	}
 
+	if item.more != "" {
+		return m.expandClosedItems(item)
+	}
+
+	if item.closed {
+		return m.resumeClosedItem(item)
+	}
+
 	agent := item.agent
 	if item.task {
 		agent.PaneID = string(item.live.AgentPane)
@@ -759,6 +781,10 @@ func (m *Model) inboxDetailFields(item inboxItem) [][2]string {
 	}
 
 	location := "no window"
+	if item.closed {
+		location = "closed"
+	}
+
 	if item.owner.ID != "" {
 		location = item.owner.Name
 		if item.task && item.live.Present {
@@ -780,6 +806,10 @@ func (m *Model) inboxDetailFields(item inboxItem) [][2]string {
 
 	if item.task {
 		fields = append(fields, [2]string{"runs", taskRunsDetail(record.Runs)})
+	}
+
+	if issues := closedIssues(item.work); issues != "" {
+		fields = append(fields, [2]string{"issues", issues})
 	}
 
 	if evidence := m.evidenceOf(item); len(evidence) > 0 {

@@ -286,19 +286,21 @@
 # INBOX mode. group is "state" or "project". sections lists the shown sections in order; a
 # section left out is hidden. labels renames sections, as in labels = { done = "new" }. dim lists
 # sections with dimmed rows. snooze lists the snooze choices: a duration, a time of day such as
-# "18:00", "tomorrow 09:00", or "next message".
+# "18:00", "tomorrow 09:00", or "next message". closed_shown is how many closed rows a project
+# shows before a row that expands the rest; 0 shows them all.
 [inbox]
 
 # group = "state"
-# sections = ["done", "waiting", "unmerged", "running", "snoozed", "asleep", "idle"]
-# dim = ["running", "snoozed", "asleep"]
+# sections = ["done", "waiting", "unmerged", "running", "snoozed", "asleep", "idle", "closed"]
+# dim = ["running", "snoozed", "asleep", "closed"]
 # snooze = ["next message", "1h", "4h", "tomorrow 09:00"]
+# closed_shown = 3
 
 # Row menus, opened with a right-click or keys.menu. "-" is a divider, and "items" lists the
 # menu items not named elsewhere.
 [menu]
 
-# agent = ["go", "snooze", "unsnooze", "seen", "unseen", "evidence", "pr", "merge", "sleep", "wake", "open", "finish", "-", "items"]
+# agent = ["go", "snooze", "unsnooze", "seen", "unseen", "evidence", "pr", "merge", "sleep", "wake", "open", "finish", "archive", "-", "items"]
 # session = ["go", "rename", "snapshot", "kill", "delete"]
 
 # Menu items run headless in the task worktree, in a window of the task's popup session. The

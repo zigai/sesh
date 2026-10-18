@@ -49,7 +49,7 @@ func (m *Model) evidenceWanted(agent session.AgentSession) bool {
 	switch agent.Status.DisplayStatus() {
 	case session.AgentStatusIdle, session.AgentStatusInterrupted, session.AgentStatusFailed:
 	case session.AgentStatusRunning, session.AgentStatusWaiting, session.AgentStatusUnknown,
-		session.AgentStatusSleeping, session.AgentStatusMerged:
+		session.AgentStatusSleeping, session.AgentStatusMerged, session.AgentStatusClosed:
 		return false
 	}
 

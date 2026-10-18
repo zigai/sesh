@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -16,9 +17,13 @@ import (
 	"github.com/zigai/sesh/internal/inbox"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/task"
+	"github.com/zigai/sesh/internal/work"
 )
 
-const inboxTestHost = "devbox"
+const (
+	inboxTestHost    = "devbox"
+	inboxTestHarness = "claude"
+)
 
 var errTranscriptUnreadable = errors.New("transcript unreadable")
 
@@ -42,7 +47,7 @@ func inboxTestRecord(id string, state task.State) task.Record {
 	record.Kind = task.KindProject
 	record.State = state
 	record.Project = "/work/api"
-	record.Harness = "claude"
+	record.Harness = inboxTestHarness
 	record.Directory = "/work/trees/api-" + id
 	record.Branch = "wt/main/" + id
 	record.Base = "main"
@@ -61,7 +66,7 @@ func inboxTestLive(record task.Record, pane string) task.Live {
 func inboxTestAgent(name, pane string, status session.AgentStatus, since time.Time) session.AgentSession {
 	agent := emptyAgentSession()
 	agent.PaneID = pane
-	agent.Harness = "claude"
+	agent.Harness = inboxTestHarness
 	agent.HarnessSession = name
 	agent.SessionID = "conversation-" + name
 	agent.ProjectRoot = "/work/api"
@@ -80,7 +85,7 @@ func newInboxTestModel(t *testing.T, tasks []task.Live, agents []session.AgentSe
 		ID: "$1", Name: testSupportSessionAlphaName, Kind: session.KindLive, Origin: session.OriginLocal, Agents: agents, AgentTotal: len(agents),
 	}}
 	model.tasks = tasks
-	model.deps.Inbox = &memoryInbox{state: inbox.State{Version: inbox.Version, Snoozes: nil, Unseen: nil}}
+	model.deps.Inbox = &memoryInbox{state: inbox.State{Version: inbox.Version, Snoozes: nil, Unseen: nil, Archived: nil}}
 	model.displayMode = displayModeInbox
 	refreshInbox(model)
 
@@ -626,4 +631,124 @@ func TestInboxDoesNotReadTheReportsOfRemoteAgents(t *testing.T) {
 	if len(reports.reads) != 0 {
 		t.Fatalf("reports read = %v, want none for another machine's agent", reports.reads)
 	}
+}
+
+func closedTestItem(id, conversation string, turnAt time.Time) work.Item {
+	item := work.EmptyItem()
+	item.ID = id
+	item.Harness = inboxTestHarness
+	item.Conversation = conversation
+	item.Resume = []string{"claude", "--resume", conversation}
+	item.Title = "closed " + id
+	item.Directory = "/work/api"
+	item.Project = "/work/api"
+	item.TurnAt = turnAt.Unix()
+
+	return item
+}
+
+func TestInboxListsARecordedConversationOnlyAfterItsAgentCloses(t *testing.T) {
+	running := inboxTestAgent("running", "%1", session.AgentStatusIdle, time.Now())
+	model := newInboxTestModel(t, nil, []session.AgentSession{running})
+	model.work = []work.Item{
+		closedTestItem("w1", running.SessionID, time.Now()),
+		closedTestItem("w2", "conversation-gone", time.Now()),
+	}
+	refreshInbox(model)
+
+	assertInboxRows(t, model, map[string][]string{
+		config.InboxDone:   {"running"},
+		config.InboxClosed: {"closed w2"},
+	})
+}
+
+func TestInboxLeavesOutARecordedConversationWhosePullRequestEnded(t *testing.T) {
+	model := newInboxTestModel(t, nil, nil)
+	merged := closedTestItem("w1", "conversation-merged", time.Now())
+	merged.PR = task.PullRequest{Number: 9, State: task.PRMerged, URL: ""}
+	model.work = []work.Item{merged, closedTestItem("w2", "conversation-open", time.Now())}
+	refreshInbox(model)
+
+	assertInboxRows(t, model, map[string][]string{config.InboxClosed: {"closed w2"}})
+}
+
+func TestArchiveHidesAClosedConversationUntilItsNextTurn(t *testing.T) {
+	turn := time.Now().Add(-time.Hour)
+	model := newInboxTestModel(t, nil, nil)
+	model.work = []work.Item{closedTestItem("w1", "conversation-one", turn)}
+	refreshInbox(model)
+	selectInboxRow(t, model, "closed w1")
+
+	runHandler(t, model, model.invokeAction(action.InboxArchive.ID, action.Values{}))
+
+	assertInboxRows(t, model, map[string][]string{})
+
+	model.work = []work.Item{closedTestItem("w1", "conversation-one", turn.Add(time.Minute))}
+	refreshInbox(model)
+
+	assertInboxRows(t, model, map[string][]string{config.InboxClosed: {"closed w1"}})
+}
+
+func TestEnterOnAClosedConversationResumesIt(t *testing.T) {
+	var dispatched action.Invocation
+
+	model := newInboxTestModel(t, nil, nil)
+	inboxState := model.deps.Inbox
+	model.deps = testServices(Dependencies{RunAction: func(_ context.Context, invocation action.Invocation) (any, error) {
+		dispatched = invocation
+
+		return action.ResumedAgent{Item: "w1", Session: testLiveRef("$2", "api"), Pane: "%9"}, nil
+	}})
+	model.deps.Inbox = inboxState
+	model.work = []work.Item{closedTestItem("w1", "conversation-one", time.Now())}
+	refreshInbox(model)
+	selectInboxRow(t, model, "closed w1")
+
+	runHandler(t, model, model.handleEnter())
+
+	input, ok := dispatched.Input.(action.ResumeAgent)
+	if dispatched.Action != action.AgentResume.ID || !ok || input.Item != "w1" || dispatched.At != action.Local() {
+		t.Fatalf("dispatched %+v, want agent.resume of w1 on this machine", dispatched)
+	}
+}
+
+func TestClosedConversationMenuOffersArchiveInsteadOfSnooze(t *testing.T) {
+	model := newInboxTestModel(t, nil, nil)
+	model.work = []work.Item{closedTestItem("w1", "conversation-one", time.Now())}
+	refreshInbox(model)
+	selectInboxRow(t, model, "closed w1")
+	model.config.Menu.Agent = []string{config.MenuGo, config.MenuSnooze, config.MenuArchive}
+
+	runHandler(t, model, model.openRowMenu())
+
+	labels := make([]string, 0, len(model.menu.entries))
+	for _, entry := range model.menu.entries {
+		labels = append(labels, entry.label)
+	}
+
+	if !slices.Equal(labels, []string{"go", config.MenuArchive}) {
+		t.Fatalf("menu = %q, want go and archive", labels)
+	}
+}
+
+func TestAProjectShowsItsNewestClosedRowsAndExpandsTheRest(t *testing.T) {
+	now := time.Now()
+	model := newInboxTestModel(t, nil, nil)
+	model.config.Inbox.ClosedShown = 3
+
+	for index := range 5 {
+		id := "w" + strconv.Itoa(index+1)
+		model.work = append(model.work, closedTestItem(id, "conversation-"+id, now.Add(time.Duration(index)*time.Minute)))
+	}
+
+	refreshInbox(model)
+
+	assertInboxRows(t, model, map[string][]string{config.InboxClosed: {"closed w5", "closed w4", "closed w3", "2 more"}})
+
+	selectInboxRow(t, model, "2 more")
+	runHandler(t, model, model.handleEnter())
+
+	assertInboxRows(t, model, map[string][]string{
+		config.InboxClosed: {"closed w5", "closed w4", "closed w3", "closed w2", "closed w1"},
+	})
 }

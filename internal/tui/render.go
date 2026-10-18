@@ -953,6 +953,8 @@ func agentStatusGlyphChar(status session.AgentStatus) string {
 		return "○"
 	case session.AgentStatusSleeping:
 		return "☾"
+	case session.AgentStatusClosed:
+		return "◌"
 	case session.AgentStatusMerged:
 		return "✓"
 	default:
@@ -974,7 +976,8 @@ func (m *Model) agentStatusColor(status session.AgentStatus) string {
 		return colors.Waiting
 	case session.AgentStatusFailed:
 		return colors.Failed
-	case session.AgentStatusIdle, session.AgentStatusInterrupted, session.AgentStatusUnknown, session.AgentStatusSleeping:
+	case session.AgentStatusIdle, session.AgentStatusInterrupted, session.AgentStatusUnknown, session.AgentStatusSleeping,
+		session.AgentStatusClosed:
 		return colors.Idle
 	case session.AgentStatusMerged:
 		return m.config.Theme.Success
@@ -1183,6 +1186,8 @@ func agentStatusLabel(status session.AgentStatus) string {
 		return "UNKNOWN"
 	case session.AgentStatusSleeping:
 		return "SLEEPING"
+	case session.AgentStatusClosed:
+		return "CLOSED"
 	case session.AgentStatusMerged:
 		return "MERGED"
 	default:
