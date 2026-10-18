@@ -69,10 +69,21 @@ func NewCommand() *cobra.Command {
 		actioncli.Command(action.AgentResume, actioncli.Options[action.ResumeAgent, action.ResumedAgent]{
 			Operation: "", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
 		}),
+		workCommand(action.AgentFinish),
+		workCommand(action.AgentPin),
+		workCommand(action.AgentUnpin),
+		workCommand(action.AgentLink),
+		workCommand(action.AgentUnlink),
 		newAgentStatusCommand(),
 	)
 
 	return cmd
+}
+
+func workCommand(definition *action.Definition[action.ChangeWork, action.ChangedWork]) *cobra.Command {
+	return actioncli.Command(definition, actioncli.Options[action.ChangeWork, action.ChangedWork]{
+		Operation: "", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
+	})
 }
 
 func navigationCommand(definition *action.Definition[action.NavigateAgents, action.FocusedPane]) *cobra.Command {
@@ -168,7 +179,7 @@ func runAgentStatusRun(cmd *cobra.Command, _ []string) error {
 
 	styles := agents.NewTmuxStyleController(server, resolved.SetWindowStatusStyle, resolved.SetWindowStatusBellStyle)
 	tracker := agents.NewTracker(styles, statusTrackerOptions(cfg, resolved))
-	recorder := work.NewRecorder(work.NewStore(workspace.Work), func(ctx context.Context) (string, map[string]bool, error) {
+	recorder := work.NewRecorder(work.NewStore(workspace.Work), func(ctx context.Context) (string, map[string]string, error) {
 		return task.WindowPanes(ctx, server)
 	})
 

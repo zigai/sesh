@@ -12,7 +12,10 @@ const (
 	InboxGroupProject = "project"
 
 	InboxDone     = "done"
+	InboxApprove  = "approve"
+	InboxInput    = "input"
 	InboxWaiting  = "waiting"
+	InboxLimited  = "limited"
 	InboxUnmerged = "unmerged"
 	InboxRunning  = "running"
 	InboxSnoozed  = "snoozed"
@@ -24,16 +27,18 @@ const (
 )
 
 var (
-	errInboxGroup          = errors.New(`inbox.group must be "state" or "project"`)
-	errInboxSection        = errors.New("unknown inbox section")
-	errInboxSectionTwice   = errors.New("inbox section is listed twice")
-	errInboxSectionsEmpty  = errors.New("inbox.sections must list at least one section")
-	errInboxLabelInvalid   = errors.New("inbox section label must be non-empty text")
-	errInboxSnoozeEmpty    = errors.New("inbox.snooze must list at least one choice")
-	errInboxSnoozeTwice    = errors.New("inbox snooze choice is listed twice")
-	errInboxSnoozeInvalid  = errors.New("inbox snooze choice is not a duration, a time of day or next message")
-	errInboxClosedShown    = errors.New("inbox.closed_shown must not be negative")
-	inboxSectionNames      = []string{InboxDone, InboxWaiting, InboxUnmerged, InboxRunning, InboxSnoozed, InboxAsleep, InboxIdle, InboxClosed}
+	errInboxGroup         = errors.New(`inbox.group must be "state" or "project"`)
+	errInboxSection       = errors.New("unknown inbox section")
+	errInboxSectionTwice  = errors.New("inbox section is listed twice")
+	errInboxSectionsEmpty = errors.New("inbox.sections must list at least one section")
+	errInboxLabelInvalid  = errors.New("inbox section label must be non-empty text")
+	errInboxSnoozeEmpty   = errors.New("inbox.snooze must list at least one choice")
+	errInboxSnoozeTwice   = errors.New("inbox snooze choice is listed twice")
+	errInboxSnoozeInvalid = errors.New("inbox snooze choice is not a duration, a time of day or next message")
+	errInboxClosedShown   = errors.New("inbox.closed_shown must not be negative")
+	inboxSectionNames     = []string{
+		InboxDone, InboxApprove, InboxInput, InboxWaiting, InboxLimited, InboxUnmerged, InboxRunning, InboxSnoozed, InboxAsleep, InboxIdle, InboxClosed,
+	}
 	defaultInboxDimmed     = []string{InboxRunning, InboxSnoozed, InboxAsleep, InboxClosed}
 	defaultInboxSnoozeList = []string{SnoozeNextMessage, "1h", "4h", "tomorrow 09:00"}
 )

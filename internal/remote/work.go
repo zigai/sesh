@@ -35,20 +35,40 @@ func validWorkRows(rows []work.Item) bool {
 	ids := make(map[string]bool, len(rows))
 
 	for _, row := range rows {
-		if !ValidIdentifier(row.ID) || ids[row.ID] || !ValidIdentifier(row.Conversation) || len(row.Resume) != 0 ||
-			row.SessionPath != "" || len(row.Issues) > MaxWork {
+		if ids[row.ID] || !validWorkRow(row) {
 			return false
 		}
 
-		for _, text := range []string{
-			row.Harness, row.Title, row.Directory, row.Project, row.Branch, row.PR.URL, row.Server, row.Pane,
-		} {
-			if !ValidText(text) {
-				return false
-			}
-		}
-
 		ids[row.ID] = true
+	}
+
+	return true
+}
+
+func validWorkRow(row work.Item) bool {
+	if !ValidIdentifier(row.ID) || !ValidIdentifier(row.Conversation) || len(row.Resume) != 0 || row.SessionPath != "" ||
+		(row.Task != "" && !ValidIdentifier(row.Task)) || !validPRLinks(row.PRs) {
+		return false
+	}
+
+	for _, text := range []string{row.Harness, row.Title, row.Directory, row.Project, row.Branch, row.Server, row.Pane, row.FinishedBy} {
+		if !ValidText(text) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func validPRLinks(links []work.PRLink) bool {
+	if len(links) > MaxWork {
+		return false
+	}
+
+	for _, link := range links {
+		if len(link.Issues) > MaxWork || !ValidText(link.URL) || !ValidText(string(link.State)) || !ValidText(link.Source) {
+			return false
+		}
 	}
 
 	return true

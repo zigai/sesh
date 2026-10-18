@@ -54,11 +54,11 @@ func Inventory(ctx context.Context, server *gotmux.Server, store Store) ([]Live,
 	return live, nil
 }
 
-// WindowPanes returns the socket of server and the panes of its task windows.
-func WindowPanes(ctx context.Context, server *gotmux.Server) (string, map[string]bool, error) {
+// WindowPanes returns the socket of server and the task of each pane in a task window.
+func WindowPanes(ctx context.Context, server *gotmux.Server) (string, map[string]string, error) {
 	panes, err := server.PanesWith(ctx, gotmux.QueryOptions{Filter: "", ExtraFields: []string{OptionTask, socketPathField}})
 	if errors.Is(err, gotmux.ErrNoServer) {
-		return "", map[string]bool{}, nil
+		return "", map[string]string{}, nil
 	}
 
 	if err != nil {
@@ -66,7 +66,7 @@ func WindowPanes(ctx context.Context, server *gotmux.Server) (string, map[string
 	}
 
 	socket := ""
-	inTask := make(map[string]bool, len(panes))
+	inTask := make(map[string]string, len(panes))
 
 	for _, pane := range panes {
 		if path, _ := pane.Raw(socketPathField); len(path) > 0 {
@@ -74,7 +74,7 @@ func WindowPanes(ctx context.Context, server *gotmux.Server) (string, map[string
 		}
 
 		if taskID, _ := pane.Raw(OptionTask); len(taskID) > 0 {
-			inTask[string(pane.ID)] = true
+			inTask[string(pane.ID)] = string(taskID)
 		}
 	}
 

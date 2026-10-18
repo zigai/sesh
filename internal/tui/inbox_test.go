@@ -85,7 +85,7 @@ func newInboxTestModel(t *testing.T, tasks []task.Live, agents []session.AgentSe
 		ID: "$1", Name: testSupportSessionAlphaName, Kind: session.KindLive, Origin: session.OriginLocal, Agents: agents, AgentTotal: len(agents),
 	}}
 	model.tasks = tasks
-	model.deps.Inbox = &memoryInbox{state: inbox.State{Version: inbox.Version, Snoozes: nil, Unseen: nil, Archived: nil}}
+	model.deps.Inbox = &memoryInbox{state: inbox.State{Version: inbox.Version, Snoozes: nil, Unseen: nil}}
 	model.displayMode = displayModeInbox
 	refreshInbox(model)
 
@@ -167,6 +167,13 @@ func TestInboxSectionsFollowAgentStateSeenMarksAndTasks(t *testing.T) {
 	merged := inboxTestRecord("merged", task.StateActive)
 	merged.PR = task.PullRequest{Number: 4, State: task.PRMerged, URL: ""}
 
+	approval := inboxTestAgent("approval", "%8", session.AgentStatusWaiting, older)
+	approval.WaitingReason = "permission"
+	question := inboxTestAgent("question", "%9", session.AgentStatusWaiting, older)
+	question.WaitingReason = "question"
+	limited := inboxTestAgent("limited", "%10", session.AgentStatusFailed, older)
+	limited.FailureReason = "usage_limit"
+
 	stalled := inboxTestLive(inboxTestRecord("stalled", task.StateCreating), "")
 	stalled.Stalled = true
 
@@ -183,6 +190,7 @@ func TestInboxSectionsFollowAgentStateSeenMarksAndTasks(t *testing.T) {
 		commits,
 		inboxTestAgent("seen", "%6", session.AgentStatusIdle, older),
 		inboxTestAgent("broke", "%7", session.AgentStatusFailed, older),
+		approval, question, limited,
 	})
 	markViewed(model, "%5", now)
 	markViewed(model, "%6", now)
@@ -190,7 +198,10 @@ func TestInboxSectionsFollowAgentStateSeenMarksAndTasks(t *testing.T) {
 
 	assertInboxRows(t, model, map[string][]string{
 		config.InboxDone:     {"fresh-new", "fresh-old", "broke", "stalled"},
+		config.InboxApprove:  {"approval"},
+		config.InboxInput:    {"question"},
 		config.InboxWaiting:  {"asking"},
+		config.InboxLimited:  {"limited"},
 		config.InboxUnmerged: {"commits"},
 		config.InboxRunning:  {"busy"},
 		config.InboxAsleep:   {"asleep"},
@@ -662,30 +673,107 @@ func TestInboxListsARecordedConversationOnlyAfterItsAgentCloses(t *testing.T) {
 	})
 }
 
-func TestInboxLeavesOutARecordedConversationWhosePullRequestEnded(t *testing.T) {
+func TestInboxLeavesOutFinishedAndTaskConversations(t *testing.T) {
 	model := newInboxTestModel(t, nil, nil)
-	merged := closedTestItem("w1", "conversation-merged", time.Now())
-	merged.PR = task.PullRequest{Number: 9, State: task.PRMerged, URL: ""}
-	model.work = []work.Item{merged, closedTestItem("w2", "conversation-open", time.Now())}
+	finished := closedTestItem("w1", "conversation-finished", time.Now())
+	finished.FinishedAt, finished.FinishedBy = time.Now().Unix(), work.FinishedByPR
+	ofTask := closedTestItem("w3", "conversation-task", time.Now())
+	ofTask.Task = "t1"
+	model.work = []work.Item{finished, closedTestItem("w2", "conversation-open", time.Now()), ofTask}
 	refreshInbox(model)
 
 	assertInboxRows(t, model, map[string][]string{config.InboxClosed: {"closed w2"}})
 }
 
-func TestArchiveHidesAClosedConversationUntilItsNextTurn(t *testing.T) {
-	turn := time.Now().Add(-time.Hour)
+func recordingDispatcher(model *Model, dispatched *action.Invocation) {
+	inboxState := model.deps.Inbox
+	model.deps = testServices(Dependencies{RunAction: func(_ context.Context, invocation action.Invocation) (any, error) {
+		*dispatched = invocation
+
+		return action.ChangedWork{Item: "w1"}, nil
+	}})
+	model.deps.Inbox = inboxState
+}
+
+func TestFinishOnAClosedConversationFinishesItOnItsMachine(t *testing.T) {
+	var dispatched action.Invocation
+
 	model := newInboxTestModel(t, nil, nil)
-	model.work = []work.Item{closedTestItem("w1", "conversation-one", turn)}
+	recordingDispatcher(model, &dispatched)
+	model.work = []work.Item{closedTestItem("w1", "conversation-one", time.Now())}
 	refreshInbox(model)
 	selectInboxRow(t, model, "closed w1")
 
-	runHandler(t, model, model.invokeAction(action.InboxArchive.ID, action.Values{}))
+	runHandler(t, model, model.invokeAction(action.InboxFinish.ID, action.Values{}))
 
-	assertInboxRows(t, model, map[string][]string{})
+	input, ok := dispatched.Input.(action.ChangeWork)
+	if dispatched.Action != action.AgentFinish.ID || !ok || input.Item != "w1" || dispatched.At != action.Local() {
+		t.Fatalf("dispatched %+v, want agent.finish of w1 on this machine", dispatched)
+	}
+}
 
-	model.work = []work.Item{closedTestItem("w1", "conversation-one", turn.Add(time.Minute))}
+func TestFinishOnATaskRowFinishesTheTask(t *testing.T) {
+	model := newInboxTestModel(t, []task.Live{inboxTestLive(inboxTestRecord("feature", task.StateActive), "%9")}, nil)
+	selectInboxRow(t, model, "feature")
+
+	runHandler(t, model, model.invokeAction(action.InboxFinish.ID, action.Values{}))
+
+	if model.pending == nil || model.pending.entry.Describe().ID != action.TaskFinish.ID {
+		t.Fatalf("pending = %+v, want task.finish waiting for confirmation", model.pending)
+	}
+}
+
+func TestPinnedRowsComeFirstAndStayAmongTheShownClosedRows(t *testing.T) {
+	now := time.Now()
+	model := newInboxTestModel(t, nil, nil)
+	model.config.Inbox.ClosedShown = 2
+
+	pinned := closedTestItem("w1", "conversation-w1", now.Add(-time.Hour))
+	pinned.PinnedAt = now.Unix()
+	model.work = []work.Item{pinned, closedTestItem("w2", "conversation-w2", now), closedTestItem("w3", "conversation-w3", now.Add(-time.Minute))}
 	refreshInbox(model)
 
+	assertInboxRows(t, model, map[string][]string{config.InboxClosed: {"closed w1", "closed w2", "1 more"}})
+}
+
+func TestUnlinkOffersTheLinkedPullRequestsWhenThereAreSeveral(t *testing.T) {
+	var dispatched action.Invocation
+
+	model := newInboxTestModel(t, nil, nil)
+	recordingDispatcher(model, &dispatched)
+
+	linked := closedTestItem("w1", "conversation-one", time.Now())
+	linked.PRs = []work.PRLink{
+		{Number: 4, State: task.PRMerged, URL: "", Issues: []int{}, Source: work.LinkBranch},
+		{Number: 9, State: task.PROpen, URL: "", Issues: []int{}, Source: work.LinkUser},
+	}
+	model.work = []work.Item{linked}
+	refreshInbox(model)
+	selectInboxRow(t, model, "closed w1")
+
+	runHandler(t, model, model.invokeAction(action.InboxUnlink.ID, action.Values{}))
+
+	if model.menu == nil || len(model.menu.entries) != 2 || model.menu.entries[1].label != "#9" {
+		t.Fatalf("menu = %+v, want #4 merged and #9", model.menu)
+	}
+
+	runHandler(t, model, model.runMenuEntry(1))
+
+	if input, ok := dispatched.Input.(action.ChangeWork); dispatched.Action != action.AgentUnlink.ID || !ok || input.PR != 9 {
+		t.Fatalf("dispatched %+v, want agent.unlink of #9", dispatched)
+	}
+}
+
+func TestAClosedConversationMarkedUnseenIsDoneUntilSeen(t *testing.T) {
+	model := newInboxTestModel(t, nil, nil)
+	model.work = []work.Item{closedTestItem("w1", "conversation-one", time.Now())}
+	refreshInbox(model)
+	selectInboxRow(t, model, "closed w1")
+
+	runHandler(t, model, model.invokeAction(action.InboxUnseen.ID, action.Values{}))
+	assertInboxRows(t, model, map[string][]string{config.InboxDone: {"closed w1"}})
+
+	runHandler(t, model, model.invokeAction(action.InboxSeen.ID, action.Values{}))
 	assertInboxRows(t, model, map[string][]string{config.InboxClosed: {"closed w1"}})
 }
 
@@ -712,12 +800,12 @@ func TestEnterOnAClosedConversationResumesIt(t *testing.T) {
 	}
 }
 
-func TestClosedConversationMenuOffersArchiveInsteadOfSnooze(t *testing.T) {
+func TestClosedConversationMenuOffersFinishAndPinInsteadOfSnooze(t *testing.T) {
 	model := newInboxTestModel(t, nil, nil)
 	model.work = []work.Item{closedTestItem("w1", "conversation-one", time.Now())}
 	refreshInbox(model)
 	selectInboxRow(t, model, "closed w1")
-	model.config.Menu.Agent = []string{config.MenuGo, config.MenuSnooze, config.MenuArchive}
+	model.config.Menu.Agent = []string{config.MenuGo, config.MenuSnooze, config.MenuPin, config.MenuUnpin, config.MenuFinish}
 
 	runHandler(t, model, model.openRowMenu())
 
@@ -726,8 +814,8 @@ func TestClosedConversationMenuOffersArchiveInsteadOfSnooze(t *testing.T) {
 		labels = append(labels, entry.label)
 	}
 
-	if !slices.Equal(labels, []string{"go", config.MenuArchive}) {
-		t.Fatalf("menu = %q, want go and archive", labels)
+	if !slices.Equal(labels, []string{"go", config.MenuPin, config.MenuFinish}) {
+		t.Fatalf("menu = %q, want go, pin and finish", labels)
 	}
 }
 

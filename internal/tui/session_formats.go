@@ -298,7 +298,7 @@ func (v sessionFormatValues) resolveResourceSummaryCell(field string) (string, l
 func (v sessionFormatValues) resolveGHCell(field string) (string, layout.State) {
 	recorded := ""
 	if field == display.FieldAgentPR {
-		recorded = v.model.recordedTaskPR(v.agent)
+		recorded = v.model.recordedPR(v.agent)
 	}
 
 	if remoteAgentRow(v.row, v.agent) {

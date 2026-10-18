@@ -23,13 +23,30 @@ var (
 		"List the screenshots, recordings, files and links in the Evidence section of the selected agent's latest "+
 			"report. Choosing one opens it: a file or link with xdg-open, text in a pager.")
 
-	InboxArchive = defineInboxAction("inbox.archive", "Archive", "Hide a closed conversation until it gets a new turn",
-		"Hide the selected closed conversation from the inbox. It returns when the conversation gets a new turn.")
+	InboxFinish = defineInboxAction("inbox.finish", "Finish", "Finish the row's task or conversation",
+		"Finish the selected row: a task is finished as task.finish does, and any other recorded conversation "+
+			"as agent.finish does.")
+
+	InboxPin = defineInboxAction("inbox.pin", "Pin", "Pin the row's conversation",
+		"Pin the selected row's recorded conversation as agent.pin does.")
+
+	InboxUnpin = defineInboxAction("inbox.unpin", "Unpin", "Unpin the row's conversation",
+		"Unpin the selected row's recorded conversation.")
+
+	InboxLink = defineInboxAction("inbox.link", "Link PR", "Link a pull request to the row's conversation",
+		"Link a pull request to the selected row's recorded conversation as agent.link does.",
+		newParam("pr", ParamText, "Pull request number").required())
+
+	InboxUnlink = defineInboxAction("inbox.unlink", "Unlink PR", "Unlink a pull request from the row's conversation",
+		"Unlink a pull request from the selected row's recorded conversation; without --pr the picker offers "+
+			"the linked ones.",
+		newParam("pr", ParamText, "Pull request number"))
 )
 
 // InboxInput is the input of an inbox action: the picker applies it to the selected row.
 type InboxInput struct {
 	Until string `json:"until"`
+	PR    string `json:"pr"`
 }
 
 type InboxOutput struct{}
@@ -50,6 +67,6 @@ func defineInboxAction(id ID, title, summary, help string, params ...Param) *Def
 		InPicker:    true,
 		check:       nil,
 	}, func(_ Subject, values Values) (InboxInput, error) {
-		return InboxInput{Until: values.String("until")}, nil
+		return InboxInput{Until: values.String("until"), PR: values.String("pr")}, nil
 	}, func(InboxOutput) string { return "" })
 }

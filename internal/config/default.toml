@@ -280,8 +280,9 @@
 # show_footer = true
 
 # A [projects.overrides.<name>] table changes one project: menu_items there override fields of
-# menu items, merge replaces [merge], task_panes replace or add panes by name, and task_layouts
-# replace the layouts. <name> is the project's directory name or its path, such as "~/work/api".
+# menu items, merge and finish replace [merge] and [finish], task_panes replace or add panes by
+# name, and task_layouts replace the layouts. <name> is the project's directory name or its path,
+# such as "~/work/api".
 
 # INBOX mode. group is "state" or "project". sections lists the shown sections in order; a
 # section left out is hidden. labels renames sections, as in labels = { done = "new" }. dim lists
@@ -291,7 +292,7 @@
 [inbox]
 
 # group = "state"
-# sections = ["done", "waiting", "unmerged", "running", "snoozed", "asleep", "idle", "closed"]
+# sections = ["done", "approve", "input", "waiting", "limited", "unmerged", "running", "snoozed", "asleep", "idle", "closed"]
 # dim = ["running", "snoozed", "asleep", "closed"]
 # snooze = ["next message", "1h", "4h", "tomorrow 09:00"]
 # closed_shown = 3
@@ -300,7 +301,7 @@
 # menu items not named elsewhere.
 [menu]
 
-# agent = ["go", "snooze", "unsnooze", "seen", "unseen", "evidence", "pr", "merge", "sleep", "wake", "open", "finish", "archive", "-", "items"]
+# agent = ["go", "snooze", "unsnooze", "seen", "unseen", "pin", "unpin", "evidence", "pr", "link", "unlink", "merge", "sleep", "wake", "open", "finish", "-", "items"]
 # session = ["go", "rename", "snapshot", "kill", "delete"]
 
 # Menu items run headless in the task worktree, in a window of the task's popup session. The
@@ -318,6 +319,12 @@
 [merge]
 
 # check = []
+
+# Finishing a task runs run in its worktree before removing it, never in a main checkout. A failing
+# run stops the finish unless it discards work. For example run = ["docker", "compose", "down"].
+[finish]
+
+# run = []
 
 # State, metadata, and diagnostic log locations.
 [paths]

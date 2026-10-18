@@ -69,6 +69,7 @@ type Config struct {
 	Inbox         InboxConfig         `toml:"inbox"`
 	Menu          MenuConfig          `toml:"menu"`
 	Merge         MergeConfig         `toml:"merge"`
+	Finish        FinishConfig        `toml:"finish"`
 }
 
 // ActionsConfig overrides per-action policy, keyed by action group then verb: [actions.session.kill].
@@ -333,6 +334,7 @@ func (c *Config) Clone() *Config {
 	cp.Inbox = c.Inbox.Clone()
 	cp.Menu = c.Menu.Clone()
 	cp.Merge = MergeConfig{Check: slices.Clone(c.Merge.Check)}
+	cp.Finish = FinishConfig{Run: slices.Clone(c.Finish.Run)}
 	cp.Keys.Bind = cloneKeyBinds(c.Keys.Bind)
 
 	cp.AgentStatus = c.AgentStatus.Clone()
@@ -516,6 +518,7 @@ func DefaultConfig() *Config {
 		Inbox:    DefaultInboxConfig(),
 		Menu:     DefaultMenuConfig(),
 		Merge:    MergeConfig{Check: nil},
+		Finish:   FinishConfig{Run: nil},
 		AgentStatus: AgentStatusConfig{
 			Enabled:                  true,
 			StorePath:                "",

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/samber/oops"
 	gotmux "github.com/zigai/gotmux/tmux"
@@ -22,7 +23,7 @@ var (
 )
 
 // resumeAgent opens a window that resumes a recorded conversation in its directory: in its
-// project's session, else in the invoking pane's session.
+// project's session, else in the invoking pane's session, and reopens it.
 func (local *Local) resumeAgent(ctx context.Context, caller action.Caller, input action.ResumeAgent) (action.ResumedAgent, error) {
 	var resumed action.ResumedAgent
 
@@ -61,7 +62,97 @@ func (local *Local) resumeAgent(ctx context.Context, caller action.Caller, input
 	resumed.Session = action.RefOf(row)
 	resumed.Pane = string(pane)
 
+	if item.Finished() {
+		if err := local.updateWork(ctx, func(state *work.State) error { return state.Reopen(item.ID) }); err != nil {
+			return resumed, action.Wrap(action.CodePartial, err)
+		}
+	}
+
 	return resumed, nil
+}
+
+func (local *Local) finishWork(ctx context.Context, _ action.Caller, input action.ChangeWork) (action.ChangedWork, error) {
+	return action.ChangedWork{Item: input.Item}, local.updateWork(ctx, func(state *work.State) error {
+		return state.Finish(input.Item, work.FinishedByUser, time.Now())
+	})
+}
+
+func (local *Local) pinWork(ctx context.Context, _ action.Caller, input action.ChangeWork) (action.ChangedWork, error) {
+	return action.ChangedWork{Item: input.Item}, local.updateWork(ctx, func(state *work.State) error {
+		return state.Pin(input.Item, time.Now())
+	})
+}
+
+func (local *Local) unpinWork(ctx context.Context, _ action.Caller, input action.ChangeWork) (action.ChangedWork, error) {
+	return action.ChangedWork{Item: input.Item}, local.updateWork(ctx, func(state *work.State) error {
+		return state.Unpin(input.Item)
+	})
+}
+
+// linkWork links a pull request of the conversation's repository, as gh reports it.
+func (local *Local) linkWork(ctx context.Context, _ action.Caller, input action.ChangeWork) (action.ChangedWork, error) {
+	changed := action.ChangedWork{Item: input.Item}
+
+	item, err := local.workItem(ctx, input.Item)
+	if err != nil {
+		return changed, err
+	}
+
+	pr, err := work.ViewPR(ctx, item.Directory, input.PR)
+	if err != nil {
+		return changed, action.Wrap(action.CodeUnavailable, oops.In("app").With("operation", "view_pr").Wrap(err))
+	}
+
+	return changed, local.updateWork(ctx, func(state *work.State) error { return state.Link(input.Item, pr) })
+}
+
+func (local *Local) unlinkWork(ctx context.Context, _ action.Caller, input action.ChangeWork) (action.ChangedWork, error) {
+	return action.ChangedWork{Item: input.Item}, local.updateWork(ctx, func(state *work.State) error {
+		return state.Unlink(input.Item, input.PR)
+	})
+}
+
+// finishTaskWork finishes the recorded conversations of a task that was finished.
+func (local *Local) finishTaskWork(ctx context.Context, id string) error {
+	if local.workState == "" {
+		return nil
+	}
+
+	_, err := work.NewStore(local.workState).Update(ctx, func(state *work.State) error {
+		now := time.Now()
+
+		for _, item := range state.Items {
+			if item.Task == id && !item.Finished() {
+				if err := state.Finish(item.ID, work.FinishedByUser, now); err != nil {
+					return fmt.Errorf("finish work item: %w", err)
+				}
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		return oops.In("app").With("operation", "finish_task_work").Wrap(err)
+	}
+
+	return nil
+}
+
+func (local *Local) updateWork(ctx context.Context, change func(*work.State) error) error {
+	if local.workState == "" {
+		return action.Wrap(action.CodeUnavailable, ErrWorkStateRequired)
+	}
+
+	_, err := work.NewStore(local.workState).Update(ctx, change)
+
+	switch {
+	case errors.Is(err, work.ErrNotFound), errors.Is(err, work.ErrNotLinked):
+		return action.Wrap(action.CodeNotFound, err)
+	case err != nil:
+		return oops.In("app").With("operation", "update_work").Wrap(err)
+	default:
+		return nil
+	}
 }
 
 func (local *Local) workItem(ctx context.Context, id string) (work.Item, error) {

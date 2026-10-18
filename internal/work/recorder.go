@@ -15,8 +15,8 @@ import (
 	"github.com/zigai/sesh/internal/agents"
 )
 
-// Recorder records the conversations of the interactive agents in one tmux server's panes that
-// are not in a task window: tasks keep their own record.
+// Recorder records the conversations of the interactive agents in one tmux server's panes, with
+// the task whose window each runs in.
 type Recorder struct {
 	store Store
 	panes Panes
@@ -25,16 +25,16 @@ type Recorder struct {
 
 	mu    sync.Mutex
 	known State
-	// skipped are the conversations last seen in task windows.
-	skipped map[string]bool
+	// tasks are the tasks whose windows conversations were last seen in.
+	tasks map[string]string
 }
 
-// Panes reads the socket of the recorded tmux server and the panes of its task windows.
-type Panes func(context.Context) (string, map[string]bool, error)
+// Panes reads the socket of the recorded tmux server and the task of each pane in a task window.
+type Panes func(context.Context) (string, map[string]string, error)
 
 // NewRecorder records into store the agents of the tmux server panes reads.
 func NewRecorder(store Store, panes Panes) *Recorder {
-	return &Recorder{store: store, panes: panes, server: "", mu: sync.Mutex{}, known: emptyState(), skipped: map[string]bool{}}
+	return &Recorder{store: store, panes: panes, server: "", mu: sync.Mutex{}, known: emptyState(), tasks: map[string]string{}}
 }
 
 // Record records the conversations sessions show. It writes the work state only when a
@@ -65,10 +65,9 @@ func (r *Recorder) Record(ctx context.Context, sessions []aht.Session) error {
 			continue
 		}
 
-		r.skipped[seen.Conversation] = taskPanes[seen.Pane]
-		if !taskPanes[seen.Pane] {
-			kept = append(kept, seen)
-		}
+		seen.Task = taskPanes[seen.Pane]
+		r.tasks[seen.Conversation] = seen.Task
+		kept = append(kept, seen)
 	}
 
 	titled := withHistory(ctx, kept, r.known)
@@ -91,13 +90,13 @@ func (r *Recorder) sightings(sessions []aht.Session) []Sighting {
 	var sightings []Sighting
 
 	for _, agent := range agents.ObservedAgentSessions(sessions) {
-		if (r.server != "" && !agents.SameServerSocket(agent.ServerSocket, r.server)) || r.skipped[agent.HarnessSessionID] {
+		if r.server != "" && !agents.SameServerSocket(agent.ServerSocket, r.server) {
 			continue
 		}
 
 		sightings = append(sightings, Sighting{
 			Harness: agent.Harness, Conversation: agent.HarnessSessionID, SessionPath: agent.SessionPath,
-			Resume: agent.ResumeCommand, Title: "", Directory: agent.CWD, Project: agent.ProjectRoot,
+			Resume: agent.ResumeCommand, Title: "", Directory: agent.CWD, Project: agent.ProjectRoot, Task: r.tasks[agent.HarnessSessionID],
 			Server: agent.ServerSocket, Pane: agent.PaneID, PanePID: agent.PanePID, TurnAt: agent.ActivityChanged,
 		})
 	}

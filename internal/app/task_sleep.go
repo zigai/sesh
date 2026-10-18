@@ -145,7 +145,7 @@ func (local *Local) taskService() (*task.Service, error) {
 		Placeholder: func(id string) []string {
 			return append([]string{executable}, apps.PlaceholderArguments(id)...)
 		},
-		PRs: task.GitHub{}, ClosePopup: local.closeTaskPopup,
+		PRs: task.GitHub{}, ClosePopup: local.closeTaskPopup, FinishRun: local.cfg.FinishRunFor,
 	}), nil
 }
 

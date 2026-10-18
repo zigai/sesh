@@ -29,6 +29,7 @@ var (
 	ErrMergeDirty     = errors.New("the checkout has uncommitted changes")
 	ErrMergeConflict  = errors.New("rebasing onto the base branch conflicts; the rebase was aborted")
 	ErrMergeCheck     = errors.New("the merge check failed")
+	ErrFinishRun      = errors.New("the finish command failed")
 	ErrMergeDetached  = errors.New("the checkout has no branch")
 	ErrMergeNoRemote  = errors.New("the repository has no origin remote")
 	ErrMergeNoBase    = errors.New("origin has no default branch to merge into")
@@ -47,12 +48,25 @@ type CheckError struct {
 	ExitCode int
 }
 
+// FinishRunError is a finish command that exited with ExitCode.
+type FinishRunError struct {
+	ExitCode int
+}
+
 func (e *CheckError) Error() string {
 	return fmt.Sprintf("the merge check exited with code %d", e.ExitCode)
 }
 
 func (e *CheckError) Is(target error) bool {
 	return target == ErrMergeCheck
+}
+
+func (e *FinishRunError) Error() string {
+	return fmt.Sprintf("the finish command exited with code %d", e.ExitCode)
+}
+
+func (e *FinishRunError) Is(target error) bool {
+	return target == ErrFinishRun
 }
 
 // MergeExitCode is the exit code of a merge run that ended with err.

@@ -12,6 +12,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/zigai/aht/v2/pkg/aht"
 
 	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/config"
@@ -55,8 +56,8 @@ type inboxHost struct {
 }
 
 // inboxItem is one row of the inbox: an agent, a task whose agent is not running, or a recorded
-// conversation whose agent closed, with the live session that owns its pane, the machine it runs on
-// and the section it is listed in.
+// conversation whose agent closed, with the live session that owns its pane, the machine it runs on,
+// its recorded conversation, if any, and the section it is listed in.
 type inboxItem struct {
 	agent  session.AgentSession
 	owner  session.Session
@@ -198,15 +199,15 @@ func inboxProject(item inboxItem) string {
 	}
 }
 
-// compareInboxItems orders rows by the configured section order, then the most recent change
-// first.
+// compareInboxItems orders rows by the configured section order, then pinned rows first, then
+// the most recent change first.
 func (m *Model) compareInboxItems(left, right inboxItem) int {
 	sections := m.config.Inbox.Sections
 	if order := cmp.Compare(slices.Index(sections, left.section), slices.Index(sections, right.section)); order != 0 {
 		return order
 	}
 
-	return right.agent.StatusSince.Compare(left.agent.StatusSince)
+	return compareRecency(left, right)
 }
 
 // inboxKey identifies an inbox row: pane IDs are only unique within one host.
@@ -335,7 +336,10 @@ func (m *Model) newInboxItem(host inboxHost, owner session.Session, agent sessio
 
 	agent.Host = host.identity.ConnectionID
 
-	item := inboxItem{agent: agent, owner: owner, host: host, live: live, task: isTask, closed: false, work: work.EmptyItem(), more: "", section: ""}
+	item := inboxItem{
+		agent: agent, owner: owner, host: host, live: live, task: isTask, closed: false, work: recordedWork(host, agent, live, isTask), more: "",
+		section: "",
+	}
 	item.section = m.inboxSection(item)
 
 	return item
@@ -354,7 +358,7 @@ func (m *Model) inboxSection(item inboxItem) string {
 		return config.InboxSnoozed
 	}
 
-	if section, decided := statusSection(item.agent.Status.DisplayStatus()); decided {
+	if section, decided := statusSection(item.agent); decided {
 		return section
 	}
 
@@ -369,12 +373,23 @@ func (m *Model) inboxSection(item inboxItem) string {
 	return config.InboxIdle
 }
 
-// statusSection is the section an agent's status alone decides, if any.
-func statusSection(status session.AgentStatus) (string, bool) {
-	switch status {
+// statusSection is the section an agent's status and its reason alone decide, if any.
+func statusSection(agent session.AgentSession) (string, bool) {
+	switch agent.Status.DisplayStatus() {
 	case session.AgentStatusWaiting:
+		switch agent.WaitingReason {
+		case string(aht.ActivityDetailPermission):
+			return config.InboxApprove, true
+		case string(aht.ActivityDetailQuestion):
+			return config.InboxInput, true
+		}
+
 		return config.InboxWaiting, true
 	case session.AgentStatusFailed:
+		if agent.FailureReason == string(aht.ActivityDetailUsageLimit) {
+			return config.InboxLimited, true
+		}
+
 		return config.InboxDone, true
 	case session.AgentStatusRunning:
 		return config.InboxRunning, true
@@ -405,7 +420,7 @@ func (m *Model) unmergedItem(item inboxItem) bool {
 // task records with that pull request's state when it is no longer open.
 func (m *Model) inboxPR(item inboxItem) string {
 	if item.closed {
-		return closedPR(item.work)
+		return linkedPRs(item.work)
 	}
 
 	if item.agent.Host == "" && item.agent.PaneID != "" {
@@ -670,14 +685,19 @@ func (m *Model) handleInboxEnter(selected popupListRow) func() (tea.Model, tea.C
 	}
 }
 
-// recordedTaskPR is the pull request the task's ledger records for an inbox row, which outlives
-// the open-PR lookup once the PR is merged or closed and is all that is known for a remote task.
-func (m *Model) recordedTaskPR(agent session.AgentSession) string {
+// recordedPR is the pull request the task's ledger records for an inbox row, which outlives
+// the open-PR lookup once the PR is merged or closed and is all that is known for a remote task,
+// or the pull requests linked to a closed conversation.
+func (m *Model) recordedPR(agent session.AgentSession) string {
 	if m.displayMode != displayModeInbox {
 		return ""
 	}
 
 	item, ok := m.inboxItems[inboxKey(agent.Host, agent.PaneID)]
+	if ok && item.closed {
+		return linkedPRs(item.work)
+	}
+
 	if !ok || !item.task || item.live.Record.PR.Number == 0 {
 		return ""
 	}
@@ -780,19 +800,7 @@ func (m *Model) inboxDetailFields(item inboxItem) [][2]string {
 		branch += " ← " + record.Base
 	}
 
-	location := "no window"
-	if item.closed {
-		location = "closed"
-	}
-
-	if item.owner.ID != "" {
-		location = item.owner.Name
-		if item.task && item.live.Present {
-			location = fmt.Sprintf("%s:%d %s", item.live.SessionName, item.live.WindowIndex, item.live.WindowName)
-		}
-	}
-
-	directory := session.ShortenHomePath(item.agent.CWD)
+	location, directory := inboxLocation(item), session.ShortenHomePath(item.agent.CWD)
 	if item.host.label != "" {
 		location, directory = item.host.label+" "+location, item.agent.CWD
 	}
@@ -808,6 +816,10 @@ func (m *Model) inboxDetailFields(item inboxItem) [][2]string {
 		fields = append(fields, [2]string{"runs", taskRunsDetail(record.Runs)})
 	}
 
+	if linked := linkedPRs(item.work); linked != "" && !item.closed {
+		fields = append(fields, [2]string{"linked", linked})
+	}
+
 	if issues := closedIssues(item.work); issues != "" {
 		fields = append(fields, [2]string{"issues", issues})
 	}
@@ -819,6 +831,20 @@ func (m *Model) inboxDetailFields(item inboxItem) [][2]string {
 	return fields
 }
 
+// inboxLocation is where a row's agent runs in tmux.
+func inboxLocation(item inboxItem) string {
+	switch {
+	case item.owner.ID != "" && item.task && item.live.Present:
+		return fmt.Sprintf("%s:%d %s", item.live.SessionName, item.live.WindowIndex, item.live.WindowName)
+	case item.owner.ID != "":
+		return item.owner.Name
+	case item.closed:
+		return "closed"
+	default:
+		return "no window"
+	}
+}
+
 func (m *Model) inboxStateDetail(item inboxItem) string {
 	parts := []string{m.config.Inbox.Label(item.section)}
 
@@ -828,6 +854,14 @@ func (m *Model) inboxStateDetail(item inboxItem) string {
 
 	if item.task && item.live.Record.State != task.StateActive {
 		parts = append(parts, "task "+string(item.live.Record.State))
+	}
+
+	if item.work.Pinned() {
+		parts = append(parts, "pinned")
+	}
+
+	if item.work.Finished() {
+		parts = append(parts, "finished")
 	}
 
 	if item.agent.GitUnmerged > 0 {

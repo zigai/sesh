@@ -22,7 +22,18 @@ import (
 )
 
 const (
-	Version = 1
+	Version = 2
+
+	// FinishedByPR and FinishedByUser say why an item finished: every pull request linked to it
+	// ended, or the user finished it.
+	FinishedByPR   = "pr"
+	FinishedByUser = "user"
+
+	// LinkBranch, LinkUser and LinkDismissed say how a pull request is linked to an item: found for
+	// its branch, linked by the user, or unlinked by the user, which keeps sync from linking it again.
+	LinkBranch    = "branch"
+	LinkUser      = "user"
+	LinkDismissed = "dismissed"
 
 	maxFileBytes = 8 << 20
 	idPrefix     = "w"
@@ -36,25 +47,27 @@ var (
 	ErrUncertain = errors.New("work state publication durability uncertain")
 	ErrNilUpdate = errors.New("work state update is nil")
 	ErrNotFound  = errors.New("no work item has that ID")
+	ErrNotLinked = errors.New("the pull request is not linked to the work item")
 )
 
 // Item is one piece of work: an agent conversation the user drove in a tmux pane, where it ran,
-// and the pull request and issues of its branch. A new conversation in the same pane, such as
-// after the agent clears its context, continues the item.
+// and the pull requests linked to it. A new conversation in the same pane, such as after the agent
+// clears its context, continues the item until the item finishes.
 type Item struct {
 	ID      string `json:"id"`
 	Harness string `json:"harness"`
 	// Conversation is the harness's ID of the latest conversation; Resume is the native command
 	// line that resumes it in Directory.
-	Conversation string           `json:"conversation"`
-	SessionPath  string           `json:"sessionPath"`
-	Resume       []string         `json:"resume"`
-	Title        string           `json:"title"`
-	Directory    string           `json:"directory"`
-	Project      string           `json:"project"`
-	Branch       string           `json:"branch"`
-	PR           task.PullRequest `json:"pr"`
-	Issues       []int            `json:"issues"`
+	Conversation string   `json:"conversation"`
+	SessionPath  string   `json:"sessionPath"`
+	Resume       []string `json:"resume"`
+	Title        string   `json:"title"`
+	Directory    string   `json:"directory"`
+	Project      string   `json:"project"`
+	Branch       string   `json:"branch"`
+	// Task is the sesh task whose window the conversation last ran in, empty outside task windows.
+	Task string   `json:"task"`
+	PRs  []PRLink `json:"prs"`
 	// Server and Pane are the tmux server socket and the pane the conversation last ran in, with
 	// the pane's process, which tells a later pane with a reused ID apart.
 	Server  string `json:"server"`
@@ -64,6 +77,20 @@ type Item struct {
 	// both as Unix seconds.
 	CreatedAt int64 `json:"createdAt"`
 	TurnAt    int64 `json:"turnAt"`
+	// PinnedAt is when the user pinned the item, and FinishedAt when it finished, as Unix seconds,
+	// zero when it is not.
+	PinnedAt   int64  `json:"pinnedAt"`
+	FinishedAt int64  `json:"finishedAt"`
+	FinishedBy string `json:"finishedBy"`
+}
+
+// PRLink is a pull request linked to an item, with its last known state and the issues it closes.
+type PRLink struct {
+	Number int          `json:"number"`
+	State  task.PRState `json:"state"`
+	URL    string       `json:"url"`
+	Issues []int        `json:"issues"`
+	Source string       `json:"source"`
 }
 
 type State struct {
@@ -118,16 +145,124 @@ func (s *State) NextID() string {
 	return idPrefix + strconv.Itoa(s.LastID)
 }
 
-// PREnded reports whether the item's pull request was merged or closed, which ends the work.
-func (i Item) PREnded() bool {
-	return i.PR.State == task.PRMerged || i.PR.State == task.PRClosed
+// Finish finishes the item with id, by the user or because its pull requests ended.
+func (s *State) Finish(id, by string, now time.Time) error {
+	return s.change(id, func(item *Item) error {
+		item.FinishedAt, item.FinishedBy = now.Unix(), by
+
+		return nil
+	})
+}
+
+// Reopen returns the finished item with id to the open work.
+func (s *State) Reopen(id string) error {
+	return s.change(id, func(item *Item) error {
+		*item = item.reopened()
+
+		return nil
+	})
+}
+
+// Pin keeps the item with id first in its section and stops its pull requests from finishing it.
+func (s *State) Pin(id string, now time.Time) error {
+	return s.change(id, func(item *Item) error {
+		item.PinnedAt = now.Unix()
+
+		return nil
+	})
+}
+
+func (s *State) Unpin(id string) error {
+	return s.change(id, func(item *Item) error {
+		item.PinnedAt = 0
+
+		return nil
+	})
+}
+
+// Link links a pull request to the item with id, replacing what was known about it.
+func (s *State) Link(id string, pr PRLink) error {
+	return s.change(id, func(item *Item) error {
+		pr.Source = LinkUser
+		item.PRs = slices.DeleteFunc(item.PRs, func(linked PRLink) bool { return linked.Number == pr.Number })
+		item.PRs = append(item.PRs, pr)
+
+		return nil
+	})
+}
+
+// Unlink unlinks pull request number from the item with id. The item remembers it, so sync does
+// not link it again.
+func (s *State) Unlink(id string, number int) error {
+	return s.change(id, func(item *Item) error {
+		index := slices.IndexFunc(item.PRs, func(linked PRLink) bool { return linked.Number == number && linked.Source != LinkDismissed })
+		if index < 0 {
+			return ErrNotLinked
+		}
+
+		item.PRs[index].Source = LinkDismissed
+
+		return nil
+	})
+}
+
+func (s *State) change(id string, apply func(*Item) error) error {
+	index := slices.IndexFunc(s.Items, func(item Item) bool { return item.ID == id })
+	if index < 0 {
+		return ErrNotFound
+	}
+
+	return apply(&s.Items[index])
+}
+
+func (i Item) Finished() bool {
+	return i.FinishedAt != 0
+}
+
+func (i Item) Pinned() bool {
+	return i.PinnedAt != 0
+}
+
+// Linked lists the pull requests linked to the item, leaving out those the user unlinked.
+func (i Item) Linked() []PRLink {
+	return slices.DeleteFunc(slices.Clone(i.PRs), func(pr PRLink) bool { return pr.Source == LinkDismissed })
+}
+
+// PRsEnded reports whether the item has linked pull requests and every one was merged or closed.
+func (i Item) PRsEnded() bool {
+	linked := i.Linked()
+
+	return len(linked) > 0 && !slices.ContainsFunc(linked, func(pr PRLink) bool { return !pr.Ended() })
+}
+
+// Issues lists the issues the item's linked pull requests close.
+func (i Item) Issues() []int {
+	var issues []int
+	for _, pr := range i.Linked() {
+		issues = append(issues, pr.Issues...)
+	}
+
+	slices.Sort(issues)
+
+	return slices.Compact(issues)
+}
+
+func (i Item) reopened() Item {
+	i.FinishedAt, i.FinishedBy = 0, ""
+
+	return i
+}
+
+// Ended reports whether the pull request was merged or closed.
+func (pr PRLink) Ended() bool {
+	return pr.State == task.PRMerged || pr.State == task.PRClosed
 }
 
 func EmptyItem() Item {
 	return Item{
 		ID: "", Harness: "", Conversation: "", SessionPath: "", Resume: []string{}, Title: "", Directory: "",
-		Project: "", Branch: "", PR: task.PullRequest{Number: 0, State: "", URL: ""}, Issues: []int{},
-		Server: "", Pane: "", PanePID: 0, CreatedAt: 0, TurnAt: 0,
+		Project: "", Branch: "", Task: "", PRs: []PRLink{}, Server: "", Pane: "", PanePID: 0, CreatedAt: 0, TurnAt: 0,
+		PinnedAt: 0, FinishedAt: 0, FinishedBy: "",
 	}
 }
 
@@ -283,7 +418,8 @@ func (s *State) validate() error {
 	ids := make(map[string]bool, len(s.Items))
 
 	for _, item := range s.Items {
-		if item.ID == "" || ids[item.ID] || item.Conversation == "" || len(item.Resume) == 0 || !filepath.IsAbs(item.Directory) {
+		if item.ID == "" || ids[item.ID] || item.Conversation == "" || len(item.Resume) == 0 || !filepath.IsAbs(item.Directory) ||
+			!item.validLifecycle() {
 			return ErrInvalid
 		}
 
@@ -291,6 +427,33 @@ func (s *State) validate() error {
 	}
 
 	return nil
+}
+
+func (i Item) validLifecycle() bool {
+	switch i.FinishedBy {
+	case "":
+		if i.FinishedAt != 0 {
+			return false
+		}
+	case FinishedByPR, FinishedByUser:
+		if i.FinishedAt == 0 {
+			return false
+		}
+	default:
+		return false
+	}
+
+	numbers := make(map[int]bool, len(i.PRs))
+
+	for _, pr := range i.PRs {
+		if pr.Number <= 0 || numbers[pr.Number] || (pr.Source != LinkBranch && pr.Source != LinkUser && pr.Source != LinkDismissed) {
+			return false
+		}
+
+		numbers[pr.Number] = true
+	}
+
+	return true
 }
 
 func emptyState() State {

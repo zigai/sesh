@@ -121,7 +121,8 @@ func (m *Model) ghTargets() []ghTarget {
 
 	for _, row := range m.displaySessions {
 		for _, agent := range row.Agents {
-			if agent.PaneID == "" {
+			// A closed conversation shows the pull requests linked to it, not its branch's.
+			if agent.PaneID == "" || strings.HasPrefix(agent.PaneID, closedRowPrefix) || strings.HasPrefix(agent.PaneID, moreRowPrefix) {
 				continue
 			}
 

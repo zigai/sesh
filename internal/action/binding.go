@@ -101,7 +101,7 @@ func defaultBindings() []Binding {
 		picker("alt+s", SnapshotSave),
 		picker("alt+z", TaskSleep),
 		picker(config.PickerKeyName("alt+shift+z"), TaskWake),
-		picker("alt+f", TaskFinish),
+		picker("alt+f", InboxFinish),
 		picker("alt+o", TaskOpen),
 		tmux("S-F12", AgentNext, Values{}),
 		tmux("M-S-F12", AgentNext, Values{"local": {"true"}}),

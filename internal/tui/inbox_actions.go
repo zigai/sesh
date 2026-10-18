@@ -121,8 +121,8 @@ func (m *Model) pickerActionError(id action.ID) error {
 		}
 
 		return nil
-	case action.InboxArchive.ID:
-		return m.archiveError(item)
+	case action.InboxFinish.ID, action.InboxPin.ID, action.InboxUnpin.ID, action.InboxLink.ID, action.InboxUnlink.ID:
+		return workActionError(id, item)
 	default:
 		return errUnknownInboxAct
 	}
@@ -160,8 +160,10 @@ func (m *Model) snoozeError(id action.ID, item inboxItem) error {
 }
 
 func (m *Model) seenError(id action.ID, item inboxItem) error {
+	viewable := item.owner.ID != "" || item.closed
+
 	if id == action.InboxSeen.ID {
-		if item.section != config.InboxDone || item.owner.ID == "" {
+		if item.section != config.InboxDone || !viewable {
 			return errAlreadySeen
 		}
 
@@ -172,7 +174,7 @@ func (m *Model) seenError(id action.ID, item inboxItem) error {
 		return err
 	}
 
-	if item.section == config.InboxDone || item.owner.ID == "" {
+	if item.section == config.InboxDone || !viewable {
 		return errNotSeen
 	}
 
@@ -209,9 +211,11 @@ func (m *Model) runPickerAction(request pendingAction) func() (tea.Model, tea.Cm
 	case action.InboxUnsnooze.ID:
 		return m.updateInbox(func(state *inbox.State) error { state.Remove(key); return nil })
 	case action.InboxSeen.ID:
-		m.recordActionState(func(current *session.State) {
-			current.RecordAgentView(item.owner.SemanticIdentity(), item.agent.PaneID)
-		})
+		if item.owner.ID != "" {
+			m.recordActionState(func(current *session.State) {
+				current.RecordAgentView(item.owner.SemanticIdentity(), item.agent.PaneID)
+			})
+		}
 
 		return m.updateInbox(func(state *inbox.State) error { state.ClearUnseen(key); return nil })
 	case action.InboxUnseen.ID:
@@ -220,10 +224,8 @@ func (m *Model) runPickerAction(request pendingAction) func() (tea.Model, tea.Cm
 		return m.openPullRequest(item)
 	case action.InboxEvidence.ID:
 		return m.openEvidenceMenu(item)
-	case action.InboxArchive.ID:
-		archived := closedKey(item.host.identity.ConnectionID, item.work.ID)
-
-		return m.updateInbox(func(state *inbox.State) error { state.Archive(archived, item.work.TurnAt); return nil })
+	case action.InboxFinish.ID, action.InboxPin.ID, action.InboxUnpin.ID, action.InboxLink.ID, action.InboxUnlink.ID:
+		return m.runWorkAction(id, item, request.values)
 	}
 
 	return func() (tea.Model, tea.Cmd) { return m, nil }
@@ -304,9 +306,14 @@ func (m *Model) handleInboxUpdated(msg inboxUpdatedMsg) {
 	m.restoreSelectedSession(selected)
 }
 
-// openPullRequest opens the row's pull request in the browser through gh.
+// openPullRequest opens the row's pull request in the browser through gh: a closed conversation's
+// latest linked one, a task's recorded one, else its branch's.
 func (m *Model) openPullRequest(item inboxItem) func() (tea.Model, tea.Cmd) {
 	target := item.agent.GitBranch
+	if linked := item.work.Linked(); item.closed && len(linked) > 0 {
+		target = strconv.Itoa(linked[len(linked)-1].Number)
+	}
+
 	if item.task && item.live.Record.PR.Number != 0 {
 		target = strconv.Itoa(item.live.Record.PR.Number)
 	}

@@ -15,6 +15,7 @@ type Sighting struct {
 	Title        string
 	Directory    string
 	Project      string
+	Task         string
 	Server       string
 	Pane         string
 	PanePID      int
@@ -26,9 +27,10 @@ type Sighting struct {
 type Checkout func(dir string) (branch, project string)
 
 // Observe records sightings: a known conversation updates its item, a new conversation in the
-// pane and directory an item last ran in continues that item, and any other conversation starts
-// a new item. checkout reads the branch and project of a new item or one that moved. It reports
-// whether anything changed.
+// pane and directory an open item last ran in continues that item, and any other conversation
+// starts a new item. A finished conversation seen in another pane was resumed, which reopens it.
+// checkout reads the branch and project of a new item or one that moved. It reports whether
+// anything changed.
 func (s *State) Observe(sightings []Sighting, now time.Time, checkout Checkout) bool {
 	changed := false
 
@@ -66,8 +68,8 @@ func (s *State) match(seen Sighting) int {
 	latest := -1
 
 	for index, item := range s.Items {
-		continues := item.Harness == seen.Harness && item.Server == seen.Server && item.Pane == seen.Pane &&
-			item.PanePID == seen.PanePID && item.Directory == seen.Directory
+		continues := !item.Finished() && item.Harness == seen.Harness && item.Server == seen.Server &&
+			item.Pane == seen.Pane && item.PanePID == seen.PanePID && item.Directory == seen.Directory
 		if continues && (latest < 0 || item.TurnAt > s.Items[latest].TurnAt) {
 			latest = index
 		}
@@ -81,11 +83,16 @@ func apply(item Item, seen Sighting, checkout Checkout) Item {
 		item.Branch, item.Project = checkout(seen.Directory)
 	}
 
+	if item.Finished() && (item.Server != seen.Server || item.Pane != seen.Pane || item.PanePID != seen.PanePID) {
+		item = item.reopened()
+	}
+
 	item.Harness = seen.Harness
 	item.Conversation = seen.Conversation
 	item.SessionPath = seen.SessionPath
 	item.Resume = slices.Clone(seen.Resume)
 	item.Directory = seen.Directory
+	item.Task = seen.Task
 	item.Server = seen.Server
 	item.Pane = seen.Pane
 	item.PanePID = seen.PanePID
@@ -114,8 +121,8 @@ func withoutEmptySlices(item Item) Item {
 		item.Resume = nil
 	}
 
-	if len(item.Issues) == 0 {
-		item.Issues = nil
+	if len(item.PRs) == 0 {
+		item.PRs = nil
 	}
 
 	return item

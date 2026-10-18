@@ -209,23 +209,26 @@ main_size = "60%"
 ```toml
 [inbox]
 group = "state" # state, project
-sections = ["done", "waiting", "unmerged", "running", "snoozed", "asleep", "idle", "closed"] # shown, in order
+sections = ["done", "approve", "input", "waiting", "limited", "unmerged", "running", "snoozed", "asleep", "idle", "closed"] # shown, in order
 labels = { done = "new" }
 dim = ["running", "snoozed", "asleep", "closed"]
 snooze = ["next message", "1h", "4h", "tomorrow 09:00"]
 closed_shown = 3 # closed rows per project before a "more" row; 0 shows all
 
 [menu]
-agent = ["go", "snooze", "unsnooze", "seen", "unseen", "evidence", "pr", "merge", "sleep", "wake", "open", "finish", "archive", "-", "items"]
+agent = ["go", "snooze", "unsnooze", "seen", "unseen", "pin", "unpin", "evidence", "pr", "link", "unlink", "merge", "sleep", "wake", "open", "finish", "-", "items"]
 session = ["go", "rename", "snapshot", "kill", "delete"]
 
 [merge]
 check = ["just", "check"] # runs after the rebase, before the push
+
+[finish]
+run = ["docker", "compose", "down"] # runs in a task worktree before finishing removes it
 ```
 
 A menu lists only the entries that apply to the row. `-` is a divider; `items` lists the menu items not named elsewhere in the list.
 
-The `closed` section lists agent conversations that ran in your own panes, outside task windows, after their agent exits. The agent status service records them in `$XDG_STATE_HOME/sesh/work.json`. Enter resumes one in a new window of its project session (`agent.resume`). A row leaves when its branch's pull request is merged or closed, when its directory is gone, or when `archive` hides it until the conversation gets a new turn.
+`approve` and `input` hold agents waiting for permission or an answer, and `limited` agents stopped by a usage limit. The agent status service records agent conversations in `$XDG_STATE_HOME/sesh/work.json`. After its agent exits, a conversation outside task windows is listed in `closed`; Enter resumes it in a new window of its project session (`agent.resume`). `finish` finishes a task or a conversation, which leaves the inbox until it is resumed; so does a conversation whose linked pull requests, its branch's and those `link` adds, all end. `pin` keeps a row first and open.
 
 ## Menu items
 
@@ -242,7 +245,7 @@ link_pr = true
 prompt_file = ".agents/ship.md"
 ```
 
-`[projects.overrides.<name>.menu_items.<item>]` replaces fields of an item for the project with that directory name, or at that path when `<name>` is a path such as `"~/work/api"`, which wins over the name; a prompt or prompt file replaces both. `[projects.overrides.<name>.merge]` replaces `[merge]` for the project.
+`[projects.overrides.<name>.menu_items.<item>]` replaces fields of an item for the project with that directory name, or at that path when `<name>` is a path such as `"~/work/api"`, which wins over the name; a prompt or prompt file replaces both. `[projects.overrides.<name>.merge]` and `[projects.overrides.<name>.finish]` replace `[merge]` and `[finish]` for the project.
 
 ## Actions
 
@@ -258,7 +261,7 @@ allow_remote = true
 
 `[[keys.bind]]` binds a key to an action in the picker (`in = "picker"`) or in a tmux key table (`in = "tmux"`, rendered by `sesh setup tmux`). An entry replaces the default binding of the same key, and an entry without an action removes it. `params` sets action parameters. Tmux bindings pass the current session or pane as the action's subject; a root-table key pressed in a pane that shows a remote attachment goes to the remote tmux instead. Picker bindings cannot use the picker's own navigation keys or keys that type into its search field.
 
-Defaults: in the picker `alt+c` session.create, `alt+r` session.rename, `alt+x` session.kill, `alt+X` session.delete, `alt+s` snapshot.save, `alt+z` task.sleep, `alt+Z` task.wake, `alt+f` task.finish, `alt+o` task.open; in tmux table `root` `S-F12` agent.next, `M-S-F12` agent.next with `local = true`, `S-F1` agent.back, `C-o` pick.popup, `M-w` pick.popup with `mode = "inbox"`, `C-t` task.menu, `M-n` project.pick.
+Defaults: in the picker `alt+c` session.create, `alt+r` session.rename, `alt+x` session.kill, `alt+X` session.delete, `alt+s` snapshot.save, `alt+z` task.sleep, `alt+Z` task.wake, `alt+f` inbox.finish, `alt+o` task.open; in tmux table `root` `S-F12` agent.next, `M-S-F12` agent.next with `local = true`, `S-F1` agent.back, `C-o` pick.popup, `M-w` pick.popup with `mode = "inbox"`, `C-t` task.menu, `M-n` project.pick.
 
 ```toml
 [[keys.bind]]

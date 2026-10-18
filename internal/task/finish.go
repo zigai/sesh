@@ -122,8 +122,9 @@ func (s *Service) refreshPR(ctx context.Context, record Record) (Record, string,
 // for it. A worktree or branch sesh did not create stays as it is. Without discard it refuses
 // when the removal would lose work: commits not merged into the base on a branch it deletes,
 // uncommitted changes in a worktree it removes, or a pull request of that branch closed without
-// merging. A finish that stops part way leaves the task finishing, and finishing it again
-// completes the removal.
+// merging. Before removing a worktree it runs the project's finish command there; without discard
+// a failing command stops the finish. A finish that stops part way leaves the task finishing, and
+// finishing it again completes the removal.
 func (s *Service) Finish(ctx context.Context, id string, discard bool) (Record, error) {
 	record, err := s.record(ctx, id)
 	if err != nil {
@@ -134,15 +135,9 @@ func (s *Service) Finish(ctx context.Context, id string, discard bool) (Record, 
 		return record, taskError("finish_task", ErrTaskStarting)
 	}
 
-	if record.State != StateFinishing && !discard {
-		mergedHead := ""
-
-		if refreshed, head, _, refreshErr := s.refreshPR(ctx, record); refreshErr == nil {
-			record = refreshed
-			mergedHead = head
-		}
-
-		if err := s.checkLoss(ctx, record, mergedHead); err != nil {
+	if record.State != StateFinishing {
+		record, err = s.prepareFinish(ctx, record, discard)
+		if err != nil {
 			return record, taskError("finish_task", err)
 		}
 	}
@@ -165,6 +160,59 @@ func (s *Service) Finish(ctx context.Context, id string, discard bool) (Record, 
 	})
 
 	return record, taskError("finish_task", err)
+}
+
+// prepareFinish checks that finishing a task loses no work, unless it discards work, and runs the
+// project's finish command in its worktree.
+func (s *Service) prepareFinish(ctx context.Context, record Record, discard bool) (Record, error) {
+	if !discard {
+		mergedHead := ""
+
+		if refreshed, head, _, refreshErr := s.refreshPR(ctx, record); refreshErr == nil {
+			record = refreshed
+			mergedHead = head
+		}
+
+		if err := s.checkLoss(ctx, record, mergedHead); err != nil {
+			return record, err
+		}
+	}
+
+	if err := s.runFinish(ctx, record); err != nil && !discard {
+		return record, err
+	}
+
+	return record, nil
+}
+
+func (s *Service) runFinish(ctx context.Context, record Record) error {
+	if s.finishRun == nil || !record.OwnsWorktree {
+		return nil
+	}
+
+	run := s.finishRun(record.Project)
+	if len(run) == 0 {
+		return nil
+	}
+
+	if _, err := os.Stat(record.Directory); errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+
+	command := exec.CommandContext(ctx, run[0], run[1:]...)
+	command.Dir = record.Directory
+	command.Env = os.Environ()
+
+	err := command.Run()
+	if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
+		return &FinishRunError{ExitCode: exitErr.ExitCode()}
+	}
+
+	if err != nil {
+		return errors.Join(ErrFinishRun, err)
+	}
+
+	return nil
 }
 
 func (s *Service) checkLoss(ctx context.Context, record Record, mergedHead string) error {

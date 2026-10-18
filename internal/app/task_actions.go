@@ -51,6 +51,10 @@ func (local *Local) finishTask(ctx context.Context, _ action.Caller, input actio
 		return action.FinishedTask{ID: input.Task}, oops.In("app").With("operation", "finish_task").Wrap(err)
 	}
 
+	if err := local.finishTaskWork(ctx, input.Task); err != nil {
+		return action.FinishedTask{ID: input.Task}, action.Wrap(action.CodePartial, err)
+	}
+
 	return action.FinishedTask{ID: input.Task}, nil
 }
 

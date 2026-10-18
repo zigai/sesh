@@ -21,7 +21,13 @@ const (
 	moreRowPrefix   = "more:"
 )
 
-var errNotClosed = errors.New("only a closed conversation is archived")
+var (
+	errNotRecorded     = errors.New("the row has no recorded conversation")
+	errAlreadyPinned   = errors.New("the conversation is already pinned")
+	errNotPinned       = errors.New("the conversation is not pinned")
+	errNothingLinked   = errors.New("no pull request is linked to the conversation")
+	errAlreadyFinished = errors.New("the conversation is already finished")
+)
 
 type workSyncMsg struct {
 	changed bool
@@ -35,8 +41,8 @@ type remoteResume struct {
 	pane       string
 }
 
-// hostClosedItems lists the recorded conversations of a host whose agent no longer runs there,
-// except those whose pull request ended and those the user archived. A project shows its most
+// hostClosedItems lists the open recorded conversations of a host whose agent no longer runs
+// there, except those of tasks, which have rows of their own. A project shows its pinned and most
 // recent ones up to the configured count, then a row that expands the rest.
 func (m *Model) hostClosedItems(host inboxHost) []inboxItem {
 	running := make(map[string]bool)
@@ -56,8 +62,7 @@ func (m *Model) hostClosedItems(host inboxHost) []inboxItem {
 	projects := make(map[string][]inboxItem)
 
 	for _, recorded := range host.work {
-		if running[recorded.Harness+"/"+recorded.Conversation] || recorded.PREnded() ||
-			m.inbox.IsArchived(closedKey(host.identity.ConnectionID, recorded.ID), recorded.TurnAt) {
+		if running[recorded.Harness+"/"+recorded.Conversation] || recorded.Finished() || recorded.Task != "" {
 			continue
 		}
 
@@ -80,8 +85,8 @@ func (m *Model) hostClosedItems(host inboxHost) []inboxItem {
 	return items
 }
 
-// shownClosedItems are the closed rows a project shows: the most recent ones up to the configured
-// count unless the user expanded the project, then a row that expands the rest.
+// shownClosedItems are the closed rows a project shows: the pinned and most recent ones up to the
+// configured count unless the user expanded the project, then a row that expands the rest.
 func (m *Model) shownClosedItems(host inboxHost, project string, items []inboxItem) []inboxItem {
 	shown := m.config.Inbox.ClosedShown
 	expandKey := host.identity.ConnectionID + "\x00" + project
@@ -90,7 +95,7 @@ func (m *Model) shownClosedItems(host inboxHost, project string, items []inboxIt
 		return items
 	}
 
-	slices.SortStableFunc(items, func(left, right inboxItem) int { return right.agent.StatusSince.Compare(left.agent.StatusSince) })
+	slices.SortStableFunc(items, compareRecency)
 
 	more := items[shown]
 	more.agent.PaneID = moreRowPrefix + project
@@ -132,6 +137,7 @@ func (m *Model) newClosedItem(host inboxHost, recorded work.Item) inboxItem {
 	agent.Task = recorded.Title
 	agent.Status = session.AgentStatusClosed
 	agent.StatusSince = time.Unix(recorded.TurnAt, 0)
+	agent.Host = host.identity.ConnectionID
 
 	if agent.HarnessSession == "" {
 		agent.HarnessSession = recorded.Harness
@@ -141,22 +147,51 @@ func (m *Model) newClosedItem(host inboxHost, recorded work.Item) inboxItem {
 		applyAgentGitMetadata(&agent, metadata)
 	}
 
-	agent.Host = host.identity.ConnectionID
-
 	var (
 		owner session.Session
 		live  task.Live
 	)
 
+	section := config.InboxClosed
+	if _, marked := m.inbox.FindUnseen(conversationKey(agent)); marked {
+		section = config.InboxDone
+	}
+
 	return inboxItem{
-		agent: agent, owner: owner, host: host, live: live, task: false, closed: true, work: recorded, more: "", section: config.InboxClosed,
+		agent: agent, owner: owner, host: host, live: live, task: false, closed: true, work: recorded, more: "", section: section,
 	}
 }
 
-// closedKey names a recorded conversation in the inbox state: work item IDs are only unique on
-// one host.
-func closedKey(host, id string) string {
-	return host + "/" + closedRowPrefix + id
+// compareRecency orders pinned rows first, then the most recent change first.
+func compareRecency(left, right inboxItem) int {
+	if left.work.Pinned() != right.work.Pinned() {
+		if left.work.Pinned() {
+			return -1
+		}
+
+		return 1
+	}
+
+	return right.agent.StatusSince.Compare(left.agent.StatusSince)
+}
+
+// recordedWork is the recorded conversation of a row: the latest one of its task, else the one
+// with its agent's conversation.
+func recordedWork(host inboxHost, agent session.AgentSession, live task.Live, isTask bool) work.Item {
+	found := work.EmptyItem()
+
+	for _, recorded := range host.work {
+		matches := recorded.Harness == agent.Harness && recorded.Conversation == agent.SessionID && agent.SessionID != ""
+		if isTask {
+			matches = recorded.Task == live.Record.ID
+		}
+
+		if matches && (found.ID == "" || recorded.TurnAt > found.TurnAt) {
+			found = recorded
+		}
+	}
+
+	return found
 }
 
 // resumeClosedItem resumes a closed conversation on its host and goes to its new window.
@@ -210,15 +245,86 @@ func (m *Model) attachResumed() tea.Cmd {
 	return tea.Quit
 }
 
-func (m *Model) archiveError(item inboxItem) error {
+// workActionError reports why a row's recorded conversation cannot be finished, pinned or
+// linked.
+func workActionError(id action.ID, item inboxItem) error {
 	switch {
-	case !item.closed || item.more != "":
-		return errNotClosed
-	case m.deps.Inbox == nil:
-		return errInboxUnsaved
+	case id == action.InboxFinish.ID && item.task:
+		return nil
+	case item.work.ID == "" || item.more != "":
+		return errNotRecorded
+	default:
+		return recordedActionError(id, item.work)
+	}
+}
+
+func recordedActionError(id action.ID, recorded work.Item) error {
+	switch {
+	case id == action.InboxFinish.ID && recorded.Finished():
+		return errAlreadyFinished
+	case id == action.InboxPin.ID && recorded.Pinned():
+		return errAlreadyPinned
+	case id == action.InboxUnpin.ID && !recorded.Pinned():
+		return errNotPinned
+	case id == action.InboxUnlink.ID && len(recorded.Linked()) == 0:
+		return errNothingLinked
 	default:
 		return nil
 	}
+}
+
+// runWorkAction applies an inbox action to the row's recorded conversation on its host; finishing
+// a task row finishes the task.
+func (m *Model) runWorkAction(id action.ID, item inboxItem, values action.Values) func() (tea.Model, tea.Cmd) {
+	if id == action.InboxFinish.ID && item.task {
+		return m.invokeAction(action.TaskFinish.ID, action.Values{})
+	}
+
+	at := action.Local()
+	if item.host.origin == session.OriginSSH {
+		at = action.Peer(item.host.identity.ConnectionID)
+	}
+
+	subject := action.Subject{At: at, Sessions: nil, Pane: "", Task: ""}
+	params := action.Values{"item": {item.work.ID}}
+
+	switch id {
+	case action.InboxPin.ID:
+		return m.runAction(action.AgentPin, subject, params)
+	case action.InboxUnpin.ID:
+		return m.runAction(action.AgentUnpin, subject, params)
+	case action.InboxLink.ID:
+		params.Set("pr", values.String("pr"))
+
+		return m.runAction(action.AgentLink, subject, params)
+	case action.InboxUnlink.ID:
+		return m.unlinkPR(item, subject, values.String("pr"))
+	default:
+		return m.runAction(action.AgentFinish, subject, params)
+	}
+}
+
+// unlinkPR unlinks a pull request from a row's conversation: the one given, the only one linked,
+// else the one the user picks.
+func (m *Model) unlinkPR(item inboxItem, subject action.Subject, pr string) func() (tea.Model, tea.Cmd) {
+	linked := item.work.Linked()
+	if pr == "" && len(linked) == 1 {
+		pr = strconv.Itoa(linked[0].Number)
+	}
+
+	if pr != "" {
+		return m.runAction(action.AgentUnlink, subject, action.Values{"item": {item.work.ID}, "pr": {pr}})
+	}
+
+	entries := make([]menuEntry, 0, len(linked))
+	for _, link := range linked {
+		number := strconv.Itoa(link.Number)
+		entries = append(entries, menuEntry{label: prText(link), key: "", run: func() (tea.Model, tea.Cmd) {
+			return m.runAction(action.AgentUnlink, subject, action.Values{"item": {item.work.ID}, "pr": {number}})()
+		}})
+	}
+
+	return m.openMenu(&rowMenu{title: "unlink", entries: entries, cursor: 0, anchored: false, anchorX: 0, anchorY: 0, box: menuBox{x: 0, y: 0, width: 0, height: 0}})
 }
 
 // syncWorkCommand brings the recorded conversations up to date once per picker, after they first
@@ -251,7 +357,7 @@ func (m *Model) workDirectories() []string {
 	directories := make([]string, 0, len(m.work))
 
 	for _, recorded := range m.work {
-		if !recorded.PREnded() {
+		if !recorded.Finished() {
 			directories = append(directories, recorded.Directory)
 		}
 	}
@@ -259,15 +365,22 @@ func (m *Model) workDirectories() []string {
 	return directories
 }
 
-// closedPR is the pull request recorded for a closed row, with the issues it closes.
-func closedPR(recorded work.Item) string {
-	pr := recorded.PR
-	if pr.Number == 0 {
-		return ""
+// linkedPRs are the pull requests linked to a recorded conversation, with the state of those no
+// longer open.
+func linkedPRs(recorded work.Item) string {
+	linked := recorded.Linked()
+	texts := make([]string, 0, len(linked))
+
+	for _, pr := range linked {
+		texts = append(texts, prText(pr))
 	}
 
+	return strings.Join(texts, ", ")
+}
+
+func prText(pr work.PRLink) string {
 	text := "#" + strconv.Itoa(pr.Number)
-	if pr.State != task.PROpen {
+	if pr.State != task.PROpen && pr.State != "" {
 		text += " " + string(pr.State)
 	}
 
@@ -275,11 +388,12 @@ func closedPR(recorded work.Item) string {
 }
 
 func closedIssues(recorded work.Item) string {
-	issues := make([]string, 0, len(recorded.Issues))
+	issues := recorded.Issues()
+	texts := make([]string, 0, len(issues))
 
-	for _, issue := range slices.Sorted(slices.Values(recorded.Issues)) {
-		issues = append(issues, "#"+strconv.Itoa(issue))
+	for _, issue := range issues {
+		texts = append(texts, "#"+strconv.Itoa(issue))
 	}
 
-	return strings.Join(issues, " ")
+	return strings.Join(texts, " ")
 }

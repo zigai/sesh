@@ -233,7 +233,7 @@ func agentReportedCell(values sessionFormatValues, part display.Part, cell rowla
 	}
 
 	if part.Field == display.FieldAgentPR && cell.State != rowlayout.Present {
-		if recorded := values.model.recordedTaskPR(values.agent); recorded != "" {
+		if recorded := values.model.recordedPR(values.agent); recorded != "" {
 			cell.Text, cell.State = recorded, rowlayout.Present
 		}
 	}

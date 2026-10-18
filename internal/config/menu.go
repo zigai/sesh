@@ -23,14 +23,17 @@ const (
 	MenuUnsnooze = "unsnooze"
 	MenuSeen     = "seen"
 	MenuUnseen   = "unseen"
+	MenuPin      = "pin"
+	MenuUnpin    = "unpin"
 	MenuEvidence = "evidence"
 	MenuPR       = "pr"
+	MenuLink     = "link"
+	MenuUnlink   = "unlink"
 	MenuMerge    = "merge"
 	MenuSleep    = "sleep"
 	MenuWake     = "wake"
 	MenuOpen     = "open"
 	MenuFinish   = "finish"
-	MenuArchive  = "archive"
 	MenuRename   = "rename"
 	MenuSnapshot = "snapshot"
 	MenuKill     = "kill"
@@ -40,8 +43,8 @@ const (
 var (
 	// AgentMenuEntries are the built-in entries of the menu of an agent or task row.
 	AgentMenuEntries = []string{
-		MenuGo, MenuSnooze, MenuUnsnooze, MenuSeen, MenuUnseen, MenuEvidence, MenuPR, MenuMerge,
-		MenuSleep, MenuWake, MenuOpen, MenuFinish, MenuArchive,
+		MenuGo, MenuSnooze, MenuUnsnooze, MenuSeen, MenuUnseen, MenuPin, MenuUnpin, MenuEvidence, MenuPR,
+		MenuLink, MenuUnlink, MenuMerge, MenuSleep, MenuWake, MenuOpen, MenuFinish,
 	}
 	// SessionMenuEntries are the built-in entries of the menu of a session row.
 	SessionMenuEntries = []string{MenuGo, MenuRename, MenuSnapshot, MenuKill, MenuDelete}
@@ -58,6 +61,7 @@ var (
 	errMenuEntry            = errors.New("unknown menu entry")
 	errMenuEntryTwice       = errors.New("menu entry is listed twice")
 	errMergeCheckEmpty      = errors.New("merge check needs a program")
+	errFinishRunEmpty       = errors.New("finish run needs a program")
 	errWakeOnRestoreInvalid = errors.New(`tasks.wake_on_restore must be "previous", "none", or a positive count such as "3"`)
 
 	templateVariable = regexp.MustCompile(`\{[^{}]*\}`)
@@ -91,10 +95,17 @@ type MergeConfig struct {
 	Check []string `toml:"check"`
 }
 
-// ProjectConfig holds settings for one project. A Merge it sets replaces the global one.
+// FinishConfig configures finishing a task. Run runs in the task's worktree before sesh removes
+// it; a failing run stops the finish unless it discards work. It never runs in a main checkout.
+type FinishConfig struct {
+	Run []string `toml:"run"`
+}
+
+// ProjectConfig holds settings for one project. A Merge or Finish it sets replaces the global one.
 type ProjectConfig struct {
 	MenuItems   map[string]MenuItemConfig `toml:"menu_items"`
 	Merge       *MergeConfig              `toml:"merge"`
+	Finish      *FinishConfig             `toml:"finish"`
 	TaskPanes   []TaskPaneConfig          `toml:"task_panes"`
 	TaskLayouts []TaskLayoutConfig        `toml:"task_layouts"`
 }
@@ -144,11 +155,20 @@ func (c *Config) MergeCheckFor(root string) []string {
 	return slices.Clone(c.Merge.Check)
 }
 
+// FinishRunFor returns the finish command of the project at root: its own, else the global one.
+func (c *Config) FinishRunFor(root string) []string {
+	if override := c.ProjectOverride(root).Finish; override != nil {
+		return slices.Clone(override.Run)
+	}
+
+	return slices.Clone(c.Finish.Run)
+}
+
 // ProjectOverride returns the overrides of the project at root: those keyed by its path, else
 // those keyed by its directory name. A path key tells apart projects with the same name.
 func (c *Config) ProjectOverride(root string) ProjectConfig {
 	if root == "" {
-		return ProjectConfig{MenuItems: nil, Merge: nil, TaskPanes: nil, TaskLayouts: nil}
+		return ProjectConfig{MenuItems: nil, Merge: nil, Finish: nil, TaskPanes: nil, TaskLayouts: nil}
 	}
 
 	for key, override := range c.Projects.Overrides {
@@ -202,15 +222,26 @@ func ValidateMenu(cfg *Config) error {
 	return validateMenuList("menu.session", cfg.Menu.Session, SessionMenuEntries, false, nil)
 }
 
-// ValidateMerge checks the global merge check and every project's.
+// ValidateMerge checks the global merge check and finish command and every project's.
 func ValidateMerge(cfg *Config) error {
-	if err := validateMergeCheck("merge.check", cfg.Merge.Check); err != nil {
+	if err := validateCommand("merge.check", cfg.Merge.Check, errMergeCheckEmpty); err != nil {
+		return err
+	}
+
+	if err := validateCommand("finish.run", cfg.Finish.Run, errFinishRunEmpty); err != nil {
 		return err
 	}
 
 	for _, project := range slices.Sorted(maps.Keys(cfg.Projects.Overrides)) {
-		if override := cfg.Projects.Overrides[project].Merge; override != nil {
-			if err := validateMergeCheck("projects.overrides."+project+".merge.check", override.Check); err != nil {
+		override := cfg.Projects.Overrides[project]
+		if override.Merge != nil {
+			if err := validateCommand("projects.overrides."+project+".merge.check", override.Merge.Check, errMergeCheckEmpty); err != nil {
+				return err
+			}
+		}
+
+		if override.Finish != nil {
+			if err := validateCommand("projects.overrides."+project+".finish.run", override.Finish.Run, errFinishRunEmpty); err != nil {
 				return err
 			}
 		}
@@ -244,9 +275,9 @@ func ValidateWakeOnRestore(value string) error {
 	return errWakeOnRestoreInvalid
 }
 
-func validateMergeCheck(name string, check []string) error {
-	if len(check) > 0 && strings.TrimSpace(check[0]) == "" {
-		return fmt.Errorf("invalid %s: %w", name, errMergeCheckEmpty)
+func validateCommand(name string, command []string, empty error) error {
+	if len(command) > 0 && strings.TrimSpace(command[0]) == "" {
+		return fmt.Errorf("invalid %s: %w", name, empty)
 	}
 
 	return nil
@@ -258,6 +289,14 @@ func cloneMergeConfig(merge *MergeConfig) *MergeConfig {
 	}
 
 	return &MergeConfig{Check: slices.Clone(merge.Check)}
+}
+
+func cloneFinishConfig(finish *FinishConfig) *FinishConfig {
+	if finish == nil {
+		return nil
+	}
+
+	return &FinishConfig{Run: slices.Clone(finish.Run)}
 }
 
 func validateMenuList(name string, entries, builtIn []string, takesItems bool, items []string) error {
@@ -353,7 +392,8 @@ func cloneProjects(projects map[string]ProjectConfig) map[string]ProjectConfig {
 	clone := make(map[string]ProjectConfig, len(projects))
 	for name, project := range projects {
 		clone[name] = ProjectConfig{
-			MenuItems: cloneMenuItems(project.MenuItems), Merge: cloneMergeConfig(project.Merge), TaskPanes: cloneTaskPanes(project.TaskPanes),
+			MenuItems: cloneMenuItems(project.MenuItems), Merge: cloneMergeConfig(project.Merge), Finish: cloneFinishConfig(project.Finish),
+			TaskPanes:   cloneTaskPanes(project.TaskPanes),
 			TaskLayouts: cloneTaskLayouts(project.TaskLayouts),
 		}
 	}

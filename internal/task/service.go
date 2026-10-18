@@ -75,6 +75,9 @@ type Options struct {
 	PRs         PRFinder
 	// ClosePopup closes a task's popup session, if it has one.
 	ClosePopup func(ctx context.Context, id string) error
+	// FinishRun returns the command run in a task worktree before finishing removes it, for the
+	// project at a root.
+	FinishRun func(project string) []string
 }
 
 // Service creates tasks and their windows on one tmux server.
@@ -91,13 +94,14 @@ type Service struct {
 	placeholder func(id string) []string
 	prs         PRFinder
 	closePopup  func(ctx context.Context, id string) error
+	finishRun   func(project string) []string
 }
 
 func NewService(opts Options) *Service {
 	return &Service{
 		server: opts.Server, store: opts.Store, catalog: opts.Catalog, cfg: opts.Config, windows: opts.Windows,
 		worktreeDir: opts.WorktreeDir, lookPath: opts.LookPath, now: opts.Now, agents: opts.Agents,
-		placeholder: opts.Placeholder, prs: opts.PRs, closePopup: opts.ClosePopup,
+		placeholder: opts.Placeholder, prs: opts.PRs, closePopup: opts.ClosePopup, finishRun: opts.FinishRun,
 	}
 }
 

@@ -1,5 +1,14 @@
 package action
 
+import (
+	"errors"
+	"strconv"
+	"strings"
+)
+
+// ErrPRNumber rejects a pull request that is not a positive number.
+var ErrPRNumber = errors.New("pull request must be a number such as 12 or #12")
+
 var (
 	AgentNext = defineAgentNavigation("agent.next", "Next agent", "Switch to the next coding agent needing attention",
 		"Switch to the next coding agent pane needing attention (waiting, failed, or idle) and activate its window, session, and pane.")
@@ -102,8 +111,8 @@ var AgentResume = define(Descriptor{
 	Title:   "Resume agent",
 	Summary: "Resume a closed agent conversation in a new window",
 	Help: "Open a window that runs the native resume command of a recorded agent conversation in its directory: " +
-		"in its project's session, else in the invoking pane's session. The agent status service records the " +
-		"conversations of interactive agents in panes outside task windows.",
+		"in its project's session, else in the invoking pane's session, and reopen it if it finished. The agent " +
+		"status service records the conversations of interactive agents in tmux panes.",
 	Subject:     SubjectNone,
 	Arity:       ArityOne,
 	Params:      []Param{newParam("item", ParamText, "Recorded conversation to resume").required().positional()},
@@ -116,6 +125,28 @@ var AgentResume = define(Descriptor{
 }, func(_ Subject, values Values) (ResumeAgent, error) {
 	return ResumeAgent{Item: values.String("item")}, nil
 }, func(out ResumedAgent) string { return "Resumed " + out.Item })
+
+var (
+	AgentFinish = defineWorkAction("agent.finish", "Finished", "Finish conversation", "Mark a recorded conversation finished",
+		"Finish a recorded agent conversation: the inbox stops listing it once its agent exits. Resuming it "+
+			"reopens it. A conversation also finishes when every pull request linked to it is merged or closed.")
+
+	AgentPin = defineWorkAction("agent.pin", "Pinned", "Pin conversation", "Keep a recorded conversation first and open",
+		"Pin a recorded agent conversation: the inbox lists it first in its section, and its pull requests "+
+			"ending does not finish it.")
+
+	AgentUnpin = defineWorkAction("agent.unpin", "Unpinned", "Unpin conversation", "Unpin a recorded conversation",
+		"Unpin a recorded agent conversation.")
+
+	AgentLink = defineWorkAction("agent.link", "Linked a pull request to", "Link PR", "Link a pull request to a recorded conversation",
+		"Link a pull request of the conversation's repository to it, as gh reports it. The conversation finishes "+
+			"when every linked pull request is merged or closed.",
+		newParam("pr", ParamText, "Pull request number").required().positional())
+
+	AgentUnlink = defineWorkAction("agent.unlink", "Unlinked a pull request from", "Unlink PR", "Unlink a pull request from a recorded conversation",
+		"Unlink a pull request from a recorded conversation. Sync does not link it again.",
+		newParam("pr", ParamText, "Pull request number").required().positional())
+)
 
 type NavigateAgents struct {
 	Local bool `json:"local"`
@@ -153,6 +184,16 @@ type ResumeAgent struct {
 	Item string `json:"item"`
 }
 
+// ChangeWork names a recorded conversation and, for linking, a pull request number.
+type ChangeWork struct {
+	Item string `json:"item"`
+	PR   int    `json:"pr"`
+}
+
+type ChangedWork struct {
+	Item string `json:"item"`
+}
+
 // ResumedAgent is the window a resumed conversation runs in.
 type ResumedAgent struct {
 	Item    string     `json:"item"`
@@ -178,6 +219,37 @@ func defineAgentNavigation(id ID, title, summary, help string) *Definition[Navig
 	}, func(_ Subject, values Values) (NavigateAgents, error) {
 		return NavigateAgents{Local: values.Bool("local")}, nil
 	}, reportFocusedPane)
+}
+
+func defineWorkAction(id ID, done, title, summary, help string, params ...Param) *Definition[ChangeWork, ChangedWork] {
+	return define(Descriptor{
+		ID:          id,
+		Title:       title,
+		Summary:     summary,
+		Help:        help,
+		Subject:     SubjectNone,
+		Arity:       ArityOne,
+		Params:      append([]Param{newParam("item", ParamText, "Recorded conversation").required().positional()}, params...),
+		NeedsClient: false,
+		Interactive: false,
+		Destructive: false,
+		Remote:      RemoteOnByDefault,
+		InPicker:    false,
+		check:       nil,
+	}, func(_ Subject, values Values) (ChangeWork, error) {
+		pr := 0
+
+		if text := values.String("pr"); text != "" {
+			number, err := strconv.Atoi(strings.TrimPrefix(text, "#"))
+			if err != nil || number <= 0 {
+				return ChangeWork{Item: "", PR: 0}, ErrPRNumber
+			}
+
+			pr = number
+		}
+
+		return ChangeWork{Item: values.String("item"), PR: pr}, nil
+	}, func(out ChangedWork) string { return done + " " + out.Item })
 }
 
 // reportFocusedPane is silent: navigation runs from tmux key bindings, where any output would

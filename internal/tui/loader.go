@@ -193,7 +193,7 @@ func loadSessionRows(ctx context.Context, cfg *config.Config, deps Services) ses
 			work:              nil,
 			workLoaded:        false,
 			workErr:           nil,
-			inbox:             inbox.State{Version: 0, Snoozes: nil, Unseen: nil, Archived: nil},
+			inbox:             inbox.State{Version: 0, Snoozes: nil, Unseen: nil},
 			inboxLoaded:       false,
 			inboxErr:          nil,
 			agentGit:          nil,

@@ -1,6 +1,7 @@
 package work_test
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -134,5 +135,81 @@ func TestObservedItemsSurviveTheStore(t *testing.T) {
 
 	if item, found := state.Find("w1"); !found || item.Conversation != "c1" || item.Resume[2] != "c1" {
 		t.Errorf("Find(w1) = %+v, %t", item, found)
+	}
+}
+
+func finishedState(t *testing.T) work.State {
+	t.Helper()
+
+	state := emptyState()
+	state.Observe([]work.Sighting{sighting("c1", "%1", 100)}, observedAt, branchMain)
+
+	if err := state.Finish("w1", work.FinishedByUser, observedAt); err != nil {
+		t.Fatalf("Finish() error = %v", err)
+	}
+
+	return state
+}
+
+func TestAFinishedConversationSeenInAnotherPaneReopens(t *testing.T) {
+	state := finishedState(t)
+	state.Observe([]work.Sighting{sighting("c1", "%7", 300)}, observedAt, branchMain)
+
+	if state.Items[0].Finished() {
+		t.Errorf("item = %+v, want it reopened", state.Items[0])
+	}
+}
+
+func TestAFinishedConversationStillInItsPaneStaysFinished(t *testing.T) {
+	state := finishedState(t)
+
+	later := sighting("c1", "%1", 100)
+	later.TurnAt = observedAt.Add(time.Minute)
+	state.Observe([]work.Sighting{later}, observedAt, branchMain)
+
+	if !state.Items[0].Finished() {
+		t.Errorf("item = %+v, want it still finished", state.Items[0])
+	}
+}
+
+func TestANewConversationInAFinishedItemsPaneStartsANewItem(t *testing.T) {
+	state := finishedState(t)
+	state.Observe([]work.Sighting{sighting("c2", "%1", 100)}, observedAt, branchMain)
+
+	if len(state.Items) != 2 || state.Items[0].Conversation != "c1" || state.Items[1].Finished() {
+		t.Errorf("Items = %+v, want c1 finished and c2 a new open item", state.Items)
+	}
+}
+
+func TestObserveRecordsTheTaskAConversationRunsIn(t *testing.T) {
+	state := emptyState()
+
+	inTask := sighting("c1", "%1", 100)
+	inTask.Task = "t3"
+	state.Observe([]work.Sighting{inTask}, observedAt, branchMain)
+
+	if state.Items[0].Task != "t3" {
+		t.Errorf("Task = %q, want t3", state.Items[0].Task)
+	}
+}
+
+func TestUnlinkingAPullRequestKeepsItOutOfTheLinkedOnes(t *testing.T) {
+	state := emptyState()
+	state.Observe([]work.Sighting{sighting("c1", "%1", 100)}, observedAt, branchMain)
+
+	if err := state.Link("w1", work.PRLink{Number: 4, State: "open", URL: "", Issues: []int{2}, Source: ""}); err != nil {
+		t.Fatalf("Link() error = %v", err)
+	}
+
+	if err := state.Unlink("w1", 4); err != nil {
+		t.Fatalf("Unlink() error = %v", err)
+	}
+
+	if item := state.Items[0]; len(item.Linked()) != 0 || len(item.Issues()) != 0 || len(item.PRs) != 1 {
+		t.Errorf("item = %+v, want the pull request remembered but not linked", item)
+	}
+
+	if err := state.Unlink("w1", 4); !errors.Is(err, work.ErrNotLinked) {
+		t.Errorf("Unlink() again error = %v, want ErrNotLinked", err)
 	}
 }
