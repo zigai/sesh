@@ -1,0 +1,9 @@
+- Two hand-started pi agents on branch feature with open PR #5 (fake gh) both show #5 in the inbox after it opens
+- alt+f on a closed conversation marks it finished by the user and removes the row
+- sesh agent resume on the finished conversation reopens it; sesh agent pin and sesh agent link '#6' update the item, link 99 fails with gh's error, a second unlink of #5 is refused
+- With #5 and #6 merged, the unpinned conversation finishes by its pull request and the pinned one stays, showing #6 merged and issue #7
+- alt+f on a task row asks to confirm, runs the finish command in the task worktree, removes the worktree and finishes the task's recorded conversation
+- A finish command exiting 3 stops task finish with that exit code; --discard removes the task anyway
+- The row menu on a closed row offers unseen, pin or unpin, pr, link, unlink and finish; unseen moves it to done; the link prompt links #5 again; pr opens the newest linked PR
+- A loopback remote host lists its closed conversation; pin and finish from the local inbox change the remote work state
+- The live work.json (25 items) converts to version 2 and the installed status daemon rewrites it after restart
