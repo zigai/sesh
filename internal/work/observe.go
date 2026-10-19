@@ -20,6 +20,9 @@ type Sighting struct {
 	Pane         string
 	PanePID      int
 	TurnAt       time.Time
+	// PromptAt is when the user last sent the agent a prompt, zero when the agent's latest event is
+	// not a prompt.
+	PromptAt time.Time
 }
 
 // Checkout reads the branch checked out in a directory and the root of its project's main
@@ -28,7 +31,8 @@ type Checkout func(dir string) (branch, project string)
 
 // Observe records sightings: a known conversation updates its item, a new conversation in the
 // pane and directory an open item last ran in continues that item, and any other conversation
-// starts a new item. A finished conversation seen in another pane was resumed, which reopens it.
+// starts a new item. A finished conversation seen in another pane was resumed, and one prompted
+// again after it finished was continued; either reopens it.
 // checkout reads the branch and project of a new item or one that moved. It reports whether
 // anything changed.
 func (s *State) Observe(sightings []Sighting, now time.Time, checkout Checkout) bool {
@@ -48,7 +52,7 @@ func (s *State) Observe(sightings []Sighting, now time.Time, checkout Checkout) 
 			index = len(s.Items) - 1
 		}
 
-		updated := apply(s.Items[index], seen, checkout)
+		updated := apply(s.Items[index], seen, now, checkout)
 		if !same(updated, s.Items[index]) {
 			s.Items[index] = updated
 			changed = true
@@ -78,13 +82,16 @@ func (s *State) match(seen Sighting) int {
 	return latest
 }
 
-func apply(item Item, seen Sighting, checkout Checkout) Item {
+func apply(item Item, seen Sighting, now time.Time, checkout Checkout) Item {
 	if item.Conversation == "" || item.Directory != seen.Directory {
 		item.Branch, item.Project = checkout(seen.Directory)
 	}
 
-	if item.Finished() && (item.Server != seen.Server || item.Pane != seen.Pane || item.PanePID != seen.PanePID) {
-		item = item.reopened()
+	moved := item.Server != seen.Server || item.Pane != seen.Pane || item.PanePID != seen.PanePID
+	prompt := unixOrZero(seen.PromptAt)
+
+	if item.Finished() && (moved || prompt > item.FinishedAt) {
+		item = item.reopened(now)
 	}
 
 	item.Harness = seen.Harness
@@ -108,6 +115,8 @@ func apply(item Item, seen Sighting, checkout Checkout) Item {
 	if turn := seen.TurnAt.Unix(); !seen.TurnAt.IsZero() && turn > item.TurnAt {
 		item.TurnAt = turn
 	}
+
+	item.PromptAt = max(item.PromptAt, prompt)
 
 	return item
 }

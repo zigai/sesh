@@ -98,6 +98,7 @@ func (r *Recorder) sightings(sessions []aht.Session) []Sighting {
 			Harness: agent.Harness, Conversation: agent.HarnessSessionID, SessionPath: agent.SessionPath,
 			Resume: agent.ResumeCommand, Title: "", Directory: agent.CWD, Project: agent.ProjectRoot, Task: r.tasks[agent.HarnessSessionID],
 			Server: agent.ServerSocket, Pane: agent.PaneID, PanePID: agent.PanePID, TurnAt: agent.ActivityChanged,
+			PromptAt: agent.PromptAt,
 		})
 	}
 

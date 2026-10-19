@@ -247,6 +247,10 @@ func ClassifySSHFailure(ctxErr error, diagnostics string) error {
 		strings.Contains(message, "no such file or directory"),
 		strings.Contains(message, ": not found"):
 		return ErrRemotePeerUnavailable
+	case strings.Contains(message, strings.ToLower(ErrUnsupportedProtocol.Error())),
+		strings.Contains(message, strings.ToLower(ErrInvalidFrame.Error())):
+		// A peer on another protocol version rejects the first frame and exits with this message.
+		return ErrUnsupportedProtocol
 	case strings.Contains(message, "remote port forwarding failed"),
 		strings.Contains(message, "cannot listen to port"),
 		strings.Contains(message, "address already in use"):

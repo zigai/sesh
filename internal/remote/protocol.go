@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	ProtocolVersion    = 5
+	ProtocolVersion    = 6
 	MaxFrameBytes      = 1 << 20
 	MaxSessions        = 4096
 	MaxAgents          = 16384

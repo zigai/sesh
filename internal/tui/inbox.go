@@ -56,8 +56,8 @@ type inboxHost struct {
 }
 
 // inboxItem is one row of the inbox: an agent, a task whose agent is not running, or a recorded
-// conversation whose agent closed, with the live session that owns its pane, the machine it runs on,
-// its recorded conversation, if any, and the section it is listed in.
+// conversation whose agent closed, open or finished, with the live session that owns its pane,
+// the machine it runs on, its recorded conversation, if any, and the section it is listed in.
 type inboxItem struct {
 	agent  session.AgentSession
 	owner  session.Session
@@ -98,7 +98,8 @@ func (m *Model) inboxSessions() []session.Session {
 	return append(rows, m.inboxOfflineRows()...)
 }
 
-// inboxOfflineRows are one heading for each configured remote host the picker cannot reach.
+// inboxOfflineRows are one heading for each configured remote host the picker cannot reach, or
+// that runs a sesh that speaks another protocol.
 func (m *Model) inboxOfflineRows() []session.Session {
 	if !remoteSessionsEnabled(m.config, m.deps) {
 		return nil
@@ -107,16 +108,17 @@ func (m *Model) inboxOfflineRows() []session.Session {
 	var rows []session.Session
 
 	for _, connection := range m.remoteCatalog.Connections {
-		if remoteConnectionStatus(connection, m.config.Remote.StaleAfter, time.Now()) != session.RemoteStatusUnavailable {
-			continue
-		}
-
 		label := connection.Label
 		if label == "" {
 			label = connection.ID
 		}
 
-		rows = append(rows, inboxGroupRow("offline:"+connection.ID, label+" offline", nil))
+		switch {
+		case connection.LastError == RemoteErrorIncompatibleProtocol:
+			rows = append(rows, inboxGroupRow("offline:"+connection.ID, label+" needs the same sesh version", nil))
+		case remoteConnectionStatus(connection, m.config.Remote.StaleAfter, time.Now()) == session.RemoteStatusUnavailable:
+			rows = append(rows, inboxGroupRow("offline:"+connection.ID, label+" offline", nil))
+		}
 	}
 
 	return rows
@@ -816,11 +818,11 @@ func (m *Model) inboxDetailFields(item inboxItem) [][2]string {
 		fields = append(fields, [2]string{"runs", taskRunsDetail(record.Runs)})
 	}
 
-	if linked := linkedPRs(item.work); linked != "" && !item.closed {
+	if linked := linkedPRs(item.work); linked != "" && !item.closed && !item.task {
 		fields = append(fields, [2]string{"linked", linked})
 	}
 
-	if issues := closedIssues(item.work); issues != "" {
+	if issues := closedIssues(item.work); issues != "" && !item.task {
 		fields = append(fields, [2]string{"issues", issues})
 	}
 
@@ -860,7 +862,7 @@ func (m *Model) inboxStateDetail(item inboxItem) string {
 		parts = append(parts, "pinned")
 	}
 
-	if item.work.Finished() {
+	if item.work.Finished() && item.section != config.InboxFinished {
 		parts = append(parts, "finished")
 	}
 

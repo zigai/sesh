@@ -27,6 +27,10 @@ var (
 		"Finish the selected row: a task is finished as task.finish does, and any other recorded conversation "+
 			"as agent.finish does.")
 
+	InboxTask = defineInboxAction("inbox.task", "New task", "Open the new task menu for the row's project",
+		"Close the picker and open the new task menu, as task.menu does, for the project of the selected row "+
+			"instead of the invoking pane's.")
+
 	InboxPin = defineInboxAction("inbox.pin", "Pin", "Pin the row's conversation",
 		"Pin the selected row's recorded conversation as agent.pin does.")
 

@@ -23,7 +23,7 @@ var (
 )
 
 // resumeAgent opens a window that resumes a recorded conversation in its directory: in its
-// project's session, else in the invoking pane's session, and reopens it.
+// project's session, else in the invoking pane's session, reopens it and clears its unseen mark.
 func (local *Local) resumeAgent(ctx context.Context, caller action.Caller, input action.ResumeAgent) (action.ResumedAgent, error) {
 	var resumed action.ResumedAgent
 
@@ -62,8 +62,10 @@ func (local *Local) resumeAgent(ctx context.Context, caller action.Caller, input
 	resumed.Session = action.RefOf(row)
 	resumed.Pane = string(pane)
 
-	if item.Finished() {
-		if err := local.updateWork(ctx, func(state *work.State) error { return state.Reopen(item.ID) }); err != nil {
+	if item.Finished() || item.UnseenAt != 0 {
+		if err := local.updateWork(ctx, func(state *work.State) error {
+			return errors.Join(state.Reopen(item.ID, time.Now()), state.ClearUnseen(item.ID))
+		}); err != nil {
 			return resumed, action.Wrap(action.CodePartial, err)
 		}
 	}
@@ -86,6 +88,18 @@ func (local *Local) pinWork(ctx context.Context, _ action.Caller, input action.C
 func (local *Local) unpinWork(ctx context.Context, _ action.Caller, input action.ChangeWork) (action.ChangedWork, error) {
 	return action.ChangedWork{Item: input.Item}, local.updateWork(ctx, func(state *work.State) error {
 		return state.Unpin(input.Item)
+	})
+}
+
+func (local *Local) markWorkUnseen(ctx context.Context, _ action.Caller, input action.ChangeWork) (action.ChangedWork, error) {
+	return action.ChangedWork{Item: input.Item}, local.updateWork(ctx, func(state *work.State) error {
+		return state.MarkUnseen(input.Item, time.Now())
+	})
+}
+
+func (local *Local) markWorkSeen(ctx context.Context, _ action.Caller, input action.ChangeWork) (action.ChangedWork, error) {
+	return action.ChangedWork{Item: input.Item}, local.updateWork(ctx, func(state *work.State) error {
+		return state.ClearUnseen(input.Item)
 	})
 }
 
@@ -112,22 +126,20 @@ func (local *Local) unlinkWork(ctx context.Context, _ action.Caller, input actio
 	})
 }
 
-// finishTaskWork finishes the recorded conversations of a task that was finished.
-func (local *Local) finishTaskWork(ctx context.Context, id string) error {
+// finishTaskWork finishes the conversations of a finished task and detaches them from it. A
+// conversation in the worktree the finish removed resumes in the project's main checkout.
+func (local *Local) finishTaskWork(ctx context.Context, record task.Record, by string) error {
 	if local.workState == "" {
 		return nil
 	}
 
-	_, err := work.NewStore(local.workState).Update(ctx, func(state *work.State) error {
-		now := time.Now()
+	directory := ""
+	if record.OwnsWorktree {
+		directory = record.Project
+	}
 
-		for _, item := range state.Items {
-			if item.Task == id && !item.Finished() {
-				if err := state.Finish(item.ID, work.FinishedByUser, now); err != nil {
-					return fmt.Errorf("finish work item: %w", err)
-				}
-			}
-		}
+	_, err := work.NewStore(local.workState).Update(ctx, func(state *work.State) error {
+		state.FinishTask(record.ID, by, directory, time.Now())
 
 		return nil
 	})

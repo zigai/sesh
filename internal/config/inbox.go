@@ -22,6 +22,7 @@ const (
 	InboxAsleep   = "asleep"
 	InboxIdle     = "idle"
 	InboxClosed   = "closed"
+	InboxFinished = "finished"
 
 	defaultClosedShown = 3
 )
@@ -36,10 +37,11 @@ var (
 	errInboxSnoozeTwice   = errors.New("inbox snooze choice is listed twice")
 	errInboxSnoozeInvalid = errors.New("inbox snooze choice is not a duration, a time of day or next message")
 	errInboxClosedShown   = errors.New("inbox.closed_shown must not be negative")
-	inboxSectionNames     = []string{
+	defaultInboxSections  = []string{
 		InboxDone, InboxApprove, InboxInput, InboxWaiting, InboxLimited, InboxUnmerged, InboxRunning, InboxSnoozed, InboxAsleep, InboxIdle, InboxClosed,
 	}
-	defaultInboxDimmed     = []string{InboxRunning, InboxSnoozed, InboxAsleep, InboxClosed}
+	inboxSectionNames      = append(slices.Clone(defaultInboxSections), InboxFinished)
+	defaultInboxDimmed     = []string{InboxRunning, InboxSnoozed, InboxAsleep, InboxClosed, InboxFinished}
 	defaultInboxSnoozeList = []string{SnoozeNextMessage, "1h", "4h", "tomorrow 09:00"}
 )
 
@@ -56,9 +58,10 @@ type InboxConfig struct {
 	ClosedShown int               `toml:"closed_shown"`
 }
 
-// InboxSections returns every inbox section name in the default order.
+// InboxSections returns the inbox sections shown by default, in order. The finished section is
+// shown only when configured.
 func InboxSections() []string {
-	return slices.Clone(inboxSectionNames)
+	return slices.Clone(defaultInboxSections)
 }
 
 func DefaultInboxConfig() InboxConfig {

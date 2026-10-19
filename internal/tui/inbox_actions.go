@@ -36,6 +36,8 @@ var (
 	errNoEvidence         = errors.New("the agent's latest report lists no evidence")
 	errUnknownInboxAct    = errors.New("unknown inbox action")
 	errClosedConversation = errors.New("the conversation's agent is closed")
+	errNoProject          = errors.New("the row belongs to no project")
+	errRemoteProject      = errors.New("tasks of other machines start there")
 )
 
 type inboxUpdatedMsg struct {
@@ -123,9 +125,34 @@ func (m *Model) pickerActionError(id action.ID) error {
 		return nil
 	case action.InboxFinish.ID, action.InboxPin.ID, action.InboxUnpin.ID, action.InboxLink.ID, action.InboxUnlink.ID:
 		return workActionError(id, item)
+	case action.InboxTask.ID:
+		return taskProjectError(item)
 	default:
 		return errUnknownInboxAct
 	}
+}
+
+func taskProjectError(item inboxItem) error {
+	switch {
+	case item.agent.Host != "":
+		return errRemoteProject
+	case rowProject(item) == "":
+		return errNoProject
+	default:
+		return nil
+	}
+}
+
+func rowProject(item inboxItem) string {
+	if item.task && item.live.Record.Kind == task.KindProject {
+		return item.live.Record.Project
+	}
+
+	if item.more != "" {
+		return ""
+	}
+
+	return item.agent.ProjectRoot
 }
 
 // inboxStateError reports why the inbox cannot remember something about a row.
@@ -160,10 +187,12 @@ func (m *Model) snoozeError(id action.ID, item inboxItem) error {
 }
 
 func (m *Model) seenError(id action.ID, item inboxItem) error {
-	viewable := item.owner.ID != "" || item.closed
+	if item.closed {
+		return recordedSeenError(id, item)
+	}
 
 	if id == action.InboxSeen.ID {
-		if item.section != config.InboxDone || !viewable {
+		if item.section != config.InboxDone || item.owner.ID == "" {
 			return errAlreadySeen
 		}
 
@@ -174,11 +203,26 @@ func (m *Model) seenError(id action.ID, item inboxItem) error {
 		return err
 	}
 
-	if item.section == config.InboxDone || !viewable {
+	if item.section == config.InboxDone || item.owner.ID == "" {
 		return errNotSeen
 	}
 
 	return nil
+}
+
+// recordedSeenError reports why a closed or finished row cannot be marked seen or unseen: the mark
+// is kept with its recorded conversation on its host.
+func recordedSeenError(id action.ID, item inboxItem) error {
+	switch {
+	case item.work.ID == "" || item.more != "":
+		return errNotRecorded
+	case id == action.InboxSeen.ID && item.work.UnseenAt == 0:
+		return errAlreadySeen
+	case id == action.InboxUnseen.ID && item.work.UnseenAt != 0:
+		return errNotSeen
+	default:
+		return nil
+	}
 }
 
 func (m *Model) pullRequestError(item inboxItem) error {
@@ -210,7 +254,30 @@ func (m *Model) runPickerAction(request pendingAction) func() (tea.Model, tea.Cm
 		return m.snoozeItem(key, request.values.String("until"))
 	case action.InboxUnsnooze.ID:
 		return m.updateInbox(func(state *inbox.State) error { state.Remove(key); return nil })
-	case action.InboxSeen.ID:
+	case action.InboxSeen.ID, action.InboxUnseen.ID:
+		if item.closed {
+			return m.runWorkAction(id, item, request.values)
+		}
+
+		return m.markSeen(id, item, key)
+	case action.InboxPR.ID:
+		return m.openPullRequest(item)
+	case action.InboxEvidence.ID:
+		return m.openEvidenceMenu(item)
+	case action.InboxFinish.ID, action.InboxPin.ID, action.InboxUnpin.ID, action.InboxLink.ID, action.InboxUnlink.ID:
+		return m.runWorkAction(id, item, request.values)
+	case action.InboxTask.ID:
+		m.taskProject = rowProject(item)
+
+		return func() (tea.Model, tea.Cmd) { return m, tea.Quit }
+	}
+
+	return func() (tea.Model, tea.Cmd) { return m, nil }
+}
+
+// markSeen marks a live agent's latest result seen or not seen in the inbox state.
+func (m *Model) markSeen(id action.ID, item inboxItem, key string) func() (tea.Model, tea.Cmd) {
+	if id == action.InboxSeen.ID {
 		if item.owner.ID != "" {
 			m.recordActionState(func(current *session.State) {
 				current.RecordAgentView(item.owner.SemanticIdentity(), item.agent.PaneID)
@@ -218,17 +285,9 @@ func (m *Model) runPickerAction(request pendingAction) func() (tea.Model, tea.Cm
 		}
 
 		return m.updateInbox(func(state *inbox.State) error { state.ClearUnseen(key); return nil })
-	case action.InboxUnseen.ID:
-		return m.updateInbox(func(state *inbox.State) error { state.MarkUnseen(key, time.Now()); return nil })
-	case action.InboxPR.ID:
-		return m.openPullRequest(item)
-	case action.InboxEvidence.ID:
-		return m.openEvidenceMenu(item)
-	case action.InboxFinish.ID, action.InboxPin.ID, action.InboxUnpin.ID, action.InboxLink.ID, action.InboxUnlink.ID:
-		return m.runWorkAction(id, item, request.values)
 	}
 
-	return func() (tea.Model, tea.Cmd) { return m, nil }
+	return m.updateInbox(func(state *inbox.State) error { state.MarkUnseen(key, time.Now()); return nil })
 }
 
 // snoozeItem snoozes a conversation until the given choice, or offers the configured choices.

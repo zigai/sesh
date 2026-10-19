@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	Version = 2
+	Version = 3
 
 	// FinishedByPR and FinishedByUser say why an item finished: every pull request linked to it
 	// ended, or the user finished it.
@@ -73,24 +73,33 @@ type Item struct {
 	Server  string `json:"server"`
 	Pane    string `json:"pane"`
 	PanePID int    `json:"panePid"`
-	// CreatedAt is when the item was first seen, and TurnAt when its agent last changed activity,
-	// both as Unix seconds.
+	// CreatedAt is when the item was first seen, TurnAt when its agent last changed activity, and
+	// PromptAt when the user last sent its agent a prompt, as far as the harness reports it, all as
+	// Unix seconds.
 	CreatedAt int64 `json:"createdAt"`
 	TurnAt    int64 `json:"turnAt"`
-	// PinnedAt is when the user pinned the item, and FinishedAt when it finished, as Unix seconds,
+	PromptAt  int64 `json:"promptAt"`
+	// PinnedAt is when the user pinned the item, FinishedAt when it finished, ReopenedAt when it
+	// last reopened after finishing, and UnseenAt when the user marked it not seen, as Unix seconds,
 	// zero when it is not.
 	PinnedAt   int64  `json:"pinnedAt"`
 	FinishedAt int64  `json:"finishedAt"`
 	FinishedBy string `json:"finishedBy"`
+	ReopenedAt int64  `json:"reopenedAt"`
+	UnseenAt   int64  `json:"unseenAt"`
 }
 
 // PRLink is a pull request linked to an item, with its last known state and the issues it closes.
+// CreatedAt and EndedAt are when it was opened and when it was merged or closed, as Unix seconds,
+// zero when unknown or still open.
 type PRLink struct {
-	Number int          `json:"number"`
-	State  task.PRState `json:"state"`
-	URL    string       `json:"url"`
-	Issues []int        `json:"issues"`
-	Source string       `json:"source"`
+	Number    int          `json:"number"`
+	State     task.PRState `json:"state"`
+	URL       string       `json:"url"`
+	Issues    []int        `json:"issues"`
+	Source    string       `json:"source"`
+	CreatedAt int64        `json:"createdAt"`
+	EndedAt   int64        `json:"endedAt"`
 }
 
 type State struct {
@@ -154,10 +163,32 @@ func (s *State) Finish(id, by string, now time.Time) error {
 	})
 }
 
+// FinishTask finishes the items of a finished task and detaches them from it, so they resume
+// outside the task. A non-empty directory replaces where they resume, for a task whose
+// worktree was removed.
+func (s *State) FinishTask(id, by, directory string, now time.Time) {
+	for index := range s.Items {
+		item := &s.Items[index]
+		if item.Task != id {
+			continue
+		}
+
+		if !item.Finished() {
+			item.FinishedAt, item.FinishedBy = now.Unix(), by
+		}
+
+		item.Task = ""
+
+		if directory != "" {
+			item.Directory = directory
+		}
+	}
+}
+
 // Reopen returns the finished item with id to the open work.
-func (s *State) Reopen(id string) error {
+func (s *State) Reopen(id string, now time.Time) error {
 	return s.change(id, func(item *Item) error {
-		*item = item.reopened()
+		*item = item.reopened(now)
 
 		return nil
 	})
@@ -170,6 +201,31 @@ func (s *State) Pin(id string, now time.Time) error {
 
 		return nil
 	})
+}
+
+// MarkUnseen marks the item with id as not seen.
+func (s *State) MarkUnseen(id string, now time.Time) error {
+	return s.change(id, func(item *Item) error {
+		item.UnseenAt = now.Unix()
+
+		return nil
+	})
+}
+
+func (s *State) ClearUnseen(id string) error {
+	return s.change(id, func(item *Item) error {
+		item.UnseenAt = 0
+
+		return nil
+	})
+}
+
+// Prune drops the items that finished before cutoff. It reports whether any was dropped.
+func (s *State) Prune(cutoff time.Time) bool {
+	count := len(s.Items)
+	s.Items = slices.DeleteFunc(s.Items, func(item Item) bool { return item.Finished() && item.FinishedAt < cutoff.Unix() })
+
+	return len(s.Items) != count
 }
 
 func (s *State) Unpin(id string) error {
@@ -247,8 +303,8 @@ func (i Item) Issues() []int {
 	return slices.Compact(issues)
 }
 
-func (i Item) reopened() Item {
-	i.FinishedAt, i.FinishedBy = 0, ""
+func (i Item) reopened(now time.Time) Item {
+	i.FinishedAt, i.FinishedBy, i.ReopenedAt = 0, "", now.Unix()
 
 	return i
 }
@@ -262,7 +318,7 @@ func EmptyItem() Item {
 	return Item{
 		ID: "", Harness: "", Conversation: "", SessionPath: "", Resume: []string{}, Title: "", Directory: "",
 		Project: "", Branch: "", Task: "", PRs: []PRLink{}, Server: "", Pane: "", PanePID: 0, CreatedAt: 0, TurnAt: 0,
-		PinnedAt: 0, FinishedAt: 0, FinishedBy: "",
+		PromptAt: 0, PinnedAt: 0, FinishedAt: 0, FinishedBy: "", ReopenedAt: 0, UnseenAt: 0,
 	}
 }
 

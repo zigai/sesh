@@ -28,6 +28,13 @@ var (
 	errPopupNotRemoved = errors.New("task popup session was not closed")
 )
 
+// FinishOptions controls a finish: Discard removes the task even if that loses work, and SkipRun
+// leaves out the project's finish command.
+type FinishOptions struct {
+	Discard bool
+	SkipRun bool
+}
+
 // PRFinder looks up the pull request opened from a branch, in any state.
 type PRFinder interface {
 	FindPR(ctx context.Context, dir, branch string) (PullRequest, string, bool, error)
@@ -122,10 +129,10 @@ func (s *Service) refreshPR(ctx context.Context, record Record) (Record, string,
 // for it. A worktree or branch sesh did not create stays as it is. Without discard it refuses
 // when the removal would lose work: commits not merged into the base on a branch it deletes,
 // uncommitted changes in a worktree it removes, or a pull request of that branch closed without
-// merging. Before removing a worktree it runs the project's finish command there; without discard
-// a failing command stops the finish. A finish that stops part way leaves the task finishing, and
-// finishing it again completes the removal.
-func (s *Service) Finish(ctx context.Context, id string, discard bool) (Record, error) {
+// merging. Before removing a worktree it runs the project's finish command there, unless it skips
+// it; a failing command stops the finish. A finish that stops part way leaves the task finishing,
+// and finishing it again completes the removal.
+func (s *Service) Finish(ctx context.Context, id string, opts FinishOptions) (Record, error) {
 	record, err := s.record(ctx, id)
 	if err != nil {
 		return record, taskError("finish_task", err)
@@ -136,7 +143,7 @@ func (s *Service) Finish(ctx context.Context, id string, discard bool) (Record, 
 	}
 
 	if record.State != StateFinishing {
-		record, err = s.prepareFinish(ctx, record, discard)
+		record, err = s.prepareFinish(ctx, record, opts)
 		if err != nil {
 			return record, taskError("finish_task", err)
 		}
@@ -163,9 +170,9 @@ func (s *Service) Finish(ctx context.Context, id string, discard bool) (Record, 
 }
 
 // prepareFinish checks that finishing a task loses no work, unless it discards work, and runs the
-// project's finish command in its worktree.
-func (s *Service) prepareFinish(ctx context.Context, record Record, discard bool) (Record, error) {
-	if !discard {
+// project's finish command in its worktree, unless it skips it.
+func (s *Service) prepareFinish(ctx context.Context, record Record, opts FinishOptions) (Record, error) {
+	if !opts.Discard {
 		mergedHead := ""
 
 		if refreshed, head, _, refreshErr := s.refreshPR(ctx, record); refreshErr == nil {
@@ -178,11 +185,11 @@ func (s *Service) prepareFinish(ctx context.Context, record Record, discard bool
 		}
 	}
 
-	if err := s.runFinish(ctx, record); err != nil && !discard {
-		return record, err
+	if opts.SkipRun {
+		return record, nil
 	}
 
-	return record, nil
+	return record, s.runFinish(ctx, record)
 }
 
 func (s *Service) runFinish(ctx context.Context, record Record) error {

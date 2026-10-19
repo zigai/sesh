@@ -45,7 +45,7 @@ func TestFinishRefusesToLoseUnmergedCommitsAndChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err := f.service.Finish(t.Context(), f.record.ID, false)
+	_, err := f.service.Finish(t.Context(), f.record.ID, task.FinishOptions{Discard: false, SkipRun: false})
 
 	var loss *task.LossError
 	if !errors.As(err, &loss) || loss.UnmergedCommits != 1 || loss.ChangedFiles != 1 || loss.ClosedUnmerged {
@@ -59,7 +59,7 @@ func TestFinishRefusesATaskWhosePullRequestWasClosedUnmerged(t *testing.T) {
 	f := newFinishFixture(t)
 	f.prs.pr, f.prs.found = task.PullRequest{Number: 7, State: task.PRClosed, URL: ""}, true
 
-	_, err := f.service.Finish(t.Context(), f.record.ID, false)
+	_, err := f.service.Finish(t.Context(), f.record.ID, task.FinishOptions{Discard: false, SkipRun: false})
 
 	var loss *task.LossError
 	if !errors.As(err, &loss) || !loss.ClosedUnmerged {
@@ -79,7 +79,7 @@ func TestFinishRemovesAMergedTaskWithoutDiscard(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if _, err := f.service.Finish(t.Context(), f.record.ID, false); err != nil {
+			if _, err := f.service.Finish(t.Context(), f.record.ID, task.FinishOptions{Discard: false, SkipRun: false}); err != nil {
 				t.Fatalf("Finish() error = %v", err)
 			}
 
@@ -96,7 +96,7 @@ func TestFinishRefusesCommitsAddedAfterPullRequestMerge(t *testing.T) {
 			commit(t, f.record.Directory)
 			tip := gitOutput(t, f.record.Directory, "rev-parse", "HEAD")
 
-			_, err := f.service.Finish(t.Context(), f.record.ID, false)
+			_, err := f.service.Finish(t.Context(), f.record.ID, task.FinishOptions{Discard: false, SkipRun: false})
 
 			var loss *task.LossError
 			if !errors.As(err, &loss) || loss.UnmergedCommits != 1 || loss.ChangedFiles != 0 || loss.ClosedUnmerged {
@@ -134,7 +134,7 @@ func TestFinishRefusesCachedMergedStateWithoutFreshHeadEvidence(t *testing.T) {
 
 			f.prs.head, f.prs.found, f.prs.err = "", tt.found, tt.err
 
-			_, err := f.service.Finish(t.Context(), f.record.ID, false)
+			_, err := f.service.Finish(t.Context(), f.record.ID, task.FinishOptions{Discard: false, SkipRun: false})
 
 			var loss *task.LossError
 			if !errors.As(err, &loss) || loss.UnmergedCommits != 1 || loss.ChangedFiles != 0 || loss.ClosedUnmerged {
@@ -170,7 +170,7 @@ func mergeTask(t *testing.T, f *finishFixture, squash bool) {
 func TestFinishRemovesATaskWithNothingToLose(t *testing.T) {
 	f := newFinishFixture(t)
 
-	if _, err := f.service.Finish(t.Context(), f.record.ID, false); err != nil {
+	if _, err := f.service.Finish(t.Context(), f.record.ID, task.FinishOptions{Discard: false, SkipRun: false}); err != nil {
 		t.Fatalf("Finish() error = %v", err)
 	}
 
@@ -181,7 +181,7 @@ func TestFinishWithDiscardRemovesUnmergedWork(t *testing.T) {
 	f := newFinishFixture(t)
 	commit(t, f.record.Directory)
 
-	if _, err := f.service.Finish(t.Context(), f.record.ID, true); err != nil {
+	if _, err := f.service.Finish(t.Context(), f.record.ID, task.FinishOptions{Discard: true, SkipRun: false}); err != nil {
 		t.Fatalf("Finish() error = %v", err)
 	}
 
@@ -203,7 +203,7 @@ func TestFinishCompletesARemovalThatStoppedPartWay(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := f.service.Finish(t.Context(), f.record.ID, false); err != nil {
+	if _, err := f.service.Finish(t.Context(), f.record.ID, task.FinishOptions{Discard: false, SkipRun: false}); err != nil {
 		t.Fatalf("Finish() error = %v", err)
 	}
 
@@ -227,7 +227,7 @@ func TestFinishLeavesACheckoutSeshDidNotCreateWithItsWork(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := f.service.Finish(t.Context(), record.ID, false); err != nil {
+	if _, err := f.service.Finish(t.Context(), record.ID, task.FinishOptions{Discard: false, SkipRun: false}); err != nil {
 		t.Fatalf("Finish() error = %v, want a checkout sesh does not own finished without loss checks", err)
 	}
 
@@ -258,7 +258,7 @@ func TestFinishOfABranchWorktreeRemovesTheWorktreeAndKeepsTheBranch(t *testing.T
 		t.Fatal(err)
 	}
 
-	_, err = f.service.Finish(t.Context(), record.ID, false)
+	_, err = f.service.Finish(t.Context(), record.ID, task.FinishOptions{Discard: false, SkipRun: false})
 
 	var loss *task.LossError
 	if !errors.As(err, &loss) || loss.ChangedFiles != 1 || loss.UnmergedCommits != 0 {
@@ -269,7 +269,7 @@ func TestFinishOfABranchWorktreeRemovesTheWorktreeAndKeepsTheBranch(t *testing.T
 		t.Fatal(err)
 	}
 
-	if _, err := f.service.Finish(t.Context(), record.ID, false); err != nil {
+	if _, err := f.service.Finish(t.Context(), record.ID, task.FinishOptions{Discard: false, SkipRun: false}); err != nil {
 		t.Fatalf("Finish() error = %v, want the branch's commits kept, not counted as loss", err)
 	}
 
@@ -295,7 +295,7 @@ func TestFinishOfARemoteBranchTaskKeepsUnpushedWorkAndTheRemoteBranch(t *testing
 
 	commit(t, record.Directory)
 
-	_, err = f.service.Finish(t.Context(), record.ID, false)
+	_, err = f.service.Finish(t.Context(), record.ID, task.FinishOptions{Discard: false, SkipRun: false})
 
 	var loss *task.LossError
 	if !errors.As(err, &loss) || loss.UnmergedCommits != 1 {
@@ -304,7 +304,7 @@ func TestFinishOfARemoteBranchTaskKeepsUnpushedWorkAndTheRemoteBranch(t *testing
 
 	runGit(t, record.Directory, "push", "-q", "origin", "review")
 
-	if _, err := f.service.Finish(t.Context(), record.ID, false); err != nil {
+	if _, err := f.service.Finish(t.Context(), record.ID, task.FinishOptions{Discard: false, SkipRun: false}); err != nil {
 		t.Fatalf("Finish() error = %v, want a pushed branch removed without loss", err)
 	}
 
@@ -533,7 +533,7 @@ func TestATaskStartedFromOriginsNewerBaseFinishesWithNothingToLose(t *testing.T)
 		t.Fatalf("new branch starts at %q, want origin's newer main", got)
 	}
 
-	if _, err := f.service.Finish(t.Context(), record.ID, false); err != nil {
+	if _, err := f.service.Finish(t.Context(), record.ID, task.FinishOptions{Discard: false, SkipRun: false}); err != nil {
 		t.Fatalf("Finish() error = %v, want nothing to lose", err)
 	}
 }
@@ -577,7 +577,7 @@ func TestFinishRemovesATaskWhoseCreationStoppedWithItsProcess(t *testing.T) {
 	running := task.Process{PID: os.Getpid(), Birth: ""}
 	setCreating(t, f, running)
 
-	if _, err := f.service.Finish(t.Context(), f.record.ID, false); !errors.Is(err, task.ErrTaskStarting) {
+	if _, err := f.service.Finish(t.Context(), f.record.ID, task.FinishOptions{Discard: false, SkipRun: false}); !errors.Is(err, task.ErrTaskStarting) {
 		t.Fatalf("Finish() of a task its running process is creating error = %v, want ErrTaskStarting", err)
 	}
 
@@ -597,7 +597,7 @@ func TestFinishRemovesATaskWhoseCreationStoppedWithItsProcess(t *testing.T) {
 		t.Fatal("Inventory() does not report the task as stalled")
 	}
 
-	if _, err := f.service.Finish(t.Context(), f.record.ID, false); err != nil {
+	if _, err := f.service.Finish(t.Context(), f.record.ID, task.FinishOptions{Discard: false, SkipRun: false}); err != nil {
 		t.Fatalf("Finish() error = %v", err)
 	}
 

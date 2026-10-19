@@ -18,6 +18,7 @@ import (
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/task"
+	"github.com/zigai/sesh/internal/work"
 )
 
 const (
@@ -47,11 +48,12 @@ func (local *Local) finishTask(ctx context.Context, _ action.Caller, input actio
 		return action.FinishedTask{ID: input.Task}, err
 	}
 
-	if _, err := service.Finish(ctx, input.Task, input.Discard); err != nil {
+	record, err := service.Finish(ctx, input.Task, task.FinishOptions{Discard: input.Discard, SkipRun: input.SkipRun})
+	if err != nil {
 		return action.FinishedTask{ID: input.Task}, oops.In("app").With("operation", "finish_task").Wrap(err)
 	}
 
-	if err := local.finishTaskWork(ctx, input.Task); err != nil {
+	if err := local.finishTaskWork(ctx, record, work.FinishedByUser); err != nil {
 		return action.FinishedTask{ID: input.Task}, action.Wrap(action.CodePartial, err)
 	}
 

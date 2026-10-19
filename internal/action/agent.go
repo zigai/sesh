@@ -138,6 +138,13 @@ var (
 	AgentUnpin = defineWorkAction("agent.unpin", "Unpinned", "Unpin conversation", "Unpin a recorded conversation",
 		"Unpin a recorded agent conversation.")
 
+	AgentUnseen = defineWorkAction("agent.unseen", "Marked unseen", "Mark conversation unseen",
+		"Mark a recorded conversation as not seen", "Mark a recorded conversation as not seen on its machine, so the inbox lists it "+
+			"as done until it is marked seen or resumed.")
+
+	AgentSeen = defineWorkAction("agent.seen", "Marked seen", "Mark conversation seen", "Mark a recorded conversation as seen",
+		"Clear the mark that a recorded conversation is not seen.")
+
 	AgentLink = defineWorkAction("agent.link", "Linked a pull request to", "Link PR", "Link a pull request to a recorded conversation",
 		"Link a pull request of the conversation's repository to it, as gh reports it. The conversation finishes "+
 			"when every linked pull request is merged or closed.",

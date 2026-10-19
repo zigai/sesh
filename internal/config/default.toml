@@ -285,7 +285,7 @@
 # such as "~/work/api".
 
 # INBOX mode. group is "state" or "project". sections lists the shown sections in order; a
-# section left out is hidden. labels renames sections, as in labels = { done = "new" }. dim lists
+# section left out is hidden, and "finished" is hidden unless listed. labels renames sections, as in labels = { done = "new" }. dim lists
 # sections with dimmed rows. snooze lists the snooze choices: a duration, a time of day such as
 # "18:00", "tomorrow 09:00", or "next message". closed_shown is how many closed rows a project
 # shows before a row that expands the rest; 0 shows them all.
@@ -293,7 +293,7 @@
 
 # group = "state"
 # sections = ["done", "approve", "input", "waiting", "limited", "unmerged", "running", "snoozed", "asleep", "idle", "closed"]
-# dim = ["running", "snoozed", "asleep", "closed"]
+# dim = ["running", "snoozed", "asleep", "closed", "finished"]
 # snooze = ["next message", "1h", "4h", "tomorrow 09:00"]
 # closed_shown = 3
 
@@ -321,7 +321,7 @@
 # check = []
 
 # Finishing a task runs run in its worktree before removing it, never in a main checkout. A failing
-# run stops the finish unless it discards work. For example run = ["docker", "compose", "down"].
+# run stops the finish; --skip-run leaves it out. For example run = ["docker", "compose", "down"].
 [finish]
 
 # run = []

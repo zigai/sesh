@@ -13,11 +13,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"github.com/zigai/sesh/internal/git"
 	"github.com/zigai/sesh/internal/task"
 )
 
-const ghOutputLimit = 1 << 20
+const (
+	ghOutputLimit     = 1 << 20
+	ghPRFields        = "number,state,url,isCrossRepository,closingIssuesReferences,createdAt,mergedAt,closedAt"
+	finishedRetention = 90 * 24 * time.Hour
+)
 
 var (
 	errGitHub     = errors.New("gh could not read pull requests")
@@ -41,13 +47,17 @@ type ghPR struct {
 	Closes []struct {
 		Number int `json:"number"`
 	} `json:"closingIssuesReferences"`
+	CreatedAt time.Time `json:"createdAt"`
+	MergedAt  time.Time `json:"mergedAt"`
+	ClosedAt  time.Time `json:"closedAt"`
 }
 
-// Sync brings the work items up to date: it drops the items whose directory is gone, and for each
-// open item records its branch, links the pull request gh finds for that branch, and refreshes the
-// linked pull requests that were open. An item whose linked pull requests have all ended, with one
-// of them open before, finishes unless it is pinned. Without gh pull requests stay as they are. It
-// reports whether anything changed.
+// Sync brings the work items up to date: it drops the items whose directory is gone and those
+// finished longer than finishedRetention ago, and for each open item records its branch. Outside
+// task windows it also links the pull request gh finds for that branch when it was open during the
+// conversation, refreshes the linked pull requests that were open, and finishes an unpinned item
+// whose linked pull requests all ended after it started and after its latest prompt. Without gh
+// pull requests stay as they are. It reports whether anything changed.
 func Sync(ctx context.Context, store Store) (bool, error) {
 	state, err := store.Load(ctx)
 	if err != nil {
@@ -71,7 +81,7 @@ func Sync(ctx context.Context, store Store) (bool, error) {
 		}
 
 		update.branch = branchOf(ctx, item.Directory)
-		if gh {
+		if gh && item.Task == "" {
 			update.found, err = findPRs(ctx, item, update.branch)
 			gh = err == nil
 		}
@@ -82,7 +92,9 @@ func Sync(ctx context.Context, store Store) (bool, error) {
 	changed := false
 
 	_, err = store.Update(ctx, func(state *State) error {
-		changed = state.apply(refreshed, time.Now())
+		now := time.Now()
+		changed = state.apply(refreshed, now)
+		changed = state.Prune(now.Add(-finishedRetention)) || changed
 
 		return nil
 	})
@@ -90,19 +102,52 @@ func Sync(ctx context.Context, store Store) (bool, error) {
 	return changed, err
 }
 
+// SyncEvery runs Sync every interval until ctx ends. It logs a failing sync once, until a sync
+// succeeds again.
+func SyncEvery(ctx context.Context, store Store, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	syncOnTicks(ctx, store, ticker.C)
+}
+
 // ViewPR returns pull request number of the repository dir is in, as gh reports it.
 func ViewPR(ctx context.Context, dir string, number int) (PRLink, error) {
 	var viewed ghPR
 
-	if err := runGH(ctx, dir, &viewed, "pr", "view", strconv.Itoa(number), "--json", "number,state,url,closingIssuesReferences"); err != nil {
-		return PRLink{Number: 0, State: "", URL: "", Issues: []int{}, Source: ""}, err
+	if err := runGH(ctx, dir, &viewed, "pr", "view", strconv.Itoa(number), "--json", ghPRFields); err != nil {
+		return noPR(), err
 	}
 
 	if viewed.Number != number {
-		return PRLink{Number: 0, State: "", URL: "", Issues: []int{}, Source: ""}, errors.Join(errGitHub, errPRMismatch)
+		return noPR(), errors.Join(errGitHub, errPRMismatch)
 	}
 
 	return viewed.link(), nil
+}
+
+func syncOnTicks(ctx context.Context, store Store, ticks <-chan time.Time) {
+	failing := false
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticks:
+		}
+
+		_, err := Sync(ctx, store)
+		if ctx.Err() != nil {
+			return
+		}
+
+		if err != nil && !failing {
+			zerolog.Ctx(ctx).Warn().Str("component", "work").Str("operation", "sync_work").
+				Str("status", "degraded").Str("reason", "work_sync_failed").Msg("periodic work sync failed")
+		}
+
+		failing = err != nil
+	}
 }
 
 // findPRs lists the pull request of branch, unless it is the default branch, and views the item's
@@ -157,14 +202,7 @@ func (s *State) apply(refreshed map[string]refresh, now time.Time) bool {
 
 		before := item
 		item.Branch = update.branch
-
-		for _, pr := range update.found {
-			item = item.withPR(pr)
-		}
-
-		if item.PRsEnded() && !item.Pinned() && !item.Finished() && slices.ContainsFunc(before.Linked(), func(pr PRLink) bool { return !pr.Ended() }) {
-			item.FinishedAt, item.FinishedBy = now.Unix(), FinishedByPR
-		}
+		item = item.withFound(update.found, now)
 
 		changed = changed || !same(item, before)
 		kept = append(kept, item)
@@ -173,6 +211,55 @@ func (s *State) apply(refreshed map[string]refresh, now time.Time) bool {
 	s.Items = kept
 
 	return changed
+}
+
+// withFound links and refreshes the pull requests sync found for the item, and finishes the item
+// when they ended it. The task ledger owns the pull requests of task items.
+func (i Item) withFound(found []PRLink, now time.Time) Item {
+	if i.Task != "" {
+		return i
+	}
+
+	for _, pr := range found {
+		if i.knows(pr.Number) || i.overlaps(pr) {
+			i = i.withPR(pr)
+		}
+	}
+
+	if !i.Pinned() && !i.Finished() && i.endedByPRs() {
+		i.FinishedAt, i.FinishedBy = now.Unix(), FinishedByPR
+	}
+
+	return i
+}
+
+func (i Item) knows(number int) bool {
+	return slices.ContainsFunc(i.PRs, func(linked PRLink) bool { return linked.Number == number })
+}
+
+// overlaps reports whether the pull request was open at some point during the conversation: opened
+// no later than its last turn, and still open or ended no earlier than its start.
+func (i Item) overlaps(pr PRLink) bool {
+	if i.TurnAt != 0 && pr.CreatedAt > i.TurnAt {
+		return false
+	}
+
+	return !pr.Ended() || pr.EndedAt >= i.CreatedAt
+}
+
+// endedByPRs reports whether every linked pull request ended and the last one ended after the
+// item started, after the user's latest prompt, and after it last reopened.
+func (i Item) endedByPRs() bool {
+	if !i.PRsEnded() {
+		return false
+	}
+
+	var latest int64
+	for _, pr := range i.Linked() {
+		latest = max(latest, pr.EndedAt)
+	}
+
+	return latest >= i.CreatedAt && latest >= i.PromptAt && latest >= i.ReopenedAt
 }
 
 // withPR updates what is known about a pull request found for the item, keeping how it was
@@ -239,9 +326,8 @@ func defaultBranch(ctx context.Context, dir string) string {
 func branchPR(ctx context.Context, dir, branch string) (PRLink, error) {
 	var listed []ghPR
 
-	if err := runGH(ctx, dir, &listed, "pr", "list", "--head", branch, "--state", "all",
-		"--json", "number,state,url,isCrossRepository,closingIssuesReferences"); err != nil {
-		return PRLink{Number: 0, State: "", URL: "", Issues: []int{}, Source: ""}, err
+	if err := runGH(ctx, dir, &listed, "pr", "list", "--head", branch, "--state", "all", "--json", ghPRFields); err != nil {
+		return noPR(), err
 	}
 
 	for _, pr := range listed {
@@ -250,7 +336,7 @@ func branchPR(ctx context.Context, dir, branch string) (PRLink, error) {
 		}
 	}
 
-	return PRLink{Number: 0, State: "", URL: "", Issues: []int{}, Source: ""}, nil
+	return noPR(), nil
 }
 
 func (pr ghPR) link() PRLink {
@@ -261,7 +347,32 @@ func (pr ghPR) link() PRLink {
 
 	slices.Sort(issues)
 
-	return PRLink{Number: pr.Number, State: task.PRState(strings.ToLower(pr.State)), URL: pr.URL, Issues: issues, Source: ""}
+	link := PRLink{
+		Number: pr.Number, State: task.PRState(strings.ToLower(pr.State)), URL: pr.URL, Issues: issues, Source: "",
+		CreatedAt: unixOrZero(pr.CreatedAt), EndedAt: 0,
+	}
+
+	switch link.State {
+	case task.PRMerged:
+		link.EndedAt = unixOrZero(pr.MergedAt)
+	case task.PRClosed:
+		link.EndedAt = unixOrZero(pr.ClosedAt)
+	case task.PROpen:
+	}
+
+	return link
+}
+
+func unixOrZero(at time.Time) int64 {
+	if at.IsZero() {
+		return 0
+	}
+
+	return at.Unix()
+}
+
+func noPR() PRLink {
+	return PRLink{Number: 0, State: "", URL: "", Issues: []int{}, Source: "", CreatedAt: 0, EndedAt: 0}
 }
 
 func runGH(ctx context.Context, dir string, decoded any, args ...string) error {

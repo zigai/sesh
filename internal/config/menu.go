@@ -96,7 +96,7 @@ type MergeConfig struct {
 }
 
 // FinishConfig configures finishing a task. Run runs in the task's worktree before sesh removes
-// it; a failing run stops the finish unless it discards work. It never runs in a main checkout.
+// it; a failing run stops the finish, and a finish can skip it. It never runs in a main checkout.
 type FinishConfig struct {
 	Run []string `toml:"run"`
 }

@@ -507,6 +507,28 @@ func TestUnreachableHostShowsOneDimmedOfflineLine(t *testing.T) {
 	}
 }
 
+func TestAHostOnAnotherProtocolAsksForTheSameSeshVersion(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.Remote.Enabled = true
+	cfg.Remote.Connections = []config.RemoteConnectionConfig{{ID: inboxTestHost, Host: inboxTestHost}}
+
+	model := loaderTestModel(t, cfg, Dependencies{})
+	model.handleRemoteCatalog(remoteCatalogMsg{catalog: RemoteCatalog{
+		GeneratedAt: time.Now(),
+		Connections: []RemoteConnection{{
+			ID: inboxTestHost, Label: inboxTestHost, Connected: false, LastSeen: time.Now(), LastError: RemoteErrorIncompatibleProtocol,
+		}},
+	}})
+	model.displayMode = displayModeInbox
+	refreshInbox(model)
+	model.width, model.height = 120, 20
+
+	frame := stripANSI(model.renderFrame())
+	if !strings.Contains(frame, "devbox needs the same sesh version") || strings.Contains(frame, "devbox offline") {
+		t.Fatalf("frame does not ask for the same sesh version on devbox:\n%s", frame)
+	}
+}
+
 func TestInboxActsOnARemoteTaskWithoutAWindowOnItsMachine(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Remote.Enabled = true
@@ -764,17 +786,193 @@ func TestUnlinkOffersTheLinkedPullRequestsWhenThereAreSeveral(t *testing.T) {
 	}
 }
 
-func TestAClosedConversationMarkedUnseenIsDoneUntilSeen(t *testing.T) {
+func TestMarkingAClosedConversationUnseenAndSeenAsksItsMachine(t *testing.T) {
+	var dispatched action.Invocation
+
 	model := newInboxTestModel(t, nil, nil)
+	recordingDispatcher(model, &dispatched)
 	model.work = []work.Item{closedTestItem("w1", "conversation-one", time.Now())}
 	refreshInbox(model)
 	selectInboxRow(t, model, "closed w1")
 
+	runHandler(t, model, model.invokeAction(action.InboxSeen.ID, action.Values{}))
+
+	if dispatched.Action != "" || !strings.Contains(model.statusMessage, errAlreadySeen.Error()) {
+		t.Fatalf("seen on a seen row dispatched %q with status %q, want only an error", dispatched.Action, model.statusMessage)
+	}
+
 	runHandler(t, model, model.invokeAction(action.InboxUnseen.ID, action.Values{}))
+
+	input, ok := dispatched.Input.(action.ChangeWork)
+	if dispatched.Action != action.AgentUnseen.ID || !ok || input.Item != "w1" || dispatched.At != action.Local() {
+		t.Fatalf("dispatched %+v, want agent.unseen of w1 on this machine", dispatched)
+	}
+
+	if _, marked := model.inbox.FindUnseen("/" + inboxTestHarness + "/conversation-one"); marked {
+		t.Fatal("unseen mark was kept in the local inbox state")
+	}
+
+	model.work[0].UnseenAt = time.Now().Unix()
+	refreshInbox(model)
 	assertInboxRows(t, model, map[string][]string{config.InboxDone: {"closed w1"}})
+	selectInboxRow(t, model, "closed w1")
 
 	runHandler(t, model, model.invokeAction(action.InboxSeen.ID, action.Values{}))
-	assertInboxRows(t, model, map[string][]string{config.InboxClosed: {"closed w1"}})
+
+	if dispatched.Action != action.AgentSeen.ID {
+		t.Fatalf("dispatched %+v, want agent.seen", dispatched)
+	}
+}
+
+func TestMarkingARemoteClosedConversationUnseenGoesToItsMachine(t *testing.T) {
+	var dispatched action.Invocation
+
+	cfg := config.DefaultConfig()
+	cfg.Remote.Enabled = true
+	cfg.Remote.Connections = []config.RemoteConnectionConfig{{ID: inboxTestHost, Host: inboxTestHost}}
+
+	model := loaderTestModel(t, cfg, Dependencies{})
+	recordingDispatcher(model, &dispatched)
+	model.handleRemoteCatalog(remoteCatalogMsg{catalog: RemoteCatalog{
+		GeneratedAt: time.Now(),
+		Connections: []RemoteConnection{{
+			ID: inboxTestHost, Label: inboxTestHost, Connected: true, LastSeen: time.Now(),
+			Work: []work.Item{closedTestItem("w1", "conversation-one", time.Now())},
+		}},
+	}})
+	model.displayMode = displayModeInbox
+	refreshInbox(model)
+	selectInboxRow(t, model, "closed w1")
+
+	runHandler(t, model, model.invokeAction(action.InboxUnseen.ID, action.Values{}))
+
+	if dispatched.Action != action.AgentUnseen.ID || dispatched.At != action.Peer(inboxTestHost) {
+		t.Fatalf("dispatched %+v, want agent.unseen on devbox", dispatched)
+	}
+}
+
+func finishedTestItem(id string, turnAt time.Time) work.Item {
+	item := closedTestItem(id, "conversation-"+id, turnAt)
+	item.FinishedAt, item.FinishedBy = turnAt.Unix(), work.FinishedByUser
+
+	return item
+}
+
+func TestFinishedConversationsAreListedWhenTheirSectionIsConfigured(t *testing.T) {
+	model := newInboxTestModel(t, nil, nil)
+	ofTask := finishedTestItem("w3", time.Now())
+	ofTask.Task = "t1"
+	model.work = []work.Item{finishedTestItem("w1", time.Now()), closedTestItem("w2", "conversation-w2", time.Now()), ofTask}
+
+	model.config.Inbox.Sections = append(config.InboxSections(), config.InboxFinished)
+	refreshInbox(model)
+
+	assertInboxRows(t, model, map[string][]string{
+		config.InboxClosed:   {"closed w2"},
+		config.InboxFinished: {"closed w1"},
+	})
+}
+
+func TestFinishedRowsCollapseApartFromClosedRows(t *testing.T) {
+	now := time.Now()
+	model := newInboxTestModel(t, nil, nil)
+
+	model.config.Inbox.Sections = append(config.InboxSections(), config.InboxFinished)
+	model.config.Inbox.ClosedShown = 1
+
+	unseen := closedTestItem("w3", "conversation-w3", now.Add(-time.Hour))
+	unseen.UnseenAt = now.Unix()
+	model.work = []work.Item{
+		closedTestItem("w1", "conversation-w1", now.Add(-time.Minute)),
+		closedTestItem("w2", "conversation-w2", now),
+		unseen,
+		closedTestItem("w4", "conversation-w4", now.Add(-2*time.Hour)),
+		finishedTestItem("f1", now.Add(-time.Minute)),
+		finishedTestItem("f2", now),
+		finishedTestItem("f3", now.Add(-time.Hour)),
+	}
+	refreshInbox(model)
+
+	assertInboxRows(t, model, map[string][]string{
+		config.InboxDone:     {"closed w3"},
+		config.InboxClosed:   {"closed w2", "2 more"},
+		config.InboxFinished: {"closed f2", "2 more"},
+	})
+
+	model.config.Inbox.Sections = []string{config.InboxFinished, config.InboxClosed}
+	refreshInbox(model)
+	selectInboxRow(t, model, "2 more")
+	runHandler(t, model, model.handleEnter())
+
+	assertInboxRows(t, model, map[string][]string{
+		config.InboxClosed:   {"closed w2", "2 more"},
+		config.InboxFinished: {"closed f2", "closed f1", "closed f3"},
+	})
+}
+
+func TestEnterOnAFinishedConversationResumesItAndItsMenuOffersNoFinishOrSnooze(t *testing.T) {
+	var dispatched action.Invocation
+
+	model := newInboxTestModel(t, nil, nil)
+	inboxState := model.deps.Inbox
+	model.deps = testServices(Dependencies{RunAction: func(_ context.Context, invocation action.Invocation) (any, error) {
+		dispatched = invocation
+
+		return action.ResumedAgent{Item: "w1", Session: testLiveRef("$2", "api"), Pane: "%9"}, nil
+	}})
+	model.deps.Inbox = inboxState
+
+	model.config.Inbox.Sections = append(config.InboxSections(), config.InboxFinished)
+	model.config.Menu.Agent = []string{config.MenuGo, config.MenuSnooze, config.MenuPin, config.MenuFinish, config.MenuUnseen}
+	model.work = []work.Item{finishedTestItem("w1", time.Now())}
+	refreshInbox(model)
+	selectInboxRow(t, model, "closed w1")
+
+	runHandler(t, model, model.openRowMenu())
+
+	labels := make([]string, 0, len(model.menu.entries))
+	for _, entry := range model.menu.entries {
+		labels = append(labels, entry.label)
+	}
+
+	if !slices.Equal(labels, []string{"go", config.MenuPin, config.MenuUnseen}) {
+		t.Fatalf("menu = %q, want go, pin and unseen", labels)
+	}
+
+	updateTestModel(t, model, keyCode(tea.KeyEscape))
+	runHandler(t, model, model.handleEnter())
+
+	if input, ok := dispatched.Input.(action.ResumeAgent); dispatched.Action != action.AgentResume.ID || !ok || input.Item != "w1" {
+		t.Fatalf("dispatched %+v, want agent.resume of w1", dispatched)
+	}
+}
+
+func TestATaskRowShowsOnlyItsLedgerPullRequestAndRefusesLinking(t *testing.T) {
+	var dispatched action.Invocation
+
+	record := inboxTestRecord("t1", task.StateActive)
+	record.PR = task.PullRequest{Number: 42, State: task.PRMerged, URL: ""}
+	model := newInboxTestModel(t, []task.Live{inboxTestLive(record, "%1")}, nil)
+	recordingDispatcher(model, &dispatched)
+
+	ofTask := closedTestItem("w1", "conversation-one", time.Now())
+	ofTask.Task = "t1"
+	ofTask.PRs = []work.PRLink{{Number: 7, State: task.PROpen, URL: "", Issues: []int{3}, Source: work.LinkUser, CreatedAt: 0, EndedAt: 0}}
+	model.work = []work.Item{ofTask}
+	model.width, model.height = 160, 30
+	refreshInbox(model)
+	selectInboxRow(t, model, "t1")
+
+	frame := stripANSI(model.renderFrame())
+	if !strings.Contains(frame, "#42 merged") || !strings.Contains(frame, "ready to finish") || strings.Contains(frame, "#7") {
+		t.Fatalf("frame does not show only the task's PR #42, ready to finish:\n%s", frame)
+	}
+
+	runHandler(t, model, model.invokeAction(action.InboxUnlink.ID, action.Values{}))
+
+	if dispatched.Action != "" || !strings.Contains(model.statusMessage, errTaskPR.Error()) {
+		t.Fatalf("unlink on a task row dispatched %q with status %q, want only an error", dispatched.Action, model.statusMessage)
+	}
 }
 
 func TestEnterOnAClosedConversationResumesIt(t *testing.T) {
@@ -839,4 +1037,34 @@ func TestAProjectShowsItsNewestClosedRowsAndExpandsTheRest(t *testing.T) {
 	assertInboxRows(t, model, map[string][]string{
 		config.InboxClosed: {"closed w5", "closed w4", "closed w3", "closed w2", "closed w1"},
 	})
+}
+
+func TestNewTaskOnATaskRowClosesThePickerForItsProject(t *testing.T) {
+	model := newInboxTestModel(t, []task.Live{inboxTestLive(inboxTestRecord("feature", task.StateActive), "%9")}, nil)
+	selectInboxRow(t, model, "feature")
+
+	_, cmd := model.invokeAction(action.InboxTask.ID, action.Values{})()
+
+	if model.TaskProject() != "/work/api" || cmd == nil {
+		t.Fatalf("TaskProject() = %q, cmd = %v, want /work/api and the picker closing", model.TaskProject(), cmd)
+	}
+
+	if _, quit := cmd().(tea.QuitMsg); !quit {
+		t.Fatal("the picker stays open, want it closed")
+	}
+}
+
+func TestNewTaskIsUnavailableOnAConversationOutsideAProject(t *testing.T) {
+	model := newInboxTestModel(t, nil, nil)
+	loose := closedTestItem("w1", "conversation-loose", time.Now())
+	loose.Project = ""
+	model.work = []work.Item{loose}
+	refreshInbox(model)
+	selectInboxRow(t, model, "closed w1")
+
+	_, cmd := model.invokeAction(action.InboxTask.ID, action.Values{})()
+
+	if model.TaskProject() != "" || cmd != nil {
+		t.Fatalf("TaskProject() = %q, cmd = %v, want no project and the picker open", model.TaskProject(), cmd)
+	}
 }

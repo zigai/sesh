@@ -301,6 +301,7 @@ func TestClassifySSHFailureUsesFixedPrivacySafeReasons(t *testing.T) {
 		{name: "context canceled", ctxErr: context.Canceled, diagnostics: "PRIVATE", want: context.Canceled, code: ConnectionErrorUnavailable},
 		{name: "reported timeout", diagnostics: "ssh: connect to host: Connection timed out PRIVATE", want: context.DeadlineExceeded, code: ConnectionErrorTimeout},
 		{name: "remote peer missing", diagnostics: "sh: sesh: command not found PRIVATE", want: ErrRemotePeerUnavailable, code: ConnectionErrorRemotePeerUnavailable},
+		{name: "peer on another protocol", diagnostics: "invalid remote frame PRIVATE", want: ErrUnsupportedProtocol, code: ConnectionErrorIncompatibleProtocol},
 		{name: "forwarding failed", diagnostics: "remote port forwarding failed for listen path PRIVATE", want: ErrForwardingFailed, code: ConnectionErrorUnavailable},
 		{name: "other", diagnostics: "PRIVATE network detail", want: ErrConnectionUnavailable, code: ConnectionErrorUnavailable},
 	}

@@ -33,6 +33,8 @@ func (local *Local) registerAgentHandlers() {
 	handle(local, action.AgentFinish, local.finishWork)
 	handle(local, action.AgentPin, local.pinWork)
 	handle(local, action.AgentUnpin, local.unpinWork)
+	handle(local, action.AgentUnseen, local.markWorkUnseen)
+	handle(local, action.AgentSeen, local.markWorkSeen)
 	handle(local, action.AgentLink, local.linkWork)
 	handle(local, action.AgentUnlink, local.unlinkWork)
 }

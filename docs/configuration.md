@@ -211,7 +211,7 @@ main_size = "60%"
 group = "state" # state, project
 sections = ["done", "approve", "input", "waiting", "limited", "unmerged", "running", "snoozed", "asleep", "idle", "closed"] # shown, in order
 labels = { done = "new" }
-dim = ["running", "snoozed", "asleep", "closed"]
+dim = ["running", "snoozed", "asleep", "closed", "finished"]
 snooze = ["next message", "1h", "4h", "tomorrow 09:00"]
 closed_shown = 3 # closed rows per project before a "more" row; 0 shows all
 
@@ -228,7 +228,7 @@ run = ["docker", "compose", "down"] # runs in a task worktree before finishing r
 
 A menu lists only the entries that apply to the row. `-` is a divider; `items` lists the menu items not named elsewhere in the list.
 
-`approve` and `input` hold agents waiting for permission or an answer, and `limited` agents stopped by a usage limit. The agent status service records agent conversations in `$XDG_STATE_HOME/sesh/work.json`. After its agent exits, a conversation outside task windows is listed in `closed`; Enter resumes it in a new window of its project session (`agent.resume`). `finish` finishes a task or a conversation, which leaves the inbox until it is resumed; so does a conversation whose linked pull requests, its branch's and those `link` adds, all end. `pin` keeps a row first and open.
+`approve` and `input` hold agents waiting for permission or an answer, and `limited` agents stopped by a usage limit. The agent status service records agent conversations in `$XDG_STATE_HOME/sesh/work.json`. After its agent exits, a conversation outside task windows is listed in `closed`; Enter resumes it in a new window of its project session (`agent.resume`). `finish` finishes a task or a conversation, which leaves the inbox until it is resumed; so does a conversation whose linked pull requests, its branch's and those `link` adds, all end. The agent status service also finishes a task whose pull request merged, once its agent is idle and no client shows its window. A finished task's conversations resume in the project's main checkout. `pin` keeps a row first and open. Add `finished` to `sections` to list finished conversations; Enter resumes and reopens one.
 
 ## Menu items
 

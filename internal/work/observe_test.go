@@ -213,3 +213,96 @@ func TestUnlinkingAPullRequestKeepsItOutOfTheLinkedOnes(t *testing.T) {
 		t.Errorf("Unlink() again error = %v, want ErrNotLinked", err)
 	}
 }
+
+func TestObserveKeepsTheLatestPrompt(t *testing.T) {
+	state := emptyState()
+
+	prompted := sighting("c1", "%1", 100)
+	prompted.PromptAt = observedAt.Add(time.Hour)
+	state.Observe([]work.Sighting{prompted}, observedAt, branchMain)
+
+	earlier := sighting("c1", "%1", 100)
+	earlier.PromptAt = observedAt
+
+	if state.Observe([]work.Sighting{sighting("c1", "%1", 100), earlier}, observedAt, branchMain) ||
+		state.Items[0].PromptAt != prompted.PromptAt.Unix() {
+		t.Errorf("Items = %+v, want the later prompt kept unchanged", state.Items)
+	}
+}
+
+func TestAFinishedConversationPromptedAgainInItsPaneReopens(t *testing.T) {
+	state := finishedState(t)
+
+	prompted := sighting("c1", "%1", 100)
+	prompted.PromptAt = observedAt.Add(time.Minute)
+	state.Observe([]work.Sighting{prompted}, observedAt, branchMain)
+
+	if state.Items[0].Finished() || state.Items[0].PromptAt != prompted.PromptAt.Unix() {
+		t.Errorf("item = %+v, want it reopened with the new prompt", state.Items[0])
+	}
+}
+
+func TestAFinishedConversationWithAPromptFromBeforeItFinishedStaysFinished(t *testing.T) {
+	state := finishedState(t)
+
+	prompted := sighting("c1", "%1", 100)
+	prompted.PromptAt = observedAt.Add(-time.Minute)
+	state.Observe([]work.Sighting{prompted}, observedAt, branchMain)
+
+	if !state.Items[0].Finished() {
+		t.Errorf("item = %+v, want it still finished", state.Items[0])
+	}
+}
+
+func taskState(t *testing.T) work.State {
+	t.Helper()
+
+	state := emptyState()
+
+	for index, conversation := range []string{"c1", "c2", "c3"} {
+		seen := sighting(conversation, "%"+conversation, 100+index)
+		seen.Task, seen.Directory = "t1", "/trees/shop-t1"
+
+		if conversation == "c3" {
+			seen.Task, seen.Directory = "t2", "/trees/shop-t2"
+		}
+
+		state.Observe([]work.Sighting{seen}, observedAt, branchMain)
+	}
+
+	if err := state.Finish("w2", work.FinishedByUser, observedAt); err != nil {
+		t.Fatalf("Finish() error = %v", err)
+	}
+
+	return state
+}
+
+func TestFinishingATaskFinishesItsConversationsInTheMainCheckout(t *testing.T) {
+	state := taskState(t)
+	state.FinishTask("t1", work.FinishedByPR, "/code/shop", observedAt.Add(time.Hour))
+
+	open, earlier, other := state.Items[0], state.Items[1], state.Items[2]
+
+	if open.FinishedBy != work.FinishedByPR || open.FinishedAt != observedAt.Add(time.Hour).Unix() || open.Task != "" ||
+		open.Directory != "/code/shop" {
+		t.Errorf("open item = %+v, want it finished by pr, detached and in /code/shop", open)
+	}
+
+	if earlier.FinishedBy != work.FinishedByUser || earlier.FinishedAt != observedAt.Unix() || earlier.Task != "" ||
+		earlier.Directory != "/code/shop" {
+		t.Errorf("earlier finished item = %+v, want its finish kept, detached and in /code/shop", earlier)
+	}
+
+	if other.Finished() || other.Task != "t2" || other.Directory != "/trees/shop-t2" {
+		t.Errorf("item of another task = %+v, want it unchanged", other)
+	}
+}
+
+func TestFinishingATaskWithoutADirectoryKeepsWhereItsConversationsRan(t *testing.T) {
+	state := taskState(t)
+	state.FinishTask("t1", work.FinishedByUser, "", observedAt)
+
+	if item := state.Items[0]; item.Directory != "/trees/shop-t1" || item.Task != "" || !item.Finished() {
+		t.Errorf("item = %+v, want it finished and detached in /trees/shop-t1", item)
+	}
+}

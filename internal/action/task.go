@@ -214,10 +214,14 @@ var (
 		Summary: "Remove a task's window, popup, worktree and branch",
 		Help: "Remove a task: its popup terminal, its window, and for a project task its worktree and branch. " +
 			"Without discard it refuses when that would lose work: commits not merged into the base branch, " +
-			"uncommitted changes, or a pull request closed without merging.",
-		Subject:     SubjectTask,
-		Arity:       ArityOne,
-		Params:      []Param{newParam("discard", ParamBool, "Remove the task even if that loses work")},
+			"uncommitted changes, or a pull request closed without merging. The project's finish command runs in its " +
+			"worktree first unless --skip-run; a failing command stops the finish.",
+		Subject: SubjectTask,
+		Arity:   ArityOne,
+		Params: []Param{
+			newParam("discard", ParamBool, "Remove the task even if that loses work"),
+			newParam("skip-run", ParamBool, "Leave out the project's finish command"),
+		},
 		NeedsClient: false,
 		Interactive: false,
 		Destructive: true,
@@ -225,7 +229,7 @@ var (
 		InPicker:    false,
 		check:       nil,
 	}, func(subject Subject, values Values) (FinishTask, error) {
-		return FinishTask{Task: subject.Task, Discard: values.Bool("discard")}, nil
+		return FinishTask{Task: subject.Task, Discard: values.Bool("discard"), SkipRun: values.Bool("skip-run")}, nil
 	}, func(out FinishedTask) string { return "Finished task " + out.ID })
 
 	TaskMerge = define(Descriptor{
@@ -373,6 +377,7 @@ type OpenedTask struct {
 type FinishTask struct {
 	Task    string `json:"task"`
 	Discard bool   `json:"discard"`
+	SkipRun bool   `json:"skipRun"`
 }
 
 type FinishedTask struct {

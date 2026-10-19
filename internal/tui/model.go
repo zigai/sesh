@@ -174,6 +174,7 @@ type Model struct {
 	remoteCatalogObservation     uint64
 	switchAfterQuit              string
 	replayKey                    string
+	taskProject                  string
 	paneAfterQuit                string
 	loadingSessions              bool
 	popupStartup                 popupStartupPresentation
@@ -356,6 +357,7 @@ func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps
 		switchAfterQuit:              "",
 		paneAfterQuit:                "",
 		replayKey:                    "",
+		taskProject:                  "",
 		loadingSessions:              false,
 		popupStartup:                 popupStartupContent,
 		launchedAt:                   time.Time{},
@@ -517,6 +519,11 @@ func (m *Model) DeferredAttachSession() string {
 // ReplayKey returns the tmux key to replay on the invoking client after the picker closes.
 func (m *Model) ReplayKey() string {
 	return m.replayKey
+}
+
+// TaskProject returns the project whose new task menu to open after the picker closes.
+func (m *Model) TaskProject() string {
+	return m.taskProject
 }
 
 func (m *Model) DeferredSwitchPane() string {

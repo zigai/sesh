@@ -27,6 +27,7 @@ var (
 	errNotPinned       = errors.New("the conversation is not pinned")
 	errNothingLinked   = errors.New("no pull request is linked to the conversation")
 	errAlreadyFinished = errors.New("the conversation is already finished")
+	errTaskPR          = errors.New("a task's pull request is its branch's")
 )
 
 type workSyncMsg struct {
@@ -41,9 +42,10 @@ type remoteResume struct {
 	pane       string
 }
 
-// hostClosedItems lists the open recorded conversations of a host whose agent no longer runs
-// there, except those of tasks, which have rows of their own. A project shows its pinned and most
-// recent ones up to the configured count, then a row that expands the rest.
+// hostClosedItems lists the recorded conversations of a host whose agent no longer runs there,
+// open or finished, except those of tasks, which have rows of their own. A project shows its
+// pinned and most recent closed rows up to the configured count, then a row that expands the rest,
+// and its finished rows the same way.
 func (m *Model) hostClosedItems(host inboxHost) []inboxItem {
 	running := make(map[string]bool)
 
@@ -62,12 +64,12 @@ func (m *Model) hostClosedItems(host inboxHost) []inboxItem {
 	projects := make(map[string][]inboxItem)
 
 	for _, recorded := range host.work {
-		if running[recorded.Harness+"/"+recorded.Conversation] || recorded.Finished() || recorded.Task != "" {
+		if running[recorded.Harness+"/"+recorded.Conversation] || recorded.Task != "" {
 			continue
 		}
 
 		item := m.newClosedItem(host, recorded)
-		key := inboxProject(item)
+		key := item.section + ":" + inboxProject(item)
 
 		if _, seen := projects[key]; !seen {
 			keys = append(keys, key)
@@ -85,20 +87,21 @@ func (m *Model) hostClosedItems(host inboxHost) []inboxItem {
 	return items
 }
 
-// shownClosedItems are the closed rows a project shows: the pinned and most recent ones up to the
-// configured count unless the user expanded the project, then a row that expands the rest.
-func (m *Model) shownClosedItems(host inboxHost, project string, items []inboxItem) []inboxItem {
+// shownClosedItems are the closed or finished rows of a project: the pinned and most recent ones
+// up to the configured count unless the user expanded them, then a row that expands the rest. Rows
+// marked unseen are all shown.
+func (m *Model) shownClosedItems(host inboxHost, group string, items []inboxItem) []inboxItem {
 	shown := m.config.Inbox.ClosedShown
-	expandKey := host.identity.ConnectionID + "\x00" + project
+	expandKey := host.identity.ConnectionID + "\x00" + group
 
-	if shown == 0 || len(items) <= shown || m.closedExpanded[expandKey] {
+	if items[0].section == config.InboxDone || shown == 0 || len(items) <= shown || m.closedExpanded[expandKey] {
 		return items
 	}
 
 	slices.SortStableFunc(items, compareRecency)
 
 	more := items[shown]
-	more.agent.PaneID = moreRowPrefix + project
+	more.agent.PaneID = moreRowPrefix + group
 	more.agent.HarnessSession = strconv.Itoa(len(items)-shown) + " more"
 	more.agent.Task = more.agent.HarnessSession
 	more.agent.SessionID = ""
@@ -153,8 +156,12 @@ func (m *Model) newClosedItem(host inboxHost, recorded work.Item) inboxItem {
 	)
 
 	section := config.InboxClosed
-	if _, marked := m.inbox.FindUnseen(conversationKey(agent)); marked {
+
+	switch {
+	case recorded.UnseenAt != 0:
 		section = config.InboxDone
+	case recorded.Finished():
+		section = config.InboxFinished
 	}
 
 	return inboxItem{
@@ -251,6 +258,8 @@ func workActionError(id action.ID, item inboxItem) error {
 	switch {
 	case id == action.InboxFinish.ID && item.task:
 		return nil
+	case item.task && (id == action.InboxLink.ID || id == action.InboxUnlink.ID):
+		return errTaskPR
 	case item.work.ID == "" || item.more != "":
 		return errNotRecorded
 	default:
@@ -293,6 +302,10 @@ func (m *Model) runWorkAction(id action.ID, item inboxItem, values action.Values
 		return m.runAction(action.AgentPin, subject, params)
 	case action.InboxUnpin.ID:
 		return m.runAction(action.AgentUnpin, subject, params)
+	case action.InboxUnseen.ID:
+		return m.runAction(action.AgentUnseen, subject, params)
+	case action.InboxSeen.ID:
+		return m.runAction(action.AgentSeen, subject, params)
 	case action.InboxLink.ID:
 		params.Set("pr", values.String("pr"))
 
