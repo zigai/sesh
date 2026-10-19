@@ -306,7 +306,7 @@ func captureBaseline(t *testing.T, server *gotmux.Server, session gotmux.Session
 		t.Fatal(err)
 	}
 
-	m, _, err := graph(before, []gotmux.SessionID{session.ID()})
+	m, _, err := tiledGraph(before, []gotmux.SessionID{session.ID()})
 	if err != nil {
 		t.Fatal(err)
 	}

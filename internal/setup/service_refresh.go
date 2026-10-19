@@ -28,9 +28,8 @@ type ServiceManager struct {
 }
 
 type ServiceRefreshResult struct {
-	Reloaded  bool     `json:"reloaded"`
-	Restarted []string `json:"restarted,omitempty"`
-	// Recovered lists failed services started again on their refreshed definition.
+	Reloaded        bool     `json:"reloaded"`
+	Restarted       []string `json:"restarted,omitempty"`
 	Recovered       []string `json:"recovered,omitempty"`
 	RestartRequired []string `json:"restartRequired,omitempty"`
 }
@@ -44,7 +43,7 @@ type UnitState struct {
 type serviceRefreshPlan struct {
 	reload          bool
 	restart         []string
-	recover         []string
+	failed          []string
 	restartRequired []string
 }
 
@@ -103,18 +102,9 @@ func RefreshDefinitions(
 		refreshed.Restarted = append(refreshed.Restarted, name)
 	}
 
-	// A failed service was started and then crashed, often on the very definition this refresh
-	// replaced. Starting it again restores the state its user chose instead of leaving it down.
-	for _, name := range prepared.recover {
-		if err := manager.run(ctx, "--user", "reset-failed", name); err != nil {
-			return applied, refreshed, enrichServiceRefresh("recover", errors.Join(ErrServiceRestart, err))
-		}
-
-		if err := manager.run(ctx, "--user", "restart", name); err != nil {
-			return applied, refreshed, enrichServiceRefresh("recover", errors.Join(ErrServiceRestart, err))
-		}
-
-		refreshed.Recovered = append(refreshed.Recovered, name)
+	refreshed.Recovered, err = restartFailedUnits(ctx, manager, prepared.failed)
+	if err != nil {
+		return applied, refreshed, enrichServiceRefresh("recover", errors.Join(ErrServiceRestart, err))
 	}
 
 	return applied, refreshed, nil
@@ -141,6 +131,24 @@ func UnitStates(ctx context.Context, manager ServiceManager, names []string) ([]
 	}
 
 	return states, nil
+}
+
+func restartFailedUnits(ctx context.Context, manager ServiceManager, names []string) ([]string, error) {
+	var restarted []string
+
+	for _, name := range names {
+		if err := manager.run(ctx, "--user", "reset-failed", name); err != nil {
+			return restarted, err
+		}
+
+		if err := manager.run(ctx, "--user", "restart", name); err != nil {
+			return restarted, err
+		}
+
+		restarted = append(restarted, name)
+	}
+
+	return restarted, nil
 }
 
 func prepareServiceRefresh(
@@ -225,7 +233,7 @@ func inspectRefreshDefinition(
 		case "active", "reloading":
 			prepared.restart = append(prepared.restart, definition.Name)
 		case "failed":
-			prepared.recover = append(prepared.recover, definition.Name)
+			prepared.failed = append(prepared.failed, definition.Name)
 		}
 	}
 

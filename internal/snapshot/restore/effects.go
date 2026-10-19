@@ -82,11 +82,11 @@ func classifyMutation(err error) mutationOutcome {
 		return mutationOutcome{Effect: gotmux.EffectRejected, RuntimeID: ""}
 	}
 
-	if evidence.hasNotSent && !evidence.hasUnknown && !evidence.unrecognized {
+	if evidence.hasNotSent {
 		return mutationOutcome{Effect: gotmux.EffectNotSent, RuntimeID: ""}
 	}
 
-	return mutationOutcome{Effect: gotmux.EffectUnknown, RuntimeID: evidence.runtimeID}
+	return mutationOutcome{Effect: gotmux.EffectUnknown, RuntimeID: ""}
 }
 
 func collectEvidence(err error) collectedEvidence {

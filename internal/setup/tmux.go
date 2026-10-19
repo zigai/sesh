@@ -142,6 +142,10 @@ func bindingProgram(key, table, command string) []string {
 		return []string{"run-shell", "-b", command}
 	}
 
+	return forwardInRemoteAttachment(key, command)
+}
+
+func forwardInRemoteAttachment(key, command string) []string {
 	return []string{"if-shell", "-F", "#{" + remote.AttachmentPaneOption + "}", "send-keys " + quote(key), "run-shell -b " + quote(command)}
 }
 

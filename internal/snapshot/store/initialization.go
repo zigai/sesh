@@ -150,6 +150,10 @@ func (r *Repository) finalizeInitialization(ctx context.Context, catalog Catalog
 	return r.removeInitializationMarker(ctx)
 }
 
+func initializationFinished(names []string) bool {
+	return slices.Contains(names, "catalog.json") && !slices.Contains(names, initializationMarker)
+}
+
 func (r *Repository) removeInitializationMarker(ctx context.Context) error {
 	if err := r.root.RemoveDir(initializationMarker); err != nil {
 		return errors.Join(ErrUncertain, err)

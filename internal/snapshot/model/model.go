@@ -146,3 +146,16 @@ type Artifact struct {
 	Length int64  `json:"length"`
 	SHA256 string `json:"sha256"`
 }
+
+// Command is the command line that runs the launch: its executable, then its arguments after
+// argv[0].
+func (l Launch) Command() []string {
+	command := make([]string, 0, len(l.Arguments))
+	command = append(command, string(l.Executable))
+
+	for _, argument := range l.Arguments[1:] {
+		command = append(command, string(argument))
+	}
+
+	return command
+}

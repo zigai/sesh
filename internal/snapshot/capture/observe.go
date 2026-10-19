@@ -29,9 +29,8 @@ const (
 var beforeCompareGraphHook func()
 
 type Observation struct {
-	Manifest  model.Manifest
-	Artifacts map[string][]byte
-	// FloatingPanesOmitted counts floating panes left out of the manifest.
+	Manifest             model.Manifest
+	Artifacts            map[string][]byte
 	FloatingPanesOmitted int
 }
 
@@ -139,7 +138,7 @@ func observeOnce(ctx context.Context, server *gotmux.Server, selected []gotmux.S
 		return Observation{}, err
 	}
 
-	m, floating, err := graph(before, selected)
+	m, floating, err := tiledGraph(before, selected)
 	if err != nil {
 		return Observation{}, err
 	}
@@ -353,24 +352,13 @@ func (o *Observation) panes(ctx context.Context, snapshot gotmux.Snapshot, outpu
 
 		o.Manifest.Panes[index].Options = settings
 
-		var capture gotmux.CaptureOptions
-
-		capture.EntireHistory, capture.IncludeEscapes, capture.PreserveSpaces = true, true, true
-
-		// A pane whose terminal text exceeds the remaining byte budget keeps no artifact
-		// rather than failing the whole observation; its structure is still recorded.
-		capture.MaxBytes = min(outputLimit, model.MaxArtifactBytes, model.MaxGenerationBytes-total)
-		if capture.MaxBytes <= 0 {
-			continue
-		}
-
-		data, err := info.Handle().Capture(ctx, capture)
-		if errors.Is(err, gotmux.ErrOutputLimit) {
-			continue
-		}
-
+		data, omitted, err := captureWithinBudget(ctx, info.Handle(), min(outputLimit, model.MaxArtifactBytes, model.MaxGenerationBytes-total))
 		if err != nil {
-			return oops.In("snapshot.capture").With("operation", "observe_terminal_text").Wrapf(err, "observe terminal text")
+			return err
+		}
+
+		if omitted {
+			continue
 		}
 
 		total += int64(len(data))
@@ -384,13 +372,35 @@ func (o *Observation) panes(ctx context.Context, snapshot gotmux.Snapshot, outpu
 	return nil
 }
 
+func captureWithinBudget(ctx context.Context, pane gotmux.Pane, budget int64) ([]byte, bool, error) {
+	if budget <= 0 {
+		return nil, true, nil
+	}
+
+	var capture gotmux.CaptureOptions
+
+	capture.EntireHistory, capture.IncludeEscapes, capture.PreserveSpaces = true, true, true
+	capture.MaxBytes = budget
+
+	data, err := pane.Capture(ctx, capture)
+	if errors.Is(err, gotmux.ErrOutputLimit) {
+		return nil, true, nil
+	}
+
+	if err != nil {
+		return nil, false, oops.In("snapshot.capture").With("operation", "observe_terminal_text").Wrapf(err, "observe terminal text")
+	}
+
+	return data, false, nil
+}
+
 func compareGraph(ctx context.Context, server *gotmux.Server, before gotmux.Snapshot, selected []gotmux.SessionID, captured *model.Manifest, paneProcesses map[string]paneProcessRecord) error {
 	after, err := reobserveGraph(ctx, server, before)
 	if err != nil {
 		return err
 	}
 
-	initial, _, err := graph(before, selected)
+	initial, _, err := tiledGraph(before, selected)
 	if err != nil {
 		return err
 	}
@@ -400,7 +410,7 @@ func compareGraph(ctx context.Context, server *gotmux.Server, before gotmux.Snap
 		return err
 	}
 
-	projected, _, err := graph(after, selected)
+	projected, _, err := tiledGraph(after, selected)
 	if err != nil {
 		return err
 	}

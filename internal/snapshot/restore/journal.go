@@ -14,18 +14,6 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/model"
 )
 
-// Durable journal states for one plan step, mirroring the repository action states. Intent is
-// durable before dispatch, so only "planned" proves nothing was sent; "issued" and "unknown"
-// never authorize a redispatch.
-const (
-	StatePlanned   = model.ActionStatePlanned
-	StateIssued    = model.ActionStateIssued
-	StateNotSent   = model.ActionStateNotSent
-	StateUnknown   = model.ActionStateUnknown
-	StateConfirmed = model.ActionStateConfirmed
-	StateVerified  = model.ActionStateVerified
-)
-
 const (
 	KindCreateSession = model.ActionKindCreateSession
 	KindCreateWindow  = model.ActionKindCreateWindow

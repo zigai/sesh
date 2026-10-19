@@ -45,34 +45,6 @@ func planFailureReason(current string, err error) string {
 	return current
 }
 
-// planSelection keeps a resumed operation's registered session set, leaving the executor's
-// adoption-aware guard to decide which live sessions are its own, and plans a new operation
-// around live collisions.
-func planSelection(
-	ctx context.Context,
-	repository *store.Repository,
-	server *gotmux.Server,
-	manifest model.Manifest,
-	selected []string,
-	cfg RestoreConfig,
-) (restore.Plan, []SkippedSession, error) {
-	resumed, err := restoreOperationExists(ctx, repository, cfg.OperationID)
-	if err != nil {
-		return restore.Plan{}, nil, err
-	}
-
-	if resumed {
-		plan, err := restore.BuildPlan(manifest, selected)
-		if err != nil {
-			return restore.Plan{}, nil, fmt.Errorf("build restore plan: %w", err)
-		}
-
-		return plan, nil, nil
-	}
-
-	return planAroundCollisions(ctx, server, manifest, selected, effectiveCollisionPolicy(cfg))
-}
-
 func effectiveCollisionPolicy(cfg RestoreConfig) CollisionPolicy {
 	switch {
 	case cfg.OnCollision != CollisionPolicyDefault:

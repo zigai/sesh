@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"io/fs"
-	"slices"
 
 	"github.com/samber/oops"
 
@@ -100,9 +99,7 @@ func (v *View) read(ctx context.Context, read func() error) error {
 		return oops.In("snapshot.store").With("operation", "inspect_repository_view").Wrap(err)
 	}
 
-	// Only a durable open publishes the first catalog and removes the initialization
-	// marker, and no save can commit before that, so either state lists nothing.
-	if slices.Contains(names, initializationMarker) || !slices.Contains(names, "catalog.json") {
+	if !initializationFinished(names) {
 		return ErrUnavailable
 	}
 
@@ -115,5 +112,5 @@ func (v *View) read(ctx context.Context, read func() error) error {
 }
 
 func replacedDuringRead(err error) bool {
-	return errors.Is(err, fs.ErrNotExist) || errors.Is(err, privatefs.ErrUnsafe)
+	return errors.Is(err, fs.ErrNotExist) || errors.Is(err, privatefs.ErrUnlinked)
 }

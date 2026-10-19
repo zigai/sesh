@@ -121,7 +121,7 @@ func saveWithProfile(ctx context.Context, repository *store.Repository, leaseRoo
 
 	if err != nil {
 		var failErr error
-		if !errors.Is(err, store.ErrUncertain) {
+		if store.PublishedNothing(err) {
 			failErr = recordFailedAttempt(ctx, repository, attempt.ID)
 		}
 

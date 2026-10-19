@@ -16,7 +16,9 @@ import (
 
 var (
 	ErrUnsafe = errors.New("unsafe private storage entry")
-	ErrLimit  = errors.New("private storage inventory limit exceeded")
+	// ErrUnlinked is an opened file whose last link was removed; it is also ErrUnsafe.
+	ErrUnlinked = fmt.Errorf("%w: last link removed", ErrUnsafe)
+	ErrLimit    = errors.New("private storage inventory limit exceeded")
 )
 
 type Dir struct{ file *os.File }
@@ -315,11 +317,14 @@ func checkMode(file *os.File, directory bool) error {
 		return ErrUnsafe
 	}
 
-	if directory {
+	switch {
+	case directory:
 		if stat.Mode&unix.S_IFMT != unix.S_IFDIR || stat.Mode&0o777 != 0o700 {
 			return ErrUnsafe
 		}
-	} else if stat.Mode&unix.S_IFMT != unix.S_IFREG || stat.Mode&0o777 != 0o600 || stat.Nlink != 1 {
+	case stat.Nlink == 0:
+		return ErrUnlinked
+	case stat.Mode&unix.S_IFMT != unix.S_IFREG || stat.Mode&0o777 != 0o600 || stat.Nlink != 1:
 		return ErrUnsafe
 	}
 

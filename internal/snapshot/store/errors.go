@@ -9,6 +9,12 @@ import (
 	"github.com/samber/oops"
 )
 
+// PublishedNothing reports whether a failed write is known to have left the catalog unchanged.
+// An uncertain publication may have committed.
+func PublishedNothing(err error) bool {
+	return !errors.Is(err, ErrUncertain)
+}
+
 func repositoryError(operation string, err error) error {
 	if err == nil {
 		return nil

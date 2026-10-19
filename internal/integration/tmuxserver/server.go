@@ -8,15 +8,17 @@ import (
 	"github.com/samber/oops"
 
 	gotmux "github.com/zigai/gotmux/tmux"
+
+	"github.com/zigai/sesh/internal/snapshot/model"
 )
 
 const (
 	LibraryVersion            = "v0.7.4"
 	interactiveCommandTimeout = 24 * time.Hour
 
-	// OutputBytes bounds stdout and stderr of one tmux command. It matches the snapshot
-	// artifact limit so a pane's full terminal text fits in a single capture.
-	OutputBytes = 256 << 20
+	// OutputBytes bounds stdout and stderr of one tmux command, so a pane's full terminal text
+	// fits in a single capture.
+	OutputBytes = model.MaxArtifactBytes
 )
 
 var ErrEndpoint = errors.New("an explicit absolute tmux socket is required")

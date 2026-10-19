@@ -94,14 +94,13 @@ func Prepare(observed model.Launch, agent *AgentResume) (model.Launch, Reason) {
 	fallback.Recovery = RecoveryUnverified
 	fallback.Reason = ""
 
+	if sleepingTaskPlaceholder(observed) {
+		return preparePlaceholder(fallback)
+	}
+
 	executable := string(observed.Executable)
 	clean := cleanAbsolute(executable) && cleanAbsolute(string(observed.Directory))
 	name := executableName(executable)
-
-	// A sleeping task's agent pane may still carry the stopped agent's record.
-	if clean && name == seshName {
-		return preparePlaceholder(fallback)
-	}
 
 	if agent != nil {
 		return prepareAgent(fallback, agent)

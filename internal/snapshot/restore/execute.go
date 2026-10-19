@@ -330,7 +330,7 @@ func (e *Executor) executeStep(ctx context.Context, step Step, state StepState, 
 	}
 
 	switch state.State {
-	case StateConfirmed, StateVerified:
+	case model.ActionStateConfirmed, model.ActionStateVerified:
 		if err := e.installStep(ctx, step, state.RuntimeID); err != nil {
 			return err
 		}
@@ -338,8 +338,8 @@ func (e *Executor) executeStep(ctx context.Context, step Step, state StepState, 
 		report.Adopted = append(report.Adopted, step.ID())
 
 		return nil
-	case StatePlanned, StateNotSent:
-	case StateIssued, StateUnknown:
+	case model.ActionStatePlanned, model.ActionStateNotSent:
+	case model.ActionStateIssued, model.ActionStateUnknown:
 		return nil
 	}
 
@@ -421,12 +421,12 @@ func validateJournalStates(plan Plan, states map[string]StepState) error {
 		}
 
 		switch state.State {
-		case StateIssued, StateUnknown:
+		case model.ActionStateIssued, model.ActionStateUnknown:
 			return oops.In("snapshot.restore").
 				Code("operation_uncertain").
 				With("operation", "execute", "reason", "prior_effect_uncertain").
 				Wrap(ErrPriorUncertainty)
-		case StatePlanned, StateNotSent, StateConfirmed, StateVerified:
+		case model.ActionStatePlanned, model.ActionStateNotSent, model.ActionStateConfirmed, model.ActionStateVerified:
 		default:
 			return oops.In("snapshot.restore").
 				Code("restore_failed").
@@ -448,9 +448,9 @@ func adoptedSessionIDs(plan Plan, states map[string]StepState) map[string]bool {
 		}
 
 		switch states[step.ID()].State {
-		case StateConfirmed, StateVerified:
+		case model.ActionStateConfirmed, model.ActionStateVerified:
 			adopted[create.SessionID] = true
-		case StatePlanned, StateIssued, StateNotSent, StateUnknown:
+		case model.ActionStatePlanned, model.ActionStateIssued, model.ActionStateNotSent, model.ActionStateUnknown:
 		}
 	}
 

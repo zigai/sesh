@@ -194,7 +194,7 @@ func TestExecutorJournalIntentFaultPreventsEffect(t *testing.T) {
 			continue
 		}
 
-		if action.State != StatePlanned {
+		if action.State != model.ActionStatePlanned {
 			t.Fatalf("expected action to stay planned after a failed intent, got %q", action.State)
 		}
 	}
@@ -226,7 +226,7 @@ func TestExecutorRefusesPriorUncertainEffect(t *testing.T) {
 
 	createStep := createSessionStep(t, plan)
 
-	if err := repo.Transition(ctx, operation, ActionID(createStep.ID()), StatePlanned, StateIssued, nil); err != nil {
+	if err := repo.Transition(ctx, operation, ActionID(createStep.ID()), model.ActionStatePlanned, model.ActionStateIssued, nil); err != nil {
 		t.Fatalf("Transition failed: %v", err)
 	}
 
@@ -327,8 +327,8 @@ func assertCanceledReceiptOutcome(
 	}
 
 	states := actionStates(op)
-	if states[ActionID(createStep.ID())] != StateUnknown {
-		t.Fatalf("expected the unconfirmed effect to be recorded as %q, got %q", StateUnknown, states[ActionID(createStep.ID())])
+	if states[ActionID(createStep.ID())] != model.ActionStateUnknown {
+		t.Fatalf("expected the unconfirmed effect to be recorded as %q, got %q", model.ActionStateUnknown, states[ActionID(createStep.ID())])
 	}
 
 	if count := restoredSessionCount(t, ctx, server); count != 1 {
@@ -472,8 +472,8 @@ func requireCrashedCreationSurvived(
 		t.Fatalf("ReconcileOperation failed: %v", err)
 	}
 
-	if states := actionStates(op); states[ActionID(createStep.ID())] != StateIssued {
-		t.Fatalf("expected the interrupted effect to stay %q, got %q", StateIssued, states[ActionID(createStep.ID())])
+	if states := actionStates(op); states[ActionID(createStep.ID())] != model.ActionStateIssued {
+		t.Fatalf("expected the interrupted effect to stay %q, got %q", model.ActionStateIssued, states[ActionID(createStep.ID())])
 	}
 }
 
@@ -817,7 +817,7 @@ func TestExecutorJournalsUnspecifiedEffectAsUnknown(t *testing.T) {
 		t.Fatalf("dispatch error = %v, want uncertain execution", err)
 	}
 
-	if state := journal.state(step.ID()); state.State != StateUnknown || state.RuntimeID != "" {
+	if state := journal.state(step.ID()); state.State != model.ActionStateUnknown || state.RuntimeID != "" {
 		t.Fatalf("journal state = %+v, want unknown without a runtime identity", state)
 	}
 

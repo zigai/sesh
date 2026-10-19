@@ -561,7 +561,7 @@ func verifiedOperationReceipts(plan restore.Plan, ledger *actionLedger) (map[str
 			return nil, false, err
 		}
 
-		if action.State != restore.StateVerified {
+		if action.State != model.ActionStateVerified {
 			return nil, false, nil
 		}
 
@@ -576,7 +576,7 @@ func verifiedOperationReceipts(plan restore.Plan, ledger *actionLedger) (map[str
 			return nil, false, err
 		}
 
-		if action.State != restore.StateVerified {
+		if action.State != model.ActionStateVerified {
 			return nil, false, nil
 		}
 	}
@@ -636,9 +636,28 @@ func prepareRestorePlan(
 		}
 	}
 
-	plan, skipped, err := planSelection(ctx, repository, server, manifest, selected, cfg)
+	resumed, err := restoreOperationExists(ctx, repository, cfg.OperationID)
 	if err != nil {
-		return restore.Plan{}, none, genID, skipped, err
+		return restore.Plan{}, none, genID, nil, err
+	}
+
+	var (
+		plan    restore.Plan
+		skipped []SkippedSession
+	)
+
+	if resumed {
+		// The resumed operation's own sessions are live already; the executor's adoption guard
+		// tells them apart from collisions.
+		plan, err = restore.BuildPlan(manifest, selected)
+		if err != nil {
+			return restore.Plan{}, none, genID, nil, fmt.Errorf("build restore plan: %w", err)
+		}
+	} else {
+		plan, skipped, err = planAroundCollisions(ctx, server, manifest, selected, effectiveCollisionPolicy(cfg))
+		if err != nil {
+			return restore.Plan{}, none, genID, skipped, err
+		}
 	}
 
 	if _, err := restore.PlanActions(plan); err != nil {
@@ -815,9 +834,7 @@ func restoreTarget(endpoint string, daemon restoreDaemonIdentity, cfg RestoreCon
 		}
 	}
 
-	target := fmt.Sprintf("%s%s\n%d\n%d\nlaunch=%t\nmissing_working_dir=%s\ncompensate=false\nprofile=%s",
-		restoreTargetPrefix,
-		endpoint, identity.PID, identity.Started.UnixNano(),
+	target := restoreTargetInstance(endpoint, identity) + fmt.Sprintf("launch=%t\nmissing_working_dir=%s\ncompensate=false\nprofile=%s",
 		cfg.LaunchProcesses, cfg.MissingWorkingDir, cfg.Profile)
 	target += restoreDaemonTargetAppendix(daemon)
 
@@ -830,6 +847,10 @@ func restoreTarget(endpoint string, daemon restoreDaemonIdentity, cfg RestoreCon
 	}
 
 	return []byte(target), nil
+}
+
+func restoreTargetInstance(endpoint string, server gotmux.ServerIdentity) string {
+	return fmt.Sprintf("%s%s\n%d\n%d\n", restoreTargetPrefix, endpoint, server.PID, server.Started.UnixNano())
 }
 
 func requireRestoreDaemonIdentity(ctx context.Context, server *gotmux.Server, expected restoreDaemonIdentity, effectsPossible bool) error {

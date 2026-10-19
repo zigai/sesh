@@ -21,6 +21,10 @@ const (
 	CodeFailed          Code = "failed"
 )
 
+// ExitCodeCanceled is the exit status of a command whose action was canceled, including by a stop
+// request to a service that runs it.
+const ExitCodeCanceled = 130
+
 var errUnspecified = errors.New("action failed")
 
 // Code classifies an action failure the same way for every caller: CLI exit status and JSON,

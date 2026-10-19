@@ -60,7 +60,7 @@ func newMemoryJournal() *memoryJournal {
 func (j *memoryJournal) state(id string) TestStep {
 	state, ok := j.states[id]
 	if !ok {
-		return TestStep{State: StatePlanned, RuntimeID: ""}
+		return TestStep{State: model.ActionStatePlanned, RuntimeID: ""}
 	}
 
 	return state
@@ -107,13 +107,13 @@ func (j *memoryJournal) Intent(_ context.Context, step Step) error {
 	current := j.state(step.ID())
 
 	switch current.State {
-	case StatePlanned, StateNotSent:
-		j.set(step.ID(), TestStep{State: StateIssued, RuntimeID: ""})
+	case model.ActionStatePlanned, model.ActionStateNotSent:
+		j.set(step.ID(), TestStep{State: model.ActionStateIssued, RuntimeID: ""})
 
 		return nil
-	case StateIssued:
+	case model.ActionStateIssued:
 		return nil
-	case StateUnknown, StateConfirmed, StateVerified:
+	case model.ActionStateUnknown, model.ActionStateConfirmed, model.ActionStateVerified:
 	}
 
 	return fmt.Errorf("%w: intent from %s", errJournalOrder, current.State)
@@ -136,11 +136,11 @@ func (j *memoryJournal) Confirmed(_ context.Context, step Step, runtimeID string
 		return err
 	}
 
-	if j.state(step.ID()).State != StateIssued {
+	if j.state(step.ID()).State != model.ActionStateIssued {
 		return fmt.Errorf("%w: confirm from %s", errJournalOrder, j.state(step.ID()).State)
 	}
 
-	j.set(step.ID(), TestStep{State: StateConfirmed, RuntimeID: runtimeID})
+	j.set(step.ID(), TestStep{State: model.ActionStateConfirmed, RuntimeID: runtimeID})
 
 	return nil
 }
@@ -155,11 +155,11 @@ func (j *memoryJournal) NotSent(_ context.Context, step Step) error {
 		return err
 	}
 
-	if j.state(step.ID()).State != StateIssued {
+	if j.state(step.ID()).State != model.ActionStateIssued {
 		return fmt.Errorf("%w: not-sent from %s", errJournalOrder, j.state(step.ID()).State)
 	}
 
-	j.set(step.ID(), TestStep{State: StateNotSent, RuntimeID: ""})
+	j.set(step.ID(), TestStep{State: model.ActionStateNotSent, RuntimeID: ""})
 
 	return nil
 }
@@ -174,11 +174,11 @@ func (j *memoryJournal) Unknown(_ context.Context, step Step) error {
 		return err
 	}
 
-	if j.state(step.ID()).State != StateIssued {
+	if j.state(step.ID()).State != model.ActionStateIssued {
 		return nil
 	}
 
-	j.set(step.ID(), TestStep{State: StateUnknown, RuntimeID: ""})
+	j.set(step.ID(), TestStep{State: model.ActionStateUnknown, RuntimeID: ""})
 
 	return nil
 }
@@ -223,17 +223,17 @@ func (j *storeJournal) advance(ctx context.Context, id string) error {
 	}
 
 	switch action.State {
-	case StateIssued:
+	case model.ActionStateIssued:
 		return nil
-	case StatePlanned:
-		return j.transition(ctx, id, StatePlanned, StateIssued, nil)
-	case StateNotSent:
-		if err := j.transition(ctx, id, StateNotSent, StatePlanned, nil); err != nil {
+	case model.ActionStatePlanned:
+		return j.transition(ctx, id, model.ActionStatePlanned, model.ActionStateIssued, nil)
+	case model.ActionStateNotSent:
+		if err := j.transition(ctx, id, model.ActionStateNotSent, model.ActionStatePlanned, nil); err != nil {
 			return err
 		}
 
-		return j.transition(ctx, id, StatePlanned, StateIssued, nil)
-	case StateUnknown, StateConfirmed, StateVerified:
+		return j.transition(ctx, id, model.ActionStatePlanned, model.ActionStateIssued, nil)
+	case model.ActionStateUnknown, model.ActionStateConfirmed, model.ActionStateVerified:
 	}
 
 	return ErrPriorUncertainty
@@ -263,11 +263,11 @@ func (j *storeJournal) Intent(ctx context.Context, step Step) error {
 }
 
 func (j *storeJournal) Confirmed(ctx context.Context, step Step, runtimeID string) error {
-	return j.transition(ctx, ActionID(step.ID()), StateIssued, StateConfirmed, model.Bytes(runtimeID))
+	return j.transition(ctx, ActionID(step.ID()), model.ActionStateIssued, model.ActionStateConfirmed, model.Bytes(runtimeID))
 }
 
 func (j *storeJournal) NotSent(ctx context.Context, step Step) error {
-	return j.transition(ctx, ActionID(step.ID()), StateIssued, StateNotSent, nil)
+	return j.transition(ctx, ActionID(step.ID()), model.ActionStateIssued, model.ActionStateNotSent, nil)
 }
 
 func (j *storeJournal) Unknown(ctx context.Context, step Step) error {
@@ -276,11 +276,11 @@ func (j *storeJournal) Unknown(ctx context.Context, step Step) error {
 		return errJournalActionSet
 	}
 
-	if action.State != StateIssued {
+	if action.State != model.ActionStateIssued {
 		return nil
 	}
 
-	return j.transition(ctx, ActionID(step.ID()), StateIssued, StateUnknown, nil)
+	return j.transition(ctx, ActionID(step.ID()), model.ActionStateIssued, model.ActionStateUnknown, nil)
 }
 
 type faultJournal struct {

@@ -166,7 +166,7 @@ func TestRestoreRecoveryAPIsRejectForeignOperation(t *testing.T) {
 	operationID := store.NewOperationID()
 
 	_, err = repo.RegisterOperation(ctx, operationID, generation, model.Bytes("foreign-target"), []store.Action{
-		{ID: "launch", Kind: restore.KindLaunch, State: restore.StatePlanned},
+		{ID: "launch", Kind: restore.KindLaunch, State: model.ActionStatePlanned},
 	})
 	if err != nil {
 		t.Fatalf("RegisterOperation failed: %v", err)

@@ -5,7 +5,6 @@ package engine
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -16,12 +15,7 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
-const (
-	restoreTargetBirthPrefix = "birth="
-	// restoreTargetPIDIndex is the line holding the daemon PID in a restore target after its
-	// format prefix, following the endpoint line.
-	restoreTargetPIDIndex = 1
-)
+const restoreTargetBirthPrefix = "birth="
 
 // ActiveRestores lists the restore operations a repository still records as active, the ones that
 // hold back automatic saves and startup restores until they finish or are abandoned.
@@ -64,8 +58,7 @@ func RestoreTargetedServer(ctx context.Context, repository *store.Repository, se
 		return false, oops.In("snapshot").Code("inspect_failed").With("operation", "find_server_restore").Wrap(err)
 	}
 
-	instance := fmt.Sprintf("%s%s\n%d\n%d\n",
-		restoreTargetPrefix, server.Endpoint().SocketPath, live.Server.PID, live.Server.Started.UnixNano())
+	instance := restoreTargetInstance(server.Endpoint().SocketPath, live.Server)
 
 	for _, op := range catalog.Operations {
 		if validateRestoreOperation(op) == nil && strings.HasPrefix(string(op.Target), instance) {
@@ -141,17 +134,15 @@ func parseRestoreTargetDaemon(target string) (int, string, bool) {
 		return 0, "", false
 	}
 
-	lines := strings.Split(rest, "\n")
-	if len(lines) <= restoreTargetPIDIndex {
-		return 0, "", false
-	}
+	_, afterEndpoint, _ := strings.Cut(rest, "\n")
+	pidLine, _, _ := strings.Cut(afterEndpoint, "\n")
 
-	pid, err := strconv.Atoi(lines[restoreTargetPIDIndex])
+	pid, err := strconv.Atoi(pidLine)
 	if err != nil || pid <= 0 {
 		return 0, "", false
 	}
 
-	for _, line := range lines {
+	for line := range strings.SplitSeq(rest, "\n") {
 		if birth, found := strings.CutPrefix(line, restoreTargetBirthPrefix); found {
 			return pid, birth, true
 		}

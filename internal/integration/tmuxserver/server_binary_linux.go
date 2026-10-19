@@ -14,8 +14,7 @@ import (
 
 const (
 	// unixListening is __SO_ACCEPTCON in /proc/net/unix flags: the socket accepts connections.
-	unixListening = 0x10000
-	// maxServerDescriptors bounds the descriptor scan of the candidate server.
+	unixListening        = 0x10000
 	maxServerDescriptors = 65536
 )
 

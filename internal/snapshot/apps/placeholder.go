@@ -42,6 +42,12 @@ func LaunchHarness(launch model.Launch) (string, bool) {
 	return string(harnessID), ok
 }
 
+func sleepingTaskPlaceholder(observed model.Launch) bool {
+	executable := string(observed.Executable)
+
+	return cleanAbsolute(executable) && cleanAbsolute(string(observed.Directory)) && executableName(executable) == seshName
+}
+
 func preparePlaceholder(fallback model.Launch) (model.Launch, Reason) {
 	if len(fallback.Arguments) != placeholderArgumentCount {
 		return fallback, ReasonUnsupportedApplication

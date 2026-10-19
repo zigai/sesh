@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/samber/oops"
+
+	"github.com/zigai/sesh/internal/action"
 )
 
 const ManagedMarker = "Managed by sesh. Do not edit."
@@ -44,9 +46,6 @@ const ForegroundServerTmuxMinor = 7
 
 const (
 	restoreStartTimeout = "10min"
-
-	// supervisorStopExitStatus is the CLI's exit status for cancellation, which a stop request causes.
-	supervisorStopExitStatus = 130
 )
 
 const (
@@ -344,7 +343,7 @@ func renderSystemdCoordinatorService(inputs ServiceInputs) string {
 	content.WriteString("[Service]\n")
 	content.WriteString("Type=exec\n")
 	content.WriteString("ExecStart=" + systemdCommand(inputs.Program, CoordinatorArgs(inputs)) + "\n")
-	content.WriteString("SuccessExitStatus=" + strconv.Itoa(supervisorStopExitStatus) + "\n")
+	content.WriteString("SuccessExitStatus=" + strconv.Itoa(action.ExitCodeCanceled) + "\n")
 	content.WriteString("Restart=on-failure\n\n")
 	content.WriteString("[Install]\n")
 	content.WriteString("WantedBy=default.target\n")
@@ -363,7 +362,7 @@ func renderSystemdRemoteMonitor(inputs ServiceInputs) string {
 	content.WriteString("[Service]\n")
 	content.WriteString("Type=exec\n")
 	content.WriteString("ExecStart=" + systemdCommand(inputs.Program, RemoteMonitorArgs(inputs)) + "\n")
-	content.WriteString("SuccessExitStatus=" + strconv.Itoa(supervisorStopExitStatus) + "\n")
+	content.WriteString("SuccessExitStatus=" + strconv.Itoa(action.ExitCodeCanceled) + "\n")
 	content.WriteString("Restart=on-failure\n\n")
 	content.WriteString("[Install]\n")
 	content.WriteString("WantedBy=default.target\n")
@@ -382,7 +381,7 @@ func renderSystemdAgentStatus(inputs ServiceInputs) string {
 	content.WriteString("[Service]\n")
 	content.WriteString("Type=exec\n")
 	content.WriteString("ExecStart=" + systemdCommand(inputs.Program, AgentStatusArgs(inputs)) + "\n")
-	content.WriteString("SuccessExitStatus=" + strconv.Itoa(supervisorStopExitStatus) + "\n")
+	content.WriteString("SuccessExitStatus=" + strconv.Itoa(action.ExitCodeCanceled) + "\n")
 	content.WriteString("Restart=on-failure\n\n")
 	content.WriteString("[Install]\n")
 	content.WriteString("WantedBy=default.target\n")
@@ -470,7 +469,7 @@ func renderSystemdTmuxService(inputs ServiceInputs) string {
 	content.WriteString("KillMode=control-group\n")
 	// One OOM-killed process must cost that process, not the server and every pane with it.
 	content.WriteString("OOMPolicy=continue\n")
-	content.WriteString("SuccessExitStatus=" + strconv.Itoa(supervisorStopExitStatus) + "\n")
+	content.WriteString("SuccessExitStatus=" + strconv.Itoa(action.ExitCodeCanceled) + "\n")
 	content.WriteString("Restart=no\n\n")
 	content.WriteString("[Install]\n")
 	content.WriteString("WantedBy=default.target\n")

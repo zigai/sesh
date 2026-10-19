@@ -29,9 +29,7 @@ func (e *SessionNotFoundError) Error() string {
 	return "no tmux session has ID " + string(e.ID)
 }
 
-// graph projects the selected sessions into a manifest. Floating panes are left out because the
-// snapshot format models only the tiled layout; the count of omitted panes is returned.
-func graph(snapshot gotmux.Snapshot, selected []gotmux.SessionID) (model.Manifest, int, error) {
+func tiledGraph(snapshot gotmux.Snapshot, selected []gotmux.SessionID) (model.Manifest, int, error) {
 	var m model.Manifest
 	if snapshot.Consistency != gotmux.ConsistencyComplete {
 		return m, 0, ErrChanged
