@@ -73,7 +73,7 @@ func TestFrameReadRejectsClosedContractViolations(t *testing.T) {
 		"unsupported version": strings.Replace(valid, version, `"version":1`, 1),
 		"zero sequence":       strings.Replace(valid, `"sequence":1`, `"sequence":0`, 1),
 		"peer mismatch":       strings.Replace(valid, `"peerId":"peer","streamInstance"`, `"peerId":"other","streamInstance"`, 1),
-		"payload exclusivity": strings.Replace(valid, `"startedAt":"0001-01-01T00:00:00Z"}`, `"startedAt":"0001-01-01T00:00:00Z"},"health":{"observedAt":"0001-01-01T00:00:00Z","sources":{"tmux":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"},"agents":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"},"snapshots":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"}}}`, 1),
+		"payload exclusivity": strings.Replace(valid, `"startedAt":"0001-01-01T00:00:00Z"}`, `"startedAt":"0001-01-01T00:00:00Z"},"health":{"observedAt":"0001-01-01T00:00:00Z","sources":{"tmux":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"},"agents":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"},"snapshots":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"},"tasks":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"},"work":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"}}}`, 1),
 		"lower cased key":     strings.Replace(valid, `"streamInstance"`, `"streaminstance"`, 1),
 		"unknown frame type":  strings.Replace(valid, `"type":"hello"`, `"type":"inventory"`, 1),
 		"bridge dir control":  strings.Replace(valid, `"bridgeDir":""`, `"bridgeDir":"/tmp/\u001b]0;x"`, 1),
@@ -138,6 +138,8 @@ func TestValidateFrameRejectsOSCAndCSI(t *testing.T) {
 		Tmux:      SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
 		Agents:    SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
 		Snapshots: SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
+		Tasks:     SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
+		Work:      SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
 	}
 
 	tests := []struct {
@@ -206,6 +208,8 @@ func TestValidateFrameRetainsUnicode(t *testing.T) {
 				Tmux:      SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
 				Agents:    SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
 				Snapshots: SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
+				Tasks:     SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
+				Work:      SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
 			},
 		},
 	}
@@ -225,6 +229,8 @@ func TestValidateFrameRejectsUnboundedHealthReason(t *testing.T) {
 			Tmux:      SourceStatus{Status: HealthDegraded, Reason: HealthReason("\x1b]0;forged\x07raw error")},
 			Agents:    SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
 			Snapshots: SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
+			Tasks:     SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
+			Work:      SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
 		}},
 	}
 	if err := ValidateFrame(frame); !errors.Is(err, ErrInvalidFrame) {
@@ -240,7 +246,7 @@ func TestValidateFrameRejectsInconsistentHealth(t *testing.T) {
 	}
 
 	for _, status := range statuses {
-		if ValidSourceHealth(SourceHealth{Tmux: status, Agents: status, Snapshots: status}) {
+		if ValidSourceHealth(SourceHealth{Tmux: status, Agents: status, Snapshots: status, Tasks: status, Work: status}) {
 			t.Fatalf("accepted inconsistent health %#v", status)
 		}
 	}
@@ -251,6 +257,8 @@ func TestSnapshotBoundsRejectOversizedInventories(t *testing.T) {
 		Tmux:      SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
 		Agents:    SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
 		Snapshots: SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
+		Tasks:     SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
+		Work:      SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
 	}
 
 	oversized := make([]session.Session, MaxSessions+1)
@@ -279,6 +287,8 @@ func TestSnapshotRejectsSavedSessionsCarryingAgents(t *testing.T) {
 				Tmux:      SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
 				Agents:    SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
 				Snapshots: SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
+				Tasks:     SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
+				Work:      SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
 			},
 		},
 	}
@@ -343,6 +353,8 @@ func snapshotFrameWithSession(row session.Session) Frame {
 			Tmux:      SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
 			Agents:    SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
 			Snapshots: SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
+			Tasks:     SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
+			Work:      SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
 		}},
 	}
 }
@@ -478,6 +490,8 @@ func FuzzFrameReader(f *testing.F) {
 			Tmux:      SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
 			Agents:    SourceStatus{Status: HealthDegraded, Reason: HealthReasonUnavailable},
 			Snapshots: SourceStatus{Status: HealthUnknown, Reason: HealthReasonUnavailable},
+			Tasks:     SourceStatus{Status: HealthUnknown, Reason: HealthReasonUnavailable},
+			Work:      SourceStatus{Status: HealthUnknown, Reason: HealthReasonUnavailable},
 		}},
 	})
 	if err != nil {

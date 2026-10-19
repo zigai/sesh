@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	ProtocolVersion    = 6
+	ProtocolVersion    = 7
 	MaxFrameBytes      = 1 << 20
 	MaxSessions        = 4096
 	MaxAgents          = 16384
@@ -73,6 +73,8 @@ type SourceHealth struct {
 	Tmux      SourceStatus `json:"tmux"`
 	Agents    SourceStatus `json:"agents"`
 	Snapshots SourceStatus `json:"snapshots"`
+	Tasks     SourceStatus `json:"tasks"`
+	Work      SourceStatus `json:"work"`
 }
 
 type Hello struct {
@@ -252,7 +254,9 @@ func ValidSession(value session.Session) bool {
 func ValidSourceHealth(health SourceHealth) bool {
 	return validSourceStatus(health.Tmux) &&
 		validSourceStatus(health.Agents) &&
-		validSourceStatus(health.Snapshots)
+		validSourceStatus(health.Snapshots) &&
+		validSourceStatus(health.Tasks) &&
+		validSourceStatus(health.Work)
 }
 
 func ValidIdentifier(value string) bool {

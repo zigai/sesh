@@ -259,12 +259,14 @@ func ReconcileCatalog(catalog *Catalog, now time.Time, staleAfter, hideAfter tim
 func UnavailableHealth() SourceHealth {
 	unavailable := SourceStatus{Status: HealthUnknown, Reason: HealthReasonUnavailable, CheckedAt: time.Time{}}
 
-	return SourceHealth{Tmux: unavailable, Agents: unavailable, Snapshots: unavailable}
+	return SourceHealth{Tmux: unavailable, Agents: unavailable, Snapshots: unavailable, Tasks: unavailable, Work: unavailable}
 }
 
 func NormalizeHealth(health SourceHealth) SourceHealth {
-	if health.Snapshots == (SourceStatus{Status: "", Reason: "", CheckedAt: time.Time{}}) {
-		health.Snapshots = SourceStatus{Status: HealthUnknown, Reason: HealthReasonUnavailable, CheckedAt: time.Time{}}
+	for _, status := range []*SourceStatus{&health.Snapshots, &health.Tasks, &health.Work} {
+		if *status == (SourceStatus{Status: "", Reason: "", CheckedAt: time.Time{}}) {
+			*status = SourceStatus{Status: HealthUnknown, Reason: HealthReasonUnavailable, CheckedAt: time.Time{}}
+		}
 	}
 
 	return health

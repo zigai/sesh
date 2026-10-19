@@ -23,7 +23,7 @@ import (
 func healthyHealth() SourceHealth {
 	status := SourceStatus{Status: HealthOK, Reason: HealthReasonNone}
 
-	return SourceHealth{Tmux: status, Agents: status, Snapshots: status}
+	return SourceHealth{Tmux: status, Agents: status, Snapshots: status, Tasks: status, Work: status}
 }
 
 func helloFrame(peerID, streamInstance string, sequence uint64) Frame {

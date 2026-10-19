@@ -122,7 +122,8 @@ func pickerCatalog(catalog remote.Catalog) tui.RemoteCatalog {
 			Connected: state.Connected, LastSeen: state.LastSeen, LastAttempt: state.LastAttempt,
 			LastError: state.LastError, LastErrorAt: state.LastErrorAt,
 			HealthTmux: string(state.Snapshot.Health.Tmux.Status), HealthAgents: string(state.Snapshot.Health.Agents.Status),
-			HealthSnapshots: string(state.Snapshot.Health.Snapshots.Status), Sessions: remote.CatalogSessions(state),
+			HealthSnapshots: string(state.Snapshot.Health.Snapshots.Status), HealthTasks: string(state.Snapshot.Health.Tasks.Status),
+			HealthWork: string(state.Snapshot.Health.Work.Status), Sessions: remote.CatalogSessions(state),
 			Tasks: remote.CatalogTasks(state), Work: state.Snapshot.Work,
 		})
 	}

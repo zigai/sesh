@@ -15,6 +15,7 @@ import (
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/task"
+	"github.com/zigai/sesh/internal/work"
 )
 
 func TestLoadOrCreatePeerIDPersistsIdentity(t *testing.T) {
@@ -294,12 +295,22 @@ func TestInventoryStreamReportsIndependentSourceHealth(t *testing.T) {
 			failures.Add(1)
 			return nil, context.DeadlineExceeded
 		},
+		Tasks: func(context.Context) ([]TaskRow, error) { return make([]TaskRow, MaxTasks+1), nil },
+		Work:  func(context.Context) ([]work.Item, error) { return nil, errTestRegistry },
 	})
 
 	_ = harness.next(t)
 
 	snapshot := harness.next(t)
 	health := snapshot.Snapshot.Health
+
+	if health.Tasks.Status != HealthDegraded || health.Tasks.Reason != HealthReasonInvalidData {
+		t.Fatalf("task health = %#v, want degraded/invalid data", health.Tasks)
+	}
+
+	if health.Work.Status != HealthDegraded || health.Work.Reason != HealthReasonUnavailable {
+		t.Fatalf("work health = %#v, want degraded/unavailable", health.Work)
+	}
 
 	if health.Tmux.Status != HealthOK || health.Tmux.Reason != HealthReasonNone {
 		t.Fatalf("tmux health = %#v, want ok", health.Tmux)

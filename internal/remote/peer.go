@@ -313,22 +313,41 @@ func (state *streamState) scan(ctx context.Context) {
 }
 
 func (state *streamState) scanTasks(ctx context.Context) {
+	now := time.Now().UTC()
+
 	if state.options.Tasks == nil {
+		state.health.Tasks = SourceStatus{Status: HealthUnknown, Reason: HealthReasonUnavailable, CheckedAt: now}
+
 		return
 	}
 
 	rows, err := state.options.Tasks(ctx)
-	if err == nil && len(rows) <= MaxTasks {
+	if err == nil && len(rows) > MaxTasks {
+		state.health.Tasks = SourceStatus{Status: HealthDegraded, Reason: HealthReasonInvalidData, CheckedAt: now}
+
+		return
+	}
+
+	state.health.Tasks = sourceStatus(err, now)
+
+	if err == nil {
 		state.tasks = rows
 	}
 }
 
 func (state *streamState) scanWork(ctx context.Context) {
+	now := time.Now().UTC()
+
 	if state.options.Work == nil {
+		state.health.Work = SourceStatus{Status: HealthUnknown, Reason: HealthReasonUnavailable, CheckedAt: now}
+
 		return
 	}
 
 	items, err := state.options.Work(ctx)
+
+	state.health.Work = sourceStatus(err, now)
+
 	if err == nil {
 		state.work = NewWorkRows(items)
 	}
@@ -500,9 +519,13 @@ func snapshotsSemanticallyEqual(left, right Snapshot) bool {
 	left.Health.Tmux.CheckedAt = time.Time{}
 	left.Health.Agents.CheckedAt = time.Time{}
 	left.Health.Snapshots.CheckedAt = time.Time{}
+	left.Health.Tasks.CheckedAt = time.Time{}
+	left.Health.Work.CheckedAt = time.Time{}
 	right.Health.Tmux.CheckedAt = time.Time{}
 	right.Health.Agents.CheckedAt = time.Time{}
 	right.Health.Snapshots.CheckedAt = time.Time{}
+	right.Health.Tasks.CheckedAt = time.Time{}
+	right.Health.Work.CheckedAt = time.Time{}
 
 	return reflect.DeepEqual(left, right)
 }

@@ -501,7 +501,9 @@ func monitorScript(t *testing.T, markerPath string, frames ...Frame) string {
 		`"health":{"observedAt":"1970-01-01T00:00:01Z","sources":{` +
 		`"tmux":{"status":"ok","reason":"none","checkedAt":"1970-01-01T00:00:00Z"},` +
 		`"agents":{"status":"ok","reason":"none","checkedAt":"1970-01-01T00:00:00Z"},` +
-		`"snapshots":{"status":"ok","reason":"none","checkedAt":"1970-01-01T00:00:00Z"}}}}`
+		`"snapshots":{"status":"ok","reason":"none","checkedAt":"1970-01-01T00:00:00Z"},` +
+		`"tasks":{"status":"ok","reason":"none","checkedAt":"1970-01-01T00:00:00Z"},` +
+		`"work":{"status":"ok","reason":"none","checkedAt":"1970-01-01T00:00:00Z"}}}}`
 
 	var script strings.Builder
 

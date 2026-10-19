@@ -37,6 +37,8 @@ type RemoteConnection struct {
 	HealthTmux      string
 	HealthAgents    string
 	HealthSnapshots string
+	HealthTasks     string
+	HealthWork      string
 
 	Sessions []session.Session
 	Tasks    []task.Live
@@ -134,9 +136,10 @@ func remoteConnectionStatus(
 		return session.RemoteStatusUnavailable
 	}
 
-	if remoteSourceDegraded(connection.HealthTmux) ||
-		remoteSourceDegraded(connection.HealthAgents) ||
-		remoteSourceDegraded(connection.HealthSnapshots) {
+	health := []string{
+		connection.HealthTmux, connection.HealthAgents, connection.HealthSnapshots, connection.HealthTasks, connection.HealthWork,
+	}
+	if slices.ContainsFunc(health, remoteSourceDegraded) {
 		return session.RemoteStatusDegraded
 	}
 
