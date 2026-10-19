@@ -65,3 +65,4 @@ tmux access goes through `github.com/zigai/gotmux` (imported as `gotmux`).
 - Logging uses zerolog.
 - golangci-lint is strict: declaration order const, var, type, func (`decorder`, `funcorder`); `exhaustruct`; `wrapcheck`; `wsl_v5`; `err113`; `nolint` needs a specific linter and an explanation. `internal/cli` and test files have some of these relaxed.
 - Many packages are `//go:build linux || darwin`, with `_linux.go`, `_darwin.go` and `_other.go` variants.
+- Edit `README.md` only to keep it accurate. When a command, flag or feature it describes changes, correct that part at about the same length. Do not add new sections, examples or long explanations.
