@@ -31,12 +31,16 @@ func summary(env Env, outcome outcome) string {
 	out.WriteString(restorableLine(outcome))
 	out.WriteString(abandonedLine(outcome.abandoned))
 
+	if outcome.maintenance == maintenanceFailed {
+		out.WriteString("Removing old snapshots failed; the sesh log has the cause.\n")
+	}
+
 	return out.String()
 }
 
 func headline(env Env, outcome outcome) string {
-	if outcome.restore {
-		return restoredHeadline(outcome)
+	if outcome.restore != nil {
+		return restoredHeadline(outcome.generation, outcome.status, *outcome.restore)
 	}
 
 	switch outcome.status {
@@ -69,13 +73,13 @@ func savedHeadline(outcome outcome) string {
 	return "Saved generation " + shortGeneration(outcome.generation) + "."
 }
 
-func restoredHeadline(outcome outcome) string {
-	headline := fmt.Sprintf("Restored %s from generation %s.", sessionCount(outcome.restored), shortGeneration(outcome.generation))
+func restoredHeadline(generation, status string, counts restoreCounts) string {
+	headline := fmt.Sprintf("Restored %s from generation %s.", sessionCount(counts.restored), shortGeneration(generation))
 
 	switch {
-	case outcome.skipped > 0:
-		headline += fmt.Sprintf("\nSkipped %s whose names are already in use; sesh snapshot restore shows them and how to restore them.", sessionCount(outcome.skipped))
-	case outcome.status != "complete" && outcome.status != "best_effort":
+	case counts.skipped > 0:
+		headline += fmt.Sprintf("\nSkipped %s whose names are already in use; sesh snapshot restore shows them and how to restore them.", sessionCount(counts.skipped))
+	case status != "complete" && status != "best_effort":
 		headline += "\nThe restored sessions do not fully match the snapshot; sesh snapshot restore --verbose shows the differences."
 	}
 

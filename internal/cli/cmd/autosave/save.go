@@ -106,8 +106,15 @@ func executeAutosaveSave(ctx context.Context, cmd *cobra.Command, env Env) error
 		return errors.Join(err, wrapCloseError(repo.Close()))
 	}
 
-	if handled, err := resolvePendingRestore(ctx, cmd, env, server, repo); handled {
-		return err
+	if pending := findPendingRestore(ctx, cmd, server, repo); pending.sessions > 0 {
+		switch decidePendingRestore(ctx, env, server, repo, pending) {
+		case pendingRestoreSave:
+			reportRestoreIncomplete(ctx, env, pending)
+		case pendingRestoreRun:
+			return runLateStartupRestore(cmd, env, repo, pending)
+		case pendingRestoreHold:
+			return skipAutosaveWhileRestorePending(ctx, cmd, env, repo, pending)
+		}
 	}
 
 	lock, err := automation.TryAcquireSaveLock(ctx, automation.SaveLockPath())
@@ -122,9 +129,32 @@ func executeAutosaveSave(ctx context.Context, cmd *cobra.Command, env Env) error
 		AgentSource:            env.workspace.AgentSource(),
 		Profile:                engine.RecoveryPractical,
 	})
-	if saveErr == nil {
-		cmd.Annotations[clibase.AnnotationSuccessOwned] = "true"
+
+	return finishAutosave(ctx, cmd, env, repo, lock, result, saveErr)
+}
+
+func finishAutosave(
+	ctx context.Context,
+	cmd *cobra.Command,
+	env Env,
+	repo *store.Repository,
+	lock *automation.SaveLock,
+	result engine.SaveResult,
+	saveErr error,
+) error {
+	if saveErr != nil {
+		closeErr := repo.Close()
+		lockErr := lock.Release()
+
+		return renderAutosaveDegraded(
+			cmd,
+			env,
+			failedSaveOutcome(env, result, saveErr),
+			errors.Join(oops.In("cli").With("operation", "autosave_save").Wrap(saveErr), wrapCloseError(closeErr), lockErr),
+		)
 	}
+
+	cmd.Annotations[clibase.AnnotationSuccessOwned] = "true"
 
 	decision := automation.EvaluateSaveCompletion(automation.SaveCompletion{
 		Attempt:    result.Attempt,
@@ -133,27 +163,20 @@ func executeAutosaveSave(ctx context.Context, cmd *cobra.Command, env Env) error
 		Uncertain:  false,
 	}, nil)
 
-	maintainAfterAutosave(ctx, repo, env, decision, saveErr)
+	maintenanceErr := maintainAfterAutosave(ctx, repo, env, decision)
 
 	closeErr := repo.Close()
 	lockErr := lock.Release()
-
-	if saveErr != nil {
-		outcome := failedSaveOutcome(env, result, saveErr)
-
-		return renderAutosaveDegraded(
-			cmd,
-			env,
-			outcome,
-			errors.Join(oops.In("cli").With("operation", "autosave_save").Wrap(saveErr), wrapCloseError(closeErr), lockErr),
-		)
-	}
 
 	outcome := newOutcome(decision.Status, decision.Reason)
 	outcome.attempt = result.Attempt
 	outcome.generation = result.Generation
 	outcome.snapshot = result.Status
 	outcome.history = historyState(env)
+
+	if maintenanceErr != nil {
+		outcome.maintenance = maintenanceFailed
+	}
 
 	var bookkeepingErr error
 	if decision.Record {
@@ -478,26 +501,27 @@ func recordFinalSaveBookkeeping(
 	return clibase.NewExitError(clibase.ExitCodeGeneral, errors.Join(errAutosaveBookkeeping, bookkeepingErr))
 }
 
-// maintainAfterAutosave runs repository maintenance with the first recorded save of each day.
-func maintainAfterAutosave(ctx context.Context, repo *store.Repository, env Env, decision automation.CompletionDecision, saveErr error) {
-	if saveErr != nil || !decision.Record || !automation.MaintenanceDue(env.lastSavedUnix, time.Now()) {
-		return
+func maintainAfterAutosave(ctx context.Context, repo *store.Repository, env Env, decision automation.CompletionDecision) error {
+	if !decision.Record || !automation.MaintenanceDue(env.lastSavedUnix, time.Now()) {
+		return nil
 	}
 
-	maintainAutosaveRepository(ctx, repo, env.workspace.Config.Snapshot)
+	return maintainAutosaveRepository(ctx, repo, env.workspace.Config.Snapshot)
 }
 
-// maintainAutosaveRepository applies snapshot retention and reclaims retired generations. It
-// never fails the save that preceded it.
-func maintainAutosaveRepository(ctx context.Context, repo *store.Repository, snapshot config.SnapshotConfig) {
+// maintainAutosaveRepository applies snapshot retention and reclaims retired generations. The
+// engine logs each failure; a failure degrades the outcome and never fails the save before it.
+func maintainAutosaveRepository(ctx context.Context, repo *store.Repository, snapshot config.SnapshotConfig) error {
 	policy := store.RetentionPolicy{
 		MaxAge:   time.Duration(snapshot.RetentionDays) * hoursPerDay * time.Hour,
 		MaxCount: snapshot.MaxCount,
 		MaxBytes: snapshot.MaxBytes,
 	}
 
-	_, _ = engine.Prune(ctx, repo, time.Now().UTC(), policy)
-	_, _ = engine.GarbageCollect(ctx, repo, store.CollectionBudget{Generations: collectionGenerations, Bytes: math.MaxInt64})
+	_, pruneErr := engine.Prune(ctx, repo, time.Now().UTC(), policy)
+	_, collectErr := engine.GarbageCollect(ctx, repo, store.CollectionBudget{Generations: collectionGenerations, Bytes: math.MaxInt64})
+
+	return errors.Join(pruneErr, collectErr)
 }
 
 func skipAutosaveWithoutServer(ctx context.Context, cmd *cobra.Command, env Env, repo *store.Repository) error {
@@ -526,29 +550,24 @@ func recordCompletedAutosave(ctx context.Context, env Env, outcome *outcome) err
 	return nil
 }
 
-// resolvePendingRestore handles a server that started after the newest snapshot and lacks some of
-// its saved sessions. It reports whether it finished the command; otherwise the save goes ahead.
-func resolvePendingRestore(ctx context.Context, cmd *cobra.Command, env Env, server *gotmux.Server, repo *store.Repository) (bool, error) {
-	pending := findPendingRestore(ctx, cmd, server, repo)
-	if pending.sessions == 0 {
-		return false, nil
+func runLateStartupRestore(cmd *cobra.Command, env Env, repo *store.Repository, pending pendingRestore) error {
+	if err := wrapCloseError(repo.Close()); err != nil {
+		return err
 	}
 
-	switch decidePendingRestore(ctx, env, server, repo, pending) {
-	case pendingRestoreSave:
-		reportRestoreIncomplete(ctx, env, pending)
-
-		return false, nil
-	case pendingRestoreRun:
-		if err := wrapCloseError(repo.Close()); err != nil {
-			return true, err
-		}
-
-		return true, executeStartupRestore(cmd, env, func() bool { return claimPendingEpisode(env, pending) })
-	case pendingRestoreHold:
+	held, err := acquireStartupRestore(cmd, env)
+	if held == nil {
+		return err
 	}
 
-	return true, skipAutosaveWhileRestorePending(ctx, cmd, env, repo, pending)
+	// The episode is claimed under the lock, so a busy lock leaves the late restore to the next
+	// interval while a refused restore is not retried.
+	claimed, err := claimPendingEpisode(env, pending)
+	if err != nil || !claimed {
+		return held.skip(cmd, env, err)
+	}
+
+	return restoreUnderLock(cmd, env, held)
 }
 
 func skipAutosaveWhileRestorePending(ctx context.Context, cmd *cobra.Command, env Env, repo *store.Repository, pending pendingRestore) error {

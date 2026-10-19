@@ -27,6 +27,8 @@ const (
 	reasonTmuxNotRunning     = "tmux_not_running"
 	reasonRestorableSessions = "restorable_sessions"
 
+	maintenanceFailed = "failed"
+
 	historyRecorded    = "recorded"
 	historyNeverRun    = "never_run"
 	historyUnavailable = "unavailable"
@@ -70,8 +72,11 @@ type outcome struct {
 	abandoned    int
 	daemonState  string
 	daemonStatus daemon.RuntimeStatus
-	// restore marks a restore-on-start result; restored and skipped count its sessions.
-	restore  bool
+	maintenance  string
+	restore      *restoreCounts
+}
+
+type restoreCounts struct {
 	restored int
 	skipped  int
 }
@@ -102,9 +107,8 @@ func newOutcome(status, reason string) outcome {
 		abandoned:    0,
 		daemonState:  DaemonUnselected,
 		daemonStatus: emptyDaemonRuntimeStatus(),
-		restore:      false,
-		restored:     0,
-		skipped:      0,
+		maintenance:  "",
+		restore:      nil,
 	}
 }
 

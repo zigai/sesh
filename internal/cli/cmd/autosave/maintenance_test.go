@@ -32,7 +32,9 @@ func TestAutosaveMaintenanceRetiresAndReclaimsGenerations(t *testing.T) {
 		commitMaintenanceObservation(t, repo)
 	}
 
-	maintainAutosaveRepository(t.Context(), repo, config.SnapshotConfig{RetentionDays: 0, MaxCount: 5, MaxBytes: 0})
+	if err := maintainAutosaveRepository(t.Context(), repo, config.SnapshotConfig{RetentionDays: 0, MaxCount: 5, MaxBytes: 0}); err != nil {
+		t.Fatal(err)
+	}
 
 	catalog, err := repo.Inspect(t.Context())
 	if err != nil {

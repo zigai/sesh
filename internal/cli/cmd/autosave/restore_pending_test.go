@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -143,5 +144,20 @@ func TestRestoreIncompleteStaysSilentWithoutHistoryPath(t *testing.T) {
 
 	if records := reportRecords(t, reportRestoreIncomplete, Env{}, pending, 2); len(records) != 0 {
 		t.Fatalf("without a marker location the report must stay silent, got %+v", records)
+	}
+}
+
+func TestPendingRestoreWarnsWhenMarkerCannotBeWritten(t *testing.T) {
+	stateFile := filepath.Join(t.TempDir(), "state")
+	if err := os.WriteFile(stateFile, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	env := Env{workspace: app.Workspace{History: filepath.Join(stateFile, "history.json")}}
+	pending := pendingRestore{sessions: 2, serverStarted: time.Unix(2_000, 0)}
+
+	records := reportPendingRestoreRecords(t, env, pending, 1)
+	if len(records) != 1 || records[0]["level"] != "warn" || records[0]["reason"] != "episode_marker_failed" {
+		t.Fatalf("an unwritable marker must be reported, got %+v", records)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/samber/oops"
 	"github.com/spf13/cobra"
 	gotmux "github.com/zigai/gotmux/tmux"
 
@@ -16,6 +17,8 @@ import (
 const (
 	reasonRestorePending    = "restore_pending"
 	reasonRestoreIncomplete = "restore_incomplete"
+	reasonEpisodeMarker     = "episode_marker_failed"
+	reasonRestoreTarget     = "restore_target_unavailable"
 )
 
 type pendingRestore struct {
@@ -25,8 +28,8 @@ type pendingRestore struct {
 
 // findPendingRestore reports a pending restore for an automatic save of every live session.
 // Saving then would replace the newest snapshot with the new server's scratch state. An explicit
-// session selection is a deliberate save and is never held back. When the server, the snapshot or
-// the live sessions cannot be read, it reports nothing and the save goes ahead as before.
+// session selection is a deliberate save and is never held back. The engine logs an inspection
+// failure and reports nothing, so the save goes ahead.
 func findPendingRestore(ctx context.Context, cmd *cobra.Command, server *gotmux.Server, repo *store.Repository) pendingRestore {
 	if explicit, _ := cmd.Flags().GetStringSlice("session"); len(explicit) > 0 {
 		return pendingRestore{sessions: 0, serverStarted: time.Time{}}
@@ -51,42 +54,67 @@ const (
 // gets the startup restore once, when it is configured; otherwise the save is held back.
 func decidePendingRestore(ctx context.Context, env Env, server *gotmux.Server, repo *store.Repository, pending pendingRestore) pendingRestoreAction {
 	targeted, err := engine.RestoreTargetedServer(ctx, repo, server)
+	if err != nil {
+		logPendingRestoreFailure(ctx, reasonRestoreTarget)
 
-	switch {
-	case err != nil:
-		return pendingRestoreHold
-	case targeted:
-		return pendingRestoreSave
-	case env.workspace.Config.Autosave.RestoreLastOnStart && pendingEpisodeUnhandled(env, pending):
-		return pendingRestoreRun
-	default:
 		return pendingRestoreHold
 	}
+
+	if targeted {
+		return pendingRestoreSave
+	}
+
+	if !env.workspace.Config.Autosave.RestoreLastOnStart {
+		return pendingRestoreHold
+	}
+
+	// A marker read failure holds the save; the hold path reports it when it claims the episode.
+	if unhandled, err := pendingEpisodeUnhandled(env, pending); err == nil && unhandled {
+		return pendingRestoreRun
+	}
+
+	return pendingRestoreHold
 }
 
-func pendingEpisodeUnhandled(env Env, pending pendingRestore) bool {
+func pendingEpisodeUnhandled(env Env, pending pendingRestore) (bool, error) {
 	if env.workspace.History == "" {
-		return false
+		return false, nil
 	}
 
 	unhandled, err := automation.EpisodeUnreported(automation.RestorePendingMarkerPath(env.workspace.History), pending.serverStarted.Unix())
+	if err != nil {
+		return false, oops.In("cli").With("operation", "read_restore_pending_marker").Wrap(err)
+	}
 
-	return err == nil && unhandled
+	return unhandled, nil
 }
 
 // claimPendingEpisode marks this server start handled and reports whether this call was the one
-// that did, so each unrestored server is warned about or late-restored once. Without a history
-// path, or when the marker cannot be read or written, it claims nothing.
-func claimPendingEpisode(env Env, pending pendingRestore) bool {
-	if !pendingEpisodeUnhandled(env, pending) {
-		return false
+// that did, so each unrestored server is warned about or late-restored once.
+func claimPendingEpisode(env Env, pending pendingRestore) (bool, error) {
+	unhandled, err := pendingEpisodeUnhandled(env, pending)
+	if err != nil || !unhandled {
+		return false, err
 	}
 
-	return automation.RecordEpisodeReported(automation.RestorePendingMarkerPath(env.workspace.History), pending.serverStarted.Unix()) == nil
+	if err := automation.RecordEpisodeReported(automation.RestorePendingMarkerPath(env.workspace.History), pending.serverStarted.Unix()); err != nil {
+		return false, oops.In("cli").With("operation", "record_restore_pending_marker").Wrap(err)
+	}
+
+	return true, nil
+}
+
+func claimPendingReport(ctx context.Context, env Env, pending pendingRestore) bool {
+	claimed, err := claimPendingEpisode(env, pending)
+	if err != nil {
+		logPendingRestoreFailure(ctx, reasonEpisodeMarker)
+	}
+
+	return claimed
 }
 
 func reportRestoreIncomplete(ctx context.Context, env Env, pending pendingRestore) {
-	if !claimPendingEpisode(env, pending) {
+	if !claimPendingReport(ctx, env, pending) {
 		return
 	}
 
@@ -100,7 +128,7 @@ func reportRestoreIncomplete(ctx context.Context, env Env, pending pendingRestor
 }
 
 func reportPendingRestore(ctx context.Context, env Env, pending pendingRestore) {
-	if !claimPendingEpisode(env, pending) {
+	if !claimPendingReport(ctx, env, pending) {
 		return
 	}
 
@@ -111,4 +139,13 @@ func reportPendingRestore(ctx context.Context, env Env, pending pendingRestore) 
 		Str("reason", reasonRestorePending).
 		Int("sessions", pending.sessions).
 		Msg("tmux started after the newest snapshot and its saved sessions are not restored")
+}
+
+func logPendingRestoreFailure(ctx context.Context, reason string) {
+	zerolog.Ctx(ctx).Warn().
+		Str("component", "snapshot").
+		Str("operation", "autosave").
+		Str("status", statusDegraded).
+		Str("reason", reason).
+		Msg("pending restore state could not be checked")
 }

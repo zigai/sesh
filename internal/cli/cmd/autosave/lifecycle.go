@@ -40,13 +40,22 @@ func runAutosaveRestoreOnStart(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	return executeStartupRestore(cmd, env, func() bool { return true })
+	held, err := acquireStartupRestore(cmd, env)
+	if held == nil {
+		return err
+	}
+
+	return restoreUnderLock(cmd, env, held)
 }
 
-// executeStartupRestore restores the newest snapshot under the save lock. claim runs once the lock
-// is held and before admission, so a busy lock leaves a late restore free to run at the next
-// interval while a refused one is not retried.
-func executeStartupRestore(cmd *cobra.Command, env Env, claim func() bool) error {
+type heldStartupRestore struct {
+	repo *store.Repository
+	lock *automation.SaveLock
+}
+
+// acquireStartupRestore opens the repository and takes the save lock. It returns nil after
+// rendering the result when there is no repository or another save holds the lock.
+func acquireStartupRestore(cmd *cobra.Command, env Env) (*heldStartupRestore, error) {
 	ctx := clibase.CommandContext(cmd)
 
 	reportUnsavedShutdownSinceBoot(ctx, env)
@@ -58,10 +67,10 @@ func executeStartupRestore(cmd *cobra.Command, env Env, claim func() bool) error
 			missing.repository = repositoryMissing
 			missing.history = historyState(env)
 
-			return renderAutosaveResult(cmd, env, missing)
+			return nil, renderAutosaveResult(cmd, env, missing)
 		}
 
-		return err
+		return nil, err
 	}
 
 	lock, err := automation.TryAcquireSaveLock(ctx, automation.SaveLockPath())
@@ -72,18 +81,25 @@ func executeStartupRestore(cmd *cobra.Command, env Env, claim func() bool) error
 			busy := newOutcome(statusSkipped, reasonLockBusy)
 			busy.history = historyState(env)
 
-			return errors.Join(renderAutosaveResult(cmd, env, busy), closeErr)
+			return nil, errors.Join(renderAutosaveResult(cmd, env, busy), closeErr)
 		}
 
-		return errors.Join(oops.In("cli").With("operation", "acquire_autosave_lock").Wrap(err), closeErr)
+		return nil, errors.Join(oops.In("cli").With("operation", "acquire_autosave_lock").Wrap(err), closeErr)
 	}
 
-	if !claim() {
-		held := newOutcome(statusSkipped, reasonRestorePending)
-		held.history = historyState(env)
+	return &heldStartupRestore{repo: repo, lock: lock}, nil
+}
 
-		return errors.Join(renderAutosaveResult(cmd, env, held), wrapCloseError(repo.Close()), lock.Release())
-	}
+func (h *heldStartupRestore) skip(cmd *cobra.Command, env Env, err error) error {
+	held := newOutcome(statusSkipped, reasonRestorePending)
+	held.history = historyState(env)
+
+	return errors.Join(renderAutosaveDegraded(cmd, env, held, err), wrapCloseError(h.repo.Close()), h.lock.Release())
+}
+
+func restoreUnderLock(cmd *cobra.Command, env Env, held *heldStartupRestore) error {
+	ctx := clibase.CommandContext(cmd)
+	repo, lock := held.repo, held.lock
 
 	settled, settleErr := engine.SettleDeadRestores(ctx, repo)
 	if settleErr != nil {
@@ -147,9 +163,7 @@ func executeStartupRestore(cmd *cobra.Command, env Env, claim func() bool) error
 	restored.repository = repositoryState(ctx, env)
 	restored.history = historyState(env)
 	restored.abandoned = state.Abandoned
-	restored.restore = true
-	restored.restored = len(result.SessionsRestored)
-	restored.skipped = len(result.SessionsSkipped)
+	restored.restore = &restoreCounts{restored: len(result.SessionsRestored), skipped: len(result.SessionsSkipped)}
 
 	renderErr := renderAutosaveResult(cmd, env, restored)
 

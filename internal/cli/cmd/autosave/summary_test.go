@@ -34,10 +34,10 @@ func TestAutosaveSummarySaysWhatHappenedInOneLine(t *testing.T) {
 	refused.abandoned = 1
 
 	restored := newOutcome("complete", "verified")
-	restored.restore, restored.restored, restored.generation = true, 2, "d879e6dc156d244c6e807b18d070d558"
+	restored.restore, restored.generation = &restoreCounts{restored: 2, skipped: 0}, "d879e6dc156d244c6e807b18d070d558"
 
 	partial := newOutcome("partial", "sessions_skipped")
-	partial.restore, partial.restored, partial.skipped, partial.generation = true, 1, 1, "d879e6dc156d244c6e807b18d070d558"
+	partial.restore, partial.generation = &restoreCounts{restored: 1, skipped: 1}, "d879e6dc156d244c6e807b18d070d558"
 
 	tests := []struct {
 		name    string

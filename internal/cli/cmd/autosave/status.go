@@ -35,6 +35,7 @@ type resultJSON struct {
 	InhibitorsHeld   bool   `json:"inhibitorsHeld"`
 	LogindDelayMS    int64  `json:"logindDelayMillis,omitempty"`
 	ServerManagement string `json:"serverManagement,omitempty"`
+	MaintenanceState string `json:"maintenanceState,omitempty"`
 }
 
 func emptyDaemonRuntimeStatus() daemon.RuntimeStatus {
@@ -255,6 +256,7 @@ func payload(env Env, outcome outcome) resultJSON {
 		InhibitorsHeld:   outcome.daemonStatus.InhibitorsHeld,
 		LogindDelayMS:    outcome.daemonStatus.LogindDelayMillis,
 		ServerManagement: outcome.daemonStatus.ServerManagement,
+		MaintenanceState: outcome.maintenance,
 	}
 }
 
