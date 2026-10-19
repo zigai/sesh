@@ -47,11 +47,10 @@ Entry: `cmd/sesh/main.go` calls `cli.Execute`. `internal/cli/root.go` builds the
 tmux access goes through `github.com/zigai/gotmux` (imported as `gotmux`).
 
 **Import boundaries** are enforced by `internal/architecture_test.go`:
-- Services must not import `internal/app`.
-- Production code must not import `testing`, `internal/testsupport`, `test/` or `gotmux/tmuxtest`.
-- `snapshot/model`, `snapshot/store` and `integration/*` must not import workflow packages.
-- `snapshot/model` and `snapshot/store` must not import other snapshot packages, `integration`, or gotmux.
-- `action` must not import the surfaces that invoke it or the services that run it.
+- Every production package has a layer in `packageLayers`: base, model (`snapshot/model`), storage (`snapshot/store`), adapter (`integration/*`), config, domain, contract (`action`), service, composition (`app`), surface (`cli`, `cmd/sesh`). A new package fails the test until it gets one.
+- A package may import lower layers, and its own layer only inside the same directory tree. Other same-layer imports must be listed with a reason in `sameLayerImports`.
+- gotmux may be imported only from the adapter layer up.
+- Production code must not import `testing`, `internal/testsupport`, `test/`, `gotmux/tmuxtest`, `rapid` or `go-cmp`.
 
 ## Error handling
 
