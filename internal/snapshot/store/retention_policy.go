@@ -14,9 +14,8 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/model"
 )
 
-// RetentionPolicy specifies snapshot retention rules. Regardless of configuration, it always
-// keeps the five newest generations by sequence (not wall clock), the current generation, every
-// active restore's source, and never alters the latest save attempt.
+// RetentionPolicy always keeps the five newest generations by sequence, the current generation and
+// every active restore's source, and never alters the latest save attempt.
 type RetentionPolicy struct {
 	MaxAge   time.Duration
 	MaxCount int

@@ -233,10 +233,9 @@ func (s *services) UpdateInbox(ctx context.Context, change func(*inbox.State) er
 	return state, nil
 }
 
-// LastReport is the last assistant message in an agent's transcript, or empty when it has none.
-// A harness writes the transcript with the conversation's first message, so a missing one means
-// no report yet.
 func (s *services) LastReport(ctx context.Context, agent session.AgentSession) (string, error) {
+	// A harness writes the transcript with the conversation's first message, so none means no
+	// report yet.
 	if _, err := os.Stat(agent.SessionPath); errors.Is(err, fs.ErrNotExist) {
 		return "", nil
 	}
@@ -262,14 +261,12 @@ func (s *services) SyncTasks(ctx context.Context, titles map[string]string) (boo
 	return changed, nil
 }
 
-// LoadCatalog lists saved sessions through a lock-free repository view: the picker's first
-// frame must not wait on a concurrent save's commit or on the durable open's fsync. Actions
-// that act on a saved session open the repository durably.
 func (s *services) LoadCatalog(ctx context.Context) (session.CatalogResult, error) {
 	if s.workspace.Repository == "" {
 		return s.listCatalog(ctx, nil)
 	}
 
+	// The first frame must not wait on a concurrent save's commit or on the durable open's fsync.
 	view, err := store.OpenView(ctx, s.workspace.Repository)
 	if err != nil {
 		return s.listCatalog(ctx, unreadableSnapshots{err: err})
@@ -685,13 +682,13 @@ func (s *services) UpdateModelState(ctx context.Context, update session.StateUpd
 	return nil
 }
 
-// DeferAgentViews keeps a popup's agent views in memory: the invoking process records them
-// with its switch after the popup closes, so the popup never waits on a history write.
 func (s *services) DeferAgentViews(views []tui.AgentView) bool {
 	if !s.popupChild {
 		return false
 	}
 
+	// The invoking process records these with its switch, so the popup never waits on a history
+	// write.
 	s.viewsMu.Lock()
 	defer s.viewsMu.Unlock()
 
@@ -744,8 +741,6 @@ func (s *services) performSwitch(ctx context.Context, target session.Session, pa
 	return s.performSwitchValidated(ctx, target, paneID, clientName, originSessionID, nil)
 }
 
-// performSwitchValidated switches to a target the handoff already validated, skipping a second
-// catalog pass. History, which fsyncs, is recorded once after the switch and pane focus.
 func (s *services) performSwitchValidated(
 	ctx context.Context,
 	target session.Session,
@@ -781,11 +776,10 @@ func (s *services) performSwitchValidated(
 		activateErr = s.activatePane(ctx, target, paneID, outcome.Client)
 	}
 
+	// History fsyncs, so it is recorded once, after the switch and pane focus.
 	return errors.Join(activateErr, s.recordPickerHistory(ctx, outcome.SessionName, views))
 }
 
-// recordPickerHistory records a completed switch to switched, when set, and the agent views
-// in one history update.
 func (s *services) recordPickerHistory(ctx context.Context, switched string, views []tui.AgentView) error {
 	identity, recordSwitch := s.workflow.SwitchHistoryIdentity(switched)
 	if s.workspace.History == "" || (!recordSwitch && len(views) == 0) {

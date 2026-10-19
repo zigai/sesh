@@ -11,8 +11,6 @@ var (
 	ErrInputType      = errors.New("action input has the wrong type")
 )
 
-// Definition is a registered action with its typed input and output. Inputs and outputs are
-// the JSON contract shared by the CLI and the remote protocol.
 type Definition[In, Out any] struct {
 	Descriptor
 

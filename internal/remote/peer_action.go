@@ -13,8 +13,6 @@ import (
 	"github.com/zigai/sesh/internal/privatefs"
 )
 
-// PeerActionOptions configures how a peer runs invocations. Allowed is the peer's own policy;
-// Dispatcher runs admitted actions on the peer.
 type PeerActionOptions struct {
 	PeerID     string
 	Receipts   *privatefs.Dir
@@ -23,8 +21,8 @@ type PeerActionOptions struct {
 	Now        func() time.Time
 }
 
-// ExecutePeerAction runs one invocation at most once. A repeated invocation ID returns the
-// recorded result instead of running the action again.
+// ExecutePeerAction runs an invocation at most once; a repeated invocation ID returns the
+// recorded result.
 func ExecutePeerAction(ctx context.Context, opts PeerActionOptions, request ActionRequest) ActionResult {
 	refused := func(code action.Code) ActionResult {
 		return ActionResult{InvocationID: request.InvocationID, Action: knownAction(request.Action), OK: false, Code: code, Output: nil}

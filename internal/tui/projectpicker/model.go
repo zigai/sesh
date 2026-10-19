@@ -1,5 +1,3 @@
-// Package projectpicker is the picker that opens a project: an existing one under the project
-// roots, a repository to clone, or a new one to create.
 package projectpicker
 
 import (
@@ -37,7 +35,6 @@ const (
 
 type ChoiceKind uint8
 
-// Entry is a project the picker lists. Session names the project's open session.
 type Entry struct {
 	Root        string
 	Name        string
@@ -46,8 +43,6 @@ type Entry struct {
 	NameTakenBy string
 }
 
-// Choice is what the person picked: a project root to open or adopt, a URL to clone, or a name
-// to create.
 type Choice struct {
 	Kind  ChoiceKind
 	Value string

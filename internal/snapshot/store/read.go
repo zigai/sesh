@@ -46,8 +46,6 @@ func (r *Repository) ReadCurrent(ctx context.Context) (Generation, model.Manifes
 	return generation, manifest, nil
 }
 
-// ReadPracticalCurrent reads the generation used for practical recovery: everything ReadCurrent
-// admits plus what [Catalog.PracticalCurrentAdmissible] allows.
 func (r *Repository) ReadPracticalCurrent(ctx context.Context) (Generation, model.Manifest, error) {
 	lock, err := r.root.Lock(ctx, "repository.lock")
 	if err != nil {
@@ -91,10 +89,8 @@ func (c Catalog) practicalCurrentGeneration() (Generation, error) {
 	return c.Generations[c.generationIndex(c.Current)], nil
 }
 
-// PracticalCurrentAdmissible reports whether practical recovery may read the current generation:
-// the latest save's observation-only result, or the newest saved generation when the latest save
-// produced none because it failed or never finished. A pending rewrite of the current generation
-// blocks either way, so a saved-session deletion in progress is never undone.
+// PracticalCurrentAdmissible admits the latest save's observation-only result, or the newest
+// generation when the latest save failed or never finished; a pending rewrite always blocks.
 func (c Catalog) PracticalCurrentAdmissible() bool {
 	if c.Current == "" {
 		return false
@@ -123,8 +119,6 @@ func (c Catalog) PracticalCurrentAdmissible() bool {
 	}
 }
 
-// LatestSaveUnfinished reports whether the latest save attempt failed or never finished, so the
-// current generation, if any, predates it.
 func (c Catalog) LatestSaveUnfinished() bool {
 	state := c.latestSaveAttempt().State
 

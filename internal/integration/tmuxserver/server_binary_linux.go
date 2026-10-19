@@ -13,16 +13,12 @@ import (
 )
 
 const (
-	// unixListening is __SO_ACCEPTCON in /proc/net/unix flags: the socket accepts connections.
 	unixListening        = 0x10000
 	maxServerDescriptors = 65536
 )
 
-// serverBinary returns the executable of the tmux server listening on socket when $TMUX
-// names that server, and "" otherwise. Commands then run the exact binary the server runs,
-// skipping any PATH wrapper around tmux. The candidate pid is trusted only while it holds
-// the listening socket, so a stale $TMUX or a reused pid never selects another program.
 func serverBinary(socket string) string {
+	// Running the server's own binary skips any PATH wrapper around tmux.
 	return resolveServerBinary(os.Getenv("TMUX"), socket, os.DirFS("/proc"))
 }
 
@@ -32,6 +28,8 @@ func resolveServerBinary(tmuxEnvironment, socket string, proc fs.FS) string {
 		return ""
 	}
 
+	// The pid counts only while it holds the listening socket, so a stale $TMUX or a reused pid
+	// never selects another program.
 	inodes := listeningSocketInodes(proc, socket)
 	if len(inodes) == 0 || !holdsSocket(proc, path.Join(pid, "fd"), inodes) {
 		return ""
@@ -45,8 +43,8 @@ func resolveServerBinary(tmuxEnvironment, socket string, proc fs.FS) string {
 	return executable
 }
 
-// tmuxServerPID parses $TMUX ("socket,pid,session") and returns the pid when the socket matches.
 func tmuxServerPID(tmuxEnvironment, socket string) (string, bool) {
+	// $TMUX is "socket,pid,session".
 	fields := strings.Split(tmuxEnvironment, ",")
 	if len(fields) != 3 || filepath.Clean(fields[0]) != socket {
 		return "", false
@@ -79,6 +77,7 @@ func listeningSocketInodes(proc fs.FS, socket string) map[string]bool {
 		}
 
 		flags, err := strconv.ParseUint(fields[3], 16, 32)
+		// unixListening is __SO_ACCEPTCON: the socket accepts connections.
 		if err == nil && flags&unixListening != 0 {
 			inodes[fields[6]] = true
 		}

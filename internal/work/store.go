@@ -1,5 +1,3 @@
-// Package work keeps the durable record of the agent conversations the user drove in their own
-// tmux panes, so the inbox can list them after their agent exits and resume them.
 package work
 
 import (
@@ -27,9 +25,8 @@ const (
 	FinishedByPR   FinishReason = "pr"
 	FinishedByUser FinishReason = "user"
 
-	LinkBranch LinkSource = "branch"
-	LinkUser   LinkSource = "user"
-	// LinkDismissed marks a pull request the user unlinked, which keeps sync from linking it again.
+	LinkBranch    LinkSource = "branch"
+	LinkUser      LinkSource = "user"
 	LinkDismissed LinkSource = "dismissed"
 
 	maxFileBytes = 8 << 20
@@ -52,9 +49,8 @@ type (
 	LinkSource   string
 )
 
-// Item is one piece of work: an agent conversation the user drove in a tmux pane, where it ran,
-// and the pull requests linked to it. A new conversation in the same pane, such as after the agent
-// clears its context, continues the item until the item finishes.
+// Item is continued by a new conversation in the same pane, such as after the agent clears its
+// context, until the item finishes.
 type Item struct {
 	ID           string   `json:"id"`
 	Harness      string   `json:"harness"`
@@ -67,20 +63,15 @@ type Item struct {
 	Branch       string   `json:"branch"`
 	Task         string   `json:"task"`
 	PRs          []PRLink `json:"prs"`
-	// Server and Pane are the tmux server socket and the pane the conversation last ran in, with
-	// the pane's process, which tells a later pane with a reused ID apart.
-	Server  string `json:"server"`
-	Pane    string `json:"pane"`
-	PanePID int    `json:"panePid"`
-	// CreatedAt is when the item was first seen, TurnAt when its agent last changed activity, and
-	// PromptAt when the user last sent its agent a prompt, as far as the harness reports it, all as
-	// Unix seconds.
+	Server       string   `json:"server"`
+	Pane         string   `json:"pane"`
+	PanePID      int      `json:"panePid"`
+	// CreatedAt, TurnAt (last activity change) and PromptAt (last user prompt, as far as the
+	// harness reports it) are Unix seconds.
 	CreatedAt int64 `json:"createdAt"`
 	TurnAt    int64 `json:"turnAt"`
 	PromptAt  int64 `json:"promptAt"`
-	// PinnedAt is when the user pinned the item, FinishedAt when it finished, ReopenedAt when it
-	// last reopened after finishing, and UnseenAt when the user marked it not seen, as Unix seconds,
-	// zero when it is not.
+	// PinnedAt, FinishedAt, ReopenedAt and UnseenAt are Unix seconds, zero when unset.
 	PinnedAt   int64        `json:"pinnedAt"`
 	FinishedAt int64        `json:"finishedAt"`
 	FinishedBy FinishReason `json:"finishedBy"`
@@ -88,17 +79,15 @@ type Item struct {
 	UnseenAt   int64        `json:"unseenAt"`
 }
 
-// PRLink is a pull request linked to an item, with its last known state and the issues it closes.
-// CreatedAt and EndedAt are when it was opened and when it was merged or closed, as Unix seconds,
-// zero when unknown or still open.
 type PRLink struct {
-	Number    int          `json:"number"`
-	State     task.PRState `json:"state"`
-	URL       string       `json:"url"`
-	Issues    []int        `json:"issues"`
-	Source    LinkSource   `json:"source"`
-	CreatedAt int64        `json:"createdAt"`
-	EndedAt   int64        `json:"endedAt"`
+	Number int          `json:"number"`
+	State  task.PRState `json:"state"`
+	URL    string       `json:"url"`
+	Issues []int        `json:"issues"`
+	Source LinkSource   `json:"source"`
+	// CreatedAt and EndedAt are Unix seconds, zero when unknown or still open.
+	CreatedAt int64 `json:"createdAt"`
+	EndedAt   int64 `json:"endedAt"`
 }
 
 type State struct {
@@ -107,8 +96,8 @@ type State struct {
 	Items   []Item `json:"items"`
 }
 
-// Store reads and updates the work state file. Updates hold an exclusive lock, so concurrent sesh
-// processes never lose each other's changes.
+// Store updates hold an exclusive lock, so concurrent sesh processes never lose each other's
+// changes.
 type Store struct {
 	path string
 }
@@ -157,9 +146,6 @@ func (s *State) Finish(id string, by FinishReason, now time.Time) error {
 	})
 }
 
-// FinishTask finishes the items of a finished task and detaches them from it, so they resume
-// outside the task. A non-empty directory replaces where they resume, for a task whose
-// worktree was removed.
 func (s *State) FinishTask(id string, by FinishReason, directory string, now time.Time) {
 	for index := range s.Items {
 		item := &s.Items[index]
@@ -187,7 +173,6 @@ func (s *State) Reopen(id string, now time.Time) error {
 	})
 }
 
-// Pin keeps the item with id first in its section and stops its pull requests from finishing it.
 func (s *State) Pin(id string, now time.Time) error {
 	return s.change(id, func(item *Item) error {
 		item.PinnedAt = now.Unix()
@@ -237,8 +222,6 @@ func (s *State) Link(id string, pr PRLink) error {
 	})
 }
 
-// Unlink unlinks pull request number from the item with id. The item remembers it, so sync does
-// not link it again.
 func (s *State) Unlink(id string, number int) error {
 	return s.change(id, func(item *Item) error {
 		index := slices.IndexFunc(item.PRs, func(linked PRLink) bool { return linked.Number == number && linked.Source != LinkDismissed })
@@ -308,7 +291,6 @@ func EmptyItem() Item {
 	}
 }
 
-// Load returns the current state; a missing file is an empty state.
 func (s Store) Load(ctx context.Context) (State, error) {
 	dir, name, err := s.open(false)
 	if errors.Is(err, os.ErrNotExist) {
@@ -324,8 +306,6 @@ func (s Store) Load(ctx context.Context) (State, error) {
 	return state, storeError("load_work", errors.Join(err, dir.Close(), ctx.Err()))
 }
 
-// Update applies change to the locked state and publishes the result. A change that returns an
-// error leaves the file as it was.
 func (s Store) Update(ctx context.Context, change func(*State) error) (State, error) {
 	if change == nil {
 		return State{}, storeError("update_work", ErrNilUpdate)

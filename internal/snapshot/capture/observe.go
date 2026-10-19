@@ -41,8 +41,6 @@ type paneProcessRecord struct {
 	dead       bool
 }
 
-// OmittedTerminalText counts panes observed without a terminal text artifact because their
-// text exceeded the capture byte budget.
 func (o *Observation) OmittedTerminalText() int {
 	omitted := 0
 

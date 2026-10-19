@@ -12,8 +12,6 @@ const (
 	snoozeClockForm = "15:04"
 )
 
-// Snooze is a parsed snooze choice: until the agent's next message, for a duration, or until a
-// time of day, today or tomorrow.
 type Snooze struct {
 	nextMessage bool
 	duration    time.Duration
@@ -22,8 +20,6 @@ type Snooze struct {
 	tomorrow    bool
 }
 
-// ParseSnooze reads "next message", a positive duration such as "90m", a time of day such as
-// "18:00" (today, or tomorrow once it has passed), or "tomorrow 09:00".
 func ParseSnooze(choice string) (Snooze, error) {
 	text := strings.TrimSpace(choice)
 	if text == SnoozeNextMessage {
@@ -45,8 +41,7 @@ func ParseSnooze(choice string) (Snooze, error) {
 	return Snooze{nextMessage: false, duration: duration, atClock: false, clock: 0, tomorrow: false}, nil
 }
 
-// Until is when a snooze set at now ends; the zero time for a snooze that waits for the next
-// message.
+// Until is zero for a snooze that waits for the next message.
 func (s Snooze) Until(now time.Time) time.Time {
 	switch {
 	case s.nextMessage:

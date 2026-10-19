@@ -602,8 +602,6 @@ func writeSetupServiceRefresh(out *strings.Builder, result *setup.ServiceRefresh
 	}
 }
 
-// automaticSaveStates reads the automatic-save units' state after systemd reloaded them. Without
-// the states the next steps fall back to the full start command.
 func automaticSaveStates(
 	ctx context.Context,
 	manager setup.ServiceManager,
@@ -765,14 +763,14 @@ func resolveSetupTmuxProgram(cmd *cobra.Command) (string, error) {
 	return abs, nil
 }
 
-// resolveSetupServiceSocket never defaults to the managed socket unless the managed server is
-// rendered too, since nothing else creates it.
 func resolveSetupServiceSocket(cmd *cobra.Command, withTmux bool) (string, error) {
 	socketPath, _ := cmd.Flags().GetString("socket")
 
 	switch {
 	case socketPath != "":
 	case withTmux:
+		// Nothing else creates the managed socket, so it is the default only with the managed
+		// server.
 		socketPath = managedTmuxSocket()
 	default:
 		socketPath = clibase.DefaultTmuxSocket()

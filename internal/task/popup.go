@@ -21,9 +21,6 @@ func PopupSessionName(taskID string) string {
 	return popupSessionPrefix + taskID
 }
 
-// EnsurePopupSession returns the task's popup session, starting it in the task directory on
-// first use. Without a popup config, the server gets the few settings a popup terminal needs:
-// no status line, no prefix, and the popup key closes it again.
 func EnsurePopupSession(ctx context.Context, popup *gotmux.Server, cfg config.TasksConfig, record Record, size gotmux.Size) (gotmux.Session, error) {
 	existing, err := popup.FindSession(ctx, PopupSessionName(record.ID))
 	if err == nil {
@@ -56,9 +53,6 @@ func EnsurePopupSession(ctx context.Context, popup *gotmux.Server, cfg config.Ta
 	return created, nil
 }
 
-// OpenRunWindow opens a window named after a task action in the task's popup session, running
-// argv and then the popup's shell so the output stays readable. A previous run's window of the
-// same action is replaced. The window is selected, so the popup opens on it.
 func OpenRunWindow(ctx context.Context, popup *gotmux.Server, popupSession gotmux.Session, record Record, name string, argv []string) error {
 	windows, err := popupSession.Windows(ctx)
 	if err != nil {

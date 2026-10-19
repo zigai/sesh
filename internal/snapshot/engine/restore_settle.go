@@ -17,8 +17,6 @@ import (
 
 const restoreTargetBirthPrefix = "birth="
 
-// ActiveRestores lists the restore operations a repository still records as active, the ones that
-// hold back automatic saves and startup restores until they finish or are abandoned.
 func ActiveRestores(ctx context.Context, repository *store.Repository) ([]OperationStatus, error) {
 	if repository == nil {
 		return nil, oops.In("snapshot").Code("repository_required").With("operation", "list_active_restores").Wrap(ErrRepositoryRequired)
@@ -40,9 +38,6 @@ func ActiveRestores(ctx context.Context, repository *store.Repository) ([]Operat
 	return active, nil
 }
 
-// RestoreTargetedServer reports whether a restore operation, in any state, was admitted against
-// the tmux daemon now serving server. The socket, daemon PID and daemon start time recorded in a
-// restore target identify one server instance.
 func RestoreTargetedServer(ctx context.Context, repository *store.Repository, server *gotmux.Server) (bool, error) {
 	if repository == nil {
 		return false, oops.In("snapshot").Code("repository_required").With("operation", "find_server_restore").Wrap(ErrRepositoryRequired)
@@ -69,12 +64,8 @@ func RestoreTargetedServer(ctx context.Context, repository *store.Repository, se
 	return false, nil
 }
 
-// SettleDeadRestores abandons every active restore whose target tmux daemon is provably gone:
-// the daemon recorded at admission no longer runs, because the machine rebooted or the process
-// exited or was replaced. Such a restore can never resume, since resuming requires that exact
-// daemon. Abandonment is bookkeeping only: no tmux object is touched and nothing is rolled back.
-// A restore whose daemon may still run, or whose daemon cannot be checked, stays active. It
-// returns the abandoned operations.
+// SettleDeadRestores abandons, as bookkeeping only, every active restore whose daemon provably no
+// longer runs and returns them. A restore whose daemon may run or cannot be checked stays active.
 func SettleDeadRestores(ctx context.Context, repository *store.Repository) ([]OperationStatus, error) {
 	active, err := ActiveRestores(ctx, repository)
 	if err != nil {
@@ -99,8 +90,6 @@ func SettleDeadRestores(ctx context.Context, repository *store.Repository) ([]Op
 	return settled, nil
 }
 
-// TargetDaemonGone reports whether the tmux daemon this restore targeted provably no longer runs,
-// so the restore can never resume. SettleDeadRestores abandons exactly these.
 func (s OperationStatus) TargetDaemonGone(ctx context.Context) bool {
 	return restoreTargetDaemonGone(ctx, s.Target)
 }

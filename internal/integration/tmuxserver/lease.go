@@ -34,8 +34,8 @@ type Lease struct {
 	closed   bool
 }
 
-// AcquireLease takes the target endpoint lease. Acquire it before any repository lock, and never
-// while holding one, or lock ordering inverts and can deadlock.
+// AcquireLease must run before any repository lock is taken, never while one is held, or lock
+// ordering inverts and can deadlock.
 func AcquireLease(ctx context.Context, leaseRoot string, socket string) (*Lease, error) {
 	return acquireLease(ctx, leaseRoot, socket, nil)
 }

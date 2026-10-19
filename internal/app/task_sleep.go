@@ -55,8 +55,6 @@ func (local *Local) wakeTask(ctx context.Context, _ action.Caller, input action.
 	return result, nil
 }
 
-// WakeTaskHere marks a sleeping task awake and returns the command line that resumes its agent,
-// for the placeholder in the agent pane to replace itself with.
 func (local *Local) WakeTaskHere(ctx context.Context, id string) ([]string, error) {
 	service, err := local.taskService()
 	if err != nil {

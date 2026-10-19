@@ -10,9 +10,8 @@ import (
 
 var ErrInvalidRawBytes = errors.New("invalid raw bytes encoding")
 
-// RawBytes carries exact tmux-reported bytes, such as session names and paths, in session JSON
-// output and the remote peer protocol. It always encodes as strict canonical base64, so both
-// contracts stay independent of the snapshot manifest's readable encoding.
+// RawBytes always encodes as strict canonical base64, so session JSON and the peer protocol stay
+// independent of the snapshot manifest's readable encoding.
 //
 //nolint:recvcheck // Value marshaling and pointer decoding preserve the byte-slice JSON method contracts.
 type RawBytes []byte

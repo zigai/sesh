@@ -172,8 +172,6 @@ func TestObserveOmitsFloatingPanes(t *testing.T) {
 	}
 }
 
-// floatingPaneFixture opens an active floating pane between two tiled panes, so the floating
-// pane takes the middle pane index.
 func floatingPaneFixture(t *testing.T, server *gotmux.Server) (gotmux.Session, gotmux.Pane, gotmux.Pane) {
 	t.Helper()
 

@@ -177,7 +177,7 @@ func TestInstallPathListsEveryCopyOnPathOnce(t *testing.T) {
 
 	first, second, third := t.TempDir(), t.TempDir(), t.TempDir()
 	for _, dir := range []string{first, second} {
-		if err := os.WriteFile(filepath.Join(dir, "sesh"), []byte("#!/bin/sh\n"), 0o700); err != nil { //nolint:gosec // PATH lookup only finds executable files.
+		if err := os.WriteFile(filepath.Join(dir, "sesh"), []byte("#!/bin/sh\n"), 0o700); err != nil {
 			t.Fatal(err)
 		}
 	}

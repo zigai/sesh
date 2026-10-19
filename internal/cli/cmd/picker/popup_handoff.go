@@ -25,8 +25,6 @@ const (
 
 var errPickerHandoffInvalid = errors.New("invalid popup switch handoff")
 
-// switchHandoff carries a popup's result to the invoking process: the selected session, if
-// any, and the agent views whose recording the popup deferred.
 type switchHandoff struct {
 	SessionID        string                  `json:"sessionId,omitempty"`
 	SessionName      string                  `json:"sessionName,omitempty"`
@@ -190,8 +188,6 @@ func newPickerSwitchTarget(handoff switchHandoff) session.Session {
 	return target
 }
 
-// replayPickerKey replays the key the popup asked for on the client that opened it, once the
-// popup has closed. Only keys the picker is known to request are accepted.
 func replayPickerKey(ctx context.Context, path, socketPath, clientName string) error {
 	handoff, _, err := readPickerSwitchHandoff(path)
 	if err != nil || handoff.ReplayKey == "" {

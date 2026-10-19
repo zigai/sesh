@@ -509,8 +509,6 @@ func maintainAfterAutosave(ctx context.Context, repo *store.Repository, env Env,
 	return maintainAutosaveRepository(ctx, repo, env.workspace.Config.Snapshot)
 }
 
-// maintainAutosaveRepository applies snapshot retention and reclaims retired generations. The
-// engine logs each failure; a failure degrades the outcome and never fails the save before it.
 func maintainAutosaveRepository(ctx context.Context, repo *store.Repository, snapshot config.SnapshotConfig) error {
 	policy := store.RetentionPolicy{
 		MaxAge:   time.Duration(snapshot.RetentionDays) * hoursPerDay * time.Hour,
@@ -521,6 +519,7 @@ func maintainAutosaveRepository(ctx context.Context, repo *store.Repository, sna
 	_, pruneErr := engine.Prune(ctx, repo, time.Now().UTC(), policy)
 	_, collectErr := engine.GarbageCollect(ctx, repo, store.CollectionBudget{Generations: collectionGenerations, Bytes: math.MaxInt64})
 
+	// The engine logs each failure; it degrades the outcome and never fails the save before it.
 	return errors.Join(pruneErr, collectErr)
 }
 

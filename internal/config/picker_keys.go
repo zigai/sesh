@@ -21,9 +21,8 @@ var (
 	pickerModifiers = []string{"ctrl", "alt", "shift", "meta", "hyper", "super"}
 )
 
-// PickerKeyName normalizes a picker key to the form the terminal reports it in, so differently
-// written forms of one key compare equal: modifiers in the terminal's order and lower case,
-// named keys lower case, and alt with a shifted letter written as the upper case letter.
+// PickerKeyName normalizes to the form the terminal reports: modifiers in the terminal's order
+// and lower case, named keys lower case, and alt with a shifted letter as the upper case letter.
 func PickerKeyName(value string) string {
 	held, base := splitPickerModifiers(strings.TrimSpace(value))
 	single := utf8.RuneCountInString(base) == 1
@@ -52,8 +51,6 @@ func PickerKeyName(value string) string {
 	return name.String()
 }
 
-// PickerReservedKeys returns every key the picker handles before action bindings: its fixed
-// keys, the configured navigation keys and the configured session keys.
 func PickerReservedKeys(keys KeyConfig) []string {
 	reserved := []string{
 		keys.Help, keys.CycleMode, keys.AgentSort, keys.InboxGroup, keys.Menu, keys.PageUp, keys.PageDown, keys.Top, keys.Bottom,
@@ -85,8 +82,6 @@ func (keys KeyConfig) SessionKeysHoldAlt() bool {
 	return PickerKeyName(keys.SessionPrefix) == sessionPrefixAlt
 }
 
-// PickerSessionKey returns the keys that reach the session assigned letter: alt held with the
-// letter, or the prefix key followed by the letter.
 func (keys KeyConfig) PickerSessionKey(letter string) string {
 	if keys.SessionKeysHoldAlt() {
 		return sessionPrefixAlt + "+" + letter
@@ -99,8 +94,8 @@ func ValidAgentKey(key rune) bool {
 	return (key >= 'a' && key <= 'z') || (key >= '0' && key <= '9')
 }
 
-// PickerKeyTypes reports whether a normalized picker key types into the search field, so binding
-// it would make the character impossible to search for.
+// PickerKeyTypes reports keys that type into the search field; binding one would make its
+// character impossible to search for.
 func PickerKeyTypes(key string) bool {
 	if key == "space" {
 		return true

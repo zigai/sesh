@@ -24,9 +24,8 @@ var finishableActivities = []string{
 	string(aht.ActivityIdle), string(aht.ActivityInterrupted), string(aht.ActivityFailed),
 }
 
-// FinishMergedTasksEvery finishes, every interval until ctx ends, each project task whose pull
-// request merged, as task.finish does, while its agent is idle and no client shows its window.
-// A task the finish refuses is left for the user and not tried again.
+// FinishMergedTasksEvery runs until ctx ends. It finishes a merged task only while its agent is
+// idle and no client shows its window, and never retries a task the finish refused.
 func (local *Local) FinishMergedTasksEvery(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()

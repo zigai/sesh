@@ -20,9 +20,8 @@ var (
 	ErrIncomplete = errors.New("snapshot parity is incomplete")
 )
 
-// Bytes holds exact bytes reported by tmux or the operating system. Valid UTF-8 encodes as a
-// plain JSON string so manifests stay readable; any other sequence encodes as
-// {"base64": "..."}. Each byte sequence has exactly one accepted encoding.
+// Bytes encodes valid UTF-8 as a JSON string and anything else as {"base64": "..."}; each
+// sequence has exactly one accepted encoding.
 //
 //nolint:recvcheck // Value marshaling and pointer decoding preserve the byte-slice JSON method contracts.
 type Bytes []byte

@@ -838,8 +838,6 @@ func programOutput(output io.Writer) io.Writer {
 	return terminalOutput{Writer: output, fd: terminal.Fd()}
 }
 
-// colorProfile returns the profile inside tmux, and false outside it. tmux converts RGB per
-// client, so TrueColor is safe and skips bubbletea running `tmux info` before the first frame.
 func colorProfile(environ []string) (colorprofile.Profile, bool) {
 	inside := slices.ContainsFunc(environ, func(entry string) bool {
 		value, ok := strings.CutPrefix(entry, "TMUX=")
@@ -854,6 +852,8 @@ func colorProfile(environ []string) (colorprofile.Profile, bool) {
 		return profile, true
 	}
 
+	// tmux converts RGB per client, and TrueColor skips bubbletea running `tmux info` before the
+	// first frame.
 	return colorprofile.TrueColor, true
 }
 

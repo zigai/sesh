@@ -107,8 +107,6 @@ type AgentView struct {
 	PaneID  string
 }
 
-// WorkSource lists the conversations recorded on this machine and brings their branch and pull
-// request up to date, reporting whether anything changed.
 type WorkSource interface {
 	LoadWork(ctx context.Context) ([]work.Item, error)
 	SyncWork(ctx context.Context) (bool, error)

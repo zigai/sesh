@@ -17,15 +17,13 @@ const (
 	CollisionGroupInUse = "group_in_use"
 )
 
-// Collision identifies a planned session that cannot be created because the live server already
-// uses its name or its session-group name.
 type Collision struct {
 	SessionID string
 	Reason    string
 }
 
-// FindCollisions reports every session in the plan's closure that collides with a live session.
-// It only observes: the executor still refuses to create anything over a collision.
+// FindCollisions checks the plan's whole closure and only observes: the executor still refuses to
+// create anything over a collision.
 func FindCollisions(ctx context.Context, server *gotmux.Server, plan Plan) ([]Collision, error) {
 	if server == nil {
 		return nil, oops.In("snapshot.restore").Code("endpoint_required").Wrap(tmuxserver.ErrEndpoint)

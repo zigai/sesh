@@ -498,9 +498,6 @@ func startNvimContext(
 	return command
 }
 
-// observeProcess waits until pid reports the executable the test started. Under load, /proc
-// can still show the starting test binary's image and arguments for a few milliseconds
-// after [exec.Cmd.Start] returns.
 func observeProcess(ctx context.Context, pid int, birth process.Identity, executable string) (*process.Observation, error) {
 	want, err := filepath.EvalSymlinks(executable)
 	if err != nil {
@@ -509,6 +506,7 @@ func observeProcess(ctx context.Context, pid int, birth process.Identity, execut
 
 	for ctx.Err() == nil {
 		observation, err := process.Observe(ctx, process.Request{PID: pid, ExpectedBirth: birth, EnvironmentKeys: nil})
+		// Under load, /proc can show the test binary's image for a few milliseconds after Start.
 		if err == nil && string(observation.Executable) == want {
 			return observation, nil
 		}
@@ -566,10 +564,8 @@ func waitForEditorArguments(
 	return model.Launch{}, "", fmt.Errorf("wait for editor arguments: %w", ctx.Err())
 }
 
-// transientEnrichmentError reports failures a starting nvim can produce before it settles: its
-// server endpoint is not listening yet, or a child is mid-exec with an empty command line.
-// Capture treats the latter as a changed observation and retries it the same way.
 func transientEnrichmentError(err error) bool {
+	// A starting nvim may not listen yet, or a child may be mid-exec with an empty command line.
 	return errors.Is(err, apps.ErrEditorEndpointMissing) || errors.Is(err, process.ErrEmptyCmdline)
 }
 

@@ -28,34 +28,27 @@ var (
 	errHarnessCommandEmpty  = errors.New("harness needs a command unless it names a harness AHT supports")
 )
 
-// ProjectsConfig lists where projects are found. Roots are scanned one level deep for git
-// repositories; extra registers folders that are projects without git.
 type ProjectsConfig struct {
-	Roots []string `toml:"roots"`
-	Extra []string `toml:"extra"`
-	// Overrides holds per-project settings, keyed by the project's path or directory name.
+	Roots     []string                 `toml:"roots"`
+	Extra     []string                 `toml:"extra"`
 	Overrides map[string]ProjectConfig `toml:"overrides"`
 }
 
-// TasksConfig configures task windows: the panes beside the agent and their layouts, the tmux
-// server that hosts task popups, and the harnesses offered when a task starts. Harness entries
-// are the offer, in order; without them, every supported harness installed on the host is
-// offered.
 type TasksConfig struct {
-	Panes         []TaskPaneConfig   `toml:"panes"`
-	Layouts       []TaskLayoutConfig `toml:"layouts"`
-	PopupSocket   string             `toml:"popup_socket"`
-	PopupConfig   string             `toml:"popup_config"`
-	Harness       []HarnessConfig    `toml:"harness"`
-	WakeOnRestore string             `toml:"wake_on_restore"`
-	ShowFooter    bool               `toml:"show_footer"`
+	Panes       []TaskPaneConfig   `toml:"panes"`
+	Layouts     []TaskLayoutConfig `toml:"layouts"`
+	PopupSocket string             `toml:"popup_socket"`
+	PopupConfig string             `toml:"popup_config"`
+	// Harness entries are offered in order; without them, every supported harness installed on the
+	// host is offered.
+	Harness       []HarnessConfig `toml:"harness"`
+	WakeOnRestore string          `toml:"wake_on_restore"`
+	ShowFooter    bool            `toml:"show_footer"`
 }
 
-// HarnessConfig is a harness offered for new tasks. Command may be left out for a harness AHT
-// supports; it then runs that harness's installed executable. PromptArgs are appended to the
-// command when a task is started with a title, with task variables such as {title} filled in.
 type HarnessConfig struct {
-	Name       string   `toml:"name"`
+	Name string `toml:"name"`
+	// Command may be left out for a harness AHT supports, to run its installed executable.
 	Command    []string `toml:"command"`
 	PromptArgs []string `toml:"prompt_args"`
 }

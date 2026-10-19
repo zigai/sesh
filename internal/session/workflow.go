@@ -168,8 +168,6 @@ func NewWorkflowWithOptions(opts WorkflowOptions) *Workflow {
 	}
 }
 
-// SwitchHistoryIdentity returns the history identity a switch to name records, and false when
-// the workflow keeps no history.
 func (w *Workflow) SwitchHistoryIdentity(name string) (Identity, bool) {
 	return w.localIdentity(name)
 }

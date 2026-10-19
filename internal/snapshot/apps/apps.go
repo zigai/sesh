@@ -62,9 +62,6 @@ var agentArgumentPrefixes = map[aht.Harness][]string{
 	aht.HarnessHermes:   {"--resume"},
 }
 
-// agentStopSignals lists the harnesses whose sleep was verified with a real stop and native
-// resume: the signal that ends the harness after it has saved its session. A harness missing
-// here cannot sleep.
 var agentStopSignals = map[aht.Harness]syscall.Signal{
 	aht.HarnessClaude: syscall.SIGTERM,
 	aht.HarnessCodex:  syscall.SIGTERM,
@@ -120,6 +117,7 @@ func RunsHarness(launch model.Launch, harnessName string) bool {
 }
 
 func StopSignal(harnessName string) (syscall.Signal, bool) {
+	// Only harnesses whose sleep was verified with a real stop and native resume have a signal.
 	signal, ok := agentStopSignals[aht.Harness(harnessName)]
 
 	return signal, ok

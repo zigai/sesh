@@ -4,8 +4,6 @@ package automation
 
 import "time"
 
-// UnrestoredSessions names the saved sessions a live tmux server lacks while the newest snapshot
-// predates that server's start: the state after a reboot or crash before anything was restored.
 func UnrestoredSessions(serverStarted, snapshotFinished time.Time, saved, live []string) []string {
 	// tmux reports its start in whole seconds, so a snapshot finished within the server's start
 	// second, as a stop-time save just before a restart is, counts as older than the server.

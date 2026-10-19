@@ -74,13 +74,12 @@ func WriteTable(
 	return nil
 }
 
-// trimHeaderRulePadding removes the last column's right padding from the header
-// rule, which SuppressTrailingSpaces cannot trim because the rule has no spaces.
 func trimHeaderRulePadding(rendered string) string {
 	lines := strings.Split(rendered, "\n")
 
 	for i, line := range lines {
 		if line != "" && strings.Trim(line, headerRule) == "" {
+			// SuppressTrailingSpaces cannot trim this padding because the rule has no spaces.
 			lines[i] = strings.TrimSuffix(line, strings.Repeat(headerRule, columnSpacing))
 
 			break

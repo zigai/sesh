@@ -24,8 +24,6 @@ type ActionOriginOptions struct {
 	State      ConnectionState
 }
 
-// Peer dispatches actions to configured remote connections over SSH. It offers the actions each
-// peer advertised in its last observed inventory and checks the current catalog before sending.
 type Peer struct {
 	remote config.RemoteConfig
 	load   func() (Catalog, error)
@@ -171,8 +169,8 @@ func NewActionRequest(opts ActionOriginOptions, id action.ID, input jsontext.Val
 	return request, nil
 }
 
-// RunAction sends one invocation over SSH. When the answer is lost the outcome is unknown, and
-// `sesh remote lookup` reads the receipt the peer kept.
+// RunAction leaves the outcome unknown when the answer is lost; `sesh remote lookup` reads the
+// receipt the peer kept.
 func RunAction(ctx context.Context, opts ActionOriginOptions, request ActionRequest) (ActionResult, error) {
 	if err := ValidateActionRequest(request); err != nil {
 		return ActionResult{}, oops.In("remote").With("operation", "run_action").Wrap(err)

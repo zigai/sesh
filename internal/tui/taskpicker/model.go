@@ -46,15 +46,6 @@ var (
 	sectionOrder = []section{sectionNew, sectionCheckout, sectionBranch, sectionInUse}
 )
 
-// Options is what the picker offers. Project names the pane's project and is empty elsewhere;
-// Locations, the Current checkout's index in them, and NextNumber and Branches that name a new
-// worktree's branch come from the project's offer. Expanded lists every location of the project,
-// and Title and Agent fill in the title and agent, the first agent when empty. Refs describe the
-// branches as of Now, Starts names the ref each new worktree base starts from, and Changes counts the uncommitted changes of checkouts after the popup
-// opens. Start runs the choice while the popup is still open, so a failure can be shown in it.
-// Machines lists this machine and then the remote hosts a task can start on; the popup shows them
-// when there is more than one. Machine is the index of the chosen one, and Problem, when set, is
-// why no task can start on it, shown in place of the checkouts.
 type Options struct {
 	Project    string
 	Locations  []task.Location
@@ -80,10 +71,6 @@ type Machine struct {
 	Usable bool
 }
 
-// Choice is what the person picked: a plain tab, or a harness, a title and, in a project, the
-// location the task works in. Show is a task to go to once the popup closes, one that already
-// works in the chosen checkout. Reopen asks for the popup again on Machine, Expanded or not,
-// keeping the title and harness.
 type Choice struct {
 	Reopen   bool
 	Expanded bool
@@ -403,8 +390,6 @@ func (m *Model) reopen(expanded bool) (tea.Model, tea.Cmd) {
 	return m, tea.Quit
 }
 
-// hasWhere reports whether the task can work somewhere other than the pane's checkout: in a
-// repository, whose first location is a new worktree.
 func (m *Model) hasWhere() bool {
 	return m.options.Project != "" && len(m.options.Locations) > 0 && m.options.Locations[0].Where == task.WhereNew
 }
@@ -659,8 +644,6 @@ func choiceAt(choices []placed, column int) (int, bool) {
 	return 0, false
 }
 
-// rowsOf lists the rows of the expanded list: the project's locations. New worktrees after the
-// leading ones start from less likely bases and wait for a filter.
 func rowsOf(opts Options) []row {
 	rows := make([]row, 0, len(opts.Locations))
 	leading := true

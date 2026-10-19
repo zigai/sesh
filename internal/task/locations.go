@@ -17,15 +17,10 @@ import (
 )
 
 const (
-	// WhereNew is a new worktree on a new branch that starts from Branch.
-	WhereNew Where = "new"
-	// WhereBranch is a new worktree that checks out Branch: a local branch, or one only Remote
-	// has, which then gets a local branch tracking it.
-	WhereBranch Where = "branch"
-	// WhereWorktree is an existing worktree of the project, made by sesh or by hand.
+	WhereNew      Where = "new"
+	WhereBranch   Where = "branch"
 	WhereWorktree Where = "worktree"
-	// WhereMain is the project's main checkout on whatever branch it has checked out.
-	WhereMain Where = "main"
+	WhereMain     Where = "main"
 
 	maxSlugRunes = 48
 )
@@ -34,13 +29,10 @@ var ErrLocationUnavailable = errors.New("that checkout or branch is no longer fr
 
 type Where string
 
-// Location is a place a project task can work in. Branch is the branch checked out there, the
-// branch a new worktree checks out, or the base a new branch starts from; Remote names the remote
-// holding a branch no local branch has; Directory names an existing worktree or the main
-// checkout. Task and TaskTitle name the task that already works in a checkout, which then cannot
-// take another.
 type Location struct {
-	Where     Where
+	Where Where
+	// Branch is the branch checked out there, the branch a new worktree checks out, or the base a
+	// new branch starts from.
 	Branch    string
 	Remote    string
 	Directory string
@@ -48,20 +40,13 @@ type Location struct {
 	TaskTitle string
 }
 
-// Request is what a new task starts with: its harness, an optional title that names it and is
-// the agent's first prompt, and, for a project task, its location.
 type Request struct {
 	Harness  string
 	Title    string
 	Location Location
-	// Layout names the task window's layout; empty picks the first that fits the window.
-	Layout string
+	Layout   string
 }
 
-// Offer is what a new task can start with at a place: the offered harnesses, the root of the
-// place's project with its locations, and the index of the checkout the place is in. NextNumber
-// and Branches are what a new worktree's branch is named from. Outside a project Project is
-// empty and there are no locations.
 type Offer struct {
 	Harnesses  []Harness
 	Project    string
@@ -69,15 +54,12 @@ type Offer struct {
 	Current    int
 	NextNumber int
 	Branches   []string
-	// Refs describes the project's branches by full ref name, and Starts names the ref a new
-	// worktree from each base starts from.
-	Refs   map[string]Ref
-	Starts map[string]string
+	Refs       map[string]Ref
+	Starts     map[string]string
 }
 
-// Ref is a branch's latest commit, as a Unix time and subject, and how many commits the branch
-// has that the default branch lacks and the other way round.
 type Ref struct {
+	// Time is Unix seconds.
 	Time    int64
 	Subject string
 	Ahead   int
@@ -103,8 +85,6 @@ type worktree struct {
 	prunable  bool
 }
 
-// branches are a project's local branch names and the branches only a remote has, most
-// recently committed first, and every branch's latest commit.
 type branches struct {
 	local  []string
 	remote []remoteBranch
@@ -112,10 +92,6 @@ type branches struct {
 	starts map[string]string
 }
 
-// Offer lists the harnesses and, in a project session or a repository, the locations a new task
-// can start with, with each branch's latest commit and distance from the default branch when
-// describe is set. A directory holds at most one task, so a checkout a task works in is offered
-// only to go to that task.
 func (s *Service) Offer(ctx context.Context, place Place, describe bool) (Offer, error) {
 	ledger, err := s.store.Load(ctx)
 	if err != nil {
@@ -262,9 +238,6 @@ func (l Location) names(requested Location) bool {
 	}
 }
 
-// NewBranch is the branch a new worktree gets: wt/ and the title as a slug, or without a title
-// wt/, the base and the task number. A name taken by a local branch gets the lowest free numeric
-// suffix.
 func NewBranch(title, base string, number int, taken []string) string {
 	name := taskBranch(base, number)
 	if slug := slug(title); slug != "" {
@@ -279,8 +252,6 @@ func NewBranch(title, base string, number int, taken []string) string {
 	return candidate
 }
 
-// Changes counts the lines each checkout's uncommitted changes add and delete, as agent rows do,
-// leaving out a checkout git cannot read.
 func Changes(ctx context.Context, directories []string) map[string]git.Diff {
 	var (
 		mutex   sync.Mutex
@@ -432,9 +403,6 @@ func emptyOffer() Offer {
 	}
 }
 
-// listBranches lists the local branches and the remote branches no local branch shares a name
-// with, most recently committed first, and when describe is set their latest commits and how far
-// each is from base.
 func listBranches(ctx context.Context, root, base string, describe bool) (branches, error) {
 	aheadBehind := ""
 
@@ -571,13 +539,12 @@ func within(dir, directory string) bool {
 	return err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
 }
 
-// sameDirectory compares two directories after resolving symlinks, since git reports resolved
-// paths while project roots may be configured through a link.
 func sameDirectory(a, b string) bool {
 	if a == "" || b == "" {
 		return false
 	}
 
+	// git reports resolved paths, while project roots may be configured through a link.
 	return resolved(a) == resolved(b)
 }
 

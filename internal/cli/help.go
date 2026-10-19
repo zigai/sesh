@@ -130,8 +130,6 @@ func writeUsageHelpTopics(out *strings.Builder, cmd *cobra.Command) {
 	}
 }
 
-// flagUsages renders flags with pflag's layout. pflag also keeps a back-quoted placeholder in the
-// description, so each copy is marked with metavarMarker and the inline copy is removed.
 func flagUsages(flags *pflag.FlagSet) string {
 	rendered := pflag.NewFlagSet(flags.Name(), pflag.ContinueOnError)
 	rendered.SortFlags = flags.SortFlags
@@ -140,6 +138,7 @@ func flagUsages(flags *pflag.FlagSet) string {
 
 	flags.VisitAll(func(flag *pflag.Flag) {
 		display := *flag
+		// Hiding the concrete value type keeps pflag from appending a default of its own.
 		display.Value = defaultlessValue{Value: flag.Value}
 		display.DefValue = ""
 
@@ -151,6 +150,8 @@ func flagUsages(flags *pflag.FlagSet) string {
 			display.Usage += " [default: " + value + "]"
 		}
 
+		// pflag also keeps a back-quoted placeholder in the description; the marked copy is
+		// removed.
 		if metavar := flagMetavar(flag); metavar != "" {
 			display.Usage = "`" + metavar + "`" + metavarMarker + display.Usage
 			inline = append(inline, metavar+metavarMarker)
@@ -167,8 +168,6 @@ func flagUsages(flags *pflag.FlagSet) string {
 	return usages
 }
 
-// defaultlessValue hides a flag's concrete value type from pflag so that pflag appends no
-// default of its own; flagUsages writes every default as "[default: X]" instead.
 type defaultlessValue struct {
 	pflag.Value
 }

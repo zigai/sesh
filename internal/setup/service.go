@@ -477,8 +477,6 @@ func renderSystemdTmuxService(inputs ServiceInputs) string {
 	return content.String()
 }
 
-// renderSystemdRestoreService restores the newest snapshot once the managed tmux server is up. It
-// is a separate oneshot so a long restore never delays or times out the server's own start.
 func renderSystemdRestoreService(inputs ServiceInputs) string {
 	var content strings.Builder
 
@@ -488,6 +486,7 @@ func renderSystemdRestoreService(inputs ServiceInputs) string {
 	content.WriteString("Documentation=man:sesh(1)\n")
 	content.WriteString("After=" + TmuxServiceName + "\n\n")
 	content.WriteString("[Service]\n")
+	// A separate oneshot keeps a long restore from delaying or timing out the server's start.
 	content.WriteString("Type=oneshot\n")
 	content.WriteString("ExecStart=" + systemdCommand(inputs.Program, restoreOnStartArgs(inputs)) + "\n")
 	content.WriteString("TimeoutStartSec=" + restoreStartTimeout + "\n")

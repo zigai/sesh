@@ -24,9 +24,7 @@ const (
 
 var (
 	ErrStartupRepositoryRequired = errors.New("repository is required to inspect startup state")
-	// ErrActiveRestores reports restores still recorded as active, which hold back automatic saves
-	// and startup restores until they finish or are abandoned.
-	ErrActiveRestores = errors.New("restore still in progress or interrupted")
+	ErrActiveRestores            = errors.New("restore still in progress or interrupted")
 )
 
 type ActiveRestoresError struct {
@@ -44,13 +42,11 @@ type StartupState struct {
 	RepositoryPresent bool
 	PendingOperations int
 	ActiveOperations  []string
-	// Abandoned counts the restores abandoned before inspection because their tmux server no
-	// longer exists.
-	Abandoned        int
-	RecoveryRequired bool
-	ObservationOnly  bool
-	Generation       string
-	Practical        bool
+	Abandoned         int
+	RecoveryRequired  bool
+	ObservationOnly   bool
+	Generation        string
+	Practical         bool
 }
 
 func (e *ActiveRestoresError) Error() string {

@@ -107,8 +107,6 @@ func EvaluateSaveCompletion(result SaveCompletion, err error) CompletionDecision
 	return CompletionDecision{Record: true, Status: CompletionSaved, Reason: ReasonDurableGeneration}
 }
 
-// MaintenanceDue reports whether a save recorded at now is the first one of its local calendar
-// day, so snapshot retention runs at most once per day using only the last recorded save time.
 func MaintenanceDue(previousSaveUnix int64, now time.Time) bool {
 	if previousSaveUnix <= 0 {
 		return true

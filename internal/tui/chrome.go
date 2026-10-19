@@ -53,7 +53,6 @@ func (c Chrome) BodyHeight(height int) int {
 	return max(height-popupBodyHeightMargin, 1)
 }
 
-// Frame draws the border around lines, each already bodyWidth wide.
 func (c Chrome) Frame(bodyWidth int, lines []string) string {
 	horizontal := strings.Repeat("─", bodyWidth+frameBorderPadding)
 	top, bottom, left, right := frameBorders(c.cfg, horizontal)
@@ -171,7 +170,6 @@ func (c Chrome) Blank(width int) string {
 	return strings.Repeat(" ", max(width, 0))
 }
 
-// Pad fills a styled line to width, truncating it when it is wider.
 func (c Chrome) Pad(line string, width int) string {
 	line = truncateStyled(line, width)
 	if lineWidth := lipgloss.Width(line); lineWidth < width {

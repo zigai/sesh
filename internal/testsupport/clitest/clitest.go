@@ -1,4 +1,3 @@
-// Package clitest runs the production command pipeline for command tests.
 package clitest
 
 import (
@@ -51,8 +50,6 @@ func ExecuteContext(ctx context.Context, input io.Reader, args ...string) Execut
 	return exec
 }
 
-// ExecuteJSON runs args and decodes the JSON envelope from stdout, or from
-// stderr when stdout is empty. An output that is not an envelope fails the test.
 func ExecuteJSON(t *testing.T, args ...string) Execution {
 	t.Helper()
 

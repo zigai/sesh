@@ -85,8 +85,6 @@ type Hello struct {
 	StartedAt      time.Time `json:"startedAt"`
 }
 
-// Snapshot is a peer's inventory. Actions lists the actions the peer accepts from this
-// machine, so callers can offer only those.
 type Snapshot struct {
 	GeneratedAt time.Time         `json:"generatedAt"`
 	Sessions    []session.Session `json:"sessions"`

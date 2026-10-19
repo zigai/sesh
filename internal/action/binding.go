@@ -26,21 +26,20 @@ var (
 	ErrPickerKeyReserved  = errors.New("key is reserved by the picker")
 )
 
-// Surface is where a key binding is pressed: inside the picker, or in a tmux key table.
 type Surface string
 
-// Binding runs an action when its key is pressed. Values are parameter values the binding
-// supplies; the picker prompts for the rest, while a tmux binding must supply every required one.
 type Binding struct {
 	Key    string
 	Action ID
 	In     Surface
 	Table  string
+	// Values supply action parameters; the picker prompts for the rest, while a tmux binding must
+	// supply every required one.
 	Values Values
 }
 
-// Bindings resolves the configured key bindings over the defaults. A configured binding replaces
-// the default bound to the same key, and one without an action removes it.
+// Bindings lets a configured binding replace the default bound to the same key, and one without
+// an action remove it.
 func Bindings(cfg *config.Config) ([]Binding, error) {
 	bindings := defaultBindings()
 	if cfg == nil {

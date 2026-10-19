@@ -26,15 +26,14 @@ type pendingRestore struct {
 	serverStarted time.Time
 }
 
-// findPendingRestore reports a pending restore for an automatic save of every live session.
-// Saving then would replace the newest snapshot with the new server's scratch state. An explicit
-// session selection is a deliberate save and is never held back. The engine logs an inspection
-// failure and reports nothing, so the save goes ahead.
 func findPendingRestore(ctx context.Context, cmd *cobra.Command, server *gotmux.Server, repo *store.Repository) pendingRestore {
+	// A save of explicitly selected sessions is deliberate and never held back.
 	if explicit, _ := cmd.Flags().GetStringSlice("session"); len(explicit) > 0 {
 		return pendingRestore{sessions: 0, serverStarted: time.Time{}}
 	}
 
+	// Saving every session now would replace the newest snapshot with the new server's scratch
+	// state. An inspection failure is logged by the engine and lets the save go ahead.
 	unrestored := engine.FindUnrestored(ctx, server, repo)
 
 	return pendingRestore{sessions: len(unrestored.Sessions), serverStarted: unrestored.ServerStarted}
@@ -48,10 +47,6 @@ const (
 	pendingRestoreSave
 )
 
-// decidePendingRestore chooses what an automatic save does on a server that lacks saved sessions.
-// A server a restore already targeted is saved again, since a second restore would bring back
-// sessions closed since and holding back would stop every later save. A server no restore reached
-// gets the startup restore once, when it is configured; otherwise the save is held back.
 func decidePendingRestore(ctx context.Context, env Env, server *gotmux.Server, repo *store.Repository, pending pendingRestore) pendingRestoreAction {
 	targeted, err := engine.RestoreTargetedServer(ctx, repo, server)
 	if err != nil {
@@ -60,6 +55,8 @@ func decidePendingRestore(ctx context.Context, env Env, server *gotmux.Server, r
 		return pendingRestoreHold
 	}
 
+	// A second restore would bring back sessions closed since, and holding back would stop every
+	// later save.
 	if targeted {
 		return pendingRestoreSave
 	}
@@ -89,8 +86,6 @@ func pendingEpisodeUnhandled(env Env, pending pendingRestore) (bool, error) {
 	return unhandled, nil
 }
 
-// claimPendingEpisode marks this server start handled and reports whether this call was the one
-// that did, so each unrestored server is warned about or late-restored once.
 func claimPendingEpisode(env Env, pending pendingRestore) (bool, error) {
 	unhandled, err := pendingEpisodeUnhandled(env, pending)
 	if err != nil || !unhandled {

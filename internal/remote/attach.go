@@ -24,8 +24,8 @@ const (
 	maxAttachTimeoutMillis = 24 * 60 * 60 * 1000
 )
 
-// AttachmentPaneOption marks a local pane while it shows a remote attachment, so sesh keys pressed
-// there go on to the remote tmux.
+// AttachmentPaneOption marks a local pane showing a remote attachment, so sesh keys pressed there
+// go on to the remote tmux.
 const AttachmentPaneOption = "@sesh_remote"
 
 var ErrTargetChanged = errors.New("remote attach target changed")

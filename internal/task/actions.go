@@ -55,8 +55,7 @@ func (s *Service) RecordRun(ctx context.Context, id string, run Run) error {
 	return taskError("record_run", err)
 }
 
-// Retitle records the title a task's agent reports and names the task window after it, unless
-// the user renamed the window.
+// Retitle leaves the window name alone when the user renamed the window.
 func (s *Service) Retitle(ctx context.Context, id, title string) (bool, error) {
 	title = windowTitle(title)
 	if title == "" {

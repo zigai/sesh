@@ -1,5 +1,3 @@
-// Package snapfixture commits small native snapshot generations for tests that need a repository
-// with saved sessions but no tmux server.
 package snapfixture
 
 import (
@@ -22,8 +20,7 @@ const (
 	fixtureHeight   = 24
 )
 
-// CommitOneSession opens or creates the repository at repoPath and commits a generation holding a
-// single session named "work".
+// CommitOneSession creates the repository if needed and commits one session named "work".
 func CommitOneSession(t *testing.T, repoPath string) {
 	t.Helper()
 
@@ -57,9 +54,6 @@ func CommitOneSession(t *testing.T, repoPath string) {
 	}
 }
 
-// RegisterRestore records the active restore an interrupted restore leaves behind, from the
-// current generation and aimed at the daemon with pid and birth identity (empty records none).
-// It returns the operation ID.
 func RegisterRestore(t *testing.T, repoPath string, pid int, birth string) string {
 	t.Helper()
 

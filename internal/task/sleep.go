@@ -45,7 +45,6 @@ type Agent struct {
 	PanePID       int
 }
 
-// AgentFinder lists the live agents with native resume evidence AHT tracks in a pane.
 type AgentFinder interface {
 	AgentsIn(ctx context.Context, pane gotmux.PaneID) ([]Agent, error)
 }
@@ -56,15 +55,13 @@ type sleepPlan struct {
 	resume  Resume
 }
 
-// Woken is a task marked awake and the command line that resumes its agent.
 type Woken struct {
 	Record       Record
 	Command      []string
 	AlreadyAwake bool
 }
 
-// Sleep stops the idle agent of a task and leaves a placeholder in its
-// pane. The resume evidence is recorded before the agent is signaled, so a sleep cut short never
+// Sleep records the resume evidence before the agent is signaled, so a sleep cut short never
 // loses the way back.
 func (s *Service) Sleep(ctx context.Context, id string) (Record, error) {
 	record, live, err := s.task(ctx, id)
@@ -111,16 +108,12 @@ func (s *Service) Sleep(ctx context.Context, id string) (Record, error) {
 	return record, nil
 }
 
-// Wake relaunches the sleeping agent of a task through its native resume, replacing the
-// placeholder in its pane.
 func (s *Service) Wake(ctx context.Context, id string) (Woken, error) {
 	return s.wake(ctx, id, func(live Live, woken Woken) error {
 		return s.respawn(ctx, live.AgentPane, woken.Record, woken.Command)
 	})
 }
 
-// WakeHere marks the task awake and returns the command that resumes its agent, for the
-// placeholder in the agent pane to replace itself with.
 func (s *Service) WakeHere(ctx context.Context, id string) (Woken, error) {
 	return s.wake(ctx, id, func(Live, Woken) error { return nil })
 }
@@ -330,8 +323,6 @@ func emptyAgent() Agent {
 	}
 }
 
-// stopAgent signals the agent process after checking it is still the one AHT reported, and waits
-// for it to exit. It never escalates: a harness killed outright may not have saved its session.
 func stopAgent(ctx context.Context, pid int, identity process.Identity, signal syscall.Signal) (bool, error) {
 	current, err := process.ReadIdentity(ctx, pid)
 	if err != nil || current != identity {
@@ -353,6 +344,7 @@ func stopAgent(ctx context.Context, pid int, identity process.Identity, signal s
 		case <-ctx.Done():
 			return true, fmt.Errorf("wait for agent exit: %w", ctx.Err())
 		case <-deadline.C:
+			// Never escalate: a harness killed outright may not have saved its session.
 			return true, ErrAgentDidNotStop
 		case <-ticker.C:
 			current, err := process.ReadIdentity(ctx, pid)

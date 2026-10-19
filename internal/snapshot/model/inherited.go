@@ -13,10 +13,8 @@ const (
 	scopeWindow        = "window"
 )
 
-// CompactInheritedOptions returns a copy without session and window options that tmux reports as
-// inherited with the global value; EffectiveSessionOptions and EffectiveWindowOptions restore
-// them. User ("@") options are never reported as inherited, so they are kept. Pane lists stay
-// complete because they cannot be rebuilt from the window.
+// CompactInheritedOptions drops session and window options tmux reports as inherited, which
+// EffectiveSessionOptions and EffectiveWindowOptions restore; pane lists stay complete.
 func (m Manifest) CompactInheritedOptions() Manifest {
 	compact := m
 
@@ -91,8 +89,6 @@ func withoutSuppliedOptions(options []Option, parent map[string]Option) []Option
 	return kept
 }
 
-// withSuppliedOptions adds the parent options a scope inherits. A local array option, even an
-// empty one, replaces the whole parent array, so no parent element of that array is inherited.
 func withSuppliedOptions(options []Option, parent map[string]Option, scope string) []Option {
 	result := cloneOptions(options)
 	local := make(map[string]bool, len(options))
@@ -101,6 +97,7 @@ func withSuppliedOptions(options []Option, parent map[string]Option, scope strin
 		local[arrayName(string(option.Name))] = true
 	}
 
+	// A local array option, even an empty one, replaces the whole parent array.
 	for name, supplied := range parent {
 		if local[arrayName(name)] {
 			continue

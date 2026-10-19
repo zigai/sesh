@@ -13,11 +13,6 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/model"
 )
 
-// RestoreLaunches decides how task agents come back when a snapshot is restored, following
-// tasks.wake_on_restore. Awake agents it does not resume come back behind the sleeping
-// placeholder, and once the restore commits, their records turn sleeping with the captured
-// native resume command. Agents that were asleep stay asleep because their placeholder is
-// captured like any other restartable application.
 type RestoreLaunches struct {
 	store             Store
 	policy            config.WakePolicy
@@ -40,10 +35,9 @@ func NewRestoreLaunches(store Store, policy config.WakePolicy, placeholderBinary
 	return &RestoreLaunches{store: store, policy: policy, placeholderBinary: placeholderBinary, restored: nil}
 }
 
-// Override replaces the native resume launch of each task agent that wake_on_restore keeps
-// asleep with the placeholder launch, runs the command of each task pane configured to restart
-// again, and starts every launched pane of a task window with the task's environment. It decides
-// from the snapshot and the tasks' records only, so a resumed restore decides the same way.
+// Override puts kept-asleep agents behind the placeholder, reruns restart panes, and gives task
+// panes the task's environment. It reads only the snapshot and the records, so a resumed restore
+// decides the same way.
 func (r *RestoreLaunches) Override(ctx context.Context, manifest model.Manifest) (map[string]model.Launch, error) {
 	r.restored = make(map[string]restoredTask)
 
@@ -139,8 +133,6 @@ func withEnvironment(launch model.Launch, env map[string]string) model.Launch {
 	return launch
 }
 
-// Commit records each restored task's captured agent state and the resume command its
-// placeholder wakes it with. A task finished since is left alone.
 func (r *RestoreLaunches) Commit(ctx context.Context, panes []string) error {
 	if !slices.ContainsFunc(panes, func(pane string) bool {
 		_, found := r.restored[pane]

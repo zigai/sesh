@@ -33,8 +33,6 @@ func NewRecorder(store Store, panes Panes) *Recorder {
 	return &Recorder{store: store, panes: panes, server: "", mu: sync.Mutex{}, known: emptyState(), taskByConversation: map[string]string{}}
 }
 
-// Record records the conversations sessions show. It writes the work state only when a
-// conversation is new or changed since the last write.
 func (r *Recorder) Record(ctx context.Context, sessions []aht.Session) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

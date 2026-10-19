@@ -21,7 +21,6 @@ var (
 	ErrExists      = errors.New("project directory already exists")
 )
 
-// Clone clones url into the first root, in a directory named after the repository.
 func (c Catalog) Clone(ctx context.Context, url string) (Project, error) {
 	dir, err := c.newDirectory(repositoryName(url))
 	if err != nil {
@@ -35,7 +34,6 @@ func (c Catalog) Clone(ctx context.Context, url string) (Project, error) {
 	return gitProject(dir), nil
 }
 
-// Create makes a directory with an empty repository in the first root.
 func (c Catalog) Create(ctx context.Context, name string) (Project, error) {
 	dir, err := c.newDirectory(name)
 	if err != nil {
@@ -75,9 +73,8 @@ func (c Catalog) newDirectory(name string) (string, error) {
 	return dir, nil
 }
 
-// repositoryName is the last path segment of a clone URL without its .git suffix, the name git
-// clone itself would choose.
 func repositoryName(url string) string {
+	// Matches the directory name git clone itself would choose.
 	trimmed := strings.TrimRight(url, "/")
 	if index := strings.LastIndexAny(trimmed, "/:"); index >= 0 {
 		trimmed = trimmed[index+1:]

@@ -16,9 +16,6 @@ import (
 
 var errUnresolvableSubject = errors.New("action subject cannot be selected by name")
 
-// ResolveSubject selects what an action applies to for callers that name their target, such as
-// the command line: sessions by name or ID, or an agent pane by pane ID. Saved sessions come
-// from generation, or the current one when empty.
 func (local *Local) ResolveSubject(ctx context.Context, kind action.SubjectKind, generation string, selectors []string) (action.Subject, error) {
 	subject := action.Subject{At: action.Local(), Sessions: nil, Pane: "", Task: ""}
 

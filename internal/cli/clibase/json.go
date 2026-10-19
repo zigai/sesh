@@ -178,8 +178,6 @@ func JSONCommandName(cmd *cobra.Command) string {
 	return strings.Join(parts, ".")
 }
 
-// JSONErrorCode reports an action failure by its action code. An action failure without a
-// more specific code keeps the detailed code of its cause.
 func JSONErrorCode(err error) string {
 	if classified, ok := errors.AsType[*action.Error](err); ok && classified.Code != action.CodeFailed {
 		return string(classified.Code)
@@ -335,17 +333,12 @@ func WriteCommandError(cmd *cobra.Command, err error) error {
 	return nil
 }
 
-// UncertainCause returns the uncertainty sentinel err carries, or nil. It outranks any other cause
-// in a diagnostic.
 func UncertainCause(err error) error {
 	contract, _ := matchErrorContract(err, uncertainErrors)
 
 	return contract.cause
 }
 
-// HumanErrorMessage is the terminal diagnostic: mapped sentinels keep their wording, configuration
-// errors add their cause, and other causes are reported verbatim so the reader can act on them. JSON envelopes keep the
-// sanitized message from SafeCommandErrorMessage.
 func HumanErrorMessage(err error) string {
 	if msg, ok := HumanConfigurationErrorMessage(err); ok {
 		return msg
@@ -370,8 +363,6 @@ func NotExistMessage(err error) string {
 	return "file or directory does not exist"
 }
 
-// EnvironmentError reports whether err comes from the environment sesh runs in rather than
-// from the command, so its diagnostic can point at the doctor.
 func EnvironmentError(err error) bool {
 	if _, ok := errors.AsType[*ConfigurationError](err); ok {
 		return true

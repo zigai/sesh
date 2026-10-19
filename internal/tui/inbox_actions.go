@@ -203,8 +203,6 @@ func (m *Model) seenError(id action.ID, item inboxItem) error {
 	return nil
 }
 
-// recordedSeenError reports why a closed or finished row cannot be marked seen or unseen: the mark
-// is kept with its recorded conversation on its host.
 func recordedSeenError(id action.ID, item inboxItem) error {
 	switch {
 	case item.work.ID == "":

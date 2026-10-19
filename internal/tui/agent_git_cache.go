@@ -66,7 +66,6 @@ func writeAgentGitCache(path string, entries map[string]agentGitCacheEntry) erro
 	return nil
 }
 
-// fsync would stall popup shutdown under disk pressure; a cache a crash leaves unreadable is rebuilt.
 func replaceCacheUnsynced(dir *privatefs.Dir, name string, data []byte) error {
 	temporary := ".agent-git-" + rand.Text() + ".tmp"
 
@@ -75,6 +74,7 @@ func replaceCacheUnsynced(dir *privatefs.Dir, name string, data []byte) error {
 		return oops.In("tui").Code("git_cache_failed").With("operation", "create_temp_file").Wrap(err)
 	}
 
+	// No fsync: it would stall popup shutdown under disk pressure, and an unreadable cache is rebuilt.
 	_, writeErr := file.Write(data)
 	closeErr := file.Close()
 

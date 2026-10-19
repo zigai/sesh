@@ -82,7 +82,6 @@ var (
 	})
 )
 
-// AgentMerge merges the branch an agent works on when it is not a sesh task.
 var AgentMerge = define(Descriptor{
 	ID:      "agent.merge",
 	Title:   "Merge branch",
@@ -254,8 +253,7 @@ func defineWorkAction(id ID, done, title, summary, help string, params ...Param)
 	}, func(out ChangedWork) string { return done + " " + out.Item })
 }
 
-// reportFocusedPane is silent: navigation runs from tmux key bindings, where any output would
-// cover the pane it just focused.
 func reportFocusedPane(FocusedPane) string {
+	// Navigation runs from tmux key bindings, where any output would cover the focused pane.
 	return ""
 }

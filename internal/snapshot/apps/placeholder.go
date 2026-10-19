@@ -14,14 +14,10 @@ const (
 
 var placeholderTask = regexp.MustCompile(`^t[1-9][0-9]*$`)
 
-// PlaceholderArguments are the arguments after the sesh executable of the pane that holds a
-// sleeping task's place until it is woken.
 func PlaceholderArguments(task string) []string {
 	return []string{"task", "placeholder", task}
 }
 
-// PlaceholderLaunch is the launch that shows a sleeping task's placeholder with the given sesh
-// executable, in the directory and environment of the agent it stands in for.
 func PlaceholderLaunch(executable, task string, agent model.Launch) model.Launch {
 	argv := append([]string{seshName}, PlaceholderArguments(task)...)
 

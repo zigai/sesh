@@ -10,7 +10,6 @@ import (
 
 const defaultDirMode = 0o755
 
-// SystemConfigPath is the system-wide configuration, layered below the user's.
 const SystemConfigPath = "/etc/sesh/config.toml"
 
 var ErrNilConfig = errors.New("config is nil")

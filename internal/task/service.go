@@ -48,8 +48,6 @@ var (
 	ErrDefaultShell   = errors.New("tmux default-shell is not set")
 )
 
-// Place is where a task command was invoked: the pane, its session and directory, the project of
-// a project session, and the task of a task window.
 type Place struct {
 	Pane    gotmux.PaneID
 	Session gotmux.SessionID
@@ -59,12 +57,10 @@ type Place struct {
 }
 
 type Options struct {
-	Server  *gotmux.Server
-	Store   Store
-	Catalog project.Catalog
-	Config  config.TasksConfig
-	// Windows returns the task window configuration of the project at a root, or of a loose task
-	// for an empty root.
+	Server               *gotmux.Server
+	Store                Store
+	Catalog              project.Catalog
+	Config               config.TasksConfig
 	Windows              func(project string) config.TaskWindow
 	WorktreeDir          string
 	LookPath             func(string) (string, error)
@@ -126,11 +122,6 @@ func (s *Service) Locate(ctx context.Context, pane gotmux.PaneID) (Place, error)
 	return Place{Pane: info.ID, Session: session, Dir: info.CurrentPath, Project: string(projectRoot), Task: string(taskID)}, nil
 }
 
-// Start creates a task at place running the requested harness. In a project session or a
-// repository the task works in the requested location, one the project currently offers, with a
-// window in the pane's session, next to the current window outside a project session; elsewhere
-// it is a loose task in the pane's directory, next to the current window. A title names the task
-// and is passed to the agent as its first prompt when its harness says how.
 func (s *Service) Start(ctx context.Context, place Place, request Request) (Record, error) {
 	offered, err := s.harness(request.Harness)
 	if err != nil {
@@ -167,8 +158,6 @@ func (s *Service) OpenTab(ctx context.Context, place Place) error {
 	return taskError("open_tab", err)
 }
 
-// RunWindow opens a window after the current one in a session that runs argv in dir through the
-// user's shell, which stays in the pane once argv exits, and returns the window's pane.
 func RunWindow(ctx context.Context, server *gotmux.Server, sessionID gotmux.SessionID, dir string, argv []string) (gotmux.PaneID, error) {
 	session, err := server.Session(ctx, sessionID)
 	if err != nil {
@@ -401,9 +390,6 @@ func (s *Service) addWorktree(ctx context.Context, root string, record Record) e
 	return nil
 }
 
-// openTaskWindow opens a task's window in place's session running launch, with the panes and
-// layout of its project. A session no client shows is laid out for the size of place's window,
-// the size the user is likely to see it at.
 func (s *Service) openTaskWindow(
 	ctx context.Context,
 	place Place,
@@ -417,6 +403,7 @@ func (s *Service) openTaskWindow(
 		return fmt.Errorf("find task session: %w", err)
 	}
 
+	// A session no client shows is laid out for place's window, where the user will likely see it.
 	shownAt, err := s.hiddenSessionSize(ctx, session, place.Pane)
 	if err != nil {
 		return err
@@ -563,14 +550,13 @@ func defaultShell(ctx context.Context, server *gotmux.Server) (string, error) {
 	return shell, nil
 }
 
-// shellProgram runs argv in the user's interactive shell, so its functions apply as when the
-// user types the command, and then that shell in the same pane, so an agent or editor that exits
-// leaves a usable shell where it ran. Interrupts reach argv, not the wrapper.
 func shellProgram(shell string, argv []string) gotmux.Program {
 	if len(argv) == 0 {
 		return gotmux.Program{}
 	}
 
+	// An interactive shell so the user's functions apply, kept afterwards so an agent that exits
+	// leaves a usable shell. Interrupts reach argv, not the wrapper.
 	command := shellArgv(shell, argv)
 
 	return gotmux.Exec(command[0], command[1:]...)

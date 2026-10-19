@@ -50,9 +50,6 @@ type ghPR struct {
 	ClosedAt  time.Time `json:"closedAt"`
 }
 
-// Sync drops the work items whose directory is gone and those finished longer than
-// finishedRetention ago, and brings the branch and pull requests of the others up to date. It
-// reports whether anything changed.
 func Sync(ctx context.Context, store Store) (bool, error) {
 	state, err := store.Load(ctx)
 	if err != nil {
@@ -73,8 +70,6 @@ func Sync(ctx context.Context, store Store) (bool, error) {
 	return changed, err
 }
 
-// SyncEvery runs Sync every interval until ctx ends. It logs a failing sync once, until a sync
-// succeeds again.
 func SyncEvery(ctx context.Context, store Store, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -286,9 +281,8 @@ func branchOf(ctx context.Context, dir string) string {
 	return strings.TrimSpace(branch)
 }
 
-// projectOf is the root of the main checkout of the repository dir is in, which a linked worktree
-// shares, or empty outside a repository.
 func projectOf(ctx context.Context, dir string) string {
+	// A linked worktree shares the main checkout's common dir.
 	common, err := git.Output(ctx, dir, "rev-parse", "--path-format=absolute", "--git-common-dir")
 	if err != nil {
 		return ""
@@ -317,8 +311,6 @@ func defaultBranch(ctx context.Context, dir string) string {
 	return branch
 }
 
-// branchPR returns the pull request gh lists for branch, from this repository rather than a fork.
-// No pull request is a zero one.
 func branchPR(ctx context.Context, dir, branch string) (PRLink, error) {
 	var listed []ghPR
 

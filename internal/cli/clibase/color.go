@@ -7,8 +7,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// ColorOutput reports whether command output may carry ANSI color: CLICOLOR_FORCE forces it,
-// NO_COLOR, NOCOLOR and TERM=dumb turn it off, and otherwise stdout must be a terminal.
 func ColorOutput(cmd *cobra.Command) bool {
 	if os.Getenv("NO_COLOR") != "" || os.Getenv("NOCOLOR") != "" || os.Getenv("TERM") == "dumb" {
 		return false

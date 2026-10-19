@@ -66,17 +66,14 @@ var (
 	TaskActionVariables = []string{"task", "title", "branch", "base", "project", "worktree"}
 )
 
-// MenuConfig lists the entries of the row menus in order: built-in entries by name, "-" for a
-// divider, "items" for every menu item not listed by name, or a menu item's name. Items are the
-// user-defined entries, which run on tasks.
+// MenuConfig entries are built-in entry names, "-" for a divider, "items" for every menu item not
+// listed by name, or a menu item's name.
 type MenuConfig struct {
 	Agent   []string                  `toml:"agent"`
 	Session []string                  `toml:"session"`
 	Items   map[string]MenuItemConfig `toml:"items"`
 }
 
-// MenuItemConfig is a user-defined action on a task: a command run headless in the task's
-// worktree, with an optional prompt passed as its last argument.
 type MenuItemConfig struct {
 	Label      string   `toml:"label"`
 	Key        string   `toml:"key"`
@@ -86,25 +83,22 @@ type MenuItemConfig struct {
 	LinkPR     *bool    `toml:"link_pr"`
 }
 
-// MergeConfig configures the merge action. Check runs in the checkout after the rebase and before
-// the push; a failing check stops the merge.
 type MergeConfig struct {
+	// Check runs in the checkout after the rebase and before the push; failing stops the merge.
 	Check []string `toml:"check"`
 }
 
-// FinishConfig configures finishing a task. Run runs in the task's worktree before sesh removes
-// it; a failing run stops the finish, and a finish can skip it. It never runs in a main checkout.
 type FinishConfig struct {
+	// Run runs in the task's worktree before sesh removes it, never in a main checkout; failing
+	// stops the finish unless the finish skips it.
 	Run []string `toml:"run"`
 }
 
-// WakePolicy is a parsed tasks.wake_on_restore.
 type WakePolicy struct {
 	all    bool
 	newest int
 }
 
-// ProjectConfig holds settings for one project. A Merge or Finish it sets replaces the global one.
 type ProjectConfig struct {
 	MenuItems   map[string]MenuItemConfig `toml:"menu_items"`
 	Merge       *MergeConfig              `toml:"merge"`
@@ -141,9 +135,6 @@ func (a MenuItemConfig) LinksPR() bool {
 	return a.LinkPR != nil && *a.LinkPR
 }
 
-// MenuItemsFor returns the menu items of the project at root: the global ones with the
-// project's overrides applied field by field. An override that sets a prompt or prompt file
-// replaces both.
 func (c *Config) MenuItemsFor(root string) map[string]MenuItemConfig {
 	return c.menuItems(c.ProjectOverride(root))
 }
@@ -164,8 +155,6 @@ func (c *Config) FinishRunFor(root string) []string {
 	return slices.Clone(c.Finish.Run)
 }
 
-// ProjectOverride returns the overrides of the project at root: those keyed by its path, else
-// those keyed by its directory name. A path key tells apart projects with the same name.
 func (c *Config) ProjectOverride(root string) ProjectConfig {
 	if root == "" {
 		return ProjectConfig{MenuItems: nil, Merge: nil, Finish: nil, TaskPanes: nil, TaskLayouts: nil}
@@ -193,8 +182,6 @@ func (c *Config) menuItems(override ProjectConfig) map[string]MenuItemConfig {
 	return items
 }
 
-// ValidateMenu checks the menu lists, the global menu items and every project's overrides. A
-// project's items are checked after its overrides are applied, so an override may complete an item.
 func ValidateMenu(cfg *Config) error {
 	if err := validateMenuItemSet("menu.items", cfg.Menu.Items, true); err != nil {
 		return err
@@ -274,7 +261,6 @@ func ParseWakeOnRestore(value string) (WakePolicy, error) {
 	return WakePolicy{}, errWakeOnRestoreInvalid
 }
 
-// Resumes returns how many of awake task agents, newest first, the policy resumes.
 func (p WakePolicy) Resumes(awake int) int {
 	if p.all {
 		return awake

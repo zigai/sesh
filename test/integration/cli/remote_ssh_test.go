@@ -311,7 +311,7 @@ func writeRemoteSSHWrapper(t *testing.T, path, argumentLog, ssh, clientConfig st
 	t.Helper()
 
 	body := fmt.Sprintf("#!/bin/sh\nprintf '%%s\\n' \"$@\" > %q\nexec %q -F %q \"$@\"\n", argumentLog, ssh, clientConfig)
-	if err := os.WriteFile(path, []byte(body), 0o700); err != nil { //nolint:gosec // executable fixture is isolated beneath t.TempDir.
+	if err := os.WriteFile(path, []byte(body), 0o700); err != nil {
 		t.Fatal(err)
 	}
 }

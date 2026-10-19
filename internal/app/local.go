@@ -1,7 +1,5 @@
 //go:build linux || darwin
 
-// Package app runs actions on this machine. It is the composition root that connects action
-// definitions to the services that own each operation.
 package app
 
 import (
@@ -65,9 +63,7 @@ type Repository struct {
 
 type handler func(ctx context.Context, caller action.Caller, input any) (any, error)
 
-// NewLocal wires every registered action to its handler. A registered action without a
-// handler is a programming error, so construction panics instead of failing at dispatch.
-// Interactive actions belong to the front end that owns the invoking client.
+// NewLocal panics when a registered action other than an interactive or picker one has no handler.
 func NewLocal(opts LocalOptions) *Local {
 	cfg := opts.Config
 	if cfg == nil {
@@ -116,7 +112,7 @@ func NewLocal(opts LocalOptions) *Local {
 	return local
 }
 
-// NewRepository returns a lazily opened repository handle; an empty path means no repository.
+// NewRepository treats an empty path as no repository.
 func NewRepository(path string) *Repository {
 	return &Repository{path: path, mu: sync.Mutex{}, repo: nil}
 }
@@ -228,15 +224,13 @@ func (repository *Repository) open(ctx context.Context, create bool) (*store.Rep
 	return repo, true, nil
 }
 
-// useRepository attaches the repository to the workflow for actions that touch saved state.
-// The handle keeps the repository it opened, and actions may run concurrently, so the shared
-// workflow is given it once.
 func (local *Local) useRepository(ctx context.Context, create bool) (*store.Repository, bool, error) {
 	repo, found, err := local.repository.open(ctx, create)
 	if err != nil || !found {
 		return nil, false, err
 	}
 
+	// Actions may run concurrently, so the shared workflow is given the repository once.
 	local.attachRepo.Do(func() { local.workflow.SetRepository(repo) })
 
 	return repo, true, nil

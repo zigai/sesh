@@ -10,8 +10,6 @@ import (
 
 const MaxTasks = 4096
 
-// TaskRow is a task on a peer: its record and where its window is in the peer's tmux. The
-// record carries no resume command; waking happens on the peer.
 type TaskRow struct {
 	Record      task.Record `json:"record"`
 	Present     bool        `json:"present"`

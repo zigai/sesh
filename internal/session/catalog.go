@@ -36,8 +36,6 @@ var (
 
 type CatalogStatus string
 
-// SavedSnapshots reads the generations a catalog lists saved sessions from. Both a durable
-// *store.Repository and a lock-free *store.View satisfy it.
 type SavedSnapshots interface {
 	ReadCurrentListing(ctx context.Context) (store.Listing, error)
 	ReadListing(ctx context.Context, id string) (store.Listing, error)

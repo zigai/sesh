@@ -21,14 +21,10 @@ const (
 	CodeFailed          Code = "failed"
 )
 
-// ExitCodeCanceled is the exit status of a command whose action was canceled, including by a stop
-// request to a service that runs it.
 const ExitCodeCanceled = 130
 
 var errUnspecified = errors.New("action failed")
 
-// Code classifies an action failure the same way for every caller: CLI exit status and JSON,
-// picker status text and remote results.
 type Code string
 
 type Error struct {
@@ -59,7 +55,6 @@ func (e *Error) Unwrap() error {
 	return e.Err
 }
 
-// Wrap classifies err. An already classified error keeps its code.
 func Wrap(code Code, err error) error {
 	if err == nil {
 		err = errUnspecified
@@ -72,7 +67,6 @@ func Wrap(code Code, err error) error {
 	return &Error{Code: code, Err: err}
 }
 
-// CodeOf reports the classification of err; unclassified errors are failures.
 func CodeOf(err error) Code {
 	if err == nil {
 		return ""

@@ -29,17 +29,11 @@ var (
 
 type EvidenceKind string
 
-// Evidence is one item of a report's Evidence section: a URL, or a file path that is absolute,
-// under "~/", or made absolute against the agent's directory.
 type Evidence struct {
 	Target string
 	Kind   EvidenceKind
 }
 
-// ParseEvidence lists the items of the Evidence section of an agent's report, in order and once
-// each. The section starts at an "**Evidence**" or "## Evidence" line and ends at the next
-// heading. Each list item gives its link targets, else its code spans, else the words that look
-// like a URL or a path.
 func ParseEvidence(report, dir string) []Evidence {
 	var items []Evidence
 

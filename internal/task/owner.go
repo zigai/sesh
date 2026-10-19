@@ -8,8 +8,8 @@ import (
 	"github.com/zigai/sesh/internal/integration/process"
 )
 
-// Stalled reports whether a task is creating or finishing while the process that started that
-// is gone, so nothing will complete it. A process that cannot be checked counts as running.
+// Stalled reports a creating or finishing task whose owner process is gone. A process that
+// cannot be checked counts as running.
 func Stalled(ctx context.Context, record Record) bool {
 	if record.State != StateCreating && record.State != StateFinishing {
 		return false

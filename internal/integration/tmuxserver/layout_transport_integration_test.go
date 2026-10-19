@@ -21,6 +21,8 @@ func startCliServer(t *testing.T) string {
 	t.Helper()
 
 	socketPath := filepath.Join(t.TempDir(), "cli.sock")
+	// Cleanups run in reverse, so the server dies before TempDir removes its socket directory and
+	// strands the daemon.
 	t.Cleanup(func() { killCliServer(t, socketPath) })
 
 	for _, args := range [][]string{
@@ -39,8 +41,6 @@ func startCliServer(t *testing.T) string {
 	return socketPath
 }
 
-// killCliServer stops the server started through the tmux CLI before its socket directory is
-// removed, which would otherwise leave the daemon running without a reachable socket.
 func killCliServer(t *testing.T, socketPath string) {
 	t.Helper()
 

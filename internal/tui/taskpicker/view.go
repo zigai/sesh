@@ -93,8 +93,6 @@ type placed struct {
 	end   int
 }
 
-// Size is the popup size that shows options without truncating them, up to the widest the
-// picker grows; a longer list scrolls.
 func Size(cfg *config.Config, opts Options) (int, int) {
 	probe := NewModel(cfg, opts)
 	width := probe.bodyWidth()
@@ -577,7 +575,6 @@ func (s section) label() string {
 	}
 }
 
-// taskName shows an untitled task, whose title is its number, as task and the number.
 func taskName(title string) string {
 	if title != "" && strings.IndexFunc(title, func(r rune) bool { return !unicode.IsDigit(r) }) < 0 {
 		return "task " + title

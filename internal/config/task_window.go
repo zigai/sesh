@@ -54,21 +54,14 @@ var (
 	}
 )
 
-// TaskPaneConfig is a pane a task window opens beside the agent. Command runs in the user's
-// interactive shell with task variables filled in; without one the pane is a shell. Dir is
-// relative to the task's directory. A restart pane runs its command again after a snapshot
-// restore.
 type TaskPaneConfig struct {
 	Name    string   `toml:"name"`
 	Command []string `toml:"command"`
-	Dir     string   `toml:"dir"`
-	Restart bool     `toml:"restart"`
+	// Dir is relative to the task's directory.
+	Dir     string `toml:"dir"`
+	Restart bool   `toml:"restart"`
 }
 
-// TaskLayoutConfig arranges a task window's panes. A window takes the first layout whose When
-// matches it. Arrange applies a tmux layout to the agent and Panes, the agent as its main pane;
-// Splits place each pane by splitting the agent or an earlier pane instead. Focus is the pane
-// selected when the window opens.
 type TaskLayoutConfig struct {
 	Name     string            `toml:"name"`
 	When     TaskLayoutWhen    `toml:"when"`
@@ -79,9 +72,8 @@ type TaskLayoutConfig struct {
 	Focus    string            `toml:"focus"`
 }
 
-// TaskLayoutWhen is what a task window must be for a layout to apply. Zero values match any
-// window. A landscape window is at least twice as many columns wide as it is rows tall, which is
-// about as wide as tall on screen.
+// TaskLayoutWhen zero values match any window. A landscape window has at least twice as many
+// columns as rows, which is about as wide as tall on screen.
 type TaskLayoutWhen struct {
 	Orientation string   `toml:"orientation"`
 	MinWidth    int      `toml:"min_width"`
@@ -91,7 +83,6 @@ type TaskLayoutWhen struct {
 	Harness     []string `toml:"harness"`
 }
 
-// TaskSplitConfig places Pane by splitting Of in Direction; Size is the new pane's.
 type TaskSplitConfig struct {
 	Pane      string `toml:"pane"`
 	Of        string `toml:"of"`
@@ -104,14 +95,12 @@ type TaskWindow struct {
 	Layouts []TaskLayoutConfig
 }
 
-// PaneSize is a size in cells or a percentage of the space split; zero for both splits it evenly.
+// PaneSize zero in both fields splits the space evenly.
 type PaneSize struct {
 	Cells   int
 	Percent int
 }
 
-// DefaultTaskLayouts are used without configured layouts: the agent beside the other panes in a
-// landscape window, above them otherwise.
 func DefaultTaskLayouts() []TaskLayoutConfig {
 	return []TaskLayoutConfig{
 		{
@@ -125,10 +114,6 @@ func DefaultTaskLayouts() []TaskLayoutConfig {
 	}
 }
 
-// TaskWindowFor returns the task window of the project at root, or of a loose task for an empty
-// root: the global panes with the project's panes replacing those of the same name and adding
-// the others, and the project's layouts if it sets them, else the global ones. An empty list of
-// layouts means DefaultTaskLayouts.
 func (c *Config) TaskWindowFor(root string) TaskWindow {
 	return c.taskWindow(c.ProjectOverride(root))
 }
@@ -156,7 +141,6 @@ func (c *Config) taskWindow(override ProjectConfig) TaskWindow {
 	return TaskWindow{Panes: panes, Layouts: cloneTaskLayouts(layouts)}
 }
 
-// Placed returns the panes a layout places besides the agent, in the order it places them.
 func (w TaskWindow) Placed(layout TaskLayoutConfig) []string {
 	if len(layout.Splits) > 0 {
 		placed := make([]string, 0, len(layout.Splits))
@@ -205,7 +189,6 @@ func (w TaskLayoutWhen) Matches(width, height int, harness string) bool {
 	}
 }
 
-// ParsePaneSize reads a pane size: cells such as "80", a percentage such as "40%", or empty.
 func ParsePaneSize(size string) (PaneSize, error) {
 	if size == "" {
 		return PaneSize{Cells: 0, Percent: 0}, nil
@@ -244,8 +227,6 @@ func (l TaskLayoutConfig) Clone() TaskLayoutConfig {
 	return clone
 }
 
-// ValidateTaskWindows checks the global task window and the window of every project with
-// overrides, after the overrides are applied.
 func ValidateTaskWindows(cfg *Config) error {
 	harnesses := cfg.harnessNames()
 

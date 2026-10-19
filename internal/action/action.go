@@ -62,14 +62,11 @@ type (
 	LocationKind uint8
 )
 
-// Location names the machine an action runs on: this one, a configured peer, or the origin
-// machine of a reverse bridge.
 type Location struct {
 	Kind       LocationKind
 	Connection string
 }
 
-// Caller is the tmux context that invoked an action. Actions that move a client need it.
 type Caller struct {
 	Client  string
 	Pane    string
@@ -89,9 +86,6 @@ type Env struct {
 	Accepts func(Location, ID) bool
 }
 
-// Descriptor describes an action to every front end. NeedsClient actions act on the invoking
-// tmux client. Interactive actions take over that client's display, so the front end that owns
-// it runs them instead of the machine's executor.
 type Descriptor struct {
 	ID          ID
 	Title       string
@@ -110,8 +104,6 @@ type Descriptor struct {
 	check    func(Subject) error
 }
 
-// Entry is a registered action without its type parameters, for callers that select actions
-// by ID: the picker, key bindings and the remote protocol.
 type Entry interface {
 	Describe() Descriptor
 	BindAny(subject Subject, values Values) (any, error)
@@ -134,7 +126,6 @@ type Dispatcher interface {
 	Dispatch(ctx context.Context, invocation Invocation) (any, error)
 }
 
-// Dispatchers runs each invocation on the first dispatcher that accepts it.
 type Dispatchers []Dispatcher
 
 type Router struct {
@@ -189,8 +180,8 @@ func (descriptor Descriptor) Param(name string) (Param, bool) {
 	return missing, false
 }
 
-// Available reports whether the action can run on subject. It reads only the subject and the
-// dispatcher's capabilities, so menus may call it on every render; Run validates again.
+// Available reads only the subject and the dispatcher's capabilities, so menus may call it on
+// every render; Run validates again.
 func (descriptor Descriptor) Available(env Env, subject Subject) error {
 	if err := descriptor.matchSubject(subject); err != nil {
 		return err
@@ -259,7 +250,6 @@ func Peer(connection string) Location {
 	return Location{Kind: LocationPeer, Connection: connection}
 }
 
-// Origin is the machine that attached to this one through the reverse bridge.
 func Origin() Location {
 	return Location{Kind: LocationOrigin, Connection: ""}
 }
@@ -286,7 +276,7 @@ func SubjectOf(sessions ...session.Session) Subject {
 	return Subject{At: at, Sessions: sessions, Pane: "", Task: ""}
 }
 
-// SelectSession finds the session a person named: an exact ID first, then a name.
+// SelectSession matches an exact ID before a name.
 func SelectSession(rows []session.Session, selector string) (session.Session, error) {
 	if index := slices.IndexFunc(rows, func(row session.Session) bool { return row.ID == selector }); index >= 0 {
 		return rows[index], nil
@@ -305,7 +295,6 @@ func Lookup(id ID) (Entry, bool) {
 	return entry, ok
 }
 
-// All returns every registered action in declaration order.
 func All() []Entry {
 	entries := make([]Entry, 0, len(order))
 	for _, id := range order {
@@ -315,8 +304,8 @@ func All() []Entry {
 	return entries
 }
 
-// Run dispatches a typed invocation. On partial or uncertain failures the output describes
-// what is known alongside the error.
+// Run returns, on partial or uncertain failures, an output that describes what is known
+// alongside the error.
 func Run[In, Out any](
 	ctx context.Context,
 	dispatcher Dispatcher,

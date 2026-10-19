@@ -9,10 +9,6 @@ import (
 	"github.com/godbus/dbus/v5"
 )
 
-// boundedSignalHandler replaces godbus's default signal handler for the owned
-// logind connection. The default handler starts a goroutine whenever a
-// registered channel is full; lifecycle admission instead fails closed on the
-// first bounded-queue overflow.
 type boundedSignalHandler struct {
 	mu            sync.Mutex
 	registrations map[chan<- *dbus.Signal]struct{}
@@ -50,6 +46,8 @@ func (h *boundedSignalHandler) DeliverSignal(_ string, _ string, signal *dbus.Si
 		case <-h.overflow:
 			return
 		default:
+			// godbus's default handler would start a goroutine per full channel; admission fails
+			// closed on the first overflow instead.
 			delete(h.received, signal)
 			h.failed = true
 			close(h.overflow)

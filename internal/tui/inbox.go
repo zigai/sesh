@@ -44,9 +44,6 @@ const (
 	taskRunPollInterval  = time.Second
 )
 
-// TaskSource lists the recorded tasks with their live tmux location, and brings their records
-// up to date: the pull request of each branch, and window titles from the titles agents report,
-// keyed by task.
 type TaskSource interface {
 	LoadTasks(ctx context.Context) ([]task.Live, error)
 	SyncTasks(ctx context.Context, titles map[string]string) (bool, error)
@@ -406,8 +403,6 @@ func (m *Model) unmergedItem(item inboxItem) bool {
 	return m.inboxPR(item) != ""
 }
 
-// inboxPR is the pull request of a row: the open one gh lists for its branch, else the one its
-// task records with that pull request's state when it is no longer open.
 func (m *Model) inboxPR(item inboxItem) string {
 	if item.agent.Host == "" && item.agent.PaneID != "" {
 		if cell := m.providerRunner.Cell(providers.GH, item.agent.PaneID, display.FieldAgentPR); cell.Text != "" {

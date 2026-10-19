@@ -18,8 +18,8 @@ type Policy struct {
 	AllowRemote bool
 }
 
-// PolicyFor resolves an action's configured policy over its defaults: destructive actions ask
-// for confirmation, and peers accept only actions that are remote by default.
+// PolicyFor defaults to confirming destructive actions and letting peers run only actions that
+// are remote by default; configuration overrides both, except for RemoteNever actions.
 func PolicyFor(cfg *config.Config, descriptor Descriptor) Policy {
 	policy := Policy{Confirm: descriptor.Destructive, AllowRemote: descriptor.Remote == RemoteOnByDefault}
 
@@ -43,8 +43,6 @@ func PolicyFor(cfg *config.Config, descriptor Descriptor) Policy {
 	return policy
 }
 
-// ValidateConfig rejects [actions] entries that name no registered action or allow remote use
-// of an action that cannot run on a peer, and key bindings that cannot run their action.
 func ValidateConfig(cfg *config.Config) error {
 	if cfg == nil {
 		return nil

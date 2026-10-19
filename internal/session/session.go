@@ -35,12 +35,9 @@ const (
 	AgentStatusFailed      AgentStatus = "failed"
 	AgentStatusInterrupted AgentStatus = "interrupted"
 	AgentStatusUnknown     AgentStatus = "unknown"
-	// AgentStatusSleeping and AgentStatusMerged describe task rows whose agent sesh stopped or
-	// whose pull request was merged or closed.
-	AgentStatusSleeping AgentStatus = "sleeping"
-	AgentStatusMerged   AgentStatus = "merged"
-	// AgentStatusClosed describes a recorded conversation whose agent no longer runs.
-	AgentStatusClosed AgentStatus = "closed"
+	AgentStatusSleeping    AgentStatus = "sleeping"
+	AgentStatusMerged      AgentStatus = "merged"
+	AgentStatusClosed      AgentStatus = "closed"
 )
 
 type (
@@ -124,43 +121,39 @@ type AgentSession struct {
 	RegistryID     string `json:"registryId,omitempty"`
 	Harness        string `json:"harness,omitempty"`
 	HarnessSession string `json:"harnessSession,omitempty"`
-	// SessionID is the harness's own ID of the conversation, which its native resume and
-	// conversation history use.
-	SessionID string `json:"sessionId,omitempty"`
-	// Host is the remote connection of the machine the agent runs on, empty for this machine.
-	// Views that list the agents of several machines together set it.
-	Host             string `json:"-"`
-	PaneID           string `json:"paneId,omitempty"`
-	PanePID          int    `json:"panePid,omitempty"`
-	CWD              string `json:"cwd,omitempty"`
-	ProjectRoot      string `json:"projectRoot,omitempty"`
-	GitBranch        string `json:"gitBranch,omitempty"`
-	Worktree         string `json:"worktree,omitempty"`
-	GitRepo          string `json:"gitRepo,omitempty"`
-	GitHasRemote     bool   `json:"gitHasRemote,omitempty"`
-	GitChanges       string `json:"gitChanges,omitempty"`
-	LinkedWorktree   bool   `json:"linkedWorktree,omitempty"`
-	GitAhead         int    `json:"gitAhead,omitempty"`
-	GitBehind        int    `json:"gitBehind,omitempty"`
-	GitTrackingKnown bool   `json:"gitTrackingKnown,omitempty"`
-	GitStash         int    `json:"gitStash,omitempty"`
-	GitConflicts     int    `json:"gitConflicts,omitempty"`
-	GitDirty         bool   `json:"gitDirty,omitempty"`
-	// GitUnmerged counts the commits of the agent's checkout that origin's default branch lacks.
-	GitUnmerged   int             `json:"gitUnmerged,omitempty"`
-	SessionPath   string          `json:"sessionPath,omitempty"`
-	Executable    string          `json:"executable,omitempty"`
-	PID           int             `json:"pid,omitempty"`
-	Status        AgentStatus     `json:"status,omitempty"`
-	InitialIdle   bool            `json:"initialIdle,omitempty"`
-	StatusSince   time.Time       `json:"statusSince"`
-	Model         string          `json:"model,omitempty"`
-	WaitingReason string          `json:"waitingReason,omitempty"`
-	FailureReason string          `json:"failureReason,omitempty"`
-	Detail        aht.StateDetail `json:"detail,omitzero"`
-	LastTool      string          `json:"lastTool,omitempty"`
-	Task          string          `json:"task,omitempty"`
-	PromptAt      time.Time       `json:"promptAt,omitzero"`
+	SessionID      string `json:"sessionId,omitempty"`
+	// Host is empty for this machine and set only by views that list several machines' agents.
+	Host             string          `json:"-"`
+	PaneID           string          `json:"paneId,omitempty"`
+	PanePID          int             `json:"panePid,omitempty"`
+	CWD              string          `json:"cwd,omitempty"`
+	ProjectRoot      string          `json:"projectRoot,omitempty"`
+	GitBranch        string          `json:"gitBranch,omitempty"`
+	Worktree         string          `json:"worktree,omitempty"`
+	GitRepo          string          `json:"gitRepo,omitempty"`
+	GitHasRemote     bool            `json:"gitHasRemote,omitempty"`
+	GitChanges       string          `json:"gitChanges,omitempty"`
+	LinkedWorktree   bool            `json:"linkedWorktree,omitempty"`
+	GitAhead         int             `json:"gitAhead,omitempty"`
+	GitBehind        int             `json:"gitBehind,omitempty"`
+	GitTrackingKnown bool            `json:"gitTrackingKnown,omitempty"`
+	GitStash         int             `json:"gitStash,omitempty"`
+	GitConflicts     int             `json:"gitConflicts,omitempty"`
+	GitDirty         bool            `json:"gitDirty,omitempty"`
+	GitUnmerged      int             `json:"gitUnmerged,omitempty"`
+	SessionPath      string          `json:"sessionPath,omitempty"`
+	Executable       string          `json:"executable,omitempty"`
+	PID              int             `json:"pid,omitempty"`
+	Status           AgentStatus     `json:"status,omitempty"`
+	InitialIdle      bool            `json:"initialIdle,omitempty"`
+	StatusSince      time.Time       `json:"statusSince"`
+	Model            string          `json:"model,omitempty"`
+	WaitingReason    string          `json:"waitingReason,omitempty"`
+	FailureReason    string          `json:"failureReason,omitempty"`
+	Detail           aht.StateDetail `json:"detail,omitzero"`
+	LastTool         string          `json:"lastTool,omitempty"`
+	Task             string          `json:"task,omitempty"`
+	PromptAt         time.Time       `json:"promptAt,omitzero"`
 }
 
 func (s AgentStatus) DisplayStatus() AgentStatus {

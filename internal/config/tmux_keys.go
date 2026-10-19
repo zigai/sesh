@@ -13,8 +13,8 @@ const (
 	tmuxModifierOrder = "CMS"
 )
 
-// TmuxKeyName writes a tmux key the way tmux lists it, so differently written forms of one key
-// compare equal: modifiers in C-M-S order, ^x as C-x, and F13 to F24 as shifted F1 to F12.
+// TmuxKeyName writes a key the way tmux lists it: modifiers in C-M-S order, ^x as C-x, and F13 to
+// F24 as shifted F1 to F12.
 func TmuxKeyName(key string) string {
 	held, base := splitTmuxModifiers(strings.TrimSpace(key))
 

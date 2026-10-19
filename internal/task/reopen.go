@@ -14,9 +14,6 @@ var (
 	ErrTaskDirectoryMissing = errors.New("task directory no longer exists")
 )
 
-// Reopen opens the window of a task that has none, in place's session, with its project's panes
-// and layout. A sleeping task's agent resumes through its recorded native resume command; any
-// other task starts a new agent. A task that has a window keeps it.
 func (s *Service) Reopen(ctx context.Context, place Place, id string) (Record, error) {
 	record, err := s.record(ctx, id)
 	if err != nil {

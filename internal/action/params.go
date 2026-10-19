@@ -33,8 +33,6 @@ type (
 	Suggestion uint8
 )
 
-// Param is one input an action takes besides its subject. The same list drives CLI flags and
-// arguments, picker prompts and key binding arguments.
 type Param struct {
 	Name       string
 	Kind       ParamKind

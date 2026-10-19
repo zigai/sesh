@@ -24,8 +24,8 @@ type Observation struct {
 	Birth      Identity
 	Executable []byte
 
-	// ExecutableDeleted is true only if positive evidence (nlink==0) confirms the
-	// executable inode was unlinked from disk.
+	// ExecutableDeleted is true only when the executable inode has zero links; false is not proof
+	// that it exists.
 	ExecutableDeleted bool
 
 	Arguments        [][]byte

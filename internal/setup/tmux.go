@@ -32,8 +32,6 @@ var callerFormats = []string{
 	"--client-height", "'#{client_height}'",
 }
 
-// Binding is one tmux key binding that runs an action's command. Command is the shell command
-// the binding runs; Program is the tmux command bound to the key.
 type Binding struct {
 	Key     string   `json:"key"`
 	Table   string   `json:"table"`
@@ -70,8 +68,6 @@ func (b Binding) Text() string {
 	return "bind-key -T " + b.Table + " " + b.Key + " " + strings.Join(parts, " ")
 }
 
-// Bindings renders the tmux bindings of an action binding set. Each runs the action's command,
-// passing the current session or pane as its subject and the invoking client when it needs one.
 func Bindings(bindings []action.Binding) ([]Binding, error) {
 	tmux := action.SurfaceBindings(bindings, action.SurfaceTmux)
 	rendered := make([]Binding, 0, len(tmux))
@@ -126,8 +122,8 @@ func RenderBlock(bindings []Binding) string {
 	return out.String()
 }
 
-// ShellWord quotes a value for the shell run-shell starts, doubling '#' so tmux does not
-// expand it as a format.
+// ShellWord quotes value for the shell run-shell starts and doubles '#' so tmux does not expand it
+// as a format.
 func ShellWord(value string) string {
 	value = strings.ReplaceAll(value, "#", "##")
 	if value != "" && strings.Trim(value, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_./:=@%+-") == "" {

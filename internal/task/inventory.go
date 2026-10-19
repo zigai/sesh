@@ -10,8 +10,8 @@ import (
 
 const socketPathField = "socket_path"
 
-// Live is a task record and where its window is in tmux. A task without a tagged window is
-// not Present; its record is kept and never matched to a window by guessing.
+// Live is not Present without a tagged window; its record is never matched to a window by
+// guessing.
 type Live struct {
 	Record      Record
 	Present     bool

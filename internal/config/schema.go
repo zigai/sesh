@@ -72,10 +72,8 @@ type Config struct {
 	Finish        FinishConfig        `toml:"finish"`
 }
 
-// ActionsConfig overrides per-action policy, keyed by action group then verb: [actions.session.kill].
 type ActionsConfig map[string]map[string]ActionConfig
 
-// ActionConfig overrides one action's defaults; unset fields keep the action's own default.
 type ActionConfig struct {
 	Confirm     *bool `toml:"confirm"`
 	AllowRemote *bool `toml:"allow_remote"`
@@ -121,27 +119,21 @@ type ThemeConfig struct {
 }
 
 type KeyConfig struct {
-	Bind       []KeyBindConfig `toml:"bind"`
-	Help       string          `toml:"help"`
-	CycleMode  string          `toml:"cycle_mode"`
-	AgentSort  string          `toml:"agent_sort"`
-	InboxGroup string          `toml:"inbox_group"`
-	Menu       string          `toml:"menu"`
-	PageUp     string          `toml:"page_up"`
-	PageDown   string          `toml:"page_down"`
-	Top        string          `toml:"top"`
-	Bottom     string          `toml:"bottom"`
-	// SessionPrefix is the key pressed before a session letter, or "alt" to hold alt with it.
-	SessionPrefix string `toml:"session_prefix"`
-	// AgentKeys are handed out in order to the agents of a focused session.
-	AgentKeys string `toml:"agent_keys"`
-	// Sessions maps a local session name to its letter in the picker. Other sessions get a free
-	// letter assigned once and kept.
-	Sessions map[string]string `toml:"sessions"`
+	Bind          []KeyBindConfig   `toml:"bind"`
+	Help          string            `toml:"help"`
+	CycleMode     string            `toml:"cycle_mode"`
+	AgentSort     string            `toml:"agent_sort"`
+	InboxGroup    string            `toml:"inbox_group"`
+	Menu          string            `toml:"menu"`
+	PageUp        string            `toml:"page_up"`
+	PageDown      string            `toml:"page_down"`
+	Top           string            `toml:"top"`
+	Bottom        string            `toml:"bottom"`
+	SessionPrefix string            `toml:"session_prefix"`
+	AgentKeys     string            `toml:"agent_keys"`
+	Sessions      map[string]string `toml:"sessions"`
 }
 
-// KeyBindConfig binds a key in the picker or a tmux key table to an action. It replaces the
-// default binding of the same key; an empty action removes that default.
 type KeyBindConfig struct {
 	Key    string         `toml:"key"`
 	Action string         `toml:"action"`

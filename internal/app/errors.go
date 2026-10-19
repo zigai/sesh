@@ -19,9 +19,8 @@ import (
 	"github.com/zigai/sesh/internal/task"
 )
 
-// classifications map domain sentinels to action codes. The first match wins, so uncertain
-// outcomes are checked before the failures that may accompany them.
 var classifications = []classification{
+	// The first match wins, so uncertain outcomes come before failures that may accompany them.
 	{context.Canceled, action.CodeCanceled},
 	{store.ErrUncertain, action.CodeUncertain},
 	{session.ErrUncertain, action.CodeUncertain},

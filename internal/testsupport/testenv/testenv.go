@@ -1,4 +1,3 @@
-// Package testenv keeps test processes away from the developer's live tmux server and sesh data.
 package testenv
 
 import (
@@ -14,17 +13,12 @@ import (
 	"testing"
 )
 
-// IsolatedMarker marks a helper process that re-executes the test binary. Its SESH_ and tmux
-// variables are fixture signals from the parent test, so [RunIsolated] keeps them and only
-// isolates the directories the parent left unset. Add IsolatedMarker+"=1" to a helper's
-// environment when it does not inherit the parent's.
+// IsolatedMarker set to "1" makes [RunIsolated] keep a helper's SESH_ and tmux variables and only
+// isolate unset directories; add it when a helper does not inherit the parent's environment.
 const IsolatedMarker = "SESH_TESTENV_ISOLATED"
 
 const integrationRequiredSuffix = "_INTEGRATION_REQUIRED"
 
-// sessionVariables point at the developer's live session: tmux sets the TMUX ones inside its panes
-// and popups, and a tmux built with systemd support registers every new pane with the user
-// manager over the session bus.
 var sessionVariables = []string{"TMUX", "TMUX_PANE", "TMUX_POPUP", "DBUS_SESSION_BUS_ADDRESS"}
 
 var directoryVariables = map[string]string{
@@ -37,14 +31,8 @@ var directoryVariables = map[string]string{
 	"TMUX_TMPDIR":     "tmux",
 }
 
-// goToolchainVariables keep go subprocesses on the developer's caches and settings, which would
-// otherwise move into the isolated home and re-download modules on every run.
 var goToolchainVariables = []string{"GOPATH", "GOMODCACHE", "GOCACHE", "GOENV"}
 
-// RunIsolated runs the package tests with $HOME, the XDG directories, and $TMUX_TMPDIR in a
-// temporary directory and the live-session variables and every SESH_ variable except the
-// integration requirements cleared, so no fallback reaches the live tmux server, the user's
-// service manager, or sesh data.
 func RunIsolated(m *testing.M) int {
 	root, err := os.MkdirTemp("", "sesh-test-home-")
 	if err != nil {
@@ -90,6 +78,8 @@ func isolate(root string) error {
 		}
 	}
 
+	// A tmux built with systemd support registers every new pane with the user manager over the
+	// session bus.
 	for _, variable := range sessionVariables {
 		if err := os.Unsetenv(variable); err != nil {
 			return fmt.Errorf("clear %s: %w", variable, err)
@@ -100,6 +90,7 @@ func isolate(root string) error {
 		return err
 	}
 
+	// Inside the isolated home, go would re-download modules on every run.
 	for variable, value := range toolchain {
 		if err := os.Setenv(variable, value); err != nil {
 			return fmt.Errorf("set %s: %w", variable, err)
@@ -138,15 +129,14 @@ func setDirectories(root string, keepSet bool) error {
 	return nil
 }
 
-// disableGoTelemetry turns go telemetry off in an isolated config directory. Its default local
-// mode starts a detached child that keeps writing there after the go command exits, racing the
-// removal of the isolated home.
 func disableGoTelemetry(configDir string) error {
 	dir := filepath.Join(configDir, "go", "telemetry")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("create go telemetry directory: %w", err)
 	}
 
+	// Local mode starts a detached child that keeps writing here after go exits, racing the
+	// removal of the isolated home.
 	if err := os.WriteFile(filepath.Join(dir, "mode"), []byte("off"), 0o600); err != nil {
 		return fmt.Errorf("turn go telemetry off: %w", err)
 	}
@@ -180,15 +170,13 @@ func goToolchainEnvironment() (map[string]string, error) {
 	return values, nil
 }
 
-// removeIsolatedHome deletes the isolated home. Tools such as the go module cache create
-// read-only directories that [os.RemoveAll] cannot empty, so a failed removal makes every
-// directory writable and retries.
 func removeIsolatedHome(root string) error {
 	err := os.RemoveAll(root)
 	if err == nil {
 		return nil
 	}
 
+	// The go module cache creates read-only directories that RemoveAll cannot empty.
 	if writableErr := makeDirectoriesWritable(root); writableErr != nil {
 		return errors.Join(err, writableErr)
 	}

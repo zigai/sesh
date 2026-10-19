@@ -26,14 +26,11 @@ type layoutReader struct {
 	panes    map[string]string
 }
 
-// WindowLayout is a window's tiled layout and the floating panes drawn over it. Floating panes
-// take no space in the tiled layout, so they are reported separately.
+// WindowLayout lists Floating panes in stacking order; they take no space in Tiled.
 type WindowLayout struct {
 	Tiled    model.Layout
 	Floating []string
-	// Recent is the tiled pane that is active or was used most recently, empty when the layout
-	// does not record pane use.
-	Recent string
+	Recent   string
 }
 
 type typedDecoder struct {
@@ -183,9 +180,9 @@ func (r *layoutReader) branch(node model.Layout, depth int) (model.Layout, error
 	}
 }
 
-// floating reads the optional "<cell,...>" suffix in which tmux lists floating panes in stacking
-// order. The same cells also appear inside the tiled tree.
 func (r *layoutReader) floating() ([]string, error) {
+	// tmux lists floating panes in stacking order in an optional "<cell,...>" suffix; the same
+	// cells also appear inside the tiled tree.
 	if !r.consume('<') {
 		return nil, nil
 	}

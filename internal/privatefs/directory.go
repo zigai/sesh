@@ -15,8 +15,7 @@ import (
 )
 
 var (
-	ErrUnsafe = errors.New("unsafe private storage entry")
-	// ErrUnlinked is an opened file whose last link was removed; it is also ErrUnsafe.
+	ErrUnsafe   = errors.New("unsafe private storage entry")
 	ErrUnlinked = fmt.Errorf("%w: last link removed", ErrUnsafe)
 	ErrLimit    = errors.New("private storage inventory limit exceeded")
 )

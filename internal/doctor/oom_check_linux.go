@@ -27,8 +27,6 @@ func serviceUnitOf(pid int) (string, error) {
 	return unitFromCgroup(data)
 }
 
-// unitFromCgroup reads the unified-hierarchy entry. Only the leaf counts: a server started from a
-// terminal sits in a scope under the user manager, whose own service must not be mistaken for it.
 func unitFromCgroup(data []byte) (string, error) {
 	for line := range bytes.SplitSeq(bytes.TrimSpace(data), []byte("\n")) {
 		cgroupPath, found := strings.CutPrefix(string(line), "0::")
@@ -36,6 +34,8 @@ func unitFromCgroup(data []byte) (string, error) {
 			continue
 		}
 
+		// Only the leaf counts: a server started from a terminal sits in a scope under the user
+		// manager, whose own service must not be mistaken for it.
 		if name := path.Base(cgroupPath); strings.HasSuffix(name, ".service") {
 			return name, nil
 		}

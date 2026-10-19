@@ -63,9 +63,6 @@ type windowPane struct {
 	height int
 }
 
-// Relayout arranges the task window of the pane at place again, for the window's current size:
-// with the named layout, else the first whose conditions the window meets. Panes the layout
-// places that the window lacks are opened again, and panes it does not place are kept.
 func (s *Service) Relayout(ctx context.Context, place Place, name string) error {
 	if place.Task == "" {
 		return taskError("relayout_task", ErrNotInTaskWindow)
@@ -89,9 +86,6 @@ func (s *Service) Relayout(ctx context.Context, place Place, name string) error 
 	return taskError("relayout_task", s.arrange(ctx, window, record, name, rearrangeWindow, nil))
 }
 
-// arrange opens the panes the task window's layout places that it lacks, then lays the window
-// out. The layout is picked for shownAt, else the window's own size. The whole layout is
-// planned before any pane opens, so a window too small for it is left untouched.
 func (s *Service) arrange(
 	ctx context.Context,
 	window gotmux.Window,
@@ -122,6 +116,7 @@ func (s *Service) arrange(
 		return err
 	}
 
+	// Fit before any pane opens, so a window too small for the layout is left untouched.
 	layout, err = fitting(setup, layout, panes, info.Width, info.Height, mode)
 	if err != nil {
 		return err
@@ -149,8 +144,6 @@ func (s *Service) arrange(
 	return s.focus(ctx, panes, layout.Focus)
 }
 
-// fitting checks that a splits layout fits the window with every pane it will hold. One that
-// does not falls back to the default arrangement in a new window and fails otherwise.
 func fitting(setup config.TaskWindow, layout config.TaskLayoutConfig, panes []windowPane, width, height int, mode arrangeMode) (config.TaskLayoutConfig, error) {
 	if len(layout.Splits) == 0 {
 		return layout, nil
@@ -334,8 +327,6 @@ func defaultArrangement() config.TaskLayoutConfig {
 	}
 }
 
-// paneKeys names each pane in a layout: the agent and each placed pane by its role, every other
-// pane, and a second pane with a role already taken, by its pane ID.
 func paneKeys(panes []windowPane, placed []string) map[gotmux.PaneID]string {
 	keys := make(map[gotmux.PaneID]string, len(panes))
 	taken := make(map[string]bool, len(panes))
@@ -352,7 +343,6 @@ func paneKeys(panes []windowPane, placed []string) map[gotmux.PaneID]string {
 	return keys
 }
 
-// extraKeys are the keys of the panes a layout does not place, in window order.
 func extraKeys(panes []windowPane, keys map[gotmux.PaneID]string, placed []string) []string {
 	var extras []string
 
@@ -365,10 +355,6 @@ func extraKeys(panes []windowPane, keys map[gotmux.PaneID]string, placed []strin
 	return extras
 }
 
-// applyLayout lays a window out. An arrangement orders the agent first, then the panes it
-// places, then the others in their order, and applies the tmux layout. Splits, with the other
-// panes in the largest cells, are laid out as one custom tmux layout, which tmux fills with the
-// window's panes in order.
 func applyLayout(
 	ctx context.Context,
 	server *gotmux.Server,
@@ -409,6 +395,7 @@ func applyLayout(
 		return err
 	}
 
+	// tmux fills a custom layout with the window's panes in order.
 	if err := orderPanes(ctx, server, panes, root.leaves(), ids); err != nil {
 		return err
 	}
@@ -482,10 +469,6 @@ func orderPanes(ctx context.Context, server *gotmux.Server, panes []windowPane, 
 	return nil
 }
 
-// splitCells lays splits out in a window of width by height cells, as tmux would split the
-// panes: a split takes its size from the pane it splits, one cell goes to the border between
-// them, and a split along the line its pane already shares with siblings joins that line. Each
-// extra pane then takes half of the largest cell, along its longer side.
 func splitCells(width, height int, splits []config.TaskSplitConfig, extras []string) (*cell, error) {
 	root := &cell{pane: config.TaskPaneAgent, sideBySide: false, children: nil, parent: nil, x: 0, y: 0, w: width, h: height}
 
@@ -498,6 +481,7 @@ func splitCells(width, height int, splits []config.TaskSplitConfig, extras []str
 		sideBySide := split.Direction == config.DirectionRight || split.Direction == config.DirectionLeft
 		before := split.Direction == config.DirectionLeft || split.Direction == config.DirectionAbove
 
+		// Mirrors tmux: the size comes from the split pane, and one cell goes to the border.
 		if err := root.find(split.Of).splitOff(split.Pane, sideBySide, before, size); err != nil {
 			return nil, err
 		}
@@ -653,10 +637,10 @@ func (c *cell) layout(ids map[string]string) string {
 	return head + "[" + strings.Join(parts, ",") + "]"
 }
 
-// customLayout is a tmux layout string: the checksum tmux verifies, then the cells.
 func customLayout(root *cell, ids map[string]string) string {
 	body := root.layout(ids)
 
+	// tmux rejects a custom layout whose checksum does not match.
 	var sum uint16
 	for _, character := range []byte(body) {
 		sum = (sum >> 1) + ((sum & 1) << checksumTop)

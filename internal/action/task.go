@@ -302,8 +302,6 @@ type OfferTask struct {
 	Describe bool   `json:"describe"`
 }
 
-// TaskOffered is what a new task can start with in a project: the project's root and the
-// choices the new task popup shows.
 type TaskOffered struct {
 	Project    string                `json:"project"`
 	Harnesses  []string              `json:"harnesses"`

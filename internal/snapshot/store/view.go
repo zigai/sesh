@@ -14,15 +14,12 @@ import (
 
 const viewReadAttempts = 4
 
-// View reads the published catalog without the repository lock or fsync, so display listings
-// never wait on a concurrent save. It sees one consistent publication that a crash may still roll
-// back, so mutations and recovery decisions must use Open or OpenExisting.
+// View reads without the repository lock or fsync and may see a publication a crash rolls back;
+// mutations and recovery decisions must use Open or OpenExisting.
 type View struct {
 	repository Repository
 }
 
-// OpenView opens an existing repository for lock-free display reads. A repository that
-// does not exist yet has no saved sessions; its reads report ErrUnavailable.
 func OpenView(ctx context.Context, path string) (*View, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, repositoryError("open_view", err)

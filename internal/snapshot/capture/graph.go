@@ -142,9 +142,6 @@ func graphLayouts(snapshot gotmux.Snapshot, windows map[gotmux.WindowID]bool, m 
 	return layouts, floating, nil
 }
 
-// retileWindowPanes renumbers a window's tiled panes as tmux numbers them once its floating
-// panes are gone, and moves the active flag to the tiled pane used most recently when a
-// floating pane was active.
 func retileWindowPanes(snapshot gotmux.Snapshot, panes []model.Pane, window string, layout tmuxserver.WindowLayout) {
 	base := -1
 
@@ -166,6 +163,7 @@ func retileWindowPanes(snapshot gotmux.Snapshot, panes []model.Pane, window stri
 
 	active := false
 
+	// tmux renumbers the tiled panes from the window base once its floating panes are gone.
 	for rank, index := range tiled {
 		panes[index].Index = base + rank
 		active = active || panes[index].Active

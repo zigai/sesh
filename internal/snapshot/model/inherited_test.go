@@ -11,8 +11,6 @@ func option(scope, name, value string, inherited bool) Option {
 	return Option{Scope: scope, Name: Bytes(name), Value: Bytes(value), Present: true, Inherited: inherited}
 }
 
-// reportedOptionsFixture mirrors tmux's show-options -A output: every built-in global option is
-// listed as inherited at session and window scope, and global user options are not.
 func reportedOptionsFixture() Manifest {
 	m := fixture()
 	m.Source.Options = []Option{
@@ -24,6 +22,8 @@ func reportedOptionsFixture() Manifest {
 		option("global-window", "mode-keys", "vi", false),
 	}
 
+	// tmux show-options -A lists built-in globals as inherited at session and window scope, but not
+	// global user options.
 	for index := range m.Sessions {
 		m.Sessions[index].Options = []Option{
 			option("session", "base-index", "1", true),

@@ -81,8 +81,6 @@ func (m *Model) hostClosedItems(host inboxHost) []inboxItem {
 	return items
 }
 
-// shownClosedItems are the closed or finished rows of a project: the pinned and most recent ones
-// up to the configured count unless the user expanded them, then a row that expands the rest.
 func (m *Model) shownClosedItems(host inboxHost, group string, items []inboxItem) []inboxItem {
 	shown := m.config.Inbox.ClosedShown
 	expandKey := host.identity.ConnectionID + "\x00" + group

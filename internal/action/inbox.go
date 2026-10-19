@@ -47,7 +47,6 @@ var (
 		newParam("pr", ParamText, "Pull request number"))
 )
 
-// InboxInput is the input of an inbox action: the picker applies it to the selected row.
 type InboxInput struct {
 	Until string `json:"until"`
 	PR    string `json:"pr"`

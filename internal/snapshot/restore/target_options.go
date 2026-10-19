@@ -14,18 +14,15 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/model"
 )
 
-// TargetOptions holds the option and hook names a target tmux server accepts. A snapshot can
-// carry options its source tmux had and the target no longer does; tmux rejects setting those
-// without changing anything, so restore leaves them out instead of treating the rejection as an
-// uncertain effect.
+// TargetOptions lets restore leave out options the target tmux no longer has; tmux rejects those
+// without changing anything, so the rejection is not an uncertain effect.
 type TargetOptions struct {
 	session map[string]bool
 	window  map[string]bool
 }
 
-// ReadTargetOptions lists the target's global session and window tables, which name every
-// session, window and pane option and hook the server knows.
 func ReadTargetOptions(ctx context.Context, server *gotmux.Server) (TargetOptions, error) {
+	// The global session and window tables name every option and hook the server knows.
 	session, err := optionNames(ctx, server.GlobalSessionOptions())
 	if err != nil {
 		return TargetOptions{session: nil, window: nil}, err
@@ -62,8 +59,6 @@ func optionBaseName(name string) string {
 	return base
 }
 
-// Adapt drops the saved options the target does not accept and returns how many it dropped.
-// User options and server-scope options, which restore never applies, are kept.
 func (t TargetOptions) Adapt(m model.Manifest) (model.Manifest, int) {
 	adapted := m
 	dropped := 0

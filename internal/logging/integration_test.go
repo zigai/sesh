@@ -55,7 +55,6 @@ func TestConcurrentAppendAndRotationIntegration(t *testing.T) {
 func startIntegrationWorker(t *testing.T, exe, logPath, id string) *workerProc {
 	t.Helper()
 
-	//nolint:gosec // integration test invokes current test executable with controlled arguments
 	cmd := exec.CommandContext(
 		t.Context(),
 		exe,

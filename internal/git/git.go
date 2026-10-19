@@ -19,8 +19,6 @@ const (
 
 var ErrOutputTooLarge = errors.New("command output exceeds its limit")
 
-// LimitedBuffer collects a command's output up to a limit. A write past the limit fails, which
-// stops the command instead of holding unbounded output.
 type LimitedBuffer struct {
 	data     bytes.Buffer
 	limit    int
@@ -32,12 +30,12 @@ type Diff struct {
 	Deleted int
 }
 
-// CommandError reports a git command that ran and failed. Detail is git's first error line,
-// meant for the user who asked for the operation; it is never logged.
 type CommandError struct {
 	Subcommand string
 	ExitCode   int
-	Detail     string
+	// Detail is git's first error line, meant for the user who asked for the operation; it is never
+	// logged.
+	Detail string
 }
 
 func (e *CommandError) Error() string {
@@ -48,9 +46,8 @@ func (e *CommandError) Error() string {
 	return fmt.Sprintf("git %s failed: %s", e.Subcommand, e.Detail)
 }
 
-// Output runs git in dir and returns its trimmed standard output. Inherited GIT_ variables are
-// dropped so a caller running inside a git hook cannot redirect the command to another
-// repository.
+// Output drops inherited GIT_ variables so a caller inside a git hook cannot redirect the command
+// to another repository.
 func Output(ctx context.Context, dir string, args ...string) (string, error) {
 	command := exec.CommandContext(ctx, "git", args...)
 	command.Dir = dir

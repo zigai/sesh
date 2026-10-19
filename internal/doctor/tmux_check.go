@@ -133,8 +133,6 @@ func (s *Service) classifyTmuxProbeError(err error) Result {
 		withManual(findServer)
 }
 
-// startServerCommand starts a server on the selected socket the way a plain tmux command
-// would, naming the socket only when it is not tmux's default.
 func (s *Service) startServerCommand() string {
 	if s.opts.Socket == s.opts.DefaultSocket {
 		return "tmux new-session -d"

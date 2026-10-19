@@ -77,11 +77,9 @@ func replacedInPlace(executable []byte) bool {
 	return err == nil && info.Mode().IsRegular() && info.Mode().Perm()&0o111 != 0
 }
 
-// deletedPathLaunch classifies a program running from a deleted executable or working directory.
-// An agent stays resumable when only its binary was deleted, as an agent's self-update removes old
-// versions, while its resume command still resolves to a live executable for the same harness; the
-// resume then launches that executable. Anything else cannot be relaunched as it ran.
 func deletedPathLaunch(observed *process.Observation, unsupported bool, agent *apps.AgentResume) model.Launch {
+	// An agent's self-update deletes its old binary, so it stays resumable while its resume
+	// command resolves to a live executable.
 	if !observed.DirectoryDeleted && !unsupported && agent != nil && agent.Executable != "" {
 		launch, reason := apps.Prepare(processLaunch(observed), agent)
 		if reason == apps.ReasonAgentResume && launch.Recovery == model.RecoveryResume {

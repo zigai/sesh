@@ -12,7 +12,6 @@ import (
 	"github.com/zigai/sesh/internal/git"
 )
 
-// Exit codes of a merge run, recorded on the task so the inbox can say why a merge stopped.
 const (
 	MergeExitFailed   = 1
 	MergeExitConflict = 3
@@ -80,11 +79,9 @@ func MergeExitCode(err error) int {
 	}
 }
 
-// MergeBranch puts the branch checked out in dir on origin's base branch without a merge commit:
-// it refuses uncommitted changes, fetches the base, rebases onto it (aborting the rebase on a
-// conflict), runs check when it is set, pushes the result to origin's base as a fast-forward, and
-// fast-forwards the base in the repository's main checkout when that checkout is clean and has
-// the base checked out. An empty base means origin's default branch. Progress goes to out.
+// MergeBranch rebases onto origin's base and pushes as a fast-forward, without a merge commit. It
+// refuses uncommitted changes, aborts the rebase on a conflict, and fast-forwards the main
+// checkout only when it is clean on the base. An empty base means origin's default branch.
 func MergeBranch(ctx context.Context, dir, base string, check []string, out io.Writer) (Merged, error) {
 	if err := requireClean(ctx, dir); err != nil {
 		return Merged{Branch: "", Base: base}, err

@@ -59,37 +59,30 @@ type (
 	RunStatus string
 )
 
-// Record is one task. A project task works in a worktree or the main checkout of its project; a
-// loose task runs in a plain directory. Number counts a project's tasks and is never reused.
 type Record struct {
-	ID        string `json:"id"`
-	Kind      Kind   `json:"kind"`
-	State     State  `json:"state"`
-	Project   string `json:"project"`
+	ID      string `json:"id"`
+	Kind    Kind   `json:"kind"`
+	State   State  `json:"state"`
+	Project string `json:"project"`
+	// Number counts a project's tasks and is never reused.
 	Number    int    `json:"number"`
 	Harness   string `json:"harness"`
 	Directory string `json:"directory"`
 	Branch    string `json:"branch"`
 	Base      string `json:"base"`
-	// OwnsWorktree and OwnsBranch record what sesh created for the task, which is all that
-	// finishing it removes.
-	OwnsWorktree bool `json:"ownsWorktree"`
-	OwnsBranch   bool `json:"ownsBranch"`
-	// Upstream is the remote branch an owned branch was created to track; finishing compares the
-	// branch with it instead of the base.
-	Upstream   string      `json:"upstream"`
-	CreatedAt  int64       `json:"createdAt"`
-	Title      string      `json:"title"`
-	WindowName string      `json:"windowName"`
-	Resume     Resume      `json:"resume"`
-	PR         PullRequest `json:"pr"`
-	Runs       []Run       `json:"runs"`
-	// Owner is the sesh process that put the task in its creating or finishing state; once it
-	// is gone the task is stalled there.
-	Owner Process `json:"owner"`
+	// OwnsWorktree and OwnsBranch record what sesh created, which is all finishing removes.
+	OwnsWorktree bool        `json:"ownsWorktree"`
+	OwnsBranch   bool        `json:"ownsBranch"`
+	Upstream     string      `json:"upstream"`
+	CreatedAt    int64       `json:"createdAt"`
+	Title        string      `json:"title"`
+	WindowName   string      `json:"windowName"`
+	Resume       Resume      `json:"resume"`
+	PR           PullRequest `json:"pr"`
+	Runs         []Run       `json:"runs"`
+	Owner        Process     `json:"owner"`
 }
 
-// Process identifies a process across PID reuse by its birth identity.
 type Process struct {
 	PID   int    `json:"pid"`
 	Birth string `json:"birth"`
@@ -107,7 +100,6 @@ type PullRequest struct {
 	URL    string  `json:"url"`
 }
 
-// Run is the latest execution of a named task action, in a window of the task's popup session.
 type Run struct {
 	Action     string    `json:"action"`
 	Window     string    `json:"window"`
@@ -129,8 +121,8 @@ type Ledger struct {
 	Projects []ProjectState `json:"projects"`
 }
 
-// Store reads and updates the ledger file. Updates hold an exclusive lock, so concurrent sesh
-// processes never lose each other's records.
+// Store updates hold an exclusive lock, so concurrent sesh processes never lose each other's
+// records.
 type Store struct {
 	path string
 }
@@ -139,7 +131,6 @@ func NewStore(path string) Store {
 	return Store{path: path}
 }
 
-// Load returns the current ledger; a missing file is an empty ledger.
 func (s Store) Load(ctx context.Context) (Ledger, error) {
 	dir, name, err := s.open(false)
 	if errors.Is(err, os.ErrNotExist) {
@@ -155,8 +146,6 @@ func (s Store) Load(ctx context.Context) (Ledger, error) {
 	return ledger, ledgerError("load_tasks", errors.Join(err, dir.Close(), ctx.Err()))
 }
 
-// Update applies change to the locked ledger and publishes the result. A change that returns
-// an error leaves the file as it was.
 func (s Store) Update(ctx context.Context, change func(*Ledger) error) (Ledger, error) {
 	if change == nil {
 		return Ledger{}, ledgerError("update_tasks", ErrNilUpdate)

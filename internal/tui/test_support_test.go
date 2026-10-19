@@ -143,8 +143,6 @@ func (adapter *testServiceAdapter) Accepts(at action.Location, id action.ID) boo
 	return true
 }
 
-// Dispatch runs actions against the fake tmux hooks, so tests describe effects the way they
-// did before actions existed.
 func (adapter *testServiceAdapter) Dispatch(ctx context.Context, invocation action.Invocation) (any, error) {
 	if adapter.deps.RunAction != nil {
 		return adapter.deps.RunAction(ctx, invocation)

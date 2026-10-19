@@ -98,8 +98,6 @@ var groups = map[string]string{
 
 type Status string
 
-// Result is one check's finding. Every warn and fail result carries a Fix; Needs names the
-// check whose failure kept this one from running.
 type Result struct {
 	ID      string   `json:"id"`
 	Group   string   `json:"group"`
@@ -111,7 +109,6 @@ type Result struct {
 	Fix     *Fix     `json:"fix"`
 }
 
-// Fix is either a command to run or, when no command can do it, a manual step.
 type Fix struct {
 	Command string `json:"command,omitempty"`
 	Manual  string `json:"manual,omitempty"`
@@ -130,8 +127,6 @@ type CustomField struct {
 	Command string
 }
 
-// ConfigFile is one configuration source in precedence order. Source names the flag or
-// environment variable that selected it.
 type ConfigFile struct {
 	Path   string `json:"path"`
 	Status string `json:"status"`
@@ -146,20 +141,18 @@ type Daemon struct {
 }
 
 type Options struct {
-	// PathEnv is the PATH searched for copies of sesh, tmux and custom field commands.
 	PathEnv    string
 	Executable string
 
 	ConfigFiles []ConfigFile
-	// ConfigError describes why the configuration failed to load; the other checks then run on
-	// built-in settings.
+	// ConfigError is set when the configuration failed to load; the other checks then use built-in
+	// settings.
 	ConfigError     string
 	AutosaveEnabled bool
 	CustomFields    []CustomField
 
-	// Flags are the doctor's own configuration and location flags, by name, that fix commands
-	// repeat so they act on the same configuration, server and repository. A flag without a
-	// value is a switch.
+	// Flags are repeated by fix commands so they act on the same configuration, server and
+	// repository; an empty value is a switch.
 	Flags map[string]string
 
 	Socket        string
@@ -172,14 +165,10 @@ type Options struct {
 	LogPath     string
 
 	Daemon Daemon
-	// ServiceDirs is the systemd user unit search path, highest precedence first; nil skips the
-	// service checks.
-	ServiceDirs []string
-	// UnitActiveState returns the systemd ActiveState of a user unit. The daemon check needs it
-	// whenever the coordinator unit is installed.
+	// ServiceDirs is highest precedence first; nil skips the service checks.
+	ServiceDirs     []string
 	UnitActiveState func(ctx context.Context, unit string) (string, error)
-	// ValidateCommand reports whether this sesh accepts a command line, given without the
-	// program; nil skips the unit command check.
+	// ValidateCommand gets a command line without the program; nil skips the unit command check.
 	ValidateCommand func(args []string) error
 }
 
@@ -260,8 +249,6 @@ func Run(ctx context.Context, opts Options) ([]Result, error) {
 	return NewService(opts).Run(ctx)
 }
 
-// Run executes every check in report order. It stops early only when ctx ends, returning the
-// results gathered so far.
 func (s *Service) Run(ctx context.Context) ([]Result, error) {
 	steps := []func(context.Context) ([]Result, error){
 		func(context.Context) ([]Result, error) { return []Result{s.checkInstallPath()}, nil },

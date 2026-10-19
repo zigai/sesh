@@ -21,8 +21,6 @@ const pager = "less"
 
 var errEvidenceUnreadable = errors.New("the latest reports of some agents could not be read")
 
-// EvidenceSource reads the latest report of an agent on this machine, whose Evidence section the
-// inbox lists.
 type EvidenceSource interface {
 	LastReport(ctx context.Context, agent session.AgentSession) (string, error)
 }

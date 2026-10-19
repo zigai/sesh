@@ -17,8 +17,6 @@ import (
 
 const nativeModule = "github.com/zigai/sesh/"
 
-// Layers are ordered from the bottom up. A package may import any lower layer, its own layer
-// within the same directory tree, and the same-layer edges in sameLayerImports.
 const (
 	layerBase layer = iota
 	layerModel
@@ -36,8 +34,6 @@ const testSupportReason = "production must not depend on test support"
 
 var layerNames = []string{"base", "model", "storage", "adapter", "config", "domain", "contract", "service", "composition", "surface"}
 
-// packageLayers assigns every production package to a layer. An entry covers its subpackages
-// unless a longer entry overrides it.
 var packageLayers = map[string]layer{
 	"internal/strictjson": layerBase,
 	"internal/privatefs":  layerBase,
@@ -74,8 +70,6 @@ var packageLayers = map[string]layer{
 	"cmd/sesh":                  layerSurface,
 }
 
-// sameLayerImports lists the deliberate imports between packages of one layer in different
-// directory trees.
 var sameLayerImports = map[packageEdge]string{
 	{"cmd/sesh", "internal/cli"}:                     "the binary runs the command tree",
 	{"internal/snapshot/capture", "internal/agents"}: "capture records the agent session in each pane",
@@ -89,8 +83,6 @@ var sameLayerImports = map[packageEdge]string{
 	{"internal/doctor", "internal/snapshot/engine"}:  "doctor reports restore state",
 }
 
-// moduleLayers names the lowest layer that may import each external module. With the layer
-// order this keeps the module out of everything the lower layers reach.
 var moduleLayers = map[string]layer{
 	"github.com/zigai/gotmux": layerAdapter,
 }

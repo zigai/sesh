@@ -10,8 +10,6 @@ import (
 	"github.com/zigai/sesh/internal/task"
 )
 
-// TaskRestoreLaunches returns the launch overrides that bring task agents back after a restore
-// as tasks.wake_on_restore asks.
 func TaskRestoreLaunches(ledger string, cfg config.TasksConfig) (engine.LaunchOverrides, error) {
 	executable, err := seshExecutable()
 	if err != nil {

@@ -17,10 +17,8 @@ import (
 
 var ErrLaunchOverride = errors.New("launch override names no pane of the snapshot")
 
-// LaunchOverrides replaces the saved launch of some panes before a restore plans them. Override
-// must decide from the manifest alone, so a resumed restore plans the same launches. Commit
-// receives every pane the restore will create, after the operation is registered and
-// before any pane is launched.
+// LaunchOverrides must decide Override from the manifest alone, so a resumed restore plans the
+// same launches. Commit gets every pane to create, after registration and before any launch.
 type LaunchOverrides interface {
 	Override(ctx context.Context, manifest model.Manifest) (map[string]model.Launch, error)
 	Commit(ctx context.Context, panes []string) error

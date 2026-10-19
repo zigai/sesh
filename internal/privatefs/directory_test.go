@@ -79,7 +79,7 @@ func makeUnsafeFile(t *testing.T, root, kind string) {
 	case "fifo":
 		err = unix.Mkfifo(path, 0o600)
 	case "permissions":
-		err = os.WriteFile(path, nil, 0o644) //nolint:gosec // Empty, deliberately world-readable fixture verifies rejection of public files.
+		err = os.WriteFile(path, nil, 0o644)
 	case "symlink":
 		err = os.Symlink("missing", path)
 	case "hardlink":

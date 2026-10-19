@@ -42,8 +42,6 @@ type ReplayFence struct {
 	Tombstones map[string]Tombstone `json:"tombstones"`
 }
 
-// Tombstone keeps the outcome of a retired invocation so its ID cannot run again. The output is
-// not kept.
 type Tombstone struct {
 	IntentDigest string    `json:"intentDigest"`
 	Action       action.ID `json:"action"`
@@ -51,17 +49,16 @@ type Tombstone struct {
 	RetiredAt    time.Time `json:"retiredAt"`
 }
 
-// Invocation is the durable receipt of one admitted action. Outcome is empty until the action
-// finishes, then "ok" or the failure code. Output is kept when it fits the receipt.
 type Invocation struct {
-	Version      int            `json:"version"`
-	ID           string         `json:"id"`
-	IntentDigest string         `json:"intentDigest"`
-	Action       action.ID      `json:"action"`
-	AdmittedAt   time.Time      `json:"admittedAt"`
-	Outcome      string         `json:"outcome"`
-	ResolvedAt   time.Time      `json:"resolvedAt"`
-	Output       jsontext.Value `json:"output,omitzero"`
+	Version      int       `json:"version"`
+	ID           string    `json:"id"`
+	IntentDigest string    `json:"intentDigest"`
+	Action       action.ID `json:"action"`
+	AdmittedAt   time.Time `json:"admittedAt"`
+	// Outcome is empty until the action finishes, then "ok" or the failure code.
+	Outcome    string         `json:"outcome"`
+	ResolvedAt time.Time      `json:"resolvedAt"`
+	Output     jsontext.Value `json:"output,omitzero"`
 }
 
 type recordVersion struct {
@@ -169,8 +166,6 @@ func AdmitInvocation(ctx context.Context, dir *privatefs.Dir, request ActionRequ
 	return invocation, admitted, closeErr
 }
 
-// ResolveInvocation records an invocation's outcome. An output too large for the receipt is
-// dropped; the outcome is always kept.
 func ResolveInvocation(ctx context.Context, dir *privatefs.Dir, id, outcome string, output jsontext.Value, now time.Time) error {
 	if !ValidInvocationID(id) || !validOutcome(outcome) || outcome == "" {
 		return oops.In("remote").With("operation", "resolve_invocation").Wrap(ErrInvalidFrame)
@@ -538,8 +533,6 @@ func validOutcome(outcome string) bool {
 	return action.Code(outcome).Valid()
 }
 
-// removeOtherProtocolRecord removes a receipt written by another protocol version. Its invocation
-// cannot be retried with this protocol, so it only takes space.
 func removeOtherProtocolRecord(dir *privatefs.Dir, name string) (bool, error) {
 	content, err := dir.Read(name, int64(maxInvocationBytes))
 	if err != nil {
@@ -550,6 +543,7 @@ func removeOtherProtocolRecord(dir *privatefs.Dir, name string) (bool, error) {
 		return false, nil
 	}
 
+	// Another protocol version's invocation cannot be retried with this one.
 	return true, removeFile(dir, name)
 }
 

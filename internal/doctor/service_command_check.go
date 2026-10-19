@@ -21,9 +21,7 @@ const (
 	maxServiceUnitKiB   = 64
 	maxServiceUnitBytes = maxServiceUnitKiB << 10
 	execPrefixes        = "-@:+!|"
-	// argv0Override is the position of the argv[0] word that the "@" Exec prefix adds after the
-	// executable path.
-	argv0Override = 1
+	argv0Override       = 1
 )
 
 var errUnitTooLarge = errors.New("unit file is too large")
@@ -48,11 +46,6 @@ type execWords struct {
 	escaped bool
 }
 
-// checkServiceUnits fails when a systemd user unit runs a sesh command line that this sesh
-// rejects, such as a renamed command or a removed flag left behind by an upgrade. Such a unit
-// fails on every start or stop, which silently disables the saves and restores it was written
-// for. It reads units the way systemd resolves them: the first unit file of a name along the
-// search path, links followed, with its drop-ins applied.
 func (s *Service) checkServiceUnits() []Result {
 	if runtime.GOOS != "linux" || s.opts.ServiceDirs == nil {
 		return nil
@@ -119,8 +112,6 @@ func (s *Service) serviceUnitsResult(checked int, stale, unreadable []string) []
 	return []Result{newResult(CheckServiceUnits, StatusOK, plural(checked, "unit")+" run sesh command lines this sesh accepts")}
 }
 
-// unitFiles maps each service unit name to the file systemd loads for it: the first along the
-// search path, with links followed. Masked and dangling units are left out.
 func (s *Service) unitFiles() (map[string]string, []string) {
 	units := make(map[string]string)
 	shadowed := make(map[string]bool)
@@ -145,10 +136,12 @@ func (s *Service) unitFiles() (map[string]string, []string) {
 				continue
 			}
 
+			// systemd loads the first file of a name along the search path.
 			shadowed[name] = true
 
 			path := filepath.Join(dir, name)
 
+			// Stat follows links; a masked unit links to /dev/null, which is not a regular file.
 			info, err := os.Stat(path)
 			switch {
 			case errors.Is(err, fs.ErrNotExist):
@@ -164,8 +157,6 @@ func (s *Service) unitFiles() (map[string]string, []string) {
 	return units, unreadable
 }
 
-// unitCommands returns the sesh command lines a unit runs after its drop-ins apply. An empty
-// Exec assignment clears the commands set before it, as in systemd.
 func (s *Service) unitCommands(name, path string) ([]unitCommand, error) {
 	execs := make(map[string][]unitCommand)
 
@@ -189,6 +180,7 @@ func (s *Service) unitCommands(name, path string) ([]unitCommand, error) {
 			}
 
 			argv := splitExecLine(value)
+			// As in systemd, an empty Exec assignment clears the commands set before it.
 			if len(argv) == 0 {
 				execs[key] = nil
 
@@ -209,8 +201,6 @@ func (s *Service) unitCommands(name, path string) ([]unitCommand, error) {
 	return commands, nil
 }
 
-// dropIns lists the drop-in files of a unit in the order systemd applies them: by file name,
-// with a name in an earlier search directory shadowing the same name in a later one.
 func (s *Service) dropIns(unit string) ([]string, error) {
 	byName := make(map[string]string)
 
@@ -231,6 +221,7 @@ func (s *Service) dropIns(unit string) ([]string, error) {
 
 		for _, entry := range entries {
 			name := entry.Name()
+			// systemd applies drop-ins by file name; an earlier directory shadows a later one's file.
 			if _, shadowed := byName[name]; shadowed || !strings.HasSuffix(name, ".conf") {
 				continue
 			}
@@ -308,9 +299,6 @@ func unitLines(data []byte) []unitLine {
 	return lines
 }
 
-// splitExecLine splits a systemd Exec value into the executable and its arguments. It removes the
-// special executable prefixes, the argv[0] override that "@" introduces, quotes and the escapes
-// sesh setup writes ("%%", "$$" and backslashes).
 func splitExecLine(value string) []string {
 	value = strings.TrimSpace(value)
 	prefix := value[:len(value)-len(strings.TrimLeft(value, execPrefixes))]
@@ -327,6 +315,7 @@ func splitExecLine(value string) []string {
 		words.words[index] = unescape.Replace(word)
 	}
 
+	// The "@" prefix makes the word after the executable path its argv[0], not an argument.
 	if strings.Contains(prefix, "@") && len(words.words) > argv0Override {
 		return slices.Delete(words.words, argv0Override, argv0Override+1)
 	}

@@ -23,9 +23,6 @@ const (
 	bindingMessageTimeout = 2 * time.Second
 )
 
-// showBindingFailureMessage shows a failed action as a message on the invoking tmux client, where
-// run-shell would print "'…' returned 1" or, with -E, cover the pane in view mode. It reports
-// whether the message reached tmux; the caller then exits successfully.
 func showBindingFailureMessage(cmd *cobra.Command, err error, stdout, stderr io.Writer) bool {
 	if err == nil || clibase.JSONOutputEnabled(cmd) || !invokedByTmuxBinding(cmd, stdout, stderr) {
 		return false
@@ -43,6 +40,8 @@ func showBindingFailureMessage(cmd *cobra.Command, err error, stdout, stderr io.
 	ctx, cancel := context.WithTimeout(context.Background(), bindingMessageTimeout)
 	defer cancel()
 
+	// run-shell would print "'…' returned 1" for the failure or, with -E, cover the pane in view
+	// mode.
 	return showBindingMessage(ctx, cmd, server, bindingFailureMessage(err)) == nil
 }
 

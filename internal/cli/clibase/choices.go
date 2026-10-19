@@ -7,8 +7,7 @@ import (
 
 const FlagChoicesAnnotation = "choices"
 
-// SetFlagChoices records the values a flag accepts for help and shell completion. The
-// command still validates the value itself.
+// SetFlagChoices only feeds help and shell completion; the command still validates the value.
 func SetFlagChoices(cmd *cobra.Command, name string, choices ...string) {
 	_ = cmd.Flags().SetAnnotation(name, FlagChoicesAnnotation, choices)
 	_ = cmd.RegisterFlagCompletionFunc(name, cobra.FixedCompletions(choices, cobra.ShellCompDirectiveNoFileComp))

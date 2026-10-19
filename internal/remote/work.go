@@ -11,8 +11,6 @@ import (
 
 const MaxWork = 4096
 
-// NewWorkRows describes a peer's work items, the most recently active first and at most MaxWork,
-// without their resume commands and transcripts: resuming happens on the peer.
 func NewWorkRows(items []work.Item) []work.Item {
 	rows := slices.Clone(items)
 	slices.SortStableFunc(rows, func(a, b work.Item) int { return cmp.Compare(b.TurnAt, a.TurnAt) })

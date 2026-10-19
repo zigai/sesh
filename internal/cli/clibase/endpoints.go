@@ -24,8 +24,8 @@ func AddSocketFlag(cmd *cobra.Command) {
 	cmd.Flags().String("socket", "", SocketFlagUsage)
 }
 
-// ResolveSocket selects the tmux server: --socket, else the server named by $TMUX,
-// else tmux's default socket for this user, matching what a plain `tmux` command targets.
+// ResolveSocket prefers --socket, then the server named by $TMUX, then tmux's default socket,
+// matching what a plain `tmux` command targets.
 func ResolveSocket(cmd *cobra.Command) string {
 	if cmd.Flags().Lookup("socket") != nil {
 		if socketPath, _ := cmd.Flags().GetString("socket"); socketPath != "" {
@@ -40,7 +40,6 @@ func ResolveSocket(cmd *cobra.Command) string {
 	return DefaultTmuxSocket()
 }
 
-// DefaultTmuxSocket returns the socket tmux uses without -L or -S: $TMUX_TMPDIR (or /tmp)/tmux-UID/default.
 func DefaultTmuxSocket() string {
 	dir := os.Getenv("TMUX_TMPDIR")
 	if dir == "" || !filepath.IsAbs(dir) {

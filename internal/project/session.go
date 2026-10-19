@@ -73,7 +73,6 @@ func RootOfSession(ctx context.Context, server *gotmux.Server, id gotmux.Session
 	return "", ErrSessionNotFound
 }
 
-// NameConflict returns the untagged session that already uses the project's session name.
 func NameConflict(ctx context.Context, server *gotmux.Server, p Project) (gotmux.SessionInfo, bool, error) {
 	sessions, err := taggedSessions(ctx, server)
 	if err != nil {
@@ -89,10 +88,8 @@ func NameConflict(ctx context.Context, server *gotmux.Server, p Project) (gotmux
 	return emptySessionInfo(), false, nil
 }
 
-// CreateSession starts the project's session with a main window in its root and tags both. The
-// session takes the project's name; when another project's session holds that name, a numeric
-// suffix tells them apart. An untagged session with the name is never renamed or replaced: the
-// caller adopts it or stops with ErrNameTaken.
+// CreateSession adds a numeric suffix when another project's session holds the name. An untagged
+// session with the name is never renamed or replaced; the caller gets ErrNameTaken.
 func CreateSession(ctx context.Context, server *gotmux.Server, p Project) (gotmux.Session, error) {
 	sessions, err := taggedSessions(ctx, server)
 	if err != nil {
@@ -124,8 +121,6 @@ func CreateSession(ctx context.Context, server *gotmux.Server, p Project) (gotmu
 	return created, tagMainWindow(ctx, windows[0].Window())
 }
 
-// AdoptSession turns an existing untagged session into the project's session and adds a main
-// window in the project root. Its existing windows stay as they are.
 func AdoptSession(ctx context.Context, server *gotmux.Server, id gotmux.SessionID, p Project) (gotmux.Session, error) {
 	current, err := RootOfSession(ctx, server, id)
 	if err != nil {
@@ -160,14 +155,10 @@ func AdoptSession(ctx context.Context, server *gotmux.Server, id gotmux.SessionI
 	return adopted, nil
 }
 
-// SessionName is the session name a project asks for: its name with the characters tmux
-// reserves in session targets replaced.
 func SessionName(p Project) string {
 	return strings.NewReplacer(".", "_", ":", "_").Replace(p.Name)
 }
 
-// Open returns the project's session, creating it when the project has none. With adopt, the
-// untagged session holding the project's name becomes the project's session instead.
 func Open(ctx context.Context, server *gotmux.Server, p Project, adopt bool) (Opened, error) {
 	existing, found, err := SessionOf(ctx, server, p.Root)
 	if err != nil {

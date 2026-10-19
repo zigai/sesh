@@ -39,8 +39,6 @@ var (
 	ErrProjectAmbiguous = errors.New("several git projects have that name on this machine")
 )
 
-// TaskOffer is what the new task popup offers at the caller's pane: the harnesses and, in a project
-// session or a repository, the project's name and the locations a task can work in.
 type TaskOffer struct {
 	Project string
 	Offer   task.Offer
@@ -60,8 +58,6 @@ func (local *Local) registerTaskHandlers() {
 	handle(local, action.TaskMerge, local.mergeTask)
 }
 
-// TaskOffer lists what a new task can start with at the caller's pane, or in the project at dir
-// when one is named, with branch details when describe is set.
 func (local *Local) TaskOffer(ctx context.Context, caller action.Caller, dir string, describe bool) (TaskOffer, error) {
 	offered := TaskOffer{Project: "", Offer: task.Offer{
 		Harnesses: nil, Project: "", Locations: nil, Current: -1, NextNumber: 0, Branches: nil, Refs: nil, Starts: nil,
@@ -424,8 +420,6 @@ func (local *Local) openTaskPopup(ctx context.Context, caller action.Caller, _ a
 	return result, nil
 }
 
-// AttachTaskPopup attaches the terminal to a task's popup session. It runs inside the popup that
-// task.popup opens.
 func (local *Local) AttachTaskPopup(ctx context.Context, taskID string, streams gotmux.Streams) error {
 	popup, err := local.openPopupServer()
 	if err != nil {

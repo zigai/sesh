@@ -67,10 +67,9 @@ func loadHistoryEntries(ctx context.Context, repo *store.Repository, catalog sto
 	return entries
 }
 
-// historyResult names an attempt's outcome. Every observation is saved incomplete because tmux
-// cannot be checkpointed atomically, so incomplete and committed both read as saved.
 func historyResult(state string) string {
 	switch state {
+	// tmux cannot be checkpointed atomically, so every observation is saved incomplete.
 	case "committed", "incomplete":
 		return "saved"
 	case "failed":

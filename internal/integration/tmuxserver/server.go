@@ -16,8 +16,6 @@ const (
 	LibraryVersion            = "v0.7.4"
 	interactiveCommandTimeout = 24 * time.Hour
 
-	// OutputBytes bounds stdout and stderr of one tmux command, so a pane's full terminal text
-	// fits in a single capture.
 	OutputBytes = model.MaxArtifactBytes
 )
 
@@ -44,8 +42,7 @@ func Open(socket string) (*gotmux.Server, error) {
 	return server, nil
 }
 
-// OpenNamed opens the server on the named socket with configFile, running the same tmux build as
-// the server at socket so both answer to the same features.
+// OpenNamed runs the same tmux build as the server at socket, so both answer to the same features.
 func OpenNamed(socket, name, configFile string) (*gotmux.Server, error) {
 	if !filepath.IsAbs(socket) || filepath.Clean(socket) != socket {
 		return nil, oops.In("tmux").Code("endpoint_required").With("operation", "open_named").Wrap(ErrEndpoint)

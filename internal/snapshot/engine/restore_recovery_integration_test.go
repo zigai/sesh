@@ -553,6 +553,7 @@ func TestSettleDeadRestoresAbandonsARestoreWhoseServerExited(t *testing.T) {
 		t.Fatalf("kill the target server: %v", err)
 	}
 
+	// kill-server returns before the daemon exits.
 	waitForProcessExit(t, ctx, probe.Identity.PID)
 
 	settled, err := engine.SettleDeadRestores(ctx, repo)
@@ -604,7 +605,6 @@ func interruptRestoreAtMissingDirectory(t *testing.T, ctx context.Context, serve
 	return repo, interrupted.OperationID
 }
 
-// waitForProcessExit waits for a process to be gone, which kill-server does not wait for.
 func waitForProcessExit(t *testing.T, ctx context.Context, pid int) {
 	t.Helper()
 

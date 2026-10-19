@@ -16,12 +16,8 @@ import (
 	"github.com/zigai/sesh/internal/strictjson"
 )
 
-// ServerLossMarkerName records the autosave a server-loss report followed, so each loss is
-// reported once.
 const ServerLossMarkerName = "server-loss.json"
 
-// RestorePendingMarkerName records the server start a restore-pending report or late restore was
-// made for, so each unrestored server is handled once.
 const RestorePendingMarkerName = "restore-pending.json"
 
 const maxEpisodeMarkerBytes = 4096
@@ -38,8 +34,6 @@ func RestorePendingMarkerPath(historyPath string) string {
 	return filepath.Join(filepath.Dir(historyPath), RestorePendingMarkerName)
 }
 
-// EpisodeUnreported reports whether the episode identified by stamp has not been reported yet.
-// A non-positive stamp identifies no episode.
 func EpisodeUnreported(path string, stamp int64) (bool, error) {
 	if stamp <= 0 {
 		return false, nil

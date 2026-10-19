@@ -1,7 +1,5 @@
 //go:build linux || darwin
 
-// Package actioncli builds command-line commands from action definitions. The command path is
-// the action ID: session.kill runs as `sesh session kill`.
 package actioncli
 
 import (
@@ -30,8 +28,7 @@ const (
 
 	ConnectionFlag = "connection"
 
-	// ClientFlag and the flags after it name the tmux client that invoked an action; key
-	// bindings fill them from tmux formats.
+	// ClientFlag and the flags after it are filled by key bindings from tmux formats.
 	ClientFlag        = "client"
 	PaneFlag          = "pane"
 	ClientSessionFlag = "client-session"
@@ -41,9 +38,6 @@ const (
 
 var errPeerDisconnected = errors.New("remote peer is not connected")
 
-// Options adapts one action's command to command-line conventions the definition does not
-// describe, such as interactive selection or a detailed text summary. Frontend runs interactive
-// actions, which only the command line can present.
 type Options[In, Out any] struct {
 	Operation    string
 	SuccessOwned bool
@@ -59,8 +53,6 @@ type Runtime struct {
 	Router     action.Router
 }
 
-// Command builds the command for an action. Positional arguments are the subject followed by
-// positional parameters; other parameters become flags.
 func Command[In, Out any](definition *action.Definition[In, Out], opts Options[In, Out]) *cobra.Command {
 	operation := opts.Operation
 	if operation == "" {
@@ -141,8 +133,6 @@ func CallerOf(cmd *cobra.Command) action.Caller {
 	}
 }
 
-// OpenRuntime opens the tmux server and lazily opened repository selected by the environment
-// flags.
 func OpenRuntime(cmd *cobra.Command, cfg *config.Config) (*Runtime, error) {
 	workspace, err := app.Resolve(cfg, clibase.CommandLocations(cmd))
 	if err != nil {

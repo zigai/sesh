@@ -200,8 +200,8 @@ func ReconcileRestore(ctx context.Context, repository *store.Repository, operati
 	return operationStatus(op), nil
 }
 
-// AbandonRestore explicitly abandons an active restore operation and releases its recovery
-// source pin. Existing tmux objects are retained and nothing is rolled back.
+// AbandonRestore releases the recovery source pin; it keeps existing tmux objects and rolls
+// nothing back.
 func AbandonRestore(ctx context.Context, repository *store.Repository, operationID string) (OperationStatus, error) {
 	return abandonRestore(ctx, repository, operationID, "explicit_abandonment")
 }

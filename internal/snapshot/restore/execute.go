@@ -19,13 +19,9 @@ import (
 )
 
 const (
-	MissingWorkingDirFail MissingWorkingDir = "fail"
-	// MissingWorkingDirLaunch starts the pane, and relaunches its program, in tmux's fallback
-	// directory.
+	MissingWorkingDirFail   MissingWorkingDir = "fail"
 	MissingWorkingDirLaunch MissingWorkingDir = "launch_in_fallback"
-	// MissingWorkingDirShell starts the pane in tmux's fallback directory with its default shell
-	// and does not relaunch its program, which would run outside the directory it belongs to.
-	MissingWorkingDirShell MissingWorkingDir = "shell_in_fallback"
+	MissingWorkingDirShell  MissingWorkingDir = "shell_in_fallback"
 )
 
 const (
@@ -48,8 +44,6 @@ var (
 	errAdoptedLayoutUnresolved  = errors.New("adopted window has no identifiable initial pane")
 )
 
-// MissingWorkingDir selects what restore does with a pane whose saved working directory no
-// longer exists. Any value other than launch or shell fails the restore.
 type MissingWorkingDir string
 
 type ExecuteConfig struct {

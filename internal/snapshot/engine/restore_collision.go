@@ -26,9 +26,8 @@ const (
 
 var ErrNoServerRunning = errors.New("no tmux server is running on the selected socket; start tmux there first, then retry")
 
-// CollisionPolicy selects what restore does with saved sessions whose names are already in use on
-// the live server. The zero value skips them when every saved session was requested and fails when
-// the caller named sessions explicitly.
+// CollisionPolicy left empty skips colliding sessions when every saved session was requested and
+// fails when the caller named sessions explicitly.
 type CollisionPolicy string
 
 type SkippedSession struct {

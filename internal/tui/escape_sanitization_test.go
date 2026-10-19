@@ -217,7 +217,6 @@ func testPreserveCJKAndEmojiWidth(t *testing.T) {
 	model := newTestModel()
 	model.width = 60
 
-	//nolint:gosmopolitan // Test explicitly exercises CJK Han runes for terminal display width.
 	unicodeName := "sesh-🚀-项目-ワークスペース"
 	row := session.Session{
 		Name: unicodeName,

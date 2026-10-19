@@ -33,8 +33,7 @@ var (
 	ErrPromptFile        = errors.New("task action prompt file cannot be read")
 )
 
-// TaskActionRun is the result of running a task action in its popup window. ExitCode is nil when
-// the action did not run.
+// TaskActionRun has a nil ExitCode when the action did not run.
 type TaskActionRun struct {
 	ExitCode *int
 	PR       task.PullRequest
@@ -74,8 +73,6 @@ func (local *Local) runTaskAction(ctx context.Context, _ action.Caller, input ac
 	return result, local.openTaskRunWindow(ctx, record, input.Action, []string{"task", actionRunVerb, record.ID, input.Action})
 }
 
-// RunTaskAction runs a task action in the current terminal, records its run on the task, and
-// links the branch's pull request afterwards when the action asks for it.
 func (local *Local) RunTaskAction(ctx context.Context, id, name string, streams gotmux.Streams) (TaskActionRun, error) {
 	run := TaskActionRun{ExitCode: nil, PR: task.PullRequest{Number: 0, State: "", URL: ""}, Linked: false}
 
@@ -130,9 +127,6 @@ func (local *Local) RunTaskAction(ctx context.Context, id, name string, streams 
 	return run, nil
 }
 
-// SyncTasks records the current pull request of every project task and renames task windows
-// after the titles their agents report, keyed by task. It reports whether any record changed.
-// Without gh, pull requests are left as they are.
 func (local *Local) SyncTasks(ctx context.Context, titles map[string]string) (bool, error) {
 	service, err := local.taskService()
 	if err != nil {

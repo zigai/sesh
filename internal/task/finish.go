@@ -33,15 +33,12 @@ type FinishOptions struct {
 	SkipRun bool
 }
 
-// PRFinder looks up the pull request opened from a branch, in any state.
 type PRFinder interface {
 	FindPR(ctx context.Context, dir, branch string) (PullRequest, string, bool, error)
 }
 
 type GitHub struct{}
 
-// LossError lists what finishing a task would destroy: commits only its branch holds and changes
-// only its worktree holds, when sesh owns them, and a closed pull request of a branch it owns.
 type LossError struct {
 	UnmergedCommits int
 	ChangedFiles    int
@@ -121,13 +118,10 @@ func (s *Service) refreshPR(ctx context.Context, record Record) (Record, string,
 	return stored, head, true, nil
 }
 
-// Finish removes a task: its popup session, its window, and the worktree and branch sesh created
-// for it. A worktree or branch sesh did not create stays as it is. Without discard it refuses
-// when the removal would lose work: commits not merged into the base on a branch it deletes,
-// uncommitted changes in a worktree it removes, or a pull request of that branch closed without
-// merging. Before removing a worktree it runs the project's finish command there, unless it skips
-// it; a failing command stops the finish. A finish that stops part way leaves the task finishing,
-// and finishing it again completes the removal.
+// Finish removes only the worktree and branch sesh created. Without discard it refuses to lose
+// unmerged commits, uncommitted changes, or a pull request closed without merging. A failing
+// finish command stops it; a stopped finish leaves the task finishing, and finishing again
+// completes it.
 func (s *Service) Finish(ctx context.Context, id string, opts FinishOptions) (Record, error) {
 	record, err := s.record(ctx, id)
 	if err != nil {
@@ -277,8 +271,6 @@ func unmergedCommitCount(ctx context.Context, record Record, mergedHead string) 
 	return commits, nil
 }
 
-// mergeTargets are the branches a task's commits count as merged into: the remote branch it
-// tracks, or its base both locally and on origin, since a new task branch may start from either.
 func mergeTargets(ctx context.Context, record Record) ([]string, error) {
 	if record.Upstream != "" {
 		return []string{record.Upstream}, nil
@@ -286,6 +278,7 @@ func mergeTargets(ctx context.Context, record Record) ([]string, error) {
 
 	var bases []string
 
+	// A new task branch may start from the local base or from origin's.
 	for _, ref := range []string{"refs/heads/" + record.Base, "refs/remotes/origin/" + record.Base} {
 		exists, err := refExists(ctx, record.Project, ref)
 		if err != nil {

@@ -1,5 +1,3 @@
-// Package project decides which project a directory belongs to and lists the known projects.
-// A project is a git repository, with its linked worktrees, or a folder registered in config.
 package project
 
 import (
@@ -38,7 +36,6 @@ type repository struct {
 	root     string
 }
 
-// Project is identified by Root: the main checkout of a repository, or a registered folder.
 type Project struct {
 	Root string `json:"root"`
 	Name string `json:"name"`
@@ -64,9 +61,8 @@ func NewCatalog(cfg config.ProjectsConfig) (Catalog, error) {
 	return Catalog{roots: roots, extra: extra}, nil
 }
 
-// Resolve returns the project dir belongs to. The most specific match wins: a registered
-// folder inside a repository owns the paths below it, and a repository inside a registered
-// folder owns its own paths. Linked worktrees always resolve to their main checkout.
+// Resolve picks the most specific match between a registered folder and a repository. Linked
+// worktrees always resolve to their main checkout.
 func (c Catalog) Resolve(ctx context.Context, dir string) (Project, error) {
 	resolved, err := filepath.EvalSymlinks(dir)
 	if err != nil {
@@ -90,8 +86,6 @@ func (c Catalog) Resolve(ctx context.Context, dir string) (Project, error) {
 	}
 }
 
-// List returns the repositories directly under each root and the registered folders, sorted
-// by name. Linked worktrees and hidden directories are not projects of their own.
 func (c Catalog) List() ([]Project, error) {
 	seen := make(map[string]bool)
 	projects := make([]Project, 0)

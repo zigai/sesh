@@ -37,8 +37,6 @@ var (
 	errMixedServers      = errors.New("selected sessions belong to different tmux servers")
 )
 
-// engineLoggedError marks an outcome the snapshot engine already logged, so the caller's boundary
-// does not log it again.
 type engineLoggedError struct{ error }
 
 type paneLabel struct {

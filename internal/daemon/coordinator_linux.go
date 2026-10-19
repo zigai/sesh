@@ -15,14 +15,11 @@ import (
 var ErrFinalSaveNil = errors.New("cannot run lifecycle coordinator: FinalSave is nil")
 
 type CoordinatorConfig struct {
-	Runtime  lifecycle.LogindRuntime
-	Reporter *RuntimeReporter
-	// FinalSave runs one bounded save for an announced sleep or shutdown.
+	Runtime   lifecycle.LogindRuntime
+	Reporter  *RuntimeReporter
 	FinalSave func(context.Context) (FinalSaveOutcome, error)
 }
 
-// FinalSaveOutcome says whether a final save failure was durably recorded, which keeps the
-// coordinator running.
 type FinalSaveOutcome struct {
 	Recorded bool
 }

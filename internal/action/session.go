@@ -114,8 +114,8 @@ var (
 	})
 )
 
-// SessionRef identifies one session incarnation. Live references carry the tmux server and
-// session creation times so a replaced session is never mistaken for the selected one.
+// SessionRef carries, for live sessions, the tmux server and session creation times so a
+// replaced session is never mistaken for the selected one.
 type SessionRef struct {
 	Kind            session.Kind `json:"kind"`
 	ID              string       `json:"id"`
@@ -197,8 +197,6 @@ func (ref SessionRef) Saved() bool {
 	return ref.Kind == session.KindSaved
 }
 
-// Session describes the referenced session as a catalog row at a location, carrying the
-// identity later actions check before they act on it.
 func (ref SessionRef) Session(at Location) session.Session {
 	var target session.Session
 

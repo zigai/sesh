@@ -62,9 +62,9 @@ type AgentViewHistoryEntry struct {
 	ViewedAtUnixNano int64    `json:"viewedAt"`
 }
 
-// KeyAssignment records the letter the picker opens a session with. Session is a key
-// identity (see Identity.KeyIdentity), so the key follows a session between live and saved.
 type KeyAssignment struct {
+	// Session is a key identity (see Identity.KeyIdentity), so the key follows a session between
+	// live and saved.
 	Session Identity `json:"session"`
 	Key     string   `json:"key"`
 }
@@ -298,8 +298,6 @@ func (e *HistoryVersionError) Unwrap() error {
 	return ErrInvalidHistoryVersion
 }
 
-// HistoryUpgradeFilter returns the jq filter that converts a history file of version to
-// CurrentHistoryVersion, and false when no conversion exists.
 func HistoryUpgradeFilter(version int) (string, bool) {
 	if version == 1 {
 		return ".version = 2 | .sessionKeys = []", true

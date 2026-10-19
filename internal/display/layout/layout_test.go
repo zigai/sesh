@@ -254,7 +254,7 @@ func TestStyledPaintStripsToUnstyledPaint(t *testing.T) {
 
 func TestColoredCellsPaintLikePlainCellsAndCloseTheirStyles(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		words := rapid.SliceOfN(rapid.StringMatching(`[a-zé漢]{0,4}`), 1, 5).Draw(t, "words") //nolint:gosmopolitan // Generator mixes wide Han runes into colored cells to test width.
+		words := rapid.SliceOfN(rapid.StringMatching(`[a-zé漢]{0,4}`), 1, 5).Draw(t, "words")
 		styles := rapid.SliceOfN(rapid.SampledFrom([]string{"\x1b[31m", "\x1b[1;38;5;208m", "\x1b[0m", "\x1b[m", ""}), len(words), len(words)).Draw(t, "styles")
 		width := rapid.IntRange(1, 16).Draw(t, "width")
 		side := rapid.SampledFrom([]TruncateSide{TruncateRight, TruncateLeft}).Draw(t, "side")

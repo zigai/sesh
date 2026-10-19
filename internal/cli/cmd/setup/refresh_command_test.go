@@ -188,7 +188,7 @@ if [ %[4]q = "$*" ]; then exit %[3]d; fi
 exit 0
 `, callsPath, failing, fakeSystemctlFailureExit, "--user "+failing)
 
-	if err := os.WriteFile(filepath.Join(binDir, "systemctl"), []byte(script), 0o700); err != nil { //nolint:gosec // the stub must be executable.
+	if err := os.WriteFile(filepath.Join(binDir, "systemctl"), []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
 
@@ -352,7 +352,7 @@ esac
 exit 0
 `, callsPath, failedCases.String(), unitFileState)
 
-	if err := os.WriteFile(filepath.Join(binDir, "systemctl"), []byte(script), 0o700); err != nil { //nolint:gosec // the stub must be executable.
+	if err := os.WriteFile(filepath.Join(binDir, "systemctl"), []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
 

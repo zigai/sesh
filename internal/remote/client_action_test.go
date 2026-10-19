@@ -55,7 +55,7 @@ func scriptedSSHPath(t *testing.T, script string) string {
 	t.Helper()
 
 	path := filepath.Join(t.TempDir(), "fake-ssh")
-	if err := os.WriteFile(path, []byte("#!/bin/sh\n"+script), 0o700); err != nil { //nolint:gosec // the fake ssh must be executable.
+	if err := os.WriteFile(path, []byte("#!/bin/sh\n"+script), 0o700); err != nil {
 		t.Fatal(err)
 	}
 

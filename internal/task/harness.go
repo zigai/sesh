@@ -15,11 +15,6 @@ type Harness struct {
 	PromptArgs []string
 }
 
-// Harnesses returns the harnesses offered for new tasks, in menu order. Configured harnesses are
-// the offer, in order: one with a command runs it, and one without runs the installed executable
-// of the AHT harness it names, or is left out when that harness is not installed. Without
-// configuration, every harness AHT supports whose executable lookPath finds is offered under its
-// AHT name.
 func Harnesses(cfg config.TasksConfig, lookPath func(string) (string, error)) []Harness {
 	if len(cfg.Harness) == 0 {
 		offered := make([]Harness, 0)

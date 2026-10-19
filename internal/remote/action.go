@@ -31,11 +31,10 @@ var (
 	errNilActionOutput = errors.New("remote action output is not configured")
 )
 
-// ActionRequest asks a peer to run one action. Input is the action's typed input as JSON; the
-// intent digest binds the invocation ID to the action, peer, tmux server and input, so a retry
-// of the same ID with different intent is refused instead of replayed.
 type ActionRequest struct {
-	InvocationID string         `json:"invocationId"`
+	InvocationID string `json:"invocationId"`
+	// IntentDigest binds the invocation ID to the action, peer, tmux server and input, so a retry of
+	// the same ID with different intent is refused instead of replayed.
 	IntentDigest string         `json:"intentDigest"`
 	Action       action.ID      `json:"action"`
 	ConnectionID string         `json:"connectionId"`
@@ -45,9 +44,6 @@ type ActionRequest struct {
 	Input        jsontext.Value `json:"input"`
 }
 
-// ActionResult is a peer's answer to an invocation: success with the action's output, or a
-// failure code. A failure may carry output that describes what is known. Action is empty only
-// when the peer could not tell which action was meant.
 type ActionResult struct {
 	InvocationID string         `json:"invocationId"`
 	Action       action.ID      `json:"action"`
@@ -56,8 +52,6 @@ type ActionResult struct {
 	Output       jsontext.Value `json:"output,omitzero"`
 }
 
-// PeerError is a remote action that failed or whose outcome is unknown. The invocation ID
-// finds the peer's receipt with `sesh remote lookup`.
 type PeerError struct {
 	Code         action.Code
 	InvocationID string

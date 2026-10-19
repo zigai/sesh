@@ -44,9 +44,6 @@ const (
 
 var errRemoteTaskSession = errors.New("the remote task's session is not in the remote catalog")
 
-// taskHandoff names the task the task picker popup hands to its opener to go to, or asks it to
-// reopen the popup on Machine, expanded or not, with the title and agent chosen so far. Machine
-// is a remote connection, empty for this machine.
 type taskHandoff struct {
 	Show     string `json:"show"`
 	Reopen   bool   `json:"reopen"`
@@ -322,9 +319,6 @@ func finishTaskPicker(ctx context.Context, handoffPath string, picked pickedTask
 	}
 }
 
-// pickedTask is what the popup ended with: the choice, the popup's machines, on a remote
-// connection the session the started task opened in, and the task started in another project's
-// session, which the opener goes to.
 type pickedTask struct {
 	choice   taskpicker.Choice
 	machines []action.Location
@@ -574,8 +568,6 @@ func handOffRemoteTask(ctx context.Context, handoffPath string, picked pickedTas
 	})
 }
 
-// waitRemoteTaskSession waits until the remote catalog shows the session find looks for on the
-// picked connection. A new project session reaches the catalog with the peer's next inventory.
 func waitRemoteTaskSession(
 	ctx context.Context, picked pickedTask, find func(tui.RemoteConnection) (session.Session, bool),
 ) (session.Session, error) {
@@ -587,6 +579,7 @@ func waitRemoteTaskSession(
 		listed bool
 	)
 
+	// A new project session reaches the remote catalog only with the peer's next inventory.
 	err := picked.remote.Watcher.WatchRemoteCatalog(watching, func(catalog tui.RemoteCatalog, err error) {
 		if err != nil || listed {
 			return

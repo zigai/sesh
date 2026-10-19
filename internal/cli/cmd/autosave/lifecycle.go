@@ -53,8 +53,6 @@ type heldStartupRestore struct {
 	lock *automation.SaveLock
 }
 
-// acquireStartupRestore opens the repository and takes the save lock. It returns nil after
-// rendering the result when there is no repository or another save holds the lock.
 func acquireStartupRestore(cmd *cobra.Command, env Env) (*heldStartupRestore, error) {
 	ctx := clibase.CommandContext(cmd)
 

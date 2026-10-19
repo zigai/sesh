@@ -19,16 +19,11 @@ type Sighting struct {
 	Pane         string
 	PanePID      int
 	TurnAt       time.Time
-	// PromptAt is when the user last sent the agent a prompt, zero when the agent's latest event is
-	// not a prompt.
-	PromptAt time.Time
+	PromptAt     time.Time
 }
 
 type Checkout func(dir string) (branch, project string)
 
-// Observe records sightings into their items, starting an item for a conversation no item
-// continues, and reports whether anything changed. checkout reads the branch and project of a new
-// item or one that moved.
 func (s *State) Observe(sightings []Sighting, now time.Time, checkout Checkout) bool {
 	changed := false
 

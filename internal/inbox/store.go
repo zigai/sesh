@@ -1,5 +1,3 @@
-// Package inbox keeps what the inbox remembers between pickers: the rows the user snoozed and the
-// results the user marked as not seen.
 package inbox
 
 import (
@@ -35,16 +33,12 @@ var (
 	ErrNilUpdate = errors.New("inbox state update is nil")
 )
 
-// Snooze hides the conversation Key from the inbox. It ends at Until when Timed, or when the agent
-// finishes a turn or asks for input after SnoozedAt.
 type Snooze struct {
 	Key       string `json:"key"`
 	Until     int64  `json:"until"`
 	SnoozedAt int64  `json:"since"`
 }
 
-// Unseen marks the latest result of the conversation Key as not seen, until its pane is viewed
-// after At.
 type Unseen struct {
 	Key string `json:"key"`
 	At  int64  `json:"at"`
@@ -56,8 +50,7 @@ type State struct {
 	Unseen  []Unseen `json:"unseen"`
 }
 
-// Store reads and updates the inbox state file. Updates hold an exclusive lock, so concurrent sesh
-// processes never lose each other's changes.
+// Store updates hold an exclusive lock, so concurrent sesh processes never lose each other's changes.
 type Store struct {
 	path string
 }
@@ -112,7 +105,6 @@ func (s *State) Expire(now time.Time) {
 	s.Snoozes = slices.DeleteFunc(s.Snoozes, func(snooze Snooze) bool { return snooze.Timed() && snooze.Until <= now.Unix() })
 }
 
-// Load returns the current state; a missing file is an empty state.
 func (s Store) Load(ctx context.Context) (State, error) {
 	dir, name, err := s.open(false)
 	if errors.Is(err, os.ErrNotExist) {
@@ -128,8 +120,6 @@ func (s Store) Load(ctx context.Context) (State, error) {
 	return state, storeError("load_inbox", errors.Join(err, dir.Close(), ctx.Err()))
 }
 
-// Update applies change to the locked state and publishes the result. A change that returns an
-// error leaves the file as it was.
 func (s Store) Update(ctx context.Context, change func(*State) error) (State, error) {
 	if change == nil {
 		return State{}, storeError("update_inbox", ErrNilUpdate)

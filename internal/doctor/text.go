@@ -37,9 +37,8 @@ func shellArg(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", `'\''`) + "'"
 }
 
-// shellPath renders path for a command line, abbreviating the home directory only when the
-// result needs no quoting, because a quoted ~ does not expand.
 func shellPath(path string) string {
+	// A quoted ~ does not expand, so abbreviate the home directory only when no quoting is needed.
 	if display := DisplayPath(path); display != path && shellSafe.MatchString(display) {
 		return display
 	}

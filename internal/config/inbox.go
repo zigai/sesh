@@ -45,21 +45,18 @@ var (
 	defaultInboxSnoozeList = []string{SnoozeNextMessage, "1h", "4h", "tomorrow 09:00"}
 )
 
-// InboxConfig configures the inbox view. Sections lists the shown sections in order; a section
-// left out is hidden. Labels renames sections, Dim lists the sections whose rows are dimmed, and
-// Snooze lists the choices the snooze action offers. ClosedShown is how many closed rows a project
-// shows before a row that expands the rest; zero shows them all.
 type InboxConfig struct {
-	Group       string            `toml:"group"`
-	Sections    []string          `toml:"sections"`
-	Labels      map[string]string `toml:"labels"`
-	Dim         []string          `toml:"dim"`
-	Snooze      []string          `toml:"snooze"`
-	ClosedShown int               `toml:"closed_shown"`
+	Group string `toml:"group"`
+	// Sections are shown in order; a section left out is hidden.
+	Sections []string          `toml:"sections"`
+	Labels   map[string]string `toml:"labels"`
+	Dim      []string          `toml:"dim"`
+	Snooze   []string          `toml:"snooze"`
+	// ClosedShown is how many closed rows a project shows before a row that expands the rest; zero
+	// shows them all.
+	ClosedShown int `toml:"closed_shown"`
 }
 
-// InboxSections returns the inbox sections shown by default, in order. The finished section is
-// shown only when configured.
 func InboxSections() []string {
 	return slices.Clone(defaultInboxSections)
 }
@@ -78,7 +75,6 @@ func (c InboxConfig) Clone() InboxConfig {
 	}
 }
 
-// Label is the heading of a section: its configured label, else its name.
 func (c InboxConfig) Label(section string) string {
 	if label := c.Labels[section]; label != "" {
 		return label

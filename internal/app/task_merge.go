@@ -46,9 +46,8 @@ func (local *Local) mergeTask(ctx context.Context, _ action.Caller, input action
 	return result, local.openTaskRunWindow(ctx, record, task.MergeAction, []string{"task", mergeRunVerb, record.ID})
 }
 
-// RunTaskMerge merges a task in the current terminal, records the run on the task, and finishes
-// the task once its branch is on the base. The finish closes the popup session this runs in, so
-// it runs in its own session and the hangup is ignored until it ends.
+// RunTaskMerge records the run on the task and finishes the task once its branch is on the base.
+// From then on it ignores SIGHUP, since the finish closes the popup session it runs in.
 func (local *Local) RunTaskMerge(ctx context.Context, id string, streams gotmux.Streams) (TaskMergeRun, error) {
 	run := TaskMergeRun{ExitCode: nil, Merged: task.Merged{Branch: "", Base: ""}, Finished: false}
 
@@ -107,9 +106,6 @@ func (local *Local) RunTaskMerge(ctx context.Context, id string, streams gotmux.
 	return run, oops.In("app").With("operation", "finish_merged_task").Wrap(finishErr)
 }
 
-// finishInOwnSession finishes a task through a child sesh in a new session. When the popup
-// terminal closes, its whole foreground job is hung up, tmux clients that sesh starts included;
-// a finish that belonged to that job would lose the reply to its own kill-session.
 func (local *Local) finishInOwnSession(ctx context.Context, id string) error {
 	argv, err := local.seshCommand([]string{"task", "finish", id})
 	if err != nil {
@@ -121,6 +117,8 @@ func (local *Local) finishInOwnSession(ctx context.Context, id string) error {
 		processAttr syscall.SysProcAttr
 	)
 
+	// Closing the popup hangs up its whole foreground job, tmux clients included; a finish in
+	// that job would lose the reply to its own kill-session.
 	processAttr.Setsid = true
 
 	command := exec.CommandContext(context.WithoutCancel(ctx), argv[0], argv[1:]...)
