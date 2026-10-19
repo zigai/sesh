@@ -146,23 +146,28 @@ func TestMissingServerStaysSilentWithoutAnythingToRestore(t *testing.T) {
 			t.Fatalf("expected silence, got %d and %q", count, fixture.buffer.String())
 		}
 	})
+}
 
-	t.Run("unreadable marker", func(t *testing.T) {
-		fixture := newLossFixture(t, true)
+func TestUnreadableLossMarkerWarnsInsteadOfReporting(t *testing.T) {
+	fixture := newLossFixture(t, true)
 
-		markerPath := automation.ServerLossMarkerPath(fixture.historyPath)
-		if err := os.MkdirAll(filepath.Dir(markerPath), 0o700); err != nil {
-			t.Fatal(err)
-		}
+	markerPath := automation.ServerLossMarkerPath(fixture.historyPath)
+	if err := os.MkdirAll(filepath.Dir(markerPath), 0o700); err != nil {
+		t.Fatal(err)
+	}
 
-		if err := os.WriteFile(markerPath, []byte("{not json"), 0o600); err != nil {
-			t.Fatal(err)
-		}
+	if err := os.WriteFile(markerPath, []byte("{not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 
-		if count := fixture.report(t); count != 0 || fixture.buffer.Len() != 0 {
-			t.Fatalf("an unreadable marker must not turn into a report on every interval, got %d and %q", count, fixture.buffer.String())
-		}
-	})
+	if count := fixture.report(t); count != 0 {
+		t.Fatalf("an unreadable marker must not turn into a restorable-session report, got %d", count)
+	}
+
+	records := fixture.records(t)
+	if len(records) != 1 || records[0]["level"] != "warn" || records[0]["reason"] != "episode_marker_failed" {
+		t.Fatalf("an unreadable marker must be reported, got %+v", records)
+	}
 }
 
 func TestNothingSavedDoesNotConsumeTheEpisode(t *testing.T) {

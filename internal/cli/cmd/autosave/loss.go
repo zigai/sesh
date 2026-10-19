@@ -18,7 +18,13 @@ func reportRestorableSessions(ctx context.Context, env Env, repo *store.Reposito
 	markerPath := automation.ServerLossMarkerPath(env.workspace.History)
 
 	unreported, err := automation.EpisodeUnreported(markerPath, env.lastSavedUnix)
-	if err != nil || !unreported {
+	if err != nil {
+		logLossMarkerFailure(ctx)
+
+		return 0
+	}
+
+	if !unreported {
 		return 0
 	}
 
@@ -28,6 +34,8 @@ func reportRestorableSessions(ctx context.Context, env Env, repo *store.Reposito
 	}
 
 	if err := automation.RecordEpisodeReported(markerPath, env.lastSavedUnix); err != nil {
+		logLossMarkerFailure(ctx)
+
 		return 0
 	}
 
@@ -40,4 +48,13 @@ func reportRestorableSessions(ctx context.Context, env Env, repo *store.Reposito
 		Msg("tmux is not running and a snapshot has restorable sessions")
 
 	return count
+}
+
+func logLossMarkerFailure(ctx context.Context) {
+	zerolog.Ctx(ctx).Warn().
+		Str("component", "snapshot").
+		Str("operation", "autosave").
+		Str("status", statusDegraded).
+		Str("reason", reasonEpisodeMarker).
+		Msg("restorable session report state could not be checked")
 }
