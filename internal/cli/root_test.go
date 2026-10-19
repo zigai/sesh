@@ -53,7 +53,7 @@ func TestRootHelpOrdersCoreCommandsFirstWithDoctorBeforeHelp(t *testing.T) {
 		t.Fatalf("help failed: %v, stderr %q", err, stderr)
 	}
 
-	section, found := strings.CutPrefix(stdout, "Native tmux session persistence\n\n")
+	section, found := strings.CutPrefix(stdout, "Session, task, and agent manager for tmux\n\n")
 	if !found {
 		t.Fatalf("unexpected root help: %s", stdout)
 	}

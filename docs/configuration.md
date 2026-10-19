@@ -1,184 +1,342 @@
 # Configuration
 
-Location: `$XDG_CONFIG_HOME/sesh/config.toml` (defaults to `~/.config/sesh/config.toml`).
+sesh reads its configuration from `$XDG_CONFIG_HOME/sesh/config.toml`, which defaults to `~/.config/sesh/config.toml`. Every setting is optional.
 
-Initialize template:
+To create the file, run:
 
 ```sh
 sesh config init
 ```
 
-Override via flag: `--config /path/to/config.toml` or `--no-config`.
+The generated file lists every setting with its default, commented out. Uncomment a setting to change it.
 
-Override via environment: `SESH_<SECTION>_<KEY>`, for example `SESH_SETTINGS_LOG_LEVEL=warn`.
+## Overrides
 
-## Storage paths
+- `--config <path>` reads a different file.
+- `--no-config` ignores the file and uses the built-in defaults.
+- `SESH_<TABLE>_<KEY>` environment variables override single settings, for example `SESH_SETTINGS_LOG_LEVEL=warn`.
 
-| Component | Default path |
+## Services
+
+sesh runs its background work as systemd user services. To write them, run:
+
+```sh
+sesh setup services --apply
+```
+
+| Service | Purpose |
 | --- | --- |
-| Config | `$XDG_CONFIG_HOME/sesh/config.toml` |
-| Data | `$XDG_DATA_HOME/sesh` |
-| Snapshots | `$XDG_DATA_HOME/sesh/snapshots` |
-| Logs | `$XDG_STATE_HOME/sesh/sesh.log` |
-| History | `$XDG_STATE_HOME/sesh/history.json` |
-| Tasks | `$XDG_STATE_HOME/sesh/tasks.json` |
-| Task worktrees | `$WORKTREE_DIR/<project>/`, else `~/Worktrees/<project>/` |
-| Custom field cache | `$XDG_CACHE_HOME/sesh/fields` |
+| `sesh-autosave.timer` | Saves a snapshot every `autosave.interval`. |
+| `sesh-coordinator.service` | Saves before sleep and shutdown. Written only with `--with-coordinator`. |
+| `sesh-agent-status.service` | Tracks agents, colors windows that need attention, and finishes merged tasks. |
+| `sesh-remote-monitor.service` | Keeps the list of remote sessions current. |
 
-## Default configuration
+Enable the services you want:
+
+```sh
+systemctl --user enable --now sesh-autosave.timer sesh-agent-status.service
+```
+
+`sesh setup tmux --apply` registers the tmux key bindings. `sesh setup agents` connects sesh to [aht](https://github.com/zigai/aht) v2, which all agent features need.
+
+## Example
 
 ```toml
 [settings]
-show_footer = true
-directory_suggestions = 5
-default_session_path_suggestion = "~/Projects/{session}"
-display_modes = ["sesh", "agents", "inbox"]
-log_level = "info" # trace, debug, info, warn, error, disabled
-shortcut_style = "none" # none, indent (session keys and focused agent keys on the left), right
-session_key_action = "focus" # focus (then an agent key opens one of its agents), open
-
-[popup]
-sesh_width = "40%"
-sesh_height = "45%"
-agents_width = "40%"
-agents_height = "80%"
-
-[display]
-# Row templates: {field} substitutions; {right} and agent columns align across filtered rows.
-sesh_format = "{source_prefix}{session_name}{right}{session_agent_context}"
-agents_session_format = "{source_prefix}{session_name}"
-agents_agent_format = "{tree}{status_glyph} {status_age:<7}   {agent_cwd_name:<23.23}  {agent_session}{right}{harness:<6.6}   {agent_git_label:<6.22} {agent_git_added:<5} {agent_git_deleted:<5} {agent_git_ahead:<2} {agent_git_behind:<2}"
-inbox_group_format = "{session_name}"
-inbox_agent_format = "{tree}{status_glyph} {status_age:<7}   {agent_project_name:<16.16}  {agent_session}{right}{harness:<6.6}   {agent_git_label:<6.22} {agent_git_added:<5} {agent_git_deleted:<5} {agent_pr:<10} {evidence:<5} {host}"
-
-[agent_sessions]
-enabled = true
-popup_sort = "position" # position, name, attention
-popup_counts = false
-refresh_interval = "250ms"
-status_style = "glyph" # glyph, text
-status_time_format = "relative" # relative, relative-seconds, clock, hh:mm
-
-[agent_status]
-enabled = true
-store_path = "" # defaults to ~/.local/state/aht/state.json
-tmux_binary = "tmux"
-style_waiting = "fg=#1e1e2e,bg=#ffdd57,bold"
-style_failed = "fg=#1e1e2e,bg=#ff5555,bold"
-style_unread = "fg=#1e1e2e,bg=#6c7086,bold"
-set_window_status_style = true
-set_window_status_bell_style = true
-active_bypass = true
-clear_failed_on_visit = true
-
-[remote]
-enabled = false
-ssh_path = "ssh"
-tmux_poll_interval = "1s"
-connect_timeout = "5s"
-action_timeout = "2m"
-max_parallel_connects = 4
-enable_reverse_bridge = true
-return_to_origin = true
-connections = []
-# Example peer connection:
-# connections = [
-#   { id = "prod", label = "Production", host = "prod", sesh_path = "/usr/local/bin/sesh", tmux_socket = "/tmp/tmux-1000/default" }
-# ]
-
-[autosave]
-enabled = true
-interval = "3m"
-restore_last_on_start = true # restore the newest snapshot when tmux starts, or at the next autosave if that start skipped it
-
-[snapshot]
-retention_days = 14 # 0 disables age limit
-max_count = 0       # 0 disables count limit
-max_bytes = 0       # 0 disables size limit
-process_environment = ["PATH", "VIRTUAL_ENV", "CONDA_PREFIX", "CONDA_DEFAULT_ENV", "PYTHONPATH", "NODE_PATH"]
-
-[keys]
-help = "?"
-cycle_mode = "ctrl+f"
-agent_sort = "ctrl+s"
-inbox_group = "ctrl+g" # inbox grouping: state or project
-menu = "alt+m" # the selected row's menu; a right-click also opens it
-session_prefix = "tab" # pressed before a session letter; "alt" holds alt with the letter
-agent_keys = "asdfghjklqwertyuiopzxcvbnm" # handed out in order to a focused session's agents
-
-[keys.sessions] # session_prefix then a letter opens a session, or focuses it in agents and inbox modes so an agent key opens one of its agents; other sessions get a free letter assigned once and kept
-dotfiles = "d"
-
-[theme]
-preset = "dracula" # dracula, catppuccin, catppuccin-latte, tokyo-night, gruvbox, nord, terminal
-primary = "#24c8ff"
-secondary = "#ffdd57"
-muted = "#6c7086"
-error = "#ff5555"
-warning = "#ff9e3b"
-success = "#50fa7b"
-border = "#3a3d45"
-selected = "#2a2a2a"
-background = "" # empty for black popup, "default" for transparent terminal background
-foreground = "" # empty/default for light text, or custom hex/ANSI
-
-[theme.agent_status]
-running = "#50fa7b"
-waiting = "#ffdd57"
-failed = "#ff5555"
-interrupted = "#ff9e3b"
-idle = "#6c7086"
+display_modes = ["sesh", "inbox"]
 
 [projects]
-roots = ["~/Projects"]
-extra = []
-
-[tasks]
-panes = [{ name = "editor", command = ["nvim"] }] # panes beside the agent; see Task windows
-popup_socket = "sesh-popup"
-popup_config = "" # without it, the popup server hides its status line and C-p closes it
-wake_on_restore = "previous" # after a restore: "previous" resumes the agents that were awake, "none" brings every task back asleep, "3" resumes only the 3 newest awake tasks
-harness = [] # the agents ctrl+t offers, in order; defaults to every supported harness found on PATH
-
-[paths]
-data_dir = "" # defaults to $XDG_DATA_HOME/sesh
-log_file = "" # defaults to $XDG_STATE_HOME/sesh/sesh.log
-
-[hooks]
-timeout = "30s"
-session_switch_pre = []
-session_switch_post = []
-session_attach_pre = []
-session_attach_post = []
-tmux_startup_post = []
-```
-
-## Tasks
-
-`ctrl+t` opens a popup that starts a task: a title (optional), the agent, and in a project session or a repository where it works. Left/right pick the agent, starting from the first; up/down pick the checkout; typing goes to the title; enter starts the task. The title keeps its usual editing keys. The title names the task window and a new branch (`wt/<title>`), and is passed to the agent through the harness's `prompt_args`. The places are a new worktree on a new branch from the default branch, or `origin`'s when the local one is behind it, whose name the popup shows, the pane's checkout, and `existing branch…`, where enter expands the popup to list every location:
-
-- new worktrees on a new branch, from the default branch or the branch the pane is on; filtering also finds the other local branches
-- the main checkout and existing worktrees
-- local branches no worktree has checked out, and branches only a remote has, which get a local branch tracking them
-
-A checkout another task works in is shown with that task, and enter goes to it. Outside a repository the task works in the pane's directory, and the agent row also offers a plain tab. The task window opens in the pane's session. Finishing a task removes only the worktree and branch sesh created. A failed start is shown in the popup. With remote connections, a `host` row lists this machine and the connected hosts; shift+left/right picks one, which starts the task in the project of the same name there and then attaches to its session. A host whose sesh is too old shows `(update sesh)`, one without the project shows `not on <host>`, and one that fails shows `<host> unavailable`. Key hints show at its bottom; `tasks.show_footer = false` hides them.
-
-`[[tasks.harness]]` entries are the agents the popup offers, in order. A harness AHT supports needs only its name; any other entry needs `command`. Task commands run in your interactive shell (tmux's `default-shell`), so your aliases, functions and options apply as when you type them. `prompt_args` are appended to the command when the task has a title, with the task variables of task action prompts filled in.
-
-```toml
-[[tasks.harness]]
-name = "pi"
+roots = ["~/Projects", "~/work"]
 
 [[tasks.harness]]
 name = "claude"
 prompt_args = ["{title}"]
+
+[inbox]
+sections = ["done", "input", "running", "closed", "finished"]
+
+[merge]
+check = ["just", "check"]
+
+[[keys.bind]]
+key = "M-s"
+action = "snapshot.save"
+in = "tmux"
+table = "prefix"
 ```
 
-## Task windows
+## General
 
-A task window holds the agent and the panes in `[[tasks.panes]]`. A pane's `command` runs in your interactive shell in the task directory, or `dir` relative to it, and can use the task action variables; a pane without a command is a shell. `restart = true` on a pane with a command runs it again after a snapshot restore. Each pane is tagged with its name in `@sesh_role`; the agent's is `agent`.
+### `[settings]`
 
-`[[tasks.layouts]]` arrange the window; the first whose `when` fits the new window applies. `when` can test `orientation` (`landscape` is at least twice as many columns as rows), `min_width`, `max_width`, `min_height`, `max_height` and `harness`. A layout either sets `arrange`, a tmux layout with the agent as the main pane (`main_size` sets its share, `panes` limits the panes), or `splits`, which place each pane by splitting the agent or an earlier pane `right`, `below`, `left` or `above`, with a size in cells or percent. `focus` picks the pane selected when the window opens. Without layouts, the agent sits beside the panes in a landscape window and above them otherwise.
+- `show_footer` `(bool: true)` - Show key hints at the bottom of the popup.
+- `display_modes` `(list: ["sesh", "agents", "inbox"])` - Popup modes, in cycle order. One entry locks the popup to that mode.
+- `directory_suggestions` `(int: 5)` - Number of directory completions shown when creating a session.
+- `default_session_path_suggestion` `(string: "~/Projects/{session}")` - Initial directory for a new session. `{session}` becomes the session name.
+- `shortcut_style` `(string: "none")` - Where session keys are shown: `none`, `indent` (left of each row), or `right`.
+- `session_key_action` `(string: "focus")` - What a session key does in the agents and inbox modes: `focus` waits for an agent key, `open` opens the session.
+- `log_level` `(string: "info")` - One of `debug`, `info`, `warn`, `error`, or `disabled`.
+
+### `[paths]`
+
+- `data_dir` `(string: "$XDG_DATA_HOME/sesh")` - Directory for snapshots.
+- `log_file` `(string: "$XDG_STATE_HOME/sesh/sesh.log")` - Log file.
+
+Other files sesh writes:
+
+| Data | Path |
+| --- | --- |
+| Snapshots | `<data_dir>/snapshots` |
+| Session history | `$XDG_STATE_HOME/sesh/history.json` |
+| Tasks | `$XDG_STATE_HOME/sesh/tasks.json` |
+| Agent conversations | `$XDG_STATE_HOME/sesh/work.json` |
+| Task worktrees | `$WORKTREE_DIR/<project>/`, else `~/Worktrees/<project>/` |
+| Custom field cache | `$XDG_CACHE_HOME/sesh/fields` |
+
+## Picker
+
+### `[popup]`
+
+Sizes are terminal cells (`"80"`), percentages (`"50%"`), or `"auto"`.
+
+- `sesh_width` `(string: "40%")` - Width in sesh mode.
+- `sesh_height` `(string: "45%")` - Height in sesh mode.
+- `agents_width` `(string: "40%")` - Width in the agents and inbox modes.
+- `agents_height` `(string: "80%")` - Height in the agents and inbox modes.
+
+### `[display]`
+
+Row templates. `{field}` inserts a value, and `{right}` starts a right-aligned column. Widths use `{field:<20}`, `{field:>20}`, `{field:^20}`, and `{field:<20.20}`. `{{` and `}}` produce literal braces.
+
+- `sesh_format` `(string)` - Rows in sesh mode.
+- `agents_session_format` `(string)` - Session headings in agents mode.
+- `agents_agent_format` `(string)` - Agent rows in agents mode.
+- `inbox_group_format` `(string)` - Group headings in inbox mode.
+- `inbox_agent_format` `(string)` - Rows in inbox mode.
+
+The defaults are in the file `sesh config init` writes.
+
+### `[display.fields]`
+
+Custom fields. `{custom.NAME}` in a row template shows the output of the command named `NAME`.
+
+```toml
+[display]
+sesh_format = "{source_prefix}{session_name}{right}{custom.git_sha}"
+
+[display.fields]
+git_sha = "git rev-parse --short HEAD"
+weather = { command = "/usr/local/bin/weather", args = ["--short"], refresh = "10m" }
+```
+
+A field is either a string, run with `/bin/sh -c`, or a table:
+
+- `command` `(string: <required>)` - Program to run.
+- `args` `(list: [])` - Arguments.
+- `refresh` `(duration: "")` - Rerun interval while the popup is open. By default a field runs when the popup opens and when its row changes.
+
+Field names use `a-z`, `0-9`, and `_`. The command starts in the row's directory when the row is local. The value is everything it writes to stdout; line breaks become spaces, and only color and style escapes are kept. Empty output hides the field and any `[...]` group around it. A failed run keeps the previous value.
+
+The command gets the row as one JSON line on stdin, and these environment variables:
+
+| Variable | Value |
+| --- | --- |
+| `SESH_FIELD` | Field name |
+| `SESH_ROW` | `session` or `agent` |
+| `SESH_SESSION`, `SESH_SESSION_ID` | Session name and ID |
+| `SESH_SESSION_KIND` | `live` or `saved` |
+| `SESH_SESSION_PATH` | Session directory |
+| `SESH_ORIGIN`, `SESH_CONNECTION_ID` | `local`, `ssh`, or `bridge`, and the remote connection |
+| `SESH_PANE_ID` | Agent pane on agent rows, active pane on session rows |
+| `SESH_AGENT_HARNESS`, `SESH_AGENT_STATUS`, `SESH_AGENT_CWD`, `SESH_AGENT_PROJECT_ROOT`, `SESH_AGENT_GIT_BRANCH`, `SESH_AGENT_PID` | Agent details, empty on session rows |
+
+### `[keys]`
+
+Keys handled while the popup is focused.
+
+- `help` `(string: "?")` - Show help.
+- `cycle_mode` `(string: "ctrl+f")` - Switch to the next mode.
+- `agent_sort` `(string: "ctrl+s")` - Change the agent sort order.
+- `inbox_group` `(string: "ctrl+g")` - Group the inbox by state or by project.
+- `menu` `(string: "alt+m")` - Open the selected row's menu. A right-click also opens it.
+- `page_up`, `page_down`, `top`, `bottom` `(string: "pgup", "pgdown", "home", "end")` - Scroll the list.
+- `session_prefix` `(string: "tab")` - Key pressed before a session letter. `"alt"` holds alt with the letter instead.
+- `agent_keys` `(string: "asdfghjklqwertyuiopzxcvbnm")` - Letters given in order to the agents of a focused session.
+
+### `[keys.sessions]`
+
+Fixed letters for local sessions, as `<session> = "<letter>"`. Other sessions get a free letter once and keep it.
+
+```toml
+[keys.sessions]
+dotfiles = "d"
+```
+
+### `[[keys.bind]]`
+
+Binds a key to an action in the popup or in a tmux key table. An entry replaces the default binding of the same key. An entry without `action` removes it.
+
+- `key` `(string: <required>)` - The key.
+- `in` `(string: <required>)` - `picker` for the popup, or `tmux` for a tmux key table.
+- `action` `(string: "")` - Action ID to run.
+- `table` `(string: "root")` - tmux key table. Only with `in = "tmux"`.
+- `params` `(table: {})` - Action parameters.
+
+Picker bindings cannot use the popup's navigation keys or keys that type into its search field. A tmux binding gets the current session or pane as its subject. `sesh setup tmux` applies tmux bindings, and `sesh keys` lists the picker bindings.
+
+Default bindings:
+
+| Key | In | Action |
+| --- | --- | --- |
+| `alt+c` | picker | `session.create` |
+| `alt+r` | picker | `session.rename` |
+| `alt+x` | picker | `session.kill` |
+| `alt+X` | picker | `session.delete` |
+| `alt+s` | picker | `snapshot.save` |
+| `alt+z` | picker | `task.sleep` |
+| `alt+Z` | picker | `task.wake` |
+| `alt+f` | picker | `inbox.finish` |
+| `alt+o` | picker | `task.open` |
+| `alt+t` | picker | `inbox.task` |
+| `C-o` | tmux | `pick.popup` |
+| `M-w` | tmux | `pick.popup` with `mode = "inbox"` |
+| `C-t` | tmux | `task.menu` |
+| `M-n` | tmux | `project.pick` |
+| `S-F12` | tmux | `agent.next` |
+| `M-S-F12` | tmux | `agent.next` with `local = true` |
+| `S-F1` | tmux | `agent.back` |
+
+### `[theme]`
+
+Colors accept hex values and terminal color names.
+
+- `preset` `(string: "dracula")` - One of `dracula`, `catppuccin`, `catppuccin-mocha`, `catppuccin-latte`, `tokyo-night`, `gruvbox`, `nord`, or `terminal`. Other settings override single colors of the preset.
+- `primary`, `secondary`, `muted`, `error`, `warning`, `success`, `border`, `selected` `(string)` - Interface colors.
+- `background` `(string: "")` - Empty for a black popup, `"default"` for the terminal's background.
+- `foreground` `(string: "")` - Empty for light text.
+
+### `[theme.agent_status]`
+
+Agent status colors. Each defaults to a theme color.
+
+- `running` `(string: success)`
+- `waiting` `(string: secondary)`
+- `failed` `(string: error)`
+- `interrupted` `(string: warning)`
+- `idle` `(string: muted)`
+
+## Snapshots
+
+### `[autosave]`
+
+- `enabled` `(bool: true)` - Save snapshots automatically.
+- `interval` `(duration: "3m")` - Time between saves.
+- `restore_last_on_start` `(bool: true)` - Restore the newest snapshot when tmux starts.
+
+After a crash, start tmux on the same socket and run `sesh snapshot restore`.
+
+### `[snapshot]`
+
+The newest five snapshots are always kept.
+
+- `retention_days` `(int: 14)` - Delete snapshots older than this. `0` disables the limit.
+- `max_count` `(int: 0)` - Keep at most this many snapshots. `0` disables the limit.
+- `max_bytes` `(int: 0)` - Keep at most this many bytes of snapshots. `0` disables the limit.
+- `process_environment` `(list: ["PATH", "VIRTUAL_ENV", "CONDA_PREFIX", "CONDA_DEFAULT_ENV", "PYTHONPATH", "NODE_PATH"])` - Environment variables saved for running programs. An empty list saves none.
+
+## Agents
+
+### `[agent_sessions]`
+
+Agent rows in the popup.
+
+- `enabled` `(bool: true)` - Show agents and enable agent navigation.
+- `popup_sort` `(string: "position")` - Agent order within a session: `position`, `name`, or `attention`.
+- `popup_counts` `(bool: false)` - Show agent counts on sesh mode rows.
+- `refresh_interval` `(duration: "250ms")` - Refresh rate when live updates are unavailable.
+- `status_style` `(string: "glyph")` - `glyph` for colored circles, `text` for words such as `WORKING`.
+- `status_time_format` `(string: "relative-seconds")` - `relative` (`12m`), `relative-seconds` (`40s`, `12m`), `clock` (`00:01:23`), or `hh:mm` (`00:01`).
+
+### `[agent_status]`
+
+tmux window styles for agents that need attention. Applied by `sesh-agent-status.service`.
+
+- `enabled` `(bool: true)` - Style windows by agent state.
+- `style_waiting` `(string: "fg=#1e1e2e,bg=#ffdd57,bold")` - Style of a window whose agent waits for input.
+- `style_failed` `(string: "fg=#1e1e2e,bg=#ff5555,bold")` - Style of a window whose agent failed.
+- `style_unread` `(string: "fg=#1e1e2e,bg=#6c7086,bold")` - Style of a window whose agent finished while you were away.
+- `set_window_status_style` `(bool: true)` - Set `window-status-style`.
+- `set_window_status_bell_style` `(bool: true)` - Set `window-status-bell-style`.
+- `active_bypass` `(bool: true)` - Skip the unread style when the window was active as the agent finished.
+- `clear_failed_on_visit` `(bool: true)` - Clear the failed style when you visit the window.
+- `clear_on_shutdown` `(bool: true)` - Clear all styles when the service stops.
+- `store_path` `(string: "~/.local/state/aht/state.json")` - aht state file.
+- `tmux_binary` `(string: "tmux")` - tmux executable.
+- `initial_backoff` `(duration: "500ms")` - First reconnect delay after losing aht.
+- `max_backoff` `(duration: "5s")` - Longest reconnect delay.
+- `backoff_factor` `(float: 2.0)` - Reconnect delay multiplier.
+- `quiet` `(bool: false)` - Drop informational log records.
+
+## Projects and tasks
+
+### `[projects]`
+
+A project is a git repository or registered folder with its own tmux session.
+
+- `roots` `(list: ["~/Projects"])` - Directories whose direct child repositories are projects.
+- `extra` `(list: [])` - More folders to treat as projects.
+
+### `[projects.overrides.<name>]`
+
+Settings for one project. `<name>` is the project's directory name, or a path such as `"~/work/api"`, which wins over the name.
+
+- `task_panes` `(list)` - Replaces or adds `[[tasks.panes]]` entries by name.
+- `task_layouts` `(list)` - Replaces `[[tasks.layouts]]`. An empty list keeps the defaults.
+- `menu_items.<item>` `(table)` - Replaces fields of a `[menu.items]` entry. A prompt or prompt file replaces both.
+- `merge` `(table)` - Replaces `[merge]`.
+- `finish` `(table)` - Replaces `[finish]`.
+
+### `[tasks]`
+
+A task is a tmux window with its own worktree, agent, and panes. `ctrl+t` starts one.
+
+- `wake_on_restore` `(string: "previous")` - Task agents to resume after a restore: `previous` for the ones that were running, `none`, or a count such as `"3"` for the newest ones.
+- `popup_socket` `(string: "sesh-popup")` - tmux server for task popup terminals.
+- `popup_config` `(string: "")` - Config file for that server. Without one, sesh hides its status line and binds `C-p` to close the popup.
+- `show_footer` `(bool: true)` - Show key hints in the new task popup.
+
+Commands in task settings run in your interactive shell, so aliases and functions work. They can use the variables `{task}`, `{title}`, `{branch}`, `{base}`, `{project}`, and `{worktree}`.
+
+### `[[tasks.harness]]`
+
+Agents offered for a new task, in order. Without entries, every supported agent found on `PATH` is offered.
+
+- `name` `(string: <required>)` - Agent name. Uses `a-z`, `0-9`, `_`, and `-`.
+- `command` `(list: [])` - Command to start the agent. Required for agents aht does not support.
+- `prompt_args` `(list: [])` - Arguments added when the task has a title.
+
+### `[[tasks.panes]]`
+
+Panes opened beside the agent. Default: one `editor` pane running `nvim`.
+
+- `name` `(string: <required>)` - Pane name, stored in the pane's `@sesh_role` option. The agent pane is `agent`.
+- `command` `(list: [])` - Command to run. Without one, the pane is a shell.
+- `dir` `(string: "")` - Directory relative to the task directory.
+- `restart` `(bool: false)` - Run the command again after a restore.
+
+### `[[tasks.layouts]]`
+
+How a task window is arranged. The first layout whose `when` matches the window is used. Without layouts, the agent sits beside the panes in a landscape window and above them otherwise.
+
+- `name` `(string: "")` - Layout name, for `sesh task new --layout <name>`.
+- `when` `(table: {})` - Conditions: `orientation` (`landscape` or `portrait`), `min_width`, `max_width`, `min_height`, `max_height`, and `harness`. A landscape window has at least twice as many columns as rows.
+- `arrange` `(string: "")` - tmux layout with the agent as the main pane: `main-vertical`, `main-horizontal`, `main-vertical-mirrored`, `main-horizontal-mirrored`, `even-horizontal`, `even-vertical`, or `tiled`.
+- `main_size` `(string: "50%")` - Size of the agent pane with `arrange`.
+- `panes` `(list: [])` - Panes `arrange` includes.
+- `splits` `(list: [])` - Places panes one by one instead of `arrange`. Each split has `pane`, `of` (the agent or an earlier pane), `direction` (`right`, `below`, `left`, or `above`), and `size` (cells or a percentage).
+- `focus` `(string: "")` - Pane selected when the window opens.
+
+Set either `arrange` or `splits`.
 
 ```toml
 [[tasks.panes]]
@@ -202,37 +360,40 @@ arrange = "main-horizontal"
 main_size = "60%"
 ```
 
-`[[projects.overrides.<name>.task_panes]]` replaces or adds panes by name for one project, and `[[projects.overrides.<name>.task_layouts]]` replaces its layouts; an empty list keeps the defaults. `sesh task new --layout <name>` picks a layout by name. The `task.relayout` action lays the current task window out again for its current size, reopening panes the layout places that were closed and keeping other panes in the largest space; bind it with `[[keys.bind]]`.
+The `task.relayout` action arranges the current task window again for its current size.
 
-## Inbox and menus
+## Inbox
 
-```toml
-[inbox]
-group = "state" # state, project
-sections = ["done", "approve", "input", "waiting", "limited", "unmerged", "running", "snoozed", "asleep", "idle", "closed"] # shown, in order
-labels = { done = "new" }
-dim = ["running", "snoozed", "asleep", "closed", "finished"]
-snooze = ["next message", "1h", "4h", "tomorrow 09:00"]
-closed_shown = 3 # closed rows per project before a "more" row; 0 shows all
+### `[inbox]`
 
-[menu]
-agent = ["go", "snooze", "unsnooze", "seen", "unseen", "pin", "unpin", "evidence", "pr", "link", "unlink", "merge", "sleep", "wake", "open", "finish", "-", "items"]
-session = ["go", "rename", "snapshot", "kill", "delete"]
+The inbox lists agent conversations by state. The agent status service records them.
 
-[merge]
-check = ["just", "check"] # runs after the rebase, before the push
+- `group` `(string: "state")` - Group rows by `state` or `project`.
+- `sections` `(list: ["done", "approve", "input", "waiting", "limited", "unmerged", "running", "snoozed", "asleep", "idle", "closed"])` - Sections shown, in order. Add `finished` to show finished conversations.
+- `labels` `(table: {})` - Section headings, as in `labels = { done = "new" }`.
+- `dim` `(list: ["running", "snoozed", "asleep", "closed", "finished"])` - Sections with dimmed rows.
+- `snooze` `(list: ["next message", "1h", "4h", "tomorrow 09:00"])` - Snooze choices: a duration, a time such as `"18:00"`, `"tomorrow 09:00"`, or `"next message"`.
+- `closed_shown` `(int: 3)` - Closed rows per project before a row that shows the rest. `0` shows all.
 
-[finish]
-run = ["docker", "compose", "down"] # runs in a task worktree before finishing removes it
-```
+`approve` and `input` hold agents waiting for permission or an answer, and `limited` holds agents stopped by a usage limit. A conversation finishes when you finish it or when all its linked pull requests end. The agent status service also finishes a task when its pull request merges, once its agent is idle and no client shows its window. Enter on a closed or finished conversation resumes it.
 
-A menu lists only the entries that apply to the row. `-` is a divider; `items` lists the menu items not named elsewhere in the list.
+### `[menu]`
 
-`approve` and `input` hold agents waiting for permission or an answer, and `limited` agents stopped by a usage limit. The agent status service records agent conversations in `$XDG_STATE_HOME/sesh/work.json`. After its agent exits, a conversation outside task windows is listed in `closed`; Enter resumes it in a new window of its project session (`agent.resume`). `finish` finishes a task or a conversation, which leaves the inbox until it is resumed; so does a conversation whose linked pull requests, its branch's and those `link` adds, all end. The agent status service also finishes a task whose pull request merged, once its agent is idle and no client shows its window. A finished task's conversations resume in the project's main checkout. `pin` keeps a row first and open. Add `finished` to `sections` to list finished conversations; Enter resumes and reopens one.
+Row menus, opened with `keys.menu` or a right-click. A menu shows only the entries that apply to the row. `-` is a divider, and `items` lists the `[menu.items]` entries not named elsewhere.
 
-## Menu items
+- `agent` `(list: ["go", "snooze", "unsnooze", "seen", "unseen", "pin", "unpin", "evidence", "pr", "link", "unlink", "merge", "sleep", "wake", "open", "finish", "-", "items"])` - Menu of agent rows.
+- `session` `(list: ["go", "rename", "snapshot", "kill", "delete"])` - Menu of session rows.
 
-`[menu.items.<name>]` defines an action on a task. It runs `run` headless in the task worktree, in a window of the task's popup terminal named after the action, with `prompt` (or the contents of `prompt_file`, relative to the worktree) as its last argument. Prompts can use `{task}`, `{title}`, `{branch}`, `{base}`, `{project}` and `{worktree}`. `key` binds it in the picker, `label` names it in the menu; `link_pr` records the branch's pull request afterwards.
+### `[menu.items.<name>]`
+
+Custom task actions. An item runs headless in the task worktree, in a window of the task's popup terminal.
+
+- `run` `(list: <required>)` - Command to run.
+- `prompt` `(string: "")` - Last argument of the command. Can use the task variables.
+- `prompt_file` `(string: "")` - File in the worktree to read the prompt from.
+- `key` `(string: "")` - Picker key that runs the item.
+- `label` `(string: <name>)` - Name shown in the menu.
+- `link_pr` `(bool: false)` - Link the branch's pull request afterwards.
 
 ```toml
 [menu.items.ship]
@@ -240,16 +401,66 @@ key = "alt+p"
 run = ["claude", "-p", "--model", "sonnet"]
 prompt = "Commit, push and open a PR for {branch} against {base}."
 link_pr = true
-
-[projects.overrides.sesh.menu_items.ship]
-prompt_file = ".agents/ship.md"
 ```
 
-`[projects.overrides.<name>.menu_items.<item>]` replaces fields of an item for the project with that directory name, or at that path when `<name>` is a path such as `"~/work/api"`, which wins over the name; a prompt or prompt file replaces both. `[projects.overrides.<name>.merge]` and `[projects.overrides.<name>.finish]` replace `[merge]` and `[finish]` for the project.
+### `[merge]`
+
+The merge action rebases a branch onto its base and pushes it to the base on `origin`.
+
+- `check` `(list: [])` - Command run after the rebase and before the push. A failure stops the merge.
+
+### `[finish]`
+
+- `run` `(list: [])` - Command run in a task worktree before finishing removes it, never in a main checkout. A failure stops the finish; `--skip-run` skips it.
+
+## Remote machines
+
+### `[remote]`
+
+Remote access uses SSH. Users, ports, keys, and proxies come from your OpenSSH configuration, and hosts must allow noninteractive login. The remote machine needs the same sesh version.
+
+- `enabled` `(bool: false)` - Turn on remote sessions.
+- `ssh_path` `(string: "ssh")` - SSH executable.
+- `tmux_poll_interval` `(duration: "1s")` - How often remote tmux state is read.
+- `connect_timeout` `(duration: "5s")` - Connection timeout.
+- `action_timeout` `(duration: "2m")` - Timeout for a remote action.
+- `heartbeat_interval` `(duration: "10s")` - Time between connection checks.
+- `stale_after` `(duration: "30s")` - Age at which remote sessions show as stale. Must exceed `heartbeat_interval`.
+- `hide_after` `(duration: "10m")` - Age at which remote sessions are hidden. Must exceed `stale_after`.
+- `max_parallel_connects` `(int: 4)` - Connections opened at once, from 1 to 128.
+- `enable_reverse_bridge` `(bool: true)` - While you are attached to a remote session, list this machine's sessions in the remote popup so you can switch back.
+
+### `[[remote.connections]]`
+
+- `id` `(string: <required>)` - Connection name. Uses letters, digits, `_`, `-`, and `.`.
+- `host` `(string: <required>)` - SSH host or alias.
+- `label` `(string: "")` - Name shown in the popup.
+- `sesh_path` `(string: "")` - Path to sesh on the remote machine.
+- `tmux_socket` `(string: "")` - tmux socket on the remote machine.
+
+```toml
+[remote]
+enabled = true
+
+[[remote.connections]]
+id = "prod"
+host = "prod.example.com"
+sesh_path = "/usr/local/bin/sesh"
+tmux_socket = "/tmp/tmux-1000/default"
+```
+
+Attach with `sesh remote attach prod work`.
 
 ## Actions
 
-Per-action policy is keyed by action ID. `confirm` asks before the popup runs the action; `allow_remote` lets remote peers run it on this machine. `session.kill`, `session.delete` and `task.finish` confirm and refuse remote use by default; `task.new`, `task.offer`, `task.sleep`, `task.wake` and `task.run` run remotely by default; `session.switch` never runs remotely.
+### `[actions.<id>]`
+
+Policy for one action.
+
+- `confirm` `(bool)` - Ask before the popup runs the action.
+- `allow_remote` `(bool)` - Let remote machines run the action here.
+
+By default, `session.kill`, `session.delete`, and `task.finish` ask first and refuse remote use. `task.new`, `task.offer`, `task.sleep`, `task.wake`, and `task.run` allow remote use. `session.switch` never runs remotely.
 
 ```toml
 [actions.session.kill]
@@ -257,59 +468,23 @@ confirm = false
 allow_remote = true
 ```
 
-## Key bindings
+## Hooks
 
-`[[keys.bind]]` binds a key to an action in the picker (`in = "picker"`) or in a tmux key table (`in = "tmux"`, rendered by `sesh setup tmux`). An entry replaces the default binding of the same key, and an entry without an action removes it. `params` sets action parameters. Tmux bindings pass the current session or pane as the action's subject; a root-table key pressed in a pane that shows a remote attachment goes to the remote tmux instead. Picker bindings cannot use the picker's own navigation keys or keys that type into its search field.
+### `[hooks]`
 
-Defaults: in the picker `alt+c` session.create, `alt+r` session.rename, `alt+x` session.kill, `alt+X` session.delete, `alt+s` snapshot.save, `alt+z` task.sleep, `alt+Z` task.wake, `alt+f` inbox.finish, `alt+o` task.open, `alt+t` inbox.task; in tmux table `root` `S-F12` agent.next, `M-S-F12` agent.next with `local = true`, `S-F1` agent.back, `C-o` pick.popup, `M-w` pick.popup with `mode = "inbox"`, `C-t` task.menu, `M-n` project.pick.
+Commands run on lifecycle events. Each entry is a shell string, or a table with `command`, `args`, and `timeout`.
 
-```toml
-[[keys.bind]]
-key = "ctrl+g"
-action = "session.create"
-in = "picker"
-
-[[keys.bind]]
-key = "alt+c"
-in = "picker"
-
-[[keys.bind]]
-key = "M-s"
-action = "snapshot.save"
-in = "tmux"
-table = "prefix"
-```
-
-## Custom fields
-
-`{custom.NAME}` in a row format shows the output of the command defined under `[display.fields]`:
+- `timeout` `(duration: "30s")` - Default timeout for each command.
+- `session_switch_pre`, `session_switch_post` `(list: [])` - Before and after switching sessions.
+- `session_attach_pre`, `session_attach_post` `(list: [])` - Before and after attaching to a session.
+- `tmux_startup_post` `(list: [])` - After tmux starts.
 
 ```toml
-[display]
-sesh_format = "{source_prefix}{session_name}{right}{custom.git_sha}"
-
-[display.fields]
-git_sha = "git rev-parse --short HEAD"
-weather = { command = "/usr/local/bin/weather", args = ["--short"], refresh = "10m" }
+[hooks]
+session_switch_post = [
+  "notify-send 'sesh' \"$SESH_SESSION\"",
+  { command = "logger", args = ["sesh switched"], timeout = "2s" },
+]
 ```
 
-A string runs with `/bin/sh -c`. A table runs `command` with `args`, for example `{ command = "zsh", args = ["-c", "..."] }` for another shell. Names use `a-z`, `0-9` and `_`.
-
-The popup runs a field for each row when it opens and again when that row changes. `refresh` also reruns it on an interval. Rows run at the same time. Closing the popup stops running commands.
-
-Each run gets the row as one JSON line on stdin, with `schemaVersion`, `field`, `row`, `session`, and `agent` on agent rows. It also gets these environment variables:
-
-| Variable | Value |
-| --- | --- |
-| `SESH_FIELD` | Field name |
-| `SESH_ROW` | `session` or `agent` |
-| `SESH_SESSION`, `SESH_SESSION_ID` | Session name and ID |
-| `SESH_SESSION_KIND` | `live` or `saved` |
-| `SESH_SESSION_PATH` | Session directory |
-| `SESH_ORIGIN`, `SESH_CONNECTION_ID` | `local`, `ssh` or `bridge`, and the remote connection |
-| `SESH_PANE_ID` | Agent pane on agent rows, active pane on session rows |
-| `SESH_AGENT_HARNESS`, `SESH_AGENT_STATUS`, `SESH_AGENT_CWD`, `SESH_AGENT_PROJECT_ROOT`, `SESH_AGENT_GIT_BRANCH`, `SESH_AGENT_PID` | Agent details, empty on session rows |
-
-A command starts in the row's directory when the row is local and the directory exists.
-
-The value is everything the command writes to stdout until stdout closes, so redirect the output of background jobs. Line breaks become spaces. Color and style escape sequences are kept; other escape sequences are removed. Empty output hides the field and any `[...]` group around it. When a command fails, the field keeps its previous value and the failure goes to the log with fixed reason and error codes and the exit code, without command output.
+`sesh hooks list` shows the configured hooks, and `sesh hooks validate` checks them.

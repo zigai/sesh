@@ -11,7 +11,7 @@ const testConfigFlag = "--config"
 func newRootCommand(_ context.Context) *cobra.Command {
 	rootCommand := &cobra.Command{
 		Use:           "sesh",
-		Short:         "Native tmux session persistence",
+		Short:         "Session, task, and agent manager for tmux",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}

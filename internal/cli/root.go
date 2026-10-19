@@ -101,7 +101,7 @@ func newRootCommand(ctx context.Context) *cobra.Command {
 
 	rootCommand := &cobra.Command{
 		Use:           "sesh",
-		Short:         "Native tmux session persistence",
+		Short:         "Session, task, and agent manager for tmux",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		CompletionOptions: cobra.CompletionOptions{
