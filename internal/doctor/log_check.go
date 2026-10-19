@@ -12,8 +12,6 @@ import (
 
 const chooseLogFile = "Set paths.log_file to a file in a directory you can write"
 
-// checkLogFile verifies through permission checks alone that commands can open their log, so
-// the doctor never creates it.
 func (s *Service) checkLogFile() Result {
 	path := s.opts.LogPath
 

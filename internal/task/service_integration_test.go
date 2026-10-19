@@ -1004,7 +1004,6 @@ func initRepository(t *testing.T, dir string) string {
 	return dir
 }
 
-// addRemoteBranch makes another repository with branch and fetches it into repo as origin.
 func addRemoteBranch(t *testing.T, base, repo, branch string) {
 	t.Helper()
 

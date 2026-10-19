@@ -21,9 +21,7 @@ import (
 )
 
 const (
-	// OptionTask is the window user option that ties a tmux window to its task record.
 	OptionTask = "@sesh_task"
-	// OptionRole names the panes of a task window: the agent pane and the configured panes.
 	OptionRole = "@sesh_role"
 	RoleAgent  = config.TaskPaneAgent
 
@@ -80,7 +78,6 @@ type Options struct {
 	FinishRun func(project string) []string
 }
 
-// Service creates tasks and their windows on one tmux server.
 type Service struct {
 	server      *gotmux.Server
 	store       Store
@@ -105,7 +102,6 @@ func NewService(opts Options) *Service {
 	}
 }
 
-// Locate describes the pane a command was invoked from.
 func (s *Service) Locate(ctx context.Context, pane gotmux.PaneID) (Place, error) {
 	panes, err := s.server.PanesWith(ctx, gotmux.QueryOptions{
 		Filter:      gotmux.Format("#{==:#{pane_id}," + string(pane) + "}"),
@@ -159,7 +155,6 @@ func (s *Service) Start(ctx context.Context, place Place, request Request) (Reco
 	return s.startProject(ctx, place, root, request, offered)
 }
 
-// OpenTab opens a plain window in the pane's directory next to the current window.
 func (s *Service) OpenTab(ctx context.Context, place Place) error {
 	session, err := s.server.Session(ctx, place.Session)
 	if err != nil {
@@ -281,12 +276,6 @@ func (s *Service) startLoose(ctx context.Context, place Place, request Request, 
 	return s.activate(ctx, record)
 }
 
-// reserveProjectTask records the new task before any worktree or window exists, so a crash
-// part way through leaves a record of what was being created. A new worktree's number skips any
-// branch or directory that already exists, including ones made by hand with the same naming
-// scheme, and a new branch skips the names of local branches. A task in an existing checkout is
-// refused if another task took it meanwhile. Checking out a branch only a remote has creates a
-// local branch tracking it, which sesh then owns.
 func (s *Service) reserveProjectTask(ctx context.Context, p project.Project, request Request, location Location, local []string) (Record, error) {
 	creates := location.Where == WhereNew || location.Where == WhereBranch
 	base := ""
@@ -530,8 +519,6 @@ func (s *Service) harness(name string) (Harness, error) {
 	return offered, nil
 }
 
-// launchOf is the command line that starts a task's agent: the harness command, followed by its
-// prompt arguments filled in with the task when the task was given a title.
 func launchOf(offered Harness, request Request, record Record) []string {
 	launch := slices.Clone(offered.Command)
 	if len(launch) == 0 || request.Title == "" {
@@ -545,7 +532,6 @@ func launchOf(offered Harness, request Request, record Record) []string {
 	return launch
 }
 
-// record returns the task with id from the ledger.
 func (s *Service) record(ctx context.Context, id string) (Record, error) {
 	ledger, err := s.store.Load(ctx)
 	if err != nil {
@@ -635,8 +621,6 @@ func branchExists(ctx context.Context, root, branch string) (bool, error) {
 	return refExists(ctx, root, "refs/heads/"+branch)
 }
 
-// startPoint is where a new branch from base starts: origin's base when the local base is
-// missing or behind it, and otherwise the local base. Nothing is fetched.
 func startPoint(ctx context.Context, root, base string) (string, error) {
 	local, remote := "refs/heads/"+base, "refs/remotes/origin/"+base
 

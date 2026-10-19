@@ -32,7 +32,6 @@ const (
 	busyCheckout = 4
 )
 
-// starts records what the picker asked to start and answers with a fixed result.
 type starts struct {
 	choices []taskpicker.Choice
 	err     error
@@ -488,7 +487,6 @@ func looseModel(t *testing.T) (*taskpicker.Model, *starts) {
 	return sized(taskpicker.Options{Harnesses: []string{"pi", "claude"}, Start: started.start}), started
 }
 
-// compactOptions are the project popup's with the pane in the checkout at index current.
 func compactOptions(current int, agent string, start func(taskpicker.Choice) error) taskpicker.Options {
 	return taskpicker.Options{
 		Project:    "shop",
@@ -502,7 +500,6 @@ func compactOptions(current int, agent string, start func(taskpicker.Choice) err
 	}
 }
 
-// listOptions are the expanded project popup's.
 func listOptions(agent string, start func(taskpicker.Choice) error) taskpicker.Options {
 	options := compactOptions(1, agent, start)
 	options.Expanded = true
@@ -518,9 +515,6 @@ func sized(opts taskpicker.Options) *taskpicker.Model {
 	return model
 }
 
-// run sends messages. The command enter returns starts the choice, so it runs before the next
-// message and its result is sent back, the way the program would; other commands only blink the
-// cursor.
 func run(model *taskpicker.Model, messages ...tea.Msg) {
 	for _, msg := range messages {
 		_, cmd := model.Update(msg)
@@ -557,7 +551,6 @@ func plainView(model *taskpicker.Model) string {
 	return ansi.Strip(model.View().Content)
 }
 
-// listLines are the lines of the expanded list: from below the filter line to the bottom border.
 func listLines(t *testing.T, model *taskpicker.Model) []string {
 	t.Helper()
 
@@ -571,7 +564,6 @@ func listLines(t *testing.T, model *taskpicker.Model) []string {
 	return lines[start : len(lines)-1]
 }
 
-// rowLines are the list rows, without the section headings.
 func rowLines(t *testing.T, model *taskpicker.Model) []string {
 	t.Helper()
 
@@ -586,7 +578,6 @@ func rowLines(t *testing.T, model *taskpicker.Model) []string {
 	return rows
 }
 
-// sectionRows are the list rows under the section heading label.
 func sectionRows(t *testing.T, model *taskpicker.Model, label string) []string {
 	t.Helper()
 
@@ -606,7 +597,6 @@ func sectionRows(t *testing.T, model *taskpicker.Model, label string) []string {
 	return rows
 }
 
-// line is the body line whose label is label.
 func line(t *testing.T, model *taskpicker.Model, label string) string {
 	t.Helper()
 
@@ -620,7 +610,6 @@ func line(t *testing.T, model *taskpicker.Model, label string) string {
 	return lines[index]
 }
 
-// placeLine is the line of the place to work called name.
 func placeLine(t *testing.T, model *taskpicker.Model, name string) string {
 	t.Helper()
 
@@ -640,7 +629,6 @@ func agentRow(t *testing.T, model *taskpicker.Model) string {
 	return line(t, model, "agent")
 }
 
-// slicesIndex finds the body line that starts with label.
 func slicesIndex(lines []string, label string) int {
 	for index, row := range lines {
 		if strings.HasPrefix(strings.TrimPrefix(row, "│ "), label+" ") {
@@ -651,7 +639,6 @@ func slicesIndex(lines []string, label string) int {
 	return -1
 }
 
-// slicesContaining finds the first line that contains text.
 func slicesContaining(lines []string, text string) int {
 	for index, row := range lines {
 		if strings.Contains(row, text) {
@@ -728,14 +715,12 @@ func TestANarrowListDropsTheSubjectButKeepsTheNames(t *testing.T) {
 	}
 }
 
-// column is the display column where part starts in line.
 func column(line, part string) int {
 	before, _, _ := strings.Cut(line, part)
 
 	return utf8.RuneCountInString(before)
 }
 
-// collect runs a command and the commands of a batch it returns, and returns their messages.
 func collect(cmd tea.Cmd) []tea.Msg {
 	if cmd == nil {
 		return nil

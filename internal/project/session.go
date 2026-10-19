@@ -11,7 +11,6 @@ import (
 )
 
 const (
-	// OptionProject is the session user option that ties a tmux session to its project root.
 	OptionProject = "@sesh_project"
 	// OptionMain marks the window that holds a project's main checkout.
 	OptionMain = "@sesh_main"
@@ -34,13 +33,11 @@ type Opened struct {
 	Adopted bool
 }
 
-// LiveSession is a tmux session and the project root it is tagged with, empty for a plain one.
 type LiveSession struct {
 	Name string
 	Root string
 }
 
-// SessionOf returns the session tagged with root, if one exists.
 func SessionOf(ctx context.Context, server *gotmux.Server, root string) (gotmux.SessionInfo, bool, error) {
 	sessions, err := taggedSessions(ctx, server)
 	if err != nil {
@@ -56,7 +53,6 @@ func SessionOf(ctx context.Context, server *gotmux.Server, root string) (gotmux.
 	return emptySessionInfo(), false, nil
 }
 
-// RootOfSession returns the project root a session is tagged with, or "" for a plain session.
 func RootOfSession(ctx context.Context, server *gotmux.Server, id gotmux.SessionID) (string, error) {
 	sessions, err := taggedSessions(ctx, server)
 	if err != nil {
@@ -196,7 +192,6 @@ func Open(ctx context.Context, server *gotmux.Server, p Project, adopt bool) (Op
 	return Opened{Session: info, Created: !adopt, Adopted: adopt}, nil
 }
 
-// LiveSessions lists every session with its project tag.
 func LiveSessions(ctx context.Context, server *gotmux.Server) ([]LiveSession, error) {
 	sessions, err := taggedSessions(ctx, server)
 	if err != nil {
@@ -265,7 +260,6 @@ func sessionError(operation string, err error) error {
 	return oops.In("project").Code("project_session_failed").With("operation", operation).Wrap(err)
 }
 
-// adoptNamesake adopts the untagged session that holds the project's name.
 func adoptNamesake(ctx context.Context, server *gotmux.Server, p Project) (gotmux.Session, error) {
 	conflict, conflicting, err := NameConflict(ctx, server, p)
 	if err != nil {

@@ -30,7 +30,6 @@ var errUnitTooLarge = errors.New("unit file is too large")
 
 var execKeys = []string{"ExecStart", "ExecStartPre", "ExecStartPost", "ExecReload", "ExecStop", "ExecStopPost", "ExecCondition"}
 
-// unitCommand is one sesh command line of a unit and the file and line that set it.
 type unitCommand struct {
 	args   []string
 	source string
@@ -41,8 +40,6 @@ type unitLine struct {
 	number int
 }
 
-// execWords splits an Exec value into words, honoring single and double quotes and backslash
-// escapes.
 type execWords struct {
 	words   []string
 	current strings.Builder
@@ -272,8 +269,6 @@ func (s *Service) isSeshProgram(program string) bool {
 	return filepath.Base(program) == programName || (s.opts.Executable != "" && program == s.opts.Executable)
 }
 
-// unitLines returns the logical lines of a unit file with the number of the line each starts on:
-// comments dropped and lines ending in a backslash joined with the next one.
 func unitLines(data []byte) []unitLine {
 	var (
 		lines   []unitLine

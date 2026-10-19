@@ -18,8 +18,6 @@ import (
 	"github.com/zigai/sesh/internal/session"
 )
 
-// popupFrontend opens the picker popup for the command that invoked pick.popup; the popup child
-// re-runs sesh with the same configuration and state flags.
 type popupFrontend struct {
 	cmd    *cobra.Command
 	remote RemoteFactory
@@ -62,8 +60,6 @@ func (frontend popupFrontend) Dispatch(ctx context.Context, invocation action.In
 	return action.ClosedPicker{}, nil
 }
 
-// checkPopupClientSession refuses to open the popup when the client moved to another session
-// after the key binding captured it.
 func checkPopupClientSession(ctx context.Context, server *gotmux.Server, expected, shown string) error {
 	if expected == "" || expected == shown {
 		return nil

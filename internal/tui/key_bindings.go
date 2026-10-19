@@ -120,7 +120,6 @@ func (m *Model) availableActions(keys actionKeyMap) []boundAction {
 	return available
 }
 
-// actionKey returns the key bound to id without parameters, or empty when none is.
 func (k actionKeyMap) actionKey(id action.ID) string {
 	for _, bound := range k.actions {
 		if bound.binding.Action == id && len(bound.binding.Values) == 0 {

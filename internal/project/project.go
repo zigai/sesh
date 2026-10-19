@@ -45,7 +45,6 @@ type Project struct {
 	Kind Kind   `json:"kind"`
 }
 
-// Catalog resolves directories to projects and lists projects under the configured roots.
 type Catalog struct {
 	roots []string
 	extra []string

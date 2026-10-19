@@ -8,7 +8,6 @@ import (
 	"github.com/zigai/sesh/internal/task"
 )
 
-// MaxTasks bounds the tasks one peer reports.
 const MaxTasks = 4096
 
 // TaskRow is a task on a peer: its record and where its window is in the peer's tmux. The
@@ -25,7 +24,6 @@ type TaskRow struct {
 	Stalled     bool        `json:"stalled"`
 }
 
-// NewTaskRow describes a live task for the peer's inventory.
 func NewTaskRow(live task.Live) TaskRow {
 	record := live.Record
 	record.Resume = task.Resume{Harness: "", Session: "", Command: []string{}}
@@ -44,7 +42,6 @@ func NewTaskRow(live task.Live) TaskRow {
 	}
 }
 
-// CatalogTasks returns the tasks a connection reported, located in the peer's tmux.
 func CatalogTasks(state ConnectionState) []task.Live {
 	tasks := make([]task.Live, 0, len(state.Snapshot.Tasks))
 

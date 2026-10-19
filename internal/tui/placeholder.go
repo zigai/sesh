@@ -12,8 +12,6 @@ import (
 
 const centered = 2
 
-// SleepPlaceholder draws the screen a sleeping task's agent pane shows: the sleeping glyph and
-// harness centered, and below them the last wake failure, if any.
 func SleepPlaceholder(cfg *config.Config, harness string, failure string, width, height int) string {
 	chrome := NewChrome(cfg)
 	glyph := lipgloss.NewStyle().Foreground(lipgloss.Color(cfg.ResolvedAgentStatusColors().Idle)).

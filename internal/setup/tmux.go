@@ -24,7 +24,6 @@ var (
 	errNoProgram    = errors.New("binding has no program")
 )
 
-// callerFormats pass the invoking tmux client to actions that act on it.
 var callerFormats = []string{
 	"--client", "'#{client_name}'",
 	"--pane", "'#{pane_id}'",
@@ -138,9 +137,6 @@ func ShellWord(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", `'\''`) + "'"
 }
 
-// bindingProgram runs the action's command, except that a root key pressed in a pane showing a
-// remote attachment goes on to the remote tmux, so the remote sesh acts on its own host as it
-// does when the attachment runs in a popup.
 func bindingProgram(key, table, command string) []string {
 	if table != rootTable {
 		return []string{"run-shell", "-b", command}
@@ -170,7 +166,6 @@ func actionCommand(descriptor action.Descriptor, values action.Values) string {
 	return strings.Join(words, " ")
 }
 
-// paramWords passes positional parameters in order, then the others as flags.
 func paramWords(params []action.Param, values action.Values) []string {
 	var words []string
 

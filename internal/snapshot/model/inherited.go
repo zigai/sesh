@@ -39,18 +39,14 @@ func (m Manifest) CompactInheritedOptions() Manifest {
 	return compact
 }
 
-// EffectiveSessionOptions returns the session's options including those it inherits.
 func (m Manifest) EffectiveSessionOptions(session Session) []Option {
 	return withSuppliedOptions(session.Options, m.globalOptions(scopeGlobalSession), scopeSession)
 }
 
-// EffectiveWindowOptions returns the window's options including those it inherits.
 func (m Manifest) EffectiveWindowOptions(window Window) []Option {
 	return withSuppliedOptions(window.Options, m.globalOptions(scopeGlobalWindow), scopeWindow)
 }
 
-// WithInheritedOptions returns a copy whose session and window option lists include every
-// inherited option, as tmux reported them.
 func (m Manifest) WithInheritedOptions() Manifest {
 	expanded := m
 

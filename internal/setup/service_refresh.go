@@ -35,7 +35,6 @@ type ServiceRefreshResult struct {
 	RestartRequired []string `json:"restartRequired,omitempty"`
 }
 
-// UnitState is what the service manager reports for one unit.
 type UnitState struct {
 	Name    string `json:"name"`
 	Active  string `json:"active"`
@@ -54,7 +53,6 @@ type serviceInspectionOutput struct {
 	overflow bool
 }
 
-// Running reports whether the unit is active, and Enabled whether it starts with the session.
 func (u UnitState) Running() bool { return u.Active == "active" || u.Active == "reloading" }
 
 func (u UnitState) EnabledAtLogin() bool { return u.Enabled == "enabled" || u.Enabled == "static" }
@@ -122,7 +120,6 @@ func RefreshDefinitions(
 	return applied, refreshed, nil
 }
 
-// UnitStates reports the active and enabled state of each named unit.
 func UnitStates(ctx context.Context, manager ServiceManager, names []string) ([]UnitState, error) {
 	ctx, cancel := context.WithTimeout(ctx, serviceRefreshTimeout)
 	defer cancel()
@@ -248,8 +245,6 @@ func systemdStartupDefinition(content string) string {
 	return startup.String()
 }
 
-// activeState returns a unit's ActiveState, refusing a transitional state whose outcome a
-// refresh cannot predict.
 func (manager ServiceManager) activeState(ctx context.Context, name string) (string, error) {
 	state, err := manager.property(ctx, name, "ActiveState")
 	if err != nil {

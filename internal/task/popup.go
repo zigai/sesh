@@ -17,7 +17,6 @@ const (
 	rootKeyTable       = gotmux.KeyTable("root")
 )
 
-// PopupSessionName is the popup server session that holds a task's terminal.
 func PopupSessionName(taskID string) string {
 	return popupSessionPrefix + taskID
 }

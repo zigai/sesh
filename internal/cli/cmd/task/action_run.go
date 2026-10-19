@@ -34,8 +34,6 @@ func newActionRunCommand() *cobra.Command {
 	return cmd
 }
 
-// runActionRun runs the action with the window's terminal and ends with a line saying how it
-// went, which stays readable in the window after the run.
 func runActionRun(cmd *cobra.Command, args []string) error {
 	ctx := clibase.CommandContext(cmd)
 

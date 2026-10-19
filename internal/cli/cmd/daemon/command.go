@@ -21,8 +21,6 @@ const (
 
 var errDaemonSocketRequired = errors.New("--socket must be an explicit absolute path")
 
-// NewCommand returns the group of long-running processes a service manager starts and stops,
-// including those other packages contribute.
 func NewCommand(processes ...*cobra.Command) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "daemon",

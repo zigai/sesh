@@ -59,7 +59,6 @@ func (local *Local) createProject(ctx context.Context, caller action.Caller, inp
 	return local.enterProject(ctx, caller, created, false)
 }
 
-// enterProject opens the project's session and moves the invoking client to it.
 func (local *Local) enterProject(ctx context.Context, caller action.Caller, p project.Project, adopt bool) (action.OpenedProject, error) {
 	result := action.OpenedProject{Root: p.Root, Session: "", Created: false, Adopted: false}
 

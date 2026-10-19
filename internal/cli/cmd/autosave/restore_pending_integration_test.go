@@ -29,8 +29,6 @@ type pendingRestoreFixture struct {
 	config     []string
 }
 
-// newPendingRestoreFixture starts a disposable tmux server after the repository already holds a
-// saved "work" session, the state right after a reboot and before anything is restored.
 func newPendingRestoreFixture(t *testing.T) pendingRestoreFixture {
 	t.Helper()
 
@@ -53,8 +51,6 @@ func newPendingRestoreFixture(t *testing.T) pendingRestoreFixture {
 	}
 }
 
-// newSavedSessionFixture saves a real "work" session from one tmux server and then starts another,
-// a reboot whose startup restore never ran.
 func newSavedSessionFixture(t *testing.T) pendingRestoreFixture {
 	t.Helper()
 

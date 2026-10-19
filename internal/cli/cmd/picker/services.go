@@ -181,7 +181,6 @@ func (s *services) TUIServices() tui.Services {
 	}
 }
 
-// LoadTasks lists the recorded tasks with their tagged windows.
 func (s *services) LoadTasks(ctx context.Context) ([]task.Live, error) {
 	var live []task.Live
 
@@ -199,7 +198,6 @@ func (s *services) LoadTasks(ctx context.Context) ([]task.Live, error) {
 	return live, nil
 }
 
-// LoadWork lists the conversations recorded on this machine.
 func (s *services) LoadWork(ctx context.Context) ([]work.Item, error) {
 	state, err := work.NewStore(s.workspace.Work).Load(ctx)
 	if err != nil {
@@ -209,7 +207,6 @@ func (s *services) LoadWork(ctx context.Context) ([]work.Item, error) {
 	return state.Items, nil
 }
 
-// SyncWork refreshes the branches and pull requests of the recorded conversations.
 func (s *services) SyncWork(ctx context.Context) (bool, error) {
 	changed, err := work.Sync(ctx, work.NewStore(s.workspace.Work))
 	if err != nil {
@@ -219,7 +216,6 @@ func (s *services) SyncWork(ctx context.Context) (bool, error) {
 	return changed, nil
 }
 
-// LoadInbox reads what the inbox remembers: snoozed rows and results marked unseen.
 func (s *services) LoadInbox(ctx context.Context) (inbox.State, error) {
 	state, err := inbox.NewStore(s.workspace.Inbox).Load(ctx)
 	if err != nil {
@@ -229,7 +225,6 @@ func (s *services) LoadInbox(ctx context.Context) (inbox.State, error) {
 	return state, nil
 }
 
-// UpdateInbox changes what the inbox remembers.
 func (s *services) UpdateInbox(ctx context.Context, change func(*inbox.State) error) (inbox.State, error) {
 	state, err := inbox.NewStore(s.workspace.Inbox).Update(ctx, change)
 	if err != nil {
@@ -259,7 +254,6 @@ func (s *services) LastReport(ctx context.Context, agent session.AgentSession) (
 	return message.Text, nil
 }
 
-// SyncTasks refreshes the pull requests and window titles of the recorded tasks.
 func (s *services) SyncTasks(ctx context.Context, titles map[string]string) (bool, error) {
 	changed, err := s.local.SyncTasks(ctx, titles)
 	if err != nil {
@@ -277,7 +271,6 @@ func (s *services) LoadCatalog(ctx context.Context) (session.CatalogResult, erro
 		return s.listCatalog(ctx, nil)
 	}
 
-	// An unreadable repository leaves saved rows out.
 	view, err := store.OpenView(ctx, s.workspace.Repository)
 	if err != nil {
 		return s.listCatalog(ctx, nil)

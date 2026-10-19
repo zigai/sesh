@@ -60,8 +60,6 @@ func (local *Local) finishTask(ctx context.Context, _ action.Caller, input actio
 	return action.FinishedTask{ID: input.Task}, nil
 }
 
-// runTaskAction opens a window in the task's popup session that runs the action through the
-// hidden action-run command, and selects it so the popup shows its output.
 func (local *Local) runTaskAction(ctx context.Context, _ action.Caller, input action.RunTaskAction) (action.StartedTaskAction, error) {
 	result := action.StartedTaskAction{ID: input.Task, Action: input.Action}
 
@@ -209,8 +207,6 @@ func (local *Local) closeTaskPopup(ctx context.Context, id string) error {
 	return nil
 }
 
-// actionCommand is the command line of a task action: its run command and, when it has one,
-// its prompt rendered for the task as the last argument.
 func actionCommand(configured config.MenuItemConfig, record task.Record) ([]string, error) {
 	argv := append([]string{}, configured.Run...)
 
@@ -239,8 +235,6 @@ func actionCommand(configured config.MenuItemConfig, record task.Record) ([]stri
 	return argv, nil
 }
 
-// runCommand runs argv in the task's worktree on the terminal and returns its exit code; a
-// command that cannot start reports 127 like a shell would.
 func runCommand(ctx context.Context, argv []string, record task.Record, streams gotmux.Streams) int {
 	command := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	command.Dir = record.Directory

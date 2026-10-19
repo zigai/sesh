@@ -6,7 +6,6 @@ import (
 	"github.com/zigai/sesh/internal/cli/clibase"
 )
 
-// NewCommand returns the group of commands a person uses to manage live tmux sessions.
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "session",

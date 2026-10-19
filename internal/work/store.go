@@ -118,7 +118,6 @@ func NewStore(path string) Store {
 	return Store{path: path}
 }
 
-// Find returns the item with id.
 func (s *State) Find(id string) (Item, bool) {
 	for _, item := range s.Items {
 		if item.ID == id {
@@ -129,7 +128,6 @@ func (s *State) Find(id string) (Item, bool) {
 	return EmptyItem(), false
 }
 
-// Put stores item, replacing the earlier item with the same ID.
 func (s *State) Put(item Item) {
 	for index := range s.Items {
 		if s.Items[index].ID == item.ID {
@@ -142,12 +140,10 @@ func (s *State) Put(item Item) {
 	s.Items = append(s.Items, item)
 }
 
-// Remove deletes the item with id.
 func (s *State) Remove(id string) {
 	s.Items = slices.DeleteFunc(s.Items, func(item Item) bool { return item.ID == id })
 }
 
-// NextID reserves the next item identifier.
 func (s *State) NextID() string {
 	s.LastID++
 
@@ -185,7 +181,6 @@ func (s *State) FinishTask(id, by, directory string, now time.Time) {
 	}
 }
 
-// Reopen returns the finished item with id to the open work.
 func (s *State) Reopen(id string, now time.Time) error {
 	return s.change(id, func(item *Item) error {
 		*item = item.reopened(now)
@@ -203,7 +198,6 @@ func (s *State) Pin(id string, now time.Time) error {
 	})
 }
 
-// MarkUnseen marks the item with id as not seen.
 func (s *State) MarkUnseen(id string, now time.Time) error {
 	return s.change(id, func(item *Item) error {
 		item.UnseenAt = now.Unix()
@@ -220,7 +214,6 @@ func (s *State) ClearUnseen(id string) error {
 	})
 }
 
-// Prune drops the items that finished before cutoff. It reports whether any was dropped.
 func (s *State) Prune(cutoff time.Time) bool {
 	count := len(s.Items)
 	s.Items = slices.DeleteFunc(s.Items, func(item Item) bool { return item.Finished() && item.FinishedAt < cutoff.Unix() })
@@ -236,7 +229,6 @@ func (s *State) Unpin(id string) error {
 	})
 }
 
-// Link links a pull request to the item with id, replacing what was known about it.
 func (s *State) Link(id string, pr PRLink) error {
 	return s.change(id, func(item *Item) error {
 		pr.Source = LinkUser
@@ -279,19 +271,16 @@ func (i Item) Pinned() bool {
 	return i.PinnedAt != 0
 }
 
-// Linked lists the pull requests linked to the item, leaving out those the user unlinked.
 func (i Item) Linked() []PRLink {
 	return slices.DeleteFunc(slices.Clone(i.PRs), func(pr PRLink) bool { return pr.Source == LinkDismissed })
 }
 
-// PRsEnded reports whether the item has linked pull requests and every one was merged or closed.
 func (i Item) PRsEnded() bool {
 	linked := i.Linked()
 
 	return len(linked) > 0 && !slices.ContainsFunc(linked, func(pr PRLink) bool { return !pr.Ended() })
 }
 
-// Issues lists the issues the item's linked pull requests close.
 func (i Item) Issues() []int {
 	var issues []int
 	for _, pr := range i.Linked() {
@@ -309,7 +298,6 @@ func (i Item) reopened(now time.Time) Item {
 	return i
 }
 
-// Ended reports whether the pull request was merged or closed.
 func (pr PRLink) Ended() bool {
 	return pr.State == task.PRMerged || pr.State == task.PRClosed
 }

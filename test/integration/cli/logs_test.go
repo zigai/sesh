@@ -41,7 +41,6 @@ func (w *logWatchTestWriter) Write(p []byte) (int, error) {
 
 	w.writeCount++
 
-	// bytes.Buffer.Write always consumes all of p and never returns an error.
 	_, _ = w.buf.Write(p)
 
 	if w.afterWrite != nil {

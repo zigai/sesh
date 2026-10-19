@@ -11,8 +11,6 @@ import (
 	"github.com/zigai/sesh/internal/testsupport/clitest"
 )
 
-// isolatedServiceHome points the systemd user unit directory doctor inspects at a temporary
-// directory and returns it.
 func isolatedServiceHome(t *testing.T) string {
 	t.Helper()
 

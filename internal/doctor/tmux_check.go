@@ -22,8 +22,6 @@ const (
 	upgradeTmux  = "Install tmux " + tmuxRequired + " or later"
 )
 
-// checkTmux reports the tmux client on PATH and the server on the selected socket. A server
-// that answers is also listed once for the checks that need its sessions.
 func (s *Service) checkTmux(ctx context.Context) ([]Result, error) {
 	client, clientOK := s.checkTmuxClient(ctx)
 	if err := ctx.Err(); err != nil {
@@ -159,7 +157,6 @@ func (s *Service) listSessions(ctx context.Context) ([]string, error) {
 	return names, nil
 }
 
-// saveFix names the live sessions so the save command runs as given.
 func (s *Service) saveFix(result Result) Result {
 	if len(s.sessions) == 0 {
 		return result.withManual("Start a tmux session, then save it with 'sesh snapshot save <session>'")

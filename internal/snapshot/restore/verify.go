@@ -87,8 +87,6 @@ func (r *VerificationReport) mismatch(domain, entity, reason string) {
 	r.Mismatches = append(r.Mismatches, VerificationMismatch{Domain: domain, Entity: entity, Reason: reason})
 }
 
-// advisory records an observed difference in state that applications own after launch. It never
-// fails verification and never claims the observed value equals the saved one.
 func (r *VerificationReport) advisory(domain, entity, reason string) {
 	if len(r.Advisories) >= maxVerificationMismatches {
 		return

@@ -154,7 +154,6 @@ func writeRewriteResult(cmd *cobra.Command, id string, result store.RewriteResul
 	return errors.Join(err, writeErr)
 }
 
-// ValidateSnapshotCommand checks snapshot inputs before configuration and logging start.
 func ValidateSnapshotCommand(cmd *cobra.Command, args []string) error {
 	if cmd.Annotations[clibase.AnnotationOperation] == "restore" {
 		return validateSnapshotRestorePicker(cmd)

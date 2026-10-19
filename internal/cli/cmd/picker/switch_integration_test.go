@@ -92,7 +92,6 @@ func originSession(t *testing.T, server *gotmux.Server) gotmux.SessionInfo {
 	return sessions[0]
 }
 
-// newPickerAgentTarget creates a session whose unselected second window runs the agent pane.
 func newPickerAgentTarget(t *testing.T, server *gotmux.Server) (gotmux.Session, gotmux.WindowID, gotmux.PaneID) {
 	t.Helper()
 
@@ -182,7 +181,6 @@ func TestPopupHandoffSwitchesOnlyOpeningClientAfterPopupSelection(t *testing.T) 
 	assertPickerClientDisplays(t, server, openingClient, targetSession.ID())
 	assertPickerClientDisplays(t, server, otherClient, origin.ID)
 
-	// The invoking process records the switch and the popup's deferred views together.
 	st, err := session.LoadState(runtime.workspace.History)
 	if err != nil {
 		t.Fatal(err)
@@ -223,7 +221,6 @@ func TestResolvePopupClientSelection(t *testing.T) {
 	assertPopupClientRejected(t, server, "/dev/pts/nonexistent-client-id", "unknown explicit client")
 }
 
-// resolvePopupClientFlag resolves the popup client, naming the invoking client only when flag is set.
 func resolvePopupClientFlag(t *testing.T, server *gotmux.Server, flag string) (gotmux.ClientInfo, error) {
 	t.Helper()
 
@@ -345,7 +342,6 @@ func attachPickerTestClient(t *testing.T, liveSession gotmux.Session) string {
 	return waitForNewPickerClient(t, liveSession, existing)
 }
 
-// openPickerTestPTY allocates a pseudo-terminal and returns its slave side for an attached client.
 func openPickerTestPTY(t *testing.T) *os.File {
 	t.Helper()
 

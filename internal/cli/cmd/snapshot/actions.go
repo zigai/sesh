@@ -56,7 +56,6 @@ func renderSnapshotSave(cmd *cobra.Command, output action.SavedSnapshot, err err
 	return clibase.NewCommandResultError(err)
 }
 
-// prepareSnapshotRestore lets --pick choose the generation before the restore runs.
 func prepareSnapshotRestore(ctx context.Context, cmd *cobra.Command, values action.Values) (bool, error) {
 	if !restorePickerEnabled(cmd) {
 		return true, nil

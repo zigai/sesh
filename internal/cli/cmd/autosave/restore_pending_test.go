@@ -73,8 +73,6 @@ func TestPendingRestoreIsReportedOncePerServerStart(t *testing.T) {
 	}
 }
 
-// assertPendingRestoreRecord checks the fixed schema of the restore-pending warning and that it
-// carries no path.
 func assertPendingRestoreRecord(t *testing.T, record map[string]any, historyPath string) {
 	t.Helper()
 

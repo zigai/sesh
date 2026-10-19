@@ -48,7 +48,6 @@ type Param struct {
 	Suggest    Suggestion
 }
 
-// Values holds raw parameter values by name. Bind parses them.
 type Values map[string][]string
 
 func (values Values) Set(name string, value ...string) {
@@ -79,8 +78,6 @@ func (values Values) Bool(name string) bool {
 	return parsed
 }
 
-// normalize checks values against params and fills defaults, so Bind functions only read
-// validated values.
 func normalize(params []Param, values Values) (Values, error) {
 	normalized := make(Values, len(params))
 

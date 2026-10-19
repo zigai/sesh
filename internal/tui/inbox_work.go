@@ -34,18 +34,12 @@ type workSyncMsg struct {
 	changed bool
 }
 
-// remoteResume is a conversation resumed on a remote host, whose window the picker attaches to
-// once the remote catalog lists its session.
 type remoteResume struct {
 	connection string
 	session    string
 	pane       string
 }
 
-// hostClosedItems lists the recorded conversations of a host whose agent no longer runs there,
-// open or finished, except those of tasks, which have rows of their own. A project shows its
-// pinned and most recent closed rows up to the configured count, then a row that expands the rest,
-// and its finished rows the same way.
 func (m *Model) hostClosedItems(host inboxHost) []inboxItem {
 	running := make(map[string]bool)
 
@@ -113,7 +107,6 @@ func (m *Model) shownClosedItems(host inboxHost, group string, items []inboxItem
 	return append(items[:shown:shown], more)
 }
 
-// expandClosedItems shows every closed row of the project a "more" row stands for.
 func (m *Model) expandClosedItems(item inboxItem) func() (tea.Model, tea.Cmd) {
 	return func() (tea.Model, tea.Cmd) {
 		m.closedExpanded[item.more] = true
@@ -169,7 +162,6 @@ func (m *Model) newClosedItem(host inboxHost, recorded work.Item) inboxItem {
 	}
 }
 
-// compareRecency orders pinned rows first, then the most recent change first.
 func compareRecency(left, right inboxItem) int {
 	if left.work.Pinned() != right.work.Pinned() {
 		if left.work.Pinned() {
@@ -201,7 +193,6 @@ func recordedWork(host inboxHost, agent session.AgentSession, live task.Live, is
 	return found
 }
 
-// resumeClosedItem resumes a closed conversation on its host and goes to its new window.
 func (m *Model) resumeClosedItem(item inboxItem) func() (tea.Model, tea.Cmd) {
 	at := action.Local()
 	if item.host.origin == session.OriginSSH {
@@ -213,7 +204,6 @@ func (m *Model) resumeClosedItem(item inboxItem) func() (tea.Model, tea.Cmd) {
 	return m.runAction(action.AgentResume, subject, action.Values{"item": {item.work.ID}})
 }
 
-// followResume goes to the window a resumed conversation runs in.
 func (m *Model) followResume(at action.Location, resumed action.ResumedAgent) tea.Cmd {
 	target := resumed.Session.Session(at)
 
@@ -252,8 +242,6 @@ func (m *Model) attachResumed() tea.Cmd {
 	return tea.Quit
 }
 
-// workActionError reports why a row's recorded conversation cannot be finished, pinned or
-// linked.
 func workActionError(id action.ID, item inboxItem) error {
 	switch {
 	case id == action.InboxFinish.ID && item.task:
@@ -282,8 +270,6 @@ func recordedActionError(id action.ID, recorded work.Item) error {
 	}
 }
 
-// runWorkAction applies an inbox action to the row's recorded conversation on its host; finishing
-// a task row finishes the task.
 func (m *Model) runWorkAction(id action.ID, item inboxItem, values action.Values) func() (tea.Model, tea.Cmd) {
 	if id == action.InboxFinish.ID && item.task {
 		return m.invokeAction(action.TaskFinish.ID, action.Values{})
@@ -317,8 +303,6 @@ func (m *Model) runWorkAction(id action.ID, item inboxItem, values action.Values
 	}
 }
 
-// unlinkPR unlinks a pull request from a row's conversation: the one given, the only one linked,
-// else the one the user picks.
 func (m *Model) unlinkPR(item inboxItem, subject action.Subject, pr string) func() (tea.Model, tea.Cmd) {
 	linked := item.work.Linked()
 	if pr == "" && len(linked) == 1 {
@@ -340,8 +324,6 @@ func (m *Model) unlinkPR(item inboxItem, subject action.Subject, pr string) func
 	return m.openMenu(&rowMenu{title: "unlink", entries: entries, cursor: 0, anchored: false, anchorX: 0, anchorY: 0, box: menuBox{x: 0, y: 0, width: 0, height: 0}})
 }
 
-// syncWorkCommand brings the recorded conversations up to date once per picker, after they first
-// load, and reloads them when anything changed.
 func (m *Model) syncWorkCommand() tea.Cmd {
 	if m.deps.Work == nil || m.workSynced || len(m.work) == 0 {
 		return nil
@@ -378,8 +360,6 @@ func (m *Model) workDirectories() []string {
 	return directories
 }
 
-// linkedPRs are the pull requests linked to a recorded conversation, with the state of those no
-// longer open.
 func linkedPRs(recorded work.Item) string {
 	linked := recorded.Linked()
 	texts := make([]string, 0, len(linked))

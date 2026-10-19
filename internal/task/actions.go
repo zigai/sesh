@@ -8,7 +8,6 @@ import (
 	"unicode"
 )
 
-// Variables are the values a task action prompt can refer to.
 func Variables(record Record) map[string]string {
 	project := filepath.Base(record.Project)
 	if record.Kind == KindLoose {
@@ -21,7 +20,6 @@ func Variables(record Record) map[string]string {
 	}
 }
 
-// Render fills a prompt template with a task's variables.
 func Render(prompt string, record Record) string {
 	variables := Variables(record)
 
@@ -33,8 +31,6 @@ func Render(prompt string, record Record) string {
 	return strings.NewReplacer(pairs...).Replace(prompt)
 }
 
-// RecordRun stores the latest run of a named action on a task, replacing the previous run of the
-// same action.
 func (s *Service) RecordRun(ctx context.Context, id string, run Run) error {
 	_, err := s.store.Update(ctx, func(ledger *Ledger) error {
 		record, found := ledger.Find(id)

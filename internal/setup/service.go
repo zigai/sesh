@@ -405,8 +405,6 @@ func renderSystemdAutosaveService(inputs ServiceInputs) string {
 	return content.String()
 }
 
-// managedTmuxOrdering orders a unit after the sesh-managed tmux server, and binds its lifetime to
-// that server when partOf is set. Units rendered for a user-run tmux server reference no such unit.
 func managedTmuxOrdering(inputs ServiceInputs, partOf bool) string {
 	if !inputs.WithTmuxService {
 		return ""

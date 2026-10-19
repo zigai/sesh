@@ -48,8 +48,6 @@ func parseDisplayMode(value string) displayMode {
 	}
 }
 
-// tree reports whether the mode lists groups with agent rows below them: sessions in AGENTS,
-// sections in WORK.
 func (mode displayMode) tree() bool {
 	return mode == displayModeAgents || mode == displayModeInbox
 }

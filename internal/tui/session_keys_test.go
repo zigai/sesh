@@ -61,7 +61,6 @@ func TestAssignSessionKeysPrefersLettersOfTheName(t *testing.T) {
 func TestAssignSessionKeysSkipsLettersOfPickerActionsWithAlt(t *testing.T) {
 	assigned, _ := assignSessionKeys(nil, []session.Identity{localKeyIdentity("scratch")}, newSessionKeyRules(altSessionKeyConfig()), true)
 
-	// alt+s, alt+c and alt+r are default picker actions.
 	if got := keyOf(assigned, "scratch"); got != "a" {
 		t.Fatalf("key of scratch = %q, want a", got)
 	}

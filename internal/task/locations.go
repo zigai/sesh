@@ -34,7 +34,6 @@ const (
 
 var ErrLocationUnavailable = errors.New("that checkout or branch is no longer free in this project")
 
-// Where is the kind of place a project task works in.
 type Where string
 
 // Location is a place a project task can work in. Branch is the branch checked out there, the
@@ -151,10 +150,6 @@ func (s *Service) Offer(ctx context.Context, place Place, describe bool) (Offer,
 	return offer, nil
 }
 
-// locations lists, in order: new worktrees from the default branch and from the branch checked
-// out at dir, the main checkout and the other worktrees, local branches no worktree has checked
-// out, branches only a remote has, and new worktrees from every other local branch. It also
-// returns the project's branches, described when describe is set.
 func (s *Service) locations(ctx context.Context, p project.Project, ledger Ledger, dir string, describe bool) ([]Location, branches, error) {
 	if p.Kind != project.KindGit {
 		id, title := taskIn(ledger, p.Root)
@@ -208,10 +203,6 @@ func (s *Service) locations(ctx context.Context, p project.Project, ledger Ledge
 	return locations, known, nil
 }
 
-// offered returns the location offered at root that a request names. A new worktree needs only
-// its kind and base, the default branch when none is named; a branch needs its name and remote;
-// an existing checkout its directory, and the main checkout may be named by kind alone. A
-// checkout another task works in is not offered.
 func (s *Service) offered(ctx context.Context, p project.Project, requested Location) (Location, []string, error) {
 	ledger, err := s.store.Load(ctx)
 	if err != nil {
@@ -301,8 +292,6 @@ func Changes(ctx context.Context, directories []string) map[string]git.Diff {
 	return changes
 }
 
-// currentCheckout returns the index of the innermost checkout that holds dir, else the main
-// checkout's.
 func currentCheckout(locations []Location, dir string) int {
 	current, depth := -1, -1
 
@@ -323,8 +312,6 @@ func currentCheckout(locations []Location, dir string) int {
 	return current
 }
 
-// slug turns a title into a branch name part: lower case letters and digits joined by single
-// dashes, cut to a bounded length.
 func slug(title string) string {
 	var out strings.Builder
 
@@ -352,8 +339,6 @@ func slug(title string) string {
 	return out.String()
 }
 
-// branchLocations lists the branches a new worktree can check out, local ones before ones only a
-// remote has, and then new worktrees from the local branches that are not bases already.
 func branchLocations(known branches, checkedOut, bases []string) []Location {
 	locations := make([]Location, 0, len(known.local)*2+len(known.remote))
 
@@ -403,7 +388,6 @@ func checkouts(root string, worktrees []worktree, ledger Ledger, dir string) ([]
 	return existing, current
 }
 
-// taskIn returns the ID and title of the task that works in directory.
 func taskIn(ledger Ledger, directory string) (string, string) {
 	index := slices.IndexFunc(ledger.Tasks, func(record Record) bool { return sameDirectory(record.Directory, directory) })
 	if index < 0 {
@@ -555,8 +539,6 @@ func listWorktrees(ctx context.Context, root string) ([]worktree, error) {
 	return worktrees, nil
 }
 
-// within reports whether dir is directory or inside it. A worktree placed inside the main
-// checkout matches both; git lists the main checkout first, so the last match is the closest.
 func within(dir, directory string) bool {
 	if dir == "" || directory == "" {
 		return false
@@ -585,7 +567,6 @@ func resolved(path string) string {
 	return filepath.Clean(path)
 }
 
-// startPoints maps the base of each new worktree location to the ref the worktree starts from.
 func startPoints(ctx context.Context, root string, locations []Location) (map[string]string, error) {
 	starts := make(map[string]string)
 

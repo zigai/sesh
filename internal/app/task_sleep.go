@@ -20,7 +20,6 @@ import (
 	"github.com/zigai/sesh/internal/task"
 )
 
-// paneAgents finds the agents AHT tracks in a pane of this machine's tmux server.
 type paneAgents struct {
 	source agents.SessionSource
 	socket string
@@ -76,14 +75,12 @@ func (local *Local) WakeTaskHere(ctx context.Context, id string) ([]string, erro
 	return woken.Command, nil
 }
 
-// TaskHarness returns the harness a task was started with.
 func (local *Local) TaskHarness(ctx context.Context, id string) (string, error) {
 	record, err := local.taskRecord(ctx, id)
 
 	return record.Harness, err
 }
 
-// selectTask returns the task a selector names: a task ID, or a pane of the task's window.
 func (local *Local) selectTask(ctx context.Context, selector string) (string, error) {
 	if !strings.HasPrefix(selector, "%") {
 		return selector, nil
@@ -97,7 +94,6 @@ func (local *Local) selectTask(ctx context.Context, selector string) (string, er
 	return id, err
 }
 
-// paneTask returns the task whose window holds pane, or empty for a pane outside task windows.
 func (local *Local) paneTask(ctx context.Context, pane string) (string, error) {
 	panes, err := local.server.PanesWith(ctx, gotmux.QueryOptions{
 		Filter: gotmux.Format("#{==:#{pane_id}," + pane + "}"), ExtraFields: []string{task.OptionTask},
@@ -115,7 +111,6 @@ func (local *Local) paneTask(ctx context.Context, pane string) (string, error) {
 	return string(id), nil
 }
 
-// taskService builds the task service for this machine's tmux server and task ledger.
 func (local *Local) taskService() (*task.Service, error) {
 	if local.server == nil {
 		return nil, action.Wrap(action.CodeUnavailable, ErrServerRequired)

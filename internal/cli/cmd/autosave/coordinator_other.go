@@ -12,7 +12,6 @@ import (
 
 var errCoordinatorUnsupported = errors.New("daemon lifecycle runtime is available only on Linux")
 
-// NewDaemonCoordinatorCommand returns the sleep and shutdown save coordinator, which needs logind.
 func NewDaemonCoordinatorCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "coordinator",

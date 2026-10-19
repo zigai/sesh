@@ -27,7 +27,6 @@ var (
 	textExtensions  = []string{".txt", ".log", ".md", ".json", ".jsonl", ".csv", ".diff", ".patch", ".cast", ".out"}
 )
 
-// EvidenceKind says how an evidence item opens.
 type EvidenceKind string
 
 // Evidence is one item of a report's Evidence section: a URL, or a file path made absolute
@@ -104,7 +103,6 @@ func submatches(matches [][]string) []string {
 	return values
 }
 
-// looksLikeTarget reports whether text is a URL or a path rather than prose.
 func looksLikeTarget(text string) bool {
 	switch {
 	case strings.ContainsAny(text, " \t"):

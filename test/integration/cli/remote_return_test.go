@@ -203,7 +203,6 @@ func publishRemoteReturnCatalog(t *testing.T, fixture remoteSSHFixture, peer *go
 	}
 }
 
-// defaultRemoteActions lists the actions a peer with default configuration advertises.
 func defaultRemoteActions() []action.ID {
 	ids := make([]action.ID, 0)
 

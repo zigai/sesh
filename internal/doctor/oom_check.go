@@ -13,9 +13,6 @@ const oomPolicyStop = "stop"
 
 var errNoServiceUnit = errors.New("process is not in a service unit cgroup")
 
-// checkServiceOOMPolicy warns when the service that owns the tmux server stops the whole unit
-// after the kernel kills any one process in it, which turns one runaway pane process into the
-// loss of the server and every pane.
 func (s *Service) checkServiceOOMPolicy(ctx context.Context) []Result {
 	if runtime.GOOS != "linux" || s.opts.ServiceDirs == nil {
 		return nil

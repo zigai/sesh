@@ -22,7 +22,6 @@ import (
 
 var errCoordinatorRecoveryBarrier = errors.New("repository has unresolved recovery state")
 
-// NewDaemonCoordinatorCommand returns the long-running sleep and shutdown save coordinator.
 func NewDaemonCoordinatorCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "coordinator",
@@ -132,7 +131,6 @@ func ensureCoordinatorRepositoryReady(ctx context.Context, env Env) error {
 		return oops.In("cli").With("operation", "open_daemon_repository").Wrap(err)
 	}
 
-	// Restores aimed at a vanished server can never resume and must not block saving.
 	_, settleErr := engine.SettleDeadRestores(ctx, repository)
 
 	state, inspectErr := automation.InspectStartupState(ctx, repository)

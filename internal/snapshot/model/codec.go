@@ -106,8 +106,6 @@ func Decode(data []byte) (Manifest, error) {
 	return m, nil
 }
 
-// decodeBase64Bytes reads the rest of a {"base64": "..."} object. It accepts only canonical
-// base64 of a sequence that is not valid UTF-8, which must use the plain string form instead.
 func decodeBase64Bytes(in *jsontext.Decoder) (Bytes, error) {
 	member, err := in.ReadToken()
 	if err != nil || member.Kind() != '"' || member.String() != bytesBase64Member {

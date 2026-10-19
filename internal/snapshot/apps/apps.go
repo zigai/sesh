@@ -114,15 +114,12 @@ func Prepare(observed model.Launch, agent *AgentResume) (model.Launch, Reason) {
 	return prepareApplication(observed, fallback, name)
 }
 
-// RunsHarness reports whether launch is a process of the named agent harness.
 func RunsHarness(launch model.Launch, harnessName string) bool {
 	observed, ok := observedAgentHarness(launch)
 
 	return ok && observed == aht.Harness(harnessName)
 }
 
-// StopSignal returns the signal that stops harness so that it can be resumed, if its stop was
-// verified.
 func StopSignal(harnessName string) (syscall.Signal, bool) {
 	signal, ok := agentStopSignals[aht.Harness(harnessName)]
 

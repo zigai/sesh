@@ -28,7 +28,6 @@ import (
 const (
 	ownedValue = "true"
 
-	// ConnectionFlag runs an action on a configured remote connection.
 	ConnectionFlag = "connection"
 
 	// ClientFlag and the flags after it name the tmux client that invoked an action; key
@@ -54,7 +53,6 @@ type Options[In, Out any] struct {
 	Render       func(cmd *cobra.Command, output Out, err error) error
 }
 
-// Runtime is what a command needs to run actions on this machine.
 type Runtime struct {
 	Local      *app.Local
 	Repository *app.Repository
@@ -107,8 +105,6 @@ func Command[In, Out any](definition *action.Definition[In, Out], opts Options[I
 	return cmd
 }
 
-// AddEnvironmentFlags registers the flags that select the tmux server, repository and state
-// files every action runs against.
 func AddEnvironmentFlags(cmd *cobra.Command) {
 	clibase.AddSocketFlag(cmd)
 	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
@@ -125,7 +121,6 @@ func addCallerFlags(cmd *cobra.Command) {
 	cmd.Flags().String(ClientHeightFlag, "", "Invoking client height [default: the client's height]")
 }
 
-// CallerOf reads the invoking tmux client from the caller flags.
 func CallerOf(cmd *cobra.Command) action.Caller {
 	value := func(name string) string {
 		if cmd.Flags().Lookup(name) == nil {
@@ -178,7 +173,6 @@ func OpenRuntime(cmd *cobra.Command, cfg *config.Config) (*Runtime, error) {
 	return &Runtime{Local: local, Repository: repository, Router: action.Router{Local: local, Peer: nil, Origin: nil}}, nil
 }
 
-// TerminalStreams returns the command's streams when they are terminal files.
 func TerminalStreams(cmd *cobra.Command) gotmux.Streams {
 	var streams gotmux.Streams
 
@@ -237,7 +231,6 @@ func run[In, Out any](cmd *cobra.Command, args []string, definition *action.Defi
 	return Render(cmd, definition, output, runErr)
 }
 
-// dispatch runs the action on the connection the command names, else on this machine.
 func dispatch[In, Out any](
 	ctx context.Context,
 	cmd *cobra.Command,
@@ -267,8 +260,6 @@ func dispatch[In, Out any](
 	return output, ran, errors.Join(err, runtime.Close())
 }
 
-// execute reports whether the action ran, so failures to select its subject or bind its input
-// are reported without an action result, like actions that fail without producing one.
 func execute[In, Out any](
 	ctx context.Context,
 	runtime *Runtime,
@@ -294,8 +285,6 @@ func execute[In, Out any](
 	return output, true, err
 }
 
-// executeRemote runs the action on a peer. Sessions are selected from the peer's inventory in
-// the local remote catalog.
 func executeRemote[In, Out any](
 	ctx context.Context,
 	cfg *config.Config,
@@ -403,7 +392,6 @@ func peerSessions(rows []session.Session, kind action.SubjectKind, selectors []s
 	return selected, nil
 }
 
-// Render writes an action result: the JSON envelope, or the action's one-line report.
 func Render[In, Out any](cmd *cobra.Command, definition *action.Definition[In, Out], output Out, err error) error {
 	if clibase.JSONOutputEnabled(cmd) {
 		return clibase.WriteJSONResultError(cmd, output, err)
@@ -479,9 +467,6 @@ func flagValue(cmd *cobra.Command, param action.Param, values action.Values, loc
 	return nil
 }
 
-// pathValue resolves a relative path against the working directory of the command, which is
-// where the person typing it expects it to point. Paths for a remote connection are the peer's
-// to resolve.
 func pathValue(param action.Param, value string, local bool) string {
 	if !local || param.Kind != action.ParamPath || value == "" || filepath.IsAbs(value) {
 		return value

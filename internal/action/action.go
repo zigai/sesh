@@ -78,7 +78,6 @@ type Caller struct {
 	Height  string
 }
 
-// Subject is what the user selected when invoking an action.
 type Subject struct {
 	At       Location
 	Sessions []session.Session
@@ -87,7 +86,6 @@ type Subject struct {
 	Task string
 }
 
-// Env tells availability checks what the dispatcher can run.
 type Env struct {
 	Accepts func(Location, ID) bool
 }
@@ -140,7 +138,6 @@ type Dispatcher interface {
 // Dispatchers runs each invocation on the first dispatcher that accepts it.
 type Dispatchers []Dispatcher
 
-// Router sends each invocation to the dispatcher for its location.
 type Router struct {
 	Local  Dispatcher
 	Peer   Dispatcher
@@ -255,12 +252,10 @@ func (descriptor Descriptor) matchSessions(sessions []session.Session) error {
 	return nil
 }
 
-// Local is this machine.
 func Local() Location {
 	return Location{Kind: LocationLocal, Connection: ""}
 }
 
-// Peer is a configured remote connection.
 func Peer(connection string) Location {
 	return Location{Kind: LocationPeer, Connection: connection}
 }
@@ -270,7 +265,6 @@ func Origin() Location {
 	return Location{Kind: LocationOrigin, Connection: ""}
 }
 
-// LocationOf reports where a catalog session lives.
 func LocationOf(target session.Session) Location {
 	switch target.Origin {
 	case session.OriginSSH:
@@ -284,7 +278,6 @@ func LocationOf(target session.Session) Location {
 	}
 }
 
-// SubjectOf selects sessions that live at the same location.
 func SubjectOf(sessions ...session.Session) Subject {
 	at := Local()
 	if len(sessions) > 0 {
@@ -352,7 +345,6 @@ func Run[In, Out any](
 	return typed, err
 }
 
-// RunAny dispatches an invocation whose input was bound through an Entry.
 func RunAny(ctx context.Context, dispatcher Dispatcher, invocation Invocation) (any, error) {
 	if _, ok := Lookup(invocation.Action); !ok {
 		return nil, Wrap(CodeUnsupported, ErrUnknownAction)

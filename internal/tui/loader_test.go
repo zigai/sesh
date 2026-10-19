@@ -1552,8 +1552,6 @@ func TestOpenPickerReceivesRemoteCatalogChanges(t *testing.T) {
 	})
 }
 
-// settledRemoteCatalog runs a command and every command it batches concurrently, as the program
-// does, and returns the remote catalog update they deliver once they settle.
 func settledRemoteCatalog(command tea.Cmd) *remoteCatalogMsg {
 	messages := make(chan tea.Msg, 64)
 

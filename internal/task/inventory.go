@@ -26,7 +26,6 @@ type Live struct {
 	Stalled bool
 }
 
-// Inventory returns every recorded task with its live location.
 func Inventory(ctx context.Context, server *gotmux.Server, store Store) ([]Live, error) {
 	ledger, err := store.Load(ctx)
 	if err != nil {

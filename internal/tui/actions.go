@@ -504,7 +504,6 @@ func (m *Model) handleRemoteEnter(
 	return m.attachRemote(target, paneID)
 }
 
-// attachRemote closes the picker and attaches to a remote session, at paneID when it is set.
 func (m *Model) attachRemote(target session.Session, paneID string) func() (tea.Model, tea.Cmd) {
 	if m.deps.RemoteAttach == nil {
 		return m.rejectRemoteAction("Enter")

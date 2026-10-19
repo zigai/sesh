@@ -18,7 +18,6 @@ const oomPolicyQueryTimeout = 3 * time.Second
 
 var errCgroupUninspected = errors.New("unified process cgroup could not be determined")
 
-// serviceUnitOf names the systemd service whose cgroup directly holds pid.
 func serviceUnitOf(pid int) (string, error) {
 	data, err := os.ReadFile(fmt.Sprintf("/proc/%d/cgroup", pid))
 	if err != nil {

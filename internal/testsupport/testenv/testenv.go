@@ -20,8 +20,6 @@ import (
 // environment when it does not inherit the parent's.
 const IsolatedMarker = "SESH_TESTENV_ISOLATED"
 
-// integrationRequiredSuffix marks variables such as SESH_LIFECYCLE_INTEGRATION_REQUIRED that turn
-// a missing integration dependency from a skip into a failure, so isolation must keep them.
 const integrationRequiredSuffix = "_INTEGRATION_REQUIRED"
 
 // sessionVariables point at the developer's live session: tmux sets the TMUX ones inside its panes
@@ -29,8 +27,6 @@ const integrationRequiredSuffix = "_INTEGRATION_REQUIRED"
 // manager over the session bus.
 var sessionVariables = []string{"TMUX", "TMUX_PANE", "TMUX_POPUP", "DBUS_SESSION_BUS_ADDRESS"}
 
-// directoryVariables name the locations through which sesh, tmux, and systemd reach the
-// developer's data, live server, and user service manager.
 var directoryVariables = map[string]string{
 	"HOME":            "home",
 	"XDG_CONFIG_HOME": "config",
@@ -117,8 +113,6 @@ func isolate(root string) error {
 	return nil
 }
 
-// setDirectories points each directory variable at its own directory under root. With keepSet,
-// variables that already have a value keep it.
 func setDirectories(root string, keepSet bool) error {
 	for variable, name := range directoryVariables {
 		if keepSet && os.Getenv(variable) != "" {
@@ -160,8 +154,6 @@ func disableGoTelemetry(configDir string) error {
 	return nil
 }
 
-// goToolchainEnvironment resolves the effective go toolchain locations before isolation changes
-// $HOME. Without a go command no test can start a go subprocess, so nothing needs pinning.
 func goToolchainEnvironment() (map[string]string, error) {
 	values := make(map[string]string, len(goToolchainVariables))
 

@@ -333,7 +333,6 @@ func TestSetupServicesApplyWritesManagedTmuxService(t *testing.T) {
 	}
 }
 
-// targetsSocket reports whether a unit passes exactly socket to --socket.
 func targetsSocket(content, socket string) bool {
 	return strings.Contains(content, "--socket "+socket+" ") || strings.Contains(content, "--socket "+socket+"\n")
 }

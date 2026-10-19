@@ -19,26 +19,19 @@ const (
 	SpanError
 )
 
-// GitGlyph marks a git branch, as in agent rows.
 const GitGlyph = "\ue725"
 
-// Chrome draws the picker frame, query line, rows and footer for pickers outside the session
-// picker, with the same glyphs and theme.
 type Chrome struct {
 	cfg *config.Config
 }
 
-// Span is a part of a row's right column, colored by its role.
 type Span struct {
 	Text string
 	Role SpanRole
 }
 
-// SpanRole colors a span like the counts of an agent row: muted, or a theme color that draws the
-// eye to a count that is not zero.
 type SpanRole int
 
-// Hint is one key and what it does, shown in the footer.
 type Hint struct {
 	Key  string
 	Desc string
@@ -52,12 +45,10 @@ func (c Chrome) NewTextInput() textinput.Model {
 	return newTextInput(newTextInputStyles(c.cfg))
 }
 
-// BodyWidth is the width of the lines inside a frame that is width columns wide.
 func (c Chrome) BodyWidth(width int) int {
 	return max(width-popupBodyWidthMargin, 1)
 }
 
-// BodyHeight is the number of lines inside a frame that is height rows tall.
 func (c Chrome) BodyHeight(height int) int {
 	return max(height-popupBodyHeightMargin, 1)
 }
@@ -84,19 +75,14 @@ func (c Chrome) InputBar(input *textinput.Model, width int) string {
 	return inputBar(input, width)
 }
 
-// Row draws a list row: the selection bar, the name, and a muted right column.
 func (c Chrome) Row(name, right string, selected bool, width int) string {
 	return c.TreeRow("", name, right, selected, width)
 }
 
-// TreeRow draws a list row whose name follows a muted tree prefix, like the agents under a
-// session.
 func (c Chrome) TreeRow(tree, name, right string, selected bool, width int) string {
 	return c.TreeRowSpans(tree, name, []Span{{Text: right, Role: SpanMuted}}, selected, width)
 }
 
-// TreeRowSpans draws a tree row whose right column is made of spans, each colored by its role,
-// like the git counts of an agent row.
 func (c Chrome) TreeRowSpans(tree, name string, spans []Span, selected bool, width int) string {
 	styles := rowStyles(c.cfg, inputGutterWidth(), width)
 	treeWidth := lipgloss.Width(tree)
@@ -156,7 +142,6 @@ func (c Chrome) TreeRowSpans(tree, name string, spans []Span, selected bool, wid
 	return out.String()
 }
 
-// SpansWidth is the width spans take on screen.
 func SpansWidth(spans []Span) int {
 	width := 0
 	for _, span := range spans {
@@ -166,7 +151,6 @@ func SpansWidth(spans []Span) int {
 	return width
 }
 
-// RowWidth is the width TreeRow needs to show tree, name and right in full.
 func (c Chrome) RowWidth(tree, name, right string) int {
 	if right == "" {
 		return inputGutterWidth() + lipgloss.Width(tree) + lipgloss.Width(name)
@@ -183,7 +167,6 @@ func (c Chrome) Muted(text string) string {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(c.cfg.Theme.Muted)).Render(text)
 }
 
-// Blank is an empty body line.
 func (c Chrome) Blank(width int) string {
 	return strings.Repeat(" ", max(width, 0))
 }
@@ -198,7 +181,6 @@ func (c Chrome) Pad(line string, width int) string {
 	return line
 }
 
-// Footer draws key hints on the left and the mode badge on the right.
 func (c Chrome) Footer(hints []Hint, badge string, width int) string {
 	label := modeBadge(c.cfg, badge)
 	labelWidth := lipgloss.Width(label)
@@ -219,7 +201,6 @@ func (c Chrome) Footer(hints []Hint, badge string, width int) string {
 	return renderFooterLine(parts, hintWidth, "") + strings.Repeat(" ", width-labelWidth-hintWidth) + label
 }
 
-// Border colors text like the frame border, for popups that draw their own frame.
 func (c Chrome) Border(text string) string {
 	if defaultBorderTheme(c.cfg) {
 		return ansiDefaultBorder + text + ansiReset
@@ -228,7 +209,6 @@ func (c Chrome) Border(text string) string {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(c.cfg.Theme.Border)).Render(text)
 }
 
-// Hints draws key hints the way the footer does, without padding them to a width.
 func (c Chrome) Hints(hints []Hint) string {
 	var out strings.Builder
 
@@ -245,8 +225,6 @@ func (c Chrome) Hints(hints []Hint) string {
 	return out.String()
 }
 
-// Choice draws one choice of an inline row of choices, padded by a space on each side and
-// highlighted like a selected row when it is the selected one.
 func (c Chrome) Choice(text string, selected bool) string {
 	styles := rowStyles(c.cfg, 0, 0)
 
@@ -268,7 +246,6 @@ func (c Chrome) Choice(text string, selected bool) string {
 	return out.String()
 }
 
-// Label draws a field label: muted, or styled like a footer key when its field has focus.
 func (c Chrome) Label(text string, focused bool) string {
 	if focused {
 		return ansiFooterKey + text + ansiReset
@@ -277,7 +254,6 @@ func (c Chrome) Label(text string, focused bool) string {
 	return c.Muted(text)
 }
 
-// Error colors text like a failed state.
 func (c Chrome) Error(text string) string {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(c.cfg.Theme.Error)).Render(text)
 }

@@ -20,7 +20,6 @@ const (
 	StatusFileFlagUsage = "Final save status file [default: $XDG_STATE_HOME/sesh/autosave-status.json]"
 )
 
-// AddSocketFlag registers the optional --socket flag resolved by [ResolveSocket].
 func AddSocketFlag(cmd *cobra.Command) {
 	cmd.Flags().String("socket", "", SocketFlagUsage)
 }

@@ -321,7 +321,6 @@ func (adapter *testServiceAdapter) fakeRestore(ctx context.Context, invocation a
 	return restored, nil
 }
 
-// restoredNames maps saved session IDs back to the names of the rows the model shows.
 func (adapter *testServiceAdapter) restoredNames(invocation action.Invocation, input action.RestoreSnapshot) []string {
 	names := make([]string, 0, len(input.Sessions))
 
@@ -830,16 +829,12 @@ func newModelWithContext(
 	return model, nil
 }
 
-// actionTrace is what running a picker action produced: action results the model handled, the
-// session entry it ended in, and whether it asked to quit.
 type actionTrace struct {
 	results []actionResultMsg
 	entered *sessionActionResultMsg
 	quit    bool
 }
 
-// runActionTrace runs a command the way the program would, feeding action results back into
-// the model until the action settles. Refresh and entry messages are recorded, not followed.
 func runActionTrace(t *testing.T, model *Model, cmd tea.Cmd) actionTrace {
 	t.Helper()
 
@@ -875,7 +870,6 @@ func runActionTrace(t *testing.T, model *Model, cmd tea.Cmd) actionTrace {
 	return trace
 }
 
-// invokeTestAction starts an action from the picker and runs whatever it starts.
 func invokeTestAction(t *testing.T, model *Model, id action.ID) actionTrace {
 	t.Helper()
 
@@ -889,7 +883,6 @@ func invokeTestAction(t *testing.T, model *Model, id action.ID) actionTrace {
 	return runActionTrace(t, model, cmd)
 }
 
-// pressTestKey sends a key to the model and runs the action it starts.
 func pressTestKey(t *testing.T, model *Model, key tea.KeyPressMsg) actionTrace {
 	t.Helper()
 

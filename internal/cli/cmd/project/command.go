@@ -1,6 +1,5 @@
 //go:build linux || darwin
 
-// Package project holds the commands that open, clone, create and pick projects.
 package project
 
 import (
@@ -12,7 +11,6 @@ import (
 	cmdpicker "github.com/zigai/sesh/internal/cli/cmd/picker"
 )
 
-// NewCommand returns the group of commands that open projects in their sessions.
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "project",

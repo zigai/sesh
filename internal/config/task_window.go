@@ -10,7 +10,6 @@ import (
 )
 
 const (
-	// TaskPaneAgent names the agent pane in task layouts.
 	TaskPaneAgent = "agent"
 
 	OrientationLandscape = "landscape"
@@ -101,7 +100,6 @@ type TaskSplitConfig struct {
 	Size      string `toml:"size"`
 }
 
-// TaskWindow is the task window configuration of one project.
 type TaskWindow struct {
 	Panes   []TaskPaneConfig
 	Layouts []TaskLayoutConfig
@@ -182,7 +180,6 @@ func (w TaskWindow) Placed(layout TaskLayoutConfig) []string {
 	return placed
 }
 
-// Pane returns the configured pane called name.
 func (w TaskWindow) Pane(name string) (TaskPaneConfig, bool) {
 	index := slices.IndexFunc(w.Panes, func(pane TaskPaneConfig) bool { return pane.Name == name })
 	if index < 0 {
@@ -192,7 +189,6 @@ func (w TaskWindow) Pane(name string) (TaskPaneConfig, bool) {
 	return w.Panes[index], true
 }
 
-// Matches reports whether a layout applies to a window of width by height cells running harness.
 func (w TaskLayoutWhen) Matches(width, height int, harness string) bool {
 	landscape := width >= cellAspect*height
 
@@ -278,8 +274,6 @@ func ValidateTaskWindows(cfg *Config) error {
 	return nil
 }
 
-// harnessNames are the names a layout's when.harness can use: the configured harnesses, else every
-// harness AHT supports.
 func (c *Config) harnessNames() []string {
 	if len(c.Tasks.Harness) == 0 {
 		return nil
@@ -293,8 +287,6 @@ func (c *Config) harnessNames() []string {
 	return names
 }
 
-// validateTaskPanes checks one list of panes as written, before a project's panes are merged into
-// the global ones, so a name written twice is reported.
 func validateTaskPanes(prefix string, panes []TaskPaneConfig) error {
 	names := make(map[string]bool, len(panes))
 
@@ -444,8 +436,6 @@ func validatePlacement(window TaskWindow, layout TaskLayoutConfig) ([]string, er
 	return placed, nil
 }
 
-// knownHarness reports whether name is one of the configured harnesses, or without any, one AHT
-// supports.
 func knownHarness(name string, configured []string) bool {
 	if configured == nil {
 		return SupportedHarness(name)

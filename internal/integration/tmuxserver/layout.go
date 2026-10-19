@@ -257,8 +257,6 @@ func appendLayout(out *strings.Builder, node model.Layout, panes map[string]gotm
 	return nil
 }
 
-// withoutPanes removes the given leaves and collapses splits left with a single child. It reports
-// false when no leaf remains.
 func withoutPanes(node model.Layout, removed []string) (model.Layout, bool) {
 	if node.Pane != "" {
 		return node, !slices.Contains(removed, node.Pane)
@@ -326,8 +324,6 @@ func decodeTypedLayout(text string, panes map[string]string) (WindowLayout, erro
 	return WindowLayout{Tiled: tiled, Floating: decoder.floating, Recent: decoder.recent}, nil
 }
 
-// node decodes one cell. A floating pane is recorded and reported as absent so its parent
-// lays out only the tiled cells.
 func (d *typedDecoder) node(raw json.RawMessage, depth int) (model.Layout, bool, error) {
 	var node map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &node); err != nil {

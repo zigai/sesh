@@ -19,7 +19,6 @@ const (
 	MergeExitCheck    = 4
 	MergeExitDirty    = 5
 
-	// MergeAction names the merge run in a task's runs and its popup window.
 	MergeAction = "merge"
 
 	mergeRemote = "origin"
@@ -37,18 +36,15 @@ var (
 	ErrNotProjectTask = errors.New("only a project task has a branch to merge")
 )
 
-// Merged describes a branch put on its base.
 type Merged struct {
 	Branch string
 	Base   string
 }
 
-// CheckError is a merge check that exited with ExitCode.
 type CheckError struct {
 	ExitCode int
 }
 
-// FinishRunError is a finish command that exited with ExitCode.
 type FinishRunError struct {
 	ExitCode int
 }
@@ -69,7 +65,6 @@ func (e *FinishRunError) Is(target error) bool {
 	return target == ErrFinishRun
 }
 
-// MergeExitCode is the exit code of a merge run that ended with err.
 func MergeExitCode(err error) int {
 	switch {
 	case err == nil:
@@ -186,8 +181,6 @@ func runMergeCheck(ctx context.Context, dir string, check []string, out io.Write
 	return nil
 }
 
-// fastForwardMainCheckout moves the base branch of the repository's main checkout to origin's,
-// when that checkout has the base checked out and no changes.
 func fastForwardMainCheckout(ctx context.Context, dir, base string, out io.Writer) error {
 	worktrees, err := git.Output(ctx, dir, "worktree", "list", "--porcelain")
 	if err != nil {
@@ -208,7 +201,6 @@ func fastForwardMainCheckout(ctx context.Context, dir, base string, out io.Write
 	return mergeStep(ctx, out, main, "fast-forward "+base+" in "+main, "merge", "--ff-only", mergeRemote+"/"+base)
 }
 
-// cleanOnBranch reports whether the checkout at dir has branch checked out and no changes.
 func cleanOnBranch(ctx context.Context, dir, branch string) bool {
 	head, err := git.Output(ctx, dir, "symbolic-ref", "--quiet", "--short", "HEAD")
 	if err != nil || head != branch {

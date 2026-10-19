@@ -17,8 +17,6 @@ import (
 )
 
 const (
-	// OptionRestart holds, on a pane whose command runs again after a restore, that command as
-	// JSON.
 	OptionRestart = "@sesh_restart"
 
 	percentOf = 100
@@ -45,7 +43,6 @@ type restartCommand struct {
 	Argv      []string `json:"argv"`
 }
 
-// cell is a node of a window layout: a pane, or panes side by side (across) or stacked.
 type cell struct {
 	pane     string
 	across   bool
@@ -55,7 +52,6 @@ type cell struct {
 	w, h     int
 }
 
-// windowPane is a pane of a task window, with the role sesh tagged it with, if any.
 type windowPane struct {
 	id     gotmux.PaneID
 	role   string
@@ -181,8 +177,6 @@ func (s *Service) focus(ctx context.Context, panes []windowPane, role string) er
 	return nil
 }
 
-// windowPanes lists a window's panes in order with their roles and sizes; a pane sesh did not
-// open has no role.
 func (s *Service) windowPanes(ctx context.Context, window gotmux.Window) ([]windowPane, error) {
 	infos, err := window.PanesWith(ctx, gotmux.QueryOptions{Filter: "", ExtraFields: []string{OptionRole}})
 	if err != nil {
@@ -204,9 +198,6 @@ func (s *Service) windowPanes(ctx context.Context, window gotmux.Window) ([]wind
 	return panes, nil
 }
 
-// openPanes opens the placed panes the window lacks. Each splits the largest pane along its
-// longer side, so it has room however the window is laid out now; the layout then puts it in
-// place.
 func (s *Service) openPanes(
 	ctx context.Context,
 	window gotmux.Window,
@@ -304,13 +295,10 @@ func (s *Service) openPane(
 	return nil
 }
 
-// layoutNamed reports whether the task window setup has a layout called name.
 func layoutNamed(setup config.TaskWindow, name string) bool {
 	return slices.ContainsFunc(setup.Layouts, func(layout config.TaskLayoutConfig) bool { return layout.Name == name })
 }
 
-// chooseLayout returns the layout called name, else the first that applies to a window of width
-// by height cells running harness, else the default arrangement.
 func chooseLayout(setup config.TaskWindow, harness string, width, height int, name string) (config.TaskLayoutConfig, error) {
 	if name != "" {
 		index := slices.IndexFunc(setup.Layouts, func(layout config.TaskLayoutConfig) bool { return layout.Name == name })
@@ -330,7 +318,6 @@ func chooseLayout(setup config.TaskWindow, harness string, width, height int, na
 	return defaultArrangement(), nil
 }
 
-// defaultArrangement stacks the agent above every other pane.
 func defaultArrangement() config.TaskLayoutConfig {
 	return config.TaskLayoutConfig{
 		Name: "", When: config.TaskLayoutWhen{Orientation: "", MinWidth: 0, MaxWidth: 0, MinHeight: 0, MaxHeight: 0, Harness: nil},
@@ -454,7 +441,6 @@ func setMainSize(ctx context.Context, window gotmux.Window, layout config.TaskLa
 	return nil
 }
 
-// orderPanes swaps the window's panes into the order of keys, each pane key naming one pane.
 func orderPanes(ctx context.Context, server *gotmux.Server, panes []windowPane, order []string, ids map[string]gotmux.PaneID) error {
 	current := make([]gotmux.PaneID, 0, len(panes))
 	for _, pane := range panes {
@@ -545,7 +531,6 @@ func (c *cell) splitOff(pane string, across, before bool, size config.PaneSize) 
 	return nil
 }
 
-// largest returns the pane cell with the most area, the first of equals.
 func (c *cell) largest() *cell {
 	if c.pane != "" {
 		return c

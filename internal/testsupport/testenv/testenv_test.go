@@ -131,7 +131,6 @@ func TestRemoveIsolatedHomeDeletesReadOnlyTrees(t *testing.T) {
 	}
 }
 
-// restoreIsolatedVariables registers restoration of every variable isolate changes.
 func restoreIsolatedVariables(t *testing.T) {
 	t.Helper()
 

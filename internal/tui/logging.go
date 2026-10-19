@@ -35,8 +35,6 @@ const (
 	tuiOperationLoadEvidence            tuiLogOperation = "load_evidence"
 )
 
-// tuiOperationFirstFrame names the once-per-popup timing record, which has its own schema
-// outside the closed set of operation outcomes.
 const tuiOperationFirstFrame = "first_frame"
 
 const (
@@ -62,7 +60,6 @@ const (
 
 type tuiLogOperation string
 
-// firstFrameTiming breaks down how long a popup took to show its first frame.
 type firstFrameTiming struct {
 	load        time.Duration
 	loaders     *sessionLoadTiming
@@ -251,8 +248,6 @@ func logTUIFirstFrame(ctx context.Context, timing firstFrameTiming) {
 	event.Msg("tui first frame shown")
 }
 
-// firstFrameTimingAt measures a first frame shown at now. A zero initializedAt or
-// launchedAt leaves that span unknown.
 func firstFrameTimingAt(initializedAt, launchedAt time.Time, load *sessionLoadTiming, now time.Time) firstFrameTiming {
 	timing := firstFrameTiming{load: 0, loaders: load, sinceLaunch: 0, launched: false}
 	if !initializedAt.IsZero() {

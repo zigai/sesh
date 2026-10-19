@@ -6,7 +6,6 @@ import (
 	"strings"
 )
 
-// ErrPRNumber rejects a pull request that is not a positive number.
 var ErrPRNumber = errors.New("pull request must be a number such as 12 or #12")
 
 var (
@@ -105,7 +104,6 @@ var AgentMerge = define(Descriptor{
 	return MergeAgentBranch{Session: RefOf(subject.Sessions[0]), Pane: subject.Pane}, nil
 }, func(out MergedAgentBranch) string { return "Merged " + out.Branch + " into " + out.Base })
 
-// AgentResume resumes a closed agent conversation that the inbox lists.
 var AgentResume = define(Descriptor{
 	ID:      "agent.resume",
 	Title:   "Resume agent",
@@ -166,7 +164,6 @@ type FocusAgent struct {
 	Pane    string     `json:"pane"`
 }
 
-// FocusedPane is the pane navigation activated.
 type FocusedPane struct {
 	Pane      string `json:"pane"`
 	SessionID string `json:"sessionId"`
@@ -191,7 +188,6 @@ type ResumeAgent struct {
 	Item string `json:"item"`
 }
 
-// ChangeWork names a recorded conversation and, for linking, a pull request number.
 type ChangeWork struct {
 	Item string `json:"item"`
 	PR   int    `json:"pr"`
@@ -201,7 +197,6 @@ type ChangedWork struct {
 	Item string `json:"item"`
 }
 
-// ResumedAgent is the window a resumed conversation runs in.
 type ResumedAgent struct {
 	Item    string     `json:"item"`
 	Session SessionRef `json:"session"`

@@ -149,8 +149,6 @@ func activeWindow(t *testing.T, ctx context.Context, server *gotmux.Server, sess
 	return ""
 }
 
-// runAgentNavigation runs one agent navigation action with a fresh root command and decodes
-// its JSON result.
 func runAgentNavigation(t *testing.T, action string, args ...string) agentNavResultJSON {
 	t.Helper()
 

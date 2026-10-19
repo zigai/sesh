@@ -5,7 +5,6 @@ import (
 	"time"
 )
 
-// SnoozeNextMessage is the snooze choice that lasts until the agent's next message.
 const SnoozeNextMessage = "next message"
 
 const (

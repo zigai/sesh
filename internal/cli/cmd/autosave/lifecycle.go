@@ -85,8 +85,6 @@ func executeStartupRestore(cmd *cobra.Command, env Env, claim func() bool) error
 		return errors.Join(renderAutosaveResult(cmd, env, held), wrapCloseError(repo.Close()), lock.Release())
 	}
 
-	// Restores aimed at a vanished server, e.g. one interrupted by a reboot, can never resume
-	// and must not block this start's restore.
 	settled, settleErr := engine.SettleDeadRestores(ctx, repo)
 	if settleErr != nil {
 		return errors.Join(oops.In("cli").With("operation", "settle_dead_restores").Wrap(settleErr), wrapCloseError(repo.Close()), lock.Release())
@@ -185,8 +183,6 @@ func renderDeniedStartupRestore(
 	}
 }
 
-// startupRefusalCause says why a startup restore was refused and how to clear it, so the
-// journal line is actionable on its own.
 func startupRefusalCause(reason string, state automation.StartupState) error {
 	switch reason {
 	case automation.ReasonPendingOperation:

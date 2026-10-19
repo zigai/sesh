@@ -102,8 +102,6 @@ func (invocation Invocation) Validate() error {
 	return invocation.validateResolution()
 }
 
-// validateResolution requires a resolved invocation to record when it resolved, and an
-// unresolved one to carry no resolution.
 func (invocation Invocation) validateResolution() error {
 	if invocation.Outcome == "" {
 		if !invocation.ResolvedAt.IsZero() || len(invocation.Output) > 0 {
@@ -120,7 +118,6 @@ func (invocation Invocation) validateResolution() error {
 	return nil
 }
 
-// OutcomeOf is the receipt outcome of an action result.
 func OutcomeOf(result ActionResult) string {
 	if result.OK {
 		return outcomeOK

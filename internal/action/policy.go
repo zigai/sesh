@@ -13,7 +13,6 @@ var (
 	ErrRemoteNotSupported      = errors.New("configuration allows remote use of an action that cannot run remotely")
 )
 
-// Policy is how an action behaves under the user's configuration.
 type Policy struct {
 	Confirm     bool
 	AllowRemote bool

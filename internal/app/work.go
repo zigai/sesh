@@ -22,8 +22,6 @@ var (
 	ErrWorkDirectoryGone = errors.New("the conversation's directory no longer exists")
 )
 
-// resumeAgent opens a window that resumes a recorded conversation in its directory: in its
-// project's session, else in the invoking pane's session, reopens it and clears its unseen mark.
 func (local *Local) resumeAgent(ctx context.Context, caller action.Caller, input action.ResumeAgent) (action.ResumedAgent, error) {
 	var resumed action.ResumedAgent
 
@@ -103,7 +101,6 @@ func (local *Local) markWorkSeen(ctx context.Context, _ action.Caller, input act
 	})
 }
 
-// linkWork links a pull request of the conversation's repository, as gh reports it.
 func (local *Local) linkWork(ctx context.Context, _ action.Caller, input action.ChangeWork) (action.ChangedWork, error) {
 	changed := action.ChangedWork{Item: input.Item}
 

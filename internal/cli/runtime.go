@@ -114,7 +114,6 @@ func (b *commandBuffer) File() *os.File {
 	return nil
 }
 
-// ExecuteApplication runs the sesh command line through the production runtime.
 func ExecuteApplication(ctx context.Context, args []string, input io.Reader, stdout, stderr io.Writer) error {
 	root := newRootCommand(ctx)
 	root.SetContext(ctx)

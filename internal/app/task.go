@@ -90,7 +90,6 @@ func (local *Local) TaskOffer(ctx context.Context, caller action.Caller, dir str
 	return offered, nil
 }
 
-// ShowTask moves the invoking client to a task's window and focuses its agent pane.
 func (local *Local) ShowTask(ctx context.Context, caller action.Caller, id string) error {
 	if local.taskLedger == "" {
 		return action.Wrap(action.CodeUnavailable, ErrLedgerRequired)
@@ -145,8 +144,6 @@ func (local *Local) openTask(ctx context.Context, caller action.Caller, input ac
 	return action.OpenedTask{ID: input.Task}, err
 }
 
-// reopenTask opens the window of a task that has none: a project task's in its project session,
-// a loose task's in the caller's session. It returns where the window is.
 func (local *Local) reopenTask(ctx context.Context, caller action.Caller, record task.Record) (task.Live, error) {
 	service, err := local.taskService()
 	if err != nil {
@@ -214,9 +211,6 @@ func (local *Local) startTask(ctx context.Context, caller action.Caller, input a
 	return started, nil
 }
 
-// startPlace is where a new task starts: the caller's pane, or the session of the project at
-// dir when one is named. Without an invoking pane, as for a remote connection, a project is
-// required.
 func (local *Local) startPlace(ctx context.Context, caller action.Caller, dir string) (*task.Service, task.Place, error) {
 	if dir == "" || caller.Pane != "" || os.Getenv(paneEnvironment) != "" {
 		service, place, err := local.taskPlace(ctx, caller)
@@ -239,7 +233,6 @@ func (local *Local) startPlace(ctx context.Context, caller action.Caller, dir st
 	return service, place, err
 }
 
-// offerTask lists what a new task can start with in the git project with the given name.
 func (local *Local) offerTask(ctx context.Context, _ action.Caller, input action.OfferTask) (action.TaskOffered, error) {
 	offered := action.TaskOffered{
 		Project: "", Harnesses: nil, Locations: nil, Current: -1, NextNumber: 0, Branches: nil, Refs: nil, Starts: nil,
@@ -280,7 +273,6 @@ func (local *Local) offerTask(ctx context.Context, _ action.Caller, input action
 	return OfferedTask(offer), nil
 }
 
-// OfferedTask describes a task offer for the new task popup of another machine.
 func OfferedTask(offer task.Offer) action.TaskOffered {
 	offered := action.TaskOffered{
 		Project: offer.Project, Harnesses: make([]string, 0, len(offer.Harnesses)),
@@ -321,8 +313,6 @@ func (local *Local) projectOf(ctx context.Context, from task.Place, dir string) 
 	return task.Place{Pane: from.Pane, Session: "", Dir: p.Root, Project: p.Root, Task: ""}, nil
 }
 
-// projectPlace opens the session of the project at dir, without moving any client to it, and
-// returns it as the place a task starts from.
 func (local *Local) projectPlace(ctx context.Context, from task.Place, dir string) (task.Place, error) {
 	catalog, err := local.projectCatalog()
 	if err != nil {
@@ -456,7 +446,6 @@ func (local *Local) AttachTaskPopup(ctx context.Context, taskID string, streams 
 	return nil
 }
 
-// seshExecutable is the sesh binary that tmux runs for task commands, popups and placeholders.
 func seshExecutable() (string, error) {
 	executable, err := os.Executable()
 	if err != nil {
@@ -505,8 +494,6 @@ func (local *Local) taskPlace(ctx context.Context, caller action.Caller) (*task.
 	return service, place, nil
 }
 
-// callerClient is the client named by the caller, else the only client showing the pane's
-// session.
 func (local *Local) callerClient(ctx context.Context, caller action.Caller, place task.Place) (gotmux.Client, error) {
 	if caller.Client != "" {
 		client, err := local.server.Client(ctx, gotmux.ClientName(caller.Client))

@@ -352,8 +352,6 @@ func loadAndValidate(target *Config, baseCfg *Config, files [][]byte) error {
 	return validateLoaded(target)
 }
 
-// applyEnvironmentThemePreset expands a preset that only the environment selected, keeping
-// every other theme color the environment set explicitly. Invalid names are left for validation.
 func applyEnvironmentThemePreset(theme *ThemeConfig, fileTheme ThemeConfig) {
 	name := strings.TrimSpace(theme.Preset)
 	if name == "" || strings.EqualFold(name, strings.TrimSpace(fileTheme.Preset)) {

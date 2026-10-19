@@ -102,8 +102,6 @@ func (r *RestoreLaunches) Override(ctx context.Context, manifest model.Manifest)
 	return launches, nil
 }
 
-// addTaskEnvironment gives each pane of a task window that the restore launches the environment
-// its task's processes start with.
 func addTaskEnvironment(manifest model.Manifest, ledger Ledger, launches map[string]model.Launch) {
 	records := make(map[string]Record)
 
@@ -183,8 +181,6 @@ func (r *RestoreLaunches) Commit(ctx context.Context, panes []string) error {
 	return taskError("restore_tasks", err)
 }
 
-// capturedAgents lists the task agent panes captured with a native resume launch or a sleeping
-// placeholder that belong to a task the ledger knows.
 func capturedAgents(manifest model.Manifest, ledger Ledger) []restoredAgent {
 	windowTasks := make(map[string]string)
 
@@ -218,7 +214,6 @@ func capturedAgents(manifest model.Manifest, ledger Ledger) []restoredAgent {
 	return captured
 }
 
-// restartLaunches runs again the command recorded on each pane of a task window that restarts.
 func restartLaunches(manifest model.Manifest) map[string]model.Launch {
 	taskWindows := make(map[string]bool)
 

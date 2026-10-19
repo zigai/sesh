@@ -42,7 +42,6 @@ var (
 	ErrInvalidSessionKey     = errors.New("invalid session key")
 )
 
-// HistoryVersionError reports a history file whose version is not CurrentHistoryVersion.
 type HistoryVersionError struct {
 	Version int
 }
@@ -848,7 +847,6 @@ func (s *State) RenameSessionIdentity(oldIdent Identity, newIdent Identity) {
 	}
 }
 
-// SessionKey returns the key recorded for the session with the key identity ident.
 func (s *State) SessionKey(ident Identity) (string, bool) {
 	for _, entry := range s.SessionKeys {
 		if entry.Session == ident {

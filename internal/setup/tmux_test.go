@@ -17,8 +17,6 @@ func tmuxBinding(key, table string, id action.ID, values action.Values) action.B
 	return action.Binding{Key: key, Action: id, In: action.SurfaceTmux, Table: table, Values: values}
 }
 
-// shellWords runs the words of a rendered command through the shell run-shell uses, after tmux
-// expanded its formats.
 func shellWords(t *testing.T, command string) []string {
 	t.Helper()
 

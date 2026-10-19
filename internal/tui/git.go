@@ -124,7 +124,6 @@ func readGitMetadata(ctx context.Context, directory string) agentGitCacheEntry {
 	}
 }
 
-// readGitUnmerged counts the commits of HEAD that origin's default branch lacks.
 func readGitUnmerged(ctx context.Context, directory string) int {
 	base, ok := gitMetadataOutput(ctx, directory, "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD")
 	if !ok || base == "" {

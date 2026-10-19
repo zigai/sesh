@@ -18,8 +18,6 @@ const (
 	reasonRestoreIncomplete = "restore_incomplete"
 )
 
-// pendingRestore is a live tmux server that started after the newest snapshot and still lacks
-// some of its saved sessions.
 type pendingRestore struct {
 	sessions      int
 	serverStarted time.Time
@@ -87,8 +85,6 @@ func claimPendingEpisode(env Env, pending pendingRestore) bool {
 	return automation.RecordEpisodeReported(automation.RestorePendingMarkerPath(env.workspace.History), pending.serverStarted.Unix()) == nil
 }
 
-// reportRestoreIncomplete warns once per tmux server start that automatic saves resumed although a
-// restore left saved sessions missing.
 func reportRestoreIncomplete(ctx context.Context, env Env, pending pendingRestore) {
 	if !claimPendingEpisode(env, pending) {
 		return
@@ -103,8 +99,6 @@ func reportRestoreIncomplete(ctx context.Context, env Env, pending pendingRestor
 		Msg("autosave resumed after a restore with saved sessions missing")
 }
 
-// reportPendingRestore warns once per tmux server start that saves are held back until the saved
-// sessions are restored or an explicit save keeps the live state.
 func reportPendingRestore(ctx context.Context, env Env, pending pendingRestore) {
 	if !claimPendingEpisode(env, pending) {
 		return

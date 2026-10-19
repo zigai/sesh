@@ -29,7 +29,6 @@ var actionOperations = map[action.ID]tuiLogOperation{
 	action.SessionSwitch.ID:   tuiOperationEnterLiveSession,
 }
 
-// pendingAction is an action the picker is collecting parameters or confirmation for.
 type pendingAction struct {
 	entry   action.Entry
 	subject action.Subject
@@ -51,9 +50,6 @@ func actionOperation(id action.ID) tuiLogOperation {
 	return tuiOperationRunAction
 }
 
-// invokeAction starts an action on the selection: it checks that the action applies, asks for
-// the parameters a person supplies, and asks for confirmation when the action's policy does.
-// Values are parameters the invoking key binding supplies.
 func (m *Model) invokeAction(id action.ID, values action.Values) func() (tea.Model, tea.Cmd) {
 	entry, ok := action.Lookup(id)
 	if !ok {
@@ -95,7 +91,6 @@ func (m *Model) invokeAction(id action.ID, values action.Values) func() (tea.Mod
 	return m.continueAction(request)
 }
 
-// runAction runs an action on a subject the caller chose, without prompts or confirmation.
 func (m *Model) runAction(definition action.Entry, subject action.Subject, values action.Values) func() (tea.Model, tea.Cmd) {
 	descriptor := definition.Describe()
 	if err := m.actionAvailable(descriptor, subject); err != nil {
@@ -119,10 +114,6 @@ func (m *Model) actionAvailable(descriptor action.Descriptor, subject action.Sub
 	return nil
 }
 
-// actionSubject selects what an action applies to: the selected row's session, and for pane
-// actions the selected agent's pane.
-// inboxSubject is what an action applies to on the selected inbox row: its task on the row's
-// machine, or its agent pane in the session that owns it.
 func (m *Model) inboxSubject(descriptor action.Descriptor) (action.Subject, bool) {
 	none := action.Subject{At: action.Local(), Sessions: nil, Pane: "", Task: ""}
 
@@ -194,8 +185,6 @@ func (m *Model) continueAction(request pendingAction) func() (tea.Model, tea.Cmd
 	return m.dispatchAction(request)
 }
 
-// prompted reports whether the picker asks for a parameter: required text, and values the
-// picker can suggest.
 func prompted(param action.Param) bool {
 	if param.Kind != action.ParamText && param.Kind != action.ParamPath {
 		return false
@@ -247,8 +236,6 @@ func (m *Model) suggestedPath(request pendingAction, param action.Param) (string
 	return session.DefaultCreateSessionDirectory(cwd, request.values.String("name"), m.config.Settings.DefaultSessionPathSuggestion), nil
 }
 
-// submitParam records the prompted value and moves on to the next prompt, the confirmation or
-// the action itself.
 func (m *Model) submitParam(value string) func() (tea.Model, tea.Cmd) {
 	if m.pending == nil {
 		m.closeActionDialog()
@@ -387,8 +374,6 @@ func (m *Model) handleActionResult(msg actionResultMsg) (tea.Model, tea.Cmd) {
 	return m, m.followAction(msg)
 }
 
-// recoverActionFailure turns failures the picker can resolve into the outcome the person
-// wanted: creating a session that already exists enters it.
 func (m *Model) recoverActionFailure(msg actionResultMsg) (tea.Cmd, bool) {
 	if msg.request.entry.Describe().ID != action.SessionCreate.ID || action.CodeOf(msg.err) != action.CodeAlreadyExists {
 		return nil, false
@@ -406,8 +391,6 @@ func (m *Model) recoverActionFailure(msg actionResultMsg) (tea.Cmd, bool) {
 	return nil, false
 }
 
-// followAction applies what a completed action means for the picker: entering a session that
-// was created or restored, and keeping history and selection in step with renames and deletes.
 func (m *Model) followAction(msg actionResultMsg) tea.Cmd {
 	at := msg.request.subject.At
 

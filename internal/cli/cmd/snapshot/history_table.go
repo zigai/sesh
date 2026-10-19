@@ -19,7 +19,6 @@ const (
 	shortDigest         = 12
 )
 
-// historyEntry is one save attempt as the history table shows it, newest first.
 type historyEntry struct {
 	attempt  store.Attempt
 	savedAt  time.Time
@@ -28,8 +27,6 @@ type historyEntry struct {
 	current  bool
 }
 
-// loadHistoryEntries returns the newest limit attempts (every attempt when limit is zero) with
-// the save time and session count of each one that produced a generation.
 func loadHistoryEntries(ctx context.Context, repo *store.Repository, catalog store.Catalog, limit int) []historyEntry {
 	var currentSeq uint64
 
@@ -91,7 +88,6 @@ func historyRows(entries []historyEntry, full bool) []prettytable.Row {
 	for _, entry := range entries {
 		savedAt, sessions, current := "", "", ""
 		if !entry.savedAt.IsZero() {
-			// time.Unix already yields the reader's local time.
 			savedAt = entry.savedAt.Format(historyTimeLayout)
 		}
 

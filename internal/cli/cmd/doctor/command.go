@@ -25,12 +25,10 @@ import (
 
 var ErrDoctorChecksFailed = clibase.ErrDoctorChecksFailed
 
-// envVars are the environment variables sesh reads that change where it looks.
 var envVars = []string{
 	"SESH_CONFIG", "TMUX", "TMUX_TMPDIR", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_RUNTIME_DIR", "WORKTREE_DIR",
 }
 
-// Build identifies the running binary.
 type Build struct {
 	Version string
 	Commit  string
@@ -57,13 +55,11 @@ type ReportInstall struct {
 	Executable string `json:"executable"`
 }
 
-// EnvVar is an environment variable sesh reads that is set for this run.
 type EnvVar struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
 }
 
-// Location is a path and the flag, variable or setting that chose it.
 type Location struct {
 	Path   string `json:"path"`
 	Source string `json:"source,omitempty"`
@@ -214,7 +210,6 @@ func resolveDoctorOptions(ctx context.Context, cmd *cobra.Command) (doctor.Optio
 	return opts, paths, nil
 }
 
-// configFiles lists the configuration sources in precedence order with what became of each.
 func configFiles(cmd *cobra.Command, loaded bool) []doctor.ConfigFile {
 	explicit, _ := cmd.Flags().GetString("config")
 	noConfig, _ := cmd.Flags().GetBool("no-config")
@@ -259,8 +254,6 @@ func configFiles(cmd *cobra.Command, loaded bool) []doctor.ConfigFile {
 	return files
 }
 
-// commandFlags returns the configuration and location flags given to the doctor, which fix
-// commands repeat.
 func commandFlags(cmd *cobra.Command) map[string]string {
 	flags := make(map[string]string)
 
@@ -293,8 +286,6 @@ func unitActiveState(ctx context.Context, unit string) (string, error) {
 	return states[0].Active, nil
 }
 
-// serviceSearchPath is the systemd user unit search path, highest precedence first. Launchd
-// agents are not checked.
 func serviceSearchPath() []string {
 	if runtime.GOOS != setup.PlatformLinux {
 		return nil

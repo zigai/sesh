@@ -558,7 +558,6 @@ func renderSetupServices(cmd *cobra.Command, payload servicesResultJSON, _ strin
 	return clibase.WriteOutput(cmd, "%s", out.String())
 }
 
-// serviceFileOutcome says what happened, or would happen, to one service file.
 func serviceFileOutcome(service serviceJSON, payload servicesResultJSON) string {
 	written := payload.Applied && !payload.applyFailed
 
@@ -641,7 +640,6 @@ func automaticSaveStates(
 	return states
 }
 
-// automaticSaveUnits are the units that must be enabled and running for automatic saves.
 func automaticSaveUnits(definitions []setup.ServiceDefinition) []string {
 	units := []string{}
 
@@ -678,8 +676,6 @@ func renderSetupServiceNextSteps(cmd *cobra.Command, payload servicesResultJSON)
 	return writeAutomaticSaveReadiness(cmd, units, payload.Units)
 }
 
-// writeAutomaticSaveReadiness tells the reader whether automatic saves are on, which units still
-// need starting and how to see why a failing unit failed.
 func writeAutomaticSaveReadiness(cmd *cobra.Command, units []string, states []setup.UnitState) error {
 	if len(units) == 0 {
 		return nil

@@ -1515,7 +1515,6 @@ func newFooterPart(key string, desc string) footerPart {
 	}
 }
 
-// newActionFooterPart labels an action binding with the first word of the action's title.
 func newActionFooterPart(bound boundAction) footerPart {
 	label := string(bound.binding.Action)
 	if entry, ok := action.Lookup(bound.binding.Action); ok {

@@ -10,9 +10,6 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
-// checkActiveRestores reports restores still recorded as active. One whose tmux server may still
-// run holds back the shutdown save coordinator and startup restores until it finishes or is
-// abandoned. One whose server is gone is abandoned automatically by the next of either.
 func (s *Service) checkActiveRestores(ctx context.Context) Result {
 	if s.repoStatus != StatusOK {
 		return skipped(CheckActiveRestores, CheckSnapshotRepository, "repository is unusable")

@@ -25,8 +25,6 @@ import (
 
 const placeholderMarker = "placeholder-shown"
 
-// paneAgent reports one agent with native resume evidence in every pane it is asked about, the
-// way AHT reports the agent it tracks there.
 type paneAgent struct {
 	server     *gotmux.Server
 	activity   string

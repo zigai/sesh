@@ -342,7 +342,6 @@ func runSnapshotHistory(cmd *cobra.Command, _ []string) error {
 	return renderHistoryTable(cmd, entries, len(catalog.Attempts), full)
 }
 
-// historyLimit is how many of the newest attempts the table shows; zero shows every one.
 func historyLimit(cmd *cobra.Command) int {
 	if all, _ := cmd.Flags().GetBool("all"); all {
 		return 0

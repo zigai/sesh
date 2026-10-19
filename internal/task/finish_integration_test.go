@@ -19,8 +19,6 @@ import (
 	"github.com/zigai/sesh/internal/task"
 )
 
-// pullRequests reports a fixed pull request for every branch, like gh for a repository that
-// has one.
 type pullRequests struct {
 	pr    task.PullRequest
 	head  string

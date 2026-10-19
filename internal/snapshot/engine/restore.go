@@ -792,8 +792,6 @@ func finishRestore(
 	return *result, nil
 }
 
-// markSkippedSessions downgrades a finished restore that declined some sessions to partial, so
-// the exit status and the log both say the saved set was not fully brought back.
 func markSkippedSessions(result *RestoreResult) {
 	if len(result.SessionsSkipped) == 0 {
 		return
@@ -1288,7 +1286,6 @@ func restoreFailure(ctx context.Context, phase string, err error) error {
 func (e *restoreOutcomeError) Unwrap() error       { return e.error }
 func (e *restoreOutcomeError) OutcomeLogged() bool { return true }
 
-// mismatchReasons lists the distinct fixed mismatch reasons, without the entities they name.
 func mismatchReasons(mismatches []restore.VerificationMismatch) string {
 	reasons := make([]string, 0, len(mismatches))
 	for _, mismatch := range mismatches {

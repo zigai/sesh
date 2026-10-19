@@ -125,8 +125,6 @@ func TestSetupTmuxApplySkipsAKeyBoundUnderAnotherSpelling(t *testing.T) {
 	}
 }
 
-// writeSetupBindings writes a configuration that binds the given tmux keys in the sesh-test
-// table and removes the default bindings.
 func writeSetupBindings(t *testing.T, keys ...string) string {
 	t.Helper()
 

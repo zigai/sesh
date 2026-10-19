@@ -324,7 +324,6 @@ func validSnapshotFrame(frame Frame) bool {
 	return validSnapshotRows(*frame.Snapshot) && ValidSourceHealth(frame.Snapshot.Health)
 }
 
-// validSnapshotRows checks the tasks, work items and action IDs of a peer's inventory.
 func validSnapshotRows(snapshot Snapshot) bool {
 	return validTaskRows(snapshot.Tasks) && validWorkRows(snapshot.Work) && validActionIDs(snapshot.Actions)
 }

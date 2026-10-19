@@ -12,7 +12,6 @@ import (
 	"github.com/zigai/sesh/internal/cli/clibase"
 )
 
-// Envelope is the decoded --json command envelope.
 type Envelope struct {
 	SchemaVersion int                       `json:"schemaVersion"`
 	Command       string                    `json:"command"`
@@ -21,7 +20,6 @@ type Envelope struct {
 	Error         *clibase.JSONErrorPayload `json:"error"`
 }
 
-// Execution is the observable outcome of one command invocation.
 type Execution struct {
 	Stdout   string
 	Stderr   string
@@ -29,21 +27,18 @@ type Execution struct {
 	Envelope Envelope
 }
 
-// Execute runs args through cli.ExecuteApplication with empty standard input.
 func Execute(t *testing.T, args ...string) Execution {
 	t.Helper()
 
 	return ExecuteContext(t.Context(), nil, args...)
 }
 
-// ExecuteWithInput runs args through cli.ExecuteApplication reading input.
 func ExecuteWithInput(t *testing.T, input io.Reader, args ...string) Execution {
 	t.Helper()
 
 	return ExecuteContext(t.Context(), input, args...)
 }
 
-// ExecuteContext runs args through cli.ExecuteApplication under ctx.
 func ExecuteContext(ctx context.Context, input io.Reader, args ...string) Execution {
 	var stdout, stderr bytes.Buffer
 
@@ -79,7 +74,6 @@ func ExecuteJSON(t *testing.T, args ...string) Execution {
 	return exec
 }
 
-// DecodePayload decodes an envelope result into T.
 func DecodePayload[T any](t *testing.T, payload json.RawMessage) T {
 	t.Helper()
 

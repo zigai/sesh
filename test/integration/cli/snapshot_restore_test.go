@@ -155,7 +155,6 @@ func TestApplicationRestoreTablePrintsSkippedSessionsOnStdoutWhenItExitsNonZero(
 	saved := runJSONContract(t, "snapshot.save", "snapshot", "save", testSocketFlag, socket, testRepositoryFlag, repository, testLeaseRootFlag, lease, string(kept.ID()))
 	generation := contractJSONValue[string](t, saved, "generation")
 
-	// The saved session is still live, so restoring everything must skip it by name.
 	stdout, stderr, err := executeCommand(t, "snapshot", "restore", testSocketFlag, socket, testRepositoryFlag, repository, testLeaseRootFlag, lease, testGenerationFlag, generation, "--no-processes", testNoConfigFlag)
 	if err == nil {
 		t.Fatalf("a restore that created nothing must exit non-zero, stdout=%q", stdout)

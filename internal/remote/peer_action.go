@@ -71,8 +71,6 @@ func LookupPeerInvocation(dir *privatefs.Dir, invocationID string) (ActionResult
 	return invocation.Result(), nil
 }
 
-// acceptRequest decodes a request this peer will run, or reports the code that refuses it. A
-// request is checked before it is admitted, so a refused request leaves no receipt.
 func acceptRequest(opts PeerActionOptions, request ActionRequest) (action.Entry, any, action.Code) {
 	if ValidateActionRequest(request) != nil || VerifyIntentDigest(request) != nil {
 		return nil, nil, action.CodeInvalidArgument

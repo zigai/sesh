@@ -325,8 +325,6 @@ func TestRestoreOfWindowWithFloatingPaneVerifies(t *testing.T) {
 	}
 }
 
-// restoreSessionWithScopedState saves the named source session, restores it onto the target and
-// imports its scoped state, returning the plan and runtime receipts for verification.
 func restoreSessionWithScopedState(t *testing.T, ctx context.Context, sourceServer, targetServer *gotmux.Server, source gotmux.Session, name string) (Plan, map[string]string) {
 	t.Helper()
 

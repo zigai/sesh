@@ -89,8 +89,6 @@ func ExpandHomePath(path string) (string, bool) {
 	return filepath.Join(home, strings.TrimPrefix(path, "~"+separator)), true
 }
 
-// ShortenHomePath writes a path under the home directory with a leading ~, the inverse of
-// ExpandHomePath.
 func ShortenHomePath(path string) string {
 	home, err := os.UserHomeDir()
 	if err != nil || home == "" {
@@ -188,8 +186,6 @@ func resolveParentAndPrefix(input, cwd string) (string, string, string, error) {
 	}
 }
 
-// readPrefixedEntries keeps only entries matching namePrefix while reading in batches, so the
-// scan budget bounds work in huge directories without rejecting a prefix that narrows the results.
 func readPrefixedEntries(ctx context.Context, f *os.File, namePrefix string) ([]os.DirEntry, error) {
 	var matches []os.DirEntry
 

@@ -92,7 +92,6 @@ func NewModel(cfg *config.Config, entries []Entry) *Model {
 	return m
 }
 
-// Chosen returns the pick, or false when the picker was canceled.
 func (m *Model) Chosen() (Choice, bool) {
 	return m.chosen, m.chosen.Kind != 0
 }
@@ -257,8 +256,6 @@ func (m *Model) filter() {
 	m.listTop = 0
 }
 
-// extraChoice offers to clone a query that looks like a repository URL and to create a project
-// named after any other query no project already has.
 func (m *Model) extraChoice(query string) (Choice, bool) {
 	if strings.Contains(query, urlSchemeMarker) || (strings.Contains(query, "@") && strings.Contains(query, ":")) {
 		return Choice{Kind: ChoiceClone, Value: query}, true

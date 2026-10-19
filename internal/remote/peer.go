@@ -312,7 +312,6 @@ func (state *streamState) scan(ctx context.Context) {
 	state.scanWork(ctx)
 }
 
-// scanTasks keeps the last tasks read when the ledger cannot be read, like sessions.
 func (state *streamState) scanTasks(ctx context.Context) {
 	if state.options.Tasks == nil {
 		return
@@ -324,7 +323,6 @@ func (state *streamState) scanTasks(ctx context.Context) {
 	}
 }
 
-// scanWork keeps the last work items read when the work state cannot be read, like tasks.
 func (state *streamState) scanWork(ctx context.Context) {
 	if state.options.Work == nil {
 		return

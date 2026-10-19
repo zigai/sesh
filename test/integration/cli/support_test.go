@@ -359,7 +359,6 @@ func assertRuntimeLogFields(t *testing.T, record map[string]any) {
 	}
 }
 
-// assertOperationLogField checks the fields that only one operation may emit, and their type.
 func assertOperationLogField(t *testing.T, record map[string]any, key string) {
 	t.Helper()
 
@@ -381,7 +380,6 @@ func assertOperationLogField(t *testing.T, record map[string]any, key string) {
 	}
 }
 
-// writeTestConfig writes a sparse native TOML configuration, creating parent directories.
 func writeTestConfig(t *testing.T, path, body string) {
 	t.Helper()
 

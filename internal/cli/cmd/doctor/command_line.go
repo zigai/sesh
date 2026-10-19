@@ -14,9 +14,6 @@ var (
 	errUnknownFlag    = errors.New("unknown flag")
 )
 
-// commandLineValidator reports whether root accepts a command line without running it: the words
-// resolve to a runnable command, its positional arguments are valid and every flag is defined for
-// it. Flag values are not interpreted.
 func commandLineValidator(root *cobra.Command) func(args []string) error {
 	return func(args []string) error {
 		target, rest, err := root.Find(args)
@@ -24,7 +21,6 @@ func commandLineValidator(root *cobra.Command) func(args []string) error {
 			return fmt.Errorf("%w", err)
 		}
 
-		// A missing command explains a command line better than the flags it no longer has.
 		positionals, flagErr := commandPositionals(target, rest)
 
 		if target.HasAvailableSubCommands() && len(positionals) > 0 {
@@ -43,9 +39,6 @@ func commandLineValidator(root *cobra.Command) func(args []string) error {
 	}
 }
 
-// commandPositionals returns the positional arguments of a command line, skipping the value of
-// each flag that takes one, and the first flag that is not defined for target. An undefined flag
-// is assumed to take no value.
 func commandPositionals(target *cobra.Command, args []string) ([]string, error) {
 	var (
 		positionals []string

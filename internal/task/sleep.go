@@ -35,8 +35,6 @@ var (
 	ErrAgentDidNotStop  = errors.New("agent did not exit after the stop signal")
 )
 
-// Agent is what AHT reports about the agent running in a task's agent pane: its native resume
-// evidence and the pane process it was observed under.
 type Agent struct {
 	Harness       string
 	Activity      string
@@ -52,8 +50,6 @@ type AgentFinder interface {
 	AgentsIn(ctx context.Context, pane gotmux.PaneID) ([]Agent, error)
 }
 
-// sleepPlan is how an agent is put to sleep: the signal that stops it, the process it is
-// observed as, and the native resume evidence recorded before it stops.
 type sleepPlan struct {
 	signal  syscall.Signal
 	process *process.Observation
@@ -130,9 +126,6 @@ func (s *Service) WakeHere(ctx context.Context, id string) (Woken, error) {
 	return s.wake(ctx, id, func(Live, Woken) error { return nil })
 }
 
-// wake records the intent to wake, relaunches the agent and records it awake. A task whose agent
-// pane already runs its harness in the foreground is only marked awake: the agent is never
-// launched twice.
 func (s *Service) wake(ctx context.Context, id string, relaunch func(Live, Woken) error) (Woken, error) {
 	record, live, err := s.task(ctx, id)
 	if err != nil {
@@ -225,8 +218,6 @@ func (s *Service) showPlaceholder(ctx context.Context, pane gotmux.PaneID, recor
 	return nil
 }
 
-// respawn replaces whatever runs in a task pane with argv, followed by the user's shell like
-// every task pane.
 func (s *Service) respawn(ctx context.Context, paneID gotmux.PaneID, record Record, argv []string) error {
 	shell, err := defaultShell(ctx, s.server)
 	if err != nil {
@@ -248,7 +239,6 @@ func (s *Service) respawn(ctx context.Context, paneID gotmux.PaneID, record Reco
 	return nil
 }
 
-// Env is the environment every process of a task window starts with.
 func Env(record Record) map[string]string {
 	if record.Kind == KindLoose {
 		return map[string]string{EnvTask: record.ID}
@@ -257,9 +247,6 @@ func Env(record Record) map[string]string {
 	return map[string]string{EnvTask: record.ID, EnvProject: record.Project, EnvWorktree: record.Directory, EnvBase: record.Base}
 }
 
-// planSleep checks that agent can be stopped and resumed: it is idle, its harness has a verified
-// stop, and the pane's foreground process is that harness, resumable with AHT's native resume
-// command the way a snapshot restore would resume it.
 func planSleep(ctx context.Context, agent Agent, panePID int) (sleepPlan, error) {
 	none := sleepPlan{signal: 0, process: nil, resume: emptyResume()}
 
@@ -305,7 +292,6 @@ func harnessRunning(ctx context.Context, panePID int, harness string) (bool, err
 	return apps.RunsHarness(observedLaunch(foreground), harness), nil
 }
 
-// observeForeground returns the foreground process of the pane whose process is panePID.
 func observeForeground(ctx context.Context, panePID int) (*process.Observation, error) {
 	paneBirth, err := process.ReadIdentity(ctx, panePID)
 	if err != nil {

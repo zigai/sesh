@@ -13,8 +13,6 @@ import (
 	"github.com/zigai/sesh/internal/privatefs"
 )
 
-// viewReadAttempts bounds retries when a save replaces the catalog, or collection removes a
-// generation, while a view reads it.
 const viewReadAttempts = 4
 
 // View reads the published catalog without the repository lock or fsync, so display listings
@@ -116,8 +114,6 @@ func (v *View) read(ctx context.Context, read func() error) error {
 	}
 }
 
-// replacedDuringRead reports a file that a save or collection replaced or removed after the
-// view opened it: private reads reject an opened file whose last link is gone.
 func replacedDuringRead(err error) bool {
 	return errors.Is(err, fs.ErrNotExist) || errors.Is(err, privatefs.ErrUnsafe)
 }

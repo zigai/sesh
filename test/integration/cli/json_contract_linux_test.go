@@ -116,7 +116,6 @@ func TestJSONRemoteActionAndLookupSuccessContracts(t *testing.T) {
 	assertJSONContractFields(t, contractJSONValue[map[string]any](t, lookedUp, "output"), map[string]any{"directory": fixture.root})
 }
 
-// peerReceiptID returns the one invocation the peer recorded.
 func peerReceiptID(t *testing.T, stateHome string) string {
 	t.Helper()
 
@@ -154,8 +153,6 @@ func TestJSONSnapshotActionsAndAbandonSuccessContracts(t *testing.T) {
 		t.Fatal("action save omitted durable identities")
 	}
 
-	// A restore that fails after admission leaves a pending operation to inspect and abandon.
-	// A refused collision leaves none: it is refused before any intent is registered.
 	if err := source.Kill(t.Context()); err != nil {
 		t.Fatal(err)
 	}

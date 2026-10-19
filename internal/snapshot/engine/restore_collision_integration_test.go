@@ -29,7 +29,6 @@ type collisionFixture struct {
 	live       map[string]gotmux.Session
 }
 
-// newCollisionFixture saves "kept" and "taken", then kills "kept" so only "taken" is live.
 func newCollisionFixture(t *testing.T, ctx context.Context) collisionFixture {
 	t.Helper()
 
@@ -269,7 +268,6 @@ func TestEngineRestoreLogsMissingServerAsOneFixedReasonFailure(t *testing.T) {
 	}
 }
 
-// newAbsentServer selects a socket path where no tmux server was ever started.
 func newAbsentServer(t *testing.T) (*gotmux.Server, string) {
 	t.Helper()
 

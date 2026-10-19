@@ -145,7 +145,6 @@ func compileSessionRowFormats(displayCfg config.DisplayConfig, settings config.S
 	}, nil
 }
 
-// agentRowsUseAny reports whether an agent row of any enabled mode shows one of the fields.
 func (formats sessionRowFormats) agentRowsUseAny(fields ...string) bool {
 	return formats.agentsAgent.UsesAny(fields...) || (formats.inbox && formats.inboxAgent.UsesAny(fields...))
 }
@@ -154,8 +153,6 @@ func (formats sessionRowFormats) agentRowsUseWidget(widget string) bool {
 	return formats.agentsAgent.UsesWidget(widget) || (formats.inbox && formats.inboxAgent.UsesWidget(widget))
 }
 
-// withShortcutBadge appends the right-aligned shortcut number to a default row format; a custom
-// format places the number itself.
 func withShortcutBadge(format, defaultFormat string) string {
 	if format == defaultFormat || format == "" {
 		return format + "  {shortcut:>3}"
@@ -423,8 +420,6 @@ func isRemoteOrBridge(row session.Session) bool {
 	return row.Origin == session.OriginSSH || row.Origin == session.OriginBridge
 }
 
-// remoteAgentRow reports whether an agent row shows an agent of another machine, either under a
-// remote session or in a view that lists the agents of several machines.
 func remoteAgentRow(row session.Session, agent session.AgentSession) bool {
 	return isRemoteOrBridge(row) || agent.Host != ""
 }
@@ -580,8 +575,6 @@ func (v sessionFormatValues) resolveAgentIdentityField(field string) (string, bo
 	}
 }
 
-// resolveInboxField resolves the fields inbox rows add: the machine the agent runs on, and how
-// many evidence items its latest report lists.
 func (v sessionFormatValues) resolveInboxField(field string) (string, bool) {
 	switch field {
 	case display.FieldHost:
@@ -597,7 +590,6 @@ func (v sessionFormatValues) resolveInboxField(field string) (string, bool) {
 	}
 }
 
-// host names the machine the agent runs on, empty for this machine.
 func (v sessionFormatValues) host() string {
 	if v.model == nil {
 		return ""

@@ -36,7 +36,6 @@ const (
 	workSyncInterval = 5 * time.Minute
 )
 
-// NewCommand returns the group of commands that navigate and report on coding agents.
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "agent",
@@ -258,8 +257,6 @@ func NewDaemonWindowStatusCommand() *cobra.Command {
 	return cmd
 }
 
-// recordingTracker styles agent windows and records the conversations of the agents in the user's
-// own panes, so the inbox lists them after they exit.
 type recordingTracker struct {
 	*agents.Tracker
 

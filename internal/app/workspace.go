@@ -17,7 +17,6 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
-// worktreeDirEnvironment overrides the directory that holds task worktrees, one folder per project.
 const worktreeDirEnvironment = "WORKTREE_DIR"
 
 type Locations struct {

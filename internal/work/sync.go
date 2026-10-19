@@ -111,7 +111,6 @@ func SyncEvery(ctx context.Context, store Store, interval time.Duration) {
 	syncOnTicks(ctx, store, ticker.C)
 }
 
-// ViewPR returns pull request number of the repository dir is in, as gh reports it.
 func ViewPR(ctx context.Context, dir string, number int) (PRLink, error) {
 	var viewed ghPR
 
@@ -150,8 +149,6 @@ func syncOnTicks(ctx context.Context, store Store, ticks <-chan time.Time) {
 	}
 }
 
-// findPRs lists the pull request of branch, unless it is the default branch, and views the item's
-// linked pull requests that were open again.
 func findPRs(ctx context.Context, item Item, branch string) ([]PRLink, error) {
 	var found []PRLink
 
@@ -213,8 +210,6 @@ func (s *State) apply(refreshed map[string]refresh, now time.Time) bool {
 	return changed
 }
 
-// withFound links and refreshes the pull requests sync found for the item, and finishes the item
-// when they ended it. The task ledger owns the pull requests of task items.
 func (i Item) withFound(found []PRLink, now time.Time) Item {
 	if i.Task != "" {
 		return i
@@ -247,8 +242,6 @@ func (i Item) overlaps(pr PRLink) bool {
 	return !pr.Ended() || pr.EndedAt >= i.CreatedAt
 }
 
-// endedByPRs reports whether every linked pull request ended and the last one ended after the
-// item started, after the user's latest prompt, and after it last reopened.
 func (i Item) endedByPRs() bool {
 	if !i.PRsEnded() {
 		return false
@@ -262,8 +255,6 @@ func (i Item) endedByPRs() bool {
 	return latest >= i.CreatedAt && latest >= i.PromptAt && latest >= i.ReopenedAt
 }
 
-// withPR updates what is known about a pull request found for the item, keeping how it was
-// linked; a pull request found for the first time is the branch's.
 func (i Item) withPR(pr PRLink) Item {
 	i.PRs = slices.Clone(i.PRs)
 

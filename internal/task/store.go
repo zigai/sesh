@@ -1,4 +1,3 @@
-// Package task keeps the durable record of tasks and creates their tmux windows.
 package task
 
 import (
@@ -97,16 +96,12 @@ type Process struct {
 	Birth string `json:"birth"`
 }
 
-// Resume is the native resume evidence of a sleeping agent: its AHT harness, the harness session
-// to resume and the command line that resumes it.
 type Resume struct {
 	Harness string   `json:"harness"`
 	Session string   `json:"session"`
 	Command []string `json:"command"`
 }
 
-// PullRequest is the pull request found for the task branch. A merged or closed one makes the
-// task done.
 type PullRequest struct {
 	Number int     `json:"number"`
 	State  PRState `json:"state"`
@@ -123,7 +118,6 @@ type Run struct {
 	FinishedAt int64     `json:"finishedAt"`
 }
 
-// ProjectState remembers per project the last task number handed out.
 type ProjectState struct {
 	Root       string `json:"root"`
 	LastNumber int    `json:"lastNumber"`
@@ -191,7 +185,6 @@ func (s Store) Update(ctx context.Context, change func(*Ledger) error) (Ledger, 
 	return ledger, ledgerError("update_tasks", err)
 }
 
-// Find returns the task with id.
 func (l *Ledger) Find(id string) (Record, bool) {
 	for _, record := range l.Tasks {
 		if record.ID == id {
@@ -202,12 +195,10 @@ func (l *Ledger) Find(id string) (Record, bool) {
 	return EmptyRecord(), false
 }
 
-// PREnded reports whether the task's pull request was merged or closed.
 func (r Record) PREnded() bool {
 	return r.PR.State == PRMerged || r.PR.State == PRClosed
 }
 
-// Remove deletes the record with id.
 func (l *Ledger) Remove(id string) {
 	l.Tasks = slices.DeleteFunc(l.Tasks, func(record Record) bool { return record.ID == id })
 }
@@ -221,7 +212,6 @@ func EmptyRecord() Record {
 	}
 }
 
-// ValidateRecords checks that records have unique IDs and known kinds and states.
 func ValidateRecords(records []Record) error {
 	ids := make(map[string]bool, len(records))
 
@@ -249,7 +239,6 @@ func validState(state State) bool {
 	}
 }
 
-// Project returns the remembered state of a project, or a zero state for an unseen one.
 func (l *Ledger) Project(root string) ProjectState {
 	for _, state := range l.Projects {
 		if state.Root == root {
@@ -260,14 +249,12 @@ func (l *Ledger) Project(root string) ProjectState {
 	return ProjectState{Root: root, LastNumber: 0}
 }
 
-// NextID reserves the next task identifier.
 func (l *Ledger) NextID() string {
 	l.LastID++
 
 	return idPrefix + strconv.Itoa(l.LastID)
 }
 
-// SetProject stores state, replacing the earlier state of the same project.
 func (l *Ledger) SetProject(state ProjectState) {
 	for index := range l.Projects {
 		if l.Projects[index].Root == state.Root {
@@ -280,7 +267,6 @@ func (l *Ledger) SetProject(state ProjectState) {
 	l.Projects = append(l.Projects, state)
 }
 
-// Put stores record, replacing the earlier record with the same ID.
 func (l *Ledger) Put(record Record) {
 	for index := range l.Tasks {
 		if l.Tasks[index].ID == record.ID {

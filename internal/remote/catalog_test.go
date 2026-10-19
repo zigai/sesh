@@ -488,8 +488,6 @@ type catalogDelivery struct {
 	err     error
 }
 
-// watchTestCatalog starts WatchCatalog and returns a bounded receive for its next delivery
-// and a stop function that cancels the watch and checks it ended by cancellation.
 func watchTestCatalog(t *testing.T, dir *privatefs.Dir) (func() catalogDelivery, func()) {
 	t.Helper()
 
@@ -545,7 +543,6 @@ func TestWatchCatalogRedeliversUnchangedCatalogAfterReadFailure(t *testing.T) {
 		t.Fatalf("initial delivery = %#v, want the published connection", first)
 	}
 
-	// A directory in place of the catalog file makes the read fail; the original bytes are kept aside.
 	aside := catalogPath + ".aside"
 	if err := errors.Join(os.Rename(catalogPath, aside), os.Mkdir(catalogPath, 0o700)); err != nil {
 		t.Fatal(err)

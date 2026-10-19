@@ -38,13 +38,10 @@ type projectHandoff struct {
 	Value string                   `json:"value"`
 }
 
-// projectFrontend opens the project picker popup for project.pick and then runs the action for
-// the choice made in it on the invoking client.
 type projectFrontend struct {
 	cmd *cobra.Command
 }
 
-// NewProjectPickCommand is `sesh project pick`.
 func NewProjectPickCommand() *cobra.Command {
 	return actioncli.Command(action.ProjectPick, actioncli.Options[action.PickProject, action.PickedProject]{
 		Operation:    "project_picker",
@@ -58,7 +55,6 @@ func NewProjectPickCommand() *cobra.Command {
 	})
 }
 
-// NewProjectPickerUICommand is the hidden command the project picker popup runs.
 func NewProjectPickerUICommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:    projectPickerUIVerb,
@@ -273,7 +269,6 @@ func forwardedConfigFlags(cmd *cobra.Command) []string {
 	return arguments
 }
 
-// writeHandoff writes a popup's choice to the handoff file its opener created.
 func writeHandoff[T any](path string, handoff T) error {
 	encoded, err := json.Marshal(handoff)
 	if err != nil {
@@ -293,8 +288,6 @@ func writeHandoff[T any](path string, handoff T) error {
 	return nil
 }
 
-// readHandoff reads the choice a popup wrote, reporting false when the popup closed without
-// one. A choice that does not decode or that valid rejects is an error.
 func readHandoff[T any](path string, valid func(T) bool) (T, bool, error) {
 	var handoff T
 

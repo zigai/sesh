@@ -63,21 +63,15 @@ const (
 	year  = 365 * day
 )
 
-// columns are the widths of the parts of list rows, the widest of every row so they line up.
 type columns struct {
 	age, name, label, added, deleted, ahead, behind int
 }
 
-// rowParts are what a list row shows: like an agent row, the age and name, the subject of the
-// branch's latest commit or the task working there, and on the right its branch and counts.
 type rowParts struct {
 	age, name, subject, label, added, deleted, ahead, behind string
 	addedRole, deletedRole, aheadRole, behindRole            tui.SpanRole
 }
 
-// layout is where the parts of the body are, in body lines: the title, the agents, and then the
-// places to work or the filter and the expanded list. whereTop is -1 when the popup has no places,
-// and listRows is 0 when it has no list.
 type layout struct {
 	bodyWidth      int
 	agentTop       int
@@ -89,15 +83,12 @@ type layout struct {
 	listRows       int
 }
 
-// listLine is one line of the expanded list: a section heading, with row -1, or the row at that
-// position of the filtered rows. last marks the final row of its section.
 type listLine struct {
 	section section
 	row     int
 	last    bool
 }
 
-// placed is a choice of a row of choices and the body columns it covers.
 type placed struct {
 	index int
 	start int
@@ -124,7 +115,6 @@ func Size(cfg *config.Config, opts Options) (int, int) {
 	return width + frameColumns, frameRows + rows
 }
 
-// bodyWidth fits the agents and the key hints, and is the widest in a repository.
 func (m *Model) bodyWidth() int {
 	if m.hasWhere() {
 		return maxBodyWidth
@@ -178,7 +168,6 @@ func (m *Model) render() string {
 	return m.frame(m.renderForm(geometry), geometry.bodyWidth, m.footer(m.hints()))
 }
 
-// footer draws key hints in the bottom edge when the footer is enabled.
 func (m *Model) footer(hints []tui.Hint) string {
 	if !m.showFooter {
 		return ""
@@ -187,7 +176,6 @@ func (m *Model) footer(hints []tui.Hint) string {
 	return m.chrome.Hints(hints)
 }
 
-// renderForm draws the title, the agents, and then the places to work or the expanded list.
 func (m *Model) renderForm(geometry layout) []string {
 	inputWidth := max(geometry.bodyWidth-textColumn-1, 1)
 	m.title.SetWidth(inputWidth)
@@ -223,9 +211,6 @@ func (m *Model) renderForm(geometry layout) []string {
 	return body
 }
 
-// place names a place to work and the branch it works on: the new worktree's, the pane's
-// checkout's or the task already working there, and nothing for an existing branch, which the
-// expanded list picks.
 func (m *Model) place(place where) (string, string) {
 	switch place {
 	case whereNew:
@@ -254,7 +239,6 @@ func (m *Model) field(label string, focused bool, value string) string {
 	return m.chrome.Label(label, focused) + strings.Repeat(" ", labelColumns-lipgloss.Width(label)) + labelGap + value
 }
 
-// renderChoices draws a row of choices with the selected one highlighted.
 func (m *Model) renderChoices(choices []string, selected int) string {
 	var line strings.Builder
 
@@ -269,7 +253,6 @@ func (m *Model) renderChoices(choices []string, selected int) string {
 	return line.String()
 }
 
-// lines lays the filtered rows out under their section headings.
 func (m *Model) lines() []listLine {
 	lines := make([]listLine, 0, len(m.rows)+int(sectionInUse)+1)
 
@@ -317,7 +300,6 @@ func (m *Model) renderAgents(geometry layout) []string {
 	return m.renderChoiceRows(agentLabel, agents, slices.Index(agents, m.agent), geometry.agentChoices)
 }
 
-// machineChoices places the machine choices, none when the popup has only this machine.
 func (m *Model) machineChoices(width int) [][]placed {
 	if !m.showsMachines() {
 		return nil
@@ -326,8 +308,6 @@ func (m *Model) machineChoices(width int) [][]placed {
 	return placeChoices(m.machineNames(), valueColumn, width)
 }
 
-// machineNames are the machine choices, empty when the popup has only this machine. One that
-// cannot be chosen says why.
 func (m *Model) machineNames() []string {
 	if !m.showsMachines() {
 		return nil
@@ -346,8 +326,6 @@ func (m *Model) machineNames() []string {
 	return names
 }
 
-// renderChoiceRows draws a labeled row of choices, wrapped as rows places them, with the
-// selected one highlighted.
 func (m *Model) renderChoiceRows(label string, names []string, selected int, rows [][]placed) []string {
 	lines := make([]string, 0, len(rows))
 
@@ -373,7 +351,6 @@ func (m *Model) renderChoiceRows(label string, names []string, selected int, row
 	return lines
 }
 
-// renderFailure shows why the start failed, wrapped to the body, in place of the form.
 func (m *Model) renderFailure(width, height int) []string {
 	lines := make([]string, 0, height)
 
@@ -390,7 +367,6 @@ func (m *Model) renderFailure(width, height int) []string {
 	return lines
 }
 
-// frame draws the border with the title in its top edge and footer in its bottom edge.
 func (m *Model) frame(body []string, bodyWidth int, footer string) string {
 	total := bodyWidth + frameColumns
 
@@ -418,9 +394,6 @@ func (m *Model) frame(body []string, bodyWidth int, footer string) string {
 	return out.String()
 }
 
-// parts describes a row: its branch's latest commit and how far the branch is from the default
-// branch, the branch a checkout has checked out or the remote a branch is on, and a checkout's
-// uncommitted changes once they are counted.
 func (m *Model) parts(entry row) rowParts {
 	location := entry.location
 	name, _ := label(entry)
@@ -462,7 +435,6 @@ func (m *Model) parts(entry row) rowParts {
 	return parts
 }
 
-// countRole colors a count that is not zero, as agent rows do.
 func countRole(count int, role tui.SpanRole) tui.SpanRole {
 	if count == 0 {
 		return tui.SpanMuted
@@ -491,8 +463,6 @@ func (m *Model) columns() columns {
 	return widths
 }
 
-// renderRow lays a row out in aligned columns like an agent row. The subject takes the room left
-// between the name and the right column, and is left out when too little is left.
 func (m *Model) renderRow(entry row, tree string, selected bool, width int) string {
 	widths := m.columns()
 	parts := m.parts(entry)
@@ -511,8 +481,6 @@ func (m *Model) renderRow(entry row, tree string, selected bool, width int) stri
 	return m.chrome.TreeRowSpans(tree, left, spans, selected, width)
 }
 
-// rightSpans are a row's right column: its branch or remote, its changes, and how far ahead and
-// behind it is, each padded to its column.
 func rightSpans(parts rowParts, widths columns) []tui.Span {
 	var spans []tui.Span
 
@@ -541,8 +509,6 @@ func rightSpans(parts rowParts, widths columns) []tui.Span {
 	return spans
 }
 
-// ref describes a row's branch: a remote branch on its remote, and a new worktree's base where
-// the worktree starts from.
 func (m *Model) ref(location task.Location) (task.Ref, bool) {
 	name := "refs/heads/" + location.Branch
 
@@ -562,7 +528,6 @@ func pad(text string, width int) string {
 	return text + strings.Repeat(" ", max(width-lipgloss.Width(text), 0))
 }
 
-// age is how long ago at was, in its largest whole unit.
 func age(at, now time.Time) string {
 	elapsed := now.Sub(at)
 
@@ -584,9 +549,6 @@ func age(at, now time.Time) string {
 	}
 }
 
-// label names a list row and adds a short detail. Its section says what kind of place it is: a
-// new worktree is named by its base, a checkout by its directory with its branch, a branch only a
-// remote has by its remote, and a checkout in use by the task working there.
 func label(entry row) (string, string) {
 	location := entry.location
 
@@ -626,7 +588,6 @@ func taskName(title string) string {
 	return title
 }
 
-// hints are the keys that act from the focused row.
 func (m *Model) hints() []tui.Hint {
 	agent := tui.Hint{Key: "←→", Desc: "agent"}
 	enter := tui.Hint{Key: "enter", Desc: "start"}
@@ -673,8 +634,6 @@ func hintsWidth(hints []tui.Hint) int {
 	return width
 }
 
-// wrapWords breaks text into lines of at most width columns at spaces, so paths and branch names
-// stay whole unless one alone is wider than a line.
 func wrapWords(text string, width int) []string {
 	var lines []string
 
@@ -709,8 +668,6 @@ func wrapWords(text string, width int) []string {
 	return lines
 }
 
-// placeChoices lays a row of choices out after the label, wrapping before a choice that would not
-// fit.
 func placeChoices(choices []string, indent, width int) [][]placed {
 	rows := [][]placed{{}}
 	column := indent

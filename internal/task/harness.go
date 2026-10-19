@@ -9,8 +9,6 @@ import (
 	"github.com/zigai/sesh/internal/config"
 )
 
-// Harness is an agent a task can start with: a menu label, the command that launches it, and the
-// arguments that pass it a titled task's first prompt.
 type Harness struct {
 	Name       string
 	Command    []string
@@ -54,7 +52,6 @@ func Harnesses(cfg config.TasksConfig, lookPath func(string) (string, error)) []
 	return offered
 }
 
-// Find returns the offered harness called name.
 func Find(harnesses []Harness, name string) (Harness, bool) {
 	index := slices.IndexFunc(harnesses, func(h Harness) bool { return h.Name == name })
 	if index < 0 {
@@ -64,8 +61,6 @@ func Find(harnesses []Harness, name string) (Harness, bool) {
 	return harnesses[index], true
 }
 
-// installed returns the command line that starts an AHT harness: the first of its executables
-// lookPath finds.
 func installed(id registry.Harness, lookPath func(string) (string, error)) ([]string, bool) {
 	for _, executable := range harness.ProcessNames(id) {
 		if _, err := lookPath(executable); err == nil {

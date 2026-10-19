@@ -12,7 +12,6 @@ import (
 	"github.com/zigai/sesh/internal/session"
 )
 
-// LiveServer is the peer's tmux server as remote attach sees it.
 type LiveServer interface {
 	Sessions(ctx context.Context) ([]session.Session, error)
 	Attach(ctx context.Context, sessionID string, streams AttachStreams) error

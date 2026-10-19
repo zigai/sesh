@@ -15,8 +15,6 @@ import (
 	"github.com/zigai/sesh/internal/agents"
 )
 
-// Recorder records the conversations of the interactive agents in one tmux server's panes, with
-// the task whose window each runs in.
 type Recorder struct {
 	store Store
 	panes Panes
@@ -32,7 +30,6 @@ type Recorder struct {
 // Panes reads the socket of the recorded tmux server and the task of each pane in a task window.
 type Panes func(context.Context) (string, map[string]string, error)
 
-// NewRecorder records into store the agents of the tmux server panes reads.
 func NewRecorder(store Store, panes Panes) *Recorder {
 	return &Recorder{store: store, panes: panes, server: "", mu: sync.Mutex{}, known: emptyState(), tasks: map[string]string{}}
 }
@@ -105,8 +102,6 @@ func (r *Recorder) sightings(sessions []aht.Session) []Sighting {
 	return sightings
 }
 
-// withHistory fills in the title and project of the conversations the work state has none for
-// yet from their history: the title the harness or the user gave, else the first prompt.
 func withHistory(ctx context.Context, sightings []Sighting, known State) []Sighting {
 	complete := make(map[string]bool, len(known.Items))
 

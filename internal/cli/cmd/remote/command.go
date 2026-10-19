@@ -40,8 +40,6 @@ const (
 
 var errRemoteTargetMissing = errors.New("remote target is not present in the cached catalog")
 
-// lookupOutput is a receipt as `remote lookup` reports it. Output is the action's own
-// result.
 type lookupOutput struct {
 	InvocationID string         `json:"invocationId"`
 	Action       action.ID      `json:"action"`
@@ -82,8 +80,6 @@ func newRemoteCommand() *cobra.Command {
 	return cmd
 }
 
-// NewDaemonMonitorCommand returns the foreground monitor that maintains the local remote
-// inventory cache.
 func NewDaemonMonitorCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "remote-monitor",
@@ -132,7 +128,6 @@ func liveAnnotations(operation string) map[string]string {
 	}
 }
 
-// newPeerLocal runs actions on this peer against its own snapshot repository and leases.
 func newPeerLocal(workspace app.Workspace, server *gotmux.Server) (*app.Local, *app.Repository) {
 	repository := app.NewRepository(workspace.Repository)
 	local := app.NewLocal(app.LocalOptions{
@@ -153,7 +148,6 @@ func newPeerLocal(workspace app.Workspace, server *gotmux.Server) (*app.Local, *
 	return local, repository
 }
 
-// actions lists the actions this peer accepts from other machines.
 func actions(cfg *config.Config) []action.ID {
 	ids := make([]action.ID, 0)
 
@@ -379,8 +373,6 @@ func peerTasks(ctx context.Context, server *gotmux.Server, ledger string) ([]rem
 	return rows, nil
 }
 
-// peerWork lists the recorded conversations that can still be resumed: those whose directory
-// exists.
 func peerWork(ctx context.Context, path string) ([]work.Item, error) {
 	state, err := work.NewStore(path).Load(ctx)
 	if err != nil {

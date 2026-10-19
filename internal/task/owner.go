@@ -31,7 +31,6 @@ func Stalled(ctx context.Context, record Record) bool {
 	return record.Owner.Birth != "" && identity.String() != record.Owner.Birth
 }
 
-// currentProcess identifies this sesh process. Without a birth identity it is known by PID only.
 func currentProcess(ctx context.Context) Process {
 	pid := os.Getpid()
 

@@ -11,8 +11,6 @@ import (
 
 const shortGenerationID = 8
 
-// skippedHeadlines say why a save or startup restore did nothing. Reasons without an entry are
-// shown by their code.
 var skippedHeadlines = map[string]string{
 	reasonLockBusy:                     "Skipped: another save or restore is running.",
 	reasonTmuxNotRunning:               "Skipped: tmux is not running.",
@@ -25,8 +23,6 @@ var skippedHeadlines = map[string]string{
 	automation.ReasonObservationOnly:   "Not restoring: no finished save to restore from.",
 }
 
-// summary is the human form of a save, skip or startup restore: one line saying what
-// happened, then only what needs the reader's attention. --json keeps every field.
 func summary(env Env, outcome outcome) string {
 	var out strings.Builder
 
@@ -86,8 +82,6 @@ func restoredHeadline(outcome outcome) string {
 	return headline
 }
 
-// statusSummary is the human form of autosave status: whether saves run, whether there is
-// something to restore and whether saves happen before sleep and shutdown.
 func statusSummary(env Env, outcome outcome) string {
 	var out strings.Builder
 
@@ -210,7 +204,6 @@ func shortGeneration(generation string) string {
 	return generation[:min(len(generation), shortGenerationID)]
 }
 
-// shortDuration writes a duration the way a reader says it: 3m, 1m20s, 2h5m.
 func shortDuration(duration time.Duration) string {
 	const day = 24 * time.Hour
 

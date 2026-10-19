@@ -1,6 +1,5 @@
 //go:build linux || darwin
 
-// Package task holds the commands that start tasks and open their popup terminals.
 package task
 
 import (
@@ -18,8 +17,6 @@ import (
 
 const popupAttachVerb = "popup-attach"
 
-// NewCommand returns the group of commands that start tasks. remoteFactory connects the new task
-// popup to the remote connections.
 func NewCommand(remoteFactory cmdpicker.RemoteFactory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "task",

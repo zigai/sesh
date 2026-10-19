@@ -12,7 +12,6 @@ import (
 	"github.com/zigai/sesh/internal/cli/clibase"
 )
 
-// metavarMarker ends the placeholder flagUsages prepends to a flag's usage.
 const metavarMarker = "\x01"
 
 var flagMetavars = map[string]string{
@@ -28,8 +27,6 @@ func configureCommandHelp(root *cobra.Command) {
 	addHelpFlags(root)
 }
 
-// configureCompletionHelp capitalizes the flag description cobra generates for its
-// completion commands to match the rest of the command tree.
 func configureCompletionHelp(root *cobra.Command) {
 	completion, _, err := root.Find([]string{"completion"})
 	if err != nil || completion == root {
@@ -51,8 +48,6 @@ func addHelpFlags(cmd *cobra.Command) {
 	}
 }
 
-// writeCommandUsage matches cobra's default usage output except that flag placeholders
-// appear only beside the flag name, not repeated in its description.
 func writeCommandUsage(cmd *cobra.Command) error {
 	var out strings.Builder
 
@@ -178,8 +173,6 @@ type defaultlessValue struct {
 	pflag.Value
 }
 
-// flagDefault returns the flag's default for help when it differs from the zero value of
-// its type.
 func flagDefault(flag *pflag.Flag) (string, bool) {
 	var zero []string
 

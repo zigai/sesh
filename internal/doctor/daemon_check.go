@@ -80,9 +80,6 @@ func (s *Service) absentDaemon(ctx context.Context, unit string) []Result {
 	}
 }
 
-// installedDaemon reports an installed coordinator that has no runtime status for the selected
-// tmux server. A running unit may be starting up or serving another server, so only a stopped or
-// failed unit is a warning.
 func (s *Service) installedDaemon(ctx context.Context, unit, enable string) Result {
 	state, err := s.opts.UnitActiveState(ctx, unit)
 	if err != nil {

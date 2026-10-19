@@ -112,9 +112,6 @@ func (s OperationStatus) TargetDaemonGone(ctx context.Context) bool {
 	return restoreTargetDaemonGone(ctx, s.Target)
 }
 
-// restoreTargetDaemonGone reports whether a restore target names a daemon that provably no longer
-// runs. Only a recorded birth identity proves it; without one, or when the process cannot be
-// read for any other reason, the daemon is treated as possibly alive.
 func restoreTargetDaemonGone(ctx context.Context, target string) bool {
 	pid, birth, ok := parseRestoreTargetDaemon(target)
 	if !ok {

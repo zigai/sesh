@@ -59,9 +59,6 @@ type taskHandoff struct {
 	Pane     string `json:"pane"`
 }
 
-// taskChoices are what the popup offers on the chosen machine. machines are the connections of
-// the popup's machines, empty for this machine, and root is the project's directory on a remote
-// machine.
 type taskChoices struct {
 	options  taskpicker.Options
 	machines []string
@@ -69,15 +66,11 @@ type taskChoices struct {
 	remote   RemoteServices
 }
 
-// taskFrontend opens the task picker popup for task.menu. The popup starts the task or opens the
-// tab itself; the opener then moves the client to a task the popup names, which a popup cannot do
-// for its own client.
 type taskFrontend struct {
 	cmd    *cobra.Command
 	remote RemoteFactory
 }
 
-// NewTaskMenuCommand is `sesh task menu`.
 func NewTaskMenuCommand(remoteFactory RemoteFactory) *cobra.Command {
 	return actioncli.Command(action.TaskMenu, actioncli.Options[action.OpenTaskMenu, action.OpenedTaskMenu]{
 		Operation:    "task_picker",
@@ -91,7 +84,6 @@ func NewTaskMenuCommand(remoteFactory RemoteFactory) *cobra.Command {
 	})
 }
 
-// NewTaskPickerUICommand is the hidden command the task picker popup runs.
 func NewTaskPickerUICommand(remoteFactory RemoteFactory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:    taskPickerUIVerb,
@@ -140,8 +132,6 @@ func (frontend taskFrontend) Dispatch(ctx context.Context, invocation action.Inv
 	return action.OpenedTaskMenu{}, errors.Join(err, runtime.Close())
 }
 
-// openTaskPicker opens the popup sized to what it offers, for the project at dir or else the
-// caller's pane, reopens it as often as it asks, then goes to the task it names.
 func openTaskPicker(
 	ctx context.Context, cmd *cobra.Command, cfg *config.Config, runtime *actioncli.Runtime, caller action.Caller, remoteFactory RemoteFactory,
 	dir string,
@@ -190,9 +180,6 @@ func openTaskPicker(
 	}
 }
 
-// showTaskPopup shows the task picker popup, expanded when from asks for it, and returns what it
-// handed back. In a project the popup keeps its top edge whether expanded or not, so expanding
-// grows it downwards.
 func showTaskPopup(
 	ctx context.Context, cmd *cobra.Command, cfg *config.Config, socket string, client gotmux.ClientInfo, caller action.Caller,
 	dir string, options taskpicker.Options, from taskHandoff,
@@ -243,8 +230,6 @@ func showTaskPopup(
 	return readHandoff(handoffPath, func(handoff taskHandoff) bool { return handoff.Show != "" || handoff.Reopen || handoff.Session != "" })
 }
 
-// showRemoteAttachPopup attaches to the remote session a task popup handed back, in a popup as
-// large as the picker's.
 func showRemoteAttachPopup(
 	ctx context.Context, cmd *cobra.Command, cfg *config.Config, socket string, client gotmux.ClientInfo, to taskHandoff,
 ) error {
@@ -318,8 +303,6 @@ func runTaskPickerUI(cmd *cobra.Command, _ []string, remoteFactory RemoteFactory
 	return finishTaskPicker(ctx, handoffPath, picked)
 }
 
-// finishTaskPicker hands the popup's choice to its opener: a local task to show, or the remote
-// session of the task the popup started or chose.
 func finishTaskPicker(ctx context.Context, handoffPath string, picked pickedTask) error {
 	choice := picked.choice
 
@@ -352,8 +335,6 @@ type pickedTask struct {
 	remote     RemoteServices
 }
 
-// pickTask runs the picker, which starts the chosen task or tab through runtime, or on the chosen
-// remote connection, before it closes.
 func pickTask(
 	ctx context.Context, cmd *cobra.Command, cfg *config.Config, runtime *actioncli.Runtime, caller action.Caller,
 	remoteFactory RemoteFactory, dir string, from taskHandoff,
@@ -441,10 +422,6 @@ func pickTask(
 	return picked, chosen, nil
 }
 
-// loadTaskChoices lists what a new task can start with on machine, a remote connection or empty
-// for this machine. In a project, the connected remote machines are offered too; one whose sesh
-// cannot start tasks for others is listed but cannot be chosen, and one without the project
-// offers nothing.
 func loadTaskChoices(
 	ctx context.Context, cfg *config.Config, socket string, runtime *actioncli.Runtime, caller action.Caller,
 	remoteFactory RemoteFactory, dir, machine string, describe bool,
@@ -511,8 +488,6 @@ func (choices *taskChoices) listMachines() ([]taskpicker.Machine, error) {
 	return machines, nil
 }
 
-// useMachine replaces the choices with what the remote machine at index offers for project, or
-// with why it offers nothing.
 func (choices *taskChoices) useMachine(ctx context.Context, project string, index int, describe bool) {
 	machines := choices.options.Machines
 	router := action.Router{Local: nil, Peer: choices.remote.Peer, Origin: nil}
@@ -556,8 +531,6 @@ func taskPickerOptions(project string, offered action.TaskOffered) taskpicker.Op
 	}
 }
 
-// handOffRemoteTask hands the remote session of the task the popup started or chose to the
-// popup's opener, once the remote catalog lists it.
 func handOffRemoteTask(ctx context.Context, handoffPath string, picked pickedTask) error {
 	if picked.remote.Watcher == nil {
 		return oops.In("cli").With("operation", "attach_remote_task").Wrap(errRemoteAttachUnavailable)

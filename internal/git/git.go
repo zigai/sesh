@@ -1,4 +1,3 @@
-// Package git runs git commands for sesh's own project and task bookkeeping.
 package git
 
 import (
@@ -30,7 +29,6 @@ type LimitedBuffer struct {
 	exceeded bool
 }
 
-// Diff counts the lines a change adds and deletes.
 type Diff struct {
 	Added   int
 	Deleted int
@@ -115,8 +113,6 @@ func (b *LimitedBuffer) String() string {
 	return b.data.String()
 }
 
-// ParseShortStat reads the output of git diff --shortstat; ok is false when a count cannot be
-// read.
 func ParseShortStat(output string) (Diff, bool) {
 	var diff Diff
 

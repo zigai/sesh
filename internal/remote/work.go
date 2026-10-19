@@ -9,7 +9,6 @@ import (
 	"github.com/zigai/sesh/internal/work"
 )
 
-// MaxWork bounds the work items one peer reports.
 const MaxWork = 4096
 
 // NewWorkRows describes a peer's work items, the most recently active first and at most MaxWork,

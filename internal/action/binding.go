@@ -79,7 +79,6 @@ func Bindings(cfg *config.Config) ([]Binding, error) {
 	return bindings, nil
 }
 
-// SurfaceBindings returns the bindings pressed on surface.
 func SurfaceBindings(bindings []Binding, surface Surface) []Binding {
 	return slices.DeleteFunc(slices.Clone(bindings), func(binding Binding) bool { return binding.In != surface })
 }
@@ -114,8 +113,6 @@ func defaultBindings() []Binding {
 	}
 }
 
-// taskActionBindings binds the picker keys of configured task actions to task.run. A key that an
-// action binding already uses stays with that action.
 func taskActionBindings(cfg *config.Config, existing []Binding) []Binding {
 	keys := make(map[string]string)
 
@@ -196,8 +193,6 @@ func configuredBinding(bind config.KeyBindConfig) (Binding, error) {
 	return binding, checkBindable(entry.Describe(), binding)
 }
 
-// checkBindable rejects actions a surface cannot run: the picker supplies a selected row but no
-// tmux client, and a tmux key supplies the current session or pane but cannot prompt.
 func checkBindable(descriptor Descriptor, binding Binding) error {
 	switch binding.In {
 	case SurfacePicker:
@@ -277,8 +272,6 @@ func bindingValues(params map[string]any) (Values, error) {
 	return values, nil
 }
 
-// checkPickerKeys refuses picker bindings that could never run: keys the picker handles before
-// action bindings, and keys that type into its search field.
 func checkPickerKeys(keys config.KeyConfig, bindings []Binding) error {
 	reserved := config.PickerReservedKeys(keys)
 

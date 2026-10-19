@@ -9,7 +9,6 @@ import (
 
 const sessionPrefixAlt = "alt"
 
-// The picker handles these keys itself, before any action binding.
 var (
 	PickerSelectKeys    = []string{"enter"}
 	PickerCloseKeys     = []string{"esc", "ctrl+c", "ctrl+o"}
@@ -78,13 +77,10 @@ func PickerReservedKeys(keys KeyConfig) []string {
 	return reserved
 }
 
-// ValidSessionKey reports whether key is a single lowercase ASCII letter.
 func ValidSessionKey(key string) bool {
 	return len(key) == 1 && key[0] >= 'a' && key[0] <= 'z'
 }
 
-// SessionKeysHoldAlt reports whether session letters are typed with alt held instead of after the
-// session prefix key.
 func (keys KeyConfig) SessionKeysHoldAlt() bool {
 	return PickerKeyName(keys.SessionPrefix) == sessionPrefixAlt
 }
@@ -99,7 +95,6 @@ func (keys KeyConfig) PickerSessionKey(letter string) string {
 	return PickerKeyName(keys.SessionPrefix) + " " + letter
 }
 
-// ValidAgentKey reports whether key is a single lowercase ASCII letter or digit.
 func ValidAgentKey(key rune) bool {
 	return (key >= 'a' && key <= 'z') || (key >= '0' && key <= '9')
 }

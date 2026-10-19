@@ -180,7 +180,6 @@ type SwitchedSession struct {
 	Session SessionRef `json:"session"`
 }
 
-// RefOf captures the identity of a catalog session.
 func RefOf(target session.Session) SessionRef {
 	return SessionRef{
 		Kind:            target.Kind,
@@ -234,8 +233,6 @@ func forceParam(usage string) Param {
 	return newParam("force", ParamBool, usage).withShort("f")
 }
 
-// refuseAgentPaneOrAttached keeps a selected agent pane from standing for its whole session:
-// deleting removes the session and every saved generation of it.
 func refuseAgentPaneOrAttached(subject Subject) error {
 	if subject.Pane != "" {
 		return Wrap(CodeInvalidArgument, ErrWholeSessionRequired)

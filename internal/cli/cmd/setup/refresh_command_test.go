@@ -72,7 +72,6 @@ func TestSetupServicesExplainsPreviewAndKeepsCustomDirectoryOffline(t *testing.T
 	}
 }
 
-// executeSetupServices runs the production pipeline against a fake systemctl on PATH.
 func executeSetupServices(t *testing.T, arguments ...string) commandExecution {
 	t.Helper()
 
@@ -143,7 +142,6 @@ type fakeSystemctl struct {
 	callsPath string
 }
 
-// commands returns the recorded systemctl mutations, without inspections.
 func (fake fakeSystemctl) commands(t *testing.T) []string {
 	t.Helper()
 
@@ -173,8 +171,6 @@ func (fake fakeSystemctl) calls(t *testing.T) []string {
 	return strings.Split(strings.TrimSpace(string(data)), "\n")
 }
 
-// refreshManager puts a systemctl stub first on PATH. failing names the
-// operation that exits non-zero: "inspect", "daemon-reload" or "try-restart <unit>".
 func refreshManager(t *testing.T, failing string) fakeSystemctl {
 	t.Helper()
 
@@ -336,8 +332,6 @@ func assertDefinitionOnlyRefresh(t *testing.T, preview bool, directory string, r
 	}
 }
 
-// statefulManager puts a systemctl stub first on PATH that reports active for every unit
-// except those in failed, and the same UnitFileState for all of them. It records every call.
 func statefulManager(t *testing.T, failed []string, unitFileState string) fakeSystemctl {
 	t.Helper()
 
@@ -444,7 +438,6 @@ func TestSetupServicesLabelsEachFileByWhatHappened(t *testing.T) {
 	}
 }
 
-// assertServiceFileLabel checks the outcome printed for one service file, ignoring column padding.
 func assertServiceFileLabel(t *testing.T, stdout, name, label string) {
 	t.Helper()
 

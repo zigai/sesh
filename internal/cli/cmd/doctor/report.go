@@ -26,9 +26,6 @@ var statusColors = map[doctor.Status]string{
 	doctor.StatusSkip: "\x1b[90m",
 }
 
-// writeReport prints the identity header, one row per check under its group heading, and the
-// verdict. A positive width wraps text at word boundaries with a hanging indent; piped output
-// keeps each line whole for grep.
 func writeReport(output io.Writer, report Report, width int, color bool) error {
 	var b strings.Builder
 
@@ -169,8 +166,6 @@ func statusWord(status doctor.Status, color bool) string {
 	return statusColors[status] + string(status) + "\x1b[0m"
 }
 
-// wrap breaks text to fit a terminal of the given width after indent columns. A width of zero
-// means output is not a terminal, which is never wrapped.
 func wrap(text string, width, indent int) []string {
 	if width <= 0 {
 		return []string{text}

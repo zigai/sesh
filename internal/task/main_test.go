@@ -58,8 +58,6 @@ func TestMain(m *testing.M) {
 	os.Exit(testenv.RunIsolated(m))
 }
 
-// runFakeHarness stands in for an agent harness: run through a link named like the harness, the
-// test binary records its arguments in its working directory and runs until it is signaled.
 func runFakeHarness() int {
 	if _, err := os.Stat(sleepSignalGate); err == nil {
 		return runSleepSignalHarness()

@@ -46,8 +46,6 @@ var agentMenuActions = map[string]action.ID{
 	config.MenuFinish:   action.InboxFinish.ID,
 }
 
-// rowMenu is a list of choices drawn over the picker: the actions of a row, or the choices of an
-// action. It opens next to the mouse when a right-click opened it, else in the middle.
 type rowMenu struct {
 	title    string
 	entries  []menuEntry
@@ -58,14 +56,12 @@ type rowMenu struct {
 	box      menuBox
 }
 
-// menuEntry is one choice; an entry without run is a divider.
 type menuEntry struct {
 	label string
 	key   string
 	run   func() (tea.Model, tea.Cmd)
 }
 
-// menuBox is where the menu was last drawn, in screen cells, so clicks can find its entries.
 type menuBox struct {
 	x, y, width, height int
 }
@@ -74,7 +70,6 @@ func (entry menuEntry) divider() bool {
 	return entry.run == nil
 }
 
-// openMenu shows a menu. A menu without choices only reports that nothing applies.
 func (m *Model) openMenu(menu *rowMenu) func() (tea.Model, tea.Cmd) {
 	entries := trimMenuDividers(menu.entries)
 	if len(entries) == 0 {
@@ -95,7 +90,6 @@ func (m *Model) closeMenu() {
 	m.menu = nil
 }
 
-// trimMenuDividers drops dividers at the ends and repeated dividers.
 func trimMenuDividers(entries []menuEntry) []menuEntry {
 	trimmed := make([]menuEntry, 0, len(entries))
 
@@ -171,8 +165,6 @@ func (m *Model) runMenuEntry(index int) func() (tea.Model, tea.Cmd) {
 	return run
 }
 
-// handleMenuMouse runs the entry under a click, moves the cursor under the pointer, and closes
-// the menu on a click outside it.
 func (m *Model) handleMenuMouse(mouse tea.Mouse, click bool) func() (tea.Model, tea.Cmd) {
 	if m.menu == nil {
 		return nil
@@ -198,7 +190,6 @@ func (m *Model) handleMenuMouse(mouse tea.Mouse, click bool) func() (tea.Model, 
 	return func() (tea.Model, tea.Cmd) { return m, nil }
 }
 
-// renderMenu draws the open menu over the frame.
 func (m *Model) renderMenu(frame string) string {
 	lines := m.menuLines()
 	width := lipgloss.Width(lines[0])
@@ -294,7 +285,6 @@ func (m *Model) menuEntryLine(entry menuEntry, inner, labelWidth int, selected b
 	return labelPart + lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.Theme.Muted)).Render(keyPart) + padding
 }
 
-// openRowMenu opens the menu of the selected row.
 func (m *Model) openRowMenu() func() (tea.Model, tea.Cmd) {
 	if m.cursor >= len(m.filtered) {
 		return nil
@@ -317,7 +307,6 @@ func (m *Model) openRowMenu() func() (tea.Model, tea.Cmd) {
 	return m.openMenu(&rowMenu{title: row.Name, entries: m.sessionMenuEntries(), cursor: 0, anchored: false, anchorX: 0, anchorY: 0, box: menuBox{x: 0, y: 0, width: 0, height: 0}})
 }
 
-// handleRowRightClick selects the row under the pointer and opens its menu there.
 func (m *Model) handleRowRightClick(mouse tea.Mouse) func() (tea.Model, tea.Cmd) {
 	row, ok := m.listRowAtMouse(mouse)
 	if !ok || !m.rowSelectable(row) {
@@ -341,7 +330,6 @@ func (m *Model) handleRowRightClick(mouse tea.Mouse) func() (tea.Model, tea.Cmd)
 	return handler
 }
 
-// sessionMenuEntries are the configured session entries that apply to the selected session.
 func (m *Model) sessionMenuEntries() []menuEntry {
 	entries := make([]menuEntry, 0, len(m.config.Menu.Session))
 
@@ -363,8 +351,6 @@ func (m *Model) sessionMenuEntries() []menuEntry {
 	return entries
 }
 
-// agentMenuEntries are the configured agent entries that apply to the selected agent or task
-// row: built-in entries, and the menu items of its task's project.
 func (m *Model) agentMenuEntries() []menuEntry {
 	items := m.selectedMenuItems()
 	listed := make(map[string]bool, len(m.config.Menu.Agent))
@@ -392,7 +378,6 @@ func (m *Model) agentMenuEntries() []menuEntry {
 	return entries
 }
 
-// agentMenuEntry is the entry one configured name adds to an agent row's menu, when it applies.
 func (m *Model) agentMenuEntry(name string, items map[string]config.MenuItemConfig) []menuEntry {
 	switch {
 	case name == config.MenuDivider:
@@ -442,8 +427,6 @@ func (m *Model) menuItemEntries(name string, item config.MenuItemConfig) []menuE
 	return []menuEntry{entry}
 }
 
-// actionMenuEntry is the menu entry that runs an action on the selection, when the action
-// applies to it. The entry shows the picker key bound to the action.
 func (m *Model) actionMenuEntry(label string, id action.ID, values action.Values) (menuEntry, bool) {
 	entry, ok := action.Lookup(id)
 	if !ok {

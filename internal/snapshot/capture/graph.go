@@ -106,8 +106,6 @@ func graphLinks(snapshot gotmux.Snapshot, wanted map[gotmux.SessionID]bool, m *m
 	return windows
 }
 
-// graphLayouts records each selected window with its tiled layout and returns the decoded layouts
-// with the set of floating panes they exclude.
 func graphLayouts(snapshot gotmux.Snapshot, windows map[gotmux.WindowID]bool, m *model.Manifest) (map[string]tmuxserver.WindowLayout, map[string]bool, error) {
 	panes := make(map[string]string)
 

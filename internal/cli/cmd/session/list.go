@@ -177,8 +177,6 @@ func renderListOutput(cmd *cobra.Command, server *gotmux.Server, sessions []sess
 	return listErr
 }
 
-// hintSavedSessions points at the newest snapshot on stderr when some of its sessions are not
-// running, as after a reboot before anything was restored.
 func hintSavedSessions(cmd *cobra.Command, server *gotmux.Server, empty bool) {
 	workspace, err := clibase.ResolveWorkspace(cmd)
 	if err != nil {

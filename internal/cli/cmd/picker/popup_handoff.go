@@ -98,7 +98,6 @@ func writePickerSwitchHandoff(path string, target *session.Session, paneID, repl
 	return errors.Join(writeErr, file.Close())
 }
 
-// applyPickerHandoffTarget copies a live local target into handoff and reports whether the target is valid.
 func applyPickerHandoffTarget(handoff *switchHandoff, target *session.Session, paneID string) bool {
 	if target.ID == "" || target.Name == "" || target.Kind != session.KindLive || target.Origin != session.OriginLocal {
 		return false

@@ -15,8 +15,6 @@ import (
 
 const seshBinary = "/opt/sesh/bin/sesh"
 
-// restoreFixture is a snapshot with three awake task agents created in order t1, t2, t3, plus an
-// editor pane and a pane outside any task, and a ledger that knows the three tasks.
 type restoreFixture struct {
 	store    task.Store
 	manifest model.Manifest

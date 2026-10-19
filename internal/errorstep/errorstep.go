@@ -4,7 +4,6 @@ package errorstep
 
 import "github.com/samber/oops"
 
-// Step is the operation and optional reason a domain recorded when one of its steps failed.
 type Step struct {
 	Operation string
 	Reason    string

@@ -58,7 +58,6 @@ type sessionLoadResultMsg struct {
 	timing            sessionLoadTiming
 }
 
-// sessionLoadTiming records how long the parallel catalog and agent loaders took.
 type sessionLoadTiming struct {
 	catalog time.Duration
 	agents  time.Duration

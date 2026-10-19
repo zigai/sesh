@@ -116,7 +116,6 @@ func assertSaveRecords(t *testing.T, data []byte, scenario string) {
 func assertSaveOutcomeRecord(t *testing.T, fields map[string]jsontext.Value, scenario string) {
 	t.Helper()
 
-	// The fixture pane has no terminal text artifact; failures report no count.
 	wantLevel, wantStatus, wantOmitted, wantFloating := `"error"`, `"failed"`, "", ""
 	if scenario == "partial" {
 		wantLevel, wantStatus, wantOmitted, wantFloating = `"warn"`, `"partial"`, "1", "0"
@@ -388,8 +387,6 @@ func TestInterruptedCaptureRecordsFailedAttemptAndKeepsPriorSource(t *testing.T)
 	assertPriorGenerationRecovers(t, r, prior.Generation)
 }
 
-// assertPriorGenerationRecovers checks that after an interrupted save the prior generation stays
-// readable and is what practical recovery uses, while the strict current view still refuses it.
 func assertPriorGenerationRecovers(t *testing.T, r *store.Repository, prior string) {
 	t.Helper()
 

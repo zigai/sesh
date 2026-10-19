@@ -71,9 +71,6 @@ func captureProcessLaunch(ctx context.Context, pid int, keys []string, agent *ap
 	return launch, record, err
 }
 
-// replacedInPlace reports whether the path of a running program's deleted executable holds an
-// executable again, as after a package upgrade replaced the file. Relaunching from that path runs
-// the upgraded program.
 func replacedInPlace(executable []byte) bool {
 	info, err := os.Stat(string(executable))
 

@@ -348,8 +348,6 @@ func humanErrorMessage(err error) string {
 	return "operation failed"
 }
 
-// NotExistMessage names what is missing: the snapshot repository when the store reported it,
-// otherwise a file or directory.
 func NotExistMessage(err error) string {
 	if _, ok := errorstep.Owned(err, "snapshot.store"); ok {
 		return "repository does not exist"

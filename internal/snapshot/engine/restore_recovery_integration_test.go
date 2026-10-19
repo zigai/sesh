@@ -116,8 +116,6 @@ func redirectPanesToMissingDirectory(t *testing.T, manifest *model.Manifest, ses
 	}
 }
 
-// observeSessionAtMissingDirectory commits a generation whose panes point at a directory that
-// does not exist, so a restore registers its operation and then fails after admission.
 func observeSessionAtMissingDirectory(t *testing.T, ctx context.Context, source *gotmux.Server, repoDir string, session gotmux.Session) string {
 	t.Helper()
 
@@ -572,8 +570,6 @@ func TestSettleDeadRestoresAbandonsARestoreWhoseServerExited(t *testing.T) {
 	}
 }
 
-// interruptRestoreAtMissingDirectory leaves an admitted restore active against server, as a restore
-// cut short by a shutdown does.
 func interruptRestoreAtMissingDirectory(t *testing.T, ctx context.Context, server *gotmux.Server) (*store.Repository, string) {
 	t.Helper()
 
@@ -621,8 +617,6 @@ func waitForProcessExit(t *testing.T, ctx context.Context, pid int) {
 	}
 }
 
-// killDaemonOnCleanup stops a daemon the test started itself. The identity guard keeps the
-// cleanup of a replaced daemon from killing its successor at the same socket.
 func killDaemonOnCleanup(t *testing.T, server *gotmux.Server, identity gotmux.ServerIdentity) {
 	t.Helper()
 

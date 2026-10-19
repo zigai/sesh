@@ -77,7 +77,6 @@ func TestSessionCommandsWithoutSocketTargetDefaultTmuxServer(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			exec := executeJSON(t, append(tc.args, testNoConfigFlag, testJSONFlag)...)
 
-			// Without a server, lookups find no session and mutations report the missing server.
 			if !errors.Is(exec.Err, gotmux.ErrNoServer) && !errors.Is(exec.Err, session.ErrSessionNotFound) {
 				t.Fatalf("error = %v, want the isolated default socket to have no server or session", exec.Err)
 			}

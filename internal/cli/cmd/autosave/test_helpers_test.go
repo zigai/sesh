@@ -15,7 +15,6 @@ const (
 	testNoConfigFlag = "--no-config"
 )
 
-// resultJSON is the autosave wire contract decoded from --json output.
 type resultJSON struct {
 	Status           string `json:"status"`
 	Reason           string `json:"reason"`

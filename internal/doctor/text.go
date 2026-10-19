@@ -12,7 +12,6 @@ import (
 
 var shellSafe = regexp.MustCompile(`^[A-Za-z0-9_@%+=:,./-]+$`)
 
-// DisplayPath abbreviates the home directory to ~ so a report pastes cleanly into an issue.
 func DisplayPath(path string) string {
 	home, err := os.UserHomeDir()
 	if err != nil || home == "" || home == "/" {
@@ -30,7 +29,6 @@ func DisplayPath(path string) string {
 	return path
 }
 
-// shellArg quotes value for a POSIX shell when it needs quoting.
 func shellArg(value string) string {
 	if shellSafe.MatchString(value) {
 		return value
@@ -49,8 +47,6 @@ func shellPath(path string) string {
 	return shellArg(path)
 }
 
-// pathCopies lists every executable named name in the PATH directories of pathEnv, in PATH
-// order, counting links to the same file once.
 func pathCopies(pathEnv, name string) []string {
 	var (
 		copies []string
@@ -90,7 +86,6 @@ func pathCopies(pathEnv, name string) []string {
 	return copies
 }
 
-// lookPath resolves a command the way a shell would with pathEnv as PATH.
 func lookPath(pathEnv, command string) (string, bool) {
 	if strings.Contains(command, "/") {
 		info, err := os.Stat(command)

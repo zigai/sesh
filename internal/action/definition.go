@@ -20,8 +20,6 @@ type Definition[In, Out any] struct {
 	report func(Out) string
 }
 
-// define registers an action at package initialization. A duplicate or malformed ID is a
-// programming error.
 func define[In, Out any](descriptor Descriptor, bind func(Subject, Values) (In, error), report func(Out) string) *Definition[In, Out] {
 	if !descriptor.ID.Valid() {
 		panic("action: invalid ID " + string(descriptor.ID))
@@ -38,7 +36,6 @@ func define[In, Out any](descriptor Descriptor, bind func(Subject, Values) (In, 
 	return definition
 }
 
-// Bind builds the action input from a subject and raw parameter values.
 func (definition *Definition[In, Out]) Bind(subject Subject, values Values) (In, error) {
 	var zero In
 
@@ -101,7 +98,6 @@ func (definition *Definition[In, Out]) EncodeOutput(output any) ([]byte, error) 
 	return encode(typed)
 }
 
-// Input asserts an erased input to this action's type.
 func (definition *Definition[In, Out]) Input(input any) (In, error) {
 	typed, ok := input.(In)
 	if !ok {

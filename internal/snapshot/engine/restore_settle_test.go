@@ -54,7 +54,6 @@ func newSettleFixture(t *testing.T) settleFixture {
 	return settleFixture{repository: repository, generation: generation.ID}
 }
 
-// register records an active restore aimed at the daemon with pid and birth.
 func (f settleFixture) register(t *testing.T, pid int, birth string) string {
 	t.Helper()
 

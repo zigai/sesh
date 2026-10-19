@@ -31,9 +31,6 @@ func newMergeRunCommand() *cobra.Command {
 	return cmd
 }
 
-// runMergeRun merges the task with the window's terminal. A failed merge ends with a line saying
-// why, which stays readable in the window; a merge that succeeds finishes the task, which closes
-// the window.
 func runMergeRun(cmd *cobra.Command, args []string) error {
 	ctx := clibase.CommandContext(cmd)
 

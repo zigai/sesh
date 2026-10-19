@@ -10,8 +10,6 @@ import (
 
 const shortGenerationID = 8
 
-// writeRestoreSummary writes what a restore did in terms a reader can act on: which sessions
-// came back, what happened to their programs, what was skipped and what to do next.
 func writeRestoreSummary(out *strings.Builder, res action.RestoredSnapshot) {
 	generation := res.Generation
 	if len(generation) > shortGenerationID {
@@ -58,8 +56,6 @@ func sessionCount(count int) string {
 	return fmt.Sprintf("%d sessions", count)
 }
 
-// tallyPaneOutcomes counts resumed and restarted programs and collects the panes a reader must
-// look at: programs not brought back and panes started outside their saved directory.
 func tallyPaneOutcomes(panes []action.RestoredPane) (int, int, []action.RestoredPane) {
 	var resumed, restarted int
 
@@ -121,7 +117,6 @@ func writeProgramSummary(out *strings.Builder, panes []action.RestoredPane) {
 	}
 }
 
-// paneOutcomeAdvice explains a pane whose program was not brought back, and what to do about it.
 func paneOutcomeAdvice(pane action.RestoredPane) string {
 	if pane.Outcome == restore.PaneOutcomeAllowedCWDFallback || pane.CWDFallback {
 		return "started in a fallback directory because the saved one no longer exists"
@@ -172,7 +167,6 @@ func writeSkippedSummary(out *strings.Builder, res action.RestoredSnapshot) {
 		"    sesh snapshot restore%s %s\n", first.Name, generationFlag, first.ID)
 }
 
-// writeRestoreDetails writes the per-pane evidence and verification state behind the summary.
 func writeRestoreDetails(out *strings.Builder, res action.RestoredSnapshot) {
 	fmt.Fprintf(out, "Operation:          %s\n", res.OperationID)
 	fmt.Fprintf(out, "Generation:         %s\n", res.Generation)

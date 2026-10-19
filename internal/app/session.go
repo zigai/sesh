@@ -139,8 +139,6 @@ func (local *Local) switchSession(ctx context.Context, caller action.Caller, inp
 	return result, nil
 }
 
-// refuseLiveNamesake refuses to delete a saved session everywhere once a live session took its
-// name: the person chose a session that had no live counterpart.
 func (local *Local) refuseLiveNamesake(ctx context.Context, name string) error {
 	rows, err := local.liveSessions(ctx)
 	if errors.Is(err, gotmux.ErrNoServer) {
@@ -158,8 +156,6 @@ func (local *Local) refuseLiveNamesake(ctx context.Context, name string) error {
 	return nil
 }
 
-// liveTarget finds the live session a reference was taken from. Any change of tmux server or
-// session incarnation since the reference was taken refuses the action.
 func (local *Local) liveTarget(ctx context.Context, ref action.SessionRef) (session.Session, error) {
 	if ref.Saved() {
 		return session.Session{}, action.Wrap(action.CodeInvalidArgument, errLiveRequired)
@@ -230,8 +226,6 @@ func deletedSession(name string, outcome session.DeleteOutcome) action.DeletedSe
 	}
 }
 
-// sessionDirectory resolves a requested working directory on this machine. An empty value
-// lets tmux choose its default.
 func sessionDirectory(requested string) (string, error) {
 	if requested == "" {
 		return "", nil

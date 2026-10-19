@@ -45,8 +45,6 @@ func newPlaceholderCommand() *cobra.Command {
 	return cmd
 }
 
-// runPlaceholder shows the sleeping placeholder and, on enter, replaces itself with the agent's
-// native resume command, so the woken agent runs in the pane the placeholder held.
 func runPlaceholder(cmd *cobra.Command, args []string) error {
 	ctx := clibase.CommandContext(cmd)
 
@@ -82,8 +80,6 @@ func runPlaceholder(cmd *cobra.Command, args []string) error {
 	return execResume(command)
 }
 
-// awaitWake redraws the placeholder until enter wakes the task, and returns the command that
-// resumes its agent.
 func awaitWake(ctx context.Context, runtime *actioncli.Runtime, cfg *config.Config, id, harness string) ([]string, error) {
 	resized := make(chan os.Signal, 1)
 	signal.Notify(resized, syscall.SIGWINCH)

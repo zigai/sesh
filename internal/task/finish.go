@@ -28,8 +28,6 @@ var (
 	errPopupNotRemoved = errors.New("task popup session was not closed")
 )
 
-// FinishOptions controls a finish: Discard removes the task even if that loses work, and SkipRun
-// leaves out the project's finish command.
 type FinishOptions struct {
 	Discard bool
 	SkipRun bool
@@ -40,7 +38,6 @@ type PRFinder interface {
 	FindPR(ctx context.Context, dir, branch string) (PullRequest, string, bool, error)
 }
 
-// GitHub finds pull requests with the gh command.
 type GitHub struct{}
 
 // LossError lists what finishing a task would destroy: commits only its branch holds and changes
@@ -77,7 +74,6 @@ func (e *LossError) Is(target error) bool {
 	return target == ErrWouldLoseWork
 }
 
-// RefreshPR records the pull request of a project task's branch and reports whether it changed.
 func (s *Service) RefreshPR(ctx context.Context, id string) (Record, bool, error) {
 	record, err := s.record(ctx, id)
 	if err != nil {
@@ -169,8 +165,6 @@ func (s *Service) Finish(ctx context.Context, id string, opts FinishOptions) (Re
 	return record, taskError("finish_task", err)
 }
 
-// prepareFinish checks that finishing a task loses no work, unless it discards work, and runs the
-// project's finish command in its worktree, unless it skips it.
 func (s *Service) prepareFinish(ctx context.Context, record Record, opts FinishOptions) (Record, error) {
 	if !opts.Discard {
 		mergedHead := ""
@@ -318,8 +312,6 @@ func lossOf(loss LossError) error {
 	return nil
 }
 
-// removeTask closes everything a task owns. Each step accepts that an earlier finish already
-// removed its part.
 func (s *Service) removeTask(ctx context.Context, record Record) error {
 	if s.closePopup != nil {
 		if err := s.closePopup(ctx, record.ID); err != nil {

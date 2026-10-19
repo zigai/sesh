@@ -6,7 +6,6 @@ import (
 	"time"
 )
 
-// Sighting is an agent conversation seen running in a tmux pane.
 type Sighting struct {
 	Harness      string
 	Conversation string
@@ -25,8 +24,6 @@ type Sighting struct {
 	PromptAt time.Time
 }
 
-// Checkout reads the branch checked out in a directory and the root of its project's main
-// checkout, each empty when unknown.
 type Checkout func(dir string) (branch, project string)
 
 // Observe records sightings: a known conversation updates its item, a new conversation in the

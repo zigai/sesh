@@ -27,7 +27,6 @@ type EvidenceSource interface {
 	LastReport(ctx context.Context, agent session.AgentSession) (string, error)
 }
 
-// evidenceEntry is the evidence of an agent's report as of the turn that ended at since.
 type evidenceEntry struct {
 	since time.Time
 	items []inbox.Evidence
@@ -38,8 +37,6 @@ type evidenceResultMsg struct {
 	err     error
 }
 
-// evidenceWanted reports whether the inbox reads the report of an agent: one on this machine whose
-// turn ended and whose report is not read yet for that turn.
 func (m *Model) evidenceWanted(agent session.AgentSession) bool {
 	key := conversationKey(agent)
 	if key == "" || agent.Host != "" || agent.SessionPath == "" || agent.StatusSince.IsZero() {
@@ -58,7 +55,6 @@ func (m *Model) evidenceWanted(agent session.AgentSession) bool {
 	return !read || !entry.since.Equal(agent.StatusSince)
 }
 
-// loadEvidenceCommand reads the reports of the inbox rows whose evidence is not read yet.
 func (m *Model) loadEvidenceCommand() tea.Cmd {
 	if m.deps.Evidence == nil || m.evidenceLoading || m.displayMode != displayModeInbox {
 		return nil
@@ -99,7 +95,6 @@ func readReports(ctx context.Context, source EvidenceSource, wanted map[string]s
 	for key, agent := range wanted {
 		report, err := source.LastReport(ctx, agent)
 		if err != nil {
-			// A report that cannot be read is tried again after the agent's next turn.
 			if ctx.Err() == nil {
 				unread++
 				entries[key] = evidenceEntry{since: agent.StatusSince, items: nil}
@@ -138,7 +133,6 @@ func (m *Model) handleEvidence(msg evidenceResultMsg) {
 	m.restoreSelectedSession(selected)
 }
 
-// evidenceOf lists the evidence of a row's latest report, once it is read for the row's turn.
 func (m *Model) evidenceOf(item inboxItem) []inbox.Evidence {
 	entry, ok := m.evidence[conversationKey(item.agent)]
 	if !ok || conversationKey(item.agent) == "" || !entry.since.Equal(item.agent.StatusSince) {
@@ -148,7 +142,6 @@ func (m *Model) evidenceOf(item inboxItem) []inbox.Evidence {
 	return entry.items
 }
 
-// evidenceCount is the {evidence} field of an inbox row, such as "3 ev", empty without evidence.
 func (m *Model) evidenceCount(agent session.AgentSession) string {
 	if m.displayMode != displayModeInbox {
 		return ""
@@ -166,7 +159,6 @@ func (m *Model) evidenceCount(agent session.AgentSession) string {
 	return ""
 }
 
-// evidenceDetail names the evidence items for the detail pane.
 func evidenceDetail(items []inbox.Evidence, dir string) string {
 	names := make([]string, 0, len(items))
 
@@ -177,8 +169,6 @@ func evidenceDetail(items []inbox.Evidence, dir string) string {
 	return strings.Join(names, " · ")
 }
 
-// evidenceName is a short name for an item: a path relative to the agent's directory when inside
-// it, else the path or URL.
 func evidenceName(item inbox.Evidence, dir string) string {
 	if item.Kind == inbox.EvidenceURL || dir == "" {
 		return SanitizeTerminalText(item.Target)
@@ -191,7 +181,6 @@ func evidenceName(item inbox.Evidence, dir string) string {
 	return SanitizeTerminalText(session.ShortenHomePath(item.Target))
 }
 
-// openEvidenceMenu lists the row's evidence; choosing an item opens it.
 func (m *Model) openEvidenceMenu(item inboxItem) func() (tea.Model, tea.Cmd) {
 	items := m.evidenceOf(item)
 	entries := make([]menuEntry, 0, len(items))
@@ -208,8 +197,6 @@ func (m *Model) openEvidenceMenu(item inboxItem) func() (tea.Model, tea.Cmd) {
 	})
 }
 
-// openEvidence opens an item: text in less in the picker's terminal, anything else with
-// xdg-open. Targets are URLs or absolute paths, so none reads as an option.
 func (m *Model) openEvidence(evidence inbox.Evidence, dir string) func() (tea.Model, tea.Cmd) {
 	target := evidence.Target
 	if home, err := os.UserHomeDir(); err == nil && strings.HasPrefix(target, "~/") {

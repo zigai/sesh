@@ -45,8 +45,6 @@ func openReceipts(t *testing.T) *privatefs.Dir {
 	return dir
 }
 
-// newPeerHarness runs invocations the way `sesh remote peer action` does: through this
-// machine's own action runner against a disposable tmux server.
 func newPeerHarness(t *testing.T) peerHarness {
 	t.Helper()
 

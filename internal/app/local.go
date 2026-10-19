@@ -41,7 +41,6 @@ type LocalOptions struct {
 	WorktreeDir        string
 }
 
-// Local runs actions against this machine's tmux server and snapshot repository.
 type Local struct {
 	cfg         *config.Config
 	server      *gotmux.Server
@@ -142,8 +141,6 @@ func (local *Local) Dispatch(ctx context.Context, invocation action.Invocation) 
 	return output, nil
 }
 
-// Workflow exposes the session workflow for flows that are not actions, such as entering a
-// session from the picker.
 func (local *Local) Workflow() *session.Workflow {
 	return local.workflow
 }
@@ -152,12 +149,10 @@ func (local *Local) Server() *gotmux.Server {
 	return local.server
 }
 
-// Existing opens the repository when it exists and reports whether it does.
 func (repository *Repository) Existing(ctx context.Context) (*store.Repository, bool, error) {
 	return repository.open(ctx, false)
 }
 
-// Ensure opens the repository, creating it when missing.
 func (repository *Repository) Ensure(ctx context.Context) (*store.Repository, error) {
 	repo, _, err := repository.open(ctx, true)
 
@@ -247,8 +242,6 @@ func (local *Local) useRepository(ctx context.Context, create bool) (*store.Repo
 	return repo, true, nil
 }
 
-// ensureLeaseRoot creates the lease root before an action takes a lease, so actions that never
-// lease leave the filesystem untouched. An unset root is reported by the lease holder.
 func (local *Local) ensureLeaseRoot() error {
 	if local.leaseRoot == "" {
 		return nil

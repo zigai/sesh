@@ -13,8 +13,6 @@ import (
 	"github.com/zigai/sesh/internal/setup"
 )
 
-// tmuxBindable returns a tmux binding for every action a tmux key can run, with sample values
-// for the parameters a key must supply.
 func tmuxBindable(t *testing.T) []action.Binding {
 	t.Helper()
 

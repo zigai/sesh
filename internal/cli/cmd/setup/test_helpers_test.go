@@ -19,7 +19,6 @@ const (
 	testNoConfigFlag = "--no-config"
 )
 
-// serviceJSON and servicesResultJSON decode the setup services wire contract.
 type serviceJSON struct {
 	Name     string   `json:"name"`
 	Kind     string   `json:"kind"`

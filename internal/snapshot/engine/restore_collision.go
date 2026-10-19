@@ -31,7 +31,6 @@ var ErrNoServerRunning = errors.New("no tmux server is running on the selected s
 // the caller named sessions explicitly.
 type CollisionPolicy string
 
-// SkippedSession is a saved session restore declined to create, with a fixed reason.
 type SkippedSession struct {
 	ID     string `json:"id"`
 	Name   string `json:"name"`
@@ -98,8 +97,6 @@ func restoreOperationExists(ctx context.Context, repository *store.Repository, o
 	return slices.ContainsFunc(catalog.Operations, func(op store.Operation) bool { return op.ID == operationID }), nil
 }
 
-// planAroundCollisions skips, or under the fail policy reports, sessions whose name or group is
-// already live or that are linked to one that is. It never mutates the live server.
 func planAroundCollisions(
 	ctx context.Context,
 	server *gotmux.Server,
@@ -144,8 +141,6 @@ func planAroundCollisions(
 		Wrap(restore.ErrSessionCollision)
 }
 
-// partitionSelection splits the selection into sessions that can still be restored and sessions
-// whose closure includes a colliding session.
 func partitionSelection(manifest model.Manifest, selected []string, collisions []restore.Collision) ([]string, []SkippedSession, error) {
 	colliding := make(map[string]string, len(collisions))
 	for _, collision := range collisions {
@@ -177,7 +172,6 @@ func partitionSelection(manifest model.Manifest, selected []string, collisions [
 	return kept, blocked, nil
 }
 
-// selectionBlocker reports whether restoring the selected session would need a colliding one.
 func selectionBlocker(manifest model.Manifest, id string, colliding map[string]string) (string, bool, error) {
 	if reason, ok := colliding[id]; ok {
 		return reason, true, nil

@@ -208,8 +208,6 @@ func (m *Model) subjectNames(subject action.Subject) string {
 	return strings.Join(names, ", ")
 }
 
-// enteredValues lists the values already given for a pending action, so a later prompt shows
-// what it continues from.
 func enteredValues(descriptor action.Descriptor, request pendingAction) []string {
 	lines := make([]string, 0, len(descriptor.Params))
 	for _, param := range descriptor.Params {

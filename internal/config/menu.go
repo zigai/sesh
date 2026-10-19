@@ -41,12 +41,10 @@ const (
 )
 
 var (
-	// AgentMenuEntries are the built-in entries of the menu of an agent or task row.
 	AgentMenuEntries = []string{
 		MenuGo, MenuSnooze, MenuUnsnooze, MenuSeen, MenuUnseen, MenuPin, MenuUnpin, MenuEvidence, MenuPR,
 		MenuLink, MenuUnlink, MenuMerge, MenuSleep, MenuWake, MenuOpen, MenuFinish,
 	}
-	// SessionMenuEntries are the built-in entries of the menu of a session row.
 	SessionMenuEntries = []string{MenuGo, MenuRename, MenuSnapshot, MenuKill, MenuDelete}
 )
 
@@ -134,7 +132,6 @@ func (a MenuItemConfig) Clone() MenuItemConfig {
 	return clone
 }
 
-// LinksPR reports whether the action looks up the task branch's PR after it runs.
 func (a MenuItemConfig) LinksPR() bool {
 	return a.LinkPR != nil && *a.LinkPR
 }
@@ -146,7 +143,6 @@ func (c *Config) MenuItemsFor(root string) map[string]MenuItemConfig {
 	return c.menuItems(c.ProjectOverride(root))
 }
 
-// MergeCheckFor returns the merge check of the project at root: its own, else the global one.
 func (c *Config) MergeCheckFor(root string) []string {
 	if override := c.ProjectOverride(root).Merge; override != nil {
 		return slices.Clone(override.Check)
@@ -155,7 +151,6 @@ func (c *Config) MergeCheckFor(root string) []string {
 	return slices.Clone(c.Merge.Check)
 }
 
-// FinishRunFor returns the finish command of the project at root: its own, else the global one.
 func (c *Config) FinishRunFor(root string) []string {
 	if override := c.ProjectOverride(root).Finish; override != nil {
 		return slices.Clone(override.Run)
@@ -222,7 +217,6 @@ func ValidateMenu(cfg *Config) error {
 	return validateMenuList("menu.session", cfg.Menu.Session, SessionMenuEntries, false, nil)
 }
 
-// ValidateMerge checks the global merge check and finish command and every project's.
 func ValidateMerge(cfg *Config) error {
 	if err := validateCommand("merge.check", cfg.Merge.Check, errMergeCheckEmpty); err != nil {
 		return err
@@ -250,8 +244,6 @@ func ValidateMerge(cfg *Config) error {
 	return nil
 }
 
-// ValidateTaskActionTemplate rejects a prompt that uses a variable other than
-// TaskActionVariables.
 func ValidateTaskActionTemplate(prompt string) error {
 	for _, variable := range templateVariable.FindAllString(prompt, -1) {
 		if !slices.Contains(TaskActionVariables, strings.Trim(variable, "{}")) {
@@ -357,7 +349,6 @@ func cloneMenuItems(actions map[string]MenuItemConfig) map[string]MenuItemConfig
 	return clone
 }
 
-// projectPathKey reports whether an override key is a project path rather than a directory name.
 func projectPathKey(key string) bool {
 	return strings.HasPrefix(key, "/") || key == "~" || strings.HasPrefix(key, "~/")
 }

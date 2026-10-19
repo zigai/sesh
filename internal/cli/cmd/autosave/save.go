@@ -221,8 +221,6 @@ func runAutosaveFinalSave(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-// runFinalSave runs one final save within ctx and records its outcome in the final save status
-// file. It returns the save's error and the status write's error separately.
 func runFinalSave(ctx context.Context, cmd *cobra.Command, env Env) (outcome, error, error) {
 	started := time.Now()
 
@@ -277,7 +275,6 @@ func executeFinalSave(
 	}
 
 	if pending := findPendingRestore(ctx, cmd, server, repo); pending.sessions > 0 {
-		// Saving the unrestored server would make it what the next start restores.
 		reportPendingRestore(ctx, env, pending)
 
 		status.Result, status.Reason = automation.FinalSaveIncomplete, reasonRestorePending
@@ -341,8 +338,6 @@ func executeFinalSave(
 	return outcome, status, errors.Join(bookkeepingErr, wrapCloseError(closeErr), lockErr)
 }
 
-// openFinalSaveTarget opens the tmux server and selects the sessions a final save observes. On
-// failure it also returns the fixed reason the final save status records.
 func openFinalSaveTarget(ctx context.Context, cmd *cobra.Command, workspace app.Workspace) (*gotmux.Server, []gotmux.SessionID, string, error) {
 	server, err := workspace.OpenTmux()
 	if err != nil {
@@ -351,7 +346,6 @@ func openFinalSaveTarget(ctx context.Context, cmd *cobra.Command, workspace app.
 
 	selected, err := resolveAutosaveSelection(ctx, cmd, server)
 	if errors.Is(err, gotmux.ErrNoServer) {
-		// A stop that arrives after the server died has nothing left to observe.
 		return nil, nil, "server_gone", err
 	}
 
@@ -379,8 +373,6 @@ func finalSaveFailure(
 	return outcome, status, err
 }
 
-// acquireFinalSaveLock waits for a save in progress to finish instead of skipping the final save,
-// and reports the lock as busy when the save's deadline ends the wait.
 func acquireFinalSaveLock(ctx context.Context) (*automation.SaveLock, error) {
 	lock, _, err := automation.AcquireSaveLock(ctx, automation.SaveLockPath(), automation.SaveLockBlocking)
 	if err != nil && ctx.Err() != nil {
@@ -508,8 +500,6 @@ func maintainAutosaveRepository(ctx context.Context, repo *store.Repository, sna
 	_, _ = engine.GarbageCollect(ctx, repo, store.CollectionBudget{Generations: collectionGenerations, Bytes: math.MaxInt64})
 }
 
-// skipAutosaveWithoutServer reports a skipped save when no tmux server is running on the target
-// socket, such as a timer firing after login before tmux starts: there is no state to observe.
 func skipAutosaveWithoutServer(ctx context.Context, cmd *cobra.Command, env Env, repo *store.Repository) error {
 	restorable := reportRestorableSessions(ctx, env, repo)
 	closeErr := wrapCloseError(repo.Close())
@@ -522,8 +512,6 @@ func skipAutosaveWithoutServer(ctx context.Context, cmd *cobra.Command, env Env,
 	return errors.Join(renderAutosaveResult(cmd, env, idle), closeErr)
 }
 
-// recordCompletedAutosave durably records the time of a saved autosave, even after the save's
-// own cancellation, and marks the outcome recorded when it succeeds.
 func recordCompletedAutosave(ctx context.Context, env Env, outcome *outcome) error {
 	bookkeepingCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), bookkeepingTimeout)
 	defer cancel()
@@ -563,8 +551,6 @@ func resolvePendingRestore(ctx context.Context, cmd *cobra.Command, env Env, ser
 	return true, skipAutosaveWhileRestorePending(ctx, cmd, env, repo, pending)
 }
 
-// skipAutosaveWhileRestorePending holds back a save while the live server lacks saved sessions
-// it was started without, so the scratch state never replaces them as the newest snapshot.
 func skipAutosaveWhileRestorePending(ctx context.Context, cmd *cobra.Command, env Env, repo *store.Repository, pending pendingRestore) error {
 	reportPendingRestore(ctx, env, pending)
 

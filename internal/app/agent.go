@@ -162,8 +162,6 @@ func (local *Local) navigator(caller action.Caller) (*agents.Navigator, error) {
 	return navigator, nil
 }
 
-// recordAgentView is best effort: the pane is already focused, and a lost history entry only
-// affects which results agent.unread reports as unvisited.
 func (local *Local) recordAgentView(ctx context.Context, target agents.PaneLocation) {
 	if local.historyPath == "" || target.SessionName == "" || target.PaneID == "" {
 		return

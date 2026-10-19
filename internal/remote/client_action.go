@@ -37,12 +37,10 @@ func NewPeer(remote config.RemoteConfig, load func() (Catalog, error)) *Peer {
 	return &Peer{remote: remote, load: load, mu: sync.Mutex{}, offers: map[string][]action.ID{}}
 }
 
-// NewCatalogPeer dispatches through the catalog the remote monitor keeps under cacheHome.
 func NewCatalogPeer(remote config.RemoteConfig, cacheHome string) *Peer {
 	return NewPeer(remote, func() (Catalog, error) { return ReadCatalog(cacheHome) })
 }
 
-// Observe records the actions each connected peer accepts.
 func (peer *Peer) Observe(catalog Catalog) {
 	offers := make(map[string][]action.ID, len(catalog.Connections))
 	for id, state := range catalog.Connections {

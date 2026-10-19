@@ -49,7 +49,6 @@ type openedMsg struct {
 	err error
 }
 
-// conversationKey names an agent's conversation across pickers and machines.
 func conversationKey(agent session.AgentSession) string {
 	if agent.SessionID == "" {
 		return ""
@@ -58,8 +57,6 @@ func conversationKey(agent session.AgentSession) string {
 	return agent.Host + "/" + agent.Harness + "/" + agent.SessionID
 }
 
-// snoozed reports whether a row is snoozed: its snooze has not reached its time, and the agent has
-// not finished a turn or asked for input since it was set.
 func (m *Model) snoozed(item inboxItem) bool {
 	snooze, ok := m.inbox.Find(conversationKey(item.agent))
 	if !ok || conversationKey(item.agent) == "" {
@@ -81,8 +78,6 @@ func (m *Model) snoozed(item inboxItem) bool {
 	return true
 }
 
-// markedUnseen reports whether the user marked an agent's latest result as not seen and has not
-// viewed its pane since.
 func (m *Model) markedUnseen(item inboxItem) bool {
 	mark, ok := m.inbox.FindUnseen(conversationKey(item.agent))
 	if !ok || conversationKey(item.agent) == "" || item.owner.ID == "" || m.state == nil {
@@ -103,7 +98,6 @@ func (m *Model) selectedTaskLive() task.Live {
 	return item.live
 }
 
-// pickerActionError reports why a picker action does not apply to the selected row.
 func (m *Model) pickerActionError(id action.ID) error {
 	item, ok := m.selectedInboxItem()
 	if !ok {
@@ -155,7 +149,6 @@ func rowProject(item inboxItem) string {
 	return item.agent.ProjectRoot
 }
 
-// inboxStateError reports why the inbox cannot remember something about a row.
 func (m *Model) inboxStateError(item inboxItem) error {
 	switch {
 	case conversationKey(item.agent) == "":
@@ -236,7 +229,6 @@ func (m *Model) pullRequestError(item inboxItem) error {
 	}
 }
 
-// runPickerAction applies a picker action to the selected row.
 func (m *Model) runPickerAction(request pendingAction) func() (tea.Model, tea.Cmd) {
 	id := request.entry.Describe().ID
 
@@ -275,7 +267,6 @@ func (m *Model) runPickerAction(request pendingAction) func() (tea.Model, tea.Cm
 	return func() (tea.Model, tea.Cmd) { return m, nil }
 }
 
-// markSeen marks a live agent's latest result seen or not seen in the inbox state.
 func (m *Model) markSeen(id action.ID, item inboxItem, key string) func() (tea.Model, tea.Cmd) {
 	if id == action.InboxSeen.ID {
 		if item.owner.ID != "" {
@@ -290,7 +281,6 @@ func (m *Model) markSeen(id action.ID, item inboxItem, key string) func() (tea.M
 	return m.updateInbox(func(state *inbox.State) error { state.MarkUnseen(key, time.Now()); return nil })
 }
 
-// snoozeItem snoozes a conversation until the given choice, or offers the configured choices.
 func (m *Model) snoozeItem(key, until string) func() (tea.Model, tea.Cmd) {
 	if until == "" {
 		entries := make([]menuEntry, 0, len(m.config.Inbox.Snooze)+1)
@@ -330,7 +320,6 @@ func (m *Model) snoozeItem(key, until string) func() (tea.Model, tea.Cmd) {
 	})
 }
 
-// updateInbox changes the stored inbox state and shows the result.
 func (m *Model) updateInbox(change func(*inbox.State) error) func() (tea.Model, tea.Cmd) {
 	store := m.deps.Inbox
 	ctx := m.operationContext()
@@ -365,8 +354,6 @@ func (m *Model) handleInboxUpdated(msg inboxUpdatedMsg) {
 	m.restoreSelectedSession(selected)
 }
 
-// openPullRequest opens the row's pull request in the browser through gh: a closed conversation's
-// latest linked one, a task's recorded one, else its branch's.
 func (m *Model) openPullRequest(item inboxItem) func() (tea.Model, tea.Cmd) {
 	target := item.agent.GitBranch
 	if linked := item.work.Linked(); item.closed && len(linked) > 0 {
@@ -380,8 +367,6 @@ func (m *Model) openPullRequest(item inboxItem) func() (tea.Model, tea.Cmd) {
 	return m.runOpener(item.agent.CWD, "gh", "pr", "view", target, "--web")
 }
 
-// runOpener starts a program that opens something outside the picker, such as a browser or an
-// image viewer, without waiting for it to close.
 func (m *Model) runOpener(directory string, program string, args ...string) func() (tea.Model, tea.Cmd) {
 	ctx := m.operationContext()
 
@@ -420,7 +405,6 @@ func (m *Model) handleOpened(msg openedMsg) {
 	}
 }
 
-// inboxDoneByMark reports whether a row the user marked unseen belongs to done.
 func (m *Model) inboxDoneByMark(item inboxItem) bool {
 	status := item.agent.Status.DisplayStatus()
 

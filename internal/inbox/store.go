@@ -77,18 +77,15 @@ func (s *State) Find(key string) (Snooze, bool) {
 	return Snooze{Key: "", Until: 0, Since: 0}, false
 }
 
-// Put stores snooze, replacing an earlier snooze of the same key.
 func (s *State) Put(snooze Snooze) {
 	s.Remove(snooze.Key)
 	s.Snoozes = append(s.Snoozes, snooze)
 }
 
-// Remove ends the snooze of key.
 func (s *State) Remove(key string) {
 	s.Snoozes = slices.DeleteFunc(s.Snoozes, func(snooze Snooze) bool { return snooze.Key == key })
 }
 
-// FindUnseen returns the unseen mark of key.
 func (s *State) FindUnseen(key string) (Unseen, bool) {
 	for _, mark := range s.Unseen {
 		if mark.Key == key {
@@ -99,18 +96,15 @@ func (s *State) FindUnseen(key string) (Unseen, bool) {
 	return Unseen{Key: "", At: 0}, false
 }
 
-// MarkUnseen marks the latest result of key as not seen since at.
 func (s *State) MarkUnseen(key string, at time.Time) {
 	s.ClearUnseen(key)
 	s.Unseen = append(s.Unseen, Unseen{Key: key, At: at.UnixNano()})
 }
 
-// ClearUnseen removes the unseen mark of key.
 func (s *State) ClearUnseen(key string) {
 	s.Unseen = slices.DeleteFunc(s.Unseen, func(mark Unseen) bool { return mark.Key == key })
 }
 
-// Expire drops snoozes whose time has passed.
 func (s *State) Expire(now time.Time) {
 	s.Snoozes = slices.DeleteFunc(s.Snoozes, func(snooze Snooze) bool { return snooze.Until != 0 && snooze.Until <= now.Unix() })
 }

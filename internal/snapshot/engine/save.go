@@ -21,7 +21,6 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
-// failRecordTimeout bounds recording a failed attempt once the save's own deadline has passed.
 const failRecordTimeout = 2 * time.Second
 
 var (
@@ -121,8 +120,6 @@ func saveWithProfile(ctx context.Context, repository *store.Repository, leaseRoo
 	result.Generation = generation.ID
 
 	if err != nil {
-		// An uncertain publication may have committed the generation, so only a commit known to
-		// have published nothing is recorded as failed.
 		var failErr error
 		if !errors.Is(err, store.ErrUncertain) {
 			failErr = recordFailedAttempt(ctx, repository, attempt.ID)
@@ -220,8 +217,6 @@ func logSaveSuccess(ctx context.Context, observation capture.Observation, carrie
 		Msg("snapshot observation saved")
 }
 
-// recordFailedAttempt durably marks an attempt that published nothing as failed. It outlives the
-// save's own cancellation, so a save cut short by shutdown does not stay pending.
 func recordFailedAttempt(ctx context.Context, repository *store.Repository, id string) error {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), failRecordTimeout)
 	defer cancel()
@@ -276,8 +271,6 @@ func saveFailure(ctx context.Context, phase string, started time.Time, err error
 		Wrapf(err, "save snapshot observation")}
 }
 
-// processFailureCode returns the process layer's fixed error code when a process observation
-// failed, and the empty string otherwise.
 func processFailureCode(err error) string {
 	diagnostic, ok := oops.AsOops(err)
 	if !ok || diagnostic.Domain() != process.Domain {

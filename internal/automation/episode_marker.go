@@ -53,7 +53,6 @@ func EpisodeUnreported(path string, stamp int64) (bool, error) {
 	return marker.ReportedFor != stamp, nil
 }
 
-// RecordEpisodeReported marks the episode identified by stamp as reported.
 func RecordEpisodeReported(path string, stamp int64) (returnErr error) {
 	data, err := json.Marshal(episodeMarker{ReportedFor: stamp})
 	if err != nil {

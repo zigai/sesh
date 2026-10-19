@@ -199,8 +199,6 @@ func (command *attachExec) Run() error {
 	return errors.Join(runErr, unmarkErr, closeErr)
 }
 
-// markAttachmentPane tags the local tmux pane the attachment runs in, when it runs in one, until
-// the returned function clears the tag, so sesh keys pressed there go on to the remote tmux.
 func markAttachmentPane(ctx context.Context, socket string) (func() error, error) {
 	paneID := os.Getenv("TMUX_PANE")
 	if paneID == "" || os.Getenv("TMUX") == "" {
@@ -395,7 +393,6 @@ func (adapter *originPickerAdapter) LoadOriginSessions(ctx context.Context) (str
 	return catalog.OriginLabel, rows, nil
 }
 
-// Accepts lets the picker on a peer switch the origin client that attached to it.
 func (adapter *originPickerAdapter) Accepts(at action.Location, id action.ID) bool {
 	return at.Kind == action.LocationOrigin && id == action.SessionSwitch.ID
 }

@@ -484,8 +484,6 @@ func (m *Model) SetInitialSessions(sessions []session.Session) {
 	m.popupStartup = popupStartupContent
 }
 
-// SetLaunchedAt records when the process that opened this popup started, so the first-frame
-// record can report the latency the user saw.
 func (m *Model) SetLaunchedAt(launchedAt time.Time) {
 	if m != nil {
 		m.launchedAt = launchedAt
@@ -516,12 +514,10 @@ func (m *Model) DeferredAttachSession() string {
 	return ""
 }
 
-// ReplayKey returns the tmux key to replay on the invoking client after the picker closes.
 func (m *Model) ReplayKey() string {
 	return m.replayKey
 }
 
-// TaskProject returns the project whose new task menu to open after the picker closes.
 func (m *Model) TaskProject() string {
 	return m.taskProject
 }

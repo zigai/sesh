@@ -89,7 +89,6 @@ func Dir(cacheHome string) (string, error) {
 	return path, nil
 }
 
-// ReadCatalog reads the catalog the remote monitor keeps under cacheHome.
 func ReadCatalog(cacheHome string) (Catalog, error) {
 	path, err := Dir(cacheHome)
 	if err != nil {

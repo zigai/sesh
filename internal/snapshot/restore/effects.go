@@ -63,10 +63,6 @@ func (e *uncertainError) Unwrap() error {
 	return errors.Join(ErrExecutionUncertain, e.err)
 }
 
-// classifyMutation reports the effect knowledge carried by a failed gotmux mutation.
-// It traverses all branches of joined errors. Uncertainty is strictly preserved:
-// if any branch is Unknown or unrecognized, the overall outcome stays Unknown.
-// Exit status and stderr diagnostics are never used to downgrade library Unknown.
 func classifyMutation(err error) mutationOutcome {
 	if err == nil {
 		return mutationOutcome{Effect: gotmux.EffectConfirmed, RuntimeID: ""}

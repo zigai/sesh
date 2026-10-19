@@ -94,7 +94,6 @@ type WorkingDirectoryService interface {
 	GetWorkingDirectory() (string, error)
 }
 
-// InboxStore keeps what the inbox remembers between pickers: the rows the user snoozed.
 type InboxStore interface {
 	LoadInbox(ctx context.Context) (inbox.State, error)
 	UpdateInbox(ctx context.Context, change func(*inbox.State) error) (inbox.State, error)
@@ -111,7 +110,6 @@ type AgentViewDeferrer interface {
 	DeferAgentViews(views []AgentView) bool
 }
 
-// AgentView records that the agent pane of a session was on screen.
 type AgentView struct {
 	Session session.Identity
 	PaneID  string

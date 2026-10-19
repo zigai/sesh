@@ -120,9 +120,6 @@ func (local *Local) saveSelection(ctx context.Context, refs []action.SessionRef)
 	return selected, nil
 }
 
-// saveEnvironment selects the environment keys captured for foreground processes: the
-// explicit list, else the configured one. Without enrichment nothing is captured unless a
-// list was given explicitly.
 func (local *Local) saveEnvironment(input action.SaveSnapshot) ([]string, error) {
 	keys := local.cfg.Snapshot.ProcessEnvironment
 	if input.EnvironmentSet {
@@ -193,8 +190,6 @@ func (local *Local) restoreSnapshot(ctx context.Context, _ action.Caller, input 
 	}
 }
 
-// restoreGeneration is the generation a restore uses: the requested one, else the current
-// practical generation.
 func restoreGeneration(ctx context.Context, repo *store.Repository, requested string) (string, error) {
 	if requested != "" {
 		return requested, nil
@@ -208,8 +203,6 @@ func restoreGeneration(ctx context.Context, repo *store.Repository, requested st
 	return current.ID, nil
 }
 
-// readManifest reads the restored generation to name its sessions and panes. The names only
-// make the result readable, so an unreadable manifest leaves them out.
 func readManifest(ctx context.Context, repo *store.Repository, generation string) *model.Manifest {
 	manifest, err := repo.Read(ctx, generation)
 	if err != nil {
@@ -219,8 +212,6 @@ func readManifest(ctx context.Context, repo *store.Repository, generation string
 	return &manifest
 }
 
-// restoredRefs refers to the live sessions a restore created. A session that cannot be listed
-// again, for example because it was killed right after, keeps only its tmux ID.
 func (local *Local) restoredRefs(ctx context.Context, ids []string) []action.SessionRef {
 	refs := make([]action.SessionRef, 0, len(ids))
 	if len(ids) == 0 {
@@ -293,7 +284,6 @@ func restoredSnapshot(result engine.RestoreResult, manifest *model.Manifest) act
 	return output
 }
 
-// paneLabels gives each pane of a generation its session:window.pane location and program name.
 func paneLabels(manifest *model.Manifest) map[string]paneLabel {
 	labels := map[string]paneLabel{}
 	if manifest == nil {

@@ -146,7 +146,6 @@ func ValidateTasksConfig(tasks TasksConfig) error {
 	return nil
 }
 
-// ValidHarnessName reports whether name can label a harness in menus, commands and task records.
 func ValidHarnessName(name string) bool {
 	if name == "" {
 		return false
@@ -161,7 +160,6 @@ func ValidHarnessName(name string) bool {
 	return true
 }
 
-// SupportedHarness reports whether name is a harness AHT supports.
 func SupportedHarness(name string) bool {
 	return slices.ContainsFunc(harness.Supported(), func(id registry.Harness) bool { return string(id) == name })
 }

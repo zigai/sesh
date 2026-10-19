@@ -26,8 +26,6 @@ type LaunchOverrides interface {
 	Commit(ctx context.Context, panes []string) error
 }
 
-// launchOverride holds the digest of new launches for the operation's durable intent. It is
-// empty when nothing changed.
 type launchOverride struct {
 	digest string
 }

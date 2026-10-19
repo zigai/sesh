@@ -4,8 +4,6 @@ import (
 	"strings"
 )
 
-// footerBadge is a badge in the footer and what clicking it does; the mode badge has its own
-// click handling.
 type footerBadge struct {
 	text  string
 	click func()
@@ -53,7 +51,6 @@ func (m *Model) renderAgentSortBadge() string {
 	return out.String()
 }
 
-// showsFooterBadges reports whether the footer shows any badge on its right.
 func (m *Model) showsFooterBadges() bool {
 	return m.showsDisplayModeIndicator() || m.showsAgentSortIndicator() || m.displayMode == displayModeInbox || m.hasStatusBadge()
 }
@@ -91,7 +88,6 @@ func (m *Model) renderFooterBadges() string {
 	return strings.Join(texts, strings.Repeat(" ", footerPartSpacing))
 }
 
-// footerBadges are the footer badges shown, left to right.
 func (m *Model) footerBadges() []footerBadge {
 	var badges []footerBadge
 	if m.hasStatusBadge() {

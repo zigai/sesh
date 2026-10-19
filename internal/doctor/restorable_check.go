@@ -10,8 +10,6 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
-// withRestorableSessions adds the sessions waiting in the newest snapshot to a result that says
-// no server runs, so a server that died is not mistaken for sessions that never were.
 func (s *Service) withRestorableSessions(ctx context.Context, result Result) Result {
 	repo, err := store.OpenExisting(ctx, s.opts.SnapshotDir)
 	if err != nil {

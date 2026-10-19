@@ -1,7 +1,3 @@
-// Package taskpicker is the small popup that starts a task: what it is about, which agent runs it
-// and where. Left and right always pick the agent. In a repository the task works in a new
-// worktree, the pane's checkout, or an existing branch or checkout from the list the popup expands
-// to; elsewhere it works in the pane's directory.
 package taskpicker
 
 import (
@@ -74,8 +70,6 @@ type Options struct {
 	Problem    string
 }
 
-// Machine is a machine a task can start on. One whose sesh cannot start tasks for others is
-// listed but cannot be chosen.
 type Machine struct {
 	Name   string
 	Usable bool
@@ -98,17 +92,12 @@ type Choice struct {
 
 type field int
 
-// where is where the task works: a new worktree, the checkout the pane is in, or an existing
-// branch or checkout picked from the expanded list.
 type where int
 
 type stage int
 
-// section is a group of list rows, listed in this order under a heading.
 type section int
 
-// row is one entry of the expanded list. A filterOnly row is listed only while filtering, so the
-// list stays short.
 type row struct {
 	section    section
 	location   task.Location
@@ -174,7 +163,6 @@ func NewModel(cfg *config.Config, opts Options) *Model {
 	return m
 }
 
-// Chosen returns the pick, or false when the picker was closed without one.
 func (m *Model) Chosen() (Choice, bool) {
 	return m.chosen, m.done
 }
@@ -263,8 +251,6 @@ func (m *Model) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// moveVertically moves the list's selection, or picks the place to work above or below the chosen
-// one, wrapping around. Typing still goes to the title or the filter.
 func (m *Model) moveVertically(key string) {
 	delta := 1
 	if key == "up" {
@@ -279,7 +265,6 @@ func (m *Model) moveVertically(key string) {
 	}
 }
 
-// updateFilter edits the list's filter.
 func (m *Model) updateFilter(msg tea.Msg) tea.Cmd {
 	before := m.filter.Value()
 	filter, cmd := m.filter.Update(msg)
@@ -292,7 +277,6 @@ func (m *Model) updateFilter(msg tea.Msg) tea.Cmd {
 	return cmd
 }
 
-// escape clears the list's filter, then closes the list, then the popup.
 func (m *Model) escape() (tea.Model, tea.Cmd) {
 	switch {
 	case m.focus == fieldList && m.filter.Value() != "":
@@ -307,7 +291,6 @@ func (m *Model) escape() (tea.Model, tea.Cmd) {
 	}
 }
 
-// enter opens the list when other is chosen, and otherwise starts the task.
 func (m *Model) enter() (tea.Model, tea.Cmd) {
 	if m.where == whereOther && !m.options.Expanded {
 		return m.reopen(true)
@@ -328,7 +311,6 @@ func (m *Model) updateFailedKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// otherField is the field tab moves to: between the title and the expanded list's filter.
 func (m *Model) otherField() field {
 	if m.focus == fieldTitle && m.options.Expanded {
 		return fieldList
@@ -352,7 +334,6 @@ func (m *Model) focusField(next field) tea.Cmd {
 	return nil
 }
 
-// cycleAgent picks the agent left or right of the chosen one, wrapping around.
 func (m *Model) cycleAgent(key string) {
 	delta := 1
 	if key == "left" {
@@ -368,8 +349,6 @@ func (m *Model) cycleAgent(key string) {
 	m.agent = agents[(index+delta+len(agents))%len(agents)]
 }
 
-// cycleMachine asks for the popup again on the usable machine left or right of the chosen one,
-// wrapping around.
 func (m *Model) cycleMachine(key string) (tea.Model, tea.Cmd) {
 	delta := 1
 	if key == "shift+left" {
@@ -391,7 +370,6 @@ func (m *Model) cycleMachine(key string) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// reopenOn asks for the popup again on another machine, keeping the title and agent.
 func (m *Model) reopenOn(machine int) (tea.Model, tea.Cmd) {
 	if machine == m.options.Machine || !m.options.Machines[machine].Usable {
 		return m, nil
@@ -407,7 +385,6 @@ func (m *Model) showsMachines() bool {
 	return len(m.options.Machines) > 1
 }
 
-// reopen asks for the popup again with the list open or closed, keeping the title and agent.
 func (m *Model) reopen(expanded bool) (tea.Model, tea.Cmd) {
 	m.chosen = emptyChoice()
 	m.chosen.Reopen = true
@@ -426,7 +403,6 @@ func (m *Model) hasWhere() bool {
 	return m.options.Project != "" && len(m.options.Locations) > 0 && m.options.Locations[0].Where == task.WhereNew
 }
 
-// current is the checkout the pane is in.
 func (m *Model) current() (task.Location, bool) {
 	if index := m.options.Current; index >= 0 && index < len(m.options.Locations) {
 		return m.options.Locations[index], true
@@ -435,8 +411,6 @@ func (m *Model) current() (task.Location, bool) {
 	return emptyLocation(), false
 }
 
-// location is where the task starts: the new worktree, the pane's checkout, the selected row of
-// the list, and outside a project the pane's directory, which needs no location.
 func (m *Model) location() (task.Location, bool) {
 	switch {
 	case m.options.Project == "":
@@ -456,7 +430,6 @@ func (m *Model) location() (task.Location, bool) {
 	}
 }
 
-// choose goes to the task already working in the chosen checkout, or starts the choice.
 func (m *Model) choose() (tea.Model, tea.Cmd) {
 	location, ok := m.location()
 	if !ok || m.options.Problem != "" {
@@ -516,7 +489,6 @@ func (m *Model) finishStart(msg startedMsg) (tea.Model, tea.Cmd) {
 	return m, tea.Quit
 }
 
-// agents are the agent choices: the agents, then a plain tab outside a project.
 func (m *Model) agents() []string {
 	if m.options.Project == "" {
 		return append(slices.Clone(m.options.Harnesses), config.HarnessTab)
@@ -525,8 +497,6 @@ func (m *Model) agents() []string {
 	return slices.Clone(m.options.Harnesses)
 }
 
-// filterRows lists the rows whose label contains the filter first, then the other fuzzy
-// matches, so a typed name is not outranked by a scattered match.
 func (m *Model) filterRows() {
 	query := strings.TrimSpace(m.filter.Value())
 	m.rows = m.rows[:0]
@@ -572,8 +542,6 @@ func (m *Model) move(delta int) {
 	m.keepCursorVisible()
 }
 
-// step moves the list's selection by one row from the keyboard, wrapping from the last row to the
-// first and back.
 func (m *Model) step(delta int) {
 	if len(m.rows) == 0 {
 		return
@@ -583,8 +551,6 @@ func (m *Model) step(delta int) {
 	m.keepCursorVisible()
 }
 
-// keepAgent keeps the chosen agent when it is offered, and otherwise picks the first agent, or
-// none when no agent is offered.
 func (m *Model) keepAgent() {
 	agents := m.agents()
 
@@ -596,8 +562,6 @@ func (m *Model) keepAgent() {
 	}
 }
 
-// keepCursorVisible scrolls the list so the selected row shows, with its section heading when it
-// is the section's first row.
 func (m *Model) keepCursorVisible() {
 	rows := m.layout().listRows
 	lines := m.lines()
@@ -636,7 +600,6 @@ func (m *Model) wheel(mouse tea.Mouse) {
 	}
 }
 
-// click selects the choice or list row under the pointer.
 func (m *Model) click(mouse tea.Mouse) (tea.Model, tea.Cmd) {
 	if mouse.Button != tea.MouseLeft || m.stage != stagePicking {
 		return m, nil
@@ -663,8 +626,6 @@ func (m *Model) click(mouse tea.Mouse) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// clickedChoice returns the index of the choice at line and column of rows of choices that start
-// on line top.
 func clickedChoice(rows [][]placed, top, line, column int) (int, bool) {
 	if line < top || line >= top+len(rows) {
 		return 0, false
@@ -673,7 +634,6 @@ func clickedChoice(rows [][]placed, top, line, column int) (int, bool) {
 	return choiceAt(rows[line-top], column)
 }
 
-// clickList selects the list row on the given line of the list.
 func (m *Model) clickList(line int) {
 	lines := m.lines()
 	if index := m.listTop + line; index < len(lines) && lines[index].row >= 0 {
@@ -681,7 +641,6 @@ func (m *Model) clickList(line int) {
 	}
 }
 
-// choiceAt returns the index of the choice that covers column.
 func choiceAt(choices []placed, column int) (int, bool) {
 	for _, choice := range choices {
 		if column >= choice.start && column < choice.end {

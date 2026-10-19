@@ -165,7 +165,6 @@ func initialIdle(session aht.Session) bool {
 		native != nil && sessionStartEvent(native.Event) && native.Activity != nil && *native.Activity == aht.ActivityIdle
 }
 
-// sessionStartEvent matches the session start event names that the supported harnesses emit.
 func sessionStartEvent(event string) bool {
 	return event == "SessionStart" || event == "session_start"
 }

@@ -57,8 +57,6 @@ func writeUnit(tb testing.TB, path, content string) {
 	}
 }
 
-// unitsService checks units across a user directory and a lower-precedence data directory,
-// rejecting every sesh command line that runs "old".
 func unitsService(tb testing.TB) (*Service, string, string) {
 	tb.Helper()
 

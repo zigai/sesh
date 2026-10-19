@@ -88,7 +88,6 @@ func commitTestSnapshot(t *testing.T, r *store.Repository, sessionName, dir stri
 	return commitTestManifest(t, r, testSnapshotManifest(sessionName, dir, linkCount))
 }
 
-// commitTestObservation commits the observation-only result every real capture produces.
 func commitTestObservation(t *testing.T, r *store.Repository, sessionName, dir string) store.Generation {
 	t.Helper()
 

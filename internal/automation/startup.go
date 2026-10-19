@@ -29,7 +29,6 @@ var (
 	ErrActiveRestores = errors.New("restore still in progress or interrupted")
 )
 
-// ActiveRestoresError names the active restores behind ErrActiveRestores and how to clear them.
 type ActiveRestoresError struct {
 	Operations []string
 }

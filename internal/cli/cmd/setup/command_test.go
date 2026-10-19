@@ -140,8 +140,6 @@ func TestSetupTmuxApplyTargetsAmbientServerWithoutSocket(t *testing.T) {
 	}
 }
 
-// rootBinding is the start of a rendered root-table binding: a key pressed in a remote attachment
-// goes on to the remote tmux, otherwise the command runs.
 func rootBinding(key, command string) string {
 	return `bind-key -T root ` + key + ` if-shell -F "#{@sesh_remote}" "send-keys ` + key + `" "run-shell -b \"` + command
 }

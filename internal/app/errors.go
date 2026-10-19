@@ -92,7 +92,6 @@ type classification struct {
 	code  action.Code
 }
 
-// classify assigns an action code to a failure from the services behind an action.
 func classify(err error) action.Code {
 	if classified, ok := errors.AsType[*action.Error](err); ok {
 		return classified.Code

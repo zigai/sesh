@@ -358,8 +358,6 @@ func assertLocalOption(t *testing.T, ctx context.Context, scope optionReader, na
 	}
 }
 
-// recordingOverrides replaces every pane's launch with a script that leaves a marker, and records
-// which panes each commit received and whether any marker existed at that point.
 type recordingOverrides struct {
 	script    string
 	marker    string

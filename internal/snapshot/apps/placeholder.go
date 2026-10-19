@@ -36,7 +36,6 @@ func PlaceholderLaunch(executable, task string, agent model.Launch) model.Launch
 	}
 }
 
-// LaunchHarness returns the agent harness a launch runs.
 func LaunchHarness(launch model.Launch) (string, bool) {
 	harnessID, ok := observedAgentHarness(launch)
 

@@ -18,7 +18,6 @@ import (
 
 var errTestDispatch = errors.New("dispatch failed")
 
-// fakeDispatcher stands in for the peer's own action runner.
 type fakeDispatcher struct {
 	mu       sync.Mutex
 	calls    []action.Invocation

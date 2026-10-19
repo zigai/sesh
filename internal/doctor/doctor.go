@@ -81,7 +81,6 @@ const (
 	flagHistory    = "--history"
 )
 
-// Statuses lists every status in the order the summary reports them.
 var Statuses = []Status{StatusOK, StatusInfo, StatusWarn, StatusFail, StatusSkip}
 
 var groups = map[string]string{
@@ -199,12 +198,10 @@ type Service struct {
 	repoStatus   Status
 }
 
-// FieldCheck returns the id of the check for the custom display field name.
 func FieldCheck(name string) string {
 	return "fields." + name
 }
 
-// Name is the check id without its group, as shown under the group heading.
 func (r Result) Name() string {
 	_, name, _ := strings.Cut(r.ID, ".")
 
@@ -347,8 +344,6 @@ func skipped(id, needs, message string) Result {
 	return result
 }
 
-// seshCommand renders a sesh command line that repeats the configuration flags and the given
-// location flags the doctor ran with.
 func (s *Service) seshCommand(command string, flags []string, args ...string) string {
 	parts := []string{programName, command}
 

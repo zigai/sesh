@@ -25,8 +25,6 @@ const mergeRunVerb = "merge-run"
 
 var ErrPaneMissing = errors.New("the agent's pane is gone")
 
-// TaskMergeRun is the result of merging a task in its popup window. Finished reports that the
-// task was finished after the merge.
 type TaskMergeRun struct {
 	Ran      bool
 	ExitCode int
@@ -34,8 +32,6 @@ type TaskMergeRun struct {
 	Finished bool
 }
 
-// mergeTask opens a window in the task's popup session that merges the task through the hidden
-// merge-run command, and selects it so the popup shows the progress.
 func (local *Local) mergeTask(ctx context.Context, _ action.Caller, input action.MergeTask) (action.StartedTaskMerge, error) {
 	result := action.StartedTaskMerge{ID: input.Task}
 
@@ -143,8 +139,6 @@ func (local *Local) finishInOwnSession(ctx context.Context, id string) error {
 	return nil
 }
 
-// mergeAgentBranch merges the branch checked out in an agent's directory into origin's default
-// branch. Nothing is removed afterwards: sesh owns no part of an agent outside a task.
 func (local *Local) mergeAgentBranch(ctx context.Context, _ action.Caller, input action.MergeAgentBranch) (action.MergedAgentBranch, error) {
 	result := action.MergedAgentBranch{Branch: "", Base: ""}
 
@@ -171,8 +165,6 @@ func (local *Local) mergeAgentBranch(ctx context.Context, _ action.Caller, input
 	return result, nil
 }
 
-// openTaskRunWindow opens a window named name in the task's popup session that runs this sesh
-// with args and the configuration this process loaded.
 func (local *Local) openTaskRunWindow(ctx context.Context, record task.Record, name string, args []string) error {
 	popup, err := local.openPopupServer()
 	if err != nil {
@@ -201,8 +193,6 @@ func (local *Local) openTaskRunWindow(ctx context.Context, record task.Record, n
 	return nil
 }
 
-// seshCommand is the command line that runs this sesh with args against this server and the
-// configuration this process loaded. Configuration read from stdin is read from stdin again.
 func (local *Local) seshCommand(args []string) ([]string, error) {
 	executable, err := seshExecutable()
 	if err != nil {

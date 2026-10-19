@@ -209,7 +209,6 @@ func runFailedDoctorApplication(t *testing.T, jsonOutput bool) failedDoctorFixtu
 
 const privateHistoryContent = "private-history-content-canary"
 
-// newFailedDoctorArgs runs the doctor against a corrupt history file.
 func newFailedDoctorArgs(t *testing.T, jsonOutput bool) []string {
 	t.Helper()
 
@@ -262,8 +261,6 @@ func assertFailedDoctorEnvelope(t *testing.T, output []byte) {
 	}
 }
 
-// assertDoctorLeftNoTrace checks that the report did not echo file contents and that the run did
-// not open the configured log file.
 func assertDoctorLeftNoTrace(t *testing.T, fixture failedDoctorFixture) {
 	t.Helper()
 

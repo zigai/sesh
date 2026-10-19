@@ -1049,8 +1049,6 @@ func startTopAndShellSession(t *testing.T, ctx context.Context, source *gotmux.S
 	return session
 }
 
-// commitWithRemovedDirectory commits a copy of a saved generation whose first pane works in a
-// directory that no longer exists.
 func commitWithRemovedDirectory(t *testing.T, ctx context.Context, repo *store.Repository, saved, removed string) (string, model.Manifest) {
 	t.Helper()
 

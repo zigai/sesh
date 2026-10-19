@@ -789,8 +789,6 @@ func TestCaptureKeepsAPaneNonrestartableWhenItsExecutablePathHoldsNoExecutable(t
 	assertDeletedExecutablePane(t, observation)
 }
 
-// observeShellAfterReplacingItsExecutable runs a shell from a private copy, renames a new file with
-// the given mode over that copy, as a package upgrade does, and captures the pane.
 func observeShellAfterReplacingItsExecutable(t *testing.T, replacementMode os.FileMode) Observation {
 	t.Helper()
 
@@ -872,9 +870,6 @@ func TestCaptureKeepsAnAgentNonrestartableWhenNoVersionIsInstalled(t *testing.T)
 	}
 }
 
-// captureAgentAfterUpdate runs an agent through a "codex" symlink to a versioned binary, removes
-// that version as a self-update does, optionally points the symlink at a newer version, and
-// captures the pane with the agent's resume evidence.
 func captureAgentAfterUpdate(t *testing.T, installNewer bool) (model.Launch, string) {
 	t.Helper()
 

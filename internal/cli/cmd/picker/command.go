@@ -138,8 +138,6 @@ func InvokingPickerClient(ctx context.Context, server *gotmux.Server) (gotmux.Cl
 	return invokingPickerClient(ctx, server)
 }
 
-// NewPickCommand returns the interactive session picker. The popup layout also serves as the
-// child that picker-open runs inside a tmux popup, so the handoff flags stay hidden.
 func NewPickCommand(ctx context.Context, remote ...RemoteFactory) *cobra.Command {
 	remoteFactory := firstPickerRemoteFactory(remote)
 	cmd := &cobra.Command{
@@ -253,8 +251,6 @@ func runPickCommand(ctx context.Context, cmd *cobra.Command, remoteFactory Remot
 	return runPickerInteractive(ctx, cmd, presentation, runtime, remoteFactory)
 }
 
-// resolvePickerPresentation maps the --ui choice to a layout. auto uses the popup layout inside
-// a tmux popup, inline elsewhere inside tmux, and fullscreen outside tmux.
 func resolvePickerPresentation(choice string, getenv func(string) string) (presentation, error) {
 	switch strings.ToLower(strings.TrimSpace(choice)) {
 	case "", uiAuto:
@@ -314,8 +310,6 @@ func runPickerInteractive(
 	return finishPickerInteractive(ctx, cmd, finalModel, services, runErr)
 }
 
-// launchedAt returns when the invoking picker-open started, ignoring a value that
-// cannot be a recent launch on this machine.
 func launchedAt(cmd *cobra.Command, now time.Time) (time.Time, bool) {
 	if cmd.Flags().Lookup(launchedAtFlag) == nil {
 		return time.Time{}, false

@@ -55,9 +55,6 @@ type inboxHost struct {
 	work     []work.Item
 }
 
-// inboxItem is one row of the inbox: an agent, a task whose agent is not running, or a recorded
-// conversation whose agent closed, open or finished, with the live session that owns its pane,
-// the machine it runs on, its recorded conversation, if any, and the section it is listed in.
 type inboxItem struct {
 	agent  session.AgentSession
 	owner  session.Session
@@ -98,8 +95,6 @@ func (m *Model) inboxSessions() []session.Session {
 	return append(rows, m.inboxOfflineRows()...)
 }
 
-// inboxOfflineRows are one heading for each configured remote host the picker cannot reach, or
-// that runs a sesh that speaks another protocol.
 func (m *Model) inboxOfflineRows() []session.Session {
 	if !remoteSessionsEnabled(m.config, m.deps) {
 		return nil
@@ -189,7 +184,6 @@ func inboxGroupRow(id, name string, agents []session.AgentSession) session.Sessi
 	return row
 }
 
-// inboxProject is the project an inbox row belongs to: its task's project, else the agent's.
 func inboxProject(item inboxItem) string {
 	switch {
 	case item.task && item.live.Record.Kind == task.KindProject:
@@ -201,8 +195,6 @@ func inboxProject(item inboxItem) string {
 	}
 }
 
-// compareInboxItems orders rows by the configured section order, then pinned rows first, then
-// the most recent change first.
 func (m *Model) compareInboxItems(left, right inboxItem) int {
 	sections := m.config.Inbox.Sections
 	if order := cmp.Compare(slices.Index(sections, left.section), slices.Index(sections, right.section)); order != 0 {
@@ -212,12 +204,10 @@ func (m *Model) compareInboxItems(left, right inboxItem) int {
 	return compareRecency(left, right)
 }
 
-// inboxKey identifies an inbox row: pane IDs are only unique within one host.
 func inboxKey(host, paneID string) string {
 	return host + "\x00" + paneID
 }
 
-// inboxHosts lists this machine and the connected remote hosts.
 func (m *Model) inboxHosts() []inboxHost {
 	local := session.RuntimeIdentity{
 		ConnectionID: "", ConnectionLabel: "", ConfigDigest: "", PeerID: "", StreamInstance: "", TmuxServerSocket: "",
@@ -255,8 +245,6 @@ func (m *Model) inboxHosts() []inboxHost {
 	return hosts
 }
 
-// hostInboxItems lists every agent of a host, the tasks of the host whose agent is not running,
-// and its recorded conversations whose agent closed.
 func (m *Model) hostInboxItems(host inboxHost) []inboxItem {
 	agents := m.hostAgentsByPane(host)
 	items := append(m.hostAgentItems(host, agents), m.hostTaskItems(host, agents)...)
@@ -264,7 +252,6 @@ func (m *Model) hostInboxItems(host inboxHost) []inboxItem {
 	return append(items, m.hostClosedItems(host)...)
 }
 
-// hostAgentItems lists the agents of a host. An agent in a task's agent pane is that task's row.
 func (m *Model) hostAgentItems(host inboxHost, agents map[string]session.AgentSession) []inboxItem {
 	tasks := make(map[string]task.Live, len(host.tasks))
 
@@ -298,9 +285,6 @@ func (m *Model) hostAgentItems(host inboxHost, agents map[string]session.AgentSe
 	return items
 }
 
-// hostTaskItems lists the tasks of a host whose agent is not running. A task with no window is
-// listed only while it failed, has work to merge, is asleep, or waits to be finished after its
-// pull request ended.
 func (m *Model) hostTaskItems(host inboxHost, agents map[string]session.AgentSession) []inboxItem {
 	owners := m.hostSessionsByID(host)
 
@@ -347,9 +331,6 @@ func (m *Model) newInboxItem(host inboxHost, owner session.Session, agent sessio
 	return item
 }
 
-// inboxSection places a row: a sleeping task is asleep; otherwise the agent's state decides, and
-// an idle agent the user has seen is unmerged while its branch has work not on the default branch
-// or an open pull request.
 func (m *Model) inboxSection(item inboxItem) string {
 	record := item.live.Record
 
@@ -375,7 +356,6 @@ func (m *Model) inboxSection(item inboxItem) string {
 	return config.InboxIdle
 }
 
-// statusSection is the section an agent's status and its reason alone decide, if any.
 func statusSection(agent session.AgentSession) (string, bool) {
 	switch agent.Status.DisplayStatus() {
 	case session.AgentStatusWaiting:
@@ -404,8 +384,6 @@ func statusSection(agent session.AgentSession) (string, bool) {
 	return "", false
 }
 
-// unmergedItem reports whether a row has work to merge: commits its checkout has that the default
-// branch lacks, or an open pull request.
 func (m *Model) unmergedItem(item inboxItem) bool {
 	if item.agent.GitUnmerged > 0 || (item.task && item.live.Record.PR.State == task.PROpen) {
 		return true
@@ -443,9 +421,6 @@ func (m *Model) inboxPR(item inboxItem) string {
 	return "#" + strconv.Itoa(pr.Number) + " " + string(pr.State)
 }
 
-// taskAgent is the agent row of a task, named after the task: the agent AHT reports in its agent
-// pane, else a row describing the task itself, for a task whose agent is asleep, exited or never
-// started.
 func taskAgent(live task.Live, agents map[string]session.AgentSession) session.AgentSession {
 	record := live.Record
 
@@ -473,7 +448,6 @@ func taskAgent(live task.Live, agents map[string]session.AgentSession) session.A
 	return agent
 }
 
-// agentlessTaskRow describes a task with no agent running in its agent pane.
 func agentlessTaskRow(live task.Live) session.AgentSession {
 	record := live.Record
 
@@ -492,8 +466,6 @@ func agentlessTaskRow(live task.Live) session.AgentSession {
 	return agent
 }
 
-// taskStatus is the status a task row shows: the task's own state wins over its agent's when the
-// task sleeps or failed, and a merged pull request over an agent that is not busy.
 func taskStatus(live task.Live, status session.AgentStatus) session.AgentStatus {
 	record := live.Record
 
@@ -509,8 +481,6 @@ func taskStatus(live task.Live, status session.AgentStatus) session.AgentStatus 
 	}
 }
 
-// syncTasksCommand brings the task records up to date once per picker, after tasks first load,
-// and reloads them when anything changed.
 func (m *Model) syncTasksCommand() tea.Cmd {
 	if m.deps.Tasks == nil || m.tasksSynced || len(m.tasks) == 0 {
 		return nil
@@ -534,8 +504,6 @@ func (m *Model) syncTasksCommand() tea.Cmd {
 	}
 }
 
-// taskRunTickCommand reloads the picker after a moment while a task run, such as a merge, can
-// still change the tasks: one the picker just started, one in progress, or a finish under way.
 func (m *Model) taskRunTickCommand(started bool) tea.Cmd {
 	if m.taskRunTickPending || (!started && !m.taskRunInProgress()) {
 		return nil
@@ -563,7 +531,6 @@ func (m *Model) handleTaskSync(msg taskSyncMsg) tea.Cmd {
 	return m.refreshSessions()
 }
 
-// taskTitles are the titles AHT reports for the agents running in task windows.
 func (m *Model) taskTitles() map[string]string {
 	agents := m.hostAgentsByPane(m.inboxHosts()[0])
 	titles := make(map[string]string, len(m.tasks))
@@ -577,7 +544,6 @@ func (m *Model) taskTitles() map[string]string {
 	return titles
 }
 
-// inboxItemAt returns the inbox row at a list row.
 func (m *Model) inboxItemAt(row popupListRow) (inboxItem, bool) {
 	if m.displayMode != displayModeInbox || !row.isAgent() || row.sessionIndex >= len(m.filtered) {
 		return emptyInboxItem(), false
@@ -634,12 +600,10 @@ func (m *Model) hostSessionsByID(host inboxHost) map[string]session.Session {
 	return owners
 }
 
-// owns reports whether a live session row is on the host.
 func (host inboxHost) owns(row session.Session) bool {
 	return row.Origin == host.origin && !row.Saved() && row.RuntimeIdentity.ConnectionID == host.identity.ConnectionID
 }
 
-// hostLabel names the machine of a remote connection, empty for this machine.
 func (m *Model) hostLabel(connection string) string {
 	if connection == "" {
 		return ""
@@ -654,7 +618,6 @@ func (m *Model) hostLabel(connection string) string {
 	return connection
 }
 
-// handleInboxEnter goes to the selected row's agent pane; a task with no window is opened again.
 func (m *Model) handleInboxEnter(selected popupListRow) func() (tea.Model, tea.Cmd) {
 	item, ok := m.inboxItemAt(selected)
 	if !ok {
@@ -687,9 +650,6 @@ func (m *Model) handleInboxEnter(selected popupListRow) func() (tea.Model, tea.C
 	}
 }
 
-// recordedPR is the pull request the task's ledger records for an inbox row, which outlives
-// the open-PR lookup once the PR is merged or closed and is all that is known for a remote task,
-// or the pull requests linked to a closed conversation.
 func (m *Model) recordedPR(agent session.AgentSession) string {
 	if m.displayMode != displayModeInbox {
 		return ""
@@ -712,9 +672,6 @@ func (m *Model) recordedPR(agent session.AgentSession) string {
 	return "#" + strconv.Itoa(pr.Number) + " " + string(pr.State)
 }
 
-// footerActions lists the actions the footer offers. In the inbox the selected task's own actions
-// come first, and only the one that fits its state: sleep for an awake task, wake for a sleeping
-// one.
 func (m *Model) footerActions(keys actionKeyMap) []boundAction {
 	available := m.availableActions(keys)
 	if m.displayMode != displayModeInbox {
@@ -759,7 +716,6 @@ func taskActionFits(id action.ID, live task.Live) (bool, bool) {
 	}
 }
 
-// renderInboxDetail draws the rows under the inbox list that describe the selected row.
 func (m *Model) renderInboxDetail(width, rows int) []string {
 	if rows == 0 {
 		return nil
@@ -833,7 +789,6 @@ func (m *Model) inboxDetailFields(item inboxItem) [][2]string {
 	return fields
 }
 
-// inboxLocation is where a row's agent runs in tmux.
 func inboxLocation(item inboxItem) string {
 	switch {
 	case item.owner.ID != "" && item.task && item.live.Present:
@@ -928,7 +883,6 @@ func (m *Model) detailSeparator(width int) string {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.Theme.Border)).Render(line)
 }
 
-// cycleInboxGroup switches the inbox between grouping by section and by project.
 func (m *Model) cycleInboxGroup() bool {
 	if m.displayMode != displayModeInbox {
 		return false
@@ -949,8 +903,6 @@ func (m *Model) cycleInboxGroup() bool {
 	return true
 }
 
-// inboxDims reports whether a list row is an inbox row in a dimmed section, or the line of an
-// offline host.
 func (m *Model) inboxDims(row popupListRow) bool {
 	if m.displayMode == displayModeInbox && row.sessionIndex < len(m.filtered) &&
 		strings.HasPrefix(m.filtered[row.sessionIndex].ID, inboxOfflineIDPrefix) {
