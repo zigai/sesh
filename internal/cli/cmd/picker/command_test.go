@@ -340,6 +340,48 @@ func TestPickerPopupDimensionsFollowEffectiveConfiguredMode(t *testing.T) {
 	}
 }
 
+func TestPickerCatalogKeepsLiveRowsWhenRepositoryCannotBeOpened(t *testing.T) {
+	t.Setenv("TMUX", "")
+	t.Setenv("TMUX_PANE", "")
+
+	server := tmuxtest.NewServer(t)
+	ctx := t.Context()
+
+	if _, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "live-work"}); err != nil {
+		t.Fatalf("create fixture session: %v", err)
+	}
+
+	dirs := t.TempDir()
+
+	repository := filepath.Join(dirs, "repository")
+	if err := os.WriteFile(repository, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	services, err := newServices(ctx, resolvePickerTestWorkspace(t, config.DefaultConfig(), app.Locations{
+		Socket: server.Endpoint().SocketPath, Repository: repository, LeaseRoot: filepath.Join(dirs, "leases"),
+		History: filepath.Join(dirs, "history.json"), FinalSaveStatus: "", AgentStore: filepath.Join(dirs, "agents.json"),
+	}), gotmux.Streams{}, RemoteServices{})
+	if err != nil {
+		t.Fatalf("new picker services: %v", err)
+	}
+
+	t.Cleanup(func() {
+		if err := services.Close(); err != nil {
+			t.Errorf("close picker services: %v", err)
+		}
+	})
+
+	catalog, err := services.LoadCatalog(ctx)
+	if err == nil || catalog.Status != session.StatusPartial || catalog.SavedErr == nil {
+		t.Fatalf("catalog status = %q, saved error = %v, error = %v; want a partial catalog that reports the repository", catalog.Status, catalog.SavedErr, err)
+	}
+
+	if !slices.ContainsFunc(catalog.Sessions, func(row session.Session) bool { return row.Name == "live-work" }) {
+		t.Fatalf("live session missing from partial catalog: %+v", catalog.Sessions)
+	}
+}
+
 func TestPickerServiceRejectsReplacementSessionBeforeMutation(t *testing.T) {
 	t.Setenv("TMUX", "")
 	t.Setenv("TMUX_PANE", "")

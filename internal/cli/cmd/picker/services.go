@@ -272,7 +272,7 @@ func (s *services) LoadCatalog(ctx context.Context) (session.CatalogResult, erro
 
 	view, err := store.OpenView(ctx, s.workspace.Repository)
 	if err != nil {
-		return s.listCatalog(ctx, nil)
+		return s.listCatalog(ctx, unreadableSnapshots{err: err})
 	}
 
 	result, err := s.listCatalog(ctx, view)
@@ -306,6 +306,18 @@ func (s *services) listCatalog(ctx context.Context, saved session.SavedSnapshots
 	}
 
 	return result, nil
+}
+
+type unreadableSnapshots struct {
+	err error
+}
+
+func (u unreadableSnapshots) ReadCurrentListing(context.Context) (store.Listing, error) {
+	return store.Listing{}, u.err
+}
+
+func (u unreadableSnapshots) ReadListing(context.Context, string) (store.Listing, error) {
+	return store.Listing{}, u.err
 }
 
 func (s *services) TmuxIsInsideTmux() bool {
