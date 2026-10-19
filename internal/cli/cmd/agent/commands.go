@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -30,7 +31,10 @@ type statusResultJSON struct {
 	Idle    int `json:"idle"`
 }
 
-const stateFlag = "agent-state"
+const (
+	stateFlag        = "agent-state"
+	workSyncInterval = 5 * time.Minute
+)
 
 // NewCommand returns the group of commands that navigate and report on coding agents.
 func NewCommand() *cobra.Command {
@@ -72,6 +76,8 @@ func NewCommand() *cobra.Command {
 		workCommand(action.AgentFinish),
 		workCommand(action.AgentPin),
 		workCommand(action.AgentUnpin),
+		workCommand(action.AgentUnseen),
+		workCommand(action.AgentSeen),
 		workCommand(action.AgentLink),
 		workCommand(action.AgentUnlink),
 		newAgentStatusCommand(),
@@ -179,20 +185,38 @@ func runAgentStatusRun(cmd *cobra.Command, _ []string) error {
 
 	styles := agents.NewTmuxStyleController(server, resolved.SetWindowStatusStyle, resolved.SetWindowStatusBellStyle)
 	tracker := agents.NewTracker(styles, statusTrackerOptions(cfg, resolved))
-	recorder := work.NewRecorder(work.NewStore(workspace.Work), func(ctx context.Context) (string, map[string]string, error) {
+	workStore := work.NewStore(workspace.Work)
+	recorder := work.NewRecorder(workStore, func(ctx context.Context) (string, map[string]string, error) {
 		return task.WindowPanes(ctx, server)
 	})
+
+	runtime, err := actioncli.OpenRuntime(cmd, cfg)
+	if err != nil {
+		return err
+	}
 
 	ctx, stop := signal.NotifyContext(commandContextOrBackground(cmd), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	watchOptions := statusWatchOptions(resolved, quiet)
 
-	if err := agents.RunStatusTracker(ctx, workspace.AgentSource(), recordingTracker{Tracker: tracker, recorder: recorder}, watchOptions, resolved.ClearOnShutdown); err != nil {
-		return oops.In("cli").With("operation", "agent_status_run").Wrap(err)
+	syncCtx, stopSync := context.WithCancel(ctx)
+
+	var syncing sync.WaitGroup
+
+	syncing.Go(func() { work.SyncEvery(syncCtx, workStore, workSyncInterval) })
+	syncing.Go(func() { runtime.Local.FinishMergedTasksEvery(syncCtx, workSyncInterval) })
+
+	err = agents.RunStatusTracker(ctx, workspace.AgentSource(), recordingTracker{Tracker: tracker, recorder: recorder}, watchOptions, resolved.ClearOnShutdown)
+
+	stopSync()
+	syncing.Wait()
+
+	if err != nil {
+		err = oops.In("cli").With("operation", "agent_status_run").Wrap(err)
 	}
 
-	return nil
+	return errors.Join(err, runtime.Close())
 }
 
 func statusTrackerOptions(cfg *config.Config, resolved config.AgentStatusConfig) agents.TrackerOptions {
