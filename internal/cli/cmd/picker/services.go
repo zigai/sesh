@@ -165,7 +165,6 @@ func (s *services) TUIServices() tui.Services {
 		Enterer:          s,
 		Actions:          s.actions,
 		Panes:            s,
-		TerminalAttach:   nil,
 		Agents:           s,
 		Tasks:            s,
 		Work:             s,

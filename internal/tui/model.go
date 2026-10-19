@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"errors"
+	"fmt"
 	"maps"
 	"os"
 	"slices"
@@ -16,6 +17,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/samber/oops"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/config"
 	rowlayout "github.com/zigai/sesh/internal/display/layout"
 	"github.com/zigai/sesh/internal/inbox"
@@ -136,6 +138,7 @@ type Model struct {
 	state                        *session.State
 	config                       *config.Config
 	sessionKeys                  sessionKeyRules
+	actionBindings               []action.Binding
 	cursor                       int
 	agentCursor                  int
 	listTop                      int
@@ -143,6 +146,7 @@ type Model struct {
 	showHelp                     bool
 	width                        int
 	height                       int
+	terminal                     *os.File
 	mode                         uiMode
 	displayMode                  displayMode
 	initialAgentSelectionPending bool
@@ -307,6 +311,11 @@ func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps
 		return nil, err
 	}
 
+	bindings, err := action.Bindings(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("resolve picker key bindings: %w", err)
+	}
+
 	return &Model{
 		sessions:                     []session.Session{},
 		displaySessions:              []session.Session{},
@@ -317,7 +326,8 @@ func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps
 		sessionPrefixPending:         false,
 		state:                        st,
 		config:                       cfg,
-		sessionKeys:                  newSessionKeyRules(cfg),
+		sessionKeys:                  newSessionKeyRules(cfg, bindings),
+		actionBindings:               bindings,
 		cursor:                       0,
 		agentCursor:                  parentAgentIndex,
 		listTop:                      0,
@@ -325,6 +335,7 @@ func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps
 		showHelp:                     false,
 		width:                        0,
 		height:                       0,
+		terminal:                     nil,
 		mode:                         detectUIMode(deps),
 		displayMode:                  displayMode,
 		initialAgentSelectionPending: displayMode == displayModeAgents,
@@ -439,6 +450,10 @@ func (m *Model) Close() {
 	m.flushCustomFieldCaches()
 	m.providerRunner.Close()
 	m.lifecycle.Close()
+}
+
+func (m *Model) SetTerminal(terminal *os.File) {
+	m.terminal = terminal
 }
 
 func (m *Model) SetSize(width, height int) {
@@ -862,7 +877,7 @@ func (m *Model) handleModelMessage(msg tea.Msg) func() (tea.Model, tea.Cmd) {
 		return func() (tea.Model, tea.Cmd) {
 			m.handleRemoteCatalog(msg)
 
-			return m, tea.Batch(m.waitRemoteCatalogUpdateCommand(), m.attachResumed())
+			return m, tea.Batch(m.waitRemoteCatalogUpdateCommand(), m.attachPendingResumeWhenListed())
 		}
 	}
 

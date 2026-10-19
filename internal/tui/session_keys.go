@@ -8,6 +8,7 @@ import (
 	bubbleskey "charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/session"
 )
@@ -28,10 +29,10 @@ type sessionKeyRules struct {
 	blocked   map[string]bool
 }
 
-func newSessionKeyRules(cfg *config.Config) sessionKeyRules {
+func newSessionKeyRules(cfg *config.Config, bindings []action.Binding) sessionKeyRules {
 	blocked := make(map[string]bool)
 	if cfg.Keys.SessionKeysHoldAlt() {
-		blocked = altBlockedSessionKeys(cfg)
+		blocked = altBlockedSessionKeys(cfg, bindings)
 	}
 
 	overrides := make(map[string]string, len(cfg.Keys.Sessions))
@@ -43,8 +44,8 @@ func newSessionKeyRules(cfg *config.Config) sessionKeyRules {
 	return sessionKeyRules{overrides: overrides, blocked: blocked}
 }
 
-func altBlockedSessionKeys(cfg *config.Config) map[string]bool {
-	keys := newActionKeyMap(cfg)
+func altBlockedSessionKeys(cfg *config.Config, bindings []action.Binding) map[string]bool {
+	keys := newActionKeyMap(cfg, bindings)
 	reserved := config.PickerReservedKeys(cfg.Keys)
 
 	blocked := make(map[string]bool)
@@ -95,7 +96,7 @@ func assignSessionKeys(
 	entries []session.KeyAssignment,
 	listed []session.Identity,
 	rules sessionKeyRules,
-	reclaim bool,
+	reclaimFromUnlisted bool,
 ) ([]session.KeyAssignment, bool) {
 	present := make(map[session.Identity]bool, len(listed))
 	for _, ident := range listed {
@@ -122,10 +123,8 @@ func assignSessionKeys(
 	for _, ident := range unassigned {
 		letter, ok := freeSessionKey(ident.Name, taken, rules.blocked)
 
-		// Unlisted sessions may live on another tmux server or an offline connection, so
-		// their letters are taken back only once no letter is free.
-		if !ok && reclaim {
-			assigned, letter, ok = reclaimSessionKey(assigned, present)
+		if !ok && reclaimFromUnlisted {
+			assigned, letter, ok = reclaimKeyFromUnlistedSession(assigned, present)
 		}
 
 		if ok {
@@ -161,7 +160,7 @@ func keptSessionKeys(
 	return kept, taken
 }
 
-func reclaimSessionKey(
+func reclaimKeyFromUnlistedSession(
 	assigned []session.KeyAssignment,
 	present map[session.Identity]bool,
 ) ([]session.KeyAssignment, string, bool) {
@@ -368,11 +367,11 @@ func sessionKeyIdentities(rows []session.Session) []session.Identity {
 	return idents
 }
 
-func (m *Model) assignLoadedSessionKeys(reclaim bool) tea.Cmd {
+func (m *Model) assignLoadedSessionKeys(reclaimFromUnlisted bool) tea.Cmd {
 	listed := sessionKeyIdentities(m.sessions)
 	rules := m.sessionKeys
 
-	entries, changed := assignSessionKeys(m.state.SessionKeys, listed, rules, reclaim)
+	entries, changed := assignSessionKeys(m.state.SessionKeys, listed, rules, reclaimFromUnlisted)
 	if !changed {
 		return nil
 	}
@@ -389,7 +388,7 @@ func (m *Model) assignLoadedSessionKeys(reclaim bool) tea.Cmd {
 		var saved []session.KeyAssignment
 
 		err := m.deps.State.UpdateModelState(ctx, func(current *session.State) {
-			current.SessionKeys, _ = assignSessionKeys(current.SessionKeys, listed, rules, reclaim)
+			current.SessionKeys, _ = assignSessionKeys(current.SessionKeys, listed, rules, reclaimFromUnlisted)
 			saved = slices.Clone(current.SessionKeys)
 		})
 

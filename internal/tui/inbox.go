@@ -24,6 +24,19 @@ import (
 )
 
 const (
+	inboxAgentRow inboxItemKind = iota
+	inboxTaskRow
+	inboxClosedRow
+	inboxMoreRow
+)
+
+const (
+	notTaskAction taskActionFit = iota
+	taskActionFits
+	taskActionMisfits
+)
+
+const (
 	inboxGroupIDPrefix   = "inbox:"
 	inboxOfflineIDPrefix = inboxGroupIDPrefix + "offline:"
 	inboxDetailRows      = 7
@@ -45,8 +58,10 @@ type taskSyncMsg struct {
 	changed bool
 }
 
-// inboxHost is a machine whose agents and tasks the inbox lists: this one, or a connected remote
-// host.
+type inboxItemKind uint8
+
+type taskActionFit uint8
+
 type inboxHost struct {
 	origin   session.Origin
 	identity session.RuntimeIdentity
@@ -56,20 +71,16 @@ type inboxHost struct {
 }
 
 type inboxItem struct {
-	agent  session.AgentSession
-	owner  session.Session
-	host   inboxHost
-	live   task.Live
-	task   bool
-	closed bool
-	work   work.Item
-	// more names the project whose further closed rows this row expands.
-	more    string
-	section string
+	agent     session.AgentSession
+	owner     session.Session
+	host      inboxHost
+	live      task.Live
+	kind      inboxItemKind
+	work      work.Item
+	expandKey string
+	section   string
 }
 
-// inboxSessions lists the agents and tasks of this machine and of every connected remote host as
-// group rows whose agents are the inbox rows, grouped by section or by project.
 func (m *Model) inboxSessions() []session.Session {
 	m.inboxItems = make(map[string]inboxItem)
 
@@ -139,15 +150,13 @@ func (m *Model) inboxStateRows(items []inboxItem) []session.Session {
 	return rows
 }
 
-// inboxProjectRows groups the rows by project and host. A group whose most urgent row comes first
-// in the section order is listed first.
-func (m *Model) inboxProjectRows(items []inboxItem) []session.Session {
+func (m *Model) inboxProjectRows(sorted []inboxItem) []session.Session {
 	var keys []string
 
 	groups := make(map[string][]session.AgentSession)
 	names := make(map[string]string)
 
-	for _, item := range items {
+	for _, item := range sorted {
 		project := inboxProject(item)
 		key := item.agent.Host + "\x00" + project
 
@@ -186,7 +195,7 @@ func inboxGroupRow(id, name string, agents []session.AgentSession) session.Sessi
 
 func inboxProject(item inboxItem) string {
 	switch {
-	case item.task && item.live.Record.Kind == task.KindProject:
+	case item.kind == inboxTaskRow && item.live.Record.Kind == task.KindProject:
 		return item.live.Record.Project
 	case item.agent.ProjectRoot != "":
 		return item.agent.ProjectRoot
@@ -256,7 +265,7 @@ func (m *Model) hostAgentItems(host inboxHost, agents map[string]session.AgentSe
 	tasks := make(map[string]task.Live, len(host.tasks))
 
 	for _, live := range host.tasks {
-		if listedTask(live) && live.AgentPane != "" {
+		if !taskInFlight(live) && live.AgentPane != "" {
 			tasks[string(live.AgentPane)] = live
 		}
 	}
@@ -273,12 +282,15 @@ func (m *Model) hostAgentItems(host inboxHost, agents map[string]session.AgentSe
 				continue
 			}
 
+			kind := inboxAgentRow
+
 			live, isTask := tasks[agent.PaneID]
 			if isTask {
 				agent = taskAgent(live, agents)
+				kind = inboxTaskRow
 			}
 
-			items = append(items, m.newInboxItem(host, row, agent, live, isTask))
+			items = append(items, m.newInboxItem(host, row, agent, live, kind))
 		}
 	}
 
@@ -291,11 +303,11 @@ func (m *Model) hostTaskItems(host inboxHost, agents map[string]session.AgentSes
 	var items []inboxItem
 
 	for _, live := range host.tasks {
-		if _, running := agents[string(live.AgentPane)]; !listedTask(live) || (running && live.AgentPane != "") {
+		if _, running := agents[string(live.AgentPane)]; taskInFlight(live) || (running && live.AgentPane != "") {
 			continue
 		}
 
-		item := m.newInboxItem(host, owners[string(live.SessionID)], taskAgent(live, agents), live, true)
+		item := m.newInboxItem(host, owners[string(live.SessionID)], taskAgent(live, agents), live, inboxTaskRow)
 		if live.Present || needsWindowlessRow(item) {
 			items = append(items, item)
 		}
@@ -309,13 +321,11 @@ func needsWindowlessRow(item inboxItem) bool {
 		item.section == config.InboxAsleep || item.live.Record.PREnded()
 }
 
-// listedTask reports whether the inbox lists a task: one being created or finished appears only
-// once the sesh process doing it is gone.
-func listedTask(live task.Live) bool {
-	return (live.Record.State != task.StateCreating && live.Record.State != task.StateFinishing) || live.Stalled
+func taskInFlight(live task.Live) bool {
+	return (live.Record.State == task.StateCreating || live.Record.State == task.StateFinishing) && !live.Stalled
 }
 
-func (m *Model) newInboxItem(host inboxHost, owner session.Session, agent session.AgentSession, live task.Live, isTask bool) inboxItem {
+func (m *Model) newInboxItem(host inboxHost, owner session.Session, agent session.AgentSession, live task.Live, kind inboxItemKind) inboxItem {
 	if metadata, ok := m.agentGit[agentGitDirectory(agent)]; ok && host.origin == session.OriginLocal {
 		applyAgentGitMetadata(&agent, metadata)
 	}
@@ -323,7 +333,7 @@ func (m *Model) newInboxItem(host inboxHost, owner session.Session, agent sessio
 	agent.Host = host.identity.ConnectionID
 
 	item := inboxItem{
-		agent: agent, owner: owner, host: host, live: live, task: isTask, closed: false, work: recordedWork(host, agent, live, isTask), more: "",
+		agent: agent, owner: owner, host: host, live: live, kind: kind, work: recordedWork(host, agent, live, kind), expandKey: "",
 		section: "",
 	}
 	item.section = m.inboxSection(item)
@@ -335,7 +345,7 @@ func (m *Model) inboxSection(item inboxItem) string {
 	record := item.live.Record
 
 	switch {
-	case item.task && (record.State == task.StateSleeping || record.State == task.StateWaking):
+	case item.kind == inboxTaskRow && (record.State == task.StateSleeping || record.State == task.StateWaking):
 		return config.InboxAsleep
 	case m.snoozed(item):
 		return config.InboxSnoozed
@@ -385,7 +395,7 @@ func statusSection(agent session.AgentSession) (string, bool) {
 }
 
 func (m *Model) unmergedItem(item inboxItem) bool {
-	if item.agent.GitUnmerged > 0 || (item.task && item.live.Record.PR.State == task.PROpen) {
+	if item.agent.GitUnmerged > 0 || (item.kind == inboxTaskRow && item.live.Record.PR.State == task.PROpen) {
 		return true
 	}
 
@@ -399,26 +409,31 @@ func (m *Model) unmergedItem(item inboxItem) bool {
 // inboxPR is the pull request of a row: the open one gh lists for its branch, else the one its
 // task records with that pull request's state when it is no longer open.
 func (m *Model) inboxPR(item inboxItem) string {
-	if item.closed {
-		return linkedPRs(item.work)
-	}
-
 	if item.agent.Host == "" && item.agent.PaneID != "" {
 		if cell := m.providerRunner.Cell(providers.GH, item.agent.PaneID, display.FieldAgentPR); cell.Text != "" {
 			return cell.Text
 		}
 	}
 
-	pr := item.live.Record.PR
-	if !item.task || pr.Number == 0 {
-		return ""
+	_, text := rowPR(item)
+
+	return text
+}
+
+func rowPR(item inboxItem) (int, string) {
+	switch item.kind {
+	case inboxClosedRow:
+		if linked := item.work.Linked(); len(linked) > 0 {
+			return linked[len(linked)-1].Number, linkedPRs(item.work)
+		}
+	case inboxTaskRow:
+		if pr := item.live.Record.PR; pr.Number != 0 {
+			return pr.Number, prText(pr.Number, pr.State)
+		}
+	case inboxAgentRow, inboxMoreRow:
 	}
 
-	if pr.State == task.PROpen {
-		return "#" + strconv.Itoa(pr.Number)
-	}
-
-	return "#" + strconv.Itoa(pr.Number) + " " + string(pr.State)
+	return 0, ""
 }
 
 func taskAgent(live task.Live, agents map[string]session.AgentSession) session.AgentSession {
@@ -624,20 +639,20 @@ func (m *Model) handleInboxEnter(selected popupListRow) func() (tea.Model, tea.C
 		return nil
 	}
 
-	if item.task && !item.live.Present {
+	if item.kind == inboxTaskRow && !item.live.Present {
 		return m.invokeAction(action.TaskOpen.ID, action.Values{})
 	}
 
-	if item.more != "" {
+	if item.kind == inboxMoreRow {
 		return m.expandClosedItems(item)
 	}
 
-	if item.closed {
+	if item.kind == inboxClosedRow {
 		return m.resumeClosedItem(item)
 	}
 
 	agent := item.agent
-	if item.task {
+	if item.kind == inboxTaskRow {
 		agent.PaneID = string(item.live.AgentPane)
 	}
 
@@ -651,25 +666,14 @@ func (m *Model) handleInboxEnter(selected popupListRow) func() (tea.Model, tea.C
 }
 
 func (m *Model) recordedPR(agent session.AgentSession) string {
-	if m.displayMode != displayModeInbox {
-		return ""
-	}
-
 	item, ok := m.inboxItems[inboxKey(agent.Host, agent.PaneID)]
-	if ok && item.closed {
-		return linkedPRs(item.work)
-	}
-
-	if !ok || !item.task || item.live.Record.PR.Number == 0 {
+	if !ok || m.displayMode != displayModeInbox {
 		return ""
 	}
 
-	pr := item.live.Record.PR
-	if pr.State == task.PROpen {
-		return "#" + strconv.Itoa(pr.Number)
-	}
+	_, text := rowPR(item)
 
-	return "#" + strconv.Itoa(pr.Number) + " " + string(pr.State)
+	return text
 }
 
 func (m *Model) footerActions(keys actionKeyMap) []boundAction {
@@ -684,36 +688,43 @@ func (m *Model) footerActions(keys actionKeyMap) []boundAction {
 	others := make([]boundAction, 0, len(available))
 
 	for _, bound := range available {
-		taskAction, fits := taskActionFits(bound.binding.Action, item.live)
-
-		switch {
-		case !taskAction:
+		switch taskActionFitOf(bound.binding.Action, item.live) {
+		case notTaskAction:
 			others = append(others, bound)
-		case ok && item.task && fits:
-			tasks = append(tasks, bound)
+		case taskActionFits:
+			if ok && item.kind == inboxTaskRow {
+				tasks = append(tasks, bound)
+			}
+		case taskActionMisfits:
 		}
 	}
 
 	return append(tasks, others...)
 }
 
-// taskActionFits reports whether an action is one of a task's own and, if so, whether it fits a
-// task in the given state.
-func taskActionFits(id action.ID, live task.Live) (bool, bool) {
+func taskActionFitOf(id action.ID, live task.Live) taskActionFit {
 	state := live.Record.State
+
+	var fits bool
 
 	switch id {
 	case action.TaskSleep.ID:
-		return true, state == task.StateActive
+		fits = state == task.StateActive
 	case action.TaskWake.ID:
-		return true, state == task.StateSleeping || state == task.StateWaking
+		fits = state == task.StateSleeping || state == task.StateWaking
 	case action.TaskOpen.ID:
-		return true, !live.Present && !live.Stalled && state != task.StateCreating && state != task.StateFinishing
+		fits = !live.Present && !live.Stalled && state != task.StateCreating && state != task.StateFinishing
 	case action.TaskFinish.ID, action.TaskRun.ID:
-		return true, true
+		fits = true
 	default:
-		return false, false
+		return notTaskAction
 	}
+
+	if fits {
+		return taskActionFits
+	}
+
+	return taskActionMisfits
 }
 
 func (m *Model) renderInboxDetail(width, rows int) []string {
@@ -754,7 +765,7 @@ func (m *Model) inboxDetailFields(item inboxItem) [][2]string {
 	record := item.live.Record
 
 	branch := item.agent.GitBranch
-	if item.task && record.Base != "" {
+	if item.kind == inboxTaskRow && record.Base != "" {
 		branch += " ← " + record.Base
 	}
 
@@ -770,15 +781,15 @@ func (m *Model) inboxDetailFields(item inboxItem) [][2]string {
 		{"state", m.inboxStateDetail(item)},
 	}
 
-	if item.task {
+	if item.kind == inboxTaskRow {
 		fields = append(fields, [2]string{"runs", taskRunsDetail(record.Runs)})
 	}
 
-	if linked := linkedPRs(item.work); linked != "" && !item.closed && !item.task {
+	if linked := linkedPRs(item.work); linked != "" && item.kind == inboxAgentRow {
 		fields = append(fields, [2]string{"linked", linked})
 	}
 
-	if issues := closedIssues(item.work); issues != "" && !item.task {
+	if issues := closedIssues(item.work); issues != "" && item.kind != inboxTaskRow {
 		fields = append(fields, [2]string{"issues", issues})
 	}
 
@@ -791,11 +802,11 @@ func (m *Model) inboxDetailFields(item inboxItem) [][2]string {
 
 func inboxLocation(item inboxItem) string {
 	switch {
-	case item.owner.ID != "" && item.task && item.live.Present:
+	case item.owner.ID != "" && item.kind == inboxTaskRow && item.live.Present:
 		return fmt.Sprintf("%s:%d %s", item.live.SessionName, item.live.WindowIndex, item.live.WindowName)
 	case item.owner.ID != "":
 		return item.owner.Name
-	case item.closed:
+	case item.kind == inboxClosedRow || item.kind == inboxMoreRow:
 		return "closed"
 	default:
 		return "no window"
@@ -806,10 +817,10 @@ func (m *Model) inboxStateDetail(item inboxItem) string {
 	parts := []string{m.config.Inbox.Label(item.section)}
 
 	if snooze, ok := m.inbox.Find(conversationKey(item.agent)); ok && item.section == config.InboxSnoozed {
-		parts[0] += " " + snoozeLabel(snooze.Until)
+		parts[0] += " " + snoozeLabel(snooze)
 	}
 
-	if item.task && item.live.Record.State != task.StateActive {
+	if item.kind == inboxTaskRow && item.live.Record.State != task.StateActive {
 		parts = append(parts, "task "+string(item.live.Record.State))
 	}
 
@@ -829,7 +840,7 @@ func (m *Model) inboxStateDetail(item inboxItem) string {
 		parts = append(parts, "PR "+pr)
 	}
 
-	if item.task && item.live.Record.PREnded() {
+	if item.kind == inboxTaskRow && item.live.Record.PREnded() {
 		parts = append(parts, "ready to finish")
 	}
 

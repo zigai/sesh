@@ -158,7 +158,7 @@ func (m *Model) agentGitDirectories() []string {
 		}
 	}
 
-	directories = append(directories, m.workDirectories()...)
+	directories = append(directories, m.unfinishedWorkDirectories()...)
 
 	slices.Sort(directories)
 

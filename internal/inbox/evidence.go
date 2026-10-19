@@ -29,8 +29,8 @@ var (
 
 type EvidenceKind string
 
-// Evidence is one item of a report's Evidence section: a URL, or a file path made absolute
-// against the agent's directory.
+// Evidence is one item of a report's Evidence section: a URL, or a file path that is absolute,
+// under "~/", or made absolute against the agent's directory.
 type Evidence struct {
 	Target string
 	Kind   EvidenceKind
@@ -67,8 +67,8 @@ func ParseEvidence(report, dir string) []Evidence {
 		}
 
 		for _, target := range itemTargets(match[1]) {
-			item := newEvidence(target, dir)
-			if !slices.Contains(items, item) {
+			item, ok := newEvidence(target, dir)
+			if ok && !slices.Contains(items, item) {
 				items = append(items, item)
 			}
 		}
@@ -116,16 +116,20 @@ func looksLikeTarget(text string) bool {
 	}
 }
 
-func newEvidence(target, dir string) Evidence {
+func newEvidence(target, dir string) (Evidence, bool) {
 	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
-		return Evidence{Target: target, Kind: EvidenceURL}
+		return Evidence{Target: target, Kind: EvidenceURL}, true
 	}
 
-	if !filepath.IsAbs(target) && !strings.HasPrefix(target, "~/") && dir != "" {
+	if !filepath.IsAbs(target) && !strings.HasPrefix(target, "~/") {
+		if !filepath.IsAbs(dir) {
+			return Evidence{Target: "", Kind: ""}, false
+		}
+
 		target = filepath.Join(dir, target)
 	}
 
-	return Evidence{Target: target, Kind: kindOf(target)}
+	return Evidence{Target: target, Kind: kindOf(target)}, true
 }
 
 func kindOf(path string) EvidenceKind {

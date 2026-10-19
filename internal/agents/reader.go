@@ -99,7 +99,7 @@ func agentSessionFromRegistry(session aht.Session) AgentSession {
 		Harness:          string(session.Harness),
 		Presence:         string(session.Presence()),
 		Activity:         activity,
-		InitialIdle:      initialIdle(session),
+		InitialIdle:      idleSinceSessionStart(session),
 		Attention:        AttentionFor(activity),
 		ServerSocket:     NormalizeServerSocket(session.Location.ServerID),
 		SessionID:        session.Location.SessionID,
@@ -155,9 +155,7 @@ func agentSessionFromRegistry(session aht.Session) AgentSession {
 	return agent
 }
 
-// initialIdle reports an idle from a session start with no turn since, such as an agent just
-// reopened by a snapshot restore.
-func initialIdle(session aht.Session) bool {
+func idleSinceSessionStart(session aht.Session) bool {
 	activity := session.Activity()
 	native := session.Observations.Native
 

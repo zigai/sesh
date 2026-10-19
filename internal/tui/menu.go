@@ -16,9 +16,8 @@ import (
 const (
 	menuBorderCells  = 2
 	menuPaddingCells = 1
-	// menuSideCells pads an entry on both sides inside the border.
-	menuSideCells = 2 * menuPaddingCells
-	menuKeyGap    = 3
+	menuSideCells    = 2 * menuPaddingCells
+	menuKeyGap       = 3
 )
 
 var sessionMenuActions = map[string]action.ID{
@@ -445,14 +444,14 @@ func (m *Model) actionMenuEntry(label string, id action.ID, values action.Values
 			return menuEntry{label: "", key: "", run: nil}, false
 		}
 
-		if fits, applies := taskActionFits(id, m.selectedTaskLive()); fits && !applies {
+		if taskActionFitOf(id, m.selectedTaskLive()) == taskActionMisfits {
 			return menuEntry{label: "", key: "", run: nil}, false
 		}
 	}
 
 	key := ""
 
-	for _, bound := range newActionKeyMap(m.config).actions {
+	for _, bound := range m.actionKeys().actions {
 		if bound.binding.Action == id && maps.EqualFunc(bound.binding.Values, values, slices.Equal) {
 			key = bound.key.Help().Key
 		}
@@ -469,7 +468,7 @@ func (m *Model) actionMenuEntry(label string, id action.ID, values action.Values
 
 func (m *Model) selectedMenuItems() map[string]config.MenuItemConfig {
 	item, ok := m.selectedInboxItem()
-	if !ok || !item.task {
+	if !ok || item.kind != inboxTaskRow {
 		return nil
 	}
 
@@ -479,5 +478,5 @@ func (m *Model) selectedMenuItems() map[string]config.MenuItemConfig {
 func (m *Model) selectedRowIsTask() bool {
 	item, ok := m.selectedInboxItem()
 
-	return ok && item.task
+	return ok && item.kind == inboxTaskRow
 }

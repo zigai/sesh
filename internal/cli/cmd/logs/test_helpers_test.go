@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/cli"
 	"github.com/zigai/sesh/internal/cli/clibase"
 )
@@ -17,7 +18,7 @@ const (
 	testLogsCmd    = "logs"
 	testConfigFlag = "--config"
 	exitCodeUsage  = clibase.ExitCodeUsage
-	exitCodeCancel = clibase.ExitCodeCancel
+	exitCodeCancel = action.ExitCodeCanceled
 )
 
 type logReviewWriter func([]byte) (int, error)

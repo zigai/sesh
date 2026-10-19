@@ -372,7 +372,8 @@ func TestAgentNavigationBackSkipsVanishedHistory(t *testing.T) {
 	vanished := newAgentWindow(t, ctx, server, session, "vanished")
 	previous := newAgentWindow(t, ctx, server, session, "previous")
 
-	statePath := writeRegistry(t,
+	statePath := writeRegistry(
+		t,
 		paneFixture(current, string(aht.ActivityIdle)),
 		paneFixture(vanished, string(aht.ActivityIdle)),
 		paneFixture(previous, string(aht.ActivityWaiting)),
@@ -626,7 +627,8 @@ func TestAgentNavigationTwoClientsIndependentHistory(t *testing.T) {
 	targetA := newAgentWindow(t, ctx, server, sessionA, "agent-a")
 	targetB := newAgentWindow(t, ctx, server, sessionB, "agent-b")
 
-	statePath := writeRegistry(t,
+	statePath := writeRegistry(
+		t,
 		paneFixture(targetA, string(aht.ActivityWaiting)),
 		paneFixture(targetB, string(aht.ActivityWaiting)),
 	)

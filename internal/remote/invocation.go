@@ -377,19 +377,20 @@ func pruneInvocations(dir *privatefs.Dir, limit int, now time.Time) error {
 		}
 
 		invocation, readErr := readInvocation(dir, id)
-		if readErr != nil && staleRecord(dir, name) {
-			if err := removeFile(dir, name); err != nil {
+		if readErr != nil {
+			removed, err := removeOtherProtocolRecord(dir, name)
+			if err != nil {
 				return err
+			}
+
+			if !removed {
+				recordCount++
 			}
 
 			continue
 		}
 
 		recordCount++
-
-		if readErr != nil {
-			continue
-		}
 
 		if !invocation.IsUncertain() {
 			resolved = append(resolved, invocation)
@@ -537,17 +538,19 @@ func validOutcome(outcome string) bool {
 	return action.Code(outcome).Valid()
 }
 
-// staleRecord reports a receipt written by another protocol version. Its invocation cannot be
-// retried with this protocol, so it only takes space.
-func staleRecord(dir *privatefs.Dir, name string) bool {
+// removeOtherProtocolRecord removes a receipt written by another protocol version. Its invocation
+// cannot be retried with this protocol, so it only takes space.
+func removeOtherProtocolRecord(dir *privatefs.Dir, name string) (bool, error) {
 	content, err := dir.Read(name, int64(maxInvocationBytes))
 	if err != nil {
-		return false
+		return false, oops.In("remote").With("operation", "prune_invocations").Wrap(err)
 	}
 
-	version, ok := contentVersion(content)
+	if version, ok := contentVersion(content); !ok || version == ProtocolVersion {
+		return false, nil
+	}
 
-	return ok && version != ProtocolVersion
+	return true, removeFile(dir, name)
 }
 
 func contentVersion(content []byte) (int, bool) {

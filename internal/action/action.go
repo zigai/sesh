@@ -82,8 +82,7 @@ type Subject struct {
 	At       Location
 	Sessions []session.Session
 	Pane     string
-	// Task is the selected task, for actions on a task.
-	Task string
+	Task     string
 }
 
 type Env struct {

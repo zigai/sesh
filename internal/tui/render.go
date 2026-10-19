@@ -1328,7 +1328,7 @@ func (m *Model) noMatchesMessage(query string) string {
 	case displayModeSesh:
 	}
 
-	if key := newActionKeyMap(m.config).actionKey(action.SessionCreate.ID); key != "" {
+	if key := m.actionKeys().actionKey(action.SessionCreate.ID); key != "" {
 		return fmt.Sprintf("No matches. Press %s to create %q", key, query)
 	}
 
@@ -1423,7 +1423,7 @@ func (m *Model) modeFooterHintWidth(width int) int {
 
 func (m *Model) footerParts(width int) []footerPart {
 	footerWidth := max(width, 1)
-	keys := newActionKeyMap(m.config)
+	keys := m.actionKeys()
 
 	if footerWidth < minFullFooterWidth {
 		return []footerPart{newFooterPart(keys.help.Help().Key, "help")}
@@ -1466,16 +1466,18 @@ func (m *Model) footerParts(width int) []footerPart {
 func (m *Model) baseFooterParts() []footerPart {
 	parts := make([]footerPart, 0, initialFooterPartsCap)
 	if m.displayMode == displayModeAgents {
-		return append(parts,
+		return append(
+			parts,
 			newFooterPart("↑/↓", "agents"),
 			newFooterPart("ctrl+↑/↓", "sessions"),
 		)
 	}
 
 	if m.displayMode == displayModeInbox {
-		return append(parts,
+		return append(
+			parts,
 			newFooterPart("↑/↓", "agents"),
-			newFooterPart(newActionKeyMap(m.config).menu.Help().Key, "menu"),
+			newFooterPart(m.actionKeys().menu.Help().Key, "menu"),
 		)
 	}
 
@@ -1493,7 +1495,8 @@ func (m *Model) compactAgentFooterParts(keys actionKeyMap, width int) []footerPa
 		parts = append(parts, m.sessionKeyFooterPart())
 	}
 
-	parts = append(parts,
+	parts = append(
+		parts,
 		newFooterPart(keys.help.Help().Key, "help"),
 	)
 

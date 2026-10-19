@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+
+	"github.com/zigai/sesh/internal/cli/clibase"
 )
 
 func TestLiveCommandOutputArrivesBeforeCompletion(t *testing.T) {
@@ -28,7 +30,7 @@ func testLiveCommandOutput(t *testing.T, fail bool) {
 	diagnostics := commandBuffer{output: &stderr, buffer: bytes.Buffer{}, failed: false, streaming: false}
 	root := &cobra.Command{Use: "sesh"}
 	cmd := &cobra.Command{
-		Use: "live", Annotations: map[string]string{annotationLiveIO: "true", annotationOperation: "monitor"},
+		Use: "live", Annotations: map[string]string{clibase.AnnotationLiveIO: "true", clibase.AnnotationOperation: "monitor"},
 	}
 	root.AddCommand(cmd)
 	cmd.Flags().String("config", cfg, "")
@@ -71,7 +73,7 @@ func testLiveCommandOutput(t *testing.T, fail bool) {
 
 func TestRequiredFlagsRejectBeforeLiveLogging(t *testing.T) {
 	cfg, logPath := runtimeConfig(t, "info")
-	cmd := &cobra.Command{Use: "live", Annotations: map[string]string{annotationLiveIO: "true", annotationOperation: "monitor"}}
+	cmd := &cobra.Command{Use: "live", Annotations: map[string]string{clibase.AnnotationLiveIO: "true", clibase.AnnotationOperation: "monitor"}}
 	cmd.Flags().String("config", cfg, "")
 	cmd.Flags().String("socket", "", "")
 

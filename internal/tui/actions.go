@@ -325,7 +325,7 @@ func (m *Model) logSessionActionResult(msg sessionActionResultMsg) {
 
 func (m *Model) handleSessionActionResult(msg sessionActionResultMsg) (tea.Model, tea.Cmd) {
 	if msg.attach && msg.err == nil {
-		return m.handleTerminalAttach(msg)
+		return m.deferTerminalAttach(msg.target)
 	}
 
 	m.logSessionActionResult(msg)
@@ -363,40 +363,6 @@ func (m *Model) handleSessionActionResult(msg sessionActionResultMsg) (tea.Model
 	}
 
 	return m, nil
-}
-
-func (m *Model) handleTerminalAttach(msg sessionActionResultMsg) (tea.Model, tea.Cmd) {
-	if m.deps.TerminalAttach == nil {
-		return m.deferTerminalAttach(msg.target)
-	}
-
-	cmd, err := m.deps.TerminalAttach.AttachSession(m.operationContext(), msg.target)
-	if err != nil {
-		m.setErrorStatusf("Terminal attach failed: %v", err)
-
-		return m, nil
-	}
-
-	if cmd == nil {
-		return m.deferTerminalAttach(msg.target)
-	}
-
-	return m, tea.Exec(cmd, func(err error) tea.Msg {
-		return sessionActionResultMsg{
-			operation:      msg.operation,
-			deferred:       false,
-			attach:         false,
-			err:            err,
-			sessionName:    msg.target.Name,
-			target:         msg.target,
-			switchSession:  "",
-			switchPane:     "",
-			quit:           false,
-			refresh:        err == nil,
-			statePersisted: false,
-			agentView:      nil,
-		}
-	})
 }
 
 func (m *Model) deferTerminalAttach(target session.Session) (tea.Model, tea.Cmd) {

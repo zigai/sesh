@@ -58,7 +58,7 @@ func writeAgentGitCache(path string, entries map[string]agentGitCacheEntry) erro
 		return oops.In("tui").Code("git_cache_failed").With("operation", "create_directory").Wrap(err)
 	}
 
-	writeErr := publishAgentGitCache(dir, filepath.Base(path), data)
+	writeErr := replaceCacheUnsynced(dir, filepath.Base(path), data)
 	if err := errors.Join(writeErr, dir.Close()); err != nil {
 		return oops.In("tui").Code("git_cache_failed").With("operation", "save").Wrap(err)
 	}
@@ -66,9 +66,8 @@ func writeAgentGitCache(path string, entries map[string]agentGitCacheEntry) erro
 	return nil
 }
 
-// publishAgentGitCache replaces the cache atomically without fsync, which would stall popup
-// shutdown under disk pressure. A crash leaves at worst an unreadable cache that is rebuilt.
-func publishAgentGitCache(dir *privatefs.Dir, name string, data []byte) error {
+// fsync would stall popup shutdown under disk pressure; a cache a crash leaves unreadable is rebuilt.
+func replaceCacheUnsynced(dir *privatefs.Dir, name string, data []byte) error {
 	temporary := ".agent-git-" + rand.Text() + ".tmp"
 
 	file, err := dir.File(temporary, unix.O_WRONLY|unix.O_CREAT|unix.O_EXCL)

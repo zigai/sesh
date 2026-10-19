@@ -7,25 +7,13 @@ import (
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
 
-	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/cli/clibase"
 )
 
 const (
 	exitCodeGeneral = 1
 	exitCodeUsage   = 2
-	exitCodeCancel  = 130
 	exitCodePipe    = 141
-)
-
-var (
-	errUnknownCommand     = errors.New("unknown command")
-	errPartialSnapshot    = app.ErrPartialSnapshot
-	errPartialRestore     = app.ErrPartialRestore
-	errSocketRequired     = clibase.ErrSocketRequired
-	errRepositoryRequired = clibase.ErrRepositoryRequired
-	errLeaseRootRequired  = clibase.ErrLeaseRootRequired
-	errDoctorChecksFailed = clibase.ErrDoctorChecksFailed
 )
 
 type ExitError = clibase.ExitError

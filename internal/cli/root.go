@@ -52,7 +52,6 @@ var hookEvents = []string{
 var (
 	errUnknownHookEvent  = errors.New("unknown hook event")
 	errNoHooksConfigured = errors.New("no hooks configured for event")
-	errHelpShorthand     = errors.New("-h is not a help flag; use --help")
 )
 
 type hookCommandJSON struct {
@@ -138,7 +137,7 @@ func newRootCommand(ctx context.Context) *cobra.Command {
 	rootCommand.Flags().BoolP("version", "V", false, "Print version")
 	rootCommand.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
 		if errors.Is(err, pflag.ErrHelp) {
-			return NewExitError(exitCodeUsage, errHelpShorthand)
+			return NewExitError(exitCodeUsage, clibase.ErrHelpShorthand)
 		}
 
 		return err
@@ -204,7 +203,7 @@ func newHooksListCommand(use, short string, validate bool) *cobra.Command {
 		},
 	}
 
-	addJSONFlag(cmd)
+	clibase.AddJSONFlag(cmd)
 
 	return cmd
 }
@@ -216,13 +215,13 @@ func newHooksRunCommand() *cobra.Command {
 		Long:        "Run the hooks configured for one lifecycle event.\n\nEach hook has its own deadline; a failing hook is reported and does not silently stop the remaining ones. Cancellation stops subsequent hooks.",
 		Args:        usageArgs(cobra.ExactArgs(1)),
 		RunE:        runHooksRun,
-		Annotations: map[string]string{annotationOperation: "execute_hooks"},
+		Annotations: map[string]string{clibase.AnnotationOperation: "execute_hooks"},
 	}
 
 	cmd.Flags().String("session", "", "Session name passed to the hook environment")
 	cmd.Flags().String("prev-session", "", "Previous session name passed to the hook environment")
 	cmd.Flags().String("source", "cli", "Invocation source passed to the hook environment")
-	addJSONFlag(cmd)
+	clibase.AddJSONFlag(cmd)
 
 	return cmd
 }
@@ -275,8 +274,8 @@ func runHooksList(cmd *cobra.Command, validate bool) error {
 	summary := hookEventSummary(cfg)
 	timeout := hookTimeoutSeconds(cfg)
 
-	if jsonOutputEnabled(cmd) {
-		return writeJSONResult(cmd, hooksResultJSON{TimeoutSeconds: timeout, Events: summary})
+	if clibase.JSONOutputEnabled(cmd) {
+		return clibase.WriteJSONResult(cmd, hooksResultJSON{TimeoutSeconds: timeout, Events: summary})
 	}
 
 	var out []byte
@@ -302,7 +301,7 @@ func runHooksRun(cmd *cobra.Command, args []string) error {
 	}
 
 	result, runErr := session.RunHooks(ctx, hookConfig, event)
-	cmd.Annotations[annotationSuccessOwned] = "true"
+	cmd.Annotations[clibase.AnnotationSuccessOwned] = "true"
 
 	if runErr == nil && (result.Failed > 0 || result.TimedOut > 0) {
 		runErr = result.Err()
@@ -334,7 +333,7 @@ func prepareHookRun(cmd *cobra.Command, eventName string) (config.HookConfig, se
 }
 
 func renderHookRun(cmd *cobra.Command, eventName string, result session.HookResult, runErr error) error {
-	if jsonOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(cmd) {
 		payload := hookRunResultJSON{
 			Event:     eventName,
 			Attempted: result.Attempted,
@@ -345,10 +344,10 @@ func renderHookRun(cmd *cobra.Command, eventName string, result session.HookResu
 		}
 
 		if runErr != nil {
-			return writeJSONResultError(cmd, payload, runErr)
+			return clibase.WriteJSONResultError(cmd, payload, runErr)
 		}
 
-		return writeJSONResult(cmd, payload)
+		return clibase.WriteJSONResult(cmd, payload)
 	}
 
 	summary := fmt.Sprintf(
@@ -405,7 +404,7 @@ func newKeysCommand() *cobra.Command {
 		RunE:  func(cmd *cobra.Command, _ []string) error { return runKeysList(cmd) },
 	}
 
-	addJSONFlag(cmd)
+	clibase.AddJSONFlag(cmd)
 
 	return cmd
 }
@@ -452,8 +451,8 @@ func runKeysList(cmd *cobra.Command) error {
 		return err
 	}
 
-	if jsonOutputEnabled(cmd) {
-		return writeJSONResult(cmd, struct {
+	if clibase.JSONOutputEnabled(cmd) {
+		return clibase.WriteJSONResult(cmd, struct {
 			Bindings []keyBindingJSON `json:"bindings"`
 		}{Bindings: bindings})
 	}

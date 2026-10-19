@@ -28,7 +28,7 @@ func TestWorkflowErrorsPreservePublicClassification(t *testing.T) {
 		cause error
 		code  string
 	}{
-		{errDoctorChecksFailed, "doctorChecksFailed"},
+		{clibase.ErrDoctorChecksFailed, "doctorChecksFailed"},
 		{fmt.Errorf("%w: %w", clibase.ErrLogFileUnavailable, os.ErrNotExist), "logFileUnavailable"},
 		{session.ErrNotInsideTmux, "notInsideTmux"},
 		{session.ErrInvokingClientUnavailable, "clientUnavailable"},
@@ -86,7 +86,7 @@ func TestRestoreUncertaintySurvivesJoinedCancellationAndExitCode(t *testing.T) {
 			t.Parallel()
 
 			joined := errors.Join(context.Canceled, store.ErrConflict, tc.cause, errSensitiveRaw)
-			wrapped := NewExitError(exitCodeCancel, oops.In("cli").Wrap(joined))
+			wrapped := NewExitError(action.ExitCodeCanceled, oops.In("cli").Wrap(joined))
 			assertWorkflowErrorEnvelope(t, wrapped, tc.code)
 		})
 	}
@@ -101,11 +101,11 @@ func assertWorkflowErrorEnvelope(t *testing.T, err error, code string) {
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&stderr)
 
-	if flagErr := cmd.Flags().Set(jsonFlagName, "true"); flagErr != nil {
+	if flagErr := cmd.Flags().Set(clibase.JSONFlagName, "true"); flagErr != nil {
 		t.Fatal(flagErr)
 	}
 
-	if renderErr := WriteCommandError(cmd, err); renderErr != nil {
+	if renderErr := clibase.WriteCommandError(cmd, err); renderErr != nil {
 		t.Fatal(renderErr)
 	}
 
@@ -113,7 +113,7 @@ func assertWorkflowErrorEnvelope(t *testing.T, err error, code string) {
 		t.Fatalf("failure wrote stdout: %q", stdout.String())
 	}
 
-	var envelope jsonEnvelope
+	var envelope clibase.JSONEnvelope
 	if decodeErr := json.Unmarshal(stderr.Bytes(), &envelope); decodeErr != nil {
 		t.Fatal(decodeErr)
 	}

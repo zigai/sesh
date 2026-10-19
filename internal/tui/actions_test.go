@@ -6,84 +6,8 @@ import (
 	"testing"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/zigai/sesh/internal/session"
 )
-
-func TestAttachCommandObservesModelLifecycleCancellation(t *testing.T) {
-	var commandDone <-chan struct{}
-
-	target := session.Session{
-		ID:                     "",
-		Name:                   testSupportSessionDevName,
-		TmuxServerSocket:       "",
-		Kind:                   session.KindLive,
-		Origin:                 "",
-		Generation:             "",
-		RepositorySource:       "",
-		NameRaw:                nil,
-		PathRaw:                nil,
-		RuntimeIdentity:        session.RuntimeIdentity{},
-		RemoteStatus:           session.RemoteStatusAvailable,
-		WindowCount:            0,
-		Attached:               false,
-		Activity:               time.Time{},
-		Current:                false,
-		ActivePaneID:           "",
-		ActiveWindowName:       "",
-		ActiveWindowIndex:      "",
-		ActivePanePath:         "",
-		ActivePaneCommand:      "",
-		ActivePaneTitle:        "",
-		AgentTotal:             0,
-		AgentActive:            0,
-		AgentWaiting:           0,
-		AgentFailed:            0,
-		AgentInterrupted:       0,
-		AgentUnknown:           0,
-		AgentIdleSince:         time.Time{},
-		AgentWaitingSince:      time.Time{},
-		AgentActivityChangedAt: time.Time{},
-		Agents:                 nil,
-	}
-
-	model := newTestModelWithDeps(Dependencies{
-		AttachSession: func(ctx context.Context, _ session.Session) (tea.ExecCommand, error) {
-			commandDone = ctx.Done()
-
-			return nil, nil //nolint:nilnil // A nil command explicitly requests application-owned attachment.
-		},
-	})
-
-	_, cmd := model.handleSessionActionResult(sessionActionResultMsg{
-		operation:      tuiOperationEnterLiveSession,
-		deferred:       false,
-		attach:         true,
-		err:            nil,
-		sessionName:    target.Name,
-		target:         target,
-		switchSession:  "",
-		switchPane:     "",
-		quit:           false,
-		refresh:        false,
-		statePersisted: false,
-		agentView:      nil,
-	})
-	_ = cmd
-
-	if commandDone == nil {
-		t.Fatal("attach action was not called with model operation context")
-	}
-
-	model.Close()
-
-	select {
-	case <-commandDone:
-	case <-time.After(time.Second):
-		t.Fatal("attach command context did not observe model Close()")
-	}
-}
 
 func TestSessionActionCommandDefersWorkflowUntilCommandRuns(t *testing.T) {
 	model := newTestModel()

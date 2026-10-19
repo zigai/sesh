@@ -12,6 +12,7 @@ import (
 
 	gotmux "github.com/zigai/gotmux/tmux"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/integration/tmuxserver"
 )
@@ -22,15 +23,15 @@ const (
 	bindingMessageTimeout = 2 * time.Second
 )
 
-// reportBindingFailure shows a failed action on the invoking tmux client instead of leaving
-// tmux to print "'…' returned 1". tmux run-shell discards stderr, so without this the reason
-// is lost. It reports whether the failure reached tmux; the caller then exits successfully.
-func reportBindingFailure(cmd *cobra.Command, err error, stdout, stderr io.Writer) bool {
-	if err == nil || jsonOutputEnabled(cmd) || !invokedByTmuxBinding(cmd, stdout, stderr) {
+// showBindingFailureMessage shows a failed action as a message on the invoking tmux client, where
+// run-shell would print "'…' returned 1" or, with -E, cover the pane in view mode. It reports
+// whether the message reached tmux; the caller then exits successfully.
+func showBindingFailureMessage(cmd *cobra.Command, err error, stdout, stderr io.Writer) bool {
+	if err == nil || clibase.JSONOutputEnabled(cmd) || !invokedByTmuxBinding(cmd, stdout, stderr) {
 		return false
 	}
 
-	if code := ExitCode(err); code == exitCodeCancel || code == exitCodePipe {
+	if code := ExitCode(err); code == action.ExitCodeCanceled || code == exitCodePipe {
 		return false
 	}
 
@@ -63,6 +64,10 @@ func invokedByTmuxBinding(cmd *cobra.Command, stdout, stderr io.Writer) bool {
 	return !writerIsTerminal(stdout) && !writerIsTerminal(stderr)
 }
 
+func bindingDiscardsReport(cmd *cobra.Command, output *commandBuffer, stdout, stderr io.Writer) bool {
+	return !output.streaming && !clibase.JSONOutputEnabled(cmd) && invokedByTmuxBinding(cmd, stdout, stderr)
+}
+
 func writerIsTerminal(writer io.Writer) bool {
 	file, ok := writer.(fileDescriptor)
 
@@ -70,7 +75,7 @@ func writerIsTerminal(writer io.Writer) bool {
 }
 
 func bindingFailureMessage(err error) string {
-	message := []rune(strings.Join(strings.Fields(humanErrorMessage(err)), " "))
+	message := []rune(strings.Join(strings.Fields(clibase.HumanErrorMessage(err)), " "))
 	if len(message) > bindingMessageLimit {
 		message = append(message[:bindingMessageLimit-1], '…')
 	}

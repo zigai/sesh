@@ -52,8 +52,7 @@ type servicesResultJSON struct {
 	Blocked  []string                    `json:"blocked,omitempty"`
 	Services []serviceJSON               `json:"services"`
 	Manager  *setup.ServiceRefreshResult `json:"manager,omitempty"`
-	// Units is the state of the services that make automatic saves work, read after a refresh.
-	Units []setup.UnitState `json:"units,omitempty"`
+	Units    []setup.UnitState           `json:"units,omitempty"`
 
 	applyFailed bool
 }
@@ -766,21 +765,16 @@ func resolveSetupTmuxProgram(cmd *cobra.Command) (string, error) {
 	return abs, nil
 }
 
-// resolveSetupServiceSocket selects the tmux server the rendered services target: --socket, else
-// the sesh-managed server's socket when that server is rendered too, else the server a plain
-// `tmux` command uses. Services must never default to a managed socket nothing will create.
+// resolveSetupServiceSocket never defaults to the managed socket unless the managed server is
+// rendered too, since nothing else creates it.
 func resolveSetupServiceSocket(cmd *cobra.Command, withTmux bool) (string, error) {
 	socketPath, _ := cmd.Flags().GetString("socket")
-	if socketPath == "" && withTmux {
-		runtimeDir := strings.TrimSpace(os.Getenv("XDG_RUNTIME_DIR"))
-		if runtimeDir == "" {
-			runtimeDir = filepath.Join(os.TempDir(), "sesh-runtime")
-		}
 
-		socketPath = filepath.Join(runtimeDir, "sesh", "tmux.sock")
-	}
-
-	if socketPath == "" {
+	switch {
+	case socketPath != "":
+	case withTmux:
+		socketPath = managedTmuxSocket()
+	default:
 		socketPath = clibase.DefaultTmuxSocket()
 	}
 
@@ -790,6 +784,15 @@ func resolveSetupServiceSocket(cmd *cobra.Command, withTmux bool) (string, error
 	}
 
 	return abs, nil
+}
+
+func managedTmuxSocket() string {
+	runtimeDir := strings.TrimSpace(os.Getenv("XDG_RUNTIME_DIR"))
+	if runtimeDir == "" {
+		runtimeDir = filepath.Join(os.TempDir(), "sesh-runtime")
+	}
+
+	return filepath.Join(runtimeDir, "sesh", "tmux.sock")
 }
 
 func inputsPlatform(definitions []setup.ServiceDefinition) string {

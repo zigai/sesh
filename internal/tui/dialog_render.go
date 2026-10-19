@@ -61,12 +61,14 @@ func (m *Model) helpBindings(keys actionKeyMap) []helpBinding {
 	switch m.displayMode {
 	case displayModeSesh:
 	case displayModeAgents:
-		bindings = append(bindings,
+		bindings = append(
+			bindings,
 			helpBinding{keys.agentSort.Help().Key, keys.agentSort.Help().Desc},
 			helpBinding{"ctrl+↑/ctrl+↓", "Move between tmux sessions"},
 		)
 	case displayModeInbox:
-		bindings = append(bindings,
+		bindings = append(
+			bindings,
 			helpBinding{keys.inboxGroup.Help().Key, keys.inboxGroup.Help().Desc},
 			helpBinding{"ctrl+↑/ctrl+↓", "Move between groups"},
 		)
@@ -78,7 +80,8 @@ func (m *Model) helpBindings(keys actionKeyMap) []helpBinding {
 		bindings = append(bindings, helpBinding{bound.key.Help().Key, bound.key.Help().Desc})
 	}
 
-	bindings = append(bindings,
+	bindings = append(
+		bindings,
 		helpBinding{keys.close.Help().Key, keys.close.Help().Desc},
 		helpBinding{keys.help.Help().Key, keys.help.Help().Desc},
 	)
@@ -89,7 +92,7 @@ func (m *Model) helpBindings(keys actionKeyMap) []helpBinding {
 func (m *Model) renderHelpOverlay() string {
 	contentWidth := m.contentWidth()
 	width := min(max(contentWidth-helpWidthMargin, minHelpOverlayWidth), maxHelpOverlayWidth)
-	keys := newActionKeyMap(m.config)
+	keys := m.actionKeys()
 
 	title := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(m.config.Theme.Primary)).

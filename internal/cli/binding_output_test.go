@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"testing"
+
+	"github.com/zigai/sesh/internal/app"
 )
 
 func TestBindingReportsDoNotReachTmuxRunShellOutput(t *testing.T) {
@@ -44,6 +46,7 @@ func testBindingReportOutput(t *testing.T, path []string, mode string) {
 	}
 
 	report := "command report\n"
+
 	if mode == "json" {
 		report = "{\"ok\":true}\n"
 
@@ -93,8 +96,8 @@ func TestBindingPartialSnapshotKeepsFailureWithoutPrintingReport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = publishCommandOutput(cmd, &output, &diagnostics, &stdout, &stderr, errPartialSnapshot, nil)
-	if !errors.Is(err, errPartialSnapshot) {
+	err = publishCommandOutput(cmd, &output, &diagnostics, &stdout, &stderr, app.ErrPartialSnapshot, nil)
+	if !errors.Is(err, app.ErrPartialSnapshot) {
 		t.Fatalf("error = %v, want partial snapshot cause", err)
 	}
 

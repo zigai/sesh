@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"io"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -166,8 +165,7 @@ func TestStandaloneLiveEnterDefersTerminalAttachToApplication(t *testing.T) {
 	}
 
 	model := newTestModelWithDeps(Dependencies{
-		OmitTerminalAttach: true,
-		TmuxIsInsideTmux:   func() bool { return false },
+		TmuxIsInsideTmux: func() bool { return false },
 		EnterSession: func(_ context.Context, s session.Session) (EnterOutcome, error) {
 			return EnterOutcome{SessionName: s.Name, Action: EnterNeedsAttach, Restored: false}, nil
 		},
@@ -209,71 +207,6 @@ func TestStandaloneLiveEnterDefersTerminalAttachToApplication(t *testing.T) {
 
 	if res.DeferredAttachSession() != target.Name {
 		t.Fatalf("DeferredAttachSession() = %q, want %q", res.DeferredAttachSession(), target.Name)
-	}
-}
-
-type mockExecCommand struct {
-	ran bool
-}
-
-func (m *mockExecCommand) Run() error {
-	m.ran = true
-	return nil
-}
-
-func (m *mockExecCommand) SetStdin(io.Reader)  {}
-func (m *mockExecCommand) SetStdout(io.Writer) {}
-func (m *mockExecCommand) SetStderr(io.Writer) {}
-func TestStandaloneLiveEnterExecutesInjectableTerminalAttach(t *testing.T) {
-	target := session.Session{
-		ID:               "$42",
-		Name:             "interactive-work",
-		Kind:             session.KindLive,
-		Origin:           session.OriginLocal,
-		TmuxServerSocket: "/tmp/tmux/local",
-	}
-
-	mockCmd := &mockExecCommand{ran: false}
-	attachCalled := false
-
-	model := newTestModelWithDeps(Dependencies{
-		TmuxIsInsideTmux: func() bool { return false },
-		EnterSession: func(_ context.Context, s session.Session) (EnterOutcome, error) {
-			return EnterOutcome{SessionName: s.Name, Action: EnterNeedsAttach, Restored: false}, nil
-		},
-		AttachSession: func(_ context.Context, s session.Session) (tea.ExecCommand, error) {
-			attachCalled = true
-
-			if s.ID != target.ID {
-				t.Fatalf("attach target ID = %q, want %q", s.ID, target.ID)
-			}
-
-			return mockCmd, nil
-		},
-	})
-	model.mode = modeFullscreen
-	model.filtered = []session.Session{target}
-	model.cursor = 0
-
-	handler := model.handleEnter()
-	if handler == nil {
-		t.Fatal("handleEnter() returned nil")
-	}
-
-	_, cmd := handler()
-	if cmd == nil {
-		t.Fatal("handleEnter() returned nil command")
-	}
-
-	msg := cmd()
-	_, execCmd := model.Update(msg)
-
-	if !attachCalled {
-		t.Fatal("AttachSession callback was not called")
-	}
-
-	if execCmd == nil {
-		t.Fatal("tea.Exec command was not returned")
 	}
 }
 

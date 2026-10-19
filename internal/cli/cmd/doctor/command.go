@@ -89,7 +89,7 @@ func NewCommand(build Build) *cobra.Command {
 		Annotations: map[string]string{
 			// The doctor loads configuration itself so a broken file becomes a failed check, and
 			// it opens no log file so a run changes nothing.
-			clibase.AnnotationSkipConfigLoad: "true",
+			clibase.AnnotationSkipRuntimeSetup: "true",
 		},
 	}
 

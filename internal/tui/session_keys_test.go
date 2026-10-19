@@ -22,7 +22,7 @@ func keyEntry(name, key string) session.KeyAssignment {
 }
 
 func defaultSessionKeyRules() sessionKeyRules {
-	return newSessionKeyRules(config.DefaultConfig())
+	return newSessionKeyRules(config.DefaultConfig(), testBindings(config.DefaultConfig()))
 }
 
 func altSessionKeyConfig() *config.Config {
@@ -59,7 +59,14 @@ func TestAssignSessionKeysPrefersLettersOfTheName(t *testing.T) {
 }
 
 func TestAssignSessionKeysSkipsLettersOfPickerActionsWithAlt(t *testing.T) {
-	assigned, _ := assignSessionKeys(nil, []session.Identity{localKeyIdentity("scratch")}, newSessionKeyRules(altSessionKeyConfig()), true)
+	cfg := altSessionKeyConfig()
+	cfg.Keys.Bind = []config.KeyBindConfig{
+		{Key: "alt+s", Action: "session.create", In: "picker", Table: "", Params: nil},
+		{Key: "alt+c", Action: "session.rename", In: "picker", Table: "", Params: nil},
+		{Key: "alt+r", Action: "session.kill", In: "picker", Table: "", Params: nil},
+	}
+
+	assigned, _ := assignSessionKeys(nil, []session.Identity{localKeyIdentity("scratch")}, newSessionKeyRules(cfg, testBindings(cfg)), true)
 
 	if got := keyOf(assigned, "scratch"); got != "a" {
 		t.Fatalf("key of scratch = %q, want a", got)
@@ -180,7 +187,7 @@ func TestAssignSessionKeysReportsUnchangedKeys(t *testing.T) {
 func TestAssignSessionKeysYieldsToOverrides(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Keys.Sessions = map[string]string{"api": "w", "web": "b"}
-	rules := newSessionKeyRules(cfg)
+	rules := newSessionKeyRules(cfg, testBindings(cfg))
 
 	entries := []session.KeyAssignment{keyEntry("wiki", "w"), keyEntry("web", "e")}
 	listed := []session.Identity{localKeyIdentity("wiki"), localKeyIdentity("web"), localKeyIdentity("api")}
@@ -202,7 +209,7 @@ func TestAssignSessionKeysReassignsKeysTakenByActions(t *testing.T) {
 
 	entries := []session.KeyAssignment{keyEntry("web", "w")}
 
-	assigned, _ := assignSessionKeys(entries, []session.Identity{localKeyIdentity("web")}, newSessionKeyRules(cfg), true)
+	assigned, _ := assignSessionKeys(entries, []session.Identity{localKeyIdentity("web")}, newSessionKeyRules(cfg, testBindings(cfg)), true)
 	if got := keyOf(assigned, "web"); got != "e" {
 		t.Fatalf("key of web = %q, want e once alt+w runs an action", got)
 	}

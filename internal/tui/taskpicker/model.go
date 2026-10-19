@@ -41,6 +41,11 @@ const (
 	sectionInUse
 )
 
+var (
+	whereChoices = []where{whereNew, whereHere, whereOther}
+	sectionOrder = []section{sectionNew, sectionCheckout, sectionBranch, sectionInUse}
+)
+
 // Options is what the picker offers. Project names the pane's project and is empty elsewhere;
 // Locations, the Current checkout's index in them, and NextNumber and Branches that name a new
 // worktree's branch come from the project's offer. Expanded lists every location of the project,
@@ -261,7 +266,8 @@ func (m *Model) moveVertically(key string) {
 	case m.options.Expanded:
 		m.step(delta)
 	case m.hasWhere():
-		m.where = (m.where + where(delta) + whereOther + 1) % (whereOther + 1)
+		index := slices.Index(whereChoices, m.where)
+		m.where = whereChoices[(index+delta+len(whereChoices))%len(whereChoices)]
 	}
 }
 
@@ -527,7 +533,9 @@ func (m *Model) filterRows() {
 		}
 	}
 
-	slices.SortStableFunc(m.rows, func(a, b int) int { return int(m.all[a].section) - int(m.all[b].section) })
+	slices.SortStableFunc(m.rows, func(a, b int) int {
+		return slices.Index(sectionOrder, m.all[a].section) - slices.Index(sectionOrder, m.all[b].section)
+	})
 
 	m.cursor = 0
 	m.listTop = 0
@@ -566,7 +574,7 @@ func (m *Model) keepCursorVisible() {
 	rows := m.layout().listRows
 	lines := m.lines()
 
-	target := slices.IndexFunc(lines, func(l listLine) bool { return l.row == m.cursor })
+	target := slices.IndexFunc(lines, func(l listLine) bool { return !l.heading && l.row == m.cursor })
 	if target < 0 || rows <= 0 {
 		m.listTop = 0
 
@@ -574,7 +582,7 @@ func (m *Model) keepCursorVisible() {
 	}
 
 	top := target
-	if target > 0 && lines[target-1].row < 0 {
+	if target > 0 && lines[target-1].heading {
 		top = target - 1
 	}
 
@@ -613,8 +621,8 @@ func (m *Model) click(mouse tea.Mouse) (tea.Model, tea.Cmd) {
 	}
 
 	switch {
-	case geometry.whereTop >= 0 && line >= geometry.whereTop && line <= geometry.whereTop+int(whereOther):
-		m.where = where(line - geometry.whereTop)
+	case geometry.showsWhere && line >= geometry.whereTop && line < geometry.whereTop+len(whereChoices):
+		m.where = whereChoices[line-geometry.whereTop]
 	case line >= geometry.listTop && line < geometry.listTop+geometry.listRows:
 		m.clickList(line - geometry.listTop)
 	default:
@@ -636,7 +644,7 @@ func clickedChoice(rows [][]placed, top, line, column int) (int, bool) {
 
 func (m *Model) clickList(line int) {
 	lines := m.lines()
-	if index := m.listTop + line; index < len(lines) && lines[index].row >= 0 {
+	if index := m.listTop + line; index < len(lines) && !lines[index].heading {
 		m.cursor = lines[index].row
 	}
 }

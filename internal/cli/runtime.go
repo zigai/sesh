@@ -25,15 +25,7 @@ import (
 	"github.com/zigai/sesh/internal/logging"
 )
 
-const (
-	maxCommandOutput         = 32 << 20
-	AnnotationLiveIO         = "live-io"
-	annotationLiveIO         = AnnotationLiveIO
-	annotationOperation      = "operation"
-	annotationSuccessOwned   = "success-owned"
-	annotationSkipConfigLoad = "skip-config-load"
-	annotationOwnedValue     = "true"
-)
+const maxCommandOutput = 32 << 20
 
 var (
 	errCommandOutputLimit = errors.New("command output exceeds limit")
@@ -58,8 +50,6 @@ type commandRuntime struct {
 }
 
 type commandResultError = clibase.CommandResultError
-
-type configurationError = clibase.ConfigurationError
 
 type commandBuffer struct {
 	buffer    bytes.Buffer
@@ -143,7 +133,7 @@ func ExecuteApplication(ctx context.Context, args []string, input io.Reader, std
 	closeErr := runtime.finish(ctx, runErr)
 
 	err := publishCommandOutput(executed, &output, &diagnostics, stdout, stderr, runErr, closeErr)
-	if reportBindingFailure(executed, err, stdout, stderr) {
+	if showBindingFailureMessage(executed, err, stdout, stderr) {
 		return nil
 	}
 
@@ -169,7 +159,7 @@ func (r *commandRuntime) prepare(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if r.operation != "" && cmd.Annotations[annotationSkipConfigLoad] != "true" {
+	if r.operation != "" && cmd.Annotations[clibase.AnnotationSkipRuntimeSetup] != "true" {
 		if err := r.setupLogging(cmd); err != nil {
 			return err
 		}
@@ -315,7 +305,7 @@ func (r *commandRuntime) logOutcome(ctx context.Context, err error) {
 	}
 
 	event := zerolog.Ctx(ctx).Error().Str("component", "cli").Str("operation", r.operation).Str("status", "failed").
-		Str("reason", jsonErrorCode(err)).Int64("duration_ms", duration)
+		Str("reason", clibase.JSONErrorCode(err)).Int64("duration_ms", duration)
 
 	if step, ok := errorstep.Owned(err, "cli"); ok {
 		event = event.Str("failed_step", step.Operation)
@@ -329,7 +319,7 @@ func (r *commandRuntime) logOutcome(ctx context.Context, err error) {
 }
 
 func (r *commandRuntime) ownsOutcome(err error) bool {
-	if err == nil && r.cmd != nil && r.cmd.Annotations[annotationSuccessOwned] == "true" {
+	if err == nil && r.cmd != nil && r.cmd.Annotations[clibase.AnnotationSuccessOwned] == "true" {
 		return false
 	}
 
@@ -337,7 +327,7 @@ func (r *commandRuntime) ownsOutcome(err error) bool {
 }
 
 func commandOperation(cmd *cobra.Command) string {
-	if operation := cmd.Annotations[annotationOperation]; operation != "" {
+	if operation := cmd.Annotations[clibase.AnnotationOperation]; operation != "" {
 		return operation
 	}
 
@@ -373,7 +363,7 @@ func validateCommandBeforeConfig(cmd *cobra.Command, args []string) error {
 }
 
 func publishCommandOutput(cmd *cobra.Command, output, diagnostics *commandBuffer, stdout, stderr io.Writer, runErr, closeErr error) error {
-	if !output.streaming && !jsonOutputEnabled(cmd) && invokedByTmuxBinding(cmd, stdout, stderr) {
+	if bindingDiscardsReport(cmd, output, stdout, stderr) {
 		stdout = io.Discard
 	}
 
@@ -381,7 +371,7 @@ func publishCommandOutput(cmd *cobra.Command, output, diagnostics *commandBuffer
 	cmd.SetErr(stderr)
 
 	resultErr := errors.Join(runErr, closeErr)
-	if closeErr != nil && jsonOutputEnabled(cmd) && !output.streaming {
+	if closeErr != nil && clibase.JSONOutputEnabled(cmd) && !output.streaming {
 		return publishFinalizationFailure(cmd, output, runErr, closeErr)
 	}
 
@@ -394,21 +384,21 @@ func publishCommandOutput(cmd *cobra.Command, output, diagnostics *commandBuffer
 	}
 
 	if output.streaming {
-		if runErr != nil && !commandErrorWasRendered(runErr) {
+		if runErr != nil && !clibase.CommandErrorWasRendered(runErr) {
 			return errors.Join(resultErr, writeStreamDiagnosticError(cmd, runErr))
 		}
 
 		return resultErr
 	}
 
-	return errors.Join(resultErr, WriteCommandError(cmd, runErr))
+	return errors.Join(resultErr, clibase.WriteCommandError(cmd, runErr))
 }
 
 func copyStagedBuffers(output, diagnostics *commandBuffer, stdout, stderr io.Writer, runErr error) error {
 	var outputErr error
 
 	_, hasResult := errors.AsType[*commandResultError](runErr)
-	if !output.failed && !output.streaming && (runErr == nil || commandErrorWasRendered(runErr) || errors.Is(runErr, clibase.ErrSubcommandRequired) || hasResult) {
+	if !output.failed && !output.streaming && (runErr == nil || clibase.CommandErrorWasRendered(runErr) || errors.Is(runErr, clibase.ErrSubcommandRequired) || hasResult) {
 		_, outputErr = io.Copy(stdout, bytes.NewReader(output.Bytes()))
 	}
 
@@ -429,7 +419,7 @@ func writeStreamDiagnosticError(cmd *cobra.Command, err error) error {
 		return nil
 	}
 
-	msg := humanErrorMessage(err)
+	msg := clibase.HumanErrorMessage(err)
 	if errors.Is(err, context.Canceled) {
 		msg = "log operation failed during cancellation"
 	}
@@ -440,34 +430,31 @@ func writeStreamDiagnosticError(cmd *cobra.Command, err error) error {
 }
 
 func writeFinalizationErrors(cmd *cobra.Command, runErr, closeErr error) error {
-	if contract, uncertain := matchCommandError(runErr, uncertainCommandErrors); uncertain {
-		runErr = contract.cause
+	if cause := clibase.UncertainCause(runErr); cause != nil {
+		runErr = cause
 	}
 
-	if err := WriteCommandError(cmd, runErr); err != nil {
+	if err := clibase.WriteCommandError(cmd, runErr); err != nil {
 		return err
 	}
 
-	return WriteCommandError(cmd, closeErr)
+	return clibase.WriteCommandError(cmd, closeErr)
 }
 
 func publishFinalizationFailure(cmd *cobra.Command, output *commandBuffer, runErr, closeErr error) error {
 	combined := errors.Join(runErr, closeErr)
 
 	diagnostic := closeErr
-	if contract, uncertain := matchCommandError(runErr, uncertainCommandErrors); uncertain {
-		diagnostic = contract.cause
+	if cause := clibase.UncertainCause(runErr); cause != nil {
+		diagnostic = cause
 	}
 
 	var fields map[string]json.RawMessage
 	if !output.failed && json.Unmarshal(output.Bytes(), &fields) == nil && fields["result"] != nil && string(fields["result"]) != "null" {
-		writeErr := writeJSONEnvelope(cmd.OutOrStdout(), jsonEnvelope{
-			SchemaVersion: jsonSchemaVersion, Command: jsonCommandName(cmd), OK: false,
-			Result: fields["result"], Error: newJSONErrorPayload(diagnostic),
-		})
+		writeErr := clibase.WriteJSONResultFailure(cmd, fields["result"], diagnostic)
 
 		return NewExitError(exitCodeGeneral, errors.Join(combined, writeErr))
 	}
 
-	return NewExitError(exitCodeGeneral, errors.Join(combined, WriteCommandError(cmd, diagnostic)))
+	return NewExitError(exitCodeGeneral, errors.Join(combined, clibase.WriteCommandError(cmd, diagnostic)))
 }

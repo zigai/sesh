@@ -13,8 +13,8 @@ import (
 
 func TestPickerListsOpenProjectsFirstAndOpensTheSelection(t *testing.T) {
 	model := newModel(t, []projectpicker.Entry{
-		{Root: "/code/alpha", Name: "alpha", Path: "~/code/alpha", Session: "", Taken: ""},
-		{Root: "/code/beta", Name: "beta", Path: "~/code/beta", Session: "beta", Taken: ""},
+		{Root: "/code/alpha", Name: "alpha", Path: "~/code/alpha", Session: "", NameTakenBy: ""},
+		{Root: "/code/beta", Name: "beta", Path: "~/code/beta", Session: "beta", NameTakenBy: ""},
 	})
 
 	if first := listLines(t, model)[0]; !strings.Contains(first, "beta") {
@@ -40,7 +40,7 @@ func TestPickerOffersToCloneURLsAndCreateUnknownNames(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.query, func(t *testing.T) {
-			model := newModel(t, []projectpicker.Entry{{Root: "/code/alpha", Name: "alpha", Path: "~/code/alpha", Session: "", Taken: ""}})
+			model := newModel(t, []projectpicker.Entry{{Root: "/code/alpha", Name: "alpha", Path: "~/code/alpha", Session: "", NameTakenBy: ""}})
 			send(model, typed(tt.query)...)
 			send(model, key(tea.KeyEnter))
 
@@ -62,8 +62,8 @@ func TestPasteUpdatesTheProjectChoices(t *testing.T) {
 	} {
 		t.Run(test.query, func(t *testing.T) {
 			model := newModel(t, []projectpicker.Entry{
-				{Root: "/code/alpha", Name: "alpha", Path: "~/code/alpha", Session: "", Taken: ""},
-				{Root: "/code/beta", Name: "beta", Path: "~/code/beta", Session: "", Taken: ""},
+				{Root: "/code/alpha", Name: "alpha", Path: "~/code/alpha", Session: "", NameTakenBy: ""},
+				{Root: "/code/beta", Name: "beta", Path: "~/code/beta", Session: "", NameTakenBy: ""},
 			})
 
 			send(model, tea.PasteMsg{Content: test.query}, key(tea.KeyEnter))
@@ -76,7 +76,7 @@ func TestPasteUpdatesTheProjectChoices(t *testing.T) {
 }
 
 func TestPickerDoesNotOfferToCreateAProjectThatExists(t *testing.T) {
-	model := newModel(t, []projectpicker.Entry{{Root: "/code/alpha", Name: "alpha", Path: "~/code/alpha", Session: "", Taken: ""}})
+	model := newModel(t, []projectpicker.Entry{{Root: "/code/alpha", Name: "alpha", Path: "~/code/alpha", Session: "", NameTakenBy: ""}})
 	send(model, typed("alpha")...)
 
 	for _, line := range listLines(t, model) {
@@ -87,7 +87,7 @@ func TestPickerDoesNotOfferToCreateAProjectThatExists(t *testing.T) {
 }
 
 func TestPickerAdoptsATakenNameOnlyWhenAsked(t *testing.T) {
-	model := newModel(t, []projectpicker.Entry{{Root: "/code/alpha", Name: "alpha", Path: "~/code/alpha", Session: "", Taken: "alpha"}})
+	model := newModel(t, []projectpicker.Entry{{Root: "/code/alpha", Name: "alpha", Path: "~/code/alpha", Session: "", NameTakenBy: "alpha"}})
 
 	send(model, key(tea.KeyEnter))
 
@@ -107,7 +107,7 @@ func TestPickerAdoptsATakenNameOnlyWhenAsked(t *testing.T) {
 }
 
 func TestPickerCancelChoosesNothing(t *testing.T) {
-	model := newModel(t, []projectpicker.Entry{{Root: "/code/alpha", Name: "alpha", Path: "~/code/alpha", Session: "", Taken: ""}})
+	model := newModel(t, []projectpicker.Entry{{Root: "/code/alpha", Name: "alpha", Path: "~/code/alpha", Session: "", NameTakenBy: ""}})
 	send(model, key(tea.KeyEscape))
 
 	if _, ok := model.Chosen(); ok {
@@ -118,8 +118,8 @@ func TestPickerCancelChoosesNothing(t *testing.T) {
 func TestPickerFrameLinesKeepTheirWidth(t *testing.T) {
 	long := strings.Repeat("deep/", 30) + "project"
 	model := newModel(t, []projectpicker.Entry{
-		{Root: "/code/alpha", Name: "alpha", Path: "~/" + long, Session: "alpha", Taken: ""},
-		{Root: "/code/beta", Name: "beta", Path: "~/code/beta", Session: "", Taken: "beta"},
+		{Root: "/code/alpha", Name: "alpha", Path: "~/" + long, Session: "alpha", NameTakenBy: ""},
+		{Root: "/code/beta", Name: "beta", Path: "~/code/beta", Session: "", NameTakenBy: "beta"},
 	})
 
 	for _, query := range []string{"", "a", "notebook"} {

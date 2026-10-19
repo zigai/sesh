@@ -41,11 +41,11 @@ func (k keyPressSpec) String() string {
 	return string(k)
 }
 
-func newActionKeyMap(cfg *config.Config) actionKeyMap {
+func newActionKeyMap(cfg *config.Config, bindings []action.Binding) actionKeyMap {
 	keys := cfg.Keys
 
 	return actionKeyMap{
-		actions:    pickerActions(cfg),
+		actions:    pickerActions(bindings),
 		help:       newActionBinding(keys.Help, "Show this help"),
 		cycleMode:  newActionBinding(keys.CycleMode, "Cycle display mode"),
 		agentSort:  newActionBinding(keys.AgentSort, "Cycle agent sort order"),
@@ -65,14 +65,7 @@ func newActionKeyMap(cfg *config.Config) actionKeyMap {
 	}
 }
 
-// pickerActions returns the action bindings pressed in the picker. Configuration is validated
-// when it is loaded, so a configuration that fails to resolve here binds no actions.
-func pickerActions(cfg *config.Config) []boundAction {
-	bindings, err := action.Bindings(cfg)
-	if err != nil {
-		return nil
-	}
-
+func pickerActions(bindings []action.Binding) []boundAction {
 	bound := make([]boundAction, 0, len(bindings))
 
 	for _, binding := range action.SurfaceBindings(bindings, action.SurfacePicker) {
@@ -92,7 +85,10 @@ func pickerActions(cfg *config.Config) []boundAction {
 	return bound
 }
 
-// availableActions returns the picker's action bindings that apply to the selection.
+func (m *Model) actionKeys() actionKeyMap {
+	return newActionKeyMap(m.config, m.actionBindings)
+}
+
 func (m *Model) availableActions(keys actionKeyMap) []boundAction {
 	available := make([]boundAction, 0, len(keys.actions))
 

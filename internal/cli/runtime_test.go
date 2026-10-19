@@ -16,6 +16,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/zigai/sesh/internal/action"
+	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/logging"
 	"github.com/zigai/sesh/internal/snapshot/restore"
@@ -680,7 +682,7 @@ func TestLogStreamDiagnosticsPreserveIndependentFailures(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if stderr.Len() == 0 || ExitCode(cause) == 0 || ExitCode(cause) == exitCodeCancel {
+	if stderr.Len() == 0 || ExitCode(cause) == 0 || ExitCode(cause) == action.ExitCodeCanceled {
 		t.Fatalf("independent failure hidden: %q, exit %d", stderr.String(), ExitCode(cause))
 	}
 }
@@ -696,7 +698,7 @@ func TestRestoreRuntimeLogOwnership(t *testing.T) {
 		wantRecord bool
 	}{
 		{"complete", nil, false},
-		{"partial", clibase.NewRenderedCommandError(loggedTestError{error: errPartialRestore}), false},
+		{"partial", clibase.NewRenderedCommandError(loggedTestError{error: app.ErrPartialRestore}), false},
 		{"engine_failure", clibase.NewCommandResultError(engineFailure), false},
 		{"independent_cleanup", errors.Join(engineFailure, errSensitiveRaw), true},
 		{"admission_failure", errSensitiveRaw, true},

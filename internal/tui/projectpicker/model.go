@@ -37,14 +37,13 @@ const (
 
 type ChoiceKind uint8
 
-// Entry is a project the picker lists. Session names the project's open session; Taken names
-// a session without a project that already has the project's name.
+// Entry is a project the picker lists. Session names the project's open session.
 type Entry struct {
-	Root    string
-	Name    string
-	Path    string
-	Session string
-	Taken   string
+	Root        string
+	Name        string
+	Path        string
+	Session     string
+	NameTakenBy string
 }
 
 // Choice is what the person picked: a project root to open or adopt, a URL to clone, or a name
@@ -212,14 +211,14 @@ func (m *Model) choose(adopt bool) (tea.Model, tea.Cmd) {
 	entry := m.entries[selected.entry]
 
 	switch {
-	case adopt && entry.Taken != "":
+	case adopt && entry.NameTakenBy != "":
 		m.chosen = Choice{Kind: ChoiceAdopt, Value: entry.Root}
 	case adopt:
 		m.status = "Only a project whose name is used by another session can adopt it"
 
 		return m, nil
-	case entry.Session == "" && entry.Taken != "":
-		m.status = "Session " + entry.Taken + " already has this name: alt+a adopts it"
+	case entry.Session == "" && entry.NameTakenBy != "":
+		m.status = "Session " + entry.NameTakenBy + " already has this name: alt+a adopts it"
 
 		return m, nil
 	default:
@@ -339,8 +338,8 @@ func (m *Model) renderRow(current row, selected bool, width int) string {
 	}
 
 	right := entry.Path
-	if entry.Session == "" && entry.Taken != "" {
-		right = "name used by " + entry.Taken + "  " + entry.Path
+	if entry.Session == "" && entry.NameTakenBy != "" {
+		right = "name used by " + entry.NameTakenBy + "  " + entry.Path
 	}
 
 	return m.chrome.Row(glyph+entry.Name, right, selected, width)
@@ -352,7 +351,7 @@ func (m *Model) renderFooter(width int) string {
 	}
 
 	hints := []tui.Hint{{Key: "enter", Desc: "open"}, {Key: "esc", Desc: "close"}}
-	if m.cursor < len(m.rows) && m.rows[m.cursor].entry >= 0 && m.entries[m.rows[m.cursor].entry].Taken != "" {
+	if m.cursor < len(m.rows) && m.rows[m.cursor].entry >= 0 && m.entries[m.rows[m.cursor].entry].NameTakenBy != "" {
 		hints = append(hints, tui.Hint{Key: "alt+a", Desc: "adopt"})
 	}
 

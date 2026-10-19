@@ -10,7 +10,7 @@ import (
 func (m *Model) handleActionKeys(msg tea.KeyPressMsg) func() (tea.Model, tea.Cmd) {
 	pressed := keyPressFromMsg(msg)
 
-	keys := newActionKeyMap(m.config)
+	keys := m.actionKeys()
 	if handler, matched := m.handleDisplayActionKeys(pressed, keys); matched {
 		return handler
 	}

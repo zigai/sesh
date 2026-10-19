@@ -227,19 +227,19 @@ func projectPickerEntries(ctx context.Context, cfg *config.Config, server *gotmu
 	entries := make([]projectpicker.Entry, 0, len(projects))
 
 	for _, p := range projects {
-		entry := projectpicker.Entry{Root: p.Root, Name: p.Name, Path: session.ShortenHomePath(p.Root), Session: "", Taken: ""}
+		entry := projectpicker.Entry{Root: p.Root, Name: p.Name, Path: session.ShortenHomePath(p.Root), Session: "", NameTakenBy: ""}
 
 		for _, live := range sessions {
 			switch {
 			case live.Root == p.Root:
 				entry.Session = live.Name
 			case live.Root == "" && live.Name == project.SessionName(p):
-				entry.Taken = live.Name
+				entry.NameTakenBy = live.Name
 			}
 		}
 
 		if entry.Session != "" {
-			entry.Taken = ""
+			entry.NameTakenBy = ""
 		}
 
 		entries = append(entries, entry)

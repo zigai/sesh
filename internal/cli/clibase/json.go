@@ -20,6 +20,7 @@ import (
 	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/agents"
 	"github.com/zigai/sesh/internal/app"
+	"github.com/zigai/sesh/internal/automation"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/errorstep"
 	"github.com/zigai/sesh/internal/integration/process"
@@ -48,6 +49,7 @@ var (
 	workflowErrors = []commandErrorContract{
 		{ErrDoctorChecksFailed, "doctorChecksFailed", "doctor checks failed"},
 		{ErrLogFileUnavailable, "logFileUnavailable", "log file cannot be opened; set paths.log_file to a file in a writable directory"},
+		{ErrHelpShorthand, "usageError", "-h is not a help flag; use --help"},
 		{engine.ErrRetentionBudgetUnmet, "retentionBudgetUnmet", "protected snapshot bytes exceed retention budget"},
 		{engine.ErrCollectionQuarantined, "collectionQuarantined", "snapshot collection preserved contradictory evidence"},
 		{gotmux.ErrOutputLimit, "outputLimitExceeded", "tmux command output exceeded its byte limit"},
@@ -215,6 +217,10 @@ func JSONErrorCode(err error) string {
 		return contract.code
 	}
 
+	if errors.Is(err, automation.ErrActiveRestores) {
+		return "activeRestores"
+	}
+
 	return generalErrorCode(err)
 }
 
@@ -329,10 +335,18 @@ func WriteCommandError(cmd *cobra.Command, err error) error {
 	return nil
 }
 
-// humanErrorMessage is the terminal diagnostic: mapped sentinels keep their wording, configuration
+// UncertainCause returns the uncertainty sentinel err carries, or nil. It outranks any other cause
+// in a diagnostic.
+func UncertainCause(err error) error {
+	contract, _ := matchErrorContract(err, uncertainErrors)
+
+	return contract.cause
+}
+
+// HumanErrorMessage is the terminal diagnostic: mapped sentinels keep their wording, configuration
 // errors add their cause, and other causes are reported verbatim so the reader can act on them. JSON envelopes keep the
 // sanitized message from SafeCommandErrorMessage.
-func humanErrorMessage(err error) string {
+func HumanErrorMessage(err error) string {
 	if msg, ok := HumanConfigurationErrorMessage(err); ok {
 		return msg
 	}
@@ -396,7 +410,7 @@ func tomlDocumentError(err error) bool {
 }
 
 func humanCommandErrorMessage(cmd *cobra.Command, err error) string {
-	message := humanErrorMessage(err)
+	message := HumanErrorMessage(err)
 	if EnvironmentError(err) {
 		return message + "; run 'sesh doctor' for details"
 	}
@@ -484,17 +498,17 @@ func captureSentinelMessage(err error) (string, bool) {
 	case errors.Is(err, capture.ErrUnsupported) || errors.Is(err, process.ErrUnsupported):
 		return "state cannot be represented faithfully by published API", true
 	case errors.Is(err, tmuxserver.ErrEndpoint):
-		return "explicit absolute tmux socket is required", true
+		return "an explicit absolute tmux socket is required", true
 	case errors.Is(err, capture.ErrProcessDeleted):
-		return "process state changed during capture", true
+		return "process executable or working directory was deleted", true
 	case errors.Is(err, engine.ErrLeaseRootRequired):
-		return "--lease-root is required", true
+		return "explicit shared lease root required", true
 	case errors.Is(err, engine.ErrRepositoryRequired):
-		return "--repository is required", true
+		return "repository required", true
 	case errors.Is(err, model.ErrVersion):
-		return "snapshot version is not supported", true
+		return "unsupported snapshot schema version", true
 	case errors.Is(err, model.ErrInvalid):
-		return "snapshot payload invalid", true
+		return "invalid snapshot structure", true
 	default:
 		return "", false
 	}
@@ -625,9 +639,9 @@ func sessionSentinelMessage(err error) (string, bool) {
 	case errors.Is(err, session.ErrCatalogLimitExceeded), errors.Is(err, session.ErrPaneHistoryLimitExceeded):
 		return "inventory limit exceeded", true
 	case errors.Is(err, session.ErrServerIdentityChanged):
-		return "server identity changed", true
+		return "tmux server identity changed during observation", true
 	case errors.Is(err, session.ErrInvalidIdentity):
-		return "invalid identity", true
+		return "invalid session identity", true
 	default:
 		return "", false
 	}

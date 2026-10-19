@@ -28,8 +28,8 @@ type EvidenceSource interface {
 }
 
 type evidenceEntry struct {
-	since time.Time
-	items []inbox.Evidence
+	turnEndedAt time.Time
+	items       []inbox.Evidence
 }
 
 type evidenceResultMsg struct {
@@ -52,7 +52,7 @@ func (m *Model) evidenceWanted(agent session.AgentSession) bool {
 
 	entry, read := m.evidence[key]
 
-	return !read || !entry.since.Equal(agent.StatusSince)
+	return !read || !entry.turnEndedAt.Equal(agent.StatusSince)
 }
 
 func (m *Model) loadEvidenceCommand() tea.Cmd {
@@ -97,13 +97,13 @@ func readReports(ctx context.Context, source EvidenceSource, wanted map[string]s
 		if err != nil {
 			if ctx.Err() == nil {
 				unread++
-				entries[key] = evidenceEntry{since: agent.StatusSince, items: nil}
+				entries[key] = unreadableUntilNextTurn(agent)
 			}
 
 			continue
 		}
 
-		entries[key] = evidenceEntry{since: agent.StatusSince, items: inbox.ParseEvidence(report, agent.CWD)}
+		entries[key] = evidenceEntry{turnEndedAt: agent.StatusSince, items: inbox.ParseEvidence(report, agent.CWD)}
 	}
 
 	if unread > 0 && ctx.Err() == nil {
@@ -111,6 +111,10 @@ func readReports(ctx context.Context, source EvidenceSource, wanted map[string]s
 	}
 
 	return entries, nil
+}
+
+func unreadableUntilNextTurn(agent session.AgentSession) evidenceEntry {
+	return evidenceEntry{turnEndedAt: agent.StatusSince, items: nil}
 }
 
 func (m *Model) handleEvidence(msg evidenceResultMsg) {
@@ -135,7 +139,7 @@ func (m *Model) handleEvidence(msg evidenceResultMsg) {
 
 func (m *Model) evidenceOf(item inboxItem) []inbox.Evidence {
 	entry, ok := m.evidence[conversationKey(item.agent)]
-	if !ok || conversationKey(item.agent) == "" || !entry.since.Equal(item.agent.StatusSince) {
+	if !ok || conversationKey(item.agent) == "" || !entry.turnEndedAt.Equal(item.agent.StatusSince) {
 		return nil
 	}
 
@@ -209,9 +213,10 @@ func (m *Model) openEvidence(evidence inbox.Evidence, dir string) func() (tea.Mo
 
 	command := exec.CommandContext(context.WithoutCancel(m.operationContext()), pager, "--", target)
 	command.Dir = dir
-	// The program's output is a wrapper that exec would connect through a pipe, and less only
-	// pages on a terminal.
-	command.Stdout = os.Stdout
+
+	if m.terminal != nil {
+		command.Stdout = m.terminal
+	}
 
 	return func() (tea.Model, tea.Cmd) {
 		return m, tea.ExecProcess(command, func(err error) tea.Msg { return openedMsg{err: err} })

@@ -47,8 +47,8 @@ func newConfigInitCommand() *cobra.Command {
 			"Use --path to select a different target. The inherited --config flag is not read by this command.",
 		Args: clibase.UsageArgs(cobra.NoArgs),
 		Annotations: map[string]string{
-			clibase.AnnotationOperation:      "config_init",
-			clibase.AnnotationSkipConfigLoad: "true",
+			clibase.AnnotationOperation:        "config_init",
+			clibase.AnnotationSkipRuntimeSetup: "true",
 		},
 		RunE: runConfigInit,
 	}

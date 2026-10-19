@@ -2,7 +2,6 @@ package tui
 
 import (
 	"context"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -245,46 +244,6 @@ func TestEnterLiveRowInPopupDefersSwitchUntilAfterQuit(t *testing.T) {
 
 	if saveCalls != 0 {
 		t.Fatalf("SaveModelState calls = %d, want 0 before deferred switch save", saveCalls)
-	}
-}
-
-func TestEnterLiveSessionOutsideTmuxAttachesThroughTerminalExec(t *testing.T) {
-	model := newTestModel()
-	model.mode = modeFullscreen
-	model.filtered = []session.Session{{Name: testSupportSessionDevName, Kind: session.KindLive}}
-
-	deps := dependenciesForTest(model)
-	deps.TmuxIsInsideTmux = func() bool { return false }
-	deps.TmuxSwitchSession = func(_ context.Context, name string) error {
-		t.Fatalf("TmuxSwitchSession(%q) called outside tmux, want attach", name)
-		return nil
-	}
-
-	attached := ""
-	deps.TmuxAttachCommand = func(ctx context.Context, sessionName string) *exec.Cmd {
-		attached = sessionName
-
-		return exec.CommandContext(ctx, "true")
-	}
-
-	msg := runEnterAction(t, model)
-
-	if msg.err != nil || !msg.attach || !msg.quit || msg.deferred {
-		t.Fatalf("standalone live enter msg = %#v, want terminal attach", msg)
-	}
-
-	_, attachCmd := model.handleSessionActionResult(msg)
-
-	if attachCmd == nil {
-		t.Fatal("handleSessionActionResult() returned no attach command")
-	}
-
-	if attached != testSupportSessionDevName {
-		t.Fatalf("attach command session = %q, want dev", attached)
-	}
-
-	if model.DeferredSwitchSession() != "" {
-		t.Fatalf("DeferredSwitchSession() = %q, want none while attaching", model.DeferredSwitchSession())
 	}
 }
 

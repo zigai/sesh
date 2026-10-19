@@ -246,7 +246,7 @@ func TestSnoozeUntilNextMessageEndsWhenTheAgentFinishesAnotherTurn(t *testing.T)
 func TestTimedSnoozeEndsAtItsTime(t *testing.T) {
 	agent := inboxTestAgent("fresh", "%1", session.AgentStatusIdle, time.Now().Add(-time.Hour))
 	model := newInboxTestModel(t, nil, []session.AgentSession{agent})
-	snooze := inbox.Snooze{Key: conversationKey(agent), Until: time.Now().Add(time.Hour).Unix(), Since: time.Now().UnixNano()}
+	snooze := inbox.Snooze{Key: conversationKey(agent), Until: time.Now().Add(time.Hour).Unix(), SnoozedAt: time.Now().UnixNano()}
 
 	model.inbox.Put(snooze)
 	refreshInbox(model)

@@ -82,34 +82,39 @@ func (m *Model) hostClosedItems(host inboxHost) []inboxItem {
 }
 
 // shownClosedItems are the closed or finished rows of a project: the pinned and most recent ones
-// up to the configured count unless the user expanded them, then a row that expands the rest. Rows
-// marked unseen are all shown.
+// up to the configured count unless the user expanded them, then a row that expands the rest.
 func (m *Model) shownClosedItems(host inboxHost, group string, items []inboxItem) []inboxItem {
 	shown := m.config.Inbox.ClosedShown
 	expandKey := host.identity.ConnectionID + "\x00" + group
+	unseen := items[0].work.UnseenAt != 0
 
-	if items[0].section == config.InboxDone || shown == 0 || len(items) <= shown || m.closedExpanded[expandKey] {
+	if unseen || shown == 0 || len(items) <= shown || m.closedExpanded[expandKey] {
 		return items
 	}
 
 	slices.SortStableFunc(items, compareRecency)
 
-	more := items[shown]
+	return append(items[:shown:shown], newMoreItem(items[shown], group, expandKey, len(items)-shown))
+}
+
+func newMoreItem(firstHidden inboxItem, group, expandKey string, hidden int) inboxItem {
+	more := firstHidden
 	more.agent.PaneID = moreRowPrefix + group
-	more.agent.HarnessSession = strconv.Itoa(len(items)-shown) + " more"
+	more.agent.HarnessSession = strconv.Itoa(hidden) + " more"
 	more.agent.Task = more.agent.HarnessSession
 	more.agent.SessionID = ""
 	more.agent.SessionPath = ""
 	more.agent.GitBranch = ""
 	more.work = work.EmptyItem()
-	more.more = expandKey
+	more.kind = inboxMoreRow
+	more.expandKey = expandKey
 
-	return append(items[:shown:shown], more)
+	return more
 }
 
 func (m *Model) expandClosedItems(item inboxItem) func() (tea.Model, tea.Cmd) {
 	return func() (tea.Model, tea.Cmd) {
-		m.closedExpanded[item.more] = true
+		m.closedExpanded[item.expandKey] = true
 		selected := m.selectedSessionIdentity()
 
 		m.refreshDisplaySessions()
@@ -158,7 +163,7 @@ func (m *Model) newClosedItem(host inboxHost, recorded work.Item) inboxItem {
 	}
 
 	return inboxItem{
-		agent: agent, owner: owner, host: host, live: live, task: false, closed: true, work: recorded, more: "", section: section,
+		agent: agent, owner: owner, host: host, live: live, kind: inboxClosedRow, work: recorded, expandKey: "", section: section,
 	}
 }
 
@@ -174,14 +179,12 @@ func compareRecency(left, right inboxItem) int {
 	return right.agent.StatusSince.Compare(left.agent.StatusSince)
 }
 
-// recordedWork is the recorded conversation of a row: the latest one of its task, else the one
-// with its agent's conversation.
-func recordedWork(host inboxHost, agent session.AgentSession, live task.Live, isTask bool) work.Item {
+func recordedWork(host inboxHost, agent session.AgentSession, live task.Live, kind inboxItemKind) work.Item {
 	found := work.EmptyItem()
 
 	for _, recorded := range host.work {
 		matches := recorded.Harness == agent.Harness && recorded.Conversation == agent.SessionID && agent.SessionID != ""
-		if isTask {
+		if kind == inboxTaskRow {
 			matches = recorded.Task == live.Record.ID
 		}
 
@@ -210,7 +213,7 @@ func (m *Model) followResume(at action.Location, resumed action.ResumedAgent) te
 	if at.Kind == action.LocationPeer {
 		m.pendingResume = &remoteResume{connection: at.Connection, session: resumed.Session.ID, pane: resumed.Pane}
 
-		return m.attachResumed()
+		return m.attachPendingResumeWhenListed()
 	}
 
 	agent := emptyAgentSession()
@@ -219,9 +222,7 @@ func (m *Model) followResume(at action.Location, resumed action.ResumedAgent) te
 	return m.runAgentSessionAction(target, agent)
 }
 
-// attachResumed attaches to the window of a conversation resumed on a remote host once the remote
-// catalog lists its session; a new project session reaches it with the peer's next inventory.
-func (m *Model) attachResumed() tea.Cmd {
+func (m *Model) attachPendingResumeWhenListed() tea.Cmd {
 	pending := m.pendingResume
 	if pending == nil {
 		return nil
@@ -244,11 +245,11 @@ func (m *Model) attachResumed() tea.Cmd {
 
 func workActionError(id action.ID, item inboxItem) error {
 	switch {
-	case id == action.InboxFinish.ID && item.task:
+	case id == action.InboxFinish.ID && item.kind == inboxTaskRow:
 		return nil
-	case item.task && (id == action.InboxLink.ID || id == action.InboxUnlink.ID):
+	case item.kind == inboxTaskRow && (id == action.InboxLink.ID || id == action.InboxUnlink.ID):
 		return errTaskPR
-	case item.work.ID == "" || item.more != "":
+	case item.work.ID == "":
 		return errNotRecorded
 	default:
 		return recordedActionError(id, item.work)
@@ -271,7 +272,7 @@ func recordedActionError(id action.ID, recorded work.Item) error {
 }
 
 func (m *Model) runWorkAction(id action.ID, item inboxItem, values action.Values) func() (tea.Model, tea.Cmd) {
-	if id == action.InboxFinish.ID && item.task {
+	if id == action.InboxFinish.ID && item.kind == inboxTaskRow {
 		return m.invokeAction(action.TaskFinish.ID, action.Values{})
 	}
 
@@ -316,7 +317,7 @@ func (m *Model) unlinkPR(item inboxItem, subject action.Subject, pr string) func
 	entries := make([]menuEntry, 0, len(linked))
 	for _, link := range linked {
 		number := strconv.Itoa(link.Number)
-		entries = append(entries, menuEntry{label: prText(link), key: "", run: func() (tea.Model, tea.Cmd) {
+		entries = append(entries, menuEntry{label: prText(link.Number, link.State), key: "", run: func() (tea.Model, tea.Cmd) {
 			return m.runAction(action.AgentUnlink, subject, action.Values{"item": {item.work.ID}, "pr": {number}})()
 		}})
 	}
@@ -346,9 +347,7 @@ func (m *Model) syncWorkCommand() tea.Cmd {
 	}
 }
 
-// workDirectories are the directories of this machine's recorded conversations that the inbox can
-// list, whose git state the closed rows show.
-func (m *Model) workDirectories() []string {
+func (m *Model) unfinishedWorkDirectories() []string {
 	directories := make([]string, 0, len(m.work))
 
 	for _, recorded := range m.work {
@@ -365,16 +364,16 @@ func linkedPRs(recorded work.Item) string {
 	texts := make([]string, 0, len(linked))
 
 	for _, pr := range linked {
-		texts = append(texts, prText(pr))
+		texts = append(texts, prText(pr.Number, pr.State))
 	}
 
 	return strings.Join(texts, ", ")
 }
 
-func prText(pr work.PRLink) string {
-	text := "#" + strconv.Itoa(pr.Number)
-	if pr.State != task.PROpen && pr.State != "" {
-		text += " " + string(pr.State)
+func prText(number int, state task.PRState) string {
+	text := "#" + strconv.Itoa(number)
+	if state != task.PROpen && state != "" {
+		text += " " + string(state)
 	}
 
 	return text

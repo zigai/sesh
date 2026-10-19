@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/cobra"
 	gotmux "github.com/zigai/gotmux/tmux"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/session"
 )
@@ -42,8 +43,8 @@ func TestExitCode(t *testing.T) {
 		t.Fatalf("ExitCode(EPIPE) = %d, want %d", code, clibase.ExitCodePipe)
 	}
 
-	if code := clibase.ExitCode(context.Canceled); code != clibase.ExitCodeCancel {
-		t.Fatalf("ExitCode(context.Canceled) = %d, want %d", code, clibase.ExitCodeCancel)
+	if code := clibase.ExitCode(context.Canceled); code != action.ExitCodeCanceled {
+		t.Fatalf("ExitCode(context.Canceled) = %d, want %d", code, action.ExitCodeCanceled)
 	}
 
 	if code := clibase.ExitCode(errTestUnknown); code != clibase.ExitCodeUsage {

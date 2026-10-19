@@ -4,9 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
-	"os/exec"
 	"regexp"
 	"slices"
 	"strings"
@@ -49,26 +47,23 @@ var (
 )
 
 type Dependencies struct {
-	OmitEnterer        bool
-	OmitActions        bool
-	OmitPanes          bool
-	OmitTerminalAttach bool
-	OmitRemoteAttach   bool
-	OmitOriginBridge   bool
-	DeferSwitch        bool
-	DeferAttach        bool
+	OmitEnterer      bool
+	OmitActions      bool
+	OmitPanes        bool
+	OmitRemoteAttach bool
+	OmitOriginBridge bool
+	DeferSwitch      bool
+	DeferAttach      bool
 
 	LoadCatalog            func(context.Context) (session.CatalogResult, error)
 	EnterSession           func(context.Context, session.Session) (EnterOutcome, error)
 	RunAction              func(context.Context, action.Invocation) (any, error)
 	AcceptsAction          func(action.Location, action.ID) bool
-	AttachSession          func(context.Context, session.Session) (tea.ExecCommand, error)
 	TmuxActivatePaneTarget func(context.Context, session.Session, string) error
 
 	TmuxSessionExists     func(context.Context, string) (bool, error)
 	TmuxCreateSession     func(context.Context, string, string) error
 	TmuxSwitchSession     func(context.Context, string) error
-	TmuxAttachCommand     func(context.Context, string) *exec.Cmd
 	TmuxActivatePane      func(context.Context, string, string) error
 	TmuxRenameSession     func(context.Context, string, string) error
 	TmuxKillSession       func(context.Context, string) error
@@ -92,30 +87,6 @@ type Dependencies struct {
 type testServiceAdapter struct {
 	deps  *Dependencies
 	model *Model
-}
-
-type execCommandWrapper struct {
-	cmd *exec.Cmd
-}
-
-func (w *execCommandWrapper) Run() error {
-	if err := w.cmd.Run(); err != nil {
-		return fmt.Errorf("running test exec command: %w", err)
-	}
-
-	return nil
-}
-
-func (w *execCommandWrapper) SetStdin(r io.Reader) {
-	w.cmd.Stdin = r
-}
-
-func (w *execCommandWrapper) SetStdout(w2 io.Writer) {
-	w.cmd.Stdout = w2
-}
-
-func (w *execCommandWrapper) SetStderr(w2 io.Writer) {
-	w.cmd.Stderr = w2
 }
 
 func (adapter *testServiceAdapter) isPopup() bool {
@@ -359,21 +330,6 @@ func testActionCode(err error) action.Code {
 	}
 }
 
-func (adapter *testServiceAdapter) AttachSession(ctx context.Context, target session.Session) (tea.ExecCommand, error) {
-	if adapter.deps.AttachSession != nil {
-		return adapter.deps.AttachSession(ctx, target)
-	}
-
-	if adapter.deps.TmuxAttachCommand != nil {
-		cmd := adapter.deps.TmuxAttachCommand(ctx, target.Name)
-		if cmd != nil {
-			return &execCommandWrapper{cmd: cmd}, nil
-		}
-	}
-
-	return nil, nil //nolint:nilnil // A nil command explicitly requests application-owned attachment.
-}
-
 func (adapter *testServiceAdapter) TmuxActivatePane(ctx context.Context, target session.Session, paneID string) error {
 	if adapter.deps.TmuxActivatePaneTarget != nil {
 		return adapter.deps.TmuxActivatePaneTarget(ctx, target, paneID)
@@ -437,11 +393,7 @@ func (adapter *testServiceAdapter) WatchRemoteCatalog(
 }
 
 func (adapter *testServiceAdapter) AttachRemoteSession(ctx context.Context, target session.Session, paneID string) (tea.ExecCommand, error) {
-	if adapter.deps.AttachRemoteSession != nil {
-		return adapter.deps.AttachRemoteSession(ctx, target, paneID)
-	}
-
-	return nil, nil //nolint:nilnil // A nil command explicitly requests application-owned attachment.
+	return adapter.deps.AttachRemoteSession(ctx, target, paneID)
 }
 
 func (adapter *testServiceAdapter) LoadOriginSessions(ctx context.Context) (string, []session.Session, error) {
@@ -454,6 +406,10 @@ func (adapter *testServiceAdapter) LoadOriginSessions(ctx context.Context) (stri
 
 func (adapter *testServiceAdapter) GetWorkingDirectory() (string, error) {
 	return adapter.deps.GetWorkingDirectory()
+}
+
+func (adapter *testServiceAdapter) DeferAgentViews([]AgentView) bool {
+	return false
 }
 
 func (adapter *testServiceAdapter) UpdateModelState(
@@ -494,7 +450,6 @@ func defaultTestServices(adapter *testServiceAdapter) Services {
 		Enterer:          adapter,
 		Actions:          adapter,
 		Panes:            adapter,
-		TerminalAttach:   adapter,
 		Agents:           adapter,
 		Tasks:            nil,
 		AgentWatcher:     nil,
@@ -519,17 +474,9 @@ func omitTestServices(services *Services, deps Dependencies) {
 	if deps.OmitPanes {
 		services.Panes = nil
 	}
-
-	if deps.OmitTerminalAttach {
-		services.TerminalAttach = nil
-	}
 }
 
 func addOptionalTestServices(services *Services, deps Dependencies, adapter *testServiceAdapter) {
-	if deps.AttachSession != nil || deps.TmuxAttachCommand != nil {
-		services.TerminalAttach = adapter
-	}
-
 	if deps.WatchAgentSummaries != nil {
 		services.AgentWatcher = adapter
 	}
@@ -913,4 +860,13 @@ func openTestKillConfirm(model *Model) {
 		param:   emptyParam(),
 	}
 	model.dialog = dialogConfirm
+}
+
+func testBindings(cfg *config.Config) []action.Binding {
+	bindings, err := action.Bindings(cfg)
+	if err != nil {
+		panic(err)
+	}
+
+	return bindings
 }

@@ -227,7 +227,8 @@ func loadFixtureAgents(t *testing.T, path string) []agents.AgentSession {
 func TestLoadLiveAgentsReadsRegistryThroughAHT(t *testing.T) {
 	t.Parallel()
 
-	path := writeRegistry(t,
+	path := writeRegistry(
+		t,
 		registryFixture{
 			ID:               "waiting-agent",
 			Harness:          string(aht.HarnessOmp),
@@ -367,7 +368,8 @@ func TestLoadLiveAgentsRejectsCanceledContext(t *testing.T) {
 func TestHeadlessSessionsAreNotAgents(t *testing.T) {
 	t.Parallel()
 
-	path := writeRegistry(t,
+	path := writeRegistry(
+		t,
 		registryFixture{
 			ID:            "headless-agent",
 			Activity:      string(aht.ActivityIdle),
@@ -438,7 +440,8 @@ func TestPiRequiresCurrentProcessTUIMode(t *testing.T) {
 func TestSummarizeAgentsCountsAttention(t *testing.T) {
 	t.Parallel()
 
-	path := writeRegistry(t,
+	path := writeRegistry(
+		t,
 		registryFixture{ID: "a1", Activity: string(aht.ActivityWaiting), ServerSocket: "/s", SessionID: "$1", SessionName: "dev", WindowID: "@1", PaneID: "%1"},
 		registryFixture{ID: "a2", Activity: string(aht.ActivityFailed), ServerSocket: "/s", SessionID: "$1", SessionName: "dev", WindowID: "@1", PaneID: "%2"},
 		registryFixture{ID: "a3", Activity: string(aht.ActivityIdle), ServerSocket: "/s", SessionID: "$1", SessionName: "dev", WindowID: "@1", PaneID: "%3"},

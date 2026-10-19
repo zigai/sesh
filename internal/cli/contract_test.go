@@ -15,6 +15,7 @@ import (
 	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/action"
+	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/snapshot/capture"
 	"github.com/zigai/sesh/internal/snapshot/store"
@@ -38,7 +39,7 @@ func TestSessionNotFoundErrorBoundary(t *testing.T) {
 		{"typed action", action.Wrap(action.CodeNotFound, missing), "notFound"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			if got := jsonErrorCode(test.err); got != test.want {
+			if got := clibase.JSONErrorCode(test.err); got != test.want {
 				t.Fatalf("root error code = %q, want %q", got, test.want)
 			}
 
@@ -46,7 +47,7 @@ func TestSessionNotFoundErrorBoundary(t *testing.T) {
 				t.Fatalf("command error code = %q, want %q", got, test.want)
 			}
 
-			if message := safeCommandErrorMessage(test.err); message != missing.Error() {
+			if message := clibase.SafeCommandErrorMessage(test.err); message != missing.Error() {
 				t.Fatalf("root diagnostic = %q, want %q", message, missing.Error())
 			}
 
@@ -190,9 +191,9 @@ func assertErrorStreamDiscipline(t *testing.T, exec commandExecution) {
 func TestUncertaintyOutranksCanceledInClassification(t *testing.T) {
 	joined := errors.Join(store.ErrUncertain, context.Canceled)
 
-	code := jsonErrorCode(joined)
+	code := clibase.JSONErrorCode(joined)
 	if code != "publicationUncertain" {
-		t.Fatalf("jsonErrorCode(joined) = %q, want publicationUncertain", code)
+		t.Fatalf("clibase.JSONErrorCode(joined) = %q, want publicationUncertain", code)
 	}
 
 	exitCode := ExitCode(joined)
@@ -205,7 +206,7 @@ func TestUncertaintyOutranksCanceledInClassification(t *testing.T) {
 	root := newRootCommand(t.Context())
 	root.SetErr(&stderr)
 
-	if err := WriteCommandError(root, joined); err != nil {
+	if err := clibase.WriteCommandError(root, joined); err != nil {
 		t.Fatalf("WriteCommandError returned error: %v", err)
 	}
 
@@ -215,7 +216,7 @@ func TestUncertaintyOutranksCanceledInClassification(t *testing.T) {
 
 	stderr.Reset()
 
-	if err := WriteCommandError(root, context.Canceled); err != nil {
+	if err := clibase.WriteCommandError(root, context.Canceled); err != nil {
 		t.Fatalf("WriteCommandError returned error: %v", err)
 	}
 
@@ -226,7 +227,7 @@ func TestUncertaintyOutranksCanceledInClassification(t *testing.T) {
 
 func TestSafeCommandErrorMessagePrivacy(t *testing.T) {
 	oopsErr := oops.In("cli").Public("arbitrary public string with /secret/path").Wrap(errSensitiveRaw)
-	msg := safeCommandErrorMessage(oopsErr)
+	msg := clibase.SafeCommandErrorMessage(oopsErr)
 
 	if strings.Contains(msg, "/secret/path") || strings.Contains(msg, "/private/") {
 		t.Fatalf("safeCommandErrorMessage leaked sensitive path: %q", msg)
@@ -236,22 +237,22 @@ func TestSafeCommandErrorMessagePrivacy(t *testing.T) {
 		t.Fatalf("unknown error produced %q, want %q", msg, "operation failed")
 	}
 
-	if msg := safeCommandErrorMessage(store.ErrUncertain); msg != "snapshot publication durability uncertain" {
+	if msg := clibase.SafeCommandErrorMessage(store.ErrUncertain); msg != "snapshot publication durability uncertain" {
 		t.Fatalf("ErrUncertain produced %q", msg)
 	}
 
-	if msg := safeCommandErrorMessage(errPartialSnapshot); msg != "parity-incomplete save" {
-		t.Fatalf("errPartialSnapshot produced %q", msg)
+	if msg := clibase.SafeCommandErrorMessage(app.ErrPartialSnapshot); msg != "parity-incomplete save" {
+		t.Fatalf("app.ErrPartialSnapshot produced %q", msg)
 	}
 }
 
 func TestHumanErrorMessageReportsUnmappedCause(t *testing.T) {
 	wrapped := oops.In("cli").With("operation", "open_history").Wrap(errUnmappedHistoryCause)
-	if msg := humanErrorMessage(wrapped); msg != errUnmappedHistoryCause.Error() {
+	if msg := clibase.HumanErrorMessage(wrapped); msg != errUnmappedHistoryCause.Error() {
 		t.Fatalf("unmapped error produced %q, want its cause %q", msg, errUnmappedHistoryCause.Error())
 	}
 
-	if msg := humanErrorMessage(store.ErrUncertain); msg != "snapshot publication durability uncertain" {
+	if msg := clibase.HumanErrorMessage(store.ErrUncertain); msg != "snapshot publication durability uncertain" {
 		t.Fatalf("ErrUncertain produced %q", msg)
 	}
 }
@@ -262,7 +263,7 @@ func TestJsonErrorCodeTaxonomyMappings(t *testing.T) {
 		want string
 	}{
 		{store.ErrUncertain, "publicationUncertain"},
-		{errPartialSnapshot, "partialSnapshot"},
+		{app.ErrPartialSnapshot, "partialSnapshot"},
 		{store.ErrRecoveryRequired, "recoveryRequired"},
 		{store.ErrCorrupt, "repositoryCorrupt"},
 		{store.ErrUnavailable, "snapshotUnavailable"},
@@ -275,13 +276,13 @@ func TestJsonErrorCodeTaxonomyMappings(t *testing.T) {
 		{os.ErrPermission, "permissionDenied"},
 		{context.DeadlineExceeded, "timeout"},
 		{context.Canceled, "canceled"},
-		{errUnknownCommand, "unknownCommand"},
+		{clibase.ErrUnknownCommand, "unknownCommand"},
 	}
 
 	for _, tc := range cases {
-		got := jsonErrorCode(tc.err)
+		got := clibase.JSONErrorCode(tc.err)
 		if got != tc.want {
-			t.Errorf("jsonErrorCode(%v) = %q, want %q", tc.err, got, tc.want)
+			t.Errorf("clibase.JSONErrorCode(%v) = %q, want %q", tc.err, got, tc.want)
 		}
 	}
 }

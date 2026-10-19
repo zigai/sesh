@@ -46,7 +46,7 @@ func TestLifecycleLogsReadinessDrainRecordedFailureAndRecovery(t *testing.T) {
 		{"idle", nil, nil, []string{"ok"}},
 		{"canceled_before_drain", []lifecycle.Event{{Canceled: true}}, nil, []string{"ok"}},
 		{"save", []lifecycle.Event{{Kind: lifecycle.EventSleep}}, nil, []string{"ok", "started"}},
-		{"recorded_failure", []lifecycle.Event{{Kind: lifecycle.EventShutdown}}, errors.Join(ErrFinalRecorded, errPrivateLifecycle), []string{"ok", "started", "degraded"}},
+		{"recorded_failure", []lifecycle.Event{{Kind: lifecycle.EventShutdown}}, errPrivateLifecycle, []string{"ok", "started", "degraded"}},
 		{"resumed", []lifecycle.Event{{Kind: lifecycle.EventSleep}, {Canceled: true}}, nil, []string{"ok", "started", "recovered"}},
 	}
 	for _, tc := range cases {
@@ -55,8 +55,10 @@ func TestLifecycleLogsReadinessDrainRecordedFailureAndRecovery(t *testing.T) {
 
 			ctx := zerolog.New(&logs).WithContext(t.Context())
 			if err := RunLifecycle(ctx, CoordinatorConfig{
-				Runtime:   &loggingLifecycleRuntime{events: tc.events},
-				FinalSave: func(context.Context) error { return tc.failure },
+				Runtime: &loggingLifecycleRuntime{events: tc.events},
+				FinalSave: func(context.Context) (FinalSaveOutcome, error) {
+					return FinalSaveOutcome{Recorded: true}, tc.failure
+				},
 			}); err != nil {
 				t.Fatal(err)
 			}

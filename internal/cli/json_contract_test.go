@@ -34,7 +34,7 @@ func TestJSONCommandTreeRequiresExplicitOutputContract(t *testing.T) {
 			"task finish", "task menu", "task merge", "task new", "task offer", "task open", "task popup", "task relayout", "task run", "task sleep", "task tab", "task wake",
 		},
 		"log stream; path and clear use envelopes": {"logs"},
-		"interactive terminal":                     {"pick", "project pick-ui", "remote attach", "session new", "task action-run", "task merge-run", "task pick-ui", "task placeholder", "task popup-attach"},
+		"interactive terminal":                     {"pick", "pick ui", "project pick-ui", "remote attach", "session new", "task action-run", "task merge-run", "task pick-ui", "task placeholder", "task popup-attach"},
 		"foreground service or readiness protocol": {
 			"daemon agent-window-status", "daemon coordinator", "daemon remote-monitor", "daemon tmux", "daemon wait-ready",
 		},

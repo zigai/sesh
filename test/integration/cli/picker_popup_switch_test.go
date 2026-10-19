@@ -90,7 +90,7 @@ func TestAgentsPopupInitiallySelectsInvokingAgentPane(t *testing.T) {
 	defer cancel()
 
 	command := exec.CommandContext(ctx, artifact.binary,
-		"pick", "--ui", "popup", "--no-config", "--socket", fixture.socket,
+		"pick", "ui", "--no-config", "--socket", fixture.socket,
 		"--target-pane", string(secondInfo.ID), "--current-session-id", string(origin.ID),
 		"--agent-state", registryPath, "--switch-handoff", handoffPath,
 		"--history", fixture.historyPath, "--repository", fixture.repository, "--lease-root", fixture.leaseRoot,

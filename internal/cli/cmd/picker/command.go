@@ -48,6 +48,9 @@ const (
 	annotationEnabled = "true"
 	clientEnvironment = "SESH_TMUX_CLIENT"
 	launchedAtFlag    = "launched-at"
+	switchHandoffFlag = "switch-handoff"
+	targetPaneFlag    = "target-pane"
+	sessionIDFlag     = "current-session-id"
 	uiFlag            = "ui"
 	modeFlag          = "mode"
 	uiAuto            = "auto"
@@ -146,27 +149,52 @@ func NewPickCommand(ctx context.Context, remote ...RemoteFactory) *cobra.Command
 		Args:        clibase.UsageArgs(cobra.NoArgs),
 		Annotations: map[string]string{clibase.AnnotationLiveIO: annotationEnabled, clibase.AnnotationOperation: "picker"},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runPickCommand(executionContext(ctx, cmd), cmd, remoteFactory)
+			choice, _ := cmd.Flags().GetString(uiFlag)
+
+			presentation, err := resolvePickerPresentation(choice, os.Getenv)
+			if err != nil {
+				return err
+			}
+
+			return runPickCommand(executionContext(ctx, cmd), cmd, presentation, remoteFactory)
 		},
 	}
 
 	addPickerPathFlags(cmd)
 	cmd.Flags().String(uiFlag, uiAuto, "Picker layout")
 	clibase.SetFlagChoices(cmd, uiFlag, uiAuto, "popup", "inline", "fullscreen")
-	cmd.Flags().String(modeFlag, "", "Display mode to open in")
-	clibase.SetFlagChoices(cmd, modeFlag, "sesh", "agents", "inbox")
-	cmd.Flags().String("switch-handoff", "", "Popup switch handoff file")
-	cmd.Flags().Int64(launchedAtFlag, 0, "Popup launch time")
-	cmd.Flags().String("target-pane", "", "Invoking tmux pane")
-	cmd.Flags().String("current-session-id", "", "Invoking tmux session ID")
+	addPickerModeFlag(cmd)
 
-	for _, name := range []string{"switch-handoff", launchedAtFlag, "target-pane", "current-session-id"} {
-		_ = cmd.Flags().MarkHidden(name)
-	}
-
-	cmd.AddCommand(newPickPopupCommand(remoteFactory))
+	cmd.AddCommand(newPickPopupCommand(remoteFactory), newPickUICommand(ctx, remoteFactory))
 
 	return cmd
+}
+
+func newPickUICommand(ctx context.Context, remoteFactory RemoteFactory) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:         "ui",
+		Short:       "Run the session picker inside its popup",
+		Hidden:      true,
+		Args:        clibase.UsageArgs(cobra.NoArgs),
+		Annotations: map[string]string{clibase.AnnotationLiveIO: annotationEnabled, clibase.AnnotationOperation: "picker"},
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return runPickCommand(executionContext(ctx, cmd), cmd, presentationPopup, remoteFactory)
+		},
+	}
+
+	addPickerPathFlags(cmd)
+	addPickerModeFlag(cmd)
+	cmd.Flags().String(switchHandoffFlag, "", "Popup switch handoff file")
+	cmd.Flags().Int64(launchedAtFlag, 0, "Popup launch time")
+	cmd.Flags().String(targetPaneFlag, "", "Invoking tmux pane")
+	cmd.Flags().String(sessionIDFlag, "", "Invoking tmux session ID")
+
+	return cmd
+}
+
+func addPickerModeFlag(cmd *cobra.Command) {
+	cmd.Flags().String(modeFlag, "", "Display mode to open in")
+	clibase.SetFlagChoices(cmd, modeFlag, "sesh", "agents", "inbox")
 }
 
 func HasTerminal(cmd *cobra.Command) bool {
@@ -227,14 +255,7 @@ func remoteCLIError(operation string, err error) error {
 	return oops.In("cli").With("operation", operation).Wrap(err)
 }
 
-func runPickCommand(ctx context.Context, cmd *cobra.Command, remoteFactory RemoteFactory) error {
-	choice, _ := cmd.Flags().GetString(uiFlag)
-
-	presentation, err := resolvePickerPresentation(choice, os.Getenv)
-	if err != nil {
-		return err
-	}
-
+func runPickCommand(ctx context.Context, cmd *cobra.Command, presentation presentation, remoteFactory RemoteFactory) error {
 	runtime, err := preparePickerCommand(cmd)
 	if err != nil {
 		return err
@@ -291,9 +312,9 @@ func runPickerInteractive(
 	}
 
 	services.currentPane = currentPane(cmd)
-	handoffPath, _ := cmd.Flags().GetString("switch-handoff")
+	handoffPath, _ := cmd.Flags().GetString(switchHandoffFlag)
 	services.popupChild = handoffPath != ""
-	services.currentSessionID, _ = cmd.Flags().GetString("current-session-id")
+	services.currentSessionID, _ = cmd.Flags().GetString(sessionIDFlag)
 	services.startInitialReads(ctx)
 
 	model, err := buildPickerModel(ctx, presentation, runtime.workspace.Config, runtime.state, services.TUIServices())
@@ -335,7 +356,7 @@ func finishPickerInteractive(ctx context.Context, cmd *cobra.Command, finalModel
 
 	var handoffPane string
 
-	handoffPath, _ := cmd.Flags().GetString("switch-handoff")
+	handoffPath, _ := cmd.Flags().GetString(switchHandoffFlag)
 
 	if runErr == nil && ctx.Err() == nil {
 		if target, ok := finalModel.DeferredSwitchTarget(); ok && handoffPath != "" {
@@ -402,8 +423,8 @@ func hasTerminal(cmd *cobra.Command) bool {
 }
 
 func currentPane(cmd *cobra.Command) string {
-	if flag := cmd.Flags().Lookup("target-pane"); flag != nil {
-		pane, _ := cmd.Flags().GetString("target-pane")
+	if flag := cmd.Flags().Lookup(targetPaneFlag); flag != nil {
+		pane, _ := cmd.Flags().GetString(targetPaneFlag)
 		if pane != "" {
 			return pane
 		}
@@ -586,7 +607,7 @@ func popupOptions(program gotmux.Program, width, height, background string) gotm
 }
 
 func popupArguments(cmd *cobra.Command, socketPath, sessionID, paneID, handoffPath, mode string, launchedAt time.Time) []string {
-	arguments := []string{"pick", "--" + uiFlag, "popup", "--socket", socketPath}
+	arguments := []string{"pick", "ui", "--socket", socketPath}
 
 	if mode != "" {
 		arguments = append(arguments, "--"+modeFlag, mode)
@@ -597,15 +618,15 @@ func popupArguments(cmd *cobra.Command, socketPath, sessionID, paneID, handoffPa
 	}
 
 	if handoffPath != "" {
-		arguments = append(arguments, "--switch-handoff", handoffPath)
+		arguments = append(arguments, "--"+switchHandoffFlag, handoffPath)
 	}
 
 	if paneID != "" {
-		arguments = append(arguments, "--target-pane", paneID)
+		arguments = append(arguments, "--"+targetPaneFlag, paneID)
 	}
 
 	if sessionID != "" {
-		arguments = append(arguments, "--current-session-id", sessionID)
+		arguments = append(arguments, "--"+sessionIDFlag, sessionID)
 	}
 
 	return append(arguments, forwardedConfigFlags(cmd)...)
@@ -785,6 +806,10 @@ func runPickerProgram(ctx context.Context, cmd *cobra.Command, model *tui.Model,
 			model.SetSize(width, height)
 			programOptions = append(programOptions, tea.WithWindowSize(width, height))
 		}
+	}
+
+	if output, ok := cmd.OutOrStdout().(interface{ File() *os.File }); ok {
+		model.SetTerminal(output.File())
 	}
 
 	program := tea.NewProgram(model, programOptions...)

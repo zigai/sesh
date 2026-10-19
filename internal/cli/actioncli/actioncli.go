@@ -240,8 +240,8 @@ func dispatch[In, Out any](
 	subjectArgs []string,
 	values action.Values,
 ) (Out, bool, error) {
-	if connection := Connection(cmd); connection != "" {
-		return executeRemote(ctx, cfg, definition, connection, subjectArgs, values)
+	if at := commandLocation(cmd); at.Kind == action.LocationPeer {
+		return executeRemote(ctx, cfg, definition, at.Connection, subjectArgs, values)
 	}
 
 	runtime, err := OpenRuntime(cmd, cfg)
@@ -343,15 +343,16 @@ func executeRemote[In, Out any](
 	return output, true, err
 }
 
-// Connection returns the remote connection the command targets, or empty for this machine.
-func Connection(cmd *cobra.Command) string {
+func commandLocation(cmd *cobra.Command) action.Location {
 	if cmd.Flags().Lookup(ConnectionFlag) == nil {
-		return ""
+		return action.Local()
 	}
 
-	connection, _ := cmd.Flags().GetString(ConnectionFlag)
+	if connection, _ := cmd.Flags().GetString(ConnectionFlag); connection != "" {
+		return action.Peer(connection)
+	}
 
-	return connection
+	return action.Local()
 }
 
 func peerSessions(rows []session.Session, kind action.SubjectKind, selectors []string) ([]session.Session, error) {
@@ -411,7 +412,7 @@ func Render[In, Out any](cmd *cobra.Command, definition *action.Definition[In, O
 
 func commandValues(cmd *cobra.Command, args []string, descriptor action.Descriptor) ([]string, action.Values, error) {
 	values := make(action.Values)
-	local := Connection(cmd) == ""
+	local := commandLocation(cmd).Kind == action.LocationLocal
 
 	positional := make([]action.Param, 0, len(descriptor.Params))
 	for _, param := range descriptor.Params {

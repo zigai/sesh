@@ -72,7 +72,7 @@ func TestResolvePickerPresentationFollowsChoiceAndTmuxContext(t *testing.T) {
 	}
 }
 
-func TestPickHidesPopupChildFlagsAndOmitsLauncherFlags(t *testing.T) {
+func TestPickKeepsPopupChildFlagsOnHiddenChildAndOmitsLauncherFlags(t *testing.T) {
 	t.Parallel()
 
 	cmd := NewPickCommand(t.Context())
@@ -82,9 +82,14 @@ func TestPickHidesPopupChildFlagsAndOmitsLauncherFlags(t *testing.T) {
 		t.Fatalf("--ui flag = %#v, want visible auto default", ui)
 	}
 
+	child, _, err := cmd.Find([]string{"ui"})
+	if err != nil || child == cmd || !child.Hidden {
+		t.Fatalf("pick ui = %v, %v; want a hidden popup child", child, err)
+	}
+
 	for _, name := range []string{"switch-handoff", "launched-at", "target-pane", "current-session-id"} {
-		if flag := cmd.Flags().Lookup(name); flag == nil || !flag.Hidden {
-			t.Fatalf("--%s flag = %#v, want hidden popup child flag", name, flag)
+		if cmd.Flags().Lookup(name) != nil || child.Flags().Lookup(name) == nil {
+			t.Fatalf("--%s belongs only to the popup child", name)
 		}
 	}
 
@@ -122,7 +127,7 @@ func TestPopupChildReceivesInvokingPaneSessionAndRepository(t *testing.T) {
 	launchedAt := time.Unix(0, 1790000000123456789)
 
 	arguments := popupArguments(cmd, "/private/tmux.sock", "$7", "%2", "/private/handoff", "inbox", launchedAt)
-	if !slices.Equal(arguments[:min(len(arguments), 3)], []string{"pick", "--ui", "popup"}) {
+	if !slices.Equal(arguments[:min(len(arguments), 2)], []string{"pick", "ui"}) {
 		t.Fatalf("popup child arguments = %#v", arguments)
 	}
 
@@ -139,12 +144,12 @@ func TestPopupChildReceivesInvokingPaneSessionAndRepository(t *testing.T) {
 		}
 	}
 
-	pick, _, err := newTestRootCommand(t.Context()).Find(arguments)
-	if err != nil || pick.Name() != "pick" {
-		t.Fatalf("popup child arguments resolve to %v, %v; want pick", pick, err)
+	child, _, err := newTestRootCommand(t.Context()).Find(arguments)
+	if err != nil || child.CommandPath() != "sesh pick ui" {
+		t.Fatalf("popup child arguments resolve to %v, %v; want pick ui", child, err)
 	}
 
-	if err := pick.ParseFlags(arguments[1:]); err != nil {
+	if err := child.ParseFlags(arguments[2:]); err != nil {
 		t.Fatalf("pick rejects popup child arguments: %v", err)
 	}
 }
@@ -166,7 +171,7 @@ func TestPopupChildAcceptsOnlyRecentLaunchTimes(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			cmd := NewPickCommand(t.Context())
+			cmd := newPickUICommand(t.Context(), DefaultPickerRemoteFactory)
 			if test.value != "" {
 				if err := cmd.Flags().Set("launched-at", test.value); err != nil {
 					t.Fatal(err)

@@ -38,7 +38,7 @@ func (m *Model) showsAgentSortIndicator() bool {
 }
 
 func (m *Model) renderAgentSortBadge() string {
-	key := newActionKeyMap(m.config).agentSort.Help().Key
+	key := m.actionKeys().agentSort.Help().Key
 	desc := "sort: " + m.agentSort.label()
 
 	if key == "" {
@@ -60,7 +60,7 @@ func (m *Model) showsInboxGroupBadge() bool {
 }
 
 func (m *Model) renderInboxGroupBadge() string {
-	key := newActionKeyMap(m.config).inboxGroup.Help().Key
+	key := m.actionKeys().inboxGroup.Help().Key
 	desc := "group: " + m.inboxGroup
 
 	if key == "" {

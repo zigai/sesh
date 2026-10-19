@@ -63,13 +63,13 @@ func (m *Model) snoozed(item inboxItem) bool {
 		return false
 	}
 
-	if snooze.Until != 0 && time.Now().Unix() >= snooze.Until {
+	if snooze.Timed() && time.Now().Unix() >= snooze.Until {
 		return false
 	}
 
 	switch item.agent.Status.DisplayStatus() {
 	case session.AgentStatusIdle, session.AgentStatusWaiting, session.AgentStatusFailed:
-		return item.agent.StatusSince.UnixNano() <= snooze.Since
+		return item.agent.StatusSince.UnixNano() <= snooze.SnoozedAt
 	case session.AgentStatusRunning, session.AgentStatusInterrupted, session.AgentStatusUnknown,
 		session.AgentStatusSleeping, session.AgentStatusMerged, session.AgentStatusClosed:
 		return true
@@ -89,7 +89,7 @@ func (m *Model) markedUnseen(item inboxItem) bool {
 
 func (m *Model) selectedTaskLive() task.Live {
 	item, ok := m.selectedInboxItem()
-	if !ok || !item.task {
+	if !ok || item.kind != inboxTaskRow {
 		var none task.Live
 
 		return none
@@ -138,11 +138,11 @@ func taskProjectError(item inboxItem) error {
 }
 
 func rowProject(item inboxItem) string {
-	if item.task && item.live.Record.Kind == task.KindProject {
+	if item.kind == inboxTaskRow && item.live.Record.Kind == task.KindProject {
 		return item.live.Record.Project
 	}
 
-	if item.more != "" {
+	if item.kind == inboxMoreRow {
 		return ""
 	}
 
@@ -168,7 +168,7 @@ func (m *Model) snoozeError(id action.ID, item inboxItem) error {
 	_, snoozed := m.inbox.Find(conversationKey(item.agent))
 
 	switch {
-	case item.closed:
+	case item.kind == inboxClosedRow:
 		return errClosedConversation
 	case id == action.InboxSnooze.ID && item.section == config.InboxSnoozed:
 		return errAlreadySnoozed
@@ -180,7 +180,7 @@ func (m *Model) snoozeError(id action.ID, item inboxItem) error {
 }
 
 func (m *Model) seenError(id action.ID, item inboxItem) error {
-	if item.closed {
+	if item.kind == inboxClosedRow {
 		return recordedSeenError(id, item)
 	}
 
@@ -207,7 +207,7 @@ func (m *Model) seenError(id action.ID, item inboxItem) error {
 // is kept with its recorded conversation on its host.
 func recordedSeenError(id action.ID, item inboxItem) error {
 	switch {
-	case item.work.ID == "" || item.more != "":
+	case item.work.ID == "":
 		return errNotRecorded
 	case id == action.InboxSeen.ID && item.work.UnseenAt == 0:
 		return errAlreadySeen
@@ -247,7 +247,7 @@ func (m *Model) runPickerAction(request pendingAction) func() (tea.Model, tea.Cm
 	case action.InboxUnsnooze.ID:
 		return m.updateInbox(func(state *inbox.State) error { state.Remove(key); return nil })
 	case action.InboxSeen.ID, action.InboxUnseen.ID:
-		if item.closed {
+		if item.kind == inboxClosedRow {
 			return m.runWorkAction(id, item, request.values)
 		}
 
@@ -314,7 +314,7 @@ func (m *Model) snoozeItem(key, until string) func() (tea.Model, tea.Cmd) {
 		}
 
 		state.Expire(now)
-		state.Put(inbox.Snooze{Key: key, Until: untilUnix, Since: now.UnixNano()})
+		state.Put(inbox.Snooze{Key: key, Until: untilUnix, SnoozedAt: now.UnixNano()})
 
 		return nil
 	})
@@ -356,12 +356,8 @@ func (m *Model) handleInboxUpdated(msg inboxUpdatedMsg) {
 
 func (m *Model) openPullRequest(item inboxItem) func() (tea.Model, tea.Cmd) {
 	target := item.agent.GitBranch
-	if linked := item.work.Linked(); item.closed && len(linked) > 0 {
-		target = strconv.Itoa(linked[len(linked)-1].Number)
-	}
-
-	if item.task && item.live.Record.PR.Number != 0 {
-		target = strconv.Itoa(item.live.Record.PR.Number)
+	if number, _ := rowPR(item); number != 0 {
+		target = strconv.Itoa(number)
 	}
 
 	return m.runOpener(item.agent.CWD, "gh", "pr", "view", target, "--web")
@@ -411,10 +407,10 @@ func (m *Model) inboxDoneByMark(item inboxItem) bool {
 	return (status == session.AgentStatusIdle || status == session.AgentStatusInterrupted) && m.markedUnseen(item)
 }
 
-func snoozeLabel(until int64) string {
-	if until == 0 {
+func snoozeLabel(snooze inbox.Snooze) string {
+	if !snooze.Timed() {
 		return "until " + config.SnoozeNextMessage
 	}
 
-	return "until " + time.Unix(until, 0).Format("Mon 15:04")
+	return "until " + time.Unix(snooze.Until, 0).Format("Mon 15:04")
 }

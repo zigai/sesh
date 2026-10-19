@@ -100,7 +100,7 @@ func runCoordinator(cmd *cobra.Command, _ []string) (resultErr error) {
 	if err := daemon.RunLifecycle(ctx, daemon.CoordinatorConfig{
 		Runtime:  logind,
 		Reporter: reporter,
-		FinalSave: func(saveCtx context.Context) error {
+		FinalSave: func(saveCtx context.Context) (daemon.FinalSaveOutcome, error) {
 			return coordinatorFinalSave(saveCtx, cmd, env)
 		},
 	}); err != nil {
@@ -110,15 +110,10 @@ func runCoordinator(cmd *cobra.Command, _ []string) (resultErr error) {
 	return nil
 }
 
-// coordinatorFinalSave marks a failed final save as recorded when its status file was written, so
-// the failure is reported through that file instead of stopping the coordinator.
-func coordinatorFinalSave(ctx context.Context, cmd *cobra.Command, env Env) error {
+func coordinatorFinalSave(ctx context.Context, cmd *cobra.Command, env Env) (daemon.FinalSaveOutcome, error) {
 	_, saveErr, statusErr := runFinalSave(ctx, cmd, env)
-	if saveErr != nil && statusErr == nil {
-		saveErr = errors.Join(daemon.ErrFinalRecorded, saveErr)
-	}
 
-	return errors.Join(saveErr, statusErr)
+	return daemon.FinalSaveOutcome{Recorded: statusErr == nil}, errors.Join(saveErr, statusErr)
 }
 
 func ensureCoordinatorRepositoryReady(ctx context.Context, env Env) error {

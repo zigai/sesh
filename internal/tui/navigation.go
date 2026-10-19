@@ -7,7 +7,7 @@ import (
 
 func (m *Model) handleNavigationKeys(msg tea.KeyPressMsg) func() (tea.Model, tea.Cmd) {
 	pressed := keyPressFromMsg(msg)
-	keys := newActionKeyMap(m.config)
+	keys := m.actionKeys()
 
 	switch {
 	case bubbleskey.Matches(pressed, keys.close):

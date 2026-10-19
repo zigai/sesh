@@ -70,7 +70,7 @@ func runSessionKey(model *Model, letter string) {
 
 func holdAltForSessionKeys(model *Model) {
 	model.config.Keys.SessionPrefix = "alt"
-	model.sessionKeys = newSessionKeyRules(model.config)
+	model.sessionKeys = newSessionKeyRules(model.config, model.actionBindings)
 }
 
 func isQuit(cmd tea.Cmd) bool {

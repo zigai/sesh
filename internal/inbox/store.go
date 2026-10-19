@@ -35,12 +35,12 @@ var (
 	ErrNilUpdate = errors.New("inbox state update is nil")
 )
 
-// Snooze hides the conversation Key from the inbox. It ends at Until, or when the agent finishes a
-// turn or asks for input after Since; an Until of zero waits only for that.
+// Snooze hides the conversation Key from the inbox. It ends at Until when Timed, or when the agent
+// finishes a turn or asks for input after SnoozedAt.
 type Snooze struct {
-	Key   string `json:"key"`
-	Until int64  `json:"until"`
-	Since int64  `json:"since"`
+	Key       string `json:"key"`
+	Until     int64  `json:"until"`
+	SnoozedAt int64  `json:"since"`
 }
 
 // Unseen marks the latest result of the conversation Key as not seen, until its pane is viewed
@@ -66,7 +66,10 @@ func NewStore(path string) Store {
 	return Store{path: path}
 }
 
-// Find returns the snooze of key.
+func (s Snooze) Timed() bool {
+	return s.Until != 0
+}
+
 func (s *State) Find(key string) (Snooze, bool) {
 	for _, snooze := range s.Snoozes {
 		if snooze.Key == key {
@@ -74,7 +77,7 @@ func (s *State) Find(key string) (Snooze, bool) {
 		}
 	}
 
-	return Snooze{Key: "", Until: 0, Since: 0}, false
+	return Snooze{Key: "", Until: 0, SnoozedAt: 0}, false
 }
 
 func (s *State) Put(snooze Snooze) {
@@ -106,7 +109,7 @@ func (s *State) ClearUnseen(key string) {
 }
 
 func (s *State) Expire(now time.Time) {
-	s.Snoozes = slices.DeleteFunc(s.Snoozes, func(snooze Snooze) bool { return snooze.Until != 0 && snooze.Until <= now.Unix() })
+	s.Snoozes = slices.DeleteFunc(s.Snoozes, func(snooze Snooze) bool { return snooze.Timed() && snooze.Until <= now.Unix() })
 }
 
 // Load returns the current state; a missing file is an empty state.
@@ -265,7 +268,7 @@ func (s *State) validSnoozes() bool {
 	keys := make(map[string]bool, len(s.Snoozes))
 
 	for _, snooze := range s.Snoozes {
-		if snooze.Key == "" || keys[snooze.Key] || snooze.Until < 0 || snooze.Since <= 0 {
+		if snooze.Key == "" || keys[snooze.Key] || snooze.Until < 0 || snooze.SnoozedAt <= 0 {
 			return false
 		}
 

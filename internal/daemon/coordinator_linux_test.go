@@ -59,11 +59,11 @@ func (r *daemonLifecycleRuntime) Rearm(context.Context) error {
 	return nil
 }
 
-func countingFinalSave(attempts *atomic.Int64, err error) func(context.Context) error {
-	return func(context.Context) error {
+func countingFinalSave(attempts *atomic.Int64, recorded bool, err error) func(context.Context) (FinalSaveOutcome, error) {
+	return func(context.Context) (FinalSaveOutcome, error) {
 		attempts.Add(1)
 
-		return err
+		return FinalSaveOutcome{Recorded: recorded}, err
 	}
 }
 
@@ -83,7 +83,7 @@ func TestLifecycleSavesOnceAndResumesAfterCancellation(t *testing.T) {
 
 	if err := RunLifecycle(ctx, CoordinatorConfig{
 		Runtime:   runtime,
-		FinalSave: countingFinalSave(attempts, errors.Join(ErrFinalRecorded, errTestFinalSave)),
+		FinalSave: countingFinalSave(attempts, true, errTestFinalSave),
 	}); err != nil {
 		t.Fatalf("RunLifecycle failed: %v", err)
 	}
@@ -117,7 +117,7 @@ func TestLifecycleRecordedFinalSaveFailureReleasesInhibitor(t *testing.T) {
 
 	if err := RunLifecycle(ctx, CoordinatorConfig{
 		Runtime:   runtime,
-		FinalSave: countingFinalSave(attempts, errors.Join(ErrFinalRecorded, errTestFinalSave)),
+		FinalSave: countingFinalSave(attempts, true, errTestFinalSave),
 	}); err != nil {
 		t.Fatalf("RunLifecycle error = %v, want nil for durably recorded final save failure", err)
 	}
@@ -144,7 +144,7 @@ func TestLifecycleUnrecordedFinalSaveFailureStopsCoordinator(t *testing.T) {
 
 	err := RunLifecycle(ctx, CoordinatorConfig{
 		Runtime:   runtime,
-		FinalSave: countingFinalSave(new(atomic.Int64), errTestFinalSave),
+		FinalSave: countingFinalSave(new(atomic.Int64), false, errTestFinalSave),
 	})
 	if !errors.Is(err, errTestFinalSave) {
 		t.Fatalf("RunLifecycle error = %v, want unrecorded error preserved", err)
@@ -163,11 +163,11 @@ func TestLifecycleCancellationDuringFinalSaveIsClean(t *testing.T) {
 
 	err := RunLifecycle(ctx, CoordinatorConfig{
 		Runtime: runtime,
-		FinalSave: func(saveCtx context.Context) error {
+		FinalSave: func(saveCtx context.Context) (FinalSaveOutcome, error) {
 			cancel()
 			<-saveCtx.Done()
 
-			return saveCtx.Err()
+			return FinalSaveOutcome{Recorded: false}, saveCtx.Err()
 		},
 	})
 	if err != nil {

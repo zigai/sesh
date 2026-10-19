@@ -841,15 +841,13 @@ func (m *Model) persistAgentViewsCommand(views []agentViewStateUpdate) tea.Cmd {
 		return nil
 	}
 
-	if deferrer, ok := m.deps.State.(AgentViewDeferrer); ok {
-		deferred := make([]AgentView, 0, len(views))
-		for _, view := range views {
-			deferred = append(deferred, AgentView{Session: view.identity, PaneID: view.paneID})
-		}
+	deferred := make([]AgentView, 0, len(views))
+	for _, view := range views {
+		deferred = append(deferred, AgentView{Session: view.identity, PaneID: view.paneID})
+	}
 
-		if deferrer.DeferAgentViews(deferred) {
-			return nil
-		}
+	if m.deps.State.DeferAgentViews(deferred) {
+		return nil
 	}
 
 	ctx := m.operationContext()

@@ -18,7 +18,6 @@ import (
 const (
 	ExitCodeGeneral = 1
 	ExitCodeUsage   = 2
-	ExitCodeCancel  = 130
 	ExitCodePipe    = 141
 )
 
@@ -30,6 +29,7 @@ var (
 	ErrDoctorChecksFailed = errors.New("doctor checks failed")
 	ErrLogFileUnavailable = errors.New("log file cannot be opened")
 	ErrSubcommandRequired = errors.New("subcommand required")
+	ErrHelpShorthand      = errors.New("-h is not a help flag; use --help")
 	RawArgsContextKey     = rawArgsKey{}
 )
 
@@ -103,7 +103,7 @@ func ExitCode(err error) int {
 	}
 
 	if OnlyErrorCauses(err, context.Canceled) {
-		return ExitCodeCancel
+		return action.ExitCodeCanceled
 	}
 
 	return ExitCodeGeneral

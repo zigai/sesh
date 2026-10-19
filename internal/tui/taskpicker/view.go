@@ -18,44 +18,40 @@ import (
 )
 
 const (
-	treeBranch    = "├─ "
-	treeLast      = "└─ "
-	filterLabel   = "/"
-	rowGutter     = 2
-	choiceGap     = " "
-	choicePadding = 2
-	labelGap      = "  "
-	labelColumns  = 6
-	valueColumn   = labelColumns + len(labelGap)
-	// textColumn is where a value's text starts, after the space that pads each choice.
-	textColumn = valueColumn + 1
-	// bodyColumn is where the body starts, after the left border and the space beside it.
-	bodyColumn    = 2
-	frameColumns  = 2 * bodyColumn
-	frameRows     = 2
-	cornerColumns = 3
-	// listGapRows are the blank line and the filter line above the expanded list.
-	listGapRows = 2
-	// placeColumns is the width of a place's name, before the branch it names.
-	placeColumns   = 16
-	minBodyWidth   = 36
-	maxBodyWidth   = 64
-	maxListRows    = 10
-	titleLabel     = "title"
-	agentLabel     = "agent"
-	machineLabel   = "host"
-	popupTitle     = "new task"
-	noLocations    = "nothing to start in"
-	noMatch        = "nothing matches"
-	noAgents       = "none available"
-	noAgentFailure = "no agent is available"
-	startingLabel  = "starting…"
-	columnGap      = "  "
-	// maxNameColumns caps the name column, so a long name leaves room for the subjects.
-	maxNameColumns    = 24
-	maxLabelColumns   = 22
-	minSubjectColumns = 8
-	ageGap            = "   "
+	treeBranch          = "├─ "
+	treeLast            = "└─ "
+	filterLabel         = "/"
+	rowGutter           = 2
+	choiceGap           = " "
+	choicePadding       = 2
+	labelGap            = "  "
+	labelColumns        = 6
+	valueColumn         = labelColumns + len(labelGap)
+	textColumn          = valueColumn + 1
+	bodyColumn          = 2
+	frameColumns        = 2 * bodyColumn
+	frameRows           = 2
+	cornerColumns       = 3
+	listGapRows         = 2
+	placeColumns        = 16
+	minBodyWidth        = 36
+	maxBodyWidth        = 64
+	repositoryBodyWidth = maxBodyWidth
+	maxListRows         = 10
+	titleLabel          = "title"
+	agentLabel          = "agent"
+	machineLabel        = "host"
+	popupTitle          = "new task"
+	noLocations         = "nothing to start in"
+	noMatch             = "nothing matches"
+	noAgents            = "none available"
+	noAgentFailure      = "no agent is available"
+	startingLabel       = "starting…"
+	columnGap           = "  "
+	maxNameColumns      = 24
+	maxLabelColumns     = 22
+	minSubjectColumns   = 8
+	ageGap              = "   "
 
 	day   = 24 * time.Hour
 	week  = 7 * day
@@ -78,15 +74,17 @@ type layout struct {
 	agentChoices   [][]placed
 	machineTop     int
 	machineChoices [][]placed
+	showsWhere     bool
 	whereTop       int
 	listTop        int
 	listRows       int
 }
 
 type listLine struct {
-	section section
-	row     int
-	last    bool
+	section       section
+	heading       bool
+	row           int
+	lastOfSection bool
 }
 
 type placed struct {
@@ -96,8 +94,7 @@ type placed struct {
 }
 
 // Size is the popup size that shows options without truncating them, up to the widest the
-// picker grows. In a repository it is the widest, so the branch named after a typed title fits
-// and the expanded popup is as wide; a longer list scrolls.
+// picker grows; a longer list scrolls.
 func Size(cfg *config.Config, opts Options) (int, int) {
 	probe := NewModel(cfg, opts)
 	width := probe.bodyWidth()
@@ -109,7 +106,7 @@ func Size(cfg *config.Config, opts Options) (int, int) {
 	case opts.Expanded:
 		rows += listGapRows + min(max(len(probe.lines()), 1), maxListRows)
 	case probe.hasWhere():
-		rows += 1 + int(whereOther) + 1
+		rows += 1 + len(whereChoices)
 	}
 
 	return width + frameColumns, frameRows + rows
@@ -117,7 +114,7 @@ func Size(cfg *config.Config, opts Options) (int, int) {
 
 func (m *Model) bodyWidth() int {
 	if m.hasWhere() {
-		return maxBodyWidth
+		return repositoryBodyWidth
 	}
 
 	width := max(minBodyWidth, valueColumn+choicesWidth(m.agents()))
@@ -135,7 +132,7 @@ func (m *Model) layout() layout {
 	below := 1 + len(agentChoices) + len(machineChoices) + 1
 	geometry := layout{
 		bodyWidth: bodyWidth, agentTop: 1, agentChoices: agentChoices, machineTop: 1 + len(agentChoices),
-		machineChoices: machineChoices, whereTop: -1, listTop: 0, listRows: 0,
+		machineChoices: machineChoices, showsWhere: false, whereTop: 0, listTop: 0, listRows: 0,
 	}
 
 	switch {
@@ -144,6 +141,7 @@ func (m *Model) layout() layout {
 		geometry.listTop = below + 1
 		geometry.listRows = max(m.height-frameRows-geometry.listTop, 1)
 	case m.hasWhere():
+		geometry.showsWhere = true
 		geometry.whereTop = below
 	}
 
@@ -200,7 +198,7 @@ func (m *Model) renderForm(geometry layout) []string {
 	case m.hasWhere():
 		body = append(body, "")
 
-		for place := whereNew; place <= whereOther; place++ {
+		for _, place := range whereChoices {
 			name, detail := m.place(place)
 			detail = tui.SanitizeTerminalText(detail)
 			padded := name + strings.Repeat(" ", max(placeColumns-lipgloss.Width(name), 1))
@@ -254,16 +252,16 @@ func (m *Model) renderChoices(choices []string, selected int) string {
 }
 
 func (m *Model) lines() []listLine {
-	lines := make([]listLine, 0, len(m.rows)+int(sectionInUse)+1)
+	lines := make([]listLine, 0, len(m.rows)+len(sectionOrder))
 
 	for position, index := range m.rows {
 		current := m.all[index].section
 		if position == 0 || m.all[m.rows[position-1]].section != current {
-			lines = append(lines, listLine{section: current, row: -1, last: false})
+			lines = append(lines, listLine{section: current, heading: true, row: 0, lastOfSection: false})
 		}
 
 		last := position == len(m.rows)-1 || m.all[m.rows[position+1]].section != current
-		lines = append(lines, listLine{section: current, row: position, last: last})
+		lines = append(lines, listLine{section: current, heading: false, row: position, lastOfSection: last})
 	}
 
 	return lines
@@ -271,13 +269,13 @@ func (m *Model) lines() []listLine {
 
 func (m *Model) renderLine(lines []listLine, index, width int) string {
 	switch {
-	case index < len(lines) && lines[index].row < 0:
+	case index < len(lines) && lines[index].heading:
 		return strings.Repeat(" ", rowGutter) + lines[index].section.label()
 	case index < len(lines):
 		line := lines[index]
 
 		tree := treeBranch
-		if line.last {
+		if line.lastOfSection {
 			tree = treeLast
 		}
 

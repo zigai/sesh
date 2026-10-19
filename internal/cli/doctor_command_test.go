@@ -14,6 +14,7 @@ import (
 
 	"github.com/zigai/sesh/internal/doctor"
 
+	"github.com/zigai/sesh/internal/cli/clibase"
 	cmddoctor "github.com/zigai/sesh/internal/cli/cmd/doctor"
 )
 
@@ -113,7 +114,7 @@ func TestDoctorSurvivesABrokenConfigAndReportsIt(t *testing.T) {
 
 func TestDoctorApplicationFailedChecksRetainJSONReport(t *testing.T) {
 	fixture := runFailedDoctorApplication(t, true)
-	if !errors.Is(fixture.err, errDoctorChecksFailed) || ExitCode(fixture.err) != exitCodeGeneral {
+	if !errors.Is(fixture.err, clibase.ErrDoctorChecksFailed) || ExitCode(fixture.err) != exitCodeGeneral {
 		t.Fatalf("unexpected outcome: %v", fixture.err)
 	}
 
@@ -127,7 +128,7 @@ func TestDoctorApplicationFailedChecksRetainJSONReport(t *testing.T) {
 
 func TestDoctorApplicationFailedChecksRetainPlainReport(t *testing.T) {
 	fixture := runFailedDoctorApplication(t, false)
-	if !errors.Is(fixture.err, errDoctorChecksFailed) || ExitCode(fixture.err) != exitCodeGeneral {
+	if !errors.Is(fixture.err, clibase.ErrDoctorChecksFailed) || ExitCode(fixture.err) != exitCodeGeneral {
 		t.Fatalf("unexpected outcome: %v", fixture.err)
 	}
 
@@ -179,7 +180,7 @@ func TestDoctorOutputFailureKeepsTheChecksFailure(t *testing.T) {
 	var stderr bytes.Buffer
 
 	err := ExecuteApplication(t.Context(), fixture, nil, failingRuntimeWriter{}, &stderr)
-	if !errors.Is(err, errDoctorChecksFailed) || !errors.Is(err, io.ErrClosedPipe) {
+	if !errors.Is(err, clibase.ErrDoctorChecksFailed) || !errors.Is(err, io.ErrClosedPipe) {
 		t.Fatalf("output failure lost a cause: %v", err)
 	}
 

@@ -39,8 +39,7 @@ const (
 	taskMachineFlag  = "machine"
 	taskProjectFlag  = "project"
 	thisMachine      = "local"
-	// centered divides the space around a popup to center it.
-	centered = 2
+	centered         = 2
 )
 
 var errRemoteTaskSession = errors.New("the remote task's session is not in the remote catalog")
@@ -60,10 +59,10 @@ type taskHandoff struct {
 }
 
 type taskChoices struct {
-	options  taskpicker.Options
-	machines []string
-	root     string
-	remote   RemoteServices
+	options       taskpicker.Options
+	machines      []action.Location
+	remoteProject string
+	remote        RemoteServices
 }
 
 type taskFrontend struct {
@@ -310,9 +309,9 @@ func finishTaskPicker(ctx context.Context, handoffPath string, picked pickedTask
 	case choice.Reopen:
 		return writeHandoff(handoffPath, taskHandoff{
 			Show: "", Reopen: true, Expanded: choice.Expanded, Title: choice.Title, Agent: choice.Harness,
-			Machine: picked.machines[choice.Machine], Session: "", Pane: "",
+			Machine: picked.machines[choice.Machine].Connection, Session: "", Pane: "",
 		})
-	case picked.connection != "" && (choice.Show != "" || picked.session != ""):
+	case picked.at.Kind == action.LocationPeer && (choice.Show != "" || picked.session != ""):
 		return handOffRemoteTask(ctx, handoffPath, picked)
 	case choice.Show != "" || picked.started != "":
 		return writeHandoff(handoffPath, taskHandoff{
@@ -327,19 +326,19 @@ func finishTaskPicker(ctx context.Context, handoffPath string, picked pickedTask
 // connection the session the started task opened in, and the task started in another project's
 // session, which the opener goes to.
 type pickedTask struct {
-	choice     taskpicker.Choice
-	machines   []string
-	connection string
-	session    string
-	started    string
-	remote     RemoteServices
+	choice   taskpicker.Choice
+	machines []action.Location
+	at       action.Location
+	session  string
+	started  string
+	remote   RemoteServices
 }
 
 func pickTask(
 	ctx context.Context, cmd *cobra.Command, cfg *config.Config, runtime *actioncli.Runtime, caller action.Caller,
 	remoteFactory RemoteFactory, dir string, from taskHandoff,
 ) (pickedTask, bool, error) {
-	picked := pickedTask{choice: emptyChoice(), machines: nil, connection: "", session: "", started: "", remote: emptyRemoteServices()}
+	picked := pickedTask{choice: emptyChoice(), machines: nil, at: action.Local(), session: "", started: "", remote: emptyRemoteServices()}
 
 	workspace, err := app.Resolve(cfg, clibase.CommandLocations(cmd))
 	if err != nil {
@@ -352,7 +351,7 @@ func pickTask(
 	}
 
 	picked.machines, picked.remote = choices.machines, choices.remote
-	picked.connection = choices.machines[choices.options.Machine]
+	picked.at = choices.machines[choices.options.Machine]
 
 	start := func(choice taskpicker.Choice) error {
 		location := choice.Location
@@ -362,11 +361,11 @@ func pickTask(
 		}
 
 		switch {
-		case picked.connection != "":
-			input.Project = choices.root
+		case picked.at.Kind == action.LocationPeer:
+			input.Project = choices.remoteProject
 			router := action.Router{Local: nil, Peer: choices.remote.Peer, Origin: nil}
 
-			started, err := action.Run(ctx, router, action.TaskNew, action.Peer(picked.connection), emptyCaller(), input)
+			started, err := action.Run(ctx, router, action.TaskNew, picked.at, emptyCaller(), input)
 			picked.session = started.Session
 
 			return err
@@ -389,7 +388,7 @@ func pickTask(
 		pickerOptions.Expanded, pickerOptions.Title, pickerOptions.Agent = from.Expanded, from.Title, from.Agent
 	}
 
-	if pickerOptions.Expanded && picked.connection == "" {
+	if pickerOptions.Expanded && picked.at.Kind == action.LocationLocal {
 		counting, stopCounting := context.WithCancel(ctx)
 		defer stopCounting()
 
@@ -426,9 +425,11 @@ func loadTaskChoices(
 	ctx context.Context, cfg *config.Config, socket string, runtime *actioncli.Runtime, caller action.Caller,
 	remoteFactory RemoteFactory, dir, machine string, describe bool,
 ) (taskChoices, error) {
-	choices := taskChoices{options: taskPickerOptions("", emptyTaskOffered()), machines: []string{""}, root: "", remote: emptyRemoteServices()}
+	choices := taskChoices{options: taskPickerOptions("", emptyTaskOffered()), machines: []action.Location{action.Local()}, remoteProject: "", remote: emptyRemoteServices()}
 
-	offered, err := runtime.Local.TaskOffer(ctx, caller, dir, describe && machine == "")
+	at := machineLocation(machine)
+
+	offered, err := runtime.Local.TaskOffer(ctx, caller, dir, describe && at.Kind == action.LocationLocal)
 	if err != nil {
 		return choices, err
 	}
@@ -455,7 +456,7 @@ func loadTaskChoices(
 
 	choices.options.Machines = machines
 
-	index := slices.Index(choices.machines, machine)
+	index := slices.Index(choices.machines, at)
 	if index <= 0 || !machines[index].Usable {
 		return choices, nil
 	}
@@ -465,7 +466,14 @@ func loadTaskChoices(
 	return choices, nil
 }
 
-// listMachines lists this machine and the connected remote machines, and keeps their connections.
+func machineLocation(machine string) action.Location {
+	if machine == "" {
+		return action.Local()
+	}
+
+	return action.Peer(machine)
+}
+
 func (choices *taskChoices) listMachines() ([]taskpicker.Machine, error) {
 	catalog, err := choices.remote.Catalog.LoadRemoteCatalog()
 	if err != nil {
@@ -482,7 +490,7 @@ func (choices *taskChoices) listMachines() ([]taskpicker.Machine, error) {
 		at := action.Peer(connection.ID)
 		usable := choices.remote.Peer.Accepts(at, action.TaskOffer.ID) && choices.remote.Peer.Accepts(at, action.TaskNew.ID)
 		machines = append(machines, taskpicker.Machine{Name: cmp.Or(connection.Label, connection.ID), Usable: usable})
-		choices.machines = append(choices.machines, connection.ID)
+		choices.machines = append(choices.machines, at)
 	}
 
 	return machines, nil
@@ -491,7 +499,7 @@ func (choices *taskChoices) listMachines() ([]taskpicker.Machine, error) {
 func (choices *taskChoices) useMachine(ctx context.Context, project string, index int, describe bool) {
 	machines := choices.options.Machines
 	router := action.Router{Local: nil, Peer: choices.remote.Peer, Origin: nil}
-	remoteOffer, err := action.Run(ctx, router, action.TaskOffer, action.Peer(choices.machines[index]), emptyCaller(),
+	remoteOffer, err := action.Run(ctx, router, action.TaskOffer, choices.machines[index], emptyCaller(),
 		action.OfferTask{Project: project, Describe: describe})
 
 	switch {
@@ -503,7 +511,7 @@ func (choices *taskChoices) useMachine(ctx context.Context, project string, inde
 		choices.options.Problem = machines[index].Name + " unavailable"
 	default:
 		choices.options = taskPickerOptions(project, remoteOffer)
-		choices.root = remoteOffer.Project
+		choices.remoteProject = remoteOffer.Project
 	}
 
 	choices.options.Machines, choices.options.Machine = machines, index
@@ -562,7 +570,7 @@ func handOffRemoteTask(ctx context.Context, handoffPath string, picked pickedTas
 	}
 
 	return writeHandoff(handoffPath, taskHandoff{
-		Show: "", Reopen: false, Expanded: false, Title: "", Agent: "", Machine: picked.connection, Session: target.ID, Pane: pane,
+		Show: "", Reopen: false, Expanded: false, Title: "", Agent: "", Machine: picked.at.Connection, Session: target.ID, Pane: pane,
 	})
 }
 
@@ -585,7 +593,7 @@ func waitRemoteTaskSession(
 		}
 
 		for _, connection := range catalog.Connections {
-			if connection.ID == picked.connection && connection.Connected {
+			if connection.ID == picked.at.Connection && connection.Connected {
 				found, listed = find(connection)
 			}
 		}

@@ -573,7 +573,8 @@ func TestBackPopsHistoryAndSkipsDeadPanes(t *testing.T) {
 	controller := &fakeController{
 		current: agents.CurrentContext{ServerSocket: defaultServerSocket, ClientName: "client-a", SessionID: "$1", SessionName: firstSessionName, WindowID: "@3", PaneID: "%3"},
 		panes:   navigationPanes(),
-		history: nativeHistory(t,
+		history: nativeHistory(
+			t,
 			historyEntry("%1", 1001, "@1", "$1"),
 			historyEntry("%dead", 1998, "@dead", "$1"),
 			historyEntry("%2", 1002, "@2", "$2"),
@@ -633,7 +634,8 @@ func TestBackClearsStaleHistory(t *testing.T) {
 	controller := &fakeController{
 		current: agents.CurrentContext{ServerSocket: defaultServerSocket, SessionID: "$1", SessionName: firstSessionName, WindowID: "@3", PaneID: "%3"},
 		panes:   navigationPanes(),
-		history: nativeHistory(t,
+		history: nativeHistory(
+			t,
 			historyEntry("%dead", 1998, "@dead", "$1"),
 			historyEntry("%gone", 1999, "@gone", "$1"),
 		),

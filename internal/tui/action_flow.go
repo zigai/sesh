@@ -118,7 +118,7 @@ func (m *Model) inboxSubject(descriptor action.Descriptor) (action.Subject, bool
 	none := action.Subject{At: action.Local(), Sessions: nil, Pane: "", Task: ""}
 
 	found, ok := m.selectedInboxItem()
-	if !ok || (descriptor.Subject == action.SubjectTask && !found.task) {
+	if !ok || (descriptor.Subject == action.SubjectTask && found.kind != inboxTaskRow) {
 		return none, false
 	}
 
@@ -131,7 +131,7 @@ func (m *Model) inboxSubject(descriptor action.Descriptor) (action.Subject, bool
 		return action.Subject{At: at, Sessions: nil, Pane: string(found.live.AgentPane), Task: found.live.Record.ID}, true
 	}
 
-	if found.owner.ID == "" || (found.task && found.live.AgentPane == "") {
+	if found.owner.ID == "" || (found.kind == inboxTaskRow && found.live.AgentPane == "") {
 		return none, false
 	}
 

@@ -12,17 +12,19 @@ import (
 	"github.com/zigai/sesh/internal/integration/lifecycle"
 )
 
-var (
-	ErrFinalRecorded = errors.New("daemon final save outcome was durably recorded")
-	ErrFinalSaveNil  = errors.New("cannot run lifecycle coordinator: FinalSave is nil")
-)
+var ErrFinalSaveNil = errors.New("cannot run lifecycle coordinator: FinalSave is nil")
 
 type CoordinatorConfig struct {
 	Runtime  lifecycle.LogindRuntime
 	Reporter *RuntimeReporter
-	// FinalSave runs one bounded save for an announced sleep or shutdown. A failure it joins with
-	// ErrFinalRecorded was durably recorded and does not stop the coordinator.
-	FinalSave func(context.Context) error
+	// FinalSave runs one bounded save for an announced sleep or shutdown.
+	FinalSave func(context.Context) (FinalSaveOutcome, error)
+}
+
+// FinalSaveOutcome says whether a final save failure was durably recorded, which keeps the
+// coordinator running.
+type FinalSaveOutcome struct {
+	Recorded bool
 }
 
 type lifecycleCoordinator struct {
@@ -55,8 +57,8 @@ func (c *lifecycleCoordinator) handleFinalSave(eventCtx context.Context) error {
 		c.cfg.Reporter.Update(RuntimePhaseFinalSave)
 	}
 
-	saveErr := c.cfg.FinalSave(eventCtx)
-	if errors.Is(saveErr, ErrFinalRecorded) {
+	outcome, saveErr := c.cfg.FinalSave(eventCtx)
+	if saveErr != nil && outcome.Recorded {
 		zerolog.Ctx(eventCtx).Warn().Str("component", "daemon").Str("operation", "run_lifecycle").
 			Str("status", "degraded").Str("reason", "final_save_incomplete").
 			Bool("recorded", true).Msg("lifecycle final save failure recorded")

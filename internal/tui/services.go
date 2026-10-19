@@ -48,10 +48,6 @@ type SessionEnterer interface {
 	EnterSession(ctx context.Context, target session.Session) (EnterOutcome, error)
 }
 
-type TerminalAttacher interface {
-	AttachSession(ctx context.Context, target session.Session) (tea.ExecCommand, error)
-}
-
 type PaneService interface {
 	TmuxActivatePane(ctx context.Context, target session.Session, paneID string) error
 	TmuxPaneLocations(ctx context.Context) ([]PaneLocation, error)
@@ -101,12 +97,8 @@ type InboxStore interface {
 
 type StateStore interface {
 	UpdateModelState(ctx context.Context, update session.StateUpdate) error
-}
-
-// AgentViewDeferrer is an optional StateStore capability. A store that returns true takes
-// ownership of persisting the views after the model exits, so a popup never holds its
-// close on a history write.
-type AgentViewDeferrer interface {
+	// DeferAgentViews returns true when the store persists the views after the model exits, so a
+	// popup never holds its close on a history write.
 	DeferAgentViews(views []AgentView) bool
 }
 
@@ -128,7 +120,6 @@ type Services struct {
 	Enterer          SessionEnterer
 	Actions          action.Dispatcher
 	Panes            PaneService
-	TerminalAttach   TerminalAttacher
 	Agents           AgentSource
 	Tasks            TaskSource
 	Work             WorkSource

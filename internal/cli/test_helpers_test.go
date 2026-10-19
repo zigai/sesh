@@ -12,6 +12,8 @@ import (
 
 	gotmux "github.com/zigai/gotmux/tmux"
 	"github.com/zigai/gotmux/tmuxtest"
+
+	"github.com/zigai/sesh/internal/cli/clibase"
 )
 
 func newCaptureCLIServer(t *testing.T) *gotmux.Server {
@@ -54,11 +56,11 @@ const (
 var camelCaseKeyPattern = regexp.MustCompile(`^[a-z][a-zA-Z0-9]*$`)
 
 type testJSONEnvelope struct {
-	SchemaVersion int               `json:"schemaVersion"`
-	Command       string            `json:"command"`
-	OK            bool              `json:"ok"`
-	Result        json.RawMessage   `json:"result"`
-	Error         *jsonErrorPayload `json:"error"`
+	SchemaVersion int                       `json:"schemaVersion"`
+	Command       string                    `json:"command"`
+	OK            bool                      `json:"ok"`
+	Result        json.RawMessage           `json:"result"`
+	Error         *clibase.JSONErrorPayload `json:"error"`
 }
 
 type commandExecution struct {

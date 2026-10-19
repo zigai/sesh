@@ -1834,7 +1834,8 @@ func TestAgentSummaryIndexUsesTmuxServerIdentity(t *testing.T) {
 	applyAgentSummaryToSession(&row, byID, byName)
 
 	if row.AgentTotal != 1 || row.AgentActive != 1 || row.AgentWaiting != 0 {
-		t.Fatalf("server-a summary = active/waiting/total %d/%d/%d, want 1/0/1",
+		t.Fatalf(
+			"server-a summary = active/waiting/total %d/%d/%d, want 1/0/1",
 			row.AgentActive,
 			row.AgentWaiting,
 			row.AgentTotal,
