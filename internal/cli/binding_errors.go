@@ -65,7 +65,13 @@ func invokedByTmuxBinding(cmd *cobra.Command, stdout, stderr io.Writer) bool {
 }
 
 func bindingDiscardsReport(cmd *cobra.Command, output *commandBuffer, stdout, stderr io.Writer) bool {
-	return !output.streaming && !clibase.JSONOutputEnabled(cmd) && invokedByTmuxBinding(cmd, stdout, stderr)
+	return !output.streaming && !clibase.JSONOutputEnabled(cmd) && !helpRequested(cmd) && invokedByTmuxBinding(cmd, stdout, stderr)
+}
+
+func helpRequested(cmd *cobra.Command) bool {
+	help, err := cmd.Flags().GetBool("help")
+
+	return err == nil && help
 }
 
 func writerIsTerminal(writer io.Writer) bool {

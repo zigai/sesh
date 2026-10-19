@@ -21,7 +21,7 @@ func TestBindingReportsDoNotReachTmuxRunShellOutput(t *testing.T) {
 
 	for _, path := range commands {
 		t.Run(path[0]+"_"+path[1], func(t *testing.T) {
-			for _, mode := range []string{"binding", "outside_tmux", "json"} {
+			for _, mode := range []string{"binding", "outside_tmux", "json", "help"} {
 				t.Run(mode, func(t *testing.T) {
 					testBindingReportOutput(t, path, mode)
 				})
@@ -46,6 +46,12 @@ func testBindingReportOutput(t *testing.T, path []string, mode string) {
 	}
 
 	report := "command report\n"
+
+	if mode == "help" {
+		if err := cmd.Flags().Set("help", "true"); err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	if mode == "json" {
 		report = "{\"ok\":true}\n"
