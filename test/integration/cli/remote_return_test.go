@@ -88,7 +88,7 @@ func TestRemotePickerReturnsAcrossSSH(t *testing.T) {
 	popupLine := fixture.connection.SeshPath + " pick --ui popup"
 	remoteReturnCommand(t, ctx, "send", "-q", alias, "text:"+popupLine, "enter", "--until-screen", "origin-destination", "--timeout", "8s")
 	assertPickerScreenRows(t, ctx, alias, []string{"origin-destination", "origin-start", "remote-work"}, nil)
-	remoteReturnCommand(t, ctx, "send", "-q", alias, "--text", "origin-destination", "--until-idle=100ms", "--timeout", "5s")
+	remoteReturnCommand(t, ctx, "send", "-q", alias, "--text", "origin-destination", "--until-screen", "> origin-destination", "--timeout", "5s")
 	remoteReturnCommand(t, ctx, "send", "-q", alias, "enter", "--until-screen", "RETURNED_TO_ORIGIN", "--timeout", "8s")
 
 	clients, err := origin.Clients(t.Context())

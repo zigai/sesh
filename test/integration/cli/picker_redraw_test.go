@@ -78,29 +78,29 @@ func TestPickerSearchShrinkAndRegrowAvoidFullScreenErase(t *testing.T) {
 	})
 
 	termtracePickerCommand(t, ctx, "send", "-q", alias, "--mark", "before-shrink")
-	termtracePickerCommand(t, ctx, "send", "-q", alias, "--text", "alpha-target", "--until-idle=100ms", "--timeout", "5s")
+	termtracePickerCommand(t, ctx, "send", "-q", alias, "--text", "alpha-target", "--until-screen", "> alpha-target", "--timeout", "5s")
 	termtracePickerCommand(t, ctx, "send", "-q", alias, "--mark", "after-shrink")
 	assertPickerScreenRows(t, ctx, alias, []string{"alpha-target"}, []string{"bravo-stale", "charlie-stale"})
 
 	termtracePickerCommand(t, ctx, "send", "-q", alias, "--mark", "before-grow")
-	termtracePickerCommand(t, ctx, "send", "-q", alias, "ctrl+u", "--until-idle=100ms", "--timeout", "5s")
+	termtracePickerCommand(t, ctx, "send", "-q", alias, "ctrl+u", "--until-screen", "charlie-stale", "--timeout", "5s")
 	termtracePickerCommand(t, ctx, "send", "-q", alias, "--mark", "after-grow")
 	assertPickerScreenRows(t, ctx, alias,
 		[]string{"alpha-target", "bravo-stale", "charlie-stale"}, nil)
 
 	termtracePickerCommand(t, ctx, "send", "-q", alias, "--mark", "before-empty")
-	termtracePickerCommand(t, ctx, "send", "-q", alias, "--text", "zzzzmissing", "--until-idle=100ms", "--timeout", "5s")
+	termtracePickerCommand(t, ctx, "send", "-q", alias, "--text", "zzzzmissing", "--until-screen", "> zzzzmissing", "--timeout", "5s")
 	termtracePickerCommand(t, ctx, "send", "-q", alias, "--mark", "after-empty")
 	assertPickerScreenRows(t, ctx, alias, []string{"No matches"},
 		[]string{"alpha-target", "bravo-stale", "charlie-stale"})
 
 	termtracePickerCommand(t, ctx, "send", "-q", alias, "--mark", "before-regrow")
-	termtracePickerCommand(t, ctx, "send", "-q", alias, "ctrl+u", "--until-idle=100ms", "--timeout", "5s")
+	termtracePickerCommand(t, ctx, "send", "-q", alias, "ctrl+u", "--until-screen", "charlie-stale", "--timeout", "5s")
 	termtracePickerCommand(t, ctx, "send", "-q", alias, "--mark", "after-regrow")
 	assertPickerScreenRows(t, ctx, alias,
 		[]string{"alpha-target", "bravo-stale", "charlie-stale"}, nil)
 	termtracePickerCommand(t, ctx, "send", "-q", alias, "--mark", "before-arrow")
-	termtracePickerCommand(t, ctx, "send", "-q", alias, "down", "--until-idle=100ms", "--timeout", "5s")
+	termtracePickerCommand(t, ctx, "send", "-q", alias, "down", "--until-screen", "▌ bravo-stale", "--timeout", "5s")
 	termtracePickerCommand(t, ctx, "send", "-q", alias, "--mark", "after-arrow")
 
 	termtracePickerCommand(t, ctx, "send", "-q", alias, "--signal", "INT")

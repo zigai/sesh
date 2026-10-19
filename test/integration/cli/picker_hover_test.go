@@ -33,7 +33,7 @@ func TestAgentsPopupHoverKeepsScrolledSessionRowsStable(t *testing.T) {
 	}
 
 	alias := fmt.Sprintf("sesh-picker-hover-%d-%s", os.Getpid(), filepath.Base(root))
-	evidencePath := filepath.Join(os.TempDir(), alias)
+	evidencePath := filepath.Join(t.ArtifactDir(), "termtrace")
 	t.Logf("termtrace evidence %s", evidencePath)
 
 	ctx, cancel := context.WithTimeout(t.Context(), 25*time.Second)
@@ -69,7 +69,7 @@ func TestAgentsPopupHoverKeepsScrolledSessionRowsStable(t *testing.T) {
 		arguments = append(arguments, "down")
 	}
 
-	arguments = append(arguments, "--until-idle=100ms", "--timeout", "5s")
+	arguments = append(arguments, "--until-screen", "▌ hover-session-14", "--timeout", "5s")
 	termtracePickerCommand(t, ctx, arguments...)
 
 	before := pickerHoverScreen(t, ctx, alias)

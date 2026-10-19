@@ -43,7 +43,7 @@ func TestAgentsPopupHoverKeepsVisibleSessionHeadingInPlace(t *testing.T) {
 	}
 
 	alias := fmt.Sprintf("sesh-picker-heading-hover-%d-%s", os.Getpid(), filepath.Base(root))
-	evidencePath := filepath.Join(os.TempDir(), alias)
+	evidencePath := filepath.Join(t.ArtifactDir(), "termtrace")
 	t.Logf("termtrace evidence %s", evidencePath)
 
 	ctx, cancel := context.WithTimeout(t.Context(), 25*time.Second)
