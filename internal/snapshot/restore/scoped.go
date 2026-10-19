@@ -559,16 +559,8 @@ func environmentTable(ctx context.Context, scope gotmux.EnvironmentScope) (map[e
 					Wrap(model.ErrInvalid)
 			}
 
-			value, err := scope.GetWith(ctx, entry.Name, gotmux.GetEnvironmentOptions{Hidden: hidden})
-			if err != nil {
-				return nil, oops.In("snapshot.restore").
-					Code("restore_failed").
-					With("operation", "import_environment", "reason", "scope_value_failed").
-					Wrap(err)
-			}
-
-			content, present := value.Value.Get()
-			if !present && !value.Unset {
+			content, present := entry.Value.Value.Get()
+			if !present && !entry.Value.Unset {
 				return nil, oops.In("snapshot.restore").
 					Code("restore_failed").
 					With("operation", "import_environment", "reason", "value_unavailable").
@@ -579,7 +571,7 @@ func environmentTable(ctx context.Context, scope gotmux.EnvironmentScope) (map[e
 
 			observed[environmentKey{name: entry.Name, hidden: hidden}] = environmentShape{
 				value:  content,
-				unset:  value.Unset,
+				unset:  entry.Value.Unset,
 				hidden: hidden,
 			}
 		}

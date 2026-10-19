@@ -55,7 +55,7 @@ func environment(ctx context.Context, scope gotmux.EnvironmentScope) ([]model.Va
 				return nil, environmentUnsupported("ambiguous_enumeration")
 			}
 
-			variable, err := environmentEntry(ctx, scope, entry.Name, hidden)
+			variable, err := environmentEntry(entry, hidden)
 			if err != nil {
 				return nil, err
 			}
@@ -78,20 +78,35 @@ func environmentUnsupported(reason string) error {
 		Wrap(ErrUnsupported)
 }
 
-func environmentEntry(ctx context.Context, scope gotmux.EnvironmentScope, name string, hidden bool) (model.Variable, error) {
-	value, err := scope.GetWith(ctx, name, gotmux.GetEnvironmentOptions{Hidden: hidden})
-	if err != nil {
-		return model.Variable{}, oops.In("snapshot.capture").With("operation", "observe_environment_value").Wrapf(err, "observe environment value")
+func environmentEntry(entry gotmux.EnvironmentEntry, hidden bool) (model.Variable, error) {
+	// tmux lists names such as exported bash functions (BASH_FUNC_name%%) that restore cannot set again.
+	if !shellName(entry.Name) {
+		return model.Variable{}, environmentUnsupported("name_unsupported")
 	}
 
-	content, present := value.Value.Get()
+	content, present := entry.Value.Value.Get()
 
 	state := "set"
-	if value.Unset {
+	if entry.Value.Unset {
 		state = "removed"
 	} else if !present {
 		return model.Variable{}, environmentUnsupported("value_unavailable")
 	}
 
-	return model.Variable{Name: model.Bytes(name), Value: model.Bytes(content), State: state, Hidden: hidden}, nil
+	return model.Variable{Name: model.Bytes(entry.Name), Value: model.Bytes(content), State: state, Hidden: hidden}, nil
+}
+
+func shellName(name string) bool {
+	if name == "" {
+		return false
+	}
+
+	for i, c := range []byte(name) {
+		letter := c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_'
+		if !letter && (i == 0 || c < '0' || c > '9') {
+			return false
+		}
+	}
+
+	return true
 }
