@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"syscall"
 
 	"github.com/zigai/sesh/internal/privatefs"
@@ -86,9 +85,8 @@ func (s *Service) resolveCurrentSnapshot(ctx context.Context, repo currentSnapsh
 			return s.classifyReadCurrentError(inspectErr)
 		}
 
-		candidate, admissible := practicalCurrentGeneration(before)
-		if !admissible {
-			if latestSaveAttempt(before).State == "failed" {
+		if !before.PracticalCurrentAdmissible() {
+			if before.LatestSaveFailed() {
 				return s.saveFix(newResult(CheckSnapshotCurrent, StatusFail, "Latest save failed and no earlier generation can be restored").
 					withReason(ReasonRecoveryRequired)), nil
 			}
@@ -96,7 +94,7 @@ func (s *Service) resolveCurrentSnapshot(ctx context.Context, repo currentSnapsh
 			return s.classifyReadCurrentError(readErr)
 		}
 
-		candidateManifest, candidateErr := repo.Read(ctx, candidate)
+		candidateManifest, candidateErr := repo.Read(ctx, before.Current)
 		if candidateErr != nil {
 			return s.classifyReadCurrentError(candidateErr)
 		}
@@ -106,12 +104,11 @@ func (s *Service) resolveCurrentSnapshot(ctx context.Context, repo currentSnapsh
 			return s.classifyReadCurrentError(inspectErr)
 		}
 
-		afterCandidate, stillAdmissible := practicalCurrentGeneration(after)
-		if before.Sequence != after.Sequence || candidate != afterCandidate || !stillAdmissible {
+		if before.Sequence != after.Sequence || before.Current != after.Current || !after.PracticalCurrentAdmissible() {
 			continue
 		}
 
-		return s.practicalCandidateResult(after, candidate, candidateManifest), nil
+		return s.practicalCandidateResult(after, candidateManifest), nil
 	}
 
 	return newResult(CheckSnapshotCurrent, StatusWarn, "Repository changed during inspection; the current snapshot was not verified").
@@ -119,15 +116,14 @@ func (s *Service) resolveCurrentSnapshot(ctx context.Context, repo currentSnapsh
 		withCommand(s.doctorCommand()), nil
 }
 
-// practicalCandidateResult reports the generation restore uses when the latest save failed or
-// never finished.
-func (s *Service) practicalCandidateResult(catalog store.Catalog, genID string, manifest model.Manifest) Result {
+func (s *Service) practicalCandidateResult(catalog store.Catalog, manifest model.Manifest) Result {
+	genID := catalog.Current
 	if !catalog.LatestSaveUnfinished() || len(manifest.Sessions) == 0 {
 		return s.manifestResult(genID, manifest)
 	}
 
 	sessions := plural(len(manifest.Sessions), "session")
-	if latestSaveAttempt(catalog).State == "failed" {
+	if catalog.LatestSaveFailed() {
 		return s.saveFix(newResult(CheckSnapshotCurrent, StatusWarn,
 			fmt.Sprintf("Latest save failed; restore uses %s, the newest saved generation (%s)", genID, sessions)).
 			withReason(ReasonSaveUnfinished))
@@ -227,81 +223,6 @@ func (s *Service) verifyFix(result Result) Result {
 
 func isCanceled(err error) bool {
 	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
-}
-
-func practicalCurrentGeneration(catalog store.Catalog) (string, bool) {
-	if catalog.Current == "" {
-		return "", false
-	}
-
-	for _, rewrite := range catalog.Rewrites {
-		if rewrite.State == "pending" && rewrite.Source == catalog.Current {
-			return "", false
-		}
-	}
-
-	index := slices.IndexFunc(catalog.Generations, func(gen store.Generation) bool { return gen.ID == catalog.Current })
-	if index < 0 {
-		return "", false
-	}
-
-	latestSave := latestSaveAttempt(catalog)
-
-	switch latestSave.State {
-	case "incomplete":
-		if currentRewriteDescendant(catalog, latestSave.ID) != catalog.Current {
-			return "", false
-		}
-
-		return catalog.Current, !catalog.Generations[index].Complete
-	case "pending", "failed":
-		// The latest save produced no generation, so the current one is the newest saved state.
-		return catalog.Current, true
-	default:
-		return "", false
-	}
-}
-
-func latestSaveAttempt(catalog store.Catalog) store.Attempt {
-	replacements := make(map[string]bool, len(catalog.Rewrites))
-	for _, rewrite := range catalog.Rewrites {
-		if rewrite.Replacement != "" {
-			replacements[rewrite.Replacement] = true
-		}
-	}
-
-	for _, attempt := range slices.Backward(catalog.Attempts) {
-		if !replacements[attempt.ID] {
-			return attempt
-		}
-	}
-
-	var absent store.Attempt
-
-	return absent
-}
-
-func currentRewriteDescendant(catalog store.Catalog, source string) string {
-	for range len(catalog.Rewrites) {
-		replacement, ok := completedRewriteReplacement(catalog.Rewrites, source)
-		if !ok {
-			return source
-		}
-
-		source = replacement
-	}
-
-	return source
-}
-
-func completedRewriteReplacement(rewrites []store.Rewrite, source string) (string, bool) {
-	for _, rewrite := range rewrites {
-		if rewrite.State == "completed" && rewrite.Source == source && rewrite.Replacement != "" {
-			return rewrite.Replacement, true
-		}
-	}
-
-	return "", false
 }
 
 func isUnsafePathError(path string, err error) bool {

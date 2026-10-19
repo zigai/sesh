@@ -96,7 +96,7 @@ func (c Catalog) practicalCurrentGeneration() (Generation, error) {
 // produced none because it failed or never finished. A pending rewrite of the current generation
 // blocks either way, so a saved-session deletion in progress is never undone.
 func (c Catalog) PracticalCurrentAdmissible() bool {
-	if c.Current == "" || len(c.Attempts) == 0 {
+	if c.Current == "" {
 		return false
 	}
 
@@ -111,11 +111,11 @@ func (c Catalog) PracticalCurrentAdmissible() bool {
 		return false
 	}
 
-	latest := c.latestAttempt()
+	latest := c.latestSaveAttempt()
 
 	switch latest.State {
 	case attemptStateIncomplete:
-		return latest.ID == c.Current && !c.Generations[index].Complete
+		return c.rewriteDescendant(latest.ID) == c.Current && !c.Generations[index].Complete
 	case attemptStatePending, attemptStateFailed:
 		return true
 	default:
@@ -126,24 +126,28 @@ func (c Catalog) PracticalCurrentAdmissible() bool {
 // LatestSaveUnfinished reports whether the latest save attempt failed or never finished, so the
 // current generation, if any, predates it.
 func (c Catalog) LatestSaveUnfinished() bool {
-	if len(c.Attempts) == 0 {
-		return false
-	}
-
-	state := c.latestAttempt().State
+	state := c.latestSaveAttempt().State
 
 	return state == attemptStatePending || state == attemptStateFailed
 }
 
-func (c Catalog) latestAttempt() Attempt {
-	latest := c.Attempts[0]
-	for _, attempt := range c.Attempts[1:] {
-		if attempt.Sequence > latest.Sequence {
-			latest = attempt
+func (c Catalog) LatestSaveFailed() bool {
+	return c.latestSaveAttempt().State == attemptStateFailed
+}
+
+func (c Catalog) rewriteDescendant(source string) string {
+	for range len(c.Rewrites) {
+		index := slices.IndexFunc(c.Rewrites, func(rewrite Rewrite) bool {
+			return rewrite.State == rewriteStateCompleted && rewrite.Source == source && rewrite.Replacement != ""
+		})
+		if index < 0 {
+			return source
 		}
+
+		source = c.Rewrites[index].Replacement
 	}
 
-	return latest
+	return source
 }
 
 func (r *Repository) currentLocked(ctx context.Context) (Generation, model.Manifest, error) {

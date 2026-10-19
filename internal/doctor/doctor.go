@@ -142,8 +142,7 @@ type Daemon struct {
 	State          string
 	Phase          string
 	InhibitorsHeld bool
-	// RuntimePath is the coordinator's runtime status socket for the selected tmux server.
-	RuntimePath string
+	RuntimePath    string
 }
 
 type Options struct {
@@ -163,12 +162,10 @@ type Options struct {
 	// value is a switch.
 	Flags map[string]string
 
-	Socket string
-	// DefaultSocket is the socket a plain tmux command uses.
+	Socket        string
 	DefaultSocket string
 	Server        *gotmux.Server
-	// ServerError is why the tmux server handle could not be opened.
-	ServerError error
+	ServerError   error
 
 	SnapshotDir string
 	HistoryPath string

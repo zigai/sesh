@@ -460,3 +460,39 @@ func TestUnreadableCurrentGenerationDoesNotBlockSaves(t *testing.T) {
 		t.Fatalf("listing after a new save = %v, %v; want %v", listing.Generation, err, next)
 	}
 }
+
+func TestReadPracticalCurrentIgnoresRewriteOfOlderGeneration(t *testing.T) {
+	r := openRepository(t, filepath.Join(t.TempDir(), "repository"))
+	older := commitMultiSessionFixture(t, r)
+	observation := commitFixture(t, r)
+
+	if _, err := r.RemoveSessions(t.Context(), newID(), older.ID, []string{"s0"}); err != nil {
+		t.Fatal(err)
+	}
+
+	got, _, err := r.ReadPracticalCurrent(t.Context())
+	if err != nil || got.ID != observation.ID {
+		t.Fatalf("practical current view = %v, %v; want latest observation %s", got.ID, err, observation.ID)
+	}
+}
+
+func TestReadPracticalCurrentFollowsRewriteAfterFailedSave(t *testing.T) {
+	r := openRepository(t, filepath.Join(t.TempDir(), "repository"))
+	source := commitMultiSessionFixture(t, r)
+
+	attempt, err := r.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.Fail(t.Context(), attempt.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := r.RemoveSessions(t.Context(), newID(), source.ID, []string{"s0"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertPracticalCurrentAfterUnfinishedSave(t, r, result.Replacement, "failed")
+}
