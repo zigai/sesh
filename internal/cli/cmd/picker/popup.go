@@ -21,10 +21,11 @@ import (
 // popupFrontend opens the picker popup for the command that invoked pick.popup; the popup child
 // re-runs sesh with the same configuration and state flags.
 type popupFrontend struct {
-	cmd *cobra.Command
+	cmd    *cobra.Command
+	remote RemoteFactory
 }
 
-func newPickPopupCommand() *cobra.Command {
+func newPickPopupCommand(remoteFactory RemoteFactory) *cobra.Command {
 	return actioncli.Command(action.PickPopup, actioncli.Options[action.OpenPicker, action.ClosedPicker]{
 		Operation:    "picker",
 		SuccessOwned: false,
@@ -32,7 +33,7 @@ func newPickPopupCommand() *cobra.Command {
 			cmd.Annotations[clibase.AnnotationLiveIO] = annotationEnabled
 		},
 		Prepare:  nil,
-		Frontend: func(cmd *cobra.Command) action.Dispatcher { return popupFrontend{cmd: cmd} },
+		Frontend: func(cmd *cobra.Command) action.Dispatcher { return popupFrontend{cmd: cmd, remote: remoteFactory} },
 		Render:   nil,
 	})
 }
@@ -54,7 +55,7 @@ func (frontend popupFrontend) Dispatch(ctx context.Context, invocation action.In
 		runtime.state.PopupDisplayMode = open.Mode
 	}
 
-	if err := openPickerPopup(ctx, frontend.cmd, runtime, invocation.Caller, open.Mode, launchedAt); err != nil {
+	if err := openPickerPopup(ctx, frontend.cmd, runtime, invocation.Caller, open.Mode, launchedAt, frontend.remote); err != nil {
 		return nil, err
 	}
 

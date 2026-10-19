@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"syscall"
 
 	"github.com/samber/oops"
@@ -35,6 +36,7 @@ type switchHandoff struct {
 	PaneID           string                  `json:"paneId,omitempty"`
 	AgentViews       []handoffView           `json:"agentViews,omitempty"`
 	ReplayKey        string                  `json:"replayKey,omitempty"`
+	TaskProject      string                  `json:"taskProject,omitempty"`
 }
 
 type handoffView struct {
@@ -57,10 +59,11 @@ func createPickerSwitchHandoff() (string, func(), error) {
 	return path, func() { _ = os.Remove(path) }, nil
 }
 
-func writePickerSwitchHandoff(path string, target *session.Session, paneID, replayKey string, views []tui.AgentView) error {
+func writePickerSwitchHandoff(path string, target *session.Session, paneID, replayKey, taskProject string, views []tui.AgentView) error {
 	var handoff switchHandoff
 
 	handoff.ReplayKey = replayKey
+	handoff.TaskProject = taskProject
 
 	if target != nil {
 		if !applyPickerHandoffTarget(&handoff, target, paneID) {
@@ -72,7 +75,7 @@ func writePickerSwitchHandoff(path string, target *session.Session, paneID, repl
 		handoff.AgentViews = append(handoff.AgentViews, handoffView{Session: view.Session, PaneID: view.PaneID})
 	}
 
-	if target == nil && len(handoff.AgentViews) == 0 && handoff.ReplayKey == "" {
+	if target == nil && len(handoff.AgentViews) == 0 && handoff.ReplayKey == "" && handoff.TaskProject == "" {
 		return nil
 	}
 
@@ -135,7 +138,7 @@ func readPickerSwitchHandoff(path string) (switchHandoff, bool, error) {
 	var handoff switchHandoff
 
 	if json.Unmarshal(encoded, &handoff) != nil || (handoff.SessionID == "") != (handoff.SessionName == "") ||
-		len(handoff.AgentViews) > handoffMaxAgentViews {
+		len(handoff.AgentViews) > handoffMaxAgentViews || (handoff.TaskProject != "" && !filepath.IsAbs(handoff.TaskProject)) {
 		return switchHandoff{}, false, oops.In("cli").With("operation", "read_picker_handoff").Wrap(errPickerHandoffInvalid)
 	}
 

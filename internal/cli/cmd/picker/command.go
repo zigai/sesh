@@ -30,6 +30,7 @@ import (
 
 	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/app"
+	"github.com/zigai/sesh/internal/cli/actioncli"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/integration/tmuxserver"
@@ -165,7 +166,7 @@ func NewPickCommand(ctx context.Context, remote ...RemoteFactory) *cobra.Command
 		_ = cmd.Flags().MarkHidden(name)
 	}
 
-	cmd.AddCommand(newPickPopupCommand())
+	cmd.AddCommand(newPickPopupCommand(remoteFactory))
 
 	return cmd
 }
@@ -353,7 +354,8 @@ func finishPickerInteractive(ctx context.Context, cmd *cobra.Command, finalModel
 
 	closeErr := services.Close()
 	if handoffPath != "" && closeErr == nil {
-		handoffErr := writePickerSwitchHandoff(handoffPath, handoffTarget, handoffPane, finalModel.ReplayKey(), services.takeDeferredAgentViews())
+		handoffErr := writePickerSwitchHandoff(handoffPath, handoffTarget, handoffPane, finalModel.ReplayKey(), finalModel.TaskProject(),
+			services.takeDeferredAgentViews())
 		deferredErr = errors.Join(deferredErr, handoffErr)
 	}
 
@@ -484,6 +486,7 @@ func openPickerPopup(
 	caller action.Caller,
 	mode string,
 	launchedAt time.Time,
+	remoteFactory RemoteFactory,
 ) error {
 	server, err := tmuxserver.OpenInteractive(runtime.workspace.Socket)
 	if err != nil {
@@ -542,7 +545,25 @@ func openPickerPopup(
 		completePickerSwitchHandoff(ctx, services, handoffPath, string(client.Name), string(originSessionID)),
 		replayPickerKey(ctx, handoffPath, runtime.workspace.Socket, string(client.Name)),
 		services.Close(),
+		openHandoffTaskMenu(ctx, cmd, runtime.workspace.Config, handoffPath,
+			action.Caller{Client: string(client.Name), Pane: targetPane, Session: "", Width: "", Height: ""}, remoteFactory),
 	)
+}
+
+func openHandoffTaskMenu(
+	ctx context.Context, cmd *cobra.Command, cfg *config.Config, path string, caller action.Caller, remoteFactory RemoteFactory,
+) error {
+	handoff, _, err := readPickerSwitchHandoff(path)
+	if err != nil || handoff.TaskProject == "" {
+		return err
+	}
+
+	runtime, err := actioncli.OpenRuntime(cmd, cfg)
+	if err != nil {
+		return err
+	}
+
+	return errors.Join(openTaskPicker(ctx, cmd, cfg, runtime, caller, remoteFactory, handoff.TaskProject), runtime.Close())
 }
 
 func popupOptions(program gotmux.Program, width, height, background string) gotmux.PopupOptions {

@@ -19,7 +19,7 @@ func tmuxBindable(t *testing.T) []action.Binding {
 	t.Helper()
 
 	cfg := config.DefaultConfig()
-	keys := []string{"M-a", "M-b", "M-c", "M-d", "M-e", "M-f", "M-g", "M-h", "M-i", "M-j", "M-k", "M-l", "M-m", "M-n", "M-o", "M-p", "M-q", "M-r", "M-s", "M-t", "M-u", "M-v", "M-w", "M-x", "M-y", "M-z", "C-M-a", "C-M-b", "C-M-c", "C-M-d", "C-M-e", "C-M-f", "C-M-g", "C-M-h", "C-M-i", "C-M-j", "C-M-k", "C-M-l", "C-M-m", "C-M-n", "C-M-o", "C-M-p", "C-M-q", "C-M-r", "C-M-s", "C-M-t"}
+	keys := []string{"M-a", "M-b", "M-c", "M-d", "M-e", "M-f", "M-g", "M-h", "M-i", "M-j", "M-k", "M-l", "M-m", "M-n", "M-o", "M-p", "M-q", "M-r", "M-s", "M-t", "M-u", "M-v", "M-w", "M-x", "M-y", "M-z", "C-M-a", "C-M-b", "C-M-c", "C-M-d", "C-M-e", "C-M-f", "C-M-g", "C-M-h", "C-M-i", "C-M-j", "C-M-k", "C-M-l", "C-M-m", "C-M-n", "C-M-o", "C-M-p", "C-M-q", "C-M-r", "C-M-s", "C-M-t", "C-M-u", "C-M-v", "C-M-w", "C-M-x"}
 
 	for _, entry := range action.All() {
 		descriptor := entry.Describe()

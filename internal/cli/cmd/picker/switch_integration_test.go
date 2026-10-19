@@ -156,7 +156,7 @@ func TestPopupHandoffSwitchesOnlyOpeningClientAfterPopupSelection(t *testing.T) 
 		Session: session.Identity{Origin: "local", Socket: server.Endpoint().SocketPath, Name: "origin-agent-session"},
 		PaneID:  "%0",
 	}
-	if err := writePickerSwitchHandoff(path, &target, "", "", []tui.AgentView{originView}); err != nil {
+	if err := writePickerSwitchHandoff(path, &target, "", "", "", []tui.AgentView{originView}); err != nil {
 		t.Fatal(err)
 	}
 

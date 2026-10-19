@@ -60,9 +60,9 @@ func (local *Local) registerTaskHandlers() {
 	handle(local, action.TaskMerge, local.mergeTask)
 }
 
-// TaskOffer lists what a new task can start with at the caller's pane, with branch details when
-// describe is set.
-func (local *Local) TaskOffer(ctx context.Context, caller action.Caller, describe bool) (TaskOffer, error) {
+// TaskOffer lists what a new task can start with at the caller's pane, or in the project at dir
+// when one is named, with branch details when describe is set.
+func (local *Local) TaskOffer(ctx context.Context, caller action.Caller, dir string, describe bool) (TaskOffer, error) {
 	offered := TaskOffer{Project: "", Offer: task.Offer{
 		Harnesses: nil, Project: "", Locations: nil, Current: -1, NextNumber: 0, Branches: nil, Refs: nil, Starts: nil,
 	}}
@@ -70,6 +70,12 @@ func (local *Local) TaskOffer(ctx context.Context, caller action.Caller, describ
 	service, place, err := local.taskPlace(ctx, caller)
 	if err != nil {
 		return offered, err
+	}
+
+	if dir != "" {
+		if place, err = local.projectOf(ctx, place, dir); err != nil {
+			return offered, err
+		}
 	}
 
 	offered.Offer, err = service.Offer(ctx, place, describe)
@@ -299,6 +305,20 @@ func OfferedTask(offer task.Offer) action.TaskOffered {
 	}
 
 	return offered
+}
+
+func (local *Local) projectOf(ctx context.Context, from task.Place, dir string) (task.Place, error) {
+	catalog, err := local.projectCatalog()
+	if err != nil {
+		return from, err
+	}
+
+	p, err := catalog.Resolve(ctx, dir)
+	if err != nil {
+		return from, oops.In("app").With("operation", "resolve_project").Wrap(err)
+	}
+
+	return task.Place{Pane: from.Pane, Session: "", Dir: p.Root, Project: p.Root, Task: ""}, nil
 }
 
 // projectPlace opens the session of the project at dir, without moving any client to it, and

@@ -45,7 +45,7 @@ func TestPickerSwitchHandoffCarriesSelectionAndTreatsEmptyFileAsCancel(t *testin
 		},
 		ActivePaneID: "%3",
 	}
-	if err := writePickerSwitchHandoff(path, &target, "%4", "", nil); err != nil {
+	if err := writePickerSwitchHandoff(path, &target, "%4", "", "", nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -82,7 +82,7 @@ func TestPickerSwitchHandoffRejectsInvalidSelection(t *testing.T) {
 	}
 	defer cleanup()
 
-	err = writePickerSwitchHandoff(path, &session.Session{Name: "missing-id"}, "", "", nil)
+	err = writePickerSwitchHandoff(path, &session.Session{Name: "missing-id"}, "", "", "", nil)
 	if !errors.Is(err, errPickerHandoffInvalid) {
 		t.Fatalf("invalid selection error = %v", err)
 	}
@@ -129,7 +129,7 @@ func TestCompletePickerSwitchHandoffRejectsInvalidSelection(t *testing.T) {
 		Origin:           session.OriginLocal,
 		TmuxServerSocket: "/tmp/tmux.sock",
 	}
-	if err := writePickerSwitchHandoff(path, &target, "%1", "", nil); err != nil {
+	if err := writePickerSwitchHandoff(path, &target, "%1", "", "", nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -173,7 +173,7 @@ func TestPickerHandoffWithoutResultStaysEmpty(t *testing.T) {
 	}
 	defer cleanup()
 
-	if err := writePickerSwitchHandoff(path, nil, "", "", nil); err != nil {
+	if err := writePickerSwitchHandoff(path, nil, "", "", "", nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -193,7 +193,7 @@ func TestPickerHandoffCarriesDeferredAgentViewsWithoutSelection(t *testing.T) {
 		{Session: session.Identity{Origin: "local", Socket: "/tmp/tmux.sock", Name: "alpha"}, PaneID: "%1"},
 		{Session: session.Identity{Origin: "local", Socket: "/tmp/tmux.sock", Name: "beta"}, PaneID: "%7"},
 	}
-	if err := writePickerSwitchHandoff(path, nil, "", "", views); err != nil {
+	if err := writePickerSwitchHandoff(path, nil, "", "", "", views); err != nil {
 		t.Fatal(err)
 	}
 
@@ -250,7 +250,7 @@ func TestCompletePickerHandoffRecordsDeferredViewsAfterCancel(t *testing.T) {
 	defer cleanup()
 
 	identity := session.Identity{Origin: "local", Socket: "/tmp/tmux.sock", Name: "alpha"}
-	if err := writePickerSwitchHandoff(path, nil, "", "", []tui.AgentView{{Session: identity, PaneID: "%3"}}); err != nil {
+	if err := writePickerSwitchHandoff(path, nil, "", "", "", []tui.AgentView{{Session: identity, PaneID: "%3"}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -286,7 +286,7 @@ func TestPickerHandoffCarriesReplayKeyWithoutSelection(t *testing.T) {
 	}
 	defer cleanup()
 
-	if err := writePickerSwitchHandoff(path, nil, "", tui.ReplayKeyFloatingTerminal, nil); err != nil {
+	if err := writePickerSwitchHandoff(path, nil, "", tui.ReplayKeyFloatingTerminal, "", nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -297,5 +297,38 @@ func TestPickerHandoffCarriesReplayKeyWithoutSelection(t *testing.T) {
 
 	if selected || handoff.ReplayKey != tui.ReplayKeyFloatingTerminal {
 		t.Fatalf("selected=%v replayKey=%q", selected, handoff.ReplayKey)
+	}
+}
+
+func TestPickerHandoffCarriesTheTaskMenuProject(t *testing.T) {
+	path, cleanup, err := createPickerSwitchHandoff()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+
+	if err := writePickerSwitchHandoff(path, nil, "", "", "/work/api", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	handoff, selected, err := readPickerSwitchHandoff(path)
+	if err != nil || selected || handoff.TaskProject != "/work/api" {
+		t.Fatalf("handoff = %+v, selected = %v, err = %v, want only the project /work/api", handoff, selected, err)
+	}
+}
+
+func TestPickerHandoffRejectsARelativeTaskMenuProject(t *testing.T) {
+	path, cleanup, err := createPickerSwitchHandoff()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+
+	if err := os.WriteFile(path, []byte(`{"taskProject":"work/api"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, err := readPickerSwitchHandoff(path); !errors.Is(err, errPickerHandoffInvalid) {
+		t.Fatalf("readPickerSwitchHandoff() error = %v, want errPickerHandoffInvalid", err)
 	}
 }

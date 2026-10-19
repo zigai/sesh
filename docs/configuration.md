@@ -261,7 +261,7 @@ allow_remote = true
 
 `[[keys.bind]]` binds a key to an action in the picker (`in = "picker"`) or in a tmux key table (`in = "tmux"`, rendered by `sesh setup tmux`). An entry replaces the default binding of the same key, and an entry without an action removes it. `params` sets action parameters. Tmux bindings pass the current session or pane as the action's subject; a root-table key pressed in a pane that shows a remote attachment goes to the remote tmux instead. Picker bindings cannot use the picker's own navigation keys or keys that type into its search field.
 
-Defaults: in the picker `alt+c` session.create, `alt+r` session.rename, `alt+x` session.kill, `alt+X` session.delete, `alt+s` snapshot.save, `alt+z` task.sleep, `alt+Z` task.wake, `alt+f` inbox.finish, `alt+o` task.open; in tmux table `root` `S-F12` agent.next, `M-S-F12` agent.next with `local = true`, `S-F1` agent.back, `C-o` pick.popup, `M-w` pick.popup with `mode = "inbox"`, `C-t` task.menu, `M-n` project.pick.
+Defaults: in the picker `alt+c` session.create, `alt+r` session.rename, `alt+x` session.kill, `alt+X` session.delete, `alt+s` snapshot.save, `alt+z` task.sleep, `alt+Z` task.wake, `alt+f` inbox.finish, `alt+o` task.open, `alt+t` inbox.task; in tmux table `root` `S-F12` agent.next, `M-S-F12` agent.next with `local = true`, `S-F1` agent.back, `C-o` pick.popup, `M-w` pick.popup with `mode = "inbox"`, `C-t` task.menu, `M-n` project.pick.
 
 ```toml
 [[keys.bind]]
