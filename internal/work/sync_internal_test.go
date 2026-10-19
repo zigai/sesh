@@ -33,8 +33,7 @@ func linkedItem(prs ...PRLink) Item {
 	return item
 }
 
-// pr is a pull request opened before the item started that, when ended, ended after it started.
-func pr(number int, state task.PRState, source string) PRLink {
+func prOpenedBeforeStart(number int, state task.PRState, source LinkSource) PRLink {
 	link := PRLink{Number: number, State: state, URL: "", Issues: []int{}, Source: source, CreatedAt: startedAt - 60, EndedAt: 0}
 	if link.Ended() {
 		link.EndedAt = startedAt + 60
@@ -52,7 +51,7 @@ func synced(item Item, found ...PRLink) Item {
 
 func TestAnOpenPullRequestThatMergesFinishesTheItem(t *testing.T) {
 	for _, ended := range []task.PRState{task.PRMerged, task.PRClosed} {
-		item := synced(linkedItem(pr(4, task.PROpen, LinkBranch)), pr(4, ended, ""))
+		item := synced(linkedItem(prOpenedBeforeStart(4, task.PROpen, LinkBranch)), prOpenedBeforeStart(4, ended, ""))
 
 		if !item.Finished() || item.FinishedBy != FinishedByPR || item.PRs[0].Source != LinkBranch {
 			t.Errorf("after the pull request was %s, item = %+v, want it finished by its pull request", ended, item)
@@ -61,7 +60,7 @@ func TestAnOpenPullRequestThatMergesFinishesTheItem(t *testing.T) {
 }
 
 func TestABranchPullRequestOpenedAndMergedBetweenSyncsFinishesTheItem(t *testing.T) {
-	item := synced(linkedItem(), pr(4, task.PRMerged, ""))
+	item := synced(linkedItem(), prOpenedBeforeStart(4, task.PRMerged, ""))
 
 	if !item.Finished() || item.FinishedBy != FinishedByPR || len(item.Linked()) != 1 || item.PRs[0].Source != LinkBranch {
 		t.Errorf("item = %+v, want the merged pull request linked and the item finished by it", item)
@@ -69,7 +68,7 @@ func TestABranchPullRequestOpenedAndMergedBetweenSyncsFinishesTheItem(t *testing
 }
 
 func TestABranchPullRequestThatEndedBeforeTheConversationIsNotLinked(t *testing.T) {
-	old := pr(4, task.PRMerged, "")
+	old := prOpenedBeforeStart(4, task.PRMerged, "")
 	old.CreatedAt, old.EndedAt = startedAt-7200, startedAt-3600
 
 	if item := synced(linkedItem(), old); item.Finished() || len(item.PRs) != 0 {
@@ -81,7 +80,7 @@ func TestABranchPullRequestOpenedAfterTheLastTurnIsNotLinked(t *testing.T) {
 	quiet := linkedItem()
 	quiet.TurnAt = startedAt + 60
 
-	later := pr(4, task.PROpen, "")
+	later := prOpenedBeforeStart(4, task.PROpen, "")
 	later.CreatedAt = startedAt + 600
 
 	if item := synced(quiet, later); len(item.PRs) != 0 {
@@ -90,13 +89,13 @@ func TestABranchPullRequestOpenedAfterTheLastTurnIsNotLinked(t *testing.T) {
 }
 
 func TestALinkedPullRequestOutsideTheConversationIsStillRefreshed(t *testing.T) {
-	linked := pr(4, task.PROpen, LinkUser)
+	linked := prOpenedBeforeStart(4, task.PROpen, LinkUser)
 	linked.CreatedAt = startedAt - 7200
 
 	quiet := linkedItem(linked)
 	quiet.TurnAt = startedAt - 3600
 
-	refreshed := pr(4, task.PROpen, "")
+	refreshed := prOpenedBeforeStart(4, task.PROpen, "")
 	refreshed.CreatedAt, refreshed.URL = startedAt-7200, "https://example.test/pull/4"
 
 	if item := synced(quiet, refreshed); item.PRs[0].URL != refreshed.URL || item.PRs[0].Source != LinkUser {
@@ -105,47 +104,47 @@ func TestALinkedPullRequestOutsideTheConversationIsStillRefreshed(t *testing.T) 
 }
 
 func TestAPullRequestThatEndedBeforeTheLatestPromptDoesNotFinishTheItem(t *testing.T) {
-	prompted := linkedItem(pr(4, task.PROpen, LinkBranch))
+	prompted := linkedItem(prOpenedBeforeStart(4, task.PROpen, LinkBranch))
 	prompted.PromptAt = startedAt + 120
 
-	if item := synced(prompted, pr(4, task.PRMerged, "")); item.Finished() || item.PRs[0].State != task.PRMerged {
+	if item := synced(prompted, prOpenedBeforeStart(4, task.PRMerged, "")); item.Finished() || item.PRs[0].State != task.PRMerged {
 		t.Errorf("item = %+v, want the pull request merged and the item open after a later prompt", item)
 	}
 }
 
 func TestAResumedItemWhosePullRequestEndedBeforeIsNotFinishedAgain(t *testing.T) {
-	state := State{Version: Version, LastID: 1, Items: []Item{linkedItem(pr(4, task.PRMerged, LinkBranch))}}
+	state := State{Version: Version, LastID: 1, Items: []Item{linkedItem(prOpenedBeforeStart(4, task.PRMerged, LinkBranch))}}
 	state.Items[0].FinishedAt, state.Items[0].FinishedBy = startedAt+90, FinishedByPR
 
 	if err := state.Reopen("w1", time.Unix(startedAt+600, 0)); err != nil {
 		t.Fatalf("Reopen() error = %v", err)
 	}
 
-	if item := synced(state.Items[0], pr(4, task.PRMerged, "")); item.Finished() {
+	if item := synced(state.Items[0], prOpenedBeforeStart(4, task.PRMerged, "")); item.Finished() {
 		t.Errorf("item = %+v, want it open after it was resumed", item)
 	}
 }
 
 func TestATaskItemIsNeitherLinkedNorFinishedBySync(t *testing.T) {
-	inTask := linkedItem(pr(4, task.PROpen, LinkUser))
+	inTask := linkedItem(prOpenedBeforeStart(4, task.PROpen, LinkUser))
 	inTask.Task = "t3"
 
-	if item := synced(inTask, pr(4, task.PRMerged, ""), pr(7, task.PRMerged, "")); item.Finished() || len(item.PRs) != 1 || item.PRs[0].Ended() {
+	if item := synced(inTask, prOpenedBeforeStart(4, task.PRMerged, ""), prOpenedBeforeStart(7, task.PRMerged, "")); item.Finished() || len(item.PRs) != 1 || item.PRs[0].Ended() {
 		t.Errorf("item = %+v, want the task's item left to the task ledger", item)
 	}
 }
 
 func TestAPinnedItemStaysOpenWhenItsPullRequestEnds(t *testing.T) {
-	pinned := linkedItem(pr(4, task.PROpen, LinkBranch))
+	pinned := linkedItem(prOpenedBeforeStart(4, task.PROpen, LinkBranch))
 	pinned.PinnedAt = syncedAt.Unix()
 
-	if item := synced(pinned, pr(4, task.PRMerged, "")); item.Finished() {
+	if item := synced(pinned, prOpenedBeforeStart(4, task.PRMerged, "")); item.Finished() {
 		t.Errorf("item = %+v, want a pinned item open", item)
 	}
 }
 
 func TestAnItemWithAnOpenLinkedPullRequestStaysOpen(t *testing.T) {
-	item := synced(linkedItem(pr(4, task.PROpen, LinkBranch), pr(9, task.PROpen, LinkUser)), pr(4, task.PRMerged, ""), pr(9, task.PROpen, ""))
+	item := synced(linkedItem(prOpenedBeforeStart(4, task.PROpen, LinkBranch), prOpenedBeforeStart(9, task.PROpen, LinkUser)), prOpenedBeforeStart(4, task.PRMerged, ""), prOpenedBeforeStart(9, task.PROpen, ""))
 
 	if item.Finished() {
 		t.Errorf("item = %+v, want it open while #9 is open", item)
@@ -153,7 +152,7 @@ func TestAnItemWithAnOpenLinkedPullRequestStaysOpen(t *testing.T) {
 }
 
 func TestAnUnlinkedPullRequestIsNotLinkedAgainOrCounted(t *testing.T) {
-	item := synced(linkedItem(pr(4, task.PROpen, LinkDismissed), pr(9, task.PROpen, LinkUser)), pr(4, task.PROpen, ""), pr(9, task.PRMerged, ""))
+	item := synced(linkedItem(prOpenedBeforeStart(4, task.PROpen, LinkDismissed), prOpenedBeforeStart(9, task.PROpen, LinkUser)), prOpenedBeforeStart(4, task.PROpen, ""), prOpenedBeforeStart(9, task.PRMerged, ""))
 
 	if item.PRs[0].Source != LinkDismissed || !item.Finished() {
 		t.Errorf("item = %+v, want #4 still unlinked and the item finished by #9", item)
@@ -161,8 +160,8 @@ func TestAnUnlinkedPullRequestIsNotLinkedAgainOrCounted(t *testing.T) {
 }
 
 func TestABranchChangeKeepsTheEarlierPullRequestLinked(t *testing.T) {
-	state := State{Version: Version, LastID: 1, Items: []Item{linkedItem(pr(4, task.PROpen, LinkBranch))}}
-	state.apply(map[string]refresh{"w1": {directory: "/code/shop", gone: false, branch: "next", found: []PRLink{pr(7, task.PROpen, "")}}}, syncedAt)
+	state := State{Version: Version, LastID: 1, Items: []Item{linkedItem(prOpenedBeforeStart(4, task.PROpen, LinkBranch))}}
+	state.apply(map[string]refresh{"w1": {directory: "/code/shop", gone: false, branch: "next", found: []PRLink{prOpenedBeforeStart(7, task.PROpen, "")}}}, syncedAt)
 
 	if linked := state.Items[0].Linked(); len(linked) != 2 || state.Items[0].Branch != "next" {
 		t.Errorf("item = %+v, want #4 and #7 linked on branch next", state.Items[0])

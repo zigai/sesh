@@ -33,7 +33,7 @@ var (
 type ProjectsConfig struct {
 	Roots []string `toml:"roots"`
 	Extra []string `toml:"extra"`
-	// Overrides holds per-project settings, keyed by the project's directory name.
+	// Overrides holds per-project settings, keyed by the project's path or directory name.
 	Overrides map[string]ProjectConfig `toml:"overrides"`
 }
 
@@ -42,15 +42,13 @@ type ProjectsConfig struct {
 // are the offer, in order; without them, every supported harness installed on the host is
 // offered.
 type TasksConfig struct {
-	Panes       []TaskPaneConfig   `toml:"panes"`
-	Layouts     []TaskLayoutConfig `toml:"layouts"`
-	PopupSocket string             `toml:"popup_socket"`
-	PopupConfig string             `toml:"popup_config"`
-	Harness     []HarnessConfig    `toml:"harness"`
-	// WakeOnRestore selects which task agents are woken after a snapshot restore.
-	WakeOnRestore string `toml:"wake_on_restore"`
-	// ShowFooter shows key hints at the bottom of the new task popup.
-	ShowFooter bool `toml:"show_footer"`
+	Panes         []TaskPaneConfig   `toml:"panes"`
+	Layouts       []TaskLayoutConfig `toml:"layouts"`
+	PopupSocket   string             `toml:"popup_socket"`
+	PopupConfig   string             `toml:"popup_config"`
+	Harness       []HarnessConfig    `toml:"harness"`
+	WakeOnRestore string             `toml:"wake_on_restore"`
+	ShowFooter    bool               `toml:"show_footer"`
 }
 
 // HarnessConfig is a harness offered for new tasks. Command may be left out for a harness AHT
@@ -125,7 +123,7 @@ func ValidateTasksConfig(tasks TasksConfig) error {
 		return errPopupConfigInvalid
 	}
 
-	if err := ValidateWakeOnRestore(tasks.WakeOnRestore); err != nil {
+	if _, err := ParseWakeOnRestore(tasks.WakeOnRestore); err != nil {
 		return err
 	}
 

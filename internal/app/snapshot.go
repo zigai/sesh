@@ -10,6 +10,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/samber/oops"
 	gotmux "github.com/zigai/gotmux/tmux"
 
@@ -206,6 +207,9 @@ func restoreGeneration(ctx context.Context, repo *store.Repository, requested st
 func readManifest(ctx context.Context, repo *store.Repository, generation string) *model.Manifest {
 	manifest, err := repo.Read(ctx, generation)
 	if err != nil {
+		zerolog.Ctx(ctx).Warn().Str("component", "snapshot").Str("operation", "label_restore").
+			Str("status", "degraded").Str("reason", "manifest_read_failed").Msg("restored sessions and panes are reported without names")
+
 		return nil
 	}
 
@@ -220,7 +224,8 @@ func (local *Local) restoredRefs(ctx context.Context, ids []string) []action.Ses
 
 	rows, err := local.liveSessions(ctx)
 	if err != nil {
-		rows = nil
+		zerolog.Ctx(ctx).Warn().Str("component", "snapshot").Str("operation", "list_restored_sessions").
+			Str("status", "degraded").Str("reason", "session_list_failed").Msg("restored sessions are reported by tmux ID only")
 	}
 
 	for _, id := range ids {

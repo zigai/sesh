@@ -185,7 +185,7 @@ func runAgentStatusRun(cmd *cobra.Command, _ []string) error {
 	styles := agents.NewTmuxStyleController(server, resolved.SetWindowStatusStyle, resolved.SetWindowStatusBellStyle)
 	tracker := agents.NewTracker(styles, statusTrackerOptions(cfg, resolved))
 	workStore := work.NewStore(workspace.Work)
-	recorder := work.NewRecorder(workStore, func(ctx context.Context) (string, map[string]string, error) {
+	recorder := work.NewRecorder(workStore, func(ctx context.Context) (task.PaneTasks, error) {
 		return task.WindowPanes(ctx, server)
 	})
 

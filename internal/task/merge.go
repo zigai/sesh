@@ -86,7 +86,11 @@ func MergeExitCode(err error) int {
 // fast-forwards the base in the repository's main checkout when that checkout is clean and has
 // the base checked out. An empty base means origin's default branch. Progress goes to out.
 func MergeBranch(ctx context.Context, dir, base string, check []string, out io.Writer) (Merged, error) {
-	merged, err := mergeTarget(ctx, dir, base)
+	if err := requireClean(ctx, dir); err != nil {
+		return Merged{Branch: "", Base: base}, err
+	}
+
+	merged, err := resolveMergeBranches(ctx, dir, base)
 	if err != nil {
 		return merged, err
 	}
@@ -116,19 +120,23 @@ func MergeBranch(ctx context.Context, dir, base string, check []string, out io.W
 	return merged, fastForwardMainCheckout(ctx, dir, merged.Base, out)
 }
 
-// mergeTarget is the branch checked out in dir, which must have no uncommitted changes, and the
-// base it merges into: base, or origin's default branch when base is empty.
-func mergeTarget(ctx context.Context, dir, base string) (Merged, error) {
-	merged := Merged{Branch: "", Base: base}
-
+func requireClean(ctx context.Context, dir string) error {
 	status, err := git.Output(ctx, dir, "status", "--porcelain")
 	if err != nil {
-		return merged, fmt.Errorf("inspect checkout: %w", err)
+		return fmt.Errorf("inspect checkout: %w", err)
 	}
 
 	if status != "" {
-		return merged, ErrMergeDirty
+		return ErrMergeDirty
 	}
+
+	return nil
+}
+
+func resolveMergeBranches(ctx context.Context, dir, base string) (Merged, error) {
+	merged := Merged{Branch: "", Base: base}
+
+	var err error
 
 	merged.Branch, err = git.Output(ctx, dir, "symbolic-ref", "--quiet", "--short", "HEAD")
 	if err != nil || merged.Branch == "" {

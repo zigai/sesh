@@ -187,11 +187,11 @@ func (s *Service) prepareFinish(ctx context.Context, record Record, opts FinishO
 }
 
 func (s *Service) runFinish(ctx context.Context, record Record) error {
-	if s.finishRun == nil || !record.OwnsWorktree {
+	if s.finishCommand == nil || !record.OwnsWorktree {
 		return nil
 	}
 
-	run := s.finishRun(record.Project)
+	run := s.finishCommand(record.Project)
 	if len(run) == 0 {
 		return nil
 	}

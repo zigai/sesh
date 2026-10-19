@@ -34,9 +34,7 @@ type refresh struct {
 	directory string
 	gone      bool
 	branch    string
-	// found are the pull requests gh listed for the branch or viewed again because they are
-	// linked and open.
-	found []PRLink
+	found     []PRLink
 }
 
 type ghPR struct {
@@ -52,43 +50,16 @@ type ghPR struct {
 	ClosedAt  time.Time `json:"closedAt"`
 }
 
-// Sync brings the work items up to date: it drops the items whose directory is gone and those
-// finished longer than finishedRetention ago, and for each open item records its branch. Outside
-// task windows it also links the pull request gh finds for that branch when it was open during the
-// conversation, refreshes the linked pull requests that were open, and finishes an unpinned item
-// whose linked pull requests all ended after it started and after its latest prompt. Without gh
-// pull requests stay as they are. It reports whether anything changed.
+// Sync drops the work items whose directory is gone and those finished longer than
+// finishedRetention ago, and brings the branch and pull requests of the others up to date. It
+// reports whether anything changed.
 func Sync(ctx context.Context, store Store) (bool, error) {
 	state, err := store.Load(ctx)
 	if err != nil {
 		return false, err
 	}
 
-	refreshed := make(map[string]refresh, len(state.Items))
-	gh := true
-
-	for _, item := range state.Items {
-		update := refresh{directory: item.Directory, gone: false, branch: item.Branch, found: nil}
-		if _, err := os.Stat(item.Directory); errors.Is(err, os.ErrNotExist) {
-			update.gone = true
-			refreshed[item.ID] = update
-
-			continue
-		}
-
-		if item.Finished() {
-			continue
-		}
-
-		update.branch = branchOf(ctx, item.Directory)
-		if gh && item.Task == "" {
-			update.found, err = findPRs(ctx, item, update.branch)
-			gh = err == nil
-		}
-
-		refreshed[item.ID] = update
-	}
-
+	refreshed := refreshItems(ctx, state.Items)
 	changed := false
 
 	_, err = store.Update(ctx, func(state *State) error {
@@ -123,6 +94,38 @@ func ViewPR(ctx context.Context, dir string, number int) (PRLink, error) {
 	}
 
 	return viewed.link(), nil
+}
+
+func refreshItems(ctx context.Context, items []Item) map[string]refresh {
+	refreshed := make(map[string]refresh, len(items))
+	ghWorks := true
+
+	for _, item := range items {
+		update := refresh{directory: item.Directory, gone: false, branch: item.Branch, found: nil}
+		if _, err := os.Stat(item.Directory); errors.Is(err, os.ErrNotExist) {
+			update.gone = true
+			refreshed[item.ID] = update
+
+			continue
+		}
+
+		if item.Finished() {
+			continue
+		}
+
+		update.branch = branchOf(ctx, item.Directory)
+
+		if ghWorks && !item.prsOwnedByTask() {
+			var err error
+
+			update.found, err = findPRs(ctx, item, update.branch)
+			ghWorks = err == nil
+		}
+
+		refreshed[item.ID] = update
+	}
+
+	return refreshed
 }
 
 func syncOnTicks(ctx context.Context, store Store, ticks <-chan time.Time) {
@@ -211,12 +214,12 @@ func (s *State) apply(refreshed map[string]refresh, now time.Time) bool {
 }
 
 func (i Item) withFound(found []PRLink, now time.Time) Item {
-	if i.Task != "" {
+	if i.prsOwnedByTask() {
 		return i
 	}
 
 	for _, pr := range found {
-		if i.knows(pr.Number) || i.overlaps(pr) {
+		if i.knows(pr.Number) || i.openDuringConversation(pr) {
 			i = i.withPR(pr)
 		}
 	}
@@ -232,9 +235,11 @@ func (i Item) knows(number int) bool {
 	return slices.ContainsFunc(i.PRs, func(linked PRLink) bool { return linked.Number == number })
 }
 
-// overlaps reports whether the pull request was open at some point during the conversation: opened
-// no later than its last turn, and still open or ended no earlier than its start.
-func (i Item) overlaps(pr PRLink) bool {
+func (i Item) prsOwnedByTask() bool {
+	return i.Task != ""
+}
+
+func (i Item) openDuringConversation(pr PRLink) bool {
 	if i.TurnAt != 0 && pr.CreatedAt > i.TurnAt {
 		return false
 	}

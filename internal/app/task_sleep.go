@@ -46,7 +46,7 @@ func (local *Local) wakeTask(ctx context.Context, _ action.Caller, input action.
 	}
 
 	woken, err := service.Wake(ctx, input.Task)
-	result := action.WokenTask{ID: woken.Record.ID, AlreadyAwake: woken.Awake}
+	result := action.WokenTask{ID: woken.Record.ID, AlreadyAwake: woken.AlreadyAwake}
 
 	if err != nil {
 		return result, oops.In("app").With("operation", "wake_task").Wrap(err)
@@ -68,7 +68,7 @@ func (local *Local) WakeTaskHere(ctx context.Context, id string) ([]string, erro
 		return nil, oops.In("app").With("operation", "wake_task").Wrap(err)
 	}
 
-	if woken.Awake {
+	if woken.AlreadyAwake {
 		return nil, nil
 	}
 
@@ -137,10 +137,10 @@ func (local *Local) taskService() (*task.Service, error) {
 		Windows:     local.cfg.TaskWindowFor,
 		WorktreeDir: local.worktreeDir, LookPath: exec.LookPath, Now: time.Now,
 		Agents: paneAgents{source: local.agentSource, socket: agents.NormalizeServerSocket(socket)},
-		Placeholder: func(id string) []string {
+		SleepingAgentCommand: func(id string) []string {
 			return append([]string{executable}, apps.PlaceholderArguments(id)...)
 		},
-		PRs: task.GitHub{}, ClosePopup: local.closeTaskPopup, FinishRun: local.cfg.FinishRunFor,
+		PRs: task.GitHub{}, ClosePopup: local.closeTaskPopup, FinishCommand: local.cfg.FinishRunFor,
 	}), nil
 }
 

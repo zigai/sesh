@@ -62,8 +62,7 @@ var (
 	errFinishRunEmpty       = errors.New("finish run needs a program")
 	errWakeOnRestoreInvalid = errors.New(`tasks.wake_on_restore must be "previous", "none", or a positive count such as "3"`)
 
-	templateVariable = regexp.MustCompile(`\{[^{}]*\}`)
-	// TaskActionVariables are the template variables a menu item's prompt can use.
+	templateVariable    = regexp.MustCompile(`\{[^{}]*\}`)
 	TaskActionVariables = []string{"task", "title", "branch", "base", "project", "worktree"}
 )
 
@@ -97,6 +96,12 @@ type MergeConfig struct {
 // it; a failing run stops the finish, and a finish can skip it. It never runs in a main checkout.
 type FinishConfig struct {
 	Run []string `toml:"run"`
+}
+
+// WakePolicy is a parsed tasks.wake_on_restore.
+type WakePolicy struct {
+	all    bool
+	newest int
 }
 
 // ProjectConfig holds settings for one project. A Merge or Finish it sets replaces the global one.
@@ -254,17 +259,28 @@ func ValidateTaskActionTemplate(prompt string) error {
 	return nil
 }
 
-// ValidateWakeOnRestore checks tasks.wake_on_restore.
-func ValidateWakeOnRestore(value string) error {
-	if value == WakeOnRestorePrevious || value == WakeOnRestoreNone {
-		return nil
+func ParseWakeOnRestore(value string) (WakePolicy, error) {
+	switch value {
+	case WakeOnRestorePrevious:
+		return WakePolicy{all: true, newest: 0}, nil
+	case WakeOnRestoreNone:
+		return WakePolicy{all: false, newest: 0}, nil
 	}
 
 	if count, err := strconv.Atoi(value); err == nil && count > 0 && strconv.Itoa(count) == value {
-		return nil
+		return WakePolicy{all: false, newest: count}, nil
 	}
 
-	return errWakeOnRestoreInvalid
+	return WakePolicy{}, errWakeOnRestoreInvalid
+}
+
+// Resumes returns how many of awake task agents, newest first, the policy resumes.
+func (p WakePolicy) Resumes(awake int) int {
+	if p.all {
+		return awake
+	}
+
+	return min(p.newest, awake)
 }
 
 func validateCommand(name string, command []string, empty error) error {

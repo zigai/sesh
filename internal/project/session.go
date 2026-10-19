@@ -12,11 +12,16 @@ import (
 
 const (
 	OptionProject = "@sesh_project"
-	// OptionMain marks the window that holds a project's main checkout.
-	OptionMain = "@sesh_main"
+	OptionMain    = "@sesh_main"
 
 	MainWindowName = "main"
 	maxNameSuffix  = 99
+)
+
+const (
+	OpenedExisting Opening = iota
+	OpenedCreated
+	OpenedAdopted
 )
 
 var (
@@ -26,11 +31,11 @@ var (
 	ErrSessionNotFound = errors.New("session not found")
 )
 
-// Opened is the session a project was opened in, and whether opening created or adopted it.
+type Opening int
+
 type Opened struct {
 	Session gotmux.SessionInfo
-	Created bool
-	Adopted bool
+	How     Opening
 }
 
 type LiveSession struct {
@@ -68,8 +73,7 @@ func RootOfSession(ctx context.Context, server *gotmux.Server, id gotmux.Session
 	return "", ErrSessionNotFound
 }
 
-// NameConflict returns the untagged session that already uses the project's session name. The
-// project picker offers to adopt it instead of creating a session with a different name.
+// NameConflict returns the untagged session that already uses the project's session name.
 func NameConflict(ctx context.Context, server *gotmux.Server, p Project) (gotmux.SessionInfo, bool, error) {
 	sessions, err := taggedSessions(ctx, server)
 	if err != nil {
@@ -171,12 +175,12 @@ func Open(ctx context.Context, server *gotmux.Server, p Project, adopt bool) (Op
 	}
 
 	if found {
-		return Opened{Session: existing, Created: false, Adopted: false}, nil
+		return Opened{Session: existing, How: OpenedExisting}, nil
 	}
 
-	open := CreateSession
+	open, how := CreateSession, OpenedCreated
 	if adopt {
-		open = adoptNamesake
+		open, how = adoptNamesake, OpenedAdopted
 	}
 
 	opened, err := open(ctx, server, p)
@@ -189,7 +193,7 @@ func Open(ctx context.Context, server *gotmux.Server, p Project, adopt bool) (Op
 		return Opened{}, sessionError("inspect_project_session", err)
 	}
 
-	return Opened{Session: info, Created: !adopt, Adopted: adopt}, nil
+	return Opened{Session: info, How: how}, nil
 }
 
 func LiveSessions(ctx context.Context, server *gotmux.Server) ([]LiveSession, error) {

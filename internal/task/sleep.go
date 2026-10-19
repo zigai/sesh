@@ -56,12 +56,11 @@ type sleepPlan struct {
 	resume  Resume
 }
 
-// Woken is a task whose agent was relaunched through its native resume, and the command line
-// that resumes it.
+// Woken is a task marked awake and the command line that resumes its agent.
 type Woken struct {
-	Record  Record
-	Command []string
-	Awake   bool
+	Record       Record
+	Command      []string
+	AlreadyAwake bool
 }
 
 // Sleep stops the idle agent of a task and leaves a placeholder in its
@@ -129,11 +128,11 @@ func (s *Service) WakeHere(ctx context.Context, id string) (Woken, error) {
 func (s *Service) wake(ctx context.Context, id string, relaunch func(Live, Woken) error) (Woken, error) {
 	record, live, err := s.task(ctx, id)
 	if err != nil {
-		return Woken{Record: record, Command: nil, Awake: false}, taskError("wake_task", err)
+		return Woken{Record: record, Command: nil, AlreadyAwake: false}, taskError("wake_task", err)
 	}
 
 	woken, err := s.beginWake(ctx, record, live)
-	if err != nil || woken.Awake {
+	if err != nil || woken.AlreadyAwake {
 		return woken, taskError("wake_task", err)
 	}
 
@@ -147,7 +146,7 @@ func (s *Service) wake(ctx context.Context, id string, relaunch func(Live, Woken
 }
 
 func (s *Service) beginWake(ctx context.Context, record Record, live Live) (Woken, error) {
-	woken := Woken{Record: record, Command: slices.Clone(record.Resume.Command), Awake: false}
+	woken := Woken{Record: record, Command: slices.Clone(record.Resume.Command), AlreadyAwake: false}
 
 	if record.State != StateSleeping && record.State != StateWaking {
 		return woken, ErrNotAsleep
@@ -165,7 +164,7 @@ func (s *Service) beginWake(ctx context.Context, record Record, live Live) (Woke
 	woken.Record.State = StateWaking
 	if running {
 		woken.Record.State = StateActive
-		woken.Awake = true
+		woken.AlreadyAwake = true
 	}
 
 	return woken, s.put(ctx, woken.Record)
@@ -211,7 +210,7 @@ func (s *Service) agentIn(ctx context.Context, live Live) (Agent, error) {
 }
 
 func (s *Service) showPlaceholder(ctx context.Context, pane gotmux.PaneID, record Record) error {
-	if err := s.respawn(ctx, pane, record, s.placeholder(record.ID)); err != nil {
+	if err := s.respawn(ctx, pane, record, s.sleepingAgentCommand(record.ID)); err != nil {
 		return fmt.Errorf("show sleep placeholder: %w", err)
 	}
 
@@ -279,7 +278,7 @@ func planSleep(ctx context.Context, agent Agent, panePID int) (sleepPlan, error)
 
 	return sleepPlan{
 		signal: signal, process: foreground,
-		resume: Resume{Harness: agent.Harness, Session: session, Command: launchCommand(prepared)},
+		resume: Resume{Harness: agent.Harness, Session: session, Command: prepared.Command()},
 	}, nil
 }
 
@@ -319,19 +318,6 @@ func observedLaunch(observed *process.Observation) model.Launch {
 		Environment: observed.Environment, Birth: model.Bytes(observed.Birth.Bytes()),
 		Recovery: model.RecoveryUnverified, Reason: "",
 	}
-}
-
-// launchCommand is the command line that runs a launch: its executable and then its arguments
-// after argv[0].
-func launchCommand(launch model.Launch) []string {
-	command := make([]string, 0, len(launch.Arguments))
-	command = append(command, string(launch.Executable))
-
-	for _, argument := range launch.Arguments[1:] {
-		command = append(command, string(argument))
-	}
-
-	return command
 }
 
 func emptyResume() Resume {

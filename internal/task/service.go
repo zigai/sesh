@@ -35,7 +35,9 @@ const (
 	launchShell   = "/bin/sh"
 
 	worktreeParentMode = 0o755
-	launchScript       = `trap ':' INT QUIT; "$0" -i -c "$1"; trap - INT QUIT; exec "$0" -i`
+	launchScript       = `shell=$0; trap ':' INT QUIT; "$shell" -i -c "$@"; trap - INT QUIT; exec "$shell" -i`
+	runArgsPOSIX       = `"$@"`
+	runArgsFish        = `$argv`
 )
 
 var (
@@ -63,42 +65,38 @@ type Options struct {
 	Config  config.TasksConfig
 	// Windows returns the task window configuration of the project at a root, or of a loose task
 	// for an empty root.
-	Windows     func(project string) config.TaskWindow
-	WorktreeDir string
-	LookPath    func(string) (string, error)
-	Now         func() time.Time
-	Agents      AgentFinder
-	// Placeholder is the command line a sleeping task's agent pane runs.
-	Placeholder func(id string) []string
-	PRs         PRFinder
-	// ClosePopup closes a task's popup session, if it has one.
-	ClosePopup func(ctx context.Context, id string) error
-	// FinishRun returns the command run in a task worktree before finishing removes it, for the
-	// project at a root.
-	FinishRun func(project string) []string
+	Windows              func(project string) config.TaskWindow
+	WorktreeDir          string
+	LookPath             func(string) (string, error)
+	Now                  func() time.Time
+	Agents               AgentFinder
+	SleepingAgentCommand func(id string) []string
+	PRs                  PRFinder
+	ClosePopup           func(ctx context.Context, id string) error
+	FinishCommand        func(project string) []string
 }
 
 type Service struct {
-	server      *gotmux.Server
-	store       Store
-	catalog     project.Catalog
-	cfg         config.TasksConfig
-	windows     func(project string) config.TaskWindow
-	worktreeDir string
-	lookPath    func(string) (string, error)
-	now         func() time.Time
-	agents      AgentFinder
-	placeholder func(id string) []string
-	prs         PRFinder
-	closePopup  func(ctx context.Context, id string) error
-	finishRun   func(project string) []string
+	server               *gotmux.Server
+	store                Store
+	catalog              project.Catalog
+	cfg                  config.TasksConfig
+	windows              func(project string) config.TaskWindow
+	worktreeDir          string
+	lookPath             func(string) (string, error)
+	now                  func() time.Time
+	agents               AgentFinder
+	sleepingAgentCommand func(id string) []string
+	prs                  PRFinder
+	closePopup           func(ctx context.Context, id string) error
+	finishCommand        func(project string) []string
 }
 
 func NewService(opts Options) *Service {
 	return &Service{
 		server: opts.Server, store: opts.Store, catalog: opts.Catalog, cfg: opts.Config, windows: opts.Windows,
 		worktreeDir: opts.WorktreeDir, lookPath: opts.LookPath, now: opts.Now, agents: opts.Agents,
-		placeholder: opts.Placeholder, prs: opts.PRs, closePopup: opts.ClosePopup, finishRun: opts.FinishRun,
+		sleepingAgentCommand: opts.SleepingAgentCommand, prs: opts.PRs, closePopup: opts.ClosePopup, finishCommand: opts.FinishCommand,
 	}
 }
 
@@ -128,18 +126,18 @@ func (s *Service) Locate(ctx context.Context, pane gotmux.PaneID) (Place, error)
 	return Place{Pane: info.ID, Session: session, Dir: info.CurrentPath, Project: string(projectRoot), Task: string(taskID)}, nil
 }
 
-// Start creates a task at place running the requested harness. In a project session or a repository the task works in the requested
-// location, one the project currently offers, with a window in the pane's session, next to the
-// current window outside a project session; elsewhere it is a loose task in the pane's directory,
-// next to the current window. A title names the task and is passed to the agent as its first
-// prompt when its harness says how.
+// Start creates a task at place running the requested harness. In a project session or a
+// repository the task works in the requested location, one the project currently offers, with a
+// window in the pane's session, next to the current window outside a project session; elsewhere
+// it is a loose task in the pane's directory, next to the current window. A title names the task
+// and is passed to the agent as its first prompt when its harness says how.
 func (s *Service) Start(ctx context.Context, place Place, request Request) (Record, error) {
 	offered, err := s.harness(request.Harness)
 	if err != nil {
 		return Record{}, taskError("start_task", err)
 	}
 
-	root, err := s.projectOf(ctx, place)
+	root, err := s.gitProjectRoot(ctx, place)
 	if err != nil {
 		return Record{}, taskError("start_task", err)
 	}
@@ -198,10 +196,7 @@ func RunWindow(ctx context.Context, server *gotmux.Server, sessionID gotmux.Sess
 	return pane.ID(), nil
 }
 
-// projectOf returns the root of the project a task started at place belongs to: the project
-// session's, else the repository the pane's directory is in, else none. A registered folder
-// outside a project session leaves the task loose, in the pane's directory.
-func (s *Service) projectOf(ctx context.Context, place Place) (string, error) {
+func (s *Service) gitProjectRoot(ctx context.Context, place Place) (string, error) {
 	if place.Project != "" {
 		return place.Project, nil
 	}
@@ -238,12 +233,12 @@ func (s *Service) startProject(ctx context.Context, place Place, root string, re
 
 	if record.OwnsWorktree {
 		if err := s.addWorktree(ctx, p.Root, record); err != nil {
-			return record, s.fail(ctx, record, err)
+			return record, s.failKeepingResources(ctx, record, err)
 		}
 	}
 
 	if err := s.openTaskWindow(ctx, place, record, launchOf(offered, request, record), request.Layout, place.Project == ""); err != nil {
-		return record, s.fail(ctx, record, err)
+		return record, s.failKeepingResources(ctx, record, err)
 	}
 
 	return s.activate(ctx, record)
@@ -261,6 +256,7 @@ func (s *Service) startLoose(ctx context.Context, place Place, request Request, 
 		record.Harness = request.Harness
 		record.Directory = place.Dir
 		record.Title = cmp.Or(request.Title, filepath.Base(place.Dir))
+		record.WindowName = windowTitle(record.Title)
 		record.CreatedAt = s.now().Unix()
 
 		return record, nil
@@ -270,14 +266,13 @@ func (s *Service) startLoose(ctx context.Context, place Place, request Request, 
 	}
 
 	if err := s.openTaskWindow(ctx, place, record, launchOf(offered, request, record), request.Layout, true); err != nil {
-		return record, s.fail(ctx, record, err)
+		return record, s.failKeepingResources(ctx, record, err)
 	}
 
 	return s.activate(ctx, record)
 }
 
 func (s *Service) reserveProjectTask(ctx context.Context, p project.Project, request Request, location Location, local []string) (Record, error) {
-	creates := location.Where == WhereNew || location.Where == WhereBranch
 	base := ""
 
 	if p.Kind == project.KindGit {
@@ -295,7 +290,7 @@ func (s *Service) reserveProjectTask(ctx context.Context, p project.Project, req
 		state := ledger.Project(p.Root)
 		number, directory := state.LastNumber+1, location.Directory
 
-		if creates {
+		if location.createsWorktree() {
 			var err error
 
 			number, directory, err = s.freeNumber(ctx, p, base, state.LastNumber)
@@ -319,9 +314,10 @@ func (s *Service) reserveProjectTask(ctx context.Context, p project.Project, req
 		record.Directory = directory
 		record.Branch = location.Branch
 		record.Base = base
-		record.OwnsWorktree = creates
-		record.OwnsBranch = location.Where == WhereNew || location.Remote != ""
+		record.OwnsWorktree = location.createsWorktree()
+		record.OwnsBranch = location.createsBranch()
 		record.Title = cmp.Or(request.Title, filepath.Base(directory))
+		record.WindowName = windowTitle(record.Title)
 		record.CreatedAt = s.now().Unix()
 
 		switch {
@@ -421,7 +417,7 @@ func (s *Service) openTaskWindow(
 		return fmt.Errorf("find task session: %w", err)
 	}
 
-	expected, err := s.expectedSize(ctx, session, place.Pane)
+	shownAt, err := s.hiddenSessionSize(ctx, session, place.Pane)
 	if err != nil {
 		return err
 	}
@@ -434,7 +430,7 @@ func (s *Service) openTaskWindow(
 	env := Env(record)
 
 	link, err := session.NewWindow(ctx, gotmux.NewWindowOptions{
-		Name: record.Title, Dir: record.Directory, Program: shellProgram(shell, launch), Env: nil, TmuxEnv: env,
+		Name: record.WindowName, Dir: record.Directory, Program: shellProgram(shell, launch), Env: nil, TmuxEnv: env,
 		Index: nil, Before: false, After: nextToCurrent, Select: true,
 	})
 	if err != nil {
@@ -456,12 +452,11 @@ func (s *Service) openTaskWindow(
 		return fmt.Errorf("tag agent pane: %w", err)
 	}
 
-	return s.arrange(ctx, window, record, layout, expected, true)
+	return s.arrange(ctx, window, record, layout, arrangeNewWindow, shownAt)
 }
 
-// expectedSize is the size of the window of pane when no client shows session, else zero.
-func (s *Service) expectedSize(ctx context.Context, session gotmux.Session, pane gotmux.PaneID) (gotmux.Size, error) {
-	none := gotmux.Size{Width: 0, Height: 0}
+func (s *Service) hiddenSessionSize(ctx context.Context, session gotmux.Session, pane gotmux.PaneID) (*gotmux.Size, error) {
+	var none *gotmux.Size
 
 	info, err := session.Info(ctx)
 	if err != nil {
@@ -487,7 +482,7 @@ func (s *Service) expectedSize(ctx context.Context, session gotmux.Session, pane
 		return none, fmt.Errorf("inspect calling window: %w", err)
 	}
 
-	return gotmux.Size{Width: size.Width, Height: size.Height}, nil
+	return &gotmux.Size{Width: size.Width, Height: size.Height}, nil
 }
 
 func (s *Service) activate(ctx context.Context, record Record) (Record, error) {
@@ -502,9 +497,7 @@ func (s *Service) activate(ctx context.Context, record Record) (Record, error) {
 	return record, taskError("record_task", err)
 }
 
-// fail marks a task whose creation stopped part way. Whatever was already created stays: the
-// record names the worktree and branch so they can be inspected or finished by hand.
-func (s *Service) fail(ctx context.Context, record Record, cause error) error {
+func (s *Service) failKeepingResources(ctx context.Context, record Record, cause error) error {
 	record.State = StateFailed
 
 	return taskError("start_task", errors.Join(cause, s.put(context.WithoutCancel(ctx), record)))
@@ -570,9 +563,9 @@ func defaultShell(ctx context.Context, server *gotmux.Server) (string, error) {
 	return shell, nil
 }
 
-// shellProgram runs argv in the user's interactive shell, so its functions and aliases apply as
-// when the user types the command, and then that shell in the same pane, so an agent or editor
-// that exits leaves a usable shell where it ran. Interrupts reach argv, not the wrapper.
+// shellProgram runs argv in the user's interactive shell, so its functions apply as when the
+// user types the command, and then that shell in the same pane, so an agent or editor that exits
+// leaves a usable shell where it ran. Interrupts reach argv, not the wrapper.
 func shellProgram(shell string, argv []string) gotmux.Program {
 	if len(argv) == 0 {
 		return gotmux.Program{}
@@ -584,18 +577,16 @@ func shellProgram(shell string, argv []string) gotmux.Program {
 }
 
 func shellArgv(shell string, argv []string) []string {
-	words := make([]string, 0, len(argv))
-	for _, argument := range argv {
-		words = append(words, shellQuote(argument))
+	// argv goes in as arguments, never as quoted source: fish treats backslashes inside single
+	// quotes as escapes, so no one quoting is safe in every shell.
+	command := []string{launchShell, "-m", "-c", launchScript, shell}
+	if filepath.Base(shell) == "fish" {
+		command = append(command, runArgsFish)
+	} else {
+		command = append(command, runArgsPOSIX, shell)
 	}
 
-	return []string{launchShell, "-m", "-c", launchScript, shell, strings.Join(words, " ")}
-}
-
-// shellQuote quotes an argument for sh, bash, zsh and fish: inside single quotes nothing is
-// special, and a single quote ends the quoting, is escaped, and reopens it.
-func shellQuote(argument string) string {
-	return "'" + strings.ReplaceAll(argument, "'", `'\''`) + "'"
+	return append(command, argv...)
 }
 
 func taskBranch(base string, number int) string {

@@ -23,9 +23,8 @@ const (
 	ArrangeMainVertical   = "main-vertical"
 	ArrangeMainHorizontal = "main-horizontal"
 
-	maxPercent = 100
-	// cellAspect is how many times taller than wide a terminal cell is, about.
-	cellAspect = 2
+	maxPercent         = 100
+	cellHeightPerWidth = 2
 )
 
 var (
@@ -190,7 +189,7 @@ func (w TaskWindow) Pane(name string) (TaskPaneConfig, bool) {
 }
 
 func (w TaskLayoutWhen) Matches(width, height int, harness string) bool {
-	landscape := width >= cellAspect*height
+	landscape := width >= cellHeightPerWidth*height
 
 	switch {
 	case w.Orientation == OrientationLandscape && !landscape, w.Orientation == OrientationPortrait && landscape:

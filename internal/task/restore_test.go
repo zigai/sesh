@@ -23,7 +23,7 @@ type restoreFixture struct {
 func TestRestoreLaunchesKeepsCapturedLaunchesWhenWakingThePrevious(t *testing.T) {
 	f := newRestoreFixture(t)
 
-	launches, err := task.NewRestoreLaunches(f.store, config.WakeOnRestorePrevious, seshBinary).Override(t.Context(), f.manifest)
+	launches, err := task.NewRestoreLaunches(f.store, wakePolicy(t, config.WakeOnRestorePrevious), seshBinary).Override(t.Context(), f.manifest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestRestoreLaunchesStartTaskPanesWithTheTaskEnvironment(t *testing.T) {
 	}
 
 	for _, policy := range []string{config.WakeOnRestorePrevious, config.WakeOnRestoreNone} {
-		launches, err := task.NewRestoreLaunches(f.store, policy, seshBinary).Override(t.Context(), f.manifest)
+		launches, err := task.NewRestoreLaunches(f.store, wakePolicy(t, policy), seshBinary).Override(t.Context(), f.manifest)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -80,7 +80,7 @@ func TestRestoreLaunchesRunsTheRecordedCommandOfRestartingTaskPanesOnly(t *testi
 	restart("%2", `{"directory":"/worktrees/t1/web","argv":["/bin/sh","-c","npm run dev"]}`)
 	restart("%6", `{"directory":"/srv","argv":["/bin/sh","-c","serve"]}`)
 
-	launches, err := task.NewRestoreLaunches(f.store, config.WakeOnRestorePrevious, seshBinary).Override(t.Context(), f.manifest)
+	launches, err := task.NewRestoreLaunches(f.store, wakePolicy(t, config.WakeOnRestorePrevious), seshBinary).Override(t.Context(), f.manifest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,7 @@ func TestRestoreLaunchesIgnoresAnUnreadableRestartCommand(t *testing.T) {
 		f := newRestoreFixture(t)
 		f.manifest.Panes[1].Options = append(f.manifest.Panes[1].Options, userOption("pane", task.OptionRestart, value)...)
 
-		launches, err := task.NewRestoreLaunches(f.store, config.WakeOnRestorePrevious, seshBinary).Override(t.Context(), f.manifest)
+		launches, err := task.NewRestoreLaunches(f.store, wakePolicy(t, config.WakeOnRestorePrevious), seshBinary).Override(t.Context(), f.manifest)
 		if launch := launches["%2"]; err != nil || !slices.Equal(arguments(launch), []string{"sh"}) {
 			t.Errorf("Override() with restart command %s = %+v, %v; want the captured launch", value, launch, err)
 		}
@@ -111,7 +111,7 @@ func TestRestoreLaunchesIgnoresAnUnreadableRestartCommand(t *testing.T) {
 func TestRestoreLaunchesBringsEveryTaskBackAsleepWithNone(t *testing.T) {
 	f := newRestoreFixture(t)
 
-	launches, err := task.NewRestoreLaunches(f.store, config.WakeOnRestoreNone, seshBinary).Override(t.Context(), f.manifest)
+	launches, err := task.NewRestoreLaunches(f.store, wakePolicy(t, config.WakeOnRestoreNone), seshBinary).Override(t.Context(), f.manifest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +135,7 @@ func TestRestoreLaunchesBringsEveryTaskBackAsleepWithNone(t *testing.T) {
 func TestRestoreLaunchesResumesOnlyTheNewestTasksWithACount(t *testing.T) {
 	f := newRestoreFixture(t)
 
-	launches, err := task.NewRestoreLaunches(f.store, "2", seshBinary).Override(t.Context(), f.manifest)
+	launches, err := task.NewRestoreLaunches(f.store, wakePolicy(t, "2"), seshBinary).Override(t.Context(), f.manifest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +147,7 @@ func TestRestoreLaunchesResumesOnlyTheNewestTasksWithACount(t *testing.T) {
 
 func TestRestoreLaunchesCommitRecordsResumeOnlyForPlannedPanes(t *testing.T) {
 	f := newRestoreFixture(t)
-	launches := task.NewRestoreLaunches(f.store, config.WakeOnRestoreNone, seshBinary)
+	launches := task.NewRestoreLaunches(f.store, wakePolicy(t, config.WakeOnRestoreNone), seshBinary)
 
 	if _, err := launches.Override(t.Context(), f.manifest); err != nil {
 		t.Fatal(err)
@@ -197,7 +197,7 @@ func TestRestoreLaunchesReconcilesCapturedAgentStates(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			launches := task.NewRestoreLaunches(f.store, policy, seshBinary)
+			launches := task.NewRestoreLaunches(f.store, wakePolicy(t, policy), seshBinary)
 			if _, err := launches.Override(t.Context(), f.manifest); err != nil {
 				t.Fatal(err)
 			}
@@ -336,4 +336,15 @@ func environment(launch model.Launch) map[string]string {
 	}
 
 	return values
+}
+
+func wakePolicy(t *testing.T, value string) config.WakePolicy {
+	t.Helper()
+
+	policy, err := config.ParseWakeOnRestore(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return policy
 }

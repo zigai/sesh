@@ -309,7 +309,7 @@ func TestARestartingPaneRunsAgainWithItsTaskAfterARestore(t *testing.T) {
 
 	if _, err := engine.Restore(t.Context(), repo, f.server, engine.RestoreConfig{
 		LeaseRoot: leases, Generation: saved.Generation, LaunchProcesses: true, Profile: engine.RecoveryPractical,
-		Launches: task.NewRestoreLaunches(f.store, config.WakeOnRestorePrevious, "/nonexistent/sesh"),
+		Launches: task.NewRestoreLaunches(f.store, wakePolicy(t, config.WakeOnRestorePrevious), "/nonexistent/sesh"),
 	}); err != nil {
 		t.Fatalf("Restore() error = %v", err)
 	}

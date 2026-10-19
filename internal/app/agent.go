@@ -24,7 +24,7 @@ func (local *Local) registerAgentHandlers() {
 	local.handleNavigation(action.AgentWaiting, (*agents.Navigator).Waiting)
 	local.handleNavigation(action.AgentFailed, (*agents.Navigator).Failed)
 	local.handleNavigation(action.AgentToggle, (*agents.Navigator).Toggle)
-	handle(local, action.AgentUnread, local.unreadAgent)
+	handle(local, action.AgentUnread, local.advanceUnreadAgent)
 	handle(local, action.AgentBack, local.agentBack)
 	handle(local, action.AgentFocus, local.focusAgent)
 	handle(local, action.AgentWindowStatusClear, local.clearWindowStatus)
@@ -57,9 +57,7 @@ func (local *Local) handleNavigation(definition *action.Definition[action.Naviga
 	})
 }
 
-// unreadAgent acknowledges what it observed even when no unread result remains, so repeated
-// invocations advance instead of revisiting the same pane.
-func (local *Local) unreadAgent(ctx context.Context, caller action.Caller, input action.NavigateAgents) (action.FocusedPane, error) {
+func (local *Local) advanceUnreadAgent(ctx context.Context, caller action.Caller, input action.NavigateAgents) (action.FocusedPane, error) {
 	navigator, err := local.navigator(caller)
 	if err != nil {
 		return action.FocusedPane{}, err

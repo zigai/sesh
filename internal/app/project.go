@@ -72,8 +72,8 @@ func (local *Local) enterProject(ctx context.Context, caller action.Caller, p pr
 	}
 
 	result.Session = opened.Session.Name
-	result.Created = opened.Created
-	result.Adopted = opened.Adopted
+	result.Created = opened.How == project.OpenedCreated
+	result.Adopted = opened.How == project.OpenedAdopted
 
 	if caller.Client != "" && caller.Session != "" {
 		_, err = local.workflow.SwitchSessionOutcomeForClient(ctx, opened.Session.Name, caller.Client, caller.Session)

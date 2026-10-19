@@ -4,6 +4,7 @@ package task_test
 
 import (
 	"errors"
+	"fmt"
 	"maps"
 	"os"
 	"os/exec"
@@ -57,6 +58,7 @@ func TestStartCreatesAProjectTaskInItsOwnWorktreeAndWindow(t *testing.T) {
 	want := task.EmptyRecord()
 	want.ID, want.Kind, want.State, want.Project, want.Number = "t1", task.KindProject, task.StateActive, repo, 1
 	want.Harness, want.Directory, want.Branch, want.Base, want.Title = envHarness, worktree, "wt/main/1", "main", "main-1"
+	want.WindowName = "main-1"
 	want.OwnsWorktree, want.OwnsBranch = true, true
 	want.CreatedAt = record.CreatedAt
 	want.Owner = task.Process{PID: os.Getpid(), Birth: record.Owner.Birth}
@@ -464,6 +466,33 @@ func TestOfferStartsANewWorktreeFromTheBranchThePaneIsOn(t *testing.T) {
 	}
 }
 
+func TestOfferInAMainCheckoutInsideALinkedWorktreeStartsFromTheMainCheckout(t *testing.T) {
+	f := newFixture(t)
+	moved := initRepository(t, filepath.Join(f.base, "code", "shop"))
+	outer := filepath.Join(f.base, "outer")
+	runGit(t, moved, "worktree", "add", "-q", "-b", "outer", outer)
+
+	repo := filepath.Join(outer, "shop")
+	if err := os.Rename(moved, repo); err != nil {
+		t.Fatal(err)
+	}
+
+	runGit(t, repo, "worktree", "repair", outer)
+
+	offer, err := f.service.Offer(t.Context(), projectPlace(t, f, repo), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(offer.Locations) < 2 || offer.Locations[1].Where != task.WhereMain {
+		t.Fatalf("Offer() locations = %+v, want only a new worktree from main before the checkouts", offer.Locations)
+	}
+
+	if current := offer.Current; current < 0 || offer.Locations[current].Directory != repo {
+		t.Fatalf("Offer() current = %d in %+v, want the main checkout the pane is in", current, offer.Locations)
+	}
+}
+
 func TestOutsideARepositoryOfferHasNoProject(t *testing.T) {
 	f := newFixture(t)
 	initRepository(t, filepath.Join(f.base, "code", "shop"))
@@ -567,40 +596,73 @@ func TestStartWithATitleNamesTheTaskAndBranchAndPromptsTheAgent(t *testing.T) {
 	}
 }
 
-func TestStartRunsTheHarnessInTheUserShellWithItsFunctions(t *testing.T) {
+func TestStartWithABackslashInTheTitleKeepsTheTitleAndNamesTheWindowWithoutIt(t *testing.T) {
 	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
+	place := projectPlace(t, f, repo)
+	request := task.Request{Harness: promptedHarness, Title: `Fix C:\Users path`, Location: task.Location{Where: task.WhereNew}}
 
-	bash, err := exec.LookPath("bash")
+	record, err := f.service.Start(t.Context(), place, request)
 	if err != nil {
-		t.Fatal(err)
-	}
-
-	home, err := f.server.Environment().Get(t.Context(), "HOME")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	homeDir, _ := home.Value.Get()
-	rc := "shellagent() { printf '%s|' --yolo \"$@\" > " + f.promptFile + "; exec sleep 300; }\n"
-
-	if err := os.WriteFile(filepath.Join(homeDir, ".bashrc"), []byte(rc), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := f.server.GlobalSessionOptions().SetDefaultShell(t.Context(), bash); err != nil {
-		t.Fatal(err)
-	}
-
-	title := `it's "quoted" $HOME`
-	if _, err := f.service.Start(t.Context(), projectPlace(t, f, repo), task.Request{
-		Harness: functionHarness, Title: title, Location: task.Location{Where: task.WhereNew},
-	}); err != nil {
 		t.Fatalf("Start() error = %v", err)
 	}
 
-	if got := waitForFile(t, f.promptFile); got != "--yolo|"+title+"|" {
-		t.Fatalf("shell function ran with %q, want its own option and the title unchanged", got)
+	if record.Title != request.Title {
+		t.Fatalf("title = %q, want %q", record.Title, request.Title)
+	}
+
+	if name := taskWindow(t, f.server, place.Session, record.ID).Name; name != "Fix C:/Users path" {
+		t.Fatalf("window name = %q, want the title with the backslash replaced", name)
+	}
+}
+
+func TestStartRunsTheHarnessInTheUserShellWithItsFunctions(t *testing.T) {
+	for _, shell := range []struct {
+		name, rcFile, rc string
+	}{
+		{name: "bash", rcFile: ".bashrc", rc: "shellagent() { printf '%%s|' --yolo \"$@\" > '%s'; exec sleep 300; }\n"},
+		{name: "fish", rcFile: ".config/fish/config.fish", rc: "function shellagent; printf '%%s|' --yolo $argv > '%s'; exec sleep 300; end\n"},
+	} {
+		t.Run(shell.name, func(t *testing.T) {
+			f := newFixture(t)
+			repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
+
+			path, err := exec.LookPath(shell.name)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			home, err := f.server.Environment().Get(t.Context(), "HOME")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			homeDir, _ := home.Value.Get()
+			rcPath := filepath.Join(homeDir, shell.rcFile)
+
+			if err := os.MkdirAll(filepath.Dir(rcPath), 0o700); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := os.WriteFile(rcPath, []byte(fmt.Sprintf(shell.rc, f.promptFile)), 0o600); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := f.server.GlobalSessionOptions().SetDefaultShell(t.Context(), path); err != nil {
+				t.Fatal(err)
+			}
+
+			title := `it's "quoted" $HOME`
+			if _, err := f.service.Start(t.Context(), projectPlace(t, f, repo), task.Request{
+				Harness: functionHarness, Title: title, Location: task.Location{Where: task.WhereNew},
+			}); err != nil {
+				t.Fatalf("Start() error = %v", err)
+			}
+
+			if got := waitForFile(t, f.promptFile); got != `--yolo|a\b \'|`+title+"|" {
+				t.Fatalf("shell function ran with %q, want its own option and the title unchanged", got)
+			}
+		})
 	}
 }
 
@@ -820,7 +882,7 @@ func newFixture(t *testing.T) fixture {
 		{Name: envHarness, Command: []string{"sh", "-c", `printf '%s|%s|%s|%s' "$SESH_TASK" "$SESH_PROJECT" "$SESH_WORKTREE" "$SESH_BASE" > "$0"; exec sleep 300`, envFile}},
 		{Name: sleepHarness, Command: []string{"sleep", "300"}},
 		{Name: promptedHarness, Command: []string{"sh", "-c", `printf '%s:%s' "$#" "$*" > "$0"; exec sleep 300`, promptFile}, PromptArgs: []string{"prompt for {title}"}},
-		{Name: functionHarness, Command: []string{"shellagent"}, PromptArgs: []string{"{title}"}},
+		{Name: functionHarness, Command: []string{"shellagent", `a\b \'`}, PromptArgs: []string{"{title}"}},
 	}
 
 	full := config.DefaultConfig()

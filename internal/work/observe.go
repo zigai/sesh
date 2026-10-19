@@ -26,12 +26,9 @@ type Sighting struct {
 
 type Checkout func(dir string) (branch, project string)
 
-// Observe records sightings: a known conversation updates its item, a new conversation in the
-// pane and directory an open item last ran in continues that item, and any other conversation
-// starts a new item. A finished conversation seen in another pane was resumed, and one prompted
-// again after it finished was continued; either reopens it.
-// checkout reads the branch and project of a new item or one that moved. It reports whether
-// anything changed.
+// Observe records sightings into their items, starting an item for a conversation no item
+// continues, and reports whether anything changed. checkout reads the branch and project of a new
+// item or one that moved.
 func (s *State) Observe(sightings []Sighting, now time.Time, checkout Checkout) bool {
 	changed := false
 
@@ -59,6 +56,13 @@ func (s *State) Observe(sightings []Sighting, now time.Time, checkout Checkout) 
 	return changed
 }
 
+func (s *State) changedBy(sightings []Sighting, now time.Time) bool {
+	probe := *s
+	probe.Items = slices.Clone(s.Items)
+
+	return probe.Observe(sightings, now, func(string) (string, string) { return "", "" })
+}
+
 func (s *State) match(seen Sighting) int {
 	if index := slices.IndexFunc(s.Items, func(item Item) bool {
 		return item.Harness == seen.Harness && item.Conversation == seen.Conversation
@@ -69,9 +73,7 @@ func (s *State) match(seen Sighting) int {
 	latest := -1
 
 	for index, item := range s.Items {
-		continues := !item.Finished() && item.Harness == seen.Harness && item.Server == seen.Server &&
-			item.Pane == seen.Pane && item.PanePID == seen.PanePID && item.Directory == seen.Directory
-		if continues && (latest < 0 || item.TurnAt > s.Items[latest].TurnAt) {
+		if continuesItem(item, seen) && (latest < 0 || item.TurnAt > s.Items[latest].TurnAt) {
 			latest = index
 		}
 	}
@@ -84,10 +86,7 @@ func apply(item Item, seen Sighting, now time.Time, checkout Checkout) Item {
 		item.Branch, item.Project = checkout(seen.Directory)
 	}
 
-	moved := item.Server != seen.Server || item.Pane != seen.Pane || item.PanePID != seen.PanePID
-	prompt := unixOrZero(seen.PromptAt)
-
-	if item.Finished() && (moved || prompt > item.FinishedAt) {
+	if reopenedBy(item, seen) {
 		item = item.reopened(now)
 	}
 
@@ -113,9 +112,20 @@ func apply(item Item, seen Sighting, now time.Time, checkout Checkout) Item {
 		item.TurnAt = turn
 	}
 
-	item.PromptAt = max(item.PromptAt, prompt)
+	item.PromptAt = max(item.PromptAt, unixOrZero(seen.PromptAt))
 
 	return item
+}
+
+func continuesItem(item Item, seen Sighting) bool {
+	return !item.Finished() && item.Harness == seen.Harness && item.Server == seen.Server &&
+		item.Pane == seen.Pane && item.PanePID == seen.PanePID && item.Directory == seen.Directory
+}
+
+func reopenedBy(item Item, seen Sighting) bool {
+	moved := item.Server != seen.Server || item.Pane != seen.Pane || item.PanePID != seen.PanePID
+
+	return item.Finished() && (moved || unixOrZero(seen.PromptAt) > item.FinishedAt)
 }
 
 func same(a, b Item) bool {

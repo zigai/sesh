@@ -22,8 +22,12 @@ type Live struct {
 	WindowName  string
 	AgentPane   gotmux.PaneID
 	AgentPID    int
-	// Stalled is set when the task is stuck creating or finishing; see Stalled.
-	Stalled bool
+	Stalled     bool
+}
+
+type PaneTasks struct {
+	Socket     string
+	TaskByPane map[string]string
 }
 
 func Inventory(ctx context.Context, server *gotmux.Server, store Store) ([]Live, error) {
@@ -53,31 +57,29 @@ func Inventory(ctx context.Context, server *gotmux.Server, store Store) ([]Live,
 	return live, nil
 }
 
-// WindowPanes returns the socket of server and the task of each pane in a task window.
-func WindowPanes(ctx context.Context, server *gotmux.Server) (string, map[string]string, error) {
+func WindowPanes(ctx context.Context, server *gotmux.Server) (PaneTasks, error) {
+	found := PaneTasks{Socket: "", TaskByPane: map[string]string{}}
+
 	panes, err := server.PanesWith(ctx, gotmux.QueryOptions{Filter: "", ExtraFields: []string{OptionTask, socketPathField}})
 	if errors.Is(err, gotmux.ErrNoServer) {
-		return "", map[string]string{}, nil
+		return found, nil
 	}
 
 	if err != nil {
-		return "", nil, fmt.Errorf("list task panes: %w", err)
+		return found, fmt.Errorf("list task panes: %w", err)
 	}
-
-	socket := ""
-	inTask := make(map[string]string, len(panes))
 
 	for _, pane := range panes {
 		if path, _ := pane.Raw(socketPathField); len(path) > 0 {
-			socket = string(path)
+			found.Socket = string(path)
 		}
 
 		if taskID, _ := pane.Raw(OptionTask); len(taskID) > 0 {
-			inTask[string(pane.ID)] = string(taskID)
+			found.TaskByPane[string(pane.ID)] = string(taskID)
 		}
 	}
 
-	return socket, inTask, nil
+	return found, nil
 }
 
 func locateTasks(ctx context.Context, server *gotmux.Server) (map[string]Live, error) {

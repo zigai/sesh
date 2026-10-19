@@ -15,8 +15,6 @@ import (
 const (
 	waitDelay   = time.Second
 	outputLimit = 1 << 20
-	// shortStatFields are a count and what it counts, such as "12 insertions(+)".
-	shortStatFields = 2
 )
 
 var ErrOutputTooLarge = errors.New("command output exceeds its limit")
@@ -117,17 +115,17 @@ func ParseShortStat(output string) (Diff, bool) {
 	var diff Diff
 
 	for part := range strings.SplitSeq(output, ",") {
-		fields := strings.Fields(part)
-		if len(fields) != shortStatFields {
+		countText, counted, found := strings.Cut(strings.TrimSpace(part), " ")
+		if !found {
 			continue
 		}
 
-		count, err := strconv.Atoi(fields[0])
+		count, err := strconv.Atoi(countText)
 		if err != nil || count < 0 {
 			return Diff{Added: 0, Deleted: 0}, false
 		}
 
-		switch fields[1] {
+		switch counted {
 		case "insertion(+)", "insertions(+)":
 			diff.Added = count
 		case "deletion(-)", "deletions(-)":

@@ -207,7 +207,7 @@ func assertWakeAfterInterruptedSleep(t *testing.T, f sleepFixture, pid int, runn
 		t.Fatalf("Wake() after interrupted sleep: %v", err)
 	}
 
-	if woken.Awake != running || woken.Record.State != task.StateActive {
+	if woken.AlreadyAwake != running || woken.Record.State != task.StateActive {
 		t.Fatalf("Wake() = %+v, want active with Awake=%t", woken, running)
 	}
 
@@ -257,7 +257,7 @@ func TestSleepTimeoutRetainsResumeAndWakeKeepsTheRunningAgent(t *testing.T) {
 		t.Fatalf("Wake() after stop timeout: %v", err)
 	}
 
-	if !woken.Awake || woken.Record.State != task.StateActive || !processAlive(pid) || readArgs(t, f) != "" {
+	if !woken.AlreadyAwake || woken.Record.State != task.StateActive || !processAlive(pid) || readArgs(t, f) != "" {
 		t.Fatalf("Wake() = %+v, want the original running harness reconciled", woken)
 	}
 
@@ -273,7 +273,7 @@ func TestWakeRelaunchesTheAgentThroughItsResumeCommand(t *testing.T) {
 		t.Fatalf("Wake() error = %v", err)
 	}
 
-	if woken.Awake || woken.Record.State != task.StateActive {
+	if woken.AlreadyAwake || woken.Record.State != task.StateActive {
 		t.Fatalf("Wake() = %+v, want a relaunch that leaves the task active", woken)
 	}
 
@@ -321,7 +321,7 @@ func TestWakeOnlyMarksAwakeATaskWhoseHarnessAlreadyRuns(t *testing.T) {
 		t.Fatalf("Wake() error = %v", err)
 	}
 
-	if !woken.Awake || readArgs(t, f) != "--again" {
+	if !woken.AlreadyAwake || readArgs(t, f) != "--again" {
 		t.Fatalf("Wake() = %+v with harness arguments %q, want the running harness kept", woken, readArgs(t, f))
 	}
 
@@ -364,9 +364,7 @@ func newSleepFixture(t *testing.T) sleepFixture {
 	return newSleepFixtureWith(t, func(string) {})
 }
 
-// newSleepFixtureWith starts a project task whose agent is the fake harness. prepare runs in the
-// worktree before the harness starts.
-func newSleepFixtureWith(t *testing.T, prepare func(dir string)) sleepFixture {
+func newSleepFixtureWith(t *testing.T, prepareWorktree func(dir string)) sleepFixture {
 	t.Helper()
 
 	f := newFixture(t)
@@ -402,7 +400,7 @@ func newSleepFixtureWith(t *testing.T, prepare func(dir string)) sleepFixture {
 	f.service = task.NewService(task.Options{
 		Server: f.server, Store: f.store, Catalog: catalog, Config: cfg, Windows: full.TaskWindowFor, WorktreeDir: f.worktreeDir,
 		LookPath: exec.LookPath, Now: time.Now, Agents: agents,
-		Placeholder: func(string) []string {
+		SleepingAgentCommand: func(string) []string {
 			return []string{"sh", "-c", "echo shown > " + placeholderMarker + "; exec sleep 300"}
 		},
 	})
@@ -414,7 +412,7 @@ func newSleepFixtureWith(t *testing.T, prepare func(dir string)) sleepFixture {
 		t.Fatalf("Start() error = %v", err)
 	}
 
-	prepare(record.Directory)
+	prepareWorktree(record.Directory)
 
 	if err := os.WriteFile(filepath.Join(record.Directory, "ready"), nil, 0o600); err != nil {
 		t.Fatal(err)

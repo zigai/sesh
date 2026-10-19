@@ -28,8 +28,6 @@ const (
 	WhereMain Where = "main"
 
 	maxSlugRunes = 48
-	// refFields are a ref's name, symref, commit time, ahead-behind counts and subject.
-	refFields = 5
 )
 
 var ErrLocationUnavailable = errors.New("that checkout or branch is no longer free in this project")
@@ -61,8 +59,9 @@ type Request struct {
 }
 
 // Offer is what a new task can start with at a place: the offered harnesses, the root of the
-// place's project with its locations, and the index of the checkout the place is in. NextNumber and Branches are what a new worktree's branch is named
-// from. Outside a project Project is empty and there are no locations.
+// place's project with its locations, and the index of the checkout the place is in. NextNumber
+// and Branches are what a new worktree's branch is named from. Outside a project Project is
+// empty and there are no locations.
 type Offer struct {
 	Harnesses  []Harness
 	Project    string
@@ -85,17 +84,30 @@ type Ref struct {
 	Behind  int
 }
 
+type remoteBranch struct {
+	remote string
+	name   string
+}
+
+type refLine struct {
+	name        string
+	symref      string
+	committed   string
+	aheadBehind string
+	subject     string
+}
+
 type worktree struct {
 	directory string
 	branch    string
 	prunable  bool
 }
 
-// branches are a project's local branch names and the branches only a remote has, as
-// remote and branch pairs, most recently committed first, and every branch's latest commit.
+// branches are a project's local branch names and the branches only a remote has, most
+// recently committed first, and every branch's latest commit.
 type branches struct {
 	local  []string
-	remote [][2]string
+	remote []remoteBranch
 	refs   map[string]Ref
 	starts map[string]string
 }
@@ -110,7 +122,7 @@ func (s *Service) Offer(ctx context.Context, place Place, describe bool) (Offer,
 		return emptyOffer(), taskError("offer_task", err)
 	}
 
-	root, err := s.projectOf(ctx, place)
+	root, err := s.gitProjectRoot(ctx, place)
 	if err != nil {
 		return emptyOffer(), taskError("offer_task", err)
 	}
@@ -172,7 +184,7 @@ func (s *Service) locations(ctx context.Context, p project.Project, ledger Ledge
 		return nil, noBranches(), err
 	}
 
-	existing, current := checkouts(p.Root, worktrees, ledger, dir)
+	existing := checkouts(p.Root, worktrees, ledger)
 	bases := []string{base}
 
 	checkedOut := make([]string, 0, len(worktrees))
@@ -180,8 +192,8 @@ func (s *Service) locations(ctx context.Context, p project.Project, ledger Ledge
 		checkedOut = append(checkedOut, tree.branch)
 	}
 
-	if current != "" && current != base {
-		bases = append(bases, current)
+	if index := innermostCheckout(existing, dir); index >= 0 && existing[index].Branch != "" && existing[index].Branch != base {
+		bases = append(bases, existing[index].Branch)
 	}
 
 	locations := make([]Location, 0, len(bases)+len(existing)+len(known.local)*2+len(known.remote))
@@ -222,7 +234,15 @@ func (s *Service) offered(ctx context.Context, p project.Project, requested Loca
 	return locations[index], known.local, nil
 }
 
-// names reports whether a requested location names l.
+func (l Location) createsWorktree() bool {
+	return l.Where == WhereNew || l.Where == WhereBranch
+}
+
+func (l Location) createsBranch() bool {
+	// A branch only a remote has gets a local branch tracking it.
+	return l.Where == WhereNew || l.Remote != ""
+}
+
 func (l Location) names(requested Location) bool {
 	if l.Where != requested.Where {
 		return false
@@ -293,6 +313,14 @@ func Changes(ctx context.Context, directories []string) map[string]git.Diff {
 }
 
 func currentCheckout(locations []Location, dir string) int {
+	if current := innermostCheckout(locations, dir); current >= 0 {
+		return current
+	}
+
+	return slices.IndexFunc(locations, func(l Location) bool { return l.Where == WhereMain })
+}
+
+func innermostCheckout(locations []Location, dir string) int {
 	current, depth := -1, -1
 
 	for index, location := range locations {
@@ -300,13 +328,9 @@ func currentCheckout(locations []Location, dir string) int {
 			continue
 		}
 
-		if within(dir, location.Directory) && len(location.Directory) > depth {
-			current, depth = index, len(location.Directory)
+		if within(dir, location.Directory) && len(resolved(location.Directory)) > depth {
+			current, depth = index, len(resolved(location.Directory))
 		}
-	}
-
-	if current < 0 {
-		current = slices.IndexFunc(locations, func(l Location) bool { return l.Where == WhereMain })
 	}
 
 	return current
@@ -348,8 +372,8 @@ func branchLocations(known branches, checkedOut, bases []string) []Location {
 		}
 	}
 
-	for _, pair := range known.remote {
-		locations = append(locations, Location{Where: WhereBranch, Branch: pair[1], Remote: pair[0], Directory: "", Task: "", TaskTitle: ""})
+	for _, branch := range known.remote {
+		locations = append(locations, Location{Where: WhereBranch, Branch: branch.name, Remote: branch.remote, Directory: "", Task: "", TaskTitle: ""})
 	}
 
 	for _, branch := range known.local {
@@ -361,19 +385,12 @@ func branchLocations(known branches, checkedOut, bases []string) []Location {
 	return locations
 }
 
-// checkouts lists the main checkout and the worktrees that still exist, with the task working in
-// each, and returns the branch checked out where dir is.
-func checkouts(root string, worktrees []worktree, ledger Ledger, dir string) ([]Location, string) {
-	current := ""
+func checkouts(root string, worktrees []worktree, ledger Ledger) []Location {
 	existing := make([]Location, 0, len(worktrees))
 
 	for _, tree := range worktrees {
 		if tree.prunable {
 			continue
-		}
-
-		if within(dir, tree.directory) {
-			current = tree.branch
 		}
 
 		where := WhereWorktree
@@ -385,7 +402,7 @@ func checkouts(root string, worktrees []worktree, ledger Ledger, dir string) ([]
 		existing = append(existing, Location{Where: where, Branch: tree.branch, Remote: "", Directory: tree.directory, Task: id, TaskTitle: title})
 	}
 
-	return existing, current
+	return existing
 }
 
 func taskIn(ledger Ledger, directory string) (string, string) {
@@ -416,62 +433,79 @@ func emptyOffer() Offer {
 }
 
 // listBranches lists the local branches and the remote branches no local branch shares a name
-// with, most recently committed first, leaving out each remote's HEAD, and when describe is set
-// their latest commits and how far each is from base.
+// with, most recently committed first, and when describe is set their latest commits and how far
+// each is from base.
 func listBranches(ctx context.Context, root, base string, describe bool) (branches, error) {
-	distance := ""
+	aheadBehind := ""
 
 	if describe {
 		var err error
 
-		distance, err = distanceFrom(ctx, root, base)
+		aheadBehind, err = aheadBehindFormat(ctx, root, base)
 		if err != nil {
 			return noBranches(), err
 		}
 	}
 
+	format := []string{"%(refname)", "%(symref)", "%(committerdate:unix)", aheadBehind, "%(contents:subject)"}
+
 	output, err := git.Output(ctx, root, "for-each-ref", "--sort=-committerdate",
-		"--format=%(refname)%09%(symref)%09%(committerdate:unix)%09"+distance+"%09%(contents:subject)%00",
-		"refs/heads/", "refs/remotes/")
+		"--format="+strings.Join(format, "%09")+"%00", "refs/heads/", "refs/remotes/")
 	if err != nil {
 		return branches{}, fmt.Errorf("list branches: %w", err)
 	}
 
 	found := branches{local: nil, remote: nil, refs: make(map[string]Ref), starts: nil}
 
-	var remotes [][2]string
+	var remotes []remoteBranch
 
 	for line := range strings.Lines(output) {
 		record, _ := strings.CutSuffix(strings.TrimRight(line, "\n"), "\x00")
 
-		fields := strings.SplitN(record, "\t", refFields)
-		if len(fields) != refFields || fields[1] != "" {
+		fields := strings.SplitN(record, "\t", len(format))
+		if len(fields) != len(format) {
 			continue
 		}
 
-		if branch, local := strings.CutPrefix(fields[0], "refs/heads/"); local {
+		ref := refLine{name: fields[0], symref: fields[1], committed: fields[2], aheadBehind: fields[3], subject: fields[4]}
+		if ref.isSymref() {
+			continue
+		}
+
+		if branch, local := strings.CutPrefix(ref.name, "refs/heads/"); local {
 			found.local = append(found.local, branch)
-		} else if remote, branch, ok := strings.Cut(strings.TrimPrefix(fields[0], "refs/remotes/"), "/"); ok {
-			remotes = append(remotes, [2]string{remote, branch})
+		} else if remote, branch, ok := strings.Cut(strings.TrimPrefix(ref.name, "refs/remotes/"), "/"); ok {
+			remotes = append(remotes, remoteBranch{remote: remote, name: branch})
 		}
 
 		if describe {
-			found.refs[fields[0]] = parseRef(fields[2], fields[3], fields[4])
+			found.refs[ref.name] = ref.ref()
 		}
 	}
 
-	for _, pair := range remotes {
-		if !slices.Contains(found.local, pair[1]) {
-			found.remote = append(found.remote, pair)
+	for _, branch := range remotes {
+		if !slices.Contains(found.local, branch.name) {
+			found.remote = append(found.remote, branch)
 		}
 	}
 
 	return found, nil
 }
 
-// distanceFrom is the for-each-ref format of a branch's distance from base, local or on origin,
-// and empty while base has no commits.
-func distanceFrom(ctx context.Context, root, base string) (string, error) {
+func (r refLine) isSymref() bool {
+	return r.symref != ""
+}
+
+func (r refLine) ref() Ref {
+	committed, _ := strconv.ParseInt(r.committed, 10, 64)
+	aheadText, behindText, _ := strings.Cut(r.aheadBehind, " ")
+	ahead, _ := strconv.Atoi(aheadText)
+	behind, _ := strconv.Atoi(behindText)
+
+	return Ref{Time: committed, Subject: r.subject, Ahead: ahead, Behind: behind}
+}
+
+func aheadBehindFormat(ctx context.Context, root, base string) (string, error) {
 	for _, ref := range []string{"refs/heads/" + base, "refs/remotes/origin/" + base} {
 		exists, err := refExists(ctx, root, ref)
 		if err != nil {
@@ -486,18 +520,6 @@ func distanceFrom(ctx context.Context, root, base string) (string, error) {
 	return "", nil
 }
 
-// parseRef reads a branch's commit time, its ahead-behind counts and its subject.
-func parseRef(at, aheadBehind, subject string) Ref {
-	committed, _ := strconv.ParseInt(at, 10, 64)
-	aheadText, behindText, _ := strings.Cut(aheadBehind, " ")
-	ahead, _ := strconv.Atoi(aheadText)
-	behind, _ := strconv.Atoi(behindText)
-
-	return Ref{Time: committed, Subject: subject, Ahead: ahead, Behind: behind}
-}
-
-// listWorktrees parses `git worktree list --porcelain`: blocks of attribute lines, one block per
-// worktree, the main checkout first.
 func listWorktrees(ctx context.Context, root string) ([]worktree, error) {
 	output, err := git.Output(ctx, root, "worktree", "list", "--porcelain")
 	if err != nil {

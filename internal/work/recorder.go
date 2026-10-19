@@ -13,6 +13,7 @@ import (
 	"github.com/zigai/aht/v2/pkg/registry"
 
 	"github.com/zigai/sesh/internal/agents"
+	"github.com/zigai/sesh/internal/task"
 )
 
 type Recorder struct {
@@ -21,17 +22,15 @@ type Recorder struct {
 
 	server string
 
-	mu    sync.Mutex
-	known State
-	// tasks are the tasks whose windows conversations were last seen in.
-	tasks map[string]string
+	mu                 sync.Mutex
+	known              State
+	taskByConversation map[string]string
 }
 
-// Panes reads the socket of the recorded tmux server and the task of each pane in a task window.
-type Panes func(context.Context) (string, map[string]string, error)
+type Panes func(context.Context) (task.PaneTasks, error)
 
 func NewRecorder(store Store, panes Panes) *Recorder {
-	return &Recorder{store: store, panes: panes, server: "", mu: sync.Mutex{}, known: emptyState(), tasks: map[string]string{}}
+	return &Recorder{store: store, panes: panes, server: "", mu: sync.Mutex{}, known: emptyState(), taskByConversation: map[string]string{}}
 }
 
 // Record records the conversations sessions show. It writes the work state only when a
@@ -41,20 +40,16 @@ func (r *Recorder) Record(ctx context.Context, sessions []aht.Session) error {
 	defer r.mu.Unlock()
 
 	sightings := r.sightings(sessions)
-
-	probe := r.known
-	probe.Items = append([]Item(nil), r.known.Items...)
-
-	if !probe.Observe(sightings, time.Now(), func(string) (string, string) { return "", "" }) {
+	if !r.known.changedBy(sightings, time.Now()) {
 		return nil
 	}
 
-	socket, taskPanes, err := r.panes(ctx)
+	panes, err := r.panes(ctx)
 	if err != nil {
 		return err
 	}
 
-	r.server = agents.NormalizeServerSocket(socket)
+	r.server = agents.NormalizeServerSocket(panes.Socket)
 	kept := sightings[:0]
 
 	for _, seen := range sightings {
@@ -62,8 +57,8 @@ func (r *Recorder) Record(ctx context.Context, sessions []aht.Session) error {
 			continue
 		}
 
-		seen.Task = taskPanes[seen.Pane]
-		r.tasks[seen.Conversation] = seen.Task
+		seen.Task = panes.TaskByPane[seen.Pane]
+		r.taskByConversation[seen.Conversation] = seen.Task
 		kept = append(kept, seen)
 	}
 
@@ -93,7 +88,7 @@ func (r *Recorder) sightings(sessions []aht.Session) []Sighting {
 
 		sightings = append(sightings, Sighting{
 			Harness: agent.Harness, Conversation: agent.HarnessSessionID, SessionPath: agent.SessionPath,
-			Resume: agent.ResumeCommand, Title: "", Directory: agent.CWD, Project: agent.ProjectRoot, Task: r.tasks[agent.HarnessSessionID],
+			Resume: agent.ResumeCommand, Title: "", Directory: agent.CWD, Project: agent.ProjectRoot, Task: r.taskByConversation[agent.HarnessSessionID],
 			Server: agent.ServerSocket, Pane: agent.PaneID, PanePID: agent.PanePID, TurnAt: agent.ActivityChanged,
 			PromptAt: agent.PromptAt,
 		})

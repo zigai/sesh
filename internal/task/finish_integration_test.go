@@ -330,7 +330,7 @@ func TestRefreshPRRecordsTheBranchPullRequest(t *testing.T) {
 	}
 }
 
-func TestRetitleRenamesTheWindowUntilTheUserRenamesIt(t *testing.T) {
+func TestRetitleRenamesTheWindowUntilTheUserRenamesItAndKeepsTheTitle(t *testing.T) {
 	f := newFinishFixture(t)
 
 	renamed, err := f.service.Retitle(t.Context(), f.record.ID, "fix login\nflow")
@@ -352,12 +352,21 @@ func TestRetitleRenamesTheWindowUntilTheUserRenamesIt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if renamed, err := f.service.Retitle(t.Context(), f.record.ID, "another title"); err != nil || renamed {
-		t.Fatalf("Retitle() after a manual rename = %v, %v; want the user's name kept", renamed, err)
+	if changed, err := f.service.Retitle(t.Context(), f.record.ID, "another title"); err != nil || !changed {
+		t.Fatalf("Retitle() after a manual rename = %v, %v; want the title recorded", changed, err)
 	}
 
 	if name := taskWindowOf(t, f).Name; name != "mine" {
 		t.Fatalf("window name = %q, want the user's name", name)
+	}
+
+	ledger, err := f.store.Load(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if record, _ := ledger.Find(f.record.ID); record.Title != "another title" {
+		t.Fatalf("task title = %q, want the agent's latest title", record.Title)
 	}
 }
 
@@ -387,7 +396,7 @@ func newFinishFixture(t *testing.T) *finishFixture {
 
 	f.service = task.NewService(task.Options{
 		Server: f.server, Store: f.store, Catalog: catalog, Config: cfg, Windows: full.TaskWindowFor, WorktreeDir: f.worktreeDir,
-		LookPath: exec.LookPath, Now: time.Now, Agents: nil, Placeholder: nil, PRs: f.prs,
+		LookPath: exec.LookPath, Now: time.Now, Agents: nil, SleepingAgentCommand: nil, PRs: f.prs,
 		ClosePopup: func(_ context.Context, id string) error {
 			f.closed = append(f.closed, id)
 

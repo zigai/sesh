@@ -7,7 +7,6 @@ import (
 	"maps"
 	"path/filepath"
 	"slices"
-	"strconv"
 
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/snapshot/apps"
@@ -15,16 +14,15 @@ import (
 )
 
 // RestoreLaunches decides how task agents come back when a snapshot is restored, following
-// tasks.wake_on_restore: "previous" resumes the agents that were awake, "none" brings every task
-// back asleep, and a count resumes only that many of the most recently created awake tasks. The
-// others come back behind the sleeping placeholder, and once the restore commits, their records
-// turn sleeping with the captured native resume command. Agents that were asleep stay asleep
-// because their placeholder is captured like any other restartable application.
+// tasks.wake_on_restore. Awake agents it does not resume come back behind the sleeping
+// placeholder, and once the restore commits, their records turn sleeping with the captured
+// native resume command. Agents that were asleep stay asleep because their placeholder is
+// captured like any other restartable application.
 type RestoreLaunches struct {
-	store      Store
-	policy     string
-	executable string
-	restored   map[string]restoredTask
+	store             Store
+	policy            config.WakePolicy
+	placeholderBinary string
+	restored          map[string]restoredTask
 }
 
 type restoredTask struct {
@@ -38,10 +36,8 @@ type restoredAgent struct {
 	record Record
 }
 
-// NewRestoreLaunches returns the launch overrides for a restore; executable is the sesh binary
-// the placeholder runs.
-func NewRestoreLaunches(store Store, policy, executable string) *RestoreLaunches {
-	return &RestoreLaunches{store: store, policy: policy, executable: executable, restored: nil}
+func NewRestoreLaunches(store Store, policy config.WakePolicy, placeholderBinary string) *RestoreLaunches {
+	return &RestoreLaunches{store: store, policy: policy, placeholderBinary: placeholderBinary, restored: nil}
 }
 
 // Override replaces the native resume launch of each task agent that wake_on_restore keeps
@@ -80,17 +76,12 @@ func (r *RestoreLaunches) Override(ctx context.Context, manifest model.Manifest)
 		return cmp.Or(cmp.Compare(b.record.CreatedAt, a.record.CreatedAt), cmp.Compare(b.record.ID, a.record.ID))
 	})
 
-	keep := len(awake)
-	if r.policy != config.WakeOnRestorePrevious {
-		keep, _ = strconv.Atoi(r.policy)
-	}
-
-	for _, agent := range awake[min(keep, len(awake)):] {
+	for _, agent := range awake[r.policy.Resumes(len(awake)):] {
 		launch := agent.pane.Launch
 		harness, _ := apps.LaunchHarness(launch)
-		command := launchCommand(launch)
+		command := launch.Command()
 
-		launches[agent.pane.ID] = apps.PlaceholderLaunch(r.executable, agent.record.ID, launch)
+		launches[agent.pane.ID] = apps.PlaceholderLaunch(r.placeholderBinary, agent.record.ID, launch)
 		r.restored[agent.pane.ID] = restoredTask{
 			task: agent.record.ID, state: StateSleeping,
 			resume: Resume{Harness: harness, Session: command[len(command)-1], Command: command},

@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	LedgerVersion = 1
+	LedgerVersion = 2
 
 	KindProject Kind = "project"
 	KindLoose   Kind = "loose"
@@ -77,14 +77,13 @@ type Record struct {
 	OwnsBranch   bool `json:"ownsBranch"`
 	// Upstream is the remote branch an owned branch was created to track; finishing compares the
 	// branch with it instead of the base.
-	Upstream  string `json:"upstream"`
-	CreatedAt int64  `json:"createdAt"`
-	// Title is the window name sesh last gave the task; a different window name means the
-	// user renamed it and sesh leaves it alone.
-	Title  string      `json:"title"`
-	Resume Resume      `json:"resume"`
-	PR     PullRequest `json:"pr"`
-	Runs   []Run       `json:"runs"`
+	Upstream   string      `json:"upstream"`
+	CreatedAt  int64       `json:"createdAt"`
+	Title      string      `json:"title"`
+	WindowName string      `json:"windowName"`
+	Resume     Resume      `json:"resume"`
+	PR         PullRequest `json:"pr"`
+	Runs       []Run       `json:"runs"`
 	// Owner is the sesh process that put the task in its creating or finishing state; once it
 	// is gone the task is stalled there.
 	Owner Process `json:"owner"`
@@ -207,7 +206,7 @@ func EmptyRecord() Record {
 	return Record{
 		ID: "", Kind: "", State: "", Project: "", Number: 0, Harness: "", Directory: "", Branch: "", Base: "",
 		OwnsWorktree: false, OwnsBranch: false, Upstream: "", CreatedAt: 0,
-		Title: "", Resume: Resume{Harness: "", Session: "", Command: []string{}}, PR: PullRequest{Number: 0, State: "", URL: ""}, Runs: []Run{},
+		Title: "", WindowName: "", Resume: Resume{Harness: "", Session: "", Command: []string{}}, PR: PullRequest{Number: 0, State: "", URL: ""}, Runs: []Run{},
 		Owner: Process{PID: 0, Birth: ""},
 	}
 }

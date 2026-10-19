@@ -122,12 +122,12 @@ func TestCorruptOrUnknownLedgersAreRejected(t *testing.T) {
 		content string
 	}{
 		{"not json", "{"},
-		{"unknown version", `{"version":2,"lastId":0,"tasks":[],"projects":[]}`},
-		{"missing field", `{"version":1,"tasks":[],"projects":[]}`},
-		{"unknown field", `{"version":1,"lastId":0,"tasks":[],"projects":[],"extra":1}`},
+		{"unknown version", `{"version":1,"lastId":0,"tasks":[],"projects":[]}`},
+		{"missing field", `{"version":2,"tasks":[],"projects":[]}`},
+		{"unknown field", `{"version":2,"lastId":0,"tasks":[],"projects":[],"extra":1}`},
 		{
 			"duplicate task id",
-			`{"version":1,"lastId":2,"projects":[],"tasks":[` + record("t1") + `,` + record("t1") + `]}`,
+			`{"version":2,"lastId":2,"projects":[],"tasks":[` + record("t1") + `,` + record("t1") + `]}`,
 		},
 	}
 

@@ -47,8 +47,8 @@ func runMergeRun(cmd *cobra.Command, args []string) error {
 	run, err := runtime.Local.RunTaskMerge(ctx, args[0], gotmux.Streams{In: os.Stdin, Out: os.Stdout, Err: os.Stderr})
 	err = errors.Join(err, runtime.Close())
 
-	if run.Ran && run.ExitCode != 0 {
-		_, _ = fmt.Fprintf(os.Stdout, "\nmerge stopped with exit code %d\n", run.ExitCode)
+	if run.ExitCode != nil && *run.ExitCode != 0 {
+		_, _ = fmt.Fprintf(os.Stdout, "\nmerge stopped with exit code %d\n", *run.ExitCode)
 	}
 
 	return err

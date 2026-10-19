@@ -50,7 +50,7 @@ func validWorkRow(row work.Item) bool {
 		return false
 	}
 
-	for _, text := range []string{row.Harness, row.Title, row.Directory, row.Project, row.Branch, row.Server, row.Pane, row.FinishedBy} {
+	for _, text := range []string{row.Harness, row.Title, row.Directory, row.Project, row.Branch, row.Server, row.Pane, string(row.FinishedBy)} {
 		if !ValidText(text) {
 			return false
 		}
@@ -65,7 +65,7 @@ func validPRLinks(links []work.PRLink) bool {
 	}
 
 	for _, link := range links {
-		if len(link.Issues) > MaxWork || !ValidText(link.URL) || !ValidText(string(link.State)) || !ValidText(link.Source) {
+		if len(link.Issues) > MaxWork || !ValidText(link.URL) || !ValidText(string(link.State)) || !ValidText(string(link.Source)) {
 			return false
 		}
 	}

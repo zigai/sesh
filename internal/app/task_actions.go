@@ -33,11 +33,10 @@ var (
 	ErrPromptFile        = errors.New("task action prompt file cannot be read")
 )
 
-// TaskActionRun is the result of running a task action in its popup window. ExitCode is only
-// meaningful when the action Ran.
+// TaskActionRun is the result of running a task action in its popup window. ExitCode is nil when
+// the action did not run.
 type TaskActionRun struct {
-	Ran      bool
-	ExitCode int
+	ExitCode *int
 	PR       task.PullRequest
 	Linked   bool
 }
@@ -78,7 +77,7 @@ func (local *Local) runTaskAction(ctx context.Context, _ action.Caller, input ac
 // RunTaskAction runs a task action in the current terminal, records its run on the task, and
 // links the branch's pull request afterwards when the action asks for it.
 func (local *Local) RunTaskAction(ctx context.Context, id, name string, streams gotmux.Streams) (TaskActionRun, error) {
-	run := TaskActionRun{Ran: false, ExitCode: 0, PR: task.PullRequest{Number: 0, State: "", URL: ""}, Linked: false}
+	run := TaskActionRun{ExitCode: nil, PR: task.PullRequest{Number: 0, State: "", URL: ""}, Linked: false}
 
 	service, err := local.taskService()
 	if err != nil {
@@ -105,12 +104,13 @@ func (local *Local) RunTaskAction(ctx context.Context, id, name string, streams 
 		return run, oops.In("app").With("operation", "record_task_action").Wrap(err)
 	}
 
-	run.Ran, run.ExitCode = true, runCommand(ctx, argv, record, streams)
+	exitCode := runCommand(ctx, argv, record, streams)
+	run.ExitCode = &exitCode
 
 	finished := started
-	finished.Status, finished.ExitCode, finished.FinishedAt = task.RunOK, run.ExitCode, time.Now().Unix()
+	finished.Status, finished.ExitCode, finished.FinishedAt = task.RunOK, exitCode, time.Now().Unix()
 
-	if run.ExitCode != 0 {
+	if exitCode != 0 {
 		finished.Status = task.RunFailed
 	}
 

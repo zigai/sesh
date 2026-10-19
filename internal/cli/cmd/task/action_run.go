@@ -50,11 +50,11 @@ func runActionRun(cmd *cobra.Command, args []string) error {
 	run, err := runtime.Local.RunTaskAction(ctx, args[0], args[1], gotmux.Streams{In: os.Stdin, Out: os.Stdout, Err: os.Stderr})
 	err = errors.Join(err, runtime.Close())
 
-	if !run.Ran {
+	if run.ExitCode == nil {
 		return err
 	}
 
-	summary := fmt.Sprintf("\n%s finished with exit code %d", args[1], run.ExitCode)
+	summary := fmt.Sprintf("\n%s finished with exit code %d", args[1], *run.ExitCode)
 	if run.Linked {
 		summary += fmt.Sprintf("; pull request #%d is %s", run.PR.Number, run.PR.State)
 	}

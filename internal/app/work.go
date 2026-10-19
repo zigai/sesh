@@ -123,9 +123,7 @@ func (local *Local) unlinkWork(ctx context.Context, _ action.Caller, input actio
 	})
 }
 
-// finishTaskWork finishes the conversations of a finished task and detaches them from it. A
-// conversation in the worktree the finish removed resumes in the project's main checkout.
-func (local *Local) finishTaskWork(ctx context.Context, record task.Record, by string) error {
+func (local *Local) finishTaskWork(ctx context.Context, record task.Record, by work.FinishReason) error {
 	if local.workState == "" {
 		return nil
 	}

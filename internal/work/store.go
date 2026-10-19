@@ -24,16 +24,13 @@ import (
 const (
 	Version = 3
 
-	// FinishedByPR and FinishedByUser say why an item finished: every pull request linked to it
-	// ended, or the user finished it.
-	FinishedByPR   = "pr"
-	FinishedByUser = "user"
+	FinishedByPR   FinishReason = "pr"
+	FinishedByUser FinishReason = "user"
 
-	// LinkBranch, LinkUser and LinkDismissed say how a pull request is linked to an item: found for
-	// its branch, linked by the user, or unlinked by the user, which keeps sync from linking it again.
-	LinkBranch    = "branch"
-	LinkUser      = "user"
-	LinkDismissed = "dismissed"
+	LinkBranch LinkSource = "branch"
+	LinkUser   LinkSource = "user"
+	// LinkDismissed marks a pull request the user unlinked, which keeps sync from linking it again.
+	LinkDismissed LinkSource = "dismissed"
 
 	maxFileBytes = 8 << 20
 	idPrefix     = "w"
@@ -50,14 +47,17 @@ var (
 	ErrNotLinked = errors.New("the pull request is not linked to the work item")
 )
 
+type (
+	FinishReason string
+	LinkSource   string
+)
+
 // Item is one piece of work: an agent conversation the user drove in a tmux pane, where it ran,
 // and the pull requests linked to it. A new conversation in the same pane, such as after the agent
 // clears its context, continues the item until the item finishes.
 type Item struct {
-	ID      string `json:"id"`
-	Harness string `json:"harness"`
-	// Conversation is the harness's ID of the latest conversation; Resume is the native command
-	// line that resumes it in Directory.
+	ID           string   `json:"id"`
+	Harness      string   `json:"harness"`
 	Conversation string   `json:"conversation"`
 	SessionPath  string   `json:"sessionPath"`
 	Resume       []string `json:"resume"`
@@ -65,9 +65,8 @@ type Item struct {
 	Directory    string   `json:"directory"`
 	Project      string   `json:"project"`
 	Branch       string   `json:"branch"`
-	// Task is the sesh task whose window the conversation last ran in, empty outside task windows.
-	Task string   `json:"task"`
-	PRs  []PRLink `json:"prs"`
+	Task         string   `json:"task"`
+	PRs          []PRLink `json:"prs"`
 	// Server and Pane are the tmux server socket and the pane the conversation last ran in, with
 	// the pane's process, which tells a later pane with a reused ID apart.
 	Server  string `json:"server"`
@@ -82,11 +81,11 @@ type Item struct {
 	// PinnedAt is when the user pinned the item, FinishedAt when it finished, ReopenedAt when it
 	// last reopened after finishing, and UnseenAt when the user marked it not seen, as Unix seconds,
 	// zero when it is not.
-	PinnedAt   int64  `json:"pinnedAt"`
-	FinishedAt int64  `json:"finishedAt"`
-	FinishedBy string `json:"finishedBy"`
-	ReopenedAt int64  `json:"reopenedAt"`
-	UnseenAt   int64  `json:"unseenAt"`
+	PinnedAt   int64        `json:"pinnedAt"`
+	FinishedAt int64        `json:"finishedAt"`
+	FinishedBy FinishReason `json:"finishedBy"`
+	ReopenedAt int64        `json:"reopenedAt"`
+	UnseenAt   int64        `json:"unseenAt"`
 }
 
 // PRLink is a pull request linked to an item, with its last known state and the issues it closes.
@@ -97,7 +96,7 @@ type PRLink struct {
 	State     task.PRState `json:"state"`
 	URL       string       `json:"url"`
 	Issues    []int        `json:"issues"`
-	Source    string       `json:"source"`
+	Source    LinkSource   `json:"source"`
 	CreatedAt int64        `json:"createdAt"`
 	EndedAt   int64        `json:"endedAt"`
 }
@@ -150,8 +149,7 @@ func (s *State) NextID() string {
 	return idPrefix + strconv.Itoa(s.LastID)
 }
 
-// Finish finishes the item with id, by the user or because its pull requests ended.
-func (s *State) Finish(id, by string, now time.Time) error {
+func (s *State) Finish(id string, by FinishReason, now time.Time) error {
 	return s.change(id, func(item *Item) error {
 		item.FinishedAt, item.FinishedBy = now.Unix(), by
 
@@ -162,7 +160,7 @@ func (s *State) Finish(id, by string, now time.Time) error {
 // FinishTask finishes the items of a finished task and detaches them from it, so they resume
 // outside the task. A non-empty directory replaces where they resume, for a task whose
 // worktree was removed.
-func (s *State) FinishTask(id, by, directory string, now time.Time) {
+func (s *State) FinishTask(id string, by FinishReason, directory string, now time.Time) {
 	for index := range s.Items {
 		item := &s.Items[index]
 		if item.Task != id {

@@ -121,17 +121,16 @@ type ThemeConfig struct {
 }
 
 type KeyConfig struct {
-	Bind      []KeyBindConfig `toml:"bind"`
-	Help      string          `toml:"help"`
-	CycleMode string          `toml:"cycle_mode"`
-	AgentSort string          `toml:"agent_sort"`
-	// InboxGroup cycles how the inbox groups its rows; Menu opens the menu of the selected row.
-	InboxGroup string `toml:"inbox_group"`
-	Menu       string `toml:"menu"`
-	PageUp     string `toml:"page_up"`
-	PageDown   string `toml:"page_down"`
-	Top        string `toml:"top"`
-	Bottom     string `toml:"bottom"`
+	Bind       []KeyBindConfig `toml:"bind"`
+	Help       string          `toml:"help"`
+	CycleMode  string          `toml:"cycle_mode"`
+	AgentSort  string          `toml:"agent_sort"`
+	InboxGroup string          `toml:"inbox_group"`
+	Menu       string          `toml:"menu"`
+	PageUp     string          `toml:"page_up"`
+	PageDown   string          `toml:"page_down"`
+	Top        string          `toml:"top"`
+	Bottom     string          `toml:"bottom"`
 	// SessionPrefix is the key pressed before a session letter, or "alt" to hold alt with it.
 	SessionPrefix string `toml:"session_prefix"`
 	// AgentKeys are handed out in order to the agents of a focused session.

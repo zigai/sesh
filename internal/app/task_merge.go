@@ -26,8 +26,7 @@ const mergeRunVerb = "merge-run"
 var ErrPaneMissing = errors.New("the agent's pane is gone")
 
 type TaskMergeRun struct {
-	Ran      bool
-	ExitCode int
+	ExitCode *int
 	Merged   task.Merged
 	Finished bool
 }
@@ -51,7 +50,7 @@ func (local *Local) mergeTask(ctx context.Context, _ action.Caller, input action
 // the task once its branch is on the base. The finish closes the popup session this runs in, so
 // it runs in its own session and the hangup is ignored until it ends.
 func (local *Local) RunTaskMerge(ctx context.Context, id string, streams gotmux.Streams) (TaskMergeRun, error) {
-	run := TaskMergeRun{Ran: false, ExitCode: 0, Merged: task.Merged{Branch: "", Base: ""}, Finished: false}
+	run := TaskMergeRun{ExitCode: nil, Merged: task.Merged{Branch: "", Base: ""}, Finished: false}
 
 	service, err := local.taskService()
 	if err != nil {
@@ -73,9 +72,9 @@ func (local *Local) RunTaskMerge(ctx context.Context, id string, streams gotmux.
 
 	var mergeErr, finishErr error
 
-	run.Ran = true
 	run.Merged, mergeErr = task.MergeBranch(ctx, record.Directory, record.Base, local.cfg.MergeCheckFor(record.Project), streams.Out)
-	run.ExitCode = task.MergeExitCode(mergeErr)
+	exitCode := task.MergeExitCode(mergeErr)
+	run.ExitCode = &exitCode
 
 	if mergeErr == nil {
 		_, _ = fmt.Fprintf(streams.Out, "· merged %s into %s; finishing the task\n", run.Merged.Branch, run.Merged.Base)
@@ -91,7 +90,7 @@ func (local *Local) RunTaskMerge(ctx context.Context, id string, streams gotmux.
 	}
 
 	finished := started
-	finished.Status, finished.ExitCode, finished.FinishedAt = task.RunOK, run.ExitCode, time.Now().Unix()
+	finished.Status, finished.ExitCode, finished.FinishedAt = task.RunOK, exitCode, time.Now().Unix()
 
 	if mergeErr != nil {
 		finished.Status = task.RunFailed

@@ -23,7 +23,7 @@ func TestOpenCreatesATaggedSessionWithAMainWindowInTheRoot(t *testing.T) {
 		t.Fatalf("Open() error = %v", err)
 	}
 
-	if !opened.Created || opened.Adopted || opened.Session.Name != "shop" {
+	if opened.How != project.OpenedCreated || opened.Session.Name != "shop" {
 		t.Fatalf("Open() = %+v, want a created session named shop", opened)
 	}
 
@@ -34,7 +34,7 @@ func TestOpenCreatesATaggedSessionWithAMainWindowInTheRoot(t *testing.T) {
 		t.Fatalf("second Open() error = %v", err)
 	}
 
-	if again.Created || again.Session.ID != opened.Session.ID || len(sessions(t, server)) != before+1 {
+	if again.How != project.OpenedExisting || again.Session.ID != opened.Session.ID || len(sessions(t, server)) != before+1 {
 		t.Fatalf("second Open() = %+v, want the existing session", again)
 	}
 }
@@ -63,7 +63,7 @@ func TestOpenLeavesASessionWithTheProjectNameAloneUnlessAdopting(t *testing.T) {
 		t.Fatalf("adopting Open() error = %v", err)
 	}
 
-	if !opened.Adopted || opened.Session.ID != existing.ID() || windowCount(t, existing) != 2 {
+	if opened.How != project.OpenedAdopted || opened.Session.ID != existing.ID() || windowCount(t, existing) != 2 {
 		t.Fatalf("adopting Open() = %+v, want the existing session with its window kept and main added", opened)
 	}
 

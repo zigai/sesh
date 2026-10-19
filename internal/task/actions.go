@@ -55,8 +55,8 @@ func (s *Service) RecordRun(ctx context.Context, id string, run Run) error {
 	return taskError("record_run", err)
 }
 
-// Retitle names a task's window after the title its agent reports, unless the user renamed the
-// window: a window still named what sesh last named it follows the agent's title.
+// Retitle records the title a task's agent reports and names the task window after it, unless
+// the user renamed the window.
 func (s *Service) Retitle(ctx context.Context, id, title string) (bool, error) {
 	title = windowTitle(title)
 	if title == "" {
@@ -68,24 +68,31 @@ func (s *Service) Retitle(ctx context.Context, id, title string) (bool, error) {
 		return false, taskError("retitle_task", err)
 	}
 
-	if record.Title == title || live.WindowName != record.Title {
+	if record.Title == title {
 		return false, nil
 	}
 
-	window, err := s.server.Window(ctx, live.WindowID)
-	if err != nil {
-		return false, taskError("retitle_task", fmt.Errorf("find task window: %w", err))
-	}
-
-	if err := window.Rename(ctx, title); err != nil {
-		return false, taskError("retitle_task", fmt.Errorf("rename task window: %w", err))
-	}
-
 	record.Title = title
+
+	if live.WindowName == record.WindowName {
+		window, err := s.server.Window(ctx, live.WindowID)
+		if err != nil {
+			return false, taskError("retitle_task", fmt.Errorf("find task window: %w", err))
+		}
+
+		if err := window.Rename(ctx, title); err != nil {
+			return false, taskError("retitle_task", fmt.Errorf("rename task window: %w", err))
+		}
+
+		record.WindowName = title
+	}
 
 	return true, taskError("retitle_task", s.put(ctx, record))
 }
 
 func windowTitle(title string) string {
+	// tmux escapes backslashes in window names, so the name would not read back as set.
+	title = strings.ReplaceAll(strings.ToValidUTF8(title, ""), `\`, "/")
+
 	return strings.Join(strings.FieldsFunc(title, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }), " ")
 }
