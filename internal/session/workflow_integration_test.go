@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -1176,7 +1177,7 @@ func TestWorkflow_DeleteRefusesUnscopedSavedSessionBeforeMutation(t *testing.T) 
 		t.Fatalf("unscoped saved generation was modified: %v", names)
 	}
 
-	assertSavedSessionScopeConflictLog(t, &output, gen.ID)
+	assertSavedSessionScopeConflictLog(t, &output)
 }
 
 func TestWorkflow_DeleteSavedTargetReturnsDurableReceiptAndPreservesLiveSession(t *testing.T) {
@@ -1293,7 +1294,7 @@ func TestWorkflow_DeleteSavedTargetRejectsWrongSessionAndEndpoint(t *testing.T) 
 	}
 }
 
-func assertSavedSessionScopeConflictLog(t *testing.T, output *bytes.Buffer, generationID string) {
+func assertSavedSessionScopeConflictLog(t *testing.T, output *bytes.Buffer) {
 	t.Helper()
 
 	records := decodeWorkflowLogRecords(t, output)
@@ -1308,8 +1309,8 @@ func assertSavedSessionScopeConflictLog(t *testing.T, output *bytes.Buffer, gene
 		t.Fatalf("scope-conflict record = %#v", record)
 	}
 
-	if strings.Contains(output.String(), "fixture") || strings.Contains(output.String(), generationID) {
-		t.Fatalf("scope-conflict log leaked saved identities: %s", output.String())
+	if !strings.Contains(fmt.Sprint(record["error"]), `saved session "fixture" has no endpoint scope`) {
+		t.Fatalf("scope-conflict record lacks its cause: %#v", record)
 	}
 }
 

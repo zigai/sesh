@@ -129,7 +129,9 @@ func (harness peerHarness) request(t *testing.T, id action.ID, input any) remote
 func (harness peerHarness) run(t *testing.T, ctx context.Context, id action.ID, input any) remote.ActionResult {
 	t.Helper()
 
-	return remote.ExecutePeerAction(ctx, harness.options, harness.request(t, id, input))
+	result, _ := remote.ExecutePeerAction(ctx, harness.options, harness.request(t, id, input))
+
+	return result
 }
 
 func (harness peerHarness) liveRef(t *testing.T, ctx context.Context, name string) action.SessionRef {
@@ -222,7 +224,7 @@ func killAndReplay(t *testing.T, ctx context.Context, harness peerHarness, targe
 
 	kill := harness.request(t, action.SessionKill.ID, action.KillSession{Session: target, Force: false})
 
-	first := remote.ExecutePeerAction(ctx, harness.options, kill)
+	first, _ := remote.ExecutePeerAction(ctx, harness.options, kill)
 	if !first.OK {
 		t.Fatalf("kill result = %#v, want success", first)
 	}
@@ -231,7 +233,7 @@ func killAndReplay(t *testing.T, ctx context.Context, harness peerHarness, targe
 		t.Fatal("killed session is still present")
 	}
 
-	replayed := remote.ExecutePeerAction(ctx, harness.options, kill)
+	replayed, _ := remote.ExecutePeerAction(ctx, harness.options, kill)
 	if !replayed.OK || replayed.InvocationID != first.InvocationID || string(replayed.Output) != string(first.Output) {
 		t.Fatalf("replayed result = %#v, want the recorded outcome", replayed)
 	}

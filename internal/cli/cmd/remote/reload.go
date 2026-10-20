@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/zigai/sesh/internal/config"
+	"github.com/zigai/sesh/internal/logging"
 	"github.com/zigai/sesh/internal/remote"
 )
 
@@ -102,30 +103,28 @@ func bridgeRemoteMonitorReloads(
 	defer close(done)
 	defer close(configs)
 
-	failed := false
+	var episode logging.Episode
 
 	for reload := range observed {
+		changed := episode.Observe(reload.Err)
 		if reload.Err != nil {
-			if !failed {
+			if changed {
 				zerolog.Ctx(ctx).Warn().
 					Str("component", "remote_monitor").
 					Str("operation", "reload_config").
 					Str("status", "degraded").
 					Str("reason", "invalid_configuration").
+					Func(logging.Cause(reload.Err)).
 					Msg("remote monitor configuration reload rejected")
 			}
-
-			failed = true
 
 			continue
 		}
 
-		if failed {
+		if changed {
 			zerolog.Ctx(ctx).Info().Str("component", "remote_monitor").Str("operation", "reload_config").
 				Str("status", "recovered").Str("reason", "configuration_valid").Msg("remote monitor configuration reload recovered")
 		}
-
-		failed = false
 
 		enqueueRemoteConfig(ctx, configs, reload.Remote)
 	}

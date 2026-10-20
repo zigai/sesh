@@ -217,15 +217,11 @@ func TestBridgeRemoteMonitorReloadsCoalescesFailuresAndKeepsOutputPrivate(t *tes
 	record := records[0]
 	if record["level"] != "warn" || record["component"] != "remote_monitor" ||
 		record["operation"] != "reload_config" || record["status"] != "degraded" ||
-		record["reason"] != "invalid_configuration" {
+		record["reason"] != "invalid_configuration" || record["error"] != errPrivateReloadFailure.Error() {
 		t.Fatalf("reload warning = %#v", record)
 	}
 
 	assertReloadRecovery(t, records[1])
-
-	if strings.Contains(logs.String(), errPrivateReloadFailure.Error()) || strings.Contains(logs.String(), want.SSHPath) {
-		t.Fatalf("reload warning leaked private data: %s", logs.String())
-	}
 }
 
 func assertReloadRecovery(t *testing.T, record map[string]any) {

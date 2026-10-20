@@ -5,7 +5,6 @@ package agents_test
 import (
 	"bytes"
 	"context"
-	"strings"
 	"testing"
 	"time"
 
@@ -81,7 +80,7 @@ func TestWatchLogsOneDisconnectAndRecoveryPerOutage(t *testing.T) {
 				wantCount = 1
 			}
 
-			if len(records) != wantCount || source.calls != 4 || strings.Contains(logs.String(), errWatchUnavailable.Error()) {
+			if len(records) != wantCount || source.calls != 4 {
 				t.Fatalf("incorrect outage records: %s", logs.String())
 			}
 
@@ -105,6 +104,7 @@ func assertWatchLogRecord(t *testing.T, record map[string]any) {
 		want["level"], want["operation"], want["message"] = "info", "watch_loop", "agent status watch loop started"
 	case "disconnected":
 		want["level"], want["reason"], want["message"] = "warn", "watch_failed", "AHT broker watch disconnected, will retry"
+		want["error"] = errWatchUnavailable.Error()
 
 		if _, ok := record["retry_in"].(float64); !ok {
 			t.Fatal("retry delay must be numeric")
@@ -150,6 +150,7 @@ func assertSnapshotApplicationLogs(t *testing.T, records []map[string]any, quiet
 	want := []map[string]any{{
 		"level": "warn", "component": "agents", "operation": "apply_snapshot", "status": "degraded",
 		"reason": "snapshot_apply_failed", "message": "agent status snapshot could not be applied",
+		"error": errWatchUnavailable.Error(), "error_domain": "agents", "error_code": "snapshot_apply_failed", "error_step": "apply_snapshot",
 	}}
 	if !quiet {
 		want = append(want, map[string]any{

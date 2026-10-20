@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/samber/oops"
 	"github.com/zigai/aht/v2/pkg/aht"
 	"github.com/zigai/aht/v2/pkg/history"
@@ -25,6 +26,7 @@ import (
 	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/inbox"
+	"github.com/zigai/sesh/internal/logging"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/snapshot/store"
 	"github.com/zigai/sesh/internal/task"
@@ -814,9 +816,14 @@ func (s *services) performDeferredAttach(ctx context.Context, target session.Ses
 	}
 
 	if target.ActivePaneID != "" && s.workspace.History != "" {
-		_, _ = session.UpdateState(ctx, s.workspace.History, func(st *session.State) {
+		_, err := session.UpdateState(ctx, s.workspace.History, func(st *session.State) {
 			st.RecordAgentView(target.SemanticIdentity(), target.ActivePaneID)
 		})
+		if err != nil {
+			zerolog.Ctx(ctx).Warn().Str("component", "agents").Str("operation", "record_view").
+				Str("status", "degraded").Str("reason", "history_update_failed").Func(logging.Cause(err)).
+				Msg("agent navigation history was not recorded")
+		}
 	}
 
 	return nil

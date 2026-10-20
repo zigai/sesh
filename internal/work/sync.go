@@ -16,6 +16,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/zigai/sesh/internal/git"
+	"github.com/zigai/sesh/internal/logging"
 	"github.com/zigai/sesh/internal/task"
 )
 
@@ -124,7 +125,7 @@ func refreshItems(ctx context.Context, items []Item) map[string]refresh {
 }
 
 func syncOnTicks(ctx context.Context, store Store, ticks <-chan time.Time) {
-	failing := false
+	var episode logging.Episode
 
 	for {
 		select {
@@ -138,12 +139,15 @@ func syncOnTicks(ctx context.Context, store Store, ticks <-chan time.Time) {
 			return
 		}
 
-		if err != nil && !failing {
+		switch {
+		case !episode.Observe(err):
+		case err != nil:
 			zerolog.Ctx(ctx).Warn().Str("component", "work").Str("operation", "sync_work").
-				Str("status", "degraded").Str("reason", "work_sync_failed").Msg("periodic work sync failed")
+				Str("status", "degraded").Str("reason", "work_sync_failed").Func(logging.Cause(err)).Msg("periodic work sync failed")
+		default:
+			zerolog.Ctx(ctx).Info().Str("component", "work").Str("operation", "sync_work").
+				Str("status", "recovered").Msg("periodic work sync recovered")
 		}
-
-		failing = err != nil
 	}
 }
 

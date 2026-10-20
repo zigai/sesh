@@ -5,6 +5,8 @@ package session
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -14,6 +16,7 @@ import (
 	"github.com/samber/oops"
 
 	"github.com/zigai/sesh/internal/config"
+	"github.com/zigai/sesh/internal/logging"
 )
 
 const (
@@ -28,6 +31,7 @@ const (
 	DefaultHookTimeout  = 30 * time.Second
 	MaxHookCount        = 64
 	hookEnvEntriesCount = 8
+	hookStderrLimit     = 2048
 )
 
 const (
@@ -463,6 +467,22 @@ func (r *HookRunner) runCommand(
 		Int64("timeout_ms", timeout.Milliseconds()).
 		Msg("hook started")
 
+	stderr, stderrErr := openHookStderr()
+	if stderrErr != nil {
+		logger.Warn().
+			Str("component", "hooks").
+			Str("operation", "capture_stderr").
+			Str("hook_event", event.Name).
+			Int("hook_index", index).
+			Str("status", "degraded").
+			Func(logging.Cause(stderrErr)).
+			Msg("hook stderr not captured")
+	} else {
+		defer func() { _ = stderr.Close() }()
+
+		cmd.Stderr = stderr
+	}
+
 	status, elapsed, runErr := runSupervisedCommand(ctx, cmd, timeout, r.now)
 	if runErr != nil {
 		runErr = oops.In("session").Code("hook_execution_failed").With("operation", "execute").
@@ -483,6 +503,8 @@ func (r *HookRunner) runCommand(
 			Int("hook_index", index).
 			Str("status", "failed").
 			Str("reason", "canceled").
+			Func(logging.Cause(runErr)).
+			Func(hookStderrTail(stderr)).
 			Int64("timeout_ms", timeout.Milliseconds()).
 			Int64("duration_ms", elapsed.Milliseconds()).
 			Msg("hook canceled")
@@ -503,6 +525,7 @@ func (r *HookRunner) runCommand(
 			Int("hook_index", index).
 			Str("status", "failed").
 			Str("reason", "deadline_exceeded").
+			Func(hookStderrTail(stderr)).
 			Int64("timeout_ms", timeout.Milliseconds()).
 			Int64("duration_ms", elapsed.Milliseconds()).
 			Msg("hook timed out")
@@ -516,9 +539,9 @@ func (r *HookRunner) runCommand(
 		}, nil
 
 	case HookStatusFailed:
-		exitCode := 1
+		exitCode, reason := -1, "start_failed"
 		if exitErr, ok := errors.AsType[*exec.ExitError](runErr); ok {
-			exitCode = exitErr.ExitCode()
+			exitCode, reason = exitErr.ExitCode(), "execution_failed"
 		}
 
 		logger.Warn().
@@ -527,8 +550,10 @@ func (r *HookRunner) runCommand(
 			Str("hook_event", event.Name).
 			Int("hook_index", index).
 			Str("status", "failed").
-			Str("reason", "execution_failed").
+			Str("reason", reason).
 			Int("exit_code", exitCode).
+			Func(logging.Cause(runErr)).
+			Func(hookStderrTail(stderr)).
 			Int64("timeout_ms", timeout.Milliseconds()).
 			Int64("duration_ms", elapsed.Milliseconds()).
 			Msg("hook failed")
@@ -588,4 +613,62 @@ func (r *HookRunner) buildCmd(ctx context.Context, hook config.HookCommand) *exe
 	cmd.WaitDelay = 0
 
 	return cmd
+}
+
+func openHookStderr() (*os.File, error) {
+	file, err := os.CreateTemp("", "sesh-hook-stderr-*")
+	if err != nil {
+		return nil, fmt.Errorf("create hook stderr file: %w", err)
+	}
+
+	if err := os.Remove(file.Name()); err != nil {
+		_ = file.Close()
+
+		return nil, fmt.Errorf("unlink hook stderr file: %w", err)
+	}
+
+	return file, nil
+}
+
+func hookStderrTail(file *os.File) func(*zerolog.Event) {
+	return func(event *zerolog.Event) {
+		if file == nil {
+			return
+		}
+
+		tail, err := readHookStderrTail(file)
+		if err != nil {
+			event.Str("stderr_error", err.Error())
+
+			return
+		}
+
+		if tail != "" {
+			event.Str("stderr", tail)
+		}
+	}
+}
+
+func readHookStderrTail(file *os.File) (string, error) {
+	info, err := file.Stat()
+	if err != nil {
+		return "", fmt.Errorf("stat hook stderr file: %w", err)
+	}
+
+	offset := max(info.Size()-hookStderrLimit, 0)
+	buf := make([]byte, info.Size()-offset)
+
+	n, err := file.ReadAt(buf, offset)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return "", fmt.Errorf("read hook stderr file: %w", err)
+	}
+
+	tail := string(buf[:n])
+	if offset > 0 {
+		if _, rest, found := strings.Cut(tail, "\n"); found {
+			tail = rest
+		}
+	}
+
+	return strings.TrimSpace(strings.ToValidUTF8(tail, "")), nil
 }

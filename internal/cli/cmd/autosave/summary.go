@@ -15,6 +15,7 @@ var skippedHeadlines = map[string]string{
 	reasonLockBusy:                     "Skipped: another save or restore is running.",
 	reasonTmuxNotRunning:               "Skipped: tmux is not running.",
 	reasonRestorableSessions:           "Skipped: tmux is not running.",
+	reasonCaptureChanged:               "Skipped: tmux changed during the save; the next run retries.",
 	reasonRestorePending:               "Skipped: tmux started after the newest snapshot and its saved sessions are not restored yet.",
 	automation.ReasonRestoreDisabled:   "Not restoring: restore_last_on_start is off.",
 	automation.ReasonRepositoryMissing: "Nothing to restore: no snapshots saved yet.",

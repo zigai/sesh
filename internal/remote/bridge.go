@@ -20,8 +20,10 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"github.com/rs/zerolog"
 	"github.com/samber/oops"
 
+	"github.com/zigai/sesh/internal/logging"
 	"github.com/zigai/sesh/internal/privatefs"
 )
 
@@ -87,6 +89,7 @@ type BridgeServer struct {
 	connections   map[net.Conn]struct{}
 	wg            sync.WaitGroup
 	closeOnce     sync.Once
+	logger        zerolog.Logger
 	closeErr      error
 }
 
@@ -250,6 +253,7 @@ func NewBridgeServer(ctx context.Context, cfg BridgeServerConfig) (*BridgeServer
 		wg:            sync.WaitGroup{},
 		closeOnce:     sync.Once{},
 		closeErr:      nil,
+		logger:        zerolog.Ctx(ctx).With().Str("component", "remote_bridge").Logger(),
 	}
 
 	server.wg.Add(1)
@@ -331,10 +335,24 @@ func (server *BridgeServer) serve() {
 	for {
 		connection, err := server.listener.Accept()
 		if err != nil {
+			if !server.closed.Load() {
+				server.logger.Error().Str("operation", "accept").Str("status", "failed").Str("reason", "listener_failed").
+					Func(logging.Cause(err)).Msg("bridge listener stopped unexpectedly")
+			}
+
 			return
 		}
 
-		if server.closed.Load() || !server.admit(connection) {
+		if server.closed.Load() {
+			_ = connection.Close()
+
+			continue
+		}
+
+		if !server.admit(connection) {
+			server.logger.Warn().Str("operation", "accept").Str("status", "skipped").Str("reason", "capacity").
+				Msg("bridge connection refused at capacity")
+
 			_ = connection.Close()
 
 			continue
@@ -389,7 +407,7 @@ func (server *BridgeServer) handleConnection(connection net.Conn) {
 	<-server.handshakes
 
 	if err != nil || authMessage.Type != TypeAuthRequest || !server.authenticated(authMessage.Token) {
-		_ = WriteMessage(connection, Message{
+		_ = server.reply(connection, err, Message{
 			Type: TypeAuthResponse, Token: "", OK: false, Error: "unauthorized",
 			OriginID: "", OriginLabel: "", CatalogGeneration: 0, Sessions: nil, TargetID: "",
 			TargetServerPID: 0, TargetServerStartedAt: time.Time{}, TargetCreatedAt: time.Time{},
@@ -398,7 +416,7 @@ func (server *BridgeServer) handleConnection(connection net.Conn) {
 		return
 	}
 
-	if err := WriteMessage(connection, Message{
+	if err := server.reply(connection, nil, Message{
 		Type: TypeAuthResponse, Token: "", OK: true, Error: "",
 		OriginID: "", OriginLabel: "", CatalogGeneration: 0, Sessions: nil, TargetID: "",
 		TargetServerPID: 0, TargetServerStartedAt: time.Time{}, TargetCreatedAt: time.Time{},
@@ -436,7 +454,7 @@ func (server *BridgeServer) authenticated(token string) bool {
 func (server *BridgeServer) handleCatalogRequest(connection net.Conn) {
 	sessions, err := server.listSessions()
 	if err != nil {
-		_ = WriteMessage(connection, Message{
+		_ = server.reply(connection, err, Message{
 			Type: TypeCatalogResponse, Token: "", OK: false, Error: "catalog_failed",
 			OriginID: "", OriginLabel: "", CatalogGeneration: 0, Sessions: nil, TargetID: "",
 			TargetServerPID: 0, TargetServerStartedAt: time.Time{}, TargetCreatedAt: time.Time{},
@@ -447,7 +465,7 @@ func (server *BridgeServer) handleCatalogRequest(connection net.Conn) {
 
 	generation := server.generation.Add(1)
 
-	_ = WriteMessage(connection, Message{
+	_ = server.reply(connection, nil, Message{
 		Type: TypeCatalogResponse, Token: "", OK: true, Error: "",
 		OriginID: server.originID, OriginLabel: server.originLabel, CatalogGeneration: generation,
 		Sessions: sessions, TargetID: "",
@@ -457,7 +475,7 @@ func (server *BridgeServer) handleCatalogRequest(connection net.Conn) {
 
 func (server *BridgeServer) handleSwitchRequest(connection net.Conn, message Message) {
 	if message.TargetID == "" {
-		_ = WriteMessage(connection, Message{
+		_ = server.reply(connection, nil, Message{
 			Type: TypeSwitchResponse, Token: "", OK: false, Error: "empty_target",
 			OriginID: "", OriginLabel: "", CatalogGeneration: 0, Sessions: nil, TargetID: "",
 			TargetServerPID: 0, TargetServerStartedAt: time.Time{}, TargetCreatedAt: time.Time{},
@@ -467,7 +485,7 @@ func (server *BridgeServer) handleSwitchRequest(connection net.Conn, message Mes
 	}
 
 	if message.CatalogGeneration == 0 || message.CatalogGeneration != server.generation.Load() {
-		_ = WriteMessage(connection, Message{
+		_ = server.reply(connection, nil, Message{
 			Type: TypeSwitchResponse, Token: "", OK: false, Error: "catalog_failed",
 			OriginID: "", OriginLabel: "", CatalogGeneration: 0, Sessions: nil, TargetID: "",
 			TargetServerPID: 0, TargetServerStartedAt: time.Time{}, TargetCreatedAt: time.Time{},
@@ -478,7 +496,7 @@ func (server *BridgeServer) handleSwitchRequest(connection net.Conn, message Mes
 
 	sessions, err := server.listSessions()
 	if err != nil {
-		_ = WriteMessage(connection, Message{
+		_ = server.reply(connection, err, Message{
 			Type: TypeSwitchResponse, Token: "", OK: false, Error: "catalog_failed",
 			OriginID: "", OriginLabel: "", CatalogGeneration: 0, Sessions: nil, TargetID: "",
 			TargetServerPID: 0, TargetServerStartedAt: time.Time{}, TargetCreatedAt: time.Time{},
@@ -495,7 +513,7 @@ func (server *BridgeServer) handleSwitchRequest(connection net.Conn, message Mes
 		if session.TmuxServerPID != message.TargetServerPID ||
 			!session.TmuxServerStartedAt.Equal(message.TargetServerStartedAt) ||
 			!session.SessionCreatedAt.Equal(message.TargetCreatedAt) {
-			_ = WriteMessage(connection, Message{
+			_ = server.reply(connection, nil, Message{
 				Type: TypeSwitchResponse, Token: "", OK: false, Error: "target_changed",
 				OriginID: "", OriginLabel: "", CatalogGeneration: 0, Sessions: nil, TargetID: "",
 				TargetServerPID: 0, TargetServerStartedAt: time.Time{}, TargetCreatedAt: time.Time{},
@@ -508,7 +526,7 @@ func (server *BridgeServer) handleSwitchRequest(connection net.Conn, message Mes
 		server.switchTarget.Store(&target)
 		server.switchOnce.Do(func() { close(server.switchNotify) })
 
-		_ = WriteMessage(connection, Message{
+		_ = server.reply(connection, nil, Message{
 			Type: TypeSwitchResponse, Token: "", OK: true, Error: "",
 			OriginID: "", OriginLabel: "", CatalogGeneration: 0, Sessions: nil, TargetID: "",
 			TargetServerPID: 0, TargetServerStartedAt: time.Time{}, TargetCreatedAt: time.Time{},
@@ -517,11 +535,26 @@ func (server *BridgeServer) handleSwitchRequest(connection net.Conn, message Mes
 		return
 	}
 
-	_ = WriteMessage(connection, Message{
+	_ = server.reply(connection, nil, Message{
 		Type: TypeSwitchResponse, Token: "", OK: false, Error: "unknown_target",
 		OriginID: "", OriginLabel: "", CatalogGeneration: 0, Sessions: nil, TargetID: "",
 		TargetServerPID: 0, TargetServerStartedAt: time.Time{}, TargetCreatedAt: time.Time{},
 	})
+}
+
+func (server *BridgeServer) reply(connection net.Conn, cause error, message Message) error {
+	if !message.OK {
+		server.logger.Warn().Str("operation", string(message.Type)).Str("status", "rejected").Str("reason", message.Error).
+			Func(logging.Cause(cause)).Msg("bridge request rejected")
+	}
+
+	err := WriteMessage(connection, message)
+	if err != nil {
+		server.logger.Warn().Str("operation", string(message.Type)).Str("status", "failed").Str("reason", "write_failed").
+			Func(logging.Cause(err)).Msg("bridge response was not delivered")
+	}
+
+	return err
 }
 
 func validateMessage(message Message) error {

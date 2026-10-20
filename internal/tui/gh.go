@@ -10,9 +10,11 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/rs/zerolog"
 
 	"github.com/zigai/sesh/internal/display"
 	"github.com/zigai/sesh/internal/display/layout"
+	"github.com/zigai/sesh/internal/logging"
 	"github.com/zigai/sesh/internal/tui/providers"
 )
 
@@ -205,13 +207,19 @@ func queryGH(ctx context.Context, ghPath string, target ghTarget, now time.Time)
 
 	command.Stdout = output
 	if err := command.Run(); err != nil {
+		logGHFailure(ctx, "gh_failed", err)
+
 		entry.pr.State, entry.ci.State = layout.Pending, layout.Pending
+
 		return entry
 	}
 
 	var results []ghPullRequest
 	if err := json.Unmarshal([]byte(output.String()), &results); err != nil {
+		logGHFailure(ctx, "gh_output_invalid", err)
+
 		entry.pr.State, entry.ci.State = layout.Pending, layout.Pending
+
 		return entry
 	}
 
@@ -271,4 +279,18 @@ func ghCheckPending(check ghCheck) bool {
 	}
 
 	return strings.ToUpper(check.Status) != "COMPLETED"
+}
+
+func logGHFailure(ctx context.Context, reason string, err error) {
+	if ctx.Err() != nil {
+		return
+	}
+
+	zerolog.Ctx(ctx).Warn().
+		Str("component", "tui").
+		Str("operation", "query_pull_request").
+		Str("status", "degraded").
+		Str("reason", reason).
+		Func(logging.Cause(err)).
+		Msg("pull request state could not be read")
 }

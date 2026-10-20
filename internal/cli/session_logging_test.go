@@ -18,5 +18,5 @@ func TestSessionLoggingOutcomeOwnership(t *testing.T) {
 		t.Fatalf("list on empty server returned error: %v", err)
 	}
 
-	assertRuntimeLog(t, logPath, "cli", "list", "info", "ok", sockPath, cfg)
+	assertRuntimeLog(t, logPath, "cli", "list", "info", "ok")
 }

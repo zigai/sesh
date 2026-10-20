@@ -17,7 +17,7 @@ import (
 	"github.com/zigai/sesh/internal/remote"
 )
 
-func TestPeerActionLogsReceiptOutcomeWithoutIdentities(t *testing.T) {
+func TestPeerActionLogsReceiptOutcome(t *testing.T) {
 	cases := []struct {
 		code   action.Code
 		level  string
@@ -35,11 +35,11 @@ func TestPeerActionLogsReceiptOutcomeWithoutIdentities(t *testing.T) {
 
 			ctx := zerolog.New(&logs).WithContext(t.Context())
 			logPeerActionResult(ctx, remote.ActionResult{
-				InvocationID: "PRIVATE_INVOCATION", Action: action.SessionKill.ID,
+				InvocationID: "invocation-1", Action: action.SessionKill.ID,
 				OK: tc.code == "", Code: tc.code, Output: jsontext.Value(`{"name":"PRIVATE_NAME"}`),
-			})
+			}, nil)
 
-			if bytes.Count(logs.Bytes(), []byte("\n")) != 1 || strings.Contains(logs.String(), "PRIVATE_") {
+			if bytes.Count(logs.Bytes(), []byte("\n")) != 1 || strings.Contains(logs.String(), "PRIVATE_NAME") {
 				t.Fatalf("unexpected receipt log: %s", logs.String())
 			}
 
@@ -49,7 +49,7 @@ func TestPeerActionLogsReceiptOutcomeWithoutIdentities(t *testing.T) {
 			}
 
 			want := map[string]any{
-				"component": "remote", "operation": "remote_peer_action", "action": "session.kill", "level": tc.level,
+				"component": "remote", "operation": "remote_peer_action", "action": "session.kill", "invocation_id": "invocation-1", "level": tc.level,
 				"status": tc.status, "phase": "receipt", "message": "remote action receipt resolved",
 			}
 			if tc.code != "" {

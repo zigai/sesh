@@ -138,7 +138,7 @@ func TestCustomFieldFailureLoggingIsPrivateAndIsolated(t *testing.T) {
 	want := map[string]any{
 		"command": "tui.test", "version": "test-version", "commit": "test-commit", "pid": float64(4242),
 		"component": "tui", "operation": "custom_field_run", "level": zerolog.ErrorLevel.String(), "status": "failed",
-		"reason": "command_failed", "error_code": "operation_failed", "exit_code": float64(3),
+		"reason": "command_failed", zerolog.ErrorFieldName: "run field command: exit status 3", "exit_code": float64(3),
 		"message": "custom field command failed",
 	}
 	if len(records) != 1 || !maps.Equal(records[0], want) {
@@ -180,14 +180,14 @@ func TestCustomFieldCacheFailureIsRetainedAndCloseFlushesAcceptedValue(t *testin
 	want := map[string]any{
 		"command": "tui.test", "version": "test-version", "commit": "test-commit", "pid": float64(4242),
 		"component": "tui", "operation": "custom_field_cache_write", "level": zerolog.ErrorLevel.String(), "status": "failed",
-		"reason": "cache_write_failed", "error_code": "operation_failed",
+		"reason": "cache_write_failed", "field": "blocked", zerolog.ErrorFieldName: "open field cache: unsafe private storage entry",
 		"message": "custom field cache write failed",
 	}
 	if len(records) != 1 || !maps.Equal(records[0], want) {
 		t.Fatalf("cache failure records = %#v, want exactly %#v", records, want)
 	}
 
-	for _, secret := range []string{"private-value", path, filepath.Dir(path), loggingTestPrivacySentinel} {
+	for _, secret := range []string{"private-value", loggingTestPrivacySentinel} {
 		if strings.Contains(logs.String(), secret) {
 			t.Errorf("cache failure logs contain private value %q", secret)
 		}
@@ -272,8 +272,8 @@ func TestOriginSessionDegradationNamesItsCause(t *testing.T) {
 	model.applySessionRows(sessionLoadResultMsg{originQueried: true, originErr: fmt.Errorf("origin: %w", gotmux.ErrNoServer)})
 
 	records := loggingTestRecords(t, &logs)
-	if len(records) != 1 || records[0]["status"] != "degraded" || records[0]["error_code"] != tuiErrorNoServer {
-		t.Fatalf("degradation record = %s, want one record with error_code %q", logs.String(), tuiErrorNoServer)
+	if len(records) != 1 || records[0]["status"] != "degraded" || records[0][zerolog.ErrorFieldName] != "origin: "+gotmux.ErrNoServer.Error() {
+		t.Fatalf("degradation record = %s, want one record naming the missing server", logs.String())
 	}
 }
 
@@ -299,12 +299,17 @@ func assertLoggingTestRecord(
 		"message":   message,
 	}
 	if status == "failed" {
-		want["error_code"] = tuiErrorOperationFailed
+		want["reason"] = tuiErrorOperationFailed
 	}
 
 	if status == "degraded" {
 		want["reason"] = "dependency_unavailable"
-		want["error_code"] = tuiErrorOperationFailed
+	}
+
+	for _, key := range []string{zerolog.ErrorFieldName, "error_domain", "error_code", "error_step"} {
+		if value, ok := record[key]; ok && (status == "failed" || status == "degraded") {
+			want[key] = value
+		}
 	}
 
 	if status == "recovered" {
@@ -492,10 +497,6 @@ func TestLoggingKeepsRecordsOffStdStreams(t *testing.T) {
 
 	assertLoggingTestRecord(t, records[0], tuiOperationSaveState, "info", "ok", "tui operation completed")
 	assertLoggingTestRecord(t, records[1], tuiOperationKillSession, "error", "failed", "tui operation failed")
-
-	if strings.Contains(output.String(), loggingTestPrivacySentinel) {
-		t.Fatalf("log contains raw action error: %s", output.String())
-	}
 }
 
 func TestSessionActionLoggingDefersOnlyPendingPopupOperations(t *testing.T) {
@@ -680,10 +681,6 @@ func TestSessionActionLoggingMapsSuccessAndConsumedFailure(t *testing.T) {
 		assertLoggingTestRecord(t, records[index*2], operation, "info", "ok", "tui operation completed")
 		assertLoggingTestRecord(t, records[index*2+1], operation, "error", "failed", "tui operation failed")
 	}
-
-	if strings.Contains(output.String(), loggingTestPrivacySentinel) {
-		t.Fatalf("log contains raw action error: %s", output.String())
-	}
 }
 
 func TestLoaderLoggingRecordsOnlyHealthTransitions(t *testing.T) {
@@ -748,16 +745,6 @@ func TestLoaderLoggingRecordsOnlyHealthTransitions(t *testing.T) {
 	for index, expected := range want {
 		assertLoggingTestRecord(t, records[index], expected.operation, expected.level, expected.status, expected.message)
 	}
-
-	for _, sentinel := range []string{
-		errLoggingTestCatalogFailure.Error(),
-		errLoggingTestAgentFailure.Error(),
-		errLoggingTestRemoteFailure.Error(),
-	} {
-		if strings.Contains(output.String(), sentinel) {
-			t.Fatalf("loader log contains raw error %q: %s", sentinel, output.String())
-		}
-	}
 }
 
 func TestLoaderLoggingRecordsPartialCatalogReloadAsOneDegradation(t *testing.T) {
@@ -794,10 +781,6 @@ func TestLoaderLoggingRecordsPartialCatalogReloadAsOneDegradation(t *testing.T) 
 
 	assertLoggingTestRecord(t, records[0], tuiOperationLoadCatalog, "warn", "degraded", "tui dependency degraded")
 	assertLoggingTestRecord(t, records[1], tuiOperationLoadCatalog, "info", "recovered", "tui dependency recovered")
-
-	if strings.Contains(output.String(), errLoggingTestCatalogFailure.Error()) {
-		t.Fatalf("loader log contains raw error: %s", output.String())
-	}
 }
 
 func TestLoaderLoggingKeepsHealthyLoadsSilent(t *testing.T) {
@@ -1074,8 +1057,8 @@ func TestCreateDirectoryAndStateSaveLoggingBoundaries(t *testing.T) {
 	)
 	assertLoggingTestRecord(t, records[1], tuiOperationSaveState, "error", "failed", "tui operation failed")
 
-	if strings.Contains(output.String(), "TOP_SECRET") {
-		t.Fatalf("boundary log contains private input, error, or status: %s", output.String())
+	if strings.Contains(output.String(), loggingTestPrivacySentinel) {
+		t.Fatalf("boundary log contains typed input: %s", output.String())
 	}
 }
 
@@ -1102,7 +1085,7 @@ func TestConfirmWithoutPendingActionDoesNotLogSuccess(t *testing.T) {
 	}
 }
 
-func TestSnapshotActionLoggingUsesFixedPrivateSchema(t *testing.T) {
+func TestSnapshotActionLoggingUsesFixedSchema(t *testing.T) {
 	var output bytes.Buffer
 
 	model := loggingTestModel(t, &output)
@@ -1122,10 +1105,6 @@ func TestSnapshotActionLoggingUsesFixedPrivateSchema(t *testing.T) {
 
 	assertLoggingTestRecord(t, records[0], tuiOperationSnapshotSession, "error", "failed", "tui operation failed")
 	assertLoggingTestRecord(t, records[1], tuiOperationSnapshotSession, "info", "ok", "tui operation completed")
-
-	if strings.Contains(output.String(), loggingTestPrivacySentinel) {
-		t.Fatalf("snapshot log contains raw action error: %s", output.String())
-	}
 }
 
 func TestLogTUIFailureClassification(t *testing.T) {
@@ -1257,8 +1236,8 @@ func checkFailureClassification(t *testing.T, tt failureClassificationCase) {
 	}
 
 	record := records[0]
-	if record["error_code"] != tt.wantCode {
-		t.Errorf("error_code = %q, want %q", record["error_code"], tt.wantCode)
+	if record["reason"] != tt.wantCode {
+		t.Errorf("reason = %q, want %q", record["reason"], tt.wantCode)
 	}
 
 	if record["component"] != "tui" || record["operation"] != string(tuiOperationEnterLiveSession) ||
@@ -1268,8 +1247,8 @@ func checkFailureClassification(t *testing.T, tt failureClassificationCase) {
 
 	assertClassificationContext(t, record, tt)
 
-	if strings.Contains(output.String(), "secret details") || strings.Contains(output.String(), loggingTestPrivacySentinel) {
-		t.Fatalf("log contains raw error: %s", output.String())
+	if tt.err != nil && record[zerolog.ErrorFieldName] != tt.err.Error() {
+		t.Errorf("error = %q, want %q", record[zerolog.ErrorFieldName], tt.err.Error())
 	}
 }
 
@@ -1279,7 +1258,7 @@ func assertAllowedFailureFields(t *testing.T, record map[string]any) {
 	for field := range record {
 		switch field {
 		case "command", "version", "commit", "pid", "component",
-			"operation", "level", "status", "message", "error_code":
+			"operation", "level", "status", "message", "reason", zerolog.ErrorFieldName, "error_domain", "error_code", "error_step":
 		default:
 			t.Errorf("record field %q = %#v, want only the fixed failure schema", field, record[field])
 		}
@@ -1302,7 +1281,7 @@ func assertClassificationContext(t *testing.T, record map[string]any, tt failure
 	}
 }
 
-func TestInboxSaveAndOpenLogOnlyFailuresWithAFixedPrivateSchema(t *testing.T) {
+func TestInboxSaveAndOpenLogOnlyFailures(t *testing.T) {
 	var output bytes.Buffer
 
 	model := loggingTestModel(t, &output)
@@ -1319,12 +1298,8 @@ func TestInboxSaveAndOpenLogOnlyFailuresWithAFixedPrivateSchema(t *testing.T) {
 
 	assertLoggingTestRecord(t, records[0], tuiOperationSaveInbox, "error", "failed", "tui operation failed")
 
-	if open := records[1]; open["operation"] != string(tuiOperationOpen) || open["level"] != "error" || open["error_code"] != "not_found" {
-		t.Fatalf("open failure record = %#v, want an error with code not_found", open)
-	}
-
-	if strings.Contains(output.String(), loggingTestPrivacySentinel) {
-		t.Fatalf("log contains a raw error or path: %s", output.String())
+	if open := records[1]; open["operation"] != string(tuiOperationOpen) || open["level"] != "error" || open["reason"] != "not_found" {
+		t.Fatalf("open failure record = %#v, want an error with reason not_found", open)
 	}
 }
 

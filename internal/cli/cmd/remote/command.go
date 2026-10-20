@@ -25,6 +25,7 @@ import (
 	cmdpicker "github.com/zigai/sesh/internal/cli/cmd/picker"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/integration/tmuxserver"
+	"github.com/zigai/sesh/internal/logging"
 	"github.com/zigai/sesh/internal/privatefs"
 	"github.com/zigai/sesh/internal/remote"
 	"github.com/zigai/sesh/internal/session"
@@ -418,19 +419,19 @@ func runRemotePeerAction(cmd *cobra.Command, _ []string) (resultErr error) {
 	}()
 
 	allowed := actions(workspace.Config)
-	result := remote.ExecutePeerAction(clibase.CommandContext(cmd), remote.PeerActionOptions{
+	result, resultCause := remote.ExecutePeerAction(clibase.CommandContext(cmd), remote.PeerActionOptions{
 		PeerID:     runtime.peerID,
 		Receipts:   runtime.receipts,
 		Allowed:    func(id action.ID) bool { return slices.Contains(allowed, id) },
 		Dispatcher: local,
 		Now:        nil,
 	}, request)
-	logPeerActionResult(clibase.CommandContext(cmd), result)
+	logPeerActionResult(clibase.CommandContext(cmd), result, resultCause)
 
 	return cliError("write_remote_action_result", remote.WriteActionResult(cmd.OutOrStdout(), result))
 }
 
-func logPeerActionResult(ctx context.Context, result remote.ActionResult) {
+func logPeerActionResult(ctx context.Context, result remote.ActionResult, cause error) {
 	level, status, reason := zerolog.InfoLevel, "ok", ""
 	if !result.OK {
 		level, status, reason = zerolog.ErrorLevel, "failed", string(result.Code)
@@ -440,7 +441,8 @@ func logPeerActionResult(ctx context.Context, result remote.ActionResult) {
 	}
 
 	event := zerolog.Ctx(ctx).WithLevel(level).Str("component", "remote").
-		Str("operation", "remote_peer_action").Str("action", string(result.Action)).Str("status", status).Str("phase", "receipt")
+		Str("operation", "remote_peer_action").Str("action", string(result.Action)).
+		Str("invocation_id", result.InvocationID).Str("status", status).Str("phase", "receipt").Func(logging.Cause(cause))
 	if reason != "" {
 		event.Str("reason", reason)
 	}

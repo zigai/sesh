@@ -17,6 +17,7 @@ import (
 	"github.com/zigai/sesh/internal/display"
 	"github.com/zigai/sesh/internal/display/layout"
 	"github.com/zigai/sesh/internal/fields"
+	"github.com/zigai/sesh/internal/logging"
 	"github.com/zigai/sesh/internal/session"
 )
 
@@ -272,7 +273,8 @@ func (m *Model) saveCustomFieldCache(name string) {
 				Str("operation", "custom_field_cache_write").
 				Str("status", "failed").
 				Str("reason", "cache_write_failed").
-				Str("error_code", classifyTUIErrorCode(err)).
+				Str("field", name).
+				Func(logging.Cause(err)).
 				Msg("custom field cache write failed")
 		}
 
@@ -446,6 +448,6 @@ func logCustomFieldFailure(ctx context.Context, result fields.Result) {
 		Str("status", "failed").
 		Str("reason", "command_failed").
 		Int("exit_code", result.ExitCode).
-		Str("error_code", classifyTUIErrorCode(result.Err)).
+		Func(logging.Cause(result.Err)).
 		Msg("custom field command failed")
 }

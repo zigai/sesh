@@ -13,6 +13,7 @@ import (
 
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/integration/tmuxserver"
+	"github.com/zigai/sesh/internal/logging"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
@@ -205,7 +206,7 @@ func (w *Workflow) fail(ctx context.Context, operation string, err error) error 
 		Str("operation", operation).
 		Str("status", "failed").
 		Str("reason", sessionFailureReason(err)).
-		Msg("session operation failed")
+		Func(logging.Cause(err)).Msg("session operation failed")
 
 	if marked, ok := err.(interface{ OutcomeLogged() bool }); ok && marked.OutcomeLogged() {
 		return err

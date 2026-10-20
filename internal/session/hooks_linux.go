@@ -32,7 +32,6 @@ func runSupervisedCommand(
 
 	cmd.Stdin = nil
 	cmd.Stdout = nil
-	cmd.Stderr = nil
 
 	if err := ctx.Err(); err != nil {
 		return HookStatusCanceled, 0, fmt.Errorf("canceled before start: %w", err)

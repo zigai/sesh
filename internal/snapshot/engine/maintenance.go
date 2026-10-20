@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/samber/oops"
 
+	"github.com/zigai/sesh/internal/logging"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
@@ -136,7 +137,7 @@ func maintenanceFailure(ctx context.Context, operation, phase string, err error)
 		Str("status", "failed").
 		Str("phase", phase).
 		Str("reason", reason).
-		Msg("snapshot maintenance failed")
+		Func(logging.Cause(err)).Msg("snapshot maintenance failed")
 
 	return &maintenanceError{error: oops.In("snapshot").Code(reason).
 		With("operation", operation, "phase", phase).

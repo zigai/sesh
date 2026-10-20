@@ -69,8 +69,12 @@ func testRuntimeStatusListenerLogging(t *testing.T, fail bool) {
 
 	want := map[string]any{
 		"level": "error", "component": "daemon", "operation": "serve_runtime_status", "status": "failed",
-		"reason": "listener_failed", "message": "runtime status listener stopped unexpectedly",
+		"reason": "listener_failed", "message": "runtime status listener stopped unexpectedly", "error": record["error"],
 	}
+	if record["error"] == nil {
+		t.Fatalf("listener failure lacks its cause: %#v", record)
+	}
+
 	if diff := cmp.Diff(want, record); diff != "" {
 		t.Fatalf("incorrect listener failure: %s", diff)
 	}

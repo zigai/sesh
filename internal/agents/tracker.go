@@ -11,6 +11,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/samber/oops"
 	"github.com/zigai/aht/v2/pkg/aht"
+
+	"github.com/zigai/sesh/internal/logging"
 )
 
 type TrackerOptions struct {
@@ -30,6 +32,7 @@ type Tracker struct {
 	paneWindow      map[string]string
 	windowStyles    map[string]string
 	windowWasActive map[string]bool
+	queryEpisode    logging.Episode
 }
 
 func DefaultTrackerOptions() TrackerOptions {
@@ -54,6 +57,7 @@ func NewTracker(tmux StyleController, opts TrackerOptions) *Tracker {
 		paneWindow:      make(map[string]string),
 		windowStyles:    make(map[string]string),
 		windowWasActive: make(map[string]bool),
+		queryEpisode:    logging.Episode{},
 	}
 }
 
@@ -62,14 +66,11 @@ func (t *Tracker) HandleSnapshot(ctx context.Context, sessions []aht.Session) er
 	defer t.mu.Unlock()
 
 	activePanes, err := t.tmux.ActivePanes(ctx)
-	if err != nil {
-		zerolog.Ctx(ctx).Warn().
-			Str("component", "agents").
-			Str("operation", "handle_snapshot").
-			Str("status", "skipped").
-			Str("reason", "tmux_query_failed").
-			Msg("agent status cycle skipped")
+	if t.queryEpisode.Observe(err) {
+		logQueryEpisode(ctx, err)
+	}
 
+	if err != nil {
 		return nil
 	}
 
@@ -378,4 +379,17 @@ func isWindowActive(windowID string, activePanes map[string]ActivePane) bool {
 	}
 
 	return false
+}
+
+func logQueryEpisode(ctx context.Context, err error) {
+	if err == nil {
+		zerolog.Ctx(ctx).Info().Str("component", "agents").Str("operation", "handle_snapshot").
+			Str("status", "recovered").Msg("agent status cycles resumed")
+
+		return
+	}
+
+	zerolog.Ctx(ctx).Warn().Str("component", "agents").Str("operation", "handle_snapshot").
+		Str("status", "skipped").Str("reason", "tmux_query_failed").Func(logging.Cause(err)).
+		Msg("agent status cycles skipped until tmux answers")
 }

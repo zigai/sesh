@@ -71,16 +71,22 @@ func runFinishTicks(t *testing.T, results ...error) []map[string]any {
 	return decodeRecords(t, &logs)
 }
 
-var scanFailed = map[string]any{
-	"level": "warn", "component": "task", "operation": "finish_merged_tasks", "status": "degraded",
-	"reason": "task_scan_failed", "message": "periodic merged task finish failed",
-}
+var (
+	scanFailed = map[string]any{
+		"level": "warn", "component": "task", "operation": "finish_merged_tasks", "status": "degraded",
+		"reason": "task_scan_failed", "message": "periodic merged task finish failed", "error": errPrivateScan.Error(),
+	}
+	scanRecovered = map[string]any{
+		"level": "info", "component": "task", "operation": "finish_merged_tasks", "status": "recovered",
+		"message": "periodic merged task finish recovered",
+	}
+)
 
 func TestRepeatedMergedTaskScanFailuresLogOneRecordPerStreak(t *testing.T) {
 	records := runFinishTicks(t, errPrivateScan, errPrivateScan, nil, errPrivateScan, nil)
 
-	if !reflect.DeepEqual(records, []map[string]any{scanFailed, scanFailed}) {
-		t.Errorf("records = %#v, want one degraded record for each of the two failing streaks", records)
+	if !reflect.DeepEqual(records, []map[string]any{scanFailed, scanRecovered, scanFailed, scanRecovered}) {
+		t.Errorf("records = %#v, want a degraded and a recovered record for each of the two failing streaks", records)
 	}
 }
 
@@ -112,17 +118,17 @@ func TestMergedTaskFinishOutcomesLogTheirReasonWithoutDetails(t *testing.T) {
 	for _, test := range cases {
 		var logs bytes.Buffer
 
-		logMergedTaskFinish(zerolog.New(&logs).WithContext(t.Context()), test.err)
+		logMergedTaskFinish(zerolog.New(&logs).WithContext(t.Context()), "task-1", test.err)
 
-		want := map[string]any{"level": test.level, "component": "task", "operation": "finish_merged_task"}
+		want := map[string]any{"level": test.level, "component": "task", "operation": "finish_merged_task", "task_id": "task-1"}
 		maps.Copy(want, test.want)
 
 		if want["reason"] != nil {
 			want["message"] = "task whose pull request merged was not finished"
+			want["error"] = test.err.Error()
 		}
 
-		if records := decodeRecords(t, &logs); len(records) != 1 || !reflect.DeepEqual(records[0], want) ||
-			strings.Contains(logs.String(), "PRIVATE_") {
+		if records := decodeRecords(t, &logs); len(records) != 1 || !reflect.DeepEqual(records[0], want) {
 			t.Errorf("logMergedTaskFinish(%v) records = %#v, want only %#v", test.err, records, want)
 		}
 	}

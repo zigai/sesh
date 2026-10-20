@@ -67,7 +67,8 @@ func hookDecodeRecords(t *testing.T, logText string) []map[string]any {
 		for key := range record {
 			switch key {
 			case "level", "component", "operation", "hook_event", "hook_index", "status",
-				"reason", "timeout_ms", "duration_ms", "exit_code", "message":
+				"reason", "timeout_ms", "duration_ms", "exit_code", "message",
+				"error", "error_domain", "error_code", "error_step", "stderr":
 			default:
 				t.Fatalf("unexpected hook log field: %s", key)
 			}
@@ -492,7 +493,7 @@ func TestHookIntegrationFailureContinuesAndLogsWarning(t *testing.T) {
 		SessionSwitchPost: []config.HookCommand{
 			{
 				Command: hookTestShell,
-				Args:    []string{"-c", "exit 42"},
+				Args:    []string{"-c", "printf 'first line\\nlast line\\n' >&2; exit 42"},
 				Timeout: "2s",
 			},
 			{
@@ -555,7 +556,46 @@ func TestHookIntegrationFailureContinuesAndLogsWarning(t *testing.T) {
 		"status":     "failed",
 		"reason":     "execution_failed",
 		"exit_code":  float64(42),
+		"stderr":     "first line\nlast line",
 		"message":    "hook failed",
+	})
+}
+
+func TestHookIntegrationFailureLogsOnlyStderrTail(t *testing.T) {
+	cfg := config.HookConfig{
+		SessionSwitchPost: []config.HookCommand{{
+			Command: hookTestShell,
+			Args:    []string{"-c", "head -c 5000 /dev/zero | tr '\\0' x >&2; printf '\\nfinal line\\n' >&2; exit 3"},
+			Timeout: "2s",
+		}},
+	}
+
+	var logOutput bytes.Buffer
+
+	ctx := hookLogContext(t.Context(), &logOutput)
+	runner := session.NewHookRunner(session.HookRunnerDeps{
+		Now:    hookSteppedClock(15 * time.Millisecond),
+		Getenv: nil,
+	})
+
+	_, err := runner.Run(ctx, cfg, session.HookEvent{
+		Name:          session.EventSessionSwitchPost,
+		Action:        "",
+		Phase:         "",
+		PrevSession:   "",
+		Session:       "",
+		PrevSessionID: "",
+		SessionID:     "",
+		Source:        "",
+	})
+	if err != nil {
+		t.Fatalf("Run() err = %v, want nil", err)
+	}
+
+	records := hookDecodeRecords(t, logOutput.String())
+	hookAssertRecord(t, records[1], map[string]any{
+		"message": "hook failed",
+		"stderr":  "final line",
 	})
 }
 

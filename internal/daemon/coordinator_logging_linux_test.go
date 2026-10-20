@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -64,7 +63,7 @@ func TestLifecycleLogsReadinessDrainRecordedFailureAndRecovery(t *testing.T) {
 			}
 
 			lines := bytes.Split(bytes.TrimSpace(logs.Bytes()), []byte("\n"))
-			if len(lines) != len(tc.statuses) || strings.Contains(logs.String(), "PRIVATE_LIFECYCLE_ERROR") {
+			if len(lines) != len(tc.statuses) {
 				t.Fatalf("unexpected lifecycle records: %s", logs.String())
 			}
 
@@ -91,7 +90,7 @@ func assertLifecycleLogRecord(t *testing.T, line []byte, status string) {
 		want["phase"], want["message"] = "final_save", "lifecycle final save started"
 	case "degraded":
 		want["level"], want["reason"], want["recorded"] = "warn", "final_save_incomplete", true
-		want["message"] = "lifecycle final save failure recorded"
+		want["message"], want["error"] = "lifecycle final save failure recorded", errPrivateLifecycle.Error()
 	case "recovered":
 		want["reason"], want["message"] = "lifecycle_canceled", "lifecycle coordinator resumed"
 	}

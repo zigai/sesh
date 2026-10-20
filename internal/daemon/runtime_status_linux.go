@@ -21,6 +21,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	processintegration "github.com/zigai/sesh/internal/integration/process"
+	"github.com/zigai/sesh/internal/logging"
 	"github.com/zigai/sesh/internal/privatefs"
 )
 
@@ -50,6 +51,8 @@ var (
 	ErrRuntimeStatusActive      = errors.New("daemon runtime status endpoint is already active")
 	ErrRuntimeStatusStale       = errors.New("daemon runtime status endpoint is stale")
 	ErrRuntimeStatusPath        = errors.New("daemon runtime status path is invalid")
+
+	errRuntimeStatusTooLarge = errors.New("daemon runtime status reply exceeds the size limit")
 )
 
 type RuntimePhase string
@@ -346,7 +349,7 @@ func (r *RuntimeReporter) serve(ctx context.Context) {
 
 			if !stopping {
 				zerolog.Ctx(ctx).Error().Str("component", "daemon").Str("operation", "serve_runtime_status").
-					Str("status", "failed").Str("reason", "listener_failed").Msg("runtime status listener stopped unexpectedly")
+					Str("status", "failed").Str("reason", "listener_failed").Func(logging.Cause(err)).Msg("runtime status listener stopped unexpectedly")
 			}
 
 			return
@@ -362,7 +365,17 @@ func (r *RuntimeReporter) respond(ctx context.Context, connection *net.UnixConn)
 	peer, err := unixPeerIdentity(connection)
 
 	uid, uidErr := effectiveUID()
-	if err != nil || uidErr != nil || peer.uid != uid {
+	if err := errors.Join(err, uidErr); err != nil {
+		logStatusReplyFailure(ctx, "peer_unidentified", err)
+
+		return
+	}
+
+	if peer.uid != uid {
+		zerolog.Ctx(ctx).Warn().Str("component", "daemon").Str("operation", "serve_runtime_status").
+			Str("status", "skipped").Str("reason", "peer_rejected").Uint32("peer_uid", peer.uid).
+			Msg("runtime status request from another user rejected")
+
 		return
 	}
 
@@ -377,6 +390,8 @@ func (r *RuntimeReporter) respond(ctx context.Context, connection *net.UnixConn)
 	cancel()
 
 	if err != nil {
+		logStatusReplyFailure(ctx, "live_probe_failed", err)
+
 		return
 	}
 
@@ -391,12 +406,26 @@ func (r *RuntimeReporter) respond(ctx context.Context, connection *net.UnixConn)
 	status.InhibitorsHeld = live.InhibitorsHeld
 
 	data, err := json.Marshal(status)
-	if err != nil || len(data) > runtimeStatusMaximumBytes {
+	if err == nil && len(data) > runtimeStatusMaximumBytes {
+		err = errRuntimeStatusTooLarge
+	}
+
+	if err != nil {
+		logStatusReplyFailure(ctx, "encode_failed", err)
+
 		return
 	}
 
-	_ = connection.SetWriteDeadline(time.Now().Add(runtimeStatusWriteDeadline))
-	_, _ = connection.Write(data)
+	deadlineErr := connection.SetWriteDeadline(time.Now().Add(runtimeStatusWriteDeadline))
+	if _, err := connection.Write(data); err != nil {
+		logStatusReplyFailure(ctx, "write_failed", errors.Join(deadlineErr, err))
+	}
+}
+
+func logStatusReplyFailure(ctx context.Context, reason string, err error) {
+	zerolog.Ctx(ctx).Warn().Str("component", "daemon").Str("operation", "serve_runtime_status").
+		Str("status", "failed").Str("reason", reason).Func(logging.Cause(err)).
+		Msg("runtime status request was not answered")
 }
 
 func runtimeEndpointID(endpoint string) string {

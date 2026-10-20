@@ -85,7 +85,7 @@ func (m *Model) loadResourceCommand() tea.Cmd {
 
 		rows := providers.ResourceRows(sample, previous, targets)
 		if ctx.Err() == nil {
-			_ = writeResourceCache(cachePath, sample)
+			logCacheWriteFailure(ctx, "resource", writeResourceCache(cachePath, sample))
 		}
 
 		return resourceResultMsg{request: request, sample: sample, rows: rows, err: nil}
@@ -95,6 +95,15 @@ func (m *Model) loadResourceCommand() tea.Cmd {
 func (m *Model) handleResource(msg resourceResultMsg) tea.Cmd {
 	if !m.providerRunner.InFlight(providers.Resource) || msg.request != m.providerRunner.CurrentRequest(providers.Resource) {
 		return m.resourceTickCommand()
+	}
+
+	failure := msg.err
+	if errors.Is(failure, providers.ErrResourceUnsupported) {
+		failure = nil
+	}
+
+	if m.resourceEpisode.Observe(failure) {
+		logProviderEpisode(m.operationContext(), "resource", failure)
 	}
 
 	if msg.err != nil {

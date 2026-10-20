@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/zigai/sesh/internal/logging"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
@@ -18,5 +19,5 @@ func logRecoveryInspectionFailure(ctx context.Context, operation, phase string, 
 
 	zerolog.Ctx(ctx).Warn().Str("component", "snapshot").Str("operation", operation).
 		Str("status", "degraded").Str("phase", phase).Str("reason", "recovery_inspection_failed").
-		Msg("saved session recovery inspection could not be completed")
+		Func(logging.Cause(err)).Msg("saved session recovery inspection could not be completed")
 }

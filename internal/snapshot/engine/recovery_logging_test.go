@@ -85,6 +85,17 @@ func assertRecoveryInspectionRecord(t *testing.T, data []byte, operation, phase 
 		"status": "degraded", "reason": "recovery_inspection_failed",
 		"message": "saved session recovery inspection could not be completed",
 	}
+
+	if record["error"] == nil {
+		t.Fatalf("recovery inspection warning lacks its cause: %#v", record)
+	}
+
+	for _, key := range []string{"error", "error_domain", "error_code", "error_step"} {
+		if value, ok := record[key]; ok {
+			want[key] = value
+		}
+	}
+
 	if diff := cmp.Diff(want, record); diff != "" {
 		t.Fatalf("incorrect recovery inspection warning: %s", diff)
 	}

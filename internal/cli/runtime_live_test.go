@@ -60,11 +60,11 @@ func testLiveCommandOutput(t *testing.T, fail bool) {
 		level, status = "error", "failed"
 	}
 
-	if err := runtime.finish(t.Context(), cause); err != nil {
+	if err := runtime.finish(cause); err != nil {
 		t.Fatal(err)
 	}
 
-	assertRuntimeLog(t, logPath, "cli", "monitor", level, status, "private-protocol-payload", "/private/secret/key", cfg)
+	assertRuntimeLog(t, logPath, "cli", "monitor", level, status)
 
 	if stderr.Len() != 0 || strings.Contains(stdout.String(), `"level"`) {
 		t.Fatal("logging contaminated live output")

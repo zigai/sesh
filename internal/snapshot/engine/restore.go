@@ -17,6 +17,7 @@ import (
 	"github.com/zigai/sesh/internal/errorstep"
 	"github.com/zigai/sesh/internal/integration/process"
 	"github.com/zigai/sesh/internal/integration/tmuxserver"
+	"github.com/zigai/sesh/internal/logging"
 	"github.com/zigai/sesh/internal/snapshot/model"
 	"github.com/zigai/sesh/internal/snapshot/restore"
 	"github.com/zigai/sesh/internal/snapshot/store"
@@ -240,6 +241,7 @@ func abandonRestore(ctx context.Context, repository *store.Repository, operation
 	zerolog.Ctx(ctx).Warn().
 		Str("component", "snapshot").
 		Str("operation", "restore").
+		Str("restore_id", operationID).
 		Str("status", "abandoned").
 		Str("reason", reason).
 		Int("uncertain", len(status.Uncertain)).
@@ -334,6 +336,7 @@ func executeRestore(
 	plan, override, generation, skipped, err := prepareRestorePlan(ctx, repository, server, cfg)
 	result.Generation = generation
 	result.SessionsSkipped = skipped
+	ctx = zerolog.Ctx(ctx).With().Str("generation", generation).Logger().WithContext(ctx)
 
 	if err != nil {
 		result.Reason = planFailureReason(result.Reason, err)
@@ -344,6 +347,7 @@ func executeRestore(
 	daemon, op, ledger, admissionPhase, err := establishRestoreIntent(ctx, repository, server, cfg, generation, plan, override)
 	if op.ID != "" {
 		result.OperationID = op.ID
+		ctx = zerolog.Ctx(ctx).With().Str("restore_id", op.ID).Logger().WithContext(ctx)
 	}
 
 	if err != nil {
@@ -1282,7 +1286,8 @@ func restoreFailure(ctx context.Context, phase string, err error) error {
 		Str("status", "failed").
 		Str("phase", phase).
 		Str("reason", reason).
-		Int64("duration_ms", restoreDuration(ctx))
+		Int64("duration_ms", restoreDuration(ctx)).
+		Func(logging.Cause(err))
 
 	if verification, ok := errors.AsType[*verificationError](err); ok {
 		event = event.Int("mismatches", len(verification.report.Mismatches)).

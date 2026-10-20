@@ -681,14 +681,14 @@ func TestCLIAgentLatestNoTargetPreservesActiveWindow(t *testing.T) {
 		t.Fatalf("envelope = %+v", envelope)
 	}
 
-	assertAgentLatestFailureLog(t, logPath, fixture.socket, fixture.statePath, fixture.current.PaneID, fixture.target.PaneID)
+	assertAgentLatestFailureLog(t, logPath)
 
 	if got := activeWindow(t, t.Context(), fixture.server, fixture.current.SessionID); got != fixture.current.WindowID {
 		t.Fatalf("active window changed to %q", got)
 	}
 }
 
-func assertAgentLatestFailureLog(t *testing.T, logPath string, privateValues ...string) {
+func assertAgentLatestFailureLog(t *testing.T, logPath string) {
 	t.Helper()
 
 	data, err := os.ReadFile(logPath)
@@ -703,7 +703,10 @@ func assertAgentLatestFailureLog(t *testing.T, logPath string, privateValues ...
 
 	expected := []map[string]any{
 		{"level": "info", "component": "cli", "operation": "latest", "status": "started"},
-		{"level": "error", "component": "cli", "operation": "latest", "status": "failed", "reason": "notFound"},
+		{
+			"level": "error", "component": "cli", "operation": "latest", "status": "failed", "reason": "notFound",
+			"error": "no candidate agent pane found", "error_step": "latest_idle",
+		},
 	}
 	for index, fields := range expected {
 		var record map[string]any
@@ -715,12 +718,6 @@ func assertAgentLatestFailureLog(t *testing.T, logPath string, privateValues ...
 			if record[key] != want {
 				t.Fatalf("record[%s] = %v, want %v", key, record[key], want)
 			}
-		}
-	}
-
-	for _, private := range privateValues {
-		if strings.Contains(string(data), private) {
-			t.Fatalf("private value in log = %s", data)
 		}
 	}
 }

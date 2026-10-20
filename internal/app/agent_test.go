@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -28,7 +27,7 @@ func TestAgentViewHistoryFailureLogsDegradationWithoutIdentity(t *testing.T) {
 	ctx := zerolog.New(&logs).WithContext(t.Context())
 	local.recordAgentView(ctx, agents.PaneLocation{SessionName: "PRIVATE_SESSION", PaneID: "PRIVATE_PANE", ServerSocket: "PRIVATE_SOCKET"})
 
-	if bytes.Count(logs.Bytes(), []byte("\n")) != 1 || strings.Contains(logs.String(), "PRIVATE_") {
+	if bytes.Count(logs.Bytes(), []byte("\n")) != 1 {
 		t.Fatalf("incorrect history logging: %s", logs.String())
 	}
 
@@ -40,8 +39,9 @@ func TestAgentViewHistoryFailureLogsDegradationWithoutIdentity(t *testing.T) {
 	want := map[string]any{
 		"level": "warn", "component": "agents", "operation": "record_view", "status": "degraded",
 		"reason": "history_update_failed", "message": "agent navigation history was not recorded",
+		"error_domain": "session", "error_code": "history_failed", "error_step": "update_history",
 	}
-	if len(record) != len(want) {
+	if record["error"] == nil || len(record) != len(want)+1 {
 		t.Fatalf("unexpected history schema: %s", logs.String())
 	}
 

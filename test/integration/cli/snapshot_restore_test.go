@@ -46,7 +46,7 @@ func TestApplicationRestoreReportsBestEffortWithSettledReceipt(t *testing.T) {
 		t.Fatalf("restored session absent: %v", err)
 	}
 
-	assertRuntimeLog(t, logPath, "snapshot", "restore", "warn", "best_effort", repoPath, cfg, name, operationID)
+	assertRuntimeLog(t, logPath, "snapshot", "restore", "warn", "best_effort")
 	assertCompletedRestoreOperation(t, repoPath, operationID)
 
 	if _, err := target.FindSession(t.Context(), name); err != nil {

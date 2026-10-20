@@ -202,7 +202,7 @@ func LookupInvocation(dir *privatefs.Dir, id string) (Invocation, error) {
 
 	fence, fenceErr := readReplayFence(dir)
 	if fenceErr != nil {
-		return Invocation{}, err
+		return Invocation{}, fenceErr
 	}
 
 	tombstone, ok := fence.Tombstones[id]
