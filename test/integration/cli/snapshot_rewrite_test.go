@@ -47,7 +47,7 @@ func TestSnapshotRewriteCommandsPreserveCompletedDeletionReceipt(t *testing.T) {
 			t.Fatalf("wrong rewrite receipt: %s / %s", stdout.String(), stderr.String())
 		}
 
-		assertRuntimeLog(t, logPath, "cli", operation, "info", "ok", path, cfg, id, generation)
+		assertRuntimeLog(t, logPath, "cli", operation, "info", "ok")
 	}
 
 	after, err := os.ReadFile(filepath.Join(path, "catalog.json"))

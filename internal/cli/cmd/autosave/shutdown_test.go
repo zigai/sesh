@@ -13,7 +13,7 @@ import (
 	"github.com/zigai/sesh/internal/automation"
 )
 
-func TestStartupWarnsOnlyWhenThePreviousBootEndedWithoutAFinalSave(t *testing.T) {
+func TestStartupWarnsWhenThePreviousBootEndedWithoutAFinalSaveOrCannotBeChecked(t *testing.T) {
 	t.Parallel()
 
 	const boot = int64(1_000_000)
@@ -23,14 +23,14 @@ func TestStartupWarnsOnlyWhenThePreviousBootEndedWithoutAFinalSave(t *testing.T)
 		lastSaved int64
 		finalSave int64
 		status    string
-		wantWarn  bool
+		wantWarn  string
 	}{
-		{"no save recorded", 0, 0, "missing", false},
-		{"saved since this boot", boot + 60, 0, "missing", false},
-		{"final save after the last save", boot - 600, boot - 300, "written", false},
-		{"final save older than the last save", boot - 600, boot - 9000, "written", true},
-		{"no final save ever", boot - 600, 0, "missing", true},
-		{"final save status unreadable", boot - 600, 0, "corrupt", false},
+		{"no save recorded", 0, 0, "missing", ""},
+		{"saved since this boot", boot + 60, 0, "missing", ""},
+		{"final save after the last save", boot - 600, boot - 300, "written", ""},
+		{"final save older than the last save", boot - 600, boot - 9000, "written", reasonFinalSaveMissing},
+		{"no final save ever", boot - 600, 0, "missing", reasonFinalSaveMissing},
+		{"final save status unreadable", boot - 600, 0, "corrupt", reasonFinalSaveUnverifiable},
 	}
 
 	for _, tc := range tests {
@@ -44,9 +44,17 @@ func TestStartupWarnsOnlyWhenThePreviousBootEndedWithoutAFinalSave(t *testing.T)
 			ctx := zerolog.New(&logs).WithContext(t.Context())
 			reportUnsavedShutdown(ctx, statusPath, tc.lastSaved, boot)
 
-			if !tc.wantWarn {
+			if tc.wantWarn == "" {
 				if logs.Len() != 0 {
 					t.Fatalf("unexpected record: %s", logs.Bytes())
+				}
+
+				return
+			}
+
+			if tc.wantWarn == reasonFinalSaveUnverifiable {
+				if !bytes.Contains(logs.Bytes(), []byte(`"reason":"final_save_unverifiable"`)) || !bytes.Contains(logs.Bytes(), []byte(`"error":`)) {
+					t.Fatalf("unverifiable final save record = %s", logs.Bytes())
 				}
 
 				return

@@ -14,6 +14,7 @@ import (
 	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/agents"
+	"github.com/zigai/sesh/internal/logging"
 	"github.com/zigai/sesh/internal/task"
 	"github.com/zigai/sesh/internal/work"
 )
@@ -35,7 +36,8 @@ func (local *Local) FinishMergedTasksEvery(ctx context.Context, interval time.Du
 
 func finishOnTicks(ctx context.Context, ticks <-chan time.Time, scan func(context.Context, map[string]bool) error) {
 	refused := make(map[string]bool)
-	failing := false
+
+	var episode logging.Episode
 
 	for {
 		select {
@@ -49,12 +51,15 @@ func finishOnTicks(ctx context.Context, ticks <-chan time.Time, scan func(contex
 			return
 		}
 
-		if err != nil && !failing {
+		switch {
+		case !episode.Observe(err):
+		case err != nil:
 			zerolog.Ctx(ctx).Warn().Str("component", "task").Str("operation", "finish_merged_tasks").
-				Str("status", "degraded").Str("reason", "task_scan_failed").Msg("periodic merged task finish failed")
+				Str("status", "degraded").Str("reason", "task_scan_failed").Func(logging.Cause(err)).Msg("periodic merged task finish failed")
+		default:
+			zerolog.Ctx(ctx).Info().Str("component", "task").Str("operation", "finish_merged_tasks").
+				Str("status", "recovered").Msg("periodic merged task finish recovered")
 		}
-
-		failing = err != nil
 	}
 }
 
@@ -128,14 +133,14 @@ func (local *Local) finishMergedTask(ctx context.Context, service *task.Service,
 		refused[id] = true
 	}
 
-	logMergedTaskFinish(ctx, err)
+	logMergedTaskFinish(ctx, id, err)
 }
 
-func logMergedTaskFinish(ctx context.Context, err error) {
+func logMergedTaskFinish(ctx context.Context, id string, err error) {
 	logger := zerolog.Ctx(ctx)
 
 	if err == nil {
-		logger.Info().Str("component", "task").Str("operation", "finish_merged_task").Str("status", "ok").
+		logger.Info().Str("component", "task").Str("operation", "finish_merged_task").Str("task_id", id).Str("status", "ok").
 			Msg("finished a task whose pull request merged")
 
 		return
@@ -152,8 +157,8 @@ func logMergedTaskFinish(ctx context.Context, err error) {
 		reason = "finish_run_failed"
 	}
 
-	logger.Warn().Str("component", "task").Str("operation", "finish_merged_task").Str("status", "degraded").
-		Str("reason", reason).Msg("task whose pull request merged was not finished")
+	logger.Warn().Str("component", "task").Str("operation", "finish_merged_task").Str("task_id", id).Str("status", "degraded").
+		Str("reason", reason).Func(logging.Cause(err)).Msg("task whose pull request merged was not finished")
 }
 
 func (local *Local) shownWindows(ctx context.Context) (map[gotmux.WindowID]bool, error) {

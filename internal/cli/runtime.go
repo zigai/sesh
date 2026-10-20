@@ -130,7 +130,7 @@ func ExecuteApplication(ctx context.Context, args []string, input io.Reader, std
 		runErr = errors.Join(runErr, errCommandOutputLimit)
 	}
 
-	closeErr := runtime.finish(ctx, runErr)
+	closeErr := runtime.finish(runErr)
 
 	err := publishCommandOutput(executed, &output, &diagnostics, stdout, stderr, runErr, closeErr)
 	if showBindingFailureMessage(executed, err, stdout, stderr) {
@@ -224,7 +224,7 @@ func getBoolFlag(cmd *cobra.Command, name string) bool {
 func (r *commandRuntime) setupLogging(cmd *cobra.Command) error {
 	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
 	if err != nil {
-		return err
+		return errors.Join(err, r.openLog(cmd, config.DefaultConfig(), zerolog.InfoLevel))
 	}
 
 	level, err := zerolog.ParseLevel(cfg.Settings.LogLevel)
@@ -243,6 +243,19 @@ func (r *commandRuntime) setupLogging(cmd *cobra.Command) error {
 		level = zerolog.WarnLevel
 	}
 
+	if err := r.openLog(cmd, cfg, level); err != nil {
+		return err
+	}
+
+	if r.operation != "save" && r.operation != "restore" {
+		logger := r.logger()
+		logger.Info().Str("component", "cli").Str("operation", r.operation).Str("status", "started").Msg("command started")
+	}
+
+	return nil
+}
+
+func (r *commandRuntime) openLog(cmd *cobra.Command, cfg *config.Config, level zerolog.Level) error {
 	logPath, err := config.GetLogFile(cfg)
 	if err != nil {
 		return oops.In("cli").With("operation", "configure_logging").Wrap(err)
@@ -259,32 +272,38 @@ func (r *commandRuntime) setupLogging(cmd *cobra.Command) error {
 	}
 
 	r.sink.SetLevel(level)
-	logger := r.sink.Logger()
+
+	logger := r.logger()
 	cmd.SetContext(logger.WithContext(cmd.Context()))
 
 	r.started = time.Now()
 
-	if r.operation != "save" && r.operation != "restore" {
-		zerolog.Ctx(cmd.Context()).Info().Str("component", "cli").Str("operation", r.operation).Str("status", "started").Msg("command started")
+	return nil
+}
+
+func (r *commandRuntime) logger() zerolog.Logger {
+	fields := r.sink.Logger().With().Int("pid", os.Getpid()).Str("version", version)
+	if r.cmd != nil {
+		fields = fields.Str("socket", clibase.ResolveSocket(r.cmd))
+		if id := r.cmd.Annotations[clibase.AnnotationAction]; id != "" {
+			fields = fields.Str("action", id)
+		}
 	}
 
-	return nil
+	return fields.Logger()
 }
 
 func quietAgentTracker(cmd *cobra.Command, cfg *config.Config, operation string) bool {
 	return operation == "agent_status_run" && (getBoolFlag(cmd, "quiet") || cfg.ResolvedAgentStatus().Quiet)
 }
 
-func (r *commandRuntime) finish(ctx context.Context, err error) error {
+func (r *commandRuntime) finish(err error) error {
 	if r.sink == nil {
 		return nil
 	}
 
-	logger := r.sink.Logger()
-	ctx = logger.WithContext(ctx)
-
 	if r.ownsOutcome(err) {
-		r.logOutcome(ctx, err)
+		r.logOutcome(err)
 	}
 
 	if closeErr := r.sink.Close(); closeErr != nil {
@@ -294,18 +313,26 @@ func (r *commandRuntime) finish(ctx context.Context, err error) error {
 	return nil
 }
 
-func (r *commandRuntime) logOutcome(ctx context.Context, err error) {
+func (r *commandRuntime) logOutcome(err error) {
 	duration := time.Since(r.started).Milliseconds()
+	logger := r.logger()
 
 	if err == nil {
-		zerolog.Ctx(ctx).Info().Str("component", "cli").Str("operation", r.operation).Str("status", "ok").
+		logger.Info().Str("component", "cli").Str("operation", r.operation).Str("status", "ok").
 			Int64("duration_ms", duration).Msg("command finished")
 
 		return
 	}
 
-	event := zerolog.Ctx(ctx).Error().Str("component", "cli").Str("operation", r.operation).Str("status", "failed").
-		Str("reason", clibase.JSONErrorCode(err)).Int64("duration_ms", duration)
+	if clibase.OnlyErrorCauses(err, context.Canceled) {
+		logger.Info().Str("component", "cli").Str("operation", r.operation).Str("status", "canceled").
+			Int64("duration_ms", duration).Msg("command canceled")
+
+		return
+	}
+
+	event := logger.Error().Str("component", "cli").Str("operation", r.operation).Str("status", "failed").
+		Str("reason", clibase.JSONErrorCode(err)).Int64("duration_ms", duration).Func(logging.Cause(err))
 
 	if step, ok := errorstep.Owned(err, "cli"); ok {
 		event = event.Str("failed_step", step.Operation)

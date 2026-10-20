@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
@@ -102,7 +101,7 @@ func TestFailedOriginRefreshKeepsObservedOriginRows(t *testing.T) {
 	}
 }
 
-func TestOriginSwitchLogsOnlyItsPrivateFailureBoundary(t *testing.T) {
+func TestOriginSwitchLogsOnlyItsFailureBoundary(t *testing.T) {
 	var output bytes.Buffer
 
 	model := loggingTestModel(t, &output)
@@ -118,8 +117,8 @@ func TestOriginSwitchLogsOnlyItsPrivateFailureBoundary(t *testing.T) {
 			t.Fatalf("failed origin switch trace = %+v, detach %t", trace, model.DeferredOriginDetach())
 		}
 	})
-	if leaked != "" || strings.Contains(output.String(), loggingTestPrivacySentinel) {
-		t.Fatal("origin boundary leaked into streams or diagnostic fields")
+	if leaked != "" {
+		t.Fatal("origin boundary leaked into streams")
 	}
 
 	records := loggingTestRecords(t, &output)

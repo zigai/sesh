@@ -12,6 +12,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/samber/oops"
 	gotmux "github.com/zigai/gotmux/tmux"
+
+	"github.com/zigai/sesh/internal/logging"
 )
 
 const (
@@ -580,7 +582,7 @@ func (n *Navigator) replaceHistoryAndActivate(
 		Str("operation", "history_rollback").
 		Str("status", "failed").
 		Str("reason", "rollback_failed").
-		Msg("agent navigation history rollback failed")
+		Func(logging.Cause(rollbackErr)).Msg("agent navigation history rollback failed")
 
 	return errors.Join(enriched, rollbackErr)
 }

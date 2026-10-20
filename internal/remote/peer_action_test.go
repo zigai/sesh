@@ -91,7 +91,7 @@ func resignedRequest(t *testing.T, request ActionRequest) ActionRequest {
 func TestExecutePeerActionRunsTheTypedInputLocally(t *testing.T) {
 	options, dispatcher := peerActionFixture(t)
 
-	result := ExecutePeerAction(t.Context(), options, liveActionRequest(t))
+	result, _ := ExecutePeerAction(t.Context(), options, liveActionRequest(t))
 	if !result.OK || result.Action != action.SessionKill.ID {
 		t.Fatalf("result = %#v, want success", result)
 	}
@@ -149,7 +149,7 @@ func TestExecutePeerActionRefusesBeforeRunning(t *testing.T) {
 			test.mutate(&options, &request)
 			request = resignedRequest(t, request)
 
-			result := ExecutePeerAction(t.Context(), options, request)
+			result, _ := ExecutePeerAction(t.Context(), options, request)
 			if result.OK || result.Code != test.code || dispatcher.callCount() != 0 {
 				t.Fatalf("result = %#v after %d dispatches, want %s without running", result, dispatcher.callCount(), test.code)
 			}
@@ -162,7 +162,7 @@ func TestExecutePeerActionRejectsTamperedIntent(t *testing.T) {
 	request := liveActionRequest(t)
 	request.Input = jsontext.Value(`{"session":{"id":"$2","name":"other"},"force":true}`)
 
-	result := ExecutePeerAction(t.Context(), options, request)
+	result, _ := ExecutePeerAction(t.Context(), options, request)
 	if result.OK || result.Code != action.CodeInvalidArgument || dispatcher.callCount() != 0 {
 		t.Fatalf("tampered request = %#v, want refusal without running", result)
 	}
@@ -172,8 +172,8 @@ func TestExecutePeerActionRunsEachInvocationOnce(t *testing.T) {
 	options, dispatcher := peerActionFixture(t)
 	request := liveActionRequest(t)
 
-	first := ExecutePeerAction(t.Context(), options, request)
-	replayed := ExecutePeerAction(t.Context(), options, request)
+	first, _ := ExecutePeerAction(t.Context(), options, request)
+	replayed, _ := ExecutePeerAction(t.Context(), options, request)
 
 	if dispatcher.callCount() != 1 {
 		t.Fatalf("invocation ran %d times, want once", dispatcher.callCount())
@@ -187,7 +187,7 @@ func TestExecutePeerActionRunsEachInvocationOnce(t *testing.T) {
 	conflicting.Input = jsontext.Value(`{"session":{"id":"$2","name":"other"},"force":false}`)
 	conflicting = resignedRequest(t, conflicting)
 
-	if result := ExecutePeerAction(t.Context(), options, conflicting); result.Code != action.CodeConflict || dispatcher.callCount() != 1 {
+	if result, _ := ExecutePeerAction(t.Context(), options, conflicting); result.Code != action.CodeConflict || dispatcher.callCount() != 1 {
 		t.Fatalf("reused invocation ID = %#v, want conflict without running", result)
 	}
 }
@@ -205,7 +205,7 @@ func TestExecutePeerActionReportsTheActionsFailure(t *testing.T) {
 
 	request := liveActionRequest(t)
 
-	result := ExecutePeerAction(t.Context(), options, request)
+	result, _ := ExecutePeerAction(t.Context(), options, request)
 	if result.OK || result.Code != action.CodeAttached || len(result.Output) == 0 {
 		t.Fatalf("result = %#v, want the action's code and output", result)
 	}
@@ -226,7 +226,7 @@ func TestExecutePeerActionInterruptedWhileRunningIsUncertain(t *testing.T) {
 		return nil, context.Canceled
 	}
 
-	result := ExecutePeerAction(ctx, options, liveActionRequest(t))
+	result, _ := ExecutePeerAction(ctx, options, liveActionRequest(t))
 	if result.OK || result.Code != action.CodeUncertain {
 		t.Fatalf("result = %#v, want an uncertain outcome", result)
 	}
@@ -244,7 +244,7 @@ func TestExecutePeerActionIsUncertainWhenTheReceiptCannotBeResolved(t *testing.T
 		return action.KilledSession{Session: action.SessionRef{}}, nil
 	}
 
-	result := ExecutePeerAction(t.Context(), options, request)
+	result, _ := ExecutePeerAction(t.Context(), options, request)
 	if result.OK || result.Code != action.CodeUncertain {
 		t.Fatalf("result = %#v, want an uncertain outcome when the receipt is lost", result)
 	}

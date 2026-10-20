@@ -67,7 +67,8 @@ func hookDecodeRecords(t *testing.T, logText string) []map[string]any {
 		for key := range record {
 			switch key {
 			case "level", "component", "operation", "hook_event", "hook_index", "status",
-				"reason", "timeout_ms", "duration_ms", "exit_code", "message":
+				"reason", "timeout_ms", "duration_ms", "exit_code", "message",
+				"error", "error_domain", "error_code", "error_step":
 			default:
 				t.Fatalf("unexpected hook log field: %s", key)
 			}

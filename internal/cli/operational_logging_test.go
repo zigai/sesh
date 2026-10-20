@@ -54,11 +54,11 @@ func TestOperationalCommandsPersistFailuresWithoutPrivateDetails(t *testing.T) {
 				t.Fatalf("lost failure: %v", runErr)
 			}
 
-			if err := runtime.finish(t.Context(), runErr); err != nil {
+			if err := runtime.finish(runErr); err != nil {
 				t.Fatal(err)
 			}
 
-			assertRuntimeLog(t, path, "cli", tc.operation, "error", "failed", cfg, errSensitiveRaw.Error())
+			assertRuntimeLog(t, path, "cli", tc.operation, "error", "failed")
 
 			if stdout.Len() != 0 || stderr.Len() != 0 {
 				t.Fatal("logging contaminated command streams")
@@ -79,7 +79,7 @@ func TestSetupTmuxRenderingPersistsSuccessAndKeepsJSONSeparate(t *testing.T) {
 		t.Fatal("setup JSON result contaminated")
 	}
 
-	assertRuntimeLog(t, path, "cli", "setup_tmux", "info", "ok", cfg)
+	assertRuntimeLog(t, path, "cli", "setup_tmux", "info", "ok")
 }
 
 func TestHooksPersistExecutionWithoutRepeatingSuccessOrLeakingOutput(t *testing.T) {
@@ -178,10 +178,12 @@ func assertDisabledAutosaveRecords(t *testing.T, logs []byte) {
 		t.Fatal(err)
 	}
 
-	delete(record, "time")
+	for _, key := range []string{"time", "pid", "socket"} {
+		delete(record, key)
+	}
 
 	want := map[string]any{
-		"level": "info", "component": "snapshot", "operation": "save-if-due", "status": "skipped",
+		"version": "dev", "level": "info", "component": "snapshot", "operation": "save-if-due", "status": "skipped",
 		"reason": "disabled", "message": "automatic snapshot operation skipped",
 	}
 	if diff := cmp.Diff(want, record); diff != "" {
@@ -228,11 +230,11 @@ func TestAgentNavigationCommandsPersistTheirSuccessOutcome(t *testing.T) {
 				t.Fatal(runErr)
 			}
 
-			if err := runtime.finish(t.Context(), runErr); err != nil {
+			if err := runtime.finish(runErr); err != nil {
 				t.Fatal(err)
 			}
 
-			assertRuntimeLog(t, path, "cli", operation, "info", "ok", cfg)
+			assertRuntimeLog(t, path, "cli", operation, "info", "ok")
 
 			if stdout.Len() != 0 || stderr.Len() != 0 {
 				t.Fatal("navigation logs contaminated command streams")
@@ -271,7 +273,7 @@ func testQuietTrackerOutcome(t *testing.T, failed bool) {
 		t.Fatalf("lost tracker outcome: %v", runErr)
 	}
 
-	if err := runtime.finish(t.Context(), runErr); err != nil {
+	if err := runtime.finish(runErr); err != nil {
 		t.Fatal(err)
 	}
 

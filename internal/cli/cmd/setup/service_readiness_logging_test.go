@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -72,6 +74,12 @@ func assertServiceReadinessWarning(t *testing.T, data []byte, scenario string) {
 	}
 	if scenario == "failed" {
 		want["reason"], want["message"], want["failed"] = "service_failed", "automatic save services are failing", float64(1)
+		want["units"] = []any{setup.AutosaveTimerName}
+	} else {
+		want["error"] = record["error"]
+		if !strings.Contains(fmt.Sprint(record["error"]), errPrivateServiceInspection.Error()) {
+			t.Fatalf("readiness warning lacks its cause: %#v", record)
+		}
 	}
 
 	if diff := cmp.Diff(want, record); diff != "" {

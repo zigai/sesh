@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog"
 	gotmux "github.com/zigai/gotmux/tmux"
 
+	"github.com/zigai/sesh/internal/logging"
 	"github.com/zigai/sesh/internal/session"
 )
 
@@ -182,9 +183,36 @@ func logTUIFailure(ctx context.Context, operation tuiLogOperation, err error) {
 		Str("component", "tui").
 		Str("operation", string(operation)).
 		Str("status", "failed").
-		Str("error_code", classifyTUIErrorCode(err))
+		Str("reason", classifyTUIErrorCode(err)).
+		Func(logging.Cause(err))
 
 	event.Msg("tui operation failed")
+}
+
+func logCacheWriteFailure(ctx context.Context, cache string, err error) {
+	if err == nil {
+		return
+	}
+
+	zerolog.Ctx(ctx).Warn().
+		Str("component", "tui").
+		Str("operation", "cache_write").
+		Str("cache", cache).
+		Str("status", "failed").
+		Func(logging.Cause(err)).
+		Msg("tui cache write failed")
+}
+
+func logProviderEpisode(ctx context.Context, provider string, err error) {
+	if err == nil {
+		zerolog.Ctx(ctx).Info().Str("component", "tui").Str("operation", "read_provider").Str("provider", provider).
+			Str("status", "recovered").Msg("tui provider recovered")
+
+		return
+	}
+
+	zerolog.Ctx(ctx).Warn().Str("component", "tui").Str("operation", "read_provider").Str("provider", provider).
+		Str("status", "degraded").Func(logging.Cause(err)).Msg("tui provider could not be read")
 }
 
 func logTUIDegradation(ctx context.Context, operation tuiLogOperation, err error) {
@@ -197,7 +225,7 @@ func logTUIDegradation(ctx context.Context, operation tuiLogOperation, err error
 		Str("operation", string(operation)).
 		Str("status", "degraded").
 		Str("reason", "dependency_unavailable").
-		Str("error_code", classifyTUIErrorCode(err)).
+		Func(logging.Cause(err)).
 		Msg("tui dependency degraded")
 }
 

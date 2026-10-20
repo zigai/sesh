@@ -9,6 +9,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/samber/oops"
 	"github.com/zigai/aht/v2/pkg/aht"
+
+	"github.com/zigai/sesh/internal/logging"
 )
 
 const (
@@ -129,7 +131,7 @@ func (h *watchHealth) apply(ctx context.Context, sessions []aht.Session) error {
 	if err != nil {
 		if !h.degraded {
 			zerolog.Ctx(ctx).Warn().Str("component", "agents").Str("operation", "apply_snapshot").
-				Str("status", "degraded").Str("reason", "snapshot_apply_failed").Msg("agent status snapshot could not be applied")
+				Str("status", "degraded").Str("reason", "snapshot_apply_failed").Func(logging.Cause(err)).Msg("agent status snapshot could not be applied")
 		}
 
 		h.degraded = true
@@ -156,7 +158,7 @@ func (h *watchHealth) disconnect(ctx context.Context, err error, handlerFailed b
 
 	zerolog.Ctx(ctx).Warn().Str("component", "agents").Str("operation", "watch").
 		Str("status", "disconnected").Str("reason", "watch_failed").Dur("retry_in", backoff).
-		Msg("AHT broker watch disconnected, will retry")
+		Func(logging.Cause(err)).Msg("AHT broker watch disconnected, will retry")
 }
 
 func RunStatusTracker(ctx context.Context, source SnapshotSource, handler SnapshotHandler, opts WatchOptions, clearOnShutdown bool) error {
@@ -175,7 +177,7 @@ func RunStatusTracker(ctx context.Context, source SnapshotSource, handler Snapsh
 			Str("operation", "clear_styles").
 			Str("status", "uncertain").
 			Str("reason", "cleanup_failed").
-			Msg("agent window style cleanup failed")
+			Func(logging.Cause(err)).Msg("agent window style cleanup failed")
 
 		return oops.In("agents").Code("cleanup_failed").With("operation", "clear_styles").Wrap(err)
 	}

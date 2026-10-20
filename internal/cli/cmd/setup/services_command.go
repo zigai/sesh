@@ -17,6 +17,7 @@ import (
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/integration/tmuxserver"
+	"github.com/zigai/sesh/internal/logging"
 	"github.com/zigai/sesh/internal/setup"
 )
 
@@ -615,22 +616,22 @@ func automaticSaveStates(
 	states, err := setup.UnitStates(ctx, manager, automaticSaveUnits(definitions))
 	if err != nil {
 		zerolog.Ctx(ctx).Warn().Str("component", "setup").Str("operation", "inspect_autosave_services").
-			Str("status", "degraded").Str("reason", "service_state_unavailable").Msg("automatic save service readiness could not be verified")
+			Str("status", "degraded").Str("reason", "service_state_unavailable").Func(logging.Cause(err)).Msg("automatic save service readiness could not be verified")
 
 		return nil
 	}
 
-	failed := 0
+	var failed []string
 
 	for _, state := range states {
 		if state.Active == "failed" {
-			failed++
+			failed = append(failed, state.Name)
 		}
 	}
 
-	if failed > 0 {
+	if len(failed) > 0 {
 		zerolog.Ctx(ctx).Warn().Str("component", "setup").Str("operation", "inspect_autosave_services").
-			Str("status", "degraded").Str("reason", "service_failed").Int("failed", failed).
+			Str("status", "degraded").Str("reason", "service_failed").Int("failed", len(failed)).Strs("units", failed).
 			Msg("automatic save services are failing")
 	}
 

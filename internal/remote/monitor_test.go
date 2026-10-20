@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -106,7 +107,7 @@ func TestMonitorStateTransitionLogging(t *testing.T) {
 		hidden:     make(map[string]ConnectionState),
 	}
 
-	const connectionID = "private-host"
+	const connectionID = "work-host"
 
 	connected := ConnectionState{ID: connectionID, Connected: true, Snapshot: Snapshot{Health: UnavailableHealth()}}
 	state.catalog.Connections[connectionID] = connected
@@ -119,12 +120,9 @@ func TestMonitorStateTransitionLogging(t *testing.T) {
 	}
 
 	if records[0]["status"] != "degraded" || records[0]["operation"] != "connection" ||
-		records[0]["component"] != "remote_monitor" || records[0]["error_code"] != ConnectionErrorUnavailable {
+		records[0]["component"] != "remote_monitor" || records[0]["reason"] != ConnectionErrorUnavailable ||
+		records[0]["connection_id"] != connectionID || records[0]["error"] != errTestConnectionFailed.Error() {
 		t.Errorf("degraded record = %#v", records[0])
-	}
-
-	if strings.Contains(logs.String(), connectionID) {
-		t.Fatalf("logs leaked the connection identity: %s", logs.String())
 	}
 
 	logs.Reset()
@@ -132,16 +130,13 @@ func TestMonitorStateTransitionLogging(t *testing.T) {
 	state.storeAcceptedFrame(ctx, connectionID, ConnectionState{ID: connectionID, Connected: true, Snapshot: Snapshot{Health: healthyHealth()}}, false, FrameSnapshot, nil)
 
 	records = decodeLogRecords(t, logs.String())
-	if len(records) != 1 || records[0]["status"] != "recovered" || records[0]["reason"] != "connection_available" || records[0]["level"] != "info" {
+	if len(records) != 1 || records[0]["status"] != "recovered" || records[0]["reason"] != "connection_available" ||
+		records[0]["level"] != "info" || records[0]["connection_id"] != connectionID {
 		t.Fatalf("recovered records = %#v, want one recovery boundary", records)
-	}
-
-	if strings.Contains(logs.String(), connectionID) {
-		t.Fatalf("logs leaked the connection identity: %s", logs.String())
 	}
 }
 
-func TestMonitorReconcileLogsStaleCountWithoutIdentities(t *testing.T) {
+func TestMonitorReconcileLogsStaleConnections(t *testing.T) {
 	var logs bytes.Buffer
 
 	ctx := zerolog.New(&logs).WithContext(t.Context())
@@ -169,12 +164,9 @@ func TestMonitorReconcileLogsStaleCountWithoutIdentities(t *testing.T) {
 
 	if records[0]["level"] != "warn" || records[0]["component"] != "remote_monitor" ||
 		records[0]["operation"] != "reconcile" || records[0]["status"] != "degraded" ||
-		records[0]["reason"] != "connections_stale" || records[0]["stale_count"] != float64(1) {
+		records[0]["reason"] != "connections_stale" || records[0]["stale_count"] != float64(1) ||
+		!reflect.DeepEqual(records[0]["connection_ids"], []any{"private-host"}) {
 		t.Errorf("stale record = %#v", records[0])
-	}
-
-	if strings.Contains(logs.String(), "private-host") {
-		t.Fatalf("logs leaked the connection identity: %s", logs.String())
 	}
 }
 
@@ -433,17 +425,14 @@ func TestMonitorRejectsInvalidReloadThenRemovesObsoleteConnection(t *testing.T) 
 		invalidRecords++
 
 		if record["level"] != "warn" || record["component"] != "remote_monitor" ||
-			record["status"] != "degraded" || record["reason"] != "invalid_configuration" {
+			record["status"] != "degraded" || record["reason"] != "invalid_configuration" ||
+			!strings.Contains(fmt.Sprint(record["error"]), "private-invalid-value") {
 			t.Errorf("reload rejection record = %#v", record)
 		}
 	}
 
 	if invalidRecords != 1 {
 		t.Fatalf("reload rejection records = %d, want one; records = %#v", invalidRecords, records)
-	}
-
-	if strings.Contains(logs.String(), "private-invalid-value") || strings.Contains(logs.String(), testConnectionID) {
-		t.Fatalf("reload logs leaked configuration values or identities: %s", logs.String())
 	}
 }
 

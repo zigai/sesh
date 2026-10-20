@@ -286,7 +286,8 @@ func TestRepeatedSyncFailuresLogOneDegradedRecord(t *testing.T) {
 
 	want := map[string]any{
 		"level": "warn", "component": "work", "operation": "sync_work", "status": "degraded", "reason": "work_sync_failed",
-		"message": "periodic work sync failed",
+		"message": "periodic work sync failed", "error": "work state path must be absolute and clean",
+		"error_code": "work_state_failed", "error_domain": "work", "error_step": "load_work",
 	}
 	if len(records) != 1 || !reflect.DeepEqual(records[0], want) {
 		t.Errorf("records = %#v, want only %#v", records, want)

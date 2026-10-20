@@ -17,6 +17,7 @@ import (
 	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/integration/process"
+	"github.com/zigai/sesh/internal/logging"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/snapshot/capture"
 	"github.com/zigai/sesh/internal/snapshot/engine"
@@ -205,8 +206,8 @@ func restoreGeneration(ctx context.Context, repo *store.Repository, requested st
 func readManifest(ctx context.Context, repo *store.Repository, generation string) *model.Manifest {
 	manifest, err := repo.Read(ctx, generation)
 	if err != nil {
-		zerolog.Ctx(ctx).Warn().Str("component", "snapshot").Str("operation", "label_restore").
-			Str("status", "degraded").Str("reason", "manifest_read_failed").Msg("restored sessions and panes are reported without names")
+		zerolog.Ctx(ctx).Warn().Str("component", "snapshot").Str("operation", "label_restore").Str("generation", generation).
+			Str("status", "degraded").Str("reason", "manifest_read_failed").Func(logging.Cause(err)).Msg("restored sessions and panes are reported without names")
 
 		return nil
 	}
@@ -223,7 +224,7 @@ func (local *Local) restoredRefs(ctx context.Context, ids []string) []action.Ses
 	rows, err := local.liveSessions(ctx)
 	if err != nil {
 		zerolog.Ctx(ctx).Warn().Str("component", "snapshot").Str("operation", "list_restored_sessions").
-			Str("status", "degraded").Str("reason", "session_list_failed").Msg("restored sessions are reported by tmux ID only")
+			Str("status", "degraded").Str("reason", "session_list_failed").Func(logging.Cause(err)).Msg("restored sessions are reported by tmux ID only")
 	}
 
 	for _, id := range ids {

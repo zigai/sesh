@@ -16,6 +16,7 @@ import (
 	"github.com/zigai/sesh/internal/agents"
 	"github.com/zigai/sesh/internal/integration/process"
 	"github.com/zigai/sesh/internal/integration/tmuxserver"
+	"github.com/zigai/sesh/internal/logging"
 	"github.com/zigai/sesh/internal/snapshot/capture"
 	"github.com/zigai/sesh/internal/snapshot/model"
 	"github.com/zigai/sesh/internal/snapshot/store"
@@ -141,7 +142,7 @@ func saveWithProfile(ctx context.Context, repository *store.Repository, leaseRoo
 
 	result.Status = status
 
-	logSaveSuccess(ctx, observation, carried, status, reason, started)
+	logSaveSuccess(ctx, observation, carried, result, reason, started)
 
 	return result, nil
 }
@@ -193,16 +194,22 @@ func resumeBaseline(ctx context.Context, repository *store.Repository) (map[pane
 	return baseline, nil
 }
 
-func logSaveSuccess(ctx context.Context, observation capture.Observation, carried int, status, reason string, started time.Time) {
+func logSaveSuccess(ctx context.Context, observation capture.Observation, carried int, result SaveResult, reason string, started time.Time) {
 	recovery := make(map[model.Recovery]int, len(observation.Manifest.Panes))
 	for _, pane := range observation.Manifest.Panes {
 		recovery[pane.Launch.Recovery]++
 	}
 
-	zerolog.Ctx(ctx).Warn().
+	level := zerolog.WarnLevel
+	if result.Status == "best_effort" {
+		level = zerolog.InfoLevel
+	}
+
+	zerolog.Ctx(ctx).WithLevel(level).
 		Str("component", "snapshot").
 		Str("operation", "save").
-		Str("status", status).
+		Str("generation", result.Generation).
+		Str("status", result.Status).
 		Str("reason", reason).
 		Int("sessions", len(observation.Manifest.Sessions)).
 		Int("panes", len(observation.Manifest.Panes)).
@@ -252,13 +259,19 @@ func saveFailure(ctx context.Context, phase string, started time.Time, err error
 		reason = "process_observation_failed"
 	}
 
-	event := zerolog.Ctx(ctx).Error().
+	level := zerolog.ErrorLevel
+	if reason == "capture_changed" {
+		level = zerolog.WarnLevel
+	}
+
+	event := zerolog.Ctx(ctx).WithLevel(level).
 		Str("component", "snapshot").
 		Str("operation", "save").
 		Str("status", "failed").
 		Str("phase", phase).
 		Str("reason", reason).
-		Int64("duration_ms", time.Since(started).Milliseconds())
+		Int64("duration_ms", time.Since(started).Milliseconds()).
+		Func(logging.Cause(err))
 
 	if code := processFailureCode(err); code != "" {
 		event = event.Str("process_code", code)

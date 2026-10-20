@@ -13,6 +13,7 @@ import (
 
 	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/agents"
+	"github.com/zigai/sesh/internal/logging"
 	"github.com/zigai/sesh/internal/session"
 )
 
@@ -170,7 +171,7 @@ func (local *Local) recordAgentView(ctx context.Context, target agents.PaneLocat
 	})
 	if err != nil {
 		zerolog.Ctx(ctx).Warn().Str("component", "agents").Str("operation", "record_view").
-			Str("status", "degraded").Str("reason", "history_update_failed").Msg("agent navigation history was not recorded")
+			Str("status", "degraded").Str("reason", "history_update_failed").Func(logging.Cause(err)).Msg("agent navigation history was not recorded")
 	}
 }
 

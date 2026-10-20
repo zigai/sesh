@@ -56,13 +56,21 @@ tmux access goes through `github.com/zigai/gotmux` (imported as `gotmux`).
 
 - Use `github.com/samber/oops` at application and domain error boundaries for structured operation details, stable codes, phases and stack traces (`oops.In("<domain>").Code(...).With("operation", ...)`).
 - Sentinel errors are package-level `Err*` vars. Preserve standard sentinels and typed causes with `errors.Is`/`errors.As`. Preserve independent cleanup failures with `errors.Join` before enrichment. Low-level helpers may return ordinary errors for the domain to enrich.
-- Keep messages and added metadata fixed and privacy-safe. Never automatically ingest context attributes, serialize an error into logs, or add a logger adapter.
+- Keep error messages fixed and put variable data in `oops` context. Do not add a logger adapter.
 - `oops` enrichment does not authorize retries. Reconcile uncertain mutations through durable state. Preserve uncertainty even when cancellation is joined.
-- In the pinned `oops` release, `Code()`/`Domain()` resolve the deepest values and `Context()` merges layers. Use the owning layer for boundary metadata, never arbitrary cause fields in logs. `internal/errorstep` reads the step a domain recorded on its own error for this.
+- In the pinned `oops` release, `Code()`/`Domain()` resolve the deepest values and `Context()` merges layers. `internal/errorstep` reads the step a domain recorded on its own error.
+
+## Logging
+
+- Logging uses zerolog. The log file is private to the user (mode 0600) and exists to explain what went wrong and why.
+- A record about a failure carries the error through `.Func(logging.Cause(err))`, which also records its `oops` domain, code and step. Error text, the diagnostics an error carries, paths, session names and IDs may appear. Credentials, environment values, terminal contents and command stdout may not.
+- Log a failure once, at the boundary that handles it. A failure handled by skipping or falling back still gets a record when it hides a broken dependency.
+- Levels: `error` when the operation failed, `warn` when it degraded, retried or skipped work, `info` for normal outcomes, including requested cancellation.
+- Periodic loops log the first failure, a change of cause, and recovery, not every tick.
+- Name the subject with stable IDs (action ID, task ID, connection ID, restore operation ID) so records can be correlated.
 
 ## Conventions
 
-- Logging uses zerolog.
 - golangci-lint is strict: declaration order const, var, type, func (`decorder`, `funcorder`); `exhaustruct`; `wrapcheck`; `wsl_v5`; `err113`; `nolint` needs a specific linter and an explanation. `internal/cli` and test files have some of these relaxed.
 - Many packages are `//go:build linux || darwin`, with `_linux.go`, `_darwin.go` and `_other.go` variants.
 - Edit `README.md` only to keep it accurate. When a command, flag or feature it describes changes, correct that part at about the same length. Do not add new sections, examples or long explanations.

@@ -13,6 +13,7 @@ import (
 	"github.com/zigai/sesh/internal/automation"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/daemon"
+	"github.com/zigai/sesh/internal/logging"
 )
 
 type resultJSON struct {
@@ -79,7 +80,7 @@ func runAutosaveStatus(cmd *cobra.Command, _ []string) error {
 	outcome.repository = repositoryState(ctx, env)
 	outcome.daemonState, outcome.daemonStatus = DaemonRuntimeState(ctx, env.workspace.Socket)
 
-	outcome.finalSave, outcome.finalSaveAt = finalSaveState(env)
+	outcome.finalSave, outcome.finalSaveAt = finalSaveState(ctx, env)
 	if outcome.finalSaveAt > 0 {
 		outcome.finalSaveAge = time.Since(time.Unix(outcome.finalSaveAt, 0))
 	}
@@ -106,6 +107,8 @@ func runAutosaveStatus(cmd *cobra.Command, _ []string) error {
 func DaemonRuntimeState(ctx context.Context, socket string) (string, daemon.RuntimeStatus) {
 	path, err := daemon.RuntimeStatusPath(os.Getenv("XDG_RUNTIME_DIR"), socket)
 	if err != nil {
+		logStateUnavailable(ctx, "daemon_runtime_state", err)
+
 		return daemonUnverifiable, emptyDaemonRuntimeStatus()
 	}
 
@@ -126,7 +129,15 @@ func DaemonRuntimeState(ctx context.Context, socket string) (string, daemon.Runt
 		return daemonStale, emptyDaemonRuntimeStatus()
 	}
 
+	logStateUnavailable(ctx, "daemon_runtime_state", err)
+
 	return daemonUnverifiable, emptyDaemonRuntimeStatus()
+}
+
+func logStateUnavailable(ctx context.Context, state string, err error) {
+	zerolog.Ctx(ctx).Warn().Str("component", "snapshot").Str("operation", "inspect_"+state).
+		Str("status", statusDegraded).Str("reason", "state_unavailable").Func(logging.Cause(err)).
+		Msg("automatic snapshot state could not be read")
 }
 
 func historyState(env Env) string {
@@ -148,6 +159,8 @@ func repositoryState(ctx context.Context, env Env) string {
 			return repositoryMissing
 		}
 
+		logStateUnavailable(ctx, "repository_state", err)
+
 		return ""
 	}
 
@@ -155,7 +168,9 @@ func repositoryState(ctx context.Context, env Env) string {
 
 	closeErr := repository.Close()
 
-	if stateErr != nil || closeErr != nil {
+	if err := errors.Join(stateErr, closeErr); err != nil {
+		logStateUnavailable(ctx, "repository_state", err)
+
 		return ""
 	}
 
@@ -169,9 +184,13 @@ func repositoryState(ctx context.Context, env Env) string {
 	}
 }
 
-func finalSaveState(env Env) (string, int64) {
+func finalSaveState(ctx context.Context, env Env) (string, int64) {
 	status, err := automation.ReadFinalSaveStatus(env.workspace.FinalSaveStatus)
 	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			logStateUnavailable(ctx, "final_save_state", err)
+		}
+
 		return "", 0
 	}
 

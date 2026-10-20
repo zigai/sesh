@@ -63,7 +63,7 @@ func (m *Model) loadAgentGitCommand() tea.Cmd {
 
 		entries := scan(ctx, directories)
 		if !maps.Equal(previous, entries) && ctx.Err() == nil {
-			_ = writeAgentGitCache(cachePath, entries)
+			logCacheWriteFailure(ctx, "agent_git", writeAgentGitCache(cachePath, entries))
 		}
 
 		return agentGitResultMsg{request: request, entries: entries}

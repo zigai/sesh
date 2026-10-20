@@ -10,6 +10,7 @@ import (
 	"github.com/samber/oops"
 
 	"github.com/zigai/sesh/internal/integration/lifecycle"
+	"github.com/zigai/sesh/internal/logging"
 )
 
 var ErrFinalSaveNil = errors.New("cannot run lifecycle coordinator: FinalSave is nil")
@@ -58,7 +59,7 @@ func (c *lifecycleCoordinator) handleFinalSave(eventCtx context.Context) error {
 	if saveErr != nil && outcome.Recorded {
 		zerolog.Ctx(eventCtx).Warn().Str("component", "daemon").Str("operation", "run_lifecycle").
 			Str("status", "degraded").Str("reason", "final_save_incomplete").
-			Bool("recorded", true).Msg("lifecycle final save failure recorded")
+			Bool("recorded", true).Func(logging.Cause(saveErr)).Msg("lifecycle final save failure recorded")
 
 		return nil
 	}

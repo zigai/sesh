@@ -14,6 +14,7 @@ import (
 	"github.com/samber/oops"
 
 	"github.com/zigai/sesh/internal/config"
+	"github.com/zigai/sesh/internal/logging"
 )
 
 const (
@@ -483,6 +484,7 @@ func (r *HookRunner) runCommand(
 			Int("hook_index", index).
 			Str("status", "failed").
 			Str("reason", "canceled").
+			Func(logging.Cause(runErr)).
 			Int64("timeout_ms", timeout.Milliseconds()).
 			Int64("duration_ms", elapsed.Milliseconds()).
 			Msg("hook canceled")
@@ -516,9 +518,9 @@ func (r *HookRunner) runCommand(
 		}, nil
 
 	case HookStatusFailed:
-		exitCode := 1
+		exitCode, reason := -1, "start_failed"
 		if exitErr, ok := errors.AsType[*exec.ExitError](runErr); ok {
-			exitCode = exitErr.ExitCode()
+			exitCode, reason = exitErr.ExitCode(), "execution_failed"
 		}
 
 		logger.Warn().
@@ -527,8 +529,9 @@ func (r *HookRunner) runCommand(
 			Str("hook_event", event.Name).
 			Int("hook_index", index).
 			Str("status", "failed").
-			Str("reason", "execution_failed").
+			Str("reason", reason).
 			Int("exit_code", exitCode).
+			Func(logging.Cause(runErr)).
 			Int64("timeout_ms", timeout.Milliseconds()).
 			Int64("duration_ms", elapsed.Milliseconds()).
 			Msg("hook failed")

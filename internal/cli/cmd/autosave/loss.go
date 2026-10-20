@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/zigai/sesh/internal/automation"
+	"github.com/zigai/sesh/internal/logging"
 	"github.com/zigai/sesh/internal/snapshot/engine"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
@@ -19,7 +20,7 @@ func reportRestorableSessions(ctx context.Context, env Env, repo *store.Reposito
 
 	unreported, err := automation.EpisodeUnreported(markerPath, env.lastSavedUnix)
 	if err != nil {
-		logLossMarkerFailure(ctx)
+		logLossMarkerFailure(ctx, err)
 
 		return 0
 	}
@@ -34,7 +35,7 @@ func reportRestorableSessions(ctx context.Context, env Env, repo *store.Reposito
 	}
 
 	if err := automation.RecordEpisodeReported(markerPath, env.lastSavedUnix); err != nil {
-		logLossMarkerFailure(ctx)
+		logLossMarkerFailure(ctx, err)
 
 		return 0
 	}
@@ -50,11 +51,12 @@ func reportRestorableSessions(ctx context.Context, env Env, repo *store.Reposito
 	return count
 }
 
-func logLossMarkerFailure(ctx context.Context) {
+func logLossMarkerFailure(ctx context.Context, err error) {
 	zerolog.Ctx(ctx).Warn().
 		Str("component", "snapshot").
 		Str("operation", "autosave").
 		Str("status", statusDegraded).
 		Str("reason", reasonEpisodeMarker).
+		Func(logging.Cause(err)).
 		Msg("restorable session report state could not be checked")
 }

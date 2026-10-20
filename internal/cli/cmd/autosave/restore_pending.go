@@ -10,6 +10,7 @@ import (
 	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/automation"
+	"github.com/zigai/sesh/internal/logging"
 	"github.com/zigai/sesh/internal/snapshot/engine"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
@@ -50,7 +51,7 @@ const (
 func decidePendingRestore(ctx context.Context, env Env, server *gotmux.Server, repo *store.Repository, pending pendingRestore) pendingRestoreAction {
 	targeted, err := engine.RestoreTargetedServer(ctx, repo, server)
 	if err != nil {
-		logPendingRestoreFailure(ctx, reasonRestoreTarget)
+		logPendingRestoreFailure(ctx, reasonRestoreTarget, err)
 
 		return pendingRestoreHold
 	}
@@ -102,7 +103,7 @@ func claimPendingEpisode(env Env, pending pendingRestore) (bool, error) {
 func claimPendingReport(ctx context.Context, env Env, pending pendingRestore) bool {
 	claimed, err := claimPendingEpisode(env, pending)
 	if err != nil {
-		logPendingRestoreFailure(ctx, reasonEpisodeMarker)
+		logPendingRestoreFailure(ctx, reasonEpisodeMarker, err)
 	}
 
 	return claimed
@@ -136,11 +137,11 @@ func reportPendingRestore(ctx context.Context, env Env, pending pendingRestore) 
 		Msg("tmux started after the newest snapshot and its saved sessions are not restored")
 }
 
-func logPendingRestoreFailure(ctx context.Context, reason string) {
+func logPendingRestoreFailure(ctx context.Context, reason string, err error) {
 	zerolog.Ctx(ctx).Warn().
 		Str("component", "snapshot").
 		Str("operation", "autosave").
 		Str("status", statusDegraded).
 		Str("reason", reason).
-		Msg("pending restore state could not be checked")
+		Func(logging.Cause(err)).Msg("pending restore state could not be checked")
 }

@@ -21,6 +21,7 @@ import (
 	"github.com/zigai/sesh/internal/config"
 	rowlayout "github.com/zigai/sesh/internal/display/layout"
 	"github.com/zigai/sesh/internal/inbox"
+	"github.com/zigai/sesh/internal/logging"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/task"
 	"github.com/zigai/sesh/internal/tui/providers"
@@ -188,6 +189,7 @@ type Model struct {
 	agentRowRatchet              rowlayout.RatchetState
 	providerRunner               providers.Runner
 	resourceSample               providers.ResourceSample
+	resourceEpisode              logging.Episode
 	resourceProcRoot             string
 	ghEntries                    map[ghKey]ghEntry
 	customFields                 customFieldState
@@ -377,6 +379,7 @@ func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps
 		agentRowRatchet:              rowlayout.RatchetState{},
 		providerRunner:               providers.Runner{},
 		resourceSample:               providers.ResourceSample{At: time.Time{}, Processes: nil},
+		resourceEpisode:              logging.Episode{},
 		resourceProcRoot:             "",
 		ghEntries:                    nil,
 		customFields:                 customFields,

@@ -477,7 +477,9 @@ func TestNextIdleActivationFailureRestoresHistory(t *testing.T) {
 				assertLogField(t, records[0], "message", "agent navigation history rollback failed")
 			}
 
-			assertLogOmitsPrivateValues(t, &output, errFakeActivation.Error(), errFakeRollback.Error(), "%3", "%1", "@3")
+			if test.wantLogRecords == 1 {
+				assertLogField(t, records[0], "error", errFakeRollback.Error())
+			}
 		})
 	}
 }
@@ -852,16 +854,6 @@ func assertLogField(t *testing.T, record map[string]any, field string, want any)
 
 	if got := record[field]; !reflect.DeepEqual(got, want) {
 		t.Fatalf("log field %q = %#v, want %#v; record = %#v", field, got, want, record)
-	}
-}
-
-func assertLogOmitsPrivateValues(t *testing.T, output *bytes.Buffer, forbidden ...string) {
-	t.Helper()
-
-	for _, value := range forbidden {
-		if value != "" && strings.Contains(output.String(), value) {
-			t.Fatalf("navigation log contains private value %q: %s", value, output.String())
-		}
 	}
 }
 

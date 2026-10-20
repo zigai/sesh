@@ -251,7 +251,7 @@ func TestRunStatusTrackerClearsStylesOnShutdown(t *testing.T) {
 	}
 }
 
-func TestRunStatusTrackerReturnsCleanupFailureWithPrivateLogSchema(t *testing.T) {
+func TestRunStatusTrackerReturnsAndLogsCleanupFailure(t *testing.T) {
 	t.Parallel()
 
 	var output bytes.Buffer
@@ -291,15 +291,11 @@ func TestRunStatusTrackerReturnsCleanupFailureWithPrivateLogSchema(t *testing.T)
 
 	for field, want := range map[string]any{
 		"level": "warn", "component": "agents", "operation": "clear_styles",
-		"status": "uncertain", "reason": "cleanup_failed",
+		"status": "uncertain", "reason": "cleanup_failed", "error": errWatchUnavailable.Error(),
 	} {
 		if got := record[field]; got != want {
 			t.Fatalf("log field %q = %#v, want %#v: %#v", field, got, want, record)
 		}
-	}
-
-	if strings.Contains(output.String(), errWatchUnavailable.Error()) {
-		t.Fatalf("cleanup log leaked raw error: %s", output.String())
 	}
 }
 

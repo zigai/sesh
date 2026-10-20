@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"maps"
 	"os/exec"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"github.com/samber/oops"
 
 	"github.com/zigai/sesh/internal/config"
+	"github.com/zigai/sesh/internal/logging"
 	"github.com/zigai/sesh/internal/privatefs"
 )
 
@@ -79,6 +81,7 @@ type monitorState struct {
 	hideAfter         time.Duration
 	dirty             bool
 	configApplied     bool
+	reloadEpisode     logging.Episode
 }
 
 func RunMonitor(ctx context.Context, opts MonitorOptions) (resultErr error) {
@@ -128,6 +131,7 @@ func RunMonitor(ctx context.Context, opts MonitorOptions) (resultErr error) {
 		hideAfter:         0,
 		dirty:             recovered,
 		configApplied:     false,
+		reloadEpisode:     logging.Episode{},
 	}
 
 	state.applyConfig(ctx, opts.Remote, supervisor)
@@ -274,7 +278,6 @@ func (state *monitorState) run(
 	defer writeTicker.Stop()
 
 	reloadChannel := opts.Reloads
-	reloadFailed := false
 
 	for {
 		select {
@@ -295,24 +298,7 @@ func (state *monitorState) run(
 				continue
 			}
 
-			if err := config.ValidateRemoteConfig(reload); err != nil {
-				if !reloadFailed {
-					zerolog.Ctx(ctx).Warn().
-						Str("component", "remote_monitor").
-						Str("operation", "reload_config").
-						Str("status", "degraded").
-						Str("reason", "invalid_configuration").
-						Msg("remote monitor configuration reload rejected")
-				}
-
-				reloadFailed = true
-
-				continue
-			}
-
-			reloadFailed = false
-
-			state.applyConfig(ctx, reload, supervisor)
+			state.handleReload(ctx, reload, supervisor)
 		case <-writeTicker.C:
 			if err := state.flush(); err != nil {
 				return err
@@ -321,6 +307,25 @@ func (state *monitorState) run(
 			state.reconcile(ctx)
 		}
 	}
+}
+
+func (state *monitorState) handleReload(ctx context.Context, reload config.RemoteConfig, supervisor *streamSupervisor) {
+	err := config.ValidateRemoteConfig(reload)
+	if state.reloadEpisode.Observe(err) && err != nil {
+		zerolog.Ctx(ctx).Warn().
+			Str("component", "remote_monitor").
+			Str("operation", "reload_config").
+			Str("status", "degraded").
+			Str("reason", "invalid_configuration").
+			Func(logging.Cause(err)).
+			Msg("remote monitor configuration reload rejected")
+	}
+
+	if err != nil {
+		return
+	}
+
+	state.applyConfig(ctx, reload, supervisor)
 }
 
 func (state *monitorState) flush() error {
@@ -419,12 +424,14 @@ func (state *monitorState) handleConnectionError(ctx context.Context, connection
 		current.LastErrorAt = state.now().UTC()
 	}
 
-	if previous.Connected {
+	if previous.Connected || previous.LastError != current.LastError {
 		zerolog.Ctx(ctx).Warn().
 			Str("component", "remote_monitor").
 			Str("operation", "connection").
+			Str("connection_id", connectionID).
 			Str("status", "degraded").
-			Str("error_code", current.LastError).
+			Str("reason", current.LastError).
+			Func(logging.Cause(connectionErr)).
 			Msg("remote monitor connection degraded")
 	}
 
@@ -454,6 +461,7 @@ func (state *monitorState) storeAcceptedFrame(ctx context.Context, connectionID 
 			zerolog.Ctx(ctx).Info().
 				Str("component", "remote_monitor").
 				Str("operation", "connection").
+				Str("connection_id", connectionID).
 				Str("status", "recovered").
 				Str("reason", "connection_available").
 				Msg("remote monitor connection recovered")
@@ -479,6 +487,7 @@ func (state *monitorState) reconcile(ctx context.Context) {
 			Str("status", "degraded").
 			Str("reason", "connections_stale").
 			Int("stale_count", len(removed)).
+			Strs("connection_ids", slices.Sorted(maps.Keys(removed))).
 			Msg("remote monitor connections stale")
 	}
 

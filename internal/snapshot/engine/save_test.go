@@ -89,8 +89,8 @@ func assertSaveRecords(t *testing.T, data []byte, scenario string) {
 		t.Fatalf("expected exactly start and owning outcome: %s", data)
 	}
 
-	if bytes.ContainsAny(data, "\xff") || strings.Contains(string(data), "secret") || strings.Contains(string(data), "SECRET") {
-		t.Fatal("private material in log")
+	if bytes.ContainsAny(data, "\xff") || strings.Contains(string(data), "secret-session") || strings.Contains(string(data), "secret-window") {
+		t.Fatal("snapshot contents in log")
 	}
 
 	for index, line := range lines {
@@ -175,7 +175,7 @@ func observationFixture() capture.Observation {
 	return capture.Observation{Manifest: m}
 }
 
-func TestUncertainPublicationReasonAndPrivacy(t *testing.T) {
+func TestUncertainPublicationReason(t *testing.T) {
 	var output bytes.Buffer
 
 	logger := zerolog.New(&output)
@@ -190,7 +190,7 @@ func TestUncertainPublicationReasonAndPrivacy(t *testing.T) {
 	}
 
 	assertSaveDiagnostic(t, err)
-	assertPrivateFailureRecord(t, output.Bytes())
+	assertUncertainFailureRecord(t, output.Bytes())
 }
 
 var errUnclassifiedSecret = errors.New("secret failure")
@@ -228,10 +228,6 @@ func TestCaptureFailureHasFixedReason(t *testing.T) {
 			}
 
 			assertCaptureFailureRecord(t, output.Bytes(), tt.reason, tt.processCode)
-
-			if bytes.Contains(bytes.ToLower(output.Bytes()), []byte("secret")) {
-				t.Fatal("error metadata leaked")
-			}
 		})
 	}
 }
@@ -250,7 +246,13 @@ func assertCaptureFailureRecord(t *testing.T, data []byte, reason, processCode s
 
 	validateLogSchema(t, fields)
 
-	if string(fields["reason"]) != `"`+reason+`"` || string(fields["phase"]) != `"capture"` || string(fields["level"]) != `"error"` {
+	wantLevel := `"error"`
+	if reason == "capture_changed" {
+		wantLevel = `"warn"`
+	}
+
+	if string(fields["reason"]) != `"`+reason+`"` || string(fields["phase"]) != `"capture"` || string(fields["level"]) != wantLevel ||
+		len(fields["error"]) == 0 {
 		t.Fatalf("incorrect failure record: %s", data)
 	}
 
@@ -283,7 +285,7 @@ func assertSaveDiagnostic(t *testing.T, err error) {
 	}
 }
 
-func assertPrivateFailureRecord(t *testing.T, data []byte) {
+func assertUncertainFailureRecord(t *testing.T, data []byte) {
 	t.Helper()
 
 	if lines := bytes.Count(data, []byte{'\n'}); lines != 1 {
@@ -295,12 +297,8 @@ func assertPrivateFailureRecord(t *testing.T, data []byte) {
 		t.Fatal(err)
 	}
 
-	if fields["reason"] != "publication_uncertain" || fields["level"] != "error" || fields["phase"] != "commit" {
+	if fields["reason"] != "publication_uncertain" || fields["level"] != "error" || fields["phase"] != "commit" || fields["error"] == nil {
 		t.Fatal("incorrect uncertainty record")
-	}
-
-	if bytes.Contains(data, []byte("secret")) || bytes.Contains(data, []byte("SECRET")) {
-		t.Fatal("error metadata leaked")
 	}
 
 	var schema map[string]jsontext.Value
@@ -334,7 +332,8 @@ func validateLogSchema(t *testing.T, fields map[string]jsontext.Value) {
 	for key := range fields {
 		switch key {
 		case "level", "component", "operation", "status", "message", "reason", "phase", "sessions", "panes", "terminal_text_omitted", "floating_panes_omitted",
-			"restart_panes", "resume_panes", "carried_resume_panes", "unverified_panes", "nonrestartable_panes", "duration_ms", "process_code":
+			"restart_panes", "resume_panes", "carried_resume_panes", "unverified_panes", "nonrestartable_panes", "duration_ms", "process_code",
+			"generation", "error", "error_domain", "error_code", "error_step":
 		default:
 			t.Fatalf("unexpected log field %s", key)
 		}

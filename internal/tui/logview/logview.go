@@ -427,7 +427,8 @@ func shouldPruneField(key string, value any, record map[string]any, verbose bool
 		return false
 	}
 
-	return isRedundantCommandField(key, value, record) ||
+	return key == "socket" ||
+		isRedundantCommandField(key, value, record) ||
 		isDefaultExitCodeField(key, value, record) ||
 		isDefaultNoiseBooleanField(key, value) ||
 		isDefaultNoiseCountField(key, value)
@@ -636,7 +637,7 @@ func orderedLogFieldKeys(record map[string]any) []string {
 
 	rest := make([]string, 0, len(record))
 
-	var hasDuration bool
+	var hasDuration, hasError bool
 
 	for key := range record {
 		if isLogDisplayBaseField(key) {
@@ -645,6 +646,12 @@ func orderedLogFieldKeys(record map[string]any) []string {
 
 		if key == "duration_ms" {
 			hasDuration = true
+
+			continue
+		}
+
+		if key == "error" {
+			hasError = true
 
 			continue
 		}
@@ -661,6 +668,10 @@ func orderedLogFieldKeys(record map[string]any) []string {
 	keys = append(keys, rest...)
 	if hasDuration {
 		keys = append(keys, "duration_ms")
+	}
+
+	if hasError {
+		keys = append(keys, "error")
 	}
 
 	return keys

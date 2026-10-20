@@ -104,7 +104,7 @@ func TestSetupServicesApplyReloadsAndPreservesActiveServices(t *testing.T) {
 		t.Fatalf("manager commands = %v", fake.commands(t))
 	}
 
-	assertRuntimeLog(t, logPath, "cli", "refresh", "info", "ok", configPath, "private-program-canary", "systemctl")
+	assertRuntimeLog(t, logPath, "cli", "refresh", "info", "ok")
 }
 
 func refreshHome(t *testing.T) {
@@ -238,7 +238,7 @@ func TestSetupServicesManagerFailureRetainsPartialJSONAndOneErrorRecord(t *testi
 				t.Fatal("private manager diagnostics in JSON")
 			}
 
-			assertRuntimeLog(t, logPath, "cli", "refresh", "error", "failed", directory, configPath, "private-program-canary", "exit status")
+			assertRuntimeLog(t, logPath, "cli", "refresh", "error", "failed")
 		})
 	}
 }

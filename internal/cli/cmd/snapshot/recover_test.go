@@ -90,7 +90,7 @@ func testMissingOperation(t *testing.T, command, operation string) {
 		t.Fatal("missing operation changed catalog")
 	}
 
-	assertRuntimeLog(t, logPath, "cli", operation, "error", "failed", path, cfg)
+	assertRuntimeLog(t, logPath, "cli", operation, "error", "failed")
 }
 
 func TestSnapshotRecoverUnknownDeletionIsVisibleWithoutMutation(t *testing.T) {
@@ -143,5 +143,5 @@ func checkMissingRewriteReceipt(t *testing.T, command, operation string) {
 		t.Fatal("unknown rewrite changed catalog")
 	}
 
-	assertRuntimeLog(t, logPath, "cli", operation, "error", "failed", path, cfg, id)
+	assertRuntimeLog(t, logPath, "cli", operation, "error", "failed")
 }
