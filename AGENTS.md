@@ -63,7 +63,7 @@ tmux access goes through `github.com/zigai/gotmux` (imported as `gotmux`).
 ## Logging
 
 - Logging uses zerolog. The log file is private to the user (mode 0600) and exists to explain what went wrong and why.
-- A record about a failure carries the error through `.Func(logging.Cause(err))`, which also records its `oops` domain, code and step. Error text, the diagnostics an error carries, paths, session names and IDs may appear. Credentials, environment values, terminal contents and command stdout may not.
+- A record about a failure carries the error through `.Func(logging.Cause(err))`, which also records its `oops` domain, code and step. Error text, the diagnostics an error carries, paths, session names and IDs may appear. Credentials, environment values, terminal contents and command stdout may not. A failed hook logs the last 2 KB of its stderr.
 - Log a failure once, at the boundary that handles it. A failure handled by skipping or falling back still gets a record when it hides a broken dependency.
 - Levels: `error` when the operation failed, `warn` when it degraded, retried or skipped work, `info` for normal outcomes, including requested cancellation.
 - Periodic loops log the first failure, a change of cause, and recovery, not every tick.
