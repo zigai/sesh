@@ -1,0 +1,2 @@
+- With a scratch tmux pane starting a new foreground job every 10 ms, 30 runs of sesh autosave save-if-due exited 1 on 18 runs before the change and 0 on all 30 after.
+- The new build prints "Skipped: tmux changed during the save; the next run retries." and still logs each race as a warning.
