@@ -14,6 +14,7 @@ import (
 	"github.com/zigai/sesh/internal/automation"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/config"
+	"github.com/zigai/sesh/internal/snapshot/capture"
 	"github.com/zigai/sesh/internal/snapshot/engine"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
@@ -142,6 +143,18 @@ func finishAutosave(
 	result engine.SaveResult,
 	saveErr error,
 ) error {
+	if errors.Is(saveErr, capture.ErrChanged) {
+		closeErr := repo.Close()
+		lockErr := lock.Release()
+
+		// The engine logs the race; the interval stays due, so the next run retries.
+		skipped := newOutcome(statusSkipped, reasonCaptureChanged)
+		skipped.attempt = result.Attempt
+		skipped.history = historyState(env)
+
+		return errors.Join(renderAutosaveResult(cmd, env, skipped), wrapCloseError(closeErr), lockErr)
+	}
+
 	if saveErr != nil {
 		closeErr := repo.Close()
 		lockErr := lock.Release()
