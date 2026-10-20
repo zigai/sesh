@@ -1,0 +1,2 @@
+- Running sesh task finish with an unknown task in an isolated home logs the error text, its domain, code and step, plus pid, version, socket and action.
+- Running sesh session list with an unknown key in config.toml now writes a command failed record naming the config error; before, it wrote nothing.
