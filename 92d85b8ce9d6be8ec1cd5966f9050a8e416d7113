@@ -1,0 +1,1 @@
+- Running sesh hooks run session_switch_post with a hook that prints to stdout and stderr and exits 12 logs the stderr line and exit code 12; the stdout line stays out of the log.
