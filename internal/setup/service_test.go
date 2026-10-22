@@ -105,8 +105,8 @@ func TestSystemdDefinitionsRenderOwnedUnits(t *testing.T) {
 		t.Fatalf("missing %s", setup.AutosaveTimerName)
 	}
 
-	if !strings.Contains(timer.Content, "OnUnitActiveSec=3min") {
-		t.Fatalf("timer does not use the configured interval:\n%s", timer.Content)
+	if !strings.Contains(timer.Content, "OnUnitInactiveSec=3min") {
+		t.Fatalf("timer does not wait the configured interval after save completion:\n%s", timer.Content)
 	}
 
 	if !strings.Contains(timer.Content, "Unit="+setup.AutosaveServiceName) {

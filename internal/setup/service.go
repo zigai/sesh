@@ -441,7 +441,7 @@ func renderSystemdAutosaveTimer(inputs ServiceInputs) string {
 
 	content.WriteString("[Timer]\n")
 	content.WriteString("OnActiveSec=" + interval + "\n")
-	content.WriteString("OnUnitActiveSec=" + interval + "\n")
+	content.WriteString("OnUnitInactiveSec=" + interval + "\n")
 	content.WriteString("AccuracySec=5s\n")
 	content.WriteString("Unit=" + AutosaveServiceName + "\n\n")
 	content.WriteString("[Install]\n")
