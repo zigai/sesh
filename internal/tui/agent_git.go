@@ -17,6 +17,7 @@ type agentGitTickMsg struct{}
 type agentGitResultMsg struct {
 	request uint64
 	entries map[string]agentGitCacheEntry
+	err     error
 }
 
 func (m *Model) agentGitEnabled() bool {
@@ -61,18 +62,34 @@ func (m *Model) loadAgentGitCommand() tea.Cmd {
 		}
 		defer m.lifecycle.EndWorker()
 
-		entries := scan(ctx, directories)
+		entries, err := scan(ctx, directories)
+		if err != nil {
+			retained := make(map[string]agentGitCacheEntry, len(directories))
+			for _, directory := range directories {
+				if entry, ok := previous[directory]; ok {
+					retained[directory] = entry
+				}
+			}
+
+			maps.Copy(retained, entries)
+			entries = retained
+		}
+
 		if !maps.Equal(previous, entries) && ctx.Err() == nil {
 			logCacheWriteFailure(ctx, "agent_git", writeAgentGitCache(cachePath, entries))
 		}
 
-		return agentGitResultMsg{request: request, entries: entries}
+		return agentGitResultMsg{request: request, entries: entries, err: err}
 	}
 }
 
 func (m *Model) handleAgentGit(msg agentGitResultMsg) tea.Cmd {
 	if !m.providerRunner.Complete(providers.Git, msg.request, m.gitProviderRows(msg.entries)) {
 		return m.agentGitTickCommand()
+	}
+
+	if m.agentGitEpisode.Observe(msg.err) {
+		logProviderEpisode(m.operationContext(), "git", msg.err)
 	}
 
 	m.agentGit = msg.entries

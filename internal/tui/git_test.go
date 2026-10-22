@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -74,13 +75,13 @@ func TestAgentGitRefreshAppliesMetadataToLocalAgentRows(t *testing.T) {
 	var directories []string
 
 	model := gitTestModel(t)
-	model.gitScan = func(_ context.Context, dirs []string) map[string]agentGitCacheEntry {
+	model.gitScan = func(_ context.Context, dirs []string) (map[string]agentGitCacheEntry, error) {
 		directories = append([]string(nil), dirs...)
 
 		return map[string]agentGitCacheEntry{
 			"/work/alpha": {GitBranch: "main", GitChanges: "+2 -1", GitAhead: 1, GitTrackingKnown: true},
 			"/work/beta":  {GitBranch: "feature"},
-		}
+		}, nil
 	}
 
 	command := model.loadAgentGitCommand()
@@ -122,8 +123,8 @@ func TestAgentGitRefreshAppliesMetadataToLocalAgentRows(t *testing.T) {
 func TestAgentGitRefreshRejectsSupersededResult(t *testing.T) {
 	model := gitTestModel(t)
 	model.displayMode = displayModeAgents
-	model.gitScan = func(context.Context, []string) map[string]agentGitCacheEntry {
-		return map[string]agentGitCacheEntry{"/work/alpha": {GitBranch: "stale-branch"}}
+	model.gitScan = func(context.Context, []string) (map[string]agentGitCacheEntry, error) {
+		return map[string]agentGitCacheEntry{"/work/alpha": {GitBranch: "stale-branch"}}, nil
 	}
 
 	command := model.loadAgentGitCommand()
@@ -150,12 +151,12 @@ func TestAgentGitRefreshCancelsInFlightScanOnClose(t *testing.T) {
 	scanCanceled := make(chan struct{})
 
 	model := gitTestModel(t)
-	model.gitScan = func(ctx context.Context, _ []string) map[string]agentGitCacheEntry {
+	model.gitScan = func(ctx context.Context, _ []string) (map[string]agentGitCacheEntry, error) {
 		close(scanStarted)
 		<-ctx.Done()
 		close(scanCanceled)
 
-		return nil
+		return nil, ctx.Err()
 	}
 
 	command := model.loadAgentGitCommand()
@@ -184,11 +185,11 @@ func TestAgentGitRefreshDoesNotOverlapScans(t *testing.T) {
 	var calls atomic.Int32
 
 	model := gitTestModel(t)
-	model.gitScan = func(ctx context.Context, _ []string) map[string]agentGitCacheEntry {
+	model.gitScan = func(ctx context.Context, _ []string) (map[string]agentGitCacheEntry, error) {
 		calls.Add(1)
 		<-ctx.Done()
 
-		return nil
+		return nil, ctx.Err()
 	}
 
 	first := model.loadAgentGitCommand()
@@ -234,10 +235,10 @@ func TestAgentGitScanIsNotRunWhileRendering(t *testing.T) {
 	var calls atomic.Int32
 
 	model := gitTestModel(t)
-	model.gitScan = func(context.Context, []string) map[string]agentGitCacheEntry {
+	model.gitScan = func(context.Context, []string) (map[string]agentGitCacheEntry, error) {
 		calls.Add(1)
 
-		return nil
+		return map[string]agentGitCacheEntry{}, nil
 	}
 
 	model = updateTestModel(t, model, tea.WindowSizeMsg{Width: 100, Height: 30})
@@ -317,8 +318,9 @@ func TestAgentGitScanRespectsCanceledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	if entries := scanGitMetadata(ctx, []string{t.TempDir()}); len(entries) != 0 {
-		t.Fatalf("scanGitMetadata() = %v, want no entries for a canceled context", entries)
+	entries, err := scanGitMetadata(ctx, []string{t.TempDir()})
+	if len(entries) != 0 || !errors.Is(err, context.Canceled) {
+		t.Fatalf("scanGitMetadata() = %v, %v; want no entries and cancellation", entries, err)
 	}
 }
 
@@ -343,7 +345,9 @@ func TestSessionIdentityForNamePrefersLiveRows(t *testing.T) {
 	}
 }
 
-func TestScanGitMetadataReadsRealRepository(t *testing.T) {
+func gitTestRepository(t *testing.T) string {
+	t.Helper()
+
 	gitPath, err := exec.LookPath("git")
 	if err != nil {
 		t.Skip("git is not available")
@@ -376,7 +380,119 @@ func TestScanGitMetadataReadsRealRepository(t *testing.T) {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
-	entries := scanGitMetadata(t.Context(), []string{directory, directory})
+	return directory
+}
+
+func TestAgentGitRefreshKeepsCountsUntilACompleteScanSucceeds(t *testing.T) {
+	directory := gitTestRepository(t)
+
+	gitPath, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bin := t.TempDir()
+	marker := filepath.Join(bin, "slow")
+
+	wrapper := "#!/bin/sh\nif [ \"$1\" = diff ] && [ -f \"${0%/*}/slow\" ]; then exec sleep 10; fi\nexec \"" + gitPath + "\" \"$@\"\n"
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(wrapper), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	model := gitTestModel(t)
+	t.Cleanup(model.Close)
+
+	rows := gitTestSessions()[:1]
+	rows[0].Agents = []session.AgentSession{{PaneID: "%1", CWD: directory}}
+	model.applySessionRows(sessionLoadResultMsg{sessions: rows, status: session.StatusComplete})
+	model.displayMode = displayModeAgents
+	model = updateTestModel(t, model, tea.WindowSizeMsg{Width: 100, Height: 20})
+	model = updateTestModel(t, model, model.loadAgentGitCommand()())
+
+	assertCounts := func(want string) {
+		t.Helper()
+
+		if got := stripANSI(viewString(model.View())); !strings.Contains(got, want) {
+			t.Fatalf("displayed Git counts do not contain %q:\n%s", want, got)
+		}
+
+		if got := readAgentGitCache(agentGitCachePath())[directory].GitChanges; got != want {
+			t.Fatalf("cached Git changes = %q, want %q", got, want)
+		}
+	}
+
+	assertCounts("+1 -0")
+
+	if err := os.WriteFile(marker, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	model = updateTestModel(t, model, model.loadAgentGitCommand()())
+
+	assertCounts("+1 -0")
+
+	if err := os.Remove(marker); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(filepath.Join(directory, "file.txt"), []byte("first\nsecond\nthird\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	model = updateTestModel(t, model, model.loadAgentGitCommand()())
+
+	assertCounts("+2 -0")
+}
+
+func TestAgentGitScanDoesNotStarveLaterRepositories(t *testing.T) {
+	directory := gitTestRepository(t)
+
+	gitPath, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bin := t.TempDir()
+
+	wrapper := "#!/bin/sh\ncase \"$PWD\" in */slow-*) exec sleep 10 ;; esac\nexec \"" + gitPath + "\" \"$@\"\n"
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(wrapper), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	names := []string{"slow-a", "slow-b", "slow-c", "slow-d", "slow-e", "slow-f"}
+	directories := make([]string, 0, len(names)+1)
+
+	for _, name := range names {
+		path := filepath.Join(bin, name)
+		if err := os.Mkdir(path, 0o700); err != nil {
+			t.Fatal(err)
+		}
+
+		directories = append(directories, path)
+	}
+
+	directories = append(directories, directory)
+
+	entries, err := scanGitMetadata(t.Context(), directories)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("scan error = %v, want the slow repositories' deadlines reported", err)
+	}
+
+	if got := entries[directory].GitChanges; got != "+1 -0" {
+		t.Fatalf("later repository's Git changes = %q, want +1 -0 despite earlier slow repositories", got)
+	}
+}
+
+func TestScanGitMetadataReadsRealRepository(t *testing.T) {
+	directory := gitTestRepository(t)
+
+	entries, err := scanGitMetadata(t.Context(), []string{directory, directory})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	entry, ok := entries[directory]
 	if !ok {

@@ -60,10 +60,10 @@ func TestAgentGitCacheAppearsOnFirstRender(t *testing.T) {
 	model := gitTestModel(t)
 	t.Cleanup(model.Close)
 	model.loadingSessions = true
-	model.gitScan = func(context.Context, []string) map[string]agentGitCacheEntry {
+	model.gitScan = func(context.Context, []string) (map[string]agentGitCacheEntry, error) {
 		t.Error("initial load or render ran a Git scan")
 
-		return nil
+		return map[string]agentGitCacheEntry{}, nil
 	}
 
 	entries := map[string]agentGitCacheEntry{"/work/alpha": {GitBranch: "cached-branch"}}
@@ -108,7 +108,7 @@ func TestAgentGitRefreshPersistsChangesAndReplacesStaleEntries(t *testing.T) {
 
 	want := map[string]agentGitCacheEntry{"/work/alpha": {GitBranch: "new-branch"}}
 	model.agentGit = previous
-	model.gitScan = func(context.Context, []string) map[string]agentGitCacheEntry { return want }
+	model.gitScan = func(context.Context, []string) (map[string]agentGitCacheEntry, error) { return want, nil }
 
 	command := model.loadAgentGitCommand()
 	if command == nil {
@@ -135,12 +135,12 @@ func TestAgentGitCanceledRefreshPreservesCache(t *testing.T) {
 	}
 
 	model.agentGit = want
-	model.gitScan = func(ctx context.Context, _ []string) map[string]agentGitCacheEntry {
+	model.gitScan = func(ctx context.Context, _ []string) (map[string]agentGitCacheEntry, error) {
 		if ctx.Err() == nil {
 			t.Error("invalidated scan context was not canceled")
 		}
 
-		return map[string]agentGitCacheEntry{"/work/alpha": {GitBranch: "canceled-branch"}}
+		return map[string]agentGitCacheEntry{"/work/alpha": {GitBranch: "canceled-branch"}}, ctx.Err()
 	}
 
 	command := model.loadAgentGitCommand()
@@ -168,8 +168,8 @@ func TestAgentGitCacheFailureDoesNotHideLiveResults(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	model.gitScan = func(context.Context, []string) map[string]agentGitCacheEntry {
-		return map[string]agentGitCacheEntry{"/work/alpha": {GitBranch: "live-branch"}}
+	model.gitScan = func(context.Context, []string) (map[string]agentGitCacheEntry, error) {
+		return map[string]agentGitCacheEntry{"/work/alpha": {GitBranch: "live-branch"}}, nil
 	}
 
 	command := model.loadAgentGitCommand()

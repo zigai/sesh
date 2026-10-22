@@ -194,6 +194,7 @@ type Model struct {
 	ghEntries                    map[ghKey]ghEntry
 	customFields                 customFieldState
 	agentGit                     map[string]agentGitCacheEntry
+	agentGitEpisode              logging.Episode
 	gitScan                      gitScanner
 	remoteCatalogUpdates         chan remoteCatalogMsg
 	remoteCatalogWatchStarted    bool
@@ -384,6 +385,7 @@ func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps
 		ghEntries:                    nil,
 		customFields:                 customFields,
 		agentGit:                     map[string]agentGitCacheEntry{},
+		agentGitEpisode:              logging.Episode{},
 		gitScan:                      scanGitMetadata,
 		remoteCatalogUpdates:         make(chan remoteCatalogMsg, 1),
 		remoteCatalogWatchStarted:    false,

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -9,11 +10,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/samber/oops"
+
 	"github.com/zigai/sesh/internal/git"
 )
 
 const (
-	gitScanBudget      = time.Second
 	gitCommandBudget   = 200 * time.Millisecond
 	gitOutputLimit     = 64 * 1024
 	gitWaitDelay       = 50 * time.Millisecond
@@ -47,7 +49,7 @@ type gitStatus struct {
 	conflicts int
 }
 
-type gitScanner func(ctx context.Context, directories []string) map[string]agentGitCacheEntry
+type gitScanner func(ctx context.Context, directories []string) (map[string]agentGitCacheEntry, error)
 
 type boundedBuffer struct {
 	data  []byte
@@ -66,15 +68,14 @@ func (b *boundedBuffer) String() string {
 	return string(b.data)
 }
 
-func scanGitMetadata(ctx context.Context, directories []string) map[string]agentGitCacheEntry {
-	ctx, cancel := context.WithTimeout(ctx, gitScanBudget)
-	defer cancel()
-
+func scanGitMetadata(ctx context.Context, directories []string) (map[string]agentGitCacheEntry, error) {
 	result := make(map[string]agentGitCacheEntry, len(directories))
+
+	var scanErr error
 
 	for _, directory := range directories {
 		if ctx.Err() != nil {
-			return result
+			return result, errors.Join(scanErr, ctx.Err())
 		}
 
 		if !filepath.IsAbs(directory) {
@@ -85,21 +86,30 @@ func scanGitMetadata(ctx context.Context, directories []string) map[string]agent
 			continue
 		}
 
-		result[directory] = readGitMetadata(ctx, directory)
+		entry, err := readGitMetadata(ctx, directory)
+		if err != nil {
+			scanErr = errors.Join(scanErr, err)
+
+			continue
+		}
+
+		result[directory] = entry
 	}
 
-	return result
+	return result, scanErr
 }
 
-func readGitMetadata(ctx context.Context, directory string) agentGitCacheEntry {
+func readGitMetadata(ctx context.Context, directory string) (agentGitCacheEntry, error) {
 	commandCtx, cancel := context.WithTimeout(ctx, gitCommandBudget)
 	defer cancel()
+
+	failure := oops.In("tui").Code("git_scan_failed").With("operation", "scan_git_metadata", "directory", directory)
 
 	locations, ok := gitMetadataOutput(commandCtx, directory, "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-dir", "--git-common-dir")
 
 	paths := strings.Split(locations, "\n")
 	if !ok || len(paths) != 3 {
-		return emptyAgentGitCacheEntry()
+		return emptyAgentGitCacheEntry(), failure.Wrap(commandCtx.Err())
 	}
 
 	branch, _ := gitMetadataOutput(commandCtx, directory, "symbolic-ref", "--quiet", "--short", "HEAD")
@@ -121,7 +131,7 @@ func readGitMetadata(ctx context.Context, directory string) agentGitCacheEntry {
 		GitConflicts:     status.conflicts,
 		GitDirty:         status.dirty,
 		GitUnmerged:      readGitUnmerged(commandCtx, paths[0]),
-	}
+	}, failure.Wrap(commandCtx.Err())
 }
 
 func readGitUnmerged(ctx context.Context, directory string) int {
