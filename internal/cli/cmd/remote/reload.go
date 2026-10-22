@@ -74,7 +74,7 @@ func monitorReloadSource(cmd *cobra.Command) (string, func([]byte) (config.Remot
 	}
 
 	if configuredPath == "" {
-		return config.DefaultConfigPath(), loadRemoteConfigBytes, true, nil
+		return "", loadRemoteConfigBytes, true, nil
 	}
 
 	path, err := filepath.Abs(filepath.Clean(configuredPath))

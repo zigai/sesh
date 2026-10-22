@@ -40,7 +40,7 @@ func WatchRemoteConfig(
 	interval time.Duration,
 	load func([]byte) (config.RemoteConfig, error),
 ) (<-chan ConfigReload, error) {
-	if path == "" || load == nil {
+	if load == nil {
 		return nil, errNilConfigLoader
 	}
 

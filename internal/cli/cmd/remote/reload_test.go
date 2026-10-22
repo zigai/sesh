@@ -159,6 +159,89 @@ func TestRemoteMonitorReloadSourceParsesProvidedExplicitFileBytes(t *testing.T) 
 	}
 }
 
+func TestRemoteMonitorReloadsSymlinkedDefaultConfig(t *testing.T) {
+	root := t.TempDir()
+
+	configHome := filepath.Join(root, "config")
+	if err := os.Mkdir(configHome, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+
+	firstDir := filepath.Join(root, "first")
+	secondDir := filepath.Join(root, "second")
+
+	for _, dir := range []string{firstDir, secondDir} {
+		if err := os.Mkdir(dir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	firstPath := filepath.Join(firstDir, "config.toml")
+	writeRemoteReloadTestConfig(t, firstPath, "first")
+	writeRemoteReloadTestConfig(t, filepath.Join(secondDir, "config.toml"), "retargeted")
+
+	link := filepath.Join(configHome, "sesh")
+	if err := os.Symlink(firstDir, link); err != nil {
+		t.Fatal(err)
+	}
+
+	initial, err := config.Load()
+	if err != nil || initial.Remote.SSHPath != "first" {
+		t.Fatalf("startup config = %#v, %v", initial, err)
+	}
+
+	path, load, enabled, err := monitorReloadSource(reloadTestCommand(t))
+	if err != nil || !enabled {
+		t.Fatalf("reload source enabled = %t, error = %v", enabled, err)
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+
+	reloads, err := remote.WatchRemoteConfig(ctx, path, configReloadInterval, load)
+	if err != nil {
+		cancel()
+		t.Fatal(err)
+	}
+
+	t.Cleanup(func() {
+		cancel()
+
+		for range reloads {
+		}
+	})
+
+	assertReload := func(want string) {
+		t.Helper()
+
+		select {
+		case reload := <-reloads:
+			if reload.Err != nil || reload.Remote.SSHPath != want {
+				t.Fatalf("reloaded SSH path = %q, error = %v; want %q", reload.Remote.SSHPath, reload.Err, want)
+			}
+		case <-t.Context().Done():
+			t.Fatal("config reload did not arrive")
+		}
+	}
+
+	assertReload("first")
+
+	writeRemoteReloadTestConfig(t, firstPath, "edited")
+	assertReload("edited")
+
+	nextLink := filepath.Join(configHome, "next")
+	if err := os.Symlink(secondDir, nextLink); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.Rename(nextLink, link); err != nil {
+		t.Fatal(err)
+	}
+
+	assertReload("retargeted")
+}
+
 func writeRemoteReloadTestConfig(t *testing.T, path, sshPath string) {
 	t.Helper()
 

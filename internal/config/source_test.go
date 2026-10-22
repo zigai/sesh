@@ -34,13 +34,11 @@ func TestReadSourceFileReturnsExactBoundedBytes(t *testing.T) {
 	}
 }
 
-func TestReadSourceFileRejectsDiscoveryAndStdinPaths(t *testing.T) {
+func TestReadSourceFileRejectsStdinPath(t *testing.T) {
 	t.Parallel()
 
-	for _, path := range []string{"", "-"} {
-		if _, err := config.ReadSourceFile(path); err == nil {
-			t.Fatalf("ReadSourceFile(%q) error = nil, want explicit-file error", path)
-		}
+	if _, err := config.ReadSourceFile("-"); err == nil {
+		t.Fatal("ReadSourceFile accepted stdin as a watched file")
 	}
 }
 

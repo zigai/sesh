@@ -14,7 +14,7 @@ import (
 	"github.com/zigai/strata"
 )
 
-var errSourceFilePathRequired = errors.New("configuration source requires an explicit file path")
+var errSourceFilePathRequired = errors.New("configuration source requires a file path")
 
 type LoadOption func(*loadOptions)
 
@@ -74,8 +74,9 @@ func Load(opts ...LoadOption) (*Config, error) {
 	return cfg, nil
 }
 
+// ReadSourceFile uses the discovered user config when path is empty.
 func ReadSourceFile(path string) ([]byte, error) {
-	if path == "" || path == "-" {
+	if path == "-" {
 		return nil, oops.In("config").
 			Code("config_invalid_path").
 			With("operation", "read_source", "reason", "file_path_required").
