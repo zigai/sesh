@@ -27,11 +27,11 @@ const (
 	ReasonFileManagerRestart Reason = "file_manager_restart"
 	ReasonTaskPlaceholder    Reason = "task_placeholder"
 
-	ReasonUnsupportedApplication Reason = "unsupported_application"
-	ReasonUnsafeArguments        Reason = "unsafe_arguments"
-	ReasonAgentMetadataMissing   Reason = "agent_metadata_missing"
-	ReasonAgentMetadataMismatch  Reason = "agent_metadata_mismatch"
-	ReasonAgentExecutableInvalid Reason = "agent_executable_invalid"
+	ReasonUnsupportedApplication Reason = Reason(model.ReasonUnsupportedApplication)
+	ReasonUnsafeArguments        Reason = Reason(model.ReasonUnsafeArguments)
+	ReasonAgentMetadataMissing   Reason = Reason(model.ReasonAgentMetadataMissing)
+	ReasonAgentMetadataMismatch  Reason = Reason(model.ReasonAgentMetadataMismatch)
+	ReasonAgentExecutableInvalid Reason = Reason(model.ReasonAgentExecutableInvalid)
 	ReasonEditorEndpointMissing  Reason = "editor_endpoint_missing"
 	ReasonEditorIdentityChanged  Reason = "editor_identity_changed"
 	ReasonEditorQueryFailed      Reason = "editor_query_failed"

@@ -62,6 +62,8 @@ func captureProcessLaunch(ctx context.Context, pid int, keys []string, agent *ap
 
 	launch = processLaunch(observed)
 	if unsupported {
+		launch.Reason = string(model.ReasonForegroundUnavailable)
+
 		return launch, record, nil
 	}
 
@@ -187,7 +189,10 @@ func prepareApplication(ctx context.Context, observed *process.Observation, agen
 		return enriched, nil
 	}
 
-	prepared, _ := apps.Prepare(launch, agent)
+	prepared, reason := apps.Prepare(launch, agent)
+	if prepared.Recovery == model.RecoveryUnverified {
+		prepared.Reason = string(reason)
+	}
 
 	return prepared, nil
 }

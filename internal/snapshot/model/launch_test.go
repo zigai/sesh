@@ -58,7 +58,10 @@ func TestNonrestartableLaunchValidation(t *testing.T) {
 		{"unknown reason", RecoveryNonrestartable, "unknown_reason", nil, nil, nil, false},
 		{"restart with reason", RecoveryRestart, ReasonPaneDead, Bytes("/bin/sh"), []Bytes{Bytes("sh")}, Bytes("/tmp"), false},
 		{"resume with reason", RecoveryResume, ReasonPaneDead, Bytes("/bin/sh"), []Bytes{Bytes("sh")}, Bytes("/tmp"), false},
-		{"unverified with reason", RecoveryUnverified, ReasonPaneDead, nil, nil, nil, false},
+		{"unverified with nonrestartable reason", RecoveryUnverified, ReasonPaneDead, nil, nil, nil, false},
+		{"unverified unsupported application", RecoveryUnverified, "unsupported_application", Bytes("/usr/bin/node"), []Bytes{Bytes("node"), Bytes("server.js")}, Bytes("/tmp"), true},
+		{"unverified foreground unavailable", RecoveryUnverified, "foreground_unavailable", Bytes("/bin/sh"), []Bytes{Bytes("sh")}, Bytes("/tmp"), true},
+		{"unverified unknown reason", RecoveryUnverified, "unknown_reason", nil, nil, nil, false},
 		{"relative dir in nonrestartable", RecoveryNonrestartable, ReasonPaneDead, nil, nil, Bytes("relative"), false},
 	}
 

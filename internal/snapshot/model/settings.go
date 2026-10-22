@@ -87,7 +87,11 @@ func validateLaunch(launch Launch) error {
 func validateLaunchRecovery(launch Launch) error {
 	switch launch.Recovery {
 	case RecoveryUnverified:
-		if launch.Reason != "" {
+		if !slices.Contains([]Reason{
+			"", ReasonUnsupportedApplication, ReasonUnsafeArguments,
+			ReasonAgentMetadataMissing, ReasonAgentMetadataMismatch, ReasonAgentExecutableInvalid,
+			ReasonForegroundUnavailable,
+		}, Reason(launch.Reason)) {
 			return ErrInvalid
 		}
 

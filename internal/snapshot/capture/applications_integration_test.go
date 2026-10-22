@@ -110,6 +110,15 @@ func testUnsupportedApplicationCapture(t *testing.T, tt unsupportedApplicationCa
 		t.Fatalf("unsupported launch recovery = %q, want unverified", launch.Recovery)
 	}
 
+	wantReason := "unsupported_application"
+	if tt.ambiguous {
+		wantReason = "foreground_unavailable"
+	}
+
+	if launch.Reason != wantReason {
+		t.Fatalf("unsupported launch reason = %q, want %q", launch.Reason, wantReason)
+	}
+
 	if tt.ambiguous && filepath.Base(string(launch.Executable)) != "bash" {
 		t.Fatalf("pipeline selected an arbitrary member: executable = %q", launch.Executable)
 	}
