@@ -88,7 +88,7 @@ func (s *Service) refreshPR(ctx context.Context, record Record) (Record, string,
 		return record, "", false, nil
 	}
 
-	pr, head, found, err := s.prs.FindPR(ctx, record.Directory, record.Branch)
+	pr, head, found, err := s.prs.FindPR(ctx, record.Project, record.Branch)
 	if err != nil || !found {
 		return record, "", false, taskError("refresh_pr", err)
 	}

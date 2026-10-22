@@ -53,6 +53,33 @@ func TestFinishRefusesToLoseUnmergedCommitsAndChanges(t *testing.T) {
 	assertTaskKept(t, f)
 }
 
+func TestFinishRefusesUnmergedCommitsWhenTheWorktreeIsGone(t *testing.T) {
+	f := newFinishFixture(t)
+	commit(t, f.record.Directory)
+	tip := gitOutput(t, f.record.Directory, "rev-parse", "HEAD")
+
+	if err := os.RemoveAll(f.record.Directory); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := f.service.Finish(t.Context(), f.record.ID, task.FinishOptions{Discard: false, SkipRun: false})
+
+	var loss *task.LossError
+	if !errors.As(err, &loss) || loss.UnmergedCommits != 1 {
+		t.Fatalf("Finish() error = %v, want the missing worktree's unmerged commit reported", err)
+	}
+
+	assertStoredTaskState(t, f, task.StateActive)
+
+	if got := gitOutput(t, f.repo, "rev-parse", f.record.Branch); got != tip {
+		t.Fatalf("task branch tip = %q, want the unmerged commit %q kept", got, tip)
+	}
+
+	if len(f.closed) != 0 {
+		t.Fatal("popup was closed for a task that was kept")
+	}
+}
+
 func TestFinishRefusesATaskWhosePullRequestWasClosedUnmerged(t *testing.T) {
 	f := newFinishFixture(t)
 	f.prs.pr, f.prs.found = task.PullRequest{Number: 7, State: task.PRClosed, URL: ""}, true
@@ -68,10 +95,27 @@ func TestFinishRefusesATaskWhosePullRequestWasClosedUnmerged(t *testing.T) {
 }
 
 func TestFinishRemovesAMergedTaskWithoutDiscard(t *testing.T) {
-	for _, squash := range []bool{false, true} {
-		t.Run(map[bool]string{false: "merge", true: "squash"}[squash], func(t *testing.T) {
+	tests := []struct {
+		name            string
+		squash          bool
+		missingWorktree bool
+	}{
+		{name: "merge", squash: false, missingWorktree: false},
+		{name: "squash", squash: true, missingWorktree: false},
+		{name: "merge without worktree", squash: false, missingWorktree: true},
+		{name: "squash without worktree", squash: true, missingWorktree: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			f := newFinishFixture(t)
-			mergeTask(t, f, squash)
+			mergeTask(t, f, tt.squash)
+
+			if tt.missingWorktree {
+				if err := os.RemoveAll(f.record.Directory); err != nil {
+					t.Fatal(err)
+				}
+			}
 
 			if _, _, err := f.service.RefreshPR(t.Context(), f.record.ID); err != nil {
 				t.Fatal(err)
@@ -312,6 +356,62 @@ func TestFinishOfARemoteBranchTaskKeepsUnpushedWorkAndTheRemoteBranch(t *testing
 
 	if remote := gitOutput(t, f.repo, "branch", "-r", "--list", "origin/review"); remote == "" {
 		t.Fatal("the remote branch was removed")
+	}
+}
+
+func TestRefreshPRUsesTheProjectWhenTheWorktreeIsGone(t *testing.T) {
+	base := realTempDir(t)
+	repo := mkdir(t, filepath.Join(base, "repo"))
+	runGit(t, repo, "init", "-q")
+	directory := mkdir(t, filepath.Join(base, "main-1"))
+
+	store := task.NewStore(filepath.Join(base, "state", "tasks.json"))
+	record := task.EmptyRecord()
+	record.Kind, record.State = task.KindProject, task.StateActive
+	record.Project, record.Directory = repo, directory
+	record.Branch, record.Base = "wt/main/1", "main"
+	record.OwnsWorktree, record.OwnsBranch = true, true
+
+	if _, err := store.Update(t.Context(), func(ledger *task.Ledger) error {
+		record.ID = ledger.NextID()
+		ledger.Put(record)
+
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.Remove(directory); err != nil {
+		t.Fatal(err)
+	}
+
+	bin := t.TempDir()
+	listing := `[{"number":12,"state":"OPEN","url":"https://example.test/pr/12","headRefOid":"","isCrossRepository":false}]`
+	writeFile(t, filepath.Join(bin, "gh"), "#!/bin/sh\n[ \"$PWD\" = \"$PR_PROJECT\" ] && [ \"$4\" = \"wt/main/1\" ] || exit 1\nprintf '%s' '"+listing+"'\n")
+
+	if err := os.Chmod(filepath.Join(bin, "gh"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("PATH", bin)
+	t.Setenv("PR_PROJECT", repo)
+
+	service := task.NewService(task.Options{Store: store, PRs: task.GitHub{}})
+	want := task.PullRequest{Number: 12, State: task.PROpen, URL: "https://example.test/pr/12"}
+
+	refreshed, changed, err := service.RefreshPR(t.Context(), record.ID)
+	if err != nil || !changed || refreshed.PR != want {
+		t.Fatalf("RefreshPR() = %+v, %t, %v; want the branch's PR despite its missing worktree", refreshed.PR, changed, err)
+	}
+
+	ledger, err := store.Load(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stored, found := ledger.Find(record.ID)
+	if !found || stored.PR != want || stored.State != task.StateActive || stored.Directory != directory {
+		t.Fatalf("stored task = %+v, found %t; want the active task kept with its PR refreshed", stored, found)
 	}
 }
 
