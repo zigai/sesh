@@ -228,7 +228,7 @@ func (m *Model) renderMenu(frame string) string {
 }
 
 func (m *Model) menuLines() []string {
-	labelWidth, keyWidth := lipgloss.Width(m.menu.title), 0
+	labelWidth, keyWidth := 0, 0
 
 	for _, entry := range m.menu.entries {
 		labelWidth = max(labelWidth, lipgloss.Width(entry.label))
@@ -243,7 +243,7 @@ func (m *Model) menuLines() []string {
 	inner = min(inner, max(m.contentWidth()-menuBorderCells, 1))
 
 	border := lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.Theme.Border))
-	title := display.Truncate(" "+SanitizeTerminalText(m.menu.title)+" ", inner)
+	title := " " + display.Truncate(SanitizeTerminalText(m.menu.title), inner-menuSideCells) + " "
 	top := border.Render("╭") + lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.Theme.Primary)).Bold(true).Render(title) +
 		border.Render(strings.Repeat("─", max(inner-lipgloss.Width(title), 0))+"╮")
 
