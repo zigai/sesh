@@ -106,6 +106,10 @@ func runCapturing(ctx context.Context, cmd *exec.Cmd, input []byte) ([]byte, []b
 	stdin, stdout, stderr := pipes[0], pipes[1], pipes[2]
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = stdin.read, stdout.write, stderr.write
 
+	// Cancellation must kill the whole group, not let CommandContext kill only
+	// the leader and race the cleanup below.
+	cmd.Cancel = nil
+
 	startErr := cmd.Start()
 
 	childEndsErr := errors.Join(stdin.read.Close(), stdout.write.Close(), stderr.write.Close())
@@ -117,11 +121,12 @@ func runCapturing(ctx context.Context, cmd *exec.Cmd, input []byte) ([]byte, []b
 
 	var cleanupErr error
 
-	stopUnblock := context.AfterFunc(ctx, func() {
+	cleanup := func() {
 		cleanupErr = errors.Join(killProcessGroup(cmd.Process.Pid), closePipes(pipes))
 
 		close(cleanupDone)
-	})
+	}
+	stopUnblock := context.AfterFunc(ctx, cleanup)
 
 	var (
 		output, errorOutput []byte
@@ -165,15 +170,18 @@ func runCapturing(ctx context.Context, cmd *exec.Cmd, input []byte) ([]byte, []b
 
 	group.Wait()
 
-	if !stopUnblock() {
+	stopped := stopUnblock()
+	ctxErr := ctx.Err()
+
+	if !stopped {
 		<-cleanupDone
+	} else if ctxErr != nil {
+		// A canceled context can still have a pending callback. Finish cleanup
+		// before Wait reaps the leader and releases the process-group identity.
+		cleanup()
 	}
 
-	waitErr := errors.Join(exitErr, cmd.Wait())
-
-	if ctxErr := ctx.Err(); ctxErr != nil {
-		waitErr = errors.Join(ctxErr, waitErr)
-	}
+	waitErr := errors.Join(ctxErr, exitErr, cmd.Wait())
 
 	ioErr := errors.Join(childEndsErr, readErr, cleanupErr, closePipes(pipes))
 	if waitErr != nil {

@@ -114,8 +114,9 @@ func (process *captureProcess) close(t *testing.T) {
 		t.Error(killErr)
 	}
 
+	// The shell may reap the child before the group kill reaches the leader.
 	var status unix.WaitStatus
-	if _, err := unix.Wait4(process.childPID, &status, 0, nil); err != nil {
+	if _, err := unix.Wait4(process.childPID, &status, 0, nil); err != nil && !errors.Is(err, unix.ECHILD) {
 		t.Error(err)
 	}
 
