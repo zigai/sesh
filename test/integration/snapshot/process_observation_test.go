@@ -395,8 +395,8 @@ func assertPreservedDeadAndLivePanes(t *testing.T, observation capture.Observati
 
 		liveCount++
 
-		if pane.Launch.Recovery != model.RecoveryUnverified || pane.Launch.Reason != "" {
-			t.Fatalf("unaffected pane recovery/reason = %q/%q, want %q with no reason", pane.Launch.Recovery, pane.Launch.Reason, model.RecoveryUnverified)
+		if pane.Launch.Recovery != model.RecoveryUnverified || pane.Launch.Reason != string(model.ReasonUnsupportedApplication) {
+			t.Fatalf("unaffected pane recovery/reason = %q/%q, want %q/%q", pane.Launch.Recovery, pane.Launch.Reason, model.RecoveryUnverified, model.ReasonUnsupportedApplication)
 		}
 	}
 

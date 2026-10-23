@@ -615,6 +615,7 @@ func TestEnginePracticalRestorePaneOutcomesEvidence(t *testing.T) {
 	manifest.Panes[1].Launch.Arguments = []model.Bytes{model.Bytes("bash"), model.Bytes("-c"), model.Bytes("echo 1 | cat")}
 
 	manifest.Panes[2].Launch.Recovery = "restart"
+	manifest.Panes[2].Launch.Reason = ""
 	manifest.Panes[2].Launch.Directory = model.Bytes(tempDir)
 	manifest.Panes[2].Launch.Executable = model.Bytes("/nonexistent/bin/missing_binary")
 	manifest.Panes[2].Launch.Arguments = []model.Bytes{model.Bytes("missing_binary")}
