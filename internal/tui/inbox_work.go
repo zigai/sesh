@@ -320,7 +320,7 @@ func (m *Model) unlinkPR(item inboxItem, subject action.Subject, pr string) func
 		}})
 	}
 
-	return m.openMenu(&rowMenu{title: "unlink", entries: entries, cursor: 0, anchored: false, anchorX: 0, anchorY: 0, box: menuBox{x: 0, y: 0, width: 0, height: 0}})
+	return m.openMenu(&rowMenu{entries: entries, cursor: 0, anchored: false, anchorX: 0, anchorY: 0, box: menuBox{x: 0, y: 0, width: 0, height: 0}})
 }
 
 func (m *Model) syncWorkCommand() tea.Cmd {

@@ -292,7 +292,7 @@ func (m *Model) snoozeItem(key, until string) func() (tea.Model, tea.Cmd) {
 
 		entries = append(entries, menuEntry{label: snoozeCustomLabel, key: "", run: func() (tea.Model, tea.Cmd) { return m.promptParam(request, param)() }})
 
-		return m.openMenu(&rowMenu{title: "snooze until", entries: entries, cursor: 0, anchored: false, anchorX: 0, anchorY: 0, box: menuBox{x: 0, y: 0, width: 0, height: 0}})
+		return m.openMenu(&rowMenu{entries: entries, cursor: 0, anchored: false, anchorX: 0, anchorY: 0, box: menuBox{x: 0, y: 0, width: 0, height: 0}})
 	}
 
 	snooze, err := config.ParseSnooze(until)

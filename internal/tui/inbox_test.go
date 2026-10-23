@@ -489,6 +489,7 @@ func TestRowMenuListsOnlyTheEntriesThatApply(t *testing.T) {
 		inboxTestAgent("fresh", "%1", session.AgentStatusIdle, time.Now()),
 	})
 	model.config.Menu.Agent = []string{config.MenuGo, config.MenuDivider, config.MenuUnsnooze, config.MenuSnooze, config.MenuSeen, config.MenuMerge, config.MenuSleep}
+	model = updateTestModel(t, model, tea.WindowSizeMsg{Width: 80, Height: 24})
 
 	runHandler(t, model, model.openRowMenu())
 
@@ -496,13 +497,17 @@ func TestRowMenuListsOnlyTheEntriesThatApply(t *testing.T) {
 		t.Fatal("row menu did not open")
 	}
 
+	if top := stripANSI(model.menuLines()[0]); strings.Trim(top, "╭─╮") != "" {
+		t.Fatalf("context menu has a title in its top border: %q", top)
+	}
+
 	labels := make([]string, 0, len(model.menu.entries))
 	for _, entry := range model.menu.entries {
 		labels = append(labels, entry.label)
 	}
 
-	if !slices.Equal(labels, []string{"go", "", config.MenuSnooze, config.MenuSeen}) {
-		t.Fatalf("menu = %q, want go, a divider, snooze and seen", labels)
+	if !slices.Equal(labels, []string{"open", "", config.MenuSnooze, config.MenuSeen}) {
+		t.Fatalf("menu = %q, want open, a divider, snooze and seen", labels)
 	}
 
 	updateTestModel(t, model, keyCode(tea.KeyEscape))
@@ -1024,8 +1029,8 @@ func TestEnterOnAFinishedConversationResumesItAndItsMenuOffersNoFinishOrSnooze(t
 		labels = append(labels, entry.label)
 	}
 
-	if !slices.Equal(labels, []string{"go", config.MenuPin, config.MenuUnseen}) {
-		t.Fatalf("menu = %q, want go, pin and unseen", labels)
+	if !slices.Equal(labels, []string{"open", config.MenuPin, config.MenuUnseen}) {
+		t.Fatalf("menu = %q, want open, pin and unseen", labels)
 	}
 
 	updateTestModel(t, model, keyCode(tea.KeyEscape))
@@ -1101,8 +1106,8 @@ func TestClosedConversationMenuOffersFinishAndPinInsteadOfSnooze(t *testing.T) {
 		labels = append(labels, entry.label)
 	}
 
-	if !slices.Equal(labels, []string{"go", config.MenuPin, config.MenuFinish}) {
-		t.Fatalf("menu = %q, want go, pin and finish", labels)
+	if !slices.Equal(labels, []string{"open", config.MenuPin, config.MenuFinish}) {
+		t.Fatalf("menu = %q, want open, pin and finish", labels)
 	}
 }
 

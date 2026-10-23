@@ -194,7 +194,7 @@ func (m *Model) openEvidenceMenu(item inboxItem) func() (tea.Model, tea.Cmd) {
 	}
 
 	return m.openMenu(&rowMenu{
-		title: "evidence", entries: entries, cursor: 0, anchored: false, anchorX: 0, anchorY: 0,
+		entries: entries, cursor: 0, anchored: false, anchorX: 0, anchorY: 0,
 		box: menuBox{x: 0, y: 0, width: 0, height: 0},
 	})
 }

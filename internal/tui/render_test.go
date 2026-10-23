@@ -559,6 +559,24 @@ func TestRenderNarrowAgentsFooterKeepsNavigationAndHelp(t *testing.T) {
 	}
 }
 
+func TestMenuSelectionUsesTheListSelectionColors(t *testing.T) {
+	for _, selected := range []string{"#2a2a2a", "#454545"} {
+		t.Run(selected, func(t *testing.T) {
+			model := newTestModel()
+			model.config.Theme.Selected = selected
+
+			entry := menuEntry{label: "open", key: "enter", run: func() (tea.Model, tea.Cmd) { return model, nil }}
+			got := model.menuEntryLine(entry, 14, 4, true)
+			want := lipgloss.NewStyle().Foreground(lipgloss.Color("255")).
+				Background(lipgloss.Color(selected)).Bold(true).Render(" open   enter ")
+
+			if got != want {
+				t.Fatalf("selected menu entry = %q, want the list selection colors %q", got, want)
+			}
+		})
+	}
+}
+
 func TestRenderSessionRowSelectedPadsFullWidth(t *testing.T) {
 	model := newTestModel()
 	layout := model.calcSessionLayout(32)

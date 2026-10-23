@@ -46,7 +46,6 @@ var agentMenuActions = map[string]action.ID{
 }
 
 type rowMenu struct {
-	title    string
 	entries  []menuEntry
 	cursor   int
 	anchored bool
@@ -72,7 +71,7 @@ func (entry menuEntry) divider() bool {
 func (m *Model) openMenu(menu *rowMenu) func() (tea.Model, tea.Cmd) {
 	entries := trimMenuDividers(menu.entries)
 	if len(entries) == 0 {
-		m.setErrorStatusf("No actions for %s", menu.title)
+		m.setErrorStatusf("No actions available")
 
 		return func() (tea.Model, tea.Cmd) { return m, nil }
 	}
@@ -243,9 +242,7 @@ func (m *Model) menuLines() []string {
 	inner = min(inner, max(m.contentWidth()-menuBorderCells, 1))
 
 	border := lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.Theme.Border))
-	title := " " + display.Truncate(SanitizeTerminalText(m.menu.title), inner-menuSideCells) + " "
-	top := border.Render("╭") + lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.Theme.Primary)).Bold(true).Render(title) +
-		border.Render(strings.Repeat("─", max(inner-lipgloss.Width(title), 0))+"╮")
+	top := border.Render("╭" + strings.Repeat("─", inner) + "╮")
 
 	lines := []string{top}
 
@@ -277,7 +274,7 @@ func (m *Model) menuEntryLine(entry menuEntry, inner, labelWidth int, selected b
 	}
 
 	if selected {
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("0")).Background(lipgloss.Color(m.config.Theme.Primary)).Bold(true).
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("255")).Background(lipgloss.Color(m.config.Theme.Selected)).Bold(true).
 			Render(labelPart + keyPart + padding)
 	}
 
@@ -295,15 +292,10 @@ func (m *Model) openRowMenu() func() (tea.Model, tea.Cmd) {
 	}
 
 	if selected.isAgent() {
-		row := m.filtered[selected.sessionIndex]
-		title := row.Agents[selected.agentIndex].HarnessSession
-
-		return m.openMenu(&rowMenu{title: title, entries: m.agentMenuEntries(), cursor: 0, anchored: false, anchorX: 0, anchorY: 0, box: menuBox{x: 0, y: 0, width: 0, height: 0}})
+		return m.openMenu(&rowMenu{entries: m.agentMenuEntries(), cursor: 0, anchored: false, anchorX: 0, anchorY: 0, box: menuBox{x: 0, y: 0, width: 0, height: 0}})
 	}
 
-	row := m.filtered[selected.sessionIndex]
-
-	return m.openMenu(&rowMenu{title: row.Name, entries: m.sessionMenuEntries(), cursor: 0, anchored: false, anchorX: 0, anchorY: 0, box: menuBox{x: 0, y: 0, width: 0, height: 0}})
+	return m.openMenu(&rowMenu{entries: m.sessionMenuEntries(), cursor: 0, anchored: false, anchorX: 0, anchorY: 0, box: menuBox{x: 0, y: 0, width: 0, height: 0}})
 }
 
 func (m *Model) handleRowRightClick(mouse tea.Mouse) func() (tea.Model, tea.Cmd) {
@@ -338,7 +330,7 @@ func (m *Model) sessionMenuEntries() []menuEntry {
 			entries = append(entries, menuEntry{label: "", key: "", run: nil})
 		case config.MenuGo:
 			if run := m.handleEnter(); run != nil {
-				entries = append(entries, menuEntry{label: "go", key: "enter", run: run})
+				entries = append(entries, menuEntry{label: "open", key: "enter", run: run})
 			}
 		default:
 			if entry, ok := m.actionMenuEntry(name, sessionMenuActions[name], action.Values{}); ok {
@@ -383,7 +375,7 @@ func (m *Model) agentMenuEntry(name string, items map[string]config.MenuItemConf
 		return []menuEntry{{label: "", key: "", run: nil}}
 	case name == config.MenuGo:
 		if run := m.handleEnter(); run != nil {
-			return []menuEntry{{label: "go", key: "enter", run: run}}
+			return []menuEntry{{label: "open", key: "enter", run: run}}
 		}
 	case agentMenuActions[name] != "":
 		id := agentMenuActions[name]
