@@ -261,6 +261,51 @@ func TestAutosaveRestoresAServerThatStartedWithoutTheStartupRestore(t *testing.T
 	}
 }
 
+func TestAutosaveRestoresAnEmptyServerThatMissedTheStartupRestore(t *testing.T) {
+	fixture := newSavedSessionFixture(t)
+
+	if err := fixture.server.Options().SetExitEmpty(t.Context(), false); err != nil {
+		t.Fatal(err)
+	}
+
+	sessions, err := fixture.server.Sessions(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, info := range sessions {
+		sess, err := fixture.server.Session(t.Context(), info.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := sess.Kill(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	fixture.autosave(t)
+
+	if !fixture.workSessionLive(t) {
+		t.Fatal("autosave on an empty server did not restore the saved session")
+	}
+
+	fixture.killWorkSession(t)
+
+	skipped := fixture.autosave(t)
+	if fixture.workSessionLive(t) {
+		t.Fatal("autosave restored a session deliberately closed after the late restore")
+	}
+
+	if skipped.Status != "skipped" || skipped.Reason != "no_sessions" {
+		t.Fatalf("autosave after closing the restored session = %#v, want a no_sessions skip", skipped)
+	}
+
+	if got := fixture.generations(t); got != 1 {
+		t.Fatalf("generations = %d, want the saved one untouched", got)
+	}
+}
+
 func TestAutosaveRetriesALateRestoreThatFoundTheSaveLockBusy(t *testing.T) {
 	fixture := newSavedSessionFixture(t)
 

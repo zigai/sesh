@@ -118,6 +118,10 @@ func executeAutosaveSave(ctx context.Context, cmd *cobra.Command, env Env) error
 		}
 	}
 
+	if len(selected) == 0 {
+		return skipAutosaveWithoutSessions(cmd, env, repo)
+	}
+
 	lock, err := automation.TryAcquireSaveLock(ctx, automation.SaveLockPath())
 	if err != nil {
 		return handleAutosaveLockError(ctx, cmd, env, repo, err)
@@ -308,6 +312,14 @@ func executeFinalSave(
 			reason,
 			errors.Join(err, wrapCloseError(repo.Close()), lock.Release()),
 		)
+	}
+
+	if len(selected) == 0 {
+		status.Result, status.Reason = automation.FinalSaveIncomplete, reasonNoSessions
+		status.Incomplete, status.Bookkeeping = true, false
+		outcome.status, outcome.reason = statusSkipped, reasonNoSessions
+
+		return outcome, status, errors.Join(wrapCloseError(repo.Close()), lock.Release())
 	}
 
 	if pending := findPendingRestore(ctx, cmd, server, repo); pending.sessions > 0 {
@@ -546,6 +558,15 @@ func skipAutosaveWithoutServer(ctx context.Context, cmd *cobra.Command, env Env,
 	idle.restorable = restorable
 
 	return errors.Join(renderAutosaveResult(cmd, env, idle), closeErr)
+}
+
+func skipAutosaveWithoutSessions(cmd *cobra.Command, env Env, repo *store.Repository) error {
+	closeErr := wrapCloseError(repo.Close())
+
+	empty := newOutcome(statusSkipped, reasonNoSessions)
+	empty.history = historyState(env)
+
+	return errors.Join(renderAutosaveResult(cmd, env, empty), closeErr)
 }
 
 func recordCompletedAutosave(ctx context.Context, env Env, outcome *outcome) error {

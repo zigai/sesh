@@ -3,6 +3,7 @@
 package cli_test
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -323,6 +324,73 @@ func assertAutosaveNotDueAfterFinalSave(t *testing.T, socketPath string) {
 	skipped := decodeJSONPayload[autosaveResultJSON](t, due.envelope.Result)
 	if skipped.Status != "not_due" {
 		t.Fatalf("status = %q, want not_due after the final save recorded completion", skipped.Status)
+	}
+}
+
+func TestAutosaveSkipsAServerWithoutSessions(t *testing.T) {
+	server := tmuxtest.NewServer(t)
+
+	if err := server.Options().SetExitEmpty(t.Context(), false); err != nil {
+		t.Fatal(err)
+	}
+
+	sessions, err := server.Sessions(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, info := range sessions {
+		sess, err := server.Session(t.Context(), info.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := sess.Kill(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	socketPath := server.Endpoint().SocketPath
+
+	isolateAutosaveEnv(t)
+
+	statusPath := filepath.Join(dataHome(t), "final-save-status.json")
+
+	runs := [][]string{
+		{"autosave", "final-save", "--deadline", "5s", "--status-file", statusPath},
+		{"autosave", "save-if-due"},
+	}
+	for _, args := range runs {
+		exec := executeJSON(t, append(args, testSocketFlag, socketPath, testNoConfigFlag, testJSONFlag)...)
+		if !exec.envelope.OK || exec.err != nil {
+			t.Fatalf("%v = (%+v, %v), want a successful skip", args, exec.envelope, exec.err)
+		}
+
+		result := decodeJSONPayload[autosaveResultJSON](t, exec.envelope.Result)
+		if result.Status != "skipped" || result.Reason != "no_sessions" || result.Recorded {
+			t.Fatalf("%v result = %#v, want an unrecorded no_sessions skip", args, result)
+		}
+	}
+
+	status, err := automation.ReadFinalSaveStatus(statusPath)
+	if err != nil {
+		t.Fatalf("ReadFinalSaveStatus failed: %v", err)
+	}
+
+	if status.Reason != "no_sessions" || status.Attempt != "" {
+		t.Fatalf("status artifact = %#v, want a no_sessions result without a save attempt", status)
+	}
+
+	history := executeJSON(t, "snapshot", "history", testNoConfigFlag, testJSONFlag)
+	if !history.envelope.OK {
+		t.Fatalf("snapshot history failed: %+v", history.envelope)
+	}
+
+	attempts := decodeJSONPayload[struct {
+		Attempts []json.RawMessage `json:"attempts"`
+	}](t, history.envelope.Result)
+	if len(attempts.Attempts) != 0 {
+		t.Fatalf("history attempts = %s, want none for a server without sessions", attempts.Attempts)
 	}
 }
 

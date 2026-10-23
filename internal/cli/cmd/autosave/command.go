@@ -25,6 +25,7 @@ const (
 
 	reasonLockBusy           = "lock_busy"
 	reasonTmuxNotRunning     = "tmux_not_running"
+	reasonNoSessions         = "no_sessions"
 	reasonRestorableSessions = "restorable_sessions"
 	reasonCaptureChanged     = "capture_changed"
 

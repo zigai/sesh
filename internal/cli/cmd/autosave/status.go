@@ -234,7 +234,7 @@ func logAutosaveSkip(cmd *cobra.Command, outcome outcome) {
 
 	switch outcome.reason {
 	case automation.ReasonDisabled, automation.ReasonNotDue, automation.ReasonRepositoryMissing,
-		reasonLockBusy, reasonTmuxNotRunning, reasonRestorePending:
+		reasonLockBusy, reasonTmuxNotRunning, reasonNoSessions, reasonRestorePending:
 	default:
 		return
 	}
