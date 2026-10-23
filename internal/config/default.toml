@@ -29,7 +29,7 @@
 # row, and agent keys in a focused session), or "right".
 # shortcut_style = "none"
 
-# What a session key does in the agents and inbox modes: "focus" (default) waits for an agent key,
+# What a session key does in the agents mode: "focus" (default) waits for an agent key,
 # "open" opens the session.
 # session_key_action = "focus"
 
@@ -205,8 +205,8 @@
 # top = "home"
 # bottom = "end"
 
-# Session keys: session_prefix and then a letter opens a session, or in the agents and inbox modes
-# focuses it so one of agent_keys opens one of its agents. "alt" holds alt with the letter instead.
+# Session keys: session_prefix and then a letter opens a session, or in the agents mode focuses it
+# so one of agent_keys opens one of its agents. In the inbox mode the letters focus groups. "alt" holds alt with the letter instead.
 # Sessions get a free letter assigned once and kept; a [keys.sessions] table picks the letter for
 # a local session, as in dotfiles = "d".
 # session_prefix = "tab"

@@ -145,6 +145,7 @@ func (m *Model) showsDisplayModeIndicator() bool {
 func (m *Model) refreshDisplaySessions() {
 	if m.displayMode == displayModeInbox {
 		m.displaySessions = m.inboxSessions()
+		m.inboxGroupKeys = inboxGroupKeys(m.displaySessions, m.sessionKeys.blocked)
 		m.markCustomFieldsDirty()
 
 		return

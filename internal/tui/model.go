@@ -210,6 +210,7 @@ type Model struct {
 	pendingResume                *remoteResume
 	closedExpanded               map[string]bool
 	inboxItems                   map[string]inboxItem
+	inboxGroupKeys               map[string]string
 	menu                         *rowMenu
 	inbox                        inbox.State
 	inboxErr                     error
@@ -401,6 +402,7 @@ func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps
 		pendingResume:                nil,
 		closedExpanded:               map[string]bool{},
 		inboxItems:                   map[string]inboxItem{},
+		inboxGroupKeys:               map[string]string{},
 		menu:                         nil,
 		inbox:                        inbox.State{Version: 0, Snoozes: nil, Unseen: nil},
 		inboxErr:                     nil,

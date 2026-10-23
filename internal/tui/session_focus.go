@@ -45,7 +45,7 @@ func (m *Model) clearSessionFocus() {
 }
 
 func (m *Model) focusesOnSessionKey() bool {
-	return m.displayMode.tree() && m.config.Settings.SessionKeyAction == "focus"
+	return m.displayMode == displayModeInbox || (m.displayMode.tree() && m.config.Settings.SessionKeyAction == "focus")
 }
 
 func (m *Model) agentKeys() string {
@@ -54,7 +54,9 @@ func (m *Model) agentKeys() string {
 
 func (m *Model) focusOrOpenSession(target session.Session) func() (tea.Model, tea.Cmd) {
 	key := target.RuntimeKey()
-	if !m.focusesOnSessionKey() || m.focusedSession == key {
+	group := m.displayMode == displayModeInbox
+
+	if !group && (!m.focusesOnSessionKey() || m.focusedSession == key) {
 		m.clearSessionFocus()
 
 		return m.openSession(target)
@@ -69,6 +71,10 @@ func (m *Model) focusOrOpenSession(target session.Session) func() (tea.Model, te
 	if index < 0 || len(m.filtered[index].Agents) == 0 {
 		m.clearSessionFocus()
 
+		if group {
+			return func() (tea.Model, tea.Cmd) { return m, nil }
+		}
+
 		return m.openSession(target)
 	}
 
@@ -76,8 +82,21 @@ func (m *Model) focusOrOpenSession(target session.Session) func() (tea.Model, te
 		return m.openAgentRow(index, 0)
 	}
 
+	if m.focusedSession == key && m.selectedListRow().sessionIndex == index {
+		m.clearSessionFocus()
+
+		return m.openSelectedAgent()
+	}
+
 	m.focusedSession = key
-	m.selectListRow(popupListRow{sessionIndex: index, agentIndex: parentAgentIndex})
+
+	// Inbox group rows cannot be selected, so focus lands on the group's first agent.
+	selected := popupListRow{sessionIndex: index, agentIndex: parentAgentIndex}
+	if group {
+		selected.agentIndex = 0
+	}
+
+	m.selectListRow(selected)
 
 	return func() (tea.Model, tea.Cmd) { return m, nil }
 }
@@ -113,6 +132,10 @@ func (m *Model) openAgentRow(sessionIndex, agentIndex int) func() (tea.Model, te
 	m.selectListRow(popupListRow{sessionIndex: sessionIndex, agentIndex: agentIndex})
 	m.clearSessionFocus()
 
+	return m.openSelectedAgent()
+}
+
+func (m *Model) openSelectedAgent() func() (tea.Model, tea.Cmd) {
 	if handler := m.handleEnter(); handler != nil {
 		return handler
 	}
@@ -126,7 +149,7 @@ func (m *Model) focusedAgentKey(row session.Session, agent session.AgentSession)
 	}
 
 	slot := slices.IndexFunc(row.Agents, func(candidate session.AgentSession) bool {
-		return candidate.RegistryID == agent.RegistryID && candidate.PaneID == agent.PaneID
+		return candidate.Host == agent.Host && candidate.RegistryID == agent.RegistryID && candidate.PaneID == agent.PaneID
 	})
 	if slot < 0 || slot >= len(m.agentKeys()) {
 		return ""
@@ -210,7 +233,7 @@ func (m *Model) agentKeysHint() string {
 func (m *Model) sessionKeyStepFooterParts(keys actionKeyMap) []footerPart {
 	if m.sessionPrefixPending {
 		return []footerPart{
-			newFooterPart("a-z", "session"),
+			newFooterPart("a-z", m.sessionKeyTarget()),
 			newFooterPart(focusCancelKey, "back"),
 			newFooterPart(keys.help.Help().Key, "help"),
 		}
@@ -235,8 +258,16 @@ func (m *Model) sessionKeyHelpBinding() helpBinding {
 	}
 
 	if m.focusesOnSessionKey() {
-		return helpBinding{hint, "Focus session, then " + m.agentKeysHint() + " opens an agent and the key again opens it"}
+		return helpBinding{hint, "Focus " + m.sessionKeyTarget() + ", then " + m.agentKeysHint() + " opens an agent and the key again opens it"}
 	}
 
 	return helpBinding{hint, "Open session by its key"}
+}
+
+func (m *Model) sessionKeyTarget() string {
+	if m.displayMode == displayModeInbox {
+		return "group"
+	}
+
+	return "session"
 }

@@ -339,6 +339,95 @@ func TestInboxGroupsByProjectAndMachineKeepingEqualPaneIDsApart(t *testing.T) {
 	}
 }
 
+func TestInboxFocusedAgentKeysDistinguishHostsWithEqualPaneIDs(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.Remote.Enabled = true
+	cfg.Remote.Connections = []config.RemoteConnectionConfig{{ID: inboxTestHost, Host: inboxTestHost}}
+
+	now := time.Now()
+	model := loaderTestModel(t, cfg, Dependencies{})
+	model.sessions = []session.Session{{
+		ID: "$1", Name: testSupportSessionAlphaName, Kind: session.KindLive, Origin: session.OriginLocal, AgentTotal: 1,
+		Agents: []session.AgentSession{inboxTestAgent("here", "%1", session.AgentStatusRunning, now)},
+	}}
+	model.handleRemoteCatalog(remoteCatalogMsg{catalog: RemoteCatalog{
+		GeneratedAt: now,
+		Connections: []RemoteConnection{{
+			ID: inboxTestHost, Label: inboxTestHost, Connected: true, LastSeen: now,
+			Sessions: []session.Session{{
+				ID: "$1", Name: "shop", Kind: session.KindLive, AgentTotal: 1,
+				Agents: []session.AgentSession{inboxTestAgent("there", "%1", session.AgentStatusRunning, now)},
+			}},
+		}},
+	}})
+	model.displayMode = displayModeInbox
+	model.inboxGroup = config.InboxGroupState
+	refreshInbox(model)
+
+	if len(model.filtered) != 1 || len(model.filtered[0].Agents) != 2 {
+		t.Fatalf("inbox rows = %v, want both agents in one state group", inboxRowsForTest(model))
+	}
+
+	group := model.filtered[0]
+	pressSessionKey(model, model.sessionKey(group))
+
+	for slot, agent := range group.Agents {
+		want := model.agentKeys()[slot : slot+1]
+		if got := model.focusedAgentKey(group, agent); got != want {
+			t.Errorf("agent %q on host %q has key %q, want %q", agent.HarnessSession, agent.Host, got, want)
+		}
+	}
+}
+
+func TestInboxGroupKeyOnlyOpensASelectionInItsGroup(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		leaveGroup bool
+	}{
+		{name: "selection in the focused group", leaveGroup: false},
+		{name: "selection in another group", leaveGroup: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			now := time.Now()
+			model := newInboxTestModel(t, nil, []session.AgentSession{
+				inboxTestAgent("first", "%1", session.AgentStatusRunning, now),
+				inboxTestAgent("second", "%2", session.AgentStatusRunning, now.Add(-time.Minute)),
+				inboxTestAgent("other", "%3", session.AgentStatusWaiting, now),
+			})
+			model.mode = modePopup
+			selectInboxRow(t, model, "first")
+
+			group := model.filtered[model.cursor]
+			letter := model.sessionKey(group)
+			pressSessionKey(model, letter)
+
+			if model.focusedSession != group.RuntimeKey() {
+				t.Fatal("the group key did not focus its group")
+			}
+
+			if tt.leaveGroup {
+				model.moveAgentGroup(1)
+			} else {
+				pressKey(model, keyCode(tea.KeyDown))
+			}
+
+			runSessionKey(model, letter)
+
+			if tt.leaveGroup {
+				if model.DeferredSwitchSession() != "" {
+					t.Fatalf("the group key opened a different group's session %q", model.DeferredSwitchSession())
+				}
+
+				if model.focusedSession != group.RuntimeKey() || model.filtered[model.cursor].ID != group.ID || model.agentCursor != 0 {
+					t.Fatalf("selection = %d/%d with focus %q, want the original group's first agent", model.cursor, model.agentCursor, model.focusedSession)
+				}
+			} else if model.DeferredSwitchPane() != "%2" {
+				t.Fatalf("switch pane = %q, want the selected second agent", model.DeferredSwitchPane())
+			}
+		})
+	}
+}
+
 func TestInboxActsOnRemoteTasksOnTheirMachine(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Remote.Enabled = true

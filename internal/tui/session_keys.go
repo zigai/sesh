@@ -193,7 +193,29 @@ func freeSessionKey(name string, taken, blocked map[string]bool) (string, bool) 
 	return "", false
 }
 
+func inboxGroupKeys(groups []session.Session, blocked map[string]bool) map[string]string {
+	keys := make(map[string]string, len(groups))
+	taken := make(map[string]bool, len(groups))
+
+	for _, group := range groups {
+		if len(group.Agents) == 0 {
+			continue
+		}
+
+		if letter, ok := freeSessionKey(group.Name, taken, blocked); ok {
+			keys[group.ID] = letter
+			taken[letter] = true
+		}
+	}
+
+	return keys
+}
+
 func (m *Model) sessionKey(row session.Session) string {
+	if m.displayMode == displayModeInbox {
+		return m.inboxGroupKeys[row.ID]
+	}
+
 	ident := row.SemanticIdentity().KeyIdentity()
 
 	if letter, ok := m.sessionKeys.override(ident); ok {
@@ -282,9 +304,14 @@ func (m *Model) sessionForLetter(letter string) (session.Session, bool) {
 		return found, false
 	}
 
+	rows := m.sessions
+	if m.displayMode == displayModeInbox {
+		rows = m.displaySessions
+	}
+
 	matched := false
 
-	for _, row := range m.sessions {
+	for _, row := range rows {
 		if m.sessionKey(row) != letter {
 			continue
 		}
