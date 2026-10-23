@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -24,9 +25,12 @@ const (
 	ArtifactCurrent ArtifactState = "current"
 	ArtifactStale   ArtifactState = "stale"
 	ArtifactForeign ArtifactState = "foreign"
+	ArtifactRetired ArtifactState = "retired"
 )
 
 var ErrPlanMismatch = errors.New("definition and plan counts differ")
+
+var retirableServiceNames = []string{TmuxServiceName, RestoreServiceName}
 
 type ArtifactState string
 
@@ -81,6 +85,37 @@ func PlanDefinitions(definitions []ServiceDefinition) ([]ArtifactPlan, error) {
 		}
 
 		plans = append(plans, plan)
+	}
+
+	return plans, nil
+}
+
+// PlanRetiredDefinitions finds the sesh-owned managed tmux units in the definitions' directory that
+// the rendered definitions leave out.
+func PlanRetiredDefinitions(definitions []ServiceDefinition) ([]ArtifactPlan, error) {
+	if len(definitions) == 0 {
+		return nil, nil
+	}
+
+	directory := filepath.Dir(definitions[0].Path)
+
+	var plans []ArtifactPlan
+
+	for _, name := range retirableServiceNames {
+		if slices.ContainsFunc(definitions, func(definition ServiceDefinition) bool { return definition.Name == name }) {
+			continue
+		}
+
+		path := filepath.Join(directory, name)
+
+		existing, err := readDefinition(path)
+		if err != nil {
+			return nil, oops.In("setup").Code("setup_definition_failed").With("operation", "plan_retired_definitions").Wrap(err)
+		}
+
+		if existing.Exists && existing.Owned {
+			plans = append(plans, ArtifactPlan{Name: name, Path: path, State: ArtifactRetired, Changed: true, Requires: nil})
+		}
 	}
 
 	return plans, nil

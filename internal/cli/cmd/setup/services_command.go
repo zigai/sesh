@@ -415,9 +415,9 @@ func applySetupDefinitionsWithManager(
 		return oops.In("cli").With("operation", "read_setup_flag").Wrap(err)
 	}
 
-	plans, err := setup.PlanDefinitions(definitions)
+	plans, retired, err := planServices(cmd, definitions, operation)
 	if err != nil {
-		return oops.In("cli").With("operation", "plan_service_definitions").Wrap(err)
+		return err
 	}
 
 	result := setup.ApplyResult{Written: 0, SkippedNames: nil, BlockedNames: nil}
@@ -425,7 +425,7 @@ func applySetupDefinitionsWithManager(
 	var refreshed *setup.ServiceRefreshResult
 
 	if withContent {
-		result, refreshed, err = applyServiceChanges(cmd, definitions, plans, force, operation, manager)
+		result, refreshed, err = applyServiceChanges(cmd, definitions, plans, retired, force, operation, manager)
 	}
 
 	payload := servicesResultJSON{
@@ -457,6 +457,8 @@ func applySetupDefinitionsWithManager(
 		payload.Services = append(payload.Services, entry)
 	}
 
+	payload.Services = append(payload.Services, retiredServiceEntries(retired)...)
+
 	if withContent && err == nil {
 		payload.Units = automaticSaveStates(cmd.Context(), manager, definitions, refreshed)
 	}
@@ -482,12 +484,22 @@ func applyServiceChanges(
 	cmd *cobra.Command,
 	definitions []setup.ServiceDefinition,
 	plans []setup.ArtifactPlan,
+	retired []setup.ArtifactPlan,
 	force bool,
 	operation string,
 	manager setup.ServiceManager,
 ) (setup.ApplyResult, *setup.ServiceRefreshResult, error) {
-	if operation == "refresh" && inputsPlatform(definitions) == setup.PlatformLinux && !cmd.Flags().Changed("dir") {
+	if refreshesServiceManager(cmd, definitions, operation) {
+		removed, err := setup.RetireDefinitions(cmd.Context(), retired, manager)
+		if err != nil {
+			return setup.ApplyResult{Written: 0, SkippedNames: nil, BlockedNames: nil},
+				&setup.ServiceRefreshResult{Reloaded: false, Restarted: nil, Recovered: nil, RestartRequired: nil, Removed: removed},
+				oops.In("cli").With("operation", "retire_services").Wrap(err)
+		}
+
 		result, refreshed, err := setup.RefreshDefinitions(cmd.Context(), definitions, plans, force, manager)
+		refreshed.Removed = removed
+
 		if err != nil {
 			return result, &refreshed, oops.In("cli").With("operation", "refresh_services").Wrap(err)
 		}
@@ -501,6 +513,51 @@ func applyServiceChanges(
 	}
 
 	return result, nil, nil
+}
+
+func planServices(
+	cmd *cobra.Command,
+	definitions []setup.ServiceDefinition,
+	operation string,
+) ([]setup.ArtifactPlan, []setup.ArtifactPlan, error) {
+	plans, err := setup.PlanDefinitions(definitions)
+	if err != nil {
+		return nil, nil, oops.In("cli").With("operation", "plan_service_definitions").Wrap(err)
+	}
+
+	if !refreshesServiceManager(cmd, definitions, operation) {
+		return plans, nil, nil
+	}
+
+	retired, err := setup.PlanRetiredDefinitions(definitions)
+	if err != nil {
+		return nil, nil, oops.In("cli").With("operation", "plan_retired_service_definitions").Wrap(err)
+	}
+
+	return plans, retired, nil
+}
+
+func retiredServiceEntries(retired []setup.ArtifactPlan) []serviceJSON {
+	entries := make([]serviceJSON, 0, len(retired))
+
+	for _, plan := range retired {
+		entries = append(entries, serviceJSON{
+			Name:     plan.Name,
+			Kind:     string(setup.KindSystemdService),
+			Purpose:  "managed tmux server unit that this setup leaves out",
+			Path:     plan.Path,
+			State:    string(plan.State),
+			Changed:  plan.Changed,
+			Requires: nil,
+			Content:  "",
+		})
+	}
+
+	return entries
+}
+
+func refreshesServiceManager(cmd *cobra.Command, definitions []setup.ServiceDefinition, operation string) bool {
+	return operation == "refresh" && inputsPlatform(definitions) == setup.PlatformLinux && !cmd.Flags().Changed("dir")
 }
 
 func serviceOutcome(payload servicesResultJSON) error {
@@ -549,6 +606,10 @@ func renderSetupServices(cmd *cobra.Command, payload servicesResultJSON, _ strin
 
 	if !payload.Applied {
 		for _, service := range payload.Services {
+			if service.State == string(setup.ArtifactRetired) {
+				continue
+			}
+
 			fmt.Fprintf(&out, "\n# %s\n%s", service.Name, service.Content)
 		}
 	}
@@ -559,6 +620,14 @@ func renderSetupServices(cmd *cobra.Command, payload servicesResultJSON, _ strin
 }
 
 func serviceFileOutcome(service serviceJSON, payload servicesResultJSON) string {
+	if service.State == string(setup.ArtifactRetired) {
+		return retiredServiceOutcome(service, payload)
+	}
+
+	return renderedServiceOutcome(service, payload)
+}
+
+func renderedServiceOutcome(service serviceJSON, payload servicesResultJSON) string {
 	written := payload.Applied && !payload.applyFailed
 
 	switch {
@@ -579,6 +648,14 @@ func serviceFileOutcome(service serviceJSON, payload servicesResultJSON) string 
 	default:
 		return "will be updated"
 	}
+}
+
+func retiredServiceOutcome(service serviceJSON, payload servicesResultJSON) string {
+	if payload.Manager != nil && slices.Contains(payload.Manager.Removed, service.Name) {
+		return "removed: --with-tmux-service was not given"
+	}
+
+	return "will be removed: --with-tmux-service was not given"
 }
 
 func writeSetupServiceRefresh(out *strings.Builder, result *setup.ServiceRefreshResult) {
@@ -666,7 +743,7 @@ func renderSetupServiceNextSteps(cmd *cobra.Command, payload servicesResultJSON)
 	var units []string
 
 	for _, service := range payload.Services {
-		if isAutomaticSaveUnit(service.Name) {
+		if service.State != string(setup.ArtifactRetired) && isAutomaticSaveUnit(service.Name) {
 			units = append(units, service.Name)
 		}
 	}

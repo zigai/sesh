@@ -426,3 +426,146 @@ func TestRefreshDefinitionsPreservesWrittenCountOnPublicationFailure(t *testing.
 		t.Fatalf("lost typed rename failure: %v", err)
 	}
 }
+
+func TestRetireDefinitionsRemovesManagedTmuxUnitsLeftOutOfSetup(t *testing.T) {
+	t.Parallel()
+
+	for _, state := range []string{"inactive", "failed"} {
+		t.Run(state, func(t *testing.T) {
+			t.Parallel()
+
+			definitions, paths := retiredUnitsFixture(t)
+
+			retired, err := PlanRetiredDefinitions(definitions)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			manager, calls := recordingServiceManager(t, state)
+
+			removed, err := RetireDefinitions(t.Context(), retired, manager)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if !slices.Equal(removed, []string{TmuxServiceName, RestoreServiceName}) {
+				t.Fatalf("removed = %v, want both managed tmux units", removed)
+			}
+
+			for _, path := range paths {
+				if _, err := os.Lstat(path); !errors.Is(err, os.ErrNotExist) {
+					t.Fatalf("%s still exists: %v", path, err)
+				}
+			}
+
+			want := []string{"systemctl --user disable " + TmuxServiceName}
+			if state == "failed" {
+				want = append(want, "systemctl --user reset-failed "+TmuxServiceName, "systemctl --user reset-failed "+RestoreServiceName)
+			}
+
+			want = append(want, "systemctl --user daemon-reload")
+			if got := serviceManagerChanges(*calls); !slices.Equal(got, want) {
+				t.Fatalf("service manager changes = %v, want %v", got, want)
+			}
+		})
+	}
+}
+
+func TestRetireDefinitionsRefusesWhileManagedTmuxRuns(t *testing.T) {
+	t.Parallel()
+
+	for _, state := range []string{"active", "reloading"} {
+		t.Run(state, func(t *testing.T) {
+			t.Parallel()
+
+			definitions, paths := retiredUnitsFixture(t)
+
+			retired, err := PlanRetiredDefinitions(definitions)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			manager, calls := recordingServiceManager(t, state)
+
+			removed, err := RetireDefinitions(t.Context(), retired, manager)
+			if !errors.Is(err, ErrRetiredRunning) || len(removed) != 0 {
+				t.Fatalf("retire = %v, %v; want a refusal", removed, err)
+			}
+
+			if changes := serviceManagerChanges(*calls); len(changes) != 0 {
+				t.Fatalf("refusal changed service state: %v", changes)
+			}
+
+			for _, path := range paths {
+				if _, err := os.Lstat(path); err != nil {
+					t.Fatalf("refusal removed %s: %v", path, err)
+				}
+			}
+		})
+	}
+}
+
+func TestPlanRetiredDefinitionsKeepsRenderedAndForeignUnits(t *testing.T) {
+	t.Parallel()
+
+	definitions, paths := retiredUnitsFixture(t)
+
+	if err := os.WriteFile(paths[1], []byte("[Service]\nExecStart=/private/own-restore\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	retired, err := PlanRetiredDefinitions(definitions)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(retired) != 1 || retired[0].Name != TmuxServiceName || retired[0].Path != paths[0] {
+		t.Fatalf("retired = %+v, want only the owned tmux unit", retired)
+	}
+
+	withTmux := append(slices.Clone(definitions), ServiceDefinition{
+		Name: TmuxServiceName, Kind: KindSystemdService, Path: paths[0], Content: "# " + ManagedMarker + "\n",
+	})
+
+	retired, err = PlanRetiredDefinitions(withTmux)
+	if err != nil || len(retired) != 0 {
+		t.Fatalf("retired = %+v, %v; want none when the tmux unit is rendered", retired, err)
+	}
+}
+
+func retiredUnitsFixture(t *testing.T) ([]ServiceDefinition, []string) {
+	t.Helper()
+
+	directory := t.TempDir()
+	tmuxPath := filepath.Join(directory, TmuxServiceName)
+	restorePath := filepath.Join(directory, RestoreServiceName)
+
+	files := map[string]string{
+		tmuxPath:    "# " + ManagedMarker + "\n[Service]\nExecStart=/private/sesh daemon tmux\n\n[Install]\nWantedBy=default.target\n",
+		restorePath: "# " + ManagedMarker + "\n[Service]\nType=oneshot\nExecStart=/private/sesh autosave restore-on-start\n",
+	}
+	for path, content := range files {
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	definitions := []ServiceDefinition{{
+		Name: AutosaveTimerName, Kind: KindSystemdTimer, Path: filepath.Join(directory, AutosaveTimerName),
+		Content: "# " + ManagedMarker + "\n",
+	}}
+
+	return definitions, []string{tmuxPath, restorePath}
+}
+
+func serviceManagerChanges(calls []string) []string {
+	var changes []string
+
+	for _, call := range calls {
+		if !strings.HasPrefix(call, "systemctl --user show ") {
+			changes = append(changes, call)
+		}
+	}
+
+	return changes
+}

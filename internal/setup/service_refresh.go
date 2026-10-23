@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -20,6 +22,7 @@ var (
 	ErrServiceInspect = errors.New("inspect service manager before refreshing definitions")
 	ErrServiceReload  = errors.New("reload refreshed service definitions")
 	ErrServiceRestart = errors.New("refresh running service")
+	ErrRetiredRunning = errors.New("sesh-tmux.service is still running; stop it to remove it, or keep it with --with-tmux-service")
 )
 
 type ServiceManager struct {
@@ -32,6 +35,7 @@ type ServiceRefreshResult struct {
 	Restarted       []string `json:"restarted,omitempty"`
 	Recovered       []string `json:"recovered,omitempty"`
 	RestartRequired []string `json:"restartRequired,omitempty"`
+	Removed         []string `json:"removed,omitempty"`
 }
 
 type UnitState struct {
@@ -110,6 +114,49 @@ func RefreshDefinitions(
 	return applied, refreshed, nil
 }
 
+// RetireDefinitions disables and deletes the retired units, and refuses before changing anything
+// while one still runs: deleting a running managed tmux unit would orphan its server and sessions.
+func RetireDefinitions(ctx context.Context, retired []ArtifactPlan, manager ServiceManager) ([]string, error) {
+	if len(retired) == 0 {
+		return nil, nil
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, serviceRefreshTimeout)
+	defer cancel()
+
+	states := make([]string, 0, len(retired))
+
+	for _, plan := range retired {
+		state, err := manager.activeState(ctx, plan.Name)
+		if err != nil {
+			return nil, enrichServiceRefresh("inspect", err)
+		}
+
+		if state == "active" || state == "reloading" {
+			return nil, oops.In("setup").Code("retired_service_running").
+				With("operation", "retire_services").With("service", plan.Name).Wrap(ErrRetiredRunning)
+		}
+
+		states = append(states, state)
+	}
+
+	var removed []string
+
+	for index, plan := range retired {
+		if err := retireDefinition(ctx, plan, states[index], manager); err != nil {
+			return removed, enrichServiceRefresh("retire", err)
+		}
+
+		removed = append(removed, plan.Name)
+	}
+
+	if err := manager.run(ctx, "--user", "daemon-reload"); err != nil {
+		return removed, enrichServiceRefresh("reload", errors.Join(ErrServiceReload, err))
+	}
+
+	return removed, nil
+}
+
 func UnitStates(ctx context.Context, manager ServiceManager, names []string) ([]UnitState, error) {
 	ctx, cancel := context.WithTimeout(ctx, serviceRefreshTimeout)
 	defer cancel()
@@ -131,6 +178,35 @@ func UnitStates(ctx context.Context, manager ServiceManager, names []string) ([]
 	}
 
 	return states, nil
+}
+
+func retireDefinition(ctx context.Context, plan ArtifactPlan, state string, manager ServiceManager) error {
+	existing, err := readDefinition(plan.Path)
+	if err != nil {
+		return err
+	}
+
+	if !existing.Exists || !existing.Owned {
+		return ErrPlanMismatch
+	}
+
+	if strings.Contains(existing.Content, "\n[Install]\n") {
+		if err := manager.run(ctx, "--user", "disable", plan.Name); err != nil {
+			return err
+		}
+	}
+
+	if state == "failed" {
+		if err := manager.run(ctx, "--user", "reset-failed", plan.Name); err != nil {
+			return err
+		}
+	}
+
+	if err := os.Remove(plan.Path); err != nil {
+		return oops.In("setup").Code("setup_definition_failed").With("operation", "remove_retired_definition").Wrap(err)
+	}
+
+	return syncDirectory(filepath.Dir(plan.Path))
 }
 
 func restartFailedUnits(ctx context.Context, manager ServiceManager, names []string) ([]string, error) {

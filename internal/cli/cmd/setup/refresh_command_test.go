@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"slices"
 	"strings"
@@ -452,4 +453,48 @@ func assertServiceFileLabel(t *testing.T, stdout, name, label string) {
 	}
 
 	t.Fatalf("no line for %s:\n%s", name, stdout)
+}
+
+func TestSetupServicesWithoutManagedTmuxPlansRemovingItsUnitsAndRefusesWhileItRuns(t *testing.T) {
+	refreshHome(t)
+
+	directory, err := setup.ServiceDirectory(setup.PlatformLinux)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.MkdirAll(directory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	tmuxUnit := filepath.Join(directory, setup.TmuxServiceName)
+	if err := os.WriteFile(tmuxUnit, []byte("# "+setup.ManagedMarker+"\n[Install]\nWantedBy=default.target\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	fake := refreshManager(t, "")
+
+	stdout, _, err := executeCommand(t, "setup", "services", testNoConfigFlag)
+
+	removal := regexp.MustCompile(regexp.QuoteMeta(setup.TmuxServiceName) + ` +will be removed: --with-tmux-service was not given`)
+	if err != nil || !removal.MatchString(stdout) {
+		t.Fatalf("preview must announce removing the managed tmux unit: stdout=%q err=%v", stdout, err)
+	}
+
+	_, _, err = executeCommand(t, "setup", "services", "--apply", testNoConfigFlag)
+	if !errors.Is(err, setup.ErrRetiredRunning) {
+		t.Fatalf("apply while the managed tmux server runs = %v, want a refusal", err)
+	}
+
+	if _, statErr := os.Stat(tmuxUnit); statErr != nil {
+		t.Fatalf("refusal removed the running unit: %v", statErr)
+	}
+
+	if _, statErr := os.Stat(filepath.Join(directory, setup.AutosaveTimerName)); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("refusal wrote other definitions: %v", statErr)
+	}
+
+	if commands := fake.commands(t); len(commands) != 0 {
+		t.Fatalf("refusal changed service state: %v", commands)
+	}
 }
