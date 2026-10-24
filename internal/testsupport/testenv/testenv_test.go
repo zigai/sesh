@@ -61,11 +61,12 @@ func TestIsolateClearsLiveSessionVariables(t *testing.T) {
 	}
 }
 
-func TestIsolateClearsSeshSettingsAndKeepsIntegrationRequirements(t *testing.T) {
+func TestIsolateClearsSeshSettingsAndKeepsTestControls(t *testing.T) {
 	restoreIsolatedVariables(t)
 
 	t.Setenv("SESH_CONFIG", "/home/example/.config/sesh/config.toml")
 	t.Setenv("SESH_EXAMPLE_INTEGRATION_REQUIRED", "1")
+	t.Setenv("SESH_UPDATE_EXAMPLE_GOLDENS", "1")
 
 	if err := isolate(t.TempDir()); err != nil {
 		t.Fatal(err)
@@ -77,6 +78,10 @@ func TestIsolateClearsSeshSettingsAndKeepsIntegrationRequirements(t *testing.T) 
 
 	if value := os.Getenv("SESH_EXAMPLE_INTEGRATION_REQUIRED"); value != "1" {
 		t.Fatalf("SESH_EXAMPLE_INTEGRATION_REQUIRED = %q after isolation, want %q", value, "1")
+	}
+
+	if value := os.Getenv("SESH_UPDATE_EXAMPLE_GOLDENS"); value != "1" {
+		t.Fatalf("SESH_UPDATE_EXAMPLE_GOLDENS = %q after isolation, want %q", value, "1")
 	}
 }
 
