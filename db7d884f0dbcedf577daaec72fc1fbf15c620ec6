@@ -1,0 +1,2 @@
+- Rendering the 48-column agent rows golden shows the cut session name as '…me' where it used to show '...'
+- display.Truncate("abcdef", 3) returns 'ab…' and TruncateLeft returns '…ef'
