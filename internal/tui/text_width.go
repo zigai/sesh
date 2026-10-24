@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	ellipsisLength     = 3
+	ellipsis           = "…"
+	ellipsisLength     = 1
 	compactAgeMaxHours = 99
 )
 
@@ -151,7 +152,7 @@ func truncateLeftWidth(s string, width int) string {
 		return ansi.TruncateLeft(s, currentWidth-width, "")
 	}
 
-	return ansi.TruncateLeft(s, currentWidth-width+ellipsisLength, "...")
+	return ansi.TruncateLeft(s, currentWidth-width+ellipsisLength, ellipsis)
 }
 
 func isBidiOrDangerousControl(r rune) bool {

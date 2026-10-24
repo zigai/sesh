@@ -7,7 +7,8 @@ import (
 )
 
 const (
-	ellipsisWidth = 3
+	ellipsis      = "…"
+	ellipsisWidth = 1
 	centerDivisor = 2
 )
 
@@ -55,7 +56,7 @@ func Truncate(s string, width int) string {
 		return ansi.Truncate(s, width, "")
 	}
 
-	return ansi.Truncate(s, width, "...")
+	return ansi.Truncate(s, width, ellipsis)
 }
 
 func TruncateLeft(s string, width int) string {
@@ -72,7 +73,7 @@ func TruncateLeft(s string, width int) string {
 		return ansi.TruncateLeft(s, currentWidth-width, "")
 	}
 
-	return ansi.TruncateLeft(s, currentWidth-width+ellipsisWidth, "...")
+	return ansi.TruncateLeft(s, currentWidth-width+ellipsisWidth, ellipsis)
 }
 
 func StringWidth(s string) int {

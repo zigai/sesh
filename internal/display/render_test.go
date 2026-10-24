@@ -13,7 +13,7 @@ func TestSessionFieldMaximumWidthTruncatesBeforePadding(t *testing.T) {
 		MaxWidth:    8,
 		HasMaxWidth: true,
 	})
-	if left != "abcde...    " {
+	if left != "abcdefg…    " {
 		t.Fatalf("left-aligned field = %q, want truncated and padded value", left)
 	}
 
@@ -25,7 +25,7 @@ func TestSessionFieldMaximumWidthTruncatesBeforePadding(t *testing.T) {
 		MaxWidth:    8,
 		HasMaxWidth: true,
 	})
-	if right != "    ...lmnop" {
+	if right != "    …jklmnop" {
 		t.Fatalf("right-aligned field = %q, want padded tail", right)
 	}
 }
@@ -211,8 +211,8 @@ func TestAlignPartAndTruncateUnusualUnicode(t *testing.T) {
 		MaxWidth:    9,
 		HasMaxWidth: true,
 	})
-	if truncatedJapanese != "\u65e5\u672c\u8a9e..." {
-		t.Fatalf("truncatedJapanese = %q, want %q", truncatedJapanese, "\u65e5\u672c\u8a9e...")
+	if truncatedJapanese != "\u65e5\u672c\u8a9e\u30d7…" {
+		t.Fatalf("truncatedJapanese = %q, want %q", truncatedJapanese, "\u65e5\u672c\u8a9e\u30d7…")
 	}
 
 	alignedJapanese := AlignPart(Part{
@@ -223,8 +223,8 @@ func TestAlignPartAndTruncateUnusualUnicode(t *testing.T) {
 		MaxWidth:    9,
 		HasMaxWidth: true,
 	})
-	if alignedJapanese != "\u65e5\u672c\u8a9e...   " {
-		t.Fatalf("alignedJapanese = %q, want %q", alignedJapanese, "\u65e5\u672c\u8a9e...   ")
+	if alignedJapanese != "\u65e5\u672c\u8a9e\u30d7…   " {
+		t.Fatalf("alignedJapanese = %q, want %q", alignedJapanese, "\u65e5\u672c\u8a9e\u30d7…   ")
 	}
 
 	if w := StringWidth(alignedJapanese); w != 12 {
@@ -239,8 +239,8 @@ func TestAlignPartAndTruncateUnusualUnicode(t *testing.T) {
 		MaxWidth:    9,
 		HasMaxWidth: true,
 	})
-	if truncatedLeftJapanese != "   ...\u30df\u30f3\u30b0" {
-		t.Fatalf("truncatedLeftJapanese = %q, want %q", truncatedLeftJapanese, "   ...\\u30df\\u30f3\\u30b0")
+	if truncatedLeftJapanese != "   …\u30e9\u30df\u30f3\u30b0" {
+		t.Fatalf("truncatedLeftJapanese = %q, want %q", truncatedLeftJapanese, "   …\\u30e9\\u30df\\u30f3\\u30b0")
 	}
 
 	if w := StringWidth(truncatedLeftJapanese); w != 12 {
@@ -256,8 +256,8 @@ func TestTruncateAndTruncateLeftEdgeCases(t *testing.T) {
 	}{
 		{input: "hello", width: 0, want: ""},
 		{input: "hello", width: -5, want: ""},
-		{input: "abcdef", width: 3, want: "abc"},
-		{input: "abcdef", width: 2, want: "ab"},
+		{input: "abcdef", width: 3, want: "ab…"},
+		{input: "abcdef", width: 2, want: "a…"},
 		{input: "abcdef", width: 1, want: "a"},
 		{input: "abc", width: 5, want: "abc"},
 		{input: "abc", width: 3, want: "abc"},
@@ -276,8 +276,8 @@ func TestTruncateAndTruncateLeftEdgeCases(t *testing.T) {
 	}{
 		{input: "hello", width: 0, want: ""},
 		{input: "hello", width: -1, want: ""},
-		{input: "abcdef", width: 3, want: "def"},
-		{input: "abcdef", width: 2, want: "ef"},
+		{input: "abcdef", width: 3, want: "…ef"},
+		{input: "abcdef", width: 2, want: "…f"},
 		{input: "abc", width: 5, want: "abc"},
 		{input: "abc", width: 3, want: "abc"},
 	}
