@@ -17,7 +17,10 @@ import (
 // isolate unset directories; add it when a helper does not inherit the parent's environment.
 const IsolatedMarker = "SESH_TESTENV_ISOLATED"
 
-const integrationRequiredSuffix = "_INTEGRATION_REQUIRED"
+const (
+	integrationRequiredSuffix = "_INTEGRATION_REQUIRED"
+	goldenUpdatePrefix        = "SESH_UPDATE_"
+)
 
 var sessionVariables = []string{"TMUX", "TMUX_PANE", "TMUX_POPUP", "DBUS_SESSION_BUS_ADDRESS"}
 
@@ -71,7 +74,7 @@ func isolate(root string) error {
 
 	for _, entry := range os.Environ() {
 		name, _, _ := strings.Cut(entry, "=")
-		if strings.HasPrefix(name, "SESH_") && !strings.HasSuffix(name, integrationRequiredSuffix) {
+		if strings.HasPrefix(name, "SESH_") && !isTestControl(name) {
 			if err := os.Unsetenv(name); err != nil {
 				return fmt.Errorf("clear %s: %w", name, err)
 			}
@@ -102,6 +105,10 @@ func isolate(root string) error {
 	}
 
 	return nil
+}
+
+func isTestControl(name string) bool {
+	return strings.HasSuffix(name, integrationRequiredSuffix) || strings.HasPrefix(name, goldenUpdatePrefix)
 }
 
 func setDirectories(root string, keepSet bool) error {
