@@ -82,7 +82,7 @@ func TestSessionFieldMaximumWidthTruncatesBeforePadding(t *testing.T) {
 		MaxWidth:    8,
 		HasMaxWidth: true,
 	})
-	if left != "abcde...    " {
+	if left != "abcdefg…    " {
 		t.Fatalf("left-aligned field = %q, want truncated and padded value", left)
 	}
 
@@ -93,7 +93,7 @@ func TestSessionFieldMaximumWidthTruncatesBeforePadding(t *testing.T) {
 		MaxWidth:    8,
 		HasMaxWidth: true,
 	})
-	if right != "    ...lmnop" {
+	if right != "    …jklmnop" {
 		t.Fatalf("right-aligned field = %q, want padded tail", right)
 	}
 }
@@ -589,7 +589,7 @@ func TestAgentSessionExpandsWhenSpacePermits(t *testing.T) {
 		t.Fatalf("narrow render should have truncated session name: %q", narrow)
 	}
 
-	if !strings.Contains(narrow, "...") {
+	if !strings.Contains(narrow, "…") {
 		t.Fatalf("narrow render missing ellipsis: %q", narrow)
 	}
 }

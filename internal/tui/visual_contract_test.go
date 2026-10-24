@@ -49,7 +49,7 @@ func TestPickerRichAgentVisualContract(t *testing.T) {
 				assertVisualText(t, plain, "↑/↓ agents", "ctrl+↑/↓ sessions")
 				assertAlignedVisualColumn(t, plain, "\ue725")
 			} else {
-				assertVisualText(t, plain, "...", "↑/↓ agent", "⌃↑/↓ session")
+				assertVisualText(t, plain, "…", "↑/↓ agent", "⌃↑/↓ session")
 			}
 
 			if strings.Index(plain, "api") >= strings.Index(plain, " Sessions ") ||

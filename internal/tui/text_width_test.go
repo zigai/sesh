@@ -215,8 +215,8 @@ func TestTruncateStyledWidthPreservesOSCSequences(t *testing.T) {
 func TestTruncateWidthKeepsCombiningSequenceIntact(t *testing.T) {
 	got := display.Truncate("e\u0301clair", 4)
 
-	if got != "e\u0301..." {
-		t.Fatalf("display.Truncate() = %q, want %q", got, "e\u0301...")
+	if got != "e\u0301cl…" {
+		t.Fatalf("display.Truncate() = %q, want %q", got, "e\u0301cl…")
 	}
 
 	if width := ansi.StringWidth(got); width != 4 {
@@ -227,7 +227,7 @@ func TestTruncateWidthKeepsCombiningSequenceIntact(t *testing.T) {
 func TestTruncateLeftWidthPreservesIdentitySuffix(t *testing.T) {
 	got := truncateLeftWidth("2026-07-16_session-abcdef.jsonl", 15)
 
-	if got != "...abcdef.jsonl" {
+	if got != "…n-abcdef.jsonl" {
 		t.Fatalf("truncateLeftWidth() = %q, want identity suffix", got)
 	}
 

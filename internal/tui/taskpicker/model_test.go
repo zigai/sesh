@@ -661,7 +661,7 @@ func TestListRowsShowEachBranchsLatestCommitDistanceAndAge(t *testing.T) {
 	model := sized(options)
 
 	hotfix := sectionRows(t, model, "checkouts")[1]
-	for _, part := range []string{"shop-hotfix", "fix the login", "...", "hotfix", "↑2 ↓0", "3h"} {
+	for _, part := range []string{"shop-hotfix", "fix the login", "…", "hotfix", "↑2 ↓0", "3h"} {
 		if !strings.Contains(hotfix, part) {
 			t.Errorf("hotfix row %q lacks %q", hotfix, part)
 		}

@@ -32,7 +32,6 @@ const (
 	Decay              = 30 * time.Second
 	centerPaddingSides = 2
 	sgrReset           = "\x1b[m"
-	wideEllipsisWidth  = 3
 )
 
 type State uint8
@@ -412,10 +411,6 @@ func truncate(value string, width int, side TruncateSide) string {
 	}
 
 	mark := "…"
-	if width >= wideEllipsisWidth {
-		mark = "..."
-	}
-
 	if width <= ansi.StringWidth(mark) {
 		return mark
 	}

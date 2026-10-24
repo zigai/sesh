@@ -169,7 +169,7 @@ func TestTruncationKeepsGraphemesWhole(t *testing.T) {
 			t.Fatalf("broken truncation: %q", painted)
 		}
 
-		if ansi.StringWidth(value) > width && !strings.Contains(trimmed, "…") && !strings.Contains(trimmed, "...") {
+		if ansi.StringWidth(value) > width && !strings.Contains(trimmed, "…") {
 			t.Fatalf("missing ellipsis: %q", painted)
 		}
 
@@ -181,9 +181,6 @@ func TestTruncationKeepsGraphemesWhole(t *testing.T) {
 
 func wholeGraphemeTruncation(value, painted string, side TruncateSide) bool {
 	mark := "…"
-	if strings.Contains(painted, "...") {
-		mark = "..."
-	}
 
 	graphemes := uniseg.NewGraphemes(value)
 
