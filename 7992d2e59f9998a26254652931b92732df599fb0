@@ -1,0 +1,1 @@
+- Overwriting default_48_glyph.golden with junk makes the golden test fail; SESH_UPDATE_AGENT_GOLDENS=1 go test ./internal/tui -run Golden then passes and writes back a file identical to the original
