@@ -296,6 +296,40 @@ func TestPickerPopupBalancesConfiguredPercentageForClientGeometry(t *testing.T) 
 	}
 }
 
+func TestPickerPopupKeepsReadableSizeOnSmallTerminals(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		modes      []string
+		state      *session.State
+		available  gotmux.Size
+		wantWidth  string
+		wantHeight string
+	}{
+		{name: "sesh mode on laptop", state: &session.State{}, available: gotmux.Size{Width: 150, Height: 40}, wantWidth: "128", wantHeight: "32"},
+		{name: "agents mode on laptop", state: &session.State{PopupDisplayMode: "agents"}, available: gotmux.Size{Width: 150, Height: 40}, wantWidth: "128", wantHeight: "32"},
+		{name: "sesh only on laptop", modes: []string{"sesh"}, state: &session.State{}, available: gotmux.Size{Width: 150, Height: 40}, wantWidth: "96", wantHeight: "24"},
+		{name: "terminal smaller than readable size", state: &session.State{}, available: gotmux.Size{Width: 100, Height: 26}, wantWidth: "98", wantHeight: "24"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			cfg := config.DefaultConfig()
+			if test.modes != nil {
+				cfg.Settings.DisplayModes = test.modes
+			}
+
+			width, height := popupDimensions(cfg, test.state, test.available)
+			if width != test.wantWidth || height != test.wantHeight {
+				t.Fatalf("popup dimensions = %s x %s, want %s x %s", width, height, test.wantWidth, test.wantHeight)
+			}
+		})
+	}
+}
+
 func TestPickerPopupPreservesConfiguredDimensionsWithoutClientGeometry(t *testing.T) {
 	t.Parallel()
 
