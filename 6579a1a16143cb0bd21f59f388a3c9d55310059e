@@ -1,0 +1,3 @@
+- Opening the popup with the default config in a separate tmux server, through a 150x40 client, shows a 128x32 popup; the previous build showed 80x20
+- The same check through a 320x90 client shows a 143x36 popup with both builds
+- The installed binary shows the 128x32 popup through the 150x40 client
