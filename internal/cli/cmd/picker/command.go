@@ -61,12 +61,12 @@ const (
 	popupTerminalMargin      = 2
 	popupSeshMinWidth        = 40
 	popupSeshMinHeight       = 12
-	popupSeshDefaultWidth    = 64
-	popupSeshDefaultHeight   = 16
+	popupSeshDefaultWidth    = 96
+	popupSeshDefaultHeight   = 24
 	popupAgentsMinWidth      = 60
 	popupAgentsMinHeight     = 14
-	popupAgentsDefaultWidth  = 80
-	popupAgentsDefaultHeight = 20
+	popupAgentsDefaultWidth  = 128
+	popupAgentsDefaultHeight = 32
 	popupPercentBase         = 100
 	renderFPS                = 120
 )
