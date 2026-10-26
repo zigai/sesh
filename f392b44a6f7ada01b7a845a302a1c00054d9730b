@@ -1,0 +1,2 @@
+- Right-clicks rows in the picker on a scratch tmux server: the saved docs row shows restore and delete; the live api row shows open, rename, snapshot, kill and delete
+- Agent-row menus are covered by unit tests only; not checked in a real terminal
