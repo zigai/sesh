@@ -42,6 +42,7 @@ var (
 	}
 	inboxSectionNames      = append(slices.Clone(defaultInboxSections), InboxFinished)
 	defaultInboxDimmed     = []string{InboxRunning, InboxSnoozed, InboxAsleep, InboxClosed, InboxFinished}
+	defaultInboxCollapsed  = []string{InboxClosed, InboxFinished}
 	defaultInboxSnoozeList = []string{SnoozeNextMessage, "1h", "4h", "tomorrow 09:00"}
 )
 
@@ -51,7 +52,9 @@ type InboxConfig struct {
 	Sections []string          `toml:"sections"`
 	Labels   map[string]string `toml:"labels"`
 	Dim      []string          `toml:"dim"`
-	Snooze   []string          `toml:"snooze"`
+	// Collapsed sections show one heading with their row count until it is opened.
+	Collapsed []string `toml:"collapsed"`
+	Snooze    []string `toml:"snooze"`
 	// ClosedShown is how many closed rows a project shows before a row that expands the rest; zero
 	// shows them all.
 	ClosedShown int `toml:"closed_shown"`
@@ -64,14 +67,14 @@ func InboxSections() []string {
 func DefaultInboxConfig() InboxConfig {
 	return InboxConfig{
 		Group: InboxGroupState, Sections: InboxSections(), Labels: nil,
-		Dim: slices.Clone(defaultInboxDimmed), Snooze: slices.Clone(defaultInboxSnoozeList), ClosedShown: defaultClosedShown,
+		Dim: slices.Clone(defaultInboxDimmed), Collapsed: slices.Clone(defaultInboxCollapsed), Snooze: slices.Clone(defaultInboxSnoozeList), ClosedShown: defaultClosedShown,
 	}
 }
 
 func (c InboxConfig) Clone() InboxConfig {
 	return InboxConfig{
 		Group: c.Group, Sections: slices.Clone(c.Sections), Labels: maps.Clone(c.Labels),
-		Dim: slices.Clone(c.Dim), Snooze: slices.Clone(c.Snooze), ClosedShown: c.ClosedShown,
+		Dim: slices.Clone(c.Dim), Collapsed: slices.Clone(c.Collapsed), Snooze: slices.Clone(c.Snooze), ClosedShown: c.ClosedShown,
 	}
 }
 
@@ -101,6 +104,10 @@ func ValidateInboxConfig(inbox InboxConfig) error {
 	}
 
 	if err := validateInboxSectionList("inbox.dim", inbox.Dim); err != nil {
+		return err
+	}
+
+	if err := validateInboxSectionList("inbox.collapsed", inbox.Collapsed); err != nil {
 		return err
 	}
 

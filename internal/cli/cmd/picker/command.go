@@ -68,6 +68,7 @@ const (
 	popupAgentsDefaultWidth  = 128
 	popupAgentsDefaultHeight = 32
 	popupPercentBase         = 100
+	popupGrowthPercent       = 80
 	renderFPS                = 120
 )
 
@@ -327,6 +328,9 @@ func runPickerInteractive(
 	}
 
 	finalModel, runErr := runPickerProgram(ctx, cmd, model, presentation)
+	if runErr == nil {
+		services.recordPopupHeights(ctx, runtime.state, finalModel.FittingPopupHeights())
+	}
 
 	return finishPickerInteractive(ctx, cmd, finalModel, services, runErr)
 }
@@ -633,7 +637,8 @@ func popupArguments(cmd *cobra.Command, socketPath, sessionID, paneID, handoffPa
 }
 
 func popupDimensions(cfg *config.Config, state *session.State, available gotmux.Size) (string, string) {
-	agentsMode := effectivePickerPopupMode(cfg, state) != "sesh"
+	mode := effectivePickerPopupMode(cfg, state)
+	agentsMode := mode != "sesh"
 	width, height := cfg.Popup.SeshWidth, cfg.Popup.SeshHeight
 
 	if agentsMode {
@@ -655,7 +660,24 @@ func popupDimensions(cfg *config.Config, state *session.State, available gotmux.
 		fallback = gotmux.Size{Width: popupAgentsDefaultWidth, Height: popupAgentsDefaultHeight}
 	}
 
-	return adaptivePickerPopupDimensions(width, height, available, minimum, fallback)
+	width, height = adaptivePickerPopupDimensions(width, height, available, minimum, fallback)
+
+	if state != nil {
+		height = grownPopupHeight(height, state.PopupHeight(mode), available.Height)
+	}
+
+	return width, height
+}
+
+func grownPopupHeight(height string, fitting, available int) string {
+	current, err := strconv.Atoi(height)
+	if err != nil || fitting <= current || available <= 0 {
+		return height
+	}
+
+	limit := min(available*popupGrowthPercent/popupPercentBase, available-popupTerminalMargin)
+
+	return strconv.Itoa(max(current, min(fitting, limit)))
 }
 
 func effectivePickerPopupMode(cfg *config.Config, state *session.State) string {

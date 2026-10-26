@@ -294,6 +294,7 @@
 # group = "state"
 # sections = ["done", "approve", "input", "waiting", "limited", "unmerged", "running", "snoozed", "asleep", "idle", "closed"]
 # dim = ["running", "snoozed", "asleep", "closed", "finished"]
+# collapsed = ["closed", "finished"]
 # snooze = ["next message", "1h", "4h", "tomorrow 09:00"]
 # closed_shown = 3
 

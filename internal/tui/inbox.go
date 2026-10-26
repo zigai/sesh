@@ -76,6 +76,7 @@ type inboxItem struct {
 	work      work.Item
 	expandKey string
 	section   string
+	hidden    int
 }
 
 func (m *Model) inboxSessions() []session.Session {
@@ -133,13 +134,20 @@ func (m *Model) inboxStateRows(items []inboxItem) []session.Session {
 	for _, section := range m.config.Inbox.Sections {
 		var agents []session.AgentSession
 
+		conversations := 0
+
 		for _, item := range items {
 			if item.section == section {
 				agents = append(agents, item.agent)
+				conversations += max(item.hidden, 1)
 			}
 		}
 
-		if len(agents) > 0 {
+		switch {
+		case len(agents) == 0:
+		case m.sectionCollapsed(section):
+			rows = append(rows, inboxGroupRow(section, fmt.Sprintf("%s (%d)", m.config.Inbox.Label(section), conversations), nil))
+		default:
 			rows = append(rows, inboxGroupRow(section, m.config.Inbox.Label(section), agents))
 		}
 	}
@@ -175,6 +183,38 @@ func (m *Model) inboxProjectRows(sorted []inboxItem) []session.Session {
 	}
 
 	return rows
+}
+
+func (m *Model) sectionCollapsed(section string) bool {
+	return slices.Contains(m.config.Inbox.Collapsed, section) && !m.openedSections[section] && m.textInput.Value() == ""
+}
+
+func (m *Model) collapsedSectionAt(row popupListRow) (string, bool) {
+	if m.displayMode != displayModeInbox || m.inboxGroup != config.InboxGroupState || row.isAgent() || row.isSeparator() ||
+		row.sessionIndex < 0 || row.sessionIndex >= len(m.filtered) || len(m.filtered[row.sessionIndex].Agents) > 0 {
+		return "", false
+	}
+
+	section, ok := strings.CutPrefix(m.filtered[row.sessionIndex].ID, inboxGroupIDPrefix)
+
+	return section, ok && slices.Contains(m.config.Inbox.Collapsed, section)
+}
+
+func (m *Model) openSection(section string) func() (tea.Model, tea.Cmd) {
+	return func() (tea.Model, tea.Cmd) {
+		m.openedSections[section] = true
+
+		m.refreshDisplaySessions()
+		m.filterSessions()
+
+		if index := slices.IndexFunc(m.filtered, func(row session.Session) bool { return row.ID == inboxGroupIDPrefix+section }); index >= 0 {
+			m.cursor = index
+			m.agentCursor = 0
+			m.listViewportPolicy = listViewportFollowSelection
+		}
+
+		return m, nil
+	}
 }
 
 func inboxGroupRow(id, name string, agents []session.AgentSession) session.Session {
@@ -331,7 +371,7 @@ func (m *Model) newInboxItem(host inboxHost, owner session.Session, agent sessio
 
 	item := inboxItem{
 		agent: agent, owner: owner, host: host, live: live, kind: kind, work: recordedWork(host, agent, live, kind), expandKey: "",
-		section: "",
+		section: "", hidden: 0,
 	}
 	item.section = m.inboxSection(item)
 
@@ -629,6 +669,10 @@ func (m *Model) hostLabel(connection string) string {
 }
 
 func (m *Model) handleInboxEnter(selected popupListRow) func() (tea.Model, tea.Cmd) {
+	if section, ok := m.collapsedSectionAt(selected); ok {
+		return m.openSection(section)
+	}
+
 	item, ok := m.inboxItemAt(selected)
 	if !ok {
 		return nil

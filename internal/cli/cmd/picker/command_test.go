@@ -330,6 +330,40 @@ func TestPickerPopupKeepsReadableSizeOnSmallTerminals(t *testing.T) {
 	}
 }
 
+func TestPickerPopupGrowsToFitRowsUpToMostOfTheTerminal(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		fitting    int
+		available  gotmux.Size
+		wantHeight string
+	}{
+		{name: "rows fit the configured height", fitting: 20, available: gotmux.Size{Width: 200, Height: 60}, wantHeight: "25"},
+		{name: "taller list grows the popup", fitting: 40, available: gotmux.Size{Width: 200, Height: 60}, wantHeight: "40"},
+		{name: "growth stops at most of the terminal", fitting: 90, available: gotmux.Size{Width: 200, Height: 60}, wantHeight: "48"},
+		{name: "short terminal keeps a margin", fitting: 90, available: gotmux.Size{Width: 200, Height: 9}, wantHeight: "7"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			state := &session.State{}
+			state.SetPopupHeight("sesh", test.fitting)
+			state.SetPopupHeight("agents", 1)
+
+			cfg := config.DefaultConfig()
+			cfg.Settings.DisplayModes = []string{"sesh"}
+
+			_, height := popupDimensions(cfg, state, test.available)
+			if height != test.wantHeight {
+				t.Fatalf("popup height = %s, want %s", height, test.wantHeight)
+			}
+		})
+	}
+}
+
 func TestPickerPopupPreservesConfiguredDimensionsWithoutClientGeometry(t *testing.T) {
 	t.Parallel()
 
