@@ -97,7 +97,7 @@ Other files sesh writes:
 
 ### `[popup]`
 
-Sizes are terminal cells (`"80"`), percentages (`"50%"`), or `"auto"`.
+Sizes are terminal cells (`"80"`), percentages (`"50%"`), or `"auto"`. When a mode's rows did not fit the last time, the popup grows taller, up to 80% of the terminal height.
 
 - `sesh_width` `(string: "40%")` - Width in sesh mode.
 - `sesh_height` `(string: "45%")` - Height in sesh mode.

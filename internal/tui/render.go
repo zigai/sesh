@@ -148,6 +148,7 @@ func (m *Model) renderFrame() string {
 	writeExactFramedSection(&out, m.renderInputBar(layout.bodyWidth), leftBorder, rightBorder)
 
 	m.writeListFramedSection(&out, layout.bodyWidth, layout.listHeight, leftBorder, rightBorder)
+	m.recordFittingHeight(layout)
 
 	for _, line := range m.renderInboxDetail(layout.bodyWidth, layout.detailRows) {
 		writeExactFramedLine(&out, line, leftBorder, rightBorder)
@@ -161,6 +162,28 @@ func (m *Model) renderFrame() string {
 	out.WriteString(bottomBorder)
 
 	return out.String()
+}
+
+func (m *Model) recordFittingHeight(layout popupLayout) {
+	if m.mode != modePopup || m.textInput.Value() != "" || len(m.closedExpanded) > 0 || len(m.openedSections) > 0 {
+		return
+	}
+
+	reservedRows := 1
+	if m.config.Settings.ShowFooter || m.showsFooterBadges() {
+		reservedRows++
+	}
+
+	if m.displayMode == displayModeInbox {
+		reservedRows += inboxDetailRows
+	}
+
+	rows := layout.listHeight
+	if len(m.listRows) > 0 {
+		rows = len(m.listRows)
+	}
+
+	m.fittingHeights[m.displayMode] = rows + reservedRows + popupBodyHeightMargin + popupViewportInset
 }
 
 func (m *Model) renderFrameBorders(horizontal string) (string, string, string, string) {

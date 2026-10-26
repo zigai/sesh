@@ -210,6 +210,7 @@ type Model struct {
 	pendingResume                *remoteResume
 	closedExpanded               map[string]bool
 	openedSections               map[string]bool
+	fittingHeights               fittingHeights
 	inboxItems                   map[string]inboxItem
 	inboxGroupKeys               map[string]string
 	menu                         *rowMenu
@@ -403,6 +404,7 @@ func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps
 		pendingResume:                nil,
 		closedExpanded:               map[string]bool{},
 		openedSections:               map[string]bool{},
+		fittingHeights:               make(fittingHeights),
 		inboxItems:                   map[string]inboxItem{},
 		inboxGroupKeys:               map[string]string{},
 		menu:                         nil,
@@ -540,6 +542,16 @@ func (m *Model) DeferredAttachSession() string {
 
 func (m *Model) ReplayKey() string {
 	return m.replayKey
+}
+
+// FittingPopupHeights returns, per display mode shown, the popup height that fits all its rows.
+func (m *Model) FittingPopupHeights() []session.PopupHeight {
+	heights := make([]session.PopupHeight, 0, len(m.fittingHeights))
+	for mode, height := range m.fittingHeights {
+		heights = append(heights, session.PopupHeight{Mode: string(mode), Height: height})
+	}
+
+	return heights
 }
 
 func (m *Model) TaskProject() string {

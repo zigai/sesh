@@ -21,13 +21,19 @@ import (
 	"github.com/zigai/sesh/internal/strictjson"
 )
 
-const CurrentHistoryVersion = 2
+const CurrentHistoryVersion = 3
+
+const (
+	historyVersionWithoutSessionKeys  = 1
+	historyVersionWithoutPopupHeights = 2
+)
 
 const (
 	maxHistoryFileSize     = 1 << 20
 	maxSwitchHistory       = 1024
 	maxRemoteSwitchHistory = 1024
 	maxAgentViewHistory    = 512
+	maxPopupHeights        = 16
 )
 
 var (
@@ -62,6 +68,13 @@ type AgentViewHistoryEntry struct {
 	ViewedAtUnixNano int64    `json:"viewedAt"`
 }
 
+// PopupHeight is the popup height, in terminal rows, that showed every row of a display mode
+// without scrolling the last time the picker ran in it.
+type PopupHeight struct {
+	Mode   string `json:"mode"`
+	Height int    `json:"height"`
+}
+
 type KeyAssignment struct {
 	// Session is a key identity (see Identity.KeyIdentity), so the key follows a session between
 	// live and saved.
@@ -77,6 +90,7 @@ type State struct {
 	LastAutosaveUnix    int64                      `json:"lastAutosaveTimestamp"`
 	PopupDisplayMode    string                     `json:"popupDisplayMode"`
 	SessionKeys         []KeyAssignment            `json:"sessionKeys"`
+	PopupHeights        []PopupHeight              `json:"popupHeights"`
 }
 
 type ServiceDeps struct {
@@ -128,7 +142,11 @@ func (s *State) Validate() error {
 		return err
 	}
 
-	return validateSessionKeys(s.SessionKeys)
+	if err := validateSessionKeys(s.SessionKeys); err != nil {
+		return err
+	}
+
+	return validatePopupHeights(s.PopupHeights)
 }
 
 func LoadState(path string) (*State, error) {
@@ -299,8 +317,11 @@ func (e *HistoryVersionError) Unwrap() error {
 }
 
 func HistoryUpgradeFilter(version int) (string, bool) {
-	if version == 1 {
-		return ".version = 2 | .sessionKeys = []", true
+	switch version {
+	case historyVersionWithoutSessionKeys:
+		return ".version = 3 | .sessionKeys = [] | .popupHeights = []", true
+	case historyVersionWithoutPopupHeights:
+		return ".version = 3 | .popupHeights = []", true
 	}
 
 	return "", false
@@ -371,10 +392,15 @@ func encodeState(current *State) ([]byte, error) {
 		LastAutosaveUnix:    current.LastAutosaveUnix,
 		PopupDisplayMode:    current.PopupDisplayMode,
 		SessionKeys:         slices.Clone(current.SessionKeys),
+		PopupHeights:        slices.Clone(current.PopupHeights),
 	}
 
 	if toWrite.SessionKeys == nil {
 		toWrite.SessionKeys = []KeyAssignment{}
+	}
+
+	if toWrite.PopupHeights == nil {
+		toWrite.PopupHeights = []PopupHeight{}
 	}
 
 	if toWrite.SwitchHistory == nil {
@@ -546,6 +572,7 @@ func defaultState() *State {
 		LastAutosaveUnix:    0,
 		PopupDisplayMode:    "",
 		SessionKeys:         []KeyAssignment{},
+		PopupHeights:        []PopupHeight{},
 	}
 }
 
@@ -868,6 +895,7 @@ func cloneState(s *State) *State {
 		LastAutosaveUnix:    s.LastAutosaveUnix,
 		PopupDisplayMode:    s.PopupDisplayMode,
 		SessionKeys:         slices.Clone(s.SessionKeys),
+		PopupHeights:        slices.Clone(s.PopupHeights),
 	}
 }
 
@@ -974,6 +1002,50 @@ func validateAgentViewHistory(entries []AgentViewHistoryEntry) error {
 	}
 
 	return nil
+}
+
+func validatePopupHeights(entries []PopupHeight) error {
+	if len(entries) > maxPopupHeights {
+		return errors.Join(strictjson.ErrInvalid, ErrHistoryBoundExceeded)
+	}
+
+	seen := make(map[string]struct{}, len(entries))
+
+	for _, entry := range entries {
+		if entry.Mode == "" || !utf8.ValidString(entry.Mode) || entry.Height <= 0 {
+			return strictjson.ErrInvalid
+		}
+
+		if _, exists := seen[entry.Mode]; exists {
+			return errors.Join(strictjson.ErrInvalid, ErrDuplicateHistoryEntry)
+		}
+
+		seen[entry.Mode] = struct{}{}
+	}
+
+	return nil
+}
+
+func (s *State) SetPopupHeight(mode string, height int) {
+	for index := range s.PopupHeights {
+		if s.PopupHeights[index].Mode == mode {
+			s.PopupHeights[index].Height = height
+
+			return
+		}
+	}
+
+	s.PopupHeights = append(s.PopupHeights, PopupHeight{Mode: mode, Height: height})
+}
+
+func (s *State) PopupHeight(mode string) int {
+	for _, entry := range s.PopupHeights {
+		if entry.Mode == mode {
+			return entry.Height
+		}
+	}
+
+	return 0
 }
 
 func validateSessionKeys(entries []KeyAssignment) error {

@@ -19,6 +19,8 @@ const (
 
 type displayMode string
 
+type fittingHeights map[displayMode]int
+
 type sessionIdentity struct {
 	runtimeKey string
 	id         string

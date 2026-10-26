@@ -558,7 +558,7 @@ func TestLoadRejectsMissingVersionAndDuplicateFields(t *testing.T) {
 	dir := testStateDir(t)
 
 	missingVerPath := filepath.Join(dir, "missing_ver.json")
-	if err := os.WriteFile(missingVerPath, []byte(`{"switchHistory":[],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":"","sessionKeys":[]}`), 0o600); err != nil {
+	if err := os.WriteFile(missingVerPath, []byte(`{"switchHistory":[],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":"","sessionKeys":[],"popupHeights":[]}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -567,7 +567,7 @@ func TestLoadRejectsMissingVersionAndDuplicateFields(t *testing.T) {
 	}
 
 	unknownFieldPath := filepath.Join(dir, "unknown_field.json")
-	if err := os.WriteFile(unknownFieldPath, []byte(`{"version":2,"switchHistory":[],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":"","sessionKeys":[],"extraField":123}`), 0o600); err != nil {
+	if err := os.WriteFile(unknownFieldPath, []byte(`{"version":3,"switchHistory":[],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":"","sessionKeys":[],"popupHeights":[],"extraField":123}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -576,7 +576,7 @@ func TestLoadRejectsMissingVersionAndDuplicateFields(t *testing.T) {
 	}
 
 	dupSwitchPath := filepath.Join(dir, "dup_switch.json")
-	if err := os.WriteFile(dupSwitchPath, []byte(`{"version":2,"switchHistory":[{"session":{"origin":"","connectionId":"","socket":"","repositorySource":"","name":"dev"},"lastSwitch":1},{"session":{"origin":"","connectionId":"","socket":"","repositorySource":"","name":"dev"},"lastSwitch":2}],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":"","sessionKeys":[]}`), 0o600); err != nil {
+	if err := os.WriteFile(dupSwitchPath, []byte(`{"version":3,"switchHistory":[{"session":{"origin":"","connectionId":"","socket":"","repositorySource":"","name":"dev"},"lastSwitch":1},{"session":{"origin":"","connectionId":"","socket":"","repositorySource":"","name":"dev"},"lastSwitch":2}],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":"","sessionKeys":[],"popupHeights":[]}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -741,7 +741,7 @@ func TestHistoryRejectsInvalidNestedIdentitiesAndRemoteBounds(t *testing.T) {
 		`{"origin":"local","connectionId":"","socket":"","repositorySource":"","name":"dev","name":"other"}`,
 		`null`,
 	} {
-		data := []byte(`{"version":2,"switchHistory":[{"session":` + value + `,"lastSwitch":1}],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":"","sessionKeys":[]}`)
+		data := []byte(`{"version":3,"switchHistory":[{"session":` + value + `,"lastSwitch":1}],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":"","sessionKeys":[],"popupHeights":[]}`)
 		if err := os.WriteFile(path, data, 0o600); err != nil {
 			t.Fatal(err)
 		}

@@ -829,6 +829,24 @@ func (s *services) performDeferredAttach(ctx context.Context, target session.Ses
 	return nil
 }
 
+func (s *services) recordPopupHeights(ctx context.Context, recorded *session.State, heights []session.PopupHeight) {
+	if !s.popupChild || s.workspace.History == "" ||
+		!slices.ContainsFunc(heights, func(fit session.PopupHeight) bool { return recorded.PopupHeight(fit.Mode) != fit.Height }) {
+		return
+	}
+
+	_, err := session.UpdateState(ctx, s.workspace.History, func(st *session.State) {
+		for _, fit := range heights {
+			st.SetPopupHeight(fit.Mode, fit.Height)
+		}
+	})
+	if err != nil {
+		zerolog.Ctx(ctx).Warn().Str("component", "picker").Str("operation", "record_popup_heights").
+			Str("status", "degraded").Str("reason", "history_update_failed").Func(logging.Cause(err)).
+			Msg("popup heights were not recorded")
+	}
+}
+
 func (s *services) detachInvokingClient(ctx context.Context) error {
 	client, err := invokingPickerClient(ctx, s.server)
 	if err != nil {
