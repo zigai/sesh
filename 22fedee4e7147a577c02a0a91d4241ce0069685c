@@ -1,0 +1,3 @@
+- Opens the inbox popup on a scratch tmux server with 30 closed conversations; the closed section shows one heading, closed (30), and no rows
+- Presses Enter on that heading; the section opens with all 30 conversations and the first one selected
+- Clicks the heading in a fresh popup; the section opens the same way
