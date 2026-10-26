@@ -301,7 +301,7 @@
 # menu items not named elsewhere.
 [menu]
 
-# agent = ["go", "snooze", "unsnooze", "seen", "unseen", "pin", "unpin", "evidence", "pr", "link", "unlink", "merge", "sleep", "wake", "open", "finish", "-", "items"]
+# agent = ["go", "snooze", "unsnooze", "seen", "unseen", "pin", "unpin", "evidence", "pr", "link", "unlink", "merge", "sleep", "wake", "open", "finish", "task", "-", "items"]
 # session = ["go", "rename", "snapshot", "kill", "delete"]
 
 # Menu items run headless in the task worktree, in a window of the task's popup session. The

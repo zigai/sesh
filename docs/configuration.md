@@ -381,7 +381,7 @@ The inbox lists agent conversations by state. The agent status service records t
 
 Row menus, opened with `keys.menu` or a right-click. A menu shows only the entries that apply to the row. `-` is a divider, and `items` lists the `[menu.items]` entries not named elsewhere.
 
-- `agent` `(list: ["go", "snooze", "unsnooze", "seen", "unseen", "pin", "unpin", "evidence", "pr", "link", "unlink", "merge", "sleep", "wake", "open", "finish", "-", "items"])` - Menu of agent rows.
+- `agent` `(list: ["go", "snooze", "unsnooze", "seen", "unseen", "pin", "unpin", "evidence", "pr", "link", "unlink", "merge", "sleep", "wake", "open", "finish", "task", "-", "items"])` - Menu of agent rows.
 - `session` `(list: ["go", "rename", "snapshot", "kill", "delete"])` - Menu of session rows.
 
 ### `[menu.items.<name>]`

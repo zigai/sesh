@@ -34,6 +34,7 @@ const (
 	MenuWake     = "wake"
 	MenuOpen     = "open"
 	MenuFinish   = "finish"
+	MenuTask     = "task"
 	MenuRename   = "rename"
 	MenuSnapshot = "snapshot"
 	MenuKill     = "kill"
@@ -43,7 +44,7 @@ const (
 var (
 	AgentMenuEntries = []string{
 		MenuGo, MenuSnooze, MenuUnsnooze, MenuSeen, MenuUnseen, MenuPin, MenuUnpin, MenuEvidence, MenuPR,
-		MenuLink, MenuUnlink, MenuMerge, MenuSleep, MenuWake, MenuOpen, MenuFinish,
+		MenuLink, MenuUnlink, MenuMerge, MenuSleep, MenuWake, MenuOpen, MenuFinish, MenuTask,
 	}
 	SessionMenuEntries = []string{MenuGo, MenuRename, MenuSnapshot, MenuKill, MenuDelete}
 )

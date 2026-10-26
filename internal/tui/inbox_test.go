@@ -489,6 +489,7 @@ func TestRowMenuListsOnlyTheEntriesThatApply(t *testing.T) {
 		inboxTestAgent("fresh", "%1", session.AgentStatusIdle, time.Now()),
 	})
 	model.config.Menu.Agent = []string{config.MenuGo, config.MenuDivider, config.MenuUnsnooze, config.MenuSnooze, config.MenuSeen, config.MenuMerge, config.MenuSleep}
+	model.config.Menu.Session = nil
 	model = updateTestModel(t, model, tea.WindowSizeMsg{Width: 80, Height: 24})
 
 	runHandler(t, model, model.openRowMenu())
@@ -522,6 +523,7 @@ func TestRowMenuOffersMergeForCommitsNotOnTheBase(t *testing.T) {
 	agent.GitUnmerged = 1
 	model := newInboxTestModel(t, nil, []session.AgentSession{agent})
 	model.config.Menu.Agent = []string{config.MenuMerge}
+	model.config.Menu.Session = nil
 
 	runHandler(t, model, model.openRowMenu())
 
