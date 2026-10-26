@@ -1,0 +1,2 @@
+- Opens the picker in a real terminal on a scratch tmux server with live session api and saved sessions docs, web, api; moving from the live api row to the saved docs row leaves the footer keys unchanged, with rename, kill and snapshot greyed out
+- Opens the help screen on the saved docs row; it lists create, rename, kill, delete and snapshot, same as on a live row
