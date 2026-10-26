@@ -484,24 +484,26 @@ func TestRenderFooterTruncatesCompactHelpAtVeryNarrowWidth(t *testing.T) {
 	}
 }
 
-func TestRenderFooterOmitsLiveOnlyActionsForSavedRows(t *testing.T) {
+func TestRenderFooterDimsLiveOnlyActionsForSavedRows(t *testing.T) {
 	model := newTestModel()
-	model.filtered = []session.Session{{Name: "archive", Kind: session.KindSaved}}
+	model.filtered = []session.Session{{Name: "current", Kind: session.KindLive}, {Name: "archive", Kind: session.KindSaved}}
 
-	output := stripANSI(model.renderFooter(96))
-	for _, unwanted := range []string{"rename", "kill"} {
-		if strings.Contains(output, unwanted) {
-			t.Fatalf("renderFooter output = %q, should omit %q for saved rows", output, unwanted)
-		}
+	live := stripANSI(model.renderFooter(160))
+	model.cursor = 1
+
+	if saved := stripANSI(model.renderFooter(160)); saved != live {
+		t.Fatalf("saved row footer = %q, want the live row footer %q", saved, live)
 	}
 
-	if strings.Contains(output, "sessions:") {
-		t.Fatalf("renderFooter output = %q, should not include session count", output)
+	disabled := map[string]bool{}
+	for _, part := range model.footerParts(160) {
+		disabled[part.desc] = part.disabled
 	}
 
-	for _, want := range []string{"select", "delete"} {
-		if !strings.Contains(output, want) {
-			t.Fatalf("renderFooter output = %q, expected %q", output, want)
+	want := map[string]bool{"select": false, "create": false, "rename": true, "kill": true, "snapshot": true, "menu": false}
+	for desc, dimmed := range want {
+		if got, ok := disabled[desc]; !ok || got != dimmed {
+			t.Errorf("footer part %q disabled = %v (listed %v), want %v", desc, got, ok, dimmed)
 		}
 	}
 }

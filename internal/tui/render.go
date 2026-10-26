@@ -62,7 +62,14 @@ const (
 	ansiFooterDesc      = "\x1b[38;5;245m"
 	ansiFooterHoverKey  = "\x1b[48;5;236;1;94m"
 	ansiFooterHoverDesc = "\x1b[48;5;236;38;5;245m"
+	ansiFooterDisabled  = "\x1b[38;5;240m"
 )
+
+var footerActionIDs = map[displayMode][]action.ID{
+	displayModeSesh:   {action.SessionCreate.ID, action.SessionRename.ID, action.SessionKill.ID, action.SnapshotSave.ID},
+	displayModeAgents: {action.SessionCreate.ID, action.SessionRename.ID, action.SessionKill.ID},
+	displayModeInbox:  {action.InboxTask.ID, action.InboxFinish.ID, action.TaskSleep.ID, action.TaskOpen.ID},
+}
 
 type popupLayout struct {
 	bodyWidth       int
@@ -103,10 +110,11 @@ type sessionRowStyles struct {
 }
 
 type footerPart struct {
-	key     string
-	desc    string
-	width   int
-	binding action.Binding
+	key      string
+	desc     string
+	width    int
+	binding  action.Binding
+	disabled bool
 }
 
 func (m *Model) viewContent() string {
@@ -1448,10 +1456,8 @@ func (m *Model) footerParts(width int) []footerPart {
 		parts = append(parts, m.sessionKeyFooterPart())
 	}
 
-	for _, bound := range m.footerActions(keys) {
-		parts = append(parts, newActionFooterPart(bound))
-	}
-
+	parts = append(parts, m.footerActions(keys)...)
+	parts = append(parts, newFooterPart(keys.menu.Help().Key, "menu"))
 	parts = append(parts, newFooterPart("esc", "cancel"))
 	parts = append(parts, newFooterPart(keys.help.Help().Key, "help"))
 	parts = m.withoutSessionKeyHintWhenTooWide(parts, footerWidth)
@@ -1477,7 +1483,6 @@ func (m *Model) baseFooterParts() []footerPart {
 		return append(
 			parts,
 			newFooterPart("↑/↓", "agents"),
-			newFooterPart(m.actionKeys().menu.Help().Key, "menu"),
 		)
 	}
 
@@ -1511,14 +1516,15 @@ func (m *Model) compactAgentFooterParts(keys actionKeyMap, width int) []footerPa
 
 func newFooterPart(key string, desc string) footerPart {
 	return footerPart{
-		key:     key,
-		desc:    desc,
-		width:   lipgloss.Width(key) + 1 + lipgloss.Width(desc),
-		binding: action.Binding{Key: "", Action: "", In: "", Table: "", Values: nil},
+		key:      key,
+		desc:     desc,
+		width:    lipgloss.Width(key) + 1 + lipgloss.Width(desc),
+		binding:  action.Binding{Key: "", Action: "", In: "", Table: "", Values: nil},
+		disabled: false,
 	}
 }
 
-func newActionFooterPart(bound boundAction) footerPart {
+func newActionFooterPart(bound boundAction, disabled bool) footerPart {
 	label := string(bound.binding.Action)
 	if entry, ok := action.Lookup(bound.binding.Action); ok {
 		label, _, _ = strings.Cut(strings.ToLower(entry.Describe().Title), " ")
@@ -1530,6 +1536,7 @@ func newActionFooterPart(bound boundAction) footerPart {
 
 	part := newFooterPart(bound.key.Help().Key, label)
 	part.binding = bound.binding
+	part.disabled = disabled
 
 	return part
 }
@@ -1560,7 +1567,7 @@ func renderFooterLine(parts []footerPart, width int, hoverDesc string) string {
 			out.WriteString("  ")
 		}
 
-		writeFooterPart(&out, part, part.desc == hoverDesc)
+		writeFooterPart(&out, part, part.desc == hoverDesc && !part.disabled)
 	}
 
 	line := out.String()
@@ -1577,7 +1584,10 @@ func writeFooterPart(out *strings.Builder, part footerPart, hovered bool) {
 	keyStyle := ansiFooterKey
 	descStyle := ansiFooterDesc
 
-	if hovered {
+	switch {
+	case part.disabled:
+		keyStyle, descStyle = ansiFooterDisabled, ansiFooterDisabled
+	case hovered:
 		keyStyle = ansiFooterHoverKey
 		descStyle = ansiFooterHoverDesc
 	}
