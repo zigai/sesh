@@ -44,6 +44,8 @@ var (
 	errAdoptedLayoutUnresolved  = errors.New("adopted window has no identifiable initial pane")
 )
 
+var tmuxPaneVariables = []string{"TMUX", "TMUX_PANE", "TERM", "TERM_PROGRAM", "TERM_PROGRAM_VERSION", "COLORTERM"}
+
 type MissingWorkingDir string
 
 type ExecuteConfig struct {
@@ -1716,7 +1718,7 @@ func launchEnvironment(variables []model.Variable) (map[string]string, []string)
 
 	for _, variable := range variables {
 		name := string(variable.Name)
-		if name == "TMUX" || name == "TMUX_PANE" {
+		if slices.Contains(tmuxPaneVariables, name) {
 			continue
 		}
 
