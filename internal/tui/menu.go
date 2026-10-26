@@ -326,6 +326,24 @@ func (m *Model) handleRowRightClick(mouse tea.Mouse) func() (tea.Model, tea.Cmd)
 	return handler
 }
 
+func (m *Model) anchorMenuAtSelection() {
+	if m.menu == nil {
+		return
+	}
+
+	layout := m.popupMouseLayout()
+
+	index := slices.Index(m.visibleListRows(layout.layout.listHeight), m.selectedListRow())
+	if index < 0 {
+		return
+	}
+
+	inset := layout.topY
+	m.menu.anchored = true
+	m.menu.anchorX = layout.bodyX + lipgloss.Width(defaultSelectionBar) - inset
+	m.menu.anchorY = layout.listY + index - inset
+}
+
 func (m *Model) sessionMenuEntries() []menuEntry {
 	entries := make([]menuEntry, 0, len(m.config.Menu.Session))
 
