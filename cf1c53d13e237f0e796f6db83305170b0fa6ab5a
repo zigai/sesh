@@ -1,0 +1,2 @@
+- Opens the sesh-mode popup on a scratch tmux server with 40 sessions in a 160x50 terminal; the first open is 32 rows and the list scrolls
+- Closes and reopens it; the popup grows to 40 rows, 80% of the terminal height, and history.json records a sesh height of 44
