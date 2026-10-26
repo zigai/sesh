@@ -1,0 +1,1 @@
+- Runs go test -race -tags=integration ./internal/task, which failed on the unchanged code (harness-args missing) and passes with the wait
