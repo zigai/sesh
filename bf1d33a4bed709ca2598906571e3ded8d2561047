@@ -1,0 +1,3 @@
+- Live restored Claude panes in sessions sesh, lab and config had no TERM or COLORTERM; their saved session environment marked both as removed
+- Restore launch test with TERM and COLORTERM marked removed failed before the fix (TERM=dumb, empty COLORTERM) and passes after it
+- Restore package integration tests pass under -race
