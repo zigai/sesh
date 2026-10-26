@@ -1,0 +1,3 @@
+- go test ./internal/tui -count=1 passes, including Alt+m placement for first, later, scrolled and agent rows, placement above bottom rows, fitting a six-line window, fullscreen placement, and a right-click at column 30 on the second session.
+- Scratch-copy checks that center keyboard menus, remove placement above the selected row, or move a right-click menu to the row text each fail the new placement tests for the expected reason.
+- just check passes on this exact working tree, including lint, test isolation, integration tests with the race detector, and the format diff.
