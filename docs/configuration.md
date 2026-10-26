@@ -372,6 +372,7 @@ The inbox lists agent conversations by state. The agent status service records t
 - `sections` `(list: ["done", "approve", "input", "waiting", "limited", "unmerged", "running", "snoozed", "asleep", "idle", "closed"])` - Sections shown, in order. Add `finished` to show finished conversations.
 - `labels` `(table: {})` - Section headings, as in `labels = { done = "new" }`.
 - `dim` `(list: ["running", "snoozed", "asleep", "closed", "finished"])` - Sections with dimmed rows.
+- `collapsed` `(list: ["closed", "finished"])` - Sections shown as one row with their count until you press Enter on it, when grouped by state.
 - `snooze` `(list: ["next message", "1h", "4h", "tomorrow 09:00"])` - Snooze choices: a duration, a time such as `"18:00"`, `"tomorrow 09:00"`, or `"next message"`.
 - `closed_shown` `(int: 3)` - Closed rows per project before a row that shows the rest. `0` shows all.
 

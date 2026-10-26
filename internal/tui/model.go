@@ -209,6 +209,7 @@ type Model struct {
 	workSynced                   bool
 	pendingResume                *remoteResume
 	closedExpanded               map[string]bool
+	openedSections               map[string]bool
 	inboxItems                   map[string]inboxItem
 	inboxGroupKeys               map[string]string
 	menu                         *rowMenu
@@ -401,6 +402,7 @@ func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps
 		workSynced:                   false,
 		pendingResume:                nil,
 		closedExpanded:               map[string]bool{},
+		openedSections:               map[string]bool{},
 		inboxItems:                   map[string]inboxItem{},
 		inboxGroupKeys:               map[string]string{},
 		menu:                         nil,

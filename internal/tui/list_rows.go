@@ -168,7 +168,9 @@ func (m *Model) rowSelectable(row popupListRow) bool {
 
 	if row.sessionIndex >= 0 && row.sessionIndex < len(m.filtered) {
 		if !row.isAgent() {
-			return m.displayMode != displayModeInbox
+			_, collapsed := m.collapsedSectionAt(row)
+
+			return m.displayMode != displayModeInbox || collapsed
 		}
 
 		return row.agentIndex < len(m.filtered[row.sessionIndex].Agents)

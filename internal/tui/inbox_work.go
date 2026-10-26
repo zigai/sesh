@@ -106,6 +106,7 @@ func newMoreItem(firstHidden inboxItem, group, expandKey string, hidden int) inb
 	more.work = work.EmptyItem()
 	more.kind = inboxMoreRow
 	more.expandKey = expandKey
+	more.hidden = hidden
 
 	return more
 }
@@ -161,7 +162,7 @@ func (m *Model) newClosedItem(host inboxHost, recorded work.Item) inboxItem {
 	}
 
 	return inboxItem{
-		agent: agent, owner: owner, host: host, live: live, kind: inboxClosedRow, work: recorded, expandKey: "", section: section,
+		agent: agent, owner: owner, host: host, live: live, kind: inboxClosedRow, work: recorded, expandKey: "", section: section, hidden: 0,
 	}
 }
 

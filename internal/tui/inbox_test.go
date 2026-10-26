@@ -87,6 +87,7 @@ func newInboxTestModel(t *testing.T, tasks []task.Live, agents []session.AgentSe
 	model.tasks = tasks
 	model.deps.Inbox = &memoryInbox{state: inbox.State{Version: inbox.Version, Snoozes: nil, Unseen: nil}}
 	model.displayMode = displayModeInbox
+	model.config.Inbox.Collapsed = nil
 	refreshInbox(model)
 
 	return model
@@ -924,6 +925,7 @@ func TestMarkingARemoteClosedConversationUnseenGoesToItsMachine(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Remote.Enabled = true
 	cfg.Remote.Connections = []config.RemoteConnectionConfig{{ID: inboxTestHost, Host: inboxTestHost}}
+	cfg.Inbox.Collapsed = nil
 
 	model := loaderTestModel(t, cfg, Dependencies{})
 	recordingDispatcher(model, &dispatched)
@@ -1131,6 +1133,53 @@ func TestAProjectShowsItsNewestClosedRowsAndExpandsTheRest(t *testing.T) {
 	assertInboxRows(t, model, map[string][]string{
 		config.InboxClosed: {"closed w5", "closed w4", "closed w3", "closed w2", "closed w1"},
 	})
+}
+
+func TestCollapsedSectionShowsItsCountUntilEnterOpensIt(t *testing.T) {
+	now := time.Now()
+	model := newInboxTestModel(t, nil, []session.AgentSession{inboxTestAgent("fresh", "%1", session.AgentStatusIdle, now)})
+	model.config.Inbox.Collapsed = []string{config.InboxClosed}
+	model.config.Inbox.ClosedShown = 1
+	model.work = []work.Item{
+		closedTestItem("w1", "conversation-one", now),
+		closedTestItem("w2", "conversation-two", now.Add(-time.Minute)),
+		closedTestItem("w3", "conversation-three", now.Add(-2*time.Minute)),
+	}
+	refreshInbox(model)
+	model = updateTestModel(t, model, tea.WindowSizeMsg{Width: 100, Height: 30})
+
+	assertInboxRows(t, model, map[string][]string{config.InboxDone: {"fresh"}})
+
+	if !strings.Contains(stripANSI(model.View().Content), "closed (3)") {
+		t.Fatalf("view does not show the collapsed heading:\n%s", stripANSI(model.View().Content))
+	}
+
+	updateTestModel(t, model, keyCode(tea.KeyDown))
+	updateTestModel(t, model, keyCode(tea.KeyEnter))
+
+	assertInboxRows(t, model, map[string][]string{config.InboxDone: {"fresh"}, config.InboxClosed: {"closed w1", "2 more"}})
+
+	if found, ok := model.selectedInboxItem(); !ok || found.work.ID != "w1" {
+		t.Fatalf("selected after opening = %q/%v, want w1", found.work.ID, ok)
+	}
+}
+
+func TestSearchFindsRowsInACollapsedSection(t *testing.T) {
+	now := time.Now()
+	model := newInboxTestModel(t, nil, nil)
+	model.config.Inbox.Collapsed = []string{config.InboxClosed}
+	model.work = []work.Item{closedTestItem("w1", "conversation-one", now), closedTestItem("w2", "conversation-two", now)}
+	refreshInbox(model)
+	model = updateTestModel(t, model, tea.WindowSizeMsg{Width: 100, Height: 30})
+
+	updateTestModel(t, model, keyText("w2"))
+
+	assertInboxRows(t, model, map[string][]string{config.InboxClosed: {"closed w2"}})
+
+	updateTestModel(t, model, keyCode(tea.KeyBackspace))
+	updateTestModel(t, model, keyCode(tea.KeyBackspace))
+
+	assertInboxRows(t, model, map[string][]string{})
 }
 
 func TestNewTaskOnATaskRowClosesThePickerForItsProject(t *testing.T) {

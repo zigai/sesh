@@ -323,9 +323,9 @@ func (m *Model) restoreSelectedInboxItem(selected sessionIdentity) {
 			return agent.Host == selected.host && ((selected.paneID != "" && agent.PaneID == selected.paneID) ||
 				(selected.agentID != "" && agent.RegistryID == selected.agentID))
 		})
-		if agentIndex >= 0 {
+		if agentIndex >= 0 || (len(group.Agents) == 0 && group.ID == selected.id) {
 			m.cursor = index
-			m.agentCursor = agentIndex
+			m.agentCursor = max(agentIndex, parentAgentIndex)
 
 			return
 		}
