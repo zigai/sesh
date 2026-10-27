@@ -1,0 +1,4 @@
+- Runs the privatefs, config and logging tests with TMPDIR=/var/run/user/1000/... (/var/run is a root-owned symlink to /run, like /var on macOS); before the fix 9 privatefs and many config tests fail with 'open private directory: not a directory' and 'config path is a symlink', after it all three packages pass.
+- Runs the resolver test on a fixture tree with trusted and untrusted links; breaking the trust check makes the 'untrusted link stays' and 'parent step past an untrusted link' cases fail.
+- Builds and lints the changed packages for GOOS=darwin.
+- Passes just check.
