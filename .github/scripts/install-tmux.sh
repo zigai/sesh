@@ -18,7 +18,7 @@ printf '%s\n' '7c60cae9a0e25288e2e24750aafc9e8800fc7fd4555e447e1b29ee4201cfb3bf 
 tar -xzf tmux.tar.gz
 cd tmux-3.7c
 if [ "$(uname -s)" = Darwin ]; then
-    ./configure --prefix="$prefix" --enable-utf8proc
+    ./configure --prefix="$prefix" --enable-utf8proc --enable-jemalloc
 else
     ./configure --prefix="$prefix"
 fi
