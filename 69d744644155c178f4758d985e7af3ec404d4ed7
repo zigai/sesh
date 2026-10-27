@@ -1,0 +1,2 @@
+- The CI tmux install script, run on Linux into a scratch prefix, still builds and installs tmux 3.7c
+- actionlint reports no new findings in test.yml; its only finding, the empty push branch list, predates this change
