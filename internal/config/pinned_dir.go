@@ -13,6 +13,8 @@ import (
 
 	"github.com/samber/oops"
 	"golang.org/x/sys/unix"
+
+	"github.com/zigai/sesh/internal/privatefs"
 )
 
 const maxConfigFileSize int64 = 1 << 20
@@ -35,6 +37,14 @@ func openPinnedDir(dirPath string, create bool) (*pinnedDir, error) {
 		}
 
 		cleanPath = filepath.Clean(abs)
+	}
+
+	cleanPath, err := privatefs.ResolveSystemSymlinks(cleanPath)
+	if err != nil {
+		return nil, oops.In("config").
+			Code("config_open_failed").
+			With("operation", "fs", "reason", "resolve_system_symlinks").
+			Wrap(err)
 	}
 
 	rootFd, err := unix.Open("/", unix.O_RDONLY|unix.O_DIRECTORY|unix.O_CLOEXEC, 0)

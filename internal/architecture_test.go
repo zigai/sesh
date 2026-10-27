@@ -72,6 +72,7 @@ var packageLayers = map[string]layer{
 
 var sameLayerImports = map[packageEdge]string{
 	{"cmd/sesh", "internal/cli"}:                     "the binary runs the command tree",
+	{"internal/logging", "internal/privatefs"}:       "the log file follows system symbolic links the same way private storage does",
 	{"internal/snapshot/capture", "internal/agents"}: "capture records the agent session in each pane",
 	{"internal/project", "internal/session"}:         "a project lists the windows of its session",
 	{"internal/task", "internal/project"}:            "a task belongs to a project",
