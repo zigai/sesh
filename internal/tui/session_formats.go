@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/zigai/aht/v2/pkg/aht"
 
@@ -565,7 +566,7 @@ func (v sessionFormatValues) resolveAgentIdentityField(field string) (string, bo
 	case display.FieldHarnessRaw:
 		return SanitizeTerminalText(v.agent.Harness), true
 	case display.FieldAgentSession:
-		return SanitizeTerminalText(v.agent.HarnessSession), true
+		return strings.TrimLeftFunc(SanitizeTerminalText(v.agent.HarnessSession), unicode.IsSpace), true
 	case display.FieldRegistryID:
 		return SanitizeTerminalText(v.agent.RegistryID), true
 	case display.FieldPaneID:
