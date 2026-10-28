@@ -1,0 +1,3 @@
+- The inbox on a scratch home with a ledger the build rejects shows 'Unable to load tasks: task ledger is inconsistent invalid native JSON' on one line, where before the second line broke the popup border
+- A test with a two-line task load error fails before the fix and passes after
+- just check passes
