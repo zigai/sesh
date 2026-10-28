@@ -1009,13 +1009,15 @@ func TestExecutorLaunchesApprovedProgramOnceWithModeledEnvironment(t *testing.T)
 		{Name: model.Bytes("SESH_LAUNCH_SESSION"), State: "set", Value: model.Bytes("session")},
 		{Name: model.Bytes("SESH_LAUNCH_OVERRIDE"), State: "set", Value: model.Bytes("session")},
 		{Name: model.Bytes("SESH_LAUNCH_REMOVE"), State: "removed"},
+		{Name: model.Bytes("TERM"), State: "removed"},
+		{Name: model.Bytes("COLORTERM"), State: "removed"},
 	}
 	manifest.Panes[0].Launch = model.Launch{
 		Executable: model.Bytes("/bin/sh"),
 		Arguments: []model.Bytes{
 			model.Bytes("sh"),
 			model.Bytes("-c"),
-			model.Bytes(`printf '%s|%s|%s|%s|%s|%s|%s\n' "$SESH_LAUNCH_GLOBAL" "$SESH_LAUNCH_SESSION" "$SESH_LAUNCH_OVERRIDE" "$SESH_LAUNCH_SET" "${SESH_LAUNCH_REMOVE-unset}" "$TMUX" "$TMUX_PANE" >> "$1"; exec sleep 300`),
+			model.Bytes(`printf '%s|%s|%s|%s|%s|%s|%s|%s|%s\n' "$SESH_LAUNCH_GLOBAL" "$SESH_LAUNCH_SESSION" "$SESH_LAUNCH_OVERRIDE" "$SESH_LAUNCH_SET" "${SESH_LAUNCH_REMOVE-unset}" "$TMUX" "$TMUX_PANE" "$TERM" "$COLORTERM" >> "$1"; exec sleep 300`),
 			model.Bytes("sh"),
 			model.Bytes(marker),
 		},
@@ -1127,7 +1129,7 @@ func assertLaunchMarker(t *testing.T, marker string) {
 	t.Helper()
 
 	fields := strings.Split(strings.TrimSpace(marker), "|")
-	if len(fields) != 7 {
+	if len(fields) != 9 {
 		t.Fatalf("unexpected launch marker shape: %q", marker)
 	}
 
@@ -1137,6 +1139,10 @@ func assertLaunchMarker(t *testing.T, marker string) {
 
 	if fields[5] == "" || fields[5] == "source-tmux" || fields[6] == "" || fields[6] == "source-pane" {
 		t.Fatalf("source tmux identities leaked into launched process: %q", marker)
+	}
+
+	if fields[7] == "" || fields[8] == "" {
+		t.Fatalf("tmux terminal variables removed from launched process: %q", marker)
 	}
 }
 

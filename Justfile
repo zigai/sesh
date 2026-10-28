@@ -92,9 +92,13 @@ lint:
 check: mod-check lint test-isolation race
     golangci-lint fmt --diff
 
-# Build the binary
+# Build the binary with version info
 build:
-    go build -o {{ binary }} ./cmd/sesh
+    #!/usr/bin/env sh
+    set -e
+    commit=$(git rev-parse --short HEAD 2>/dev/null || echo none)
+    build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    go build -ldflags "-X github.com/zigai/sesh/internal/cli.version=dev -X github.com/zigai/sesh/internal/cli.commit=${commit} -X github.com/zigai/sesh/internal/cli.date=${build_date}" -o {{ binary }} ./cmd/sesh
 
 build-release:
     #!/usr/bin/env bash
@@ -170,14 +174,6 @@ install-binary:
 # Remove build artifacts
 clean:
     rm -rf sesh sesh.exe dist/
-
-# Build with version info (local dev)
-build-dev:
-    #!/usr/bin/env sh
-    set -e
-    commit=$(git rev-parse --short HEAD 2>/dev/null || echo none)
-    build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-    go build -ldflags "-X github.com/zigai/sesh/internal/cli.version=dev -X github.com/zigai/sesh/internal/cli.commit=${commit} -X github.com/zigai/sesh/internal/cli.date=${build_date}" -o {{ binary }} ./cmd/sesh
 
 # Validate local packaging configuration without publishing
 package-check:
@@ -256,8 +252,6 @@ release-major: _release-check
     echo "Releasing $new (was $latest)"
     git tag "$new"
     git push origin "$new"
-
-alias release := release-patch
 
 alias cov := coverage
 alias fmt := format
