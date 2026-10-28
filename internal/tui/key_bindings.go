@@ -89,8 +89,8 @@ func (m *Model) actionKeys() actionKeyMap {
 	return newActionKeyMap(m.config, m.actionBindings)
 }
 
-func (m *Model) availableActions(keys actionKeyMap) []boundAction {
-	available := make([]boundAction, 0, len(keys.actions))
+func (m *Model) viewActions(keys actionKeyMap) []boundAction {
+	actions := make([]boundAction, 0, len(keys.actions))
 
 	for _, bound := range keys.actions {
 		entry, ok := action.Lookup(bound.binding.Action)
@@ -99,21 +99,12 @@ func (m *Model) availableActions(keys actionKeyMap) []boundAction {
 		}
 
 		descriptor := entry.Describe()
-		if descriptor.InPicker {
-			if m.pickerActionError(descriptor.ID) == nil {
-				available = append(available, bound)
-			}
-
-			continue
-		}
-
-		subject, ok := m.actionSubject(descriptor)
-		if ok && m.actionAvailable(descriptor, subject) == nil {
-			available = append(available, bound)
+		if m.displayMode == displayModeInbox || (!descriptor.InPicker && descriptor.Subject != action.SubjectTask) {
+			actions = append(actions, bound)
 		}
 	}
 
-	return available
+	return actions
 }
 
 func (k actionKeyMap) actionKey(id action.ID) string {

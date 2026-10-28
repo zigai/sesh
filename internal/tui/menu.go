@@ -43,6 +43,11 @@ var agentMenuActions = map[string]action.ID{
 	config.MenuWake:     action.TaskWake.ID,
 	config.MenuOpen:     action.TaskOpen.ID,
 	config.MenuFinish:   action.InboxFinish.ID,
+	config.MenuTask:     action.InboxTask.ID,
+}
+
+var menuLabels = map[string]string{
+	config.MenuTask: "new task",
 }
 
 type rowMenu struct {
@@ -292,7 +297,7 @@ func (m *Model) openRowMenu() func() (tea.Model, tea.Cmd) {
 	}
 
 	if selected.isAgent() {
-		return m.openMenu(&rowMenu{entries: m.agentMenuEntries(), cursor: 0, anchored: false, anchorX: 0, anchorY: 0, box: menuBox{x: 0, y: 0, width: 0, height: 0}})
+		return m.openMenu(&rowMenu{entries: append(m.agentMenuEntries(), m.agentSessionMenuEntries()...), cursor: 0, anchored: false, anchorX: 0, anchorY: 0, box: menuBox{x: 0, y: 0, width: 0, height: 0}})
 	}
 
 	return m.openMenu(&rowMenu{entries: m.sessionMenuEntries(), cursor: 0, anchored: false, anchorX: 0, anchorY: 0, box: menuBox{x: 0, y: 0, width: 0, height: 0}})
@@ -321,6 +326,24 @@ func (m *Model) handleRowRightClick(mouse tea.Mouse) func() (tea.Model, tea.Cmd)
 	return handler
 }
 
+func (m *Model) anchorMenuAtSelection() {
+	if m.menu == nil {
+		return
+	}
+
+	layout := m.popupMouseLayout()
+
+	index := slices.Index(m.visibleListRows(layout.layout.listHeight), m.selectedListRow())
+	if index < 0 {
+		return
+	}
+
+	inset := layout.topY
+	m.menu.anchored = true
+	m.menu.anchorX = layout.bodyX + lipgloss.Width(defaultSelectionBar) - inset
+	m.menu.anchorY = layout.listY + index - inset
+}
+
 func (m *Model) sessionMenuEntries() []menuEntry {
 	entries := make([]menuEntry, 0, len(m.config.Menu.Session))
 
@@ -330,10 +353,32 @@ func (m *Model) sessionMenuEntries() []menuEntry {
 			entries = append(entries, menuEntry{label: "", key: "", run: nil})
 		case config.MenuGo:
 			if run := m.handleEnter(); run != nil {
-				entries = append(entries, menuEntry{label: "open", key: "enter", run: run})
+				entries = append(entries, menuEntry{label: m.goLabel(), key: "enter", run: run})
 			}
 		default:
 			if entry, ok := m.actionMenuEntry(name, sessionMenuActions[name], action.Values{}); ok {
+				entries = append(entries, entry)
+			}
+		}
+	}
+
+	return entries
+}
+
+func (m *Model) goLabel() string {
+	if m.cursor < len(m.filtered) && m.filtered[m.cursor].Saved() {
+		return "restore"
+	}
+
+	return "open"
+}
+
+func (m *Model) agentSessionMenuEntries() []menuEntry {
+	entries := []menuEntry{{label: "", key: "", run: nil}}
+
+	for _, name := range m.config.Menu.Session {
+		if id := sessionMenuActions[name]; id != "" {
+			if entry, ok := m.actionMenuEntry(name+" session", id, action.Values{}); ok {
 				entries = append(entries, entry)
 			}
 		}
@@ -389,7 +434,7 @@ func (m *Model) agentMenuEntry(name string, items map[string]config.MenuItemConf
 			}
 		}
 
-		if entry, ok := m.actionMenuEntry(name, id, action.Values{}); ok {
+		if entry, ok := m.actionMenuEntry(menuLabel(name), id, action.Values{}); ok {
 			return []menuEntry{entry}
 		}
 	default:
@@ -399,6 +444,14 @@ func (m *Model) agentMenuEntry(name string, items map[string]config.MenuItemConf
 	}
 
 	return nil
+}
+
+func menuLabel(name string) string {
+	if label, ok := menuLabels[name]; ok {
+		return label
+	}
+
+	return name
 }
 
 func (m *Model) menuItemEntries(name string, item config.MenuItemConfig) []menuEntry {
@@ -419,26 +472,8 @@ func (m *Model) menuItemEntries(name string, item config.MenuItemConfig) []menuE
 }
 
 func (m *Model) actionMenuEntry(label string, id action.ID, values action.Values) (menuEntry, bool) {
-	entry, ok := action.Lookup(id)
-	if !ok {
+	if !m.actionRunnable(id) {
 		return menuEntry{label: "", key: "", run: nil}, false
-	}
-
-	descriptor := entry.Describe()
-
-	if descriptor.InPicker {
-		if m.pickerActionError(id) != nil {
-			return menuEntry{label: "", key: "", run: nil}, false
-		}
-	} else {
-		subject, ok := m.actionSubject(descriptor)
-		if !ok || m.actionAvailable(descriptor, subject) != nil {
-			return menuEntry{label: "", key: "", run: nil}, false
-		}
-
-		if taskActionFitOf(id, m.selectedTaskLive()) == taskActionMisfits {
-			return menuEntry{label: "", key: "", run: nil}, false
-		}
 	}
 
 	key := ""
@@ -456,6 +491,25 @@ func (m *Model) actionMenuEntry(label string, id action.ID, values action.Values
 
 		return m, nil
 	}}, true
+}
+
+func (m *Model) actionRunnable(id action.ID) bool {
+	entry, ok := action.Lookup(id)
+	if !ok {
+		return false
+	}
+
+	descriptor := entry.Describe()
+	if descriptor.InPicker {
+		return m.pickerActionError(id) == nil
+	}
+
+	subject, ok := m.actionSubject(descriptor)
+	if !ok || m.actionAvailable(descriptor, subject) != nil {
+		return false
+	}
+
+	return taskActionFitOf(id, m.selectedTaskLive()) != taskActionMisfits
 }
 
 func (m *Model) selectedMenuItems() map[string]config.MenuItemConfig {

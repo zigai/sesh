@@ -403,7 +403,7 @@ func TestSessionKeysStayHiddenWithoutIndentStyle(t *testing.T) {
 
 func TestFooterNamesSessionKeysWhenTheyAreShown(t *testing.T) {
 	hasHint := func(model *Model) bool {
-		return slices.ContainsFunc(model.footerParts(120), func(part footerPart) bool {
+		return slices.ContainsFunc(model.footerParts(200), func(part footerPart) bool {
 			return part.key == "tab" && part.desc == "open"
 		})
 	}

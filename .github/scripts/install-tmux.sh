@@ -17,12 +17,10 @@ curl --fail --location --silent --show-error \
 printf '%s\n' '7c60cae9a0e25288e2e24750aafc9e8800fc7fd4555e447e1b29ee4201cfb3bf  tmux.tar.gz' | shasum -a 256 -c -
 tar -xzf tmux.tar.gz
 cd tmux-3.7c
-# configure refuses to build on macOS unless utf8proc is chosen explicitly.
 if [ "$(uname -s)" = Darwin ]; then
-    set -- --enable-utf8proc
+    ./configure --prefix="$prefix" --enable-utf8proc --enable-jemalloc
 else
-    set --
+    ./configure --prefix="$prefix"
 fi
-./configure --prefix="$prefix" "$@"
 make -j2
 make install

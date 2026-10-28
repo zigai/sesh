@@ -450,6 +450,10 @@ func (m *Model) footerPartAt(x int, width int) (footerPart, bool) {
 }
 
 func (m *Model) resolveFooterAction(part footerPart) func() (tea.Model, tea.Cmd) {
+	if part.disabled {
+		return func() (tea.Model, tea.Cmd) { return m, nil }
+	}
+
 	if part.binding.Action != "" {
 		return m.invokeAction(part.binding.Action, part.binding.Values)
 	}

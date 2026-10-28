@@ -422,6 +422,7 @@ func newSleepFixtureWith(t *testing.T, prepareWorktree func(dir string)) sleepFi
 
 	sleeping := sleepFixture{fixture: f, agents: agents, harness: harness, record: record, pane: pane}
 	waitForForeground(t, sleeping, func(command string) bool { return command == fakeHarnessName })
+	waitForHarnessStart(t, sleeping)
 
 	return sleeping
 }
@@ -567,6 +568,23 @@ func waitForArgs(t *testing.T, f sleepFixture, want string) string {
 	}
 
 	return readArgs(t, f)
+}
+
+func waitForHarnessStart(t *testing.T, f sleepFixture) {
+	t.Helper()
+
+	path := filepath.Join(f.record.Directory, fakeHarnessArgsFile)
+	deadline := time.Now().Add(envWaitLimit)
+
+	for time.Now().Before(deadline) {
+		if _, err := os.Stat(path); err == nil {
+			return
+		}
+
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	t.Fatalf("harness did not write %s", path)
 }
 
 func readArgs(t *testing.T, f sleepFixture) string {

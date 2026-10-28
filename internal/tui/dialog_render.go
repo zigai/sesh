@@ -76,7 +76,7 @@ func (m *Model) helpBindings(keys actionKeyMap) []helpBinding {
 
 	bindings = append(bindings, helpBinding{keys.menu.Help().Key + ", right-click", keys.menu.Help().Desc})
 
-	for _, bound := range m.availableActions(keys) {
+	for _, bound := range m.viewActions(keys) {
 		bindings = append(bindings, helpBinding{bound.key.Help().Key, bound.key.Help().Desc})
 	}
 

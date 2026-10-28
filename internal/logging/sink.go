@@ -17,6 +17,8 @@ import (
 
 	"github.com/rs/zerolog"
 	"golang.org/x/sys/unix"
+
+	"github.com/zigai/sesh/internal/privatefs"
 )
 
 const (
@@ -135,8 +137,12 @@ func openPinnedParentDir(path string, create bool) (*os.File, string, error) {
 	}
 
 	cleanPath := filepath.Clean(absPath)
-	parentPath := filepath.Dir(cleanPath)
 	baseName := filepath.Base(cleanPath)
+
+	parentPath, err := privatefs.ResolveSystemSymlinks(filepath.Dir(cleanPath))
+	if err != nil {
+		return nil, "", wrapErr(err, "log_open_failed", "resolve system symbolic links")
+	}
 
 	rootFd, err := unix.Open("/", unix.O_RDONLY|unix.O_DIRECTORY|unix.O_CLOEXEC, 0)
 	if err != nil {
