@@ -1301,7 +1301,7 @@ func inputGutterWidth() int {
 func (m *Model) renderEmptyState(width int) string {
 	emptyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.Theme.Muted))
 
-	message := display.Truncate(m.emptyStateMessage(), width)
+	message := display.Truncate(SanitizeTerminalText(strings.Join(strings.Fields(m.emptyStateMessage()), " ")), width)
 	if messageWidth := lipgloss.Width(message); messageWidth < width {
 		message += strings.Repeat(" ", width-messageWidth)
 	}

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/action"
@@ -25,7 +26,10 @@ const (
 	inboxTestHarness = "claude"
 )
 
-var errTranscriptUnreadable = errors.New("transcript unreadable")
+var (
+	errTranscriptUnreadable = errors.New("transcript unreadable")
+	errLedgerBroken         = errors.New("ledger is broken\nbad record")
+)
 
 type memoryInbox struct {
 	state inbox.State
@@ -601,6 +605,23 @@ func TestUnreachableHostShowsOneDimmedOfflineLine(t *testing.T) {
 	last := popupListRow{sessionIndex: len(model.filtered) - 1, agentIndex: parentAgentIndex}
 	if !model.inboxDims(last) || model.rowSelectable(last) {
 		t.Fatal("offline line is not a dimmed, unselectable heading")
+	}
+}
+
+func TestAMultilineLoadErrorStaysOnOneLineOfTheEmptyInbox(t *testing.T) {
+	model := newInboxTestModel(t, nil, nil)
+	model.tasksErr = errLedgerBroken
+	model.width, model.height = 80, 12
+
+	frame := stripANSI(model.renderFrame())
+	if !strings.Contains(frame, "Unable to load tasks: ledger is broken bad record") {
+		t.Fatalf("frame does not show the load error on one line:\n%s", frame)
+	}
+
+	for line := range strings.SplitSeq(frame, "\n") {
+		if width := lipgloss.Width(line); width != model.width {
+			t.Fatalf("frame line is %d cells wide, want %d:\n%s", width, model.width, frame)
+		}
 	}
 }
 
