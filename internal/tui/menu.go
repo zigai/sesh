@@ -14,10 +14,11 @@ import (
 )
 
 const (
-	menuBorderCells  = 2
-	menuPaddingCells = 1
-	menuSideCells    = 2 * menuPaddingCells
-	menuKeyGap       = 3
+	menuBorderCells       = 2
+	menuPaddingCells      = 1
+	menuSideCells         = 2 * menuPaddingCells
+	menuKeyGap            = 3
+	menuDividerTitleCells = 3
 )
 
 var sessionMenuActions = map[string]action.ID{
@@ -97,7 +98,15 @@ func trimMenuDividers(entries []menuEntry) []menuEntry {
 	trimmed := make([]menuEntry, 0, len(entries))
 
 	for _, entry := range entries {
-		if entry.divider() && (len(trimmed) == 0 || trimmed[len(trimmed)-1].divider()) {
+		switch {
+		case !entry.divider():
+		case len(trimmed) > 0 && trimmed[len(trimmed)-1].divider():
+			if entry.label != "" {
+				trimmed[len(trimmed)-1] = entry
+			}
+
+			continue
+		case len(trimmed) == 0 && entry.label == "":
 			continue
 		}
 
@@ -235,7 +244,12 @@ func (m *Model) menuLines() []string {
 	labelWidth, keyWidth := 0, 0
 
 	for _, entry := range m.menu.entries {
-		labelWidth = max(labelWidth, lipgloss.Width(entry.label))
+		titleCells := 0
+		if entry.divider() && entry.label != "" {
+			titleCells = menuDividerTitleCells - menuSideCells
+		}
+
+		labelWidth = max(labelWidth, lipgloss.Width(entry.label)+titleCells)
 		keyWidth = max(keyWidth, lipgloss.Width(entry.key))
 	}
 
@@ -253,7 +267,7 @@ func (m *Model) menuLines() []string {
 
 	for index, entry := range m.menu.entries {
 		if entry.divider() {
-			lines = append(lines, border.Render("├"+strings.Repeat("─", inner)+"┤"))
+			lines = append(lines, m.menuDividerLine(entry.label, inner))
 
 			continue
 		}
@@ -262,6 +276,18 @@ func (m *Model) menuLines() []string {
 	}
 
 	return append(lines, border.Render("╰"+strings.Repeat("─", inner)+"╯"))
+}
+
+func (m *Model) menuDividerLine(title string, inner int) string {
+	border := lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.Theme.Border))
+	if title == "" || lipgloss.Width(title)+menuDividerTitleCells > inner {
+		return border.Render("├" + strings.Repeat("─", inner) + "┤")
+	}
+
+	muted := lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.Theme.Muted))
+	rest := inner - lipgloss.Width(title) - menuDividerTitleCells
+
+	return border.Render("├─ ") + muted.Render(SanitizeTerminalText(title)) + border.Render(" "+strings.Repeat("─", rest)+"┤")
 }
 
 func (m *Model) menuEntryLine(entry menuEntry, inner, labelWidth int, selected bool) string {
@@ -374,11 +400,11 @@ func (m *Model) goLabel() string {
 }
 
 func (m *Model) agentSessionMenuEntries() []menuEntry {
-	entries := []menuEntry{{label: "", key: "", run: nil}}
+	entries := []menuEntry{{label: "session", key: "", run: nil}}
 
 	for _, name := range m.config.Menu.Session {
 		if id := sessionMenuActions[name]; id != "" {
-			if entry, ok := m.actionMenuEntry(name+" session", id, action.Values{}); ok {
+			if entry, ok := m.actionMenuEntry(name, id, action.Values{}); ok {
 				entries = append(entries, entry)
 			}
 		}
