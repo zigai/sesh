@@ -1,0 +1,3 @@
+- Pressing alt+m on a fake pi agent row in a scratch tmux server shows open and merge, then a divider titled session, then rename, snapshot and kill without a session suffix
+- Arrow keys move from merge straight to rename, skipping the titled divider
+- just check passes
