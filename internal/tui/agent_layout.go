@@ -227,8 +227,13 @@ func agentReportedCell(values sessionFormatValues, part display.Part, cell rowla
 		reported := values.model.providerRunner.Cell(providerID, values.agent.PaneID, part.Field)
 
 		cell.Text, cell.State = reported.Text, reported.State
-		if part.Role == "" && reported.Role != "" {
+
+		switch {
+		case part.Role != "":
+		case reported.Role != "":
 			cell.Role = reported.Role
+		default:
+			cell.Role = agentGitCountRole(part.Field, cell.Text)
 		}
 	}
 
