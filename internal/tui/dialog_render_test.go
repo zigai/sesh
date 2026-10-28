@@ -219,23 +219,29 @@ func TestConfirmDialogEnterUsesSelectedButtonAndShortcutsStillWork(t *testing.T)
 	}
 }
 
-func TestHelpOverlayOmitsLiveOnlyActionsForSavedRows(t *testing.T) {
+func TestHelpOverlayListsTheSameKeysForEveryRowOfAView(t *testing.T) {
 	model := newTestModel()
 	model.width = 96
-	model.height = 24
-	model.filtered = []session.Session{{Name: "archive", Kind: session.KindSaved}}
+	model.height = 30
+	model.filtered = []session.Session{{Name: "current", Kind: session.KindLive}, {Name: "archive", Kind: session.KindSaved}}
 	model.showHelp = true
 
-	output := stripANSI(model.renderHelpOverlay())
-	for _, unwanted := range []string{"Rename session", "Kill session"} {
-		if strings.Contains(output, unwanted) {
-			t.Fatalf("help overlay = %q, should omit %q for saved rows", output, unwanted)
+	live := stripANSI(model.renderHelpOverlay())
+	model.cursor = 1
+
+	if saved := stripANSI(model.renderHelpOverlay()); saved != live {
+		t.Fatalf("saved row help = %q, want the live row help %q", saved, live)
+	}
+
+	for _, want := range []string{"Rename session", "Kill session", "Delete session"} {
+		if !strings.Contains(live, want) {
+			t.Fatalf("help overlay = %q, expected %q", live, want)
 		}
 	}
 
-	for _, want := range []string{"Popup Keys", "Delete session"} {
-		if !strings.Contains(output, want) {
-			t.Fatalf("help overlay = %q, expected %q", output, want)
+	for _, unwanted := range []string{"Sleep task", "Finish"} {
+		if strings.Contains(live, unwanted) {
+			t.Fatalf("sessions help = %q, should omit inbox action %q", live, unwanted)
 		}
 	}
 }

@@ -715,30 +715,20 @@ func (m *Model) recordedPR(agent session.AgentSession) string {
 	return text
 }
 
-func (m *Model) footerActions(keys actionKeyMap) []boundAction {
-	available := m.availableActions(keys)
-	if m.displayMode != displayModeInbox {
-		return available
-	}
+func (m *Model) footerActions(keys actionKeyMap) []footerPart {
+	ids := footerActionIDs[m.displayMode]
+	parts := make([]footerPart, 0, len(ids))
 
-	item, ok := m.selectedInboxItem()
-
-	tasks := make([]boundAction, 0, len(available))
-	others := make([]boundAction, 0, len(available))
-
-	for _, bound := range available {
-		switch taskActionFitOf(bound.binding.Action, item.live) {
-		case notTaskAction:
-			others = append(others, bound)
-		case taskActionFits:
-			if ok && item.kind == inboxTaskRow {
-				tasks = append(tasks, bound)
-			}
-		case taskActionMisfits:
+	for _, id := range ids {
+		index := slices.IndexFunc(keys.actions, func(bound boundAction) bool {
+			return bound.binding.Action == id && len(bound.binding.Values) == 0
+		})
+		if index >= 0 {
+			parts = append(parts, newActionFooterPart(keys.actions[index], !m.actionRunnable(id)))
 		}
 	}
 
-	return append(tasks, others...)
+	return parts
 }
 
 func taskActionFitOf(id action.ID, live task.Live) taskActionFit {

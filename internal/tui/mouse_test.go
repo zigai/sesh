@@ -6,9 +6,41 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
+	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/session"
 )
+
+func TestRightClickOpensMenuAtTheClickPosition(t *testing.T) {
+	model := newTestModel()
+	model.mode = modePopup
+	model.config.Menu.Session = []string{config.MenuGo, config.MenuRename, config.MenuKill}
+	model.filtered = testSessions(3)
+	model = updateTestModel(t, model, tea.WindowSizeMsg{Width: 80, Height: 24})
+	model.View()
+
+	model = updateTestModel(t, model, mouseClick(30, 3, tea.MouseRight))
+	output := stripANSI(viewString(model.View()))
+	lines := strings.Split(output, "\n")
+
+	if !strings.HasPrefix(lines[3], "│ ▌ session-1") {
+		t.Fatalf("right-click did not select the clicked session:\n%s", output)
+	}
+
+	for _, corner := range []struct {
+		glyph string
+		y     int
+	}{
+		{glyph: "╭", y: 4},
+		{glyph: "╰", y: 8},
+	} {
+		prefix, _, ok := strings.Cut(lines[corner.y], corner.glyph)
+		if !ok || lipgloss.Width(prefix) != 30 {
+			t.Fatalf("menu corner %s is not at column 30, line %d:\n%s", corner.glyph, corner.y, output)
+		}
+	}
+}
 
 func TestMouseWheelScrollsPopupList(t *testing.T) {
 	model := newTestModel()

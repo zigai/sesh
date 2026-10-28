@@ -189,9 +189,7 @@ func (c Chrome) Footer(hints []Hint, badge string, width int) string {
 
 	parts := make([]footerPart, 0, len(hints))
 	for _, hint := range hints {
-		parts = append(parts, footerPart{
-			key: hint.Key, desc: hint.Desc, width: lipgloss.Width(hint.Key) + 1 + lipgloss.Width(hint.Desc), binding: action.Binding{Key: "", Action: "", In: "", Table: "", Values: nil},
-		})
+		parts = append(parts, newFooterPart(hint.Key, hint.Desc))
 	}
 
 	hintWidth := max(width-labelWidth-frameBorderPadding, 0)
@@ -217,6 +215,7 @@ func (c Chrome) Hints(hints []Hint) string {
 
 		writeFooterPart(&out, footerPart{
 			key: hint.Key, desc: hint.Desc, width: 0, binding: action.Binding{Key: "", Action: "", In: "", Table: "", Values: nil},
+			disabled: false,
 		}, false)
 	}
 

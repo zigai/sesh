@@ -90,12 +90,12 @@ jobs:
           echo "SESH_TERMINAL_INTEGRATION_REQUIRED=1" >> "$GITHUB_ENV"
       - name: Install macOS build dependencies
         if: runner.os == 'macOS'
-        run: brew install libevent ncurses pkgconf
+        run: brew install jemalloc libevent ncurses pkgconf utf8proc
       - name: Build checksum-pinned tmux
         shell: bash
         run: |
           if [[ "$RUNNER_OS" == macOS ]]; then
-            export PKG_CONFIG_PATH="$(brew --prefix libevent)/lib/pkgconfig:$(brew --prefix ncurses)/lib/pkgconfig"
+            export PKG_CONFIG_PATH="$(brew --prefix libevent)/lib/pkgconfig:$(brew --prefix ncurses)/lib/pkgconfig:$(brew --prefix utf8proc)/lib/pkgconfig:$(brew --prefix jemalloc)/lib/pkgconfig"
           fi
           sh .github/scripts/install-tmux.sh "$RUNNER_TEMP/sesh-tmux"
           echo "$RUNNER_TEMP/sesh-tmux/bin" >> "$GITHUB_PATH"

@@ -60,6 +60,8 @@ func (m *Model) handleDisplayActionKeys(
 		return func() (tea.Model, tea.Cmd) { return m, nil }, true
 	case bubbleskey.Matches(pressed, keys.menu):
 		if handler := m.openRowMenu(); handler != nil {
+			m.anchorMenuAtSelection()
+
 			return handler, true
 		}
 
