@@ -66,6 +66,11 @@ func openPath(path string, create, parents, privateLeaf bool) (*Dir, error) {
 		return nil, ErrUnsafe
 	}
 
+	path, err := ResolveSystemSymlinks(path)
+	if err != nil {
+		return nil, err
+	}
+
 	dir, err := openRoot()
 	if err != nil {
 		return nil, err
