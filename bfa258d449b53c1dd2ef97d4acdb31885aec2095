@@ -1,0 +1,1 @@
+- Watching a catalog through publication, republication and removal passes 30 race-detector runs; forcing republication before removal makes the prior test fail.
