@@ -199,10 +199,11 @@ func TestAutosaveFinalSaveWaitsForASaveInProgress(t *testing.T) {
 	tests := []struct {
 		name       string
 		holdFor    time.Duration
+		deadline   string
 		wantReason string
 	}{
-		{"lock released before the deadline", 100 * time.Millisecond, "server_gone"},
-		{"lock held past the deadline", time.Minute, "lock_busy"},
+		{"lock released before the deadline", 100 * time.Millisecond, "5s", "server_gone"},
+		{"lock held past the deadline", time.Minute, "1s", "lock_busy"},
 	}
 
 	for _, tc := range tests {
@@ -228,7 +229,7 @@ func TestAutosaveFinalSaveWaitsForASaveInProgress(t *testing.T) {
 				testNoConfigFlag, testJSONFlag,
 				testSocketFlag, filepath.Join(home, "absent.sock"),
 				"--status-file", statusPath,
-				"--deadline", "1s",
+				"--deadline", tc.deadline,
 			)
 
 			status, err := automation.ReadFinalSaveStatus(statusPath)
