@@ -1,0 +1,1 @@
+- A connected inventory becomes stale and then hidden as the test clock advances in ten race-detector runs; the prior test misses the stale state in three of 30 runs.
