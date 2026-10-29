@@ -77,6 +77,7 @@ mod-check:
 
 # Format Go source files
 format:
+    golangci-lint run --fix --enable-only whitespace --issues-exit-code=0
     golangci-lint fmt
 
 # Apply automatic fixes and format code
