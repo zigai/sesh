@@ -429,27 +429,10 @@ func TestCatalogAdmitsBoundsCacheCapacity(t *testing.T) {
 func TestWatchCatalogYieldsTransitions(t *testing.T) {
 	dir, path := openTestCatalogDir(t)
 
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
+	next, stop := watchTestCatalog(t, dir)
+	defer stop()
 
-	type delivery struct {
-		catalog Catalog
-		err     error
-	}
-
-	deliveries := make(chan delivery, 16)
-
-	done := make(chan error, 1)
-
-	go func() {
-		done <- WatchCatalog(ctx, dir, minWatchInterval, func(catalog Catalog, err error) error {
-			deliveries <- delivery{catalog: catalog, err: err}
-
-			return nil
-		})
-	}()
-
-	first := <-deliveries
+	first := next()
 	if first.err != nil || len(first.catalog.Connections) != 0 {
 		t.Fatalf("initial delivery = %#v, want an empty catalog", first)
 	}
@@ -458,7 +441,7 @@ func TestWatchCatalogYieldsTransitions(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	second := <-deliveries
+	second := next()
 	if second.err != nil || second.catalog.Connections["host"].PeerID != testPeerID {
 		t.Fatalf("second delivery = %#v, want the published connection", second)
 	}
@@ -467,19 +450,18 @@ func TestWatchCatalogYieldsTransitions(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	republished := next()
+	if republished.err != nil || republished.catalog.Connections["host"].PeerID != testPeerID {
+		t.Fatalf("republished delivery = %#v, want the published connection", republished)
+	}
+
 	if err := os.Remove(filepath.Join(path, catalogName)); err != nil {
 		t.Fatal(err)
 	}
 
-	third := <-deliveries
+	third := next()
 	if third.err != nil || len(third.catalog.Connections) != 0 {
 		t.Fatalf("third delivery = %#v, want an empty catalog after removal", third)
-	}
-
-	cancel()
-
-	if err := <-done; !errors.Is(err, context.Canceled) {
-		t.Fatalf("WatchCatalog() error = %v, want cancellation", err)
 	}
 }
 
