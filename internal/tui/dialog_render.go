@@ -336,15 +336,7 @@ func overlayCentered(base string, overlay string, width int, height int) string 
 	}
 
 	overlayLines := strings.Split(overlay, "\n")
-
-	overlayWidth := 0
-	for _, line := range overlayLines {
-		overlayWidth = max(overlayWidth, lipgloss.Width(line))
-	}
-
-	innerWidth := max(width-innerFrameMargin, 1)
-	x := max((innerWidth-overlayWidth)/centerDivisor, 0)
-	y := max((height-len(overlayLines))/centerDivisor, 0)
+	x, y := overlayOrigin(overlayLines, width, height)
 
 	for i, overlayLine := range overlayLines {
 		target := y + i
@@ -352,10 +344,21 @@ func overlayCentered(base string, overlay string, width int, height int) string 
 			break
 		}
 
-		baseLines[target] = overlayLineAt(baseLines[target], overlayLine, x+1, width)
+		baseLines[target] = overlayLineAt(baseLines[target], overlayLine, x, width)
 	}
 
 	return strings.Join(baseLines[:min(len(baseLines), height)], "\n")
+}
+
+func overlayOrigin(overlayLines []string, width int, height int) (int, int) {
+	overlayWidth := 0
+	for _, line := range overlayLines {
+		overlayWidth = max(overlayWidth, lipgloss.Width(line))
+	}
+
+	innerWidth := max(width-innerFrameMargin, 1)
+
+	return max((innerWidth-overlayWidth)/centerDivisor, 0) + 1, max((height-len(overlayLines))/centerDivisor, 0)
 }
 
 func overlayLineAt(baseLine string, overlayLine string, x int, width int) string {

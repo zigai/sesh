@@ -1,7 +1,10 @@
 package tui
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -294,6 +297,122 @@ func footerPartPoint(t *testing.T, model *Model, desc string) (int, int) {
 	}
 
 	t.Fatalf("footer shortcut %q not visible in %#v", desc, model.footerParts(layout.layout.bodyWidth))
+
+	return 0, 0
+}
+
+func TestMouseClickConfirmDialogButtons(t *testing.T) {
+	for _, testCase := range []struct {
+		button     string
+		wantKilled string
+	}{
+		{button: "Yes", wantKilled: "session-1"},
+		{button: "No", wantKilled: ""},
+	} {
+		t.Run(testCase.button, func(t *testing.T) {
+			model := newTestModel()
+			model.mode = modePopup
+			model.filtered = testSessions(3)
+			model.cursor = 1
+			model = updateTestModel(t, model, tea.WindowSizeMsg{Width: 80, Height: 24})
+
+			killed := ""
+			dependenciesForTest(model).TmuxKillSession = func(_ context.Context, name string) error {
+				killed = name
+
+				return nil
+			}
+
+			openTestKillConfirm(model)
+
+			x, y := renderedTextPoint(t, model, " "+testCase.button+" ")
+			model = updateTestModelWithCommand(t, model, mouseClick(x+1, y, tea.MouseLeft))
+
+			if killed != testCase.wantKilled || model.dialog != dialogNone {
+				t.Fatalf("after clicking %s: killed=%q dialog=%v, want killed=%q and dialog closed", testCase.button, killed, model.dialog, testCase.wantKilled)
+			}
+		})
+	}
+}
+
+func TestMouseHoverConfirmDialogButtonSelectsIt(t *testing.T) {
+	model := newTestModel()
+	model.mode = modePopup
+	model.filtered = testSessions(2)
+	model = updateTestModel(t, model, tea.WindowSizeMsg{Width: 80, Height: 24})
+	openTestKillConfirm(model)
+
+	x, y := renderedTextPoint(t, model, " Yes ")
+	model = updateTestModel(t, model, mouseMotion(x+1, y))
+
+	if !model.confirmYes {
+		t.Fatal("confirmYes = false after hovering Yes, want true")
+	}
+
+	model = updateTestModel(t, model, mouseClick(0, 0, tea.MouseLeft))
+
+	if model.dialog != dialogConfirm {
+		t.Fatalf("dialog after clicking outside = %v, want confirmation still open", model.dialog)
+	}
+}
+
+func TestMouseClickPathSuggestionCompletesIt(t *testing.T) {
+	model := newTestModel()
+	model.mode = modePopup
+	model = updateTestModel(t, model, tea.WindowSizeMsg{Width: 80, Height: 24})
+
+	cwd := t.TempDir()
+	for _, dir := range []string{"docs", filepath.Join("beta", "child")} {
+		if err := os.MkdirAll(filepath.Join(cwd, dir), 0o755); err != nil {
+			t.Fatalf("mkdir %s failed: %v", dir, err)
+		}
+	}
+
+	dependenciesForTest(model).GetWorkingDirectory = func() (string, error) {
+		return cwd, nil
+	}
+
+	openTestCreateDirectoryPrompt(model, "new-session")
+	model.refreshPathSuggestions()
+
+	beta := "beta" + string(os.PathSeparator)
+	x, y := renderedTextPoint(t, model, beta)
+	model = updateTestModel(t, model, mouseClick(x, y, tea.MouseLeft))
+
+	if got := model.pathInput.Value(); got != beta {
+		t.Fatalf("path input after clicking suggestion = %q, want %q", got, beta)
+	}
+
+	wantChild := filepath.Join("beta", "child") + string(os.PathSeparator)
+	if len(model.pathSuggestions) != 1 || model.pathSuggestions[0] != wantChild {
+		t.Fatalf("suggestions after clicking beta = %#v, want [%q]", model.pathSuggestions, wantChild)
+	}
+}
+
+func TestMouseClickDismissesHelpOverlay(t *testing.T) {
+	model := newTestModel()
+	model.mode = modePopup
+	model = updateTestModel(t, model, tea.WindowSizeMsg{Width: 80, Height: 24})
+	model.showHelp = true
+
+	model = updateTestModel(t, model, mouseClick(5, 5, tea.MouseLeft))
+
+	if model.showHelp {
+		t.Fatal("showHelp = true after clicking, want help dismissed")
+	}
+}
+
+func renderedTextPoint(t *testing.T, model *Model, text string) (int, int) {
+	t.Helper()
+
+	output := stripANSI(viewString(model.View()))
+	for y, line := range strings.Split(output, "\n") {
+		if prefix, _, ok := strings.Cut(line, text); ok {
+			return lipgloss.Width(prefix), y
+		}
+	}
+
+	t.Fatalf("%q not rendered:\n%s", text, output)
 
 	return 0, 0
 }

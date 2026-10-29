@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"strings"
+
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 )
@@ -9,6 +11,9 @@ const (
 	mouseWheelRows    = 3
 	mouseBorderMargin = 2
 	footerPartSpacing = 2
+	// Rows below the confirm buttons and path suggestions: bottom padding and border.
+	dialogBottomRows    = 2
+	dialogContentColumn = 1 + boxHorizontalPadding
 )
 
 type popupMouseLayout struct {
@@ -24,8 +29,18 @@ type popupMouseLayout struct {
 }
 
 func (m *Model) handleMouseClick(mouse tea.Mouse) func() (tea.Model, tea.Cmd) {
-	if !m.mouseInteractionsEnabled() {
+	if !m.mouseReady() {
 		return nil
+	}
+
+	if m.showHelp {
+		m.showHelp = false
+
+		return func() (tea.Model, tea.Cmd) { return m, nil }
+	}
+
+	if m.dialog != dialogNone {
+		return m.handleDialogMouse(mouse, true)
 	}
 
 	if m.menu != nil {
@@ -67,6 +82,10 @@ func (m *Model) handleMouseClick(mouse tea.Mouse) func() (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleMouseWheel(mouse tea.Mouse) func() (tea.Model, tea.Cmd) {
+	if m.mouseReady() && m.dialog == dialogInputPath {
+		return m.handlePathDialogWheel(mouse)
+	}
+
 	if !m.mouseInteractionsEnabled() || !m.pointInsidePopupBody(mouse) {
 		return nil
 	}
@@ -93,6 +112,10 @@ func (m *Model) handleMouseWheel(mouse tea.Mouse) func() (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleMouseMotion(mouse tea.Mouse) func() (tea.Model, tea.Cmd) {
+	if m.mouseReady() && !m.showHelp && m.dialog != dialogNone {
+		return m.handleDialogMouse(mouse, false)
+	}
+
 	if !m.mouseInteractionsEnabled() {
 		return nil
 	}
@@ -120,8 +143,113 @@ func (m *Model) handleMouseMotion(mouse tea.Mouse) func() (tea.Model, tea.Cmd) {
 	return func() (tea.Model, tea.Cmd) { return m, nil }
 }
 
+func (m *Model) mouseReady() bool {
+	return m.popupStartup == popupStartupContent && m.width > 0 && m.height > 0
+}
+
 func (m *Model) mouseInteractionsEnabled() bool {
-	return m.popupStartup == popupStartupContent && m.width > 0 && m.height > 0 && !m.showHelp && m.dialog == dialogNone
+	return m.mouseReady() && !m.showHelp && m.dialog == dialogNone
+}
+
+func (m *Model) handleDialogMouse(mouse tea.Mouse, click bool) func() (tea.Model, tea.Cmd) {
+	if click && mouse.Button != tea.MouseLeft {
+		return nil
+	}
+
+	lines := strings.Split(m.renderDialog(), "\n")
+	x, y := overlayOrigin(lines, m.contentWidth(), m.contentHeight())
+
+	inset := 0
+	if m.mode == modePopup {
+		inset = popupViewportInset
+	}
+
+	column, line := mouse.X-inset-x, mouse.Y-inset-y
+
+	switch m.dialog {
+	case dialogConfirm:
+		return m.handleConfirmMouse(column, line == len(lines)-1-dialogBottomRows, click)
+	case dialogInputPath:
+		if column < 1 || column >= lipgloss.Width(lines[0])-1 {
+			return nil
+		}
+
+		return m.handlePathSuggestionMouse(line-(len(lines)-dialogBottomRows-m.visiblePathSuggestions()), click)
+	case dialogInputText, dialogNone:
+		return nil
+	}
+
+	return nil
+}
+
+func (m *Model) handleConfirmMouse(column int, onButtonRow bool, click bool) func() (tea.Model, tea.Cmd) {
+	yes, ok := confirmButtonAt(column)
+	if !ok || !onButtonRow {
+		return nil
+	}
+
+	m.confirmYes = yes
+
+	switch {
+	case click && yes:
+		return m.confirmPending()
+	case click:
+		return m.cancelAction()
+	default:
+		return func() (tea.Model, tea.Cmd) { return m, nil }
+	}
+}
+
+func (m *Model) handlePathSuggestionMouse(row int, click bool) func() (tea.Model, tea.Cmd) {
+	index, ok := m.pathSuggestionAt(row)
+	if !ok {
+		return nil
+	}
+
+	m.pathSuggestionIndex = index
+
+	if click {
+		m.setPathInputValue(m.pathSuggestions[index])
+		m.refreshPathSuggestions()
+	}
+
+	return func() (tea.Model, tea.Cmd) { return m, nil }
+}
+
+func confirmButtonAt(column int) (bool, bool) {
+	column -= dialogContentColumn
+
+	switch {
+	case column >= 0 && column < confirmButtonWidth:
+		return true, true
+	case column > confirmButtonWidth && column <= 2*confirmButtonWidth:
+		return false, true
+	default:
+		return false, false
+	}
+}
+
+func (m *Model) pathSuggestionAt(row int) (int, bool) {
+	index := m.pathSuggestionTop + row
+	if row < 0 || row >= m.visiblePathSuggestions() || index >= len(m.pathSuggestions) {
+		return 0, false
+	}
+
+	return index, true
+}
+
+func (m *Model) handlePathDialogWheel(mouse tea.Mouse) func() (tea.Model, tea.Cmd) {
+	switch mouse.Button {
+	case tea.MouseWheelUp:
+		m.movePathSuggestion(-1)
+	case tea.MouseWheelDown:
+		m.movePathSuggestion(1)
+	case tea.MouseNone, tea.MouseLeft, tea.MouseMiddle, tea.MouseRight, tea.MouseWheelLeft, tea.MouseWheelRight,
+		tea.MouseBackward, tea.MouseForward, tea.MouseButton10, tea.MouseButton11:
+		return nil
+	}
+
+	return func() (tea.Model, tea.Cmd) { return m, nil }
 }
 
 func (m *Model) popupMouseLayout() popupMouseLayout {
