@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	gitCommandBudget   = 200 * time.Millisecond
+	gitCommandBudget   = time.Second
 	gitOutputLimit     = 64 * 1024
 	gitWaitDelay       = 50 * time.Millisecond
 	gitStatusCodeWidth = 2
