@@ -13,7 +13,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -483,68 +482,45 @@ func TestStreamSupervisorLimitsConcurrentConnects(t *testing.T) {
 	}
 }
 
-func monitorScript(t *testing.T, markerPath string, frames ...Frame) string {
-	t.Helper()
-
-	health := `{"version":` + strconv.Itoa(ProtocolVersion) + `,"type":"health","peerId":"peer","streamInstance":"stream","sequence":%d,` +
-		`"health":{"observedAt":"1970-01-01T00:00:01Z","sources":{` +
-		`"tmux":{"status":"ok","reason":"none","checkedAt":"1970-01-01T00:00:00Z"},` +
-		`"agents":{"status":"ok","reason":"none","checkedAt":"1970-01-01T00:00:00Z"},` +
-		`"snapshots":{"status":"ok","reason":"none","checkedAt":"1970-01-01T00:00:00Z"},` +
-		`"tasks":{"status":"ok","reason":"none","checkedAt":"1970-01-01T00:00:00Z"},` +
-		`"work":{"status":"ok","reason":"none","checkedAt":"1970-01-01T00:00:00Z"}}}}`
-
-	var script strings.Builder
-
-	script.WriteString("cat > /dev/null\n")
-	script.WriteString("if [ -e '" + markerPath + "' ]; then echo 'Permission denied (publickey).' >&2; exit 255; fi\n")
-	script.WriteString(": > '" + markerPath + "'\n")
-	script.WriteString("printf '%s\\n'")
-
-	for _, frame := range frames {
-		script.WriteString(" '" + encodeFrame(t, frame) + "'")
-	}
-
-	script.WriteString("\n")
-	script.WriteString("sequence=3\n")
-	script.WriteString("while [ \"$sequence\" -lt 100 ]; do\n")
-	script.WriteString("  printf '" + health + "\\n' \"$sequence\"\n")
-	script.WriteString("  sequence=$((sequence + 1))\n")
-	script.WriteString("  sleep 0.02\n")
-	script.WriteString("done\n")
-
-	return script.String()
-}
-
 func TestMonitorPublishesInventoryAndAppliesStaleLifecycle(t *testing.T) {
 	dir, path := openTestCatalogDir(t)
 
 	remote := testRemoteConfig()
-	remote.ConnectTimeout = "200ms"
-	remote.HeartbeatInterval = "20ms"
-	remote.StaleAfter = "60ms"
-	remote.HideAfter = "300ms"
+	remote.ConnectTimeout = "5s"
+	remote.HeartbeatInterval = "10s"
+	remote.StaleAfter = "1h"
+	remote.HideAfter = "2h"
 	remote.TmuxPollInterval = "20ms"
 	remote.Connections = []config.RemoteConnectionConfig{{ID: testConnectionID, Label: "Work", Host: "work.example"}}
 
-	marker := filepath.Join(t.TempDir(), "attempted")
-	script := monitorScript(
-		t, marker,
-		helloFrame(testPeerID, "stream", 1),
-		snapshotFrame(testPeerID, "stream", 2, []session.Session{{ID: "$1", Name: testSessionName, Kind: session.KindLive, WindowCount: 2}}),
-	)
+	hello := encodeFrame(t, helloFrame(testPeerID, "stream", 1))
+	snapshotJSON := encodeFrame(t, snapshotFrame(testPeerID, "stream", 2, []session.Session{{ID: "$1", Name: testSessionName, Kind: session.KindLive, WindowCount: 2}}))
+	script := "cat > /dev/null\nprintf '%s\\n' '" + hello + "' '" + snapshotJSON + "'\nexec tail -f /dev/null\n"
+	command := scriptSSH(t, script)
+
+	start := time.Unix(100, 0).UTC()
+
+	var clock atomic.Int64
+	clock.Store(start.UnixNano())
 
 	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-
 	done := make(chan error, 1)
+	finished := make(chan struct{})
 
 	go func() {
+		defer close(finished)
+
 		done <- RunMonitor(ctx, MonitorOptions{
 			CatalogDir: dir,
 			Remote:     remote,
-			Command:    scriptSSH(t, script),
+			Command:    command,
+			Now:        func() time.Time { return time.Unix(0, clock.Load()).UTC() },
 		})
+	}()
+
+	defer func() {
+		cancel()
+		<-finished
 	}()
 
 	catalogPath := filepath.Join(path, catalogName)
@@ -564,11 +540,15 @@ func TestMonitorPublishesInventoryAndAppliesStaleLifecycle(t *testing.T) {
 		t.Fatalf("cached sessions = %#v, want the observed inventory", state.Snapshot.Sessions)
 	}
 
+	clock.Store(start.Add(time.Hour + time.Second).UnixNano())
+
 	waitForCatalog(t, catalogPath, 20*time.Second, done, func(catalog Catalog) bool {
 		state, ok := catalog.Connections[testConnectionID]
 
-		return ok && !state.Connected && state.LastError != "" && !state.LastErrorAt.IsZero()
+		return ok && !state.Connected && state.LastError == ConnectionErrorStale && !state.LastErrorAt.IsZero()
 	})
+
+	clock.Store(start.Add(2*time.Hour + time.Second).UnixNano())
 
 	waitForCatalog(t, catalogPath, 20*time.Second, done, func(catalog Catalog) bool {
 		_, ok := catalog.Connections[testConnectionID]
