@@ -1,0 +1,2 @@
+- Scanning a real test repository with each Git command delayed by 40 ms succeeds three times; the previous 200 ms budget fails all three runs.
+- Scanning six stalled repositories still reaches the later healthy repository.
