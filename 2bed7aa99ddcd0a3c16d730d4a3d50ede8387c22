@@ -1,0 +1,2 @@
+- A lease on /var/run/user/1000/<dir>/s (where /var/run is a root-owned link to /run) is acquired on Linux; before the change the same path was rejected as non-canonical.
+- The macOS Test job passes on 83d1091 (run 41056870571); before this commit, ~45 macOS tests failed with 'tmux endpoint path must be canonical' on gotmux fixture sockets under /tmp.
