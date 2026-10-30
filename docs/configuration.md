@@ -53,7 +53,7 @@ name = "claude"
 prompt_args = ["{title}"]
 
 [inbox]
-sections = ["done", "input", "running", "closed", "finished"]
+sections = ["ready", "question", "working", "closed", "archived"]
 
 [merge]
 check = ["just", "check"]
@@ -369,14 +369,14 @@ The `task.relayout` action arranges the current task window again for its curren
 The inbox lists agent conversations by state. The agent status service records them.
 
 - `group` `(string: "state")` - Group rows by `state` or `project`.
-- `sections` `(list: ["done", "approve", "input", "waiting", "limited", "unmerged", "running", "snoozed", "asleep", "idle", "closed"])` - Sections shown, in order. Add `finished` to show finished conversations.
-- `labels` `(table: {})` - Section headings, as in `labels = { done = "new" }`.
-- `dim` `(list: ["running", "snoozed", "asleep", "closed", "finished"])` - Sections with dimmed rows.
-- `collapsed` `(list: ["closed", "finished"])` - Sections shown as one row with their count until you press Enter on it, when grouped by state.
+- `sections` `(list: ["ready", "failed", "approval", "question", "needs_you", "limited", "to_merge", "working", "snoozed", "paused", "seen", "closed"])` - Sections shown, in order. Add `archived` to show finished conversations.
+- `labels` `(table: {})` - Section headings, as in `labels = { ready = "New" }`. Without a label, the heading is the capitalized section name, with `_` shown as a space.
+- `dim` `(list: ["working", "snoozed", "paused", "closed", "archived"])` - Sections with dimmed rows.
+- `collapsed` `(list: ["closed", "archived"])` - Sections shown as one row with their count until you press Enter on it, when grouped by state.
 - `snooze` `(list: ["next message", "1h", "4h", "tomorrow 09:00"])` - Snooze choices: a duration, a time such as `"18:00"`, `"tomorrow 09:00"`, or `"next message"`.
 - `closed_shown` `(int: 3)` - Closed rows per project before a row that shows the rest. `0` shows all.
 
-`approve` and `input` hold agents waiting for permission or an answer, and `limited` holds agents stopped by a usage limit. A conversation finishes when you finish it or when all its linked pull requests end. The agent status service also finishes a task when its pull request merges, once its agent is idle and no client shows its window. Enter on a closed or finished conversation resumes it.
+`approval` and `question` hold agents waiting for permission or an answer, `failed` holds failed runs and stalled tasks, and `limited` holds agents stopped by a usage limit. A conversation finishes when you finish it or when all its linked pull requests end. The agent status service also finishes a task when its pull request merges, once its agent is idle and no client shows its window. Enter on a closed or archived conversation resumes it.
 
 ### `[menu]`
 

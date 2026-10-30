@@ -5,24 +5,26 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 )
 
 const (
 	InboxGroupState   = "state"
 	InboxGroupProject = "project"
 
-	InboxDone     = "done"
-	InboxApprove  = "approve"
-	InboxInput    = "input"
-	InboxWaiting  = "waiting"
+	InboxReady    = "ready"
+	InboxFailed   = "failed"
+	InboxApproval = "approval"
+	InboxQuestion = "question"
+	InboxNeedsYou = "needs_you"
 	InboxLimited  = "limited"
-	InboxUnmerged = "unmerged"
-	InboxRunning  = "running"
+	InboxToMerge  = "to_merge"
+	InboxWorking  = "working"
 	InboxSnoozed  = "snoozed"
-	InboxAsleep   = "asleep"
-	InboxIdle     = "idle"
+	InboxPaused   = "paused"
+	InboxSeen     = "seen"
 	InboxClosed   = "closed"
-	InboxFinished = "finished"
+	InboxArchived = "archived"
 
 	defaultClosedShown = 3
 )
@@ -38,11 +40,11 @@ var (
 	errInboxSnoozeInvalid = errors.New("inbox snooze choice is not a duration, a time of day or next message")
 	errInboxClosedShown   = errors.New("inbox.closed_shown must not be negative")
 	defaultInboxSections  = []string{
-		InboxDone, InboxApprove, InboxInput, InboxWaiting, InboxLimited, InboxUnmerged, InboxRunning, InboxSnoozed, InboxAsleep, InboxIdle, InboxClosed,
+		InboxReady, InboxFailed, InboxApproval, InboxQuestion, InboxNeedsYou, InboxLimited, InboxToMerge, InboxWorking, InboxSnoozed, InboxPaused, InboxSeen, InboxClosed,
 	}
-	inboxSectionNames      = append(slices.Clone(defaultInboxSections), InboxFinished)
-	defaultInboxDimmed     = []string{InboxRunning, InboxSnoozed, InboxAsleep, InboxClosed, InboxFinished}
-	defaultInboxCollapsed  = []string{InboxClosed, InboxFinished}
+	inboxSectionNames      = append(slices.Clone(defaultInboxSections), InboxArchived)
+	defaultInboxDimmed     = []string{InboxWorking, InboxSnoozed, InboxPaused, InboxClosed, InboxArchived}
+	defaultInboxCollapsed  = []string{InboxClosed, InboxArchived}
 	defaultInboxSnoozeList = []string{SnoozeNextMessage, "1h", "4h", "tomorrow 09:00"}
 )
 
@@ -83,7 +85,9 @@ func (c InboxConfig) Label(section string) string {
 		return label
 	}
 
-	return section
+	heading := strings.ReplaceAll(section, "_", " ")
+
+	return strings.ToUpper(heading[:1]) + heading[1:]
 }
 
 func ValidateInboxConfig(inbox InboxConfig) error {

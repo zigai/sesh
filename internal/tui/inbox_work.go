@@ -156,9 +156,9 @@ func (m *Model) newClosedItem(host inboxHost, recorded work.Item) inboxItem {
 
 	switch {
 	case recorded.UnseenAt != 0:
-		section = config.InboxDone
+		section = config.InboxReady
 	case recorded.Finished():
-		section = config.InboxFinished
+		section = config.InboxArchived
 	}
 
 	return inboxItem{
