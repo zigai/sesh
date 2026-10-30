@@ -35,7 +35,7 @@ const (
 	launchShell   = "/bin/sh"
 
 	worktreeParentMode = 0o755
-	launchScript       = `shell=$0; trap ':' INT QUIT; "$shell" -i -c "$@"; trap - INT QUIT; exec "$shell" -i`
+	launchScript       = `set -m; shell=$0; trap ':' INT QUIT; "$shell" -i -c "$@"; trap - INT QUIT; exec "$shell" -i`
 	runArgsPOSIX       = `"$@"`
 	runArgsFish        = `$argv`
 )
@@ -565,7 +565,8 @@ func shellProgram(shell string, argv []string) gotmux.Program {
 func shellArgv(shell string, argv []string) []string {
 	// argv goes in as arguments, never as quoted source: fish treats backslashes inside single
 	// quotes as escapes, so no one quoting is safe in every shell.
-	command := []string{launchShell, "-m", "-c", launchScript, shell}
+	// bash 3.2, macOS's /bin/sh, ignores -m with -c but honors set -m in the script.
+	command := []string{launchShell, "-c", launchScript, shell}
 	if filepath.Base(shell) == "fish" {
 		command = append(command, runArgsFish)
 	} else {

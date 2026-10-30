@@ -1653,10 +1653,10 @@ func (e *Executor) approvedLaunchProgram(launch model.Launch, ownerSessionID str
 			return gotmux.Program{}, false
 		}
 
+		// bash 3.2, macOS's /bin/sh, ignores -m with -c but honors set -m in the script.
 		arguments = append([]string{
-			"-m",
 			"-c",
-			`trap ':' INT QUIT; "$@"; trap - INT QUIT; exec "$0" -i`,
+			`set -m; trap ':' INT QUIT; "$@"; trap - INT QUIT; exec "$0" -i`,
 			e.resumeShell(ownerSessionID, environment),
 			executable,
 		}, arguments...)
