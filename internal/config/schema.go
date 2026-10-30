@@ -17,7 +17,7 @@ const (
 	DefaultAgentsSessionFormat   = "{source_prefix}{session_name}"
 	DefaultAgentsAgentFormat     = "{tree}{status_glyph} {status_age:<7}   {agent_cwd_name:<23.23}  {agent_session}{right}{harness:<6.6}   {agent_git_label:<6.22} {agent_git_added:<5} {agent_git_deleted:<5} {agent_git_ahead:<2} {agent_git_behind:<2}"
 	DefaultInboxGroupFormat      = "{session_name}"
-	DefaultInboxAgentFormat      = "{tree}{status_glyph} {status_age:<7}   {agent_project_name:<16.16}  {agent_session}{right}{harness:<6.6}   {agent_git_label:<6.22} {agent_git_added:<5} {agent_git_deleted:<5} {agent_pr:<10} {evidence:<5} {host}"
+	DefaultInboxAgentFormat      = "{tree}{status_glyph} {status_age:<7}   {agent_project_name:<16.16}  {agent_session}{right}{harness:<6.6}   {agent_git_label:<6.22} {agent_git_added:<5} {agent_git_deleted:<5} {agent_git_ahead:<2} {agent_git_behind:<2} {agent_pr:<10} {evidence:<5} {host}"
 	defaultDirectorySuggestions  = 5
 	defaultAutosaveInterval      = "3m"
 	defaultSnapshotRetentionDays = 14
