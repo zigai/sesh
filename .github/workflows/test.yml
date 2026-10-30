@@ -44,13 +44,14 @@ jobs:
             procps \
             htop \
             bash \
+            fish \
             nodejs
           echo "SESH_APPLICATION_INTEGRATION_REQUIRED=1" >> "$GITHUB_ENV"
           echo "/usr/sbin" >> "$GITHUB_PATH"
       - name: Verify Linux test fixtures
         if: runner.os == 'Linux'
         run: |
-          for tool in nvim top htop bash node dbus-daemon sshd ssh-keygen; do
+          for tool in nvim top htop bash fish node dbus-daemon sshd ssh-keygen; do
             command -v "$tool" >/dev/null || { echo "missing required fixture tool: $tool" >&2; exit 1; }
           done
       - name: Require access to the private terminal-test tool
@@ -88,9 +89,9 @@ jobs:
           sh .github/scripts/install-termtrace.sh "$RUNNER_TEMP/sesh-termtrace" "$GITHUB_WORKSPACE/.ci/termtrace"
           echo "$RUNNER_TEMP/sesh-termtrace/bin" >> "$GITHUB_PATH"
           echo "SESH_TERMINAL_INTEGRATION_REQUIRED=1" >> "$GITHUB_ENV"
-      - name: Install macOS build dependencies
+      - name: Install macOS build dependencies and test fixtures
         if: runner.os == 'macOS'
-        run: brew install jemalloc libevent ncurses pkgconf utf8proc
+        run: brew install fish jemalloc libevent ncurses pkgconf utf8proc
       - name: Build checksum-pinned tmux
         shell: bash
         run: |
