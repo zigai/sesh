@@ -1,0 +1,4 @@
+- Opens the inbox popup on an isolated tmux server; headings read To merge, Paused and Seen.
+- Loads the updated user config with the new section IDs, and rejects the old ID done with 'unknown inbox section'.
+- After just install, sesh-autosave saves a generation with the updated config.
+- Passes just check on the final tree of this series.
