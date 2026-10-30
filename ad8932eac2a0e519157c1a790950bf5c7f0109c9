@@ -1,0 +1,2 @@
+- Opens the inbox popup (sesh pick popup --mode inbox) on an isolated tmux server with three pi tasks; the list runs to the footer with no detail pane below it.
+- Passes just check on the final tree of this series.
