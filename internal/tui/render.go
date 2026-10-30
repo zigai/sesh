@@ -33,8 +33,6 @@ const (
 	popupBodyHeightMargin  = 2
 	minFooterRows          = 3
 	listBufferPadding      = 48
-	separatorDashDivisor   = 2
-	minSeparatorDashes     = 2
 	minFullFooterWidth     = 42
 	compactFooterMaxWidth  = 70
 	initialFooterPartsCap  = 10
@@ -516,18 +514,7 @@ func (m *Model) writeSeparatorRow(
 	layout sessionTableLayout,
 	styles sessionRowStyles,
 ) {
-	label := " Sessions "
-	labelWidth := lipgloss.Width(label)
-	totalWidth := layout.width
-
-	var line string
-	if totalWidth <= labelWidth {
-		line = display.Truncate(label, totalWidth)
-	} else {
-		leftDashes := max((totalWidth-labelWidth)/separatorDashDivisor, minSeparatorDashes)
-		rightDashes := max(totalWidth-labelWidth-leftDashes, 0)
-		line = strings.Repeat("─", leftDashes) + label + strings.Repeat("─", rightDashes)
-	}
+	line := strings.Repeat("─", max(layout.width, 0))
 
 	if styles.fastDefaultTheme {
 		out.WriteString(ansiDefaultMuted)

@@ -1007,8 +1007,8 @@ func assertMixedAgentSessionRendering(t *testing.T, model *Model) {
 	t.Helper()
 
 	output := stripANSI(model.renderList(80, 6))
-	if !strings.Contains(output, "Sessions") {
-		t.Fatalf("rendered list missing Sessions separator: %q", output)
+	if dividerLineIndex(output) < 0 || strings.Contains(output, "Sessions") {
+		t.Fatalf("rendered list missing a plain divider line: %q", output)
 	}
 
 	if !strings.Contains(output, "regular-session-1") || !strings.Contains(output, "regular-session-2") {

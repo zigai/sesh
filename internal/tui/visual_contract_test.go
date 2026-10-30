@@ -36,7 +36,7 @@ func TestPickerRichAgentVisualContract(t *testing.T) {
 			plain := stripANSI(rendered)
 
 			assertVisualViewport(t, rendered, viewport.width, viewport.height)
-			assertVisualText(t, plain, "sesh", "api", " Sessions ", "docs", "shell")
+			assertVisualText(t, plain, "sesh", "api", "docs", "shell")
 			assertVisualText(t, plain, "main", "+413", "-102", "↑2", "↓1")
 			assertVisualText(t, plain, "enter select", "AGENTS")
 
@@ -52,9 +52,9 @@ func TestPickerRichAgentVisualContract(t *testing.T) {
 				assertVisualText(t, plain, "…", "↑/↓ agent", "⌃↑/↓ session")
 			}
 
-			if strings.Index(plain, "api") >= strings.Index(plain, " Sessions ") ||
-				strings.Index(plain, " Sessions ") >= strings.Index(plain, "docs") {
-				t.Errorf("agent groups, Sessions divider, and ordinary rows are out of order")
+			divider := dividerLineIndex(plain)
+			if divider < 0 || lineIndexOf(plain, "api") >= divider || divider >= lineIndexOf(plain, "docs") {
+				t.Errorf("agent groups, divider, and ordinary rows are out of order")
 			}
 		})
 	}
@@ -267,4 +267,25 @@ func assertAlignedVisualColumn(t *testing.T, rendered string, marker string) {
 	if matched < 2 {
 		t.Fatalf("found %d rows with column %q, want at least 2", matched, marker)
 	}
+}
+
+func dividerLineIndex(text string) int {
+	for index, line := range strings.Split(text, "\n") {
+		inner := strings.TrimSpace(strings.Trim(strings.TrimSpace(line), "│"))
+		if inner != "" && strings.Trim(inner, "─") == "" {
+			return index
+		}
+	}
+
+	return -1
+}
+
+func lineIndexOf(text, substring string) int {
+	for index, line := range strings.Split(text, "\n") {
+		if strings.Contains(line, substring) {
+			return index
+		}
+	}
+
+	return -1
 }
