@@ -1,0 +1,3 @@
+- macOS CI run 41065594437 (Test job, rerun) passes with the darwin PTY openers.
+- A throwaway macOS run with -v over internal/session, internal/agents, test/integration/cli and internal/cli/cmd/picker shows every package ok and no 'pty allocation unavailable' skips; the only skips are the six termtrace-gated tests.
+- Locally on Linux, the picker switch and popup handoff integration tests still pass after moving the PTY opener into switch_pty_linux_test.go.
