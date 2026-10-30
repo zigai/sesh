@@ -1,0 +1,2 @@
+- Rendering the task picker with a clean checkout (+0 -0) and a worktree with +12 -3 shows both added counts ending in the same column
+- Rendering branches 0 and 40 commits behind shows ↓0 and ↓40 ending in the same column
