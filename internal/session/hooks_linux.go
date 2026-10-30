@@ -33,3 +33,7 @@ func (p *exitProbe) exited() (bool, error) {
 }
 
 func (p *exitProbe) close() {}
+
+func processGroupGone(err error) bool {
+	return errors.Is(err, unix.ESRCH)
+}

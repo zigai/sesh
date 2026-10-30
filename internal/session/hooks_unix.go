@@ -128,7 +128,7 @@ func terminateProcessGroup(pgid int) error {
 	}
 
 	err := syscall.Kill(-pgid, syscall.SIGKILL)
-	if err == nil || errors.Is(err, syscall.ESRCH) {
+	if err == nil || processGroupGone(err) {
 		return nil
 	}
 

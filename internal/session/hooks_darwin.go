@@ -64,3 +64,8 @@ func (p *exitProbe) exited() (bool, error) {
 func (p *exitProbe) close() {
 	_ = unix.Close(p.queue)
 }
+
+// macOS answers EPERM, not ESRCH, when only the unreaped leader's zombie is left in the group.
+func processGroupGone(err error) bool {
+	return errors.Is(err, unix.ESRCH) || errors.Is(err, unix.EPERM)
+}
