@@ -19,6 +19,7 @@ import (
 	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/config"
+	"github.com/zigai/sesh/internal/integration/process"
 	"github.com/zigai/sesh/internal/project"
 	"github.com/zigai/sesh/internal/task"
 )
@@ -599,14 +600,9 @@ func readArgs(t *testing.T, f sleepFixture) string {
 }
 
 func processAlive(pid int) bool {
-	data, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "stat"))
-	if err != nil {
-		return false
-	}
+	_, err := process.ReadIdentity(context.Background(), pid)
 
-	fields := strings.Fields(string(data))
-
-	return len(fields) > 2 && fields[2] != "Z"
+	return err == nil
 }
 
 func copyExecutable(t *testing.T, source, target string) {
