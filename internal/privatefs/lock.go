@@ -15,8 +15,8 @@ import (
 const lockRetry = 10 * time.Millisecond
 
 func (d *Dir) Lock(ctx context.Context, name string) (*os.File, error) {
-	// macOS can fail a plain O_CREAT open with ENOENT while another process creates the same
-	// name, so the file is created exclusively and opened as an existing file when that loses.
+	// Concurrent plain O_CREAT opens of one new name have failed with ENOENT on macOS, so the
+	// file is created exclusively and opened as an existing file when that loses.
 	file, err := d.File(name, unix.O_RDWR|unix.O_CREAT|unix.O_EXCL)
 	if errors.Is(err, unix.EEXIST) {
 		file, err = d.File(name, unix.O_RDWR)
