@@ -1,0 +1,2 @@
+- On a macOS runner, a tmux pane running '/bin/sh -m -c ... sleep' kept sleep in the shell's process group (bash 3.2 ignores -m with -c), while '/bin/sh -c "set -m; ..."' gave sleep its own foreground group.
+- TestRestoredProgramExitLeavesPaneWithUsableShell and the task sleep/wake tests pass on Linux and on the macOS runner.
