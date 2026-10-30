@@ -1,0 +1,2 @@
+- GOOS=darwin golangci-lint run ./... reports 0 issues (was 24 on the old base).
+- golangci-lint run ./... on Linux reports 0 issues.
