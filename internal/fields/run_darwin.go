@@ -13,6 +13,7 @@ func waitForFieldExit(pid int) error {
 	if err != nil {
 		return fmt.Errorf("create field process observer: %w", err)
 	}
+
 	unix.CloseOnExec(queue)
 
 	err = observeFieldExit(queue, pid)
@@ -48,11 +49,12 @@ func observeFieldExit(queue, pid int) error {
 		}
 
 		if events[0].Flags&unix.EV_ERROR != 0 {
-			if events[0].Data < 0 || events[0].Data > math.MaxInt32 {
+			data := events[0].Data
+			if data < 0 || data > math.MaxInt32 {
 				return fmt.Errorf("observe field command exit: %w", unix.EINVAL)
 			}
 
-			cause := unix.Errno(events[0].Data)
+			cause := unix.Errno(data)
 			if errors.Is(cause, unix.ESRCH) {
 				return nil
 			}

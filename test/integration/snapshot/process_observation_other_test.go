@@ -23,6 +23,7 @@ func TestProcessObservationUnsupportedOnNonLinux(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected ObserveWithProcessEnrichment to fail on non-Linux")
 	}
+
 	if !errors.Is(err, capture.ErrUnsupported) {
 		t.Fatalf("expected ErrUnsupported, got %v", err)
 	}
@@ -37,6 +38,7 @@ func TestProcessObservationUnsupportedOnNonLinux(t *testing.T) {
 	if saveErr == nil {
 		t.Fatal("expected SaveObservation with ProcessEnrichment to fail on non-Linux")
 	}
+
 	if !errors.Is(saveErr, capture.ErrUnsupported) {
 		t.Fatalf("expected ErrUnsupported from SaveObservation, got %v", saveErr)
 	}
