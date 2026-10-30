@@ -75,7 +75,6 @@ type popupLayout struct {
 	bodyWidth       int
 	bodyHeight      int
 	listHeight      int
-	detailRows      int
 	showFooter      bool
 	showFooterHints bool
 }
@@ -158,10 +157,6 @@ func (m *Model) renderFrame() string {
 	m.writeListFramedSection(&out, layout.bodyWidth, layout.listHeight, leftBorder, rightBorder)
 	m.recordFittingHeight(layout)
 
-	for _, line := range m.renderInboxDetail(layout.bodyWidth, layout.detailRows) {
-		writeExactFramedLine(&out, line, leftBorder, rightBorder)
-	}
-
 	if layout.showFooter {
 		writeExactFramedSection(&out, m.renderModeFooter(layout.bodyWidth, layout.showFooterHints), leftBorder, rightBorder)
 	}
@@ -180,10 +175,6 @@ func (m *Model) recordFittingHeight(layout popupLayout) {
 	reservedRows := 1
 	if m.config.Settings.ShowFooter || m.showsFooterBadges() {
 		reservedRows++
-	}
-
-	if m.displayMode == displayModeInbox {
-		reservedRows += inboxDetailRows
 	}
 
 	rows := layout.listHeight
@@ -284,19 +275,12 @@ func (m *Model) calcPopupLayout(_ bool) popupLayout {
 		reservedRows++
 	}
 
-	detailRows := 0
-	if m.displayMode == displayModeInbox && bodyHeight-reservedRows-inboxDetailRows >= minInboxListRows {
-		detailRows = inboxDetailRows
-		reservedRows += detailRows
-	}
-
 	listHeight := max(bodyHeight-reservedRows, 1)
 
 	return popupLayout{
 		bodyWidth:       bodyWidth,
 		bodyHeight:      bodyHeight,
 		listHeight:      listHeight,
-		detailRows:      detailRows,
 		showFooter:      showFooter,
 		showFooterHints: showFooter && m.config.Settings.ShowFooter,
 	}
