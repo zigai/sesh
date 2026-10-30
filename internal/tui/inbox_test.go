@@ -110,8 +110,13 @@ func inboxRowsForTest(model *Model) map[string][]string {
 	rows := make(map[string][]string)
 
 	for _, group := range model.filtered {
+		key := group.Name
+		if section, ok := strings.CutPrefix(group.ID, inboxGroupIDPrefix); ok && model.inboxGroup == config.InboxGroupState {
+			key = section
+		}
+
 		for _, agent := range group.Agents {
-			rows[group.Name] = append(rows[group.Name], agent.HarnessSession)
+			rows[key] = append(rows[key], agent.HarnessSession)
 		}
 	}
 
@@ -202,15 +207,16 @@ func TestInboxSectionsFollowAgentStateSeenMarksAndTasks(t *testing.T) {
 	refreshInbox(model)
 
 	assertInboxRows(t, model, map[string][]string{
-		config.InboxDone:     {"fresh-new", "fresh-old", "broke", "stalled"},
-		config.InboxApprove:  {"approval"},
-		config.InboxInput:    {"question"},
-		config.InboxWaiting:  {"asking"},
+		config.InboxReady:    {"fresh-new", "fresh-old"},
+		config.InboxFailed:   {"broke", "stalled"},
+		config.InboxApproval: {"approval"},
+		config.InboxQuestion: {"question"},
+		config.InboxNeedsYou: {"asking"},
 		config.InboxLimited:  {"limited"},
-		config.InboxUnmerged: {"commits"},
-		config.InboxRunning:  {"busy"},
-		config.InboxAsleep:   {"asleep"},
-		config.InboxIdle:     {"seen", "merged"},
+		config.InboxToMerge:  {"commits"},
+		config.InboxWorking:  {"busy"},
+		config.InboxPaused:   {"asleep"},
+		config.InboxSeen:     {"seen", "merged"},
 	})
 }
 
@@ -220,12 +226,12 @@ func TestInboxSectionsFollowTheConfiguredOrderLabelsAndHiddenSections(t *testing
 		inboxTestAgent("asking", "%2", session.AgentStatusWaiting, time.Now()),
 		inboxTestAgent("fresh", "%3", session.AgentStatusIdle, time.Now()),
 	})
-	model.config.Inbox.Sections = []string{config.InboxWaiting, config.InboxDone}
-	model.config.Inbox.Labels = map[string]string{config.InboxDone: "new"}
+	model.config.Inbox.Sections = []string{config.InboxNeedsYou, config.InboxReady}
+	model.config.Inbox.Labels = map[string]string{config.InboxReady: "new"}
 	refreshInbox(model)
 
-	if names := sessionNamesForTest(model.filtered); !slices.Equal(names, []string{config.InboxWaiting, "new"}) {
-		t.Fatalf("sections = %v, want waiting then new", names)
+	if names := sessionNamesForTest(model.filtered); !slices.Equal(names, []string{"Needs you", "new"}) {
+		t.Fatalf("sections = %v, want Needs you then new", names)
 	}
 }
 
@@ -245,7 +251,7 @@ func TestSnoozeUntilNextMessageEndsWhenTheAgentFinishesAnotherTurn(t *testing.T)
 	model.sessions[0].Agents[0].Status = session.AgentStatusIdle
 	model.sessions[0].Agents[0].StatusSince = time.Now().Add(2 * time.Second)
 	refreshInbox(model)
-	assertInboxRows(t, model, map[string][]string{config.InboxDone: {"fresh"}})
+	assertInboxRows(t, model, map[string][]string{config.InboxReady: {"fresh"}})
 }
 
 func TestTimedSnoozeEndsAtItsTime(t *testing.T) {
@@ -260,7 +266,7 @@ func TestTimedSnoozeEndsAtItsTime(t *testing.T) {
 	snooze.Until = time.Now().Add(-time.Minute).Unix()
 	model.inbox.Put(snooze)
 	refreshInbox(model)
-	assertInboxRows(t, model, map[string][]string{config.InboxDone: {"fresh"}})
+	assertInboxRows(t, model, map[string][]string{config.InboxReady: {"fresh"}})
 }
 
 func TestSnoozeWithoutATimeOffersTheConfiguredChoices(t *testing.T) {
@@ -294,13 +300,13 @@ func TestMarkUnseenReturnsARowToDoneUntilItIsSeenAgain(t *testing.T) {
 	})
 	markViewed(model, "%1", time.Now().Add(-time.Minute))
 	refreshInbox(model)
-	assertInboxRows(t, model, map[string][]string{config.InboxIdle: {"seen"}})
+	assertInboxRows(t, model, map[string][]string{config.InboxSeen: {"seen"}})
 
 	runHandler(t, model, model.invokeAction(action.InboxUnseen.ID, action.Values{}))
-	assertInboxRows(t, model, map[string][]string{config.InboxDone: {"seen"}})
+	assertInboxRows(t, model, map[string][]string{config.InboxReady: {"seen"}})
 
 	runHandler(t, model, model.invokeAction(action.InboxSeen.ID, action.Values{}))
-	assertInboxRows(t, model, map[string][]string{config.InboxIdle: {"seen"}})
+	assertInboxRows(t, model, map[string][]string{config.InboxSeen: {"seen"}})
 }
 
 func TestInboxGroupsByProjectAndMachineKeepingEqualPaneIDsApart(t *testing.T) {
@@ -797,7 +803,7 @@ func TestInboxListsARecordedConversationOnlyAfterItsAgentCloses(t *testing.T) {
 	refreshInbox(model)
 
 	assertInboxRows(t, model, map[string][]string{
-		config.InboxDone:   {"running"},
+		config.InboxReady:  {"running"},
 		config.InboxClosed: {"closed w2"},
 	})
 }
@@ -921,7 +927,7 @@ func TestMarkingAClosedConversationUnseenAndSeenAsksItsMachine(t *testing.T) {
 
 	model.work[0].UnseenAt = time.Now().Unix()
 	refreshInbox(model)
-	assertInboxRows(t, model, map[string][]string{config.InboxDone: {"closed w1"}})
+	assertInboxRows(t, model, map[string][]string{config.InboxReady: {"closed w1"}})
 	selectInboxRow(t, model, "closed w1")
 
 	runHandler(t, model, model.invokeAction(action.InboxSeen.ID, action.Values{}))
@@ -972,12 +978,12 @@ func TestFinishedConversationsAreListedWhenTheirSectionIsConfigured(t *testing.T
 	ofTask.Task = "t1"
 	model.work = []work.Item{finishedTestItem("w1", time.Now()), closedTestItem("w2", "conversation-w2", time.Now()), ofTask}
 
-	model.config.Inbox.Sections = append(config.InboxSections(), config.InboxFinished)
+	model.config.Inbox.Sections = append(config.InboxSections(), config.InboxArchived)
 	refreshInbox(model)
 
 	assertInboxRows(t, model, map[string][]string{
 		config.InboxClosed:   {"closed w2"},
-		config.InboxFinished: {"closed w1"},
+		config.InboxArchived: {"closed w1"},
 	})
 }
 
@@ -985,7 +991,7 @@ func TestFinishedRowsCollapseApartFromClosedRows(t *testing.T) {
 	now := time.Now()
 	model := newInboxTestModel(t, nil, nil)
 
-	model.config.Inbox.Sections = append(config.InboxSections(), config.InboxFinished)
+	model.config.Inbox.Sections = append(config.InboxSections(), config.InboxArchived)
 	model.config.Inbox.ClosedShown = 1
 
 	unseen := closedTestItem("w3", "conversation-w3", now.Add(-time.Hour))
@@ -1002,19 +1008,19 @@ func TestFinishedRowsCollapseApartFromClosedRows(t *testing.T) {
 	refreshInbox(model)
 
 	assertInboxRows(t, model, map[string][]string{
-		config.InboxDone:     {"closed w3"},
+		config.InboxReady:    {"closed w3"},
 		config.InboxClosed:   {"closed w2", "2 more"},
-		config.InboxFinished: {"closed f2", "2 more"},
+		config.InboxArchived: {"closed f2", "2 more"},
 	})
 
-	model.config.Inbox.Sections = []string{config.InboxFinished, config.InboxClosed}
+	model.config.Inbox.Sections = []string{config.InboxArchived, config.InboxClosed}
 	refreshInbox(model)
 	selectInboxRow(t, model, "2 more")
 	runHandler(t, model, model.handleEnter())
 
 	assertInboxRows(t, model, map[string][]string{
 		config.InboxClosed:   {"closed w2", "2 more"},
-		config.InboxFinished: {"closed f2", "closed f1", "closed f3"},
+		config.InboxArchived: {"closed f2", "closed f1", "closed f3"},
 	})
 }
 
@@ -1030,7 +1036,7 @@ func TestEnterOnAFinishedConversationResumesItAndItsMenuOffersNoFinishOrSnooze(t
 	}})
 	model.deps.Inbox = inboxState
 
-	model.config.Inbox.Sections = append(config.InboxSections(), config.InboxFinished)
+	model.config.Inbox.Sections = append(config.InboxSections(), config.InboxArchived)
 	model.config.Menu.Agent = []string{config.MenuGo, config.MenuSnooze, config.MenuPin, config.MenuFinish, config.MenuUnseen}
 	model.work = []work.Item{finishedTestItem("w1", time.Now())}
 	refreshInbox(model)
@@ -1160,16 +1166,16 @@ func TestCollapsedSectionShowsItsCountUntilEnterOpensIt(t *testing.T) {
 	refreshInbox(model)
 	model = updateTestModel(t, model, tea.WindowSizeMsg{Width: 100, Height: 30})
 
-	assertInboxRows(t, model, map[string][]string{config.InboxDone: {"fresh"}})
+	assertInboxRows(t, model, map[string][]string{config.InboxReady: {"fresh"}})
 
-	if !strings.Contains(stripANSI(model.View().Content), "closed (3)") {
+	if !strings.Contains(stripANSI(model.View().Content), "Closed (3)") {
 		t.Fatalf("view does not show the collapsed heading:\n%s", stripANSI(model.View().Content))
 	}
 
 	updateTestModel(t, model, keyCode(tea.KeyDown))
 	updateTestModel(t, model, keyCode(tea.KeyEnter))
 
-	assertInboxRows(t, model, map[string][]string{config.InboxDone: {"fresh"}, config.InboxClosed: {"closed w1", "2 more"}})
+	assertInboxRows(t, model, map[string][]string{config.InboxReady: {"fresh"}, config.InboxClosed: {"closed w1", "2 more"}})
 
 	if found, ok := model.selectedInboxItem(); !ok || found.work.ID != "w1" {
 		t.Fatalf("selected after opening = %q/%v, want w1", found.work.ID, ok)

@@ -1142,7 +1142,7 @@ func TestLoadRejectsInvalidProjectsAndTasks(t *testing.T) {
 		{name: "session menu with an agent entry", content: "[menu]\nsession = [\"go\", \"snooze\"]"},
 		{name: "menu entry listed twice", content: "[menu]\nagent = [\"go\", \"go\"]"},
 		{name: "inbox group", content: "[inbox]\ngroup = \"host\""},
-		{name: "inbox unknown section", content: "[inbox]\nsections = [\"done\", \"later\"]"},
+		{name: "inbox unknown section", content: "[inbox]\nsections = [\"ready\", \"later\"]"},
 		{name: "inbox no sections", content: "[inbox]\nsections = []"},
 		{name: "inbox label of unknown section", content: "[inbox.labels]\nlater = \"zzz\""},
 		{name: "inbox snooze word", content: "[inbox]\nsnooze = [\"soon\"]"},

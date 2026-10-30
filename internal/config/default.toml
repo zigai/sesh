@@ -285,16 +285,16 @@
 # such as "~/work/api".
 
 # INBOX mode. group is "state" or "project". sections lists the shown sections in order; a
-# section left out is hidden, and "finished" is hidden unless listed. labels renames sections, as in labels = { done = "new" }. dim lists
+# section left out is hidden, and "archived" is hidden unless listed. labels renames sections, as in labels = { ready = "New" }. dim lists
 # sections with dimmed rows. snooze lists the snooze choices: a duration, a time of day such as
 # "18:00", "tomorrow 09:00", or "next message". closed_shown is how many closed rows a project
 # shows before a row that expands the rest; 0 shows them all.
 [inbox]
 
 # group = "state"
-# sections = ["done", "approve", "input", "waiting", "limited", "unmerged", "running", "snoozed", "asleep", "idle", "closed"]
-# dim = ["running", "snoozed", "asleep", "closed", "finished"]
-# collapsed = ["closed", "finished"]
+# sections = ["ready", "failed", "approval", "question", "needs_you", "limited", "to_merge", "working", "snoozed", "paused", "seen", "closed"]
+# dim = ["working", "snoozed", "paused", "closed", "archived"]
+# collapsed = ["closed", "archived"]
 # snooze = ["next message", "1h", "4h", "tomorrow 09:00"]
 # closed_shown = 3
 

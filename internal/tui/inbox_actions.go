@@ -185,7 +185,7 @@ func (m *Model) seenError(id action.ID, item inboxItem) error {
 	}
 
 	if id == action.InboxSeen.ID {
-		if item.section != config.InboxDone || item.owner.ID == "" {
+		if item.section != config.InboxReady || item.owner.ID == "" {
 			return errAlreadySeen
 		}
 
@@ -196,7 +196,7 @@ func (m *Model) seenError(id action.ID, item inboxItem) error {
 		return err
 	}
 
-	if item.section == config.InboxDone || item.owner.ID == "" {
+	if item.section == config.InboxReady || item.owner.ID == "" {
 		return errNotSeen
 	}
 

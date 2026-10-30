@@ -350,8 +350,8 @@ func (m *Model) hostTaskItems(host inboxHost, agents map[string]session.AgentSes
 }
 
 func needsWindowlessRow(item inboxItem) bool {
-	return item.agent.Status == session.AgentStatusFailed || item.section == config.InboxUnmerged ||
-		item.section == config.InboxAsleep || item.live.Record.PREnded()
+	return item.agent.Status == session.AgentStatusFailed || item.section == config.InboxToMerge ||
+		item.section == config.InboxPaused || item.live.Record.PREnded()
 }
 
 func taskInFlight(live task.Live) bool {
@@ -379,7 +379,7 @@ func (m *Model) inboxSection(item inboxItem) string {
 
 	switch {
 	case item.kind == inboxTaskRow && (record.State == task.StateSleeping || record.State == task.StateWaking):
-		return config.InboxAsleep
+		return config.InboxPaused
 	case m.snoozed(item):
 		return config.InboxSnoozed
 	}
@@ -389,14 +389,14 @@ func (m *Model) inboxSection(item inboxItem) string {
 	}
 
 	if (item.owner.ID != "" && m.agentIdleUnread(item.owner, item.agent)) || m.inboxDoneByMark(item) {
-		return config.InboxDone
+		return config.InboxReady
 	}
 
 	if m.unmergedItem(item) {
-		return config.InboxUnmerged
+		return config.InboxToMerge
 	}
 
-	return config.InboxIdle
+	return config.InboxSeen
 }
 
 func statusSection(agent session.AgentSession) (string, bool) {
@@ -404,22 +404,22 @@ func statusSection(agent session.AgentSession) (string, bool) {
 	case session.AgentStatusWaiting:
 		switch agent.WaitingReason {
 		case string(aht.ActivityDetailPermission):
-			return config.InboxApprove, true
+			return config.InboxApproval, true
 		case string(aht.ActivityDetailQuestion):
-			return config.InboxInput, true
+			return config.InboxQuestion, true
 		}
 
-		return config.InboxWaiting, true
+		return config.InboxNeedsYou, true
 	case session.AgentStatusFailed:
 		if agent.FailureReason == string(aht.ActivityDetailUsageLimit) {
 			return config.InboxLimited, true
 		}
 
-		return config.InboxDone, true
+		return config.InboxFailed, true
 	case session.AgentStatusRunning:
-		return config.InboxRunning, true
+		return config.InboxWorking, true
 	case session.AgentStatusMerged:
-		return config.InboxIdle, true
+		return config.InboxSeen, true
 	case session.AgentStatusIdle, session.AgentStatusInterrupted, session.AgentStatusUnknown, session.AgentStatusSleeping,
 		session.AgentStatusClosed:
 	}
