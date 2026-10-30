@@ -1,0 +1,1 @@
+- On a macOS runner with tmux built at RUNNER_TEMP like the Test workflow, both remote SSH tests fail before this change and pass after it (diagnostic run 41056512409).
