@@ -1,0 +1,1 @@
+- macOS Test job run 41056870571 passes with the darwin observer: launch-exit foreground arguments, deleted-executable and deleted-directory observation tests all pass.
