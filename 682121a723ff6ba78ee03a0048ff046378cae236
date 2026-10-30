@@ -1,0 +1,2 @@
+- Opens the agents popup (sesh pick popup --mode agents) on an isolated tmux server with agent session main and plain sessions notes and scratch; a plain full-width line separates them, with no Sessions text.
+- Passes just check.
