@@ -52,8 +52,8 @@ func TestObserveDarwinCancellation(t *testing.T) {
 	}
 
 	_, err = Observe(context.Background(), req)
-	if !errors.Is(err, ErrUnsupported) {
-		t.Fatalf("Observe error = %v, want %v", err, ErrUnsupported)
+	if !errors.Is(err, ErrIdentityMismatch) {
+		t.Fatalf("Observe error = %v, want %v", err, ErrIdentityMismatch)
 	}
 }
 

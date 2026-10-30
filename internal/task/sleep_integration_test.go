@@ -19,6 +19,7 @@ import (
 	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/config"
+	"github.com/zigai/sesh/internal/integration/process"
 	"github.com/zigai/sesh/internal/project"
 	"github.com/zigai/sesh/internal/task"
 )
@@ -376,9 +377,9 @@ func newSleepFixtureWith(t *testing.T, prepareWorktree func(dir string)) sleepFi
 		t.Fatal(err)
 	}
 
-	if err := os.Symlink(executable, harness); err != nil {
-		t.Fatal(err)
-	}
+	// macOS names a process after its executable with symlinks resolved, and tmux reports that
+	// name as the pane's current command, so the harness must be a real file named like it.
+	copyExecutable(t, executable, harness)
 
 	agents := &paneAgent{
 		server: f.server, activity: "idle", harness: fakeHarnessName, executable: harness,
@@ -599,12 +600,20 @@ func readArgs(t *testing.T, f sleepFixture) string {
 }
 
 func processAlive(pid int) bool {
-	data, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "stat"))
+	_, err := process.ReadIdentity(context.Background(), pid)
+
+	return err == nil
+}
+
+func copyExecutable(t *testing.T, source, target string) {
+	t.Helper()
+
+	data, err := os.ReadFile(source)
 	if err != nil {
-		return false
+		t.Fatal(err)
 	}
 
-	fields := strings.Fields(string(data))
-
-	return len(fields) > 2 && fields[2] != "Z"
+	if err := os.WriteFile(target, data, 0o700); err != nil {
+		t.Fatal(err)
+	}
 }

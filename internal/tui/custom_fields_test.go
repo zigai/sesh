@@ -353,10 +353,13 @@ func customFieldFIFO(t *testing.T, path string) *os.File {
 		t.Fatal(err)
 	}
 
-	file, err := os.OpenFile(path, os.O_RDWR, 0)
+	// macOS does not poll a FIFO opened by path, so read deadlines need a nonblocking descriptor.
+	fd, err := syscall.Open(path, syscall.O_RDWR|syscall.O_NONBLOCK|syscall.O_CLOEXEC, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	file := os.NewFile(uintptr(fd), path)
 
 	t.Cleanup(func() {
 		if err := file.Close(); err != nil {

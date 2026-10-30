@@ -144,8 +144,6 @@ func readEnvironment(ctx context.Context, procRoot string, pid int, keys []strin
 		return nil, nil
 	}
 
-	requested, wanted := deduplicateKeys(keys)
-
 	environPath := filepath.Join(procRoot, strconv.Itoa(pid), "environ")
 
 	data, err := readBoundedFile(ctx, environPath, maxEnvironBytes)
@@ -157,76 +155,7 @@ func readEnvironment(ctx context.Context, procRoot string, pid int, keys []strin
 		return nil, err
 	}
 
-	values, err := parseEnvironEntries(data, wanted)
-	if err != nil {
-		return nil, err
-	}
-
-	result := make([]model.Variable, len(requested))
-	for i, key := range requested {
-		if val, ok := values[key]; ok {
-			result[i] = model.Variable{
-				Name:   model.Bytes(bytes.Clone([]byte(key))),
-				Value:  model.Bytes(val),
-				State:  "set",
-				Hidden: false,
-			}
-		} else {
-			result[i] = model.Variable{
-				Name:   model.Bytes(bytes.Clone([]byte(key))),
-				Value:  nil,
-				State:  "absent",
-				Hidden: false,
-			}
-		}
-	}
-
-	return result, nil
-}
-
-func deduplicateKeys(keys []string) ([]string, map[string]struct{}) {
-	requested := make([]string, 0, len(keys))
-	seen := make(map[string]struct{}, len(keys))
-
-	for _, key := range keys {
-		if _, exists := seen[key]; !exists {
-			seen[key] = struct{}{}
-			requested = append(requested, key)
-		}
-	}
-
-	return requested, seen
-}
-
-func parseEnvironEntries(data []byte, wanted map[string]struct{}) (map[string][]byte, error) {
-	if len(data) == 0 {
-		return make(map[string][]byte), nil
-	}
-
-	if data[len(data)-1] != 0 {
-		return nil, ErrMalformedEnviron
-	}
-
-	entries := bytes.Split(data[:len(data)-1], []byte{0})
-	values := make(map[string][]byte, len(wanted))
-
-	for _, entry := range entries {
-		nameBytes, valBytes, ok := bytes.Cut(entry, []byte("="))
-		if !ok || len(nameBytes) == 0 {
-			continue
-		}
-
-		name := string(nameBytes)
-		if _, isWanted := wanted[name]; isWanted {
-			if _, alreadyFound := values[name]; alreadyFound {
-				return nil, ErrDuplicateEnvironmentVariable
-			}
-
-			values[name] = bytes.Clone(valBytes)
-		}
-	}
-
-	return values, nil
+	return selectEnvironment(data, keys)
 }
 
 func readProcLink(ctx context.Context, linkPath string) ([]byte, bool, error) {
