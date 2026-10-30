@@ -233,11 +233,11 @@ func readDarwinExecutable(ctx context.Context, req Request, launchedPath []byte)
 
 	if _, err := procPIDInfo(req.PID, procPIDPathInfo, buffer[:]); err != nil {
 		readErr := explainDarwinReadError(ctx, req, fmt.Errorf("read process executable: %w", err))
-		if !errors.Is(readErr, unix.ESRCH) {
+		if !errors.Is(readErr, unix.ESRCH) && !errors.Is(readErr, unix.ENOENT) {
 			return nil, false, readErr
 		}
 
-		// The kernel reports ESRCH when the executable no longer resolves at its path.
+		// The kernel reports ESRCH or ENOENT when the executable no longer resolves at its path.
 		if len(launchedPath) == 0 {
 			return nil, false, errMalformedProcInfo
 		}
