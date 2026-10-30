@@ -1,0 +1,2 @@
+- Opens the inbox popup on an isolated tmux server; add-docs (git: ahead 1) shows ↑1 ↓0 and fix-login (git: ahead 2, behind 1) shows ↑2 ↓1.
+- Passes just check on the final tree of this series.
