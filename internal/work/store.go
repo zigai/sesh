@@ -262,17 +262,6 @@ func (i Item) PRsEnded() bool {
 	return len(linked) > 0 && !slices.ContainsFunc(linked, func(pr PRLink) bool { return !pr.Ended() })
 }
 
-func (i Item) Issues() []int {
-	var issues []int
-	for _, pr := range i.Linked() {
-		issues = append(issues, pr.Issues...)
-	}
-
-	slices.Sort(issues)
-
-	return slices.Compact(issues)
-}
-
 func (i Item) reopened(now time.Time) Item {
 	i.FinishedAt, i.FinishedBy, i.ReopenedAt = 0, "", now.Unix()
 

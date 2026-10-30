@@ -161,16 +161,6 @@ func (m *Model) evidenceCount(agent session.AgentSession) string {
 	return ""
 }
 
-func evidenceDetail(items []inbox.Evidence, dir string) string {
-	names := make([]string, 0, len(items))
-
-	for _, item := range items {
-		names = append(names, evidenceName(item, dir))
-	}
-
-	return strings.Join(names, " · ")
-}
-
 func evidenceName(item inbox.Evidence, dir string) string {
 	if item.Kind == inbox.EvidenceURL || dir == "" {
 		return SanitizeTerminalText(item.Target)

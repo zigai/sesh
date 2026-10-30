@@ -404,11 +404,3 @@ func (m *Model) inboxDoneByMark(item inboxItem) bool {
 
 	return (status == session.AgentStatusIdle || status == session.AgentStatusInterrupted) && m.markedUnseen(item)
 }
-
-func snoozeLabel(snooze inbox.Snooze) string {
-	if !snooze.Timed() {
-		return "until " + config.SnoozeNextMessage
-	}
-
-	return "until " + time.Unix(snooze.Until, 0).Format("Mon 15:04")
-}

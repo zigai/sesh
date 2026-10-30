@@ -205,7 +205,7 @@ func TestUnlinkingAPullRequestKeepsItOutOfTheLinkedOnes(t *testing.T) {
 		t.Fatalf("Unlink() error = %v", err)
 	}
 
-	if item := state.Items[0]; len(item.Linked()) != 0 || len(item.Issues()) != 0 || len(item.PRs) != 1 {
+	if item := state.Items[0]; len(item.Linked()) != 0 || len(item.PRs) != 1 {
 		t.Errorf("item = %+v, want the pull request remembered but not linked", item)
 	}
 

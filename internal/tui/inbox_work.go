@@ -377,14 +377,3 @@ func prText(number int, state task.PRState) string {
 
 	return text
 }
-
-func closedIssues(recorded work.Item) string {
-	issues := recorded.Issues()
-	texts := make([]string, 0, len(issues))
-
-	for _, issue := range issues {
-		texts = append(texts, "#"+strconv.Itoa(issue))
-	}
-
-	return strings.Join(texts, " ")
-}

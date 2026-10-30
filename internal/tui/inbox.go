@@ -6,12 +6,10 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	"github.com/zigai/aht/v2/pkg/aht"
 
 	"github.com/zigai/sesh/internal/action"
@@ -39,8 +37,6 @@ const (
 const (
 	inboxGroupIDPrefix   = "inbox:"
 	inboxOfflineIDPrefix = inboxGroupIDPrefix + "offline:"
-	inboxDetailRows      = 7
-	minInboxListRows     = 6
 	taskRunPollInterval  = time.Second
 )
 
@@ -754,173 +750,6 @@ func taskActionFitOf(id action.ID, live task.Live) taskActionFit {
 	}
 
 	return taskActionMisfits
-}
-
-func (m *Model) renderInboxDetail(width, rows int) []string {
-	if rows == 0 {
-		return nil
-	}
-
-	chrome := NewChrome(m.config)
-	lines := make([]string, 0, rows)
-	lines = append(lines, m.detailSeparator(width))
-
-	item, ok := m.selectedInboxItem()
-	if !ok {
-		for len(lines) < rows {
-			lines = append(lines, chrome.Blank(width))
-		}
-
-		return lines
-	}
-
-	fields := m.inboxDetailFields(item)
-	for _, field := range fields[:min(len(fields), rows-1)] {
-		if field[1] == "" {
-			field[1] = "-"
-		}
-
-		lines = append(lines, chrome.Pad(chrome.Muted(fmt.Sprintf("%-9s", field[0]))+field[1], width))
-	}
-
-	for len(lines) < rows {
-		lines = append(lines, chrome.Blank(width))
-	}
-
-	return lines
-}
-
-func (m *Model) inboxDetailFields(item inboxItem) [][2]string {
-	record := item.live.Record
-
-	branch := item.agent.GitBranch
-	if item.kind == inboxTaskRow && record.Base != "" {
-		branch += " ← " + record.Base
-	}
-
-	location, directory := inboxLocation(item), session.ShortenHomePath(item.agent.CWD)
-	if item.host.label != "" {
-		location, directory = item.host.label+" "+location, item.agent.CWD
-	}
-
-	fields := [][2]string{
-		{"branch", branch},
-		{"dir", directory},
-		{"tmux", location},
-		{"state", m.inboxStateDetail(item)},
-	}
-
-	if item.kind == inboxTaskRow {
-		fields = append(fields, [2]string{"runs", taskRunsDetail(record.Runs)})
-	}
-
-	if linked := linkedPRs(item.work); linked != "" && item.kind == inboxAgentRow {
-		fields = append(fields, [2]string{"linked", linked})
-	}
-
-	if issues := closedIssues(item.work); issues != "" && item.kind != inboxTaskRow {
-		fields = append(fields, [2]string{"issues", issues})
-	}
-
-	if evidence := m.evidenceOf(item); len(evidence) > 0 {
-		fields = append(fields, [2]string{"evidence", evidenceDetail(evidence, item.agent.CWD)})
-	}
-
-	return fields
-}
-
-func inboxLocation(item inboxItem) string {
-	switch {
-	case item.owner.ID != "" && item.kind == inboxTaskRow && item.live.Present:
-		return fmt.Sprintf("%s:%d %s", item.live.SessionName, item.live.WindowIndex, item.live.WindowName)
-	case item.owner.ID != "":
-		return item.owner.Name
-	case item.kind == inboxClosedRow || item.kind == inboxMoreRow:
-		return "closed"
-	default:
-		return "no window"
-	}
-}
-
-func (m *Model) inboxStateDetail(item inboxItem) string {
-	parts := []string{m.config.Inbox.Label(item.section)}
-
-	if snooze, ok := m.inbox.Find(conversationKey(item.agent)); ok && item.section == config.InboxSnoozed {
-		parts[0] += " " + snoozeLabel(snooze)
-	}
-
-	if item.kind == inboxTaskRow && item.live.Record.State != task.StateActive {
-		parts = append(parts, "task "+string(item.live.Record.State))
-	}
-
-	if item.work.Pinned() {
-		parts = append(parts, "pinned")
-	}
-
-	if item.work.Finished() && item.section != config.InboxFinished {
-		parts = append(parts, "finished")
-	}
-
-	if item.agent.GitUnmerged > 0 {
-		parts = append(parts, plural(item.agent.GitUnmerged, "commit")+" not on the default branch")
-	}
-
-	if pr := m.inboxPR(item); pr != "" {
-		parts = append(parts, "PR "+pr)
-	}
-
-	if item.kind == inboxTaskRow && item.live.Record.PREnded() {
-		parts = append(parts, "ready to finish")
-	}
-
-	return strings.Join(parts, " · ")
-}
-
-func plural(count int, noun string) string {
-	if count == 1 {
-		return "1 " + noun
-	}
-
-	return strconv.Itoa(count) + " " + noun + "s"
-}
-
-func taskRunsDetail(runs []task.Run) string {
-	parts := make([]string, 0, len(runs))
-
-	for _, run := range runs {
-		switch run.Status {
-		case task.RunFailed:
-			parts = append(parts, runFailure(run))
-		case task.RunOK, task.RunRunning:
-			parts = append(parts, run.Action+" "+string(run.Status))
-		}
-	}
-
-	return strings.Join(parts, " · ")
-}
-
-func runFailure(run task.Run) string {
-	if run.Action == task.MergeAction {
-		switch run.ExitCode {
-		case task.MergeExitConflict:
-			return "merge conflict"
-		case task.MergeExitCheck:
-			return "merge check failed"
-		case task.MergeExitDirty:
-			return "merge refused: uncommitted changes"
-		}
-	}
-
-	return fmt.Sprintf("%s failed (exit %d)", run.Action, run.ExitCode)
-}
-
-func (m *Model) detailSeparator(width int) string {
-	line := strings.Repeat("─", max(width, 0))
-	if defaultBorderTheme(m.config) {
-		return ansiDefaultMuted + line + ansiReset
-	}
-
-	return lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.Theme.Border)).Render(line)
 }
 
 func (m *Model) cycleInboxGroup() bool {

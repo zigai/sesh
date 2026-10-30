@@ -548,17 +548,6 @@ func TestMergedTaskShowsRecordedPullRequestOnceGitHubNoLongerListsIt(t *testing.
 	}
 }
 
-func TestDetailNamesWhyAMergeStopped(t *testing.T) {
-	record := inboxTestRecord("t1", task.StateActive)
-	record.Runs = []task.Run{{Action: task.MergeAction, Window: task.MergeAction, Status: task.RunFailed, ExitCode: task.MergeExitConflict, StartedAt: 1, FinishedAt: 2}}
-	model := newInboxTestModel(t, []task.Live{inboxTestLive(record, "%1")}, nil)
-	model.width, model.height = 160, 30
-
-	if frame := stripANSI(model.renderFrame()); !strings.Contains(frame, "merge conflict") {
-		t.Fatalf("frame lacks the merge conflict:\n%s", frame)
-	}
-}
-
 func TestCyclingThroughEmptyInboxKeepsTheSessionSelection(t *testing.T) {
 	model := newTestModel()
 	model.sessions = []session.Session{
@@ -713,8 +702,8 @@ func TestInboxReadsEachFinishedTurnsEvidenceOnceAndShowsIt(t *testing.T) {
 	selectInboxRow(t, model, "fresh")
 
 	frame := stripANSI(model.renderFrame())
-	if !strings.Contains(frame, "2 ev") || !strings.Contains(frame, "shots/login.png · https://example.com/pr/4") {
-		t.Fatalf("frame lacks the evidence count or items:\n%s", frame)
+	if !strings.Contains(frame, "2 ev") {
+		t.Fatalf("frame lacks the evidence count:\n%s", frame)
 	}
 
 	runHandler(t, model, model.invokeAction(action.InboxEvidence.ID, action.Values{}))
@@ -1083,8 +1072,8 @@ func TestATaskRowShowsOnlyItsLedgerPullRequestAndRefusesLinking(t *testing.T) {
 	selectInboxRow(t, model, "t1")
 
 	frame := stripANSI(model.renderFrame())
-	if !strings.Contains(frame, "#42 merged") || !strings.Contains(frame, "ready to finish") || strings.Contains(frame, "#7") {
-		t.Fatalf("frame does not show only the task's PR #42, ready to finish:\n%s", frame)
+	if !strings.Contains(frame, "#42 merged") || strings.Contains(frame, "#7") {
+		t.Fatalf("frame does not show only the task's PR #42:\n%s", frame)
 	}
 
 	runHandler(t, model, model.invokeAction(action.InboxUnlink.ID, action.Values{}))
