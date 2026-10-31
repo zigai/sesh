@@ -113,6 +113,31 @@ func TestSessionCreateRejectsMissingDirectoryBeforeTmuxWork(t *testing.T) {
 	}
 }
 
+func TestSessionCreateWithCreateDirRejectsRegularFile(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(file, []byte("fixture"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	exec := executeJSON(
+		t,
+		"session", "create", "dev",
+		testSocketFlag, "/tmp/sesh-cli-unit-socket",
+		"--dir", file,
+		"--create-dir",
+		testNoConfigFlag,
+		testJSONFlag,
+	)
+
+	if exec.Err == nil || exec.Envelope.OK {
+		t.Fatalf("create in a regular file = %v / %+v, want failure", exec.Err, exec.Envelope)
+	}
+
+	if !strings.Contains(exec.Err.Error(), "path is not a directory") {
+		t.Fatalf("error = %v, want not-a-directory failure", exec.Err)
+	}
+}
+
 func TestSessionDeletePropagatesRepositoryOpenFailure(t *testing.T) {
 	repositoryFile := filepath.Join(t.TempDir(), "not-a-repository")
 	if err := os.WriteFile(repositoryFile, []byte("fixture"), 0o600); err != nil {

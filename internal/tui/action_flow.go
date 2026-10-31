@@ -254,6 +254,11 @@ func (m *Model) submitParam(value string) func() (tea.Model, tea.Cmd) {
 	}
 
 	request.values.Set(param.Name, value)
+
+	if m.createsMissingPath(request, value) {
+		request.values.Set(param.CreateWith, "true")
+	}
+
 	request.param = emptyParam()
 
 	m.closeActionDialog()
@@ -297,6 +302,7 @@ func (m *Model) closeActionDialog() {
 	m.pathSuggestions = nil
 	m.pathSuggestionIndex = 0
 	m.pathSuggestionTop = 0
+	m.pathState = pathUnknown
 }
 
 func (m *Model) dispatchAction(request pendingAction) func() (tea.Model, tea.Cmd) {

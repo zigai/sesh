@@ -235,7 +235,7 @@ func (m *Model) renderPathDialog(descriptor action.Descriptor, request pendingAc
 		lines = append(lines, "")
 	}
 
-	lines = append(lines, request.param.Usage+":", input, "")
+	lines = append(lines, request.param.Usage+":", input, m.pathMarker(request))
 
 	start := min(m.pathSuggestionTop, len(m.pathSuggestions))
 
@@ -272,6 +272,27 @@ func (m *Model) renderPathDialog(descriptor action.Descriptor, request pendingAc
 		Bold(true)
 
 	return box.Render(titleStyle.Render(descriptor.Title) + "\n\n" + strings.Join(lines, "\n"))
+}
+
+func (m *Model) pathMarker(request pendingAction) string {
+	if len(m.pathSuggestions) > 0 || request.subject.At.Kind != action.LocationLocal {
+		return ""
+	}
+
+	switch m.pathState {
+	case pathMissing:
+		if request.param.CreateWith == "" {
+			return lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.Theme.Error)).Render("does not exist")
+		}
+
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.Theme.Warning)).Render("will be created")
+	case pathNotDirectory:
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.Theme.Error)).Render("not a directory")
+	case pathUnknown, pathExists:
+		return ""
+	}
+
+	return ""
 }
 
 func renderDialog(width, height int, title, content string, cfg *config.Config) string {

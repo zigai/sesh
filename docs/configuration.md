@@ -72,7 +72,7 @@ table = "prefix"
 - `show_footer` `(bool: true)` - Show key hints at the bottom of the popup.
 - `display_modes` `(list: ["sesh", "agents", "inbox"])` - Popup modes, in cycle order. One entry locks the popup to that mode.
 - `directory_suggestions` `(int: 5)` - Number of directory completions shown when creating a session.
-- `default_session_path_suggestion` `(string: "~/Projects/{session}")` - Initial directory for a new session. `{session}` becomes the session name.
+- `default_session_path_suggestion` `(string: "~/Projects/{session}")` - Initial directory for a new session. `{session}` becomes the session name. The picker creates the directory if it is missing.
 - `shortcut_style` `(string: "none")` - Where session keys are shown: `none`, `indent` (left of each row), or `right`.
 - `session_key_action` `(string: "focus")` - What a session key does in the agents mode: `focus` waits for an agent key, `open` opens the session. In the inbox mode the letters mark groups and always focus.
 - `log_level` `(string: "info")` - One of `debug`, `info`, `warn`, `error`, or `disabled`.

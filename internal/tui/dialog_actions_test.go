@@ -759,3 +759,49 @@ func openTestCreateDirectoryPrompt(model *Model, name string) {
 	}
 	model.dialog = dialogInputPath
 }
+
+func TestCreateDirDialogEnterAsksToCreateOnlyAMissingDirectory(t *testing.T) {
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, "existing"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := map[string]struct {
+		path string
+		want bool
+	}{
+		"missing directory":  {path: filepath.Join(root, "missing", "nested"), want: true},
+		"existing directory": {path: filepath.Join(root, "existing"), want: false},
+		"relative missing":   {path: "relative-missing", want: true},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var dispatched action.CreateSession
+
+			model := newTestModelWithDeps(Dependencies{
+				RunAction: func(_ context.Context, invocation action.Invocation) (any, error) {
+					input, ok := invocation.Input.(action.CreateSession)
+					if !ok {
+						t.Fatalf("dispatched %T, want CreateSession", invocation.Input)
+					}
+
+					dispatched = input
+
+					return action.CreatedSession{Session: testLiveRef("$9", input.Name), Directory: input.Directory}, nil
+				},
+			})
+			dependenciesForTest(model).GetWorkingDirectory = func() (string, error) { return root, nil }
+			openTestCreateDirectoryPrompt(model, "new-session")
+			model.setPathInputValue(tc.path)
+			model.refreshPathSuggestions()
+
+			_, cmd := model.handlePathDialogInput(keyCode(tea.KeyEnter))()
+			runActionTrace(t, model, cmd)
+
+			if filepath.Clean(dispatched.Directory) != tc.path || dispatched.CreateDirectory != tc.want {
+				t.Fatalf("dispatched %+v, want directory %q with CreateDirectory=%v", dispatched, tc.path, tc.want)
+			}
+		})
+	}
+}

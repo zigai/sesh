@@ -3,6 +3,8 @@ package tui
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -275,5 +277,44 @@ func TestHelpOverlayExplainsAgentAndTmuxGroupNavigation(t *testing.T) {
 		if strings.Contains(output, unwanted) {
 			t.Fatalf("agent help = %q, should omit %q", output, unwanted)
 		}
+	}
+}
+
+func TestRenderCreateDirDialogMarksPathsThatAreNotDirectories(t *testing.T) {
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, "existing"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(filepath.Join(root, "file"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := map[string]struct {
+		path   string
+		marker string
+	}{
+		"missing directory":  {path: filepath.Join(root, "missing"), marker: "will be created"},
+		"existing directory": {path: filepath.Join(root, "existing"), marker: ""},
+		"regular file":       {path: filepath.Join(root, "file"), marker: "not a directory"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			model := newTestModel()
+			model.width = 90
+			model.height = 24
+			dependenciesForTest(model).GetWorkingDirectory = func() (string, error) { return root, nil }
+			openTestCreateDirectoryPrompt(model, testSupportNewSessionName)
+			model.setPathInputValue(tc.path)
+			model.refreshPathSuggestions()
+
+			output := stripANSI(model.renderDialog())
+			for _, marker := range []string{"will be created", "not a directory"} {
+				if got := strings.Contains(output, marker); got != (marker == tc.marker) {
+					t.Fatalf("dialog shows %q = %v, want marker %q:\n%s", marker, got, tc.marker, output)
+				}
+			}
+		})
 	}
 }

@@ -5,16 +5,20 @@ package app
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
 
+	"github.com/rs/zerolog"
 	"github.com/samber/oops"
 	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/session"
 )
+
+const sessionDirectoryMode = 0o755
 
 var (
 	ErrTargetChanged     = errors.New("selected session changed since it was observed")
@@ -34,7 +38,7 @@ func (local *Local) registerSessionHandlers() {
 func (local *Local) createSession(ctx context.Context, _ action.Caller, input action.CreateSession) (action.CreatedSession, error) {
 	var created action.CreatedSession
 
-	directory, err := sessionDirectory(input.Directory)
+	directory, err := sessionDirectory(ctx, input.Directory, input.CreateDirectory)
 	if err != nil {
 		return created, err
 	}
@@ -226,7 +230,7 @@ func deletedSession(name string, outcome session.DeleteOutcome) action.DeletedSe
 	}
 }
 
-func sessionDirectory(requested string) (string, error) {
+func sessionDirectory(ctx context.Context, requested string, create bool) (string, error) {
 	if requested == "" {
 		return "", nil
 	}
@@ -241,6 +245,10 @@ func sessionDirectory(requested string) (string, error) {
 	}
 
 	info, err := os.Stat(directory)
+	if errors.Is(err, os.ErrNotExist) && create {
+		return createSessionDirectory(ctx, directory)
+	}
+
 	if errors.Is(err, os.ErrNotExist) {
 		return "", action.Wrap(action.CodeInvalidArgument, ErrDirectoryNotFound)
 	}
@@ -252,6 +260,23 @@ func sessionDirectory(requested string) (string, error) {
 	if !info.IsDir() {
 		return "", action.Wrap(action.CodeInvalidArgument, ErrDirectoryNotDir)
 	}
+
+	return directory, nil
+}
+
+func createSessionDirectory(ctx context.Context, directory string) (string, error) {
+	if err := os.MkdirAll(directory, sessionDirectoryMode); err != nil {
+		code := action.CodeUnavailable
+		if errors.Is(err, fs.ErrPermission) {
+			code = action.CodeForbidden
+		}
+
+		return "", action.Wrap(code, oops.In("app").Code("session_directory_create_failed").
+			With("operation", "create_session_directory").With("directory", directory).Wrapf(err, "creating directory"))
+	}
+
+	zerolog.Ctx(ctx).Info().Str("component", "session").Str("operation", "create_session_directory").
+		Str("directory", directory).Msg("created session directory")
 
 	return directory, nil
 }

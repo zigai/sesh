@@ -44,6 +44,7 @@ type Param struct {
 	Positional bool
 	FromQuery  bool
 	Suggest    Suggestion
+	CreateWith string
 }
 
 type Values map[string][]string
@@ -165,7 +166,7 @@ func (param Param) checkScalar(value string) (string, error) {
 func newParam(name string, kind ParamKind, usage string) Param {
 	return Param{
 		Name: name, Kind: kind, Usage: usage, Short: "", Default: "", Choices: nil,
-		Required: false, Positional: false, FromQuery: false, Suggest: SuggestNone,
+		Required: false, Positional: false, FromQuery: false, Suggest: SuggestNone, CreateWith: "",
 	}
 }
 
@@ -207,6 +208,12 @@ func (param Param) fromQuery() Param {
 
 func (param Param) suggest(suggestion Suggestion) Param {
 	param.Suggest = suggestion
+
+	return param
+}
+
+func (param Param) createWith(flag string) Param {
+	param.CreateWith = flag
 
 	return param
 }

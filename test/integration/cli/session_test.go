@@ -1137,6 +1137,47 @@ func TestCLIIntegrationSessionCreateDoesNotAttach(t *testing.T) {
 	fixture.assertNoDefaultLeaseRoot(t)
 }
 
+func TestCLIIntegrationSessionCreateMakesMissingDirectoryOnRequest(t *testing.T) {
+	fixture := newCLISessionFixture(t)
+
+	clearAmbientTmux(t)
+
+	directory := filepath.Join(t.TempDir(), "projects", "fresh")
+
+	refused := executeJSON(t, append([]string{sessionCmd, "create", "fresh", "--dir", directory}, append(fixture.sessionArgs(), testJSONFlag)...)...)
+	if refused.err == nil || refused.envelope.OK {
+		t.Fatalf("create without --create-dir = %v / %+v, want a missing directory failure", refused.err, refused.envelope)
+	}
+
+	if _, err := os.Stat(directory); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("directory after refused create: %v, want it absent", err)
+	}
+
+	created := executeJSON(t, append([]string{sessionCmd, "create", "fresh", "--dir", directory, "--create-dir"}, append(fixture.sessionArgs(), testJSONFlag)...)...)
+	if created.err != nil || !created.envelope.OK {
+		t.Fatalf("create with --create-dir failed: %v / %+v", created.err, created.envelope)
+	}
+
+	if info, err := os.Stat(directory); err != nil || !info.IsDir() {
+		t.Fatalf("directory after create = %v, %v, want a directory", info, err)
+	}
+
+	result := decodeJSONPayload[sessionCreateJSONResult](t, created.envelope.Result)
+	if result.Directory != directory {
+		t.Fatalf("create result = %+v, want directory %s", result, directory)
+	}
+
+	live, err := fixture.server.FindSession(t.Context(), "fresh")
+	if err != nil {
+		t.Fatalf("created session missing: %v", err)
+	}
+
+	panes, err := live.Panes(t.Context())
+	if err != nil || len(panes) != 1 || panes[0].CurrentPath != directory {
+		t.Fatalf("created session panes = %+v, %v, want one pane in %s", panes, err, directory)
+	}
+}
+
 func TestCLIIntegrationSessionNewInteractiveEnters(t *testing.T) {
 	fixture := newCLISessionFixture(t)
 

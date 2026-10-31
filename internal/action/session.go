@@ -12,12 +12,14 @@ var (
 		ID:      "session.create",
 		Title:   "Create session",
 		Summary: "Create a live tmux session",
-		Help:    "Create a live tmux session. Without --dir the session starts in tmux's default directory.",
+		Help: "Create a live tmux session. Without --dir the session starts in tmux's default directory. " +
+			"A missing --dir fails unless --create-dir is given.",
 		Subject: SubjectNone,
 		Arity:   ArityOne,
 		Params: []Param{
 			newParam("name", ParamText, "Session name").required().positional().fromQuery(),
-			newParam("dir", ParamPath, "Initial working directory").withShort("d").suggest(SuggestSessionDirectory),
+			newParam("dir", ParamPath, "Initial working directory").withShort("d").suggest(SuggestSessionDirectory).createWith("create-dir"),
+			newParam("create-dir", ParamBool, "Create the working directory when it does not exist"),
 		},
 		NeedsClient: false,
 		Interactive: false,
@@ -128,8 +130,9 @@ type SessionRef struct {
 }
 
 type CreateSession struct {
-	Name      string `json:"name"`
-	Directory string `json:"directory"`
+	Name            string `json:"name"`
+	Directory       string `json:"directory"`
+	CreateDirectory bool   `json:"createDirectory"`
 }
 
 type CreatedSession struct {
@@ -224,7 +227,7 @@ func (ref SessionRef) Session(at Location) session.Session {
 }
 
 func bindCreateSession(_ Subject, values Values) (CreateSession, error) {
-	return CreateSession{Name: values.String("name"), Directory: values.String("dir")}, nil
+	return CreateSession{Name: values.String("name"), Directory: values.String("dir"), CreateDirectory: values.Bool("create-dir")}, nil
 }
 
 func forceParam(usage string) Param {

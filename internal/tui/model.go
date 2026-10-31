@@ -163,6 +163,7 @@ type Model struct {
 	pathSuggestions              []string
 	pathSuggestionIndex          int
 	pathSuggestionTop            int
+	pathState                    pathState
 	statusMessage                string
 	statusLevel                  statusLevel
 	degradedSources              map[string]string
@@ -357,6 +358,7 @@ func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps
 		pathSuggestions:              nil,
 		pathSuggestionIndex:          0,
 		pathSuggestionTop:            0,
+		pathState:                    pathUnknown,
 		statusMessage:                "",
 		statusLevel:                  statusNone,
 		degradedSources:              nil,

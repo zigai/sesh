@@ -2,13 +2,26 @@ package tui
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/session"
 )
 
 const minPathSuggestions = 1
+
+const (
+	pathUnknown pathState = iota
+	pathExists
+	pathMissing
+	pathNotDirectory
+)
+
+type pathState uint8
 
 func (m *Model) handleDialogKeys(msg tea.KeyPressMsg) func() (tea.Model, tea.Cmd) {
 	switch m.dialog {
@@ -164,9 +177,12 @@ func (m *Model) refreshPathSuggestions() {
 	if err != nil {
 		m.pathSuggestions = nil
 		m.pathSuggestionIndex = 0
+		m.pathState = pathUnknown
 
 		return
 	}
+
+	m.pathState = inspectPath(m.pathInput.Value(), cwd)
 
 	suggestions, err := session.DirectoryPathSuggestions(m.operationContext(), m.pathInput.Value(), cwd)
 	if err != nil {
@@ -224,4 +240,46 @@ func (m *Model) scrollPathSuggestions() {
 
 func (m *Model) visiblePathSuggestions() int {
 	return max(m.config.Settings.DirectorySuggestions, minPathSuggestions)
+}
+
+func (m *Model) createsMissingPath(request pendingAction, value string) bool {
+	flag := request.param.CreateWith
+	if flag == "" || request.values.Has(flag) || request.subject.At.Kind != action.LocationLocal {
+		return false
+	}
+
+	cwd, err := m.deps.WorkingDirectory.GetWorkingDirectory()
+	if err != nil {
+		return false
+	}
+
+	return inspectPath(value, cwd) == pathMissing
+}
+
+func inspectPath(value, cwd string) pathState {
+	path := strings.TrimSpace(value)
+	if path == "" {
+		return pathUnknown
+	}
+
+	if expanded, ok := session.ExpandHomePath(path); ok {
+		path = expanded
+	}
+
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(cwd, path)
+	}
+
+	info, err := os.Stat(path)
+
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		return pathMissing
+	case err != nil:
+		return pathUnknown
+	case !info.IsDir():
+		return pathNotDirectory
+	default:
+		return pathExists
+	}
 }
