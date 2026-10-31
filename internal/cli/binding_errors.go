@@ -2,12 +2,9 @@ package cli
 
 import (
 	"context"
-	"io"
-	"os"
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/x/term"
 	"github.com/spf13/cobra"
 
 	gotmux "github.com/zigai/gotmux/tmux"
@@ -15,6 +12,7 @@ import (
 	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/integration/tmuxserver"
+	"github.com/zigai/sesh/internal/setup"
 )
 
 const (
@@ -23,8 +21,8 @@ const (
 	bindingMessageTimeout = 2 * time.Second
 )
 
-func showBindingFailureMessage(cmd *cobra.Command, err error, stdout, stderr io.Writer) bool {
-	if err == nil || clibase.JSONOutputEnabled(cmd) || !invokedByTmuxBinding(cmd, stdout, stderr) {
+func showBindingFailureMessage(cmd *cobra.Command, err error) bool {
+	if err == nil || clibase.JSONOutputEnabled(cmd) || !invokedByTmuxBinding(cmd) {
 		return false
 	}
 
@@ -45,38 +43,24 @@ func showBindingFailureMessage(cmd *cobra.Command, err error, stdout, stderr io.
 	return showBindingMessage(ctx, cmd, server, bindingFailureMessage(err)) == nil
 }
 
-func invokedByTmuxBinding(cmd *cobra.Command, stdout, stderr io.Writer) bool {
-	if cmd == nil || cmd.Parent() == nil {
+func invokedByTmuxBinding(cmd *cobra.Command) bool {
+	if cmd == nil {
 		return false
 	}
 
-	bindable := cmd.Annotations[clibase.AnnotationAction] != "" ||
-		(cmd.Parent().Name() == "hooks" && cmd.Name() == "run")
-	if !bindable {
-		return false
-	}
+	flag := cmd.Flag(setup.BindingFlag)
 
-	if os.Getenv("TMUX") == "" {
-		return false
-	}
-
-	return !writerIsTerminal(stdout) && !writerIsTerminal(stderr)
+	return flag != nil && flag.Value.String() == "true"
 }
 
-func bindingDiscardsReport(cmd *cobra.Command, output *commandBuffer, stdout, stderr io.Writer) bool {
-	return !output.streaming && !clibase.JSONOutputEnabled(cmd) && !helpRequested(cmd) && invokedByTmuxBinding(cmd, stdout, stderr)
+func bindingDiscardsReport(cmd *cobra.Command, output *commandBuffer) bool {
+	return !output.streaming && !clibase.JSONOutputEnabled(cmd) && !helpRequested(cmd) && invokedByTmuxBinding(cmd)
 }
 
 func helpRequested(cmd *cobra.Command) bool {
 	help, err := cmd.Flags().GetBool("help")
 
 	return err == nil && help
-}
-
-func writerIsTerminal(writer io.Writer) bool {
-	file, ok := writer.(fileDescriptor)
-
-	return ok && term.IsTerminal(file.Fd())
 }
 
 func bindingFailureMessage(err error) string {

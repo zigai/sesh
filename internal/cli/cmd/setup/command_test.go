@@ -49,10 +49,10 @@ func TestSetupTmuxPrintsBindingsWithoutSocket(t *testing.T) {
 	caller := " --client '#{client_name}' --pane '#{pane_id}' --client-session '#{session_id}' --client-width '#{client_width}' --client-height '#{client_height}'"
 
 	for _, want := range []string{
-		rootBinding("S-F12", "sesh agent next"+caller) + `\""`,
-		rootBinding("M-S-F12", "sesh agent next --local=true"+caller) + `\""`,
-		rootBinding("S-F1", "sesh agent back"+caller) + `\""`,
-		rootBinding("C-o", "sesh pick popup"+caller) + `\""`,
+		rootBinding("S-F12", "sesh agent next"+caller+" --tmux-binding") + `\""`,
+		rootBinding("M-S-F12", "sesh agent next --local=true"+caller+" --tmux-binding") + `\""`,
+		rootBinding("S-F1", "sesh agent back"+caller+" --tmux-binding") + `\""`,
+		rootBinding("C-o", "sesh pick popup"+caller+" --tmux-binding") + `\""`,
 	} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("stdout missing %q:\n%s", want, stdout)
@@ -101,7 +101,7 @@ table = "prefix"
 
 	for _, want := range []string{
 		rootBinding("S-F8", "sesh agent latest "),
-		"bind-key -T prefix M-s run-shell -b \"sesh snapshot save '#{session_id}'\"",
+		"bind-key -T prefix M-s run-shell -b \"sesh snapshot save '#{session_id}' --tmux-binding\"",
 		"bind-key -T root S-F12 ",
 	} {
 		if !strings.Contains(stdout, want) {

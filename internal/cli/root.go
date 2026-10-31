@@ -32,6 +32,7 @@ import (
 	cmdtask "github.com/zigai/sesh/internal/cli/cmd/task"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/session"
+	"github.com/zigai/sesh/internal/setup"
 )
 
 var (
@@ -144,6 +145,8 @@ func newRootCommand(ctx context.Context) *cobra.Command {
 	})
 	rootCommand.PersistentFlags().String("config", "", "Explicit native TOML configuration file")
 	rootCommand.PersistentFlags().Bool("no-config", false, "Use built-in settings without reading configuration files")
+	rootCommand.PersistentFlags().Bool(setup.BindingFlag, false, "Report through tmux messages, as a key binding run by run-shell")
+	_ = rootCommand.PersistentFlags().MarkHidden(setup.BindingFlag)
 	rootCommand.AddCommand(
 		cmdpicker.NewPickCommand(ctx, cmdremote.DefaultPickerRemoteFactory),
 		cmdsession.NewCommand(),

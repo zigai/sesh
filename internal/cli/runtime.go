@@ -133,7 +133,7 @@ func ExecuteApplication(ctx context.Context, args []string, input io.Reader, std
 	closeErr := runtime.finish(runErr)
 
 	err := publishCommandOutput(executed, &output, &diagnostics, stdout, stderr, runErr, closeErr)
-	if showBindingFailureMessage(executed, err, stdout, stderr) {
+	if showBindingFailureMessage(executed, err) {
 		return nil
 	}
 
@@ -402,7 +402,7 @@ func validateCommandBeforeConfig(cmd *cobra.Command, args []string) error {
 }
 
 func publishCommandOutput(cmd *cobra.Command, output, diagnostics *commandBuffer, stdout, stderr io.Writer, runErr, closeErr error) error {
-	if bindingDiscardsReport(cmd, output, stdout, stderr) {
+	if bindingDiscardsReport(cmd, output) {
 		stdout = io.Discard
 	}
 

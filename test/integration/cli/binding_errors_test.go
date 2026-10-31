@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -14,7 +15,10 @@ import (
 	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/cli"
+	"github.com/zigai/sesh/internal/setup"
 )
+
+const bindingFlag = "--" + setup.BindingFlag
 
 func TestBindingActionFailureIsShownOnInvokingClient(t *testing.T) {
 	fixture := newCLISessionFixture(t)
@@ -24,7 +28,7 @@ func TestBindingActionFailureIsShownOnInvokingClient(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	err := cli.ExecuteApplication(t.Context(), []string{"agent", "focus", "--client", client, "--no-config"}, nil, &stdout, &stderr)
+	err := cli.ExecuteApplication(t.Context(), []string{"agent", "focus", "--client", client, "--no-config", bindingFlag}, nil, &stdout, &stderr)
 	if err != nil {
 		t.Fatalf("reported binding failure = %v, want success so tmux adds no exit-status message", err)
 	}
@@ -50,22 +54,22 @@ func TestBindingActionFailureIsShownOnInvokingClient(t *testing.T) {
 	}
 }
 
-func TestBindingActionFailureKeepsExitStatusOutsideTmux(t *testing.T) {
+func TestActionFailureInTmuxPaneKeepsExitStatus(t *testing.T) {
 	fixture := newCLISessionFixture(t)
-	clearAmbientTmux(t)
+	fixture.setAmbientTmux(t, fixture.fixtureSession(t))
 
 	var stdout, stderr bytes.Buffer
 
-	err := cli.ExecuteApplication(t.Context(), []string{"agent", "focus", "--socket", fixture.socket, "--no-config"}, nil, &stdout, &stderr)
+	err := cli.ExecuteApplication(t.Context(), []string{"agent", "focus", "--no-config"}, nil, &stdout, &stderr)
 	if cli.ExitCode(err) != 2 || !strings.Contains(stderr.String(), "accepts 1 arg(s), received 0") {
-		t.Fatalf("failure outside tmux = %v / %q, want usage exit and stderr diagnostic", err, stderr.String())
+		t.Fatalf("failure in a tmux pane = %v / %q, want usage exit and stderr diagnostic", err, stderr.String())
 	}
 }
 
 func TestBindingActionsKeepReportsOutOfTmuxOutput(t *testing.T) {
 	for _, args := range [][]string{
-		{"agent", "window-status-clear", "--no-config"},
-		{"hooks", "run", "session_switch_pre"},
+		{"agent", "window-status-clear", "--no-config", bindingFlag},
+		{"hooks", "run", "session_switch_pre", bindingFlag},
 	} {
 		t.Run(strings.Join(args[:2], "_"), func(t *testing.T) {
 			testBindingActionReports(t, args)
@@ -103,9 +107,7 @@ func testBindingActionReports(t *testing.T, args []string) {
 		t.Fatalf("JSON output = %q / %q / %v, want valid JSON and success", stdout, stderr, err)
 	}
 
-	clearAmbientTmux(t)
-
-	stdout, stderr, err = executeCommand(t, args...)
+	stdout, stderr, err = executeCommand(t, slices.DeleteFunc(args, func(arg string) bool { return arg == bindingFlag })...)
 	if err != nil || stdout == "" || stderr != "" {
 		t.Fatalf("direct output = %q / %q / %v, want a report and success", stdout, stderr, err)
 	}
@@ -115,7 +117,7 @@ func TestBindingJSONFailureKeepsMachineExitStatus(t *testing.T) {
 	fixture := newCLISessionFixture(t)
 	fixture.setAmbientTmux(t, fixture.fixtureSession(t))
 
-	stdout, stderr, err := executeCommand(t, "agent", "focus", "--no-config", "--json")
+	stdout, stderr, err := executeCommand(t, "agent", "focus", "--no-config", bindingFlag, "--json")
 	if cli.ExitCode(err) != 2 || !json.Valid([]byte(stderr)) || stdout != "" {
 		t.Fatalf("JSON failure = %q / %q / %v, want JSON on stderr and usage exit", stdout, stderr, err)
 	}

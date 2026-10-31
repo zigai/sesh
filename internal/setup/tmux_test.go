@@ -69,7 +69,7 @@ func TestBindingsQuoteParamsForTheShell(t *testing.T) {
 	}
 
 	words := shellWords(t, rendered[0].Command)
-	if len(words) != 6 || words[3] != name || words[4] != "--dir" || words[5] != "/srv/a b" {
+	if len(words) != 7 || words[3] != name || words[4] != "--dir" || words[5] != "/srv/a b" {
 		t.Fatalf("shell words = %q, want the name and directory verbatim", words)
 	}
 }

@@ -16,7 +16,12 @@ import (
 	"github.com/zigai/sesh/internal/remote"
 )
 
-const rootTable = "root"
+const (
+	// BindingFlag marks a command run by a rendered key binding, so the CLI reports through tmux
+	// messages instead of run-shell output and exit status.
+	BindingFlag = "tmux-binding"
+	rootTable   = "root"
+)
 
 var (
 	ErrInvalidKey   = errors.New("invalid tmux key")
@@ -162,6 +167,8 @@ func actionCommand(descriptor action.Descriptor, values action.Values) string {
 	if descriptor.NeedsClient {
 		words = append(words, callerFormats...)
 	}
+
+	words = append(words, "--"+BindingFlag)
 
 	return strings.Join(words, " ")
 }

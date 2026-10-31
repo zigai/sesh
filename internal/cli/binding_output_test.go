@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/zigai/sesh/internal/app"
+	"github.com/zigai/sesh/internal/setup"
 )
 
 func TestBindingReportsDoNotReachTmuxRunShellOutput(t *testing.T) {
@@ -21,7 +22,7 @@ func TestBindingReportsDoNotReachTmuxRunShellOutput(t *testing.T) {
 
 	for _, path := range commands {
 		t.Run(path[0]+"_"+path[1], func(t *testing.T) {
-			for _, mode := range []string{"binding", "outside_tmux", "json", "help"} {
+			for _, mode := range []string{"binding", "tmux_pane", "json", "help"} {
 				t.Run(mode, func(t *testing.T) {
 					testBindingReportOutput(t, path, mode)
 				})
@@ -34,11 +35,12 @@ func testBindingReportOutput(t *testing.T, path []string, mode string) {
 	t.Helper()
 	t.Setenv("TMUX", "/tmp/test-binding/socket,1,0")
 
-	if mode == "outside_tmux" {
-		t.Setenv("TMUX", "")
-	}
-
 	root := newRootCommand(t.Context())
+	if mode != "tmux_pane" {
+		if err := root.PersistentFlags().Set(setup.BindingFlag, "true"); err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	cmd, _, err := root.Find(path)
 	if err != nil {
@@ -85,8 +87,10 @@ func testBindingReportOutput(t *testing.T, path []string, mode string) {
 }
 
 func TestBindingPartialSnapshotKeepsFailureWithoutPrintingReport(t *testing.T) {
-	t.Setenv("TMUX", "/tmp/test-binding/socket,1,0")
 	root := newRootCommand(t.Context())
+	if err := root.PersistentFlags().Set(setup.BindingFlag, "true"); err != nil {
+		t.Fatal(err)
+	}
 
 	cmd, _, err := root.Find([]string{snapshotCmd, "save"})
 	if err != nil {
