@@ -93,6 +93,15 @@ func Decode(data []byte) (Manifest, error) {
 		return Manifest{}, oops.In("snapshot.model").Code("snapshot_invalid").With("operation", "decode", "phase", "size").Wrap(ErrInvalid)
 	}
 
+	var header struct {
+		Format  string `json:"format"`
+		Version int    `json:"version"`
+	}
+	// Manifests of another schema fail strict decoding, so read the version first to report it.
+	if json.Unmarshal(data, &header) == nil && header.Format == "sesh" && header.Version != Schema {
+		return Manifest{}, oops.In("snapshot.model").Code("snapshot_version_unsupported").With("operation", "decode", "phase", "version").Wrap(ErrVersion)
+	}
+
 	m, err := strictjson.Decode[Manifest](data)
 	if err != nil {
 		return Manifest{}, oops.In("snapshot.model").Code("snapshot_invalid").With("operation", "decode", "phase", "json").Wrapf(errors.Join(ErrInvalid, err), "decode manifest")

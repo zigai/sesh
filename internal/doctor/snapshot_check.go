@@ -222,6 +222,9 @@ func (s *Service) classifyReadCurrentError(err error) (Result, error) {
 	case errors.Is(err, store.ErrRecoveryRequired):
 		return s.saveFix(newResult(CheckSnapshotCurrent, StatusFail, "A save was interrupted and must finish before restores").
 			withReason(ReasonRecoveryRequired)), nil
+	case errors.Is(err, model.ErrVersion):
+		return s.saveFix(newResult(CheckSnapshotCurrent, StatusFail, "Current generation has an unsupported schema version").
+			withReason(ReasonIncompatible)), nil
 	case errors.Is(err, store.ErrCorrupt):
 		return s.verifyFix(newResult(CheckSnapshotCurrent, StatusFail, "Current generation is corrupt").withReason(ReasonCorrupt)), nil
 	default:

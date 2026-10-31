@@ -741,7 +741,7 @@ func TestRetentionBytesOverflowSyntheticInputs(t *testing.T) {
 
 	policy := RetentionPolicy{MaxAge: 0, MaxCount: 0, MaxBytes: 1000}
 
-	_, err := cat.evaluateRetention(time.Time{}, policy, nil, syntheticSizes)
+	_, err := cat.evaluateRetention(time.Time{}, policy, nil, syntheticSizes, nil)
 	if !errors.Is(err, ErrCorrupt) {
 		t.Fatalf("expected ErrCorrupt on synthetic size overflow, got %v", err)
 	}
@@ -991,14 +991,14 @@ func TestRetentionBytesMissingSizeMapRejected(t *testing.T) {
 
 	policy := RetentionPolicy{MaxAge: 0, MaxCount: 0, MaxBytes: 1000}
 
-	_, err := cat.evaluateRetention(time.Time{}, policy, nil, incompleteSizes)
+	_, err := cat.evaluateRetention(time.Time{}, policy, nil, incompleteSizes, nil)
 	if !errors.Is(err, ErrCorrupt) {
 		t.Fatalf("expected ErrCorrupt on missing size map entry, got %v", err)
 	}
 
 	disabledPolicy := RetentionPolicy{MaxAge: 0, MaxCount: 0, MaxBytes: 0}
 
-	res, err := cat.evaluateRetention(time.Time{}, disabledPolicy, nil, incompleteSizes)
+	res, err := cat.evaluateRetention(time.Time{}, disabledPolicy, nil, incompleteSizes, nil)
 	if err != nil {
 		t.Fatalf("disabled byte policy should not evaluate sizes: %v", err)
 	}

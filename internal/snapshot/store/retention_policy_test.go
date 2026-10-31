@@ -1001,3 +1001,113 @@ func TestRetentionRetainsUnderlyingErrorCauses(t *testing.T) {
 		}
 	})
 }
+
+func retireManifestSchema(t *testing.T, r *Repository, path, id string) {
+	t.Helper()
+
+	manifestPath := filepath.Clean(filepath.Join(path, "generations", id, "manifest.json"))
+
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var fields map[string]any
+	if err := json.Unmarshal(data, &fields); err != nil {
+		t.Fatal(err)
+	}
+
+	fields["version"] = model.Schema - 1
+
+	encoded, err := json.Marshal(fields)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(manifestPath, encoded, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	newDigest := digest(encoded)
+
+	err = r.update(t.Context(), func(c *Catalog) error {
+		c.Generations[c.generationIndex(id)].ManifestSHA256 = newDigest
+		c.Attempts[c.attemptIndex(id)].ManifestSHA256 = newDigest
+
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRetentionRemovesGenerationsWithUnsupportedSchema(t *testing.T) {
+	now := time.Date(2026, 9, 19, 12, 0, 0, 0, time.UTC)
+	policies := map[string]RetentionPolicy{
+		"age":   {MaxAge: 24 * time.Hour},
+		"bytes": {MaxBytes: 1 << 30},
+	}
+
+	for name, policy := range policies {
+		t.Run(name+"/older generations", func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "repository")
+			r := openRepository(t, path)
+
+			gens := make([]Generation, 6)
+			for i := range gens {
+				gens[i] = commitSnapshotAt(t, r, now.Add(time.Duration(i-10)*time.Minute))
+			}
+
+			for _, gen := range gens[:4] {
+				retireManifestSchema(t, r, path, gen.ID)
+			}
+
+			result, err := r.RetainPolicy(t.Context(), now, policy)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			wantRemoved := []string{gens[3].ID, gens[2].ID, gens[1].ID, gens[0].ID}
+			if diff := cmp.Diff(wantRemoved, result.Removed); diff != "" {
+				t.Fatalf("removed generations mismatch (-want +got):\n%s", diff)
+			}
+
+			catalog, err := r.Inspect(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if len(catalog.Generations) != 2 {
+				t.Fatalf("catalog still holds retired generations: %+v", catalog.Generations)
+			}
+		})
+
+		t.Run(name+"/current generation", func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "repository")
+			r := openRepository(t, path)
+
+			older := commitSnapshotAt(t, r, now.Add(-2*time.Minute))
+			current := commitSnapshotAt(t, r, now.Add(-time.Minute))
+
+			retireManifestSchema(t, r, path, older.ID)
+			retireManifestSchema(t, r, path, current.ID)
+
+			result, err := r.RetainPolicy(t.Context(), now, policy)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if diff := cmp.Diff([]string{older.ID}, result.Removed); diff != "" {
+				t.Fatalf("removed generations mismatch (-want +got):\n%s", diff)
+			}
+
+			if diff := cmp.Diff([]string{current.ID}, result.Protected); diff != "" {
+				t.Fatalf("protected generations mismatch (-want +got):\n%s", diff)
+			}
+
+			if result.BudgetUnmet {
+				t.Fatal("a kept retired generation must not count against the byte budget")
+			}
+		})
+	}
+}

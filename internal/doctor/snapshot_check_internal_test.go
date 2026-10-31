@@ -5,6 +5,8 @@ package doctor
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/zigai/sesh/internal/snapshot/model"
@@ -90,6 +92,23 @@ func TestInspectSnapshotClassifiesCorruptCatalog(t *testing.T) {
 
 	if curRes.Status != StatusSkip || curRes.Needs != CheckSnapshotRepository {
 		t.Fatalf("curRes = %+v, want a skip that needs %s", curRes, CheckSnapshotRepository)
+	}
+}
+
+func TestResolveCurrentSnapshotAsksForNewSaveForUnsupportedSchema(t *testing.T) {
+	t.Parallel()
+
+	reader := &snapshotReaderStub{
+		currentErr: fmt.Errorf("read generation: %w", model.ErrVersion),
+	}
+
+	result, err := NewService(Options{}).resolveCurrentSnapshot(t.Context(), reader)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result.Status != StatusFail || result.Reason != ReasonIncompatible || result.Fix == nil || !strings.Contains(result.Fix.Manual, "sesh snapshot save") {
+		t.Fatalf("result = %+v, want an incompatible failure that asks for a new save", result)
 	}
 }
 

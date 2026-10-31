@@ -24,6 +24,11 @@ var (
 	errCollectionContradiction = errors.New("retired generation contradicts its deletion intent")
 )
 
+type manifestArtifacts struct {
+	descriptors []model.Artifact
+	otherSchema bool
+}
+
 type collectionTarget struct {
 	dir       *privatefs.Dir
 	artifacts *privatefs.Dir
@@ -141,7 +146,7 @@ func readGenerationInventory(ctx context.Context, dir *privatefs.Dir, candidate 
 		return CollectionIntent{}, errCollectionContent
 	}
 
-	manifest, err := model.Decode(data)
+	owned, err := decodeManifestArtifacts(data)
 	if err != nil {
 		return CollectionIntent{}, errors.Join(errCollectionContent, err)
 	}
@@ -151,7 +156,18 @@ func readGenerationInventory(ctx context.Context, dir *privatefs.Dir, candidate 
 		return CollectionIntent{}, errors.Join(errCollectionUnsafe, err)
 	}
 
-	files, artifactBytes, artifactErr := inventoryArtifacts(ctx, artifacts, manifest.Artifacts)
+	var (
+		files         []CollectionFile
+		artifactBytes int64
+		artifactErr   error
+	)
+
+	if owned.otherSchema {
+		files, artifactBytes, artifactErr = inventoryListedArtifacts(ctx, artifacts)
+	} else {
+		files, artifactBytes, artifactErr = inventoryArtifacts(ctx, artifacts, owned.descriptors)
+	}
+
 	closeErr := artifacts.Close()
 
 	if err := errors.Join(artifactErr, closeErr); err != nil {
@@ -174,6 +190,80 @@ func readGenerationInventory(ctx context.Context, dir *privatefs.Dir, candidate 
 		Files:          files,
 		Bytes:          total,
 	}, nil
+}
+
+func decodeManifestArtifacts(data []byte) (manifestArtifacts, error) {
+	manifest, err := model.Decode(data)
+	if errors.Is(err, model.ErrVersion) {
+		return manifestArtifacts{descriptors: nil, otherSchema: true}, nil
+	}
+
+	if err != nil {
+		return manifestArtifacts{}, oops.In("snapshot.store").With("operation", "decode_retired_manifest").Wrap(err)
+	}
+
+	return manifestArtifacts{descriptors: manifest.Artifacts, otherSchema: false}, nil
+}
+
+func (a manifestArtifacts) size(ctx context.Context, dir *privatefs.Dir, index int, name string) (int64, error) {
+	if a.otherSchema {
+		return listedArtifactSize(dir, name)
+	}
+
+	return readValidatedArtifact(ctx, dir, a.descriptors[index])
+}
+
+func listedArtifactSize(dir *privatefs.Dir, name string) (int64, error) {
+	file, err := dir.File(name, unix.O_RDONLY)
+	if err != nil {
+		return 0, oops.In("snapshot.store").With("operation", "open_listed_artifact", "artifact", name).Wrap(err)
+	}
+
+	info, statErr := file.Stat()
+	if err := errors.Join(statErr, file.Close()); err != nil {
+		return 0, err
+	}
+
+	if info.Size() <= 0 || info.Size() > maxCompressedBytes {
+		return 0, ErrCorrupt
+	}
+
+	return info.Size(), nil
+}
+
+func inventoryListedArtifacts(ctx context.Context, dir *privatefs.Dir) ([]CollectionFile, int64, error) {
+	names, err := collectionNames(dir, model.MaxEntities)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	files := make([]CollectionFile, 0, len(names))
+
+	var total int64
+
+	for _, name := range slices.Sorted(slices.Values(names)) {
+		if err := ctx.Err(); err != nil {
+			return nil, 0, oops.In("snapshot.store").With("operation", "inventory_generation_artifacts").Wrap(err)
+		}
+
+		if !validCollectionFileName(name) {
+			return nil, 0, errCollectionStructure
+		}
+
+		size, err := listedArtifactSize(dir, name)
+		if err != nil {
+			return nil, 0, errors.Join(errCollectionContent, err)
+		}
+
+		total, err = safeAdd(total, size)
+		if err != nil {
+			return nil, 0, errors.Join(errCollectionContent, err)
+		}
+
+		files = append(files, CollectionFile{Name: name, Bytes: size})
+	}
+
+	return files, total, nil
 }
 
 func inventoryArtifacts(ctx context.Context, dir *privatefs.Dir, descriptors []model.Artifact) ([]CollectionFile, int64, error) {
@@ -259,12 +349,12 @@ func verifyGenerationContent(ctx context.Context, dir *privatefs.Dir, intent Col
 		return collectionTarget{}, errors.Join(err, dir.Close())
 	}
 
-	var descriptors []model.Artifact
+	var owned manifestArtifacts
 
 	if target.manifest {
 		var err error
 
-		descriptors, err = verifyGenerationManifest(dir, intent)
+		owned, err = verifyGenerationManifest(dir, intent)
 		if err != nil {
 			return collectionTarget{}, errors.Join(err, dir.Close())
 		}
@@ -276,7 +366,7 @@ func verifyGenerationContent(ctx context.Context, dir *privatefs.Dir, intent Col
 		return target, nil
 	}
 
-	return verifyTargetArtifacts(ctx, dir, target, intent, descriptors)
+	return verifyTargetArtifacts(ctx, dir, target, intent, owned)
 }
 
 func verifyGenerationEntries(names []string) error {
@@ -289,13 +379,13 @@ func verifyGenerationEntries(names []string) error {
 	return nil
 }
 
-func verifyTargetArtifacts(ctx context.Context, dir *privatefs.Dir, target collectionTarget, intent CollectionIntent, descriptors []model.Artifact) (collectionTarget, error) {
+func verifyTargetArtifacts(ctx context.Context, dir *privatefs.Dir, target collectionTarget, intent CollectionIntent, owned manifestArtifacts) (collectionTarget, error) {
 	artifacts, err := dir.Child(collectionArtifactsName, false)
 	if err != nil {
 		return collectionTarget{}, errors.Join(errCollectionUnsafe, err, dir.Close())
 	}
 
-	files, bytes, verifyErr := verifyArtifactFiles(ctx, artifacts, intent, descriptors)
+	files, bytes, verifyErr := verifyArtifactFiles(ctx, artifacts, intent, owned)
 	if verifyErr != nil {
 		return collectionTarget{}, errors.Join(verifyErr, artifacts.Close(), dir.Close())
 	}
@@ -310,41 +400,45 @@ func verifyTargetArtifacts(ctx context.Context, dir *privatefs.Dir, target colle
 	return target, nil
 }
 
-func verifyGenerationManifest(dir *privatefs.Dir, intent CollectionIntent) ([]model.Artifact, error) {
+func verifyGenerationManifest(dir *privatefs.Dir, intent CollectionIntent) (manifestArtifacts, error) {
 	data, err := dir.Read(collectionManifestName, model.MaxManifestBytes)
 	if err != nil {
-		return nil, errors.Join(errCollectionUnsafe, err)
+		return manifestArtifacts{}, errors.Join(errCollectionUnsafe, err)
 	}
 
 	if int64(len(data)) != intent.ManifestBytes || digest(data) != intent.ManifestSHA256 {
-		return nil, errCollectionContradiction
+		return manifestArtifacts{}, errCollectionContradiction
 	}
 
-	manifest, err := model.Decode(data)
+	owned, err := decodeManifestArtifacts(data)
 	if err != nil {
-		return nil, errors.Join(errCollectionContradiction, err)
+		return manifestArtifacts{}, errors.Join(errCollectionContradiction, err)
 	}
 
-	if len(manifest.Artifacts) != len(intent.Files) {
-		return nil, errCollectionContradiction
+	if owned.otherSchema {
+		return owned, nil
 	}
 
-	for index, descriptor := range manifest.Artifacts {
+	if len(owned.descriptors) != len(intent.Files) {
+		return manifestArtifacts{}, errCollectionContradiction
+	}
+
+	for index, descriptor := range owned.descriptors {
 		if descriptor.ID+collectionArtifactSuffix != intent.Files[index].Name {
-			return nil, errCollectionContradiction
+			return manifestArtifacts{}, errCollectionContradiction
 		}
 	}
 
-	return manifest.Artifacts, nil
+	return owned, nil
 }
 
-func verifyArtifactFiles(ctx context.Context, dir *privatefs.Dir, intent CollectionIntent, descriptors []model.Artifact) ([]CollectionFile, int64, error) {
+func verifyArtifactFiles(ctx context.Context, dir *privatefs.Dir, intent CollectionIntent, manifest manifestArtifacts) ([]CollectionFile, int64, error) {
 	names, err := collectionNames(dir, len(intent.Files))
 	if err != nil {
 		return nil, 0, err
 	}
 
-	if len(names) > 0 && len(descriptors) != len(intent.Files) {
+	if len(names) > 0 && !manifest.otherSchema && len(manifest.descriptors) != len(intent.Files) {
 		return nil, 0, errCollectionContradiction
 	}
 
@@ -371,7 +465,7 @@ func verifyArtifactFiles(ctx context.Context, dir *privatefs.Dir, intent Collect
 			continue
 		}
 
-		size, err := readValidatedArtifact(ctx, dir, descriptors[index])
+		size, err := manifest.size(ctx, dir, index, file.Name)
 		if err != nil {
 			return nil, 0, errors.Join(errCollectionContent, err)
 		}

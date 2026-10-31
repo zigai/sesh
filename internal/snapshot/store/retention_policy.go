@@ -9,6 +9,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/samber/oops"
 
 	"github.com/zigai/sesh/internal/snapshot/model"
@@ -104,12 +105,12 @@ func (r *Repository) retainPolicyLocked(ctx context.Context, now time.Time, poli
 		}, nil
 	}
 
-	sizes, timestamps, loadErr := r.loadRetentionMetadata(ctx, catalog.Generations, policy)
+	sizes, timestamps, retired, loadErr := r.loadRetentionMetadata(ctx, catalog.Generations, policy)
 	if loadErr != nil {
 		return RetentionResult{}, loadErr
 	}
 
-	result, evalErr := catalog.evaluateRetention(now, policy, timestamps, sizes)
+	result, evalErr := catalog.evaluateRetention(now, policy, timestamps, sizes, retired)
 	if evalErr != nil {
 		return RetentionResult{}, evalErr
 	}
@@ -130,50 +131,84 @@ func (r *Repository) retainPolicyLocked(ctx context.Context, now time.Time, poli
 		return RetentionResult{}, err
 	}
 
+	logRetiredRemovals(ctx, result.Removed, retired)
+
 	return result, nil
 }
 
-func (r *Repository) loadRetentionMetadata(ctx context.Context, gens []Generation, policy RetentionPolicy) (map[string]int64, map[string]int64, error) {
+func logRetiredRemovals(ctx context.Context, removed []string, retired map[string]bool) {
+	ids := slices.DeleteFunc(slices.Clone(removed), func(id string) bool { return !retired[id] })
+	if len(ids) == 0 {
+		return
+	}
+
+	zerolog.Ctx(ctx).Info().
+		Str("component", "snapshot").
+		Str("operation", "prune").
+		Strs("generations", ids).
+		Msg("removed snapshot generations with an unsupported manifest schema")
+}
+
+func (r *Repository) loadRetentionMetadata(
+	ctx context.Context,
+	gens []Generation,
+	policy RetentionPolicy,
+) (map[string]int64, map[string]int64, map[string]bool, error) {
 	if policy.MaxBytes > 0 {
 		return r.loadRetentionBytes(ctx, gens)
 	}
 
 	if policy.MaxAge > 0 {
-		timestamps, err := r.loadRetentionTimestamps(ctx, gens)
-		return nil, timestamps, err
+		timestamps, retired, err := r.loadRetentionTimestamps(ctx, gens)
+		return nil, timestamps, retired, err
 	}
 
-	return nil, nil, nil
+	return nil, nil, nil, nil
 }
 
-func (r *Repository) loadRetentionTimestamps(ctx context.Context, gens []Generation) (map[string]int64, error) {
+func (r *Repository) loadRetentionTimestamps(ctx context.Context, gens []Generation) (map[string]int64, map[string]bool, error) {
 	timestamps := make(map[string]int64, len(gens))
+	retired := make(map[string]bool)
 
 	for _, gen := range gens {
 		if err := ctx.Err(); err != nil {
-			return nil, oops.In("snapshot.store").With("operation", "load_retention_timestamps").Wrap(err)
+			return nil, nil, oops.In("snapshot.store").With("operation", "load_retention_timestamps").Wrap(err)
 		}
 
 		finished, err := r.readGenerationFinished(gen)
+		if errors.Is(err, model.ErrVersion) {
+			retired[gen.ID] = true
+			continue
+		}
+
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		timestamps[gen.ID] = finished
 	}
 
-	return timestamps, nil
+	return timestamps, retired, nil
 }
 
-func (c Catalog) orderedWithProtection() ([]Generation, map[string]bool) {
+func (c Catalog) orderedWithProtection(retired map[string]bool) ([]Generation, map[string]bool) {
 	ordered := slices.Clone(c.Generations)
 	slices.SortFunc(ordered, func(a, b Generation) int {
 		return cmp.Compare(b.Sequence, a.Sequence)
 	})
 
 	protectedMap := c.protected()
-	for i := 0; i < len(ordered) && i < minimumRetained; i++ {
-		protectedMap[ordered[i].ID] = true
+	usable := 0
+
+	for _, gen := range ordered {
+		if usable == minimumRetained {
+			break
+		}
+
+		if !retired[gen.ID] {
+			protectedMap[gen.ID] = true
+			usable++
+		}
 	}
 
 	return ordered, protectedMap
@@ -184,12 +219,13 @@ func (c Catalog) evaluateRetention(
 	policy RetentionPolicy,
 	timestamps map[string]int64,
 	sizes map[string]int64,
+	retired map[string]bool,
 ) (RetentionResult, error) {
-	ordered, protectedMap := c.orderedWithProtection()
+	ordered, protectedMap := c.orderedWithProtection(retired)
 
-	removedSet := c.evaluateAgeCountRemovals(ordered, protectedMap, policy, now, timestamps)
+	removedSet := c.evaluateAgeCountRemovals(ordered, protectedMap, policy, now, timestamps, retired)
 
-	retainedBytes, protectedBytes, budgetUnmet, err := evaluateByteBudget(ordered, removedSet, protectedMap, policy.MaxBytes, sizes)
+	retainedBytes, protectedBytes, budgetUnmet, err := evaluateByteBudget(ordered, removedSet, protectedMap, policy.MaxBytes, sizes, retired)
 	if err != nil {
 		return RetentionResult{}, err
 	}
@@ -212,6 +248,7 @@ func (c Catalog) evaluateAgeCountRemovals(
 	policy RetentionPolicy,
 	now time.Time,
 	timestamps map[string]int64,
+	retired map[string]bool,
 ) map[string]bool {
 	var cutoff time.Time
 	if policy.MaxAge > 0 {
@@ -219,15 +256,22 @@ func (c Catalog) evaluateAgeCountRemovals(
 	}
 
 	removedSet := make(map[string]bool)
+	index := 0
 
-	for index, gen := range ordered {
-		if protectedMap[gen.ID] {
+	for _, gen := range ordered {
+		if retired[gen.ID] {
+			if !protectedMap[gen.ID] {
+				removedSet[gen.ID] = true
+			}
+
 			continue
 		}
 
-		if shouldPrune(index, gen.ID, policy, cutoff, timestamps) {
+		if !protectedMap[gen.ID] && shouldPrune(index, gen.ID, policy, cutoff, timestamps) {
 			removedSet[gen.ID] = true
 		}
+
+		index++
 	}
 
 	return removedSet
@@ -239,12 +283,13 @@ func evaluateByteBudget(
 	protectedMap map[string]bool,
 	maxBytes int64,
 	sizes map[string]int64,
+	retired map[string]bool,
 ) (int64, int64, bool, error) {
 	if maxBytes <= 0 {
 		return 0, 0, false, nil
 	}
 
-	retainedBytes, protectedBytes, err := calculateCandidateBytes(ordered, removedSet, protectedMap, sizes)
+	retainedBytes, protectedBytes, err := calculateCandidateBytes(ordered, removedSet, protectedMap, sizes, retired)
 	if err != nil {
 		return 0, 0, false, err
 	}
@@ -279,6 +324,7 @@ func calculateCandidateBytes(
 	removedSet map[string]bool,
 	protectedMap map[string]bool,
 	sizes map[string]int64,
+	retired map[string]bool,
 ) (int64, int64, error) {
 	var (
 		retainedBytes  int64
@@ -286,7 +332,8 @@ func calculateCandidateBytes(
 	)
 
 	for _, gen := range ordered {
-		if removedSet[gen.ID] {
+		// A kept retired generation is catalog-protected and its size is unknown, so it stays out of the budget.
+		if removedSet[gen.ID] || retired[gen.ID] {
 			continue
 		}
 

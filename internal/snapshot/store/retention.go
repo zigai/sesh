@@ -81,25 +81,31 @@ func (c Catalog) protected() map[string]bool {
 	return protected
 }
 
-func (r *Repository) loadRetentionBytes(ctx context.Context, gens []Generation) (map[string]int64, map[string]int64, error) {
+func (r *Repository) loadRetentionBytes(ctx context.Context, gens []Generation) (map[string]int64, map[string]int64, map[string]bool, error) {
 	sizes := make(map[string]int64, len(gens))
 	timestamps := make(map[string]int64, len(gens))
+	retired := make(map[string]bool)
 
 	for _, gen := range gens {
 		if err := ctx.Err(); err != nil {
-			return nil, nil, oops.In("snapshot.store").With("operation", "load_retention_bytes").Wrap(err)
+			return nil, nil, nil, oops.In("snapshot.store").With("operation", "load_retention_bytes").Wrap(err)
 		}
 
 		size, finished, err := r.generationUsage(ctx, gen)
+		if errors.Is(err, model.ErrVersion) {
+			retired[gen.ID] = true
+			continue
+		}
+
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 
 		sizes[gen.ID] = size
 		timestamps[gen.ID] = finished
 	}
 
-	return sizes, timestamps, nil
+	return sizes, timestamps, retired, nil
 }
 
 func (r *Repository) Usage(ctx context.Context) (Usage, error) {
@@ -157,7 +163,7 @@ func (r *Repository) usageLocked(ctx context.Context) (Usage, error) {
 		}, nil
 	}
 
-	_, protectedMap := catalog.orderedWithProtection()
+	_, protectedMap := catalog.orderedWithProtection(nil)
 
 	genBytes := make(map[string]int64, len(catalog.Generations))
 

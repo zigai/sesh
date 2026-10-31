@@ -911,3 +911,108 @@ func TestCollectionRemovesCommittedAndIncompleteGenerations(t *testing.T) {
 	assertGenerationRemoved(t, path, incomplete.ID)
 	assertGenerationPresent(t, path, current.ID)
 }
+
+func retireOtherSchemaGeneration(t *testing.T, r *Repository, path string) (Generation, Generation) {
+	t.Helper()
+
+	retired := commitTwoArtifactFixture(t, r)
+	current := commitCompleteFixture(t, r)
+
+	retireManifestSchema(t, r, path, retired.ID)
+
+	if err := r.Delete(t.Context(), retired.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	return retired, current
+}
+
+func TestCollectionRemovesGenerationOfOtherManifestSchema(t *testing.T) {
+	for name, interrupt := range map[string]bool{"uninterrupted": false, "resumed after artifact removal": true} {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "repository")
+			r := openRepository(t, path)
+			retired, current := retireOtherSchemaGeneration(t, r, path)
+			stored := generationStoredBytes(t, path, retired.ID)
+
+			if interrupt {
+				interruptCollection(t, r, collectionPhaseArtifactUnlinked)
+			}
+
+			result := collectGenerations(t, r)
+
+			if diff := cmp.Diff([]string{retired.ID}, result.Removed); diff != "" || len(result.Preserved)+len(result.Quarantined) != 0 {
+				t.Fatalf("other-schema generation was not collected: %+v", result)
+			}
+
+			if !interrupt && result.Bytes != stored {
+				t.Fatalf("collected bytes = %d, want %d", result.Bytes, stored)
+			}
+
+			assertGenerationRemoved(t, path, retired.ID)
+			assertCollectionSettled(t, r, retired.ID)
+
+			if _, err := r.Read(t.Context(), current.ID); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestCollectionPreservesOtherSchemaGenerationWithUnexpectedArtifacts(t *testing.T) {
+	cases := map[string]struct {
+		plant  func(t *testing.T, artifacts string)
+		reason string
+	}{
+		"subdirectory": {
+			plant: func(t *testing.T, artifacts string) {
+				t.Helper()
+
+				if err := os.Mkdir(filepath.Join(artifacts, "a2.bin.gz"), 0o700); err != nil {
+					t.Fatal(err)
+				}
+			},
+			reason: CollectionReasonUnsafe,
+		},
+		"symlink": {
+			plant: func(t *testing.T, artifacts string) {
+				t.Helper()
+
+				if err := os.Symlink(filepath.Join(artifacts, "a0.bin.gz"), filepath.Join(artifacts, "a2.bin.gz")); err != nil {
+					t.Fatal(err)
+				}
+			},
+			reason: CollectionReasonUnsafe,
+		},
+		"unrecognized name": {
+			plant: func(t *testing.T, artifacts string) {
+				t.Helper()
+
+				if err := os.WriteFile(filepath.Join(artifacts, "notes.txt"), []byte("notes"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			},
+			reason: CollectionReasonUnknownContent,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "repository")
+			r := openRepository(t, path)
+			retired, _ := retireOtherSchemaGeneration(t, r, path)
+			tc.plant(t, filepath.Join(path, generationsDirectory, retired.ID, collectionArtifactsName))
+			before := repositoryTree(t, path)
+
+			result := collectGenerations(t, r)
+
+			if diff := cmp.Diff([]CollectionSkip{{Generation: retired.ID, Reason: tc.reason}}, result.Preserved); diff != "" || len(result.Removed) != 0 {
+				t.Fatalf("unexpected collection result %+v: %s", result, diff)
+			}
+
+			if diff := cmp.Diff(before, repositoryTree(t, path)); diff != "" {
+				t.Fatal(diff)
+			}
+		})
+	}
+}
