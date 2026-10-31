@@ -44,7 +44,7 @@ func openPickerControl(ctx context.Context, server *gotmux.Server, sessionID str
 	conn, err := server.OpenControl(ctx, gotmux.SessionID(sessionID), gotmux.ControlOptions{
 		PaneOutput:       false,
 		NoEcho:           false,
-		Flags:            []gotmux.ClientFlag{gotmux.ClientFlagReadOnly},
+		Flags:            nil,
 		UTF8:             gotmux.UTF8Default,
 		Colors256:        false,
 		TerminalFeatures: nil,
