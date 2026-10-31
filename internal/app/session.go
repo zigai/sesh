@@ -57,14 +57,18 @@ func (local *Local) createSession(ctx context.Context, _ action.Caller, input ac
 }
 
 func (local *Local) renameSession(ctx context.Context, _ action.Caller, input action.RenameSession) (action.RenamedSession, error) {
-	result := action.RenamedSession{PreviousName: input.Session.Name, Name: input.Name, HistoryUpdated: false}
+	var unchanged action.RenamedSession
 
 	if _, err := local.liveTarget(ctx, input.Session); err != nil {
-		return result, err
+		return unchanged, err
 	}
 
 	outcome, err := local.workflow.RenameSessionTargetOutcome(ctx, input.Session.Name, input.Name, input.Session.ID)
-	result.HistoryUpdated = outcome.HistoryUpdated
+
+	result := action.RenamedSession{PreviousName: input.Session.Name, Name: input.Name, HistoryUpdated: outcome.HistoryUpdated}
+	if !outcome.Renamed {
+		result = unchanged
+	}
 
 	if err != nil {
 		return result, oops.In("app").With("operation", "rename_session").Wrap(err)

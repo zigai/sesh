@@ -1178,6 +1178,25 @@ func TestCLIIntegrationSessionCreateMakesMissingDirectoryOnRequest(t *testing.T)
 	}
 }
 
+func TestCLIIntegrationSessionRenameConflictReportsNoResult(t *testing.T) {
+	fixture := newCLISessionFixture(t)
+	fixture.newLiveSession(t, "rename-source")
+	fixture.newLiveSession(t, "rename-taken")
+
+	renamed := executeJSON(t, append([]string{sessionCmd, "rename", "rename-source", "rename-taken"}, append(fixture.sessionArgs(), testJSONFlag)...)...)
+	if renamed.err == nil || renamed.envelope.OK || renamed.envelope.Error == nil || renamed.envelope.Error.Code != "alreadyExists" {
+		t.Fatalf("rename onto a taken name = %v / %+v, want alreadyExists", renamed.err, renamed.envelope)
+	}
+
+	if string(renamed.envelope.Result) != "null" {
+		t.Fatalf("failed rename result = %s, want null", renamed.envelope.Result)
+	}
+
+	if _, err := fixture.server.FindSession(t.Context(), "rename-source"); err != nil {
+		t.Fatalf("source session missing after failed rename: %v", err)
+	}
+}
+
 func TestCLIIntegrationSessionNewInteractiveEnters(t *testing.T) {
 	fixture := newCLISessionFixture(t)
 
