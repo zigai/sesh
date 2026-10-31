@@ -4,6 +4,7 @@ package agents
 
 import (
 	"context"
+	"math"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -58,7 +59,7 @@ func (o WatchOptions) normalized() WatchOptions {
 		o.MaxBackoff = DefaultMaxBackoff
 	}
 
-	if o.BackoffFactor <= 1.0 {
+	if math.IsNaN(o.BackoffFactor) || o.BackoffFactor <= 1.0 {
 		o.BackoffFactor = DefaultBackoffFactor
 	}
 
@@ -106,7 +107,7 @@ func RunWatchLoop(ctx context.Context, source SnapshotSource, handler SnapshotHa
 
 			return
 		case <-timer.C:
-			backoff = min(time.Duration(float64(backoff)*opts.BackoffFactor), opts.MaxBackoff)
+			backoff = nextBackoff(backoff, opts.BackoffFactor, opts.MaxBackoff)
 		}
 	}
 }
@@ -183,4 +184,13 @@ func RunStatusTracker(ctx context.Context, source SnapshotSource, handler Snapsh
 	}
 
 	return nil
+}
+
+func nextBackoff(current time.Duration, factor float64, limit time.Duration) time.Duration {
+	next := float64(current) * factor
+	if next >= float64(limit) {
+		return limit
+	}
+
+	return time.Duration(next)
 }

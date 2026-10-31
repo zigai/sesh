@@ -60,7 +60,7 @@ var (
 	errAgentStatusInitialBackoffNotPositive = errors.New("agent_status.initial_backoff must be positive")
 	errAgentStatusMaxBackoffNotPositive     = errors.New("agent_status.max_backoff must be positive")
 	errAgentStatusMaxLessThanInitial        = errors.New("agent_status.max_backoff must be greater than or equal to initial_backoff")
-	errAgentStatusBackoffFactorNegative     = errors.New("agent_status.backoff_factor must be non-negative")
+	errAgentStatusBackoffFactorInvalid      = errors.New("agent_status.backoff_factor must be a finite non-negative number")
 	errNilConfig                            = errors.New("cannot validate nil config")
 
 	errRemoteStaleAfterTooShort             = errors.New("invalid remote timing: stale_after must be greater than heartbeat_interval")
@@ -284,8 +284,8 @@ func ValidateAgentStatusConfig(status AgentStatusConfig) error {
 		return fmt.Errorf("%w: max (%s) < initial (%s)", errAgentStatusMaxLessThanInitial, status.MaxBackoff, status.InitialBackoff)
 	}
 
-	if status.BackoffFactor < 0 {
-		return fmt.Errorf("%w: got %f", errAgentStatusBackoffFactorNegative, status.BackoffFactor)
+	if math.IsNaN(status.BackoffFactor) || math.IsInf(status.BackoffFactor, 0) || status.BackoffFactor < 0 {
+		return fmt.Errorf("%w: got %f", errAgentStatusBackoffFactorInvalid, status.BackoffFactor)
 	}
 
 	return nil

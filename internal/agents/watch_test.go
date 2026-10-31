@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"strings"
 	"sync"
 	"testing"
@@ -192,6 +193,40 @@ func TestWatchLoopRetriesUnavailableBroker(t *testing.T) {
 	if handler.handledCount() != 0 {
 		t.Fatalf("handled snapshots = %d, want 0 while the broker is unavailable", handler.handledCount())
 	}
+}
+
+func TestWatchLoopCapsOverflowingBackoffAtMaximum(t *testing.T) {
+	t.Parallel()
+
+	source := newFailingSource(100)
+	handler := &recordingHandler{}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	opts := agents.DefaultWatchOptions()
+	opts.InitialBackoff = time.Millisecond
+	opts.MaxBackoff = time.Hour
+	opts.BackoffFactor = math.Inf(1)
+	opts.Quiet = true
+
+	done := make(chan struct{})
+
+	go func() {
+		agents.RunWatchLoop(ctx, source, handler, opts)
+		close(done)
+	}()
+
+	waitForCalls(t, source.callCh, 2)
+
+	select {
+	case <-source.callCh:
+		t.Fatal("watch retried without waiting for the maximum backoff")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	cancel()
+	waitDone(t, done)
 }
 
 func TestWatchLoopReturnsAfterCancellation(t *testing.T) {

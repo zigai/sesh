@@ -3,6 +3,7 @@ package config_test
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -901,12 +902,14 @@ func TestValidateAgentStatusConfig(t *testing.T) {
 		}
 	})
 
-	t.Run("negative backoff factor", func(t *testing.T) {
-		cfg := config.AgentStatusConfig{BackoffFactor: -1.0}
-		if err := config.ValidateAgentStatusConfig(cfg); err == nil || !strings.Contains(err.Error(), "must be non-negative") {
-			t.Fatalf("ValidateAgentStatusConfig() error = %v, want non-negative factor error", err)
-		}
-	})
+	for _, factor := range []float64{-1.0, math.Inf(1), math.NaN()} {
+		t.Run(fmt.Sprintf("backoff factor %v", factor), func(t *testing.T) {
+			cfg := config.AgentStatusConfig{BackoffFactor: factor}
+			if err := config.ValidateAgentStatusConfig(cfg); err == nil || !strings.Contains(err.Error(), "must be a finite non-negative number") {
+				t.Fatalf("ValidateAgentStatusConfig() error = %v, want finite non-negative factor error", err)
+			}
+		})
+	}
 }
 
 func TestAgentStatusPaletteResolution(t *testing.T) {
