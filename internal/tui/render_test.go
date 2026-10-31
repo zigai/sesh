@@ -842,6 +842,10 @@ func TestStatusMinimalBadgeRenderingAndInteractions(t *testing.T) {
 		t.Fatalf("view does not contain minimal error badge: %q", errorView)
 	}
 
+	if !strings.Contains(errorView, "command execution failed") {
+		t.Fatalf("view does not show error message without hover: %q", errorView)
+	}
+
 	model.showHelp = true
 
 	helpView := stripANSI(viewString(model.View()))

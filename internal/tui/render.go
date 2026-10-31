@@ -1366,7 +1366,7 @@ func (m *Model) renderModeFooter(width int, showHints bool) string {
 	prefixWidth := width - badgeWidth
 	prefix := strings.Repeat(" ", prefixWidth)
 
-	if m.hasStatusBadge() && m.statusBadgeHovered {
+	if m.hasStatusBadge() && (m.statusBadgeHovered || m.statusLevel == statusError) {
 		prefix = m.renderStatusHoverPrefix(prefixWidth)
 	} else if showHints {
 		hintWidth := m.modeFooterHintWidth(width)
