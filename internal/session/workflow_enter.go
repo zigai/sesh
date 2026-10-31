@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/rs/zerolog"
 	"github.com/samber/oops"
@@ -502,9 +503,19 @@ func sleepContext(ctx context.Context, delay time.Duration) error {
 }
 
 func validateSessionName(name string) error {
-	if name == "" || strings.ContainsAny(name, ":.") {
+	if name == "" || !utf8.ValidString(name) || strings.ContainsAny(name, ":.\\") || looksLikeSessionID(name) {
+		return ErrInvalidSessionName
+	}
+
+	if strings.ContainsFunc(name, func(r rune) bool { return r < ' ' || r == 0x7f }) {
 		return ErrInvalidSessionName
 	}
 
 	return nil
+}
+
+func looksLikeSessionID(name string) bool {
+	digits, ok := strings.CutPrefix(name, "$")
+
+	return ok && digits != "" && strings.Trim(digits, "0123456789") == ""
 }

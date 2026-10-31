@@ -33,9 +33,16 @@ func TestWorkflow_CreateValidation(t *testing.T) {
 	ctx := t.Context()
 	wf := session.NewWorkflow(nil, nil, "")
 
-	for _, name := range []string{"", "has:colon", "has.period"} {
+	invalid := []string{"", "has:colon", "has.period", `back\slash`, "tab\there", "line\nbreak", "esc\x1b", "del\x7f", "bad\xffutf8", "$1", "$042"}
+	for _, name := range invalid {
 		if _, err := wf.CreateSession(ctx, name, "/tmp"); !errors.Is(err, session.ErrInvalidSessionName) {
 			t.Fatalf("CreateSession(%q) error = %v, want ErrInvalidSessionName", name, err)
+		}
+	}
+
+	for _, name := range []string{"$", "$a1", "a$1", "$1a", "émoji"} {
+		if _, err := wf.CreateSession(ctx, name, "/tmp"); errors.Is(err, session.ErrInvalidSessionName) {
+			t.Fatalf("CreateSession(%q) error = %v, want the name accepted", name, err)
 		}
 	}
 }
@@ -46,7 +53,7 @@ func TestWorkflow_RenameValidation(t *testing.T) {
 	ctx := t.Context()
 	wf := session.NewWorkflow(nil, nil, "")
 
-	for _, name := range []string{"", "invalid:name"} {
+	for _, name := range []string{"", "invalid:name", "$3", "line\nbreak"} {
 		if _, err := wf.RenameSessionOutcome(ctx, "old", name); !errors.Is(err, session.ErrInvalidSessionName) {
 			t.Fatalf("RenameSessionOutcome(%q) error = %v, want ErrInvalidSessionName", name, err)
 		}
