@@ -15,6 +15,7 @@ import (
 const (
 	waitDelay   = time.Second
 	outputLimit = 1 << 20
+	detailLimit = 512
 )
 
 var ErrOutputTooLarge = errors.New("command output exceeds its limit")
@@ -33,8 +34,8 @@ type Diff struct {
 type CommandError struct {
 	Subcommand string
 	ExitCode   int
-	// Detail is git's first error line, meant for the user who asked for the operation; it is never
-	// logged.
+	// Detail is git's last fatal or error line, meant for the user who asked for the operation; it is
+	// never logged.
 	Detail string
 }
 
@@ -74,7 +75,7 @@ func Output(ctx context.Context, dir string, args ...string) (string, error) {
 	}
 
 	if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
-		return "", &CommandError{Subcommand: subcommand(args), ExitCode: exitErr.ExitCode(), Detail: firstLine(stderr.String())}
+		return "", &CommandError{Subcommand: subcommand(args), ExitCode: exitErr.ExitCode(), Detail: errorDetail(stderr.String())}
 	}
 
 	if err != nil {
@@ -143,8 +144,24 @@ func subcommand(args []string) string {
 	return ""
 }
 
-func firstLine(text string) string {
-	line, _, _ := strings.Cut(strings.TrimSpace(text), "\n")
+func errorDetail(stderr string) string {
+	detail := ""
 
-	return strings.TrimSpace(line)
+	// git writes progress such as "Preparing worktree" to stderr before the failure it reports.
+	for line := range strings.Lines(stderr) {
+		line = strings.TrimSpace(line)
+
+		switch {
+		case strings.HasPrefix(line, "fatal:"), strings.HasPrefix(line, "error:"):
+			detail = line
+		case detail == "":
+			detail = line
+		}
+	}
+
+	if len(detail) > detailLimit {
+		detail = strings.ToValidUTF8(detail[:detailLimit], "")
+	}
+
+	return detail
 }
