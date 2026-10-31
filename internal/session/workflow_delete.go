@@ -334,7 +334,7 @@ func (w *Workflow) planSavedDelete(ctx context.Context, name, endpointScope stri
 		return nil, nil
 	}
 
-	catalog, err := w.repo.Inspect(ctx)
+	catalog, err := w.repo.SettleAbandonedAttempts(ctx)
 	if err != nil {
 		return nil, oops.In("session").Code("repository_unavailable").With("operation", "inspect_repository").Wrap(err)
 	}

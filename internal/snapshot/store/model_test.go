@@ -23,7 +23,11 @@ func TestRepositoryHistoriesNeverFallback(t *testing.T) {
 			}
 
 			var want error
-			if outcome != "committed" {
+
+			switch {
+			case len(committed) == 0 && outcome != "pending":
+				want = ErrUnavailable
+			case outcome != "committed":
 				want = ErrRecoveryRequired
 			}
 

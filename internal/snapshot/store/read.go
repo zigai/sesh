@@ -167,12 +167,8 @@ func (c Catalog) currentGeneration() (Generation, error) {
 		}
 	}
 
-	if len(c.Attempts) == 0 {
-		return Generation{}, ErrUnavailable
-	}
-
 	latest := c.latestSaveAttempt()
-	if c.Current == "" && collectionRetiredState(latest.State) {
+	if c.Current == "" && latest.State != attemptStatePending {
 		return Generation{}, ErrUnavailable
 	}
 

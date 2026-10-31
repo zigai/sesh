@@ -95,7 +95,7 @@ func TestCoordinatorNamesARestoreThatMayStillRun(t *testing.T) {
 	}
 }
 
-func TestCoordinatorRefusesUnresolvedSave(t *testing.T) {
+func TestCoordinatorStartsAfterFailedFirstSave(t *testing.T) {
 	repositoryPath := filepath.Join(t.TempDir(), "repository")
 
 	repository, err := store.Open(t.Context(), repositoryPath)
@@ -126,8 +126,7 @@ func TestCoordinatorRefusesUnresolvedSave(t *testing.T) {
 		t.Fatalf("resolve autosave env: %v", err)
 	}
 
-	err = ensureCoordinatorRepositoryReady(t.Context(), env)
-	if !errors.Is(err, errCoordinatorRecoveryBarrier) {
-		t.Fatalf("ensureCoordinatorRepositoryReady error = %v, want recovery barrier", err)
+	if err := ensureCoordinatorRepositoryReady(t.Context(), env); err != nil {
+		t.Fatalf("ensureCoordinatorRepositoryReady error = %v, want nil with no generation to recover", err)
 	}
 }

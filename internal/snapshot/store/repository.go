@@ -7,6 +7,7 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"slices"
+	"sync"
 
 	"github.com/samber/oops"
 	"golang.org/x/sys/unix"
@@ -16,8 +17,10 @@ import (
 )
 
 type Repository struct {
-	root  *privatefs.Dir
-	fault func(string) error
+	root   *privatefs.Dir
+	path   string
+	fault  func(string) error
+	owners attemptOwners
 }
 
 func Open(ctx context.Context, path string) (*Repository, error) {
@@ -34,7 +37,7 @@ func OpenExisting(ctx context.Context, path string) (*Repository, error) {
 		return nil, repositoryError("open_existing", err)
 	}
 
-	repository := &Repository{root: root, fault: nil}
+	repository := &Repository{root: root, path: path, fault: nil, owners: attemptOwners{mu: sync.Mutex{}, held: nil}}
 	if err := repository.inspectExisting(ctx); err != nil {
 		return nil, repositoryError("open_existing", errors.Join(err, root.Close()))
 	}
@@ -48,7 +51,7 @@ func openWithFault(ctx context.Context, path string, fault func(string) error) (
 		return nil, repositoryError("open", oops.In("snapshot.store").With("operation", "open_repository").Wrapf(err, "open repository"))
 	}
 
-	repository := &Repository{root: root, fault: fault}
+	repository := &Repository{root: root, path: path, fault: fault, owners: attemptOwners{mu: sync.Mutex{}, held: nil}}
 	if err := repository.initialize(ctx); err != nil {
 		return nil, repositoryError("open", errors.Join(err, root.Close()))
 	}
@@ -57,7 +60,9 @@ func openWithFault(ctx context.Context, path string, fault func(string) error) (
 }
 
 func (r *Repository) Close() error {
-	if err := r.root.Close(); err != nil {
+	releaseErr := r.releaseAttempts()
+
+	if err := errors.Join(releaseErr, r.root.Close()); err != nil {
 		return repositoryError("close", oops.In("snapshot.store").With("operation", "close_repository").Wrapf(err, "close repository"))
 	}
 
@@ -75,21 +80,41 @@ func (r *Repository) Inspect(ctx context.Context) (Catalog, error) {
 	return catalog, repositoryError("inspect", errors.Join(readErr, lock.Close()))
 }
 
+// Begin registers a pending attempt owned by this process until Release or Close, and first
+// settles pending attempts whose save process died.
 func (r *Repository) Begin(ctx context.Context) (Attempt, error) {
 	attempt := Attempt{ID: newID(), Sequence: 0, State: "pending", Reason: "capture_pending", ManifestSHA256: ""}
+
+	var abandoned []string
+
 	err := r.update(ctx, func(c *Catalog) error {
 		if c.Sequence == ^uint64(0) {
 			return ErrConflict
 		}
 
+		resolved, err := r.resolveAbandoned(c)
+		if err != nil {
+			return err
+		}
+
+		if err := r.holdAttempt(attempt.ID); err != nil {
+			return err
+		}
+
+		abandoned = resolved
 		c.Sequence++
 		attempt.Sequence = c.Sequence
 		c.Attempts = append(c.Attempts, attempt)
 
 		return nil
 	})
+	if err != nil {
+		return attempt, repositoryError("begin", errors.Join(err, r.Release(attempt.ID)))
+	}
 
-	return attempt, repositoryError("begin", err)
+	logAbandonedAttempts(ctx, abandoned)
+
+	return attempt, nil
 }
 
 func (r *Repository) Fail(ctx context.Context, id string) error {

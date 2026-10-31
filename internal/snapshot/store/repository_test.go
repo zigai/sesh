@@ -296,6 +296,76 @@ func TestConcurrentAttemptsAndCanceledLock(t *testing.T) {
 	}
 }
 
+func TestPendingAttemptOfGoneSaveIsSettledAndLiveOneIsKept(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "repository")
+	r := openRepository(t, path)
+	live := openRepository(t, path)
+
+	gone, err := Open(t.Context(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	abandoned, err := gone.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := gone.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	running, err := live.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	catalog, err := r.SettleAbandonedAttempts(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	states := map[string]Attempt{}
+	for _, attempt := range catalog.Attempts {
+		states[attempt.ID] = attempt
+	}
+
+	if got := states[abandoned.ID]; got.State != "failed" || got.Reason != "abandoned" {
+		t.Fatalf("attempt of a closed save = %s/%s, want failed/abandoned", got.State, got.Reason)
+	}
+
+	if got := states[running.ID]; got.State != "pending" {
+		t.Fatalf("attempt of a running save = %s, want pending", got.State)
+	}
+
+	if err := live.Release(running.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	next, err := r.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	reopened := openRepository(t, path)
+
+	catalog, err = reopened.Inspect(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, attempt := range catalog.Attempts {
+		want := "failed"
+		if attempt.ID == next.ID {
+			want = "pending"
+		}
+
+		if attempt.State != want {
+			t.Fatalf("attempt %s state = %s, want %s", attempt.ID, attempt.State, want)
+		}
+	}
+}
+
 func verifyPublication(t *testing.T, path, prior, attempt string, published bool) {
 	t.Helper()
 

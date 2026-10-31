@@ -10,7 +10,7 @@ import (
 	"github.com/zigai/sesh/internal/testsupport/snapfixture"
 )
 
-func TestInspectStartupState_UnresolvedAttemptKeepsRecoveryBarrier(t *testing.T) {
+func TestInspectStartupState_FailedFirstSaveLeavesNothingToRecover(t *testing.T) {
 	t.Parallel()
 
 	ctx := t.Context()
@@ -44,8 +44,8 @@ func TestInspectStartupState_UnresolvedAttemptKeepsRecoveryBarrier(t *testing.T)
 		t.Fatal("RepositoryPresent = false, want true for an opened repository")
 	}
 
-	if !state.RecoveryRequired {
-		t.Fatalf("state = %+v, want an unresolved recovery barrier", state)
+	if state.RecoveryRequired {
+		t.Fatalf("state = %+v, want no recovery barrier without any generation", state)
 	}
 
 	if state.ObservationOnly {
@@ -57,8 +57,8 @@ func TestInspectStartupState_UnresolvedAttemptKeepsRecoveryBarrier(t *testing.T)
 	}
 
 	admission := automation.EvaluateStartupRestore(automation.StartupState{Enabled: true, RepositoryPresent: state.RepositoryPresent, RecoveryRequired: state.RecoveryRequired, ObservationOnly: state.ObservationOnly, Generation: state.Generation})
-	if admission.Allowed || admission.Reason != automation.ReasonRecoveryRequired {
-		t.Fatalf("admission = %+v, want refusal with recovery_required", admission)
+	if admission.Allowed || admission.Reason == automation.ReasonRecoveryRequired {
+		t.Fatalf("admission = %+v, want refusal without recovery_required", admission)
 	}
 }
 

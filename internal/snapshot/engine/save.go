@@ -104,10 +104,12 @@ func saveWithProfile(ctx context.Context, repository *store.Repository, leaseRoo
 		return result, saveFailure(ctx, "register", started, errors.Join(err, closeErr))
 	}
 
+	release := func() error { return errors.Join(lease.Close(), repository.Release(attempt.ID)) }
+
 	observation, carried, err := observeCarryingResumeEvidence(ctx, repository, observe)
 	if err != nil {
 		failErr := recordFailedAttempt(ctx, repository, attempt.ID)
-		closeErr := lease.Close()
+		closeErr := release()
 
 		return result, saveFailure(ctx, "capture", started, errors.Join(err, failErr, closeErr))
 	}
@@ -126,12 +128,12 @@ func saveWithProfile(ctx context.Context, repository *store.Repository, leaseRoo
 			failErr = recordFailedAttempt(ctx, repository, attempt.ID)
 		}
 
-		closeErr := lease.Close()
+		closeErr := release()
 
 		return result, saveFailure(ctx, "commit", started, errors.Join(err, failErr, closeErr))
 	}
 
-	if closeErr := lease.Close(); closeErr != nil {
+	if closeErr := release(); closeErr != nil {
 		return result, saveFailure(ctx, "finalize", started, closeErr)
 	}
 

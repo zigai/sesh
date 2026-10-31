@@ -213,7 +213,7 @@ func validAttemptOutcome(state, reason string) bool {
 	case "incomplete":
 		return reason == "parity_incomplete"
 	case "failed":
-		return reason == "save_failed"
+		return reason == "save_failed" || reason == attemptReasonAbandoned
 	default:
 		return false
 	}

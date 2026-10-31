@@ -906,11 +906,11 @@ func (f *cliSessionFixture) beginPendingSave(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	defer func() {
+	t.Cleanup(func() {
 		if err := repo.Close(); err != nil {
 			t.Error(err)
 		}
-	}()
+	})
 
 	if _, err := repo.Begin(t.Context()); err != nil {
 		t.Fatal(err)

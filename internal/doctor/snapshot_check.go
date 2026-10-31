@@ -76,6 +76,10 @@ func (s *Service) resolveCurrentSnapshot(ctx context.Context, repo currentSnapsh
 			return s.manifestResult(gen.ID, manifest), nil
 		}
 
+		if errors.Is(readErr, store.ErrUnavailable) {
+			return s.classifyUnavailableCurrent(ctx, repo, readErr)
+		}
+
 		if !errors.Is(readErr, store.ErrRecoveryRequired) {
 			return s.classifyReadCurrentError(readErr)
 		}
@@ -86,11 +90,6 @@ func (s *Service) resolveCurrentSnapshot(ctx context.Context, repo currentSnapsh
 		}
 
 		if !before.PracticalCurrentAdmissible() {
-			if before.LatestSaveFailed() {
-				return s.saveFix(newResult(CheckSnapshotCurrent, StatusFail, "Latest save failed and no earlier generation can be restored").
-					withReason(ReasonRecoveryRequired)), nil
-			}
-
 			return s.classifyReadCurrentError(readErr)
 		}
 
@@ -114,6 +113,20 @@ func (s *Service) resolveCurrentSnapshot(ctx context.Context, repo currentSnapsh
 	return newResult(CheckSnapshotCurrent, StatusWarn, "Repository changed during inspection; the current snapshot was not verified").
 		withReason(ReasonUnverifiable).
 		withCommand(s.doctorCommand()), nil
+}
+
+func (s *Service) classifyUnavailableCurrent(ctx context.Context, repo currentSnapshotReader, readErr error) (Result, error) {
+	catalog, inspectErr := repo.Inspect(ctx)
+	if inspectErr != nil {
+		return s.classifyReadCurrentError(inspectErr)
+	}
+
+	if catalog.LatestSaveFailed() {
+		return s.saveFix(newResult(CheckSnapshotCurrent, StatusFail, "Latest save failed and no earlier generation can be restored").
+			withReason(ReasonRecoveryRequired)), nil
+	}
+
+	return s.classifyReadCurrentError(readErr)
 }
 
 func (s *Service) practicalCandidateResult(catalog store.Catalog, manifest model.Manifest) Result {

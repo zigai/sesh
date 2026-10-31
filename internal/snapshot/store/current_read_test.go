@@ -242,7 +242,7 @@ func TestReadPracticalCurrentUsesCompleteGenerationAfterFailedSave(t *testing.T)
 	assertPracticalCurrentAfterUnfinishedSave(t, r, generation, "failed")
 }
 
-func TestReadPracticalCurrentWithoutAnyGenerationKeepsBarrier(t *testing.T) {
+func TestReadPracticalCurrentWithoutAnyGenerationIsUnavailable(t *testing.T) {
 	r := openRepository(t, filepath.Join(t.TempDir(), "repository"))
 
 	attempt, err := r.Begin(t.Context())
@@ -254,7 +254,7 @@ func TestReadPracticalCurrentWithoutAnyGenerationKeepsBarrier(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, _, err := r.ReadPracticalCurrent(t.Context()); !errors.Is(err, ErrRecoveryRequired) {
+	if _, _, err := r.ReadPracticalCurrent(t.Context()); !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("failed first save has no generation to use: %v", err)
 	}
 }
