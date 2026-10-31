@@ -184,7 +184,18 @@ func resumeBaseline(ctx context.Context, repository *store.Repository) (map[pane
 	}
 
 	if err != nil {
-		return nil, oops.In("snapshot").With("operation", "read_resume_baseline").Wrapf(err, "read current snapshot")
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, oops.In("snapshot").With("operation", "read_resume_baseline").Wrapf(errors.Join(err, ctxErr), "read current snapshot")
+		}
+
+		zerolog.Ctx(ctx).Warn().
+			Str("component", "snapshot").
+			Str("operation", "save").
+			Str("phase", "read_resume_baseline").
+			Func(logging.Cause(err)).
+			Msg("current snapshot unreadable; saving without carried resume evidence")
+
+		return baseline, nil
 	}
 
 	for _, pane := range manifest.Panes {
