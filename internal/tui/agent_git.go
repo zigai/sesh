@@ -62,17 +62,9 @@ func (m *Model) loadAgentGitCommand() tea.Cmd {
 		}
 		defer m.lifecycle.EndWorker()
 
-		entries, err := scan(ctx, directories)
+		entries, incomplete, err := scan(ctx, directories)
 		if err != nil {
-			retained := make(map[string]agentGitCacheEntry, len(directories))
-			for _, directory := range directories {
-				if entry, ok := previous[directory]; ok {
-					retained[directory] = entry
-				}
-			}
-
-			maps.Copy(retained, entries)
-			entries = retained
+			entries = retainPreviousAgentGit(directories, previous, entries, incomplete)
 		}
 
 		if !maps.Equal(previous, entries) && ctx.Err() == nil {
@@ -81,6 +73,29 @@ func (m *Model) loadAgentGitCommand() tea.Cmd {
 
 		return agentGitResultMsg{request: request, entries: entries, err: err}
 	}
+}
+
+func retainPreviousAgentGit(
+	directories []string,
+	previous, scanned map[string]agentGitCacheEntry,
+	incomplete []string,
+) map[string]agentGitCacheEntry {
+	retained := make(map[string]agentGitCacheEntry, len(directories))
+	for _, directory := range directories {
+		if entry, ok := previous[directory]; ok {
+			retained[directory] = entry
+		}
+	}
+
+	for directory, entry := range scanned {
+		if _, kept := retained[directory]; kept && slices.Contains(incomplete, directory) {
+			continue
+		}
+
+		retained[directory] = entry
+	}
+
+	return retained
 }
 
 func (m *Model) handleAgentGit(msg agentGitResultMsg) tea.Cmd {

@@ -2,12 +2,13 @@ package tui
 
 import (
 	"context"
-	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/samber/oops"
@@ -16,10 +17,10 @@ import (
 )
 
 const (
-	gitCommandBudget   = time.Second
-	gitOutputLimit     = 64 * 1024
-	gitWaitDelay       = 50 * time.Millisecond
-	gitStatusCodeWidth = 2
+	gitCommandTimeout = 5 * time.Second
+	gitProcessLimit   = 8
+	gitOutputLimit    = 64 * 1024
+	gitWaitDelay      = 50 * time.Millisecond
 )
 
 type agentGitCacheEntry struct {
@@ -45,11 +46,31 @@ type gitTracking struct {
 }
 
 type gitStatus struct {
+	branch    string
+	tracking  gitTracking
 	dirty     bool
 	conflicts int
 }
 
-type gitScanner func(ctx context.Context, directories []string) (map[string]agentGitCacheEntry, error)
+type gitLocation struct {
+	worktree  string
+	gitDir    string
+	commonDir string
+}
+
+type gitWorktreeState struct {
+	status    gitStatus
+	changes   string
+	hasRemote bool
+	stash     int
+	unmerged  int
+}
+
+type gitScanner func(ctx context.Context, directories []string) (map[string]agentGitCacheEntry, []string, error)
+
+type gitRunner struct {
+	slots chan struct{}
+}
 
 type boundedBuffer struct {
 	data  []byte
@@ -68,147 +89,225 @@ func (b *boundedBuffer) String() string {
 	return string(b.data)
 }
 
-func scanGitMetadata(ctx context.Context, directories []string) (map[string]agentGitCacheEntry, error) {
-	result := make(map[string]agentGitCacheEntry, len(directories))
+func scanGitMetadata(ctx context.Context, directories []string) (map[string]agentGitCacheEntry, []string, error) {
+	runner := gitRunner{slots: make(chan struct{}, gitProcessLimit)}
 
-	var scanErr error
+	directories = absoluteDirectories(directories)
+	locations := make([]gitLocation, len(directories))
+	failures := make([]error, len(directories))
 
+	var group sync.WaitGroup
+	for index, directory := range directories {
+		group.Go(func() { locations[index], failures[index] = runner.locate(ctx, directory) })
+	}
+
+	group.Wait()
+
+	worktrees := make([]string, 0, len(locations))
+	for _, location := range locations {
+		if location.worktree != "" {
+			worktrees = append(worktrees, location.worktree)
+		}
+	}
+
+	slices.Sort(worktrees)
+	worktrees = slices.Compact(worktrees)
+	states := make([]gitWorktreeState, len(worktrees))
+	stateFailures := make([]error, len(worktrees))
+
+	for index, worktree := range worktrees {
+		group.Go(func() { states[index], stateFailures[index] = runner.readWorktree(ctx, worktree) })
+	}
+
+	group.Wait()
+
+	entries := make(map[string]agentGitCacheEntry, len(directories))
+	incomplete := make([]string, 0)
+
+	var cause error
+
+	for index, directory := range directories {
+		failure := failures[index]
+
+		if location := locations[index]; location.worktree != "" {
+			worktree, _ := slices.BinarySearch(worktrees, location.worktree)
+			failure = firstError(failure, stateFailures[worktree])
+			entries[directory] = location.entry(states[worktree])
+		} else if failure == nil {
+			entries[directory] = emptyAgentGitCacheEntry()
+		}
+
+		if failure != nil {
+			incomplete = append(incomplete, directory)
+			cause = firstError(cause, failure)
+		}
+	}
+
+	if cause != nil {
+		return entries, incomplete, oops.In("tui").Code("git_scan_failed").
+			With("operation", "scan_git_metadata", "directories", incomplete).Wrap(cause)
+	}
+
+	return entries, nil, nil
+}
+
+func absoluteDirectories(directories []string) []string {
+	absolute := make([]string, 0, len(directories))
 	for _, directory := range directories {
-		if ctx.Err() != nil {
-			return result, errors.Join(scanErr, ctx.Err())
+		if filepath.IsAbs(directory) {
+			absolute = append(absolute, directory)
 		}
+	}
 
-		if !filepath.IsAbs(directory) {
-			continue
-		}
+	slices.Sort(absolute)
 
-		if _, seen := result[directory]; seen {
-			continue
-		}
+	return slices.Compact(absolute)
+}
 
-		entry, err := readGitMetadata(ctx, directory)
+func firstError(errs ...error) error {
+	for _, err := range errs {
 		if err != nil {
-			scanErr = errors.Join(scanErr, err)
-
-			continue
+			return err
 		}
-
-		result[directory] = entry
 	}
 
-	return result, scanErr
+	return nil
 }
 
-func readGitMetadata(ctx context.Context, directory string) (agentGitCacheEntry, error) {
-	commandCtx, cancel := context.WithTimeout(ctx, gitCommandBudget)
-	defer cancel()
-
-	failure := oops.In("tui").Code("git_scan_failed").With("operation", "scan_git_metadata", "directory", directory)
-
-	locations, ok := gitMetadataOutput(commandCtx, directory, "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-dir", "--git-common-dir")
-
-	paths := strings.Split(locations, "\n")
-	if !ok || len(paths) != 3 {
-		return emptyAgentGitCacheEntry(), failure.Wrap(commandCtx.Err())
-	}
-
-	branch, _ := gitMetadataOutput(commandCtx, directory, "symbolic-ref", "--quiet", "--short", "HEAD")
-	tracking := readGitTracking(commandCtx, paths[0])
-	status := readGitStatus(commandCtx, paths[0])
-	remotes, remotesOK := gitMetadataOutput(commandCtx, paths[0], "remote")
-
+func (location gitLocation) entry(state gitWorktreeState) agentGitCacheEntry {
 	return agentGitCacheEntry{
-		GitBranch:        branch,
-		Worktree:         paths[0],
-		GitRepo:          paths[2],
-		GitHasRemote:     remotesOK && remotes != "",
-		LinkedWorktree:   paths[1] != paths[2],
-		GitChanges:       readGitChanges(commandCtx, paths[0]),
-		GitAhead:         tracking.ahead,
-		GitBehind:        tracking.behind,
-		GitTrackingKnown: tracking.known,
-		GitStash:         readGitStashCount(commandCtx, paths[0]),
-		GitConflicts:     status.conflicts,
-		GitDirty:         status.dirty,
-		GitUnmerged:      readGitUnmerged(commandCtx, paths[0]),
-	}, failure.Wrap(commandCtx.Err())
+		GitBranch:        state.status.branch,
+		Worktree:         location.worktree,
+		GitRepo:          location.commonDir,
+		GitHasRemote:     state.hasRemote,
+		LinkedWorktree:   location.gitDir != location.commonDir,
+		GitChanges:       state.changes,
+		GitAhead:         state.status.tracking.ahead,
+		GitBehind:        state.status.tracking.behind,
+		GitTrackingKnown: state.status.tracking.known,
+		GitStash:         state.stash,
+		GitConflicts:     state.status.conflicts,
+		GitDirty:         state.status.dirty,
+		GitUnmerged:      state.unmerged,
+	}
 }
 
-func readGitUnmerged(ctx context.Context, directory string) int {
-	base, ok := gitMetadataOutput(ctx, directory, "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD")
-	if !ok || base == "" {
-		return 0
+func (r gitRunner) locate(ctx context.Context, directory string) (gitLocation, error) {
+	output, ok, err := r.output(ctx, directory, "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-dir", "--git-common-dir")
+
+	paths := strings.Split(output, "\n")
+	if !ok || len(paths) != 3 {
+		var location gitLocation
+
+		return location, err
 	}
 
-	output, ok := gitMetadataOutput(ctx, directory, "rev-list", "--count", base+"..HEAD", "--")
-
-	count, err := strconv.Atoi(output)
-	if !ok || err != nil || count < 0 {
-		return 0
-	}
-
-	return count
+	return gitLocation{worktree: paths[0], gitDir: paths[1], commonDir: paths[2]}, nil
 }
 
-func readGitStatus(ctx context.Context, directory string) gitStatus {
-	output, ok := gitMetadataOutput(ctx, directory, "status", "--porcelain=v1", "--untracked-files=normal")
+func (r gitRunner) readWorktree(ctx context.Context, worktree string) (gitWorktreeState, error) {
+	var (
+		state    gitWorktreeState
+		failures [5]error
+		group    sync.WaitGroup
+	)
+
+	group.Go(func() { state.status, failures[0] = r.status(ctx, worktree) })
+	group.Go(func() { state.changes, failures[1] = r.changes(ctx, worktree) })
+	group.Go(func() { state.hasRemote, failures[2] = r.hasRemote(ctx, worktree) })
+	group.Go(func() { state.stash, failures[3] = r.stashCount(ctx, worktree) })
+	group.Go(func() { state.unmerged, failures[4] = r.unmerged(ctx, worktree) })
+	group.Wait()
+
+	return state, firstError(failures[:]...)
+}
+
+func (r gitRunner) status(ctx context.Context, worktree string) (gitStatus, error) {
+	output, ok, err := r.output(ctx, worktree, "status", "--porcelain=v2", "--branch", "--untracked-files=normal")
 	if !ok {
-		return gitStatus{dirty: false, conflicts: 0}
+		var status gitStatus
+
+		return status, err
 	}
 
-	return parseGitStatus(output)
+	return parseGitStatus(output), nil
 }
 
 func parseGitStatus(output string) gitStatus {
-	status := gitStatus{dirty: output != "", conflicts: 0}
+	var status gitStatus
+
 	for line := range strings.SplitSeq(output, "\n") {
-		if len(line) < gitStatusCodeWidth {
+		header, isHeader := strings.CutPrefix(line, "# ")
+		if !isHeader {
+			status.dirty = status.dirty || line != ""
+			if strings.HasPrefix(line, "u ") {
+				status.conflicts++
+			}
+
 			continue
 		}
 
-		code := line[:gitStatusCodeWidth]
-		if code == "UU" || code == "AA" || code == "DD" || code == "AU" || code == "UA" || code == "DU" || code == "UD" {
-			status.conflicts++
+		key, value, _ := strings.Cut(header, " ")
+		switch key {
+		case "branch.head":
+			if value != "(detached)" {
+				status.branch = value
+			}
+		case "branch.ab":
+			status.tracking = parseGitAheadBehind(value)
 		}
 	}
 
 	return status
 }
 
-func readGitStashCount(ctx context.Context, directory string) int {
-	output, ok := gitMetadataOutput(ctx, directory, "stash", "list", "--format=%gd")
-	if !ok || output == "" {
-		return 0
-	}
+func parseGitAheadBehind(value string) gitTracking {
+	aheadText, behindText, found := strings.Cut(value, " ")
+	ahead, aheadErr := strconv.Atoi(strings.TrimPrefix(aheadText, "+"))
 
-	return strings.Count(output, "\n") + 1
-}
+	behind, behindErr := strconv.Atoi(strings.TrimPrefix(behindText, "-"))
+	if !found || aheadErr != nil || behindErr != nil || ahead < 0 || behind < 0 {
+		var tracking gitTracking
 
-func readGitTracking(ctx context.Context, directory string) gitTracking {
-	output, ok := gitMetadataOutput(ctx, directory, "rev-list", "--left-right", "--count", "HEAD...@{upstream}", "--")
-
-	values := strings.Fields(output)
-	if !ok || len(values) != 2 {
-		return emptyGitTracking()
-	}
-
-	ahead, aheadErr := strconv.Atoi(values[0])
-
-	behind, behindErr := strconv.Atoi(values[1])
-	if aheadErr != nil || behindErr != nil || ahead < 0 || behind < 0 {
-		return emptyGitTracking()
+		return tracking
 	}
 
 	return gitTracking{ahead: ahead, behind: behind, known: true}
 }
 
-func readGitChanges(ctx context.Context, directory string) string {
-	output, ok := gitMetadataOutput(ctx, directory, "diff", "--no-ext-diff", "--no-textconv", "--shortstat", "HEAD", "--")
+func (r gitRunner) changes(ctx context.Context, worktree string) (string, error) {
+	output, ok, err := r.output(ctx, worktree, "diff", "--no-ext-diff", "--no-textconv", "--shortstat", "HEAD", "--")
 	if !ok {
-		return ""
+		return "", err
 	}
 
-	return formatGitChanges(output)
+	return formatGitChanges(output), nil
+}
+
+func (r gitRunner) hasRemote(ctx context.Context, worktree string) (bool, error) {
+	output, ok, err := r.output(ctx, worktree, "remote")
+
+	return ok && output != "", err
+}
+
+func (r gitRunner) stashCount(ctx context.Context, worktree string) (int, error) {
+	output, ok, err := r.output(ctx, worktree, "stash", "list", "--format=%gd")
+	if !ok || output == "" {
+		return 0, err
+	}
+
+	return strings.Count(output, "\n") + 1, nil
+}
+
+func (r gitRunner) unmerged(ctx context.Context, worktree string) (int, error) {
+	output, ok, err := r.output(ctx, worktree, "rev-list", "--count", "refs/remotes/origin/HEAD..HEAD", "--")
+
+	count, parseErr := strconv.Atoi(output)
+	if !ok || parseErr != nil || count < 0 {
+		return 0, err
+	}
+
+	return count, nil
 }
 
 func formatGitChanges(output string) string {
@@ -220,8 +319,23 @@ func formatGitChanges(output string) string {
 	return "+" + strconv.Itoa(diff.Added) + " -" + strconv.Itoa(diff.Deleted)
 }
 
-func gitMetadataOutput(ctx context.Context, directory string, args ...string) (string, bool) {
-	command := exec.CommandContext(ctx, "git", args...)
+func (r gitRunner) output(ctx context.Context, directory string, args ...string) (string, bool, error) {
+	if ctx.Err() != nil {
+		return "", false, oops.With("command", args[0]).Wrap(ctx.Err())
+	}
+
+	select {
+	case r.slots <- struct{}{}:
+	case <-ctx.Done():
+		return "", false, oops.With("command", args[0]).Wrap(ctx.Err())
+	}
+
+	defer func() { <-r.slots }()
+
+	commandCtx, cancel := context.WithTimeout(ctx, gitCommandTimeout)
+	defer cancel()
+
+	command := exec.CommandContext(commandCtx, "git", args...)
 	command.Dir = directory
 
 	for _, variable := range os.Environ() {
@@ -237,20 +351,18 @@ func gitMetadataOutput(ctx context.Context, directory string, args ...string) (s
 	command.Stdout = output
 
 	if err := command.Run(); err != nil {
-		return "", false
+		if commandCtx.Err() != nil {
+			return "", false, oops.With("command", args[0]).Wrap(commandCtx.Err())
+		}
+
+		return "", false, nil
 	}
 
-	return strings.TrimSpace(output.String()), true
+	return strings.TrimSpace(output.String()), true, nil
 }
 
 func emptyAgentGitCacheEntry() agentGitCacheEntry {
 	var entry agentGitCacheEntry
 
 	return entry
-}
-
-func emptyGitTracking() gitTracking {
-	var tracking gitTracking
-
-	return tracking
 }

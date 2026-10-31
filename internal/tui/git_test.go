@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -75,13 +76,13 @@ func TestAgentGitRefreshAppliesMetadataToLocalAgentRows(t *testing.T) {
 	var directories []string
 
 	model := gitTestModel(t)
-	model.gitScan = func(_ context.Context, dirs []string) (map[string]agentGitCacheEntry, error) {
+	model.gitScan = func(_ context.Context, dirs []string) (map[string]agentGitCacheEntry, []string, error) {
 		directories = append([]string(nil), dirs...)
 
 		return map[string]agentGitCacheEntry{
 			"/work/alpha": {GitBranch: "main", GitChanges: "+2 -1", GitAhead: 1, GitTrackingKnown: true},
 			"/work/beta":  {GitBranch: "feature"},
-		}, nil
+		}, nil, nil
 	}
 
 	command := model.loadAgentGitCommand()
@@ -123,8 +124,8 @@ func TestAgentGitRefreshAppliesMetadataToLocalAgentRows(t *testing.T) {
 func TestAgentGitRefreshRejectsSupersededResult(t *testing.T) {
 	model := gitTestModel(t)
 	model.displayMode = displayModeAgents
-	model.gitScan = func(context.Context, []string) (map[string]agentGitCacheEntry, error) {
-		return map[string]agentGitCacheEntry{"/work/alpha": {GitBranch: "stale-branch"}}, nil
+	model.gitScan = func(context.Context, []string) (map[string]agentGitCacheEntry, []string, error) {
+		return map[string]agentGitCacheEntry{"/work/alpha": {GitBranch: "stale-branch"}}, nil, nil
 	}
 
 	command := model.loadAgentGitCommand()
@@ -151,12 +152,12 @@ func TestAgentGitRefreshCancelsInFlightScanOnClose(t *testing.T) {
 	scanCanceled := make(chan struct{})
 
 	model := gitTestModel(t)
-	model.gitScan = func(ctx context.Context, _ []string) (map[string]agentGitCacheEntry, error) {
+	model.gitScan = func(ctx context.Context, _ []string) (map[string]agentGitCacheEntry, []string, error) {
 		close(scanStarted)
 		<-ctx.Done()
 		close(scanCanceled)
 
-		return nil, ctx.Err()
+		return nil, nil, ctx.Err()
 	}
 
 	command := model.loadAgentGitCommand()
@@ -185,11 +186,11 @@ func TestAgentGitRefreshDoesNotOverlapScans(t *testing.T) {
 	var calls atomic.Int32
 
 	model := gitTestModel(t)
-	model.gitScan = func(ctx context.Context, _ []string) (map[string]agentGitCacheEntry, error) {
+	model.gitScan = func(ctx context.Context, _ []string) (map[string]agentGitCacheEntry, []string, error) {
 		calls.Add(1)
 		<-ctx.Done()
 
-		return nil, ctx.Err()
+		return nil, nil, ctx.Err()
 	}
 
 	first := model.loadAgentGitCommand()
@@ -235,10 +236,10 @@ func TestAgentGitScanIsNotRunWhileRendering(t *testing.T) {
 	var calls atomic.Int32
 
 	model := gitTestModel(t)
-	model.gitScan = func(context.Context, []string) (map[string]agentGitCacheEntry, error) {
+	model.gitScan = func(context.Context, []string) (map[string]agentGitCacheEntry, []string, error) {
 		calls.Add(1)
 
-		return map[string]agentGitCacheEntry{}, nil
+		return map[string]agentGitCacheEntry{}, nil, nil
 	}
 
 	model = updateTestModel(t, model, tea.WindowSizeMsg{Width: 100, Height: 30})
@@ -318,7 +319,7 @@ func TestAgentGitScanRespectsCanceledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	entries, err := scanGitMetadata(ctx, []string{t.TempDir()})
+	entries, _, err := scanGitMetadata(ctx, []string{t.TempDir()})
 	if len(entries) != 0 || !errors.Is(err, context.Canceled) {
 		t.Fatalf("scanGitMetadata() = %v, %v; want no entries and cancellation", entries, err)
 	}
@@ -476,9 +477,13 @@ func TestAgentGitScanDoesNotStarveLaterRepositories(t *testing.T) {
 
 	directories = append(directories, directory)
 
-	entries, err := scanGitMetadata(t.Context(), directories)
-	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("scan error = %v, want the slow repositories' deadlines reported", err)
+	entries, incomplete, err := scanGitMetadata(t.Context(), directories)
+	if !errors.Is(err, context.DeadlineExceeded) || err.Error() != context.DeadlineExceeded.Error() {
+		t.Fatalf("scan error = %q, want one deadline cause however many repositories were slow", err)
+	}
+
+	if !slices.Equal(incomplete, directories[:len(names)]) {
+		t.Fatalf("incomplete directories = %v, want the slow repositories %v", incomplete, directories[:len(names)])
 	}
 
 	if got := entries[directory].GitChanges; got != "+1 -0" {
@@ -489,7 +494,7 @@ func TestAgentGitScanDoesNotStarveLaterRepositories(t *testing.T) {
 func TestScanGitMetadataReadsRealRepository(t *testing.T) {
 	directory := gitTestRepository(t)
 
-	entries, err := scanGitMetadata(t.Context(), []string{directory, directory})
+	entries, _, err := scanGitMetadata(t.Context(), []string{directory, directory})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -527,12 +532,18 @@ func assertCleanGitExtrasExceptDirty(t *testing.T, entry agentGitCacheEntry) {
 }
 
 func TestParseGitStatusCountsConflictsAndDirtyWorktree(t *testing.T) {
-	status := parseGitStatus("UU conflicted.txt\nAA added.txt\n M edited.txt\n?? untracked.txt")
-	if !status.dirty || status.conflicts != 2 {
-		t.Fatalf("parsed status = %+v", status)
+	status := parseGitStatus("# branch.oid 0123\n# branch.head main\n# branch.upstream origin/main\n# branch.ab +2 -3\n" +
+		"u UU N... 100644 100644 100644 100644 a b c conflicted.txt\n" +
+		"u AA N... 000000 100644 100644 100644 a b c added.txt\n" +
+		"1 .M N... 100644 100644 100644 a b edited.txt\n? untracked.txt")
+
+	want := gitStatus{branch: "main", tracking: gitTracking{ahead: 2, behind: 3, known: true}, dirty: true, conflicts: 2}
+	if status != want {
+		t.Fatalf("parsed status = %+v, want %+v", status, want)
 	}
 
-	if clean := parseGitStatus(""); clean.dirty || clean.conflicts != 0 {
-		t.Fatalf("clean status = %+v", clean)
+	clean := parseGitStatus("# branch.oid 0123\n# branch.head (detached)")
+	if clean != (gitStatus{}) {
+		t.Fatalf("clean detached status = %+v, want no branch, tracking or changes", clean)
 	}
 }
