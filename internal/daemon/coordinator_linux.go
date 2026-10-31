@@ -19,6 +19,8 @@ type CoordinatorConfig struct {
 	Runtime   lifecycle.LogindRuntime
 	Reporter  *RuntimeReporter
 	FinalSave func(context.Context) (FinalSaveOutcome, error)
+	// Resumed runs when logind cancels the announced shutdown or sleep, or the system wakes.
+	Resumed func(context.Context) error
 }
 
 type FinalSaveOutcome struct {
@@ -39,6 +41,14 @@ func (c *lifecycleCoordinator) handleCanceled(ctx context.Context) {
 
 	if c.cfg.Reporter != nil {
 		c.cfg.Reporter.Update(RuntimePhaseRunning)
+	}
+
+	if c.cfg.Resumed != nil {
+		if err := c.cfg.Resumed(ctx); err != nil {
+			zerolog.Ctx(ctx).Warn().Str("component", "daemon").Str("operation", "run_lifecycle").
+				Str("status", "degraded").Str("reason", "announcement_not_ended").Func(logging.Cause(err)).
+				Msg("final save status still marks the canceled shutdown or sleep")
+		}
 	}
 
 	zerolog.Ctx(ctx).Info().Str("component", "daemon").Str("operation", "run_lifecycle").

@@ -273,6 +273,61 @@ func TestAutosaveFinalSaveRecordsPracticalRecovery(t *testing.T) {
 	assertAutosaveNotDueAfterFinalSave(t, socketPath)
 }
 
+func TestAutosaveFinalSaveSkipsAServerTheShutdownSaveCovered(t *testing.T) {
+	server := tmuxtest.NewServer(t)
+	sess := newAutosaveSession(t, server)
+
+	socketPath := server.Endpoint().SocketPath
+
+	isolateAutosaveEnv(t)
+
+	probe, err := server.Probe(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	statusPath := filepath.Join(dataHome(t), "final-save-status.json")
+	covered := automation.FinalSaveStatus{
+		StartedAtUnix: 1, CompletedAtUnix: 2, Result: automation.FinalSaveSaved, Generation: "covered",
+		SnapshotStatus: "best_effort", Recorded: true, Bookkeeping: true,
+		ServerPID: probe.Identity.PID, ServerStarted: probe.Identity.Started.Unix(), Announcement: true,
+	}
+
+	finalSave := func() commandExecution {
+		return executeJSON(
+			t, "autosave", "final-save",
+			testSocketFlag, socketPath,
+			testSessionFlag, string(sess.ID()),
+			testNoConfigFlag, testJSONFlag,
+			"--deadline", "20s",
+			"--status-file", statusPath,
+		)
+	}
+
+	if err := automation.WriteFinalSaveStatus(statusPath, covered); err != nil {
+		t.Fatal(err)
+	}
+
+	skipped := finalSave()
+	if !skipped.envelope.OK || skipped.err != nil {
+		t.Fatalf("final-save = (%+v, %v), want a successful skip", skipped.envelope, skipped.err)
+	}
+
+	if result := decodeJSONPayload[autosaveResultJSON](t, skipped.envelope.Result); result.Status != "skipped" || result.Generation != "" {
+		t.Fatalf("result = %#v, want a skip without a new generation", result)
+	}
+
+	if status, err := automation.ReadFinalSaveStatus(statusPath); err != nil || status != covered {
+		t.Fatalf("status after skip = (%#v, %v), want the shutdown save record kept", status, err)
+	}
+
+	if err := automation.EndAnnouncement(statusPath); err != nil {
+		t.Fatal(err)
+	}
+
+	assertPracticalFinalSaveResult(t, finalSave())
+}
+
 func assertPracticalFinalSaveResult(t *testing.T, exec commandExecution) autosaveResultJSON {
 	t.Helper()
 

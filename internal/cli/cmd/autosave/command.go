@@ -28,6 +28,7 @@ const (
 	reasonNoSessions         = "no_sessions"
 	reasonRestorableSessions = "restorable_sessions"
 	reasonCaptureChanged     = "capture_changed"
+	reasonAnnouncedStopSaved = "announced_stop_saved"
 
 	maintenanceFailed = "failed"
 

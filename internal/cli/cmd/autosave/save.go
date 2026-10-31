@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math"
+	"os"
 	"time"
 
 	"github.com/samber/oops"
@@ -41,6 +42,9 @@ func newFinalSaveStatus() automation.FinalSaveStatus {
 		Recorded:        false,
 		Bookkeeping:     true,
 		Incomplete:      false,
+		ServerPID:       0,
+		ServerStarted:   0,
+		Announcement:    false,
 	}
 }
 
@@ -242,7 +246,7 @@ func runAutosaveFinalSave(cmd *cobra.Command, _ []string) error {
 	ctx, cancel := context.WithTimeout(clibase.CommandContext(cmd), deadline)
 	defer cancel()
 
-	outcome, saveErr, statusErr := runFinalSave(ctx, cmd, env)
+	outcome, saveErr, statusErr := runFinalSave(ctx, cmd, env, false)
 	if saveErr != nil {
 		return errors.Join(
 			renderAutosaveDegraded(cmd, env, outcome, errors.Join(saveErr, statusErr)),
@@ -261,11 +265,17 @@ func runAutosaveFinalSave(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-func runFinalSave(ctx context.Context, cmd *cobra.Command, env Env) (outcome, error, error) {
+// runFinalSave records announced final saves so the final save that stopping tmux runs later
+// during the same shutdown can skip a server the coordinator already saved.
+func runFinalSave(ctx context.Context, cmd *cobra.Command, env Env, announced bool) (outcome, error, error) {
 	started := time.Now()
 
-	outcome, status, saveErr := executeFinalSave(ctx, cmd, env)
+	outcome, status, saveErr := executeFinalSave(ctx, cmd, env, announced)
+	if outcome.reason == reasonAnnouncedStopSaved {
+		return outcome, saveErr, nil
+	}
 
+	status.Announcement = announced
 	status.StartedAtUnix = started.Unix()
 	status.CompletedAtUnix = time.Now().Unix()
 	status.DurationMS = time.Since(started).Milliseconds()
@@ -282,6 +292,7 @@ func executeFinalSave(
 	ctx context.Context,
 	cmd *cobra.Command,
 	env Env,
+	announced bool,
 ) (outcome, automation.FinalSaveStatus, error) {
 	outcome := newOutcome(statusSaved, automation.ReasonShutdownAdmit)
 	outcome.history = historyState(env)
@@ -303,7 +314,7 @@ func executeFinalSave(
 		return finalSaveLockFailure(outcome, status, repo, err)
 	}
 
-	server, selected, reason, err := openFinalSaveTarget(ctx, cmd, env.workspace)
+	server, identity, selected, reason, err := openFinalSaveTarget(ctx, cmd, env.workspace)
 	if err != nil {
 		return finalSaveFailure(
 			outcome,
@@ -314,20 +325,15 @@ func executeFinalSave(
 		)
 	}
 
-	if len(selected) == 0 {
-		status.Result, status.Reason = automation.FinalSaveIncomplete, reasonNoSessions
-		status.Incomplete, status.Bookkeeping = true, false
-		outcome.status, outcome.reason = statusSkipped, reasonNoSessions
+	status.ServerPID, status.ServerStarted = identity.PID, identity.Started.Unix()
 
-		return outcome, status, errors.Join(wrapCloseError(repo.Close()), lock.Release())
-	}
+	if skip, restorable := finalSaveSkipReason(ctx, cmd, env, server, repo, identity, selected, announced); skip != "" {
+		if skip != reasonAnnouncedStopSaved {
+			status.Result, status.Reason = automation.FinalSaveIncomplete, skip
+			status.Incomplete, status.Bookkeeping = true, false
+		}
 
-	if pending := findPendingRestore(ctx, cmd, server, repo); pending.sessions > 0 {
-		reportPendingRestore(ctx, env, pending)
-
-		status.Result, status.Reason = automation.FinalSaveIncomplete, reasonRestorePending
-		status.Incomplete, status.Bookkeeping = true, false
-		outcome.status, outcome.reason, outcome.restorable = statusSkipped, reasonRestorePending, pending.sessions
+		outcome.status, outcome.reason, outcome.restorable = statusSkipped, skip, restorable
 
 		return outcome, status, errors.Join(wrapCloseError(repo.Close()), lock.Release())
 	}
@@ -386,22 +392,77 @@ func executeFinalSave(
 	return outcome, status, errors.Join(bookkeepingErr, wrapCloseError(closeErr), lockErr)
 }
 
-func openFinalSaveTarget(ctx context.Context, cmd *cobra.Command, workspace app.Workspace) (*gotmux.Server, []gotmux.SessionID, string, error) {
+func finalSaveSkipReason(
+	ctx context.Context,
+	cmd *cobra.Command,
+	env Env,
+	server *gotmux.Server,
+	repo *store.Repository,
+	identity gotmux.ServerIdentity,
+	selected []gotmux.SessionID,
+	announced bool,
+) (string, int) {
+	if !announced && announcedStopSaved(ctx, env, identity) {
+		return reasonAnnouncedStopSaved, 0
+	}
+
+	if len(selected) == 0 {
+		return reasonNoSessions, 0
+	}
+
+	if pending := findPendingRestore(ctx, cmd, server, repo); pending.sessions > 0 {
+		reportPendingRestore(ctx, env, pending)
+
+		return reasonRestorePending, pending.sessions
+	}
+
+	return "", 0
+}
+
+func openFinalSaveTarget(
+	ctx context.Context,
+	cmd *cobra.Command,
+	workspace app.Workspace,
+) (*gotmux.Server, gotmux.ServerIdentity, []gotmux.SessionID, string, error) {
+	var identity gotmux.ServerIdentity
+
 	server, err := workspace.OpenTmux()
 	if err != nil {
-		return nil, nil, "server_unavailable", err
+		return nil, identity, nil, "server_unavailable", err
+	}
+
+	probe, err := server.Probe(ctx)
+	if errors.Is(err, gotmux.ErrNoServer) {
+		return nil, identity, nil, "server_gone", oops.In("cli").With("operation", "identify_server").Wrap(err)
+	}
+
+	if err != nil {
+		return nil, identity, nil, "server_unavailable", oops.In("cli").With("operation", "identify_server").Wrap(err)
 	}
 
 	selected, err := resolveAutosaveSelection(ctx, cmd, server)
 	if errors.Is(err, gotmux.ErrNoServer) {
-		return nil, nil, "server_gone", err
+		return nil, identity, nil, "server_gone", err
 	}
 
 	if err != nil {
-		return nil, nil, "selection_failed", err
+		return nil, identity, nil, "selection_failed", err
 	}
 
-	return server, selected, "", nil
+	return server, probe.Identity, selected, "", nil
+}
+
+func announcedStopSaved(ctx context.Context, env Env, identity gotmux.ServerIdentity) bool {
+	status, err := automation.ReadFinalSaveStatus(env.workspace.FinalSaveStatus)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			logStateUnavailable(ctx, "final_save_state", err)
+		}
+
+		return false
+	}
+
+	return status.CoversAnnouncedStop(identity.PID, identity.Started.Unix())
 }
 
 func finalSaveFailure(

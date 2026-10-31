@@ -17,6 +17,7 @@ var skippedHeadlines = map[string]string{
 	reasonNoSessions:                   "Skipped: tmux has no sessions to save.",
 	reasonRestorableSessions:           "Skipped: tmux is not running.",
 	reasonCaptureChanged:               "Skipped: tmux changed during the save; the next run retries.",
+	reasonAnnouncedStopSaved:           "Skipped: the shutdown save already saved this tmux server.",
 	reasonRestorePending:               "Skipped: tmux started after the newest snapshot and its saved sessions are not restored yet.",
 	automation.ReasonRestoreDisabled:   "Not restoring: restore_last_on_start is off.",
 	automation.ReasonRepositoryMissing: "Nothing to restore: no snapshots saved yet.",

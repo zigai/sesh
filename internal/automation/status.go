@@ -49,6 +49,38 @@ type FinalSaveStatus struct {
 	Recorded        bool   `json:"recorded"`
 	Bookkeeping     bool   `json:"bookkeepingComplete"`
 	Incomplete      bool   `json:"incomplete"`
+	ServerPID       int    `json:"serverPid,omitempty"`
+	ServerStarted   int64  `json:"serverStartedAt,omitempty"`
+	// Announcement is set by the lifecycle coordinator for a shutdown or sleep that logind
+	// announced and has not canceled since.
+	Announcement bool `json:"announcement,omitempty"`
+}
+
+// CoversAnnouncedStop reports whether the coordinator already saved this exact tmux server for a
+// shutdown or sleep that is still in progress.
+func (s FinalSaveStatus) CoversAnnouncedStop(serverPID int, serverStarted int64) bool {
+	return s.Announcement && s.Result == FinalSaveSaved && !s.Incomplete &&
+		serverPID > 0 && s.ServerPID == serverPID && s.ServerStarted == serverStarted
+}
+
+// EndAnnouncement marks a recorded coordinator save as no longer covering the current state.
+func EndAnnouncement(path string) error {
+	status, err := ReadFinalSaveStatus(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	if !status.Announcement {
+		return nil
+	}
+
+	status.Announcement = false
+
+	return WriteFinalSaveStatus(path, status)
 }
 
 func WriteFinalSaveStatus(path string, status FinalSaveStatus) (returnErr error) {

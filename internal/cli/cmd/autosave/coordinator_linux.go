@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/rs/zerolog"
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/daemon"
 	"github.com/zigai/sesh/internal/integration/lifecycle"
+	"github.com/zigai/sesh/internal/logging"
 	"github.com/zigai/sesh/internal/snapshot/engine"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
@@ -77,6 +79,12 @@ func runCoordinator(cmd *cobra.Command, _ []string) (resultErr error) {
 		return oops.In("cli").With("operation", "inspect_daemon_repository").Wrap(err)
 	}
 
+	if err := automation.EndAnnouncement(env.workspace.FinalSaveStatus); err != nil {
+		zerolog.Ctx(ctx).Warn().Str("component", "daemon").Str("operation", "run_lifecycle").
+			Str("status", "degraded").Str("reason", "announcement_not_ended").Func(logging.Cause(err)).
+			Msg("final save status still marks an earlier shutdown or sleep")
+	}
+
 	reporter, err := daemon.StartRuntimeReporter(ctx, daemon.RuntimeStatusConfig{
 		RuntimeDir:  os.Getenv("XDG_RUNTIME_DIR"),
 		Endpoint:    socket,
@@ -103,6 +111,9 @@ func runCoordinator(cmd *cobra.Command, _ []string) (resultErr error) {
 		FinalSave: func(saveCtx context.Context) (daemon.FinalSaveOutcome, error) {
 			return coordinatorFinalSave(saveCtx, cmd, env)
 		},
+		Resumed: func(context.Context) error {
+			return automation.EndAnnouncement(env.workspace.FinalSaveStatus)
+		},
 	}); err != nil {
 		return oops.In("cli").With("operation", "run_daemon_lifecycle").Wrap(err)
 	}
@@ -111,7 +122,7 @@ func runCoordinator(cmd *cobra.Command, _ []string) (resultErr error) {
 }
 
 func coordinatorFinalSave(ctx context.Context, cmd *cobra.Command, env Env) (daemon.FinalSaveOutcome, error) {
-	_, saveErr, statusErr := runFinalSave(ctx, cmd, env)
+	_, saveErr, statusErr := runFinalSave(ctx, cmd, env, true)
 
 	return daemon.FinalSaveOutcome{Recorded: statusErr == nil}, errors.Join(saveErr, statusErr)
 }
