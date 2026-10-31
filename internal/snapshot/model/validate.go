@@ -177,7 +177,7 @@ func (m Manifest) validateWindow(window Window, seen map[string]bool) error {
 
 func (m Manifest) validateWindowPanes(window Window, leaves map[string]Layout, seen map[string]bool) error {
 	indexes := make(map[int]bool)
-	active, count := 0, 0
+	active, last, count := 0, 0, 0
 
 	// Pane geometry depends on options such as pane-border-status, which a window often inherits.
 	window.Options = m.EffectiveWindowOptions(window)
@@ -195,10 +195,18 @@ func (m Manifest) validateWindowPanes(window Window, leaves map[string]Layout, s
 			active++
 		}
 
+		if pane.Last {
+			if pane.Active {
+				return ErrInvalid
+			}
+
+			last++
+		}
+
 		count++
 	}
 
-	if count != len(leaves) || active != 1 {
+	if count != len(leaves) || active != 1 || last > 1 {
 		return ErrInvalid
 	}
 

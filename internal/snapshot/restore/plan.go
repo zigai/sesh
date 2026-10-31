@@ -52,7 +52,7 @@ func BuildPlan(m model.Manifest, selected []string) (Plan, error) {
 
 	// Restore materializes inherited session and window options locally, so it works from the
 	// option lists tmux reported rather than the manifest's compact form.
-	m = m.WithInheritedOptions()
+	m = withoutPinnedWindowSize(m).WithInheritedOptions()
 
 	requested, err := validateSelection(m, selected)
 	if err != nil {
@@ -91,6 +91,22 @@ func BuildPlan(m model.Manifest, selected []string) (Plan, error) {
 	}
 
 	return plan, nil
+}
+
+// resize-window pins a window to window-size manual, so a captured manual value is what an
+// earlier restore left behind. Dropping it lets the global policy size the restored window.
+func withoutPinnedWindowSize(m model.Manifest) model.Manifest {
+	released := m
+
+	released.Windows = make([]model.Window, len(m.Windows))
+	for index, window := range m.Windows {
+		window.Options = slices.DeleteFunc(slices.Clone(window.Options), func(option model.Option) bool {
+			return !option.Inherited && bytes.Equal(option.Name, []byte("window-size")) && bytes.Equal(option.Value, []byte("manual"))
+		})
+		released.Windows[index] = window
+	}
+
+	return released
 }
 
 func validateNames(m model.Manifest) error {

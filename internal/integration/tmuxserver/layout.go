@@ -27,10 +27,13 @@ type layoutReader struct {
 }
 
 // WindowLayout lists Floating panes in stacking order; they take no space in Tiled.
+// Recent and Last are the most and second most recently used tiled panes, known only
+// from typed layouts.
 type WindowLayout struct {
 	Tiled    model.Layout
 	Floating []string
 	Recent   string
+	Last     string
 }
 
 type typedDecoder struct {
@@ -38,6 +41,8 @@ type typedDecoder struct {
 	floating   []string
 	recent     string
 	recentRank int
+	last       string
+	lastRank   int
 }
 
 func DecodeLayout(value gotmux.Layout, panes map[string]string) (WindowLayout, error) {
@@ -64,7 +69,7 @@ func DecodeLayout(value gotmux.Layout, panes map[string]string) (WindowLayout, e
 	}
 
 	if len(floating) == 0 {
-		return WindowLayout{Tiled: node, Floating: nil, Recent: ""}, nil
+		return WindowLayout{Tiled: node, Floating: nil, Recent: "", Last: ""}, nil
 	}
 
 	tiled, present := withoutPanes(node, floating)
@@ -72,7 +77,7 @@ func DecodeLayout(value gotmux.Layout, panes map[string]string) (WindowLayout, e
 		return WindowLayout{}, model.ErrInvalid
 	}
 
-	return WindowLayout{Tiled: tiled, Floating: floating, Recent: ""}, nil
+	return WindowLayout{Tiled: tiled, Floating: floating, Recent: "", Last: ""}, nil
 }
 
 func EncodeLayout(node model.Layout, panes map[string]gotmux.PaneID) (gotmux.Layout, error) {
@@ -307,7 +312,7 @@ func decodeTypedLayout(text string, panes map[string]string) (WindowLayout, erro
 		return WindowLayout{}, model.ErrInvalid
 	}
 
-	decoder := typedDecoder{panes: panes, floating: nil, recent: "", recentRank: 0}
+	decoder := typedDecoder{panes: panes, floating: nil, recent: "", recentRank: 0, last: "", lastRank: 0}
 
 	tiled, present, err := decoder.node(root, 0)
 	if err != nil {
@@ -318,7 +323,7 @@ func decodeTypedLayout(text string, panes map[string]string) (WindowLayout, erro
 		return WindowLayout{}, model.ErrInvalid
 	}
 
-	return WindowLayout{Tiled: tiled, Floating: decoder.floating, Recent: decoder.recent}, nil
+	return WindowLayout{Tiled: tiled, Floating: decoder.floating, Recent: decoder.recent, Last: decoder.last}, nil
 }
 
 func (d *typedDecoder) node(raw json.RawMessage, depth int) (model.Layout, bool, error) {
@@ -444,8 +449,16 @@ func (d *typedDecoder) noteUse(node map[string]json.RawMessage, reference string
 		rank, used = activeRank, true
 	}
 
-	if used && (d.recent == "" || rank < d.recentRank) {
+	if !used {
+		return
+	}
+
+	switch {
+	case d.recent == "" || rank < d.recentRank:
+		d.last, d.lastRank = d.recent, d.recentRank
 		d.recent, d.recentRank = reference, rank
+	case d.last == "" || rank < d.lastRank:
+		d.last, d.lastRank = reference, rank
 	}
 }
 

@@ -231,6 +231,242 @@ func TestSnapshotRestore_MultiWindowFidelity(t *testing.T) {
 	}
 }
 
+func TestSnapshotRestoreReleasesWindowSizePinnedByResize(t *testing.T) {
+	server := tmuxtest.NewServer(t)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+
+	repo, err := store.Open(ctx, filepath.Join(t.TempDir(), "repo"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		_ = repo.Close()
+	}()
+
+	leaseRoot := filepath.Join(t.TempDir(), "leases")
+	sess := setupTestMultiWindowSession(t, ctx, server)
+
+	windows, _, err := sess.WindowInfos(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// resize-window pins the window to window-size manual, as an earlier restore leaves it.
+	if err := windows[0].Handle().Resize(ctx, gotmux.Size{Width: 150, Height: 50}); err != nil {
+		t.Fatal(err)
+	}
+
+	pinned, err := windows[0].Handle().Options().WindowSize(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if local, _ := pinned.Local.Get(); local != gotmux.WindowSizeManual {
+		t.Fatalf("source window-size = %q, want the fixture pinned to manual", local)
+	}
+
+	saveRes, err := engine.SaveObservation(ctx, repo, server, []gotmux.SessionID{sess.ID()}, engine.SaveConfig{
+		LeaseRoot:              leaseRoot,
+		ProcessEnrichment:      false,
+		ProcessEnvironmentKeys: nil,
+	})
+	if err != nil {
+		t.Fatalf("SaveObservation failed: %v", err)
+	}
+
+	if err := sess.Kill(ctx); err != nil {
+		t.Fatalf("Kill session failed: %v", err)
+	}
+
+	if _, err := engine.Restore(ctx, repo, server, engine.RestoreConfig{
+		LeaseRoot:         leaseRoot,
+		Generation:        saveRes.Generation,
+		Sessions:          nil,
+		LaunchProcesses:   false,
+		MissingWorkingDir: restore.MissingWorkingDirLaunch,
+	}); err != nil {
+		t.Fatalf("Restore failed: %v", err)
+	}
+
+	global, err := server.GlobalWindowOptions().WindowSize(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want, _ := global.Effective.Get()
+
+	restored, err := server.FindSession(ctx, "project-alpha")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	restoredWindows, _, err := restored.WindowInfos(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, window := range restoredWindows {
+		policy, err := window.Handle().Options().WindowSize(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if got, _ := policy.Effective.Get(); got != want {
+			t.Fatalf("restored window %s window-size = %q, want global %q", window.Handle().ID(), got, want)
+		}
+	}
+}
+
+func TestSnapshotRestoreKeepsLastActivePane(t *testing.T) {
+	for _, last := range []string{"left-pane", "bottom-pane"} {
+		t.Run(last, func(t *testing.T) {
+			server := tmuxtest.NewServer(t)
+
+			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+			defer cancel()
+
+			repo, err := store.Open(ctx, filepath.Join(t.TempDir(), "repo"))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			defer func() {
+				_ = repo.Close()
+			}()
+
+			leaseRoot := filepath.Join(t.TempDir(), "leases")
+			sess := setupTestMultiWindowSession(t, ctx, server)
+			editor := findPaneWindow(t, ctx, sess, "left-pane")
+			left := findTitledPane(t, ctx, editor, "left-pane")
+
+			bottom, err := left.Split(ctx, gotmux.SplitOptions{Direction: gotmux.DirectionVertical, Program: gotmux.Exec("sleep", "300")})
+			if err != nil {
+				t.Fatalf("Split failed: %v", err)
+			}
+
+			if err := bottom.SetTitle(ctx, "bottom-pane"); err != nil {
+				t.Fatal(err)
+			}
+
+			for _, title := range []string{"right-pane", last, "right-pane"} {
+				if err := findTitledPane(t, ctx, editor, title).Select(ctx); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			saveRes, err := engine.SaveObservation(ctx, repo, server, []gotmux.SessionID{sess.ID()}, engine.SaveConfig{
+				LeaseRoot:              leaseRoot,
+				ProcessEnrichment:      false,
+				ProcessEnvironmentKeys: nil,
+			})
+			if err != nil {
+				t.Fatalf("SaveObservation failed: %v", err)
+			}
+
+			if err := sess.Kill(ctx); err != nil {
+				t.Fatalf("Kill session failed: %v", err)
+			}
+
+			if _, err := engine.Restore(ctx, repo, server, engine.RestoreConfig{
+				LeaseRoot:         leaseRoot,
+				Generation:        saveRes.Generation,
+				Sessions:          nil,
+				LaunchProcesses:   false,
+				MissingWorkingDir: restore.MissingWorkingDirLaunch,
+			}); err != nil {
+				t.Fatalf("Restore failed: %v", err)
+			}
+
+			restored, err := server.FindSession(ctx, "project-alpha")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			window := findPaneWindow(t, ctx, restored, "left-pane")
+			if got := activePaneTitle(t, ctx, window); got != "right-pane" {
+				t.Fatalf("restored active pane = %q, want right-pane", got)
+			}
+
+			command, err := gotmux.NewCommand("select-pane", "-l", "-t", string(window.ID()))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if _, err := server.Run(ctx, command); err != nil {
+				t.Fatalf("select-pane -l failed: %v", err)
+			}
+
+			if got := activePaneTitle(t, ctx, window); got != last {
+				t.Fatalf("select-pane -l went to %q, want %q", got, last)
+			}
+		})
+	}
+}
+
+func findPaneWindow(t *testing.T, ctx context.Context, sess gotmux.Session, title string) gotmux.Window {
+	t.Helper()
+
+	windows, _, err := sess.WindowInfos(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, window := range windows {
+		panes, err := window.Handle().Panes(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for _, pane := range panes {
+			if pane.Title == title {
+				return window.Handle()
+			}
+		}
+	}
+
+	t.Fatalf("no window holds pane %q", title)
+
+	return gotmux.Window{}
+}
+
+func findTitledPane(t *testing.T, ctx context.Context, window gotmux.Window, title string) gotmux.Pane {
+	t.Helper()
+
+	panes, err := window.Panes(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, pane := range panes {
+		if pane.Title == title {
+			return pane.Handle()
+		}
+	}
+
+	t.Fatalf("no pane titled %q", title)
+
+	return gotmux.Pane{}
+}
+
+func activePaneTitle(t *testing.T, ctx context.Context, window gotmux.Window) string {
+	t.Helper()
+
+	pane, err := window.ActivePane(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	info, err := pane.Info(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return info.Title
+}
+
 func disableServerWindowRename(t *testing.T, ctx context.Context, server *gotmux.Server) {
 	t.Helper()
 

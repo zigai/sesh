@@ -107,8 +107,9 @@ type ApplyLayoutStep struct {
 type SelectPaneStep struct {
 	stepBase
 
-	WindowID string `json:"windowId"`
-	PaneID   string `json:"paneId"`
+	WindowID   string `json:"windowId"`
+	PaneID     string `json:"paneId"`
+	LastPaneID string `json:"lastPaneId,omitempty"`
 }
 
 type ApplyZoomStep struct {
@@ -967,21 +968,15 @@ func planWindowFinalization(
 			currentWinStep = titleStepID
 		}
 
-		var activePaneID string
-
-		for _, p := range idx.panesByWindow[w.ID] {
-			if p.Active {
-				activePaneID = p.ID
-				break
-			}
-		}
+		activePaneID, lastPaneID := selectedPanes(idx.panesByWindow[w.ID])
 
 		if activePaneID != "" {
 			paneStepID := fmt.Sprintf("select-pane:%s:%s", w.ID, activePaneID)
 			spStep := &SelectPaneStep{
-				stepBase: newStep(paneStepID, []string{currentWinStep}),
-				WindowID: w.ID,
-				PaneID:   activePaneID,
+				stepBase:   newStep(paneStepID, []string{currentWinStep}),
+				WindowID:   w.ID,
+				PaneID:     activePaneID,
+				LastPaneID: lastPaneID,
 			}
 			steps = append(steps, spStep)
 			currentWinStep = paneStepID
@@ -1002,6 +997,22 @@ func planWindowFinalization(
 	}
 
 	return steps
+}
+
+func selectedPanes(panes []model.Pane) (string, string) {
+	var active, last string
+
+	for _, pane := range panes {
+		if pane.Active {
+			active = pane.ID
+		}
+
+		if pane.Last {
+			last = pane.ID
+		}
+	}
+
+	return active, last
 }
 
 func sessionNavigationDependencies(s model.Session, roles groupRoles, idx entityIndexes, reg *stepRegistry) []string {

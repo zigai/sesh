@@ -801,6 +801,22 @@ func (t *planTracker) validateSelectPaneDeps(step Step, windowID string, windows
 	return nil
 }
 
+func validateSelectPaneLast(panes []model.Pane, windowID, lastPaneID string) error {
+	want := ""
+
+	for i := range panes {
+		if panes[i].Window == windowID && panes[i].Last {
+			want = panes[i].ID
+		}
+	}
+
+	if lastPaneID != want {
+		return planFailure("validation", "select_pane_last_mismatch", ErrInvalid)
+	}
+
+	return nil
+}
+
 func validateSelectPaneActive(panes []model.Pane, windowID, paneID string) error {
 	for i := range panes {
 		if panes[i].ID == paneID && panes[i].Window == windowID {
@@ -829,6 +845,10 @@ func (t *planTracker) recordSelectPane(sp *SelectPaneStep, ctx validationContext
 	}
 
 	if err := validateSelectPaneActive(ctx.graph.Panes, sp.WindowID, sp.PaneID); err != nil {
+		return err
+	}
+
+	if err := validateSelectPaneLast(ctx.graph.Panes, sp.WindowID, sp.LastPaneID); err != nil {
 		return err
 	}
 

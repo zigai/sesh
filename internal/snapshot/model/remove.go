@@ -318,6 +318,7 @@ func clonePane(pane Pane) Pane {
 		Left:      pane.Left,
 		Top:       pane.Top,
 		Active:    pane.Active,
+		Last:      pane.Last,
 		Dead:      pane.Dead,
 		Options:   cloneOptions(pane.Options),
 		Terminal:  cloneTerminal(pane.Terminal),

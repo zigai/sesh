@@ -119,7 +119,7 @@ func fixtureManifest(digest string, length int64) model.Manifest {
 		Links: []model.Link{{Session: "s0", Window: "w0", Index: 0, Active: true, Last: false, Flags: nil}},
 		Panes: []model.Pane{{
 			ID: "p0", Window: "w0", Index: 0, Title: nil, Directory: model.Bytes("/tmp"),
-			Width: fixtureWidth, Height: fixtureHeight, Left: 0, Top: 0, Active: true, Dead: false, Options: nil,
+			Width: fixtureWidth, Height: fixtureHeight, Left: 0, Top: 0, Active: true, Last: false, Dead: false, Options: nil,
 			Terminal: model.Terminal{Artifact: "a0", History: 0, Alternate: false, CursorX: 0, CursorY: 0, Mode: nil},
 			Launch: model.Launch{
 				Executable: nil, Arguments: nil, Directory: nil, Environment: nil, Birth: nil,

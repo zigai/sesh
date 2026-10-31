@@ -134,6 +134,7 @@ func TestDecodeTypedLayoutSeparatesFloatingPanes(t *testing.T) {
 		wantTiled    model.Layout
 		wantFloating []string
 		wantRecent   string
+		wantLast     string
 	}{
 		{
 			name: "floating pane over a single tiled pane",
@@ -143,6 +144,7 @@ func TestDecodeTypedLayoutSeparatesFloatingPanes(t *testing.T) {
 			wantTiled:    model.Layout{Width: 80, Height: 24, Pane: "p-0"},
 			wantFloating: []string{"p-1"},
 			wantRecent:   "p-0",
+			wantLast:     "",
 		},
 		{
 			name: "nested floating pane collapses its split",
@@ -157,6 +159,7 @@ func TestDecodeTypedLayoutSeparatesFloatingPanes(t *testing.T) {
 			}},
 			wantFloating: []string{"p-1"},
 			wantRecent:   "p-2",
+			wantLast:     "p-0",
 		},
 		{
 			name: "several floating panes keep stacking order",
@@ -171,6 +174,7 @@ func TestDecodeTypedLayoutSeparatesFloatingPanes(t *testing.T) {
 			}},
 			wantFloating: []string{"p-3", "p-1"},
 			wantRecent:   "p-0",
+			wantLast:     "p-2",
 		},
 	}
 
@@ -191,6 +195,10 @@ func TestDecodeTypedLayoutSeparatesFloatingPanes(t *testing.T) {
 
 			if decoded.Recent != tt.wantRecent {
 				t.Fatalf("recent pane = %q, want %q", decoded.Recent, tt.wantRecent)
+			}
+
+			if decoded.Last != tt.wantLast {
+				t.Fatalf("last pane = %q, want %q", decoded.Last, tt.wantLast)
 			}
 		})
 	}

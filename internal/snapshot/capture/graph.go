@@ -80,6 +80,10 @@ func graphWindows(snapshot gotmux.Snapshot, wanted map[gotmux.SessionID]bool, m 
 		}
 	}
 
+	for index := range m.Panes {
+		m.Panes[index].Last = m.Panes[index].ID == layouts[m.Panes[index].Window].Last
+	}
+
 	for window, layout := range layouts {
 		if len(layout.Floating) > 0 {
 			retileWindowPanes(snapshot, m.Panes, window, layout)
@@ -214,7 +218,7 @@ func paneObservation(info gotmux.PaneInfo) model.Pane {
 	return model.Pane{
 		ID: ref("p", string(info.ID)), Window: ref("w", string(info.WindowID)), Index: info.Index,
 		Title: model.Bytes(info.Title), Directory: model.Bytes(info.CurrentPath), Width: info.Width, Height: info.Height,
-		Left: info.Left, Top: info.Top, Active: info.Active, Dead: dead, Options: nil,
+		Left: info.Left, Top: info.Top, Active: info.Active, Last: false, Dead: dead, Options: nil,
 		Terminal: model.Terminal{Artifact: "", History: info.HistorySize, Alternate: info.Alternate, CursorX: info.CursorX, CursorY: info.CursorY, Mode: model.Bytes(mode)},
 		Launch:   launch,
 	}

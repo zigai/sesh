@@ -1,7 +1,7 @@
 package model
 
 const (
-	Schema             = 2
+	Schema             = 3
 	MaxManifestBytes   = 16 << 20
 	MaxEntities        = 10000
 	MaxArtifactBytes   = 256 << 20
@@ -100,6 +100,7 @@ type Pane struct {
 	Left      int      `json:"left"`
 	Top       int      `json:"top"`
 	Active    bool     `json:"active"`
+	Last      bool     `json:"last"`
 	Dead      bool     `json:"dead"`
 	Options   []Option `json:"options"`
 	Terminal  Terminal `json:"terminal"`

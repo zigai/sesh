@@ -1421,8 +1421,27 @@ func (e *Executor) prepareSelectPane(step SelectPaneStep) (stepEffect, error) {
 			Wrapf(errPaneNotFound, "%s", step.PaneID)
 	}
 
+	var last gotmux.Pane
+
+	if step.LastPaneID != "" {
+		last, ok = e.panes[step.LastPaneID]
+		if !ok {
+			return stepEffect{}, oops.In("snapshot.restore").
+				Code("restore_failed").
+				With("operation", "prepare_step", "step_id", step.LastPaneID).
+				Wrapf(errPaneNotFound, "%s", step.LastPaneID)
+		}
+	}
+
 	return stepEffect{
 		run: func(ctx context.Context) (string, error) {
+			// Selecting the last pane first leaves it on top of tmux's last-pane stack.
+			if step.LastPaneID != "" {
+				if err := last.Select(ctx); err != nil {
+					return "", fmt.Errorf("select last pane %s: %w", step.LastPaneID, err)
+				}
+			}
+
 			if err := pane.Select(ctx); err != nil {
 				return "", fmt.Errorf("select pane %s: %w", step.PaneID, err)
 			}
