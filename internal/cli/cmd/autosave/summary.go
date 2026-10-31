@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/zigai/sesh/internal/automation"
+	"github.com/zigai/sesh/internal/snapshot/restore"
 )
 
 const shortGenerationID = 8
@@ -77,16 +78,30 @@ func savedHeadline(outcome outcome) string {
 }
 
 func restoredHeadline(generation, status string, counts restoreCounts) string {
-	headline := fmt.Sprintf("Restored %s from generation %s.", sessionCount(counts.restored), shortGeneration(generation))
+	var headline strings.Builder
+
+	fmt.Fprintf(&headline, "Restored %s from generation %s.", sessionCount(counts.restored), shortGeneration(generation))
 
 	switch {
-	case counts.skipped > 0:
-		headline += fmt.Sprintf("\nSkipped %s whose names are already in use; sesh snapshot restore shows them and how to restore them.", sessionCount(counts.skipped))
+	case len(counts.skipped) > 0:
+		fmt.Fprintf(&headline, "\nSkipped %s; sesh snapshot restore shows how to restore them:", sessionCount(len(counts.skipped)))
+
+		for _, session := range counts.skipped {
+			fmt.Fprintf(&headline, "\n  %s (%s): %s", session.Name, session.ID, skippedSessionReason(session.Reason))
+		}
 	case status != "complete" && status != "best_effort":
-		headline += "\nThe restored sessions do not fully match the snapshot; sesh snapshot restore --verbose shows the differences."
+		headline.WriteString("\nThe restored sessions do not fully match the snapshot; sesh snapshot restore --verbose shows the differences.")
 	}
 
-	return headline
+	return headline.String()
+}
+
+func skippedSessionReason(reason string) string {
+	if reason == restore.CollisionNameInUse {
+		return "a live session already uses this name"
+	}
+
+	return reason
 }
 
 func statusSummary(env Env, outcome outcome) string {

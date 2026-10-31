@@ -161,7 +161,7 @@ func restoreUnderLock(cmd *cobra.Command, env Env, held *heldStartupRestore) err
 	restored.repository = repositoryState(ctx, env)
 	restored.history = historyState(env)
 	restored.abandoned = state.Abandoned
-	restored.restore = &restoreCounts{restored: len(result.SessionsRestored), skipped: len(result.SessionsSkipped)}
+	restored.restore = &restoreCounts{restored: len(result.SessionsRestored), skipped: result.SessionsSkipped}
 
 	renderErr := renderAutosaveResult(cmd, env, restored)
 

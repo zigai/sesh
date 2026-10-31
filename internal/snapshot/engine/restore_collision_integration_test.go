@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -204,7 +205,7 @@ func TestEngineRestoreExplainsMissingServerBeforeTakingALease(t *testing.T) {
 	}
 }
 
-func TestEngineRestoreLogsSkippedSessionsOnceAsPartialWithoutNames(t *testing.T) {
+func TestEngineRestoreLogsEachSkippedSessionWithItsReason(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 
@@ -229,10 +230,9 @@ func TestEngineRestoreLogsSkippedSessionsOnceAsPartialWithoutNames(t *testing.T)
 		t.Fatalf("a restore that skipped sessions must be one warn record with a fixed reason and a count: %+v", terminal)
 	}
 
-	for _, private := range []string{"collision-kept", "collision-taken", fixture.repoDir, fixture.leaseRoot, fixture.ids["collision-taken"]} {
-		if bytes.Contains(buffer.Bytes(), []byte(private)) {
-			t.Fatalf("restore logs must not contain names, ids or paths (%q): %s", private, buffer.String())
-		}
+	want := []any{map[string]any{"id": fixture.ids["collision-taken"], "name": "collision-taken", "reason": restore.CollisionNameInUse}}
+	if !reflect.DeepEqual(terminal["skipped_sessions"], want) {
+		t.Fatalf("skipped_sessions = %#v, want %#v", terminal["skipped_sessions"], want)
 	}
 }
 

@@ -341,6 +341,10 @@ func executeRestore(
 	if err != nil {
 		result.Reason = planFailureReason(result.Reason, err)
 
+		if len(skipped) > 0 {
+			ctx = zerolog.Ctx(ctx).With().Array("skipped_sessions", skippedSessionsArray(skipped)).Logger().WithContext(ctx)
+		}
+
 		return result, closeWith(ctx, lease, "plan", err)
 	}
 
@@ -1228,7 +1232,7 @@ func logRestoreSuccess(ctx context.Context, result RestoreResult) {
 
 	outcomes := tallyRestoredPanes(result.Panes)
 
-	zerolog.Ctx(ctx).WithLevel(level).
+	event := zerolog.Ctx(ctx).WithLevel(level).
 		Str("component", "snapshot").
 		Str("operation", "restore").
 		Str("status", result.Status).
@@ -1241,8 +1245,22 @@ func logRestoreSuccess(ctx context.Context, result RestoreResult) {
 		Int("shell_panes", outcomes.shell).
 		Int("unrecovered_panes", outcomes.unrecovered).
 		Int("directory_fallback_panes", outcomes.directoryFallback).
-		Int64("duration_ms", restoreDuration(ctx)).
-		Msg("snapshot restored")
+		Int64("duration_ms", restoreDuration(ctx))
+
+	if len(result.SessionsSkipped) > 0 {
+		event = event.Array("skipped_sessions", skippedSessionsArray(result.SessionsSkipped))
+	}
+
+	event.Msg("snapshot restored")
+}
+
+func skippedSessionsArray(skipped []SkippedSession) *zerolog.Array {
+	array := zerolog.Arr()
+	for _, session := range skipped {
+		array = array.Dict(zerolog.Dict().Str("id", session.ID).Str("name", session.Name).Str("reason", session.Reason))
+	}
+
+	return array
 }
 
 func tallyRestoredPanes(panes []restore.PaneResult) restoredPaneTally {

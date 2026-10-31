@@ -15,6 +15,7 @@ import (
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/daemon"
 	"github.com/zigai/sesh/internal/session"
+	"github.com/zigai/sesh/internal/snapshot/engine"
 )
 
 const (
@@ -81,7 +82,7 @@ type outcome struct {
 
 type restoreCounts struct {
 	restored int
-	skipped  int
+	skipped  []engine.SkippedSession
 }
 
 type Env struct {
