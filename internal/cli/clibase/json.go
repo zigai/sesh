@@ -50,11 +50,14 @@ var (
 		{ErrDoctorChecksFailed, "doctorChecksFailed", "doctor checks failed"},
 		{ErrLogFileUnavailable, "logFileUnavailable", "log file cannot be opened; set paths.log_file to a file in a writable directory"},
 		{ErrHelpShorthand, "usageError", "-h is not a help flag; use --help"},
+		{ErrConfigPathEmpty, "usageError", "--config requires a file path"},
 		{engine.ErrRetentionBudgetUnmet, "retentionBudgetUnmet", "protected snapshot bytes exceed retention budget"},
 		{engine.ErrCollectionQuarantined, "collectionQuarantined", "snapshot collection preserved contradictory evidence"},
 		{gotmux.ErrOutputLimit, "outputLimitExceeded", "tmux command output exceeded its byte limit"},
 		{config.ErrConfigExists, "configExists", "configuration already exists; use --force to replace it"},
 		{config.ErrConfigSymlink, "configSymlink", "configuration target must not be a symbolic link"},
+		{config.ErrConfigNotRegular, "configNotRegularFile", "configuration target must be a regular file"},
+		{config.ErrConfigNotDirectory, "configNotDirectory", "configuration path component is not a directory"},
 		{app.ErrPartialSnapshot, "partialSnapshot", "parity-incomplete save"},
 		{app.ErrPartialRestore, "partialRestore", "restore incomplete: sessions were skipped or not verified; see the summary"},
 		{remote.ErrActionFailed, "remoteActionFailed", "remote action failed"},
@@ -534,17 +537,39 @@ func cobraErrorMessage(err error) string {
 }
 
 func configurationErrorMessage(err error) string {
-	if strictErr, ok := errors.AsType[*toml.StrictMissingError](err); ok && len(strictErr.Errors) > 0 {
-		line, column := strictErr.Errors[0].Position()
-		return fmt.Sprintf("invalid configuration at line %d, column %d", line, column)
+	docErr, ok := config.AsDocumentError(err)
+	if !ok {
+		return "configuration could not be loaded"
 	}
 
-	if decodeErr, ok := errors.AsType[*toml.DecodeError](err); ok {
-		line, column := decodeErr.Position()
-		return fmt.Sprintf("invalid configuration at line %d, column %d", line, column)
+	return fmt.Sprintf("invalid configuration at line %d, column %d: %s", docErr.Line, docErr.Column, documentProblem(docErr))
+}
+
+func documentProblem(docErr config.DocumentError) string {
+	problem, keyJoin := "invalid value", " for "
+
+	switch docErr.Reason {
+	case config.DocumentUnknownKey:
+		problem, keyJoin = "unknown key", " "
+	case config.DocumentDuplicateKey:
+		problem, keyJoin = "duplicate key", " "
+	case config.DocumentInvalidType:
+		problem = "wrong value type"
+	case config.DocumentDecodeError:
+		if docErr.Key == "" {
+			return "invalid TOML syntax"
+		}
 	}
 
-	return "configuration could not be loaded"
+	if docErr.Key != "" {
+		problem += keyJoin + docErr.Key
+	}
+
+	if docErr.GotType != "" {
+		problem += " (got " + docErr.GotType + ")"
+	}
+
+	return problem
 }
 
 func generalErrorCode(err error) string {

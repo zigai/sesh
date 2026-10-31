@@ -339,7 +339,7 @@ func readStdinConfig(r io.Reader) ([]byte, error) {
 func loadAndValidate(target *Config, baseCfg *Config, files [][]byte) error {
 	current := baseCfg.Clone()
 	for _, data := range files {
-		if err := decodeFileWithPresets(data, current); err != nil {
+		if err := decodeFileWithPresets(bytes.TrimPrefix(data, utf8BOM), current); err != nil {
 			return enrichLoadError(err)
 		}
 	}
@@ -526,62 +526,27 @@ func enrichLoadError(err error) error {
 		return nil
 	}
 
-	if strictErr, ok := errors.AsType[*toml.StrictMissingError](err); ok {
-		return enrichStrictMissingError(strictErr, err)
-	}
-
-	if decodeErr, ok := errors.AsType[*toml.DecodeError](err); ok {
-		return enrichTOMLDecodeError(decodeErr, err)
-	}
-
-	return oops.In("config").
-		Code("config_invalid").
-		With("operation", "load", "reason", "load_failed").
-		Wrap(err)
-}
-
-func enrichStrictMissingError(strictErr *toml.StrictMissingError, rawErr error) error {
-	var (
-		line int
-		col  int
-	)
-
-	if len(strictErr.Errors) > 0 {
-		e := strictErr.Errors[0]
-		line, col = e.Position()
+	docErr, ok := AsDocumentError(err)
+	if !ok {
+		return oops.In("config").
+			Code("config_invalid").
+			With("operation", "load", "reason", "load_failed").
+			Wrap(err)
 	}
 
 	b := oops.In("config").
 		Code("config_invalid").
-		With("operation", "load", "reason", "unknown_field")
+		With("operation", "load", "reason", string(docErr.Reason))
 
-	if line > 0 {
-		b = b.With("line", line, "column", col)
+	if docErr.Key != "" {
+		b = b.With("key", docErr.Key)
 	}
 
-	return b.Wrap(rawErr)
-}
-
-func enrichTOMLDecodeError(decodeErr *toml.DecodeError, rawErr error) error {
-	line, col := decodeErr.Position()
-	msg := decodeErr.Error()
-	reason := "decode_error"
-
-	if strings.Contains(msg, "already defined") {
-		reason = "duplicate_key"
-	} else if strings.Contains(msg, "cannot decode") {
-		reason = "invalid_type"
+	if docErr.Line > 0 {
+		b = b.With("line", docErr.Line, "column", docErr.Column)
 	}
 
-	b := oops.In("config").
-		Code("config_invalid").
-		With("operation", "load", "reason", reason)
-
-	if line > 0 {
-		b = b.With("line", line, "column", col)
-	}
-
-	return b.Wrap(rawErr)
+	return b.Wrap(err)
 }
 
 func enrichValidationError(err error) error {

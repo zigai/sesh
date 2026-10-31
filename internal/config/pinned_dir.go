@@ -19,7 +19,11 @@ import (
 
 const maxConfigFileSize int64 = 1 << 20
 
-var ErrFileTooLarge = errors.New("config file exceeds size limit")
+var (
+	ErrFileTooLarge       = errors.New("config file exceeds size limit")
+	ErrConfigNotDirectory = errors.New("config path component is not a directory")
+	ErrConfigNotRegular   = errors.New("config path is not a regular file")
+)
 
 type pinnedDir struct {
 	fd int
@@ -95,11 +99,8 @@ func openPinnedDir(dirPath string, create bool) (*pinnedDir, error) {
 func checkChildSymlink(parentFd int, part string) error {
 	var checkStat unix.Stat_t
 	if fstatatErr := unix.Fstatat(parentFd, part, &checkStat, unix.AT_SYMLINK_NOFOLLOW); fstatatErr == nil {
-		if checkStat.Mode&unix.S_IFMT == unix.S_IFLNK || checkStat.Mode&unix.S_IFMT != unix.S_IFDIR {
-			return oops.In("config").
-				Code("config_symlink").
-				With("operation", "fs", "reason", "symlink_traversal_prohibited").
-				Wrap(ErrConfigSymlink)
+		if checkStat.Mode&unix.S_IFMT != unix.S_IFDIR {
+			return fileTypeError(checkStat.Mode&unix.S_IFMT == unix.S_IFLNK, "fs", ErrConfigNotDirectory)
 		}
 	}
 
@@ -142,11 +143,12 @@ func openChildDir(parentFd int, part string, create bool) (int, error) {
 
 	childFd, openErr := unix.Openat(parentFd, part, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
 	if openErr != nil {
-		if errors.Is(openErr, unix.ELOOP) || errors.Is(openErr, unix.ENOTDIR) {
-			return -1, oops.In("config").
-				Code("config_symlink").
-				With("operation", "fs", "reason", "symlink_traversal_prohibited").
-				Wrap(ErrConfigSymlink)
+		if errors.Is(openErr, unix.ELOOP) {
+			return -1, symlinkError("fs")
+		}
+
+		if errors.Is(openErr, unix.ENOTDIR) {
+			return -1, wrongFileTypeError("fs", ErrConfigNotDirectory)
 		}
 
 		if errors.Is(openErr, unix.ENOENT) {
@@ -160,11 +162,15 @@ func openChildDir(parentFd int, part string, create bool) (int, error) {
 	}
 
 	var stat unix.Stat_t
-	if fstatErr := unix.Fstat(childFd, &stat); fstatErr != nil || (stat.Mode&unix.S_IFMT != unix.S_IFDIR) {
+	if fstatErr := unix.Fstat(childFd, &stat); fstatErr != nil {
 		return -1, oops.In("config").
-			Code("config_symlink").
-			With("operation", "fs", "reason", "symlink_traversal_prohibited").
-			Wrap(errors.Join(ErrConfigSymlink, fstatErr, unix.Close(childFd)))
+			Code("config_stat_failed").
+			With("operation", "fs", "reason", "stat_failed").
+			Wrap(errors.Join(fstatErr, unix.Close(childFd)))
+	}
+
+	if stat.Mode&unix.S_IFMT != unix.S_IFDIR {
+		return -1, errors.Join(fileTypeError(stat.Mode&unix.S_IFMT == unix.S_IFLNK, "fs", ErrConfigNotDirectory), unix.Close(childFd))
 	}
 
 	return childFd, nil
@@ -208,7 +214,7 @@ func (d *pinnedDir) ReadFile(name string, maxBytes int64) ([]byte, error) {
 		return nil, oops.In("config").
 			Code("config_invalid_path").
 			With("operation", "load", "reason", "invalid_file_name").
-			Wrap(ErrConfigSymlink)
+			Wrap(ErrConfigNotRegular)
 	}
 
 	file, err := openRegularFile(d.fd, name, maxBytes)
@@ -239,21 +245,15 @@ func (d *pinnedDir) ReadFile(name string, maxBytes int64) ([]byte, error) {
 func openRegularFile(dirFd int, name string, maxBytes int64) (*os.File, error) {
 	var preStat unix.Stat_t
 	if fstatatErr := unix.Fstatat(dirFd, name, &preStat, unix.AT_SYMLINK_NOFOLLOW); fstatatErr == nil {
-		if preStat.Mode&unix.S_IFMT == unix.S_IFLNK || preStat.Mode&unix.S_IFMT != unix.S_IFREG {
-			return nil, oops.In("config").
-				Code("config_symlink").
-				With("operation", "load", "reason", "symlink_traversal_prohibited").
-				Wrap(ErrConfigSymlink)
+		if preStat.Mode&unix.S_IFMT != unix.S_IFREG {
+			return nil, fileTypeError(preStat.Mode&unix.S_IFMT == unix.S_IFLNK, "load", ErrConfigNotRegular)
 		}
 	}
 
 	fileFd, err := unix.Openat(dirFd, name, unix.O_RDONLY|unix.O_NOFOLLOW|unix.O_CLOEXEC|unix.O_NONBLOCK, 0)
 	if err != nil {
 		if errors.Is(err, unix.ELOOP) {
-			return nil, oops.In("config").
-				Code("config_symlink").
-				With("operation", "load", "reason", "symlink_traversal_prohibited").
-				Wrap(ErrConfigSymlink)
+			return nil, symlinkError("load")
 		}
 
 		if errors.Is(err, unix.ENOENT) {
@@ -275,10 +275,7 @@ func openRegularFile(dirFd int, name string, maxBytes int64) (*os.File, error) {
 	}
 
 	if stat.Mode&unix.S_IFMT != unix.S_IFREG {
-		return nil, oops.In("config").
-			Code("config_symlink").
-			With("operation", "load", "reason", "symlink_traversal_prohibited").
-			Wrap(errors.Join(ErrConfigSymlink, unix.Close(fileFd)))
+		return nil, errors.Join(fileTypeError(stat.Mode&unix.S_IFMT == unix.S_IFLNK, "load", ErrConfigNotRegular), unix.Close(fileFd))
 	}
 
 	if maxBytes > 0 && stat.Size > maxBytes {
@@ -296,7 +293,7 @@ func (d *pinnedDir) CreateExclusive(name string, data []byte) error {
 		return oops.In("config").
 			Code("config_invalid_path").
 			With("operation", "init", "reason", "invalid_file_name").
-			Wrap(ErrConfigSymlink)
+			Wrap(ErrConfigNotRegular)
 	}
 
 	tmpName, err := d.stageTempFile(name, data)
@@ -353,7 +350,7 @@ func (d *pinnedDir) WriteAtomic(name string, data []byte) error {
 		return oops.In("config").
 			Code("config_invalid_path").
 			With("operation", "save", "reason", "invalid_file_name").
-			Wrap(ErrConfigSymlink)
+			Wrap(ErrConfigNotRegular)
 	}
 
 	tmpName, err := d.stageTempFile(name, data)
@@ -363,16 +360,10 @@ func (d *pinnedDir) WriteAtomic(name string, data []byte) error {
 
 	var stat unix.Stat_t
 	if fstatErr := unix.Fstatat(d.fd, name, &stat, unix.AT_SYMLINK_NOFOLLOW); fstatErr == nil {
-		if stat.Mode&unix.S_IFMT == unix.S_IFLNK || stat.Mode&unix.S_IFMT != unix.S_IFREG {
+		if stat.Mode&unix.S_IFMT != unix.S_IFREG {
 			unlinkErr := unix.Unlinkat(d.fd, tmpName, 0)
 
-			return errors.Join(
-				oops.In("config").
-					Code("config_symlink").
-					With("operation", "save", "reason", "symlink_traversal_prohibited").
-					Wrap(ErrConfigSymlink),
-				unlinkErr,
-			)
+			return errors.Join(fileTypeError(stat.Mode&unix.S_IFMT == unix.S_IFLNK, "save", ErrConfigNotRegular), unlinkErr)
 		}
 	}
 
@@ -394,11 +385,8 @@ func (d *pinnedDir) WriteAtomic(name string, data []byte) error {
 func (d *pinnedDir) stageTempFile(name string, data []byte) (string, error) {
 	var stat unix.Stat_t
 	if fstatErr := unix.Fstatat(d.fd, name, &stat, unix.AT_SYMLINK_NOFOLLOW); fstatErr == nil {
-		if stat.Mode&unix.S_IFMT == unix.S_IFLNK || stat.Mode&unix.S_IFMT != unix.S_IFREG {
-			return "", oops.In("config").
-				Code("config_symlink").
-				With("operation", "fs", "reason", "symlink_traversal_prohibited").
-				Wrap(ErrConfigSymlink)
+		if stat.Mode&unix.S_IFMT != unix.S_IFREG {
+			return "", fileTypeError(stat.Mode&unix.S_IFMT == unix.S_IFLNK, "fs", ErrConfigNotRegular)
 		}
 	}
 
@@ -430,4 +418,26 @@ func (d *pinnedDir) stageTempFile(name string, data []byte) (string, error) {
 	}
 
 	return tmpName, nil
+}
+
+func fileTypeError(symlink bool, operation string, wrongType error) error {
+	if symlink {
+		return symlinkError(operation)
+	}
+
+	return wrongFileTypeError(operation, wrongType)
+}
+
+func symlinkError(operation string) error {
+	return oops.In("config").
+		Code("config_symlink").
+		With("operation", operation, "reason", "symlink_traversal_prohibited").
+		Wrap(ErrConfigSymlink)
+}
+
+func wrongFileTypeError(operation string, wrongType error) error {
+	return oops.In("config").
+		Code("config_wrong_file_type").
+		With("operation", operation, "reason", "wrong_file_type").
+		Wrap(wrongType)
 }

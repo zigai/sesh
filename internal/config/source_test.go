@@ -77,8 +77,21 @@ func TestReadSourceFileRejectsSpecialAndOversizedFiles(t *testing.T) {
 		t.Skipf("mkfifo unavailable: %v", err)
 	}
 
-	if _, err := config.ReadSourceFile(fifo); !errors.Is(err, config.ErrConfigSymlink) {
-		t.Fatalf("FIFO error = %v, want unsafe-file rejection", err)
+	if _, err := config.ReadSourceFile(fifo); !errors.Is(err, config.ErrConfigNotRegular) {
+		t.Fatalf("FIFO error = %v, want ErrConfigNotRegular", err)
+	}
+
+	if _, err := config.ReadSourceFile(root); !errors.Is(err, config.ErrConfigNotRegular) {
+		t.Fatalf("directory error = %v, want ErrConfigNotRegular", err)
+	}
+
+	regular := filepath.Join(root, "regular.toml")
+	if err := os.WriteFile(regular, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := config.ReadSourceFile(filepath.Join(regular, "config.toml")); !errors.Is(err, config.ErrConfigNotDirectory) {
+		t.Fatalf("file as directory component error = %v, want ErrConfigNotDirectory", err)
 	}
 
 	oversized := filepath.Join(root, "oversized.toml")

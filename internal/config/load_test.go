@@ -576,6 +576,24 @@ func TestLoadDecodesNonTomlExtensionAsToml(t *testing.T) {
 	}
 }
 
+func TestLoadAcceptsLeadingByteOrderMark(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte("\xef\xbb\xbf[theme]\nprimary = \"#445566\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(config.WithExplicitPath(path))
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if cfg.Theme.Primary != "#445566" {
+		t.Errorf("Theme.Primary = %q, want #445566", cfg.Theme.Primary)
+	}
+}
+
 func TestConsistentEnvironmentPrefixAcrossAllModes(t *testing.T) {
 	t.Setenv("SETTINGS_LOG_LEVEL", "debug")
 	t.Setenv("LOG_LEVEL", "debug")

@@ -142,11 +142,7 @@ func ExecuteApplication(ctx context.Context, args []string, input io.Reader, std
 
 func (r *commandRuntime) prepare(cmd *cobra.Command, args []string) error {
 	r.cmd = cmd
-	if err := cmd.ValidateRequiredFlags(); err != nil {
-		return NewExitError(exitCodeUsage, err)
-	}
-
-	if err := cmd.ValidateFlagGroups(); err != nil {
+	if err := validateFlags(cmd); err != nil {
 		return NewExitError(exitCodeUsage, err)
 	}
 
@@ -173,6 +169,22 @@ func (r *commandRuntime) prepare(cmd *cobra.Command, args []string) error {
 		if r.diagnostics != nil {
 			r.diagnostics.streaming = true
 		}
+	}
+
+	return nil
+}
+
+func validateFlags(cmd *cobra.Command) error {
+	if err := cmd.ValidateRequiredFlags(); err != nil {
+		return err
+	}
+
+	if err := cmd.ValidateFlagGroups(); err != nil {
+		return err
+	}
+
+	if path, _ := cmd.Flags().GetString("config"); path == "" && cmd.Flags().Changed("config") {
+		return clibase.ErrConfigPathEmpty
 	}
 
 	return nil

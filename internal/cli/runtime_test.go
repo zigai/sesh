@@ -237,6 +237,20 @@ func TestApplicationUsageFailureDoesNotOpenLog(t *testing.T) {
 	}
 }
 
+func TestApplicationRejectsEmptyConfigPath(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+
+	err := ExecuteApplication(t.Context(), []string{snapshotCmd, "history", testConfigFlag, "", testJSONFlag}, nil, &stdout, &stderr)
+	if ExitCode(err) != exitCodeUsage {
+		t.Fatalf("unexpected outcome: %v", err)
+	}
+
+	env := singleRuntimeEnvelope(t, stderr.Bytes())
+	if env.Error == nil || !strings.Contains(env.Error.Message, "--config requires a file path") {
+		t.Fatalf("diagnostic does not reject the empty config path: %s", stderr.Bytes())
+	}
+}
+
 func TestApplicationUnknownFlagNamesTheFlag(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
@@ -280,9 +294,21 @@ func TestApplicationHumanConfigDiagnostics(t *testing.T) {
 			config: "[display]\nsesh_format = \"{session_name} {custom.weather}\"\n",
 			want:   "configuration could not be loaded: invalid display.sesh_format: undefined custom field: custom.weather has no display.fields.weather entry; run 'sesh doctor' for details\n",
 		},
-		"toml location only": {
-			config: "[settings]\nsecret_private_key = 1\n",
-			want:   "invalid configuration at line 2, column 1; run 'sesh doctor' for details\n",
+		"unknown key": {
+			config: "[settings]\nlog_levl = \"debug\"\n",
+			want:   "invalid configuration at line 2, column 1: unknown key settings.log_levl; run 'sesh doctor' for details\n",
+		},
+		"wrong value type": {
+			config: "[theme]\npreset = 5\n",
+			want:   "invalid configuration at line 2, column 10: wrong value type for theme.preset (got integer); run 'sesh doctor' for details\n",
+		},
+		"duplicate table": {
+			config: "[theme]\n[theme]\n",
+			want:   "invalid configuration at line 2, column 2: duplicate key theme; run 'sesh doctor' for details\n",
+		},
+		"syntax": {
+			config: "[theme]\npreset = = 1\n",
+			want:   "invalid configuration at line 2, column 10: invalid TOML syntax; run 'sesh doctor' for details\n",
 		},
 	}
 
@@ -305,7 +331,7 @@ func TestApplicationHumanConfigDiagnostics(t *testing.T) {
 func TestApplicationConfigDiagnosticsRetainLocationWithoutPrivateValues(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
-	input := strings.NewReader("[settings]\nsecret_private_key = 1\n")
+	input := strings.NewReader("[settings]\nlog_levl = \"private-canary\"\n")
 
 	err := ExecuteApplication(t.Context(), []string{snapshotCmd, "history", testRepositoryFlag, filepath.Join(t.TempDir(), "missing"), testConfigFlag, "-", testJSONFlag}, input, &stdout, &stderr)
 	if err == nil {
@@ -317,8 +343,8 @@ func TestApplicationConfigDiagnosticsRetainLocationWithoutPrivateValues(t *testi
 		t.Fatalf("wrong configuration diagnostic: %s", stderr.Bytes())
 	}
 
-	if bytes.Contains(stderr.Bytes(), []byte("secret_private_key")) {
-		t.Fatal("private key echoed")
+	if bytes.Contains(stderr.Bytes(), []byte("private-canary")) {
+		t.Fatal("private value echoed")
 	}
 }
 

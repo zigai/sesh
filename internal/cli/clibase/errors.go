@@ -24,6 +24,7 @@ const (
 var (
 	ErrUnknownCommand     = errors.New("unknown command")
 	ErrSocketRequired     = errors.New("--socket is required")
+	ErrConfigPathEmpty    = errors.New("--config requires a file path")
 	ErrRepositoryRequired = errors.New("--repository is required")
 	ErrLeaseRootRequired  = errors.New("--lease-root is required")
 	ErrDoctorChecksFailed = errors.New("doctor checks failed")
