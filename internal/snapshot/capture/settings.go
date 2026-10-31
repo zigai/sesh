@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/rs/zerolog"
 	"github.com/samber/oops"
 
 	gotmux "github.com/zigai/gotmux/tmux"
@@ -35,29 +36,39 @@ func options(ctx context.Context, scope string, source optionLister) ([]model.Op
 	return result, nil
 }
 
-func environment(ctx context.Context, scope gotmux.EnvironmentScope) ([]model.Variable, error) {
-	var result []model.Variable
+func environment(ctx context.Context, scope gotmux.EnvironmentScope) ([]model.Variable, []string, error) {
+	var (
+		result  []model.Variable
+		skipped []string
+	)
 
 	seen := make(map[string]bool)
 
 	for _, hidden := range []bool{false, true} {
 		entries, err := scope.ListWith(ctx, gotmux.ListEnvironmentOptions{Hidden: hidden})
 		if err != nil {
-			return nil, oops.In("snapshot.capture").With("operation", "enumerate_environment").Wrapf(err, "enumerate environment")
+			return nil, nil, oops.In("snapshot.capture").With("operation", "enumerate_environment").Wrapf(err, "enumerate environment")
 		}
 
 		for _, entry := range entries {
+			// tmux lists names such as exported bash functions (BASH_FUNC_name%%) that restore cannot set again.
+			if !shellName(entry.Name) {
+				skipped = append(skipped, entry.Name)
+
+				continue
+			}
+
 			if seen[entry.Name] {
 				if hidden {
 					continue
 				}
 
-				return nil, environmentUnsupported("ambiguous_enumeration")
+				return nil, nil, environmentUnsupported("ambiguous_enumeration")
 			}
 
 			variable, err := environmentEntry(entry, hidden)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
 			seen[entry.Name] = true
@@ -68,7 +79,7 @@ func environment(ctx context.Context, scope gotmux.EnvironmentScope) ([]model.Va
 
 	slices.SortFunc(result, func(a, b model.Variable) int { return strings.Compare(string(a.Name), string(b.Name)) })
 
-	return result, nil
+	return result, skipped, nil
 }
 
 func environmentUnsupported(reason string) error {
@@ -79,11 +90,6 @@ func environmentUnsupported(reason string) error {
 }
 
 func environmentEntry(entry gotmux.EnvironmentEntry, hidden bool) (model.Variable, error) {
-	// tmux lists names such as exported bash functions (BASH_FUNC_name%%) that restore cannot set again.
-	if !shellName(entry.Name) {
-		return model.Variable{}, environmentUnsupported("name_unsupported")
-	}
-
 	content, present := entry.Value.Value.Get()
 
 	state := "set"
@@ -109,4 +115,17 @@ func shellName(name string) bool {
 	}
 
 	return true
+}
+
+func logSkippedEnvironment(ctx context.Context, names []string) {
+	names = slices.Compact(slices.Sorted(slices.Values(names)))
+	if len(names) == 0 {
+		return
+	}
+
+	zerolog.Ctx(ctx).Warn().
+		Str("component", "snapshot").
+		Str("operation", "observe_environment").
+		Strs("variables", names).
+		Msg("skipped environment variables that restore cannot set")
 }

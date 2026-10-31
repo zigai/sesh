@@ -32,6 +32,7 @@ type Observation struct {
 	Manifest             model.Manifest
 	Artifacts            map[string][]byte
 	FloatingPanesOmitted int
+	skippedEnvironment   []string
 }
 
 type paneProcessRecord struct {
@@ -107,6 +108,8 @@ func observe(ctx context.Context, server *gotmux.Server, selected []gotmux.Sessi
 
 		obs, err := observeOnce(ctx, server, selected, envKeys, enrichProcesses, agentSource)
 		if err == nil {
+			logSkippedEnvironment(ctx, obs.skippedEnvironment)
+
 			return obs, nil
 		}
 
@@ -283,12 +286,13 @@ func (o *Observation) globals(ctx context.Context, server *gotmux.Server) error 
 		o.Manifest.Source.Options = append(o.Manifest.Source.Options, values...)
 	}
 
-	values, err := environment(ctx, server.Environment())
+	values, skipped, err := environment(ctx, server.Environment())
 	if err != nil {
 		return err
 	}
 
 	o.Manifest.Source.Environment = values
+	o.skippedEnvironment = append(o.skippedEnvironment, skipped...)
 
 	return nil
 }
@@ -305,12 +309,13 @@ func (o *Observation) sessions(ctx context.Context, snapshot gotmux.Snapshot) er
 			return err
 		}
 
-		values, err := environment(ctx, info.Handle().Environment())
+		values, skipped, err := environment(ctx, info.Handle().Environment())
 		if err != nil {
 			return err
 		}
 
 		o.Manifest.Sessions[index].Options, o.Manifest.Sessions[index].Environment = settings, values
+		o.skippedEnvironment = append(o.skippedEnvironment, skipped...)
 	}
 
 	return nil
