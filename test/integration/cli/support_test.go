@@ -342,7 +342,7 @@ func assertRuntimeLogFields(t *testing.T, record map[string]any) {
 	for key := range record {
 		switch key {
 		case "time", "level", "component", "operation", "status", "message", "reason", "phase", "code", "sessions", "windows", "panes", "error_code",
-			"pid", "version", "socket", "action", "error", "error_domain", "error_step", "generation", "restore_id",
+			"pid", "version", "socket", "action", "error", "error_domain", "error_step", "error_context", "generation", "restore_id",
 			"duration_ms", "failed_step", "store_step", "step_reason", "mismatches", "mismatch_reasons", "floating_panes_omitted",
 			"restart_panes", "resume_panes", "carried_resume_panes", "unverified_panes", "nonrestartable_panes",
 			"resumed_panes", "restarted_panes", "shell_panes", "unrecovered_panes", "directory_fallback_panes":

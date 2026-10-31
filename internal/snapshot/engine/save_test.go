@@ -333,7 +333,7 @@ func validateLogSchema(t *testing.T, fields map[string]jsontext.Value) {
 		switch key {
 		case "level", "component", "operation", "status", "message", "reason", "phase", "sessions", "panes", "terminal_text_omitted", "floating_panes_omitted",
 			"restart_panes", "resume_panes", "carried_resume_panes", "unverified_panes", "nonrestartable_panes", "duration_ms", "process_code",
-			"generation", "error", "error_domain", "error_code", "error_step":
+			"generation", "error", "error_domain", "error_code", "error_step", "error_context":
 		default:
 			t.Fatalf("unexpected log field %s", key)
 		}

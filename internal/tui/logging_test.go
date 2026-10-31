@@ -10,6 +10,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -306,7 +307,7 @@ func assertLoggingTestRecord(
 		want["reason"] = "dependency_unavailable"
 	}
 
-	for _, key := range []string{zerolog.ErrorFieldName, "error_domain", "error_code", "error_step"} {
+	for _, key := range []string{zerolog.ErrorFieldName, "error_domain", "error_code", "error_step", "error_context"} {
 		if value, ok := record[key]; ok && (status == "failed" || status == "degraded") {
 			want[key] = value
 		}
@@ -321,7 +322,7 @@ func assertLoggingTestRecord(
 	}
 
 	for field, value := range want {
-		if record[field] != value {
+		if !reflect.DeepEqual(record[field], value) {
 			t.Fatalf("record[%q] = %#v, want %#v in %#v", field, record[field], value, record)
 		}
 	}
@@ -1110,12 +1111,13 @@ func TestSnapshotActionLoggingUsesFixedSchema(t *testing.T) {
 func TestLogTUIFailureClassification(t *testing.T) {
 	tests := []failureClassificationCase{
 		{
-			name: "oops metadata does not enter logs",
+			name: "oops context stays out of the classification and keeps only safe keys",
 			err: oops.In("tui").
-				Code(loggingTestPrivacySentinel).
-				With("phase", loggingTestPrivacySentinel, "action", loggingTestPrivacySentinel).
+				Code("enter_failed").
+				With("phase", "resolve_target", "output", loggingTestPrivacySentinel).
 				Wrap(errLoggingTestSecretDetails),
-			wantCode: tuiErrorOperationFailed,
+			wantCode:    tuiErrorOperationFailed,
+			wantContext: map[string]any{"phase": "resolve_target"},
 		},
 		{
 			name:     "session attached sentinel",
@@ -1215,11 +1217,12 @@ func TestLogTUIFailureClassification(t *testing.T) {
 }
 
 type failureClassificationCase struct {
-	name       string
-	err        error
-	wantCode   string
-	wantPhase  string
-	wantAction string
+	name        string
+	err         error
+	wantCode    string
+	wantPhase   string
+	wantAction  string
+	wantContext map[string]any
 }
 
 func checkFailureClassification(t *testing.T, tt failureClassificationCase) {
@@ -1247,6 +1250,10 @@ func checkFailureClassification(t *testing.T, tt failureClassificationCase) {
 
 	assertClassificationContext(t, record, tt)
 
+	if errorContext, _ := record["error_context"].(map[string]any); !maps.Equal(errorContext, tt.wantContext) {
+		t.Errorf("error_context = %#v, want %#v", record["error_context"], tt.wantContext)
+	}
+
 	if tt.err != nil && record[zerolog.ErrorFieldName] != tt.err.Error() {
 		t.Errorf("error = %q, want %q", record[zerolog.ErrorFieldName], tt.err.Error())
 	}
@@ -1258,7 +1265,8 @@ func assertAllowedFailureFields(t *testing.T, record map[string]any) {
 	for field := range record {
 		switch field {
 		case "command", "version", "commit", "pid", "component",
-			"operation", "level", "status", "message", "reason", zerolog.ErrorFieldName, "error_domain", "error_code", "error_step":
+			"operation", "level", "status", "message", "reason", zerolog.ErrorFieldName, "error_domain", "error_code", "error_step",
+			"error_context":
 		default:
 			t.Errorf("record field %q = %#v, want only the fixed failure schema", field, record[field])
 		}

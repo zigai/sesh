@@ -135,7 +135,7 @@ func restoreRecord(t *testing.T, data []byte) map[string]any {
 		switch key {
 		case "level", "component", "operation", "status", "message", "reason", "phase", "sessions", "skipped", "verified",
 			"mismatches", "mismatch_reasons", "failed_step", "step_reason", "duration_ms",
-			"error", "error_domain", "error_code", "error_step", "generation", "restore_id",
+			"error", "error_domain", "error_code", "error_step", "error_context", "generation", "restore_id",
 			"resumed_panes", "restarted_panes", "shell_panes", "unrecovered_panes", "directory_fallback_panes":
 		default:
 			t.Fatalf("unexpected restore log field %s", key)

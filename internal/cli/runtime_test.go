@@ -179,6 +179,10 @@ func TestCorruptRepositoryFailureNamesTheStoreStep(t *testing.T) {
 	if record["reason"] != "repositoryCorrupt" || record["store_step"] == nil {
 		t.Fatalf("corruption record = %v, want reason repositoryCorrupt with the store step", record)
 	}
+
+	if errorContext, _ := record["error_context"].(map[string]any); errorContext["repository"] != repoPath || errorContext["file"] != "catalog.json" {
+		t.Fatalf("corruption record = %v, want the repository path and catalog file in its error context", record)
+	}
 }
 
 func TestApplicationDisabledLogging(t *testing.T) {
@@ -511,6 +515,9 @@ func runtimeTypedLogFieldValid(key string, value any, record map[string]any) boo
 		return ok && duration >= 0
 	case "failed_step", "store_step":
 		_, ok := value.(string)
+		return ok
+	case "error_context":
+		_, ok := value.(map[string]any)
 		return ok
 	case "verified":
 		_, ok := value.(bool)
