@@ -144,9 +144,9 @@ func observeOnce(ctx context.Context, server *gotmux.Server, selected []gotmux.S
 		return Observation{}, err
 	}
 
-	result := Observation{Manifest: m, Artifacts: make(map[string][]byte), FloatingPanesOmitted: floating}
+	result := Observation{Manifest: m, Artifacts: make(map[string][]byte), FloatingPanesOmitted: floating, skippedEnvironment: nil}
 	if err := result.collect(ctx, server, before); err != nil {
-		return Observation{}, err
+		return Observation{}, changedDuringCollect(ctx, server, before, selected, err)
 	}
 
 	var paneProcesses map[string]paneProcessRecord
@@ -440,6 +440,46 @@ func compareGraph(ctx context.Context, server *gotmux.Server, before gotmux.Snap
 	}
 
 	return nil
+}
+
+// changedDuringCollect marks a failed per-target query as a state change when the graph shows
+// that sessions, windows or panes changed since it was observed, such as a pane that exited.
+func changedDuringCollect(ctx context.Context, server *gotmux.Server, before gotmux.Snapshot, selected []gotmux.SessionID, err error) error {
+	if errors.Is(err, ErrChanged) || ctx.Err() != nil {
+		return err
+	}
+
+	after, reobserveErr := reobserveGraph(ctx, server, before)
+	if errors.Is(reobserveErr, ErrChanged) {
+		return errors.Join(ErrChanged, err)
+	}
+
+	if reobserveErr != nil {
+		return errors.Join(err, reobserveErr)
+	}
+
+	initial, _, initialErr := tiledGraph(before, selected)
+	if initialErr != nil {
+		return errors.Join(err, initialErr)
+	}
+
+	projected, _, projectedErr := tiledGraph(after, selected)
+	if projectedErr != nil {
+		return errors.Join(ErrChanged, err)
+	}
+
+	baseline, baselineErr := stabilityBytes(initial)
+	current, currentErr := stabilityBytes(projected)
+
+	if encodeErr := errors.Join(baselineErr, currentErr); encodeErr != nil {
+		return errors.Join(err, encodeErr)
+	}
+
+	if !bytes.Equal(baseline, current) {
+		return errors.Join(ErrChanged, err)
+	}
+
+	return err
 }
 
 func probeInitialSnapshot(ctx context.Context, server *gotmux.Server) (gotmux.ServerInfo, gotmux.Snapshot, error) {

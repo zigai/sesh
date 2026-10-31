@@ -5,6 +5,7 @@ package capture
 import (
 	"bytes"
 	"context"
+	"errors"
 	"slices"
 	"testing"
 	"time"
@@ -14,6 +15,8 @@ import (
 
 	"github.com/zigai/sesh/internal/snapshot/model"
 )
+
+var errOptionsQuery = errors.New("show-options failed")
 
 func TestTitleChangesDoNotInvalidateObservation(t *testing.T) {
 	server := tmuxtest.NewServer(t)
@@ -69,6 +72,38 @@ func TestSelectedMutationRejectsObservation(t *testing.T) {
 				t.Fatal("accepted changed selected pane")
 			}
 		})
+	}
+}
+
+func TestPaneExitDuringCollectionIsAStateChange(t *testing.T) {
+	server := tmuxtest.NewServer(t)
+	session, pane := captureSessionFixture(t, server, "selected")
+	mutatePane(t, pane, "split")
+
+	selected := []gotmux.SessionID{session.ID()}
+
+	before, baseline := captureBaseline(t, server, session)
+	mutatePane(t, pane, "kill")
+
+	observation := Observation{Manifest: baseline, Artifacts: map[string][]byte{}}
+
+	err := observation.collect(t.Context(), server, before)
+	if err == nil {
+		t.Fatal("collecting options of an exited pane succeeded")
+	}
+
+	if errors.Is(err, ErrChanged) {
+		t.Fatalf("collection failure was already a state change: %v", err)
+	}
+
+	if err := changedDuringCollect(t.Context(), server, before, selected, err); !errors.Is(err, ErrChanged) {
+		t.Fatalf("failure after a pane exited = %v, want ErrChanged", err)
+	}
+
+	unchanged, _ := captureBaseline(t, server, session)
+
+	if err := changedDuringCollect(t.Context(), server, unchanged, selected, errOptionsQuery); errors.Is(err, ErrChanged) || !errors.Is(err, errOptionsQuery) {
+		t.Fatalf("failure with an unchanged graph = %v, want the original failure only", err)
 	}
 }
 
