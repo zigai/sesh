@@ -214,6 +214,35 @@ func TestStartSkipsTaskNumbersWhoseBranchOrDirectoryExists(t *testing.T) {
 	}
 }
 
+func TestStartPicksABranchThatDoesNotNestWithAnExistingBranch(t *testing.T) {
+	titled := task.Request{Harness: sleepHarness, Title: "main", Location: task.Location{Where: task.WhereNew}}
+
+	for _, test := range []struct {
+		name     string
+		existing string
+		request  task.Request
+		want     string
+	}{
+		{name: "untitled under a titled branch", existing: "wt/main", request: inNewWorktree(sleepHarness), want: "wt/main-2/1"},
+		{name: "titled above an untitled branch", existing: "wt/main/1", request: titled, want: "wt/main-2"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			f := newFixture(t)
+			repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
+			runGit(t, repo, "branch", test.existing)
+
+			record, err := f.service.Start(t.Context(), projectPlace(t, f, repo), test.request)
+			if err != nil {
+				t.Fatalf("Start() error = %v", err)
+			}
+
+			if record.Branch != test.want {
+				t.Fatalf("branch = %q, want %q", record.Branch, test.want)
+			}
+		})
+	}
+}
+
 func TestStartRejectsAHarnessThatIsNotOffered(t *testing.T) {
 	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))

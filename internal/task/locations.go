@@ -129,7 +129,7 @@ func (s *Service) Offer(ctx context.Context, place Place, describe bool) (Offer,
 	offer.Current = currentCheckout(offer.Locations, place.Dir)
 
 	if len(offer.Locations) > 0 && offer.Locations[0].Where == WhereNew {
-		offer.NextNumber, _, err = s.freeNumber(ctx, p, offer.Locations[0].Branch, state.LastNumber)
+		offer.NextNumber, _, err = s.freeNumber(p, offer.Locations[0].Branch, state.LastNumber, known.local)
 		if err != nil {
 			return offer, taskError("offer_task", err)
 		}
@@ -244,9 +244,21 @@ func NewBranch(title, base string, number int, taken []string) string {
 		name = branchPrefix + slug
 	}
 
+	// git stores refs as paths, so a branch cannot sit inside or above another one. A suffix on the
+	// leaf cannot free wt/main/1 while wt/main exists, so it goes on the first segment; each taken
+	// ref then blocks at most one candidate, which bounds the search.
+	first, rest, nested := strings.Cut(strings.TrimPrefix(name, branchPrefix), "/")
+	if nested {
+		rest = "/" + rest
+	}
+
+	collides := func(candidate string) bool {
+		return slices.ContainsFunc(taken, func(branch string) bool { return refsCollide(candidate, branch) })
+	}
+
 	candidate := name
-	for suffix := 2; slices.Contains(taken, candidate); suffix++ {
-		candidate = name + "-" + strconv.Itoa(suffix)
+	for suffix := 2; suffix <= len(taken)+1 && collides(candidate); suffix++ {
+		candidate = branchPrefix + first + "-" + strconv.Itoa(suffix) + rest
 	}
 
 	return candidate
@@ -332,6 +344,10 @@ func slug(title string) string {
 	}
 
 	return out.String()
+}
+
+func refsCollide(a, b string) bool {
+	return a == b || strings.HasPrefix(a, b+"/") || strings.HasPrefix(b, a+"/")
 }
 
 func branchLocations(known branches, checkedOut, bases []string) []Location {

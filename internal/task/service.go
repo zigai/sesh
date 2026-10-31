@@ -282,7 +282,7 @@ func (s *Service) reserveProjectTask(ctx context.Context, p project.Project, req
 		if location.createsWorktree() {
 			var err error
 
-			number, directory, err = s.freeNumber(ctx, p, base, state.LastNumber)
+			number, directory, err = s.freeNumber(p, base, state.LastNumber, local)
 			if err != nil {
 				return Record{}, err
 			}
@@ -321,7 +321,7 @@ func (s *Service) reserveProjectTask(ctx context.Context, p project.Project, req
 	})
 }
 
-func (s *Service) freeNumber(ctx context.Context, p project.Project, base string, last int) (int, string, error) {
+func (s *Service) freeNumber(p project.Project, base string, last int, taken []string) (int, string, error) {
 	if p.Kind != project.KindGit {
 		return last + 1, p.Root, nil
 	}
@@ -333,12 +333,9 @@ func (s *Service) freeNumber(ctx context.Context, p project.Project, base string
 			continue
 		}
 
-		exists, err := branchExists(ctx, p.Root, taskBranch(base, number))
-		if err != nil {
-			return 0, "", err
-		}
-
-		if !exists {
+		// A ref above this one, such as wt/main, blocks every number alike; NewBranch steps around it.
+		branch := taskBranch(base, number)
+		if !slices.ContainsFunc(taken, func(other string) bool { return other == branch || strings.HasPrefix(other, branch+"/") }) {
 			return number, directory, nil
 		}
 	}
