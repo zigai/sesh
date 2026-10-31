@@ -133,12 +133,14 @@ func (r *Repository) readCurrentState() (currentState, error) {
 	}
 
 	state, err := strictjson.Decode[currentState](data)
-	if err != nil {
-		return currentState{}, errors.Join(ErrCorrupt, err)
+	if err == nil {
+		err = state.validate()
+	} else {
+		err = errors.Join(ErrCorrupt, err)
 	}
 
-	if err := state.validate(); err != nil {
-		return currentState{}, err
+	if err != nil {
+		return currentState{}, oops.In("snapshot.store").With("operation", "decode_current_state", "repository", r.path, "file", currentStateName).Wrapf(err, "decode current state")
 	}
 
 	return state, nil

@@ -214,12 +214,14 @@ func (r *Repository) catalog() (Catalog, error) {
 	}
 
 	catalog, err := strictjson.Decode[Catalog](data)
-	if err != nil {
-		return Catalog{}, errors.Join(ErrCorrupt, err)
+	if err == nil {
+		err = catalog.validate()
+	} else {
+		err = errors.Join(ErrCorrupt, err)
 	}
 
-	if err := catalog.validate(); err != nil {
-		return Catalog{}, err
+	if err != nil {
+		return Catalog{}, oops.In("snapshot.store").With("operation", "decode_catalog", "repository", r.path, "file", "catalog.json").Wrapf(err, "decode catalog")
 	}
 
 	return catalog, nil

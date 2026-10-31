@@ -203,12 +203,25 @@ func (r *Repository) readLocked(ctx context.Context, id string) (model.Manifest,
 }
 
 func (r *Repository) readGeneration(ctx context.Context, generation Generation) (model.Manifest, error) {
+	manifest, err := r.readGenerationFiles(ctx, generation)
+	if err != nil {
+		return manifest, oops.In("snapshot.store").With("operation", "read_generation", "generation", generation.ID).Wrapf(err, "read generation")
+	}
+
+	return manifest, nil
+}
+
+func (r *Repository) readGenerationFiles(ctx context.Context, generation Generation) (model.Manifest, error) {
 	parent, err := r.root.Child("generations", false)
 	if err != nil {
 		return model.Manifest{}, oops.In("snapshot.store").With("operation", "open_generations").Wrapf(err, "open generations")
 	}
 
 	dir, openErr := parent.Child(generation.ID, false)
+	if openErr != nil {
+		openErr = oops.In("snapshot.store").With("operation", "open_generation").Wrapf(openErr, "open generation")
+	}
+
 	if err := errors.Join(openErr, parent.Close()); err != nil {
 		if dir != nil {
 			err = errors.Join(err, dir.Close())

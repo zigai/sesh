@@ -356,8 +356,13 @@ func HumanErrorMessage(err error) string {
 }
 
 func NotExistMessage(err error) string {
-	if _, ok := errorstep.Owned(err, "snapshot.store"); ok {
-		return "repository does not exist"
+	if step, ok := errorstep.Owned(err, "snapshot.store"); ok {
+		switch step.Operation {
+		case "open_generations", "open_generation", "read_manifest", "open_artifacts", "open_artifact":
+			return "snapshot generation files are missing"
+		default:
+			return "repository does not exist"
+		}
 	}
 
 	return "file or directory does not exist"
@@ -662,13 +667,28 @@ func storeSentinelMessage(err error) (string, bool) {
 	case errors.Is(err, store.ErrRecoveryRequired):
 		return "latest save requires explicit recovery", true
 	case errors.Is(err, store.ErrCorrupt):
-		return "invalid native repository", true
+		return corruptRepositoryMessage(err), true
 	case errors.Is(err, store.ErrUnavailable):
 		return "snapshot generation unavailable", true
 	case errors.Is(err, store.ErrConflict):
 		return "repository operation conflict", true
 	default:
 		return "", false
+	}
+}
+
+func corruptRepositoryMessage(err error) string {
+	step, _ := errorstep.Owned(err, "snapshot.store")
+
+	switch step.Operation {
+	case "decode_catalog":
+		return "snapshot catalog is corrupt"
+	case "decode_current_state":
+		return "snapshot current state is corrupt"
+	case "read_generation", "decode_manifest":
+		return "snapshot generation is corrupt"
+	default:
+		return "invalid native repository"
 	}
 }
 
