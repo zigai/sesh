@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -224,5 +225,282 @@ func TestTruncateStyledWidthPreservesANSIAndGraphemeClusters(t *testing.T) {
 
 	if width := ansi.StringWidth(got); width != 3 {
 		t.Fatalf("truncateStyledWidth() width = %d, want 3", width)
+	}
+}
+
+func newBindingModel(t *testing.T, bindings ...Binding) *Model {
+	t.Helper()
+
+	model := NewModel(t.Context(), config.DefaultConfig(), &whichKeyTestSource{}, "prefix")
+	t.Cleanup(model.Close)
+	model.Update(keyLoadMsg{bindings: bindings, err: nil})
+
+	return model
+}
+
+func press(t *testing.T, model *Model, keys ...tea.KeyPressMsg) tea.Cmd {
+	t.Helper()
+
+	var cmd tea.Cmd
+	for _, key := range keys {
+		_, cmd = model.Update(key)
+	}
+
+	return cmd
+}
+
+func typeText(text string) []tea.KeyPressMsg {
+	keys := make([]tea.KeyPressMsg, 0, len(text))
+	for _, r := range text {
+		keys = append(keys, tea.KeyPressMsg(tea.Key{Code: r, Text: string(r)}))
+	}
+
+	return keys
+}
+
+func keyCode(code rune) tea.KeyPressMsg {
+	return tea.KeyPressMsg(tea.Key{Code: code})
+}
+
+func ctrlKey(code rune) tea.KeyPressMsg {
+	return tea.KeyPressMsg(tea.Key{Code: code, Mod: tea.ModCtrl})
+}
+
+func bindingKeys(bindings []Binding) []string {
+	keys := make([]string, 0, len(bindings))
+	for _, binding := range bindings {
+		keys = append(keys, binding.Key)
+	}
+
+	return keys
+}
+
+func assertFiltered(t *testing.T, model *Model, want ...string) {
+	t.Helper()
+
+	got := bindingKeys(model.filtered)
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("filtered keys = %q, want %q", got, want)
+	}
+}
+
+func assertFilteredSet(t *testing.T, model *Model, want ...string) {
+	t.Helper()
+
+	got := slices.Sorted(slices.Values(bindingKeys(model.filtered)))
+	if !slices.Equal(got, slices.Sorted(slices.Values(want))) {
+		t.Fatalf("filtered keys = %q, want %q in any order", got, want)
+	}
+}
+
+func assertQuit(t *testing.T, cmd tea.Cmd) {
+	t.Helper()
+
+	if cmd == nil {
+		t.Fatal("Update() returned nil command, want quit")
+	}
+
+	if msg := cmd(); msg != (tea.QuitMsg{}) {
+		t.Fatalf("command message = %T, want tea.QuitMsg", msg)
+	}
+}
+
+var searchTestBindings = []Binding{
+	{Key: "c", Description: "create window", Command: "new-window"},
+	{Key: "d", Description: "leave the session", Command: "detach-client"},
+	{Key: "%", Description: "split pane horizontally", Command: "split-window -h"},
+	{Key: "m", Description: "café menu", Command: "display-menu"},
+}
+
+func TestRowNavigationWrapsAtListEnds(t *testing.T) {
+	tests := []struct {
+		name   string
+		start  int
+		key    tea.KeyPressMsg
+		cursor int
+	}{
+		{name: "up from first row selects last", start: 0, key: keyCode(tea.KeyUp), cursor: 3},
+		{name: "ctrl+p from first row selects last", start: 0, key: ctrlKey('p'), cursor: 3},
+		{name: "down from last row selects first", start: 3, key: keyCode(tea.KeyDown), cursor: 0},
+		{name: "ctrl+n from last row selects first", start: 3, key: ctrlKey('n'), cursor: 0},
+		{name: "up moves one row", start: 2, key: keyCode(tea.KeyUp), cursor: 1},
+		{name: "down moves one row", start: 1, key: keyCode(tea.KeyDown), cursor: 2},
+		{name: "home selects first row", start: 2, key: keyCode(tea.KeyHome), cursor: 0},
+		{name: "end selects last row", start: 1, key: keyCode(tea.KeyEnd), cursor: 3},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model := newBindingModel(t, searchTestBindings...)
+			model.cursor = tt.start
+
+			if cmd := press(t, model, tt.key); cmd != nil {
+				t.Fatalf("Update() command = %v, want nil", cmd)
+			}
+
+			if model.cursor != tt.cursor {
+				t.Fatalf("cursor = %d, want %d", model.cursor, tt.cursor)
+			}
+		})
+	}
+}
+
+func TestRowNavigationOnEmptyListKeepsCursorAtTop(t *testing.T) {
+	model := newBindingModel(t)
+
+	press(t, model, keyCode(tea.KeyUp), keyCode(tea.KeyDown), ctrlKey('p'), ctrlKey('n'), keyCode(tea.KeyEnd))
+
+	if model.cursor != 0 {
+		t.Fatalf("cursor = %d, want 0", model.cursor)
+	}
+}
+
+func TestEnterRunsSelectedBindingAndQuits(t *testing.T) {
+	model := newBindingModel(t, searchTestBindings...)
+
+	cmd := press(t, model, keyCode(tea.KeyDown), keyCode(tea.KeyDown), keyCode(tea.KeyEnter))
+
+	if got := model.DeferredCommand(); got != "split-window -h" {
+		t.Fatalf("DeferredCommand() = %q, want %q", got, "split-window -h")
+	}
+
+	assertQuit(t, cmd)
+}
+
+func TestEnterOnEmptyFilteredListDoesNothing(t *testing.T) {
+	model := newBindingModel(t, searchTestBindings...)
+	press(t, model, append([]tea.KeyPressMsg{ctrlKey('f')}, typeText("zzz")...)...)
+	assertFiltered(t, model)
+
+	cmd := press(t, model, keyCode(tea.KeyEnter))
+
+	if cmd != nil {
+		t.Fatalf("Update() command = %v, want nil", cmd)
+	}
+
+	if got := model.DeferredCommand(); got != "" {
+		t.Fatalf("DeferredCommand() = %q, want empty", got)
+	}
+}
+
+func TestSearchFiltersByKeyDescriptionAndCommand(t *testing.T) {
+	tests := []struct {
+		name  string
+		query string
+		want  []string
+	}{
+		{name: "key", query: "%", want: []string{"%"}},
+		{name: "description", query: "leave", want: []string{"d"}},
+		{name: "command", query: "split-window", want: []string{"%"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model := newBindingModel(t, searchTestBindings...)
+
+			press(t, model, append([]tea.KeyPressMsg{ctrlKey('f')}, typeText(tt.query)...)...)
+
+			assertFiltered(t, model, tt.want...)
+		})
+	}
+}
+
+func TestBindingKeyTypedInSearchFiltersWithoutRunningBinding(t *testing.T) {
+	model := newBindingModel(t, searchTestBindings...)
+	press(t, model, ctrlKey('f'))
+
+	cmd := press(t, model, typeText("m")...)
+
+	if cmd != nil {
+		t.Fatalf("Update() command = %v, want nil", cmd)
+	}
+
+	if got := model.DeferredCommand(); got != "" {
+		t.Fatalf("DeferredCommand() = %q, want empty", got)
+	}
+
+	assertFiltered(t, model, "m")
+}
+
+func TestBackspaceRemovesOneMultiByteRuneAndRefilters(t *testing.T) {
+	model := newBindingModel(t, searchTestBindings...)
+	press(t, model, append([]tea.KeyPressMsg{ctrlKey('f')}, typeText("cé")...)...)
+	assertFiltered(t, model, "m")
+
+	press(t, model, keyCode(tea.KeyBackspace))
+
+	if model.query != "c" {
+		t.Fatalf("query = %q, want %q", model.query, "c")
+	}
+
+	assertFilteredSet(t, model, "c", "d", "m")
+}
+
+func TestBackspaceOnEmptyQueryKeepsFullList(t *testing.T) {
+	model := newBindingModel(t, searchTestBindings...)
+	press(t, model, ctrlKey('f'))
+
+	cmd := press(t, model, keyCode(tea.KeyBackspace))
+
+	if cmd != nil {
+		t.Fatalf("Update() command = %v, want nil", cmd)
+	}
+
+	if model.query != "" {
+		t.Fatalf("query = %q, want empty", model.query)
+	}
+
+	assertFiltered(t, model, "c", "d", "%", "m")
+}
+
+func TestClearingSearchQueryRestoresFullList(t *testing.T) {
+	model := newBindingModel(t, searchTestBindings...)
+	press(t, model, append([]tea.KeyPressMsg{ctrlKey('f')}, typeText("leave")...)...)
+	assertFiltered(t, model, "d")
+
+	press(t, model, keyCode(tea.KeyBackspace), keyCode(tea.KeyBackspace), keyCode(tea.KeyBackspace), keyCode(tea.KeyBackspace), keyCode(tea.KeyBackspace))
+
+	assertFiltered(t, model, "c", "d", "%", "m")
+}
+
+func TestFilteringClampsCursorToNewListLength(t *testing.T) {
+	model := newBindingModel(t, searchTestBindings...)
+	press(t, model, keyCode(tea.KeyEnd), ctrlKey('f'))
+
+	press(t, model, typeText("leave")...)
+
+	if model.cursor != 0 {
+		t.Fatalf("cursor = %d, want 0", model.cursor)
+	}
+
+	press(t, model, keyCode(tea.KeyEnter))
+
+	if got := model.DeferredCommand(); got != "detach-client" {
+		t.Fatalf("DeferredCommand() = %q, want detach-client", got)
+	}
+}
+
+func TestCloseKeysQuitWithoutRunningCommand(t *testing.T) {
+	tests := []struct {
+		name string
+		key  tea.KeyPressMsg
+	}{
+		{name: "esc", key: keyCode(tea.KeyEscape)},
+		{name: "ctrl+c", key: ctrlKey('c')},
+		{name: "ctrl+o", key: ctrlKey('o')},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model := newBindingModel(t, searchTestBindings...)
+
+			cmd := press(t, model, tt.key)
+
+			if got := model.DeferredCommand(); got != "" {
+				t.Fatalf("DeferredCommand() = %q, want empty", got)
+			}
+
+			assertQuit(t, cmd)
+		})
 	}
 }
