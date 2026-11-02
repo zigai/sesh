@@ -354,3 +354,155 @@ func (w *logWatchTestWriter) String() string {
 func lineMatchesFilter(line []byte, opts Options) bool {
 	return logging.LineMatchesFilter(line, opts.toLoggingFilter())
 }
+
+func todayLogTime(clock string) (string, string) {
+	date := time.Now().UTC().Format("2006-01-02")
+
+	return date + "T" + clock + "Z", date
+}
+
+func boundedLogRecord(timestamp, message string) string {
+	if timestamp == "" {
+		return `{"level":"info","component":"probe","message":"` + message + `"}` + "\n"
+	}
+
+	return `{"time":"` + timestamp + `","level":"info","component":"probe","message":"` + message + `"}` + "\n"
+}
+
+func TestDisplayRetainedLogsWithLineLimitShowsShortTimesWhenAllRecordsAreFromToday(t *testing.T) {
+	first, _ := todayLogTime("00:00:01")
+	second, _ := todayLogTime("00:00:02")
+	path := writeLogsTestFile(t, boundedLogRecord(first, "alpha")+boundedLogRecord(second, "beta"))
+
+	var output, diagnostics bytes.Buffer
+
+	err := DisplayRetainedLogs(t.Context(), &output, &diagnostics, path, Options{Lines: 10})
+	if err != nil {
+		t.Fatalf("DisplayRetainedLogs() error = %v", err)
+	}
+
+	want := "00:00:01 INFO  probe: alpha\n" +
+		"00:00:02 INFO  probe: beta\n"
+	if output.String() != want || diagnostics.Len() != 0 {
+		t.Fatalf("output = %q, diagnostics = %q, want %q and no diagnostics", output.String(), diagnostics.String(), want)
+	}
+}
+
+func TestDisplayRetainedLogsWithLineLimitShowsFullTimesWhenAnyRecordIsFromAnotherDay(t *testing.T) {
+	today, date := todayLogTime("00:00:02")
+	path := writeLogsTestFile(t, boundedLogRecord("2001-02-03T04:05:06Z", "old")+boundedLogRecord(today, "new"))
+
+	var output bytes.Buffer
+
+	if err := DisplayRetainedLogs(t.Context(), &output, io.Discard, path, Options{Lines: 10}); err != nil {
+		t.Fatalf("DisplayRetainedLogs() error = %v", err)
+	}
+
+	want := "2001-02-03 04:05:06 INFO  probe: old\n" +
+		date + " 00:00:02 INFO  probe: new\n"
+	if output.String() != want {
+		t.Fatalf("output = %q, want %q", output.String(), want)
+	}
+}
+
+func TestDisplayRetainedLogsWithLineLimitIgnoresRecordsWithoutUsableTimeForShortTimes(t *testing.T) {
+	today, _ := todayLogTime("00:00:03")
+	content := boundedLogRecord("", "untimed") +
+		boundedLogRecord("not-a-time", "garbled") +
+		boundedLogRecord(today, "timed")
+	path := writeLogsTestFile(t, content)
+
+	var output bytes.Buffer
+
+	if err := DisplayRetainedLogs(t.Context(), &output, io.Discard, path, Options{Lines: 10}); err != nil {
+		t.Fatalf("DisplayRetainedLogs() error = %v", err)
+	}
+
+	want := "         INFO  probe: untimed\n" +
+		"not-a-time INFO  probe: garbled\n" +
+		"00:00:03 INFO  probe: timed\n"
+	if output.String() != want {
+		t.Fatalf("output = %q, want %q", output.String(), want)
+	}
+}
+
+func TestDisplayRetainedLogsWithLineLimitReportsMalformedRecordAndKeepsRendering(t *testing.T) {
+	content := boundedLogRecord("2001-02-03T04:05:06Z", "before") +
+		`{"time":"2001-02-03T04:05:07Z","message":` + "\n" +
+		boundedLogRecord("2001-02-03T04:05:08Z", "after")
+	path := writeLogsTestFile(t, content)
+
+	var output, diagnostics bytes.Buffer
+
+	if err := DisplayRetainedLogs(t.Context(), &output, &diagnostics, path, Options{Lines: 10}); err != nil {
+		t.Fatalf("DisplayRetainedLogs() error = %v", err)
+	}
+
+	wantOutput := "2001-02-03 04:05:06 INFO  probe: before\n" +
+		"2001-02-03 04:05:08 INFO  probe: after\n"
+	wantDiagnostics := "warning: omitted malformed diagnostic log record 2\n"
+
+	if output.String() != wantOutput {
+		t.Fatalf("output = %q, want %q", output.String(), wantOutput)
+	}
+
+	if diagnostics.String() != wantDiagnostics {
+		t.Fatalf("diagnostics = %q, want %q", diagnostics.String(), wantDiagnostics)
+	}
+}
+
+func TestDisplayRetainedLogsWithLineLimitShowsOnlyTheLastRecords(t *testing.T) {
+	content := boundedLogRecord("2001-02-03T04:05:01Z", "one") +
+		boundedLogRecord("2001-02-03T04:05:02Z", "two") +
+		boundedLogRecord("2001-02-03T04:05:03Z", "three")
+	path := writeLogsTestFile(t, content)
+
+	var output bytes.Buffer
+
+	if err := DisplayRetainedLogs(t.Context(), &output, io.Discard, path, Options{Lines: 2}); err != nil {
+		t.Fatalf("DisplayRetainedLogs() error = %v", err)
+	}
+
+	want := "2001-02-03 04:05:02 INFO  probe: two\n" +
+		"2001-02-03 04:05:03 INFO  probe: three\n"
+	if output.String() != want {
+		t.Fatalf("output = %q, want %q", output.String(), want)
+	}
+}
+
+func TestDisplayRetainedLogsWithLineLimitStopsWhenCanceledMidOutput(t *testing.T) {
+	content := boundedLogRecord("2001-02-03T04:05:01Z", "one") +
+		boundedLogRecord("2001-02-03T04:05:02Z", "two")
+	path := writeLogsTestFile(t, content)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	writer := &logWatchTestWriter{afterWrite: func(int) { cancel() }}
+
+	err := DisplayRetainedLogs(ctx, writer, io.Discard, path, Options{Lines: 10})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("DisplayRetainedLogs() error = %v, want context.Canceled", err)
+	}
+
+	want := "2001-02-03 04:05:01 INFO  probe: one\n"
+	if writer.String() != want {
+		t.Fatalf("output = %q, want only the record written before cancellation %q", writer.String(), want)
+	}
+}
+
+func TestDisplayRetainedLogsPrettyRawIndentsJSONAndPassesOtherLinesThrough(t *testing.T) {
+	path := writeLogsTestFile(t, `{"a":1,"b":[2]}`+"\n"+"not json {\n")
+
+	var output bytes.Buffer
+
+	if err := DisplayRetainedLogs(t.Context(), &output, io.Discard, path, Options{Raw: true, Pretty: true, Lines: 10}); err != nil {
+		t.Fatalf("DisplayRetainedLogs() error = %v", err)
+	}
+
+	want := "{\n  \"a\": 1,\n  \"b\": [\n    2\n  ]\n}\n" +
+		"not json {\n"
+	if output.String() != want {
+		t.Fatalf("output = %q, want %q", output.String(), want)
+	}
+}
