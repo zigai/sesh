@@ -158,7 +158,16 @@ func fieldsOf(typ reflect.Type) *structFields {
 	fields := &structFields{types: nil, byName: make(map[string][]int)}
 
 	for field := range typ.Fields() {
-		name, _, _ := strings.Cut(field.Tag.Get("json"), ",")
+		tag := field.Tag.Get("json")
+		if !field.IsExported() || tag == "-" {
+			continue
+		}
+
+		name, _, _ := strings.Cut(tag, ",")
+		if name == "" {
+			name = field.Name
+		}
+
 		fields.byName[name] = append(fields.byName[name], len(fields.types))
 		fields.types = append(fields.types, field.Type)
 	}
