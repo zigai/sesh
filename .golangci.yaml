@@ -281,6 +281,11 @@ linters:
         linters: [gosec]
         text: "G703:"
 
+      # TOML keys are the documented user config format, so they stay snake_case.
+      - path: "internal/config/.*"
+        linters: [tagliatelle]
+        text: "toml\\(camel\\)"
+
       # Test-helper packages (named like httptest) only build fixtures.
       - path: "(^|/)[a-z0-9]+test/"
         linters: [exhaustruct_v5]
