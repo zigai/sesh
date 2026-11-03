@@ -13,14 +13,16 @@ var (
 		"agent.next",
 		"Next agent",
 		"Switch to the next coding agent needing attention",
-		"Switch to the next coding agent pane needing attention (waiting, failed, or idle) and activate its window, session, and pane.",
+		"Switch to the next coding agent pane needing attention (waiting, failed, or idle) and activate "+
+			"its window, session, and pane.",
 	)
 
 	AgentLatest = defineAgentNavigation(
 		"agent.latest",
 		"Latest agent",
 		"Focus the coding agent that most recently became idle",
-		"Focus the live coding agent pane with the most recent recorded transition to idle. Idle can include startup and does not confirm completed work.",
+		"Focus the live coding agent pane with the most recent recorded transition to idle. "+
+			"Idle can include startup and does not confirm completed work.",
 	)
 
 	AgentWaiting = defineAgentNavigation(
@@ -34,7 +36,8 @@ var (
 		"agent.unread",
 		"Unread agent",
 		"Focus the most recently idle coding agent with an unvisited result",
-		"Focus the newest idle transition not acknowledged by sesh-recorded visits. The current pane is observed as visited. "+
+		"Focus the newest idle transition not acknowledged by sesh-recorded visits. "+
+			"The current pane is observed as visited. "+
 			"Repeated invocations advance through unread results. Arbitrary manual pane visits are not tracked.",
 	)
 
@@ -49,8 +52,10 @@ var (
 		"agent.toggle",
 		"Toggle agent",
 		"Alternate between your working pane and the last agent visited",
-		"Alternate between the working pane and the last agent visited through sesh navigation, independently of agent back "+
-			"history. A manually selected working pane replaces the remembered working pane. Requires an earlier agent navigation for this client.",
+		"Alternate between the working pane and the last agent visited through sesh navigation, "+
+			"independently of agent back "+
+			"history. A manually selected working pane replaces the remembered working pane. "+
+			"Requires an earlier agent navigation for this client.",
 	)
 
 	AgentBack = define(Descriptor{
@@ -101,9 +106,12 @@ var (
 		Remote:      RemoteNever,
 		InPicker:    false,
 		check:       nil,
-	}, func(Subject, Values) (ClearWindowStatus, error) { return ClearWindowStatus{}, nil }, func(ClearedWindowStatus) string {
-		return "Cleared agent window styles"
-	})
+	},
+		func(Subject, Values) (ClearWindowStatus, error) { return ClearWindowStatus{}, nil },
+		func(ClearedWindowStatus) string {
+			return "Cleared agent window styles"
+		},
+	)
 )
 
 var AgentMerge = define(Descriptor{

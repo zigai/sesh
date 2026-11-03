@@ -156,7 +156,19 @@ func TestLatestIdleRejectsIneligibleRecordsWithoutSuccessLogs(t *testing.T) {
 
 	panes := navigationPanes()
 
-	for _, name := range []string{"running", "waiting", "failed", "interrupted", "unknown", "zero_time", "vanished", "wrong_process", "wrong_session", "noninteractive", "ended"} {
+	for _, name := range []string{
+		"running",
+		"waiting",
+		"failed",
+		"interrupted",
+		"unknown",
+		"zero_time",
+		"vanished",
+		"wrong_process",
+		"wrong_session",
+		"noninteractive",
+		"ended",
+	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 

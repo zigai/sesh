@@ -634,8 +634,10 @@ func retiredUnitsFixture(t *testing.T) ([]ServiceDefinition, []string) {
 	restorePath := filepath.Join(directory, RestoreServiceName)
 
 	files := map[string]string{
-		tmuxPath:    "# " + ManagedMarker + "\n[Service]\nExecStart=/private/sesh daemon tmux\n\n[Install]\nWantedBy=default.target\n",
-		restorePath: "# " + ManagedMarker + "\n[Service]\nType=oneshot\nExecStart=/private/sesh autosave restore-on-start\n",
+		tmuxPath: "# " + ManagedMarker + "\n[Service]\nExecStart=/private/sesh daemon tmux\n\n" +
+			"[Install]\nWantedBy=default.target\n",
+		restorePath: "# " + ManagedMarker + "\n[Service]\n" +
+			"Type=oneshot\nExecStart=/private/sesh autosave restore-on-start\n",
 	}
 	for path, content := range files {
 		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {

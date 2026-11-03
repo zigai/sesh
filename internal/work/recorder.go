@@ -158,7 +158,12 @@ func withHistory(ctx context.Context, sightings []Sighting, known State) []Sight
 }
 
 func conversationTitle(conversation history.Conversation) string {
-	for _, title := range []string{conversation.CustomTitle, conversation.AITitle, conversation.Title, conversation.Prompt} {
+	for _, title := range []string{
+		conversation.CustomTitle,
+		conversation.AITitle,
+		conversation.Title,
+		conversation.Prompt,
+	} {
 		if line, _, _ := strings.Cut(strings.TrimSpace(title), "\n"); line != "" {
 			return line
 		}

@@ -120,7 +120,8 @@ func TestLogsCommandMultiFileBounding(t *testing.T) {
 	for i := range 30 {
 		fmt.Fprintf(
 			&newer,
-			`{"time":"2026-08-06T15:46:%02dZ","level":"info","component":"resurrect","command":"test","message":"event %d"}`+"\n",
+			`{"time":"2026-08-06T15:46:%02dZ","level":"info",`+
+				`"component":"resurrect","command":"test","message":"event %d"}`+"\n",
 			i%60,
 			31+i,
 		)
@@ -233,9 +234,12 @@ func testCombinedAndInvalidFilters(t *testing.T, path string) {
 
 func TestLogsCommandFiltering(t *testing.T) {
 	dataset := strings.Join([]string{
-		`{"time":"2026-08-06T15:45:01Z","level":"info","component":"resurrect","command":"test","message":"alpha-info"}`,
-		`{"time":"2026-08-06T15:45:02Z","level":"warn","component":"resurrect","command":"test","message":"bravo-warn"}`,
-		`{"time":"2026-08-06T15:45:03Z","level":"error","component":"remote","command":"test","message":"charlie-error"}`,
+		`{"time":"2026-08-06T15:45:01Z","level":"info","component":"resurrect",` +
+			`"command":"test","message":"alpha-info"}`,
+		`{"time":"2026-08-06T15:45:02Z","level":"warn","component":"resurrect",` +
+			`"command":"test","message":"bravo-warn"}`,
+		`{"time":"2026-08-06T15:45:03Z","level":"error","component":"remote",` +
+			`"command":"test","message":"charlie-error"}`,
 		`{"time":"2026-08-06T15:45:04Z","level":"debug","component":"remote","command":"test","message":"delta-debug"}`,
 		`{"time":"2026-08-06T15:45:05Z","level":"info","component":"tui","command":"test","message":"echo-info"}`,
 	}, "\n") + "\n"

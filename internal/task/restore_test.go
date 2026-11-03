@@ -121,7 +121,12 @@ func TestRestoreLaunchesRunsTheRecordedCommandOfRestartingTaskPanesOnly(t *testi
 }
 
 func TestRestoreLaunchesIgnoresAnUnreadableRestartCommand(t *testing.T) {
-	for _, value := range []string{`not json`, `{"directory":"/w","argv":[]}`, `{"directory":"/w","argv":["sh"]}`, `{"directory":"w","argv":["/bin/sh"]}`} {
+	for _, value := range []string{
+		`not json`,
+		`{"directory":"/w","argv":[]}`,
+		`{"directory":"/w","argv":["sh"]}`,
+		`{"directory":"w","argv":["/bin/sh"]}`,
+	} {
 		f := newRestoreFixture(t)
 		f.manifest.Panes[1].Options = append(
 			f.manifest.Panes[1].Options,

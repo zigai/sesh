@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	SocketFlagUsage     = "Socket path of the tmux server [default: the current tmux server, else tmux's default socket]"
+	SocketFlagUsage = "Socket path of the tmux server " +
+		"[default: the current tmux server, else tmux's default socket]"
 	RepositoryFlagUsage = "Snapshot repository directory [default: <data dir>/snapshots]"
 	LeaseRootFlagUsage  = "Shared tmux endpoint lease directory [default: <data dir>/leases]"
 	HistoryFlagUsage    = "Session history state file [default: $XDG_STATE_HOME/sesh/history.json]"

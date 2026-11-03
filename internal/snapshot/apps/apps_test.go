@@ -1122,7 +1122,8 @@ func testAdapterArgv0(
 			[]string{name},
 			apps.RecoveryRestart,
 		)
-	} else if reason != apps.ReasonUnsafeArguments || reason.Supported() || prepared.Recovery != apps.RecoveryUnverified {
+	} else if reason != apps.ReasonUnsafeArguments || reason.Supported() ||
+		prepared.Recovery != apps.RecoveryUnverified {
 		t.Fatalf("argv0-only: got %q, want ReasonUnsafeArguments", reason)
 	}
 }

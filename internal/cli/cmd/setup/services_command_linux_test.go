@@ -73,7 +73,12 @@ func TestSetupServicesApplyWritesOwnedDefinitions(t *testing.T) {
 		t.Fatalf("result = %+v, want four written definitions", result)
 	}
 
-	for _, name := range []string{setup.AutosaveServiceName, setup.AutosaveTimerName, setup.RemoteServiceName, setup.AgentStatusServiceName} {
+	for _, name := range []string{
+		setup.AutosaveServiceName,
+		setup.AutosaveTimerName,
+		setup.RemoteServiceName,
+		setup.AgentStatusServiceName,
+	} {
 		content, err := os.ReadFile(filepath.Join(directory, name))
 		if err != nil {
 			t.Fatalf("reading %s failed: %v", name, err)
@@ -316,7 +321,12 @@ func targetsSocket(content string, socket string) bool {
 func assertWrittenManagedUnits(t *testing.T, directory string) {
 	t.Helper()
 
-	for _, name := range []string{setup.AutosaveServiceName, setup.AutosaveTimerName, setup.TmuxServiceName, setup.RestoreServiceName} {
+	for _, name := range []string{
+		setup.AutosaveServiceName,
+		setup.AutosaveTimerName,
+		setup.TmuxServiceName,
+		setup.RestoreServiceName,
+	} {
 		content, err := os.ReadFile(filepath.Join(directory, name))
 		if err != nil {
 			t.Fatalf("reading %s failed: %v", name, err)
@@ -516,7 +526,13 @@ func TestSetupServicesWithCoordinatorApplyWritesAllDefinitions(t *testing.T) {
 		t.Fatalf("result = %+v, want 5 written definitions", result)
 	}
 
-	for _, name := range []string{setup.AutosaveServiceName, setup.AutosaveTimerName, setup.RemoteServiceName, setup.AgentStatusServiceName, setup.CoordinatorServiceName} {
+	for _, name := range []string{
+		setup.AutosaveServiceName,
+		setup.AutosaveTimerName,
+		setup.RemoteServiceName,
+		setup.AgentStatusServiceName,
+		setup.CoordinatorServiceName,
+	} {
 		content, err := os.ReadFile(filepath.Join(directory, name))
 		if err != nil {
 			t.Fatalf("expected %s to exist: %v", name, err)

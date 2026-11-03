@@ -93,7 +93,8 @@ func TestUnopenableLogFileNamesTheSettingAndTheDoctor(t *testing.T) {
 		t.Fatal("a command whose log cannot open must fail")
 	}
 
-	want := "log file cannot be opened; set paths.log_file to a file in a writable directory; run 'sesh doctor' for details\n"
+	want := "log file cannot be opened; set paths.log_file to a file in a writable directory; " +
+		"run 'sesh doctor' for details\n"
 	if stderr.String() != want {
 		t.Fatalf("stderr = %q, want %q", stderr.String(), want)
 	}
@@ -414,15 +415,19 @@ func TestApplicationHumanConfigDiagnostics(t *testing.T) {
 	}{
 		"validation reason": {
 			config: "[display]\nsesh_format = \"{session_name} {custom.weather}\"\n",
-			want:   "configuration could not be loaded: invalid display.sesh_format: undefined custom field: custom.weather has no display.fields.weather entry; run 'sesh doctor' for details\n",
+			want: "configuration could not be loaded: invalid display.sesh_format: " +
+				"undefined custom field: custom.weather has no display.fields.weather entry; " +
+				"run 'sesh doctor' for details\n",
 		},
 		"unknown key": {
 			config: "[settings]\nlog_levl = \"debug\"\n",
-			want:   "invalid configuration at line 2, column 1: unknown key settings.log_levl; run 'sesh doctor' for details\n",
+			want: "invalid configuration at line 2, column 1: unknown key settings.log_levl; " +
+				"run 'sesh doctor' for details\n",
 		},
 		"wrong value type": {
 			config: "[theme]\npreset = 5\n",
-			want:   "invalid configuration at line 2, column 10: wrong value type for theme.preset (got integer); run 'sesh doctor' for details\n",
+			want: "invalid configuration at line 2, column 10: wrong value type for theme.preset (got integer); " +
+				"run 'sesh doctor' for details\n",
 		},
 		"duplicate table": {
 			config: "[theme]\n[theme]\n",
@@ -787,7 +792,8 @@ func testFinalizationFailure(t *testing.T, uncertain bool) {
 
 	_, err := output.Write(
 		[]byte(
-			`{"schemaVersion":1,"ok":true,"result":{"generation":"9007199254740993","sequence":9007199254740993},"error":null}`,
+			`{"schemaVersion":1,"ok":true,"result":{"generation":"9007199254740993","sequence":9007199254740993},` +
+				`"error":null}`,
 		),
 	)
 	if err != nil {

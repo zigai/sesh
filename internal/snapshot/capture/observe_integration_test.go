@@ -269,7 +269,10 @@ func TestObserveOmitsFloatingPanes(t *testing.T) {
 		t.Fatal("exactly one tiled pane must take over from the active floating pane")
 	}
 
-	layoutEvidence := observation.Manifest.Evidence[slices.IndexFunc(observation.Manifest.Evidence, func(e model.Evidence) bool { return e.Domain == "S03" })]
+	layoutEvidence := observation.Manifest.Evidence[slices.IndexFunc(
+		observation.Manifest.Evidence,
+		func(e model.Evidence) bool { return e.Domain == "S03" },
+	)]
 	if layoutEvidence.Reason != string(model.ReasonFloatingPanesOmitted) {
 		t.Fatalf("layout evidence = %+v, want floating panes omitted", layoutEvidence)
 	}

@@ -1542,7 +1542,8 @@ func TestDeepOwnershipStepsImmutability(t *testing.T) {
 		stepAs[*CreateSessionStep](plan.Steps[0]).Name[0] = 'Z'
 		if plan.SourceGraph.Sessions[0].Name[0] == 'Z' {
 			t.Fatal(
-				"mutating plan.Steps[0].(*CreateSessionStep).Name mutated plan.SourceGraph.Sessions[0].Name (aliasing bug)",
+				"mutating plan.Steps[0].(*CreateSessionStep).Name mutated " +
+					"plan.SourceGraph.Sessions[0].Name (aliasing bug)",
 			)
 		}
 	}
@@ -1551,7 +1552,8 @@ func TestDeepOwnershipStepsImmutability(t *testing.T) {
 		stepAs[*CreateSessionStep](plan.Steps[0]).Directory[0] = 'X'
 		if plan.SourceGraph.Sessions[0].Directory[0] == 'X' {
 			t.Fatal(
-				"mutating plan.Steps[0].(*CreateSessionStep).Directory mutated plan.SourceGraph.Sessions[0].Directory (aliasing bug)",
+				"mutating plan.Steps[0].(*CreateSessionStep).Directory mutated " +
+					"plan.SourceGraph.Sessions[0].Directory (aliasing bug)",
 			)
 		}
 	}

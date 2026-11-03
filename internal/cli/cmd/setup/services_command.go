@@ -91,7 +91,8 @@ func newSetupAgentsCommand() *cobra.Command {
 		Use:   "agents [agent...]",
 		Short: "Configure coding-agent reporting through the published AHT interface",
 		Long: "Configure coding-agent integrations and the background tracker.\n\n" +
-			"Agent hooks, shims and the tracker service are owned and installed by AHT; sesh never duplicates hook installation. " +
+			"Agent hooks, shims and the tracker service are owned and installed by AHT; " +
+			"sesh never duplicates hook installation. " +
 			"Without agent names every supported harness is selected.",
 		Args:        clibase.UsageArgs(cobra.ArbitraryArgs),
 		RunE:        runSetupAgents,
@@ -263,7 +264,11 @@ func newSetupServicesCommand() *cobra.Command {
 	cmd.Flags().
 		Bool("with-coordinator", false, "Also render the sleep and shutdown save coordinator definition")
 	cmd.Flags().
-		Bool("verify-tmux", false, "Verify the target tmux version through the given socket before rendering the tmux service")
+		Bool(
+			"verify-tmux",
+			false,
+			"Verify the target tmux version through the given socket before rendering the tmux service",
+		)
 
 	return cmd
 }
@@ -277,14 +282,23 @@ func addServiceSetupFlags(cmd *cobra.Command) {
 		String("program", "", "Absolute path of the sesh executable [default: the running sesh executable]")
 	cmd.Flags().String("tmux", "", "Explicit absolute path of the tmux executable")
 	cmd.Flags().
-		String("socket", "", "Socket of the tmux server the services target [default: the sesh-managed socket with --with-tmux-service, else tmux's default socket]")
+		String(
+			"socket",
+			"",
+			"Socket of the tmux server the services target "+
+				"[default: the sesh-managed socket with --with-tmux-service, else tmux's default socket]",
+		)
 	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
 	cmd.Flags().String("lease-root", "", clibase.LeaseRootFlagUsage)
 	cmd.Flags().String("history", "", clibase.HistoryFlagUsage)
 	cmd.Flags().String("status-file", "", clibase.StatusFileFlagUsage)
 	cmd.Flags().Duration("interval", 0, "Autosave interval [default: autosave.interval setting]")
 	cmd.Flags().
-		Duration("final-save-deadline", defaultServiceFinalSaveDeadline, "Bounded time budget for the shutdown final save")
+		Duration(
+			"final-save-deadline",
+			defaultServiceFinalSaveDeadline,
+			"Bounded time budget for the shutdown final save",
+		)
 	clibase.AddJSONFlag(cmd)
 }
 

@@ -29,7 +29,8 @@ func TestProcessObservationExactLaunchFacts(t *testing.T) {
 
 	dir := filepath.Join(
 		t.TempDir(),
-		"cwd with spaces and \t tabs and \n newlines", //nolint:gocritic // filepathJoin: escapes encode control characters.
+		//nolint:gocritic // filepathJoin: escapes encode control characters.
+		"cwd with spaces and \t tabs and \n newlines",
 	)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatal(err)

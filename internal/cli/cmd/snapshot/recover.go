@@ -35,7 +35,9 @@ func newRecoverRestoreCommand() *cobra.Command {
 	show := newRecoverOperationCommand(
 		"show",
 		"Inspect and confirm the durable journal of a restore operation",
-		"Inspect and confirm the durable journal of a restore operation. This does not replay effects, inspect live tmux state, or release its recovery source. To resume it, rerun snapshot restore with --operation and the original generation and sessions.",
+		"Inspect and confirm the durable journal of a restore operation. "+
+			"This does not replay effects, inspect live tmux state, or release its recovery source. "+
+			"To resume it, rerun snapshot restore with --operation and the original generation and sessions.",
 		"reconcile_restore",
 		runRecoverRestoreShow,
 	)
@@ -43,7 +45,8 @@ func newRecoverRestoreCommand() *cobra.Command {
 	abandon := newRecoverOperationCommand(
 		"abandon",
 		"Explicitly abandon a restore and release its recovery source pin",
-		"Explicitly abandon a restore and release its recovery source pin. Existing tmux objects are retained. Uncertain external effects remain uncertain; abandonment never rolls them back.",
+		"Explicitly abandon a restore and release its recovery source pin. Existing tmux objects are retained. "+
+			"Uncertain external effects remain uncertain; abandonment never rolls them back.",
 		"abandon_restore",
 		runRecoverRestoreAbandon,
 	)

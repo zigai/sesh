@@ -65,7 +65,16 @@ func TestAgentResumeRequiresUniqueExactPaneAndEndpoint(t *testing.T) {
 
 	pane.ID, pane.PID = "%4", 120
 
-	for _, change := range []string{"valid", "unknown_socket", "shorthand_socket", "other_socket", "other_pane", "other_process", "ambiguous", "missing_command"} {
+	for _, change := range []string{
+		"valid",
+		"unknown_socket",
+		"shorthand_socket",
+		"other_socket",
+		"other_pane",
+		"other_process",
+		"ambiguous",
+		"missing_command",
+	} {
 		t.Run(change, func(t *testing.T) {
 			candidate := agent
 			changeAgentBinding(&candidate, change)

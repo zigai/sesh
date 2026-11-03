@@ -50,9 +50,10 @@ func newListCommand() *cobra.Command {
 		Use:         "list",
 		Short:       "List live tmux sessions",
 		Annotations: map[string]string{clibase.AnnotationOperation: "list"},
-		Long:        "List live tmux sessions ordered by activity and switch history.\n\nReads metadata only from the explicit tmux server socket and configured history state.",
-		Args:        clibase.UsageArgs(cobra.NoArgs),
-		RunE:        runList,
+		Long: "List live tmux sessions ordered by activity and switch history.\n\n" +
+			"Reads metadata only from the explicit tmux server socket and configured history state.",
+		Args: clibase.UsageArgs(cobra.NoArgs),
+		RunE: runList,
 	}
 
 	clibase.AddSocketFlag(cmd)
@@ -237,7 +238,8 @@ func hintSavedSessions(cmd *cobra.Command, server *gotmux.Server, empty bool) {
 	case len(missing) > 0:
 		_, _ = fmt.Fprintf(
 			cmd.ErrOrStderr(),
-			"Saved sessions not running: %s\ntmux started after the newest snapshot, so they were not restored.\nRestore with: %s\n",
+			"Saved sessions not running: %s\ntmux started after the newest snapshot, so they were not restored.\n"+
+				"Restore with: %s\n",
 			strings.Join(missing, ", "),
 			restoreCommand(cmd, workspace),
 		)

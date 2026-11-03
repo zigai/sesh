@@ -24,7 +24,14 @@ func TestNewCommand(t *testing.T) {
 func TestReportsShareApplicableChecksAndCounts(test *testing.T) {
 	test.Parallel()
 
-	for _, scenario := range []string{"unsupported", "no services", "stale unit", "inspection error", "autosave enabled", "installed coordinator"} {
+	for _, scenario := range []string{
+		"unsupported",
+		"no services",
+		"stale unit",
+		"inspection error",
+		"autosave enabled",
+		"installed coordinator",
+	} {
 		test.Run(scenario, func(test *testing.T) {
 			test.Parallel()
 

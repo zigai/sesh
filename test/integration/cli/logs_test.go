@@ -24,8 +24,10 @@ import (
 
 const (
 	testLogsCmd         = "logs"
-	formattedInfoRecord = `{"time":"2026-08-06T15:46:01Z","level":"info","command":"continuum.tick","version":"dev","commit":"abc123","pid":43,"component":"resurrect","operation":"save","status":"ok","duplicate":false,"partial":false,"duration_ms":4983,"message":"resurrect save completed"}`
-	exitCodePipe        = 141
+	formattedInfoRecord = `{"time":"2026-08-06T15:46:01Z","level":"info","command":"continuum.tick","version":"dev",` +
+		`"commit":"abc123","pid":43,"component":"resurrect","operation":"save","status":"ok",` +
+		`"duplicate":false,"partial":false,"duration_ms":4983,"message":"resurrect save completed"}`
+	exitCodePipe = 141
 )
 
 type logWatchTestWriter struct {
@@ -479,7 +481,8 @@ func TestLogsHostileRecordsAndTerminalSanitization(t *testing.T) {
 	tempDir := t.TempDir()
 	logPath := filepath.Join(tempDir, "hostile.log")
 
-	hostileRecord := "{\"time\":\"2026-09-20T12:00:00Z\",\"level\":\"error\",\"component\":\"evil\\u001b[2J\",\"message\":\"msg\\u001b[H\\u001b[?25l\"}\n"
+	hostileRecord := "{\"time\":\"2026-09-20T12:00:00Z\",\"level\":\"error\"," +
+		"\"component\":\"evil\\u001b[2J\",\"message\":\"msg\\u001b[H\\u001b[?25l\"}\n"
 	if err := os.WriteFile(logPath, []byte(hostileRecord), 0o600); err != nil {
 		t.Fatalf("writing hostile log: %v", err)
 	}

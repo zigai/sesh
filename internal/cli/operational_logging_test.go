@@ -94,7 +94,8 @@ func TestHooksPersistExecutionWithoutRepeatingSuccessOrLeakingOutput(t *testing.
 	path := filepath.Join(base, "hook.jsonl")
 
 	data := fmt.Sprintf(
-		"[settings]\nlog_level = \"info\"\n[paths]\nlog_file = %q\n[[hooks.session_switch_pre]]\ncommand = \"printf\"\nargs = [\"PRIVATE_HOOK_OUTPUT\"]\n",
+		"[settings]\nlog_level = \"info\"\n[paths]\nlog_file = %q\n"+
+			"[[hooks.session_switch_pre]]\ncommand = \"printf\"\nargs = [\"PRIVATE_HOOK_OUTPUT\"]\n",
 		path,
 	)
 	if err := os.WriteFile(cfg, []byte(data), 0o600); err != nil {

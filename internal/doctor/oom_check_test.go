@@ -43,12 +43,60 @@ func TestServiceOOMPolicyReportsApplicablePoliciesAndInspectionErrors(test *test
 		message string
 		fix     string
 	}{
-		{"stops whole unit", oomService(4242, "tmux.service", nil, "stop", nil), StatusWarn, ReasonUnsafe, "", "tmux.service uses OOMPolicy=stop", "OOMPolicy=continue"},
-		{"continues", oomService(4242, "tmux.service", nil, "continue", nil), StatusOK, "", "", "tmux.service uses OOMPolicy=continue", ""},
-		{"kills", oomService(4242, "tmux.service", nil, "kill", nil), StatusOK, "", "", "tmux.service uses OOMPolicy=kill", ""},
-		{"membership error", oomService(4242, "", errTestScope, "", nil), StatusWarn, ReasonInspectionFailed, "", "could not be inspected", "cgroup"},
-		{"policy error", oomService(4242, "tmux.service", nil, "", errTestSystemd), StatusWarn, ReasonInspectionFailed, "", "unreadable", "systemctl --user show"},
-		{"no server", oomService(0, "tmux.service", nil, "stop", nil), StatusSkip, "", CheckTmuxServer, "unavailable", ""},
+		{
+			"stops whole unit",
+			oomService(4242, "tmux.service", nil, "stop", nil),
+			StatusWarn,
+			ReasonUnsafe,
+			"",
+			"tmux.service uses OOMPolicy=stop",
+			"OOMPolicy=continue",
+		},
+		{
+			"continues",
+			oomService(4242, "tmux.service", nil, "continue", nil),
+			StatusOK,
+			"",
+			"",
+			"tmux.service uses OOMPolicy=continue",
+			"",
+		},
+		{
+			"kills",
+			oomService(4242, "tmux.service", nil, "kill", nil),
+			StatusOK,
+			"",
+			"",
+			"tmux.service uses OOMPolicy=kill",
+			"",
+		},
+		{
+			"membership error",
+			oomService(4242, "", errTestScope, "", nil),
+			StatusWarn,
+			ReasonInspectionFailed,
+			"",
+			"could not be inspected",
+			"cgroup",
+		},
+		{
+			"policy error",
+			oomService(4242, "tmux.service", nil, "", errTestSystemd),
+			StatusWarn,
+			ReasonInspectionFailed,
+			"",
+			"unreadable",
+			"systemctl --user show",
+		},
+		{
+			"no server",
+			oomService(0, "tmux.service", nil, "stop", nil),
+			StatusSkip,
+			"",
+			CheckTmuxServer,
+			"unavailable",
+			"",
+		},
 	} {
 		test.Run(scenario.name, func(test *testing.T) {
 			test.Parallel()

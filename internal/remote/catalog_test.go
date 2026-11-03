@@ -89,7 +89,11 @@ func TestRemoteDirUsesPrivateCacheHome(t *testing.T) {
 		t.Fatalf("RemoteDir() = %q, want %q", path, want)
 	}
 
-	for _, directory := range []string{cacheHome, filepath.Join(cacheHome, "sesh"), filepath.Join(cacheHome, "sesh", "remote")} {
+	for _, directory := range []string{
+		cacheHome,
+		filepath.Join(cacheHome, "sesh"),
+		filepath.Join(cacheHome, "sesh", "remote"),
+	} {
 		info, err := os.Lstat(directory)
 		if err != nil {
 			t.Fatalf("Lstat(%q) error = %v", directory, err)
@@ -185,9 +189,13 @@ func TestDecodeCatalogRejectsUnsafeContent(t *testing.T) {
 
 func TestDecodeCatalogRejectsInvalidConnectionState(t *testing.T) {
 	tests := map[string]func(*Catalog){
-		"mismatched id":      func(c *Catalog) { c.Connections["other"] = c.Connections["host"] },
-		"missing digest":     func(c *Catalog) { mutateConnection(c, func(s *ConnectionState) { s.ConfigDigest = "" }) },
-		"unknown error code": func(c *Catalog) { mutateConnection(c, func(s *ConnectionState) { s.LastError = "raw failure text" }) },
+		"mismatched id": func(c *Catalog) { c.Connections["other"] = c.Connections["host"] },
+		"missing digest": func(c *Catalog) {
+			mutateConnection(c, func(s *ConnectionState) { s.ConfigDigest = "" })
+		},
+		"unknown error code": func(c *Catalog) {
+			mutateConnection(c, func(s *ConnectionState) { s.LastError = "raw failure text" })
+		},
 		"invalid session": func(c *Catalog) {
 			mutateConnection(
 				c,
@@ -200,7 +208,9 @@ func TestDecodeCatalogRejectsInvalidConnectionState(t *testing.T) {
 				func(s *ConnectionState) { s.Snapshot.Health.Tmux = SourceStatus{} },
 			)
 		},
-		"control in label": func(c *Catalog) { mutateConnection(c, func(s *ConnectionState) { s.Label = "host\x1b[31m" }) },
+		"control in label": func(c *Catalog) {
+			mutateConnection(c, func(s *ConnectionState) { s.Label = "host\x1b[31m" })
+		},
 		"negative generation": func(c *Catalog) {
 			mutateConnection(c, func(s *ConnectionState) {
 				s.Sequence = 0

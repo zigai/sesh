@@ -55,10 +55,30 @@ func TestResolvePickerPresentationFollowsChoiceAndTmuxContext(t *testing.T) {
 	}{
 		{name: "auto outside tmux", choice: "auto", env: nil, want: presentationFullscreen},
 		{name: "empty outside tmux", choice: "", env: nil, want: presentationFullscreen},
-		{name: "auto inside tmux", choice: "auto", env: map[string]string{"TMUX": "/tmp/tmux-1/default,1,0"}, want: presentationInline},
-		{name: "auto inside tmux popup", choice: "auto", env: map[string]string{"TMUX": "/tmp/tmux-1/default,1,0", "TMUX_POPUP": "1"}, want: presentationPopup},
-		{name: "auto ignores popup marker outside tmux", choice: "auto", env: map[string]string{"TMUX_POPUP": "1"}, want: presentationFullscreen},
-		{name: "explicit fullscreen inside tmux", choice: "fullscreen", env: map[string]string{"TMUX": "/tmp/tmux-1/default,1,0"}, want: presentationFullscreen},
+		{
+			name:   "auto inside tmux",
+			choice: "auto",
+			env:    map[string]string{"TMUX": "/tmp/tmux-1/default,1,0"},
+			want:   presentationInline,
+		},
+		{
+			name:   "auto inside tmux popup",
+			choice: "auto",
+			env:    map[string]string{"TMUX": "/tmp/tmux-1/default,1,0", "TMUX_POPUP": "1"},
+			want:   presentationPopup,
+		},
+		{
+			name:   "auto ignores popup marker outside tmux",
+			choice: "auto",
+			env:    map[string]string{"TMUX_POPUP": "1"},
+			want:   presentationFullscreen,
+		},
+		{
+			name:   "explicit fullscreen inside tmux",
+			choice: "fullscreen",
+			env:    map[string]string{"TMUX": "/tmp/tmux-1/default,1,0"},
+			want:   presentationFullscreen,
+		},
 		{name: "explicit inline outside tmux", choice: "inline", env: nil, want: presentationInline},
 		{name: "explicit popup case insensitive", choice: " Popup ", env: nil, want: presentationPopup},
 	} {
@@ -262,7 +282,12 @@ func TestPickerColorProfileInsideTmuxNeedsNoTmuxQuery(t *testing.T) {
 		{"outside tmux", []string{"TERM=xterm-256color"}, colorprofile.Unknown, false},
 		{"inside tmux", inside, colorprofile.TrueColor, true},
 		{"inside tmux without color", append(slices.Clone(inside), "NO_COLOR=1"), colorprofile.ASCII, true},
-		{"inside tmux on a dumb terminal", []string{"TMUX=/tmp/tmux-1000/default,42,0", "TERM=dumb"}, colorprofile.NoTTY, true},
+		{
+			"inside tmux on a dumb terminal",
+			[]string{"TMUX=/tmp/tmux-1000/default,42,0", "TERM=dumb"},
+			colorprofile.NoTTY,
+			true,
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
@@ -724,10 +749,26 @@ func TestPickerHarnessSessionLabelFallbacks(t *testing.T) {
 		want  string
 	}{
 		{name: "native identifier", agent: agents.AgentSession{HarnessSessionID: " native "}, want: "native"},
-		{name: "pi filename", agent: agents.AgentSession{Harness: "pi", SessionPath: "/state/date_" + nativeID + ".jsonl"}, want: nativeID},
-		{name: "ordinary filename", agent: agents.AgentSession{Harness: "codex", SessionPath: "/state/conversation.jsonl"}, want: "conversation.jsonl"},
-		{name: "invalid pi suffix", agent: agents.AgentSession{Harness: "pi", SessionPath: "/state/date_not-a-uuid.jsonl"}, want: "date_not-a-uuid.jsonl"},
-		{name: "registry identifier", agent: agents.AgentSession{ID: " registry-id ", SessionPath: "/"}, want: "registry:registry-id"},
+		{
+			name:  "pi filename",
+			agent: agents.AgentSession{Harness: "pi", SessionPath: "/state/date_" + nativeID + ".jsonl"},
+			want:  nativeID,
+		},
+		{
+			name:  "ordinary filename",
+			agent: agents.AgentSession{Harness: "codex", SessionPath: "/state/conversation.jsonl"},
+			want:  "conversation.jsonl",
+		},
+		{
+			name:  "invalid pi suffix",
+			agent: agents.AgentSession{Harness: "pi", SessionPath: "/state/date_not-a-uuid.jsonl"},
+			want:  "date_not-a-uuid.jsonl",
+		},
+		{
+			name:  "registry identifier",
+			agent: agents.AgentSession{ID: " registry-id ", SessionPath: "/"},
+			want:  "registry:registry-id",
+		},
 		{name: "unknown", agent: agents.AgentSession{}, want: "unknown"},
 	} {
 		t.Run(test.name, func(t *testing.T) {

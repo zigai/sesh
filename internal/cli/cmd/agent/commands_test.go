@@ -49,6 +49,7 @@ func writeAgentRegistry(t *testing.T, sessions ...string) string {
 }
 
 func registrySession(id string, activity string, paneID string) string {
+	//nolint:lll // raw JSON fixture line cannot wrap without changing the string.
 	return `"` + id + `": {
 		"schema_version": 3,
 		"id": "` + id + `",

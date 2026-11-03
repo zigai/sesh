@@ -46,7 +46,8 @@ func TestSetupTmuxPrintsBindingsWithoutSocket(t *testing.T) {
 		t.Fatalf("setup tmux failed: %v\nstderr: %s", err, stderr)
 	}
 
-	caller := " --client '#{client_name}' --pane '#{pane_id}' --client-session '#{session_id}' --client-width '#{client_width}' --client-height '#{client_height}'"
+	caller := " --client '#{client_name}' --pane '#{pane_id}' --client-session '#{session_id}' " +
+		"--client-width '#{client_width}' --client-height '#{client_height}'"
 
 	for _, want := range []string{
 		rootBinding("S-F12", "sesh agent next"+caller+" --tmux-binding") + `\""`,
@@ -118,8 +119,9 @@ func TestSetupTmuxRejectsBindingsTmuxCannotRun(t *testing.T) {
 	t.Setenv("TMUX", "")
 
 	for name, text := range map[string]string{
-		"invalid key":    "[[keys.bind]]\nkey = \"not a key\"\naction = \"agent.back\"\nin = \"tmux\"\n",
-		"invalid table":  "[[keys.bind]]\nkey = \"M-b\"\naction = \"agent.back\"\nin = \"tmux\"\ntable = \"bad table\"\n",
+		"invalid key": "[[keys.bind]]\nkey = \"not a key\"\naction = \"agent.back\"\nin = \"tmux\"\n",
+		"invalid table": "[[keys.bind]]\nkey = \"M-b\"\naction = \"agent.back\"\nin = \"tmux\"\n" +
+			"table = \"bad table\"\n",
 		"missing params": "[[keys.bind]]\nkey = \"M-c\"\naction = \"session.create\"\nin = \"tmux\"\n",
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -152,5 +154,7 @@ func TestSetupTmuxApplyTargetsAmbientServerWithoutSocket(t *testing.T) {
 }
 
 func rootBinding(key string, command string) string {
-	return `bind-key -T root ` + key + ` if-shell -F "#{@sesh_remote}" "send-keys ` + key + `" "run-shell -b \"` + command
+	return `bind-key -T root ` + key +
+		` if-shell -F "#{@sesh_remote}" "send-keys ` + key +
+		`" "run-shell -b \"` + command
 }

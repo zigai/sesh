@@ -825,7 +825,8 @@ func newTestModelWithDeps(deps Dependencies) *Model {
 
 func defaultCompactTestConfig() *config.Config {
 	cfg := config.DefaultConfig()
-	cfg.Display.AgentsAgentFormat = "{tree}{harness:<6} · {agent_session}{right}{active_marker}{status_age:>3}  {status}"
+	cfg.Display.AgentsAgentFormat = "{tree}{harness:<6} · {agent_session}" +
+		"{right}{active_marker}{status_age:>3}  {status}"
 
 	return cfg
 }

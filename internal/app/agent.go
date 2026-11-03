@@ -17,7 +17,11 @@ import (
 	"github.com/zigai/sesh/internal/session"
 )
 
-type agentNavigation func(navigator *agents.Navigator, ctx context.Context, scope agents.NavigationScope) (agents.PaneLocation, error)
+type agentNavigation func(
+	navigator *agents.Navigator,
+	ctx context.Context,
+	scope agents.NavigationScope,
+) (agents.PaneLocation, error)
 
 func (local *Local) registerAgentHandlers() {
 	local.handleNavigation(action.AgentNext, (*agents.Navigator).NextIdle)

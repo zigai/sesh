@@ -171,7 +171,8 @@ func runConfiguredTaskAction(
 	configPath := filepath.Join(fixture.workDir, selection+" config.toml")
 
 	source := fmt.Sprintf(
-		"[tasks]\npopup_socket = 'actions'\n[menu.items.mark]\nrun = ['/bin/sh', '-c', 'printf selected > \"$1\"', 'mark', %q]\n",
+		"[tasks]\npopup_socket = 'actions'\n"+
+			"[menu.items.mark]\nrun = ['/bin/sh', '-c', 'printf selected > \"$1\"', 'mark', %q]\n",
 		marker,
 	)
 	if err := os.WriteFile(configPath, []byte(source), 0o600); err != nil {

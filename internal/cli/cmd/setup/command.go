@@ -39,7 +39,8 @@ func NewCommand() *cobra.Command {
 		Use:   "setup",
 		Short: "Render or apply tmux bindings, agent integrations and services",
 		Long: "Render or apply tmux bindings, agent integrations and services.\n\n" +
-			"Setup prints configuration blocks and owned service definitions by default and only writes files when --apply is given. " +
+			"Setup prints configuration blocks and owned service definitions by default " +
+			"and only writes files when --apply is given. " +
 			"Agent integrations are installed by AHT, never by duplicated hook installation.",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
@@ -62,9 +63,12 @@ func NewCommand() *cobra.Command {
 
 func newSetupTmuxCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:         "tmux",
-		Short:       "Print or apply the sesh tmux key bindings",
-		Long:        "Print or apply the sesh tmux key bindings configured by [[keys.bind]].\n\nWithout --apply, the configuration block is printed and no tmux server is contacted. With --apply, the same bindings are registered through tmux, skipping keys that are already bound unless --force is given.",
+		Use:   "tmux",
+		Short: "Print or apply the sesh tmux key bindings",
+		Long: "Print or apply the sesh tmux key bindings configured by [[keys.bind]].\n\n" +
+			"Without --apply, the configuration block is printed and no tmux server is contacted. " +
+			"With --apply, the same bindings are registered through tmux, " +
+			"skipping keys that are already bound unless --force is given.",
 		Args:        clibase.UsageArgs(cobra.NoArgs),
 		RunE:        runSetupTmux,
 		Annotations: map[string]string{clibase.AnnotationOperation: "setup_tmux"},

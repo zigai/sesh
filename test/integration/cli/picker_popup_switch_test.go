@@ -414,7 +414,11 @@ func attachPickerPopupClient(
 
 	attachDone := make(chan error, 1)
 	go func() {
-		attachDone <- origin.Handle().Attach(attachCtx, gotmux.Streams{In: slave, Out: slave, Err: slave}, gotmux.AttachOptions{})
+		attachDone <- origin.Handle().Attach(
+			attachCtx,
+			gotmux.Streams{In: slave, Out: slave, Err: slave},
+			gotmux.AttachOptions{},
+		)
 	}()
 
 	t.Cleanup(func() {

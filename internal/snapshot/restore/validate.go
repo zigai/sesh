@@ -558,7 +558,11 @@ func (t *planTracker) recordCreateSessionInitialWindow(
 		}
 
 		t.createdWindows[cs.InitialWindowID] = "create-session:" + cs.SessionID
-		t.handledLinks[linkSlotKey{session: cs.SessionID, window: cs.InitialWindowID, index: cs.InitialWindowIndex}] = true
+		t.handledLinks[linkSlotKey{
+			session: cs.SessionID,
+			window:  cs.InitialWindowID,
+			index:   cs.InitialWindowIndex,
+		}] = true
 	case cs.Width != 0 || cs.Height != 0:
 		return planFailure(
 			"validation",

@@ -459,7 +459,8 @@ func assertInventoryHello(t *testing.T, hello Frame) {
 	t.Helper()
 
 	if hello.Type != FrameHello || hello.PeerID != testPeerID || hello.Hello == nil ||
-		hello.Hello.Hostname != "remote-host" || hello.Hello.BridgeDir != "/home/remote/.local/state/sesh/remote/bridge" {
+		hello.Hello.Hostname != "remote-host" ||
+		hello.Hello.BridgeDir != "/home/remote/.local/state/sesh/remote/bridge" {
 		t.Fatalf("hello frame = %#v, want the peer identity and bridge directory", hello)
 	}
 

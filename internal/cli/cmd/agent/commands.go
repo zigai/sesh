@@ -151,7 +151,11 @@ func navigationCommand(
 
 func addAgentRegistryFlags(cmd *cobra.Command) {
 	cmd.Flags().
-		String(stateFlag, "", "AHT agent registry file [default: agent_status.store_path setting, else AHT's default registry]")
+		String(
+			stateFlag,
+			"",
+			"AHT agent registry file [default: agent_status.store_path setting, else AHT's default registry]",
+		)
 }
 
 func newAgentStatusCommand() *cobra.Command {
@@ -205,9 +209,10 @@ func runAgentStatus(cmd *cobra.Command, _ []string) error {
 
 func newAgentStatusRunCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:         "run",
-		Short:       "Run the agent window status tracker in the foreground",
-		Long:        "Run the realtime agent window status tracker until interrupted. The tracker streams AHT state and styles tmux windows needing attention.",
+		Use:   "run",
+		Short: "Run the agent window status tracker in the foreground",
+		Long: "Run the realtime agent window status tracker until interrupted. " +
+			"The tracker streams AHT state and styles tmux windows needing attention.",
 		Args:        clibase.UsageArgs(cobra.NoArgs),
 		RunE:        runAgentStatusRun,
 		Annotations: map[string]string{clibase.AnnotationOperation: "agent_status_run"},

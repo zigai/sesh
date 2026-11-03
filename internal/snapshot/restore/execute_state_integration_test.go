@@ -733,7 +733,10 @@ func TestVerifyReportsPaneTitleRewrittenByRunningProgramAsAdvisory(t *testing.T)
 	}
 }
 
-const inheritedChildEnvironment = "source-global\nsource-local\n\n\n\nunset\nunset\n" //nolint:dupword // both hidden variables must independently report unset in child output
+// Both hidden variables must independently report unset in child output.
+//
+//nolint:dupword // the two trailing unset lines are distinct hidden variables.
+const inheritedChildEnvironment = "source-global\nsource-local\n\n\n\nunset\nunset\n"
 
 func observeInheritedSource(
 	t *testing.T,
@@ -1114,7 +1117,8 @@ func assertChildEnvironment(
 		Program: gotmux.Exec(
 			"sh",
 			"-c",
-			`printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "$SESH_GLOBAL" "$SESH_OVERRIDE" "${SESH_REMOVED-}" "$SESH_EMPTY" "${SESH_TARGET_ONLY-}" "${SESH_HIDDEN-unset}" "${SESH_TARGET_ONLY_HIDDEN-unset}" > "$1"`,
+			`printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "$SESH_GLOBAL" "$SESH_OVERRIDE" "${SESH_REMOVED-}" "$SESH_EMPTY" `+
+				`"${SESH_TARGET_ONLY-}" "${SESH_HIDDEN-unset}" "${SESH_TARGET_ONLY_HIDDEN-unset}" > "$1"`,
 			"sh",
 			output,
 		),
@@ -1223,7 +1227,9 @@ func TestExecutorLaunchesApprovedProgramOnceWithModeledEnvironment(t *testing.T)
 			model.Bytes("sh"),
 			model.Bytes("-c"),
 			model.Bytes(
-				`printf '%s|%s|%s|%s|%s|%s|%s|%s|%s\n' "$SESH_LAUNCH_GLOBAL" "$SESH_LAUNCH_SESSION" "$SESH_LAUNCH_OVERRIDE" "$SESH_LAUNCH_SET" "${SESH_LAUNCH_REMOVE-unset}" "$TMUX" "$TMUX_PANE" "$TERM" "$COLORTERM" >> "$1"; exec sleep 300`,
+				`printf '%s|%s|%s|%s|%s|%s|%s|%s|%s\n' "$SESH_LAUNCH_GLOBAL" "$SESH_LAUNCH_SESSION" ` +
+					`"$SESH_LAUNCH_OVERRIDE" "$SESH_LAUNCH_SET" "${SESH_LAUNCH_REMOVE-unset}" ` +
+					`"$TMUX" "$TMUX_PANE" "$TERM" "$COLORTERM" >> "$1"; exec sleep 300`,
 			),
 			model.Bytes("sh"),
 			model.Bytes(marker),

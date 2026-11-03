@@ -47,7 +47,8 @@ func TestCompletionFlagDescriptionsOmitPlaceholders(t *testing.T) {
 	}
 
 	line, _, _ := strings.Cut(stdout, "\n")
-	if line != "--socket\tSocket path of the tmux server [default: the current tmux server, else tmux's default socket]" {
+	if line != "--socket\tSocket path of the tmux server [default: the current tmux server, "+
+		"else tmux's default socket]" {
 		t.Fatalf("socket completion = %q", line)
 	}
 }

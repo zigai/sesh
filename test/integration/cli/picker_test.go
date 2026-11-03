@@ -208,8 +208,16 @@ func runPickerTermtrace(
 		t.Fatalf("cancel picker application: %v: %s", err, output)
 	}
 
-	if output, err := exec.CommandContext(ctx, termtraceExecutable, "status", "-q", alias, "--wait-complete", "--timeout-ms", "5000").
-		CombinedOutput(); err != nil {
+	if output, err := exec.CommandContext(
+		ctx,
+		termtraceExecutable,
+		"status",
+		"-q",
+		alias,
+		"--wait-complete",
+		"--timeout-ms",
+		"5000",
+	).CombinedOutput(); err != nil {
 		t.Fatalf("wait for canceled picker workers: %v: %s", err, output)
 	}
 
@@ -294,8 +302,16 @@ func failPickerTermtraceRecord(
 
 	_, _ = exec.CommandContext(ctx, termtraceExecutable, "send", "-q", alias, "--signal", "QUIT").
 		CombinedOutput()
-	_, _ = exec.CommandContext(ctx, termtraceExecutable, "status", "-q", alias, "--wait-complete", "--timeout-ms", "2000").
-		CombinedOutput()
+	_, _ = exec.CommandContext(
+		ctx,
+		termtraceExecutable,
+		"status",
+		"-q",
+		alias,
+		"--wait-complete",
+		"--timeout-ms",
+		"2000",
+	).CombinedOutput()
 	diagnostic, _ := exec.CommandContext(ctx, termtraceExecutable, "analyze", alias).
 		CombinedOutput()
 	screen, _ := exec.CommandContext(ctx, termtraceExecutable, "screen", alias).CombinedOutput()

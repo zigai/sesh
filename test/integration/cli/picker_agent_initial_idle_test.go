@@ -76,7 +76,8 @@ func TestAgentsPopupInitialIdleIsReadAndCompletedTurnIsUnread(t *testing.T) {
 	if err := os.WriteFile(
 		configPath,
 		[]byte(
-			"[agent_sessions]\npopup_sort = \"name\"\nstatus_style = \"text\"\n[display]\nagents_agent_format = \"{tree}{status_text} {agent_session} {harness}\"\n",
+			"[agent_sessions]\npopup_sort = \"name\"\nstatus_style = \"text\"\n"+
+				"[display]\nagents_agent_format = \"{tree}{status_text} {agent_session} {harness}\"\n",
 		),
 		0o600,
 	); err != nil {

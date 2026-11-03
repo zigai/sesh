@@ -48,7 +48,8 @@ var (
 		ID:      "project.create",
 		Title:   "Create project",
 		Summary: "Create a repository in the first project root and open it",
-		Help:    "Create a directory with an empty git repository in the first configured project root and switch to its new session.",
+		Help: "Create a directory with an empty git repository in the first configured project root " +
+			"and switch to its new session.",
 		Subject: SubjectNone,
 		Arity:   ArityOne,
 		Params: []Param{
@@ -71,10 +72,11 @@ var (
 	}, reportOpenedProject)
 
 	ProjectPick = define(Descriptor{
-		ID:          "project.pick",
-		Title:       "Open project picker",
-		Summary:     "Pick a project to open in a tmux popup",
-		Help:        "Open the project picker in a tmux popup sized for the invoking client, then open the chosen project.",
+		ID:      "project.pick",
+		Title:   "Open project picker",
+		Summary: "Pick a project to open in a tmux popup",
+		Help: "Open the project picker in a tmux popup sized for the invoking client, " +
+			"then open the chosen project.",
 		Subject:     SubjectNone,
 		Arity:       ArityOne,
 		Params:      nil,
@@ -84,7 +86,10 @@ var (
 		Remote:      RemoteNever,
 		InPicker:    false,
 		check:       nil,
-	}, func(Subject, Values) (PickProject, error) { return PickProject{}, nil }, func(PickedProject) string { return "" })
+	},
+		func(Subject, Values) (PickProject, error) { return PickProject{}, nil },
+		func(PickedProject) string { return "" },
+	)
 )
 
 type OpenProject struct {

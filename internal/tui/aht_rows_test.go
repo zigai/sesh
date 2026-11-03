@@ -20,7 +20,8 @@ func TestAgentRowsRenderCurrentReasonsAndSuppressStaleReasons(t *testing.T) {
 			model := newTestModel()
 			t.Cleanup(model.Close)
 			model.displayMode = displayModeAgents
-			model.config.Display.AgentsAgentFormat = "{tree}{status_text} {agent_waiting_reason} {agent_failure_reason}{stale} {agent_session}"
+			model.config.Display.AgentsAgentFormat = "{tree}{status_text} {agent_waiting_reason} " +
+				"{agent_failure_reason}{stale} {agent_session}"
 
 			formats, err := compileSessionRowFormats(model.config.Display, model.config.Settings)
 			if err != nil {

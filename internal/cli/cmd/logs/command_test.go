@@ -12,8 +12,13 @@ import (
 )
 
 const (
-	formattedWarningRecord = `{"time":"2026-08-06T15:45:52.328165852Z","level":"warn","command":"doctor","version":"dev","commit":"abc123","pid":42,"component":"doctor","check":"continuum-shutdown-save","status":"warning","reason":"save_failed","message":"doctor check non-ok"}`
-	formattedInfoRecord    = `{"time":"2026-08-06T15:46:01Z","level":"info","command":"continuum.tick","version":"dev","commit":"abc123","pid":43,"component":"resurrect","operation":"save","status":"ok","duplicate":false,"partial":false,"duration_ms":4983,"message":"resurrect save completed"}`
+	formattedWarningRecord = `{"time":"2026-08-06T15:45:52.328165852Z","level":"warn","command":"doctor",` +
+		`"version":"dev",` +
+		`"commit":"abc123","pid":42,"component":"doctor","check":"continuum-shutdown-save","status":"warning",` +
+		`"reason":"save_failed","message":"doctor check non-ok"}`
+	formattedInfoRecord = `{"time":"2026-08-06T15:46:01Z","level":"info","command":"continuum.tick","version":"dev",` +
+		`"commit":"abc123","pid":43,"component":"resurrect","operation":"save","status":"ok",` +
+		`"duplicate":false,"partial":false,"duration_ms":4983,"message":"resurrect save completed"}`
 )
 
 func TestLogsCommandFormatsStructuredRecordsWithoutSelfLogging(t *testing.T) {

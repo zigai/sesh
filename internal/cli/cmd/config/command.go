@@ -20,7 +20,8 @@ func NewCommand() *cobra.Command {
 		Long: "Manage native sesh configuration.\n\n" +
 			"Settings start with built-in defaults. System configuration at /etc/sesh/config.toml " +
 			"and the XDG user file override them in that order. " +
-			"SESH_ environment values override files. --config or SESH_CONFIG selects one file instead of the discovered files; " +
+			"SESH_ environment values override files. " +
+			"--config or SESH_CONFIG selects one file instead of the discovered files; " +
 			"--config takes precedence. --no-config skips files but still applies SESH_ values. " +
 			"An absent system or user file is allowed; use 'sesh config init' to create the user file.",
 		Args: func(cmd *cobra.Command, args []string) error {

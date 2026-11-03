@@ -203,6 +203,7 @@ func TestPeerDispatchChecksTheCurrentCatalogBeforeSending(t *testing.T) {
 
 func TestPeerDispatchDecodesThePeersTypedOutput(t *testing.T) {
 	options, target := actionOriginFixture()
+	//nolint:lll // Raw string: exact scripted ssh shell body.
 	options.Remote.SSHPath = scriptedSSHPath(t, `request=$(cat)
 id=$(printf '%s' "$request" | sed -n 's/.*"invocationId":"\([0-9a-f]*\)".*/\1/p')
 printf '{"invocationId":"%s","action":"session.kill","ok":false,"code":"targetChanged","output":{"session":{"name":"work"}}}\n' "$id"

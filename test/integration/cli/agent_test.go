@@ -131,7 +131,9 @@ func agentRegistrySessionForPane(pane agents.PaneLocation, activity string) stri
 		"updated_at": "2026-09-20T10:00:00Z",
 		"presence_changed_at": "2026-09-20T10:00:00Z",
 		"activity_changed_at": "2026-09-20T10:00:00Z",
-		"location": {"kind": "tmux", "server_id": "` + pane.ServerSocket + `", "session_id": "` + pane.SessionID + `", "session_name": "` + pane.SessionName + `", "window_id": "` + pane.WindowID + `", "pane_id": "` + pane.PaneID + `", "pane_pid": ` + strconv.Itoa(pane.PanePID) + `}
+		"location": {"kind": "tmux", "server_id": "` + pane.ServerSocket + `", "session_id": "` + pane.SessionID +
+		`", "session_name": "` + pane.SessionName + `", "window_id": "` + pane.WindowID +
+		`", "pane_id": "` + pane.PaneID + `", "pane_pid": ` + strconv.Itoa(pane.PanePID) + `}
 	}`
 }
 
@@ -281,7 +283,17 @@ func TestCLIAgentFocusActivatesNamedPane(t *testing.T) {
 }
 
 func TestAgentNavigationActionsSucceedWithoutTerminalOutput(t *testing.T) {
-	for _, action := range []string{"next", "next-local", "latest", "waiting", "failed", "unread", "toggle", "back", "focus"} {
+	for _, action := range []string{
+		"next",
+		"next-local",
+		"latest",
+		"waiting",
+		"failed",
+		"unread",
+		"toggle",
+		"back",
+		"focus",
+	} {
 		t.Run(action, func(t *testing.T) {
 			fixture := newAgentIntegrationFixture(t)
 			args, want := quietAgentNavigation(t, fixture, action)
@@ -625,7 +637,12 @@ func TestCLIAgentToggleRepeatedlyReturnsToWorkingAndAgentPanes(t *testing.T) {
 			runAgentNavigation(t, action, args...)
 
 			current := fixture.target
-			for _, want := range []agents.PaneLocation{fixture.current, fixture.target, fixture.current, fixture.target} {
+			for _, want := range []agents.PaneLocation{
+				fixture.current,
+				fixture.target,
+				fixture.current,
+				fixture.target,
+			} {
 				result := runAgentNavigation(
 					t,
 					"toggle",

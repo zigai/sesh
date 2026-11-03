@@ -398,7 +398,14 @@ func newReport(
 		paths.Config[index].Path = doctor.DisplayPath(paths.Config[index].Path)
 	}
 
-	for _, location := range []*Location{&paths.Data, &paths.State, &paths.Log, &paths.Snapshots, &paths.History, &paths.Socket} {
+	for _, location := range []*Location{
+		&paths.Data,
+		&paths.State,
+		&paths.Log,
+		&paths.Snapshots,
+		&paths.History,
+		&paths.Socket,
+	} {
 		location.Path = doctor.DisplayPath(location.Path)
 	}
 

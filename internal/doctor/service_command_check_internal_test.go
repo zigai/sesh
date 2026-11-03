@@ -21,8 +21,14 @@ func TestSplitExecLineFollowsSystemdQuotingAndPrefixes(t *testing.T) {
 		value string
 		want  []string
 	}{
-		{value: `/bin/sesh autosave final-save --deadline 20s`, want: []string{"/bin/sesh", "autosave", "final-save", "--deadline", "20s"}},
-		{value: `-/bin/sesh daemon tmux --socket "/tmp/a b"`, want: []string{"/bin/sesh", "daemon", "tmux", "--socket", "/tmp/a b"}},
+		{
+			value: `/bin/sesh autosave final-save --deadline 20s`,
+			want:  []string{"/bin/sesh", "autosave", "final-save", "--deadline", "20s"},
+		},
+		{
+			value: `-/bin/sesh daemon tmux --socket "/tmp/a b"`,
+			want:  []string{"/bin/sesh", "daemon", "tmux", "--socket", "/tmp/a b"},
+		},
 		{value: `  /bin/sesh   --name 'it''s' "q\"uote"`, want: []string{"/bin/sesh", "--name", "its", `q"uote`}},
 		{value: `/bin/sesh --path "%%h/$$HOME" ""`, want: []string{"/bin/sesh", "--path", "%h/$HOME", ""}},
 		{value: `@/bin/sesh sesh-alias daemon coordinator`, want: []string{"/bin/sesh", "daemon", "coordinator"}},

@@ -839,7 +839,12 @@ func TestRemoveSessionsSubsequentCollectionAndIdentitySurvival(t *testing.T) {
 }
 
 func TestRemoveSessionsFaultBoundaries(t *testing.T) {
-	for _, boundary := range []string{"rewrite_stage_synced", "rewrite_generation_published", "catalog_replaced_pending", "catalog_replaced_commit"} {
+	for _, boundary := range []string{
+		"rewrite_stage_synced",
+		"rewrite_generation_published",
+		"catalog_replaced_pending",
+		"catalog_replaced_commit",
+	} {
 		t.Run(boundary, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "repository")
 			r := openRepository(t, path)

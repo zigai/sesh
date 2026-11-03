@@ -50,7 +50,16 @@ func validWorkRow(row work.Item) bool {
 		return false
 	}
 
-	for _, text := range []string{row.Harness, row.Title, row.Directory, row.Project, row.Branch, row.Server, row.Pane, string(row.FinishedBy)} {
+	for _, text := range []string{
+		row.Harness,
+		row.Title,
+		row.Directory,
+		row.Project,
+		row.Branch,
+		row.Server,
+		row.Pane,
+		string(row.FinishedBy),
+	} {
 		if !ValidText(text) {
 			return false
 		}

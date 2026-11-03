@@ -43,7 +43,12 @@ func TestRetainedSourceReleasedOnlyAfterVerification(t *testing.T) {
 		t.Fatal("active recovery source pruned", err)
 	}
 
-	for _, step := range [][2]model.ActionState{{actionPlanned, actionIssued}, {actionIssued, actionUnknown}, {actionUnknown, actionConfirmed}, {actionConfirmed, actionVerified}} {
+	for _, step := range [][2]model.ActionState{
+		{actionPlanned, actionIssued},
+		{actionIssued, actionUnknown},
+		{actionUnknown, actionConfirmed},
+		{actionConfirmed, actionVerified},
+	} {
 		if err := reopened.Transition(
 			t.Context(),
 			op.ID,

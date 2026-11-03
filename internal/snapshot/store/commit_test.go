@@ -35,7 +35,15 @@ func commitCompleteFixture(t *testing.T, r *Repository) Generation {
 }
 
 func TestPublicationNeverFallsBack(t *testing.T) {
-	for _, state := range []string{"pending", "failed", "incomplete", faultStageSynced, faultGenerationPublished, faultCatalogSynced, faultCatalogReplaced} {
+	for _, state := range []string{
+		"pending",
+		"failed",
+		"incomplete",
+		faultStageSynced,
+		faultGenerationPublished,
+		faultCatalogSynced,
+		faultCatalogReplaced,
+	} {
 		t.Run(state, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "repository")
 			r := openRepository(t, path)

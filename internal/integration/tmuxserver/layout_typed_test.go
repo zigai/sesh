@@ -88,19 +88,22 @@ func TestDecodeTypedLayoutRejections(t *testing.T) {
 	panes := map[string]string{"%0": "p-0", "%2": "p-2"}
 
 	cases := map[string]string{
-		"unknown version":      `{"V":3,"L":{"t":"p","w":80,"h":24,"x":0,"y":0,"I":"%0"}}`,
-		"unknown node type":    `{"V":2,"L":{"t":"z","w":80,"h":24,"x":0,"y":0}}`,
-		"unknown pane id":      `{"V":2,"L":{"t":"p","w":80,"h":24,"x":0,"y":0,"I":"%9"}}`,
-		"missing pane id":      `{"V":2,"L":{"t":"p","w":80,"h":24,"x":0,"y":0}}`,
-		"single child branch":  `{"V":2,"L":{"t":"h","w":80,"h":24,"x":0,"y":0,"c":[{"t":"p","w":80,"h":24,"x":0,"y":0,"I":"%0"}]}}`,
-		"leaf with children":   `{"V":2,"L":{"t":"p","w":80,"h":24,"x":0,"y":0,"I":"%0","c":[{"t":"p","w":80,"h":24,"x":0,"y":0,"I":"%2"}]}}`,
+		"unknown version":   `{"V":3,"L":{"t":"p","w":80,"h":24,"x":0,"y":0,"I":"%0"}}`,
+		"unknown node type": `{"V":2,"L":{"t":"z","w":80,"h":24,"x":0,"y":0}}`,
+		"unknown pane id":   `{"V":2,"L":{"t":"p","w":80,"h":24,"x":0,"y":0,"I":"%9"}}`,
+		"missing pane id":   `{"V":2,"L":{"t":"p","w":80,"h":24,"x":0,"y":0}}`,
+		"single child branch": `{"V":2,"L":{"t":"h","w":80,"h":24,"x":0,"y":0,"c":[` +
+			`{"t":"p","w":80,"h":24,"x":0,"y":0,"I":"%0"}]}}`,
+		"leaf with children": `{"V":2,"L":{"t":"p","w":80,"h":24,"x":0,"y":0,"I":"%0","c":[` +
+			`{"t":"p","w":80,"h":24,"x":0,"y":0,"I":"%2"}]}}`,
 		"negative dimension":   `{"V":2,"L":{"t":"p","w":-1,"h":24,"x":0,"y":0,"I":"%0"}}`,
 		"negative offset":      `{"V":2,"L":{"t":"p","w":80,"h":24,"x":-1,"y":0,"I":"%0"}}`,
 		"not a document":       `{"L":{"t":"p","w":80,"h":24,"x":0,"y":0,"I":"%0"}}`,
 		"malformed json":       `{"V":2,"L":`,
 		"branch without child": `{"V":2,"L":{"t":"h","w":80,"h":24,"x":0,"y":0}}`,
 		"only floating panes": `{"V":2,"L":{"t":"v","w":80,"h":24,"x":0,"y":0,"c":[` +
-			`{"t":"p","w":20,"h":5,"x":1,"y":1,"i":1,"z":0,"I":"%0"},{"t":"p","w":20,"h":5,"x":30,"y":10,"a":true,"i":2,"z":1,"I":"%2"}]}}`,
+			`{"t":"p","w":20,"h":5,"x":1,"y":1,"i":1,"z":0,"I":"%0"},` +
+			`{"t":"p","w":20,"h":5,"x":30,"y":10,"a":true,"i":2,"z":1,"I":"%2"}]}}`,
 	}
 
 	for name, value := range cases {

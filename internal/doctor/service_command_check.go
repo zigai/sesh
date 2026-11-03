@@ -111,7 +111,8 @@ func (s *Service) serviceUnitsResult(checked int, stale []string, unreadable []s
 				withReason(ReasonStale).
 				withDetails(stale...).
 				withDetails(unreadable...).
-				withManual("Regenerate sesh-managed units with 'sesh setup services --apply' (add the flags you set them up with), " +
+				withManual("Regenerate sesh-managed units with 'sesh setup services --apply' " +
+					"(add the flags you set them up with), " +
 					"update hand-maintained units to the current commands, then run 'systemctl --user daemon-reload'"),
 		}
 	}

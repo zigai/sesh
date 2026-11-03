@@ -244,6 +244,7 @@ func TestABranchChangeKeepsTheEarlierPullRequestLinked(t *testing.T) {
 }
 
 func TestGitHubPullRequestTimesBecomeTheLinkLifetime(t *testing.T) {
+	//nolint:lll // Multi-line raw string: PR JSON fixture content must stay byte-identical.
 	const listed = `[
 		{"number": 1, "state": "MERGED", "createdAt": "2027-01-15T08:00:00Z", "mergedAt": "2027-01-15T10:00:00Z", "closedAt": "2027-01-15T10:00:00Z"},
 		{"number": 2, "state": "CLOSED", "createdAt": "2027-01-15T08:00:00Z", "mergedAt": null, "closedAt": "2027-01-15T09:00:00Z"},

@@ -1604,7 +1604,8 @@ func TestSessionLoadPreservesNewerRemoteWatchObservations(t *testing.T) {
 			}
 
 			if observation == "error" &&
-				(!errors.Is(model.remoteCatalogErr, errTmuxUnavailable) || model.degradedSources[degradedSourceRemote] == "") {
+				(!errors.Is(model.remoteCatalogErr, errTmuxUnavailable) ||
+					model.degradedSources[degradedSourceRemote] == "") {
 				t.Fatal("delayed load cleared the newer remote watch error")
 			}
 		})
@@ -1626,7 +1627,15 @@ func TestAgentWatchValidatesPanesBeforePublishing(t *testing.T) {
 		want    int
 	}{
 		{name: "only owned live pane survives", panes: []PaneLocation{
-			{SessionID: "$1", SessionName: testSupportSessionDevName, PaneID: "%1", PanePID: 101, WindowIndex: "0", PaneLeft: "0", PaneTop: "0"},
+			{
+				SessionID:   "$1",
+				SessionName: testSupportSessionDevName,
+				PaneID:      "%1",
+				PanePID:     101,
+				WindowIndex: "0",
+				PaneLeft:    "0",
+				PaneTop:     "0",
+			},
 			{SessionID: "$other", SessionName: "other", PaneID: "%2", PanePID: 102},
 		}, want: 1},
 		{name: "successful empty inventory", want: 0},
@@ -1663,7 +1672,10 @@ func TestAgentWatchValidatesPanesBeforePublishing(t *testing.T) {
 			}
 			paneLoads := 0
 			model := loaderTestModel(t, config.DefaultConfig(), Dependencies{
-				WatchAgentSummaries: func(_ context.Context, publish func(uint64, []session.AgentSummary, error) error) error {
+				WatchAgentSummaries: func(
+					_ context.Context,
+					publish func(uint64, []session.AgentSummary, error) error,
+				) error {
 					return publish(1, summaries, nil)
 				},
 				TmuxPaneLocations: func(context.Context) ([]PaneLocation, error) {
@@ -1899,7 +1911,10 @@ func TestRemoteWatchDeliversQueuedRemoval(t *testing.T) {
 func TestAgentWatchDeliversQueuedRemoval(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		model := loaderTestModel(t, config.DefaultConfig(), Dependencies{
-			WatchAgentSummaries: func(_ context.Context, publish func(uint64, []session.AgentSummary, error) error) error {
+			WatchAgentSummaries: func(
+				_ context.Context,
+				publish func(uint64, []session.AgentSummary, error) error,
+			) error {
 				if err := publish(1, []session.AgentSummary{{
 					TmuxSessionID: "$1", Total: 1,
 					Agents: []session.AgentSession{{RegistryID: "live", PaneID: "%1"}},

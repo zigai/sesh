@@ -335,7 +335,19 @@ func FuzzNativeManifest(f *testing.F) {
 }
 
 func TestMetadataAndLaunchBytes(t *testing.T) {
-	for _, value := range []string{"invalid\xff\tbytes", "a\tb\nc\r", "trailing\n", ":leading-colon", "sesh_record_v1\t[]", "two words", "", "'quotes'", "$HOME", "; exit 1", "žiga"} {
+	for _, value := range []string{
+		"invalid\xff\tbytes",
+		"a\tb\nc\r",
+		"trailing\n",
+		":leading-colon",
+		"sesh_record_v1\t[]",
+		"two words",
+		"",
+		"'quotes'",
+		"$HOME",
+		"; exit 1",
+		"žiga",
+	} {
 		t.Run(value, func(t *testing.T) {
 			m := fixture()
 			m.Panes[0].Title = Bytes(value)

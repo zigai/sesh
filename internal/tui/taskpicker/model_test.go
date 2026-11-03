@@ -469,9 +469,39 @@ func TestPopupsFitTheirContentWithoutTruncating(t *testing.T) {
 		options taskpicker.Options
 		want    []string
 	}{
-		{options: compact, want: []string{"new task", "shop", "new worktree", "wt/main/4", "this checkout", "shop-hotfix", "existing branch", "pi", "claude", "enter start"}},
-		{options: list, want: []string{"new worktree", "checkouts", "branches", "in use", "shop-hotfix", "feature", "review docs", "wt/fix-login-redirect", "esc back"}},
-		{options: taskpicker.Options{Harnesses: []string{"pi", "claude"}}, want: []string{"new task", "pi", "claude", "tab", "enter start"}},
+		{
+			options: compact,
+			want: []string{
+				"new task",
+				"shop",
+				"new worktree",
+				"wt/main/4",
+				"this checkout",
+				"shop-hotfix",
+				"existing branch",
+				"pi",
+				"claude",
+				"enter start",
+			},
+		},
+		{
+			options: list,
+			want: []string{
+				"new worktree",
+				"checkouts",
+				"branches",
+				"in use",
+				"shop-hotfix",
+				"feature",
+				"review docs",
+				"wt/fix-login-redirect",
+				"esc back",
+			},
+		},
+		{
+			options: taskpicker.Options{Harnesses: []string{"pi", "claude"}},
+			want:    []string{"new task", "pi", "claude", "tab", "enter start"},
+		},
 	} {
 		width, height := taskpicker.Size(config.DefaultConfig(), tc.options)
 		view := plainView(sized(tc.options))

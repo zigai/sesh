@@ -107,7 +107,8 @@ func assertWatchLogRecord(t *testing.T, record map[string]any) {
 	case "started":
 		want["level"], want["operation"], want["message"] = "info", "watch_loop", "agent status watch loop started"
 	case "disconnected":
-		want["level"], want["reason"], want["message"] = "warn", "watch_failed", "AHT broker watch disconnected, will retry"
+		want["level"], want["reason"], want["message"] =
+			"warn", "watch_failed", "AHT broker watch disconnected, will retry"
 		want["error"] = errWatchUnavailable.Error()
 
 		if _, ok := record["retry_in"].(float64); !ok {

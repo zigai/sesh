@@ -421,7 +421,8 @@ func TestAgentGitRefreshKeepsCountsUntilACompleteScanSucceeds(t *testing.T) {
 	bin := t.TempDir()
 	marker := filepath.Join(bin, "slow")
 
-	wrapper := "#!/bin/sh\nif [ \"$1\" = diff ] && [ -f \"${0%/*}/slow\" ]; then exec sleep 10; fi\nexec \"" + gitPath + "\" \"$@\"\n"
+	wrapper := "#!/bin/sh\nif [ \"$1\" = diff ] && [ -f \"${0%/*}/slow\" ]; then exec sleep 10; fi\n" +
+		"exec \"" + gitPath + "\" \"$@\"\n"
 	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(wrapper), 0o700); err != nil {
 		t.Fatal(err)
 	}

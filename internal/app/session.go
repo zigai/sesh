@@ -237,7 +237,8 @@ func (local *Local) liveTarget(
 	identity := row.RuntimeIdentity
 	if row.Name != ref.Name ||
 		(ref.Socket != "" && row.TmuxServerSocket != ref.Socket) ||
-		(ref.ServerPID != 0 && (identity.TmuxServerPID != ref.ServerPID || !identity.TmuxServerStartedAt.Equal(ref.ServerStartedAt))) ||
+		(ref.ServerPID != 0 && (identity.TmuxServerPID != ref.ServerPID ||
+			!identity.TmuxServerStartedAt.Equal(ref.ServerStartedAt))) ||
 		(!ref.CreatedAt.IsZero() && !identity.TmuxSessionCreatedAt.Equal(ref.CreatedAt)) {
 		return session.Session{}, action.Wrap(action.CodeTargetChanged, ErrTargetChanged)
 	}

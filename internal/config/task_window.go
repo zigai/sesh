@@ -35,7 +35,8 @@ var (
 	errTaskLayoutDuplicate = errors.New("duplicate layout name")
 	errTaskLayoutShape     = errors.New("layout needs either arrange or splits")
 	errTaskLayoutArrange   = errors.New(
-		"arrange must be a tmux layout: main-vertical, main-horizontal, main-vertical-mirrored, main-horizontal-mirrored, even-horizontal, even-vertical or tiled",
+		"arrange must be a tmux layout: main-vertical, main-horizontal, " +
+			"main-vertical-mirrored, main-horizontal-mirrored, even-horizontal, even-vertical or tiled",
 	)
 	errTaskLayoutMainSize = errors.New("main_size needs a main-* arrange")
 	errTaskLayoutPanes    = errors.New(

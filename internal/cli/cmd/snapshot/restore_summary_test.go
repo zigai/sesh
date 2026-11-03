@@ -75,7 +75,8 @@ func TestRestoreSummaryNamesSessionsProgramsAndNextSteps(t *testing.T) {
 
 	want := "Restored 1 session from generation d879e6dc: agent\n" +
 		"Programs: 1 resumed, 1 restarted, 1 need attention\n" +
-		"  agent:3.2  node: its program file was replaced while it ran (for example by an upgrade); start it again yourself\n" +
+		"  agent:3.2  node: its program file was replaced while it ran (for example by an upgrade); " +
+		"start it again yourself\n" +
 		"Resumed and restarted programs were launched, but sesh cannot confirm they recovered; check those panes.\n" +
 		"Skipped:\n" +
 		"  0 (s0): a live session already uses this name\n" +
@@ -97,7 +98,11 @@ func TestRestoreSummaryVerboseAddsPerPaneDetails(t *testing.T) {
 
 	got := renderSummary(t, summaryResult(), true)
 
-	for _, want := range []string{"Restored 1 session", "Operation:          op-1", `p3 runtime="%3" outcome=unsupported reason="executable_deleted"`} {
+	for _, want := range []string{
+		"Restored 1 session",
+		"Operation:          op-1",
+		`p3 runtime="%3" outcome=unsupported reason="executable_deleted"`,
+	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("verbose output is missing %q:\n%s", want, got)
 		}
@@ -113,7 +118,10 @@ func TestRestoreSummaryWithoutSessionNamesCountsSessions(t *testing.T) {
 
 	got := renderSummary(t, res, false)
 
-	for _, want := range []string{"Restored 1 session from generation d879e6dc.\n", "  p3  its program file was replaced"} {
+	for _, want := range []string{
+		"Restored 1 session from generation d879e6dc.\n",
+		"  p3  its program file was replaced",
+	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("summary without labels is missing %q:\n%s", want, got)
 		}

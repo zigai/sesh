@@ -938,8 +938,11 @@ func TestCollectionIntentValidation(t *testing.T) {
 		{name: "digest", change: func(i *CollectionIntent) { i.ManifestSHA256 = "zz" }},
 		{name: "manifest size", change: func(i *CollectionIntent) { i.ManifestBytes = 0 }},
 		{
-			name:   "manifest oversize",
-			change: func(i *CollectionIntent) { i.ManifestBytes = model.MaxManifestBytes + 1; i.Bytes = i.ManifestBytes + 4 },
+			name: "manifest oversize",
+			change: func(i *CollectionIntent) {
+				i.ManifestBytes = model.MaxManifestBytes + 1
+				i.Bytes = i.ManifestBytes + 4
+			},
 		},
 		{name: "path escaping file", change: func(i *CollectionIntent) {
 			i.Files = []CollectionFile{{Name: "../../catalog.json", Bytes: 4}}

@@ -689,7 +689,11 @@ func (w *Workflow) revalidateSavedDeletions(
 		if manifest.Source.EndpointScope == endpointScope {
 			return oops.In("session").
 				Code("saved_generations_protected").
-				Wrapf(ErrSavedGenerationsProtected, "saved generations still contain session %q after concurrent publication", name)
+				Wrapf(
+					ErrSavedGenerationsProtected,
+					"saved generations still contain session %q after concurrent publication",
+					name,
+				)
 		}
 	}
 

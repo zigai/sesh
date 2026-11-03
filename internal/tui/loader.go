@@ -681,7 +681,10 @@ func (m *Model) startRemoteCatalogWatchCommand() tea.Cmd {
 
 		if watchErr != nil && ctx.Err() == nil {
 			select {
-			case updates <- remoteCatalogMsg{catalog: RemoteCatalog{GeneratedAt: time.Time{}, Connections: nil}, err: watchErr}:
+			case updates <- remoteCatalogMsg{
+				catalog: RemoteCatalog{GeneratedAt: time.Time{}, Connections: nil},
+				err:     watchErr,
+			}:
 			case <-ctx.Done():
 			}
 		}
@@ -1020,7 +1023,13 @@ func (m *Model) startAgentSummaryWatchCommand() tea.Cmd {
 				}
 
 				select {
-				case updates <- agentSummariesMsg{summaries: summaries, revision: revision, polled: false, observation: 0, err: err}:
+				case updates <- agentSummariesMsg{
+					summaries:   summaries,
+					revision:    revision,
+					polled:      false,
+					observation: 0,
+					err:         err,
+				}:
 					return nil
 				case <-ctx.Done():
 					return ctx.Err()
@@ -1030,7 +1039,13 @@ func (m *Model) startAgentSummaryWatchCommand() tea.Cmd {
 
 		if shouldReportAgentWatchError(ctx, watchErr, pollAvailable) {
 			select {
-			case updates <- agentSummariesMsg{summaries: nil, revision: 0, polled: false, observation: 0, err: watchErr}:
+			case updates <- agentSummariesMsg{
+				summaries:   nil,
+				revision:    0,
+				polled:      false,
+				observation: 0,
+				err:         watchErr,
+			}:
 			case <-ctx.Done():
 			}
 		}

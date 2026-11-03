@@ -32,9 +32,10 @@ type paneHistoryJSONResult struct {
 
 func newScrollbackCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:         "scrollback",
-		Short:       "Show tmux scrollback line counts by session",
-		Long:        "Show tmux scrollback line counts by session or per pane.\n\nReads metadata only from the explicit tmux server socket.",
+		Use:   "scrollback",
+		Short: "Show tmux scrollback line counts by session",
+		Long: "Show tmux scrollback line counts by session or per pane.\n\n" +
+			"Reads metadata only from the explicit tmux server socket.",
 		Annotations: map[string]string{clibase.AnnotationOperation: "scrollback"},
 		Args:        clibase.UsageArgs(cobra.NoArgs),
 		RunE:        runHistory,

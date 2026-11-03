@@ -76,9 +76,11 @@ func NewTaskMenuCommand(remoteFactory RemoteFactory) *cobra.Command {
 			Configure: func(cmd *cobra.Command) {
 				cmd.Annotations[clibase.AnnotationLiveIO] = annotationEnabled
 			},
-			Prepare:  nil,
-			Frontend: func(cmd *cobra.Command) action.Dispatcher { return taskFrontend{cmd: cmd, remote: remoteFactory} },
-			Render:   nil,
+			Prepare: nil,
+			Frontend: func(cmd *cobra.Command) action.Dispatcher {
+				return taskFrontend{cmd: cmd, remote: remoteFactory}
+			},
+			Render: nil,
 		},
 	)
 }

@@ -82,7 +82,8 @@ func RegisterRestore(t *testing.T, repoPath string, pid int, birth string) strin
 	}
 
 	target := fmt.Sprintf(
-		"restore-v1\n/tmp/fixture.sock\n%d\n%d\nlaunch=true\nmissing_working_dir=fail\ncompensate=false\nprofile=practical",
+		"restore-v1\n/tmp/fixture.sock\n%d\n%d\nlaunch=true\n"+
+			"missing_working_dir=fail\ncompensate=false\nprofile=practical",
 		pid,
 		fixtureStarted,
 	)

@@ -98,7 +98,10 @@ func TestLoadedConfigPreservesItsSourceAcrossDirectoryChangesAndCloning(t *testi
 		{[]config.LoadOption{config.WithExplicitPath("selected.toml")}, config.Source{Path: path}},
 		{nil, config.Source{Path: path}},
 		{[]config.LoadOption{config.WithoutConfig()}, config.Source{WithoutConfig: true}},
-		{[]config.LoadOption{config.WithExplicitPath("-"), config.WithInput(strings.NewReader(input))}, config.Source{Path: "-", Input: input}},
+		{
+			[]config.LoadOption{config.WithExplicitPath("-"), config.WithInput(strings.NewReader(input))},
+			config.Source{Path: "-", Input: input},
+		},
 	} {
 		cfg, err := config.Load(test.options...)
 		if err != nil {

@@ -411,7 +411,12 @@ func TestActionsOnRemoteRowsReportRejectedLocation(t *testing.T) {
 		Origin: session.OriginSSH,
 	}}
 
-	for _, definition := range []action.Entry{action.SessionRename, action.SessionKill, action.SessionDelete, action.SnapshotSave} {
+	for _, definition := range []action.Entry{
+		action.SessionRename,
+		action.SessionKill,
+		action.SessionDelete,
+		action.SnapshotSave,
+	} {
 		descriptor := definition.Describe()
 
 		t.Run(string(descriptor.ID), func(t *testing.T) {

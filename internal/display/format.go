@@ -456,7 +456,8 @@ func parseExtendedExpression(expression string, allowed map[string]struct{}) (to
 
 	item := newToken()
 	item.field, item.role = field, role
-	item.alignment, item.width, item.maxWidth, item.hasMaxWidth = spec.alignment, spec.width, spec.maxWidth, spec.hasMaxWidth
+	item.alignment, item.width, item.maxWidth, item.hasMaxWidth = spec.alignment, spec.width,
+		spec.maxWidth, spec.hasMaxWidth
 
 	if field != rightField && !fieldAllowed(allowed, field) {
 		return token{}, fmt.Errorf("%w %q for this row", ErrUnknownField, field)

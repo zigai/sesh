@@ -100,7 +100,12 @@ func TestOnlyNotSentPermitsRedispatch(t *testing.T) {
 	r := openRepository(t, filepath.Join(t.TempDir(), "repository"))
 
 	op := pinnedLaunch(t, r)
-	for _, step := range [][2]model.ActionState{{actionPlanned, actionIssued}, {actionIssued, actionNotSent}, {actionNotSent, actionPlanned}, {actionPlanned, actionIssued}} {
+	for _, step := range [][2]model.ActionState{
+		{actionPlanned, actionIssued},
+		{actionIssued, actionNotSent},
+		{actionNotSent, actionPlanned},
+		{actionPlanned, actionIssued},
+	} {
 		if err := r.Transition(t.Context(), op.ID, "launch", step[0], step[1], nil); err != nil {
 			t.Fatal(err)
 		}
@@ -233,18 +238,42 @@ func TestReconcileOperationAfterInterruptedUpdate(t *testing.T) {
 		operation string
 		apply     func(context.Context, *Repository, string) error
 	}{
-		{name: "dispatch", before: actionPlanned, after: actionIssued, operation: "active", apply: func(ctx context.Context, r *Repository, id string) error {
-			return r.Transition(ctx, id, "launch", actionPlanned, actionIssued, nil)
-		}},
-		{name: "uncertain launch", before: actionIssued, after: actionUnknown, operation: "active", apply: func(ctx context.Context, r *Repository, id string) error {
-			return r.Transition(ctx, id, "launch", actionIssued, actionUnknown, nil)
-		}},
-		{name: "completion", before: actionVerified, after: actionVerified, operation: "complete", apply: func(ctx context.Context, r *Repository, id string) error {
-			return r.Finish(ctx, id, false)
-		}},
-		{name: "abandonment", before: actionIssued, after: actionIssued, operation: "abandoned", apply: func(ctx context.Context, r *Repository, id string) error {
-			return r.Finish(ctx, id, true)
-		}},
+		{
+			name:      "dispatch",
+			before:    actionPlanned,
+			after:     actionIssued,
+			operation: "active",
+			apply: func(ctx context.Context, r *Repository, id string) error {
+				return r.Transition(ctx, id, "launch", actionPlanned, actionIssued, nil)
+			},
+		},
+		{
+			name:      "uncertain launch",
+			before:    actionIssued,
+			after:     actionUnknown,
+			operation: "active",
+			apply: func(ctx context.Context, r *Repository, id string) error {
+				return r.Transition(ctx, id, "launch", actionIssued, actionUnknown, nil)
+			},
+		},
+		{
+			name:      "completion",
+			before:    actionVerified,
+			after:     actionVerified,
+			operation: "complete",
+			apply: func(ctx context.Context, r *Repository, id string) error {
+				return r.Finish(ctx, id, false)
+			},
+		},
+		{
+			name:      "abandonment",
+			before:    actionIssued,
+			after:     actionIssued,
+			operation: "abandoned",
+			apply: func(ctx context.Context, r *Repository, id string) error {
+				return r.Finish(ctx, id, true)
+			},
+		},
 	} {
 		for _, phase := range []string{faultCatalogSynced, faultCatalogReplaced} {
 			t.Run(tt.name+"/"+phase, func(t *testing.T) {

@@ -69,9 +69,17 @@ func (s *Service) checkServiceOOMPolicy(ctx context.Context) []Result {
 		newResult(
 			CheckServiceOOMPolicy,
 			StatusWarn,
-			unit+" uses OOMPolicy=stop: one process killed for memory stops the unit, including the tmux server and every pane",
+			unit+" uses OOMPolicy=stop: one process killed for memory stops the unit, "+
+				"including the tmux server and every pane",
 		).
 			withReason(ReasonUnsafe).
-			withManual(fmt.Sprintf("Set OOMPolicy=continue in the [Service] section of %s (systemctl --user edit %s), then restart tmux at a convenient time", unit, unit)),
+			withManual(
+				fmt.Sprintf(
+					"Set OOMPolicy=continue in the [Service] section of %s (systemctl --user edit %s), "+
+						"then restart tmux at a convenient time",
+					unit,
+					unit,
+				),
+			),
 	}
 }

@@ -64,7 +64,8 @@ func TestConcurrentUpdatesKeepEveryRecordAndUniqueIDs(t *testing.T) {
 		group.Go(func() {
 			_, err := store.Update(t.Context(), func(ledger *task.Ledger) error {
 				record := task.EmptyRecord()
-				record.ID, record.Kind, record.State, record.Harness, record.Directory = ledger.NextID(), task.KindLoose, task.StateActive, "claude", "/tmp"
+				record.ID, record.Kind, record.State, record.Harness, record.Directory =
+					ledger.NextID(), task.KindLoose, task.StateActive, "claude", "/tmp"
 				ledger.Put(record)
 
 				return nil
@@ -179,7 +180,8 @@ func record(id string) string {
 
 func projectRecord(id string) task.Record {
 	record := task.EmptyRecord()
-	record.ID, record.Kind, record.State, record.Project, record.Number = id, task.KindProject, task.StateActive, "/code/shop", 3
+	record.ID, record.Kind, record.State, record.Project, record.Number =
+		id, task.KindProject, task.StateActive, "/code/shop", 3
 	record.Harness, record.Directory, record.Branch, record.Base = "pi", "/worktrees/shop/main-3", "wt/main/3", "main"
 	record.CreatedAt = 1700000000
 

@@ -270,7 +270,8 @@ func (m *Model) sessionKeyHelpBinding() helpBinding {
 	if m.focusesOnSessionKey() {
 		return helpBinding{
 			hint,
-			"Focus " + m.sessionKeyTarget() + ", then " + m.agentKeysHint() + " opens an agent and the key again opens it",
+			"Focus " + m.sessionKeyTarget() + ", then " + m.agentKeysHint() +
+				" opens an agent and the key again opens it",
 		}
 	}
 

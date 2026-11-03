@@ -45,7 +45,11 @@ func TestAgentGitCacheInvalidDataIsColdStart(t *testing.T) {
 		t.Fatal("missing cache produced entries")
 	}
 
-	for _, data := range []string{"broken", `{"version":2,"entries":{}}`, strings.Repeat("x", maxAgentGitCacheBytes+1)} {
+	for _, data := range []string{
+		"broken",
+		`{"version":2,"entries":{}}`,
+		strings.Repeat("x", maxAgentGitCacheBytes+1),
+	} {
 		if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
 			t.Fatal(err)
 		}

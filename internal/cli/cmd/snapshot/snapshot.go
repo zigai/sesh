@@ -86,7 +86,9 @@ func newSnapshotCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "snapshot",
 		Short: "Manage native tmux session snapshots",
-		Long:  "Manage native tmux session snapshots.\n\nSnapshots support practical session reconstruction and best-effort application recovery while keeping exact fidelity limits visible.",
+		Long: "Manage native tmux session snapshots.\n\n" +
+			"Snapshots support practical session reconstruction and best-effort application recovery " +
+			"while keeping exact fidelity limits visible.",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				return nil
@@ -115,9 +117,10 @@ func newSnapshotListCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List sessions saved in the native repository",
-		Long:  "List sessions saved in the native repository.\n\nPractical recovery generations remain observational and retain their exact fidelity limits.",
-		Args:  clibase.UsageArgs(cobra.NoArgs),
-		RunE:  runSnapshotList,
+		Long: "List sessions saved in the native repository.\n\n" +
+			"Practical recovery generations remain observational and retain their exact fidelity limits.",
+		Args: clibase.UsageArgs(cobra.NoArgs),
+		RunE: runSnapshotList,
 	}
 
 	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
@@ -277,9 +280,10 @@ func newSnapshotHistoryCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "history",
 		Short: "Show recent saves: when each ran, whether it finished and which one restore uses",
-		Long:  "Show recent saves: when each ran, whether it finished and which one restore uses.\n\nEvery save records tmux, not an atomic checkpoint; --json reports the raw attempt states.",
-		Args:  clibase.UsageArgs(cobra.NoArgs),
-		RunE:  runSnapshotHistory,
+		Long: "Show recent saves: when each ran, whether it finished and which one restore uses.\n\n" +
+			"Every save records tmux, not an atomic checkpoint; --json reports the raw attempt states.",
+		Args: clibase.UsageArgs(cobra.NoArgs),
+		RunE: runSnapshotHistory,
 	}
 
 	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
@@ -382,9 +386,11 @@ func newSnapshotVerifyCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "verify",
 		Short: "Verify snapshot byte integrity and inspect restore readiness capabilities",
-		Long:  "Verify snapshot byte integrity and inspect restore readiness capabilities.\n\nPractical readiness means a valid reconstructable graph; runtime preflight and fidelity limits still apply.",
-		Args:  clibase.UsageArgs(cobra.NoArgs),
-		RunE:  runSnapshotVerify,
+		Long: "Verify snapshot byte integrity and inspect restore readiness capabilities.\n\n" +
+			"Practical readiness means a valid reconstructable graph; " +
+			"runtime preflight and fidelity limits still apply.",
+		Args: clibase.UsageArgs(cobra.NoArgs),
+		RunE: runSnapshotVerify,
 	}
 
 	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
@@ -466,7 +472,8 @@ func renderVerifyTable(cmd *cobra.Command, targetGen string, manifest model.Mani
 	if manifest.PracticalRecoveryReady() {
 		fmt.Fprintf(
 			&out,
-			"Restore Ready:            yes (best-effort reconstruction; exact terminal and application memory recovery remain limited)\n",
+			"Restore Ready:            yes (best-effort reconstruction; "+
+				"exact terminal and application memory recovery remain limited)\n",
 		)
 	} else {
 		fmt.Fprintf(&out, "Restore Ready:            no (snapshot graph is not reconstructable)\n")

@@ -342,7 +342,9 @@ func (s *Service) reserveProjectTask(
 			if err != nil {
 				return Record{}, err
 			}
-		} else if slices.ContainsFunc(ledger.Tasks, func(record Record) bool { return sameDirectory(record.Directory, directory) }) {
+		} else if slices.ContainsFunc(ledger.Tasks, func(record Record) bool {
+			return sameDirectory(record.Directory, directory)
+		}) {
 			return Record{}, ErrLocationUnavailable
 		}
 

@@ -511,7 +511,11 @@ func (r *HookRunner) runCommand(
 			ExitCode: exitCode,
 			Duration: elapsed,
 			Err:      runErr,
-		}, oops.In("session").Code("operation_canceled").With("operation", "execute").With("hook_index", index).Wrap(runErr)
+		}, oops.In("session").
+			Code("operation_canceled").
+			With("operation", "execute").
+			With("hook_index", index).
+			Wrap(runErr)
 
 	case HookStatusTimedOut:
 		logger.Warn().

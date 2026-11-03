@@ -81,7 +81,10 @@ func TestPasteUpdatesTheProjectChoices(t *testing.T) {
 		want  projectpicker.Choice
 	}{
 		{"beta", projectpicker.Choice{Kind: projectpicker.ChoiceOpen, Value: "/code/beta"}},
-		{"https://example.com/team/widget.git", projectpicker.Choice{Kind: projectpicker.ChoiceClone, Value: "https://example.com/team/widget.git"}},
+		{
+			"https://example.com/team/widget.git",
+			projectpicker.Choice{Kind: projectpicker.ChoiceClone, Value: "https://example.com/team/widget.git"},
+		},
 		{"notebook", projectpicker.Choice{Kind: projectpicker.ChoiceCreate, Value: "notebook"}},
 	} {
 		t.Run(test.query, func(t *testing.T) {

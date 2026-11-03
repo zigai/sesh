@@ -83,11 +83,41 @@ func TestServerBinaryFallsBackToPathWithoutVerifiedServer(t *testing.T) {
 		descriptor string
 	}{
 		{"outside tmux", "", listeningRow("4242", fakeServerSocket), fakeServerBinary, "socket:[4242]"},
-		{"malformed environment", fakeServerSocket + "," + fakeServerPID, listeningRow("4242", fakeServerSocket), fakeServerBinary, "socket:[4242]"},
-		{"other server socket", "/tmp/tmux-1000/other," + fakeServerPID + ",0", listeningRow("4242", fakeServerSocket), fakeServerBinary, "socket:[4242]"},
-		{"stale pid", fakeServerSocket + "," + fakeServerPID + ",0", listeningRow("4242", fakeServerSocket), "/usr/bin/rm", "socket:[7]"},
-		{"socket not listening", fakeServerSocket + "," + fakeServerPID + ",0", "0000000000000000: 00000002 00000000 00000000 0001 03 4242 " + fakeServerSocket + "\n", fakeServerBinary, "socket:[4242]"},
-		{"replaced executable", fakeServerSocket + "," + fakeServerPID + ",0", listeningRow("4242", fakeServerSocket), fakeServerBinary + " (deleted)", "socket:[4242]"},
+		{
+			"malformed environment",
+			fakeServerSocket + "," + fakeServerPID,
+			listeningRow("4242", fakeServerSocket),
+			fakeServerBinary,
+			"socket:[4242]",
+		},
+		{
+			"other server socket",
+			"/tmp/tmux-1000/other," + fakeServerPID + ",0",
+			listeningRow("4242", fakeServerSocket),
+			fakeServerBinary,
+			"socket:[4242]",
+		},
+		{
+			"stale pid",
+			fakeServerSocket + "," + fakeServerPID + ",0",
+			listeningRow("4242", fakeServerSocket),
+			"/usr/bin/rm",
+			"socket:[7]",
+		},
+		{
+			"socket not listening",
+			fakeServerSocket + "," + fakeServerPID + ",0",
+			"0000000000000000: 00000002 00000000 00000000 0001 03 4242 " + fakeServerSocket + "\n",
+			fakeServerBinary,
+			"socket:[4242]",
+		},
+		{
+			"replaced executable",
+			fakeServerSocket + "," + fakeServerPID + ",0",
+			listeningRow("4242", fakeServerSocket),
+			fakeServerBinary + " (deleted)",
+			"socket:[4242]",
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			proc := newFakeProc(t, test.rows)

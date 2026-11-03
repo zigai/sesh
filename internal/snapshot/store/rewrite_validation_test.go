@@ -105,7 +105,14 @@ func TestRewriteReconciliationPreservesLateCancellation(t *testing.T) {
 }
 
 func TestRewriteCatalogRejectsContradictoryHistory(t *testing.T) {
-	for _, kind := range []string{"pending_replacement_exists", "source_failed", "completed_replacement_pending", "duplicate_source", "duplicate_replacement", "pin_on_pending_source"} {
+	for _, kind := range []string{
+		"pending_replacement_exists",
+		"source_failed",
+		"completed_replacement_pending",
+		"duplicate_source",
+		"duplicate_replacement",
+		"pin_on_pending_source",
+	} {
 		t.Run(kind, func(t *testing.T) {
 			r := openRepository(t, filepath.Join(t.TempDir(), "repository"))
 			source := commitMultiSessionFixture(t, r)

@@ -680,7 +680,11 @@ func assertSparseRepeatedAndSharedLinks(t *testing.T, ctx context.Context, targe
 }
 
 func TestDeepAsymmetricLayoutTinyCellsBordersAndZoom(t *testing.T) {
-	for _, border := range []gotmux.PaneBorderStatus{gotmux.PaneBorderStatusOff, gotmux.PaneBorderStatusTop, gotmux.PaneBorderStatusBottom} {
+	for _, border := range []gotmux.PaneBorderStatus{
+		gotmux.PaneBorderStatusOff,
+		gotmux.PaneBorderStatusTop,
+		gotmux.PaneBorderStatusBottom,
+	} {
 		t.Run(string(border), func(t *testing.T) {
 			verifyDeepLayoutAtBorder(t, border)
 		})

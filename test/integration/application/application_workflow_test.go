@@ -248,7 +248,16 @@ func decodeEnvelope(t *testing.T, data []byte) cliResultEnvelope {
 	return env
 }
 
-const nvimBufferQueryExpr = `json_encode({"pid":luaeval("(function() for _, u in ipairs(vim.api.nvim_list_uis()) do local info = vim.api.nvim_get_chan_info(u.chan) if info and info.client and info.client.attributes and info.client.attributes.pid then return info.client.attributes.pid end; end if #vim.api.nvim_list_uis() > 0 and vim.uv.os_getppid() > 1 then return vim.uv.os_getppid() end return vim.fn.getpid() end)()"),"files":map(filter(getbufinfo(), 'v:val.listed && !empty(v:val.name)'), 'fnamemodify(v:val.name, ":p")')})`
+const nvimBufferQueryExpr = `json_encode({"pid":luaeval("(function() ` +
+	`for _, u in ipairs(vim.api.nvim_list_uis()) do ` +
+	`local info = vim.api.nvim_get_chan_info(u.chan) ` +
+	`if info and info.client and info.client.attributes and info.client.attributes.pid then ` +
+	`return info.client.attributes.pid end; end ` +
+	`if #vim.api.nvim_list_uis() > 0 and vim.uv.os_getppid() > 1 then ` +
+	`return vim.uv.os_getppid() end ` +
+	`return vim.fn.getpid() end)()"),` +
+	`"files":map(filter(getbufinfo(), 'v:val.listed && !empty(v:val.name)'), ` +
+	`'fnamemodify(v:val.name, ":p")')})`
 
 type nvimBufferQueryResponse struct {
 	PID   int      `json:"pid"`

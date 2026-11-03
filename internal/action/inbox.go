@@ -6,8 +6,10 @@ var (
 		"Snooze",
 		"Hide an inbox row until a time or the agent's next message",
 		"Move the selected inbox row to the snoozed section until --until passes or the agent finishes a turn or asks "+
-			"for input, whichever comes first. --until is one of the configured inbox.snooze choices, a duration such as "+
-			"90m, a time of day such as 18:00, \"tomorrow 09:00\" or \"next message\"; without it the picker offers the choices.",
+			"for input, whichever comes first. "+
+			"--until is one of the configured inbox.snooze choices, a duration such as "+
+			"90m, a time of day such as 18:00, \"tomorrow 09:00\" or \"next message\"; "+
+			"without it the picker offers the choices.",
 		newParam("until", ParamText, "When the snooze ends"),
 	)
 

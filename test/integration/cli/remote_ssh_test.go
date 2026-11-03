@@ -107,7 +107,8 @@ func TestRemoteTaskFinishRunsOnThePeerOnlyWhenThePeerAllowsIt(t *testing.T) {
 	ledger := task.NewStore(filepath.Join(fixture.stateHome, "sesh", "tasks.json"))
 	if _, err := ledger.Update(t.Context(), func(l *task.Ledger) error {
 		record := task.EmptyRecord()
-		record.ID, record.Kind, record.State, record.Directory = l.NextID(), task.KindLoose, task.StateActive, fixture.root
+		record.ID, record.Kind, record.State, record.Directory =
+			l.NextID(), task.KindLoose, task.StateActive, fixture.root
 		l.Put(record)
 
 		return nil
@@ -336,7 +337,11 @@ func writeRemoteSSHConfigs(
 
 	// Sessions get the test's PATH so the peer runs the same tmux as the local fixtures.
 	sshdBody := fmt.Sprintf(
-		"Port %d\nListenAddress 127.0.0.1\nHostKey %s\nPidFile %s\nAuthorizedKeysFile %s\nPubkeyAuthentication yes\nPasswordAuthentication no\nKbdInteractiveAuthentication no\nUsePAM no\nStrictModes no\nPermitRootLogin yes\nAllowUsers %s\nAcceptEnv XDG_STATE_HOME XDG_CACHE_HOME XDG_DATA_HOME XDG_CONFIG_HOME\nSetEnv \"PATH=%s\"\nLogLevel ERROR\n",
+		"Port %d\nListenAddress 127.0.0.1\nHostKey %s\nPidFile %s\nAuthorizedKeysFile %s\nPubkeyAuthentication yes\n"+
+			"PasswordAuthentication no\nKbdInteractiveAuthentication no\nUsePAM no\nStrictModes no\n"+
+			"PermitRootLogin yes\n"+
+			"AllowUsers %s\nAcceptEnv XDG_STATE_HOME XDG_CACHE_HOME XDG_DATA_HOME XDG_CONFIG_HOME\n"+
+			"SetEnv \"PATH=%s\"\nLogLevel ERROR\n",
 		port,
 		hostKey,
 		filepath.Join(root, "sshd.pid"),
@@ -368,7 +373,9 @@ func writeRemoteSSHConfigs(
 	clientConfig := filepath.Join(sshDir, "config")
 
 	clientBody := fmt.Sprintf(
-		"Host sesh-fixture\n  HostName 127.0.0.1\n  Port %d\n  User %s\n  IdentityFile %s\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n  UserKnownHostsFile %s\n  SendEnv XDG_STATE_HOME XDG_CACHE_HOME XDG_DATA_HOME XDG_CONFIG_HOME\n",
+		"Host sesh-fixture\n  HostName 127.0.0.1\n  Port %d\n  User %s\n  IdentityFile %s\n  IdentitiesOnly yes\n"+
+			"  StrictHostKeyChecking yes\n  UserKnownHostsFile %s\n"+
+			"  SendEnv XDG_STATE_HOME XDG_CACHE_HOME XDG_DATA_HOME XDG_CONFIG_HOME\n",
 		port,
 		username,
 		clientKey,

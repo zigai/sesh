@@ -57,7 +57,8 @@ func TestStartCreatesAProjectTaskInItsOwnWorktreeAndWindow(t *testing.T) {
 	worktree := filepath.Join(f.worktreeDir, "shop", "main-1")
 	want := task.EmptyRecord()
 	want.ID, want.Kind, want.State, want.Project, want.Number = "t1", task.KindProject, task.StateActive, repo, 1
-	want.Harness, want.Directory, want.Branch, want.Base, want.Title = envHarness, worktree, "wt/main/1", "main", "main-1"
+	want.Harness, want.Directory, want.Branch, want.Base, want.Title =
+		envHarness, worktree, "wt/main/1", "main", "main-1"
 	want.WindowName = "main-1"
 	want.OwnsWorktree, want.OwnsBranch = true, true
 	want.CreatedAt = record.CreatedAt
@@ -253,7 +254,12 @@ func TestStartPicksABranchThatDoesNotNestWithAnExistingBranch(t *testing.T) {
 		request  task.Request
 		want     string
 	}{
-		{name: "untitled under a titled branch", existing: "wt/main", request: inNewWorktree(sleepHarness), want: "wt/main-2/1"},
+		{
+			name:     "untitled under a titled branch",
+			existing: "wt/main",
+			request:  inNewWorktree(sleepHarness),
+			want:     "wt/main-2/1",
+		},
 		{name: "titled above an untitled branch", existing: "wt/main/1", request: titled, want: "wt/main-2"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -418,7 +424,8 @@ func TestOfferListsEveryCheckoutAndBranchAndMarksTheOnesTasksUse(t *testing.T) {
 	}
 	if !slices.Equal(offer.Locations, want) {
 		t.Fatalf(
-			"Offer() locations = %+v, want %+v: a missing worktree and checked-out branches left out, the task's worktree marked",
+			"Offer() locations = %+v, want %+v: "+
+				"a missing worktree and checked-out branches left out, the task's worktree marked",
 			offer.Locations,
 			want,
 		)
@@ -770,7 +777,11 @@ func TestStartRunsTheHarnessInTheUserShellWithItsFunctions(t *testing.T) {
 		name, rcFile, rc string
 	}{
 		{name: "bash", rcFile: ".bashrc", rc: "shellagent() { printf '%%s|' --yolo \"$@\" > '%s'; exec sleep 300; }\n"},
-		{name: "fish", rcFile: ".config/fish/config.fish", rc: "function shellagent; printf '%%s|' --yolo $argv > '%s'; exec sleep 300; end\n"},
+		{
+			name:   "fish",
+			rcFile: ".config/fish/config.fish",
+			rc:     "function shellagent; printf '%%s|' --yolo $argv > '%s'; exec sleep 300; end\n",
+		},
 	} {
 		t.Run(shell.name, func(t *testing.T) {
 			f := newFixture(t)
@@ -1114,7 +1125,8 @@ func newFixture(t *testing.T) fixture {
 			Command: []string{
 				"sh",
 				"-c",
-				`printf '%s|%s|%s|%s' "$SESH_TASK" "$SESH_PROJECT" "$SESH_WORKTREE" "$SESH_BASE" > "$0"; exec sleep 300`,
+				`printf '%s|%s|%s|%s' "$SESH_TASK" "$SESH_PROJECT" "$SESH_WORKTREE" "$SESH_BASE" > "$0"; ` +
+					`exec sleep 300`,
 				envFile,
 			},
 		},

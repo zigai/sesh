@@ -314,7 +314,9 @@ func checkPickerKeys(keys config.KeyConfig, bindings []Binding) error {
 		var err error
 
 		switch {
-		case slices.ContainsFunc(reserved, func(key string) bool { return key != "" && config.PickerKeyName(key) == binding.Key }):
+		case slices.ContainsFunc(reserved, func(key string) bool {
+			return key != "" && config.PickerKeyName(key) == binding.Key
+		}):
 			err = fmt.Errorf("%w: %s is a picker navigation key", ErrPickerKeyReserved, binding.Key)
 		case config.PickerKeyTypes(binding.Key):
 			err = fmt.Errorf(

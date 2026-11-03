@@ -344,7 +344,9 @@ func (o *Observation) globals(ctx context.Context, server *gotmux.Server) error 
 		name   string
 		source optionLister
 	}{
-		{"server", server.Options()}, {"global-session", server.GlobalSessionOptions()}, {"global-window", server.GlobalWindowOptions()},
+		{"server", server.Options()},
+		{"global-session", server.GlobalSessionOptions()},
+		{"global-window", server.GlobalWindowOptions()},
 	} {
 		values, err := options(ctx, scoped.name, scoped.source)
 		if err != nil {

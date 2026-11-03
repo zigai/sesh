@@ -14,7 +14,8 @@ import (
 
 func TestSeshDisplayFormatControlsFieldsAndAlignment(t *testing.T) {
 	cfg := config.DefaultConfig()
-	cfg.Display.SeshFormat = "{current_marker}{session_name} [{active_window_name}] {active_pane_path_name} windows={window_count} {attached}{right}{agent_working}/{agent_total}"
+	cfg.Display.SeshFormat = "{current_marker}{session_name} [{active_window_name}] {active_pane_path_name} " +
+		"windows={window_count} {attached}{right}{agent_working}/{agent_total}"
 	model := newTestModelWithConfig(t, cfg)
 	model.filtered = []session.Session{
 		{
@@ -52,7 +53,8 @@ func TestSessionFieldFormatsAlignByTerminalDisplayWidth(t *testing.T) {
 	const wideName = "\u958b\u767a"
 
 	cfg := config.DefaultConfig()
-	cfg.Display.SeshFormat = "{session_name:<8.8}|{active_window_name:^10.10}|{window_count:>3}{right}{session_kind:>6.6}"
+	cfg.Display.SeshFormat = "{session_name:<8.8}|{active_window_name:^10.10}|{window_count:>3}" +
+		"{right}{session_kind:>6.6}"
 	model := newTestModelWithConfig(t, cfg)
 	model.filtered = []session.Session{{
 		Name:             wideName,
@@ -116,7 +118,8 @@ func TestAgentsDisplayFormatsControlParentAndChildRows(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.AgentSessions.StatusStyle = "text"
 	cfg.Display.AgentsSessionFormat = "SESSION {session_name} [{active_window_name}] [{agent_status}]"
-	cfg.Display.AgentsAgentFormat = "{tree}{status} {harness_raw}:{agent_session} [{agent_project_name}] {registry_id} {pane_id} {active_marker}{stale}{right}{session_name}"
+	cfg.Display.AgentsAgentFormat = "{tree}{status} {harness_raw}:{agent_session} [{agent_project_name}] " +
+		"{registry_id} {pane_id} {active_marker}{stale}{right}{session_name}"
 	model := newTestModelWithConfig(t, cfg)
 	model.displayMode = displayModeAgents
 	model.agentSummaryErr = errSaveFailed
@@ -415,7 +418,8 @@ func TestShortcutFieldResolution(t *testing.T) {
 
 func TestAgentGitCountersKeepSeparateColumns(t *testing.T) {
 	cfg := config.DefaultConfig()
-	cfg.Display.AgentsAgentFormat = "{agent_session}{right} {agent_git_label:<6.12}|{agent_git_added:<5}|{agent_git_deleted:<5}|{agent_git_ahead:<2}|{agent_git_behind:<2}"
+	cfg.Display.AgentsAgentFormat = "{agent_session}{right} {agent_git_label:<6.12}|" +
+		"{agent_git_added:<5}|{agent_git_deleted:<5}|{agent_git_ahead:<2}|{agent_git_behind:<2}"
 	model := newTestModelWithConfig(t, cfg)
 	model.displayMode = displayModeAgents
 	model.filtered = []session.Session{{Name: "dev", AgentTotal: 2, Agents: []session.AgentSession{
@@ -640,9 +644,21 @@ func TestAgentGitInfoOptionalMetadata(t *testing.T) {
 		want  string
 	}{
 		{name: "outside Git", want: ""},
-		{name: "detached", agent: session.AgentSession{Worktree: "/work/repo", GitChanges: "+1 -2"}, want: "detached +1 -2"},
-		{name: "main checkout", agent: session.AgentSession{Worktree: "/work/repo", GitBranch: "main", GitChanges: "+0 -0"}, want: "main +0 -0"},
-		{name: "unavailable diff", agent: session.AgentSession{Worktree: "/work/repo", GitBranch: "main"}, want: "main"},
+		{
+			name:  "detached",
+			agent: session.AgentSession{Worktree: "/work/repo", GitChanges: "+1 -2"},
+			want:  "detached +1 -2",
+		},
+		{
+			name:  "main checkout",
+			agent: session.AgentSession{Worktree: "/work/repo", GitBranch: "main", GitChanges: "+0 -0"},
+			want:  "main +0 -0",
+		},
+		{
+			name:  "unavailable diff",
+			agent: session.AgentSession{Worktree: "/work/repo", GitBranch: "main"},
+			want:  "main",
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := agentGitInfo(tt.agent); got != tt.want {

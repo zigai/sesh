@@ -181,7 +181,14 @@ func TestRemoteCommandTreeMarksProtocolChannelsLive(t *testing.T) {
 	}
 
 	root := cmdremote.NewCommand()
-	for _, path := range [][]string{{"peer", "stream"}, {"peer", "action"}, {"peer", "lookup"}, {"peer", "attach-prepare"}, {"peer", "attach"}, {"attach"}} {
+	for _, path := range [][]string{
+		{"peer", "stream"},
+		{"peer", "action"},
+		{"peer", "lookup"},
+		{"peer", "attach-prepare"},
+		{"peer", "attach"},
+		{"attach"},
+	} {
 		command, _, err := root.Find(path)
 		if err != nil {
 			t.Fatalf("Find(%v): %v", path, err)

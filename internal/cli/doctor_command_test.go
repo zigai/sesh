@@ -75,7 +75,15 @@ func TestDoctorCommandPlainReportListsGroupsChecksAndVerdict(t *testing.T) {
 		filepath.Join(t.TempDir(), "absent.sock"),
 	)
 
-	for _, want := range []string{"\n  socket      ", "\nTmux\n", "\n  fail  server", "\nSnapshots\n", " attention.\n", " ok, ", " fail, "} {
+	for _, want := range []string{
+		"\n  socket      ",
+		"\nTmux\n",
+		"\n  fail  server",
+		"\nSnapshots\n",
+		" attention.\n",
+		" ok, ",
+		" fail, ",
+	} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("stdout missing %q:\n%s", want, stdout)
 		}

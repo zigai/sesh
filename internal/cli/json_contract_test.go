@@ -212,7 +212,14 @@ func isolateJSONContractHome(t *testing.T) string {
 	t.Helper()
 	home := t.TempDir()
 
-	for _, key := range []string{"HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME", "XDG_RUNTIME_DIR"} {
+	for _, key := range []string{
+		"HOME",
+		"XDG_CONFIG_HOME",
+		"XDG_DATA_HOME",
+		"XDG_STATE_HOME",
+		"XDG_CACHE_HOME",
+		"XDG_RUNTIME_DIR",
+	} {
 		t.Setenv(key, home)
 	}
 

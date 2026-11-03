@@ -20,8 +20,14 @@ import (
 )
 
 const (
-	formattedWarningRecord = `{"time":"2026-08-06T15:45:52.328165852Z","level":"warn","command":"doctor","version":"dev","commit":"abc123","pid":42,"component":"doctor","check":"continuum-shutdown-save","status":"warning","reason":"save_failed","message":"doctor check non-ok"}`
-	formattedInfoRecord    = `{"time":"2026-08-06T15:46:01Z","level":"info","command":"continuum.tick","version":"dev","commit":"abc123","pid":43,"component":"resurrect","operation":"save","status":"ok","duplicate":false,"partial":false,"duration_ms":4983,"message":"resurrect save completed"}`
+	formattedWarningRecord = `{"time":"2026-08-06T15:45:52.328165852Z","level":"warn",` +
+		`"command":"doctor","version":"dev","commit":"abc123","pid":42,` +
+		`"component":"doctor","check":"continuum-shutdown-save","status":"warning",` +
+		`"reason":"save_failed","message":"doctor check non-ok"}`
+	formattedInfoRecord = `{"time":"2026-08-06T15:46:01Z","level":"info",` +
+		`"command":"continuum.tick","version":"dev","commit":"abc123","pid":43,"component":"resurrect",` +
+		`"operation":"save","status":"ok","duplicate":false,"partial":false,` +
+		`"duration_ms":4983,"message":"resurrect save completed"}`
 )
 
 func writeLogsTestFile(t *testing.T, content string) string {
@@ -37,16 +43,20 @@ func writeLogsTestFile(t *testing.T, content string) string {
 
 func TestLogRendererUsesCompactComponentPrefixesAndFields(t *testing.T) {
 	popupStartedRecord := []byte(
-		`{"time":"2026-08-06T16:36:09Z","level":"info","component":"popup","command":"popup","message":"popup operation started"}` + "\n",
+		`{"time":"2026-08-06T16:36:09Z","level":"info",` +
+			`"component":"popup","command":"popup","message":"popup operation started"}` + "\n",
 	)
 	popupCompletedRecord := []byte(
-		`{"time":"2026-08-06T16:36:09Z","level":"info","component":"popup","command":"popup","message":"popup operation completed"}` + "\n",
+		`{"time":"2026-08-06T16:36:09Z","level":"info",` +
+			`"component":"popup","command":"popup","message":"popup operation completed"}` + "\n",
 	)
 	commandRecord := []byte(
-		`{"time":"2026-08-06T16:36:09Z","level":"info","component":"command","command":"popup","message":"command completed"}` + "\n",
+		`{"time":"2026-08-06T16:36:09Z","level":"info",` +
+			`"component":"command","command":"popup","message":"command completed"}` + "\n",
 	)
 	resurrectRecord := []byte(
-		`{"time":"2026-08-06T16:36:09Z","level":"info","component":"resurrect","command":"continuum.tick","message":"resurrect save started"}` + "\n",
+		`{"time":"2026-08-06T16:36:09Z","level":"info",` +
+			`"component":"resurrect","command":"continuum.tick","message":"resurrect save started"}` + "\n",
 	)
 
 	popupStartedLine := renderLogTestLine(t, popupStartedRecord)
@@ -205,7 +215,8 @@ func TestLogRendererAppliesStylesAndEscapesTerminalControlCharacters(t *testing.
 	}
 
 	unsafeRecord := []byte(
-		"{\"time\":\"2026-08-06T15:45:52Z\",\"level\":\"error\",\"component\":\"bad\\u001b[2J\",\"message\":\"line\\nnext\"}\n",
+		"{\"time\":\"2026-08-06T15:45:52Z\",\"level\":\"error\"," +
+			"\"component\":\"bad\\u001b[2J\",\"message\":\"line\\nnext\"}\n",
 	)
 
 	safe, err := RenderLogLine(unsafeRecord, Styles{})
@@ -245,7 +256,12 @@ func TestHumanizeDuration(t *testing.T) {
 
 func TestLogRendererPrunesRedundantFieldsInCompactMode(t *testing.T) {
 	record := []byte(
-		`{"time":"2026-09-09T11:08:36Z","level":"info","component":"continuum","command":"continuum.startup","operation":"startup","status":"ok","boot_reconciled":false,"default_session_changed":false,"duration_ms":25,"hook_dispatched":true,"restore_partial":false,"restore_skipped_reason":"not_startup","restore_status":"skipped","message":"continuum startup completed"}` + "\n",
+		`{"time":"2026-09-09T11:08:36Z","level":"info","component":"continuum","command":"continuum.startup",` +
+			`"operation":"startup","status":"ok",` +
+			`"boot_reconciled":false,"default_session_changed":false,"duration_ms":25,` +
+			`"hook_dispatched":true,"restore_partial":false,` +
+			`"restore_skipped_reason":"not_startup","restore_status":"skipped",` +
+			`"message":"continuum startup completed"}` + "\n",
 	)
 
 	compactLine, err := RenderLogLine(record, NewLogStyles(false, false))
@@ -339,7 +355,8 @@ func TestLogStylesStatusHighlighting(t *testing.T) {
 	styles := NewLogStyles(true)
 
 	degradedRecord := []byte(
-		`{"time":"2026-08-06T15:46:01Z","level":"warn","component":"resurrect","status":"degraded","message":"save degraded"}` + "\n",
+		`{"time":"2026-08-06T15:46:01Z","level":"warn",` +
+			`"component":"resurrect","status":"degraded","message":"save degraded"}` + "\n",
 	)
 
 	rendered, err := RenderLogLine(degradedRecord, styles)

@@ -148,7 +148,12 @@ func assertSaveOutcomeRecord(t *testing.T, fields map[string]jsontext.Value, sce
 	}
 
 	if scenario == "partial" {
-		for field, want := range map[string]string{"restart_panes": "0", "resume_panes": "0", "unverified_panes": "1", "nonrestartable_panes": "0"} {
+		for field, want := range map[string]string{
+			"restart_panes":        "0",
+			"resume_panes":         "0",
+			"unverified_panes":     "1",
+			"nonrestartable_panes": "0",
+		} {
 			if got := string(fields[field]); got != want {
 				t.Fatalf("%s = %q, want %q", field, got, want)
 			}

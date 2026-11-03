@@ -306,7 +306,8 @@ func assertTmuxServiceContent(t *testing.T, content string) {
 	t.Helper()
 
 	for _, want := range []string{
-		"ExecStart=/usr/local/bin/sesh daemon tmux --socket /run/user/1000/sesh/tmux.sock --tmux /usr/bin/tmux --stop-grace 5s",
+		"ExecStart=/usr/local/bin/sesh daemon tmux --socket /run/user/1000/sesh/tmux.sock " +
+			"--tmux /usr/bin/tmux --stop-grace 5s",
 		"ExecStartPost=/usr/local/bin/sesh daemon wait-ready --socket /run/user/1000/sesh/tmux.sock --timeout 5s",
 		"autosave final-save",
 		"--deadline 20s",
@@ -756,9 +757,15 @@ func TestSystemdLongRunningServicesTreatAStopAsSuccess(t *testing.T) {
 	inputs := linuxInputs(t)
 
 	render := map[string]func() (setup.ServiceDefinition, error){
-		setup.CoordinatorServiceName: func() (setup.ServiceDefinition, error) { return setup.CoordinatorDefinition(inputs) },
-		setup.RemoteServiceName:      func() (setup.ServiceDefinition, error) { return setup.RemoteMonitorDefinition(inputs, true) },
-		setup.AgentStatusServiceName: func() (setup.ServiceDefinition, error) { return setup.AgentStatusDefinition(inputs) },
+		setup.CoordinatorServiceName: func() (setup.ServiceDefinition, error) {
+			return setup.CoordinatorDefinition(inputs)
+		},
+		setup.RemoteServiceName: func() (setup.ServiceDefinition, error) {
+			return setup.RemoteMonitorDefinition(inputs, true)
+		},
+		setup.AgentStatusServiceName: func() (setup.ServiceDefinition, error) {
+			return setup.AgentStatusDefinition(inputs)
+		},
 	}
 
 	for name, definition := range render {

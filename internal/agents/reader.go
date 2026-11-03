@@ -173,7 +173,8 @@ func idleSinceSessionStart(session aht.Session) bool {
 	native := session.Observations.Native
 
 	return activity != nil && *activity == aht.ActivityIdle &&
-		native != nil && sessionStartEvent(native.Event) && native.Activity != nil && *native.Activity == aht.ActivityIdle
+		native != nil && sessionStartEvent(native.Event) &&
+		native.Activity != nil && *native.Activity == aht.ActivityIdle
 }
 
 func sessionStartEvent(event string) bool {

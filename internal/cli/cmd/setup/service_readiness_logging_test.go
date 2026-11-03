@@ -84,9 +84,8 @@ func assertServiceReadinessWarning(t *testing.T, data []byte, scenario string) {
 		"message":   "automatic save service readiness could not be verified",
 	}
 	if scenario == "failed" {
-		want["reason"], want["message"], want["failed"] = "service_failed", "automatic save services are failing", float64(
-			1,
-		)
+		want["reason"], want["message"], want["failed"] =
+			"service_failed", "automatic save services are failing", float64(1)
 		want["units"] = []any{setup.AutosaveTimerName}
 	} else {
 		want["error"] = record["error"]

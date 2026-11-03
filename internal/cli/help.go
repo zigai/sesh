@@ -206,7 +206,8 @@ func flagDefault(flag *pflag.Flag) (string, bool) {
 		zero = []string{"false", ""}
 	case kind == "duration":
 		zero = []string{"0", "0s", ""}
-	case strings.HasPrefix(kind, "int") || strings.HasPrefix(kind, "uint") || strings.HasPrefix(kind, "float") || kind == "count":
+	case strings.HasPrefix(kind, "int") || strings.HasPrefix(kind, "uint") ||
+		strings.HasPrefix(kind, "float") || kind == "count":
 		zero = []string{"0", ""}
 	case strings.HasSuffix(kind, "Slice") || strings.HasSuffix(kind, "Array"):
 		zero = []string{"[]", ""}

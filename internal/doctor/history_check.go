@@ -104,10 +104,24 @@ func incompatibleHistory(path string, loadErr error, moveAside string) Result {
 	return newResult(
 		CheckHistoryFile,
 		StatusFail,
-		fmt.Sprintf("Has schema version %d; convert it to version %d", versionErr.Version, session.CurrentHistoryVersion),
+		fmt.Sprintf(
+			"Has schema version %d; convert it to version %d",
+			versionErr.Version,
+			session.CurrentHistoryVersion,
+		),
 	).
 		withReason(ReasonIncompatible).
-		withCommand(fmt.Sprintf("jq %s %s > %s && chmod 600 %s && mv %s %s", shellArg(filter), file, temp, temp, temp, file))
+		withCommand(
+			fmt.Sprintf(
+				"jq %s %s > %s && chmod 600 %s && mv %s %s",
+				shellArg(filter),
+				file,
+				temp,
+				temp,
+				temp,
+				file,
+			),
+		)
 }
 
 func (s *Service) unsafeHistory() Result {
@@ -115,5 +129,10 @@ func (s *Service) unsafeHistory() Result {
 
 	return newResult(CheckHistoryFile, StatusFail, path+" is a symlink or has unsafe permissions").
 		withReason(ReasonUnsafe).
-		withManual(fmt.Sprintf("Make %s a regular file owned by you with mode 0600 in a directory only you can write", path))
+		withManual(
+			fmt.Sprintf(
+				"Make %s a regular file owned by you with mode 0600 in a directory only you can write",
+				path,
+			),
+		)
 }

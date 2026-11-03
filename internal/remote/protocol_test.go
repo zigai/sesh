@@ -76,7 +76,8 @@ func TestFrameRoundTrip(t *testing.T) {
 func TestFrameReadRejectsClosedContractViolations(t *testing.T) {
 	version := `"version":` + strconv.Itoa(ProtocolVersion)
 	valid := `{` + version + `,"type":"hello","peerId":"peer","streamInstance":"stream","sequence":1,` +
-		`"hello":{"peerId":"peer","streamInstance":"stream","hostname":"host","bridgeDir":"","startedAt":"0001-01-01T00:00:00Z"}}`
+		`"hello":{"peerId":"peer","streamInstance":"stream","hostname":"host",` +
+		`"bridgeDir":"","startedAt":"0001-01-01T00:00:00Z"}}`
 
 	tests := map[string]string{
 		"unknown member": strings.Replace(
@@ -103,7 +104,12 @@ func TestFrameReadRejectsClosedContractViolations(t *testing.T) {
 		"payload exclusivity": strings.Replace(
 			valid,
 			`"startedAt":"0001-01-01T00:00:00Z"}`,
-			`"startedAt":"0001-01-01T00:00:00Z"},"health":{"observedAt":"0001-01-01T00:00:00Z","sources":{"tmux":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"},"agents":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"},"snapshots":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"},"tasks":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"},"work":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"}}}`,
+			`"startedAt":"0001-01-01T00:00:00Z"},"health":{"observedAt":"0001-01-01T00:00:00Z","sources":{`+
+				`"tmux":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"},`+
+				`"agents":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"},`+
+				`"snapshots":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"},`+
+				`"tasks":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"},`+
+				`"work":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"}}}`,
 			1,
 		),
 		"lower cased key":    strings.Replace(valid, `"streamInstance"`, `"streaminstance"`, 1),

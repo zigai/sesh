@@ -21,9 +21,11 @@ import (
 
 func newRestoreOnStartCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:         "restore-on-start",
-		Short:       "Restore the newest saved snapshot when explicitly configured",
-		Long:        "Restore the newest saved snapshot when explicitly configured.\n\nWhen the latest save failed or never finished, the newest saved generation is restored and reported. A pending saved-session deletion or an active restore operation refuses automatic restoration.",
+		Use:   "restore-on-start",
+		Short: "Restore the newest saved snapshot when explicitly configured",
+		Long: "Restore the newest saved snapshot when explicitly configured.\n\n" +
+			"When the latest save failed or never finished, the newest saved generation is restored and reported. " +
+			"A pending saved-session deletion or an active restore operation refuses automatic restoration.",
 		Args:        clibase.UsageArgs(cobra.NoArgs),
 		RunE:        runAutosaveRestoreOnStart,
 		Annotations: map[string]string{clibase.AnnotationOperation: "restore-on-start"},

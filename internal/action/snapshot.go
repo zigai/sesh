@@ -17,7 +17,8 @@ var (
 		ID:      "snapshot.save",
 		Title:   "Snapshot session",
 		Summary: "Save live tmux sessions to the native repository",
-		Help:    "Save live tmux sessions to the native repository.\n\nSaves are practical recovery observations, not atomic checkpoints or application memory images.",
+		Help: "Save live tmux sessions to the native repository.\n\n" +
+			"Saves are practical recovery observations, not atomic checkpoints or application memory images.",
 		Subject: SubjectLiveSession,
 		Arity:   ArityMany,
 		Params: []Param{
@@ -75,7 +76,8 @@ var (
 			newParam(
 				"on-collision",
 				ParamChoice,
-				"Handle saved sessions whose names are already live; unset, restoring all sessions skips them and naming sessions fails",
+				"Handle saved sessions whose names are already live; "+
+					"unset, restoring all sessions skips them and naming sessions fails",
 			).
 				withChoices(CollisionSkip, CollisionFail),
 		},

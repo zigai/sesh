@@ -214,7 +214,10 @@ func TestVerifiedRuntimePaneResultsDoNotInventLaunchEvidence(t *testing.T) {
 		t.Fatalf("reinspected dead-pane result = %+v", got)
 	}
 
-	for index, reason := range []string{string(model.ReasonExecutableDeleted), string(model.ReasonWorkingDirectoryDeleted)} {
+	for index, reason := range []string{
+		string(model.ReasonExecutableDeleted),
+		string(model.ReasonWorkingDirectoryDeleted),
+	} {
 		if got := launched[index+2]; got.Outcome != PaneOutcomeUnsupported || got.Reason != reason {
 			t.Fatalf("reinspected nonrestartable result = %+v, want reason %q", got, reason)
 		}

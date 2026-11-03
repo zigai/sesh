@@ -63,9 +63,10 @@ func newSnapshotPruneCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "prune",
 		Short: "Apply configured snapshot retention to catalog membership",
-		Long:  "Apply configured snapshot retention to catalog membership.\n\nPruning removes catalog references and retires generations without deleting physical bytes immediately.",
-		Args:  validateSnapshotMaintenanceArgs,
-		RunE:  runSnapshotPrune,
+		Long: "Apply configured snapshot retention to catalog membership.\n\n" +
+			"Pruning removes catalog references and retires generations without deleting physical bytes immediately.",
+		Args: validateSnapshotMaintenanceArgs,
+		RunE: runSnapshotPrune,
 	}
 
 	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
@@ -84,9 +85,11 @@ func newSnapshotGCCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "gc",
 		Short: "Physically collect retired snapshot generation bytes",
-		Long:  "Physically collect retired snapshot generation bytes.\n\nPhysical collection requires explicit bounded budgets, acquires the physical collection lock, and preserves quarantined or protected evidence.",
-		Args:  validateSnapshotMaintenanceArgs,
-		RunE:  runSnapshotGC,
+		Long: "Physically collect retired snapshot generation bytes.\n\n" +
+			"Physical collection requires explicit bounded budgets, acquires the physical collection lock, " +
+			"and preserves quarantined or protected evidence.",
+		Args: validateSnapshotMaintenanceArgs,
+		RunE: runSnapshotGC,
 	}
 
 	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
@@ -295,7 +298,8 @@ func renderPruneResult(cmd *cobra.Command, result pruneResultJSON, err error) er
 
 	if writeErr := clibase.WriteOutput(
 		cmd,
-		"Membership removed: %d\nMembership retained: %d\nProtected: %d\nRetained bytes: %d\nProtected bytes: %d\nProtected overage: %t\n",
+		"Membership removed: %d\nMembership retained: %d\nProtected: %d\n"+
+			"Retained bytes: %d\nProtected bytes: %d\nProtected overage: %t\n",
 		len(
 			result.Removed,
 		),
@@ -330,7 +334,8 @@ func renderGCResult(cmd *cobra.Command, result gcResultJSON, err error) error {
 
 	if writeErr := clibase.WriteOutput(
 		cmd,
-		"Physical generations removed: %d\nPhysical bytes removed: %d\nDeferred: %d\nPreserved: %d\nQuarantined: %d\nResumed intent: %t\n",
+		"Physical generations removed: %d\nPhysical bytes removed: %d\nDeferred: %d\n"+
+			"Preserved: %d\nQuarantined: %d\nResumed intent: %t\n",
 		len(
 			result.Removed,
 		),

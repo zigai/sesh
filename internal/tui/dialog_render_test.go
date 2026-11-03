@@ -24,7 +24,14 @@ func TestRenderCreateDirDialogShowsInputAndSuggestions(t *testing.T) {
 	model.pathSuggestions = []string{"/work/api/", "/work/web/"}
 
 	output := stripANSI(model.renderDialog())
-	for _, want := range []string{"Create session", "Session name: new-session", "Initial working directory:", "/work/", "/work/api/", "/work/web/"} {
+	for _, want := range []string{
+		"Create session",
+		"Session name: new-session",
+		"Initial working directory:",
+		"/work/",
+		"/work/api/",
+		"/work/web/",
+	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("create dir dialog = %q, expected %q", output, want)
 		}

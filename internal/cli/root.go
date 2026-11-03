@@ -186,7 +186,9 @@ func newHooksCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "hooks",
 		Short: "Inspect and run configured lifecycle hooks",
-		Long:  "Inspect and run configured lifecycle hooks.\n\nHook configuration is validated against the same limits the workflow enforces. Nothing runs unless an explicit event is requested.",
+		Long: "Inspect and run configured lifecycle hooks.\n\n" +
+			"Hook configuration is validated against the same limits the workflow enforces. " +
+			"Nothing runs unless an explicit event is requested.",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				return nil
@@ -227,9 +229,11 @@ func newHooksListCommand(use string, short string, validate bool) *cobra.Command
 
 func newHooksRunCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:         "run <event>",
-		Short:       "Run the hooks configured for one lifecycle event",
-		Long:        "Run the hooks configured for one lifecycle event.\n\nEach hook has its own deadline; a failing hook is reported and does not silently stop the remaining ones. Cancellation stops subsequent hooks.",
+		Use:   "run <event>",
+		Short: "Run the hooks configured for one lifecycle event",
+		Long: "Run the hooks configured for one lifecycle event.\n\n" +
+			"Each hook has its own deadline; a failing hook is reported " +
+			"and does not silently stop the remaining ones. Cancellation stops subsequent hooks.",
 		Args:        usageArgs(cobra.ExactArgs(1)),
 		RunE:        runHooksRun,
 		Annotations: map[string]string{clibase.AnnotationOperation: "execute_hooks"},
@@ -445,9 +449,11 @@ func newKeysCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "keys",
 		Short: "List the session picker key bindings",
-		Long:  "List the key bindings used inside the session picker.\n\nBindings are read from configuration; this command does not modify any tmux key table. Use 'sesh setup tmux' to register the sesh tmux bindings.",
-		Args:  usageArgs(cobra.NoArgs),
-		RunE:  func(cmd *cobra.Command, _ []string) error { return runKeysList(cmd) },
+		Long: "List the key bindings used inside the session picker.\n\n" +
+			"Bindings are read from configuration; this command does not modify any tmux key table. " +
+			"Use 'sesh setup tmux' to register the sesh tmux bindings.",
+		Args: usageArgs(cobra.NoArgs),
+		RunE: func(cmd *cobra.Command, _ []string) error { return runKeysList(cmd) },
 	}
 
 	clibase.AddJSONFlag(cmd)

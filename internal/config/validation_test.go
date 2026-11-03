@@ -1325,8 +1325,9 @@ func TestLoadRejectsInvalidProjectsAndTasks(t *testing.T) {
 		},
 		{name: "layout without arrangement", content: "[[tasks.layouts]]\nfocus = \"agent\""},
 		{
-			name:    "layout with arrange and splits",
-			content: "[[tasks.layouts]]\narrange = \"tiled\"\nsplits = [{ pane = \"editor\", of = \"agent\", direction = \"right\" }]",
+			name: "layout with arrange and splits",
+			content: "[[tasks.layouts]]\narrange = \"tiled\"\n" +
+				"splits = [{ pane = \"editor\", of = \"agent\", direction = \"right\" }]",
 		},
 		{name: "unknown arrange", content: "[[tasks.layouts]]\narrange = \"spiral\""},
 		{
@@ -1346,20 +1347,25 @@ func TestLoadRejectsInvalidProjectsAndTasks(t *testing.T) {
 			content: "[[tasks.layouts]]\nsplits = [{ pane = \"shell\", of = \"agent\", direction = \"right\" }]",
 		},
 		{
-			name:    "split of a later pane",
-			content: "[[tasks.panes]]\nname = \"editor\"\n[[tasks.panes]]\nname = \"shell\"\n[[tasks.layouts]]\nsplits = [{ pane = \"shell\", of = \"editor\", direction = \"below\" }, { pane = \"editor\", of = \"agent\", direction = \"right\" }]",
+			name: "split of a later pane",
+			content: "[[tasks.panes]]\nname = \"editor\"\n[[tasks.panes]]\nname = \"shell\"\n" +
+				"[[tasks.layouts]]\nsplits = [{ pane = \"shell\", of = \"editor\", direction = \"below\" }, " +
+				"{ pane = \"editor\", of = \"agent\", direction = \"right\" }]",
 		},
 		{
-			name:    "pane placed twice",
-			content: "[[tasks.layouts]]\nsplits = [{ pane = \"editor\", of = \"agent\", direction = \"right\" }, { pane = \"editor\", of = \"agent\", direction = \"below\" }]",
+			name: "pane placed twice",
+			content: "[[tasks.layouts]]\n" +
+				"splits = [{ pane = \"editor\", of = \"agent\", direction = \"right\" }, " +
+				"{ pane = \"editor\", of = \"agent\", direction = \"below\" }]",
 		},
 		{
 			name:    "split direction",
 			content: "[[tasks.layouts]]\nsplits = [{ pane = \"editor\", of = \"agent\", direction = \"up\" }]",
 		},
 		{
-			name:    "split size",
-			content: "[[tasks.layouts]]\nsplits = [{ pane = \"editor\", of = \"agent\", direction = \"right\", size = \"half\" }]",
+			name: "split size",
+			content: "[[tasks.layouts]]\n" +
+				"splits = [{ pane = \"editor\", of = \"agent\", direction = \"right\", size = \"half\" }]",
 		},
 		{
 			name:    "focus on an unplaced pane",
@@ -1374,8 +1380,9 @@ func TestLoadRejectsInvalidProjectsAndTasks(t *testing.T) {
 			content: "[[tasks.layouts]]\narrange = \"tiled\"\nwhen = { min_width = 200, max_width = 100 }",
 		},
 		{
-			name:    "duplicate layout name",
-			content: "[[tasks.layouts]]\nname = \"a\"\narrange = \"tiled\"\n[[tasks.layouts]]\nname = \"a\"\narrange = \"tiled\"",
+			name: "duplicate layout name",
+			content: "[[tasks.layouts]]\nname = \"a\"\narrange = \"tiled\"\n" +
+				"[[tasks.layouts]]\nname = \"a\"\narrange = \"tiled\"",
 		},
 		{
 			name:    "pane without a program",
@@ -1386,12 +1393,14 @@ func TestLoadRejectsInvalidProjectsAndTasks(t *testing.T) {
 			content: "[[tasks.panes]]\nname = \"shell\"\nrestart = true",
 		},
 		{
-			name:    "duplicate project pane",
-			content: "[[projects.overrides.shop.task_panes]]\nname = \"editor\"\n[[projects.overrides.shop.task_panes]]\nname = \"editor\"",
+			name: "duplicate project pane",
+			content: "[[projects.overrides.shop.task_panes]]\nname = \"editor\"\n" +
+				"[[projects.overrides.shop.task_panes]]\nname = \"editor\"",
 		},
 		{
-			name:    "layout for a harness that is not offered",
-			content: "[[tasks.harness]]\nname = \"pi\"\n[[tasks.layouts]]\narrange = \"tiled\"\nwhen = { harness = [\"claud\"] }",
+			name: "layout for a harness that is not offered",
+			content: "[[tasks.harness]]\nname = \"pi\"\n" +
+				"[[tasks.layouts]]\narrange = \"tiled\"\nwhen = { harness = [\"claud\"] }",
 		},
 		{
 			name:    "relative override path",
@@ -1420,8 +1429,9 @@ func TestLoadRejectsInvalidProjectsAndTasks(t *testing.T) {
 			content: "[[tasks.harness]]\nname = \"my agent\"\ncommand = [\"agent\"]",
 		},
 		{
-			name:    "duplicate harness",
-			content: "[[tasks.harness]]\nname = \"pi\"\ncommand = [\"pi\"]\n[[tasks.harness]]\nname = \"pi\"\ncommand = [\"pi\", \"--fast\"]",
+			name: "duplicate harness",
+			content: "[[tasks.harness]]\nname = \"pi\"\ncommand = [\"pi\"]\n" +
+				"[[tasks.harness]]\nname = \"pi\"\ncommand = [\"pi\", \"--fast\"]",
 		},
 		{name: "wake on restore word", content: "[tasks]\nwake_on_restore = \"all\""},
 		{name: "wake on restore zero", content: "[tasks]\nwake_on_restore = \"0\""},

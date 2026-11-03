@@ -597,7 +597,8 @@ func TestPruneInvocationsRemovesRecordsFromAnotherProtocol(t *testing.T) {
 		"a",
 		64,
 	) +
-		`","operation":"kill","admittedAt":"1970-01-01T00:16:40Z","outcome":"","resolvedAt":"0001-01-01T00:00:00Z","durableOperationId":""}`
+		`","operation":"kill","admittedAt":"1970-01-01T00:16:40Z","outcome":"",` +
+		`"resolvedAt":"0001-01-01T00:00:00Z","durableOperationId":""}`
 	if err := writeFileAtomic(
 		dir,
 		"0123456789abcdef0123456789abcdef.json",

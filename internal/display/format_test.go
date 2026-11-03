@@ -32,7 +32,8 @@ func TestCompileAgentGitFields(t *testing.T) {
 func TestTemplateGroupsFallbackPipesAndStyleRoles(t *testing.T) {
 	template, err := Compile(
 		FormatKindAgentsAgent,
-		"[{agent_git_label|agent_cwd_name|upper} {agent_git_added:5@success}]{right}{agent_cwd|path_short|trunc_left:4|default:\"-\"}",
+		"[{agent_git_label|agent_cwd_name|upper} {agent_git_added:5@success}]{right}"+
+			"{agent_cwd|path_short|trunc_left:4|default:\"-\"}",
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -185,7 +186,8 @@ func TestCompileAllowsAgentFieldsOnlyForAgentRows(t *testing.T) {
 
 	if _, err := Compile(
 		FormatKindSession,
-		"{source_prefix}{session_name} [{source}/{connection}] {current_marker}{active_window_name} {active_pane_path_name}",
+		"{source_prefix}{session_name} [{source}/{connection}] "+
+			"{current_marker}{active_window_name} {active_pane_path_name}",
 	); err != nil {
 		t.Fatalf("Compile(session row) error = %v", err)
 	}

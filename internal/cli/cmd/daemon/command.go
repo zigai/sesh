@@ -53,7 +53,11 @@ func newDaemonTmuxCommand() *cobra.Command {
 	cmd.Flags().
 		String("tmux-config", "", "Configuration file for the tmux server [default: tmux's own configuration lookup]")
 	cmd.Flags().
-		Duration("stop-grace", defaultDaemonStopGrace, "Grace period before a forced process stop is reported incomplete")
+		Duration(
+			"stop-grace",
+			defaultDaemonStopGrace,
+			"Grace period before a forced process stop is reported incomplete",
+		)
 
 	return cmd
 }

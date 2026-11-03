@@ -18,17 +18,21 @@ import (
 
 func TestCatalogCorruptionFailsClosed(t *testing.T) {
 	for name, mutate := range map[string]func(*Catalog){
-		"unsupported version":    func(c *Catalog) { c.Version++ },
-		"missing attempt":        func(c *Catalog) { c.Attempts = nil },
-		"duplicate attempt":      func(c *Catalog) { c.Attempts = append(c.Attempts, c.Attempts[0]) },
-		"unsafe generation":      func(c *Catalog) { c.Generations[0].ID = "../outside" },
-		"missing current":        func(c *Catalog) { c.Current = newID() },
-		"wrong sequence":         func(c *Catalog) { c.Generations[0].Sequence++ },
-		"pending publication":    func(c *Catalog) { c.Attempts[0].State, c.Attempts[0].Reason = "pending", "capture_pending" },
+		"unsupported version": func(c *Catalog) { c.Version++ },
+		"missing attempt":     func(c *Catalog) { c.Attempts = nil },
+		"duplicate attempt":   func(c *Catalog) { c.Attempts = append(c.Attempts, c.Attempts[0]) },
+		"unsafe generation":   func(c *Catalog) { c.Generations[0].ID = "../outside" },
+		"missing current":     func(c *Catalog) { c.Current = newID() },
+		"wrong sequence":      func(c *Catalog) { c.Generations[0].Sequence++ },
+		"pending publication": func(c *Catalog) {
+			c.Attempts[0].State, c.Attempts[0].Reason = "pending", "capture_pending"
+		},
 		"false completeness":     func(c *Catalog) { c.Generations[0].Complete = false },
 		"digest":                 func(c *Catalog) { c.Generations[0].ManifestSHA256 = "invalid" },
 		"missing attempt digest": func(c *Catalog) { c.Attempts[0].ManifestSHA256 = "" },
-		"changed attempt digest": func(c *Catalog) { c.Attempts[0].ManifestSHA256 = digest([]byte("different manifest")) },
+		"changed attempt digest": func(c *Catalog) {
+			c.Attempts[0].ManifestSHA256 = digest([]byte("different manifest"))
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "repository")
@@ -122,7 +126,8 @@ func FuzzNativeCatalog(f *testing.F) {
 	f.Add(data)
 	f.Add(
 		[]byte(
-			`{"version":1,"sequence":0,"current":"../escape","attempts":[],"generations":[],"operations":[],"rewrites":[]}`,
+			`{"version":1,"sequence":0,"current":"../escape","attempts":[],` +
+				`"generations":[],"operations":[],"rewrites":[]}`,
 		),
 	)
 	f.Add([]byte(`{"schemaVersion":1,"generation":1}`))

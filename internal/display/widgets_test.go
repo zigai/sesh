@@ -28,9 +28,18 @@ func TestWidgetsRenderValuesAndStates(t *testing.T) {
 		wantRole string
 	}{
 		{source: "{bar:context_pct:8}", values: testResolver{FieldAgentContextPct: "50"}, want: "████░░░░"},
-		{source: "{todo_progress:5}", values: testResolver{FieldAgentTodoDone: "3", FieldAgentTodoTotal: "7"}, want: " 3/ 7 ▰▰▱▱▱"},
+		{
+			source: "{todo_progress:5}",
+			values: testResolver{FieldAgentTodoDone: "3", FieldAgentTodoTotal: "7"},
+			want:   " 3/ 7 ▰▰▱▱▱",
+		},
 		{source: "{spinner}", values: testResolver{FieldStatus: "running"}, want: "⠋"},
-		{source: "{badge:subagent_count@warn>0}", values: testResolver{FieldSubagentCount: "101"}, want: "99+", wantRole: "warn"},
+		{
+			source:   "{badge:subagent_count@warn>0}",
+			values:   testResolver{FieldSubagentCount: "101"},
+			want:     "99+",
+			wantRole: "warn",
+		},
 	} {
 		template, err := Compile(FormatKindAgentsAgent, tc.source)
 		if err != nil {

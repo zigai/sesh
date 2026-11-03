@@ -50,9 +50,11 @@ func newFinalSaveStatus() automation.FinalSaveStatus {
 
 func newSaveIfDueCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:         "save-if-due",
-		Short:       "Save a snapshot when the configured autosave interval has elapsed",
-		Long:        "Save a snapshot when the configured autosave interval has elapsed.\n\nAn elapsed interval always admits a capture attempt; unchanged topology does not prove unchanged terminal or application state.",
+		Use:   "save-if-due",
+		Short: "Save a snapshot when the configured autosave interval has elapsed",
+		Long: "Save a snapshot when the configured autosave interval has elapsed.\n\n" +
+			"An elapsed interval always admits a capture attempt; " +
+			"unchanged topology does not prove unchanged terminal or application state.",
 		Args:        clibase.UsageArgs(cobra.NoArgs),
 		RunE:        runAutosaveSaveIfDue,
 		Annotations: map[string]string{clibase.AnnotationOperation: "save-if-due"},
@@ -230,7 +232,8 @@ func newFinalSaveCommand() *cobra.Command {
 		Use:   "final-save",
 		Short: "Run one bounded high-priority save for shutdown ordering",
 		Long: "Run one bounded high-priority save for shutdown ordering.\n\n" +
-			"The save runs even when the configured interval has not elapsed, respects the provided deadline and records an " +
+			"The save runs even when the configured interval has not elapsed, " +
+			"respects the provided deadline and records an " +
 			"incomplete result instead of reporting success. It never stops tmux, kills sessions or removes snapshots.",
 		Args:        clibase.UsageArgs(cobra.NoArgs),
 		RunE:        runAutosaveFinalSave,

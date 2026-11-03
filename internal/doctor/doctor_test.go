@@ -126,7 +126,8 @@ func TestRunOmitsUnusedServiceAndCoordinatorChecks(test *testing.T) {
 			if result := findCheck(results, doctor.CheckServiceOOMPolicy); result.ID != "" {
 				test.Errorf("unsupported service OOM check was collected: %+v", result)
 			}
-		} else if result := findCheck(results, doctor.CheckServiceOOMPolicy); result.Status != doctor.StatusSkip || result.Needs != doctor.CheckTmuxServer {
+		} else if result := findCheck(results, doctor.CheckServiceOOMPolicy); result.Status != doctor.StatusSkip ||
+			result.Needs != doctor.CheckTmuxServer {
 			test.Errorf("applicable OOM check lost its prerequisite skip: %+v", result)
 		}
 	}
@@ -988,7 +989,8 @@ func TestHistoryState_InvalidVersion(t *testing.T) {
 	historyDir := testDir(t, "history")
 	historyPath := filepath.Join(historyDir, "history.json")
 
-	invalidVersionJSON := `{"version": 999, "switchHistory": [], "remoteSwitchHistory": [], "agentViewHistory": [], "lastAutosaveTimestamp": 0, "popupDisplayMode": ""}`
+	invalidVersionJSON := `{"version": 999, "switchHistory": [], "remoteSwitchHistory": [], ` +
+		`"agentViewHistory": [], "lastAutosaveTimestamp": 0, "popupDisplayMode": ""}`
 	if err := os.WriteFile(historyPath, []byte(invalidVersionJSON), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -1012,7 +1014,8 @@ func TestHistoryState_VersionOneFixConvertsFile(t *testing.T) {
 	historyDir := testDir(t, "history")
 	historyPath := filepath.Join(historyDir, "history.json")
 
-	versionOneJSON := `{"version": 1, "switchHistory": [], "remoteSwitchHistory": [], "agentViewHistory": [], "lastAutosaveTimestamp": 0, "popupDisplayMode": ""}`
+	versionOneJSON := `{"version": 1, "switchHistory": [], "remoteSwitchHistory": [], ` +
+		`"agentViewHistory": [], "lastAutosaveTimestamp": 0, "popupDisplayMode": ""}`
 	if err := os.WriteFile(historyPath, []byte(versionOneJSON), 0o600); err != nil {
 		t.Fatal(err)
 	}

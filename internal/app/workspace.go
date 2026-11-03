@@ -83,7 +83,11 @@ func Resolve(cfg *config.Config, locations Locations) (Workspace, error) {
 		{&workspace.Repository, locations.Repository, filepath.Join(dataDir, "snapshots")},
 		{&workspace.LeaseRoot, locations.LeaseRoot, filepath.Join(dataDir, "leases")},
 		{&workspace.History, locations.History, filepath.Join(stateDir, "history.json")},
-		{&workspace.FinalSaveStatus, locations.FinalSaveStatus, filepath.Join(stateDir, automation.FinalSaveStatusName)},
+		{
+			&workspace.FinalSaveStatus,
+			locations.FinalSaveStatus,
+			filepath.Join(stateDir, automation.FinalSaveStatusName),
+		},
 		{&workspace.AgentStore, locations.AgentStore, cfg.ResolvedAgentStatus().StorePath},
 		{&workspace.WorktreeDir, os.Getenv(worktreeDirEnvironment), filepath.Join(home, "Worktrees")},
 	} {

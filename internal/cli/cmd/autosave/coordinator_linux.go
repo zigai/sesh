@@ -29,8 +29,10 @@ func NewDaemonCoordinatorCommand() *cobra.Command {
 		Use:   "coordinator",
 		Short: "Run the Linux sleep and shutdown save coordinator",
 		Long: "Run the Linux sleep and shutdown save coordinator in the foreground. " +
-			"The runtime holds logind delay locks for shutdown and sleep before readiness, runs one final save within the logind " +
-			"delay when logind announces either, and records incomplete final saves without stopping tmux. Periodic saves belong to the autosave timer.",
+			"The runtime holds logind delay locks for shutdown and sleep before readiness, " +
+			"runs one final save within the logind " +
+			"delay when logind announces either, and records incomplete final saves without stopping tmux. " +
+			"Periodic saves belong to the autosave timer.",
 		Args: clibase.UsageArgs(cobra.NoArgs),
 		Annotations: map[string]string{
 			clibase.AnnotationLiveIO:    strconv.FormatBool(true),

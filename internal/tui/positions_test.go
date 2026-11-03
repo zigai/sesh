@@ -15,12 +15,71 @@ func TestAgentPruningRejectsMissingAndConflictingPaneOwners(t *testing.T) {
 	}{
 		{name: "empty observation", panes: nil, want: 0},
 		{name: "missing pane", panes: []PaneLocation{{PaneID: "%2"}}, want: 0},
-		{name: "different server", panes: []PaneLocation{{ServerSocket: "/other", SessionID: "$1", SessionName: testSupportSessionDevName, PaneID: "%1", PanePID: 100}}, want: 0},
-		{name: "different session", panes: []PaneLocation{{ServerSocket: "/test", SessionID: "$2", SessionName: testSupportSessionDevName, PaneID: "%1", PanePID: 100}}, want: 0},
-		{name: "different name", panes: []PaneLocation{{ServerSocket: "/test", SessionID: "$1", SessionName: "other", PaneID: "%1", PanePID: 100}}, want: 0},
-		{name: "replaced process", panes: []PaneLocation{{ServerSocket: "/test", SessionID: "$1", SessionName: testSupportSessionDevName, PaneID: "%1", PanePID: 101}}, want: 0},
-		{name: "matching owner", panes: []PaneLocation{{ServerSocket: "/test", SessionID: "$1", SessionName: testSupportSessionDevName, PaneID: "%1", PanePID: 100}}, want: 1},
-		{name: "unknown process", panes: []PaneLocation{{ServerSocket: "/test", SessionID: "$1", SessionName: testSupportSessionDevName, PaneID: "%1"}}, want: 1},
+		{
+			name: "different server",
+			panes: []PaneLocation{{
+				ServerSocket: "/other",
+				SessionID:    "$1",
+				SessionName:  testSupportSessionDevName,
+				PaneID:       "%1",
+				PanePID:      100,
+			}},
+			want: 0,
+		},
+		{
+			name: "different session",
+			panes: []PaneLocation{{
+				ServerSocket: "/test",
+				SessionID:    "$2",
+				SessionName:  testSupportSessionDevName,
+				PaneID:       "%1",
+				PanePID:      100,
+			}},
+			want: 0,
+		},
+		{
+			name: "different name",
+			panes: []PaneLocation{{
+				ServerSocket: "/test",
+				SessionID:    "$1",
+				SessionName:  "other",
+				PaneID:       "%1",
+				PanePID:      100,
+			}},
+			want: 0,
+		},
+		{
+			name: "replaced process",
+			panes: []PaneLocation{{
+				ServerSocket: "/test",
+				SessionID:    "$1",
+				SessionName:  testSupportSessionDevName,
+				PaneID:       "%1",
+				PanePID:      101,
+			}},
+			want: 0,
+		},
+		{
+			name: "matching owner",
+			panes: []PaneLocation{{
+				ServerSocket: "/test",
+				SessionID:    "$1",
+				SessionName:  testSupportSessionDevName,
+				PaneID:       "%1",
+				PanePID:      100,
+			}},
+			want: 1,
+		},
+		{
+			name: "unknown process",
+			panes: []PaneLocation{{
+				ServerSocket: "/test",
+				SessionID:    "$1",
+				SessionName:  testSupportSessionDevName,
+				PaneID:       "%1",
+			}},
+			want: 1,
+		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			summaries := []session.AgentSummary{

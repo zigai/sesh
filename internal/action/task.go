@@ -20,7 +20,10 @@ var (
 		Remote:      RemoteNever,
 		InPicker:    false,
 		check:       nil,
-	}, func(Subject, Values) (OpenTaskMenu, error) { return OpenTaskMenu{}, nil }, func(OpenedTaskMenu) string { return "" })
+	},
+		func(Subject, Values) (OpenTaskMenu, error) { return OpenTaskMenu{}, nil },
+		func(OpenedTaskMenu) string { return "" },
+	)
 
 	TaskNew = define(Descriptor{
 		ID:      "task.new",
@@ -28,8 +31,10 @@ var (
 		Summary: "Start a task with an agent harness",
 		Help: "Start a task from the invoking pane, in a window with the agent and the configured panes, " +
 			"laid out by --layout or the first configured layout that fits the window. In a project " +
-			"session, a repository, or the project --project names, --where picks the task's checkout: new (a worktree " +
-			"on a new branch from --branch, by default the default branch, or origin's when the local one is behind), branch (a new worktree on " +
+			"session, a repository, or the project --project names, --where picks the task's checkout: " +
+			"new (a worktree " +
+			"on a new branch from --branch, by default the default branch, " +
+			"or origin's when the local one is behind), branch (a new worktree on " +
 			"--branch, a local branch or one only --remote has), worktree (the existing worktree --dir) " +
 			"or main (the main checkout). Sesh removes on finish only the worktree and branch it created. " +
 			"Elsewhere the task runs in the pane's directory. --title names the task and its new branch and " +
@@ -144,7 +149,10 @@ var (
 		Remote:      RemoteNever,
 		InPicker:    false,
 		check:       nil,
-	}, func(Subject, Values) (OpenTaskPopup, error) { return OpenTaskPopup{}, nil }, func(ClosedTaskPopup) string { return "" })
+	},
+		func(Subject, Values) (OpenTaskPopup, error) { return OpenTaskPopup{}, nil },
+		func(ClosedTaskPopup) string { return "" },
+	)
 
 	TaskRelayout = define(Descriptor{
 		ID:      "task.relayout",

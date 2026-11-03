@@ -159,7 +159,8 @@ func renderSessionDelete(cmd *cobra.Command, output action.DeletedSession, err e
 
 	_, writeErr := fmt.Fprintf(
 		cmd.ErrOrStderr(),
-		"Partial deletion of session %s: live killed %t, saved generations %d, saved sessions %d, preserved generations %d\n",
+		"Partial deletion of session %s: live killed %t, saved generations %d, "+
+			"saved sessions %d, preserved generations %d\n",
 		output.Name,
 		output.LiveKilled,
 		output.SavedGenerations,

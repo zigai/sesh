@@ -456,7 +456,10 @@ func TestSetupServicesStartsAFailedServiceAgainAfterFixingIt(t *testing.T) {
 
 	assertServiceFileLabel(t, stdout, setup.CoordinatorServiceName, "updated")
 
-	for _, want := range []string{"Reloaded systemd.", "Started " + setup.CoordinatorServiceName + " again; it had failed."} {
+	for _, want := range []string{
+		"Reloaded systemd.",
+		"Started " + setup.CoordinatorServiceName + " again; it had failed.",
+	} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("output is missing %q:\n%s", want, stdout)
 		}

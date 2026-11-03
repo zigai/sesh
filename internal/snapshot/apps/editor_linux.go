@@ -37,7 +37,9 @@ const (
 	procUnixInodeField   = 6
 	procUnixFieldCount   = 7
 
-	nvimBufferExpression = `json_encode({"pid":getpid(),"files":map(filter(getbufinfo(), 'v:val.listed && !empty(v:val.name) && getbufvar(v:val.bufnr, "&buftype") == ""'), 'fnamemodify(v:val.name, ":p")')})`
+	nvimBufferExpression = `json_encode({"pid":getpid(),"files":map(filter(getbufinfo(), ` +
+		`'v:val.listed && !empty(v:val.name) && getbufvar(v:val.bufnr, "&buftype") == ""'), ` +
+		`'fnamemodify(v:val.name, ":p")')})`
 )
 
 var errProcFileTooLarge = errors.New("proc file exceeds configured bound")

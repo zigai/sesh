@@ -484,7 +484,8 @@ func copyStagedBuffers(
 
 	_, hasResult := errors.AsType[*commandResultError](runErr)
 	if !output.failed && !output.streaming &&
-		(runErr == nil || clibase.CommandErrorWasRendered(runErr) || errors.Is(runErr, clibase.ErrSubcommandRequired) || hasResult) {
+		(runErr == nil || clibase.CommandErrorWasRendered(runErr) ||
+			errors.Is(runErr, clibase.ErrSubcommandRequired) || hasResult) {
 		_, outputErr = io.Copy(stdout, bytes.NewReader(output.Bytes()))
 	}
 

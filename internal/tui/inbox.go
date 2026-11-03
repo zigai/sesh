@@ -125,7 +125,8 @@ func (m *Model) inboxOfflineRows() []session.Session {
 				rows,
 				inboxGroupRow("offline:"+connection.ID, label+" needs the same sesh version", nil),
 			)
-		case remoteConnectionStatus(connection, m.config.Remote.StaleAfter, time.Now()) == session.RemoteStatusUnavailable:
+		case remoteConnectionStatus(connection, m.config.Remote.StaleAfter, time.Now()) ==
+			session.RemoteStatusUnavailable:
 			rows = append(rows, inboxGroupRow("offline:"+connection.ID, label+" offline", nil))
 		}
 	}

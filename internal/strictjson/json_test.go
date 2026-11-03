@@ -75,7 +75,8 @@ type withOmitempty struct {
 }
 
 func TestDecodeAcceptsCompleteNestedDocument(t *testing.T) {
-	input := `{"title":"report","owner":{"name":"alice"},"items":[{"id":"a","count":1},{"id":"b","count":2}],"data":"aGVsbG8="}`
+	input := `{"title":"report","owner":{"name":"alice"},` +
+		`"items":[{"id":"a","count":1},{"id":"b","count":2}],"data":"aGVsbG8="}`
 
 	got, err := strictjson.Decode[document]([]byte(input))
 	if err != nil {

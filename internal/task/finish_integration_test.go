@@ -500,11 +500,13 @@ func TestRefreshPRUsesTheProjectWhenTheWorktreeIsGone(t *testing.T) {
 	}
 
 	bin := t.TempDir()
-	listing := `[{"number":12,"state":"OPEN","url":"https://example.test/pr/12","headRefOid":"","isCrossRepository":false}]`
+	listing := `[{"number":12,"state":"OPEN","url":"https://example.test/pr/12",` +
+		`"headRefOid":"","isCrossRepository":false}]`
 	writeFile(
 		t,
 		filepath.Join(bin, "gh"),
-		"#!/bin/sh\n[ \"$PWD\" = \"$PR_PROJECT\" ] && [ \"$4\" = \"wt/main/1\" ] || exit 1\nprintf '%s' '"+listing+"'\n",
+		"#!/bin/sh\n[ \"$PWD\" = \"$PR_PROJECT\" ] && [ \"$4\" = \"wt/main/1\" ] || exit 1\n"+
+			"printf '%s' '"+listing+"'\n",
 	)
 
 	if err := os.Chmod(filepath.Join(bin, "gh"), 0o700); err != nil {
@@ -865,7 +867,8 @@ func TestATaskStartsFromTheLocalBaseWhenItHasCommitsOriginLacks(t *testing.T) {
 
 func TestFindPRSkipsPullRequestsFromForks(t *testing.T) {
 	bin := t.TempDir()
-	listing := `[{"number":7,"state":"CLOSED","url":"https://example.test/fork/7","headRefOid":"","isCrossRepository":true},` +
+	listing := `[{"number":7,"state":"CLOSED","url":"https://example.test/fork/7",` +
+		`"headRefOid":"","isCrossRepository":true},` +
 		`{"number":5,"state":"OPEN","url":"https://example.test/pr/5","headRefOid":"","isCrossRepository":false}]`
 	writeFile(t, filepath.Join(bin, "gh"), "#!/bin/sh\nprintf '%s' '"+listing+"'\n")
 

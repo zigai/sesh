@@ -109,24 +109,77 @@ func TestBindingsRejectBindingsTheirSurfaceCannotRun(t *testing.T) {
 		binds []config.KeyBindConfig
 		want  error
 	}{
-		"unknown action":          {[]config.KeyBindConfig{bind("picker", "ctrl+g", "session.explode", nil)}, action.ErrUnknownConfiguredAction},
-		"unknown surface":         {[]config.KeyBindConfig{bind("shell", "ctrl+g", "session.create", nil)}, action.ErrInvalidBinding},
-		"missing key":             {[]config.KeyBindConfig{bind("picker", " ", "session.create", nil)}, action.ErrInvalidBinding},
-		"picker table":            {[]config.KeyBindConfig{{Key: "ctrl+g", Action: "session.create", In: "picker", Table: "root", Params: nil}}, action.ErrInvalidBinding},
-		"client action in picker": {[]config.KeyBindConfig{bind("picker", "ctrl+g", "agent.next", nil)}, action.ErrBindingUnsupported},
-		"tmux cannot prompt":      {[]config.KeyBindConfig{bind("tmux", "M-c", "session.create", nil)}, action.ErrMissingParam},
-		"unknown param":           {[]config.KeyBindConfig{bind("tmux", "M-n", "agent.next", map[string]any{"global": true})}, action.ErrUnknownParam},
-		"invalid param value":     {[]config.KeyBindConfig{bind("tmux", "M-n", "agent.next", map[string]any{"local": "sometimes"})}, action.ErrInvalidParam},
-		"key bound twice":         {[]config.KeyBindConfig{bind("tmux", "M-n", "agent.next", nil), bind("tmux", "M-n", "agent.back", nil)}, action.ErrDuplicateBinding},
-		"tmux key spelled twice":  {[]config.KeyBindConfig{bind("tmux", "M-C-x", "agent.next", nil), bind("tmux", "C-M-x", "agent.back", nil)}, action.ErrDuplicateBinding},
-		"picker key spelled twice": {
-			[]config.KeyBindConfig{bind("picker", "alt+ctrl+g", "session.create", nil), bind("picker", "ctrl+alt+g", "session.rename", nil)},
+		"unknown action": {
+			[]config.KeyBindConfig{bind("picker", "ctrl+g", "session.explode", nil)},
+			action.ErrUnknownConfiguredAction,
+		},
+		"unknown surface": {
+			[]config.KeyBindConfig{bind("shell", "ctrl+g", "session.create", nil)},
+			action.ErrInvalidBinding,
+		},
+		"missing key": {
+			[]config.KeyBindConfig{bind("picker", " ", "session.create", nil)},
+			action.ErrInvalidBinding,
+		},
+		"picker table": {
+			[]config.KeyBindConfig{
+				{Key: "ctrl+g", Action: "session.create", In: "picker", Table: "root", Params: nil},
+			},
+			action.ErrInvalidBinding,
+		},
+		"client action in picker": {
+			[]config.KeyBindConfig{bind("picker", "ctrl+g", "agent.next", nil)},
+			action.ErrBindingUnsupported,
+		},
+		"tmux cannot prompt": {
+			[]config.KeyBindConfig{bind("tmux", "M-c", "session.create", nil)},
+			action.ErrMissingParam,
+		},
+		"unknown param": {
+			[]config.KeyBindConfig{bind("tmux", "M-n", "agent.next", map[string]any{"global": true})},
+			action.ErrUnknownParam,
+		},
+		"invalid param value": {
+			[]config.KeyBindConfig{bind("tmux", "M-n", "agent.next", map[string]any{"local": "sometimes"})},
+			action.ErrInvalidParam,
+		},
+		"key bound twice": {
+			[]config.KeyBindConfig{
+				bind("tmux", "M-n", "agent.next", nil),
+				bind("tmux", "M-n", "agent.back", nil),
+			},
 			action.ErrDuplicateBinding,
 		},
-		"configured picker key":   {[]config.KeyBindConfig{bind("picker", "?", "session.create", nil)}, action.ErrPickerKeyReserved},
-		"fixed picker key":        {[]config.KeyBindConfig{bind("picker", "ctrl+n", "session.create", nil)}, action.ErrPickerKeyReserved},
-		"key types into search":   {[]config.KeyBindConfig{bind("picker", "x", "session.create", nil)}, action.ErrPickerKeyReserved},
-		"space types into search": {[]config.KeyBindConfig{bind("picker", "space", "session.create", nil)}, action.ErrPickerKeyReserved},
+		"tmux key spelled twice": {
+			[]config.KeyBindConfig{
+				bind("tmux", "M-C-x", "agent.next", nil),
+				bind("tmux", "C-M-x", "agent.back", nil),
+			},
+			action.ErrDuplicateBinding,
+		},
+		"picker key spelled twice": {
+			[]config.KeyBindConfig{
+				bind("picker", "alt+ctrl+g", "session.create", nil),
+				bind("picker", "ctrl+alt+g", "session.rename", nil),
+			},
+			action.ErrDuplicateBinding,
+		},
+		"configured picker key": {
+			[]config.KeyBindConfig{bind("picker", "?", "session.create", nil)},
+			action.ErrPickerKeyReserved,
+		},
+		"fixed picker key": {
+			[]config.KeyBindConfig{bind("picker", "ctrl+n", "session.create", nil)},
+			action.ErrPickerKeyReserved,
+		},
+		"key types into search": {
+			[]config.KeyBindConfig{bind("picker", "x", "session.create", nil)},
+			action.ErrPickerKeyReserved,
+		},
+		"space types into search": {
+			[]config.KeyBindConfig{bind("picker", "space", "session.create", nil)},
+			action.ErrPickerKeyReserved,
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()

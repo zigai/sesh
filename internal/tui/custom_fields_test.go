@@ -234,7 +234,8 @@ func TestCustomFieldFailureKeepsPreviousValue(t *testing.T) {
 	failFlag := filepath.Join(t.TempDir(), "fail")
 	model := customFieldTestModel(t, "{session_name} {custom.flaky}", config.FieldCommands{
 		"flaky": shellFieldCommand(
-			`if [ -e ` + failFlag + ` ]; then echo broken >&2; exit 2; fi; printf 'v%s' "$(cat | sed 's/.*"windowCount":\([0-9]*\).*/\1/')"`,
+			`if [ -e ` + failFlag + ` ]; then echo broken >&2; exit 2; fi; ` +
+				`printf 'v%s' "$(cat | sed 's/.*"windowCount":\([0-9]*\).*/\1/')"`,
 		),
 	})
 	row := liveTestSession("$1", "alpha")
@@ -350,7 +351,8 @@ func TestCustomFieldCompletedValueSurvivesCloseWithPendingRow(t *testing.T) {
 
 	model := customFieldTestModel(t, "{session_name} {custom.partial}", config.FieldCommands{
 		"partial": shellFieldCommand(
-			"if [ \"$SESH_SESSION\" = second ]; then printf 'ready\\n' > " + readyPath + "; read blocked < " + blockedPath + "; else printf completed; fi",
+			"if [ \"$SESH_SESSION\" = second ]; then printf 'ready\\n' > " + readyPath +
+				"; read blocked < " + blockedPath + "; else printf completed; fi",
 		),
 	})
 	first, second := liveTestSession("$1", "first"), liveTestSession("$2", "second")

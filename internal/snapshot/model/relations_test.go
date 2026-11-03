@@ -9,10 +9,12 @@ import (
 
 func TestInvalidGroups(t *testing.T) {
 	for name, mutate := range map[string]func(*Manifest){
-		"dangling member":   func(m *Manifest) { m.Groups[0].Members[1] = "missing" },
-		"duplicate member":  func(m *Manifest) { m.Groups[0].Members[1] = "s0" },
-		"missing group":     func(m *Manifest) { m.Sessions[0].Group = "missing" },
-		"two owners":        func(m *Manifest) { m.Groups = append(m.Groups, Group{ID: "g1", Members: []string{"s0"}}) },
+		"dangling member":  func(m *Manifest) { m.Groups[0].Members[1] = "missing" },
+		"duplicate member": func(m *Manifest) { m.Groups[0].Members[1] = "s0" },
+		"missing group":    func(m *Manifest) { m.Sessions[0].Group = "missing" },
+		"two owners": func(m *Manifest) {
+			m.Groups = append(m.Groups, Group{ID: "g1", Members: []string{"s0"}})
+		},
 		"different indexes": func(m *Manifest) { m.Links[1].Index++ },
 		"empty group":       func(m *Manifest) { m.Groups[0].Members = nil },
 	} {

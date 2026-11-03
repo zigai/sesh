@@ -56,7 +56,8 @@ const (
 const (
 	tmuxForegroundRequirement    = "tmux >= 3.7 foreground server mode is not verified on this host"
 	remoteEntryRequirement       = "the native remote monitor entry point is not available in this binary"
-	tmuxDarwinRuntimeRequirement = "managed tmux service is unavailable on macOS until the native launchd runtime is exercised on a disposable host"
+	tmuxDarwinRuntimeRequirement = "managed tmux service is unavailable on macOS until " +
+		"the native launchd runtime is exercised on a disposable host"
 	coordinatorDarwinRequirement = "lifecycle coordinator daemon is available only on Linux"
 )
 

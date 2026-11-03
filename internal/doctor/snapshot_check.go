@@ -260,7 +260,13 @@ func (s *Service) classifySnapshotOpenError(err error) Result {
 			dir+" is a symlink or has unsafe permissions",
 		).
 			withReason(ReasonUnsafe).
-			withManual(fmt.Sprintf("Make %s a real directory owned by you with mode 0700 (chmod 700 %s)", dir, shellPath(s.opts.SnapshotDir)))
+			withManual(
+				fmt.Sprintf(
+					"Make %s a real directory owned by you with mode 0700 (chmod 700 %s)",
+					dir,
+					shellPath(s.opts.SnapshotDir),
+				),
+			)
 	case errors.Is(err, store.ErrRecoveryRequired):
 		return s.saveFix(
 			newResult(

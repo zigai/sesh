@@ -197,7 +197,9 @@ func TestRestoreJSONProjectionExposesPanes(t *testing.T) {
 		t.Fatalf("renderSnapshotRestore failed: %v", err)
 	}
 
-	wantPaneLine := "  source-pane-1 runtime=\"%7\" outcome=allowed_cwd_fallback reason=\"saved_working_directory_missing\" app-verified=false cwd-fallback=true\n"
+	wantPaneLine := "  source-pane-1 runtime=\"%7\" outcome=allowed_cwd_fallback " +
+		"reason=\"saved_working_directory_missing\" " +
+		"app-verified=false cwd-fallback=true\n"
 	if !strings.Contains(stdout.String(), wantPaneLine) {
 		t.Fatalf("text pane evidence missing:\n%s", stdout.String())
 	}
@@ -240,7 +242,12 @@ func TestRestoreRefusedForCollisionNamesSessionsWithoutAnOperation(t *testing.T)
 		t.Fatalf("expected the collision error to be preserved, got %v", err)
 	}
 
-	for _, want := range []string{"Skipped:", "0 (s38): a live session already uses this name", `tmux rename-session -t "0"`, "sesh snapshot restore s38"} {
+	for _, want := range []string{
+		"Skipped:",
+		"0 (s38): a live session already uses this name",
+		`tmux rename-session -t "0"`,
+		"sesh snapshot restore s38",
+	} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("expected %q in output:\n%s", want, stdout.String())
 		}

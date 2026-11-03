@@ -110,7 +110,11 @@ func AddEnvironmentFlags(cmd *cobra.Command) {
 	cmd.Flags().String("lease-root", "", clibase.LeaseRootFlagUsage)
 	cmd.Flags().String("history", "", clibase.HistoryFlagUsage)
 	cmd.Flags().
-		String("agent-state", "", "AHT agent registry file [default: agent_status.store_path setting, else AHT's default registry]")
+		String(
+			"agent-state",
+			"",
+			"AHT agent registry file [default: agent_status.store_path setting, else AHT's default registry]",
+		)
 }
 
 func addCallerFlags(cmd *cobra.Command) {

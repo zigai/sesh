@@ -98,7 +98,8 @@ func TestRunPassesContextOnStdinAndInEnvironment(t *testing.T) {
 	env := fields.Run(
 		t.Context(),
 		shellField(
-			`printf '%s|' "$SESH_FIELD" "$SESH_ROW" "$SESH_SESSION" "$SESH_SESSION_ID" "$SESH_ORIGIN" "$SESH_PANE_ID" "$SESH_AGENT_STATUS" "$SESH_AGENT_CWD" "$SESH_AGENT_PID"`,
+			`printf '%s|' "$SESH_FIELD" "$SESH_ROW" "$SESH_SESSION" "$SESH_SESSION_ID" `+
+				`"$SESH_ORIGIN" "$SESH_PANE_ID" "$SESH_AGENT_STATUS" "$SESH_AGENT_CWD" "$SESH_AGENT_PID"`,
 		),
 		input,
 	)
@@ -195,7 +196,8 @@ func TestRunCancelKillsBackgroundChildren(t *testing.T) {
 
 func TestRunCancelReturnsWhileDetachedChildHoldsStdout(t *testing.T) {
 	pidFile := filepath.Join(t.TempDir(), "pid")
-	script := `perl -e 'use POSIX; POSIX::setsid() or die; open(my $f, ">", $ARGV[0]) or die; print $f "$$"; close $f; sleep 300' ` + pidFile + ` & echo shown`
+	script := `perl -e 'use POSIX; POSIX::setsid() or die; ` +
+		`open(my $f, ">", $ARGV[0]) or die; print $f "$$"; close $f; sleep 300' ` + pidFile + ` & echo shown`
 
 	ctx, cancel := context.WithCancel(t.Context())
 

@@ -395,10 +395,29 @@ func TestAgentPositionRefreshHonorsNewPaneEvidence(t *testing.T) {
 		name  string
 		agent session.AgentSession
 	}{
-		{name: "agent moved to another pane", agent: session.AgentSession{RegistryID: "z", PaneID: "%3", PanePID: 102, HarnessSession: nameLast}},
-		{name: "pane process replaced", agent: session.AgentSession{RegistryID: "z", PaneID: "%2", PanePID: 103, HarnessSession: nameLast}},
-		{name: "new agent in same pane", agent: session.AgentSession{RegistryID: "new", PaneID: "%2", PanePID: 102, HarnessSession: nameLast}},
-		{name: "new geometry supplied", agent: session.AgentSession{RegistryID: "z", PaneID: "%2", PanePID: 102, HarnessSession: nameLast, PositionKnown: true, PaneLeft: 40}},
+		{
+			name:  "agent moved to another pane",
+			agent: session.AgentSession{RegistryID: "z", PaneID: "%3", PanePID: 102, HarnessSession: nameLast},
+		},
+		{
+			name:  "pane process replaced",
+			agent: session.AgentSession{RegistryID: "z", PaneID: "%2", PanePID: 103, HarnessSession: nameLast},
+		},
+		{
+			name:  "new agent in same pane",
+			agent: session.AgentSession{RegistryID: "new", PaneID: "%2", PanePID: 102, HarnessSession: nameLast},
+		},
+		{
+			name: "new geometry supplied",
+			agent: session.AgentSession{
+				RegistryID:     "z",
+				PaneID:         "%2",
+				PanePID:        102,
+				HarnessSession: nameLast,
+				PositionKnown:  true,
+				PaneLeft:       40,
+			},
+		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			model := newTestModel()

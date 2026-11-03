@@ -145,7 +145,8 @@ func TestEngineRestoreSkipsCollidingSessionAndRestoresTheRest(t *testing.T) {
 	}
 
 	if len(result.SessionsSkipped) != 1 || result.SessionsSkipped[0].Name != "collision-taken" ||
-		result.SessionsSkipped[0].ID != fixture.ids["collision-taken"] || result.SessionsSkipped[0].Reason != restore.CollisionNameInUse {
+		result.SessionsSkipped[0].ID != fixture.ids["collision-taken"] ||
+		result.SessionsSkipped[0].Reason != restore.CollisionNameInUse {
 		t.Fatalf(
 			"expected the colliding session to be reported by name and id, got %+v",
 			result.SessionsSkipped,

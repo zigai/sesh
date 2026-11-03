@@ -122,7 +122,9 @@ func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "autosave",
 		Short: "Manage periodic and lifecycle snapshot automation",
-		Long:  "Manage periodic and lifecycle snapshot automation.\n\nAutosave records practical recovery observations without claiming atomic checkpoints or exact application memory recovery.",
+		Long: "Manage periodic and lifecycle snapshot automation.\n\n" +
+			"Autosave records practical recovery observations " +
+			"without claiming atomic checkpoints or exact application memory recovery.",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				return nil

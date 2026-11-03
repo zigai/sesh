@@ -48,7 +48,8 @@ func writeRestoreSummary(out *strings.Builder, res action.RestoredSnapshot) {
 	if res.Uncertain && res.OperationID != "" {
 		fmt.Fprintf(
 			out,
-			"Some steps may or may not have happened. Continue without repeating them:\n  sesh snapshot restore --generation %s --operation %s\n",
+			"Some steps may or may not have happened. Continue without repeating them:\n"+
+				"  sesh snapshot restore --generation %s --operation %s\n",
 			res.Generation,
 			res.OperationID,
 		)
@@ -132,7 +133,8 @@ func writeProgramSummary(out *strings.Builder, panes []action.RestoredPane) {
 
 	if resumed+restarted > 0 {
 		out.WriteString(
-			"Resumed and restarted programs were launched, but sesh cannot confirm they recovered; check those panes.\n",
+			"Resumed and restarted programs were launched, but sesh cannot confirm they recovered; " +
+				"check those panes.\n",
 		)
 	}
 }
@@ -252,7 +254,8 @@ func writeRestoreDetails(out *strings.Builder, res action.RestoredSnapshot) {
 	if count := len(res.Advisories); count > 0 {
 		fmt.Fprintf(
 			out,
-			"Observed Changes:   %d values differ from the snapshot after launch (for example pane titles that applications rewrite)\n",
+			"Observed Changes:   %d values differ from the snapshot after launch "+
+				"(for example pane titles that applications rewrite)\n",
 			count,
 		)
 	}

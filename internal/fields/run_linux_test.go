@@ -49,9 +49,11 @@ func captureCancellation(t *testing.T, leaderExits bool) {
 
 	var result fields.Result
 
-	script := `sleep 300 & printf '%s %s\n' "$$" "$!" > ` + readyPath + `; read release < ` + releasePath + `; printf shown`
+	script := `sleep 300 & printf '%s %s\n' "$$" "$!" > ` + readyPath +
+		`; read release < ` + releasePath + `; printf shown`
 	if !leaderExits {
-		script = `exec 1>&- 2>&-; sleep 300 & printf '%s %s\n' "$$" "$!" > ` + readyPath + `; read release < ` + releasePath + `; wait`
+		script = `exec 1>&- 2>&-; sleep 300 & printf '%s %s\n' "$$" "$!" > ` + readyPath +
+			`; read release < ` + releasePath + `; wait`
 	}
 
 	go func() {

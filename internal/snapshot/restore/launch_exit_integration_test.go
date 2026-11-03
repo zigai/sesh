@@ -106,7 +106,10 @@ func configuredRestoredLaunchFixture(t *testing.T, placement string) restoredLau
 			model.Bytes("sh"),
 			model.Bytes("-c"),
 			model.Bytes(
-				`trap 'printf exited > "$2"; exit 130' INT; [ "$3" = 'literal spaces "$HOME"; $(touch unexpected)' ] && [ "${SESH_AGENT_EXIT_REMOVE-unset}" = unset ] || exit 99; printf ready > "$1"; read -r answer; printf exited > "$2"`,
+				`trap 'printf exited > "$2"; exit 130' INT; ` +
+					`[ "$3" = 'literal spaces "$HOME"; $(touch unexpected)' ] && ` +
+					`[ "${SESH_AGENT_EXIT_REMOVE-unset}" = unset ] || exit 99; ` +
+					`printf ready > "$1"; read -r answer; printf exited > "$2"`,
 			),
 			model.Bytes(
 				"sh",

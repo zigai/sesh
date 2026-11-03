@@ -107,11 +107,36 @@ func newRemotePeerCommand() *cobra.Command {
 		RunE:   clibase.RequireSubcommand,
 	}
 	for _, child := range []*cobra.Command{
-		{Use: "stream", Args: clibase.UsageArgs(cobra.NoArgs), Annotations: liveAnnotations("remote_peer_stream"), RunE: runRemotePeerStream},
-		{Use: "action", Args: clibase.UsageArgs(cobra.NoArgs), Annotations: liveAnnotations("remote_peer_action"), RunE: runRemotePeerAction},
-		{Use: "lookup", Args: clibase.UsageArgs(cobra.NoArgs), Annotations: liveAnnotations("remote_peer_lookup"), RunE: runRemotePeerLookup},
-		{Use: "attach-prepare", Args: clibase.UsageArgs(cobra.NoArgs), Annotations: liveAnnotations("remote_peer_attach_prepare"), RunE: runRemotePeerAttachPrepare},
-		{Use: "attach <attachment-id>", Args: clibase.UsageArgs(cobra.ExactArgs(1)), Annotations: liveAnnotations("remote_peer_attach"), RunE: runRemotePeerAttach},
+		{
+			Use:         "stream",
+			Args:        clibase.UsageArgs(cobra.NoArgs),
+			Annotations: liveAnnotations("remote_peer_stream"),
+			RunE:        runRemotePeerStream,
+		},
+		{
+			Use:         "action",
+			Args:        clibase.UsageArgs(cobra.NoArgs),
+			Annotations: liveAnnotations("remote_peer_action"),
+			RunE:        runRemotePeerAction,
+		},
+		{
+			Use:         "lookup",
+			Args:        clibase.UsageArgs(cobra.NoArgs),
+			Annotations: liveAnnotations("remote_peer_lookup"),
+			RunE:        runRemotePeerLookup,
+		},
+		{
+			Use:         "attach-prepare",
+			Args:        clibase.UsageArgs(cobra.NoArgs),
+			Annotations: liveAnnotations("remote_peer_attach_prepare"),
+			RunE:        runRemotePeerAttachPrepare,
+		},
+		{
+			Use:         "attach <attachment-id>",
+			Args:        clibase.UsageArgs(cobra.ExactArgs(1)),
+			Annotations: liveAnnotations("remote_peer_attach"),
+			RunE:        runRemotePeerAttach,
+		},
 	} {
 		if child.Name() == "action" {
 			child.Annotations[clibase.AnnotationSuccessOwned] = "true"
@@ -363,7 +388,9 @@ func runRemotePeerStream(cmd *cobra.Command, _ []string) error {
 			Agents: func(ctx context.Context) ([]session.AgentSummary, error) {
 				return peerAgentSummaries(ctx, workspace)
 			},
-			SavedSessions: func(ctx context.Context) ([]session.Session, error) { return peerSavedSessions(ctx, workspace) },
+			SavedSessions: func(ctx context.Context) ([]session.Session, error) {
+				return peerSavedSessions(ctx, workspace)
+			},
 			Tasks: func(ctx context.Context) ([]remote.TaskRow, error) {
 				return peerTasks(ctx, runtime.server, workspace.Tasks)
 			},

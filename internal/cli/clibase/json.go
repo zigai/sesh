@@ -605,7 +605,12 @@ func cobraErrorMessage(err error) string {
 	msg := err.Error()
 
 	// pflag and cobra name only the mistyped flag or command, never a flag value.
-	for _, prefix := range []string{"unknown flag: ", "unknown shorthand flag: ", "flag needs an argument: ", "unknown command "} {
+	for _, prefix := range []string{
+		"unknown flag: ",
+		"unknown shorthand flag: ",
+		"flag needs an argument: ",
+		"unknown command ",
+	} {
 		if strings.HasPrefix(msg, prefix) {
 			line, _, _ := strings.Cut(msg, "\n")
 

@@ -419,7 +419,8 @@ func TestOpenRepairsCurrentStateInterruptedAfterCatalogPublication(t *testing.T)
 }
 
 func TestOpenRestoresMissingOrDamagedCurrentState(t *testing.T) {
-	unavailable := `{"version":1,"status":"unavailable","listing":{"generation":{"id":"","sequence":0,"manifestSha256":"","complete":false},"started":0,"finished":0,"sessions":[]}}`
+	unavailable := `{"version":1,"status":"unavailable","listing":{"generation":` +
+		`{"id":"","sequence":0,"manifestSha256":"","complete":false},"started":0,"finished":0,"sessions":[]}}`
 
 	for name, damage := range map[string]func(string) error{
 		"missing":   os.Remove,

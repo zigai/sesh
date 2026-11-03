@@ -346,9 +346,11 @@ func (m *Model) customFieldTargets() []customFieldTarget {
 	sessionFields, agentFields := m.sessionFormats.seshSession.CustomFields(), []string(nil)
 	switch m.displayMode {
 	case displayModeAgents:
-		sessionFields, agentFields = m.sessionFormats.agentsSession.CustomFields(), m.sessionFormats.agentsAgent.CustomFields()
+		sessionFields, agentFields = m.sessionFormats.agentsSession.CustomFields(),
+			m.sessionFormats.agentsAgent.CustomFields()
 	case displayModeInbox:
-		sessionFields, agentFields = m.sessionFormats.inboxGroup.CustomFields(), m.sessionFormats.inboxAgent.CustomFields()
+		sessionFields, agentFields = m.sessionFormats.inboxGroup.CustomFields(),
+			m.sessionFormats.inboxAgent.CustomFields()
 	case displayModeSesh:
 	}
 

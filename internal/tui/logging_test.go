@@ -1507,7 +1507,8 @@ func assertAllowedFailureFields(t *testing.T, record map[string]any) {
 	for field := range record {
 		switch field {
 		case "command", "version", "commit", "pid", "component",
-			"operation", "level", "status", "message", "reason", zerolog.ErrorFieldName, "error_domain", "error_code", "error_step",
+			"operation", "level", "status", "message", "reason", zerolog.ErrorFieldName,
+			"error_domain", "error_code", "error_step",
 			"error_context":
 		default:
 			t.Errorf(

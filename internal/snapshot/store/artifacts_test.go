@@ -81,7 +81,9 @@ func corruptArtifact(t *testing.T, file string, kind string) {
 func TestTerminalArtifactsPreserveExactBytes(t *testing.T) {
 	for name, content := range map[string][]byte{
 		"empty": {}, "single line": []byte("marker"), "spaces": []byte("line one\n\nline two  \n   \n\t\n"),
-		"broadcast":      []byte("saved\nBroadcast message from synthetic host:\nThe system will power off now!\nhost% \n"),
+		"broadcast": []byte(
+			"saved\nBroadcast message from synthetic host:\nThe system will power off now!\nhost% \n",
+		),
 		"terminal bytes": []byte("\x1b[31mred\x1b[0m\x00\xff\n"),
 	} {
 		t.Run(name, func(t *testing.T) {

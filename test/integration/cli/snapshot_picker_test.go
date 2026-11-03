@@ -111,8 +111,16 @@ func TestSnapshotRestorePickerCleansTerminalBeforeRestoringSelectedGeneration(t 
 		t.Fatalf("select snapshot generation: %v: %s", err, output)
 	}
 
-	if output, err := exec.CommandContext(ctx, termtraceExecutable, "status", "-q", alias, "--wait-complete", "--timeout-ms", "5000").
-		CombinedOutput(); err != nil {
+	if output, err := exec.CommandContext(
+		ctx,
+		termtraceExecutable,
+		"status",
+		"-q",
+		alias,
+		"--wait-complete",
+		"--timeout-ms",
+		"5000",
+	).CombinedOutput(); err != nil {
 		t.Fatalf("wait for selected restore: %v: %s", err, output)
 	}
 
@@ -230,8 +238,16 @@ func assertSnapshotRestorePickerCancellation(t *testing.T, command []string, ali
 		t.Fatalf("cancel snapshot selection: %v: %s", err, output)
 	}
 
-	if output, err := exec.CommandContext(ctx, termtraceExecutable, "status", "-q", alias, "--wait-complete", "--timeout-ms", "5000").
-		CombinedOutput(); err != nil {
+	if output, err := exec.CommandContext(
+		ctx,
+		termtraceExecutable,
+		"status",
+		"-q",
+		alias,
+		"--wait-complete",
+		"--timeout-ms",
+		"5000",
+	).CombinedOutput(); err != nil {
 		t.Fatalf("wait for canceled selection: %v: %s", err, output)
 	}
 

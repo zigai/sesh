@@ -159,7 +159,9 @@ func TestSSHCommandNeverUnlinksRemoteSocketPaths(t *testing.T) {
 
 	for _, want := range []string{
 		"-t", "-o ExitOnForwardFailure=yes", "-o StreamLocalBindUnlink=no",
-		"-R", "/home/remote/.local/state/sesh/remote/bridge/attach-0123456789abcdef0123456789abcdef.sock:/run/user/1000/sesh/bridge.sock",
+		"-R",
+		"/home/remote/.local/state/sesh/remote/bridge/attach-0123456789abcdef0123456789abcdef.sock:" +
+			"/run/user/1000/sesh/bridge.sock",
 	} {
 		if !slices.Contains(command.Args, want) && !strings.Contains(joined, want) {
 			t.Fatalf("SSH argv = %#v, want %q", command.Args, want)
@@ -242,7 +244,12 @@ func verifyNonInteractiveOpenSSHOptions(t *testing.T, remote config.RemoteConfig
 	}
 
 	text := string(out)
-	for _, expected := range []string{"batchmode yes", "clearallforwardings yes", "connecttimeout 5", "serveraliveinterval 19"} {
+	for _, expected := range []string{
+		"batchmode yes",
+		"clearallforwardings yes",
+		"connecttimeout 5",
+		"serveraliveinterval 19",
+	} {
 		if !strings.Contains(text, expected) {
 			t.Errorf("ssh -G missing %s:\n%s", expected, text)
 		}

@@ -111,7 +111,12 @@ func (s *Service) absentDaemon(ctx context.Context, unit string) []Result {
 				"Coordinator is not installed, so no save runs before shutdown or sleep",
 			).
 				withReason(ReasonNotRunning).
-				withCommand(s.seshCommand("setup services --apply --with-coordinator", []string{flagSocket, flagRepository, flagHistory}) + " && " + enable),
+				withCommand(
+					s.seshCommand(
+						"setup services --apply --with-coordinator",
+						[]string{flagSocket, flagRepository, flagHistory},
+					) + " && " + enable,
+				),
 		}
 	default:
 		return nil

@@ -156,8 +156,20 @@ func TestDecodeActionResultRejectsUnboundedOrUnknownResponses(t *testing.T) {
 
 func TestActionResultRoundTripPreservesOutput(t *testing.T) {
 	for _, result := range []ActionResult{
-		{InvocationID: strings.Repeat("d", 32), Action: action.SessionKill.ID, OK: true, Code: "", Output: jsontext.Value(`{"session":{"id":"$1"}}`)},
-		{InvocationID: strings.Repeat("d", 32), Action: action.SnapshotRestore.ID, OK: false, Code: action.CodePartial, Output: jsontext.Value(`{"status":"partial"}`)},
+		{
+			InvocationID: strings.Repeat("d", 32),
+			Action:       action.SessionKill.ID,
+			OK:           true,
+			Code:         "",
+			Output:       jsontext.Value(`{"session":{"id":"$1"}}`),
+		},
+		{
+			InvocationID: strings.Repeat("d", 32),
+			Action:       action.SnapshotRestore.ID,
+			OK:           false,
+			Code:         action.CodePartial,
+			Output:       jsontext.Value(`{"status":"partial"}`),
+		},
 		{InvocationID: strings.Repeat("d", 32), Action: "", OK: false, Code: action.CodeInvalidArgument, Output: nil},
 	} {
 		var output bytes.Buffer
