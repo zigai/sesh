@@ -42,13 +42,12 @@ const (
 )
 
 var (
-	ErrInvalidHookEvent           = errors.New("invalid hook event")
-	ErrInvalidHookConfig          = errors.New("invalid hook config")
-	ErrHookTimeoutInvalid         = errors.New("invalid hook timeout")
-	ErrHookLimitExceeded          = errors.New("hook limit exceeded")
-	ErrHookCommandEmpty           = errors.New("hook command cannot be empty")
-	ErrHookExecution              = errors.New("hook execution failed")
-	ErrHookSupervisionUnsupported = errors.New("process group hook supervision unsupported on this platform")
+	ErrInvalidHookEvent   = errors.New("invalid hook event")
+	ErrInvalidHookConfig  = errors.New("invalid hook config")
+	ErrHookTimeoutInvalid = errors.New("invalid hook timeout")
+	ErrHookLimitExceeded  = errors.New("hook limit exceeded")
+	ErrHookCommandEmpty   = errors.New("hook command cannot be empty")
+	ErrHookExecution      = errors.New("hook execution failed")
 )
 
 type HookStatus string
@@ -335,13 +334,6 @@ func (r *HookRunner) Run(ctx context.Context, cfg config.HookConfig, event HookE
 
 	if len(commands) == 0 {
 		return result, nil
-	}
-
-	if err := checkPlatformSupervision(); err != nil {
-		return result, oops.In("session").
-			Code("supervision_unsupported").
-			With("operation", "execute").
-			Wrap(err)
 	}
 
 	for i, hook := range commands {

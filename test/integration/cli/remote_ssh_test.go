@@ -275,7 +275,8 @@ func writeRemoteSSHConfigs(t *testing.T, username, sshDir, root, clientKey, host
 
 	sshdConfig := filepath.Join(root, "sshd_config")
 
-	sshdBody := fmt.Sprintf("Port %d\nListenAddress 127.0.0.1\nHostKey %s\nPidFile %s\nAuthorizedKeysFile %s\nPubkeyAuthentication yes\nPasswordAuthentication no\nKbdInteractiveAuthentication no\nUsePAM no\nStrictModes no\nPermitRootLogin yes\nAllowUsers %s\nAcceptEnv XDG_STATE_HOME XDG_CACHE_HOME XDG_DATA_HOME XDG_CONFIG_HOME\nLogLevel ERROR\n", port, hostKey, filepath.Join(root, "sshd.pid"), authorized, username)
+	// Sessions get the test's PATH so the peer runs the same tmux as the local fixtures.
+	sshdBody := fmt.Sprintf("Port %d\nListenAddress 127.0.0.1\nHostKey %s\nPidFile %s\nAuthorizedKeysFile %s\nPubkeyAuthentication yes\nPasswordAuthentication no\nKbdInteractiveAuthentication no\nUsePAM no\nStrictModes no\nPermitRootLogin yes\nAllowUsers %s\nAcceptEnv XDG_STATE_HOME XDG_CACHE_HOME XDG_DATA_HOME XDG_CONFIG_HOME\nSetEnv \"PATH=%s\"\nLogLevel ERROR\n", port, hostKey, filepath.Join(root, "sshd.pid"), authorized, username, os.Getenv("PATH"))
 	if err := os.WriteFile(sshdConfig, []byte(sshdBody), 0o600); err != nil {
 		t.Fatal(err)
 	}

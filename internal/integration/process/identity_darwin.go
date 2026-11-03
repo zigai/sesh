@@ -54,13 +54,9 @@ func readDarwinIdentity(ctx context.Context, pid int) (Identity, error) {
 		return Identity{}, fmt.Errorf("context canceled: %w", err)
 	}
 
-	info, err := unix.SysctlKinfoProc("kern.proc.pid", pid)
+	info, err := readDarwinKinfo(ctx, pid)
 	if err != nil {
-		return Identity{}, classifyDarwinProcessError(err)
-	}
-
-	if info == nil || int(info.Proc.P_pid) != pid {
-		return Identity{}, ErrProcessVanished
+		return Identity{}, err
 	}
 
 	startTime, err := darwinStartTime(info.Proc.P_starttime.Sec, int64(info.Proc.P_starttime.Usec))

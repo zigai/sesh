@@ -92,11 +92,11 @@ func TestSelectLinuxForegroundUsesUniqueProcessGroupRoot(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			procRoot := writeForegroundProcFixture(t, tt.processes)
 
-			selection, err := selectLinuxForeground(t.Context(), procRoot, ForegroundRequest{
+			selection, err := selectForeground(t.Context(), procForegroundSource{procRoot: procRoot, bootIDPath: ""}, ForegroundRequest{
 				PanePID: 10, ExpectedPaneBirth: Identity{BootID: testBootID, StartTime: 100}, EnvironmentKeys: nil,
 			})
 			if !errors.Is(err, tt.wantErr) {
-				t.Fatalf("selectLinuxForeground error = %v, want %v", err, tt.wantErr)
+				t.Fatalf("selectForeground error = %v, want %v", err, tt.wantErr)
 			}
 
 			if err == nil && selection.process.pid != tt.wantPID {
@@ -131,7 +131,7 @@ func TestSelectLinuxForegroundRejectsPanePIDReuse(t *testing.T) {
 		{pid: 10, parent: 1, group: 10, foregroundGroup: 10, startTime: 101},
 	})
 
-	_, err := selectLinuxForeground(t.Context(), procRoot, ForegroundRequest{
+	_, err := selectForeground(t.Context(), procForegroundSource{procRoot: procRoot, bootIDPath: ""}, ForegroundRequest{
 		PanePID: 10, ExpectedPaneBirth: Identity{BootID: testBootID, StartTime: 100}, EnvironmentKeys: nil,
 	})
 	if !errors.Is(err, ErrIdentityMismatch) {
@@ -140,11 +140,11 @@ func TestSelectLinuxForegroundRejectsPanePIDReuse(t *testing.T) {
 }
 
 func TestLinuxForegroundSelectionDetectsGroupAndBirthRaces(t *testing.T) {
-	initial := linuxForegroundSelection{
-		pane: linuxForegroundProcess{
+	initial := foregroundSelection{
+		pane: foregroundProcess{
 			pid: 10, parent: 1, group: 10, session: 10, tty: 1, foregroundGroup: 20, startTime: 100,
 		},
-		process: linuxForegroundProcess{
+		process: foregroundProcess{
 			pid: 20, parent: 10, group: 20, session: 10, tty: 1, foregroundGroup: 20, startTime: 200,
 		},
 	}
@@ -152,14 +152,14 @@ func TestLinuxForegroundSelectionDetectsGroupAndBirthRaces(t *testing.T) {
 	changedGroup := initial
 
 	changedGroup.pane.foregroundGroup = 30
-	if sameLinuxForegroundSelection(initial, changedGroup) {
+	if sameForegroundSelection(initial, changedGroup) {
 		t.Fatal("foreground process-group change was not detected")
 	}
 
 	reusedPID := initial
 
 	reusedPID.process.startTime++
-	if sameLinuxForegroundSelection(initial, reusedPID) {
+	if sameForegroundSelection(initial, reusedPID) {
 		t.Fatal("foreground PID birth change was not detected")
 	}
 }

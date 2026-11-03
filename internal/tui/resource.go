@@ -2,7 +2,6 @@ package tui
 
 import (
 	"errors"
-	"runtime"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -28,7 +27,7 @@ func (m *Model) resourceEnabled() bool {
 }
 
 func (m *Model) resourceTickCommand() tea.Cmd {
-	if !m.resourceEnabled() || runtime.GOOS != "linux" {
+	if !m.resourceEnabled() || !providers.ResourceSupported {
 		return nil
 	}
 
@@ -47,9 +46,8 @@ func (m *Model) loadResourceCommand() tea.Cmd {
 		return m.resourceTickCommand()
 	}
 
-	if runtime.GOOS != "linux" {
-		var empty providers.ResourceSample
-		m.providerRunner.Publish(providers.Resource, providers.ResourceRows(empty, empty, targets))
+	if !providers.ResourceSupported {
+		m.providerRunner.Publish(providers.Resource, unsupportedResourceRows(targets))
 
 		return nil
 	}
@@ -108,17 +106,7 @@ func (m *Model) handleResource(msg resourceResultMsg) tea.Cmd {
 
 	if msg.err != nil {
 		if errors.Is(msg.err, providers.ErrResourceUnsupported) {
-			rows := make(providers.Rows)
-			for _, target := range m.resourceTargets() {
-				fields := make(map[string]layout.Cell)
-				for _, field := range display.FieldsByProvider(display.ProviderResource) {
-					fields[field] = layout.Cell{Text: "", State: layout.Unsupported, Role: "", Variants: nil}
-				}
-
-				rows[target.PaneID] = fields
-			}
-
-			m.providerRunner.Complete(providers.Resource, msg.request, rows)
+			m.providerRunner.Complete(providers.Resource, msg.request, unsupportedResourceRows(m.resourceTargets()))
 		} else {
 			m.providerRunner.Invalidate(providers.Resource)
 		}
@@ -151,4 +139,18 @@ func (m *Model) resourceTargets() []providers.ResourceTarget {
 	}
 
 	return targets
+}
+
+func unsupportedResourceRows(targets []providers.ResourceTarget) providers.Rows {
+	rows := make(providers.Rows)
+	for _, target := range targets {
+		fields := make(map[string]layout.Cell)
+		for _, field := range display.FieldsByProvider(display.ProviderResource) {
+			fields[field] = layout.Cell{Text: "", State: layout.Unsupported, Role: "", Variants: nil}
+		}
+
+		rows[target.PaneID] = fields
+	}
+
+	return rows
 }

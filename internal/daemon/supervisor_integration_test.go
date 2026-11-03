@@ -20,8 +20,9 @@ func TestTmuxSupervisorOwnsDisposableForegroundServer(t *testing.T) {
 		t.Skip("set TMUX_INTEGRATION_REQUIRED=1 to run disposable tmux integration tests")
 	}
 
-	parent := filepath.Join(t.TempDir(), "runtime", "sesh")
-	socket := filepath.Join(parent, "supervised.sock")
+	// Short names keep the socket within macOS's 104-byte unix socket path limit.
+	parent := filepath.Join(t.TempDir(), "run", "sesh")
+	socket := filepath.Join(parent, "tmux.sock")
 
 	supervisor, err := daemon.NewTmuxSupervisor("tmux", socket, "/dev/null", 2*time.Second)
 	if err != nil {

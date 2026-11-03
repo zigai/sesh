@@ -54,14 +54,16 @@ func runFinishTicks(t *testing.T, results ...error) []map[string]any {
 
 	go func() {
 		finishOnTicks(ctx, ticks, func(context.Context, map[string]bool) error {
-			scans++
+			scans = min(scans+1, len(results))
 
 			return results[scans-1]
 		})
 		close(done)
 	}()
 
-	for range results {
+	// The loop takes the extra tick only after it logged the last result, and repeating that
+	// result logs nothing new.
+	for range len(results) + 1 {
 		ticks <- time.Now()
 	}
 

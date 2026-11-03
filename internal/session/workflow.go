@@ -331,8 +331,6 @@ func hookSentinelReason(err error) (string, bool) {
 		return "hook_timeout_invalid", true
 	case errors.Is(err, ErrHookLimitExceeded):
 		return "hook_limit_exceeded", true
-	case errors.Is(err, ErrHookSupervisionUnsupported):
-		return "hook_supervision_unsupported", true
 	default:
 		return "", false
 	}

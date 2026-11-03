@@ -18,6 +18,7 @@ import (
 const IsolatedMarker = "SESH_TESTENV_ISOLATED"
 
 const (
+	shortTempRoot             = "/tmp"
 	integrationRequiredSuffix = "_INTEGRATION_REQUIRED"
 	goldenUpdatePrefix        = "SESH_UPDATE_"
 )
@@ -37,6 +38,14 @@ var directoryVariables = map[string]string{
 var goToolchainVariables = []string{"GOPATH", "GOMODCACHE", "GOCACHE", "GOENV"}
 
 func RunIsolated(m *testing.M) int {
+	if os.Getenv(IsolatedMarker) != "1" {
+		if err := useShortCanonicalTempDir(); err != nil {
+			fmt.Fprintln(os.Stderr, "isolate temporary directory:", err)
+
+			return 1
+		}
+	}
+
 	root, err := os.MkdirTemp("", "sesh-test-home-")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "create isolated test home:", err)
@@ -64,6 +73,22 @@ func RunIsolated(m *testing.M) int {
 	}
 
 	return code
+}
+
+// Tests bind unix sockets under t.TempDir, so its root must be short enough for sun_path (104 bytes
+// on macOS), and tmux endpoints must be canonical. macOS's per-user TMPDIR is long and sits behind
+// the /var -> /private/var symlink.
+func useShortCanonicalTempDir() error {
+	dir, err := filepath.EvalSymlinks(shortTempRoot)
+	if err != nil {
+		return fmt.Errorf("resolve %s: %w", shortTempRoot, err)
+	}
+
+	if err := os.Setenv("TMPDIR", dir); err != nil {
+		return fmt.Errorf("set TMPDIR: %w", err)
+	}
+
+	return nil
 }
 
 func isolate(root string) error {

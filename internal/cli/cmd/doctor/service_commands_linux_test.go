@@ -1,3 +1,5 @@
+//go:build linux
+
 package doctor_test
 
 import (

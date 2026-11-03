@@ -49,6 +49,11 @@ func acquireLease(ctx context.Context, leaseRoot, socket string, afterLock func(
 		return nil, err
 	}
 
+	socket, err := resolveEndpoint(socket)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := validateEndpoint(socket); err != nil {
 		return nil, err
 	}
@@ -108,9 +113,28 @@ func validateLeaseRoot(leaseRoot string) error {
 	return nil
 }
 
+// Links only root can change, such as macOS's /tmp -> /private/tmp, name the same endpoint, so
+// they are resolved before the endpoint must be canonical and before it names the lease.
+func resolveEndpoint(socket string) (string, error) {
+	if !validEndpointPath(socket) {
+		return "", oops.In("tmux").Code("endpoint_required").With("operation", "acquire_lease").Wrap(ErrEndpoint)
+	}
+
+	resolved, err := privatefs.ResolveSystemSymlinks(socket)
+	if err != nil {
+		return "", oops.In("tmux").Code("endpoint_required").With("operation", "acquire_lease").Wrap(errors.Join(ErrEndpoint, sanitizePathError(err)))
+	}
+
+	return resolved, nil
+}
+
+func validEndpointPath(socket string) bool {
+	return socket != "" && !strings.Contains(socket, "\x00") &&
+		filepath.IsAbs(socket) && filepath.Clean(socket) == socket && socket != "/"
+}
+
 func validateEndpoint(socket string) error {
-	if socket == "" || strings.Contains(socket, "\x00") ||
-		!filepath.IsAbs(socket) || filepath.Clean(socket) != socket || socket == "/" {
+	if !validEndpointPath(socket) {
 		return oops.In("tmux").Code("endpoint_required").With("operation", "acquire_lease").Wrap(ErrEndpoint)
 	}
 

@@ -137,7 +137,7 @@ func killAndWaitWorker(t *testing.T, cmd *exec.Cmd, output *bytes.Buffer) {
 
 	status, ok := exit.Sys().(syscall.WaitStatus)
 	if !ok || !status.Signaled() || status.Signal() != syscall.SIGKILL {
-		t.Fatalf("worker did not exit by SIGKILL: %v", exit)
+		t.Fatalf("worker did not exit by SIGKILL: %v\n%s", exit, output.String())
 	}
 }
 

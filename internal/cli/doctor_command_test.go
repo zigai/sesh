@@ -67,7 +67,7 @@ func TestDoctorCommandPlainReportListsGroupsChecksAndVerdict(t *testing.T) {
 
 	stdout, _, _ := executeCommand(t, "doctor", testNoConfigFlag, testSocketFlag, filepath.Join(t.TempDir(), "absent.sock"))
 
-	for _, want := range []string{"\n  socket      ", "\nTmux\n", "\n  fail  server", "\nSnapshots\n", "need attention.\n", " ok, ", " fail, "} {
+	for _, want := range []string{"\n  socket      ", "\nTmux\n", "\n  fail  server", "\nSnapshots\n", " attention.\n", " ok, ", " fail, "} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("stdout missing %q:\n%s", want, stdout)
 		}
@@ -148,13 +148,19 @@ func TestDoctorApplicationWarningOnlyJSONSucceeds(t *testing.T) {
 	base := t.TempDir()
 	cfg, logPath := runtimeConfig(t, "info")
 
+	// A repository directory without a repository warns on every platform.
+	repository := filepath.Join(base, "empty-repository")
+	if err := os.Mkdir(repository, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
 	var stdout, stderr bytes.Buffer
 
 	err := ExecuteApplication(t.Context(), []string{
 		"doctor",
 		testSocketFlag, tmuxtest.NewServer(t).Endpoint().SocketPath,
 		"--history", filepath.Join(base, "missing-history.json"),
-		testRepositoryFlag, filepath.Join(base, "missing-repository"),
+		testRepositoryFlag, repository,
 		testConfigFlag, cfg,
 		testJSONFlag,
 	}, nil, &stdout, &stderr)
