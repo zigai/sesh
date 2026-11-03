@@ -28,6 +28,8 @@ import (
 	"github.com/zigai/sesh/internal/testsupport/testenv"
 )
 
+const kernelPTYDir = "/dev/pts"
+
 const (
 	envHelperFlag     = "GO_PROCESS_TEST_HELPER"
 	envCustomVar      = "CUSTOM_TEST_VAR"
@@ -358,7 +360,7 @@ func openTestPTY(t *testing.T) (*os.File, *os.File) {
 	}
 
 	slave, err := os.OpenFile(
-		filepath.Join("/dev/pts", strconv.Itoa(ptyNumber)),
+		filepath.Join(kernelPTYDir, strconv.Itoa(ptyNumber)),
 		os.O_RDWR|syscall.O_NOCTTY,
 		0,
 	)

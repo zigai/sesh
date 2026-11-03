@@ -822,20 +822,30 @@ func (m *Model) handleTickModelMessage(msg tea.Msg) func() (tea.Model, tea.Cmd) 
 			return m, tea.Batch(m.loadAgentSummariesCommand(), m.agentSummaryTickCommand())
 		}
 	case agentPositionTickMsg:
-		return func() (tea.Model, tea.Cmd) { return m, m.loadAgentPositionsCommand() }
+		return func() (tea.Model, tea.Cmd) {
+			cmd := m.loadAgentPositionsCommand()
+
+			return m, cmd
+		}
 	case agentPositionsMsg:
 		return func() (tea.Model, tea.Cmd) {
 			m.applyAgentPositions(msg)
-			return m, m.agentPositionTickCommand()
+			cmd := m.agentPositionTickCommand()
+
+			return m, cmd
 		}
 	case agentClockTickMsg:
 		return func() (tea.Model, tea.Cmd) {
-			return m, m.agentClockTickCommand()
+			cmd := m.agentClockTickCommand()
+
+			return m, cmd
 		}
 	case remoteStatusTickMsg:
 		return func() (tea.Model, tea.Cmd) {
 			m.handleRemoteStatusTick(msg.now)
-			return m, m.remoteStatusTickCommand()
+			cmd := m.remoteStatusTickCommand()
+
+			return m, cmd
 		}
 	default:
 		return nil
@@ -847,15 +857,35 @@ func (m *Model) handleProviderModelMessage(msg tea.Msg) func() (tea.Model, tea.C
 	case agentGitTickMsg:
 		return func() (tea.Model, tea.Cmd) { return m, tea.Batch(m.loadAgentGitCommand(), m.loadEvidenceCommand()) }
 	case agentGitResultMsg:
-		return func() (tea.Model, tea.Cmd) { return m, m.handleAgentGit(msg) }
+		return func() (tea.Model, tea.Cmd) {
+			cmd := m.handleAgentGit(msg)
+
+			return m, cmd
+		}
 	case resourceTickMsg:
-		return func() (tea.Model, tea.Cmd) { return m, m.loadResourceCommand() }
+		return func() (tea.Model, tea.Cmd) {
+			cmd := m.loadResourceCommand()
+
+			return m, cmd
+		}
 	case resourceResultMsg:
-		return func() (tea.Model, tea.Cmd) { return m, m.handleResource(msg) }
+		return func() (tea.Model, tea.Cmd) {
+			cmd := m.handleResource(msg)
+
+			return m, cmd
+		}
 	case ghTickMsg:
-		return func() (tea.Model, tea.Cmd) { return m, m.loadGHCommand() }
+		return func() (tea.Model, tea.Cmd) {
+			cmd := m.loadGHCommand()
+
+			return m, cmd
+		}
 	case ghResultMsg:
-		return func() (tea.Model, tea.Cmd) { return m, m.handleGH(msg) }
+		return func() (tea.Model, tea.Cmd) {
+			cmd := m.handleGH(msg)
+
+			return m, cmd
+		}
 	case customFieldResultMsg:
 		return func() (tea.Model, tea.Cmd) {
 			m.handleCustomFieldResult(msg)
@@ -863,7 +893,11 @@ func (m *Model) handleProviderModelMessage(msg tea.Msg) func() (tea.Model, tea.C
 			return m, nil
 		}
 	case customFieldTickMsg:
-		return func() (tea.Model, tea.Cmd) { return m, m.handleCustomFieldTick(msg) }
+		return func() (tea.Model, tea.Cmd) {
+			cmd := m.handleCustomFieldTick(msg)
+
+			return m, cmd
+		}
 	default:
 		return nil
 	}
@@ -892,21 +926,29 @@ func (m *Model) handleModelMessage(msg tea.Msg) func() (tea.Model, tea.Cmd) {
 
 	case sessionLoadResultMsg:
 		return func() (tea.Model, tea.Cmd) {
-			return m, m.handleSessionLoadResult(msg)
+			cmd := m.handleSessionLoadResult(msg)
+
+			return m, cmd
 		}
 	case taskSyncMsg:
 		return func() (tea.Model, tea.Cmd) {
-			return m, m.handleTaskSync(msg)
+			cmd := m.handleTaskSync(msg)
+
+			return m, cmd
 		}
 	case workSyncMsg:
 		return func() (tea.Model, tea.Cmd) {
-			return m, m.handleTaskSync(taskSyncMsg(msg))
+			cmd := m.handleTaskSync(taskSyncMsg(msg))
+
+			return m, cmd
 		}
 	case taskRunTickMsg:
 		return func() (tea.Model, tea.Cmd) {
 			m.taskRunTickPending = false
 
-			return m, m.refreshSessions()
+			cmd := m.refreshSessions()
+
+			return m, cmd
 		}
 	case originSessionsMsg:
 		return func() (tea.Model, tea.Cmd) {

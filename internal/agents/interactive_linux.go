@@ -9,8 +9,10 @@ import (
 	"strings"
 )
 
+const kernelProcessDir = "/proc"
+
 func agentProcessArguments(pid int) []string {
-	data, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "cmdline"))
+	data, err := os.ReadFile(filepath.Join(kernelProcessDir, strconv.Itoa(pid), "cmdline"))
 	if err != nil || len(data) == 0 {
 		return nil
 	}

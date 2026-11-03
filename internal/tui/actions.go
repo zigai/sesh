@@ -454,7 +454,9 @@ func (m *Model) handleEnter() func() (tea.Model, tea.Cmd) {
 		agent := selectedSession.Agents[selected.agentIndex]
 
 		return func() (tea.Model, tea.Cmd) {
-			return m, m.runAgentSessionAction(selectedSession, agent)
+			cmd := m.runAgentSessionAction(selectedSession, agent)
+
+			return m, cmd
 		}
 	}
 
@@ -478,7 +480,9 @@ func (m *Model) openSession(target session.Session) func() (tea.Model, tea.Cmd) 
 			return m.runAction(action.SnapshotRestore, action.SubjectOf(target), action.Values{})()
 		}
 
-		return m, m.runLiveSessionAction(target)
+		cmd := m.runLiveSessionAction(target)
+
+		return m, cmd
 	}
 }
 

@@ -385,13 +385,17 @@ func (m *Model) handleActionResult(msg actionResultMsg) (tea.Model, tea.Cmd) {
 			m.statusMessage = fmt.Sprintf("%s incomplete: %v", descriptor.Title, msg.err)
 			m.statusLevel = statusDegraded
 
-			return m, m.refreshSessions()
+			cmd := m.refreshSessions()
+
+			return m, cmd
 		}
 
 		m.setErrorStatusf("%s failed: %v", descriptor.Title, msg.err)
 
 		if code == action.CodeUncertain {
-			return m, m.refreshSessions()
+			cmd := m.refreshSessions()
+
+			return m, cmd
 		}
 
 		return m, nil
@@ -400,7 +404,9 @@ func (m *Model) handleActionResult(msg actionResultMsg) (tea.Model, tea.Cmd) {
 	logTUIEvent(ctx, operation, tuiLogOutcomeSuccess)
 	m.clearStatus()
 
-	return m, m.followAction(msg)
+	cmd := m.followAction(msg)
+
+	return m, cmd
 }
 
 func (m *Model) recoverActionFailure(msg actionResultMsg) (tea.Cmd, bool) {

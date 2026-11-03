@@ -14,6 +14,8 @@ import (
 	"github.com/zigai/sesh/internal/config"
 )
 
+const tmuxDefaultSocketParent = "/tmp"
+
 func endpointCommand(t *testing.T, args ...string) *cobra.Command {
 	t.Helper()
 
@@ -59,7 +61,7 @@ func TestResolveSocketPrefersFlagThenAmbientServerThenTmuxDefault(t *testing.T) 
 func TestDefaultTmuxSocketIgnoresRelativeTmuxTmpdir(t *testing.T) {
 	t.Setenv("TMUX_TMPDIR", "relative")
 
-	want := filepath.Join("/tmp", "tmux-"+strconv.Itoa(os.Getuid()), "default")
+	want := filepath.Join(tmuxDefaultSocketParent, "tmux-"+strconv.Itoa(os.Getuid()), "default")
 	if resolved, err := filepath.EvalSymlinks("/tmp"); err == nil {
 		want = filepath.Join(resolved, "tmux-"+strconv.Itoa(os.Getuid()), "default")
 	}

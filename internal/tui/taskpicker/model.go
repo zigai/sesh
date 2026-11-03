@@ -240,7 +240,9 @@ func (m *Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "shift+left", "shift+right":
 		return m.cycleMachine(key)
 	case "tab", "shift+tab":
-		return m, m.focusField(m.otherField())
+		cmd := m.focusField(m.otherField())
+
+		return m, cmd
 	case "up", "down":
 		m.moveVertically(key)
 
@@ -252,7 +254,9 @@ func (m *Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.focus == fieldList {
-		return m, m.updateFilter(msg)
+		cmd := m.updateFilter(msg)
+
+		return m, cmd
 	}
 
 	title, cmd := m.title.Update(msg)

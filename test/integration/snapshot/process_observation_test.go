@@ -27,7 +27,10 @@ func TestProcessObservationExactLaunchFacts(t *testing.T) {
 	server := tmuxtest.NewServer(t)
 	helper := buildLaunchHelper(t)
 
-	dir := filepath.Join(t.TempDir(), "cwd with spaces and \t tabs and \n newlines")
+	dir := filepath.Join(
+		t.TempDir(),
+		"cwd with spaces and \t tabs and \n newlines", //nolint:gocritic // filepathJoin: escapes encode control characters.
+	)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}

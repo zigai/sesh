@@ -23,7 +23,10 @@ import (
 func TestSaveUsesExplicitServerAndExactSession(t *testing.T) {
 	source, other := tmuxtest.NewServer(t), tmuxtest.NewServer(t)
 
-	dir := filepath.Join(t.TempDir(), "space ' tab\t newline\n directory")
+	dir := filepath.Join(
+		t.TempDir(),
+		"space ' tab\t newline\n directory", //nolint:gocritic // filepathJoin: escapes encode control characters.
+	)
 	if err := os.Mkdir(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}

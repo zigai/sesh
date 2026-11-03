@@ -25,6 +25,8 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
+const kernelProcessDir = "/proc"
+
 var (
 	errToolNotFound = errors.New("tool not found in PATH")
 	errNoNvimSocket = errors.New("no nvim socket endpoint found for process")
@@ -964,7 +966,13 @@ func findNvimSocket(pid int) (string, error) {
 func collectSocketInodes(pid int) map[string]bool {
 	pids := []int{pid}
 
-	childrenFile := filepath.Join("/proc", strconv.Itoa(pid), "task", strconv.Itoa(pid), "children")
+	childrenFile := filepath.Join(
+		kernelProcessDir,
+		strconv.Itoa(pid),
+		"task",
+		strconv.Itoa(pid),
+		"children",
+	)
 	if childData, err := os.ReadFile(childrenFile); err == nil {
 		for field := range strings.FieldsSeq(string(childData)) {
 			if childPID, cErr := strconv.Atoi(field); cErr == nil && childPID > 0 {
@@ -976,7 +984,7 @@ func collectSocketInodes(pid int) map[string]bool {
 	socketInodes := make(map[string]bool)
 
 	for _, p := range pids {
-		fdDir := filepath.Join("/proc", strconv.Itoa(p), "fd")
+		fdDir := filepath.Join(kernelProcessDir, strconv.Itoa(p), "fd")
 
 		entries, err := os.ReadDir(fdDir)
 		if err != nil {

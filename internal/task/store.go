@@ -367,7 +367,9 @@ func read(dir *privatefs.Dir, name string) (Ledger, error) {
 		return Ledger{}, errors.Join(ErrLedgerInvalid, err)
 	}
 
-	return ledger, ledger.validate()
+	err = ledger.validate()
+
+	return ledger, err
 }
 
 func write(dir *privatefs.Dir, name string, ledger Ledger) error {

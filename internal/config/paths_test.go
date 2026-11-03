@@ -134,7 +134,7 @@ func TestGetXDGPathsFallsBackToRoot(t *testing.T) {
 	t.Setenv("XDG_CACHE_HOME", "")
 
 	paths := config.GetXDGPaths()
-	if want := filepath.Join("/", ".local", "state"); paths.StateHome != want {
+	if want := "/.local/state"; paths.StateHome != want {
 		t.Fatalf("StateHome = %q, want %q", paths.StateHome, want)
 	}
 }

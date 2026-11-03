@@ -198,11 +198,11 @@ func TestInitializationConcurrentOpen(t *testing.T) {
 			t.Fatalf("concurrent open %d failed: %v", i, err)
 		}
 
-		defer func() {
+		t.Cleanup(func() {
 			if closeErr := repos[i].Close(); closeErr != nil {
 				t.Error(closeErr)
 			}
-		}()
+		})
 
 		catalog, err := repos[i].Inspect(t.Context())
 		if err != nil {

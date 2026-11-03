@@ -21,6 +21,8 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/model"
 )
 
+const kernelProcessDir = "/proc"
+
 const (
 	maxEditorFiles       = 256
 	maxEditorOutputBytes = 1 << 20
@@ -296,7 +298,7 @@ func equalArguments(current [][]byte, observed []model.Bytes) bool {
 }
 
 func directProcessChildren(ctx context.Context, pid int) ([]int, error) {
-	taskDirectory, err := os.Open(filepath.Join("/proc", strconv.Itoa(pid), "task"))
+	taskDirectory, err := os.Open(filepath.Join(kernelProcessDir, strconv.Itoa(pid), "task"))
 	if err != nil {
 		return nil, fmt.Errorf("read editor process tasks: %w", err)
 	}
@@ -347,7 +349,7 @@ func directProcessChildren(ctx context.Context, pid int) ([]int, error) {
 
 func readEditorTaskChildren(pid int, task string) ([]byte, error) {
 	return readBoundedFile(
-		filepath.Join("/proc", strconv.Itoa(pid), "task", task, "children"),
+		filepath.Join(kernelProcessDir, strconv.Itoa(pid), "task", task, "children"),
 		maxEditorChildrenRaw,
 	)
 }
@@ -374,7 +376,7 @@ func appendEditorChildren(children []int, data []byte) ([]int, error) {
 
 func processParentPID(pid int) (int, error) {
 	data, err := readBoundedFile(
-		filepath.Join("/proc", strconv.Itoa(pid), "stat"),
+		filepath.Join(kernelProcessDir, strconv.Itoa(pid), "stat"),
 		maxEditorStatBytes,
 	)
 	if err != nil {
@@ -499,7 +501,7 @@ func ownedUnixSocketPaths(pid int) ([]string, error) {
 }
 
 func processSocketInodes(pid int) (map[string]bool, error) {
-	directory, err := os.Open(filepath.Join("/proc", strconv.Itoa(pid), "fd"))
+	directory, err := os.Open(filepath.Join(kernelProcessDir, strconv.Itoa(pid), "fd"))
 	if err != nil {
 		return nil, fmt.Errorf("read process descriptors: %w", err)
 	}
@@ -521,7 +523,7 @@ func processSocketInodes(pid int) (map[string]bool, error) {
 
 	for _, entry := range entries {
 		target, readErr := os.Readlink(
-			filepath.Join("/proc", strconv.Itoa(pid), "fd", entry.Name()),
+			filepath.Join(kernelProcessDir, strconv.Itoa(pid), "fd", entry.Name()),
 		)
 		if readErr != nil {
 			continue

@@ -42,7 +42,12 @@ func (m *Model) handleDisplayActionKeys(
 	case bubbleskey.Matches(pressed, keys.cycleMode):
 		if m.cycleDisplayMode() {
 			m.clearStatus()
-			return func() (tea.Model, tea.Cmd) { return m, m.saveDisplayStateCommand() }, true
+
+			return func() (tea.Model, tea.Cmd) {
+				cmd := m.saveDisplayStateCommand()
+
+				return m, cmd
+			}, true
 		}
 
 		return func() (tea.Model, tea.Cmd) { return m, nil }, true

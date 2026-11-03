@@ -11,6 +11,8 @@ import (
 	"github.com/zigai/gotmux/tmuxtest"
 )
 
+const kernelProcessDir = "/proc"
+
 func TestOpenRunsTheExecutableOfTheServerNamedByTMUX(t *testing.T) {
 	server := tmuxtest.NewServer(t)
 	socket := server.Endpoint().SocketPath
@@ -22,7 +24,7 @@ func TestOpenRunsTheExecutableOfTheServerNamedByTMUX(t *testing.T) {
 
 	pid := strconv.Itoa(probe.Identity.PID)
 
-	want, err := os.Readlink(filepath.Join("/proc", pid, "exe"))
+	want, err := os.Readlink(filepath.Join(kernelProcessDir, pid, "exe"))
 	if err != nil {
 		t.Fatal(err)
 	}

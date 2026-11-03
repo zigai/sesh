@@ -416,7 +416,9 @@ func read(dir *privatefs.Dir, name string) (State, error) {
 		return State{}, errors.Join(ErrInvalid, err)
 	}
 
-	return state, state.validate()
+	err = state.validate()
+
+	return state, err
 }
 
 func write(dir *privatefs.Dir, name string, state State) error {

@@ -771,7 +771,9 @@ func (m *Model) handleInboxEnter(selected popupListRow) func() (tea.Model, tea.C
 	}
 
 	return func() (tea.Model, tea.Cmd) {
-		return m, m.runAgentSessionAction(item.owner, agent)
+		cmd := m.runAgentSessionAction(item.owner, agent)
+
+		return m, cmd
 	}
 }
 

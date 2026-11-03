@@ -478,7 +478,7 @@ func shortRuntimeDir(t *testing.T) string {
 	t.Helper()
 
 	directory := filepath.Join(
-		"/tmp",
+		"/tmp", //nolint:gocritic // filepathJoin: Unix socket paths need a short fixed parent.
 		fmt.Sprintf("sesh-runtime-%d-%d", os.Getpid(), runtimeTestDirectoryCounter.Add(1)),
 	)
 	if err := os.Mkdir(directory, 0o700); err != nil {

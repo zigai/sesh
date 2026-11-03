@@ -121,7 +121,7 @@ func Decode(data []byte) (Manifest, error) {
 			Wrapf(errors.Join(ErrInvalid, err), "decode manifest")
 	}
 
-	if err = m.Validate(); err != nil {
+	if err := m.Validate(); err != nil {
 		return Manifest{}, err
 	}
 
