@@ -44,7 +44,14 @@ var (
 	errAdoptedLayoutUnresolved  = errors.New("adopted window has no identifiable initial pane")
 )
 
-var tmuxPaneVariables = []string{"TMUX", "TMUX_PANE", "TERM", "TERM_PROGRAM", "TERM_PROGRAM_VERSION", "COLORTERM"}
+var tmuxPaneVariables = []string{
+	"TMUX",
+	"TMUX_PANE",
+	"TERM",
+	"TERM_PROGRAM",
+	"TERM_PROGRAM_VERSION",
+	"COLORTERM",
+}
 
 type MissingWorkingDir string
 
@@ -151,14 +158,22 @@ func PreflightCheckCollisions(ctx context.Context, server *gotmux.Server, plan P
 	return PreflightCheckCollisionsExcluding(ctx, server, plan, nil)
 }
 
-func PreflightCheckCollisionsExcluding(ctx context.Context, server *gotmux.Server, plan Plan, adoptedSessions map[string]bool) error {
+func PreflightCheckCollisionsExcluding(
+	ctx context.Context,
+	server *gotmux.Server,
+	plan Plan,
+	adoptedSessions map[string]bool,
+) error {
 	if server == nil {
 		return oops.In("snapshot.restore").Code("endpoint_required").Wrap(tmuxserver.ErrEndpoint)
 	}
 
 	liveSessions, err := server.Sessions(ctx)
 	if err != nil {
-		return oops.In("snapshot.restore").Code("endpoint_required").With("operation", "preflight_collisions").Wrapf(err, "query live sessions")
+		return oops.In("snapshot.restore").
+			Code("endpoint_required").
+			With("operation", "preflight_collisions").
+			Wrapf(err, "query live sessions")
 	}
 
 	if err := checkSessionCollisions(liveSessions, plan, adoptedSessions); err != nil {
@@ -168,7 +183,11 @@ func PreflightCheckCollisionsExcluding(ctx context.Context, server *gotmux.Serve
 	return checkGroupCollisions(ctx, server, plan, adoptedSessions)
 }
 
-func PreflightCheckGroupCollision(ctx context.Context, server *gotmux.Server, groupName string) error {
+func PreflightCheckGroupCollision(
+	ctx context.Context,
+	server *gotmux.Server,
+	groupName string,
+) error {
 	sessions, err := server.Sessions(ctx)
 	if err != nil {
 		return oops.In("snapshot.restore").
@@ -210,7 +229,11 @@ func PreflightCheckGroupCollision(ctx context.Context, server *gotmux.Server, gr
 	return nil
 }
 
-func checkSessionCollisions(liveSessions []gotmux.SessionInfo, plan Plan, adoptedSessions map[string]bool) error {
+func checkSessionCollisions(
+	liveSessions []gotmux.SessionInfo,
+	plan Plan,
+	adoptedSessions map[string]bool,
+) error {
 	sessionNames := make(map[string]string, len(plan.SourceGraph.Sessions))
 	for _, s := range plan.SourceGraph.Sessions {
 		sessionNames[s.ID] = string(s.Name)
@@ -239,7 +262,12 @@ func checkSessionCollisions(liveSessions []gotmux.SessionInfo, plan Plan, adopte
 	return nil
 }
 
-func checkGroupCollisions(ctx context.Context, server *gotmux.Server, plan Plan, adoptedSessions map[string]bool) error {
+func checkGroupCollisions(
+	ctx context.Context,
+	server *gotmux.Server,
+	plan Plan,
+	adoptedSessions map[string]bool,
+) error {
 	for _, step := range plan.Steps {
 		create, ok := step.(*CreateSessionStep)
 		if !ok || len(create.GroupName) == 0 {
@@ -259,7 +287,11 @@ func checkGroupCollisions(ctx context.Context, server *gotmux.Server, plan Plan,
 	return nil
 }
 
-func (e *Executor) Execute(ctx context.Context, plan Plan, journal Journal) (ExecutionReport, error) {
+func (e *Executor) Execute(
+	ctx context.Context,
+	plan Plan,
+	journal Journal,
+) (ExecutionReport, error) {
 	report := ExecutionReport{
 		SessionsCreated: nil,
 		WindowsCreated:  nil,
@@ -317,7 +349,13 @@ func (e *Executor) Execute(ctx context.Context, plan Plan, journal Journal) (Exe
 	return report, nil
 }
 
-func (e *Executor) executeStep(ctx context.Context, step Step, state StepState, journal Journal, report *ExecutionReport) error {
+func (e *Executor) executeStep(
+	ctx context.Context,
+	step Step,
+	state StepState,
+	journal Journal,
+	report *ExecutionReport,
+) error {
 	if err := ctx.Err(); err != nil {
 		return oops.In("snapshot.restore").
 			Code("operation_canceled").
@@ -383,7 +421,10 @@ func indexPlan(plan Plan) planIndex {
 			index.ownerSessionByWindow[s.WindowID] = s.OwnerSessionID
 		case *CreateSessionStep:
 			if s.GroupLeaderSessionID != "" {
-				index.followersByLeader[s.GroupLeaderSessionID] = append(index.followersByLeader[s.GroupLeaderSessionID], s.SessionID)
+				index.followersByLeader[s.GroupLeaderSessionID] = append(
+					index.followersByLeader[s.GroupLeaderSessionID],
+					s.SessionID,
+				)
 			}
 
 			if s.InitialWindowID != "" {
@@ -422,7 +463,10 @@ func validateJournalStates(plan Plan, states map[string]StepState) error {
 				Code("operation_uncertain").
 				With("operation", "execute", "reason", "prior_effect_uncertain").
 				Wrap(ErrPriorUncertainty)
-		case model.ActionStatePlanned, model.ActionStateNotSent, model.ActionStateConfirmed, model.ActionStateVerified:
+		case model.ActionStatePlanned,
+			model.ActionStateNotSent,
+			model.ActionStateConfirmed,
+			model.ActionStateVerified:
 		default:
 			return oops.In("snapshot.restore").
 				Code("restore_failed").
@@ -446,7 +490,10 @@ func adoptedSessionIDs(plan Plan, states map[string]StepState) map[string]bool {
 		switch states[step.ID()].State {
 		case model.ActionStateConfirmed, model.ActionStateVerified:
 			adopted[create.SessionID] = true
-		case model.ActionStatePlanned, model.ActionStateIssued, model.ActionStateNotSent, model.ActionStateUnknown:
+		case model.ActionStatePlanned,
+			model.ActionStateIssued,
+			model.ActionStateNotSent,
+			model.ActionStateUnknown:
 		}
 	}
 
@@ -546,7 +593,12 @@ func (e *Executor) restoredWindowAndPaneIDs(plan Plan) ([]string, []string) {
 	return windows, panes
 }
 
-func (e *Executor) abort(_ context.Context, plan Plan, report *ExecutionReport, err error) (ExecutionReport, error) {
+func (e *Executor) abort(
+	_ context.Context,
+	plan Plan,
+	report *ExecutionReport,
+	err error,
+) (ExecutionReport, error) {
 	report.Receipts = e.cloneReceipts()
 	report.SessionsCreated = e.restoredSessionIDs(plan)
 	report.WindowsCreated, report.PanesCreated = e.restoredWindowAndPaneIDs(plan)
@@ -555,7 +607,12 @@ func (e *Executor) abort(_ context.Context, plan Plan, report *ExecutionReport, 
 	return *report, err
 }
 
-func (e *Executor) dispatch(ctx context.Context, step Step, effect stepEffect, journal Journal) (string, error) {
+func (e *Executor) dispatch(
+	ctx context.Context,
+	step Step,
+	effect stepEffect,
+	journal Journal,
+) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", oops.In("snapshot.restore").
 			Code("operation_canceled").
@@ -586,7 +643,12 @@ func (e *Executor) dispatch(ctx context.Context, step Step, effect stepEffect, j
 	return e.handleFailedEffect(ctx, step, journal, runErr)
 }
 
-func (e *Executor) handleFailedEffect(ctx context.Context, step Step, journal Journal, runErr error) (string, error) {
+func (e *Executor) handleFailedEffect(
+	ctx context.Context,
+	step Step,
+	journal Journal,
+	runErr error,
+) (string, error) {
 	outcome := classifyMutation(runErr)
 
 	switch outcome.Effect {
@@ -608,7 +670,12 @@ func (e *Executor) handleFailedEffect(ctx context.Context, step Step, journal Jo
 	return "", e.uncertain(ctx, step, journal, runErr)
 }
 
-func (e *Executor) confirm(ctx context.Context, journal Journal, step Step, runtimeID string) error {
+func (e *Executor) confirm(
+	ctx context.Context,
+	journal Journal,
+	step Step,
+	runtimeID string,
+) error {
 	recordCtx, cancel := detach(ctx)
 	defer cancel()
 
@@ -653,14 +720,23 @@ func (e *Executor) installStep(ctx context.Context, step Step, runtimeID string)
 		delete(e.bootstraps, s.SessionID)
 
 		return nil
-	case *LinkWindowStep, *ApplyLayoutStep, *SelectPaneStep, *ApplyZoomStep, *SelectWindowStep, *SetPaneTitleStep:
+	case *LinkWindowStep,
+		*ApplyLayoutStep,
+		*SelectPaneStep,
+		*ApplyZoomStep,
+		*SelectWindowStep,
+		*SetPaneTitleStep:
 		return nil
 	}
 
 	return planFailure("execution", "unknown_step_kind", ErrInvalid)
 }
 
-func (e *Executor) installSession(ctx context.Context, step CreateSessionStep, runtimeID string) error {
+func (e *Executor) installSession(
+	ctx context.Context,
+	step CreateSessionStep,
+	runtimeID string,
+) error {
 	session, err := e.server.Session(ctx, gotmux.SessionID(runtimeID))
 	if err != nil {
 		return oops.In("snapshot.restore").
@@ -708,7 +784,10 @@ func (e *Executor) installSession(ctx context.Context, step CreateSessionStep, r
 	return nil
 }
 
-func (e *Executor) sessionInitialLink(ctx context.Context, step CreateSessionStep) (gotmux.WindowLink, bool, error) {
+func (e *Executor) sessionInitialLink(
+	ctx context.Context,
+	step CreateSessionStep,
+) (gotmux.WindowLink, bool, error) {
 	session := e.sessions[step.SessionID]
 
 	placement, ok := e.index.placeStepBySession[step.SessionID]
@@ -731,7 +810,10 @@ func (e *Executor) sessionInitialLink(ctx context.Context, step CreateSessionSte
 	return e.unplacedInitialLink(ctx, session)
 }
 
-func (e *Executor) unplacedInitialLink(ctx context.Context, session gotmux.Session) (gotmux.WindowLink, bool, error) {
+func (e *Executor) unplacedInitialLink(
+	ctx context.Context,
+	session gotmux.Session,
+) (gotmux.WindowLink, bool, error) {
 	_, links, err := session.WindowInfos(ctx)
 	if err != nil {
 		return gotmux.WindowLink{}, false, oops.In("snapshot.restore").
@@ -750,7 +832,11 @@ func (e *Executor) unplacedInitialLink(ctx context.Context, session gotmux.Sessi
 	return links[0].Handle(), true, nil
 }
 
-func (e *Executor) installInitialPlacement(ctx context.Context, step PlaceInitialWindowStep, runtimeID string) error {
+func (e *Executor) installInitialPlacement(
+	ctx context.Context,
+	step PlaceInitialWindowStep,
+	runtimeID string,
+) error {
 	session, ok := e.sessions[step.SessionID]
 	if !ok {
 		return oops.In("snapshot.restore").
@@ -773,7 +859,12 @@ func (e *Executor) installInitialPlacement(ctx context.Context, step PlaceInitia
 	return nil
 }
 
-func (e *Executor) linkAt(ctx context.Context, session gotmux.Session, index int, windowID gotmux.WindowID) (gotmux.WindowLink, error) {
+func (e *Executor) linkAt(
+	ctx context.Context,
+	session gotmux.Session,
+	index int,
+	windowID gotmux.WindowID,
+) (gotmux.WindowLink, error) {
 	_, links, err := session.WindowInfos(ctx)
 	if err != nil {
 		return gotmux.WindowLink{}, oops.In("snapshot.restore").
@@ -794,7 +885,11 @@ func (e *Executor) linkAt(ctx context.Context, session gotmux.Session, index int
 		Wrapf(errRuntimeHandleUnusable, "session %s index %d", session.ID(), index)
 }
 
-func (e *Executor) installWindow(ctx context.Context, step CreateWindowStep, runtimeID string) error {
+func (e *Executor) installWindow(
+	ctx context.Context,
+	step CreateWindowStep,
+	runtimeID string,
+) error {
 	window, err := e.server.Window(ctx, gotmux.WindowID(runtimeID))
 	if err != nil {
 		return oops.In("snapshot.restore").
@@ -829,7 +924,11 @@ func (e *Executor) installPane(ctx context.Context, step SplitPaneStep, runtimeI
 	return nil
 }
 
-func (e *Executor) initialPaneFromConfirmedSplits(ctx context.Context, windowID string, window gotmux.Window) (gotmux.Pane, error) {
+func (e *Executor) initialPaneFromConfirmedSplits(
+	ctx context.Context,
+	windowID string,
+	window gotmux.Window,
+) (gotmux.Pane, error) {
 	produced := e.confirmedSplitPaneIDs(windowID)
 
 	paneID, err := initialPaneIDOf(ctx, window, windowID, produced)
@@ -942,7 +1041,12 @@ func (e *Executor) prepareFollowerSession(step CreateSessionStep) (stepEffect, e
 
 			if targetLeaderName != "" && targetLeaderName != groupTarget {
 				if err := leader.Rename(ctx, targetLeaderName); err != nil {
-					return string(session.ID()), &appliedError{runtimeID: string(session.ID()), err: err}
+					return string(
+						session.ID(),
+					), &appliedError{
+						runtimeID: string(session.ID()),
+						err:       err,
+					}
 				}
 			}
 
@@ -968,12 +1072,22 @@ func (e *Executor) prepareStandaloneSession(step CreateSessionStep) (stepEffect,
 			}
 
 			if err := e.alignInitialWindow(ctx, session, step, windowName); err != nil {
-				return string(session.ID()), &appliedError{runtimeID: string(session.ID()), err: err}
+				return string(
+					session.ID(),
+				), &appliedError{
+					runtimeID: string(session.ID()),
+					err:       err,
+				}
 			}
 
 			runtimePaneID, err := e.launchSessionInitialPane(ctx, session, step.SessionID, launch)
 			if err != nil {
-				return string(session.ID()), &appliedError{runtimeID: string(session.ID()), err: err}
+				return string(
+					session.ID(),
+				), &appliedError{
+					runtimeID: string(session.ID()),
+					err:       err,
+				}
 			}
 
 			if hasPane && runtimePaneID != "" {
@@ -985,7 +1099,9 @@ func (e *Executor) prepareStandaloneSession(step CreateSessionStep) (stepEffect,
 	}, nil
 }
 
-func (e *Executor) standaloneSessionOptions(step CreateSessionStep) (gotmux.NewSessionOptions, paneLaunch, bool, error) {
+func (e *Executor) standaloneSessionOptions(
+	step CreateSessionStep,
+) (gotmux.NewSessionOptions, paneLaunch, bool, error) {
 	size := gotmux.Size{Width: defaultWindowWidth, Height: defaultWindowHeight}
 	if step.Width > 0 && step.Height > 0 {
 		size = gotmux.Size{Width: step.Width, Height: step.Height}
@@ -1036,7 +1152,12 @@ func (e *Executor) standaloneSessionOptions(step CreateSessionStep) (gotmux.NewS
 	return options, launch, hasPane, nil
 }
 
-func (e *Executor) alignInitialWindow(ctx context.Context, session gotmux.Session, step CreateSessionStep, windowName string) error {
+func (e *Executor) alignInitialWindow(
+	ctx context.Context,
+	session gotmux.Session,
+	step CreateSessionStep,
+	windowName string,
+) error {
 	if step.InitialWindowID == "" {
 		return nil
 	}
@@ -1047,7 +1168,11 @@ func (e *Executor) alignInitialWindow(ctx context.Context, session gotmux.Sessio
 	}
 
 	if len(links) != 1 {
-		return fmt.Errorf("bootstrap window links for session %s: %w", step.SessionID, errBootstrapNotFound)
+		return fmt.Errorf(
+			"bootstrap window links for session %s: %w",
+			step.SessionID,
+			errBootstrapNotFound,
+		)
 	}
 
 	window := links[0].Handle().Window()
@@ -1128,7 +1253,9 @@ func (e *Executor) prepareCreateWindow(step CreateWindowStep) (stepEffect, error
 	}, nil
 }
 
-func (e *Executor) newWindowOptions(step CreateWindowStep) (gotmux.NewWindowOptions, gotmux.Size, paneLaunch, error) {
+func (e *Executor) newWindowOptions(
+	step CreateWindowStep,
+) (gotmux.NewWindowOptions, gotmux.Size, paneLaunch, error) {
 	idx := step.Index
 
 	options := gotmux.NewWindowOptions{
@@ -1181,35 +1308,65 @@ func (e *Executor) createWindow(
 ) (string, error) {
 	link, err := session.NewWindow(ctx, opts)
 	if err != nil {
-		return "", fmt.Errorf("new window %s in session %s: %w", step.WindowID, step.OwnerSessionID, err)
+		return "", fmt.Errorf(
+			"new window %s in session %s: %w",
+			step.WindowID,
+			step.OwnerSessionID,
+			err,
+		)
 	}
 
 	window := link.Window()
 
 	info, infoErr := window.Info(ctx)
 	if infoErr != nil {
-		return string(window.ID()), &appliedError{runtimeID: string(window.ID()), err: fmt.Errorf("window info %s: %w", step.WindowID, infoErr)}
+		return string(
+			window.ID(),
+		), &appliedError{
+			runtimeID: string(window.ID()),
+			err:       fmt.Errorf("window info %s: %w", step.WindowID, infoErr),
+		}
 	}
 
 	if info.Width != size.Width || info.Height != size.Height {
 		if err := window.Resize(ctx, size); err != nil {
-			return string(window.ID()), &appliedError{runtimeID: string(window.ID()), err: fmt.Errorf("resize window %s: %w", step.WindowID, err)}
+			return string(
+				window.ID(),
+			), &appliedError{
+				runtimeID: string(window.ID()),
+				err:       fmt.Errorf("resize window %s: %w", step.WindowID, err),
+			}
 		}
 	}
 
 	if info.Name != windowName {
 		if err := window.Rename(ctx, windowName); err != nil {
-			return string(window.ID()), &appliedError{runtimeID: string(window.ID()), err: fmt.Errorf("rename window %s: %w", step.WindowID, err)}
+			return string(
+				window.ID(),
+			), &appliedError{
+				runtimeID: string(window.ID()),
+				err:       fmt.Errorf("rename window %s: %w", step.WindowID, err),
+			}
 		}
 	}
 
 	pane, err := window.ActivePane(ctx)
 	if err != nil {
-		return string(window.ID()), &appliedError{runtimeID: string(window.ID()), err: fmt.Errorf("resolve initial pane for window %s: %w", step.WindowID, err)}
+		return string(
+			window.ID(),
+		), &appliedError{
+			runtimeID: string(window.ID()),
+			err:       fmt.Errorf("resolve initial pane for window %s: %w", step.WindowID, err),
+		}
 	}
 
 	if err := respawnPane(ctx, pane, launch); err != nil {
-		return string(window.ID()), &appliedError{runtimeID: string(window.ID()), err: fmt.Errorf("launch initial pane for window %s: %w", step.WindowID, err)}
+		return string(
+			window.ID(),
+		), &appliedError{
+			runtimeID: string(window.ID()),
+			err:       fmt.Errorf("launch initial pane for window %s: %w", step.WindowID, err),
+		}
 	}
 
 	if step.InitialPaneID != "" {
@@ -1287,11 +1444,21 @@ func (e *Executor) prepareSplitPane(step SplitPaneStep) (stepEffect, error) {
 			}
 
 			if err := newPane.SetTitle(ctx, title); err != nil {
-				return string(newPane.ID()), &appliedError{runtimeID: string(newPane.ID()), err: fmt.Errorf("set title for pane %s: %w", step.PaneID, err)}
+				return string(
+					newPane.ID(),
+				), &appliedError{
+					runtimeID: string(newPane.ID()),
+					err:       fmt.Errorf("set title for pane %s: %w", step.PaneID, err),
+				}
 			}
 
 			if err := respawnPane(ctx, newPane, launch); err != nil {
-				return string(newPane.ID()), &appliedError{runtimeID: string(newPane.ID()), err: fmt.Errorf("launch pane %s: %w", step.PaneID, err)}
+				return string(
+					newPane.ID(),
+				), &appliedError{
+					runtimeID: string(newPane.ID()),
+					err:       fmt.Errorf("launch pane %s: %w", step.PaneID, err),
+				}
 			}
 
 			if hasPane {
@@ -1371,7 +1538,13 @@ func (e *Executor) prepareLinkWindow(step LinkWindowStep) (stepEffect, error) {
 				Select:  false,
 				Replace: false,
 			}); err != nil {
-				return "", fmt.Errorf("link window %s to %s:%d: %w", step.WindowID, step.SessionID, idx, err)
+				return "", fmt.Errorf(
+					"link window %s to %s:%d: %w",
+					step.WindowID,
+					step.SessionID,
+					idx,
+					err,
+				)
 			}
 
 			return string(window.ID()), nil
@@ -1491,7 +1664,11 @@ func (e *Executor) prepareSelectWindow(step SelectWindowStep) (stepEffect, error
 	}, nil
 }
 
-func (e *Executor) selectWindows(ctx context.Context, session gotmux.Session, step SelectWindowStep) error {
+func (e *Executor) selectWindows(
+	ctx context.Context,
+	session gotmux.Session,
+	step SelectWindowStep,
+) error {
 	_, links, err := session.WindowInfos(ctx)
 	if err != nil {
 		return fmt.Errorf("window infos for session %s: %w", step.SessionID, err)
@@ -1506,7 +1683,12 @@ func (e *Executor) selectWindows(ctx context.Context, session gotmux.Session, st
 	return selectWindowAt(ctx, links, step.ActiveIndex, "active")
 }
 
-func selectWindowAt(ctx context.Context, links []gotmux.WindowLinkInfo, index int, kind string) error {
+func selectWindowAt(
+	ctx context.Context,
+	links []gotmux.WindowLinkInfo,
+	index int,
+	kind string,
+) error {
 	for _, link := range links {
 		if link.Index != index {
 			continue
@@ -1608,7 +1790,8 @@ func (e *Executor) unlaunchedPane(pane model.Pane) (paneLaunch, error) {
 	}
 
 	result.cwdFallback = cwdFallback
-	if !e.cfg.LaunchProcesses && (pane.Launch.Recovery == model.RecoveryRestart || pane.Launch.Recovery == model.RecoveryResume) {
+	if !e.cfg.LaunchProcesses &&
+		(pane.Launch.Recovery == model.RecoveryRestart || pane.Launch.Recovery == model.RecoveryResume) {
 		result.reason = PaneReasonProcessLaunchDisabled
 	}
 
@@ -1617,7 +1800,8 @@ func (e *Executor) unlaunchedPane(pane model.Pane) (paneLaunch, error) {
 
 func (e *Executor) preparePaneLaunch(pane model.Pane, ownerSessionID string) (paneLaunch, error) {
 	launch := pane.Launch
-	if !e.cfg.LaunchProcesses || (launch.Recovery != model.RecoveryRestart && launch.Recovery != model.RecoveryResume) {
+	if !e.cfg.LaunchProcesses ||
+		(launch.Recovery != model.RecoveryRestart && launch.Recovery != model.RecoveryResume) {
 		return e.unlaunchedPane(pane)
 	}
 
@@ -1643,7 +1827,9 @@ func (e *Executor) preparePaneLaunch(pane model.Pane, ownerSessionID string) (pa
 		return result, nil
 	}
 
-	environment, removed := launchEnvironment(e.effectivePaneLaunchEnvironment(pane, ownerSessionID))
+	environment, removed := launchEnvironment(
+		e.effectivePaneLaunchEnvironment(pane, ownerSessionID),
+	)
 
 	program, ok := e.approvedLaunchProgram(launch, ownerSessionID, environment, removed)
 	if !ok {
@@ -1656,10 +1842,22 @@ func (e *Executor) preparePaneLaunch(pane model.Pane, ownerSessionID string) (pa
 		return result, nil
 	}
 
-	return paneLaunch{program: program, directory: directory, environment: environment, enabled: true, cwdFallback: cwdFallback, reason: ""}, nil
+	return paneLaunch{
+		program:     program,
+		directory:   directory,
+		environment: environment,
+		enabled:     true,
+		cwdFallback: cwdFallback,
+		reason:      "",
+	}, nil
 }
 
-func (e *Executor) approvedLaunchProgram(launch model.Launch, ownerSessionID string, environment map[string]string, removed []string) (gotmux.Program, bool) {
+func (e *Executor) approvedLaunchProgram(
+	launch model.Launch,
+	ownerSessionID string,
+	environment map[string]string,
+	removed []string,
+) (gotmux.Program, bool) {
 	executable := string(launch.Executable)
 
 	arguments := make([]string, 0, len(launch.Arguments)-1)
@@ -1688,7 +1886,8 @@ func (e *Executor) approvedLaunchProgram(launch model.Launch, ownerSessionID str
 func (e *Executor) resumeShell(ownerSessionID string, environment map[string]string) string {
 	session := e.index.sessionsByID[ownerSessionID]
 	for _, option := range e.manifest.EffectiveSessionOptions(session) {
-		if string(option.Name) == "default-shell" && option.Present && executableAvailable(string(option.Value)) {
+		if string(option.Name) == "default-shell" && option.Present &&
+			executableAvailable(string(option.Value)) {
 			return string(option.Value)
 		}
 	}
@@ -1700,7 +1899,10 @@ func (e *Executor) resumeShell(ownerSessionID string, environment map[string]str
 	return resumeShellProgram
 }
 
-func (e *Executor) effectivePaneLaunchEnvironment(pane model.Pane, ownerSessionID string) []model.Variable {
+func (e *Executor) effectivePaneLaunchEnvironment(
+	pane model.Pane,
+	ownerSessionID string,
+) []model.Variable {
 	session := e.index.sessionsByID[ownerSessionID]
 	effective := effectiveEnvironmentVariables(e.manifest.Source.Environment, session.Environment)
 	values := make(map[string]model.Variable, len(effective)+len(pane.Launch.Environment))
@@ -1722,7 +1924,14 @@ func (e *Executor) effectivePaneLaunchEnvironment(pane model.Pane, ownerSessionI
 }
 
 func disabledPaneLaunch() paneLaunch {
-	return paneLaunch{program: gotmux.Program{}, directory: "", environment: nil, enabled: false, cwdFallback: false, reason: ""}
+	return paneLaunch{
+		program:     gotmux.Program{},
+		directory:   "",
+		environment: nil,
+		enabled:     false,
+		cwdFallback: false,
+		reason:      "",
+	}
 }
 
 func executableAvailable(path string) bool {
@@ -1782,14 +1991,23 @@ func (e *Executor) resolveLaunchWorkingDir(pane model.Pane) (string, bool, error
 	return e.resolveWorkingDir(launchPane)
 }
 
-func (e *Executor) launchSessionInitialPane(ctx context.Context, session gotmux.Session, sessionID string, launch paneLaunch) (string, error) {
+func (e *Executor) launchSessionInitialPane(
+	ctx context.Context,
+	session gotmux.Session,
+	sessionID string,
+	launch paneLaunch,
+) (string, error) {
 	_, links, err := session.WindowInfos(ctx)
 	if err != nil {
 		return "", fmt.Errorf("resolve initial window for session %s: %w", sessionID, err)
 	}
 
 	if len(links) != 1 {
-		return "", fmt.Errorf("resolve initial window for session %s: %w", sessionID, errBootstrapNotFound)
+		return "", fmt.Errorf(
+			"resolve initial window for session %s: %w",
+			sessionID,
+			errBootstrapNotFound,
+		)
 	}
 
 	pane, err := links[0].Handle().Window().ActivePane(ctx)
@@ -1799,7 +2017,13 @@ func (e *Executor) launchSessionInitialPane(ctx context.Context, session gotmux.
 
 	if launch.enabled {
 		if err := respawnPane(ctx, pane, launch); err != nil {
-			return string(pane.ID()), fmt.Errorf("launch initial pane for session %s: %w", sessionID, err)
+			return string(
+					pane.ID(),
+				), fmt.Errorf(
+					"launch initial pane for session %s: %w",
+					sessionID,
+					err,
+				)
 		}
 	}
 
@@ -1896,7 +2120,8 @@ func (e *Executor) paneLaunchReason(pane model.Pane, launch paneLaunch) string {
 		return launch.reason
 	}
 
-	if pane.Launch.Recovery == model.RecoveryUnverified && (len(pane.Launch.Executable) > 0 || len(pane.Launch.Arguments) > 0) {
+	if pane.Launch.Recovery == model.RecoveryUnverified &&
+		(len(pane.Launch.Executable) > 0 || len(pane.Launch.Arguments) > 0) {
 		return PaneReasonUnsupportedLaunch
 	}
 

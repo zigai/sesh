@@ -29,7 +29,17 @@ func TestUncertainActionsCannotBeDispatchedAgain(t *testing.T) {
 
 			reopened := openRepository(t, path)
 			for _, next := range []model.ActionState{actionPlanned, actionIssued} {
-				if err := reopened.Transition(t.Context(), op.ID, "launch", state, next, nil); !errors.Is(err, ErrConflict) {
+				if err := reopened.Transition(
+					t.Context(),
+					op.ID,
+					"launch",
+					state,
+					next,
+					nil,
+				); !errors.Is(
+					err,
+					ErrConflict,
+				) {
 					t.Fatal("replayed potentially executed launch", err)
 				}
 			}
@@ -41,7 +51,12 @@ func pinnedLaunch(t *testing.T, r *Repository) Operation {
 	t.Helper()
 	source := commitFixture(t, r)
 
-	op, err := r.Pin(t.Context(), source.ID, model.Bytes("explicit-target"), []Action{{ID: actionLaunch, Kind: actionLaunch, State: actionPlanned}})
+	op, err := r.Pin(
+		t.Context(),
+		source.ID,
+		model.Bytes("explicit-target"),
+		[]Action{{ID: actionLaunch, Kind: actionLaunch, State: actionPlanned}},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +81,14 @@ func advanceAction(t *testing.T, r *Repository, id string, state model.ActionSta
 
 	before := model.ActionStatePlanned
 	for _, next := range steps {
-		if err := r.Transition(t.Context(), id, "launch", before, next, model.Bytes("original-runtime")); err != nil {
+		if err := r.Transition(
+			t.Context(),
+			id,
+			"launch",
+			before,
+			next,
+			model.Bytes("original-runtime"),
+		); err != nil {
 			t.Fatal(err)
 		}
 
@@ -141,7 +163,12 @@ func TestPinAndDeleteAreSerialized(t *testing.T) {
 	workers.Go(func() {
 		<-start
 
-		_, err := r.Pin(t.Context(), source.ID, model.Bytes("target"), []Action{{ID: "launch", Kind: actionLaunch, State: actionPlanned}})
+		_, err := r.Pin(
+			t.Context(),
+			source.ID,
+			model.Bytes("target"),
+			[]Action{{ID: "launch", Kind: actionLaunch, State: actionPlanned}},
+		)
 		pinned <- err
 	})
 	workers.Go(func() { <-start; deleted <- other.Delete(t.Context(), source.ID) })
@@ -183,7 +210,12 @@ func TestReconcileOperationAfterInterruptedRegistration(t *testing.T) {
 			source := commitFixture(t, r)
 			interruptCatalogPublication(r, phase)
 
-			op, err := r.Pin(t.Context(), source.ID, model.Bytes("target"), []Action{{ID: "launch", Kind: actionLaunch, State: actionPlanned}})
+			op, err := r.Pin(
+				t.Context(),
+				source.ID,
+				model.Bytes("target"),
+				[]Action{{ID: "launch", Kind: actionLaunch, State: actionPlanned}},
+			)
 			if !errors.Is(err, errInjected) || !validID(op.ID) {
 				t.Fatal("interrupted registration lost its identity", err)
 			}
@@ -222,7 +254,9 @@ func TestReconcileOperationAfterInterruptedUpdate(t *testing.T) {
 				op := pinnedLaunch(t, r)
 				if tt.before != actionPlanned {
 					advanceAction(t, r, op.ID, tt.before)
-					op.Actions[0].State, op.Actions[0].RuntimeID = tt.before, model.Bytes("original-runtime")
+					op.Actions[0].State, op.Actions[0].RuntimeID = tt.before, model.Bytes(
+						"original-runtime",
+					)
 				}
 
 				interruptCatalogPublication(r, phase)
@@ -266,7 +300,13 @@ func assertReconciledOperation(t *testing.T, path string, want Operation, missin
 
 	got, err := r.ReconcileOperation(t.Context(), want.ID)
 	if missing {
-		assertRepositoryDiagnostic(t, err, "reconcile_operation", "snapshot_unavailable", ErrUnavailable)
+		assertRepositoryDiagnostic(
+			t,
+			err,
+			"reconcile_operation",
+			"snapshot_unavailable",
+			ErrUnavailable,
+		)
 
 		want = Operation{}
 	} else if err != nil {
@@ -303,9 +343,16 @@ func TestReconcileOperationSyncFailurePreservesUncertainty(t *testing.T) {
 
 	for _, id := range []string{op.ID, newID()} {
 		got, err := r.ReconcileOperation(t.Context(), id)
-		assertRepositoryDiagnostic(t, err, "reconcile_operation", "publication_uncertain", ErrUncertain)
+		assertRepositoryDiagnostic(
+			t,
+			err,
+			"reconcile_operation",
+			"publication_uncertain",
+			ErrUncertain,
+		)
 
-		if !errors.Is(err, os.ErrPermission) || !errors.Is(err, context.Canceled) || errors.Is(err, ErrUnavailable) {
+		if !errors.Is(err, os.ErrPermission) || !errors.Is(err, context.Canceled) ||
+			errors.Is(err, ErrUnavailable) {
 			t.Fatal("reconciliation lost causes or reported certain absence", err)
 		}
 
@@ -334,7 +381,13 @@ func TestReconcileOperationCancellationAndCorruptCatalog(t *testing.T) {
 	cancel()
 
 	_, err := r.ReconcileOperation(ctx, op.ID)
-	assertRepositoryDiagnostic(t, err, "reconcile_operation", "operation_canceled", context.Canceled)
+	assertRepositoryDiagnostic(
+		t,
+		err,
+		"reconcile_operation",
+		"operation_canceled",
+		context.Canceled,
+	)
 
 	data, err := os.ReadFile(filepath.Join(path, "catalog.json"))
 	if err != nil {
@@ -364,7 +417,13 @@ func TestReconcileOperationWaitsForWriterLock(t *testing.T) {
 	_, readErr := r.ReconcileOperation(ctx, op.ID)
 	closeErr := lock.Close()
 
-	assertRepositoryDiagnostic(t, readErr, "reconcile_operation", "operation_timed_out", context.DeadlineExceeded)
+	assertRepositoryDiagnostic(
+		t,
+		readErr,
+		"reconcile_operation",
+		"operation_timed_out",
+		context.DeadlineExceeded,
+	)
 
 	if closeErr != nil {
 		t.Fatal(closeErr)

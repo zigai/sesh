@@ -24,8 +24,10 @@ const (
 )
 
 var (
-	ErrMergeDirty     = errors.New("the checkout has uncommitted changes")
-	ErrMergeConflict  = errors.New("rebasing onto the base branch conflicts; the rebase was aborted")
+	ErrMergeDirty    = errors.New("the checkout has uncommitted changes")
+	ErrMergeConflict = errors.New(
+		"rebasing onto the base branch conflicts; the rebase was aborted",
+	)
 	ErrMergeCheck     = errors.New("the merge check failed")
 	ErrFinishRun      = errors.New("the finish command failed")
 	ErrMergeDetached  = errors.New("the checkout has no branch")
@@ -82,7 +84,12 @@ func MergeExitCode(err error) int {
 // MergeBranch rebases onto origin's base and pushes as a fast-forward, without a merge commit. It
 // refuses uncommitted changes, aborts the rebase on a conflict, and fast-forwards the main
 // checkout only when it is clean on the base. An empty base means origin's default branch.
-func MergeBranch(ctx context.Context, dir, base string, check []string, out io.Writer) (Merged, error) {
+func MergeBranch(
+	ctx context.Context,
+	dir, base string,
+	check []string,
+	out io.Writer,
+) (Merged, error) {
 	if err := requireClean(ctx, dir); err != nil {
 		return Merged{Branch: "", Base: base}, err
 	}
@@ -94,11 +101,26 @@ func MergeBranch(ctx context.Context, dir, base string, check []string, out io.W
 
 	target := mergeRemote + "/" + merged.Base
 
-	if err := mergeStep(ctx, out, dir, "fetch "+target, "fetch", mergeRemote, merged.Base); err != nil {
+	if err := mergeStep(
+		ctx,
+		out,
+		dir,
+		"fetch "+target,
+		"fetch",
+		mergeRemote,
+		merged.Base,
+	); err != nil {
 		return merged, err
 	}
 
-	if err := mergeStep(ctx, out, dir, "rebase "+merged.Branch+" onto "+target, "rebase", target); err != nil {
+	if err := mergeStep(
+		ctx,
+		out,
+		dir,
+		"rebase "+merged.Branch+" onto "+target,
+		"rebase",
+		target,
+	); err != nil {
 		_, abortErr := git.Output(context.WithoutCancel(ctx), dir, "rebase", "--abort")
 
 		return merged, errors.Join(ErrMergeConflict, err, abortErr)
@@ -110,7 +132,15 @@ func MergeBranch(ctx context.Context, dir, base string, check []string, out io.W
 		}
 	}
 
-	if err := mergeStep(ctx, out, dir, "push to "+target, "push", mergeRemote, "HEAD:refs/heads/"+merged.Base); err != nil {
+	if err := mergeStep(
+		ctx,
+		out,
+		dir,
+		"push to "+target,
+		"push",
+		mergeRemote,
+		"HEAD:refs/heads/"+merged.Base,
+	); err != nil {
 		return merged, errors.Join(ErrMergeRejected, err)
 	}
 
@@ -140,12 +170,24 @@ func resolveMergeBranches(ctx context.Context, dir, base string) (Merged, error)
 		return merged, errors.Join(ErrMergeDetached, err)
 	}
 
-	if remotes, err := git.Output(ctx, dir, "remote"); err != nil || !strings.Contains("\n"+remotes+"\n", "\n"+mergeRemote+"\n") {
+	if remotes, err := git.Output(
+		ctx,
+		dir,
+		"remote",
+	); err != nil ||
+		!strings.Contains("\n"+remotes+"\n", "\n"+mergeRemote+"\n") {
 		return merged, errors.Join(ErrMergeNoRemote, err)
 	}
 
 	if merged.Base == "" {
-		remoteHead, err := git.Output(ctx, dir, "symbolic-ref", "--quiet", "--short", "refs/remotes/"+mergeRemote+"/HEAD")
+		remoteHead, err := git.Output(
+			ctx,
+			dir,
+			"symbolic-ref",
+			"--quiet",
+			"--short",
+			"refs/remotes/"+mergeRemote+"/HEAD",
+		)
 		if err != nil {
 			return merged, errors.Join(ErrMergeNoBase, err)
 		}
@@ -203,7 +245,15 @@ func fastForwardMainCheckout(ctx context.Context, dir, base string, out io.Write
 		return nil
 	}
 
-	return mergeStep(ctx, out, main, "fast-forward "+base+" in "+main, "merge", "--ff-only", mergeRemote+"/"+base)
+	return mergeStep(
+		ctx,
+		out,
+		main,
+		"fast-forward "+base+" in "+main,
+		"merge",
+		"--ff-only",
+		mergeRemote+"/"+base,
+	)
 }
 
 func cleanOnBranch(ctx context.Context, dir, branch string) bool {

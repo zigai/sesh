@@ -31,7 +31,13 @@ func TestDecodeTypedLayoutSplit(t *testing.T) {
 	}
 
 	if node.Width != 80 || node.Height != 24 || node.Left != 0 || node.Top != 0 {
-		t.Fatalf("root geometry = %dx%d at %d,%d, want 80x24 at 0,0", node.Width, node.Height, node.Left, node.Top)
+		t.Fatalf(
+			"root geometry = %dx%d at %d,%d, want 80x24 at 0,0",
+			node.Width,
+			node.Height,
+			node.Left,
+			node.Top,
+		)
 	}
 
 	assertSplitChildren(t, node.Children)
@@ -50,7 +56,8 @@ func assertSplitChildren(t *testing.T, children []model.Layout) {
 	}
 
 	for index, child := range children {
-		if child.Pane != want[index].Pane || child.Width != want[index].Width || child.Left != want[index].Left {
+		if child.Pane != want[index].Pane || child.Width != want[index].Width ||
+			child.Left != want[index].Left {
 			t.Fatalf("child %d = %#v, want %#v", index, child, want[index])
 		}
 

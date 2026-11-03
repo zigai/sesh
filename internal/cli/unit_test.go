@@ -165,7 +165,12 @@ func TestSnapshotReadCommandsDefaultToConfiguredRepository(t *testing.T) {
 				t.Fatalf("%v without --repository is a usage error: %v / %q", cmdArgs, err, stderr)
 			}
 
-			if _, statErr := os.Stat(filepath.Join(dataHome, "sesh", "snapshots")); !errors.Is(statErr, os.ErrNotExist) {
+			if _, statErr := os.Stat(
+				filepath.Join(dataHome, "sesh", "snapshots"),
+			); !errors.Is(
+				statErr,
+				os.ErrNotExist,
+			) {
 				t.Fatalf("read command created the default repository: %v", statErr)
 			}
 		})

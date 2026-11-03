@@ -48,7 +48,15 @@ func TestSetupServicesTmuxServiceRequiresExplicitTmuxPath(t *testing.T) {
 func TestSetupAgentsRejectsUnknownNames(t *testing.T) {
 	isolatedSetupHome(t)
 
-	exec := executeJSON(t, "setup", "agents", "not-a-real-agent", "--dry-run", testNoConfigFlag, testJSONFlag)
+	exec := executeJSON(
+		t,
+		"setup",
+		"agents",
+		"not-a-real-agent",
+		"--dry-run",
+		testNoConfigFlag,
+		testJSONFlag,
+	)
 	if exec.Err == nil {
 		t.Fatal("an unknown agent name must fail")
 	}
@@ -61,7 +69,16 @@ func TestSetupAgentsRejectsUnknownNames(t *testing.T) {
 func TestSetupAgentsRejectsUnknownTrackerMode(t *testing.T) {
 	isolatedSetupHome(t)
 
-	exec := executeJSON(t, "setup", "agents", "--tracker", "bogus", "--dry-run", testNoConfigFlag, testJSONFlag)
+	exec := executeJSON(
+		t,
+		"setup",
+		"agents",
+		"--tracker",
+		"bogus",
+		"--dry-run",
+		testNoConfigFlag,
+		testJSONFlag,
+	)
 	if exec.Err == nil {
 		t.Fatal("an unknown tracker operation must fail")
 	}

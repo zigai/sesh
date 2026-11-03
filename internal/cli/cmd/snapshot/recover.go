@@ -20,7 +20,10 @@ type rewriteOutput struct {
 }
 
 func newSnapshotRecoverCommand() *cobra.Command {
-	cmd := newSnapshotGroupCommand("recover", "Inspect and finish interrupted restores and saved-session deletions")
+	cmd := newSnapshotGroupCommand(
+		"recover",
+		"Inspect and finish interrupted restores and saved-session deletions",
+	)
 	cmd.AddCommand(newRecoverRestoreCommand(), newRecoverDeleteCommand())
 
 	return cmd
@@ -29,13 +32,21 @@ func newSnapshotRecoverCommand() *cobra.Command {
 func newRecoverRestoreCommand() *cobra.Command {
 	cmd := newSnapshotGroupCommand("restore", "Inspect or abandon an interrupted restore")
 
-	show := newRecoverOperationCommand("show", "Inspect and confirm the durable journal of a restore operation",
+	show := newRecoverOperationCommand(
+		"show",
+		"Inspect and confirm the durable journal of a restore operation",
 		"Inspect and confirm the durable journal of a restore operation. This does not replay effects, inspect live tmux state, or release its recovery source. To resume it, rerun snapshot restore with --operation and the original generation and sessions.",
-		"reconcile_restore", runRecoverRestoreShow)
+		"reconcile_restore",
+		runRecoverRestoreShow,
+	)
 
-	abandon := newRecoverOperationCommand("abandon", "Explicitly abandon a restore and release its recovery source pin",
+	abandon := newRecoverOperationCommand(
+		"abandon",
+		"Explicitly abandon a restore and release its recovery source pin",
 		"Explicitly abandon a restore and release its recovery source pin. Existing tmux objects are retained. Uncertain external effects remain uncertain; abandonment never rolls them back.",
-		"abandon_restore", runRecoverRestoreAbandon)
+		"abandon_restore",
+		runRecoverRestoreAbandon,
+	)
 	abandon.Annotations[clibase.AnnotationSuccessOwned] = "true"
 
 	cmd.AddCommand(show, abandon)
@@ -44,13 +55,26 @@ func newRecoverRestoreCommand() *cobra.Command {
 }
 
 func newRecoverDeleteCommand() *cobra.Command {
-	cmd := newSnapshotGroupCommand("delete", "Inspect or resume an interrupted saved-session deletion")
+	cmd := newSnapshotGroupCommand(
+		"delete",
+		"Inspect or resume an interrupted saved-session deletion",
+	)
 
 	cmd.AddCommand(
-		newRecoverOperationCommand("show", "Inspect durable saved-session deletion state without replay", "",
-			"reconcile_rewrite", runRecoverDeleteShow),
-		newRecoverOperationCommand("resume", "Complete only the original durable saved-session deletion intent", "",
-			"resume_rewrite", runRecoverDeleteResume),
+		newRecoverOperationCommand(
+			"show",
+			"Inspect durable saved-session deletion state without replay",
+			"",
+			"reconcile_rewrite",
+			runRecoverDeleteShow,
+		),
+		newRecoverOperationCommand(
+			"resume",
+			"Complete only the original durable saved-session deletion intent",
+			"",
+			"resume_rewrite",
+			runRecoverDeleteResume,
+		),
 	)
 
 	return cmd
@@ -71,7 +95,10 @@ func newSnapshotGroupCommand(use, short string) *cobra.Command {
 	}
 }
 
-func newRecoverOperationCommand(name, short, long, operation string, run func(*cobra.Command, *store.Repository, string) error) *cobra.Command {
+func newRecoverOperationCommand(
+	name, short, long, operation string,
+	run func(*cobra.Command, *store.Repository, string) error,
+) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:         name + " <operation>",
 		Short:       short,
@@ -111,7 +138,11 @@ func runRecoverRestoreAbandon(cmd *cobra.Command, repo *store.Repository, id str
 	return writeRestoreOperationResult(cmd, result, errors.Join(err, repo.Close()))
 }
 
-func writeRestoreOperationResult(cmd *cobra.Command, result engine.OperationStatus, err error) error {
+func writeRestoreOperationResult(
+	cmd *cobra.Command,
+	result engine.OperationStatus,
+	err error,
+) error {
 	if err != nil {
 		return oops.In("cli").With("operation", commandOperation(cmd)).Wrap(err)
 	}
@@ -120,7 +151,14 @@ func writeRestoreOperationResult(cmd *cobra.Command, result engine.OperationStat
 		return clibase.WriteJSONResult(cmd, result)
 	}
 
-	return clibase.WriteOutput(cmd, "Operation: %s\nState: %s\nSettled: %t\nUncertain actions: %d\n", result.OperationID, result.State, result.Settled, len(result.Uncertain))
+	return clibase.WriteOutput(
+		cmd,
+		"Operation: %s\nState: %s\nSettled: %t\nUncertain actions: %d\n",
+		result.OperationID,
+		result.State,
+		result.Settled,
+		len(result.Uncertain),
+	)
 }
 
 func runRecoverDeleteShow(cmd *cobra.Command, repo *store.Repository, id string) error {
@@ -135,7 +173,12 @@ func runRecoverDeleteResume(cmd *cobra.Command, repo *store.Repository, id strin
 	return writeRewriteResult(cmd, id, result, errors.Join(err, repo.Close()))
 }
 
-func writeRewriteResult(cmd *cobra.Command, id string, result store.RewriteResult, err error) error {
+func writeRewriteResult(
+	cmd *cobra.Command,
+	id string,
+	result store.RewriteResult,
+	err error,
+) error {
 	output := rewriteOutput{
 		OperationID: id, Source: result.Source, Replacement: result.Replacement.ID,
 		State: result.State, Empty: result.Empty,
@@ -149,7 +192,14 @@ func writeRewriteResult(cmd *cobra.Command, id string, result store.RewriteResul
 		return clibase.WriteJSONResultError(cmd, output, err)
 	}
 
-	writeErr := clibase.WriteOutput(cmd, "Operation: %s\nSource: %s\nReplacement: %s\nState: %s\n", id, output.Source, output.Replacement, output.State)
+	writeErr := clibase.WriteOutput(
+		cmd,
+		"Operation: %s\nSource: %s\nReplacement: %s\nState: %s\n",
+		id,
+		output.Source,
+		output.Replacement,
+		output.State,
+	)
 
 	return errors.Join(err, writeErr)
 }
@@ -159,7 +209,8 @@ func ValidateSnapshotCommand(cmd *cobra.Command, args []string) error {
 		return validateSnapshotRestorePicker(cmd)
 	}
 
-	if cmd.Parent() != nil && cmd.Parent().Name() == "snapshot" && (cmd.Name() == "prune" || cmd.Name() == "gc") {
+	if cmd.Parent() != nil && cmd.Parent().Name() == "snapshot" &&
+		(cmd.Name() == "prune" || cmd.Name() == "gc") {
 		return validateSnapshotMaintenanceCommand(cmd)
 	}
 

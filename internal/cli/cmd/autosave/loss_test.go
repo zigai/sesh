@@ -84,12 +84,17 @@ func TestMissingServerWithSavedSessionsIsReportedOncePerAutosaveEpisode(t *testi
 
 	records := fixture.records(t)
 	if len(records) != 1 {
-		t.Fatalf("expected exactly one log record, got %d: %s", len(records), fixture.buffer.String())
+		t.Fatalf(
+			"expected exactly one log record, got %d: %s",
+			len(records),
+			fixture.buffer.String(),
+		)
 	}
 
 	record := records[0]
 	if record["level"] != "warn" || record["component"] != "snapshot" || record["operation"] != "autosave" ||
-		record["status"] != "skipped" || record["reason"] != "restorable_sessions" || record["sessions"] != float64(1) {
+		record["status"] != "skipped" || record["reason"] != "restorable_sessions" ||
+		record["sessions"] != float64(1) {
 		t.Fatalf("unexpected record schema: %+v", record)
 	}
 
@@ -115,7 +120,11 @@ func TestRestorableSessionReportNamesNothingPrivate(t *testing.T) {
 
 	for _, private := range []string{"work", fixture.historyPath, filepath.Dir(fixture.historyPath)} {
 		if strings.Contains(fixture.buffer.String(), private) {
-			t.Fatalf("the log must not contain session names or paths (%q): %s", private, fixture.buffer.String())
+			t.Fatalf(
+				"the log must not contain session names or paths (%q): %s",
+				private,
+				fixture.buffer.String(),
+			)
 		}
 	}
 }
@@ -161,11 +170,15 @@ func TestUnreadableLossMarkerWarnsInsteadOfReporting(t *testing.T) {
 	}
 
 	if count := fixture.report(t); count != 0 {
-		t.Fatalf("an unreadable marker must not turn into a restorable-session report, got %d", count)
+		t.Fatalf(
+			"an unreadable marker must not turn into a restorable-session report, got %d",
+			count,
+		)
 	}
 
 	records := fixture.records(t)
-	if len(records) != 1 || records[0]["level"] != "warn" || records[0]["reason"] != "episode_marker_failed" {
+	if len(records) != 1 || records[0]["level"] != "warn" ||
+		records[0]["reason"] != "episode_marker_failed" {
 		t.Fatalf("an unreadable marker must be reported, got %+v", records)
 	}
 }
@@ -193,7 +206,10 @@ func TestRestorableLineIsOnlyShownWhenSessionsAreWaiting(t *testing.T) {
 	}
 
 	idle.restorable = 3
-	if line := restorableLine(idle); !strings.Contains(line, "3 saved sessions can be restored") || !strings.Contains(line, "Start tmux") ||
+	if line := restorableLine(
+		idle,
+	); !strings.Contains(line, "3 saved sessions can be restored") ||
+		!strings.Contains(line, "Start tmux") ||
 		!strings.Contains(line, "sesh snapshot restore") {
 		t.Fatalf("unexpected line: %q", line)
 	}
@@ -202,7 +218,8 @@ func TestRestorableLineIsOnlyShownWhenSessionsAreWaiting(t *testing.T) {
 	pending.restorable = 2
 
 	line := restorableLine(pending)
-	if !strings.Contains(line, "2 saved sessions are not running") || !strings.Contains(line, "sesh snapshot restore") ||
+	if !strings.Contains(line, "2 saved sessions are not running") ||
+		!strings.Contains(line, "sesh snapshot restore") ||
 		!strings.Contains(line, "sesh snapshot save") {
 		t.Fatalf("unexpected restore-pending line: %q", line)
 	}

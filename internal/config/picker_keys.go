@@ -53,7 +53,15 @@ func PickerKeyName(value string) string {
 
 func PickerReservedKeys(keys KeyConfig) []string {
 	reserved := []string{
-		keys.Help, keys.CycleMode, keys.AgentSort, keys.InboxGroup, keys.Menu, keys.PageUp, keys.PageDown, keys.Top, keys.Bottom,
+		keys.Help,
+		keys.CycleMode,
+		keys.AgentSort,
+		keys.InboxGroup,
+		keys.Menu,
+		keys.PageUp,
+		keys.PageDown,
+		keys.Top,
+		keys.Bottom,
 	}
 
 	if keys.SessionKeysHoldAlt() {
@@ -111,7 +119,11 @@ func splitPickerModifiers(value string) (map[string]bool, string) {
 
 	for {
 		modifier, rest, found := strings.Cut(value, "+")
-		if !found || rest == "" || !slices.ContainsFunc(pickerModifiers, func(name string) bool { return strings.EqualFold(name, modifier) }) {
+		if !found || rest == "" ||
+			!slices.ContainsFunc(
+				pickerModifiers,
+				func(name string) bool { return strings.EqualFold(name, modifier) },
+			) {
 			return held, value
 		}
 

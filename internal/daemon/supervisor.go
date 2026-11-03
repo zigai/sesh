@@ -47,7 +47,10 @@ type Supervisor struct {
 
 func (p *commandProcess) Start() error {
 	if err := p.command.Start(); err != nil {
-		return oops.In("daemon").Code("supervisor_failed").With("operation", "start_process").Wrap(err)
+		return oops.In("daemon").
+			Code("supervisor_failed").
+			With("operation", "start_process").
+			Wrap(err)
 	}
 
 	return nil
@@ -55,7 +58,10 @@ func (p *commandProcess) Start() error {
 
 func (p *commandProcess) Wait() error {
 	if err := p.command.Wait(); err != nil {
-		return oops.In("daemon").Code("supervisor_failed").With("operation", "wait_process").Wrap(err)
+		return oops.In("daemon").
+			Code("supervisor_failed").
+			With("operation", "wait_process").
+			Wrap(err)
 	}
 
 	return nil
@@ -63,7 +69,10 @@ func (p *commandProcess) Wait() error {
 
 func (p *commandProcess) Signal(signal os.Signal) error {
 	if err := p.command.Process.Signal(signal); err != nil {
-		return oops.In("daemon").Code("supervisor_failed").With("operation", "signal_process").Wrap(err)
+		return oops.In("daemon").
+			Code("supervisor_failed").
+			With("operation", "signal_process").
+			Wrap(err)
 	}
 
 	return nil
@@ -71,7 +80,10 @@ func (p *commandProcess) Signal(signal os.Signal) error {
 
 func (p *commandProcess) Kill() error {
 	if err := p.command.Process.Kill(); err != nil {
-		return oops.In("daemon").Code("supervisor_failed").With("operation", "kill_process").Wrap(err)
+		return oops.In("daemon").
+			Code("supervisor_failed").
+			With("operation", "kill_process").
+			Wrap(err)
 	}
 
 	return nil
@@ -79,23 +91,38 @@ func (p *commandProcess) Kill() error {
 
 func NewSupervisor(prepare PrepareProcess, stopGrace time.Duration) (*Supervisor, error) {
 	if prepare == nil {
-		return nil, oops.In("daemon").Code("supervisor_failed").With("operation", "new_supervisor").Wrap(ErrPrepare)
+		return nil, oops.In("daemon").
+			Code("supervisor_failed").
+			With("operation", "new_supervisor").
+			Wrap(ErrPrepare)
 	}
 
 	if stopGrace <= 0 {
-		return nil, oops.In("daemon").Code("supervisor_failed").With("operation", "new_supervisor").Wrap(ErrStopGrace)
+		return nil, oops.In("daemon").
+			Code("supervisor_failed").
+			With("operation", "new_supervisor").
+			Wrap(ErrStopGrace)
 	}
 
 	return &Supervisor{prepare: prepare, stopGrace: stopGrace, mu: sync.Mutex{}, used: false}, nil
 }
 
-func NewTmuxSupervisor(binary, socket, configFile string, stopGrace time.Duration) (*Supervisor, error) {
+func NewTmuxSupervisor(
+	binary, socket, configFile string,
+	stopGrace time.Duration,
+) (*Supervisor, error) {
 	if !filepath.IsAbs(socket) || filepath.Clean(socket) != socket {
-		return nil, oops.In("daemon").Code("supervisor_failed").With("operation", "new_tmux_supervisor").Wrap(ErrSocketRequired)
+		return nil, oops.In("daemon").
+			Code("supervisor_failed").
+			With("operation", "new_tmux_supervisor").
+			Wrap(ErrSocketRequired)
 	}
 
 	if stopGrace <= 0 {
-		return nil, oops.In("daemon").Code("supervisor_failed").With("operation", "new_tmux_supervisor").Wrap(ErrStopGrace)
+		return nil, oops.In("daemon").
+			Code("supervisor_failed").
+			With("operation", "new_tmux_supervisor").
+			Wrap(ErrStopGrace)
 	}
 
 	server, err := gotmux.New(gotmux.Config{
@@ -118,17 +145,26 @@ func NewTmuxSupervisor(binary, socket, configFile string, stopGrace time.Duratio
 		LoginShell:       false,
 	})
 	if err != nil {
-		return nil, oops.In("daemon").Code("supervisor_failed").With("operation", "new_tmux_supervisor").Wrap(err)
+		return nil, oops.In("daemon").
+			Code("supervisor_failed").
+			With("operation", "new_tmux_supervisor").
+			Wrap(err)
 	}
 
 	return NewSupervisor(func(ctx context.Context) (Process, error) {
 		if err := os.MkdirAll(filepath.Dir(socket), 0o700); err != nil {
-			return nil, oops.In("daemon").Code("supervisor_failed").With("operation", "prepare_tmux_socket_directory").Wrap(err)
+			return nil, oops.In("daemon").
+				Code("supervisor_failed").
+				With("operation", "prepare_tmux_socket_directory").
+				Wrap(err)
 		}
 
 		command, err := server.PrepareForegroundServer(context.WithoutCancel(ctx))
 		if err != nil {
-			return nil, oops.In("daemon").Code("supervisor_failed").With("operation", "prepare_tmux_server").Wrap(err)
+			return nil, oops.In("daemon").
+				Code("supervisor_failed").
+				With("operation", "prepare_tmux_server").
+				Wrap(err)
 		}
 
 		return &commandProcess{command: command}, nil
@@ -140,27 +176,42 @@ func (s *Supervisor) Run(ctx context.Context) error {
 	if s.used {
 		s.mu.Unlock()
 
-		return oops.In("daemon").Code("supervisor_failed").With("operation", "run_supervisor").Wrap(ErrSupervisorUsed)
+		return oops.In("daemon").
+			Code("supervisor_failed").
+			With("operation", "run_supervisor").
+			Wrap(ErrSupervisorUsed)
 	}
 
 	s.used = true
 	s.mu.Unlock()
 
 	if err := context.Cause(ctx); err != nil {
-		return oops.In("daemon").Code("supervisor_failed").With("operation", "run_supervisor").Wrap(err)
+		return oops.In("daemon").
+			Code("supervisor_failed").
+			With("operation", "run_supervisor").
+			Wrap(err)
 	}
 
 	process, err := s.prepare(ctx)
 	if err != nil {
-		return oops.In("daemon").Code("supervisor_failed").With("operation", "run_supervisor").Wrap(errors.Join(ErrPrepare, err))
+		return oops.In("daemon").
+			Code("supervisor_failed").
+			With("operation", "run_supervisor").
+			Wrap(errors.Join(ErrPrepare, err))
 	}
 
 	if err := context.Cause(ctx); err != nil {
-		return oops.In("daemon").Code("supervisor_failed").With("operation", "run_supervisor").Wrap(err)
+		return oops.In("daemon").
+			Code("supervisor_failed").
+			With("operation", "run_supervisor").
+			Wrap(err)
 	}
 
 	if err := process.Start(); err != nil {
-		return oops.In("daemon").Code("supervisor_failed").With("operation", "start").Wrap(errors.Join(ErrStart, err))
+		return oops.In("daemon").
+			Code("supervisor_failed").
+			With("operation", "start").
+			Wrap(errors.Join(ErrStart, err))
 	}
 
 	waited := make(chan error, 1)
@@ -179,7 +230,10 @@ func (s *Supervisor) Run(ctx context.Context) error {
 
 	select {
 	case waitErr := <-waited:
-		if err := errors.Join(normalizeSignalError(signalErr), classifyWait(waitErr, true)); err != nil {
+		if err := errors.Join(
+			normalizeSignalError(signalErr),
+			classifyWait(waitErr, true),
+		); err != nil {
 			return oops.In("daemon").Code("supervisor_failed").With("operation", "stop").Wrap(err)
 		}
 
@@ -192,7 +246,12 @@ func (s *Supervisor) Run(ctx context.Context) error {
 		killErr := process.Kill()
 		waitErr := <-waited
 
-		err := errors.Join(normalizeSignalError(signalErr), killErr, classifyWait(waitErr, true), ErrStopIncomplete)
+		err := errors.Join(
+			normalizeSignalError(signalErr),
+			killErr,
+			classifyWait(waitErr, true),
+			ErrStopIncomplete,
+		)
 
 		return oops.In("daemon").Code("supervisor_failed").With("operation", "stop").Wrap(err)
 	}
@@ -203,7 +262,10 @@ func classifyWait(err error, stopped bool) error {
 		return nil
 	}
 
-	return oops.In("daemon").Code("supervisor_failed").With("operation", "wait").Wrap(errors.Join(ErrWait, err))
+	return oops.In("daemon").
+		Code("supervisor_failed").
+		With("operation", "wait").
+		Wrap(errors.Join(ErrWait, err))
 }
 
 func normalizeSignalError(err error) error {

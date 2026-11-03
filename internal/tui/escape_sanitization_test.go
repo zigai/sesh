@@ -119,7 +119,8 @@ func testSanitizeAgentCSI(t *testing.T) {
 	parentSession.Agents = []session.AgentSession{agent}
 
 	renderedAgent := model.FormatAgentRow(parentSession, agent)
-	if strings.Contains(renderedAgent, "\x1b[2J") || strings.Contains(renderedAgent, "\x1b[0;0H") || strings.Contains(renderedAgent, "\x1b[?25l") {
+	if strings.Contains(renderedAgent, "\x1b[2J") || strings.Contains(renderedAgent, "\x1b[0;0H") ||
+		strings.Contains(renderedAgent, "\x1b[?25l") {
 		t.Fatalf("FormatAgentRow contains raw CSI control sequence: %q", renderedAgent)
 	}
 
@@ -130,7 +131,8 @@ func testSanitizeAgentCSI(t *testing.T) {
 	model.filtered = []session.Session{parentSession}
 	fullView := model.RenderView()
 
-	if strings.Contains(fullView, "\x1b[2J") || strings.Contains(fullView, "\x1b[0;0H") || strings.Contains(fullView, "\x1b[?25l") {
+	if strings.Contains(fullView, "\x1b[2J") || strings.Contains(fullView, "\x1b[0;0H") ||
+		strings.Contains(fullView, "\x1b[?25l") {
 		t.Fatalf("RenderView contains raw CSI control sequence: %q", fullView)
 	}
 }
@@ -202,7 +204,11 @@ func testSanitizeC0Controls(t *testing.T) {
 	rendered := model.FormatSessionRow(row)
 	for _, forbidden := range []rune{'\r', '\n', '\a', '\b', 0} {
 		if strings.ContainsRune(rendered, forbidden) {
-			t.Fatalf("FormatSessionRow contains unescaped C0 control code %q: %q", forbidden, rendered)
+			t.Fatalf(
+				"FormatSessionRow contains unescaped C0 control code %q: %q",
+				forbidden,
+				rendered,
+			)
 		}
 	}
 
@@ -232,7 +238,12 @@ func testPreserveCJKAndEmojiWidth(t *testing.T) {
 	expectedWidth := ansi.StringWidth(unicodeName)
 
 	if nameWidth != expectedWidth {
-		t.Fatalf("lipgloss.Width (%d) != ansi.StringWidth (%d) for %q", nameWidth, expectedWidth, unicodeName)
+		t.Fatalf(
+			"lipgloss.Width (%d) != ansi.StringWidth (%d) for %q",
+			nameWidth,
+			expectedWidth,
+			unicodeName,
+		)
 	}
 }
 

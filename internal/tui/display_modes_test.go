@@ -59,8 +59,12 @@ func TestDisplayModeParsingPreservesConfiguredOrderAndPersistedFallback(t *testi
 				t.Fatalf("persisted display mode = %q, want %q", model.displayMode, tt.want)
 			}
 
-			if len(model.displayModes) != 2 || model.displayModes[0] != displayModeAgents || model.displayModes[1] != displayModeSesh {
-				t.Fatalf("configured display modes = %v, want agents followed by sesh", model.displayModes)
+			if len(model.displayModes) != 2 || model.displayModes[0] != displayModeAgents ||
+				model.displayModes[1] != displayModeSesh {
+				t.Fatalf(
+					"configured display modes = %v, want agents followed by sesh",
+					model.displayModes,
+				)
 			}
 		})
 	}
@@ -90,7 +94,12 @@ func TestSingleConfiguredDisplayModeOverridesPersistedMode(t *testing.T) {
 			}
 
 			if model.displayMode != tt.want || model.showsDisplayModeIndicator() {
-				t.Fatalf("display mode/indicator = %q/%v, want %q/false", model.displayMode, model.showsDisplayModeIndicator(), tt.want)
+				t.Fatalf(
+					"display mode/indicator = %q/%v, want %q/false",
+					model.displayMode,
+					model.showsDisplayModeIndicator(),
+					tt.want,
+				)
 			}
 		})
 	}
@@ -113,7 +122,11 @@ func TestSingleDisplayModeMakesCycleKeyNoOp(t *testing.T) {
 
 	model = updateTestModelWithCommand(t, model, keyCtrl('f'))
 	if model.displayMode != displayModeAgents || saves != 0 {
-		t.Fatalf("cycle result = %q with %d saves, want locked agents with no save", model.displayMode, saves)
+		t.Fatalf(
+			"cycle result = %q with %d saves, want locked agents with no save",
+			model.displayMode,
+			saves,
+		)
 	}
 
 	model.width = 60
@@ -179,7 +192,13 @@ func TestCycleDisplayModeFiltersAgentsWrapsAndPersists(t *testing.T) {
 
 	model.sessions = []session.Session{
 		{ID: "$1", Name: "plain", Kind: session.KindLive},
-		{ID: "$2", Name: "agent", Kind: session.KindLive, AgentTotal: 1, Agents: []session.AgentSession{{RegistryID: "agent-1"}}},
+		{
+			ID:         "$2",
+			Name:       "agent",
+			Kind:       session.KindLive,
+			AgentTotal: 1,
+			Agents:     []session.AgentSession{{RegistryID: "agent-1"}},
+		},
 		{Name: "saved-agent", Kind: session.KindSaved, AgentTotal: 1},
 	}
 	model.refreshDisplaySessions()
@@ -270,13 +289,21 @@ func TestCycleDisplayModeRedrawsPopupInPlaceAndPreservesSearch(t *testing.T) {
 
 	updated, cmd := handler()
 	if updated != model || cmd == nil {
-		t.Fatalf("cycle result = model:%T cmd:%v, want same model with persistence command", updated, cmd != nil)
+		t.Fatalf(
+			"cycle result = model:%T cmd:%v, want same model with persistence command",
+			updated,
+			cmd != nil,
+		)
 	}
 
 	model = updateTestModel(t, model, cmd())
 
 	if model.displayMode != displayModeAgents || model.textInput.Value() != "project agent" {
-		t.Fatalf("cycle state = mode:%q query:%q, want agents with preserved search", model.displayMode, model.textInput.Value())
+		t.Fatalf(
+			"cycle state = mode:%q query:%q, want agents with preserved search",
+			model.displayMode,
+			model.textInput.Value(),
+		)
 	}
 }
 
@@ -305,7 +332,12 @@ func TestCycleDisplayModeStaysOpenWhenPersistenceFails(t *testing.T) {
 	}
 }
 
-func assertDisplayModeState(t *testing.T, model *Model, wantMode displayMode, wantPersisted string) {
+func assertDisplayModeState(
+	t *testing.T,
+	model *Model,
+	wantMode displayMode,
+	wantPersisted string,
+) {
 	t.Helper()
 
 	got := struct {
@@ -327,9 +359,32 @@ func TestAgentsModePreservesSearchAndSortsSessionsChronologically(t *testing.T) 
 	model := newTestModel()
 	model.displayMode = displayModeAgents
 	model.sessions = []session.Session{
-		{ID: "$1", Name: "charlie", AgentTotal: 1, AgentIdleSince: now.Add(-2 * time.Minute), Agents: []session.AgentSession{{RegistryID: "charlie"}}},
-		{ID: "$2", Name: "alpha", AgentTotal: 2, AgentActive: 1, AgentActivityChangedAt: now.Add(-time.Minute), Agents: []session.AgentSession{{RegistryID: "alpha-1"}, {RegistryID: "alpha-2"}}},
-		{ID: "$3", Name: "bravo", AgentTotal: 1, AgentWaiting: 1, AgentWaitingSince: now.Add(-10 * time.Minute), Agents: []session.AgentSession{{RegistryID: "bravo"}}},
+		{
+			ID:             "$1",
+			Name:           "charlie",
+			AgentTotal:     1,
+			AgentIdleSince: now.Add(-2 * time.Minute),
+			Agents:         []session.AgentSession{{RegistryID: "charlie"}},
+		},
+		{
+			ID:                     "$2",
+			Name:                   "alpha",
+			AgentTotal:             2,
+			AgentActive:            1,
+			AgentActivityChangedAt: now.Add(-time.Minute),
+			Agents: []session.AgentSession{
+				{RegistryID: "alpha-1"},
+				{RegistryID: "alpha-2"},
+			},
+		},
+		{
+			ID:                "$3",
+			Name:              "bravo",
+			AgentTotal:        1,
+			AgentWaiting:      1,
+			AgentWaitingSince: now.Add(-10 * time.Minute),
+			Agents:            []session.AgentSession{{RegistryID: "bravo"}},
+		},
 		{ID: "$4", Name: "plain"},
 	}
 	model.refreshDisplaySessions()
@@ -356,9 +411,33 @@ func TestAgentSummaryRefreshKeepsSessionOrderAndSelectionStable(t *testing.T) {
 	model := newTestModel()
 	model.displayMode = displayModeAgents
 	model.sessions = []session.Session{
-		{ID: "$1", Name: "alpha", AgentTotal: 1, AgentActive: 1, Agents: []session.AgentSession{{RegistryID: "alpha", Status: session.AgentStatusRunning}}},
-		{ID: "$2", Name: "bravo", AgentTotal: 1, AgentActive: 1, Agents: []session.AgentSession{{RegistryID: "bravo", Status: session.AgentStatusRunning}}},
-		{ID: "$3", Name: "charlie", AgentTotal: 1, AgentActive: 1, Agents: []session.AgentSession{{RegistryID: "charlie", Status: session.AgentStatusRunning}}},
+		{
+			ID:          "$1",
+			Name:        "alpha",
+			AgentTotal:  1,
+			AgentActive: 1,
+			Agents: []session.AgentSession{
+				{RegistryID: "alpha", Status: session.AgentStatusRunning},
+			},
+		},
+		{
+			ID:          "$2",
+			Name:        "bravo",
+			AgentTotal:  1,
+			AgentActive: 1,
+			Agents: []session.AgentSession{
+				{RegistryID: "bravo", Status: session.AgentStatusRunning},
+			},
+		},
+		{
+			ID:          "$3",
+			Name:        "charlie",
+			AgentTotal:  1,
+			AgentActive: 1,
+			Agents: []session.AgentSession{
+				{RegistryID: "charlie", Status: session.AgentStatusRunning},
+			},
+		},
 	}
 	model.refreshDisplaySessions()
 	model.filterSessions()
@@ -366,9 +445,32 @@ func TestAgentSummaryRefreshKeepsSessionOrderAndSelectionStable(t *testing.T) {
 	model.agentCursor = 0
 
 	model.applyAgentSummaries([]session.AgentSummary{
-		{TmuxSessionID: "$1", TmuxSessionName: "alpha", Total: 1, Agents: []session.AgentSession{{RegistryID: "alpha", Status: session.AgentStatusIdle}}},
-		{TmuxSessionID: "$2", TmuxSessionName: "bravo", Total: 1, Waiting: 1, Agents: []session.AgentSession{{RegistryID: "bravo", Status: session.AgentStatusWaiting}}},
-		{TmuxSessionID: "$3", TmuxSessionName: "charlie", Total: 1, Active: 1, Agents: []session.AgentSession{{RegistryID: "charlie", Status: session.AgentStatusRunning}}},
+		{
+			TmuxSessionID:   "$1",
+			TmuxSessionName: "alpha",
+			Total:           1,
+			Agents: []session.AgentSession{
+				{RegistryID: "alpha", Status: session.AgentStatusIdle},
+			},
+		},
+		{
+			TmuxSessionID:   "$2",
+			TmuxSessionName: "bravo",
+			Total:           1,
+			Waiting:         1,
+			Agents: []session.AgentSession{
+				{RegistryID: "bravo", Status: session.AgentStatusWaiting},
+			},
+		},
+		{
+			TmuxSessionID:   "$3",
+			TmuxSessionName: "charlie",
+			Total:           1,
+			Active:          1,
+			Agents: []session.AgentSession{
+				{RegistryID: "charlie", Status: session.AgentStatusRunning},
+			},
+		},
 	})
 
 	want := []string{"alpha", "bravo", "charlie"}
@@ -397,31 +499,72 @@ func TestAgentContextLabelsStateAndIdleAge(t *testing.T) {
 		wantGlyph string
 		wantText  string
 	}{
-		{name: "working", row: session.Session{AgentActive: 2, AgentTotal: 3}, wantGlyph: "●", wantText: "RUNNING"},
-		{name: "waiting", row: session.Session{AgentWaiting: 1, AgentTotal: 2, AgentWaitingSince: now.Add(-4 * time.Minute)}, wantGlyph: "● 4m", wantText: "WAITING 4m"},
-		{name: "failed", row: session.Session{AgentFailed: 1, AgentTotal: 2}, wantGlyph: "●", wantText: "ERROR"},
-		{name: "interrupted", row: session.Session{AgentInterrupted: 1, AgentTotal: 2}, wantGlyph: "○", wantText: "IDLE"},
-		{name: "idle", row: session.Session{AgentTotal: 1, AgentIdleSince: now.Add(-18 * time.Minute)}, wantGlyph: "○ 18m", wantText: "IDLE 18m"},
-		{name: "unknown", row: session.Session{AgentTotal: 1, AgentUnknown: 1}, wantGlyph: "○", wantText: "UNKNOWN"},
+		{
+			name:      "working",
+			row:       session.Session{AgentActive: 2, AgentTotal: 3},
+			wantGlyph: "●",
+			wantText:  "RUNNING",
+		},
+		{
+			name: "waiting",
+			row: session.Session{
+				AgentWaiting:      1,
+				AgentTotal:        2,
+				AgentWaitingSince: now.Add(-4 * time.Minute),
+			},
+			wantGlyph: "● 4m",
+			wantText:  "WAITING 4m",
+		},
+		{
+			name:      "failed",
+			row:       session.Session{AgentFailed: 1, AgentTotal: 2},
+			wantGlyph: "●",
+			wantText:  "ERROR",
+		},
+		{
+			name:      "interrupted",
+			row:       session.Session{AgentInterrupted: 1, AgentTotal: 2},
+			wantGlyph: "○",
+			wantText:  "IDLE",
+		},
+		{
+			name:      "idle",
+			row:       session.Session{AgentTotal: 1, AgentIdleSince: now.Add(-18 * time.Minute)},
+			wantGlyph: "○ 18m",
+			wantText:  "IDLE 18m",
+		},
+		{
+			name:      "unknown",
+			row:       session.Session{AgentTotal: 1, AgentUnknown: 1},
+			wantGlyph: "○",
+			wantText:  "UNKNOWN",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run("glyph_"+tt.name, func(t *testing.T) {
-			if got := stripANSI(model.formattedAgentContextAt(tt.row, now, 0)); got != tt.wantGlyph {
+			if got := stripANSI(
+				model.formattedAgentContextAt(tt.row, now, 0),
+			); got != tt.wantGlyph {
 				t.Fatalf("formattedAgentContextAt() = %q, want %q", got, tt.wantGlyph)
 			}
 		})
 	}
 
 	if got := model.agentContextLabelAt(session.Session{AgentActive: 1, AgentTotal: 1}); got != "" {
-		t.Fatalf("agentContextLabelAt in agents mode = %q, want empty (no circle on session row)", got)
+		t.Fatalf(
+			"agentContextLabelAt in agents mode = %q, want empty (no circle on session row)",
+			got,
+		)
 	}
 
 	model.config.AgentSessions.StatusStyle = "text"
 
 	for _, tt := range tests {
 		t.Run("text_"+tt.name, func(t *testing.T) {
-			if got := strings.TrimSpace(model.formattedAgentContextAt(tt.row, now, 0)); got != tt.wantText {
+			if got := strings.TrimSpace(
+				model.formattedAgentContextAt(tt.row, now, 0),
+			); got != tt.wantText {
 				t.Fatalf("formattedAgentContextAt() = %q, want %q", got, tt.wantText)
 			}
 		})
@@ -444,7 +587,8 @@ func TestFormattedAgentContextAlignsStateAndAgeColumns(t *testing.T) {
 	}, now, 3)
 
 	statusColumn := strings.Index(shortAge, "IDLE")
-	if strings.Index(longAge, "IDLE") != statusColumn || strings.Index(working, "RUNNING") != statusColumn {
+	if strings.Index(longAge, "IDLE") != statusColumn ||
+		strings.Index(working, "RUNNING") != statusColumn {
 		t.Fatalf("contexts are not state-aligned: %q / %q / %q", shortAge, longAge, working)
 	}
 
@@ -528,7 +672,10 @@ func TestAgentsModeInitialSelectionFocusesCurrentSessionAndActivePane(t *testing
 
 	selected := model.selectedListRow()
 	if selected.sessionIndex != 1 || selected.agentIndex != 1 {
-		t.Fatalf("initial selection = %#v, want session 1 agent 1 (current-session/current-agent-2)", selected)
+		t.Fatalf(
+			"initial selection = %#v, want session 1 agent 1 (current-session/current-agent-2)",
+			selected,
+		)
 	}
 }
 

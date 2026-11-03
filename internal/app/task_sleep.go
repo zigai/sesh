@@ -25,7 +25,11 @@ type paneAgents struct {
 	socket string
 }
 
-func (local *Local) sleepTask(ctx context.Context, _ action.Caller, input action.SleepTask) (action.SleptTask, error) {
+func (local *Local) sleepTask(
+	ctx context.Context,
+	_ action.Caller,
+	input action.SleepTask,
+) (action.SleptTask, error) {
 	service, err := local.taskService()
 	if err != nil {
 		return action.SleptTask{ID: ""}, err
@@ -33,13 +37,21 @@ func (local *Local) sleepTask(ctx context.Context, _ action.Caller, input action
 
 	record, err := service.Sleep(ctx, input.Task)
 	if err != nil {
-		return action.SleptTask{ID: record.ID}, oops.In("app").With("operation", "sleep_task").Wrap(err)
+		return action.SleptTask{
+			ID: record.ID,
+		}, oops.In("app").
+			With("operation", "sleep_task").
+			Wrap(err)
 	}
 
 	return action.SleptTask{ID: record.ID}, nil
 }
 
-func (local *Local) wakeTask(ctx context.Context, _ action.Caller, input action.WakeTask) (action.WokenTask, error) {
+func (local *Local) wakeTask(
+	ctx context.Context,
+	_ action.Caller,
+	input action.WakeTask,
+) (action.WokenTask, error) {
 	service, err := local.taskService()
 	if err != nil {
 		return action.WokenTask{ID: "", AlreadyAwake: false}, err
@@ -94,7 +106,10 @@ func (local *Local) selectTask(ctx context.Context, selector string) (string, er
 
 func (local *Local) paneTask(ctx context.Context, pane string) (string, error) {
 	panes, err := local.server.PanesWith(ctx, gotmux.QueryOptions{
-		Filter: gotmux.Format("#{==:#{pane_id}," + pane + "}"), ExtraFields: []string{task.OptionTask},
+		Filter: gotmux.Format(
+			"#{==:#{pane_id}," + pane + "}",
+		),
+		ExtraFields: []string{task.OptionTask},
 	})
 	if err != nil {
 		return "", oops.In("app").With("operation", "find_pane_task").Wrap(err)
@@ -131,20 +146,32 @@ func (local *Local) taskService() (*task.Service, error) {
 	socket := local.server.Endpoint().SocketPath
 
 	return task.NewService(task.Options{
-		Server: local.server, Store: task.NewStore(local.taskLedger), Catalog: catalog, Config: local.cfg.Tasks,
+		Server:      local.server,
+		Store:       task.NewStore(local.taskLedger),
+		Catalog:     catalog,
+		Config:      local.cfg.Tasks,
 		Windows:     local.cfg.TaskWindowFor,
-		WorktreeDir: local.worktreeDir, LookPath: exec.LookPath, Now: time.Now,
-		Agents: paneAgents{source: local.agentSource, socket: agents.NormalizeServerSocket(socket)},
+		WorktreeDir: local.worktreeDir,
+		LookPath:    exec.LookPath,
+		Now:         time.Now,
+		Agents: paneAgents{
+			source: local.agentSource,
+			socket: agents.NormalizeServerSocket(socket),
+		},
 		SleepingAgentCommand: func(id string) []string {
 			return append([]string{executable}, apps.PlaceholderArguments(id)...)
 		},
-		PRs: task.GitHub{}, ClosePopup: local.closeTaskPopup, FinishCommand: local.cfg.FinishRunFor,
+		PRs:           task.GitHub{},
+		ClosePopup:    local.closeTaskPopup,
+		FinishCommand: local.cfg.FinishRunFor,
 	}), nil
 }
 
 func (finder paneAgents) AgentsIn(ctx context.Context, pane gotmux.PaneID) ([]task.Agent, error) {
 	if finder.source == nil {
-		return nil, oops.In("app").With("operation", "find_task_agent").Wrap(agents.ErrRegistryUnavailable)
+		return nil, oops.In("app").
+			With("operation", "find_task_agent").
+			Wrap(agents.ErrRegistryUnavailable)
 	}
 
 	var filter aht.Filter
@@ -161,7 +188,8 @@ func (finder paneAgents) AgentsIn(ctx context.Context, pane gotmux.PaneID) ([]ta
 
 	for _, observed := range sessions {
 		location := observed.Location
-		if location.Kind != aht.MultiplexerTmux || location.PaneID != string(pane) || len(observed.ResumeCommand) == 0 ||
+		if location.Kind != aht.MultiplexerTmux || location.PaneID != string(pane) ||
+			len(observed.ResumeCommand) == 0 ||
 			agents.NormalizeServerSocket(location.ServerID) != finder.socket {
 			continue
 		}
@@ -174,8 +202,15 @@ func (finder paneAgents) AgentsIn(ctx context.Context, pane gotmux.PaneID) ([]ta
 
 func taskAgent(observed aht.Session) task.Agent {
 	agent := task.Agent{
-		Harness: string(observed.Harness), Activity: "", SessionID: observed.SessionID, SessionPath: observed.SessionPath,
-		ResumeCommand: observed.ResumeCommand, Executable: "", PanePID: observed.Location.PanePID,
+		Harness: string(
+			observed.Harness,
+		),
+		Activity:      "",
+		SessionID:     observed.SessionID,
+		SessionPath:   observed.SessionPath,
+		ResumeCommand: observed.ResumeCommand,
+		Executable:    "",
+		PanePID:       observed.Location.PanePID,
 	}
 
 	if activity := observed.Activity(); activity != nil {
@@ -183,7 +218,10 @@ func taskAgent(observed aht.Session) task.Agent {
 	}
 
 	if len(observed.ResumeCommand) > 0 {
-		if executable, err := exec.LookPath(observed.ResumeCommand[0]); err == nil && filepath.IsAbs(executable) {
+		if executable, err := exec.LookPath(
+			observed.ResumeCommand[0],
+		); err == nil &&
+			filepath.IsAbs(executable) {
 			agent.Executable = filepath.Clean(executable)
 		}
 	}

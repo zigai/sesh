@@ -39,7 +39,10 @@ func (store *memoryInbox) LoadInbox(context.Context) (inbox.State, error) {
 	return store.state, nil
 }
 
-func (store *memoryInbox) UpdateInbox(_ context.Context, change func(*inbox.State) error) (inbox.State, error) {
+func (store *memoryInbox) UpdateInbox(
+	_ context.Context,
+	change func(*inbox.State) error,
+) (inbox.State, error) {
 	err := change(&store.state)
 
 	return store.state, err
@@ -62,12 +65,22 @@ func inboxTestRecord(id string, state task.State) task.Record {
 
 func inboxTestLive(record task.Record, pane string) task.Live {
 	return task.Live{
-		Record: record, Present: pane != "", SessionID: "$1", SessionName: testSupportSessionAlphaName, WindowID: "@1", WindowIndex: 2,
-		WindowName: record.Title, AgentPane: gotmux.PaneID(pane),
+		Record:      record,
+		Present:     pane != "",
+		SessionID:   "$1",
+		SessionName: testSupportSessionAlphaName,
+		WindowID:    "@1",
+		WindowIndex: 2,
+		WindowName:  record.Title,
+		AgentPane:   gotmux.PaneID(pane),
 	}
 }
 
-func inboxTestAgent(name, pane string, status session.AgentStatus, since time.Time) session.AgentSession {
+func inboxTestAgent(
+	name, pane string,
+	status session.AgentStatus,
+	since time.Time,
+) session.AgentSession {
 	agent := emptyAgentSession()
 	agent.PaneID = pane
 	agent.Harness = inboxTestHarness
@@ -85,11 +98,20 @@ func newInboxTestModel(t *testing.T, tasks []task.Live, agents []session.AgentSe
 	t.Helper()
 
 	model := newTestModel()
-	model.sessions = []session.Session{{
-		ID: "$1", Name: testSupportSessionAlphaName, Kind: session.KindLive, Origin: session.OriginLocal, Agents: agents, AgentTotal: len(agents),
-	}}
+	model.sessions = []session.Session{
+		{
+			ID:         "$1",
+			Name:       testSupportSessionAlphaName,
+			Kind:       session.KindLive,
+			Origin:     session.OriginLocal,
+			Agents:     agents,
+			AgentTotal: len(agents),
+		},
+	}
 	model.tasks = tasks
-	model.deps.Inbox = &memoryInbox{state: inbox.State{Version: inbox.Version, Snoozes: nil, Unseen: nil}}
+	model.deps.Inbox = &memoryInbox{
+		state: inbox.State{Version: inbox.Version, Snoozes: nil, Unseen: nil},
+	}
 	model.displayMode = displayModeInbox
 	model.config.Inbox.Collapsed = nil
 	refreshInbox(model)
@@ -111,7 +133,11 @@ func inboxRowsForTest(model *Model) map[string][]string {
 
 	for _, group := range model.filtered {
 		key := group.Name
-		if section, ok := strings.CutPrefix(group.ID, inboxGroupIDPrefix); ok && model.inboxGroup == config.InboxGroupState {
+		if section, ok := strings.CutPrefix(
+			group.ID,
+			inboxGroupIDPrefix,
+		); ok &&
+			model.inboxGroup == config.InboxGroupState {
 			key = section
 		}
 
@@ -230,7 +256,12 @@ func TestInboxSectionsFollowTheConfiguredOrderLabelsAndHiddenSections(t *testing
 	model.config.Inbox.Labels = map[string]string{config.InboxReady: "new"}
 	refreshInbox(model)
 
-	if names := sessionNamesForTest(model.filtered); !slices.Equal(names, []string{"Needs you", "new"}) {
+	if names := sessionNamesForTest(
+		model.filtered,
+	); !slices.Equal(
+		names,
+		[]string{"Needs you", "new"},
+	) {
 		t.Fatalf("sections = %v, want Needs you then new", names)
 	}
 }
@@ -240,7 +271,14 @@ func TestSnoozeUntilNextMessageEndsWhenTheAgentFinishesAnotherTurn(t *testing.T)
 		inboxTestAgent("fresh", "%1", session.AgentStatusIdle, time.Now().Add(-time.Minute)),
 	})
 
-	runHandler(t, model, model.invokeAction(action.InboxSnooze.ID, action.Values{"until": {config.SnoozeNextMessage}}))
+	runHandler(
+		t,
+		model,
+		model.invokeAction(
+			action.InboxSnooze.ID,
+			action.Values{"until": {config.SnoozeNextMessage}},
+		),
+	)
 	assertInboxRows(t, model, map[string][]string{config.InboxSnoozed: {"fresh"}})
 
 	model.sessions[0].Agents[0].Status = session.AgentStatusRunning
@@ -257,7 +295,11 @@ func TestSnoozeUntilNextMessageEndsWhenTheAgentFinishesAnotherTurn(t *testing.T)
 func TestTimedSnoozeEndsAtItsTime(t *testing.T) {
 	agent := inboxTestAgent("fresh", "%1", session.AgentStatusIdle, time.Now().Add(-time.Hour))
 	model := newInboxTestModel(t, nil, []session.AgentSession{agent})
-	snooze := inbox.Snooze{Key: conversationKey(agent), Until: time.Now().Add(time.Hour).Unix(), SnoozedAt: time.Now().UnixNano()}
+	snooze := inbox.Snooze{
+		Key:       conversationKey(agent),
+		Until:     time.Now().Add(time.Hour).Unix(),
+		SnoozedAt: time.Now().UnixNano(),
+	}
 
 	model.inbox.Put(snooze)
 	refreshInbox(model)
@@ -278,7 +320,11 @@ func TestSnoozeWithoutATimeOffersTheConfiguredChoices(t *testing.T) {
 	runHandler(t, model, model.invokeAction(action.InboxSnooze.ID, action.Values{}))
 
 	if model.menu == nil || model.dialog != dialogNone {
-		t.Fatalf("snooze without a time opened menu %v and dialog %v, want only the choices", model.menu, model.dialog)
+		t.Fatalf(
+			"snooze without a time opened menu %v and dialog %v, want only the choices",
+			model.menu,
+			model.dialog,
+		)
 	}
 
 	labels := make([]string, 0, len(model.menu.entries))
@@ -312,24 +358,42 @@ func TestMarkUnseenReturnsARowToDoneUntilItIsSeenAgain(t *testing.T) {
 func TestInboxGroupsByProjectAndMachineKeepingEqualPaneIDsApart(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Remote.Enabled = true
-	cfg.Remote.Connections = []config.RemoteConnectionConfig{{ID: inboxTestHost, Host: inboxTestHost}}
+	cfg.Remote.Connections = []config.RemoteConnectionConfig{
+		{ID: inboxTestHost, Host: inboxTestHost},
+	}
 
 	web := inboxTestAgent("web-agent", "%2", session.AgentStatusWaiting, time.Now())
 	web.ProjectRoot = "/work/web"
 
 	model := loaderTestModel(t, cfg, Dependencies{})
-	model.sessions = []session.Session{{
-		ID: "$1", Name: testSupportSessionAlphaName, Kind: session.KindLive, Origin: session.OriginLocal, AgentTotal: 2,
-		Agents: []session.AgentSession{inboxTestAgent("here", "%1", session.AgentStatusRunning, time.Now()), web},
-	}}
+	model.sessions = []session.Session{
+		{
+			ID:         "$1",
+			Name:       testSupportSessionAlphaName,
+			Kind:       session.KindLive,
+			Origin:     session.OriginLocal,
+			AgentTotal: 2,
+			Agents: []session.AgentSession{
+				inboxTestAgent("here", "%1", session.AgentStatusRunning, time.Now()),
+				web,
+			},
+		},
+	}
 	model.handleRemoteCatalog(remoteCatalogMsg{catalog: RemoteCatalog{
 		GeneratedAt: time.Now(),
 		Connections: []RemoteConnection{{
 			ID: inboxTestHost, Label: inboxTestHost, Connected: true, LastSeen: time.Now(),
-			Sessions: []session.Session{{
-				ID: "$1", Name: "shop", Kind: session.KindLive, AgentTotal: 1,
-				Agents: []session.AgentSession{inboxTestAgent("there", "%1", session.AgentStatusRunning, time.Now())},
-			}},
+			Sessions: []session.Session{
+				{
+					ID:         "$1",
+					Name:       "shop",
+					Kind:       session.KindLive,
+					AgentTotal: 1,
+					Agents: []session.AgentSession{
+						inboxTestAgent("there", "%1", session.AgentStatusRunning, time.Now()),
+					},
+				},
+			},
 			Tasks: nil,
 		}},
 	}})
@@ -345,30 +409,52 @@ func TestInboxGroupsByProjectAndMachineKeepingEqualPaneIDsApart(t *testing.T) {
 
 	selectInboxRow(t, model, "there")
 
-	if item, ok := model.selectedInboxItem(); !ok || item.agent.HarnessSession != "there" || item.host.label != inboxTestHost {
-		t.Fatalf("selected = %q on %q, want there on devbox", item.agent.HarnessSession, item.host.label)
+	if item, ok := model.selectedInboxItem(); !ok || item.agent.HarnessSession != "there" ||
+		item.host.label != inboxTestHost {
+		t.Fatalf(
+			"selected = %q on %q, want there on devbox",
+			item.agent.HarnessSession,
+			item.host.label,
+		)
 	}
 }
 
 func TestInboxFocusedAgentKeysDistinguishHostsWithEqualPaneIDs(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Remote.Enabled = true
-	cfg.Remote.Connections = []config.RemoteConnectionConfig{{ID: inboxTestHost, Host: inboxTestHost}}
+	cfg.Remote.Connections = []config.RemoteConnectionConfig{
+		{ID: inboxTestHost, Host: inboxTestHost},
+	}
 
 	now := time.Now()
 	model := loaderTestModel(t, cfg, Dependencies{})
-	model.sessions = []session.Session{{
-		ID: "$1", Name: testSupportSessionAlphaName, Kind: session.KindLive, Origin: session.OriginLocal, AgentTotal: 1,
-		Agents: []session.AgentSession{inboxTestAgent("here", "%1", session.AgentStatusRunning, now)},
-	}}
+	model.sessions = []session.Session{
+		{
+			ID:         "$1",
+			Name:       testSupportSessionAlphaName,
+			Kind:       session.KindLive,
+			Origin:     session.OriginLocal,
+			AgentTotal: 1,
+			Agents: []session.AgentSession{
+				inboxTestAgent("here", "%1", session.AgentStatusRunning, now),
+			},
+		},
+	}
 	model.handleRemoteCatalog(remoteCatalogMsg{catalog: RemoteCatalog{
 		GeneratedAt: now,
 		Connections: []RemoteConnection{{
 			ID: inboxTestHost, Label: inboxTestHost, Connected: true, LastSeen: now,
-			Sessions: []session.Session{{
-				ID: "$1", Name: "shop", Kind: session.KindLive, AgentTotal: 1,
-				Agents: []session.AgentSession{inboxTestAgent("there", "%1", session.AgentStatusRunning, now)},
-			}},
+			Sessions: []session.Session{
+				{
+					ID:         "$1",
+					Name:       "shop",
+					Kind:       session.KindLive,
+					AgentTotal: 1,
+					Agents: []session.AgentSession{
+						inboxTestAgent("there", "%1", session.AgentStatusRunning, now),
+					},
+				},
+			},
 		}},
 	}})
 	model.displayMode = displayModeInbox
@@ -385,7 +471,13 @@ func TestInboxFocusedAgentKeysDistinguishHostsWithEqualPaneIDs(t *testing.T) {
 	for slot, agent := range group.Agents {
 		want := model.agentKeys()[slot : slot+1]
 		if got := model.focusedAgentKey(group, agent); got != want {
-			t.Errorf("agent %q on host %q has key %q, want %q", agent.HarnessSession, agent.Host, got, want)
+			t.Errorf(
+				"agent %q on host %q has key %q, want %q",
+				agent.HarnessSession,
+				agent.Host,
+				got,
+				want,
+			)
 		}
 	}
 }
@@ -426,14 +518,27 @@ func TestInboxGroupKeyOnlyOpensASelectionInItsGroup(t *testing.T) {
 
 			if tt.leaveGroup {
 				if model.DeferredSwitchSession() != "" {
-					t.Fatalf("the group key opened a different group's session %q", model.DeferredSwitchSession())
+					t.Fatalf(
+						"the group key opened a different group's session %q",
+						model.DeferredSwitchSession(),
+					)
 				}
 
-				if model.focusedSession != group.RuntimeKey() || model.filtered[model.cursor].ID != group.ID || model.agentCursor != 0 {
-					t.Fatalf("selection = %d/%d with focus %q, want the original group's first agent", model.cursor, model.agentCursor, model.focusedSession)
+				if model.focusedSession != group.RuntimeKey() ||
+					model.filtered[model.cursor].ID != group.ID ||
+					model.agentCursor != 0 {
+					t.Fatalf(
+						"selection = %d/%d with focus %q, want the original group's first agent",
+						model.cursor,
+						model.agentCursor,
+						model.focusedSession,
+					)
 				}
 			} else if model.DeferredSwitchPane() != "%2" {
-				t.Fatalf("switch pane = %q, want the selected second agent", model.DeferredSwitchPane())
+				t.Fatalf(
+					"switch pane = %q, want the selected second agent",
+					model.DeferredSwitchPane(),
+				)
 			}
 		})
 	}
@@ -442,17 +547,26 @@ func TestInboxGroupKeyOnlyOpensASelectionInItsGroup(t *testing.T) {
 func TestInboxActsOnRemoteTasksOnTheirMachine(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Remote.Enabled = true
-	cfg.Remote.Connections = []config.RemoteConnectionConfig{{ID: inboxTestHost, Host: inboxTestHost}}
+	cfg.Remote.Connections = []config.RemoteConnectionConfig{
+		{ID: inboxTestHost, Host: inboxTestHost},
+	}
 
 	model := loaderTestModel(t, cfg, Dependencies{})
 	model.handleRemoteCatalog(remoteCatalogMsg{catalog: RemoteCatalog{
 		GeneratedAt: time.Now(),
 		Connections: []RemoteConnection{{
 			ID: inboxTestHost, Label: inboxTestHost, Connected: true, LastSeen: time.Now(),
-			Sessions: []session.Session{{
-				ID: "$1", Name: "shop", Kind: session.KindLive, AgentTotal: 1,
-				Agents: []session.AgentSession{inboxTestAgent("t7", "%1", session.AgentStatusRunning, time.Now())},
-			}},
+			Sessions: []session.Session{
+				{
+					ID:         "$1",
+					Name:       "shop",
+					Kind:       session.KindLive,
+					AgentTotal: 1,
+					Agents: []session.AgentSession{
+						inboxTestAgent("t7", "%1", session.AgentStatusRunning, time.Now()),
+					},
+				},
+			},
 			Tasks: []task.Live{inboxTestLive(inboxTestRecord("t7", task.StateActive), "%1")},
 		}},
 	}})
@@ -467,7 +581,11 @@ func TestInboxActsOnRemoteTasksOnTheirMachine(t *testing.T) {
 }
 
 func TestEnterOnTaskFocusesItsAgentPaneInTheOwningSession(t *testing.T) {
-	model := newInboxTestModel(t, []task.Live{inboxTestLive(inboxTestRecord("t1", task.StateActive), "%9")}, nil)
+	model := newInboxTestModel(
+		t,
+		[]task.Live{inboxTestLive(inboxTestRecord("t1", task.StateActive), "%9")},
+		nil,
+	)
 
 	activated := ""
 
@@ -484,7 +602,11 @@ func TestEnterOnTaskFocusesItsAgentPaneInTheOwningSession(t *testing.T) {
 }
 
 func TestInboxHeadingsAreNotSelectable(t *testing.T) {
-	model := newInboxTestModel(t, []task.Live{inboxTestLive(inboxTestRecord("t1", task.StateActive), "%1")}, nil)
+	model := newInboxTestModel(
+		t,
+		[]task.Live{inboxTestLive(inboxTestRecord("t1", task.StateActive), "%1")},
+		nil,
+	)
 
 	if model.rowSelectable(popupListRow{sessionIndex: 0, agentIndex: parentAgentIndex}) {
 		t.Fatal("section heading is selectable")
@@ -499,7 +621,15 @@ func TestRowMenuListsOnlyTheEntriesThatApply(t *testing.T) {
 	model := newInboxTestModel(t, nil, []session.AgentSession{
 		inboxTestAgent("fresh", "%1", session.AgentStatusIdle, time.Now()),
 	})
-	model.config.Menu.Agent = []string{config.MenuGo, config.MenuDivider, config.MenuUnsnooze, config.MenuSnooze, config.MenuSeen, config.MenuMerge, config.MenuSleep}
+	model.config.Menu.Agent = []string{
+		config.MenuGo,
+		config.MenuDivider,
+		config.MenuUnsnooze,
+		config.MenuSnooze,
+		config.MenuSeen,
+		config.MenuMerge,
+		config.MenuSleep,
+	}
 	model.config.Menu.Session = nil
 	model = updateTestModel(t, model, tea.WindowSizeMsg{Width: 80, Height: 24})
 
@@ -538,7 +668,8 @@ func TestRowMenuOffersMergeForCommitsNotOnTheBase(t *testing.T) {
 
 	runHandler(t, model, model.openRowMenu())
 
-	if model.menu == nil || len(model.menu.entries) != 1 || model.menu.entries[0].label != config.MenuMerge {
+	if model.menu == nil || len(model.menu.entries) != 1 ||
+		model.menu.entries[0].label != config.MenuMerge {
 		t.Fatalf("menu = %+v, want merge", model.menu)
 	}
 }
@@ -575,18 +706,34 @@ func TestCyclingThroughEmptyInboxKeepsTheSessionSelection(t *testing.T) {
 func TestUnreachableHostShowsOneDimmedOfflineLine(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Remote.Enabled = true
-	cfg.Remote.Connections = []config.RemoteConnectionConfig{{ID: inboxTestHost, Host: inboxTestHost}}
+	cfg.Remote.Connections = []config.RemoteConnectionConfig{
+		{ID: inboxTestHost, Host: inboxTestHost},
+	}
 
 	model := loaderTestModel(t, cfg, Dependencies{})
-	model.sessions = []session.Session{{
-		ID: "$1", Name: testSupportSessionAlphaName, Kind: session.KindLive, Origin: session.OriginLocal, AgentTotal: 1,
-		Agents: []session.AgentSession{inboxTestAgent("here", "%1", session.AgentStatusRunning, time.Now())},
-	}}
+	model.sessions = []session.Session{
+		{
+			ID:         "$1",
+			Name:       testSupportSessionAlphaName,
+			Kind:       session.KindLive,
+			Origin:     session.OriginLocal,
+			AgentTotal: 1,
+			Agents: []session.AgentSession{
+				inboxTestAgent("here", "%1", session.AgentStatusRunning, time.Now()),
+			},
+		},
+	}
 	model.handleRemoteCatalog(remoteCatalogMsg{catalog: RemoteCatalog{
 		GeneratedAt: time.Now(),
-		Connections: []RemoteConnection{{
-			ID: inboxTestHost, Label: inboxTestHost, Connected: false, LastSeen: time.Now().Add(-time.Hour), LastError: "connection_failed",
-		}},
+		Connections: []RemoteConnection{
+			{
+				ID:        inboxTestHost,
+				Label:     inboxTestHost,
+				Connected: false,
+				LastSeen:  time.Now().Add(-time.Hour),
+				LastError: "connection_failed",
+			},
+		},
 	}})
 	model.displayMode = displayModeInbox
 	refreshInbox(model)
@@ -623,21 +770,30 @@ func TestAMultilineLoadErrorStaysOnOneLineOfTheEmptyInbox(t *testing.T) {
 func TestAHostOnAnotherProtocolAsksForTheSameSeshVersion(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Remote.Enabled = true
-	cfg.Remote.Connections = []config.RemoteConnectionConfig{{ID: inboxTestHost, Host: inboxTestHost}}
+	cfg.Remote.Connections = []config.RemoteConnectionConfig{
+		{ID: inboxTestHost, Host: inboxTestHost},
+	}
 
 	model := loaderTestModel(t, cfg, Dependencies{})
 	model.handleRemoteCatalog(remoteCatalogMsg{catalog: RemoteCatalog{
 		GeneratedAt: time.Now(),
-		Connections: []RemoteConnection{{
-			ID: inboxTestHost, Label: inboxTestHost, Connected: false, LastSeen: time.Now(), LastError: RemoteErrorIncompatibleProtocol,
-		}},
+		Connections: []RemoteConnection{
+			{
+				ID:        inboxTestHost,
+				Label:     inboxTestHost,
+				Connected: false,
+				LastSeen:  time.Now(),
+				LastError: RemoteErrorIncompatibleProtocol,
+			},
+		},
 	}})
 	model.displayMode = displayModeInbox
 	refreshInbox(model)
 	model.width, model.height = 120, 20
 
 	frame := stripANSI(model.renderFrame())
-	if !strings.Contains(frame, "devbox needs the same sesh version") || strings.Contains(frame, "devbox offline") {
+	if !strings.Contains(frame, "devbox needs the same sesh version") ||
+		strings.Contains(frame, "devbox offline") {
 		t.Fatalf("frame does not ask for the same sesh version on devbox:\n%s", frame)
 	}
 }
@@ -645,7 +801,9 @@ func TestAHostOnAnotherProtocolAsksForTheSameSeshVersion(t *testing.T) {
 func TestInboxActsOnARemoteTaskWithoutAWindowOnItsMachine(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Remote.Enabled = true
-	cfg.Remote.Connections = []config.RemoteConnectionConfig{{ID: inboxTestHost, Host: inboxTestHost}}
+	cfg.Remote.Connections = []config.RemoteConnectionConfig{
+		{ID: inboxTestHost, Host: inboxTestHost},
+	}
 
 	model := loaderTestModel(t, cfg, Dependencies{})
 	model.handleRemoteCatalog(remoteCatalogMsg{catalog: RemoteCatalog{
@@ -671,7 +829,10 @@ type fakeReports struct {
 	err     error
 }
 
-func (source *fakeReports) LastReport(_ context.Context, agent session.AgentSession) (string, error) {
+func (source *fakeReports) LastReport(
+	_ context.Context,
+	agent session.AgentSession,
+) (string, error) {
 	source.reads = append(source.reads, agent.SessionID)
 
 	return source.reports[agent.SessionID], source.err
@@ -714,7 +875,8 @@ func TestInboxReadsEachFinishedTurnsEvidenceOnceAndShowsIt(t *testing.T) {
 
 	runHandler(t, model, model.invokeAction(action.InboxEvidence.ID, action.Values{}))
 
-	if model.menu == nil || len(model.menu.entries) != 2 || model.menu.entries[0].label != "shots/login.png" {
+	if model.menu == nil || len(model.menu.entries) != 2 ||
+		model.menu.entries[0].label != "shots/login.png" {
 		t.Fatalf("evidence menu = %+v, want the two items", model.menu)
 	}
 
@@ -754,7 +916,9 @@ func TestInboxTriesAnUnreadableReportAgainOnlyAfterTheNextTurn(t *testing.T) {
 func TestInboxDoesNotReadTheReportsOfRemoteAgents(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Remote.Enabled = true
-	cfg.Remote.Connections = []config.RemoteConnectionConfig{{ID: inboxTestHost, Host: inboxTestHost}}
+	cfg.Remote.Connections = []config.RemoteConnectionConfig{
+		{ID: inboxTestHost, Host: inboxTestHost},
+	}
 
 	remoteAgent := inboxTestAgent("there", "%1", session.AgentStatusIdle, time.Now())
 	remoteAgent.SessionPath = "/history/there.jsonl"
@@ -762,10 +926,23 @@ func TestInboxDoesNotReadTheReportsOfRemoteAgents(t *testing.T) {
 	model := loaderTestModel(t, cfg, Dependencies{})
 	model.handleRemoteCatalog(remoteCatalogMsg{catalog: RemoteCatalog{
 		GeneratedAt: time.Now(),
-		Connections: []RemoteConnection{{
-			ID: inboxTestHost, Label: inboxTestHost, Connected: true, LastSeen: time.Now(),
-			Sessions: []session.Session{{ID: "$1", Name: "shop", Kind: session.KindLive, AgentTotal: 1, Agents: []session.AgentSession{remoteAgent}}},
-		}},
+		Connections: []RemoteConnection{
+			{
+				ID:        inboxTestHost,
+				Label:     inboxTestHost,
+				Connected: true,
+				LastSeen:  time.Now(),
+				Sessions: []session.Session{
+					{
+						ID:         "$1",
+						Name:       "shop",
+						Kind:       session.KindLive,
+						AgentTotal: 1,
+						Agents:     []session.AgentSession{remoteAgent},
+					},
+				},
+			},
+		},
 	}})
 	model.displayMode = displayModeInbox
 	refreshInbox(model)
@@ -814,7 +991,11 @@ func TestInboxLeavesOutFinishedAndTaskConversations(t *testing.T) {
 	finished.FinishedAt, finished.FinishedBy = time.Now().Unix(), work.FinishedByPR
 	ofTask := closedTestItem("w3", "conversation-task", time.Now())
 	ofTask.Task = "t1"
-	model.work = []work.Item{finished, closedTestItem("w2", "conversation-open", time.Now()), ofTask}
+	model.work = []work.Item{
+		finished,
+		closedTestItem("w2", "conversation-open", time.Now()),
+		ofTask,
+	}
 	refreshInbox(model)
 
 	assertInboxRows(t, model, map[string][]string{config.InboxClosed: {"closed w2"}})
@@ -822,11 +1003,13 @@ func TestInboxLeavesOutFinishedAndTaskConversations(t *testing.T) {
 
 func recordingDispatcher(model *Model, dispatched *action.Invocation) {
 	inboxState := model.deps.Inbox
-	model.deps = testServices(Dependencies{RunAction: func(_ context.Context, invocation action.Invocation) (any, error) {
-		*dispatched = invocation
+	model.deps = testServices(
+		Dependencies{RunAction: func(_ context.Context, invocation action.Invocation) (any, error) {
+			*dispatched = invocation
 
-		return action.ChangedWork{Item: "w1"}, nil
-	}})
+			return action.ChangedWork{Item: "w1"}, nil
+		}},
+	)
 	model.deps.Inbox = inboxState
 }
 
@@ -842,13 +1025,18 @@ func TestFinishOnAClosedConversationFinishesItOnItsMachine(t *testing.T) {
 	runHandler(t, model, model.invokeAction(action.InboxFinish.ID, action.Values{}))
 
 	input, ok := dispatched.Input.(action.ChangeWork)
-	if dispatched.Action != action.AgentFinish.ID || !ok || input.Item != "w1" || dispatched.At != action.Local() {
+	if dispatched.Action != action.AgentFinish.ID || !ok || input.Item != "w1" ||
+		dispatched.At != action.Local() {
 		t.Fatalf("dispatched %+v, want agent.finish of w1 on this machine", dispatched)
 	}
 }
 
 func TestFinishOnATaskRowFinishesTheTask(t *testing.T) {
-	model := newInboxTestModel(t, []task.Live{inboxTestLive(inboxTestRecord("feature", task.StateActive), "%9")}, nil)
+	model := newInboxTestModel(
+		t,
+		[]task.Live{inboxTestLive(inboxTestRecord("feature", task.StateActive), "%9")},
+		nil,
+	)
 	selectInboxRow(t, model, "feature")
 
 	runHandler(t, model, model.invokeAction(action.InboxFinish.ID, action.Values{}))
@@ -865,10 +1053,18 @@ func TestPinnedRowsComeFirstAndStayAmongTheShownClosedRows(t *testing.T) {
 
 	pinned := closedTestItem("w1", "conversation-w1", now.Add(-time.Hour))
 	pinned.PinnedAt = now.Unix()
-	model.work = []work.Item{pinned, closedTestItem("w2", "conversation-w2", now), closedTestItem("w3", "conversation-w3", now.Add(-time.Minute))}
+	model.work = []work.Item{
+		pinned,
+		closedTestItem("w2", "conversation-w2", now),
+		closedTestItem("w3", "conversation-w3", now.Add(-time.Minute)),
+	}
 	refreshInbox(model)
 
-	assertInboxRows(t, model, map[string][]string{config.InboxClosed: {"closed w1", "closed w2", "1 more"}})
+	assertInboxRows(
+		t,
+		model,
+		map[string][]string{config.InboxClosed: {"closed w1", "closed w2", "1 more"}},
+	)
 }
 
 func TestUnlinkOffersTheLinkedPullRequestsWhenThereAreSeveral(t *testing.T) {
@@ -894,7 +1090,9 @@ func TestUnlinkOffersTheLinkedPullRequestsWhenThereAreSeveral(t *testing.T) {
 
 	runHandler(t, model, model.runMenuEntry(1))
 
-	if input, ok := dispatched.Input.(action.ChangeWork); dispatched.Action != action.AgentUnlink.ID || !ok || input.PR != 9 {
+	if input, ok := dispatched.Input.(action.ChangeWork); dispatched.Action != action.AgentUnlink.ID ||
+		!ok ||
+		input.PR != 9 {
 		t.Fatalf("dispatched %+v, want agent.unlink of #9", dispatched)
 	}
 }
@@ -911,13 +1109,18 @@ func TestMarkingAClosedConversationUnseenAndSeenAsksItsMachine(t *testing.T) {
 	runHandler(t, model, model.invokeAction(action.InboxSeen.ID, action.Values{}))
 
 	if dispatched.Action != "" || !strings.Contains(model.statusMessage, errAlreadySeen.Error()) {
-		t.Fatalf("seen on a seen row dispatched %q with status %q, want only an error", dispatched.Action, model.statusMessage)
+		t.Fatalf(
+			"seen on a seen row dispatched %q with status %q, want only an error",
+			dispatched.Action,
+			model.statusMessage,
+		)
 	}
 
 	runHandler(t, model, model.invokeAction(action.InboxUnseen.ID, action.Values{}))
 
 	input, ok := dispatched.Input.(action.ChangeWork)
-	if dispatched.Action != action.AgentUnseen.ID || !ok || input.Item != "w1" || dispatched.At != action.Local() {
+	if dispatched.Action != action.AgentUnseen.ID || !ok || input.Item != "w1" ||
+		dispatched.At != action.Local() {
 		t.Fatalf("dispatched %+v, want agent.unseen of w1 on this machine", dispatched)
 	}
 
@@ -942,7 +1145,9 @@ func TestMarkingARemoteClosedConversationUnseenGoesToItsMachine(t *testing.T) {
 
 	cfg := config.DefaultConfig()
 	cfg.Remote.Enabled = true
-	cfg.Remote.Connections = []config.RemoteConnectionConfig{{ID: inboxTestHost, Host: inboxTestHost}}
+	cfg.Remote.Connections = []config.RemoteConnectionConfig{
+		{ID: inboxTestHost, Host: inboxTestHost},
+	}
 	cfg.Inbox.Collapsed = nil
 
 	model := loaderTestModel(t, cfg, Dependencies{})
@@ -976,7 +1181,11 @@ func TestFinishedConversationsAreListedWhenTheirSectionIsConfigured(t *testing.T
 	model := newInboxTestModel(t, nil, nil)
 	ofTask := finishedTestItem("w3", time.Now())
 	ofTask.Task = "t1"
-	model.work = []work.Item{finishedTestItem("w1", time.Now()), closedTestItem("w2", "conversation-w2", time.Now()), ofTask}
+	model.work = []work.Item{
+		finishedTestItem("w1", time.Now()),
+		closedTestItem("w2", "conversation-w2", time.Now()),
+		ofTask,
+	}
 
 	model.config.Inbox.Sections = append(config.InboxSections(), config.InboxArchived)
 	refreshInbox(model)
@@ -1029,15 +1238,27 @@ func TestEnterOnAFinishedConversationResumesItAndItsMenuOffersNoFinishOrSnooze(t
 
 	model := newInboxTestModel(t, nil, nil)
 	inboxState := model.deps.Inbox
-	model.deps = testServices(Dependencies{RunAction: func(_ context.Context, invocation action.Invocation) (any, error) {
-		dispatched = invocation
+	model.deps = testServices(
+		Dependencies{RunAction: func(_ context.Context, invocation action.Invocation) (any, error) {
+			dispatched = invocation
 
-		return action.ResumedAgent{Item: "w1", Session: testLiveRef("$2", "api"), Pane: "%9"}, nil
-	}})
+			return action.ResumedAgent{
+				Item:    "w1",
+				Session: testLiveRef("$2", "api"),
+				Pane:    "%9",
+			}, nil
+		}},
+	)
 	model.deps.Inbox = inboxState
 
 	model.config.Inbox.Sections = append(config.InboxSections(), config.InboxArchived)
-	model.config.Menu.Agent = []string{config.MenuGo, config.MenuSnooze, config.MenuPin, config.MenuFinish, config.MenuUnseen}
+	model.config.Menu.Agent = []string{
+		config.MenuGo,
+		config.MenuSnooze,
+		config.MenuPin,
+		config.MenuFinish,
+		config.MenuUnseen,
+	}
 	model.work = []work.Item{finishedTestItem("w1", time.Now())}
 	refreshInbox(model)
 	selectInboxRow(t, model, "closed w1")
@@ -1056,7 +1277,9 @@ func TestEnterOnAFinishedConversationResumesItAndItsMenuOffersNoFinishOrSnooze(t
 	updateTestModel(t, model, keyCode(tea.KeyEscape))
 	runHandler(t, model, model.handleEnter())
 
-	if input, ok := dispatched.Input.(action.ResumeAgent); dispatched.Action != action.AgentResume.ID || !ok || input.Item != "w1" {
+	if input, ok := dispatched.Input.(action.ResumeAgent); dispatched.Action != action.AgentResume.ID ||
+		!ok ||
+		input.Item != "w1" {
 		t.Fatalf("dispatched %+v, want agent.resume of w1", dispatched)
 	}
 }
@@ -1071,7 +1294,17 @@ func TestATaskRowShowsOnlyItsLedgerPullRequestAndRefusesLinking(t *testing.T) {
 
 	ofTask := closedTestItem("w1", "conversation-one", time.Now())
 	ofTask.Task = "t1"
-	ofTask.PRs = []work.PRLink{{Number: 7, State: task.PROpen, URL: "", Issues: []int{3}, Source: work.LinkUser, CreatedAt: 0, EndedAt: 0}}
+	ofTask.PRs = []work.PRLink{
+		{
+			Number:    7,
+			State:     task.PROpen,
+			URL:       "",
+			Issues:    []int{3},
+			Source:    work.LinkUser,
+			CreatedAt: 0,
+			EndedAt:   0,
+		},
+	}
 	model.work = []work.Item{ofTask}
 	model.width, model.height = 160, 30
 	refreshInbox(model)
@@ -1085,7 +1318,11 @@ func TestATaskRowShowsOnlyItsLedgerPullRequestAndRefusesLinking(t *testing.T) {
 	runHandler(t, model, model.invokeAction(action.InboxUnlink.ID, action.Values{}))
 
 	if dispatched.Action != "" || !strings.Contains(model.statusMessage, errTaskPR.Error()) {
-		t.Fatalf("unlink on a task row dispatched %q with status %q, want only an error", dispatched.Action, model.statusMessage)
+		t.Fatalf(
+			"unlink on a task row dispatched %q with status %q, want only an error",
+			dispatched.Action,
+			model.statusMessage,
+		)
 	}
 }
 
@@ -1094,11 +1331,17 @@ func TestEnterOnAClosedConversationResumesIt(t *testing.T) {
 
 	model := newInboxTestModel(t, nil, nil)
 	inboxState := model.deps.Inbox
-	model.deps = testServices(Dependencies{RunAction: func(_ context.Context, invocation action.Invocation) (any, error) {
-		dispatched = invocation
+	model.deps = testServices(
+		Dependencies{RunAction: func(_ context.Context, invocation action.Invocation) (any, error) {
+			dispatched = invocation
 
-		return action.ResumedAgent{Item: "w1", Session: testLiveRef("$2", "api"), Pane: "%9"}, nil
-	}})
+			return action.ResumedAgent{
+				Item:    "w1",
+				Session: testLiveRef("$2", "api"),
+				Pane:    "%9",
+			}, nil
+		}},
+	)
 	model.deps.Inbox = inboxState
 	model.work = []work.Item{closedTestItem("w1", "conversation-one", time.Now())}
 	refreshInbox(model)
@@ -1107,7 +1350,8 @@ func TestEnterOnAClosedConversationResumesIt(t *testing.T) {
 	runHandler(t, model, model.handleEnter())
 
 	input, ok := dispatched.Input.(action.ResumeAgent)
-	if dispatched.Action != action.AgentResume.ID || !ok || input.Item != "w1" || dispatched.At != action.Local() {
+	if dispatched.Action != action.AgentResume.ID || !ok || input.Item != "w1" ||
+		dispatched.At != action.Local() {
 		t.Fatalf("dispatched %+v, want agent.resume of w1 on this machine", dispatched)
 	}
 }
@@ -1117,7 +1361,13 @@ func TestClosedConversationMenuOffersFinishAndPinInsteadOfSnooze(t *testing.T) {
 	model.work = []work.Item{closedTestItem("w1", "conversation-one", time.Now())}
 	refreshInbox(model)
 	selectInboxRow(t, model, "closed w1")
-	model.config.Menu.Agent = []string{config.MenuGo, config.MenuSnooze, config.MenuPin, config.MenuUnpin, config.MenuFinish}
+	model.config.Menu.Agent = []string{
+		config.MenuGo,
+		config.MenuSnooze,
+		config.MenuPin,
+		config.MenuUnpin,
+		config.MenuFinish,
+	}
 
 	runHandler(t, model, model.openRowMenu())
 
@@ -1138,12 +1388,19 @@ func TestAProjectShowsItsNewestClosedRowsAndExpandsTheRest(t *testing.T) {
 
 	for index := range 5 {
 		id := "w" + strconv.Itoa(index+1)
-		model.work = append(model.work, closedTestItem(id, "conversation-"+id, now.Add(time.Duration(index)*time.Minute)))
+		model.work = append(
+			model.work,
+			closedTestItem(id, "conversation-"+id, now.Add(time.Duration(index)*time.Minute)),
+		)
 	}
 
 	refreshInbox(model)
 
-	assertInboxRows(t, model, map[string][]string{config.InboxClosed: {"closed w5", "closed w4", "closed w3", "2 more"}})
+	assertInboxRows(
+		t,
+		model,
+		map[string][]string{config.InboxClosed: {"closed w5", "closed w4", "closed w3", "2 more"}},
+	)
 
 	selectInboxRow(t, model, "2 more")
 	runHandler(t, model, model.handleEnter())
@@ -1155,7 +1412,11 @@ func TestAProjectShowsItsNewestClosedRowsAndExpandsTheRest(t *testing.T) {
 
 func TestCollapsedSectionShowsItsCountUntilEnterOpensIt(t *testing.T) {
 	now := time.Now()
-	model := newInboxTestModel(t, nil, []session.AgentSession{inboxTestAgent("fresh", "%1", session.AgentStatusIdle, now)})
+	model := newInboxTestModel(
+		t,
+		nil,
+		[]session.AgentSession{inboxTestAgent("fresh", "%1", session.AgentStatusIdle, now)},
+	)
 	model.config.Inbox.Collapsed = []string{config.InboxClosed}
 	model.config.Inbox.ClosedShown = 1
 	model.work = []work.Item{
@@ -1175,7 +1436,14 @@ func TestCollapsedSectionShowsItsCountUntilEnterOpensIt(t *testing.T) {
 	updateTestModel(t, model, keyCode(tea.KeyDown))
 	updateTestModel(t, model, keyCode(tea.KeyEnter))
 
-	assertInboxRows(t, model, map[string][]string{config.InboxReady: {"fresh"}, config.InboxClosed: {"closed w1", "2 more"}})
+	assertInboxRows(
+		t,
+		model,
+		map[string][]string{
+			config.InboxReady:  {"fresh"},
+			config.InboxClosed: {"closed w1", "2 more"},
+		},
+	)
 
 	if found, ok := model.selectedInboxItem(); !ok || found.work.ID != "w1" {
 		t.Fatalf("selected after opening = %q/%v, want w1", found.work.ID, ok)
@@ -1186,7 +1454,10 @@ func TestSearchFindsRowsInACollapsedSection(t *testing.T) {
 	now := time.Now()
 	model := newInboxTestModel(t, nil, nil)
 	model.config.Inbox.Collapsed = []string{config.InboxClosed}
-	model.work = []work.Item{closedTestItem("w1", "conversation-one", now), closedTestItem("w2", "conversation-two", now)}
+	model.work = []work.Item{
+		closedTestItem("w1", "conversation-one", now),
+		closedTestItem("w2", "conversation-two", now),
+	}
 	refreshInbox(model)
 	model = updateTestModel(t, model, tea.WindowSizeMsg{Width: 100, Height: 30})
 
@@ -1201,13 +1472,21 @@ func TestSearchFindsRowsInACollapsedSection(t *testing.T) {
 }
 
 func TestNewTaskOnATaskRowClosesThePickerForItsProject(t *testing.T) {
-	model := newInboxTestModel(t, []task.Live{inboxTestLive(inboxTestRecord("feature", task.StateActive), "%9")}, nil)
+	model := newInboxTestModel(
+		t,
+		[]task.Live{inboxTestLive(inboxTestRecord("feature", task.StateActive), "%9")},
+		nil,
+	)
 	selectInboxRow(t, model, "feature")
 
 	_, cmd := model.invokeAction(action.InboxTask.ID, action.Values{})()
 
 	if model.TaskProject() != "/work/api" || cmd == nil {
-		t.Fatalf("TaskProject() = %q, cmd = %v, want /work/api and the picker closing", model.TaskProject(), cmd)
+		t.Fatalf(
+			"TaskProject() = %q, cmd = %v, want /work/api and the picker closing",
+			model.TaskProject(),
+			cmd,
+		)
 	}
 
 	if _, quit := cmd().(tea.QuitMsg); !quit {
@@ -1226,6 +1505,10 @@ func TestNewTaskIsUnavailableOnAConversationOutsideAProject(t *testing.T) {
 	_, cmd := model.invokeAction(action.InboxTask.ID, action.Values{})()
 
 	if model.TaskProject() != "" || cmd != nil {
-		t.Fatalf("TaskProject() = %q, cmd = %v, want no project and the picker open", model.TaskProject(), cmd)
+		t.Fatalf(
+			"TaskProject() = %q, cmd = %v, want no project and the picker open",
+			model.TaskProject(),
+			cmd,
+		)
 	}
 }

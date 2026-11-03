@@ -118,7 +118,8 @@ func (s *State) Validate() error {
 		return ErrInvalidHistoryVersion
 	}
 
-	if len(s.SwitchHistory) > maxSwitchHistory || len(s.RemoteSwitchHistory) > maxRemoteSwitchHistory {
+	if len(s.SwitchHistory) > maxSwitchHistory ||
+		len(s.RemoteSwitchHistory) > maxRemoteSwitchHistory {
 		return errors.Join(strictjson.ErrInvalid, ErrHistoryBoundExceeded)
 	}
 
@@ -155,12 +156,18 @@ func LoadState(path string) (*State, error) {
 
 func (s *Service) LoadState(path string) (*State, error) {
 	if path == "" {
-		return nil, oops.In("session").Code("history_failed").With("operation", "load_history").Wrap(ErrEmptyStatePath)
+		return nil, oops.In("session").
+			Code("history_failed").
+			With("operation", "load_history").
+			Wrap(ErrEmptyStatePath)
 	}
 
 	dirPath, fileName, err := validatePath(path)
 	if err != nil {
-		return nil, oops.In("session").Code("history_failed").With("operation", "load_history").Wrap(err)
+		return nil, oops.In("session").
+			Code("history_failed").
+			With("operation", "load_history").
+			Wrap(err)
 	}
 
 	dir, err := openHistoryDir(dirPath, false)
@@ -169,18 +176,27 @@ func (s *Service) LoadState(path string) (*State, error) {
 			return defaultState(), nil
 		}
 
-		return nil, oops.In("session").Code("history_failed").With("operation", "load_history").Wrap(err)
+		return nil, oops.In("session").
+			Code("history_failed").
+			With("operation", "load_history").
+			Wrap(err)
 	}
 
 	state, loadErr := s.loadStateFromDir(dir, fileName)
 
 	closeErr := dir.Close()
 	if closeErr != nil {
-		return nil, oops.In("session").Code("history_failed").With("operation", "load_history").Wrap(errors.Join(loadErr, closeErr))
+		return nil, oops.In("session").
+			Code("history_failed").
+			With("operation", "load_history").
+			Wrap(errors.Join(loadErr, closeErr))
 	}
 
 	if loadErr != nil {
-		return nil, oops.In("session").Code("history_failed").With("operation", "load_history").Wrap(loadErr)
+		return nil, oops.In("session").
+			Code("history_failed").
+			With("operation", "load_history").
+			Wrap(loadErr)
 	}
 
 	return state, nil
@@ -196,11 +212,17 @@ func (s *Service) SaveState(ctx context.Context, path string, current *State) er
 	}
 
 	if path == "" {
-		return oops.In("session").Code("history_failed").With("operation", "save_history").Wrap(ErrEmptyStatePath)
+		return oops.In("session").
+			Code("history_failed").
+			With("operation", "save_history").
+			Wrap(ErrEmptyStatePath)
 	}
 
 	if current == nil {
-		return oops.In("session").Code("history_failed").With("operation", "save_history").Wrap(ErrNilState)
+		return oops.In("session").
+			Code("history_failed").
+			With("operation", "save_history").
+			Wrap(ErrNilState)
 	}
 
 	if err := current.Validate(); err != nil {
@@ -221,12 +243,18 @@ func (s *Service) SaveState(ctx context.Context, path string, current *State) er
 	lockFile, err := dir.Lock(ctx, lockName)
 	if err != nil {
 		closeErr := dir.Close()
-		return oops.In("session").Code("history_failed").With("operation", "save_history").Wrap(errors.Join(err, closeErr))
+		return oops.In("session").
+			Code("history_failed").
+			With("operation", "save_history").
+			Wrap(errors.Join(err, closeErr))
 	}
 
 	if err := ctx.Err(); err != nil {
 		cleanupErr := errors.Join(lockFile.Close(), dir.Close())
-		return oops.In("session").Code("history_failed").With("operation", "save_history").Wrap(errors.Join(err, cleanupErr))
+		return oops.In("session").
+			Code("history_failed").
+			With("operation", "save_history").
+			Wrap(errors.Join(err, cleanupErr))
 	}
 
 	_, saveErr := s.loadStateFromDir(dir, fileName)
@@ -239,11 +267,17 @@ func (s *Service) SaveState(ctx context.Context, path string, current *State) er
 
 	cleanupErr := errors.Join(lockCloseErr, dirCloseErr)
 	if saveErr != nil {
-		return oops.In("session").Code("history_failed").With("operation", "save_history").Wrap(errors.Join(saveErr, cleanupErr))
+		return oops.In("session").
+			Code("history_failed").
+			With("operation", "save_history").
+			Wrap(errors.Join(saveErr, cleanupErr))
 	}
 
 	if cleanupErr != nil {
-		return oops.In("session").Code("history_failed").With("operation", "save_history").Wrap(errors.Join(ErrUncertain, cleanupErr))
+		return oops.In("session").
+			Code("history_failed").
+			With("operation", "save_history").
+			Wrap(errors.Join(ErrUncertain, cleanupErr))
 	}
 
 	return nil
@@ -259,37 +293,58 @@ func (s *Service) UpdateState(
 	update StateUpdate,
 ) (*State, error) {
 	if err := ctx.Err(); err != nil {
-		return nil, oops.In("session").Code("history_failed").With("operation", "update_history").Wrap(err)
+		return nil, oops.In("session").
+			Code("history_failed").
+			With("operation", "update_history").
+			Wrap(err)
 	}
 
 	if path == "" {
-		return nil, oops.In("session").Code("history_failed").With("operation", "update_history").Wrap(ErrEmptyStatePath)
+		return nil, oops.In("session").
+			Code("history_failed").
+			With("operation", "update_history").
+			Wrap(ErrEmptyStatePath)
 	}
 
 	if update == nil {
-		return nil, oops.In("session").Code("history_failed").With("operation", "update_history").Wrap(ErrNilStateUpdate)
+		return nil, oops.In("session").
+			Code("history_failed").
+			With("operation", "update_history").
+			Wrap(ErrNilStateUpdate)
 	}
 
 	dirPath, fileName, err := validatePath(path)
 	if err != nil {
-		return nil, oops.In("session").Code("history_failed").With("operation", "update_history").Wrap(err)
+		return nil, oops.In("session").
+			Code("history_failed").
+			With("operation", "update_history").
+			Wrap(err)
 	}
 
 	dir, err := openHistoryDir(dirPath, true)
 	if err != nil {
-		return nil, oops.In("session").Code("history_failed").With("operation", "update_history").Wrap(err)
+		return nil, oops.In("session").
+			Code("history_failed").
+			With("operation", "update_history").
+			Wrap(err)
 	}
 
 	lockName := fileName + ".lock"
 	lockFile, err := dir.Lock(ctx, lockName)
 	if err != nil {
 		closeErr := dir.Close()
-		return nil, oops.In("session").Code("history_failed").With("operation", "update_history").Wrap(errors.Join(err, closeErr))
+		return nil, oops.In("session").
+			Code("history_failed").
+			With("operation", "update_history").
+			Wrap(errors.Join(err, closeErr))
 	}
 
 	if err := ctx.Err(); err != nil {
 		cleanupErr := errors.Join(lockFile.Close(), dir.Close())
-		return nil, oops.In("session").Code("history_failed").With("operation", "update_history").Wrap(errors.Join(err, cleanupErr))
+		return nil, oops.In("session").
+			Code("history_failed").
+			With("operation", "update_history").
+			Wrap(errors.Join(err, cleanupErr))
 	}
 
 	mutated, updateErr := s.executeStateUpdate(ctx, dir, fileName, update)
@@ -298,11 +353,17 @@ func (s *Service) UpdateState(
 
 	cleanupErr := errors.Join(lockCloseErr, dirCloseErr)
 	if updateErr != nil {
-		return nil, oops.In("session").Code("history_failed").With("operation", "update_history").Wrap(errors.Join(updateErr, cleanupErr))
+		return nil, oops.In("session").
+			Code("history_failed").
+			With("operation", "update_history").
+			Wrap(errors.Join(updateErr, cleanupErr))
 	}
 
 	if cleanupErr != nil {
-		return nil, oops.In("session").Code("history_failed").With("operation", "update_history").Wrap(errors.Join(ErrUncertain, cleanupErr))
+		return nil, oops.In("session").
+			Code("history_failed").
+			With("operation", "update_history").
+			Wrap(errors.Join(ErrUncertain, cleanupErr))
 	}
 
 	return mutated, nil
@@ -427,7 +488,12 @@ func encodeState(current *State) ([]byte, error) {
 	return data, nil
 }
 
-func (s *Service) saveStateToDir(ctx context.Context, dir *privatefs.Dir, fileName string, current *State) error {
+func (s *Service) saveStateToDir(
+	ctx context.Context,
+	dir *privatefs.Dir,
+	fileName string,
+	current *State,
+) error {
 	if err := ctx.Err(); err != nil {
 		return fmt.Errorf("context check: %w", err)
 	}
@@ -450,7 +516,11 @@ func (s *Service) saveStateToDir(ctx context.Context, dir *privatefs.Dir, fileNa
 	return s.publishTempState(ctx, dir, tempName, fileName)
 }
 
-func (s *Service) publishTempState(ctx context.Context, dir *privatefs.Dir, tempName, fileName string) error {
+func (s *Service) publishTempState(
+	ctx context.Context,
+	dir *privatefs.Dir,
+	tempName, fileName string,
+) error {
 	if s.faultHook != nil {
 		if fault := s.faultHook("rename"); fault != nil {
 			removeErr := dir.Remove(tempName)
@@ -820,13 +890,19 @@ func (s *State) DeleteSessionIdentity(ident Identity) {
 		return entry.Session == ident
 	})
 
-	s.RemoteSwitchHistory = slices.DeleteFunc(s.RemoteSwitchHistory, func(entry RemoteSwitchHistoryEntry) bool {
-		return entry.Session == ident
-	})
+	s.RemoteSwitchHistory = slices.DeleteFunc(
+		s.RemoteSwitchHistory,
+		func(entry RemoteSwitchHistoryEntry) bool {
+			return entry.Session == ident
+		},
+	)
 
-	s.AgentViewHistory = slices.DeleteFunc(s.AgentViewHistory, func(entry AgentViewHistoryEntry) bool {
-		return entry.Session == ident
-	})
+	s.AgentViewHistory = slices.DeleteFunc(
+		s.AgentViewHistory,
+		func(entry AgentViewHistoryEntry) bool {
+			return entry.Session == ident
+		},
+	)
 }
 
 func (s *State) RenameSession(oldIdent Identity, newIdent Identity) {

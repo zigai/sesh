@@ -63,13 +63,24 @@ func TestAgentRowsPreserveProviderStyleRole(t *testing.T) {
 	row := session.Session{Agents: []session.AgentSession{agent}}
 	model.providerRunner.Publish(providers.GH, providers.Rows{
 		agent.PaneID: {
-			display.FieldAgentCI: {Text: "failing", Role: "error", Variants: nil, State: rowlayout.Present},
+			display.FieldAgentCI: {
+				Text:     "failing",
+				Role:     "error",
+				Variants: nil,
+				State:    rowlayout.Present,
+			},
 		},
 	})
 
 	var values sessionFormatValues
 
-	left, _ := model.agentLayoutCells(sessionTableLayout{now: time.Unix(1, 0)}, row, agent, true, &values)
+	left, _ := model.agentLayoutCells(
+		sessionTableLayout{now: time.Unix(1, 0)},
+		row,
+		agent,
+		true,
+		&values,
+	)
 
 	cells := agentCells(values, left)
 	if len(cells) != 1 || cells[0].Text != "failing" || cells[0].Role != "error" {

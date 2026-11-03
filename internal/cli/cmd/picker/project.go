@@ -43,16 +43,19 @@ type projectFrontend struct {
 }
 
 func NewProjectPickCommand() *cobra.Command {
-	return actioncli.Command(action.ProjectPick, actioncli.Options[action.PickProject, action.PickedProject]{
-		Operation:    "project_picker",
-		SuccessOwned: false,
-		Configure: func(cmd *cobra.Command) {
-			cmd.Annotations[clibase.AnnotationLiveIO] = annotationEnabled
+	return actioncli.Command(
+		action.ProjectPick,
+		actioncli.Options[action.PickProject, action.PickedProject]{
+			Operation:    "project_picker",
+			SuccessOwned: false,
+			Configure: func(cmd *cobra.Command) {
+				cmd.Annotations[clibase.AnnotationLiveIO] = annotationEnabled
+			},
+			Prepare:  nil,
+			Frontend: func(cmd *cobra.Command) action.Dispatcher { return projectFrontend{cmd: cmd} },
+			Render:   nil,
 		},
-		Prepare:  nil,
-		Frontend: func(cmd *cobra.Command) action.Dispatcher { return projectFrontend{cmd: cmd} },
-		Render:   nil,
-	})
+	)
 }
 
 func NewProjectPickerUICommand() *cobra.Command {
@@ -63,7 +66,8 @@ func NewProjectPickerUICommand() *cobra.Command {
 		Args:   clibase.UsageArgs(cobra.NoArgs),
 		RunE:   runProjectPickerUI,
 		Annotations: map[string]string{
-			clibase.AnnotationOperation: "project_picker", clibase.AnnotationLiveIO: annotationEnabled,
+			clibase.AnnotationOperation: "project_picker",
+			clibase.AnnotationLiveIO:    annotationEnabled,
 		},
 	}
 
@@ -77,7 +81,10 @@ func (frontend projectFrontend) Accepts(at action.Location, id action.ID) bool {
 	return at.Kind == action.LocationLocal && id == action.ProjectPick.ID
 }
 
-func (frontend projectFrontend) Dispatch(ctx context.Context, invocation action.Invocation) (any, error) {
+func (frontend projectFrontend) Dispatch(
+	ctx context.Context,
+	invocation action.Invocation,
+) (any, error) {
 	cmd := frontend.cmd
 
 	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
@@ -112,18 +119,37 @@ func (frontend projectFrontend) Dispatch(ctx context.Context, invocation action.
 	defer cleanup()
 
 	arguments := slices.Concat(
-		[]string{"project", projectPickerUIVerb, "--socket", workspace.Socket, "--" + projectHandoffFlag, handoffPath},
+		[]string{
+			"project",
+			projectPickerUIVerb,
+			"--socket",
+			workspace.Socket,
+			"--" + projectHandoffFlag,
+			handoffPath,
+		},
 		forwardedConfigFlags(cmd),
 	)
 
-	width, height := popupDimensions(cfg, nil, gotmux.Size{Width: client.Width, Height: client.Height})
-	options := popupOptions(gotmux.Exec(executable, arguments...), width, height, cfg.Theme.Background)
+	width, height := popupDimensions(
+		cfg,
+		nil,
+		gotmux.Size{Width: client.Width, Height: client.Height},
+	)
+	options := popupOptions(
+		gotmux.Exec(executable, arguments...),
+		width,
+		height,
+		cfg.Theme.Background,
+	)
 
 	if err := client.Handle().Popup(ctx, options); err != nil {
 		return nil, oops.In("cli").With("operation", "open_project_picker").Wrap(err)
 	}
 
-	handoff, chosen, err := readHandoff(handoffPath, func(handoff projectHandoff) bool { return handoff.Value != "" })
+	handoff, chosen, err := readHandoff(
+		handoffPath,
+		func(handoff projectHandoff) bool { return handoff.Value != "" },
+	)
 	if err != nil || !chosen {
 		return action.PickedProject{}, err
 	}
@@ -131,7 +157,13 @@ func (frontend projectFrontend) Dispatch(ctx context.Context, invocation action.
 	return action.PickedProject{}, runProjectChoice(ctx, cmd, cfg, invocation.Caller, handoff)
 }
 
-func runProjectChoice(ctx context.Context, cmd *cobra.Command, cfg *config.Config, caller action.Caller, handoff projectHandoff) error {
+func runProjectChoice(
+	ctx context.Context,
+	cmd *cobra.Command,
+	cfg *config.Config,
+	caller action.Caller,
+	handoff projectHandoff,
+) error {
 	runtime, err := actioncli.OpenRuntime(cmd, cfg)
 	if err != nil {
 		return err
@@ -141,12 +173,35 @@ func runProjectChoice(ctx context.Context, cmd *cobra.Command, cfg *config.Confi
 
 	switch handoff.Kind {
 	case projectpicker.ChoiceOpen, projectpicker.ChoiceAdopt:
-		_, runErr = action.Run(ctx, runtime.Router, action.ProjectOpen, action.Local(), caller,
-			action.OpenProject{Directory: handoff.Value, Adopt: handoff.Kind == projectpicker.ChoiceAdopt})
+		_, runErr = action.Run(
+			ctx,
+			runtime.Router,
+			action.ProjectOpen,
+			action.Local(),
+			caller,
+			action.OpenProject{
+				Directory: handoff.Value,
+				Adopt:     handoff.Kind == projectpicker.ChoiceAdopt,
+			},
+		)
 	case projectpicker.ChoiceClone:
-		_, runErr = action.Run(ctx, runtime.Router, action.ProjectClone, action.Local(), caller, action.CloneProject{URL: handoff.Value})
+		_, runErr = action.Run(
+			ctx,
+			runtime.Router,
+			action.ProjectClone,
+			action.Local(),
+			caller,
+			action.CloneProject{URL: handoff.Value},
+		)
 	case projectpicker.ChoiceCreate:
-		_, runErr = action.Run(ctx, runtime.Router, action.ProjectCreate, action.Local(), caller, action.CreateProject{Name: handoff.Value})
+		_, runErr = action.Run(
+			ctx,
+			runtime.Router,
+			action.ProjectCreate,
+			action.Local(),
+			caller,
+			action.CreateProject{Name: handoff.Value},
+		)
 	default:
 		runErr = errPickerHandoffInvalid
 	}
@@ -208,7 +263,11 @@ func runProjectPickerUI(cmd *cobra.Command, _ []string) error {
 	return writeHandoff(handoffPath, projectHandoff{Kind: choice.Kind, Value: choice.Value})
 }
 
-func projectPickerEntries(ctx context.Context, cfg *config.Config, server *gotmux.Server) ([]projectpicker.Entry, error) {
+func projectPickerEntries(
+	ctx context.Context,
+	cfg *config.Config,
+	server *gotmux.Server,
+) ([]projectpicker.Entry, error) {
 	catalog, err := project.NewCatalog(cfg.Projects)
 	if err != nil {
 		return nil, clibase.NewExitError(clibase.ExitCodeUsage, err)
@@ -227,7 +286,13 @@ func projectPickerEntries(ctx context.Context, cfg *config.Config, server *gotmu
 	entries := make([]projectpicker.Entry, 0, len(projects))
 
 	for _, p := range projects {
-		entry := projectpicker.Entry{Root: p.Root, Name: p.Name, Path: session.ShortenHomePath(p.Root), Session: "", NameTakenBy: ""}
+		entry := projectpicker.Entry{
+			Root:        p.Root,
+			Name:        p.Name,
+			Path:        session.ShortenHomePath(p.Root),
+			Session:     "",
+			NameTakenBy: "",
+		}
 
 		for _, live := range sessions {
 			switch {
@@ -305,10 +370,13 @@ func readHandoff[T any](path string, valid func(T) bool) (T, bool, error) {
 		return handoff, false, nil
 	}
 
-	if len(encoded) > handoffMaxBytes || json.Unmarshal(encoded, &handoff) != nil || !valid(handoff) {
+	if len(encoded) > handoffMaxBytes || json.Unmarshal(encoded, &handoff) != nil ||
+		!valid(handoff) {
 		var empty T
 
-		return empty, false, oops.In("cli").With("operation", "read_picker_handoff").Wrap(errPickerHandoffInvalid)
+		return empty, false, oops.In("cli").
+			With("operation", "read_picker_handoff").
+			Wrap(errPickerHandoffInvalid)
 	}
 
 	return handoff, true, nil

@@ -61,7 +61,13 @@ func TestStoreRejectsRelativeOrUncleanPath(t *testing.T) {
 				t.Errorf("Load() error = %v, want ErrPath", err)
 			}
 
-			if _, err := store.Update(t.Context(), func(*inbox.State) error { return nil }); !errors.Is(err, inbox.ErrPath) {
+			if _, err := store.Update(
+				t.Context(),
+				func(*inbox.State) error { return nil },
+			); !errors.Is(
+				err,
+				inbox.ErrPath,
+			) {
 				t.Errorf("Update() error = %v, want ErrPath", err)
 			}
 		})
@@ -75,7 +81,11 @@ func TestStoreRejectsRelativeOrUncleanPath(t *testing.T) {
 func TestUpdateRejectsNilChange(t *testing.T) {
 	path := statePath(t)
 
-	if _, err := inbox.NewStore(path).Update(t.Context(), nil); !errors.Is(err, inbox.ErrNilUpdate) {
+	if _, err := inbox.NewStore(path).
+		Update(t.Context(), nil); !errors.Is(
+		err,
+		inbox.ErrNilUpdate,
+	) {
 		t.Fatalf("Update(nil) error = %v, want ErrNilUpdate", err)
 	}
 
@@ -205,7 +215,11 @@ func TestUpdateAcceptsTheEntryLimit(t *testing.T) {
 	}
 
 	if len(loaded.Snoozes) != 4096 || len(loaded.Unseen) != 4096 {
-		t.Fatalf("Load() returned %d snoozes and %d unseen marks, want 4096 each", len(loaded.Snoozes), len(loaded.Unseen))
+		t.Fatalf(
+			"Load() returned %d snoozes and %d unseen marks, want 4096 each",
+			len(loaded.Snoozes),
+			len(loaded.Unseen),
+		)
 	}
 }
 
@@ -232,12 +246,28 @@ func TestLoadRejectsMalformedFile(t *testing.T) {
 	}{
 		{"newer version", `{"version":2,"snoozes":[],"unseen":[]}`, inbox.ErrVersion},
 		{"unknown member", `{"version":1,"snoozes":[],"unseen":[],"pinned":[]}`, inbox.ErrInvalid},
-		{"unknown snooze member", `{"version":1,"snoozes":[{"key":"a","until":0,"since":1,"note":"x"}],"unseen":[]}`, inbox.ErrInvalid},
+		{
+			"unknown snooze member",
+			`{"version":1,"snoozes":[{"key":"a","until":0,"since":1,"note":"x"}],"unseen":[]}`,
+			inbox.ErrInvalid,
+		},
 		{"missing unseen list", `{"version":1,"snoozes":[]}`, inbox.ErrInvalid},
-		{"missing snooze field", `{"version":1,"snoozes":[{"key":"a","until":0}],"unseen":[]}`, inbox.ErrInvalid},
+		{
+			"missing snooze field",
+			`{"version":1,"snoozes":[{"key":"a","until":0}],"unseen":[]}`,
+			inbox.ErrInvalid,
+		},
 		{"not json", `version 1`, inbox.ErrInvalid},
-		{"duplicate key on disk", `{"version":1,"snoozes":[{"key":"a","until":0,"since":1},{"key":"a","until":0,"since":2}],"unseen":[]}`, inbox.ErrInvalid},
-		{"oversized file", `{"version":1,"snoozes":[],"unseen":[]}` + strings.Repeat(" ", 1<<20), inbox.ErrTooBig},
+		{
+			"duplicate key on disk",
+			`{"version":1,"snoozes":[{"key":"a","until":0,"since":1},{"key":"a","until":0,"since":2}],"unseen":[]}`,
+			inbox.ErrInvalid,
+		},
+		{
+			"oversized file",
+			`{"version":1,"snoozes":[],"unseen":[]}` + strings.Repeat(" ", 1<<20),
+			inbox.ErrTooBig,
+		},
 	}
 
 	for _, tc := range cases {
@@ -255,7 +285,11 @@ func TestLoadRejectsMalformedFile(t *testing.T) {
 				t.Errorf("Load() error = %v, want %v", err, tc.want)
 			}
 
-			if _, err := inbox.NewStore(path).Update(t.Context(), func(*inbox.State) error { return nil }); !errors.Is(err, tc.want) {
+			if _, err := inbox.NewStore(path).
+				Update(t.Context(), func(*inbox.State) error { return nil }); !errors.Is(
+				err,
+				tc.want,
+			) {
 				t.Errorf("Update() error = %v, want %v", err, tc.want)
 			}
 
@@ -361,7 +395,11 @@ func TestConcurrentUpdatesFromSeparateStoresKeepEveryChange(t *testing.T) {
 		got = append(got, snooze.Key)
 	}
 
-	if diff := cmp.Diff(keys, got, cmpopts.SortSlices(func(a, b string) bool { return a < b })); diff != "" {
+	if diff := cmp.Diff(
+		keys,
+		got,
+		cmpopts.SortSlices(func(a, b string) bool { return a < b }),
+	); diff != "" {
 		t.Fatalf("snooze keys after concurrent updates mismatch (-want +got):\n%s", diff)
 	}
 }

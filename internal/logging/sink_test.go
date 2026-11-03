@@ -409,7 +409,11 @@ func TestOpenRejectsEmptyDirectoryAndNonRegularPaths(t *testing.T) {
 	}
 
 	if sink, err := Open(os.DevNull); !errors.Is(err, ErrLogPathNotRegular) || sink != nil {
-		t.Fatalf("Open(non-regular) = (%v, %v), want nil sink and non-regular-path error", sink, err)
+		t.Fatalf(
+			"Open(non-regular) = (%v, %v), want nil sink and non-regular-path error",
+			sink,
+			err,
+		)
 	}
 }
 
@@ -489,7 +493,12 @@ func TestOpenExistingRejectsChangedFile(t *testing.T) {
 	}()
 
 	var origStat unix.Stat_t
-	if err := unix.Fstatat(int(parentFile.Fd()), baseName, &origStat, unix.AT_SYMLINK_NOFOLLOW); err != nil {
+	if err := unix.Fstatat(
+		int(parentFile.Fd()),
+		baseName,
+		&origStat,
+		unix.AT_SYMLINK_NOFOLLOW,
+	); err != nil {
 		t.Fatalf("Fstatat() error = %v", err)
 	}
 
@@ -503,7 +512,11 @@ func TestOpenExistingRejectsChangedFile(t *testing.T) {
 
 	file, err := openExisting(parentFile, path, baseName, &origStat)
 	if !errors.Is(err, ErrLogPathChanged) || file != nil {
-		t.Fatalf("openExisting(changed path) = (%v, %v), want nil file and changed-path error", file, err)
+		t.Fatalf(
+			"openExisting(changed path) = (%v, %v), want nil file and changed-path error",
+			file,
+			err,
+		)
 	}
 
 	if err := os.Remove(path); err != nil {
@@ -555,7 +568,11 @@ func TestSinkRollsBackPartialFileWrites(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "sesh.log")
 
-			file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_APPEND|os.O_RDWR, logFileMode)
+			file, err := os.OpenFile(
+				path,
+				os.O_CREATE|os.O_TRUNC|os.O_APPEND|os.O_RDWR,
+				logFileMode,
+			)
 			if err != nil {
 				t.Fatalf("OpenFile() error = %v", err)
 			}
@@ -636,7 +653,11 @@ func TestSinkRetainsWriteFailuresWithoutZerologStderrFallback(t *testing.T) {
 			}
 
 			if secondErr := sink.Close(); !errors.Is(secondErr, firstErr) {
-				t.Errorf("second Close() error = %v, want identical retained error %v", secondErr, firstErr)
+				t.Errorf(
+					"second Close() error = %v, want identical retained error %v",
+					secondErr,
+					firstErr,
+				)
 			}
 
 			if got, want := writer.writeCalls, 1; got != want {

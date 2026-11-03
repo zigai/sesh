@@ -47,7 +47,9 @@ func (r *Repository) initializeLocked(ctx context.Context) error {
 	} {
 		dir, err := r.root.Child(step.name, true)
 		if err != nil {
-			return oops.In("snapshot.store").With("operation", "create_repository_directory").Wrap(err)
+			return oops.In("snapshot.store").
+				With("operation", "create_repository_directory").
+				Wrap(err)
 		}
 
 		if err := errors.Join(dir.Sync(), dir.Close()); err != nil {
@@ -59,7 +61,15 @@ func (r *Repository) initializeLocked(ctx context.Context) error {
 		}
 	}
 
-	catalog = Catalog{Version: catalogVersion, Sequence: 0, Current: "", Attempts: nil, Generations: nil, Operations: nil, Rewrites: nil}
+	catalog = Catalog{
+		Version:     catalogVersion,
+		Sequence:    0,
+		Current:     "",
+		Attempts:    nil,
+		Generations: nil,
+		Operations:  nil,
+		Rewrites:    nil,
+	}
 	if err := r.publish(ctx, catalog, nil); err != nil {
 		return err
 	}
@@ -185,7 +195,8 @@ func stagedRepositoryFile(name string) bool {
 }
 
 func (r *Repository) validatePublishedInitialization(catalog Catalog, names []string) error {
-	if catalog.Sequence != 0 || catalog.Current != "" || len(catalog.Attempts)+len(catalog.Generations)+len(catalog.Operations) != 0 {
+	if catalog.Sequence != 0 || catalog.Current != "" ||
+		len(catalog.Attempts)+len(catalog.Generations)+len(catalog.Operations) != 0 {
 		return ErrCorrupt
 	}
 

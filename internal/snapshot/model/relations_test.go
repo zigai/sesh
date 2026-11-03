@@ -31,8 +31,28 @@ func TestExactSelectionAndSharedClosure(t *testing.T) {
 	m := fixture()
 	m.Sessions[0].Name, m.Sessions[1].Name = Bytes("1"), Bytes("10")
 	m.Sessions = append(m.Sessions, Session{ID: "s2", Name: Bytes("100"), Directory: Bytes("/tmp")})
-	m.Windows = append(m.Windows, Window{ID: "w1", Name: Bytes("unrelated"), Width: 80, Height: 24, Layout: Layout{Width: 80, Height: 24, Pane: "p1"}})
-	m.Panes = append(m.Panes, Pane{ID: "p1", Window: "w1", Directory: Bytes("/tmp"), Width: 80, Height: 24, Active: true, Launch: Launch{Recovery: "unverified"}})
+	m.Windows = append(
+		m.Windows,
+		Window{
+			ID:     "w1",
+			Name:   Bytes("unrelated"),
+			Width:  80,
+			Height: 24,
+			Layout: Layout{Width: 80, Height: 24, Pane: "p1"},
+		},
+	)
+	m.Panes = append(
+		m.Panes,
+		Pane{
+			ID:        "p1",
+			Window:    "w1",
+			Directory: Bytes("/tmp"),
+			Width:     80,
+			Height:    24,
+			Active:    true,
+			Launch:    Launch{Recovery: "unverified"},
+		},
+	)
 
 	m.Links = append(m.Links, Link{Session: "s2", Window: "w1", Index: 9, Active: true})
 	for _, id := range []string{"s0", "s1"} {

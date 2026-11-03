@@ -60,7 +60,10 @@ func PlanDefinitions(definitions []ServiceDefinition) ([]ArtifactPlan, error) {
 	for _, definition := range definitions {
 		existing, err := readDefinition(definition.Path)
 		if err != nil {
-			return nil, oops.In("setup").Code("setup_definition_failed").With("operation", "plan_definitions").Wrap(err)
+			return nil, oops.In("setup").
+				Code("setup_definition_failed").
+				With("operation", "plan_definitions").
+				Wrap(err)
 		}
 
 		plan := ArtifactPlan{
@@ -102,7 +105,10 @@ func PlanRetiredDefinitions(definitions []ServiceDefinition) ([]ArtifactPlan, er
 	var plans []ArtifactPlan
 
 	for _, name := range retirableServiceNames {
-		if slices.ContainsFunc(definitions, func(definition ServiceDefinition) bool { return definition.Name == name }) {
+		if slices.ContainsFunc(
+			definitions,
+			func(definition ServiceDefinition) bool { return definition.Name == name },
+		) {
 			continue
 		}
 
@@ -110,11 +116,23 @@ func PlanRetiredDefinitions(definitions []ServiceDefinition) ([]ArtifactPlan, er
 
 		existing, err := readDefinition(path)
 		if err != nil {
-			return nil, oops.In("setup").Code("setup_definition_failed").With("operation", "plan_retired_definitions").Wrap(err)
+			return nil, oops.In("setup").
+				Code("setup_definition_failed").
+				With("operation", "plan_retired_definitions").
+				Wrap(err)
 		}
 
 		if existing.Exists && existing.Owned {
-			plans = append(plans, ArtifactPlan{Name: name, Path: path, State: ArtifactRetired, Changed: true, Requires: nil})
+			plans = append(
+				plans,
+				ArtifactPlan{
+					Name:     name,
+					Path:     path,
+					State:    ArtifactRetired,
+					Changed:  true,
+					Requires: nil,
+				},
+			)
 		}
 	}
 
@@ -127,7 +145,10 @@ func ApplyDefinitions(
 	force bool,
 ) (ApplyResult, error) {
 	if len(definitions) != len(plans) {
-		return emptyApplyResult(), oops.In("setup").Code("setup_definition_failed").With("operation", "apply_definitions").Wrap(ErrPlanMismatch)
+		return emptyApplyResult(), oops.In("setup").
+			Code("setup_definition_failed").
+			With("operation", "apply_definitions").
+			Wrap(ErrPlanMismatch)
 	}
 
 	result := emptyApplyResult()
@@ -152,7 +173,10 @@ func ApplyDefinitions(
 		}
 
 		if err := writeDefinition(definition.Path, definition.Content); err != nil {
-			return result, oops.In("setup").Code("setup_definition_failed").With("operation", "apply_definitions").Wrap(err)
+			return result, oops.In("setup").
+				Code("setup_definition_failed").
+				With("operation", "apply_definitions").
+				Wrap(err)
 		}
 
 		result.Written++
@@ -176,7 +200,10 @@ func readDefinition(path string) (definitionFile, error) {
 			return emptyDefinitionFile(), nil
 		}
 
-		return emptyDefinitionFile(), oops.In("setup").Code("setup_definition_failed").With("operation", "inspect_definition").Wrap(err)
+		return emptyDefinitionFile(), oops.In("setup").
+			Code("setup_definition_failed").
+			With("operation", "inspect_definition").
+			Wrap(err)
 	}
 
 	if !info.Mode().IsRegular() || info.Size() > maxDefinitionBytes {
@@ -189,16 +216,25 @@ func readDefinition(path string) (definitionFile, error) {
 			return emptyDefinitionFile(), nil
 		}
 
-		return emptyDefinitionFile(), oops.In("setup").Code("setup_definition_failed").With("operation", "open_definition").Wrap(err)
+		return emptyDefinitionFile(), oops.In("setup").
+			Code("setup_definition_failed").
+			With("operation", "open_definition").
+			Wrap(err)
 	}
 
 	data, readErr := io.ReadAll(io.LimitReader(file, maxDefinitionBytes))
 	closeErr := file.Close()
 
 	if readErr != nil {
-		readFailure := oops.In("setup").Code("setup_definition_failed").With("operation", "read_definition").Wrap(readErr)
+		readFailure := oops.In("setup").
+			Code("setup_definition_failed").
+			With("operation", "read_definition").
+			Wrap(readErr)
 		if closeErr != nil {
-			closeFailure := oops.In("setup").Code("setup_definition_failed").With("operation", "close_definition").Wrap(closeErr)
+			closeFailure := oops.In("setup").
+				Code("setup_definition_failed").
+				With("operation", "close_definition").
+				Wrap(closeErr)
 			return emptyDefinitionFile(), errors.Join(readFailure, closeFailure)
 		}
 
@@ -206,7 +242,10 @@ func readDefinition(path string) (definitionFile, error) {
 	}
 
 	if closeErr != nil {
-		return emptyDefinitionFile(), oops.In("setup").Code("setup_definition_failed").With("operation", "close_definition").Wrap(closeErr)
+		return emptyDefinitionFile(), oops.In("setup").
+			Code("setup_definition_failed").
+			With("operation", "close_definition").
+			Wrap(closeErr)
 	}
 
 	content := string(data)
@@ -226,7 +265,10 @@ func writeDefinition(path, content string) error {
 	directory := filepath.Dir(path)
 
 	if err := os.MkdirAll(directory, definitionDirectoryMode); err != nil {
-		return oops.In("setup").Code("setup_definition_failed").With("operation", "create_definition_directory").Wrap(err)
+		return oops.In("setup").
+			Code("setup_definition_failed").
+			With("operation", "create_definition_directory").
+			Wrap(err)
 	}
 
 	name := filepath.Base(path)
@@ -237,21 +279,34 @@ func writeDefinition(path, content string) error {
 	}
 
 	if err := os.Rename(temp, path); err != nil {
-		renameErr := oops.In("setup").Code("setup_definition_failed").With("operation", "publish_definition").Wrap(err)
+		renameErr := oops.In("setup").
+			Code("setup_definition_failed").
+			With("operation", "publish_definition").
+			Wrap(err)
 		return errors.Join(renameErr, removeDefinitionTemp(temp))
 	}
 
 	if err := syncDirectory(directory); err != nil {
-		return oops.In("setup").Code("setup_definition_failed").With("operation", "sync_definition_directory").Wrap(err)
+		return oops.In("setup").
+			Code("setup_definition_failed").
+			With("operation", "sync_definition_directory").
+			Wrap(err)
 	}
 
 	return nil
 }
 
 func writeDefinitionTemp(temp string, data []byte) error {
-	file, err := os.OpenFile(temp, os.O_WRONLY|os.O_CREATE|os.O_EXCL|unix.O_NOFOLLOW, definitionFileMode)
+	file, err := os.OpenFile(
+		temp,
+		os.O_WRONLY|os.O_CREATE|os.O_EXCL|unix.O_NOFOLLOW,
+		definitionFileMode,
+	)
 	if err != nil {
-		return oops.In("setup").Code("setup_definition_failed").With("operation", "create_definition").Wrap(err)
+		return oops.In("setup").
+			Code("setup_definition_failed").
+			With("operation", "create_definition").
+			Wrap(err)
 	}
 
 	_, writeErr := file.Write(data)
@@ -259,7 +314,10 @@ func writeDefinitionTemp(temp string, data []byte) error {
 	closeErr := file.Close()
 
 	if err := errors.Join(writeErr, syncErr, closeErr); err != nil {
-		writeFailure := oops.In("setup").Code("setup_definition_failed").With("operation", "write_definition").Wrap(err)
+		writeFailure := oops.In("setup").
+			Code("setup_definition_failed").
+			With("operation", "write_definition").
+			Wrap(err)
 		return errors.Join(writeFailure, removeDefinitionTemp(temp))
 	}
 
@@ -268,7 +326,10 @@ func writeDefinitionTemp(temp string, data []byte) error {
 
 func removeDefinitionTemp(temp string) error {
 	if err := os.Remove(temp); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return oops.In("setup").Code("setup_definition_failed").With("operation", "remove_temp_definition").Wrap(err)
+		return oops.In("setup").
+			Code("setup_definition_failed").
+			With("operation", "remove_temp_definition").
+			Wrap(err)
 	}
 
 	return nil
@@ -277,14 +338,20 @@ func removeDefinitionTemp(temp string) error {
 func syncDirectory(path string) error {
 	dir, err := os.Open(path)
 	if err != nil {
-		return oops.In("setup").Code("setup_definition_failed").With("operation", "open_definition_directory").Wrap(err)
+		return oops.In("setup").
+			Code("setup_definition_failed").
+			With("operation", "open_definition_directory").
+			Wrap(err)
 	}
 
 	syncErr := dir.Sync()
 	closeErr := dir.Close()
 
 	if err := errors.Join(syncErr, closeErr); err != nil {
-		return oops.In("setup").Code("setup_definition_failed").With("operation", "sync_definition_directory").Wrap(err)
+		return oops.In("setup").
+			Code("setup_definition_failed").
+			With("operation", "sync_definition_directory").
+			Wrap(err)
 	}
 
 	return nil

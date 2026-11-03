@@ -84,13 +84,19 @@ func (m *Model) inboxSessions() []session.Session {
 	}
 
 	shown := m.config.Inbox.Sections
-	items = slices.DeleteFunc(items, func(item inboxItem) bool { return !slices.Contains(shown, item.section) })
+	items = slices.DeleteFunc(
+		items,
+		func(item inboxItem) bool { return !slices.Contains(shown, item.section) },
+	)
 
 	for _, item := range items {
 		m.inboxItems[inboxKey(item.agent.Host, item.agent.PaneID)] = item
 	}
 
-	slices.SortStableFunc(items, func(left, right inboxItem) int { return m.compareInboxItems(left, right) })
+	slices.SortStableFunc(
+		items,
+		func(left, right inboxItem) int { return m.compareInboxItems(left, right) },
+	)
 
 	rows := m.inboxStateRows(items)
 	if m.inboxGroup == config.InboxGroupProject {
@@ -115,7 +121,10 @@ func (m *Model) inboxOfflineRows() []session.Session {
 
 		switch {
 		case connection.LastError == RemoteErrorIncompatibleProtocol:
-			rows = append(rows, inboxGroupRow("offline:"+connection.ID, label+" needs the same sesh version", nil))
+			rows = append(
+				rows,
+				inboxGroupRow("offline:"+connection.ID, label+" needs the same sesh version", nil),
+			)
 		case remoteConnectionStatus(connection, m.config.Remote.StaleAfter, time.Now()) == session.RemoteStatusUnavailable:
 			rows = append(rows, inboxGroupRow("offline:"+connection.ID, label+" offline", nil))
 		}
@@ -142,7 +151,14 @@ func (m *Model) inboxStateRows(items []inboxItem) []session.Session {
 		switch {
 		case len(agents) == 0:
 		case m.sectionCollapsed(section):
-			rows = append(rows, inboxGroupRow(section, fmt.Sprintf("%s (%d)", m.config.Inbox.Label(section), conversations), nil))
+			rows = append(
+				rows,
+				inboxGroupRow(
+					section,
+					fmt.Sprintf("%s (%d)", m.config.Inbox.Label(section), conversations),
+					nil,
+				),
+			)
 		default:
 			rows = append(rows, inboxGroupRow(section, m.config.Inbox.Label(section), agents))
 		}
@@ -182,12 +198,15 @@ func (m *Model) inboxProjectRows(sorted []inboxItem) []session.Session {
 }
 
 func (m *Model) sectionCollapsed(section string) bool {
-	return slices.Contains(m.config.Inbox.Collapsed, section) && !m.openedSections[section] && m.textInput.Value() == ""
+	return slices.Contains(m.config.Inbox.Collapsed, section) && !m.openedSections[section] &&
+		m.textInput.Value() == ""
 }
 
 func (m *Model) collapsedSectionAt(row popupListRow) (string, bool) {
 	if m.displayMode != displayModeInbox || m.inboxGroup != config.InboxGroupState || row.isAgent() || row.isSeparator() ||
-		row.sessionIndex < 0 || row.sessionIndex >= len(m.filtered) || len(m.filtered[row.sessionIndex].Agents) > 0 {
+		row.sessionIndex < 0 ||
+		row.sessionIndex >= len(m.filtered) ||
+		len(m.filtered[row.sessionIndex].Agents) > 0 {
 		return "", false
 	}
 
@@ -203,7 +222,10 @@ func (m *Model) openSection(section string) func() (tea.Model, tea.Cmd) {
 		m.refreshDisplaySessions()
 		m.filterSessions()
 
-		if index := slices.IndexFunc(m.filtered, func(row session.Session) bool { return row.ID == inboxGroupIDPrefix+section }); index >= 0 {
+		if index := slices.IndexFunc(
+			m.filtered,
+			func(row session.Session) bool { return row.ID == inboxGroupIDPrefix+section },
+		); index >= 0 {
 			m.cursor = index
 			m.agentCursor = 0
 			m.listViewportPolicy = listViewportFollowSelection
@@ -239,7 +261,10 @@ func inboxProject(item inboxItem) string {
 
 func (m *Model) compareInboxItems(left, right inboxItem) int {
 	sections := m.config.Inbox.Sections
-	if order := cmp.Compare(slices.Index(sections, left.section), slices.Index(sections, right.section)); order != 0 {
+	if order := cmp.Compare(
+		slices.Index(sections, left.section),
+		slices.Index(sections, right.section),
+	); order != 0 {
 		return order
 	}
 
@@ -252,11 +277,20 @@ func inboxKey(host, paneID string) string {
 
 func (m *Model) inboxHosts() []inboxHost {
 	local := session.RuntimeIdentity{
-		ConnectionID: "", ConnectionLabel: "", ConfigDigest: "", PeerID: "", StreamInstance: "", TmuxServerSocket: "",
-		TmuxServerPID: 0, TmuxServerStartedAt: time.Time{}, TmuxSessionCreatedAt: time.Time{},
+		ConnectionID:         "",
+		ConnectionLabel:      "",
+		ConfigDigest:         "",
+		PeerID:               "",
+		StreamInstance:       "",
+		TmuxServerSocket:     "",
+		TmuxServerPID:        0,
+		TmuxServerStartedAt:  time.Time{},
+		TmuxSessionCreatedAt: time.Time{},
 	}
 
-	hosts := []inboxHost{{origin: session.OriginLocal, identity: local, label: "", tasks: m.tasks, work: m.work}}
+	hosts := []inboxHost{
+		{origin: session.OriginLocal, identity: local, label: "", tasks: m.tasks, work: m.work},
+	}
 	if !remoteSessionsEnabled(m.config, m.deps) {
 		return hosts
 	}
@@ -274,9 +308,15 @@ func (m *Model) inboxHosts() []inboxHost {
 		hosts = append(hosts, inboxHost{
 			origin: session.OriginSSH,
 			identity: session.RuntimeIdentity{
-				ConnectionID: connection.ID, ConnectionLabel: connection.Label, ConfigDigest: connection.ConfigDigest,
-				PeerID: connection.PeerID, StreamInstance: connection.StreamInstance, TmuxServerSocket: "",
-				TmuxServerPID: 0, TmuxServerStartedAt: time.Time{}, TmuxSessionCreatedAt: time.Time{},
+				ConnectionID:         connection.ID,
+				ConnectionLabel:      connection.Label,
+				ConfigDigest:         connection.ConfigDigest,
+				PeerID:               connection.PeerID,
+				StreamInstance:       connection.StreamInstance,
+				TmuxServerSocket:     "",
+				TmuxServerPID:        0,
+				TmuxServerStartedAt:  time.Time{},
+				TmuxSessionCreatedAt: time.Time{},
 			},
 			label: label,
 			tasks: connection.Tasks,
@@ -336,11 +376,18 @@ func (m *Model) hostTaskItems(host inboxHost, agents map[string]session.AgentSes
 	var items []inboxItem
 
 	for _, live := range host.tasks {
-		if _, running := agents[string(live.AgentPane)]; taskInFlight(live) || (running && live.AgentPane != "") {
+		if _, running := agents[string(live.AgentPane)]; taskInFlight(live) ||
+			(running && live.AgentPane != "") {
 			continue
 		}
 
-		item := m.newInboxItem(host, owners[string(live.SessionID)], taskAgent(live, agents), live, inboxTaskRow)
+		item := m.newInboxItem(
+			host,
+			owners[string(live.SessionID)],
+			taskAgent(live, agents),
+			live,
+			inboxTaskRow,
+		)
 		if live.Present || needsWindowlessRow(item) {
 			items = append(items, item)
 		}
@@ -355,19 +402,34 @@ func needsWindowlessRow(item inboxItem) bool {
 }
 
 func taskInFlight(live task.Live) bool {
-	return (live.Record.State == task.StateCreating || live.Record.State == task.StateFinishing) && !live.Stalled
+	return (live.Record.State == task.StateCreating || live.Record.State == task.StateFinishing) &&
+		!live.Stalled
 }
 
-func (m *Model) newInboxItem(host inboxHost, owner session.Session, agent session.AgentSession, live task.Live, kind inboxItemKind) inboxItem {
-	if metadata, ok := m.agentGit[agentGitDirectory(agent)]; ok && host.origin == session.OriginLocal {
+func (m *Model) newInboxItem(
+	host inboxHost,
+	owner session.Session,
+	agent session.AgentSession,
+	live task.Live,
+	kind inboxItemKind,
+) inboxItem {
+	if metadata, ok := m.agentGit[agentGitDirectory(agent)]; ok &&
+		host.origin == session.OriginLocal {
 		applyAgentGitMetadata(&agent, metadata)
 	}
 
 	agent.Host = host.identity.ConnectionID
 
 	item := inboxItem{
-		agent: agent, owner: owner, host: host, live: live, kind: kind, work: recordedWork(host, agent, live, kind), expandKey: "",
-		section: "", hidden: 0,
+		agent:     agent,
+		owner:     owner,
+		host:      host,
+		live:      live,
+		kind:      kind,
+		work:      recordedWork(host, agent, live, kind),
+		expandKey: "",
+		section:   "",
+		hidden:    0,
 	}
 	item.section = m.inboxSection(item)
 
@@ -388,7 +450,8 @@ func (m *Model) inboxSection(item inboxItem) string {
 		return section
 	}
 
-	if (item.owner.ID != "" && m.agentIdleUnread(item.owner, item.agent)) || m.inboxDoneByMark(item) {
+	if (item.owner.ID != "" && m.agentIdleUnread(item.owner, item.agent)) ||
+		m.inboxDoneByMark(item) {
 		return config.InboxReady
 	}
 
@@ -420,7 +483,10 @@ func statusSection(agent session.AgentSession) (string, bool) {
 		return config.InboxWorking, true
 	case session.AgentStatusMerged:
 		return config.InboxSeen, true
-	case session.AgentStatusIdle, session.AgentStatusInterrupted, session.AgentStatusUnknown, session.AgentStatusSleeping,
+	case session.AgentStatusIdle,
+		session.AgentStatusInterrupted,
+		session.AgentStatusUnknown,
+		session.AgentStatusSleeping,
 		session.AgentStatusClosed:
 	}
 
@@ -428,7 +494,8 @@ func statusSection(agent session.AgentSession) (string, bool) {
 }
 
 func (m *Model) unmergedItem(item inboxItem) bool {
-	if item.agent.GitUnmerged > 0 || (item.kind == inboxTaskRow && item.live.Record.PR.State == task.PROpen) {
+	if item.agent.GitUnmerged > 0 ||
+		(item.kind == inboxTaskRow && item.live.Record.PR.State == task.PROpen) {
 		return true
 	}
 
@@ -441,7 +508,11 @@ func (m *Model) unmergedItem(item inboxItem) bool {
 
 func (m *Model) inboxPR(item inboxItem) string {
 	if item.agent.Host == "" && item.agent.PaneID != "" {
-		if cell := m.providerRunner.Cell(providers.GH, item.agent.PaneID, display.FieldAgentPR); cell.Text != "" {
+		if cell := m.providerRunner.Cell(
+			providers.GH,
+			item.agent.PaneID,
+			display.FieldAgentPR,
+		); cell.Text != "" {
 			return cell.Text
 		}
 	}
@@ -582,7 +653,8 @@ func (m *Model) taskTitles() map[string]string {
 	titles := make(map[string]string, len(m.tasks))
 
 	for _, live := range m.tasks {
-		if agent, found := agents[string(live.AgentPane)]; found && live.AgentPane != "" && agent.Task != "" {
+		if agent, found := agents[string(live.AgentPane)]; found && live.AgentPane != "" &&
+			agent.Task != "" {
 			titles[live.Record.ID] = agent.Task
 		}
 	}
@@ -647,7 +719,8 @@ func (m *Model) hostSessionsByID(host inboxHost) map[string]session.Session {
 }
 
 func (host inboxHost) owns(row session.Session) bool {
-	return row.Origin == host.origin && !row.Saved() && row.RuntimeIdentity.ConnectionID == host.identity.ConnectionID
+	return row.Origin == host.origin && !row.Saved() &&
+		row.RuntimeIdentity.ConnectionID == host.identity.ConnectionID
 }
 
 func (m *Model) hostLabel(connection string) string {
@@ -738,7 +811,8 @@ func taskActionFitOf(id action.ID, live task.Live) taskActionFit {
 	case action.TaskWake.ID:
 		fits = state == task.StateSleeping || state == task.StateWaking
 	case action.TaskOpen.ID:
-		fits = !live.Present && !live.Stalled && state != task.StateCreating && state != task.StateFinishing
+		fits = !live.Present && !live.Stalled && state != task.StateCreating &&
+			state != task.StateFinishing
 	case action.TaskFinish.ID, action.TaskRun.ID:
 		fits = true
 	default:

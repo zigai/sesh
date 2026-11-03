@@ -57,21 +57,61 @@ func NewCommand() *cobra.Command {
 		navigationCommand(action.AgentUnread),
 		navigationCommand(action.AgentFailed),
 		navigationCommand(action.AgentToggle),
-		actioncli.Command(action.AgentBack, actioncli.Options[action.ReturnToAgent, action.FocusedPane]{
-			Operation: "", SuccessOwned: false, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
-		}),
-		actioncli.Command(action.AgentFocus, actioncli.Options[action.FocusAgent, action.FocusedPane]{
-			Operation: "", SuccessOwned: false, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
-		}),
-		actioncli.Command(action.AgentWindowStatusClear, actioncli.Options[action.ClearWindowStatus, action.ClearedWindowStatus]{
-			Operation: "", SuccessOwned: false, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
-		}),
-		actioncli.Command(action.AgentMerge, actioncli.Options[action.MergeAgentBranch, action.MergedAgentBranch]{
-			Operation: "", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
-		}),
-		actioncli.Command(action.AgentResume, actioncli.Options[action.ResumeAgent, action.ResumedAgent]{
-			Operation: "", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
-		}),
+		actioncli.Command(
+			action.AgentBack,
+			actioncli.Options[action.ReturnToAgent, action.FocusedPane]{
+				Operation:    "",
+				SuccessOwned: false,
+				Configure:    nil,
+				Prepare:      nil,
+				Frontend:     nil,
+				Render:       nil,
+			},
+		),
+		actioncli.Command(
+			action.AgentFocus,
+			actioncli.Options[action.FocusAgent, action.FocusedPane]{
+				Operation:    "",
+				SuccessOwned: false,
+				Configure:    nil,
+				Prepare:      nil,
+				Frontend:     nil,
+				Render:       nil,
+			},
+		),
+		actioncli.Command(
+			action.AgentWindowStatusClear,
+			actioncli.Options[action.ClearWindowStatus, action.ClearedWindowStatus]{
+				Operation:    "",
+				SuccessOwned: false,
+				Configure:    nil,
+				Prepare:      nil,
+				Frontend:     nil,
+				Render:       nil,
+			},
+		),
+		actioncli.Command(
+			action.AgentMerge,
+			actioncli.Options[action.MergeAgentBranch, action.MergedAgentBranch]{
+				Operation:    "",
+				SuccessOwned: true,
+				Configure:    nil,
+				Prepare:      nil,
+				Frontend:     nil,
+				Render:       nil,
+			},
+		),
+		actioncli.Command(
+			action.AgentResume,
+			actioncli.Options[action.ResumeAgent, action.ResumedAgent]{
+				Operation:    "",
+				SuccessOwned: true,
+				Configure:    nil,
+				Prepare:      nil,
+				Frontend:     nil,
+				Render:       nil,
+			},
+		),
 		workCommand(action.AgentFinish),
 		workCommand(action.AgentPin),
 		workCommand(action.AgentUnpin),
@@ -85,20 +125,33 @@ func NewCommand() *cobra.Command {
 	return cmd
 }
 
-func workCommand(definition *action.Definition[action.ChangeWork, action.ChangedWork]) *cobra.Command {
+func workCommand(
+	definition *action.Definition[action.ChangeWork, action.ChangedWork],
+) *cobra.Command {
 	return actioncli.Command(definition, actioncli.Options[action.ChangeWork, action.ChangedWork]{
 		Operation: "", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
 	})
 }
 
-func navigationCommand(definition *action.Definition[action.NavigateAgents, action.FocusedPane]) *cobra.Command {
-	return actioncli.Command(definition, actioncli.Options[action.NavigateAgents, action.FocusedPane]{
-		Operation: "", SuccessOwned: false, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
-	})
+func navigationCommand(
+	definition *action.Definition[action.NavigateAgents, action.FocusedPane],
+) *cobra.Command {
+	return actioncli.Command(
+		definition,
+		actioncli.Options[action.NavigateAgents, action.FocusedPane]{
+			Operation:    "",
+			SuccessOwned: false,
+			Configure:    nil,
+			Prepare:      nil,
+			Frontend:     nil,
+			Render:       nil,
+		},
+	)
 }
 
 func addAgentRegistryFlags(cmd *cobra.Command) {
-	cmd.Flags().String(stateFlag, "", "AHT agent registry file [default: agent_status.store_path setting, else AHT's default registry]")
+	cmd.Flags().
+		String(stateFlag, "", "AHT agent registry file [default: agent_status.store_path setting, else AHT's default registry]")
 }
 
 func newAgentStatusCommand() *cobra.Command {
@@ -182,7 +235,11 @@ func runAgentStatusRun(cmd *cobra.Command, _ []string) error {
 	quiet, _ := cmd.Flags().GetBool("quiet")
 	resolved := cfg.ResolvedAgentStatus()
 
-	styles := agents.NewTmuxStyleController(server, resolved.SetWindowStatusStyle, resolved.SetWindowStatusBellStyle)
+	styles := agents.NewTmuxStyleController(
+		server,
+		resolved.SetWindowStatusStyle,
+		resolved.SetWindowStatusBellStyle,
+	)
 	tracker := agents.NewTracker(styles, statusTrackerOptions(cfg, resolved))
 	workStore := work.NewStore(workspace.Work)
 	recorder := work.NewRecorder(workStore, func(ctx context.Context) (task.PaneTasks, error) {
@@ -194,7 +251,11 @@ func runAgentStatusRun(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	ctx, stop := signal.NotifyContext(commandContextOrBackground(cmd), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(
+		commandContextOrBackground(cmd),
+		os.Interrupt,
+		syscall.SIGTERM,
+	)
 	defer stop()
 
 	watchOptions := statusWatchOptions(resolved, quiet)
@@ -206,7 +267,13 @@ func runAgentStatusRun(cmd *cobra.Command, _ []string) error {
 	syncing.Go(func() { work.SyncEvery(syncCtx, workStore, workSyncInterval) })
 	syncing.Go(func() { runtime.Local.FinishMergedTasksEvery(syncCtx, workSyncInterval) })
 
-	err = agents.RunStatusTracker(ctx, workspace.AgentSource(), recordingTracker{Tracker: tracker, recorder: recorder}, watchOptions, resolved.ClearOnShutdown)
+	err = agents.RunStatusTracker(
+		ctx,
+		workspace.AgentSource(),
+		recordingTracker{Tracker: tracker, recorder: recorder},
+		watchOptions,
+		resolved.ClearOnShutdown,
+	)
 
 	stopSync()
 	syncing.Wait()
@@ -218,7 +285,10 @@ func runAgentStatusRun(cmd *cobra.Command, _ []string) error {
 	return errors.Join(err, runtime.Close())
 }
 
-func statusTrackerOptions(cfg *config.Config, resolved config.AgentStatusConfig) agents.TrackerOptions {
+func statusTrackerOptions(
+	cfg *config.Config,
+	resolved config.AgentStatusConfig,
+) agents.TrackerOptions {
 	opts := agents.DefaultTrackerOptions()
 	opts.Palette = cfg.ResolvedPalette()
 	opts.ActiveBypass = resolved.ActiveBypass

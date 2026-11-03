@@ -462,7 +462,11 @@ func buildGroupRoles(g model.Manifest) groupRoles {
 	}
 }
 
-func findWindowOwner(links []model.Link, roles groupRoles, sessions []model.Session) (string, string) {
+func findWindowOwner(
+	links []model.Link,
+	roles groupRoles,
+	sessions []model.Session,
+) (string, string) {
 	for _, l := range links {
 		if grpID := roles.groupOf[l.Session]; grpID != "" {
 			return roles.leaderOf[grpID], grpID
@@ -654,7 +658,10 @@ func planWindowCreation(
 	steps := make([]Step, 0, 1+len(splits))
 
 	cwStep := &CreateWindowStep{
-		stepBase:       newStep(winStepID, []string{reg.sessionStepID[s.ID], reg.sessionReadyStepID[s.ID]}),
+		stepBase: newStep(
+			winStepID,
+			[]string{reg.sessionStepID[s.ID], reg.sessionReadyStepID[s.ID]},
+		),
 		WindowID:       w.ID,
 		OwnerSessionID: s.ID,
 		OwnerGroupID:   own.ownerGroup[w.ID],
@@ -756,7 +763,10 @@ func planNonFollowerSessions(
 			}
 			steps = append(steps, csStep)
 			reg.sessionStepID[s.ID] = stepID
-			steps = append(steps, placeInitialWindow(s.ID, "", freeBootstrapIndex(idx.linksBySession[s.ID]), reg))
+			steps = append(
+				steps,
+				placeInitialWindow(s.ID, "", freeBootstrapIndex(idx.linksBySession[s.ID]), reg),
+			)
 		}
 
 		var createdStepIDs []string
@@ -876,7 +886,11 @@ func planSharedLinks(
 
 			linkStepID := fmt.Sprintf("link-window:%s:%s:%d", s.ID, l.Window, l.Index)
 
-			deps := []string{reg.sessionStepID[s.ID], reg.sessionReadyStepID[s.ID], reg.windowStepID[l.Window]}
+			deps := []string{
+				reg.sessionStepID[s.ID],
+				reg.sessionReadyStepID[s.ID],
+				reg.windowStepID[l.Window],
+			}
 			for _, p := range idx.panesByWindow[l.Window] {
 				if reg.paneStepID[p.ID] != reg.windowStepID[l.Window] {
 					deps = append(deps, reg.paneStepID[p.ID])
@@ -903,7 +917,8 @@ func planSharedLinks(
 	}
 
 	for _, s := range g.Sessions {
-		if reg.closeBootstrapStepID[s.ID] == "" && own.initialWindowOf[s.ID] == "" && !roles.isFollower[s.ID] {
+		if reg.closeBootstrapStepID[s.ID] == "" && own.initialWindowOf[s.ID] == "" &&
+			!roles.isFollower[s.ID] {
 			stepID := "close-bootstrap:" + s.ID
 			deps := slices.Clone(reg.linkStepIDs[s.ID])
 			slices.Sort(deps)
@@ -1015,7 +1030,12 @@ func selectedPanes(panes []model.Pane) (string, string) {
 	return active, last
 }
 
-func sessionNavigationDependencies(s model.Session, roles groupRoles, idx entityIndexes, reg *stepRegistry) []string {
+func sessionNavigationDependencies(
+	s model.Session,
+	roles groupRoles,
+	idx entityIndexes,
+	reg *stepRegistry,
+) []string {
 	deps := []string{reg.sessionStepID[s.ID], reg.sessionReadyStepID[s.ID]}
 	for _, l := range idx.linksBySession[s.ID] {
 		deps = append(deps, reg.windowFinalStepID[l.Window])

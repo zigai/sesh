@@ -224,7 +224,10 @@ func loadDiscoveredConfigFiles() ([][]byte, error) {
 func readOptionalConfigFile(path string) ([]byte, bool, error) {
 	absPath, err := filepath.Abs(filepath.Clean(path))
 	if err != nil {
-		return nil, false, oops.In("config").Code("config_invalid_path").With("operation", "load", "reason", "resolve_abs_path").Wrap(err)
+		return nil, false, oops.In("config").
+			Code("config_invalid_path").
+			With("operation", "load", "reason", "resolve_abs_path").
+			Wrap(err)
 	}
 
 	return readPinnedConfigFile(filepath.Dir(absPath), filepath.Base(absPath), false)
@@ -407,7 +410,11 @@ func applyThemeProbe(theme *ThemeConfig, probe *rawThemePresetProbe) error {
 
 	preset, ok := LookupPreset(*probe.Theme.Preset)
 	if !ok {
-		return fmt.Errorf("%w %q: expected dracula, catppuccin, catppuccin-latte, tokyo-night, gruvbox, nord, or terminal", errThemePresetInvalid, *probe.Theme.Preset)
+		return fmt.Errorf(
+			"%w %q: expected dracula, catppuccin, catppuccin-latte, tokyo-night, gruvbox, nord, or terminal",
+			errThemePresetInvalid,
+			*probe.Theme.Preset,
+		)
 	}
 
 	theme.applyPreset(preset)

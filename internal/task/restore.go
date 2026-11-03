@@ -31,14 +31,26 @@ type restoredAgent struct {
 	record Record
 }
 
-func NewRestoreLaunches(store Store, policy config.WakePolicy, placeholderBinary string) *RestoreLaunches {
-	return &RestoreLaunches{store: store, policy: policy, placeholderBinary: placeholderBinary, restored: nil}
+func NewRestoreLaunches(
+	store Store,
+	policy config.WakePolicy,
+	placeholderBinary string,
+) *RestoreLaunches {
+	return &RestoreLaunches{
+		store:             store,
+		policy:            policy,
+		placeholderBinary: placeholderBinary,
+		restored:          nil,
+	}
 }
 
 // Override puts kept-asleep agents behind the placeholder, reruns restart panes, and gives task
 // panes the task's environment. It reads only the snapshot and the records, so a resumed restore
 // decides the same way.
-func (r *RestoreLaunches) Override(ctx context.Context, manifest model.Manifest) (map[string]model.Launch, error) {
+func (r *RestoreLaunches) Override(
+	ctx context.Context,
+	manifest model.Manifest,
+) (map[string]model.Launch, error) {
 	r.restored = make(map[string]restoredTask)
 
 	launches := restartLaunches(manifest)
@@ -60,14 +72,25 @@ func (r *RestoreLaunches) Override(ctx context.Context, manifest model.Manifest)
 	for _, agent := range capturedAgents(manifest, ledger) {
 		if agent.pane.Launch.Recovery == model.RecoveryResume {
 			awake = append(awake, agent)
-			r.restored[agent.pane.ID] = restoredTask{task: agent.record.ID, state: StateActive, resume: agent.record.Resume}
+			r.restored[agent.pane.ID] = restoredTask{
+				task:   agent.record.ID,
+				state:  StateActive,
+				resume: agent.record.Resume,
+			}
 		} else {
-			r.restored[agent.pane.ID] = restoredTask{task: agent.record.ID, state: StateSleeping, resume: agent.record.Resume}
+			r.restored[agent.pane.ID] = restoredTask{
+				task:   agent.record.ID,
+				state:  StateSleeping,
+				resume: agent.record.Resume,
+			}
 		}
 	}
 
 	slices.SortFunc(awake, func(a, b restoredAgent) int {
-		return cmp.Or(cmp.Compare(b.record.CreatedAt, a.record.CreatedAt), cmp.Compare(b.record.ID, a.record.ID))
+		return cmp.Or(
+			cmp.Compare(b.record.CreatedAt, a.record.CreatedAt),
+			cmp.Compare(b.record.ID, a.record.ID),
+		)
 	})
 
 	for _, agent := range awake[r.policy.Resumes(len(awake)):] {
@@ -75,7 +98,11 @@ func (r *RestoreLaunches) Override(ctx context.Context, manifest model.Manifest)
 		harness, _ := apps.LaunchHarness(launch)
 		command := launch.Command()
 
-		launches[agent.pane.ID] = apps.PlaceholderLaunch(r.placeholderBinary, agent.record.ID, launch)
+		launches[agent.pane.ID] = apps.PlaceholderLaunch(
+			r.placeholderBinary,
+			agent.record.ID,
+			launch,
+		)
 		r.restored[agent.pane.ID] = restoredTask{
 			task: agent.record.ID, state: StateSleeping,
 			resume: Resume{Harness: harness, Session: command[len(command)-1], Command: command},
@@ -118,14 +145,25 @@ func addTaskEnvironment(manifest model.Manifest, ledger Ledger, launches map[str
 }
 
 func withEnvironment(launch model.Launch, env map[string]string) model.Launch {
-	environment := slices.DeleteFunc(slices.Clone(launch.Environment), func(variable model.Variable) bool {
-		_, replaced := env[string(variable.Name)]
+	environment := slices.DeleteFunc(
+		slices.Clone(launch.Environment),
+		func(variable model.Variable) bool {
+			_, replaced := env[string(variable.Name)]
 
-		return replaced
-	})
+			return replaced
+		},
+	)
 
 	for _, name := range slices.Sorted(maps.Keys(env)) {
-		environment = append(environment, model.Variable{Name: model.Bytes(name), Value: model.Bytes(env[name]), State: "set", Hidden: false})
+		environment = append(
+			environment,
+			model.Variable{
+				Name:   model.Bytes(name),
+				Value:  model.Bytes(env[name]),
+				State:  "set",
+				Hidden: false,
+			},
+		)
 	}
 
 	launch.Environment = environment
@@ -215,7 +253,11 @@ func restartLaunches(manifest model.Manifest) map[string]model.Launch {
 		}
 
 		var command restartCommand
-		if err := json.Unmarshal([]byte(value), &command); err != nil || len(command.Argv) == 0 || !filepath.IsAbs(command.Argv[0]) || !filepath.IsAbs(command.Directory) {
+		if err := json.Unmarshal(
+			[]byte(value),
+			&command,
+		); err != nil || len(command.Argv) == 0 || !filepath.IsAbs(command.Argv[0]) ||
+			!filepath.IsAbs(command.Directory) {
 			continue
 		}
 
@@ -225,8 +267,17 @@ func restartLaunches(manifest model.Manifest) map[string]model.Launch {
 		}
 
 		launches[pane.ID] = model.Launch{
-			Executable: model.Bytes(command.Argv[0]), Arguments: arguments, Directory: model.Bytes(command.Directory),
-			Environment: slices.Clone(pane.Launch.Environment), Birth: nil, Recovery: model.RecoveryRestart, Reason: "",
+			Executable: model.Bytes(
+				command.Argv[0],
+			),
+			Arguments: arguments,
+			Directory: model.Bytes(command.Directory),
+			Environment: slices.Clone(
+				pane.Launch.Environment,
+			),
+			Birth:    nil,
+			Recovery: model.RecoveryRestart,
+			Reason:   "",
 		}
 	}
 
@@ -242,7 +293,8 @@ func capturedTaskLaunch(launch model.Launch, id string) bool {
 	case model.RecoveryRestart:
 		_, reason := apps.Prepare(launch, nil)
 
-		return reason == apps.ReasonTaskPlaceholder && string(launch.Arguments[len(launch.Arguments)-1]) == id
+		return reason == apps.ReasonTaskPlaceholder &&
+			string(launch.Arguments[len(launch.Arguments)-1]) == id
 	case model.RecoveryUnverified, model.RecoveryNonrestartable:
 		return false
 	default:

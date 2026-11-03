@@ -16,13 +16,22 @@ import (
 func TestPickerConversionPreservesDetailEvidenceAndActivityAge(t *testing.T) {
 	at := time.Unix(500, 0).UTC()
 	source := agents.AgentSession{
-		Activity: string(aht.ActivityFailed), Attention: string(agents.StateFailed),
-		FailureReason: "usage_limit", ActivityChanged: at.Add(-time.Minute),
-		Detail: aht.StateDetail{Value: aht.ActivityDetailUsageLimit, Quality: aht.DetailQualityCurrent, Authority: "screen", ObservedAt: at},
+		Activity:        string(aht.ActivityFailed),
+		Attention:       string(agents.StateFailed),
+		FailureReason:   "usage_limit",
+		ActivityChanged: at.Add(-time.Minute),
+		Detail: aht.StateDetail{
+			Value:      aht.ActivityDetailUsageLimit,
+			Quality:    aht.DetailQualityCurrent,
+			Authority:  "screen",
+			ObservedAt: at,
+		},
 	}
 
 	agent := agentSession(source)
-	if agent.Status != session.AgentStatusFailed || agent.FailureReason != "usage_limit" || agent.Detail != source.Detail || !agent.StatusSince.Equal(source.ActivityChanged) {
+	if agent.Status != session.AgentStatusFailed || agent.FailureReason != "usage_limit" ||
+		agent.Detail != source.Detail ||
+		!agent.StatusSince.Equal(source.ActivityChanged) {
 		t.Fatalf("picker conversion = %+v", agent)
 	}
 
@@ -44,11 +53,19 @@ func TestPickerConversionPreservesDetailEvidenceAndActivityAge(t *testing.T) {
 func TestPickerInterruptedAgentRetainsMachineStateAndCountsAsIdle(t *testing.T) {
 	at := time.Unix(500, 0)
 
-	summaries := agentSummaries([]agents.AgentSession{{
-		Activity: string(aht.ActivityInterrupted), Attention: agents.AttentionFor(string(aht.ActivityInterrupted)),
-		ActivityChanged: at, SessionID: "$1", PaneID: "%1",
-	}})
-	if len(summaries) != 1 || summaries[0].Interrupted != 1 || !summaries[0].IdleSince.Equal(at) || summaries[0].Agents[0].Status != session.AgentStatusInterrupted {
+	summaries := agentSummaries([]agents.AgentSession{
+		{
+			Activity: string(
+				aht.ActivityInterrupted,
+			),
+			Attention:       agents.AttentionFor(string(aht.ActivityInterrupted)),
+			ActivityChanged: at,
+			SessionID:       "$1",
+			PaneID:          "%1",
+		},
+	})
+	if len(summaries) != 1 || summaries[0].Interrupted != 1 || !summaries[0].IdleSince.Equal(at) ||
+		summaries[0].Agents[0].Status != session.AgentStatusInterrupted {
 		t.Fatalf("interrupted summary = %+v", summaries)
 	}
 }
@@ -57,9 +74,15 @@ func TestPickerConversionPreservesInitialIdleAndAge(t *testing.T) {
 	at := time.Unix(500, 0).UTC()
 
 	agent := agentSession(agents.AgentSession{
-		Activity: string(aht.ActivityIdle), Attention: "idle", InitialIdle: true, ActivityChanged: at,
+		Activity: string(
+			aht.ActivityIdle,
+		),
+		Attention:       "idle",
+		InitialIdle:     true,
+		ActivityChanged: at,
 	})
-	if agent.Status != session.AgentStatusIdle || !agent.InitialIdle || !agent.StatusSince.Equal(at) {
+	if agent.Status != session.AgentStatusIdle || !agent.InitialIdle ||
+		!agent.StatusSince.Equal(at) {
 		t.Fatalf("picker conversion = %+v", agent)
 	}
 

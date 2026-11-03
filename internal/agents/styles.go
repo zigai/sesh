@@ -63,7 +63,11 @@ type styleRecord struct {
 	Bell   optionPrior `json:"bell"`
 }
 
-func NewTmuxStyleController(server *gotmux.Server, setStatusStyle bool, setBellStyle bool) *TmuxStyleController {
+func NewTmuxStyleController(
+	server *gotmux.Server,
+	setStatusStyle bool,
+	setBellStyle bool,
+) *TmuxStyleController {
 	return &TmuxStyleController{
 		server:         server,
 		setStatusStyle: setStatusStyle,
@@ -93,7 +97,11 @@ func (c *TmuxStyleController) ActivePanes(ctx context.Context) (map[string]Activ
 	return active, nil
 }
 
-func (c *TmuxStyleController) SetWindowStyle(ctx context.Context, windowID string, style string) (retErr error) {
+func (c *TmuxStyleController) SetWindowStyle(
+	ctx context.Context,
+	windowID string,
+	style string,
+) (retErr error) {
 	unlock, err := c.lock(ctx)
 	if err != nil {
 		return err
@@ -134,7 +142,10 @@ func (c *TmuxStyleController) SetWindowStyle(ctx context.Context, windowID strin
 	return nil
 }
 
-func (c *TmuxStyleController) ClearWindowStyle(ctx context.Context, windowID string) (retErr error) {
+func (c *TmuxStyleController) ClearWindowStyle(
+	ctx context.Context,
+	windowID string,
+) (retErr error) {
 	unlock, err := c.lock(ctx)
 	if err != nil {
 		return err
@@ -155,7 +166,10 @@ func (c *TmuxStyleController) ClearWindowStyle(ctx context.Context, windowID str
 
 func (c *TmuxStyleController) ClearOwned(ctx context.Context) (retErr error) {
 	if c.server == nil {
-		return oops.In("agents").Code("endpoint_required").With("operation", "clear_window_styles").Wrap(ErrServerRequired)
+		return oops.In("agents").
+			Code("endpoint_required").
+			With("operation", "clear_window_styles").
+			Wrap(ErrServerRequired)
 	}
 
 	unlock, err := c.lock(ctx)
@@ -211,7 +225,10 @@ func (c *TmuxStyleController) styleRecordForUpdate(
 	return owned, false, err
 }
 
-func (c *TmuxStyleController) adoptWindow(ctx context.Context, window gotmux.Window) (ownedWindowStyle, error) {
+func (c *TmuxStyleController) adoptWindow(
+	ctx context.Context,
+	window gotmux.Window,
+) (ownedWindowStyle, error) {
 	if record, ok, err := c.readRecord(ctx, window); err != nil {
 		return ownedWindowStyle{}, err
 	} else if ok {
@@ -232,24 +249,36 @@ func (c *TmuxStyleController) adoptWindow(ctx context.Context, window gotmux.Win
 
 	encoded, err := json.Marshal(styleRecord{Status: status, Bell: bell})
 	if err != nil {
-		return ownedWindowStyle{}, oops.In("agents").Code("encode_style_record").With("operation", "record_window_style").Wrap(err)
+		return ownedWindowStyle{}, oops.In("agents").
+			Code("encode_style_record").
+			With("operation", "record_window_style").
+			Wrap(err)
 	}
 
 	options := window.Options()
 
 	if err := options.SetUser(ctx, stylePriorOption, string(encoded)); err != nil {
-		return ownedWindowStyle{}, oops.In("agents").Code("tmux_failed").With("operation", "record_window_style").Wrap(err)
+		return ownedWindowStyle{}, oops.In("agents").
+			Code("tmux_failed").
+			With("operation", "record_window_style").
+			Wrap(err)
 	}
 
 	if err := options.SetUser(ctx, styleOwnerOption, ""); err != nil {
-		ownerErr := oops.In("agents").Code("tmux_failed").With("operation", "record_window_style").Wrap(err)
+		ownerErr := oops.In("agents").
+			Code("tmux_failed").
+			With("operation", "record_window_style").
+			Wrap(err)
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), defaultLockTimeout)
 		cleanupErr := options.UnsetUser(cleanupCtx, stylePriorOption)
 
 		cancel()
 
 		if cleanupErr != nil {
-			cleanupErr = oops.In("agents").Code("tmux_failed").With("operation", "rollback_window_style_prior").Wrap(cleanupErr)
+			cleanupErr = oops.In("agents").
+				Code("tmux_failed").
+				With("operation", "rollback_window_style_prior").
+				Wrap(cleanupErr)
 		}
 
 		return ownedWindowStyle{}, errors.Join(ownerErr, cleanupErr)
@@ -266,12 +295,24 @@ func (c *TmuxStyleController) checkManualEdits(
 ) (bool, bool) {
 	statusEdited := false
 	if known && c.setStatusStyle && owned.applied != "" {
-		statusEdited = c.checkOptionEdited(ctx, window, windowStatusStyleOption, owned.applied, "set_window_status_style")
+		statusEdited = c.checkOptionEdited(
+			ctx,
+			window,
+			windowStatusStyleOption,
+			owned.applied,
+			"set_window_status_style",
+		)
 	}
 
 	bellEdited := false
 	if known && c.setBellStyle && owned.applied != "" {
-		bellEdited = c.checkOptionEdited(ctx, window, windowStatusBellStyleOption, owned.applied, "set_window_bell_style")
+		bellEdited = c.checkOptionEdited(
+			ctx,
+			window,
+			windowStatusBellStyleOption,
+			owned.applied,
+			"set_window_bell_style",
+		)
 	}
 
 	return statusEdited, bellEdited
@@ -303,22 +344,36 @@ func (c *TmuxStyleController) checkOptionEdited(
 	return false
 }
 
-func (c *TmuxStyleController) applyStyleSelective(ctx context.Context, window gotmux.Window, style string, applyStatus, applyBell bool) error {
+func (c *TmuxStyleController) applyStyleSelective(
+	ctx context.Context,
+	window gotmux.Window,
+	style string,
+	applyStatus, applyBell bool,
+) error {
 	options := window.Options()
 
 	if err := options.SetUser(ctx, styleOwnerOption, style); err != nil {
-		return oops.In("agents").Code("tmux_failed").With("operation", "record_window_style").Wrap(err)
+		return oops.In("agents").
+			Code("tmux_failed").
+			With("operation", "record_window_style").
+			Wrap(err)
 	}
 
 	if c.setStatusStyle && applyStatus {
 		if err := options.Set(ctx, windowStatusStyleOption, style); err != nil {
-			return oops.In("agents").Code("tmux_failed").With("operation", "set_window_status_style").Wrap(err)
+			return oops.In("agents").
+				Code("tmux_failed").
+				With("operation", "set_window_status_style").
+				Wrap(err)
 		}
 	}
 
 	if c.setBellStyle && applyBell {
 		if err := options.Set(ctx, windowStatusBellStyleOption, style); err != nil {
-			return oops.In("agents").Code("tmux_failed").With("operation", "set_window_status_bell_style").Wrap(err)
+			return oops.In("agents").
+				Code("tmux_failed").
+				With("operation", "set_window_status_bell_style").
+				Wrap(err)
 		}
 	}
 
@@ -338,13 +393,25 @@ func (c *TmuxStyleController) releaseWindow(ctx context.Context, window gotmux.W
 	var failures []error
 
 	if c.setStatusStyle {
-		if err := c.restoreOption(ctx, window, windowStatusStyleOption, record.status, record.applied); err != nil {
+		if err := c.restoreOption(
+			ctx,
+			window,
+			windowStatusStyleOption,
+			record.status,
+			record.applied,
+		); err != nil {
 			failures = append(failures, err)
 		}
 	}
 
 	if c.setBellStyle {
-		if err := c.restoreOption(ctx, window, windowStatusBellStyleOption, record.bell, record.applied); err != nil {
+		if err := c.restoreOption(
+			ctx,
+			window,
+			windowStatusBellStyleOption,
+			record.bell,
+			record.applied,
+		); err != nil {
 			failures = append(failures, err)
 		}
 	}
@@ -356,15 +423,24 @@ func (c *TmuxStyleController) releaseWindow(ctx context.Context, window gotmux.W
 	return c.releaseOwnershipMarkers(ctx, window)
 }
 
-func (c *TmuxStyleController) releaseOwnershipMarkers(ctx context.Context, window gotmux.Window) error {
+func (c *TmuxStyleController) releaseOwnershipMarkers(
+	ctx context.Context,
+	window gotmux.Window,
+) error {
 	options := window.Options()
 
 	if err := options.UnsetUser(ctx, stylePriorOption); err != nil {
-		return oops.In("agents").Code("tmux_failed").With("operation", "release_window_style_prior").Wrap(err)
+		return oops.In("agents").
+			Code("tmux_failed").
+			With("operation", "release_window_style_prior").
+			Wrap(err)
 	}
 
 	if err := options.UnsetUser(ctx, styleOwnerOption); err != nil {
-		return oops.In("agents").Code("tmux_failed").With("operation", "release_window_style_owner").Wrap(err)
+		return oops.In("agents").
+			Code("tmux_failed").
+			With("operation", "release_window_style_owner").
+			Wrap(err)
 	}
 
 	return nil
@@ -373,7 +449,10 @@ func (c *TmuxStyleController) releaseOwnershipMarkers(ctx context.Context, windo
 func (c *TmuxStyleController) isOwned(ctx context.Context, window gotmux.Window) (bool, error) {
 	value, err := window.Options().User(ctx, styleOwnerOption)
 	if err != nil {
-		return false, oops.In("agents").Code("tmux_failed").With("operation", "read_window_ownership").Wrap(err)
+		return false, oops.In("agents").
+			Code("tmux_failed").
+			With("operation", "read_window_ownership").
+			Wrap(err)
 	}
 
 	_, ok := value.Effective.Get()
@@ -381,12 +460,18 @@ func (c *TmuxStyleController) isOwned(ctx context.Context, window gotmux.Window)
 	return ok, nil
 }
 
-func (c *TmuxStyleController) readRecord(ctx context.Context, window gotmux.Window) (ownedWindowStyle, bool, error) {
+func (c *TmuxStyleController) readRecord(
+	ctx context.Context,
+	window gotmux.Window,
+) (ownedWindowStyle, bool, error) {
 	options := window.Options()
 
 	owner, err := options.User(ctx, styleOwnerOption)
 	if err != nil {
-		return ownedWindowStyle{}, false, oops.In("agents").Code("tmux_failed").With("operation", "read_window_ownership").Wrap(err)
+		return ownedWindowStyle{}, false, oops.In("agents").
+			Code("tmux_failed").
+			With("operation", "read_window_ownership").
+			Wrap(err)
 	}
 
 	applied, owned := owner.Effective.Get()
@@ -394,21 +479,34 @@ func (c *TmuxStyleController) readRecord(ctx context.Context, window gotmux.Wind
 		return emptyOwnedWindowStyle, false, nil
 	}
 
-	record := ownedWindowStyle{applied: applied, status: optionPrior{Present: false, Value: ""}, bell: optionPrior{Present: false, Value: ""}}
+	record := ownedWindowStyle{
+		applied: applied,
+		status:  optionPrior{Present: false, Value: ""},
+		bell:    optionPrior{Present: false, Value: ""},
+	}
 
 	prior, err := options.User(ctx, stylePriorOption)
 	if err != nil {
-		return ownedWindowStyle{}, false, oops.In("agents").Code("tmux_failed").With("operation", "read_window_ownership").Wrap(err)
+		return ownedWindowStyle{}, false, oops.In("agents").
+			Code("tmux_failed").
+			With("operation", "read_window_ownership").
+			Wrap(err)
 	}
 
 	raw, ok := prior.Effective.Get()
 	if !ok {
-		return ownedWindowStyle{}, false, oops.In("agents").Code("style_ownership_corrupt").With("operation", "read_window_ownership").Wrap(ErrStyleOwnershipCorrupt)
+		return ownedWindowStyle{}, false, oops.In("agents").
+			Code("style_ownership_corrupt").
+			With("operation", "read_window_ownership").
+			Wrap(ErrStyleOwnershipCorrupt)
 	}
 
 	stored, decoded := decodeStyleRecord(raw)
 	if !decoded {
-		return ownedWindowStyle{}, false, oops.In("agents").Code("style_ownership_corrupt").With("operation", "read_window_ownership").Wrap(ErrStyleOwnershipCorrupt)
+		return ownedWindowStyle{}, false, oops.In("agents").
+			Code("style_ownership_corrupt").
+			With("operation", "read_window_ownership").
+			Wrap(ErrStyleOwnershipCorrupt)
 	}
 
 	record.status = stored.Status
@@ -427,10 +525,17 @@ func decodeStyleRecord(raw string) (styleRecord, bool) {
 	return stored, true
 }
 
-func (c *TmuxStyleController) readOption(ctx context.Context, window gotmux.Window, name string) (optionPrior, error) {
+func (c *TmuxStyleController) readOption(
+	ctx context.Context,
+	window gotmux.Window,
+	name string,
+) (optionPrior, error) {
 	value, err := window.Options().Get(ctx, name)
 	if err != nil {
-		return optionPrior{}, oops.In("agents").Code("tmux_failed").With("operation", "read_window_option").Wrap(err)
+		return optionPrior{}, oops.In("agents").
+			Code("tmux_failed").
+			With("operation", "read_window_option").
+			Wrap(err)
 	}
 
 	local, ok := value.Local.Get()
@@ -470,14 +575,20 @@ func (c *TmuxStyleController) restoreOption(
 
 	if prior.Present {
 		if err := options.Set(ctx, name, prior.Value); err != nil {
-			return oops.In("agents").Code("tmux_failed").With("operation", "restore_window_option").Wrap(err)
+			return oops.In("agents").
+				Code("tmux_failed").
+				With("operation", "restore_window_option").
+				Wrap(err)
 		}
 
 		return nil
 	}
 
 	if err := options.Unset(ctx, name); err != nil {
-		return oops.In("agents").Code("tmux_failed").With("operation", "restore_window_option").Wrap(err)
+		return oops.In("agents").
+			Code("tmux_failed").
+			With("operation", "restore_window_option").
+			Wrap(err)
 	}
 
 	return nil
@@ -485,12 +596,18 @@ func (c *TmuxStyleController) restoreOption(
 
 func (c *TmuxStyleController) window(windowID string) (gotmux.Window, error) {
 	if c.server == nil {
-		return gotmux.Window{}, oops.In("agents").Code("endpoint_required").With("operation", "window_style").Wrap(ErrServerRequired)
+		return gotmux.Window{}, oops.In("agents").
+			Code("endpoint_required").
+			With("operation", "window_style").
+			Wrap(ErrServerRequired)
 	}
 
 	window, err := c.server.WindowHandle(gotmux.WindowID(windowID))
 	if err != nil {
-		return gotmux.Window{}, oops.In("agents").Code("invalid_target").With("operation", "window_style").Wrap(err)
+		return gotmux.Window{}, oops.In("agents").
+			Code("invalid_target").
+			With("operation", "window_style").
+			Wrap(err)
 	}
 
 	return window, nil
@@ -513,7 +630,10 @@ func (c *TmuxStyleController) lock(ctx context.Context) (func() error, error) {
 			cancel()
 		}
 
-		return nil, oops.In("agents").Code("fencing_failed").With("operation", "style_lock").Wrap(err)
+		return nil, oops.In("agents").
+			Code("fencing_failed").
+			With("operation", "style_lock").
+			Wrap(err)
 	}
 
 	return func() error {
@@ -521,11 +641,17 @@ func (c *TmuxStyleController) lock(ctx context.Context) (func() error, error) {
 			cancel()
 		}
 
-		unlockCtx, unlockCancel := context.WithTimeout(context.WithoutCancel(ctx), defaultLockTimeout)
+		unlockCtx, unlockCancel := context.WithTimeout(
+			context.WithoutCancel(ctx),
+			defaultLockTimeout,
+		)
 		defer unlockCancel()
 
 		if err := c.server.Unlock(unlockCtx, styleLockChannel); err != nil {
-			return oops.In("agents").Code("fencing_failed").With("operation", "style_unlock").Wrap(err)
+			return oops.In("agents").
+				Code("fencing_failed").
+				With("operation", "style_unlock").
+				Wrap(err)
 		}
 
 		return nil

@@ -27,8 +27,19 @@ func (c Catalog) Clone(ctx context.Context, url string) (Project, error) {
 		return Project{}, err
 	}
 
-	if _, err := git.Output(ctx, filepath.Dir(dir), "clone", "--quiet", "--", url, dir); err != nil {
-		return Project{}, oops.In("project").Code("project_clone_failed").With("operation", "clone_project").Wrap(err)
+	if _, err := git.Output(
+		ctx,
+		filepath.Dir(dir),
+		"clone",
+		"--quiet",
+		"--",
+		url,
+		dir,
+	); err != nil {
+		return Project{}, oops.In("project").
+			Code("project_clone_failed").
+			With("operation", "clone_project").
+			Wrap(err)
 	}
 
 	return gitProject(dir), nil
@@ -41,11 +52,17 @@ func (c Catalog) Create(ctx context.Context, name string) (Project, error) {
 	}
 
 	if err := os.Mkdir(dir, projectDirMode); err != nil {
-		return Project{}, oops.In("project").Code("project_create_failed").With("operation", "create_project").Wrap(err)
+		return Project{}, oops.In("project").
+			Code("project_create_failed").
+			With("operation", "create_project").
+			Wrap(err)
 	}
 
 	if _, err := git.Output(ctx, dir, "init", "--quiet"); err != nil {
-		return Project{}, oops.In("project").Code("project_create_failed").With("operation", "init_project").Wrap(err)
+		return Project{}, oops.In("project").
+			Code("project_create_failed").
+			With("operation", "init_project").
+			Wrap(err)
 	}
 
 	return gitProject(dir), nil
@@ -56,13 +73,17 @@ func (c Catalog) newDirectory(name string) (string, error) {
 		return "", ErrNoRoot
 	}
 
-	if name == "" || strings.HasPrefix(name, ".") || strings.ContainsAny(name, "/\x00") || containsControl(name) {
+	if name == "" || strings.HasPrefix(name, ".") || strings.ContainsAny(name, "/\x00") ||
+		containsControl(name) {
 		return "", fmt.Errorf("%w: %q", ErrNameInvalid, name)
 	}
 
 	root, err := filepath.EvalSymlinks(c.roots[0])
 	if err != nil {
-		return "", oops.In("project").Code("project_create_failed").With("operation", "resolve_root").Wrap(err)
+		return "", oops.In("project").
+			Code("project_create_failed").
+			With("operation", "resolve_root").
+			Wrap(err)
 	}
 
 	dir := filepath.Join(root, name)

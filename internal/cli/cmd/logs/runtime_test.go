@@ -29,7 +29,13 @@ func TestCanceledLogClearPreservesContents(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	err := cli.ExecuteApplication(ctx, []string{testConfigFlag, cfg, testLogsCmd, "--clear"}, nil, &stdout, &stderr)
+	err := cli.ExecuteApplication(
+		ctx,
+		[]string{testConfigFlag, cfg, testLogsCmd, "--clear"},
+		nil,
+		&stdout,
+		&stderr,
+	)
 	if !errors.Is(err, context.Canceled) || stdout.Len() != 0 {
 		t.Fatalf("canceled clear accepted: %v, %q", err, stdout.String())
 	}
@@ -48,14 +54,27 @@ func TestLogsValidateLineBoundBeforeConfiguration(t *testing.T) {
 		"--lines", strconv.Itoa(logging.MaxRetainedLogRecords + 1),
 	}, nil, &stdout, &stderr)
 	if clibase.ExitCode(err) != exitCodeUsage || stdout.Len() != 0 {
-		t.Fatalf("line bound not validated first: %v, %q, %q", err, stdout.String(), stderr.String())
+		t.Fatalf(
+			"line bound not validated first: %v, %q, %q",
+			err,
+			stdout.String(),
+			stderr.String(),
+		)
 	}
 }
 
 func TestLogsExplicitFalseAllAllowsLineLimit(t *testing.T) {
 	path := writeLogsTestFile(t, formattedInfoRecord+"\n")
 
-	stdout, stderr, err := executeLogsCommand(t, path, testLogsCmd, "--all=false", "--lines", "1", "--json")
+	stdout, stderr, err := executeLogsCommand(
+		t,
+		path,
+		testLogsCmd,
+		"--all=false",
+		"--lines",
+		"1",
+		"--json",
+	)
 	if err != nil || stdout != formattedInfoRecord+"\n" || stderr != "" {
 		t.Fatalf("explicit false option: %q, %q, %v", stdout, stderr, err)
 	}
@@ -88,7 +107,13 @@ func TestLogsRuntimeEmitsBeforeCancellation(t *testing.T) {
 
 	var stderr bytes.Buffer
 
-	err := cli.ExecuteApplication(ctx, []string{testConfigFlag, cfg, testLogsCmd, "--watch", "--json"}, nil, writer, &stderr)
+	err := cli.ExecuteApplication(
+		ctx,
+		[]string{testConfigFlag, cfg, testLogsCmd, "--watch", "--json"},
+		nil,
+		writer,
+		&stderr,
+	)
 	if err != nil || !emitted || stderr.Len() != 0 {
 		t.Fatalf("watch runtime: emitted=%v, %v, %q", emitted, err, stderr.String())
 	}

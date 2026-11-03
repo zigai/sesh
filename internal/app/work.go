@@ -22,7 +22,11 @@ var (
 	ErrWorkDirectoryGone = errors.New("the conversation's directory no longer exists")
 )
 
-func (local *Local) resumeAgent(ctx context.Context, caller action.Caller, input action.ResumeAgent) (action.ResumedAgent, error) {
+func (local *Local) resumeAgent(
+	ctx context.Context,
+	caller action.Caller,
+	input action.ResumeAgent,
+) (action.ResumedAgent, error) {
 	var resumed action.ResumedAgent
 
 	resumed.Item = input.Item
@@ -33,12 +37,25 @@ func (local *Local) resumeAgent(ctx context.Context, caller action.Caller, input
 	}
 
 	if _, err := os.Stat(item.Directory); err != nil {
-		return resumed, action.Wrap(action.CodeUnavailable, fmt.Errorf("%w: %w", ErrWorkDirectoryGone, err))
+		return resumed, action.Wrap(
+			action.CodeUnavailable,
+			fmt.Errorf("%w: %w", ErrWorkDirectoryGone, err),
+		)
 	}
 
 	var place task.Place
 	if item.Project != "" {
-		place, err = local.projectPlace(ctx, task.Place{Pane: gotmux.PaneID(caller.Pane), Session: "", Dir: "", Project: "", Task: ""}, item.Project)
+		place, err = local.projectPlace(
+			ctx,
+			task.Place{
+				Pane:    gotmux.PaneID(caller.Pane),
+				Session: "",
+				Dir:     "",
+				Project: "",
+				Task:    "",
+			},
+			item.Project,
+		)
 	} else {
 		_, place, err = local.taskPlace(ctx, caller)
 	}
@@ -71,37 +88,86 @@ func (local *Local) resumeAgent(ctx context.Context, caller action.Caller, input
 	return resumed, nil
 }
 
-func (local *Local) finishWork(ctx context.Context, _ action.Caller, input action.ChangeWork) (action.ChangedWork, error) {
-	return action.ChangedWork{Item: input.Item}, local.updateWork(ctx, func(state *work.State) error {
-		return state.Finish(input.Item, work.FinishedByUser, time.Now())
-	})
+func (local *Local) finishWork(
+	ctx context.Context,
+	_ action.Caller,
+	input action.ChangeWork,
+) (action.ChangedWork, error) {
+	return action.ChangedWork{
+		Item: input.Item,
+	}, local.updateWork(
+		ctx,
+		func(state *work.State) error {
+			return state.Finish(input.Item, work.FinishedByUser, time.Now())
+		},
+	)
 }
 
-func (local *Local) pinWork(ctx context.Context, _ action.Caller, input action.ChangeWork) (action.ChangedWork, error) {
-	return action.ChangedWork{Item: input.Item}, local.updateWork(ctx, func(state *work.State) error {
-		return state.Pin(input.Item, time.Now())
-	})
+func (local *Local) pinWork(
+	ctx context.Context,
+	_ action.Caller,
+	input action.ChangeWork,
+) (action.ChangedWork, error) {
+	return action.ChangedWork{
+		Item: input.Item,
+	}, local.updateWork(
+		ctx,
+		func(state *work.State) error {
+			return state.Pin(input.Item, time.Now())
+		},
+	)
 }
 
-func (local *Local) unpinWork(ctx context.Context, _ action.Caller, input action.ChangeWork) (action.ChangedWork, error) {
-	return action.ChangedWork{Item: input.Item}, local.updateWork(ctx, func(state *work.State) error {
-		return state.Unpin(input.Item)
-	})
+func (local *Local) unpinWork(
+	ctx context.Context,
+	_ action.Caller,
+	input action.ChangeWork,
+) (action.ChangedWork, error) {
+	return action.ChangedWork{
+		Item: input.Item,
+	}, local.updateWork(
+		ctx,
+		func(state *work.State) error {
+			return state.Unpin(input.Item)
+		},
+	)
 }
 
-func (local *Local) markWorkUnseen(ctx context.Context, _ action.Caller, input action.ChangeWork) (action.ChangedWork, error) {
-	return action.ChangedWork{Item: input.Item}, local.updateWork(ctx, func(state *work.State) error {
-		return state.MarkUnseen(input.Item, time.Now())
-	})
+func (local *Local) markWorkUnseen(
+	ctx context.Context,
+	_ action.Caller,
+	input action.ChangeWork,
+) (action.ChangedWork, error) {
+	return action.ChangedWork{
+		Item: input.Item,
+	}, local.updateWork(
+		ctx,
+		func(state *work.State) error {
+			return state.MarkUnseen(input.Item, time.Now())
+		},
+	)
 }
 
-func (local *Local) markWorkSeen(ctx context.Context, _ action.Caller, input action.ChangeWork) (action.ChangedWork, error) {
-	return action.ChangedWork{Item: input.Item}, local.updateWork(ctx, func(state *work.State) error {
-		return state.ClearUnseen(input.Item)
-	})
+func (local *Local) markWorkSeen(
+	ctx context.Context,
+	_ action.Caller,
+	input action.ChangeWork,
+) (action.ChangedWork, error) {
+	return action.ChangedWork{
+		Item: input.Item,
+	}, local.updateWork(
+		ctx,
+		func(state *work.State) error {
+			return state.ClearUnseen(input.Item)
+		},
+	)
 }
 
-func (local *Local) linkWork(ctx context.Context, _ action.Caller, input action.ChangeWork) (action.ChangedWork, error) {
+func (local *Local) linkWork(
+	ctx context.Context,
+	_ action.Caller,
+	input action.ChangeWork,
+) (action.ChangedWork, error) {
 	changed := action.ChangedWork{Item: input.Item}
 
 	item, err := local.workItem(ctx, input.Item)
@@ -111,19 +177,38 @@ func (local *Local) linkWork(ctx context.Context, _ action.Caller, input action.
 
 	pr, err := work.ViewPR(ctx, item.Directory, input.PR)
 	if err != nil {
-		return changed, action.Wrap(action.CodeUnavailable, oops.In("app").With("operation", "view_pr").Wrap(err))
+		return changed, action.Wrap(
+			action.CodeUnavailable,
+			oops.In("app").With("operation", "view_pr").Wrap(err),
+		)
 	}
 
-	return changed, local.updateWork(ctx, func(state *work.State) error { return state.Link(input.Item, pr) })
+	return changed, local.updateWork(
+		ctx,
+		func(state *work.State) error { return state.Link(input.Item, pr) },
+	)
 }
 
-func (local *Local) unlinkWork(ctx context.Context, _ action.Caller, input action.ChangeWork) (action.ChangedWork, error) {
-	return action.ChangedWork{Item: input.Item}, local.updateWork(ctx, func(state *work.State) error {
-		return state.Unlink(input.Item, input.PR)
-	})
+func (local *Local) unlinkWork(
+	ctx context.Context,
+	_ action.Caller,
+	input action.ChangeWork,
+) (action.ChangedWork, error) {
+	return action.ChangedWork{
+		Item: input.Item,
+	}, local.updateWork(
+		ctx,
+		func(state *work.State) error {
+			return state.Unlink(input.Item, input.PR)
+		},
+	)
 }
 
-func (local *Local) finishTaskWork(ctx context.Context, record task.Record, by work.FinishReason) error {
+func (local *Local) finishTaskWork(
+	ctx context.Context,
+	record task.Record,
+	by work.FinishReason,
+) error {
 	if local.workState == "" {
 		return nil
 	}

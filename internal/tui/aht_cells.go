@@ -61,10 +61,19 @@ func ahtFieldCell(agent session.AgentSession, field string, now time.Time) layou
 		return layout.Cell{Text: "", Role: "", Variants: nil, State: layout.Unsupported}
 	}
 
-	return layout.Cell{Text: SanitizeTerminalText(value), Role: "", Variants: nil, State: layout.Present}
+	return layout.Cell{
+		Text:     SanitizeTerminalText(value),
+		Role:     "",
+		Variants: nil,
+		State:    layout.Present,
+	}
 }
 
-func ahtReasonCell(agent session.AgentSession, status session.AgentStatus, value string) layout.Cell {
+func ahtReasonCell(
+	agent session.AgentSession,
+	status session.AgentStatus,
+	value string,
+) layout.Cell {
 	cell := layout.Cell{Text: "", Role: "", Variants: nil, State: layout.Absent}
 	if agent.Status != status {
 		return cell

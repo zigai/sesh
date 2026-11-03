@@ -60,11 +60,31 @@ type entry struct {
 
 func Definitions() []Definition {
 	return []Definition{
-		{ID: Git, Fields: display.FieldsByProvider(display.ProviderGit), Cadence: Cadence{Kind: CadencePoll, Interval: gitPollInterval}},
-		{ID: Clock, Fields: display.FieldsByProvider(display.ProviderClock), Cadence: Cadence{Kind: CadenceClock, Interval: time.Second}},
-		{ID: Resource, Fields: display.FieldsByProvider(display.ProviderResource), Cadence: ResourceCadence()},
-		{ID: GH, Fields: display.FieldsByProvider(display.ProviderGH), Cadence: Cadence{Kind: CadencePoll, Interval: time.Minute}},
-		{ID: AHT, Fields: display.FieldsByProvider(display.ProviderAHT), Cadence: Cadence{Kind: CadenceEvent, Interval: 0}},
+		{
+			ID:      Git,
+			Fields:  display.FieldsByProvider(display.ProviderGit),
+			Cadence: Cadence{Kind: CadencePoll, Interval: gitPollInterval},
+		},
+		{
+			ID:      Clock,
+			Fields:  display.FieldsByProvider(display.ProviderClock),
+			Cadence: Cadence{Kind: CadenceClock, Interval: time.Second},
+		},
+		{
+			ID:      Resource,
+			Fields:  display.FieldsByProvider(display.ProviderResource),
+			Cadence: ResourceCadence(),
+		},
+		{
+			ID:      GH,
+			Fields:  display.FieldsByProvider(display.ProviderGH),
+			Cadence: Cadence{Kind: CadencePoll, Interval: time.Minute},
+		},
+		{
+			ID:      AHT,
+			Fields:  display.FieldsByProvider(display.ProviderAHT),
+			Cadence: Cadence{Kind: CadenceEvent, Interval: 0},
+		},
 	}
 }
 
@@ -178,7 +198,12 @@ func (r *Runner) get(id ID) *entry {
 		return current
 	}
 
-	current := &entry{request: 0, inFlight: false, cancel: nil, snapshot: Snapshot{Version: 0, Rows: nil}}
+	current := &entry{
+		request:  0,
+		inFlight: false,
+		cancel:   nil,
+		snapshot: Snapshot{Version: 0, Rows: nil},
+	}
 	r.entries[id] = current
 
 	return current
@@ -210,7 +235,8 @@ func cloneCell(cell layout.Cell) layout.Cell {
 func rowsEqual(a, b Rows) bool {
 	return maps.EqualFunc(a, b, func(a, b map[string]layout.Cell) bool {
 		return maps.EqualFunc(a, b, func(a, b layout.Cell) bool {
-			return a.Text == b.Text && a.Role == b.Role && a.State == b.State && slices.Equal(a.Variants, b.Variants)
+			return a.Text == b.Text && a.Role == b.Role && a.State == b.State &&
+				slices.Equal(a.Variants, b.Variants)
 		})
 	})
 }

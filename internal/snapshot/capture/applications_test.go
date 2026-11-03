@@ -19,7 +19,10 @@ func (s unavailableAgentSource) List(context.Context, aht.Filter) ([]aht.Session
 }
 
 func TestMissingAgentMetadataDoesNotPreventSessionCapture(t *testing.T) {
-	live, err := recoveryAgents(t.Context(), unavailableAgentSource{err: agents.ErrRegistryUnavailable})
+	live, err := recoveryAgents(
+		t.Context(),
+		unavailableAgentSource{err: agents.ErrRegistryUnavailable},
+	)
 	if err != nil || len(live) != 0 {
 		t.Fatalf("optional registry unavailable: agents=%d err=%v", len(live), err)
 	}
@@ -27,7 +30,8 @@ func TestMissingAgentMetadataDoesNotPreventSessionCapture(t *testing.T) {
 
 func TestUnreadableAgentRegistryFailsCapture(t *testing.T) {
 	live, err := recoveryAgents(t.Context(), unavailableAgentSource{err: agents.ErrRegistryCorrupt})
-	if !errors.Is(err, ErrAgentRegistry) || !errors.Is(err, agents.ErrRegistryCorrupt) || live != nil {
+	if !errors.Is(err, ErrAgentRegistry) || !errors.Is(err, agents.ErrRegistryCorrupt) ||
+		live != nil {
 		t.Fatalf("unreadable registry: agents=%d err=%v", len(live), err)
 	}
 }
@@ -73,7 +77,8 @@ func TestAgentResumeRequiresUniqueExactPaneAndEndpoint(t *testing.T) {
 
 			resume := matchingAgentResume(live, agent.ServerSocket, pane)
 			if change == "valid" {
-				if resume == nil || resume.SessionID != agent.HarnessSessionID || resume.Executable != executable {
+				if resume == nil || resume.SessionID != agent.HarnessSessionID ||
+					resume.Executable != executable {
 					t.Fatalf("exact native resume was not retained: %+v", resume)
 				}
 			} else if resume != nil {

@@ -74,7 +74,9 @@ func (r *Repository) writeCollectionIntent(records *privatefs.Dir, intent Collec
 
 	data, err := json.Marshal(intent)
 	if err != nil {
-		return oops.In("snapshot.store").With("operation", "encode_collection_intent").Wrapf(err, "encode collection intent")
+		return oops.In("snapshot.store").
+			With("operation", "encode_collection_intent").
+			Wrapf(err, "encode collection intent")
 	}
 
 	if len(data) > maxCollectionRecord {
@@ -86,8 +88,14 @@ func (r *Repository) writeCollectionIntent(records *privatefs.Dir, intent Collec
 		return err
 	}
 
-	if err := records.Rename(scratch, records, intent.Generation+collectionRecordSuffix); err != nil {
-		return oops.In("snapshot.store").With("operation", "record_collection_intent").Wrapf(err, "record collection intent")
+	if err := records.Rename(
+		scratch,
+		records,
+		intent.Generation+collectionRecordSuffix,
+	); err != nil {
+		return oops.In("snapshot.store").
+			With("operation", "record_collection_intent").
+			Wrapf(err, "record collection intent")
 	}
 
 	if err := records.Sync(); err != nil {
@@ -100,7 +108,9 @@ func (r *Repository) writeCollectionIntent(records *privatefs.Dir, intent Collec
 func (r *Repository) openCollectionDirectory(create bool) (*privatefs.Dir, error) {
 	dir, err := r.root.Child(collectionDirectory, create)
 	if err != nil {
-		return nil, oops.In("snapshot.store").With("operation", "open_collection_directory").Wrapf(err, "open collection directory")
+		return nil, oops.In("snapshot.store").
+			With("operation", "open_collection_directory").
+			Wrapf(err, "open collection directory")
 	}
 
 	return dir, nil

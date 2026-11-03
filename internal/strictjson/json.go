@@ -29,7 +29,11 @@ func Decode[T any](data []byte) (T, error) {
 		return zero, ErrInvalid
 	}
 
-	if err := required(jsontext.NewDecoder(bytes.NewReader(data)), reflect.TypeFor[T](), 0); err != nil {
+	if err := required(
+		jsontext.NewDecoder(bytes.NewReader(data)),
+		reflect.TypeFor[T](),
+		0,
+	); err != nil {
 		var zero T
 		return zero, err
 	}
@@ -113,7 +117,11 @@ func requiredMember(dec *jsontext.Decoder, fields *structFields, indexes []int, 
 		}
 
 		for _, index := range indexes {
-			if err := required(jsontext.NewDecoder(bytes.NewReader(raw)), fields.types[index], depth+1); err != nil {
+			if err := required(
+				jsontext.NewDecoder(bytes.NewReader(raw)),
+				fields.types[index],
+				depth+1,
+			); err != nil {
 				return err
 			}
 		}

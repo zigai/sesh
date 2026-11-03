@@ -86,7 +86,12 @@ func TestHelpOverlayShowsHelpShortcutLast(t *testing.T) {
 	}
 
 	if closeIndex >= helpIndex || helpIndex >= dismissIndex {
-		t.Fatalf("help overlay order = close:%d help:%d dismiss:%d, want help shortcut last", closeIndex, helpIndex, dismissIndex)
+		t.Fatalf(
+			"help overlay order = close:%d help:%d dismiss:%d, want help shortcut last",
+			closeIndex,
+			helpIndex,
+			dismissIndex,
+		)
 	}
 }
 
@@ -179,8 +184,10 @@ func TestConfirmDialogEnterUsesSelectedButtonAndShortcutsStillWork(t *testing.T)
 		},
 		LoadCatalog: func(context.Context) (session.CatalogResult, error) {
 			return session.CatalogResult{
-				Sessions: []session.Session{{Name: testSupportSessionDevName, Kind: session.KindLive}},
-				Status:   session.StatusComplete,
+				Sessions: []session.Session{
+					{Name: testSupportSessionDevName, Kind: session.KindLive},
+				},
+				Status: session.StatusComplete,
 			}, nil
 		},
 	})
@@ -225,7 +232,10 @@ func TestHelpOverlayListsTheSameKeysForEveryRowOfAView(t *testing.T) {
 	model := newTestModel()
 	model.width = 96
 	model.height = 30
-	model.filtered = []session.Session{{Name: "current", Kind: session.KindLive}, {Name: "archive", Kind: session.KindSaved}}
+	model.filtered = []session.Session{
+		{Name: "current", Kind: session.KindLive},
+		{Name: "archive", Kind: session.KindSaved},
+	}
 	model.showHelp = true
 
 	live := stripANSI(model.renderHelpOverlay())
@@ -312,7 +322,13 @@ func TestRenderCreateDirDialogMarksPathsThatAreNotDirectories(t *testing.T) {
 			output := stripANSI(model.renderDialog())
 			for _, marker := range []string{"will be created", "not a directory"} {
 				if got := strings.Contains(output, marker); got != (marker == tc.marker) {
-					t.Fatalf("dialog shows %q = %v, want marker %q:\n%s", marker, got, tc.marker, output)
+					t.Fatalf(
+						"dialog shows %q = %v, want marker %q:\n%s",
+						marker,
+						got,
+						tc.marker,
+						output,
+					)
 				}
 			}
 		})

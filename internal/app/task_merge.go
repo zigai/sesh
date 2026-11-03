@@ -31,7 +31,11 @@ type TaskMergeRun struct {
 	Finished bool
 }
 
-func (local *Local) mergeTask(ctx context.Context, _ action.Caller, input action.MergeTask) (action.StartedTaskMerge, error) {
+func (local *Local) mergeTask(
+	ctx context.Context,
+	_ action.Caller,
+	input action.MergeTask,
+) (action.StartedTaskMerge, error) {
 	result := action.StartedTaskMerge{ID: input.Task}
 
 	record, err := local.taskRecord(ctx, input.Task)
@@ -43,12 +47,21 @@ func (local *Local) mergeTask(ctx context.Context, _ action.Caller, input action
 		return result, action.Wrap(action.CodeInvalidArgument, task.ErrNotProjectTask)
 	}
 
-	return result, local.openTaskRunWindow(ctx, record, task.MergeAction, []string{"task", mergeRunVerb, record.ID})
+	return result, local.openTaskRunWindow(
+		ctx,
+		record,
+		task.MergeAction,
+		[]string{"task", mergeRunVerb, record.ID},
+	)
 }
 
 // RunTaskMerge records the run on the task and finishes the task once its branch is on the base.
 // From then on it ignores SIGHUP, since the finish closes the popup session it runs in.
-func (local *Local) RunTaskMerge(ctx context.Context, id string, streams gotmux.Streams) (TaskMergeRun, error) {
+func (local *Local) RunTaskMerge(
+	ctx context.Context,
+	id string,
+	streams gotmux.Streams,
+) (TaskMergeRun, error) {
 	run := TaskMergeRun{ExitCode: nil, Merged: task.Merged{Branch: "", Base: ""}, Finished: false}
 
 	service, err := local.taskService()
@@ -71,12 +84,23 @@ func (local *Local) RunTaskMerge(ctx context.Context, id string, streams gotmux.
 
 	var mergeErr, finishErr error
 
-	run.Merged, mergeErr = task.MergeBranch(ctx, record.Directory, record.Base, local.cfg.MergeCheckFor(record.Project), streams.Out)
+	run.Merged, mergeErr = task.MergeBranch(
+		ctx,
+		record.Directory,
+		record.Base,
+		local.cfg.MergeCheckFor(record.Project),
+		streams.Out,
+	)
 	exitCode := task.MergeExitCode(mergeErr)
 	run.ExitCode = &exitCode
 
 	if mergeErr == nil {
-		_, _ = fmt.Fprintf(streams.Out, "· merged %s into %s; finishing the task\n", run.Merged.Branch, run.Merged.Base)
+		_, _ = fmt.Fprintf(
+			streams.Out,
+			"· merged %s into %s; finishing the task\n",
+			run.Merged.Branch,
+			run.Merged.Base,
+		)
 
 		signal.Ignore(syscall.SIGHUP)
 
@@ -89,14 +113,19 @@ func (local *Local) RunTaskMerge(ctx context.Context, id string, streams gotmux.
 	}
 
 	finished := started
-	finished.Status, finished.ExitCode, finished.FinishedAt = task.RunOK, exitCode, time.Now().Unix()
+	finished.Status, finished.ExitCode, finished.FinishedAt = task.RunOK, exitCode, time.Now().
+		Unix()
 
 	if mergeErr != nil {
 		finished.Status = task.RunFailed
 	}
 
 	if err := service.RecordRun(context.WithoutCancel(ctx), id, finished); err != nil {
-		return run, errors.Join(mergeErr, finishErr, oops.In("app").With("operation", "record_task_merge").Wrap(err))
+		return run, errors.Join(
+			mergeErr,
+			finishErr,
+			oops.In("app").With("operation", "record_task_merge").Wrap(err),
+		)
 	}
 
 	if mergeErr != nil {
@@ -136,7 +165,11 @@ func (local *Local) finishInOwnSession(ctx context.Context, id string) error {
 	return nil
 }
 
-func (local *Local) mergeAgentBranch(ctx context.Context, _ action.Caller, input action.MergeAgentBranch) (action.MergedAgentBranch, error) {
+func (local *Local) mergeAgentBranch(
+	ctx context.Context,
+	_ action.Caller,
+	input action.MergeAgentBranch,
+) (action.MergedAgentBranch, error) {
 	result := action.MergedAgentBranch{Branch: "", Base: ""}
 
 	panes, err := local.server.PanesWith(ctx, gotmux.QueryOptions{
@@ -152,7 +185,13 @@ func (local *Local) mergeAgentBranch(ctx context.Context, _ action.Caller, input
 
 	directory := panes[0].CurrentPath
 
-	merged, err := task.MergeBranch(ctx, directory, "", local.cfg.MergeCheckFor(directory), io.Discard)
+	merged, err := task.MergeBranch(
+		ctx,
+		directory,
+		"",
+		local.cfg.MergeCheckFor(directory),
+		io.Discard,
+	)
 	result.Branch, result.Base = merged.Branch, merged.Base
 
 	if err != nil {
@@ -162,7 +201,12 @@ func (local *Local) mergeAgentBranch(ctx context.Context, _ action.Caller, input
 	return result, nil
 }
 
-func (local *Local) openTaskRunWindow(ctx context.Context, record task.Record, name string, args []string) error {
+func (local *Local) openTaskRunWindow(
+	ctx context.Context,
+	record task.Record,
+	name string,
+	args []string,
+) error {
 	popup, err := local.openPopupServer()
 	if err != nil {
 		return err
@@ -180,7 +224,15 @@ func (local *Local) openTaskRunWindow(ctx context.Context, record task.Record, n
 	}
 
 	if source := local.cfg.Source(); source.Path == "-" {
-		argv = append([]string{"/bin/sh", "-c", `config=$1; shift; printf '%s' "$config" | "$@"`, "task-action", source.Input}, argv...)
+		argv = append(
+			[]string{
+				"/bin/sh",
+				"-c",
+				`config=$1; shift; printf '%s' "$config" | "$@"`,
+				"task-action",
+				source.Input,
+			},
+			argv...)
 	}
 
 	if err := task.OpenRunWindow(ctx, popup, popupSession, record, name, argv); err != nil {

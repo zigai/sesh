@@ -58,7 +58,9 @@ func startRemoteMonitorReloads(ctx context.Context, cmd *cobra.Command) (*monito
 	return reloads, nil
 }
 
-func monitorReloadSource(cmd *cobra.Command) (string, func([]byte) (config.RemoteConfig, error), bool, error) {
+func monitorReloadSource(
+	cmd *cobra.Command,
+) (string, func([]byte) (config.RemoteConfig, error), bool, error) {
 	noConfig, err := cmd.Flags().GetBool("no-config")
 	if err != nil {
 		return "", nil, false, cliError("read_no_config_flag", err)
@@ -86,7 +88,10 @@ func monitorReloadSource(cmd *cobra.Command) (string, func([]byte) (config.Remot
 }
 
 func loadRemoteConfigBytes(content []byte) (config.RemoteConfig, error) {
-	cfg, err := config.Load(config.WithExplicitPath("-"), config.WithInput(bytes.NewReader(content)))
+	cfg, err := config.Load(
+		config.WithExplicitPath("-"),
+		config.WithInput(bytes.NewReader(content)),
+	)
 	if err != nil {
 		return config.RemoteConfig{}, cliError("reload_remote_config", err)
 	}
@@ -122,15 +127,24 @@ func bridgeRemoteMonitorReloads(
 		}
 
 		if changed {
-			zerolog.Ctx(ctx).Info().Str("component", "remote_monitor").Str("operation", "reload_config").
-				Str("status", "recovered").Str("reason", "configuration_valid").Msg("remote monitor configuration reload recovered")
+			zerolog.Ctx(ctx).
+				Info().
+				Str("component", "remote_monitor").
+				Str("operation", "reload_config").
+				Str("status", "recovered").
+				Str("reason", "configuration_valid").
+				Msg("remote monitor configuration reload recovered")
 		}
 
 		enqueueRemoteConfig(ctx, configs, reload.Remote)
 	}
 }
 
-func enqueueRemoteConfig(ctx context.Context, configs chan config.RemoteConfig, remoteConfig config.RemoteConfig) {
+func enqueueRemoteConfig(
+	ctx context.Context,
+	configs chan config.RemoteConfig,
+	remoteConfig config.RemoteConfig,
+) {
 	select {
 	case configs <- remoteConfig:
 		return

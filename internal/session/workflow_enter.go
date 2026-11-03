@@ -42,7 +42,10 @@ func (w *Workflow) CreateSession(ctx context.Context, name, dir string) (gotmux.
 	return sess, nil
 }
 
-func (w *Workflow) EnterOrCreateSession(ctx context.Context, name, dir string) (EnterOutcome, error) {
+func (w *Workflow) EnterOrCreateSession(
+	ctx context.Context,
+	name, dir string,
+) (EnterOutcome, error) {
 	out := EnterOutcome{
 		SessionName: name,
 		SessionID:   "",
@@ -58,12 +61,23 @@ func (w *Workflow) EnterOrCreateSession(ctx context.Context, name, dir string) (
 	}
 
 	if w.server == nil {
-		return out, w.fail(ctx, "enter", oops.In("session").Code("endpoint_required").Wrap(errServerRequired))
+		return out, w.fail(
+			ctx,
+			"enter",
+			oops.In("session").Code("endpoint_required").Wrap(errServerRequired),
+		)
 	}
 
 	if !w.insideTmux() {
 		if err := validateTerminalStreams(w.terminalStreams()); err != nil {
-			return out, w.fail(ctx, "enter", oops.In("session").Code("terminal_required").With("operation", "validate_terminals").Wrap(err))
+			return out, w.fail(
+				ctx,
+				"enter",
+				oops.In("session").
+					Code("terminal_required").
+					With("operation", "validate_terminals").
+					Wrap(err),
+			)
 		}
 	}
 
@@ -108,17 +122,30 @@ func (w *Workflow) SwitchSessionOutcome(ctx context.Context, name string) (Enter
 	return w.switchSessionOutcome(ctx, name, "", "")
 }
 
-func (w *Workflow) SwitchSessionOutcomeForClient(ctx context.Context, name, clientName, originSessionID string) (EnterOutcome, error) {
+func (w *Workflow) SwitchSessionOutcomeForClient(
+	ctx context.Context,
+	name, clientName, originSessionID string,
+) (EnterOutcome, error) {
 	if clientName == "" || originSessionID == "" {
-		return EnterOutcome{}, oops.In("session").Code("client_unavailable").With("operation", "select_client").Wrap(ErrInvokingClientUnavailable)
+		return EnterOutcome{}, oops.In("session").
+			Code("client_unavailable").
+			With("operation", "select_client").
+			Wrap(ErrInvokingClientUnavailable)
 	}
 
 	return w.switchSessionOutcome(ctx, name, clientName, originSessionID)
 }
 
-func (w *Workflow) SwitchSessionOutcomeForClientTarget(ctx context.Context, expected Session, clientName, originSessionID string) (EnterOutcome, error) {
+func (w *Workflow) SwitchSessionOutcomeForClientTarget(
+	ctx context.Context,
+	expected Session,
+	clientName, originSessionID string,
+) (EnterOutcome, error) {
 	if clientName == "" || originSessionID == "" {
-		return EnterOutcome{}, oops.In("session").Code("client_unavailable").With("operation", "select_client").Wrap(ErrInvokingClientUnavailable)
+		return EnterOutcome{}, oops.In("session").
+			Code("client_unavailable").
+			With("operation", "select_client").
+			Wrap(ErrInvokingClientUnavailable)
 	}
 
 	out := newSessionSwitchOutcome(expected.Name)
@@ -127,7 +154,11 @@ func (w *Workflow) SwitchSessionOutcomeForClientTarget(ctx context.Context, expe
 	}
 
 	if w.server == nil {
-		return out, w.fail(ctx, "switch", oops.In("session").Code("endpoint_required").Wrap(errServerRequired))
+		return out, w.fail(
+			ctx,
+			"switch",
+			oops.In("session").Code("endpoint_required").Wrap(errServerRequired),
+		)
 	}
 
 	target, err := w.server.SessionHandle(gotmux.SessionID(expected.ID))
@@ -185,7 +216,8 @@ func (w *Workflow) SwitchSessionOutcomeForClientTarget(ctx context.Context, expe
 }
 
 func validateLiveSwitchTarget(expected Session) error {
-	if expected.Kind != KindLive || expected.Origin != OriginLocal || expected.ID == "" || expected.Name == "" {
+	if expected.Kind != KindLive || expected.Origin != OriginLocal || expected.ID == "" ||
+		expected.Name == "" {
 		return gotmux.ErrNotFound
 	}
 
@@ -204,11 +236,18 @@ func newSessionSwitchOutcome(name string) EnterOutcome {
 	}
 }
 
-func (w *Workflow) switchSessionOutcome(ctx context.Context, name, clientName, originSessionID string) (EnterOutcome, error) {
+func (w *Workflow) switchSessionOutcome(
+	ctx context.Context,
+	name, clientName, originSessionID string,
+) (EnterOutcome, error) {
 	out := newSessionSwitchOutcome(name)
 
 	if w.server == nil {
-		return out, w.fail(ctx, "switch", oops.In("session").Code("endpoint_required").Wrap(errServerRequired))
+		return out, w.fail(
+			ctx,
+			"switch",
+			oops.In("session").Code("endpoint_required").Wrap(errServerRequired),
+		)
 	}
 
 	sess, err := w.server.FindSession(ctx, name)
@@ -272,8 +311,13 @@ func (w *Workflow) switchSessionOutcomeWithClient(
 
 	out.Hooks = preHooks
 
-	if err := client.Handle().Switch(ctx, sess, gotmux.SwitchOptions{ToggleReadOnly: false, PreserveEnvironment: false}); err != nil {
-		return out, w.fail(ctx, "switch", oops.In("session").Code("switch_failed").With("operation", "switch_client").Wrap(err))
+	if err := client.Handle().
+		Switch(ctx, sess, gotmux.SwitchOptions{ToggleReadOnly: false, PreserveEnvironment: false}); err != nil {
+		return out, w.fail(
+			ctx,
+			"switch",
+			oops.In("session").Code("switch_failed").With("operation", "switch_client").Wrap(err),
+		)
 	}
 
 	out.Started = true
@@ -293,7 +337,14 @@ func (w *Workflow) switchSessionOutcomeWithClient(
 
 	if !w.deferSwitchHistory {
 		if err := w.recordSwitch(ctx, out.SessionName); err != nil {
-			return out, w.fail(ctx, "switch", oops.In("session").Code("history_failed").With("operation", "record_switch").Wrap(err))
+			return out, w.fail(
+				ctx,
+				"switch",
+				oops.In("session").
+					Code("history_failed").
+					With("operation", "record_switch").
+					Wrap(err),
+			)
 		}
 	}
 
@@ -306,30 +357,50 @@ func (w *Workflow) switchSessionOutcomeWithClient(
 	return out, nil
 }
 
-func (w *Workflow) clientForSession(ctx context.Context, clientName, originSessionID string) (gotmux.ClientInfo, previousSession, error) {
+func (w *Workflow) clientForSession(
+	ctx context.Context,
+	clientName, originSessionID string,
+) (gotmux.ClientInfo, previousSession, error) {
 	clientHandle, err := w.server.ClientHandle(gotmux.ClientName(clientName))
 	if err != nil {
-		return gotmux.ClientInfo{}, previousSession{}, oops.In("session").Code("client_unavailable").With("operation", "select_client").Wrap(ErrInvokingClientUnavailable)
+		return gotmux.ClientInfo{}, previousSession{}, oops.In("session").
+			Code("client_unavailable").
+			With("operation", "select_client").
+			Wrap(ErrInvokingClientUnavailable)
 	}
 
-	client, err := clientHandle.InfoWith(ctx, gotmux.QueryOptions{Filter: "", ExtraFields: []string{"session_name"}})
+	client, err := clientHandle.InfoWith(
+		ctx,
+		gotmux.QueryOptions{Filter: "", ExtraFields: []string{"session_name"}},
+	)
 	if err != nil {
 		if errors.Is(err, gotmux.ErrNotFound) || errors.Is(err, gotmux.ErrClientChanged) {
-			return gotmux.ClientInfo{}, previousSession{}, oops.In("session").Code("client_unavailable").With("operation", "select_client").Wrap(ErrInvokingClientUnavailable)
+			return gotmux.ClientInfo{}, previousSession{}, oops.In("session").
+				Code("client_unavailable").
+				With("operation", "select_client").
+				Wrap(ErrInvokingClientUnavailable)
 		}
 
-		return gotmux.ClientInfo{}, previousSession{}, oops.In("session").Code("tmux_failed").With("operation", "resolve_client").Wrap(err)
+		return gotmux.ClientInfo{}, previousSession{}, oops.In("session").
+			Code("tmux_failed").
+			With("operation", "resolve_client").
+			Wrap(err)
 	}
 
 	displayed, ok := client.SessionID.Get()
 	if client.Control || !ok || string(displayed) != originSessionID {
-		return gotmux.ClientInfo{}, previousSession{}, oops.In("session").Code("client_unavailable").With("operation", "select_client").Wrap(ErrInvokingClientUnavailable)
+		return gotmux.ClientInfo{}, previousSession{}, oops.In("session").
+			Code("client_unavailable").
+			With("operation", "select_client").
+			Wrap(ErrInvokingClientUnavailable)
 	}
 
 	originName, ok := client.Raw("session_name")
 	if !ok || len(originName) == 0 {
-		return gotmux.ClientInfo{}, previousSession{}, oops.In("session").Code("invoking_context_failed").
-			With("operation", "resolve_invoking_session").Wrap(gotmux.ErrProtocol)
+		return gotmux.ClientInfo{}, previousSession{}, oops.In("session").
+			Code("invoking_context_failed").
+			With("operation", "resolve_invoking_session").
+			Wrap(gotmux.ErrProtocol)
 	}
 
 	return client, previousSession{Name: string(originName), ID: originSessionID}, nil
@@ -341,7 +412,9 @@ func (w *Workflow) createSession(ctx context.Context, name, dir string) (gotmux.
 	}
 
 	if w.server == nil {
-		return gotmux.Session{}, oops.In("session").Code("endpoint_required").Wrap(errServerRequired)
+		return gotmux.Session{}, oops.In("session").
+			Code("endpoint_required").
+			Wrap(errServerRequired)
 	}
 
 	exists, err := w.sessionExists(ctx, name)
@@ -350,7 +423,9 @@ func (w *Workflow) createSession(ctx context.Context, name, dir string) (gotmux.
 	}
 
 	if exists {
-		return gotmux.Session{}, oops.In("session").Code("already_exists").Wrapf(ErrSessionAlreadyExists, "session %q already exists", name)
+		return gotmux.Session{}, oops.In("session").
+			Code("already_exists").
+			Wrapf(ErrSessionAlreadyExists, "session %q already exists", name)
 	}
 
 	targetDir := dir
@@ -372,7 +447,10 @@ func (w *Workflow) createSession(ctx context.Context, name, dir string) (gotmux.
 		Group:   "",
 	})
 	if err != nil {
-		return gotmux.Session{}, oops.In("session").Code("tmux_failed").With("operation", "create_session").Wrap(err)
+		return gotmux.Session{}, oops.In("session").
+			Code("tmux_failed").
+			With("operation", "create_session").
+			Wrap(err)
 	}
 
 	return sess, nil
@@ -402,22 +480,33 @@ func (w *Workflow) invokingClient(ctx context.Context) (gotmux.ClientInfo, previ
 	env := gotmux.TmuxVars{TMUX: w.getenv("TMUX"), TMUXPane: w.getenv("TMUX_PANE")}
 
 	if env.TMUX == "" {
-		return gotmux.ClientInfo{}, previousSession{}, oops.In("session").Code("not_inside_tmux").Wrap(ErrNotInsideTmux)
+		return gotmux.ClientInfo{}, previousSession{}, oops.In("session").
+			Code("not_inside_tmux").
+			Wrap(ErrNotInsideTmux)
 	}
 
 	info, err := w.server.CurrentFrom(ctx, env)
 	if err != nil {
-		return gotmux.ClientInfo{}, previousSession{}, oops.In("session").Code("invoking_context_failed").With("operation", "resolve_invoking_context").Wrap(err)
+		return gotmux.ClientInfo{}, previousSession{}, oops.In("session").
+			Code("invoking_context_failed").
+			With("operation", "resolve_invoking_context").
+			Wrap(err)
 	}
 
 	session, ok := info.Session.Get()
 	if !ok || session.ID == "" {
-		return gotmux.ClientInfo{}, previousSession{}, oops.In("session").Code("invoking_context_failed").With("operation", "resolve_invoking_session").Wrap(ErrInvokingClientUnavailable)
+		return gotmux.ClientInfo{}, previousSession{}, oops.In("session").
+			Code("invoking_context_failed").
+			With("operation", "resolve_invoking_session").
+			Wrap(ErrInvokingClientUnavailable)
 	}
 
 	clients, err := w.server.Clients(ctx)
 	if err != nil {
-		return gotmux.ClientInfo{}, previousSession{}, oops.In("session").Code("tmux_failed").With("operation", "list_clients").Wrap(err)
+		return gotmux.ClientInfo{}, previousSession{}, oops.In("session").
+			Code("tmux_failed").
+			With("operation", "list_clients").
+			Wrap(err)
 	}
 
 	candidates := clientsDisplaying(clients, session.ID)
@@ -425,11 +514,17 @@ func (w *Workflow) invokingClient(ctx context.Context) (gotmux.ClientInfo, previ
 
 	switch len(candidates) {
 	case 0:
-		return gotmux.ClientInfo{}, previous, oops.In("session").Code("client_unavailable").With("operation", "select_client").Wrap(ErrInvokingClientUnavailable)
+		return gotmux.ClientInfo{}, previous, oops.In("session").
+			Code("client_unavailable").
+			With("operation", "select_client").
+			Wrap(ErrInvokingClientUnavailable)
 	case 1:
 		return candidates[0], previous, nil
 	default:
-		return gotmux.ClientInfo{}, previous, oops.In("session").Code("client_ambiguous").With("operation", "select_client").Wrap(ErrInvokingClientAmbiguous)
+		return gotmux.ClientInfo{}, previous, oops.In("session").
+			Code("client_ambiguous").
+			With("operation", "select_client").
+			Wrap(ErrInvokingClientAmbiguous)
 	}
 }
 
@@ -449,17 +544,27 @@ func clientsDisplaying(clients []gotmux.ClientInfo, session gotmux.SessionID) []
 	return candidates
 }
 
-func (w *Workflow) verifyClientSession(ctx context.Context, name gotmux.ClientName, target gotmux.SessionID) error {
+func (w *Workflow) verifyClientSession(
+	ctx context.Context,
+	name gotmux.ClientName,
+	target gotmux.SessionID,
+) error {
 	for attempt := range switchVerifyAttempts {
 		if attempt > 0 {
 			if err := sleepContext(ctx, switchVerifyDelay); err != nil {
-				return oops.In("session").Code("operation_canceled").With("operation", "verify_switch").Wrap(err)
+				return oops.In("session").
+					Code("operation_canceled").
+					With("operation", "verify_switch").
+					Wrap(err)
 			}
 		}
 
 		clients, err := w.server.Clients(ctx)
 		if err != nil {
-			return oops.In("session").Code("tmux_failed").With("operation", "verify_switch").Wrap(err)
+			return oops.In("session").
+				Code("tmux_failed").
+				With("operation", "verify_switch").
+				Wrap(err)
 		}
 
 		for _, client := range clients {
@@ -474,7 +579,10 @@ func (w *Workflow) verifyClientSession(ctx context.Context, name gotmux.ClientNa
 		}
 	}
 
-	return oops.In("session").Code("switch_unverified").With("operation", "verify_switch").Wrap(ErrSwitchUnverified)
+	return oops.In("session").
+		Code("switch_unverified").
+		With("operation", "verify_switch").
+		Wrap(ErrSwitchUnverified)
 }
 
 func (w *Workflow) recordSwitch(ctx context.Context, name string) error {
@@ -496,14 +604,18 @@ func sleepContext(ctx context.Context, delay time.Duration) error {
 
 	select {
 	case <-ctx.Done():
-		return oops.In("session").Code("operation_canceled").With("operation", "wait").Wrap(ctx.Err())
+		return oops.In("session").
+			Code("operation_canceled").
+			With("operation", "wait").
+			Wrap(ctx.Err())
 	case <-timer.C:
 		return nil
 	}
 }
 
 func validateSessionName(name string) error {
-	if name == "" || !utf8.ValidString(name) || strings.ContainsAny(name, ":.\\") || looksLikeSessionID(name) {
+	if name == "" || !utf8.ValidString(name) || strings.ContainsAny(name, ":.\\") ||
+		looksLikeSessionID(name) {
 		return ErrInvalidSessionName
 	}
 

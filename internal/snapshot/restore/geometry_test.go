@@ -73,7 +73,8 @@ func TestSplitDependenciesPreserveIntermediateSubtrees(t *testing.T) {
 		steps = append(steps[:chosen], steps[chosen+1:]...)
 	}
 
-	if len(splitOrder) != 3 || splitOrder[0] != "p2" || splitOrder[1] != "p1" || splitOrder[2] != "p3" {
+	if len(splitOrder) != 3 || splitOrder[0] != "p2" || splitOrder[1] != "p1" ||
+		splitOrder[2] != "p3" {
 		t.Fatalf("subtree split order: %v", splitOrder)
 	}
 }

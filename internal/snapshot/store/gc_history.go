@@ -40,7 +40,12 @@ func (r *Repository) compactHistory(ctx context.Context) error {
 	return errors.Join(compactErr, closeCollectionDirectory(records))
 }
 
-func (r *Repository) compactAttempts(ctx context.Context, catalog Catalog, present map[string]bool, records *privatefs.Dir) error {
+func (r *Repository) compactAttempts(
+	ctx context.Context,
+	catalog Catalog,
+	present map[string]bool,
+	records *privatefs.Dir,
+) error {
 	referenced := catalog.historyReferences()
 	published := catalog.latestPublishedSaveSequence()
 	failedFloor := published
@@ -58,7 +63,8 @@ func (r *Repository) compactAttempts(ctx context.Context, catalog Catalog, prese
 		case attemptStateFailed:
 			return attempt.Sequence < failedFloor
 		case attemptStateCommitted, attemptStateIncomplete:
-			return attempt.Sequence < published && collectionSettled(readCollectionRecord(records, attempt.ID))
+			return attempt.Sequence < published &&
+				collectionSettled(readCollectionRecord(records, attempt.ID))
 		default:
 			return false
 		}
@@ -96,7 +102,11 @@ func collectionSettled(record collectionRecord) bool {
 	return record.reason == "" && (!record.found || record.intent.State == collectionStateRemoved)
 }
 
-func removeSettledCollectionRecords(records *privatefs.Dir, attempts []Attempt, present map[string]bool) error {
+func removeSettledCollectionRecords(
+	records *privatefs.Dir,
+	attempts []Attempt,
+	present map[string]bool,
+) error {
 	if records == nil {
 		return nil
 	}
@@ -108,21 +118,31 @@ func removeSettledCollectionRecords(records *privatefs.Dir, attempts []Attempt, 
 
 	for _, name := range settled {
 		if err := records.Remove(name); err != nil {
-			return oops.In("snapshot.store").With("operation", "remove_collection_record").Wrapf(err, "remove collection record")
+			return oops.In("snapshot.store").
+				With("operation", "remove_collection_record").
+				Wrapf(err, "remove collection record")
 		}
 	}
 
 	if err := records.Sync(); err != nil {
-		return oops.In("snapshot.store").With("operation", "sync_collection_records").Wrapf(err, "sync collection records")
+		return oops.In("snapshot.store").
+			With("operation", "sync_collection_records").
+			Wrapf(err, "sync collection records")
 	}
 
 	return nil
 }
 
-func settledCollectionRecords(records *privatefs.Dir, attempts []Attempt, present map[string]bool) ([]string, error) {
+func settledCollectionRecords(
+	records *privatefs.Dir,
+	attempts []Attempt,
+	present map[string]bool,
+) ([]string, error) {
 	names, err := records.NamesLimit(maxCollectionEntries)
 	if err != nil {
-		return nil, oops.In("snapshot.store").With("operation", "list_collection_records").Wrapf(err, "list collection records")
+		return nil, oops.In("snapshot.store").
+			With("operation", "list_collection_records").
+			Wrapf(err, "list collection records")
 	}
 
 	attempted := make(map[string]bool, len(attempts))

@@ -8,7 +8,13 @@ import (
 )
 
 func option(scope, name, value string, inherited bool) Option {
-	return Option{Scope: scope, Name: Bytes(name), Value: Bytes(value), Present: true, Inherited: inherited}
+	return Option{
+		Scope:     scope,
+		Name:      Bytes(name),
+		Value:     Bytes(value),
+		Present:   true,
+		Inherited: inherited,
+	}
 }
 
 func reportedOptionsFixture() Manifest {
@@ -37,7 +43,10 @@ func reportedOptionsFixture() Manifest {
 	}
 
 	m.Panes[0].Top, m.Panes[0].Height = 1, 23
-	m.Panes[0].Options = []Option{option("pane", "remain-on-exit", "off", true), option("pane", "@pane-mark", "1", false)}
+	m.Panes[0].Options = []Option{
+		option("pane", "remain-on-exit", "off", true),
+		option("pane", "@pane-mark", "1", false),
+	}
 
 	return m
 }
@@ -50,12 +59,18 @@ func TestCompactInheritedOptionsRoundTripsReportedLists(t *testing.T) {
 
 	compact := reportedOptionsFixture().CompactInheritedOptions()
 
-	if diff := cmp.Diff([]Option{option("session", "status", "off", false)}, compact.Sessions[0].Options); diff != "" {
+	if diff := cmp.Diff(
+		[]Option{option("session", "status", "off", false)},
+		compact.Sessions[0].Options,
+	); diff != "" {
 		t.Fatalf("compact session options (-want +got):\n%s", diff)
 	}
 
 	if len(compact.Windows[0].Options) != 0 {
-		t.Fatalf("compact window options = %+v, want every inherited option omitted", compact.Windows[0].Options)
+		t.Fatalf(
+			"compact window options = %+v, want every inherited option omitted",
+			compact.Windows[0].Options,
+		)
 	}
 
 	if diff := cmp.Diff(reported.Panes[0].Options, compact.Panes[0].Options); diff != "" {
@@ -72,7 +87,9 @@ func TestCompactInheritedOptionsRoundTripsReportedLists(t *testing.T) {
 	}
 
 	expanded := decoded.WithInheritedOptions()
-	byName := cmpopts.SortSlices(func(left, right Option) bool { return string(left.Name) < string(right.Name) })
+	byName := cmpopts.SortSlices(
+		func(left, right Option) bool { return string(left.Name) < string(right.Name) },
+	)
 
 	for index, session := range reported.Sessions {
 		if diff := cmp.Diff(session.Options, expanded.Sessions[index].Options, byName); diff != "" {
@@ -80,7 +97,11 @@ func TestCompactInheritedOptionsRoundTripsReportedLists(t *testing.T) {
 		}
 	}
 
-	if diff := cmp.Diff(reported.Windows[0].Options, expanded.Windows[0].Options, byName); diff != "" {
+	if diff := cmp.Diff(
+		reported.Windows[0].Options,
+		expanded.Windows[0].Options,
+		byName,
+	); diff != "" {
 		t.Fatalf("window options (-reported +expanded):\n%s", diff)
 	}
 }
@@ -90,13 +111,19 @@ func TestCompactInheritedOptionsKeepsInheritedValuesThatDiffer(t *testing.T) {
 	m.Windows[0].Options[0].Value = Bytes("emacs")
 	m = m.CompactInheritedOptions()
 
-	if diff := cmp.Diff([]Option{option("window", "mode-keys", "emacs", true)}, m.Windows[0].Options); diff != "" {
+	if diff := cmp.Diff(
+		[]Option{option("window", "mode-keys", "emacs", true)},
+		m.Windows[0].Options,
+	); diff != "" {
 		t.Fatalf("window options (-want +got):\n%s", diff)
 	}
 
 	effective := m.EffectiveWindowOptions(m.Windows[0])
 	if len(effective) != 2 || string(effective[0].Value) != "emacs" {
-		t.Fatalf("effective window options = %+v, want the recorded value kept over the global one", effective)
+		t.Fatalf(
+			"effective window options = %+v, want the recorded value kept over the global one",
+			effective,
+		)
 	}
 }
 

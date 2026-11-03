@@ -36,7 +36,11 @@ func (s *scriptedSource) List(context.Context, aht.Filter) ([]aht.Session, error
 	return nil, nil
 }
 
-func (s *scriptedSource) Watch(ctx context.Context, _ aht.Filter, yield func(aht.StateSnapshot) error) error {
+func (s *scriptedSource) Watch(
+	ctx context.Context,
+	_ aht.Filter,
+	yield func(aht.StateSnapshot) error,
+) error {
 	s.mu.Lock()
 	call := s.calls
 	s.calls++
@@ -75,7 +79,11 @@ func (s *failingSource) List(context.Context, aht.Filter) ([]aht.Session, error)
 	return nil, errWatchUnavailable
 }
 
-func (s *failingSource) Watch(ctx context.Context, _ aht.Filter, _ func(aht.StateSnapshot) error) error {
+func (s *failingSource) Watch(
+	ctx context.Context,
+	_ aht.Filter,
+	_ func(aht.StateSnapshot) error,
+) error {
 	s.mu.Lock()
 	call := s.calls
 	s.calls++
@@ -191,7 +199,10 @@ func TestWatchLoopRetriesUnavailableBroker(t *testing.T) {
 	waitDone(t, done)
 
 	if handler.handledCount() != 0 {
-		t.Fatalf("handled snapshots = %d, want 0 while the broker is unavailable", handler.handledCount())
+		t.Fatalf(
+			"handled snapshots = %d, want 0 while the broker is unavailable",
+			handler.handledCount(),
+		)
 	}
 }
 

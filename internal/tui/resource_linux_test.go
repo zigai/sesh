@@ -36,12 +36,22 @@ func TestResourceProviderSamplesWithoutBlockingRender(t *testing.T) {
 	}
 
 	model.resourceProcRoot = root
-	model.applySessionRows(sessionLoadResultMsg{sessions: []session.Session{{
-		Name: "work", Kind: session.KindLive, Origin: session.OriginLocal,
-		Agents: []session.AgentSession{{PaneID: "%1", PanePID: pid, Status: session.AgentStatusRunning}},
-	}}, status: session.StatusComplete})
+	model.applySessionRows(sessionLoadResultMsg{sessions: []session.Session{
+		{
+			Name:   "work",
+			Kind:   session.KindLive,
+			Origin: session.OriginLocal,
+			Agents: []session.AgentSession{
+				{PaneID: "%1", PanePID: pid, Status: session.AgentStatusRunning},
+			},
+		},
+	}, status: session.StatusComplete})
 
-	if got := model.providerRunner.Cell(providers.Resource, "%1", display.FieldPaneCPU).State; got != layout.Pending {
+	if got := model.providerRunner.Cell(
+		providers.Resource,
+		"%1",
+		display.FieldPaneCPU,
+	).State; got != layout.Pending {
 		t.Fatalf("initial cpu state = %v", got)
 	}
 
@@ -57,11 +67,20 @@ func TestResourceProviderSamplesWithoutBlockingRender(t *testing.T) {
 
 	model.handleResource(msg)
 
-	if got := model.providerRunner.Cell(providers.Resource, "%1", display.FieldPaneMem); got.State != layout.Present || got.Text == "" {
+	if got := model.providerRunner.Cell(
+		providers.Resource,
+		"%1",
+		display.FieldPaneMem,
+	); got.State != layout.Present ||
+		got.Text == "" {
 		t.Fatalf("memory cell = %+v", got)
 	}
 
-	if got := model.providerRunner.Cell(providers.Resource, "%1", display.FieldPaneCPU).State; got != layout.Pending {
+	if got := model.providerRunner.Cell(
+		providers.Resource,
+		"%1",
+		display.FieldPaneCPU,
+	).State; got != layout.Pending {
 		t.Fatalf("first cpu sample state = %v", got)
 	}
 
@@ -82,7 +101,11 @@ func writeResourceProcFixture(t *testing.T, root string, pid int) {
 	}
 
 	fields[0], fields[1], fields[11], fields[12], fields[19] = "S", "1", "100", "0", "10"
-	if err := os.WriteFile(filepath.Join(dir, "stat"), []byte("1234 (test) "+strings.Join(fields, " ")), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(dir, "stat"),
+		[]byte("1234 (test) "+strings.Join(fields, " ")),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 

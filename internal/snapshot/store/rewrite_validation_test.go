@@ -20,7 +20,12 @@ func TestRewriteDoesNotOverrideLatestSaveOutcome(t *testing.T) {
 			source := commitMultiSessionFixture(t, r)
 			applySaveOutcome(t, r, state)
 
-			if _, err := r.RemoveSessions(t.Context(), newID(), source.ID, []string{"s0"}); err != nil {
+			if _, err := r.RemoveSessions(
+				t.Context(),
+				newID(),
+				source.ID,
+				[]string{"s0"},
+			); err != nil {
 				t.Fatal(err)
 			}
 
@@ -60,7 +65,11 @@ func TestRewriteReconciliationConfirmsEveryLookup(t *testing.T) {
 
 				return nil
 			}
-			if _, err := r.ReconcileRewrite(t.Context(), id); !errors.Is(err, ErrUncertain) || !errors.Is(err, errInjected) {
+			if _, err := r.ReconcileRewrite(
+				t.Context(),
+				id,
+			); !errors.Is(err, ErrUncertain) ||
+				!errors.Is(err, errInjected) {
 				t.Fatalf("%s lookup did not confirm durability: %v", outcome, err)
 			}
 		})
@@ -86,7 +95,11 @@ func TestRewriteReconciliationPreservesLateCancellation(t *testing.T) {
 
 		return nil
 	}
-	if _, err := r.ReconcileRewrite(ctx, id); !errors.Is(err, context.Canceled) || !errors.Is(err, ErrUncertain) {
+	if _, err := r.ReconcileRewrite(
+		ctx,
+		id,
+	); !errors.Is(err, context.Canceled) ||
+		!errors.Is(err, ErrUncertain) {
 		t.Fatalf("lost late cancellation/uncertainty: %v", err)
 	}
 }
@@ -103,7 +116,14 @@ func TestRewriteCatalogRejectsContradictoryHistory(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			rw := Rewrite{ID: newID(), Source: source.ID, Replacement: newID(), State: rewriteStatePending, Sessions: []string{"s0"}, Artifacts: []string{}}
+			rw := Rewrite{
+				ID:          newID(),
+				Source:      source.ID,
+				Replacement: newID(),
+				State:       rewriteStatePending,
+				Sessions:    []string{"s0"},
+				Artifacts:   []string{},
+			}
 
 			switch kind {
 			case "pending_replacement_exists":
@@ -118,7 +138,15 @@ func TestRewriteCatalogRejectsContradictoryHistory(t *testing.T) {
 			case "completed_replacement_pending":
 				catalog.Generations = catalog.Generations[1:]
 				catalog.Sequence++
-				catalog.Attempts = append(catalog.Attempts, Attempt{ID: rw.Replacement, Sequence: catalog.Sequence, State: "pending", Reason: "capture_pending"})
+				catalog.Attempts = append(
+					catalog.Attempts,
+					Attempt{
+						ID:       rw.Replacement,
+						Sequence: catalog.Sequence,
+						State:    "pending",
+						Reason:   "capture_pending",
+					},
+				)
 				rw.State = rewriteStateCompleted
 			case "duplicate_source":
 				catalog.Generations = catalog.Generations[1:]
@@ -133,7 +161,15 @@ func TestRewriteCatalogRejectsContradictoryHistory(t *testing.T) {
 				duplicate.Source = other.ID
 				catalog.Rewrites = append(catalog.Rewrites, duplicate)
 			case "pin_on_pending_source":
-				catalog.Operations = append(catalog.Operations, Operation{ID: newID(), Source: source.ID, Target: []byte("synthetic"), State: "active"})
+				catalog.Operations = append(
+					catalog.Operations,
+					Operation{
+						ID:     newID(),
+						Source: source.ID,
+						Target: []byte("synthetic"),
+						State:  "active",
+					},
+				)
 			}
 
 			catalog.Rewrites = append(catalog.Rewrites, rw)
@@ -159,7 +195,15 @@ func TestRewriteRejectsCorruptSourceBeforeRegistration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := r.RemoveSessions(t.Context(), newID(), source.ID, []string{"s0"}); !errors.Is(err, ErrCorrupt) {
+	if _, err := r.RemoveSessions(
+		t.Context(),
+		newID(),
+		source.ID,
+		[]string{"s0"},
+	); !errors.Is(
+		err,
+		ErrCorrupt,
+	) {
 		t.Fatalf("corrupt source accepted: %v", err)
 	}
 
@@ -193,7 +237,15 @@ func TestRewriteSequenceExhaustionHasNoEffects(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := r.RemoveSessions(t.Context(), newID(), source.ID, []string{"s0"}); !errors.Is(err, ErrCorrupt) {
+	if _, err := r.RemoveSessions(
+		t.Context(),
+		newID(),
+		source.ID,
+		[]string{"s0"},
+	); !errors.Is(
+		err,
+		ErrCorrupt,
+	) {
 		t.Fatalf("exhausted sequence: %v", err)
 	}
 
@@ -277,7 +329,12 @@ func TestRewriteDoesNotOvertakeRegisteredSave(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := r.RemoveSessions(t.Context(), newID(), result.Replacement.ID, []string{"s1"}); err != nil {
+	if _, err := r.RemoveSessions(
+		t.Context(),
+		newID(),
+		result.Replacement.ID,
+		[]string{"s1"},
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -305,7 +362,12 @@ func TestLateOlderSaveDoesNotUndoCurrentRetirement(t *testing.T) {
 	}
 
 	current := commitMultiSessionFixture(t, r)
-	if _, err := r.RemoveSessions(t.Context(), newID(), current.ID, []string{"s0", "s1", "s2"}); err != nil {
+	if _, err := r.RemoveSessions(
+		t.Context(),
+		newID(),
+		current.ID,
+		[]string{"s0", "s1", "s2"},
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -365,7 +427,15 @@ func checkRewriteCapacity(t *testing.T, empty bool) {
 
 	for len(catalog.Attempts) < maxEntries {
 		catalog.Sequence++
-		catalog.Attempts = append(catalog.Attempts, Attempt{ID: fmt.Sprintf("%032x", catalog.Sequence), Sequence: catalog.Sequence, State: "pending", Reason: "capture_pending"})
+		catalog.Attempts = append(
+			catalog.Attempts,
+			Attempt{
+				ID:       fmt.Sprintf("%032x", catalog.Sequence),
+				Sequence: catalog.Sequence,
+				State:    "pending",
+				Reason:   "capture_pending",
+			},
+		)
 	}
 
 	if err := r.publish(t.Context(), catalog, nil); err != nil {

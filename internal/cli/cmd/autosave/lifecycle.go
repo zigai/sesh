@@ -82,7 +82,10 @@ func acquireStartupRestore(cmd *cobra.Command, env Env) (*heldStartupRestore, er
 			return nil, errors.Join(renderAutosaveResult(cmd, env, busy), closeErr)
 		}
 
-		return nil, errors.Join(oops.In("cli").With("operation", "acquire_autosave_lock").Wrap(err), closeErr)
+		return nil, errors.Join(
+			oops.In("cli").With("operation", "acquire_autosave_lock").Wrap(err),
+			closeErr,
+		)
 	}
 
 	return &heldStartupRestore{repo: repo, lock: lock}, nil
@@ -92,7 +95,11 @@ func (h *heldStartupRestore) skip(cmd *cobra.Command, env Env, err error) error 
 	held := newOutcome(statusSkipped, reasonRestorePending)
 	held.history = historyState(env)
 
-	return errors.Join(renderAutosaveDegraded(cmd, env, held, err), wrapCloseError(h.repo.Close()), h.lock.Release())
+	return errors.Join(
+		renderAutosaveDegraded(cmd, env, held, err),
+		wrapCloseError(h.repo.Close()),
+		h.lock.Release(),
+	)
 }
 
 func restoreUnderLock(cmd *cobra.Command, env Env, held *heldStartupRestore) error {
@@ -101,12 +108,20 @@ func restoreUnderLock(cmd *cobra.Command, env Env, held *heldStartupRestore) err
 
 	settled, settleErr := engine.SettleDeadRestores(ctx, repo)
 	if settleErr != nil {
-		return errors.Join(oops.In("cli").With("operation", "settle_dead_restores").Wrap(settleErr), wrapCloseError(repo.Close()), lock.Release())
+		return errors.Join(
+			oops.In("cli").With("operation", "settle_dead_restores").Wrap(settleErr),
+			wrapCloseError(repo.Close()),
+			lock.Release(),
+		)
 	}
 
 	state, stateErr := automation.InspectStartupState(ctx, repo)
 	if stateErr != nil {
-		return errors.Join(oops.In("cli").With("operation", "inspect_startup_state").Wrap(stateErr), wrapCloseError(repo.Close()), lock.Release())
+		return errors.Join(
+			oops.In("cli").With("operation", "inspect_startup_state").Wrap(stateErr),
+			wrapCloseError(repo.Close()),
+			lock.Release(),
+		)
 	}
 
 	state.Abandoned = len(settled)
@@ -116,7 +131,10 @@ func restoreUnderLock(cmd *cobra.Command, env Env, held *heldStartupRestore) err
 
 	admission := automation.EvaluateStartupRestore(state)
 	if !admission.Allowed {
-		return errors.Join(renderDeniedStartupRestore(cmd, env, admission, state, repo), lock.Release())
+		return errors.Join(
+			renderDeniedStartupRestore(cmd, env, admission, state, repo),
+			lock.Release(),
+		)
 	}
 
 	server, err := env.workspace.OpenTmux()
@@ -161,7 +179,10 @@ func restoreUnderLock(cmd *cobra.Command, env Env, held *heldStartupRestore) err
 	restored.repository = repositoryState(ctx, env)
 	restored.history = historyState(env)
 	restored.abandoned = state.Abandoned
-	restored.restore = &restoreCounts{restored: len(result.SessionsRestored), skipped: result.SessionsSkipped}
+	restored.restore = &restoreCounts{
+		restored: len(result.SessionsRestored),
+		skipped:  result.SessionsSkipped,
+	}
 
 	renderErr := renderAutosaveResult(cmd, env, restored)
 
@@ -188,8 +209,13 @@ func renderDeniedStartupRestore(
 	case automation.ReasonRestoreDisabled, automation.ReasonRepositoryMissing:
 		return errors.Join(renderErr, closeErr)
 	default:
-		refusal := clibase.NewExitError(clibase.ExitCodeGeneral, oops.In("cli").Code("startup_refused").With("operation", "restore_on_start", "reason", admission.Reason).
-			Wrap(errors.Join(errAutosaveStartupRefused, startupRefusalCause(admission.Reason, state))))
+		refusal := clibase.NewExitError(
+			clibase.ExitCodeGeneral,
+			oops.In("cli").
+				Code("startup_refused").
+				With("operation", "restore_on_start", "reason", admission.Reason).
+				Wrap(errors.Join(errAutosaveStartupRefused, startupRefusalCause(admission.Reason, state))),
+		)
 
 		return errors.Join(renderErr, refusal, closeErr)
 	}
@@ -219,7 +245,11 @@ func repositoryFromState(state automation.StartupState) string {
 	}
 }
 
-func resolveAutosaveSelection(ctx context.Context, cmd *cobra.Command, server *gotmux.Server) ([]gotmux.SessionID, error) {
+func resolveAutosaveSelection(
+	ctx context.Context,
+	cmd *cobra.Command,
+	server *gotmux.Server,
+) ([]gotmux.SessionID, error) {
 	flags, _ := cmd.Flags().GetStringSlice("session")
 
 	selected := make([]gotmux.SessionID, 0, len(flags))

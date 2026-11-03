@@ -9,25 +9,49 @@ import (
 var ErrPRNumber = errors.New("pull request must be a number such as 12 or #12")
 
 var (
-	AgentNext = defineAgentNavigation("agent.next", "Next agent", "Switch to the next coding agent needing attention",
-		"Switch to the next coding agent pane needing attention (waiting, failed, or idle) and activate its window, session, and pane.")
+	AgentNext = defineAgentNavigation(
+		"agent.next",
+		"Next agent",
+		"Switch to the next coding agent needing attention",
+		"Switch to the next coding agent pane needing attention (waiting, failed, or idle) and activate its window, session, and pane.",
+	)
 
-	AgentLatest = defineAgentNavigation("agent.latest", "Latest agent", "Focus the coding agent that most recently became idle",
-		"Focus the live coding agent pane with the most recent recorded transition to idle. Idle can include startup and does not confirm completed work.")
+	AgentLatest = defineAgentNavigation(
+		"agent.latest",
+		"Latest agent",
+		"Focus the coding agent that most recently became idle",
+		"Focus the live coding agent pane with the most recent recorded transition to idle. Idle can include startup and does not confirm completed work.",
+	)
 
-	AgentWaiting = defineAgentNavigation("agent.waiting", "Waiting agent", "Focus the coding agent waiting longest for input or approval",
-		"Focus the live coding agent with the oldest recorded transition to waiting.")
+	AgentWaiting = defineAgentNavigation(
+		"agent.waiting",
+		"Waiting agent",
+		"Focus the coding agent waiting longest for input or approval",
+		"Focus the live coding agent with the oldest recorded transition to waiting.",
+	)
 
-	AgentUnread = defineAgentNavigation("agent.unread", "Unread agent", "Focus the most recently idle coding agent with an unvisited result",
+	AgentUnread = defineAgentNavigation(
+		"agent.unread",
+		"Unread agent",
+		"Focus the most recently idle coding agent with an unvisited result",
 		"Focus the newest idle transition not acknowledged by sesh-recorded visits. The current pane is observed as visited. "+
-			"Repeated invocations advance through unread results. Arbitrary manual pane visits are not tracked.")
+			"Repeated invocations advance through unread results. Arbitrary manual pane visits are not tracked.",
+	)
 
-	AgentFailed = defineAgentNavigation("agent.failed", "Failed agent", "Focus the most recently failed coding agent",
-		"Focus the live coding agent with the most recent recorded transition to failed.")
+	AgentFailed = defineAgentNavigation(
+		"agent.failed",
+		"Failed agent",
+		"Focus the most recently failed coding agent",
+		"Focus the live coding agent with the most recent recorded transition to failed.",
+	)
 
-	AgentToggle = defineAgentNavigation("agent.toggle", "Toggle agent", "Alternate between your working pane and the last agent visited",
+	AgentToggle = defineAgentNavigation(
+		"agent.toggle",
+		"Toggle agent",
+		"Alternate between your working pane and the last agent visited",
 		"Alternate between the working pane and the last agent visited through sesh navigation, independently of agent back "+
-			"history. A manually selected working pane replaces the remembered working pane. Requires an earlier agent navigation for this client.")
+			"history. A manually selected working pane replaces the remembered working pane. Requires an earlier agent navigation for this client.",
+	)
 
 	AgentBack = define(Descriptor{
 		ID:          "agent.back",
@@ -110,9 +134,11 @@ var AgentResume = define(Descriptor{
 	Help: "Open a window that runs the native resume command of a recorded agent conversation in its directory: " +
 		"in its project's session, else in the invoking pane's session, and reopen it if it finished. The agent " +
 		"status service records the conversations of interactive agents in tmux panes.",
-	Subject:     SubjectNone,
-	Arity:       ArityOne,
-	Params:      []Param{newParam("item", ParamText, "Recorded conversation to resume").required().positional()},
+	Subject: SubjectNone,
+	Arity:   ArityOne,
+	Params: []Param{
+		newParam("item", ParamText, "Recorded conversation to resume").required().positional(),
+	},
 	NeedsClient: false,
 	Interactive: false,
 	Destructive: false,
@@ -124,32 +150,67 @@ var AgentResume = define(Descriptor{
 }, func(out ResumedAgent) string { return "Resumed " + out.Item })
 
 var (
-	AgentFinish = defineWorkAction("agent.finish", "Finished", "Finish conversation", "Mark a recorded conversation finished",
+	AgentFinish = defineWorkAction(
+		"agent.finish",
+		"Finished",
+		"Finish conversation",
+		"Mark a recorded conversation finished",
 		"Finish a recorded agent conversation: the inbox stops listing it once its agent exits. Resuming it "+
-			"reopens it. A conversation also finishes when every pull request linked to it is merged or closed.")
+			"reopens it. A conversation also finishes when every pull request linked to it is merged or closed.",
+	)
 
-	AgentPin = defineWorkAction("agent.pin", "Pinned", "Pin conversation", "Keep a recorded conversation first and open",
+	AgentPin = defineWorkAction(
+		"agent.pin",
+		"Pinned",
+		"Pin conversation",
+		"Keep a recorded conversation first and open",
 		"Pin a recorded agent conversation: the inbox lists it first in its section, and its pull requests "+
-			"ending does not finish it.")
+			"ending does not finish it.",
+	)
 
-	AgentUnpin = defineWorkAction("agent.unpin", "Unpinned", "Unpin conversation", "Unpin a recorded conversation",
-		"Unpin a recorded agent conversation.")
+	AgentUnpin = defineWorkAction(
+		"agent.unpin",
+		"Unpinned",
+		"Unpin conversation",
+		"Unpin a recorded conversation",
+		"Unpin a recorded agent conversation.",
+	)
 
-	AgentUnseen = defineWorkAction("agent.unseen", "Marked unseen", "Mark conversation unseen",
-		"Mark a recorded conversation as not seen", "Mark a recorded conversation as not seen on its machine, so the inbox lists it "+
-			"as done until it is marked seen or resumed.")
+	AgentUnseen = defineWorkAction(
+		"agent.unseen",
+		"Marked unseen",
+		"Mark conversation unseen",
+		"Mark a recorded conversation as not seen",
+		"Mark a recorded conversation as not seen on its machine, so the inbox lists it "+
+			"as done until it is marked seen or resumed.",
+	)
 
-	AgentSeen = defineWorkAction("agent.seen", "Marked seen", "Mark conversation seen", "Mark a recorded conversation as seen",
-		"Clear the mark that a recorded conversation is not seen.")
+	AgentSeen = defineWorkAction(
+		"agent.seen",
+		"Marked seen",
+		"Mark conversation seen",
+		"Mark a recorded conversation as seen",
+		"Clear the mark that a recorded conversation is not seen.",
+	)
 
-	AgentLink = defineWorkAction("agent.link", "Linked a pull request to", "Link PR", "Link a pull request to a recorded conversation",
+	AgentLink = defineWorkAction(
+		"agent.link",
+		"Linked a pull request to",
+		"Link PR",
+		"Link a pull request to a recorded conversation",
 		"Link a pull request of the conversation's repository to it, as gh reports it. The conversation finishes "+
 			"when every linked pull request is merged or closed.",
-		newParam("pr", ParamText, "Pull request number").required().positional())
+		newParam("pr", ParamText, "Pull request number").required().positional(),
+	)
 
-	AgentUnlink = defineWorkAction("agent.unlink", "Unlinked a pull request from", "Unlink PR", "Unlink a pull request from a recorded conversation",
+	AgentUnlink = defineWorkAction(
+		"agent.unlink",
+		"Unlinked a pull request from",
+		"Unlink PR",
+		"Unlink a pull request from a recorded conversation",
 		"Unlink a pull request from a recorded conversation. Sync does not link it again.",
-		newParam("pr", ParamText, "Pull request number").required().positional())
+		newParam("pr", ParamText, "Pull request number").required().positional(),
+	)
 )
 
 type NavigateAgents struct {
@@ -202,15 +263,20 @@ type ResumedAgent struct {
 	Pane    string     `json:"pane"`
 }
 
-func defineAgentNavigation(id ID, title, summary, help string) *Definition[NavigateAgents, FocusedPane] {
+func defineAgentNavigation(
+	id ID,
+	title, summary, help string,
+) *Definition[NavigateAgents, FocusedPane] {
 	return define(Descriptor{
-		ID:          id,
-		Title:       title,
-		Summary:     summary,
-		Help:        help,
-		Subject:     SubjectNone,
-		Arity:       ArityOne,
-		Params:      []Param{newParam("local", ParamBool, "Only consider panes in the current tmux session")},
+		ID:      id,
+		Title:   title,
+		Summary: summary,
+		Help:    help,
+		Subject: SubjectNone,
+		Arity:   ArityOne,
+		Params: []Param{
+			newParam("local", ParamBool, "Only consider panes in the current tmux session"),
+		},
 		NeedsClient: true,
 		Interactive: false,
 		Destructive: false,
@@ -222,15 +288,21 @@ func defineAgentNavigation(id ID, title, summary, help string) *Definition[Navig
 	}, reportFocusedPane)
 }
 
-func defineWorkAction(id ID, done, title, summary, help string, params ...Param) *Definition[ChangeWork, ChangedWork] {
+func defineWorkAction(
+	id ID,
+	done, title, summary, help string,
+	params ...Param,
+) *Definition[ChangeWork, ChangedWork] {
 	return define(Descriptor{
-		ID:          id,
-		Title:       title,
-		Summary:     summary,
-		Help:        help,
-		Subject:     SubjectNone,
-		Arity:       ArityOne,
-		Params:      append([]Param{newParam("item", ParamText, "Recorded conversation").required().positional()}, params...),
+		ID:      id,
+		Title:   title,
+		Summary: summary,
+		Help:    help,
+		Subject: SubjectNone,
+		Arity:   ArityOne,
+		Params: append(
+			[]Param{newParam("item", ParamText, "Recorded conversation").required().positional()},
+			params...),
 		NeedsClient: false,
 		Interactive: false,
 		Destructive: false,

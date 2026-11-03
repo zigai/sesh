@@ -93,7 +93,8 @@ func TestSnapshotPruneThenGCReportsSeparatePhysicalRemoval(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !envelope.OK || len(envelope.Result.Removed) != 2 || envelope.Result.Bytes < 1 || len(envelope.Result.Intents) != 2 {
+	if !envelope.OK || len(envelope.Result.Removed) != 2 || envelope.Result.Bytes < 1 ||
+		len(envelope.Result.Intents) != 2 {
 		t.Fatalf("physical collection receipt = %s", stdout)
 	}
 }
@@ -188,7 +189,8 @@ func TestSnapshotPruneProtectedOverageEmitsOneEngineOwnedJSONOutcome(t *testing.
 	envelope := singleRuntimeEnvelope(t, stdout.Bytes())
 	result := decodeJSONPayload[testSnapshotPruneResult](t, envelope.Result)
 
-	if envelope.OK || envelope.Error == nil || envelope.Error.Code != "retentionBudgetUnmet" || !result.BudgetUnmet {
+	if envelope.OK || envelope.Error == nil || envelope.Error.Code != "retentionBudgetUnmet" ||
+		!result.BudgetUnmet {
 		t.Fatalf("protected overage receipt = %s", stdout.String())
 	}
 

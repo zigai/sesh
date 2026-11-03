@@ -21,7 +21,13 @@ func PopupSessionName(taskID string) string {
 	return popupSessionPrefix + taskID
 }
 
-func EnsurePopupSession(ctx context.Context, popup *gotmux.Server, cfg config.TasksConfig, record Record, size gotmux.Size) (gotmux.Session, error) {
+func EnsurePopupSession(
+	ctx context.Context,
+	popup *gotmux.Server,
+	cfg config.TasksConfig,
+	record Record,
+	size gotmux.Size,
+) (gotmux.Session, error) {
 	existing, err := popup.FindSession(ctx, PopupSessionName(record.ID))
 	if err == nil {
 		return existing, nil
@@ -32,9 +38,17 @@ func EnsurePopupSession(ctx context.Context, popup *gotmux.Server, cfg config.Ta
 	}
 
 	created, err := popup.NewSession(ctx, gotmux.NewSessionOptions{
-		Name: PopupSessionName(record.ID), Dir: record.Directory, Window: "", Program: gotmux.Program{}, Env: nil,
-		TmuxEnv: Env(record), Size: size,
-		Start: gotmux.StartPolicyAllowStart, Group: "",
+		Name: PopupSessionName(
+			record.ID,
+		),
+		Dir:     record.Directory,
+		Window:  "",
+		Program: gotmux.Program{},
+		Env:     nil,
+		TmuxEnv: Env(record),
+		Size:    size,
+		Start:   gotmux.StartPolicyAllowStart,
+		Group:   "",
 	})
 	if err != nil {
 		return gotmux.Session{}, taskError("open_task_popup", err)
@@ -53,7 +67,14 @@ func EnsurePopupSession(ctx context.Context, popup *gotmux.Server, cfg config.Ta
 	return created, nil
 }
 
-func OpenRunWindow(ctx context.Context, popup *gotmux.Server, popupSession gotmux.Session, record Record, name string, argv []string) error {
+func OpenRunWindow(
+	ctx context.Context,
+	popup *gotmux.Server,
+	popupSession gotmux.Session,
+	record Record,
+	name string,
+	argv []string,
+) error {
 	windows, err := popupSession.Windows(ctx)
 	if err != nil {
 		return taskError("open_task_action", fmt.Errorf("list popup windows: %w", err))
@@ -78,8 +99,15 @@ func OpenRunWindow(ctx context.Context, popup *gotmux.Server, popupSession gotmu
 	}
 
 	if _, err := popupSession.NewWindow(ctx, gotmux.NewWindowOptions{
-		Name: name, Dir: record.Directory, Program: shellProgram(shell, argv), Env: nil, TmuxEnv: Env(record),
-		Index: nil, Before: false, After: false, Select: true,
+		Name:    name,
+		Dir:     record.Directory,
+		Program: shellProgram(shell, argv),
+		Env:     nil,
+		TmuxEnv: Env(record),
+		Index:   nil,
+		Before:  false,
+		After:   false,
+		Select:  true,
 	}); err != nil {
 		return taskError("open_task_action", fmt.Errorf("open action window: %w", err))
 	}
@@ -108,7 +136,13 @@ func applyPopupDefaults(ctx context.Context, popup *gotmux.Server) error {
 		return fmt.Errorf("build popup detach: %w", err)
 	}
 
-	if err := popup.Bind(ctx, rootKeyTable, gotmux.Key(popupDetachKey), sequence, gotmux.BindOptions{Repeat: false, Note: "", ClearNote: false}); err != nil {
+	if err := popup.Bind(
+		ctx,
+		rootKeyTable,
+		gotmux.Key(popupDetachKey),
+		sequence,
+		gotmux.BindOptions{Repeat: false, Note: "", ClearNote: false},
+	); err != nil {
 		return fmt.Errorf("bind popup detach: %w", err)
 	}
 

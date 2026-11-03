@@ -146,7 +146,10 @@ func (m *Model) loadKeysCommand() tea.Cmd {
 		defer m.lifecycle.EndWorker()
 
 		if m.source == nil {
-			return keyLoadMsg{bindings: nil, err: oops.In("tui").Code("config_invalid").Wrap(errNilSource)}
+			return keyLoadMsg{
+				bindings: nil,
+				err:      oops.In("tui").Code("config_invalid").Wrap(errNilSource),
+			}
 		}
 
 		bindings, err := m.source.ListKeyBindings(m.lifecycle, m.table)
@@ -348,7 +351,9 @@ func (m *Model) render() string {
 
 	body := make([]string, 0, contentHeight)
 	body = append(body, header, m.searchLine(contentWidth), "")
-	body = append(body, m.renderRows(contentWidth, max(contentHeight-whichKeyHeaderFooterRows, 1))...)
+	body = append(
+		body,
+		m.renderRows(contentWidth, max(contentHeight-whichKeyHeaderFooterRows, 1))...)
 	body = append(body, "", m.footer(contentWidth))
 
 	box = box.Width(width).Height(height)

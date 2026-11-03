@@ -49,12 +49,30 @@ type attachExec struct {
 
 type originPickerAdapter struct{ socket string }
 
-func DefaultPickerRemoteFactory(_ context.Context, cfg *config.Config, socket string) (cmdpicker.RemoteServices, error) {
+func DefaultPickerRemoteFactory(
+	_ context.Context,
+	cfg *config.Config,
+	socket string,
+) (cmdpicker.RemoteServices, error) {
 	if cfg == nil {
-		return cmdpicker.RemoteServices{Catalog: nil, Watcher: nil, Peer: nil, Attach: nil, OriginBridge: nil, Origin: nil}, nil
+		return cmdpicker.RemoteServices{
+			Catalog:      nil,
+			Watcher:      nil,
+			Peer:         nil,
+			Attach:       nil,
+			OriginBridge: nil,
+			Origin:       nil,
+		}, nil
 	}
 
-	services := cmdpicker.RemoteServices{Catalog: nil, Watcher: nil, Peer: nil, Attach: nil, OriginBridge: nil, Origin: nil}
+	services := cmdpicker.RemoteServices{
+		Catalog:      nil,
+		Watcher:      nil,
+		Peer:         nil,
+		Attach:       nil,
+		OriginBridge: nil,
+		Origin:       nil,
+	}
 
 	if cfg.Remote.EnableReverseBridge {
 		origin := &originPickerAdapter{socket: socket}
@@ -65,7 +83,11 @@ func DefaultPickerRemoteFactory(_ context.Context, cfg *config.Config, socket st
 		return services, nil
 	}
 
-	adapter := &pickerAdapter{cfg: cfg.Clone(), originSocket: socket, peer: remote.NewCatalogPeer(cfg.Remote, config.GetXDGPaths().CacheHome)}
+	adapter := &pickerAdapter{
+		cfg:          cfg.Clone(),
+		originSocket: socket,
+		peer:         remote.NewCatalogPeer(cfg.Remote, config.GetXDGPaths().CacheHome),
+	}
 
 	services.Catalog, services.Watcher, services.Attach, services.Peer = adapter, adapter, adapter, adapter.peer
 
@@ -87,7 +109,10 @@ func (adapter *pickerAdapter) LoadRemoteCatalog() (tui.RemoteCatalog, error) {
 	return pickerCatalog(catalog), nil
 }
 
-func (adapter *pickerAdapter) WatchRemoteCatalog(ctx context.Context, publish func(tui.RemoteCatalog, error)) (resultErr error) {
+func (adapter *pickerAdapter) WatchRemoteCatalog(
+	ctx context.Context,
+	publish func(tui.RemoteCatalog, error),
+) (resultErr error) {
 	path, err := remote.Dir(config.GetXDGPaths().CacheHome)
 	if err != nil {
 		return cliError("resolve_remote_picker_cache", err)
@@ -100,15 +125,20 @@ func (adapter *pickerAdapter) WatchRemoteCatalog(ctx context.Context, publish fu
 
 	defer func() { resultErr = errors.Join(resultErr, dir.Close()) }()
 
-	err = remote.WatchCatalog(ctx, dir, watchInterval, func(catalog remote.Catalog, watchErr error) error {
-		if watchErr == nil {
-			adapter.peer.Observe(catalog)
-		}
+	err = remote.WatchCatalog(
+		ctx,
+		dir,
+		watchInterval,
+		func(catalog remote.Catalog, watchErr error) error {
+			if watchErr == nil {
+				adapter.peer.Observe(catalog)
+			}
 
-		publish(pickerCatalog(catalog), watchErr)
+			publish(pickerCatalog(catalog), watchErr)
 
-		return nil
-	})
+			return nil
+		},
+	)
 
 	return cliError("watch_remote_picker_catalog", err)
 }
@@ -117,14 +147,30 @@ func pickerCatalog(catalog remote.Catalog) tui.RemoteCatalog {
 	connections := make([]tui.RemoteConnection, 0, len(catalog.Connections))
 	for _, state := range catalog.Connections {
 		connections = append(connections, tui.RemoteConnection{
-			ID: state.ID, Label: state.Label,
-			ConfigDigest: state.ConfigDigest, PeerID: state.PeerID, StreamInstance: state.StreamInstance,
-			Connected: state.Connected, LastSeen: state.LastSeen, LastAttempt: state.LastAttempt,
-			LastError: state.LastError, LastErrorAt: state.LastErrorAt,
-			HealthTmux: string(state.Snapshot.Health.Tmux.Status), HealthAgents: string(state.Snapshot.Health.Agents.Status),
-			HealthSnapshots: string(state.Snapshot.Health.Snapshots.Status), HealthTasks: string(state.Snapshot.Health.Tasks.Status),
-			HealthWork: string(state.Snapshot.Health.Work.Status), Sessions: remote.CatalogSessions(state),
-			Tasks: remote.CatalogTasks(state), Work: state.Snapshot.Work,
+			ID:             state.ID,
+			Label:          state.Label,
+			ConfigDigest:   state.ConfigDigest,
+			PeerID:         state.PeerID,
+			StreamInstance: state.StreamInstance,
+			Connected:      state.Connected,
+			LastSeen:       state.LastSeen,
+			LastAttempt:    state.LastAttempt,
+			LastError:      state.LastError,
+			LastErrorAt:    state.LastErrorAt,
+			HealthTmux: string(
+				state.Snapshot.Health.Tmux.Status,
+			),
+			HealthAgents: string(state.Snapshot.Health.Agents.Status),
+			HealthSnapshots: string(
+				state.Snapshot.Health.Snapshots.Status,
+			),
+			HealthTasks: string(state.Snapshot.Health.Tasks.Status),
+			HealthWork: string(
+				state.Snapshot.Health.Work.Status,
+			),
+			Sessions: remote.CatalogSessions(state),
+			Tasks:    remote.CatalogTasks(state),
+			Work:     state.Snapshot.Work,
 		})
 	}
 
@@ -143,12 +189,19 @@ func pickerCatalog(catalog remote.Catalog) tui.RemoteCatalog {
 	return tui.RemoteCatalog{GeneratedAt: catalog.GeneratedAt, Connections: connections}
 }
 
-func (adapter *pickerAdapter) AttachRemoteSession(ctx context.Context, target session.Session, paneID string) (tea.ExecCommand, error) {
+func (adapter *pickerAdapter) AttachRemoteSession(
+	ctx context.Context,
+	target session.Session,
+	paneID string,
+) (tea.ExecCommand, error) {
 	if adapter == nil || adapter.cfg == nil {
 		return nil, cliError("attach_remote_session", remote.ErrIncompleteDependencies)
 	}
 
-	connection, err := remote.FindConnection(adapter.cfg.Remote, target.RuntimeIdentity.ConnectionID)
+	connection, err := remote.FindConnection(
+		adapter.cfg.Remote,
+		target.RuntimeIdentity.ConnectionID,
+	)
 	if err != nil {
 		return nil, cliError("find_remote_attach_connection", err)
 	}
@@ -171,7 +224,15 @@ func (adapter *pickerAdapter) AttachRemoteSession(ctx context.Context, target se
 		return nil, cliError("attach_remote_session", remote.ErrTargetChanged)
 	}
 
-	return prepareRemoteAttachExec(ctx, adapter.cfg, adapter.originSocket, connection, state, fresh, paneID)
+	return prepareRemoteAttachExec(
+		ctx,
+		adapter.cfg,
+		adapter.originSocket,
+		connection,
+		state,
+		fresh,
+		paneID,
+	)
 }
 
 func (command *attachExec) SetStdin(reader io.Reader)  { command.command.Stdin = reader }
@@ -191,7 +252,8 @@ func (command *attachExec) Run() error {
 	runErr := command.command.Run()
 	unmarkErr := unmark()
 
-	if target, requested := command.bridge.SwitchTarget(); requested && runErr == nil && command.finish != nil {
+	if target, requested := command.bridge.SwitchTarget(); requested && runErr == nil &&
+		command.finish != nil {
 		runErr = command.finish(target)
 	}
 
@@ -272,29 +334,50 @@ func prepareRemoteAttachExec(
 	}
 
 	bridge, err := remote.NewBridgeServer(ctx, remote.BridgeServerConfig{
-		SocketPath: localSocket,
-		Token:      bootstrap.Capability.Token, ExpiresAt: bootstrap.Capability.ExpiresAt, OriginID: "local", OriginLabel: "origin",
+		SocketPath:  localSocket,
+		Token:       bootstrap.Capability.Token,
+		ExpiresAt:   bootstrap.Capability.ExpiresAt,
+		OriginID:    "local",
+		OriginLabel: "origin",
 		ListSessions: func() ([]remote.OriginSession, error) {
 			if !cfg.Remote.EnableReverseBridge {
 				return nil, nil
 			}
 
 			return originSessions(ctx, originSocket)
-		}, Now: nil,
+		},
+		Now: nil,
 	})
 	if err != nil {
 		return nil, cliError("start_remote_origin_bridge", err)
 	}
 
-	if _, err := remote.RunAttachPrepare(ctx, cfg.Remote, connection, bootstrap, remote.AttachCommandOptions{
-		Streams: remote.AttachStreams{In: nil, Out: nil, Err: nil}, Command: nil,
-	}); err != nil {
+	if _, err := remote.RunAttachPrepare(
+		ctx,
+		cfg.Remote,
+		connection,
+		bootstrap,
+		remote.AttachCommandOptions{
+			Streams: remote.AttachStreams{In: nil, Out: nil, Err: nil}, Command: nil,
+		},
+	); err != nil {
 		return nil, errors.Join(cliError("run_remote_attach_prepare", err), bridge.Close())
 	}
 
-	attach, err := remote.NewAttachCommand(ctx, cfg.Remote, connection, bootstrap, remote.AttachCommandOptions{
-		Streams: remote.AttachStreams{In: os.Stdin, Out: os.Stdout, Err: os.Stderr}, Command: nil,
-	})
+	attach, err := remote.NewAttachCommand(
+		ctx,
+		cfg.Remote,
+		connection,
+		bootstrap,
+		remote.AttachCommandOptions{
+			Streams: remote.AttachStreams{
+				In:  os.Stdin,
+				Out: os.Stdout,
+				Err: os.Stderr,
+			},
+			Command: nil,
+		},
+	)
 	if err != nil {
 		return nil, errors.Join(cliError("new_remote_attach_command", err), bridge.Close())
 	}
@@ -312,7 +395,10 @@ func prepareRemoteAttachExec(
 	return &attachExec{command: attach, bridge: bridge, finish: finish, mark: mark}, nil
 }
 
-func originReturnAction(ctx context.Context, socket string) (func(remote.OriginSession) error, error) {
+func originReturnAction(
+	ctx context.Context,
+	socket string,
+) (func(remote.OriginSession) error, error) {
 	server, err := tmuxserver.Open(socket)
 	if err != nil {
 		return nil, cliError("open_origin_return_endpoint", err)
@@ -346,17 +432,39 @@ func originReturnAction(ctx context.Context, socket string) (func(remote.OriginS
 			}
 
 			if client.Valid() {
-				return cliError("switch_origin_session", client.Switch(ctx, handle, gotmux.SwitchOptions{ToggleReadOnly: false, PreserveEnvironment: false}))
+				return cliError(
+					"switch_origin_session",
+					client.Switch(
+						ctx,
+						handle,
+						gotmux.SwitchOptions{ToggleReadOnly: false, PreserveEnvironment: false},
+					),
+				)
 			}
 
-			return cliError("attach_origin_session", handle.Attach(ctx, gotmux.Streams{In: os.Stdin, Out: os.Stdout, Err: os.Stderr}, gotmux.AttachOptions{ReadOnly: false, PreserveEnvironment: false, Detach: gotmux.DetachModeNone, Dir: "", Flags: nil}))
+			return cliError(
+				"attach_origin_session",
+				handle.Attach(
+					ctx,
+					gotmux.Streams{In: os.Stdin, Out: os.Stdout, Err: os.Stderr},
+					gotmux.AttachOptions{
+						ReadOnly:            false,
+						PreserveEnvironment: false,
+						Detach:              gotmux.DetachModeNone,
+						Dir:                 "",
+						Flags:               nil,
+					},
+				),
+			)
 		}
 
 		return cliError("origin_return_action", remote.ErrTargetChanged)
 	}, nil
 }
 
-func (adapter *originPickerAdapter) LoadOriginSessions(ctx context.Context) (string, []session.Session, error) {
+func (adapter *originPickerAdapter) LoadOriginSessions(
+	ctx context.Context,
+) (string, []session.Session, error) {
 	client, err := adapter.client(ctx)
 	if errors.Is(err, remote.ErrBridgeSocketRequired) {
 		return "", nil, nil
@@ -374,18 +482,45 @@ func (adapter *originPickerAdapter) LoadOriginSessions(ctx context.Context) (str
 	rows := make([]session.Session, 0, len(catalog.Sessions))
 	for _, target := range catalog.Sessions {
 		rows = append(rows, session.Session{
-			ID: target.ID, Name: target.Name, Kind: session.KindLive, Origin: session.OriginBridge,
-			WindowCount: target.WindowCount, Attached: target.Attached, RemoteStatus: session.RemoteStatusAvailable,
-			TmuxServerSocket: "", Generation: "", RepositorySource: "", NameRaw: nil, PathRaw: nil,
-			Activity: time.Time{}, Current: false, ActivePaneID: "", ActiveWindowName: "", ActiveWindowIndex: "",
-			ActivePanePath: "", ActivePaneCommand: "", ActivePaneTitle: "",
-			AgentFailed: 0, AgentInterrupted: 0, AgentUnknown: 0, AgentIdleSince: time.Time{},
-			AgentWaitingSince: time.Time{}, AgentActivityChangedAt: time.Time{}, Agents: nil,
-			AgentTotal: target.AgentTotal, AgentActive: target.AgentActive, AgentWaiting: target.AgentWaiting,
+			ID:                     target.ID,
+			Name:                   target.Name,
+			Kind:                   session.KindLive,
+			Origin:                 session.OriginBridge,
+			WindowCount:            target.WindowCount,
+			Attached:               target.Attached,
+			RemoteStatus:           session.RemoteStatusAvailable,
+			TmuxServerSocket:       "",
+			Generation:             "",
+			RepositorySource:       "",
+			NameRaw:                nil,
+			PathRaw:                nil,
+			Activity:               time.Time{},
+			Current:                false,
+			ActivePaneID:           "",
+			ActiveWindowName:       "",
+			ActiveWindowIndex:      "",
+			ActivePanePath:         "",
+			ActivePaneCommand:      "",
+			ActivePaneTitle:        "",
+			AgentFailed:            0,
+			AgentInterrupted:       0,
+			AgentUnknown:           0,
+			AgentIdleSince:         time.Time{},
+			AgentWaitingSince:      time.Time{},
+			AgentActivityChangedAt: time.Time{},
+			Agents:                 nil,
+			AgentTotal:             target.AgentTotal,
+			AgentActive:            target.AgentActive,
+			AgentWaiting:           target.AgentWaiting,
 			RuntimeIdentity: session.RuntimeIdentity{
-				ConfigDigest: "", PeerID: "", StreamInstance: "", TmuxServerSocket: "",
-				ConnectionID: catalog.OriginID, ConnectionLabel: catalog.OriginLabel,
-				TmuxServerPID: target.TmuxServerPID, TmuxServerStartedAt: target.TmuxServerStartedAt,
+				ConfigDigest:         "",
+				PeerID:               "",
+				StreamInstance:       "",
+				TmuxServerSocket:     "",
+				ConnectionID:         catalog.OriginID,
+				ConnectionLabel:      catalog.OriginLabel,
+				TmuxServerPID:        target.TmuxServerPID,
+				TmuxServerStartedAt:  target.TmuxServerStartedAt,
 				TmuxSessionCreatedAt: target.SessionCreatedAt,
 			},
 		})
@@ -398,7 +533,10 @@ func (adapter *originPickerAdapter) Accepts(at action.Location, id action.ID) bo
 	return at.Kind == action.LocationOrigin && id == action.SessionSwitch.ID
 }
 
-func (adapter *originPickerAdapter) Dispatch(ctx context.Context, invocation action.Invocation) (any, error) {
+func (adapter *originPickerAdapter) Dispatch(
+	ctx context.Context,
+	invocation action.Invocation,
+) (any, error) {
 	if !adapter.Accepts(invocation.At, invocation.Action) {
 		return nil, action.Wrap(action.CodeUnsupported, action.ErrLocationRejected)
 	}
@@ -417,16 +555,25 @@ func (adapter *originPickerAdapter) Dispatch(ctx context.Context, invocation act
 
 	catalog, err := client.GetCatalog(ctx)
 	if err != nil {
-		return output, action.Wrap(action.CodeUnavailable, cliError("refresh_origin_switch_catalog", err))
+		return output, action.Wrap(
+			action.CodeUnavailable,
+			cliError("refresh_origin_switch_catalog", err),
+		)
 	}
 
 	for _, candidate := range catalog.Sessions {
 		if sameOriginTarget(input.Session, candidate) {
-			return output, cliError("request_origin_switch", client.RequestSwitch(ctx, catalog.CatalogGeneration, candidate))
+			return output, cliError(
+				"request_origin_switch",
+				client.RequestSwitch(ctx, catalog.CatalogGeneration, candidate),
+			)
 		}
 	}
 
-	return output, action.Wrap(action.CodeTargetChanged, cliError("request_origin_switch", remote.ErrTargetChanged))
+	return output, action.Wrap(
+		action.CodeTargetChanged,
+		cliError("request_origin_switch", remote.ErrTargetChanged),
+	)
 }
 
 func (adapter *originPickerAdapter) client(ctx context.Context) (*remote.BridgeClient, error) {
@@ -471,7 +618,8 @@ func (adapter *originPickerAdapter) client(ctx context.Context) (*remote.BridgeC
 	}
 
 	identity := client.Handle().ServerIdentity()
-	if record.Target.TmuxServerSocket != adapter.socket || record.Target.TmuxServerPID != identity.PID ||
+	if record.Target.TmuxServerSocket != adapter.socket ||
+		record.Target.TmuxServerPID != identity.PID ||
 		!record.Target.TmuxServerStartedAt.Equal(identity.Started) {
 		return nil, cliError("origin_picker_adapter_client", remote.ErrTargetChanged)
 	}
@@ -488,11 +636,17 @@ func sameOriginTarget(ref action.SessionRef, target remote.OriginSession) bool {
 
 func newRemoteAttachCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "attach <connection> <session>", Short: "Attach to an exact cached remote session incarnation",
-		Args: clibase.UsageArgs(cobra.ExactArgs(attachArgCount)), Annotations: liveAnnotations("remote_attach"), RunE: runRemoteAttach,
+		Use:   "attach <connection> <session>",
+		Short: "Attach to an exact cached remote session incarnation",
+		Args: clibase.UsageArgs(
+			cobra.ExactArgs(attachArgCount),
+		),
+		Annotations: liveAnnotations("remote_attach"),
+		RunE:        runRemoteAttach,
 	}
 	cmd.Flags().String("pane", "", "Exact remote pane ID to select")
-	cmd.Flags().String("origin-socket", "", "Explicit local tmux socket exposed through the scoped reverse bridge")
+	cmd.Flags().
+		String("origin-socket", "", "Explicit local tmux socket exposed through the scoped reverse bridge")
 	cmd.Flags().String("origin-label", "", "Fixed origin label shown by the remote peer")
 
 	return cmd
@@ -517,10 +671,16 @@ func loadRemoteCatalog() (remote.Catalog, *privatefs.Dir, error) {
 	return catalog, dir, nil
 }
 
-func resolveRemoteTarget(catalog remote.Catalog, connectionID, selector string) (remote.ConnectionState, session.Session, error) {
+func resolveRemoteTarget(
+	catalog remote.Catalog,
+	connectionID, selector string,
+) (remote.ConnectionState, session.Session, error) {
 	state, ok := catalog.Connections[connectionID]
 	if !ok || !state.Connected {
-		return remote.ConnectionState{}, session.Session{}, cliError("resolve_remote_target", errRemoteTargetMissing)
+		return remote.ConnectionState{}, session.Session{}, cliError(
+			"resolve_remote_target",
+			errRemoteTargetMissing,
+		)
 	}
 
 	for _, target := range remote.CatalogSessions(state) {
@@ -529,15 +689,27 @@ func resolveRemoteTarget(catalog remote.Catalog, connectionID, selector string) 
 		}
 	}
 
-	return remote.ConnectionState{}, session.Session{}, cliError("resolve_remote_target", errRemoteTargetMissing)
+	return remote.ConnectionState{}, session.Session{}, cliError(
+		"resolve_remote_target",
+		errRemoteTargetMissing,
+	)
 }
 
-func attachTarget(state remote.ConnectionState, target session.Session, paneID string) remote.AttachTarget {
+func attachTarget(
+	state remote.ConnectionState,
+	target session.Session,
+	paneID string,
+) remote.AttachTarget {
 	return remote.AttachTarget{
-		PeerID: state.PeerID, TmuxServerSocket: target.TmuxServerSocket,
-		TmuxServerPID: target.RuntimeIdentity.TmuxServerPID, TmuxServerStartedAt: target.RuntimeIdentity.TmuxServerStartedAt,
-		SessionID: target.ID, SessionName: target.Name, SessionCreatedAt: target.RuntimeIdentity.TmuxSessionCreatedAt,
-		PaneID: paneID, CatalogSequence: state.Sequence,
+		PeerID:              state.PeerID,
+		TmuxServerSocket:    target.TmuxServerSocket,
+		TmuxServerPID:       target.RuntimeIdentity.TmuxServerPID,
+		TmuxServerStartedAt: target.RuntimeIdentity.TmuxServerStartedAt,
+		SessionID:           target.ID,
+		SessionName:         target.Name,
+		SessionCreatedAt:    target.RuntimeIdentity.TmuxSessionCreatedAt,
+		PaneID:              paneID,
+		CatalogSequence:     state.Sequence,
 	}
 }
 
@@ -562,16 +734,27 @@ func originSessions(ctx context.Context, socket string) ([]remote.OriginSession,
 				active++
 			case session.AgentStatusWaiting:
 				waiting++
-			case session.AgentStatusIdle, session.AgentStatusFailed, session.AgentStatusInterrupted, session.AgentStatusUnknown,
-				session.AgentStatusSleeping, session.AgentStatusMerged, session.AgentStatusClosed:
+			case session.AgentStatusIdle,
+				session.AgentStatusFailed,
+				session.AgentStatusInterrupted,
+				session.AgentStatusUnknown,
+				session.AgentStatusSleeping,
+				session.AgentStatusMerged,
+				session.AgentStatusClosed:
 			}
 		}
 
 		result = append(result, remote.OriginSession{
-			ID: row.ID, Name: row.Name, WindowCount: row.WindowCount,
-			Attached: row.Attached, AgentTotal: len(row.Agents), AgentActive: active, AgentWaiting: waiting,
-			TmuxServerPID: row.RuntimeIdentity.TmuxServerPID, TmuxServerStartedAt: row.RuntimeIdentity.TmuxServerStartedAt,
-			SessionCreatedAt: row.RuntimeIdentity.TmuxSessionCreatedAt,
+			ID:                  row.ID,
+			Name:                row.Name,
+			WindowCount:         row.WindowCount,
+			Attached:            row.Attached,
+			AgentTotal:          len(row.Agents),
+			AgentActive:         active,
+			AgentWaiting:        waiting,
+			TmuxServerPID:       row.RuntimeIdentity.TmuxServerPID,
+			TmuxServerStartedAt: row.RuntimeIdentity.TmuxServerStartedAt,
+			SessionCreatedAt:    row.RuntimeIdentity.TmuxSessionCreatedAt,
 		})
 	}
 
@@ -666,10 +849,16 @@ func runRemoteAttachSession(
 		}
 	}
 
-	if _, err := remote.RunAttachPrepare(clibase.CommandContext(cmd), cfg.Remote, connection, bootstrap, remote.AttachCommandOptions{
-		Streams: remote.AttachStreams{In: nil, Out: nil, Err: nil},
-		Command: nil,
-	}); err != nil {
+	if _, err := remote.RunAttachPrepare(
+		clibase.CommandContext(cmd),
+		cfg.Remote,
+		connection,
+		bootstrap,
+		remote.AttachCommandOptions{
+			Streams: remote.AttachStreams{In: nil, Out: nil, Err: nil},
+			Command: nil,
+		},
+	); err != nil {
 		return cliError("run_remote_attach_prepare", err)
 	}
 
@@ -678,10 +867,16 @@ func runRemoteAttachSession(
 		return err
 	}
 
-	attach, err := remote.NewAttachCommand(clibase.CommandContext(cmd), cfg.Remote, connection, bootstrap, remote.AttachCommandOptions{
-		Streams: remote.AttachStreams{In: in, Out: out, Err: errFile},
-		Command: nil,
-	})
+	attach, err := remote.NewAttachCommand(
+		clibase.CommandContext(cmd),
+		cfg.Remote,
+		connection,
+		bootstrap,
+		remote.AttachCommandOptions{
+			Streams: remote.AttachStreams{In: in, Out: out, Err: errFile},
+			Command: nil,
+		},
+	)
 	if err != nil {
 		return cliError("build_remote_attach", err)
 	}
@@ -733,7 +928,10 @@ func runRemoteAttach(cmd *cobra.Command, args []string) (resultErr error) {
 
 	originSocket, _ := cmd.Flags().GetString("origin-socket")
 	if !filepath.IsAbs(originSocket) {
-		return clibase.NewExitError(clibase.ExitCodeUsage, cliError("validate_origin_socket", errOriginSocketNotAbsolute))
+		return clibase.NewExitError(
+			clibase.ExitCodeUsage,
+			cliError("validate_origin_socket", errOriginSocketNotAbsolute),
+		)
 	}
 
 	originLabel, _ := cmd.Flags().GetString("origin-label")
@@ -742,7 +940,16 @@ func runRemoteAttach(cmd *cobra.Command, args []string) (resultErr error) {
 	}
 
 	bootstrap, bridge, err := openRemoteOriginBridge(
-		clibase.CommandContext(cmd), cfg, connection, state, target, paneID, originSocket, originLabel,
+		clibase.CommandContext(
+			cmd,
+		),
+		cfg,
+		connection,
+		state,
+		target,
+		paneID,
+		originSocket,
+		originLabel,
 	)
 	if err != nil {
 		return err

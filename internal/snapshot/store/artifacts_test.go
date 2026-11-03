@@ -89,7 +89,10 @@ func TestTerminalArtifactsPreserveExactBytes(t *testing.T) {
 			r := openRepository(t, path)
 			generation := commitContentFixture(t, r, content)
 
-			got := readGzipFixture(t, filepath.Join(path, "generations", generation.ID, "artifacts", "a0.bin.gz"))
+			got := readGzipFixture(
+				t,
+				filepath.Join(path, "generations", generation.ID, "artifacts", "a0.bin.gz"),
+			)
 			if !bytes.Equal(got, content) {
 				t.Fatal("stored terminal bytes changed")
 			}
@@ -161,7 +164,10 @@ func TestSameTimestampSavesKeepTheirOwnContent(t *testing.T) {
 			t.Fatal("fixture did not exercise equal capture timestamps")
 		}
 
-		got := readGzipFixture(t, filepath.Join(path, "generations", item.generation.ID, "artifacts", "a0.bin.gz"))
+		got := readGzipFixture(
+			t,
+			filepath.Join(path, "generations", item.generation.ID, "artifacts", "a0.bin.gz"),
+		)
 		if string(got) != item.content {
 			t.Fatal("generation read another attempt's pane content")
 		}

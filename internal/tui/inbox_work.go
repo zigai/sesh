@@ -92,7 +92,10 @@ func (m *Model) shownClosedItems(host inboxHost, group string, items []inboxItem
 
 	slices.SortStableFunc(items, compareRecency)
 
-	return append(items[:shown:shown], newMoreItem(items[shown], group, expandKey, len(items)-shown))
+	return append(
+		items[:shown:shown],
+		newMoreItem(items[shown], group, expandKey, len(items)-shown),
+	)
 }
 
 func newMoreItem(firstHidden inboxItem, group, expandKey string, hidden int) inboxItem {
@@ -143,7 +146,8 @@ func (m *Model) newClosedItem(host inboxHost, recorded work.Item) inboxItem {
 		agent.HarnessSession = recorded.Harness
 	}
 
-	if metadata, ok := m.agentGit[agentGitDirectory(agent)]; ok && host.origin == session.OriginLocal {
+	if metadata, ok := m.agentGit[agentGitDirectory(agent)]; ok &&
+		host.origin == session.OriginLocal {
 		applyAgentGitMetadata(&agent, metadata)
 	}
 
@@ -162,7 +166,15 @@ func (m *Model) newClosedItem(host inboxHost, recorded work.Item) inboxItem {
 	}
 
 	return inboxItem{
-		agent: agent, owner: owner, host: host, live: live, kind: inboxClosedRow, work: recorded, expandKey: "", section: section, hidden: 0,
+		agent:     agent,
+		owner:     owner,
+		host:      host,
+		live:      live,
+		kind:      inboxClosedRow,
+		work:      recorded,
+		expandKey: "",
+		section:   section,
+		hidden:    0,
 	}
 }
 
@@ -178,11 +190,17 @@ func compareRecency(left, right inboxItem) int {
 	return right.agent.StatusSince.Compare(left.agent.StatusSince)
 }
 
-func recordedWork(host inboxHost, agent session.AgentSession, live task.Live, kind inboxItemKind) work.Item {
+func recordedWork(
+	host inboxHost,
+	agent session.AgentSession,
+	live task.Live,
+	kind inboxItemKind,
+) work.Item {
 	found := work.EmptyItem()
 
 	for _, recorded := range host.work {
-		matches := recorded.Harness == agent.Harness && recorded.Conversation == agent.SessionID && agent.SessionID != ""
+		matches := recorded.Harness == agent.Harness && recorded.Conversation == agent.SessionID &&
+			agent.SessionID != ""
 		if kind == inboxTaskRow {
 			matches = recorded.Task == live.Record.ID
 		}
@@ -210,7 +228,11 @@ func (m *Model) followResume(at action.Location, resumed action.ResumedAgent) te
 	target := resumed.Session.Session(at)
 
 	if at.Kind == action.LocationPeer {
-		m.pendingResume = &remoteResume{connection: at.Connection, session: resumed.Session.ID, pane: resumed.Pane}
+		m.pendingResume = &remoteResume{
+			connection: at.Connection,
+			session:    resumed.Session.ID,
+			pane:       resumed.Pane,
+		}
 
 		return m.attachPendingResumeWhenListed()
 	}
@@ -228,7 +250,9 @@ func (m *Model) attachPendingResumeWhenListed() tea.Cmd {
 	}
 
 	index := slices.IndexFunc(m.sessions, func(row session.Session) bool {
-		return row.Origin == session.OriginSSH && row.RuntimeIdentity.ConnectionID == pending.connection && row.ID == pending.session
+		return row.Origin == session.OriginSSH &&
+			row.RuntimeIdentity.ConnectionID == pending.connection &&
+			row.ID == pending.session
 	})
 	if index < 0 {
 		return nil
@@ -270,7 +294,11 @@ func recordedActionError(id action.ID, recorded work.Item) error {
 	}
 }
 
-func (m *Model) runWorkAction(id action.ID, item inboxItem, values action.Values) func() (tea.Model, tea.Cmd) {
+func (m *Model) runWorkAction(
+	id action.ID,
+	item inboxItem,
+	values action.Values,
+) func() (tea.Model, tea.Cmd) {
 	if id == action.InboxFinish.ID && item.kind == inboxTaskRow {
 		return m.invokeAction(action.TaskFinish.ID, action.Values{})
 	}
@@ -303,25 +331,53 @@ func (m *Model) runWorkAction(id action.ID, item inboxItem, values action.Values
 	}
 }
 
-func (m *Model) unlinkPR(item inboxItem, subject action.Subject, pr string) func() (tea.Model, tea.Cmd) {
+func (m *Model) unlinkPR(
+	item inboxItem,
+	subject action.Subject,
+	pr string,
+) func() (tea.Model, tea.Cmd) {
 	linked := item.work.Linked()
 	if pr == "" && len(linked) == 1 {
 		pr = strconv.Itoa(linked[0].Number)
 	}
 
 	if pr != "" {
-		return m.runAction(action.AgentUnlink, subject, action.Values{"item": {item.work.ID}, "pr": {pr}})
+		return m.runAction(
+			action.AgentUnlink,
+			subject,
+			action.Values{"item": {item.work.ID}, "pr": {pr}},
+		)
 	}
 
 	entries := make([]menuEntry, 0, len(linked))
 	for _, link := range linked {
 		number := strconv.Itoa(link.Number)
-		entries = append(entries, menuEntry{label: prText(link.Number, link.State), key: "", run: func() (tea.Model, tea.Cmd) {
-			return m.runAction(action.AgentUnlink, subject, action.Values{"item": {item.work.ID}, "pr": {number}})()
-		}})
+		entries = append(
+			entries,
+			menuEntry{
+				label: prText(link.Number, link.State),
+				key:   "",
+				run: func() (tea.Model, tea.Cmd) {
+					return m.runAction(
+						action.AgentUnlink,
+						subject,
+						action.Values{"item": {item.work.ID}, "pr": {number}},
+					)()
+				},
+			},
+		)
 	}
 
-	return m.openMenu(&rowMenu{entries: entries, cursor: 0, anchored: false, anchorX: 0, anchorY: 0, box: menuBox{x: 0, y: 0, width: 0, height: 0}})
+	return m.openMenu(
+		&rowMenu{
+			entries:  entries,
+			cursor:   0,
+			anchored: false,
+			anchorX:  0,
+			anchorY:  0,
+			box:      menuBox{x: 0, y: 0, width: 0, height: 0},
+		},
+	)
 }
 
 func (m *Model) syncWorkCommand() tea.Cmd {

@@ -61,14 +61,26 @@ const (
 )
 
 var (
-	ErrUnsupportedPlatform       = errors.New("unsupported service platform")
-	ErrServiceProgramRequired    = errors.New("sesh executable path is required to render service definitions")
+	ErrUnsupportedPlatform    = errors.New("unsupported service platform")
+	ErrServiceProgramRequired = errors.New(
+		"sesh executable path is required to render service definitions",
+	)
 	ErrServiceProgramNotAbsolute = errors.New("sesh executable path must be absolute")
-	ErrServiceSocketRequired     = errors.New("an absolute tmux socket path is required to render service definitions")
-	ErrServicePathsRequired      = errors.New("repository, lease root and history paths are required to render service definitions")
-	ErrServiceIntervalRequired   = errors.New("autosave interval must be positive to render service definitions")
-	ErrServiceDeadlineRequired   = errors.New("final save deadline must be positive to render service definitions")
-	ErrServiceTmuxRequired       = errors.New("tmux executable path is required for the managed tmux service")
+	ErrServiceSocketRequired     = errors.New(
+		"an absolute tmux socket path is required to render service definitions",
+	)
+	ErrServicePathsRequired = errors.New(
+		"repository, lease root and history paths are required to render service definitions",
+	)
+	ErrServiceIntervalRequired = errors.New(
+		"autosave interval must be positive to render service definitions",
+	)
+	ErrServiceDeadlineRequired = errors.New(
+		"final save deadline must be positive to render service definitions",
+	)
+	ErrServiceTmuxRequired = errors.New(
+		"tmux executable path is required for the managed tmux service",
+	)
 )
 
 type ServiceKind string
@@ -110,7 +122,10 @@ func ServiceDirectory(platform string) (string, error) {
 		if configHome == "" {
 			home, err := os.UserHomeDir()
 			if err != nil {
-				return "", oops.In("setup").Code("setup_service_failed").With("operation", "resolve_service_directory").Wrap(err)
+				return "", oops.In("setup").
+					Code("setup_service_failed").
+					With("operation", "resolve_service_directory").
+					Wrap(err)
 			}
 
 			configHome = filepath.Join(home, ".config")
@@ -120,12 +135,18 @@ func ServiceDirectory(platform string) (string, error) {
 	case PlatformDarwin:
 		home, err := os.UserHomeDir()
 		if err != nil {
-			return "", oops.In("setup").Code("setup_service_failed").With("operation", "resolve_service_directory").Wrap(err)
+			return "", oops.In("setup").
+				Code("setup_service_failed").
+				With("operation", "resolve_service_directory").
+				Wrap(err)
 		}
 
 		return filepath.Join(home, "Library", "LaunchAgents"), nil
 	default:
-		return "", oops.In("setup").Code("setup_service_failed").With("operation", "resolve_service_directory").Wrap(ErrUnsupportedPlatform)
+		return "", oops.In("setup").
+			Code("setup_service_failed").
+			With("operation", "resolve_service_directory").
+			Wrap(ErrUnsupportedPlatform)
 	}
 }
 
@@ -138,12 +159,18 @@ func Definitions(inputs ServiceInputs) ([]ServiceDefinition, error) {
 	inputs.Platform = platform
 
 	if err := validateServiceInputs(inputs); err != nil {
-		return nil, oops.In("setup").Code("setup_service_failed").With("operation", "render_definitions").Wrap(err)
+		return nil, oops.In("setup").
+			Code("setup_service_failed").
+			With("operation", "render_definitions").
+			Wrap(err)
 	}
 
 	root, err := ServiceDirectory(platform)
 	if err != nil {
-		return nil, oops.In("setup").Code("setup_service_failed").With("operation", "render_definitions").Wrap(err)
+		return nil, oops.In("setup").
+			Code("setup_service_failed").
+			With("operation", "render_definitions").
+			Wrap(err)
 	}
 
 	switch platform {
@@ -152,7 +179,10 @@ func Definitions(inputs ServiceInputs) ([]ServiceDefinition, error) {
 	case PlatformDarwin:
 		return launchdDefinitions(root, inputs)
 	default:
-		return nil, oops.In("setup").Code("setup_service_failed").With("operation", "render_definitions").Wrap(ErrUnsupportedPlatform)
+		return nil, oops.In("setup").
+			Code("setup_service_failed").
+			With("operation", "render_definitions").
+			Wrap(ErrUnsupportedPlatform)
 	}
 }
 
@@ -177,12 +207,18 @@ func RemoteMonitorDefinition(inputs ServiceInputs, available bool) (ServiceDefin
 	}
 
 	if err := validateServiceInputs(inputs); err != nil {
-		return ServiceDefinition{}, oops.In("setup").Code("setup_service_failed").With("operation", "render_remote_definition").Wrap(err)
+		return ServiceDefinition{}, oops.In("setup").
+			Code("setup_service_failed").
+			With("operation", "render_remote_definition").
+			Wrap(err)
 	}
 
 	root, err := ServiceDirectory(inputs.Platform)
 	if err != nil {
-		return ServiceDefinition{}, oops.In("setup").Code("setup_service_failed").With("operation", "render_remote_definition").Wrap(err)
+		return ServiceDefinition{}, oops.In("setup").
+			Code("setup_service_failed").
+			With("operation", "render_remote_definition").
+			Wrap(err)
 	}
 
 	definition := ServiceDefinition{
@@ -211,7 +247,10 @@ func RemoteMonitorDefinition(inputs ServiceInputs, available bool) (ServiceDefin
 			false,
 		)
 	default:
-		return ServiceDefinition{}, oops.In("setup").Code("setup_service_failed").With("operation", "render_remote_definition").Wrap(ErrUnsupportedPlatform)
+		return ServiceDefinition{}, oops.In("setup").
+			Code("setup_service_failed").
+			With("operation", "render_remote_definition").
+			Wrap(ErrUnsupportedPlatform)
 	}
 
 	if !available {
@@ -231,12 +270,18 @@ func AgentStatusDefinition(inputs ServiceInputs) (ServiceDefinition, error) {
 	}
 
 	if err := validateServiceInputs(inputs); err != nil {
-		return ServiceDefinition{}, oops.In("setup").Code("setup_service_failed").With("operation", "render_agent_status_definition").Wrap(err)
+		return ServiceDefinition{}, oops.In("setup").
+			Code("setup_service_failed").
+			With("operation", "render_agent_status_definition").
+			Wrap(err)
 	}
 
 	root, err := ServiceDirectory(inputs.Platform)
 	if err != nil {
-		return ServiceDefinition{}, oops.In("setup").Code("setup_service_failed").With("operation", "render_agent_status_definition").Wrap(err)
+		return ServiceDefinition{}, oops.In("setup").
+			Code("setup_service_failed").
+			With("operation", "render_agent_status_definition").
+			Wrap(err)
 	}
 
 	definition := ServiceDefinition{
@@ -264,7 +309,10 @@ func AgentStatusDefinition(inputs ServiceInputs) (ServiceDefinition, error) {
 			true,
 		)
 	default:
-		return ServiceDefinition{}, oops.In("setup").Code("setup_service_failed").With("operation", "render_agent_status_definition").Wrap(ErrUnsupportedPlatform)
+		return ServiceDefinition{}, oops.In("setup").
+			Code("setup_service_failed").
+			With("operation", "render_agent_status_definition").
+			Wrap(ErrUnsupportedPlatform)
 	}
 
 	return definition, nil
@@ -291,12 +339,18 @@ func CoordinatorDefinition(inputs ServiceInputs) (ServiceDefinition, error) {
 	}
 
 	if err := validateServiceInputs(inputs); err != nil {
-		return ServiceDefinition{}, oops.In("setup").Code("setup_service_failed").With("operation", "render_coordinator_definition").Wrap(err)
+		return ServiceDefinition{}, oops.In("setup").
+			Code("setup_service_failed").
+			With("operation", "render_coordinator_definition").
+			Wrap(err)
 	}
 
 	root, err := ServiceDirectory(inputs.Platform)
 	if err != nil {
-		return ServiceDefinition{}, oops.In("setup").Code("setup_service_failed").With("operation", "render_coordinator_definition").Wrap(err)
+		return ServiceDefinition{}, oops.In("setup").
+			Code("setup_service_failed").
+			With("operation", "render_coordinator_definition").
+			Wrap(err)
 	}
 
 	definition := ServiceDefinition{
@@ -326,7 +380,10 @@ func CoordinatorDefinition(inputs ServiceInputs) (ServiceDefinition, error) {
 		)
 		definition.Requires = append(definition.Requires, coordinatorDarwinRequirement)
 	default:
-		return ServiceDefinition{}, oops.In("setup").Code("setup_service_failed").With("operation", "render_coordinator_definition").Wrap(ErrUnsupportedPlatform)
+		return ServiceDefinition{}, oops.In("setup").
+			Code("setup_service_failed").
+			With("operation", "render_coordinator_definition").
+			Wrap(ErrUnsupportedPlatform)
 	}
 
 	return definition, nil
@@ -342,7 +399,9 @@ func renderSystemdCoordinatorService(inputs ServiceInputs) string {
 	content.WriteString(managedTmuxOrdering(inputs, false) + "\n")
 	content.WriteString("[Service]\n")
 	content.WriteString("Type=exec\n")
-	content.WriteString("ExecStart=" + systemdCommand(inputs.Program, CoordinatorArgs(inputs)) + "\n")
+	content.WriteString(
+		"ExecStart=" + systemdCommand(inputs.Program, CoordinatorArgs(inputs)) + "\n",
+	)
 	content.WriteString("SuccessExitStatus=" + strconv.Itoa(action.ExitCodeCanceled) + "\n")
 	content.WriteString("Restart=on-failure\n\n")
 	content.WriteString("[Install]\n")
@@ -361,7 +420,9 @@ func renderSystemdRemoteMonitor(inputs ServiceInputs) string {
 	content.WriteString(managedTmuxOrdering(inputs, false) + "\n")
 	content.WriteString("[Service]\n")
 	content.WriteString("Type=exec\n")
-	content.WriteString("ExecStart=" + systemdCommand(inputs.Program, RemoteMonitorArgs(inputs)) + "\n")
+	content.WriteString(
+		"ExecStart=" + systemdCommand(inputs.Program, RemoteMonitorArgs(inputs)) + "\n",
+	)
 	content.WriteString("SuccessExitStatus=" + strconv.Itoa(action.ExitCodeCanceled) + "\n")
 	content.WriteString("Restart=on-failure\n\n")
 	content.WriteString("[Install]\n")
@@ -380,7 +441,9 @@ func renderSystemdAgentStatus(inputs ServiceInputs) string {
 	content.WriteString(managedTmuxOrdering(inputs, false) + "\n")
 	content.WriteString("[Service]\n")
 	content.WriteString("Type=exec\n")
-	content.WriteString("ExecStart=" + systemdCommand(inputs.Program, AgentStatusArgs(inputs)) + "\n")
+	content.WriteString(
+		"ExecStart=" + systemdCommand(inputs.Program, AgentStatusArgs(inputs)) + "\n",
+	)
 	content.WriteString("SuccessExitStatus=" + strconv.Itoa(action.ExitCodeCanceled) + "\n")
 	content.WriteString("Restart=on-failure\n\n")
 	content.WriteString("[Install]\n")
@@ -433,7 +496,9 @@ func renderSystemdAutosaveTimer(inputs ServiceInputs) string {
 	content.WriteString("[Unit]\n")
 
 	if inputs.WithTmuxService {
-		content.WriteString("Description=Run the sesh autosave service while the managed tmux server runs\n")
+		content.WriteString(
+			"Description=Run the sesh autosave service while the managed tmux server runs\n",
+		)
 		content.WriteString("PartOf=" + TmuxServiceName + "\n\n")
 	} else {
 		content.WriteString("Description=Run the sesh autosave service periodically\n\n")
@@ -463,9 +528,13 @@ func renderSystemdTmuxService(inputs ServiceInputs) string {
 	content.WriteString("[Service]\n")
 	content.WriteString("Type=exec\n")
 	content.WriteString("ExecStart=" + systemdCommand(inputs.Program, daemonArgs(inputs)) + "\n")
-	content.WriteString("ExecStartPost=" + systemdCommand(inputs.Program, daemonReadyArgs(inputs)) + "\n")
+	content.WriteString(
+		"ExecStartPost=" + systemdCommand(inputs.Program, daemonReadyArgs(inputs)) + "\n",
+	)
 	content.WriteString("ExecStop=" + systemdCommand(inputs.Program, finalSaveArgs(inputs)) + "\n")
-	content.WriteString("TimeoutStopSec=" + strconv.FormatInt(int64(stopBudget/time.Second), 10) + "s\n")
+	content.WriteString(
+		"TimeoutStopSec=" + strconv.FormatInt(int64(stopBudget/time.Second), 10) + "s\n",
+	)
 	content.WriteString("KillMode=control-group\n")
 	// One OOM-killed process must cost that process, not the server and every pane with it.
 	content.WriteString("OOMPolicy=continue\n")
@@ -488,7 +557,9 @@ func renderSystemdRestoreService(inputs ServiceInputs) string {
 	content.WriteString("[Service]\n")
 	// A separate oneshot keeps a long restore from delaying or timing out the server's start.
 	content.WriteString("Type=oneshot\n")
-	content.WriteString("ExecStart=" + systemdCommand(inputs.Program, restoreOnStartArgs(inputs)) + "\n")
+	content.WriteString(
+		"ExecStart=" + systemdCommand(inputs.Program, restoreOnStartArgs(inputs)) + "\n",
+	)
 	content.WriteString("TimeoutStartSec=" + restoreStartTimeout + "\n")
 
 	return content.String()
@@ -551,7 +622,10 @@ func launchdDefinitions(root string, inputs ServiceInputs) ([]ServiceDefinition,
 	if inputs.WithCoordinator {
 		coord, err := CoordinatorDefinition(inputs)
 		if err != nil {
-			return nil, oops.In("setup").Code("setup_service_failed").With("operation", "render_definitions").Wrap(err)
+			return nil, oops.In("setup").
+				Code("setup_service_failed").
+				With("operation", "render_definitions").
+				Wrap(err)
 		}
 
 		definitions = append(definitions, coord)
@@ -560,12 +634,19 @@ func launchdDefinitions(root string, inputs ServiceInputs) ([]ServiceDefinition,
 	return definitions, nil
 }
 
-func renderLaunchdAgent(label, description, program string, args []string, intervalSeconds int, runAtLoad bool) string {
+func renderLaunchdAgent(
+	label, description, program string,
+	args []string,
+	intervalSeconds int,
+	runAtLoad bool,
+) string {
 	var content strings.Builder
 
 	content.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
 	content.WriteString("<!-- " + ManagedMarker + " -->\n")
-	content.WriteString("<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n")
+	content.WriteString(
+		"<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n",
+	)
 	content.WriteString("<plist version=\"1.0\">\n")
 	content.WriteString("<dict>\n")
 	content.WriteString("\t<key>Label</key>\n\t<string>" + xmlEscape(label) + "</string>\n")
@@ -579,11 +660,17 @@ func renderLaunchdAgent(label, description, program string, args []string, inter
 	content.WriteString("\t</array>\n")
 
 	if intervalSeconds > 0 {
-		content.WriteString("\t<key>StartInterval</key>\n\t<integer>" + strconv.Itoa(intervalSeconds) + "</integer>\n")
+		content.WriteString(
+			"\t<key>StartInterval</key>\n\t<integer>" + strconv.Itoa(
+				intervalSeconds,
+			) + "</integer>\n",
+		)
 	}
 
 	content.WriteString("\t<key>RunAtLoad</key>\n\t<" + strconv.FormatBool(runAtLoad) + "/>\n")
-	content.WriteString("\t<key>Description</key>\n\t<string>" + xmlEscape(description) + "</string>\n")
+	content.WriteString(
+		"\t<key>Description</key>\n\t<string>" + xmlEscape(description) + "</string>\n",
+	)
 	content.WriteString("</dict>\n")
 	content.WriteString("</plist>\n")
 
@@ -634,31 +721,52 @@ func xmlEscape(value string) string {
 
 func validateServiceInputs(inputs ServiceInputs) error {
 	if inputs.Program == "" {
-		return oops.In("setup").Code("setup_service_failed").With("operation", "validate_service_inputs").Wrap(ErrServiceProgramRequired)
+		return oops.In("setup").
+			Code("setup_service_failed").
+			With("operation", "validate_service_inputs").
+			Wrap(ErrServiceProgramRequired)
 	}
 
 	if !filepath.IsAbs(inputs.Program) {
-		return oops.In("setup").Code("setup_service_failed").With("operation", "validate_service_inputs").Wrap(ErrServiceProgramNotAbsolute)
+		return oops.In("setup").
+			Code("setup_service_failed").
+			With("operation", "validate_service_inputs").
+			Wrap(ErrServiceProgramNotAbsolute)
 	}
 
 	if inputs.SocketPath == "" || !filepath.IsAbs(inputs.SocketPath) {
-		return oops.In("setup").Code("setup_service_failed").With("operation", "validate_service_inputs").Wrap(ErrServiceSocketRequired)
+		return oops.In("setup").
+			Code("setup_service_failed").
+			With("operation", "validate_service_inputs").
+			Wrap(ErrServiceSocketRequired)
 	}
 
 	if inputs.RepositoryPath == "" || inputs.LeaseRootPath == "" || inputs.HistoryPath == "" {
-		return oops.In("setup").Code("setup_service_failed").With("operation", "validate_service_inputs").Wrap(ErrServicePathsRequired)
+		return oops.In("setup").
+			Code("setup_service_failed").
+			With("operation", "validate_service_inputs").
+			Wrap(ErrServicePathsRequired)
 	}
 
 	if inputs.Interval <= 0 {
-		return oops.In("setup").Code("setup_service_failed").With("operation", "validate_service_inputs").Wrap(ErrServiceIntervalRequired)
+		return oops.In("setup").
+			Code("setup_service_failed").
+			With("operation", "validate_service_inputs").
+			Wrap(ErrServiceIntervalRequired)
 	}
 
 	if inputs.FinalSaveDeadline <= 0 {
-		return oops.In("setup").Code("setup_service_failed").With("operation", "validate_service_inputs").Wrap(ErrServiceDeadlineRequired)
+		return oops.In("setup").
+			Code("setup_service_failed").
+			With("operation", "validate_service_inputs").
+			Wrap(ErrServiceDeadlineRequired)
 	}
 
 	if inputs.WithTmuxService && inputs.Tmux == "" {
-		return oops.In("setup").Code("setup_service_failed").With("operation", "validate_service_inputs").Wrap(ErrServiceTmuxRequired)
+		return oops.In("setup").
+			Code("setup_service_failed").
+			With("operation", "validate_service_inputs").
+			Wrap(ErrServiceTmuxRequired)
 	}
 
 	return nil
@@ -701,7 +809,14 @@ func daemonArgs(inputs ServiceInputs) []string {
 }
 
 func daemonReadyArgs(inputs ServiceInputs) []string {
-	return []string{"daemon", "wait-ready", "--socket", inputs.SocketPath, "--timeout", stopBudgetGrace.String()}
+	return []string{
+		"daemon",
+		"wait-ready",
+		"--socket",
+		inputs.SocketPath,
+		"--timeout",
+		stopBudgetGrace.String(),
+	}
 }
 
 func systemdDefinitions(root string, inputs ServiceInputs) ([]ServiceDefinition, error) {
@@ -752,7 +867,10 @@ func systemdDefinitions(root string, inputs ServiceInputs) ([]ServiceDefinition,
 	if inputs.WithCoordinator {
 		coord, err := CoordinatorDefinition(inputs)
 		if err != nil {
-			return nil, oops.In("setup").Code("setup_service_failed").With("operation", "render_definitions").Wrap(err)
+			return nil, oops.In("setup").
+				Code("setup_service_failed").
+				With("operation", "render_definitions").
+				Wrap(err)
 		}
 
 		definitions = append(definitions, coord)

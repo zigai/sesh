@@ -28,7 +28,10 @@ func (dispatcher *fakeDispatcher) Accepts(at action.Location, _ action.ID) bool 
 	return at.Kind == action.LocationLocal
 }
 
-func (dispatcher *fakeDispatcher) Dispatch(ctx context.Context, invocation action.Invocation) (any, error) {
+func (dispatcher *fakeDispatcher) Dispatch(
+	ctx context.Context,
+	invocation action.Invocation,
+) (any, error) {
 	dispatcher.mu.Lock()
 	dispatcher.calls = append(dispatcher.calls, invocation)
 	dispatcher.mu.Unlock()
@@ -106,7 +109,8 @@ func TestExecutePeerActionRunsTheTypedInputLocally(t *testing.T) {
 	}
 
 	output, err := action.SessionKill.DecodeOutput(result.Output)
-	if killed, ok := output.(action.KilledSession); err != nil || !ok || killed.Session.Name != "work" {
+	if killed, ok := output.(action.KilledSession); err != nil || !ok ||
+		killed.Session.Name != "work" {
 		t.Fatalf("result output = %s, %v; want the typed output", result.Output, err)
 	}
 }
@@ -151,7 +155,12 @@ func TestExecutePeerActionRefusesBeforeRunning(t *testing.T) {
 
 			result, _ := ExecutePeerAction(t.Context(), options, request)
 			if result.OK || result.Code != test.code || dispatcher.callCount() != 0 {
-				t.Fatalf("result = %#v after %d dispatches, want %s without running", result, dispatcher.callCount(), test.code)
+				t.Fatalf(
+					"result = %#v after %d dispatches, want %s without running",
+					result,
+					dispatcher.callCount(),
+					test.code,
+				)
 			}
 		})
 	}
@@ -187,7 +196,12 @@ func TestExecutePeerActionRunsEachInvocationOnce(t *testing.T) {
 	conflicting.Input = jsontext.Value(`{"session":{"id":"$2","name":"other"},"force":false}`)
 	conflicting = resignedRequest(t, conflicting)
 
-	if result, _ := ExecutePeerAction(t.Context(), options, conflicting); result.Code != action.CodeConflict || dispatcher.callCount() != 1 {
+	if result, _ := ExecutePeerAction(
+		t.Context(),
+		options,
+		conflicting,
+	); result.Code != action.CodeConflict ||
+		dispatcher.callCount() != 1 {
 		t.Fatalf("reused invocation ID = %#v, want conflict without running", result)
 	}
 }
@@ -200,7 +214,12 @@ func TestExecutePeerActionReportsTheActionsFailure(t *testing.T) {
 			return nil, fmt.Errorf("fake dispatch: %w", err)
 		}
 
-		return action.KilledSession{Session: input.Session}, action.Wrap(action.CodeAttached, errTestDispatch)
+		return action.KilledSession{
+			Session: input.Session,
+		}, action.Wrap(
+			action.CodeAttached,
+			errTestDispatch,
+		)
 	}
 
 	request := liveActionRequest(t)
@@ -237,7 +256,9 @@ func TestExecutePeerActionIsUncertainWhenTheReceiptCannotBeResolved(t *testing.T
 	request := liveActionRequest(t)
 
 	dispatcher.dispatch = func(context.Context, action.Invocation) (any, error) {
-		if err := os.Remove(filepath.Join(receiptsPath, request.InvocationID+invocationFileSuffix)); err != nil {
+		if err := os.Remove(
+			filepath.Join(receiptsPath, request.InvocationID+invocationFileSuffix),
+		); err != nil {
 			t.Fatal(err)
 		}
 

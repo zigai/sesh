@@ -200,7 +200,10 @@ func (r *FrameReader) Read() (Frame, error) {
 
 func ValidateFrame(frame Frame) error {
 	if frame.Version != ProtocolVersion {
-		return oops.In("remote").With("operation", "validate_frame").With("version", frame.Version).Wrap(ErrUnsupportedProtocol)
+		return oops.In("remote").
+			With("operation", "validate_frame").
+			With("version", frame.Version).
+			Wrap(ErrUnsupportedProtocol)
 	}
 
 	if !validFrameEnvelope(frame) || framePayloadCount(frame) != 1 {
@@ -327,7 +330,8 @@ func validSnapshotFrame(frame Frame) bool {
 }
 
 func validSnapshotRows(snapshot Snapshot) bool {
-	return validTaskRows(snapshot.Tasks) && validWorkRows(snapshot.Work) && validActionIDs(snapshot.Actions)
+	return validTaskRows(snapshot.Tasks) && validWorkRows(snapshot.Work) &&
+		validActionIDs(snapshot.Actions)
 }
 
 func validActionIDs(ids []action.ID) bool {
@@ -477,7 +481,8 @@ func validTerminalText(value string) bool {
 	}
 
 	for _, character := range value {
-		if character <= '\x1f' || character == '\x7f' || character >= '\x80' && character <= '\x9f' {
+		if character <= '\x1f' || character == '\x7f' ||
+			character >= '\x80' && character <= '\x9f' {
 			return false
 		}
 	}

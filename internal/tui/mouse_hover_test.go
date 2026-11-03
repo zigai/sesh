@@ -30,8 +30,18 @@ func TestMouseHoverSessionHeadingKeepsAgentRowsInPlace(t *testing.T) {
 		{
 			name: "repeated hover of partially visible heading",
 			sessions: []session.Session{
-				{Name: hoverEarlierProject, Agents: []session.AgentSession{{Harness: testSupportHarnessCodex, HarnessSession: "earlier-agent"}}},
-				{Name: hoverMiddleProject, Agents: []session.AgentSession{{Harness: testSupportHarnessCodex, HarnessSession: "middle-agent"}}},
+				{
+					Name: hoverEarlierProject,
+					Agents: []session.AgentSession{
+						{Harness: testSupportHarnessCodex, HarnessSession: "earlier-agent"},
+					},
+				},
+				{
+					Name: hoverMiddleProject,
+					Agents: []session.AgentSession{
+						{Harness: testSupportHarnessCodex, HarnessSession: "middle-agent"},
+					},
+				},
 				{Name: hoverLaterProject, Agents: []session.AgentSession{
 					{Harness: testSupportHarnessCodex, HarnessSession: "later-first"},
 					{Harness: testSupportHarnessCodex, HarnessSession: "later-second"},
@@ -42,34 +52,69 @@ func TestMouseHoverSessionHeadingKeepsAgentRowsInPlace(t *testing.T) {
 			agentCursor:  0,
 			hoverRow:     2,
 			hoverSession: 2,
-			visibleNames: []string{hoverMiddleProject, "middle-agent", hoverLaterProject, "later-first"},
+			visibleNames: []string{
+				hoverMiddleProject,
+				"middle-agent",
+				hoverLaterProject,
+				"later-first",
+			},
 		},
 		{
 			name: "crowded heading at final visible row",
 			sessions: []session.Session{
-				{Name: hoverEarlierProject, Agents: hoverAgents("earlier-first", "earlier-second", "earlier-third")},
-				{Name: hoverMiddleProject, Agents: hoverAgents("middle-first", "middle-second", "middle-third")},
-				{Name: hoverLaterProject, Agents: hoverAgents("later-first", "later-second", "later-third")},
+				{
+					Name:   hoverEarlierProject,
+					Agents: hoverAgents("earlier-first", "earlier-second", "earlier-third"),
+				},
+				{
+					Name:   hoverMiddleProject,
+					Agents: hoverAgents("middle-first", "middle-second", "middle-third"),
+				},
+				{
+					Name:   hoverLaterProject,
+					Agents: hoverAgents("later-first", "later-second", "later-third"),
+				},
 			},
 			height:       9,
 			agentCursor:  0,
 			hoverRow:     4,
 			hoverSession: 1,
-			visibleNames: []string{hoverEarlierProject, "earlier-first", "earlier-second", "earlier-third", hoverMiddleProject},
+			visibleNames: []string{
+				hoverEarlierProject,
+				"earlier-first",
+				"earlier-second",
+				"earlier-third",
+				hoverMiddleProject,
+			},
 		},
 		{
 			name: "heading below a partially visible different session",
 			sessions: []session.Session{
-				{Name: hoverEarlierProject, Agents: hoverAgents("earlier-first", "earlier-second", "earlier-third")},
-				{Name: hoverMiddleProject, Agents: hoverAgents("middle-first", "middle-second", "middle-third")},
-				{Name: hoverLaterProject, Agents: hoverAgents("later-first", "later-second", "later-third")},
+				{
+					Name:   hoverEarlierProject,
+					Agents: hoverAgents("earlier-first", "earlier-second", "earlier-third"),
+				},
+				{
+					Name:   hoverMiddleProject,
+					Agents: hoverAgents("middle-first", "middle-second", "middle-third"),
+				},
+				{
+					Name:   hoverLaterProject,
+					Agents: hoverAgents("later-first", "later-second", "later-third"),
+				},
 			},
 			height:       9,
 			listTop:      2,
 			agentCursor:  1,
 			hoverRow:     2,
 			hoverSession: 1,
-			visibleNames: []string{"earlier-second", "earlier-third", hoverMiddleProject, "middle-first", "middle-second"},
+			visibleNames: []string{
+				"earlier-second",
+				"earlier-third",
+				hoverMiddleProject,
+				"middle-first",
+				"middle-second",
+			},
 		},
 	}
 
@@ -87,15 +132,29 @@ func TestMouseHoverSessionHeadingKeepsAgentRowsInPlace(t *testing.T) {
 
 			layout := model.popupMouseLayout()
 			if layout.layout.listHeight != len(tt.visibleNames) {
-				t.Fatalf("list height = %d, want %d", layout.layout.listHeight, len(tt.visibleNames))
+				t.Fatalf(
+					"list height = %d, want %d",
+					layout.layout.listHeight,
+					len(tt.visibleNames),
+				)
 			}
 
 			assertHoverVisibleRows(t, model, tt.visibleNames)
 
 			for motion := 1; motion <= 4; motion++ {
-				model = updateTestModel(t, model, mouseMotion(layout.bodyX, layout.listY+tt.hoverRow))
+				model = updateTestModel(
+					t,
+					model,
+					mouseMotion(layout.bodyX, layout.listY+tt.hoverRow),
+				)
 				if model.cursor != tt.hoverSession || model.agentCursor != parentAgentIndex {
-					t.Errorf("motion %d selected session/agent = %d/%d, want heading %d/-1", motion, model.cursor, model.agentCursor, tt.hoverSession)
+					t.Errorf(
+						"motion %d selected session/agent = %d/%d, want heading %d/-1",
+						motion,
+						model.cursor,
+						model.agentCursor,
+						tt.hoverSession,
+					)
 				}
 
 				assertHoverVisibleRows(t, model, tt.visibleNames)
@@ -146,7 +205,17 @@ func TestAgentMetadataRefreshKeepsHoveredViewport(t *testing.T) {
 	layout := model.popupMouseLayout()
 	model.View()
 	model = updateTestModel(t, model, mouseMotion(layout.bodyX, layout.listY))
-	assertHoverVisibleRows(t, model, []string{"earlier-second", "earlier-third", hoverMiddleProject, "middle-first", "middle-second"})
+	assertHoverVisibleRows(
+		t,
+		model,
+		[]string{
+			"earlier-second",
+			"earlier-third",
+			hoverMiddleProject,
+			"middle-first",
+			"middle-second",
+		},
+	)
 
 	summaries := make([]session.AgentSummary, 0, len(model.sessions))
 	for _, row := range model.sessions {
@@ -160,10 +229,26 @@ func TestAgentMetadataRefreshKeepsHoveredViewport(t *testing.T) {
 	summaries[0].Agents[1].Status = session.AgentStatusWaiting
 	model = updateTestModel(t, model, agentSummariesMsg{summaries: summaries})
 
-	assertHoverVisibleRows(t, model, []string{"earlier-second", "earlier-third", hoverMiddleProject, "middle-first", "middle-second"})
+	assertHoverVisibleRows(
+		t,
+		model,
+		[]string{
+			"earlier-second",
+			"earlier-third",
+			hoverMiddleProject,
+			"middle-first",
+			"middle-second",
+		},
+	)
 
-	if model.cursor != 0 || model.agentCursor != 1 || model.filtered[0].Agents[1].Status != session.AgentStatusWaiting {
-		t.Fatalf("refreshed selection = %d/%d with status %q, want first session's second agent waiting", model.cursor, model.agentCursor, model.filtered[0].Agents[1].Status)
+	if model.cursor != 0 || model.agentCursor != 1 ||
+		model.filtered[0].Agents[1].Status != session.AgentStatusWaiting {
+		t.Fatalf(
+			"refreshed selection = %d/%d with status %q, want first session's second agent waiting",
+			model.cursor,
+			model.agentCursor,
+			model.filtered[0].Agents[1].Status,
+		)
 	}
 }
 
@@ -172,10 +257,30 @@ func TestMouseWheelAfterHoverScrollsFromPresentedViewport(t *testing.T) {
 	layout := model.popupMouseLayout()
 	model.View()
 	model = updateTestModel(t, model, mouseMotion(layout.bodyX, layout.listY+2))
-	assertHoverVisibleRows(t, model, []string{"earlier-second", "earlier-third", hoverMiddleProject, "middle-first", "middle-second"})
+	assertHoverVisibleRows(
+		t,
+		model,
+		[]string{
+			"earlier-second",
+			"earlier-third",
+			hoverMiddleProject,
+			"middle-first",
+			"middle-second",
+		},
+	)
 
 	model = updateTestModel(t, model, mouseWheel(layout.bodyX, layout.listY, tea.MouseWheelUp))
-	assertHoverVisibleRows(t, model, []string{hoverEarlierProject, "earlier-first", "earlier-second", "earlier-third", hoverMiddleProject})
+	assertHoverVisibleRows(
+		t,
+		model,
+		[]string{
+			hoverEarlierProject,
+			"earlier-first",
+			"earlier-second",
+			"earlier-third",
+			hoverMiddleProject,
+		},
+	)
 }
 
 func TestMouseWheelDownKeepsViewportThroughAgentRefreshAndHover(t *testing.T) {
@@ -186,7 +291,17 @@ func TestMouseWheelDownKeepsViewportThroughAgentRefreshAndHover(t *testing.T) {
 	model.View()
 
 	model = updateTestModel(t, model, mouseWheel(layout.bodyX, layout.listY, tea.MouseWheelDown))
-	assertHoverVisibleRows(t, model, []string{"earlier-third", hoverMiddleProject, "middle-first", "middle-second", "middle-third"})
+	assertHoverVisibleRows(
+		t,
+		model,
+		[]string{
+			"earlier-third",
+			hoverMiddleProject,
+			"middle-first",
+			"middle-second",
+			"middle-third",
+		},
+	)
 
 	summaries := make([]session.AgentSummary, 0, len(model.sessions))
 	for _, row := range model.sessions {
@@ -198,16 +313,44 @@ func TestMouseWheelDownKeepsViewportThroughAgentRefreshAndHover(t *testing.T) {
 	}
 
 	model = updateTestModel(t, model, agentSummariesMsg{summaries: summaries})
-	assertHoverVisibleRows(t, model, []string{"earlier-third", hoverMiddleProject, "middle-first", "middle-second", "middle-third"})
+	assertHoverVisibleRows(
+		t,
+		model,
+		[]string{
+			"earlier-third",
+			hoverMiddleProject,
+			"middle-first",
+			"middle-second",
+			"middle-third",
+		},
+	)
 
 	model = updateTestModel(t, model, mouseMotion(layout.bodyX, layout.listY+1))
-	assertHoverVisibleRows(t, model, []string{"earlier-third", hoverMiddleProject, "middle-first", "middle-second", "middle-third"})
+	assertHoverVisibleRows(
+		t,
+		model,
+		[]string{
+			"earlier-third",
+			hoverMiddleProject,
+			"middle-first",
+			"middle-second",
+			"middle-third",
+		},
+	)
 	model = updateTestModel(t, model, mouseWheel(layout.bodyX, layout.listY, tea.MouseWheelDown))
-	assertHoverVisibleRows(t, model, []string{"middle-second", "middle-third", hoverLaterProject, "later-first", "later-second"})
+	assertHoverVisibleRows(
+		t,
+		model,
+		[]string{"middle-second", "middle-third", hoverLaterProject, "later-first", "later-second"},
+	)
 
 	model = updateTestModel(t, model, mouseMotion(layout.bodyX, layout.listY))
 	model = updateTestModel(t, model, mouseWheel(layout.bodyX, layout.listY, tea.MouseWheelDown))
-	assertHoverVisibleRows(t, model, []string{"middle-third", hoverLaterProject, "later-first", "later-second", "later-third"})
+	assertHoverVisibleRows(
+		t,
+		model,
+		[]string{"middle-third", hoverLaterProject, "later-first", "later-second", "later-third"},
+	)
 }
 
 func crowdedHoverTestModel() *Model {
@@ -218,9 +361,21 @@ func crowdedHoverTestModel() *Model {
 	model.height = 9
 
 	model.sessions = []session.Session{
-		{ID: "$1", Name: hoverEarlierProject, Agents: hoverAgents("earlier-first", "earlier-second", "earlier-third")},
-		{ID: "$2", Name: hoverMiddleProject, Agents: hoverAgents("middle-first", "middle-second", "middle-third")},
-		{ID: "$3", Name: hoverLaterProject, Agents: hoverAgents("later-first", "later-second", "later-third")},
+		{
+			ID:     "$1",
+			Name:   hoverEarlierProject,
+			Agents: hoverAgents("earlier-first", "earlier-second", "earlier-third"),
+		},
+		{
+			ID:     "$2",
+			Name:   hoverMiddleProject,
+			Agents: hoverAgents("middle-first", "middle-second", "middle-third"),
+		},
+		{
+			ID:     "$3",
+			Name:   hoverLaterProject,
+			Agents: hoverAgents("later-first", "later-second", "later-third"),
+		},
 	}
 	for sessionIndex := range model.sessions {
 		for agentIndex := range model.sessions[sessionIndex].Agents {

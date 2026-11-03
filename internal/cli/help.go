@@ -15,11 +15,27 @@ import (
 const metavarMarker = "\x01"
 
 var flagMetavars = map[string]string{
-	"config": "<path>", "socket": "<path>", "repository": "<path>", "history": "<path>",
-	"lease-root": "<path>", "status-file": "<path>", "state": "<path>", "dir": "<path>",
-	"tmux-config": "<path>", "file": "<path>", "output": "<path>", "agent-state": "<path>",
-	"generation": "<id>", "operation": "<id>", "target-pane": "<id>", "current-pane": "<id>", "pane": "<id>",
-	"max-bytes": "<bytes>", "max-generations": "<count>", "max-count": "<count>", "retention-days": "<days>",
+	"config":          "<path>",
+	"socket":          "<path>",
+	"repository":      "<path>",
+	"history":         "<path>",
+	"lease-root":      "<path>",
+	"status-file":     "<path>",
+	"state":           "<path>",
+	"dir":             "<path>",
+	"tmux-config":     "<path>",
+	"file":            "<path>",
+	"output":          "<path>",
+	"agent-state":     "<path>",
+	"generation":      "<id>",
+	"operation":       "<id>",
+	"target-pane":     "<id>",
+	"current-pane":    "<id>",
+	"pane":            "<id>",
+	"max-bytes":       "<bytes>",
+	"max-generations": "<count>",
+	"max-count":       "<count>",
+	"retention-days":  "<days>",
 }
 
 func configureCommandHelp(root *cobra.Command) {
@@ -57,7 +73,11 @@ func writeCommandUsage(cmd *cobra.Command) error {
 	writeUsageHelpTopics(&out, cmd)
 
 	if cmd.HasAvailableSubCommands() {
-		fmt.Fprintf(&out, "\n\nUse \"%s [command] --help\" for more information about a command.", cmd.CommandPath())
+		fmt.Fprintf(
+			&out,
+			"\n\nUse \"%s [command] --help\" for more information about a command.",
+			cmd.CommandPath(),
+		)
 	}
 
 	out.WriteString("\n")
@@ -125,7 +145,13 @@ func writeUsageHelpTopics(out *strings.Builder, cmd *cobra.Command) {
 
 	for _, child := range cmd.Commands() {
 		if child.IsAdditionalHelpTopicCommand() {
-			fmt.Fprintf(out, "\n  %-*s %s", child.CommandPathPadding(), child.CommandPath(), child.Short)
+			fmt.Fprintf(
+				out,
+				"\n  %-*s %s",
+				child.CommandPathPadding(),
+				child.CommandPath(),
+				child.Short,
+			)
 		}
 	}
 }

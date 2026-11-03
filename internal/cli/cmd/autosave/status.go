@@ -89,7 +89,10 @@ func runAutosaveStatus(cmd *cobra.Command, _ []string) error {
 		outcome.status = statusDegraded
 		outcome.reason = automation.ReasonHistoryUnavailable
 
-		err := clibase.NewExitError(clibase.ExitCodeGeneral, errors.Join(errAutosaveHistoryUnavailable, env.historyErr))
+		err := clibase.NewExitError(
+			clibase.ExitCodeGeneral,
+			errors.Join(errAutosaveHistoryUnavailable, env.historyErr),
+		)
 		if clibase.JSONOutputEnabled(cmd) {
 			return clibase.WriteJSONResultError(cmd, payload(env, outcome), err)
 		}
@@ -228,7 +231,8 @@ func renderAutosaveResult(cmd *cobra.Command, env Env, outcome outcome) error {
 }
 
 func logAutosaveSkip(cmd *cobra.Command, outcome outcome) {
-	if outcome.status != statusSkipped && outcome.reason != automation.ReasonDisabled && outcome.reason != automation.ReasonNotDue {
+	if outcome.status != statusSkipped && outcome.reason != automation.ReasonDisabled &&
+		outcome.reason != automation.ReasonNotDue {
 		return
 	}
 

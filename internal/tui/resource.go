@@ -23,7 +23,8 @@ type resourceResultMsg struct {
 
 func (m *Model) resourceEnabled() bool {
 	definition, _ := providers.DefinitionFor(providers.Resource)
-	return agentSummariesEnabled(m.config, m.deps) && m.sessionFormats.agentRowsUseAny(definition.Fields...)
+	return agentSummariesEnabled(m.config, m.deps) &&
+		m.sessionFormats.agentRowsUseAny(definition.Fields...)
 }
 
 func (m *Model) resourceTickCommand() tea.Cmd {
@@ -33,7 +34,10 @@ func (m *Model) resourceTickCommand() tea.Cmd {
 
 	definition, _ := providers.DefinitionFor(providers.Resource)
 
-	return tea.Tick(definition.Cadence.Interval, func(time.Time) tea.Msg { return resourceTickMsg{} })
+	return tea.Tick(
+		definition.Cadence.Interval,
+		func(time.Time) tea.Msg { return resourceTickMsg{} },
+	)
 }
 
 func (m *Model) loadResourceCommand() tea.Cmd {
@@ -78,7 +82,12 @@ func (m *Model) loadResourceCommand() tea.Cmd {
 
 		sample, err := providers.ReadResourceSample(ctx, procRoot, time.Now())
 		if err != nil {
-			return resourceResultMsg{request: request, sample: providers.ResourceSample{At: time.Time{}, Processes: nil}, rows: nil, err: err}
+			return resourceResultMsg{
+				request: request,
+				sample:  providers.ResourceSample{At: time.Time{}, Processes: nil},
+				rows:    nil,
+				err:     err,
+			}
 		}
 
 		rows := providers.ResourceRows(sample, previous, targets)
@@ -91,7 +100,8 @@ func (m *Model) loadResourceCommand() tea.Cmd {
 }
 
 func (m *Model) handleResource(msg resourceResultMsg) tea.Cmd {
-	if !m.providerRunner.InFlight(providers.Resource) || msg.request != m.providerRunner.CurrentRequest(providers.Resource) {
+	if !m.providerRunner.InFlight(providers.Resource) ||
+		msg.request != m.providerRunner.CurrentRequest(providers.Resource) {
 		return m.resourceTickCommand()
 	}
 
@@ -106,7 +116,11 @@ func (m *Model) handleResource(msg resourceResultMsg) tea.Cmd {
 
 	if msg.err != nil {
 		if errors.Is(msg.err, providers.ErrResourceUnsupported) {
-			m.providerRunner.Complete(providers.Resource, msg.request, unsupportedResourceRows(m.resourceTargets()))
+			m.providerRunner.Complete(
+				providers.Resource,
+				msg.request,
+				unsupportedResourceRows(m.resourceTargets()),
+			)
 		} else {
 			m.providerRunner.Invalidate(providers.Resource)
 		}
@@ -146,7 +160,12 @@ func unsupportedResourceRows(targets []providers.ResourceTarget) providers.Rows 
 	for _, target := range targets {
 		fields := make(map[string]layout.Cell)
 		for _, field := range display.FieldsByProvider(display.ProviderResource) {
-			fields[field] = layout.Cell{Text: "", State: layout.Unsupported, Role: "", Variants: nil}
+			fields[field] = layout.Cell{
+				Text:     "",
+				State:    layout.Unsupported,
+				Role:     "",
+				Variants: nil,
+			}
 		}
 
 		rows[target.PaneID] = fields

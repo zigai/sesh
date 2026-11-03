@@ -214,7 +214,11 @@ func validateAgentMetadata(agent *AgentResume) (aht.Harness, Reason) {
 	return harnessID, ""
 }
 
-func agentInvocation(observed model.Launch, agent *AgentResume, harnessID aht.Harness) (string, []string, bool) {
+func agentInvocation(
+	observed model.Launch,
+	agent *AgentResume,
+	harnessID aht.Harness,
+) (string, []string, bool) {
 	if agent.Executable != "" {
 		return agent.Executable, slices.Clone(agent.Command), true
 	}
@@ -228,7 +232,8 @@ func agentInvocation(observed model.Launch, agent *AgentResume, harnessID aht.Ha
 		return executable, slices.Clone(agent.Command), true
 	}
 
-	if !isScriptInterpreter(executableName(executable)) || len(observed.Arguments) < minimumEditorArguments {
+	if !isScriptInterpreter(executableName(executable)) ||
+		len(observed.Arguments) < minimumEditorArguments {
 		return "", nil, false
 	}
 
@@ -447,7 +452,8 @@ func observedAgentHarness(launch model.Launch) (aht.Harness, bool) {
 		}
 	}
 
-	if !isScriptInterpreter(executableName(string(launch.Executable))) || len(launch.Arguments) < minimumEditorArguments {
+	if !isScriptInterpreter(executableName(string(launch.Executable))) ||
+		len(launch.Arguments) < minimumEditorArguments {
 		return "", false
 	}
 
@@ -463,7 +469,10 @@ func observedAgentHarness(launch model.Launch) (aht.Harness, bool) {
 
 func scriptHarness(scriptPath string) aht.Harness {
 	candidate := filepath.Base(filepath.Clean(scriptPath))
-	candidate = strings.TrimSuffix(strings.TrimSuffix(strings.TrimSuffix(candidate, ".js"), ".mjs"), ".cjs")
+	candidate = strings.TrimSuffix(
+		strings.TrimSuffix(strings.TrimSuffix(candidate, ".js"), ".mjs"),
+		".cjs",
+	)
 
 	if harnessID, ok := harness.FromCommand(candidate); ok {
 		return harnessID
@@ -473,11 +482,15 @@ func scriptHarness(scriptPath string) aht.Harness {
 }
 
 func isScriptInterpreter(name string) bool {
-	return slices.Contains([]string{"bun", "deno", "node", "nodejs"}, name) || strings.HasPrefix(name, "python")
+	return slices.Contains([]string{"bun", "deno", "node", "nodejs"}, name) ||
+		strings.HasPrefix(name, "python")
 }
 
 func isShell(name string) bool {
-	return slices.Contains([]string{"bash", "csh", "dash", "fish", "ksh", "nu", "sh", "tcsh", "zsh"}, name)
+	return slices.Contains(
+		[]string{"bash", "csh", "dash", "fish", "ksh", "nu", "sh", "tcsh", "zsh"},
+		name,
+	)
 }
 
 func isEditor(name string) bool {

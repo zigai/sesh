@@ -120,7 +120,12 @@ func (w *linkWalk) descend(name, resolved string) {
 	w.resolved = resolved
 	w.trustedDir = false
 
-	fd, err := unix.Openat(w.fd, name, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
+	fd, err := unix.Openat(
+		w.fd,
+		name,
+		unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC,
+		0,
+	)
 	if err != nil {
 		return
 	}

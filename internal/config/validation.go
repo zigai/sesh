@@ -28,62 +28,112 @@ const (
 )
 
 var (
-	errAgentPopupSortInvalid                = errors.New("invalid agent_sessions.popup_sort")
-	errHookCommandEmpty                     = errors.New("command cannot be empty")
-	errHookCommandAmbiguousFormat           = errors.New("use either a shell command string or command object")
-	errHookTimeoutNotPositive               = errors.New("timeout must be positive")
-	errFieldUndefined                       = errors.New("undefined custom field")
-	errFieldNameInvalid                     = errors.New("field names may only contain a-z, 0-9 and _")
-	errFieldRefreshInvalid                  = errors.New("refresh must be a positive duration")
-	errDuplicateKeyBinding                  = errors.New("duplicate key binding")
-	errInvalidSessionKey                    = errors.New("invalid session key")
-	errDisplayModesEmpty                    = errors.New("display modes cannot be empty")
-	errDisplayModeInvalid                   = errors.New("invalid display mode")
-	errDisplayModeDuplicate                 = errors.New("duplicate display mode")
-	errPopupDimensionInvalid                = errors.New("invalid popup dimension")
-	errPopupDimensionPositive               = errors.New("expected a positive cell count or percentage")
-	errPopupPercentageRange                 = errors.New("percentage must be between 1% and 100%")
-	errSnapshotRetentionNegative            = errors.New("snapshot retention values cannot be negative")
-	errSnapshotRetentionTooLong             = errors.New("snapshot.retention_days exceeds the supported duration")
-	errSnapshotCountTooLow                  = errors.New("snapshot.max_count must be zero or at least five")
-	errAgentStatusStyleInvalid              = errors.New("invalid agent_sessions.status_style")
-	errAgentStatusTimeFormatInvalid         = errors.New("invalid agent_sessions.status_time_format")
-	errAgentStatusTimeStyleInvalid          = errors.New("invalid agent_sessions.status_time_style")
-	errInvalidLogLevel                      = errors.New("invalid settings.log_level")
-	errShortcutStyleInvalid                 = errors.New("invalid settings.shortcut_style")
-	errSessionKeyActionInvalid              = errors.New("invalid settings.session_key_action")
-	errSessionPrefixInvalid                 = errors.New("invalid keys.session_prefix")
-	errAgentKeysInvalid                     = errors.New("invalid keys.agent_keys")
-	errAutosaveIntervalEmpty                = errors.New("invalid autosave.interval: cannot be empty when autosave is enabled")
-	errAutosaveIntervalNotPositive          = errors.New("invalid autosave.interval: must be positive duration")
-	errAgentRefreshIntervalNotPositive      = errors.New("invalid agent_sessions.refresh_interval: must be positive duration")
-	errAgentStatusInitialBackoffNotPositive = errors.New("agent_status.initial_backoff must be positive")
-	errAgentStatusMaxBackoffNotPositive     = errors.New("agent_status.max_backoff must be positive")
-	errAgentStatusMaxLessThanInitial        = errors.New("agent_status.max_backoff must be greater than or equal to initial_backoff")
-	errAgentStatusBackoffFactorInvalid      = errors.New("agent_status.backoff_factor must be a finite non-negative number")
-	errNilConfig                            = errors.New("cannot validate nil config")
+	errAgentPopupSortInvalid      = errors.New("invalid agent_sessions.popup_sort")
+	errHookCommandEmpty           = errors.New("command cannot be empty")
+	errHookCommandAmbiguousFormat = errors.New(
+		"use either a shell command string or command object",
+	)
+	errHookTimeoutNotPositive = errors.New("timeout must be positive")
+	errFieldUndefined         = errors.New("undefined custom field")
+	errFieldNameInvalid       = errors.New(
+		"field names may only contain a-z, 0-9 and _",
+	)
+	errFieldRefreshInvalid    = errors.New("refresh must be a positive duration")
+	errDuplicateKeyBinding    = errors.New("duplicate key binding")
+	errInvalidSessionKey      = errors.New("invalid session key")
+	errDisplayModesEmpty      = errors.New("display modes cannot be empty")
+	errDisplayModeInvalid     = errors.New("invalid display mode")
+	errDisplayModeDuplicate   = errors.New("duplicate display mode")
+	errPopupDimensionInvalid  = errors.New("invalid popup dimension")
+	errPopupDimensionPositive = errors.New(
+		"expected a positive cell count or percentage",
+	)
+	errPopupPercentageRange      = errors.New("percentage must be between 1% and 100%")
+	errSnapshotRetentionNegative = errors.New(
+		"snapshot retention values cannot be negative",
+	)
+	errSnapshotRetentionTooLong = errors.New(
+		"snapshot.retention_days exceeds the supported duration",
+	)
+	errSnapshotCountTooLow = errors.New(
+		"snapshot.max_count must be zero or at least five",
+	)
+	errAgentStatusStyleInvalid      = errors.New("invalid agent_sessions.status_style")
+	errAgentStatusTimeFormatInvalid = errors.New(
+		"invalid agent_sessions.status_time_format",
+	)
+	errAgentStatusTimeStyleInvalid = errors.New("invalid agent_sessions.status_time_style")
+	errInvalidLogLevel             = errors.New("invalid settings.log_level")
+	errShortcutStyleInvalid        = errors.New("invalid settings.shortcut_style")
+	errSessionKeyActionInvalid     = errors.New("invalid settings.session_key_action")
+	errSessionPrefixInvalid        = errors.New("invalid keys.session_prefix")
+	errAgentKeysInvalid            = errors.New("invalid keys.agent_keys")
+	errAutosaveIntervalEmpty       = errors.New(
+		"invalid autosave.interval: cannot be empty when autosave is enabled",
+	)
+	errAutosaveIntervalNotPositive = errors.New(
+		"invalid autosave.interval: must be positive duration",
+	)
+	errAgentRefreshIntervalNotPositive = errors.New(
+		"invalid agent_sessions.refresh_interval: must be positive duration",
+	)
+	errAgentStatusInitialBackoffNotPositive = errors.New(
+		"agent_status.initial_backoff must be positive",
+	)
+	errAgentStatusMaxBackoffNotPositive = errors.New(
+		"agent_status.max_backoff must be positive",
+	)
+	errAgentStatusMaxLessThanInitial = errors.New(
+		"agent_status.max_backoff must be greater than or equal to initial_backoff",
+	)
+	errAgentStatusBackoffFactorInvalid = errors.New(
+		"agent_status.backoff_factor must be a finite non-negative number",
+	)
+	errNilConfig = errors.New("cannot validate nil config")
 
-	errRemoteStaleAfterTooShort             = errors.New("invalid remote timing: stale_after must be greater than heartbeat_interval")
-	errRemoteHideAfterTooShort              = errors.New("invalid remote timing: hide_after must be greater than stale_after")
-	errRemoteMaxParallelConnectsNotPositive = errors.New("invalid remote.max_parallel_connects: expected a positive integer")
-	errRemoteMaxParallelConnectsTooLarge    = errors.New("invalid remote.max_parallel_connects: exceeds remote connection limit")
-	errRemoteConnectionDuplicate            = errors.New("duplicate connection ID")
-	errRemoteDurationNotPositive            = errors.New("expected a positive duration")
-	errRemoteValueRequired                  = errors.New("value is required")
-	errRemoteControlCharacter               = errors.New("value cannot contain control characters")
-	errRemoteSurroundingWhitespace          = errors.New("value cannot have leading or trailing whitespace")
-	errRemoteStartsWithDash                 = errors.New("value cannot start with a dash")
-	errRemoteIDCharacters                   = errors.New("value may contain only letters, numbers, underscores, dashes, and dots")
-	errRemoteValueTooLong                   = errors.New("value exceeds the remote protocol limit")
-	errRemoteConnectionsTooMany             = errors.New("remote connection count exceeds catalog capacity")
+	errRemoteStaleAfterTooShort = errors.New(
+		"invalid remote timing: stale_after must be greater than heartbeat_interval",
+	)
+	errRemoteHideAfterTooShort = errors.New(
+		"invalid remote timing: hide_after must be greater than stale_after",
+	)
+	errRemoteMaxParallelConnectsNotPositive = errors.New(
+		"invalid remote.max_parallel_connects: expected a positive integer",
+	)
+	errRemoteMaxParallelConnectsTooLarge = errors.New(
+		"invalid remote.max_parallel_connects: exceeds remote connection limit",
+	)
+	errRemoteConnectionDuplicate   = errors.New("duplicate connection ID")
+	errRemoteDurationNotPositive   = errors.New("expected a positive duration")
+	errRemoteValueRequired         = errors.New("value is required")
+	errRemoteControlCharacter      = errors.New("value cannot contain control characters")
+	errRemoteSurroundingWhitespace = errors.New(
+		"value cannot have leading or trailing whitespace",
+	)
+	errRemoteStartsWithDash = errors.New("value cannot start with a dash")
+	errRemoteIDCharacters   = errors.New(
+		"value may contain only letters, numbers, underscores, dashes, and dots",
+	)
+	errRemoteValueTooLong       = errors.New("value exceeds the remote protocol limit")
+	errRemoteConnectionsTooMany = errors.New(
+		"remote connection count exceeds catalog capacity",
+	)
 
-	ErrSnapshotProcessEnvInvalid = errors.New("invalid snapshot.process_environment: invalid environment variable name")
-	ErrSnapshotProcessEnvLimit   = errors.New("invalid snapshot.process_environment: environment limit exceeded")
+	ErrSnapshotProcessEnvInvalid = errors.New(
+		"invalid snapshot.process_environment: invalid environment variable name",
+	)
+	ErrSnapshotProcessEnvLimit = errors.New(
+		"invalid snapshot.process_environment: environment limit exceeded",
+	)
 )
 
 func ValidateAutosaveConfig(autosave AutosaveConfig) error {
 	if autosave.Interval != "" {
-		if _, err := validatePositiveDuration("autosave.interval", autosave.Interval, errAutosaveIntervalNotPositive); err != nil {
+		if _, err := validatePositiveDuration(
+			"autosave.interval",
+			autosave.Interval,
+			errAutosaveIntervalNotPositive,
+		); err != nil {
 			return err
 		}
 	} else if autosave.Enabled {
@@ -157,10 +207,26 @@ func ValidateDisplayConfig(disp DisplayConfig) error {
 		format string
 	}{
 		{name: "sesh_format", kind: display.FormatKindSession, format: disp.SeshFormat},
-		{name: "agents_session_format", kind: display.FormatKindAgentsSession, format: disp.AgentsSessionFormat},
-		{name: "agents_agent_format", kind: display.FormatKindAgentsAgent, format: disp.AgentsAgentFormat},
-		{name: "inbox_group_format", kind: display.FormatKindAgentsSession, format: disp.InboxGroupFormat},
-		{name: "inbox_agent_format", kind: display.FormatKindAgentsAgent, format: disp.InboxAgentFormat},
+		{
+			name:   "agents_session_format",
+			kind:   display.FormatKindAgentsSession,
+			format: disp.AgentsSessionFormat,
+		},
+		{
+			name:   "agents_agent_format",
+			kind:   display.FormatKindAgentsAgent,
+			format: disp.AgentsAgentFormat,
+		},
+		{
+			name:   "inbox_group_format",
+			kind:   display.FormatKindAgentsSession,
+			format: disp.InboxGroupFormat,
+		},
+		{
+			name:   "inbox_agent_format",
+			kind:   display.FormatKindAgentsAgent,
+			format: disp.InboxAgentFormat,
+		},
 	}
 
 	for _, candidate := range formats {
@@ -171,7 +237,13 @@ func ValidateDisplayConfig(disp DisplayConfig) error {
 
 		for _, name := range template.CustomFields() {
 			if _, ok := disp.Fields[name]; !ok {
-				return fmt.Errorf("invalid display.%s: %w: custom.%s has no display.fields.%s entry", candidate.name, errFieldUndefined, name, name)
+				return fmt.Errorf(
+					"invalid display.%s: %w: custom.%s has no display.fields.%s entry",
+					candidate.name,
+					errFieldUndefined,
+					name,
+					name,
+				)
 			}
 		}
 	}
@@ -232,17 +304,29 @@ func ValidateAgentSessionsConfig(agentSessions AgentSessionsConfig) error {
 	switch strings.ToLower(strings.TrimSpace(agentSessions.PopupSort)) {
 	case "", "position", "name", "attention":
 	default:
-		return fmt.Errorf("%w %q: expected position, name, or attention", errAgentPopupSortInvalid, agentSessions.PopupSort)
+		return fmt.Errorf(
+			"%w %q: expected position, name, or attention",
+			errAgentPopupSortInvalid,
+			agentSessions.PopupSort,
+		)
 	}
 
 	if agentSessions.RefreshInterval != "" {
 		dur, err := time.ParseDuration(agentSessions.RefreshInterval)
 		if err != nil {
-			return fmt.Errorf("invalid agent_sessions.refresh_interval %q: %w", agentSessions.RefreshInterval, err)
+			return fmt.Errorf(
+				"invalid agent_sessions.refresh_interval %q: %w",
+				agentSessions.RefreshInterval,
+				err,
+			)
 		}
 
 		if dur <= 0 {
-			return fmt.Errorf("%w %q", errAgentRefreshIntervalNotPositive, agentSessions.RefreshInterval)
+			return fmt.Errorf(
+				"%w %q",
+				errAgentRefreshIntervalNotPositive,
+				agentSessions.RefreshInterval,
+			)
 		}
 	}
 
@@ -267,24 +351,38 @@ func ValidateAgentStatusConfig(status AgentStatusConfig) error {
 	)
 
 	if status.InitialBackoff != "" {
-		initDur, err = validatePositiveDuration("agent_status.initial_backoff", status.InitialBackoff, errAgentStatusInitialBackoffNotPositive)
+		initDur, err = validatePositiveDuration(
+			"agent_status.initial_backoff",
+			status.InitialBackoff,
+			errAgentStatusInitialBackoffNotPositive,
+		)
 		if err != nil {
 			return err
 		}
 	}
 
 	if status.MaxBackoff != "" {
-		maxDur, err = validatePositiveDuration("agent_status.max_backoff", status.MaxBackoff, errAgentStatusMaxBackoffNotPositive)
+		maxDur, err = validatePositiveDuration(
+			"agent_status.max_backoff",
+			status.MaxBackoff,
+			errAgentStatusMaxBackoffNotPositive,
+		)
 		if err != nil {
 			return err
 		}
 	}
 
 	if initDur > 0 && maxDur > 0 && maxDur < initDur {
-		return fmt.Errorf("%w: max (%s) < initial (%s)", errAgentStatusMaxLessThanInitial, status.MaxBackoff, status.InitialBackoff)
+		return fmt.Errorf(
+			"%w: max (%s) < initial (%s)",
+			errAgentStatusMaxLessThanInitial,
+			status.MaxBackoff,
+			status.InitialBackoff,
+		)
 	}
 
-	if math.IsNaN(status.BackoffFactor) || math.IsInf(status.BackoffFactor, 0) || status.BackoffFactor < 0 {
+	if math.IsNaN(status.BackoffFactor) || math.IsInf(status.BackoffFactor, 0) ||
+		status.BackoffFactor < 0 {
 		return fmt.Errorf("%w: got %f", errAgentStatusBackoffFactorInvalid, status.BackoffFactor)
 	}
 
@@ -383,7 +481,13 @@ func ValidateKeyConfig(keys KeyConfig) error {
 		}
 
 		if previous, exists := seen[normalized]; exists {
-			return fmt.Errorf("%w: %s and %s both use %q", errDuplicateKeyBinding, previous, entry.name, entry.key)
+			return fmt.Errorf(
+				"%w: %s and %s both use %q",
+				errDuplicateKeyBinding,
+				previous,
+				entry.name,
+				entry.key,
+			)
 		}
 
 		seen[normalized] = entry.name
@@ -416,7 +520,15 @@ func NormalizeStatusTimeFormat(format string) string {
 		return "relative-seconds"
 	case "hh:mm":
 		return "hh:mm"
-	case "clock", "duration", "hms", "hh:mm:ss", "00:00:00", "00:01:23", "timer", "stopwatch", "elapsed":
+	case "clock",
+		"duration",
+		"hms",
+		"hh:mm:ss",
+		"00:00:00",
+		"00:01:23",
+		"timer",
+		"stopwatch",
+		"elapsed":
 		return "clock"
 	default:
 		return "relative"
@@ -426,7 +538,11 @@ func NormalizeStatusTimeFormat(format string) string {
 func ValidateThemeConfig(theme ThemeConfig) error {
 	if theme.Preset != "" {
 		if _, ok := LookupPreset(theme.Preset); !ok {
-			return fmt.Errorf("%w %q: expected dracula, catppuccin, catppuccin-latte, tokyo-night, gruvbox, nord, or terminal", errThemePresetInvalid, theme.Preset)
+			return fmt.Errorf(
+				"%w %q: expected dracula, catppuccin, catppuccin-latte, tokyo-night, gruvbox, nord, or terminal",
+				errThemePresetInvalid,
+				theme.Preset,
+			)
 		}
 	}
 
@@ -520,7 +636,12 @@ func validateRemoteConnections(connections []RemoteConnectionConfig) error {
 		}
 
 		if _, ok := seen[connection.ID]; ok {
-			return fmt.Errorf("invalid remote.connections[%d].id %q: %w", i, connection.ID, errRemoteConnectionDuplicate)
+			return fmt.Errorf(
+				"invalid remote.connections[%d].id %q: %w",
+				i,
+				connection.ID,
+				errRemoteConnectionDuplicate,
+			)
 		}
 
 		seen[connection.ID] = struct{}{}
@@ -696,7 +817,11 @@ func validateSessionKeyAction(sessionKeyAction string) error {
 	case "focus", "open":
 		return nil
 	default:
-		return fmt.Errorf("%w %q: expected focus or open", errSessionKeyActionInvalid, sessionKeyAction)
+		return fmt.Errorf(
+			"%w %q: expected focus or open",
+			errSessionKeyActionInvalid,
+			sessionKeyAction,
+		)
 	}
 }
 
@@ -705,7 +830,11 @@ func validateLogLevel(level string) error {
 	case "", "debug", "info", "warn", "error", "disabled":
 		return nil
 	default:
-		return fmt.Errorf("%w %q: expected debug, info, warn, error, or disabled", errInvalidLogLevel, level)
+		return fmt.Errorf(
+			"%w %q: expected debug, info, warn, error, or disabled",
+			errInvalidLogLevel,
+			level,
+		)
 	}
 }
 
@@ -727,19 +856,31 @@ func validateAgentSessionStatusFormats(agentSessions AgentSessionsConfig) error 
 		switch strings.ToLower(strings.TrimSpace(agentSessions.StatusStyle)) {
 		case "glyph", "circle", "circles", "icon", "icons", "text":
 		default:
-			return fmt.Errorf("%w %q: expected glyph or text", errAgentStatusStyleInvalid, agentSessions.StatusStyle)
+			return fmt.Errorf(
+				"%w %q: expected glyph or text",
+				errAgentStatusStyleInvalid,
+				agentSessions.StatusStyle,
+			)
 		}
 	}
 
 	if agentSessions.StatusTimeFormat != "" {
 		if !ValidStatusTimeFormat(agentSessions.StatusTimeFormat) {
-			return fmt.Errorf("%w %q: expected relative, relative-seconds, clock (00:01:23), or hh:mm (00:01)", errAgentStatusTimeFormatInvalid, agentSessions.StatusTimeFormat)
+			return fmt.Errorf(
+				"%w %q: expected relative, relative-seconds, clock (00:01:23), or hh:mm (00:01)",
+				errAgentStatusTimeFormatInvalid,
+				agentSessions.StatusTimeFormat,
+			)
 		}
 	}
 
 	if agentSessions.StatusTimeStyle != "" {
 		if !ValidStatusTimeFormat(agentSessions.StatusTimeStyle) {
-			return fmt.Errorf("%w %q: expected relative, clock (00:01:23), or hh:mm (00:01)", errAgentStatusTimeStyleInvalid, agentSessions.StatusTimeStyle)
+			return fmt.Errorf(
+				"%w %q: expected relative, clock (00:01:23), or hh:mm (00:01)",
+				errAgentStatusTimeStyleInvalid,
+				agentSessions.StatusTimeStyle,
+			)
 		}
 	}
 
@@ -766,7 +907,11 @@ func validateSessionPrefix(keys KeyConfig, seen map[string]string) error {
 
 	prefix := PickerKeyName(keys.SessionPrefix)
 	if prefix == "" || PickerKeyTypes(prefix) {
-		return fmt.Errorf("%w %q: expected alt or a key that does not type into the search field", errSessionPrefixInvalid, keys.SessionPrefix)
+		return fmt.Errorf(
+			"%w %q: expected alt or a key that does not type into the search field",
+			errSessionPrefixInvalid,
+			keys.SessionPrefix,
+		)
 	}
 
 	for _, fixed := range [][]string{
@@ -774,12 +919,21 @@ func validateSessionPrefix(keys KeyConfig, seen map[string]string) error {
 		PickerStepUpKeys, PickerStepDownKeys, PickerGroupUpKeys, PickerGroupDownKeys,
 	} {
 		if slices.Contains(fixed, prefix) {
-			return fmt.Errorf("%w %q: the picker already uses it", errSessionPrefixInvalid, keys.SessionPrefix)
+			return fmt.Errorf(
+				"%w %q: the picker already uses it",
+				errSessionPrefixInvalid,
+				keys.SessionPrefix,
+			)
 		}
 	}
 
 	if previous, exists := seen[prefix]; exists {
-		return fmt.Errorf("%w: %s and session_prefix both use %q", errDuplicateKeyBinding, previous, keys.SessionPrefix)
+		return fmt.Errorf(
+			"%w: %s and session_prefix both use %q",
+			errDuplicateKeyBinding,
+			previous,
+			keys.SessionPrefix,
+		)
 	}
 
 	seen[prefix] = "session_prefix"
@@ -796,7 +950,12 @@ func validateAgentKeys(agentKeys string) error {
 
 	for _, key := range agentKeys {
 		if !ValidAgentKey(key) {
-			return fmt.Errorf("%w %q: %q is not a lowercase letter or digit", errAgentKeysInvalid, agentKeys, key)
+			return fmt.Errorf(
+				"%w %q: %q is not a lowercase letter or digit",
+				errAgentKeysInvalid,
+				agentKeys,
+				key,
+			)
 		}
 
 		if used[key] {
@@ -813,12 +972,23 @@ func validateSessionKeys(keys KeyConfig, seen map[string]string) error {
 	for _, name := range slices.Sorted(maps.Keys(keys.Sessions)) {
 		letter := keys.Sessions[name]
 		if name == "" || !ValidSessionKey(letter) {
-			return fmt.Errorf("%w: sessions.%q = %q must be one lowercase letter", errInvalidSessionKey, name, letter)
+			return fmt.Errorf(
+				"%w: sessions.%q = %q must be one lowercase letter",
+				errInvalidSessionKey,
+				name,
+				letter,
+			)
 		}
 
 		key := keys.PickerSessionKey(letter)
 		if previous, exists := seen[key]; exists {
-			return fmt.Errorf("%w: %s and sessions.%q both use %q", errDuplicateKeyBinding, previous, name, key)
+			return fmt.Errorf(
+				"%w: %s and sessions.%q both use %q",
+				errDuplicateKeyBinding,
+				previous,
+				name,
+				key,
+			)
 		}
 
 		seen[key] = fmt.Sprintf("sessions.%q", name)

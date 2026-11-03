@@ -11,11 +11,17 @@ func TestConfigInitCommandDeclaresExplicitSafeRuntimeContract(t *testing.T) {
 	cmd := newConfigInitCommand()
 
 	if cmd.Annotations[clibase.AnnotationOperation] != "config_init" {
-		t.Fatalf("operation annotation = %q, want config_init", cmd.Annotations[clibase.AnnotationOperation])
+		t.Fatalf(
+			"operation annotation = %q, want config_init",
+			cmd.Annotations[clibase.AnnotationOperation],
+		)
 	}
 
 	if cmd.Annotations[clibase.AnnotationSkipRuntimeSetup] != "true" {
-		t.Fatalf("skip-runtime-setup annotation = %q, want true", cmd.Annotations[clibase.AnnotationSkipRuntimeSetup])
+		t.Fatalf(
+			"skip-runtime-setup annotation = %q, want true",
+			cmd.Annotations[clibase.AnnotationSkipRuntimeSetup],
+		)
 	}
 
 	for _, flag := range []string{"path", "force", clibase.JSONFlagName} {

@@ -34,8 +34,13 @@ func TestPickRejectsUnknownUIAsUsageBeforeRepositoryCreation(t *testing.T) {
 		"pick", "--ui", "standalone", "--no-config", "--socket", "/tmp/sesh-picker-missing.sock",
 		"--repository", repository,
 	)
-	if exec.Err == nil || !strings.Contains(exec.Err.Error(), "invalid picker ui") || clibase.ExitCode(exec.Err) != clibase.ExitCodeUsage {
-		t.Fatalf("pick error = %v (exit %d), want invalid ui usage error", exec.Err, clibase.ExitCode(exec.Err))
+	if exec.Err == nil || !strings.Contains(exec.Err.Error(), "invalid picker ui") ||
+		clibase.ExitCode(exec.Err) != clibase.ExitCodeUsage {
+		t.Fatalf(
+			"pick error = %v (exit %d), want invalid ui usage error",
+			exec.Err,
+			clibase.ExitCode(exec.Err),
+		)
 	}
 
 	if _, statErr := os.Stat(repository); !errors.Is(statErr, os.ErrNotExist) {

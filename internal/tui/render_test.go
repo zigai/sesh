@@ -68,7 +68,9 @@ func TestRenderInputBarAlignsQueryWithSessionNames(t *testing.T) {
 	inputWidth := lipgloss.Width(before)
 
 	layout := model.calcSessionLayout(32)
-	row := stripANSI(model.renderSessionRow(layout, session.Session{Name: testSupportSessionDevName}, true))
+	row := stripANSI(
+		model.renderSessionRow(layout, session.Session{Name: testSupportSessionDevName}, true),
+	)
 
 	before0, _, ok0 := strings.Cut(row, "dev")
 	if !ok0 {
@@ -78,7 +80,11 @@ func TestRenderInputBarAlignsQueryWithSessionNames(t *testing.T) {
 	rowWidth := lipgloss.Width(before0)
 
 	if inputWidth != rowWidth {
-		t.Fatalf("input query starts at column %d, session name starts at column %d", inputWidth, rowWidth)
+		t.Fatalf(
+			"input query starts at column %d, session name starts at column %d",
+			inputWidth,
+			rowWidth,
+		)
 	}
 }
 
@@ -147,7 +153,8 @@ func TestLoadingViewDoesNotRenderFalseEmptyState(t *testing.T) {
 	model.handleSessionLoadResult(sessionLoadResultMsg{})
 
 	loaded := stripANSI(viewString(model.View()))
-	if strings.Contains(loaded, "Loading sessions...") || !strings.Contains(loaded, "No live agent sessions found") {
+	if strings.Contains(loaded, "Loading sessions...") ||
+		!strings.Contains(loaded, "No live agent sessions found") {
 		t.Fatalf("loaded empty view = %q, want the true empty state after loading", loaded)
 	}
 }
@@ -160,12 +167,15 @@ func TestPopupInitialCatalogRendersWithoutLoadingFrame(t *testing.T) {
 	model.Init()
 
 	model.handleSessionLoadResult(sessionLoadResultMsg{
-		sessions: []session.Session{{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive}},
-		status:   session.StatusComplete,
+		sessions: []session.Session{
+			{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive},
+		},
+		status: session.StatusComplete,
 	})
 
 	view := stripANSI(viewString(model.View()))
-	if !strings.Contains(view, testSupportSessionDevName) || strings.Contains(view, "Loading sessions...") {
+	if !strings.Contains(view, testSupportSessionDevName) ||
+		strings.Contains(view, "Loading sessions...") {
 		t.Fatalf("loaded popup view = %q, want session row without loading frame", view)
 	}
 
@@ -183,14 +193,21 @@ func TestPopupStartupLoadingHidesIncompleteOriginRows(t *testing.T) {
 	model.width = 80
 	model.height = 20
 	model.Init()
-	updateTestModel(t, model, originSessionsMsg{rows: []session.Session{{
-		ID: "$2", Name: "origin-agent-session", Kind: session.KindLive, Origin: session.OriginBridge, AgentTotal: 1,
-	}}})
+	updateTestModel(t, model, originSessionsMsg{rows: []session.Session{
+		{
+			ID:         "$2",
+			Name:       "origin-agent-session",
+			Kind:       session.KindLive,
+			Origin:     session.OriginBridge,
+			AgentTotal: 1,
+		},
+	}})
 	updateTestModel(t, model, popupStartupDeadlineMsg{})
 
 	for _, rendered := range []string{viewString(model.View()), model.renderList(76, 12)} {
 		view := stripANSI(rendered)
-		if !strings.Contains(view, "Loading sessions...") || strings.Contains(view, "origin-agent-session") ||
+		if !strings.Contains(view, "Loading sessions...") ||
+			strings.Contains(view, "origin-agent-session") ||
 			strings.Contains(view, "No live agent sessions found") {
 			t.Fatalf("startup view = %q, want loading without incomplete origin rows", view)
 		}
@@ -199,7 +216,8 @@ func TestPopupStartupLoadingHidesIncompleteOriginRows(t *testing.T) {
 	model.handleSessionLoadResult(sessionLoadResultMsg{status: session.StatusComplete})
 
 	view := stripANSI(viewString(model.View()))
-	if !strings.Contains(view, "origin-agent-session") || strings.Contains(view, "Loading sessions...") {
+	if !strings.Contains(view, "origin-agent-session") ||
+		strings.Contains(view, "Loading sessions...") {
 		t.Fatalf("completed startup view = %q, want observed origin row", view)
 	}
 }
@@ -217,7 +235,8 @@ func TestPopupInitialCatalogFailureReplacesBlankView(t *testing.T) {
 	})
 
 	view := stripANSI(viewString(model.View()))
-	if !strings.Contains(view, "Failed to load sessions") || strings.Contains(view, "Loading sessions...") {
+	if !strings.Contains(view, "Failed to load sessions") ||
+		strings.Contains(view, "Loading sessions...") {
 		t.Fatalf("failed popup view = %q, want failure rather than loading state", view)
 	}
 }
@@ -319,7 +338,12 @@ func TestViewFitsNarrowPhonePopupViewport(t *testing.T) {
 
 	lines := strings.Split(output, "\n")
 	if len(lines) > model.height {
-		t.Fatalf("phone popup output has %d lines, want <= %d: %q", len(lines), model.height, output)
+		t.Fatalf(
+			"phone popup output has %d lines, want <= %d: %q",
+			len(lines),
+			model.height,
+			output,
+		)
 	}
 
 	for i, line := range lines {
@@ -383,7 +407,11 @@ func TestCalcPopupLayoutHidesFooterHintsButKeepsModeWhenDisabled(t *testing.T) {
 	}
 
 	if withoutFooter.listHeight != withFooter.listHeight {
-		t.Fatalf("listHeight without hints = %d, want %d", withoutFooter.listHeight, withFooter.listHeight)
+		t.Fatalf(
+			"listHeight without hints = %d, want %d",
+			withoutFooter.listHeight,
+			withFooter.listHeight,
+		)
 	}
 }
 
@@ -441,7 +469,11 @@ func TestRenderFooterUsesShortcutKeyColor(t *testing.T) {
 		Render("enter")
 
 	if !strings.Contains(rendered, want) {
-		t.Fatalf("renderFooter shortcut color missing: got %q, want styled enter %q", rendered, want)
+		t.Fatalf(
+			"renderFooter shortcut color missing: got %q, want styled enter %q",
+			rendered,
+			want,
+		)
 	}
 }
 
@@ -486,7 +518,10 @@ func TestRenderFooterTruncatesCompactHelpAtVeryNarrowWidth(t *testing.T) {
 
 func TestRenderFooterDimsLiveOnlyActionsForSavedRows(t *testing.T) {
 	model := newTestModel()
-	model.filtered = []session.Session{{Name: "current", Kind: session.KindLive}, {Name: "archive", Kind: session.KindSaved}}
+	model.filtered = []session.Session{
+		{Name: "current", Kind: session.KindLive},
+		{Name: "archive", Kind: session.KindSaved},
+	}
 
 	live := stripANSI(model.renderFooter(160))
 	model.cursor = 1
@@ -500,7 +535,14 @@ func TestRenderFooterDimsLiveOnlyActionsForSavedRows(t *testing.T) {
 		disabled[part.desc] = part.disabled
 	}
 
-	want := map[string]bool{"select": false, "create": false, "rename": true, "kill": true, "snapshot": true, "menu": false}
+	want := map[string]bool{
+		"select":   false,
+		"create":   false,
+		"rename":   true,
+		"kill":     true,
+		"snapshot": true,
+		"menu":     false,
+	}
 	for desc, dimmed := range want {
 		if got, ok := disabled[desc]; !ok || got != dimmed {
 			t.Errorf("footer part %q disabled = %v (listed %v), want %v", desc, got, ok, dimmed)
@@ -547,7 +589,9 @@ func TestRenderAgentsFooterKeepsSessionActionsForSelectedChild(t *testing.T) {
 func TestRenderNarrowAgentsFooterKeepsNavigationAndHelp(t *testing.T) {
 	model := newTestModel()
 	model.displayMode = displayModeAgents
-	model.filtered = []session.Session{{Name: "project", Agents: []session.AgentSession{{RegistryID: "agent-1"}}}}
+	model.filtered = []session.Session{
+		{Name: "project", Agents: []session.AgentSession{{RegistryID: "agent-1"}}},
+	}
 
 	output := stripANSI(model.renderFooter(50))
 	for _, want := range []string{"↑/↓ agent", "? help"} {
@@ -567,7 +611,11 @@ func TestMenuSelectionUsesTheListSelectionColors(t *testing.T) {
 			model := newTestModel()
 			model.config.Theme.Selected = selected
 
-			entry := menuEntry{label: "open", key: "enter", run: func() (tea.Model, tea.Cmd) { return model, nil }}
+			entry := menuEntry{
+				label: "open",
+				key:   "enter",
+				run:   func() (tea.Model, tea.Cmd) { return model, nil },
+			}
 			got := model.menuEntryLine(entry, 14, 4, true)
 			want := lipgloss.NewStyle().Foreground(lipgloss.Color("255")).
 				Background(lipgloss.Color(selected)).Bold(true).Render(" open   enter ")
@@ -583,7 +631,11 @@ func TestRenderSessionRowSelectedPadsFullWidth(t *testing.T) {
 	model := newTestModel()
 	layout := model.calcSessionLayout(32)
 
-	rendered := model.renderSessionRow(layout, session.Session{Name: testSupportSessionDevName}, true)
+	rendered := model.renderSessionRow(
+		layout,
+		session.Session{Name: testSupportSessionDevName},
+		true,
+	)
 
 	output := stripANSI(rendered)
 	if got := lipgloss.Width(output); got != 32 {
@@ -629,9 +681,14 @@ func TestSelectedAgentRowPreservesStatusGlyphColor(t *testing.T) {
 	model.filtered = []session.Session{{
 		Name:       "project",
 		AgentTotal: 1,
-		Agents: []session.AgentSession{{
-			Harness: "pi", HarnessSession: "agent-id", PaneID: "%7", Status: session.AgentStatusRunning,
-		}},
+		Agents: []session.AgentSession{
+			{
+				Harness:        "pi",
+				HarnessSession: "agent-id",
+				PaneID:         "%7",
+				Status:         session.AgentStatusRunning,
+			},
+		},
 	}}
 
 	output := model.renderList(60, 2)
@@ -643,7 +700,10 @@ func TestSelectedAgentRowPreservesStatusGlyphColor(t *testing.T) {
 
 	childLine := lines[1]
 	if !strings.Contains(childLine, "\x1b[38;2;80;250;123m●\x1b[m") {
-		t.Fatalf("selected agent child row = %q, want green ● glyph with RGB escape codes", childLine)
+		t.Fatalf(
+			"selected agent child row = %q, want green ● glyph with RGB escape codes",
+			childLine,
+		)
 	}
 
 	if !strings.Contains(childLine, ansiDefaultSelectedBg) {
@@ -660,9 +720,14 @@ func TestSelectedAgentRowPreservesStatusGlyphColorWithCustomTheme(t *testing.T) 
 	model.filtered = []session.Session{{
 		Name:       "project",
 		AgentTotal: 1,
-		Agents: []session.AgentSession{{
-			Harness: "pi", HarnessSession: "agent-id", PaneID: "%7", Status: session.AgentStatusRunning,
-		}},
+		Agents: []session.AgentSession{
+			{
+				Harness:        "pi",
+				HarnessSession: "agent-id",
+				PaneID:         "%7",
+				Status:         session.AgentStatusRunning,
+			},
+		},
 	}}
 
 	output := model.renderList(60, 2)
@@ -674,7 +739,10 @@ func TestSelectedAgentRowPreservesStatusGlyphColorWithCustomTheme(t *testing.T) 
 
 	childLine := lines[1]
 	if !strings.Contains(childLine, "\x1b[38;2;80;250;123m●\x1b[m") {
-		t.Fatalf("selected agent child row = %q, want green ● glyph with RGB escape codes", childLine)
+		t.Fatalf(
+			"selected agent child row = %q, want green ● glyph with RGB escape codes",
+			childLine,
+		)
 	}
 
 	if !strings.Contains(childLine, "\x1b[48;2;18;52;86m") {
@@ -702,7 +770,9 @@ func TestRenderSessionRowDoesNotShowAttachedBadge(t *testing.T) {
 	model := newTestModel()
 	layout := model.calcSessionLayout(48)
 
-	output := stripANSI(model.renderSessionRow(layout, session.Session{Name: "dev", Attached: true}, false))
+	output := stripANSI(
+		model.renderSessionRow(layout, session.Session{Name: "dev", Attached: true}, false),
+	)
 	if strings.Contains(output, "[attached]") {
 		t.Fatalf("renderSessionRow output = %q, should not show attached badge", output)
 	}
@@ -818,7 +888,10 @@ func TestStatusMinimalBadgeRenderingAndInteractions(t *testing.T) {
 		{Name: "sess-2"},
 	}
 
-	model.setDegradedSource(degradedSourceCatalog, "Session list is incomplete: some sources could not be read")
+	model.setDegradedSource(
+		degradedSourceCatalog,
+		"Session list is incomplete: some sources could not be read",
+	)
 
 	view := stripANSI(viewString(model.View()))
 
@@ -826,7 +899,10 @@ func TestStatusMinimalBadgeRenderingAndInteractions(t *testing.T) {
 	for i, line := range lines {
 		if strings.Contains(line, ">") && i+1 < len(lines) {
 			if strings.Contains(lines[i+1], "Session list is incomplete") {
-				t.Fatalf("status banner unexpectedly rendered directly below input bar: %q", lines[i+1])
+				t.Fatalf(
+					"status banner unexpectedly rendered directly below input bar: %q",
+					lines[i+1],
+				)
 			}
 		}
 	}
@@ -856,7 +932,10 @@ func TestStatusMinimalBadgeRenderingAndInteractions(t *testing.T) {
 	model.showHelp = false
 
 	layout := model.popupMouseLayout()
-	badgeX := layout.bodyX + max(layout.layout.bodyWidth-lipgloss.Width(model.renderFooterBadges()), 0)
+	badgeX := layout.bodyX + max(
+		layout.layout.bodyWidth-lipgloss.Width(model.renderFooterBadges()),
+		0,
+	)
 
 	clickHandler, handled := model.handleFooterBadgeClick(tea.Mouse{
 		X: badgeX,
@@ -869,7 +948,11 @@ func TestStatusMinimalBadgeRenderingAndInteractions(t *testing.T) {
 	clickHandler()
 
 	if model.hasStatusBadge() {
-		t.Fatalf("status badge still active after click dismiss: level=%v message=%q", model.statusLevel, model.statusMessage)
+		t.Fatalf(
+			"status badge still active after click dismiss: level=%v message=%q",
+			model.statusLevel,
+			model.statusMessage,
+		)
 	}
 }
 

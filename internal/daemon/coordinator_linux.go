@@ -46,13 +46,15 @@ func (c *lifecycleCoordinator) handleCanceled(ctx context.Context) {
 	if c.cfg.Resumed != nil {
 		if err := c.cfg.Resumed(ctx); err != nil {
 			zerolog.Ctx(ctx).Warn().Str("component", "daemon").Str("operation", "run_lifecycle").
-				Str("status", "degraded").Str("reason", "announcement_not_ended").Func(logging.Cause(err)).
+				Str("status", "degraded").
+				Str("reason", "announcement_not_ended").Func(logging.Cause(err)).
 				Msg("final save status still marks the canceled shutdown or sleep")
 		}
 	}
 
 	zerolog.Ctx(ctx).Info().Str("component", "daemon").Str("operation", "run_lifecycle").
-		Str("status", "recovered").Str("reason", "lifecycle_canceled").Msg("lifecycle coordinator resumed")
+		Str("status", "recovered").
+		Str("reason", "lifecycle_canceled").Msg("lifecycle coordinator resumed")
 }
 
 func (c *lifecycleCoordinator) handleFinalSave(eventCtx context.Context) error {
@@ -69,13 +71,17 @@ func (c *lifecycleCoordinator) handleFinalSave(eventCtx context.Context) error {
 	if saveErr != nil && outcome.Recorded {
 		zerolog.Ctx(eventCtx).Warn().Str("component", "daemon").Str("operation", "run_lifecycle").
 			Str("status", "degraded").Str("reason", "final_save_incomplete").
-			Bool("recorded", true).Func(logging.Cause(saveErr)).Msg("lifecycle final save failure recorded")
+			Bool("recorded", true).
+			Func(logging.Cause(saveErr)).Msg("lifecycle final save failure recorded")
 
 		return nil
 	}
 
 	if saveErr != nil {
-		return oops.In("daemon").Code("lifecycle_failed").With("operation", "run_lifecycle").Wrap(saveErr)
+		return oops.In("daemon").
+			Code("lifecycle_failed").
+			With("operation", "run_lifecycle").
+			Wrap(saveErr)
 	}
 
 	return nil
@@ -83,7 +89,10 @@ func (c *lifecycleCoordinator) handleFinalSave(eventCtx context.Context) error {
 
 func RunLifecycle(ctx context.Context, cfg CoordinatorConfig) error {
 	if cfg.FinalSave == nil {
-		return oops.In("daemon").Code("lifecycle_failed").With("operation", "run_lifecycle").Wrap(ErrFinalSaveNil)
+		return oops.In("daemon").
+			Code("lifecycle_failed").
+			With("operation", "run_lifecycle").
+			Wrap(ErrFinalSaveNil)
 	}
 
 	c := &lifecycleCoordinator{cfg: cfg, draining: false}
@@ -91,18 +100,25 @@ func RunLifecycle(ctx context.Context, cfg CoordinatorConfig) error {
 	zerolog.Ctx(ctx).Info().Str("component", "daemon").Str("operation", "run_lifecycle").
 		Str("status", "ok").Str("phase", "running").Msg("lifecycle coordinator ready")
 
-	runErr := lifecycle.RunLogind(ctx, cfg.Runtime, func(eventCtx context.Context, event lifecycle.Event) error {
-		if event.Canceled {
-			c.handleCanceled(eventCtx)
+	runErr := lifecycle.RunLogind(
+		ctx,
+		cfg.Runtime,
+		func(eventCtx context.Context, event lifecycle.Event) error {
+			if event.Canceled {
+				c.handleCanceled(eventCtx)
 
-			return nil
-		}
+				return nil
+			}
 
-		return c.handleFinalSave(eventCtx)
-	})
+			return c.handleFinalSave(eventCtx)
+		},
+	)
 
 	if err := NormalizeDaemonCancellation(runErr); err != nil {
-		return oops.In("daemon").Code("lifecycle_failed").With("operation", "run_lifecycle").Wrap(err)
+		return oops.In("daemon").
+			Code("lifecycle_failed").
+			With("operation", "run_lifecycle").
+			Wrap(err)
 	}
 
 	return nil

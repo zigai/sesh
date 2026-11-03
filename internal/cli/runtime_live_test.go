@@ -26,11 +26,25 @@ func testLiveCommandOutput(t *testing.T, fail bool) {
 
 	var stdout, stderr bytes.Buffer
 
-	output := commandBuffer{output: &stdout, buffer: bytes.Buffer{}, failed: false, streaming: false}
-	diagnostics := commandBuffer{output: &stderr, buffer: bytes.Buffer{}, failed: false, streaming: false}
+	output := commandBuffer{
+		output:    &stdout,
+		buffer:    bytes.Buffer{},
+		failed:    false,
+		streaming: false,
+	}
+	diagnostics := commandBuffer{
+		output:    &stderr,
+		buffer:    bytes.Buffer{},
+		failed:    false,
+		streaming: false,
+	}
 	root := &cobra.Command{Use: "sesh"}
 	cmd := &cobra.Command{
-		Use: "live", Annotations: map[string]string{clibase.AnnotationLiveIO: "true", clibase.AnnotationOperation: "monitor"},
+		Use: "live",
+		Annotations: map[string]string{
+			clibase.AnnotationLiveIO:    "true",
+			clibase.AnnotationOperation: "monitor",
+		},
 	}
 	root.AddCommand(cmd)
 	cmd.Flags().String("config", cfg, "")
@@ -38,7 +52,13 @@ func testLiveCommandOutput(t *testing.T, fail bool) {
 	cmd.SetOut(&output)
 	cmd.SetErr(&diagnostics)
 
-	runtime := commandRuntime{cmd: root, sink: nil, operation: "", output: &output, diagnostics: &diagnostics}
+	runtime := commandRuntime{
+		cmd:         root,
+		sink:        nil,
+		operation:   "",
+		output:      &output,
+		diagnostics: &diagnostics,
+	}
 	if err := runtime.prepare(cmd, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +93,13 @@ func testLiveCommandOutput(t *testing.T, fail bool) {
 
 func TestRequiredFlagsRejectBeforeLiveLogging(t *testing.T) {
 	cfg, logPath := runtimeConfig(t, "info")
-	cmd := &cobra.Command{Use: "live", Annotations: map[string]string{clibase.AnnotationLiveIO: "true", clibase.AnnotationOperation: "monitor"}}
+	cmd := &cobra.Command{
+		Use: "live",
+		Annotations: map[string]string{
+			clibase.AnnotationLiveIO:    "true",
+			clibase.AnnotationOperation: "monitor",
+		},
+	}
 	cmd.Flags().String("config", cfg, "")
 	cmd.Flags().String("socket", "", "")
 

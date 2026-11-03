@@ -90,9 +90,19 @@ type Service struct {
 
 func NewService(opts Options) *Service {
 	return &Service{
-		server: opts.Server, store: opts.Store, catalog: opts.Catalog, cfg: opts.Config, windows: opts.Windows,
-		worktreeDir: opts.WorktreeDir, lookPath: opts.LookPath, now: opts.Now, agents: opts.Agents,
-		sleepingAgentCommand: opts.SleepingAgentCommand, prs: opts.PRs, closePopup: opts.ClosePopup, finishCommand: opts.FinishCommand,
+		server:               opts.Server,
+		store:                opts.Store,
+		catalog:              opts.Catalog,
+		cfg:                  opts.Config,
+		windows:              opts.Windows,
+		worktreeDir:          opts.WorktreeDir,
+		lookPath:             opts.LookPath,
+		now:                  opts.Now,
+		agents:               opts.Agents,
+		sleepingAgentCommand: opts.SleepingAgentCommand,
+		prs:                  opts.PRs,
+		closePopup:           opts.ClosePopup,
+		finishCommand:        opts.FinishCommand,
 	}
 }
 
@@ -119,7 +129,13 @@ func (s *Service) Locate(ctx context.Context, pane gotmux.PaneID) (Place, error)
 	projectRoot, _ := info.Raw(project.OptionProject)
 	taskID, _ := info.Raw(OptionTask)
 
-	return Place{Pane: info.ID, Session: session, Dir: info.CurrentPath, Project: string(projectRoot), Task: string(taskID)}, nil
+	return Place{
+		Pane:    info.ID,
+		Session: session,
+		Dir:     info.CurrentPath,
+		Project: string(projectRoot),
+		Task:    string(taskID),
+	}, nil
 }
 
 func (s *Service) Start(ctx context.Context, place Place, request Request) (Record, error) {
@@ -134,7 +150,10 @@ func (s *Service) Start(ctx context.Context, place Place, request Request) (Reco
 	}
 
 	if request.Layout != "" && !layoutNamed(s.windows(root), request.Layout) {
-		return Record{}, taskError("start_task", fmt.Errorf("%w: %s", ErrUnknownLayout, request.Layout))
+		return Record{}, taskError(
+			"start_task",
+			fmt.Errorf("%w: %s", ErrUnknownLayout, request.Layout),
+		)
 	}
 
 	if root == "" {
@@ -158,7 +177,13 @@ func (s *Service) OpenTab(ctx context.Context, place Place) error {
 	return taskError("open_tab", err)
 }
 
-func RunWindow(ctx context.Context, server *gotmux.Server, sessionID gotmux.SessionID, dir string, argv []string) (gotmux.PaneID, error) {
+func RunWindow(
+	ctx context.Context,
+	server *gotmux.Server,
+	sessionID gotmux.SessionID,
+	dir string,
+	argv []string,
+) (gotmux.PaneID, error) {
 	session, err := server.Session(ctx, sessionID)
 	if err != nil {
 		return "", fmt.Errorf("find session: %w", err)
@@ -204,7 +229,13 @@ func (s *Service) gitProjectRoot(ctx context.Context, place Place) (string, erro
 	}
 }
 
-func (s *Service) startProject(ctx context.Context, place Place, root string, request Request, offered Harness) (Record, error) {
+func (s *Service) startProject(
+	ctx context.Context,
+	place Place,
+	root string,
+	request Request,
+	offered Harness,
+) (Record, error) {
 	p, err := s.catalog.Resolve(ctx, root)
 	if err != nil {
 		return Record{}, taskError("start_task", err)
@@ -226,14 +257,26 @@ func (s *Service) startProject(ctx context.Context, place Place, root string, re
 		}
 	}
 
-	if err := s.openTaskWindow(ctx, place, record, launchOf(offered, request, record), request.Layout, place.Project == ""); err != nil {
+	if err := s.openTaskWindow(
+		ctx,
+		place,
+		record,
+		launchOf(offered, request, record),
+		request.Layout,
+		place.Project == "",
+	); err != nil {
 		return record, s.failKeepingResources(ctx, record, err)
 	}
 
 	return s.activate(ctx, record)
 }
 
-func (s *Service) startLoose(ctx context.Context, place Place, request Request, offered Harness) (Record, error) {
+func (s *Service) startLoose(
+	ctx context.Context,
+	place Place,
+	request Request,
+	offered Harness,
+) (Record, error) {
 	owner := currentProcess(ctx)
 
 	record, err := s.reserve(ctx, func(ledger *Ledger) (Record, error) {
@@ -254,14 +297,27 @@ func (s *Service) startLoose(ctx context.Context, place Place, request Request, 
 		return Record{}, taskError("start_task", err)
 	}
 
-	if err := s.openTaskWindow(ctx, place, record, launchOf(offered, request, record), request.Layout, true); err != nil {
+	if err := s.openTaskWindow(
+		ctx,
+		place,
+		record,
+		launchOf(offered, request, record),
+		request.Layout,
+		true,
+	); err != nil {
 		return record, s.failKeepingResources(ctx, record, err)
 	}
 
 	return s.activate(ctx, record)
 }
 
-func (s *Service) reserveProjectTask(ctx context.Context, p project.Project, request Request, location Location, local []string) (Record, error) {
+func (s *Service) reserveProjectTask(
+	ctx context.Context,
+	p project.Project,
+	request Request,
+	location Location,
+	local []string,
+) (Record, error) {
 	base := ""
 
 	if p.Kind == project.KindGit {
@@ -321,7 +377,12 @@ func (s *Service) reserveProjectTask(ctx context.Context, p project.Project, req
 	})
 }
 
-func (s *Service) freeNumber(p project.Project, base string, last int, taken []string) (int, string, error) {
+func (s *Service) freeNumber(
+	p project.Project,
+	base string,
+	last int,
+	taken []string,
+) (int, string, error) {
 	if p.Kind != project.KindGit {
 		return last + 1, p.Root, nil
 	}
@@ -335,7 +396,10 @@ func (s *Service) freeNumber(p project.Project, base string, last int, taken []s
 
 		// A ref above this one, such as wt/main, blocks every number alike; NewBranch steps around it.
 		branch := taskBranch(base, number)
-		if !slices.ContainsFunc(taken, func(other string) bool { return other == branch || strings.HasPrefix(other, branch+"/") }) {
+		if !slices.ContainsFunc(
+			taken,
+			func(other string) bool { return other == branch || strings.HasPrefix(other, branch+"/") },
+		) {
 			return number, directory, nil
 		}
 	}
@@ -343,7 +407,10 @@ func (s *Service) freeNumber(p project.Project, base string, last int, taken []s
 	return 0, "", ErrNoFreeNumber
 }
 
-func (s *Service) reserve(ctx context.Context, build func(*Ledger) (Record, error)) (Record, error) {
+func (s *Service) reserve(
+	ctx context.Context,
+	build func(*Ledger) (Record, error),
+) (Record, error) {
 	var record Record
 
 	_, err := s.store.Update(ctx, func(ledger *Ledger) error {
@@ -370,14 +437,30 @@ func (s *Service) addWorktree(ctx context.Context, root string, record Record) e
 
 	switch {
 	case record.Upstream != "":
-		args = []string{"worktree", "add", "--track", "-b", record.Branch, record.Directory, record.Upstream}
+		args = []string{
+			"worktree",
+			"add",
+			"--track",
+			"-b",
+			record.Branch,
+			record.Directory,
+			record.Upstream,
+		}
 	case record.OwnsBranch:
 		start, err := startPoint(ctx, root, record.Base)
 		if err != nil {
 			return err
 		}
 
-		args = []string{"worktree", "add", "--no-track", "-b", record.Branch, record.Directory, start}
+		args = []string{
+			"worktree",
+			"add",
+			"--no-track",
+			"-b",
+			record.Branch,
+			record.Directory,
+			start,
+		}
 	}
 
 	if _, err := git.Output(ctx, root, args...); err != nil {
@@ -414,8 +497,15 @@ func (s *Service) openTaskWindow(
 	env := Env(record)
 
 	link, err := session.NewWindow(ctx, gotmux.NewWindowOptions{
-		Name: record.WindowName, Dir: record.Directory, Program: shellProgram(shell, launch), Env: nil, TmuxEnv: env,
-		Index: nil, Before: false, After: nextToCurrent, Select: true,
+		Name:    record.WindowName,
+		Dir:     record.Directory,
+		Program: shellProgram(shell, launch),
+		Env:     nil,
+		TmuxEnv: env,
+		Index:   nil,
+		Before:  false,
+		After:   nextToCurrent,
+		Select:  true,
 	})
 	if err != nil {
 		return fmt.Errorf("open task window: %w", err)
@@ -439,7 +529,11 @@ func (s *Service) openTaskWindow(
 	return s.arrange(ctx, window, record, layout, arrangeNewWindow, shownAt)
 }
 
-func (s *Service) hiddenSessionSize(ctx context.Context, session gotmux.Session, pane gotmux.PaneID) (*gotmux.Size, error) {
+func (s *Service) hiddenSessionSize(
+	ctx context.Context,
+	session gotmux.Session,
+	pane gotmux.PaneID,
+) (*gotmux.Size, error) {
 	var none *gotmux.Size
 
 	info, err := session.Info(ctx)
@@ -578,7 +672,14 @@ func taskBranch(base string, number int) string {
 }
 
 func defaultBranch(ctx context.Context, root string) (string, error) {
-	if remote, err := git.Output(ctx, root, "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"); err == nil {
+	if remote, err := git.Output(
+		ctx,
+		root,
+		"symbolic-ref",
+		"--quiet",
+		"--short",
+		"refs/remotes/origin/HEAD",
+	); err == nil {
 		if branch, found := strings.CutPrefix(remote, "origin/"); found && branch != "" {
 			return branch, nil
 		}

@@ -17,7 +17,11 @@ type Unrestored struct {
 	ServerStarted time.Time
 }
 
-func FindUnrestored(ctx context.Context, server *gotmux.Server, repository *store.Repository) Unrestored {
+func FindUnrestored(
+	ctx context.Context,
+	server *gotmux.Server,
+	repository *store.Repository,
+) Unrestored {
 	var none Unrestored
 
 	if server == nil || repository == nil {
@@ -55,7 +59,12 @@ func FindUnrestored(ctx context.Context, server *gotmux.Server, repository *stor
 	started := info.Identity.Started
 
 	return Unrestored{
-		Sessions:      automation.UnrestoredSessions(started, time.Unix(0, manifest.Finished), saved, running),
+		Sessions: automation.UnrestoredSessions(
+			started,
+			time.Unix(0, manifest.Finished),
+			saved,
+			running,
+		),
 		ServerStarted: started,
 	}
 }

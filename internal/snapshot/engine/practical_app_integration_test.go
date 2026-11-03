@@ -38,7 +38,9 @@ func TestEnginePracticalRestoreRestartsForegroundMonitorOnce(t *testing.T) {
 	defer cancel()
 
 	sourceSession, err := source.NewSession(ctx, gotmux.NewSessionOptions{
-		Name: "practical-top", Program: gotmux.Exec(topPath, "-d", "100"), Start: gotmux.StartPolicyExistingOnly,
+		Name:    "practical-top",
+		Program: gotmux.Exec(topPath, "-d", "100"),
+		Start:   gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("start source top: %v", err)
@@ -90,7 +92,11 @@ func requireFixtureExecutable(t *testing.T, name string) string {
 	path, err := exec.LookPath(name)
 	if err != nil {
 		if os.Getenv("SESH_APPLICATION_INTEGRATION_REQUIRED") == "1" {
-			t.Fatalf("%s fixture required by SESH_APPLICATION_INTEGRATION_REQUIRED=1: %v", name, err)
+			t.Fatalf(
+				"%s fixture required by SESH_APPLICATION_INTEGRATION_REQUIRED=1: %v",
+				name,
+				err,
+			)
 		}
 
 		t.Skipf("%s fixture unavailable: %v", name, err)
@@ -180,12 +186,22 @@ func assertSamePracticalProcess(t *testing.T, before, after *process.Observation
 	t.Helper()
 
 	if after.PID != before.PID || after.Birth != before.Birth {
-		t.Fatalf("completed retry relaunched process: before pid=%d birth=%+v, after pid=%d birth=%+v",
-			before.PID, before.Birth, after.PID, after.Birth)
+		t.Fatalf(
+			"completed retry relaunched process: before pid=%d birth=%+v, after pid=%d birth=%+v",
+			before.PID,
+			before.Birth,
+			after.PID,
+			after.Birth,
+		)
 	}
 }
 
-func assertSinglePracticalPane(t *testing.T, ctx context.Context, server *gotmux.Server, session gotmux.Session) {
+func assertSinglePracticalPane(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	session gotmux.Session,
+) {
 	t.Helper()
 
 	sessions, err := server.Sessions(ctx)
@@ -224,12 +240,21 @@ func assertSinglePracticalPane(t *testing.T, ctx context.Context, server *gotmux
 	}
 }
 
-func waitForPracticalTop(t *testing.T, ctx context.Context, session gotmux.Session) *process.Observation {
+func waitForPracticalTop(
+	t *testing.T,
+	ctx context.Context,
+	session gotmux.Session,
+) *process.Observation {
 	t.Helper()
 	return waitForPracticalForeground(t, ctx, session, "top")
 }
 
-func waitForPracticalForeground(t *testing.T, ctx context.Context, session gotmux.Session, name string) *process.Observation {
+func waitForPracticalForeground(
+	t *testing.T,
+	ctx context.Context,
+	session gotmux.Session,
+	name string,
+) *process.Observation {
 	t.Helper()
 
 	windows, _, err := session.WindowInfos(ctx)
@@ -272,13 +297,22 @@ func waitForPracticalForeground(t *testing.T, ctx context.Context, session gotmu
 
 		select {
 		case <-observeCtx.Done():
-			t.Fatalf("foreground %s not observed: %v", name, errors.Join(observeErr, observeCtx.Err()))
+			t.Fatalf(
+				"foreground %s not observed: %v",
+				name,
+				errors.Join(observeErr, observeCtx.Err()),
+			)
 		case <-ticker.C:
 		}
 	}
 }
 
-func assertPracticalOperationSettled(t *testing.T, ctx context.Context, repo *store.Repository, operationID string) {
+func assertPracticalOperationSettled(
+	t *testing.T,
+	ctx context.Context,
+	repo *store.Repository,
+	operationID string,
+) {
 	t.Helper()
 
 	status, err := engine.ReconcileRestore(ctx, repo, operationID)
@@ -427,7 +461,10 @@ func TestEnginePracticalRestoreSyntheticAgentResumeExactArgv(t *testing.T) {
 
 	recordOut := filepath.Join(fixtureDir, "synthetic_agent_argv.txt")
 	resumeScript := filepath.Join(fixtureDir, "codex")
-	scriptContent := fmt.Sprintf("#!/bin/sh\nprintf '%%s\\n' \"$@\" > %q\nexec sleep 300\n", recordOut)
+	scriptContent := fmt.Sprintf(
+		"#!/bin/sh\nprintf '%%s\\n' \"$@\" > %q\nexec sleep 300\n",
+		recordOut,
+	)
 
 	if err := os.WriteFile(resumeScript, []byte(scriptContent), 0o600); err != nil {
 		t.Fatalf("write resume script: %v", err)
@@ -440,7 +477,11 @@ func TestEnginePracticalRestoreSyntheticAgentResumeExactArgv(t *testing.T) {
 	t.Setenv("PATH", fixtureDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	scriptPath := filepath.Join(fixtureDir, "codex.js")
-	if err := os.WriteFile(scriptPath, []byte("setInterval(() => {}, 1000);\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		scriptPath,
+		[]byte("setInterval(() => {}, 1000);\n"),
+		0o600,
+	); err != nil {
 		t.Fatalf("write agent script: %v", err)
 	}
 
@@ -497,11 +538,17 @@ func TestEnginePracticalRestoreSyntheticAgentResumeExactArgv(t *testing.T) {
 
 	paneRes := restored.Panes[0]
 	if paneRes.Outcome != restore.PaneOutcomeNativeResumeDispatch {
-		t.Fatalf("pane outcome = %q, want %q", paneRes.Outcome, restore.PaneOutcomeNativeResumeDispatch)
+		t.Fatalf(
+			"pane outcome = %q, want %q",
+			paneRes.Outcome,
+			restore.PaneOutcomeNativeResumeDispatch,
+		)
 	}
 
 	if paneRes.AppVerified {
-		t.Fatalf("synthetic agent dispatch unexpectedly marked app-verified; dispatch is not app-verified recovery")
+		t.Fatalf(
+			"synthetic agent dispatch unexpectedly marked app-verified; dispatch is not app-verified recovery",
+		)
 	}
 
 	assertRecordedSyntheticArgv(t, recordOut, []string{"resume", "synthetic-session-987"})
@@ -612,7 +659,11 @@ func TestEnginePracticalRestorePaneOutcomesEvidence(t *testing.T) {
 
 	manifest.Panes[1].Launch.Recovery = "unverified"
 	manifest.Panes[1].Launch.Executable = model.Bytes(shPath)
-	manifest.Panes[1].Launch.Arguments = []model.Bytes{model.Bytes("bash"), model.Bytes("-c"), model.Bytes("echo 1 | cat")}
+	manifest.Panes[1].Launch.Arguments = []model.Bytes{
+		model.Bytes("bash"),
+		model.Bytes("-c"),
+		model.Bytes("echo 1 | cat"),
+	}
 
 	manifest.Panes[2].Launch.Recovery = "restart"
 	manifest.Panes[2].Launch.Reason = ""
@@ -650,7 +701,13 @@ func TestEnginePracticalRestorePaneOutcomesEvidence(t *testing.T) {
 		t.Fatalf("restored panes count = %d, want 3", len(restored.Panes))
 	}
 
-	assertExpectedPaneOutcomes(t, restored.Panes, manifest.Panes[0].ID, manifest.Panes[1].ID, manifest.Panes[2].ID)
+	assertExpectedPaneOutcomes(
+		t,
+		restored.Panes,
+		manifest.Panes[0].ID,
+		manifest.Panes[1].ID,
+		manifest.Panes[2].ID,
+	)
 }
 
 func setupOutcomesSourceSession(
@@ -715,20 +772,30 @@ func assertExpectedPaneOutcomes(
 		outcomes[p.PaneID] = p
 	}
 
-	if p, ok := outcomes[p0ID]; !ok || p.Outcome != restore.PaneOutcomeAllowedCWDFallback || !p.CWDFallback || p.AppVerified {
+	if p, ok := outcomes[p0ID]; !ok || p.Outcome != restore.PaneOutcomeAllowedCWDFallback ||
+		!p.CWDFallback ||
+		p.AppVerified {
 		t.Errorf("pane 0 = %+v, want allowed_cwd_fallback with CWDFallback true", p)
 	}
 
-	if p, ok := outcomes[p1ID]; !ok || p.Outcome != restore.PaneOutcomeUnsupported || p.AppVerified {
+	if p, ok := outcomes[p1ID]; !ok || p.Outcome != restore.PaneOutcomeUnsupported ||
+		p.AppVerified {
 		t.Errorf("pane 1 = %+v, want unsupported", p)
 	}
 
-	if p, ok := outcomes[p2ID]; !ok || p.Outcome != restore.PaneOutcomeMissingExecutable || p.AppVerified {
+	if p, ok := outcomes[p2ID]; !ok || p.Outcome != restore.PaneOutcomeMissingExecutable ||
+		p.AppVerified {
 		t.Errorf("pane 2 = %+v, want missing_executable", p)
 	}
 }
 
-func assertNvimReopenedFiles(t *testing.T, ctx context.Context, session gotmux.Session, observed *process.Observation, expectedFiles ...string) {
+func assertNvimReopenedFiles(
+	t *testing.T,
+	ctx context.Context,
+	session gotmux.Session,
+	observed *process.Observation,
+	expectedFiles ...string,
+) {
 	t.Helper()
 
 	restoredArgs := make([]string, 0, len(observed.Arguments))
@@ -851,7 +918,13 @@ func TestEnginePracticalRestoreMixedHealthyAndNonrestartablePanes(t *testing.T) 
 		t.Fatalf("restored panes count = %d, want 3", len(restored.Panes))
 	}
 
-	assertMixedPanesOutcomes(t, restored.Panes, manifest.Panes[0].ID, manifest.Panes[1].ID, manifest.Panes[2].ID)
+	assertMixedPanesOutcomes(
+		t,
+		restored.Panes,
+		manifest.Panes[0].ID,
+		manifest.Panes[1].ID,
+		manifest.Panes[2].ID,
+	)
 
 	restoredSession, err := target.FindSession(ctx, "mixed-source")
 	if err != nil {
@@ -929,12 +1002,18 @@ func assertMixedPanesOutcomes(
 		t.Errorf("healthy pane outcome = %+v, want restart_dispatch", p)
 	}
 
-	if p, ok := outcomes[p1ID]; !ok || p.Outcome != restore.PaneOutcomeUnsupported || p.Reason != string(model.ReasonPaneDead) {
+	if p, ok := outcomes[p1ID]; !ok || p.Outcome != restore.PaneOutcomeUnsupported ||
+		p.Reason != string(model.ReasonPaneDead) {
 		t.Errorf("dead pane outcome = %+v, want unsupported/%s", p, string(model.ReasonPaneDead))
 	}
 
-	if p, ok := outcomes[p2ID]; !ok || p.Outcome != restore.PaneOutcomeUnsupported || p.Reason != string(model.ReasonWorkingDirectoryDeleted) {
-		t.Errorf("deleted cwd pane outcome = %+v, want unsupported/%s", p, string(model.ReasonWorkingDirectoryDeleted))
+	if p, ok := outcomes[p2ID]; !ok || p.Outcome != restore.PaneOutcomeUnsupported ||
+		p.Reason != string(model.ReasonWorkingDirectoryDeleted) {
+		t.Errorf(
+			"deleted cwd pane outcome = %+v, want unsupported/%s",
+			p,
+			string(model.ReasonWorkingDirectoryDeleted),
+		)
 	}
 }
 
@@ -1003,7 +1082,13 @@ func TestEnginePracticalRestoreStartsAShellForAPaneWhoseDirectoryIsGone(t *testi
 		Profile:           engine.RecoveryPractical,
 	})
 
-	generation, manifest := commitWithRemovedDirectory(t, ctx, repo, saved.Generation, filepath.Join(tempDir, "removed-worktree"))
+	generation, manifest := commitWithRemovedDirectory(
+		t,
+		ctx,
+		repo,
+		saved.Generation,
+		filepath.Join(tempDir, "removed-worktree"),
+	)
 
 	restored := restorePracticalSnapshot(t, ctx, repo, target, engine.RestoreConfig{
 		LeaseRoot:         leaseRoot,
@@ -1017,7 +1102,12 @@ func TestEnginePracticalRestoreStartsAShellForAPaneWhoseDirectoryIsGone(t *testi
 	assertRemovedDirectoryOutcomes(t, restored, manifest.Panes[0].ID, manifest.Panes[1].ID)
 }
 
-func startTopAndShellSession(t *testing.T, ctx context.Context, source *gotmux.Server, topPath, shPath string) gotmux.Session {
+func startTopAndShellSession(
+	t *testing.T,
+	ctx context.Context,
+	source *gotmux.Server,
+	topPath, shPath string,
+) gotmux.Session {
 	t.Helper()
 
 	session, err := source.NewSession(ctx, gotmux.NewSessionOptions{
@@ -1041,7 +1131,10 @@ func startTopAndShellSession(t *testing.T, ctx context.Context, source *gotmux.S
 		t.Fatalf("active pane: %v", err)
 	}
 
-	if _, err := topPane.Split(ctx, gotmux.SplitOptions{Direction: gotmux.DirectionHorizontal, Program: gotmux.Exec(shPath)}); err != nil {
+	if _, err := topPane.Split(
+		ctx,
+		gotmux.SplitOptions{Direction: gotmux.DirectionHorizontal, Program: gotmux.Exec(shPath)},
+	); err != nil {
 		t.Fatalf("split shell pane: %v", err)
 	}
 
@@ -1050,7 +1143,12 @@ func startTopAndShellSession(t *testing.T, ctx context.Context, source *gotmux.S
 	return session
 }
 
-func commitWithRemovedDirectory(t *testing.T, ctx context.Context, repo *store.Repository, saved, removed string) (string, model.Manifest) {
+func commitWithRemovedDirectory(
+	t *testing.T,
+	ctx context.Context,
+	repo *store.Repository,
+	saved, removed string,
+) (string, model.Manifest) {
 	t.Helper()
 
 	manifest, err := repo.Read(ctx, saved)
@@ -1058,7 +1156,8 @@ func commitWithRemovedDirectory(t *testing.T, ctx context.Context, repo *store.R
 		t.Fatalf("read saved manifest: %v", err)
 	}
 
-	if len(manifest.Panes) != 2 || manifest.Panes[0].Launch.Recovery != model.RecoveryRestart || manifest.Panes[1].Launch.Recovery != model.RecoveryRestart {
+	if len(manifest.Panes) != 2 || manifest.Panes[0].Launch.Recovery != model.RecoveryRestart ||
+		manifest.Panes[1].Launch.Recovery != model.RecoveryRestart {
 		t.Fatalf("saved panes = %+v, want two restartable panes", manifest.Panes)
 	}
 
@@ -1083,7 +1182,11 @@ func commitWithRemovedDirectory(t *testing.T, ctx context.Context, repo *store.R
 	return generation.ID, manifest
 }
 
-func assertRemovedDirectoryOutcomes(t *testing.T, restored engine.RestoreResult, removedPaneID, healthyPaneID string) {
+func assertRemovedDirectoryOutcomes(
+	t *testing.T,
+	restored engine.RestoreResult,
+	removedPaneID, healthyPaneID string,
+) {
 	t.Helper()
 
 	outcomes := map[string]restore.PaneResult{}
@@ -1092,16 +1195,28 @@ func assertRemovedDirectoryOutcomes(t *testing.T, restored engine.RestoreResult,
 	}
 
 	gone := outcomes[removedPaneID]
-	if gone.Outcome != restore.PaneOutcomeAllowedCWDFallback || gone.Reason != restore.PaneReasonWorkingDirFallback || !gone.CWDFallback {
-		t.Errorf("pane with the removed directory = %+v, want a shell in the fallback directory", gone)
+	if gone.Outcome != restore.PaneOutcomeAllowedCWDFallback ||
+		gone.Reason != restore.PaneReasonWorkingDirFallback ||
+		!gone.CWDFallback {
+		t.Errorf(
+			"pane with the removed directory = %+v, want a shell in the fallback directory",
+			gone,
+		)
 	}
 
 	if healthy := outcomes[healthyPaneID]; healthy.Outcome != restore.PaneOutcomeRestartDispatch {
 		t.Errorf("pane with its directory = %+v, want restart_dispatch", healthy)
 	}
 
-	note := restore.MissingRequirement{Domain: "directory", Status: "partial", Reason: model.ReasonSavedWorkingDirectoryMissing}
+	note := restore.MissingRequirement{
+		Domain: "directory",
+		Status: "partial",
+		Reason: model.ReasonSavedWorkingDirectoryMissing,
+	}
 	if !slices.Contains(restored.MissingRequirements, note) {
-		t.Errorf("missing requirements %v lack the removed directory note", restored.MissingRequirements)
+		t.Errorf(
+			"missing requirements %v lack the removed directory note",
+			restored.MissingRequirements,
+		)
 	}
 }

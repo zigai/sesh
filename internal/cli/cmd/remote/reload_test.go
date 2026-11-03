@@ -36,7 +36,10 @@ func TestPeerLocalWorkspaceRouting(t *testing.T) {
 		cfg.AgentStatus.StorePath = "/custom/aht/remote.json"
 		cfg.AgentSessions.Status = &config.AgentStatusConfig{StorePath: "/custom/aht/nested.json"}
 
-		workspace, err := app.Resolve(cfg, app.Locations{Socket: filepath.Join(t.TempDir(), "absent.sock")})
+		workspace, err := app.Resolve(
+			cfg,
+			app.Locations{Socket: filepath.Join(t.TempDir(), "absent.sock")},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -61,7 +64,10 @@ func TestPeerLocalWorkspaceRouting(t *testing.T) {
 		}
 
 		if workspace.AgentSource().StorePath() != "/custom/aht/nested.json" {
-			t.Fatalf("peer source did not use the resolved nested store path: %q", workspace.AgentStore)
+			t.Fatalf(
+				"peer source did not use the resolved nested store path: %q",
+				workspace.AgentStore,
+			)
 		}
 	}
 }
@@ -95,7 +101,11 @@ func TestNewCommand(t *testing.T) {
 func TestDaemonMonitorCommandRunsForeground(t *testing.T) {
 	cmd := NewDaemonMonitorCommand()
 	if cmd.Name() != "remote-monitor" || cmd.Annotations[clibase.AnnotationLiveIO] != "true" {
-		t.Fatalf("monitor command = %q live-io %q, want foreground remote-monitor", cmd.Name(), cmd.Annotations[clibase.AnnotationLiveIO])
+		t.Fatalf(
+			"monitor command = %q live-io %q, want foreground remote-monitor",
+			cmd.Name(),
+			cmd.Annotations[clibase.AnnotationLiveIO],
+		)
 	}
 }
 
@@ -218,7 +228,12 @@ func TestRemoteMonitorReloadsSymlinkedDefaultConfig(t *testing.T) {
 		select {
 		case reload := <-reloads:
 			if reload.Err != nil || reload.Remote.SSHPath != want {
-				t.Fatalf("reloaded SSH path = %q, error = %v; want %q", reload.Remote.SSHPath, reload.Err, want)
+				t.Fatalf(
+					"reloaded SSH path = %q, error = %v; want %q",
+					reload.Remote.SSHPath,
+					reload.Err,
+					want,
+				)
 			}
 		case <-t.Context().Done():
 			t.Fatal("config reload did not arrive")
@@ -245,7 +260,11 @@ func TestRemoteMonitorReloadsSymlinkedDefaultConfig(t *testing.T) {
 func writeRemoteReloadTestConfig(t *testing.T, path, sshPath string) {
 	t.Helper()
 
-	if err := os.WriteFile(path, []byte("[remote]\nssh_path = "+strconv.Quote(sshPath)+"\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		path,
+		[]byte("[remote]\nssh_path = "+strconv.Quote(sshPath)+"\n"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -311,8 +330,12 @@ func assertReloadRecovery(t *testing.T, record map[string]any) {
 	t.Helper()
 
 	want := map[string]any{
-		"level": "info", "component": "remote_monitor", "operation": "reload_config",
-		"status": "recovered", "reason": "configuration_valid", "message": "remote monitor configuration reload recovered",
+		"level":     "info",
+		"component": "remote_monitor",
+		"operation": "reload_config",
+		"status":    "recovered",
+		"reason":    "configuration_valid",
+		"message":   "remote monitor configuration reload recovered",
 	}
 	if diff := cmp.Diff(want, record); diff != "" {
 		t.Fatalf("incorrect reload recovery: %s", diff)

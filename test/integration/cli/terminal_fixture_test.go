@@ -34,11 +34,17 @@ func TestTermtraceRequirementRejectsMissingTool(t *testing.T) {
 			t.Setenv(pickerTerminalIntegrationRequired, required)
 			t.Setenv(terminalAvailabilityProbe, "1")
 
-			command := exec.CommandContext(t.Context(), executable, "-test.run=^TestTermtraceAvailabilityProbe$", "-test.v")
+			command := exec.CommandContext(
+				t.Context(),
+				executable,
+				"-test.run=^TestTermtraceAvailabilityProbe$",
+				"-test.v",
+			)
 
 			output, runErr := command.CombinedOutput()
 			if required == "0" {
-				if runErr != nil || !strings.Contains(string(output), "--- SKIP: TestTermtraceAvailabilityProbe") {
+				if runErr != nil ||
+					!strings.Contains(string(output), "--- SKIP: TestTermtraceAvailabilityProbe") {
 					t.Fatalf("optional missing tool must skip: %v\n%s", runErr, output)
 				}
 
@@ -50,7 +56,10 @@ func TestTermtraceRequirementRejectsMissingTool(t *testing.T) {
 				t.Fatalf("required missing tool must fail: %v\n%s", runErr, output)
 			}
 
-			if !strings.Contains(string(output), "termtrace is required by "+pickerTerminalIntegrationRequired) {
+			if !strings.Contains(
+				string(output),
+				"termtrace is required by "+pickerTerminalIntegrationRequired,
+			) {
 				t.Fatalf("missing required-tool diagnostic:\n%s", output)
 			}
 		})

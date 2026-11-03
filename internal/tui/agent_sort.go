@@ -57,7 +57,10 @@ func sortAgentSessions(agents []session.AgentSession, order agentSort) {
 		}
 
 		if order == agentSortAttention {
-			if priority := cmp.Compare(agentAttentionRank(left.Status), agentAttentionRank(right.Status)); priority != 0 {
+			if priority := cmp.Compare(
+				agentAttentionRank(left.Status),
+				agentAttentionRank(right.Status),
+			); priority != 0 {
 				return priority
 			}
 
@@ -112,7 +115,10 @@ func agentAttentionRank(status session.AgentStatus) int {
 		return rankIdle
 	case session.AgentStatusRunning:
 		return rankRunning
-	case session.AgentStatusUnknown, session.AgentStatusSleeping, session.AgentStatusMerged, session.AgentStatusClosed:
+	case session.AgentStatusUnknown,
+		session.AgentStatusSleeping,
+		session.AgentStatusMerged,
+		session.AgentStatusClosed:
 		return rankUnknown
 	default:
 		return rankUnknown

@@ -40,17 +40,34 @@ func TestPickerAgentSelectionSwitchesClientAndFocusesPane(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Setenv("TMUX", server.Endpoint().SocketPath+","+strconv.Itoa(probe.Identity.PID)+","+strings.TrimPrefix(string(origin.ID), "$"))
+	t.Setenv(
+		"TMUX",
+		server.Endpoint().SocketPath+","+strconv.Itoa(
+			probe.Identity.PID,
+		)+","+strings.TrimPrefix(
+			string(origin.ID),
+			"$",
+		),
+	)
 	t.Setenv("TMUX_PANE", string(originPanes[0].ID))
 
 	clientName := attachPickerTestClient(t, origin.Handle())
 	root := t.TempDir()
 	historyPath := historyPath(t, root)
 
-	services, err := newServices(ctx, resolvePickerTestWorkspace(t, config.DefaultConfig(), app.Locations{
-		Socket: server.Endpoint().SocketPath, Repository: filepath.Join(root, "repository"), LeaseRoot: filepath.Join(root, "leases"),
-		History: historyPath, FinalSaveStatus: "", AgentStore: filepath.Join(root, "agents.json"),
-	}), gotmux.Streams{}, RemoteServices{})
+	services, err := newServices(
+		ctx,
+		resolvePickerTestWorkspace(t, config.DefaultConfig(), app.Locations{
+			Socket:          server.Endpoint().SocketPath,
+			Repository:      filepath.Join(root, "repository"),
+			LeaseRoot:       filepath.Join(root, "leases"),
+			History:         historyPath,
+			FinalSaveStatus: "",
+			AgentStore:      filepath.Join(root, "agents.json"),
+		}),
+		gotmux.Streams{},
+		RemoteServices{},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +107,10 @@ func originSession(t *testing.T, server *gotmux.Server) gotmux.SessionInfo {
 	return sessions[0]
 }
 
-func newPickerAgentTarget(t *testing.T, server *gotmux.Server) (gotmux.Session, gotmux.WindowID, gotmux.PaneID) {
+func newPickerAgentTarget(
+	t *testing.T,
+	server *gotmux.Server,
+) (gotmux.Session, gotmux.WindowID, gotmux.PaneID) {
 	t.Helper()
 
 	target, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{Name: "agent-target"})
@@ -98,7 +118,10 @@ func newPickerAgentTarget(t *testing.T, server *gotmux.Server) (gotmux.Session, 
 		t.Fatal(err)
 	}
 
-	link, err := target.NewWindow(t.Context(), gotmux.NewWindowOptions{Name: "agent", Program: gotmux.Exec("sleep", "300"), Select: false})
+	link, err := target.NewWindow(
+		t.Context(),
+		gotmux.NewWindowOptions{Name: "agent", Program: gotmux.Exec("sleep", "300"), Select: false},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +151,10 @@ func TestPopupHandoffSwitchesOnlyOpeningClientAfterPopupSelection(t *testing.T) 
 
 	origin := originSession(t, server)
 
-	targetSession, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "mobile-target", Program: gotmux.Exec("sleep", "300")})
+	targetSession, err := server.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{Name: "mobile-target", Program: gotmux.Exec("sleep", "300")},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,29 +176,57 @@ func TestPopupHandoffSwitchesOnlyOpeningClientAfterPopupSelection(t *testing.T) 
 	}
 
 	originView := tui.AgentView{
-		Session: session.Identity{Origin: "local", Socket: server.Endpoint().SocketPath, Name: "origin-agent-session"},
-		PaneID:  "%0",
+		Session: session.Identity{
+			Origin: "local",
+			Socket: server.Endpoint().SocketPath,
+			Name:   "origin-agent-session",
+		},
+		PaneID: "%0",
 	}
-	if err := writePickerSwitchHandoff(path, &target, "", "", "", []tui.AgentView{originView}); err != nil {
+	if err := writePickerSwitchHandoff(
+		path,
+		&target,
+		"",
+		"",
+		"",
+		[]tui.AgentView{originView},
+	); err != nil {
 		t.Fatal(err)
 	}
 
 	runtime := commandRuntime{
 		workspace: resolvePickerTestWorkspace(t, config.DefaultConfig(), app.Locations{
-			Socket: server.Endpoint().SocketPath, Repository: filepath.Join(root, "repository"),
-			LeaseRoot: filepath.Join(root, "leases"), History: historyPath(t, root), FinalSaveStatus: "", AgentStore: "",
+			Socket:     server.Endpoint().SocketPath,
+			Repository: filepath.Join(root, "repository"),
+			LeaseRoot: filepath.Join(
+				root,
+				"leases",
+			),
+			History:         historyPath(t, root),
+			FinalSaveStatus: "",
+			AgentStore:      "",
 		}),
 	}
 
-	services, err := newServices(ctx, runtime.workspace, gotmux.Streams{In: nil, Out: nil, Err: nil},
-		RemoteServices{Catalog: nil, Watcher: nil, Peer: nil, Attach: nil, OriginBridge: nil})
+	services, err := newServices(
+		ctx,
+		runtime.workspace,
+		gotmux.Streams{In: nil, Out: nil, Err: nil},
+		RemoteServices{Catalog: nil, Watcher: nil, Peer: nil, Attach: nil, OriginBridge: nil},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	t.Cleanup(func() { _ = services.Close() })
 
-	if err := completePickerSwitchHandoff(ctx, services, path, openingClient, string(origin.ID)); err != nil {
+	if err := completePickerSwitchHandoff(
+		ctx,
+		services,
+		path,
+		openingClient,
+		string(origin.ID),
+	); err != nil {
 		t.Fatalf("popup handoff failed: %v", err)
 	}
 
@@ -184,7 +238,11 @@ func TestPopupHandoffSwitchesOnlyOpeningClientAfterPopupSelection(t *testing.T) 
 		t.Fatal(err)
 	}
 
-	switched := session.Identity{Origin: "local", Socket: server.Endpoint().SocketPath, Name: "mobile-target"}
+	switched := session.Identity{
+		Origin: "local",
+		Socket: server.Endpoint().SocketPath,
+		Name:   "mobile-target",
+	}
 	if st.GetLastSwitchIdentity(switched) == 0 {
 		t.Fatal("popup handoff did not record the switch in history")
 	}
@@ -216,13 +274,26 @@ func TestResolvePopupClientSelection(t *testing.T) {
 	assertPopupClientResolves(t, server, "", openingClient)
 	assertPopupClientResolves(t, server, openingClient, openingClient)
 	assertPopupClientRejected(t, server, controlClient(t, server), "explicit control client")
-	assertPopupClientRejected(t, server, "/dev/pts/nonexistent-client-id", "unknown explicit client")
+	assertPopupClientRejected(
+		t,
+		server,
+		"/dev/pts/nonexistent-client-id",
+		"unknown explicit client",
+	)
 }
 
-func resolvePopupClientFlag(t *testing.T, server *gotmux.Server, flag string) (gotmux.ClientInfo, error) {
+func resolvePopupClientFlag(
+	t *testing.T,
+	server *gotmux.Server,
+	flag string,
+) (gotmux.ClientInfo, error) {
 	t.Helper()
 
-	return resolvePopupClient(t.Context(), action.Caller{Client: flag, Pane: "", Session: "", Width: "", Height: ""}, server)
+	return resolvePopupClient(
+		t.Context(),
+		action.Caller{Client: flag, Pane: "", Session: "", Width: "", Height: ""},
+		server,
+	)
 }
 
 func assertPopupClientResolves(t *testing.T, server *gotmux.Server, flag, want string) {
@@ -230,14 +301,27 @@ func assertPopupClientResolves(t *testing.T, server *gotmux.Server, flag, want s
 
 	resolved, err := resolvePopupClientFlag(t, server, flag)
 	if err != nil || string(resolved.Name) != want {
-		t.Fatalf("resolvePopupClient(--client=%q) = %q, %v; want %q", flag, resolved.Name, err, want)
+		t.Fatalf(
+			"resolvePopupClient(--client=%q) = %q, %v; want %q",
+			flag,
+			resolved.Name,
+			err,
+			want,
+		)
 	}
 }
 
 func assertPopupClientRejected(t *testing.T, server *gotmux.Server, flag, description string) {
 	t.Helper()
 
-	if _, err := resolvePopupClientFlag(t, server, flag); !errors.Is(err, session.ErrInvokingClientUnavailable) {
+	if _, err := resolvePopupClientFlag(
+		t,
+		server,
+		flag,
+	); !errors.Is(
+		err,
+		session.ErrInvokingClientUnavailable,
+	) {
 		t.Fatalf("expected ErrInvokingClientUnavailable for %s, got: %v", description, err)
 	}
 }
@@ -261,7 +345,12 @@ func controlClient(t *testing.T, server *gotmux.Server) string {
 	return ""
 }
 
-func assertPickerClientDisplays(t *testing.T, server *gotmux.Server, name string, want gotmux.SessionID) {
+func assertPickerClientDisplays(
+	t *testing.T,
+	server *gotmux.Server,
+	name string,
+	want gotmux.SessionID,
+) {
 	t.Helper()
 
 	client, err := server.Client(t.Context(), gotmux.ClientName(name))
@@ -340,7 +429,11 @@ func attachPickerTestClient(t *testing.T, liveSession gotmux.Session) string {
 	return waitForNewPickerClient(t, liveSession, existing)
 }
 
-func waitForNewPickerClient(t *testing.T, liveSession gotmux.Session, existing map[gotmux.ClientName]bool) string {
+func waitForNewPickerClient(
+	t *testing.T,
+	liveSession gotmux.Session,
+	existing map[gotmux.ClientName]bool,
+) string {
 	t.Helper()
 
 	deadline := time.Now().Add(10 * time.Second)

@@ -32,7 +32,12 @@ func TestParseEvidenceTakesTheItemsOfTheEvidenceSectionOnly(t *testing.T) {
 func TestParseEvidenceAcceptsTheHeadingStylesAgentsWrite(t *testing.T) {
 	for _, heading := range []string{"**Evidence**", "**Evidence:**", "## Evidence", "### evidence"} {
 		got := inbox.ParseEvidence("Done.\n\n"+heading+"\n- ~/shots/one.png\n", "/work")
-		if want := []inbox.Evidence{{Target: "~/shots/one.png", Kind: inbox.EvidenceImage}}; !slices.Equal(got, want) {
+		if want := []inbox.Evidence{
+			{Target: "~/shots/one.png", Kind: inbox.EvidenceImage},
+		}; !slices.Equal(
+			got,
+			want,
+		) {
 			t.Errorf("heading %q: ParseEvidence() = %v, want %v", heading, got, want)
 		}
 	}

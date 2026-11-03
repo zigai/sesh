@@ -30,7 +30,14 @@ type Recorder struct {
 type Panes func(context.Context) (task.PaneTasks, error)
 
 func NewRecorder(store Store, panes Panes) *Recorder {
-	return &Recorder{store: store, panes: panes, server: "", mu: sync.Mutex{}, known: emptyState(), taskByConversation: map[string]string{}}
+	return &Recorder{
+		store:              store,
+		panes:              panes,
+		server:             "",
+		mu:                 sync.Mutex{},
+		known:              emptyState(),
+		taskByConversation: map[string]string{},
+	}
 }
 
 func (r *Recorder) Record(ctx context.Context, sessions []aht.Session) error {
@@ -63,7 +70,11 @@ func (r *Recorder) Record(ctx context.Context, sessions []aht.Session) error {
 	titled := withHistory(ctx, kept, r.known)
 
 	state, err := r.store.Update(ctx, func(state *State) error {
-		state.Observe(titled, time.Now(), func(dir string) (string, string) { return branchOf(ctx, dir), projectOf(ctx, dir) })
+		state.Observe(
+			titled,
+			time.Now(),
+			func(dir string) (string, string) { return branchOf(ctx, dir), projectOf(ctx, dir) },
+		)
 
 		return nil
 	})
@@ -85,10 +96,19 @@ func (r *Recorder) sightings(sessions []aht.Session) []Sighting {
 		}
 
 		sightings = append(sightings, Sighting{
-			Harness: agent.Harness, Conversation: agent.HarnessSessionID, SessionPath: agent.SessionPath,
-			Resume: agent.ResumeCommand, Title: "", Directory: agent.CWD, Project: agent.ProjectRoot, Task: r.taskByConversation[agent.HarnessSessionID],
-			Server: agent.ServerSocket, Pane: agent.PaneID, PanePID: agent.PanePID, TurnAt: agent.ActivityChanged,
-			PromptAt: agent.PromptAt,
+			Harness:      agent.Harness,
+			Conversation: agent.HarnessSessionID,
+			SessionPath:  agent.SessionPath,
+			Resume:       agent.ResumeCommand,
+			Title:        "",
+			Directory:    agent.CWD,
+			Project:      agent.ProjectRoot,
+			Task:         r.taskByConversation[agent.HarnessSessionID],
+			Server:       agent.ServerSocket,
+			Pane:         agent.PaneID,
+			PanePID:      agent.PanePID,
+			TurnAt:       agent.ActivityChanged,
+			PromptAt:     agent.PromptAt,
 		})
 	}
 
@@ -110,7 +130,11 @@ func withHistory(ctx context.Context, sightings []Sighting, known State) []Sight
 		}
 
 		catalog := history.Catalog{
-			Sources: []history.Source{{Harness: registry.Harness(seen.Harness), Path: seen.SessionPath}}, IndexPath: "", Progress: nil,
+			Sources: []history.Source{
+				{Harness: registry.Harness(seen.Harness), Path: seen.SessionPath},
+			},
+			IndexPath: "",
+			Progress:  nil,
 		}
 
 		var query history.ListQuery

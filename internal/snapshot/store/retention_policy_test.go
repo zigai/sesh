@@ -356,7 +356,12 @@ func TestRetentionProtectsActiveRecoveryPins(t *testing.T) {
 		gens[i] = commitSnapshotAt(t, r, now.Add(-10*time.Hour))
 	}
 
-	op, err := r.Pin(t.Context(), gens[0].ID, model.Bytes("target"), []Action{{ID: "act", Kind: actionLaunch, State: actionPlanned}})
+	op, err := r.Pin(
+		t.Context(),
+		gens[0].ID,
+		model.Bytes("target"),
+		[]Action{{ID: "act", Kind: actionLaunch, State: actionPlanned}},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -470,7 +475,11 @@ func TestRetentionDisabledSettings(t *testing.T) {
 		t.Fatalf("expected 2 removed with count=6, got %v", result2.Removed)
 	}
 
-	result3, err := r.RetainPolicy(t.Context(), now, RetentionPolicy{MaxAge: 1 * time.Hour, MaxCount: 0})
+	result3, err := r.RetainPolicy(
+		t.Context(),
+		now,
+		RetentionPolicy{MaxAge: 1 * time.Hour, MaxCount: 0},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -822,7 +831,12 @@ func TestConcurrentRetentionPinDelete(t *testing.T) {
 
 			source := catalog.Generations[0].ID
 
-			op, err := r.Pin(ctx, source, model.Bytes("target"), []Action{{ID: "act", Kind: actionLaunch, State: actionPlanned}})
+			op, err := r.Pin(
+				ctx,
+				source,
+				model.Bytes("target"),
+				[]Action{{ID: "act", Kind: actionLaunch, State: actionPlanned}},
+			)
 			if err != nil {
 				continue
 			}
@@ -896,7 +910,11 @@ func TestRetentionEmptyRepositoryDoesNotPublish(t *testing.T) {
 		return errInjected
 	}
 
-	emptyResult, err := emptyRepo.RetainPolicy(t.Context(), now, RetentionPolicy{MaxCount: 5, MaxAge: time.Hour})
+	emptyResult, err := emptyRepo.RetainPolicy(
+		t.Context(),
+		now,
+		RetentionPolicy{MaxCount: 5, MaxAge: time.Hour},
+	)
 	if err != nil {
 		t.Fatalf("expected no error on empty repository no-op, got %v", err)
 	}
@@ -951,7 +969,9 @@ func TestRetentionRetainsUnderlyingErrorCauses(t *testing.T) {
 			gens[i] = commitSnapshotAt(t, r, now.Add(-5*time.Hour))
 		}
 
-		manifestPath := filepath.Clean(filepath.Join(path, "generations", gens[0].ID, "manifest.json"))
+		manifestPath := filepath.Clean(
+			filepath.Join(path, "generations", gens[0].ID, "manifest.json"),
+		)
 		if err := os.Remove(manifestPath); err != nil {
 			t.Fatal(err)
 		}
@@ -973,7 +993,9 @@ func TestRetentionRetainsUnderlyingErrorCauses(t *testing.T) {
 			gens[i] = commitSnapshotAt(t, r, now.Add(-5*time.Hour))
 		}
 
-		manifestPath := filepath.Clean(filepath.Join(path, "generations", gens[0].ID, "manifest.json"))
+		manifestPath := filepath.Clean(
+			filepath.Join(path, "generations", gens[0].ID, "manifest.json"),
+		)
 
 		data := []byte(`{"not": "valid manifest"}`)
 		if err := os.WriteFile(manifestPath, data, 0o600); err != nil {

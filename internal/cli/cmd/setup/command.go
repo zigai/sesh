@@ -91,7 +91,10 @@ func resolveSetupBindings(cmd *cobra.Command) ([]setup.Binding, error) {
 
 	rendered, err := setup.Bindings(bindings)
 	if err != nil {
-		return nil, oops.In("cli").Code("config_invalid").With("operation", "render_tmux_bindings").Wrap(err)
+		return nil, oops.In("cli").
+			Code("config_invalid").
+			With("operation", "render_tmux_bindings").
+			Wrap(err)
 	}
 
 	return rendered, nil
@@ -206,7 +209,13 @@ func registerSetupBindings(
 
 		bindOptions := gotmux.BindOptions{Repeat: false, Note: binding.Purpose, ClearNote: false}
 
-		if err := server.Bind(ctx, gotmux.KeyTable(binding.Table), gotmux.Key(binding.Key), sequence, bindOptions); err != nil {
+		if err := server.Bind(
+			ctx,
+			gotmux.KeyTable(binding.Table),
+			gotmux.Key(binding.Key),
+			sequence,
+			bindOptions,
+		); err != nil {
 			return 0, nil, oops.In("cli").With("operation", "apply_binding").Wrap(err)
 		}
 
@@ -216,7 +225,11 @@ func registerSetupBindings(
 	return applied, conflicts, nil
 }
 
-func existingBindingKeys(ctx context.Context, server *gotmux.Server, bindings []setup.Binding) (map[string]bool, error) {
+func existingBindingKeys(
+	ctx context.Context,
+	server *gotmux.Server,
+	bindings []setup.Binding,
+) (map[string]bool, error) {
 	keys := make(map[string]bool)
 	listed := make(map[string]bool)
 
@@ -246,7 +259,12 @@ func existingBindingKeys(ctx context.Context, server *gotmux.Server, bindings []
 	return keys, nil
 }
 
-func renderSetupApplyResult(cmd *cobra.Command, applied int, conflicts map[string]bool, bindings []setup.Binding) error {
+func renderSetupApplyResult(
+	cmd *cobra.Command,
+	applied int,
+	conflicts map[string]bool,
+	bindings []setup.Binding,
+) error {
 	payload := applyResultJSON{
 		Applied:  applied,
 		Skipped:  len(conflicts),
@@ -259,7 +277,12 @@ func renderSetupApplyResult(cmd *cobra.Command, applied int, conflicts map[strin
 		return clibase.WriteJSONResultError(cmd, payload, conflictErr)
 	}
 
-	if err := clibase.WriteOutput(cmd, "Applied %d binding(s); skipped %d existing key(s)\n", applied, len(conflicts)); err != nil {
+	if err := clibase.WriteOutput(
+		cmd,
+		"Applied %d binding(s); skipped %d existing key(s)\n",
+		applied,
+		len(conflicts),
+	); err != nil {
 		return err
 	}
 

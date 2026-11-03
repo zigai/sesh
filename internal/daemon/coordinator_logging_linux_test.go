@@ -45,8 +45,18 @@ func TestLifecycleLogsReadinessDrainRecordedFailureAndRecovery(t *testing.T) {
 		{"idle", nil, nil, []string{"ok"}},
 		{"canceled_before_drain", []lifecycle.Event{{Canceled: true}}, nil, []string{"ok"}},
 		{"save", []lifecycle.Event{{Kind: lifecycle.EventSleep}}, nil, []string{"ok", "started"}},
-		{"recorded_failure", []lifecycle.Event{{Kind: lifecycle.EventShutdown}}, errPrivateLifecycle, []string{"ok", "started", "degraded"}},
-		{"resumed", []lifecycle.Event{{Kind: lifecycle.EventSleep}, {Canceled: true}}, nil, []string{"ok", "started", "recovered"}},
+		{
+			"recorded_failure",
+			[]lifecycle.Event{{Kind: lifecycle.EventShutdown}},
+			errPrivateLifecycle,
+			[]string{"ok", "started", "degraded"},
+		},
+		{
+			"resumed",
+			[]lifecycle.Event{{Kind: lifecycle.EventSleep}, {Canceled: true}},
+			nil,
+			[]string{"ok", "started", "recovered"},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -82,7 +92,12 @@ func assertLifecycleLogRecord(t *testing.T, line []byte, status string) {
 		t.Fatal(err)
 	}
 
-	want := map[string]any{"component": "daemon", "operation": "run_lifecycle", "status": status, "level": "info"}
+	want := map[string]any{
+		"component": "daemon",
+		"operation": "run_lifecycle",
+		"status":    status,
+		"level":     "info",
+	}
 	switch status {
 	case "ok":
 		want["phase"], want["message"] = "running", "lifecycle coordinator ready"

@@ -24,11 +24,18 @@ func TestSinkRotatesCompleteJSONLinesIntoBoundedBackups(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "sesh.log")
-	sink := openTestRotatingSink(t, path, rotationPolicy{maxBytes: rotationTestMaxBytes, backupCount: 2})
+	sink := openTestRotatingSink(
+		t,
+		path,
+		rotationPolicy{maxBytes: rotationTestMaxBytes, backupCount: 2},
+	)
 	logger := sink.Logger()
 
 	for sequence := range 40 {
-		logger.Info().Int("sequence", sequence).Str("payload", strings.Repeat("x", 24)).Msg("rotation test")
+		logger.Info().
+			Int("sequence", sequence).
+			Str("payload", strings.Repeat("x", 24)).
+			Msg("rotation test")
 	}
 
 	if err := sink.Close(); err != nil {
@@ -192,7 +199,12 @@ func openTestRotatingSink(t *testing.T, path string, policy rotationPolicy) *Sin
 	return sink
 }
 
-func readRotatedRecords(t *testing.T, path string, backupCount int, maxBytes int64) []map[string]any {
+func readRotatedRecords(
+	t *testing.T,
+	path string,
+	backupCount int,
+	maxBytes int64,
+) []map[string]any {
 	t.Helper()
 
 	records := []map[string]any{}
@@ -209,7 +221,12 @@ func readRotatedRecords(t *testing.T, path string, backupCount int, maxBytes int
 
 		data, fileRecords := readJSONLines(t, currentPath)
 		if index > 0 && int64(len(data)) > maxBytes {
-			t.Fatalf("%s size = %d, want at most %d", filepath.Base(currentPath), len(data), maxBytes)
+			t.Fatalf(
+				"%s size = %d, want at most %d",
+				filepath.Base(currentPath),
+				len(data),
+				maxBytes,
+			)
 		}
 
 		records = append(records, fileRecords...)
@@ -241,7 +258,12 @@ func assertRotationArtifactsBounded(t *testing.T, path string, backupCount int) 
 		}
 
 		if info.Mode().Perm() != logFileMode {
-			t.Fatalf("%s mode = %04o, want %04o", filepath.Base(currentPath), info.Mode().Perm(), logFileMode)
+			t.Fatalf(
+				"%s mode = %04o, want %04o",
+				filepath.Base(currentPath),
+				info.Mode().Perm(),
+				logFileMode,
+			)
 		}
 	}
 
@@ -285,7 +307,11 @@ func TestEqualActiveAndBackupBothSurvive(t *testing.T) {
 	}
 
 	if info.Size() != int64(content.Len()) {
-		t.Fatalf("active log was truncated or corrupted: size = %d, want %d", info.Size(), content.Len())
+		t.Fatalf(
+			"active log was truncated or corrupted: size = %d, want %d",
+			info.Size(),
+			content.Len(),
+		)
 	}
 
 	backupInfo, err := os.Stat(backupPath)
@@ -294,7 +320,11 @@ func TestEqualActiveAndBackupBothSurvive(t *testing.T) {
 	}
 
 	if backupInfo.Size() != int64(content.Len()) {
-		t.Fatalf("backup log was truncated or corrupted: size = %d, want %d", backupInfo.Size(), content.Len())
+		t.Fatalf(
+			"backup log was truncated or corrupted: size = %d, want %d",
+			backupInfo.Size(),
+			content.Len(),
+		)
 	}
 
 	if err := sink.Close(); err != nil {

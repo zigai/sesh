@@ -124,7 +124,11 @@ func testUnsupportedApplicationCapture(t *testing.T, tt unsupportedApplicationCa
 	}
 
 	if !tt.ambiguous && filepath.Base(string(launch.Executable)) != tt.foreground {
-		t.Fatalf("unsupported foreground executable = %q, want %q", launch.Executable, tt.foreground)
+		t.Fatalf(
+			"unsupported foreground executable = %q, want %q",
+			launch.Executable,
+			tt.foreground,
+		)
 	}
 
 	assertApplicationDirectory(t, launch, workingDir)
@@ -137,7 +141,11 @@ func TestCaptureAgentResumeRequiresExactEndpointBinding(t *testing.T) {
 	fixtureDir := t.TempDir()
 	scriptPath := filepath.Join(fixtureDir, "codex.js")
 
-	if err := os.WriteFile(scriptPath, []byte("setInterval(() => {}, 1000);\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		scriptPath,
+		[]byte("setInterval(() => {}, 1000);\n"),
+		0o600,
+	); err != nil {
 		t.Fatalf("write agent fixture: %v", err)
 	}
 
@@ -220,8 +228,14 @@ func applicationCaptureFixture(
 	workingDir := t.TempDir()
 
 	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{
-		Name: name, Dir: workingDir,
-		Program: gotmux.Exec(bashPath, "--noprofile", "--norc"), Start: gotmux.StartPolicyExistingOnly,
+		Name: name,
+		Dir:  workingDir,
+		Program: gotmux.Exec(
+			bashPath,
+			"--noprofile",
+			"--norc",
+		),
+		Start: gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("create application session: %v", err)
@@ -240,7 +254,11 @@ func applicationCaptureFixture(
 	return server, session, pane, workingDir
 }
 
-func waitForApplicationForeground(t *testing.T, pane gotmux.Pane, executable string) *process.Observation {
+func waitForApplicationForeground(
+	t *testing.T,
+	pane gotmux.Pane,
+	executable string,
+) *process.Observation {
 	t.Helper()
 
 	info, err := pane.Info(t.Context())
@@ -269,7 +287,11 @@ func waitForApplicationForeground(t *testing.T, pane gotmux.Pane, executable str
 
 		select {
 		case <-ctx.Done():
-			t.Fatalf("foreground %q not observed: %v", executable, errors.Join(observeErr, ctx.Err()))
+			t.Fatalf(
+				"foreground %q not observed: %v",
+				executable,
+				errors.Join(observeErr, ctx.Err()),
+			)
 		case <-ticker.C:
 		}
 	}
@@ -402,8 +424,14 @@ func TestCapturePreservesDeadPaneAlongsideHealthyPane(t *testing.T) {
 	workingDir := t.TempDir()
 
 	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{
-		Name: "dead-and-healthy", Dir: workingDir,
-		Program: gotmux.Exec(bashPath, "--noprofile", "--norc"), Start: gotmux.StartPolicyExistingOnly,
+		Name: "dead-and-healthy",
+		Dir:  workingDir,
+		Program: gotmux.Exec(
+			bashPath,
+			"--noprofile",
+			"--norc",
+		),
+		Start: gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("create session: %v", err)
@@ -431,11 +459,17 @@ func TestCapturePreservesDeadPaneAlongsideHealthyPane(t *testing.T) {
 		t.Fatalf("set remain-on-exit: %v", err)
 	}
 
-	if err := deadPane.Submit(t.Context(), `printf "DEAD_PANE_OUTPUT_MARKER\n"; exit 0`); err != nil {
+	if err := deadPane.Submit(
+		t.Context(),
+		`printf "DEAD_PANE_OUTPUT_MARKER\n"; exit 0`,
+	); err != nil {
 		t.Fatalf("submit dead pane command: %v", err)
 	}
 
-	if err := healthyPane.Submit(t.Context(), `printf "HEALTHY_PANE_OUTPUT_MARKER\n"; exec sleep 300`); err != nil {
+	if err := healthyPane.Submit(
+		t.Context(),
+		`printf "HEALTHY_PANE_OUTPUT_MARKER\n"; exec sleep 300`,
+	); err != nil {
 		t.Fatalf("submit healthy pane command: %v", err)
 	}
 
@@ -698,7 +732,11 @@ func TestCaptureRetriesAndPreservesPaneAcrossProcessReplacement(t *testing.T) {
 
 			if respawnErr := pane.Respawn(t.Context(), gotmux.RespawnOptions{
 				KillRunning: true,
-				Program:     gotmux.Exec("sh", "-c", `printf "REPLACEMENT_MARKER\n"; exec sleep 300`),
+				Program: gotmux.Exec(
+					"sh",
+					"-c",
+					`printf "REPLACEMENT_MARKER\n"; exec sleep 300`,
+				),
 			}); respawnErr != nil {
 				t.Errorf("respawn pane: %v", respawnErr)
 			}
@@ -788,7 +826,11 @@ func TestCaptureRestartsAShellWhoseExecutableWasReplacedInPlace(t *testing.T) {
 
 	pane := observation.Manifest.Panes[0]
 	if pane.Launch.Recovery != model.RecoveryRestart {
-		t.Fatalf("recovery = %q (reason %q), want restart from the upgraded executable", pane.Launch.Recovery, pane.Launch.Reason)
+		t.Fatalf(
+			"recovery = %q (reason %q), want restart from the upgraded executable",
+			pane.Launch.Recovery,
+			pane.Launch.Reason,
+		)
 	}
 }
 
@@ -798,7 +840,10 @@ func TestCaptureKeepsAPaneNonrestartableWhenItsExecutablePathHoldsNoExecutable(t
 	assertDeletedExecutablePane(t, observation)
 }
 
-func observeShellAfterReplacingItsExecutable(t *testing.T, replacementMode os.FileMode) Observation {
+func observeShellAfterReplacingItsExecutable(
+	t *testing.T,
+	replacementMode os.FileMode,
+) Observation {
 	t.Helper()
 
 	shellPath := requireApplicationExecutable(t, "sh")
@@ -867,15 +912,23 @@ func TestCaptureResumesAnAgentWhoseRunningVersionWasRemovedByAnUpdate(t *testing
 
 	if launch.Recovery != model.RecoveryResume || string(launch.Executable) != link ||
 		!equalLaunchArguments(launch.Arguments, []string{"codex", "resume", "exact-session"}) {
-		t.Fatalf("agent launch after its running version was removed = %#v, want a resume through %s", launch, link)
+		t.Fatalf(
+			"agent launch after its running version was removed = %#v, want a resume through %s",
+			launch,
+			link,
+		)
 	}
 }
 
 func TestCaptureKeepsAnAgentNonrestartableWhenNoVersionIsInstalled(t *testing.T) {
 	launch, _ := captureAgentAfterUpdate(t, false)
 
-	if launch.Recovery != model.RecoveryNonrestartable || launch.Reason != string(model.ReasonExecutableDeleted) {
-		t.Fatalf("agent launch with no installed version = %#v, want nonrestartable executable_deleted", launch)
+	if launch.Recovery != model.RecoveryNonrestartable ||
+		launch.Reason != string(model.ReasonExecutableDeleted) {
+		t.Fatalf(
+			"agent launch with no installed version = %#v, want nonrestartable executable_deleted",
+			launch,
+		)
 	}
 }
 

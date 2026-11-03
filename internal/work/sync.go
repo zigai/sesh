@@ -81,7 +81,16 @@ func SyncEvery(ctx context.Context, store Store, interval time.Duration) {
 func ViewPR(ctx context.Context, dir string, number int) (PRLink, error) {
 	var viewed ghPR
 
-	if err := runGH(ctx, dir, &viewed, "pr", "view", strconv.Itoa(number), "--json", ghPRFields); err != nil {
+	if err := runGH(
+		ctx,
+		dir,
+		&viewed,
+		"pr",
+		"view",
+		strconv.Itoa(number),
+		"--json",
+		ghPRFields,
+	); err != nil {
 		return noPR(), err
 	}
 
@@ -143,7 +152,9 @@ func syncOnTicks(ctx context.Context, store Store, ticks <-chan time.Time) {
 		case !episode.Observe(err):
 		case err != nil:
 			zerolog.Ctx(ctx).Warn().Str("component", "work").Str("operation", "sync_work").
-				Str("status", "degraded").Str("reason", "work_sync_failed").Func(logging.Cause(err)).Msg("periodic work sync failed")
+				Str("status", "degraded").
+				Str("reason", "work_sync_failed").
+				Func(logging.Cause(err)).Msg("periodic work sync failed")
 		default:
 			zerolog.Ctx(ctx).Info().Str("component", "work").Str("operation", "sync_work").
 				Str("status", "recovered").Msg("periodic work sync recovered")
@@ -166,7 +177,8 @@ func findPRs(ctx context.Context, item Item, branch string) ([]PRLink, error) {
 	}
 
 	for _, linked := range item.Linked() {
-		if linked.Ended() || slices.ContainsFunc(found, func(pr PRLink) bool { return pr.Number == linked.Number }) {
+		if linked.Ended() ||
+			slices.ContainsFunc(found, func(pr PRLink) bool { return pr.Number == linked.Number }) {
 			continue
 		}
 
@@ -305,7 +317,14 @@ func projectOf(ctx context.Context, dir string) string {
 }
 
 func defaultBranch(ctx context.Context, dir string) string {
-	head, err := git.Output(ctx, dir, "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD")
+	head, err := git.Output(
+		ctx,
+		dir,
+		"symbolic-ref",
+		"--quiet",
+		"--short",
+		"refs/remotes/origin/HEAD",
+	)
 	if err != nil {
 		return ""
 	}
@@ -318,7 +337,19 @@ func defaultBranch(ctx context.Context, dir string) string {
 func branchPR(ctx context.Context, dir, branch string) (PRLink, error) {
 	var listed []ghPR
 
-	if err := runGH(ctx, dir, &listed, "pr", "list", "--head", branch, "--state", "all", "--json", ghPRFields); err != nil {
+	if err := runGH(
+		ctx,
+		dir,
+		&listed,
+		"pr",
+		"list",
+		"--head",
+		branch,
+		"--state",
+		"all",
+		"--json",
+		ghPRFields,
+	); err != nil {
 		return noPR(), err
 	}
 
@@ -340,8 +371,13 @@ func (pr ghPR) link() PRLink {
 	slices.Sort(issues)
 
 	link := PRLink{
-		Number: pr.Number, State: task.PRState(strings.ToLower(pr.State)), URL: pr.URL, Issues: issues, Source: "",
-		CreatedAt: unixOrZero(pr.CreatedAt), EndedAt: 0,
+		Number:    pr.Number,
+		State:     task.PRState(strings.ToLower(pr.State)),
+		URL:       pr.URL,
+		Issues:    issues,
+		Source:    "",
+		CreatedAt: unixOrZero(pr.CreatedAt),
+		EndedAt:   0,
 	}
 
 	switch link.State {
@@ -364,7 +400,15 @@ func unixOrZero(at time.Time) int64 {
 }
 
 func noPR() PRLink {
-	return PRLink{Number: 0, State: "", URL: "", Issues: []int{}, Source: "", CreatedAt: 0, EndedAt: 0}
+	return PRLink{
+		Number:    0,
+		State:     "",
+		URL:       "",
+		Issues:    []int{},
+		Source:    "",
+		CreatedAt: 0,
+		EndedAt:   0,
+	}
 }
 
 func runGH(ctx context.Context, dir string, decoded any, args ...string) error {
@@ -376,7 +420,12 @@ func runGH(ctx context.Context, dir string, decoded any, args ...string) error {
 	command := exec.CommandContext(ctx, ghPath, args...)
 	command.Dir = dir
 
-	command.Env = append(os.Environ(), "GH_PROMPT_DISABLED=1", "GIT_TERMINAL_PROMPT=0", "NO_COLOR=1")
+	command.Env = append(
+		os.Environ(),
+		"GH_PROMPT_DISABLED=1",
+		"GIT_TERMINAL_PROMPT=0",
+		"NO_COLOR=1",
+	)
 
 	output := git.NewLimitedBuffer(ghOutputLimit)
 

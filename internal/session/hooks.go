@@ -283,7 +283,11 @@ func HookEventEnv(base []string, event HookEvent) []string {
 	return env
 }
 
-func (r *HookRunner) Run(ctx context.Context, cfg config.HookConfig, event HookEvent) (HookResult, error) {
+func (r *HookRunner) Run(
+	ctx context.Context,
+	cfg config.HookConfig,
+	event HookEvent,
+) (HookResult, error) {
 	if err := ctx.Err(); err != nil {
 		canceledErr := oops.In("session").
 			Code("operation_canceled").

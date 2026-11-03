@@ -36,7 +36,12 @@ func TestArtifactVerificationPreservesFinalReadCancellation(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 
-			_, err := verifyArtifactFile(ctx, file, descriptor, cancelArtifactWriter{cancel: cancel, err: outputErr})
+			_, err := verifyArtifactFile(
+				ctx,
+				file,
+				descriptor,
+				cancelArtifactWriter{cancel: cancel, err: outputErr},
+			)
 			if !errors.Is(err, context.Canceled) {
 				t.Fatalf("final read cancellation lost: %v", err)
 			}
@@ -85,5 +90,10 @@ func artifactVerificationFile(t *testing.T, content []byte) (*os.File, model.Art
 		t.Fatal(err)
 	}
 
-	return file, model.Artifact{ID: "a0", Kind: "terminal-text", Length: int64(len(content)), SHA256: digest(content)}
+	return file, model.Artifact{
+		ID:     "a0",
+		Kind:   "terminal-text",
+		Length: int64(len(content)),
+		SHA256: digest(content),
+	}
 }

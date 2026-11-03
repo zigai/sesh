@@ -68,7 +68,8 @@ func ghCell(text, role string, state layout.State) layout.Cell {
 
 func (m *Model) ghEnabled() bool {
 	definition, _ := providers.DefinitionFor(providers.GH)
-	return agentSummariesEnabled(m.config, m.deps) && m.sessionFormats.agentRowsUseAny(definition.Fields...)
+	return agentSummariesEnabled(m.config, m.deps) &&
+		m.sessionFormats.agentRowsUseAny(definition.Fields...)
 }
 
 func (m *Model) ghTickCommand() tea.Cmd {
@@ -124,13 +125,19 @@ func (m *Model) ghTargets() []ghTarget {
 	for _, row := range m.displaySessions {
 		for _, agent := range row.Agents {
 			item, listed := m.inboxItems[inboxKey(agent.Host, agent.PaneID)]
-			if agent.PaneID == "" || (listed && (item.kind == inboxClosedRow || item.kind == inboxMoreRow)) {
+			if agent.PaneID == "" ||
+				(listed && (item.kind == inboxClosedRow || item.kind == inboxMoreRow)) {
 				continue
 			}
 
 			targets = append(targets, ghTarget{
-				paneID: agent.PaneID, key: ghKey{repo: agent.GitRepo, branch: agent.GitBranch},
-				directory: agentGitDirectory(agent), remote: remoteAgentRow(row, agent), hasRemote: agent.GitHasRemote,
+				paneID: agent.PaneID,
+				key:    ghKey{repo: agent.GitRepo, branch: agent.GitBranch},
+				directory: agentGitDirectory(
+					agent,
+				),
+				remote:    remoteAgentRow(row, agent),
+				hasRemote: agent.GitHasRemote,
 			})
 		}
 	}
@@ -138,15 +145,34 @@ func (m *Model) ghTargets() []ghTarget {
 	return targets
 }
 
-func scanGH(ctx context.Context, targets []ghTarget, previous map[ghKey]ghEntry, now time.Time) (map[ghKey]ghEntry, providers.Rows) {
+func scanGH(
+	ctx context.Context,
+	targets []ghTarget,
+	previous map[ghKey]ghEntry,
+	now time.Time,
+) (map[ghKey]ghEntry, providers.Rows) {
 	ghPath, lookupErr := exec.LookPath("gh")
 
-	return scanGHWithQuery(ctx, targets, previous, now, lookupErr == nil, func(ctx context.Context, target ghTarget, at time.Time) ghEntry {
-		return queryGH(ctx, ghPath, target, at)
-	})
+	return scanGHWithQuery(
+		ctx,
+		targets,
+		previous,
+		now,
+		lookupErr == nil,
+		func(ctx context.Context, target ghTarget, at time.Time) ghEntry {
+			return queryGH(ctx, ghPath, target, at)
+		},
+	)
 }
 
-func scanGHWithQuery(ctx context.Context, targets []ghTarget, previous map[ghKey]ghEntry, now time.Time, available bool, query func(context.Context, ghTarget, time.Time) ghEntry) (map[ghKey]ghEntry, providers.Rows) {
+func scanGHWithQuery(
+	ctx context.Context,
+	targets []ghTarget,
+	previous map[ghKey]ghEntry,
+	now time.Time,
+	available bool,
+	query func(context.Context, ghTarget, time.Time) ghEntry,
+) (map[ghKey]ghEntry, providers.Rows) {
 	ctx, cancel := context.WithTimeout(ctx, ghScanBudget)
 	defer cancel()
 
@@ -159,14 +185,28 @@ func scanGHWithQuery(ctx context.Context, targets []ghTarget, previous map[ghKey
 			entries[target.key] = entry
 		}
 
-		rows[target.paneID] = map[string]layout.Cell{display.FieldAgentPR: entry.pr, display.FieldAgentCI: entry.ci}
+		rows[target.paneID] = map[string]layout.Cell{
+			display.FieldAgentPR: entry.pr,
+			display.FieldAgentCI: entry.ci,
+		}
 	}
 
 	return entries, rows
 }
 
-func ghEntryForTarget(ctx context.Context, target ghTarget, entries, previous map[ghKey]ghEntry, now time.Time, available bool, query func(context.Context, ghTarget, time.Time) ghEntry) (ghEntry, bool) {
-	entry := ghEntry{at: time.Time{}, pr: ghCell("", "", layout.Absent), ci: ghCell("", "", layout.Absent)}
+func ghEntryForTarget(
+	ctx context.Context,
+	target ghTarget,
+	entries, previous map[ghKey]ghEntry,
+	now time.Time,
+	available bool,
+	query func(context.Context, ghTarget, time.Time) ghEntry,
+) (ghEntry, bool) {
+	entry := ghEntry{
+		at: time.Time{},
+		pr: ghCell("", "", layout.Absent),
+		ci: ghCell("", "", layout.Absent),
+	}
 	if target.remote || !available || !target.hasRemote {
 		entry.pr.State, entry.ci.State = layout.Unsupported, layout.Unsupported
 		return entry, false
@@ -198,10 +238,26 @@ func queryGH(ctx context.Context, ghPath string, target ghTarget, now time.Time)
 	commandCtx, cancel := context.WithTimeout(ctx, ghCommandBudget)
 	defer cancel()
 
-	command := exec.CommandContext(commandCtx, ghPath, "pr", "list", "--head", target.key.branch, "--json", "number,statusCheckRollup", "--limit", "1")
+	command := exec.CommandContext(
+		commandCtx,
+		ghPath,
+		"pr",
+		"list",
+		"--head",
+		target.key.branch,
+		"--json",
+		"number,statusCheckRollup",
+		"--limit",
+		"1",
+	)
 	command.Dir = target.directory
 
-	command.Env = append(os.Environ(), "GH_PROMPT_DISABLED=1", "GIT_TERMINAL_PROMPT=0", "NO_COLOR=1")
+	command.Env = append(
+		os.Environ(),
+		"GH_PROMPT_DISABLED=1",
+		"GIT_TERMINAL_PROMPT=0",
+		"NO_COLOR=1",
+	)
 	command.WaitDelay = gitWaitDelay
 	output := &boundedBuffer{data: nil, limit: ghOutputLimit}
 

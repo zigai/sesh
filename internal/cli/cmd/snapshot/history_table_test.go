@@ -33,7 +33,12 @@ func renderHistoryForTest(t *testing.T, repoPath string, args ...string) string 
 	var stdout bytes.Buffer
 	cmd.SetOut(&stdout)
 
-	if err := renderHistoryTable(cmd, loadHistoryEntries(t.Context(), repo, catalog, historyLimit(cmd)), len(catalog.Attempts), false); err != nil {
+	if err := renderHistoryTable(
+		cmd,
+		loadHistoryEntries(t.Context(), repo, catalog, historyLimit(cmd)),
+		len(catalog.Attempts),
+		false,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -86,11 +91,21 @@ func TestHistoryShowsOnlyTheNewestAttemptsUnlessAskedForAll(t *testing.T) {
 	}
 
 	limited := renderHistoryForTest(t, repoPath, "--limit", "2")
-	if !strings.Contains(limited, "Showing the newest 2 of 3 save attempts; --all shows every one.") {
+	if !strings.Contains(
+		limited,
+		"Showing the newest 2 of 3 save attempts; --all shows every one.",
+	) {
 		t.Fatalf("a limited history must say how much it hides:\n%s", limited)
 	}
 
-	if all := renderHistoryForTest(t, repoPath, "--all"); strings.Contains(all, "Showing the newest") {
+	if all := renderHistoryForTest(
+		t,
+		repoPath,
+		"--all",
+	); strings.Contains(
+		all,
+		"Showing the newest",
+	) {
 		t.Fatalf("--all must show every attempt:\n%s", all)
 	}
 }

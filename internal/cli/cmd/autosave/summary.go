@@ -57,7 +57,11 @@ func headline(env Env, outcome outcome) string {
 
 		return "Skipped (" + outcome.reason + ")."
 	case "not_due":
-		return fmt.Sprintf("Not due: last save %s ago, saves run every %s.", shortDuration(env.decision.Elapsed), shortDuration(env.interval))
+		return fmt.Sprintf(
+			"Not due: last save %s ago, saves run every %s.",
+			shortDuration(env.decision.Elapsed),
+			shortDuration(env.interval),
+		)
 	case "disabled":
 		return "Autosave is off."
 	case automation.CompletionUncertain:
@@ -80,17 +84,34 @@ func savedHeadline(outcome outcome) string {
 func restoredHeadline(generation, status string, counts restoreCounts) string {
 	var headline strings.Builder
 
-	fmt.Fprintf(&headline, "Restored %s from generation %s.", sessionCount(counts.restored), shortGeneration(generation))
+	fmt.Fprintf(
+		&headline,
+		"Restored %s from generation %s.",
+		sessionCount(counts.restored),
+		shortGeneration(generation),
+	)
 
 	switch {
 	case len(counts.skipped) > 0:
-		fmt.Fprintf(&headline, "\nSkipped %s; sesh snapshot restore shows how to restore them:", sessionCount(len(counts.skipped)))
+		fmt.Fprintf(
+			&headline,
+			"\nSkipped %s; sesh snapshot restore shows how to restore them:",
+			sessionCount(len(counts.skipped)),
+		)
 
 		for _, session := range counts.skipped {
-			fmt.Fprintf(&headline, "\n  %s (%s): %s", session.Name, session.ID, skippedSessionReason(session.Reason))
+			fmt.Fprintf(
+				&headline,
+				"\n  %s (%s): %s",
+				session.Name,
+				session.ID,
+				skippedSessionReason(session.Reason),
+			)
 		}
 	case status != "complete" && status != "best_effort":
-		headline.WriteString("\nThe restored sessions do not fully match the snapshot; sesh snapshot restore --verbose shows the differences.")
+		headline.WriteString(
+			"\nThe restored sessions do not fully match the snapshot; sesh snapshot restore --verbose shows the differences.",
+		)
 	}
 
 	return headline.String()
@@ -132,7 +153,9 @@ func scheduleState(env Env, outcome outcome) string {
 	case outcome.reason == automation.ReasonNeverRun:
 		return every + "; no save recorded yet"
 	case outcome.status == "due":
-		return every + "; last save " + shortDuration(env.decision.Elapsed) + " ago, the next one is due"
+		return every + "; last save " + shortDuration(
+			env.decision.Elapsed,
+		) + " ago, the next one is due"
 	default:
 		return every + "; last save " + shortDuration(env.decision.Elapsed) + " ago"
 	}
@@ -195,7 +218,10 @@ func abandonedLine(count int) string {
 		return ""
 	}
 
-	return fmt.Sprintf("Abandoned %s whose tmux server no longer exists.\n", countNoun(count, "interrupted restore", "interrupted restores"))
+	return fmt.Sprintf(
+		"Abandoned %s whose tmux server no longer exists.\n",
+		countNoun(count, "interrupted restore", "interrupted restores"),
+	)
 }
 
 func restorableLine(outcome outcome) string {
@@ -203,10 +229,18 @@ func restorableLine(outcome outcome) string {
 	case outcome.restorable == 0:
 		return ""
 	case outcome.reason == reasonRestorePending:
-		return countNoun(outcome.restorable, "saved session is", "saved sessions are") + " not running. Restore with: sesh snapshot restore\n" +
+		return countNoun(
+			outcome.restorable,
+			"saved session is",
+			"saved sessions are",
+		) + " not running. Restore with: sesh snapshot restore\n" +
 			"Or keep the current state, which resumes autosave: sesh snapshot save\n"
 	default:
-		return countNoun(outcome.restorable, "saved session", "saved sessions") + " can be restored. Start tmux, then run: sesh snapshot restore\n"
+		return countNoun(
+			outcome.restorable,
+			"saved session",
+			"saved sessions",
+		) + " can be restored. Start tmux, then run: sesh snapshot restore\n"
 	}
 }
 

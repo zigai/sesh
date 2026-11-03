@@ -27,7 +27,30 @@ func TestApplicationRestoreReportsBestEffortWithSettledReceipt(t *testing.T) {
 
 	operationID := "0123456789abcdef0123456789abcdef"
 
-	err := cli.ExecuteApplication(t.Context(), []string{"snapshot", "restore", testRepositoryFlag, repoPath, testLeaseRootFlag, leasePath, testSocketFlag, target.Endpoint().SocketPath, testGenerationFlag, generation, "--operation", operationID, "--no-processes", testConfigFlag, cfg, testJSONFlag}, nil, &stdout, &stderr)
+	err := cli.ExecuteApplication(
+		t.Context(),
+		[]string{
+			"snapshot",
+			"restore",
+			testRepositoryFlag,
+			repoPath,
+			testLeaseRootFlag,
+			leasePath,
+			testSocketFlag,
+			target.Endpoint().SocketPath,
+			testGenerationFlag,
+			generation,
+			"--operation",
+			operationID,
+			"--no-processes",
+			testConfigFlag,
+			cfg,
+			testJSONFlag,
+		},
+		nil,
+		&stdout,
+		&stderr,
+	)
 	if err != nil {
 		t.Fatalf("expected practical restore: %v / %s", err, stderr.String())
 	}
@@ -80,7 +103,16 @@ func assertCompletedRestoreCannotBeAbandoned(t *testing.T, path, id string, befo
 	var stdout, stderr bytes.Buffer
 
 	err := cli.ExecuteApplication(t.Context(), []string{
-		snapshotCmd, "recover", "restore", "abandon", id, testRepositoryFlag, path, testConfigFlag, cfg, testJSONFlag,
+		snapshotCmd,
+		"recover",
+		"restore",
+		"abandon",
+		id,
+		testRepositoryFlag,
+		path,
+		testConfigFlag,
+		cfg,
+		testJSONFlag,
 	}, nil, &stdout, &stderr)
 	if err == nil {
 		t.Fatalf("completed restore was abandoned: %s", stdout.String())
@@ -98,7 +130,18 @@ func checkRestoreOperationCommand(t *testing.T, path, id, command, want string) 
 
 	var stdout, stderr bytes.Buffer
 
-	args := []string{snapshotCmd, "recover", "restore", command, id, testRepositoryFlag, path, testConfigFlag, cfg, testJSONFlag}
+	args := []string{
+		snapshotCmd,
+		"recover",
+		"restore",
+		command,
+		id,
+		testRepositoryFlag,
+		path,
+		testConfigFlag,
+		cfg,
+		testJSONFlag,
+	}
 	if err := cli.ExecuteApplication(t.Context(), args, nil, &stdout, &stderr); err != nil {
 		t.Fatalf("%s: %v / %s", command, err, stderr.String())
 	}
@@ -130,7 +173,20 @@ func captureRemovedSession(t *testing.T, name string) (string, string, string) {
 	repoPath := filepath.Join(t.TempDir(), "repo")
 	leasePath := filepath.Join(t.TempDir(), "leases")
 
-	saved := executeJSON(t, "snapshot", "save", testRepositoryFlag, repoPath, testLeaseRootFlag, leasePath, testSocketFlag, source.Endpoint().SocketPath, string(sessions[0].ID), testNoConfigFlag, testJSONFlag)
+	saved := executeJSON(
+		t,
+		"snapshot",
+		"save",
+		testRepositoryFlag,
+		repoPath,
+		testLeaseRootFlag,
+		leasePath,
+		testSocketFlag,
+		source.Endpoint().SocketPath,
+		string(sessions[0].ID),
+		testNoConfigFlag,
+		testJSONFlag,
+	)
 	if saved.err != nil || !saved.envelope.OK {
 		t.Fatalf("save: %v", saved.err)
 	}
@@ -152,17 +208,48 @@ func TestApplicationRestoreTablePrintsSkippedSessionsOnStdoutWhenItExitsNonZero(
 	repository := filepath.Join(home, "repository")
 	lease := filepath.Join(home, "leases")
 
-	saved := runJSONContract(t, "snapshot.save", "snapshot", "save", testSocketFlag, socket, testRepositoryFlag, repository, testLeaseRootFlag, lease, string(kept.ID()))
+	saved := runJSONContract(
+		t,
+		"snapshot.save",
+		"snapshot",
+		"save",
+		testSocketFlag,
+		socket,
+		testRepositoryFlag,
+		repository,
+		testLeaseRootFlag,
+		lease,
+		string(kept.ID()),
+	)
 	generation := contractJSONValue[string](t, saved, "generation")
 
-	stdout, stderr, err := executeCommand(t, "snapshot", "restore", testSocketFlag, socket, testRepositoryFlag, repository, testLeaseRootFlag, lease, testGenerationFlag, generation, "--no-processes", testNoConfigFlag)
+	stdout, stderr, err := executeCommand(
+		t,
+		"snapshot",
+		"restore",
+		testSocketFlag,
+		socket,
+		testRepositoryFlag,
+		repository,
+		testLeaseRootFlag,
+		lease,
+		testGenerationFlag,
+		generation,
+		"--no-processes",
+		testNoConfigFlag,
+	)
 	if err == nil {
 		t.Fatalf("a restore that created nothing must exit non-zero, stdout=%q", stdout)
 	}
 
 	for _, want := range []string{"Skipped:", "autosave-alpha (", "a live session already uses this name"} {
 		if !strings.Contains(stdout, want) {
-			t.Fatalf("the result table must reach stdout even when the command fails; missing %q in stdout=%q stderr=%q", want, stdout, stderr)
+			t.Fatalf(
+				"the result table must reach stdout even when the command fails; missing %q in stdout=%q stderr=%q",
+				want,
+				stdout,
+				stderr,
+			)
 		}
 	}
 }

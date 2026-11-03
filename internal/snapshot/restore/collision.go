@@ -26,12 +26,17 @@ type Collision struct {
 // create anything over a collision.
 func FindCollisions(ctx context.Context, server *gotmux.Server, plan Plan) ([]Collision, error) {
 	if server == nil {
-		return nil, oops.In("snapshot.restore").Code("endpoint_required").Wrap(tmuxserver.ErrEndpoint)
+		return nil, oops.In("snapshot.restore").
+			Code("endpoint_required").
+			Wrap(tmuxserver.ErrEndpoint)
 	}
 
 	live, err := server.Sessions(ctx)
 	if err != nil {
-		return nil, oops.In("snapshot.restore").Code("endpoint_required").With("operation", "find_collisions").Wrapf(err, "query live sessions")
+		return nil, oops.In("snapshot.restore").
+			Code("endpoint_required").
+			With("operation", "find_collisions").
+			Wrapf(err, "query live sessions")
 	}
 
 	liveNames, liveGroups := liveSessionNamespaces(live)
@@ -43,7 +48,10 @@ func FindCollisions(ctx context.Context, server *gotmux.Server, plan Plan) ([]Co
 		collisions = append(collisions, Collision{SessionID: id, Reason: reason})
 	}
 
-	sort.Slice(collisions, func(i, j int) bool { return collisions[i].SessionID < collisions[j].SessionID })
+	sort.Slice(
+		collisions,
+		func(i, j int) bool { return collisions[i].SessionID < collisions[j].SessionID },
+	)
 
 	return collisions, nil
 }

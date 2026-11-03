@@ -19,15 +19,21 @@ func TestModelConstructorsRejectNilConfigAndState(t *testing.T) {
 		new  func(*config.Config, *session.State) (*Model, error)
 	}{
 		{name: "newModel", new: newModel},
-		{name: "newModelWithDeps", new: func(cfg *config.Config, st *session.State) (*Model, error) {
-			return newModelWithDeps(cfg, st, Dependencies{})
-		}},
+		{
+			name: "newModelWithDeps",
+			new: func(cfg *config.Config, st *session.State) (*Model, error) {
+				return newModelWithDeps(cfg, st, Dependencies{})
+			},
+		},
 		{name: "NewPopupModel", new: func(cfg *config.Config, st *session.State) (*Model, error) {
 			return NewPopupModel(context.Background(), cfg, st, testServices(Dependencies{}))
 		}},
-		{name: "newModelWithTestContext", new: func(cfg *config.Config, st *session.State) (*Model, error) {
-			return newModelWithTestContext(context.Background(), cfg, st, Dependencies{})
-		}},
+		{
+			name: "newModelWithTestContext",
+			new: func(cfg *config.Config, st *session.State) (*Model, error) {
+				return newModelWithTestContext(context.Background(), cfg, st, Dependencies{})
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -93,7 +99,12 @@ func TestModelDetectsPresentationMode(t *testing.T) {
 		{name: "standalone outside tmux", inside: false, want: modeFullscreen},
 		{name: "inline inside tmux", inside: true, want: modeInline},
 		{name: "popup inside tmux", inside: true, popup: true, want: modePopup},
-		{name: "popup flag outside tmux stays standalone", inside: false, popup: true, want: modeFullscreen},
+		{
+			name:   "popup flag outside tmux stays standalone",
+			inside: false,
+			popup:  true,
+			want:   modeFullscreen,
+		},
 	}
 
 	for _, test := range tests {

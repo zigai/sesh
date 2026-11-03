@@ -75,11 +75,14 @@ func TestRuntimeReporterReturnsVerifiedLiveState(t *testing.T) {
 func assertRunningRuntimeStatus(t *testing.T, status RuntimeStatus) {
 	t.Helper()
 
-	if status.Phase != RuntimePhaseRunning || !status.InhibitorsHeld || status.LogindDelayMillis != 3000 {
+	if status.Phase != RuntimePhaseRunning || !status.InhibitorsHeld ||
+		status.LogindDelayMillis != 3000 {
 		t.Fatalf("status = %+v", status)
 	}
 
-	if status.ServerManagement != ServerManagementUnknown || status.PID != os.Getpid() || status.BootID == "" || status.ProcessStartTicks == 0 {
+	if status.ServerManagement != ServerManagementUnknown || status.PID != os.Getpid() ||
+		status.BootID == "" ||
+		status.ProcessStartTicks == 0 {
 		t.Fatalf("identity = %+v", status)
 	}
 }
@@ -101,7 +104,11 @@ func TestRuntimeReporterRejectsSecondActiveOwner(t *testing.T) {
 
 	t.Cleanup(func() { _ = first.Close() })
 
-	if second, err := StartRuntimeReporter(t.Context(), config); !errors.Is(err, ErrRuntimeStatusActive) || second != nil {
+	if second, err := StartRuntimeReporter(
+		t.Context(),
+		config,
+	); !errors.Is(err, ErrRuntimeStatusActive) ||
+		second != nil {
 		if second != nil {
 			_ = second.Close()
 		}
@@ -232,7 +239,10 @@ func TestQueryRuntimeStatusRejectsReporterForAnotherEndpoint(t *testing.T) {
 	runtimeDir := shortRuntimeDir(t)
 	endpointB := filepath.Join(runtimeDir, "tmux-b.sock")
 
-	reporter, err := StartRuntimeReporter(t.Context(), validRuntimeConfig(runtimeDir, endpointB, nil))
+	reporter, err := StartRuntimeReporter(
+		t.Context(),
+		validRuntimeConfig(runtimeDir, endpointB, nil),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,12 +268,15 @@ func TestRuntimeReporterRejectsTornPhaseResponse(t *testing.T) {
 	probeStarted := make(chan struct{})
 	releaseProbe := make(chan struct{})
 
-	reporter, err := StartRuntimeReporter(t.Context(), validRuntimeConfig(runtimeDir, endpoint, func(context.Context) (RuntimeLiveStatus, error) {
-		close(probeStarted)
-		<-releaseProbe
+	reporter, err := StartRuntimeReporter(
+		t.Context(),
+		validRuntimeConfig(runtimeDir, endpoint, func(context.Context) (RuntimeLiveStatus, error) {
+			close(probeStarted)
+			<-releaseProbe
 
-		return RuntimeLiveStatus{InhibitorsHeld: true}, nil
-	}))
+			return RuntimeLiveStatus{InhibitorsHeld: true}, nil
+		}),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -401,12 +414,24 @@ func TestQueryRuntimeStatusRejectsInvalidBudget(t *testing.T) {
 }
 
 func TestRuntimeStatusPathRejectsUnboundedOrRelativeInput(t *testing.T) {
-	if _, err := RuntimeStatusPath("relative", "/tmp/tmux.sock"); !errors.Is(err, ErrRuntimeStatusPath) {
+	if _, err := RuntimeStatusPath(
+		"relative",
+		"/tmp/tmux.sock",
+	); !errors.Is(
+		err,
+		ErrRuntimeStatusPath,
+	) {
 		t.Fatalf("relative runtime path error = %v", err)
 	}
 
 	longRuntime := "/tmp/" + strings.Repeat("x", linuxUnixPathMaximum)
-	if _, err := RuntimeStatusPath(longRuntime, "/tmp/tmux.sock"); !errors.Is(err, ErrRuntimeStatusPath) {
+	if _, err := RuntimeStatusPath(
+		longRuntime,
+		"/tmp/tmux.sock",
+	); !errors.Is(
+		err,
+		ErrRuntimeStatusPath,
+	) {
 		t.Fatalf("long runtime path error = %v", err)
 	}
 }
@@ -432,8 +457,19 @@ func TestValidateRuntimeStatusRejectsNonUnknownServerManagement(t *testing.T) {
 		status := validStatus
 		status.ServerManagement = invalidManagement
 
-		if err := validateRuntimeStatus(status, 1234, status.EndpointID); !errors.Is(err, ErrRuntimeStatusIdentity) {
-			t.Errorf("validateRuntimeStatus with management %q = %v, want ErrRuntimeStatusIdentity", invalidManagement, err)
+		if err := validateRuntimeStatus(
+			status,
+			1234,
+			status.EndpointID,
+		); !errors.Is(
+			err,
+			ErrRuntimeStatusIdentity,
+		) {
+			t.Errorf(
+				"validateRuntimeStatus with management %q = %v, want ErrRuntimeStatusIdentity",
+				invalidManagement,
+				err,
+			)
 		}
 	}
 }

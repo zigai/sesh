@@ -133,7 +133,8 @@ func isolate(root string) error {
 }
 
 func isTestControl(name string) bool {
-	return strings.HasSuffix(name, integrationRequiredSuffix) || strings.HasPrefix(name, goldenUpdatePrefix)
+	return strings.HasSuffix(name, integrationRequiredSuffix) ||
+		strings.HasPrefix(name, goldenUpdatePrefix)
 }
 
 func setDirectories(root string, keepSet bool) error {

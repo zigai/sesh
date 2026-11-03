@@ -34,12 +34,40 @@ func TestResolveFindsTheProjectOfADirectory(t *testing.T) {
 		want project.Project
 	}{
 		{"repository root", repo, project.Project{Root: repo, Name: "shop", Kind: project.KindGit}},
-		{"repository subdirectory", nested, project.Project{Root: repo, Name: "shop", Kind: project.KindGit}},
-		{"linked worktree", worktree, project.Project{Root: repo, Name: "shop", Kind: project.KindGit}},
-		{"symlink to repository", symlink, project.Project{Root: repo, Name: "shop", Kind: project.KindGit}},
-		{"registered folder", filepath.Join(base, "notes", "daily"), project.Project{Root: filepath.Join(base, "notes"), Name: "notes", Kind: project.KindFolder}},
-		{"registered folder inside repository", docs, project.Project{Root: docs, Name: "docs", Kind: project.KindFolder}},
-		{"repository inside registered folder", vendored, project.Project{Root: vendored, Name: "vendored", Kind: project.KindGit}},
+		{
+			"repository subdirectory",
+			nested,
+			project.Project{Root: repo, Name: "shop", Kind: project.KindGit},
+		},
+		{
+			"linked worktree",
+			worktree,
+			project.Project{Root: repo, Name: "shop", Kind: project.KindGit},
+		},
+		{
+			"symlink to repository",
+			symlink,
+			project.Project{Root: repo, Name: "shop", Kind: project.KindGit},
+		},
+		{
+			"registered folder",
+			filepath.Join(base, "notes", "daily"),
+			project.Project{
+				Root: filepath.Join(base, "notes"),
+				Name: "notes",
+				Kind: project.KindFolder,
+			},
+		},
+		{
+			"registered folder inside repository",
+			docs,
+			project.Project{Root: docs, Name: "docs", Kind: project.KindFolder},
+		},
+		{
+			"repository inside registered folder",
+			vendored,
+			project.Project{Root: vendored, Name: "vendored", Kind: project.KindGit},
+		},
 	}
 
 	for _, tt := range tests {
@@ -106,7 +134,12 @@ func TestListFailsOnAMissingRoot(t *testing.T) {
 }
 
 func TestNewCatalogRejectsRelativePaths(t *testing.T) {
-	if _, err := project.NewCatalog(config.ProjectsConfig{Roots: []string{"code"}, Extra: nil, Overrides: nil}); !errors.Is(err, project.ErrPathInvalid) {
+	if _, err := project.NewCatalog(
+		config.ProjectsConfig{Roots: []string{"code"}, Extra: nil, Overrides: nil},
+	); !errors.Is(
+		err,
+		project.ErrPathInvalid,
+	) {
 		t.Fatalf("NewCatalog() error = %v, want ErrPathInvalid", err)
 	}
 }
@@ -114,7 +147,9 @@ func TestNewCatalogRejectsRelativePaths(t *testing.T) {
 func newCatalog(t *testing.T, roots, extra []string) project.Catalog {
 	t.Helper()
 
-	catalog, err := project.NewCatalog(config.ProjectsConfig{Roots: roots, Extra: extra, Overrides: nil})
+	catalog, err := project.NewCatalog(
+		config.ProjectsConfig{Roots: roots, Extra: extra, Overrides: nil},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +183,19 @@ func initRepository(t *testing.T, dir string) string {
 
 	mkdir(t, dir)
 	runGit(t, dir, "init", "-q", "-b", "main")
-	runGit(t, dir, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-q", "--allow-empty", "-m", "init")
+	runGit(
+		t,
+		dir,
+		"-c",
+		"user.name=Test",
+		"-c",
+		"user.email=test@example.com",
+		"commit",
+		"-q",
+		"--allow-empty",
+		"-m",
+		"init",
+	)
 
 	return dir
 }

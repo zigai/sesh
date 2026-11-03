@@ -33,7 +33,11 @@ func TestAgentsPopupHoverKeepsVisibleSessionHeadingInPlace(t *testing.T) {
 	}
 
 	configPath := filepath.Join(root, "picker.toml")
-	if err := os.WriteFile(configPath, []byte("[agent_sessions]\npopup_sort = \"name\"\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		configPath,
+		[]byte("[agent_sessions]\npopup_sort = \"name\"\n"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -53,16 +57,47 @@ func TestAgentsPopupHoverKeepsVisibleSessionHeadingInPlace(t *testing.T) {
 		stopCtx, stopCancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer stopCancel()
 
-		_ = exec.CommandContext(stopCtx, termtraceExecutable, "stop", "-q", alias, "--wait", "--timeout-ms", "1500").Run()
+		_ = exec.CommandContext(stopCtx, termtraceExecutable, "stop", "-q", alias, "--wait", "--timeout-ms", "1500").
+			Run()
 	})
 
-	record := exec.CommandContext(ctx, termtraceExecutable,
-		"record", "-d", alias, "--out", evidencePath, "--cols", "80", "--rows", "9",
-		"--until-screen", "heading-session-bravo", "--timeout", "8s", "--max-duration", "20s", "--no-input",
-		executable, "-test.run=^TestPickerApplicationHelper$", "--", "pick", "--ui", "popup",
-		"--config", configPath, testSocketFlag, fixture.socket,
-		testRepositoryFlag, fixture.repository, "--lease-root", fixture.leaseRoot,
-		"--history", fixture.historyPath, "--agent-state", registryPath,
+	record := exec.CommandContext(
+		ctx,
+		termtraceExecutable,
+		"record",
+		"-d",
+		alias,
+		"--out",
+		evidencePath,
+		"--cols",
+		"80",
+		"--rows",
+		"9",
+		"--until-screen",
+		"heading-session-bravo",
+		"--timeout",
+		"8s",
+		"--max-duration",
+		"20s",
+		"--no-input",
+		executable,
+		"-test.run=^TestPickerApplicationHelper$",
+		"--",
+		"pick",
+		"--ui",
+		"popup",
+		"--config",
+		configPath,
+		testSocketFlag,
+		fixture.socket,
+		testRepositoryFlag,
+		fixture.repository,
+		"--lease-root",
+		fixture.leaseRoot,
+		"--history",
+		fixture.historyPath,
+		"--agent-state",
+		registryPath,
 	)
 
 	record.Env = append(pickerEnvironmentWithout(os.Environ(), "NO_COLOR", "TERM"),
@@ -84,7 +119,11 @@ func TestAgentsPopupHoverKeepsVisibleSessionHeadingInPlace(t *testing.T) {
 		assertHeadingHoverRows(t, after)
 
 		if !strings.Contains(after[6], "▌") {
-			t.Fatalf("hover motion %d did not select the visible session heading: %s", motion+1, after[6])
+			t.Fatalf(
+				"hover motion %d did not select the visible session heading: %s",
+				motion+1,
+				after[6],
+			)
 		}
 	}
 
@@ -99,7 +138,8 @@ func assertHeadingHoverRows(t *testing.T, screen []string) {
 		"heading-session-alpha", "a0 Omp", "a1 Omp", "a2 Omp", "heading-session-bravo",
 	} {
 		row := index + 2
-		if row >= len(screen) || !strings.Contains(strings.Join(strings.Fields(screen[row]), " "), name) {
+		if row >= len(screen) ||
+			!strings.Contains(strings.Join(strings.Fields(screen[row]), " "), name) {
 			t.Fatalf("expected %q at row %d\n%s", name, row+1, strings.Join(screen, "\n"))
 		}
 	}
@@ -120,7 +160,8 @@ func prepareHeadingHoverRegistry(t *testing.T, fixture *cliSessionFixture, root 
 		}
 
 		for range 2 {
-			if _, err := panes[0].Handle().Split(t.Context(), gotmux.SplitOptions{Direction: gotmux.DirectionVertical}); err != nil {
+			if _, err := panes[0].Handle().
+				Split(t.Context(), gotmux.SplitOptions{Direction: gotmux.DirectionVertical}); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -133,9 +174,15 @@ func prepareHeadingHoverRegistry(t *testing.T, fixture *cliSessionFixture, root 
 		for index, pane := range panes {
 			id := fmt.Sprintf("%s%d", name[:1], index)
 			records[id] = map[string]any{
-				"schema_version": 3, "id": id, "harness": "omp", "liveness": map[string]any{"kind": "live", "activity": "running"},
-				"session_id": id, "created_at": now, "updated_at": now,
-				"presence_changed_at": now, "activity_changed_at": now,
+				"schema_version":      3,
+				"id":                  id,
+				"harness":             "omp",
+				"liveness":            map[string]any{"kind": "live", "activity": "running"},
+				"session_id":          id,
+				"created_at":          now,
+				"updated_at":          now,
+				"presence_changed_at": now,
+				"activity_changed_at": now,
 				"location": map[string]any{
 					"kind": "tmux", "server_id": fixture.socket, "session_id": string(live.ID),
 					"session_name": live.Name, "window_id": string(pane.WindowID),
@@ -145,7 +192,9 @@ func prepareHeadingHoverRegistry(t *testing.T, fixture *cliSessionFixture, root 
 		}
 	}
 
-	encoded, err := json.Marshal(map[string]any{"schema_version": 3, "revision": 1, "sessions": records})
+	encoded, err := json.Marshal(
+		map[string]any{"schema_version": 3, "revision": 1, "sessions": records},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

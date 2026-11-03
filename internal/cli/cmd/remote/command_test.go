@@ -26,7 +26,11 @@ func TestRunRemoteLookupMissingTargetErrorWrapping(t *testing.T) {
 id = "workstation"
 host = "10.0.0.1"
 `
-	if err := os.WriteFile(filepath.Join(configDir, "config.toml"), []byte(configContent), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(configDir, "config.toml"),
+		[]byte(configContent),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 

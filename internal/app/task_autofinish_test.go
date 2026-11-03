@@ -75,20 +75,34 @@ func runFinishTicks(t *testing.T, results ...error) []map[string]any {
 
 var (
 	scanFailed = map[string]any{
-		"level": "warn", "component": "task", "operation": "finish_merged_tasks", "status": "degraded",
-		"reason": "task_scan_failed", "message": "periodic merged task finish failed", "error": errPrivateScan.Error(),
+		"level":     "warn",
+		"component": "task",
+		"operation": "finish_merged_tasks",
+		"status":    "degraded",
+		"reason":    "task_scan_failed",
+		"message":   "periodic merged task finish failed",
+		"error":     errPrivateScan.Error(),
 	}
 	scanRecovered = map[string]any{
-		"level": "info", "component": "task", "operation": "finish_merged_tasks", "status": "recovered",
-		"message": "periodic merged task finish recovered",
+		"level":     "info",
+		"component": "task",
+		"operation": "finish_merged_tasks",
+		"status":    "recovered",
+		"message":   "periodic merged task finish recovered",
 	}
 )
 
 func TestRepeatedMergedTaskScanFailuresLogOneRecordPerStreak(t *testing.T) {
 	records := runFinishTicks(t, errPrivateScan, errPrivateScan, nil, errPrivateScan, nil)
 
-	if !reflect.DeepEqual(records, []map[string]any{scanFailed, scanRecovered, scanFailed, scanRecovered}) {
-		t.Errorf("records = %#v, want a degraded and a recovered record for each of the two failing streaks", records)
+	if !reflect.DeepEqual(
+		records,
+		[]map[string]any{scanFailed, scanRecovered, scanFailed, scanRecovered},
+	) {
+		t.Errorf(
+			"records = %#v, want a degraded and a recovered record for each of the two failing streaks",
+			records,
+		)
 	}
 }
 
@@ -104,12 +118,24 @@ func TestMergedTaskFinishOutcomesLogTheirReasonWithoutDetails(t *testing.T) {
 		level string
 		want  map[string]any
 	}{
-		{nil, "info", map[string]any{"status": "ok", "message": "finished a task whose pull request merged"}},
 		{
-			fmt.Errorf("PRIVATE_TASK: %w", &task.LossError{UnmergedCommits: 1, ChangedFiles: 0, ClosedUnmerged: false}), "warn",
+			nil,
+			"info",
+			map[string]any{"status": "ok", "message": "finished a task whose pull request merged"},
+		},
+		{
+			fmt.Errorf(
+				"PRIVATE_TASK: %w",
+				&task.LossError{UnmergedCommits: 1, ChangedFiles: 0, ClosedUnmerged: false},
+			),
+			"warn",
 			map[string]any{"status": "degraded", "reason": "would_lose_work"},
 		},
-		{&task.FinishRunError{ExitCode: 3}, "warn", map[string]any{"status": "degraded", "reason": "finish_run_failed"}},
+		{
+			&task.FinishRunError{ExitCode: 3},
+			"warn",
+			map[string]any{"status": "degraded", "reason": "finish_run_failed"},
+		},
 		{
 			errors.Join(errWorkNotFinished, errPrivateStore), "warn",
 			map[string]any{"status": "degraded", "reason": "work_not_finished"},
@@ -122,7 +148,12 @@ func TestMergedTaskFinishOutcomesLogTheirReasonWithoutDetails(t *testing.T) {
 
 		logMergedTaskFinish(zerolog.New(&logs).WithContext(t.Context()), "task-1", test.err)
 
-		want := map[string]any{"level": test.level, "component": "task", "operation": "finish_merged_task", "task_id": "task-1"}
+		want := map[string]any{
+			"level":     test.level,
+			"component": "task",
+			"operation": "finish_merged_task",
+			"task_id":   "task-1",
+		}
 		maps.Copy(want, test.want)
 
 		if want["reason"] != nil {
@@ -130,8 +161,17 @@ func TestMergedTaskFinishOutcomesLogTheirReasonWithoutDetails(t *testing.T) {
 			want["error"] = test.err.Error()
 		}
 
-		if records := decodeRecords(t, &logs); len(records) != 1 || !reflect.DeepEqual(records[0], want) {
-			t.Errorf("logMergedTaskFinish(%v) records = %#v, want only %#v", test.err, records, want)
+		if records := decodeRecords(
+			t,
+			&logs,
+		); len(records) != 1 ||
+			!reflect.DeepEqual(records[0], want) {
+			t.Errorf(
+				"logMergedTaskFinish(%v) records = %#v, want only %#v",
+				test.err,
+				records,
+				want,
+			)
 		}
 	}
 }

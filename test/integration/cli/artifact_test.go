@@ -103,7 +103,9 @@ func TestBuiltArtifactTaskActionReloadsSelectedConfig(t *testing.T) {
 	}
 }
 
-func newTaskActionArtifactFixture(t *testing.T) (artifactBinaryFixture, *gotmux.Server, *gotmux.Server, task.Store) {
+func newTaskActionArtifactFixture(
+	t *testing.T,
+) (artifactBinaryFixture, *gotmux.Server, *gotmux.Server, task.Store) {
 	t.Helper()
 
 	fixture := newArtifactBinaryFixture(t)
@@ -155,14 +157,23 @@ func newTaskActionArtifactFixture(t *testing.T) (artifactBinaryFixture, *gotmux.
 	return fixture, server, popup, store
 }
 
-func runConfiguredTaskAction(t *testing.T, fixture artifactBinaryFixture, server, popup *gotmux.Server, store task.Store, selection string) {
+func runConfiguredTaskAction(
+	t *testing.T,
+	fixture artifactBinaryFixture,
+	server, popup *gotmux.Server,
+	store task.Store,
+	selection string,
+) {
 	t.Helper()
 
 	directory := t.TempDir()
 	marker := filepath.Join(directory, "action-marker")
 	configPath := filepath.Join(fixture.workDir, selection+" config.toml")
 
-	source := fmt.Sprintf("[tasks]\npopup_socket = 'actions'\n[menu.items.mark]\nrun = ['/bin/sh', '-c', 'printf selected > \"$1\"', 'mark', %q]\n", marker)
+	source := fmt.Sprintf(
+		"[tasks]\npopup_socket = 'actions'\n[menu.items.mark]\nrun = ['/bin/sh', '-c', 'printf selected > \"$1\"', 'mark', %q]\n",
+		marker,
+	)
 	if err := os.WriteFile(configPath, []byte(source), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -184,9 +195,22 @@ func runConfiguredTaskAction(t *testing.T, fixture artifactBinaryFixture, server
 		t.Fatal(err)
 	}
 
-	command := exec.CommandContext(t.Context(), fixture.binary, "task", "run", record.ID, "mark", "--socket", server.Endpoint().SocketPath, "--config", configPath)
+	command := exec.CommandContext(
+		t.Context(),
+		fixture.binary,
+		"task",
+		"run",
+		record.ID,
+		"mark",
+		"--socket",
+		server.Endpoint().SocketPath,
+		"--config",
+		configPath,
+	)
 
-	command.Dir, command.Env, command.Stdin = fixture.workDir, fixture.env, strings.NewReader(source)
+	command.Dir, command.Env, command.Stdin = fixture.workDir, fixture.env, strings.NewReader(
+		source,
+	)
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("start task action: %v\n%s", err, output)
 	}
@@ -194,7 +218,13 @@ func runConfiguredTaskAction(t *testing.T, fixture artifactBinaryFixture, server
 	waitForTaskActionResult(t, popup, store, record, marker)
 }
 
-func waitForTaskActionResult(t *testing.T, popup *gotmux.Server, store task.Store, record task.Record, marker string) {
+func waitForTaskActionResult(
+	t *testing.T,
+	popup *gotmux.Server,
+	store task.Store,
+	record task.Record,
+	marker string,
+) {
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
@@ -235,7 +265,11 @@ func waitForTaskActionResult(t *testing.T, popup *gotmux.Server, store task.Stor
 				output = append(output, captured...)
 			}
 
-			t.Fatalf("spawned task action did not finish: runs=%+v; popup output:\n%s", finished.Runs, output)
+			t.Fatalf(
+				"spawned task action did not finish: runs=%+v; popup output:\n%s",
+				finished.Runs,
+				output,
+			)
 		}
 	}
 }
@@ -268,7 +302,15 @@ func newArtifactBinaryFixture(t *testing.T) artifactBinaryFixture {
 		}
 	}
 
-	build := exec.CommandContext(t.Context(), "go", "build", "-mod=readonly", "-o", binary, "./cmd/sesh")
+	build := exec.CommandContext(
+		t.Context(),
+		"go",
+		"build",
+		"-mod=readonly",
+		"-o",
+		binary,
+		"./cmd/sesh",
+	)
 	build.Dir = repositoryRoot
 	build.Env = environmentWithGOWORKOff()
 
@@ -322,7 +364,9 @@ func assertArtifactUsesPublishedGotmux(t *testing.T, binary string) {
 			continue
 		}
 
-		if dependency.Version != artifactExpectedGotmuxVersion || dependency.Sum != artifactExpectedGotmuxSum || dependency.Replace != nil {
+		if dependency.Version != artifactExpectedGotmuxVersion ||
+			dependency.Sum != artifactExpectedGotmuxSum ||
+			dependency.Replace != nil {
 			t.Fatalf(
 				"artifact gotmux dependency = %s sum=%s replace=%v, want published %s %s",
 				dependency.Version, dependency.Sum, dependency.Replace,
@@ -365,7 +409,10 @@ func newArtifactSource(t *testing.T) (*gotmux.Server, gotmux.Session, artifactSe
 		t.Fatalf("observe initial source pane: %v", err)
 	}
 
-	if _, err := firstPane.Split(t.Context(), gotmux.SplitOptions{Direction: gotmux.DirectionVertical}); err != nil {
+	if _, err := firstPane.Split(
+		t.Context(),
+		gotmux.SplitOptions{Direction: gotmux.DirectionVertical},
+	); err != nil {
 		t.Fatalf("split source window: %v", err)
 	}
 
@@ -381,7 +428,11 @@ func newArtifactSource(t *testing.T) (*gotmux.Server, gotmux.Session, artifactSe
 	return server, session, observeArtifactSession(t, server, "artifact-native-source")
 }
 
-func observeArtifactSession(t *testing.T, server *gotmux.Server, name string) artifactSessionStructure {
+func observeArtifactSession(
+	t *testing.T,
+	server *gotmux.Server,
+	name string,
+) artifactSessionStructure {
 	t.Helper()
 
 	session, err := server.FindSession(t.Context(), name)
@@ -394,7 +445,10 @@ func observeArtifactSession(t *testing.T, server *gotmux.Server, name string) ar
 		t.Fatalf("observe session windows: %v", err)
 	}
 
-	structure := artifactSessionStructure{Name: name, Windows: make([]artifactWindowStructure, 0, len(links))}
+	structure := artifactSessionStructure{
+		Name:    name,
+		Windows: make([]artifactWindowStructure, 0, len(links)),
+	}
 	for _, link := range links {
 		info, err := link.Info(t.Context())
 		if err != nil {
@@ -419,11 +473,17 @@ func observeArtifactSession(t *testing.T, server *gotmux.Server, name string) ar
 			})
 		}
 
-		slices.SortFunc(window.Panes, func(left, right artifactPaneStructure) int { return left.Index - right.Index })
+		slices.SortFunc(
+			window.Panes,
+			func(left, right artifactPaneStructure) int { return left.Index - right.Index },
+		)
 		structure.Windows = append(structure.Windows, window)
 	}
 
-	slices.SortFunc(structure.Windows, func(left, right artifactWindowStructure) int { return left.Index - right.Index })
+	slices.SortFunc(
+		structure.Windows,
+		func(left, right artifactWindowStructure) int { return left.Index - right.Index },
+	)
 
 	return structure
 }
@@ -453,7 +513,10 @@ func saveThroughArtifact(
 	envelope := decodeArtifactEnvelope(t, stdout)
 
 	result := decodeJSONPayload[snapshotSaveResultJSON](t, envelope.Result)
-	if envelope.Command != "snapshot.save" || !envelope.OK || envelope.Error != nil || result.Status != "best_effort" || result.Generation == "" || result.Attempt == "" {
+	if envelope.Command != "snapshot.save" || !envelope.OK || envelope.Error != nil ||
+		result.Status != "best_effort" ||
+		result.Generation == "" ||
+		result.Attempt == "" {
 		t.Fatalf("artifact save lost practical receipt: envelope=%+v result=%+v", envelope, result)
 	}
 
@@ -486,8 +549,16 @@ func restoreThroughArtifact(
 	envelope := decodeArtifactEnvelope(t, stdout)
 
 	result := decodeJSONPayload[snapshotRestoreResultJSON](t, envelope.Result)
-	if envelope.Command != "snapshot.restore" || !envelope.OK || envelope.Error != nil || result.OperationID == "" || result.Generation != generation || result.Status != "best_effort" || !result.Verified {
-		t.Fatalf("artifact restore lost practical operation receipt: envelope=%+v result=%+v", envelope, result)
+	if envelope.Command != "snapshot.restore" || !envelope.OK || envelope.Error != nil ||
+		result.OperationID == "" ||
+		result.Generation != generation ||
+		result.Status != "best_effort" ||
+		!result.Verified {
+		t.Fatalf(
+			"artifact restore lost practical operation receipt: envelope=%+v result=%+v",
+			envelope,
+			result,
+		)
 	}
 
 	got := observeArtifactSession(t, target, want.Name)
@@ -503,7 +574,11 @@ func rejectCorruptRepositoryWithoutTargetMutation(
 ) {
 	t.Helper()
 
-	if err := os.WriteFile(filepath.Join(repository, "catalog.json"), []byte("pane\tlegacy\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(repository, "catalog.json"),
+		[]byte("pane\tlegacy\n"),
+		0o600,
+	); err != nil {
 		t.Fatalf("replace native catalog with non-native bytes: %v", err)
 	}
 
@@ -525,7 +600,9 @@ func rejectCorruptRepositoryWithoutTargetMutation(
 	}
 
 	envelope := decodeArtifactEnvelope(t, stderr)
-	if envelope.Command != "snapshot.restore" || envelope.OK || envelope.Error == nil || envelope.Error.Code != "repositoryCorrupt" || envelope.Error.ExitCode != exitCodeGeneral {
+	if envelope.Command != "snapshot.restore" || envelope.OK || envelope.Error == nil ||
+		envelope.Error.Code != "repositoryCorrupt" ||
+		envelope.Error.ExitCode != exitCodeGeneral {
 		t.Fatalf("corrupt repository was not rejected: %+v", envelope)
 	}
 
@@ -558,7 +635,10 @@ func artifactServerIdentity(t *testing.T, server *gotmux.Server) []string {
 				t.Fatalf("observe target link: %v", err)
 			}
 
-			identity = append(identity, fmt.Sprintf("window:%s:%s:%d", info.WindowID, info.WindowName, info.Index))
+			identity = append(
+				identity,
+				fmt.Sprintf("window:%s:%s:%d", info.WindowID, info.WindowName, info.Index),
+			)
 
 			panes, err := link.Window().Panes(t.Context())
 			if err != nil {
@@ -566,7 +646,18 @@ func artifactServerIdentity(t *testing.T, server *gotmux.Server) []string {
 			}
 
 			for _, pane := range panes {
-				identity = append(identity, fmt.Sprintf("pane:%s:%d:%d:%d:%d:%d", pane.ID, pane.Index, pane.Left, pane.Top, pane.Width, pane.Height))
+				identity = append(
+					identity,
+					fmt.Sprintf(
+						"pane:%s:%d:%d:%d:%d:%d",
+						pane.ID,
+						pane.Index,
+						pane.Left,
+						pane.Top,
+						pane.Width,
+						pane.Height,
+					),
+				)
 			}
 		}
 	}
@@ -591,7 +682,13 @@ func (fixture artifactBinaryFixture) runExitOne(t *testing.T, args ...string) ([
 
 	exitErr, ok := errors.AsType[*exec.ExitError](err)
 	if !ok || exitErr.ExitCode() != exitCodeGeneral {
-		t.Fatalf("artifact command exit = %v, want %d; stdout=%s stderr=%s", err, exitCodeGeneral, stdout.String(), stderr.String())
+		t.Fatalf(
+			"artifact command exit = %v, want %d; stdout=%s stderr=%s",
+			err,
+			exitCodeGeneral,
+			stdout.String(),
+			stderr.String(),
+		)
 	}
 
 	return stdout.Bytes(), stderr.Bytes()
@@ -609,7 +706,12 @@ func (fixture artifactBinaryFixture) runSuccess(t *testing.T, args ...string) ([
 	command.Stderr = &stderr
 
 	if err := command.Run(); err != nil {
-		t.Fatalf("artifact command failed: %v; stdout=%s stderr=%s", err, stdout.String(), stderr.String())
+		t.Fatalf(
+			"artifact command failed: %v; stdout=%s stderr=%s",
+			err,
+			stdout.String(),
+			stderr.String(),
+		)
 	}
 
 	return stdout.Bytes(), stderr.Bytes()
@@ -628,7 +730,11 @@ func decodeArtifactEnvelope(t *testing.T, data []byte) testJSONEnvelope {
 	}
 
 	if envelope.SchemaVersion != jsonSchemaVersion {
-		t.Fatalf("artifact JSON schema version = %d, want %d", envelope.SchemaVersion, jsonSchemaVersion)
+		t.Fatalf(
+			"artifact JSON schema version = %d, want %d",
+			envelope.SchemaVersion,
+			jsonSchemaVersion,
+		)
 	}
 
 	return envelope

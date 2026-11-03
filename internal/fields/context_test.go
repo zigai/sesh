@@ -14,15 +14,33 @@ func agentContext() fields.Context {
 		Field:         "build",
 		Row:           fields.RowAgent,
 		Session: fields.Session{
-			ID: "$4", Name: "api", Kind: "live", Path: "/work/api", Origin: "local", ConnectionID: "",
-			WindowCount: 2, Attached: true, Activity: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
-			ActivePaneID: "%9", ActivePanePath: "/work/api", ActivePaneCommand: "nvim", ActivePaneTitle: "editor",
+			ID:                "$4",
+			Name:              "api",
+			Kind:              "live",
+			Path:              "/work/api",
+			Origin:            "local",
+			ConnectionID:      "",
+			WindowCount:       2,
+			Attached:          true,
+			Activity:          time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
+			ActivePaneID:      "%9",
+			ActivePanePath:    "/work/api",
+			ActivePaneCommand: "nvim",
+			ActivePaneTitle:   "editor",
 		},
 		Agent: &fields.Agent{
-			PaneID: "%12", Harness: "claude", Status: "running",
+			PaneID:      "%12",
+			Harness:     "claude",
+			Status:      "running",
 			StatusSince: time.Date(2026, 1, 2, 3, 0, 0, 0, time.UTC),
-			CWD:         "/work/api/server", ProjectRoot: "/work/api", GitBranch: "main", Worktree: "",
-			SessionPath: "/home/u/.claude/s.jsonl", PID: 4242, Model: "opus", Task: "refactor",
+			CWD:         "/work/api/server",
+			ProjectRoot: "/work/api",
+			GitBranch:   "main",
+			Worktree:    "",
+			SessionPath: "/home/u/.claude/s.jsonl",
+			PID:         4242,
+			Model:       "opus",
+			Task:        "refactor",
 		},
 	}
 }
@@ -34,7 +52,11 @@ func TestContextEncodeWritesVersionedJSONLine(t *testing.T) {
 	}
 
 	text := string(data)
-	if !strings.HasPrefix(text, `{"schemaVersion":1,"field":"build","row":"agent","session":{"id":"$4"`) || !strings.HasSuffix(text, "}\n") {
+	if !strings.HasPrefix(
+		text,
+		`{"schemaVersion":1,"field":"build","row":"agent","session":{"id":"$4"`,
+	) ||
+		!strings.HasSuffix(text, "}\n") {
 		t.Fatalf("Encode() = %s", text)
 	}
 

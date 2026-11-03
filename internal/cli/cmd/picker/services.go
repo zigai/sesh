@@ -226,7 +226,10 @@ func (s *services) LoadInbox(ctx context.Context) (inbox.State, error) {
 	return state, nil
 }
 
-func (s *services) UpdateInbox(ctx context.Context, change func(*inbox.State) error) (inbox.State, error) {
+func (s *services) UpdateInbox(
+	ctx context.Context,
+	change func(*inbox.State) error,
+) (inbox.State, error) {
 	state, err := inbox.NewStore(s.workspace.Inbox).Update(ctx, change)
 	if err != nil {
 		return state, oops.In("cli").With("operation", "update_inbox").Wrap(err)
@@ -243,7 +246,11 @@ func (s *services) LastReport(ctx context.Context, agent session.AgentSession) (
 	}
 
 	catalog := history.Catalog{
-		Sources: []history.Source{{Harness: registry.Harness(agent.Harness), Path: agent.SessionPath}}, IndexPath: "", Progress: nil,
+		Sources: []history.Source{
+			{Harness: registry.Harness(agent.Harness), Path: agent.SessionPath},
+		},
+		IndexPath: "",
+		Progress:  nil,
 	}
 
 	message, _, err := catalog.LastMessage(ctx, agent.SessionID, "assistant")
@@ -276,13 +283,19 @@ func (s *services) LoadCatalog(ctx context.Context) (session.CatalogResult, erro
 
 	result, err := s.listCatalog(ctx, view)
 	if closeErr := view.Close(); closeErr != nil {
-		err = errors.Join(err, oops.In("cli").With("operation", "close_repository_view").Wrap(closeErr))
+		err = errors.Join(
+			err,
+			oops.In("cli").With("operation", "close_repository_view").Wrap(closeErr),
+		)
 	}
 
 	return result, err
 }
 
-func (s *services) listCatalog(ctx context.Context, saved session.SavedSnapshots) (session.CatalogResult, error) {
+func (s *services) listCatalog(
+	ctx context.Context,
+	saved session.SavedSnapshots,
+) (session.CatalogResult, error) {
 	var result session.CatalogResult
 
 	err := s.readTmux(ctx, func(server *gotmux.Server) error {
@@ -323,7 +336,10 @@ func (s *services) TmuxIsInsideTmux() bool {
 	return s.popupChild || strings.TrimSpace(os.Getenv("TMUX")) != ""
 }
 
-func (s *services) EnterSession(ctx context.Context, target session.Session) (tui.EnterOutcome, error) {
+func (s *services) EnterSession(
+	ctx context.Context,
+	target session.Session,
+) (tui.EnterOutcome, error) {
 	if err := revalidatePickerLiveTarget(ctx, s.server, target); err != nil {
 		return enterOutcome(target.Name, tui.EnterCompleted, false), err
 	}
@@ -337,7 +353,12 @@ func (s *services) EnterSession(ctx context.Context, target session.Session) (tu
 func enterOutcome(name string, enterAction tui.EnterAction, restored bool) tui.EnterOutcome {
 	var target session.Session
 
-	return tui.EnterOutcome{SessionName: name, Action: enterAction, Restored: restored, Target: target}
+	return tui.EnterOutcome{
+		SessionName: name,
+		Action:      enterAction,
+		Restored:    restored,
+		Target:      target,
+	}
 }
 
 func deferredEnterAction(insideTmux bool) tui.EnterAction {
@@ -348,7 +369,11 @@ func deferredEnterAction(insideTmux bool) tui.EnterAction {
 	return tui.EnterNeedsAttach
 }
 
-func revalidatePickerLiveTarget(ctx context.Context, server *gotmux.Server, target session.Session) error {
+func revalidatePickerLiveTarget(
+	ctx context.Context,
+	server *gotmux.Server,
+	target session.Session,
+) error {
 	if target.Kind != session.KindLive || target.Origin != session.OriginLocal || target.ID == "" {
 		return errPickerTargetChanged
 	}
@@ -367,10 +392,16 @@ func revalidatePickerLiveTarget(ctx context.Context, server *gotmux.Server, targ
 	return errPickerTargetChanged
 }
 
-func findPickerLiveTarget(ctx context.Context, server *gotmux.Server, id, name string) (session.Session, error) {
+func findPickerLiveTarget(
+	ctx context.Context,
+	server *gotmux.Server,
+	id, name string,
+) (session.Session, error) {
 	rows, err := session.ListLive(ctx, server, "")
 	if err != nil {
-		return session.Session{}, oops.In("cli").With("operation", "resolve_picker_session").Wrap(err)
+		return session.Session{}, oops.In("cli").
+			With("operation", "resolve_picker_session").
+			Wrap(err)
 	}
 
 	for _, row := range rows {
@@ -382,11 +413,19 @@ func findPickerLiveTarget(ctx context.Context, server *gotmux.Server, id, name s
 	return session.Session{}, errPickerTargetChanged
 }
 
-func (s *services) TmuxActivatePane(ctx context.Context, target session.Session, paneID string) error {
+func (s *services) TmuxActivatePane(
+	ctx context.Context,
+	target session.Session,
+	paneID string,
+) error {
 	return s.activatePane(ctx, target, paneID, "")
 }
 
-func (s *services) activatePane(ctx context.Context, target session.Session, paneID, clientName string) error {
+func (s *services) activatePane(
+	ctx context.Context,
+	target session.Session,
+	paneID, clientName string,
+) error {
 	if err := revalidatePickerLiveTarget(ctx, s.server, target); err != nil {
 		return err
 	}
@@ -410,7 +449,10 @@ func (s *services) activatePane(ctx context.Context, target session.Session, pan
 		return oops.In("cli").With("operation", "construct_picker_navigator").Wrap(err)
 	}
 
-	_, err = navigator.Focus(ctx, agents.FocusTarget{PaneID: paneID, SessionID: target.ID, SessionName: target.Name})
+	_, err = navigator.Focus(
+		ctx,
+		agents.FocusTarget{PaneID: paneID, SessionID: target.ID, SessionName: target.Name},
+	)
 	if err != nil {
 		return oops.In("cli").With("operation", "focus_picker_pane").Wrap(err)
 	}
@@ -481,7 +523,11 @@ func (s *services) WatchAgentSummaries(
 	var filter aht.Filter
 
 	err := s.agentStore.Watch(ctx, filter, func(snapshot aht.StateSnapshot) error {
-		return publish(snapshot.Revision, s.agentSnapshot(ctx, agents.ObservedAgentSessions(snapshot.Sessions)), nil)
+		return publish(
+			snapshot.Revision,
+			s.agentSnapshot(ctx, agents.ObservedAgentSessions(snapshot.Sessions)),
+			nil,
+		)
 	})
 	if err != nil {
 		return oops.In("cli").With("operation", "watch_picker_agents").Wrap(err)
@@ -490,7 +536,10 @@ func (s *services) WatchAgentSummaries(
 	return nil
 }
 
-func (s *services) agentSnapshot(ctx context.Context, observed []agents.AgentSession) tui.AgentSnapshot {
+func (s *services) agentSnapshot(
+	ctx context.Context,
+	observed []agents.AgentSession,
+) tui.AgentSnapshot {
 	var (
 		panes    []tui.PaneLocation
 		panesErr error
@@ -512,7 +561,11 @@ func (s *services) agentSnapshot(ctx context.Context, observed []agents.AgentSes
 
 	observer.Wait()
 
-	return tui.AgentSnapshot{Summaries: summaries, Panes: panes, PanesObserved: len(observed) > 0 && panesErr == nil}
+	return tui.AgentSnapshot{
+		Summaries:     summaries,
+		Panes:         panes,
+		PanesObserved: len(observed) > 0 && panesErr == nil,
+	}
 }
 
 func agentSummaries(observed []agents.AgentSession) []session.AgentSummary {
@@ -565,7 +618,10 @@ func agentSummaries(observed []agents.AgentSession) []session.AgentSummary {
 			summary.IdleSince = earlierNonZero(summary.IdleSince, agent.StatusSince)
 		case session.AgentStatusIdle:
 			summary.IdleSince = earlierNonZero(summary.IdleSince, agent.StatusSince)
-		case session.AgentStatusUnknown, session.AgentStatusSleeping, session.AgentStatusMerged, session.AgentStatusClosed:
+		case session.AgentStatusUnknown,
+			session.AgentStatusSleeping,
+			session.AgentStatusMerged,
+			session.AgentStatusClosed:
 			summary.Unknown++
 		}
 	}
@@ -730,11 +786,19 @@ func clonePickerTarget(target session.Session) session.Session {
 	return target
 }
 
-func (s *services) performDeferredSwitch(ctx context.Context, target session.Session, paneID string) error {
+func (s *services) performDeferredSwitch(
+	ctx context.Context,
+	target session.Session,
+	paneID string,
+) error {
 	return s.performSwitch(ctx, target, paneID, "", "")
 }
 
-func (s *services) performSwitch(ctx context.Context, target session.Session, paneID, clientName, originSessionID string) error {
+func (s *services) performSwitch(
+	ctx context.Context,
+	target session.Session,
+	paneID, clientName, originSessionID string,
+) error {
 	target = clonePickerTarget(target)
 	if err := revalidatePickerLiveTarget(ctx, s.server, target); err != nil {
 		return err
@@ -753,7 +817,12 @@ func (s *services) performSwitchValidated(
 
 	var err error
 	if clientName != "" && originSessionID != "" {
-		outcome, err = s.workflow.SwitchSessionOutcomeForClientTarget(ctx, target, clientName, originSessionID)
+		outcome, err = s.workflow.SwitchSessionOutcomeForClientTarget(
+			ctx,
+			target,
+			clientName,
+			originSessionID,
+		)
 	} else {
 		outcome, err = s.workflow.SwitchSessionOutcome(ctx, target.Name)
 	}
@@ -782,7 +851,11 @@ func (s *services) performSwitchValidated(
 	return errors.Join(activateErr, s.recordPickerHistory(ctx, outcome.SessionName, views))
 }
 
-func (s *services) recordPickerHistory(ctx context.Context, switched string, views []tui.AgentView) error {
+func (s *services) recordPickerHistory(
+	ctx context.Context,
+	switched string,
+	views []tui.AgentView,
+) error {
 	identity, recordSwitch := s.workflow.SwitchHistoryIdentity(switched)
 	if s.workspace.History == "" || (!recordSwitch && len(views) == 0) {
 		return nil
@@ -798,7 +871,10 @@ func (s *services) recordPickerHistory(ctx context.Context, switched string, vie
 		}
 	})
 	if err != nil {
-		return oops.In("cli").Code("history_failed").With("operation", "record_picker_history").Wrap(err)
+		return oops.In("cli").
+			Code("history_failed").
+			With("operation", "record_picker_history").
+			Wrap(err)
 	}
 
 	return nil
@@ -821,7 +897,8 @@ func (s *services) performDeferredAttach(ctx context.Context, target session.Ses
 		})
 		if err != nil {
 			zerolog.Ctx(ctx).Warn().Str("component", "agents").Str("operation", "record_view").
-				Str("status", "degraded").Str("reason", "history_update_failed").Func(logging.Cause(err)).
+				Str("status", "degraded").
+				Str("reason", "history_update_failed").Func(logging.Cause(err)).
 				Msg("agent navigation history was not recorded")
 		}
 	}
@@ -829,9 +906,16 @@ func (s *services) performDeferredAttach(ctx context.Context, target session.Ses
 	return nil
 }
 
-func (s *services) recordPopupHeights(ctx context.Context, recorded *session.State, heights []session.PopupHeight) {
+func (s *services) recordPopupHeights(
+	ctx context.Context,
+	recorded *session.State,
+	heights []session.PopupHeight,
+) {
 	if !s.popupChild || s.workspace.History == "" ||
-		!slices.ContainsFunc(heights, func(fit session.PopupHeight) bool { return recorded.PopupHeight(fit.Mode) != fit.Height }) {
+		!slices.ContainsFunc(
+			heights,
+			func(fit session.PopupHeight) bool { return recorded.PopupHeight(fit.Mode) != fit.Height },
+		) {
 		return
 	}
 
@@ -842,7 +926,8 @@ func (s *services) recordPopupHeights(ctx context.Context, recorded *session.Sta
 	})
 	if err != nil {
 		zerolog.Ctx(ctx).Warn().Str("component", "picker").Str("operation", "record_popup_heights").
-			Str("status", "degraded").Str("reason", "history_update_failed").Func(logging.Cause(err)).
+			Str("status", "degraded").
+			Str("reason", "history_update_failed").Func(logging.Cause(err)).
 			Msg("popup heights were not recorded")
 	}
 }

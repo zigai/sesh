@@ -44,16 +44,28 @@ func TestPrepareAttachmentDerivesScopedSocketAndGrant(t *testing.T) {
 		t.Fatalf("bridge socket = %q, want %q", bootstrap.BridgeSocket, wantSocket)
 	}
 
-	if !filepath.IsAbs(bootstrap.BridgeSocket) || filepath.Dir(bootstrap.BridgeSocket) != bridgeDir {
-		t.Fatalf("bridge socket = %q, want a path inside the peer bridge directory", bootstrap.BridgeSocket)
+	if !filepath.IsAbs(bootstrap.BridgeSocket) ||
+		filepath.Dir(bootstrap.BridgeSocket) != bridgeDir {
+		t.Fatalf(
+			"bridge socket = %q, want a path inside the peer bridge directory",
+			bootstrap.BridgeSocket,
+		)
 	}
 
 	if bootstrap.Capability.ExpiresAt != now.Add(2*time.Minute) {
-		t.Fatalf("capability expiry = %v, want %v", bootstrap.Capability.ExpiresAt, now.Add(2*time.Minute))
+		t.Fatalf(
+			"capability expiry = %v, want %v",
+			bootstrap.Capability.ExpiresAt,
+			now.Add(2*time.Minute),
+		)
 	}
 
 	if bootstrap.TimeoutMillis != int((2 * time.Minute).Milliseconds()) {
-		t.Fatalf("timeout = %dms, want %dms", bootstrap.TimeoutMillis, (2 * time.Minute).Milliseconds())
+		t.Fatalf(
+			"timeout = %dms, want %dms",
+			bootstrap.TimeoutMillis,
+			(2 * time.Minute).Milliseconds(),
+		)
 	}
 
 	if !bootstrap.Capability.Matches(bootstrap.Capability.Token, now) {
@@ -120,14 +132,21 @@ func TestRunAttachPrepareReadsPeerConfirmation(t *testing.T) {
 
 	script := "cat > /dev/null\nprintf '%s\\n' '" + string(result) + "'\n"
 
-	confirmed, err := RunAttachPrepare(t.Context(), remote, remote.Connections[0], bootstrap, AttachCommandOptions{
-		Command: scriptSSH(t, script),
-	})
+	confirmed, err := RunAttachPrepare(
+		t.Context(),
+		remote,
+		remote.Connections[0],
+		bootstrap,
+		AttachCommandOptions{
+			Command: scriptSSH(t, script),
+		},
+	)
 	if err != nil {
 		t.Fatalf("RunAttachPrepare() error = %v", err)
 	}
 
-	if confirmed.AttachmentID != bootstrap.Capability.AttachmentID || confirmed.BridgeSocket != bootstrap.BridgeSocket {
+	if confirmed.AttachmentID != bootstrap.Capability.AttachmentID ||
+		confirmed.BridgeSocket != bootstrap.BridgeSocket {
 		t.Fatalf("confirmation = %#v, want the prepared attachment", confirmed)
 	}
 }
@@ -165,9 +184,18 @@ func TestRunAttachPrepareRejectsMismatchedConfirmation(t *testing.T) {
 
 	script := "printf '%s\\n' '" + string(encoded) + "'\n"
 
-	if _, err := RunAttachPrepare(t.Context(), remote, remote.Connections[0], bootstrap, AttachCommandOptions{
-		Command: scriptSSH(t, script),
-	}); !errors.Is(err, ErrCapabilityMismatch) {
+	if _, err := RunAttachPrepare(
+		t.Context(),
+		remote,
+		remote.Connections[0],
+		bootstrap,
+		AttachCommandOptions{
+			Command: scriptSSH(t, script),
+		},
+	); !errors.Is(
+		err,
+		ErrCapabilityMismatch,
+	) {
 		t.Fatalf("RunAttachPrepare() error = %v, want %v", err, ErrCapabilityMismatch)
 	}
 }
@@ -186,15 +214,33 @@ func TestRunAttachPrepareFailsClosed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := RunAttachPrepare(t.Context(), remote, remote.Connections[0], bootstrap, AttachCommandOptions{
-		Command: scriptSSH(t, "exit 0\n"),
-	}); !errors.Is(err, errAttachResultMissing) {
+	if _, err := RunAttachPrepare(
+		t.Context(),
+		remote,
+		remote.Connections[0],
+		bootstrap,
+		AttachCommandOptions{
+			Command: scriptSSH(t, "exit 0\n"),
+		},
+	); !errors.Is(
+		err,
+		errAttachResultMissing,
+	) {
 		t.Fatalf("RunAttachPrepare(no result) error = %v, want %v", err, errAttachResultMissing)
 	}
 
-	if _, err := RunAttachPrepare(t.Context(), remote, remote.Connections[0], bootstrap, AttachCommandOptions{
-		Command: scriptSSH(t, "echo 'Permission denied (publickey).' >&2\nexit 255\n"),
-	}); !errors.Is(err, ErrSSHAuthUnavailable) {
+	if _, err := RunAttachPrepare(
+		t.Context(),
+		remote,
+		remote.Connections[0],
+		bootstrap,
+		AttachCommandOptions{
+			Command: scriptSSH(t, "echo 'Permission denied (publickey).' >&2\nexit 255\n"),
+		},
+	); !errors.Is(
+		err,
+		ErrSSHAuthUnavailable,
+	) {
 		t.Fatalf("RunAttachPrepare(auth failure) error = %v, want %v", err, ErrSSHAuthUnavailable)
 	}
 }
@@ -226,7 +272,12 @@ func TestAttachPrepareResultRoundTrip(t *testing.T) {
 		t.Fatalf("decoded result = %#v, want %#v", decoded, result)
 	}
 
-	if _, err := DecodeAttachPrepareResult([]byte(`{"version":1}`)); !errors.Is(err, ErrInvalidFrame) {
+	if _, err := DecodeAttachPrepareResult(
+		[]byte(`{"version":1}`),
+	); !errors.Is(
+		err,
+		ErrInvalidFrame,
+	) {
 		t.Fatalf("DecodeAttachPrepareResult(incomplete) error = %v, want %v", err, ErrInvalidFrame)
 	}
 }
@@ -245,7 +296,16 @@ func TestNewAttachCommandRequiresTerminalStreams(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := NewAttachCommand(context.Background(), remote, remote.Connections[0], bootstrap, AttachCommandOptions{}); !errors.Is(err, errNilAttachStreams) {
+	if _, err := NewAttachCommand(
+		context.Background(),
+		remote,
+		remote.Connections[0],
+		bootstrap,
+		AttachCommandOptions{},
+	); !errors.Is(
+		err,
+		errNilAttachStreams,
+	) {
 		t.Fatalf("NewAttachCommand() error = %v, want %v", err, errNilAttachStreams)
 	}
 }

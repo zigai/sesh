@@ -45,18 +45,27 @@ func TestSaveBoundaryLogging(t *testing.T) {
 
 			leaseRoot, socketPath := testLeaseEndpoint(t)
 
-			result, saveErr := save(ctx, r, leaseRoot, socketPath, func(context.Context) (capture.Observation, error) {
-				if scenario == "capture-failed" {
-					return capture.Observation{}, fmt.Errorf("private-error /secret/path SECRET_COMMAND=token: %w", os.ErrPermission)
-				}
+			result, saveErr := save(
+				ctx,
+				r,
+				leaseRoot,
+				socketPath,
+				func(context.Context) (capture.Observation, error) {
+					if scenario == "capture-failed" {
+						return capture.Observation{}, fmt.Errorf(
+							"private-error /secret/path SECRET_COMMAND=token: %w",
+							os.ErrPermission,
+						)
+					}
 
-				observation := observationFixture()
-				if scenario == "invalid-graph" {
-					observation.Manifest.Version++
-				}
+					observation := observationFixture()
+					if scenario == "invalid-graph" {
+						observation.Manifest.Version++
+					}
 
-				return observation, nil
-			})
+					return observation, nil
+				},
+			)
 			if (saveErr == nil) != (scenario == "partial") {
 				t.Fatalf("unexpected result: %#v, %v", result, saveErr)
 			}
@@ -89,7 +98,8 @@ func assertSaveRecords(t *testing.T, data []byte, scenario string) {
 		t.Fatalf("expected exactly start and owning outcome: %s", data)
 	}
 
-	if bytes.ContainsAny(data, "\xff") || strings.Contains(string(data), "secret-session") || strings.Contains(string(data), "secret-window") {
+	if bytes.ContainsAny(data, "\xff") || strings.Contains(string(data), "secret-session") ||
+		strings.Contains(string(data), "secret-window") {
 		t.Fatal("snapshot contents in log")
 	}
 
@@ -161,15 +171,45 @@ func assertDurationField(t *testing.T, fields map[string]jsontext.Value) {
 
 func observationFixture() capture.Observation {
 	m := model.Manifest{
-		Format: "sesh", Version: model.Schema, Started: 1, Finished: 2,
-		Source:   model.Source{TmuxVersion: "3.6", LibraryVersion: "v0.3.0", Consistency: "observed"},
-		Sessions: []model.Session{{ID: "s0", Name: model.Bytes("secret-session"), Directory: model.Bytes("/secret/path")}},
-		Windows:  []model.Window{{ID: "w0", Name: model.Bytes("secret-window"), Width: 80, Height: 24, Layout: model.Layout{Width: 80, Height: 24, Pane: "p0"}}},
-		Panes:    []model.Pane{{ID: "p0", Window: "w0", Width: 80, Height: 24, Active: true, Directory: model.Bytes("/secret/path"), Launch: model.Launch{Recovery: "unverified"}}},
-		Links:    []model.Link{{Session: "s0", Window: "w0", Active: true}},
+		Format:   "sesh",
+		Version:  model.Schema,
+		Started:  1,
+		Finished: 2,
+		Source: model.Source{
+			TmuxVersion:    "3.6",
+			LibraryVersion: "v0.3.0",
+			Consistency:    "observed",
+		},
+		Sessions: []model.Session{
+			{ID: "s0", Name: model.Bytes("secret-session"), Directory: model.Bytes("/secret/path")},
+		},
+		Windows: []model.Window{
+			{
+				ID:     "w0",
+				Name:   model.Bytes("secret-window"),
+				Width:  80,
+				Height: 24,
+				Layout: model.Layout{Width: 80, Height: 24, Pane: "p0"},
+			},
+		},
+		Panes: []model.Pane{
+			{
+				ID:        "p0",
+				Window:    "w0",
+				Width:     80,
+				Height:    24,
+				Active:    true,
+				Directory: model.Bytes("/secret/path"),
+				Launch:    model.Launch{Recovery: "unverified"},
+			},
+		},
+		Links: []model.Link{{Session: "s0", Window: "w0", Active: true}},
 	}
 	for _, domain := range []string{"S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10"} {
-		m.Evidence = append(m.Evidence, model.Evidence{Domain: domain, Status: "unverified", Reason: "not_captured"})
+		m.Evidence = append(
+			m.Evidence,
+			model.Evidence{Domain: domain, Status: "unverified", Reason: "not_captured"},
+		)
 	}
 
 	return capture.Observation{Manifest: m}
@@ -185,7 +225,8 @@ func TestUncertainPublicationReason(t *testing.T) {
 		Wrap(errors.Join(store.ErrUncertain, os.ErrPermission, context.Canceled))
 
 	err := saveFailure(logger.WithContext(t.Context()), "commit", time.Now(), cause)
-	if !errors.Is(err, store.ErrUncertain) || !errors.Is(err, os.ErrPermission) || !errors.Is(err, context.Canceled) {
+	if !errors.Is(err, store.ErrUncertain) || !errors.Is(err, os.ErrPermission) ||
+		!errors.Is(err, context.Canceled) {
 		t.Fatal("lost joined failure identities")
 	}
 
@@ -202,14 +243,37 @@ func TestCaptureFailureHasFixedReason(t *testing.T) {
 		reason      string
 		processCode string
 	}{
-		{name: "output limit", cause: fmt.Errorf("capture /secret/path: %w", gotmux.ErrOutputLimit), reason: "output_limit_exceeded"},
-		{name: "changed state", cause: fmt.Errorf("capture /secret/path: %w", capture.ErrChanged), reason: "capture_changed"},
-		{name: "agent registry", cause: fmt.Errorf("read /secret/path: %w", capture.ErrAgentRegistry), reason: "agent_registry_failed"},
-		{name: "unsupported state", cause: fmt.Errorf("capture /secret/path: %w", capture.ErrUnsupported), reason: "capture_unsupported"},
-		{name: "invalid observation", cause: oops.In("snapshot.capture").With("path", "/secret/path").Wrap(model.ErrInvalid), reason: "snapshot_invalid"},
 		{
-			name:        "process observation",
-			cause:       oops.In(process.Domain).Code(process.CodeProcessZombie).With("path", "/secret/path").Wrap(process.ErrProcessZombie),
+			name:   "output limit",
+			cause:  fmt.Errorf("capture /secret/path: %w", gotmux.ErrOutputLimit),
+			reason: "output_limit_exceeded",
+		},
+		{
+			name:   "changed state",
+			cause:  fmt.Errorf("capture /secret/path: %w", capture.ErrChanged),
+			reason: "capture_changed",
+		},
+		{
+			name:   "agent registry",
+			cause:  fmt.Errorf("read /secret/path: %w", capture.ErrAgentRegistry),
+			reason: "agent_registry_failed",
+		},
+		{
+			name:   "unsupported state",
+			cause:  fmt.Errorf("capture /secret/path: %w", capture.ErrUnsupported),
+			reason: "capture_unsupported",
+		},
+		{
+			name:   "invalid observation",
+			cause:  oops.In("snapshot.capture").With("path", "/secret/path").Wrap(model.ErrInvalid),
+			reason: "snapshot_invalid",
+		},
+		{
+			name: "process observation",
+			cause: oops.In(process.Domain).
+				Code(process.CodeProcessZombie).
+				With("path", "/secret/path").
+				Wrap(process.ErrProcessZombie),
 			reason:      "process_observation_failed",
 			processCode: process.CodeProcessZombie,
 		},
@@ -251,12 +315,14 @@ func assertCaptureFailureRecord(t *testing.T, data []byte, reason, processCode s
 		wantLevel = `"warn"`
 	}
 
-	if string(fields["reason"]) != `"`+reason+`"` || string(fields["phase"]) != `"capture"` || string(fields["level"]) != wantLevel ||
+	if string(fields["reason"]) != `"`+reason+`"` || string(fields["phase"]) != `"capture"` ||
+		string(fields["level"]) != wantLevel ||
 		len(fields["error"]) == 0 {
 		t.Fatalf("incorrect failure record: %s", data)
 	}
 
-	if code, logged := fields["process_code"]; logged != (processCode != "") || (logged && string(code) != `"`+processCode+`"`) {
+	if code, logged := fields["process_code"]; logged != (processCode != "") ||
+		(logged && string(code) != `"`+processCode+`"`) {
 		t.Fatalf("process_code = %s, want %q", code, processCode)
 	}
 
@@ -272,11 +338,13 @@ func assertSaveDiagnostic(t *testing.T, err error) {
 	}
 
 	layers := diagnostic.Layers()
-	if len(layers) != 2 || layers[0].Domain != "snapshot" || layers[0].Code != "publication_uncertain" {
+	if len(layers) != 2 || layers[0].Domain != "snapshot" ||
+		layers[0].Code != "publication_uncertain" {
 		t.Fatal("owning save classification was lost")
 	}
 
-	if len(layers[0].Context) != 2 || layers[0].Context["phase"] != "commit" || layers[0].Context["operation"] != "save" {
+	if len(layers[0].Context) != 2 || layers[0].Context["phase"] != "commit" ||
+		layers[0].Context["operation"] != "save" {
 		t.Fatal("wrong owning operation details")
 	}
 
@@ -297,7 +365,9 @@ func assertUncertainFailureRecord(t *testing.T, data []byte) {
 		t.Fatal(err)
 	}
 
-	if fields["reason"] != "publication_uncertain" || fields["level"] != "error" || fields["phase"] != "commit" || fields["error"] == nil {
+	if fields["reason"] != "publication_uncertain" || fields["level"] != "error" ||
+		fields["phase"] != "commit" ||
+		fields["error"] == nil {
 		t.Fatal("incorrect uncertainty record")
 	}
 
@@ -331,9 +401,30 @@ func validateLogSchema(t *testing.T, fields map[string]jsontext.Value) {
 
 	for key := range fields {
 		switch key {
-		case "level", "component", "operation", "status", "message", "reason", "phase", "sessions", "panes", "terminal_text_omitted", "floating_panes_omitted",
-			"restart_panes", "resume_panes", "carried_resume_panes", "unverified_panes", "nonrestartable_panes", "duration_ms", "process_code",
-			"generation", "error", "error_domain", "error_code", "error_step", "error_context":
+		case "level",
+			"component",
+			"operation",
+			"status",
+			"message",
+			"reason",
+			"phase",
+			"sessions",
+			"panes",
+			"terminal_text_omitted",
+			"floating_panes_omitted",
+			"restart_panes",
+			"resume_panes",
+			"carried_resume_panes",
+			"unverified_panes",
+			"nonrestartable_panes",
+			"duration_ms",
+			"process_code",
+			"generation",
+			"error",
+			"error_domain",
+			"error_code",
+			"error_step",
+			"error_context":
 		default:
 			t.Fatalf("unexpected log field %s", key)
 		}
@@ -348,7 +439,13 @@ func TestInterruptedCaptureRecordsFailedAttemptAndKeepsPriorSource(t *testing.T)
 	r := testRepository(t)
 	leaseRoot, socketPath := testLeaseEndpoint(t)
 
-	prior, err := save(t.Context(), r, leaseRoot, socketPath, func(context.Context) (capture.Observation, error) { return observationFixture(), nil })
+	prior, err := save(
+		t.Context(),
+		r,
+		leaseRoot,
+		socketPath,
+		func(context.Context) (capture.Observation, error) { return observationFixture(), nil },
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -360,10 +457,16 @@ func TestInterruptedCaptureRecordsFailedAttemptAndKeepsPriorSource(t *testing.T)
 	ctx, cancel := context.WithCancel(logger.WithContext(t.Context()))
 	defer cancel()
 
-	result, err := save(ctx, r, leaseRoot, socketPath, func(context.Context) (capture.Observation, error) {
-		cancel()
-		return capture.Observation{}, context.Canceled
-	})
+	result, err := save(
+		ctx,
+		r,
+		leaseRoot,
+		socketPath,
+		func(context.Context) (capture.Observation, error) {
+			cancel()
+			return capture.Observation{}, context.Canceled
+		},
+	)
 	if !errors.Is(err, context.Canceled) || result.Attempt == "" {
 		t.Fatal("lost interrupted capture identity", err)
 	}
@@ -375,7 +478,8 @@ func TestInterruptedCaptureRecordsFailedAttemptAndKeepsPriorSource(t *testing.T)
 		t.Fatal(err)
 	}
 
-	if len(catalog.Attempts) != 2 || catalog.Attempts[1].ID != result.Attempt || catalog.Attempts[1].State != "failed" {
+	if len(catalog.Attempts) != 2 || catalog.Attempts[1].ID != result.Attempt ||
+		catalog.Attempts[1].State != "failed" {
 		t.Fatalf("interrupted capture was not recorded as failed: %+v", catalog.Attempts)
 	}
 
@@ -399,7 +503,11 @@ func assertPriorGenerationRecovers(t *testing.T, r *store.Repository, prior stri
 
 	practical, _, err := r.ReadPracticalCurrent(t.Context())
 	if err != nil || practical.ID != prior {
-		t.Fatalf("practical recovery after interrupted save = %v, %v; want prior generation", practical.ID, err)
+		t.Fatalf(
+			"practical recovery after interrupted save = %v, %v; want prior generation",
+			practical.ID,
+			err,
+		)
 	}
 }
 
@@ -410,10 +518,16 @@ func TestCaptureDeadlineRecordsFailedAttempt(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), time.Hour)
 	defer cancel()
 
-	result, err := save(ctx, r, leaseRoot, socketPath, func(context.Context) (capture.Observation, error) {
-		cancel()
-		return capture.Observation{}, context.DeadlineExceeded
-	})
+	result, err := save(
+		ctx,
+		r,
+		leaseRoot,
+		socketPath,
+		func(context.Context) (capture.Observation, error) {
+			cancel()
+			return capture.Observation{}, context.DeadlineExceeded
+		},
+	)
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("save error = %v, want the capture deadline", err)
 	}
@@ -423,7 +537,8 @@ func TestCaptureDeadlineRecordsFailedAttempt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(catalog.Attempts) != 1 || catalog.Attempts[0].ID != result.Attempt || catalog.Attempts[0].State != "failed" {
+	if len(catalog.Attempts) != 1 || catalog.Attempts[0].ID != result.Attempt ||
+		catalog.Attempts[0].State != "failed" {
 		t.Fatalf("expired capture was not recorded as failed: %+v", catalog.Attempts)
 	}
 }
@@ -444,7 +559,13 @@ func TestSaveObservationAdmissionValidation(t *testing.T) {
 		t.Fatalf("expected ErrLeaseRootRequired, got %v", err)
 	}
 
-	_, err = SaveObservation(t.Context(), r, nil, nil, SaveConfig{LeaseRoot: filepath.Join(t.TempDir(), "leases")})
+	_, err = SaveObservation(
+		t.Context(),
+		r,
+		nil,
+		nil,
+		SaveConfig{LeaseRoot: filepath.Join(t.TempDir(), "leases")},
+	)
 	if err == nil {
 		t.Fatal("expected error for nil server")
 	}
@@ -454,13 +575,25 @@ func TestSaveObservationAdmissionValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = SaveObservation(t.Context(), nil, server, nil, SaveConfig{LeaseRoot: filepath.Join(t.TempDir(), "leases")})
+	_, err = SaveObservation(
+		t.Context(),
+		nil,
+		server,
+		nil,
+		SaveConfig{LeaseRoot: filepath.Join(t.TempDir(), "leases")},
+	)
 	if !errors.Is(err, ErrRepositoryRequired) {
 		t.Fatalf("expected ErrRepositoryRequired, got %v", err)
 	}
 }
 
-func save(ctx context.Context, repository *store.Repository, leaseRoot string, socketPath string, observe func(context.Context) (capture.Observation, error)) (SaveResult, error) {
+func save(
+	ctx context.Context,
+	repository *store.Repository,
+	leaseRoot string,
+	socketPath string,
+	observe func(context.Context) (capture.Observation, error),
+) (SaveResult, error) {
 	return saveWithProfile(ctx, repository, leaseRoot, socketPath, RecoveryExact, observe)
 }
 
@@ -486,9 +619,15 @@ func TestSaveKeepsResumeLaunchOfARunningAgentTheRegistryLost(t *testing.T) {
 	r := testRepository(t)
 	leaseRoot, socketPath := testLeaseEndpoint(t)
 
-	if _, err := save(t.Context(), r, leaseRoot, socketPath, func(context.Context) (capture.Observation, error) {
-		return agentObservation("boot-a:100", model.RecoveryResume), nil
-	}); err != nil {
+	if _, err := save(
+		t.Context(),
+		r,
+		leaseRoot,
+		socketPath,
+		func(context.Context) (capture.Observation, error) {
+			return agentObservation("boot-a:100", model.RecoveryResume), nil
+		},
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -497,9 +636,15 @@ func TestSaveKeepsResumeLaunchOfARunningAgentTheRegistryLost(t *testing.T) {
 
 		logger := zerolog.New(&output)
 
-		result, err := save(logger.WithContext(t.Context()), r, leaseRoot, socketPath, func(context.Context) (capture.Observation, error) {
-			return agentObservation("boot-a:100", model.RecoveryUnverified), nil
-		})
+		result, err := save(
+			logger.WithContext(t.Context()),
+			r,
+			leaseRoot,
+			socketPath,
+			func(context.Context) (capture.Observation, error) {
+				return agentObservation("boot-a:100", model.RecoveryUnverified), nil
+			},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -510,8 +655,13 @@ func TestSaveKeepsResumeLaunchOfARunningAgentTheRegistryLost(t *testing.T) {
 		}
 
 		launch := current.Panes[0].Launch
-		if launch.Recovery != model.RecoveryResume || len(launch.Arguments) != 3 || string(launch.Arguments[2]) != "session-a" {
-			t.Fatalf("generation %s launch = %+v, want the earlier resume launch", result.Generation, launch)
+		if launch.Recovery != model.RecoveryResume || len(launch.Arguments) != 3 ||
+			string(launch.Arguments[2]) != "session-a" {
+			t.Fatalf(
+				"generation %s launch = %+v, want the earlier resume launch",
+				result.Generation,
+				launch,
+			)
 		}
 
 		records := bytes.Split(bytes.TrimSpace(output.Bytes()), []byte{'\n'})
@@ -523,7 +673,8 @@ func TestSaveKeepsResumeLaunchOfARunningAgentTheRegistryLost(t *testing.T) {
 
 		validateLogSchema(t, fields)
 
-		if string(fields["level"]) != `"warn"` || string(fields["carried_resume_panes"]) != "1" || string(fields["resume_panes"]) != "1" {
+		if string(fields["level"]) != `"warn"` || string(fields["carried_resume_panes"]) != "1" ||
+			string(fields["resume_panes"]) != "1" {
 			t.Fatalf("save record = %s, want one carried resume pane", records[len(records)-1])
 		}
 	}
@@ -538,7 +689,13 @@ func TestSaveAcceptsAgentPaneWhoseProcessChanged(t *testing.T) {
 		agentObservation("boot-a:100", model.RecoveryResume),
 		agentObservation("boot-a:200", model.RecoveryUnverified),
 	} {
-		if _, err := save(t.Context(), r, leaseRoot, socketPath, func(context.Context) (capture.Observation, error) { return observation, nil }); err != nil {
+		if _, err := save(
+			t.Context(),
+			r,
+			leaseRoot,
+			socketPath,
+			func(context.Context) (capture.Observation, error) { return observation, nil },
+		); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -548,7 +705,8 @@ func TestSaveAcceptsAgentPaneWhoseProcessChanged(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if launch := current.Panes[0].Launch; launch.Recovery != model.RecoveryUnverified || string(launch.Birth) != "boot-a:200" {
+	if launch := current.Panes[0].Launch; launch.Recovery != model.RecoveryUnverified ||
+		string(launch.Birth) != "boot-a:200" {
 		t.Fatalf("current launch = %+v, want the replacement process", launch)
 	}
 }

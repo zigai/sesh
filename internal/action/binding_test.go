@@ -19,7 +19,12 @@ func bind(in, key, id string, params map[string]any) config.KeyBindConfig {
 	return config.KeyBindConfig{Key: key, Action: id, In: in, Table: "", Params: params}
 }
 
-func boundTo(t *testing.T, bindings []action.Binding, in action.Surface, key string) (action.Binding, bool) {
+func boundTo(
+	t *testing.T,
+	bindings []action.Binding,
+	in action.Surface,
+	key string,
+) (action.Binding, bool) {
 	t.Helper()
 
 	for _, binding := range bindings {
@@ -43,19 +48,43 @@ func TestConfiguredBindingReplacesTheDefaultOnItsKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if binding, ok := boundTo(t, bindings, action.SurfacePicker, "alt+c"); !ok || binding.Action != action.SessionRename.ID {
+	if binding, ok := boundTo(
+		t,
+		bindings,
+		action.SurfacePicker,
+		"alt+c",
+	); !ok ||
+		binding.Action != action.SessionRename.ID {
 		t.Fatalf("alt+c = %#v, want the configured action", binding)
 	}
 
-	if binding, ok := boundTo(t, bindings, action.SurfaceTmux, "S-F12"); !ok || binding.Action != action.AgentLatest.ID {
+	if binding, ok := boundTo(
+		t,
+		bindings,
+		action.SurfaceTmux,
+		"S-F12",
+	); !ok ||
+		binding.Action != action.AgentLatest.ID {
 		t.Fatalf("S-F12 written as F24 = %#v, want the configured action", binding)
 	}
 
-	if binding, ok := boundTo(t, bindings, action.SurfaceTmux, "M-S-F12"); !ok || binding.Action != action.AgentBack.ID {
+	if binding, ok := boundTo(
+		t,
+		bindings,
+		action.SurfaceTmux,
+		"M-S-F12",
+	); !ok ||
+		binding.Action != action.AgentBack.ID {
 		t.Fatalf("M-S-F12 written as S-M-F12 = %#v, want the configured action", binding)
 	}
 
-	if binding, ok := boundTo(t, bindings, action.SurfacePicker, "alt+r"); !ok || binding.Action != action.SessionRename.ID {
+	if binding, ok := boundTo(
+		t,
+		bindings,
+		action.SurfacePicker,
+		"alt+r",
+	); !ok ||
+		binding.Action != action.SessionRename.ID {
 		t.Fatalf("untouched default alt+r = %#v", binding)
 	}
 }
@@ -102,7 +131,12 @@ func TestBindingsRejectBindingsTheirSurfaceCannotRun(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			if _, err := action.Bindings(configWithBinds(test.binds...)); !errors.Is(err, test.want) {
+			if _, err := action.Bindings(
+				configWithBinds(test.binds...),
+			); !errors.Is(
+				err,
+				test.want,
+			) {
 				t.Fatalf("Bindings() error = %v, want %v", err, test.want)
 			}
 		})
@@ -135,13 +169,24 @@ func TestPickerBindingRejectsSessionPrefix(t *testing.T) {
 func TestTmuxBindingCarriesItsParams(t *testing.T) {
 	t.Parallel()
 
-	bindings, err := action.Bindings(configWithBinds(bind("tmux", "M-c", "session.create", map[string]any{"name": "scratch", "dir": "~/work"})))
+	bindings, err := action.Bindings(
+		configWithBinds(
+			bind(
+				"tmux",
+				"M-c",
+				"session.create",
+				map[string]any{"name": "scratch", "dir": "~/work"},
+			),
+		),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	binding, ok := boundTo(t, bindings, action.SurfaceTmux, "M-c")
-	if !ok || binding.Table != action.DefaultTmuxTable || binding.Values.String("name") != "scratch" || binding.Values.String("dir") != "~/work" {
+	if !ok || binding.Table != action.DefaultTmuxTable ||
+		binding.Values.String("name") != "scratch" ||
+		binding.Values.String("dir") != "~/work" {
 		t.Fatalf("M-c = %#v, want session.create in the root table with its params", binding)
 	}
 }

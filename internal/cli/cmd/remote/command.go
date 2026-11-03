@@ -92,7 +92,8 @@ func NewDaemonMonitorCommand() *cobra.Command {
 		},
 		RunE: runRemoteMonitor,
 	}
-	cmd.Flags().String("socket", "", "Managed tmux socket retained for service-definition consistency")
+	cmd.Flags().
+		String("socket", "", "Managed tmux socket retained for service-definition consistency")
 
 	return cmd
 }
@@ -236,7 +237,10 @@ func runRemoteMonitor(cmd *cobra.Command, _ []string) (resultErr error) {
 	return cliError("run_remote_monitor", err)
 }
 
-func readRemoteInput(reader io.Reader, limit int) ([]byte, error) { //nolint:unparam // Action and bootstrap protocols keep independent limits.
+func readRemoteInput(
+	reader io.Reader,
+	limit int,
+) ([]byte, error) { //nolint:unparam // Action and bootstrap protocols keep independent limits.
 	content, err := io.ReadAll(io.LimitReader(reader, int64(limit)+1))
 	if err != nil {
 		return nil, cliError("read_remote_input", err)
@@ -343,24 +347,37 @@ func runRemotePeerStream(cmd *cobra.Command, _ []string) error {
 
 	hostname, _ := os.Hostname()
 
-	return cliError("run_remote_inventory", remote.RunInventoryStream(clibase.CommandContext(cmd), remote.InventoryOptions{
-		PeerID: runtime.peerID, Hostname: hostname, BridgeDir: runtime.bridgeDir, TmuxSocket: bootstrap.TmuxSocket,
-		PollInterval:      remote.ParsedDuration(bootstrap.PollInterval, time.Second),
-		HeartbeatInterval: remote.ParsedDuration(bootstrap.HeartbeatInterval, heartbeatInterval),
-		Sessions:          runtime.live.Sessions,
-		Agents: func(ctx context.Context) ([]session.AgentSummary, error) {
-			return peerAgentSummaries(ctx, workspace)
-		},
-		SavedSessions: func(ctx context.Context) ([]session.Session, error) { return peerSavedSessions(ctx, workspace) },
-		Tasks: func(ctx context.Context) ([]remote.TaskRow, error) {
-			return peerTasks(ctx, runtime.server, workspace.Tasks)
-		},
-		Work:    func(ctx context.Context) ([]work.Item, error) { return peerWork(ctx, workspace.Work) },
-		Actions: actions(workspace.Config),
-	}, cmd.OutOrStdout()))
+	return cliError(
+		"run_remote_inventory",
+		remote.RunInventoryStream(clibase.CommandContext(cmd), remote.InventoryOptions{
+			PeerID:       runtime.peerID,
+			Hostname:     hostname,
+			BridgeDir:    runtime.bridgeDir,
+			TmuxSocket:   bootstrap.TmuxSocket,
+			PollInterval: remote.ParsedDuration(bootstrap.PollInterval, time.Second),
+			HeartbeatInterval: remote.ParsedDuration(
+				bootstrap.HeartbeatInterval,
+				heartbeatInterval,
+			),
+			Sessions: runtime.live.Sessions,
+			Agents: func(ctx context.Context) ([]session.AgentSummary, error) {
+				return peerAgentSummaries(ctx, workspace)
+			},
+			SavedSessions: func(ctx context.Context) ([]session.Session, error) { return peerSavedSessions(ctx, workspace) },
+			Tasks: func(ctx context.Context) ([]remote.TaskRow, error) {
+				return peerTasks(ctx, runtime.server, workspace.Tasks)
+			},
+			Work:    func(ctx context.Context) ([]work.Item, error) { return peerWork(ctx, workspace.Work) },
+			Actions: actions(workspace.Config),
+		}, cmd.OutOrStdout()),
+	)
 }
 
-func peerTasks(ctx context.Context, server *gotmux.Server, ledger string) ([]remote.TaskRow, error) {
+func peerTasks(
+	ctx context.Context,
+	server *gotmux.Server,
+	ledger string,
+) ([]remote.TaskRow, error) {
 	tasks, err := task.Inventory(ctx, server, task.NewStore(ledger))
 	if err != nil {
 		return nil, cliError("list_remote_tasks", err)
@@ -419,16 +436,23 @@ func runRemotePeerAction(cmd *cobra.Command, _ []string) (resultErr error) {
 	}()
 
 	allowed := actions(workspace.Config)
-	result, resultCause := remote.ExecutePeerAction(clibase.CommandContext(cmd), remote.PeerActionOptions{
-		PeerID:     runtime.peerID,
-		Receipts:   runtime.receipts,
-		Allowed:    func(id action.ID) bool { return slices.Contains(allowed, id) },
-		Dispatcher: local,
-		Now:        nil,
-	}, request)
+	result, resultCause := remote.ExecutePeerAction(
+		clibase.CommandContext(cmd),
+		remote.PeerActionOptions{
+			PeerID:     runtime.peerID,
+			Receipts:   runtime.receipts,
+			Allowed:    func(id action.ID) bool { return slices.Contains(allowed, id) },
+			Dispatcher: local,
+			Now:        nil,
+		},
+		request,
+	)
 	logPeerActionResult(clibase.CommandContext(cmd), result, resultCause)
 
-	return cliError("write_remote_action_result", remote.WriteActionResult(cmd.OutOrStdout(), result))
+	return cliError(
+		"write_remote_action_result",
+		remote.WriteActionResult(cmd.OutOrStdout(), result),
+	)
 }
 
 func logPeerActionResult(ctx context.Context, result remote.ActionResult, cause error) {
@@ -442,7 +466,8 @@ func logPeerActionResult(ctx context.Context, result remote.ActionResult, cause 
 
 	event := zerolog.Ctx(ctx).WithLevel(level).Str("component", "remote").
 		Str("operation", "remote_peer_action").Str("action", string(result.Action)).
-		Str("invocation_id", result.InvocationID).Str("status", status).Str("phase", "receipt").Func(logging.Cause(cause))
+		Str("invocation_id", result.InvocationID).
+		Str("status", status).Str("phase", "receipt").Func(logging.Cause(cause))
 	if reason != "" {
 		event.Str("reason", reason)
 	}
@@ -472,10 +497,17 @@ func runRemotePeerAttachPrepare(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	result, err := remote.RunPeerAttachPrepare(clibase.CommandContext(cmd), remote.PeerAttachOptions{
-		PeerID: runtime.peerID, BridgeDir: runtime.bridgeDir, Live: runtime.live, PaneOwner: runtime.live,
-		Now: nil,
-	}, bootstrap)
+	result, err := remote.RunPeerAttachPrepare(
+		clibase.CommandContext(cmd),
+		remote.PeerAttachOptions{
+			PeerID:    runtime.peerID,
+			BridgeDir: runtime.bridgeDir,
+			Live:      runtime.live,
+			PaneOwner: runtime.live,
+			Now:       nil,
+		},
+		bootstrap,
+	)
 	if err != nil {
 		return cliError("prepare_remote_peer_attach", err)
 	}
@@ -516,10 +548,16 @@ func runRemotePeerAttach(cmd *cobra.Command, args []string) error {
 		return streamErr
 	}
 
-	return cliError("run_remote_peer_attach", remote.RunPeerAttach(clibase.CommandContext(cmd), remote.PeerAttachOptions{
-		PeerID: runtime.peerID, BridgeDir: runtime.bridgeDir, Live: runtime.live, PaneOwner: runtime.live,
-		Now: nil,
-	}, args[0], remote.AttachStreams{In: in, Out: out, Err: errFile}))
+	return cliError(
+		"run_remote_peer_attach",
+		remote.RunPeerAttach(clibase.CommandContext(cmd), remote.PeerAttachOptions{
+			PeerID:    runtime.peerID,
+			BridgeDir: runtime.bridgeDir,
+			Live:      runtime.live,
+			PaneOwner: runtime.live,
+			Now:       nil,
+		}, args[0], remote.AttachStreams{In: in, Out: out, Err: errFile}),
+	)
 }
 
 func terminalFiles(cmd *cobra.Command) (*os.File, *os.File, *os.File, error) {
@@ -556,7 +594,10 @@ func outputFile(writer io.Writer) (*os.File, bool) {
 	return nil, false
 }
 
-func peerAgentSummaries(ctx context.Context, workspace app.Workspace) ([]session.AgentSummary, error) {
+func peerAgentSummaries(
+	ctx context.Context,
+	workspace app.Workspace,
+) ([]session.AgentSummary, error) {
 	observed, err := agents.LoadLiveAgents(ctx, workspace.AgentSource())
 	if err != nil {
 		return nil, oops.In("cli").With("operation", "load_remote_agents").Wrap(err)
@@ -622,18 +663,28 @@ func runRemotePeerLookup(cmd *cobra.Command, _ []string) (resultErr error) {
 
 	if runtime.receipts != nil {
 		defer func() {
-			resultErr = errors.Join(resultErr, cliError("close_remote_lookup", runtime.receipts.Close()))
+			resultErr = errors.Join(
+				resultErr,
+				cliError("close_remote_lookup", runtime.receipts.Close()),
+			)
 		}()
 	}
 
 	result := remote.ActionResult{
-		InvocationID: request.InvocationID, Action: "", OK: false, Code: action.CodeNotFound, Output: nil,
+		InvocationID: request.InvocationID,
+		Action:       "",
+		OK:           false,
+		Code:         action.CodeNotFound,
+		Output:       nil,
 	}
 	if runtime.receipts != nil {
 		result = remote.ExecutePeerLookup(runtime.receipts, runtime.peerID, request)
 	}
 
-	return cliError("write_remote_lookup_result", remote.WriteActionResult(cmd.OutOrStdout(), result))
+	return cliError(
+		"write_remote_lookup_result",
+		remote.WriteActionResult(cmd.OutOrStdout(), result),
+	)
 }
 
 func openLookupRuntime() (*lookupRuntime, error) {
@@ -707,7 +758,11 @@ func runRemoteLookup(cmd *cobra.Command, args []string) (resultErr error) {
 
 	result, runErr := remote.RunInvocationLookup(clibase.CommandContext(cmd), options, request)
 	output := lookupOutput{
-		InvocationID: result.InvocationID, Action: result.Action, OK: result.OK, Code: result.Code, Output: result.Output,
+		InvocationID: result.InvocationID,
+		Action:       result.Action,
+		OK:           result.OK,
+		Code:         result.Code,
+		Output:       result.Output,
 	}
 
 	if runErr != nil {

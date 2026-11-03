@@ -71,7 +71,11 @@ func runSupervisedCommand(
 			waitErr := cmd.Wait()
 			duration := now().Sub(start)
 
-			return HookStatusTimedOut, duration, errors.Join(context.DeadlineExceeded, waitErr, terminateErr)
+			return HookStatusTimedOut, duration, errors.Join(
+				context.DeadlineExceeded,
+				waitErr,
+				terminateErr,
+			)
 
 		case <-ticker.C:
 			done, status, duration, err := pollProcessState(probe, pgid, cmd, start, now)

@@ -19,11 +19,32 @@ func summaryResult() action.RestoredSnapshot {
 		Sessions:    []action.SessionRef{{Kind: session.KindLive, ID: "$1", Name: "agent"}},
 		Verified:    true,
 		Panes: []action.RestoredPane{
-			{PaneID: "p1", RuntimeID: "%1", Outcome: restore.PaneOutcomeNativeResumeDispatch, Location: "agent:3.0", Program: "claude"},
-			{PaneID: "p2", RuntimeID: "%2", Outcome: restore.PaneOutcomeRestartDispatch, Location: "agent:3.1", Program: "nvim"},
-			{PaneID: "p3", RuntimeID: "%3", Outcome: restore.PaneOutcomeUnsupported, Reason: "executable_deleted", Location: "agent:3.2", Program: "node"},
+			{
+				PaneID:    "p1",
+				RuntimeID: "%1",
+				Outcome:   restore.PaneOutcomeNativeResumeDispatch,
+				Location:  "agent:3.0",
+				Program:   "claude",
+			},
+			{
+				PaneID:    "p2",
+				RuntimeID: "%2",
+				Outcome:   restore.PaneOutcomeRestartDispatch,
+				Location:  "agent:3.1",
+				Program:   "nvim",
+			},
+			{
+				PaneID:    "p3",
+				RuntimeID: "%3",
+				Outcome:   restore.PaneOutcomeUnsupported,
+				Reason:    "executable_deleted",
+				Location:  "agent:3.2",
+				Program:   "node",
+			},
 		},
-		SessionsSkipped: []action.SkippedSession{{ID: "s0", Name: "0", Reason: restore.CollisionNameInUse}},
+		SessionsSkipped: []action.SkippedSession{
+			{ID: "s0", Name: "0", Reason: restore.CollisionNameInUse},
+		},
 	}
 }
 
@@ -106,7 +127,10 @@ func TestRestoreSummaryOffersSafeResumeWhenEffectsAreUncertain(t *testing.T) {
 	res.Uncertain = true
 
 	got := renderSummary(t, res, false)
-	if !strings.Contains(got, "sesh snapshot restore --generation d879e6dc156d244c6e807b18d070d558 --operation op-1") {
+	if !strings.Contains(
+		got,
+		"sesh snapshot restore --generation d879e6dc156d244c6e807b18d070d558 --operation op-1",
+	) {
 		t.Fatalf("an uncertain restore must say how to continue it safely:\n%s", got)
 	}
 }
@@ -116,7 +140,9 @@ func TestRestoreSummaryListsLayoutDifferencesWhenVerbose(t *testing.T) {
 
 	res := summaryResult()
 	res.Verified = false
-	res.Mismatches = []action.Mismatch{{Domain: restore.MismatchPane, Entity: "p2", Reason: "pane_geometry_mismatch"}}
+	res.Mismatches = []action.Mismatch{
+		{Domain: restore.MismatchPane, Entity: "p2", Reason: "pane_geometry_mismatch"},
+	}
 
 	summary := renderSummary(t, res, false)
 	if !strings.Contains(summary, "does not fully match the snapshot") {

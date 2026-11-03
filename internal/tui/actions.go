@@ -41,21 +41,36 @@ func (m *Model) runLiveSessionAction(target session.Session) tea.Cmd {
 
 	var agentView *agentViewStateUpdate
 	if target.ActivePaneID != "" {
-		agentView = &agentViewStateUpdate{identity: target.SemanticIdentity(), paneID: target.ActivePaneID}
+		agentView = &agentViewStateUpdate{
+			identity: target.SemanticIdentity(),
+			paneID:   target.ActivePaneID,
+		}
 	}
 
-	return m.sessionActionCommandWithAgentView(tuiOperationEnterLiveSession, target, agentView, func(ctx context.Context) (EnterOutcome, error) {
-		if m.deps.Enterer == nil {
-			return EnterOutcome{SessionName: target.Name, Action: EnterCompleted, Restored: false, Target: target}, errEnterUnavailable
-		}
+	return m.sessionActionCommandWithAgentView(
+		tuiOperationEnterLiveSession,
+		target,
+		agentView,
+		func(ctx context.Context) (EnterOutcome, error) {
+			if m.deps.Enterer == nil {
+				return EnterOutcome{
+					SessionName: target.Name,
+					Action:      EnterCompleted,
+					Restored:    false,
+					Target:      target,
+				}, errEnterUnavailable
+			}
 
-		outcome, err := m.deps.Enterer.EnterSession(ctx, target)
-		if err != nil {
-			return outcome, oops.In("tui").With("operation", "enter_live_session", "action", "enter_live").Wrap(err)
-		}
+			outcome, err := m.deps.Enterer.EnterSession(ctx, target)
+			if err != nil {
+				return outcome, oops.In("tui").
+					With("operation", "enter_live_session", "action", "enter_live").
+					Wrap(err)
+			}
 
-		return outcome, nil
-	})
+			return outcome, nil
+		},
+	)
 }
 
 func (m *Model) runAgentSessionAction(target session.Session, agent session.AgentSession) tea.Cmd {
@@ -122,7 +137,11 @@ func (m *Model) runAgentSessionAction(target session.Session, agent session.Agen
 			}
 		}
 
-		if err := m.deps.Panes.TmuxActivatePane(m.operationContext(), target, agent.PaneID); err != nil {
+		if err := m.deps.Panes.TmuxActivatePane(
+			m.operationContext(),
+			target,
+			agent.PaneID,
+		); err != nil {
 			return sessionActionResultMsg{
 				operation:      tuiOperationActivateAgentPane,
 				deferred:       false,
@@ -142,10 +161,12 @@ func (m *Model) runAgentSessionAction(target session.Session, agent session.Agen
 		view := &agentViewStateUpdate{identity: target.SemanticIdentity(), paneID: agent.PaneID}
 		if err := m.persistSessionState(m.operationContext(), target, view); err != nil {
 			return sessionActionResultMsg{
-				operation:      tuiOperationActivateAgentPane,
-				deferred:       false,
-				attach:         false,
-				err:            oops.In("tui").With("operation", "save_state", "action", "activate_agent_pane").Wrap(err),
+				operation: tuiOperationActivateAgentPane,
+				deferred:  false,
+				attach:    false,
+				err: oops.In("tui").
+					With("operation", "save_state", "action", "activate_agent_pane").
+					Wrap(err),
 				sessionName:    sessionName,
 				target:         target,
 				switchSession:  "",
@@ -268,7 +289,11 @@ func enterSwitchSession(outcome EnterOutcome) string {
 	return ""
 }
 
-func (m *Model) persistSessionState(ctx context.Context, target session.Session, agentView *agentViewStateUpdate) error {
+func (m *Model) persistSessionState(
+	ctx context.Context,
+	target session.Session,
+	agentView *agentViewStateUpdate,
+) error {
 	identity := target.SemanticIdentity()
 
 	if err := m.updateState(ctx, func(current *session.State) {
@@ -439,7 +464,10 @@ func (m *Model) handleEnter() func() (tea.Model, tea.Cmd) {
 func (m *Model) openSession(target session.Session) func() (tea.Model, tea.Cmd) {
 	switch target.Origin {
 	case session.OriginSSH:
-		return m.handleRemoteEnter(target, popupListRow{sessionIndex: 0, agentIndex: parentAgentIndex})
+		return m.handleRemoteEnter(
+			target,
+			popupListRow{sessionIndex: 0, agentIndex: parentAgentIndex},
+		)
 	case session.OriginBridge:
 		return m.runAction(action.SessionSwitch, action.SubjectOf(target), action.Values{})
 	case session.OriginLocal:
@@ -485,7 +513,11 @@ func (m *Model) attachRemote(target session.Session, paneID string) func() (tea.
 }
 
 func (m *Model) rejectRemoteAction(operation string) func() (tea.Model, tea.Cmd) {
-	m.setErrorStatusf("%s is not supported for remote sessions: %v", operation, errRemoteActionUnsupported)
+	m.setErrorStatusf(
+		"%s is not supported for remote sessions: %v",
+		operation,
+		errRemoteActionUnsupported,
+	)
 
 	return func() (tea.Model, tea.Cmd) { return m, nil }
 }
@@ -501,7 +533,10 @@ func (m *Model) remoteStatusTickCommand() tea.Cmd {
 		return nil
 	}
 
-	return tea.Tick(remoteStatusTickInterval, func(time.Time) tea.Msg { return remoteStatusTickMsg{now: time.Now()} })
+	return tea.Tick(
+		remoteStatusTickInterval,
+		func(time.Time) tea.Msg { return remoteStatusTickMsg{now: time.Now()} },
+	)
 }
 
 func (m *Model) handleRemoteStatusTick(now time.Time) {
@@ -511,7 +546,11 @@ func (m *Model) handleRemoteStatusTick(now time.Time) {
 
 	statuses := make(map[string]session.RemoteStatus, len(m.remoteCatalog.Connections))
 	for _, connection := range m.remoteCatalog.Connections {
-		statuses[connection.ID] = remoteConnectionStatus(connection, m.config.Remote.StaleAfter, now)
+		statuses[connection.ID] = remoteConnectionStatus(
+			connection,
+			m.config.Remote.StaleAfter,
+			now,
+		)
 	}
 
 	changed := false

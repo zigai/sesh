@@ -81,7 +81,8 @@ func runCoordinator(cmd *cobra.Command, _ []string) (resultErr error) {
 
 	if err := automation.EndAnnouncement(env.workspace.FinalSaveStatus); err != nil {
 		zerolog.Ctx(ctx).Warn().Str("component", "daemon").Str("operation", "run_lifecycle").
-			Str("status", "degraded").Str("reason", "announcement_not_ended").Func(logging.Cause(err)).
+			Str("status", "degraded").
+			Str("reason", "announcement_not_ended").Func(logging.Cause(err)).
 			Msg("final save status still marks an earlier shutdown or sleep")
 	}
 
@@ -92,7 +93,9 @@ func runCoordinator(cmd *cobra.Command, _ []string) (resultErr error) {
 		LiveStatus: func(statusCtx context.Context) (daemon.RuntimeLiveStatus, error) {
 			status, statusErr := logind.Status(statusCtx)
 			if statusErr != nil {
-				return daemon.RuntimeLiveStatus{}, oops.In("cli").With("operation", "query_live_logind_status").Wrap(statusErr)
+				return daemon.RuntimeLiveStatus{}, oops.In("cli").
+					With("operation", "query_live_logind_status").
+					Wrap(statusErr)
 			}
 
 			return daemon.RuntimeLiveStatus{InhibitorsHeld: status.InhibitorsHeld}, nil
@@ -121,7 +124,11 @@ func runCoordinator(cmd *cobra.Command, _ []string) (resultErr error) {
 	return nil
 }
 
-func coordinatorFinalSave(ctx context.Context, cmd *cobra.Command, env Env) (daemon.FinalSaveOutcome, error) {
+func coordinatorFinalSave(
+	ctx context.Context,
+	cmd *cobra.Command,
+	env Env,
+) (daemon.FinalSaveOutcome, error) {
 	_, saveErr, statusErr := runFinalSave(ctx, cmd, env, true)
 
 	return daemon.FinalSaveOutcome{Recorded: statusErr == nil}, errors.Join(saveErr, statusErr)
@@ -147,7 +154,10 @@ func ensureCoordinatorRepositoryReady(ctx context.Context, env Env) error {
 	}
 
 	if state.PendingOperations > 0 {
-		return errors.Join(errCoordinatorRecoveryBarrier, &automation.ActiveRestoresError{Operations: state.ActiveOperations})
+		return errors.Join(
+			errCoordinatorRecoveryBarrier,
+			&automation.ActiveRestoresError{Operations: state.ActiveOperations},
+		)
 	}
 
 	if state.RecoveryRequired {

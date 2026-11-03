@@ -15,28 +15,36 @@ import (
 )
 
 func newSnapshotSaveCommand() *cobra.Command {
-	return actioncli.Command(action.SnapshotSave, actioncli.Options[action.SaveSnapshot, action.SavedSnapshot]{
-		Operation:    "save",
-		SuccessOwned: true,
-		Configure:    nil,
-		Prepare:      nil,
-		Frontend:     nil,
-		Render:       renderSnapshotSave,
-	})
+	return actioncli.Command(
+		action.SnapshotSave,
+		actioncli.Options[action.SaveSnapshot, action.SavedSnapshot]{
+			Operation:    "save",
+			SuccessOwned: true,
+			Configure:    nil,
+			Prepare:      nil,
+			Frontend:     nil,
+			Render:       renderSnapshotSave,
+		},
+	)
 }
 
 func newSnapshotRestoreCommand() *cobra.Command {
-	return actioncli.Command(action.SnapshotRestore, actioncli.Options[action.RestoreSnapshot, action.RestoredSnapshot]{
-		Operation:    "restore",
-		SuccessOwned: true,
-		Configure: func(cmd *cobra.Command) {
-			cmd.Flags().Bool("pick", false, "Interactively select an immutable generation from the snapshot timeline")
-			cmd.Flags().Bool("verbose", false, "Also print the operation, per-pane outcomes and verification details")
+	return actioncli.Command(
+		action.SnapshotRestore,
+		actioncli.Options[action.RestoreSnapshot, action.RestoredSnapshot]{
+			Operation:    "restore",
+			SuccessOwned: true,
+			Configure: func(cmd *cobra.Command) {
+				cmd.Flags().
+					Bool("pick", false, "Interactively select an immutable generation from the snapshot timeline")
+				cmd.Flags().
+					Bool("verbose", false, "Also print the operation, per-pane outcomes and verification details")
+			},
+			Prepare:  prepareSnapshotRestore,
+			Frontend: nil,
+			Render:   renderSnapshotRestore,
 		},
-		Prepare:  prepareSnapshotRestore,
-		Frontend: nil,
-		Render:   renderSnapshotRestore,
-	})
+	)
 }
 
 func renderSnapshotSave(cmd *cobra.Command, output action.SavedSnapshot, err error) error {
@@ -48,7 +56,13 @@ func renderSnapshotSave(cmd *cobra.Command, output action.SavedSnapshot, err err
 		return clibase.WriteJSONResultError(cmd, output, err)
 	}
 
-	writeErr := clibase.WriteOutput(cmd, "Attempt:    %s\nGeneration: %s\nStatus:     %s\n", output.Attempt, output.Generation, output.Status)
+	writeErr := clibase.WriteOutput(
+		cmd,
+		"Attempt:    %s\nGeneration: %s\nStatus:     %s\n",
+		output.Attempt,
+		output.Generation,
+		output.Status,
+	)
 	if writeErr != nil {
 		return errors.Join(err, writeErr)
 	}
@@ -56,7 +70,11 @@ func renderSnapshotSave(cmd *cobra.Command, output action.SavedSnapshot, err err
 	return clibase.NewCommandResultError(err)
 }
 
-func prepareSnapshotRestore(ctx context.Context, cmd *cobra.Command, values action.Values) (bool, error) {
+func prepareSnapshotRestore(
+	ctx context.Context,
+	cmd *cobra.Command,
+	values action.Values,
+) (bool, error) {
 	if !restorePickerEnabled(cmd) {
 		return true, nil
 	}

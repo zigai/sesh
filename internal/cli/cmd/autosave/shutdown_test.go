@@ -28,7 +28,13 @@ func TestStartupWarnsWhenThePreviousBootEndedWithoutAFinalSaveOrCannotBeChecked(
 		{"no save recorded", 0, 0, "missing", ""},
 		{"saved since this boot", boot + 60, 0, "missing", ""},
 		{"final save after the last save", boot - 600, boot - 300, "written", ""},
-		{"final save older than the last save", boot - 600, boot - 9000, "written", reasonFinalSaveMissing},
+		{
+			"final save older than the last save",
+			boot - 600,
+			boot - 9000,
+			"written",
+			reasonFinalSaveMissing,
+		},
 		{"no final save ever", boot - 600, 0, "missing", reasonFinalSaveMissing},
 		{"final save status unreadable", boot - 600, 0, "corrupt", reasonFinalSaveUnverifiable},
 	}
@@ -53,7 +59,8 @@ func TestStartupWarnsWhenThePreviousBootEndedWithoutAFinalSaveOrCannotBeChecked(
 			}
 
 			if tc.wantWarn == reasonFinalSaveUnverifiable {
-				if !bytes.Contains(logs.Bytes(), []byte(`"reason":"final_save_unverifiable"`)) || !bytes.Contains(logs.Bytes(), []byte(`"error":`)) {
+				if !bytes.Contains(logs.Bytes(), []byte(`"reason":"final_save_unverifiable"`)) ||
+					!bytes.Contains(logs.Bytes(), []byte(`"error":`)) {
 					t.Fatalf("unverifiable final save record = %s", logs.Bytes())
 				}
 
@@ -75,7 +82,10 @@ func finalSaveStatusFixture(t *testing.T, kind string, completedAt int64) string
 
 	switch kind {
 	case "written":
-		status := automation.FinalSaveStatus{Result: automation.FinalSaveSaved, CompletedAtUnix: completedAt}
+		status := automation.FinalSaveStatus{
+			Result:          automation.FinalSaveSaved,
+			CompletedAtUnix: completedAt,
+		}
 		if err := automation.WriteFinalSaveStatus(statusPath, status); err != nil {
 			t.Fatal(err)
 		}

@@ -52,7 +52,12 @@ type ImportReport struct {
 	Missing     []MissingRequirement `json:"missingRequirements"`
 }
 
-func ImportScopedState(ctx context.Context, server *gotmux.Server, plan Plan, receipts map[string]string) (ImportReport, error) {
+func ImportScopedState(
+	ctx context.Context,
+	server *gotmux.Server,
+	plan Plan,
+	receipts map[string]string,
+) (ImportReport, error) {
 	report := ImportReport{
 		Sessions:    0,
 		Windows:     0,
@@ -63,7 +68,9 @@ func ImportScopedState(ctx context.Context, server *gotmux.Server, plan Plan, re
 	}
 
 	if server == nil {
-		return report, oops.In("snapshot.restore").Code("endpoint_required").Wrap(tmuxserver.ErrEndpoint)
+		return report, oops.In("snapshot.restore").
+			Code("endpoint_required").
+			Wrap(tmuxserver.ErrEndpoint)
 	}
 
 	report.Missing = ScopedStateRequirements(plan)
@@ -88,7 +95,12 @@ func ImportScopedState(ctx context.Context, server *gotmux.Server, plan Plan, re
 	return report, nil
 }
 
-func ObserveScopedStateConflicts(ctx context.Context, server *gotmux.Server, plan Plan, receipts map[string]string) ([]VerificationMismatch, error) {
+func ObserveScopedStateConflicts(
+	ctx context.Context,
+	server *gotmux.Server,
+	plan Plan,
+	receipts map[string]string,
+) ([]VerificationMismatch, error) {
 	identities, err := ResolveRuntimeIdentities(ctx, server, plan, receipts)
 	if err != nil {
 		return nil, err
@@ -118,7 +130,8 @@ func ScopedStateRequirements(plan Plan) []MissingRequirement {
 	}
 
 	for _, option := range plan.SourceGraph.Source.Options {
-		if option.Scope == "server" || option.Scope == "global-session" || option.Scope == "global-window" {
+		if option.Scope == "server" || option.Scope == "global-session" ||
+			option.Scope == "global-window" {
 			report.note("options", model.ReasonGlobalScopeOptionsNotApplied)
 		}
 	}
@@ -156,14 +169,28 @@ func (r *ImportReport) noteInheritedOptions(options []model.Option) {
 	}
 }
 
-func importSessionScopes(ctx context.Context, server *gotmux.Server, plan Plan, identities RuntimeIdentities, report *ImportReport) error {
+func importSessionScopes(
+	ctx context.Context,
+	server *gotmux.Server,
+	plan Plan,
+	identities RuntimeIdentities,
+	report *ImportReport,
+) error {
 	targetGlobal, err := environmentTable(ctx, server.Environment())
 	if err != nil {
 		return err
 	}
 
 	for _, session := range plan.SourceGraph.Sessions {
-		if err := importSessionScope(ctx, server, session, plan.SourceGraph.Source.Environment, identities, targetGlobal, report); err != nil {
+		if err := importSessionScope(
+			ctx,
+			server,
+			session,
+			plan.SourceGraph.Source.Environment,
+			identities,
+			targetGlobal,
+			report,
+		); err != nil {
 			return err
 		}
 	}
@@ -197,7 +224,12 @@ func importSessionScope(
 
 	expectedEnvironment := effectiveEnvironmentVariables(sourceGlobal, session.Environment)
 
-	variables, masked, err := applyEnvironment(ctx, expectedEnvironment, targetGlobal, handle.Environment())
+	variables, masked, err := applyEnvironment(
+		ctx,
+		expectedEnvironment,
+		targetGlobal,
+		handle.Environment(),
+	)
 	if err != nil {
 		return err
 	}
@@ -215,7 +247,13 @@ func importSessionScope(
 		report.note("options", model.ReasonTargetInheritedOptionsUnmasked)
 	}
 
-	environmentMatch, err := effectiveEnvironmentMatch(ctx, targetGlobal, handle.Environment(), sourceGlobal, session.Environment)
+	environmentMatch, err := effectiveEnvironmentMatch(
+		ctx,
+		targetGlobal,
+		handle.Environment(),
+		sourceGlobal,
+		session.Environment,
+	)
 	if err != nil {
 		return err
 	}
@@ -231,7 +269,13 @@ func importSessionScope(
 	return nil
 }
 
-func importWindowScopes(ctx context.Context, server *gotmux.Server, plan Plan, identities RuntimeIdentities, report *ImportReport) error {
+func importWindowScopes(
+	ctx context.Context,
+	server *gotmux.Server,
+	plan Plan,
+	identities RuntimeIdentities,
+	report *ImportReport,
+) error {
 	for _, window := range plan.SourceGraph.Windows {
 		runtimeID, ok := identities.Windows[window.ID]
 		if !ok {
@@ -264,7 +308,13 @@ func importWindowScopes(ctx context.Context, server *gotmux.Server, plan Plan, i
 	return nil
 }
 
-func importPaneScopes(ctx context.Context, server *gotmux.Server, plan Plan, identities RuntimeIdentities, report *ImportReport) error {
+func importPaneScopes(
+	ctx context.Context,
+	server *gotmux.Server,
+	plan Plan,
+	identities RuntimeIdentities,
+	report *ImportReport,
+) error {
 	for _, pane := range plan.SourceGraph.Panes {
 		runtimeID, ok := identities.Panes[pane.ID]
 		if !ok {
@@ -313,7 +363,12 @@ func resolveFailure(kind string, err error) error {
 		Wrap(err)
 }
 
-func applyOptions(ctx context.Context, expected []model.Option, scope optionScope, materializeInherited bool) (int, error) {
+func applyOptions(
+	ctx context.Context,
+	expected []model.Option,
+	scope optionScope,
+	materializeInherited bool,
+) (int, error) {
 	local, err := scope.ListWith(ctx, gotmux.ListOptionOptions{Inherited: false, Hooks: true})
 	if err != nil {
 		return 0, oops.In("snapshot.restore").
@@ -328,7 +383,11 @@ func applyOptions(ctx context.Context, expected []model.Option, scope optionScop
 	return applied, err
 }
 
-func applyWantedOptions(ctx context.Context, scope optionScope, wanted, live map[string]optionShape) (int, error) {
+func applyWantedOptions(
+	ctx context.Context,
+	scope optionScope,
+	wanted, live map[string]optionShape,
+) (int, error) {
 	applied := 0
 
 	for _, name := range slices.Sorted(maps.Keys(wanted)) {
@@ -367,7 +426,10 @@ func wantedOptions(expected []model.Option, materializeInherited bool) map[strin
 			continue
 		}
 
-		wanted[string(option.Name)] = optionShape{value: string(option.Value), present: option.Present}
+		wanted[string(option.Name)] = optionShape{
+			value:   string(option.Value),
+			present: option.Present,
+		}
 	}
 
 	return wanted
@@ -386,7 +448,8 @@ func hasUnsupportedInheritedOption(options []model.Option) bool {
 
 func hasMaterializableInheritedOption(options []model.Option) bool {
 	for _, option := range options {
-		if option.Inherited && option.Present && len(option.Name) > 0 && !inheritedOptionNotRepresentable(option) {
+		if option.Inherited && option.Present && len(option.Name) > 0 &&
+			!inheritedOptionNotRepresentable(option) {
 			return true
 		}
 	}
@@ -415,7 +478,11 @@ func optionEntries(entries []gotmux.OptionEntry) map[string]optionShape {
 	return values
 }
 
-func effectiveOptionsMatch(ctx context.Context, scope optionScope, expected []model.Option) (bool, error) {
+func effectiveOptionsMatch(
+	ctx context.Context,
+	scope optionScope,
+	expected []model.Option,
+) (bool, error) {
 	live, err := scope.ListWith(ctx, gotmux.ListOptionOptions{Inherited: true, Hooks: true})
 	if err != nil {
 		return false, oops.In("snapshot.restore").
@@ -449,7 +516,10 @@ func effectiveOptions(expected []model.Option) (map[string]optionShape, map[stri
 			continue
 		}
 
-		values[string(option.Name)] = optionShape{value: string(option.Value), present: option.Present}
+		values[string(option.Name)] = optionShape{
+			value:   string(option.Value),
+			present: option.Present,
+		}
 	}
 
 	return values, ignored
@@ -531,14 +601,22 @@ func environmentVariables(table map[environmentKey]environmentShape) []model.Var
 		}
 
 		variables = append(variables, model.Variable{
-			Name: model.Bytes(key.name), Value: model.Bytes(shape.value), State: state, Hidden: key.hidden,
+			Name: model.Bytes(
+				key.name,
+			),
+			Value:  model.Bytes(shape.value),
+			State:  state,
+			Hidden: key.hidden,
 		})
 	}
 
 	return variables
 }
 
-func environmentTable(ctx context.Context, scope gotmux.EnvironmentScope) (map[environmentKey]environmentShape, error) {
+func environmentTable(
+	ctx context.Context,
+	scope gotmux.EnvironmentScope,
+) (map[environmentKey]environmentShape, error) {
 	observed := map[environmentKey]environmentShape{}
 	seen := map[string]struct{}{}
 
@@ -707,20 +785,35 @@ func environmentChange(
 	return changed, nil
 }
 
-func setEnvironment(ctx context.Context, scope gotmux.EnvironmentScope, name string, variable model.Variable, live map[environmentKey]environmentShape) (bool, error) {
+func setEnvironment(
+	ctx context.Context,
+	scope gotmux.EnvironmentScope,
+	name string,
+	variable model.Variable,
+	live map[environmentKey]environmentShape,
+) (bool, error) {
 	current, present := live[environmentKey{name: name, hidden: variable.Hidden}]
 	if present && !current.unset && current.value == string(variable.Value) {
 		return false, nil
 	}
 
 	if variable.Hidden {
-		return true, environmentFailure("set_hidden", scope.SetHidden(ctx, name, string(variable.Value)))
+		return true, environmentFailure(
+			"set_hidden",
+			scope.SetHidden(ctx, name, string(variable.Value)),
+		)
 	}
 
 	return true, environmentFailure("set", scope.Set(ctx, name, string(variable.Value)))
 }
 
-func removeEnvironment(ctx context.Context, scope gotmux.EnvironmentScope, name string, variable model.Variable, live map[environmentKey]environmentShape) (bool, error) {
+func removeEnvironment(
+	ctx context.Context,
+	scope gotmux.EnvironmentScope,
+	name string,
+	variable model.Variable,
+	live map[environmentKey]environmentShape,
+) (bool, error) {
 	current, present := live[environmentKey{name: name, hidden: variable.Hidden}]
 	if present && current.unset {
 		return false, nil
@@ -729,7 +822,12 @@ func removeEnvironment(ctx context.Context, scope gotmux.EnvironmentScope, name 
 	return true, environmentFailure("remove", scope.Remove(ctx, name))
 }
 
-func unsetEnvironment(ctx context.Context, scope gotmux.EnvironmentScope, name string, live map[environmentKey]environmentShape) (bool, error) {
+func unsetEnvironment(
+	ctx context.Context,
+	scope gotmux.EnvironmentScope,
+	name string,
+	live map[environmentKey]environmentShape,
+) (bool, error) {
 	_, visible := live[environmentKey{name: name, hidden: false}]
 	_, hidden := live[environmentKey{name: name, hidden: true}]
 

@@ -21,8 +21,16 @@ var (
 		Subject: SubjectLiveSession,
 		Arity:   ArityMany,
 		Params: []Param{
-			newParam("process-enrichment", ParamBool, "Capture foreground process and native application recovery context").withDefault("true"),
-			newParam("process-env", ParamList, "Environment keys to capture for observed foreground processes [default: snapshot.process_environment]"),
+			newParam(
+				"process-enrichment",
+				ParamBool,
+				"Capture foreground process and native application recovery context",
+			).withDefault("true"),
+			newParam(
+				"process-env",
+				ParamList,
+				"Environment keys to capture for observed foreground processes [default: snapshot.process_environment]",
+			),
 		},
 		NeedsClient: false,
 		Interactive: false,
@@ -44,11 +52,31 @@ var (
 		Subject: SubjectSavedSession,
 		Arity:   ArityOptional,
 		Params: []Param{
-			newParam("generation", ParamText, "Generation ID to restore [default: the current generation]"),
-			newParam("operation", ParamText, "Restore under this operation ID; an existing operation resumes without replaying uncertain effects"),
-			newParam("no-processes", ParamBool, "Do not launch processes recorded in launch context"),
-			newParam("allow-missing-dir", ParamBool, "Fall back when a saved working directory does not exist"),
-			newParam("on-collision", ParamChoice, "Handle saved sessions whose names are already live; unset, restoring all sessions skips them and naming sessions fails").
+			newParam(
+				"generation",
+				ParamText,
+				"Generation ID to restore [default: the current generation]",
+			),
+			newParam(
+				"operation",
+				ParamText,
+				"Restore under this operation ID; an existing operation resumes without replaying uncertain effects",
+			),
+			newParam(
+				"no-processes",
+				ParamBool,
+				"Do not launch processes recorded in launch context",
+			),
+			newParam(
+				"allow-missing-dir",
+				ParamBool,
+				"Fall back when a saved working directory does not exist",
+			),
+			newParam(
+				"on-collision",
+				ParamChoice,
+				"Handle saved sessions whose names are already live; unset, restoring all sessions skips them and naming sessions fails",
+			).
 				withChoices(CollisionSkip, CollisionFail),
 		},
 		NeedsClient: false,
@@ -58,7 +86,12 @@ var (
 		InPicker:    false,
 		check:       nil,
 	}, bindRestoreSnapshot, func(out RestoredSnapshot) string {
-		return fmt.Sprintf("Restored %d of %d sessions (%s)", len(out.Sessions), len(out.Sessions)+len(out.SessionsSkipped), out.Status)
+		return fmt.Sprintf(
+			"Restored %d of %d sessions (%s)",
+			len(out.Sessions),
+			len(out.Sessions)+len(out.SessionsSkipped),
+			out.Status,
+		)
 	})
 )
 

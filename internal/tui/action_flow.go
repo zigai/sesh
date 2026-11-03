@@ -75,7 +75,12 @@ func (m *Model) invokeAction(id action.ID, values action.Values) func() (tea.Mod
 		return func() (tea.Model, tea.Cmd) { return m, nil }
 	}
 
-	request := pendingAction{entry: entry, subject: subject, values: maps.Clone(values), param: emptyParam()}
+	request := pendingAction{
+		entry:   entry,
+		subject: subject,
+		values:  maps.Clone(values),
+		param:   emptyParam(),
+	}
 	if request.values == nil {
 		request.values = action.Values{}
 	}
@@ -91,7 +96,11 @@ func (m *Model) invokeAction(id action.ID, values action.Values) func() (tea.Mod
 	return m.continueAction(request)
 }
 
-func (m *Model) runAction(definition action.Entry, subject action.Subject, values action.Values) func() (tea.Model, tea.Cmd) {
+func (m *Model) runAction(
+	definition action.Entry,
+	subject action.Subject,
+	values action.Values,
+) func() (tea.Model, tea.Cmd) {
 	descriptor := definition.Describe()
 	if err := m.actionAvailable(descriptor, subject); err != nil {
 		m.setErrorStatusf("%s unavailable: %v", descriptor.Title, err)
@@ -99,7 +108,9 @@ func (m *Model) runAction(definition action.Entry, subject action.Subject, value
 		return func() (tea.Model, tea.Cmd) { return m, nil }
 	}
 
-	return m.dispatchAction(pendingAction{entry: definition, subject: subject, values: values, param: emptyParam()})
+	return m.dispatchAction(
+		pendingAction{entry: definition, subject: subject, values: values, param: emptyParam()},
+	)
 }
 
 func (m *Model) actionAvailable(descriptor action.Descriptor, subject action.Subject) error {
@@ -107,7 +118,10 @@ func (m *Model) actionAvailable(descriptor action.Descriptor, subject action.Sub
 		return errActionsUnavailable
 	}
 
-	if err := descriptor.Available(action.Env{Accepts: m.deps.Actions.Accepts}, subject); err != nil {
+	if err := descriptor.Available(
+		action.Env{Accepts: m.deps.Actions.Accepts},
+		subject,
+	); err != nil {
 		return oops.In("tui").With("action", string(descriptor.ID)).Wrap(err)
 	}
 
@@ -128,7 +142,12 @@ func (m *Model) inboxSubject(descriptor action.Descriptor) (action.Subject, bool
 			at = action.Peer(found.host.identity.ConnectionID)
 		}
 
-		return action.Subject{At: at, Sessions: nil, Pane: string(found.live.AgentPane), Task: found.live.Record.ID}, true
+		return action.Subject{
+			At:       at,
+			Sessions: nil,
+			Pane:     string(found.live.AgentPane),
+			Task:     found.live.Record.ID,
+		}, true
 	}
 
 	if found.owner.ID == "" || (found.kind == inboxTaskRow && found.live.AgentPane == "") {
@@ -233,7 +252,11 @@ func (m *Model) suggestedPath(request pendingAction, param action.Param) (string
 		return "", oops.In("tui").With("operation", "suggest_path").Wrap(err)
 	}
 
-	return session.DefaultCreateSessionDirectory(cwd, request.values.String("name"), m.config.Settings.DefaultSessionPathSuggestion), nil
+	return session.DefaultCreateSessionDirectory(
+		cwd,
+		request.values.String("name"),
+		m.config.Settings.DefaultSessionPathSuggestion,
+	), nil
 }
 
 func (m *Model) submitParam(value string) func() (tea.Model, tea.Cmd) {
@@ -381,7 +404,8 @@ func (m *Model) handleActionResult(msg actionResultMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) recoverActionFailure(msg actionResultMsg) (tea.Cmd, bool) {
-	if msg.request.entry.Describe().ID != action.SessionCreate.ID || action.CodeOf(msg.err) != action.CodeAlreadyExists {
+	if msg.request.entry.Describe().ID != action.SessionCreate.ID ||
+		action.CodeOf(msg.err) != action.CodeAlreadyExists {
 		return nil, false
 	}
 
@@ -420,7 +444,9 @@ func (m *Model) followAction(msg actionResultMsg) tea.Cmd {
 		renamed := previous
 		renamed.Name = output.Name
 
-		m.recordActionState(func(current *session.State) { current.RenameSessionIdentity(previous, renamed) })
+		m.recordActionState(
+			func(current *session.State) { current.RenameSessionIdentity(previous, renamed) },
+		)
 	case action.DeletedSession:
 		deleted := msg.request.subject.Sessions[0].SemanticIdentity()
 

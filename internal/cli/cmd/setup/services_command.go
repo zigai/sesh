@@ -31,7 +31,9 @@ var (
 	errSetupProgramRequired  = errors.New("the sesh executable path is required")
 	errSetupBlockedArtifacts = errors.New("some service definitions have unmet prerequisites")
 	errSetupForeignArtifacts = errors.New("some service definitions are not owned by sesh")
-	errSetupTmuxRequired     = errors.New("--tmux is required for the managed tmux service definition")
+	errSetupTmuxRequired     = errors.New(
+		"--tmux is required for the managed tmux service definition",
+	)
 )
 
 type serviceJSON struct {
@@ -99,9 +101,16 @@ func newSetupAgentsCommand() *cobra.Command {
 	cmd.Flags().Bool("dry-run", false, "Show changes without writing")
 	cmd.Flags().Bool("force", false, "Replace integration files that AHT does not own")
 	cmd.Flags().Bool("shim", false, "Install a wrapper executable instead of editing harness files")
-	cmd.Flags().Bool("status", false, "Report integration and tracker state without changing anything")
+	cmd.Flags().
+		Bool("status", false, "Report integration and tracker state without changing anything")
 	cmd.Flags().String("tracker", setup.TrackerEnable, "Tracker operation")
-	clibase.SetFlagChoices(cmd, "tracker", setup.TrackerEnable, setup.TrackerDisable, setup.TrackerStatus)
+	clibase.SetFlagChoices(
+		cmd,
+		"tracker",
+		setup.TrackerEnable,
+		setup.TrackerDisable,
+		setup.TrackerStatus,
+	)
 	cmd.Flags().String("target-binary", "", "Explicit harness executable path for a shim")
 	clibase.AddJSONFlag(cmd)
 
@@ -188,12 +197,22 @@ func renderSetupAgents(cmd *cobra.Command, result setup.AgentResult) error {
 		verb = "Would configure"
 	}
 
-	if err := clibase.WriteOutput(cmd, "%s %d agent integration(s).\n", verb, len(result.Harnesses)); err != nil {
+	if err := clibase.WriteOutput(
+		cmd,
+		"%s %d agent integration(s).\n",
+		verb,
+		len(result.Harnesses),
+	); err != nil {
 		return err
 	}
 
 	for _, item := range result.Harnesses {
-		if err := clibase.WriteOutput(cmd, "  %s: %s\n", item.Harness, agentStatusLine(item)); err != nil {
+		if err := clibase.WriteOutput(
+			cmd,
+			"  %s: %s\n",
+			item.Harness,
+			agentStatusLine(item),
+		); err != nil {
 			return err
 		}
 
@@ -241,8 +260,10 @@ func newSetupServicesCommand() *cobra.Command {
 
 	addServiceSetupFlags(cmd)
 	cmd.Flags().Bool("with-tmux-service", false, "Advanced: add a managed tmux server")
-	cmd.Flags().Bool("with-coordinator", false, "Also render the sleep and shutdown save coordinator definition")
-	cmd.Flags().Bool("verify-tmux", false, "Verify the target tmux version through the given socket before rendering the tmux service")
+	cmd.Flags().
+		Bool("with-coordinator", false, "Also render the sleep and shutdown save coordinator definition")
+	cmd.Flags().
+		Bool("verify-tmux", false, "Verify the target tmux version through the given socket before rendering the tmux service")
 
 	return cmd
 }
@@ -250,16 +271,20 @@ func newSetupServicesCommand() *cobra.Command {
 func addServiceSetupFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("apply", false, "Write the rendered definitions to the service directory")
 	cmd.Flags().Bool("force", false, "Replace service files that sesh does not own")
-	cmd.Flags().String("dir", "", "Service directory to render into [default: the platform user service directory]")
-	cmd.Flags().String("program", "", "Absolute path of the sesh executable [default: the running sesh executable]")
+	cmd.Flags().
+		String("dir", "", "Service directory to render into [default: the platform user service directory]")
+	cmd.Flags().
+		String("program", "", "Absolute path of the sesh executable [default: the running sesh executable]")
 	cmd.Flags().String("tmux", "", "Explicit absolute path of the tmux executable")
-	cmd.Flags().String("socket", "", "Socket of the tmux server the services target [default: the sesh-managed socket with --with-tmux-service, else tmux's default socket]")
+	cmd.Flags().
+		String("socket", "", "Socket of the tmux server the services target [default: the sesh-managed socket with --with-tmux-service, else tmux's default socket]")
 	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
 	cmd.Flags().String("lease-root", "", clibase.LeaseRootFlagUsage)
 	cmd.Flags().String("history", "", clibase.HistoryFlagUsage)
 	cmd.Flags().String("status-file", "", clibase.StatusFileFlagUsage)
 	cmd.Flags().Duration("interval", 0, "Autosave interval [default: autosave.interval setting]")
-	cmd.Flags().Duration("final-save-deadline", defaultServiceFinalSaveDeadline, "Bounded time budget for the shutdown final save")
+	cmd.Flags().
+		Duration("final-save-deadline", defaultServiceFinalSaveDeadline, "Bounded time budget for the shutdown final save")
 	clibase.AddJSONFlag(cmd)
 }
 
@@ -315,7 +340,10 @@ func resolveServiceInputs(cmd *cobra.Command, withTmux bool) (setup.ServiceInput
 	return inputs, nil
 }
 
-func resolveServiceTiming(cmd *cobra.Command, cfg *config.Config) (time.Duration, time.Duration, error) {
+func resolveServiceTiming(
+	cmd *cobra.Command,
+	cfg *config.Config,
+) (time.Duration, time.Duration, error) {
 	interval, err := cmd.Flags().GetDuration("interval")
 	if err != nil {
 		return 0, 0, oops.In("cli").With("operation", "read_setup_flag").Wrap(err)
@@ -425,7 +453,15 @@ func applySetupDefinitionsWithManager(
 	var refreshed *setup.ServiceRefreshResult
 
 	if withContent {
-		result, refreshed, err = applyServiceChanges(cmd, definitions, plans, retired, force, operation, manager)
+		result, refreshed, err = applyServiceChanges(
+			cmd,
+			definitions,
+			plans,
+			retired,
+			force,
+			operation,
+			manager,
+		)
 	}
 
 	payload := servicesResultJSON{
@@ -493,15 +529,29 @@ func applyServiceChanges(
 		removed, err := setup.RetireDefinitions(cmd.Context(), retired, manager)
 		if err != nil {
 			return setup.ApplyResult{Written: 0, SkippedNames: nil, BlockedNames: nil},
-				&setup.ServiceRefreshResult{Reloaded: false, Restarted: nil, Recovered: nil, RestartRequired: nil, Removed: removed},
+				&setup.ServiceRefreshResult{
+					Reloaded:        false,
+					Restarted:       nil,
+					Recovered:       nil,
+					RestartRequired: nil,
+					Removed:         removed,
+				},
 				oops.In("cli").With("operation", "retire_services").Wrap(err)
 		}
 
-		result, refreshed, err := setup.RefreshDefinitions(cmd.Context(), definitions, plans, force, manager)
+		result, refreshed, err := setup.RefreshDefinitions(
+			cmd.Context(),
+			definitions,
+			plans,
+			force,
+			manager,
+		)
 		refreshed.Removed = removed
 
 		if err != nil {
-			return result, &refreshed, oops.In("cli").With("operation", "refresh_services").Wrap(err)
+			return result, &refreshed, oops.In("cli").
+				With("operation", "refresh_services").
+				Wrap(err)
 		}
 
 		return result, &refreshed, nil
@@ -531,7 +581,9 @@ func planServices(
 
 	retired, err := setup.PlanRetiredDefinitions(definitions)
 	if err != nil {
-		return nil, nil, oops.In("cli").With("operation", "plan_retired_service_definitions").Wrap(err)
+		return nil, nil, oops.In("cli").
+			With("operation", "plan_retired_service_definitions").
+			Wrap(err)
 	}
 
 	return plans, retired, nil
@@ -556,8 +608,13 @@ func retiredServiceEntries(retired []setup.ArtifactPlan) []serviceJSON {
 	return entries
 }
 
-func refreshesServiceManager(cmd *cobra.Command, definitions []setup.ServiceDefinition, operation string) bool {
-	return operation == "refresh" && inputsPlatform(definitions) == setup.PlatformLinux && !cmd.Flags().Changed("dir")
+func refreshesServiceManager(
+	cmd *cobra.Command,
+	definitions []setup.ServiceDefinition,
+	operation string,
+) bool {
+	return operation == "refresh" && inputsPlatform(definitions) == setup.PlatformLinux &&
+		!cmd.Flags().Changed("dir")
 }
 
 func serviceOutcome(payload servicesResultJSON) error {
@@ -565,12 +622,18 @@ func serviceOutcome(payload servicesResultJSON) error {
 	case len(payload.Blocked) > 0:
 		return clibase.NewExitError(
 			clibase.ExitCodeGeneral,
-			oops.In("cli").Code("setup_blocked").With("operation", "setup_services", "blocked", strings.Join(payload.Blocked, ", ")).Wrap(errSetupBlockedArtifacts),
+			oops.In("cli").
+				Code("setup_blocked").
+				With("operation", "setup_services", "blocked", strings.Join(payload.Blocked, ", ")).
+				Wrap(errSetupBlockedArtifacts),
 		)
 	case len(payload.Skipped) > 0:
 		return clibase.NewExitError(
 			clibase.ExitCodeGeneral,
-			oops.In("cli").Code("setup_blocked").With("operation", "setup_services", "skipped", strings.Join(payload.Skipped, ", ")).Wrap(errSetupForeignArtifacts),
+			oops.In("cli").
+				Code("setup_blocked").
+				With("operation", "setup_services", "skipped", strings.Join(payload.Skipped, ", ")).
+				Wrap(errSetupForeignArtifacts),
 		)
 	default:
 		return nil
@@ -668,7 +731,11 @@ func writeSetupServiceRefresh(out *strings.Builder, result *setup.ServiceRefresh
 	}
 
 	if len(result.Restarted) > 0 {
-		fmt.Fprintf(out, "Restarted %s to pick up the new definition and sesh binary.\n", strings.Join(result.Restarted, ", "))
+		fmt.Fprintf(
+			out,
+			"Restarted %s to pick up the new definition and sesh binary.\n",
+			strings.Join(result.Restarted, ", "),
+		)
 	}
 
 	if len(result.Recovered) > 0 {
@@ -676,7 +743,9 @@ func writeSetupServiceRefresh(out *strings.Builder, result *setup.ServiceRefresh
 	}
 
 	if len(result.RestartRequired) > 0 {
-		out.WriteString("Tmux startup changes take full effect the next time its server starts; live sessions were preserved.\n")
+		out.WriteString(
+			"Tmux startup changes take full effect the next time its server starts; live sessions were preserved.\n",
+		)
 	}
 }
 
@@ -692,8 +761,14 @@ func automaticSaveStates(
 
 	states, err := setup.UnitStates(ctx, manager, automaticSaveUnits(definitions))
 	if err != nil {
-		zerolog.Ctx(ctx).Warn().Str("component", "setup").Str("operation", "inspect_autosave_services").
-			Str("status", "degraded").Str("reason", "service_state_unavailable").Func(logging.Cause(err)).Msg("automatic save service readiness could not be verified")
+		zerolog.Ctx(ctx).
+			Warn().
+			Str("component", "setup").
+			Str("operation", "inspect_autosave_services").
+			Str("status", "degraded").
+			Str("reason", "service_state_unavailable").
+			Func(logging.Cause(err)).
+			Msg("automatic save service readiness could not be verified")
 
 		return nil
 	}
@@ -707,8 +782,14 @@ func automaticSaveStates(
 	}
 
 	if len(failed) > 0 {
-		zerolog.Ctx(ctx).Warn().Str("component", "setup").Str("operation", "inspect_autosave_services").
-			Str("status", "degraded").Str("reason", "service_failed").Int("failed", len(failed)).Strs("units", failed).
+		zerolog.Ctx(ctx).
+			Warn().
+			Str("component", "setup").
+			Str("operation", "inspect_autosave_services").
+			Str("status", "degraded").
+			Str("reason", "service_failed").
+			Int("failed", len(failed)).
+			Strs("units", failed).
 			Msg("automatic save services are failing")
 	}
 
@@ -728,7 +809,8 @@ func automaticSaveUnits(definitions []setup.ServiceDefinition) []string {
 }
 
 func isAutomaticSaveUnit(name string) bool {
-	return name == setup.AutosaveTimerName || name == setup.CoordinatorServiceName || name == setup.TmuxServiceName
+	return name == setup.AutosaveTimerName || name == setup.CoordinatorServiceName ||
+		name == setup.TmuxServiceName
 }
 
 func renderSetupServiceNextSteps(cmd *cobra.Command, payload servicesResultJSON) error {
@@ -736,7 +818,8 @@ func renderSetupServiceNextSteps(cmd *cobra.Command, payload servicesResultJSON)
 		return clibase.WriteOutput(cmd, "\nTo install, repeat this command with --apply.\n")
 	}
 
-	if payload.Platform != setup.PlatformLinux || payload.Manager == nil || !payload.Manager.Reloaded {
+	if payload.Platform != setup.PlatformLinux || payload.Manager == nil ||
+		!payload.Manager.Reloaded {
 		return nil
 	}
 
@@ -751,13 +834,21 @@ func renderSetupServiceNextSteps(cmd *cobra.Command, payload servicesResultJSON)
 	return writeAutomaticSaveReadiness(cmd, units, payload.Units)
 }
 
-func writeAutomaticSaveReadiness(cmd *cobra.Command, units []string, states []setup.UnitState) error {
+func writeAutomaticSaveReadiness(
+	cmd *cobra.Command,
+	units []string,
+	states []setup.UnitState,
+) error {
 	if len(units) == 0 {
 		return nil
 	}
 
 	if states == nil {
-		return clibase.WriteOutput(cmd, "\nTo start automatic saves:\n  systemctl --user enable --now %s\n", strings.Join(units, " "))
+		return clibase.WriteOutput(
+			cmd,
+			"\nTo start automatic saves:\n  systemctl --user enable --now %s\n",
+			strings.Join(units, " "),
+		)
 	}
 
 	var (
@@ -776,14 +867,27 @@ func writeAutomaticSaveReadiness(cmd *cobra.Command, units []string, states []se
 	}
 
 	for _, name := range failing {
-		fmt.Fprintf(&out, "\n%s is failing; see why with:\n  journalctl --user -u %s -n 20\n", name, name)
+		fmt.Fprintf(
+			&out,
+			"\n%s is failing; see why with:\n  journalctl --user -u %s -n 20\n",
+			name,
+			name,
+		)
 	}
 
 	switch {
 	case len(failing) == 0 && len(pending) == 0:
-		fmt.Fprintf(&out, "\nAutomatic saves are on: %s enabled and running.\n", strings.Join(units, ", "))
+		fmt.Fprintf(
+			&out,
+			"\nAutomatic saves are on: %s enabled and running.\n",
+			strings.Join(units, ", "),
+		)
 	case len(pending) > 0:
-		fmt.Fprintf(&out, "\nTo start automatic saves:\n  systemctl --user enable --now %s\n", strings.Join(pending, " "))
+		fmt.Fprintf(
+			&out,
+			"\nTo start automatic saves:\n  systemctl --user enable --now %s\n",
+			strings.Join(pending, " "),
+		)
 	}
 
 	return clibase.WriteOutput(cmd, "%s", out.String())
@@ -813,7 +917,9 @@ func resolveSetupProgram(cmd *cobra.Command) (string, error) {
 	if program == "" {
 		executable, err := os.Executable()
 		if err != nil {
-			return "", oops.In("cli").With("operation", "resolve_executable").Wrap(errors.Join(errSetupProgramRequired, err))
+			return "", oops.In("cli").
+				With("operation", "resolve_executable").
+				Wrap(errors.Join(errSetupProgramRequired, err))
 		}
 
 		program = executable

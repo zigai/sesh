@@ -87,7 +87,12 @@ func TestToggleRejectsStaleEndpointsAndCorruptStateWithoutNavigation(t *testing.
 
 			_, err := n.Toggle(zerolog.New(&logs).WithContext(t.Context()), agents.NavigationGlobal)
 			if err == nil || len(controller.activated) != before || logs.Len() != 0 {
-				t.Fatalf("error = %v, activations = %v, logs = %q", err, controller.activated, logs.String())
+				t.Fatalf(
+					"error = %v, activations = %v, logs = %q",
+					err,
+					controller.activated,
+					logs.String(),
+				)
 			}
 		})
 	}
@@ -97,29 +102,44 @@ func TestToggleActivationFailurePreservesBothStatesAndIndependentRollbackFailure
 	t.Parallel()
 
 	for _, rollbackFails := range []bool{false, true} {
-		t.Run(map[bool]string{false: "restored", true: "cleanup_cause_retained"}[rollbackFails], func(t *testing.T) {
-			t.Parallel()
-			n, controller := establishedToggle(t)
-			previous := controller.historyMap["\x00sesh-agent-toggle\x00client"]
-			history := controller.history
+		t.Run(
+			map[bool]string{false: "restored", true: "cleanup_cause_retained"}[rollbackFails],
+			func(t *testing.T) {
+				t.Parallel()
+				n, controller := establishedToggle(t)
+				previous := controller.historyMap["\x00sesh-agent-toggle\x00client"]
+				history := controller.history
 
-			controller.activateErr = errFakeActivation
-			if rollbackFails {
-				controller.toggleFailAt = len(controller.toggleWrites) + 2
-				controller.toggleWriteErr = errFakeRollback
-			}
+				controller.activateErr = errFakeActivation
+				if rollbackFails {
+					controller.toggleFailAt = len(controller.toggleWrites) + 2
+					controller.toggleWriteErr = errFakeRollback
+				}
 
-			var logs bytes.Buffer
+				var logs bytes.Buffer
 
-			_, err := n.Toggle(zerolog.New(&logs).WithContext(t.Context()), agents.NavigationGlobal)
-			if !errors.Is(err, errFakeActivation) || errors.Is(err, errFakeRollback) != rollbackFails || controller.history != history || logs.Len() != 0 {
-				t.Fatalf("error = %v, history = %q, logs = %q", err, controller.history, logs.String())
-			}
+				_, err := n.Toggle(
+					zerolog.New(&logs).WithContext(t.Context()),
+					agents.NavigationGlobal,
+				)
+				if !errors.Is(err, errFakeActivation) ||
+					errors.Is(err, errFakeRollback) != rollbackFails ||
+					controller.history != history ||
+					logs.Len() != 0 {
+					t.Fatalf(
+						"error = %v, history = %q, logs = %q",
+						err,
+						controller.history,
+						logs.String(),
+					)
+				}
 
-			if !rollbackFails && controller.historyMap["\x00sesh-agent-toggle\x00client"] != previous {
-				t.Fatal("toggle pair was not restored")
-			}
-		})
+				if !rollbackFails &&
+					controller.historyMap["\x00sesh-agent-toggle\x00client"] != previous {
+					t.Fatal("toggle pair was not restored")
+				}
+			},
+		)
 	}
 }
 
@@ -127,31 +147,42 @@ func TestFocusOrdinaryPaneAndUnavailableRegistryPreserveLastAgent(t *testing.T) 
 	t.Parallel()
 
 	for _, unavailable := range []bool{false, true} {
-		t.Run(map[bool]string{false: "ordinary_pane", true: "unavailable_registry"}[unavailable], func(t *testing.T) {
-			t.Parallel()
-			n, controller := establishedToggle(t)
+		t.Run(
+			map[bool]string{false: "ordinary_pane", true: "unavailable_registry"}[unavailable],
+			func(t *testing.T) {
+				t.Parallel()
+				n, controller := establishedToggle(t)
 
-			if unavailable {
-				var err error
+				if unavailable {
+					var err error
 
-				n, err = agents.NewNavigator(agents.NavigatorOptions{Controller: controller, Source: fakeSource{err: errFakeActivation}})
+					n, err = agents.NewNavigator(
+						agents.NavigatorOptions{
+							Controller: controller,
+							Source:     fakeSource{err: errFakeActivation},
+						},
+					)
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+
+				target, err := n.Focus(
+					t.Context(),
+					agents.FocusTarget{PaneID: "%3", SessionID: "$1"},
+				)
 				if err != nil {
 					t.Fatal(err)
 				}
-			}
 
-			target, err := n.Focus(t.Context(), agents.FocusTarget{PaneID: "%3", SessionID: "$1"})
-			if err != nil {
-				t.Fatal(err)
-			}
+				controller.current = paneContext(target, "client")
 
-			controller.current = paneContext(target, "client")
-
-			target, err = n.Toggle(t.Context(), agents.NavigationGlobal)
-			if err != nil || target.PaneID != "%2" {
-				t.Fatalf("target = %+v, error = %v", target, err)
-			}
-		})
+				target, err = n.Toggle(t.Context(), agents.NavigationGlobal)
+				if err != nil || target.PaneID != "%2" {
+					t.Fatalf("target = %+v, error = %v", target, err)
+				}
+			},
+		)
 	}
 }
 
@@ -173,7 +204,8 @@ func TestAgentNavigationChangesAgentWithoutChangingWorkingPaneAndNoopKeepsPair(t
 		t.Fatal(err)
 	}
 
-	if len(controller.toggleWrites) != pairWrites || len(controller.historyWrites) != historyWrites {
+	if len(controller.toggleWrites) != pairWrites ||
+		len(controller.historyWrites) != historyWrites {
 		t.Fatal("already focused agent changed navigation state")
 	}
 
@@ -190,7 +222,10 @@ func TestFocusLinkedAgentRecognizesOwnerAndKeepsInvokingSession(t *testing.T) {
 	alias := panes[1]
 	alias.SessionID = "$1"
 	alias.SessionName = firstSessionName
-	controller := &fakeController{current: paneContext(panes[0], "client"), panes: append(panes, alias)}
+	controller := &fakeController{
+		current: paneContext(panes[0], "client"),
+		panes:   append(panes, alias),
+	}
 	n := newFakeNavigator(t, controller, []aht.Session{idleSessionAt(panes[1], 1)})
 
 	target, err := n.Focus(t.Context(), agents.FocusTarget{PaneID: "%2"})

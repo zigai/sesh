@@ -82,7 +82,10 @@ func ResourceRows(sample, previous ResourceSample, targets []ResourceTarget) Row
 	return rows
 }
 
-func aggregateResourceTargets(sample, previous ResourceSample, targets []ResourceTarget) (map[string]resourceTotals, map[string]resourceTotals, map[string]resourceTotals) {
+func aggregateResourceTargets(
+	sample, previous ResourceSample,
+	targets []ResourceTarget,
+) (map[string]resourceTotals, map[string]resourceTotals, map[string]resourceTotals) {
 	children := make(map[int][]int)
 	for pid, process := range sample.Processes {
 		children[process.ParentPID] = append(children[process.ParentPID], pid)
@@ -105,7 +108,10 @@ func aggregateResourceTargets(sample, previous ResourceSample, targets []Resourc
 		paneTotals[target.PaneID] = total
 		windowKey := target.SessionKey + ":" + strconv.Itoa(target.WindowIndex)
 		windowTotals[windowKey] = addResourceTotals(windowTotals[windowKey], total)
-		sessionTotals[target.SessionKey] = addResourceTotals(sessionTotals[target.SessionKey], total)
+		sessionTotals[target.SessionKey] = addResourceTotals(
+			sessionTotals[target.SessionKey],
+			total,
+		)
 	}
 
 	return paneTotals, windowTotals, sessionTotals
@@ -119,7 +125,11 @@ func addResourceTotals(current, next resourceTotals) resourceTotals {
 	return current
 }
 
-func measurePaneSubtree(rootPID int, sample, previous ResourceSample, children map[int][]int) (resourceTotals, bool) {
+func measurePaneSubtree(
+	rootPID int,
+	sample, previous ResourceSample,
+	children map[int][]int,
+) (resourceTotals, bool) {
 	var total resourceTotals
 
 	seen := make(map[int]bool)
@@ -146,8 +156,12 @@ func measurePaneSubtree(rootPID int, sample, previous ResourceSample, children m
 		found = true
 
 		total.memory += process.RSSBytes
-		if prior, ok := previous.Processes[pid]; canUsePrevious && ok && prior.StartTime == process.StartTime && process.CPUTicks >= prior.CPUTicks {
-			total.cpu += float64(process.CPUTicks-prior.CPUTicks) / cpuTicksPerSecond / delta.Seconds() * percentScale
+		if prior, ok := previous.Processes[pid]; canUsePrevious && ok &&
+			prior.StartTime == process.StartTime &&
+			process.CPUTicks >= prior.CPUTicks {
+			total.cpu += float64(
+				process.CPUTicks-prior.CPUTicks,
+			) / cpuTicksPerSecond / delta.Seconds() * percentScale
 		} else {
 			total.pending = true
 		}
@@ -172,9 +186,19 @@ func cpuCell(total resourceTotals) layout.Cell {
 		return layout.Cell{Text: "", State: layout.Pending, Role: "", Variants: nil}
 	}
 
-	return layout.Cell{Text: strconv.FormatFloat(total.cpu, 'f', 0, 64) + "%", State: layout.Present, Role: "", Variants: nil}
+	return layout.Cell{
+		Text:     strconv.FormatFloat(total.cpu, 'f', 0, 64) + "%",
+		State:    layout.Present,
+		Role:     "",
+		Variants: nil,
+	}
 }
 
 func memoryCell(total resourceTotals) layout.Cell {
-	return layout.Cell{Text: strconv.FormatUint(total.memory/bytesPerMiB, 10) + "MiB", State: layout.Present, Role: "", Variants: nil}
+	return layout.Cell{
+		Text:     strconv.FormatUint(total.memory/bytesPerMiB, 10) + "MiB",
+		State:    layout.Present,
+		Role:     "",
+		Variants: nil,
+	}
 }

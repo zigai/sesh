@@ -93,7 +93,13 @@ func (m *Model) loadSessions() error {
 		)
 		m.sessionLoadErr = result.catalogErr
 	} else if m.sessionLoadErr != nil {
-		logTUILoadTransition(m.operationContext(), tuiOperationLoadCatalog, m.sessionLoadErr, nil, tuiLogOutcomeFailure)
+		logTUILoadTransition(
+			m.operationContext(),
+			tuiOperationLoadCatalog,
+			m.sessionLoadErr,
+			nil,
+			tuiLogOutcomeFailure,
+		)
 		m.sessionLoadErr = nil
 	}
 
@@ -238,18 +244,26 @@ func loadSessionRows(ctx context.Context, cfg *config.Config, deps Services) ses
 	}
 }
 
-func loadInitialSessionRows(ctx context.Context, cfg *config.Config, deps Services) sessionLoadResultMsg {
+func loadInitialSessionRows(
+	ctx context.Context,
+	cfg *config.Config,
+	deps Services,
+) sessionLoadResultMsg {
 	deps.OriginBridge = nil
 
 	return loadSessionRows(ctx, cfg, deps)
 }
 
-func applyAgentSummaries(rows []session.Session, summaries []session.AgentSummary) []session.Session {
+func applyAgentSummaries(
+	rows []session.Session,
+	summaries []session.AgentSummary,
+) []session.Session {
 	result := slices.Clone(rows)
 	byID, byName := indexAgentSummaries(summaries)
 
 	for index := range result {
-		if result[index].Origin == session.OriginSSH || result[index].Origin == session.OriginBridge {
+		if result[index].Origin == session.OriginSSH ||
+			result[index].Origin == session.OriginBridge {
 			continue
 		}
 
@@ -270,7 +284,10 @@ func loadAgentSummaries(
 
 	snapshot, err := deps.Agents.LoadAgentSummaries(ctx)
 	if err != nil {
-		return nil, oops.In("tui").Code("load_agents_failed").With("operation", "load_agent_summaries").Wrap(err)
+		return nil, oops.In("tui").
+			Code("load_agents_failed").
+			With("operation", "load_agent_summaries").
+			Wrap(err)
 	}
 
 	return liveAgentSummaries(snapshot), nil
@@ -326,7 +343,9 @@ func agentDisplayModeEnabled(modes []string) bool {
 	return false
 }
 
-func indexAgentSummaries(summaries []session.AgentSummary) (map[string]session.AgentSummary, map[string]session.AgentSummary) {
+func indexAgentSummaries(
+	summaries []session.AgentSummary,
+) (map[string]session.AgentSummary, map[string]session.AgentSummary) {
 	byID := make(map[string]session.AgentSummary, len(summaries))
 	byName := make(map[string]session.AgentSummary, len(summaries))
 	idCounts := make(map[string]int, len(summaries))
@@ -503,7 +522,13 @@ func (m *Model) applySessionRows(result sessionLoadResultMsg) []agentViewStateUp
 
 	m.sessions = rows
 	if !acceptLoadedRemote || result.remoteErr != nil {
-		m.sessions = mergeRemoteSessionRows(localSessionRows(rows), m.remoteCatalog, m.config, m.state, time.Now())
+		m.sessions = mergeRemoteSessionRows(
+			localSessionRows(rows),
+			m.remoteCatalog,
+			m.config,
+			m.state,
+			time.Now(),
+		)
 	}
 
 	if m.acceptsLoadedAgents(result) {
@@ -620,12 +645,19 @@ func (m *Model) handleOriginSessions(msg originSessionsMsg) {
 }
 
 func (m *Model) observeOriginLoad(err error) {
-	logTUILoadTransition(m.operationContext(), tuiOperationLoadOriginSessions, m.originLoadErr, err, tuiLogOutcomeDegradation)
+	logTUILoadTransition(
+		m.operationContext(),
+		tuiOperationLoadOriginSessions,
+		m.originLoadErr,
+		err,
+		tuiLogOutcomeDegradation,
+	)
 	m.originLoadErr = err
 }
 
 func (m *Model) startRemoteCatalogWatchCommand() tea.Cmd {
-	if !remoteSessionsEnabled(m.config, m.deps) || m.deps.RemoteWatcher == nil || m.remoteCatalogWatchStarted {
+	if !remoteSessionsEnabled(m.config, m.deps) || m.deps.RemoteWatcher == nil ||
+		m.remoteCatalogWatchStarted {
 		return nil
 	}
 
@@ -710,7 +742,13 @@ func (m *Model) handleRemoteCatalog(msg remoteCatalogMsg) {
 	}
 
 	selected := m.selectedSessionIdentity()
-	m.sessions = mergeRemoteSessionRows(localSessionRows(m.sessions), m.remoteCatalog, m.config, m.state, time.Now())
+	m.sessions = mergeRemoteSessionRows(
+		localSessionRows(m.sessions),
+		m.remoteCatalog,
+		m.config,
+		m.state,
+		time.Now(),
+	)
 	m.refreshDisplaySessions()
 	m.filterSessions()
 	m.restoreSelectedSession(selected)
@@ -946,7 +984,13 @@ func (m *Model) loadAgentSummariesCommand() tea.Cmd {
 
 		summaries, err := loadAgentSummaries(ctx, cfg, deps)
 
-		return agentSummariesMsg{summaries: summaries, revision: 0, polled: true, observation: observation, err: err}
+		return agentSummariesMsg{
+			summaries:   summaries,
+			revision:    0,
+			polled:      true,
+			observation: observation,
+			err:         err,
+		}
 	}
 }
 
@@ -967,19 +1011,22 @@ func (m *Model) startAgentSummaryWatchCommand() tea.Cmd {
 		}
 		defer m.lifecycle.EndWorker()
 
-		watchErr := watcher.WatchAgentSummaries(ctx, func(revision uint64, snapshot AgentSnapshot, err error) error {
-			summaries := snapshot.Summaries
-			if err == nil {
-				summaries = liveAgentSummaries(snapshot)
-			}
+		watchErr := watcher.WatchAgentSummaries(
+			ctx,
+			func(revision uint64, snapshot AgentSnapshot, err error) error {
+				summaries := snapshot.Summaries
+				if err == nil {
+					summaries = liveAgentSummaries(snapshot)
+				}
 
-			select {
-			case updates <- agentSummariesMsg{summaries: summaries, revision: revision, polled: false, observation: 0, err: err}:
-				return nil
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-		})
+				select {
+				case updates <- agentSummariesMsg{summaries: summaries, revision: revision, polled: false, observation: 0, err: err}:
+					return nil
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			},
+		)
 
 		if shouldReportAgentWatchError(ctx, watchErr, pollAvailable) {
 			select {
@@ -1025,7 +1072,10 @@ func (m *Model) agentSummaryWatchEnabled() bool {
 
 func (m *Model) handleSessionLoadResult(msg sessionLoadResultMsg) tea.Cmd {
 	if m.popupStartup == popupStartupWaiting {
-		logTUIFirstFrame(m.operationContext(), firstFrameTimingAt(m.initializedAt, m.launchedAt, &msg.timing, time.Now()))
+		logTUIFirstFrame(
+			m.operationContext(),
+			firstFrameTimingAt(m.initializedAt, m.launchedAt, &msg.timing, time.Now()),
+		)
 	}
 
 	m.popupStartup = popupStartupContent
@@ -1151,7 +1201,10 @@ func (m *Model) agentClockTickCommand() tea.Cmd {
 		return nil
 	}
 
-	return tea.Tick(definition.Cadence.Interval, func(time.Time) tea.Msg { return agentClockTickMsg{} })
+	return tea.Tick(
+		definition.Cadence.Interval,
+		func(time.Time) tea.Msg { return agentClockTickMsg{} },
+	)
 }
 
 func (m *Model) handleRefresh() {
@@ -1162,7 +1215,10 @@ func (m *Model) handleRefresh() {
 
 func (m *Model) applyCatalogStatus(status session.CatalogStatus) {
 	if status == session.StatusPartial {
-		m.setDegradedSource(degradedSourceCatalog, "Session list is incomplete: some sources could not be read")
+		m.setDegradedSource(
+			degradedSourceCatalog,
+			"Session list is incomplete: some sources could not be read",
+		)
 
 		return
 	}
@@ -1177,7 +1233,10 @@ func (m *Model) applyRemoteStatus(err error) {
 		return
 	}
 
-	m.setDegradedSource(degradedSourceRemote, "Remote sessions unavailable: cache could not be read")
+	m.setDegradedSource(
+		degradedSourceRemote,
+		"Remote sessions unavailable: cache could not be read",
+	)
 }
 
 func (m *Model) applyAgentSummaryStatus(err error) {
@@ -1187,7 +1246,10 @@ func (m *Model) applyAgentSummaryStatus(err error) {
 		return
 	}
 
-	m.setDegradedSource(degradedSourceAgents, "Agent status unavailable: inventory could not be read")
+	m.setDegradedSource(
+		degradedSourceAgents,
+		"Agent status unavailable: inventory could not be read",
+	)
 }
 
 func inboxModeEnabled(cfg *config.Config) bool {

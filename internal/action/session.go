@@ -18,8 +18,18 @@ var (
 		Arity:   ArityOne,
 		Params: []Param{
 			newParam("name", ParamText, "Session name").required().positional().fromQuery(),
-			newParam("dir", ParamPath, "Initial working directory").withShort("d").suggest(SuggestSessionDirectory).createWith("create-dir"),
-			newParam("create-dir", ParamBool, "Create the working directory when it does not exist"),
+			newParam(
+				"dir",
+				ParamPath,
+				"Initial working directory",
+			).withShort("d").
+				suggest(SuggestSessionDirectory).
+				createWith("create-dir"),
+			newParam(
+				"create-dir",
+				ParamBool,
+				"Create the working directory when it does not exist",
+			),
 		},
 		NeedsClient: false,
 		Interactive: false,
@@ -32,13 +42,15 @@ var (
 	})
 
 	SessionRename = define(Descriptor{
-		ID:          "session.rename",
-		Title:       "Rename session",
-		Summary:     "Rename a live tmux session",
-		Help:        "Rename a live tmux session and update its switch history.",
-		Subject:     SubjectLiveSession,
-		Arity:       ArityOne,
-		Params:      []Param{newParam("name", ParamText, "New session name").required().positional()},
+		ID:      "session.rename",
+		Title:   "Rename session",
+		Summary: "Rename a live tmux session",
+		Help:    "Rename a live tmux session and update its switch history.",
+		Subject: SubjectLiveSession,
+		Arity:   ArityOne,
+		Params: []Param{
+			newParam("name", ParamText, "New session name").required().positional(),
+		},
 		NeedsClient: false,
 		Interactive: false,
 		Destructive: false,
@@ -90,7 +102,12 @@ var (
 	}, func(subject Subject, values Values) (DeleteSession, error) {
 		return DeleteSession{Session: RefOf(subject.Sessions[0]), Force: values.Bool("force")}, nil
 	}, func(out DeletedSession) string {
-		return fmt.Sprintf("Deleted session %s (live killed: %t, saved generations: %d)", out.Name, out.LiveKilled, out.SavedGenerations)
+		return fmt.Sprintf(
+			"Deleted session %s (live killed: %t, saved generations: %d)",
+			out.Name,
+			out.LiveKilled,
+			out.SavedGenerations,
+		)
 	})
 
 	SessionSwitch = define(Descriptor{
@@ -227,7 +244,11 @@ func (ref SessionRef) Session(at Location) session.Session {
 }
 
 func bindCreateSession(_ Subject, values Values) (CreateSession, error) {
-	return CreateSession{Name: values.String("name"), Directory: values.String("dir"), CreateDirectory: values.Bool("create-dir")}, nil
+	return CreateSession{
+		Name:            values.String("name"),
+		Directory:       values.String("dir"),
+		CreateDirectory: values.Bool("create-dir"),
+	}, nil
 }
 
 func forceParam(usage string) Param {

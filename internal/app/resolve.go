@@ -16,7 +16,12 @@ import (
 
 var errUnresolvableSubject = errors.New("action subject cannot be selected by name")
 
-func (local *Local) ResolveSubject(ctx context.Context, kind action.SubjectKind, generation string, selectors []string) (action.Subject, error) {
+func (local *Local) ResolveSubject(
+	ctx context.Context,
+	kind action.SubjectKind,
+	generation string,
+	selectors []string,
+) (action.Subject, error) {
 	subject := action.Subject{At: action.Local(), Sessions: nil, Pane: "", Task: ""}
 
 	switch kind {
@@ -73,7 +78,10 @@ func (local *Local) resolvePane(ctx context.Context, paneID string) (session.Ses
 		return session.Session{}, oops.In("app").With("operation", "list_panes").Wrap(err)
 	}
 
-	index := slices.IndexFunc(panes, func(pane agents.PaneLocation) bool { return pane.PaneID == paneID })
+	index := slices.IndexFunc(
+		panes,
+		func(pane agents.PaneLocation) bool { return pane.PaneID == paneID },
+	)
 	if index < 0 {
 		return session.Session{}, action.Wrap(action.CodeNotFound, agents.ErrPaneNotLive)
 	}
@@ -81,7 +89,11 @@ func (local *Local) resolvePane(ctx context.Context, paneID string) (session.Ses
 	return local.findLive(ctx, panes[index].SessionID)
 }
 
-func (local *Local) resolveSession(ctx context.Context, kind action.SubjectKind, generation, selector string) (session.Session, error) {
+func (local *Local) resolveSession(
+	ctx context.Context,
+	kind action.SubjectKind,
+	generation, selector string,
+) (session.Session, error) {
 	switch kind {
 	case action.SubjectLiveSession:
 		return local.resolveLive(ctx, selector)
@@ -115,7 +127,10 @@ func (local *Local) resolveLive(ctx context.Context, selector string) (session.S
 	return target, nil
 }
 
-func (local *Local) resolveSaved(ctx context.Context, generation, selector string) (session.Session, error) {
+func (local *Local) resolveSaved(
+	ctx context.Context,
+	generation, selector string,
+) (session.Session, error) {
 	repo, found, err := local.useRepository(ctx, false)
 	if err != nil {
 		return session.Session{}, err

@@ -38,7 +38,11 @@ func repeatedReader(ctx context.Context, r *Repository, id string) error {
 }
 
 func singleRetention(ctx context.Context, r *Repository) error {
-	_, err := r.RetainPolicy(ctx, time.Time{}, RetentionPolicy{MaxAge: 0, MaxCount: minimumRetained, MaxBytes: 0})
+	_, err := r.RetainPolicy(
+		ctx,
+		time.Time{},
+		RetentionPolicy{MaxAge: 0, MaxCount: minimumRetained, MaxBytes: 0},
+	)
 
 	return err
 }
@@ -55,7 +59,12 @@ func TestCollectionConcurrentWithReadsPinsAndRetention(t *testing.T) {
 
 	current := generations[len(generations)-1]
 
-	op, err := r.Pin(t.Context(), generations[0].ID, model.Bytes("synthetic-target"), []Action{{ID: actionLaunch, Kind: actionLaunch, State: actionPlanned}})
+	op, err := r.Pin(
+		t.Context(),
+		generations[0].ID,
+		model.Bytes("synthetic-target"),
+		[]Action{{ID: actionLaunch, Kind: actionLaunch, State: actionPlanned}},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

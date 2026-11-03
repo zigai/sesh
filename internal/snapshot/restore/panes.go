@@ -28,7 +28,11 @@ type PaneResult struct {
 	VerificationReason string `json:"verificationReason,omitempty"`
 }
 
-func PanesFromVerifiedRuntime(plan Plan, runtimePanes map[string]string, launchProcesses bool) []PaneResult {
+func PanesFromVerifiedRuntime(
+	plan Plan,
+	runtimePanes map[string]string,
+	launchProcesses bool,
+) []PaneResult {
 	results := make([]PaneResult, 0, len(plan.SourceGraph.Panes))
 
 	for _, pane := range plan.SourceGraph.Panes {

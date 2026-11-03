@@ -96,7 +96,11 @@ type placed struct {
 func Size(cfg *config.Config, opts Options) (int, int) {
 	probe := NewModel(cfg, opts)
 	width := probe.bodyWidth()
-	rows := 1 + len(placeChoices(probe.agents(), valueColumn, width)) + len(probe.machineChoices(width))
+	rows := 1 + len(
+		placeChoices(probe.agents(), valueColumn, width),
+	) + len(
+		probe.machineChoices(width),
+	)
 
 	switch {
 	case opts.Problem != "":
@@ -129,8 +133,15 @@ func (m *Model) layout() layout {
 	machineChoices := m.machineChoices(bodyWidth)
 	below := 1 + len(agentChoices) + len(machineChoices) + 1
 	geometry := layout{
-		bodyWidth: bodyWidth, agentTop: 1, agentChoices: agentChoices, machineTop: 1 + len(agentChoices),
-		machineChoices: machineChoices, showsWhere: false, whereTop: 0, listTop: 0, listRows: 0,
+		bodyWidth:      bodyWidth,
+		agentTop:       1,
+		agentChoices:   agentChoices,
+		machineTop:     1 + len(agentChoices),
+		machineChoices: machineChoices,
+		showsWhere:     false,
+		whereTop:       0,
+		listTop:        0,
+		listRows:       0,
 	}
 
 	switch {
@@ -155,7 +166,11 @@ func (m *Model) render() string {
 
 	switch m.stage {
 	case stageFailed:
-		return m.frame(m.renderFailure(geometry.bodyWidth, m.height-frameRows), geometry.bodyWidth, m.footer(failedHints()))
+		return m.frame(
+			m.renderFailure(geometry.bodyWidth, m.height-frameRows),
+			geometry.bodyWidth,
+			m.footer(failedHints()),
+		)
 	case stageStarting:
 		return m.frame(m.renderForm(geometry), geometry.bodyWidth, m.chrome.Muted(startingLabel))
 	case stagePicking:
@@ -180,11 +195,24 @@ func (m *Model) renderForm(geometry layout) []string {
 	body := make([]string, 0, m.height-frameRows)
 	body = append(body, m.field(titleLabel, m.focus == fieldTitle, " "+m.title.View()))
 	body = append(body, m.renderAgents(geometry)...)
-	body = append(body, m.renderChoiceRows(machineLabel, m.machineNames(), m.options.Machine, geometry.machineChoices)...)
+	body = append(
+		body,
+		m.renderChoiceRows(
+			machineLabel,
+			m.machineNames(),
+			m.options.Machine,
+			geometry.machineChoices,
+		)...)
 
 	switch {
 	case m.options.Problem != "":
-		body = append(body, "", m.chrome.Muted(strings.Repeat(" ", rowGutter)+tui.SanitizeTerminalText(m.options.Problem)))
+		body = append(
+			body,
+			"",
+			m.chrome.Muted(
+				strings.Repeat(" ", rowGutter)+tui.SanitizeTerminalText(m.options.Problem),
+			),
+		)
 	case m.options.Expanded:
 		filter := m.chrome.Label(filterLabel, m.focus == fieldList) + " " + m.filter.View()
 		body = append(body, "", strings.Repeat(" ", rowGutter)+filter)
@@ -200,7 +228,10 @@ func (m *Model) renderForm(geometry layout) []string {
 			name, detail := m.place(place)
 			detail = tui.SanitizeTerminalText(detail)
 			padded := name + strings.Repeat(" ", max(placeColumns-lipgloss.Width(name), 1))
-			body = append(body, m.chrome.Row(padded+detail, "", place == m.where, geometry.bodyWidth))
+			body = append(
+				body,
+				m.chrome.Row(padded+detail, "", place == m.where, geometry.bodyWidth),
+			)
 		}
 	}
 
@@ -213,7 +244,12 @@ func (m *Model) place(place where) (string, string) {
 		location := m.options.Locations[0]
 		title := strings.TrimSpace(m.title.Value())
 
-		return "new worktree", task.NewBranch(title, location.Branch, m.options.NextNumber, m.options.Branches)
+		return "new worktree", task.NewBranch(
+			title,
+			location.Branch,
+			m.options.NextNumber,
+			m.options.Branches,
+		)
 	case whereHere:
 		current, ok := m.current()
 		if !ok {
@@ -232,7 +268,13 @@ func (m *Model) place(place where) (string, string) {
 }
 
 func (m *Model) field(label string, focused bool, value string) string {
-	return m.chrome.Label(label, focused) + strings.Repeat(" ", labelColumns-lipgloss.Width(label)) + labelGap + value
+	return m.chrome.Label(
+		label,
+		focused,
+	) + strings.Repeat(
+		" ",
+		labelColumns-lipgloss.Width(label),
+	) + labelGap + value
 }
 
 func (m *Model) renderChoices(choices []string, selected int) string {
@@ -255,11 +297,17 @@ func (m *Model) lines() []listLine {
 	for position, index := range m.rows {
 		current := m.all[index].section
 		if position == 0 || m.all[m.rows[position-1]].section != current {
-			lines = append(lines, listLine{section: current, heading: true, row: 0, lastOfSection: false})
+			lines = append(
+				lines,
+				listLine{section: current, heading: true, row: 0, lastOfSection: false},
+			)
 		}
 
 		last := position == len(m.rows)-1 || m.all[m.rows[position+1]].section != current
-		lines = append(lines, listLine{section: current, heading: false, row: position, lastOfSection: last})
+		lines = append(
+			lines,
+			listLine{section: current, heading: false, row: position, lastOfSection: last},
+		)
 	}
 
 	return lines
@@ -293,7 +341,12 @@ func (m *Model) renderAgents(geometry layout) []string {
 		return []string{m.field(agentLabel, false, m.chrome.Muted(noAgents))}
 	}
 
-	return m.renderChoiceRows(agentLabel, agents, slices.Index(agents, m.agent), geometry.agentChoices)
+	return m.renderChoiceRows(
+		agentLabel,
+		agents,
+		slices.Index(agents, m.agent),
+		geometry.agentChoices,
+	)
 }
 
 func (m *Model) machineChoices(width int) [][]placed {
@@ -322,7 +375,12 @@ func (m *Model) machineNames() []string {
 	return names
 }
 
-func (m *Model) renderChoiceRows(label string, names []string, selected int, rows [][]placed) []string {
+func (m *Model) renderChoiceRows(
+	label string,
+	names []string,
+	selected int,
+	rows [][]placed,
+) []string {
 	lines := make([]string, 0, len(rows))
 
 	for row, choices := range rows {
@@ -368,7 +426,9 @@ func (m *Model) frame(body []string, bodyWidth int, footer string) string {
 
 	title := " " + popupTitle + " "
 	if m.options.Project != "" {
-		title = " " + popupTitle + m.chrome.Muted(" · "+tui.SanitizeTerminalText(m.options.Project)) + " "
+		title = " " + popupTitle + m.chrome.Muted(
+			" · "+tui.SanitizeTerminalText(m.options.Project),
+		) + " "
 	}
 
 	if footer != "" {
@@ -378,14 +438,31 @@ func (m *Model) frame(body []string, bodyWidth int, footer string) string {
 	var out strings.Builder
 
 	out.WriteString(m.chrome.Border("┌─") + title)
-	out.WriteString(m.chrome.Border(strings.Repeat("─", max(total-cornerColumns-lipgloss.Width(title), 0)) + "┐"))
+	out.WriteString(
+		m.chrome.Border(
+			strings.Repeat("─", max(total-cornerColumns-lipgloss.Width(title), 0)) + "┐",
+		),
+	)
 
 	for _, line := range body {
-		out.WriteString("\n" + m.chrome.Border("│") + " " + m.chrome.Pad(line, bodyWidth) + " " + m.chrome.Border("│"))
+		out.WriteString(
+			"\n" + m.chrome.Border(
+				"│",
+			) + " " + m.chrome.Pad(
+				line,
+				bodyWidth,
+			) + " " + m.chrome.Border(
+				"│",
+			),
+		)
 	}
 
 	out.WriteString("\n" + m.chrome.Border("└─") + footer)
-	out.WriteString(m.chrome.Border(strings.Repeat("─", max(total-cornerColumns-lipgloss.Width(footer), 0)) + "┘"))
+	out.WriteString(
+		m.chrome.Border(
+			strings.Repeat("─", max(total-cornerColumns-lipgloss.Width(footer), 0)) + "┘",
+		),
+	)
 
 	return out.String()
 }
@@ -394,8 +471,18 @@ func (m *Model) parts(entry row) rowParts {
 	location := entry.location
 	name, _ := label(entry)
 	parts := rowParts{
-		age: "", name: tui.SanitizeTerminalText(name), subject: "", label: "", added: "", deleted: "", ahead: "", behind: "",
-		addedRole: tui.SpanMuted, deletedRole: tui.SpanMuted, aheadRole: tui.SpanMuted, behindRole: tui.SpanMuted,
+		age:         "",
+		name:        tui.SanitizeTerminalText(name),
+		subject:     "",
+		label:       "",
+		added:       "",
+		deleted:     "",
+		ahead:       "",
+		behind:      "",
+		addedRole:   tui.SpanMuted,
+		deletedRole: tui.SpanMuted,
+		aheadRole:   tui.SpanMuted,
+		behindRole:  tui.SpanMuted,
 	}
 
 	switch {
@@ -407,7 +494,13 @@ func (m *Model) parts(entry row) rowParts {
 
 	if diff, ok := m.changes[location.Directory]; ok && location.Directory != "" {
 		parts.added, parts.deleted = "+"+strconv.Itoa(diff.Added), "-"+strconv.Itoa(diff.Deleted)
-		parts.addedRole, parts.deletedRole = countRole(diff.Added, tui.SpanSuccess), countRole(diff.Deleted, tui.SpanError)
+		parts.addedRole, parts.deletedRole = countRole(
+			diff.Added,
+			tui.SpanSuccess,
+		), countRole(
+			diff.Deleted,
+			tui.SpanError,
+		)
 	}
 
 	ref, ok := m.ref(location)
@@ -426,7 +519,13 @@ func (m *Model) parts(entry row) rowParts {
 	parts.age = age(time.Unix(ref.Time, 0), m.options.Now)
 	parts.ahead, parts.behind = "↑"+strconv.Itoa(ref.Ahead), "↓"+strconv.Itoa(ref.Behind)
 
-	parts.aheadRole, parts.behindRole = countRole(ref.Ahead, tui.SpanPrimary), countRole(ref.Behind, tui.SpanSecondary)
+	parts.aheadRole, parts.behindRole = countRole(
+		ref.Ahead,
+		tui.SpanPrimary,
+	), countRole(
+		ref.Behind,
+		tui.SpanSecondary,
+	)
 
 	return parts
 }
@@ -586,7 +685,8 @@ func (s section) label() string {
 }
 
 func taskName(title string) string {
-	if title != "" && strings.IndexFunc(title, func(r rune) bool { return !unicode.IsDigit(r) }) < 0 {
+	if title != "" &&
+		strings.IndexFunc(title, func(r rune) bool { return !unicode.IsDigit(r) }) < 0 {
 		return "task " + title
 	}
 

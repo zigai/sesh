@@ -93,7 +93,11 @@ func (f *fakeStyles) ClearOwned(_ context.Context) error {
 	return nil
 }
 
-func trackerSession(paneID, windowID string, activity aht.Activity, presence aht.Presence) aht.Session {
+func trackerSession(
+	paneID, windowID string,
+	activity aht.Activity,
+	presence aht.Presence,
+) aht.Session {
 	return aht.Session{
 		ID:       "session-" + paneID,
 		Harness:  aht.HarnessOmp,
@@ -118,7 +122,10 @@ func TestTrackerRunningToIdleInInactiveWindowMarksUnread(t *testing.T) {
 	tracker := agents.NewTracker(styles, agents.DefaultTrackerOptions())
 	ctx := t.Context()
 
-	if err := tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityRunning, aht.PresenceLive)}); err != nil {
+	if err := tracker.HandleSnapshot(
+		ctx,
+		[]aht.Session{trackerSession("%1", "@1", aht.ActivityRunning, aht.PresenceLive)},
+	); err != nil {
 		t.Fatalf("running snapshot failed: %v", err)
 	}
 
@@ -130,7 +137,10 @@ func TestTrackerRunningToIdleInInactiveWindowMarksUnread(t *testing.T) {
 		t.Fatalf("running agent must not style its window, got %q", style)
 	}
 
-	if err := tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityIdle, aht.PresenceLive)}); err != nil {
+	if err := tracker.HandleSnapshot(
+		ctx,
+		[]aht.Session{trackerSession("%1", "@1", aht.ActivityIdle, aht.PresenceLive)},
+	); err != nil {
 		t.Fatalf("idle snapshot failed: %v", err)
 	}
 
@@ -143,7 +153,8 @@ func TestTrackerRunningToIdleInInactiveWindowMarksUnread(t *testing.T) {
 		t.Fatalf("window style = %q, want %q", style, expected)
 	}
 
-	if len(styles.setCalls) != 1 || styles.setCalls[0].WindowID != "@1" || styles.setCalls[0].Style != expected {
+	if len(styles.setCalls) != 1 || styles.setCalls[0].WindowID != "@1" ||
+		styles.setCalls[0].Style != expected {
 		t.Fatalf("style set calls = %+v", styles.setCalls)
 	}
 }
@@ -157,8 +168,14 @@ func TestTrackerActiveBypassSkipsUnreadInActiveWindow(t *testing.T) {
 	tracker := agents.NewTracker(styles, agents.DefaultTrackerOptions())
 	ctx := t.Context()
 
-	_ = tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityRunning, aht.PresenceLive)})
-	_ = tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityIdle, aht.PresenceLive)})
+	_ = tracker.HandleSnapshot(
+		ctx,
+		[]aht.Session{trackerSession("%1", "@1", aht.ActivityRunning, aht.PresenceLive)},
+	)
+	_ = tracker.HandleSnapshot(
+		ctx,
+		[]aht.Session{trackerSession("%1", "@1", aht.ActivityIdle, aht.PresenceLive)},
+	)
 
 	if tracker.PaneUnread("%1") {
 		t.Fatal("completion in the active window must not be unread")
@@ -181,8 +198,14 @@ func TestTrackerActiveBypassDisabledMarksUnread(t *testing.T) {
 	tracker := agents.NewTracker(styles, opts)
 	ctx := t.Context()
 
-	_ = tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityRunning, aht.PresenceLive)})
-	_ = tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityIdle, aht.PresenceLive)})
+	_ = tracker.HandleSnapshot(
+		ctx,
+		[]aht.Session{trackerSession("%1", "@1", aht.ActivityRunning, aht.PresenceLive)},
+	)
+	_ = tracker.HandleSnapshot(
+		ctx,
+		[]aht.Session{trackerSession("%1", "@1", aht.ActivityIdle, aht.PresenceLive)},
+	)
 
 	if !tracker.PaneUnread("%1") {
 		t.Fatal("ActiveBypass=false must mark completions unread")
@@ -198,8 +221,14 @@ func TestTrackerWindowVisitClearsUnread(t *testing.T) {
 	tracker := agents.NewTracker(styles, agents.DefaultTrackerOptions())
 	ctx := t.Context()
 
-	_ = tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityRunning, aht.PresenceLive)})
-	_ = tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityIdle, aht.PresenceLive)})
+	_ = tracker.HandleSnapshot(
+		ctx,
+		[]aht.Session{trackerSession("%1", "@1", aht.ActivityRunning, aht.PresenceLive)},
+	)
+	_ = tracker.HandleSnapshot(
+		ctx,
+		[]aht.Session{trackerSession("%1", "@1", aht.ActivityIdle, aht.PresenceLive)},
+	)
 
 	if !tracker.PaneUnread("%1") {
 		t.Fatal("expected unread before the visit")
@@ -207,7 +236,10 @@ func TestTrackerWindowVisitClearsUnread(t *testing.T) {
 
 	styles.setActive("%1", "@1", true, true)
 
-	_ = tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityIdle, aht.PresenceLive)})
+	_ = tracker.HandleSnapshot(
+		ctx,
+		[]aht.Session{trackerSession("%1", "@1", aht.ActivityIdle, aht.PresenceLive)},
+	)
 
 	if tracker.PaneUnread("%1") {
 		t.Fatal("visiting the window must clear unread")
@@ -231,11 +263,17 @@ func TestTrackerIdleUnreadLifecycleAcrossSessionVisits(t *testing.T) {
 	tracker := agents.NewTracker(styles, agents.DefaultTrackerOptions())
 	ctx := t.Context()
 
-	if err := tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityRunning, aht.PresenceLive)}); err != nil {
+	if err := tracker.HandleSnapshot(
+		ctx,
+		[]aht.Session{trackerSession("%1", "@1", aht.ActivityRunning, aht.PresenceLive)},
+	); err != nil {
 		t.Fatalf("running snapshot failed: %v", err)
 	}
 
-	if err := tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityIdle, aht.PresenceLive)}); err != nil {
+	if err := tracker.HandleSnapshot(
+		ctx,
+		[]aht.Session{trackerSession("%1", "@1", aht.ActivityIdle, aht.PresenceLive)},
+	); err != nil {
 		t.Fatalf("idle snapshot failed: %v", err)
 	}
 
@@ -243,7 +281,10 @@ func TestTrackerIdleUnreadLifecycleAcrossSessionVisits(t *testing.T) {
 		t.Fatal("expected unread on running -> idle in inactive window")
 	}
 
-	if err := tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityIdle, aht.PresenceLive)}); err != nil {
+	if err := tracker.HandleSnapshot(
+		ctx,
+		[]aht.Session{trackerSession("%1", "@1", aht.ActivityIdle, aht.PresenceLive)},
+	); err != nil {
 		t.Fatalf("second idle snapshot failed: %v", err)
 	}
 
@@ -253,7 +294,10 @@ func TestTrackerIdleUnreadLifecycleAcrossSessionVisits(t *testing.T) {
 
 	styles.setActive("%1", "@1", true, true)
 
-	if err := tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityIdle, aht.PresenceLive)}); err != nil {
+	if err := tracker.HandleSnapshot(
+		ctx,
+		[]aht.Session{trackerSession("%1", "@1", aht.ActivityIdle, aht.PresenceLive)},
+	); err != nil {
 		t.Fatalf("visited snapshot failed: %v", err)
 	}
 
@@ -263,7 +307,10 @@ func TestTrackerIdleUnreadLifecycleAcrossSessionVisits(t *testing.T) {
 
 	styles.setActive("%1", "@1", false, false)
 
-	if err := tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityIdle, aht.PresenceLive)}); err != nil {
+	if err := tracker.HandleSnapshot(
+		ctx,
+		[]aht.Session{trackerSession("%1", "@1", aht.ActivityIdle, aht.PresenceLive)},
+	); err != nil {
 		t.Fatalf("snapshot after leaving visited window failed: %v", err)
 	}
 
@@ -281,7 +328,10 @@ func TestTrackerClearsStyleWhenWindowLeftAsStateReturnsNormal(t *testing.T) {
 	tracker := agents.NewTracker(styles, agents.DefaultTrackerOptions())
 	ctx := t.Context()
 
-	if err := tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityWaiting, aht.PresenceLive)}); err != nil {
+	if err := tracker.HandleSnapshot(
+		ctx,
+		[]aht.Session{trackerSession("%1", "@1", aht.ActivityWaiting, aht.PresenceLive)},
+	); err != nil {
 		t.Fatalf("waiting snapshot failed: %v", err)
 	}
 
@@ -291,7 +341,10 @@ func TestTrackerClearsStyleWhenWindowLeftAsStateReturnsNormal(t *testing.T) {
 
 	styles.setActive("%1", "@1", true, false)
 
-	if err := tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityInterrupted, aht.PresenceLive)}); err != nil {
+	if err := tracker.HandleSnapshot(
+		ctx,
+		[]aht.Session{trackerSession("%1", "@1", aht.ActivityInterrupted, aht.PresenceLive)},
+	); err != nil {
 		t.Fatalf("interrupted snapshot failed: %v", err)
 	}
 
@@ -313,18 +366,27 @@ func TestTrackerReappliesStyleWhenWindowLeft(t *testing.T) {
 	tracker := agents.NewTracker(styles, agents.DefaultTrackerOptions())
 	ctx := t.Context()
 
-	if err := tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityWaiting, aht.PresenceLive)}); err != nil {
+	if err := tracker.HandleSnapshot(
+		ctx,
+		[]aht.Session{trackerSession("%1", "@1", aht.ActivityWaiting, aht.PresenceLive)},
+	); err != nil {
 		t.Fatalf("waiting snapshot failed: %v", err)
 	}
 
 	styles.setActive("%1", "@1", true, false)
 
-	if err := tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityWaiting, aht.PresenceLive)}); err != nil {
+	if err := tracker.HandleSnapshot(
+		ctx,
+		[]aht.Session{trackerSession("%1", "@1", aht.ActivityWaiting, aht.PresenceLive)},
+	); err != nil {
 		t.Fatalf("waiting snapshot after leaving failed: %v", err)
 	}
 
 	if len(styles.setCalls) != 2 {
-		t.Fatalf("set calls = %+v, want the waiting style reapplied after leaving the window", styles.setCalls)
+		t.Fatalf(
+			"set calls = %+v, want the waiting style reapplied after leaving the window",
+			styles.setCalls,
+		)
 	}
 }
 
@@ -345,7 +407,9 @@ func TestTrackerMultiPanePriority(t *testing.T) {
 		trackerSession("%3", "@1", aht.ActivityIdle, aht.PresenceLive),
 	})
 
-	if style := tracker.WindowStyle("@1"); style != agents.DefaultPalette[string(agents.StateWaiting)] {
+	if style := tracker.WindowStyle(
+		"@1",
+	); style != agents.DefaultPalette[string(agents.StateWaiting)] {
 		t.Fatalf("window style = %q, want waiting style", style)
 	}
 
@@ -355,7 +419,9 @@ func TestTrackerMultiPanePriority(t *testing.T) {
 		trackerSession("%3", "@1", aht.ActivityIdle, aht.PresenceLive),
 	})
 
-	if style := tracker.WindowStyle("@1"); style != agents.DefaultPalette[string(agents.StateFailed)] {
+	if style := tracker.WindowStyle(
+		"@1",
+	); style != agents.DefaultPalette[string(agents.StateFailed)] {
 		t.Fatalf("window style = %q, want failed style", style)
 	}
 
@@ -379,13 +445,19 @@ func TestTrackerClearsStyleWhenSessionGone(t *testing.T) {
 	tracker := agents.NewTracker(styles, agents.DefaultTrackerOptions())
 	ctx := t.Context()
 
-	_ = tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityWaiting, aht.PresenceLive)})
+	_ = tracker.HandleSnapshot(
+		ctx,
+		[]aht.Session{trackerSession("%1", "@1", aht.ActivityWaiting, aht.PresenceLive)},
+	)
 
 	if tracker.WindowStyle("@1") == "" {
 		t.Fatal("expected a styled window while waiting")
 	}
 
-	_ = tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityWaiting, aht.PresenceGone)})
+	_ = tracker.HandleSnapshot(
+		ctx,
+		[]aht.Session{trackerSession("%1", "@1", aht.ActivityWaiting, aht.PresenceGone)},
+	)
 
 	if style := tracker.WindowStyle("@1"); style != "" {
 		t.Fatalf("window style = %q, want cleared after the session is gone", style)
@@ -455,7 +527,10 @@ func TestTrackerSkipsCycleWhenTmuxQueryFails(t *testing.T) {
 
 	tracker := agents.NewTracker(styles, agents.DefaultTrackerOptions())
 
-	if err := tracker.HandleSnapshot(t.Context(), []aht.Session{trackerSession("%1", "@1", aht.ActivityWaiting, aht.PresenceLive)}); err != nil {
+	if err := tracker.HandleSnapshot(
+		t.Context(),
+		[]aht.Session{trackerSession("%1", "@1", aht.ActivityWaiting, aht.PresenceLive)},
+	); err != nil {
 		t.Fatalf("HandleSnapshot must not fail the watch loop: %v", err)
 	}
 
@@ -515,7 +590,10 @@ func TestTrackerInterruptedSessionDoesNotStyle(t *testing.T) {
 
 	tracker := agents.NewTracker(styles, agents.DefaultTrackerOptions())
 
-	_ = tracker.HandleSnapshot(t.Context(), []aht.Session{trackerSession("%1", "@1", aht.ActivityInterrupted, aht.PresenceLive)})
+	_ = tracker.HandleSnapshot(
+		t.Context(),
+		[]aht.Session{trackerSession("%1", "@1", aht.ActivityInterrupted, aht.PresenceLive)},
+	)
 
 	if len(styles.setCalls) != 0 {
 		t.Fatalf("interrupted agents must not style windows: %+v", styles.setCalls)
@@ -531,7 +609,10 @@ func TestTrackerWindowVisitClearsFailedAlert(t *testing.T) {
 	tracker := agents.NewTracker(styles, agents.DefaultTrackerOptions())
 	ctx := t.Context()
 
-	_ = tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityFailed, aht.PresenceLive)})
+	_ = tracker.HandleSnapshot(
+		ctx,
+		[]aht.Session{trackerSession("%1", "@1", aht.ActivityFailed, aht.PresenceLive)},
+	)
 
 	if !tracker.PaneFailed("%1") {
 		t.Fatal("expected a failed alert")
@@ -539,7 +620,10 @@ func TestTrackerWindowVisitClearsFailedAlert(t *testing.T) {
 
 	styles.setActive("%1", "@1", true, true)
 
-	_ = tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityFailed, aht.PresenceLive)})
+	_ = tracker.HandleSnapshot(
+		ctx,
+		[]aht.Session{trackerSession("%1", "@1", aht.ActivityFailed, aht.PresenceLive)},
+	)
 
 	if tracker.PaneFailed("%1") {
 		t.Fatal("visiting the window must clear the failed alert")
@@ -555,8 +639,14 @@ func TestTrackerRunningClearsFailedAlert(t *testing.T) {
 	tracker := agents.NewTracker(styles, agents.DefaultTrackerOptions())
 	ctx := t.Context()
 
-	_ = tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityFailed, aht.PresenceLive)})
-	_ = tracker.HandleSnapshot(ctx, []aht.Session{trackerSession("%1", "@1", aht.ActivityRunning, aht.PresenceLive)})
+	_ = tracker.HandleSnapshot(
+		ctx,
+		[]aht.Session{trackerSession("%1", "@1", aht.ActivityFailed, aht.PresenceLive)},
+	)
+	_ = tracker.HandleSnapshot(
+		ctx,
+		[]aht.Session{trackerSession("%1", "@1", aht.ActivityRunning, aht.PresenceLive)},
+	)
 
 	if tracker.PaneFailed("%1") {
 		t.Fatal("a retry must clear the failed alert")
@@ -574,7 +664,10 @@ func TestTrackerCustomPalette(t *testing.T) {
 
 	tracker := agents.NewTracker(styles, opts)
 
-	_ = tracker.HandleSnapshot(t.Context(), []aht.Session{trackerSession("%1", "@1", aht.ActivityWaiting, aht.PresenceLive)})
+	_ = tracker.HandleSnapshot(
+		t.Context(),
+		[]aht.Session{trackerSession("%1", "@1", aht.ActivityWaiting, aht.PresenceLive)},
+	)
 
 	if style := tracker.WindowStyle("@1"); style != "fg=white,bg=blue" {
 		t.Fatalf("window style = %q, want the custom palette entry", style)

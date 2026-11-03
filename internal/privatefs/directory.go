@@ -146,7 +146,12 @@ func (d *Dir) File(name string, flags int) (*os.File, error) {
 		return nil, ErrUnsafe
 	}
 
-	fd, err := unix.Openat(int(d.file.Fd()), name, flags|unix.O_NOFOLLOW|unix.O_CLOEXEC|unix.O_NONBLOCK, 0o600)
+	fd, err := unix.Openat(
+		int(d.file.Fd()),
+		name,
+		flags|unix.O_NOFOLLOW|unix.O_CLOEXEC|unix.O_NONBLOCK,
+		0o600,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("open private file: %w", err)
 	}
@@ -220,7 +225,12 @@ func (d *Dir) Rename(name string, target *Dir, destination string) error {
 		return ErrUnsafe
 	}
 
-	if err := unix.Renameat(int(d.file.Fd()), name, int(target.file.Fd()), destination); err != nil {
+	if err := unix.Renameat(
+		int(d.file.Fd()),
+		name,
+		int(target.file.Fd()),
+		destination,
+	); err != nil {
 		return fmt.Errorf("rename private entry: %w", err)
 	}
 
@@ -292,7 +302,12 @@ func (d *Dir) child(name string, create, private bool) (*Dir, error) {
 		}
 	}
 
-	fd, err := unix.Openat(int(d.file.Fd()), name, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
+	fd, err := unix.Openat(
+		int(d.file.Fd()),
+		name,
+		unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC,
+		0,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("open private directory: %w", err)
 	}

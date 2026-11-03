@@ -37,7 +37,14 @@ func newCollisionFixture(t *testing.T, ctx context.Context) collisionFixture {
 	live := map[string]gotmux.Session{}
 
 	for _, name := range []string{"collision-kept", "collision-taken"} {
-		session, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: name, Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly})
+		session, err := server.NewSession(
+			ctx,
+			gotmux.NewSessionOptions{
+				Name:    name,
+				Program: gotmux.Exec("sleep", "300"),
+				Start:   gotmux.StartPolicyExistingOnly,
+			},
+		)
 		if err != nil {
 			t.Fatalf("NewSession %s failed: %v", name, err)
 		}
@@ -47,7 +54,11 @@ func newCollisionFixture(t *testing.T, ctx context.Context) collisionFixture {
 		live[name] = session
 	}
 
-	observation, err := capture.Observe(ctx, server, []gotmux.SessionID{live["collision-kept"].ID(), live["collision-taken"].ID()})
+	observation, err := capture.Observe(
+		ctx,
+		server,
+		[]gotmux.SessionID{live["collision-kept"].ID(), live["collision-taken"].ID()},
+	)
 	if err != nil {
 		t.Fatalf("capture.Observe failed: %v", err)
 	}
@@ -74,7 +85,10 @@ func newCollisionFixture(t *testing.T, ctx context.Context) collisionFixture {
 	}
 }
 
-func (f collisionFixture) config(sessions []string, policy engine.CollisionPolicy) engine.RestoreConfig {
+func (f collisionFixture) config(
+	sessions []string,
+	policy engine.CollisionPolicy,
+) engine.RestoreConfig {
 	return engine.RestoreConfig{
 		LeaseRoot:         f.leaseRoot,
 		Generation:        f.generation,
@@ -87,7 +101,12 @@ func (f collisionFixture) config(sessions []string, policy engine.CollisionPolic
 	}
 }
 
-func requireLiveSessionUntouched(t *testing.T, ctx context.Context, f collisionFixture, name string) {
+func requireLiveSessionUntouched(
+	t *testing.T,
+	ctx context.Context,
+	f collisionFixture,
+	name string,
+) {
 	t.Helper()
 
 	found, err := f.server.FindSession(ctx, name)
@@ -107,7 +126,12 @@ func TestEngineRestoreSkipsCollidingSessionAndRestoresTheRest(t *testing.T) {
 	fixture := newCollisionFixture(t, ctx)
 	repo := openFixture(t, ctx, fixture.repoDir)
 
-	result, err := engine.Restore(ctx, repo, fixture.server, fixture.config(nil, engine.CollisionPolicyDefault))
+	result, err := engine.Restore(
+		ctx,
+		repo,
+		fixture.server,
+		fixture.config(nil, engine.CollisionPolicyDefault),
+	)
 	if err != nil {
 		t.Fatalf("restoring around a collision must succeed: %v", err)
 	}
@@ -122,7 +146,10 @@ func TestEngineRestoreSkipsCollidingSessionAndRestoresTheRest(t *testing.T) {
 
 	if len(result.SessionsSkipped) != 1 || result.SessionsSkipped[0].Name != "collision-taken" ||
 		result.SessionsSkipped[0].ID != fixture.ids["collision-taken"] || result.SessionsSkipped[0].Reason != restore.CollisionNameInUse {
-		t.Fatalf("expected the colliding session to be reported by name and id, got %+v", result.SessionsSkipped)
+		t.Fatalf(
+			"expected the colliding session to be reported by name and id, got %+v",
+			result.SessionsSkipped,
+		)
 	}
 
 	if _, err := fixture.server.FindSession(ctx, "collision-kept"); err != nil {
@@ -140,7 +167,11 @@ func TestEngineRestoreNamesCollidingSessionWhenSessionsAreExplicit(t *testing.T)
 	repo := openFixture(t, ctx, fixture.repoDir)
 
 	result, err := engine.Restore(ctx, repo, fixture.server, fixture.config(
-		[]string{fixture.ids["collision-kept"], fixture.ids["collision-taken"]}, engine.CollisionPolicyDefault,
+		[]string{
+			fixture.ids["collision-kept"],
+			fixture.ids["collision-taken"],
+		},
+		engine.CollisionPolicyDefault,
 	))
 	if !errors.Is(err, restore.ErrSessionCollision) {
 		t.Fatalf("explicit selection with a collision must fail, got %v", err)
@@ -154,7 +185,13 @@ func TestEngineRestoreNamesCollidingSessionWhenSessionsAreExplicit(t *testing.T)
 		t.Fatalf("a refused plan must not leave a pending operation, got %q", result.OperationID)
 	}
 
-	if _, err := fixture.server.FindSession(ctx, "collision-kept"); !errors.Is(err, gotmux.ErrNotFound) {
+	if _, err := fixture.server.FindSession(
+		ctx,
+		"collision-kept",
+	); !errors.Is(
+		err,
+		gotmux.ErrNotFound,
+	) {
 		t.Fatalf("a refused restore must not create any session, got %v", err)
 	}
 
@@ -168,7 +205,12 @@ func TestEngineRestoreRefusesEverythingWhenCollisionPolicyIsFail(t *testing.T) {
 	fixture := newCollisionFixture(t, ctx)
 	repo := openFixture(t, ctx, fixture.repoDir)
 
-	result, err := engine.Restore(ctx, repo, fixture.server, fixture.config(nil, engine.CollisionPolicyFail))
+	result, err := engine.Restore(
+		ctx,
+		repo,
+		fixture.server,
+		fixture.config(nil, engine.CollisionPolicyFail),
+	)
 	if !errors.Is(err, restore.ErrSessionCollision) {
 		t.Fatalf("fail policy must refuse the restore, got %v", err)
 	}
@@ -177,7 +219,13 @@ func TestEngineRestoreRefusesEverythingWhenCollisionPolicyIsFail(t *testing.T) {
 		t.Fatalf("the colliding session must be named, got %+v", result.SessionsSkipped)
 	}
 
-	if _, err := fixture.server.FindSession(ctx, "collision-kept"); !errors.Is(err, gotmux.ErrNotFound) {
+	if _, err := fixture.server.FindSession(
+		ctx,
+		"collision-kept",
+	); !errors.Is(
+		err,
+		gotmux.ErrNotFound,
+	) {
 		t.Fatalf("fail policy must not restore the other sessions, got %v", err)
 	}
 }
@@ -191,7 +239,12 @@ func TestEngineRestoreExplainsMissingServerBeforeTakingALease(t *testing.T) {
 
 	dead, _ := newAbsentServer(t)
 
-	result, err := engine.Restore(ctx, repo, dead, fixture.config(nil, engine.CollisionPolicyDefault))
+	result, err := engine.Restore(
+		ctx,
+		repo,
+		dead,
+		fixture.config(nil, engine.CollisionPolicyDefault),
+	)
 	if !errors.Is(err, engine.ErrNoServerRunning) {
 		t.Fatalf("expected the no-server explanation, got %v", err)
 	}
@@ -216,21 +269,41 @@ func TestEngineRestoreLogsEachSkippedSessionWithItsReason(t *testing.T) {
 
 	logCtx := zerolog.New(&buffer).WithContext(ctx)
 
-	if _, err := engine.Restore(logCtx, repo, fixture.server, fixture.config(nil, engine.CollisionPolicyDefault)); err != nil {
+	if _, err := engine.Restore(
+		logCtx,
+		repo,
+		fixture.server,
+		fixture.config(nil, engine.CollisionPolicyDefault),
+	); err != nil {
 		t.Fatalf("Restore failed: %v", err)
 	}
 
 	records := decodeLogRecords(t, buffer.Bytes())
 	if len(records) != 2 {
-		t.Fatalf("expected one start and one terminal record, got %d: %s", len(records), buffer.String())
+		t.Fatalf(
+			"expected one start and one terminal record, got %d: %s",
+			len(records),
+			buffer.String(),
+		)
 	}
 
 	terminal := records[1]
-	if terminal["level"] != "warn" || terminal["status"] != "partial" || terminal["reason"] != "sessions_skipped" || terminal["skipped"] != float64(1) {
-		t.Fatalf("a restore that skipped sessions must be one warn record with a fixed reason and a count: %+v", terminal)
+	if terminal["level"] != "warn" || terminal["status"] != "partial" ||
+		terminal["reason"] != "sessions_skipped" ||
+		terminal["skipped"] != float64(1) {
+		t.Fatalf(
+			"a restore that skipped sessions must be one warn record with a fixed reason and a count: %+v",
+			terminal,
+		)
 	}
 
-	want := []any{map[string]any{"id": fixture.ids["collision-taken"], "name": "collision-taken", "reason": restore.CollisionNameInUse}}
+	want := []any{
+		map[string]any{
+			"id":     fixture.ids["collision-taken"],
+			"name":   "collision-taken",
+			"reason": restore.CollisionNameInUse,
+		},
+	}
 	if !reflect.DeepEqual(terminal["skipped_sessions"], want) {
 		t.Fatalf("skipped_sessions = %#v, want %#v", terminal["skipped_sessions"], want)
 	}
@@ -249,18 +322,32 @@ func TestEngineRestoreLogsMissingServerAsOneFixedReasonFailure(t *testing.T) {
 
 	logCtx := zerolog.New(&buffer).WithContext(ctx)
 
-	if _, err := engine.Restore(logCtx, repo, dead, fixture.config(nil, engine.CollisionPolicyDefault)); err == nil {
+	if _, err := engine.Restore(
+		logCtx,
+		repo,
+		dead,
+		fixture.config(nil, engine.CollisionPolicyDefault),
+	); err == nil {
 		t.Fatal("expected a missing server to fail")
 	}
 
 	records := decodeLogRecords(t, buffer.Bytes())
 	if len(records) != 2 {
-		t.Fatalf("expected one start and one failure record, got %d: %s", len(records), buffer.String())
+		t.Fatalf(
+			"expected one start and one failure record, got %d: %s",
+			len(records),
+			buffer.String(),
+		)
 	}
 
 	failure := records[1]
-	if failure["level"] != "error" || failure["status"] != "failed" || failure["phase"] != "admission" || failure["reason"] != "no_server" {
-		t.Fatalf("expected one error record with phase admission and reason no_server: %+v", failure)
+	if failure["level"] != "error" || failure["status"] != "failed" ||
+		failure["phase"] != "admission" ||
+		failure["reason"] != "no_server" {
+		t.Fatalf(
+			"expected one error record with phase admission and reason no_server: %+v",
+			failure,
+		)
 	}
 
 	if bytes.Contains(buffer.Bytes(), []byte(socketDir)) {

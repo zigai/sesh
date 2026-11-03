@@ -12,8 +12,12 @@ func TestActionStateCanBecomeForEveryPair(t *testing.T) {
 		ActionStateVerified,
 	}
 	allowed := map[ActionState]map[ActionState]bool{
-		ActionStatePlanned:   {ActionStateIssued: true},
-		ActionStateIssued:    {ActionStateNotSent: true, ActionStateUnknown: true, ActionStateConfirmed: true},
+		ActionStatePlanned: {ActionStateIssued: true},
+		ActionStateIssued: {
+			ActionStateNotSent:   true,
+			ActionStateUnknown:   true,
+			ActionStateConfirmed: true,
+		},
 		ActionStateNotSent:   {ActionStatePlanned: true},
 		ActionStateUnknown:   {ActionStateConfirmed: true},
 		ActionStateConfirmed: {ActionStateVerified: true},
@@ -32,7 +36,8 @@ func TestActionStateCanBecomeForEveryPair(t *testing.T) {
 		}
 	}
 
-	if ActionState("invalid").Valid() || ActionState("invalid").CanBecome(ActionStateIssued) || ActionStatePlanned.CanBecome(ActionState("invalid")) {
+	if ActionState("invalid").Valid() || ActionState("invalid").CanBecome(ActionStateIssued) ||
+		ActionStatePlanned.CanBecome(ActionState("invalid")) {
 		t.Fatal("invalid action state accepted")
 	}
 }

@@ -34,17 +34,33 @@ var restoreFailureClasses = []struct {
 	reason string
 	causes []error
 }{
-	{"endpoint_required", "admission_failed", []error{ErrLeaseRootRequired, tmuxserver.ErrEndpoint, ErrRepositoryRequired}},
+	{
+		"endpoint_required",
+		"admission_failed",
+		[]error{ErrLeaseRootRequired, tmuxserver.ErrEndpoint, ErrRepositoryRequired},
+	},
 	{"operation_uncertain", "effect_outcome_uncertain", []error{restore.ErrExecutionUncertain}},
 	{"operation_uncertain", "prior_effect_uncertain", []error{restore.ErrPriorUncertainty}},
 	{"operation_uncertain", "prior_effect_conflicted", []error{restore.ErrPriorConflict}},
-	{"restore_failed", "journal_unavailable", []error{restore.ErrJournalRequired, restore.ErrJournalIncomplete}},
+	{
+		"restore_failed",
+		"journal_unavailable",
+		[]error{restore.ErrJournalRequired, restore.ErrJournalIncomplete},
+	},
 	{"restore_conflict", "daemon_identity_changed", []error{tmuxserver.ErrDaemonIdentityChanged}},
 	{"restore_no_server", "no_server", []error{ErrNoServerRunning, gotmux.ErrNoServer}},
-	{"restore_failed", "daemon_identity_unavailable", []error{tmuxserver.ErrDaemonIdentityUnavailable}},
+	{
+		"restore_failed",
+		"daemon_identity_unavailable",
+		[]error{tmuxserver.ErrDaemonIdentityUnavailable},
+	},
 	{"operation_canceled", "canceled", []error{context.Canceled}},
 	{"operation_timed_out", "timeout", []error{context.DeadlineExceeded}},
-	{"restore_conflict", "collision", []error{restore.ErrSessionCollision, restore.ErrGroupCollision}},
+	{
+		"restore_conflict",
+		"collision",
+		[]error{restore.ErrSessionCollision, restore.ErrGroupCollision},
+	},
 	{"restore_conflict", "working_directory_missing", []error{restore.ErrWorkingDirNotFound}},
 	{"snapshot_invalid", "invalid_snapshot", []error{store.ErrCorrupt, model.ErrInvalid}},
 	{"snapshot_version_unsupported", "version_unsupported", []error{model.ErrVersion}},
@@ -131,10 +147,19 @@ func (e *verificationError) Error() string {
 		codes = append(codes, mismatch.Domain+"/"+mismatch.Entity+"/"+mismatch.Reason)
 	}
 
-	return fmt.Sprintf("independent verification failed with %d mismatches: %s", len(codes), strings.Join(codes, ", "))
+	return fmt.Sprintf(
+		"independent verification failed with %d mismatches: %s",
+		len(codes),
+		strings.Join(codes, ", "),
+	)
 }
 
-func Restore(ctx context.Context, repository *store.Repository, server *gotmux.Server, cfg RestoreConfig) (RestoreResult, error) {
+func Restore(
+	ctx context.Context,
+	repository *store.Repository,
+	server *gotmux.Server,
+	cfg RestoreConfig,
+) (RestoreResult, error) {
 	result := RestoreResult{
 		OperationID:         cfg.OperationID,
 		Generation:          "",
@@ -184,14 +209,24 @@ func Restore(ctx context.Context, repository *store.Repository, server *gotmux.S
 	return executeRestore(ctx, repository, server, lease, cfg)
 }
 
-func ReconcileRestore(ctx context.Context, repository *store.Repository, operationID string) (OperationStatus, error) {
+func ReconcileRestore(
+	ctx context.Context,
+	repository *store.Repository,
+	operationID string,
+) (OperationStatus, error) {
 	if repository == nil {
-		return OperationStatus{}, oops.In("snapshot").Code("repository_required").With("operation", "reconcile_restore").Wrap(ErrRepositoryRequired)
+		return OperationStatus{}, oops.In("snapshot").
+			Code("repository_required").
+			With("operation", "reconcile_restore").
+			Wrap(ErrRepositoryRequired)
 	}
 
 	op, err := repository.ReconcileOperation(ctx, operationID)
 	if err != nil {
-		return OperationStatus{}, oops.In("snapshot").Code("reconcile_failed").With("operation", "reconcile_restore").Wrap(err)
+		return OperationStatus{}, oops.In("snapshot").
+			Code("reconcile_failed").
+			With("operation", "reconcile_restore").
+			Wrap(err)
 	}
 
 	if err := validateRestoreOperation(op); err != nil {
@@ -203,18 +238,32 @@ func ReconcileRestore(ctx context.Context, repository *store.Repository, operati
 
 // AbandonRestore releases the recovery source pin; it keeps existing tmux objects and rolls
 // nothing back.
-func AbandonRestore(ctx context.Context, repository *store.Repository, operationID string) (OperationStatus, error) {
+func AbandonRestore(
+	ctx context.Context,
+	repository *store.Repository,
+	operationID string,
+) (OperationStatus, error) {
 	return abandonRestore(ctx, repository, operationID, "explicit_abandonment")
 }
 
-func abandonRestore(ctx context.Context, repository *store.Repository, operationID, reason string) (OperationStatus, error) {
+func abandonRestore(
+	ctx context.Context,
+	repository *store.Repository,
+	operationID, reason string,
+) (OperationStatus, error) {
 	if repository == nil {
-		return OperationStatus{}, oops.In("snapshot").Code("repository_required").With("operation", "abandon_restore").Wrap(ErrRepositoryRequired)
+		return OperationStatus{}, oops.In("snapshot").
+			Code("repository_required").
+			With("operation", "abandon_restore").
+			Wrap(ErrRepositoryRequired)
 	}
 
 	op, err := repository.ReconcileOperation(ctx, operationID)
 	if err != nil {
-		return OperationStatus{}, oops.In("snapshot").Code("reconcile_failed").With("operation", "abandon_restore").Wrap(err)
+		return OperationStatus{}, oops.In("snapshot").
+			Code("reconcile_failed").
+			With("operation", "abandon_restore").
+			Wrap(err)
 	}
 
 	if err := validateRestoreOperation(op); err != nil {
@@ -279,7 +328,11 @@ func validateRestoreOperation(op store.Operation) error {
 		Wrap(store.ErrConflict)
 }
 
-func readGeneration(ctx context.Context, repository *store.Repository, genID string) (string, model.Manifest, error) {
+func readGeneration(
+	ctx context.Context,
+	repository *store.Repository,
+	genID string,
+) (string, model.Manifest, error) {
 	if genID != "" {
 		manifest, err := repository.Read(ctx, genID)
 		if err != nil {
@@ -342,13 +395,25 @@ func executeRestore(
 		result.Reason = planFailureReason(result.Reason, err)
 
 		if len(skipped) > 0 {
-			ctx = zerolog.Ctx(ctx).With().Array("skipped_sessions", skippedSessionsArray(skipped)).Logger().WithContext(ctx)
+			ctx = zerolog.Ctx(ctx).
+				With().
+				Array("skipped_sessions", skippedSessionsArray(skipped)).
+				Logger().
+				WithContext(ctx)
 		}
 
 		return result, closeWith(ctx, lease, "plan", err)
 	}
 
-	daemon, op, ledger, admissionPhase, err := establishRestoreIntent(ctx, repository, server, cfg, generation, plan, override)
+	daemon, op, ledger, admissionPhase, err := establishRestoreIntent(
+		ctx,
+		repository,
+		server,
+		cfg,
+		generation,
+		plan,
+		override,
+	)
 	if op.ID != "" {
 		result.OperationID = op.ID
 		ctx = zerolog.Ctx(ctx).With().Str("restore_id", op.ID).Logger().WithContext(ctx)
@@ -358,7 +423,18 @@ func executeRestore(
 		return result, closeWith(ctx, lease, admissionPhase, err)
 	}
 
-	if inspected, done, inspectErr := reinspectVerifiedRestore(ctx, repository, server, lease, daemon, op.ID, cfg, plan, ledger, &result); done {
+	if inspected, done, inspectErr := reinspectVerifiedRestore(
+		ctx,
+		repository,
+		server,
+		lease,
+		daemon,
+		op.ID,
+		cfg,
+		plan,
+		ledger,
+		&result,
+	); done {
 		return inspected, inspectErr
 	}
 
@@ -424,7 +500,16 @@ func establishRestoreIntent(
 		return restoreDaemonIdentity{}, store.Operation{}, nil, "identity", err
 	}
 
-	op, ledger, err := admitRestore(ctx, repository, server, daemon, cfg, generation, plan, override.digest)
+	op, ledger, err := admitRestore(
+		ctx,
+		repository,
+		server,
+		daemon,
+		cfg,
+		generation,
+		plan,
+		override.digest,
+	)
 	if err != nil {
 		return daemon, op, nil, "pin", err
 	}
@@ -471,7 +556,8 @@ func executeRestorePlan(
 	report, err := executor.Execute(ctx, plan, &stepJournal{ledger: ledger})
 	if err != nil {
 		executeErr := fmt.Errorf("execute restore plan: %w", err)
-		effectsPossible := executionMayHaveDispatched(report, dispatchCandidates) || isUncertain(err)
+		effectsPossible := executionMayHaveDispatched(report, dispatchCandidates) ||
+			isUncertain(err)
 
 		return report, postRestoreDaemonIdentity(ctx, server, daemon, executeErr, effectsPossible)
 	}
@@ -532,9 +618,20 @@ func reinspectVerifiedRestore(
 	}
 
 	result.SessionsRestored = restoredSessionReceipts(plan, receipts)
-	result.MissingRequirements = mergeRequirements(plan.MissingRequirements, restore.ScopedStateRequirements(plan))
+	result.MissingRequirements = mergeRequirements(
+		plan.MissingRequirements,
+		restore.ScopedStateRequirements(plan),
+	)
 
-	verification, scopedMissing, err := applyAndVerify(ctx, server, daemon, plan, receipts, ledger, false)
+	verification, scopedMissing, err := applyAndVerify(
+		ctx,
+		server,
+		daemon,
+		plan,
+		receipts,
+		ledger,
+		false,
+	)
 
 	result.MissingRequirements = mergeRequirements(result.MissingRequirements, scopedMissing)
 	if err != nil {
@@ -550,17 +647,29 @@ func reinspectVerifiedRestore(
 	if !verification.Verified {
 		result.Mismatches = verification.Mismatches
 
-		return *result, true, closeWith(ctx, lease, "reinspect", reportVerificationFailure(verification))
+		return *result, true, closeWith(
+			ctx,
+			lease,
+			"reinspect",
+			reportVerificationFailure(verification),
+		)
 	}
 
-	result.Panes = restore.PanesFromVerifiedRuntime(plan, verification.RuntimePanes, cfg.LaunchProcesses)
+	result.Panes = restore.PanesFromVerifiedRuntime(
+		plan,
+		verification.RuntimePanes,
+		cfg.LaunchProcesses,
+	)
 
 	finished, err := finishRestore(ctx, repository, lease, operation, cfg.Profile, result)
 
 	return finished, true, err
 }
 
-func verifiedOperationReceipts(plan restore.Plan, ledger *actionLedger) (map[string]string, bool, error) {
+func verifiedOperationReceipts(
+	plan restore.Plan,
+	ledger *actionLedger,
+) (map[string]string, bool, error) {
 	receipts := make(map[string]string, len(plan.Steps))
 
 	for _, step := range plan.Steps {
@@ -662,7 +771,13 @@ func prepareRestorePlan(
 			return restore.Plan{}, none, genID, nil, fmt.Errorf("build restore plan: %w", err)
 		}
 	} else {
-		plan, skipped, err = planAroundCollisions(ctx, server, manifest, selected, effectiveCollisionPolicy(cfg))
+		plan, skipped, err = planAroundCollisions(
+			ctx,
+			server,
+			manifest,
+			selected,
+			effectiveCollisionPolicy(cfg),
+		)
 		if err != nil {
 			return restore.Plan{}, none, genID, skipped, err
 		}
@@ -706,7 +821,13 @@ func admitRestore(
 		operationID = store.NewOperationID()
 	}
 
-	op, err := repository.RegisterOperation(ctx, operationID, generation, target, buildRestoreActions(specs))
+	op, err := repository.RegisterOperation(
+		ctx,
+		operationID,
+		generation,
+		target,
+		buildRestoreActions(specs),
+	)
 	if err != nil {
 		return op, nil, fmt.Errorf("register restore operation: %w", err)
 	}
@@ -830,20 +951,39 @@ func markSkippedSessions(result *RestoreResult) {
 	}
 }
 
-func restoreTarget(endpoint string, daemon restoreDaemonIdentity, cfg RestoreConfig, launches string) ([]byte, error) {
+func restoreTarget(
+	endpoint string,
+	daemon restoreDaemonIdentity,
+	cfg RestoreConfig,
+	launches string,
+) ([]byte, error) {
 	identity := daemon.Server
-	if endpoint == "" || identity.PID <= 0 || identity.Started.IsZero() || identity.ReportedSocket == "" {
-		return nil, oops.In("snapshot").Code("endpoint_required").With("operation", "restore_target").Wrap(tmuxserver.ErrEndpoint)
+	if endpoint == "" || identity.PID <= 0 || identity.Started.IsZero() ||
+		identity.ReportedSocket == "" {
+		return nil, oops.In("snapshot").
+			Code("endpoint_required").
+			With("operation", "restore_target").
+			Wrap(tmuxserver.ErrEndpoint)
 	}
 
 	if daemon.Birth != "" {
 		if _, err := process.ParseIdentity(daemon.Birth); err != nil {
-			return nil, oops.In("snapshot").Code("daemon_identity_unavailable").With("operation", "restore_target").Wrap(tmuxserver.ErrDaemonIdentityUnavailable)
+			return nil, oops.In("snapshot").
+				Code("daemon_identity_unavailable").
+				With("operation", "restore_target").
+				Wrap(tmuxserver.ErrDaemonIdentityUnavailable)
 		}
 	}
 
-	target := restoreTargetInstance(endpoint, identity) + fmt.Sprintf("launch=%t\nmissing_working_dir=%s\ncompensate=false\nprofile=%s",
-		cfg.LaunchProcesses, cfg.MissingWorkingDir, cfg.Profile)
+	target := restoreTargetInstance(
+		endpoint,
+		identity,
+	) + fmt.Sprintf(
+		"launch=%t\nmissing_working_dir=%s\ncompensate=false\nprofile=%s",
+		cfg.LaunchProcesses,
+		cfg.MissingWorkingDir,
+		cfg.Profile,
+	)
 	target += restoreDaemonTargetAppendix(daemon)
 
 	if launches != "" {
@@ -851,17 +991,31 @@ func restoreTarget(endpoint string, daemon restoreDaemonIdentity, cfg RestoreCon
 	}
 
 	if len(target) > maxRestoreTargetBytes {
-		return nil, oops.In("snapshot").Code("endpoint_required").With("operation", "restore_target", "reason", "target_too_long").Wrap(tmuxserver.ErrEndpoint)
+		return nil, oops.In("snapshot").
+			Code("endpoint_required").
+			With("operation", "restore_target", "reason", "target_too_long").
+			Wrap(tmuxserver.ErrEndpoint)
 	}
 
 	return []byte(target), nil
 }
 
 func restoreTargetInstance(endpoint string, server gotmux.ServerIdentity) string {
-	return fmt.Sprintf("%s%s\n%d\n%d\n", restoreTargetPrefix, endpoint, server.PID, server.Started.UnixNano())
+	return fmt.Sprintf(
+		"%s%s\n%d\n%d\n",
+		restoreTargetPrefix,
+		endpoint,
+		server.PID,
+		server.Started.UnixNano(),
+	)
 }
 
-func requireRestoreDaemonIdentity(ctx context.Context, server *gotmux.Server, expected restoreDaemonIdentity, effectsPossible bool) error {
+func requireRestoreDaemonIdentity(
+	ctx context.Context,
+	server *gotmux.Server,
+	expected restoreDaemonIdentity,
+	effectsPossible bool,
+) error {
 	observed, err := observeRestoreDaemonIdentity(ctx, server)
 	if err == nil && !expected.Equal(observed) {
 		err = tmuxserver.ErrDaemonIdentityChanged
@@ -911,7 +1065,11 @@ func isUncertain(err error) bool {
 		errors.Is(err, store.ErrUncertain)
 }
 
-func loadActionLedger(ctx context.Context, repository *store.Repository, operation string) (*actionLedger, error) {
+func loadActionLedger(
+	ctx context.Context,
+	repository *store.Repository,
+	operation string,
+) (*actionLedger, error) {
 	op, err := repository.ReconcileOperation(ctx, operation)
 	if err != nil {
 		return nil, fmt.Errorf("read operation journal: %w", err)
@@ -937,7 +1095,12 @@ func (l *actionLedger) state(id string) (store.Action, error) {
 	return action, nil
 }
 
-func (l *actionLedger) transition(ctx context.Context, id string, expected, next model.ActionState, runtimeID model.Bytes) error {
+func (l *actionLedger) transition(
+	ctx context.Context,
+	id string,
+	expected, next model.ActionState,
+	runtimeID model.Bytes,
+) error {
 	if err := l.repository.Transition(ctx, l.operation, id, expected, next, runtimeID); err != nil {
 		return fmt.Errorf("record action transition: %w", err)
 	}
@@ -976,7 +1139,10 @@ func (l *actionLedger) advance(ctx context.Context, id string) error {
 		Wrapf(restore.ErrPriorUncertainty, "%s", id)
 }
 
-func (j *stepJournal) Steps(ctx context.Context, steps []restore.Step) (map[string]restore.StepState, error) {
+func (j *stepJournal) Steps(
+	ctx context.Context,
+	steps []restore.Step,
+) (map[string]restore.StepState, error) {
 	states := make(map[string]restore.StepState, len(steps))
 
 	for _, step := range steps {
@@ -992,7 +1158,10 @@ func (j *stepJournal) Steps(ctx context.Context, steps []restore.Step) (map[stri
 				Wrapf(store.ErrConflict, "%s", action.ID)
 		}
 
-		states[step.ID()] = restore.StepState{State: action.State, RuntimeID: string(action.RuntimeID)}
+		states[step.ID()] = restore.StepState{
+			State:     action.State,
+			RuntimeID: string(action.RuntimeID),
+		}
 	}
 
 	return states, nil
@@ -1045,7 +1214,10 @@ func runScopedImport(
 	case model.ActionStateConfirmed, model.ActionStateVerified:
 		mismatches, observeErr := restore.ObserveScopedStateConflicts(ctx, server, plan, receipts)
 		if observeErr != nil {
-			return staticMissing, false, fmt.Errorf("observe scoped state conflicts: %w", observeErr)
+			return staticMissing, false, fmt.Errorf(
+				"observe scoped state conflicts: %w",
+				observeErr,
+			)
 		}
 
 		if len(mismatches) > 0 {
@@ -1075,12 +1247,24 @@ func runScopedImport(
 		recordCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), journalCleanupTimeout)
 		defer cancel()
 
-		journalErr := ledger.transition(recordCtx, restore.ImportStateActionID, "issued", "unknown", nil)
+		journalErr := ledger.transition(
+			recordCtx,
+			restore.ImportStateActionID,
+			"issued",
+			"unknown",
+			nil,
+		)
 
 		return missing, true, scopedImportFailure(importErr, journalErr)
 	}
 
-	return missing, true, ledger.transition(ctx, restore.ImportStateActionID, "issued", "confirmed", nil)
+	return missing, true, ledger.transition(
+		ctx,
+		restore.ImportStateActionID,
+		"issued",
+		"confirmed",
+		nil,
+	)
 }
 
 func scopedImportFailure(importErr, journalErr error) error {
@@ -1090,7 +1274,12 @@ func scopedImportFailure(importErr, journalErr error) error {
 		Wrap(errors.Join(restore.ErrExecutionUncertain, importErr, journalErr))
 }
 
-func markVerified(ctx context.Context, ledger *actionLedger, plan restore.Plan, verification restore.VerificationReport) error {
+func markVerified(
+	ctx context.Context,
+	ledger *actionLedger,
+	plan restore.Plan,
+	verification restore.VerificationReport,
+) error {
 	verified := make(map[string]bool, len(verification.VerifiedSteps))
 	for _, stepID := range verification.VerifiedSteps {
 		verified[restore.ActionID(stepID)] = true
@@ -1122,7 +1311,13 @@ func markVerified(ctx context.Context, ledger *actionLedger, plan restore.Plan, 
 				Wrapf(restore.ErrExecutionFailed, "%s", action.ID)
 		}
 
-		if err := ledger.transition(ctx, id, "confirmed", "verified", action.RuntimeID); err != nil {
+		if err := ledger.transition(
+			ctx,
+			id,
+			"confirmed",
+			"verified",
+			action.RuntimeID,
+		); err != nil {
 			return err
 		}
 	}
@@ -1257,7 +1452,12 @@ func logRestoreSuccess(ctx context.Context, result RestoreResult) {
 func skippedSessionsArray(skipped []SkippedSession) *zerolog.Array {
 	array := zerolog.Arr()
 	for _, session := range skipped {
-		array = array.Dict(zerolog.Dict().Str("id", session.ID).Str("name", session.Name).Str("reason", session.Reason))
+		array = array.Dict(
+			zerolog.Dict().
+				Str("id", session.ID).
+				Str("name", session.Name).
+				Str("reason", session.Reason),
+		)
 	}
 
 	return array

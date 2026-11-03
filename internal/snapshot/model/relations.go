@@ -23,7 +23,8 @@ func (m Manifest) validateLinks() error {
 			session string
 			index   int
 		}{link.Session, link.Index}
-		if !sessions[link.Session] || !windows[link.Window] || link.Index < 0 || slots[key] || link.Active && link.Last {
+		if !sessions[link.Session] || !windows[link.Window] || link.Index < 0 || slots[key] ||
+			link.Active && link.Last {
 			return ErrInvalid
 		}
 
@@ -40,7 +41,10 @@ func (m Manifest) validateLinks() error {
 	return validateLinkCoverage(sessions, windows, linked, active, last)
 }
 
-func validateLinkCoverage(sessions, windows, linked map[string]bool, active, last map[string]int) error {
+func validateLinkCoverage(
+	sessions, windows, linked map[string]bool,
+	active, last map[string]int,
+) error {
 	for session := range sessions {
 		if active[session] != 1 || last[session] > 1 {
 			return ErrInvalid

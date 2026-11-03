@@ -56,7 +56,10 @@ func SaveLockPath() string {
 
 func AcquireSaveLock(ctx context.Context, path string, mode SaveLockMode) (*SaveLock, bool, error) {
 	if path == "" {
-		return nil, false, oops.In("automation").Code("save_lock_failed").With("operation", "acquire_save_lock").Wrap(ErrSaveLockPathEmpty)
+		return nil, false, oops.In("automation").
+			Code("save_lock_failed").
+			With("operation", "acquire_save_lock").
+			Wrap(ErrSaveLockPathEmpty)
 	}
 
 	dir, err := openSaveLockDir(filepath.Dir(path))
@@ -79,7 +82,10 @@ func TryAcquireSaveLock(ctx context.Context, path string) (*SaveLock, error) {
 	}
 
 	if !acquired {
-		return nil, oops.In("automation").Code("save_lock_busy").With("operation", "try_acquire_save_lock").Wrap(ErrSaveLockBusy)
+		return nil, oops.In("automation").
+			Code("save_lock_busy").
+			With("operation", "try_acquire_save_lock").
+			Wrap(ErrSaveLockBusy)
 	}
 
 	return lock, nil

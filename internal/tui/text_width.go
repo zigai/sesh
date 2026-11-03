@@ -63,7 +63,8 @@ func SanitizeTerminalTextKeepSGR(s string) string {
 		}
 
 		for _, r := range seq {
-			if !isBidiOrDangerousControl(r) && (unicode.IsPrint(r) || r == '\u200c' || r == '\u200d') {
+			if !isBidiOrDangerousControl(r) &&
+				(unicode.IsPrint(r) || r == '\u200c' || r == '\u200d') {
 				b.WriteRune(r)
 			}
 		}

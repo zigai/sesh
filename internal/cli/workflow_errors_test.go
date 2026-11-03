@@ -78,7 +78,17 @@ func TestRestoreUncertaintySurvivesJoinedCancellationAndExitCode(t *testing.T) {
 		{restore.ErrExecutionUncertain, "operationUncertain"},
 		{restore.ErrPriorUncertainty, "priorEffectUncertain"},
 		{store.ErrUncertain, "publicationUncertain"},
-		{action.Wrap(action.CodeUncertain, &remote.PeerError{Code: action.CodeUncertain, InvocationID: "0123456789abcdef0123456789abcdef", Err: nil}), "uncertain"},
+		{
+			action.Wrap(
+				action.CodeUncertain,
+				&remote.PeerError{
+					Code:         action.CodeUncertain,
+					InvocationID: "0123456789abcdef0123456789abcdef",
+					Err:          nil,
+				},
+			),
+			"uncertain",
+		},
 	}
 
 	for _, tc := range cases {
@@ -126,7 +136,8 @@ func assertWorkflowErrorEnvelope(t *testing.T, err error, code string) {
 		t.Fatalf("classification = %+v, want %s and exit 1", envelope.Error, code)
 	}
 
-	if envelope.Error.Message == "operation failed" || strings.Contains(stderr.String(), "/private/") {
+	if envelope.Error.Message == "operation failed" ||
+		strings.Contains(stderr.String(), "/private/") {
 		t.Fatalf("missing safe domain message: %s", stderr.String())
 	}
 }

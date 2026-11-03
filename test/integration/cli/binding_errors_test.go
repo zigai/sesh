@@ -28,16 +28,28 @@ func TestBindingActionFailureIsShownOnInvokingClient(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	err := cli.ExecuteApplication(t.Context(), []string{"agent", "focus", "--client", client, "--no-config", bindingFlag}, nil, &stdout, &stderr)
+	err := cli.ExecuteApplication(
+		t.Context(),
+		[]string{"agent", "focus", "--client", client, "--no-config", bindingFlag},
+		nil,
+		&stdout,
+		&stderr,
+	)
 	if err != nil {
-		t.Fatalf("reported binding failure = %v, want success so tmux adds no exit-status message", err)
+		t.Fatalf(
+			"reported binding failure = %v, want success so tmux adds no exit-status message",
+			err,
+		)
 	}
 
 	want := "sesh: accepts 1 arg(s), received 0"
 	deadline := time.Now().Add(5 * time.Second)
 
 	for {
-		messages, err := fixture.server.Messages(t.Context(), gotmux.MessagesOptions{Jobs: false, Terminal: false})
+		messages, err := fixture.server.Messages(
+			t.Context(),
+			gotmux.MessagesOptions{Jobs: false, Terminal: false},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -60,9 +72,20 @@ func TestActionFailureInTmuxPaneKeepsExitStatus(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	err := cli.ExecuteApplication(t.Context(), []string{"agent", "focus", "--no-config"}, nil, &stdout, &stderr)
-	if cli.ExitCode(err) != 2 || !strings.Contains(stderr.String(), "accepts 1 arg(s), received 0") {
-		t.Fatalf("failure in a tmux pane = %v / %q, want usage exit and stderr diagnostic", err, stderr.String())
+	err := cli.ExecuteApplication(
+		t.Context(),
+		[]string{"agent", "focus", "--no-config"},
+		nil,
+		&stdout,
+		&stderr,
+	)
+	if cli.ExitCode(err) != 2 ||
+		!strings.Contains(stderr.String(), "accepts 1 arg(s), received 0") {
+		t.Fatalf(
+			"failure in a tmux pane = %v / %q, want usage exit and stderr diagnostic",
+			err,
+			stderr.String(),
+		)
 	}
 }
 
@@ -86,7 +109,11 @@ func testBindingActionReports(t *testing.T, args []string) {
 		args = append(args, "--socket", fixture.socket)
 	} else {
 		configPath := filepath.Join(t.TempDir(), "config.toml")
-		if err := os.WriteFile(configPath, []byte("[[hooks.session_switch_pre]]\ncommand = 'true'\n"), 0o600); err != nil {
+		if err := os.WriteFile(
+			configPath,
+			[]byte("[[hooks.session_switch_pre]]\ncommand = 'true'\n"),
+			0o600,
+		); err != nil {
 			t.Fatal(err)
 		}
 
@@ -107,7 +134,9 @@ func testBindingActionReports(t *testing.T, args []string) {
 		t.Fatalf("JSON output = %q / %q / %v, want valid JSON and success", stdout, stderr, err)
 	}
 
-	stdout, stderr, err = executeCommand(t, slices.DeleteFunc(args, func(arg string) bool { return arg == bindingFlag })...)
+	stdout, stderr, err = executeCommand(
+		t,
+		slices.DeleteFunc(args, func(arg string) bool { return arg == bindingFlag })...)
 	if err != nil || stdout == "" || stderr != "" {
 		t.Fatalf("direct output = %q / %q / %v, want a report and success", stdout, stderr, err)
 	}
@@ -119,6 +148,11 @@ func TestBindingJSONFailureKeepsMachineExitStatus(t *testing.T) {
 
 	stdout, stderr, err := executeCommand(t, "agent", "focus", "--no-config", bindingFlag, "--json")
 	if cli.ExitCode(err) != 2 || !json.Valid([]byte(stderr)) || stdout != "" {
-		t.Fatalf("JSON failure = %q / %q / %v, want JSON on stderr and usage exit", stdout, stderr, err)
+		t.Fatalf(
+			"JSON failure = %q / %q / %v, want JSON on stderr and usage exit",
+			stdout,
+			stderr,
+			err,
+		)
 	}
 }

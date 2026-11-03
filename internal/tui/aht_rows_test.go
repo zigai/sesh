@@ -28,15 +28,63 @@ func TestAgentRowsRenderCurrentReasonsAndSuppressStaleReasons(t *testing.T) {
 			}
 
 			model.sessionFormats = formats
-			model.filtered = []session.Session{{Name: "project", AgentTotal: 4, Agents: []session.AgentSession{
-				{PaneID: "%1", HarnessSession: "approval", Status: session.AgentStatusWaiting, WaitingReason: "permission", Detail: aht.StateDetail{Value: aht.ActivityDetailPermission, Quality: aht.DetailQualityCurrent, Authority: "hook", ObservedAt: at}},
-				{PaneID: "%2", HarnessSession: "limit", Status: session.AgentStatusFailed, FailureReason: "usage_limit", Detail: aht.StateDetail{Value: aht.ActivityDetailUsageLimit, Quality: aht.DetailQualityCurrent, Authority: "screen", ObservedAt: at}},
-				{PaneID: "%3", HarnessSession: "old", Status: session.AgentStatusWaiting, WaitingReason: "question", Detail: aht.StateDetail{Value: aht.ActivityDetailQuestion, Quality: aht.DetailQualityStale, Authority: "hook", ObservedAt: at}},
-				{PaneID: "%4", HarnessSession: "stopped", Status: session.AgentStatusInterrupted},
-			}}}
+			model.filtered = []session.Session{
+				{Name: "project", AgentTotal: 4, Agents: []session.AgentSession{
+					{
+						PaneID:         "%1",
+						HarnessSession: "approval",
+						Status:         session.AgentStatusWaiting,
+						WaitingReason:  "permission",
+						Detail: aht.StateDetail{
+							Value:      aht.ActivityDetailPermission,
+							Quality:    aht.DetailQualityCurrent,
+							Authority:  "hook",
+							ObservedAt: at,
+						},
+					},
+					{
+						PaneID:         "%2",
+						HarnessSession: "limit",
+						Status:         session.AgentStatusFailed,
+						FailureReason:  "usage_limit",
+						Detail: aht.StateDetail{
+							Value:      aht.ActivityDetailUsageLimit,
+							Quality:    aht.DetailQualityCurrent,
+							Authority:  "screen",
+							ObservedAt: at,
+						},
+					},
+					{
+						PaneID:         "%3",
+						HarnessSession: "old",
+						Status:         session.AgentStatusWaiting,
+						WaitingReason:  "question",
+						Detail: aht.StateDetail{
+							Value:      aht.ActivityDetailQuestion,
+							Quality:    aht.DetailQualityStale,
+							Authority:  "hook",
+							ObservedAt: at,
+						},
+					},
+					{
+						PaneID:         "%4",
+						HarnessSession: "stopped",
+						Status:         session.AgentStatusInterrupted,
+					},
+				}},
+			}
 
 			output := stripANSI(model.renderList(width, 5))
-			requireTextContainsAll(t, output, "WAITING", "permission", "ERROR", "usage_limit", "~", "IDLE")
+			requireTextContainsAll(
+				t,
+				output,
+				"WAITING",
+				"permission",
+				"ERROR",
+				"usage_limit",
+				"~",
+				"IDLE",
+			)
 
 			if strings.Contains(output, "question") || strings.Contains(output, "PAUSED") {
 				t.Fatalf("render exposed stale detail or a fifth state: %q", output)
@@ -54,12 +102,21 @@ func TestAgentRowsRenderCurrentReasonsAndSuppressStaleReasons(t *testing.T) {
 func TestInterruptedAgentUsesIdleSortingSearchAndCounts(t *testing.T) {
 	at := time.Unix(500, 0)
 	agents := []session.AgentSession{
-		{HarnessSession: "new interrupted", Status: session.AgentStatusInterrupted, StatusSince: at},
-		{HarnessSession: "old idle", Status: session.AgentStatusIdle, StatusSince: at.Add(-time.Minute)},
+		{
+			HarnessSession: "new interrupted",
+			Status:         session.AgentStatusInterrupted,
+			StatusSince:    at,
+		},
+		{
+			HarnessSession: "old idle",
+			Status:         session.AgentStatusIdle,
+			StatusSince:    at.Add(-time.Minute),
+		},
 	}
 	sortAgentSessions(agents, agentSortAttention)
 
-	if agents[0].HarnessSession != "old idle" || !agentStatusMatches("idle", session.AgentStatusInterrupted) {
+	if agents[0].HarnessSession != "old idle" ||
+		!agentStatusMatches("idle", session.AgentStatusInterrupted) {
 		t.Fatalf("interrupted agent differs from idle: %+v", agents)
 	}
 

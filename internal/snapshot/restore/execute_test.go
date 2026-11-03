@@ -18,7 +18,11 @@ func TestDefaultExecuteConfig(t *testing.T) {
 	}
 
 	if cfg.MissingWorkingDir != MissingWorkingDirFail {
-		t.Errorf("default missing working directory policy = %q, want %q", cfg.MissingWorkingDir, MissingWorkingDirFail)
+		t.Errorf(
+			"default missing working directory policy = %q, want %q",
+			cfg.MissingWorkingDir,
+			MissingWorkingDirFail,
+		)
 	}
 }
 
@@ -62,8 +66,12 @@ func TestPaneOutcomeClassification(t *testing.T) {
 				Directory: model.Bytes(t.TempDir()),
 				Launch: model.Launch{
 					Executable: model.Bytes(execPath),
-					Arguments:  []model.Bytes{model.Bytes("sh"), model.Bytes("-c"), model.Bytes("echo 1")},
-					Recovery:   "unverified",
+					Arguments: []model.Bytes{
+						model.Bytes("sh"),
+						model.Bytes("-c"),
+						model.Bytes("echo 1"),
+					},
+					Recovery: "unverified",
 				},
 			},
 			{
@@ -119,12 +127,19 @@ func TestPaneOutcomeClassification(t *testing.T) {
 	}
 
 	expected := map[string]PaneResult{
-		"p-shell":        {Outcome: PaneOutcomeDefaultShell},
-		"p-unsupported":  {Outcome: PaneOutcomeUnsupported, Reason: PaneReasonUnsupportedLaunch},
-		"p-restart":      {Outcome: PaneOutcomeRestartDispatch},
-		"p-resume":       {Outcome: PaneOutcomeNativeResumeDispatch},
-		"p-missing-exec": {Outcome: PaneOutcomeMissingExecutable, Reason: PaneReasonExecutableUnavailable},
-		"p-cwd-fallback": {Outcome: PaneOutcomeAllowedCWDFallback, Reason: PaneReasonWorkingDirFallback, CWDFallback: true},
+		"p-shell":       {Outcome: PaneOutcomeDefaultShell},
+		"p-unsupported": {Outcome: PaneOutcomeUnsupported, Reason: PaneReasonUnsupportedLaunch},
+		"p-restart":     {Outcome: PaneOutcomeRestartDispatch},
+		"p-resume":      {Outcome: PaneOutcomeNativeResumeDispatch},
+		"p-missing-exec": {
+			Outcome: PaneOutcomeMissingExecutable,
+			Reason:  PaneReasonExecutableUnavailable,
+		},
+		"p-cwd-fallback": {
+			Outcome:     PaneOutcomeAllowedCWDFallback,
+			Reason:      PaneReasonWorkingDirFallback,
+			CWDFallback: true,
+		},
 	}
 
 	for _, r := range results {
@@ -135,8 +150,16 @@ func TestPaneOutcomeClassification(t *testing.T) {
 			continue
 		}
 
-		if r.Outcome != want.Outcome || r.Reason != want.Reason || r.CWDFallback != want.CWDFallback {
-			t.Errorf("pane %s result = %+v, want outcome=%q reason=%q cwdFallback=%t", r.PaneID, r, want.Outcome, want.Reason, want.CWDFallback)
+		if r.Outcome != want.Outcome || r.Reason != want.Reason ||
+			r.CWDFallback != want.CWDFallback {
+			t.Errorf(
+				"pane %s result = %+v, want outcome=%q reason=%q cwdFallback=%t",
+				r.PaneID,
+				r,
+				want.Outcome,
+				want.Reason,
+				want.CWDFallback,
+			)
 		}
 
 		if r.AppVerified {
@@ -150,18 +173,44 @@ func TestVerifiedRuntimePaneResultsDoNotInventLaunchEvidence(t *testing.T) {
 
 	plan := Plan{SourceGraph: model.Manifest{Panes: []model.Pane{
 		{ID: "p-restart", Launch: model.Launch{Recovery: model.RecoveryRestart}},
-		{ID: "p-dead", Launch: model.Launch{Recovery: model.RecoveryNonrestartable, Reason: string(model.ReasonPaneDead)}},
-		{ID: "p-executable", Launch: model.Launch{Recovery: model.RecoveryNonrestartable, Reason: string(model.ReasonExecutableDeleted)}},
-		{ID: "p-directory", Launch: model.Launch{Recovery: model.RecoveryNonrestartable, Reason: string(model.ReasonWorkingDirectoryDeleted)}},
+		{
+			ID: "p-dead",
+			Launch: model.Launch{
+				Recovery: model.RecoveryNonrestartable,
+				Reason:   string(model.ReasonPaneDead),
+			},
+		},
+		{
+			ID: "p-executable",
+			Launch: model.Launch{
+				Recovery: model.RecoveryNonrestartable,
+				Reason:   string(model.ReasonExecutableDeleted),
+			},
+		},
+		{
+			ID: "p-directory",
+			Launch: model.Launch{
+				Recovery: model.RecoveryNonrestartable,
+				Reason:   string(model.ReasonWorkingDirectoryDeleted),
+			},
+		},
 	}}}
-	runtimePanes := map[string]string{"p-restart": "%10", "p-dead": "%11", "p-executable": "%12", "p-directory": "%13"}
+	runtimePanes := map[string]string{
+		"p-restart":    "%10",
+		"p-dead":       "%11",
+		"p-executable": "%12",
+		"p-directory":  "%13",
+	}
 
 	launched := PanesFromVerifiedRuntime(plan, runtimePanes, true)
-	if got := launched[0]; got.RuntimeID != "%10" || got.Outcome != PaneOutcomeEvidenceUnavailable || got.Reason != PaneReasonEvidenceUnavailable {
+	if got := launched[0]; got.RuntimeID != "%10" ||
+		got.Outcome != PaneOutcomeEvidenceUnavailable ||
+		got.Reason != PaneReasonEvidenceUnavailable {
 		t.Fatalf("reinspected restart result = %+v", got)
 	}
 
-	if got := launched[1]; got.RuntimeID != "%11" || got.Outcome != PaneOutcomeUnsupported || got.Reason != string(model.ReasonPaneDead) {
+	if got := launched[1]; got.RuntimeID != "%11" || got.Outcome != PaneOutcomeUnsupported ||
+		got.Reason != string(model.ReasonPaneDead) {
 		t.Fatalf("reinspected dead-pane result = %+v", got)
 	}
 
@@ -172,7 +221,8 @@ func TestVerifiedRuntimePaneResultsDoNotInventLaunchEvidence(t *testing.T) {
 	}
 
 	disabled := PanesFromVerifiedRuntime(plan, runtimePanes, false)
-	if got := disabled[0]; got.Outcome != PaneOutcomeDefaultShell || got.Reason != PaneReasonProcessLaunchDisabled {
+	if got := disabled[0]; got.Outcome != PaneOutcomeDefaultShell ||
+		got.Reason != PaneReasonProcessLaunchDisabled {
 		t.Fatalf("no-processes result = %+v", got)
 	}
 }
@@ -194,7 +244,8 @@ func TestMissingPaneResultDoesNotRerunLaunchPreflight(t *testing.T) {
 	executor.ensureAllPaneResults(Plan{SourceGraph: manifest})
 
 	got := executor.paneResults[pane.ID]
-	if got.Outcome != PaneOutcomeEvidenceUnavailable || got.Reason != PaneReasonEvidenceUnavailable {
+	if got.Outcome != PaneOutcomeEvidenceUnavailable ||
+		got.Reason != PaneReasonEvidenceUnavailable {
 		t.Fatalf("missing pane result = %+v, want conservative unavailable evidence", got)
 	}
 }
@@ -217,6 +268,11 @@ func TestResolveWorkingDirPreservesAbsoluteSymlink(t *testing.T) {
 	}
 
 	if directory != link || fallback {
-		t.Fatalf("resolved working directory = %q, fallback=%t; want symlink %q without fallback", directory, fallback, link)
+		t.Fatalf(
+			"resolved working directory = %q, fallback=%t; want symlink %q without fallback",
+			directory,
+			fallback,
+			link,
+		)
 	}
 }

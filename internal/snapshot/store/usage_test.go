@@ -81,7 +81,11 @@ func TestUsageExactByteAccounting(t *testing.T) {
 	r := openRepository(t, path)
 
 	g1 := commitContentFixture(t, r, []byte("short content"))
-	g2 := commitContentFixture(t, r, bytes.Repeat([]byte("repeating pattern of terminal text "), 100))
+	g2 := commitContentFixture(
+		t,
+		r,
+		bytes.Repeat([]byte("repeating pattern of terminal text "), 100),
+	)
 	g3 := commitContentFixture(t, r, bytes.Repeat([]byte("distinct buffer data \n"), 300))
 
 	size1 := generationDiskBytes(t, path, g1.ID)
@@ -106,7 +110,8 @@ func TestUsageExactByteAccounting(t *testing.T) {
 		t.Errorf("usage.GenerationCount = %d, want 3", usage.GenerationCount)
 	}
 
-	if usage.GenerationBytes[g1.ID] != size1 || usage.GenerationBytes[g2.ID] != size2 || usage.GenerationBytes[g3.ID] != size3 {
+	if usage.GenerationBytes[g1.ID] != size1 || usage.GenerationBytes[g2.ID] != size2 ||
+		usage.GenerationBytes[g3.ID] != size3 {
 		t.Errorf("unexpected GenerationBytes map: %v", usage.GenerationBytes)
 	}
 }
@@ -124,7 +129,12 @@ func TestUsageProtectedBytes(t *testing.T) {
 
 	pinnedID := gens[0].ID
 
-	_, err := r.Pin(t.Context(), pinnedID, model.Bytes("target"), []Action{{ID: "act1", Kind: actionLaunch, State: "planned"}})
+	_, err := r.Pin(
+		t.Context(),
+		pinnedID,
+		model.Bytes("target"),
+		[]Action{{ID: "act1", Kind: actionLaunch, State: "planned"}},
+	)
 	if err != nil {
 		t.Fatalf("Pin: %v", err)
 	}
@@ -147,7 +157,11 @@ func TestUsageProtectedBytes(t *testing.T) {
 	}
 
 	if usage.TotalBytes <= usage.ProtectedBytes {
-		t.Errorf("TotalBytes (%d) should exceed ProtectedBytes (%d)", usage.TotalBytes, usage.ProtectedBytes)
+		t.Errorf(
+			"TotalBytes (%d) should exceed ProtectedBytes (%d)",
+			usage.TotalBytes,
+			usage.ProtectedBytes,
+		)
 	}
 }
 
@@ -182,7 +196,9 @@ func TestUsageRejectsCorruptArtifact(t *testing.T) {
 	r := openRepository(t, path)
 	g := commitContentFixture(t, r, []byte("valid content"))
 
-	artifactFile := filepath.Clean(filepath.Join(path, "generations", g.ID, "artifacts", "a0.bin.gz"))
+	artifactFile := filepath.Clean(
+		filepath.Join(path, "generations", g.ID, "artifacts", "a0.bin.gz"),
+	)
 	rewriteFixtureFile(t, artifactFile, []byte("not valid gzip content at all!"))
 
 	_, err := r.Usage(t.Context())

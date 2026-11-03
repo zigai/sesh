@@ -51,7 +51,10 @@ func attachFixture(t *testing.T) (PeerAttachOptions, AttachBootstrap, *fakeLiveS
 
 	_, bridgePath := openTestBridgeDir(t)
 
-	live := &fakeLiveServer{sessions: []session.Session{liveTargetSession()}, paneOwners: map[string]string{}}
+	live := &fakeLiveServer{
+		sessions:   []session.Session{liveTargetSession()},
+		paneOwners: map[string]string{},
+	}
 
 	options := PeerAttachOptions{
 		PeerID:    testPeerID,
@@ -87,7 +90,8 @@ func TestRunPeerAttachPreparePublishesPrivateCapability(t *testing.T) {
 		t.Fatalf("RunPeerAttachPrepare() error = %v", err)
 	}
 
-	if result.AttachmentID != bootstrap.Capability.AttachmentID || result.BridgeSocket != bootstrap.BridgeSocket {
+	if result.AttachmentID != bootstrap.Capability.AttachmentID ||
+		result.BridgeSocket != bootstrap.BridgeSocket {
 		t.Fatalf("prepare result = %#v, want the confirmed attachment", result)
 	}
 
@@ -99,7 +103,12 @@ func TestRunPeerAttachPreparePublishesPrivateCapability(t *testing.T) {
 	assertCapabilityFileMode(t, bridgePath, bootstrap.Capability.AttachmentID)
 }
 
-func assertStoredCapabilityRecord(t *testing.T, bridgePath string, bootstrap AttachBootstrap, now time.Time) {
+func assertStoredCapabilityRecord(
+	t *testing.T,
+	bridgePath string,
+	bootstrap AttachBootstrap,
+	now time.Time,
+) {
 	t.Helper()
 
 	dir, err := openPrivateDir(bridgePath, false)
@@ -141,7 +150,14 @@ func TestRunPeerAttachPrepareRejectsForeignBridgeSocket(t *testing.T) {
 
 	bootstrap.BridgeSocket = "/tmp/foreign.sock"
 
-	if _, err := RunPeerAttachPrepare(t.Context(), options, bootstrap); !errors.Is(err, ErrUnsafePath) {
+	if _, err := RunPeerAttachPrepare(
+		t.Context(),
+		options,
+		bootstrap,
+	); !errors.Is(
+		err,
+		ErrUnsafePath,
+	) {
 		t.Fatalf("RunPeerAttachPrepare() error = %v, want %v", err, ErrUnsafePath)
 	}
 }
@@ -152,14 +168,28 @@ func TestRunPeerAttachPrepareRejectsUnusableCapabilityWindows(t *testing.T) {
 	expired := bootstrap
 	expired.Capability.ExpiresAt = options.Now().Add(-time.Second)
 
-	if _, err := RunPeerAttachPrepare(t.Context(), options, expired); !errors.Is(err, ErrCapabilityExpired) {
+	if _, err := RunPeerAttachPrepare(
+		t.Context(),
+		options,
+		expired,
+	); !errors.Is(
+		err,
+		ErrCapabilityExpired,
+	) {
 		t.Fatalf("RunPeerAttachPrepare(expired) error = %v, want %v", err, ErrCapabilityExpired)
 	}
 
 	unbounded := bootstrap
 	unbounded.Capability.ExpiresAt = options.Now().Add(48 * time.Hour)
 
-	if _, err := RunPeerAttachPrepare(t.Context(), options, unbounded); !errors.Is(err, ErrInvalidFrame) {
+	if _, err := RunPeerAttachPrepare(
+		t.Context(),
+		options,
+		unbounded,
+	); !errors.Is(
+		err,
+		ErrInvalidFrame,
+	) {
 		t.Fatalf("RunPeerAttachPrepare(unbounded) error = %v, want %v", err, ErrInvalidFrame)
 	}
 }
@@ -169,7 +199,14 @@ func TestRunPeerAttachPrepareValidatesTargetIncarnation(t *testing.T) {
 
 	bootstrap.Target.SessionCreatedAt = time.Unix(300, 0).UTC()
 
-	if _, err := RunPeerAttachPrepare(t.Context(), options, bootstrap); !errors.Is(err, ErrTargetChanged) {
+	if _, err := RunPeerAttachPrepare(
+		t.Context(),
+		options,
+		bootstrap,
+	); !errors.Is(
+		err,
+		ErrTargetChanged,
+	) {
 		t.Fatalf("RunPeerAttachPrepare(replaced) error = %v, want %v", err, ErrTargetChanged)
 	}
 
@@ -177,7 +214,14 @@ func TestRunPeerAttachPrepareValidatesTargetIncarnation(t *testing.T) {
 	absent.Target = attachTargetFor(defaultSessionTarget())
 	absent.Target.SessionName = "gone"
 
-	if _, err := RunPeerAttachPrepare(t.Context(), options, absent); !errors.Is(err, ErrTargetChanged) {
+	if _, err := RunPeerAttachPrepare(
+		t.Context(),
+		options,
+		absent,
+	); !errors.Is(
+		err,
+		ErrTargetChanged,
+	) {
 		t.Fatalf("RunPeerAttachPrepare(absent) error = %v, want %v", err, ErrTargetChanged)
 	}
 }
@@ -187,8 +231,19 @@ func TestRunPeerAttachPrepareValidatesPaneOwnership(t *testing.T) {
 
 	bootstrap.Target.PaneID = "%7"
 
-	if _, err := RunPeerAttachPrepare(t.Context(), options, bootstrap); !errors.Is(err, ErrTargetChanged) {
-		t.Fatalf("RunPeerAttachPrepare(unattributed pane) error = %v, want %v", err, ErrTargetChanged)
+	if _, err := RunPeerAttachPrepare(
+		t.Context(),
+		options,
+		bootstrap,
+	); !errors.Is(
+		err,
+		ErrTargetChanged,
+	) {
+		t.Fatalf(
+			"RunPeerAttachPrepare(unattributed pane) error = %v, want %v",
+			err,
+			ErrTargetChanged,
+		)
 	}
 
 	live.paneOwners["%7"] = "$1"
@@ -200,7 +255,14 @@ func TestRunPeerAttachPrepareValidatesPaneOwnership(t *testing.T) {
 
 	live.paneOwners["%7"] = "$2"
 
-	if _, err := RunPeerAttachPrepare(t.Context(), options, bootstrap); !errors.Is(err, ErrTargetChanged) {
+	if _, err := RunPeerAttachPrepare(
+		t.Context(),
+		options,
+		bootstrap,
+	); !errors.Is(
+		err,
+		ErrTargetChanged,
+	) {
 		t.Fatalf("RunPeerAttachPrepare(foreign pane) error = %v, want %v", err, ErrTargetChanged)
 	}
 }
@@ -214,7 +276,12 @@ func TestRunPeerAttachConsumesAndRevokesCapability(t *testing.T) {
 
 	streams := AttachStreams{In: os.Stdin, Out: os.Stdout, Err: os.Stderr}
 
-	if err := RunPeerAttach(t.Context(), options, bootstrap.Capability.AttachmentID, streams); err != nil {
+	if err := RunPeerAttach(
+		t.Context(),
+		options,
+		bootstrap.Capability.AttachmentID,
+		streams,
+	); err != nil {
 		t.Fatalf("RunPeerAttach() error = %v", err)
 	}
 
@@ -233,11 +300,26 @@ func TestRunPeerAttachConsumesAndRevokesCapability(t *testing.T) {
 
 	defer func() { _ = dir.Close() }()
 
-	if _, err := ReadCapability(dir, bootstrap.Capability.AttachmentID, options.Now()); !errors.Is(err, os.ErrNotExist) {
+	if _, err := ReadCapability(
+		dir,
+		bootstrap.Capability.AttachmentID,
+		options.Now(),
+	); !errors.Is(
+		err,
+		os.ErrNotExist,
+	) {
 		t.Fatalf("capability survived detach: %v", err)
 	}
 
-	if err := RunPeerAttach(t.Context(), options, bootstrap.Capability.AttachmentID, streams); !errors.Is(err, os.ErrNotExist) {
+	if err := RunPeerAttach(
+		t.Context(),
+		options,
+		bootstrap.Capability.AttachmentID,
+		streams,
+	); !errors.Is(
+		err,
+		os.ErrNotExist,
+	) {
 		t.Fatalf("RunPeerAttach(revoked) error = %v, want not-exist", err)
 	}
 }
@@ -247,11 +329,27 @@ func TestRunPeerAttachRejectsUnusableCapabilities(t *testing.T) {
 
 	streams := AttachStreams{In: os.Stdin, Out: os.Stdout, Err: os.Stderr}
 
-	if err := RunPeerAttach(t.Context(), options, "short", streams); !errors.Is(err, ErrInvalidFrame) {
+	if err := RunPeerAttach(
+		t.Context(),
+		options,
+		"short",
+		streams,
+	); !errors.Is(
+		err,
+		ErrInvalidFrame,
+	) {
 		t.Fatalf("RunPeerAttach(invalid ID) error = %v, want %v", err, ErrInvalidFrame)
 	}
 
-	if err := RunPeerAttach(t.Context(), options, bootstrap.Capability.AttachmentID, streams); !errors.Is(err, os.ErrNotExist) {
+	if err := RunPeerAttach(
+		t.Context(),
+		options,
+		bootstrap.Capability.AttachmentID,
+		streams,
+	); !errors.Is(
+		err,
+		os.ErrNotExist,
+	) {
 		t.Fatalf("RunPeerAttach(missing record) error = %v, want not-exist", err)
 	}
 
@@ -262,14 +360,30 @@ func TestRunPeerAttachRejectsUnusableCapabilities(t *testing.T) {
 	expired := options
 	expired.Now = func() time.Time { return bootstrap.Capability.ExpiresAt.Add(time.Second) }
 
-	if err := RunPeerAttach(t.Context(), expired, bootstrap.Capability.AttachmentID, streams); !errors.Is(err, ErrCapabilityExpired) {
+	if err := RunPeerAttach(
+		t.Context(),
+		expired,
+		bootstrap.Capability.AttachmentID,
+		streams,
+	); !errors.Is(
+		err,
+		ErrCapabilityExpired,
+	) {
 		t.Fatalf("RunPeerAttach(expired) error = %v, want %v", err, ErrCapabilityExpired)
 	}
 
 	other := options
 	other.PeerID = "other"
 
-	if err := RunPeerAttach(t.Context(), other, bootstrap.Capability.AttachmentID, streams); !errors.Is(err, ErrPeerMismatch) {
+	if err := RunPeerAttach(
+		t.Context(),
+		other,
+		bootstrap.Capability.AttachmentID,
+		streams,
+	); !errors.Is(
+		err,
+		ErrPeerMismatch,
+	) {
 		t.Fatalf("RunPeerAttach(peer mismatch) error = %v, want %v", err, ErrPeerMismatch)
 	}
 }
@@ -281,7 +395,15 @@ func TestRunPeerAttachRequiresTerminalStreams(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := RunPeerAttach(t.Context(), options, bootstrap.Capability.AttachmentID, AttachStreams{}); !errors.Is(err, errNilAttachStreams) {
+	if err := RunPeerAttach(
+		t.Context(),
+		options,
+		bootstrap.Capability.AttachmentID,
+		AttachStreams{},
+	); !errors.Is(
+		err,
+		errNilAttachStreams,
+	) {
 		t.Fatalf("RunPeerAttach(no streams) error = %v, want %v", err, errNilAttachStreams)
 	}
 }
@@ -290,7 +412,14 @@ func TestRunPeerAttachRequiresLiveServer(t *testing.T) {
 	options, bootstrap, _, _ := attachFixture(t)
 	options.Live = nil
 
-	if _, err := RunPeerAttachPrepare(t.Context(), options, bootstrap); !errors.Is(err, ErrIncompleteDependencies) {
+	if _, err := RunPeerAttachPrepare(
+		t.Context(),
+		options,
+		bootstrap,
+	); !errors.Is(
+		err,
+		ErrIncompleteDependencies,
+	) {
 		t.Fatalf("RunPeerAttachPrepare() error = %v, want %v", err, ErrIncompleteDependencies)
 	}
 }
@@ -318,14 +447,26 @@ func TestPrepareAttachmentKeepsSecretsOutOfArguments(t *testing.T) {
 
 	remote := testRemoteConfig()
 
-	prepare, err := NewAttachPrepareCommand(t.Context(), remote, remote.Connections[0], bootstrap, AttachCommandOptions{})
+	prepare, err := NewAttachPrepareCommand(
+		t.Context(),
+		remote,
+		remote.Connections[0],
+		bootstrap,
+		AttachCommandOptions{},
+	)
 	if err != nil {
 		t.Fatalf("NewAttachPrepareCommand() error = %v", err)
 	}
 
-	attach, err := NewAttachCommand(t.Context(), remote, remote.Connections[0], bootstrap, AttachCommandOptions{
-		Streams: AttachStreams{In: os.Stdin, Out: os.Stdout, Err: os.Stderr},
-	})
+	attach, err := NewAttachCommand(
+		t.Context(),
+		remote,
+		remote.Connections[0],
+		bootstrap,
+		AttachCommandOptions{
+			Streams: AttachStreams{In: os.Stdin, Out: os.Stdout, Err: os.Stderr},
+		},
+	)
 	if err != nil {
 		t.Fatalf("NewAttachCommand() error = %v", err)
 	}
@@ -348,11 +489,17 @@ func TestPrepareAttachmentKeepsSecretsOutOfArguments(t *testing.T) {
 		}
 	}
 
-	if !strings.Contains(strings.Join(attach.Args, " "), "'"+bootstrap.Capability.AttachmentID+"'") {
+	if !strings.Contains(
+		strings.Join(attach.Args, " "),
+		"'"+bootstrap.Capability.AttachmentID+"'",
+	) {
 		t.Fatalf("attach argv = %#v, want the opaque attachment selector", attach.Args)
 	}
 
-	if !strings.Contains(strings.Join(attach.Args, " "), "-R "+bootstrap.BridgeSocket+":"+bootstrap.Capability.OriginSocket) {
+	if !strings.Contains(
+		strings.Join(attach.Args, " "),
+		"-R "+bootstrap.BridgeSocket+":"+bootstrap.Capability.OriginSocket,
+	) {
 		t.Fatalf("attach argv = %#v, want the scoped reverse forward", attach.Args)
 	}
 }

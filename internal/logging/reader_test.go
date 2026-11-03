@@ -131,9 +131,15 @@ func TestTruncateRejectsSymlink(t *testing.T) {
 func TestLineMatchesFilter(t *testing.T) {
 	t.Parallel()
 
-	lineInfo := []byte(`{"time":"2026-09-20T12:00:00Z","level":"info","component":"cli","message":"hello world"}` + "\n")
-	lineWarn := []byte(`{"time":"2026-09-20T12:05:00Z","level":"warn","component":"tmux","message":"warning event"}` + "\n")
-	lineError := []byte(`{"time":"2026-09-20T12:10:00Z","level":"error","component":"store","message":"error occurred"}` + "\n")
+	lineInfo := []byte(
+		`{"time":"2026-09-20T12:00:00Z","level":"info","component":"cli","message":"hello world"}` + "\n",
+	)
+	lineWarn := []byte(
+		`{"time":"2026-09-20T12:05:00Z","level":"warn","component":"tmux","message":"warning event"}` + "\n",
+	)
+	lineError := []byte(
+		`{"time":"2026-09-20T12:10:00Z","level":"error","component":"store","message":"error occurred"}` + "\n",
+	)
 
 	t1, _ := time.Parse(time.RFC3339, "2026-09-20T12:02:00Z")
 	t2, _ := time.Parse(time.RFC3339, "2026-09-20T12:08:00Z")
@@ -264,7 +270,10 @@ func TestStreamLogsFiltering(t *testing.T) {
 	}
 
 	if recordString(t, records[1], "message") != "error msg" {
-		t.Errorf("records[1] message = %q, want 'error msg'", recordString(t, records[1], "message"))
+		t.Errorf(
+			"records[1] message = %q, want 'error msg'",
+			recordString(t, records[1], "message"),
+		)
 	}
 }
 
@@ -421,7 +430,11 @@ func TestStreamLogsFollowAcrossRenameRotation(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "follow_rename.log")
-	if err := os.WriteFile(path, []byte(`{"time":"2026-09-20T12:00:00Z","level":"info","message":"before-rename"}`+"\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		path,
+		[]byte(`{"time":"2026-09-20T12:00:00Z","level":"info","message":"before-rename"}`+"\n"),
+		0o600,
+	); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
@@ -449,7 +462,11 @@ func TestStreamLogsFollowAcrossRenameRotation(t *testing.T) {
 		t.Fatalf("Rename() error = %v", err)
 	}
 
-	if err := os.WriteFile(path, []byte(`{"time":"2026-09-20T12:01:00Z","level":"info","message":"after-rename"}`+"\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		path,
+		[]byte(`{"time":"2026-09-20T12:01:00Z","level":"info","message":"after-rename"}`+"\n"),
+		0o600,
+	); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
@@ -696,7 +713,9 @@ func testRingBufferFillAndDrain(t *testing.T, ring *ringBuffer, line1, line2, li
 	assertRingAdd(t, ring, line4, 3, 90)
 
 	drained := ring.drain()
-	if len(drained) != 3 || string(drained[0]) != string(line2) || string(drained[1]) != string(line3) || string(drained[2]) != string(line4) {
+	if len(drained) != 3 || string(drained[0]) != string(line2) ||
+		string(drained[1]) != string(line3) ||
+		string(drained[2]) != string(line4) {
 		t.Fatalf("drain unexpected: %q", drained)
 	}
 }
@@ -985,7 +1004,10 @@ func TestStreamLogsBoundedDrainCancellation(t *testing.T) {
 		}
 
 		if writer.count != 1 {
-			t.Fatalf("writer processed %d lines, want exactly 1 line before cancellation", writer.count)
+			t.Fatalf(
+				"writer processed %d lines, want exactly 1 line before cancellation",
+				writer.count,
+			)
 		}
 	})
 
@@ -999,7 +1021,10 @@ func TestStreamLogsBoundedDrainCancellation(t *testing.T) {
 		}
 
 		if writer.count != 1 {
-			t.Fatalf("writer processed %d lines, want exactly 1 line before cancellation", writer.count)
+			t.Fatalf(
+				"writer processed %d lines, want exactly 1 line before cancellation",
+				writer.count,
+			)
 		}
 	})
 }
@@ -1026,7 +1051,11 @@ func TestTruncateLockCancelNoClear(t *testing.T) {
 
 		data, err := os.ReadFile(logPath)
 		if err != nil || string(data) != string(initialContent) {
-			t.Fatalf("active log was modified despite cancellation: data=%q err=%v", string(data), err)
+			t.Fatalf(
+				"active log was modified despite cancellation: data=%q err=%v",
+				string(data),
+				err,
+			)
 		}
 	})
 
@@ -1056,7 +1085,10 @@ func TestTruncateLockCancelNoClear(t *testing.T) {
 		}
 
 		if elapsed > 2*time.Second {
-			t.Fatalf("Truncate blocked for %v on held lock instead of aborting promptly on context cancellation", elapsed)
+			t.Fatalf(
+				"Truncate blocked for %v on held lock instead of aborting promptly on context cancellation",
+				elapsed,
+			)
 		}
 
 		data, err := os.ReadFile(logPath)

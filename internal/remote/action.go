@@ -118,7 +118,9 @@ func EncodeActionRequest(request ActionRequest) ([]byte, error) {
 	}
 
 	if len(encoded) > MaxActionBytes {
-		return nil, oops.In("remote").With("operation", "encode_action_request").Wrap(ErrFrameTooLarge)
+		return nil, oops.In("remote").
+			With("operation", "encode_action_request").
+			Wrap(ErrFrameTooLarge)
 	}
 
 	return encoded, nil
@@ -148,7 +150,9 @@ func VerifyIntentDigest(request ActionRequest) error {
 	}
 
 	if digest != request.IntentDigest {
-		return oops.In("remote").With("operation", "verify_intent_digest").Wrap(ErrInvocationConflict)
+		return oops.In("remote").
+			With("operation", "verify_intent_digest").
+			Wrap(ErrInvocationConflict)
 	}
 
 	return nil
@@ -218,7 +222,8 @@ func ValidateActionResult(result ActionResult) error {
 
 func ValidateActionRequest(request ActionRequest) error {
 	if !request.Action.Valid() || !ValidIdentifier(request.PeerID) || !ValidIdentifier(request.ConnectionID) ||
-		!ValidIdentifier(request.ConfigDigest) || !ValidText(request.Socket) {
+		!ValidIdentifier(request.ConfigDigest) ||
+		!ValidText(request.Socket) {
 		return ErrInvalidFrame
 	}
 
@@ -265,7 +270,9 @@ func encodeActionResult(result ActionResult) ([]byte, error) {
 	}
 
 	if len(encoded) > MaxResultBytes {
-		return nil, oops.In("remote").With("operation", "encode_action_result").Wrap(ErrFrameTooLarge)
+		return nil, oops.In("remote").
+			With("operation", "encode_action_result").
+			Wrap(ErrFrameTooLarge)
 	}
 
 	return encoded, nil

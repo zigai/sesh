@@ -26,13 +26,20 @@ func TestPickerSearchShrinkAndRegrowAvoidFullScreenErase(t *testing.T) {
 	server := tmuxtest.NewServer(t)
 
 	for _, name := range []string{"alpha-target", "bravo-stale", "charlie-stale"} {
-		if _, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{Name: name}); err != nil {
+		if _, err := server.NewSession(
+			t.Context(),
+			gotmux.NewSessionOptions{Name: name},
+		); err != nil {
 			t.Fatalf("create session %q: %v", name, err)
 		}
 	}
 
 	configPath := filepath.Join(root, "picker.toml")
-	if err := os.WriteFile(configPath, []byte("[agent_sessions]\nenabled = false\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		configPath,
+		[]byte("[agent_sessions]\nenabled = false\n"),
+		0o600,
+	); err != nil {
 		t.Fatalf("write picker config: %v", err)
 	}
 
@@ -74,33 +81,97 @@ func TestPickerSearchShrinkAndRegrowAvoidFullScreenErase(t *testing.T) {
 		stopCtx, stopCancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer stopCancel()
 
-		_ = exec.CommandContext(stopCtx, termtraceExecutable, "stop", "-q", alias, "--wait", "--timeout-ms", "1500").Run()
+		_ = exec.CommandContext(stopCtx, termtraceExecutable, "stop", "-q", alias, "--wait", "--timeout-ms", "1500").
+			Run()
 	})
 
 	termtracePickerCommand(t, ctx, "send", "-q", alias, "--mark", "before-shrink")
-	termtracePickerCommand(t, ctx, "send", "-q", alias, "--text", "alpha-target", "--until-screen", "> alpha-target", "--timeout", "5s")
+	termtracePickerCommand(
+		t,
+		ctx,
+		"send",
+		"-q",
+		alias,
+		"--text",
+		"alpha-target",
+		"--until-screen",
+		"> alpha-target",
+		"--timeout",
+		"5s",
+	)
 	termtracePickerCommand(t, ctx, "send", "-q", alias, "--mark", "after-shrink")
-	assertPickerScreenRows(t, ctx, alias, []string{"alpha-target"}, []string{"bravo-stale", "charlie-stale"})
+	assertPickerScreenRows(
+		t,
+		ctx,
+		alias,
+		[]string{"alpha-target"},
+		[]string{"bravo-stale", "charlie-stale"},
+	)
 
 	termtracePickerCommand(t, ctx, "send", "-q", alias, "--mark", "before-grow")
-	termtracePickerCommand(t, ctx, "send", "-q", alias, "ctrl+u", "--until-screen", "charlie-stale", "--timeout", "5s")
+	termtracePickerCommand(
+		t,
+		ctx,
+		"send",
+		"-q",
+		alias,
+		"ctrl+u",
+		"--until-screen",
+		"charlie-stale",
+		"--timeout",
+		"5s",
+	)
 	termtracePickerCommand(t, ctx, "send", "-q", alias, "--mark", "after-grow")
 	assertPickerScreenRows(t, ctx, alias,
 		[]string{"alpha-target", "bravo-stale", "charlie-stale"}, nil)
 
 	termtracePickerCommand(t, ctx, "send", "-q", alias, "--mark", "before-empty")
-	termtracePickerCommand(t, ctx, "send", "-q", alias, "--text", "zzzzmissing", "--until-screen", "> zzzzmissing", "--timeout", "5s")
+	termtracePickerCommand(
+		t,
+		ctx,
+		"send",
+		"-q",
+		alias,
+		"--text",
+		"zzzzmissing",
+		"--until-screen",
+		"> zzzzmissing",
+		"--timeout",
+		"5s",
+	)
 	termtracePickerCommand(t, ctx, "send", "-q", alias, "--mark", "after-empty")
 	assertPickerScreenRows(t, ctx, alias, []string{"No matches"},
 		[]string{"alpha-target", "bravo-stale", "charlie-stale"})
 
 	termtracePickerCommand(t, ctx, "send", "-q", alias, "--mark", "before-regrow")
-	termtracePickerCommand(t, ctx, "send", "-q", alias, "ctrl+u", "--until-screen", "charlie-stale", "--timeout", "5s")
+	termtracePickerCommand(
+		t,
+		ctx,
+		"send",
+		"-q",
+		alias,
+		"ctrl+u",
+		"--until-screen",
+		"charlie-stale",
+		"--timeout",
+		"5s",
+	)
 	termtracePickerCommand(t, ctx, "send", "-q", alias, "--mark", "after-regrow")
 	assertPickerScreenRows(t, ctx, alias,
 		[]string{"alpha-target", "bravo-stale", "charlie-stale"}, nil)
 	termtracePickerCommand(t, ctx, "send", "-q", alias, "--mark", "before-arrow")
-	termtracePickerCommand(t, ctx, "send", "-q", alias, "down", "--until-screen", "▌ bravo-stale", "--timeout", "5s")
+	termtracePickerCommand(
+		t,
+		ctx,
+		"send",
+		"-q",
+		alias,
+		"down",
+		"--until-screen",
+		"▌ bravo-stale",
+		"--timeout",
+		"5s",
+	)
 	termtracePickerCommand(t, ctx, "send", "-q", alias, "--mark", "after-arrow")
 
 	termtracePickerCommand(t, ctx, "send", "-q", alias, "--signal", "INT")
@@ -130,7 +201,13 @@ func assertPickerIncrementalRedraw(t *testing.T, operation string, output []byte
 
 	for _, sequence := range [][]byte{[]byte("\x1b[?1049h"), []byte("\x1b[?1049l")} {
 		if count := bytes.Count(output, sequence); count != 0 {
-			t.Fatalf("%s emitted %d alternate-screen transitions %q: %q", operation, count, sequence, output)
+			t.Fatalf(
+				"%s emitted %d alternate-screen transitions %q: %q",
+				operation,
+				count,
+				sequence,
+				output,
+			)
 		}
 	}
 }
@@ -138,12 +215,18 @@ func assertPickerIncrementalRedraw(t *testing.T, operation string, output []byte
 func termtracePickerCommand(t *testing.T, ctx context.Context, arguments ...string) {
 	t.Helper()
 
-	if output, err := exec.CommandContext(ctx, termtraceExecutable, arguments...).CombinedOutput(); err != nil {
+	if output, err := exec.CommandContext(ctx, termtraceExecutable, arguments...).
+		CombinedOutput(); err != nil {
 		t.Fatalf("termtrace %s: %v: %s", strings.Join(arguments, " "), err, output)
 	}
 }
 
-func assertPickerScreenRows(t *testing.T, ctx context.Context, alias string, present, absent []string) {
+func assertPickerScreenRows(
+	t *testing.T,
+	ctx context.Context,
+	alias string,
+	present, absent []string,
+) {
 	t.Helper()
 
 	screen, err := exec.CommandContext(ctx, termtraceExecutable, "screen", alias).CombinedOutput()
@@ -164,7 +247,11 @@ func assertPickerScreenRows(t *testing.T, ctx context.Context, alias string, pre
 	}
 }
 
-func termtracePickerOutputBetween(t *testing.T, ctx context.Context, alias, from, to string) []byte {
+func termtracePickerOutputBetween(
+	t *testing.T,
+	ctx context.Context,
+	alias, from, to string,
+) []byte {
 	t.Helper()
 
 	output, err := exec.CommandContext(

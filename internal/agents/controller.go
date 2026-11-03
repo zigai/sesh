@@ -37,12 +37,21 @@ type tmuxController struct {
 }
 
 func NewTmuxController(server *gotmux.Server, target CurrentTarget) Controller {
-	return &tmuxController{server: server, target: target, getenv: os.Getenv, mu: sync.Mutex{}, serverPID: 0}
+	return &tmuxController{
+		server:    server,
+		target:    target,
+		getenv:    os.Getenv,
+		mu:        sync.Mutex{},
+		serverPID: 0,
+	}
 }
 
 func (c *tmuxController) CurrentContext(ctx context.Context) (CurrentContext, error) {
 	if c.server == nil {
-		return CurrentContext{}, oops.In("agents").Code("endpoint_required").With("operation", "current_context").Wrap(ErrServerRequired)
+		return CurrentContext{}, oops.In("agents").
+			Code("endpoint_required").
+			With("operation", "current_context").
+			Wrap(ErrServerRequired)
 	}
 
 	switch {
@@ -67,20 +76,32 @@ func (c *tmuxController) Panes(ctx context.Context) ([]PaneLocation, error) {
 	return ObservePanes(ctx, c.server)
 }
 
-func (c *tmuxController) SessionWindows(ctx context.Context, sessionID string) ([]SessionWindow, error) {
+func (c *tmuxController) SessionWindows(
+	ctx context.Context,
+	sessionID string,
+) ([]SessionWindow, error) {
 	session, err := c.server.Session(ctx, gotmux.SessionID(sessionID))
 	if err != nil {
-		return nil, oops.In("agents").Code("session_not_found").With("operation", "session_windows").Wrap(err)
+		return nil, oops.In("agents").
+			Code("session_not_found").
+			With("operation", "session_windows").
+			Wrap(err)
 	}
 
 	info, err := session.Info(ctx)
 	if err != nil {
-		return nil, oops.In("agents").Code("tmux_failed").With("operation", "session_info").Wrap(err)
+		return nil, oops.In("agents").
+			Code("tmux_failed").
+			With("operation", "session_info").
+			Wrap(err)
 	}
 
 	links, err := session.Windows(ctx)
 	if err != nil {
-		return nil, oops.In("agents").Code("tmux_failed").With("operation", "session_windows").Wrap(err)
+		return nil, oops.In("agents").
+			Code("tmux_failed").
+			With("operation", "session_windows").
+			Wrap(err)
 	}
 
 	windows := make([]SessionWindow, 0, len(links))
@@ -88,7 +109,10 @@ func (c *tmuxController) SessionWindows(ctx context.Context, sessionID string) (
 	for _, link := range links {
 		linkInfo, linkErr := link.Info(ctx)
 		if linkErr != nil {
-			return nil, oops.In("agents").Code("tmux_failed").With("operation", "window_info").Wrap(linkErr)
+			return nil, oops.In("agents").
+				Code("tmux_failed").
+				With("operation", "window_info").
+				Wrap(linkErr)
 		}
 
 		windows = append(windows, SessionWindow{
@@ -102,9 +126,16 @@ func (c *tmuxController) SessionWindows(ctx context.Context, sessionID string) (
 	return windows, nil
 }
 
-func (c *tmuxController) Activate(ctx context.Context, current CurrentContext, target PaneLocation) error {
+func (c *tmuxController) Activate(
+	ctx context.Context,
+	current CurrentContext,
+	target PaneLocation,
+) error {
 	if target.SessionID == "" || target.WindowID == "" || target.PaneID == "" {
-		return oops.In("agents").Code("invalid_target").With("operation", "activate").Wrap(ErrPaneNotLive)
+		return oops.In("agents").
+			Code("invalid_target").
+			With("operation", "activate").
+			Wrap(ErrPaneNotLive)
 	}
 
 	if err := c.switchSession(ctx, current, target); err != nil {
@@ -140,7 +171,10 @@ func (c *tmuxController) SetHistory(ctx context.Context, clientKey string, raw s
 
 	if raw == "" {
 		if err := options.UnsetUser(ctx, option); err != nil {
-			return oops.In("agents").Code("tmux_failed").With("operation", "write_history").Wrap(err)
+			return oops.In("agents").
+				Code("tmux_failed").
+				With("operation", "write_history").
+				Wrap(err)
 		}
 
 		return nil
@@ -155,7 +189,10 @@ func (c *tmuxController) SetHistory(ctx context.Context, clientKey string, raw s
 
 func (c *tmuxController) Lock(ctx context.Context, channel string) error {
 	if c.server == nil {
-		return oops.In("agents").Code("endpoint_required").With("operation", "lock").Wrap(ErrServerRequired)
+		return oops.In("agents").
+			Code("endpoint_required").
+			With("operation", "lock").
+			Wrap(ErrServerRequired)
 	}
 
 	lockCtx := ctx
@@ -175,7 +212,10 @@ func (c *tmuxController) Lock(ctx context.Context, channel string) error {
 
 func (c *tmuxController) Unlock(ctx context.Context, channel string) error {
 	if c.server == nil {
-		return oops.In("agents").Code("endpoint_required").With("operation", "unlock").Wrap(ErrServerRequired)
+		return oops.In("agents").
+			Code("endpoint_required").
+			With("operation", "unlock").
+			Wrap(ErrServerRequired)
 	}
 
 	if err := c.server.Unlock(ctx, channel); err != nil {
@@ -185,7 +225,10 @@ func (c *tmuxController) Unlock(ctx context.Context, channel string) error {
 	return nil
 }
 
-func (c *tmuxController) contextFromPaneID(ctx context.Context, paneID string) (CurrentContext, error) {
+func (c *tmuxController) contextFromPaneID(
+	ctx context.Context,
+	paneID string,
+) (CurrentContext, error) {
 	panes, err := c.Panes(ctx)
 	if err != nil {
 		return CurrentContext{}, err
@@ -193,11 +236,18 @@ func (c *tmuxController) contextFromPaneID(ctx context.Context, paneID string) (
 
 	pane, ok := c.paneLinkForTarget(ctx, panes, paneID)
 	if !ok {
-		return CurrentContext{}, oops.In("agents").Code("pane_not_live").With("operation", "current_context").Wrap(ErrPaneNotLive)
+		return CurrentContext{}, oops.In("agents").
+			Code("pane_not_live").
+			With("operation", "current_context").
+			Wrap(ErrPaneNotLive)
 	}
 
 	if strings.TrimSpace(c.target.Client) == "" {
-		return contextFromPane(pane, c.soleClientForSession(ctx, pane.SessionID), c.resolveServerPID(ctx)), nil
+		return contextFromPane(
+			pane,
+			c.soleClientForSession(ctx, pane.SessionID),
+			c.resolveServerPID(ctx),
+		), nil
 	}
 
 	client, err := c.contextFromClient(ctx, strings.TrimSpace(c.target.Client))
@@ -225,7 +275,11 @@ func (c *tmuxController) contextFromPaneID(ctx context.Context, paneID string) (
 	return current, nil
 }
 
-func (c *tmuxController) paneLinkForTarget(ctx context.Context, panes []PaneLocation, paneID string) (PaneLocation, bool) {
+func (c *tmuxController) paneLinkForTarget(
+	ctx context.Context,
+	panes []PaneLocation,
+	paneID string,
+) (PaneLocation, bool) {
 	links := FindPanes(panes, paneID, c.socketPath())
 	if len(links) == 0 {
 		return emptyPaneLocation, false
@@ -272,26 +326,41 @@ func (c *tmuxController) sessionIDFor(ctx context.Context, requested string) (st
 
 	session, err := c.server.FindSession(ctx, requested)
 	if err != nil {
-		return "", oops.In("agents").Code("session_not_found").With("operation", "resolve_session").Wrap(err)
+		return "", oops.In("agents").
+			Code("session_not_found").
+			With("operation", "resolve_session").
+			Wrap(err)
 	}
 
 	return string(session.ID()), nil
 }
 
-func (c *tmuxController) contextFromClient(ctx context.Context, name string) (CurrentContext, error) {
+func (c *tmuxController) contextFromClient(
+	ctx context.Context,
+	name string,
+) (CurrentContext, error) {
 	client, err := c.server.Client(ctx, gotmux.ClientName(name))
 	if err != nil {
-		return CurrentContext{}, oops.In("agents").Code("client_not_found").With("operation", "current_context").Wrap(err)
+		return CurrentContext{}, oops.In("agents").
+			Code("client_not_found").
+			With("operation", "current_context").
+			Wrap(err)
 	}
 
 	info, err := client.Info(ctx)
 	if err != nil {
-		return CurrentContext{}, oops.In("agents").Code("tmux_failed").With("operation", "client_info").Wrap(err)
+		return CurrentContext{}, oops.In("agents").
+			Code("tmux_failed").
+			With("operation", "client_info").
+			Wrap(err)
 	}
 
 	sessionID, ok := info.SessionID.Get()
 	if !ok {
-		return CurrentContext{}, oops.In("agents").Code("client_detached").With("operation", "current_context").Wrap(ErrCurrentContextUnknown)
+		return CurrentContext{}, oops.In("agents").
+			Code("client_detached").
+			With("operation", "current_context").
+			Wrap(ErrCurrentContextUnknown)
 	}
 
 	current, err := c.contextFromSessionID(ctx, sessionID)
@@ -305,34 +374,55 @@ func (c *tmuxController) contextFromClient(ctx context.Context, name string) (Cu
 	return current, nil
 }
 
-func (c *tmuxController) contextFromSessionID(ctx context.Context, sessionID gotmux.SessionID) (CurrentContext, error) {
+func (c *tmuxController) contextFromSessionID(
+	ctx context.Context,
+	sessionID gotmux.SessionID,
+) (CurrentContext, error) {
 	session, err := c.server.Session(ctx, sessionID)
 	if err != nil {
-		return CurrentContext{}, oops.In("agents").Code("session_not_found").With("operation", "current_context").Wrap(err)
+		return CurrentContext{}, oops.In("agents").
+			Code("session_not_found").
+			With("operation", "current_context").
+			Wrap(err)
 	}
 
 	return c.contextFromSession(ctx, session)
 }
 
-func (c *tmuxController) contextFromSessionName(ctx context.Context, name string) (CurrentContext, error) {
+func (c *tmuxController) contextFromSessionName(
+	ctx context.Context,
+	name string,
+) (CurrentContext, error) {
 	session, err := c.server.FindSession(ctx, name)
 	if err != nil {
-		return CurrentContext{}, oops.In("agents").Code("session_not_found").With("operation", "current_context").Wrap(err)
+		return CurrentContext{}, oops.In("agents").
+			Code("session_not_found").
+			With("operation", "current_context").
+			Wrap(err)
 	}
 
 	return c.contextFromSession(ctx, session)
 }
 
-func (c *tmuxController) contextFromSession(ctx context.Context, session gotmux.Session) (CurrentContext, error) {
+func (c *tmuxController) contextFromSession(
+	ctx context.Context,
+	session gotmux.Session,
+) (CurrentContext, error) {
 	links, err := session.Windows(ctx)
 	if err != nil {
-		return CurrentContext{}, oops.In("agents").Code("tmux_failed").With("operation", "session_windows").Wrap(err)
+		return CurrentContext{}, oops.In("agents").
+			Code("tmux_failed").
+			With("operation", "session_windows").
+			Wrap(err)
 	}
 
 	for _, link := range links {
 		info, infoErr := link.Info(ctx)
 		if infoErr != nil {
-			return CurrentContext{}, oops.In("agents").Code("tmux_failed").With("operation", "window_info").Wrap(infoErr)
+			return CurrentContext{}, oops.In("agents").
+				Code("tmux_failed").
+				With("operation", "window_info").
+				Wrap(infoErr)
 		}
 
 		if !info.Active {
@@ -341,12 +431,18 @@ func (c *tmuxController) contextFromSession(ctx context.Context, session gotmux.
 
 		pane, paneErr := link.Window().ActivePane(ctx)
 		if paneErr != nil {
-			return CurrentContext{}, oops.In("agents").Code("tmux_failed").With("operation", "active_pane").Wrap(paneErr)
+			return CurrentContext{}, oops.In("agents").
+				Code("tmux_failed").
+				With("operation", "active_pane").
+				Wrap(paneErr)
 		}
 
 		paneInfo, paneErr := pane.Info(ctx)
 		if paneErr != nil {
-			return CurrentContext{}, oops.In("agents").Code("tmux_failed").With("operation", "pane_info").Wrap(paneErr)
+			return CurrentContext{}, oops.In("agents").
+				Code("tmux_failed").
+				With("operation", "pane_info").
+				Wrap(paneErr)
 		}
 
 		current := CurrentContext{
@@ -370,7 +466,10 @@ func (c *tmuxController) contextFromSession(ctx context.Context, session gotmux.
 		return current, nil
 	}
 
-	return CurrentContext{}, oops.In("agents").Code("no_active_window").With("operation", "current_context").Wrap(ErrCurrentContextUnknown)
+	return CurrentContext{}, oops.In("agents").
+		Code("no_active_window").
+		With("operation", "current_context").
+		Wrap(ErrCurrentContextUnknown)
 }
 
 func (c *tmuxController) ambientContext(ctx context.Context) (CurrentContext, error) {
@@ -379,9 +478,15 @@ func (c *tmuxController) ambientContext(ctx context.Context) (CurrentContext, er
 		getenv = os.Getenv
 	}
 
-	info, err := c.server.CurrentFrom(ctx, gotmux.TmuxVars{TMUX: getenv("TMUX"), TMUXPane: getenv("TMUX_PANE")})
+	info, err := c.server.CurrentFrom(
+		ctx,
+		gotmux.TmuxVars{TMUX: getenv("TMUX"), TMUXPane: getenv("TMUX_PANE")},
+	)
 	if err != nil {
-		return CurrentContext{}, oops.In("agents").Code("ambient_unverified").With("operation", "current_context").Wrap(err)
+		return CurrentContext{}, oops.In("agents").
+			Code("ambient_unverified").
+			With("operation", "current_context").
+			Wrap(err)
 	}
 
 	if session, ok := info.Session.Get(); ok && !c.paneIsLive(ctx, string(info.Pane.ID)) {
@@ -410,7 +515,10 @@ func (c *tmuxController) ambientContext(ctx context.Context) (CurrentContext, er
 	}
 
 	if !current.Valid() {
-		return CurrentContext{}, oops.In("agents").Code("ambient_incomplete").With("operation", "current_context").Wrap(ErrCurrentContextUnknown)
+		return CurrentContext{}, oops.In("agents").
+			Code("ambient_incomplete").
+			With("operation", "current_context").
+			Wrap(ErrCurrentContextUnknown)
 	}
 
 	current.ClientName = c.soleClientForSession(ctx, current.SessionID)
@@ -436,7 +544,10 @@ func (c *tmuxController) paneIsLive(ctx context.Context, paneID string) bool {
 func (c *tmuxController) soleClientContext(ctx context.Context) (CurrentContext, error) {
 	clients, err := c.server.Clients(ctx)
 	if err != nil {
-		return CurrentContext{}, oops.In("agents").Code("tmux_failed").With("operation", "list_clients").Wrap(err)
+		return CurrentContext{}, oops.In("agents").
+			Code("tmux_failed").
+			With("operation", "list_clients").
+			Wrap(err)
 	}
 
 	name := ""
@@ -447,14 +558,20 @@ func (c *tmuxController) soleClientContext(ctx context.Context) (CurrentContext,
 		}
 
 		if name != "" {
-			return CurrentContext{}, oops.In("agents").Code("ambiguous_context").With("operation", "current_context").Wrap(ErrCurrentContextUnknown)
+			return CurrentContext{}, oops.In("agents").
+				Code("ambiguous_context").
+				With("operation", "current_context").
+				Wrap(ErrCurrentContextUnknown)
 		}
 
 		name = string(client.Name)
 	}
 
 	if name == "" {
-		return CurrentContext{}, oops.In("agents").Code("no_client").With("operation", "current_context").Wrap(ErrCurrentContextUnknown)
+		return CurrentContext{}, oops.In("agents").
+			Code("no_client").
+			With("operation", "current_context").
+			Wrap(ErrCurrentContextUnknown)
 	}
 
 	return c.contextFromClient(ctx, name)
@@ -492,7 +609,11 @@ func (c *tmuxController) soleClientForSession(ctx context.Context, sessionID str
 	return name
 }
 
-func (c *tmuxController) switchSession(ctx context.Context, current CurrentContext, target PaneLocation) error {
+func (c *tmuxController) switchSession(
+	ctx context.Context,
+	current CurrentContext,
+	target PaneLocation,
+) error {
 	if current.SessionID == target.SessionID {
 		return nil
 	}
@@ -510,11 +631,21 @@ func (c *tmuxController) switchSession(ctx context.Context, current CurrentConte
 	if clientName != "" {
 		client, err := c.server.Client(ctx, gotmux.ClientName(clientName))
 		if err != nil {
-			return oops.In("agents").Code("client_not_found").With("operation", "switch_client").Wrap(err)
+			return oops.In("agents").
+				Code("client_not_found").
+				With("operation", "switch_client").
+				Wrap(err)
 		}
 
-		if err := client.Switch(ctx, session, gotmux.SwitchOptions{ToggleReadOnly: false, PreserveEnvironment: false}); err != nil {
-			return oops.In("agents").Code("tmux_failed").With("operation", "switch_client").Wrap(err)
+		if err := client.Switch(
+			ctx,
+			session,
+			gotmux.SwitchOptions{ToggleReadOnly: false, PreserveEnvironment: false},
+		); err != nil {
+			return oops.In("agents").
+				Code("tmux_failed").
+				With("operation", "switch_client").
+				Wrap(err)
 		}
 
 		return nil
@@ -522,7 +653,10 @@ func (c *tmuxController) switchSession(ctx context.Context, current CurrentConte
 
 	command, err := gotmux.NewCommand("switch-client", "-t", target.SessionID)
 	if err != nil {
-		return oops.In("agents").Code("invalid_command").With("operation", "switch_client").Wrap(err)
+		return oops.In("agents").
+			Code("invalid_command").
+			With("operation", "switch_client").
+			Wrap(err)
 	}
 
 	if err := c.runCommands(ctx, command); err != nil {
@@ -532,7 +666,11 @@ func (c *tmuxController) switchSession(ctx context.Context, current CurrentConte
 	return nil
 }
 
-func (c *tmuxController) selectWindow(ctx context.Context, current CurrentContext, target PaneLocation) error {
+func (c *tmuxController) selectWindow(
+	ctx context.Context,
+	current CurrentContext,
+	target PaneLocation,
+) error {
 	if current.WindowID == target.WindowID {
 		return nil
 	}
@@ -542,7 +680,10 @@ func (c *tmuxController) selectWindow(ctx context.Context, current CurrentContex
 		return oops.In("agents").Code("invalid_target").With("operation", "select_window").Wrap(err)
 	}
 
-	if err := window.SelectWith(ctx, gotmux.SelectWindowOptions{PreserveZoom: false, Last: false}); err != nil {
+	if err := window.SelectWith(
+		ctx,
+		gotmux.SelectWindowOptions{PreserveZoom: false, Last: false},
+	); err != nil {
 		return oops.In("agents").Code("tmux_failed").With("operation", "select_window").Wrap(err)
 	}
 

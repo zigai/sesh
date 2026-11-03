@@ -24,7 +24,13 @@ type prefixWriter struct {
 	append    bool
 }
 
-func (r *Repository) completeRewriteStage(ctx context.Context, stage *privatefs.Dir, source string, manifest model.Manifest, data []byte) error {
+func (r *Repository) completeRewriteStage(
+	ctx context.Context,
+	stage *privatefs.Dir,
+	source string,
+	manifest model.Manifest,
+	data []byte,
+) error {
 	if err := validateStageNames(stage, manifest); err != nil {
 		return err
 	}
@@ -89,12 +95,24 @@ func validateStageNames(stage *privatefs.Dir, manifest model.Manifest) error {
 	return nil
 }
 
-func (r *Repository) completeStageFiles(ctx context.Context, stage, source *privatefs.Dir, manifest model.Manifest, data []byte) error {
+func (r *Repository) completeStageFiles(
+	ctx context.Context,
+	stage, source *privatefs.Dir,
+	manifest model.Manifest,
+	data []byte,
+) error {
 	emitManifest := func(dst io.Writer) error {
 		_, err := io.Copy(dst, bytes.NewReader(data))
 		return oops.In("snapshot.store").With("operation", "complete_rewrite_stage").Wrap(err)
 	}
-	if err := recoverPrefixFile(ctx, stage, "manifest.json", model.MaxManifestBytes, false, emitManifest); err != nil {
+	if err := recoverPrefixFile(
+		ctx,
+		stage,
+		"manifest.json",
+		model.MaxManifestBytes,
+		false,
+		emitManifest,
+	); err != nil {
 		return err
 	}
 
@@ -128,7 +146,14 @@ func (r *Repository) completeStageFiles(ctx context.Context, stage, source *priv
 		return err
 	}
 
-	if err := recoverPrefixFile(ctx, stage, "manifest.json", model.MaxManifestBytes, true, emitManifest); err != nil {
+	if err := recoverPrefixFile(
+		ctx,
+		stage,
+		"manifest.json",
+		model.MaxManifestBytes,
+		true,
+		emitManifest,
+	); err != nil {
 		return err
 	}
 
@@ -139,7 +164,12 @@ func (r *Repository) completeStageFiles(ctx context.Context, stage, source *priv
 	return validateReplacementDirectory(ctx, stage, manifest, digest(data))
 }
 
-func (r *Repository) recoverStageArtifacts(ctx context.Context, source, stage *privatefs.Dir, descriptors []model.Artifact, write bool) error {
+func (r *Repository) recoverStageArtifacts(
+	ctx context.Context,
+	source, stage *privatefs.Dir,
+	descriptors []model.Artifact,
+	write bool,
+) error {
 	for _, descriptor := range descriptors {
 		emit := func(dst io.Writer) error {
 			compressed := gzip.NewWriter(dst)
@@ -147,14 +177,26 @@ func (r *Repository) recoverStageArtifacts(ctx context.Context, source, stage *p
 				return err
 			}
 
-			return oops.In("snapshot.store").With("operation", "complete_stage_artifact").Wrap(compressed.Close())
+			return oops.In("snapshot.store").
+				With("operation", "complete_stage_artifact").
+				Wrap(compressed.Close())
 		}
-		if err := recoverPrefixFile(ctx, stage, descriptor.ID+".bin.gz", maxCompressedBytes, write, emit); err != nil {
+		if err := recoverPrefixFile(
+			ctx,
+			stage,
+			descriptor.ID+".bin.gz",
+			maxCompressedBytes,
+			write,
+			emit,
+		); err != nil {
 			return err
 		}
 
 		if write {
-			if err := errors.Join(r.boundary("rewrite_resume_artifact_synced"), ctx.Err()); err != nil {
+			if err := errors.Join(
+				r.boundary("rewrite_resume_artifact_synced"),
+				ctx.Err(),
+			); err != nil {
 				return err
 			}
 		}
@@ -163,7 +205,14 @@ func (r *Repository) recoverStageArtifacts(ctx context.Context, source, stage *p
 	return nil
 }
 
-func recoverPrefixFile(ctx context.Context, dir *privatefs.Dir, name string, limit int64, write bool, emit func(io.Writer) error) error {
+func recoverPrefixFile(
+	ctx context.Context,
+	dir *privatefs.Dir,
+	name string,
+	limit int64,
+	write bool,
+	emit func(io.Writer) error,
+) error {
 	if err := ctx.Err(); err != nil {
 		return oops.In("snapshot.store").With("operation", "recover_rewrite_file").Wrap(err)
 	}
@@ -191,7 +240,13 @@ func recoverPrefixFile(ctx context.Context, dir *privatefs.Dir, name string, lim
 	return errors.Join(completeErr, file.Close())
 }
 
-func completePrefixFile(ctx context.Context, file *os.File, limit int64, write bool, emit func(io.Writer) error) error {
+func completePrefixFile(
+	ctx context.Context,
+	file *os.File,
+	limit int64,
+	write bool,
+	emit func(io.Writer) error,
+) error {
 	info, err := file.Stat()
 	if err != nil {
 		return oops.In("snapshot.store").With("operation", "inspect_rewrite_file").Wrap(err)
@@ -257,7 +312,9 @@ func (w *prefixWriter) Write(data []byte) (int, error) {
 
 	written, err := w.file.Write(data[matched:])
 
-	return matched + written, oops.In("snapshot.store").With("operation", "append_rewrite_suffix").Wrap(err)
+	return matched + written, oops.In("snapshot.store").
+		With("operation", "append_rewrite_suffix").
+		Wrap(err)
 }
 
 func readSyncedManifest(ctx context.Context, dir *privatefs.Dir) ([]byte, error) {
@@ -274,7 +331,9 @@ func readSyncedManifest(ctx context.Context, dir *privatefs.Dir) ([]byte, error)
 		return nil, errors.Join(ErrUncertain, err, file.Close())
 	}
 
-	data, readErr := io.ReadAll(io.LimitReader(cancellableReader(ctx, file), model.MaxManifestBytes+1))
+	data, readErr := io.ReadAll(
+		io.LimitReader(cancellableReader(ctx, file), model.MaxManifestBytes+1),
+	)
 	if err := errors.Join(readErr, file.Close()); err != nil {
 		return nil, err
 	}
@@ -286,7 +345,11 @@ func readSyncedManifest(ctx context.Context, dir *privatefs.Dir) ([]byte, error)
 	return data, nil
 }
 
-func verifySyncedArtifact(ctx context.Context, dir *privatefs.Dir, descriptor model.Artifact) error {
+func verifySyncedArtifact(
+	ctx context.Context,
+	dir *privatefs.Dir,
+	descriptor model.Artifact,
+) error {
 	if err := ctx.Err(); err != nil {
 		return oops.In("snapshot.store").With("operation", "recover_rewrite_file").Wrap(err)
 	}

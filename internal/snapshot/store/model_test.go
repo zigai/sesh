@@ -12,7 +12,8 @@ import (
 
 func TestRepositoryHistoriesNeverFallback(t *testing.T) {
 	rapid.Check(t, func(rt *rapid.T) {
-		outcomes := rapid.SliceOfN(rapid.SampledFrom([]string{"committed", "pending", "failed", "incomplete"}), 1, 12).Draw(rt, "outcomes")
+		outcomes := rapid.SliceOfN(rapid.SampledFrom([]string{"committed", "pending", "failed", "incomplete"}), 1, 12).
+			Draw(rt, "outcomes")
 		r := openRepository(t, filepath.Join(t.TempDir(), "repository"))
 
 		var committed []string

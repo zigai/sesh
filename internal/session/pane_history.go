@@ -128,32 +128,51 @@ func probeServerProbe(ctx context.Context, server *gotmux.Server) (gotmux.Server
 			return zeroInfo, true, nil
 		}
 
-		return zeroInfo, false, oops.In("session").Code("history_failed").With("operation", "list_pane_history").Wrapf(err, "probe server")
+		return zeroInfo, false, oops.In("session").
+			Code("history_failed").
+			With("operation", "list_pane_history").
+			Wrapf(err, "probe server")
 	}
 
 	return probeInfo, false, nil
 }
 
-func listSessionInfos(ctx context.Context, server *gotmux.Server) ([]gotmux.SessionInfo, bool, error) {
+func listSessionInfos(
+	ctx context.Context,
+	server *gotmux.Server,
+) ([]gotmux.SessionInfo, bool, error) {
 	sessionInfos, err := server.Sessions(ctx)
 	if err != nil {
 		if serverAbsent(err) {
 			return nil, true, nil
 		}
 
-		return nil, false, oops.In("session").Code("history_failed").With("operation", "list_pane_history").Wrapf(err, "listing sessions")
+		return nil, false, oops.In("session").
+			Code("history_failed").
+			With("operation", "list_pane_history").
+			Wrapf(err, "listing sessions")
 	}
 
 	return sessionInfos, false, nil
 }
 
-func collectAllPanes(ctx context.Context, sessionInfos []gotmux.SessionInfo) ([]PaneHistory, bool, error) {
+func collectAllPanes(
+	ctx context.Context,
+	sessionInfos []gotmux.SessionInfo,
+) ([]PaneHistory, bool, error) {
 	limitHit := false
-	panes := make([]PaneHistory, 0, min(len(sessionInfos)*defaultPanesPerSession, maxPaneHistoryInventory))
+	panes := make(
+		[]PaneHistory,
+		0,
+		min(len(sessionInfos)*defaultPanesPerSession, maxPaneHistoryInventory),
+	)
 
 	for _, sessInfo := range sessionInfos {
 		if ctx.Err() != nil {
-			return nil, false, oops.In("session").Code("history_failed").With("operation", "list_pane_history").Wrap(ctx.Err())
+			return nil, false, oops.In("session").
+				Code("history_failed").
+				With("operation", "list_pane_history").
+				Wrap(ctx.Err())
 		}
 
 		sessPanes, err := querySessionPanes(ctx, sessInfo)
@@ -170,37 +189,57 @@ func collectAllPanes(ctx context.Context, sessionInfos []gotmux.SessionInfo) ([]
 	return panes, limitHit, nil
 }
 
-func verifyPostProbe(ctx context.Context, server *gotmux.Server, probeInfo gotmux.ServerInfo) error {
+func verifyPostProbe(
+	ctx context.Context,
+	server *gotmux.Server,
+	probeInfo gotmux.ServerInfo,
+) error {
 	postProbe, err := server.Probe(ctx)
 	if err != nil {
 		if serverAbsent(err) {
 			return nil
 		}
 
-		return oops.In("session").Code("history_failed").With("operation", "list_pane_history").Wrapf(err, "post-probe server")
+		return oops.In("session").
+			Code("history_failed").
+			With("operation", "list_pane_history").
+			Wrapf(err, "post-probe server")
 	}
 
 	if !postProbe.Identity.Equal(probeInfo.Identity) {
-		return oops.In("session").Code("history_failed").With("operation", "list_pane_history").Wrap(ErrServerIdentityChanged)
+		return oops.In("session").
+			Code("history_failed").
+			With("operation", "list_pane_history").
+			Wrap(ErrServerIdentityChanged)
 	}
 
 	return nil
 }
 
-func querySessionPanes(ctx context.Context, sessInfo gotmux.SessionInfo) ([]gotmux.PaneInfo, error) {
+func querySessionPanes(
+	ctx context.Context,
+	sessInfo gotmux.SessionInfo,
+) ([]gotmux.PaneInfo, error) {
 	panes, err := sessInfo.Handle().Panes(ctx)
 	if err != nil {
 		if serverAbsent(err) || errors.Is(err, gotmux.ErrNotFound) {
 			return nil, nil
 		}
 
-		return nil, oops.In("session").Code("history_failed").With("operation", "list_pane_history").Wrapf(err, "listing session panes")
+		return nil, oops.In("session").
+			Code("history_failed").
+			With("operation", "list_pane_history").
+			Wrapf(err, "listing session panes")
 	}
 
 	return panes, nil
 }
 
-func appendSessionPanes(panes []PaneHistory, sessPanes []gotmux.PaneInfo, sessInfo gotmux.SessionInfo) ([]PaneHistory, bool) {
+func appendSessionPanes(
+	panes []PaneHistory,
+	sessPanes []gotmux.PaneInfo,
+	sessInfo gotmux.SessionInfo,
+) ([]PaneHistory, bool) {
 	rawName, hasRaw := sessInfo.Raw("session_name")
 
 	var nameRaw RawBytes

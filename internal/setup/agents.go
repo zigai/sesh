@@ -60,11 +60,17 @@ type AgentResult struct {
 func Agents(ctx context.Context, request AgentRequest) (AgentResult, error) {
 	harnesses, err := resolveHarnesses(request.Agents)
 	if err != nil {
-		return AgentResult{}, oops.In("setup").Code("setup_agent_failed").With("operation", "setup_agents").Wrap(err)
+		return AgentResult{}, oops.In("setup").
+			Code("setup_agent_failed").
+			With("operation", "setup_agents").
+			Wrap(err)
 	}
 
 	if err := validateTrackerMode(request.Tracker); err != nil {
-		return AgentResult{}, oops.In("setup").Code("setup_agent_failed").With("operation", "setup_agents").Wrap(err)
+		return AgentResult{}, oops.In("setup").
+			Code("setup_agent_failed").
+			With("operation", "setup_agents").
+			Wrap(err)
 	}
 
 	manager := manage.New(manage.Config{
@@ -89,7 +95,10 @@ func Agents(ctx context.Context, request AgentRequest) (AgentResult, error) {
 			UseShim:      request.UseShim,
 		})
 		if err != nil {
-			return result, oops.In("setup").Code("setup_agent_failed").With("operation", "install_integration").Wrap(err)
+			return result, oops.In("setup").
+				Code("setup_agent_failed").
+				With("operation", "install_integration").
+				Wrap(err)
 		}
 
 		result.Harnesses = append(result.Harnesses, AgentHarnessResult{
@@ -103,7 +112,10 @@ func Agents(ctx context.Context, request AgentRequest) (AgentResult, error) {
 
 	tracker, err := runTracker(ctx, manager, request)
 	if err != nil {
-		return result, oops.In("setup").Code("setup_agent_failed").With("operation", "setup_agents").Wrap(err)
+		return result, oops.In("setup").
+			Code("setup_agent_failed").
+			With("operation", "setup_agents").
+			Wrap(err)
 	}
 
 	result.Tracker = tracker
@@ -114,7 +126,10 @@ func Agents(ctx context.Context, request AgentRequest) (AgentResult, error) {
 func AgentStatus(ctx context.Context, request AgentRequest) (AgentResult, error) {
 	harnesses, err := resolveHarnesses(request.Agents)
 	if err != nil {
-		return AgentResult{}, oops.In("setup").Code("setup_agent_failed").With("operation", "agent_status").Wrap(err)
+		return AgentResult{}, oops.In("setup").
+			Code("setup_agent_failed").
+			With("operation", "agent_status").
+			Wrap(err)
 	}
 
 	manager := manage.New(manage.Config{
@@ -134,7 +149,10 @@ func AgentStatus(ctx context.Context, request AgentRequest) (AgentResult, error)
 	for _, target := range harnesses {
 		status, err := manager.IntegrationStatus(ctx, target)
 		if err != nil {
-			return result, oops.In("setup").Code("setup_agent_failed").With("operation", "inspect_integration").Wrap(err)
+			return result, oops.In("setup").
+				Code("setup_agent_failed").
+				With("operation", "inspect_integration").
+				Wrap(err)
 		}
 
 		result.Harnesses = append(result.Harnesses, AgentHarnessResult{
@@ -155,7 +173,10 @@ func AgentStatus(ctx context.Context, request AgentRequest) (AgentResult, error)
 		Tracker:      TrackerStatus,
 	})
 	if err != nil {
-		return result, oops.In("setup").Code("setup_agent_failed").With("operation", "agent_status").Wrap(err)
+		return result, oops.In("setup").
+			Code("setup_agent_failed").
+			With("operation", "agent_status").
+			Wrap(err)
 	}
 
 	result.Tracker = tracker
@@ -164,7 +185,11 @@ func AgentStatus(ctx context.Context, request AgentRequest) (AgentResult, error)
 	return result, nil
 }
 
-func runTracker(ctx context.Context, manager *manage.Manager, request AgentRequest) (AgentTrackerResult, error) {
+func runTracker(
+	ctx context.Context,
+	manager *manage.Manager,
+	request AgentRequest,
+) (AgentTrackerResult, error) {
 	if request.Tracker == TrackerNone {
 		return emptyTrackerResult(), nil
 	}
@@ -184,11 +209,17 @@ func runTracker(ctx context.Context, manager *manage.Manager, request AgentReque
 	case TrackerStatus:
 		result, err = manager.TrackerStatus(ctx)
 	default:
-		return emptyTrackerResult(), oops.In("setup").Code("setup_agent_failed").With("operation", "run_tracker").Wrap(ErrUnknownTrackerMode)
+		return emptyTrackerResult(), oops.In("setup").
+			Code("setup_agent_failed").
+			With("operation", "run_tracker").
+			Wrap(ErrUnknownTrackerMode)
 	}
 
 	if err != nil {
-		return emptyTrackerResult(), oops.In("setup").Code("setup_agent_failed").With("operation", "run_tracker").Wrap(err)
+		return emptyTrackerResult(), oops.In("setup").
+			Code("setup_agent_failed").
+			With("operation", "run_tracker").
+			Wrap(err)
 	}
 
 	return AgentTrackerResult{
@@ -207,7 +238,10 @@ func validateTrackerMode(mode string) error {
 	case TrackerNone, TrackerEnable, TrackerDisable, TrackerStatus:
 		return nil
 	default:
-		return oops.In("setup").Code("setup_agent_failed").With("operation", "validate_tracker_mode").Wrap(ErrUnknownTrackerMode)
+		return oops.In("setup").
+			Code("setup_agent_failed").
+			With("operation", "validate_tracker_mode").
+			Wrap(ErrUnknownTrackerMode)
 	}
 }
 
@@ -229,7 +263,10 @@ func resolveHarnesses(names []string) ([]registry.Harness, error) {
 
 		parsed, err := harness.Parse(trimmed)
 		if err != nil {
-			return nil, oops.In("setup").Code("setup_agent_failed").With("operation", "parse_agent_list").Wrap(errors.Join(ErrUnknownAgent, err))
+			return nil, oops.In("setup").
+				Code("setup_agent_failed").
+				With("operation", "parse_agent_list").
+				Wrap(errors.Join(ErrUnknownAgent, err))
 		}
 
 		if seen[parsed] {

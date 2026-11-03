@@ -51,8 +51,10 @@ const (
 )
 
 var (
-	errAutosaveStartupRefused      = errors.New("startup restore refused")
-	errStartupNeedsRecovery        = errors.New("the snapshot repository needs recovery before it can restore; run 'sesh doctor' for the cause and fix")
+	errAutosaveStartupRefused = errors.New("startup restore refused")
+	errStartupNeedsRecovery   = errors.New(
+		"the snapshot repository needs recovery before it can restore; run 'sesh doctor' for the cause and fix",
+	)
 	errStartupNothingSaved         = errors.New("no saved snapshot to restore yet")
 	errAutosaveHistoryUnavailable  = errors.New("autosave history state is unavailable")
 	errAutosaveBookkeeping         = errors.New("autosave bookkeeping did not complete")
@@ -133,7 +135,12 @@ func NewCommand() *cobra.Command {
 
 	addAutosaveFlags(cmd.PersistentFlags())
 
-	cmd.AddCommand(newStatusCommand(), newSaveIfDueCommand(), newRestoreOnStartCommand(), newFinalSaveCommand())
+	cmd.AddCommand(
+		newStatusCommand(),
+		newSaveIfDueCommand(),
+		newRestoreOnStartCommand(),
+		newFinalSaveCommand(),
+	)
 
 	return cmd
 }

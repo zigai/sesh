@@ -27,9 +27,24 @@ func TestSnapshotRestorePickerRejectsConflictsBeforeRepositoryAccess(t *testing.
 
 	tests := []pickerConflictCase{
 		{name: "json", flag: jsonFlagName, value: "true", want: errSnapshotPickerJSONConflict},
-		{name: "generation", flag: "generation", value: "selected", want: errSnapshotPickerGenerationConflict},
-		{name: "operation", flag: "operation", value: "selected", want: errSnapshotPickerOperationConflict},
-		{name: "connection", flag: "connection", value: "peer", want: errSnapshotPickerConnectionConflict},
+		{
+			name:  "generation",
+			flag:  "generation",
+			value: "selected",
+			want:  errSnapshotPickerGenerationConflict,
+		},
+		{
+			name:  "operation",
+			flag:  "operation",
+			value: "selected",
+			want:  errSnapshotPickerOperationConflict,
+		},
+		{
+			name:  "connection",
+			flag:  "connection",
+			value: "peer",
+			want:  errSnapshotPickerConnectionConflict,
+		},
 	}
 
 	for _, test := range tests {
@@ -94,7 +109,8 @@ func TestSnapshotRestorePickerRejectsNonTerminalBeforeRepositoryAccess(t *testin
 	}
 
 	err := ValidateSnapshotCommand(cmd, nil)
-	if !errors.Is(err, errSnapshotPickerTerminalRequired) || clibase.ExitCode(err) != clibase.ExitCodeUsage {
+	if !errors.Is(err, errSnapshotPickerTerminalRequired) ||
+		clibase.ExitCode(err) != clibase.ExitCodeUsage {
 		t.Fatalf("non-terminal error = %v, want %v", err, errSnapshotPickerTerminalRequired)
 	}
 
@@ -118,7 +134,8 @@ func TestSnapshotPickerEntryReportsIncompleteParityAsWarning(t *testing.T) {
 		t.Fatalf("validity = %v, want %v", entry.Validity, snapshotpicker.SnapshotPartial)
 	}
 
-	if len(entry.Warnings) != 1 || entry.Warnings[0] != "parity evidence is incomplete; restore will report a partial result" {
+	if len(entry.Warnings) != 1 ||
+		entry.Warnings[0] != "parity evidence is incomplete; restore will report a partial result" {
 		t.Fatalf("warnings = %v, want incomplete parity warning", entry.Warnings)
 	}
 

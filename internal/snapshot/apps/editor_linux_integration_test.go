@@ -64,13 +64,18 @@ func testEnrichEditorOwnedServer(t *testing.T, nvim string, explicitListen bool)
 		t.Fatalf("observing nvim: %v", err)
 	}
 
-	prepared, reason, err := waitForEditorEnrichment(ctx, observedLaunch(observation), command.Process.Pid)
+	prepared, reason, err := waitForEditorEnrichment(
+		ctx,
+		observedLaunch(observation),
+		command.Process.Pid,
+	)
 	if err != nil {
 		t.Fatalf("EnrichEditor did not find owned nvim endpoint: %v", err)
 	}
 
 	want := []string{"nvim", "--", first, second}
-	if reason != apps.ReasonEditorReopen || !slices.Equal(byteArguments(prepared.Arguments), want) ||
+	if reason != apps.ReasonEditorReopen ||
+		!slices.Equal(byteArguments(prepared.Arguments), want) ||
 		prepared.Recovery != apps.RecoveryRestart {
 		t.Fatalf("enriched launch = %#v, reason %q; want argv %#v", prepared, reason, want)
 	}
@@ -95,13 +100,18 @@ func TestEnrichEditorRestartsNvimWithoutListedFiles(t *testing.T) {
 		t.Fatalf("observing nvim: %v", err)
 	}
 
-	prepared, reason, err := waitForEditorEnrichment(ctx, observedLaunch(observation), command.Process.Pid)
+	prepared, reason, err := waitForEditorEnrichment(
+		ctx,
+		observedLaunch(observation),
+		command.Process.Pid,
+	)
 	if err != nil {
 		t.Fatalf("EnrichEditor failed on empty nvim: %v", err)
 	}
 
 	want := []string{"nvim"}
-	if reason != apps.ReasonEditorRestart || !slices.Equal(byteArguments(prepared.Arguments), want) ||
+	if reason != apps.ReasonEditorRestart ||
+		!slices.Equal(byteArguments(prepared.Arguments), want) ||
 		prepared.Recovery != apps.RecoveryRestart {
 		t.Fatalf("enriched launch = %#v, reason %q; want argv %#v", prepared, reason, want)
 	}
@@ -112,7 +122,13 @@ func TestEnrichEditorExcludesUnlistedAndScratchBuffers(t *testing.T) {
 
 	directory := t.TempDir()
 	listed := filepath.Join(directory, "listed.txt")
-	command := startNvimWithExtraArgs(t, nvim, directory, []string{"-c", "enew | setlocal buftype=nofile"}, listed)
+	command := startNvimWithExtraArgs(
+		t,
+		nvim,
+		directory,
+		[]string{"-c", "enew | setlocal buftype=nofile"},
+		listed,
+	)
 
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
@@ -127,13 +143,18 @@ func TestEnrichEditorExcludesUnlistedAndScratchBuffers(t *testing.T) {
 		t.Fatalf("observing nvim: %v", err)
 	}
 
-	prepared, reason, err := waitForEditorEnrichment(ctx, observedLaunch(observation), command.Process.Pid)
+	prepared, reason, err := waitForEditorEnrichment(
+		ctx,
+		observedLaunch(observation),
+		command.Process.Pid,
+	)
 	if err != nil {
 		t.Fatalf("EnrichEditor failed: %v", err)
 	}
 
 	want := []string{"nvim", "--", listed}
-	if reason != apps.ReasonEditorReopen || !slices.Equal(byteArguments(prepared.Arguments), want) ||
+	if reason != apps.ReasonEditorReopen ||
+		!slices.Equal(byteArguments(prepared.Arguments), want) ||
 		prepared.Recovery != apps.RecoveryRestart {
 		t.Fatalf("enriched launch = %#v, reason %q; want argv %#v", prepared, reason, want)
 	}
@@ -163,7 +184,8 @@ func TestEnrichEditorRejectsIdentityMismatch(t *testing.T) {
 	launch.Birth = model.Bytes("999999:999999")
 
 	_, reason, err := apps.EnrichEditor(ctx, launch, command.Process.Pid)
-	if err == nil || !errors.Is(err, apps.ErrEditorIdentityChanged) || reason != apps.ReasonEditorIdentityChanged {
+	if err == nil || !errors.Is(err, apps.ErrEditorIdentityChanged) ||
+		reason != apps.ReasonEditorIdentityChanged {
 		t.Fatalf("EnrichEditor accepted forged birth identity: reason %q, err %v", reason, err)
 	}
 }
@@ -202,7 +224,11 @@ func TestEnrichEditorReadsFilesOpenedAfterInteractiveNvimStartup(t *testing.T) {
 	}
 
 	if reason != apps.ReasonEditorReopen || prepared.Recovery != apps.RecoveryRestart {
-		t.Fatalf("initial interactive enrichment reason/recovery = %q/%q", reason, prepared.Recovery)
+		t.Fatalf(
+			"initial interactive enrichment reason/recovery = %q/%q",
+			reason,
+			prepared.Recovery,
+		)
 	}
 
 	if _, err := interactive.master.WriteString(":edit " + second + "\r"); err != nil {
@@ -211,13 +237,22 @@ func TestEnrichEditorReadsFilesOpenedAfterInteractiveNvimStartup(t *testing.T) {
 
 	want := []string{"nvim", "--", first, second}
 
-	prepared, reason, err = waitForEditorArguments(ctx, launch, interactive.command.Process.Pid, want)
+	prepared, reason, err = waitForEditorArguments(
+		ctx,
+		launch,
+		interactive.command.Process.Pid,
+		want,
+	)
 	if err != nil {
 		t.Fatalf("reading buffers opened after interactive nvim startup: %v", err)
 	}
 
 	if reason != apps.ReasonEditorReopen || prepared.Recovery != apps.RecoveryRestart {
-		t.Fatalf("updated interactive enrichment reason/recovery = %q/%q", reason, prepared.Recovery)
+		t.Fatalf(
+			"updated interactive enrichment reason/recovery = %q/%q",
+			reason,
+			prepared.Recovery,
+		)
 	}
 
 	if _, err := os.Lstat(filepath.Join(directory, ".config")); !errors.Is(err, os.ErrNotExist) {
@@ -261,7 +296,12 @@ func startInteractiveNvim(t *testing.T, nvim, directory, first string) *interact
 		t.Fatalf("starting interactive nvim in PTY: %v", err)
 	}
 
-	interactive := &interactiveNvim{command: command, master: master, wait: make(chan error, 1), stopped: false}
+	interactive := &interactiveNvim{
+		command: command,
+		master:  master,
+		wait:    make(chan error, 1),
+		stopped: false,
+	}
 	go func() {
 		interactive.wait <- command.Wait()
 	}()
@@ -327,8 +367,13 @@ func assertInteractiveEditorIdentityRefusals(
 	replaced.Birth = model.Bytes("999999:999999")
 
 	_, replacedReason, replacedErr := apps.EnrichEditor(ctx, replaced, interactivePID)
-	if !errors.Is(replacedErr, apps.ErrEditorIdentityChanged) || replacedReason != apps.ReasonEditorIdentityChanged {
-		t.Fatalf("interactive nvim replacement accepted: reason %q, err %v", replacedReason, replacedErr)
+	if !errors.Is(replacedErr, apps.ErrEditorIdentityChanged) ||
+		replacedReason != apps.ReasonEditorIdentityChanged {
+		t.Fatalf(
+			"interactive nvim replacement accepted: reason %q, err %v",
+			replacedReason,
+			replacedErr,
+		)
 	}
 
 	unrelated := startNvimContext(t, ctx, nvim, directory, true, first)
@@ -344,13 +389,22 @@ func assertInteractiveEditorIdentityRefusals(
 	}
 
 	unrelatedLaunch := observedLaunch(unrelatedObservation)
-	if _, _, err := waitForEditorEnrichment(ctx, unrelatedLaunch, unrelated.Process.Pid); err != nil {
+	if _, _, err := waitForEditorEnrichment(
+		ctx,
+		unrelatedLaunch,
+		unrelated.Process.Pid,
+	); err != nil {
 		t.Fatalf("waiting for unrelated nvim endpoint: %v", err)
 	}
 
 	_, unrelatedReason, unrelatedErr := apps.EnrichEditor(ctx, unrelatedLaunch, interactivePID)
-	if !errors.Is(unrelatedErr, apps.ErrEditorIdentityChanged) || unrelatedReason != apps.ReasonEditorIdentityChanged {
-		t.Fatalf("unrelated nvim endpoint accepted for interactive process: reason %q, err %v", unrelatedReason, unrelatedErr)
+	if !errors.Is(unrelatedErr, apps.ErrEditorIdentityChanged) ||
+		unrelatedReason != apps.ReasonEditorIdentityChanged {
+		t.Fatalf(
+			"unrelated nvim endpoint accepted for interactive process: reason %q, err %v",
+			unrelatedReason,
+			unrelatedErr,
+		)
 	}
 }
 
@@ -433,7 +487,12 @@ func isolatedEditorEnvironment(t *testing.T, directory string) []string {
 	}
 }
 
-func startNvimWithExtraArgs(t *testing.T, nvim, directory string, extraArgs []string, files ...string) *exec.Cmd {
+func startNvimWithExtraArgs(
+	t *testing.T,
+	nvim, directory string,
+	extraArgs []string,
+	files ...string,
+) *exec.Cmd {
 	t.Helper()
 
 	arguments := make([]string, 0, 2+len(extraArgs)+len(files))
@@ -458,7 +517,12 @@ func startNvimWithExtraArgs(t *testing.T, nvim, directory string, extraArgs []st
 	return command
 }
 
-func startNvim(t *testing.T, nvim, directory string, explicitListen bool, files ...string) *exec.Cmd {
+func startNvim(
+	t *testing.T,
+	nvim, directory string,
+	explicitListen bool,
+	files ...string,
+) *exec.Cmd {
 	t.Helper()
 
 	return startNvimContext(t, t.Context(), nvim, directory, explicitListen, files...)
@@ -498,14 +562,22 @@ func startNvimContext(
 	return command
 }
 
-func observeProcess(ctx context.Context, pid int, birth process.Identity, executable string) (*process.Observation, error) {
+func observeProcess(
+	ctx context.Context,
+	pid int,
+	birth process.Identity,
+	executable string,
+) (*process.Observation, error) {
 	want, err := filepath.EvalSymlinks(executable)
 	if err != nil {
 		return nil, fmt.Errorf("resolving executable: %w", err)
 	}
 
 	for ctx.Err() == nil {
-		observation, err := process.Observe(ctx, process.Request{PID: pid, ExpectedBirth: birth, EnvironmentKeys: nil})
+		observation, err := process.Observe(
+			ctx,
+			process.Request{PID: pid, ExpectedBirth: birth, EnvironmentKeys: nil},
+		)
 		// Under load, /proc can show the test binary's image for a few milliseconds after Start.
 		if err == nil && string(observation.Executable) == want {
 			return observation, nil

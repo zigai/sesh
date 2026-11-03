@@ -36,8 +36,18 @@ func TestFrameReaderRejectsTruncatedTrailingFrame(t *testing.T) {
 
 func TestFrameRoundTrip(t *testing.T) {
 	frame := Frame{
-		Version: ProtocolVersion, Type: FrameHello, PeerID: "peer", StreamInstance: "stream", Sequence: 1,
-		Hello: &Hello{PeerID: "peer", StreamInstance: "stream", Hostname: "host", BridgeDir: "/home/user/.local/state/sesh/remote/bridge", StartedAt: time.Unix(1, 0).UTC()},
+		Version:        ProtocolVersion,
+		Type:           FrameHello,
+		PeerID:         "peer",
+		StreamInstance: "stream",
+		Sequence:       1,
+		Hello: &Hello{
+			PeerID:         "peer",
+			StreamInstance: "stream",
+			Hostname:       "host",
+			BridgeDir:      "/home/user/.local/state/sesh/remote/bridge",
+			StartedAt:      time.Unix(1, 0).UTC(),
+		},
 	}
 
 	var output bytes.Buffer
@@ -56,7 +66,9 @@ func TestFrameRoundTrip(t *testing.T) {
 		t.Fatalf("Read() error = %v", err)
 	}
 
-	if !reflect.DeepEqual(got.Hello, frame.Hello) || got.Sequence != frame.Sequence || got.PeerID != frame.PeerID || got.Type != FrameHello {
+	if !reflect.DeepEqual(got.Hello, frame.Hello) || got.Sequence != frame.Sequence ||
+		got.PeerID != frame.PeerID ||
+		got.Type != FrameHello {
 		t.Fatalf("Read() = %#v, want %#v", got, frame)
 	}
 }
@@ -67,16 +79,41 @@ func TestFrameReadRejectsClosedContractViolations(t *testing.T) {
 		`"hello":{"peerId":"peer","streamInstance":"stream","hostname":"host","bridgeDir":"","startedAt":"0001-01-01T00:00:00Z"}}`
 
 	tests := map[string]string{
-		"unknown member":      strings.Replace(valid, `"sequence":1`, `"sequence":1,"forged":true`, 1),
-		"duplicate member":    strings.Replace(valid, `"sequence":1`, `"sequence":1,"sequence":2`, 1),
+		"unknown member": strings.Replace(
+			valid,
+			`"sequence":1`,
+			`"sequence":1,"forged":true`,
+			1,
+		),
+		"duplicate member": strings.Replace(
+			valid,
+			`"sequence":1`,
+			`"sequence":1,"sequence":2`,
+			1,
+		),
 		"trailing content":    valid + `{}`,
 		"unsupported version": strings.Replace(valid, version, `"version":1`, 1),
 		"zero sequence":       strings.Replace(valid, `"sequence":1`, `"sequence":0`, 1),
-		"peer mismatch":       strings.Replace(valid, `"peerId":"peer","streamInstance"`, `"peerId":"other","streamInstance"`, 1),
-		"payload exclusivity": strings.Replace(valid, `"startedAt":"0001-01-01T00:00:00Z"}`, `"startedAt":"0001-01-01T00:00:00Z"},"health":{"observedAt":"0001-01-01T00:00:00Z","sources":{"tmux":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"},"agents":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"},"snapshots":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"},"tasks":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"},"work":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"}}}`, 1),
-		"lower cased key":     strings.Replace(valid, `"streamInstance"`, `"streaminstance"`, 1),
-		"unknown frame type":  strings.Replace(valid, `"type":"hello"`, `"type":"inventory"`, 1),
-		"bridge dir control":  strings.Replace(valid, `"bridgeDir":""`, `"bridgeDir":"/tmp/\u001b]0;x"`, 1),
+		"peer mismatch": strings.Replace(
+			valid,
+			`"peerId":"peer","streamInstance"`,
+			`"peerId":"other","streamInstance"`,
+			1,
+		),
+		"payload exclusivity": strings.Replace(
+			valid,
+			`"startedAt":"0001-01-01T00:00:00Z"}`,
+			`"startedAt":"0001-01-01T00:00:00Z"},"health":{"observedAt":"0001-01-01T00:00:00Z","sources":{"tmux":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"},"agents":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"},"snapshots":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"},"tasks":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"},"work":{"status":"ok","reason":"none","checkedAt":"0001-01-01T00:00:00Z"}}}`,
+			1,
+		),
+		"lower cased key":    strings.Replace(valid, `"streamInstance"`, `"streaminstance"`, 1),
+		"unknown frame type": strings.Replace(valid, `"type":"hello"`, `"type":"inventory"`, 1),
+		"bridge dir control": strings.Replace(
+			valid,
+			`"bridgeDir":""`,
+			`"bridgeDir":"/tmp/\u001b]0;x"`,
+			1,
+		),
 	}
 
 	for name, payload := range tests {
@@ -176,7 +213,10 @@ func TestValidateFrameRejectsOSCAndCSI(t *testing.T) {
 				PeerID:         "peer",
 				StreamInstance: "stream",
 				Sequence:       1,
-				Snapshot:       &Snapshot{Sessions: []session.Session{test.session}, Health: healthy},
+				Snapshot: &Snapshot{
+					Sessions: []session.Session{test.session},
+					Health:   healthy,
+				},
 			}
 			if err := ValidateFrame(frame); !errors.Is(err, ErrInvalidFrame) {
 				t.Fatalf("ValidateFrame() error = %v, want %v", err, ErrInvalidFrame)
@@ -226,7 +266,10 @@ func TestValidateFrameRejectsUnboundedHealthReason(t *testing.T) {
 		StreamInstance: "stream",
 		Sequence:       1,
 		Health: &Health{Sources: SourceHealth{
-			Tmux:      SourceStatus{Status: HealthDegraded, Reason: HealthReason("\x1b]0;forged\x07raw error")},
+			Tmux: SourceStatus{
+				Status: HealthDegraded,
+				Reason: HealthReason("\x1b]0;forged\x07raw error"),
+			},
 			Agents:    SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
 			Snapshots: SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
 			Tasks:     SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
@@ -246,7 +289,15 @@ func TestValidateFrameRejectsInconsistentHealth(t *testing.T) {
 	}
 
 	for _, status := range statuses {
-		if ValidSourceHealth(SourceHealth{Tmux: status, Agents: status, Snapshots: status, Tasks: status, Work: status}) {
+		if ValidSourceHealth(
+			SourceHealth{
+				Tmux:      status,
+				Agents:    status,
+				Snapshots: status,
+				Tasks:     status,
+				Work:      status,
+			},
+		) {
 			t.Fatalf("accepted inconsistent health %#v", status)
 		}
 	}
@@ -267,8 +318,12 @@ func TestSnapshotBoundsRejectOversizedInventories(t *testing.T) {
 	}
 
 	frame := Frame{
-		Version: ProtocolVersion, Type: FrameSnapshot, PeerID: "peer", StreamInstance: "stream", Sequence: 1,
-		Snapshot: &Snapshot{Sessions: oversized, Health: healthy},
+		Version:        ProtocolVersion,
+		Type:           FrameSnapshot,
+		PeerID:         "peer",
+		StreamInstance: "stream",
+		Sequence:       1,
+		Snapshot:       &Snapshot{Sessions: oversized, Health: healthy},
 	}
 	if err := ValidateFrame(frame); !errors.Is(err, ErrInvalidFrame) {
 		t.Fatalf("ValidateFrame() error = %v, want %v", err, ErrInvalidFrame)
@@ -277,7 +332,11 @@ func TestSnapshotBoundsRejectOversizedInventories(t *testing.T) {
 
 func TestSnapshotRejectsSavedSessionsCarryingAgents(t *testing.T) {
 	frame := Frame{
-		Version: ProtocolVersion, Type: FrameSnapshot, PeerID: "peer", StreamInstance: "stream", Sequence: 1,
+		Version:        ProtocolVersion,
+		Type:           FrameSnapshot,
+		PeerID:         "peer",
+		StreamInstance: "stream",
+		Sequence:       1,
 		Snapshot: &Snapshot{
 			Sessions: []session.Session{{
 				ID: "saved:dev", Name: "dev", Kind: session.KindSaved,
@@ -302,7 +361,9 @@ func TestSnapshotRejectsMalformedActionOffers(t *testing.T) {
 		"malformed id": {"session.kill", "Session Kill"},
 		"too many":     slices.Repeat([]action.ID{action.SessionKill.ID}, MaxActions+1),
 	} {
-		frame := snapshotFrameWithSession(session.Session{ID: "$1", Name: "dev", Kind: session.KindLive})
+		frame := snapshotFrameWithSession(
+			session.Session{ID: "$1", Name: "dev", Kind: session.KindLive},
+		)
 		frame.Snapshot.Actions = offers
 
 		if err := ValidateFrame(frame); !errors.Is(err, ErrInvalidFrame) {
@@ -316,10 +377,19 @@ func TestSnapshotRejectsUnsafeTaskRows(t *testing.T) {
 		record := task.EmptyRecord()
 		record.ID, record.Kind, record.State, record.Title = "t1", task.KindProject, task.StateActive, "fix login"
 
-		return TaskRow{Record: record, Present: true, SessionID: "$1", WindowID: "@1", WindowName: "fix login", AgentPane: "%1"}
+		return TaskRow{
+			Record:     record,
+			Present:    true,
+			SessionID:  "$1",
+			WindowID:   "@1",
+			WindowName: "fix login",
+			AgentPane:  "%1",
+		}
 	}
 
-	frame := snapshotFrameWithSession(session.Session{ID: "$1", Name: "dev", Kind: session.KindLive})
+	frame := snapshotFrameWithSession(
+		session.Session{ID: "$1", Name: "dev", Kind: session.KindLive},
+	)
 	frame.Snapshot.Tasks = []TaskRow{valid()}
 
 	if err := ValidateFrame(frame); err != nil {
@@ -348,7 +418,11 @@ func TestSnapshotRejectsUnsafeTaskRows(t *testing.T) {
 
 func snapshotFrameWithSession(row session.Session) Frame {
 	return Frame{
-		Version: ProtocolVersion, Type: FrameSnapshot, PeerID: "peer", StreamInstance: "stream", Sequence: 1,
+		Version:        ProtocolVersion,
+		Type:           FrameSnapshot,
+		PeerID:         "peer",
+		StreamInstance: "stream",
+		Sequence:       1,
 		Snapshot: &Snapshot{Sessions: []session.Session{row}, Health: SourceHealth{
 			Tmux:      SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
 			Agents:    SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
@@ -362,25 +436,66 @@ func snapshotFrameWithSession(row session.Session) Frame {
 func TestSessionFrameRoundTripPreservesSharedModel(t *testing.T) {
 	stamp := time.Unix(100, 0).UTC()
 	row := session.Session{
-		ID: "$1", Name: "dev", Kind: session.KindLive, TmuxServerSocket: "/remote/tmux.sock",
-		Generation: "generation", RepositorySource: "default",
-		RuntimeIdentity: session.RuntimeIdentity{TmuxServerPID: 42, TmuxServerStartedAt: stamp, TmuxSessionCreatedAt: stamp},
-		WindowCount:     3, Attached: true, Activity: stamp,
-		ActivePaneID: "%2", ActiveWindowName: "editor", ActiveWindowIndex: "1", ActivePanePath: "/remote/work",
-		ActivePaneCommand: "vim", ActivePaneTitle: "project",
-		AgentTotal: 6, AgentActive: 1, AgentWaiting: 1, AgentFailed: 1, AgentInterrupted: 1, AgentUnknown: 1,
-		AgentIdleSince: stamp, AgentWaitingSince: stamp, AgentActivityChangedAt: stamp,
-		Agents: []session.AgentSession{{
-			PositionKnown: true, WindowIndex: 1, PaneLeft: 20, PaneTop: 10,
-			RegistryID: "agent", Harness: "codex", HarnessSession: "harness-session", PaneID: "%2", PanePID: 321,
-			CWD: "/remote/work", ProjectRoot: "/remote", GitBranch: "feature", Worktree: "/remote/worktree",
-			GitChanges: "+2 -1", LinkedWorktree: true, GitAhead: 2, GitBehind: 1, GitTrackingKnown: true,
-			SessionPath: "/remote/session", Executable: "codex", PID: 123,
-			Status: session.AgentStatusFailed, StatusSince: stamp,
-		}, {
-			RegistryID: "initial-agent", Harness: "codex", PaneID: "%3",
-			Status: session.AgentStatusIdle, InitialIdle: true, StatusSince: stamp,
-		}},
+		ID:               "$1",
+		Name:             "dev",
+		Kind:             session.KindLive,
+		TmuxServerSocket: "/remote/tmux.sock",
+		Generation:       "generation",
+		RepositorySource: "default",
+		RuntimeIdentity: session.RuntimeIdentity{
+			TmuxServerPID:        42,
+			TmuxServerStartedAt:  stamp,
+			TmuxSessionCreatedAt: stamp,
+		},
+		WindowCount:            3,
+		Attached:               true,
+		Activity:               stamp,
+		ActivePaneID:           "%2",
+		ActiveWindowName:       "editor",
+		ActiveWindowIndex:      "1",
+		ActivePanePath:         "/remote/work",
+		ActivePaneCommand:      "vim",
+		ActivePaneTitle:        "project",
+		AgentTotal:             6,
+		AgentActive:            1,
+		AgentWaiting:           1,
+		AgentFailed:            1,
+		AgentInterrupted:       1,
+		AgentUnknown:           1,
+		AgentIdleSince:         stamp,
+		AgentWaitingSince:      stamp,
+		AgentActivityChangedAt: stamp,
+		Agents: []session.AgentSession{
+			{
+				PositionKnown:    true,
+				WindowIndex:      1,
+				PaneLeft:         20,
+				PaneTop:          10,
+				RegistryID:       "agent",
+				Harness:          "codex",
+				HarnessSession:   "harness-session",
+				PaneID:           "%2",
+				PanePID:          321,
+				CWD:              "/remote/work",
+				ProjectRoot:      "/remote",
+				GitBranch:        "feature",
+				Worktree:         "/remote/worktree",
+				GitChanges:       "+2 -1",
+				LinkedWorktree:   true,
+				GitAhead:         2,
+				GitBehind:        1,
+				GitTrackingKnown: true,
+				SessionPath:      "/remote/session",
+				Executable:       "codex",
+				PID:              123,
+				Status:           session.AgentStatusFailed,
+				StatusSince:      stamp,
+			},
+			{
+				RegistryID: "initial-agent", Harness: "codex", PaneID: "%3",
+				Status: session.AgentStatusIdle, InitialIdle: true, StatusSince: stamp,
+			},
+		},
 	}
 
 	var output bytes.Buffer
@@ -407,8 +522,12 @@ func TestSessionFrameExcludesLocalState(t *testing.T) {
 		ID: "$1", Name: "dev", Kind: session.KindLive, TmuxServerSocket: "/remote/tmux.sock",
 		Origin: session.OriginSSH, Current: true, RemoteStatus: session.RemoteStatusStale,
 		RuntimeIdentity: session.RuntimeIdentity{
-			ConnectionID: "PRIVATE_CONNECTION", ConnectionLabel: "PRIVATE_LABEL", ConfigDigest: "PRIVATE_CONFIG",
-			PeerID: "PRIVATE_PEER", StreamInstance: "PRIVATE_STREAM", TmuxServerSocket: "PRIVATE_SOCKET",
+			ConnectionID:     "PRIVATE_CONNECTION",
+			ConnectionLabel:  "PRIVATE_LABEL",
+			ConfigDigest:     "PRIVATE_CONFIG",
+			PeerID:           "PRIVATE_PEER",
+			StreamInstance:   "PRIVATE_STREAM",
+			TmuxServerSocket: "PRIVATE_SOCKET",
 		},
 	}
 
@@ -427,13 +546,16 @@ func TestSessionFrameExcludesLocalState(t *testing.T) {
 	}
 
 	got := frame.Snapshot.Sessions[0]
-	if got.Origin != "" || got.Current || got.RemoteStatus != "" || got.RuntimeIdentity != (session.RuntimeIdentity{}) {
+	if got.Origin != "" || got.Current || got.RemoteStatus != "" ||
+		got.RuntimeIdentity != (session.RuntimeIdentity{}) {
 		t.Fatalf("local state survived the wire: %#v", got)
 	}
 }
 
 func TestSessionFrameRejectsPeerSuppliedLocalState(t *testing.T) {
-	frame := snapshotFrameWithSession(session.Session{ID: "$1", Name: "dev", Kind: session.KindLive})
+	frame := snapshotFrameWithSession(
+		session.Session{ID: "$1", Name: "dev", Kind: session.KindLive},
+	)
 
 	encoded, err := json.Marshal(frame)
 	if err != nil {
@@ -445,7 +567,12 @@ func TestSessionFrameRejectsPeerSuppliedLocalState(t *testing.T) {
 		`"peerId":"forged"`, `"streamInstance":"forged"`, `"tmuxServerSocket":"forged"`,
 	} {
 		t.Run(field, func(t *testing.T) {
-			payload := bytes.Replace(encoded, []byte(`"runtimeIdentity":{`), []byte(`"runtimeIdentity":{`+field+`,`), 1)
+			payload := bytes.Replace(
+				encoded,
+				[]byte(`"runtimeIdentity":{`),
+				[]byte(`"runtimeIdentity":{`+field+`,`),
+				1,
+			)
 			if _, err := NewFrameReader(bytes.NewReader(payload)).Read(); err == nil {
 				t.Fatalf("accepted peer supplied local identity %s", field)
 			}
@@ -454,7 +581,12 @@ func TestSessionFrameRejectsPeerSuppliedLocalState(t *testing.T) {
 
 	for _, field := range []string{`"origin":"local"`, `"isCurrent":true`, `"remoteStatus":"stale"`} {
 		t.Run(field, func(t *testing.T) {
-			payload := bytes.Replace(encoded, []byte(`"id":"$1",`), []byte(`"id":"$1",`+field+`,`), 1)
+			payload := bytes.Replace(
+				encoded,
+				[]byte(`"id":"$1",`),
+				[]byte(`"id":"$1",`+field+`,`),
+				1,
+			)
 			if _, err := NewFrameReader(bytes.NewReader(payload)).Read(); err == nil {
 				t.Fatalf("accepted peer supplied local state %s", field)
 			}
@@ -478,14 +610,19 @@ func TestSnapshotWireCarriesRawIdentityBytes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !bytes.Equal(frame.Snapshot.Sessions[0].NameRaw, raw) || !bytes.Equal(frame.Snapshot.Sessions[0].PathRaw, raw) {
+	if !bytes.Equal(frame.Snapshot.Sessions[0].NameRaw, raw) ||
+		!bytes.Equal(frame.Snapshot.Sessions[0].PathRaw, raw) {
 		t.Fatalf("raw identity bytes were not preserved: %#v", frame.Snapshot.Sessions[0])
 	}
 }
 
 func FuzzFrameReader(f *testing.F) {
 	seed, err := json.Marshal(Frame{
-		Version: ProtocolVersion, Type: FrameHealth, PeerID: "peer", StreamInstance: "stream", Sequence: 1,
+		Version:        ProtocolVersion,
+		Type:           FrameHealth,
+		PeerID:         "peer",
+		StreamInstance: "stream",
+		Sequence:       1,
 		Health: &Health{Sources: SourceHealth{
 			Tmux:      SourceStatus{Status: HealthOK, Reason: HealthReasonNone},
 			Agents:    SourceStatus{Status: HealthDegraded, Reason: HealthReasonUnavailable},

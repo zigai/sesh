@@ -145,7 +145,8 @@ func (m *Model) completePath(direction int) {
 }
 
 func (m *Model) applySelectedPathSuggestion() {
-	if len(m.pathSuggestions) == 0 || m.pathSuggestionIndex < 0 || m.pathSuggestionIndex >= len(m.pathSuggestions) {
+	if len(m.pathSuggestions) == 0 || m.pathSuggestionIndex < 0 ||
+		m.pathSuggestionIndex >= len(m.pathSuggestions) {
 		return
 	}
 
@@ -184,7 +185,11 @@ func (m *Model) refreshPathSuggestions() {
 
 	m.pathState = inspectPath(m.pathInput.Value(), cwd)
 
-	suggestions, err := session.DirectoryPathSuggestions(m.operationContext(), m.pathInput.Value(), cwd)
+	suggestions, err := session.DirectoryPathSuggestions(
+		m.operationContext(),
+		m.pathInput.Value(),
+		cwd,
+	)
 	if err != nil {
 		if !errors.Is(err, session.ErrDirectoryLimit) {
 			logTUIFailure(m.operationContext(), tuiOperationResolveWorkingDirectory, err)

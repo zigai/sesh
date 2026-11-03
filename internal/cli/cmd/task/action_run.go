@@ -21,12 +21,15 @@ const (
 
 func newActionRunCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:         actionRunVerb + " <task> <action>",
-		Short:       "Run a task action in the task's popup window",
-		Hidden:      true,
-		Args:        clibase.UsageArgs(cobra.ExactArgs(actionRunArgs)),
-		RunE:        runActionRun,
-		Annotations: map[string]string{clibase.AnnotationOperation: "task_action", clibase.AnnotationLiveIO: "true"},
+		Use:    actionRunVerb + " <task> <action>",
+		Short:  "Run a task action in the task's popup window",
+		Hidden: true,
+		Args:   clibase.UsageArgs(cobra.ExactArgs(actionRunArgs)),
+		RunE:   runActionRun,
+		Annotations: map[string]string{
+			clibase.AnnotationOperation: "task_action",
+			clibase.AnnotationLiveIO:    "true",
+		},
 	}
 
 	actioncli.AddEnvironmentFlags(cmd)
@@ -47,7 +50,12 @@ func runActionRun(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	run, err := runtime.Local.RunTaskAction(ctx, args[0], args[1], gotmux.Streams{In: os.Stdin, Out: os.Stdout, Err: os.Stderr})
+	run, err := runtime.Local.RunTaskAction(
+		ctx,
+		args[0],
+		args[1],
+		gotmux.Streams{In: os.Stdin, Out: os.Stdout, Err: os.Stderr},
+	)
 	err = errors.Join(err, runtime.Close())
 
 	if run.ExitCode == nil {

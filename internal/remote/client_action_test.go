@@ -17,25 +17,49 @@ import (
 var errTestCatalog = errors.New("catalog unreadable")
 
 func actionOriginFixture() (ActionOriginOptions, action.SessionRef) {
-	connection := config.RemoteConnectionConfig{ID: "peer-a", Label: "Peer A", Host: "peer.example", SeshPath: "sesh", TmuxSocket: "/tmp/peer.sock"}
+	connection := config.RemoteConnectionConfig{
+		ID:         "peer-a",
+		Label:      "Peer A",
+		Host:       "peer.example",
+		SeshPath:   "sesh",
+		TmuxSocket: "/tmp/peer.sock",
+	}
 	remoteConfig := config.RemoteConfig{
 		Enabled: true, SSHPath: "ssh", ActionTimeout: "5s",
 		Connections: []config.RemoteConnectionConfig{connection},
 	}
 	state := ConnectionState{
-		ID: connection.ID, ConfigDigest: ConnectionDigest(connection), PeerID: "peer-id", Connected: true,
-		Snapshot: Snapshot{GeneratedAt: time.Time{}, Sessions: nil, Actions: []action.ID{action.SessionKill.ID}, Health: UnavailableHealth()},
+		ID:           connection.ID,
+		ConfigDigest: ConnectionDigest(connection),
+		PeerID:       "peer-id",
+		Connected:    true,
+		Snapshot: Snapshot{
+			GeneratedAt: time.Time{},
+			Sessions:    nil,
+			Actions:     []action.ID{action.SessionKill.ID},
+			Health:      UnavailableHealth(),
+		},
 	}
 	target := action.SessionRef{
-		Kind: session.KindLive, ID: "$1", Name: "work", Socket: connection.TmuxSocket,
-		ServerPID: 42, ServerStartedAt: time.Unix(10, 0).UTC(), CreatedAt: time.Unix(11, 0).UTC(), Generation: "",
+		Kind:            session.KindLive,
+		ID:              "$1",
+		Name:            "work",
+		Socket:          connection.TmuxSocket,
+		ServerPID:       42,
+		ServerStartedAt: time.Unix(10, 0).UTC(),
+		CreatedAt:       time.Unix(11, 0).UTC(),
+		Generation:      "",
 	}
 
 	return ActionOriginOptions{Remote: remoteConfig, Connection: connection, State: state}, target
 }
 
 func fixturePeer(opts ActionOriginOptions) *Peer {
-	catalog := Catalog{Version: ProtocolVersion, GeneratedAt: time.Time{}, Connections: map[string]ConnectionState{opts.State.ID: opts.State}}
+	catalog := Catalog{
+		Version:     ProtocolVersion,
+		GeneratedAt: time.Time{},
+		Connections: map[string]ConnectionState{opts.State.ID: opts.State},
+	}
 	peer := NewPeer(opts.Remote, func() (Catalog, error) { return catalog, nil })
 	peer.Observe(catalog)
 
@@ -75,7 +99,9 @@ func TestNewActionRequestBindsCachedPeerAndServer(t *testing.T) {
 		t.Fatalf("NewActionRequest() error = %v", err)
 	}
 
-	if request.PeerID != options.State.PeerID || request.ConfigDigest != options.State.ConfigDigest || request.Socket != options.Connection.TmuxSocket {
+	if request.PeerID != options.State.PeerID ||
+		request.ConfigDigest != options.State.ConfigDigest ||
+		request.Socket != options.Connection.TmuxSocket {
 		t.Fatalf("request lost cached identity: %#v", request)
 	}
 
@@ -94,7 +120,11 @@ func TestNewActionRequestRefusesStaleOrDisabledConnections(t *testing.T) {
 			options, _ := actionOriginFixture()
 			mutate(&options)
 
-			if _, err := NewActionRequest(options, action.SessionKill.ID, []byte(`{}`)); err == nil {
+			if _, err := NewActionRequest(
+				options,
+				action.SessionKill.ID,
+				[]byte(`{}`),
+			); err == nil {
 				t.Fatal("NewActionRequest() accepted a connection it cannot trust")
 			}
 		})
@@ -110,14 +140,21 @@ func TestPeerOffersOnlyAdvertisedActionsOfConnectedPeers(t *testing.T) {
 		t.Fatal("advertised action was not offered")
 	}
 
-	if peer.Accepts(at, action.SessionDelete.ID) || peer.Accepts(action.Local(), action.SessionKill.ID) ||
+	if peer.Accepts(at, action.SessionDelete.ID) ||
+		peer.Accepts(action.Local(), action.SessionKill.ID) ||
 		peer.Accepts(action.Peer("other"), action.SessionKill.ID) {
 		t.Fatal("peer offered an action its peer did not advertise")
 	}
 
 	disconnected := options.State
 	disconnected.Connected = false
-	peer.Observe(Catalog{Version: ProtocolVersion, GeneratedAt: time.Time{}, Connections: map[string]ConnectionState{disconnected.ID: disconnected}})
+	peer.Observe(
+		Catalog{
+			Version:     ProtocolVersion,
+			GeneratedAt: time.Time{},
+			Connections: map[string]ConnectionState{disconnected.ID: disconnected},
+		},
+	)
 
 	if peer.Accepts(at, action.SessionKill.ID) {
 		t.Fatal("disconnected peer still offered actions")
@@ -126,21 +163,40 @@ func TestPeerOffersOnlyAdvertisedActionsOfConnectedPeers(t *testing.T) {
 
 func TestPeerDispatchChecksTheCurrentCatalogBeforeSending(t *testing.T) {
 	options, target := actionOriginFixture()
-	options.Remote.SSHPath = scriptedSSHPath(t, "echo sent >> \""+filepath.Join(t.TempDir(), "sent")+"\"\nexit 1\n")
+	options.Remote.SSHPath = scriptedSSHPath(
+		t,
+		"echo sent >> \""+filepath.Join(t.TempDir(), "sent")+"\"\nexit 1\n",
+	)
 
 	withdrawn := options.State
 	withdrawn.Snapshot.Actions = nil
 
 	peer := NewPeer(options.Remote, func() (Catalog, error) {
-		return Catalog{Version: ProtocolVersion, GeneratedAt: time.Time{}, Connections: map[string]ConnectionState{withdrawn.ID: withdrawn}}, nil
+		return Catalog{
+			Version:     ProtocolVersion,
+			GeneratedAt: time.Time{},
+			Connections: map[string]ConnectionState{withdrawn.ID: withdrawn},
+		}, nil
 	})
 
-	if _, err := peer.Dispatch(t.Context(), killInvocation(options, target)); action.CodeOf(err) != action.CodeForbidden || !errors.Is(err, ErrActionNotOffered) {
+	if _, err := peer.Dispatch(
+		t.Context(),
+		killInvocation(options, target),
+	); action.CodeOf(err) != action.CodeForbidden ||
+		!errors.Is(err, ErrActionNotOffered) {
 		t.Fatalf("Dispatch(withdrawn action) error = %v, want forbidden", err)
 	}
 
-	unreadable := NewPeer(options.Remote, func() (Catalog, error) { return Catalog{}, errTestCatalog })
-	if _, err := unreadable.Dispatch(t.Context(), killInvocation(options, target)); action.CodeOf(err) != action.CodeUnavailable {
+	unreadable := NewPeer(
+		options.Remote,
+		func() (Catalog, error) { return Catalog{}, errTestCatalog },
+	)
+	if _, err := unreadable.Dispatch(
+		t.Context(),
+		killInvocation(options, target),
+	); action.CodeOf(
+		err,
+	) != action.CodeUnavailable {
 		t.Fatalf("Dispatch(unreadable catalog) error = %v, want unavailable", err)
 	}
 }
@@ -189,7 +245,11 @@ func TestPeerDispatchRejectsAnswersForAnotherInvocation(t *testing.T) {
 printf '{"invocationId":"0123456789abcdef0123456789abcdef","action":"session.kill","ok":true,"code":""}\n'
 `)
 
-	if _, err := fixturePeer(options).Dispatch(t.Context(), killInvocation(options, target)); action.CodeOf(err) != action.CodeUncertain {
+	if _, err := fixturePeer(
+		options,
+	).Dispatch(t.Context(), killInvocation(options, target)); action.CodeOf(
+		err,
+	) != action.CodeUncertain {
 		t.Fatalf("Dispatch() error = %v, want an uncertain outcome", err)
 	}
 }

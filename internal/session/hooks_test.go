@@ -53,11 +53,21 @@ func TestHookCommandsForHookEvent(t *testing.T) {
 		t.Run(tt.event, func(t *testing.T) {
 			got := session.CommandsForHookEvent(cfg, tt.event)
 			if len(got) != len(tt.want) {
-				t.Fatalf("CommandsForHookEvent(%q) len = %d, want %d", tt.event, len(got), len(tt.want))
+				t.Fatalf(
+					"CommandsForHookEvent(%q) len = %d, want %d",
+					tt.event,
+					len(got),
+					len(tt.want),
+				)
 			}
 
 			if len(got) > 0 && got[0].Command != tt.want[0].Command {
-				t.Fatalf("CommandsForHookEvent(%q)[0] = %q, want %q", tt.event, got[0].Command, tt.want[0].Command)
+				t.Fatalf(
+					"CommandsForHookEvent(%q)[0] = %q, want %q",
+					tt.event,
+					got[0].Command,
+					tt.want[0].Command,
+				)
 			}
 		})
 	}
@@ -268,7 +278,10 @@ func TestHookConfigValidationTimeouts(t *testing.T) {
 
 		err := session.ValidateHookConfig(cfg, session.EventSessionSwitchPost)
 		if !errors.Is(err, session.ErrHookTimeoutInvalid) {
-			t.Fatalf("ValidateHookConfig(cmd invalid timeout) = %v, want ErrHookTimeoutInvalid", err)
+			t.Fatalf(
+				"ValidateHookConfig(cmd invalid timeout) = %v, want ErrHookTimeoutInvalid",
+				err,
+			)
 		}
 	})
 }
@@ -291,7 +304,12 @@ func TestHookResolveTimeout(t *testing.T) {
 	t.Run("default_timeout_fallback", func(t *testing.T) {
 		d, err := session.ResolveHookTimeout("", "")
 		if err != nil || d != session.DefaultHookTimeout {
-			t.Fatalf("ResolveHookTimeout(\"\", \"\") = (%v, %v), want (%v, nil)", d, err, session.DefaultHookTimeout)
+			t.Fatalf(
+				"ResolveHookTimeout(\"\", \"\") = (%v, %v), want (%v, nil)",
+				d,
+				err,
+				session.DefaultHookTimeout,
+			)
 		}
 	})
 
@@ -349,7 +367,8 @@ func TestHookEventEnv(t *testing.T) {
 		counts[k]++
 	}
 
-	if envMap["PATH"] != "/usr/bin:/bin" || envMap["HOME"] != "/home/testuser" || envMap["USER"] != "testuser" {
+	if envMap["PATH"] != "/usr/bin:/bin" || envMap["HOME"] != "/home/testuser" ||
+		envMap["USER"] != "testuser" {
 		t.Fatalf("standard env not preserved: %#v", envMap)
 	}
 
@@ -463,7 +482,11 @@ func TestHookOopsErrorInspection(t *testing.T) {
 	cancel()
 
 	runner := session.NewHookRunner(session.HookRunnerDeps{})
-	_, err := runner.Run(ctx, config.HookConfig{}, session.HookEvent{Name: session.EventSessionSwitchPre})
+	_, err := runner.Run(
+		ctx,
+		config.HookConfig{},
+		session.HookEvent{Name: session.EventSessionSwitchPre},
+	)
 
 	oopsErr, ok := oops.AsOops(err)
 	if !ok {

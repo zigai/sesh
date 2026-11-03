@@ -89,7 +89,12 @@ func TestViewReadsCurrentWhileRepositoryLockIsHeld(t *testing.T) {
 
 	got, err := view.ReadCurrentListing(ctx)
 	if err != nil || got.Generation != generation || len(got.Sessions) == 0 {
-		t.Fatalf("view current under a held lock = %v, %v; want generation %v", got.Generation, err, generation)
+		t.Fatalf(
+			"view current under a held lock = %v, %v; want generation %v",
+			got.Generation,
+			err,
+			generation,
+		)
 	}
 
 	if _, err := view.ReadListing(ctx, generation.ID); err != nil {

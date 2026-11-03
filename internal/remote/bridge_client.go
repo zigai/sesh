@@ -41,7 +41,10 @@ func (client *BridgeClient) GetCatalog(ctx context.Context) (BridgeCatalog, erro
 	}
 
 	if response.Type != TypeCatalogResponse || !response.OK {
-		return BridgeCatalog{}, oops.In("remote").With("operation", "get_catalog").With("error", response.Error).Wrap(ErrBridgeInvalidFrame)
+		return BridgeCatalog{}, oops.In("remote").
+			With("operation", "get_catalog").
+			With("error", response.Error).
+			Wrap(ErrBridgeInvalidFrame)
 	}
 
 	return BridgeCatalog{
@@ -52,7 +55,11 @@ func (client *BridgeClient) GetCatalog(ctx context.Context) (BridgeCatalog, erro
 	}, nil
 }
 
-func (client *BridgeClient) RequestSwitch(ctx context.Context, catalogGeneration uint64, target OriginSession) error {
+func (client *BridgeClient) RequestSwitch(
+	ctx context.Context,
+	catalogGeneration uint64,
+	target OriginSession,
+) error {
 	response, err := client.exchange(ctx, Message{
 		Type:                  TypeSwitchRequest,
 		Token:                 "",
@@ -72,7 +79,10 @@ func (client *BridgeClient) RequestSwitch(ctx context.Context, catalogGeneration
 	}
 
 	if response.Type != TypeSwitchResponse || !response.OK {
-		return oops.In("remote").With("operation", "request_switch").With("error", response.Error).Wrap(ErrBridgeSwitchRejected)
+		return oops.In("remote").
+			With("operation", "request_switch").
+			With("error", response.Error).
+			Wrap(ErrBridgeSwitchRejected)
 	}
 
 	return nil
@@ -80,10 +90,15 @@ func (client *BridgeClient) RequestSwitch(ctx context.Context, catalogGeneration
 
 func (client *BridgeClient) exchange(parent context.Context, request Message) (Message, error) {
 	if client == nil || client.SocketPath == "" || client.Token == "" {
-		return Message{}, oops.In("remote").With("operation", "bridge_exchange").Wrap(ErrBridgeSocketRequired)
+		return Message{}, oops.In("remote").
+			With("operation", "bridge_exchange").
+			Wrap(ErrBridgeSocketRequired)
 	}
 
-	ctx, cancel := context.WithTimeout(parent, positiveDuration(client.Timeout, bridgeClientTimeout))
+	ctx, cancel := context.WithTimeout(
+		parent,
+		positiveDuration(client.Timeout, bridgeClientTimeout),
+	)
 	defer cancel()
 
 	var dialer net.Dialer

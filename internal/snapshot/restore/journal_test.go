@@ -189,7 +189,11 @@ type storeJournal struct {
 	states     map[string]store.Action
 }
 
-func newStoreJournal(ctx context.Context, repository *store.Repository, operation string) (*storeJournal, error) {
+func newStoreJournal(
+	ctx context.Context,
+	repository *store.Repository,
+	operation string,
+) (*storeJournal, error) {
 	op, err := repository.ReconcileOperation(ctx, operation)
 	if err != nil {
 		return nil, fmt.Errorf("read operation journal: %w", err)
@@ -203,7 +207,12 @@ func newStoreJournal(ctx context.Context, repository *store.Repository, operatio
 	return &storeJournal{repository: repository, operation: operation, states: states}, nil
 }
 
-func (j *storeJournal) transition(ctx context.Context, id string, expected, next model.ActionState, runtimeID model.Bytes) error {
+func (j *storeJournal) transition(
+	ctx context.Context,
+	id string,
+	expected, next model.ActionState,
+	runtimeID model.Bytes,
+) error {
 	if err := j.repository.Transition(ctx, j.operation, id, expected, next, runtimeID); err != nil {
 		return fmt.Errorf("record action transition: %w", err)
 	}
@@ -228,7 +237,13 @@ func (j *storeJournal) advance(ctx context.Context, id string) error {
 	case model.ActionStatePlanned:
 		return j.transition(ctx, id, model.ActionStatePlanned, model.ActionStateIssued, nil)
 	case model.ActionStateNotSent:
-		if err := j.transition(ctx, id, model.ActionStateNotSent, model.ActionStatePlanned, nil); err != nil {
+		if err := j.transition(
+			ctx,
+			id,
+			model.ActionStateNotSent,
+			model.ActionStatePlanned,
+			nil,
+		); err != nil {
 			return err
 		}
 
@@ -263,11 +278,23 @@ func (j *storeJournal) Intent(ctx context.Context, step Step) error {
 }
 
 func (j *storeJournal) Confirmed(ctx context.Context, step Step, runtimeID string) error {
-	return j.transition(ctx, ActionID(step.ID()), model.ActionStateIssued, model.ActionStateConfirmed, model.Bytes(runtimeID))
+	return j.transition(
+		ctx,
+		ActionID(step.ID()),
+		model.ActionStateIssued,
+		model.ActionStateConfirmed,
+		model.Bytes(runtimeID),
+	)
 }
 
 func (j *storeJournal) NotSent(ctx context.Context, step Step) error {
-	return j.transition(ctx, ActionID(step.ID()), model.ActionStateIssued, model.ActionStateNotSent, nil)
+	return j.transition(
+		ctx,
+		ActionID(step.ID()),
+		model.ActionStateIssued,
+		model.ActionStateNotSent,
+		nil,
+	)
 }
 
 func (j *storeJournal) Unknown(ctx context.Context, step Step) error {
@@ -280,7 +307,13 @@ func (j *storeJournal) Unknown(ctx context.Context, step Step) error {
 		return nil
 	}
 
-	return j.transition(ctx, ActionID(step.ID()), model.ActionStateIssued, model.ActionStateUnknown, nil)
+	return j.transition(
+		ctx,
+		ActionID(step.ID()),
+		model.ActionStateIssued,
+		model.ActionStateUnknown,
+		nil,
+	)
 }
 
 type faultJournal struct {
@@ -399,7 +432,10 @@ func testOperationID(label string) string {
 func testActions(specs []ActionSpec) []store.Action {
 	actions := make([]store.Action, 0, len(specs))
 	for _, spec := range specs {
-		actions = append(actions, store.Action{ID: spec.ID, Kind: spec.Kind, State: "planned", RuntimeID: nil})
+		actions = append(
+			actions,
+			store.Action{ID: spec.ID, Kind: spec.Kind, State: "planned", RuntimeID: nil},
+		)
 	}
 
 	return actions

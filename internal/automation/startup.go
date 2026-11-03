@@ -68,7 +68,11 @@ func (e *ActiveRestoresError) Is(target error) bool { return target == ErrActive
 
 func EvaluateStartupRestore(state StartupState) RestoreAdmission {
 	if !state.Enabled {
-		return RestoreAdmission{Allowed: false, Reason: ReasonRestoreDisabled, Generation: state.Generation}
+		return RestoreAdmission{
+			Allowed:    false,
+			Reason:     ReasonRestoreDisabled,
+			Generation: state.Generation,
+		}
 	}
 
 	if !state.RepositoryPresent {
@@ -76,23 +80,42 @@ func EvaluateStartupRestore(state StartupState) RestoreAdmission {
 	}
 
 	if state.PendingOperations > 0 {
-		return RestoreAdmission{Allowed: false, Reason: ReasonPendingOperation, Generation: state.Generation}
+		return RestoreAdmission{
+			Allowed:    false,
+			Reason:     ReasonPendingOperation,
+			Generation: state.Generation,
+		}
 	}
 
 	if state.RecoveryRequired {
-		return RestoreAdmission{Allowed: false, Reason: ReasonRecoveryRequired, Generation: state.Generation}
+		return RestoreAdmission{
+			Allowed:    false,
+			Reason:     ReasonRecoveryRequired,
+			Generation: state.Generation,
+		}
 	}
 
 	if (state.ObservationOnly && !state.Practical) || state.Generation == "" {
-		return RestoreAdmission{Allowed: false, Reason: ReasonObservationOnly, Generation: state.Generation}
+		return RestoreAdmission{
+			Allowed:    false,
+			Reason:     ReasonObservationOnly,
+			Generation: state.Generation,
+		}
 	}
 
-	return RestoreAdmission{Allowed: true, Reason: ReasonRestoreAdmitted, Generation: state.Generation}
+	return RestoreAdmission{
+		Allowed:    true,
+		Reason:     ReasonRestoreAdmitted,
+		Generation: state.Generation,
+	}
 }
 
 func InspectStartupState(ctx context.Context, repository *store.Repository) (StartupState, error) {
 	if repository == nil {
-		return StartupState{}, oops.In("automation").Code("repository_required").With("operation", "inspect_startup_state").Wrap(ErrStartupRepositoryRequired)
+		return StartupState{}, oops.In("automation").
+			Code("repository_required").
+			With("operation", "inspect_startup_state").
+			Wrap(ErrStartupRepositoryRequired)
 	}
 
 	state := new(StartupState)
@@ -100,7 +123,10 @@ func InspectStartupState(ctx context.Context, repository *store.Repository) (Sta
 
 	catalog, err := repository.Inspect(ctx)
 	if err != nil {
-		return StartupState{}, oops.In("automation").Code("startup_inspect_failed").With("operation", "inspect_startup_state").Wrap(err)
+		return StartupState{}, oops.In("automation").
+			Code("startup_inspect_failed").
+			With("operation", "inspect_startup_state").
+			Wrap(err)
 	}
 
 	for _, operation := range catalog.Operations {
@@ -124,7 +150,10 @@ func InspectStartupState(ctx context.Context, repository *store.Repository) (Sta
 		}
 	case errors.Is(readErr, store.ErrUnavailable):
 	default:
-		return StartupState{}, oops.In("automation").Code("startup_inspect_failed").With("operation", "inspect_startup_state").Wrap(readErr)
+		return StartupState{}, oops.In("automation").
+			Code("startup_inspect_failed").
+			With("operation", "inspect_startup_state").
+			Wrap(readErr)
 	}
 
 	return *state, nil

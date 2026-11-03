@@ -126,7 +126,12 @@ func (harness peerHarness) request(t *testing.T, id action.ID, input any) remote
 	return request
 }
 
-func (harness peerHarness) run(t *testing.T, ctx context.Context, id action.ID, input any) remote.ActionResult {
+func (harness peerHarness) run(
+	t *testing.T,
+	ctx context.Context,
+	id action.ID,
+	input any,
+) remote.ActionResult {
 	t.Helper()
 
 	result, _ := remote.ExecutePeerAction(ctx, harness.options, harness.request(t, id, input))
@@ -134,7 +139,11 @@ func (harness peerHarness) run(t *testing.T, ctx context.Context, id action.ID, 
 	return result
 }
 
-func (harness peerHarness) liveRef(t *testing.T, ctx context.Context, name string) action.SessionRef {
+func (harness peerHarness) liveRef(
+	t *testing.T,
+	ctx context.Context,
+	name string,
+) action.SessionRef {
 	t.Helper()
 
 	rows, err := session.ListLive(ctx, harness.server, "")
@@ -183,34 +192,59 @@ func TestPeerActionAgainstDisposableServer(t *testing.T) {
 	killAndReplay(t, ctx, harness, renamed)
 }
 
-func createAndRenameThroughPeer(t *testing.T, ctx context.Context, harness peerHarness) action.SessionRef {
+func createAndRenameThroughPeer(
+	t *testing.T,
+	ctx context.Context,
+	harness peerHarness,
+) action.SessionRef {
 	t.Helper()
 
-	created := harness.run(t, ctx, action.SessionCreate.ID, action.CreateSession{Name: "peer-target", Directory: t.TempDir()})
+	created := harness.run(
+		t,
+		ctx,
+		action.SessionCreate.ID,
+		action.CreateSession{Name: "peer-target", Directory: t.TempDir()},
+	)
 	if !created.OK {
 		t.Fatalf("create result = %#v, want success", created)
 	}
 
 	output, err := action.SessionCreate.DecodeOutput(created.Output)
-	if createdSession, ok := output.(action.CreatedSession); err != nil || !ok || createdSession.Session.Name != "peer-target" {
+	if createdSession, ok := output.(action.CreatedSession); err != nil || !ok ||
+		createdSession.Session.Name != "peer-target" {
 		t.Fatalf("create output = %s, %v; want the created session", created.Output, err)
 	}
 
 	target := harness.liveRef(t, ctx, "peer-target")
-	if result := harness.run(t, ctx, action.SessionRename.ID, action.RenameSession{Session: target, Name: "peer-renamed"}); !result.OK {
+	if result := harness.run(
+		t,
+		ctx,
+		action.SessionRename.ID,
+		action.RenameSession{Session: target, Name: "peer-renamed"},
+	); !result.OK {
 		t.Fatalf("rename result = %#v, want success", result)
 	}
 
 	return harness.liveRef(t, ctx, "peer-renamed")
 }
 
-func refuseStaleKill(t *testing.T, ctx context.Context, harness peerHarness, target action.SessionRef) {
+func refuseStaleKill(
+	t *testing.T,
+	ctx context.Context,
+	harness peerHarness,
+	target action.SessionRef,
+) {
 	t.Helper()
 
 	stale := target
 	stale.ServerPID++
 
-	if result := harness.run(t, ctx, action.SessionKill.ID, action.KillSession{Session: stale, Force: false}); result.Code != action.CodeTargetChanged {
+	if result := harness.run(
+		t,
+		ctx,
+		action.SessionKill.ID,
+		action.KillSession{Session: stale, Force: false},
+	); result.Code != action.CodeTargetChanged {
 		t.Fatalf("stale kill result = %#v, want %s", result, action.CodeTargetChanged)
 	}
 
@@ -219,10 +253,19 @@ func refuseStaleKill(t *testing.T, ctx context.Context, harness peerHarness, tar
 	}
 }
 
-func killAndReplay(t *testing.T, ctx context.Context, harness peerHarness, target action.SessionRef) {
+func killAndReplay(
+	t *testing.T,
+	ctx context.Context,
+	harness peerHarness,
+	target action.SessionRef,
+) {
 	t.Helper()
 
-	kill := harness.request(t, action.SessionKill.ID, action.KillSession{Session: target, Force: false})
+	kill := harness.request(
+		t,
+		action.SessionKill.ID,
+		action.KillSession{Session: target, Force: false},
+	)
 
 	first, _ := remote.ExecutePeerAction(ctx, harness.options, kill)
 	if !first.OK {
@@ -234,7 +277,8 @@ func killAndReplay(t *testing.T, ctx context.Context, harness peerHarness, targe
 	}
 
 	replayed, _ := remote.ExecutePeerAction(ctx, harness.options, kill)
-	if !replayed.OK || replayed.InvocationID != first.InvocationID || string(replayed.Output) != string(first.Output) {
+	if !replayed.OK || replayed.InvocationID != first.InvocationID ||
+		string(replayed.Output) != string(first.Output) {
 		t.Fatalf("replayed result = %#v, want the recorded outcome", replayed)
 	}
 }
@@ -245,20 +289,31 @@ func TestPeerDeleteRefusesSameNameReplacement(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
 	defer cancel()
 
-	if _, err := harness.server.NewSession(ctx, gotmux.NewSessionOptions{Name: "replacement-target", Dir: t.TempDir()}); err != nil {
+	if _, err := harness.server.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{Name: "replacement-target", Dir: t.TempDir()},
+	); err != nil {
 		t.Fatal(err)
 	}
 
 	original := harness.liveRef(t, ctx, "replacement-target")
 	killSession(t, ctx, harness.server, original.ID)
 
-	if _, err := harness.server.NewSession(ctx, gotmux.NewSessionOptions{Name: "replacement-target", Dir: t.TempDir()}); err != nil {
+	if _, err := harness.server.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{Name: "replacement-target", Dir: t.TempDir()},
+	); err != nil {
 		t.Fatal(err)
 	}
 
 	replacement := harness.liveRef(t, ctx, "replacement-target")
 
-	result := harness.run(t, ctx, action.SessionDelete.ID, action.DeleteSession{Session: original, Force: false})
+	result := harness.run(
+		t,
+		ctx,
+		action.SessionDelete.ID,
+		action.DeleteSession{Session: original, Force: false},
+	)
 	if result.Code != action.CodeTargetChanged {
 		t.Fatalf("delete result = %#v, want %s", result, action.CodeTargetChanged)
 	}
@@ -274,19 +329,33 @@ func TestPeerSavedDeleteRefusesToKillALiveNamesake(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 
-	if _, err := harness.server.NewSession(ctx, gotmux.NewSessionOptions{Name: "saved-delete-target", Dir: t.TempDir()}); err != nil {
+	if _, err := harness.server.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{Name: "saved-delete-target", Dir: t.TempDir()},
+	); err != nil {
 		t.Fatal(err)
 	}
 
 	live := harness.liveRef(t, ctx, "saved-delete-target")
-	generation, savedID := commitSavedDeleteFixture(t, ctx, harness.repository, harness.server.Endpoint().SocketPath, live.Name)
+	generation, savedID := commitSavedDeleteFixture(
+		t,
+		ctx,
+		harness.repository,
+		harness.server.Endpoint().SocketPath,
+		live.Name,
+	)
 
 	saved := action.SessionRef{
 		Kind: session.KindSaved, ID: savedID, Name: live.Name, Socket: "", ServerPID: 0,
 		ServerStartedAt: time.Time{}, CreatedAt: time.Time{}, Generation: generation,
 	}
 
-	result := harness.run(t, ctx, action.SessionDelete.ID, action.DeleteSession{Session: saved, Force: false})
+	result := harness.run(
+		t,
+		ctx,
+		action.SessionDelete.ID,
+		action.DeleteSession{Session: saved, Force: false},
+	)
 	if result.Code != action.CodeTargetChanged {
 		t.Fatalf("saved delete result = %#v, want %s", result, action.CodeTargetChanged)
 	}
@@ -304,7 +373,10 @@ func TestPeerAttachValidationAgainstDisposableServer(t *testing.T) {
 
 	live := remote.NewGotmuxLiveServer(server)
 
-	if _, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "attach-target", Dir: t.TempDir()}); err != nil {
+	if _, err := server.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{Name: "attach-target", Dir: t.TempDir()},
+	); err != nil {
 		t.Fatalf("NewSession() error = %v", err)
 	}
 
@@ -349,8 +421,18 @@ func TestPeerAttachValidationAgainstDisposableServer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := remote.ValidateAttachTarget(attachTarget, fresh); !errors.Is(err, remote.ErrTargetChanged) {
-		t.Fatalf("ValidateAttachTarget(fresh inventory) error = %v, want %v", err, remote.ErrTargetChanged)
+	if _, err := remote.ValidateAttachTarget(
+		attachTarget,
+		fresh,
+	); !errors.Is(
+		err,
+		remote.ErrTargetChanged,
+	) {
+		t.Fatalf(
+			"ValidateAttachTarget(fresh inventory) error = %v, want %v",
+			err,
+			remote.ErrTargetChanged,
+		)
 	}
 }
 
@@ -384,18 +466,44 @@ func commitSavedDeleteFixture(
 	const sessionID = "saved-session"
 
 	manifest := model.Manifest{
-		Format: "sesh", Version: model.Schema, Started: 1, Finished: 2,
+		Format:   "sesh",
+		Version:  model.Schema,
+		Started:  1,
+		Finished: 2,
 		Source: model.Source{
-			TmuxVersion: "3.7c", LibraryVersion: "v0.3.0", Consistency: "observed", EndpointScope: endpointScope,
+			TmuxVersion:    "3.7c",
+			LibraryVersion: "v0.3.0",
+			Consistency:    "observed",
+			EndpointScope:  endpointScope,
 		},
-		Sessions: []model.Session{{ID: sessionID, Name: model.Bytes(name), Directory: model.Bytes("/tmp")}},
-		Windows:  []model.Window{{ID: "saved-window", Name: model.Bytes("window"), Width: 80, Height: 24, Layout: model.Layout{Width: 80, Height: 24, Pane: "saved-pane"}}},
-		Panes: []model.Pane{{
-			ID: "saved-pane", Window: "saved-window", Directory: model.Bytes("/tmp"), Width: 80, Height: 24,
-			Active: true, Launch: model.Launch{Recovery: "unverified"},
-		}},
-		Links:     []model.Link{{Session: sessionID, Window: "saved-window", Index: 0, Active: true}},
-		Artifacts: nil, Evidence: savedDeleteEvidence(),
+		Sessions: []model.Session{
+			{ID: sessionID, Name: model.Bytes(name), Directory: model.Bytes("/tmp")},
+		},
+		Windows: []model.Window{
+			{
+				ID:     "saved-window",
+				Name:   model.Bytes("window"),
+				Width:  80,
+				Height: 24,
+				Layout: model.Layout{Width: 80, Height: 24, Pane: "saved-pane"},
+			},
+		},
+		Panes: []model.Pane{
+			{
+				ID:        "saved-pane",
+				Window:    "saved-window",
+				Directory: model.Bytes("/tmp"),
+				Width:     80,
+				Height:    24,
+				Active:    true,
+				Launch:    model.Launch{Recovery: "unverified"},
+			},
+		},
+		Links: []model.Link{
+			{Session: sessionID, Window: "saved-window", Index: 0, Active: true},
+		},
+		Artifacts: nil,
+		Evidence:  savedDeleteEvidence(),
 	}
 
 	generation, err := repo.Commit(ctx, attempt.ID, manifest, nil)
@@ -409,7 +517,10 @@ func commitSavedDeleteFixture(
 func savedDeleteEvidence() []model.Evidence {
 	evidence := make([]model.Evidence, 0, 10)
 	for _, domain := range []string{"S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10"} {
-		evidence = append(evidence, model.Evidence{Domain: domain, Status: "unverified", Reason: "not_captured"})
+		evidence = append(
+			evidence,
+			model.Evidence{Domain: domain, Status: "unverified", Reason: "not_captured"},
+		)
 	}
 
 	return evidence

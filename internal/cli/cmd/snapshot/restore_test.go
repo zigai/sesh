@@ -21,7 +21,11 @@ type restoreTestEnvelope struct {
 	Error  *clibase.JSONErrorPayload `json:"error"`
 }
 
-func renderRestoreJSONForTest(t *testing.T, result action.RestoredSnapshot, cause error) (restoreTestEnvelope, error) {
+func renderRestoreJSONForTest(
+	t *testing.T,
+	result action.RestoredSnapshot,
+	cause error,
+) (restoreTestEnvelope, error) {
 	t.Helper()
 
 	cmd := newSnapshotRestoreCommand()
@@ -72,7 +76,14 @@ func TestRestoreFailureRetainsOperationReceipt(t *testing.T) {
 		cause error
 		code  string
 	}{
-		{"effect", action.Wrap(action.CodeUncertain, errors.Join(restore.ErrExecutionUncertain, context.Canceled)), "uncertain"},
+		{
+			"effect",
+			action.Wrap(
+				action.CodeUncertain,
+				errors.Join(restore.ErrExecutionUncertain, context.Canceled),
+			),
+			"uncertain",
+		},
 		{"close", action.Wrap(action.CodeFailed, errSensitiveRaw), "operationFailed"},
 	}
 	for _, tc := range cases {
@@ -88,7 +99,8 @@ func TestRestoreFailureRetainsOperationReceipt(t *testing.T) {
 				t.Fatalf("failure envelope: %+v", envelope)
 			}
 
-			if envelope.Result.OperationID != result.OperationID || !envelope.Result.Uncertain || envelope.Result.Verified {
+			if envelope.Result.OperationID != result.OperationID || !envelope.Result.Uncertain ||
+				envelope.Result.Verified {
 				t.Fatalf("recovery receipt was lost: %+v", envelope.Result)
 			}
 		})
@@ -99,16 +111,24 @@ func TestPartialRestoreReportsDegradedResult(t *testing.T) {
 	t.Parallel()
 
 	result := action.RestoredSnapshot{
-		OperationID:         "0123456789abcdef0123456789abcdef",
-		Generation:          "abcdef0123456789abcdef0123456789",
-		Status:              "partial",
-		Reason:              "parity_incomplete",
-		Sessions:            []action.SessionRef{{Kind: session.KindLive, ID: "$1", Name: "restored"}},
-		Verified:            true,
-		MissingRequirements: []action.Requirement{{Domain: "terminal", Status: "unsupported", Reason: "terminal_checkpoint_unavailable"}},
+		OperationID: "0123456789abcdef0123456789abcdef",
+		Generation:  "abcdef0123456789abcdef0123456789",
+		Status:      "partial",
+		Reason:      "parity_incomplete",
+		Sessions: []action.SessionRef{
+			{Kind: session.KindLive, ID: "$1", Name: "restored"},
+		},
+		Verified: true,
+		MissingRequirements: []action.Requirement{
+			{Domain: "terminal", Status: "unsupported", Reason: "terminal_checkpoint_unavailable"},
+		},
 	}
 
-	envelope, err := renderRestoreJSONForTest(t, result, action.Wrap(action.CodePartial, app.ErrPartialRestore))
+	envelope, err := renderRestoreJSONForTest(
+		t,
+		result,
+		action.Wrap(action.CodePartial, app.ErrPartialRestore),
+	)
 	if !errors.Is(err, app.ErrPartialRestore) || clibase.ExitCode(err) != clibase.ExitCodeGeneral {
 		t.Fatalf("partial restore was reported as success: %v", err)
 	}
@@ -117,7 +137,9 @@ func TestPartialRestoreReportsDegradedResult(t *testing.T) {
 		t.Fatalf("expected one degraded envelope: %+v", envelope)
 	}
 
-	if envelope.Result.OperationID != result.OperationID || len(envelope.Result.MissingRequirements) != 1 || !envelope.Result.Verified {
+	if envelope.Result.OperationID != result.OperationID ||
+		len(envelope.Result.MissingRequirements) != 1 ||
+		!envelope.Result.Verified {
 		t.Fatalf("lost partial outcome evidence: %+v", envelope.Result)
 	}
 }
@@ -209,7 +231,11 @@ func TestRestoreRefusedForCollisionNamesSessionsWithoutAnOperation(t *testing.T)
 	var stdout bytes.Buffer
 	cmd.SetOut(&stdout)
 
-	err := renderSnapshotRestore(cmd, result, action.Wrap(action.CodeAlreadyExists, restore.ErrSessionCollision))
+	err := renderSnapshotRestore(
+		cmd,
+		result,
+		action.Wrap(action.CodeAlreadyExists, restore.ErrSessionCollision),
+	)
 	if !errors.Is(err, restore.ErrSessionCollision) {
 		t.Fatalf("expected the collision error to be preserved, got %v", err)
 	}
@@ -225,17 +251,25 @@ func TestRestoreJSONReportsSkippedSessionsAndAdvisories(t *testing.T) {
 	t.Parallel()
 
 	result := action.RestoredSnapshot{
-		OperationID:     "op-1",
-		Generation:      "gen-1",
-		Status:          "partial",
-		Reason:          "sessions_skipped",
-		Sessions:        []action.SessionRef{{Kind: session.KindLive, ID: "$1", Name: "kept"}},
-		Verified:        true,
-		SessionsSkipped: []action.SkippedSession{{ID: "s38", Name: "0", Reason: restore.CollisionNameInUse}},
-		Advisories:      []action.Mismatch{{Domain: restore.MismatchPane, Entity: "p1", Reason: "pane_title_changed"}},
+		OperationID: "op-1",
+		Generation:  "gen-1",
+		Status:      "partial",
+		Reason:      "sessions_skipped",
+		Sessions:    []action.SessionRef{{Kind: session.KindLive, ID: "$1", Name: "kept"}},
+		Verified:    true,
+		SessionsSkipped: []action.SkippedSession{
+			{ID: "s38", Name: "0", Reason: restore.CollisionNameInUse},
+		},
+		Advisories: []action.Mismatch{
+			{Domain: restore.MismatchPane, Entity: "p1", Reason: "pane_title_changed"},
+		},
 	}
 
-	envelope, err := renderRestoreJSONForTest(t, result, action.Wrap(action.CodePartial, app.ErrPartialRestore))
+	envelope, err := renderRestoreJSONForTest(
+		t,
+		result,
+		action.Wrap(action.CodePartial, app.ErrPartialRestore),
+	)
 	if !errors.Is(err, app.ErrPartialRestore) {
 		t.Fatalf("a restore that skipped sessions must exit as partial, got %v", err)
 	}
@@ -244,7 +278,8 @@ func TestRestoreJSONReportsSkippedSessionsAndAdvisories(t *testing.T) {
 		t.Fatalf("skipped sessions missing from JSON: %+v", envelope.Result)
 	}
 
-	if len(envelope.Result.Advisories) != 1 || envelope.Result.Advisories[0].Reason != "pane_title_changed" {
+	if len(envelope.Result.Advisories) != 1 ||
+		envelope.Result.Advisories[0].Reason != "pane_title_changed" {
 		t.Fatalf("advisories missing from JSON: %+v", envelope.Result)
 	}
 }

@@ -17,16 +17,25 @@ var emptyAgentSession AgentSession
 
 func LoadLiveAgents(ctx context.Context, source SessionSource) ([]AgentSession, error) {
 	if source == nil {
-		return nil, oops.In("agents").Code("registry_unavailable").With("operation", "load_live_agents").Wrap(ErrRegistryUnavailable)
+		return nil, oops.In("agents").
+			Code("registry_unavailable").
+			With("operation", "load_live_agents").
+			Wrap(ErrRegistryUnavailable)
 	}
 
 	if err := ctx.Err(); err != nil {
-		return nil, oops.In("agents").Code("operation_canceled").With("operation", "load_live_agents").Wrap(err)
+		return nil, oops.In("agents").
+			Code("operation_canceled").
+			With("operation", "load_live_agents").
+			Wrap(err)
 	}
 
 	sessions, err := source.List(ctx, liveSessionsFilter())
 	if err != nil {
-		return nil, oops.In("agents").Code("registry_read").With("operation", "load_live_agents").Wrap(err)
+		return nil, oops.In("agents").
+			Code("registry_read").
+			With("operation", "load_live_agents").
+			Wrap(err)
 	}
 
 	return ObservedAgentSessions(sessions), nil
@@ -74,7 +83,8 @@ func observedAgentSession(session aht.Session) (AgentSession, bool) {
 		return emptyAgentSession, false
 	}
 
-	if session.Location.Kind != aht.MultiplexerTmux || strings.TrimSpace(session.Location.PaneID) == "" {
+	if session.Location.Kind != aht.MultiplexerTmux ||
+		strings.TrimSpace(session.Location.PaneID) == "" {
 		return emptyAgentSession, false
 	}
 
@@ -150,7 +160,10 @@ func agentSessionFromRegistry(session aht.Session) AgentSession {
 		agent.Detail = *session.Detail
 	}
 
-	agent.WaitingReason, agent.FailureReason = agentDetailReasons(aht.Activity(activity), agent.Detail)
+	agent.WaitingReason, agent.FailureReason = agentDetailReasons(
+		aht.Activity(activity),
+		agent.Detail,
+	)
 
 	return agent
 }

@@ -16,10 +16,20 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/model"
 )
 
-func (r *Repository) Commit(ctx context.Context, id string, manifest model.Manifest, artifacts map[string]io.Reader) (Generation, error) {
+func (r *Repository) Commit(
+	ctx context.Context,
+	id string,
+	manifest model.Manifest,
+	artifacts map[string]io.Reader,
+) (Generation, error) {
 	data, err := model.Encode(manifest)
 	if err != nil {
-		return Generation{}, repositoryError("commit", oops.In("snapshot.store").With("operation", "encode_snapshot").Wrapf(err, "encode snapshot"))
+		return Generation{}, repositoryError(
+			"commit",
+			oops.In("snapshot.store").
+				With("operation", "encode_snapshot").
+				Wrapf(err, "encode snapshot"),
+		)
 	}
 
 	if len(artifacts) != len(manifest.Artifacts) {
@@ -28,7 +38,12 @@ func (r *Repository) Commit(ctx context.Context, id string, manifest model.Manif
 
 	lock, err := r.root.Lock(ctx, "repository.lock")
 	if err != nil {
-		return Generation{}, repositoryError("commit", oops.In("snapshot.store").With("operation", "lock_snapshot_commit").Wrapf(err, "lock snapshot commit"))
+		return Generation{}, repositoryError(
+			"commit",
+			oops.In("snapshot.store").
+				With("operation", "lock_snapshot_commit").
+				Wrapf(err, "lock snapshot commit"),
+		)
 	}
 
 	generation, commitErr := r.commitLocked(ctx, id, manifest, data, artifacts)
@@ -36,7 +51,13 @@ func (r *Repository) Commit(ctx context.Context, id string, manifest model.Manif
 	return generation, repositoryError("commit", errors.Join(commitErr, lock.Close()))
 }
 
-func (r *Repository) commitLocked(ctx context.Context, id string, manifest model.Manifest, data []byte, artifacts map[string]io.Reader) (Generation, error) {
+func (r *Repository) commitLocked(
+	ctx context.Context,
+	id string,
+	manifest model.Manifest,
+	data []byte,
+	artifacts map[string]io.Reader,
+) (Generation, error) {
 	catalog, err := r.catalog()
 	if err != nil {
 		return Generation{}, err
@@ -47,7 +68,12 @@ func (r *Repository) commitLocked(ctx context.Context, id string, manifest model
 		return Generation{}, ErrUnavailable
 	}
 
-	generation := Generation{ID: id, Sequence: catalog.Attempts[index].Sequence, ManifestSHA256: digest(data), Complete: manifest.Complete()}
+	generation := Generation{
+		ID:             id,
+		Sequence:       catalog.Attempts[index].Sequence,
+		ManifestSHA256: digest(data),
+		Complete:       manifest.Complete(),
+	}
 	if existing := catalog.generationIndex(id); existing >= 0 {
 		if catalog.Generations[existing] != generation {
 			return Generation{}, ErrConflict
@@ -65,7 +91,9 @@ func (r *Repository) commitLocked(ctx context.Context, id string, manifest model
 	}
 
 	if err := ctx.Err(); err != nil {
-		return Generation{}, oops.In("snapshot.store").With("operation", "commit_snapshot").Wrapf(err, "commit snapshot")
+		return Generation{}, oops.In("snapshot.store").
+			With("operation", "commit_snapshot").
+			Wrapf(err, "commit snapshot")
 	}
 
 	catalog.Generations = append(catalog.Generations, generation)
@@ -88,10 +116,18 @@ func (r *Repository) commitLocked(ctx context.Context, id string, manifest model
 	return generation, nil
 }
 
-func (r *Repository) stage(ctx context.Context, id string, manifest model.Manifest, data []byte, artifacts map[string]io.Reader) error {
+func (r *Repository) stage(
+	ctx context.Context,
+	id string,
+	manifest model.Manifest,
+	data []byte,
+	artifacts map[string]io.Reader,
+) error {
 	staging, err := r.root.Child("staging", false)
 	if err != nil {
-		return oops.In("snapshot.store").With("operation", "open_staging_directory").Wrapf(err, "open staging directory")
+		return oops.In("snapshot.store").
+			With("operation", "open_staging_directory").
+			Wrapf(err, "open staging directory")
 	}
 
 	err = r.stageInto(ctx, staging, id, manifest, data, artifacts)
@@ -99,10 +135,19 @@ func (r *Repository) stage(ctx context.Context, id string, manifest model.Manife
 	return errors.Join(err, staging.Close())
 }
 
-func (r *Repository) stageInto(ctx context.Context, staging *privatefs.Dir, id string, manifest model.Manifest, data []byte, artifacts map[string]io.Reader) error {
+func (r *Repository) stageInto(
+	ctx context.Context,
+	staging *privatefs.Dir,
+	id string,
+	manifest model.Manifest,
+	data []byte,
+	artifacts map[string]io.Reader,
+) error {
 	dir, err := staging.CreateDir(id)
 	if err != nil {
-		return oops.In("snapshot.store").With("operation", "create_generation_staging").Wrapf(err, "create generation staging")
+		return oops.In("snapshot.store").
+			With("operation", "create_generation_staging").
+			Wrapf(err, "create generation staging")
 	}
 
 	stageErr := r.writeGeneration(ctx, dir, manifest, data, artifacts)
@@ -116,21 +161,36 @@ func (r *Repository) stageInto(ctx context.Context, staging *privatefs.Dir, id s
 
 	generations, err := r.root.Child("generations", false)
 	if err != nil {
-		return oops.In("snapshot.store").With("operation", "open_generations").Wrapf(err, "open generations")
+		return oops.In("snapshot.store").
+			With("operation", "open_generations").
+			Wrapf(err, "open generations")
 	}
 
 	renameErr := staging.Rename(id, generations, id)
-	if err := errors.Join(renameErr, generations.Sync(), staging.Sync(), generations.Close()); err != nil {
+	if err := errors.Join(
+		renameErr,
+		generations.Sync(),
+		staging.Sync(),
+		generations.Close(),
+	); err != nil {
 		return err
 	}
 
 	return r.boundary("generation_published")
 }
 
-func (r *Repository) writeGeneration(ctx context.Context, dir *privatefs.Dir, manifest model.Manifest, data []byte, artifacts map[string]io.Reader) error {
+func (r *Repository) writeGeneration(
+	ctx context.Context,
+	dir *privatefs.Dir,
+	manifest model.Manifest,
+	data []byte,
+	artifacts map[string]io.Reader,
+) error {
 	artifactDir, err := dir.CreateDir("artifacts")
 	if err != nil {
-		return oops.In("snapshot.store").With("operation", "create_artifact_directory").Wrapf(err, "create artifact directory")
+		return oops.In("snapshot.store").
+			With("operation", "create_artifact_directory").
+			Wrapf(err, "create artifact directory")
 	}
 
 	writeErr := writeArtifacts(ctx, artifactDir, manifest.Artifacts, artifacts)
@@ -143,7 +203,9 @@ func (r *Repository) writeGeneration(ctx context.Context, dir *privatefs.Dir, ma
 	}
 
 	if err := dir.Sync(); err != nil {
-		return oops.In("snapshot.store").With("operation", "sync_generation").Wrapf(err, "sync generation")
+		return oops.In("snapshot.store").
+			With("operation", "sync_generation").
+			Wrapf(err, "sync generation")
 	}
 
 	_, err = readManifest(ctx, dir, digest(data))

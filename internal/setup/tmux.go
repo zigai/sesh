@@ -48,17 +48,26 @@ type Binding struct {
 
 func (b Binding) CommandSequence() (gotmux.CommandSequence, error) {
 	if len(b.Program) == 0 {
-		return gotmux.CommandSequence{}, oops.In("setup").Code("setup_tmux_failed").With("operation", "build_command_sequence").Wrap(errNoProgram)
+		return gotmux.CommandSequence{}, oops.In("setup").
+			Code("setup_tmux_failed").
+			With("operation", "build_command_sequence").
+			Wrap(errNoProgram)
 	}
 
 	command, err := gotmux.NewCommand(b.Program[0], b.Program[1:]...)
 	if err != nil {
-		return gotmux.CommandSequence{}, oops.In("setup").Code("setup_tmux_failed").With("operation", "build_command_sequence").Wrap(err)
+		return gotmux.CommandSequence{}, oops.In("setup").
+			Code("setup_tmux_failed").
+			With("operation", "build_command_sequence").
+			Wrap(err)
 	}
 
 	sequence, err := gotmux.Sequence(command)
 	if err != nil {
-		return gotmux.CommandSequence{}, oops.In("setup").Code("setup_tmux_failed").With("operation", "build_command_sequence").Wrap(err)
+		return gotmux.CommandSequence{}, oops.In("setup").
+			Code("setup_tmux_failed").
+			With("operation", "build_command_sequence").
+			Wrap(err)
 	}
 
 	return sequence, nil
@@ -131,7 +140,11 @@ func RenderBlock(bindings []Binding) string {
 // as a format.
 func ShellWord(value string) string {
 	value = strings.ReplaceAll(value, "#", "##")
-	if value != "" && strings.Trim(value, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_./:=@%+-") == "" {
+	if value != "" &&
+		strings.Trim(
+			value,
+			"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_./:=@%+-",
+		) == "" {
 		return value
 	}
 
@@ -147,7 +160,13 @@ func bindingProgram(key, table, command string) []string {
 }
 
 func forwardInRemoteAttachment(key, command string) []string {
-	return []string{"if-shell", "-F", "#{" + remote.AttachmentPaneOption + "}", "send-keys " + quote(key), "run-shell -b " + quote(command)}
+	return []string{
+		"if-shell",
+		"-F",
+		"#{" + remote.AttachmentPaneOption + "}",
+		"send-keys " + quote(key),
+		"run-shell -b " + quote(command),
+	}
 }
 
 func actionCommand(descriptor action.Descriptor, values action.Values) string {

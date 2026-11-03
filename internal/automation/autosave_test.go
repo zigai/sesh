@@ -27,49 +27,97 @@ func TestEvaluateDueState_Decisions(t *testing.T) {
 		elapsedCheck bool
 	}{
 		{
-			name:       "disabled",
-			state:      automation.DueState{Enabled: false, Interval: 3 * time.Minute, Now: now, LastCompletedUnix: now.Unix(), HistoryKnown: true},
+			name: "disabled",
+			state: automation.DueState{
+				Enabled:           false,
+				Interval:          3 * time.Minute,
+				Now:               now,
+				LastCompletedUnix: now.Unix(),
+				HistoryKnown:      true,
+			},
 			wantReason: "disabled",
 		},
 		{
-			name:       "history unavailable",
-			state:      automation.DueState{Enabled: true, Interval: 3 * time.Minute, Now: now, LastCompletedUnix: 0, HistoryKnown: false},
+			name: "history unavailable",
+			state: automation.DueState{
+				Enabled:           true,
+				Interval:          3 * time.Minute,
+				Now:               now,
+				LastCompletedUnix: 0,
+				HistoryKnown:      false,
+			},
 			wantReason: "history_unavailable",
 		},
 		{
-			name:       "never run",
-			state:      automation.DueState{Enabled: true, Interval: 3 * time.Minute, Now: now, LastCompletedUnix: 0, HistoryKnown: true},
+			name: "never run",
+			state: automation.DueState{
+				Enabled:           true,
+				Interval:          3 * time.Minute,
+				Now:               now,
+				LastCompletedUnix: 0,
+				HistoryKnown:      true,
+			},
 			wantDue:    true,
 			wantReason: "never_run",
 		},
 		{
-			name:         "interval elapsed",
-			state:        automation.DueState{Enabled: true, Interval: 3 * time.Minute, Now: now, LastCompletedUnix: now.Add(-5 * time.Minute).Unix(), HistoryKnown: true},
+			name: "interval elapsed",
+			state: automation.DueState{
+				Enabled:           true,
+				Interval:          3 * time.Minute,
+				Now:               now,
+				LastCompletedUnix: now.Add(-5 * time.Minute).Unix(),
+				HistoryKnown:      true,
+			},
 			wantDue:      true,
 			wantReason:   "interval_elapsed",
 			wantElapsed:  5 * time.Minute,
 			elapsedCheck: true,
 		},
 		{
-			name:       "not due",
-			state:      automation.DueState{Enabled: true, Interval: 3 * time.Minute, Now: now, LastCompletedUnix: now.Add(-time.Minute).Unix(), HistoryKnown: true},
+			name: "not due",
+			state: automation.DueState{
+				Enabled:           true,
+				Interval:          3 * time.Minute,
+				Now:               now,
+				LastCompletedUnix: now.Add(-time.Minute).Unix(),
+				HistoryKnown:      true,
+			},
 			wantReason: "not_due",
 		},
 		{
-			name:       "exactly due",
-			state:      automation.DueState{Enabled: true, Interval: 3 * time.Minute, Now: now, LastCompletedUnix: now.Add(-3 * time.Minute).Unix(), HistoryKnown: true},
+			name: "exactly due",
+			state: automation.DueState{
+				Enabled:           true,
+				Interval:          3 * time.Minute,
+				Now:               now,
+				LastCompletedUnix: now.Add(-3 * time.Minute).Unix(),
+				HistoryKnown:      true,
+			},
 			wantDue:    true,
 			wantReason: "interval_elapsed",
 		},
 		{
-			name:       "zero interval uses default",
-			state:      automation.DueState{Enabled: true, Interval: 0, Now: now, LastCompletedUnix: now.Add(-4 * time.Minute).Unix(), HistoryKnown: true},
+			name: "zero interval uses default",
+			state: automation.DueState{
+				Enabled:           true,
+				Interval:          0,
+				Now:               now,
+				LastCompletedUnix: now.Add(-4 * time.Minute).Unix(),
+				HistoryKnown:      true,
+			},
 			wantDue:    true,
 			wantReason: "interval_elapsed",
 		},
 		{
-			name:       "future clock clamped",
-			state:      automation.DueState{Enabled: true, Interval: 3 * time.Minute, Now: now, LastCompletedUnix: now.Add(10 * time.Minute).Unix(), HistoryKnown: true},
+			name: "future clock clamped",
+			state: automation.DueState{
+				Enabled:           true,
+				Interval:          3 * time.Minute,
+				Now:               now,
+				LastCompletedUnix: now.Add(10 * time.Minute).Unix(),
+				HistoryKnown:      true,
+			},
 			wantReason: "not_due",
 		},
 	}
@@ -125,8 +173,13 @@ func TestEvaluateSaveCompletion_RecordsOnlyDurablePublication(t *testing.T) {
 			wantReason: automation.ReasonSaveFailed,
 		},
 		{
-			name:       "uncertain publication does not record",
-			result:     automation.SaveCompletion{Attempt: "a", Generation: "g", Status: "failed", Uncertain: true},
+			name: "uncertain publication does not record",
+			result: automation.SaveCompletion{
+				Attempt:    "a",
+				Generation: "g",
+				Status:     "failed",
+				Uncertain:  true,
+			},
 			err:        errUncertainPublish,
 			wantStatus: automation.CompletionUncertain,
 			wantReason: automation.ReasonPublicationUnsafe,
@@ -189,9 +242,24 @@ func TestMaintenanceDueOncePerCalendarDay(t *testing.T) {
 		want     bool
 	}{
 		{name: "no previous save", previous: 0, now: morning, want: true},
-		{name: "earlier the same day", previous: morning.Add(-2 * time.Hour).Unix(), now: morning, want: false},
-		{name: "just before midnight", previous: time.Date(2026, 9, 24, 23, 59, 0, 0, location).Unix(), now: morning, want: true},
-		{name: "same day across utc midnight", previous: time.Date(2026, 9, 25, 1, 30, 0, 0, location).Unix(), now: morning, want: false},
+		{
+			name:     "earlier the same day",
+			previous: morning.Add(-2 * time.Hour).Unix(),
+			now:      morning,
+			want:     false,
+		},
+		{
+			name:     "just before midnight",
+			previous: time.Date(2026, 9, 24, 23, 59, 0, 0, location).Unix(),
+			now:      morning,
+			want:     true,
+		},
+		{
+			name:     "same day across utc midnight",
+			previous: time.Date(2026, 9, 25, 1, 30, 0, 0, location).Unix(),
+			now:      morning,
+			want:     false,
+		},
 	}
 
 	for _, testCase := range cases {

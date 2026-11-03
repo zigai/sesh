@@ -27,7 +27,13 @@ func interruptCollection(t *testing.T, r *Repository, phase string) {
 		return nil
 	}
 
-	if _, err := r.Collect(t.Context(), CollectionBudget{Generations: 8, Bytes: 1 << 30}); !errors.Is(err, errInjected) {
+	if _, err := r.Collect(
+		t.Context(),
+		CollectionBudget{Generations: 8, Bytes: 1 << 30},
+	); !errors.Is(
+		err,
+		errInjected,
+	) {
 		t.Fatalf("interruption at %s = %v", phase, err)
 	}
 
@@ -36,7 +42,10 @@ func interruptCollection(t *testing.T, r *Repository, phase string) {
 
 func sortedSkips(skips []CollectionSkip) []CollectionSkip {
 	ordered := slices.Clone(skips)
-	slices.SortFunc(ordered, func(a, b CollectionSkip) int { return strings.Compare(a.Generation, b.Generation) })
+	slices.SortFunc(
+		ordered,
+		func(a, b CollectionSkip) int { return strings.Compare(a.Generation, b.Generation) },
+	)
 
 	return ordered
 }
@@ -85,12 +94,24 @@ func TestCollectionResumesAfterInterruptionAtEachBoundary(t *testing.T) {
 			generations := retireGenerations(t, r, 2)
 
 			interruptCollection(t, r, test.phase)
-			assertCollectionRecovery(t, r, path, generations[0].ID, generations[1].ID, test.finished)
+			assertCollectionRecovery(
+				t,
+				r,
+				path,
+				generations[0].ID,
+				generations[1].ID,
+				test.finished,
+			)
 		})
 	}
 }
 
-func assertCollectionRecovery(t *testing.T, r *Repository, path, retired, current string, finished bool) {
+func assertCollectionRecovery(
+	t *testing.T,
+	r *Repository,
+	path, retired, current string,
+	finished bool,
+) {
 	t.Helper()
 
 	assertSelectionIntact(t, r, current)
@@ -111,7 +132,8 @@ func assertCollectionRecovery(t *testing.T, r *Repository, path, retired, curren
 	assertCollectionSettled(t, r, retired)
 
 	third := collectGenerations(t, r)
-	if len(third.Removed)+len(third.Deferred)+len(third.Preserved)+len(third.Quarantined) != 0 || third.Bytes != 0 {
+	if len(third.Removed)+len(third.Deferred)+len(third.Preserved)+len(third.Quarantined) != 0 ||
+		third.Bytes != 0 {
 		t.Fatalf("completed collection was not a no-op: %+v", third)
 	}
 }
@@ -309,8 +331,14 @@ func TestCollectionPreservesUnreadableIntentRecords(t *testing.T) {
 		data []byte
 	}{
 		{name: "truncated", data: []byte(`{"version":1,`)},
-		{name: "unknown member", data: withUnknownIntentMember(t, validFixtureIntent(generation, 1))},
-		{name: "mislabeled generation", data: encodeFixtureIntent(t, validFixtureIntent("fedcba9876543210fedcba9876543210", 1))},
+		{
+			name: "unknown member",
+			data: withUnknownIntentMember(t, validFixtureIntent(generation, 1)),
+		},
+		{
+			name: "mislabeled generation",
+			data: encodeFixtureIntent(t, validFixtureIntent("fedcba9876543210fedcba9876543210", 1)),
+		},
 		{name: "invalid inventory", data: encodeFixtureIntent(t, CollectionIntent{
 			Version:        collectionVersion,
 			Generation:     generation,
@@ -347,7 +375,9 @@ func TestCollectionPreservesUnreadableIntentRecords(t *testing.T) {
 			tree := repositoryTree(t, path)
 			result := collectGenerations(t, r)
 
-			want := []CollectionSkip{{Generation: retired.ID, Reason: CollectionReasonUnreadableIntent}}
+			want := []CollectionSkip{
+				{Generation: retired.ID, Reason: CollectionReasonUnreadableIntent},
+			}
 			if diff := cmp.Diff(want, result.Preserved); diff != "" {
 				t.Fatal(diff)
 			}
@@ -388,7 +418,9 @@ func TestCollectionInspectionReportsDurableIntent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if pending.State != collectionStateDeleting || pending.Generation != retired.ID || pending.Bytes <= 0 || len(pending.Files) == 0 {
+	if pending.State != collectionStateDeleting || pending.Generation != retired.ID ||
+		pending.Bytes <= 0 ||
+		len(pending.Files) == 0 {
 		t.Fatalf("recorded intent = %+v", pending)
 	}
 
@@ -443,7 +475,15 @@ func TestCollectionIntentRecordsAreNotReusable(t *testing.T) {
 	}
 
 	manifest, artifacts := snapshotFixture()
-	if _, err := r.Commit(t.Context(), retired.ID, manifest, artifacts); !errors.Is(err, ErrConflict) {
+	if _, err := r.Commit(
+		t.Context(),
+		retired.ID,
+		manifest,
+		artifacts,
+	); !errors.Is(
+		err,
+		ErrConflict,
+	) {
 		t.Fatalf("retired generation ID was reused: %v", err)
 	}
 }
@@ -513,7 +553,8 @@ func TestCollectionRecordsPrivateIntentInventory(t *testing.T) {
 func assertStoredIntentInventory(t *testing.T, stored CollectionIntent) {
 	t.Helper()
 
-	if stored.ManifestSHA256 == "" || stored.ManifestBytes <= 0 || stored.Bytes <= 0 || len(stored.Files) == 0 {
+	if stored.ManifestSHA256 == "" || stored.ManifestBytes <= 0 || stored.Bytes <= 0 ||
+		len(stored.Files) == 0 {
 		t.Fatalf("stored record lacks durable evidence: %+v", stored)
 	}
 

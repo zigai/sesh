@@ -31,20 +31,44 @@ func TestLogindEventUsesMeasuredDelayAndRejectsMalformedSignals(t *testing.T) {
 	client := &Logind{delay: 4 * time.Second, owner: ":1.99"}
 	now := time.Unix(100, 0)
 
-	event, err := client.event(testLifecycleSignal(client.owner, LogindManagerIface+"."+LogindPrepareForShutdownSignal, true), now)
+	event, err := client.event(
+		testLifecycleSignal(
+			client.owner,
+			LogindManagerIface+"."+LogindPrepareForShutdownSignal,
+			true,
+		),
+		now,
+	)
 	if err != nil {
 		t.Fatalf("event failed: %v", err)
 	}
 
-	if event.Kind != EventShutdown || event.Cycle != 1 || !event.Deadline.Equal(now.Add(4*time.Second)) {
+	if event.Kind != EventShutdown || event.Cycle != 1 ||
+		!event.Deadline.Equal(now.Add(4*time.Second)) {
 		t.Fatalf("event = %+v", event)
 	}
 
-	if _, err := client.event(testLifecycleSignal(client.owner, "wrong", true), now); !errors.Is(err, ErrLogindSignal) {
+	if _, err := client.event(
+		testLifecycleSignal(client.owner, "wrong", true),
+		now,
+	); !errors.Is(
+		err,
+		ErrLogindSignal,
+	) {
 		t.Fatalf("malformed event error = %v", err)
 	}
 
-	if _, err := client.event(testLifecycleSignal(client.owner, LogindManagerIface+"."+LogindPrepareForShutdownSignal, true), now); !errors.Is(err, ErrLogindDuplicate) {
+	if _, err := client.event(
+		testLifecycleSignal(
+			client.owner,
+			LogindManagerIface+"."+LogindPrepareForShutdownSignal,
+			true,
+		),
+		now,
+	); !errors.Is(
+		err,
+		ErrLogindDuplicate,
+	) {
 		t.Fatalf("duplicate event error = %v", err)
 	}
 
@@ -67,7 +91,13 @@ func TestLogindEventRejectsUnpairedAndConcurrentCycles(t *testing.T) {
 	shutdown := LogindManagerIface + "." + LogindPrepareForShutdownSignal
 	sleep := LogindManagerIface + "." + LogindPrepareForSleepSignal
 
-	if _, err := client.event(testLifecycleSignal(client.owner, shutdown, false), now); !errors.Is(err, ErrLogindSignal) {
+	if _, err := client.event(
+		testLifecycleSignal(client.owner, shutdown, false),
+		now,
+	); !errors.Is(
+		err,
+		ErrLogindSignal,
+	) {
 		t.Fatalf("false without prepare error = %v, want ErrLogindSignal", err)
 	}
 
@@ -75,11 +105,23 @@ func TestLogindEventRejectsUnpairedAndConcurrentCycles(t *testing.T) {
 		t.Fatalf("shutdown prepare failed: %v", err)
 	}
 
-	if _, err := client.event(testLifecycleSignal(client.owner, sleep, true), now); !errors.Is(err, ErrLogindDuplicate) {
+	if _, err := client.event(
+		testLifecycleSignal(client.owner, sleep, true),
+		now,
+	); !errors.Is(
+		err,
+		ErrLogindDuplicate,
+	) {
 		t.Fatalf("concurrent sleep prepare error = %v, want ErrLogindDuplicate", err)
 	}
 
-	if _, err := client.event(testLifecycleSignal(client.owner, sleep, false), now); !errors.Is(err, ErrLogindSignal) {
+	if _, err := client.event(
+		testLifecycleSignal(client.owner, sleep, false),
+		now,
+	); !errors.Is(
+		err,
+		ErrLogindSignal,
+	) {
 		t.Fatalf("mismatched cancellation error = %v, want ErrLogindSignal", err)
 	}
 
@@ -88,7 +130,13 @@ func TestLogindEventRejectsUnpairedAndConcurrentCycles(t *testing.T) {
 		t.Fatalf("shutdown cancellation = (%+v, %v), want cycle 1 canceled", canceled, err)
 	}
 
-	if _, err := client.event(testLifecycleSignal(client.owner, shutdown, false), now); !errors.Is(err, ErrLogindSignal) {
+	if _, err := client.event(
+		testLifecycleSignal(client.owner, shutdown, false),
+		now,
+	); !errors.Is(
+		err,
+		ErrLogindSignal,
+	) {
 		t.Fatalf("duplicate cancellation error = %v, want ErrLogindSignal", err)
 	}
 }
@@ -174,7 +222,10 @@ func TestRunLogindRearmsCanceledCycle(t *testing.T) {
 	err := RunLogind(ctx, runtime, func(_ context.Context, event Event) error {
 		if event.Canceled {
 			if runtime.rearmed != 1 {
-				t.Fatalf("canceled handler observed rearmed=%d, want inhibitor first", runtime.rearmed)
+				t.Fatalf(
+					"canceled handler observed rearmed=%d, want inhibitor first",
+					runtime.rearmed,
+				)
 			}
 
 			return nil

@@ -142,7 +142,9 @@ func TestAgentGitCanceledRefreshPreservesCache(t *testing.T) {
 			t.Error("invalidated scan context was not canceled")
 		}
 
-		return map[string]agentGitCacheEntry{"/work/alpha": {GitBranch: "canceled-branch"}}, nil, ctx.Err()
+		return map[string]agentGitCacheEntry{
+			"/work/alpha": {GitBranch: "canceled-branch"},
+		}, nil, ctx.Err()
 	}
 
 	command := model.loadAgentGitCommand()
@@ -166,7 +168,11 @@ func TestAgentGitCacheFailureDoesNotHideLiveResults(t *testing.T) {
 	model := gitTestModel(t)
 	t.Cleanup(model.Close)
 
-	if err := os.WriteFile(filepath.Dir(agentGitCachePath()), []byte("occupied"), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Dir(agentGitCachePath()),
+		[]byte("occupied"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -233,7 +239,9 @@ func TestAgentGitCacheOversizedWritePreservesPreviousFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	oversized := map[string]agentGitCacheEntry{"/project": {GitBranch: strings.Repeat("x", maxAgentGitCacheBytes)}}
+	oversized := map[string]agentGitCacheEntry{
+		"/project": {GitBranch: strings.Repeat("x", maxAgentGitCacheBytes)},
+	}
 	if err := writeAgentGitCache(path, oversized); err != nil {
 		t.Fatal(err)
 	}
@@ -248,7 +256,10 @@ func TestAgentGitCacheUsesOnlyNativePath(t *testing.T) {
 	t.Setenv("XDG_CACHE_HOME", directory)
 
 	legacyPath := filepath.Join(directory, "legacy-tool", "agent-git.json")
-	if err := writeAgentGitCache(legacyPath, map[string]agentGitCacheEntry{"/project": {GitBranch: "old-tool"}}); err != nil {
+	if err := writeAgentGitCache(
+		legacyPath,
+		map[string]agentGitCacheEntry{"/project": {GitBranch: "old-tool"}},
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -265,8 +276,14 @@ func TestAgentGitCacheDoesNotScanOrDecorateRemoteOrigins(t *testing.T) {
 	model := gitTestModel(t)
 	t.Cleanup(model.Close)
 	model.sessions = []session.Session{
-		{Origin: session.OriginSSH, Agents: []session.AgentSession{{CWD: "/shared/path", GitBranch: "ssh-branch"}}},
-		{Origin: session.OriginBridge, Agents: []session.AgentSession{{CWD: "/shared/path", GitBranch: "origin-branch"}}},
+		{
+			Origin: session.OriginSSH,
+			Agents: []session.AgentSession{{CWD: "/shared/path", GitBranch: "ssh-branch"}},
+		},
+		{
+			Origin: session.OriginBridge,
+			Agents: []session.AgentSession{{CWD: "/shared/path", GitBranch: "origin-branch"}},
+		},
 	}
 
 	model.agentGit = map[string]agentGitCacheEntry{"/shared/path": {GitBranch: "local-branch"}}

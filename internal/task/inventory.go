@@ -60,7 +60,10 @@ func Inventory(ctx context.Context, server *gotmux.Server, store Store) ([]Live,
 func WindowPanes(ctx context.Context, server *gotmux.Server) (PaneTasks, error) {
 	found := PaneTasks{Socket: "", TaskByPane: map[string]string{}}
 
-	panes, err := server.PanesWith(ctx, gotmux.QueryOptions{Filter: "", ExtraFields: []string{OptionTask, socketPathField}})
+	panes, err := server.PanesWith(
+		ctx,
+		gotmux.QueryOptions{Filter: "", ExtraFields: []string{OptionTask, socketPathField}},
+	)
 	if errors.Is(err, gotmux.ErrNoServer) {
 		return found, nil
 	}
@@ -83,7 +86,10 @@ func WindowPanes(ctx context.Context, server *gotmux.Server) (PaneTasks, error) 
 }
 
 func locateTasks(ctx context.Context, server *gotmux.Server) (map[string]Live, error) {
-	panes, err := server.PanesWith(ctx, gotmux.QueryOptions{Filter: "", ExtraFields: []string{OptionTask, OptionRole}})
+	panes, err := server.PanesWith(
+		ctx,
+		gotmux.QueryOptions{Filter: "", ExtraFields: []string{OptionTask, OptionRole}},
+	)
 	if errors.Is(err, gotmux.ErrNoServer) {
 		return map[string]Live{}, nil
 	}
@@ -124,7 +130,15 @@ func locateTasks(ctx context.Context, server *gotmux.Server) (map[string]Live, e
 
 func absent() Live {
 	return Live{
-		Record: EmptyRecord(), Present: false, SessionID: "", SessionName: "", WindowID: "", WindowIndex: 0,
-		WindowName: "", AgentPane: "", AgentPID: 0, Stalled: false,
+		Record:      EmptyRecord(),
+		Present:     false,
+		SessionID:   "",
+		SessionName: "",
+		WindowID:    "",
+		WindowIndex: 0,
+		WindowName:  "",
+		AgentPane:   "",
+		AgentPID:    0,
+		Stalled:     false,
 	}
 }

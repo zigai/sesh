@@ -63,12 +63,21 @@ func runPlannedSplitsAtBase(t *testing.T, base int) {
 		}
 	}
 
-	target := executeRestorePlan(t, ctx, server, manifest, plan, assertAroundLayout, assertAroundLayout)
+	target := executeRestorePlan(
+		t,
+		ctx,
+		server,
+		manifest,
+		plan,
+		assertAroundLayout,
+		assertAroundLayout,
+	)
 
 	target.assertRectangles(t, ctx)
 
 	_, links, err := target.sessions["s0"].WindowInfos(ctx)
-	if err != nil || len(links) != 1 || links[0].Index != 5 || links[0].WindowID != target.windows["w0"].ID() {
+	if err != nil || len(links) != 1 || links[0].Index != 5 ||
+		links[0].WindowID != target.windows["w0"].ID() {
 		t.Fatalf("final sparse membership: %v, %v", links, err)
 	}
 }
@@ -144,14 +153,59 @@ func buildNativeGroupManifest() model.Manifest {
 		},
 	}
 	m.Windows = []model.Window{
-		{ID: "w0", Name: model.Bytes("win-alpha"), Width: 80, Height: 24, Layout: model.Layout{Width: 80, Height: 24, Pane: "p0"}},
-		{ID: "w1", Name: model.Bytes("win-beta"), Width: 80, Height: 24, Layout: model.Layout{Width: 80, Height: 24, Pane: "p1"}},
-		{ID: "w2", Name: model.Bytes("win-gamma"), Width: 80, Height: 24, Layout: model.Layout{Width: 80, Height: 24, Pane: "p2"}},
+		{
+			ID:     "w0",
+			Name:   model.Bytes("win-alpha"),
+			Width:  80,
+			Height: 24,
+			Layout: model.Layout{Width: 80, Height: 24, Pane: "p0"},
+		},
+		{
+			ID:     "w1",
+			Name:   model.Bytes("win-beta"),
+			Width:  80,
+			Height: 24,
+			Layout: model.Layout{Width: 80, Height: 24, Pane: "p1"},
+		},
+		{
+			ID:     "w2",
+			Name:   model.Bytes("win-gamma"),
+			Width:  80,
+			Height: 24,
+			Layout: model.Layout{Width: 80, Height: 24, Pane: "p2"},
+		},
 	}
 	m.Panes = []model.Pane{
-		{ID: "p0", Window: "w0", Index: 0, Width: 80, Height: 24, Active: true, Directory: model.Bytes("/tmp"), Launch: model.Launch{Recovery: statusUnverified}},
-		{ID: "p1", Window: "w1", Index: 0, Width: 80, Height: 24, Active: true, Directory: model.Bytes("/tmp"), Launch: model.Launch{Recovery: statusUnverified}},
-		{ID: "p2", Window: "w2", Index: 0, Width: 80, Height: 24, Active: true, Directory: model.Bytes("/tmp"), Launch: model.Launch{Recovery: statusUnverified}},
+		{
+			ID:        "p0",
+			Window:    "w0",
+			Index:     0,
+			Width:     80,
+			Height:    24,
+			Active:    true,
+			Directory: model.Bytes("/tmp"),
+			Launch:    model.Launch{Recovery: statusUnverified},
+		},
+		{
+			ID:        "p1",
+			Window:    "w1",
+			Index:     0,
+			Width:     80,
+			Height:    24,
+			Active:    true,
+			Directory: model.Bytes("/tmp"),
+			Launch:    model.Launch{Recovery: statusUnverified},
+		},
+		{
+			ID:        "p2",
+			Window:    "w2",
+			Index:     0,
+			Width:     80,
+			Height:    24,
+			Active:    true,
+			Directory: model.Bytes("/tmp"),
+			Launch:    model.Launch{Recovery: statusUnverified},
+		},
 	}
 	m.Links = []model.Link{
 		{Session: "s0", Window: "w0", Index: 1, Active: true, Last: false},
@@ -170,15 +224,28 @@ func buildNativeGroupManifest() model.Manifest {
 	return m
 }
 
-func verifyNativeGroupState(t *testing.T, ctx context.Context, target *restoredTarget, unrelatedID gotmux.SessionID, uLinksBefore []gotmux.WindowLinkInfo, unrelated gotmux.Session) {
+func verifyNativeGroupState(
+	t *testing.T,
+	ctx context.Context,
+	target *restoredTarget,
+	unrelatedID gotmux.SessionID,
+	uLinksBefore []gotmux.WindowLinkInfo,
+	unrelated gotmux.Session,
+) {
 	t.Helper()
 
 	leadSess := target.sessions["s0"]
 	foll1Sess := target.sessions["s1"]
 	foll2Sess := target.sessions["s2"]
 
-	if string(leadSess.ID()) == "s0" || string(foll1Sess.ID()) == "s1" || string(foll2Sess.ID()) == "s2" {
-		t.Fatalf("runtime session IDs should differ from source IDs: %v, %v, %v", leadSess.ID(), foll1Sess.ID(), foll2Sess.ID())
+	if string(leadSess.ID()) == "s0" || string(foll1Sess.ID()) == "s1" ||
+		string(foll2Sess.ID()) == "s2" {
+		t.Fatalf(
+			"runtime session IDs should differ from source IDs: %v, %v, %v",
+			leadSess.ID(),
+			foll1Sess.ID(),
+			foll2Sess.ID(),
+		)
 	}
 
 	assertNativeGroupCommonGroup(t, ctx, leadSess, foll1Sess, foll2Sess, "native-source-group")
@@ -186,7 +253,12 @@ func verifyNativeGroupState(t *testing.T, ctx context.Context, target *restoredT
 	assertUnrelatedFixtureUnchanged(t, ctx, unrelated, unrelatedID, uLinksBefore)
 }
 
-func assertNativeGroupCommonGroup(t *testing.T, ctx context.Context, leadSess, foll1Sess, foll2Sess gotmux.Session, wantGroupName string) {
+func assertNativeGroupCommonGroup(
+	t *testing.T,
+	ctx context.Context,
+	leadSess, foll1Sess, foll2Sess gotmux.Session,
+	wantGroupName string,
+) {
 	t.Helper()
 
 	leadInfo, err := leadSess.Info(ctx)
@@ -213,11 +285,21 @@ func assertNativeGroupCommonGroup(t *testing.T, ctx context.Context, leadSess, f
 	}
 
 	if grp0 != wantGroupName || grp1 != wantGroupName || grp2 != wantGroupName {
-		t.Fatalf("runtime group mismatch across members: got (%q, %q, %q), want %q", grp0, grp1, grp2, wantGroupName)
+		t.Fatalf(
+			"runtime group mismatch across members: got (%q, %q, %q), want %q",
+			grp0,
+			grp1,
+			grp2,
+			wantGroupName,
+		)
 	}
 }
 
-func assertNativeGroupSharedWindows(t *testing.T, ctx context.Context, leadSess, foll1Sess, foll2Sess gotmux.Session) {
+func assertNativeGroupSharedWindows(
+	t *testing.T,
+	ctx context.Context,
+	leadSess, foll1Sess, foll2Sess gotmux.Session,
+) {
 	t.Helper()
 
 	_, links0, err := leadSess.WindowInfos(ctx)
@@ -236,16 +318,33 @@ func assertNativeGroupSharedWindows(t *testing.T, ctx context.Context, leadSess,
 	}
 
 	if len(links0) != 3 || len(links1) != 3 || len(links2) != 3 {
-		t.Fatalf("expected 3 windows in each session, got %d, %d, %d", len(links0), len(links1), len(links2))
+		t.Fatalf(
+			"expected 3 windows in each session, got %d, %d, %d",
+			len(links0),
+			len(links1),
+			len(links2),
+		)
 	}
 
 	for i := range 3 {
 		if links0[i].Index != links1[i].Index || links1[i].Index != links2[i].Index {
-			t.Fatalf("index mismatch at pos %d: %d, %d, %d", i, links0[i].Index, links1[i].Index, links2[i].Index)
+			t.Fatalf(
+				"index mismatch at pos %d: %d, %d, %d",
+				i,
+				links0[i].Index,
+				links1[i].Index,
+				links2[i].Index,
+			)
 		}
 
 		if links0[i].WindowID != links1[i].WindowID || links1[i].WindowID != links2[i].WindowID {
-			t.Fatalf("WindowID mismatch at pos %d: %v, %v, %v", i, links0[i].WindowID, links1[i].WindowID, links2[i].WindowID)
+			t.Fatalf(
+				"WindowID mismatch at pos %d: %v, %v, %v",
+				i,
+				links0[i].WindowID,
+				links1[i].WindowID,
+				links2[i].WindowID,
+			)
 		}
 	}
 
@@ -254,7 +353,13 @@ func assertNativeGroupSharedWindows(t *testing.T, ctx context.Context, leadSess,
 	assertActiveAndLast(t, links2, 5, 1, "s2")
 }
 
-func assertUnrelatedFixtureUnchanged(t *testing.T, ctx context.Context, unrelated gotmux.Session, unrelatedID gotmux.SessionID, uLinksBefore []gotmux.WindowLinkInfo) {
+func assertUnrelatedFixtureUnchanged(
+	t *testing.T,
+	ctx context.Context,
+	unrelated gotmux.Session,
+	unrelatedID gotmux.SessionID,
+	uLinksBefore []gotmux.WindowLinkInfo,
+) {
 	t.Helper()
 
 	uInfoAfter, err := unrelated.Info(ctx)
@@ -333,16 +438,76 @@ func TestSharedWindowsAcrossUnrelatedSessionsAndMultipleGroups(t *testing.T) {
 		{ID: "g2", Name: model.Bytes("group-two"), Members: []string{"s-g2-0", "s-g2-1"}},
 	}
 	m.Windows = []model.Window{
-		{ID: "w-shared", Name: model.Bytes("win-shared"), Width: 80, Height: 24, Layout: model.Layout{Width: 80, Height: 24, Pane: "p-shared"}},
-		{ID: "w-solo", Name: model.Bytes("win-solo"), Width: 80, Height: 24, Layout: model.Layout{Width: 80, Height: 24, Pane: "p-solo"}},
-		{ID: "w-g1", Name: model.Bytes("win-g1"), Width: 80, Height: 24, Layout: model.Layout{Width: 80, Height: 24, Pane: "p-g1"}},
-		{ID: "w-g2", Name: model.Bytes("win-g2"), Width: 80, Height: 24, Layout: model.Layout{Width: 80, Height: 24, Pane: "p-g2"}},
+		{
+			ID:     "w-shared",
+			Name:   model.Bytes("win-shared"),
+			Width:  80,
+			Height: 24,
+			Layout: model.Layout{Width: 80, Height: 24, Pane: "p-shared"},
+		},
+		{
+			ID:     "w-solo",
+			Name:   model.Bytes("win-solo"),
+			Width:  80,
+			Height: 24,
+			Layout: model.Layout{Width: 80, Height: 24, Pane: "p-solo"},
+		},
+		{
+			ID:     "w-g1",
+			Name:   model.Bytes("win-g1"),
+			Width:  80,
+			Height: 24,
+			Layout: model.Layout{Width: 80, Height: 24, Pane: "p-g1"},
+		},
+		{
+			ID:     "w-g2",
+			Name:   model.Bytes("win-g2"),
+			Width:  80,
+			Height: 24,
+			Layout: model.Layout{Width: 80, Height: 24, Pane: "p-g2"},
+		},
 	}
 	m.Panes = []model.Pane{
-		{ID: "p-shared", Window: "w-shared", Index: 0, Width: 80, Height: 24, Active: true, Directory: model.Bytes("/tmp"), Launch: model.Launch{Recovery: statusUnverified}},
-		{ID: "p-solo", Window: "w-solo", Index: 0, Width: 80, Height: 24, Active: true, Directory: model.Bytes("/tmp"), Launch: model.Launch{Recovery: statusUnverified}},
-		{ID: "p-g1", Window: "w-g1", Index: 0, Width: 80, Height: 24, Active: true, Directory: model.Bytes("/tmp"), Launch: model.Launch{Recovery: statusUnverified}},
-		{ID: "p-g2", Window: "w-g2", Index: 0, Width: 80, Height: 24, Active: true, Directory: model.Bytes("/tmp"), Launch: model.Launch{Recovery: statusUnverified}},
+		{
+			ID:        "p-shared",
+			Window:    "w-shared",
+			Index:     0,
+			Width:     80,
+			Height:    24,
+			Active:    true,
+			Directory: model.Bytes("/tmp"),
+			Launch:    model.Launch{Recovery: statusUnverified},
+		},
+		{
+			ID:        "p-solo",
+			Window:    "w-solo",
+			Index:     0,
+			Width:     80,
+			Height:    24,
+			Active:    true,
+			Directory: model.Bytes("/tmp"),
+			Launch:    model.Launch{Recovery: statusUnverified},
+		},
+		{
+			ID:        "p-g1",
+			Window:    "w-g1",
+			Index:     0,
+			Width:     80,
+			Height:    24,
+			Active:    true,
+			Directory: model.Bytes("/tmp"),
+			Launch:    model.Launch{Recovery: statusUnverified},
+		},
+		{
+			ID:        "p-g2",
+			Window:    "w-g2",
+			Index:     0,
+			Width:     80,
+			Height:    24,
+			Active:    true,
+			Directory: model.Bytes("/tmp"),
+			Launch:    model.Launch{Recovery: statusUnverified},
+		},
 	}
 	m.Links = []model.Link{
 		{Session: "s-solo", Window: "w-solo", Index: 0, Active: true, Last: false},
@@ -415,15 +580,49 @@ func TestSparseSlotRepeatedLinksAndSharedOnlyOwners(t *testing.T) {
 	m.Sessions = []model.Session{
 		{ID: "s-owner", Name: model.Bytes("owner-session"), Directory: model.Bytes("/tmp")},
 		{ID: "s-repeat", Name: model.Bytes("repeat-session"), Directory: model.Bytes("/tmp")},
-		{ID: "s-shared-only", Name: model.Bytes("shared-only-session"), Directory: model.Bytes("/tmp")},
+		{
+			ID:        "s-shared-only",
+			Name:      model.Bytes("shared-only-session"),
+			Directory: model.Bytes("/tmp"),
+		},
 	}
 	m.Windows = []model.Window{
-		{ID: "w0", Name: model.Bytes("target-win"), Width: 80, Height: 24, Layout: model.Layout{Width: 80, Height: 24, Pane: "p0"}},
-		{ID: "w-own", Name: model.Bytes("owner-own"), Width: 80, Height: 24, Layout: model.Layout{Width: 80, Height: 24, Pane: "p1"}},
+		{
+			ID:     "w0",
+			Name:   model.Bytes("target-win"),
+			Width:  80,
+			Height: 24,
+			Layout: model.Layout{Width: 80, Height: 24, Pane: "p0"},
+		},
+		{
+			ID:     "w-own",
+			Name:   model.Bytes("owner-own"),
+			Width:  80,
+			Height: 24,
+			Layout: model.Layout{Width: 80, Height: 24, Pane: "p1"},
+		},
 	}
 	m.Panes = []model.Pane{
-		{ID: "p0", Window: "w0", Index: 0, Width: 80, Height: 24, Active: true, Directory: model.Bytes("/tmp"), Launch: model.Launch{Recovery: statusUnverified}},
-		{ID: "p1", Window: "w-own", Index: 0, Width: 80, Height: 24, Active: true, Directory: model.Bytes("/tmp"), Launch: model.Launch{Recovery: statusUnverified}},
+		{
+			ID:        "p0",
+			Window:    "w0",
+			Index:     0,
+			Width:     80,
+			Height:    24,
+			Active:    true,
+			Directory: model.Bytes("/tmp"),
+			Launch:    model.Launch{Recovery: statusUnverified},
+		},
+		{
+			ID:        "p1",
+			Window:    "w-own",
+			Index:     0,
+			Width:     80,
+			Height:    24,
+			Active:    true,
+			Directory: model.Bytes("/tmp"),
+			Launch:    model.Launch{Recovery: statusUnverified},
+		},
 	}
 	m.Links = []model.Link{
 		{Session: "s-owner", Window: "w-own", Index: 0, Active: true, Last: false},
@@ -462,7 +661,12 @@ func assertSparseRepeatedAndSharedLinks(t *testing.T, ctx context.Context, targe
 	}
 
 	if rLinks[0].WindowID != rLinks[1].WindowID || rLinks[0].WindowID != target.windows["w0"].ID() {
-		t.Fatalf("repeated links must share exact WindowID: slot2=%v slot7=%v w0=%v", rLinks[0].WindowID, rLinks[1].WindowID, target.windows["w0"].ID())
+		t.Fatalf(
+			"repeated links must share exact WindowID: slot2=%v slot7=%v w0=%v",
+			rLinks[0].WindowID,
+			rLinks[1].WindowID,
+			target.windows["w0"].ID(),
+		)
 	}
 
 	_, soLinks, err := target.sessions["s-shared-only"].WindowInfos(ctx)
@@ -534,7 +738,10 @@ func verifyDeepLayoutAtBorder(t *testing.T, border gotmux.PaneBorderStatus) {
 	verifyDeepLayoutGeometry(t, ctx, win, target.panes["p3"], target, expectedRects)
 }
 
-func computeExpectedBorderRectangles(wantRects map[string][4]int, border gotmux.PaneBorderStatus) map[string][4]int {
+func computeExpectedBorderRectangles(
+	wantRects map[string][4]int,
+	border gotmux.PaneBorderStatus,
+) map[string][4]int {
 	expectedRects := make(map[string][4]int, len(wantRects))
 	for id, rect := range wantRects {
 		left, top, width, height := rect[0], rect[1], rect[2], rect[3]
@@ -558,7 +765,14 @@ func computeExpectedBorderRectangles(wantRects map[string][4]int, border gotmux.
 	return expectedRects
 }
 
-func verifyDeepLayoutGeometry(t *testing.T, ctx context.Context, win gotmux.Window, p3Pane gotmux.Pane, target *restoredTarget, expectedRects map[string][4]int) {
+func verifyDeepLayoutGeometry(
+	t *testing.T,
+	ctx context.Context,
+	win gotmux.Window,
+	p3Pane gotmux.Pane,
+	target *restoredTarget,
+	expectedRects map[string][4]int,
+) {
 	t.Helper()
 
 	winInfo, err := win.Info(ctx)
@@ -631,7 +845,11 @@ func TestPlannedConstructionWindowResizeContract(t *testing.T) {
 	verifyResizePanes(t, ctx, win, gotmux.Size{Width: 60, Height: 20}, originalIDs)
 }
 
-func assertPanesMatchOriginalIDs(t *testing.T, panes []gotmux.PaneInfo, originalIDs map[string]gotmux.PaneID) {
+func assertPanesMatchOriginalIDs(
+	t *testing.T,
+	panes []gotmux.PaneInfo,
+	originalIDs map[string]gotmux.PaneID,
+) {
 	t.Helper()
 
 	liveIDs := make(map[gotmux.PaneID]bool, len(panes))
@@ -667,7 +885,11 @@ func assertLeftColumnNestedGeometry(t *testing.T, p0, p1 gotmux.PaneInfo, height
 	}
 }
 
-func assertRightColumnNestedGeometry(t *testing.T, p2, p3 gotmux.PaneInfo, leftColWidth, width, height int) {
+func assertRightColumnNestedGeometry(
+	t *testing.T,
+	p2, p3 gotmux.PaneInfo,
+	leftColWidth, width, height int,
+) {
 	t.Helper()
 
 	wantRightLeft := leftColWidth + 1
@@ -676,7 +898,13 @@ func assertRightColumnNestedGeometry(t *testing.T, p2, p3 gotmux.PaneInfo, leftC
 	}
 
 	if p3.Left != wantRightLeft || p3.Top != p2.Height+1 {
-		t.Fatalf("p3 expected at (%d, %d), got (%d, %d)", wantRightLeft, p2.Height+1, p3.Left, p3.Top)
+		t.Fatalf(
+			"p3 expected at (%d, %d), got (%d, %d)",
+			wantRightLeft,
+			p2.Height+1,
+			p3.Left,
+			p3.Top,
+		)
 	}
 
 	if p2.Width != p3.Width {
@@ -694,7 +922,12 @@ func assertRightColumnNestedGeometry(t *testing.T, p2, p3 gotmux.PaneInfo, leftC
 	}
 }
 
-func assertFourPaneNestedGeometryAndDividers(t *testing.T, panes []gotmux.PaneInfo, size gotmux.Size, originalIDs map[string]gotmux.PaneID) {
+func assertFourPaneNestedGeometryAndDividers(
+	t *testing.T,
+	panes []gotmux.PaneInfo,
+	size gotmux.Size,
+	originalIDs map[string]gotmux.PaneID,
+) {
 	t.Helper()
 
 	byID := make(map[gotmux.PaneID]gotmux.PaneInfo, len(panes))
@@ -720,7 +953,13 @@ func assertFourPaneNestedGeometryAndDividers(t *testing.T, panes []gotmux.PaneIn
 	}
 }
 
-func verifyResizePanes(t *testing.T, ctx context.Context, win gotmux.Window, size gotmux.Size, originalIDs map[string]gotmux.PaneID) {
+func verifyResizePanes(
+	t *testing.T,
+	ctx context.Context,
+	win gotmux.Window,
+	size gotmux.Size,
+	originalIDs map[string]gotmux.PaneID,
+) {
 	t.Helper()
 
 	if err := win.Resize(ctx, size); err != nil {
@@ -748,8 +987,18 @@ func TestAdversarialTopologicalSchedulingPreservesPrerequisites(t *testing.T) {
 
 	m := makeBaseManifest()
 	m.Sessions = []model.Session{
-		{ID: "s0", Name: model.Bytes("adversarial-lead"), Directory: model.Bytes("/tmp"), Group: "g0"},
-		{ID: "s1", Name: model.Bytes("adversarial-foll"), Directory: model.Bytes("/tmp"), Group: "g0"},
+		{
+			ID:        "s0",
+			Name:      model.Bytes("adversarial-lead"),
+			Directory: model.Bytes("/tmp"),
+			Group:     "g0",
+		},
+		{
+			ID:        "s1",
+			Name:      model.Bytes("adversarial-foll"),
+			Directory: model.Bytes("/tmp"),
+			Group:     "g0",
+		},
 	}
 	m.Groups = []model.Group{
 		{ID: "g0", Name: model.Bytes("adv-group"), Members: []string{"s0", "s1"}},
@@ -770,9 +1019,40 @@ func TestAdversarialTopologicalSchedulingPreservesPrerequisites(t *testing.T) {
 		},
 	}
 	m.Panes = []model.Pane{
-		{ID: "p0", Window: "w0", Index: 0, Width: 39, Height: 24, Title: model.Bytes("adv-p0-init"), Active: true, Directory: model.Bytes("/tmp"), Launch: model.Launch{Recovery: statusUnverified}},
-		{ID: "p1", Window: "w0", Index: 1, Width: 40, Height: 24, Left: 40, Title: model.Bytes("adv-p1-split"), Active: false, Directory: model.Bytes("/tmp"), Launch: model.Launch{Recovery: statusUnverified}},
-		{ID: "p2", Window: "w1", Index: 0, Width: 80, Height: 24, Title: model.Bytes("adv-p2-init"), Active: true, Directory: model.Bytes("/tmp"), Launch: model.Launch{Recovery: statusUnverified}},
+		{
+			ID:        "p0",
+			Window:    "w0",
+			Index:     0,
+			Width:     39,
+			Height:    24,
+			Title:     model.Bytes("adv-p0-init"),
+			Active:    true,
+			Directory: model.Bytes("/tmp"),
+			Launch:    model.Launch{Recovery: statusUnverified},
+		},
+		{
+			ID:        "p1",
+			Window:    "w0",
+			Index:     1,
+			Width:     40,
+			Height:    24,
+			Left:      40,
+			Title:     model.Bytes("adv-p1-split"),
+			Active:    false,
+			Directory: model.Bytes("/tmp"),
+			Launch:    model.Launch{Recovery: statusUnverified},
+		},
+		{
+			ID:        "p2",
+			Window:    "w1",
+			Index:     0,
+			Width:     80,
+			Height:    24,
+			Title:     model.Bytes("adv-p2-init"),
+			Active:    true,
+			Directory: model.Bytes("/tmp"),
+			Launch:    model.Launch{Recovery: statusUnverified},
+		},
 	}
 	m.Links = []model.Link{
 		{Session: "s0", Window: "w0", Index: 1, Active: true, Last: false},
@@ -822,12 +1102,20 @@ func assertAdversarialResults(t *testing.T, ctx context.Context, target *restore
 
 	w0Info, err := target.windows["w0"].Info(ctx)
 	if err != nil || w0Info.Name != "win-split" {
-		t.Fatalf("w0 name mismatch after adversarial execution: got %q, want %q", w0Info.Name, "win-split")
+		t.Fatalf(
+			"w0 name mismatch after adversarial execution: got %q, want %q",
+			w0Info.Name,
+			"win-split",
+		)
 	}
 
 	w1Info, err := target.windows["w1"].Info(ctx)
 	if err != nil || w1Info.Name != "win-single" {
-		t.Fatalf("w1 name mismatch after adversarial execution: got %q, want %q", w1Info.Name, "win-single")
+		t.Fatalf(
+			"w1 name mismatch after adversarial execution: got %q, want %q",
+			w1Info.Name,
+			"win-single",
+		)
 	}
 
 	for _, check := range []struct {
@@ -844,7 +1132,12 @@ func assertAdversarialResults(t *testing.T, ctx context.Context, target *restore
 		}
 
 		if pInfo.Title != check.wantTitle {
-			t.Fatalf("pane %s title mismatch after adversarial execution: got %q, want %q", check.paneID, pInfo.Title, check.wantTitle)
+			t.Fatalf(
+				"pane %s title mismatch after adversarial execution: got %q, want %q",
+				check.paneID,
+				pInfo.Title,
+				check.wantTitle,
+			)
 		}
 	}
 }
@@ -866,14 +1159,18 @@ func TestUnrelatedFixturesPreservedAcrossTargetOptions(t *testing.T) {
 			}
 
 			u1, err := server.NewSession(ctx, gotmux.NewSessionOptions{
-				Name: "unrelated-one", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly,
+				Name:    "unrelated-one",
+				Program: gotmux.Exec("sleep", "300"),
+				Start:   gotmux.StartPolicyExistingOnly,
 			})
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			u2, err := server.NewSession(ctx, gotmux.NewSessionOptions{
-				Name: "unrelated-two", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly,
+				Name:    "unrelated-two",
+				Program: gotmux.Exec("sleep", "300"),
+				Start:   gotmux.StartPolicyExistingOnly,
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -893,7 +1190,12 @@ func TestUnrelatedFixturesPreservedAcrossTargetOptions(t *testing.T) {
 	}
 }
 
-func verifyUnrelatedSessionsIntact(t *testing.T, ctx context.Context, u1, u2 gotmux.Session, base int) {
+func verifyUnrelatedSessionsIntact(
+	t *testing.T,
+	ctx context.Context,
+	u1, u2 gotmux.Session,
+	base int,
+) {
 	t.Helper()
 
 	u1Info, err := u1.Info(ctx)
@@ -939,7 +1241,10 @@ func executeRestorePlan(
 
 	if beforeStep != nil {
 		journal.beforeIntent = func(step Step) error {
-			beforeStep(step, func() *restoredTarget { return resolveRestoredTarget(t, ctx, server, plan, journal) })
+			beforeStep(
+				step,
+				func() *restoredTarget { return resolveRestoredTarget(t, ctx, server, plan, journal) },
+			)
 
 			return nil
 		}
@@ -947,13 +1252,20 @@ func executeRestorePlan(
 
 	if afterStep != nil {
 		journal.beforeConfirmed = func(step Step) error {
-			afterStep(step, func() *restoredTarget { return resolveRestoredTarget(t, ctx, server, plan, journal) })
+			afterStep(
+				step,
+				func() *restoredTarget { return resolveRestoredTarget(t, ctx, server, plan, journal) },
+			)
 
 			return nil
 		}
 	}
 
-	if _, err := NewExecutor(server, manifest, DefaultExecuteConfig()).Execute(ctx, plan, journal); err != nil {
+	if _, err := NewExecutor(
+		server,
+		manifest,
+		DefaultExecuteConfig(),
+	).Execute(ctx, plan, journal); err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
@@ -965,7 +1277,13 @@ type initialPaneSource struct {
 	pane   string
 }
 
-func resolveRestoredTarget(t *testing.T, ctx context.Context, server *gotmux.Server, plan Plan, journal *memoryJournal) *restoredTarget {
+func resolveRestoredTarget(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	plan Plan,
+	journal *memoryJournal,
+) *restoredTarget {
 	t.Helper()
 
 	target := &restoredTarget{
@@ -978,7 +1296,14 @@ func resolveRestoredTarget(t *testing.T, ctx context.Context, server *gotmux.Ser
 	var initialPanes []initialPaneSource
 
 	for _, step := range plan.Steps {
-		if initial, ok := target.recordStep(t, ctx, server, step, journal.state(step.ID()).RuntimeID, splitPanes); ok {
+		if initial, ok := target.recordStep(
+			t,
+			ctx,
+			server,
+			step,
+			journal.state(step.ID()).RuntimeID,
+			splitPanes,
+		); ok {
 			initialPanes = append(initialPanes, initial)
 		}
 	}
@@ -1008,7 +1333,10 @@ func (target *restoredTarget) recordStep(
 			target.sessions[s.SessionID] = resolveRuntimeSession(t, ctx, server, runtimeID)
 		}
 
-		return initialPaneSource{window: s.InitialWindowID, pane: s.InitialPaneID}, s.InitialWindowID != ""
+		return initialPaneSource{
+			window: s.InitialWindowID,
+			pane:   s.InitialPaneID,
+		}, s.InitialWindowID != ""
 	case *PlaceInitialWindowStep:
 		if runtimeID != "" && s.WindowID != "" {
 			target.windows[s.WindowID] = resolveRuntimeWindow(t, ctx, server, runtimeID)
@@ -1029,7 +1357,12 @@ func (target *restoredTarget) recordStep(
 	return initialPaneSource{}, false
 }
 
-func resolveRuntimeSession(t *testing.T, ctx context.Context, server *gotmux.Server, runtimeID string) gotmux.Session {
+func resolveRuntimeSession(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	runtimeID string,
+) gotmux.Session {
 	t.Helper()
 
 	session, err := server.Session(ctx, gotmux.SessionID(runtimeID))
@@ -1040,7 +1373,12 @@ func resolveRuntimeSession(t *testing.T, ctx context.Context, server *gotmux.Ser
 	return session
 }
 
-func resolveRuntimeWindow(t *testing.T, ctx context.Context, server *gotmux.Server, runtimeID string) gotmux.Window {
+func resolveRuntimeWindow(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	runtimeID string,
+) gotmux.Window {
 	t.Helper()
 
 	window, err := server.Window(ctx, gotmux.WindowID(runtimeID))
@@ -1051,7 +1389,12 @@ func resolveRuntimeWindow(t *testing.T, ctx context.Context, server *gotmux.Serv
 	return window
 }
 
-func resolveRuntimePane(t *testing.T, ctx context.Context, server *gotmux.Server, runtimeID gotmux.PaneID) gotmux.Pane {
+func resolveRuntimePane(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	runtimeID gotmux.PaneID,
+) gotmux.Pane {
 	t.Helper()
 
 	pane, err := server.Pane(ctx, runtimeID)
@@ -1062,7 +1405,13 @@ func resolveRuntimePane(t *testing.T, ctx context.Context, server *gotmux.Server
 	return pane
 }
 
-func resolveInitialPane(t *testing.T, ctx context.Context, server *gotmux.Server, window gotmux.Window, splitPanes map[gotmux.PaneID]bool) gotmux.Pane {
+func resolveInitialPane(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	window gotmux.Window,
+	splitPanes map[gotmux.PaneID]bool,
+) gotmux.Pane {
 	t.Helper()
 
 	panes, err := window.Panes(ctx)
@@ -1128,7 +1477,11 @@ func (target *restoredTarget) assertRectangles(t *testing.T, ctx context.Context
 	})
 }
 
-func (target *restoredTarget) assertPaneRectangles(t *testing.T, ctx context.Context, want map[string][4]int) {
+func (target *restoredTarget) assertPaneRectangles(
+	t *testing.T,
+	ctx context.Context,
+	want map[string][4]int,
+) {
 	t.Helper()
 
 	for id, expected := range want {
@@ -1149,7 +1502,12 @@ func (target *restoredTarget) assertPaneRectangles(t *testing.T, ctx context.Con
 	}
 }
 
-func assertActiveAndLast(t *testing.T, links []gotmux.WindowLinkInfo, wantActive, wantLast int, sessionLabel string) {
+func assertActiveAndLast(
+	t *testing.T,
+	links []gotmux.WindowLinkInfo,
+	wantActive, wantLast int,
+	sessionLabel string,
+) {
 	t.Helper()
 
 	foundActive := false
@@ -1166,15 +1524,32 @@ func assertActiveAndLast(t *testing.T, links []gotmux.WindowLinkInfo, wantActive
 	}
 
 	if !foundActive {
-		t.Fatalf("%s: expected active window at slot %d, but links were: %v", sessionLabel, wantActive, links)
+		t.Fatalf(
+			"%s: expected active window at slot %d, but links were: %v",
+			sessionLabel,
+			wantActive,
+			links,
+		)
 	}
 
 	if wantLast >= 0 && !foundLast {
-		t.Fatalf("%s: expected last window with '-' flag at slot %d, but links were: %v", sessionLabel, wantLast, links)
+		t.Fatalf(
+			"%s: expected last window with '-' flag at slot %d, but links were: %v",
+			sessionLabel,
+			wantLast,
+			links,
+		)
 	}
 }
 
-func assertSlotWindowID(t *testing.T, ctx context.Context, sess gotmux.Session, index int, wantWindowID gotmux.WindowID, label string) {
+func assertSlotWindowID(
+	t *testing.T,
+	ctx context.Context,
+	sess gotmux.Session,
+	index int,
+	wantWindowID gotmux.WindowID,
+	label string,
+) {
 	t.Helper()
 
 	_, links, err := sess.WindowInfos(ctx)
@@ -1185,7 +1560,13 @@ func assertSlotWindowID(t *testing.T, ctx context.Context, sess gotmux.Session, 
 	for _, l := range links {
 		if l.Index == index {
 			if l.WindowID != wantWindowID {
-				t.Fatalf("%s slot %d: WindowID = %v, want %v", label, index, l.WindowID, wantWindowID)
+				t.Fatalf(
+					"%s slot %d: WindowID = %v, want %v",
+					label,
+					index,
+					l.WindowID,
+					wantWindowID,
+				)
 			}
 
 			return
@@ -1278,15 +1659,106 @@ func deepAsymmetricLayoutFixture() model.Manifest {
 		{Session: "s0", Window: "w0", Index: 0, Active: true, Last: false},
 	}
 	m.Panes = []model.Pane{
-		{ID: "p0", Window: "w0", Index: 0, Width: 29, Height: 15, Left: 0, Top: 0, Directory: model.Bytes("/tmp"), Launch: model.Launch{Recovery: statusUnverified}},
-		{ID: "p1", Window: "w0", Index: 1, Width: 29, Height: 25, Left: 0, Top: 16, Directory: model.Bytes("/tmp"), Launch: model.Launch{Recovery: statusUnverified}},
-		{ID: "p2", Window: "w0", Index: 2, Width: 50, Height: 10, Left: 30, Top: 0, Directory: model.Bytes("/tmp"), Launch: model.Launch{Recovery: statusUnverified}},
-		{ID: "p3", Window: "w0", Index: 3, Width: 24, Height: 19, Left: 30, Top: 11, Active: true, Directory: model.Bytes("/tmp"), Launch: model.Launch{Recovery: statusUnverified}},
-		{ID: "p4", Window: "w0", Index: 4, Width: 25, Height: 19, Left: 55, Top: 11, Directory: model.Bytes("/tmp"), Launch: model.Launch{Recovery: statusUnverified}},
-		{ID: "p5", Window: "w0", Index: 5, Width: 50, Height: 10, Left: 30, Top: 31, Directory: model.Bytes("/tmp"), Launch: model.Launch{Recovery: statusUnverified}},
-		{ID: "p6", Window: "w0", Index: 6, Width: 40, Height: 38, Left: 81, Top: 0, Directory: model.Bytes("/tmp"), Launch: model.Launch{Recovery: statusUnverified}},
-		{ID: "p7", Window: "w0", Index: 7, Width: 19, Height: 2, Left: 81, Top: 39, Directory: model.Bytes("/tmp"), Launch: model.Launch{Recovery: statusUnverified}},
-		{ID: "p8", Window: "w0", Index: 8, Width: 20, Height: 2, Left: 101, Top: 39, Directory: model.Bytes("/tmp"), Launch: model.Launch{Recovery: statusUnverified}},
+		{
+			ID:        "p0",
+			Window:    "w0",
+			Index:     0,
+			Width:     29,
+			Height:    15,
+			Left:      0,
+			Top:       0,
+			Directory: model.Bytes("/tmp"),
+			Launch:    model.Launch{Recovery: statusUnverified},
+		},
+		{
+			ID:        "p1",
+			Window:    "w0",
+			Index:     1,
+			Width:     29,
+			Height:    25,
+			Left:      0,
+			Top:       16,
+			Directory: model.Bytes("/tmp"),
+			Launch:    model.Launch{Recovery: statusUnverified},
+		},
+		{
+			ID:        "p2",
+			Window:    "w0",
+			Index:     2,
+			Width:     50,
+			Height:    10,
+			Left:      30,
+			Top:       0,
+			Directory: model.Bytes("/tmp"),
+			Launch:    model.Launch{Recovery: statusUnverified},
+		},
+		{
+			ID:        "p3",
+			Window:    "w0",
+			Index:     3,
+			Width:     24,
+			Height:    19,
+			Left:      30,
+			Top:       11,
+			Active:    true,
+			Directory: model.Bytes("/tmp"),
+			Launch:    model.Launch{Recovery: statusUnverified},
+		},
+		{
+			ID:        "p4",
+			Window:    "w0",
+			Index:     4,
+			Width:     25,
+			Height:    19,
+			Left:      55,
+			Top:       11,
+			Directory: model.Bytes("/tmp"),
+			Launch:    model.Launch{Recovery: statusUnverified},
+		},
+		{
+			ID:        "p5",
+			Window:    "w0",
+			Index:     5,
+			Width:     50,
+			Height:    10,
+			Left:      30,
+			Top:       31,
+			Directory: model.Bytes("/tmp"),
+			Launch:    model.Launch{Recovery: statusUnverified},
+		},
+		{
+			ID:        "p6",
+			Window:    "w0",
+			Index:     6,
+			Width:     40,
+			Height:    38,
+			Left:      81,
+			Top:       0,
+			Directory: model.Bytes("/tmp"),
+			Launch:    model.Launch{Recovery: statusUnverified},
+		},
+		{
+			ID:        "p7",
+			Window:    "w0",
+			Index:     7,
+			Width:     19,
+			Height:    2,
+			Left:      81,
+			Top:       39,
+			Directory: model.Bytes("/tmp"),
+			Launch:    model.Launch{Recovery: statusUnverified},
+		},
+		{
+			ID:        "p8",
+			Window:    "w0",
+			Index:     8,
+			Width:     20,
+			Height:    2,
+			Left:      101,
+			Top:       39,
+			Directory: model.Bytes("/tmp"),
+			Launch:    model.Launch{Recovery: statusUnverified},
+		},
 	}
 
 	return m
@@ -1327,7 +1799,12 @@ type independentSourceState struct {
 	SourcePIDs    map[string]int
 }
 
-func readIndependentSourceState(t *testing.T, ctx context.Context, server *gotmux.Server, sessionNames []string) *independentSourceState {
+func readIndependentSourceState(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	sessionNames []string,
+) *independentSourceState {
 	t.Helper()
 
 	state := &independentSourceState{
@@ -1361,7 +1838,13 @@ func readIndependentSourceState(t *testing.T, ctx context.Context, server *gotmu
 	return state
 }
 
-func readSessionLinks(t *testing.T, ctx context.Context, sess gotmux.Session, name, groupName string, state *independentSourceState) independentSessionState {
+func readSessionLinks(
+	t *testing.T,
+	ctx context.Context,
+	sess gotmux.Session,
+	name, groupName string,
+	state *independentSourceState,
+) independentSessionState {
 	t.Helper()
 
 	_, links, err := sess.WindowInfos(ctx)
@@ -1405,7 +1888,13 @@ func readSessionLinks(t *testing.T, ctx context.Context, sess gotmux.Session, na
 	return sessState
 }
 
-func readIndependentWindowState(t *testing.T, ctx context.Context, win gotmux.Window, wInfo gotmux.WindowInfo, state *independentSourceState) independentWindowState {
+func readIndependentWindowState(
+	t *testing.T,
+	ctx context.Context,
+	win gotmux.Window,
+	wInfo gotmux.WindowInfo,
+	state *independentSourceState,
+) independentWindowState {
 	t.Helper()
 
 	panes, err := win.Panes(ctx)
@@ -1474,7 +1963,11 @@ func readIndependentWindowState(t *testing.T, ctx context.Context, win gotmux.Wi
 	return winState
 }
 
-func createSourceGroup(t *testing.T, ctx context.Context, server *gotmux.Server) (gotmux.Session, gotmux.Session, gotmux.Window) {
+func createSourceGroup(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+) (gotmux.Session, gotmux.Session, gotmux.Window) {
 	t.Helper()
 
 	if err := server.GlobalSessionOptions().SetBaseIndex(ctx, 2); err != nil {
@@ -1529,7 +2022,11 @@ func createSourceGroup(t *testing.T, ctx context.Context, server *gotmux.Server)
 	return leadSess, follSess, initWin
 }
 
-func createSourceNestedWindow(t *testing.T, ctx context.Context, leadSess gotmux.Session) gotmux.WindowLink {
+func createSourceNestedWindow(
+	t *testing.T,
+	ctx context.Context,
+	leadSess gotmux.Session,
+) gotmux.WindowLink {
 	t.Helper()
 
 	slot5 := 5
@@ -1615,7 +2112,12 @@ func selectSlot(t *testing.T, ctx context.Context, sess gotmux.Session, slot int
 	t.Fatalf("slot %d not found in session", slot)
 }
 
-func configureGroupNavigation(t *testing.T, ctx context.Context, leadSess, follSess gotmux.Session, nestedLink gotmux.WindowLink) {
+func configureGroupNavigation(
+	t *testing.T,
+	ctx context.Context,
+	leadSess, follSess gotmux.Session,
+	nestedLink gotmux.WindowLink,
+) {
 	t.Helper()
 
 	if err := nestedLink.Select(ctx); err != nil {
@@ -1627,7 +2129,12 @@ func configureGroupNavigation(t *testing.T, ctx context.Context, leadSess, follS
 	selectSlot(t, ctx, follSess, 5)
 }
 
-func createSourceRepeatSession(t *testing.T, ctx context.Context, server *gotmux.Server, initWin gotmux.Window) gotmux.Session {
+func createSourceRepeatSession(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	initWin gotmux.Window,
+) gotmux.Session {
 	t.Helper()
 
 	repeatSess, err := server.NewSession(ctx, gotmux.NewSessionOptions{
@@ -1671,7 +2178,11 @@ func createSourceRepeatSession(t *testing.T, ctx context.Context, server *gotmux
 	return repeatSess
 }
 
-func createActualSourceFixture(t *testing.T, ctx context.Context, server *gotmux.Server) (gotmux.Session, gotmux.Session, gotmux.Session) {
+func createActualSourceFixture(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+) (gotmux.Session, gotmux.Session, gotmux.Session) {
 	t.Helper()
 
 	leadSess, follSess, initWin := createSourceGroup(t, ctx, server)
@@ -1710,7 +2221,12 @@ func findWindowHandle(t *testing.T, links []gotmux.WindowLinkInfo, slot int) got
 	return gotmux.Window{}
 }
 
-func commitObservationToRepo(t *testing.T, ctx context.Context, repoDir string, obs capture.Observation) string {
+func commitObservationToRepo(
+	t *testing.T,
+	ctx context.Context,
+	repoDir string,
+	obs capture.Observation,
+) string {
 	t.Helper()
 
 	repo, err := store.Open(ctx, repoDir)
@@ -1740,7 +2256,12 @@ func commitObservationToRepo(t *testing.T, ctx context.Context, repoDir string, 
 	return gen.ID
 }
 
-func runRoundtripWorkerSubprocess(t *testing.T, ctx context.Context, repoDir, genID, targetSocket string, sessionNames []string) {
+func runRoundtripWorkerSubprocess(
+	t *testing.T,
+	ctx context.Context,
+	repoDir, genID, targetSocket string,
+	sessionNames []string,
+) {
 	t.Helper()
 
 	selfExe, err := os.Executable()
@@ -1877,7 +2398,11 @@ func TestActualSourceDestructionRoundtrip(t *testing.T) {
 	sessionNames := []string{"source-lead", "source-foll", "src-repeat"}
 	expected := readIndependentSourceState(t, ctx, sourceServer, sessionNames)
 
-	obs, err := capture.Observe(ctx, sourceServer, []gotmux.SessionID{leadSess.ID(), follSess.ID(), repeatSess.ID()})
+	obs, err := capture.Observe(
+		ctx,
+		sourceServer,
+		[]gotmux.SessionID{leadSess.ID(), follSess.ID(), repeatSess.ID()},
+	)
 	if err != nil {
 		t.Fatalf("capture.Observe failed: %v", err)
 	}
@@ -1889,16 +2414,34 @@ func TestActualSourceDestructionRoundtrip(t *testing.T) {
 		t.Fatalf("kill sourceServer failed: %v", err)
 	}
 
-	runRoundtripWorkerSubprocess(t, ctx, repoDir, genID, targetServer.Endpoint().SocketPath, sessionNames)
+	runRoundtripWorkerSubprocess(
+		t,
+		ctx,
+		repoDir,
+		genID,
+		targetServer.Endpoint().SocketPath,
+		sessionNames,
+	)
 
-	verifyUnrelatedTargetIntact(t, ctx, targetServer, unrelatedBeforeID, uLinksBefore, uPaneInfoBefore)
+	verifyUnrelatedTargetIntact(
+		t,
+		ctx,
+		targetServer,
+		unrelatedBeforeID,
+		uLinksBefore,
+		uPaneInfoBefore,
+	)
 	verifyTargetStructuralParity(t, ctx, targetServer, expected)
 
 	_ = scratch0.Kill(ctx)
 	_ = scratch1.Kill(ctx)
 }
 
-func createEmptyNameAndTitleSourceSession(t *testing.T, ctx context.Context, server *gotmux.Server) gotmux.Session {
+func createEmptyNameAndTitleSourceSession(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+) gotmux.Session {
 	t.Helper()
 
 	srcSess, err := server.NewSession(ctx, gotmux.NewSessionOptions{
@@ -1946,7 +2489,12 @@ func createEmptyNameAndTitleSourceSession(t *testing.T, ctx context.Context, ser
 	return srcSess
 }
 
-func assertEmptyNameAndTitleTargetState(t *testing.T, ctx context.Context, targetServer *gotmux.Server, expected *independentSourceState) {
+func assertEmptyNameAndTitleTargetState(
+	t *testing.T,
+	ctx context.Context,
+	targetServer *gotmux.Server,
+	expected *independentSourceState,
+) {
 	t.Helper()
 
 	targetSess, err := targetServer.FindSession(ctx, "source-empty")
@@ -1983,7 +2531,13 @@ func assertEmptyNameAndTitleTargetState(t *testing.T, ctx context.Context, targe
 
 	expectedWin := expected.Windows[""]
 	if targetWinInfo.Width != expectedWin.Width || targetWinInfo.Height != expectedWin.Height {
-		t.Fatalf("window dimensions mismatch: got %dx%d, want %dx%d", targetWinInfo.Width, targetWinInfo.Height, expectedWin.Width, expectedWin.Height)
+		t.Fatalf(
+			"window dimensions mismatch: got %dx%d, want %dx%d",
+			targetWinInfo.Width,
+			targetWinInfo.Height,
+			expectedWin.Width,
+			expectedWin.Height,
+		)
 	}
 }
 
@@ -2027,7 +2581,14 @@ func TestActualSourceDestructionEmptyNameAndTitleFixture(t *testing.T) {
 		t.Fatalf("kill sourceServer failed: %v", err)
 	}
 
-	runRoundtripWorkerSubprocess(t, ctx, repoDir, genID, targetServer.Endpoint().SocketPath, sessionNames)
+	runRoundtripWorkerSubprocess(
+		t,
+		ctx,
+		repoDir,
+		genID,
+		targetServer.Endpoint().SocketPath,
+		sessionNames,
+	)
 	assertEmptyNameAndTitleTargetState(t, ctx, targetServer, expected)
 }
 
@@ -2042,7 +2603,14 @@ func getFirstPaneInfo(t *testing.T, ctx context.Context, win gotmux.Window) gotm
 	return panes[0]
 }
 
-func verifyUnrelatedTargetIntact(t *testing.T, ctx context.Context, server *gotmux.Server, beforeID gotmux.SessionID, beforeLinks []gotmux.WindowLinkInfo, beforePane gotmux.PaneInfo) {
+func verifyUnrelatedTargetIntact(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	beforeID gotmux.SessionID,
+	beforeLinks []gotmux.WindowLinkInfo,
+	beforePane gotmux.PaneInfo,
+) {
 	t.Helper()
 
 	sess, err := server.FindSession(ctx, "unrelated-target-sess")
@@ -2067,7 +2635,12 @@ func verifyUnrelatedTargetIntact(t *testing.T, ctx context.Context, server *gotm
 	assertUnrelatedPaneIntact(t, ctx, win, beforePane)
 }
 
-func assertUnrelatedPaneIntact(t *testing.T, ctx context.Context, win gotmux.Window, beforePane gotmux.PaneInfo) {
+func assertUnrelatedPaneIntact(
+	t *testing.T,
+	ctx context.Context,
+	win gotmux.Window,
+	beforePane gotmux.PaneInfo,
+) {
 	t.Helper()
 
 	panes, err := win.Panes(ctx)
@@ -2084,14 +2657,21 @@ func assertUnrelatedPaneIntact(t *testing.T, ctx context.Context, win gotmux.Win
 		t.Fatalf("unrelated pane PID changed: got %v, want %v", pInfo.PID, beforePane.PID)
 	}
 
-	if pInfo.Left != beforePane.Left || pInfo.Top != beforePane.Top || pInfo.Width != beforePane.Width || pInfo.Height != beforePane.Height {
+	if pInfo.Left != beforePane.Left || pInfo.Top != beforePane.Top ||
+		pInfo.Width != beforePane.Width ||
+		pInfo.Height != beforePane.Height {
 		t.Fatalf("unrelated pane geometry changed: got (%d,%d,%d,%d), want (%d,%d,%d,%d)",
 			pInfo.Left, pInfo.Top, pInfo.Width, pInfo.Height,
 			beforePane.Left, beforePane.Top, beforePane.Width, beforePane.Height)
 	}
 }
 
-func assertTargetSessionAndGroupParity(t *testing.T, ctx context.Context, server *gotmux.Server, expected *independentSourceState) (gotmux.Session, gotmux.Session, gotmux.Session) {
+func assertTargetSessionAndGroupParity(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	expected *independentSourceState,
+) (gotmux.Session, gotmux.Session, gotmux.Session) {
 	t.Helper()
 
 	leadSess, err := server.FindSession(ctx, "source-lead")
@@ -2125,29 +2705,56 @@ func assertTargetSessionAndGroupParity(t *testing.T, ctx context.Context, server
 
 	follGrp, ok2 := follInfo.Group.Get()
 	if !ok1 || !ok2 || leadGrp != "src-group" || follGrp != "src-group" {
-		t.Fatalf("group membership mismatch: leadGrp=%q(ok=%v), follGrp=%q(ok=%v)", leadGrp, ok1, follGrp, ok2)
+		t.Fatalf(
+			"group membership mismatch: leadGrp=%q(ok=%v), follGrp=%q(ok=%v)",
+			leadGrp,
+			ok1,
+			follGrp,
+			ok2,
+		)
 	}
 
 	return leadSess, follSess, repeatSess
 }
 
-func assertDisjointSessionIDs(t *testing.T, leadSess, follSess, repeatSess gotmux.Session, expected *independentSourceState) {
+func assertDisjointSessionIDs(
+	t *testing.T,
+	leadSess, follSess, repeatSess gotmux.Session,
+	expected *independentSourceState,
+) {
 	t.Helper()
 
 	if leadSess.ID() == expected.SourceSessIDs["source-lead"] {
-		t.Fatalf("target source-lead ID %v unexpectedly equals source ID %v", leadSess.ID(), expected.SourceSessIDs["source-lead"])
+		t.Fatalf(
+			"target source-lead ID %v unexpectedly equals source ID %v",
+			leadSess.ID(),
+			expected.SourceSessIDs["source-lead"],
+		)
 	}
 
 	if follSess.ID() == expected.SourceSessIDs["source-foll"] {
-		t.Fatalf("target source-foll ID %v unexpectedly equals source ID %v", follSess.ID(), expected.SourceSessIDs["source-foll"])
+		t.Fatalf(
+			"target source-foll ID %v unexpectedly equals source ID %v",
+			follSess.ID(),
+			expected.SourceSessIDs["source-foll"],
+		)
 	}
 
 	if repeatSess.ID() == expected.SourceSessIDs["src-repeat"] {
-		t.Fatalf("target src-repeat ID %v unexpectedly equals source ID %v", repeatSess.ID(), expected.SourceSessIDs["src-repeat"])
+		t.Fatalf(
+			"target src-repeat ID %v unexpectedly equals source ID %v",
+			repeatSess.ID(),
+			expected.SourceSessIDs["src-repeat"],
+		)
 	}
 }
 
-func assertTargetWindowSharingAndSlots(t *testing.T, ctx context.Context, leadSess, follSess, repeatSess gotmux.Session, expected *independentSourceState) ([]gotmux.WindowLinkInfo, []gotmux.WindowLinkInfo) {
+func assertTargetWindowSharingAndSlots(
+	t *testing.T,
+	ctx context.Context,
+	leadSess, follSess, repeatSess gotmux.Session,
+	expected *independentSourceState,
+) ([]gotmux.WindowLinkInfo, []gotmux.WindowLinkInfo) {
 	t.Helper()
 
 	_, lLinks, err := leadSess.WindowInfos(ctx)
@@ -2172,7 +2779,16 @@ func assertTargetWindowSharingAndSlots(t *testing.T, ctx context.Context, leadSe
 	repeatSlot3Win := findWindowIDAtSlot(t, rLinks, 3)
 	repeatSlot8Win := findWindowIDAtSlot(t, rLinks, 8)
 
-	assertSharedWindowIDs(t, leadSlot2Win, leadSlot5Win, follSlot2Win, follSlot5Win, repeatSlot3Win, repeatSlot8Win, expected)
+	assertSharedWindowIDs(
+		t,
+		leadSlot2Win,
+		leadSlot5Win,
+		follSlot2Win,
+		follSlot5Win,
+		repeatSlot3Win,
+		repeatSlot8Win,
+		expected,
+	)
 
 	assertActiveAndLast(t, lLinks, 2, 5, "target source-lead")
 	assertActiveAndLast(t, fLinks, 5, 2, "target source-foll")
@@ -2181,7 +2797,11 @@ func assertTargetWindowSharingAndSlots(t *testing.T, ctx context.Context, leadSe
 	return lLinks, fLinks
 }
 
-func assertSharedWindowIDs(t *testing.T, leadSlot2, leadSlot5, follSlot2, follSlot5, repeatSlot3, repeatSlot8 gotmux.WindowID, expected *independentSourceState) {
+func assertSharedWindowIDs(
+	t *testing.T,
+	leadSlot2, leadSlot5, follSlot2, follSlot5, repeatSlot3, repeatSlot8 gotmux.WindowID,
+	expected *independentSourceState,
+) {
 	t.Helper()
 
 	if leadSlot2 != follSlot2 {
@@ -2193,11 +2813,19 @@ func assertSharedWindowIDs(t *testing.T, leadSlot2, leadSlot5, follSlot2, follSl
 	}
 
 	if repeatSlot3 != repeatSlot8 {
-		t.Fatalf("src-repeat repeated links must share exact WindowID: slot3=%v, slot8=%v", repeatSlot3, repeatSlot8)
+		t.Fatalf(
+			"src-repeat repeated links must share exact WindowID: slot3=%v, slot8=%v",
+			repeatSlot3,
+			repeatSlot8,
+		)
 	}
 
 	if repeatSlot3 != leadSlot2 {
-		t.Fatalf("win-shared in repeat must equal win-shared in lead: repeat=%v, lead=%v", repeatSlot3, leadSlot2)
+		t.Fatalf(
+			"win-shared in repeat must equal win-shared in lead: repeat=%v, lead=%v",
+			repeatSlot3,
+			leadSlot2,
+		)
 	}
 
 	if leadSlot2 == expected.SourceWinIDs["win-shared"] {
@@ -2209,7 +2837,13 @@ func assertSharedWindowIDs(t *testing.T, leadSlot2, leadSlot5, follSlot2, follSl
 	}
 }
 
-func assertTargetNestedPanesGeometry(t *testing.T, ctx context.Context, winNested gotmux.Window, activeNested gotmux.Pane, expected *independentSourceState) {
+func assertTargetNestedPanesGeometry(
+	t *testing.T,
+	ctx context.Context,
+	winNested gotmux.Window,
+	activeNested gotmux.Pane,
+	expected *independentSourceState,
+) {
 	t.Helper()
 
 	if err := activeNested.ToggleZoom(ctx); err != nil {
@@ -2257,7 +2891,12 @@ func assertTargetNestedPanesGeometry(t *testing.T, ctx context.Context, winNeste
 	}
 }
 
-func assertTargetWindowGeometryAndTitles(t *testing.T, ctx context.Context, lLinks []gotmux.WindowLinkInfo, expected *independentSourceState) {
+func assertTargetWindowGeometryAndTitles(
+	t *testing.T,
+	ctx context.Context,
+	lLinks []gotmux.WindowLinkInfo,
+	expected *independentSourceState,
+) {
 	t.Helper()
 
 	winShared := findWindowHandle(t, lLinks, 2)
@@ -2266,7 +2905,8 @@ func assertTargetWindowGeometryAndTitles(t *testing.T, ctx context.Context, lLin
 	winNested := findWindowHandle(t, lLinks, 5)
 
 	wNestedInfo, err := winNested.Info(ctx)
-	if err != nil || wNestedInfo.Name != "win-nested" || wNestedInfo.Width != 120 || wNestedInfo.Height != 40 {
+	if err != nil || wNestedInfo.Name != "win-nested" || wNestedInfo.Width != 120 ||
+		wNestedInfo.Height != 40 {
 		t.Fatalf("win-nested info mismatch: %v, %v", wNestedInfo, err)
 	}
 
@@ -2290,11 +2930,17 @@ func assertTargetWindowGeometryAndTitles(t *testing.T, ctx context.Context, lLin
 	assertTargetNestedPanesGeometry(t, ctx, winNested, activeNested, expected)
 }
 
-func assertTargetSharedWindow(t *testing.T, ctx context.Context, winShared gotmux.Window, expected *independentSourceState) {
+func assertTargetSharedWindow(
+	t *testing.T,
+	ctx context.Context,
+	winShared gotmux.Window,
+	expected *independentSourceState,
+) {
 	t.Helper()
 
 	wSharedInfo, err := winShared.Info(ctx)
-	if err != nil || wSharedInfo.Name != "win-shared" || wSharedInfo.Width != 80 || wSharedInfo.Height != 24 {
+	if err != nil || wSharedInfo.Name != "win-shared" || wSharedInfo.Width != 80 ||
+		wSharedInfo.Height != 24 {
 		t.Fatalf("win-shared info mismatch: %v, %v", wSharedInfo, err)
 	}
 
@@ -2326,7 +2972,11 @@ func assertWindowResizeContract(t *testing.T, ctx context.Context, winShared got
 	}
 }
 
-func assertNestedWindowActivePane(t *testing.T, ctx context.Context, winNested gotmux.Window) gotmux.Pane {
+func assertNestedWindowActivePane(
+	t *testing.T,
+	ctx context.Context,
+	winNested gotmux.Window,
+) gotmux.Pane {
 	t.Helper()
 
 	activeNested, err := winNested.ActivePane(ctx)
@@ -2339,15 +2989,26 @@ func assertNestedWindowActivePane(t *testing.T, ctx context.Context, winNested g
 		t.Fatalf("winNested active pane title mismatch: %v, %v", activeNestedInfo, err)
 	}
 
-	if activeNestedInfo.Left != 0 || activeNestedInfo.Top != 0 || activeNestedInfo.Width != 120 || activeNestedInfo.Height != 40 {
-		t.Fatalf("active nested pane while zoomed expected to fill window (0,0,120,40), got (%d,%d,%d,%d)",
-			activeNestedInfo.Left, activeNestedInfo.Top, activeNestedInfo.Width, activeNestedInfo.Height)
+	if activeNestedInfo.Left != 0 || activeNestedInfo.Top != 0 || activeNestedInfo.Width != 120 ||
+		activeNestedInfo.Height != 40 {
+		t.Fatalf(
+			"active nested pane while zoomed expected to fill window (0,0,120,40), got (%d,%d,%d,%d)",
+			activeNestedInfo.Left,
+			activeNestedInfo.Top,
+			activeNestedInfo.Width,
+			activeNestedInfo.Height,
+		)
 	}
 
 	return activeNested
 }
 
-func verifyTargetStructuralParity(t *testing.T, ctx context.Context, server *gotmux.Server, expected *independentSourceState) {
+func verifyTargetStructuralParity(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	expected *independentSourceState,
+) {
 	t.Helper()
 
 	leadSess, follSess, repeatSess := assertTargetSessionAndGroupParity(t, ctx, server, expected)

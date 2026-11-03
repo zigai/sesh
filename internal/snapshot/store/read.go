@@ -19,7 +19,12 @@ import (
 func (r *Repository) Read(ctx context.Context, id string) (model.Manifest, error) {
 	lock, err := r.root.Lock(ctx, "repository.lock")
 	if err != nil {
-		return model.Manifest{}, repositoryError("read", oops.In("snapshot.store").With("operation", "lock_snapshot_read").Wrapf(err, "lock snapshot read"))
+		return model.Manifest{}, repositoryError(
+			"read",
+			oops.In("snapshot.store").
+				With("operation", "lock_snapshot_read").
+				Wrapf(err, "lock snapshot read"),
+		)
 	}
 
 	manifest, readErr := r.readLocked(ctx, id)
@@ -35,7 +40,12 @@ func (r *Repository) Current(ctx context.Context) (model.Manifest, error) {
 func (r *Repository) ReadCurrent(ctx context.Context) (Generation, model.Manifest, error) {
 	lock, err := r.root.Lock(ctx, "repository.lock")
 	if err != nil {
-		return Generation{}, model.Manifest{}, repositoryError("current", oops.In("snapshot.store").With("operation", "lock_snapshot_read").Wrapf(err, "lock snapshot read"))
+		return Generation{}, model.Manifest{}, repositoryError(
+			"current",
+			oops.In("snapshot.store").
+				With("operation", "lock_snapshot_read").
+				Wrapf(err, "lock snapshot read"),
+		)
 	}
 
 	generation, manifest, readErr := r.currentLocked(ctx)
@@ -49,7 +59,12 @@ func (r *Repository) ReadCurrent(ctx context.Context) (Generation, model.Manifes
 func (r *Repository) ReadPracticalCurrent(ctx context.Context) (Generation, model.Manifest, error) {
 	lock, err := r.root.Lock(ctx, "repository.lock")
 	if err != nil {
-		return Generation{}, model.Manifest{}, repositoryError("current", oops.In("snapshot.store").With("operation", "lock_snapshot_read").Wrapf(err, "lock snapshot read"))
+		return Generation{}, model.Manifest{}, repositoryError(
+			"current",
+			oops.In("snapshot.store").
+				With("operation", "lock_snapshot_read").
+				Wrapf(err, "lock snapshot read"),
+		)
 	}
 
 	generation, manifest, readErr := r.practicalCurrentLocked(ctx)
@@ -60,7 +75,9 @@ func (r *Repository) ReadPracticalCurrent(ctx context.Context) (Generation, mode
 	return generation, manifest, nil
 }
 
-func (r *Repository) practicalCurrentLocked(ctx context.Context) (Generation, model.Manifest, error) {
+func (r *Repository) practicalCurrentLocked(
+	ctx context.Context,
+) (Generation, model.Manifest, error) {
 	catalog, err := r.catalog()
 	if err != nil {
 		return Generation{}, model.Manifest{}, err
@@ -132,7 +149,8 @@ func (c Catalog) LatestSaveFailed() bool {
 func (c Catalog) rewriteDescendant(source string) string {
 	for range len(c.Rewrites) {
 		index := slices.IndexFunc(c.Rewrites, func(rewrite Rewrite) bool {
-			return rewrite.State == rewriteStateCompleted && rewrite.Source == source && rewrite.Replacement != ""
+			return rewrite.State == rewriteStateCompleted && rewrite.Source == source &&
+				rewrite.Replacement != ""
 		})
 		if index < 0 {
 			return source
@@ -202,24 +220,36 @@ func (r *Repository) readLocked(ctx context.Context, id string) (model.Manifest,
 	return r.readGeneration(ctx, catalog.Generations[index])
 }
 
-func (r *Repository) readGeneration(ctx context.Context, generation Generation) (model.Manifest, error) {
+func (r *Repository) readGeneration(
+	ctx context.Context,
+	generation Generation,
+) (model.Manifest, error) {
 	manifest, err := r.readGenerationFiles(ctx, generation)
 	if err != nil {
-		return manifest, oops.In("snapshot.store").With("operation", "read_generation", "generation", generation.ID).Wrapf(err, "read generation")
+		return manifest, oops.In("snapshot.store").
+			With("operation", "read_generation", "generation", generation.ID).
+			Wrapf(err, "read generation")
 	}
 
 	return manifest, nil
 }
 
-func (r *Repository) readGenerationFiles(ctx context.Context, generation Generation) (model.Manifest, error) {
+func (r *Repository) readGenerationFiles(
+	ctx context.Context,
+	generation Generation,
+) (model.Manifest, error) {
 	parent, err := r.root.Child("generations", false)
 	if err != nil {
-		return model.Manifest{}, oops.In("snapshot.store").With("operation", "open_generations").Wrapf(err, "open generations")
+		return model.Manifest{}, oops.In("snapshot.store").
+			With("operation", "open_generations").
+			Wrapf(err, "open generations")
 	}
 
 	dir, openErr := parent.Child(generation.ID, false)
 	if openErr != nil {
-		openErr = oops.In("snapshot.store").With("operation", "open_generation").Wrapf(openErr, "open generation")
+		openErr = oops.In("snapshot.store").
+			With("operation", "open_generation").
+			Wrapf(openErr, "open generation")
 	}
 
 	if err := errors.Join(openErr, parent.Close()); err != nil {
@@ -238,10 +268,16 @@ func (r *Repository) readGenerationFiles(ctx context.Context, generation Generat
 	return manifest, errors.Join(readErr, dir.Close())
 }
 
-func readManifest(ctx context.Context, dir *privatefs.Dir, expected string) (model.Manifest, error) {
+func readManifest(
+	ctx context.Context,
+	dir *privatefs.Dir,
+	expected string,
+) (model.Manifest, error) {
 	data, err := dir.Read("manifest.json", model.MaxManifestBytes)
 	if err != nil {
-		return model.Manifest{}, oops.In("snapshot.store").With("operation", "read_manifest").Wrapf(err, "read manifest")
+		return model.Manifest{}, oops.In("snapshot.store").
+			With("operation", "read_manifest").
+			Wrapf(err, "read manifest")
 	}
 
 	if digest(data) != expected {
@@ -250,12 +286,16 @@ func readManifest(ctx context.Context, dir *privatefs.Dir, expected string) (mod
 
 	manifest, err := model.Decode(data)
 	if err != nil {
-		return model.Manifest{}, oops.In("snapshot.store").With("operation", "decode_manifest").Wrapf(err, "decode manifest")
+		return model.Manifest{}, oops.In("snapshot.store").
+			With("operation", "decode_manifest").
+			Wrapf(err, "decode manifest")
 	}
 
 	artifacts, err := dir.Child("artifacts", false)
 	if err != nil {
-		return model.Manifest{}, oops.In("snapshot.store").With("operation", "open_artifacts").Wrapf(err, "open artifacts")
+		return model.Manifest{}, oops.In("snapshot.store").
+			With("operation", "open_artifacts").
+			Wrapf(err, "open artifacts")
 	}
 
 	verifyErr := verifyArtifacts(ctx, artifacts, manifest.Artifacts)

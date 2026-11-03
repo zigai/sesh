@@ -117,7 +117,13 @@ func executeJSON(t *testing.T, args ...string) commandExecution {
 	if target != "" {
 		decoder := json.NewDecoder(strings.NewReader(target))
 		if decErr := decoder.Decode(&env); decErr != nil {
-			t.Fatalf("failed to decode JSON envelope from %q (err: %v)\nstdout: %q\nstderr: %q", target, decErr, rawOut, rawErr)
+			t.Fatalf(
+				"failed to decode JSON envelope from %q (err: %v)\nstdout: %q\nstderr: %q",
+				target,
+				decErr,
+				rawOut,
+				rawErr,
+			)
 		}
 
 		var extra any
@@ -185,11 +191,21 @@ func runJSONContract(t *testing.T, command string, args ...string) map[string]an
 	return assertJSONContractSuccess(t, command, execution)
 }
 
-func assertJSONContractSuccess(t *testing.T, command string, execution commandExecution) map[string]any {
+func assertJSONContractSuccess(
+	t *testing.T,
+	command string,
+	execution commandExecution,
+) map[string]any {
 	t.Helper()
 
 	if execution.err != nil || execution.stderr != "" {
-		t.Fatalf("%s: error=%v, stderr=%q, stdout=%q", command, execution.err, execution.stderr, execution.stdout)
+		t.Fatalf(
+			"%s: error=%v, stderr=%q, stdout=%q",
+			command,
+			execution.err,
+			execution.stderr,
+			execution.stdout,
+		)
 	}
 
 	fields := contractJSONObject(t, []byte(execution.stdout))
@@ -329,7 +345,8 @@ func assertRuntimeRecord(t *testing.T, line []byte, component, operation, level,
 		t.Fatalf("wrong event: %s", line)
 	}
 
-	if status != "started" && status != "ok" && record["reason"] == nil && record["phase"] == nil && record["code"] == nil {
+	if status != "started" && status != "ok" && record["reason"] == nil && record["phase"] == nil &&
+		record["code"] == nil {
 		t.Fatalf("missing fixed reason: %s", line)
 	}
 
@@ -341,11 +358,46 @@ func assertRuntimeLogFields(t *testing.T, record map[string]any) {
 
 	for key := range record {
 		switch key {
-		case "time", "level", "component", "operation", "status", "message", "reason", "phase", "code", "sessions", "windows", "panes", "error_code",
-			"pid", "version", "socket", "action", "error", "error_domain", "error_step", "error_context", "generation", "restore_id",
-			"duration_ms", "failed_step", "store_step", "step_reason", "mismatches", "mismatch_reasons", "floating_panes_omitted",
-			"restart_panes", "resume_panes", "carried_resume_panes", "unverified_panes", "nonrestartable_panes",
-			"resumed_panes", "restarted_panes", "shell_panes", "unrecovered_panes", "directory_fallback_panes":
+		case "time",
+			"level",
+			"component",
+			"operation",
+			"status",
+			"message",
+			"reason",
+			"phase",
+			"code",
+			"sessions",
+			"windows",
+			"panes",
+			"error_code",
+			"pid",
+			"version",
+			"socket",
+			"action",
+			"error",
+			"error_domain",
+			"error_step",
+			"error_context",
+			"generation",
+			"restore_id",
+			"duration_ms",
+			"failed_step",
+			"store_step",
+			"step_reason",
+			"mismatches",
+			"mismatch_reasons",
+			"floating_panes_omitted",
+			"restart_panes",
+			"resume_panes",
+			"carried_resume_panes",
+			"unverified_panes",
+			"nonrestartable_panes",
+			"resumed_panes",
+			"restarted_panes",
+			"shell_panes",
+			"unrecovered_panes",
+			"directory_fallback_panes":
 		case "verified", "skipped", "terminal_text_omitted":
 			assertOperationLogField(t, record, key)
 		default:
@@ -391,8 +443,15 @@ func remoteConnectionsTOML(connections ...config.RemoteConnectionConfig) string 
 	var body strings.Builder
 
 	for _, connection := range connections {
-		fmt.Fprintf(&body, "\n[[remote.connections]]\nid = %q\nlabel = %q\nhost = %q\nsesh_path = %q\ntmux_socket = %q\n",
-			connection.ID, connection.Label, connection.Host, connection.SeshPath, connection.TmuxSocket)
+		fmt.Fprintf(
+			&body,
+			"\n[[remote.connections]]\nid = %q\nlabel = %q\nhost = %q\nsesh_path = %q\ntmux_socket = %q\n",
+			connection.ID,
+			connection.Label,
+			connection.Host,
+			connection.SeshPath,
+			connection.TmuxSocket,
+		)
 	}
 
 	return body.String()

@@ -12,14 +12,25 @@ import (
 
 const centered = 2
 
-func SleepPlaceholder(cfg *config.Config, harness string, failure string, width, height int) string {
+func SleepPlaceholder(
+	cfg *config.Config,
+	harness string,
+	failure string,
+	width, height int,
+) string {
 	chrome := NewChrome(cfg)
 	glyph := lipgloss.NewStyle().Foreground(lipgloss.Color(cfg.ResolvedAgentStatusColors().Idle)).
 		Render(agentStatusGlyphChar(session.AgentStatusSleeping))
 
-	lines := []string{glyph + " " + chrome.Muted("sleeping · "+harness+" · ") + "⏎" + chrome.Muted(" wake")}
+	lines := []string{
+		glyph + " " + chrome.Muted("sleeping · "+harness+" · ") + "⏎" + chrome.Muted(" wake"),
+	}
 	if failure != "" {
-		lines = append(lines, "", lipgloss.NewStyle().Foreground(lipgloss.Color(cfg.Theme.Error)).Render(failure))
+		lines = append(
+			lines,
+			"",
+			lipgloss.NewStyle().Foreground(lipgloss.Color(cfg.Theme.Error)).Render(failure),
+		)
 	}
 
 	var out strings.Builder

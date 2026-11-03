@@ -36,7 +36,10 @@ func WaitReady(ctx context.Context, socket string) error {
 				cause = ctx.Err()
 			}
 
-			return oops.In("daemon").Code("readiness_failed").With("operation", "wait_ready").Wrap(cause)
+			return oops.In("daemon").
+				Code("readiness_failed").
+				With("operation", "wait_ready").
+				Wrap(cause)
 		case <-ticker.C:
 		}
 	}

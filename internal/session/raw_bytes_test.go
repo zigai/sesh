@@ -34,7 +34,13 @@ func TestRawBytesKeepStrictBase64JSONContract(t *testing.T) {
 
 	var decoded session.RawBytes
 	for _, invalid := range []string{`"not base64!"`, `"c2VzaA"`, `{"base64":"c2VzaA=="}`} {
-		if err := json.Unmarshal([]byte(invalid), &decoded); !errors.Is(err, session.ErrInvalidRawBytes) {
+		if err := json.Unmarshal(
+			[]byte(invalid),
+			&decoded,
+		); !errors.Is(
+			err,
+			session.ErrInvalidRawBytes,
+		) {
 			t.Fatalf("decode %s error = %v, want invalid raw bytes", invalid, err)
 		}
 	}

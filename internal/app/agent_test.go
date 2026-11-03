@@ -25,7 +25,14 @@ func TestAgentViewHistoryFailureLogsDegradationWithoutIdentity(t *testing.T) {
 	var logs bytes.Buffer
 
 	ctx := zerolog.New(&logs).WithContext(t.Context())
-	local.recordAgentView(ctx, agents.PaneLocation{SessionName: "PRIVATE_SESSION", PaneID: "PRIVATE_PANE", ServerSocket: "PRIVATE_SOCKET"})
+	local.recordAgentView(
+		ctx,
+		agents.PaneLocation{
+			SessionName:  "PRIVATE_SESSION",
+			PaneID:       "PRIVATE_PANE",
+			ServerSocket: "PRIVATE_SOCKET",
+		},
+	)
 
 	if bytes.Count(logs.Bytes(), []byte("\n")) != 1 {
 		t.Fatalf("incorrect history logging: %s", logs.String())

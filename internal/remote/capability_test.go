@@ -94,7 +94,8 @@ func TestCapabilityRoundTripIsPrivate(t *testing.T) {
 		t.Fatalf("ReadCapability() error = %v", err)
 	}
 
-	if loaded.Grant.Token != grant.Token || loaded.Target.SessionID != record.Target.SessionID || loaded.BridgeSocket != record.BridgeSocket {
+	if loaded.Grant.Token != grant.Token || loaded.Target.SessionID != record.Target.SessionID ||
+		loaded.BridgeSocket != record.BridgeSocket {
 		t.Fatalf("loaded capability = %#v, want the stored record", loaded)
 	}
 
@@ -129,7 +130,14 @@ func TestCapabilityRejectsExpiredAndMismatchedRecords(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := ReadCapability(dir, grant.AttachmentID, grant.ExpiresAt); !errors.Is(err, ErrCapabilityExpired) {
+	if _, err := ReadCapability(
+		dir,
+		grant.AttachmentID,
+		grant.ExpiresAt,
+	); !errors.Is(
+		err,
+		ErrCapabilityExpired,
+	) {
 		t.Fatalf("ReadCapability(expired) error = %v, want %v", err, ErrCapabilityExpired)
 	}
 
@@ -165,14 +173,38 @@ func TestCapabilityValidationRejectsUnsafeRecords(t *testing.T) {
 		mutate func(*StoredCapability)
 		want   error
 	}{
-		"unsupported version":  {mutate: func(c *StoredCapability) { c.Version = ProtocolVersion + 1 }, want: ErrInvalidFrame},
-		"relative socket":      {mutate: func(c *StoredCapability) { c.BridgeSocket = "attach.sock" }, want: ErrInvalidFrame},
-		"dirty socket":         {mutate: func(c *StoredCapability) { c.BridgeSocket = "/tmp/../tmp/bridge.sock" }, want: ErrInvalidFrame},
-		"missing written time": {mutate: func(c *StoredCapability) { c.WrittenAt = time.Time{} }, want: ErrInvalidFrame},
-		"peer mismatch":        {mutate: func(c *StoredCapability) { c.Target.PeerID = "other" }, want: ErrPeerMismatch},
-		"control token":        {mutate: func(c *StoredCapability) { c.Grant.Token = strings.Repeat("a", 64) + "\x1b" }, want: ErrInvalidFrame},
-		"short token":          {mutate: func(c *StoredCapability) { c.Grant.Token = "abc" }, want: ErrInvalidFrame},
-		"missing expiry":       {mutate: func(c *StoredCapability) { c.Grant.ExpiresAt = time.Time{} }, want: ErrInvalidFrame},
+		"unsupported version": {
+			mutate: func(c *StoredCapability) { c.Version = ProtocolVersion + 1 },
+			want:   ErrInvalidFrame,
+		},
+		"relative socket": {
+			mutate: func(c *StoredCapability) { c.BridgeSocket = "attach.sock" },
+			want:   ErrInvalidFrame,
+		},
+		"dirty socket": {
+			mutate: func(c *StoredCapability) { c.BridgeSocket = "/tmp/../tmp/bridge.sock" },
+			want:   ErrInvalidFrame,
+		},
+		"missing written time": {
+			mutate: func(c *StoredCapability) { c.WrittenAt = time.Time{} },
+			want:   ErrInvalidFrame,
+		},
+		"peer mismatch": {
+			mutate: func(c *StoredCapability) { c.Target.PeerID = "other" },
+			want:   ErrPeerMismatch,
+		},
+		"control token": {
+			mutate: func(c *StoredCapability) { c.Grant.Token = strings.Repeat("a", 64) + "\x1b" },
+			want:   ErrInvalidFrame,
+		},
+		"short token": {
+			mutate: func(c *StoredCapability) { c.Grant.Token = "abc" },
+			want:   ErrInvalidFrame,
+		},
+		"missing expiry": {
+			mutate: func(c *StoredCapability) { c.Grant.ExpiresAt = time.Time{} },
+			want:   ErrInvalidFrame,
+		},
 	}
 
 	for name, test := range tests {

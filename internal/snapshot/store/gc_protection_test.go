@@ -30,7 +30,15 @@ func interruptedSaveFixture(t *testing.T, r *Repository) string {
 	}
 
 	manifest, artifacts := snapshotFixture()
-	if _, err := r.Commit(t.Context(), attempt.ID, manifest, artifacts); !errors.Is(err, errInjected) {
+	if _, err := r.Commit(
+		t.Context(),
+		attempt.ID,
+		manifest,
+		artifacts,
+	); !errors.Is(
+		err,
+		errInjected,
+	) {
 		t.Fatalf("interrupted save = %v", err)
 	}
 
@@ -56,7 +64,15 @@ func stagedSaveFixture(t *testing.T, r *Repository) string {
 	}
 
 	manifest, artifacts := snapshotFixture()
-	if _, err := r.Commit(t.Context(), attempt.ID, manifest, artifacts); !errors.Is(err, errInjected) {
+	if _, err := r.Commit(
+		t.Context(),
+		attempt.ID,
+		manifest,
+		artifacts,
+	); !errors.Is(
+		err,
+		errInjected,
+	) {
 		t.Fatalf("staged save = %v", err)
 	}
 
@@ -174,15 +190,26 @@ func TestCollectionPreservesEntriesWithoutAuthorizedEvidence(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(filepath.Join(plantedDir, "manifest.json"), []byte("{}"), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(plantedDir, "manifest.json"),
+		[]byte("{}"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := os.MkdirAll(filepath.Join(path, "generations", "not-a-generation-id"), 0o700); err != nil {
+	if err := os.MkdirAll(
+		filepath.Join(path, "generations", "not-a-generation-id"),
+		0o700,
+	); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(filepath.Join(path, "generations", "README"), []byte("foreign"), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(path, "generations", "README"),
+		[]byte("foreign"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -276,7 +303,10 @@ func chmodGenerationDirectory(t *testing.T, path, id string) {
 func chmodArtifactDirectory(t *testing.T, path, id string) {
 	t.Helper()
 
-	if err := os.Chmod(filepath.Join(path, generationsDirectory, id, collectionArtifactsName), 0o755); err != nil {
+	if err := os.Chmod(
+		filepath.Join(path, generationsDirectory, id, collectionArtifactsName),
+		0o755,
+	); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -337,12 +367,36 @@ func unknownContentFixtures() []struct {
 		damage func(t *testing.T, path, id string)
 		want   string
 	}{
-		{name: "unexpected entry in the generation directory", damage: plantGenerationEntry, want: CollectionReasonUnknownContent},
-		{name: "unexpected entry in the artifact directory", damage: plantArtifactEntry, want: CollectionReasonUnknownContent},
-		{name: "fifo replacing an artifact", damage: replaceArtifactWithFifo, want: CollectionReasonUnsafe},
-		{name: "missing manifest with intact artifacts", damage: removeGenerationManifest, want: CollectionReasonUnknownContent},
-		{name: "corrupt manifest", damage: truncateGenerationManifest, want: CollectionReasonInvalidContent},
-		{name: "artifact replaced by different bytes", damage: replaceArtifactBytes, want: CollectionReasonInvalidContent},
+		{
+			name:   "unexpected entry in the generation directory",
+			damage: plantGenerationEntry,
+			want:   CollectionReasonUnknownContent,
+		},
+		{
+			name:   "unexpected entry in the artifact directory",
+			damage: plantArtifactEntry,
+			want:   CollectionReasonUnknownContent,
+		},
+		{
+			name:   "fifo replacing an artifact",
+			damage: replaceArtifactWithFifo,
+			want:   CollectionReasonUnsafe,
+		},
+		{
+			name:   "missing manifest with intact artifacts",
+			damage: removeGenerationManifest,
+			want:   CollectionReasonUnknownContent,
+		},
+		{
+			name:   "corrupt manifest",
+			damage: truncateGenerationManifest,
+			want:   CollectionReasonInvalidContent,
+		},
+		{
+			name:   "artifact replaced by different bytes",
+			damage: replaceArtifactBytes,
+			want:   CollectionReasonInvalidContent,
+		},
 	}
 }
 
@@ -380,7 +434,9 @@ func replaceArtifactWithFifo(t *testing.T, path, id string) {
 func removeGenerationManifest(t *testing.T, path, id string) {
 	t.Helper()
 
-	if err := os.Remove(filepath.Join(path, generationsDirectory, id, collectionManifestName)); err != nil {
+	if err := os.Remove(
+		filepath.Join(path, generationsDirectory, id, collectionManifestName),
+	); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -388,7 +444,11 @@ func removeGenerationManifest(t *testing.T, path, id string) {
 func truncateGenerationManifest(t *testing.T, path, id string) {
 	t.Helper()
 
-	if err := os.WriteFile(filepath.Join(path, generationsDirectory, id, collectionManifestName), []byte("{"), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(path, generationsDirectory, id, collectionManifestName),
+		[]byte("{"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -536,7 +596,12 @@ func TestCollectionPreservesMemberWithOutstandingIntent(t *testing.T) {
 	generations := retireGenerations(t, r, 2)
 	current := generations[1]
 
-	writeCollectionRecordFixture(t, path, current.ID, encodeFixtureIntent(t, validFixtureIntent(current.ID, 2)))
+	writeCollectionRecordFixture(
+		t,
+		path,
+		current.ID,
+		encodeFixtureIntent(t, validFixtureIntent(current.ID, 2)),
+	)
 
 	result := collectGenerations(t, r)
 
@@ -573,11 +638,25 @@ func TestCollectionPreservesGenerationWithoutIntentRecord(t *testing.T) {
 
 	result := collectGenerations(t, r)
 
-	if len(result.Removed)+len(result.Deferred)+len(result.Preserved)+len(result.Quarantined) != 0 || result.Bytes != 0 {
+	if len(
+		result.Removed,
+	)+len(
+		result.Deferred,
+	)+len(
+		result.Preserved,
+	)+len(
+		result.Quarantined,
+	) != 0 ||
+		result.Bytes != 0 {
 		t.Fatalf("absent generation reported work: %+v", result)
 	}
 
-	if _, err := os.Stat(filepath.Join(path, collectionDirectory)); !errors.Is(err, fs.ErrNotExist) {
+	if _, err := os.Stat(
+		filepath.Join(path, collectionDirectory),
+	); !errors.Is(
+		err,
+		fs.ErrNotExist,
+	) {
 		t.Fatal("absent generation created collection state")
 	}
 }

@@ -137,7 +137,11 @@ func remoteConnectionStatus(
 	}
 
 	health := []string{
-		connection.HealthTmux, connection.HealthAgents, connection.HealthSnapshots, connection.HealthTasks, connection.HealthWork,
+		connection.HealthTmux,
+		connection.HealthAgents,
+		connection.HealthSnapshots,
+		connection.HealthTasks,
+		connection.HealthWork,
 	}
 	if slices.ContainsFunc(health, remoteSourceDegraded) {
 		return session.RemoteStatusDegraded

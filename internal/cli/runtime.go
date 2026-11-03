@@ -104,7 +104,12 @@ func (b *commandBuffer) File() *os.File {
 	return nil
 }
 
-func ExecuteApplication(ctx context.Context, args []string, input io.Reader, stdout, stderr io.Writer) error {
+func ExecuteApplication(
+	ctx context.Context,
+	args []string,
+	input io.Reader,
+	stdout, stderr io.Writer,
+) error {
 	root := newRootCommand(ctx)
 	root.SetContext(ctx)
 	root.SetArgs(args)
@@ -117,7 +122,14 @@ func ExecuteApplication(ctx context.Context, args []string, input io.Reader, std
 	root.SetOut(&output)
 	root.SetErr(&diagnostics)
 
-	runtime := commandRuntime{cmd: root, sink: nil, operation: "", output: &output, diagnostics: &diagnostics, started: time.Time{}}
+	runtime := commandRuntime{
+		cmd:         root,
+		sink:        nil,
+		operation:   "",
+		output:      &output,
+		diagnostics: &diagnostics,
+		started:     time.Time{},
+	}
 	root.PersistentPreRunE = runtime.prepare
 	ctx = clibase.ContextWithRawArgs(ctx, args)
 
@@ -261,13 +273,21 @@ func (r *commandRuntime) setupLogging(cmd *cobra.Command) error {
 
 	if r.operation != "save" && r.operation != "restore" {
 		logger := r.logger()
-		logger.Info().Str("component", "cli").Str("operation", r.operation).Str("status", "started").Msg("command started")
+		logger.Info().
+			Str("component", "cli").
+			Str("operation", r.operation).
+			Str("status", "started").
+			Msg("command started")
 	}
 
 	return nil
 }
 
-func (r *commandRuntime) openLog(cmd *cobra.Command, cfg *config.Config, level zerolog.Level) error {
+func (r *commandRuntime) openLog(
+	cmd *cobra.Command,
+	cfg *config.Config,
+	level zerolog.Level,
+) error {
 	logPath, err := config.GetLogFile(cfg)
 	if err != nil {
 		return oops.In("cli").With("operation", "configure_logging").Wrap(err)
@@ -280,7 +300,10 @@ func (r *commandRuntime) openLog(cmd *cobra.Command, cfg *config.Config, level z
 
 	r.sink, err = logging.Open(logPath)
 	if err != nil {
-		return oops.In("cli").Code("logging_failed").With("operation", "configure_logging").Wrap(fmt.Errorf("%w: %w", clibase.ErrLogFileUnavailable, err))
+		return oops.In("cli").
+			Code("logging_failed").
+			With("operation", "configure_logging").
+			Wrap(fmt.Errorf("%w: %w", clibase.ErrLogFileUnavailable, err))
 	}
 
 	r.sink.SetLevel(level)
@@ -306,7 +329,8 @@ func (r *commandRuntime) logger() zerolog.Logger {
 }
 
 func quietAgentTracker(cmd *cobra.Command, cfg *config.Config, operation string) bool {
-	return operation == "agent_status_run" && (getBoolFlag(cmd, "quiet") || cfg.ResolvedAgentStatus().Quiet)
+	return operation == "agent_status_run" &&
+		(getBoolFlag(cmd, "quiet") || cfg.ResolvedAgentStatus().Quiet)
 }
 
 func (r *commandRuntime) finish(err error) error {
@@ -319,7 +343,10 @@ func (r *commandRuntime) finish(err error) error {
 	}
 
 	if closeErr := r.sink.Close(); closeErr != nil {
-		return oops.In("cli").Code("logging_failed").With("operation", "finalize_logging").Wrap(closeErr)
+		return oops.In("cli").
+			Code("logging_failed").
+			With("operation", "finalize_logging").
+			Wrap(closeErr)
 	}
 
 	return nil
@@ -337,14 +364,23 @@ func (r *commandRuntime) logOutcome(err error) {
 	}
 
 	if clibase.OnlyErrorCauses(err, context.Canceled) {
-		logger.Info().Str("component", "cli").Str("operation", r.operation).Str("status", "canceled").
-			Int64("duration_ms", duration).Msg("command canceled")
+		logger.Info().
+			Str("component", "cli").
+			Str("operation", r.operation).
+			Str("status", "canceled").
+			Int64("duration_ms", duration).
+			Msg("command canceled")
 
 		return
 	}
 
-	event := logger.Error().Str("component", "cli").Str("operation", r.operation).Str("status", "failed").
-		Str("reason", clibase.JSONErrorCode(err)).Int64("duration_ms", duration).Func(logging.Cause(err))
+	event := logger.Error().
+		Str("component", "cli").
+		Str("operation", r.operation).
+		Str("status", "failed").
+		Str("reason", clibase.JSONErrorCode(err)).
+		Int64("duration_ms", duration).
+		Func(logging.Cause(err))
 
 	if step, ok := errorstep.Owned(err, "cli"); ok {
 		event = event.Str("failed_step", step.Operation)
@@ -387,7 +423,8 @@ func validateCommandBeforeConfig(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if cmd.Parent() == nil || cmd.Parent().Name() != "session" || cmd.Parent().Parent() != cmd.Root() {
+	if cmd.Parent() == nil || cmd.Parent().Name() != "session" ||
+		cmd.Parent().Parent() != cmd.Root() {
 		return nil
 	}
 
@@ -401,7 +438,12 @@ func validateCommandBeforeConfig(cmd *cobra.Command, args []string) error {
 	}
 }
 
-func publishCommandOutput(cmd *cobra.Command, output, diagnostics *commandBuffer, stdout, stderr io.Writer, runErr, closeErr error) error {
+func publishCommandOutput(
+	cmd *cobra.Command,
+	output, diagnostics *commandBuffer,
+	stdout, stderr io.Writer,
+	runErr, closeErr error,
+) error {
 	if bindingDiscardsReport(cmd, output) {
 		stdout = io.Discard
 	}
@@ -433,11 +475,16 @@ func publishCommandOutput(cmd *cobra.Command, output, diagnostics *commandBuffer
 	return errors.Join(resultErr, clibase.WriteCommandError(cmd, runErr))
 }
 
-func copyStagedBuffers(output, diagnostics *commandBuffer, stdout, stderr io.Writer, runErr error) error {
+func copyStagedBuffers(
+	output, diagnostics *commandBuffer,
+	stdout, stderr io.Writer,
+	runErr error,
+) error {
 	var outputErr error
 
 	_, hasResult := errors.AsType[*commandResultError](runErr)
-	if !output.failed && !output.streaming && (runErr == nil || clibase.CommandErrorWasRendered(runErr) || errors.Is(runErr, clibase.ErrSubcommandRequired) || hasResult) {
+	if !output.failed && !output.streaming &&
+		(runErr == nil || clibase.CommandErrorWasRendered(runErr) || errors.Is(runErr, clibase.ErrSubcommandRequired) || hasResult) {
 		_, outputErr = io.Copy(stdout, bytes.NewReader(output.Bytes()))
 	}
 
@@ -480,7 +527,11 @@ func writeFinalizationErrors(cmd *cobra.Command, runErr, closeErr error) error {
 	return clibase.WriteCommandError(cmd, closeErr)
 }
 
-func publishFinalizationFailure(cmd *cobra.Command, output *commandBuffer, runErr, closeErr error) error {
+func publishFinalizationFailure(
+	cmd *cobra.Command,
+	output *commandBuffer,
+	runErr, closeErr error,
+) error {
 	combined := errors.Join(runErr, closeErr)
 
 	diagnostic := closeErr
@@ -489,11 +540,16 @@ func publishFinalizationFailure(cmd *cobra.Command, output *commandBuffer, runEr
 	}
 
 	var fields map[string]json.RawMessage
-	if !output.failed && json.Unmarshal(output.Bytes(), &fields) == nil && fields["result"] != nil && string(fields["result"]) != "null" {
+	if !output.failed && json.Unmarshal(output.Bytes(), &fields) == nil &&
+		fields["result"] != nil &&
+		string(fields["result"]) != "null" {
 		writeErr := clibase.WriteJSONResultFailure(cmd, fields["result"], diagnostic)
 
 		return NewExitError(exitCodeGeneral, errors.Join(combined, writeErr))
 	}
 
-	return NewExitError(exitCodeGeneral, errors.Join(combined, clibase.WriteCommandError(cmd, diagnostic)))
+	return NewExitError(
+		exitCodeGeneral,
+		errors.Join(combined, clibase.WriteCommandError(cmd, diagnostic)),
+	)
 }

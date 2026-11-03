@@ -17,7 +17,11 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
-func setupTestMultiWindowSession(t *testing.T, ctx context.Context, server *gotmux.Server) gotmux.Session {
+func setupTestMultiWindowSession(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+) gotmux.Session {
 	t.Helper()
 
 	sess, err := server.NewSession(ctx, gotmux.NewSessionOptions{
@@ -133,7 +137,12 @@ func verifyRestoredState(t *testing.T, ctx context.Context, server *gotmux.Serve
 	}
 }
 
-func verifyOperationInCatalog(t *testing.T, ctx context.Context, repo *store.Repository, opID string) {
+func verifyOperationInCatalog(
+	t *testing.T,
+	ctx context.Context,
+	repo *store.Repository,
+	opID string,
+) {
 	t.Helper()
 
 	catalog, err := repo.Inspect(ctx)
@@ -180,11 +189,17 @@ func TestSnapshotRestore_MultiWindowFidelity(t *testing.T) {
 	leaseRoot := filepath.Join(t.TempDir(), "leases")
 	sess := setupTestMultiWindowSession(t, ctx, server)
 
-	saveRes, err := engine.SaveObservation(ctx, repo, server, []gotmux.SessionID{sess.ID()}, engine.SaveConfig{
-		LeaseRoot:              leaseRoot,
-		ProcessEnrichment:      false,
-		ProcessEnvironmentKeys: nil,
-	})
+	saveRes, err := engine.SaveObservation(
+		ctx,
+		repo,
+		server,
+		[]gotmux.SessionID{sess.ID()},
+		engine.SaveConfig{
+			LeaseRoot:              leaseRoot,
+			ProcessEnrichment:      false,
+			ProcessEnvironmentKeys: nil,
+		},
+	)
 	if err != nil {
 		t.Fatalf("SaveObservation failed: %v", err)
 	}
@@ -268,11 +283,17 @@ func TestSnapshotRestoreReleasesWindowSizePinnedByResize(t *testing.T) {
 		t.Fatalf("source window-size = %q, want the fixture pinned to manual", local)
 	}
 
-	saveRes, err := engine.SaveObservation(ctx, repo, server, []gotmux.SessionID{sess.ID()}, engine.SaveConfig{
-		LeaseRoot:              leaseRoot,
-		ProcessEnrichment:      false,
-		ProcessEnvironmentKeys: nil,
-	})
+	saveRes, err := engine.SaveObservation(
+		ctx,
+		repo,
+		server,
+		[]gotmux.SessionID{sess.ID()},
+		engine.SaveConfig{
+			LeaseRoot:              leaseRoot,
+			ProcessEnrichment:      false,
+			ProcessEnvironmentKeys: nil,
+		},
+	)
 	if err != nil {
 		t.Fatalf("SaveObservation failed: %v", err)
 	}
@@ -315,7 +336,12 @@ func TestSnapshotRestoreReleasesWindowSizePinnedByResize(t *testing.T) {
 		}
 
 		if got, _ := policy.Effective.Get(); got != want {
-			t.Fatalf("restored window %s window-size = %q, want global %q", window.Handle().ID(), got, want)
+			t.Fatalf(
+				"restored window %s window-size = %q, want global %q",
+				window.Handle().ID(),
+				got,
+				want,
+			)
 		}
 	}
 }
@@ -342,7 +368,13 @@ func TestSnapshotRestoreKeepsLastActivePane(t *testing.T) {
 			editor := findPaneWindow(t, ctx, sess, "left-pane")
 			left := findTitledPane(t, ctx, editor, "left-pane")
 
-			bottom, err := left.Split(ctx, gotmux.SplitOptions{Direction: gotmux.DirectionVertical, Program: gotmux.Exec("sleep", "300")})
+			bottom, err := left.Split(
+				ctx,
+				gotmux.SplitOptions{
+					Direction: gotmux.DirectionVertical,
+					Program:   gotmux.Exec("sleep", "300"),
+				},
+			)
 			if err != nil {
 				t.Fatalf("Split failed: %v", err)
 			}
@@ -357,11 +389,17 @@ func TestSnapshotRestoreKeepsLastActivePane(t *testing.T) {
 				}
 			}
 
-			saveRes, err := engine.SaveObservation(ctx, repo, server, []gotmux.SessionID{sess.ID()}, engine.SaveConfig{
-				LeaseRoot:              leaseRoot,
-				ProcessEnrichment:      false,
-				ProcessEnvironmentKeys: nil,
-			})
+			saveRes, err := engine.SaveObservation(
+				ctx,
+				repo,
+				server,
+				[]gotmux.SessionID{sess.ID()},
+				engine.SaveConfig{
+					LeaseRoot:              leaseRoot,
+					ProcessEnrichment:      false,
+					ProcessEnvironmentKeys: nil,
+				},
+			)
 			if err != nil {
 				t.Fatalf("SaveObservation failed: %v", err)
 			}
@@ -406,7 +444,12 @@ func TestSnapshotRestoreKeepsLastActivePane(t *testing.T) {
 	}
 }
 
-func findPaneWindow(t *testing.T, ctx context.Context, sess gotmux.Session, title string) gotmux.Window {
+func findPaneWindow(
+	t *testing.T,
+	ctx context.Context,
+	sess gotmux.Session,
+	title string,
+) gotmux.Window {
 	t.Helper()
 
 	windows, _, err := sess.WindowInfos(ctx)
@@ -432,7 +475,12 @@ func findPaneWindow(t *testing.T, ctx context.Context, sess gotmux.Session, titl
 	return gotmux.Window{}
 }
 
-func findTitledPane(t *testing.T, ctx context.Context, window gotmux.Window, title string) gotmux.Pane {
+func findTitledPane(
+	t *testing.T,
+	ctx context.Context,
+	window gotmux.Window,
+	title string,
+) gotmux.Pane {
 	t.Helper()
 
 	panes, err := window.Panes(ctx)

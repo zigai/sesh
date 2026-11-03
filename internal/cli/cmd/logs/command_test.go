@@ -90,7 +90,8 @@ func TestLogsCommandPrettyPrintsIndentedJSON(t *testing.T) {
 		t.Fatalf("stderr = %q, want empty", stderr)
 	}
 
-	if !strings.Contains(output, "  \"level\": \"warn\",\n") || !strings.Contains(output, "  \"command\": \"doctor\",\n") {
+	if !strings.Contains(output, "  \"level\": \"warn\",\n") ||
+		!strings.Contains(output, "  \"command\": \"doctor\",\n") {
 		t.Fatalf("pretty output not indented:\n%s", output)
 	}
 }
@@ -202,8 +203,10 @@ func TestLogsCommandSinceFilter(t *testing.T) {
 }
 
 func TestLogsCommandRelative(t *testing.T) {
-	recentRecord := fmt.Sprintf(`{"time":%q,"level":"info","component":"popup","message":"recent event"}`+"\n",
-		time.Now().UTC().Format(time.RFC3339Nano))
+	recentRecord := fmt.Sprintf(
+		`{"time":%q,"level":"info","component":"popup","message":"recent event"}`+"\n",
+		time.Now().UTC().Format(time.RFC3339Nano),
+	)
 	path := writeLogsTestFile(t, recentRecord)
 
 	output, _, err := executeLogsCommand(t, path, testLogsCmd, "--relative")
@@ -217,9 +220,24 @@ func TestLogsCommandRelative(t *testing.T) {
 }
 
 func TestLogsCommandDisplaysRetainedBackupsOldestFirst(t *testing.T) {
-	active := strings.Replace(formattedInfoRecord, `"message":"resurrect save completed"`, `"message":"active"`, 1) + "\n"
-	newer := strings.Replace(formattedInfoRecord, `"message":"resurrect save completed"`, `"message":"newer backup"`, 1) + "\n"
-	oldest := strings.Replace(formattedInfoRecord, `"message":"resurrect save completed"`, `"message":"oldest backup"`, 1) + "\n"
+	active := strings.Replace(
+		formattedInfoRecord,
+		`"message":"resurrect save completed"`,
+		`"message":"active"`,
+		1,
+	) + "\n"
+	newer := strings.Replace(
+		formattedInfoRecord,
+		`"message":"resurrect save completed"`,
+		`"message":"newer backup"`,
+		1,
+	) + "\n"
+	oldest := strings.Replace(
+		formattedInfoRecord,
+		`"message":"resurrect save completed"`,
+		`"message":"oldest backup"`,
+		1,
+	) + "\n"
 
 	path := writeLogsTestFile(t, active)
 	if err := os.WriteFile(path+".1", []byte(newer), 0o600); err != nil {
@@ -254,10 +272,19 @@ func TestLogsCommandWatchDisplaysExistingRawRecordsAndStopsOnCancellation(t *tes
 }
 
 func TestFormattedLogsOmitCorruptRecordsAndContinue(t *testing.T) {
-	active := strings.Replace(formattedInfoRecord, `"message":"resurrect save completed"`, `"message":"active"`, 1) + "\n"
+	active := strings.Replace(
+		formattedInfoRecord,
+		`"message":"resurrect save completed"`,
+		`"message":"active"`,
+		1,
+	) + "\n"
 
 	path := writeLogsTestFile(t, active)
-	if err := os.WriteFile(path+".1", []byte("not-json\n"+formattedWarningRecord+"\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		path+".1",
+		[]byte("not-json\n"+formattedWarningRecord+"\n"),
+		0o600,
+	); err != nil {
 		t.Fatalf("WriteFile(.1) error = %v", err)
 	}
 
@@ -274,7 +301,8 @@ func TestFormattedLogsOmitCorruptRecordsAndContinue(t *testing.T) {
 		}
 	}
 
-	if !strings.Contains(stderr, "warning: omitted malformed diagnostic log record 1") || strings.Contains(output, "warning:") {
+	if !strings.Contains(stderr, "warning: omitted malformed diagnostic log record 1") ||
+		strings.Contains(output, "warning:") {
 		t.Fatalf("malformed-record diagnostic streams: stdout=%q stderr=%q", output, stderr)
 	}
 }
@@ -291,7 +319,12 @@ func TestLogsCommandRejectsNegativeLines(t *testing.T) {
 		}
 
 		if clibase.ExitCode(err) != exitCodeUsage {
-			t.Fatalf("executeLogsCommand(%v) exit code = %d, want %d", flag, clibase.ExitCode(err), exitCodeUsage)
+			t.Fatalf(
+				"executeLogsCommand(%v) exit code = %d, want %d",
+				flag,
+				clibase.ExitCode(err),
+				exitCodeUsage,
+			)
 		}
 	}
 }
@@ -370,7 +403,10 @@ func testLogsPathJSONEnvelope(t *testing.T, path string) {
 		t.Fatalf("unexpected stderr: %s", stderr)
 	}
 
-	if !strings.Contains(out, `"schemaVersion": 2`) || !strings.Contains(out, `"command": "logs"`) || !strings.Contains(out, `"ok": true`) || !strings.Contains(out, path) {
+	if !strings.Contains(out, `"schemaVersion": 2`) ||
+		!strings.Contains(out, `"command": "logs"`) ||
+		!strings.Contains(out, `"ok": true`) ||
+		!strings.Contains(out, path) {
 		t.Fatalf("unexpected envelope for --path: %s", out)
 	}
 }
@@ -387,7 +423,10 @@ func testLogsClearJSONEnvelope(t *testing.T, path string) {
 		t.Fatalf("unexpected stderr: %s", stderr)
 	}
 
-	if !strings.Contains(out, `"schemaVersion": 2`) || !strings.Contains(out, `"command": "logs"`) || !strings.Contains(out, `"cleared": true`) || !strings.Contains(out, path) {
+	if !strings.Contains(out, `"schemaVersion": 2`) ||
+		!strings.Contains(out, `"command": "logs"`) ||
+		!strings.Contains(out, `"cleared": true`) ||
+		!strings.Contains(out, path) {
 		t.Fatalf("unexpected envelope for --clear: %s", out)
 	}
 }

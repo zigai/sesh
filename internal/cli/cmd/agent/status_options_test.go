@@ -27,7 +27,9 @@ clear_failed_on_visit = false
 	resolved := cfg.ResolvedAgentStatus()
 
 	watch := statusWatchOptions(resolved, false)
-	if watch.InitialBackoff != 2*time.Second || watch.MaxBackoff != 30*time.Second || watch.BackoffFactor != 3.0 || !watch.Quiet {
+	if watch.InitialBackoff != 2*time.Second || watch.MaxBackoff != 30*time.Second ||
+		watch.BackoffFactor != 3.0 ||
+		!watch.Quiet {
 		t.Fatalf("watch options = %+v, want configured backoff and quiet", watch)
 	}
 

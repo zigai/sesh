@@ -17,26 +17,58 @@ func removalFixture() Manifest {
 	return Manifest{
 		Format: "sesh", Version: Schema, Started: 1, Finished: 2,
 		Source: Source{
-			TmuxVersion: "3.6", LibraryVersion: "v0.3.0", Consistency: "observed",
-			Options:     []Option{{Scope: "server", Name: Bytes("@server"), Value: Bytes("server-value"), Present: true}},
+			TmuxVersion:    "3.6",
+			LibraryVersion: "v0.3.0",
+			Consistency:    "observed",
+			Options: []Option{
+				{
+					Scope:   "server",
+					Name:    Bytes("@server"),
+					Value:   Bytes("server-value"),
+					Present: true,
+				},
+			},
 			Environment: []Variable{{Name: Bytes("GLOBAL"), Value: Bytes("global"), State: "set"}},
 		},
 		Evidence: unverifiedEvidence(),
 		Sessions: []Session{
 			{
-				ID: "s0", Name: Bytes("alpha"), Directory: Bytes("/srv/alpha"), Group: "g0",
-				Options:     []Option{{Scope: "session", Name: Bytes("@prefix"), Value: Bytes("a"), Present: true}},
+				ID:        "s0",
+				Name:      Bytes("alpha"),
+				Directory: Bytes("/srv/alpha"),
+				Group:     "g0",
+				Options: []Option{
+					{Scope: "session", Name: Bytes("@prefix"), Value: Bytes("a"), Present: true},
+				},
 				Environment: []Variable{{Name: Bytes("TERM"), Value: Bytes("xterm"), State: "set"}},
 			},
 			{
-				ID: "s1", Name: Bytes("beta"), Directory: Bytes("/srv/beta"), Group: "g0",
-				Options:     []Option{{Scope: "session", Name: Bytes("@prefix"), Value: Bytes("b"), Present: true}},
-				Environment: []Variable{{Name: Bytes("TERM"), Value: Bytes("screen"), State: "set"}},
+				ID:        "s1",
+				Name:      Bytes("beta"),
+				Directory: Bytes("/srv/beta"),
+				Group:     "g0",
+				Options: []Option{
+					{Scope: "session", Name: Bytes("@prefix"), Value: Bytes("b"), Present: true},
+				},
+				Environment: []Variable{
+					{Name: Bytes("TERM"), Value: Bytes("screen"), State: "set"},
+				},
 			},
 			{ID: "s2", Name: Bytes("gamma"), Directory: Bytes("/srv/gamma"), Group: ""},
 			{
-				ID: "s3", Name: Bytes("delta"), Directory: Bytes("/srv/delta"), Group: "g1",
-				Options:     []Option{{Scope: "session", Name: Bytes("@unset"), Value: nil, Present: false, Inherited: true}},
+				ID:        "s3",
+				Name:      Bytes("delta"),
+				Directory: Bytes("/srv/delta"),
+				Group:     "g1",
+				Options: []Option{
+					{
+						Scope:     "session",
+						Name:      Bytes("@unset"),
+						Value:     nil,
+						Present:   false,
+						Inherited: true,
+					},
+				},
 				Environment: []Variable{{Name: Bytes("GONE"), Value: nil, State: "removed"}},
 			},
 			{ID: "s4", Name: Bytes("epsilon"), Directory: Bytes("/srv/epsilon"), Group: ""},
@@ -50,25 +82,46 @@ func removalFixture() Manifest {
 				ID: "w0", Name: Bytes("editor"), Width: 80, Height: 24,
 				Layout: Layout{Width: 80, Height: 24, Pane: "p0"},
 				Options: []Option{
-					{Scope: "window", Name: Bytes("pane-border-status"), Value: Bytes("top"), Present: true},
+					{
+						Scope:   "window",
+						Name:    Bytes("pane-border-status"),
+						Value:   Bytes("top"),
+						Present: true,
+					},
 					{Scope: "window", Name: Bytes("@sticky"), Value: Bytes("yes"), Present: true},
 				},
 			},
 			{
-				ID: "w1", Name: Bytes("split"), Width: 80, Height: 24,
+				ID:     "w1",
+				Name:   Bytes("split"),
+				Width:  80,
+				Height: 24,
 				Layout: Layout{Width: 80, Height: 24, Axis: "x", Children: []Layout{
 					{Width: 40, Height: 24, Left: 0, Top: 0, Pane: "p1"},
 					{Width: 39, Height: 24, Left: 41, Top: 0, Pane: "p2"},
 				}},
-				Options: []Option{{Scope: "window", Name: Bytes("pane-border-status"), Value: Bytes("bottom"), Present: true}},
+				Options: []Option{
+					{
+						Scope:   "window",
+						Name:    Bytes("pane-border-status"),
+						Value:   Bytes("bottom"),
+						Present: true,
+					},
+				},
 			},
 			{
-				ID: "w2", Name: Bytes("zoomed"), Width: 100, Height: 30, Zoomed: true,
+				ID:     "w2",
+				Name:   Bytes("zoomed"),
+				Width:  100,
+				Height: 30,
+				Zoomed: true,
 				Layout: Layout{Width: 100, Height: 30, Axis: "x", Children: []Layout{
 					{Width: 50, Height: 30, Left: 0, Top: 0, Pane: "p3"},
 					{Width: 49, Height: 30, Left: 51, Top: 0, Pane: "p4"},
 				}},
-				Options: []Option{{Scope: "window", Name: Bytes("@zoom"), Value: Bytes("kept"), Present: true}},
+				Options: []Option{
+					{Scope: "window", Name: Bytes("@zoom"), Value: Bytes("kept"), Present: true},
+				},
 			},
 		},
 		Links: []Link{
@@ -81,41 +134,113 @@ func removalFixture() Manifest {
 		},
 		Panes: []Pane{
 			{
-				ID: "p0", Window: "w0", Index: 0, Title: Bytes("banner"), Directory: Bytes("/srv/alpha"),
-				Width: 80, Height: 23, Left: 0, Top: 1, Active: true,
-				Terminal: Terminal{Artifact: "a0", History: 120, CursorX: 3, CursorY: 2, Mode: Bytes("k")},
-				Launch:   Launch{Recovery: "unverified", Birth: Bytes("1700000000:11")},
+				ID:        "p0",
+				Window:    "w0",
+				Index:     0,
+				Title:     Bytes("banner"),
+				Directory: Bytes("/srv/alpha"),
+				Width:     80,
+				Height:    23,
+				Left:      0,
+				Top:       1,
+				Active:    true,
+				Terminal: Terminal{
+					Artifact: "a0",
+					History:  120,
+					CursorX:  3,
+					CursorY:  2,
+					Mode:     Bytes("k"),
+				},
+				Launch: Launch{Recovery: "unverified", Birth: Bytes("1700000000:11")},
 			},
 			{
-				ID: "p1", Window: "w1", Index: 0, Title: Bytes("left"), Directory: Bytes("/srv/delta"),
-				Width: 40, Height: 23, Left: 0, Top: 0, Active: true,
-				Terminal: Terminal{Artifact: "a1", History: 5, CursorX: 0, CursorY: 0, Mode: Bytes("")},
-				Launch:   Launch{Recovery: "unverified"},
+				ID:        "p1",
+				Window:    "w1",
+				Index:     0,
+				Title:     Bytes("left"),
+				Directory: Bytes("/srv/delta"),
+				Width:     40,
+				Height:    23,
+				Left:      0,
+				Top:       0,
+				Active:    true,
+				Terminal: Terminal{
+					Artifact: "a1",
+					History:  5,
+					CursorX:  0,
+					CursorY:  0,
+					Mode:     Bytes(""),
+				},
+				Launch: Launch{Recovery: "unverified"},
 			},
 			{
-				ID: "p2", Window: "w1", Index: 5, Title: Bytes("right"), Directory: Bytes("/srv/delta"),
-				Width: 39, Height: 23, Left: 41, Top: 0, Dead: true,
-				Terminal: Terminal{Artifact: "a1", History: 6, CursorX: 1, CursorY: 4, Mode: Bytes("a")},
-				Launch:   Launch{Recovery: "unverified"},
+				ID:        "p2",
+				Window:    "w1",
+				Index:     5,
+				Title:     Bytes("right"),
+				Directory: Bytes("/srv/delta"),
+				Width:     39,
+				Height:    23,
+				Left:      41,
+				Top:       0,
+				Dead:      true,
+				Terminal: Terminal{
+					Artifact: "a1",
+					History:  6,
+					CursorX:  1,
+					CursorY:  4,
+					Mode:     Bytes("a"),
+				},
+				Launch: Launch{Recovery: "unverified"},
 			},
 			{
-				ID: "p3", Window: "w2", Index: 4, Title: Bytes("zoom"), Directory: Bytes("/srv/epsilon"),
-				Width: 100, Height: 30, Left: 0, Top: 0, Active: true,
-				Terminal: Terminal{Artifact: "a2", History: 9, Alternate: true, CursorX: 7, CursorY: 8, Mode: Bytes("ks")},
+				ID:        "p3",
+				Window:    "w2",
+				Index:     4,
+				Title:     Bytes("zoom"),
+				Directory: Bytes("/srv/epsilon"),
+				Width:     100,
+				Height:    30,
+				Left:      0,
+				Top:       0,
+				Active:    true,
+				Terminal: Terminal{
+					Artifact:  "a2",
+					History:   9,
+					Alternate: true,
+					CursorX:   7,
+					CursorY:   8,
+					Mode:      Bytes("ks"),
+				},
 				Launch: Launch{
-					Executable:  Bytes("/bin/tool"),
-					Arguments:   []Bytes{Bytes("tool"), {'r', 'a', 'w', 0xff}},
-					Directory:   Bytes("/srv/epsilon"),
-					Environment: []Variable{{Name: Bytes("PATH"), Value: Bytes("/usr/bin"), State: "set"}},
-					Birth:       Bytes("1700000000:99"),
-					Recovery:    "restart",
+					Executable: Bytes("/bin/tool"),
+					Arguments:  []Bytes{Bytes("tool"), {'r', 'a', 'w', 0xff}},
+					Directory:  Bytes("/srv/epsilon"),
+					Environment: []Variable{
+						{Name: Bytes("PATH"), Value: Bytes("/usr/bin"), State: "set"},
+					},
+					Birth:    Bytes("1700000000:99"),
+					Recovery: "restart",
 				},
 			},
 			{
-				ID: "p4", Window: "w2", Index: 6, Title: Bytes("hidden"), Directory: Bytes("/srv/epsilon"),
-				Width: 49, Height: 30, Left: 51, Top: 0,
-				Terminal: Terminal{Artifact: "", History: 0, CursorX: 0, CursorY: 0, Mode: Bytes("")},
-				Launch:   Launch{Recovery: "unverified"},
+				ID:        "p4",
+				Window:    "w2",
+				Index:     6,
+				Title:     Bytes("hidden"),
+				Directory: Bytes("/srv/epsilon"),
+				Width:     49,
+				Height:    30,
+				Left:      51,
+				Top:       0,
+				Terminal: Terminal{
+					Artifact: "",
+					History:  0,
+					CursorX:  0,
+					CursorY:  0,
+					Mode:     Bytes(""),
+				},
+				Launch: Launch{Recovery: "unverified"},
 			},
 		},
 		Artifacts: []Artifact{
@@ -131,7 +256,10 @@ func unverifiedEvidence() []Evidence {
 	evidence := make([]Evidence, 0, len(domains))
 
 	for _, domain := range domains {
-		evidence = append(evidence, Evidence{Domain: domain, Status: "unverified", Reason: "not_captured"})
+		evidence = append(
+			evidence,
+			Evidence{Domain: domain, Status: "unverified", Reason: "not_captured"},
+		)
 	}
 
 	return evidence
@@ -237,7 +365,13 @@ func ids[T any](values []T, identity func(T) string) []string {
 	return identities
 }
 
-func assertRetainedEqual[T any](tb rapid.TB, retained []T, source map[string]T, identity func(T) string, missing string) {
+func assertRetainedEqual[T any](
+	tb rapid.TB,
+	retained []T,
+	source map[string]T,
+	identity func(T) string,
+	missing string,
+) {
 	tb.Helper()
 
 	for _, value := range retained {
@@ -255,11 +389,41 @@ func assertRetainedEqual[T any](tb rapid.TB, retained []T, source map[string]T, 
 func assertSurvivors(tb rapid.TB, source, retained Manifest) {
 	tb.Helper()
 
-	assertRetainedEqual(tb, retained.Sessions, indexSessions(source), sessionIdentity, "retained session is absent from the source graph")
-	assertRetainedEqual(tb, retained.Windows, indexWindows(source), windowIdentity, "retained window is absent from the source graph")
-	assertRetainedEqual(tb, retained.Panes, indexPanes(source), paneIdentity, "retained pane is absent from the source graph")
-	assertRetainedEqual(tb, retained.Artifacts, indexArtifacts(source), artifactIdentity, "retained artifact is absent from the source graph")
-	assertRetainedEqual(tb, retained.Links, indexLinks(source), linkKey, "retained link is absent from the source graph")
+	assertRetainedEqual(
+		tb,
+		retained.Sessions,
+		indexSessions(source),
+		sessionIdentity,
+		"retained session is absent from the source graph",
+	)
+	assertRetainedEqual(
+		tb,
+		retained.Windows,
+		indexWindows(source),
+		windowIdentity,
+		"retained window is absent from the source graph",
+	)
+	assertRetainedEqual(
+		tb,
+		retained.Panes,
+		indexPanes(source),
+		paneIdentity,
+		"retained pane is absent from the source graph",
+	)
+	assertRetainedEqual(
+		tb,
+		retained.Artifacts,
+		indexArtifacts(source),
+		artifactIdentity,
+		"retained artifact is absent from the source graph",
+	)
+	assertRetainedEqual(
+		tb,
+		retained.Links,
+		indexLinks(source),
+		linkKey,
+		"retained link is absent from the source graph",
+	)
 	assertGroupNames(tb, source, retained)
 	assertProvenanceRetained(tb, source, retained)
 }
@@ -399,7 +563,10 @@ func TestRemovalKeepsSharedWindowAndTrimsGroups(t *testing.T) {
 	removal := removeSessions(t, m, []string{"s2"})
 	checkSurvivorGraph(t, m, []string{"s2"}, removal)
 
-	if diff := cmp.Diff([]string{"s0", "s1"}, indexGroups(removal.Retained)["g0"].Members); diff != "" {
+	if diff := cmp.Diff(
+		[]string{"s0", "s1"},
+		indexGroups(removal.Retained)["g0"].Members,
+	); diff != "" {
 		t.Fatal("group membership was not preserved", diff)
 	}
 
@@ -422,7 +589,10 @@ func TestRemovalDropsUnreferencedWindowPanesAndArtifacts(t *testing.T) {
 		t.Fatal("artifact shared by the removed panes was not reported", diff)
 	}
 
-	if diff := cmp.Diff([]string{"w0", "w2"}, ids(removal.Retained.Windows, windowIdentity)); diff != "" {
+	if diff := cmp.Diff(
+		[]string{"w0", "w2"},
+		ids(removal.Retained.Windows, windowIdentity),
+	); diff != "" {
 		t.Fatal(diff)
 	}
 }
@@ -455,7 +625,8 @@ func TestRemovalKeepsWindowsSharedWithUnrelatedSessions(t *testing.T) {
 
 	links := indexLinks(removal.Retained)
 	for _, index := range []int{7, 11} {
-		if link, found := links[linkKey(Link{Session: "s2", Index: index})]; !found || link.Window != "w0" {
+		if link, found := links[linkKey(Link{Session: "s2", Index: index})]; !found ||
+			link.Window != "w0" {
 			t.Fatal("removal dropped a link to a window another session still uses", link)
 		}
 	}
@@ -672,7 +843,8 @@ func TestRemovalRejectsMalformedAndUnknownSelection(t *testing.T) {
 			}
 
 			context := diagnostic.Context()
-			if context["operation"] != "remove" || context["phase"] != "selection" || context["reason"] != testCase.reason {
+			if context["operation"] != "remove" || context["phase"] != "selection" ||
+				context["reason"] != testCase.reason {
 				t.Fatal("missing selection classification", context)
 			}
 
@@ -712,7 +884,10 @@ func TestRemovalValidatesSourceGraphFirst(t *testing.T) {
 		t.Fatal("unsupported version error was not preserved", errVersion)
 	}
 
-	if diagnostic, ok := oops.AsOops(errVersion); !ok || diagnostic.Code() != "snapshot_version_unsupported" {
+	if diagnostic, ok := oops.AsOops(
+		errVersion,
+	); !ok ||
+		diagnostic.Code() != "snapshot_version_unsupported" {
 		t.Fatal("wrong diagnostic code for unsupported version", diagnostic)
 	}
 }

@@ -18,7 +18,11 @@ type Definition[In, Out any] struct {
 	report func(Out) string
 }
 
-func define[In, Out any](descriptor Descriptor, bind func(Subject, Values) (In, error), report func(Out) string) *Definition[In, Out] {
+func define[In, Out any](
+	descriptor Descriptor,
+	bind func(Subject, Values) (In, error),
+	report func(Out) string,
+) *Definition[In, Out] {
 	if !descriptor.ID.Valid() {
 		panic("action: invalid ID " + string(descriptor.ID))
 	}
@@ -119,7 +123,11 @@ func encode[T any](value T) ([]byte, error) {
 func decodeStrict[T any](data []byte) (T, error) {
 	var value T
 
-	if err := json.Unmarshal(bytes.TrimSpace(data), &value, json.RejectUnknownMembers(true)); err != nil {
+	if err := json.Unmarshal(
+		bytes.TrimSpace(data),
+		&value,
+		json.RejectUnknownMembers(true),
+	); err != nil {
 		var zero T
 
 		return zero, Wrap(CodeInvalidArgument, ErrInvalidPayload)

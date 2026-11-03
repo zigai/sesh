@@ -36,7 +36,14 @@ func TestTitleChangesDoNotInvalidateObservation(t *testing.T) {
 		t.Fatalf("title fixture not applied: %q", info.Title)
 	}
 
-	if err := compareGraph(t.Context(), server, before, []gotmux.SessionID{session.ID()}, &baseline, nil); err != nil {
+	if err := compareGraph(
+		t.Context(),
+		server,
+		before,
+		[]gotmux.SessionID{session.ID()},
+		&baseline,
+		nil,
+	); err != nil {
 		t.Fatal("title-only change prevented saving", err)
 	}
 
@@ -55,7 +62,14 @@ func TestUnrelatedPaneExitDoesNotInvalidateSelection(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := compareGraph(t.Context(), server, before, []gotmux.SessionID{session.ID()}, &baseline, nil); err != nil {
+	if err := compareGraph(
+		t.Context(),
+		server,
+		before,
+		[]gotmux.SessionID{session.ID()},
+		&baseline,
+		nil,
+	); err != nil {
 		t.Fatal("unrelated work invalidated explicit selection", err)
 	}
 }
@@ -68,7 +82,14 @@ func TestSelectedMutationRejectsObservation(t *testing.T) {
 			before, baseline := captureBaseline(t, server, session)
 			mutatePane(t, pane, mutation)
 
-			if err := compareGraph(t.Context(), server, before, []gotmux.SessionID{session.ID()}, &baseline, nil); err == nil {
+			if err := compareGraph(
+				t.Context(),
+				server,
+				before,
+				[]gotmux.SessionID{session.ID()},
+				&baseline,
+				nil,
+			); err == nil {
 				t.Fatal("accepted changed selected pane")
 			}
 		})
@@ -96,20 +117,42 @@ func TestPaneExitDuringCollectionIsAStateChange(t *testing.T) {
 		t.Fatalf("collection failure was already a state change: %v", err)
 	}
 
-	if err := changedDuringCollect(t.Context(), server, before, selected, err); !errors.Is(err, ErrChanged) {
+	if err := changedDuringCollect(
+		t.Context(),
+		server,
+		before,
+		selected,
+		err,
+	); !errors.Is(
+		err,
+		ErrChanged,
+	) {
 		t.Fatalf("failure after a pane exited = %v, want ErrChanged", err)
 	}
 
 	unchanged, _ := captureBaseline(t, server, session)
 
-	if err := changedDuringCollect(t.Context(), server, unchanged, selected, errOptionsQuery); errors.Is(err, ErrChanged) || !errors.Is(err, errOptionsQuery) {
+	if err := changedDuringCollect(
+		t.Context(),
+		server,
+		unchanged,
+		selected,
+		errOptionsQuery,
+	); errors.Is(err, ErrChanged) ||
+		!errors.Is(err, errOptionsQuery) {
 		t.Fatalf("failure with an unchanged graph = %v, want the original failure only", err)
 	}
 }
 
 func TestObservePreservesStyledTrailingEmptyCells(t *testing.T) {
 	server := tmuxtest.NewServer(t)
-	session, pane := scriptedSessionFixture(t, server, "trailing-cells", 20, `printf 'scrollback-marker\nline2\nline3\nline4\nline5\nline6\nanchor\033[41m\033[K\033[0m'; exec sleep 300`)
+	session, pane := scriptedSessionFixture(
+		t,
+		server,
+		"trailing-cells",
+		20,
+		`printf 'scrollback-marker\nline2\nline3\nline4\nline5\nline6\nanchor\033[41m\033[K\033[0m'; exec sleep 300`,
+	)
 
 	waitForPaneText(t, pane, []byte("anchor"))
 
@@ -141,13 +184,31 @@ func TestObservePreservesStyledTrailingEmptyCells(t *testing.T) {
 
 func TestObserveOmitsTerminalTextBeyondOutputLimit(t *testing.T) {
 	fixture := tmuxtest.NewServer(t)
-	small, smallPane := scriptedSessionFixture(t, fixture, "small", 20, `printf 'small-marker'; exec sleep 300`)
-	large, largePane := scriptedSessionFixture(t, fixture, "large", 160, `i=0; while [ $i -lt 1500 ]; do printf '%0150d\n' $i; i=$((i+1)); done; printf 'large-marker'; exec sleep 300`)
+	small, smallPane := scriptedSessionFixture(
+		t,
+		fixture,
+		"small",
+		20,
+		`printf 'small-marker'; exec sleep 300`,
+	)
+	large, largePane := scriptedSessionFixture(
+		t,
+		fixture,
+		"large",
+		160,
+		`i=0; while [ $i -lt 1500 ]; do printf '%0150d\n' $i; i=$((i+1)); done; printf 'large-marker'; exec sleep 300`,
+	)
 
 	waitForPaneText(t, smallPane, []byte("small-marker"))
 	waitForPaneText(t, largePane, []byte("large-marker"))
 
-	server, err := gotmux.New(gotmux.Config{SocketPath: fixture.Endpoint().SocketPath, ConfigFile: "/dev/null", Limits: gotmux.Limits{OutputBytes: 64 << 10}})
+	server, err := gotmux.New(
+		gotmux.Config{
+			SocketPath: fixture.Endpoint().SocketPath,
+			ConfigFile: "/dev/null",
+			Limits:     gotmux.Limits{OutputBytes: 64 << 10},
+		},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,8 +222,14 @@ func TestObserveOmitsTerminalTextBeyondOutputLimit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(observation.Manifest.Panes) != 2 || len(observation.Artifacts) != 1 || observation.OmittedTerminalText() != 1 {
-		t.Fatalf("got %d panes, %d artifacts, %d omitted; want 2, 1, 1", len(observation.Manifest.Panes), len(observation.Artifacts), observation.OmittedTerminalText())
+	if len(observation.Manifest.Panes) != 2 || len(observation.Artifacts) != 1 ||
+		observation.OmittedTerminalText() != 1 {
+		t.Fatalf(
+			"got %d panes, %d artifacts, %d omitted; want 2, 1, 1",
+			len(observation.Manifest.Panes),
+			len(observation.Artifacts),
+			observation.OmittedTerminalText(),
+		)
 	}
 
 	for _, pane := range observation.Manifest.Panes {
@@ -189,7 +256,8 @@ func TestObserveOmitsFloatingPanes(t *testing.T) {
 	}
 
 	panes := observation.Manifest.Panes
-	if len(panes) != 2 || panes[0].ID != ref("p", string(first.ID())) || panes[1].ID != ref("p", string(second.ID())) {
+	if len(panes) != 2 || panes[0].ID != ref("p", string(first.ID())) ||
+		panes[1].ID != ref("p", string(second.ID())) {
 		t.Fatalf("saved panes = %+v, want only the two tiled panes", panes)
 	}
 
@@ -207,12 +275,18 @@ func TestObserveOmitsFloatingPanes(t *testing.T) {
 	}
 }
 
-func floatingPaneFixture(t *testing.T, server *gotmux.Server) (gotmux.Session, gotmux.Pane, gotmux.Pane) {
+func floatingPaneFixture(
+	t *testing.T,
+	server *gotmux.Server,
+) (gotmux.Session, gotmux.Pane, gotmux.Pane) {
 	t.Helper()
 
 	session, first := captureSessionFixture(t, server, "floating")
 
-	second, err := first.Split(t.Context(), gotmux.SplitOptions{Program: gotmux.Exec("sleep", "300")})
+	second, err := first.Split(
+		t.Context(),
+		gotmux.SplitOptions{Program: gotmux.Exec("sleep", "300")},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +295,17 @@ func floatingPaneFixture(t *testing.T, server *gotmux.Server) (gotmux.Session, g
 		t.Fatal(err)
 	}
 
-	floating, err := first.NewPane(t.Context(), gotmux.NewPaneOptions{Width: "20", Height: "5", X: "3", Y: "3", Program: gotmux.Exec("sleep", "300"), Select: true})
+	floating, err := first.NewPane(
+		t.Context(),
+		gotmux.NewPaneOptions{
+			Width:   "20",
+			Height:  "5",
+			X:       "3",
+			Y:       "3",
+			Program: gotmux.Exec("sleep", "300"),
+			Select:  true,
+		},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,7 +322,13 @@ func floatingPaneFixture(t *testing.T, server *gotmux.Server) (gotmux.Session, g
 	return session, first, second
 }
 
-func scriptedSessionFixture(t *testing.T, server *gotmux.Server, name string, width int, script string) (gotmux.Session, gotmux.Pane) {
+func scriptedSessionFixture(
+	t *testing.T,
+	server *gotmux.Server,
+	name string,
+	width int,
+	script string,
+) (gotmux.Session, gotmux.Pane) {
 	t.Helper()
 
 	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{
@@ -300,7 +390,10 @@ func mutatePane(t *testing.T, pane gotmux.Pane, mutation string) {
 	case "split":
 		_, err = pane.Split(t.Context(), gotmux.SplitOptions{Program: gotmux.Exec("sleep", "300")})
 	case "respawn":
-		err = pane.Respawn(t.Context(), gotmux.RespawnOptions{KillRunning: true, Program: gotmux.Exec("sleep", "300")})
+		err = pane.Respawn(
+			t.Context(),
+			gotmux.RespawnOptions{KillRunning: true, Program: gotmux.Exec("sleep", "300")},
+		)
 	case "kill":
 		err = pane.Kill(t.Context())
 	}
@@ -310,10 +403,22 @@ func mutatePane(t *testing.T, pane gotmux.Pane, mutation string) {
 	}
 }
 
-func captureSessionFixture(t *testing.T, server *gotmux.Server, name string) (gotmux.Session, gotmux.Pane) {
+func captureSessionFixture(
+	t *testing.T,
+	server *gotmux.Server,
+	name string,
+) (gotmux.Session, gotmux.Pane) {
 	t.Helper()
 
-	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{Name: name, Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly, Size: gotmux.Size{Width: 100, Height: 35}})
+	session, err := server.NewSession(
+		t.Context(),
+		gotmux.NewSessionOptions{
+			Name:    name,
+			Program: gotmux.Exec("sleep", "300"),
+			Start:   gotmux.StartPolicyExistingOnly,
+			Size:    gotmux.Size{Width: 100, Height: 35},
+		},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -331,7 +436,11 @@ func captureSessionFixture(t *testing.T, server *gotmux.Server, name string) (go
 	return session, pane
 }
 
-func captureBaseline(t *testing.T, server *gotmux.Server, session gotmux.Session) (gotmux.Snapshot, model.Manifest) {
+func captureBaseline(
+	t *testing.T,
+	server *gotmux.Server,
+	session gotmux.Session,
+) (gotmux.Snapshot, model.Manifest) {
 	t.Helper()
 
 	before, err := server.Snapshot(t.Context())

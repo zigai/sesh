@@ -49,11 +49,13 @@ func newApplicableChecksReport(tb testing.TB, scenario string) Report {
 	root := tb.TempDir()
 	dir := filepath.Join(root, "units")
 	opts := checks.Options{
-		SnapshotDir:     filepath.Join(root, "snapshots"),
-		HistoryPath:     filepath.Join(root, "history.json"),
-		LogPath:         filepath.Join(root, "sesh.log"),
-		Executable:      filepath.Join(root, "bin", "sesh"),
-		ConfigFiles:     []checks.ConfigFile{{Path: filepath.Join(root, "config.toml"), Status: checks.ConfigSkipped}},
+		SnapshotDir: filepath.Join(root, "snapshots"),
+		HistoryPath: filepath.Join(root, "history.json"),
+		LogPath:     filepath.Join(root, "sesh.log"),
+		Executable:  filepath.Join(root, "bin", "sesh"),
+		ConfigFiles: []checks.ConfigFile{
+			{Path: filepath.Join(root, "config.toml"), Status: checks.ConfigSkipped},
+		},
 		Flags:           map[string]string{"--no-config": ""},
 		ServiceDirs:     []string{dir},
 		Daemon:          checks.Daemon{State: checks.DaemonAbsent},
@@ -115,7 +117,13 @@ func renderReportConsumers(tb testing.TB, report Report) (string, Report) {
 	cmd.SetOut(&encoded)
 
 	failure := clibase.NewExitError(clibase.ExitCodeGeneral, ErrDoctorChecksFailed)
-	if err := clibase.WriteJSONResultError(cmd, report, failure); clibase.ExitCode(err) != clibase.ExitCodeGeneral {
+	if err := clibase.WriteJSONResultError(
+		cmd,
+		report,
+		failure,
+	); clibase.ExitCode(
+		err,
+	) != clibase.ExitCodeGeneral {
 		tb.Fatalf("required failure exit code lost: %v", err)
 	}
 
@@ -134,7 +142,8 @@ func renderReportConsumers(tb testing.TB, report Report) (string, Report) {
 		tb.Fatalf("required failure envelope lost: %s", encoded.String())
 	}
 
-	if payload.Result.Summary != report.Summary || !strings.Contains(text.String(), counts(report.Summary)) {
+	if payload.Result.Summary != report.Summary ||
+		!strings.Contains(text.String(), counts(report.Summary)) {
 		tb.Fatalf("counts disagree: text=%s JSON=%s", text.String(), encoded.String())
 	}
 
@@ -143,7 +152,8 @@ func renderReportConsumers(tb testing.TB, report Report) (string, Report) {
 
 func applicableReportChecks(scenario string) map[string]bool {
 	units := runtime.GOOS == "linux" && (scenario == "stale unit" || scenario == "inspection error")
-	coordinator := runtime.GOOS == "linux" && (scenario == "autosave enabled" || scenario == "installed coordinator" || scenario == "inspection error")
+	coordinator := runtime.GOOS == "linux" &&
+		(scenario == "autosave enabled" || scenario == "installed coordinator" || scenario == "inspection error")
 
 	return map[string]bool{
 		checks.CheckServiceUnits:     units,
@@ -152,7 +162,11 @@ func applicableReportChecks(scenario string) map[string]bool {
 	}
 }
 
-func assertReportApplicability(tb testing.TB, scenario, text string, byID map[string]checks.Result) {
+func assertReportApplicability(
+	tb testing.TB,
+	scenario, text string,
+	byID map[string]checks.Result,
+) {
 	tb.Helper()
 
 	applicable := applicableReportChecks(scenario)
@@ -165,7 +179,8 @@ func assertReportApplicability(tb testing.TB, scenario, text string, byID map[st
 		assertReportCheckRows(tb, text, id, want)
 	}
 
-	if (scenario == "unsupported" || runtime.GOOS != "linux") && strings.Contains(text, "\nServices\n") {
+	if (scenario == "unsupported" || runtime.GOOS != "linux") &&
+		strings.Contains(text, "\nServices\n") {
 		tb.Errorf("empty services group rendered: %s", text)
 	}
 
@@ -173,7 +188,8 @@ func assertReportApplicability(tb testing.TB, scenario, text string, byID map[st
 		tb.Errorf("empty autosave group rendered: %s", text)
 	}
 
-	if runtime.GOOS == "linux" && scenario == "stale unit" && byID[checks.CheckServiceUnits].Status != checks.StatusFail {
+	if runtime.GOOS == "linux" && scenario == "stale unit" &&
+		byID[checks.CheckServiceUnits].Status != checks.StatusFail {
 		tb.Errorf("stale unit failure lost: %+v", byID)
 	}
 }
@@ -196,14 +212,20 @@ func assertReportCheckRows(tb testing.TB, text, id string, want bool) {
 	}
 }
 
-func assertReportOutcomes(tb testing.TB, report, decoded Report, text string, byID map[string]checks.Result) {
+func assertReportOutcomes(
+	tb testing.TB,
+	report, decoded Report,
+	text string,
+	byID map[string]checks.Result,
+) {
 	tb.Helper()
 
 	if report.Summary.Fail == 0 || byID[checks.CheckTmuxClient].Status != checks.StatusFail {
 		tb.Errorf("required missing dependency failure lost: %+v", report)
 	}
 
-	if byID[checks.CheckConfigFile].Status != checks.StatusSkip || !strings.Contains(text, "skipped, --no-config") {
+	if byID[checks.CheckConfigFile].Status != checks.StatusSkip ||
+		!strings.Contains(text, "skipped, --no-config") {
 		tb.Errorf("explicit configuration skip lost: %s", text)
 	}
 

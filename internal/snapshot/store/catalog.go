@@ -84,7 +84,8 @@ type Action struct {
 
 func (c Catalog) validate() error {
 	if c.Version != catalogVersion || len(c.Attempts) > maxEntries || len(c.Generations) > maxEntries ||
-		len(c.Operations) > maxEntries || len(c.Rewrites) > maxEntries {
+		len(c.Operations) > maxEntries ||
+		len(c.Rewrites) > maxEntries {
 		return ErrCorrupt
 	}
 
@@ -108,7 +109,8 @@ func (c Catalog) validateAttempts() error {
 
 	var previous uint64
 	for _, attempt := range c.Attempts {
-		if !validID(attempt.ID) || seen[attempt.ID] || attempt.Sequence <= previous || attempt.Sequence > c.Sequence {
+		if !validID(attempt.ID) || seen[attempt.ID] || attempt.Sequence <= previous ||
+			attempt.Sequence > c.Sequence {
 			return ErrCorrupt
 		}
 
@@ -131,7 +133,8 @@ func (c Catalog) validateGenerations() error {
 	seen := make(map[string]bool)
 
 	for _, generation := range c.Generations {
-		if !validID(generation.ID) || seen[generation.ID] || !validDigest(generation.ManifestSHA256) {
+		if !validID(generation.ID) || seen[generation.ID] ||
+			!validDigest(generation.ManifestSHA256) {
 			return ErrCorrupt
 		}
 
@@ -141,7 +144,8 @@ func (c Catalog) validateGenerations() error {
 		}
 
 		attempt := c.Attempts[index]
-		if attempt.Sequence != generation.Sequence || (attempt.State != "committed" && attempt.State != "incomplete") {
+		if attempt.Sequence != generation.Sequence ||
+			(attempt.State != "committed" && attempt.State != "incomplete") {
 			return ErrCorrupt
 		}
 
@@ -160,7 +164,8 @@ func (c Catalog) validateGenerations() error {
 }
 
 func (a Attempt) matchesGeneration(generation Generation) bool {
-	return generation.Complete == (a.State == "committed") && generation.ManifestSHA256 == a.ManifestSHA256
+	return generation.Complete == (a.State == "committed") &&
+		generation.ManifestSHA256 == a.ManifestSHA256
 }
 
 func (c Catalog) validateOperations() error {
@@ -182,7 +187,8 @@ func (c Catalog) validateOperations() error {
 			return err
 		}
 
-		if op.State == "complete" && slices.ContainsFunc(op.Actions, func(a Action) bool { return a.State != "verified" }) {
+		if op.State == "complete" &&
+			slices.ContainsFunc(op.Actions, func(a Action) bool { return a.State != "verified" }) {
 			return ErrCorrupt
 		}
 
@@ -249,7 +255,8 @@ func (c Catalog) validateRewrites() error {
 	pendingSources := make(map[string]bool)
 
 	for _, rewrite := range c.Rewrites {
-		if seen[rewrite.ID] || sources[rewrite.Source] || (rewrite.Replacement != "" && replacements[rewrite.Replacement]) {
+		if seen[rewrite.ID] || sources[rewrite.Source] ||
+			(rewrite.Replacement != "" && replacements[rewrite.Replacement]) {
 			return ErrCorrupt
 		}
 
@@ -309,11 +316,13 @@ func (c Catalog) validateRewriteState(rewrite Rewrite, pendingSources map[string
 }
 
 func (c Catalog) validatePendingRewrite(rewrite Rewrite, pendingSources map[string]bool) error {
-	if rewrite.Replacement != "" && (!validID(rewrite.Replacement) || rewrite.Replacement == rewrite.Source) {
+	if rewrite.Replacement != "" &&
+		(!validID(rewrite.Replacement) || rewrite.Replacement == rewrite.Source) {
 		return ErrCorrupt
 	}
 
-	if c.generationIndex(rewrite.Source) < 0 || pendingSources[rewrite.Source] || c.attemptIndex(rewrite.Replacement) >= 0 {
+	if c.generationIndex(rewrite.Source) < 0 || pendingSources[rewrite.Source] ||
+		c.attemptIndex(rewrite.Replacement) >= 0 {
 		return ErrCorrupt
 	}
 
@@ -332,7 +341,8 @@ func (c Catalog) validateCompletedRewrite(rewrite Rewrite) error {
 		return ErrCorrupt
 	}
 
-	if !collectionRetiredState(c.Attempts[index].State) || c.Attempts[index].Sequence <= c.Attempts[c.attemptIndex(rewrite.Source)].Sequence {
+	if !collectionRetiredState(c.Attempts[index].State) ||
+		c.Attempts[index].Sequence <= c.Attempts[c.attemptIndex(rewrite.Source)].Sequence {
 		return ErrCorrupt
 	}
 

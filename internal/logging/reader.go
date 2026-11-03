@@ -67,7 +67,11 @@ type boundedBuffer struct {
 
 func (b *boundedBuffer) Write(p []byte) (int, error) {
 	if b.buf.Len()+len(p) > b.maxBytes {
-		return 0, wrapErr(ErrLogReadLimit, "log_read_limit", "retained records exceed aggregate byte limit")
+		return 0, wrapErr(
+			ErrLogReadLimit,
+			"log_read_limit",
+			"retained records exceed aggregate byte limit",
+		)
 	}
 
 	n, err := b.buf.Write(p)
@@ -134,7 +138,10 @@ func Truncate(ctx context.Context, path string) (retErr error) {
 	defer func() {
 		closeErr := parentFile.Close()
 		if closeErr != nil {
-			retErr = errors.Join(retErr, wrapErr(closeErr, "log_close_failed", "close pinned parent directory"))
+			retErr = errors.Join(
+				retErr,
+				wrapErr(closeErr, "log_close_failed", "close pinned parent directory"),
+			)
 		}
 	}()
 
@@ -240,7 +247,10 @@ func truncateInParent(ctx context.Context, parentFile *os.File, baseName string)
 	}()
 
 	if err := ctx.Err(); err != nil {
-		retErr = errors.Join(retErr, wrapErr(err, "log_truncate_failed", "truncate active log canceled"))
+		retErr = errors.Join(
+			retErr,
+			wrapErr(err, "log_truncate_failed", "truncate active log canceled"),
+		)
 
 		return retErr
 	}
@@ -335,7 +345,11 @@ func inspectLogFilesToClear(parentFd int, baseName string) (bool, bool, error) {
 		}
 
 		if !errors.Is(backupErr, unix.ENOENT) {
-			return false, false, wrapErr(backupErr, "log_truncate_failed", "inspect rotation backup file")
+			return false, false, wrapErr(
+				backupErr,
+				"log_truncate_failed",
+				"inspect rotation backup file",
+			)
 		}
 	}
 
@@ -352,7 +366,11 @@ func inspectLogFilesToClear(parentFd int, baseName string) (bool, bool, error) {
 	}
 
 	if !errors.Is(tempErr, unix.ENOENT) {
-		return false, false, wrapErr(tempErr, "log_truncate_failed", "inspect rotation temporary file")
+		return false, false, wrapErr(
+			tempErr,
+			"log_truncate_failed",
+			"inspect rotation temporary file",
+		)
 	}
 
 	hasLock, lockErr := checkLockFileStat(parentFd, baseName)
@@ -381,10 +399,19 @@ func checkLockFileStat(parentFd int, baseName string) (bool, error) {
 }
 
 func openReaderAt(parentFd int, baseName, path string) (*os.File, error) {
-	fd, err := unix.Openat(parentFd, baseName, unix.O_RDONLY|unix.O_NOFOLLOW|unix.O_CLOEXEC|unix.O_NONBLOCK, 0)
+	fd, err := unix.Openat(
+		parentFd,
+		baseName,
+		unix.O_RDONLY|unix.O_NOFOLLOW|unix.O_CLOEXEC|unix.O_NONBLOCK,
+		0,
+	)
 	if err != nil {
 		if errors.Is(err, unix.ELOOP) {
-			return nil, wrapErr(ErrLogPathNotRegular, "log_path_not_regular", "open log file for reading")
+			return nil, wrapErr(
+				ErrLogPathNotRegular,
+				"log_path_not_regular",
+				"open log file for reading",
+			)
 		}
 
 		return nil, wrapErr(err, "log_open_failed", "open log file for reading")
@@ -392,29 +419,50 @@ func openReaderAt(parentFd int, baseName, path string) (*os.File, error) {
 
 	var stat unix.Stat_t
 	if err := unix.Fstat(fd, &stat); err != nil {
-		return nil, wrapErr(errors.Join(err, unix.Close(fd)), "log_open_failed", "inspect open log file")
+		return nil, wrapErr(
+			errors.Join(err, unix.Close(fd)),
+			"log_open_failed",
+			"inspect open log file",
+		)
 	}
 
 	if stat.Mode&unix.S_IFMT != unix.S_IFREG {
-		return nil, wrapErr(errors.Join(ErrLogPathNotRegular, unix.Close(fd)), "log_path_not_regular", "inspect open log file")
+		return nil, wrapErr(
+			errors.Join(ErrLogPathNotRegular, unix.Close(fd)),
+			"log_path_not_regular",
+			"inspect open log file",
+		)
 	}
 
 	if _, err := unix.FcntlInt(uintptr(fd), unix.F_SETFL, unix.O_RDONLY); err != nil {
-		return nil, wrapErr(errors.Join(err, unix.Close(fd)), "log_open_failed", "configure open log file flags")
+		return nil, wrapErr(
+			errors.Join(err, unix.Close(fd)),
+			"log_open_failed",
+			"configure open log file flags",
+		)
 	}
 
 	return os.NewFile(uintptr(fd), path), nil
 }
 
 func truncateActiveLogFile(parentFd int, baseName string) error {
-	fd, err := unix.Openat(parentFd, baseName, unix.O_WRONLY|unix.O_NOFOLLOW|unix.O_CLOEXEC|unix.O_NONBLOCK, 0)
+	fd, err := unix.Openat(
+		parentFd,
+		baseName,
+		unix.O_WRONLY|unix.O_NOFOLLOW|unix.O_CLOEXEC|unix.O_NONBLOCK,
+		0,
+	)
 	if err != nil {
 		if errors.Is(err, unix.ENOENT) {
 			return nil
 		}
 
 		if errors.Is(err, unix.ELOOP) {
-			return wrapErr(ErrLogPathNotRegular, "log_path_not_regular", "open active log file for truncation")
+			return wrapErr(
+				ErrLogPathNotRegular,
+				"log_path_not_regular",
+				"open active log file for truncation",
+			)
 		}
 
 		return wrapErr(err, "log_truncate_failed", "open active log file for truncation")
@@ -422,11 +470,19 @@ func truncateActiveLogFile(parentFd int, baseName string) error {
 
 	var openStat unix.Stat_t
 	if err := unix.Fstat(fd, &openStat); err != nil {
-		return wrapErr(errors.Join(err, unix.Close(fd)), "log_truncate_failed", "inspect active log file for truncation")
+		return wrapErr(
+			errors.Join(err, unix.Close(fd)),
+			"log_truncate_failed",
+			"inspect active log file for truncation",
+		)
 	}
 
 	if openStat.Mode&unix.S_IFMT != unix.S_IFREG {
-		return wrapErr(errors.Join(ErrLogPathNotRegular, unix.Close(fd)), "log_path_not_regular", "inspect active log file for truncation")
+		return wrapErr(
+			errors.Join(ErrLogPathNotRegular, unix.Close(fd)),
+			"log_path_not_regular",
+			"inspect active log file for truncation",
+		)
 	}
 
 	truncErr := unix.Ftruncate(fd, 0)
@@ -537,7 +593,11 @@ func (r *ringBuffer) add(line []byte) error {
 
 	if len(r.lines) < r.size {
 		if r.curBytes+newLineLen > r.maxBytes {
-			return wrapErr(ErrLogReadLimit, "log_read_limit", "retained records exceed aggregate byte limit")
+			return wrapErr(
+				ErrLogReadLimit,
+				"log_read_limit",
+				"retained records exceed aggregate byte limit",
+			)
 		}
 
 		lineCopy := append([]byte(nil), line...)
@@ -553,7 +613,11 @@ func (r *ringBuffer) add(line []byte) error {
 
 	newBytes := r.curBytes - oldLineLen + newLineLen
 	if newBytes > r.maxBytes {
-		return wrapErr(ErrLogReadLimit, "log_read_limit", "retained records exceed aggregate byte limit")
+		return wrapErr(
+			ErrLogReadLimit,
+			"log_read_limit",
+			"retained records exceed aggregate byte limit",
+		)
 	}
 
 	lineCopy := append([]byte(nil), line...)
@@ -583,7 +647,13 @@ func (r *ringBuffer) drain() [][]byte {
 	return out
 }
 
-func streamAllLogs(ctx context.Context, paths []string, activePath string, opts ReadOptions, out io.Writer) error {
+func streamAllLogs(
+	ctx context.Context,
+	paths []string,
+	activePath string,
+	opts ReadOptions,
+	out io.Writer,
+) error {
 	state, err := readInitialLogs(ctx, paths, opts.Filter, out)
 	if err != nil {
 		if opts.Follow && isCleanCancellation(ctx, err) {
@@ -596,7 +666,13 @@ func streamAllLogs(ctx context.Context, paths []string, activePath string, opts 
 	return finishInitialLogs(ctx, state, activePath, opts, out)
 }
 
-func streamBoundedLogs(ctx context.Context, paths []string, activePath string, opts ReadOptions, out io.Writer) error {
+func streamBoundedLogs(
+	ctx context.Context,
+	paths []string,
+	activePath string,
+	opts ReadOptions,
+	out io.Writer,
+) error {
 	ring := newRingBuffer(opts.Lines, MaxRetainedLogBytes)
 
 	state, err := readInitialLogs(ctx, paths, opts.Filter, ring)
@@ -615,7 +691,13 @@ func streamBoundedLogs(ctx context.Context, paths []string, activePath string, o
 	return finishInitialLogs(ctx, state, activePath, opts, out)
 }
 
-func drainRingRecords(ctx context.Context, lines [][]byte, opts ReadOptions, out io.Writer, state *followState) error {
+func drainRingRecords(
+	ctx context.Context,
+	lines [][]byte,
+	opts ReadOptions,
+	out io.Writer,
+	state *followState,
+) error {
 	for _, line := range lines {
 		if err := ctx.Err(); err != nil {
 			return handleDrainError(ctx, err, opts, state)
@@ -646,7 +728,12 @@ func handleDrainError(ctx context.Context, err error, opts ReadOptions, state *f
 	return errors.Join(err, closeErr)
 }
 
-func readInitialLogs(ctx context.Context, paths []string, opts FilterOptions, out io.Writer) (*followState, error) {
+func readInitialLogs(
+	ctx context.Context,
+	paths []string,
+	opts FilterOptions,
+	out io.Writer,
+) (*followState, error) {
 	state := &followState{file: nil, reader: nil, partial: nil, lastSize: 0}
 
 	for index, path := range paths {
@@ -680,7 +767,13 @@ func readInitialLogs(ctx context.Context, paths []string, opts FilterOptions, ou
 	return state, nil
 }
 
-func finishInitialLogs(ctx context.Context, state *followState, path string, opts ReadOptions, out io.Writer) error {
+func finishInitialLogs(
+	ctx context.Context,
+	state *followState,
+	path string,
+	opts ReadOptions,
+	out io.Writer,
+) error {
 	if !opts.Follow {
 		return state.close()
 	}
@@ -695,7 +788,13 @@ func finishInitialLogs(ctx context.Context, state *followState, path string, opt
 	return errors.Join(followErr, closeErr)
 }
 
-func followLogFile(ctx context.Context, path string, opts FilterOptions, out io.Writer, state *followState) error {
+func followLogFile(
+	ctx context.Context,
+	path string,
+	opts FilterOptions,
+	out io.Writer,
+	state *followState,
+) error {
 	const watchInterval = 50 * time.Millisecond
 
 	ticker := time.NewTicker(watchInterval)
@@ -827,7 +926,12 @@ func (s *followState) drain(ctx context.Context, opts FilterOptions, out io.Writ
 	return nil
 }
 
-func (s *followState) step(ctx context.Context, path string, opts FilterOptions, out io.Writer) error {
+func (s *followState) step(
+	ctx context.Context,
+	path string,
+	opts FilterOptions,
+	out io.Writer,
+) error {
 	if err := ctx.Err(); err != nil {
 		return wrapErr(err, "log_read_failed", "step follow reader")
 	}
@@ -872,7 +976,11 @@ func (s *followState) refresh(path string) error {
 
 	currentInfo, currentErr := current.Stat()
 	if err := errors.Join(previousErr, currentErr); err != nil {
-		return wrapErr(errors.Join(err, current.Close()), "log_read_failed", "inspect rotated log reader")
+		return wrapErr(
+			errors.Join(err, current.Close()),
+			"log_read_failed",
+			"inspect rotated log reader",
+		)
 	}
 
 	if os.SameFile(previousInfo, currentInfo) {
@@ -902,7 +1010,13 @@ func writeLogRecord(out io.Writer, line []byte) error {
 	return nil
 }
 
-func drainFollowLines(ctx context.Context, reader *bufio.Reader, opts FilterOptions, out io.Writer, partial []byte) ([]byte, error) {
+func drainFollowLines(
+	ctx context.Context,
+	reader *bufio.Reader,
+	opts FilterOptions,
+	out io.Writer,
+	partial []byte,
+) ([]byte, error) {
 	for {
 		if err := ctx.Err(); err != nil {
 			return partial, wrapErr(err, "log_read_failed", "read log stream")
@@ -954,7 +1068,11 @@ func readNextCompleteLine(reader *bufio.Reader, partial []byte) ([]byte, []byte,
 	}
 
 	if len(frag) > maxLogRecordBytes-len(partial) {
-		return nil, nil, false, wrapErr(ErrLogRecordTooLong, "log_read_failed", "log record exceeds maximum line length")
+		return nil, nil, false, wrapErr(
+			ErrLogRecordTooLong,
+			"log_read_failed",
+			"log record exceeds maximum line length",
+		)
 	}
 
 	partial = append(partial, frag...)

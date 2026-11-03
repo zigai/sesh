@@ -56,14 +56,22 @@ func remotePeerActionFixture(t *testing.T, peerConfig string) (*gotmux.Server, [
 		t.Fatal(err)
 	}
 
-	input, err := action.SessionCreate.EncodeInput(action.CreateSession{Name: "remote-created", Directory: t.TempDir()})
+	input, err := action.SessionCreate.EncodeInput(
+		action.CreateSession{Name: "remote-created", Directory: t.TempDir()},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	request := remote.ActionRequest{
-		InvocationID: "", IntentDigest: "", Action: action.SessionCreate.ID, ConnectionID: "origin", ConfigDigest: "digest",
-		PeerID: peerID, Socket: server.Endpoint().SocketPath, Input: input,
+		InvocationID: "",
+		IntentDigest: "",
+		Action:       action.SessionCreate.ID,
+		ConnectionID: "origin",
+		ConfigDigest: "digest",
+		PeerID:       peerID,
+		Socket:       server.Endpoint().SocketPath,
+		Input:        input,
 	}
 
 	request.InvocationID, err = remote.NewInvocationID()
@@ -84,12 +92,22 @@ func remotePeerActionFixture(t *testing.T, peerConfig string) (*gotmux.Server, [
 	return server, payload, configPath
 }
 
-func runRemotePeerActionEntrypoint(t *testing.T, payload []byte, configPath string) remote.ActionResult {
+func runRemotePeerActionEntrypoint(
+	t *testing.T,
+	payload []byte,
+	configPath string,
+) remote.ActionResult {
 	t.Helper()
 
 	var stdout, stderr bytes.Buffer
 
-	err := cli.ExecuteApplication(t.Context(), []string{"remote", "peer", "action", "--config", configPath}, bytes.NewReader(payload), &stdout, &stderr)
+	err := cli.ExecuteApplication(
+		t.Context(),
+		[]string{"remote", "peer", "action", "--config", configPath},
+		bytes.NewReader(payload),
+		&stdout,
+		&stderr,
+	)
 	if err != nil {
 		t.Fatalf("peer action failed: %v; stderr=%q", err, stderr.String())
 	}
@@ -112,7 +130,8 @@ func TestRemotePeerActionEntrypointCreatesAndReplaysOnDisposableServer(t *testin
 	}
 
 	created, err := action.SessionCreate.DecodeOutput(first.Output)
-	if createdSession, ok := created.(action.CreatedSession); err != nil || !ok || createdSession.Session.Name != "remote-created" {
+	if createdSession, ok := created.(action.CreatedSession); err != nil || !ok ||
+		createdSession.Session.Name != "remote-created" {
 		t.Fatalf("create output = %s, %v; want the created session", first.Output, err)
 	}
 
@@ -122,7 +141,10 @@ func TestRemotePeerActionEntrypointCreatesAndReplaysOnDisposableServer(t *testin
 }
 
 func TestRemotePeerActionEntrypointHonorsThePeersPolicy(t *testing.T) {
-	server, payload, configPath := remotePeerActionFixture(t, "[actions.session.create]\nallow_remote = false\n")
+	server, payload, configPath := remotePeerActionFixture(
+		t,
+		"[actions.session.create]\nallow_remote = false\n",
+	)
 
 	result := runRemotePeerActionEntrypoint(t, payload, configPath)
 	if result.OK || result.Code != action.CodeForbidden {

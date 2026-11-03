@@ -37,7 +37,12 @@ func OpenExisting(ctx context.Context, path string) (*Repository, error) {
 		return nil, repositoryError("open_existing", err)
 	}
 
-	repository := &Repository{root: root, path: path, fault: nil, owners: attemptOwners{mu: sync.Mutex{}, held: nil}}
+	repository := &Repository{
+		root:   root,
+		path:   path,
+		fault:  nil,
+		owners: attemptOwners{mu: sync.Mutex{}, held: nil},
+	}
 	if err := repository.inspectExisting(ctx); err != nil {
 		return nil, repositoryError("open_existing", errors.Join(err, root.Close()))
 	}
@@ -45,13 +50,27 @@ func OpenExisting(ctx context.Context, path string) (*Repository, error) {
 	return repository, nil
 }
 
-func openWithFault(ctx context.Context, path string, fault func(string) error) (*Repository, error) {
+func openWithFault(
+	ctx context.Context,
+	path string,
+	fault func(string) error,
+) (*Repository, error) {
 	root, err := privatefs.Ensure(path)
 	if err != nil {
-		return nil, repositoryError("open", oops.In("snapshot.store").With("operation", "open_repository").Wrapf(err, "open repository"))
+		return nil, repositoryError(
+			"open",
+			oops.In("snapshot.store").
+				With("operation", "open_repository").
+				Wrapf(err, "open repository"),
+		)
 	}
 
-	repository := &Repository{root: root, path: path, fault: fault, owners: attemptOwners{mu: sync.Mutex{}, held: nil}}
+	repository := &Repository{
+		root:   root,
+		path:   path,
+		fault:  fault,
+		owners: attemptOwners{mu: sync.Mutex{}, held: nil},
+	}
 	if err := repository.initialize(ctx); err != nil {
 		return nil, repositoryError("open", errors.Join(err, root.Close()))
 	}
@@ -63,7 +82,12 @@ func (r *Repository) Close() error {
 	releaseErr := r.releaseAttempts()
 
 	if err := errors.Join(releaseErr, r.root.Close()); err != nil {
-		return repositoryError("close", oops.In("snapshot.store").With("operation", "close_repository").Wrapf(err, "close repository"))
+		return repositoryError(
+			"close",
+			oops.In("snapshot.store").
+				With("operation", "close_repository").
+				Wrapf(err, "close repository"),
+		)
 	}
 
 	return nil
@@ -72,7 +96,12 @@ func (r *Repository) Close() error {
 func (r *Repository) Inspect(ctx context.Context) (Catalog, error) {
 	lock, err := r.root.Lock(ctx, "repository.lock")
 	if err != nil {
-		return Catalog{}, repositoryError("inspect", oops.In("snapshot.store").With("operation", "lock_catalog_inspection").Wrapf(err, "lock catalog inspection"))
+		return Catalog{}, repositoryError(
+			"inspect",
+			oops.In("snapshot.store").
+				With("operation", "lock_catalog_inspection").
+				Wrapf(err, "lock catalog inspection"),
+		)
 	}
 
 	catalog, readErr := r.catalog()
@@ -83,7 +112,13 @@ func (r *Repository) Inspect(ctx context.Context) (Catalog, error) {
 // Begin registers a pending attempt owned by this process until Release or Close, and first
 // settles pending attempts whose save process died.
 func (r *Repository) Begin(ctx context.Context) (Attempt, error) {
-	attempt := Attempt{ID: newID(), Sequence: 0, State: "pending", Reason: "capture_pending", ManifestSHA256: ""}
+	attempt := Attempt{
+		ID:             newID(),
+		Sequence:       0,
+		State:          "pending",
+		Reason:         "capture_pending",
+		ManifestSHA256: "",
+	}
 
 	var abandoned []string
 
@@ -139,7 +174,9 @@ func (r *Repository) Fail(ctx context.Context, id string) error {
 func (r *Repository) initialize(ctx context.Context) error {
 	lock, err := r.root.Lock(ctx, "repository.lock")
 	if err != nil {
-		return oops.In("snapshot.store").With("operation", "lock_catalog_update").Wrapf(err, "lock catalog update")
+		return oops.In("snapshot.store").
+			With("operation", "lock_catalog_update").
+			Wrapf(err, "lock catalog update")
 	}
 
 	err = r.initializeLocked(ctx)
@@ -182,7 +219,9 @@ func (r *Repository) validateExisting() error {
 func (r *Repository) update(ctx context.Context, change func(*Catalog) error) error {
 	lock, err := r.root.Lock(ctx, "repository.lock")
 	if err != nil {
-		return oops.In("snapshot.store").With("operation", "lock_catalog_update").Wrapf(err, "lock catalog update")
+		return oops.In("snapshot.store").
+			With("operation", "lock_catalog_update").
+			Wrapf(err, "lock catalog update")
 	}
 
 	err = r.change(ctx, change)
@@ -201,7 +240,9 @@ func (r *Repository) change(ctx context.Context, change func(*Catalog) error) er
 	}
 
 	if err := ctx.Err(); err != nil {
-		return oops.In("snapshot.store").With("operation", "publish_catalog").Wrapf(err, "publish catalog")
+		return oops.In("snapshot.store").
+			With("operation", "publish_catalog").
+			Wrapf(err, "publish catalog")
 	}
 
 	return r.publish(ctx, catalog, nil)
@@ -210,7 +251,9 @@ func (r *Repository) change(ctx context.Context, change func(*Catalog) error) er
 func (r *Repository) catalog() (Catalog, error) {
 	data, err := r.root.Read("catalog.json", maxCatalogBytes)
 	if err != nil {
-		return Catalog{}, oops.In("snapshot.store").With("operation", "read_catalog").Wrapf(err, "read catalog")
+		return Catalog{}, oops.In("snapshot.store").
+			With("operation", "read_catalog").
+			Wrapf(err, "read catalog")
 	}
 
 	catalog, err := strictjson.Decode[Catalog](data)
@@ -221,7 +264,9 @@ func (r *Repository) catalog() (Catalog, error) {
 	}
 
 	if err != nil {
-		return Catalog{}, oops.In("snapshot.store").With("operation", "decode_catalog", "repository", r.path, "file", "catalog.json").Wrapf(err, "decode catalog")
+		return Catalog{}, oops.In("snapshot.store").
+			With("operation", "decode_catalog", "repository", r.path, "file", "catalog.json").
+			Wrapf(err, "decode catalog")
 	}
 
 	return catalog, nil
@@ -248,7 +293,9 @@ func (r *Repository) publish(ctx context.Context, catalog Catalog, committed *Li
 	}
 
 	if err := r.root.Rename(name, r.root, "catalog.json"); err != nil {
-		return oops.In("snapshot.store").With("operation", "publish_catalog").Wrapf(err, "publish catalog")
+		return oops.In("snapshot.store").
+			With("operation", "publish_catalog").
+			Wrapf(err, "publish catalog")
 	}
 
 	if err := r.boundary("catalog_replaced"); err != nil {
@@ -257,7 +304,12 @@ func (r *Repository) publish(ctx context.Context, catalog Catalog, committed *Li
 
 	if current != "" {
 		if err := r.root.Rename(current, r.root, currentStateName); err != nil {
-			return errors.Join(ErrUncertain, oops.In("snapshot.store").With("operation", "publish_current_state").Wrapf(err, "publish current state"))
+			return errors.Join(
+				ErrUncertain,
+				oops.In("snapshot.store").
+					With("operation", "publish_current_state").
+					Wrapf(err, "publish current state"),
+			)
 		}
 
 		if err := r.boundary("current_replaced"); err != nil {
@@ -283,7 +335,9 @@ func (r *Repository) boundary(phase string) error {
 func writeFile(dir *privatefs.Dir, name string, data []byte) error {
 	file, err := dir.File(name, unix.O_WRONLY|unix.O_CREAT|unix.O_EXCL)
 	if err != nil {
-		return oops.In("snapshot.store").With("operation", "create_repository_file").Wrapf(err, "create repository file")
+		return oops.In("snapshot.store").
+			With("operation", "create_repository_file").
+			Wrapf(err, "create repository file")
 	}
 
 	_, writeErr := file.Write(data)
@@ -298,7 +352,9 @@ func encodeCatalog(catalog Catalog) ([]byte, error) {
 
 	data, err := json.Marshal(catalog)
 	if err != nil {
-		return nil, oops.In("snapshot.store").With("operation", "encode_catalog").Wrapf(err, "encode catalog")
+		return nil, oops.In("snapshot.store").
+			With("operation", "encode_catalog").
+			Wrapf(err, "encode catalog")
 	}
 
 	if len(data) > maxCatalogBytes {

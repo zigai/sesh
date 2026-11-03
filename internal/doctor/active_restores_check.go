@@ -17,7 +17,11 @@ func (s *Service) checkActiveRestores(ctx context.Context) Result {
 
 	repo, err := store.OpenExisting(ctx, s.opts.SnapshotDir)
 	if err != nil {
-		return newResult(CheckActiveRestores, StatusFail, "Cannot open the repository: "+err.Error()).
+		return newResult(
+			CheckActiveRestores,
+			StatusFail,
+			"Cannot open the repository: "+err.Error(),
+		).
 			withReason(ReasonInspectionFailed).
 			withCommand(s.doctorCommand())
 	}
@@ -28,7 +32,11 @@ func (s *Service) checkActiveRestores(ctx context.Context) Result {
 	}
 
 	if err != nil {
-		return newResult(CheckActiveRestores, StatusFail, "Cannot read active restores: "+err.Error()).
+		return newResult(
+			CheckActiveRestores,
+			StatusFail,
+			"Cannot read active restores: "+err.Error(),
+		).
 			withReason(ReasonInspectionFailed).
 			withCommand(s.doctorCommand())
 	}
@@ -45,14 +53,26 @@ func (s *Service) checkActiveRestores(ctx context.Context) Result {
 
 	switch {
 	case len(blocking) > 0:
-		return newResult(CheckActiveRestores, StatusFail,
-			plural(len(blocking), "restore")+" marked in progress; this holds back the shutdown save coordinator and startup restores").
+		return newResult(
+			CheckActiveRestores,
+			StatusFail,
+			plural(
+				len(blocking),
+				"restore",
+			)+" marked in progress; this holds back the shutdown save coordinator and startup restores",
+		).
 			withReason(ReasonRecoveryRequired).
 			withDetails(blocking...).
 			withCommand(s.abandonCommands(blocking))
 	case len(dead) > 0:
-		return newResult(CheckActiveRestores, StatusInfo,
-			plural(len(dead), "interrupted restore")+" whose tmux server is gone; the next startup restore abandons these").
+		return newResult(
+			CheckActiveRestores,
+			StatusInfo,
+			plural(
+				len(dead),
+				"interrupted restore",
+			)+" whose tmux server is gone; the next startup restore abandons these",
+		).
 			withReason(ReasonStale).
 			withDetails(dead...)
 	default:
@@ -63,7 +83,10 @@ func (s *Service) checkActiveRestores(ctx context.Context) Result {
 func (s *Service) abandonCommands(ids []string) string {
 	commands := make([]string, 0, len(ids))
 	for _, id := range ids {
-		commands = append(commands, s.seshCommand("snapshot recover restore abandon", []string{flagRepository}, id))
+		commands = append(
+			commands,
+			s.seshCommand("snapshot recover restore abandon", []string{flagRepository}, id),
+		)
 	}
 
 	return strings.Join(commands, " && ")

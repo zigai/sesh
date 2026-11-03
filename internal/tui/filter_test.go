@@ -80,7 +80,11 @@ func TestFilterSessionsMatchesRemoteSourceFields(t *testing.T) {
 		model.filterSessions()
 
 		if len(model.filtered) != 1 || model.filtered[0].Origin != session.OriginSSH {
-			t.Fatalf("query %q filtered sessions = %#v, want only remote dev", query, model.filtered)
+			t.Fatalf(
+				"query %q filtered sessions = %#v, want only remote dev",
+				query,
+				model.filtered,
+			)
 		}
 	}
 }
@@ -130,8 +134,16 @@ func TestAgentFilteringKeepsSelectionOnAgentRow(t *testing.T) {
 	model := newTestModel()
 	model.displayMode = displayModeAgents
 	model.sessions = []session.Session{
-		{Name: "first", Kind: session.KindLive, Agents: []session.AgentSession{{RegistryID: "agent-1"}}},
-		{Name: "second", Kind: session.KindLive, Agents: []session.AgentSession{{RegistryID: "agent-2"}}},
+		{
+			Name:   "first",
+			Kind:   session.KindLive,
+			Agents: []session.AgentSession{{RegistryID: "agent-1"}},
+		},
+		{
+			Name:   "second",
+			Kind:   session.KindLive,
+			Agents: []session.AgentSession{{RegistryID: "agent-2"}},
+		},
 	}
 	model.refreshDisplaySessions()
 	model.filterSessions()
@@ -143,7 +155,9 @@ func TestAgentFilteringKeepsSelectionOnAgentRow(t *testing.T) {
 		t.Fatalf("filtered sessions = %#v, want second", got)
 	}
 
-	if got, want := model.selectedListRow(), (popupListRow{sessionIndex: 0, agentIndex: 0}); !got.equal(want) {
+	if got, want := model.selectedListRow(), (popupListRow{sessionIndex: 0, agentIndex: 0}); !got.equal(
+		want,
+	) {
 		t.Fatalf("filtered selection = %#v, want agent row %#v", got, want)
 	}
 }
@@ -312,15 +326,31 @@ func TestAgentsModeFiltersChildRowsToMatchingAgents(t *testing.T) {
 			Name: "main-session",
 			Agents: []session.AgentSession{
 				{Harness: "pi", HarnessSession: "pi-ext-perf", Status: session.AgentStatusIdle},
-				{Harness: "pi", HarnessSession: "Fix Oxlint Errors", Status: session.AgentStatusRunning},
-				{Harness: "omp", HarnessSession: "Integrate Rust rewrite", Status: session.AgentStatusIdle},
-				{Harness: "omp", HarnessSession: "Add activity states", Status: session.AgentStatusWaiting},
+				{
+					Harness:        "pi",
+					HarnessSession: "Fix Oxlint Errors",
+					Status:         session.AgentStatusRunning,
+				},
+				{
+					Harness:        "omp",
+					HarnessSession: "Integrate Rust rewrite",
+					Status:         session.AgentStatusIdle,
+				},
+				{
+					Harness:        "omp",
+					HarnessSession: "Add activity states",
+					Status:         session.AgentStatusWaiting,
+				},
 			},
 		},
 		{
 			Name: "other-session",
 			Agents: []session.AgentSession{
-				{Harness: "claude", HarnessSession: "claude-review", Status: session.AgentStatusIdle},
+				{
+					Harness:        "claude",
+					HarnessSession: "claude-review",
+					Status:         session.AgentStatusIdle,
+				},
 			},
 		},
 		{
@@ -353,7 +383,8 @@ func assertAgentTaskFilter(t *testing.T, model *Model) {
 		t.Fatalf("filtered sessions count = %d, want 1", len(model.filtered))
 	}
 
-	if len(model.filtered[0].Agents) != 1 || model.filtered[0].Agents[0].HarnessSession != "Fix Oxlint Errors" {
+	if len(model.filtered[0].Agents) != 1 ||
+		model.filtered[0].Agents[0].HarnessSession != "Fix Oxlint Errors" {
 		t.Fatalf("filtered agents = %#v, want only Fix Oxlint Errors", model.filtered[0].Agents)
 	}
 
@@ -373,7 +404,11 @@ func assertAgentHarnessFilter(t *testing.T, model *Model) {
 	}
 
 	if len(model.filtered[0].Agents) != 2 {
-		t.Fatalf("filtered agents count = %d, want 2 omp agents: %#v", len(model.filtered[0].Agents), model.filtered[0].Agents)
+		t.Fatalf(
+			"filtered agents count = %d, want 2 omp agents: %#v",
+			len(model.filtered[0].Agents),
+			model.filtered[0].Agents,
+		)
 	}
 
 	for _, agent := range model.filtered[0].Agents {
@@ -394,7 +429,10 @@ func assertAgentSessionNameFilter(t *testing.T, model *Model) {
 	}
 
 	if len(model.filtered[0].Agents) != 4 {
-		t.Fatalf("filtered agents when searching session name = %#v, want all 4 agents", model.filtered[0].Agents)
+		t.Fatalf(
+			"filtered agents when searching session name = %#v, want all 4 agents",
+			model.filtered[0].Agents,
+		)
 	}
 }
 
@@ -405,7 +443,10 @@ func assertRegularSessionFilter(t *testing.T, model *Model) {
 	model.filterSessions()
 
 	if len(model.filtered) != 1 || model.filtered[0].Name != "plain-session" {
-		t.Fatalf("filtered sessions when searching regular = %#v, want plain-session", model.filtered)
+		t.Fatalf(
+			"filtered sessions when searching regular = %#v, want plain-session",
+			model.filtered,
+		)
 	}
 }
 
@@ -504,7 +545,9 @@ func TestFilterSessionsSeparatorVisibilityWhenFiltering(t *testing.T) {
 
 	for _, row := range model.popupListRows() {
 		if row.isSeparator() {
-			t.Fatal("filtered agents view unexpectedly shows separator when only regular sessions match")
+			t.Fatal(
+				"filtered agents view unexpectedly shows separator when only regular sessions match",
+			)
 		}
 	}
 }

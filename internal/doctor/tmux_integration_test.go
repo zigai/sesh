@@ -35,7 +35,8 @@ func TestTmuxLiveProbe_HealthyServer(t *testing.T) {
 		t.Fatalf("expected ok status for healthy live tmux probe, got %#v", tmuxRes)
 	}
 
-	if !strings.HasPrefix(tmuxRes.Message, "tmux ") || !strings.Contains(tmuxRes.Message, ", pid ") {
+	if !strings.HasPrefix(tmuxRes.Message, "tmux ") ||
+		!strings.Contains(tmuxRes.Message, ", pid ") {
 		t.Fatalf("expected version and pid in message, got %q", tmuxRes.Message)
 	}
 
@@ -57,7 +58,10 @@ func TestTmuxProbe_NonRunningServerEndpoint(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
 
-	results, err := doctor.Run(ctx, doctor.Options{PathEnv: os.Getenv("PATH"), Socket: socketPath, Server: server})
+	results, err := doctor.Run(
+		ctx,
+		doctor.Options{PathEnv: os.Getenv("PATH"), Socket: socketPath, Server: server},
+	)
 	if err != nil {
 		t.Fatalf("unexpected doctor run error: %v", err)
 	}
@@ -67,11 +71,16 @@ func TestTmuxProbe_NonRunningServerEndpoint(t *testing.T) {
 		t.Fatalf("expected a not-running failure, got %#v", tmuxRes)
 	}
 
-	if want := "tmux -S " + socketPath + " new-session -d"; tmuxRes.Fix == nil || tmuxRes.Fix.Command != want {
+	if want := "tmux -S " + socketPath + " new-session -d"; tmuxRes.Fix == nil ||
+		tmuxRes.Fix.Command != want {
 		t.Fatalf("expected fix %q, got %#v", want, tmuxRes.Fix)
 	}
 
-	if smoke := findCheck(results, doctor.CheckSmokeSessions); smoke.Status != doctor.StatusSkip || smoke.Needs != doctor.CheckTmuxServer {
+	if smoke := findCheck(
+		results,
+		doctor.CheckSmokeSessions,
+	); smoke.Status != doctor.StatusSkip ||
+		smoke.Needs != doctor.CheckTmuxServer {
 		t.Fatalf("the smoke test needs the server, got %#v", smoke)
 	}
 

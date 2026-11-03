@@ -100,9 +100,13 @@ func withoutPinnedWindowSize(m model.Manifest) model.Manifest {
 
 	released.Windows = make([]model.Window, len(m.Windows))
 	for index, window := range m.Windows {
-		window.Options = slices.DeleteFunc(slices.Clone(window.Options), func(option model.Option) bool {
-			return !option.Inherited && bytes.Equal(option.Name, []byte("window-size")) && bytes.Equal(option.Value, []byte("manual"))
-		})
+		window.Options = slices.DeleteFunc(
+			slices.Clone(window.Options),
+			func(option model.Option) bool {
+				return !option.Inherited && bytes.Equal(option.Name, []byte("window-size")) &&
+					bytes.Equal(option.Value, []byte("manual"))
+			},
+		)
 		released.Windows[index] = window
 	}
 
@@ -214,7 +218,10 @@ func validateSelection(m model.Manifest, selected []string) ([]string, error) {
 	return requested, nil
 }
 
-func deriveSourceGraph(m model.Manifest, requested []string) (model.Manifest, []string, []string, error) {
+func deriveSourceGraph(
+	m model.Manifest,
+	requested []string,
+) (model.Manifest, []string, []string, error) {
 	closureIDs, err := m.Closure(requested)
 	if err != nil {
 		return model.Manifest{}, nil, nil, planFailure("closure", "closure_failed", err)

@@ -27,7 +27,12 @@ var (
 	errRenameFailedAfterCreation = errors.New("rename failed after creation")
 )
 
-func commitManifest(t *testing.T, ctx context.Context, repoDir string, manifest model.Manifest) string {
+func commitManifest(
+	t *testing.T,
+	ctx context.Context,
+	repoDir string,
+	manifest model.Manifest,
+) string {
 	t.Helper()
 
 	repo, err := store.Open(ctx, repoDir)
@@ -66,7 +71,13 @@ func registerPlanOperation(
 		t.Fatalf("PlanActions failed: %v", err)
 	}
 
-	op, err := repo.RegisterOperation(ctx, testOperationID(label), generation, model.Bytes(target), testActions(specs))
+	op, err := repo.RegisterOperation(
+		ctx,
+		testOperationID(label),
+		generation,
+		model.Bytes(target),
+		testActions(specs),
+	)
 	if err != nil {
 		t.Fatalf("RegisterOperation failed: %v", err)
 	}
@@ -74,7 +85,12 @@ func registerPlanOperation(
 	return op.ID
 }
 
-func newPlanJournal(t *testing.T, ctx context.Context, repo *store.Repository, operation string) *storeJournal {
+func newPlanJournal(
+	t *testing.T,
+	ctx context.Context,
+	repo *store.Repository,
+	operation string,
+) *storeJournal {
 	t.Helper()
 
 	journal, err := newStoreJournal(ctx, repo, operation)
@@ -161,7 +177,15 @@ func TestExecutorJournalIntentFaultPreventsEffect(t *testing.T) {
 
 	defer func() { _ = repo.Close() }()
 
-	operation := registerPlanOperation(t, ctx, repo, "intent-fault", generation, server.Endpoint().SocketPath, plan)
+	operation := registerPlanOperation(
+		t,
+		ctx,
+		repo,
+		"intent-fault",
+		generation,
+		server.Endpoint().SocketPath,
+		plan,
+	)
 
 	createStep := createSessionStep(t, plan)
 
@@ -222,11 +246,26 @@ func TestExecutorRefusesPriorUncertainEffect(t *testing.T) {
 
 	defer func() { _ = repo.Close() }()
 
-	operation := registerPlanOperation(t, ctx, repo, "prior-uncertain", generation, server.Endpoint().SocketPath, plan)
+	operation := registerPlanOperation(
+		t,
+		ctx,
+		repo,
+		"prior-uncertain",
+		generation,
+		server.Endpoint().SocketPath,
+		plan,
+	)
 
 	createStep := createSessionStep(t, plan)
 
-	if err := repo.Transition(ctx, operation, ActionID(createStep.ID()), model.ActionStatePlanned, model.ActionStateIssued, nil); err != nil {
+	if err := repo.Transition(
+		ctx,
+		operation,
+		ActionID(createStep.ID()),
+		model.ActionStatePlanned,
+		model.ActionStateIssued,
+		nil,
+	); err != nil {
 		t.Fatalf("Transition failed: %v", err)
 	}
 
@@ -273,12 +312,40 @@ func TestExecutorResumeAdoptsConfirmedStepsWithoutDuplicates(t *testing.T) {
 
 	defer func() { _ = repo.Close() }()
 
-	operation := registerPlanOperation(t, ctx, repo, "resume-adoption", generation, server.Endpoint().SocketPath, plan)
+	operation := registerPlanOperation(
+		t,
+		ctx,
+		repo,
+		"resume-adoption",
+		generation,
+		server.Endpoint().SocketPath,
+		plan,
+	)
 
 	cfg := DefaultExecuteConfig()
 
-	panesBefore, linksBefore := runFirstAttemptAndCountPanes(t, ctx, server, manifest, cfg, plan, repo, operation)
-	assertResumedAttemptAdoptsAndPreservesPanes(t, ctx, server, manifest, cfg, plan, repo, operation, panesBefore, linksBefore)
+	panesBefore, linksBefore := runFirstAttemptAndCountPanes(
+		t,
+		ctx,
+		server,
+		manifest,
+		cfg,
+		plan,
+		repo,
+		operation,
+	)
+	assertResumedAttemptAdoptsAndPreservesPanes(
+		t,
+		ctx,
+		server,
+		manifest,
+		cfg,
+		plan,
+		repo,
+		operation,
+		panesBefore,
+		linksBefore,
+	)
 }
 
 func windowPaneCount(t *testing.T, ctx context.Context, links []gotmux.WindowLinkInfo) int {
@@ -328,7 +395,11 @@ func assertCanceledReceiptOutcome(
 
 	states := actionStates(op)
 	if states[ActionID(createStep.ID())] != model.ActionStateUnknown {
-		t.Fatalf("expected the unconfirmed effect to be recorded as %q, got %q", model.ActionStateUnknown, states[ActionID(createStep.ID())])
+		t.Fatalf(
+			"expected the unconfirmed effect to be recorded as %q, got %q",
+			model.ActionStateUnknown,
+			states[ActionID(createStep.ID())],
+		)
 	}
 
 	if count := restoredSessionCount(t, ctx, server); count != 1 {
@@ -364,7 +435,15 @@ func TestExecutorCancellationDuringReceiptKeepsUncertainty(t *testing.T) {
 
 	defer func() { _ = repo.Close() }()
 
-	operation := registerPlanOperation(t, ctx, repo, "cancel-uncertain", generation, server.Endpoint().SocketPath, plan)
+	operation := registerPlanOperation(
+		t,
+		ctx,
+		repo,
+		"cancel-uncertain",
+		generation,
+		server.Endpoint().SocketPath,
+		plan,
+	)
 
 	createStep := createSessionStep(t, plan)
 
@@ -388,7 +467,11 @@ func TestExecutorCancellationDuringReceiptKeepsUncertainty(t *testing.T) {
 	_, err = executor.Execute(canceled, plan, journal)
 	assertCanceledReceiptOutcome(t, ctx, server, repo, operation, createStep, err)
 
-	_, err = NewExecutor(server, manifest, DefaultExecuteConfig()).Execute(ctx, plan, newPlanJournal(t, ctx, repo, operation))
+	_, err = NewExecutor(
+		server,
+		manifest,
+		DefaultExecuteConfig(),
+	).Execute(ctx, plan, newPlanJournal(t, ctx, repo, operation))
 	if !errors.Is(err, ErrPriorUncertainty) {
 		t.Fatalf("expected refusal on prior uncertainty, got %v", err)
 	}
@@ -434,11 +517,27 @@ func TestExecutorCrashAfterEffectNeverDuplicates(t *testing.T) {
 		t.Fatalf("expected two distinct generations, got %q twice", generation)
 	}
 
-	operation := registerPlanOperation(t, ctx, repo, "crash-after-effect", generation, server.Endpoint().SocketPath, plan)
+	operation := registerPlanOperation(
+		t,
+		ctx,
+		repo,
+		"crash-after-effect",
+		generation,
+		server.Endpoint().SocketPath,
+		plan,
+	)
 
 	createStep := createSessionStep(t, plan)
 
-	runCrashWorker(t, ctx, repoDir, generation, operation, server.Endpoint().SocketPath, createStep.ID())
+	runCrashWorker(
+		t,
+		ctx,
+		repoDir,
+		generation,
+		operation,
+		server.Endpoint().SocketPath,
+		createStep.ID(),
+	)
 
 	requireCrashedCreationSurvived(t, ctx, server, repo, operation, createStep)
 	requireRefusedRetryWithoutDuplicates(t, ctx, server, repo, operation, plan, manifest)
@@ -460,7 +559,10 @@ func requireCrashedCreationSurvived(
 	t.Helper()
 
 	if count := restoredSessionCount(t, ctx, server); count != 1 {
-		t.Fatalf("crash worker should have applied exactly one creation, got %d restored sessions", count)
+		t.Fatalf(
+			"crash worker should have applied exactly one creation, got %d restored sessions",
+			count,
+		)
 	}
 
 	if _, err := server.FindSession(ctx, restoredSessionName); err != nil {
@@ -473,7 +575,11 @@ func requireCrashedCreationSurvived(
 	}
 
 	if states := actionStates(op); states[ActionID(createStep.ID())] != model.ActionStateIssued {
-		t.Fatalf("expected the interrupted effect to stay %q, got %q", model.ActionStateIssued, states[ActionID(createStep.ID())])
+		t.Fatalf(
+			"expected the interrupted effect to stay %q, got %q",
+			model.ActionStateIssued,
+			states[ActionID(createStep.ID())],
+		)
 	}
 }
 
@@ -488,13 +594,20 @@ func requireRefusedRetryWithoutDuplicates(
 ) {
 	t.Helper()
 
-	_, err := NewExecutor(server, manifest, DefaultExecuteConfig()).Execute(ctx, plan, newPlanJournal(t, ctx, repo, operation))
+	_, err := NewExecutor(
+		server,
+		manifest,
+		DefaultExecuteConfig(),
+	).Execute(ctx, plan, newPlanJournal(t, ctx, repo, operation))
 	if !errors.Is(err, ErrPriorUncertainty) {
 		t.Fatalf("expected refusal after crash, got %v", err)
 	}
 
 	if count := restoredSessionCount(t, ctx, server); count != 1 {
-		t.Fatalf("refused attempt must not duplicate the crashed creation, got %d restored sessions", count)
+		t.Fatalf(
+			"refused attempt must not duplicate the crashed creation, got %d restored sessions",
+			count,
+		)
 	}
 }
 
@@ -528,7 +641,11 @@ const (
 	crashWorkerStep       = "SESH_RESTORE_CRASH_STEP"
 )
 
-func runCrashWorker(t *testing.T, ctx context.Context, repoDir, generation, operation, socket, stepID string) {
+func runCrashWorker(
+	t *testing.T,
+	ctx context.Context,
+	repoDir, generation, operation, socket, stepID string,
+) {
 	t.Helper()
 
 	self, err := os.Executable()
@@ -619,15 +736,25 @@ func TestRestoreCrashWorker(t *testing.T) {
 	_, _ = NewExecutor(server, manifest, DefaultExecuteConfig()).Execute(ctx, plan, journal)
 }
 
-func refusalSessions(t *testing.T, ctx context.Context, server *gotmux.Server) (gotmux.Session, gotmux.Session) {
+func refusalSessions(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+) (gotmux.Session, gotmux.Session) {
 	t.Helper()
 
-	first, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "refusal-first", Start: gotmux.StartPolicyExistingOnly})
+	first, err := server.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{Name: "refusal-first", Start: gotmux.StartPolicyExistingOnly},
+	)
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
 
-	second, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "refusal-second", Start: gotmux.StartPolicyExistingOnly})
+	second, err := server.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{Name: "refusal-second", Start: gotmux.StartPolicyExistingOnly},
+	)
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -643,7 +770,10 @@ func TestRefusedCommandWithStderrPreservesUnknown(t *testing.T) {
 
 	first, second := refusalSessions(t, ctx, server)
 
-	_, dupErr := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "refusal-first", Start: gotmux.StartPolicyExistingOnly})
+	_, dupErr := server.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{Name: "refusal-first", Start: gotmux.StartPolicyExistingOnly},
+	)
 	if dupErr == nil {
 		t.Fatal("expected duplicate session creation to fail")
 	}
@@ -739,13 +869,21 @@ func runFirstAttemptAndCountPanes(
 ) (int, []gotmux.WindowLinkInfo) {
 	t.Helper()
 
-	first, err := NewExecutor(server, manifest, cfg).Execute(ctx, plan, newPlanJournal(t, ctx, repo, operation))
+	first, err := NewExecutor(
+		server,
+		manifest,
+		cfg,
+	).Execute(ctx, plan, newPlanJournal(t, ctx, repo, operation))
 	if err != nil {
 		t.Fatalf("first execution failed: %v", err)
 	}
 
 	if len(first.Dispatched) != len(plan.Steps) {
-		t.Fatalf("expected every step dispatched on first attempt, got %d of %d", len(first.Dispatched), len(plan.Steps))
+		t.Fatalf(
+			"expected every step dispatched on first attempt, got %d of %d",
+			len(first.Dispatched),
+			len(plan.Steps),
+		)
 	}
 
 	session, err := server.FindSession(ctx, restoredSessionName)
@@ -775,13 +913,20 @@ func assertResumedAttemptAdoptsAndPreservesPanes(
 ) {
 	t.Helper()
 
-	second, err := NewExecutor(server, manifest, cfg).Execute(ctx, plan, newPlanJournal(t, ctx, repo, operation))
+	second, err := NewExecutor(
+		server,
+		manifest,
+		cfg,
+	).Execute(ctx, plan, newPlanJournal(t, ctx, repo, operation))
 	if err != nil {
 		t.Fatalf("resumed execution failed: %v", err)
 	}
 
 	if len(second.Dispatched) != 0 {
-		t.Fatalf("resumed execution must not dispatch confirmed steps, dispatched %v", second.Dispatched)
+		t.Fatalf(
+			"resumed execution must not dispatch confirmed steps, dispatched %v",
+			second.Dispatched,
+		)
 	}
 
 	if len(second.Adopted) != len(plan.Steps) {
@@ -789,7 +934,10 @@ func assertResumedAttemptAdoptsAndPreservesPanes(
 	}
 
 	if count := restoredSessionCount(t, ctx, server); count != 1 {
-		t.Fatalf("resumed execution must not create duplicate session, got %d restored sessions", count)
+		t.Fatalf(
+			"resumed execution must not create duplicate session, got %d restored sessions",
+			count,
+		)
 	}
 
 	if _, err := server.FindSession(ctx, restoredSessionName); err != nil {
@@ -817,7 +965,10 @@ func TestExecutorJournalsUnspecifiedEffectAsUnknown(t *testing.T) {
 		t.Fatalf("dispatch error = %v, want uncertain execution", err)
 	}
 
-	if state := journal.state(step.ID()); state.State != model.ActionStateUnknown || state.RuntimeID != "" {
+	if state := journal.state(
+		step.ID(),
+	); state.State != model.ActionStateUnknown ||
+		state.RuntimeID != "" {
 		t.Fatalf("journal state = %+v, want unknown without a runtime identity", state)
 	}
 

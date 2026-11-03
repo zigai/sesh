@@ -52,11 +52,17 @@ func TestEngineRestore_FullRoundtrip(t *testing.T) {
 
 	disableWindowRename(t, ctx, liveSess)
 
-	saveRes, err := engine.SaveObservation(ctx, repo, server, []gotmux.SessionID{liveSess.ID()}, engine.SaveConfig{
-		LeaseRoot:              leaseRoot,
-		ProcessEnrichment:      false,
-		ProcessEnvironmentKeys: nil,
-	})
+	saveRes, err := engine.SaveObservation(
+		ctx,
+		repo,
+		server,
+		[]gotmux.SessionID{liveSess.ID()},
+		engine.SaveConfig{
+			LeaseRoot:              leaseRoot,
+			ProcessEnrichment:      false,
+			ProcessEnvironmentKeys: nil,
+		},
+	)
 	if err != nil {
 		t.Fatalf("SaveObservation failed: %v", err)
 	}
@@ -90,13 +96,21 @@ func TestEngineRestore_FullRoundtrip(t *testing.T) {
 	}
 
 	if slices.Contains(restoreRes.MissingRequirements, unsupportedOptionsNote) {
-		t.Fatalf("a snapshot from the same tmux reported unsupported options: %v", restoreRes.MissingRequirements)
+		t.Fatalf(
+			"a snapshot from the same tmux reported unsupported options: %v",
+			restoreRes.MissingRequirements,
+		)
 	}
 
 	assertSessionRestoredAs(t, ctx, server, "roundtrip-alpha")
 }
 
-func assertSessionRestoredAs(t *testing.T, ctx context.Context, server *gotmux.Server, name string) {
+func assertSessionRestoredAs(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	name string,
+) {
 	t.Helper()
 
 	restoredSess, err := server.FindSession(ctx, name)
@@ -144,11 +158,17 @@ func TestEngineRestore_SessionCollision(t *testing.T) {
 
 	disableWindowRename(t, ctx, liveSess)
 
-	saveRes, err := engine.SaveObservation(ctx, repo, server, []gotmux.SessionID{liveSess.ID()}, engine.SaveConfig{
-		LeaseRoot:              leaseRoot,
-		ProcessEnrichment:      false,
-		ProcessEnvironmentKeys: nil,
-	})
+	saveRes, err := engine.SaveObservation(
+		ctx,
+		repo,
+		server,
+		[]gotmux.SessionID{liveSess.ID()},
+		engine.SaveConfig{
+			LeaseRoot:              leaseRoot,
+			ProcessEnrichment:      false,
+			ProcessEnvironmentKeys: nil,
+		},
+	)
 	if err != nil {
 		t.Fatalf("SaveObservation failed: %v", err)
 	}
@@ -235,18 +255,30 @@ func TestEngineRestore_LeavesOutOptionsTheTargetDoesNotSupport(t *testing.T) {
 	}
 
 	if result.Status != "best_effort" || !result.Verified {
-		t.Fatalf("restore status = %q verified = %v, want best_effort and verified", result.Status, result.Verified)
+		t.Fatalf(
+			"restore status = %q verified = %v, want best_effort and verified",
+			result.Status,
+			result.Verified,
+		)
 	}
 
 	if !slices.Contains(result.MissingRequirements, unsupportedOptionsNote) {
-		t.Fatalf("missing requirements %v lack the unsupported option note", result.MissingRequirements)
+		t.Fatalf(
+			"missing requirements %v lack the unsupported option note",
+			result.MissingRequirements,
+		)
 	}
 
 	assertOperationSettled(t, ctx, repo, result.OperationID)
 	assertLocalOptionsRestored(t, ctx, server, "retired-options")
 }
 
-func sessionWithLocalOptions(t *testing.T, ctx context.Context, server *gotmux.Server, name string) gotmux.Session {
+func sessionWithLocalOptions(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	name string,
+) gotmux.Session {
 	t.Helper()
 
 	live, err := server.NewSession(ctx, gotmux.NewSessionOptions{
@@ -290,10 +322,18 @@ func addRetiredOptions(t *testing.T, manifest *model.Manifest) {
 	t.Helper()
 
 	manifest.Sessions[0].Options = append(manifest.Sessions[0].Options, model.Option{
-		Scope: "session", Name: model.Bytes("legacy-session-style"), Value: model.Bytes("default"), Present: true, Inherited: false,
+		Scope:     "session",
+		Name:      model.Bytes("legacy-session-style"),
+		Value:     model.Bytes("default"),
+		Present:   true,
+		Inherited: false,
 	})
 	manifest.Windows[0].Options = append(manifest.Windows[0].Options, model.Option{
-		Scope: "window", Name: model.Bytes("legacy-window-style"), Value: model.Bytes("default"), Present: true, Inherited: false,
+		Scope:     "window",
+		Name:      model.Bytes("legacy-window-style"),
+		Value:     model.Bytes("default"),
+		Present:   true,
+		Inherited: false,
 	})
 
 	if err := manifest.Validate(); err != nil {
@@ -301,7 +341,12 @@ func addRetiredOptions(t *testing.T, manifest *model.Manifest) {
 	}
 }
 
-func assertOperationSettled(t *testing.T, ctx context.Context, repo *store.Repository, operationID string) {
+func assertOperationSettled(
+	t *testing.T,
+	ctx context.Context,
+	repo *store.Repository,
+	operationID string,
+) {
 	t.Helper()
 
 	catalog, err := repo.Inspect(ctx)
@@ -316,7 +361,12 @@ func assertOperationSettled(t *testing.T, ctx context.Context, repo *store.Repos
 	}
 }
 
-func assertLocalOptionsRestored(t *testing.T, ctx context.Context, server *gotmux.Server, name string) {
+func assertLocalOptionsRestored(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	name string,
+) {
 	t.Helper()
 
 	restored, err := server.FindSession(ctx, name)
@@ -374,9 +424,15 @@ func TestEngineRestoreCommitsPlannedPanesWithoutLaunchOverrides(t *testing.T) {
 	restored := startSleepingSession(t, t.Context(), server, "state-restored")
 	kept := startSleepingSession(t, t.Context(), server, "state-kept")
 
-	saved, err := engine.SaveObservation(t.Context(), repo, server, []gotmux.SessionID{restored.ID(), kept.ID()}, engine.SaveConfig{
-		LeaseRoot: leaseRoot, ProcessEnrichment: true, Profile: engine.RecoveryPractical,
-	})
+	saved, err := engine.SaveObservation(
+		t.Context(),
+		repo,
+		server,
+		[]gotmux.SessionID{restored.ID(), kept.ID()},
+		engine.SaveConfig{
+			LeaseRoot: leaseRoot, ProcessEnrichment: true, Profile: engine.RecoveryPractical,
+		},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -400,7 +456,11 @@ func TestEngineRestoreCommitsPlannedPanesWithoutLaunchOverrides(t *testing.T) {
 	}
 
 	if !slices.Equal(overrides.committed, []string{result.Panes[0].PaneID}) {
-		t.Fatalf("committed panes = %v, want only restored pane %s", overrides.committed, result.Panes[0].PaneID)
+		t.Fatalf(
+			"committed panes = %v, want only restored pane %s",
+			overrides.committed,
+			result.Panes[0].PaneID,
+		)
 	}
 }
 
@@ -417,9 +477,15 @@ func TestEngineRestoreLaunchesOverriddenPanesAndCommitsOnlyPlannedOnesFirst(t *t
 	restored := startSleepingSession(t, ctx, server, "override-restored")
 	kept := startSleepingSession(t, ctx, server, "override-kept")
 
-	saved, err := engine.SaveObservation(ctx, repo, server, []gotmux.SessionID{restored.ID(), kept.ID()}, engine.SaveConfig{
-		LeaseRoot: leaseRoot, ProcessEnrichment: true, Profile: engine.RecoveryPractical,
-	})
+	saved, err := engine.SaveObservation(
+		ctx,
+		repo,
+		server,
+		[]gotmux.SessionID{restored.ID(), kept.ID()},
+		engine.SaveConfig{
+			LeaseRoot: leaseRoot, ProcessEnrichment: true, Profile: engine.RecoveryPractical,
+		},
+	)
 	if err != nil {
 		t.Fatalf("SaveObservation failed: %v", err)
 	}
@@ -428,7 +494,10 @@ func TestEngineRestoreLaunchesOverriddenPanesAndCommitsOnlyPlannedOnesFirst(t *t
 		t.Fatal(err)
 	}
 
-	overrides := &recordingOverrides{script: writeMarkerScript(t, dir), marker: filepath.Join(dir, "marker")}
+	overrides := &recordingOverrides{
+		script: writeMarkerScript(t, dir),
+		marker: filepath.Join(dir, "marker"),
+	}
 
 	result, err := engine.Restore(ctx, repo, server, engine.RestoreConfig{
 		LeaseRoot: leaseRoot, Generation: saved.Generation, LaunchProcesses: true,
@@ -439,11 +508,18 @@ func TestEngineRestoreLaunchesOverriddenPanesAndCommitsOnlyPlannedOnesFirst(t *t
 	}
 
 	if len(result.SessionsSkipped) != 1 || len(result.Panes) != 1 {
-		t.Fatalf("restore result = %+v, want the live session skipped and one pane restored", result)
+		t.Fatalf(
+			"restore result = %+v, want the live session skipped and one pane restored",
+			result,
+		)
 	}
 
 	if !slices.Equal(overrides.committed, []string{result.Panes[0].PaneID}) {
-		t.Fatalf("committed panes = %v, want only the restored pane %s", overrides.committed, result.Panes[0].PaneID)
+		t.Fatalf(
+			"committed panes = %v, want only the restored pane %s",
+			overrides.committed,
+			result.Panes[0].PaneID,
+		)
 	}
 
 	if overrides.launched {
@@ -453,7 +529,10 @@ func TestEngineRestoreLaunchesOverriddenPanesAndCommitsOnlyPlannedOnesFirst(t *t
 	waitForMarker(t, overrides.marker)
 }
 
-func (o *recordingOverrides) Override(_ context.Context, manifest model.Manifest) (map[string]model.Launch, error) {
+func (o *recordingOverrides) Override(
+	_ context.Context,
+	manifest model.Manifest,
+) (map[string]model.Launch, error) {
 	launches := make(map[string]model.Launch, len(manifest.Panes))
 	if o.unchanged {
 		return launches, nil
@@ -482,7 +561,12 @@ func (o *recordingOverrides) Commit(_ context.Context, panes []string) error {
 	return nil
 }
 
-func startSleepingSession(t *testing.T, ctx context.Context, server *gotmux.Server, name string) gotmux.Session {
+func startSleepingSession(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	name string,
+) gotmux.Session {
 	t.Helper()
 
 	session, err := server.NewSession(ctx, gotmux.NewSessionOptions{
@@ -501,7 +585,11 @@ func writeMarkerScript(t *testing.T, dir string) string {
 	t.Helper()
 
 	script := filepath.Join(dir, "marker.sh")
-	if err := os.WriteFile(script, []byte("#!/bin/sh\necho launched > \"$1\"\nexec sleep 300\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		script,
+		[]byte("#!/bin/sh\necho launched > \"$1\"\nexec sleep 300\n"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 

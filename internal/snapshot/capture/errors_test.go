@@ -16,7 +16,8 @@ func TestSelectionErrorNeedsNoServerEffects(t *testing.T) {
 	}
 
 	diagnostic, ok := oops.AsOops(err)
-	if !ok || diagnostic.Code() != "selection_required" || diagnostic.Domain() != "snapshot.capture" {
+	if !ok || diagnostic.Code() != "selection_required" ||
+		diagnostic.Domain() != "snapshot.capture" {
 		t.Fatal("missing capture diagnostics")
 	}
 
@@ -32,7 +33,8 @@ func TestOutputLimitErrorHasStableCode(t *testing.T) {
 	}
 
 	diagnostic, ok := oops.AsOops(err)
-	if !ok || diagnostic.Code() != "output_limit_exceeded" || diagnostic.Domain() != "snapshot.capture" {
+	if !ok || diagnostic.Code() != "output_limit_exceeded" ||
+		diagnostic.Domain() != "snapshot.capture" {
 		t.Fatal("output limit was not classified")
 	}
 }

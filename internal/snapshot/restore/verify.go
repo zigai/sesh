@@ -84,7 +84,10 @@ func (r *VerificationReport) mismatch(domain, entity, reason string) {
 		return
 	}
 
-	r.Mismatches = append(r.Mismatches, VerificationMismatch{Domain: domain, Entity: entity, Reason: reason})
+	r.Mismatches = append(
+		r.Mismatches,
+		VerificationMismatch{Domain: domain, Entity: entity, Reason: reason},
+	)
 }
 
 func (r *VerificationReport) advisory(domain, entity, reason string) {
@@ -92,10 +95,18 @@ func (r *VerificationReport) advisory(domain, entity, reason string) {
 		return
 	}
 
-	r.Advisories = append(r.Advisories, VerificationMismatch{Domain: domain, Entity: entity, Reason: reason})
+	r.Advisories = append(
+		r.Advisories,
+		VerificationMismatch{Domain: domain, Entity: entity, Reason: reason},
+	)
 }
 
-func Verify(ctx context.Context, server *gotmux.Server, plan Plan, receipts map[string]string) (VerificationReport, error) {
+func Verify(
+	ctx context.Context,
+	server *gotmux.Server,
+	plan Plan,
+	receipts map[string]string,
+) (VerificationReport, error) {
 	report := VerificationReport{
 		Verified:      false,
 		Sessions:      0,
@@ -155,7 +166,11 @@ func expectedSlotsBySession(plan Plan) map[string]map[int]slotExpectation {
 			slots[link.Session] = map[int]slotExpectation{}
 		}
 
-		slots[link.Session][link.Index] = slotExpectation{window: link.Window, active: link.Active, last: link.Last}
+		slots[link.Session][link.Index] = slotExpectation{
+			window: link.Window,
+			active: link.Active,
+			last:   link.Last,
+		}
 	}
 
 	return slots
@@ -198,7 +213,15 @@ func verifySessions(
 		state.session[session.ID] = sessionOK
 		state.group[session.ID] = sessionOK
 
-		navOK := verifySessionLinks(ctx, handle, identities, expectedSlots[session.ID], session.ID, state, report)
+		navOK := verifySessionLinks(
+			ctx,
+			handle,
+			identities,
+			expectedSlots[session.ID],
+			session.ID,
+			state,
+			report,
+		)
 
 		state.nav[session.ID] = navOK
 	}
@@ -397,7 +420,14 @@ func verifyWindow(
 		report.mismatch(MismatchPane, window.ID, "pane_count_mismatch")
 	}
 
-	state.layout[window.ID] = verifyWindowLayout(ctx, handle, window, identities, observedPanes, report)
+	state.layout[window.ID] = verifyWindowLayout(
+		ctx,
+		handle,
+		window,
+		identities,
+		observedPanes,
+		report,
+	)
 	state.active[window.ID] = verifyActivePane(ctx, handle, expectedPanes, identities, report)
 
 	verifyWindowPanes(observedPanes, expectedPanes, identities, state, report)
@@ -664,7 +694,13 @@ func verifyScopedState(
 
 		if globalErr != nil {
 			report.mismatch(MismatchEnvironment, session.ID, "scope_unreadable")
-			state.options[session.ID] = verifyOptions(ctx, handle.Options(), session.Options, session.ID, report)
+			state.options[session.ID] = verifyOptions(
+				ctx,
+				handle.Options(),
+				session.Options,
+				session.ID,
+				report,
+			)
 			state.variables[session.ID] = false
 
 			continue
@@ -694,7 +730,13 @@ func verifyScopedState(
 			continue
 		}
 
-		state.options[window.ID] = verifyOptions(ctx, handle.Options(), window.Options, window.ID, report)
+		state.options[window.ID] = verifyOptions(
+			ctx,
+			handle.Options(),
+			window.Options,
+			window.ID,
+			report,
+		)
 	}
 
 	for _, pane := range plan.SourceGraph.Panes {
@@ -818,7 +860,8 @@ func stepObserved(step Step, state *verifiedState) bool {
 func createdSessionObserved(step *CreateSessionStep, state *verifiedState) bool {
 	session := step.SessionID
 
-	return state.session[session] && state.group[session] && state.options[session] && state.variables[session]
+	return state.session[session] && state.group[session] && state.options[session] &&
+		state.variables[session]
 }
 
 func placedInitialWindowObserved(step *PlaceInitialWindowStep, state *verifiedState) bool {

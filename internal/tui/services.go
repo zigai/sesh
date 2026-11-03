@@ -20,7 +20,9 @@ const (
 
 var (
 	errIncompleteServices = errors.New("incomplete TUI services")
-	errEnterUnavailable   = errors.New("enter session is unavailable: no session enterer configured")
+	errEnterUnavailable   = errors.New(
+		"enter session is unavailable: no session enterer configured",
+	)
 )
 
 type EnterAction uint8
@@ -79,11 +81,17 @@ type RemoteCatalogWatcher interface {
 }
 
 type RemoteAttacher interface {
-	AttachRemoteSession(ctx context.Context, target session.Session, paneID string) (tea.ExecCommand, error)
+	AttachRemoteSession(
+		ctx context.Context,
+		target session.Session,
+		paneID string,
+	) (tea.ExecCommand, error)
 }
 
 type OriginBridgeService interface {
-	LoadOriginSessions(ctx context.Context) (originLabel string, sessions []session.Session, err error)
+	LoadOriginSessions(
+		ctx context.Context,
+	) (originLabel string, sessions []session.Session, err error)
 }
 
 type WorkingDirectoryService interface {

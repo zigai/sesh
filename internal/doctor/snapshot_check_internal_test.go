@@ -107,7 +107,8 @@ func TestResolveCurrentSnapshotAsksForNewSaveForUnsupportedSchema(t *testing.T) 
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if result.Status != StatusFail || result.Reason != ReasonIncompatible || result.Fix == nil || !strings.Contains(result.Fix.Manual, "sesh snapshot save") {
+	if result.Status != StatusFail || result.Reason != ReasonIncompatible || result.Fix == nil ||
+		!strings.Contains(result.Fix.Manual, "sesh snapshot save") {
 		t.Fatalf("result = %+v, want an incompatible failure that asks for a new save", result)
 	}
 }
@@ -127,6 +128,8 @@ func (s *snapshotReaderStub) Read(context.Context, string) (model.Manifest, erro
 	return model.Manifest{}, s.readErr
 }
 
-func (s *snapshotReaderStub) ReadCurrent(context.Context) (store.Generation, model.Manifest, error) {
+func (s *snapshotReaderStub) ReadCurrent(
+	context.Context,
+) (store.Generation, model.Manifest, error) {
 	return store.Generation{}, model.Manifest{}, s.currentErr
 }

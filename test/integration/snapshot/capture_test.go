@@ -20,7 +20,15 @@ import (
 func TestCaptureNativeObservation(t *testing.T) {
 	server := tmuxtest.NewServer(t)
 
-	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{Name: "observed", Program: gotmux.Exec("/bin/sh", "-c", "printf 'OBSERVATION_READY'; exec sleep 300"), Size: gotmux.Size{Width: 100, Height: 35}, Start: gotmux.StartPolicyExistingOnly})
+	session, err := server.NewSession(
+		t.Context(),
+		gotmux.NewSessionOptions{
+			Name:    "observed",
+			Program: gotmux.Exec("/bin/sh", "-c", "printf 'OBSERVATION_READY'; exec sleep 300"),
+			Size:    gotmux.Size{Width: 100, Height: 35},
+			Start:   gotmux.StartPolicyExistingOnly,
+		},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +70,14 @@ func TestCaptureNativeObservation(t *testing.T) {
 func TestCaptureRejectsUnknownSession(t *testing.T) {
 	server := tmuxtest.NewServer(t)
 
-	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{Name: "present", Program: gotmux.Exec("/bin/sh", "-c", "exec sleep 300"), Start: gotmux.StartPolicyExistingOnly})
+	session, err := server.NewSession(
+		t.Context(),
+		gotmux.NewSessionOptions{
+			Name:    "present",
+			Program: gotmux.Exec("/bin/sh", "-c", "exec sleep 300"),
+			Start:   gotmux.StartPolicyExistingOnly,
+		},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,11 +111,13 @@ func setCaptureSettings(t *testing.T, session gotmux.Session) {
 		t.Fatal(err)
 	}
 
-	if err := session.Environment().SetHidden(t.Context(), "SESH_HIDDEN", "hidden-value"); err != nil {
+	if err := session.Environment().
+		SetHidden(t.Context(), "SESH_HIDDEN", "hidden-value"); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := session.Options().SetUser(t.Context(), "@native", "first\nsecond\t \xff"); err != nil {
+	if err := session.Options().
+		SetUser(t.Context(), "@native", "first\nsecond\t \xff"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -114,18 +131,25 @@ func assertCaptureSettings(t *testing.T, session model.Session) {
 		{Name: model.Bytes("SESH_REMOVED"), State: "removed"},
 		{Name: model.Bytes("SESH_HIDDEN"), Value: model.Bytes("hidden-value"), State: "set", Hidden: true},
 	} {
-		index := slices.IndexFunc(session.Environment, func(v model.Variable) bool { return bytes.Equal(v.Name, want.Name) })
+		index := slices.IndexFunc(
+			session.Environment,
+			func(v model.Variable) bool { return bytes.Equal(v.Name, want.Name) },
+		)
 		if index < 0 {
 			t.Fatalf("missing fixture variable %s", want.Name)
 		}
 
 		got := session.Environment[index]
-		if !bytes.Equal(got.Value, want.Value) || got.State != want.State || got.Hidden != want.Hidden {
+		if !bytes.Equal(got.Value, want.Value) || got.State != want.State ||
+			got.Hidden != want.Hidden {
 			t.Fatalf("variable mismatch: got %#v want %#v", got, want)
 		}
 	}
 
-	index := slices.IndexFunc(session.Options, func(o model.Option) bool { return string(o.Name) == "@native" })
+	index := slices.IndexFunc(
+		session.Options,
+		func(o model.Option) bool { return string(o.Name) == "@native" },
+	)
 	if index < 0 || string(session.Options[index].Value) != "first\nsecond\t \xff" {
 		t.Fatal("lost option bytes")
 	}
@@ -138,7 +162,8 @@ func assertNativeObservation(t *testing.T, result capture.Observation) {
 		t.Fatal("observation claimed checkpoint parity")
 	}
 
-	if len(result.Manifest.Sessions) != 1 || len(result.Manifest.Windows) != 1 || len(result.Manifest.Panes) != 1 {
+	if len(result.Manifest.Sessions) != 1 || len(result.Manifest.Windows) != 1 ||
+		len(result.Manifest.Panes) != 1 {
 		t.Fatal("capture included unrelated fixture session")
 	}
 
@@ -159,7 +184,11 @@ func assertNativeObservation(t *testing.T, result capture.Observation) {
 	}
 }
 
-func assertCapturedClosure(t *testing.T, server *gotmux.Server, first, second, third gotmux.Session) {
+func assertCapturedClosure(
+	t *testing.T,
+	server *gotmux.Server,
+	first, second, third gotmux.Session,
+) {
 	t.Helper()
 
 	result, err := capture.Observe(t.Context(), server, []gotmux.SessionID{first.ID()})
@@ -168,8 +197,16 @@ func assertCapturedClosure(t *testing.T, server *gotmux.Server, first, second, t
 	}
 
 	m := result.Manifest
-	if len(m.Sessions) != 3 || len(m.Windows) != 2 || len(m.Panes) != 4 || len(m.Groups) != 1 || len(m.Links) != 4 {
-		t.Fatalf("incorrect graph closure: %d sessions, %d windows, %d panes, %d groups, %d links", len(m.Sessions), len(m.Windows), len(m.Panes), len(m.Groups), len(m.Links))
+	if len(m.Sessions) != 3 || len(m.Windows) != 2 || len(m.Panes) != 4 || len(m.Groups) != 1 ||
+		len(m.Links) != 4 {
+		t.Fatalf(
+			"incorrect graph closure: %d sessions, %d windows, %d panes, %d groups, %d links",
+			len(m.Sessions),
+			len(m.Windows),
+			len(m.Panes),
+			len(m.Groups),
+			len(m.Links),
+		)
 	}
 
 	for _, session := range []gotmux.Session{first, second, third} {
@@ -178,7 +215,10 @@ func assertCapturedClosure(t *testing.T, server *gotmux.Server, first, second, t
 			t.Fatal(err)
 		}
 
-		if !slices.ContainsFunc(m.Sessions, func(s model.Session) bool { return string(s.Name) == info.Name }) {
+		if !slices.ContainsFunc(
+			m.Sessions,
+			func(s model.Session) bool { return string(s.Name) == info.Name },
+		) {
 			t.Fatal("lost session")
 		}
 	}
@@ -202,7 +242,10 @@ func waitForCapture(t *testing.T, pane gotmux.Pane, marker []byte) []byte {
 	defer ticker.Stop()
 
 	for {
-		data, err := pane.Capture(ctx, gotmux.CaptureOptions{IncludeEscapes: true, PreserveSpaces: true})
+		data, err := pane.Capture(
+			ctx,
+			gotmux.CaptureOptions{IncludeEscapes: true, PreserveSpaces: true},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}

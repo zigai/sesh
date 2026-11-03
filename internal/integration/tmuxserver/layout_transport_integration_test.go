@@ -30,7 +30,10 @@ func startCliServer(t *testing.T) string {
 		{"new-window", "-t", "cli", "-n", "editor"},
 		{"split-window", "-t", "cli:1", "-h"},
 	} {
-		command := exec.CommandContext(t.Context(), "tmux", append([]string{"-S", socketPath}, args...)...)
+		command := exec.CommandContext(
+			t.Context(),
+			"tmux",
+			append([]string{"-S", socketPath}, args...)...)
 		command.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + t.TempDir()}
 
 		if out, err := command.CombinedOutput(); err != nil {
@@ -143,7 +146,11 @@ func assertTilingSplit(t *testing.T, node model.Layout, info gotmux.WindowInfo) 
 	}
 
 	if len(node.Children) != info.PaneCount {
-		t.Fatalf("split children = %d, want observed pane count %d", len(node.Children), info.PaneCount)
+		t.Fatalf(
+			"split children = %d, want observed pane count %d",
+			len(node.Children),
+			info.PaneCount,
+		)
 	}
 
 	next := 0
@@ -158,7 +165,14 @@ func assertTilingSplit(t *testing.T, node model.Layout, info gotmux.WindowInfo) 
 		}
 
 		if child.Top != 0 || child.Height != node.Height {
-			t.Fatalf("child %d = %dx%d at %d,%d, want full-height column", index, child.Width, child.Height, child.Left, child.Top)
+			t.Fatalf(
+				"child %d = %dx%d at %d,%d, want full-height column",
+				index,
+				child.Width,
+				child.Height,
+				child.Left,
+				child.Top,
+			)
 		}
 
 		if child.Left != next {

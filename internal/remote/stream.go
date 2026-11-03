@@ -62,7 +62,8 @@ func (identity *StreamIdentity) Accept(frame Frame) error {
 		return ErrInvalidFrame
 	}
 
-	if frame.PeerID != identity.PeerID || frame.StreamInstance != identity.StreamInstance || frame.Sequence <= identity.Sequence {
+	if frame.PeerID != identity.PeerID || frame.StreamInstance != identity.StreamInstance ||
+		frame.Sequence <= identity.Sequence {
 		return ErrInvalidFrame
 	}
 
@@ -71,7 +72,10 @@ func (identity *StreamIdentity) Accept(frame Frame) error {
 	return nil
 }
 
-func StreamBootstrapFor(remote config.RemoteConfig, connection config.RemoteConnectionConfig) StreamBootstrap {
+func StreamBootstrapFor(
+	remote config.RemoteConfig,
+	connection config.RemoteConnectionConfig,
+) StreamBootstrap {
 	return StreamBootstrap{
 		Version:           ProtocolVersion,
 		TmuxSocket:        connection.TmuxSocket,
@@ -108,7 +112,9 @@ func Stream(ctx context.Context, opts StreamOptions) error {
 		if ctx.Err() != nil {
 			pending.Wait()
 
-			return oops.In("remote").With("operation", "stream").Wrapf(ctx.Err(), "running remote stream")
+			return oops.In("remote").
+				With("operation", "stream").
+				Wrapf(ctx.Err(), "running remote stream")
 		}
 
 		if acceptedSnapshot {
@@ -143,7 +149,9 @@ func Stream(ctx context.Context, opts StreamOptions) error {
 		case <-ctx.Done():
 			timer.Stop()
 
-			return oops.In("remote").With("operation", "stream").Wrapf(ctx.Err(), "running remote stream")
+			return oops.In("remote").
+				With("operation", "stream").
+				Wrapf(ctx.Err(), "running remote stream")
 		case <-timer.C:
 		}
 
@@ -153,7 +161,11 @@ func Stream(ctx context.Context, opts StreamOptions) error {
 	return oops.In("remote").With("operation", "stream").Wrapf(ctx.Err(), "running remote stream")
 }
 
-func runStreamAttempt(ctx context.Context, opts StreamOptions, pending *sync.WaitGroup) (error, bool) {
+func runStreamAttempt(
+	ctx context.Context,
+	opts StreamOptions,
+	pending *sync.WaitGroup,
+) (error, bool) {
 	attemptContext, cancelAttempt := context.WithCancel(ctx)
 	defer cancelAttempt()
 
@@ -162,11 +174,16 @@ func runStreamAttempt(ctx context.Context, opts StreamOptions, pending *sync.Wai
 		return err, false
 	}
 
-	command, cmdErr := NewSSHCommand(attemptContext, opts.Remote, opts.Connection, SSHCommandOptions{
-		Interactive: false,
-		Forward:     nil,
-		Command:     opts.Command,
-	}, PeerEntryPoint(opts.Connection, ChannelStream)...)
+	command, cmdErr := NewSSHCommand(
+		attemptContext,
+		opts.Remote,
+		opts.Connection,
+		SSHCommandOptions{
+			Interactive: false,
+			Forward:     nil,
+			Command:     opts.Command,
+		},
+		PeerEntryPoint(opts.Connection, ChannelStream)...)
 	if cmdErr != nil {
 		return cmdErr, false
 	}
@@ -199,8 +216,15 @@ func runStreamAttempt(ctx context.Context, opts StreamOptions, pending *sync.Wai
 	helloExpired := watchHelloDeadline(attemptContext, helloAccepted, cancelAttempt,
 		positiveDuration(opts.HelloTimeout, defaultConnect))
 
-	streamErr, acceptedSnapshot := consumeFrames(attemptContext, NewFrameReader(stdout), stdout, opts.Yield, markReady,
-		positiveDuration(opts.FrameTimeout, streamFrameGrace), pending)
+	streamErr, acceptedSnapshot := consumeFrames(
+		attemptContext,
+		NewFrameReader(stdout),
+		stdout,
+		opts.Yield,
+		markReady,
+		positiveDuration(opts.FrameTimeout, streamFrameGrace),
+		pending,
+	)
 
 	finishErr := FinishCommand(ctx, command, stdout, diagnostics)
 
@@ -217,7 +241,12 @@ func runStreamAttempt(ctx context.Context, opts StreamOptions, pending *sync.Wai
 	return streamErr, acceptedSnapshot
 }
 
-func watchHelloDeadline(ctx context.Context, accepted <-chan struct{}, cancel context.CancelFunc, timeout time.Duration) <-chan struct{} {
+func watchHelloDeadline(
+	ctx context.Context,
+	accepted <-chan struct{},
+	cancel context.CancelFunc,
+	timeout time.Duration,
+) <-chan struct{} {
 	expired := make(chan struct{})
 
 	go func() {
@@ -272,7 +301,10 @@ func consumeFrames(
 				return acceptErr, acceptedSnapshot
 			}
 		case <-ctx.Done():
-			return oops.In("remote").With("operation", "accept_stream_frame").Wrap(ctx.Err()), acceptedSnapshot
+			return oops.In("remote").
+					With("operation", "accept_stream_frame").
+					Wrap(ctx.Err()),
+				acceptedSnapshot
 		}
 
 		if frame.Type == FrameHello && ready != nil {
@@ -285,7 +317,12 @@ func consumeFrames(
 	}
 }
 
-func readFrameWithTimeout(ctx context.Context, reader *FrameReader, stream io.Closer, timeout time.Duration) (Frame, error) {
+func readFrameWithTimeout(
+	ctx context.Context,
+	reader *FrameReader,
+	stream io.Closer,
+	timeout time.Duration,
+) (Frame, error) {
 	type readResult struct {
 		frame Frame
 		err   error

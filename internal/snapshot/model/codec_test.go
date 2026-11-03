@@ -15,16 +15,46 @@ import (
 
 func fixture() Manifest {
 	m := Manifest{
-		Format: "sesh", Version: Schema, Started: 1, Finished: 2,
+		Format:   "sesh",
+		Version:  Schema,
+		Started:  1,
+		Finished: 2,
 		Source:   Source{TmuxVersion: "3.6", LibraryVersion: "v0.3.0", Consistency: "observed"},
-		Sessions: []Session{{ID: "s0", Name: Bytes("work"), Directory: Bytes("/tmp"), Group: "g0"}, {ID: "s1", Name: Bytes("peer"), Directory: Bytes("/tmp"), Group: "g0"}},
-		Groups:   []Group{{ID: "g0", Name: Bytes("group"), Members: []string{"s0", "s1"}}},
-		Windows:  []Window{{ID: "w0", Name: Bytes("editor"), Width: 80, Height: 24, Layout: Layout{Width: 80, Height: 24, Pane: "p0"}}},
-		Links:    []Link{{Session: "s0", Window: "w0", Index: 3, Active: true}, {Session: "s1", Window: "w0", Index: 3, Active: true}},
-		Panes:    []Pane{{ID: "p0", Window: "w0", Directory: Bytes("/tmp"), Width: 80, Height: 24, Active: true, Launch: Launch{Recovery: "unverified"}}},
+		Sessions: []Session{
+			{ID: "s0", Name: Bytes("work"), Directory: Bytes("/tmp"), Group: "g0"},
+			{ID: "s1", Name: Bytes("peer"), Directory: Bytes("/tmp"), Group: "g0"},
+		},
+		Groups: []Group{{ID: "g0", Name: Bytes("group"), Members: []string{"s0", "s1"}}},
+		Windows: []Window{
+			{
+				ID:     "w0",
+				Name:   Bytes("editor"),
+				Width:  80,
+				Height: 24,
+				Layout: Layout{Width: 80, Height: 24, Pane: "p0"},
+			},
+		},
+		Links: []Link{
+			{Session: "s0", Window: "w0", Index: 3, Active: true},
+			{Session: "s1", Window: "w0", Index: 3, Active: true},
+		},
+		Panes: []Pane{
+			{
+				ID:        "p0",
+				Window:    "w0",
+				Directory: Bytes("/tmp"),
+				Width:     80,
+				Height:    24,
+				Active:    true,
+				Launch:    Launch{Recovery: "unverified"},
+			},
+		},
 	}
 	for _, domain := range []string{"S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10"} {
-		m.Evidence = append(m.Evidence, Evidence{Domain: domain, Status: "unverified", Reason: "not_captured"})
+		m.Evidence = append(
+			m.Evidence,
+			Evidence{Domain: domain, Status: "unverified", Reason: "not_captured"},
+		)
 	}
 
 	return m
@@ -33,7 +63,11 @@ func fixture() Manifest {
 func TestNativeBytesAndRelationships(t *testing.T) {
 	m := fixture()
 	m.Panes[0].Launch.Arguments = []Bytes{{0xff, '\n', '\t', ' ', '\''}, {}, Bytes(" spaces ")}
-	m.Sessions[0].Environment = []Variable{{Name: Bytes("EMPTY"), State: "set"}, {Name: Bytes("MISSING"), State: "removed"}, {Name: Bytes("SECRET"), Value: Bytes("private"), State: "set", Hidden: true}}
+	m.Sessions[0].Environment = []Variable{
+		{Name: Bytes("EMPTY"), State: "set"},
+		{Name: Bytes("MISSING"), State: "removed"},
+		{Name: Bytes("SECRET"), Value: Bytes("private"), State: "set", Hidden: true},
+	}
 
 	data, err := Encode(m)
 	if err != nil {
@@ -73,21 +107,46 @@ func TestRejectsMalformedNativeDocuments(t *testing.T) {
 	withVersion := func(replacement string) []byte { return bytes.Replace(data, version, []byte(replacement), 1) }
 
 	cases := map[string][]byte{
-		"legacy":                 []byte("session\twork\t0\n"),
-		"duplicate":              withVersion(string(version) + "," + string(version)),
-		"unknown":                withVersion(string(version) + `,"other":0`),
-		"missing":                bytes.Replace(data, append(bytes.Clone(version), ','), nil, 1),
-		"case":                   bytes.Replace(data, []byte(`"version"`), []byte(`"Version"`), 1),
-		"version":                withVersion(fmt.Sprintf(`"version":%d`, Schema-1)),
-		"null":                   bytes.Replace(data, []byte(`"last":false`), []byte(`"last":null`), 1),
-		"trailing":               append(bytes.Clone(data), []byte(` {}`)...),
-		"missing false":          bytes.Replace(data, []byte(`"last":false,`), nil, 1),
-		"invalid utf8":           append([]byte{'"', 0xff, '"'}, data...),
-		"utf8 as base64":         bytes.Replace(data, []byte(`"work"`), []byte(`{"base64":"d29yaw=="}`), 1),
-		"noncanonical base64":    bytes.Replace(data, []byte(`"work"`), []byte(`{"base64":"/x=="}`), 1),
-		"newline base64":         bytes.Replace(data, []byte(`"work"`), []byte(`{"base64":"/\nw=="}`), 1),
-		"unknown bytes member":   bytes.Replace(data, []byte(`"work"`), []byte(`{"hex":"ff"}`), 1),
-		"extra bytes member":     bytes.Replace(data, []byte(`"work"`), []byte(`{"base64":"/w==","other":""}`), 1),
+		"legacy":    []byte("session\twork\t0\n"),
+		"duplicate": withVersion(string(version) + "," + string(version)),
+		"unknown":   withVersion(string(version) + `,"other":0`),
+		"missing":   bytes.Replace(data, append(bytes.Clone(version), ','), nil, 1),
+		"case":      bytes.Replace(data, []byte(`"version"`), []byte(`"Version"`), 1),
+		"version":   withVersion(fmt.Sprintf(`"version":%d`, Schema-1)),
+		"null": bytes.Replace(
+			data,
+			[]byte(`"last":false`),
+			[]byte(`"last":null`),
+			1,
+		),
+		"trailing":      append(bytes.Clone(data), []byte(` {}`)...),
+		"missing false": bytes.Replace(data, []byte(`"last":false,`), nil, 1),
+		"invalid utf8":  append([]byte{'"', 0xff, '"'}, data...),
+		"utf8 as base64": bytes.Replace(
+			data,
+			[]byte(`"work"`),
+			[]byte(`{"base64":"d29yaw=="}`),
+			1,
+		),
+		"noncanonical base64": bytes.Replace(
+			data,
+			[]byte(`"work"`),
+			[]byte(`{"base64":"/x=="}`),
+			1,
+		),
+		"newline base64": bytes.Replace(
+			data,
+			[]byte(`"work"`),
+			[]byte(`{"base64":"/\nw=="}`),
+			1,
+		),
+		"unknown bytes member": bytes.Replace(data, []byte(`"work"`), []byte(`{"hex":"ff"}`), 1),
+		"extra bytes member": bytes.Replace(
+			data,
+			[]byte(`"work"`),
+			[]byte(`{"base64":"/w==","other":""}`),
+			1,
+		),
 		"bytes as number":        bytes.Replace(data, []byte(`"work"`), []byte(`7`), 1),
 		"bytes as array":         bytes.Replace(data, []byte(`"work"`), []byte(`[119]`), 1),
 		"empty base64 of object": bytes.Replace(data, []byte(`"work"`), []byte(`{}`), 1),
@@ -153,7 +212,9 @@ func TestGraphValidation(t *testing.T) {
 		"missing artifact":     func(m *Manifest) { m.Panes[0].Terminal.Artifact = "a0" },
 		"unsafe artifact":      func(m *Manifest) { m.Artifacts = []Artifact{{ID: "../escape"}} },
 		"orphan artifact": func(m *Manifest) {
-			m.Artifacts = []Artifact{{ID: "a0", Kind: "terminal-text", SHA256: strings.Repeat("0", 64)}}
+			m.Artifacts = []Artifact{
+				{ID: "a0", Kind: "terminal-text", SHA256: strings.Repeat("0", 64)},
+			}
 		},
 		"missing evidence":     func(m *Manifest) { m.Evidence = m.Evidence[:1] },
 		"no reason":            func(m *Manifest) { m.Evidence[0].Reason = "" },
@@ -279,9 +340,17 @@ func TestMetadataAndLaunchBytes(t *testing.T) {
 			m := fixture()
 			m.Panes[0].Title = Bytes(value)
 			m.Panes[0].Directory = Bytes("/tmp/" + value)
-			m.Panes[0].Launch = Launch{Executable: Bytes("/bin/tool"), Arguments: []Bytes{Bytes("tool"), Bytes(value), {}}, Directory: Bytes("/tmp/" + value), Environment: []Variable{{Name: Bytes("VALUE"), State: "set", Value: Bytes(value)}}, Recovery: "restart"}
+			m.Panes[0].Launch = Launch{
+				Executable:  Bytes("/bin/tool"),
+				Arguments:   []Bytes{Bytes("tool"), Bytes(value), {}},
+				Directory:   Bytes("/tmp/" + value),
+				Environment: []Variable{{Name: Bytes("VALUE"), State: "set", Value: Bytes(value)}},
+				Recovery:    "restart",
+			}
 			m.Windows[0].Name = Bytes(value)
-			m.Windows[0].Options = []Option{{Scope: "window", Name: Bytes("@text"), Value: Bytes(value), Present: true}}
+			m.Windows[0].Options = []Option{
+				{Scope: "window", Name: Bytes("@text"), Value: Bytes(value), Present: true},
+			}
 
 			data, err := Encode(m)
 			if err != nil {

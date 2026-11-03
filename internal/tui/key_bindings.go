@@ -55,13 +55,37 @@ func newActionKeyMap(cfg *config.Config, bindings []action.Binding) actionKeyMap
 		pageDown:   newActionBinding(keys.PageDown, "Page down"),
 		top:        newActionBinding(keys.Top, "Jump to top"),
 		bottom:     newActionBinding(keys.Bottom, "Jump to bottom"),
-		enter:      newActionBindingSet(config.PickerSelectKeys, "enter", "Open selected session or agent"),
-		close:      newActionBindingSet(config.PickerCloseKeys, "esc, ctrl+c, ctrl+o", "Close popup"),
-		handoff:    newActionBindingSet(config.PickerHandoffKeys, "ctrl+p", "Open floating terminal"),
-		stepUp:     newActionBindingSet(config.PickerStepUpKeys, "↑", "Move selection up"),
-		stepDown:   newActionBindingSet(config.PickerStepDownKeys, "↓/ctrl+n", "Move selection down"),
-		groupUp:    newActionBindingSet(config.PickerGroupUpKeys, "ctrl+↑", "Move to previous tmux session"),
-		groupDown:  newActionBindingSet(config.PickerGroupDownKeys, "ctrl+↓", "Move to next tmux session"),
+		enter: newActionBindingSet(
+			config.PickerSelectKeys,
+			"enter",
+			"Open selected session or agent",
+		),
+		close: newActionBindingSet(
+			config.PickerCloseKeys,
+			"esc, ctrl+c, ctrl+o",
+			"Close popup",
+		),
+		handoff: newActionBindingSet(
+			config.PickerHandoffKeys,
+			"ctrl+p",
+			"Open floating terminal",
+		),
+		stepUp: newActionBindingSet(config.PickerStepUpKeys, "↑", "Move selection up"),
+		stepDown: newActionBindingSet(
+			config.PickerStepDownKeys,
+			"↓/ctrl+n",
+			"Move selection down",
+		),
+		groupUp: newActionBindingSet(
+			config.PickerGroupUpKeys,
+			"ctrl+↑",
+			"Move to previous tmux session",
+		),
+		groupDown: newActionBindingSet(
+			config.PickerGroupDownKeys,
+			"ctrl+↓",
+			"Move to next tmux session",
+		),
 	}
 }
 
@@ -75,11 +99,17 @@ func pickerActions(bindings []action.Binding) []boundAction {
 		}
 
 		description := entry.Describe().Title
-		if name := binding.Values.String("action"); binding.Action == action.TaskRun.ID && name != "" {
+		if name := binding.Values.String(
+			"action",
+		); binding.Action == action.TaskRun.ID &&
+			name != "" {
 			description = name
 		}
 
-		bound = append(bound, boundAction{key: newActionBinding(binding.Key, description), binding: binding})
+		bound = append(
+			bound,
+			boundAction{key: newActionBinding(binding.Key, description), binding: binding},
+		)
 	}
 
 	return bound
@@ -99,7 +129,8 @@ func (m *Model) viewActions(keys actionKeyMap) []boundAction {
 		}
 
 		descriptor := entry.Describe()
-		if m.displayMode == displayModeInbox || (!descriptor.InPicker && descriptor.Subject != action.SubjectTask) {
+		if m.displayMode == displayModeInbox ||
+			(!descriptor.InPicker && descriptor.Subject != action.SubjectTask) {
 			actions = append(actions, bound)
 		}
 	}

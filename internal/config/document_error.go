@@ -33,7 +33,10 @@ type DocumentError struct {
 }
 
 func AsDocumentError(err error) (DocumentError, bool) {
-	if strictErr, ok := errors.AsType[*toml.StrictMissingError](err); ok && len(strictErr.Errors) > 0 {
+	if strictErr, ok := errors.AsType[*toml.StrictMissingError](
+		err,
+	); ok &&
+		len(strictErr.Errors) > 0 {
 		return newDocumentError(&strictErr.Errors[0], DocumentUnknownKey), true
 	}
 

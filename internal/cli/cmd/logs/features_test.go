@@ -10,11 +10,14 @@ import (
 func generateNumberedLogRecords(count int, component string, level string) string {
 	var builder strings.Builder
 	for i := range count {
-		fmt.Fprintf(&builder, `{"time":"2026-08-06T15:45:%02dZ","level":%q,"component":%q,"command":"test","message":"event %d"}`+"\n",
+		fmt.Fprintf(
+			&builder,
+			`{"time":"2026-08-06T15:45:%02dZ","level":%q,"component":%q,"command":"test","message":"event %d"}`+"\n",
 			i%60,
 			level,
 			component,
-			i+1)
+			i+1,
+		)
 	}
 
 	return builder.String()
@@ -116,7 +119,8 @@ func TestLogsCommandMultiFileBounding(t *testing.T) {
 	var newer strings.Builder
 	for i := range 30 {
 		fmt.Fprintf(
-			&newer, `{"time":"2026-08-06T15:46:%02dZ","level":"info","component":"resurrect","command":"test","message":"event %d"}`+"\n",
+			&newer,
+			`{"time":"2026-08-06T15:46:%02dZ","level":"info","component":"resurrect","command":"test","message":"event %d"}`+"\n",
 			i%60,
 			31+i,
 		)
@@ -153,7 +157,8 @@ func testLevelFiltering(t *testing.T, path string) {
 		t.Fatalf("execute --level warn error: %v", err)
 	}
 
-	if strings.Contains(output, "alpha-info") || strings.Contains(output, "delta-debug") || strings.Contains(output, "echo-info") {
+	if strings.Contains(output, "alpha-info") || strings.Contains(output, "delta-debug") ||
+		strings.Contains(output, "echo-info") {
 		t.Fatalf("output contains records below warn: %s", output)
 	}
 
@@ -195,7 +200,16 @@ func testComponentFiltering(t *testing.T, path string) {
 func testCombinedAndInvalidFilters(t *testing.T, path string) {
 	t.Helper()
 
-	output, _, err := executeLogsCommand(t, path, testLogsCmd, "-a", "-l", "warn", "-c", "resurrect")
+	output, _, err := executeLogsCommand(
+		t,
+		path,
+		testLogsCmd,
+		"-a",
+		"-l",
+		"warn",
+		"-c",
+		"resurrect",
+	)
 	if err != nil {
 		t.Fatalf("execute combined filter error: %v", err)
 	}

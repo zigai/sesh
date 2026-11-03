@@ -30,20 +30,27 @@ func OriginAttachmentOption(terminal *os.File) (string, error) {
 	}
 
 	if stat.Mode&unix.S_IFMT != unix.S_IFCHR {
-		return "", oops.In("remote").With("operation", "origin_attachment_option").Wrap(session.ErrTerminalRequired)
+		return "", oops.In("remote").
+			With("operation", "origin_attachment_option").
+			Wrap(session.ErrTerminalRequired)
 	}
 
 	return fmt.Sprintf("%s%x", originBindingPrefix, stat.Rdev), nil
 }
 
-func (live *GotmuxLiveServer) AttachWithOrigin(ctx context.Context, record StoredCapability, streams AttachStreams) (resultErr error) {
+func (live *GotmuxLiveServer) AttachWithOrigin(
+	ctx context.Context,
+	record StoredCapability,
+	streams AttachStreams,
+) (resultErr error) {
 	handle, err := live.session(ctx, record.Target.SessionID)
 	if err != nil {
 		return err
 	}
 
 	identity := handle.ServerIdentity()
-	if identity.PID != record.Target.TmuxServerPID || !identity.Started.Equal(record.Target.TmuxServerStartedAt) {
+	if identity.PID != record.Target.TmuxServerPID ||
+		!identity.Started.Equal(record.Target.TmuxServerStartedAt) {
 		return oops.In("remote").With("operation", "attach_with_origin").Wrap(ErrTargetChanged)
 	}
 
@@ -56,12 +63,20 @@ func (live *GotmuxLiveServer) AttachWithOrigin(ctx context.Context, record Store
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
 		defer cancel()
 
-		resultErr = errors.Join(resultErr, live.clearOriginBinding(cleanupCtx, handle, name, record.Grant.AttachmentID))
+		resultErr = errors.Join(
+			resultErr,
+			live.clearOriginBinding(cleanupCtx, handle, name, record.Grant.AttachmentID),
+		)
 	}()
 
 	options := live.server.Options()
 	if err := options.SetUserWith(ctx, name, gotmux.SetOptionOptions{
-		Value: gotmux.PresentValue(record.Grant.AttachmentID), OnlyIfUnset: true, Append: false, ExpandFormat: false,
+		Value: gotmux.PresentValue(
+			record.Grant.AttachmentID,
+		),
+		OnlyIfUnset:  true,
+		Append:       false,
+		ExpandFormat: false,
 	}); err != nil {
 		return oops.In("remote").With("operation", "attach_with_origin").Wrap(err)
 	}
@@ -79,9 +94,17 @@ func (live *GotmuxLiveServer) AttachWithOrigin(ctx context.Context, record Store
 		return err
 	}
 
-	if err := handle.Attach(ctx, gotmux.Streams{In: streams.In, Out: streams.Out, Err: streams.Err}, gotmux.AttachOptions{
-		ReadOnly: false, PreserveEnvironment: false, Detach: gotmux.DetachModeNone, Dir: "", Flags: nil,
-	}); err != nil {
+	if err := handle.Attach(
+		ctx,
+		gotmux.Streams{In: streams.In, Out: streams.Out, Err: streams.Err},
+		gotmux.AttachOptions{
+			ReadOnly:            false,
+			PreserveEnvironment: false,
+			Detach:              gotmux.DetachModeNone,
+			Dir:                 "",
+			Flags:               nil,
+		},
+	); err != nil {
 		return oops.In("remote").With("operation", "attach_with_origin").Wrap(err)
 	}
 
@@ -111,7 +134,11 @@ func selectAttachmentPane(ctx context.Context, handle gotmux.Session, paneID str
 	return oops.In("remote").With("operation", "select_attachment_pane").Wrap(ErrTargetChanged)
 }
 
-func (live *GotmuxLiveServer) clearOriginBinding(ctx context.Context, handle gotmux.Session, name, attachmentID string) error {
+func (live *GotmuxLiveServer) clearOriginBinding(
+	ctx context.Context,
+	handle gotmux.Session,
+	name, attachmentID string,
+) error {
 	probe, err := live.server.Probe(ctx)
 	if err != nil {
 		if errors.Is(err, gotmux.ErrNoServer) {
@@ -126,7 +153,13 @@ func (live *GotmuxLiveServer) clearOriginBinding(ctx context.Context, handle got
 		return nil
 	}
 
-	condition := fmt.Sprintf("#{&&:#{==:#{pid},%d},#{&&:#{==:#{start_time},%d},#{==:#{%s},%s}}}", identity.PID, identity.Started.Unix(), name, attachmentID)
+	condition := fmt.Sprintf(
+		"#{&&:#{==:#{pid},%d},#{&&:#{==:#{start_time},%d},#{==:#{%s},%s}}}",
+		identity.PID,
+		identity.Started.Unix(),
+		name,
+		attachmentID,
+	)
 
 	command, err := gotmux.NewCommand("if-shell", "-F", condition, "set-option -su "+name)
 	if err != nil {

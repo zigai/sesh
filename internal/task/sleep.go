@@ -90,7 +90,12 @@ func (s *Service) Sleep(ctx context.Context, id string) (Record, error) {
 		return record, taskError("sleep_task", err)
 	}
 
-	if delivered, err := stopAgent(ctx, plan.process.PID, plan.process.Birth, plan.signal); err != nil {
+	if delivered, err := stopAgent(
+		ctx,
+		plan.process.PID,
+		plan.process.Birth,
+		plan.signal,
+	); err != nil {
 		if delivered {
 			return record, taskError("sleep_task", err)
 		}
@@ -98,7 +103,10 @@ func (s *Service) Sleep(ctx context.Context, id string) (Record, error) {
 		record.State = StateActive
 		record.Resume = emptyResume()
 
-		return record, taskError("sleep_task", errors.Join(err, s.put(context.WithoutCancel(ctx), record)))
+		return record, taskError(
+			"sleep_task",
+			errors.Join(err, s.put(context.WithoutCancel(ctx), record)),
+		)
 	}
 
 	if err := s.showPlaceholder(ctx, live.AgentPane, record); err != nil {
@@ -118,7 +126,11 @@ func (s *Service) WakeHere(ctx context.Context, id string) (Woken, error) {
 	return s.wake(ctx, id, func(Live, Woken) error { return nil })
 }
 
-func (s *Service) wake(ctx context.Context, id string, relaunch func(Live, Woken) error) (Woken, error) {
+func (s *Service) wake(
+	ctx context.Context,
+	id string,
+	relaunch func(Live, Woken) error,
+) (Woken, error) {
 	record, live, err := s.task(ctx, id)
 	if err != nil {
 		return Woken{Record: record, Command: nil, AlreadyAwake: false}, taskError("wake_task", err)
@@ -139,7 +151,11 @@ func (s *Service) wake(ctx context.Context, id string, relaunch func(Live, Woken
 }
 
 func (s *Service) beginWake(ctx context.Context, record Record, live Live) (Woken, error) {
-	woken := Woken{Record: record, Command: slices.Clone(record.Resume.Command), AlreadyAwake: false}
+	woken := Woken{
+		Record:       record,
+		Command:      slices.Clone(record.Resume.Command),
+		AlreadyAwake: false,
+	}
 
 	if record.State != StateSleeping && record.State != StateWaking {
 		return woken, ErrNotAsleep
@@ -194,7 +210,10 @@ func (s *Service) agentIn(ctx context.Context, live Live) (Agent, error) {
 		return emptyAgent(), fmt.Errorf("find task agent: %w", err)
 	}
 
-	running = slices.DeleteFunc(running, func(agent Agent) bool { return agent.PanePID != live.AgentPID })
+	running = slices.DeleteFunc(
+		running,
+		func(agent Agent) bool { return agent.PanePID != live.AgentPID },
+	)
 	if len(running) != 1 {
 		return emptyAgent(), ErrNoAgent
 	}
@@ -210,7 +229,12 @@ func (s *Service) showPlaceholder(ctx context.Context, pane gotmux.PaneID, recor
 	return nil
 }
 
-func (s *Service) respawn(ctx context.Context, paneID gotmux.PaneID, record Record, argv []string) error {
+func (s *Service) respawn(
+	ctx context.Context,
+	paneID gotmux.PaneID,
+	record Record,
+	argv []string,
+) error {
 	shell, err := defaultShell(ctx, s.server)
 	if err != nil {
 		return err
@@ -236,7 +260,12 @@ func Env(record Record) map[string]string {
 		return map[string]string{EnvTask: record.ID}
 	}
 
-	return map[string]string{EnvTask: record.ID, EnvProject: record.Project, EnvWorktree: record.Directory, EnvBase: record.Base}
+	return map[string]string{
+		EnvTask:     record.ID,
+		EnvProject:  record.Project,
+		EnvWorktree: record.Directory,
+		EnvBase:     record.Base,
+	}
 }
 
 func planSleep(ctx context.Context, agent Agent, panePID int) (sleepPlan, error) {
@@ -307,9 +336,15 @@ func observedLaunch(observed *process.Observation) model.Launch {
 	}
 
 	return model.Launch{
-		Executable: model.Bytes(observed.Executable), Arguments: arguments, Directory: model.Bytes(observed.Directory),
-		Environment: observed.Environment, Birth: model.Bytes(observed.Birth.Bytes()),
-		Recovery: model.RecoveryUnverified, Reason: "",
+		Executable: model.Bytes(
+			observed.Executable,
+		),
+		Arguments:   arguments,
+		Directory:   model.Bytes(observed.Directory),
+		Environment: observed.Environment,
+		Birth:       model.Bytes(observed.Birth.Bytes()),
+		Recovery:    model.RecoveryUnverified,
+		Reason:      "",
 	}
 }
 
@@ -319,11 +354,22 @@ func emptyResume() Resume {
 
 func emptyAgent() Agent {
 	return Agent{
-		Harness: "", Activity: "", SessionID: "", SessionPath: "", ResumeCommand: nil, Executable: "", PanePID: 0,
+		Harness:       "",
+		Activity:      "",
+		SessionID:     "",
+		SessionPath:   "",
+		ResumeCommand: nil,
+		Executable:    "",
+		PanePID:       0,
 	}
 }
 
-func stopAgent(ctx context.Context, pid int, identity process.Identity, signal syscall.Signal) (bool, error) {
+func stopAgent(
+	ctx context.Context,
+	pid int,
+	identity process.Identity,
+	signal syscall.Signal,
+) (bool, error) {
 	current, err := process.ReadIdentity(ctx, pid)
 	if err != nil || current != identity {
 		return false, errors.Join(ErrAgentChanged, err)
@@ -348,7 +394,8 @@ func stopAgent(ctx context.Context, pid int, identity process.Identity, signal s
 			return true, ErrAgentDidNotStop
 		case <-ticker.C:
 			current, err := process.ReadIdentity(ctx, pid)
-			if errors.Is(err, process.ErrProcessVanished) || errors.Is(err, process.ErrProcessZombie) ||
+			if errors.Is(err, process.ErrProcessVanished) ||
+				errors.Is(err, process.ErrProcessZombie) ||
 				(err == nil && current != identity) {
 				return true, nil
 			}

@@ -20,20 +20,38 @@ func writeRestoreSummary(out *strings.Builder, res action.RestoredSnapshot) {
 	case len(res.Sessions) == 0:
 		fmt.Fprintf(out, "No sessions restored from generation %s.\n", generation)
 	case len(names) == len(res.Sessions):
-		fmt.Fprintf(out, "Restored %s from generation %s: %s\n", sessionCount(len(res.Sessions)), generation, strings.Join(names, ", "))
+		fmt.Fprintf(
+			out,
+			"Restored %s from generation %s: %s\n",
+			sessionCount(len(res.Sessions)),
+			generation,
+			strings.Join(names, ", "),
+		)
 	default:
-		fmt.Fprintf(out, "Restored %s from generation %s.\n", sessionCount(len(res.Sessions)), generation)
+		fmt.Fprintf(
+			out,
+			"Restored %s from generation %s.\n",
+			sessionCount(len(res.Sessions)),
+			generation,
+		)
 	}
 
 	if len(res.Mismatches) > 0 {
-		out.WriteString("The restored layout does not fully match the snapshot; run with --verbose for the differences.\n")
+		out.WriteString(
+			"The restored layout does not fully match the snapshot; run with --verbose for the differences.\n",
+		)
 	}
 
 	writeProgramSummary(out, res.Panes)
 	writeSkippedSummary(out, res)
 
 	if res.Uncertain && res.OperationID != "" {
-		fmt.Fprintf(out, "Some steps may or may not have happened. Continue without repeating them:\n  sesh snapshot restore --generation %s --operation %s\n", res.Generation, res.OperationID)
+		fmt.Fprintf(
+			out,
+			"Some steps may or may not have happened. Continue without repeating them:\n  sesh snapshot restore --generation %s --operation %s\n",
+			res.Generation,
+			res.OperationID,
+		)
 	}
 }
 
@@ -113,7 +131,9 @@ func writeProgramSummary(out *strings.Builder, panes []action.RestoredPane) {
 	}
 
 	if resumed+restarted > 0 {
-		out.WriteString("Resumed and restarted programs were launched, but sesh cannot confirm they recovered; check those panes.\n")
+		out.WriteString(
+			"Resumed and restarted programs were launched, but sesh cannot confirm they recovered; check those panes.\n",
+		)
 	}
 }
 
@@ -163,8 +183,14 @@ func writeSkippedSummary(out *strings.Builder, res action.RestoredSnapshot) {
 		generationFlag = " --generation " + res.Generation
 	}
 
-	fmt.Fprintf(out, "  To restore one, rename the live session (tmux rename-session -t %q <new-name>), then run:\n"+
-		"    sesh snapshot restore%s %s\n", first.Name, generationFlag, first.ID)
+	fmt.Fprintf(
+		out,
+		"  To restore one, rename the live session (tmux rename-session -t %q <new-name>), then run:\n"+
+			"    sesh snapshot restore%s %s\n",
+		first.Name,
+		generationFlag,
+		first.ID,
+	)
 }
 
 func writeRestoreDetails(out *strings.Builder, res action.RestoredSnapshot) {
@@ -180,13 +206,25 @@ func writeRestoreDetails(out *strings.Builder, res action.RestoredSnapshot) {
 		out.WriteString("Panes:\n")
 
 		for _, pane := range res.Panes {
-			fmt.Fprintf(out, "  %s runtime=%q outcome=%s reason=%q app-verified=%t cwd-fallback=%t\n",
-				pane.PaneID, pane.RuntimeID, pane.Outcome, pane.Reason, pane.AppVerified, pane.CWDFallback)
+			fmt.Fprintf(
+				out,
+				"  %s runtime=%q outcome=%s reason=%q app-verified=%t cwd-fallback=%t\n",
+				pane.PaneID,
+				pane.RuntimeID,
+				pane.Outcome,
+				pane.Reason,
+				pane.AppVerified,
+				pane.CWDFallback,
+			)
 		}
 	}
 
 	if len(res.MissingRequirements) > 0 {
-		fmt.Fprintf(out, "Missing Parity:     %d unverified or observational requirements\n", len(res.MissingRequirements))
+		fmt.Fprintf(
+			out,
+			"Missing Parity:     %d unverified or observational requirements\n",
+			len(res.MissingRequirements),
+		)
 	}
 
 	if len(res.SessionsSkipped) > 0 {
@@ -201,12 +239,22 @@ func writeRestoreDetails(out *strings.Builder, res action.RestoredSnapshot) {
 		out.WriteString("Differences:\n")
 
 		for _, mismatch := range res.Mismatches {
-			fmt.Fprintf(out, "  %s %s reason=%s\n", mismatch.Domain, mismatch.Entity, mismatch.Reason)
+			fmt.Fprintf(
+				out,
+				"  %s %s reason=%s\n",
+				mismatch.Domain,
+				mismatch.Entity,
+				mismatch.Reason,
+			)
 		}
 	}
 
 	if count := len(res.Advisories); count > 0 {
-		fmt.Fprintf(out, "Observed Changes:   %d values differ from the snapshot after launch (for example pane titles that applications rewrite)\n", count)
+		fmt.Fprintf(
+			out,
+			"Observed Changes:   %d values differ from the snapshot after launch (for example pane titles that applications rewrite)\n",
+			count,
+		)
 	}
 }
 

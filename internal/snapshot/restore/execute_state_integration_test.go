@@ -105,7 +105,10 @@ func TestExecutorImportsScopedStateFaithfully(t *testing.T) {
 	repoDir := filepath.Join(t.TempDir(), "repo")
 	generation := commitObservationToRepo(t, ctx, repoDir, observation)
 
-	plan, err := BuildPlan(observation.Manifest, []string{sessionIDByName(t, observation.Manifest, "state-source")})
+	plan, err := BuildPlan(
+		observation.Manifest,
+		[]string{sessionIDByName(t, observation.Manifest, "state-source")},
+	)
 	if err != nil {
 		t.Fatalf("BuildPlan failed: %v", err)
 	}
@@ -117,7 +120,15 @@ func TestExecutorImportsScopedStateFaithfully(t *testing.T) {
 
 	defer func() { _ = repo.Close() }()
 
-	operation := registerPlanOperation(t, ctx, repo, "scoped-state", generation, targetServer.Endpoint().SocketPath, plan)
+	operation := registerPlanOperation(
+		t,
+		ctx,
+		repo,
+		"scoped-state",
+		generation,
+		targetServer.Endpoint().SocketPath,
+		plan,
+	)
 
 	report, err := NewExecutor(targetServer, observation.Manifest, DefaultExecuteConfig()).
 		Execute(ctx, plan, newPlanJournal(t, ctx, repo, operation))
@@ -164,7 +175,14 @@ func TestExecutorNeverMutatesGlobalScopes(t *testing.T) {
 		t.Fatalf("setting source global option failed: %v", err)
 	}
 
-	source, err := sourceServer.NewSession(ctx, gotmux.NewSessionOptions{Name: "global-source", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly})
+	source, err := sourceServer.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{
+			Name:    "global-source",
+			Program: gotmux.Exec("sleep", "300"),
+			Start:   gotmux.StartPolicyExistingOnly,
+		},
+	)
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -184,7 +202,10 @@ func TestExecutorNeverMutatesGlobalScopes(t *testing.T) {
 	repoDir := filepath.Join(t.TempDir(), "repo")
 	generation := commitObservationToRepo(t, ctx, repoDir, observation)
 
-	plan, err := BuildPlan(observation.Manifest, []string{sessionIDByName(t, observation.Manifest, "global-source")})
+	plan, err := BuildPlan(
+		observation.Manifest,
+		[]string{sessionIDByName(t, observation.Manifest, "global-source")},
+	)
 	if err != nil {
 		t.Fatalf("BuildPlan failed: %v", err)
 	}
@@ -196,7 +217,15 @@ func TestExecutorNeverMutatesGlobalScopes(t *testing.T) {
 
 	defer func() { _ = repo.Close() }()
 
-	operation := registerPlanOperation(t, ctx, repo, "global-scope", generation, targetServer.Endpoint().SocketPath, plan)
+	operation := registerPlanOperation(
+		t,
+		ctx,
+		repo,
+		"global-scope",
+		generation,
+		targetServer.Endpoint().SocketPath,
+		plan,
+	)
 
 	report, err := NewExecutor(targetServer, observation.Manifest, DefaultExecuteConfig()).
 		Execute(ctx, plan, newPlanJournal(t, ctx, repo, operation))
@@ -219,7 +248,11 @@ func TestExecutorNeverMutatesGlobalScopes(t *testing.T) {
 	}
 
 	if targetBefore.Local != targetAfter.Local {
-		t.Fatalf("global scope must not be mutated: before %+v after %+v", targetBefore, targetAfter)
+		t.Fatalf(
+			"global scope must not be mutated: before %+v after %+v",
+			targetBefore,
+			targetAfter,
+		)
 	}
 }
 
@@ -230,11 +263,19 @@ func TestExecutorRestoresEmptySessionHookArray(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 
-	if err := sourceServer.GlobalSessionOptions().Set(ctx, "client-attached[1]", "run-shell true"); err != nil {
+	if err := sourceServer.GlobalSessionOptions().
+		Set(ctx, "client-attached[1]", "run-shell true"); err != nil {
 		t.Fatalf("setting global hook failed: %v", err)
 	}
 
-	source, err := sourceServer.NewSession(ctx, gotmux.NewSessionOptions{Name: "hook-source", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly})
+	source, err := sourceServer.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{
+			Name:    "hook-source",
+			Program: gotmux.Exec("sleep", "300"),
+			Start:   gotmux.StartPolicyExistingOnly,
+		},
+	)
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -245,14 +286,22 @@ func TestExecutorRestoresEmptySessionHookArray(t *testing.T) {
 		t.Fatalf("emptying session hook failed: %v", err)
 	}
 
-	plan, receipts := restoreSessionWithScopedState(t, ctx, sourceServer, targetServer, source, "hook-source")
+	plan, receipts := restoreSessionWithScopedState(
+		t,
+		ctx,
+		sourceServer,
+		targetServer,
+		source,
+		"hook-source",
+	)
 
 	target, err := targetServer.FindSession(ctx, "hook-source")
 	if err != nil {
 		t.Fatalf("FindSession failed: %v", err)
 	}
 
-	entries, err := target.Options().ListWith(ctx, gotmux.ListOptionOptions{Inherited: false, Hooks: true})
+	entries, err := target.Options().
+		ListWith(ctx, gotmux.ListOptionOptions{Inherited: false, Hooks: true})
 	if err != nil {
 		t.Fatalf("listing target hooks failed: %v", err)
 	}
@@ -260,7 +309,8 @@ func TestExecutorRestoresEmptySessionHookArray(t *testing.T) {
 	hooks := slices.DeleteFunc(slices.Clone(entries), func(entry gotmux.OptionEntry) bool {
 		return !strings.HasPrefix(entry.Name, "client-attached")
 	})
-	if len(hooks) != 1 || hooks[0].Name != "client-attached" || hooks[0].Value.State() == gotmux.ValueStatePresent {
+	if len(hooks) != 1 || hooks[0].Name != "client-attached" ||
+		hooks[0].Value.State() == gotmux.ValueStatePresent {
 		t.Fatalf("target session hooks = %+v, want only the empty client-attached array", hooks)
 	}
 
@@ -276,7 +326,15 @@ func TestRestoreOfWindowWithFloatingPaneVerifies(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 
-	source, err := sourceServer.NewSession(ctx, gotmux.NewSessionOptions{Name: "floating-source", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly, Size: gotmux.Size{Width: 100, Height: 35}})
+	source, err := sourceServer.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{
+			Name:    "floating-source",
+			Program: gotmux.Exec("sleep", "300"),
+			Start:   gotmux.StartPolicyExistingOnly,
+			Size:    gotmux.Size{Width: 100, Height: 35},
+		},
+	)
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -293,15 +351,35 @@ func TestRestoreOfWindowWithFloatingPaneVerifies(t *testing.T) {
 		t.Fatalf("ActivePane failed: %v", err)
 	}
 
-	if _, err := first.Split(ctx, gotmux.SplitOptions{Program: gotmux.Exec("sleep", "300")}); err != nil {
+	if _, err := first.Split(
+		ctx,
+		gotmux.SplitOptions{Program: gotmux.Exec("sleep", "300")},
+	); err != nil {
 		t.Fatalf("Split failed: %v", err)
 	}
 
-	if _, err := first.NewPane(ctx, gotmux.NewPaneOptions{Width: "20", Height: "5", X: "3", Y: "3", Program: gotmux.Exec("sleep", "300"), Select: true}); err != nil {
+	if _, err := first.NewPane(
+		ctx,
+		gotmux.NewPaneOptions{
+			Width:   "20",
+			Height:  "5",
+			X:       "3",
+			Y:       "3",
+			Program: gotmux.Exec("sleep", "300"),
+			Select:  true,
+		},
+	); err != nil {
 		t.Fatalf("NewPane failed: %v", err)
 	}
 
-	plan, receipts := restoreSessionWithScopedState(t, ctx, sourceServer, targetServer, source, "floating-source")
+	plan, receipts := restoreSessionWithScopedState(
+		t,
+		ctx,
+		sourceServer,
+		targetServer,
+		source,
+		"floating-source",
+	)
 
 	assertRestoreVerified(t, ctx, targetServer, plan, receipts)
 
@@ -325,7 +403,13 @@ func TestRestoreOfWindowWithFloatingPaneVerifies(t *testing.T) {
 	}
 }
 
-func restoreSessionWithScopedState(t *testing.T, ctx context.Context, sourceServer, targetServer *gotmux.Server, source gotmux.Session, name string) (Plan, map[string]string) {
+func restoreSessionWithScopedState(
+	t *testing.T,
+	ctx context.Context,
+	sourceServer, targetServer *gotmux.Server,
+	source gotmux.Session,
+	name string,
+) (Plan, map[string]string) {
 	t.Helper()
 
 	observation, err := capture.Observe(ctx, sourceServer, []gotmux.SessionID{source.ID()})
@@ -336,7 +420,10 @@ func restoreSessionWithScopedState(t *testing.T, ctx context.Context, sourceServ
 	repoDir := filepath.Join(t.TempDir(), "repo")
 	generation := commitObservationToRepo(t, ctx, repoDir, observation)
 
-	plan, err := BuildPlan(observation.Manifest, []string{sessionIDByName(t, observation.Manifest, name)})
+	plan, err := BuildPlan(
+		observation.Manifest,
+		[]string{sessionIDByName(t, observation.Manifest, name)},
+	)
 	if err != nil {
 		t.Fatalf("BuildPlan failed: %v", err)
 	}
@@ -348,7 +435,15 @@ func restoreSessionWithScopedState(t *testing.T, ctx context.Context, sourceServ
 
 	t.Cleanup(func() { _ = repo.Close() })
 
-	operation := registerPlanOperation(t, ctx, repo, name, generation, targetServer.Endpoint().SocketPath, plan)
+	operation := registerPlanOperation(
+		t,
+		ctx,
+		repo,
+		name,
+		generation,
+		targetServer.Endpoint().SocketPath,
+		plan,
+	)
 
 	report, err := NewExecutor(targetServer, observation.Manifest, DefaultExecuteConfig()).
 		Execute(ctx, plan, newPlanJournal(t, ctx, repo, operation))
@@ -363,7 +458,13 @@ func restoreSessionWithScopedState(t *testing.T, ctx context.Context, sourceServ
 	return plan, report.Receipts
 }
 
-func assertRestoreVerified(t *testing.T, ctx context.Context, server *gotmux.Server, plan Plan, receipts map[string]string) {
+func assertRestoreVerified(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	plan Plan,
+	receipts map[string]string,
+) {
 	t.Helper()
 
 	verification, err := Verify(ctx, server, plan, receipts)
@@ -391,7 +492,8 @@ func TestInheritedDefaultsAreMaterializedOnOwnedScopes(t *testing.T) {
 	assertInheritedRestoreState(t, ctx, targetServer, restored, unrelated)
 	assertChildEnvironment(t, ctx, restored, inheritedChildEnvironment)
 
-	if err := targetServer.GlobalSessionOptions().Set(ctx, "status-left", "target-drift"); err != nil {
+	if err := targetServer.GlobalSessionOptions().
+		Set(ctx, "status-left", "target-drift"); err != nil {
 		t.Fatalf("drifting target global option failed: %v", err)
 	}
 
@@ -467,7 +569,10 @@ func createTwoPaneSession(
 		t.Fatalf("%s ActivePane failed: %v", name, err)
 	}
 
-	if _, err := pane.Split(ctx, gotmux.SplitOptions{Program: gotmux.Exec("sleep", "300")}); err != nil {
+	if _, err := pane.Split(
+		ctx,
+		gotmux.SplitOptions{Program: gotmux.Exec("sleep", "300")},
+	); err != nil {
 		t.Fatalf("%s Split failed: %v", name, err)
 	}
 
@@ -483,7 +588,11 @@ func restorePaneIndexPlan(
 ) (ExecutionReport, gotmux.Window) {
 	t.Helper()
 
-	report, err := NewExecutor(server, observation.Manifest, DefaultExecuteConfig()).Execute(ctx, plan, newMemoryJournal())
+	report, err := NewExecutor(
+		server,
+		observation.Manifest,
+		DefaultExecuteConfig(),
+	).Execute(ctx, plan, newMemoryJournal())
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
@@ -505,7 +614,13 @@ func restorePaneIndexPlan(
 	return report, window
 }
 
-func assertPaneIndexVerification(t *testing.T, ctx context.Context, server *gotmux.Server, plan Plan, receipts map[string]string) {
+func assertPaneIndexVerification(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	plan Plan,
+	receipts map[string]string,
+) {
 	t.Helper()
 
 	verified, err := Verify(ctx, server, plan, receipts)
@@ -546,7 +661,10 @@ func TestPaneIndexesRestoreAcrossTargetDefaults(t *testing.T) {
 		t.Fatalf("capture.Observe failed: %v", err)
 	}
 
-	plan, err := BuildPlan(observation.Manifest, []string{sessionIDByName(t, observation.Manifest, "pane-index-source")})
+	plan, err := BuildPlan(
+		observation.Manifest,
+		[]string{sessionIDByName(t, observation.Manifest, "pane-index-source")},
+	)
 	if err != nil {
 		t.Fatalf("BuildPlan failed: %v", err)
 	}
@@ -579,7 +697,10 @@ func TestVerifyReportsPaneTitleRewrittenByRunningProgramAsAdvisory(t *testing.T)
 		t.Fatalf("capture.Observe failed: %v", err)
 	}
 
-	plan, err := BuildPlan(observation.Manifest, []string{sessionIDByName(t, observation.Manifest, "title-advisory-source")})
+	plan, err := BuildPlan(
+		observation.Manifest,
+		[]string{sessionIDByName(t, observation.Manifest, "title-advisory-source")},
+	)
 	if err != nil {
 		t.Fatalf("BuildPlan failed: %v", err)
 	}
@@ -614,12 +735,18 @@ func TestVerifyReportsPaneTitleRewrittenByRunningProgramAsAdvisory(t *testing.T)
 
 const inheritedChildEnvironment = "source-global\nsource-local\n\n\n\nunset\nunset\n" //nolint:dupword // both hidden variables must independently report unset in child output
 
-func observeInheritedSource(t *testing.T, ctx context.Context, server *gotmux.Server) capture.Observation {
+func observeInheritedSource(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+) capture.Observation {
 	t.Helper()
 	setInheritedFixture(t, ctx, server, "source")
 
 	source, err := server.NewSession(ctx, gotmux.NewSessionOptions{
-		Name: "inherited-source", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly,
+		Name:    "inherited-source",
+		Program: gotmux.Exec("sleep", "300"),
+		Start:   gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
@@ -651,12 +778,15 @@ func setupInheritedTarget(t *testing.T, ctx context.Context, server *gotmux.Serv
 		t.Fatalf("setting target-only environment failed: %v", err)
 	}
 
-	if err := server.Environment().SetHidden(ctx, "SESH_TARGET_ONLY_HIDDEN", "target-hidden"); err != nil {
+	if err := server.Environment().
+		SetHidden(ctx, "SESH_TARGET_ONLY_HIDDEN", "target-hidden"); err != nil {
 		t.Fatalf("setting hidden target-only environment failed: %v", err)
 	}
 
 	unrelated, err := server.NewSession(ctx, gotmux.NewSessionOptions{
-		Name: "unrelated-inherited", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly,
+		Name:    "unrelated-inherited",
+		Program: gotmux.Exec("sleep", "300"),
+		Start:   gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("creating unrelated session failed: %v", err)
@@ -673,7 +803,10 @@ func executeInheritedRestore(
 ) (Plan, map[string]string) {
 	t.Helper()
 
-	plan, err := BuildPlan(observation.Manifest, []string{sessionIDByName(t, observation.Manifest, "inherited-source")})
+	plan, err := BuildPlan(
+		observation.Manifest,
+		[]string{sessionIDByName(t, observation.Manifest, "inherited-source")},
+	)
 	if err != nil {
 		t.Fatalf("BuildPlan failed: %v", err)
 	}
@@ -688,7 +821,15 @@ func executeInheritedRestore(
 
 	t.Cleanup(func() { _ = repo.Close() })
 
-	operation := registerPlanOperation(t, ctx, repo, "inherited-defaults", generation, server.Endpoint().SocketPath, plan)
+	operation := registerPlanOperation(
+		t,
+		ctx,
+		repo,
+		"inherited-defaults",
+		generation,
+		server.Endpoint().SocketPath,
+		plan,
+	)
 
 	report, err := NewExecutor(server, observation.Manifest, DefaultExecuteConfig()).
 		Execute(ctx, plan, newPlanJournal(t, ctx, repo, operation))
@@ -703,13 +844,21 @@ func executeInheritedRestore(
 
 	if !hasPartialRequirement(importReport.Missing, "options") ||
 		!hasPartialRequirement(importReport.Missing, "environment") {
-		t.Fatalf("materialized inheritance must remain explicitly partial: %+v", importReport.Missing)
+		t.Fatalf(
+			"materialized inheritance must remain explicitly partial: %+v",
+			importReport.Missing,
+		)
 	}
 
 	return plan, report.Receipts
 }
 
-func findSession(t *testing.T, ctx context.Context, server *gotmux.Server, name string) gotmux.Session {
+func findSession(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	name string,
+) gotmux.Session {
 	t.Helper()
 
 	session, err := server.FindSession(ctx, name)
@@ -737,7 +886,14 @@ func assertInheritedRestoreState(
 		t.Fatalf("WindowInfos failed: %v %v", restoredLinks, err)
 	}
 
-	assertOptionValue(t, ctx, restoredLinks[0].Handle().Window().Options(), "window-style", "fg=red", true)
+	assertOptionValue(
+		t,
+		ctx,
+		restoredLinks[0].Handle().Window().Options(),
+		"window-style",
+		"fg=red",
+		true,
+	)
 	assertOptionValue(t, ctx, unrelated.Options(), "status-left", "target", false)
 
 	targetGlobal, err := server.GlobalSessionOptions().Get(ctx, "status-left")
@@ -752,7 +908,8 @@ func assertInheritedRestoreState(
 		t.Fatalf("target-only global environment was not locally masked: %+v %v", targetOnly, err)
 	}
 
-	hidden, err := restored.Environment().GetWith(ctx, "SESH_HIDDEN", gotmux.GetEnvironmentOptions{Hidden: true})
+	hidden, err := restored.Environment().
+		GetWith(ctx, "SESH_HIDDEN", gotmux.GetEnvironmentOptions{Hidden: true})
 
 	hiddenValue, hiddenPresent := hidden.Value.Get()
 	if err != nil || !hiddenPresent || hiddenValue != "source-hidden" || hidden.Unset {
@@ -775,7 +932,8 @@ func TestEnvironmentReinspectionPreservesMultilineValues(t *testing.T) {
 			t.Fatalf("reading multiline global environment failed: %v", err)
 		}
 
-		if got := table[environmentKey{name: "SESH_MULTILINE", hidden: false}]; got.value != "first\nsecond" || got.unset {
+		if got := table[environmentKey{name: "SESH_MULTILINE", hidden: false}]; got.value != "first\nsecond" ||
+			got.unset {
 			t.Fatalf("multiline global environment was truncated: %+v", got)
 		}
 
@@ -788,7 +946,9 @@ func TestEnvironmentReinspectionPreservesMultilineValues(t *testing.T) {
 		server := tmuxtest.NewServer(t)
 
 		session, err := server.NewSession(ctx, gotmux.NewSessionOptions{
-			Name: "multiline-session", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly,
+			Name:    "multiline-session",
+			Program: gotmux.Exec("sleep", "300"),
+			Start:   gotmux.StartPolicyExistingOnly,
 		})
 		if err != nil {
 			t.Fatalf("NewSession failed: %v", err)
@@ -803,7 +963,8 @@ func TestEnvironmentReinspectionPreservesMultilineValues(t *testing.T) {
 			t.Fatalf("reading multiline session environment failed: %v", err)
 		}
 
-		if got := table[environmentKey{name: "SESH_MULTILINE", hidden: false}]; got.value != "first\nsecond" || got.unset {
+		if got := table[environmentKey{name: "SESH_MULTILINE", hidden: false}]; got.value != "first\nsecond" ||
+			got.unset {
 			t.Fatalf("multiline session environment was truncated: %+v", got)
 		}
 
@@ -836,38 +997,66 @@ type inheritedFixtureValues struct {
 func inheritedFixtureValuesFor(value string) inheritedFixtureValues {
 	if value == "source" {
 		return inheritedFixtureValues{
-			statusLeft: value, statusRight: "", array: "source-array", windowStyle: "fg=red",
-			global: "source-global", override: "source-global", removed: value, empty: "", hidden: "source-hidden",
+			statusLeft:  value,
+			statusRight: "",
+			array:       "source-array",
+			windowStyle: "fg=red",
+			global:      "source-global",
+			override:    "source-global",
+			removed:     value,
+			empty:       "",
+			hidden:      "source-hidden",
 		}
 	}
 
 	return inheritedFixtureValues{
-		statusLeft: value, statusRight: "target-right", array: "target-array", windowStyle: "fg=blue",
-		global: value + "-global", override: value + "-global", removed: value, empty: "target-nonempty", hidden: "target-hidden",
+		statusLeft:  value,
+		statusRight: "target-right",
+		array:       "target-array",
+		windowStyle: "fg=blue",
+		global:      value + "-global",
+		override:    value + "-global",
+		removed:     value,
+		empty:       "target-nonempty",
+		hidden:      "target-hidden",
 	}
 }
 
-func setInheritedOptions(t *testing.T, ctx context.Context, server *gotmux.Server, fixture inheritedFixtureValues) {
+func setInheritedOptions(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	fixture inheritedFixtureValues,
+) {
 	t.Helper()
 
-	if err := server.GlobalSessionOptions().Set(ctx, "status-left", fixture.statusLeft); err != nil {
+	if err := server.GlobalSessionOptions().
+		Set(ctx, "status-left", fixture.statusLeft); err != nil {
 		t.Fatalf("setting global session option failed: %v", err)
 	}
 
-	if err := server.GlobalSessionOptions().Set(ctx, "status-right", fixture.statusRight); err != nil {
+	if err := server.GlobalSessionOptions().
+		Set(ctx, "status-right", fixture.statusRight); err != nil {
 		t.Fatalf("setting empty-capable global option failed: %v", err)
 	}
 
-	if err := server.GlobalSessionOptions().Set(ctx, "status-format[9]", fixture.array); err != nil {
+	if err := server.GlobalSessionOptions().
+		Set(ctx, "status-format[9]", fixture.array); err != nil {
 		t.Fatalf("setting global array option failed: %v", err)
 	}
 
-	if err := server.GlobalWindowOptions().Set(ctx, "window-style", fixture.windowStyle); err != nil {
+	if err := server.GlobalWindowOptions().
+		Set(ctx, "window-style", fixture.windowStyle); err != nil {
 		t.Fatalf("setting global window option failed: %v", err)
 	}
 }
 
-func setInheritedEnvironment(t *testing.T, ctx context.Context, server *gotmux.Server, fixture inheritedFixtureValues) {
+func setInheritedEnvironment(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	fixture inheritedFixtureValues,
+) {
 	t.Helper()
 
 	for name, content := range map[string]string{
@@ -884,7 +1073,13 @@ func setInheritedEnvironment(t *testing.T, ctx context.Context, server *gotmux.S
 	}
 }
 
-func assertOptionValue(t *testing.T, ctx context.Context, scope optionScope, name, want string, local bool) {
+func assertOptionValue(
+	t *testing.T,
+	ctx context.Context,
+	scope optionScope,
+	name, want string,
+	local bool,
+) {
 	t.Helper()
 
 	entries, err := scope.ListWith(ctx, gotmux.ListOptionOptions{Inherited: true})
@@ -906,13 +1101,24 @@ func assertOptionValue(t *testing.T, ctx context.Context, scope optionScope, nam
 	t.Fatalf("option %q missing", name)
 }
 
-func assertChildEnvironment(t *testing.T, ctx context.Context, session gotmux.Session, want string) {
+func assertChildEnvironment(
+	t *testing.T,
+	ctx context.Context,
+	session gotmux.Session,
+	want string,
+) {
 	t.Helper()
 	output := filepath.Join(t.TempDir(), "child-env")
 
 	_, err := session.NewWindow(ctx, gotmux.NewWindowOptions{
-		Name:    "environment-probe",
-		Program: gotmux.Exec("sh", "-c", `printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "$SESH_GLOBAL" "$SESH_OVERRIDE" "${SESH_REMOVED-}" "$SESH_EMPTY" "${SESH_TARGET_ONLY-}" "${SESH_HIDDEN-unset}" "${SESH_TARGET_ONLY_HIDDEN-unset}" > "$1"`, "sh", output),
+		Name: "environment-probe",
+		Program: gotmux.Exec(
+			"sh",
+			"-c",
+			`printf '%s\n%s\n%s\n%s\n%s\n%s\n%s\n' "$SESH_GLOBAL" "$SESH_OVERRIDE" "${SESH_REMOVED-}" "$SESH_EMPTY" "${SESH_TARGET_ONLY-}" "${SESH_HIDDEN-unset}" "${SESH_TARGET_ONLY_HIDDEN-unset}" > "$1"`,
+			"sh",
+			output,
+		),
 	})
 	if err != nil {
 		t.Fatalf("creating environment probe failed: %v", err)
@@ -1017,14 +1223,20 @@ func TestExecutorLaunchesApprovedProgramOnceWithModeledEnvironment(t *testing.T)
 		Arguments: []model.Bytes{
 			model.Bytes("sh"),
 			model.Bytes("-c"),
-			model.Bytes(`printf '%s|%s|%s|%s|%s|%s|%s|%s|%s\n' "$SESH_LAUNCH_GLOBAL" "$SESH_LAUNCH_SESSION" "$SESH_LAUNCH_OVERRIDE" "$SESH_LAUNCH_SET" "${SESH_LAUNCH_REMOVE-unset}" "$TMUX" "$TMUX_PANE" "$TERM" "$COLORTERM" >> "$1"; exec sleep 300`),
+			model.Bytes(
+				`printf '%s|%s|%s|%s|%s|%s|%s|%s|%s\n' "$SESH_LAUNCH_GLOBAL" "$SESH_LAUNCH_SESSION" "$SESH_LAUNCH_OVERRIDE" "$SESH_LAUNCH_SET" "${SESH_LAUNCH_REMOVE-unset}" "$TMUX" "$TMUX_PANE" "$TERM" "$COLORTERM" >> "$1"; exec sleep 300`,
+			),
 			model.Bytes("sh"),
 			model.Bytes(marker),
 		},
 		Directory: model.Bytes("/tmp"),
 		Environment: []model.Variable{
 			{Name: model.Bytes("SESH_LAUNCH_SET"), State: "set", Value: model.Bytes("approved")},
-			{Name: model.Bytes("SESH_LAUNCH_OVERRIDE"), State: "set", Value: model.Bytes("process")},
+			{
+				Name:  model.Bytes("SESH_LAUNCH_OVERRIDE"),
+				State: "set",
+				Value: model.Bytes("process"),
+			},
 			{Name: model.Bytes("TMUX"), State: "set", Value: model.Bytes("source-tmux")},
 			{Name: model.Bytes("TMUX_PANE"), State: "set", Value: model.Bytes("source-pane")},
 		},
@@ -1051,7 +1263,15 @@ func TestExecutorLaunchesApprovedProgramOnceWithModeledEnvironment(t *testing.T)
 
 	defer func() { _ = repo.Close() }()
 
-	operation := registerPlanOperation(t, ctx, repo, "approved-launch", generation, server.Endpoint().SocketPath, plan)
+	operation := registerPlanOperation(
+		t,
+		ctx,
+		repo,
+		"approved-launch",
+		generation,
+		server.Endpoint().SocketPath,
+		plan,
+	)
 
 	cfg := DefaultExecuteConfig()
 	cfg.LaunchProcesses = true
@@ -1103,7 +1323,11 @@ func TestExecutorUnavailableApprovedLaunchPreservesPaneAsPartial(t *testing.T) {
 		t.Fatalf("BuildPlan failed: %v", err)
 	}
 
-	report, err := NewExecutor(server, manifest, ExecuteConfig{LaunchProcesses: true}).Execute(ctx, plan, newMemoryJournal())
+	report, err := NewExecutor(
+		server,
+		manifest,
+		ExecuteConfig{LaunchProcesses: true},
+	).Execute(ctx, plan, newMemoryJournal())
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
@@ -1112,7 +1336,14 @@ func TestExecutorUnavailableApprovedLaunchPreservesPaneAsPartial(t *testing.T) {
 		t.Fatalf("unavailable approved launch was not reported partial: %+v", report.Missing)
 	}
 
-	if !slices.Contains(report.Missing, MissingRequirement{Domain: "launch", Status: "partial", Reason: "approved_launch_unavailable"}) {
+	if !slices.Contains(
+		report.Missing,
+		MissingRequirement{
+			Domain: "launch",
+			Status: "partial",
+			Reason: "approved_launch_unavailable",
+		},
+	) {
 		t.Fatalf("unavailable approved launch used an unexpected reason: %+v", report.Missing)
 	}
 
@@ -1133,11 +1364,14 @@ func assertLaunchMarker(t *testing.T, marker string) {
 		t.Fatalf("unexpected launch marker shape: %q", marker)
 	}
 
-	if fields[0] != "global" || fields[1] != "session" || fields[2] != "process" || fields[3] != "approved" || fields[4] != "unset" {
+	if fields[0] != "global" || fields[1] != "session" || fields[2] != "process" ||
+		fields[3] != "approved" ||
+		fields[4] != "unset" {
 		t.Fatalf("modeled launch environment not applied: %q", marker)
 	}
 
-	if fields[5] == "" || fields[5] == "source-tmux" || fields[6] == "" || fields[6] == "source-pane" {
+	if fields[5] == "" || fields[5] == "source-tmux" || fields[6] == "" ||
+		fields[6] == "source-pane" {
 		t.Fatalf("source tmux identities leaked into launched process: %q", marker)
 	}
 
@@ -1165,12 +1399,20 @@ func TestExecutorReportsUnsupportedCapturedApplication(t *testing.T) {
 		t.Fatalf("BuildPlan failed: %v", err)
 	}
 
-	report, err := NewExecutor(server, manifest, ExecuteConfig{LaunchProcesses: true}).Execute(ctx, plan, newMemoryJournal())
+	report, err := NewExecutor(
+		server,
+		manifest,
+		ExecuteConfig{LaunchProcesses: true},
+	).Execute(ctx, plan, newMemoryJournal())
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
-	want := MissingRequirement{Domain: "launch", Status: "partial", Reason: "application_restart_unsupported"}
+	want := MissingRequirement{
+		Domain: "launch",
+		Status: "partial",
+		Reason: "application_restart_unsupported",
+	}
 	if !slices.Contains(report.Missing, want) {
 		t.Fatalf("unsupported captured application was silent: %+v", report.Missing)
 	}
@@ -1191,8 +1433,13 @@ func TestExecutorLaunchesApprovedProgramInSplitPane(t *testing.T) {
 	manifest.Panes[1].Launch = model.Launch{
 		Executable: model.Bytes("/bin/sh"),
 		Arguments: []model.Bytes{
-			model.Bytes("sh"), model.Bytes("-c"),
-			model.Bytes(`printf split > "$1"; exec sleep 300`), model.Bytes("sh"), model.Bytes(marker),
+			model.Bytes("sh"),
+			model.Bytes("-c"),
+			model.Bytes(
+				`printf split > "$1"; exec sleep 300`,
+			),
+			model.Bytes("sh"),
+			model.Bytes(marker),
 		},
 		Directory: model.Bytes("/tmp"),
 		Recovery:  "resume",
@@ -1203,7 +1450,11 @@ func TestExecutorLaunchesApprovedProgramInSplitPane(t *testing.T) {
 		t.Fatalf("BuildPlan failed: %v", err)
 	}
 
-	report, err := NewExecutor(server, manifest, ExecuteConfig{LaunchProcesses: true}).Execute(ctx, plan, newMemoryJournal())
+	report, err := NewExecutor(
+		server,
+		manifest,
+		ExecuteConfig{LaunchProcesses: true},
+	).Execute(ctx, plan, newMemoryJournal())
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
@@ -1265,7 +1516,15 @@ func TestExecutorFailureRetainsCreatedAndUnrelatedSessions(t *testing.T) {
 
 	defer func() { _ = repo.Close() }()
 
-	operation := registerPlanOperation(t, ctx, repo, "compensation-unrelated", generation, server.Endpoint().SocketPath, plan)
+	operation := registerPlanOperation(
+		t,
+		ctx,
+		repo,
+		"compensation-unrelated",
+		generation,
+		server.Endpoint().SocketPath,
+		plan,
+	)
 
 	failing := plan.Steps[len(plan.Steps)-1]
 
@@ -1310,7 +1569,15 @@ func TestExecutorFailureKeepsConfirmedObjects(t *testing.T) {
 
 	defer func() { _ = repo.Close() }()
 
-	operation := registerPlanOperation(t, ctx, repo, "compensation-disabled", generation, server.Endpoint().SocketPath, plan)
+	operation := registerPlanOperation(
+		t,
+		ctx,
+		repo,
+		"compensation-disabled",
+		generation,
+		server.Endpoint().SocketPath,
+		plan,
+	)
 
 	failing := plan.Steps[len(plan.Steps)-1]
 
@@ -1359,12 +1626,24 @@ func TestExecutorWorkingDirFallbackIsExplicitlyPartial(t *testing.T) {
 
 	defer func() { _ = repo.Close() }()
 
-	operation := registerPlanOperation(t, ctx, repo, "directory-fallback", generation, server.Endpoint().SocketPath, plan)
+	operation := registerPlanOperation(
+		t,
+		ctx,
+		repo,
+		"directory-fallback",
+		generation,
+		server.Endpoint().SocketPath,
+		plan,
+	)
 
 	cfg := DefaultExecuteConfig()
 	cfg.MissingWorkingDir = MissingWorkingDirLaunch
 
-	report, err := NewExecutor(server, manifest, cfg).Execute(ctx, plan, newPlanJournal(t, ctx, repo, operation))
+	report, err := NewExecutor(
+		server,
+		manifest,
+		cfg,
+	).Execute(ctx, plan, newPlanJournal(t, ctx, repo, operation))
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
@@ -1374,10 +1653,21 @@ func TestExecutorWorkingDirFallbackIsExplicitlyPartial(t *testing.T) {
 	}
 }
 
-func setupScopedStateSourceSession(t *testing.T, ctx context.Context, server *gotmux.Server) (gotmux.Session, observedScopeState) {
+func setupScopedStateSourceSession(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+) (gotmux.Session, observedScopeState) {
 	t.Helper()
 
-	source, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "state-source", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly})
+	source, err := server.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{
+			Name:    "state-source",
+			Program: gotmux.Exec("sleep", "300"),
+			Start:   gotmux.StartPolicyExistingOnly,
+		},
+	)
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -1437,15 +1727,23 @@ func assertTargetScopedOptionsAndEnv(t *testing.T, sourceState, targetState obse
 		}
 	}
 
-	if got := targetState.Environment[environmentKey{name: "SESH_SCOPED_VAR"}]; got.value != "scoped-value" || got.unset {
+	if got := targetState.Environment[environmentKey{name: "SESH_SCOPED_VAR"}]; got.value != "scoped-value" ||
+		got.unset {
 		t.Fatalf("session environment mismatch: got %+v", got)
 	}
 }
 
-func setupUnrelatedLiveSession(t *testing.T, ctx context.Context, server *gotmux.Server) (gotmux.Session, []gotmux.WindowLinkInfo, gotmux.PaneInfo) {
+func setupUnrelatedLiveSession(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+) (gotmux.Session, []gotmux.WindowLinkInfo, gotmux.PaneInfo) {
 	t.Helper()
 
-	unrelated, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "unrelated-live", Start: gotmux.StartPolicyExistingOnly})
+	unrelated, err := server.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{Name: "unrelated-live", Start: gotmux.StartPolicyExistingOnly},
+	)
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -1502,7 +1800,8 @@ func assertUnrelatedLiveSessionIntact(
 		t.Fatalf("Pane Info failed: %v", err)
 	}
 
-	if unrelatedPaneInfoAfter.PID != unrelatedPaneInfo.PID || unrelatedPaneInfoAfter.ID != unrelatedPaneInfo.ID {
+	if unrelatedPaneInfoAfter.PID != unrelatedPaneInfo.PID ||
+		unrelatedPaneInfoAfter.ID != unrelatedPaneInfo.ID {
 		t.Fatalf("unrelated pane changed: %+v vs %+v", unrelatedPaneInfoAfter, unrelatedPaneInfo)
 	}
 }
@@ -1528,7 +1827,15 @@ func TestExecutorFailureRetainsSessionWithForeignWork(t *testing.T) {
 	}
 	defer func() { _ = repo.Close() }()
 
-	operation := registerPlanOperation(t, ctx, repo, "foreign-work", generation, server.Endpoint().SocketPath, plan)
+	operation := registerPlanOperation(
+		t,
+		ctx,
+		repo,
+		"foreign-work",
+		generation,
+		server.Endpoint().SocketPath,
+		plan,
+	)
 
 	failing := plan.Steps[len(plan.Steps)-1]
 
@@ -1542,7 +1849,10 @@ func TestExecutorFailureRetainsSessionWithForeignWork(t *testing.T) {
 
 			idx := 42
 
-			if _, winErr := sess.NewWindow(ctx, gotmux.NewWindowOptions{Name: "foreign-window", Index: &idx}); winErr != nil {
+			if _, winErr := sess.NewWindow(
+				ctx,
+				gotmux.NewWindowOptions{Name: "foreign-window", Index: &idx},
+			); winErr != nil {
 				return fmt.Errorf("new window: %w", winErr)
 			}
 
@@ -1570,7 +1880,11 @@ func TestExecutorFailureRetainsSessionWithForeignWork(t *testing.T) {
 
 type externalMutation func(context.Context, *testing.T, gotmux.Session)
 
-func soleWindowLink(t *testing.T, ctx context.Context, session gotmux.Session) gotmux.WindowLinkInfo {
+func soleWindowLink(
+	t *testing.T,
+	ctx context.Context,
+	session gotmux.Session,
+) gotmux.WindowLinkInfo {
 	t.Helper()
 
 	_, links, err := session.WindowInfos(ctx)
@@ -1589,7 +1903,10 @@ func replaceSolePane(ctx context.Context, t *testing.T, session gotmux.Session) 
 		t.Fatalf("ActivePane failed: %v", err)
 	}
 
-	if _, err := pane.Split(ctx, gotmux.SplitOptions{Program: gotmux.Exec("sleep", "300")}); err != nil {
+	if _, err := pane.Split(
+		ctx,
+		gotmux.SplitOptions{Program: gotmux.Exec("sleep", "300")},
+	); err != nil {
 		t.Fatalf("Split failed: %v", err)
 	}
 
@@ -1602,7 +1919,10 @@ func replaceSoleWindow(ctx context.Context, t *testing.T, session gotmux.Session
 	t.Helper()
 
 	original := soleWindowLink(t, ctx, session)
-	if _, err := session.NewWindow(ctx, gotmux.NewWindowOptions{Name: "replacement", Program: gotmux.Exec("sleep", "300")}); err != nil {
+	if _, err := session.NewWindow(
+		ctx,
+		gotmux.NewWindowOptions{Name: "replacement", Program: gotmux.Exec("sleep", "300")},
+	); err != nil {
 		t.Fatalf("NewWindow failed: %v", err)
 	}
 
@@ -1619,7 +1939,10 @@ func changeLiveProcess(ctx context.Context, t *testing.T, session gotmux.Session
 		t.Fatalf("ActivePane failed: %v", err)
 	}
 
-	if err := pane.Respawn(ctx, gotmux.RespawnOptions{Program: gotmux.Exec("sleep", "300"), KillRunning: true}); err != nil {
+	if err := pane.Respawn(
+		ctx,
+		gotmux.RespawnOptions{Program: gotmux.Exec("sleep", "300"), KillRunning: true},
+	); err != nil {
 		t.Fatalf("Respawn failed: %v", err)
 	}
 }
@@ -1713,7 +2036,15 @@ func TestResumedExternallyChangedScopedStateSurfacesConflict(t *testing.T) {
 	}
 	defer func() { _ = repo.Close() }()
 
-	operation := registerPlanOperation(t, ctx, repo, "resume-conflict", generation, targetServer.Endpoint().SocketPath, plan)
+	operation := registerPlanOperation(
+		t,
+		ctx,
+		repo,
+		"resume-conflict",
+		generation,
+		targetServer.Endpoint().SocketPath,
+		plan,
+	)
 
 	report, err := NewExecutor(targetServer, obs.Manifest, DefaultExecuteConfig()).
 		Execute(ctx, plan, newPlanJournal(t, ctx, repo, operation))

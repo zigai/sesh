@@ -22,8 +22,19 @@ func TestRenderAgentsModeShowsOneIndentedLinePerAgent(t *testing.T) {
 		AgentTotal:  2,
 		AgentActive: 1,
 		Agents: []session.AgentSession{
-			{Harness: testSupportHarnessCodex, HarnessSession: "codex-session", Status: session.AgentStatusRunning, StatusSince: now.Add(-time.Minute)},
-			{Harness: "claude", HarnessSession: "claude-session", PaneID: "%8", Status: session.AgentStatusIdle, StatusSince: now.Add(-3 * time.Minute)},
+			{
+				Harness:        testSupportHarnessCodex,
+				HarnessSession: "codex-session",
+				Status:         session.AgentStatusRunning,
+				StatusSince:    now.Add(-time.Minute),
+			},
+			{
+				Harness:        "claude",
+				HarnessSession: "claude-session",
+				PaneID:         "%8",
+				Status:         session.AgentStatusIdle,
+				StatusSince:    now.Add(-3 * time.Minute),
+			},
 		},
 	}}
 	model.state.RecordAgentView(model.filtered[0].SemanticIdentity(), "%8")
@@ -36,7 +47,15 @@ func TestRenderAgentsModeShowsOneIndentedLinePerAgent(t *testing.T) {
 			t.Fatalf("agent hierarchy lines = %d, want 3: %q", len(lines), output)
 		}
 
-		requireTextContainsAll(t, output, testSupportSessionProjectName, "├─ Codex  · codex-session", "●", "└─ Claude · claude-session", "○")
+		requireTextContainsAll(
+			t,
+			output,
+			testSupportSessionProjectName,
+			"├─ Codex  · codex-session",
+			"●",
+			"└─ Claude · claude-session",
+			"○",
+		)
 
 		runningPrefix, _, runningFound := strings.Cut(lines[1], "●")
 
@@ -45,7 +64,11 @@ func TestRenderAgentsModeShowsOneIndentedLinePerAgent(t *testing.T) {
 			t.Fatalf("child statuses are missing: %q / %q", lines[1], lines[2])
 		}
 
-		if runningColumn, idleColumn := lipgloss.Width(runningPrefix), lipgloss.Width(idlePrefix); runningColumn != idleColumn {
+		if runningColumn, idleColumn := lipgloss.Width(
+			runningPrefix,
+		), lipgloss.Width(
+			idlePrefix,
+		); runningColumn != idleColumn {
 			t.Fatalf("child statuses are not aligned: %q / %q", lines[1], lines[2])
 		}
 
@@ -67,7 +90,15 @@ func TestRenderAgentsModeShowsOneIndentedLinePerAgent(t *testing.T) {
 	t.Run("text style", func(t *testing.T) {
 		model.config.AgentSessions.StatusStyle = "text"
 		textOutput := stripANSI(model.renderList(80, 3))
-		requireTextContainsAll(t, textOutput, testSupportSessionProjectName, "├─ Codex  · codex-session", "RUNNING", "└─ Claude · claude-session", "IDLE")
+		requireTextContainsAll(
+			t,
+			textOutput,
+			testSupportSessionProjectName,
+			"├─ Codex  · codex-session",
+			"RUNNING",
+			"└─ Claude · claude-session",
+			"IDLE",
+		)
 	})
 }
 
@@ -82,10 +113,34 @@ func TestDefaultAgentFormatMaintainsStatusAlignmentAcrossAges(t *testing.T) {
 		AgentTotal:   4,
 		AgentActive:  1,
 		Agents: []session.AgentSession{
-			{Harness: testSupportHarnessCodex, HarnessSession: "s1", PaneID: "%1", Status: session.AgentStatusRunning, StatusSince: now.Add(-(time.Hour + 2*time.Minute))},
-			{Harness: "claude", HarnessSession: "s2", PaneID: "%2", Status: session.AgentStatusIdle, StatusSince: now.Add(-20 * time.Minute)},
-			{Harness: "pi", HarnessSession: "s3", PaneID: "%3", Status: session.AgentStatusIdle, StatusSince: now.Add(-8 * time.Minute)},
-			{Harness: "hermes", HarnessSession: "s4", PaneID: "%4", Status: session.AgentStatusRunning, StatusSince: now.Add(-15 * time.Minute)},
+			{
+				Harness:        testSupportHarnessCodex,
+				HarnessSession: "s1",
+				PaneID:         "%1",
+				Status:         session.AgentStatusRunning,
+				StatusSince:    now.Add(-(time.Hour + 2*time.Minute)),
+			},
+			{
+				Harness:        "claude",
+				HarnessSession: "s2",
+				PaneID:         "%2",
+				Status:         session.AgentStatusIdle,
+				StatusSince:    now.Add(-20 * time.Minute),
+			},
+			{
+				Harness:        "pi",
+				HarnessSession: "s3",
+				PaneID:         "%3",
+				Status:         session.AgentStatusIdle,
+				StatusSince:    now.Add(-8 * time.Minute),
+			},
+			{
+				Harness:        "hermes",
+				HarnessSession: "s4",
+				PaneID:         "%4",
+				Status:         session.AgentStatusRunning,
+				StatusSince:    now.Add(-15 * time.Minute),
+			},
 		},
 	}}
 
@@ -111,7 +166,13 @@ func TestDefaultAgentFormatMaintainsStatusAlignmentAcrossAges(t *testing.T) {
 
 	for i := 1; i < len(glyphCols); i++ {
 		if glyphCols[i] != glyphCols[0] {
-			t.Fatalf("status glyph at row %d column %d does not match row 1 column %d:\n%s", i+1, glyphCols[i], glyphCols[0], output)
+			t.Fatalf(
+				"status glyph at row %d column %d does not match row 1 column %d:\n%s",
+				i+1,
+				glyphCols[i],
+				glyphCols[0],
+				output,
+			)
 		}
 	}
 }
@@ -128,9 +189,27 @@ func TestAgentFormatSupportsClockStatusTimeFormat(t *testing.T) {
 		AgentTotal:   3,
 		AgentActive:  1,
 		Agents: []session.AgentSession{
-			{Harness: testSupportHarnessCodex, HarnessSession: "s1", PaneID: "%1", Status: session.AgentStatusRunning, StatusSince: now.Add(-(time.Hour + 2*time.Minute))},
-			{Harness: "claude", HarnessSession: "s2", PaneID: "%2", Status: session.AgentStatusIdle, StatusSince: now.Add(-(time.Minute + 23*time.Second))},
-			{Harness: "pi", HarnessSession: "s3", PaneID: "%3", Status: session.AgentStatusIdle, StatusSince: now.Add(-45 * time.Second)},
+			{
+				Harness:        testSupportHarnessCodex,
+				HarnessSession: "s1",
+				PaneID:         "%1",
+				Status:         session.AgentStatusRunning,
+				StatusSince:    now.Add(-(time.Hour + 2*time.Minute)),
+			},
+			{
+				Harness:        "claude",
+				HarnessSession: "s2",
+				PaneID:         "%2",
+				Status:         session.AgentStatusIdle,
+				StatusSince:    now.Add(-(time.Minute + 23*time.Second)),
+			},
+			{
+				Harness:        "pi",
+				HarnessSession: "s3",
+				PaneID:         "%3",
+				Status:         session.AgentStatusIdle,
+				StatusSince:    now.Add(-45 * time.Second),
+			},
 		},
 	}}
 
@@ -158,7 +237,13 @@ func TestAgentFormatSupportsClockStatusTimeFormat(t *testing.T) {
 
 		for i := 1; i < len(glyphCols); i++ {
 			if glyphCols[i] != glyphCols[0] {
-				t.Fatalf("status glyph at row %d column %d does not match row 1 column %d:\n%s", i+1, glyphCols[i], glyphCols[0], output)
+				t.Fatalf(
+					"status glyph at row %d column %d does not match row 1 column %d:\n%s",
+					i+1,
+					glyphCols[i],
+					glyphCols[0],
+					output,
+				)
 			}
 		}
 	})
@@ -198,7 +283,10 @@ func TestUnreadIdleAgentUsesDistinctStatusUntilViewed(t *testing.T) {
 	if !strings.Contains(unreadGlyph, "◎") ||
 		strings.Contains(unreadGlyph, "○") ||
 		strings.Contains(unreadGlyph, "●") {
-		t.Fatalf("unread idle row = %q, want emphasized idle ring distinct from working", unreadGlyph)
+		t.Fatalf(
+			"unread idle row = %q, want emphasized idle ring distinct from working",
+			unreadGlyph,
+		)
 	}
 
 	model.config.AgentSessions.StatusStyle = "text"
@@ -279,7 +367,10 @@ func TestCurrentActiveIdleAgentRecordsViewAndSurvivesSessionChange(t *testing.T)
 
 	outputAfterSwitch := stripANSI(model.renderList(60, 2))
 	if !strings.Contains(outputAfterSwitch, "○") || strings.Contains(outputAfterSwitch, "◎") {
-		t.Fatalf("idle row after leaving pane = %q, want viewed status to persist", outputAfterSwitch)
+		t.Fatalf(
+			"idle row after leaving pane = %q, want viewed status to persist",
+			outputAfterSwitch,
+		)
 	}
 }
 
@@ -328,7 +419,8 @@ func TestDeferringStateStoreTakesAgentViewsWithoutHistoryWrite(t *testing.T) {
 	}
 
 	identity := model.filtered[0].SemanticIdentity()
-	if len(store.views) == 0 || store.views[len(store.views)-1] != (AgentView{Session: identity, PaneID: "%7"}) {
+	if len(store.views) == 0 ||
+		store.views[len(store.views)-1] != (AgentView{Session: identity, PaneID: "%7"}) {
 		t.Fatalf("deferred views = %+v, want the current agent pane", store.views)
 	}
 
@@ -363,7 +455,10 @@ func TestActiveIdleAgentAutoRecordsViewOnLoadAndSurvivesSessionChange(t *testing
 
 	outputAfterSwitch := stripANSI(model.renderList(60, 2))
 	if !strings.Contains(outputAfterSwitch, "○") || strings.Contains(outputAfterSwitch, "◎") {
-		t.Fatalf("idle row after leaving pane = %q, want viewed status to persist", outputAfterSwitch)
+		t.Fatalf(
+			"idle row after leaving pane = %q, want viewed status to persist",
+			outputAfterSwitch,
+		)
 	}
 }
 
@@ -409,7 +504,10 @@ func TestMultiAgentSessionSwitchingPaneKeepsViewedAgentVisited(t *testing.T) {
 	}
 
 	if !strings.Contains(lines[1], "○") || strings.Contains(lines[1], "◎") {
-		t.Fatalf("agent 1 row = %q, want visited status to persist when switching to another pane", lines[1])
+		t.Fatalf(
+			"agent 1 row = %q, want visited status to persist when switching to another pane",
+			lines[1],
+		)
 	}
 }
 
@@ -512,9 +610,13 @@ func TestRenderSeshModeDoesNotExpandAgentChildren(t *testing.T) {
 	model.filtered = []session.Session{{
 		Name:       testSupportSessionProjectName,
 		AgentTotal: 1,
-		Agents: []session.AgentSession{{
-			Harness: testSupportHarnessCodex, HarnessSession: "codex-session", Status: session.AgentStatusRunning,
-		}},
+		Agents: []session.AgentSession{
+			{
+				Harness:        testSupportHarnessCodex,
+				HarnessSession: "codex-session",
+				Status:         session.AgentStatusRunning,
+			},
+		},
 	}}
 
 	output := stripANSI(model.renderList(60, 3))
@@ -532,8 +634,18 @@ func TestRenderAgentInActiveTmuxPaneShowsMarkerBeforeStatus(t *testing.T) {
 		ActivePaneID: "%7",
 		AgentTotal:   2,
 		Agents: []session.AgentSession{
-			{Harness: "pi", HarnessSession: "active-agent", PaneID: "%7", Status: session.AgentStatusIdle},
-			{Harness: testSupportHarnessCodex, HarnessSession: "other-agent", PaneID: "%8", Status: session.AgentStatusIdle},
+			{
+				Harness:        "pi",
+				HarnessSession: "active-agent",
+				PaneID:         "%7",
+				Status:         session.AgentStatusIdle,
+			},
+			{
+				Harness:        testSupportHarnessCodex,
+				HarnessSession: "other-agent",
+				PaneID:         "%8",
+				Status:         session.AgentStatusIdle,
+			},
 		},
 	}}
 
@@ -543,7 +655,8 @@ func TestRenderAgentInActiveTmuxPaneShowsMarkerBeforeStatus(t *testing.T) {
 	markerIndex := strings.Index(lines[1], "*")
 
 	statusIndex := strings.Index(lines[1], "○")
-	if !strings.Contains(lines[1], "Pi     · active-agent") || markerIndex < 0 || statusIndex < 0 || markerIndex >= statusIndex {
+	if !strings.Contains(lines[1], "Pi     · active-agent") || markerIndex < 0 || statusIndex < 0 ||
+		markerIndex >= statusIndex {
 		t.Fatalf("active agent row = %q, want active-pane marker before glyph", lines[1])
 	}
 
@@ -554,8 +667,14 @@ func TestRenderAgentInActiveTmuxPaneShowsMarkerBeforeStatus(t *testing.T) {
 	activeSessionPrefix, _, activeFound := strings.Cut(lines[1], "active-agent")
 
 	inactiveSessionPrefix, _, inactiveFound := strings.Cut(lines[2], "other-agent")
-	if !activeFound || !inactiveFound || lipgloss.Width(activeSessionPrefix) != lipgloss.Width(inactiveSessionPrefix) {
-		t.Fatalf("agent session columns = %d/%d, want aligned rows: %q", lipgloss.Width(activeSessionPrefix), lipgloss.Width(inactiveSessionPrefix), lines)
+	if !activeFound || !inactiveFound ||
+		lipgloss.Width(activeSessionPrefix) != lipgloss.Width(inactiveSessionPrefix) {
+		t.Fatalf(
+			"agent session columns = %d/%d, want aligned rows: %q",
+			lipgloss.Width(activeSessionPrefix),
+			lipgloss.Width(inactiveSessionPrefix),
+			lines,
+		)
 	}
 }
 
@@ -566,9 +685,14 @@ func TestRenderSelectedAgentChildUsesSelectionBar(t *testing.T) {
 	model.filtered = []session.Session{{
 		Name:       testSupportSessionProjectName,
 		AgentTotal: 1,
-		Agents: []session.AgentSession{{
-			Harness: "pi", HarnessSession: "agent-id", PaneID: "%7", Status: session.AgentStatusRunning,
-		}},
+		Agents: []session.AgentSession{
+			{
+				Harness:        "pi",
+				HarnessSession: "agent-id",
+				PaneID:         "%7",
+				Status:         session.AgentStatusRunning,
+			},
+		},
 	}}
 
 	lines := strings.Split(stripANSI(model.renderList(60, 2)), "\n")
@@ -606,7 +730,8 @@ func TestRenderAgentChildrenStaysBoundedAtNarrowWidth(t *testing.T) {
 	markerIndex := strings.Index(lines[1], "*")
 
 	statusIndex := strings.Index(lines[1], "○")
-	if !strings.Contains(lines[1], "Claude") || markerIndex < 0 || statusIndex < 0 || markerIndex >= statusIndex {
+	if !strings.Contains(lines[1], "Claude") || markerIndex < 0 || statusIndex < 0 ||
+		markerIndex >= statusIndex {
 		t.Fatalf("narrow child row lost required context: %q", lines[1])
 	}
 }
@@ -620,7 +745,11 @@ func TestRenderAgentChildrenUsesConfiguredMutedTheme(t *testing.T) {
 		Name:       testSupportSessionProjectName,
 		AgentTotal: 2,
 		Agents: []session.AgentSession{
-			{Harness: testSupportHarnessCodex, HarnessSession: testSupportAgentRegistryID, Status: session.AgentStatusRunning},
+			{
+				Harness:        testSupportHarnessCodex,
+				HarnessSession: testSupportAgentRegistryID,
+				Status:         session.AgentStatusRunning,
+			},
 			{Harness: "pi", HarnessSession: "agent-2", Status: session.AgentStatusIdle},
 		},
 	}}
@@ -640,7 +769,10 @@ func TestAgentVisualRowsMakeChildrenSelectable(t *testing.T) {
 	model.width = 80
 	model.height = 12
 	model.filtered = []session.Session{
-		{Name: "first", Agents: []session.AgentSession{{Harness: "pi"}, {Harness: testSupportHarnessCodex}}},
+		{
+			Name:   "first",
+			Agents: []session.AgentSession{{Harness: "pi"}, {Harness: testSupportHarnessCodex}},
+		},
 		{Name: "second", Agents: []session.AgentSession{{Harness: "claude"}}},
 	}
 
@@ -696,7 +828,8 @@ func TestAgentChildEnterDefersExactPaneSwitch(t *testing.T) {
 		t.Fatalf("updated model = %T, want *Model", updated)
 	}
 
-	if quit == nil || selected.DeferredSwitchSession() != testSupportSessionProjectName || selected.DeferredSwitchPane() != "%7" {
+	if quit == nil || selected.DeferredSwitchSession() != testSupportSessionProjectName ||
+		selected.DeferredSwitchPane() != "%7" {
 		t.Fatalf(
 			"deferred agent target = %q/%q with quit %v, want project/%%7/true",
 			selected.DeferredSwitchSession(),
@@ -721,7 +854,9 @@ func TestAgentChildMouseClickDefersExactPaneSwitch(t *testing.T) {
 
 	layout := model.popupMouseLayout()
 
-	handler := model.handleMouseClick(mouseClick(layout.bodyX, layout.listY+1, tea.MouseLeft).Mouse())
+	handler := model.handleMouseClick(
+		mouseClick(layout.bodyX, layout.listY+1, tea.MouseLeft).Mouse(),
+	)
 	if handler == nil {
 		t.Fatal("child mouse click returned nil handler")
 	}
@@ -765,15 +900,22 @@ func TestAgentHeadingMouseClickSelectsAndEntersSession(t *testing.T) {
 		t.Fatal("heading click returned nil command")
 	}
 
-	if got, want := model.selectedListRow(), (popupListRow{sessionIndex: 0, agentIndex: parentAgentIndex}); !got.equal(want) {
+	if got, want := model.selectedListRow(), (popupListRow{sessionIndex: 0, agentIndex: parentAgentIndex}); !got.equal(
+		want,
+	) {
 		t.Fatalf("selection after heading click = %#v, want heading %#v", got, want)
 	}
 
 	rawMsg := cmd()
 
 	msg, ok := rawMsg.(sessionActionResultMsg)
-	if !ok || msg.switchSession != testSupportSessionProjectName || msg.switchPane != "" || !msg.deferred {
-		t.Fatalf("heading mouse action = %#v/%v, want deferred session switch without pane", msg, ok)
+	if !ok || msg.switchSession != testSupportSessionProjectName || msg.switchPane != "" ||
+		!msg.deferred {
+		t.Fatalf(
+			"heading mouse action = %#v/%v, want deferred session switch without pane",
+			msg,
+			ok,
+		)
 	}
 }
 
@@ -789,11 +931,15 @@ func TestAgentHeadingMouseMotionSelectsHeading(t *testing.T) {
 	}}
 
 	layout := model.popupMouseLayout()
-	if handler := model.handleMouseMotion(mouseClick(layout.bodyX, layout.listY, 0).Mouse()); handler == nil {
+	if handler := model.handleMouseMotion(
+		mouseClick(layout.bodyX, layout.listY, 0).Mouse(),
+	); handler == nil {
 		t.Fatal("heading mouse motion returned nil handler")
 	}
 
-	if got, want := model.selectedListRow(), (popupListRow{sessionIndex: 0, agentIndex: parentAgentIndex}); !got.equal(want) {
+	if got, want := model.selectedListRow(), (popupListRow{sessionIndex: 0, agentIndex: parentAgentIndex}); !got.equal(
+		want,
+	) {
 		t.Fatalf("selection after heading hover = %#v, want heading %#v", got, want)
 	}
 }
@@ -815,12 +961,18 @@ func TestPageNavigationMovesOnlyAmongAgentRows(t *testing.T) {
 
 	afterDown := model.selectedSelectableIndex(model.popupSelectableRows())
 	if !model.selectedListRow().isAgent() || afterDown <= before {
-		t.Fatalf("page-down selection/index = %#v/%d, want a later agent than %d", model.selectedListRow(), afterDown, before)
+		t.Fatalf(
+			"page-down selection/index = %#v/%d, want a later agent than %d",
+			model.selectedListRow(),
+			afterDown,
+			before,
+		)
 	}
 
 	model.moveSelectionByPage(-1)
 
-	if !model.selectedListRow().isAgent() || model.selectedSelectableIndex(model.popupSelectableRows()) >= afterDown {
+	if !model.selectedListRow().isAgent() ||
+		model.selectedSelectableIndex(model.popupSelectableRows()) >= afterDown {
 		t.Fatalf("page-up selection = %#v, want an earlier agent", model.selectedListRow())
 	}
 }
@@ -831,7 +983,10 @@ func TestAgentMouseScrollCanSelectChildRow(t *testing.T) {
 	model.width = 80
 	model.height = 8
 	model.filtered = []session.Session{
-		{Name: "first", Agents: []session.AgentSession{{Harness: "pi"}, {Harness: testSupportHarnessCodex}}},
+		{
+			Name:   "first",
+			Agents: []session.AgentSession{{Harness: "pi"}, {Harness: testSupportHarnessCodex}},
+		},
 		{Name: "second", Agents: []session.AgentSession{{Harness: "claude"}}},
 		{Name: "third", Agents: []session.AgentSession{{Harness: "grok"}}},
 	}
@@ -841,7 +996,11 @@ func TestAgentMouseScrollCanSelectChildRow(t *testing.T) {
 	}
 
 	if model.cursor != 1 || model.agentCursor != parentAgentIndex {
-		t.Fatalf("scroll selection = %d/%d, want second session heading", model.cursor, model.agentCursor)
+		t.Fatalf(
+			"scroll selection = %d/%d, want second session heading",
+			model.cursor,
+			model.agentCursor,
+		)
 	}
 }
 
@@ -854,8 +1013,16 @@ func TestAgentHarnessColumnAlignmentVariableLengths(t *testing.T) {
 		Agents: []session.AgentSession{
 			{Harness: "pi", HarnessSession: "pi-session", Status: session.AgentStatusRunning},
 			{Harness: "omp", HarnessSession: "omp-session", Status: session.AgentStatusWaiting},
-			{Harness: testSupportHarnessCodex, HarnessSession: "codex-session", Status: session.AgentStatusIdle},
-			{Harness: "claude", HarnessSession: "claude-session", Status: session.AgentStatusUnknown},
+			{
+				Harness:        testSupportHarnessCodex,
+				HarnessSession: "codex-session",
+				Status:         session.AgentStatusIdle,
+			},
+			{
+				Harness:        "claude",
+				HarnessSession: "claude-session",
+				Status:         session.AgentStatusUnknown,
+			},
 		},
 	}}
 
@@ -880,7 +1047,10 @@ func TestAgentHarnessColumnAlignmentVariableLengths(t *testing.T) {
 		dotColumns = append(dotColumns, lipgloss.Width(prefix))
 		sessionColumns = append(sessionColumns, lipgloss.Width(prefix)+lipgloss.Width(" · "))
 
-		if !strings.HasPrefix(rest, []string{"pi-session", "omp-session", "codex-session", "claude-session"}[i-1]) {
+		if !strings.HasPrefix(
+			rest,
+			[]string{"pi-session", "omp-session", "codex-session", "claude-session"}[i-1],
+		) {
 			t.Fatalf("line %d unexpected session name in %q", i, rest)
 		}
 	}
@@ -924,7 +1094,11 @@ func TestAgentMouseScrollCanTraverseOversizedSelectedGroup(t *testing.T) {
 }
 
 func threeAgentsForTest() []session.AgentSession {
-	return []session.AgentSession{{Harness: "pi"}, {Harness: testSupportHarnessCodex}, {Harness: "claude"}}
+	return []session.AgentSession{
+		{Harness: "pi"},
+		{Harness: testSupportHarnessCodex},
+		{Harness: "claude"},
+	}
 }
 
 func TestVisibleAgentRowsDoNotStartWithOrphanFromAnotherSession(t *testing.T) {
@@ -932,7 +1106,10 @@ func TestVisibleAgentRowsDoNotStartWithOrphanFromAnotherSession(t *testing.T) {
 	model.displayMode = displayModeAgents
 	model.filtered = []session.Session{
 		{Name: "first", Agents: threeAgentsForTest()},
-		{Name: "second", Agents: []session.AgentSession{{Harness: "pi"}, {Harness: testSupportHarnessCodex}}},
+		{
+			Name:   "second",
+			Agents: []session.AgentSession{{Harness: "pi"}, {Harness: testSupportHarnessCodex}},
+		},
 		{Name: "selected", Agents: threeAgentsForTest()},
 		{Name: "later", Agents: threeAgentsForTest()},
 	}
@@ -969,7 +1146,16 @@ func TestAgentsModeRegularSessionsSeparatorAndSwitch(t *testing.T) {
 	model.mode = modePopup
 	model.displayMode = displayModeAgents
 	model.filtered = []session.Session{
-		{Name: "agent-session", Agents: []session.AgentSession{{Harness: testSupportHarnessCodex, HarnessSession: "s1", Status: session.AgentStatusRunning}}},
+		{
+			Name: "agent-session",
+			Agents: []session.AgentSession{
+				{
+					Harness:        testSupportHarnessCodex,
+					HarnessSession: "s1",
+					Status:         session.AgentStatusRunning,
+				},
+			},
+		},
 		{Name: "regular-session-1"},
 		{Name: "regular-session-2"},
 	}
@@ -999,7 +1185,11 @@ func assertMixedAgentSessionRows(t *testing.T, model *Model) {
 
 	selectable := model.popupSelectableRows()
 	if len(selectable) != 3 {
-		t.Fatalf("selectable count = %d, want agent child and two regular sessions: %#v", len(selectable), selectable)
+		t.Fatalf(
+			"selectable count = %d, want agent child and two regular sessions: %#v",
+			len(selectable),
+			selectable,
+		)
 	}
 }
 
@@ -1011,7 +1201,8 @@ func assertMixedAgentSessionRendering(t *testing.T, model *Model) {
 		t.Fatalf("rendered list missing a plain divider line: %q", output)
 	}
 
-	if !strings.Contains(output, "regular-session-1") || !strings.Contains(output, "regular-session-2") {
+	if !strings.Contains(output, "regular-session-1") ||
+		!strings.Contains(output, "regular-session-2") {
 		t.Fatalf("rendered list missing regular sessions: %q", output)
 	}
 }
@@ -1063,12 +1254,42 @@ func TestAgentStatusGlyphColors(t *testing.T) {
 		glyph  string
 		color  string
 	}{
-		{name: "running", status: session.AgentStatusRunning, glyph: "●", color: "\x1b[38;2;80;250;123m"},
-		{name: "waiting", status: session.AgentStatusWaiting, glyph: "●", color: "\x1b[38;2;255;221;87m"},
-		{name: "failed", status: session.AgentStatusFailed, glyph: "●", color: "\x1b[38;2;255;85;85m"},
-		{name: "interrupted", status: session.AgentStatusInterrupted, glyph: "○", color: "\x1b[38;2;108;112;134m"},
-		{name: "idle", status: session.AgentStatusIdle, glyph: "○", color: "\x1b[38;2;108;112;134m"},
-		{name: "unknown", status: session.AgentStatusUnknown, glyph: "○", color: "\x1b[38;2;108;112;134m"},
+		{
+			name:   "running",
+			status: session.AgentStatusRunning,
+			glyph:  "●",
+			color:  "\x1b[38;2;80;250;123m",
+		},
+		{
+			name:   "waiting",
+			status: session.AgentStatusWaiting,
+			glyph:  "●",
+			color:  "\x1b[38;2;255;221;87m",
+		},
+		{
+			name:   "failed",
+			status: session.AgentStatusFailed,
+			glyph:  "●",
+			color:  "\x1b[38;2;255;85;85m",
+		},
+		{
+			name:   "interrupted",
+			status: session.AgentStatusInterrupted,
+			glyph:  "○",
+			color:  "\x1b[38;2;108;112;134m",
+		},
+		{
+			name:   "idle",
+			status: session.AgentStatusIdle,
+			glyph:  "○",
+			color:  "\x1b[38;2;108;112;134m",
+		},
+		{
+			name:   "unknown",
+			status: session.AgentStatusUnknown,
+			glyph:  "○",
+			color:  "\x1b[38;2;108;112;134m",
+		},
 	}
 
 	for _, tt := range tests {
@@ -1121,7 +1342,10 @@ func TestThemePresetsRenderInTUI(t *testing.T) {
 
 	for _, preset := range presets {
 		t.Run(preset, func(t *testing.T) {
-			cfg, err := config.Load(config.WithExplicitPath("-"), config.WithInput(strings.NewReader("[theme]\npreset = \""+preset+"\"\n")))
+			cfg, err := config.Load(
+				config.WithExplicitPath("-"),
+				config.WithInput(strings.NewReader("[theme]\npreset = \""+preset+"\"\n")),
+			)
 			if err != nil {
 				t.Fatalf("Load preset %s: %v", preset, err)
 			}
@@ -1152,7 +1376,10 @@ func TestSeparatorOmittedWhenOnlyAgentsOrOnlyRegularSessions(t *testing.T) {
 	modelAgentsOnly.displayMode = displayModeAgents
 
 	modelAgentsOnly.filtered = []session.Session{
-		{Name: testSupportAgentRegistryID, Agents: []session.AgentSession{{Harness: testSupportHarnessCodex}}},
+		{
+			Name:   testSupportAgentRegistryID,
+			Agents: []session.AgentSession{{Harness: testSupportHarnessCodex}},
+		},
 		{Name: "agent-2", Agents: []session.AgentSession{{Harness: "pi"}}},
 	}
 	for _, row := range modelAgentsOnly.popupListRows() {
@@ -1235,7 +1462,11 @@ func TestAgentHarnessFormatWithLongHarnessName(t *testing.T) {
 		Name:       "long-harness",
 		AgentTotal: 2,
 		Agents: []session.AgentSession{
-			{Harness: "copilot", HarnessSession: "copilot-agent", Status: session.AgentStatusRunning},
+			{
+				Harness:        "copilot",
+				HarnessSession: "copilot-agent",
+				Status:         session.AgentStatusRunning,
+			},
 			{Harness: "kimi-code", HarnessSession: "kimi-agent", Status: session.AgentStatusIdle},
 		},
 	}}

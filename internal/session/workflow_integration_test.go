@@ -61,7 +61,11 @@ func testHistoryPath(t *testing.T) string {
 	return filepath.Join(dir, "history.json")
 }
 
-func (f *workflowFixture) workflow(getenv func(string) string, repo *store.Repository, hooks config.HookConfig) *session.Workflow {
+func (f *workflowFixture) workflow(
+	getenv func(string) string,
+	repo *store.Repository,
+	hooks config.HookConfig,
+) *session.Workflow {
 	return session.NewWorkflowWithOptions(session.WorkflowOptions{
 		Server:      f.server,
 		Repository:  repo,
@@ -136,7 +140,10 @@ func (f *workflowFixture) firstPane(t *testing.T, sess gotmux.SessionInfo) gotmu
 	return panes[0]
 }
 
-func (f *workflowFixture) ambientEnvironment(t *testing.T, sess gotmux.SessionInfo) func(string) string {
+func (f *workflowFixture) ambientEnvironment(
+	t *testing.T,
+	sess gotmux.SessionInfo,
+) func(string) string {
 	t.Helper()
 
 	probe, err := f.server.Probe(t.Context())
@@ -147,7 +154,12 @@ func (f *workflowFixture) ambientEnvironment(t *testing.T, sess gotmux.SessionIn
 	pane := f.firstPane(t, sess)
 
 	values := map[string]string{
-		"TMUX":      f.server.Endpoint().SocketPath + "," + strconv.Itoa(probe.Identity.PID) + "," + strings.TrimPrefix(string(sess.ID), "$"),
+		"TMUX": f.server.Endpoint().SocketPath + "," + strconv.Itoa(
+			probe.Identity.PID,
+		) + "," + strings.TrimPrefix(
+			string(sess.ID),
+			"$",
+		),
 		"TMUX_PANE": string(pane.ID),
 	}
 
@@ -269,7 +281,12 @@ func openTestRepository(t *testing.T) *store.Repository {
 	return repo
 }
 
-func commitSavedGeneration(t *testing.T, repo *store.Repository, endpointScope string, names ...string) store.Generation {
+func commitSavedGeneration(
+	t *testing.T,
+	repo *store.Repository,
+	endpointScope string,
+	names ...string,
+) store.Generation {
 	t.Helper()
 
 	attempt, err := repo.Begin(t.Context())
@@ -294,7 +311,10 @@ func savedManifest(names ...string) model.Manifest {
 
 	for index, name := range names {
 		id := "s" + strconv.Itoa(index)
-		sessions = append(sessions, model.Session{ID: id, Name: model.Bytes(name), Directory: model.Bytes("/tmp")})
+		sessions = append(
+			sessions,
+			model.Session{ID: id, Name: model.Bytes(name), Directory: model.Bytes("/tmp")},
+		)
 		links = append(links, model.Link{Session: id, Window: "w0", Index: 0, Active: true})
 	}
 
@@ -303,22 +323,36 @@ func savedManifest(names ...string) model.Manifest {
 		Version:  model.Schema,
 		Started:  10,
 		Finished: 20,
-		Source:   model.Source{TmuxVersion: "3.8", LibraryVersion: "v0.3.0", Consistency: "observed"},
+		Source: model.Source{
+			TmuxVersion:    "3.8",
+			LibraryVersion: "v0.3.0",
+			Consistency:    "observed",
+		},
 		Sessions: sessions,
 		Windows: []model.Window{{
 			ID: "w0", Name: model.Bytes("main"), Width: 80, Height: 24,
 			Layout: model.Layout{Width: 80, Height: 24, Pane: "p0"},
 		}},
 		Links: links,
-		Panes: []model.Pane{{
-			ID: "p0", Window: "w0", Directory: model.Bytes("/tmp"), Width: 80, Height: 24, Active: true,
-			Terminal: model.Terminal{Artifact: ""},
-			Launch:   model.Launch{Recovery: "unverified"},
-		}},
+		Panes: []model.Pane{
+			{
+				ID:        "p0",
+				Window:    "w0",
+				Directory: model.Bytes("/tmp"),
+				Width:     80,
+				Height:    24,
+				Active:    true,
+				Terminal:  model.Terminal{Artifact: ""},
+				Launch:    model.Launch{Recovery: "unverified"},
+			},
+		},
 	}
 
 	for _, domain := range []string{"S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10"} {
-		manifest.Evidence = append(manifest.Evidence, model.Evidence{Domain: domain, Status: "unverified", Reason: "not_captured"})
+		manifest.Evidence = append(
+			manifest.Evidence,
+			model.Evidence{Domain: domain, Status: "unverified", Reason: "not_captured"},
+		)
 	}
 
 	return manifest
@@ -439,7 +473,14 @@ func TestWorkflow_LiveSessionLifecycle(t *testing.T) {
 		t.Fatalf("expected session name alpha-session, got %q", info.Name)
 	}
 
-	if _, err := wf.CreateSession(t.Context(), "alpha-session", "/tmp"); !errors.Is(err, session.ErrSessionAlreadyExists) {
+	if _, err := wf.CreateSession(
+		t.Context(),
+		"alpha-session",
+		"/tmp",
+	); !errors.Is(
+		err,
+		session.ErrSessionAlreadyExists,
+	) {
 		t.Fatalf("expected ErrSessionAlreadyExists, got %v", err)
 	}
 
@@ -447,7 +488,13 @@ func TestWorkflow_LiveSessionLifecycle(t *testing.T) {
 		t.Fatalf("RenameSession failed: %v", err)
 	}
 
-	if _, err := fixture.server.FindSession(t.Context(), "alpha-session"); !errors.Is(err, gotmux.ErrNotFound) {
+	if _, err := fixture.server.FindSession(
+		t.Context(),
+		"alpha-session",
+	); !errors.Is(
+		err,
+		gotmux.ErrNotFound,
+	) {
 		t.Fatalf("expected ErrNotFound for old session, got %v", err)
 	}
 
@@ -459,7 +506,13 @@ func TestWorkflow_LiveSessionLifecycle(t *testing.T) {
 		t.Fatalf("KillSession failed: %v", err)
 	}
 
-	if _, err := fixture.server.FindSession(t.Context(), "beta-session"); !errors.Is(err, gotmux.ErrNotFound) {
+	if _, err := fixture.server.FindSession(
+		t.Context(),
+		"beta-session",
+	); !errors.Is(
+		err,
+		gotmux.ErrNotFound,
+	) {
 		t.Fatalf("expected ErrNotFound for killed session, got %v", err)
 	}
 }
@@ -477,7 +530,13 @@ func TestWorkflow_RenameTargetRejectsReplacementIdentity(t *testing.T) {
 		t.Fatalf("replacement guard changed selected session: %v", err)
 	}
 
-	if _, err := fixture.server.FindSession(t.Context(), "renamed"); !errors.Is(err, gotmux.ErrNotFound) {
+	if _, err := fixture.server.FindSession(
+		t.Context(),
+		"renamed",
+	); !errors.Is(
+		err,
+		gotmux.ErrNotFound,
+	) {
 		t.Fatalf("replacement guard created rename target: %v", err)
 	}
 }
@@ -639,7 +698,13 @@ func TestWorkflow_SwitchRefusesWithoutInvokingClient(t *testing.T) {
 
 	wf := fixture.workflow(fixture.ambientEnvironment(t, origin), nil, config.HookConfig{})
 
-	if _, err := wf.SwitchSessionOutcome(t.Context(), "switch-target"); !errors.Is(err, session.ErrInvokingClientUnavailable) {
+	if _, err := wf.SwitchSessionOutcome(
+		t.Context(),
+		"switch-target",
+	); !errors.Is(
+		err,
+		session.ErrInvokingClientUnavailable,
+	) {
 		t.Fatalf("SwitchSessionOutcome error = %v, want ErrInvokingClientUnavailable", err)
 	}
 
@@ -660,7 +725,13 @@ func TestWorkflow_SwitchRefusesOutsideTmux(t *testing.T) {
 
 	wf := fixture.workflow(func(string) string { return "" }, nil, config.HookConfig{})
 
-	if _, err := wf.SwitchSessionOutcome(t.Context(), "switch-target"); !errors.Is(err, session.ErrNotInsideTmux) {
+	if _, err := wf.SwitchSessionOutcome(
+		t.Context(),
+		"switch-target",
+	); !errors.Is(
+		err,
+		session.ErrNotInsideTmux,
+	) {
 		t.Fatalf("SwitchSessionOutcome error = %v, want ErrNotInsideTmux", err)
 	}
 }
@@ -676,7 +747,13 @@ func TestWorkflow_SwitchRefusesAmbiguousInvokingClients(t *testing.T) {
 
 	wf := fixture.workflow(fixture.ambientEnvironment(t, origin), nil, config.HookConfig{})
 
-	if _, err := wf.SwitchSessionOutcome(t.Context(), "switch-target"); !errors.Is(err, session.ErrInvokingClientAmbiguous) {
+	if _, err := wf.SwitchSessionOutcome(
+		t.Context(),
+		"switch-target",
+	); !errors.Is(
+		err,
+		session.ErrInvokingClientAmbiguous,
+	) {
 		t.Fatalf("SwitchSessionOutcome error = %v, want ErrInvokingClientAmbiguous", err)
 	}
 
@@ -746,7 +823,12 @@ func TestWorkflow_SwitchWithDeferredHistoryLeavesRecordingToCaller(t *testing.T)
 
 	identity, ok := wf.SwitchHistoryIdentity("deferred-target")
 	if !ok || identity != fixture.historyIdentity("deferred-target") {
-		t.Fatalf("switch history identity = %+v, %t; want %+v", identity, ok, fixture.historyIdentity("deferred-target"))
+		t.Fatalf(
+			"switch history identity = %+v, %t; want %+v",
+			identity,
+			ok,
+			fixture.historyIdentity("deferred-target"),
+		)
 	}
 }
 
@@ -758,7 +840,13 @@ func TestWorkflow_SwitchRefusesUnverifiedTargetSession(t *testing.T) {
 
 	wf := fixture.workflow(fixture.ambientEnvironment(t, origin), nil, config.HookConfig{})
 
-	if _, err := wf.SwitchSessionOutcome(t.Context(), "missing-session"); !errors.Is(err, session.ErrSessionNotFound) {
+	if _, err := wf.SwitchSessionOutcome(
+		t.Context(),
+		"missing-session",
+	); !errors.Is(
+		err,
+		session.ErrSessionNotFound,
+	) {
 		t.Fatalf("SwitchSessionOutcome error = %v, want ErrSessionNotFound", err)
 	}
 
@@ -799,11 +887,19 @@ func TestWorkflow_SwitchPreHookFailurePreventsSwitch(t *testing.T) {
 	fixture.newLiveSession(t, "switch-target")
 	client := fixture.attachClient(t, origin.ID)
 
-	hooks := config.HookConfig{SessionSwitchPre: []config.HookCommand{{ShellCommand: "true", Timeout: "0s"}}}
+	hooks := config.HookConfig{
+		SessionSwitchPre: []config.HookCommand{{ShellCommand: "true", Timeout: "0s"}},
+	}
 
 	wf := fixture.workflow(fixture.ambientEnvironment(t, origin), nil, hooks)
 
-	if _, err := wf.SwitchSessionOutcome(t.Context(), "switch-target"); !errors.Is(err, session.ErrHookTimeoutInvalid) {
+	if _, err := wf.SwitchSessionOutcome(
+		t.Context(),
+		"switch-target",
+	); !errors.Is(
+		err,
+		session.ErrHookTimeoutInvalid,
+	) {
 		t.Fatalf("SwitchSessionOutcome error = %v, want hook timeout failure", err)
 	}
 
@@ -823,8 +919,12 @@ func TestWorkflow_SwitchHooksRunAroundVerifiedSwitch(t *testing.T) {
 	fixture.attachClient(t, origin.ID)
 
 	hooks := config.HookConfig{
-		SessionSwitchPre:  []config.HookCommand{{ShellCommand: "printf 'pre\\n' >> \"$SESH_TEST_HOOK_MARKER\""}},
-		SessionSwitchPost: []config.HookCommand{{ShellCommand: "printf 'post\\n' >> \"$SESH_TEST_HOOK_MARKER\""}},
+		SessionSwitchPre: []config.HookCommand{
+			{ShellCommand: "printf 'pre\\n' >> \"$SESH_TEST_HOOK_MARKER\""},
+		},
+		SessionSwitchPost: []config.HookCommand{
+			{ShellCommand: "printf 'post\\n' >> \"$SESH_TEST_HOOK_MARKER\""},
+		},
 	}
 
 	wf := fixture.workflow(fixture.ambientEnvironment(t, origin), nil, hooks)
@@ -858,12 +958,19 @@ func TestWorkflow_SwitchForClientHookReceivesOriginSessionName(t *testing.T) {
 	fixture.newLiveSession(t, "switch-target")
 	client := fixture.attachClient(t, origin.ID)
 
-	hooks := config.HookConfig{SessionSwitchPre: []config.HookCommand{{
-		ShellCommand: `printf '%s:%s' "$SESH_PREV_SESSION" "$SESH_PREV_SESSION_ID" > "$SESH_TEST_HOOK_MARKER"`,
-	}}}
+	hooks := config.HookConfig{SessionSwitchPre: []config.HookCommand{
+		{
+			ShellCommand: `printf '%s:%s' "$SESH_PREV_SESSION" "$SESH_PREV_SESSION_ID" > "$SESH_TEST_HOOK_MARKER"`,
+		},
+	}}
 	wf := fixture.workflow(nil, nil, hooks)
 
-	outcome, err := wf.SwitchSessionOutcomeForClient(t.Context(), "switch-target", client, string(origin.ID))
+	outcome, err := wf.SwitchSessionOutcomeForClient(
+		t.Context(),
+		"switch-target",
+		client,
+		string(origin.ID),
+	)
 	if err != nil {
 		t.Fatalf("SwitchSessionOutcomeForClient failed: %v", err)
 	}
@@ -889,7 +996,9 @@ func TestWorkflow_SwitchPostHookFailureKeepsVerifiedSwitch(t *testing.T) {
 	target := fixture.newLiveSession(t, "switch-target")
 	client := fixture.attachClient(t, origin.ID)
 
-	hooks := config.HookConfig{SessionSwitchPost: []config.HookCommand{{ShellCommand: "true", Timeout: "0s"}}}
+	hooks := config.HookConfig{
+		SessionSwitchPost: []config.HookCommand{{ShellCommand: "true", Timeout: "0s"}},
+	}
 
 	wf := fixture.workflow(fixture.ambientEnvironment(t, origin), nil, hooks)
 
@@ -931,7 +1040,13 @@ func TestWorkflow_AttachRequiresTerminalStreams(t *testing.T) {
 		Source:      "test",
 	})
 
-	if _, err := wf.AttachSession(t.Context(), "fixture"); !errors.Is(err, session.ErrTerminalRequired) {
+	if _, err := wf.AttachSession(
+		t.Context(),
+		"fixture",
+	); !errors.Is(
+		err,
+		session.ErrTerminalRequired,
+	) {
 		t.Fatalf("AttachSession error = %v, want ErrTerminalRequired", err)
 	}
 
@@ -949,7 +1064,9 @@ func TestWorkflow_AttachPreHookFailurePreventsAttach(t *testing.T) {
 
 	_, slave := openTestPTY(t)
 
-	hooks := config.HookConfig{SessionAttachPre: []config.HookCommand{{ShellCommand: "true", Timeout: "0s"}}}
+	hooks := config.HookConfig{
+		SessionAttachPre: []config.HookCommand{{ShellCommand: "true", Timeout: "0s"}},
+	}
 
 	wf := session.NewWorkflowWithOptions(session.WorkflowOptions{
 		Server:      fixture.server,
@@ -962,7 +1079,13 @@ func TestWorkflow_AttachPreHookFailurePreventsAttach(t *testing.T) {
 		Source:      "test",
 	})
 
-	if _, err := wf.AttachSession(t.Context(), "fixture"); !errors.Is(err, session.ErrHookTimeoutInvalid) {
+	if _, err := wf.AttachSession(
+		t.Context(),
+		"fixture",
+	); !errors.Is(
+		err,
+		session.ErrHookTimeoutInvalid,
+	) {
 		t.Fatalf("AttachSession error = %v, want hook boundary failure", err)
 	}
 
@@ -986,7 +1109,9 @@ func TestWorkflow_AttachPostHookRunsAfterClientStart(t *testing.T) {
 	_, slave := openTestPTY(t)
 
 	hooks := config.HookConfig{
-		SessionAttachPost: []config.HookCommand{{ShellCommand: "printf 'post\\n' >> \"$SESH_TEST_HOOK_MARKER\""}},
+		SessionAttachPost: []config.HookCommand{
+			{ShellCommand: "printf 'post\\n' >> \"$SESH_TEST_HOOK_MARKER\""},
+		},
 	}
 
 	wf := session.NewWorkflowWithOptions(session.WorkflowOptions{
@@ -1091,7 +1216,13 @@ func TestWorkflow_DeleteRemovesEverySavedGeneration(t *testing.T) {
 		t.Fatalf("rewritten generations = %d, want 3", outcome.SavedGenerations)
 	}
 
-	if _, err := fixture.server.FindSession(t.Context(), "fixture"); !errors.Is(err, gotmux.ErrNotFound) {
+	if _, err := fixture.server.FindSession(
+		t.Context(),
+		"fixture",
+	); !errors.Is(
+		err,
+		gotmux.ErrNotFound,
+	) {
 		t.Fatalf("live session survived deletion: %v", err)
 	}
 
@@ -1218,7 +1349,11 @@ func TestWorkflow_DeleteSavedTargetReturnsDurableReceiptAndPreservesLiveSession(
 		t.Fatalf("live identity changed: got %s, want %s", current.ID(), live.ID)
 	}
 
-	if names := currentSavedSessionNames(t, repo); slices.Contains(names, "fixture") || !slices.Contains(names, "archive") {
+	if names := currentSavedSessionNames(
+		t,
+		repo,
+	); slices.Contains(names, "fixture") ||
+		!slices.Contains(names, "archive") {
 		t.Fatalf("saved survivor names = %v", names)
 	}
 
@@ -1240,7 +1375,10 @@ func TestWorkflow_DeleteSavedTargetPreservesSameNameLiveReplacement(t *testing.T
 		t.Fatalf("killing original live session: %v", err)
 	}
 
-	replacement, err := fixture.server.NewSession(t.Context(), gotmux.NewSessionOptions{Name: "fixture"})
+	replacement, err := fixture.server.NewSession(
+		t.Context(),
+		gotmux.NewSessionOptions{Name: "fixture"},
+	)
 	if err != nil {
 		t.Fatalf("creating replacement live session: %v", err)
 	}
@@ -1273,11 +1411,21 @@ func TestWorkflow_DeleteSavedTargetRejectsWrongSessionAndEndpoint(t *testing.T) 
 	other := commitSavedGeneration(t, repo, otherScope, "fixture")
 	wf := fixture.workflow(nil, repo, config.HookConfig{})
 
-	if receipt, err := wf.DeleteSavedSessionTarget(t.Context(), matching.ID, "missing"); receipt != "" || !errors.Is(err, session.ErrSessionNotFound) {
+	if receipt, err := wf.DeleteSavedSessionTarget(
+		t.Context(),
+		matching.ID,
+		"missing",
+	); receipt != "" ||
+		!errors.Is(err, session.ErrSessionNotFound) {
 		t.Fatalf("wrong saved identity = %q, %v", receipt, err)
 	}
 
-	if receipt, err := wf.DeleteSavedSessionTarget(t.Context(), other.ID, "s0"); receipt != "" || !errors.Is(err, session.ErrSavedSessionScopeConflict) {
+	if receipt, err := wf.DeleteSavedSessionTarget(
+		t.Context(),
+		other.ID,
+		"s0",
+	); receipt != "" ||
+		!errors.Is(err, session.ErrSavedSessionScopeConflict) {
 		t.Fatalf("other endpoint identity = %q, %v", receipt, err)
 	}
 
@@ -1309,7 +1457,10 @@ func assertSavedSessionScopeConflictLog(t *testing.T, output *bytes.Buffer) {
 		t.Fatalf("scope-conflict record = %#v", record)
 	}
 
-	if !strings.Contains(fmt.Sprint(record["error"]), `saved session "fixture" has no endpoint scope`) {
+	if !strings.Contains(
+		fmt.Sprint(record["error"]),
+		`saved session "fixture" has no endpoint scope`,
+	) {
 		t.Fatalf("scope-conflict record lacks its cause: %#v", record)
 	}
 }
@@ -1341,7 +1492,12 @@ func TestWorkflow_DeletePreservesProtectedGeneration(t *testing.T) {
 
 	generation := commitSavedGeneration(t, repo, fixture.endpointScope(t), "fixture")
 
-	if _, err := repo.Pin(t.Context(), generation.ID, model.Bytes("restore-target"), nil); err != nil {
+	if _, err := repo.Pin(
+		t.Context(),
+		generation.ID,
+		model.Bytes("restore-target"),
+		nil,
+	); err != nil {
 		t.Fatalf("pinning generation: %v", err)
 	}
 
@@ -1380,7 +1536,14 @@ func TestWorkflow_DeleteRefusesAttachedSessionUnlessForced(t *testing.T) {
 
 	wf := fixture.workflow(nil, repo, config.HookConfig{})
 
-	if _, err := wf.DeleteSessionEverywhere(t.Context(), "fixture", false); !errors.Is(err, session.ErrSessionAttached) {
+	if _, err := wf.DeleteSessionEverywhere(
+		t.Context(),
+		"fixture",
+		false,
+	); !errors.Is(
+		err,
+		session.ErrSessionAttached,
+	) {
 		t.Fatalf("DeleteSessionEverywhere error = %v, want ErrSessionAttached", err)
 	}
 
@@ -1438,7 +1601,14 @@ func TestWorkflow_DeleteMissingSession(t *testing.T) {
 
 	wf := fixture.workflow(nil, repo, config.HookConfig{})
 
-	if _, err := wf.DeleteSessionEverywhere(t.Context(), "missing-session", false); !errors.Is(err, session.ErrSessionNotFound) {
+	if _, err := wf.DeleteSessionEverywhere(
+		t.Context(),
+		"missing-session",
+		false,
+	); !errors.Is(
+		err,
+		session.ErrSessionNotFound,
+	) {
 		t.Fatalf("DeleteSessionEverywhere error = %v, want ErrSessionNotFound", err)
 	}
 }
@@ -1470,7 +1640,13 @@ func TestWorkflow_DeleteCleansHistoryAfterCompleteDeletion(t *testing.T) {
 		t.Fatal("history entry survived complete deletion")
 	}
 
-	if _, err := fixture.server.FindSession(t.Context(), "history-target"); !errors.Is(err, gotmux.ErrNotFound) {
+	if _, err := fixture.server.FindSession(
+		t.Context(),
+		"history-target",
+	); !errors.Is(
+		err,
+		gotmux.ErrNotFound,
+	) {
 		t.Fatalf("deleted session survived: %v", err)
 	}
 
@@ -1578,7 +1754,8 @@ func TestWorkflow_LoggingRecordsOneOutcomePerOperation(t *testing.T) {
 		t.Fatalf("switch record = %#v", record)
 	}
 
-	if strings.Contains(output.String(), "switch-target") || strings.Contains(output.String(), "fixture") {
+	if strings.Contains(output.String(), "switch-target") ||
+		strings.Contains(output.String(), "fixture") {
 		t.Fatalf("switch log leaked session identities: %s", output.String())
 	}
 }
@@ -1614,7 +1791,8 @@ func TestWorkflow_LoggingRecordsOneFailureWithoutIdentities(t *testing.T) {
 		t.Fatalf("failure record = %#v", record)
 	}
 
-	if strings.Contains(output.String(), "switch-target") || strings.Contains(output.String(), "fixture") {
+	if strings.Contains(output.String(), "switch-target") ||
+		strings.Contains(output.String(), "fixture") {
 		t.Fatalf("failure log leaked session identities: %s", output.String())
 	}
 }
@@ -1676,7 +1854,11 @@ func TestWorkflow_DeleteEndpointLeaseExcludesConcurrentOperation(t *testing.T) {
 
 	leaseRoot := filepath.Join(t.TempDir(), "leases")
 
-	heldLease, err := tmuxserver.AcquireLease(t.Context(), leaseRoot, fixture.server.Endpoint().SocketPath)
+	heldLease, err := tmuxserver.AcquireLease(
+		t.Context(),
+		leaseRoot,
+		fixture.server.Endpoint().SocketPath,
+	)
 	if err != nil {
 		t.Fatalf("acquiring helper lease: %v", err)
 	}

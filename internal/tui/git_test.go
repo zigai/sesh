@@ -62,12 +62,19 @@ func gitTestModel(t *testing.T) *Model {
 		LoadAgentSummaries: func(context.Context) ([]session.AgentSummary, error) { return nil, nil },
 	}
 
-	model, err := NewPopupModel(context.Background(), gitTestConfig(), testState(), testServices(deps))
+	model, err := NewPopupModel(
+		context.Background(),
+		gitTestConfig(),
+		testState(),
+		testServices(deps),
+	)
 	if err != nil {
 		t.Fatalf("NewPopupModel() error = %v", err)
 	}
 
-	model.applySessionRows(sessionLoadResultMsg{sessions: gitTestSessions(), status: session.StatusComplete})
+	model.applySessionRows(
+		sessionLoadResultMsg{sessions: gitTestSessions(), status: session.StatusComplete},
+	)
 
 	return model
 }
@@ -80,8 +87,13 @@ func TestAgentGitRefreshAppliesMetadataToLocalAgentRows(t *testing.T) {
 		directories = append([]string(nil), dirs...)
 
 		return map[string]agentGitCacheEntry{
-			"/work/alpha": {GitBranch: "main", GitChanges: "+2 -1", GitAhead: 1, GitTrackingKnown: true},
-			"/work/beta":  {GitBranch: "feature"},
+			"/work/alpha": {
+				GitBranch:        "main",
+				GitChanges:       "+2 -1",
+				GitAhead:         1,
+				GitTrackingKnown: true,
+			},
+			"/work/beta": {GitBranch: "feature"},
 		}, nil, nil
 	}
 
@@ -269,7 +281,9 @@ func TestAgentGitDisabledWithoutGitFormatFields(t *testing.T) {
 	}
 
 	if model.agentGitEnabled() {
-		t.Fatal("agentGitEnabled() = true, want false without git fields in the agent and task formats")
+		t.Fatal(
+			"agentGitEnabled() = true, want false without git fields in the agent and task formats",
+		)
 	}
 
 	if cmd := model.loadAgentGitCommand(); cmd != nil {
@@ -283,7 +297,11 @@ func TestFormatGitChangesReportsCountsAndUnknownOutput(t *testing.T) {
 		output string
 		want   string
 	}{
-		{"insertions and deletions", " 3 files changed, 12 insertions(+), 4 deletions(-)", "+12 -4"},
+		{
+			"insertions and deletions",
+			" 3 files changed, 12 insertions(+), 4 deletions(-)",
+			"+12 -4",
+		},
 		{"singular forms", " 1 file changed, 1 insertion(+), 1 deletion(-)", "+1 -1"},
 		{"no changes", "", "+0 -0"},
 		{"malformed count", " 2 files changed, many insertions(+)", ""},
@@ -370,14 +388,22 @@ func gitTestRepository(t *testing.T) string {
 	runGit("config", "user.email", "picker@example.invalid")
 	runGit("config", "user.name", "Picker Test")
 
-	if err := os.WriteFile(filepath.Join(directory, "file.txt"), []byte("first\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(directory, "file.txt"),
+		[]byte("first\n"),
+		0o600,
+	); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
 	runGit("add", "file.txt")
 	runGit("commit", "-m", "initial")
 
-	if err := os.WriteFile(filepath.Join(directory, "file.txt"), []byte("first\nsecond\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(directory, "file.txt"),
+		[]byte("first\nsecond\n"),
+		0o600,
+	); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
@@ -437,7 +463,11 @@ func TestAgentGitRefreshKeepsCountsUntilACompleteScanSucceeds(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(filepath.Join(directory, "file.txt"), []byte("first\nsecond\nthird\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(directory, "file.txt"),
+		[]byte("first\nsecond\nthird\n"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -478,16 +508,27 @@ func TestAgentGitScanDoesNotStarveLaterRepositories(t *testing.T) {
 	directories = append(directories, directory)
 
 	entries, incomplete, err := scanGitMetadata(t.Context(), directories)
-	if !errors.Is(err, context.DeadlineExceeded) || err.Error() != context.DeadlineExceeded.Error() {
-		t.Fatalf("scan error = %q, want one deadline cause however many repositories were slow", err)
+	if !errors.Is(err, context.DeadlineExceeded) ||
+		err.Error() != context.DeadlineExceeded.Error() {
+		t.Fatalf(
+			"scan error = %q, want one deadline cause however many repositories were slow",
+			err,
+		)
 	}
 
 	if !slices.Equal(incomplete, directories[:len(names)]) {
-		t.Fatalf("incomplete directories = %v, want the slow repositories %v", incomplete, directories[:len(names)])
+		t.Fatalf(
+			"incomplete directories = %v, want the slow repositories %v",
+			incomplete,
+			directories[:len(names)],
+		)
 	}
 
 	if got := entries[directory].GitChanges; got != "+1 -0" {
-		t.Fatalf("later repository's Git changes = %q, want +1 -0 despite earlier slow repositories", got)
+		t.Fatalf(
+			"later repository's Git changes = %q, want +1 -0 despite earlier slow repositories",
+			got,
+		)
 	}
 }
 
@@ -532,12 +573,19 @@ func assertCleanGitExtrasExceptDirty(t *testing.T, entry agentGitCacheEntry) {
 }
 
 func TestParseGitStatusCountsConflictsAndDirtyWorktree(t *testing.T) {
-	status := parseGitStatus("# branch.oid 0123\n# branch.head main\n# branch.upstream origin/main\n# branch.ab +2 -3\n" +
-		"u UU N... 100644 100644 100644 100644 a b c conflicted.txt\n" +
-		"u AA N... 000000 100644 100644 100644 a b c added.txt\n" +
-		"1 .M N... 100644 100644 100644 a b edited.txt\n? untracked.txt")
+	status := parseGitStatus(
+		"# branch.oid 0123\n# branch.head main\n# branch.upstream origin/main\n# branch.ab +2 -3\n" +
+			"u UU N... 100644 100644 100644 100644 a b c conflicted.txt\n" +
+			"u AA N... 000000 100644 100644 100644 a b c added.txt\n" +
+			"1 .M N... 100644 100644 100644 a b edited.txt\n? untracked.txt",
+	)
 
-	want := gitStatus{branch: "main", tracking: gitTracking{ahead: 2, behind: 3, known: true}, dirty: true, conflicts: 2}
+	want := gitStatus{
+		branch:    "main",
+		tracking:  gitTracking{ahead: 2, behind: 3, known: true},
+		dirty:     true,
+		conflicts: 2,
+	}
 	if status != want {
 		t.Fatalf("parsed status = %+v, want %+v", status, want)
 	}

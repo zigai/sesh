@@ -32,7 +32,10 @@ func (m *Model) focusedSessionIndex() (int, bool) {
 		return -1, false
 	}
 
-	index := slices.IndexFunc(m.filtered, func(row session.Session) bool { return row.RuntimeKey() == m.focusedSession })
+	index := slices.IndexFunc(
+		m.filtered,
+		func(row session.Session) bool { return row.RuntimeKey() == m.focusedSession },
+	)
 	if index < 0 || len(m.filtered[index].Agents) == 0 {
 		return -1, false
 	}
@@ -45,7 +48,8 @@ func (m *Model) clearSessionFocus() {
 }
 
 func (m *Model) focusesOnSessionKey() bool {
-	return m.displayMode == displayModeInbox || (m.displayMode.tree() && m.config.Settings.SessionKeyAction == "focus")
+	return m.displayMode == displayModeInbox ||
+		(m.displayMode.tree() && m.config.Settings.SessionKeyAction == "focus")
 }
 
 func (m *Model) agentKeys() string {
@@ -67,7 +71,10 @@ func (m *Model) focusOrOpenSession(target session.Session) func() (tea.Model, te
 		m.filterSessions()
 	}
 
-	index := slices.IndexFunc(m.filtered, func(row session.Session) bool { return row.RuntimeKey() == key })
+	index := slices.IndexFunc(
+		m.filtered,
+		func(row session.Session) bool { return row.RuntimeKey() == key },
+	)
 	if index < 0 || len(m.filtered[index].Agents) == 0 {
 		m.clearSessionFocus()
 
@@ -149,7 +156,8 @@ func (m *Model) focusedAgentKey(row session.Session, agent session.AgentSession)
 	}
 
 	slot := slices.IndexFunc(row.Agents, func(candidate session.AgentSession) bool {
-		return candidate.Host == agent.Host && candidate.RegistryID == agent.RegistryID && candidate.PaneID == agent.PaneID
+		return candidate.Host == agent.Host && candidate.RegistryID == agent.RegistryID &&
+			candidate.PaneID == agent.PaneID
 	})
 	if slot < 0 || slot >= len(m.agentKeys()) {
 		return ""
@@ -215,7 +223,9 @@ func sessionKeyStyles(cfg *config.Config) sessionKeySeqs {
 func fadedColor(muted string) color.Color {
 	r, g, b, _ := lipgloss.Color(muted).RGBA()
 
-	return lipgloss.Color(fmt.Sprintf("#%02x%02x%02x", fadedChannel(r), fadedChannel(g), fadedChannel(b)))
+	return lipgloss.Color(
+		fmt.Sprintf("#%02x%02x%02x", fadedChannel(r), fadedChannel(g), fadedChannel(b)),
+	)
 }
 
 func fadedChannel(value uint32) uint32 {
@@ -258,7 +268,10 @@ func (m *Model) sessionKeyHelpBinding() helpBinding {
 	}
 
 	if m.focusesOnSessionKey() {
-		return helpBinding{hint, "Focus " + m.sessionKeyTarget() + ", then " + m.agentKeysHint() + " opens an agent and the key again opens it"}
+		return helpBinding{
+			hint,
+			"Focus " + m.sessionKeyTarget() + ", then " + m.agentKeysHint() + " opens an agent and the key again opens it",
+		}
 	}
 
 	return helpBinding{hint, "Open session by its key"}

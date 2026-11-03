@@ -31,20 +31,27 @@ func testServiceReadinessLogging(t *testing.T, scenario string) {
 	var logs bytes.Buffer
 
 	ctx := zerolog.New(&logs).WithContext(t.Context())
-	manager := setup.ServiceManager{Inspect: func(context.Context, string, ...string) (string, error) {
-		if scenario == "unavailable" {
-			return "", errPrivateServiceInspection
-		}
+	manager := setup.ServiceManager{
+		Inspect: func(context.Context, string, ...string) (string, error) {
+			if scenario == "unavailable" {
+				return "", errPrivateServiceInspection
+			}
 
-		if scenario == "failed" {
-			return "failed", nil
-		}
+			if scenario == "failed" {
+				return "failed", nil
+			}
 
-		return "active", nil
-	}}
+			return "active", nil
+		},
+	}
 	definitions := []setup.ServiceDefinition{{Name: setup.AutosaveTimerName}}
 
-	states := automaticSaveStates(ctx, manager, definitions, &setup.ServiceRefreshResult{Reloaded: scenario != "not_reloaded"})
+	states := automaticSaveStates(
+		ctx,
+		manager,
+		definitions,
+		&setup.ServiceRefreshResult{Reloaded: scenario != "not_reloaded"},
+	)
 	if scenario == "healthy" || scenario == "not_reloaded" {
 		if logs.Len() != 0 {
 			t.Fatalf("healthy or unobserved state logged: %s", logs.String())
@@ -69,11 +76,17 @@ func assertServiceReadinessWarning(t *testing.T, data []byte, scenario string) {
 	}
 
 	want := map[string]any{
-		"level": "warn", "component": "setup", "operation": "inspect_autosave_services", "status": "degraded",
-		"reason": "service_state_unavailable", "message": "automatic save service readiness could not be verified",
+		"level":     "warn",
+		"component": "setup",
+		"operation": "inspect_autosave_services",
+		"status":    "degraded",
+		"reason":    "service_state_unavailable",
+		"message":   "automatic save service readiness could not be verified",
 	}
 	if scenario == "failed" {
-		want["reason"], want["message"], want["failed"] = "service_failed", "automatic save services are failing", float64(1)
+		want["reason"], want["message"], want["failed"] = "service_failed", "automatic save services are failing", float64(
+			1,
+		)
 		want["units"] = []any{setup.AutosaveTimerName}
 	} else {
 		want["error"] = record["error"]

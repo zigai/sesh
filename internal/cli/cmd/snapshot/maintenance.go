@@ -69,9 +69,12 @@ func newSnapshotPruneCommand() *cobra.Command {
 	}
 
 	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
-	cmd.Flags().Int(retentionDaysFlag, 0, "Retain complete snapshot generations from the last N days (0 or greater)")
-	cmd.Flags().Int(maxCountFlag, 0, "Retain at most N complete snapshot generations (0 or at least 5)")
-	cmd.Flags().Int64(maxBytesFlag, 0, "Retain complete snapshot generations up to N total bytes (0 or greater)")
+	cmd.Flags().
+		Int(retentionDaysFlag, 0, "Retain complete snapshot generations from the last N days (0 or greater)")
+	cmd.Flags().
+		Int(maxCountFlag, 0, "Retain at most N complete snapshot generations (0 or at least 5)")
+	cmd.Flags().
+		Int64(maxBytesFlag, 0, "Retain complete snapshot generations up to N total bytes (0 or greater)")
 	clibase.AddJSONFlag(cmd)
 
 	return cmd
@@ -87,8 +90,10 @@ func newSnapshotGCCommand() *cobra.Command {
 	}
 
 	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
-	cmd.Flags().Int(maxGenerationsFlag, 0, "Collect at most N retired generations in one pass (required; 1 to 10000)")
-	cmd.Flags().Int64(maxBytesFlag, 0, "Collect at most N retired generation bytes in one pass (required; at least 1)")
+	cmd.Flags().
+		Int(maxGenerationsFlag, 0, "Collect at most N retired generations in one pass (required; 1 to 10000)")
+	cmd.Flags().
+		Int64(maxBytesFlag, 0, "Collect at most N retired generation bytes in one pass (required; at least 1)")
 	clibase.AddJSONFlag(cmd)
 
 	return cmd
@@ -165,7 +170,10 @@ func runSnapshotPrune(cmd *cobra.Command, _ []string) error {
 	return renderPruneResult(cmd, resultJSON, errors.Join(pruneErr, closeErr))
 }
 
-func resolvedRetentionPolicy(cmd *cobra.Command, snapshot config.SnapshotConfig) (store.RetentionPolicy, error) {
+func resolvedRetentionPolicy(
+	cmd *cobra.Command,
+	snapshot config.SnapshotConfig,
+) (store.RetentionPolicy, error) {
 	days, count, bytes := snapshot.RetentionDays, snapshot.MaxCount, snapshot.MaxBytes
 	if cmd.Flags().Changed(retentionDaysFlag) {
 		days, _ = cmd.Flags().GetInt(retentionDaysFlag)
@@ -179,8 +187,13 @@ func resolvedRetentionPolicy(cmd *cobra.Command, snapshot config.SnapshotConfig)
 		bytes, _ = cmd.Flags().GetInt64(maxBytesFlag)
 	}
 
-	if days < 0 || int64(days) > maximumRetentionDays || count < 0 || (count > 0 && count < minimumRetainedGenerations) || bytes < 0 {
-		return store.RetentionPolicy{}, clibase.NewExitError(clibase.ExitCodeUsage, errInvalidRetentionPolicy)
+	if days < 0 || int64(days) > maximumRetentionDays || count < 0 ||
+		(count > 0 && count < minimumRetainedGenerations) ||
+		bytes < 0 {
+		return store.RetentionPolicy{}, clibase.NewExitError(
+			clibase.ExitCodeUsage,
+			errInvalidRetentionPolicy,
+		)
 	}
 
 	return store.RetentionPolicy{
@@ -215,7 +228,10 @@ func collectionBudget(cmd *cobra.Command) (store.CollectionBudget, error) {
 
 	budget := store.CollectionBudget{Generations: generations, Bytes: bytes}
 	if err := budget.Validate(); err != nil {
-		return store.CollectionBudget{}, clibase.NewExitError(clibase.ExitCodeUsage, errInvalidCollectionBudget)
+		return store.CollectionBudget{}, clibase.NewExitError(
+			clibase.ExitCodeUsage,
+			errInvalidCollectionBudget,
+		)
 	}
 
 	return budget, nil
@@ -280,7 +296,14 @@ func renderPruneResult(cmd *cobra.Command, result pruneResultJSON, err error) er
 	if writeErr := clibase.WriteOutput(
 		cmd,
 		"Membership removed: %d\nMembership retained: %d\nProtected: %d\nRetained bytes: %d\nProtected bytes: %d\nProtected overage: %t\n",
-		len(result.Removed), len(result.Retained), len(result.Protected), result.RetainedBytes, result.ProtectedBytes, result.BudgetUnmet,
+		len(
+			result.Removed,
+		),
+		len(result.Retained),
+		len(result.Protected),
+		result.RetainedBytes,
+		result.ProtectedBytes,
+		result.BudgetUnmet,
 	); writeErr != nil {
 		return errors.Join(err, writeErr)
 	}
@@ -308,7 +331,14 @@ func renderGCResult(cmd *cobra.Command, result gcResultJSON, err error) error {
 	if writeErr := clibase.WriteOutput(
 		cmd,
 		"Physical generations removed: %d\nPhysical bytes removed: %d\nDeferred: %d\nPreserved: %d\nQuarantined: %d\nResumed intent: %t\n",
-		len(result.Removed), result.Bytes, len(result.Deferred), len(result.Preserved), len(result.Quarantined), result.Resumed,
+		len(
+			result.Removed,
+		),
+		result.Bytes,
+		len(result.Deferred),
+		len(result.Preserved),
+		len(result.Quarantined),
+		result.Resumed,
 	); writeErr != nil {
 		return errors.Join(err, writeErr)
 	}

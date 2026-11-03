@@ -29,19 +29,34 @@ func (s *Service) checkLogFile() Result {
 	case err == nil:
 		return newResult(CheckLogFile, StatusOK, DisplayPath(path))
 	case !errors.Is(err, os.ErrNotExist):
-		return newResult(CheckLogFile, StatusFail, "Cannot inspect "+DisplayPath(path)+": "+err.Error()).
+		return newResult(
+			CheckLogFile,
+			StatusFail,
+			"Cannot inspect "+DisplayPath(path)+": "+err.Error(),
+		).
 			withReason(ReasonInspectionFailed).
 			withManual(chooseLogFile)
 	}
 
 	dir := existingAncestor(filepath.Dir(path))
-	if info, err := os.Stat(dir); err != nil || !info.IsDir() || unix.Access(dir, unix.W_OK|unix.X_OK) != nil {
-		return newResult(CheckLogFile, StatusFail, "Cannot create "+DisplayPath(path)+": "+DisplayPath(dir)+" is not a writable directory").
+	if info, err := os.Stat(
+		dir,
+	); err != nil || !info.IsDir() ||
+		unix.Access(dir, unix.W_OK|unix.X_OK) != nil {
+		return newResult(
+			CheckLogFile,
+			StatusFail,
+			"Cannot create "+DisplayPath(path)+": "+DisplayPath(dir)+" is not a writable directory",
+		).
 			withReason(ReasonUnsafe).
 			withManual(chooseLogFile)
 	}
 
-	return newResult(CheckLogFile, StatusOK, DisplayPath(path)+" (created by the next logged command)")
+	return newResult(
+		CheckLogFile,
+		StatusOK,
+		DisplayPath(path)+" (created by the next logged command)",
+	)
 }
 
 func existingAncestor(dir string) string {

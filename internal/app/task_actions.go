@@ -40,15 +40,27 @@ type TaskActionRun struct {
 	Linked   bool
 }
 
-func (local *Local) finishTask(ctx context.Context, _ action.Caller, input action.FinishTask) (action.FinishedTask, error) {
+func (local *Local) finishTask(
+	ctx context.Context,
+	_ action.Caller,
+	input action.FinishTask,
+) (action.FinishedTask, error) {
 	service, err := local.taskService()
 	if err != nil {
 		return action.FinishedTask{ID: input.Task}, err
 	}
 
-	record, err := service.Finish(ctx, input.Task, task.FinishOptions{Discard: input.Discard, SkipRun: input.SkipRun})
+	record, err := service.Finish(
+		ctx,
+		input.Task,
+		task.FinishOptions{Discard: input.Discard, SkipRun: input.SkipRun},
+	)
 	if err != nil {
-		return action.FinishedTask{ID: input.Task}, oops.In("app").With("operation", "finish_task").Wrap(err)
+		return action.FinishedTask{
+			ID: input.Task,
+		}, oops.In("app").
+			With("operation", "finish_task").
+			Wrap(err)
 	}
 
 	if err := local.finishTaskWork(ctx, record, work.FinishedByUser); err != nil {
@@ -58,7 +70,11 @@ func (local *Local) finishTask(ctx context.Context, _ action.Caller, input actio
 	return action.FinishedTask{ID: input.Task}, nil
 }
 
-func (local *Local) runTaskAction(ctx context.Context, _ action.Caller, input action.RunTaskAction) (action.StartedTaskAction, error) {
+func (local *Local) runTaskAction(
+	ctx context.Context,
+	_ action.Caller,
+	input action.RunTaskAction,
+) (action.StartedTaskAction, error) {
 	result := action.StartedTaskAction{ID: input.Task, Action: input.Action}
 
 	record, err := local.taskRecord(ctx, input.Task)
@@ -70,11 +86,24 @@ func (local *Local) runTaskAction(ctx context.Context, _ action.Caller, input ac
 		return result, action.Wrap(action.CodeNotFound, ErrUnknownTaskAction)
 	}
 
-	return result, local.openTaskRunWindow(ctx, record, input.Action, []string{"task", actionRunVerb, record.ID, input.Action})
+	return result, local.openTaskRunWindow(
+		ctx,
+		record,
+		input.Action,
+		[]string{"task", actionRunVerb, record.ID, input.Action},
+	)
 }
 
-func (local *Local) RunTaskAction(ctx context.Context, id, name string, streams gotmux.Streams) (TaskActionRun, error) {
-	run := TaskActionRun{ExitCode: nil, PR: task.PullRequest{Number: 0, State: "", URL: ""}, Linked: false}
+func (local *Local) RunTaskAction(
+	ctx context.Context,
+	id, name string,
+	streams gotmux.Streams,
+) (TaskActionRun, error) {
+	run := TaskActionRun{
+		ExitCode: nil,
+		PR:       task.PullRequest{Number: 0, State: "", URL: ""},
+		Linked:   false,
+	}
 
 	service, err := local.taskService()
 	if err != nil {
@@ -96,7 +125,14 @@ func (local *Local) RunTaskAction(ctx context.Context, id, name string, streams 
 		return run, err
 	}
 
-	started := task.Run{Action: name, Window: name, Status: task.RunRunning, ExitCode: 0, StartedAt: time.Now().Unix(), FinishedAt: 0}
+	started := task.Run{
+		Action:     name,
+		Window:     name,
+		Status:     task.RunRunning,
+		ExitCode:   0,
+		StartedAt:  time.Now().Unix(),
+		FinishedAt: 0,
+	}
 	if err := service.RecordRun(ctx, id, started); err != nil {
 		return run, oops.In("app").With("operation", "record_task_action").Wrap(err)
 	}
@@ -105,7 +141,8 @@ func (local *Local) RunTaskAction(ctx context.Context, id, name string, streams 
 	run.ExitCode = &exitCode
 
 	finished := started
-	finished.Status, finished.ExitCode, finished.FinishedAt = task.RunOK, exitCode, time.Now().Unix()
+	finished.Status, finished.ExitCode, finished.FinishedAt = task.RunOK, exitCode, time.Now().
+		Unix()
 
 	if exitCode != 0 {
 		finished.Status = task.RunFailed
@@ -229,7 +266,12 @@ func actionCommand(configured config.MenuItemConfig, record task.Record) ([]stri
 	return argv, nil
 }
 
-func runCommand(ctx context.Context, argv []string, record task.Record, streams gotmux.Streams) int {
+func runCommand(
+	ctx context.Context,
+	argv []string,
+	record task.Record,
+	streams gotmux.Streams,
+) int {
 	command := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	command.Dir = record.Directory
 	command.Stdin, command.Stdout, command.Stderr = streams.In, streams.Out, streams.Err

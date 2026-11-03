@@ -13,7 +13,11 @@ func TestCacheRoundTripsEntries(t *testing.T) {
 	path := fields.CachePath("weather")
 
 	entries := map[string]fields.CacheEntry{
-		"%12":        {ChangeKey: "a1", Text: "\x1b[32mok\x1b[0m", At: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)},
+		"%12": {
+			ChangeKey: "a1",
+			Text:      "\x1b[32mok\x1b[0m",
+			At:        time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
+		},
 		"session:$1": {ChangeKey: "b2", Text: "", At: time.Date(2026, 1, 2, 3, 4, 6, 0, time.UTC)},
 	}
 	if err := fields.MergeCache(t.Context(), path, entries); err != nil {

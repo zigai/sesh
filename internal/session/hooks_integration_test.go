@@ -167,9 +167,14 @@ func TestHookIntegrationShellEnvironment(t *testing.T) {
 	t.Setenv("BASH_ENV", "")
 	outputPath := filepath.Join(t.TempDir(), "hook.out")
 	cfg := config.HookConfig{
-		SessionSwitchPost: []config.HookCommand{{
-			ShellCommand: fmt.Sprintf(`printf '%%s:%%s:%%s' "$SESH_HOOK_EVENT" "$SESH_PREV_SESSION" "$SESH_SESSION" > %q`, outputPath),
-		}},
+		SessionSwitchPost: []config.HookCommand{
+			{
+				ShellCommand: fmt.Sprintf(
+					`printf '%%s:%%s:%%s' "$SESH_HOOK_EVENT" "$SESH_PREV_SESSION" "$SESH_SESSION" > %q`,
+					outputPath,
+				),
+			},
+		},
 	}
 
 	event := session.HookEvent{
@@ -350,7 +355,8 @@ func verifyHookOutcomesList(t *testing.T, outcomes []session.HookOutcome) {
 	t.Helper()
 
 	for i, o := range outcomes {
-		if o.Index != i || o.Status != session.HookStatusCompleted || o.ExitCode != 0 || o.Err != nil {
+		if o.Index != i || o.Status != session.HookStatusCompleted || o.ExitCode != 0 ||
+			o.Err != nil {
 			t.Fatalf("outcome[%d] mismatch: %#v", i, o)
 		}
 	}
@@ -563,11 +569,16 @@ func TestHookIntegrationFailureContinuesAndLogsWarning(t *testing.T) {
 
 func TestHookIntegrationFailureLogsOnlyStderrTail(t *testing.T) {
 	cfg := config.HookConfig{
-		SessionSwitchPost: []config.HookCommand{{
-			Command: hookTestShell,
-			Args:    []string{"-c", "head -c 5000 /dev/zero | tr '\\0' x >&2; printf '\\nfinal line\\n' >&2; exit 3"},
-			Timeout: "2s",
-		}},
+		SessionSwitchPost: []config.HookCommand{
+			{
+				Command: hookTestShell,
+				Args: []string{
+					"-c",
+					"head -c 5000 /dev/zero | tr '\\0' x >&2; printf '\\nfinal line\\n' >&2; exit 3",
+				},
+				Timeout: "2s",
+			},
+		},
 	}
 
 	var logOutput bytes.Buffer
@@ -645,9 +656,11 @@ func TestHookIntegrationStdoutStderrIsolation(t *testing.T) {
 	t.Setenv("BASH_ENV", "")
 
 	cfg := config.HookConfig{
-		SessionSwitchPost: []config.HookCommand{{
-			ShellCommand: "printf 'SUBPROCESS_LEAKED_STDOUT'; printf 'SUBPROCESS_LEAKED_STDERR' >&2",
-		}},
+		SessionSwitchPost: []config.HookCommand{
+			{
+				ShellCommand: "printf 'SUBPROCESS_LEAKED_STDOUT'; printf 'SUBPROCESS_LEAKED_STDERR' >&2",
+			},
+		},
 	}
 
 	oldStdout := os.Stdout
@@ -701,11 +714,19 @@ func TestHookIntegrationStdoutStderrIsolation(t *testing.T) {
 	}
 
 	if stdoutBuf.Len() != 0 {
-		t.Fatalf("captured stdout contains %d bytes: %q (want 0)", stdoutBuf.Len(), stdoutBuf.String())
+		t.Fatalf(
+			"captured stdout contains %d bytes: %q (want 0)",
+			stdoutBuf.Len(),
+			stdoutBuf.String(),
+		)
 	}
 
 	if stderrBuf.Len() != 0 {
-		t.Fatalf("captured stderr contains %d bytes: %q (want 0)", stderrBuf.Len(), stderrBuf.String())
+		t.Fatalf(
+			"captured stderr contains %d bytes: %q (want 0)",
+			stderrBuf.Len(),
+			stderrBuf.String(),
+		)
 	}
 }
 

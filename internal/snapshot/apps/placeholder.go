@@ -41,7 +41,8 @@ func LaunchHarness(launch model.Launch) (string, bool) {
 func sleepingTaskPlaceholder(observed model.Launch) bool {
 	executable := string(observed.Executable)
 
-	return cleanAbsolute(executable) && cleanAbsolute(string(observed.Directory)) && executableName(executable) == seshName
+	return cleanAbsolute(executable) && cleanAbsolute(string(observed.Directory)) &&
+		executableName(executable) == seshName
 }
 
 func preparePlaceholder(fallback model.Launch) (model.Launch, Reason) {
@@ -60,5 +61,8 @@ func preparePlaceholder(fallback model.Launch) (model.Launch, Reason) {
 		}
 	}
 
-	return restartLaunch(fallback, append([]string{seshName}, PlaceholderArguments(task)...)), ReasonTaskPlaceholder
+	return restartLaunch(
+		fallback,
+		append([]string{seshName}, PlaceholderArguments(task)...),
+	), ReasonTaskPlaceholder
 }

@@ -18,12 +18,15 @@ const mergeRunVerb = "merge-run"
 
 func newMergeRunCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:         mergeRunVerb + " <task>",
-		Short:       "Merge a task in the task's popup window",
-		Hidden:      true,
-		Args:        clibase.UsageArgs(cobra.ExactArgs(1)),
-		RunE:        runMergeRun,
-		Annotations: map[string]string{clibase.AnnotationOperation: "task_merge", clibase.AnnotationLiveIO: "true"},
+		Use:    mergeRunVerb + " <task>",
+		Short:  "Merge a task in the task's popup window",
+		Hidden: true,
+		Args:   clibase.UsageArgs(cobra.ExactArgs(1)),
+		RunE:   runMergeRun,
+		Annotations: map[string]string{
+			clibase.AnnotationOperation: "task_merge",
+			clibase.AnnotationLiveIO:    "true",
+		},
 	}
 
 	actioncli.AddEnvironmentFlags(cmd)
@@ -44,7 +47,11 @@ func runMergeRun(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	run, err := runtime.Local.RunTaskMerge(ctx, args[0], gotmux.Streams{In: os.Stdin, Out: os.Stdout, Err: os.Stderr})
+	run, err := runtime.Local.RunTaskMerge(
+		ctx,
+		args[0],
+		gotmux.Streams{In: os.Stdin, Out: os.Stdout, Err: os.Stderr},
+	)
 	err = errors.Join(err, runtime.Close())
 
 	if run.ExitCode != nil && *run.ExitCode != 0 {

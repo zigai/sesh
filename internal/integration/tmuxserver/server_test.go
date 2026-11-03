@@ -18,7 +18,9 @@ func TestOpenAdmitsFullTerminalTextOutput(t *testing.T) {
 		t.Fatalf("output limit = %d, want %d", limits.OutputBytes, OutputBytes)
 	}
 
-	if limits.CommandTimeout != defaults.CommandTimeout || limits.InputBytes != defaults.InputBytes || limits.Concurrent != defaults.Concurrent {
+	if limits.CommandTimeout != defaults.CommandTimeout ||
+		limits.InputBytes != defaults.InputBytes ||
+		limits.Concurrent != defaults.Concurrent {
 		t.Fatalf("unrelated limits changed: %#v", limits)
 	}
 }

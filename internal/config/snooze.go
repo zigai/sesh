@@ -23,14 +23,26 @@ type Snooze struct {
 func ParseSnooze(choice string) (Snooze, error) {
 	text := strings.TrimSpace(choice)
 	if text == SnoozeNextMessage {
-		return Snooze{nextMessage: true, duration: 0, atClock: false, clock: 0, tomorrow: false}, nil
+		return Snooze{
+			nextMessage: true,
+			duration:    0,
+			atClock:     false,
+			clock:       0,
+			tomorrow:    false,
+		}, nil
 	}
 
 	rest, tomorrow := strings.CutPrefix(text, snoozeTomorrow)
 	if clock, err := time.Parse(snoozeClockForm, strings.TrimSpace(rest)); err == nil {
 		offset := time.Duration(clock.Hour())*time.Hour + time.Duration(clock.Minute())*time.Minute
 
-		return Snooze{nextMessage: false, duration: 0, atClock: true, clock: offset, tomorrow: tomorrow}, nil
+		return Snooze{
+			nextMessage: false,
+			duration:    0,
+			atClock:     true,
+			clock:       offset,
+			tomorrow:    tomorrow,
+		}, nil
 	}
 
 	duration, err := time.ParseDuration(text)
@@ -38,7 +50,13 @@ func ParseSnooze(choice string) (Snooze, error) {
 		return Snooze{}, errInboxSnoozeInvalid
 	}
 
-	return Snooze{nextMessage: false, duration: duration, atClock: false, clock: 0, tomorrow: false}, nil
+	return Snooze{
+		nextMessage: false,
+		duration:    duration,
+		atClock:     false,
+		clock:       0,
+		tomorrow:    false,
+	}, nil
 }
 
 // Until is zero for a snooze that waits for the next message.

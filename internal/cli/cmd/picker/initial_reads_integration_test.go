@@ -156,15 +156,31 @@ func TestPickerInitialReadsStopWaitingWhenCanceled(t *testing.T) {
 	}
 }
 
-func newInitialReadsServices(t *testing.T, server *gotmux.Server, sessionID, pane string) *services {
+func newInitialReadsServices(
+	t *testing.T,
+	server *gotmux.Server,
+	sessionID, pane string,
+) *services {
 	t.Helper()
 
 	root := t.TempDir()
 
-	services, err := newServices(t.Context(), resolvePickerTestWorkspace(t, config.DefaultConfig(), app.Locations{
-		Socket: server.Endpoint().SocketPath, Repository: "", LeaseRoot: filepath.Join(root, "leases"),
-		History: filepath.Join(root, "history.json"), FinalSaveStatus: "", AgentStore: filepath.Join(root, "agents.json"),
-	}), gotmux.Streams{}, RemoteServices{})
+	services, err := newServices(
+		t.Context(),
+		resolvePickerTestWorkspace(t, config.DefaultConfig(), app.Locations{
+			Socket:     server.Endpoint().SocketPath,
+			Repository: "",
+			LeaseRoot:  filepath.Join(root, "leases"),
+			History: filepath.Join(
+				root,
+				"history.json",
+			),
+			FinalSaveStatus: "",
+			AgentStore:      filepath.Join(root, "agents.json"),
+		}),
+		gotmux.Streams{},
+		RemoteServices{},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +227,13 @@ func assertPickerCatalogsEqual(t *testing.T, got, want session.CatalogResult) {
 	t.Helper()
 
 	if got.LiveErr != nil || got.SavedErr != nil || want.LiveErr != nil || want.SavedErr != nil {
-		t.Fatalf("catalog errors: got live=%v saved=%v, want live=%v saved=%v", got.LiveErr, got.SavedErr, want.LiveErr, want.SavedErr)
+		t.Fatalf(
+			"catalog errors: got live=%v saved=%v, want live=%v saved=%v",
+			got.LiveErr,
+			got.SavedErr,
+			want.LiveErr,
+			want.SavedErr,
+		)
 	}
 
 	if got.Status != want.Status || !reflect.DeepEqual(got.Sessions, want.Sessions) {

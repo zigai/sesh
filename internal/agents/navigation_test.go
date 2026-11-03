@@ -64,7 +64,10 @@ func (f *fakeController) Panes(context.Context) ([]agents.PaneLocation, error) {
 	return f.panes, f.panesErr
 }
 
-func (f *fakeController) SessionWindows(_ context.Context, sessionID string) ([]agents.SessionWindow, error) {
+func (f *fakeController) SessionWindows(
+	_ context.Context,
+	sessionID string,
+) ([]agents.SessionWindow, error) {
 	if f.sessionWindowsErr != nil {
 		return nil, f.sessionWindowsErr
 	}
@@ -91,7 +94,11 @@ func (f *fakeController) SessionWindows(_ context.Context, sessionID string) ([]
 	return windows, nil
 }
 
-func (f *fakeController) Activate(_ context.Context, _ agents.CurrentContext, target agents.PaneLocation) error {
+func (f *fakeController) Activate(
+	_ context.Context,
+	_ agents.CurrentContext,
+	target agents.PaneLocation,
+) error {
 	if f.activateErr != nil {
 		return f.activateErr
 	}
@@ -183,7 +190,11 @@ func (s fakeSource) List(_ context.Context, filter aht.Filter) ([]aht.Session, e
 	return matched, nil
 }
 
-func newFakeNavigator(t *testing.T, controller *fakeController, sessions []aht.Session) *agents.Navigator {
+func newFakeNavigator(
+	t *testing.T,
+	controller *fakeController,
+	sessions []aht.Session,
+) *agents.Navigator {
 	t.Helper()
 
 	if controller.current.ServerPID == 0 {
@@ -203,9 +214,36 @@ func newFakeNavigator(t *testing.T, controller *fakeController, sessions []aht.S
 
 func navigationPanes() []agents.PaneLocation {
 	return []agents.PaneLocation{
-		{ServerSocket: defaultServerSocket, SessionID: "$1", SessionName: firstSessionName, WindowID: "@1", WindowIndex: "1", PaneID: "%1", PaneIndex: "1", PanePID: 1001},
-		{ServerSocket: defaultServerSocket, SessionID: "$2", SessionName: "two", WindowID: "@2", WindowIndex: "1", PaneID: "%2", PaneIndex: "1", PanePID: 1002},
-		{ServerSocket: defaultServerSocket, SessionID: "$1", SessionName: firstSessionName, WindowID: "@3", WindowIndex: "2", PaneID: "%3", PaneIndex: "1", PanePID: 1003},
+		{
+			ServerSocket: defaultServerSocket,
+			SessionID:    "$1",
+			SessionName:  firstSessionName,
+			WindowID:     "@1",
+			WindowIndex:  "1",
+			PaneID:       "%1",
+			PaneIndex:    "1",
+			PanePID:      1001,
+		},
+		{
+			ServerSocket: defaultServerSocket,
+			SessionID:    "$2",
+			SessionName:  "two",
+			WindowID:     "@2",
+			WindowIndex:  "1",
+			PaneID:       "%2",
+			PaneIndex:    "1",
+			PanePID:      1002,
+		},
+		{
+			ServerSocket: defaultServerSocket,
+			SessionID:    "$1",
+			SessionName:  firstSessionName,
+			WindowID:     "@3",
+			WindowIndex:  "2",
+			PaneID:       "%3",
+			PaneIndex:    "1",
+			PanePID:      1003,
+		},
 	}
 }
 
@@ -291,8 +329,14 @@ func TestNextIdleWrapsAcrossSessions(t *testing.T) {
 
 	panes := navigationPanes()
 	controller := &fakeController{
-		current: agents.CurrentContext{ServerSocket: defaultServerSocket, SessionID: "$1", SessionName: firstSessionName, WindowID: "@3", PaneID: "%3"},
-		panes:   panes,
+		current: agents.CurrentContext{
+			ServerSocket: defaultServerSocket,
+			SessionID:    "$1",
+			SessionName:  firstSessionName,
+			WindowID:     "@3",
+			PaneID:       "%3",
+		},
+		panes: panes,
 	}
 
 	navigator := newFakeNavigator(t, controller, []aht.Session{
@@ -322,8 +366,14 @@ func TestNextIdleCurrentSessionSkipsOtherSessions(t *testing.T) {
 	t.Parallel()
 
 	controller := &fakeController{
-		current: agents.CurrentContext{ServerSocket: defaultServerSocket, SessionID: "$1", SessionName: firstSessionName, WindowID: "@3", PaneID: "%3"},
-		panes:   navigationPanes(),
+		current: agents.CurrentContext{
+			ServerSocket: defaultServerSocket,
+			SessionID:    "$1",
+			SessionName:  firstSessionName,
+			WindowID:     "@3",
+			PaneID:       "%3",
+		},
+		panes: navigationPanes(),
 	}
 
 	navigator := newFakeNavigator(t, controller, []aht.Session{
@@ -345,8 +395,14 @@ func TestNextIdleSkipsRunningAgents(t *testing.T) {
 	t.Parallel()
 
 	controller := &fakeController{
-		current: agents.CurrentContext{ServerSocket: defaultServerSocket, SessionID: "$1", SessionName: firstSessionName, WindowID: "@1", PaneID: "%1"},
-		panes:   navigationPanes(),
+		current: agents.CurrentContext{
+			ServerSocket: defaultServerSocket,
+			SessionID:    "$1",
+			SessionName:  firstSessionName,
+			WindowID:     "@1",
+			PaneID:       "%1",
+		},
+		panes: navigationPanes(),
 	}
 
 	navigator := newFakeNavigator(t, controller, []aht.Session{
@@ -367,10 +423,20 @@ func TestNextIdleSelectsInterruptedAgent(t *testing.T) {
 	t.Parallel()
 
 	controller := &fakeController{
-		current: agents.CurrentContext{ServerSocket: defaultServerSocket, SessionID: "$1", SessionName: firstSessionName, WindowID: "@1", PaneID: "%1"},
-		panes:   navigationPanes(),
+		current: agents.CurrentContext{
+			ServerSocket: defaultServerSocket,
+			SessionID:    "$1",
+			SessionName:  firstSessionName,
+			WindowID:     "@1",
+			PaneID:       "%1",
+		},
+		panes: navigationPanes(),
 	}
-	navigator := newFakeNavigator(t, controller, []aht.Session{attentionSession(aht.ActivityInterrupted, "%3")})
+	navigator := newFakeNavigator(
+		t,
+		controller,
+		[]aht.Session{attentionSession(aht.ActivityInterrupted, "%3")},
+	)
 
 	target, err := navigator.NextIdle(t.Context(), agents.NavigationGlobal)
 	if err != nil {
@@ -389,8 +455,14 @@ func TestNextIdleIgnoresAgentsOnOtherServers(t *testing.T) {
 	other.Location.ServerID = "/tmp/other/socket"
 
 	controller := &fakeController{
-		current: agents.CurrentContext{ServerSocket: defaultServerSocket, SessionID: "$1", SessionName: firstSessionName, WindowID: "@1", PaneID: "%1"},
-		panes:   navigationPanes(),
+		current: agents.CurrentContext{
+			ServerSocket: defaultServerSocket,
+			SessionID:    "$1",
+			SessionName:  firstSessionName,
+			WindowID:     "@1",
+			PaneID:       "%1",
+		},
+		panes: navigationPanes(),
 	}
 
 	navigator := newFakeNavigator(t, controller, []aht.Session{other})
@@ -405,11 +477,21 @@ func TestNextIdleRequiresLiveCurrentPane(t *testing.T) {
 	t.Parallel()
 
 	controller := &fakeController{
-		current: agents.CurrentContext{ServerSocket: defaultServerSocket, SessionID: "$1", SessionName: firstSessionName, WindowID: "@9", PaneID: "%99"},
-		panes:   navigationPanes(),
+		current: agents.CurrentContext{
+			ServerSocket: defaultServerSocket,
+			SessionID:    "$1",
+			SessionName:  firstSessionName,
+			WindowID:     "@9",
+			PaneID:       "%99",
+		},
+		panes: navigationPanes(),
 	}
 
-	navigator := newFakeNavigator(t, controller, []aht.Session{attentionSession(aht.ActivityIdle, "%1")})
+	navigator := newFakeNavigator(
+		t,
+		controller,
+		[]aht.Session{attentionSession(aht.ActivityIdle, "%1")},
+	)
 
 	_, err := navigator.NextIdle(t.Context(), agents.NavigationGlobal)
 	if !errors.Is(err, agents.ErrCurrentPaneNotLive) {
@@ -427,8 +509,19 @@ func TestNextIdleActivationFailureRestoresHistory(t *testing.T) {
 		wantLogRecords  int
 		wantHistoryIDs  []string
 	}{
-		{name: "successful rollback stays silent", setHistoryFails: 0, wantLogRecords: 0, wantHistoryIDs: nil},
-		{name: "failed rollback warns", setHistoryFails: 2, rollbackErr: errFakeRollback, wantLogRecords: 1, wantHistoryIDs: []string{"%3"}},
+		{
+			name:            "successful rollback stays silent",
+			setHistoryFails: 0,
+			wantLogRecords:  0,
+			wantHistoryIDs:  nil,
+		},
+		{
+			name:            "failed rollback warns",
+			setHistoryFails: 2,
+			rollbackErr:     errFakeRollback,
+			wantLogRecords:  1,
+			wantHistoryIDs:  []string{"%3"},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -442,14 +535,24 @@ func TestNextIdleActivationFailureRestoresHistory(t *testing.T) {
 				Logger().WithContext(context.Background())
 
 			controller := &fakeController{
-				current:         agents.CurrentContext{ServerSocket: defaultServerSocket, SessionID: "$1", SessionName: firstSessionName, WindowID: "@3", PaneID: "%3"},
+				current: agents.CurrentContext{
+					ServerSocket: defaultServerSocket,
+					SessionID:    "$1",
+					SessionName:  firstSessionName,
+					WindowID:     "@3",
+					PaneID:       "%3",
+				},
 				panes:           navigationPanes(),
 				activateErr:     errFakeActivation,
 				setHistoryFails: test.setHistoryFails,
 				setHistoryErr:   test.rollbackErr,
 			}
 
-			navigator := newFakeNavigator(t, controller, []aht.Session{attentionSession(aht.ActivityIdle, "%1")})
+			navigator := newFakeNavigator(
+				t,
+				controller,
+				[]aht.Session{attentionSession(aht.ActivityIdle, "%1")},
+			)
 
 			_, err := navigator.NextIdle(ctx, agents.NavigationGlobal)
 			if !errors.Is(err, errFakeActivation) {
@@ -460,13 +563,24 @@ func TestNextIdleActivationFailureRestoresHistory(t *testing.T) {
 				t.Fatalf("error = %v, want the joined rollback error", err)
 			}
 
-			if got := decodeHistory(t, controller.history); !reflect.DeepEqual(got, test.wantHistoryIDs) {
+			if got := decodeHistory(
+				t,
+				controller.history,
+			); !reflect.DeepEqual(
+				got,
+				test.wantHistoryIDs,
+			) {
 				t.Fatalf("history = %v, want %v", got, test.wantHistoryIDs)
 			}
 
 			records := decodeLogRecords(t, &output)
 			if len(records) != test.wantLogRecords {
-				t.Fatalf("log records = %d, want %d: %s", len(records), test.wantLogRecords, output.String())
+				t.Fatalf(
+					"log records = %d, want %d: %s",
+					len(records),
+					test.wantLogRecords,
+					output.String(),
+				)
 			}
 
 			if test.wantLogRecords == 1 {
@@ -488,11 +602,21 @@ func TestNextIdleReturnsNavigationUnlockFailure(t *testing.T) {
 	t.Parallel()
 
 	controller := &fakeController{
-		current:   agents.CurrentContext{ServerSocket: defaultServerSocket, SessionID: "$1", SessionName: firstSessionName, WindowID: "@3", PaneID: "%3"},
+		current: agents.CurrentContext{
+			ServerSocket: defaultServerSocket,
+			SessionID:    "$1",
+			SessionName:  firstSessionName,
+			WindowID:     "@3",
+			PaneID:       "%3",
+		},
 		panes:     navigationPanes(),
 		unlockErr: errFakeRollback,
 	}
-	navigator := newFakeNavigator(t, controller, []aht.Session{attentionSession(aht.ActivityIdle, "%1")})
+	navigator := newFakeNavigator(
+		t,
+		controller,
+		[]aht.Session{attentionSession(aht.ActivityIdle, "%1")},
+	)
 
 	_, err := navigator.NextIdle(t.Context(), agents.NavigationGlobal)
 	if !errors.Is(err, errFakeRollback) {
@@ -514,11 +638,21 @@ func TestNextIdleLogsActivationTopology(t *testing.T) {
 		Logger().WithContext(context.Background())
 
 	controller := &fakeController{
-		current: agents.CurrentContext{ServerSocket: defaultServerSocket, SessionID: "$1", SessionName: firstSessionName, WindowID: "@3", PaneID: "%3"},
-		panes:   navigationPanes(),
+		current: agents.CurrentContext{
+			ServerSocket: defaultServerSocket,
+			SessionID:    "$1",
+			SessionName:  firstSessionName,
+			WindowID:     "@3",
+			PaneID:       "%3",
+		},
+		panes: navigationPanes(),
 	}
 
-	navigator := newFakeNavigator(t, controller, []aht.Session{attentionSession(aht.ActivityIdle, "%2")})
+	navigator := newFakeNavigator(
+		t,
+		controller,
+		[]aht.Session{attentionSession(aht.ActivityIdle, "%2")},
+	)
 
 	if _, err := navigator.NextIdle(ctx, agents.NavigationGlobal); err != nil {
 		t.Fatalf("NextIdle failed: %v", err)
@@ -546,14 +680,28 @@ func TestNextIdleLocalScopeLogsCurrentSession(t *testing.T) {
 
 	var output bytes.Buffer
 
-	ctx := zerolog.New(&output).Level(zerolog.InfoLevel).With().Logger().WithContext(context.Background())
+	ctx := zerolog.New(&output).
+		Level(zerolog.InfoLevel).
+		With().
+		Logger().
+		WithContext(context.Background())
 
 	controller := &fakeController{
-		current: agents.CurrentContext{ServerSocket: defaultServerSocket, SessionID: "$1", SessionName: firstSessionName, WindowID: "@1", PaneID: "%1"},
-		panes:   navigationPanes(),
+		current: agents.CurrentContext{
+			ServerSocket: defaultServerSocket,
+			SessionID:    "$1",
+			SessionName:  firstSessionName,
+			WindowID:     "@1",
+			PaneID:       "%1",
+		},
+		panes: navigationPanes(),
 	}
 
-	navigator := newFakeNavigator(t, controller, []aht.Session{attentionSession(aht.ActivityIdle, "%3")})
+	navigator := newFakeNavigator(
+		t,
+		controller,
+		[]aht.Session{attentionSession(aht.ActivityIdle, "%3")},
+	)
 
 	if _, err := navigator.NextIdle(ctx, agents.NavigationCurrentSession); err != nil {
 		t.Fatalf("NextIdle failed: %v", err)
@@ -573,8 +721,15 @@ func TestBackPopsHistoryAndSkipsDeadPanes(t *testing.T) {
 	t.Parallel()
 
 	controller := &fakeController{
-		current: agents.CurrentContext{ServerSocket: defaultServerSocket, ClientName: "client-a", SessionID: "$1", SessionName: firstSessionName, WindowID: "@3", PaneID: "%3"},
-		panes:   navigationPanes(),
+		current: agents.CurrentContext{
+			ServerSocket: defaultServerSocket,
+			ClientName:   "client-a",
+			SessionID:    "$1",
+			SessionName:  firstSessionName,
+			WindowID:     "@3",
+			PaneID:       "%3",
+		},
+		panes: navigationPanes(),
 		history: nativeHistory(
 			t,
 			historyEntry("%1", 1001, "@1", "$1"),
@@ -594,11 +749,24 @@ func TestBackPopsHistoryAndSkipsDeadPanes(t *testing.T) {
 		t.Fatalf("back target = %q, want %%2", target.PaneID)
 	}
 
-	if got := decodeHistory(t, controller.history); !reflect.DeepEqual(got, []string{"%1", "%dead"}) {
+	if got := decodeHistory(
+		t,
+		controller.history,
+	); !reflect.DeepEqual(
+		got,
+		[]string{"%1", "%dead"},
+	) {
 		t.Fatalf("history = %v, want [%%1 %%dead]", got)
 	}
 
-	controller.current = agents.CurrentContext{ServerSocket: defaultServerSocket, ClientName: "client-a", SessionID: "$2", SessionName: "two", WindowID: "@2", PaneID: "%2"}
+	controller.current = agents.CurrentContext{
+		ServerSocket: defaultServerSocket,
+		ClientName:   "client-a",
+		SessionID:    "$2",
+		SessionName:  "two",
+		WindowID:     "@2",
+		PaneID:       "%2",
+	}
 
 	target, err = navigator.Back(t.Context())
 	if err != nil {
@@ -618,8 +786,14 @@ func TestBackEmptyHistory(t *testing.T) {
 	t.Parallel()
 
 	controller := &fakeController{
-		current: agents.CurrentContext{ServerSocket: defaultServerSocket, SessionID: "$1", SessionName: firstSessionName, WindowID: "@3", PaneID: "%3"},
-		panes:   navigationPanes(),
+		current: agents.CurrentContext{
+			ServerSocket: defaultServerSocket,
+			SessionID:    "$1",
+			SessionName:  firstSessionName,
+			WindowID:     "@3",
+			PaneID:       "%3",
+		},
+		panes: navigationPanes(),
 	}
 
 	navigator := newFakeNavigator(t, controller, nil)
@@ -634,8 +808,14 @@ func TestBackClearsStaleHistory(t *testing.T) {
 	t.Parallel()
 
 	controller := &fakeController{
-		current: agents.CurrentContext{ServerSocket: defaultServerSocket, SessionID: "$1", SessionName: firstSessionName, WindowID: "@3", PaneID: "%3"},
-		panes:   navigationPanes(),
+		current: agents.CurrentContext{
+			ServerSocket: defaultServerSocket,
+			SessionID:    "$1",
+			SessionName:  firstSessionName,
+			WindowID:     "@3",
+			PaneID:       "%3",
+		},
+		panes: navigationPanes(),
 		history: nativeHistory(
 			t,
 			historyEntry("%dead", 1998, "@dead", "$1"),
@@ -663,7 +843,13 @@ func TestBackSkipsCurrentPane(t *testing.T) {
 	t.Parallel()
 
 	controller := &fakeController{
-		current: agents.CurrentContext{ServerSocket: defaultServerSocket, SessionID: "$1", SessionName: firstSessionName, WindowID: "@3", PaneID: "%3"},
+		current: agents.CurrentContext{
+			ServerSocket: defaultServerSocket,
+			SessionID:    "$1",
+			SessionName:  firstSessionName,
+			WindowID:     "@3",
+			PaneID:       "%3",
+		},
 		panes:   navigationPanes(),
 		history: nativeHistory(t, historyEntry("%3", 1003, "@3", "$1")),
 	}
@@ -680,12 +866,22 @@ func TestCorruptHistoryFailsClosed(t *testing.T) {
 	t.Parallel()
 
 	controller := &fakeController{
-		current: agents.CurrentContext{ServerSocket: defaultServerSocket, SessionID: "$1", SessionName: firstSessionName, WindowID: "@1", PaneID: "%1"},
+		current: agents.CurrentContext{
+			ServerSocket: defaultServerSocket,
+			SessionID:    "$1",
+			SessionName:  firstSessionName,
+			WindowID:     "@1",
+			PaneID:       "%1",
+		},
 		panes:   navigationPanes(),
 		history: "{not-json",
 	}
 
-	navigator := newFakeNavigator(t, controller, []aht.Session{attentionSession(aht.ActivityIdle, "%3")})
+	navigator := newFakeNavigator(
+		t,
+		controller,
+		[]aht.Session{attentionSession(aht.ActivityIdle, "%3")},
+	)
 
 	_, err := navigator.NextIdle(t.Context(), agents.NavigationGlobal)
 	if err == nil {
@@ -705,7 +901,13 @@ func TestStringOnlyNavigationHistoryIsRejected(t *testing.T) {
 	t.Parallel()
 
 	controller := &fakeController{
-		current: agents.CurrentContext{ServerSocket: defaultServerSocket, SessionID: "$1", SessionName: firstSessionName, WindowID: "@3", PaneID: "%3"},
+		current: agents.CurrentContext{
+			ServerSocket: defaultServerSocket,
+			SessionID:    "$1",
+			SessionName:  firstSessionName,
+			WindowID:     "@3",
+			PaneID:       "%3",
+		},
 		panes:   navigationPanes(),
 		history: `["%1"]`,
 	}
@@ -717,7 +919,11 @@ func TestStringOnlyNavigationHistoryIsRejected(t *testing.T) {
 	}
 
 	if len(controller.activated) != 0 || controller.history != `["%1"]` {
-		t.Fatalf("corrupt history caused mutation: activated=%+v history=%q", controller.activated, controller.history)
+		t.Fatalf(
+			"corrupt history caused mutation: activated=%+v history=%q",
+			controller.activated,
+			controller.history,
+		)
 	}
 }
 
@@ -725,13 +931,22 @@ func TestFocusRequiresLivePaneAndMatchingSession(t *testing.T) {
 	t.Parallel()
 
 	controller := &fakeController{
-		current: agents.CurrentContext{ServerSocket: defaultServerSocket, SessionID: "$1", SessionName: firstSessionName, WindowID: "@1", PaneID: "%1"},
-		panes:   navigationPanes(),
+		current: agents.CurrentContext{
+			ServerSocket: defaultServerSocket,
+			SessionID:    "$1",
+			SessionName:  firstSessionName,
+			WindowID:     "@1",
+			PaneID:       "%1",
+		},
+		panes: navigationPanes(),
 	}
 
 	navigator := newFakeNavigator(t, controller, nil)
 
-	target, err := navigator.Focus(t.Context(), agents.FocusTarget{PaneID: "%3", SessionName: firstSessionName})
+	target, err := navigator.Focus(
+		t.Context(),
+		agents.FocusTarget{PaneID: "%3", SessionName: firstSessionName},
+	)
 	if err != nil {
 		t.Fatalf("Focus failed: %v", err)
 	}
@@ -744,11 +959,23 @@ func TestFocusRequiresLivePaneAndMatchingSession(t *testing.T) {
 		t.Fatalf("history = %v, want [%%1]", got)
 	}
 
-	if _, err := navigator.Focus(t.Context(), agents.FocusTarget{PaneID: "%2", SessionName: firstSessionName}); !errors.Is(err, agents.ErrPaneNotLive) {
+	if _, err := navigator.Focus(
+		t.Context(),
+		agents.FocusTarget{PaneID: "%2", SessionName: firstSessionName},
+	); !errors.Is(
+		err,
+		agents.ErrPaneNotLive,
+	) {
 		t.Fatalf("session mismatch error = %v, want ErrPaneNotLive", err)
 	}
 
-	if _, err := navigator.Focus(t.Context(), agents.FocusTarget{PaneID: "%404"}); !errors.Is(err, agents.ErrPaneNotLive) {
+	if _, err := navigator.Focus(
+		t.Context(),
+		agents.FocusTarget{PaneID: "%404"},
+	); !errors.Is(
+		err,
+		agents.ErrPaneNotLive,
+	) {
 		t.Fatalf("missing pane error = %v, want ErrPaneNotLive", err)
 	}
 }
@@ -768,12 +995,21 @@ func TestFocusUsesRequestedSessionLinkForSharedPane(t *testing.T) {
 		PanePID:      1001,
 	})
 	controller := &fakeController{
-		current: agents.CurrentContext{ServerSocket: defaultServerSocket, SessionID: "$1", SessionName: firstSessionName, WindowID: "@3", PaneID: "%3"},
-		panes:   panes,
+		current: agents.CurrentContext{
+			ServerSocket: defaultServerSocket,
+			SessionID:    "$1",
+			SessionName:  firstSessionName,
+			WindowID:     "@3",
+			PaneID:       "%3",
+		},
+		panes: panes,
 	}
 	navigator := newFakeNavigator(t, controller, nil)
 
-	target, err := navigator.Focus(t.Context(), agents.FocusTarget{PaneID: "%1", SessionName: "two"})
+	target, err := navigator.Focus(
+		t.Context(),
+		agents.FocusTarget{PaneID: "%1", SessionName: "two"},
+	)
 	if err != nil {
 		t.Fatalf("Focus failed: %v", err)
 	}
@@ -787,8 +1023,14 @@ func TestFocusOnCurrentPaneIsANoOp(t *testing.T) {
 	t.Parallel()
 
 	controller := &fakeController{
-		current: agents.CurrentContext{ServerSocket: defaultServerSocket, SessionID: "$1", SessionName: firstSessionName, WindowID: "@1", PaneID: "%1"},
-		panes:   navigationPanes(),
+		current: agents.CurrentContext{
+			ServerSocket: defaultServerSocket,
+			SessionID:    "$1",
+			SessionName:  firstSessionName,
+			WindowID:     "@1",
+			PaneID:       "%1",
+		},
+		panes: navigationPanes(),
 	}
 
 	navigator := newFakeNavigator(t, controller, nil)
@@ -798,7 +1040,11 @@ func TestFocusOnCurrentPaneIsANoOp(t *testing.T) {
 	}
 
 	if len(controller.activated) != 0 || len(controller.historyWrites) != 0 {
-		t.Fatalf("focusing the current pane must not activate or record history: %+v %+v", controller.activated, controller.historyWrites)
+		t.Fatalf(
+			"focusing the current pane must not activate or record history: %+v %+v",
+			controller.activated,
+			controller.historyWrites,
+		)
 	}
 }
 
@@ -862,10 +1108,21 @@ func TestNextIdleConcurrentMutationPreservesHistory(t *testing.T) {
 
 	var output bytes.Buffer
 
-	ctx := zerolog.New(&output).Level(zerolog.InfoLevel).With().Logger().WithContext(context.Background())
+	ctx := zerolog.New(&output).
+		Level(zerolog.InfoLevel).
+		With().
+		Logger().
+		WithContext(context.Background())
 
 	controller := &fakeController{
-		current:     agents.CurrentContext{ServerSocket: defaultServerSocket, ClientName: "client-a", SessionID: "$1", SessionName: firstSessionName, WindowID: "@3", PaneID: "%3"},
+		current: agents.CurrentContext{
+			ServerSocket: defaultServerSocket,
+			ClientName:   "client-a",
+			SessionID:    "$1",
+			SessionName:  firstSessionName,
+			WindowID:     "@3",
+			PaneID:       "%3",
+		},
 		panes:       navigationPanes(),
 		activateErr: errFakeActivation,
 	}
@@ -922,7 +1179,11 @@ type concurrentMutationController struct {
 	onActivate func()
 }
 
-func (c *concurrentMutationController) Activate(ctx context.Context, current agents.CurrentContext, target agents.PaneLocation) error {
+func (c *concurrentMutationController) Activate(
+	ctx context.Context,
+	current agents.CurrentContext,
+	target agents.PaneLocation,
+) error {
 	if c.onActivate != nil {
 		c.onActivate()
 	}
@@ -935,7 +1196,11 @@ func TestBackRejectsProcessIncarnationMismatch(t *testing.T) {
 
 	var output bytes.Buffer
 
-	ctx := zerolog.New(&output).Level(zerolog.InfoLevel).With().Logger().WithContext(context.Background())
+	ctx := zerolog.New(&output).
+		Level(zerolog.InfoLevel).
+		With().
+		Logger().
+		WithContext(context.Background())
 
 	panes := navigationPanes()
 	panes[0].PanePID = 9999
@@ -943,7 +1208,14 @@ func TestBackRejectsProcessIncarnationMismatch(t *testing.T) {
 	historyRaw := nativeHistory(t, historyEntry("%1", 1111, "@1", "$1"))
 
 	controller := &fakeController{
-		current: agents.CurrentContext{ServerSocket: defaultServerSocket, ClientName: "client-a", SessionID: "$1", SessionName: firstSessionName, WindowID: "@3", PaneID: "%3"},
+		current: agents.CurrentContext{
+			ServerSocket: defaultServerSocket,
+			ClientName:   "client-a",
+			SessionID:    "$1",
+			SessionName:  firstSessionName,
+			WindowID:     "@3",
+			PaneID:       "%3",
+		},
 		panes:   panes,
 		history: historyRaw,
 	}
@@ -952,7 +1224,10 @@ func TestBackRejectsProcessIncarnationMismatch(t *testing.T) {
 
 	_, err := navigator.Back(ctx)
 	if !errors.Is(err, agents.ErrNoTargetPane) {
-		t.Fatalf("error = %v, want ErrNoTargetPane when history pane process incarnation changed", err)
+		t.Fatalf(
+			"error = %v, want ErrNoTargetPane when history pane process incarnation changed",
+			err,
+		)
 	}
 
 	if len(controller.activated) != 0 {
@@ -980,8 +1255,15 @@ func TestNavigationIsolatesHistoryByClientKey(t *testing.T) {
 	panes := navigationPanes()
 
 	controller := &fakeController{
-		current: agents.CurrentContext{ServerSocket: defaultServerSocket, ClientName: "client-a", SessionID: "$1", SessionName: firstSessionName, WindowID: "@3", PaneID: "%3"},
-		panes:   panes,
+		current: agents.CurrentContext{
+			ServerSocket: defaultServerSocket,
+			ClientName:   "client-a",
+			SessionID:    "$1",
+			SessionName:  firstSessionName,
+			WindowID:     "@3",
+			PaneID:       "%3",
+		},
+		panes: panes,
 	}
 
 	sessions := []aht.Session{
@@ -995,7 +1277,14 @@ func TestNavigationIsolatesHistoryByClientKey(t *testing.T) {
 		t.Fatalf("Client A NextIdle failed: %v", err)
 	}
 
-	controller.current = agents.CurrentContext{ServerSocket: defaultServerSocket, ClientName: "client-b", SessionID: "$1", SessionName: firstSessionName, WindowID: "@1", PaneID: "%1"}
+	controller.current = agents.CurrentContext{
+		ServerSocket: defaultServerSocket,
+		ClientName:   "client-b",
+		SessionID:    "$1",
+		SessionName:  firstSessionName,
+		WindowID:     "@1",
+		PaneID:       "%1",
+	}
 
 	if _, err := navigator.NextIdle(t.Context(), agents.NavigationGlobal); err != nil {
 		t.Fatalf("Client B NextIdle failed: %v", err)
@@ -1012,7 +1301,14 @@ func TestNavigationIsolatesHistoryByClientKey(t *testing.T) {
 		t.Fatalf("client B history = %v, want [%%1]", histB)
 	}
 
-	controller.current = agents.CurrentContext{ServerSocket: defaultServerSocket, ClientName: "client-a", SessionID: "$1", SessionName: firstSessionName, WindowID: "@1", PaneID: "%1"}
+	controller.current = agents.CurrentContext{
+		ServerSocket: defaultServerSocket,
+		ClientName:   "client-a",
+		SessionID:    "$1",
+		SessionName:  firstSessionName,
+		WindowID:     "@1",
+		PaneID:       "%1",
+	}
 
 	target, err := navigator.Back(t.Context())
 	if err != nil {

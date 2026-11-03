@@ -17,7 +17,12 @@ import (
 	"github.com/zigai/sesh/internal/agents"
 )
 
-func newTestNavigator(t *testing.T, server *gotmux.Server, statePath string, target agents.CurrentTarget) *agents.Navigator {
+func newTestNavigator(
+	t *testing.T,
+	server *gotmux.Server,
+	statePath string,
+	target agents.CurrentTarget,
+) *agents.Navigator {
 	t.Helper()
 
 	navigator, err := agents.NewNavigator(agents.NavigatorOptions{
@@ -32,7 +37,13 @@ func newTestNavigator(t *testing.T, server *gotmux.Server, statePath string, tar
 	return navigator
 }
 
-func newAgentWindow(t *testing.T, ctx context.Context, server *gotmux.Server, session gotmux.Session, name string) agents.PaneLocation {
+func newAgentWindow(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	session gotmux.Session,
+	name string,
+) agents.PaneLocation {
 	t.Helper()
 
 	window, err := session.NewWindow(ctx, gotmux.NewWindowOptions{
@@ -72,7 +83,12 @@ func TestAgentNavigationActivatesTargetWindow(t *testing.T) {
 	}
 
 	statePath := writeRegistry(t, paneFixture(target, string(aht.ActivityWaiting)))
-	navigator := newTestNavigator(t, server, statePath, agents.CurrentTarget{PaneID: current.PaneID})
+	navigator := newTestNavigator(
+		t,
+		server,
+		statePath,
+		agents.CurrentTarget{PaneID: current.PaneID},
+	)
 
 	selected, err := navigator.NextIdle(ctx, agents.NavigationGlobal)
 	if err != nil {
@@ -84,7 +100,11 @@ func TestAgentNavigationActivatesTargetWindow(t *testing.T) {
 	}
 
 	if !windowActive(t, ctx, server, target.SessionID, target.WindowID) {
-		t.Fatalf("navigation returned pane %s but window %s stayed inactive", selected.PaneID, target.WindowID)
+		t.Fatalf(
+			"navigation returned pane %s but window %s stayed inactive",
+			selected.PaneID,
+			target.WindowID,
+		)
 	}
 
 	if !paneActive(t, ctx, server, target.PaneID) {
@@ -111,7 +131,12 @@ func TestAgentNavigationCrossesWindowsWithinSession(t *testing.T) {
 	target := newAgentWindow(t, ctx, server, session, "target")
 
 	statePath := writeRegistry(t, paneFixture(target, string(aht.ActivityFailed)))
-	navigator := newTestNavigator(t, server, statePath, agents.CurrentTarget{PaneID: current.PaneID})
+	navigator := newTestNavigator(
+		t,
+		server,
+		statePath,
+		agents.CurrentTarget{PaneID: current.PaneID},
+	)
 
 	selected, err := navigator.NextIdle(ctx, agents.NavigationCurrentSession)
 	if err != nil {
@@ -191,7 +216,12 @@ func assertClientFollowsAgent(t *testing.T, explicitClient bool) {
 	}
 }
 
-func newAgentSession(t *testing.T, ctx context.Context, server *gotmux.Server, name string) agents.PaneLocation {
+func newAgentSession(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	name string,
+) agents.PaneLocation {
 	t.Helper()
 
 	session, err := server.NewSession(ctx, gotmux.NewSessionOptions{
@@ -243,15 +273,28 @@ func TestAgentNavigationFocusesNamedAgentPane(t *testing.T) {
 	target := livePaneFor(t, ctx, server, string(mustActivePane(t, ctx, targetSession)))
 
 	statePath := writeRegistry(t, paneFixture(target, string(aht.ActivityIdle)))
-	navigator := newTestNavigator(t, server, statePath, agents.CurrentTarget{PaneID: current.PaneID})
+	navigator := newTestNavigator(
+		t,
+		server,
+		statePath,
+		agents.CurrentTarget{PaneID: current.PaneID},
+	)
 
-	focused, err := navigator.Focus(ctx, agents.FocusTarget{PaneID: target.PaneID, SessionID: target.SessionID})
+	focused, err := navigator.Focus(
+		ctx,
+		agents.FocusTarget{PaneID: target.PaneID, SessionID: target.SessionID},
+	)
 	if err != nil {
 		t.Fatalf("Focus failed: %v", err)
 	}
 
 	if focused.SessionID != target.SessionID || focused.WindowID != target.WindowID {
-		t.Fatalf("focused location = %+v, want session %s window %s", focused, target.SessionID, target.WindowID)
+		t.Fatalf(
+			"focused location = %+v, want session %s window %s",
+			focused,
+			target.SessionID,
+			target.WindowID,
+		)
 	}
 
 	if got := clientSession(t, ctx, server, clientName); got != target.SessionID {
@@ -314,7 +357,12 @@ func TestAgentNavigationLeavesUnrelatedClientsUntouched(t *testing.T) {
 	target := livePaneFor(t, ctx, server, string(mustActivePane(t, ctx, targetSession)))
 
 	statePath := writeRegistry(t, paneFixture(target, string(aht.ActivityIdle)))
-	navigator := newTestNavigator(t, server, statePath, agents.CurrentTarget{PaneID: current.PaneID, Client: invokingClient})
+	navigator := newTestNavigator(
+		t,
+		server,
+		statePath,
+		agents.CurrentTarget{PaneID: current.PaneID, Client: invokingClient},
+	)
 
 	if _, err := navigator.NextIdle(ctx, agents.NavigationGlobal); err != nil {
 		t.Fatalf("NextIdle failed: %v", err)
@@ -346,7 +394,12 @@ func TestAgentNavigationSkipsStaleRegistryPanes(t *testing.T) {
 	stale.PanePID = target.PanePID + 1
 
 	statePath := writeRegistry(t, stale)
-	navigator := newTestNavigator(t, server, statePath, agents.CurrentTarget{PaneID: current.PaneID})
+	navigator := newTestNavigator(
+		t,
+		server,
+		statePath,
+		agents.CurrentTarget{PaneID: current.PaneID},
+	)
 
 	_, err = navigator.NextIdle(ctx, agents.NavigationGlobal)
 	if !errors.Is(err, agents.ErrNoTargetPane) {
@@ -379,12 +432,22 @@ func TestAgentNavigationBackSkipsVanishedHistory(t *testing.T) {
 		paneFixture(previous, string(aht.ActivityWaiting)),
 	)
 
-	if _, err := newTestNavigator(t, server, statePath, agents.CurrentTarget{PaneID: current.PaneID}).
+	if _, err := newTestNavigator(
+		t,
+		server,
+		statePath,
+		agents.CurrentTarget{PaneID: current.PaneID},
+	).
 		Focus(ctx, agents.FocusTarget{PaneID: vanished.PaneID}); err != nil {
 		t.Fatalf("focusing the pane that will vanish: %v", err)
 	}
 
-	if _, err := newTestNavigator(t, server, statePath, agents.CurrentTarget{PaneID: vanished.PaneID}).
+	if _, err := newTestNavigator(
+		t,
+		server,
+		statePath,
+		agents.CurrentTarget{PaneID: vanished.PaneID},
+	).
 		Focus(ctx, agents.FocusTarget{PaneID: previous.PaneID}); err != nil {
 		t.Fatalf("focusing the previous pane: %v", err)
 	}
@@ -398,7 +461,12 @@ func TestAgentNavigationBackSkipsVanishedHistory(t *testing.T) {
 		t.Fatalf("killing the history pane: %v", err)
 	}
 
-	backNavigator := newTestNavigator(t, server, statePath, agents.CurrentTarget{PaneID: previous.PaneID})
+	backNavigator := newTestNavigator(
+		t,
+		server,
+		statePath,
+		agents.CurrentTarget{PaneID: previous.PaneID},
+	)
 
 	target, err := backNavigator.Back(ctx)
 	if err != nil {
@@ -464,7 +532,12 @@ func TestAgentNavigationFocusesSharedWindowInRequestedSession(t *testing.T) {
 	}
 
 	statePath := writeRegistry(t, paneFixture(target, string(aht.ActivityWaiting)))
-	navigator := newTestNavigator(t, server, statePath, agents.CurrentTarget{PaneID: current.PaneID, SessionID: groupedSessionID})
+	navigator := newTestNavigator(
+		t,
+		server,
+		statePath,
+		agents.CurrentTarget{PaneID: current.PaneID, SessionID: groupedSessionID},
+	)
 
 	selected, err := navigator.NextIdle(ctx, agents.NavigationCurrentSession)
 	if err != nil {
@@ -472,7 +545,11 @@ func TestAgentNavigationFocusesSharedWindowInRequestedSession(t *testing.T) {
 	}
 
 	if selected.SessionID != groupedSessionID {
-		t.Fatalf("selected session = %q, want the grouped session %q", selected.SessionID, groupedSessionID)
+		t.Fatalf(
+			"selected session = %q, want the grouped session %q",
+			selected.SessionID,
+			groupedSessionID,
+		)
 	}
 
 	if !windowActive(t, ctx, server, groupedSessionID, target.WindowID) {
@@ -480,7 +557,10 @@ func TestAgentNavigationFocusesSharedWindowInRequestedSession(t *testing.T) {
 	}
 
 	if !windowActive(t, ctx, server, sessionID, current.WindowID) {
-		t.Fatalf("primary session moved off window %s while focusing the grouped session", current.WindowID)
+		t.Fatalf(
+			"primary session moved off window %s while focusing the grouped session",
+			current.WindowID,
+		)
 	}
 }
 
@@ -500,7 +580,12 @@ func mustActivePane(t *testing.T, ctx context.Context, session gotmux.Session) g
 	return pane.ID()
 }
 
-func selectWindowByID(ctx context.Context, server *gotmux.Server, sessionID string, windowID string) error {
+func selectWindowByID(
+	ctx context.Context,
+	server *gotmux.Server,
+	sessionID string,
+	windowID string,
+) error {
 	session, err := server.Session(ctx, gotmux.SessionID(sessionID))
 	if err != nil {
 		return fmt.Errorf("resolving session %s: %w", sessionID, err)
@@ -544,7 +629,17 @@ func TestAgentNavigationUsesVerifiedAmbientContext(t *testing.T) {
 		t.Fatalf("probing server: %v", err)
 	}
 
-	t.Setenv("TMUX", strings.Join([]string{current.ServerSocket, strconv.Itoa(identity.Identity.PID), strings.TrimPrefix(sessionID, "$")}, ","))
+	t.Setenv(
+		"TMUX",
+		strings.Join(
+			[]string{
+				current.ServerSocket,
+				strconv.Itoa(identity.Identity.PID),
+				strings.TrimPrefix(sessionID, "$"),
+			},
+			",",
+		),
+	)
 	t.Setenv("TMUX_PANE", current.PaneID)
 
 	statePath := writeRegistry(t, paneFixture(target, string(aht.ActivityWaiting)))
@@ -577,7 +672,10 @@ func TestAgentNavigationRejectsUnverifiedAmbientContext(t *testing.T) {
 
 	target := newAgentWindow(t, ctx, server, session, "unverified-target")
 
-	t.Setenv("TMUX", strings.Join([]string{current.ServerSocket, "1", strings.TrimPrefix(sessionID, "$")}, ","))
+	t.Setenv(
+		"TMUX",
+		strings.Join([]string{current.ServerSocket, "1", strings.TrimPrefix(sessionID, "$")}, ","),
+	)
 	t.Setenv("TMUX_PANE", current.PaneID)
 
 	statePath := writeRegistry(t, paneFixture(target, string(aht.ActivityWaiting)))
@@ -656,7 +754,12 @@ func assertClientNavigatesNext(
 ) {
 	t.Helper()
 
-	nav := newTestNavigator(t, server, statePath, agents.CurrentTarget{PaneID: current.PaneID, Client: client})
+	nav := newTestNavigator(
+		t,
+		server,
+		statePath,
+		agents.CurrentTarget{PaneID: current.PaneID, Client: client},
+	)
 
 	selected, err := nav.NextIdle(ctx, agents.NavigationCurrentSession)
 	if err != nil {
@@ -679,7 +782,12 @@ func assertClientNavigatesBack(
 ) {
 	t.Helper()
 
-	nav := newTestNavigator(t, server, statePath, agents.CurrentTarget{PaneID: target.PaneID, Client: client})
+	nav := newTestNavigator(
+		t,
+		server,
+		statePath,
+		agents.CurrentTarget{PaneID: target.PaneID, Client: client},
+	)
 
 	back, err := nav.Back(ctx)
 	if err != nil {
@@ -709,7 +817,12 @@ func TestAgentNavigationBackRejectsRespawnedPaneIncarnation(t *testing.T) {
 	target := newAgentWindow(t, ctx, server, session, "agent-target")
 
 	statePath := writeRegistry(t, paneFixture(target, string(aht.ActivityWaiting)))
-	navigator := newTestNavigator(t, server, statePath, agents.CurrentTarget{PaneID: current.PaneID})
+	navigator := newTestNavigator(
+		t,
+		server,
+		statePath,
+		agents.CurrentTarget{PaneID: current.PaneID},
+	)
 
 	if _, err := navigator.NextIdle(ctx, agents.NavigationGlobal); err != nil {
 		t.Fatalf("NextIdle failed: %v", err)
@@ -732,7 +845,12 @@ func TestAgentNavigationBackRejectsRespawnedPaneIncarnation(t *testing.T) {
 		t.Fatalf("respawned pane PID did not change: %d", respawnedLoc.PanePID)
 	}
 
-	backNavigator := newTestNavigator(t, server, statePath, agents.CurrentTarget{PaneID: target.PaneID})
+	backNavigator := newTestNavigator(
+		t,
+		server,
+		statePath,
+		agents.CurrentTarget{PaneID: target.PaneID},
+	)
 
 	_, err = backNavigator.Back(ctx)
 	if !errors.Is(err, agents.ErrNoTargetPane) {

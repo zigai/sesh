@@ -221,7 +221,12 @@ func (m *Model) visibleListStart(rows []popupListRow, height int) int {
 	return min(max(start, 0), maxTop)
 }
 
-func alignListStartToSelection(rows []popupListRow, start int, height int, selected popupListRow) int {
+func alignListStartToSelection(
+	rows []popupListRow,
+	start int,
+	height int,
+	selected popupListRow,
+) int {
 	selectedIndex := selectedVisualIndex(rows, selected)
 	if selectedIndex < 0 {
 		return start
@@ -258,7 +263,8 @@ func selectedListRange(rows []popupListRow, selected popupListRow) (int, int) {
 }
 
 func alignListStartToParent(rows []popupListRow, start int, selectedSession int, maxTop int) int {
-	if start < 0 || start >= len(rows) || !rows[start].isAgent() || rows[start].sessionIndex == selectedSession {
+	if start < 0 || start >= len(rows) || !rows[start].isAgent() ||
+		rows[start].sessionIndex == selectedSession {
 		return start
 	}
 

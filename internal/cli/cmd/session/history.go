@@ -56,7 +56,13 @@ func ValidateScrollbackCommand(cmd *cobra.Command, args []string) error {
 	socketPath := clibase.ResolveSocket(cmd)
 
 	if !filepath.IsAbs(socketPath) || filepath.Clean(socketPath) != socketPath {
-		return clibase.NewExitError(clibase.ExitCodeUsage, oops.In("tmux").Code("endpoint_required").With("operation", "open").Wrap(tmuxserver.ErrEndpoint))
+		return clibase.NewExitError(
+			clibase.ExitCodeUsage,
+			oops.In("tmux").
+				Code("endpoint_required").
+				With("operation", "open").
+				Wrap(tmuxserver.ErrEndpoint),
+		)
 	}
 
 	return nil
@@ -103,7 +109,12 @@ func wrapHistoryListError(err error) error {
 	return oops.In("cli").With("operation", "history").Wrap(err)
 }
 
-func renderHistoryPanes(cmd *cobra.Command, panes []session.PaneHistory, listErr error, full bool) error {
+func renderHistoryPanes(
+	cmd *cobra.Command,
+	panes []session.PaneHistory,
+	listErr error,
+	full bool,
+) error {
 	session.SortPaneHistory(panes)
 
 	if listErr != nil {
@@ -126,7 +137,12 @@ func renderHistoryPanes(cmd *cobra.Command, panes []session.PaneHistory, listErr
 	return listErr
 }
 
-func renderHistorySessions(cmd *cobra.Command, panes []session.PaneHistory, listErr error, full bool) error {
+func renderHistorySessions(
+	cmd *cobra.Command,
+	panes []session.PaneHistory,
+	listErr error,
+	full bool,
+) error {
 	summaries := session.SummarizePaneHistory(panes)
 
 	if listErr != nil {
@@ -160,7 +176,12 @@ func renderPaneHistoryTable(cmd *cobra.Command, panes []session.PaneHistory, ful
 	}
 
 	columns := []clibase.TableColumn{
-		{Heading: "Session", Fixed: false, MinWidth: colWidthHistorySession, Wrap: clibase.WrapSession},
+		{
+			Heading:  "Session",
+			Fixed:    false,
+			MinWidth: colWidthHistorySession,
+			Wrap:     clibase.WrapSession,
+		},
 		{Heading: "Pane", Fixed: true, MinWidth: 0, Wrap: clibase.WrapIdentifier},
 		{Heading: "Lines", Fixed: true, MinWidth: 0, Wrap: nil},
 	}
@@ -168,7 +189,11 @@ func renderPaneHistoryTable(cmd *cobra.Command, panes []session.PaneHistory, ful
 	return clibase.WriteResponsiveTable(cmd, columns, rows, full)
 }
 
-func renderSessionHistoryTable(cmd *cobra.Command, summaries []session.HistorySummary, full bool) error {
+func renderSessionHistoryTable(
+	cmd *cobra.Command,
+	summaries []session.HistorySummary,
+	full bool,
+) error {
 	rows := make([]prettytable.Row, 0, len(summaries))
 	for _, summary := range summaries {
 		rows = append(rows, prettytable.Row{
@@ -179,7 +204,12 @@ func renderSessionHistoryTable(cmd *cobra.Command, summaries []session.HistorySu
 	}
 
 	columns := []clibase.TableColumn{
-		{Heading: "Session", Fixed: false, MinWidth: colWidthHistorySession, Wrap: clibase.WrapSession},
+		{
+			Heading:  "Session",
+			Fixed:    false,
+			MinWidth: colWidthHistorySession,
+			Wrap:     clibase.WrapSession,
+		},
 		{Heading: "Panes", Fixed: true, MinWidth: 0, Wrap: nil},
 		{Heading: "Lines", Fixed: true, MinWidth: 0, Wrap: nil},
 	}

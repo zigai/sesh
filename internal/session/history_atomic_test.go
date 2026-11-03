@@ -31,7 +31,9 @@ func TestSaveRenameFailureLeavesOriginalFile(t *testing.T) {
 	stateDir := testAtomicStateDir(t)
 	statePath := filepath.Join(stateDir, "state.json")
 
-	original := []byte(`{"version":3,"switchHistory":[{"session":{"origin":"","connectionId":"","socket":"","repositorySource":"","name":"old"},"lastSwitch":1}],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":"","sessionKeys":[],"popupHeights":[]}`)
+	original := []byte(
+		`{"version":3,"switchHistory":[{"session":{"origin":"","connectionId":"","socket":"","repositorySource":"","name":"old"},"lastSwitch":1}],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":"","sessionKeys":[],"popupHeights":[]}`,
+	)
 	if err := os.WriteFile(statePath, original, 0o600); err != nil {
 		t.Fatalf("writing original state failed: %v", err)
 	}
@@ -62,7 +64,11 @@ func TestSaveRenameFailureLeavesOriginalFile(t *testing.T) {
 	}
 
 	if string(data) != string(original) {
-		t.Fatalf("state file changed after failed rename: got %q, want %q", string(data), string(original))
+		t.Fatalf(
+			"state file changed after failed rename: got %q, want %q",
+			string(data),
+			string(original),
+		)
 	}
 }
 
@@ -129,7 +135,9 @@ func TestSaveWriteFailureCleansUpTempFileAndPreservesOriginal(t *testing.T) {
 	stateDir := testAtomicStateDir(t)
 	statePath := filepath.Join(stateDir, "state.json")
 
-	original := []byte(`{"version":3,"switchHistory":[],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":"","sessionKeys":[],"popupHeights":[]}`)
+	original := []byte(
+		`{"version":3,"switchHistory":[],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":"","sessionKeys":[],"popupHeights":[]}`,
+	)
 	if err := os.WriteFile(statePath, original, 0o600); err != nil {
 		t.Fatalf("writing original state failed: %v", err)
 	}

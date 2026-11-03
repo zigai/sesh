@@ -21,7 +21,12 @@ func TestResumeRewriteRacesSavePinsRetentionAndCollection(t *testing.T) {
 	pinned := commitMultiSessionFixture(t, r)
 
 	actions := []Action{{ID: actionLaunch, Kind: actionLaunch, State: actionPlanned}}
-	if _, err := r.Pin(t.Context(), pinned.ID, model.Bytes("protected-fixture"), actions); err != nil {
+	if _, err := r.Pin(
+		t.Context(),
+		pinned.ID,
+		model.Bytes("protected-fixture"),
+		actions,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -33,7 +38,16 @@ func TestResumeRewriteRacesSavePinsRetentionAndCollection(t *testing.T) {
 	defer cancel()
 
 	resumeRepo, saveRepo := openRepository(t, path), openRepository(t, path)
-	pinRepo, retainRepo, collectRepo := openRepository(t, path), openRepository(t, path), openRepository(t, path)
+	pinRepo, retainRepo, collectRepo := openRepository(
+		t,
+		path,
+	), openRepository(
+		t,
+		path,
+	), openRepository(
+		t,
+		path,
+	)
 
 	attempt, err := saveRepo.Begin(ctx)
 	if err != nil {
@@ -53,8 +67,12 @@ func TestResumeRewriteRacesSavePinsRetentionAndCollection(t *testing.T) {
 
 	wg.Go(func() { <-start; resumed, errs[0] = resumeRepo.ResumeRewrite(ctx, id) })
 	wg.Go(func() { <-start; saved, errs[1] = saveRepo.Commit(ctx, attempt.ID, m, artifacts) })
-	wg.Go(func() { <-start; _, errs[2] = pinRepo.Pin(ctx, pinned.ID, model.Bytes("racing-fixture"), actions) })
-	wg.Go(func() { <-start; _, errs[3] = retainRepo.RetainPolicy(ctx, time.Time{}, RetentionPolicy{MaxCount: 5}) })
+	wg.Go(
+		func() { <-start; _, errs[2] = pinRepo.Pin(ctx, pinned.ID, model.Bytes("racing-fixture"), actions) },
+	)
+	wg.Go(
+		func() { <-start; _, errs[3] = retainRepo.RetainPolicy(ctx, time.Time{}, RetentionPolicy{MaxCount: 5}) },
+	)
 	wg.Go(func() {
 		<-start
 
@@ -72,11 +90,17 @@ func TestResumeRewriteRacesSavePinsRetentionAndCollection(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if catalog.Current != saved.ID || catalog.generationIndex(source.ID) >= 0 || catalog.generationIndex(pinned.ID) < 0 {
+	if catalog.Current != saved.ID || catalog.generationIndex(source.ID) >= 0 ||
+		catalog.generationIndex(pinned.ID) < 0 {
 		t.Fatalf("lost save order, rewrite, or pinned source: %+v", catalog)
 	}
 
 	for _, gen := range []string{resumed.Replacement.ID, pinned.ID, saved.ID} {
-		verifySurvivorFixtureBytes(t, r, gen, map[string]string{"a0": "shared window content\n", "a1": "s2 exclusive content\n"})
+		verifySurvivorFixtureBytes(
+			t,
+			r,
+			gen,
+			map[string]string{"a0": "shared window content\n", "a1": "s2 exclusive content\n"},
+		)
 	}
 }

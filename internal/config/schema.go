@@ -556,9 +556,21 @@ func (c AgentSessionsConfig) NormalizedStatusTimeFormat() string {
 
 func (c *AgentStatusConfig) ResolvedPalette() map[string]string {
 	palette := map[string]string{
-		"waiting": resolveStatusStyle(c.StyleWaiting, c.colorForRole("waiting"), "fg=#1e1e2e,bg=#ffdd57,bold"),
-		"failed":  resolveStatusStyle(c.StyleFailed, c.colorForRole("failed"), "fg=#1e1e2e,bg=#ff5555,bold"),
-		"unread":  resolveStatusStyle(c.StyleUnread, c.colorForRole("unread"), "fg=#1e1e2e,bg=#6c7086,bold"),
+		"waiting": resolveStatusStyle(
+			c.StyleWaiting,
+			c.colorForRole("waiting"),
+			"fg=#1e1e2e,bg=#ffdd57,bold",
+		),
+		"failed": resolveStatusStyle(
+			c.StyleFailed,
+			c.colorForRole("failed"),
+			"fg=#1e1e2e,bg=#ff5555,bold",
+		),
+		"unread": resolveStatusStyle(
+			c.StyleUnread,
+			c.colorForRole("unread"),
+			"fg=#1e1e2e,bg=#6c7086,bold",
+		),
 	}
 
 	maps.Copy(palette, c.Palette)
@@ -590,9 +602,21 @@ func (c *Config) ResolvedPalette() map[string]string {
 	colors := c.ResolvedAgentStatusColors()
 
 	palette := map[string]string{
-		"waiting": resolveStatusStyle(statusCfg.StyleWaiting, colors.Waiting, "fg=#1e1e2e,bg=#ffdd57,bold"),
-		"failed":  resolveStatusStyle(statusCfg.StyleFailed, colors.Failed, "fg=#1e1e2e,bg=#ff5555,bold"),
-		"unread":  resolveStatusStyle(statusCfg.StyleUnread, colors.Idle, "fg=#1e1e2e,bg=#6c7086,bold"),
+		"waiting": resolveStatusStyle(
+			statusCfg.StyleWaiting,
+			colors.Waiting,
+			"fg=#1e1e2e,bg=#ffdd57,bold",
+		),
+		"failed": resolveStatusStyle(
+			statusCfg.StyleFailed,
+			colors.Failed,
+			"fg=#1e1e2e,bg=#ff5555,bold",
+		),
+		"unread": resolveStatusStyle(
+			statusCfg.StyleUnread,
+			colors.Idle,
+			"fg=#1e1e2e,bg=#6c7086,bold",
+		),
 	}
 
 	maps.Copy(palette, statusCfg.Palette)
@@ -606,7 +630,8 @@ func SynthesizeTmuxStyle(color string) string {
 		return "bold"
 	}
 
-	if strings.HasPrefix(color, "#") && (len(color) == shortHexLength+1 || len(color) == fullHexLength+1) {
+	if strings.HasPrefix(color, "#") &&
+		(len(color) == shortHexLength+1 || len(color) == fullHexLength+1) {
 		contrast := ContrastForeground(color)
 		return fmt.Sprintf("fg=%s,bg=%s,bold", contrast, color)
 	}
@@ -617,7 +642,9 @@ func SynthesizeTmuxStyle(color string) string {
 func ContrastForeground(hexColor string) string {
 	hexColor = strings.TrimPrefix(hexColor, "#")
 	if len(hexColor) == shortHexLength {
-		hexColor = string([]byte{hexColor[0], hexColor[0], hexColor[1], hexColor[1], hexColor[2], hexColor[2]})
+		hexColor = string(
+			[]byte{hexColor[0], hexColor[0], hexColor[1], hexColor[1], hexColor[2], hexColor[2]},
+		)
 	}
 
 	if len(hexColor) != fullHexLength {
@@ -946,7 +973,11 @@ func (h *HookConfig) setHookField(k string, v any) error {
 
 func (h *HookConfig) setHookListField(k string, v any) error {
 	switch k {
-	case "session_switch_pre", "session_switch_post", "session_attach_pre", "session_attach_post", "tmux_startup_post":
+	case "session_switch_pre",
+		"session_switch_post",
+		"session_attach_pre",
+		"session_attach_post",
+		"tmux_startup_post":
 		cmds, err := parseHookCommands(v)
 		if err != nil {
 			return err

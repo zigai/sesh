@@ -28,16 +28,54 @@ func snapshotFixture() (model.Manifest, map[string]io.Reader) {
 	hash := sha256.Sum256(content)
 
 	m := model.Manifest{
-		Format: "sesh", Version: model.Schema, Started: 1, Finished: 2,
-		Source:    model.Source{TmuxVersion: "3.6", LibraryVersion: "v0.3.0", Consistency: "observed"},
-		Sessions:  []model.Session{{ID: "s0", Name: model.Bytes("work"), Directory: model.Bytes("/tmp")}},
-		Windows:   []model.Window{{ID: "w0", Name: model.Bytes("editor"), Width: 80, Height: 24, Layout: model.Layout{Width: 80, Height: 24, Pane: "p0"}}},
-		Links:     []model.Link{{Session: "s0", Window: "w0", Index: 7, Active: true}},
-		Panes:     []model.Pane{{ID: "p0", Window: "w0", Directory: model.Bytes("/tmp"), Width: 80, Height: 24, Active: true, Terminal: model.Terminal{Artifact: "a0"}, Launch: model.Launch{Recovery: "unverified"}}},
-		Artifacts: []model.Artifact{{ID: "a0", Kind: "terminal-text", Length: int64(len(content)), SHA256: hex.EncodeToString(hash[:])}},
+		Format:   "sesh",
+		Version:  model.Schema,
+		Started:  1,
+		Finished: 2,
+		Source: model.Source{
+			TmuxVersion:    "3.6",
+			LibraryVersion: "v0.3.0",
+			Consistency:    "observed",
+		},
+		Sessions: []model.Session{
+			{ID: "s0", Name: model.Bytes("work"), Directory: model.Bytes("/tmp")},
+		},
+		Windows: []model.Window{
+			{
+				ID:     "w0",
+				Name:   model.Bytes("editor"),
+				Width:  80,
+				Height: 24,
+				Layout: model.Layout{Width: 80, Height: 24, Pane: "p0"},
+			},
+		},
+		Links: []model.Link{{Session: "s0", Window: "w0", Index: 7, Active: true}},
+		Panes: []model.Pane{
+			{
+				ID:        "p0",
+				Window:    "w0",
+				Directory: model.Bytes("/tmp"),
+				Width:     80,
+				Height:    24,
+				Active:    true,
+				Terminal:  model.Terminal{Artifact: "a0"},
+				Launch:    model.Launch{Recovery: "unverified"},
+			},
+		},
+		Artifacts: []model.Artifact{
+			{
+				ID:     "a0",
+				Kind:   "terminal-text",
+				Length: int64(len(content)),
+				SHA256: hex.EncodeToString(hash[:]),
+			},
+		},
 	}
 	for _, domain := range []string{"S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10"} {
-		m.Evidence = append(m.Evidence, model.Evidence{Domain: domain, Status: "unverified", Reason: "not_captured"})
+		m.Evidence = append(
+			m.Evidence,
+			model.Evidence{Domain: domain, Status: "unverified", Reason: "not_captured"},
+		)
 	}
 
 	return m, map[string]io.Reader{"a0": bytes.NewReader(content)}
@@ -199,21 +237,50 @@ func TestPinsAndUnknownActionsSurviveReopen(t *testing.T) {
 	r := openRepository(t, path)
 	source := commitFixture(t, r)
 
-	op, err := r.Pin(t.Context(), source.ID, model.Bytes("explicit-synthetic-target"), []Action{{ID: "launch0", Kind: actionLaunch, State: actionPlanned}})
+	op, err := r.Pin(
+		t.Context(),
+		source.ID,
+		model.Bytes("explicit-synthetic-target"),
+		[]Action{{ID: "launch0", Kind: actionLaunch, State: actionPlanned}},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := r.Transition(t.Context(), op.ID, "launch0", actionPlanned, actionIssued, nil); err != nil {
+	if err := r.Transition(
+		t.Context(),
+		op.ID,
+		"launch0",
+		actionPlanned,
+		actionIssued,
+		nil,
+	); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := r.Transition(t.Context(), op.ID, "launch0", actionIssued, actionUnknown, nil); err != nil {
+	if err := r.Transition(
+		t.Context(),
+		op.ID,
+		"launch0",
+		actionIssued,
+		actionUnknown,
+		nil,
+	); err != nil {
 		t.Fatal(err)
 	}
 
 	reopened := openRepository(t, path)
-	if err := reopened.Transition(t.Context(), op.ID, "launch0", actionUnknown, actionPlanned, nil); !errors.Is(err, ErrConflict) {
+	if err := reopened.Transition(
+		t.Context(),
+		op.ID,
+		"launch0",
+		actionUnknown,
+		actionPlanned,
+		nil,
+	); !errors.Is(
+		err,
+		ErrConflict,
+	) {
 		t.Fatalf("uncertain launch replay allowed: %v", err)
 	}
 
@@ -273,7 +340,8 @@ func TestConcurrentAttemptsAndCanceledLock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(catalog.Attempts) != 2 || catalog.Sequence != 2 || catalog.Attempts[0].ID == catalog.Attempts[1].ID {
+	if len(catalog.Attempts) != 2 || catalog.Sequence != 2 ||
+		catalog.Attempts[0].ID == catalog.Attempts[1].ID {
 		t.Fatal("lost concurrent attempt")
 	}
 

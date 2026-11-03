@@ -32,7 +32,11 @@ func TestResolveSessionDirectoryErrorWrapping(t *testing.T) {
 		}
 
 		if oopsErr.Domain() != "cli" || oopsErr.Context()["operation"] != "stat_directory" {
-			t.Fatalf("unexpected oops metadata: domain=%q context=%v", oopsErr.Domain(), oopsErr.Context())
+			t.Fatalf(
+				"unexpected oops metadata: domain=%q context=%v",
+				oopsErr.Domain(),
+				oopsErr.Context(),
+			)
 		}
 	})
 
@@ -58,7 +62,11 @@ func TestResolveSessionDirectoryErrorWrapping(t *testing.T) {
 		}
 
 		if oopsErr.Domain() != "cli" || oopsErr.Context()["operation"] != "stat_directory" {
-			t.Fatalf("unexpected oops metadata: domain=%q context=%v", oopsErr.Domain(), oopsErr.Context())
+			t.Fatalf(
+				"unexpected oops metadata: domain=%q context=%v",
+				oopsErr.Domain(),
+				oopsErr.Context(),
+			)
 		}
 	})
 }
@@ -81,7 +89,11 @@ func TestWrapHistoryListError(t *testing.T) {
 	}
 
 	if oopsErr.Domain() != "cli" || oopsErr.Context()["operation"] != "history" {
-		t.Fatalf("unexpected oops metadata: domain=%q context=%v", oopsErr.Domain(), oopsErr.Context())
+		t.Fatalf(
+			"unexpected oops metadata: domain=%q context=%v",
+			oopsErr.Domain(),
+			oopsErr.Context(),
+		)
 	}
 
 	again := wrapHistoryListError(wrapped)

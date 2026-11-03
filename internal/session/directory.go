@@ -40,7 +40,10 @@ func DefaultCreateSessionDirectory(cwd string, sessionName string, suggestion st
 
 func DirectoryPathSuggestions(ctx context.Context, input, cwd string) ([]string, error) {
 	if err := ctx.Err(); err != nil {
-		return nil, oops.In("session").Code("operation_canceled").With("operation", "directory_suggestions").Wrap(err)
+		return nil, oops.In("session").
+			Code("operation_canceled").
+			With("operation", "directory_suggestions").
+			Wrap(err)
 	}
 
 	dirPart, namePrefix, parent, err := resolveParentAndPrefix(input, cwd)
@@ -54,7 +57,10 @@ func DirectoryPathSuggestions(ctx context.Context, input, cwd string) ([]string,
 			return nil, nil
 		}
 
-		return nil, oops.In("session").Code("directory_open_failed").With("operation", "directory_suggestions").Wrap(err)
+		return nil, oops.In("session").
+			Code("directory_open_failed").
+			With("operation", "directory_suggestions").
+			Wrap(err)
 	}
 
 	entries, readErr := readPrefixedEntries(ctx, f, namePrefix)
@@ -65,7 +71,10 @@ func DirectoryPathSuggestions(ctx context.Context, input, cwd string) ([]string,
 	}
 
 	if closeErr != nil {
-		return nil, oops.In("session").Code("directory_read_failed").With("operation", "directory_suggestions").Wrap(closeErr)
+		return nil, oops.In("session").
+			Code("directory_read_failed").
+			With("operation", "directory_suggestions").
+			Wrap(closeErr)
 	}
 
 	return collectMatchingDirectories(ctx, entries, parent, dirPart, namePrefix)
@@ -153,14 +162,20 @@ func resolveParentAndPrefix(input, cwd string) (string, string, string, error) {
 	case input == "~":
 		home, err := os.UserHomeDir()
 		if err != nil || home == "" {
-			return "", "", "", oops.In("session").Code("directory_resolve_failed").With("operation", "resolve_parent").Wrap(err)
+			return "", "", "", oops.In("session").
+				Code("directory_resolve_failed").
+				With("operation", "resolve_parent").
+				Wrap(err)
 		}
 
 		return "~" + separator, "", home, nil
 	case strings.HasPrefix(input, "~"+separator):
 		home, err := os.UserHomeDir()
 		if err != nil || home == "" {
-			return "", "", "", oops.In("session").Code("directory_resolve_failed").With("operation", "resolve_parent").Wrap(err)
+			return "", "", "", oops.In("session").
+				Code("directory_resolve_failed").
+				With("operation", "resolve_parent").
+				Wrap(err)
 		}
 
 		rel := strings.TrimPrefix(input, "~"+separator)
@@ -186,21 +201,31 @@ func resolveParentAndPrefix(input, cwd string) (string, string, string, error) {
 	}
 }
 
-func readPrefixedEntries(ctx context.Context, f *os.File, namePrefix string) ([]os.DirEntry, error) {
+func readPrefixedEntries(
+	ctx context.Context,
+	f *os.File,
+	namePrefix string,
+) ([]os.DirEntry, error) {
 	var matches []os.DirEntry
 
 	scanned := 0
 
 	for {
 		if err := ctx.Err(); err != nil {
-			return nil, oops.In("session").Code("operation_canceled").With("operation", "directory_suggestions").Wrap(err)
+			return nil, oops.In("session").
+				Code("operation_canceled").
+				With("operation", "directory_suggestions").
+				Wrap(err)
 		}
 
 		batch, err := f.ReadDir(directoryReadBatch)
 		scanned += len(batch)
 
 		if scanned > maxDirectoryEntriesRead {
-			return nil, oops.In("session").Code("directory_limit").With("operation", "directory_suggestions").Wrap(ErrDirectoryLimit)
+			return nil, oops.In("session").
+				Code("directory_limit").
+				With("operation", "directory_suggestions").
+				Wrap(ErrDirectoryLimit)
 		}
 
 		for _, entry := range batch {
@@ -214,7 +239,10 @@ func readPrefixedEntries(ctx context.Context, f *os.File, namePrefix string) ([]
 		}
 
 		if err != nil {
-			return nil, oops.In("session").Code("directory_read_failed").With("operation", "directory_suggestions").Wrap(err)
+			return nil, oops.In("session").
+				Code("directory_read_failed").
+				With("operation", "directory_suggestions").
+				Wrap(err)
 		}
 	}
 }
@@ -229,7 +257,10 @@ func collectMatchingDirectories(
 
 	for _, entry := range entries {
 		if err := ctx.Err(); err != nil {
-			return nil, oops.In("session").Code("operation_canceled").With("operation", "directory_suggestions").Wrap(err)
+			return nil, oops.In("session").
+				Code("operation_canceled").
+				With("operation", "directory_suggestions").
+				Wrap(err)
 		}
 
 		if !strings.HasPrefix(entry.Name(), namePrefix) || !entryIsDirectory(parent, entry) {
@@ -240,7 +271,10 @@ func collectMatchingDirectories(
 		matches = append(matches, suggestion)
 
 		if len(matches) > maxDirectorySuggestions {
-			return nil, oops.In("session").Code("directory_limit").With("operation", "directory_suggestions").Wrap(ErrDirectoryLimit)
+			return nil, oops.In("session").
+				Code("directory_limit").
+				With("operation", "directory_suggestions").
+				Wrap(ErrDirectoryLimit)
 		}
 	}
 

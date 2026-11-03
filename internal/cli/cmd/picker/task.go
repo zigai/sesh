@@ -68,16 +68,19 @@ type taskFrontend struct {
 }
 
 func NewTaskMenuCommand(remoteFactory RemoteFactory) *cobra.Command {
-	return actioncli.Command(action.TaskMenu, actioncli.Options[action.OpenTaskMenu, action.OpenedTaskMenu]{
-		Operation:    "task_picker",
-		SuccessOwned: false,
-		Configure: func(cmd *cobra.Command) {
-			cmd.Annotations[clibase.AnnotationLiveIO] = annotationEnabled
+	return actioncli.Command(
+		action.TaskMenu,
+		actioncli.Options[action.OpenTaskMenu, action.OpenedTaskMenu]{
+			Operation:    "task_picker",
+			SuccessOwned: false,
+			Configure: func(cmd *cobra.Command) {
+				cmd.Annotations[clibase.AnnotationLiveIO] = annotationEnabled
+			},
+			Prepare:  nil,
+			Frontend: func(cmd *cobra.Command) action.Dispatcher { return taskFrontend{cmd: cmd, remote: remoteFactory} },
+			Render:   nil,
 		},
-		Prepare:  nil,
-		Frontend: func(cmd *cobra.Command) action.Dispatcher { return taskFrontend{cmd: cmd, remote: remoteFactory} },
-		Render:   nil,
-	})
+	)
 }
 
 func NewTaskPickerUICommand(remoteFactory RemoteFactory) *cobra.Command {
@@ -110,7 +113,10 @@ func (frontend taskFrontend) Accepts(at action.Location, id action.ID) bool {
 	return at.Kind == action.LocationLocal && id == action.TaskMenu.ID
 }
 
-func (frontend taskFrontend) Dispatch(ctx context.Context, invocation action.Invocation) (any, error) {
+func (frontend taskFrontend) Dispatch(
+	ctx context.Context,
+	invocation action.Invocation,
+) (any, error) {
 	cmd := frontend.cmd
 
 	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
@@ -129,7 +135,12 @@ func (frontend taskFrontend) Dispatch(ctx context.Context, invocation action.Inv
 }
 
 func openTaskPicker(
-	ctx context.Context, cmd *cobra.Command, cfg *config.Config, runtime *actioncli.Runtime, caller action.Caller, remoteFactory RemoteFactory,
+	ctx context.Context,
+	cmd *cobra.Command,
+	cfg *config.Config,
+	runtime *actioncli.Runtime,
+	caller action.Caller,
+	remoteFactory RemoteFactory,
 	dir string,
 ) error {
 	if caller.Pane == "" {
@@ -151,15 +162,44 @@ func openTaskPicker(
 		return oops.In("cli").With("operation", "resolve_popup_client").Wrap(err)
 	}
 
-	handoff := taskHandoff{Show: "", Reopen: false, Expanded: false, Title: "", Agent: "", Machine: "", Session: "", Pane: ""}
+	handoff := taskHandoff{
+		Show:     "",
+		Reopen:   false,
+		Expanded: false,
+		Title:    "",
+		Agent:    "",
+		Machine:  "",
+		Session:  "",
+		Pane:     "",
+	}
 
 	for {
-		choices, err := loadTaskChoices(ctx, cfg, workspace.Socket, runtime, caller, remoteFactory, dir, handoff.Machine, false)
+		choices, err := loadTaskChoices(
+			ctx,
+			cfg,
+			workspace.Socket,
+			runtime,
+			caller,
+			remoteFactory,
+			dir,
+			handoff.Machine,
+			false,
+		)
 		if err != nil {
 			return err
 		}
 
-		next, chosen, err := showTaskPopup(ctx, cmd, cfg, workspace.Socket, client, caller, dir, choices.options, handoff)
+		next, chosen, err := showTaskPopup(
+			ctx,
+			cmd,
+			cfg,
+			workspace.Socket,
+			client,
+			caller,
+			dir,
+			choices.options,
+			handoff,
+		)
 		if err != nil || !chosen {
 			return err
 		}
@@ -177,12 +217,21 @@ func openTaskPicker(
 }
 
 func showTaskPopup(
-	ctx context.Context, cmd *cobra.Command, cfg *config.Config, socket string, client gotmux.ClientInfo, caller action.Caller,
-	dir string, options taskpicker.Options, from taskHandoff,
+	ctx context.Context,
+	cmd *cobra.Command,
+	cfg *config.Config,
+	socket string,
+	client gotmux.ClientInfo,
+	caller action.Caller,
+	dir string,
+	options taskpicker.Options,
+	from taskHandoff,
 ) (taskHandoff, bool, error) {
 	executable, err := os.Executable()
 	if err != nil {
-		return taskHandoff{}, false, oops.In("cli").With("operation", "resolve_executable").Wrap(err)
+		return taskHandoff{}, false, oops.In("cli").
+			With("operation", "resolve_executable").
+			Wrap(err)
 	}
 
 	handoffPath, cleanup, err := createPickerSwitchHandoff()
@@ -192,7 +241,14 @@ func showTaskPopup(
 	defer cleanup()
 
 	arguments := []string{
-		"task", taskPickerUIVerb, "--socket", socket, "--" + projectHandoffFlag, handoffPath, "--" + taskPaneFlag, caller.Pane,
+		"task",
+		taskPickerUIVerb,
+		"--socket",
+		socket,
+		"--" + projectHandoffFlag,
+		handoffPath,
+		"--" + taskPaneFlag,
+		caller.Pane,
 	}
 
 	if dir != "" {
@@ -200,8 +256,13 @@ func showTaskPopup(
 	}
 
 	if from.Reopen {
-		arguments = append(arguments, "--"+taskExpandedFlag+"="+strconv.FormatBool(from.Expanded),
-			"--"+taskTitleFlag+"="+from.Title, "--"+taskAgentFlag+"="+from.Agent, "--"+taskMachineFlag+"="+from.Machine)
+		arguments = append(
+			arguments,
+			"--"+taskExpandedFlag+"="+strconv.FormatBool(from.Expanded),
+			"--"+taskTitleFlag+"="+from.Title,
+			"--"+taskAgentFlag+"="+from.Agent,
+			"--"+taskMachineFlag+"="+from.Machine,
+		)
 		options.Expanded, options.Title, options.Agent = from.Expanded, from.Title, from.Agent
 	}
 
@@ -209,7 +270,12 @@ func showTaskPopup(
 
 	width, height := taskpicker.Size(cfg, options)
 	width, height = min(width, client.Width), min(height, client.Height)
-	popup := popupOptions(gotmux.Exec(executable, arguments...), strconv.Itoa(width), strconv.Itoa(height), cfg.Theme.Background)
+	popup := popupOptions(
+		gotmux.Exec(executable, arguments...),
+		strconv.Itoa(width),
+		strconv.Itoa(height),
+		cfg.Theme.Background,
+	)
 
 	if options.Project != "" {
 		expanded := options
@@ -223,11 +289,19 @@ func showTaskPopup(
 		return taskHandoff{}, false, oops.In("cli").With("operation", "open_task_picker").Wrap(err)
 	}
 
-	return readHandoff(handoffPath, func(handoff taskHandoff) bool { return handoff.Show != "" || handoff.Reopen || handoff.Session != "" })
+	return readHandoff(
+		handoffPath,
+		func(handoff taskHandoff) bool { return handoff.Show != "" || handoff.Reopen || handoff.Session != "" },
+	)
 }
 
 func showRemoteAttachPopup(
-	ctx context.Context, cmd *cobra.Command, cfg *config.Config, socket string, client gotmux.ClientInfo, to taskHandoff,
+	ctx context.Context,
+	cmd *cobra.Command,
+	cfg *config.Config,
+	socket string,
+	client gotmux.ClientInfo,
+	to taskHandoff,
 ) error {
 	executable, err := os.Executable()
 	if err != nil {
@@ -250,7 +324,12 @@ func showRemoteAttachPopup(
 		gotmux.Size{Width: popupAgentsMinWidth, Height: popupAgentsMinHeight},
 		gotmux.Size{Width: popupAgentsDefaultWidth, Height: popupAgentsDefaultHeight})
 
-	popup := popupOptions(gotmux.Exec(executable, arguments...), width, height, cfg.Theme.Background)
+	popup := popupOptions(
+		gotmux.Exec(executable, arguments...),
+		width,
+		height,
+		cfg.Theme.Background,
+	)
 	if err := client.Handle().Popup(ctx, popup); err != nil {
 		return oops.In("cli").With("operation", "open_remote_attach").Wrap(err)
 	}
@@ -285,7 +364,16 @@ func runTaskPickerUI(cmd *cobra.Command, _ []string, remoteFactory RemoteFactory
 
 	caller := action.Caller{Client: "", Pane: pane, Session: "", Width: "", Height: ""}
 
-	from := taskHandoff{Show: "", Reopen: true, Expanded: expanded, Title: title, Agent: agent, Machine: machine, Session: "", Pane: ""}
+	from := taskHandoff{
+		Show:     "",
+		Reopen:   true,
+		Expanded: expanded,
+		Title:    title,
+		Agent:    agent,
+		Machine:  machine,
+		Session:  "",
+		Pane:     "",
+	}
 
 	picked, chosen, err := pickTask(ctx, cmd, cfg, runtime, caller, remoteFactory, dir, from)
 	if dir == "" {
@@ -305,14 +393,30 @@ func finishTaskPicker(ctx context.Context, handoffPath string, picked pickedTask
 	switch {
 	case choice.Reopen:
 		return writeHandoff(handoffPath, taskHandoff{
-			Show: "", Reopen: true, Expanded: choice.Expanded, Title: choice.Title, Agent: choice.Harness,
-			Machine: picked.machines[choice.Machine].Connection, Session: "", Pane: "",
+			Show:     "",
+			Reopen:   true,
+			Expanded: choice.Expanded,
+			Title:    choice.Title,
+			Agent:    choice.Harness,
+			Machine:  picked.machines[choice.Machine].Connection,
+			Session:  "",
+			Pane:     "",
 		})
 	case picked.at.Kind == action.LocationPeer && (choice.Show != "" || picked.session != ""):
 		return handOffRemoteTask(ctx, handoffPath, picked)
 	case choice.Show != "" || picked.started != "":
 		return writeHandoff(handoffPath, taskHandoff{
-			Show: cmp.Or(choice.Show, picked.started), Reopen: false, Expanded: false, Title: "", Agent: "", Machine: "", Session: "", Pane: "",
+			Show: cmp.Or(
+				choice.Show,
+				picked.started,
+			),
+			Reopen:   false,
+			Expanded: false,
+			Title:    "",
+			Agent:    "",
+			Machine:  "",
+			Session:  "",
+			Pane:     "",
 		})
 	default:
 		return nil
@@ -329,17 +433,40 @@ type pickedTask struct {
 }
 
 func pickTask(
-	ctx context.Context, cmd *cobra.Command, cfg *config.Config, runtime *actioncli.Runtime, caller action.Caller,
-	remoteFactory RemoteFactory, dir string, from taskHandoff,
+	ctx context.Context,
+	cmd *cobra.Command,
+	cfg *config.Config,
+	runtime *actioncli.Runtime,
+	caller action.Caller,
+	remoteFactory RemoteFactory,
+	dir string,
+	from taskHandoff,
 ) (pickedTask, bool, error) {
-	picked := pickedTask{choice: emptyChoice(), machines: nil, at: action.Local(), session: "", started: "", remote: emptyRemoteServices()}
+	picked := pickedTask{
+		choice:   emptyChoice(),
+		machines: nil,
+		at:       action.Local(),
+		session:  "",
+		started:  "",
+		remote:   emptyRemoteServices(),
+	}
 
 	workspace, err := app.Resolve(cfg, clibase.CommandLocations(cmd))
 	if err != nil {
 		return picked, false, err
 	}
 
-	choices, err := loadTaskChoices(ctx, cfg, workspace.Socket, runtime, caller, remoteFactory, dir, from.Machine, from.Expanded)
+	choices, err := loadTaskChoices(
+		ctx,
+		cfg,
+		workspace.Socket,
+		runtime,
+		caller,
+		remoteFactory,
+		dir,
+		from.Machine,
+		from.Expanded,
+	)
 	if err != nil {
 		return picked, false, err
 	}
@@ -350,8 +477,14 @@ func pickTask(
 	start := func(choice taskpicker.Choice) error {
 		location := choice.Location
 		input := action.NewTask{
-			Harness: choice.Harness, Where: string(location.Where), Branch: location.Branch, Remote: location.Remote,
-			Directory: location.Directory, Title: choice.Title, Project: dir, Layout: "",
+			Harness:   choice.Harness,
+			Where:     string(location.Where),
+			Branch:    location.Branch,
+			Remote:    location.Remote,
+			Directory: location.Directory,
+			Title:     choice.Title,
+			Project:   dir,
+			Layout:    "",
 		}
 
 		switch {
@@ -364,11 +497,25 @@ func pickTask(
 
 			return err
 		case choice.Tab:
-			_, err := action.Run(ctx, runtime.Router, action.TaskTab, action.Local(), caller, action.OpenTab{})
+			_, err := action.Run(
+				ctx,
+				runtime.Router,
+				action.TaskTab,
+				action.Local(),
+				caller,
+				action.OpenTab{},
+			)
 
 			return err
 		default:
-			started, err := action.Run(ctx, runtime.Router, action.TaskNew, action.Local(), caller, input)
+			started, err := action.Run(
+				ctx,
+				runtime.Router,
+				action.TaskNew,
+				action.Local(),
+				caller,
+				input,
+			)
 			picked.started = started.ID
 
 			return err
@@ -416,14 +563,30 @@ func pickTask(
 }
 
 func loadTaskChoices(
-	ctx context.Context, cfg *config.Config, socket string, runtime *actioncli.Runtime, caller action.Caller,
-	remoteFactory RemoteFactory, dir, machine string, describe bool,
+	ctx context.Context,
+	cfg *config.Config,
+	socket string,
+	runtime *actioncli.Runtime,
+	caller action.Caller,
+	remoteFactory RemoteFactory,
+	dir, machine string,
+	describe bool,
 ) (taskChoices, error) {
-	choices := taskChoices{options: taskPickerOptions("", emptyTaskOffered()), machines: []action.Location{action.Local()}, remoteProject: "", remote: emptyRemoteServices()}
+	choices := taskChoices{
+		options:       taskPickerOptions("", emptyTaskOffered()),
+		machines:      []action.Location{action.Local()},
+		remoteProject: "",
+		remote:        emptyRemoteServices(),
+	}
 
 	at := machineLocation(machine)
 
-	offered, err := runtime.Local.TaskOffer(ctx, caller, dir, describe && at.Kind == action.LocationLocal)
+	offered, err := runtime.Local.TaskOffer(
+		ctx,
+		caller,
+		dir,
+		describe && at.Kind == action.LocationLocal,
+	)
 	if err != nil {
 		return choices, err
 	}
@@ -482,19 +645,34 @@ func (choices *taskChoices) listMachines() ([]taskpicker.Machine, error) {
 		}
 
 		at := action.Peer(connection.ID)
-		usable := choices.remote.Peer.Accepts(at, action.TaskOffer.ID) && choices.remote.Peer.Accepts(at, action.TaskNew.ID)
-		machines = append(machines, taskpicker.Machine{Name: cmp.Or(connection.Label, connection.ID), Usable: usable})
+		usable := choices.remote.Peer.Accepts(at, action.TaskOffer.ID) &&
+			choices.remote.Peer.Accepts(at, action.TaskNew.ID)
+		machines = append(
+			machines,
+			taskpicker.Machine{Name: cmp.Or(connection.Label, connection.ID), Usable: usable},
+		)
 		choices.machines = append(choices.machines, at)
 	}
 
 	return machines, nil
 }
 
-func (choices *taskChoices) useMachine(ctx context.Context, project string, index int, describe bool) {
+func (choices *taskChoices) useMachine(
+	ctx context.Context,
+	project string,
+	index int,
+	describe bool,
+) {
 	machines := choices.options.Machines
 	router := action.Router{Local: nil, Peer: choices.remote.Peer, Origin: nil}
-	remoteOffer, err := action.Run(ctx, router, action.TaskOffer, choices.machines[index], emptyCaller(),
-		action.OfferTask{Project: project, Describe: describe})
+	remoteOffer, err := action.Run(
+		ctx,
+		router,
+		action.TaskOffer,
+		choices.machines[index],
+		emptyCaller(),
+		action.OfferTask{Project: project, Describe: describe},
+	)
 
 	switch {
 	case action.CodeOf(err) == action.CodeNotFound:
@@ -522,49 +700,90 @@ func taskPickerOptions(project string, offered action.TaskOffered) taskpicker.Op
 
 	refs := make(map[string]task.Ref, len(offered.Refs))
 	for name, ref := range offered.Refs {
-		refs[name] = task.Ref{Time: ref.Time, Subject: ref.Subject, Ahead: ref.Ahead, Behind: ref.Behind}
+		refs[name] = task.Ref{
+			Time:    ref.Time,
+			Subject: ref.Subject,
+			Ahead:   ref.Ahead,
+			Behind:  ref.Behind,
+		}
 	}
 
 	return taskpicker.Options{
-		Project: project, Locations: locations, Current: offered.Current,
-		NextNumber: offered.NextNumber, Branches: offered.Branches, Harnesses: offered.Harnesses,
-		Agent: "", Title: "", Expanded: false, Refs: refs, Starts: offered.Starts, Now: time.Now(), Changes: nil, Start: nil,
-		Machines: nil, Machine: 0, Problem: "",
+		Project:    project,
+		Locations:  locations,
+		Current:    offered.Current,
+		NextNumber: offered.NextNumber,
+		Branches:   offered.Branches,
+		Harnesses:  offered.Harnesses,
+		Agent:      "",
+		Title:      "",
+		Expanded:   false,
+		Refs:       refs,
+		Starts:     offered.Starts,
+		Now:        time.Now(),
+		Changes:    nil,
+		Start:      nil,
+		Machines:   nil,
+		Machine:    0,
+		Problem:    "",
 	}
 }
 
 func handOffRemoteTask(ctx context.Context, handoffPath string, picked pickedTask) error {
 	if picked.remote.Watcher == nil {
-		return oops.In("cli").With("operation", "attach_remote_task").Wrap(errRemoteAttachUnavailable)
+		return oops.In("cli").
+			With("operation", "attach_remote_task").
+			Wrap(errRemoteAttachUnavailable)
 	}
 
 	sessionID, pane := picked.session, ""
 
-	target, err := waitRemoteTaskSession(ctx, picked, func(connection tui.RemoteConnection) (session.Session, bool) {
-		var none session.Session
+	target, err := waitRemoteTaskSession(
+		ctx,
+		picked,
+		func(connection tui.RemoteConnection) (session.Session, bool) {
+			var none session.Session
 
-		if picked.choice.Show != "" {
-			index := slices.IndexFunc(connection.Tasks, func(live task.Live) bool { return live.Record.ID == picked.choice.Show })
+			if picked.choice.Show != "" {
+				index := slices.IndexFunc(
+					connection.Tasks,
+					func(live task.Live) bool { return live.Record.ID == picked.choice.Show },
+				)
+				if index < 0 {
+					return none, false
+				}
+
+				sessionID, pane = string(
+					connection.Tasks[index].SessionID,
+				), string(
+					connection.Tasks[index].AgentPane,
+				)
+			}
+
+			index := slices.IndexFunc(
+				connection.Sessions,
+				func(row session.Session) bool { return row.ID == sessionID },
+			)
 			if index < 0 {
 				return none, false
 			}
 
-			sessionID, pane = string(connection.Tasks[index].SessionID), string(connection.Tasks[index].AgentPane)
-		}
-
-		index := slices.IndexFunc(connection.Sessions, func(row session.Session) bool { return row.ID == sessionID })
-		if index < 0 {
-			return none, false
-		}
-
-		return connection.Sessions[index], true
-	})
+			return connection.Sessions[index], true
+		},
+	)
 	if err != nil {
 		return err
 	}
 
 	return writeHandoff(handoffPath, taskHandoff{
-		Show: "", Reopen: false, Expanded: false, Title: "", Agent: "", Machine: picked.at.Connection, Session: target.ID, Pane: pane,
+		Show:     "",
+		Reopen:   false,
+		Expanded: false,
+		Title:    "",
+		Agent:    "",
+		Machine:  picked.at.Connection,
+		Session:  target.ID,
+		Pane:     pane,
 	})
 }
 
@@ -580,21 +799,24 @@ func waitRemoteTaskSession(
 	)
 
 	// A new project session reaches the remote catalog only with the peer's next inventory.
-	err := picked.remote.Watcher.WatchRemoteCatalog(watching, func(catalog tui.RemoteCatalog, err error) {
-		if err != nil || listed {
-			return
-		}
-
-		for _, connection := range catalog.Connections {
-			if connection.ID == picked.at.Connection && connection.Connected {
-				found, listed = find(connection)
+	err := picked.remote.Watcher.WatchRemoteCatalog(
+		watching,
+		func(catalog tui.RemoteCatalog, err error) {
+			if err != nil || listed {
+				return
 			}
-		}
 
-		if listed {
-			stop()
-		}
-	})
+			for _, connection := range catalog.Connections {
+				if connection.ID == picked.at.Connection && connection.Connected {
+					found, listed = find(connection)
+				}
+			}
+
+			if listed {
+				stop()
+			}
+		},
+	)
 
 	switch {
 	case listed:
@@ -602,13 +824,21 @@ func waitRemoteTaskSession(
 	case err != nil && ctx.Err() == nil:
 		return found, oops.In("cli").With("operation", "find_remote_task_session").Wrap(err)
 	default:
-		return found, oops.In("cli").With("operation", "find_remote_task_session").Wrap(errors.Join(errRemoteTaskSession, ctx.Err()))
+		return found, oops.In("cli").
+			With("operation", "find_remote_task_session").
+			Wrap(errors.Join(errRemoteTaskSession, ctx.Err()))
 	}
 }
 
 func emptyChoice() taskpicker.Choice {
 	return taskpicker.Choice{
-		Reopen: false, Expanded: false, Machine: 0, Tab: false, Harness: "", Title: "", Location: task.Location{
+		Reopen:   false,
+		Expanded: false,
+		Machine:  0,
+		Tab:      false,
+		Harness:  "",
+		Title:    "",
+		Location: task.Location{
 			Where: "", Branch: "", Remote: "", Directory: "", Task: "", TaskTitle: "",
 		},
 		Show: "",
@@ -620,12 +850,26 @@ func emptyCaller() action.Caller {
 }
 
 func emptyRemoteServices() RemoteServices {
-	return RemoteServices{Catalog: nil, Watcher: nil, Peer: nil, Attach: nil, OriginBridge: nil, Origin: nil}
+	return RemoteServices{
+		Catalog:      nil,
+		Watcher:      nil,
+		Peer:         nil,
+		Attach:       nil,
+		OriginBridge: nil,
+		Origin:       nil,
+	}
 }
 
 func emptyTaskOffered() action.TaskOffered {
 	return action.TaskOffered{
-		Project: "", Harnesses: nil, Locations: nil, Current: -1, NextNumber: 0, Branches: nil, Refs: nil, Starts: nil,
+		Project:    "",
+		Harnesses:  nil,
+		Locations:  nil,
+		Current:    -1,
+		NextNumber: 0,
+		Branches:   nil,
+		Refs:       nil,
+		Starts:     nil,
 	}
 }
 

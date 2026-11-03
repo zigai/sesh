@@ -27,7 +27,15 @@ func stagedRewriteFixture(t *testing.T) (*Repository, string, Rewrite) {
 
 		return nil
 	}
-	if _, err := r.RemoveSessions(t.Context(), id, source.ID, []string{"s0"}); !errors.Is(err, ErrRecoveryRequired) {
+	if _, err := r.RemoveSessions(
+		t.Context(),
+		id,
+		source.ID,
+		[]string{"s0"},
+	); !errors.Is(
+		err,
+		ErrRecoveryRequired,
+	) {
 		t.Fatal(err)
 	}
 
@@ -87,7 +95,9 @@ func assertPendingRewriteSource(t *testing.T, r *Repository, rw Rewrite) {
 	}
 
 	index := catalog.rewriteIndex(rw.ID)
-	if index < 0 || catalog.Rewrites[index].State != rewriteStatePending || catalog.Current != rw.Source || catalog.generationIndex(rw.Replacement) >= 0 {
+	if index < 0 || catalog.Rewrites[index].State != rewriteStatePending ||
+		catalog.Current != rw.Source ||
+		catalog.generationIndex(rw.Replacement) >= 0 {
 		t.Fatalf("recovery changed authoritative membership: %+v", catalog)
 	}
 
@@ -189,7 +199,11 @@ func TestResumeRewriteCancellationBeforePublication(t *testing.T) {
 
 				return nil
 			}
-			if _, err := r.ResumeRewrite(ctx, rw.ID); !errors.Is(err, context.Canceled) || !errors.Is(err, ErrRecoveryRequired) {
+			if _, err := r.ResumeRewrite(
+				ctx,
+				rw.ID,
+			); !errors.Is(err, context.Canceled) ||
+				!errors.Is(err, ErrRecoveryRequired) {
 				t.Fatalf("cancellation did not retain pending recovery: %v", err)
 			}
 
@@ -205,7 +219,10 @@ func TestResumeRewriteCancellationBeforePublication(t *testing.T) {
 
 func TestResumeRewriteReconfirmsRenamedGenerationDurability(t *testing.T) {
 	r, path, rw := stagedRewriteFixture(t)
-	if err := os.Rename(filepath.Join(path, "staging", rw.Replacement), filepath.Join(path, "generations", rw.Replacement)); err != nil {
+	if err := os.Rename(
+		filepath.Join(path, "staging", rw.Replacement),
+		filepath.Join(path, "generations", rw.Replacement),
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -222,7 +239,9 @@ func TestResumeRewriteReconfirmsRenamedGenerationDurability(t *testing.T) {
 	}
 
 	_, err := r.ResumeRewrite(ctx, rw.ID)
-	if !errors.Is(err, ErrUncertain) || !errors.Is(err, ErrRecoveryRequired) || !errors.Is(err, errInjected) || !errors.Is(err, context.Canceled) {
+	if !errors.Is(err, ErrUncertain) || !errors.Is(err, ErrRecoveryRequired) ||
+		!errors.Is(err, errInjected) ||
+		!errors.Is(err, context.Canceled) {
 		t.Fatalf("durability failure lost independent causes: %v", err)
 	}
 

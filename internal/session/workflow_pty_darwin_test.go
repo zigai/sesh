@@ -53,7 +53,12 @@ func unlockPTY(fd int) (string, error) {
 	var name [128]byte
 
 	//nolint:staticcheck // SA1019: x/sys/unix has no ioctl wrapper that fills the TIOCPTYGNAME name buffer.
-	_, _, errno := unix.Syscall(unix.SYS_IOCTL, uintptr(fd), unix.TIOCPTYGNAME, uintptr(unsafe.Pointer(&name[0])))
+	_, _, errno := unix.Syscall(
+		unix.SYS_IOCTL,
+		uintptr(fd),
+		unix.TIOCPTYGNAME,
+		uintptr(unsafe.Pointer(&name[0])),
+	)
 	if errno != 0 {
 		return "", fmt.Errorf("reading pty name: %w", errno)
 	}

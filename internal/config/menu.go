@@ -43,17 +43,34 @@ const (
 
 var (
 	AgentMenuEntries = []string{
-		MenuGo, MenuSnooze, MenuUnsnooze, MenuSeen, MenuUnseen, MenuPin, MenuUnpin, MenuEvidence, MenuPR,
-		MenuLink, MenuUnlink, MenuMerge, MenuSleep, MenuWake, MenuOpen, MenuFinish, MenuTask,
+		MenuGo,
+		MenuSnooze,
+		MenuUnsnooze,
+		MenuSeen,
+		MenuUnseen,
+		MenuPin,
+		MenuUnpin,
+		MenuEvidence,
+		MenuPR,
+		MenuLink,
+		MenuUnlink,
+		MenuMerge,
+		MenuSleep,
+		MenuWake,
+		MenuOpen,
+		MenuFinish,
+		MenuTask,
 	}
 	SessionMenuEntries = []string{MenuGo, MenuRename, MenuSnapshot, MenuKill, MenuDelete}
 )
 
 var (
-	errMenuItemNameInvalid  = errors.New("menu item names may only contain a-z, 0-9, _ and -")
-	errMenuItemRunEmpty     = errors.New("menu item needs a run command")
-	errMenuItemPrompt       = errors.New("menu item takes prompt or prompt_file, not both")
-	errMenuItemPromptPath   = errors.New("prompt_file must be absolute, start with ~/, or be relative to the task worktree")
+	errMenuItemNameInvalid = errors.New("menu item names may only contain a-z, 0-9, _ and -")
+	errMenuItemRunEmpty    = errors.New("menu item needs a run command")
+	errMenuItemPrompt      = errors.New("menu item takes prompt or prompt_file, not both")
+	errMenuItemPromptPath  = errors.New(
+		"prompt_file must be absolute, start with ~/, or be relative to the task worktree",
+	)
 	errMenuItemVariable     = errors.New("unknown template variable")
 	errMenuItemKey          = errors.New("menu item key is not a picker key")
 	errMenuItemLabel        = errors.New("menu item label must be text")
@@ -61,7 +78,9 @@ var (
 	errMenuEntryTwice       = errors.New("menu entry is listed twice")
 	errMergeCheckEmpty      = errors.New("merge check needs a program")
 	errFinishRunEmpty       = errors.New("finish run needs a program")
-	errWakeOnRestoreInvalid = errors.New(`tasks.wake_on_restore must be "previous", "none", or a positive count such as "3"`)
+	errWakeOnRestoreInvalid = errors.New(
+		`tasks.wake_on_restore must be "previous", "none", or a positive count such as "3"`,
+	)
 
 	templateVariable    = regexp.MustCompile(`\{[^{}]*\}`)
 	TaskActionVariables = []string{"task", "title", "branch", "base", "project", "worktree"}
@@ -117,7 +136,11 @@ func DefaultMenuConfig() MenuConfig {
 }
 
 func (m MenuConfig) Clone() MenuConfig {
-	return MenuConfig{Agent: slices.Clone(m.Agent), Session: slices.Clone(m.Session), Items: cloneMenuItems(m.Items)}
+	return MenuConfig{
+		Agent:   slices.Clone(m.Agent),
+		Session: slices.Clone(m.Session),
+		Items:   cloneMenuItems(m.Items),
+	}
 }
 
 func (a MenuItemConfig) Clone() MenuItemConfig {
@@ -158,7 +181,13 @@ func (c *Config) FinishRunFor(root string) []string {
 
 func (c *Config) ProjectOverride(root string) ProjectConfig {
 	if root == "" {
-		return ProjectConfig{MenuItems: nil, Merge: nil, Finish: nil, TaskPanes: nil, TaskLayouts: nil}
+		return ProjectConfig{
+			MenuItems:   nil,
+			Merge:       nil,
+			Finish:      nil,
+			TaskPanes:   nil,
+			TaskLayouts: nil,
+		}
 	}
 
 	for key, override := range c.Projects.Overrides {
@@ -192,18 +221,34 @@ func ValidateMenu(cfg *Config) error {
 
 	for _, project := range slices.Sorted(maps.Keys(cfg.Projects.Overrides)) {
 		prefix := "projects.overrides." + project + ".menu_items"
-		if err := validateMenuItemSet(prefix, cfg.Projects.Overrides[project].MenuItems, false); err != nil {
+		if err := validateMenuItemSet(
+			prefix,
+			cfg.Projects.Overrides[project].MenuItems,
+			false,
+		); err != nil {
 			return err
 		}
 
-		if err := validateMenuItemSet(prefix, cfg.menuItems(cfg.Projects.Overrides[project]), true); err != nil {
+		if err := validateMenuItemSet(
+			prefix,
+			cfg.menuItems(cfg.Projects.Overrides[project]),
+			true,
+		); err != nil {
 			return err
 		}
 
-		names = append(names, slices.Collect(maps.Keys(cfg.Projects.Overrides[project].MenuItems))...)
+		names = append(
+			names,
+			slices.Collect(maps.Keys(cfg.Projects.Overrides[project].MenuItems))...)
 	}
 
-	if err := validateMenuList("menu.agent", cfg.Menu.Agent, AgentMenuEntries, true, names); err != nil {
+	if err := validateMenuList(
+		"menu.agent",
+		cfg.Menu.Agent,
+		AgentMenuEntries,
+		true,
+		names,
+	); err != nil {
 		return err
 	}
 
@@ -222,13 +267,21 @@ func ValidateMerge(cfg *Config) error {
 	for _, project := range slices.Sorted(maps.Keys(cfg.Projects.Overrides)) {
 		override := cfg.Projects.Overrides[project]
 		if override.Merge != nil {
-			if err := validateCommand("projects.overrides."+project+".merge.check", override.Merge.Check, errMergeCheckEmpty); err != nil {
+			if err := validateCommand(
+				"projects.overrides."+project+".merge.check",
+				override.Merge.Check,
+				errMergeCheckEmpty,
+			); err != nil {
 				return err
 			}
 		}
 
 		if override.Finish != nil {
-			if err := validateCommand("projects.overrides."+project+".finish.run", override.Finish.Run, errFinishRunEmpty); err != nil {
+			if err := validateCommand(
+				"projects.overrides."+project+".finish.run",
+				override.Finish.Run,
+				errFinishRunEmpty,
+			); err != nil {
 				return err
 			}
 		}
@@ -294,11 +347,17 @@ func cloneFinishConfig(finish *FinishConfig) *FinishConfig {
 	return &FinishConfig{Run: slices.Clone(finish.Run)}
 }
 
-func validateMenuList(name string, entries, builtIn []string, takesItems bool, items []string) error {
+func validateMenuList(
+	name string,
+	entries, builtIn []string,
+	takesItems bool,
+	items []string,
+) error {
 	seen := make(map[string]bool, len(entries))
 
 	for _, entry := range entries {
-		known := entry == MenuDivider || slices.Contains(builtIn, entry) || (takesItems && (entry == MenuItems || slices.Contains(items, entry)))
+		known := entry == MenuDivider || slices.Contains(builtIn, entry) ||
+			(takesItems && (entry == MenuItems || slices.Contains(items, entry)))
 		if !known {
 			return fmt.Errorf("invalid %s %q: %w", name, entry, errMenuEntry)
 		}
@@ -386,7 +445,11 @@ func cloneProjects(projects map[string]ProjectConfig) map[string]ProjectConfig {
 	clone := make(map[string]ProjectConfig, len(projects))
 	for name, project := range projects {
 		clone[name] = ProjectConfig{
-			MenuItems: cloneMenuItems(project.MenuItems), Merge: cloneMergeConfig(project.Merge), Finish: cloneFinishConfig(project.Finish),
+			MenuItems: cloneMenuItems(
+				project.MenuItems,
+			),
+			Merge:       cloneMergeConfig(project.Merge),
+			Finish:      cloneFinishConfig(project.Finish),
 			TaskPanes:   cloneTaskPanes(project.TaskPanes),
 			TaskLayouts: cloneTaskLayouts(project.TaskLayouts),
 		}

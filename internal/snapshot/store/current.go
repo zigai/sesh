@@ -65,14 +65,24 @@ func listingFromManifest(generation Generation, manifest model.Manifest) Listing
 		})
 	}
 
-	return Listing{Generation: generation, Started: manifest.Started, Finished: manifest.Finished, Sessions: sessions}
+	return Listing{
+		Generation: generation,
+		Started:    manifest.Started,
+		Finished:   manifest.Finished,
+		Sessions:   sessions,
+	}
 }
 
 func emptyCurrentState(status string) currentState {
 	return currentState{
 		Version: currentStateVersion,
 		Status:  status,
-		Listing: Listing{Generation: noGeneration, Started: 0, Finished: 0, Sessions: []ListedSession{}},
+		Listing: Listing{
+			Generation: noGeneration,
+			Started:    0,
+			Finished:   0,
+			Sessions:   []ListedSession{},
+		},
 	}
 }
 
@@ -85,7 +95,9 @@ func (s currentState) validate() error {
 	case currentStatusAvailable:
 		return s.Listing.validate()
 	case currentStatusUnavailable, currentStatusRecoveryRequired, currentStatusUnreadable:
-		if s.Listing.Generation != noGeneration || s.Listing.Started != 0 || s.Listing.Finished != 0 || len(s.Listing.Sessions) != 0 {
+		if s.Listing.Generation != noGeneration || s.Listing.Started != 0 ||
+			s.Listing.Finished != 0 ||
+			len(s.Listing.Sessions) != 0 {
 			return ErrCorrupt
 		}
 
@@ -96,7 +108,8 @@ func (s currentState) validate() error {
 }
 
 func (l Listing) validate() error {
-	if !validID(l.Generation.ID) || l.Generation.Sequence == 0 || !validDigest(l.Generation.ManifestSHA256) {
+	if !validID(l.Generation.ID) || l.Generation.Sequence == 0 ||
+		!validDigest(l.Generation.ManifestSHA256) {
 		return ErrCorrupt
 	}
 
@@ -129,7 +142,9 @@ func (s currentState) listing() (Listing, error) {
 func (r *Repository) readCurrentState() (currentState, error) {
 	data, err := r.root.Read(currentStateName, maxCurrentStateBytes)
 	if err != nil {
-		return currentState{}, oops.In("snapshot.store").With("operation", "read_current_state").Wrapf(err, "read current state")
+		return currentState{}, oops.In("snapshot.store").
+			With("operation", "read_current_state").
+			Wrapf(err, "read current state")
 	}
 
 	state, err := strictjson.Decode[currentState](data)
@@ -140,13 +155,20 @@ func (r *Repository) readCurrentState() (currentState, error) {
 	}
 
 	if err != nil {
-		return currentState{}, oops.In("snapshot.store").With("operation", "decode_current_state", "repository", r.path, "file", currentStateName).Wrapf(err, "decode current state")
+		return currentState{}, oops.In("snapshot.store").
+			With("operation", "decode_current_state", "repository", r.path, "file", currentStateName).
+			Wrapf(err, "decode current state")
 	}
 
 	return state, nil
 }
 
-func (r *Repository) deriveCurrentState(ctx context.Context, catalog Catalog, previous currentState, committed *Listing) (currentState, error) {
+func (r *Repository) deriveCurrentState(
+	ctx context.Context,
+	catalog Catalog,
+	previous currentState,
+	committed *Listing,
+) (currentState, error) {
 	generation, err := catalog.practicalCurrentGeneration()
 
 	switch {
@@ -163,22 +185,36 @@ func (r *Repository) deriveCurrentState(ctx context.Context, catalog Catalog, pr
 	}
 
 	if committed != nil && committed.Generation == generation {
-		return currentState{Version: currentStateVersion, Status: currentStatusAvailable, Listing: *committed}, nil
+		return currentState{
+			Version: currentStateVersion,
+			Status:  currentStatusAvailable,
+			Listing: *committed,
+		}, nil
 	}
 
 	manifest, err := r.readGeneration(ctx, generation)
 	if err != nil {
 		if ctxErr := ctx.Err(); ctxErr != nil {
-			return currentState{}, oops.In("snapshot.store").With("operation", "derive_current_state").Wrap(ctxErr)
+			return currentState{}, oops.In("snapshot.store").
+				With("operation", "derive_current_state").
+				Wrap(ctxErr)
 		}
 
 		return emptyCurrentState(currentStatusUnreadable), nil
 	}
 
-	return currentState{Version: currentStateVersion, Status: currentStatusAvailable, Listing: listingFromManifest(generation, manifest)}, nil
+	return currentState{
+		Version: currentStateVersion,
+		Status:  currentStatusAvailable,
+		Listing: listingFromManifest(generation, manifest),
+	}, nil
 }
 
-func (r *Repository) stageCurrentState(ctx context.Context, catalog Catalog, committed *Listing) (string, error) {
+func (r *Repository) stageCurrentState(
+	ctx context.Context,
+	catalog Catalog,
+	committed *Listing,
+) (string, error) {
 	previous, previousErr := r.readCurrentState()
 
 	state, err := r.deriveCurrentState(ctx, catalog, previous, committed)
@@ -188,7 +224,9 @@ func (r *Repository) stageCurrentState(ctx context.Context, catalog Catalog, com
 
 	data, err := json.Marshal(state)
 	if err != nil {
-		return "", oops.In("snapshot.store").With("operation", "encode_current_state").Wrapf(err, "encode current state")
+		return "", oops.In("snapshot.store").
+			With("operation", "encode_current_state").
+			Wrapf(err, "encode current state")
 	}
 
 	if previousErr == nil {
@@ -213,7 +251,9 @@ func (r *Repository) repairCurrentState(ctx context.Context, catalog Catalog) er
 	}
 
 	if err := r.root.Rename(staged, r.root, currentStateName); err != nil {
-		return oops.In("snapshot.store").With("operation", "publish_current_state").Wrapf(err, "publish current state")
+		return oops.In("snapshot.store").
+			With("operation", "publish_current_state").
+			Wrapf(err, "publish current state")
 	}
 
 	if err := r.root.Sync(); err != nil {
@@ -226,7 +266,12 @@ func (r *Repository) repairCurrentState(ctx context.Context, catalog Catalog) er
 func (r *Repository) ReadCurrentListing(ctx context.Context) (Listing, error) {
 	lock, err := r.root.Lock(ctx, "repository.lock")
 	if err != nil {
-		return Listing{}, repositoryError("current_listing", oops.In("snapshot.store").With("operation", "lock_snapshot_read").Wrapf(err, "lock snapshot read"))
+		return Listing{}, repositoryError(
+			"current_listing",
+			oops.In("snapshot.store").
+				With("operation", "lock_snapshot_read").
+				Wrapf(err, "lock snapshot read"),
+		)
 	}
 
 	state, readErr := r.readCurrentState()
@@ -245,7 +290,12 @@ func (r *Repository) ReadCurrentListing(ctx context.Context) (Listing, error) {
 func (r *Repository) ReadListing(ctx context.Context, id string) (Listing, error) {
 	lock, err := r.root.Lock(ctx, "repository.lock")
 	if err != nil {
-		return Listing{}, repositoryError("listing", oops.In("snapshot.store").With("operation", "lock_snapshot_read").Wrapf(err, "lock snapshot read"))
+		return Listing{}, repositoryError(
+			"listing",
+			oops.In("snapshot.store").
+				With("operation", "lock_snapshot_read").
+				Wrapf(err, "lock snapshot read"),
+		)
 	}
 
 	listing, readErr := r.listingLocked(ctx, id)

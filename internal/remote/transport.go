@@ -145,16 +145,28 @@ func FindConnection(remote config.RemoteConfig, id string) (config.RemoteConnect
 		}
 	}
 
-	return config.RemoteConnectionConfig{}, oops.In("remote").With("operation", "find_connection").With("connection_id", id).Wrap(ErrConnectionMissing)
+	return config.RemoteConnectionConfig{}, oops.In("remote").
+		With("operation", "find_connection").
+		With("connection_id", id).
+		Wrap(ErrConnectionMissing)
 }
 
 func PeerEntryPoint(connection config.RemoteConnectionConfig, channel Channel) []string {
 	return []string{connection.ResolvedSeshPath(), channelCommand, peerCommand, string(channel)}
 }
 
-func NewSSHCommand(ctx context.Context, remote config.RemoteConfig, connection config.RemoteConnectionConfig, opts SSHCommandOptions, remoteCommand ...string) (*exec.Cmd, error) {
+func NewSSHCommand(
+	ctx context.Context,
+	remote config.RemoteConfig,
+	connection config.RemoteConnectionConfig,
+	opts SSHCommandOptions,
+	remoteCommand ...string,
+) (*exec.Cmd, error) {
 	if strings.HasPrefix(connection.Host, "-") || strings.TrimSpace(connection.Host) == "" {
-		return nil, oops.In("remote").With("operation", "new_ssh_command").With("host", connection.Host).Wrap(ErrInvalidFrame)
+		return nil, oops.In("remote").
+			With("operation", "new_ssh_command").
+			With("host", connection.Host).
+			Wrap(ErrInvalidFrame)
 	}
 
 	arguments := make([]string, 0, defaultSSHArgCapacity)
@@ -186,7 +198,9 @@ func NewSSHCommand(ctx context.Context, remote config.RemoteConfig, connection c
 
 		for _, forward := range opts.Forward {
 			if !validSocketPath(forward.RemotePath) || !validSocketPath(forward.LocalPath) {
-				return nil, oops.In("remote").With("operation", "new_ssh_command").Wrap(ErrUnsafePath)
+				return nil, oops.In("remote").
+					With("operation", "new_ssh_command").
+					Wrap(ErrUnsafePath)
 			}
 
 			arguments = append(arguments, "-R", forward.RemotePath+":"+forward.LocalPath)
@@ -270,7 +284,9 @@ func ConnectionErrorCode(err error) string {
 		return ConnectionErrorPeerMismatch
 	case errors.Is(err, ErrCatalogCapacity):
 		return ConnectionErrorCacheCapacity
-	case errors.Is(err, ErrUnsupportedProtocol), errors.Is(err, ErrInvalidFrame), errors.Is(err, ErrFrameTooLarge):
+	case errors.Is(err, ErrUnsupportedProtocol),
+		errors.Is(err, ErrInvalidFrame),
+		errors.Is(err, ErrFrameTooLarge):
 		return ConnectionErrorIncompatibleProtocol
 	case errors.Is(err, context.DeadlineExceeded):
 		return ConnectionErrorTimeout
@@ -285,7 +301,12 @@ func ConnectionErrorCode(err error) string {
 	}
 }
 
-func FinishCommand(ctx context.Context, command *exec.Cmd, stdout io.Closer, diagnostics *DiagnosticsBuffer) error {
+func FinishCommand(
+	ctx context.Context,
+	command *exec.Cmd,
+	stdout io.Closer,
+	diagnostics *DiagnosticsBuffer,
+) error {
 	if command == nil {
 		return errNilCommand
 	}
@@ -294,23 +315,35 @@ func FinishCommand(ctx context.Context, command *exec.Cmd, stdout io.Closer, dia
 
 	if stdout != nil {
 		if err := stdout.Close(); err != nil && !errors.Is(err, os.ErrClosed) {
-			result = errors.Join(result, ErrConnectionUnavailable, oops.In("remote").With("operation", "finish_command").Wrap(err))
+			result = errors.Join(
+				result,
+				ErrConnectionUnavailable,
+				oops.In("remote").With("operation", "finish_command").Wrap(err),
+			)
 		}
 	}
 
 	if command.Process != nil {
 		if err := command.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
-			result = errors.Join(result, ErrConnectionUnavailable, oops.In("remote").With("operation", "finish_command").Wrap(err))
+			result = errors.Join(
+				result,
+				ErrConnectionUnavailable,
+				oops.In("remote").With("operation", "finish_command").Wrap(err),
+			)
 		}
 	}
 
 	waitErr := command.Wait()
 
 	if ctx.Err() != nil {
-		return errors.Join(oops.In("remote").With("operation", "finish_command").Wrap(ctx.Err()), result)
+		return errors.Join(
+			oops.In("remote").With("operation", "finish_command").Wrap(ctx.Err()),
+			result,
+		)
 	}
 
-	if waitErr != nil && !errors.Is(waitErr, context.Canceled) && !errors.Is(waitErr, os.ErrProcessDone) {
+	if waitErr != nil && !errors.Is(waitErr, context.Canceled) &&
+		!errors.Is(waitErr, os.ErrProcessDone) {
 		result = errors.Join(result, ClassifySSHFailure(nil, diagnostics.String()))
 	}
 

@@ -40,8 +40,14 @@ func TestRemoteMonitorBinaryReloadRemovesObsoleteConnection(t *testing.T) {
 	logFile := filepath.Join(stateHome, "sesh.log")
 	logHeader := fmt.Sprintf("[paths]\nlog_file = %q\n\n", logFile)
 
-	writeTestConfig(t, configPath, logHeader+"[remote]\nenabled = true\nssh_path = \"/bin/false\"\n"+
-		remoteConnectionsTOML(config.RemoteConnectionConfig{ID: "remove-me", Host: "example.invalid"}))
+	writeTestConfig(
+		t,
+		configPath,
+		logHeader+"[remote]\nenabled = true\nssh_path = \"/bin/false\"\n"+
+			remoteConnectionsTOML(
+				config.RemoteConnectionConfig{ID: "remove-me", Host: "example.invalid"},
+			),
+	)
 
 	process := startRemoteReloadProcess(t, binary, configPath, root, cacheHome, stateHome)
 	catalogPath := filepath.Join(cacheHome, "sesh", "remote", "catalog.json")
@@ -58,7 +64,11 @@ func TestRemoteMonitorBinaryReloadRemovesObsoleteConnection(t *testing.T) {
 
 	assertRemoteReloadCatalogRetained(t, catalogPath, process.done, "remove-me")
 
-	writeTestConfig(t, configPath, logHeader+"[remote]\nenabled = false\nssh_path = \"/bin/false\"\n")
+	writeTestConfig(
+		t,
+		configPath,
+		logHeader+"[remote]\nenabled = false\nssh_path = \"/bin/false\"\n",
+	)
 
 	waitForRemoteReloadCatalog(t, catalogPath, process.done, func(catalog remote.Catalog) bool {
 		return len(catalog.Connections) == 0
@@ -83,7 +93,8 @@ func TestRemoteMonitorBinaryReloadRemovesObsoleteConnection(t *testing.T) {
 			t.Fatalf("interrupted monitor logged an error: %s", line)
 		}
 
-		if record["component"] == "cli" && record["operation"] == "remote_monitor" && record["status"] != "started" {
+		if record["component"] == "cli" && record["operation"] == "remote_monitor" &&
+			record["status"] != "started" {
 			outcomes++
 
 			if record["level"] != "info" || record["status"] != "ok" {
@@ -97,7 +108,12 @@ func TestRemoteMonitorBinaryReloadRemovesObsoleteConnection(t *testing.T) {
 	}
 }
 
-func assertRemoteReloadCatalogRetained(t *testing.T, path string, done <-chan struct{}, connectionID string) {
+func assertRemoteReloadCatalogRetained(
+	t *testing.T,
+	path string,
+	done <-chan struct{},
+	connectionID string,
+) {
 	t.Helper()
 
 	deadline := time.Now().Add(3 * remoteConfigReloadInterval)
@@ -130,7 +146,15 @@ func buildRemoteReloadBinary(t *testing.T, root string) string {
 	t.Helper()
 
 	binary := filepath.Join(root, "sesh")
-	build := exec.CommandContext(t.Context(), "go", "build", "-mod=readonly", "-o", binary, "../../../cmd/sesh")
+	build := exec.CommandContext(
+		t.Context(),
+		"go",
+		"build",
+		"-mod=readonly",
+		"-o",
+		binary,
+		"../../../cmd/sesh",
+	)
 	build.Dir = "."
 
 	build.Env = append(os.Environ(), "GOWORK=off")
@@ -142,7 +166,10 @@ func buildRemoteReloadBinary(t *testing.T, root string) string {
 	return binary
 }
 
-func startRemoteReloadProcess(t *testing.T, binary, configPath, root, cacheHome, stateHome string) *remoteReloadProcess {
+func startRemoteReloadProcess(
+	t *testing.T,
+	binary, configPath, root, cacheHome, stateHome string,
+) *remoteReloadProcess {
 	t.Helper()
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -151,7 +178,14 @@ func startRemoteReloadProcess(t *testing.T, binary, configPath, root, cacheHome,
 		stdout: bytes.Buffer{}, stderr: bytes.Buffer{},
 	}
 
-	process.command = exec.CommandContext(ctx, binary, "--config", configPath, "daemon", "remote-monitor")
+	process.command = exec.CommandContext(
+		ctx,
+		binary,
+		"--config",
+		configPath,
+		"daemon",
+		"remote-monitor",
+	)
 
 	process.command.Env = append(append(os.Environ(), "GOWORK=off"),
 		"HOME="+filepath.Join(root, "home"),
@@ -212,11 +246,20 @@ func (process *remoteReloadProcess) stop(t *testing.T) {
 	}
 
 	if process.stdout.Len() != 0 || process.stderr.Len() != 0 {
-		t.Fatalf("monitor polluted command streams: stdout=%q stderr=%q", process.stdout.String(), process.stderr.String())
+		t.Fatalf(
+			"monitor polluted command streams: stdout=%q stderr=%q",
+			process.stdout.String(),
+			process.stderr.String(),
+		)
 	}
 }
 
-func waitForRemoteReloadCatalog(t *testing.T, path string, done <-chan struct{}, accept func(remote.Catalog) bool) {
+func waitForRemoteReloadCatalog(
+	t *testing.T,
+	path string,
+	done <-chan struct{},
+	accept func(remote.Catalog) bool,
+) {
 	t.Helper()
 
 	deadline := time.Now().Add(10 * time.Second)

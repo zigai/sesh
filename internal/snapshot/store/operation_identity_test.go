@@ -152,7 +152,13 @@ func TestRegisterOperationConflictInEachImmutableField(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := r.RegisterOperation(t.Context(), baseID, tc.source, tc.target, tc.actions)
-			assertRepositoryDiagnostic(t, err, "register_operation", "repository_conflict", ErrConflict)
+			assertRepositoryDiagnostic(
+				t,
+				err,
+				"register_operation",
+				"repository_conflict",
+				ErrConflict,
+			)
 		})
 	}
 }
@@ -175,16 +181,37 @@ func TestRegisterOperationProgressedActionsPreserved(t *testing.T) {
 	}
 
 	runtimeLaunch := model.Bytes("tmux-%1")
-	if err := r.Transition(t.Context(), op.ID, actionLaunch, actionPlanned, actionIssued, runtimeLaunch); err != nil {
+	if err := r.Transition(
+		t.Context(),
+		op.ID,
+		actionLaunch,
+		actionPlanned,
+		actionIssued,
+		runtimeLaunch,
+	); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := r.Transition(t.Context(), op.ID, actionLaunch, actionIssued, actionUnknown, runtimeLaunch); err != nil {
+	if err := r.Transition(
+		t.Context(),
+		op.ID,
+		actionLaunch,
+		actionIssued,
+		actionUnknown,
+		runtimeLaunch,
+	); err != nil {
 		t.Fatal(err)
 	}
 
 	runtimeConfig := model.Bytes("cfg-%2")
-	if err := r.Transition(t.Context(), op.ID, "config", actionPlanned, actionIssued, runtimeConfig); err != nil {
+	if err := r.Transition(
+		t.Context(),
+		op.ID,
+		"config",
+		actionPlanned,
+		actionIssued,
+		runtimeConfig,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -207,7 +234,12 @@ func TestRegisterOperationProgressedActionsPreserved(t *testing.T) {
 	}
 }
 
-func assertProgressedOperation(t *testing.T, op Operation, opID string, runtimeLaunch, runtimeConfig []byte) {
+func assertProgressedOperation(
+	t *testing.T,
+	op Operation,
+	opID string,
+	runtimeLaunch, runtimeConfig []byte,
+) {
 	t.Helper()
 
 	if op.ID != opID {
@@ -222,7 +254,8 @@ func assertProgressedOperation(t *testing.T, op Operation, opID string, runtimeL
 		t.Fatalf("expected 2 actions, got %d", len(op.Actions))
 	}
 
-	if op.Actions[0].State != actionUnknown || !bytes.Equal(op.Actions[0].RuntimeID, runtimeLaunch) {
+	if op.Actions[0].State != actionUnknown ||
+		!bytes.Equal(op.Actions[0].RuntimeID, runtimeLaunch) {
 		t.Fatalf("launch action was reset or lost runtime ID: %+v", op.Actions[0])
 	}
 
@@ -397,7 +430,13 @@ func TestRegisterOperationInvalidIDsAndActionRequests(t *testing.T) {
 
 		for _, badID := range invalidIDs {
 			op, err := r.RegisterOperation(t.Context(), badID, source.ID, validTarget, validActions)
-			assertRepositoryDiagnostic(t, err, "register_operation", "repository_corrupt", ErrCorrupt)
+			assertRepositoryDiagnostic(
+				t,
+				err,
+				"register_operation",
+				"repository_corrupt",
+				ErrCorrupt,
+			)
 
 			if op.ID != badID {
 				t.Fatalf("expected op.ID %s to be preserved on error, got %s", badID, op.ID)
@@ -414,15 +453,39 @@ func TestRegisterOperationInvalidIDsAndActionRequests(t *testing.T) {
 		}
 
 		for _, badSource := range invalidSources {
-			_, err := r.RegisterOperation(t.Context(), newID(), badSource, validTarget, validActions)
-			assertRepositoryDiagnostic(t, err, "register_operation", "repository_corrupt", ErrCorrupt)
+			_, err := r.RegisterOperation(
+				t.Context(),
+				newID(),
+				badSource,
+				validTarget,
+				validActions,
+			)
+			assertRepositoryDiagnostic(
+				t,
+				err,
+				"register_operation",
+				"repository_corrupt",
+				ErrCorrupt,
+			)
 		}
 	})
 
 	t.Run("empty target bytes", func(t *testing.T) {
 		for _, emptyTarget := range []model.Bytes{nil, {}} {
-			_, err := r.RegisterOperation(t.Context(), newID(), source.ID, emptyTarget, validActions)
-			assertRepositoryDiagnostic(t, err, "register_operation", "repository_corrupt", ErrCorrupt)
+			_, err := r.RegisterOperation(
+				t.Context(),
+				newID(),
+				source.ID,
+				emptyTarget,
+				validActions,
+			)
+			assertRepositoryDiagnostic(
+				t,
+				err,
+				"register_operation",
+				"repository_corrupt",
+				ErrCorrupt,
+			)
 		}
 	})
 
@@ -430,12 +493,25 @@ func TestRegisterOperationInvalidIDsAndActionRequests(t *testing.T) {
 		for _, badState := range []model.ActionState{actionIssued, actionUnknown, actionConfirmed, actionVerified} {
 			badActions := []Action{{ID: "act", Kind: actionLaunch, State: badState}}
 			_, err := r.RegisterOperation(t.Context(), newID(), source.ID, validTarget, badActions)
-			assertRepositoryDiagnostic(t, err, "register_operation", "repository_conflict", ErrConflict)
+			assertRepositoryDiagnostic(
+				t,
+				err,
+				"register_operation",
+				"repository_conflict",
+				ErrConflict,
+			)
 		}
 	})
 
 	t.Run("action requests with non-empty runtime ID", func(t *testing.T) {
-		badActions := []Action{{ID: "act", Kind: actionLaunch, State: actionPlanned, RuntimeID: model.Bytes("pre-assigned")}}
+		badActions := []Action{
+			{
+				ID:        "act",
+				Kind:      actionLaunch,
+				State:     actionPlanned,
+				RuntimeID: model.Bytes("pre-assigned"),
+			},
+		}
 		_, err := r.RegisterOperation(t.Context(), newID(), source.ID, validTarget, badActions)
 		assertRepositoryDiagnostic(t, err, "register_operation", "repository_conflict", ErrConflict)
 	})
@@ -603,7 +679,8 @@ func TestRegisterOperationMutationDoesNotChangeJournal(t *testing.T) {
 		t.Fatalf("journal target was mutated: %s", reconciled.Target)
 	}
 
-	if len(reconciled.Actions) != 1 || reconciled.Actions[0].ID != "act1" || reconciled.Actions[0].Kind != actionLaunch {
+	if len(reconciled.Actions) != 1 || reconciled.Actions[0].ID != "act1" ||
+		reconciled.Actions[0].Kind != actionLaunch {
 		t.Fatalf("journal action was mutated: %+v", reconciled.Actions)
 	}
 
@@ -707,7 +784,13 @@ func TestRegisterOperationBoundsBeforeLockAndSourceReads(t *testing.T) {
 	_, err = r.RegisterOperation(t.Context(), newID(), source.ID, hugeTarget, validActions)
 	assertRepositoryDiagnostic(t, err, "register_operation", "repository_corrupt", ErrCorrupt)
 
-	_, err = r.RegisterOperation(t.Context(), newID(), "0123456789abcdef0123456789abcdef", hugeTarget, validActions)
+	_, err = r.RegisterOperation(
+		t.Context(),
+		newID(),
+		"0123456789abcdef0123456789abcdef",
+		hugeTarget,
+		validActions,
+	)
 	assertRepositoryDiagnostic(t, err, "register_operation", "repository_corrupt", ErrCorrupt)
 
 	excessiveActions := make([]Action, model.MaxEntities+1)
@@ -718,7 +801,9 @@ func TestRegisterOperationBoundsBeforeLockAndSourceReads(t *testing.T) {
 	_, err = r.RegisterOperation(t.Context(), newID(), source.ID, validTarget, excessiveActions)
 	assertRepositoryDiagnostic(t, err, "register_operation", "repository_corrupt", ErrCorrupt)
 
-	runtimeActions := []Action{{ID: "act", Kind: actionLaunch, State: actionPlanned, RuntimeID: model.Bytes("assigned")}}
+	runtimeActions := []Action{
+		{ID: "act", Kind: actionLaunch, State: actionPlanned, RuntimeID: model.Bytes("assigned")},
+	}
 	_, err = r.RegisterOperation(t.Context(), newID(), source.ID, validTarget, runtimeActions)
 	assertRepositoryDiagnostic(t, err, "register_operation", "repository_conflict", ErrConflict)
 
@@ -755,7 +840,10 @@ func TestRegisterOperationNoMutableAliasesOnValidFailure(t *testing.T) {
 	}
 
 	if inputActions[0].ID != "act1" {
-		t.Fatalf("input action ID was mutated by modifying returned operation: %s", inputActions[0].ID)
+		t.Fatalf(
+			"input action ID was mutated by modifying returned operation: %s",
+			inputActions[0].ID,
+		)
 	}
 
 	inputTarget[0] = 'Y'
@@ -766,7 +854,10 @@ func TestRegisterOperationNoMutableAliasesOnValidFailure(t *testing.T) {
 	}
 
 	if failedOp.Actions[0].ID != "mutated-action" {
-		t.Fatalf("failedOp action was mutated by modifying input action: %s", failedOp.Actions[0].ID)
+		t.Fatalf(
+			"failedOp action was mutated by modifying input action: %s",
+			failedOp.Actions[0].ID,
+		)
 	}
 }
 
@@ -796,7 +887,13 @@ func TestRegisterOperationNilActionsContract(t *testing.T) {
 		t.Fatalf("expected empty reconciled actions, got: %d", len(reconciledNil.Actions))
 	}
 
-	retriedNilWithEmpty, err := r.RegisterOperation(t.Context(), opNilID, source.ID, target, []Action{})
+	retriedNilWithEmpty, err := r.RegisterOperation(
+		t.Context(),
+		opNilID,
+		source.ID,
+		target,
+		[]Action{},
+	)
 	if err != nil {
 		t.Fatalf("retrying nil operation with empty actions should match intent: %v", err)
 	}
@@ -918,7 +1015,10 @@ func TestRegisterOperationReconcileAdvancedJournalAfterUnknownEffect(t *testing.
 	}
 
 	if reconciled.Actions[0].State != actionUnknown {
-		t.Fatalf("reconciled action was reset to %s instead of unknown", reconciled.Actions[0].State)
+		t.Fatalf(
+			"reconciled action was reset to %s instead of unknown",
+			reconciled.Actions[0].State,
+		)
 	}
 
 	retried, err := r.RegisterOperation(t.Context(), opID, source.ID, target, actions)
@@ -927,7 +1027,10 @@ func TestRegisterOperationReconcileAdvancedJournalAfterUnknownEffect(t *testing.
 	}
 
 	if retried.Actions[0].State != actionUnknown {
-		t.Fatalf("retried action reported planned success instead of unknown: %s", retried.Actions[0].State)
+		t.Fatalf(
+			"retried action reported planned success instead of unknown: %s",
+			retried.Actions[0].State,
+		)
 	}
 
 	if retried.State != "active" {

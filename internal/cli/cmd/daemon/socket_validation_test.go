@@ -19,7 +19,8 @@ const (
 func requireSocketUsageError(t *testing.T, err error) {
 	t.Helper()
 
-	if err == nil || clibase.ExitCode(err) != clibase.ExitCodeUsage || !strings.Contains(err.Error(), socketRequiredErrorText) {
+	if err == nil || clibase.ExitCode(err) != clibase.ExitCodeUsage ||
+		!strings.Contains(err.Error(), socketRequiredErrorText) {
 		t.Fatalf("error = %v, want the explicit socket usage error", err)
 	}
 }
@@ -42,7 +43,8 @@ func TestDaemonCoordinatorRequiresExplicitSocketBeforeOpeningLogind(t *testing.T
 		"--history", filepath.Join(t.TempDir(), "history.json"),
 		"--no-config",
 	)
-	if exec.Err == nil || clibase.ExitCode(exec.Err) != clibase.ExitCodeUsage || errors.Is(exec.Err, clibase.ErrUnknownCommand) {
+	if exec.Err == nil || clibase.ExitCode(exec.Err) != clibase.ExitCodeUsage ||
+		errors.Is(exec.Err, clibase.ErrUnknownCommand) {
 		t.Fatalf("daemon coordinator error = %v, want socket usage error", exec.Err)
 	}
 }

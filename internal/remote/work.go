@@ -44,7 +44,8 @@ func validWorkRows(rows []work.Item) bool {
 
 func validWorkRow(row work.Item) bool {
 	if !ValidIdentifier(row.ID) || !ValidIdentifier(row.Conversation) || len(row.Resume) != 0 || row.SessionPath != "" ||
-		(row.Task != "" && !ValidIdentifier(row.Task)) || !validPRLinks(row.PRs) {
+		(row.Task != "" && !ValidIdentifier(row.Task)) ||
+		!validPRLinks(row.PRs) {
 		return false
 	}
 
@@ -63,7 +64,8 @@ func validPRLinks(links []work.PRLink) bool {
 	}
 
 	for _, link := range links {
-		if len(link.Issues) > MaxWork || !ValidText(link.URL) || !ValidText(string(link.State)) || !ValidText(string(link.Source)) {
+		if len(link.Issues) > MaxWork || !ValidText(link.URL) || !ValidText(string(link.State)) ||
+			!ValidText(string(link.Source)) {
 			return false
 		}
 	}

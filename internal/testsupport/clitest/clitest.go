@@ -65,7 +65,12 @@ func ExecuteJSON(t *testing.T, args ...string) Execution {
 	}
 
 	if err := json.Unmarshal([]byte(target), &exec.Envelope); err != nil {
-		t.Fatalf("failed to parse JSON envelope: %v; stdout=%q; stderr=%q", err, exec.Stdout, exec.Stderr)
+		t.Fatalf(
+			"failed to parse JSON envelope: %v; stdout=%q; stderr=%q",
+			err,
+			exec.Stdout,
+			exec.Stderr,
+		)
 	}
 
 	return exec

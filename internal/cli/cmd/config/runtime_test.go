@@ -63,7 +63,8 @@ func TestCommandConfigurationSnapshotProcessEnvironmentIsNotChangedByCallers(t *
 		t.Fatal(err)
 	}
 
-	if len(first.Snapshot.ProcessEnvironment) != 1 || first.Snapshot.ProcessEnvironment[0] != "ORIGINAL_VAR" {
+	if len(first.Snapshot.ProcessEnvironment) != 1 ||
+		first.Snapshot.ProcessEnvironment[0] != "ORIGINAL_VAR" {
 		t.Fatalf("first = %#v, want [ORIGINAL_VAR]", first.Snapshot.ProcessEnvironment)
 	}
 
@@ -74,7 +75,8 @@ func TestCommandConfigurationSnapshotProcessEnvironmentIsNotChangedByCallers(t *
 		t.Fatal(err)
 	}
 
-	if len(second.Snapshot.ProcessEnvironment) != 1 || second.Snapshot.ProcessEnvironment[0] != "ORIGINAL_VAR" {
+	if len(second.Snapshot.ProcessEnvironment) != 1 ||
+		second.Snapshot.ProcessEnvironment[0] != "ORIGINAL_VAR" {
 		t.Fatalf("second = %#v, want [ORIGINAL_VAR]", second.Snapshot.ProcessEnvironment)
 	}
 }
@@ -119,8 +121,16 @@ func TestListSharesWorkflowHistoryPath(t *testing.T) {
 		}
 
 		sessions := []session.Session{
-			{Name: "alphabetically-first", Origin: session.OriginLocal, TmuxServerSocket: "/isolated/unused.sock"},
-			{Name: "recently-switched", Origin: session.OriginLocal, TmuxServerSocket: "/isolated/unused.sock"},
+			{
+				Name:             "alphabetically-first",
+				Origin:           session.OriginLocal,
+				TmuxServerSocket: "/isolated/unused.sock",
+			},
+			{
+				Name:             "recently-switched",
+				Origin:           session.OriginLocal,
+				TmuxServerSocket: "/isolated/unused.sock",
+			},
 		}
 
 		if _, err := session.UpdateState(t.Context(), path, func(state *session.State) {

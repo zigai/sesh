@@ -70,7 +70,12 @@ func TestFinalSaveStatusRejectsSymlinkedParent(t *testing.T) {
 		t.Fatal("WriteFinalSaveStatus succeeded through a symlinked parent")
 	}
 
-	if _, err := os.Stat(filepath.Join(realDirectory, automation.FinalSaveStatusName)); !errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(
+		filepath.Join(realDirectory, automation.FinalSaveStatusName),
+	); !errors.Is(
+		err,
+		os.ErrNotExist,
+	) {
 		t.Fatalf("target status Stat error = %v, want os.ErrNotExist", err)
 	}
 
@@ -125,7 +130,12 @@ func TestReadFinalSaveStatusRejectsOversizedValidJSONPrefix(t *testing.T) {
 		t.Fatalf("WriteFile failed: %v", err)
 	}
 
-	if _, err := automation.ReadFinalSaveStatus(path); !errors.Is(err, automation.ErrFinalStatusTooLarge) {
+	if _, err := automation.ReadFinalSaveStatus(
+		path,
+	); !errors.Is(
+		err,
+		automation.ErrFinalStatusTooLarge,
+	) {
 		t.Fatalf("ReadFinalSaveStatus error = %v, want ErrFinalStatusTooLarge", err)
 	}
 }

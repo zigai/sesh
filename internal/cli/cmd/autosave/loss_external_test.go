@@ -19,7 +19,11 @@ func TestAutosaveSkipReportsSavedSessionsOnceWhenNoServerIsRunning(t *testing.T)
 
 	snapfixture.CommitOneSession(t, repoPath)
 
-	if _, err := session.UpdateState(t.Context(), historyPath, func(state *session.State) { state.LastAutosaveUnix = 1 }); err != nil {
+	if _, err := session.UpdateState(
+		t.Context(),
+		historyPath,
+		func(state *session.State) { state.LastAutosaveUnix = 1 },
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -69,7 +73,8 @@ func TestFinalSaveAfterTheServerDiedRecordsServerGoneNotAGenericFailure(t *testi
 		t.Fatalf("the final save must still record why it was incomplete: %v", err)
 	}
 
-	if status.Result != automation.FinalSaveIncomplete || status.Reason != "server_gone" || !status.Incomplete {
+	if status.Result != automation.FinalSaveIncomplete || status.Reason != "server_gone" ||
+		!status.Incomplete {
 		t.Fatalf("status = %+v, want incomplete/server_gone", status)
 	}
 }

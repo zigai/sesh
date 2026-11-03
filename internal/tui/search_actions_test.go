@@ -94,7 +94,8 @@ func assertSearchResultsFrame(t *testing.T, model *Model, want []string, initial
 	rendered := viewString(model.View())
 
 	lines := strings.Split(rendered, "\n")
-	if len(lines) != len(initialLines) || lines[0] != initialLines[0] || lines[len(lines)-1] != initialLines[len(initialLines)-1] {
+	if len(lines) != len(initialLines) || lines[0] != initialLines[0] ||
+		lines[len(lines)-1] != initialLines[len(initialLines)-1] {
 		t.Fatal("filtering changed the surrounding frame")
 	}
 

@@ -43,7 +43,11 @@ func keyOf(entries []session.KeyAssignment, name string) string {
 }
 
 func TestAssignSessionKeysPrefersLettersOfTheName(t *testing.T) {
-	listed := []session.Identity{localKeyIdentity("web"), localKeyIdentity("wiki"), localKeyIdentity("notes")}
+	listed := []session.Identity{
+		localKeyIdentity("web"),
+		localKeyIdentity("wiki"),
+		localKeyIdentity("notes"),
+	}
 
 	assigned, changed := assignSessionKeys(nil, listed, defaultSessionKeyRules(), true)
 	if !changed {
@@ -66,7 +70,12 @@ func TestAssignSessionKeysSkipsLettersOfPickerActionsWithAlt(t *testing.T) {
 		{Key: "alt+r", Action: "session.kill", In: "picker", Table: "", Params: nil},
 	}
 
-	assigned, _ := assignSessionKeys(nil, []session.Identity{localKeyIdentity("scratch")}, newSessionKeyRules(cfg, testBindings(cfg)), true)
+	assigned, _ := assignSessionKeys(
+		nil,
+		[]session.Identity{localKeyIdentity("scratch")},
+		newSessionKeyRules(cfg, testBindings(cfg)),
+		true,
+	)
 
 	if got := keyOf(assigned, "scratch"); got != "a" {
 		t.Fatalf("key of scratch = %q, want a", got)
@@ -74,7 +83,12 @@ func TestAssignSessionKeysSkipsLettersOfPickerActionsWithAlt(t *testing.T) {
 }
 
 func TestAssignSessionKeysUsesLettersOfPickerActionsWithTab(t *testing.T) {
-	assigned, _ := assignSessionKeys(nil, []session.Identity{localKeyIdentity("scratch")}, defaultSessionKeyRules(), true)
+	assigned, _ := assignSessionKeys(
+		nil,
+		[]session.Identity{localKeyIdentity("scratch")},
+		defaultSessionKeyRules(),
+		true,
+	)
 
 	if got := keyOf(assigned, "scratch"); got != "s" {
 		t.Fatalf("key of scratch = %q, want s", got)
@@ -82,7 +96,11 @@ func TestAssignSessionKeysUsesLettersOfPickerActionsWithTab(t *testing.T) {
 }
 
 func TestAssignSessionKeysDoesNotDependOnListOrder(t *testing.T) {
-	listed := []session.Identity{localKeyIdentity("web"), localKeyIdentity("wiki"), localKeyIdentity("www")}
+	listed := []session.Identity{
+		localKeyIdentity("web"),
+		localKeyIdentity("wiki"),
+		localKeyIdentity("www"),
+	}
 	reversed := slices.Clone(listed)
 	slices.Reverse(reversed)
 
@@ -99,7 +117,12 @@ func TestAssignSessionKeysDoesNotDependOnListOrder(t *testing.T) {
 func TestAssignSessionKeysKeepsKeysOfUnlistedSessions(t *testing.T) {
 	entries := []session.KeyAssignment{keyEntry("web", "w")}
 
-	assigned, _ := assignSessionKeys(entries, []session.Identity{localKeyIdentity("wiki")}, defaultSessionKeyRules(), false)
+	assigned, _ := assignSessionKeys(
+		entries,
+		[]session.Identity{localKeyIdentity("wiki")},
+		defaultSessionKeyRules(),
+		false,
+	)
 
 	if got := keyOf(assigned, "web"); got != "w" {
 		t.Fatalf("unlisted web key = %q, want w kept", got)
@@ -123,7 +146,11 @@ func fullKeyAssignments(rules sessionKeyRules) []session.KeyAssignment {
 }
 
 func TestAssignSessionKeysKeepsUnlistedKeysWhileLettersRemain(t *testing.T) {
-	remote := session.Identity{Origin: string(session.OriginSSH), ConnectionID: "box", Name: "remote"}
+	remote := session.Identity{
+		Origin:       string(session.OriginSSH),
+		ConnectionID: "box",
+		Name:         "remote",
+	}
 	entries := []session.KeyAssignment{keyEntry("gone", "g"), {Session: remote, Key: "m"}}
 
 	assigned, changed := assignSessionKeys(entries, nil, defaultSessionKeyRules(), true)
@@ -145,7 +172,11 @@ func TestAssignSessionKeysReclaimsOldestUnlistedKeyWhenLettersRunOut(t *testing.
 	assigned, _ := assignSessionKeys(entries, listed, rules, true)
 
 	if got := keyOf(assigned, "new"); got != entries[0].Key {
-		t.Fatalf("key of new = %q, want %q taken back from the unlisted session", got, entries[0].Key)
+		t.Fatalf(
+			"key of new = %q, want %q taken back from the unlisted session",
+			got,
+			entries[0].Key,
+		)
 	}
 
 	if got := keyOf(assigned, entries[0].Session.Name); got != "" {
@@ -157,7 +188,12 @@ func TestAssignSessionKeysReclaimsNothingFromIncompleteListing(t *testing.T) {
 	rules := defaultSessionKeyRules()
 	entries := fullKeyAssignments(rules)
 
-	assigned, _ := assignSessionKeys(entries, []session.Identity{localKeyIdentity("new")}, rules, false)
+	assigned, _ := assignSessionKeys(
+		entries,
+		[]session.Identity{localKeyIdentity("new")},
+		rules,
+		false,
+	)
 
 	if got := keyOf(assigned, "new"); got != "" {
 		t.Fatalf("key of new = %q, want none while the listing is incomplete", got)
@@ -170,7 +206,9 @@ func TestSavedSessionKeysReplaceShownKeys(t *testing.T) {
 
 	model.Update(sessionKeysSavedMsg{keys: []session.KeyAssignment{keyEntry("web", "e")}, err: nil})
 
-	if got := model.sessionKey(session.Session{Name: "web", Origin: session.OriginLocal}); got != "e" {
+	if got := model.sessionKey(
+		session.Session{Name: "web", Origin: session.OriginLocal},
+	); got != "e" {
 		t.Fatalf("sessionKey(web) = %q, want e from the saved history", got)
 	}
 }
@@ -178,7 +216,12 @@ func TestSavedSessionKeysReplaceShownKeys(t *testing.T) {
 func TestAssignSessionKeysReportsUnchangedKeys(t *testing.T) {
 	entries := []session.KeyAssignment{keyEntry("web", "w")}
 
-	assigned, changed := assignSessionKeys(entries, []session.Identity{localKeyIdentity("web")}, defaultSessionKeyRules(), true)
+	assigned, changed := assignSessionKeys(
+		entries,
+		[]session.Identity{localKeyIdentity("web")},
+		defaultSessionKeyRules(),
+		true,
+	)
 	if changed || !slices.Equal(assigned, entries) {
 		t.Fatalf("assignSessionKeys() = %#v, %v, want entries unchanged", assigned, changed)
 	}
@@ -190,7 +233,11 @@ func TestAssignSessionKeysYieldsToOverrides(t *testing.T) {
 	rules := newSessionKeyRules(cfg, testBindings(cfg))
 
 	entries := []session.KeyAssignment{keyEntry("wiki", "w"), keyEntry("web", "e")}
-	listed := []session.Identity{localKeyIdentity("wiki"), localKeyIdentity("web"), localKeyIdentity("api")}
+	listed := []session.Identity{
+		localKeyIdentity("wiki"),
+		localKeyIdentity("web"),
+		localKeyIdentity("api"),
+	}
 
 	assigned, _ := assignSessionKeys(entries, listed, rules, true)
 
@@ -209,14 +256,24 @@ func TestAssignSessionKeysReassignsKeysTakenByActions(t *testing.T) {
 
 	entries := []session.KeyAssignment{keyEntry("web", "w")}
 
-	assigned, _ := assignSessionKeys(entries, []session.Identity{localKeyIdentity("web")}, newSessionKeyRules(cfg, testBindings(cfg)), true)
+	assigned, _ := assignSessionKeys(
+		entries,
+		[]session.Identity{localKeyIdentity("web")},
+		newSessionKeyRules(cfg, testBindings(cfg)),
+		true,
+	)
 	if got := keyOf(assigned, "web"); got != "e" {
 		t.Fatalf("key of web = %q, want e once alt+w runs an action", got)
 	}
 }
 
 func TestAssignSessionKeysFallsBackToAnyLetter(t *testing.T) {
-	assigned, _ := assignSessionKeys(nil, []session.Identity{localKeyIdentity("123")}, defaultSessionKeyRules(), true)
+	assigned, _ := assignSessionKeys(
+		nil,
+		[]session.Identity{localKeyIdentity("123")},
+		defaultSessionKeyRules(),
+		true,
+	)
 	if got := keyOf(assigned, "123"); got != "a" {
 		t.Fatalf("key of 123 = %q, want a", got)
 	}
@@ -225,7 +282,10 @@ func TestAssignSessionKeysFallsBackToAnyLetter(t *testing.T) {
 func TestAssignSessionKeysLeavesSessionsWithoutKeysWhenLettersRunOut(t *testing.T) {
 	listed := make([]session.Identity, 0, 30)
 	for index := range 30 {
-		listed = append(listed, localKeyIdentity(string(rune('a'+index%26))+string(rune('0'+index/26))))
+		listed = append(
+			listed,
+			localKeyIdentity(string(rune('a'+index%26))+string(rune('0'+index/26))),
+		)
 	}
 
 	assigned, _ := assignSessionKeys(nil, listed, defaultSessionKeyRules(), true)
@@ -238,8 +298,13 @@ func TestAssignSessionKeysLeavesSessionsWithoutKeysWhenLettersRunOut(t *testing.
 func TestSessionKeyOpensSessionHiddenByFilter(t *testing.T) {
 	model := newTestModel()
 	model.mode = modePopup
-	model.state.SessionKeys = []session.KeyAssignment{{Session: session.Identity{Name: "web"}, Key: "w"}}
-	model.sessions = []session.Session{{Name: "api", Kind: session.KindLive}, {Name: "web", Kind: session.KindLive}}
+	model.state.SessionKeys = []session.KeyAssignment{
+		{Session: session.Identity{Name: "web"}, Key: "w"},
+	}
+	model.sessions = []session.Session{
+		{Name: "api", Kind: session.KindLive},
+		{Name: "web", Kind: session.KindLive},
+	}
 	model.filtered = model.sessions[:1]
 	holdAltForSessionKeys(model)
 
@@ -259,7 +324,9 @@ func TestSessionKeyOpensSessionHiddenByFilter(t *testing.T) {
 
 func TestSessionKeyRestoresSavedSession(t *testing.T) {
 	model := newTestModel()
-	model.state.SessionKeys = []session.KeyAssignment{{Session: session.Identity{Name: "archive"}, Key: "v"}}
+	model.state.SessionKeys = []session.KeyAssignment{
+		{Session: session.Identity{Name: "archive"}, Key: "v"},
+	}
 	model.sessions = []session.Session{{Name: "archive", Kind: session.KindSaved}}
 	holdAltForSessionKeys(model)
 
@@ -306,8 +373,15 @@ func TestSessionLoadAssignsAndPersistsSessionKeys(t *testing.T) {
 	}
 
 	model.handleSessionLoadResult(sessionLoadResultMsg{
-		sessions: []session.Session{{Name: "web", Kind: session.KindLive, Origin: session.OriginLocal, TmuxServerSocket: "/tmp/sock"}},
-		status:   session.StatusComplete,
+		sessions: []session.Session{
+			{
+				Name:             "web",
+				Kind:             session.KindLive,
+				Origin:           session.OriginLocal,
+				TmuxServerSocket: "/tmp/sock",
+			},
+		},
+		status: session.StatusComplete,
 	})
 
 	cmd := model.assignLoadedSessionKeys(true)
@@ -335,7 +409,9 @@ func TestSessionLoadAssignsAndPersistsSessionKeys(t *testing.T) {
 
 func TestSessionKeyField(t *testing.T) {
 	model := newTestModel()
-	model.state.SessionKeys = []session.KeyAssignment{{Session: session.Identity{Name: "web"}, Key: "w"}}
+	model.state.SessionKeys = []session.KeyAssignment{
+		{Session: session.Identity{Name: "web"}, Key: "w"},
+	}
 
 	keyed := sessionFormatValues{model: model, row: session.Session{Name: "web"}}
 	if got := keyed.ResolveSessionFormatField(display.FieldSessionKey); got != "w" {
@@ -355,7 +431,9 @@ func indentKeyModel(t *testing.T, cfg *config.Config) *Model {
 	model := newTestModelWithConfig(t, cfg)
 	model.width = 60
 	model.height = 10
-	model.state.SessionKeys = []session.KeyAssignment{{Session: session.Identity{Name: "web"}, Key: "w"}}
+	model.state.SessionKeys = []session.KeyAssignment{
+		{Session: session.Identity{Name: "web"}, Key: "w"},
+	}
 	model.filtered = []session.Session{{Name: "web"}, {Name: "api"}}
 
 	return model
@@ -393,7 +471,9 @@ func TestSessionKeysStayHiddenWithoutIndentStyle(t *testing.T) {
 	model := newTestModel()
 	model.width = 60
 	model.height = 10
-	model.state.SessionKeys = []session.KeyAssignment{{Session: session.Identity{Name: "web"}, Key: "w"}}
+	model.state.SessionKeys = []session.KeyAssignment{
+		{Session: session.Identity{Name: "web"}, Key: "w"},
+	}
 	model.filtered = []session.Session{{Name: "web"}}
 
 	if line := stripANSI(model.renderList(60, 1)); !strings.HasPrefix(line, "▌ web") {

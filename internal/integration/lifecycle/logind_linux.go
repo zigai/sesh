@@ -74,12 +74,18 @@ func OpenLogind(ctx context.Context) (*Logind, error) {
 
 	conn, err := dbus.ConnectSystemBus(dbus.WithContext(ctx), dbus.WithSignalHandler(signalFeed))
 	if err != nil {
-		return nil, oops.In("lifecycle").Code("logind_failed").With("operation", "open_logind").Wrap(err)
+		return nil, oops.In("lifecycle").
+			Code("logind_failed").
+			With("operation", "open_logind").
+			Wrap(err)
 	}
 
 	client, err := openLogindOnConnection(ctx, conn, signalFeed)
 	if err != nil {
-		return nil, oops.In("lifecycle").Code("logind_failed").With("operation", "open_logind").Wrap(errors.Join(err, conn.Close()))
+		return nil, oops.In("lifecycle").
+			Code("logind_failed").
+			With("operation", "open_logind").
+			Wrap(errors.Join(err, conn.Close()))
 	}
 
 	return client, nil
@@ -89,11 +95,17 @@ func (l *Logind) Delay() time.Duration { return l.delay }
 
 func (l *Logind) Status(ctx context.Context) (LiveStatus, error) {
 	if err := l.verifyOwner(ctx); err != nil {
-		return LiveStatus{}, oops.In("lifecycle").Code("logind_failed").With("operation", "status").Wrap(err)
+		return LiveStatus{}, oops.In("lifecycle").
+			Code("logind_failed").
+			With("operation", "status").
+			Wrap(err)
 	}
 
 	if l.signalFeed.overflowed() {
-		return LiveStatus{}, oops.In("lifecycle").Code("logind_failed").With("operation", "status").Wrap(ErrLogindSignalQueue)
+		return LiveStatus{}, oops.In("lifecycle").
+			Code("logind_failed").
+			With("operation", "status").
+			Wrap(ErrLogindSignalQueue)
 	}
 
 	l.mu.Lock()
@@ -103,7 +115,10 @@ func (l *Logind) Status(ctx context.Context) (LiveStatus, error) {
 
 	sleepHeld := l.inhibitors[1] != nil
 	if shutdownHeld != sleepHeld {
-		return LiveStatus{}, oops.In("lifecycle").Code("logind_failed").With("operation", "status").Wrap(ErrLogindNotInhibited)
+		return LiveStatus{}, oops.In("lifecycle").
+			Code("logind_failed").
+			With("operation", "status").
+			Wrap(ErrLogindNotInhibited)
 	}
 
 	for _, inhibitor := range l.inhibitors {
@@ -112,7 +127,10 @@ func (l *Logind) Status(ctx context.Context) (LiveStatus, error) {
 		}
 
 		if _, err := inhibitor.Stat(); err != nil {
-			return LiveStatus{}, oops.In("lifecycle").Code("logind_failed").With("operation", "status").Wrap(errors.Join(ErrLogindNotInhibited, err))
+			return LiveStatus{}, oops.In("lifecycle").
+				Code("logind_failed").
+				With("operation", "status").
+				Wrap(errors.Join(ErrLogindNotInhibited, err))
 		}
 	}
 
@@ -121,21 +139,36 @@ func (l *Logind) Status(ctx context.Context) (LiveStatus, error) {
 
 func (l *Logind) Next(ctx context.Context) (Event, error) {
 	if l.signalFeed.overflowed() {
-		return Event{}, oops.In("lifecycle").Code("logind_failed").With("operation", "next").Wrap(ErrLogindSignalQueue)
+		return Event{}, oops.In("lifecycle").
+			Code("logind_failed").
+			With("operation", "next").
+			Wrap(ErrLogindSignalQueue)
 	}
 
 	select {
 	case <-ctx.Done():
-		return Event{}, oops.In("lifecycle").Code("logind_failed").With("operation", "next").Wrap(context.Cause(ctx))
+		return Event{}, oops.In("lifecycle").
+			Code("logind_failed").
+			With("operation", "next").
+			Wrap(context.Cause(ctx))
 	case <-l.signalFeed.overflow:
-		return Event{}, oops.In("lifecycle").Code("logind_failed").With("operation", "next").Wrap(ErrLogindSignalQueue)
+		return Event{}, oops.In("lifecycle").
+			Code("logind_failed").
+			With("operation", "next").
+			Wrap(ErrLogindSignalQueue)
 	case received, ok := <-l.events:
 		if !ok {
-			return Event{}, oops.In("lifecycle").Code("logind_failed").With("operation", "next").Wrap(dbus.ErrClosed)
+			return Event{}, oops.In("lifecycle").
+				Code("logind_failed").
+				With("operation", "next").
+				Wrap(dbus.ErrClosed)
 		}
 
 		if received.err != nil {
-			return received.event, oops.In("lifecycle").Code("logind_failed").With("operation", "next").Wrap(received.err)
+			return received.event, oops.In("lifecycle").
+				Code("logind_failed").
+				With("operation", "next").
+				Wrap(received.err)
 		}
 
 		return received.event, nil
@@ -147,7 +180,10 @@ func (l *Logind) Release() error {
 	defer l.mu.Unlock()
 
 	if l.inhibitors[0] == nil && l.inhibitors[1] == nil {
-		return oops.In("lifecycle").Code("logind_failed").With("operation", "release").Wrap(ErrLogindNotInhibited)
+		return oops.In("lifecycle").
+			Code("logind_failed").
+			With("operation", "release").
+			Wrap(ErrLogindNotInhibited)
 	}
 
 	inhibitors := l.inhibitors
@@ -244,7 +280,11 @@ func (l *Logind) acquireInhibitor(ctx context.Context, spec InhibitorSpec) (*os.
 	}
 
 	if fd < 0 {
-		return nil, fmt.Errorf("acquire %s logind delay inhibitor: %w", spec.What, ErrLogindNotInhibited)
+		return nil, fmt.Errorf(
+			"acquire %s logind delay inhibitor: %w",
+			spec.What,
+			ErrLogindNotInhibited,
+		)
 	}
 
 	inhibitor := os.NewFile(uintptr(uint32(fd)), "sesh-logind-"+spec.What+"-inhibitor")
@@ -260,8 +300,13 @@ func (l *Logind) acquireInhibitor(ctx context.Context, spec InhibitorSpec) (*os.
 
 func (l *Logind) verifyOwner(ctx context.Context) error {
 	var currentOwner string
-	if err := l.conn.BusObject().CallWithContext(ctx, "org.freedesktop.DBus.GetNameOwner", 0, LogindBusName).Store(&currentOwner); err != nil {
-		return errors.Join(ErrLogindOwnerChanged, fmt.Errorf("revalidate logind D-Bus owner: %w", err))
+	if err := l.conn.BusObject().
+		CallWithContext(ctx, "org.freedesktop.DBus.GetNameOwner", 0, LogindBusName).
+		Store(&currentOwner); err != nil {
+		return errors.Join(
+			ErrLogindOwnerChanged,
+			fmt.Errorf("revalidate logind D-Bus owner: %w", err),
+		)
 	}
 
 	if currentOwner != l.owner {
@@ -291,16 +336,26 @@ func (l *Logind) verifyReady(ctx context.Context) error {
 	return nil
 }
 
-func RunLogind(ctx context.Context, runtime LogindRuntime, handle func(context.Context, Event) error) error {
+func RunLogind(
+	ctx context.Context,
+	runtime LogindRuntime,
+	handle func(context.Context, Event) error,
+) error {
 	for {
 		event, err := runtime.Next(ctx)
 		if err != nil {
-			return oops.In("lifecycle").Code("logind_failed").With("operation", "run_logind").Wrap(err)
+			return oops.In("lifecycle").
+				Code("logind_failed").
+				With("operation", "run_logind").
+				Wrap(err)
 		}
 
 		if event.Canceled {
 			if err := runtime.Rearm(ctx); err != nil {
-				return oops.In("lifecycle").Code("logind_failed").With("operation", "run_logind").Wrap(err)
+				return oops.In("lifecycle").
+					Code("logind_failed").
+					With("operation", "run_logind").
+					Wrap(err)
 			}
 
 			if err := handle(ctx, event); err != nil {
@@ -348,7 +403,11 @@ func closeInhibitors(inhibitors [logindInhibitorCount]*os.File) error {
 	return errors.Join(shutdownErr, sleepErr)
 }
 
-func openLogindOnConnection(ctx context.Context, conn *dbus.Conn, signalFeed *boundedSignalHandler) (*Logind, error) {
+func openLogindOnConnection(
+	ctx context.Context,
+	conn *dbus.Conn,
+	signalFeed *boundedSignalHandler,
+) (*Logind, error) {
 	object := conn.Object(LogindBusName, dbus.ObjectPath(LogindObjectPath))
 
 	property, err := logindProperty(ctx, object, "InhibitDelayMaxUSec")
@@ -364,7 +423,9 @@ func openLogindOnConnection(ctx context.Context, conn *dbus.Conn, signalFeed *bo
 	}
 
 	var owner string
-	if err := conn.BusObject().CallWithContext(ctx, "org.freedesktop.DBus.GetNameOwner", 0, LogindBusName).Store(&owner); err != nil {
+	if err := conn.BusObject().
+		CallWithContext(ctx, "org.freedesktop.DBus.GetNameOwner", 0, LogindBusName).
+		Store(&owner); err != nil {
 		return nil, fmt.Errorf("resolve logind D-Bus owner: %w", err)
 	}
 
@@ -470,7 +531,8 @@ func verifyLogindIdle(ctx context.Context, object dbus.BusObject) error {
 
 func logindProperty(ctx context.Context, object dbus.BusObject, name string) (dbus.Variant, error) {
 	var property dbus.Variant
-	if err := object.CallWithContext(ctx, "org.freedesktop.DBus.Properties.Get", 0, LogindManagerIface, name).Store(&property); err != nil {
+	if err := object.CallWithContext(ctx, "org.freedesktop.DBus.Properties.Get", 0, LogindManagerIface, name).
+		Store(&property); err != nil {
 		return dbus.Variant{}, fmt.Errorf("read logind property: %w", err)
 	}
 
@@ -520,7 +582,10 @@ func (l *Logind) pump(ctx context.Context) {
 }
 
 func (l *Logind) decodeSignal(signal *dbus.Signal) logindEvent {
-	received := logindEvent{event: Event{Kind: "", Cycle: 0, Deadline: time.Time{}, Canceled: false}, err: nil}
+	received := logindEvent{
+		event: Event{Kind: "", Cycle: 0, Deadline: time.Time{}, Canceled: false},
+		err:   nil,
+	}
 	receivedAt, known := l.signalFeed.receivedAt(signal)
 
 	switch {
@@ -537,7 +602,9 @@ func (l *Logind) decodeSignal(signal *dbus.Signal) logindEvent {
 
 func (l *Logind) ownerChange(signal *dbus.Signal) error {
 	if signal == nil || signal.Sender != "org.freedesktop.DBus" ||
-		signal.Path != dbus.ObjectPath("/org/freedesktop/DBus") || len(signal.Body) != nameOwnerChangedFields {
+		signal.Path != dbus.ObjectPath(
+			"/org/freedesktop/DBus",
+		) || len(signal.Body) != nameOwnerChangedFields {
 		return ErrLogindSignal
 	}
 
@@ -557,7 +624,9 @@ func (l *Logind) ownerChange(signal *dbus.Signal) error {
 }
 
 func (l *Logind) event(signal *dbus.Signal, now time.Time) (Event, error) {
-	if signal == nil || signal.Sender != l.owner || signal.Path != dbus.ObjectPath(LogindObjectPath) || len(signal.Body) != 1 {
+	if signal == nil || signal.Sender != l.owner ||
+		signal.Path != dbus.ObjectPath(LogindObjectPath) ||
+		len(signal.Body) != 1 {
 		return Event{}, ErrLogindSignal
 	}
 

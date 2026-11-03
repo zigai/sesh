@@ -211,7 +211,8 @@ func agentMatches(query string, agent session.AgentSession) bool {
 		return true
 	}
 
-	if fuzzyMatchAny(query, agent.Harness, agent.HarnessSession) || agentStatusMatches(query, agent.Status) {
+	if fuzzyMatchAny(query, agent.Harness, agent.HarnessSession) ||
+		agentStatusMatches(query, agent.Status) {
 		return true
 	}
 
@@ -242,7 +243,12 @@ func pathMatches(query string, path string) bool {
 }
 
 func agentStatusMatches(query string, status session.AgentStatus) bool {
-	if fuzzyMatchAny(query, string(status), string(status.DisplayStatus()), agentStatusLabel(status)) {
+	if fuzzyMatchAny(
+		query,
+		string(status),
+		string(status.DisplayStatus()),
+		agentStatusLabel(status),
+	) {
 		return true
 	}
 
@@ -254,7 +260,13 @@ func agentStatusMatches(query string, status session.AgentStatus) bool {
 	case session.AgentStatusFailed:
 		return fuzzyMatchAny(query, "error", "errored", "crash")
 	case session.AgentStatusInterrupted:
-		return fuzzyMatchAny(query, "paused", "stopped", "cancelled", "canceled") //nolint:misspell // British spelling is an intentional search alias.
+		return fuzzyMatchAny(
+			query,
+			"paused",
+			"stopped",
+			"cancelled",
+			"canceled",
+		) //nolint:misspell // British spelling is an intentional search alias.
 	case session.AgentStatusIdle:
 		return fuzzyMatch(query, "offline")
 	case session.AgentStatusSleeping:

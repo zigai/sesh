@@ -18,7 +18,13 @@ type Identity struct {
 // KeyIdentity drops the tmux socket and snapshot repository, which differ between the live and
 // saved forms of one session.
 func (i Identity) KeyIdentity() Identity {
-	return Identity{Origin: i.Origin, ConnectionID: i.ConnectionID, Socket: "", RepositorySource: "", Name: i.Name}
+	return Identity{
+		Origin:           i.Origin,
+		ConnectionID:     i.ConnectionID,
+		Socket:           "",
+		RepositorySource: "",
+		Name:             i.Name,
+	}
 }
 
 func (i Identity) Validate() error {

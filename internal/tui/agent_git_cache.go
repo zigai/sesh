@@ -55,7 +55,10 @@ func writeAgentGitCache(path string, entries map[string]agentGitCacheEntry) erro
 
 	dir, err := privatefs.Ensure(filepath.Dir(path))
 	if err != nil {
-		return oops.In("tui").Code("git_cache_failed").With("operation", "create_directory").Wrap(err)
+		return oops.In("tui").
+			Code("git_cache_failed").
+			With("operation", "create_directory").
+			Wrap(err)
 	}
 
 	writeErr := replaceCacheUnsynced(dir, filepath.Base(path), data)
@@ -71,7 +74,10 @@ func replaceCacheUnsynced(dir *privatefs.Dir, name string, data []byte) error {
 
 	file, err := dir.File(temporary, unix.O_WRONLY|unix.O_CREAT|unix.O_EXCL)
 	if err != nil {
-		return oops.In("tui").Code("git_cache_failed").With("operation", "create_temp_file").Wrap(err)
+		return oops.In("tui").
+			Code("git_cache_failed").
+			With("operation", "create_temp_file").
+			Wrap(err)
 	}
 
 	// No fsync: it would stall popup shutdown under disk pressure, and an unreadable cache is rebuilt.

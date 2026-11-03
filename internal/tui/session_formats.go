@@ -61,7 +61,10 @@ func (v sessionFormatValues) ResolveSessionFormatCell(field string) (string, lay
 			return v.resolveAHTCell(field)
 		case display.ProviderCustom:
 			return v.resolveCustomCell(field)
-		case display.ProviderSession, display.ProviderAgent, display.ProviderClock, display.ProviderGit:
+		case display.ProviderSession,
+			display.ProviderAgent,
+			display.ProviderClock,
+			display.ProviderGit:
 		}
 	}
 
@@ -87,7 +90,10 @@ func emptyAgentSession() session.AgentSession {
 	return agent
 }
 
-func compileSessionRowFormats(displayCfg config.DisplayConfig, settings config.SettingsConfig) (sessionRowFormats, error) {
+func compileSessionRowFormats(
+	displayCfg config.DisplayConfig,
+	settings config.SettingsConfig,
+) (sessionRowFormats, error) {
 	seshFormat := displayCfg.SeshFormat
 	agentsSessionFormat := displayCfg.AgentsSessionFormat
 	agentsAgentFormat := displayCfg.AgentsAgentFormat
@@ -126,12 +132,20 @@ func compileSessionRowFormats(displayCfg config.DisplayConfig, settings config.S
 		return sessionRowFormats{}, err
 	}
 
-	inboxGroup, err := compileSessionRowFormat("display.inbox_group_format", display.FormatKindAgentsSession, displayCfg.InboxGroupFormat)
+	inboxGroup, err := compileSessionRowFormat(
+		"display.inbox_group_format",
+		display.FormatKindAgentsSession,
+		displayCfg.InboxGroupFormat,
+	)
 	if err != nil {
 		return sessionRowFormats{}, err
 	}
 
-	inboxAgent, err := compileSessionRowFormat("display.inbox_agent_format", display.FormatKindAgentsAgent, inboxAgentFormat)
+	inboxAgent, err := compileSessionRowFormat(
+		"display.inbox_agent_format",
+		display.FormatKindAgentsAgent,
+		inboxAgentFormat,
+	)
 	if err != nil {
 		return sessionRowFormats{}, err
 	}
@@ -147,11 +161,13 @@ func compileSessionRowFormats(displayCfg config.DisplayConfig, settings config.S
 }
 
 func (formats sessionRowFormats) agentRowsUseAny(fields ...string) bool {
-	return formats.agentsAgent.UsesAny(fields...) || (formats.inbox && formats.inboxAgent.UsesAny(fields...))
+	return formats.agentsAgent.UsesAny(fields...) ||
+		(formats.inbox && formats.inboxAgent.UsesAny(fields...))
 }
 
 func (formats sessionRowFormats) agentRowsUseWidget(widget string) bool {
-	return formats.agentsAgent.UsesWidget(widget) || (formats.inbox && formats.inboxAgent.UsesWidget(widget))
+	return formats.agentsAgent.UsesWidget(widget) ||
+		(formats.inbox && formats.inboxAgent.UsesWidget(widget))
 }
 
 func withShortcutBadge(format, defaultFormat string) string {
@@ -169,7 +185,10 @@ func compileSessionRowFormat(
 ) (display.Template, error) {
 	template, err := display.Compile(kind, format)
 	if err != nil {
-		return display.Template{}, oops.In("tui").Code("format_invalid").With("operation", "compile_format", "name", name).Wrapf(err, "%s", name)
+		return display.Template{}, oops.In("tui").
+			Code("format_invalid").
+			With("operation", "compile_format", "name", name).
+			Wrapf(err, "%s", name)
 	}
 
 	return template, nil
@@ -234,7 +253,13 @@ func (m *Model) sessionFormatRightColumnWidth(tableLayout sessionTableLayout) in
 	var values sessionFormatValues
 
 	for _, row := range m.filtered {
-		template, values = m.sessionRowFormatter(row, emptyAgentSession(), false, false, tableLayout)
+		template, values = m.sessionRowFormatter(
+			row,
+			emptyAgentSession(),
+			false,
+			false,
+			tableLayout,
+		)
 		width = max(width, display.MeasureRight(template, &values, lipgloss.Width))
 	}
 
@@ -320,7 +345,8 @@ func (v sessionFormatValues) resolveGHCell(field string) (string, layout.State) 
 }
 
 func (v sessionFormatValues) resolveAHTCell(field string) (string, layout.State) {
-	if v.agent.PaneID != "" && !remoteAgentRow(v.row, v.agent) && v.model.providerRunner.Version(providers.AHT) > 0 {
+	if v.agent.PaneID != "" && !remoteAgentRow(v.row, v.agent) &&
+		v.model.providerRunner.Version(providers.AHT) > 0 {
 		cell := v.model.providerRunner.Cell(providers.AHT, v.agent.PaneID, field)
 		return cell.Text, cell.State
 	}
@@ -566,7 +592,10 @@ func (v sessionFormatValues) resolveAgentIdentityField(field string) (string, bo
 	case display.FieldHarnessRaw:
 		return SanitizeTerminalText(v.agent.Harness), true
 	case display.FieldAgentSession:
-		return strings.TrimLeftFunc(SanitizeTerminalText(v.agent.HarnessSession), unicode.IsSpace), true
+		return strings.TrimLeftFunc(
+			SanitizeTerminalText(v.agent.HarnessSession),
+			unicode.IsSpace,
+		), true
 	case display.FieldRegistryID:
 		return SanitizeTerminalText(v.agent.RegistryID), true
 	case display.FieldPaneID:
@@ -807,10 +836,20 @@ func (v sessionFormatValues) sessionAgentContext() string {
 
 func (v sessionFormatValues) agentContext() string {
 	unreadIdle := v.model.agentIdleUnread(v.row, v.agent)
-	context := ansi.Strip(v.model.formattedAgentSessionContextAt(v.agent, v.now, v.ageWidth, v.isActivePane, unreadIdle))
+	context := ansi.Strip(
+		v.model.formattedAgentSessionContextAt(
+			v.agent,
+			v.now,
+			v.ageWidth,
+			v.isActivePane,
+			unreadIdle,
+		),
+	)
 
 	if v.contextWidth > 0 && lipgloss.Width(context) > v.contextWidth {
-		return ansi.Strip(v.model.compactAgentSessionContextAt(v.agent, v.now, v.isActivePane, unreadIdle))
+		return ansi.Strip(
+			v.model.compactAgentSessionContextAt(v.agent, v.now, v.isActivePane, unreadIdle),
+		)
 	}
 
 	return context

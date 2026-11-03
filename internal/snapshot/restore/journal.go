@@ -67,7 +67,12 @@ func StepKindAction(step Step) model.ActionKind {
 		return KindCreatePane
 	case *LinkWindowStep:
 		return KindLink
-	case *CloseBootstrapWindowStep, *ApplyLayoutStep, *SelectPaneStep, *ApplyZoomStep, *SelectWindowStep, *SetPaneTitleStep:
+	case *CloseBootstrapWindowStep,
+		*ApplyLayoutStep,
+		*SelectPaneStep,
+		*ApplyZoomStep,
+		*SelectWindowStep,
+		*SetPaneTitleStep:
 		return KindConfigure
 	}
 

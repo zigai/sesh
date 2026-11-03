@@ -259,7 +259,8 @@ func testHistoryWorkflow(t *testing.T, repoDir string) {
 		t.Fatalf("history table error: %v\nstderr: %s", err, stderr)
 	}
 
-	if !strings.Contains(stdout, "Saved") || !strings.Contains(stdout, "Result") || !strings.Contains(stdout, "saved") {
+	if !strings.Contains(stdout, "Saved") || !strings.Contains(stdout, "Result") ||
+		!strings.Contains(stdout, "saved") {
 		t.Fatalf("history output missing headers:\n%s", stdout)
 	}
 }
@@ -356,7 +357,10 @@ func TestSnapshotVerifyReportsCorruptedArtifacts(t *testing.T) {
 	)
 
 	if verifyExec.envelope.OK {
-		t.Fatalf("expected verify to fail on corrupted artifact, got ok=true: %s", verifyExec.stdout)
+		t.Fatalf(
+			"expected verify to fail on corrupted artifact, got ok=true: %s",
+			verifyExec.stdout,
+		)
 	}
 
 	if verifyExec.envelope.Error == nil {
@@ -413,7 +417,10 @@ func assertExplicitVerifyResult(t *testing.T, verRes snapshotVerifyResultJSON) {
 	}
 
 	if verRes.RestoreReason != "practical_reconstruction_available" {
-		t.Fatalf("restoreReason = %q, want practical_reconstruction_available", verRes.RestoreReason)
+		t.Fatalf(
+			"restoreReason = %q, want practical_reconstruction_available",
+			verRes.RestoreReason,
+		)
 	}
 
 	if verRes.Consistency != "observed" {
@@ -462,19 +469,36 @@ func TestSnapshotVerifyCompleteNativeFixture(t *testing.T) {
 			{ID: "g0", Name: model.Bytes("group"), Members: []string{"s0", "s1"}},
 		},
 		Windows: []model.Window{
-			{ID: "w0", Name: model.Bytes("editor"), Width: 80, Height: 24, Layout: model.Layout{Width: 80, Height: 24, Pane: "p0"}},
+			{
+				ID:     "w0",
+				Name:   model.Bytes("editor"),
+				Width:  80,
+				Height: 24,
+				Layout: model.Layout{Width: 80, Height: 24, Pane: "p0"},
+			},
 		},
 		Links: []model.Link{
 			{Session: "s0", Window: "w0", Index: 3, Active: true},
 			{Session: "s1", Window: "w0", Index: 3, Active: true},
 		},
 		Panes: []model.Pane{
-			{ID: "p0", Window: "w0", Directory: model.Bytes("/tmp"), Width: 80, Height: 24, Active: true, Launch: model.Launch{Recovery: "unverified"}},
+			{
+				ID:        "p0",
+				Window:    "w0",
+				Directory: model.Bytes("/tmp"),
+				Width:     80,
+				Height:    24,
+				Active:    true,
+				Launch:    model.Launch{Recovery: "unverified"},
+			},
 		},
 		Artifacts: nil,
 	}
 	for _, domain := range []string{"S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10"} {
-		manifest.Evidence = append(manifest.Evidence, model.Evidence{Domain: domain, Status: "verified", Reason: ""})
+		manifest.Evidence = append(
+			manifest.Evidence,
+			model.Evidence{Domain: domain, Status: "verified", Reason: ""},
+		)
 	}
 
 	if !manifest.Complete() {
@@ -516,7 +540,10 @@ func TestSnapshotVerifyCompleteNativeFixture(t *testing.T) {
 	}
 
 	if verRes.RestoreReason != "practical_reconstruction_available" {
-		t.Fatalf("restoreReason = %q, want practical_reconstruction_available", verRes.RestoreReason)
+		t.Fatalf(
+			"restoreReason = %q, want practical_reconstruction_available",
+			verRes.RestoreReason,
+		)
 	}
 }
 
@@ -602,8 +629,15 @@ func TestFailedLatestSaveFallsBackToNewestFinishedGeneration(t *testing.T) {
 		t.Fatalf("a failed latest save must not block list: %s", listExec.stderr)
 	}
 
-	if listed := decodeJSONPayload[snapshotListResultJSON](t, listExec.envelope.Result); listed.Generation != committedGen {
-		t.Fatalf("list generation = %q, want the newest finished save %q", listed.Generation, committedGen)
+	if listed := decodeJSONPayload[snapshotListResultJSON](
+		t,
+		listExec.envelope.Result,
+	); listed.Generation != committedGen {
+		t.Fatalf(
+			"list generation = %q, want the newest finished save %q",
+			listed.Generation,
+			committedGen,
+		)
 	}
 
 	verifyExec := executeJSON(t, snapshotCmd, "verify", testRepositoryFlag, repoDir, testJSONFlag)
@@ -611,8 +645,15 @@ func TestFailedLatestSaveFallsBackToNewestFinishedGeneration(t *testing.T) {
 		t.Fatalf("a failed latest save must not block verify: %s", verifyExec.stderr)
 	}
 
-	if verified := decodeJSONPayload[snapshotVerifyResultJSON](t, verifyExec.envelope.Result); verified.Generation != committedGen {
-		t.Fatalf("verify generation = %q, want the newest finished save %q", verified.Generation, committedGen)
+	if verified := decodeJSONPayload[snapshotVerifyResultJSON](
+		t,
+		verifyExec.envelope.Result,
+	); verified.Generation != committedGen {
+		t.Fatalf(
+			"verify generation = %q, want the newest finished save %q",
+			verified.Generation,
+			committedGen,
+		)
 	}
 
 	explicitList := executeJSON(

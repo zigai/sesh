@@ -23,12 +23,17 @@ func testRemoteConfig() config.RemoteConfig {
 	remote.HeartbeatInterval = "19s"
 	remote.TmuxPollInterval = "7s"
 	remote.MaxParallelConnects = 4
-	remote.Connections = []config.RemoteConnectionConfig{{ID: "work", Label: "Work", Host: "work.example"}}
+	remote.Connections = []config.RemoteConnectionConfig{
+		{ID: "work", Label: "Work", Host: "work.example"},
+	}
 
 	return remote
 }
 
-func scriptSSH(t *testing.T, script string) func(ctx context.Context, executable string, arguments ...string) *exec.Cmd {
+func scriptSSH(
+	t *testing.T,
+	script string,
+) func(ctx context.Context, executable string, arguments ...string) *exec.Cmd {
 	t.Helper()
 
 	path := filepath.Join(t.TempDir(), "fake-ssh")
@@ -49,7 +54,13 @@ func TestSSHCommandUsesConfiguredExecutableAndPolicy(t *testing.T) {
 	remote := testRemoteConfig()
 	remote.SSHPath = "/custom/ssh"
 
-	command, err := NewSSHCommand(t.Context(), remote, remote.Connections[0], SSHCommandOptions{}, "true")
+	command, err := NewSSHCommand(
+		t.Context(),
+		remote,
+		remote.Connections[0],
+		SSHCommandOptions{},
+		"true",
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,20 +84,47 @@ func TestSSHCommandUsesDefaultAndMinimumTimeouts(t *testing.T) {
 		connect   string
 		heartbeat string
 	}{
-		{name: "defaults", config: config.RemoteConfig{}, connect: "ConnectTimeout=10", heartbeat: "ServerAliveInterval=15"},
-		{name: "invalid", config: config.RemoteConfig{ConnectTimeout: "invalid", HeartbeatInterval: "-1s"}, connect: "ConnectTimeout=10", heartbeat: "ServerAliveInterval=15"},
-		{name: "subsecond", config: config.RemoteConfig{ConnectTimeout: "20ms", HeartbeatInterval: "50ms"}, connect: "ConnectTimeout=1", heartbeat: "ServerAliveInterval=1"},
+		{
+			name:      "defaults",
+			config:    config.RemoteConfig{},
+			connect:   "ConnectTimeout=10",
+			heartbeat: "ServerAliveInterval=15",
+		},
+		{
+			name:      "invalid",
+			config:    config.RemoteConfig{ConnectTimeout: "invalid", HeartbeatInterval: "-1s"},
+			connect:   "ConnectTimeout=10",
+			heartbeat: "ServerAliveInterval=15",
+		},
+		{
+			name:      "subsecond",
+			config:    config.RemoteConfig{ConnectTimeout: "20ms", HeartbeatInterval: "50ms"},
+			connect:   "ConnectTimeout=1",
+			heartbeat: "ServerAliveInterval=1",
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			command, err := NewSSHCommand(t.Context(), test.config, config.RemoteConnectionConfig{Host: "work"}, SSHCommandOptions{}, "true")
+			command, err := NewSSHCommand(
+				t.Context(),
+				test.config,
+				config.RemoteConnectionConfig{Host: "work"},
+				SSHCommandOptions{},
+				"true",
+			)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			if command.Args[0] != "ssh" || !slices.Contains(command.Args, test.connect) || !slices.Contains(command.Args, test.heartbeat) {
-				t.Fatalf("SSH argv = %#v, want default executable with %s and %s", command.Args, test.connect, test.heartbeat)
+			if command.Args[0] != "ssh" || !slices.Contains(command.Args, test.connect) ||
+				!slices.Contains(command.Args, test.heartbeat) {
+				t.Fatalf(
+					"SSH argv = %#v, want default executable with %s and %s",
+					command.Args,
+					test.connect,
+					test.heartbeat,
+				)
 			}
 		})
 	}
@@ -97,10 +135,12 @@ func TestSSHCommandNeverUnlinksRemoteSocketPaths(t *testing.T) {
 
 	command, err := NewSSHCommand(t.Context(), remote, remote.Connections[0], SSHCommandOptions{
 		Interactive: true,
-		Forward: []SocketForward{{
-			RemotePath: "/home/remote/.local/state/sesh/remote/bridge/attach-0123456789abcdef0123456789abcdef.sock",
-			LocalPath:  "/run/user/1000/sesh/bridge.sock",
-		}},
+		Forward: []SocketForward{
+			{
+				RemotePath: "/home/remote/.local/state/sesh/remote/bridge/attach-0123456789abcdef0123456789abcdef.sock",
+				LocalPath:  "/run/user/1000/sesh/bridge.sock",
+			},
+		},
 	}, "remote", "peer", "attach", "0123456789abcdef0123456789abcdef")
 	if err != nil {
 		t.Fatal(err)
@@ -112,7 +152,8 @@ func TestSSHCommandNeverUnlinksRemoteSocketPaths(t *testing.T) {
 		t.Fatalf("SSH argv enables remote unlink semantics: %#v", command.Args)
 	}
 
-	if slices.Contains(command.Args, "ClearAllForwardings=yes") || strings.Contains(joined, "ClearAllForwardings=yes") {
+	if slices.Contains(command.Args, "ClearAllForwardings=yes") ||
+		strings.Contains(joined, "ClearAllForwardings=yes") {
 		t.Fatalf("forwarding command must not enable ClearAllForwardings: %#v", command.Args)
 	}
 
@@ -135,7 +176,16 @@ func TestSSHCommandRejectsOptionLikeHostAndInvalidForwards(t *testing.T) {
 
 	for _, badHost := range []string{"-oProxyCommand=rm", "-V", "--bad", "   "} {
 		conn := config.RemoteConnectionConfig{ID: "bad", Host: badHost}
-		if _, err := NewSSHCommand(t.Context(), remote, conn, SSHCommandOptions{}, "true"); !errors.Is(err, ErrInvalidFrame) {
+		if _, err := NewSSHCommand(
+			t.Context(),
+			remote,
+			conn,
+			SSHCommandOptions{},
+			"true",
+		); !errors.Is(
+			err,
+			ErrInvalidFrame,
+		) {
 			t.Fatalf("NewSSHCommand(host=%q) error = %v, want %v", badHost, err, ErrInvalidFrame)
 		}
 	}
@@ -148,7 +198,16 @@ func TestSSHCommandRejectsOptionLikeHostAndInvalidForwards(t *testing.T) {
 		{{RemotePath: "/dirty/../path", LocalPath: "/valid/path"}},
 	}
 	for _, fwd := range badForwards {
-		if _, err := NewSSHCommand(t.Context(), remote, conn, SSHCommandOptions{Forward: fwd}, "true"); !errors.Is(err, ErrUnsafePath) {
+		if _, err := NewSSHCommand(
+			t.Context(),
+			remote,
+			conn,
+			SSHCommandOptions{Forward: fwd},
+			"true",
+		); !errors.Is(
+			err,
+			ErrUnsafePath,
+		) {
 			t.Fatalf("NewSSHCommand(fwd=%#v) error = %v, want %v", fwd, err, ErrUnsafePath)
 		}
 	}
@@ -164,7 +223,13 @@ func TestSSHCommandEffectiveOptionsWithOpenSSH(t *testing.T) {
 func verifyNonInteractiveOpenSSHOptions(t *testing.T, remote config.RemoteConfig) {
 	t.Helper()
 
-	nonInteractive, err := NewSSHCommand(t.Context(), remote, remote.Connections[0], SSHCommandOptions{}, "true")
+	nonInteractive, err := NewSSHCommand(
+		t.Context(),
+		remote,
+		remote.Connections[0],
+		SSHCommandOptions{},
+		"true",
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,10 +286,24 @@ func verifyInteractiveForwardOpenSSHOptions(t *testing.T, remote config.RemoteCo
 }
 
 func TestSSHCommandPreservesRemoteArgumentsThroughShell(t *testing.T) {
-	arguments := []string{"", "with spaces", "single'quote", "$(printf wrong)", "line\nbreak", "; exit 23", "\\", "\"quoted\""}
+	arguments := []string{
+		"",
+		"with spaces",
+		"single'quote",
+		"$(printf wrong)",
+		"line\nbreak",
+		"; exit 23",
+		"\\",
+		"\"quoted\"",
+	}
 	remoteCommand := append([]string{"printf", "%s\\000"}, arguments...)
 
-	command, err := NewSSHCommand(t.Context(), config.RemoteConfig{}, config.RemoteConnectionConfig{Host: "work"}, SSHCommandOptions{}, remoteCommand...)
+	command, err := NewSSHCommand(
+		t.Context(),
+		config.RemoteConfig{},
+		config.RemoteConnectionConfig{Host: "work"},
+		SSHCommandOptions{},
+		remoteCommand...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,7 +321,11 @@ func TestSSHCommandPreservesRemoteArgumentsThroughShell(t *testing.T) {
 }
 
 func TestPeerEntryPointIsFixedPerChannel(t *testing.T) {
-	connection := config.RemoteConnectionConfig{ID: "work", Host: "work.example", SeshPath: "/opt/my sesh"}
+	connection := config.RemoteConnectionConfig{
+		ID:       "work",
+		Host:     "work.example",
+		SeshPath: "/opt/my sesh",
+	}
 
 	for channel, want := range map[Channel][]string{
 		ChannelStream:        {"'/opt/my sesh'", "'remote'", "'peer'", "'stream'"},
@@ -252,7 +335,8 @@ func TestPeerEntryPointIsFixedPerChannel(t *testing.T) {
 	} {
 		entry := PeerEntryPoint(connection, channel)
 
-		if entry[0] != connection.SeshPath || entry[1] != "remote" || entry[2] != "peer" || entry[3] != string(channel) {
+		if entry[0] != connection.SeshPath || entry[1] != "remote" || entry[2] != "peer" ||
+			entry[3] != string(channel) {
 			t.Fatalf("PeerEntryPoint(%s) = %#v, want the fixed native path", channel, entry)
 		}
 
@@ -263,7 +347,12 @@ func TestPeerEntryPointIsFixedPerChannel(t *testing.T) {
 }
 
 func TestConnectionDigestTracksTransportInputs(t *testing.T) {
-	base := config.RemoteConnectionConfig{ID: "work", Host: "work.example", SeshPath: "/usr/bin/sesh", TmuxSocket: "work"}
+	base := config.RemoteConnectionConfig{
+		ID:         "work",
+		Host:       "work.example",
+		SeshPath:   "/usr/bin/sesh",
+		TmuxSocket: "work",
+	}
 	digest := ConnectionDigest(base)
 
 	if digest != ConnectionDigest(base) {
@@ -295,15 +384,62 @@ func TestClassifySSHFailureUsesFixedPrivacySafeReasons(t *testing.T) {
 		want        error
 		code        string
 	}{
-		{name: "authentication", diagnostics: "user@host: Permission denied (publickey). PRIVATE", want: ErrSSHAuthUnavailable, code: ConnectionErrorAuthUnavailable},
-		{name: "host key", diagnostics: "Host key verification failed. PRIVATE", want: ErrSSHHostKeyRequired, code: ConnectionErrorHostKeyRequired},
-		{name: "context timeout", ctxErr: context.DeadlineExceeded, diagnostics: "PRIVATE", want: context.DeadlineExceeded, code: ConnectionErrorTimeout},
-		{name: "context canceled", ctxErr: context.Canceled, diagnostics: "PRIVATE", want: context.Canceled, code: ConnectionErrorUnavailable},
-		{name: "reported timeout", diagnostics: "ssh: connect to host: Connection timed out PRIVATE", want: context.DeadlineExceeded, code: ConnectionErrorTimeout},
-		{name: "remote peer missing", diagnostics: "sh: sesh: command not found PRIVATE", want: ErrRemotePeerUnavailable, code: ConnectionErrorRemotePeerUnavailable},
-		{name: "peer on another protocol", diagnostics: "invalid remote frame PRIVATE", want: ErrUnsupportedProtocol, code: ConnectionErrorIncompatibleProtocol},
-		{name: "forwarding failed", diagnostics: "remote port forwarding failed for listen path PRIVATE", want: ErrForwardingFailed, code: ConnectionErrorUnavailable},
-		{name: "other", diagnostics: "PRIVATE network detail", want: ErrConnectionUnavailable, code: ConnectionErrorUnavailable},
+		{
+			name:        "authentication",
+			diagnostics: "user@host: Permission denied (publickey). PRIVATE",
+			want:        ErrSSHAuthUnavailable,
+			code:        ConnectionErrorAuthUnavailable,
+		},
+		{
+			name:        "host key",
+			diagnostics: "Host key verification failed. PRIVATE",
+			want:        ErrSSHHostKeyRequired,
+			code:        ConnectionErrorHostKeyRequired,
+		},
+		{
+			name:        "context timeout",
+			ctxErr:      context.DeadlineExceeded,
+			diagnostics: "PRIVATE",
+			want:        context.DeadlineExceeded,
+			code:        ConnectionErrorTimeout,
+		},
+		{
+			name:        "context canceled",
+			ctxErr:      context.Canceled,
+			diagnostics: "PRIVATE",
+			want:        context.Canceled,
+			code:        ConnectionErrorUnavailable,
+		},
+		{
+			name:        "reported timeout",
+			diagnostics: "ssh: connect to host: Connection timed out PRIVATE",
+			want:        context.DeadlineExceeded,
+			code:        ConnectionErrorTimeout,
+		},
+		{
+			name:        "remote peer missing",
+			diagnostics: "sh: sesh: command not found PRIVATE",
+			want:        ErrRemotePeerUnavailable,
+			code:        ConnectionErrorRemotePeerUnavailable,
+		},
+		{
+			name:        "peer on another protocol",
+			diagnostics: "invalid remote frame PRIVATE",
+			want:        ErrUnsupportedProtocol,
+			code:        ConnectionErrorIncompatibleProtocol,
+		},
+		{
+			name:        "forwarding failed",
+			diagnostics: "remote port forwarding failed for listen path PRIVATE",
+			want:        ErrForwardingFailed,
+			code:        ConnectionErrorUnavailable,
+		},
+		{
+			name:        "other",
+			diagnostics: "PRIVATE network detail",
+			want:        ErrConnectionUnavailable,
+			code:        ConnectionErrorUnavailable,
+		},
 	}
 
 	for _, test := range tests {

@@ -34,14 +34,20 @@ var (
 	ErrInvalidSessionName        = errors.New("invalid session name")
 	ErrNotInsideTmux             = errors.New("not running inside tmux")
 	ErrInvokingClientUnavailable = errors.New("no attached client displays the invoking session")
-	ErrInvokingClientAmbiguous   = errors.New("multiple attached clients display the invoking session")
+	ErrInvokingClientAmbiguous   = errors.New(
+		"multiple attached clients display the invoking session",
+	)
 	ErrSwitchUnverified          = errors.New("client switch could not be verified")
 	ErrTerminalRequired          = errors.New("attach requires an interactive terminal")
-	ErrSavedGenerationsProtected = errors.New("saved generations containing the session are protected")
+	ErrSavedGenerationsProtected = errors.New(
+		"saved generations containing the session are protected",
+	)
 	ErrSavedSessionScopeConflict = errors.New("saved session endpoint scope is missing")
-	ErrSessionReplaced           = errors.New("session identity changed or could not be verified during deletion")
-	errServerRequired            = errors.New("tmux server required")
-	errRepositoryRequired        = errors.New("snapshot repository required")
+	ErrSessionReplaced           = errors.New(
+		"session identity changed or could not be verified during deletion",
+	)
+	errServerRequired     = errors.New("tmux server required")
+	errRepositoryRequired = errors.New("snapshot repository required")
 )
 
 type WorkflowOptions struct {
@@ -190,7 +196,11 @@ func (w *Workflow) runHookBoundary(ctx context.Context, event HookEvent) (HookSu
 	}
 
 	if err != nil {
-		return summary, oops.In("session").Code("hook_failed").With("operation", "run_hooks").With("hook_event", event.Name).Wrap(err)
+		return summary, oops.In("session").
+			Code("hook_failed").
+			With("operation", "run_hooks").
+			With("hook_event", event.Name).
+			Wrap(err)
 	}
 
 	return summary, nil
@@ -242,7 +252,13 @@ func lookupSessionError(err error) error {
 
 func (w *Workflow) localIdentity(name string) (Identity, bool) {
 	if w.historyPath == "" || w.server == nil || name == "" {
-		return Identity{Origin: "", ConnectionID: "", Socket: "", RepositorySource: "", Name: ""}, false
+		return Identity{
+			Origin:           "",
+			ConnectionID:     "",
+			Socket:           "",
+			RepositorySource: "",
+			Name:             "",
+		}, false
 	}
 
 	return Identity{

@@ -15,7 +15,12 @@ type RuntimeIdentities struct {
 	Panes    map[string]gotmux.PaneID
 }
 
-func ResolveRuntimeIdentities(ctx context.Context, server *gotmux.Server, plan Plan, receipts map[string]string) (RuntimeIdentities, error) {
+func ResolveRuntimeIdentities(
+	ctx context.Context,
+	server *gotmux.Server,
+	plan Plan,
+	receipts map[string]string,
+) (RuntimeIdentities, error) {
 	index := indexPlan(plan)
 
 	identities := RuntimeIdentities{
@@ -33,14 +38,27 @@ func ResolveRuntimeIdentities(ctx context.Context, server *gotmux.Server, plan P
 		return RuntimeIdentities{}, err
 	}
 
-	if err := resolveInitialPaneIdentities(ctx, server, plan, index, produced, &identities); err != nil {
+	if err := resolveInitialPaneIdentities(
+		ctx,
+		server,
+		plan,
+		index,
+		produced,
+		&identities,
+	); err != nil {
 		return RuntimeIdentities{}, err
 	}
 
 	return identities, nil
 }
 
-func InitialPaneID(ctx context.Context, server *gotmux.Server, windowID string, runtimeID gotmux.WindowID, produced map[gotmux.PaneID]bool) (gotmux.PaneID, error) {
+func InitialPaneID(
+	ctx context.Context,
+	server *gotmux.Server,
+	windowID string,
+	runtimeID gotmux.WindowID,
+	produced map[gotmux.PaneID]bool,
+) (gotmux.PaneID, error) {
 	window, err := server.Window(ctx, runtimeID)
 	if err != nil {
 		return "", oops.In("snapshot.restore").
@@ -52,7 +70,11 @@ func InitialPaneID(ctx context.Context, server *gotmux.Server, windowID string, 
 	return initialPaneIDOf(ctx, window, windowID, produced)
 }
 
-func resolvePaneIdentities(plan Plan, receipts map[string]string, identities *RuntimeIdentities) (map[string]map[gotmux.PaneID]bool, error) {
+func resolvePaneIdentities(
+	plan Plan,
+	receipts map[string]string,
+	identities *RuntimeIdentities,
+) (map[string]map[gotmux.PaneID]bool, error) {
 	produced := map[string]map[gotmux.PaneID]bool{}
 
 	for _, step := range plan.Steps {
@@ -78,7 +100,12 @@ func resolvePaneIdentities(plan Plan, receipts map[string]string, identities *Ru
 	return produced, nil
 }
 
-func resolveStructuralIdentities(plan Plan, index planIndex, receipts map[string]string, identities *RuntimeIdentities) error {
+func resolveStructuralIdentities(
+	plan Plan,
+	index planIndex,
+	receipts map[string]string,
+	identities *RuntimeIdentities,
+) error {
 	for _, step := range plan.Steps {
 		switch step := step.(type) {
 		case *CreateSessionStep:
@@ -100,7 +127,12 @@ func resolveStructuralIdentities(plan Plan, index planIndex, receipts map[string
 	return nil
 }
 
-func resolveCreatedSession(step *CreateSessionStep, index planIndex, receipts map[string]string, identities *RuntimeIdentities) error {
+func resolveCreatedSession(
+	step *CreateSessionStep,
+	index planIndex,
+	receipts map[string]string,
+	identities *RuntimeIdentities,
+) error {
 	id := receipts[step.ID()]
 	if id == "" {
 		return missingReceipt(step.ID())
@@ -157,7 +189,12 @@ func resolveInitialPaneIdentities(
 	return nil
 }
 
-func initialPaneIDOf(ctx context.Context, window gotmux.Window, windowID string, produced map[gotmux.PaneID]bool) (gotmux.PaneID, error) {
+func initialPaneIDOf(
+	ctx context.Context,
+	window gotmux.Window,
+	windowID string,
+	produced map[gotmux.PaneID]bool,
+) (gotmux.PaneID, error) {
 	panes, err := window.Panes(ctx)
 	if err != nil {
 		return "", oops.In("snapshot.restore").

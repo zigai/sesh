@@ -108,7 +108,11 @@ func ReadCatalog(cacheHome string) (Catalog, error) {
 }
 
 func EmptyCatalog() Catalog {
-	return Catalog{Version: ProtocolVersion, GeneratedAt: time.Time{}, Connections: make(map[string]ConnectionState)}
+	return Catalog{
+		Version:     ProtocolVersion,
+		GeneratedAt: time.Time{},
+		Connections: make(map[string]ConnectionState),
+	}
 }
 
 func LoadCatalog(dir *privatefs.Dir) (Catalog, error) {
@@ -155,13 +159,23 @@ func AcquireCatalogOwner(dir *privatefs.Dir) (*os.File, error) {
 	}
 
 	if err := unix.Flock(int(lock.Fd()), unix.LOCK_EX|unix.LOCK_NB); err != nil {
-		return nil, errors.Join(oops.In("remote").With("operation", "acquire_catalog_owner").Wrap(errors.Join(ErrCatalogOwnerRunning, err)), lock.Close())
+		return nil, errors.Join(
+			oops.In("remote").
+				With("operation", "acquire_catalog_owner").
+				Wrap(errors.Join(ErrCatalogOwnerRunning, err)),
+			lock.Close(),
+		)
 	}
 
 	return lock, nil
 }
 
-func WatchCatalog(ctx context.Context, dir *privatefs.Dir, interval time.Duration, yield func(Catalog, error) error) error {
+func WatchCatalog(
+	ctx context.Context,
+	dir *privatefs.Dir,
+	interval time.Duration,
+	yield func(Catalog, error) error,
+) error {
 	if yield == nil {
 		return oops.In("remote").With("operation", "watch_catalog").Wrap(ErrIncompleteDependencies)
 	}
@@ -209,7 +223,11 @@ func CatalogAdmits(catalog Catalog, connectionID string, candidate ConnectionSta
 	return err == nil && len(encoded) <= CatalogAdmissionBytes
 }
 
-func ReconcileCatalog(catalog *Catalog, now time.Time, staleAfter, hideAfter time.Duration) (bool, map[string]ConnectionState) {
+func ReconcileCatalog(
+	catalog *Catalog,
+	now time.Time,
+	staleAfter, hideAfter time.Duration,
+) (bool, map[string]ConnectionState) {
 	if catalog == nil {
 		return false, nil
 	}
@@ -255,15 +273,29 @@ func ReconcileCatalog(catalog *Catalog, now time.Time, staleAfter, hideAfter tim
 }
 
 func UnavailableHealth() SourceHealth {
-	unavailable := SourceStatus{Status: HealthUnknown, Reason: HealthReasonUnavailable, CheckedAt: time.Time{}}
+	unavailable := SourceStatus{
+		Status:    HealthUnknown,
+		Reason:    HealthReasonUnavailable,
+		CheckedAt: time.Time{},
+	}
 
-	return SourceHealth{Tmux: unavailable, Agents: unavailable, Snapshots: unavailable, Tasks: unavailable, Work: unavailable}
+	return SourceHealth{
+		Tmux:      unavailable,
+		Agents:    unavailable,
+		Snapshots: unavailable,
+		Tasks:     unavailable,
+		Work:      unavailable,
+	}
 }
 
 func NormalizeHealth(health SourceHealth) SourceHealth {
 	for _, status := range []*SourceStatus{&health.Snapshots, &health.Tasks, &health.Work} {
 		if *status == (SourceStatus{Status: "", Reason: "", CheckedAt: time.Time{}}) {
-			*status = SourceStatus{Status: HealthUnknown, Reason: HealthReasonUnavailable, CheckedAt: time.Time{}}
+			*status = SourceStatus{
+				Status:    HealthUnknown,
+				Reason:    HealthReasonUnavailable,
+				CheckedAt: time.Time{},
+			}
 		}
 	}
 
@@ -310,7 +342,9 @@ func (state ConnectionState) remoteStatus() session.RemoteStatus {
 
 func decodeCatalog(content []byte) (Catalog, error) {
 	if len(content) == 0 || len(content) > maxCatalogBytes {
-		return Catalog{}, oops.In("remote").With("operation", "validate_catalog").Wrap(ErrInvalidFrame)
+		return Catalog{}, oops.In("remote").
+			With("operation", "validate_catalog").
+			Wrap(ErrInvalidFrame)
 	}
 
 	catalog, err := decodeStrict[Catalog](bytes.TrimSpace(content))
@@ -319,7 +353,10 @@ func decodeCatalog(content []byte) (Catalog, error) {
 	}
 
 	if catalog.Version != ProtocolVersion || catalog.Connections == nil {
-		return Catalog{}, oops.In("remote").With("operation", "validate_catalog").With("version", catalog.Version).Wrap(ErrUnsupportedProtocol)
+		return Catalog{}, oops.In("remote").
+			With("operation", "validate_catalog").
+			With("version", catalog.Version).
+			Wrap(ErrUnsupportedProtocol)
 	}
 
 	for id, state := range catalog.Connections {
@@ -329,7 +366,9 @@ func decodeCatalog(content []byte) (Catalog, error) {
 
 	for id, state := range catalog.Connections {
 		if !validCatalogConnection(id, state) {
-			return Catalog{}, oops.In("remote").With("operation", "validate_catalog").Wrap(ErrInvalidFrame)
+			return Catalog{}, oops.In("remote").
+				With("operation", "validate_catalog").
+				Wrap(ErrInvalidFrame)
 		}
 	}
 

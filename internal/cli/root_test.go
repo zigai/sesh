@@ -85,7 +85,8 @@ func TestRootHelpOrdersCoreCommandsFirstWithDoctorBeforeHelp(t *testing.T) {
 		t.Fatalf("command order = %v, want %v", names, want)
 	}
 
-	if strings.Contains(stdout, "Core Commands:") || strings.Contains(stdout, "Management Commands:") {
+	if strings.Contains(stdout, "Core Commands:") ||
+		strings.Contains(stdout, "Management Commands:") {
 		t.Fatalf("help split commands into categories: %s", stdout)
 	}
 }
@@ -109,7 +110,13 @@ func TestVersionOutputFailureRetainsDiagnostics(t *testing.T) {
 
 	var stderr bytes.Buffer
 
-	err := ExecuteApplication(t.Context(), []string{"--version"}, nil, failedWriter{cause: cause}, &stderr)
+	err := ExecuteApplication(
+		t.Context(),
+		[]string{"--version"},
+		nil,
+		failedWriter{cause: cause},
+		&stderr,
+	)
 	if !errors.Is(err, os.ErrPermission) {
 		t.Fatal("lost permission identity")
 	}
@@ -299,7 +306,15 @@ command = "true"
 command = "false"
 `)
 
-	exec := executeJSON(t, "hooks", "run", "session_switch_pre", testConfigFlag, cfgPath, testJSONFlag)
+	exec := executeJSON(
+		t,
+		"hooks",
+		"run",
+		"session_switch_pre",
+		testConfigFlag,
+		cfgPath,
+		testJSONFlag,
+	)
 	if exec.err == nil {
 		t.Fatal("expected a failing hook to surface an error")
 	}
@@ -327,7 +342,14 @@ func TestHooksRunPlainDegradedKeepsCounts(t *testing.T) {
 command = "false"
 `)
 
-	stdout, stderr, err := executeCommand(t, "hooks", "run", "session_switch_pre", testConfigFlag, cfgPath)
+	stdout, stderr, err := executeCommand(
+		t,
+		"hooks",
+		"run",
+		"session_switch_pre",
+		testConfigFlag,
+		cfgPath,
+	)
 	if err == nil {
 		t.Fatal("expected a failing hook to surface an error")
 	}
@@ -398,7 +420,10 @@ help = "f1"
 	}
 
 	for _, want := range [][]string{{"help", "f1"}, {"session.kill", "alt+x"}} {
-		if !slices.ContainsFunc(strings.Split(stdout, "\n"), func(line string) bool { return slices.Equal(strings.Fields(line), want) }) {
+		if !slices.ContainsFunc(
+			strings.Split(stdout, "\n"),
+			func(line string) bool { return slices.Equal(strings.Fields(line), want) },
+		) {
 			t.Fatalf("stdout missing %s binding:\n%s", want[0], stdout)
 		}
 	}

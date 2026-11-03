@@ -18,8 +18,17 @@ func TestPlanRejectsDependencyExpansionBeforeConstruction(t *testing.T) {
 	for i := range 300 {
 		id := "p" + strconv.Itoa(i)
 		m.Panes = append(m.Panes, model.Pane{
-			ID: id, Window: "w0", Index: i, Width: 1, Height: 24, Left: 2 * i,
-			Directory: model.Bytes("/tmp"), Active: i == 0, Launch: model.Launch{Recovery: statusUnverified},
+			ID:     id,
+			Window: "w0",
+			Index:  i,
+			Width:  1,
+			Height: 24,
+			Left:   2 * i,
+			Directory: model.Bytes(
+				"/tmp",
+			),
+			Active: i == 0,
+			Launch: model.Launch{Recovery: statusUnverified},
 		})
 		m.Links = append(m.Links, model.Link{Session: "s0", Window: "w0", Index: i, Active: i == 0})
 		m.Windows[0].Layout.Children = append(m.Windows[0].Layout.Children,
@@ -59,7 +68,9 @@ func basePayloadMutations() map[string]func(*Step) {
 	return map[string]func(*Step){
 		"session environment": func(s *Step) {
 			if typed, ok := (*s).(*CreateSessionStep); ok {
-				typed.Environment = []model.Variable{{Name: model.Bytes("EXTRA"), State: "set", Value: model.Bytes("value")}}
+				typed.Environment = []model.Variable{
+					{Name: model.Bytes("EXTRA"), State: "set", Value: model.Bytes("value")},
+				}
 			}
 		},
 		"group name": func(s *Step) {
@@ -277,7 +288,10 @@ func TestValidatePlanRejectsUnexpectedInitialWindowNameOnBootstrap(t *testing.T)
 	}
 
 	if err := ValidatePlan(plan); !errors.Is(err, ErrInvalid) {
-		t.Fatalf("expected ErrInvalid for unexpected initial window name on bootstrap, got: %v", err)
+		t.Fatalf(
+			"expected ErrInvalid for unexpected initial window name on bootstrap, got: %v",
+			err,
+		)
 	}
 }
 
@@ -326,7 +340,12 @@ func TestValidatePlanRejectsSelectWindowMissingWindowFinalizationDep(t *testing.
 		t.Fatalf("expected public ValidatePlan to reject tampered plan, got: %v", err)
 	}
 
-	tracker := newPlanTracker(len(corruptedSteps), len(plan.SourceGraph.Sessions), len(plan.SourceGraph.Windows), len(plan.SourceGraph.Panes))
+	tracker := newPlanTracker(
+		len(corruptedSteps),
+		len(plan.SourceGraph.Sessions),
+		len(plan.SourceGraph.Windows),
+		len(plan.SourceGraph.Panes),
+	)
 	ctx := validationContext{
 		graph:      plan.SourceGraph,
 		tracker:    &tracker,
@@ -340,7 +359,10 @@ func TestValidatePlanRejectsSelectWindowMissingWindowFinalizationDep(t *testing.
 	}
 
 	if !errors.Is(err, ErrInvalid) {
-		t.Fatalf("expected ErrInvalid when select-window omits window finalization dependency, got: %v", err)
+		t.Fatalf(
+			"expected ErrInvalid when select-window omits window finalization dependency, got: %v",
+			err,
+		)
 	}
 }
 
@@ -363,7 +385,11 @@ func TestValidatePlanRejectsSelectPaneBeforePaneTitle(t *testing.T) {
 	}
 
 	if titleIdx == 0 || selectIdx == 0 {
-		t.Fatalf("expected title and select steps in plan, got titleIdx=%d, selectIdx=%d", titleIdx, selectIdx)
+		t.Fatalf(
+			"expected title and select steps in plan, got titleIdx=%d, selectIdx=%d",
+			titleIdx,
+			selectIdx,
+		)
 	}
 
 	corruptedSteps := append([]Step(nil), plan.Steps...)
@@ -385,7 +411,12 @@ func TestValidatePlanRejectsSelectPaneBeforePaneTitle(t *testing.T) {
 		t.Fatalf("expected public ValidatePlan to reject tampered plan, got: %v", err)
 	}
 
-	tracker := newPlanTracker(len(corruptedSteps), len(plan.SourceGraph.Sessions), len(plan.SourceGraph.Windows), len(plan.SourceGraph.Panes))
+	tracker := newPlanTracker(
+		len(corruptedSteps),
+		len(plan.SourceGraph.Sessions),
+		len(plan.SourceGraph.Windows),
+		len(plan.SourceGraph.Panes),
+	)
 	ctx := validationContext{
 		graph:      plan.SourceGraph,
 		tracker:    &tracker,

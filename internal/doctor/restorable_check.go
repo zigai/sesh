@@ -22,7 +22,14 @@ func (s *Service) withRestorableSessions(ctx context.Context, result Result) Res
 	}
 
 	restore := s.seshCommand("snapshot restore", []string{flagSocket, flagRepository, flagHistory})
-	result.Details = append(result.Details, fmt.Sprintf("The newest snapshot holds %s; restore them with '%s' once tmux runs", plural(count, "session"), restore))
+	result.Details = append(
+		result.Details,
+		fmt.Sprintf(
+			"The newest snapshot holds %s; restore them with '%s' once tmux runs",
+			plural(count, "session"),
+			restore,
+		),
+	)
 
 	return result
 }

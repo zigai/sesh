@@ -50,7 +50,12 @@ func defaultRotationPolicy() rotationPolicy {
 	}
 }
 
-func newRotatingSink(file *os.File, path, baseName string, parentDir *os.File, policy rotationPolicy) *Sink {
+func newRotatingSink(
+	file *os.File,
+	path, baseName string,
+	parentDir *os.File,
+	policy rotationPolicy,
+) *Sink {
 	sink := newSink(file)
 	if policy.maxBytes > 0 {
 		sink.path = path
@@ -201,7 +206,11 @@ func (s *Sink) syncActiveFileLocked(currentFile *os.File) (*os.File, error) {
 	}
 
 	if pathStat.Mode&unix.S_IFMT != unix.S_IFREG {
-		return currentFile, wrapErr(ErrLogPathNotRegular, "log_path_not_regular", "inspect active log path")
+		return currentFile, wrapErr(
+			ErrLogPathNotRegular,
+			"log_path_not_regular",
+			"inspect active log path",
+		)
 	}
 
 	if !sameInode(currentInfo, &pathStat) {
@@ -319,7 +328,11 @@ func inspectLogTail(file *os.File) (int64, bool, error) {
 	}
 
 	if lineLength > maxLogRecordBytes {
-		return 0, false, wrapErr(ErrLogForeign, "log_corrupt", "log record in tail exceeds maximum size")
+		return 0, false, wrapErr(
+			ErrLogForeign,
+			"log_corrupt",
+			"log record in tail exceeds maximum size",
+		)
 	}
 
 	line := make([]byte, lineLength)
@@ -336,7 +349,12 @@ func inspectLogTail(file *os.File) (int64, bool, error) {
 	return inspectFinalRecord(file, line, lineStart, hasTrailingNewline)
 }
 
-func inspectFinalRecord(file *os.File, line []byte, lineStart int64, hasTrailingNewline bool) (int64, bool, error) {
+func inspectFinalRecord(
+	file *os.File,
+	line []byte,
+	lineStart int64,
+	hasTrailingNewline bool,
+) (int64, bool, error) {
 	if hasTrailingNewline && isJSONLogObject(line) {
 		return lineStart, true, nil
 	}
@@ -450,11 +468,17 @@ func writeEventWithRollback(file sinkFile, event []byte) (int, error) {
 	}
 
 	if err := recoverable.Truncate(info.Size()); err != nil {
-		return n, errors.Join(writeErr, wrapErr(err, "log_write_failed", "restore log file after partial write"))
+		return n, errors.Join(
+			writeErr,
+			wrapErr(err, "log_write_failed", "restore log file after partial write"),
+		)
 	}
 
 	if _, err := recoverable.Seek(0, io.SeekEnd); err != nil {
-		return n, errors.Join(writeErr, wrapErr(err, "log_write_failed", "restore log file position after partial write"))
+		return n, errors.Join(
+			writeErr,
+			wrapErr(err, "log_write_failed", "restore log file position after partial write"),
+		)
 	}
 
 	return n, writeErr
@@ -513,7 +537,12 @@ func (s *Sink) writeEvent(event []byte) (int, error) {
 	return n, errors.Join(writeErr, unlockErr)
 }
 
-func (s *Sink) handleRotationFailure(file, newFile *os.File, rotationErr error, lockTarget *os.File, event []byte) (int, error) {
+func (s *Sink) handleRotationFailure(
+	file, newFile *os.File,
+	rotationErr error,
+	lockTarget *os.File,
+	event []byte,
+) (int, error) {
 	if newFile == nil {
 		unlockErr := setLogFileLock(lockTarget, unix.LOCK_UN)
 
@@ -535,13 +564,19 @@ func (s *Sink) handleRotationFailure(file, newFile *os.File, rotationErr error, 
 	return n, errors.Join(rotationErr, writeErr, unlockErr)
 }
 
-func rotateLogIfNeeded(file *os.File, state *rotationState, parentDir *os.File, eventBytes int64) (*os.File, error) {
+func rotateLogIfNeeded(
+	file *os.File,
+	state *rotationState,
+	parentDir *os.File,
+	eventBytes int64,
+) (*os.File, error) {
 	info, err := file.Stat()
 	if err != nil {
 		return file, wrapErr(err, "log_rotation_failed", "inspect log file for rotation")
 	}
 
-	if info.Size() == 0 || (eventBytes <= state.policy.maxBytes && info.Size() <= state.policy.maxBytes-eventBytes) {
+	if info.Size() == 0 ||
+		(eventBytes <= state.policy.maxBytes && info.Size() <= state.policy.maxBytes-eventBytes) {
 		return file, nil
 	}
 
@@ -564,7 +599,11 @@ func cleanStaleRotationTemp(parentFile *os.File, baseName string) error {
 	}
 
 	if stat.Mode&unix.S_IFMT != unix.S_IFREG {
-		return wrapErr(ErrRotationPathNotRegular, "log_path_not_regular", "inspect log rotation temporary file")
+		return wrapErr(
+			ErrRotationPathNotRegular,
+			"log_path_not_regular",
+			"inspect log rotation temporary file",
+		)
 	}
 
 	if err := unix.Unlinkat(parentFd, tempName, 0); err != nil && !errors.Is(err, unix.ENOENT) {
@@ -583,7 +622,11 @@ func rotateLog(file *os.File, state *rotationState, parentDir *os.File) (*os.Fil
 		return truncateActiveLog(file)
 	}
 
-	if err := shiftRotationBackups(parentDir, state.baseName, state.policy.backupCount); err != nil {
+	if err := shiftRotationBackups(
+		parentDir,
+		state.baseName,
+		state.policy.backupCount,
+	); err != nil {
 		return file, err
 	}
 
@@ -594,7 +637,11 @@ func rotateLog(file *os.File, state *rotationState, parentDir *os.File) (*os.Fil
 
 	statErr := unix.Fstatat(parentFd, destName, &stat, unix.AT_SYMLINK_NOFOLLOW)
 	if statErr == nil && stat.Mode&unix.S_IFMT != unix.S_IFREG {
-		return file, wrapErr(ErrRotationPathNotRegular, "log_path_not_regular", "inspect destination log backup")
+		return file, wrapErr(
+			ErrRotationPathNotRegular,
+			"log_path_not_regular",
+			"inspect destination log backup",
+		)
 	}
 
 	if err := unix.Renameat(parentFd, state.baseName, parentFd, destName); err != nil {
@@ -657,7 +704,11 @@ func shiftRotationBackups(parentDir *os.File, baseName string, backupCount int) 
 		}
 
 		if stat.Mode&unix.S_IFMT != unix.S_IFREG {
-			return wrapErr(ErrRotationPathNotRegular, "log_path_not_regular", "inspect rotated log backup")
+			return wrapErr(
+				ErrRotationPathNotRegular,
+				"log_path_not_regular",
+				"inspect rotated log backup",
+			)
 		}
 
 		destName := rotationBackupName(baseName, index+1)
@@ -666,7 +717,11 @@ func shiftRotationBackups(parentDir *os.File, baseName string, backupCount int) 
 
 		destErr := unix.Fstatat(parentFd, destName, &destStat, unix.AT_SYMLINK_NOFOLLOW)
 		if destErr == nil && destStat.Mode&unix.S_IFMT != unix.S_IFREG {
-			return wrapErr(ErrRotationPathNotRegular, "log_path_not_regular", "inspect destination log backup")
+			return wrapErr(
+				ErrRotationPathNotRegular,
+				"log_path_not_regular",
+				"inspect destination log backup",
+			)
 		}
 
 		if err := unix.Renameat(parentFd, sourceName, parentFd, destName); err != nil {
@@ -692,7 +747,11 @@ func removeRegularRotationFile(parentDir *os.File, name string) error {
 	}
 
 	if stat.Mode&unix.S_IFMT != unix.S_IFREG {
-		return wrapErr(ErrRotationPathNotRegular, "log_path_not_regular", "inspect log rotation path")
+		return wrapErr(
+			ErrRotationPathNotRegular,
+			"log_path_not_regular",
+			"inspect log rotation path",
+		)
 	}
 
 	if err := unix.Unlinkat(parentFd, name, 0); err != nil && !errors.Is(err, unix.ENOENT) {

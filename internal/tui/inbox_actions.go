@@ -117,7 +117,11 @@ func (m *Model) pickerActionError(id action.ID) error {
 		}
 
 		return nil
-	case action.InboxFinish.ID, action.InboxPin.ID, action.InboxUnpin.ID, action.InboxLink.ID, action.InboxUnlink.ID:
+	case action.InboxFinish.ID,
+		action.InboxPin.ID,
+		action.InboxUnpin.ID,
+		action.InboxLink.ID,
+		action.InboxUnlink.ID:
 		return workActionError(id, item)
 	case action.InboxTask.ID:
 		return taskProjectError(item)
@@ -254,7 +258,11 @@ func (m *Model) runPickerAction(request pendingAction) func() (tea.Model, tea.Cm
 		return m.openPullRequest(item)
 	case action.InboxEvidence.ID:
 		return m.openEvidenceMenu(item)
-	case action.InboxFinish.ID, action.InboxPin.ID, action.InboxUnpin.ID, action.InboxLink.ID, action.InboxUnlink.ID:
+	case action.InboxFinish.ID,
+		action.InboxPin.ID,
+		action.InboxUnpin.ID,
+		action.InboxLink.ID,
+		action.InboxUnlink.ID:
 		return m.runWorkAction(id, item, request.values)
 	case action.InboxTask.ID:
 		m.taskProject = rowProject(item)
@@ -276,23 +284,53 @@ func (m *Model) markSeen(id action.ID, item inboxItem, key string) func() (tea.M
 		return m.updateInbox(func(state *inbox.State) error { state.ClearUnseen(key); return nil })
 	}
 
-	return m.updateInbox(func(state *inbox.State) error { state.MarkUnseen(key, time.Now()); return nil })
+	return m.updateInbox(
+		func(state *inbox.State) error { state.MarkUnseen(key, time.Now()); return nil },
+	)
 }
 
 func (m *Model) snoozeItem(key, until string) func() (tea.Model, tea.Cmd) {
 	if until == "" {
 		entries := make([]menuEntry, 0, len(m.config.Inbox.Snooze)+1)
 		for _, choice := range m.config.Inbox.Snooze {
-			entries = append(entries, menuEntry{label: choice, key: "", run: func() (tea.Model, tea.Cmd) { return m.snoozeItem(key, choice)() }})
+			entries = append(
+				entries,
+				menuEntry{
+					label: choice,
+					key:   "",
+					run:   func() (tea.Model, tea.Cmd) { return m.snoozeItem(key, choice)() },
+				},
+			)
 		}
 
 		param, _ := action.InboxSnooze.Describe().Param("until")
 		subject, _ := m.actionSubject(action.InboxSnooze.Describe())
-		request := pendingAction{entry: action.InboxSnooze, subject: subject, values: action.Values{}, param: emptyParam()}
+		request := pendingAction{
+			entry:   action.InboxSnooze,
+			subject: subject,
+			values:  action.Values{},
+			param:   emptyParam(),
+		}
 
-		entries = append(entries, menuEntry{label: snoozeCustomLabel, key: "", run: func() (tea.Model, tea.Cmd) { return m.promptParam(request, param)() }})
+		entries = append(
+			entries,
+			menuEntry{
+				label: snoozeCustomLabel,
+				key:   "",
+				run:   func() (tea.Model, tea.Cmd) { return m.promptParam(request, param)() },
+			},
+		)
 
-		return m.openMenu(&rowMenu{entries: entries, cursor: 0, anchored: false, anchorX: 0, anchorY: 0, box: menuBox{x: 0, y: 0, width: 0, height: 0}})
+		return m.openMenu(
+			&rowMenu{
+				entries:  entries,
+				cursor:   0,
+				anchored: false,
+				anchorX:  0,
+				anchorY:  0,
+				box:      menuBox{x: 0, y: 0, width: 0, height: 0},
+			},
+		)
 	}
 
 	snooze, err := config.ParseSnooze(until)
@@ -361,7 +399,11 @@ func (m *Model) openPullRequest(item inboxItem) func() (tea.Model, tea.Cmd) {
 	return m.runOpener(item.agent.CWD, "gh", "pr", "view", target, "--web")
 }
 
-func (m *Model) runOpener(directory string, program string, args ...string) func() (tea.Model, tea.Cmd) {
+func (m *Model) runOpener(
+	directory string,
+	program string,
+	args ...string,
+) func() (tea.Model, tea.Cmd) {
 	ctx := m.operationContext()
 
 	return func() (tea.Model, tea.Cmd) {
@@ -402,5 +444,6 @@ func (m *Model) handleOpened(msg openedMsg) {
 func (m *Model) inboxDoneByMark(item inboxItem) bool {
 	status := item.agent.Status.DisplayStatus()
 
-	return (status == session.AgentStatusIdle || status == session.AgentStatusInterrupted) && m.markedUnseen(item)
+	return (status == session.AgentStatusIdle || status == session.AgentStatusInterrupted) &&
+		m.markedUnseen(item)
 }

@@ -94,7 +94,10 @@ func (peer *Peer) Dispatch(ctx context.Context, invocation action.Invocation) (a
 
 	result, err := RunAction(ctx, options, request)
 	if err != nil {
-		return nil, action.Wrap(action.CodeUncertain, &PeerError{Code: action.CodeUncertain, InvocationID: request.InvocationID, Err: err})
+		return nil, action.Wrap(
+			action.CodeUncertain,
+			&PeerError{Code: action.CodeUncertain, InvocationID: request.InvocationID, Err: err},
+		)
 	}
 
 	var output any
@@ -109,7 +112,10 @@ func (peer *Peer) Dispatch(ctx context.Context, invocation action.Invocation) (a
 		return output, nil
 	}
 
-	return output, action.Wrap(result.Code, &PeerError{Code: result.Code, InvocationID: result.InvocationID, Err: nil})
+	return output, action.Wrap(
+		result.Code,
+		&PeerError{Code: result.Code, InvocationID: result.InvocationID, Err: nil},
+	)
 }
 
 func (peer *Peer) originOptions(connectionID string) (ActionOriginOptions, error) {
@@ -131,7 +137,11 @@ func (peer *Peer) originOptions(connectionID string) (ActionOriginOptions, error
 	return ActionOriginOptions{Remote: peer.remote, Connection: connection, State: state}, nil
 }
 
-func NewActionRequest(opts ActionOriginOptions, id action.ID, input jsontext.Value) (ActionRequest, error) {
+func NewActionRequest(
+	opts ActionOriginOptions,
+	id action.ID,
+	input jsontext.Value,
+) (ActionRequest, error) {
 	if !opts.Remote.Enabled {
 		return ActionRequest{}, ErrRemoteDisabled
 	}
@@ -171,14 +181,22 @@ func NewActionRequest(opts ActionOriginOptions, id action.ID, input jsontext.Val
 
 // RunAction leaves the outcome unknown when the answer is lost; `sesh remote lookup` reads the
 // receipt the peer kept.
-func RunAction(ctx context.Context, opts ActionOriginOptions, request ActionRequest) (ActionResult, error) {
+func RunAction(
+	ctx context.Context,
+	opts ActionOriginOptions,
+	request ActionRequest,
+) (ActionResult, error) {
 	if err := ValidateActionRequest(request); err != nil {
 		return ActionResult{}, oops.In("remote").With("operation", "run_action").Wrap(err)
 	}
 
-	if request.ConnectionID != opts.Connection.ID || request.ConfigDigest != opts.State.ConfigDigest ||
-		request.PeerID != opts.State.PeerID || ConnectionDigest(opts.Connection) != opts.State.ConfigDigest {
-		return ActionResult{}, oops.In("remote").With("operation", "run_action").Wrap(ErrConnectionChanged)
+	if request.ConnectionID != opts.Connection.ID ||
+		request.ConfigDigest != opts.State.ConfigDigest ||
+		request.PeerID != opts.State.PeerID ||
+		ConnectionDigest(opts.Connection) != opts.State.ConfigDigest {
+		return ActionResult{}, oops.In("remote").
+			With("operation", "run_action").
+			Wrap(ErrConnectionChanged)
 	}
 
 	payload, err := EncodeActionRequest(request)
@@ -186,7 +204,10 @@ func RunAction(ctx context.Context, opts ActionOriginOptions, request ActionRequ
 		return ActionResult{}, oops.In("remote").With("operation", "run_action").Wrap(err)
 	}
 
-	actionCtx, cancel := context.WithTimeout(ctx, ParsedDuration(opts.Remote.ActionTimeout, defaultAction))
+	actionCtx, cancel := context.WithTimeout(
+		ctx,
+		ParsedDuration(opts.Remote.ActionTimeout, defaultAction),
+	)
 	defer cancel()
 
 	command, err := NewSSHCommand(actionCtx, opts.Remote, opts.Connection, SSHCommandOptions{
@@ -203,22 +224,40 @@ func RunAction(ctx context.Context, opts ActionOriginOptions, request ActionRequ
 	diagnostics := NewDiagnosticsBuffer(maxDiagnosticsBytes)
 	command.Stderr = diagnostics
 
-	uncertain := ActionResult{InvocationID: request.InvocationID, Action: request.Action, OK: false, Code: action.CodeUncertain, Output: nil}
+	uncertain := ActionResult{
+		InvocationID: request.InvocationID,
+		Action:       request.Action,
+		OK:           false,
+		Code:         action.CodeUncertain,
+		Output:       nil,
+	}
 
 	output, runErr := command.Output()
 	if runErr != nil {
 		cause := ClassifySSHFailure(actionCtx.Err(), diagnostics.String())
 
-		return uncertain, errors.Join(cause, oops.In("remote").With("operation", "run_action").With("invocation", request.InvocationID).Wrap(runErr))
+		return uncertain, errors.Join(
+			cause,
+			oops.In("remote").
+				With("operation", "run_action").
+				With("invocation", request.InvocationID).
+				Wrap(runErr),
+		)
 	}
 
 	result, err := DecodeActionResult(output)
 	if err != nil {
-		return uncertain, oops.In("remote").With("operation", "run_action").With("invocation", request.InvocationID).Wrap(err)
+		return uncertain, oops.In("remote").
+			With("operation", "run_action").
+			With("invocation", request.InvocationID).
+			Wrap(err)
 	}
 
 	if result.InvocationID != request.InvocationID || result.Action != request.Action {
-		return uncertain, oops.In("remote").With("operation", "run_action").With("invocation", request.InvocationID).Wrap(ErrInvocationConflict)
+		return uncertain, oops.In("remote").
+			With("operation", "run_action").
+			With("invocation", request.InvocationID).
+			Wrap(ErrInvocationConflict)
 	}
 
 	return result, nil

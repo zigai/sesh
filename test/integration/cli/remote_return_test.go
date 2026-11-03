@@ -48,11 +48,26 @@ func TestRemotePickerReturnsAcrossSSH(t *testing.T) {
 
 	start := newRemoteReturnSession(t, origin, fixture, "origin-start", "ORIGIN_READY")
 
-	destination := newRemoteReturnSession(t, origin, fixture, "origin-destination", "RETURNED_TO_ORIGIN")
+	destination := newRemoteReturnSession(
+		t,
+		origin,
+		fixture,
+		"origin-destination",
+		"RETURNED_TO_ORIGIN",
+	)
 
 	configPath := filepath.Join(fixture.configHome, "sesh", "config.toml")
-	writeTestConfig(t, configPath, fmt.Sprintf("[agent_sessions]\nenabled = false\n\n[remote]\nenabled = true\nreturn_to_origin = false\nssh_path = %q\n", fixture.sshWrapper)+
-		remoteConnectionsTOML(fixture.connection))
+	writeTestConfig(
+		t,
+		configPath,
+		fmt.Sprintf(
+			"[agent_sessions]\nenabled = false\n\n[remote]\nenabled = true\nreturn_to_origin = false\nssh_path = %q\n",
+			fixture.sshWrapper,
+		)+
+			remoteConnectionsTOML(
+				fixture.connection,
+			),
+	)
 
 	publishRemoteReturnCatalog(t, fixture, peer)
 
@@ -70,7 +85,12 @@ func TestRemotePickerReturnsAcrossSSH(t *testing.T) {
 		"--until-screen", "ORIGIN_READY", "--timeout", "8s", "--max-duration", "30s", "--no-input",
 		executable, "-test.run=^TestRemoteReturnTerminalHelper$")
 
-	record.Env = append(os.Environ(), "SESH_RETURN_HELPER=1", "SESH_RETURN_SOCKET="+origin.Endpoint().SocketPath, "SESH_RETURN_SESSION="+string(start.ID()))
+	record.Env = append(
+		os.Environ(),
+		"SESH_RETURN_HELPER=1",
+		"SESH_RETURN_SOCKET="+origin.Endpoint().SocketPath,
+		"SESH_RETURN_SESSION="+string(start.ID()),
+	)
 	if output, err := record.CombinedOutput(); err != nil {
 		t.Fatalf("record origin terminal: %v: %s", err, output)
 	}
@@ -79,17 +99,74 @@ func TestRemotePickerReturnsAcrossSSH(t *testing.T) {
 		stopCtx, stopCancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer stopCancel()
 
-		_ = exec.CommandContext(stopCtx, termtraceExecutable, "stop", "-q", alias, "--wait", "--timeout-ms", "1500").Run()
+		_ = exec.CommandContext(stopCtx, termtraceExecutable, "stop", "-q", alias, "--wait", "--timeout-ms", "1500").
+			Run()
 	})
 
-	attachLine := fmt.Sprintf("%s remote attach fixture remote-work --origin-socket %s", fixture.connection.SeshPath, origin.Endpoint().SocketPath)
-	remoteReturnCommand(t, ctx, "send", alias, "text:"+attachLine, "enter", "--until-screen", "REMOTE_READY", "--timeout", "8s")
+	attachLine := fmt.Sprintf(
+		"%s remote attach fixture remote-work --origin-socket %s",
+		fixture.connection.SeshPath,
+		origin.Endpoint().SocketPath,
+	)
+	remoteReturnCommand(
+		t,
+		ctx,
+		"send",
+		alias,
+		"text:"+attachLine,
+		"enter",
+		"--until-screen",
+		"REMOTE_READY",
+		"--timeout",
+		"8s",
+	)
 	assertRemoteBridgeAuthentication(t, fixture, peer)
 	popupLine := fixture.connection.SeshPath + " pick --ui popup"
-	remoteReturnCommand(t, ctx, "send", "-q", alias, "text:"+popupLine, "enter", "--until-screen", "origin-destination", "--timeout", "8s")
-	assertPickerScreenRows(t, ctx, alias, []string{"origin-destination", "origin-start", "remote-work"}, nil)
-	remoteReturnCommand(t, ctx, "send", "-q", alias, "--text", "origin-destination", "--until-screen", "> origin-destination", "--timeout", "5s")
-	remoteReturnCommand(t, ctx, "send", "-q", alias, "enter", "--until-screen", "RETURNED_TO_ORIGIN", "--timeout", "8s")
+	remoteReturnCommand(
+		t,
+		ctx,
+		"send",
+		"-q",
+		alias,
+		"text:"+popupLine,
+		"enter",
+		"--until-screen",
+		"origin-destination",
+		"--timeout",
+		"8s",
+	)
+	assertPickerScreenRows(
+		t,
+		ctx,
+		alias,
+		[]string{"origin-destination", "origin-start", "remote-work"},
+		nil,
+	)
+	remoteReturnCommand(
+		t,
+		ctx,
+		"send",
+		"-q",
+		alias,
+		"--text",
+		"origin-destination",
+		"--until-screen",
+		"> origin-destination",
+		"--timeout",
+		"5s",
+	)
+	remoteReturnCommand(
+		t,
+		ctx,
+		"send",
+		"-q",
+		alias,
+		"enter",
+		"--until-screen",
+		"RETURNED_TO_ORIGIN",
+		"--timeout",
+		"8s",
+	)
 
 	clients, err := origin.Clients(t.Context())
 	if err != nil || len(clients) != 1 {
@@ -118,7 +195,11 @@ func assertRemoteBridgeAuthentication(t *testing.T, fixture remoteSSHFixture, pe
 	t.Helper()
 
 	record := remoteReturnCapability(t, fixture)
-	if _, err := remote.NewBridgeClient(record.BridgeSocket, "invalid-token").GetCatalog(t.Context()); !errors.Is(err, remote.ErrBridgeAuthFailed) {
+	if _, err := remote.NewBridgeClient(record.BridgeSocket, "invalid-token").
+		GetCatalog(t.Context()); !errors.Is(
+		err,
+		remote.ErrBridgeAuthFailed,
+	) {
 		t.Fatalf("unauthenticated forwarded socket request = %v", err)
 	}
 
@@ -154,15 +235,22 @@ func TestRemoteReturnTerminalHelper(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := handle.Attach(t.Context(), gotmux.Streams{In: os.Stdin, Out: os.Stdout, Err: os.Stderr}, gotmux.AttachOptions{}); err != nil {
+	if err := handle.Attach(
+		t.Context(),
+		gotmux.Streams{In: os.Stdin, Out: os.Stdout, Err: os.Stderr},
+		gotmux.AttachOptions{},
+	); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func remoteFixtureEnvironment(fixture remoteSSHFixture) map[string]string {
 	return map[string]string{
-		"HOME": filepath.Join(fixture.root, "home"), "XDG_STATE_HOME": fixture.stateHome,
-		"XDG_CACHE_HOME": fixture.cacheHome, "XDG_DATA_HOME": fixture.dataHome, "XDG_CONFIG_HOME": fixture.configHome,
+		"HOME":            filepath.Join(fixture.root, "home"),
+		"XDG_STATE_HOME":  fixture.stateHome,
+		"XDG_CACHE_HOME":  fixture.cacheHome,
+		"XDG_DATA_HOME":   fixture.dataHome,
+		"XDG_CONFIG_HOME": fixture.configHome,
 	}
 }
 
@@ -181,9 +269,19 @@ func publishRemoteReturnCatalog(t *testing.T, fixture remoteSSHFixture, peer *go
 
 	catalog := remote.EmptyCatalog()
 	catalog.Connections[fixture.connection.ID] = remote.ConnectionState{
-		ID: fixture.connection.ID, Label: fixture.connection.Label, ConfigDigest: remote.ConnectionDigest(fixture.connection),
-		PeerID: fixture.peerID, Connected: true, Sequence: 1, LastSeen: time.Now(), BridgeDir: bridgeDir,
-		Snapshot: remote.Snapshot{Sessions: rows, Actions: defaultRemoteActions(), Health: remote.UnavailableHealth()},
+		ID:           fixture.connection.ID,
+		Label:        fixture.connection.Label,
+		ConfigDigest: remote.ConnectionDigest(fixture.connection),
+		PeerID:       fixture.peerID,
+		Connected:    true,
+		Sequence:     1,
+		LastSeen:     time.Now(),
+		BridgeDir:    bridgeDir,
+		Snapshot: remote.Snapshot{
+			Sessions: rows,
+			Actions:  defaultRemoteActions(),
+			Health:   remote.UnavailableHealth(),
+		},
 	}
 
 	cachePath, err := remote.Dir(fixture.cacheHome)
@@ -249,18 +347,25 @@ func assertRemoteReturnCleanup(t *testing.T, fixture remoteSSHFixture, peer *got
 func remoteReturnCommand(t *testing.T, ctx context.Context, arguments ...string) {
 	t.Helper()
 
-	if output, err := exec.CommandContext(ctx, termtraceExecutable, arguments...).CombinedOutput(); err != nil {
+	if output, err := exec.CommandContext(ctx, termtraceExecutable, arguments...).
+		CombinedOutput(); err != nil {
 		alias := arguments[1]
 		if alias == "-q" {
 			alias = arguments[2]
 		}
 
-		screen, screenErr := exec.CommandContext(ctx, termtraceExecutable, "screen", alias).CombinedOutput()
+		screen, screenErr := exec.CommandContext(ctx, termtraceExecutable, "screen", alias).
+			CombinedOutput()
 		t.Fatalf("terminal step: %v: %s\nScreen (%v):\n%s", err, output, screenErr, screen)
 	}
 }
 
-func newRemoteReturnSession(t *testing.T, server *gotmux.Server, fixture remoteSSHFixture, name, marker string) gotmux.Session {
+func newRemoteReturnSession(
+	t *testing.T,
+	server *gotmux.Server,
+	fixture remoteSSHFixture,
+	name, marker string,
+) gotmux.Session {
 	t.Helper()
 
 	handle, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{

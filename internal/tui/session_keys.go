@@ -57,7 +57,10 @@ func altBlockedSessionKeys(cfg *config.Config, bindings []action.Binding) map[st
 			return bubbleskey.Matches(keyPressSpec(key), bound.key)
 		})
 		if !taken {
-			taken = slices.ContainsFunc(reserved, func(spec string) bool { return config.PickerKeyName(spec) == key })
+			taken = slices.ContainsFunc(
+				reserved,
+				func(spec string) bool { return config.PickerKeyName(spec) == key },
+			)
 		}
 
 		if taken {
@@ -164,7 +167,10 @@ func reclaimKeyFromUnlistedSession(
 	assigned []session.KeyAssignment,
 	present map[session.Identity]bool,
 ) ([]session.KeyAssignment, string, bool) {
-	index := slices.IndexFunc(assigned, func(entry session.KeyAssignment) bool { return !present[entry.Session] })
+	index := slices.IndexFunc(
+		assigned,
+		func(entry session.KeyAssignment) bool { return !present[entry.Session] },
+	)
 	if index < 0 {
 		return assigned, "", false
 	}
@@ -277,7 +283,8 @@ func (m *Model) rowKey(row session.Session, agent session.AgentSession, hasAgent
 		return m.focusedAgentKey(row, agent)
 	}
 
-	if m.sessionPrefixPending || (m.config.Keys.SessionKeysHoldAlt() && m.shortcutStyle() == "indent") {
+	if m.sessionPrefixPending ||
+		(m.config.Keys.SessionKeysHoldAlt() && m.shortcutStyle() == "indent") {
 		return m.sessionKey(row)
 	}
 
@@ -360,7 +367,8 @@ func (m *Model) handleSessionPrefixKeys(msg tea.KeyPressMsg) func() (tea.Model, 
 		return stay
 	}
 
-	if pressed == focusCancelKey || config.PickerKeyName(pressed) == config.PickerKeyName(m.config.Keys.SessionPrefix) {
+	if pressed == focusCancelKey ||
+		config.PickerKeyName(pressed) == config.PickerKeyName(m.config.Keys.SessionPrefix) {
 		m.sessionPrefixPending = false
 
 		return stay
@@ -415,7 +423,12 @@ func (m *Model) assignLoadedSessionKeys(reclaimFromUnlisted bool) tea.Cmd {
 		var saved []session.KeyAssignment
 
 		err := m.deps.State.UpdateModelState(ctx, func(current *session.State) {
-			current.SessionKeys, _ = assignSessionKeys(current.SessionKeys, listed, rules, reclaimFromUnlisted)
+			current.SessionKeys, _ = assignSessionKeys(
+				current.SessionKeys,
+				listed,
+				rules,
+				reclaimFromUnlisted,
+			)
 			saved = slices.Clone(current.SessionKeys)
 		})
 

@@ -55,8 +55,15 @@ func writeReport(output io.Writer, report Report, width int, color bool) error {
 			lines = append(lines, wrap(detail, width, messageIndent)...)
 		}
 
-		fmt.Fprintf(&b, "  %s%s  %-*s  %s\n", statusWord(result.Status, color), strings.Repeat(" ", statusWidth-len(result.Status)),
-			nameWidth, result.Name(), lines[0])
+		fmt.Fprintf(
+			&b,
+			"  %s%s  %-*s  %s\n",
+			statusWord(result.Status, color),
+			strings.Repeat(" ", statusWidth-len(result.Status)),
+			nameWidth,
+			result.Name(),
+			lines[0],
+		)
 
 		for _, line := range lines[1:] {
 			fmt.Fprintf(&b, "%s%s\n", strings.Repeat(" ", messageIndent), line)
@@ -85,7 +92,14 @@ func writeReport(output io.Writer, report Report, width int, color bool) error {
 }
 
 func writeHeader(b *strings.Builder, report Report) {
-	fmt.Fprintf(b, "sesh %s (%s, %s) %s\n", report.Version, report.Build.Commit, report.Build.Date, report.Build.Target)
+	fmt.Fprintf(
+		b,
+		"sesh %s (%s, %s) %s\n",
+		report.Version,
+		report.Build.Commit,
+		report.Build.Date,
+		report.Build.Target,
+	)
 
 	field := func(label string, values ...string) {
 		for index, value := range values {
@@ -101,7 +115,14 @@ func writeHeader(b *strings.Builder, report Report) {
 	configs := make([]string, 0, len(paths.Config))
 
 	for _, file := range paths.Config {
-		configs = append(configs, fmt.Sprintf("%s (%s)", configDisplay(file.Path), withSource(configStatus(file.Status), file.Source)))
+		configs = append(
+			configs,
+			fmt.Sprintf(
+				"%s (%s)",
+				configDisplay(file.Path),
+				withSource(configStatus(file.Status), file.Source),
+			),
+		)
 	}
 
 	field("executable", report.Install.Executable)

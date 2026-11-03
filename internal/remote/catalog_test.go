@@ -150,12 +150,28 @@ func TestDecodeCatalogRejectsUnsafeContent(t *testing.T) {
 	}
 
 	tests := map[string][]byte{
-		"unsupported version": []byte(strings.Replace(string(encoded), `"version":`+strconv.Itoa(ProtocolVersion), `"version":1`, 1)),
-		"unknown member":      []byte(strings.Replace(string(encoded), `"connections"`, `"forged":1,"connections"`, 1)),
-		"duplicate member":    []byte(strings.Replace(string(encoded), `"connections"`, `"connections":null,"connections"`, 1)),
-		"trailing content":    append(append([]byte{}, encoded...), []byte(`{}`)...),
-		"empty":               {},
-		"oversized":           []byte(strings.Repeat("x", maxCatalogBytes+1)),
+		"unsupported version": []byte(
+			strings.Replace(
+				string(encoded),
+				`"version":`+strconv.Itoa(ProtocolVersion),
+				`"version":1`,
+				1,
+			),
+		),
+		"unknown member": []byte(
+			strings.Replace(string(encoded), `"connections"`, `"forged":1,"connections"`, 1),
+		),
+		"duplicate member": []byte(
+			strings.Replace(
+				string(encoded),
+				`"connections"`,
+				`"connections":null,"connections"`,
+				1,
+			),
+		),
+		"trailing content": append(append([]byte{}, encoded...), []byte(`{}`)...),
+		"empty":            {},
+		"oversized":        []byte(strings.Repeat("x", maxCatalogBytes+1)),
 	}
 
 	for name, content := range tests {
@@ -173,16 +189,24 @@ func TestDecodeCatalogRejectsInvalidConnectionState(t *testing.T) {
 		"missing digest":     func(c *Catalog) { mutateConnection(c, func(s *ConnectionState) { s.ConfigDigest = "" }) },
 		"unknown error code": func(c *Catalog) { mutateConnection(c, func(s *ConnectionState) { s.LastError = "raw failure text" }) },
 		"invalid session": func(c *Catalog) {
-			mutateConnection(c, func(s *ConnectionState) { s.Snapshot.Sessions = []session.Session{{ID: "", Name: ""}} })
+			mutateConnection(
+				c,
+				func(s *ConnectionState) { s.Snapshot.Sessions = []session.Session{{ID: "", Name: ""}} },
+			)
 		},
 		"invalid health": func(c *Catalog) {
-			mutateConnection(c, func(s *ConnectionState) { s.Snapshot.Health.Tmux = SourceStatus{} })
+			mutateConnection(
+				c,
+				func(s *ConnectionState) { s.Snapshot.Health.Tmux = SourceStatus{} },
+			)
 		},
 		"control in label": func(c *Catalog) { mutateConnection(c, func(s *ConnectionState) { s.Label = "host\x1b[31m" }) },
 		"negative generation": func(c *Catalog) {
 			mutateConnection(c, func(s *ConnectionState) {
 				s.Sequence = 0
-				s.Snapshot.Sessions = []session.Session{{ID: "s", Name: "s", Kind: session.KindLive, WindowCount: -1}}
+				s.Snapshot.Sessions = []session.Session{
+					{ID: "s", Name: "s", Kind: session.KindLive, WindowCount: -1},
+				}
 			})
 		},
 	}
@@ -386,7 +410,12 @@ func TestReconcileCatalogAppliesStaleAndHideLifecycle(t *testing.T) {
 		t.Fatalf("stale connection = %#v, want disconnected with a stale code", stale)
 	}
 
-	changed, hidden = ReconcileCatalog(&catalog, now.Add(2*time.Hour), 30*time.Second, 10*time.Minute)
+	changed, hidden = ReconcileCatalog(
+		&catalog,
+		now.Add(2*time.Hour),
+		30*time.Second,
+		10*time.Minute,
+	)
 	if !changed || len(hidden) != 1 || hidden["host"].ID != "host" {
 		t.Fatalf("hide reconcile = (%t, %#v), want the connection hidden", changed, hidden)
 	}
@@ -399,11 +428,23 @@ func TestReconcileCatalogAppliesStaleAndHideLifecycle(t *testing.T) {
 func TestCatalogAdmitsBoundsCacheCapacity(t *testing.T) {
 	catalog := EmptyCatalog()
 
-	if !CatalogAdmits(catalog, "host", ConnectionState{ID: "host", ConfigDigest: testConfigDigest, Snapshot: Snapshot{Health: UnavailableHealth()}}) {
+	if !CatalogAdmits(
+		catalog,
+		"host",
+		ConnectionState{
+			ID:           "host",
+			ConfigDigest: testConfigDigest,
+			Snapshot:     Snapshot{Health: UnavailableHealth()},
+		},
+	) {
 		t.Fatal("CatalogAdmits() rejected a small connection")
 	}
 
-	oversized := ConnectionState{ID: "host", ConfigDigest: testConfigDigest, Snapshot: Snapshot{Health: UnavailableHealth()}}
+	oversized := ConnectionState{
+		ID:           "host",
+		ConfigDigest: testConfigDigest,
+		Snapshot:     Snapshot{Health: UnavailableHealth()},
+	}
 	oversized.Snapshot.Sessions = make([]session.Session, 0, MaxSessions)
 
 	for index := range MaxSessions {
@@ -494,7 +535,10 @@ func watchTestCatalog(t *testing.T, dir *privatefs.Dir) (func() catalogDelivery,
 		case <-time.After(5 * time.Second):
 			t.Fatal("timed out waiting for a catalog delivery")
 
-			return catalogDelivery{catalog: Catalog{Version: 0, GeneratedAt: time.Time{}, Connections: nil}, err: nil}
+			return catalogDelivery{
+				catalog: Catalog{Version: 0, GeneratedAt: time.Time{}, Connections: nil},
+				err:     nil,
+			}
 		}
 	}
 
@@ -538,7 +582,8 @@ func TestWatchCatalogRedeliversUnchangedCatalogAfterReadFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if recovered := next(); recovered.err != nil || recovered.catalog.Connections["host"].PeerID != testPeerID {
+	if recovered := next(); recovered.err != nil ||
+		recovered.catalog.Connections["host"].PeerID != testPeerID {
 		t.Fatalf("delivery after recovery = %#v, want the unchanged catalog again", recovered)
 	}
 }

@@ -24,7 +24,12 @@ func commandLineValidator(root *cobra.Command) func(args []string) error {
 		positionals, flagErr := commandPositionals(target, rest)
 
 		if target.HasAvailableSubCommands() && len(positionals) > 0 {
-			return fmt.Errorf("%w %q for %q", errUnknownCommand, positionals[0], target.CommandPath())
+			return fmt.Errorf(
+				"%w %q for %q",
+				errUnknownCommand,
+				positionals[0],
+				target.CommandPath(),
+			)
 		}
 
 		if !target.Runnable() {

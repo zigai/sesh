@@ -52,33 +52,73 @@ type paneHistoryJSON struct {
 }
 
 func newSessionCreateCommand() *cobra.Command {
-	return actioncli.Command(action.SessionCreate, actioncli.Options[action.CreateSession, action.CreatedSession]{
-		Operation: "create", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
-	})
+	return actioncli.Command(
+		action.SessionCreate,
+		actioncli.Options[action.CreateSession, action.CreatedSession]{
+			Operation:    "create",
+			SuccessOwned: true,
+			Configure:    nil,
+			Prepare:      nil,
+			Frontend:     nil,
+			Render:       nil,
+		},
+	)
 }
 
 func newSessionRenameCommand() *cobra.Command {
-	return actioncli.Command(action.SessionRename, actioncli.Options[action.RenameSession, action.RenamedSession]{
-		Operation: "rename", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
-	})
+	return actioncli.Command(
+		action.SessionRename,
+		actioncli.Options[action.RenameSession, action.RenamedSession]{
+			Operation:    "rename",
+			SuccessOwned: true,
+			Configure:    nil,
+			Prepare:      nil,
+			Frontend:     nil,
+			Render:       nil,
+		},
+	)
 }
 
 func newSessionKillCommand() *cobra.Command {
-	return actioncli.Command(action.SessionKill, actioncli.Options[action.KillSession, action.KilledSession]{
-		Operation: "kill", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
-	})
+	return actioncli.Command(
+		action.SessionKill,
+		actioncli.Options[action.KillSession, action.KilledSession]{
+			Operation:    "kill",
+			SuccessOwned: true,
+			Configure:    nil,
+			Prepare:      nil,
+			Frontend:     nil,
+			Render:       nil,
+		},
+	)
 }
 
 func newSessionDeleteCommand() *cobra.Command {
-	return actioncli.Command(action.SessionDelete, actioncli.Options[action.DeleteSession, action.DeletedSession]{
-		Operation: "delete", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: renderSessionDelete,
-	})
+	return actioncli.Command(
+		action.SessionDelete,
+		actioncli.Options[action.DeleteSession, action.DeletedSession]{
+			Operation:    "delete",
+			SuccessOwned: true,
+			Configure:    nil,
+			Prepare:      nil,
+			Frontend:     nil,
+			Render:       renderSessionDelete,
+		},
+	)
 }
 
 func newSessionSwitchCommand() *cobra.Command {
-	return actioncli.Command(action.SessionSwitch, actioncli.Options[action.SwitchSession, action.SwitchedSession]{
-		Operation: "switch", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
-	})
+	return actioncli.Command(
+		action.SessionSwitch,
+		actioncli.Options[action.SwitchSession, action.SwitchedSession]{
+			Operation:    "switch",
+			SuccessOwned: true,
+			Configure:    nil,
+			Prepare:      nil,
+			Frontend:     nil,
+			Render:       nil,
+		},
+	)
 }
 
 func newSessionNewCommand() *cobra.Command {
@@ -93,7 +133,10 @@ func newSessionNewCommand() *cobra.Command {
 		Args: clibase.UsageArgs(cobra.ExactArgs(1)),
 		RunE: runSessionNew,
 	}
-	cmd.Annotations = map[string]string{clibase.AnnotationOperation: "new", clibase.AnnotationSuccessOwned: annotationOwnedValue}
+	cmd.Annotations = map[string]string{
+		clibase.AnnotationOperation:    "new",
+		clibase.AnnotationSuccessOwned: annotationOwnedValue,
+	}
 
 	actioncli.AddEnvironmentFlags(cmd)
 	cmd.Flags().StringP("dir", "d", "", "Initial working directory for the session")
@@ -124,7 +167,10 @@ func renderSessionDelete(cmd *cobra.Command, output action.DeletedSession, err e
 		len(output.PreservedGenerations),
 	)
 	if writeErr != nil {
-		return errors.Join(err, oops.In("cli").With("operation", "write_partial_delete_summary").Wrap(writeErr))
+		return errors.Join(
+			err,
+			oops.In("cli").With("operation", "write_partial_delete_summary").Wrap(writeErr),
+		)
 	}
 
 	return err
@@ -190,7 +236,8 @@ func runSessionNew(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	outcome, enterErr := runtime.Local.Workflow().EnterOrCreateSession(clibase.CommandContext(cmd), name, dir)
+	outcome, enterErr := runtime.Local.Workflow().
+		EnterOrCreateSession(clibase.CommandContext(cmd), name, dir)
 	if err := errors.Join(enterErr, runtime.Close()); err != nil {
 		return err
 	}

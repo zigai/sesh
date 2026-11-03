@@ -28,7 +28,13 @@ func TestRefreshDefinitionsPreservesStateAndRecoversFailedServices(t *testing.T)
 				plans := planRefreshFixture(t, definitions)
 				manager, calls := recordingServiceManager(t, state)
 
-				applied, result, err := RefreshDefinitions(t.Context(), definitions, plans, false, manager)
+				applied, result, err := RefreshDefinitions(
+					t.Context(),
+					definitions,
+					plans,
+					false,
+					manager,
+				)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -58,8 +64,14 @@ func assertServiceRefreshResult(t *testing.T, result ServiceRefreshResult, state
 		wantRecovered = []string{AutosaveTimerName, RemoteServiceName}
 	}
 
-	if !result.Reloaded || !slices.Equal(result.Restarted, wantRestarts) || !slices.Equal(result.Recovered, wantRecovered) {
-		t.Fatalf("refresh = %+v, want restarted %v and recovered %v", result, wantRestarts, wantRecovered)
+	if !result.Reloaded || !slices.Equal(result.Restarted, wantRestarts) ||
+		!slices.Equal(result.Recovered, wantRecovered) {
+		t.Fatalf(
+			"refresh = %+v, want restarted %v and recovered %v",
+			result,
+			wantRestarts,
+			wantRecovered,
+		)
 	}
 }
 
@@ -67,12 +79,14 @@ func assertRefreshPreservesServiceState(t *testing.T, calls []string) {
 	t.Helper()
 
 	for _, call := range calls {
-		if strings.Contains(call, " enable ") || strings.Contains(call, " disable ") || strings.Contains(call, " start ") {
+		if strings.Contains(call, " enable ") || strings.Contains(call, " disable ") ||
+			strings.Contains(call, " start ") {
 			t.Fatalf("changed enabled state or started a service: %s", call)
 		}
 
 		restarts := strings.Contains(call, "restart") || strings.Contains(call, "reset-failed")
-		if restarts && !strings.HasSuffix(call, AutosaveTimerName) && !strings.HasSuffix(call, RemoteServiceName) {
+		if restarts && !strings.HasSuffix(call, AutosaveTimerName) &&
+			!strings.HasSuffix(call, RemoteServiceName) {
 			t.Fatalf("restarted tmux or an in-flight autosave: %s", call)
 		}
 	}
@@ -95,7 +109,11 @@ func refreshDefinitionsFixture(t *testing.T) []ServiceDefinition {
 			Name: name, Kind: kind, Path: filepath.Join(directory, name),
 			Content: "# " + ManagedMarker + "\n[Service]\nType=exec\nExecStart=/private/new-sesh\n",
 		}
-		if err := os.WriteFile(definition.Path, []byte(strings.ReplaceAll(definition.Content, "new-sesh", "old-sesh")), 0o600); err != nil {
+		if err := os.WriteFile(
+			definition.Path,
+			[]byte(strings.ReplaceAll(definition.Content, "new-sesh", "old-sesh")),
+			0o600,
+		); err != nil {
 			t.Fatal(err)
 		}
 
@@ -170,13 +188,23 @@ func TestRefreshDefinitionsInspectsEveryRestartBeforeAnyWrite(t *testing.T) {
 		return "active", nil
 	}
 
-	applied, result, err := RefreshDefinitions(t.Context(), definitions, planRefreshFixture(t, definitions), false, manager)
-	if !errors.Is(err, ErrServiceInspect) || !errors.Is(err, errTestServiceManager) || applied.Written != 0 || result.Reloaded || len(*calls) > 0 {
+	applied, result, err := RefreshDefinitions(
+		t.Context(),
+		definitions,
+		planRefreshFixture(t, definitions),
+		false,
+		manager,
+	)
+	if !errors.Is(err, ErrServiceInspect) || !errors.Is(err, errTestServiceManager) ||
+		applied.Written != 0 ||
+		result.Reloaded ||
+		len(*calls) > 0 {
 		t.Fatalf("failed inspection = %+v, %+v, %v; calls = %v", applied, result, err, *calls)
 	}
 
 	structured, ok := oops.AsOops(err)
-	if !ok || structured.Code() != "service_refresh_failed" || structured.Context()["phase"] != "inspect" {
+	if !ok || structured.Code() != "service_refresh_failed" ||
+		structured.Context()["phase"] != "inspect" {
 		t.Fatalf("missing fixed refresh diagnostics: %v", err)
 	}
 }
@@ -209,7 +237,13 @@ func TestRefreshDefinitionsRetriesReloadAndRestartFailures(t *testing.T) {
 				return nil
 			}
 
-			applied, result, err := RefreshDefinitions(t.Context(), definitions, planRefreshFixture(t, definitions), false, manager)
+			applied, result, err := RefreshDefinitions(
+				t.Context(),
+				definitions,
+				planRefreshFixture(t, definitions),
+				false,
+				manager,
+			)
 			if !errors.Is(err, errTestServiceManager) || applied.Written != len(definitions) {
 				t.Fatalf("failed refresh = %+v, %+v, %v", applied, result, err)
 			}
@@ -218,14 +252,22 @@ func TestRefreshDefinitionsRetriesReloadAndRestartFailures(t *testing.T) {
 				t.Fatalf("reload result was not preserved: %+v", result)
 			}
 
-			if phase == RemoteServiceName && !slices.Equal(result.Restarted, []string{AutosaveTimerName}) {
+			if phase == RemoteServiceName &&
+				!slices.Equal(result.Restarted, []string{AutosaveTimerName}) {
 				t.Fatalf("completed timer restart was not preserved: %+v", result)
 			}
 
 			manager, _ = recordingServiceManager(t, "active")
 
-			applied, result, err = RefreshDefinitions(t.Context(), definitions, planRefreshFixture(t, definitions), false, manager)
-			if err != nil || applied.Written != 0 || !result.Reloaded || !slices.Equal(result.Restarted, []string{AutosaveTimerName, RemoteServiceName}) {
+			applied, result, err = RefreshDefinitions(
+				t.Context(),
+				definitions,
+				planRefreshFixture(t, definitions),
+				false,
+				manager,
+			)
+			if err != nil || applied.Written != 0 || !result.Reloaded ||
+				!slices.Equal(result.Restarted, []string{AutosaveTimerName, RemoteServiceName}) {
 				t.Fatalf("retry with current definitions = %+v, %+v, %v", applied, result, err)
 			}
 		})
@@ -242,7 +284,13 @@ func TestRefreshDefinitionsRefusesAmbiguousManagerStates(t *testing.T) {
 			definitions := refreshDefinitionsFixture(t)
 			manager, calls := recordingServiceManager(t, state)
 
-			applied, _, err := RefreshDefinitions(t.Context(), definitions, planRefreshFixture(t, definitions), false, manager)
+			applied, _, err := RefreshDefinitions(
+				t.Context(),
+				definitions,
+				planRefreshFixture(t, definitions),
+				false,
+				manager,
+			)
 			if !errors.Is(err, ErrServiceInspect) || applied.Written != 0 || len(*calls) != 1 {
 				t.Fatalf("ambiguous refresh = %+v, %v; calls = %v", applied, err, *calls)
 			}
@@ -265,7 +313,13 @@ func TestRefreshDefinitionsDoesNotActivateMissingForeignOrBlockedServices(t *tes
 				return "", errTestServiceManager
 			}
 
-			_, result, err := RefreshDefinitions(t.Context(), definitions, planRefreshFixture(t, definitions), kind == "forced-foreign", manager)
+			_, result, err := RefreshDefinitions(
+				t.Context(),
+				definitions,
+				planRefreshFixture(t, definitions),
+				kind == "forced-foreign",
+				manager,
+			)
 			if err != nil || len(result.Restarted) != 0 {
 				t.Fatalf("refresh = %+v, %v", result, err)
 			}
@@ -300,7 +354,11 @@ func prepareUnownedRefreshFixture(t *testing.T, definitions []ServiceDefinition,
 
 		switch kind {
 		case "foreign", "forced-foreign":
-			if err := os.WriteFile(definition.Path, []byte("private foreign config"), 0o600); err != nil {
+			if err := os.WriteFile(
+				definition.Path,
+				[]byte("private foreign config"),
+				0o600,
+			); err != nil {
 				t.Fatal(err)
 			}
 		case "symlink":
@@ -317,8 +375,15 @@ func TestRefreshDefinitionsReportsTmuxStartupChangesWithoutRestart(t *testing.T)
 	definitions := refreshDefinitionsFixture(t)[:1]
 	manager, calls := recordingServiceManager(t, "active")
 
-	_, result, err := RefreshDefinitions(t.Context(), definitions, planRefreshFixture(t, definitions), false, manager)
-	if err != nil || !slices.Equal(result.RestartRequired, []string{TmuxServiceName}) || len(result.Restarted) != 0 {
+	_, result, err := RefreshDefinitions(
+		t.Context(),
+		definitions,
+		planRefreshFixture(t, definitions),
+		false,
+		manager,
+	)
+	if err != nil || !slices.Equal(result.RestartRequired, []string{TmuxServiceName}) ||
+		len(result.Restarted) != 0 {
 		t.Fatalf("refresh = %+v, %v", result, err)
 	}
 
@@ -345,7 +410,13 @@ func TestRefreshDefinitionsHonorsCancellationBeforeWriting(t *testing.T) {
 		return nil
 	}
 
-	applied, _, err := RefreshDefinitions(ctx, definitions, planRefreshFixture(t, definitions), false, manager)
+	applied, _, err := RefreshDefinitions(
+		ctx,
+		definitions,
+		planRefreshFixture(t, definitions),
+		false,
+		manager,
+	)
 	if !errors.Is(err, context.Canceled) || applied.Written != 0 {
 		t.Fatalf("canceled refresh = %+v, %v", applied, err)
 	}
@@ -372,7 +443,8 @@ func TestRefreshDefinitionsBoundsManagerWait(t *testing.T) {
 		started := time.Now()
 
 		applied, _, err := RefreshDefinitions(t.Context(), definitions, plans, false, manager)
-		if !errors.Is(err, context.DeadlineExceeded) || applied.Written != 0 || time.Since(started) != serviceRefreshTimeout {
+		if !errors.Is(err, context.DeadlineExceeded) || applied.Written != 0 ||
+			time.Since(started) != serviceRefreshTimeout {
 			t.Fatalf("timed out refresh = %+v, %v, elapsed %s", applied, err, time.Since(started))
 		}
 	})
@@ -393,7 +465,11 @@ func TestServiceInspectionOutputIsBounded(t *testing.T) {
 	}
 
 	if !output.overflow || output.buffer.Len() != maxServiceInspectionBytes {
-		t.Fatalf("inspection output length = %d, overflow = %v", output.buffer.Len(), output.overflow)
+		t.Fatalf(
+			"inspection output length = %d, overflow = %v",
+			output.buffer.Len(),
+			output.overflow,
+		)
 	}
 }
 
@@ -415,7 +491,13 @@ func TestRefreshDefinitionsPreservesWrittenCountOnPublicationFailure(t *testing.
 
 	manager, calls := recordingServiceManager(t, "active")
 
-	applied, result, err := RefreshDefinitions(t.Context(), definitions, planRefreshFixture(t, definitions), true, manager)
+	applied, result, err := RefreshDefinitions(
+		t.Context(),
+		definitions,
+		planRefreshFixture(t, definitions),
+		true,
+		manager,
+	)
 	if err == nil || applied.Written != 1 || result.Reloaded || len(*calls) > 0 {
 		t.Fatalf("publication failure = %+v, %+v, %v; calls = %v", applied, result, err, *calls)
 	}
@@ -460,7 +542,11 @@ func TestRetireDefinitionsRemovesManagedTmuxUnitsLeftOutOfSetup(t *testing.T) {
 
 			want := []string{"systemctl --user disable " + TmuxServiceName}
 			if state == "failed" {
-				want = append(want, "systemctl --user reset-failed "+TmuxServiceName, "systemctl --user reset-failed "+RestoreServiceName)
+				want = append(
+					want,
+					"systemctl --user reset-failed "+TmuxServiceName,
+					"systemctl --user reset-failed "+RestoreServiceName,
+				)
 			}
 
 			want = append(want, "systemctl --user daemon-reload")
@@ -510,7 +596,11 @@ func TestPlanRetiredDefinitionsKeepsRenderedAndForeignUnits(t *testing.T) {
 
 	definitions, paths := retiredUnitsFixture(t)
 
-	if err := os.WriteFile(paths[1], []byte("[Service]\nExecStart=/private/own-restore\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		paths[1],
+		[]byte("[Service]\nExecStart=/private/own-restore\n"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -524,7 +614,10 @@ func TestPlanRetiredDefinitionsKeepsRenderedAndForeignUnits(t *testing.T) {
 	}
 
 	withTmux := append(slices.Clone(definitions), ServiceDefinition{
-		Name: TmuxServiceName, Kind: KindSystemdService, Path: paths[0], Content: "# " + ManagedMarker + "\n",
+		Name:    TmuxServiceName,
+		Kind:    KindSystemdService,
+		Path:    paths[0],
+		Content: "# " + ManagedMarker + "\n",
 	})
 
 	retired, err = PlanRetiredDefinitions(withTmux)
@@ -550,10 +643,14 @@ func retiredUnitsFixture(t *testing.T) ([]ServiceDefinition, []string) {
 		}
 	}
 
-	definitions := []ServiceDefinition{{
-		Name: AutosaveTimerName, Kind: KindSystemdTimer, Path: filepath.Join(directory, AutosaveTimerName),
-		Content: "# " + ManagedMarker + "\n",
-	}}
+	definitions := []ServiceDefinition{
+		{
+			Name:    AutosaveTimerName,
+			Kind:    KindSystemdTimer,
+			Path:    filepath.Join(directory, AutosaveTimerName),
+			Content: "# " + ManagedMarker + "\n",
+		},
+	}
 
 	return definitions, []string{tmuxPath, restorePath}
 }

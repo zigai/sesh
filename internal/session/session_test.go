@@ -18,7 +18,13 @@ func TestSessionIdentityKeysPreserveLocalName(t *testing.T) {
 			},
 		}
 
-		wantIdentity := session.Identity{Origin: string(origin), ConnectionID: "ignored", Socket: "", RepositorySource: "", Name: "dev"}
+		wantIdentity := session.Identity{
+			Origin:           string(origin),
+			ConnectionID:     "ignored",
+			Socket:           "",
+			RepositorySource: "",
+			Name:             "dev",
+		}
 		if got := item.SemanticIdentity(); got != wantIdentity {
 			t.Fatalf("SemanticIdentity() = %#v, want %#v", got, wantIdentity)
 		}
@@ -142,7 +148,10 @@ func TestSessionEntityKeyDistinguishesLiveSavedAndGenerations(t *testing.T) {
 	}
 
 	if len(keys) != 3 {
-		t.Fatalf("expected 3 distinct entity keys for live and saved generations, got %d", len(keys))
+		t.Fatalf(
+			"expected 3 distinct entity keys for live and saved generations, got %d",
+			len(keys),
+		)
 	}
 }
 

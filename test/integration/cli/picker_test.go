@@ -81,7 +81,10 @@ func TestPickerPresentationsRenderInCurrentTerminal(t *testing.T) {
 	root := pickerIntegrationRoot(t)
 
 	server := tmuxtest.NewServer(t)
-	if _, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{Name: "picker-visible"}); err != nil {
+	if _, err := server.NewSession(
+		t.Context(),
+		gotmux.NewSessionOptions{Name: "picker-visible"},
+	); err != nil {
 		t.Fatalf("create visible session: %v", err)
 	}
 
@@ -91,7 +94,11 @@ func TestPickerPresentationsRenderInCurrentTerminal(t *testing.T) {
 	}
 
 	configPath := filepath.Join(root, "picker.toml")
-	if err := os.WriteFile(configPath, []byte("[agent_sessions]\nenabled = false\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		configPath,
+		[]byte("[agent_sessions]\nenabled = false\n"),
+		0o600,
+	); err != nil {
 		t.Fatalf("write picker config: %v", err)
 	}
 
@@ -120,8 +127,16 @@ func TestPickerPresentationsRenderInCurrentTerminal(t *testing.T) {
 				"--history", filepath.Join(root, "history.json"),
 				"--agent-state", filepath.Join(root, "agents.json"),
 			}
-			childArguments := append([]string{"-test.run=^TestPickerApplicationHelper$", "--"}, arguments...)
-			childOutput := runPickerTermtrace(t, testExecutable, childArguments, test.ui, test.noColor)
+			childArguments := append(
+				[]string{"-test.run=^TestPickerApplicationHelper$", "--"},
+				arguments...)
+			childOutput := runPickerTermtrace(
+				t,
+				testExecutable,
+				childArguments,
+				test.ui,
+				test.noColor,
+			)
 
 			if got := pickerOutputHasColor(childOutput); got != test.wantColor {
 				t.Fatalf("picker PTY color = %t, want %t: %q", got, test.wantColor, childOutput)
@@ -135,11 +150,21 @@ func TestPickerPresentationsRenderInCurrentTerminal(t *testing.T) {
 	}
 
 	if !samePickerSessions(beforeSessions, afterSessions) {
-		t.Fatalf("canceled picker mutated sessions: before=%v after=%v", beforeSessions, afterSessions)
+		t.Fatalf(
+			"canceled picker mutated sessions: before=%v after=%v",
+			beforeSessions,
+			afterSessions,
+		)
 	}
 }
 
-func runPickerTermtrace(t *testing.T, executable string, childArguments []string, presentation string, noColor bool) []byte {
+func runPickerTermtrace(
+	t *testing.T,
+	executable string,
+	childArguments []string,
+	presentation string,
+	noColor bool,
+) []byte {
 	t.Helper()
 
 	alias := "sesh-picker-" + strconv.Itoa(os.Getpid()) + "-" + presentation + "-color"
@@ -173,18 +198,22 @@ func runPickerTermtrace(t *testing.T, executable string, childArguments []string
 		stopCtx, stopCancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer stopCancel()
 
-		_ = exec.CommandContext(stopCtx, termtraceExecutable, "stop", "-q", alias, "--wait", "--timeout-ms", "1500").Run()
+		_ = exec.CommandContext(stopCtx, termtraceExecutable, "stop", "-q", alias, "--wait", "--timeout-ms", "1500").
+			Run()
 	})
 
-	if output, err := exec.CommandContext(ctx, termtraceExecutable, "send", "-q", alias, "--signal", "INT").CombinedOutput(); err != nil {
+	if output, err := exec.CommandContext(ctx, termtraceExecutable, "send", "-q", alias, "--signal", "INT").
+		CombinedOutput(); err != nil {
 		t.Fatalf("cancel picker application: %v: %s", err, output)
 	}
 
-	if output, err := exec.CommandContext(ctx, termtraceExecutable, "status", "-q", alias, "--wait-complete", "--timeout-ms", "5000").CombinedOutput(); err != nil {
+	if output, err := exec.CommandContext(ctx, termtraceExecutable, "status", "-q", alias, "--wait-complete", "--timeout-ms", "5000").
+		CombinedOutput(); err != nil {
 		t.Fatalf("wait for canceled picker workers: %v: %s", err, output)
 	}
 
-	childOutput, err := exec.CommandContext(ctx, termtraceExecutable, "analyze", "output", "--raw", alias).CombinedOutput()
+	childOutput, err := exec.CommandContext(ctx, termtraceExecutable, "analyze", "output", "--raw", alias).
+		CombinedOutput()
 	if err != nil || !bytes.Contains(childOutput, []byte("terminal-restored")) {
 		t.Fatalf("picker terminal restoration evidence: error=%v output=%q", err, childOutput)
 	}
@@ -253,16 +282,33 @@ func TestPickerApplicationHelper(t *testing.T) {
 	os.Exit(0)
 }
 
-func failPickerTermtraceRecord(t *testing.T, ctx context.Context, alias string, output []byte, recordErr error) {
+func failPickerTermtraceRecord(
+	t *testing.T,
+	ctx context.Context,
+	alias string,
+	output []byte,
+	recordErr error,
+) {
 	t.Helper()
 
-	_, _ = exec.CommandContext(ctx, termtraceExecutable, "send", "-q", alias, "--signal", "QUIT").CombinedOutput()
-	_, _ = exec.CommandContext(ctx, termtraceExecutable, "status", "-q", alias, "--wait-complete", "--timeout-ms", "2000").CombinedOutput()
-	diagnostic, _ := exec.CommandContext(ctx, termtraceExecutable, "analyze", alias).CombinedOutput()
+	_, _ = exec.CommandContext(ctx, termtraceExecutable, "send", "-q", alias, "--signal", "QUIT").
+		CombinedOutput()
+	_, _ = exec.CommandContext(ctx, termtraceExecutable, "status", "-q", alias, "--wait-complete", "--timeout-ms", "2000").
+		CombinedOutput()
+	diagnostic, _ := exec.CommandContext(ctx, termtraceExecutable, "analyze", alias).
+		CombinedOutput()
 	screen, _ := exec.CommandContext(ctx, termtraceExecutable, "screen", alias).CombinedOutput()
-	childOutput, _ := exec.CommandContext(ctx, termtraceExecutable, "analyze", "output", "--strip-controls", alias).CombinedOutput()
+	childOutput, _ := exec.CommandContext(ctx, termtraceExecutable, "analyze", "output", "--strip-controls", alias).
+		CombinedOutput()
 
-	t.Fatalf("record picker until live session rendered: %v: %s\n%s\n%s\n%q", recordErr, output, diagnostic, screen, childOutput)
+	t.Fatalf(
+		"record picker until live session rendered: %v: %s\n%s\n%s\n%q",
+		recordErr,
+		output,
+		diagnostic,
+		screen,
+		childOutput,
+	)
 }
 
 func pickerIntegrationRoot(t *testing.T) string {
@@ -327,7 +373,13 @@ func TestPickerClientSelectionUsesOnlyTheInvokingSession(t *testing.T) {
 		t.Fatal("fixture reused the first client instead of attaching a second")
 	}
 
-	if _, err := cmdpicker.InvokingPickerClient(t.Context(), fixture.server); !errors.Is(err, session.ErrInvokingClientUnavailable) {
+	if _, err := cmdpicker.InvokingPickerClient(
+		t.Context(),
+		fixture.server,
+	); !errors.Is(
+		err,
+		session.ErrInvokingClientUnavailable,
+	) {
 		t.Fatalf("ambiguous clients = %v; want unavailable", err)
 	}
 
@@ -343,7 +395,13 @@ func TestPickerClientSelectionUsesOnlyTheInvokingSession(t *testing.T) {
 	for _, name := range []string{outside, "/dev/pts/not-a-client"} {
 		t.Setenv(pickerClientEnvironment, name)
 
-		if _, err := cmdpicker.InvokingPickerClient(t.Context(), fixture.server); !errors.Is(err, session.ErrInvokingClientUnavailable) {
+		if _, err := cmdpicker.InvokingPickerClient(
+			t.Context(),
+			fixture.server,
+		); !errors.Is(
+			err,
+			session.ErrInvokingClientUnavailable,
+		) {
 			t.Fatalf("foreign or stale client hint = %v; want unavailable", err)
 		}
 	}

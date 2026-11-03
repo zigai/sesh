@@ -85,22 +85,34 @@ func EndAnnouncement(path string) error {
 
 func WriteFinalSaveStatus(path string, status FinalSaveStatus) (returnErr error) {
 	if path == "" {
-		return oops.In("automation").Code("final_status_failed").With("operation", "write_final_save_status").Wrap(ErrFinalStatusPathEmpty)
+		return oops.In("automation").
+			Code("final_status_failed").
+			With("operation", "write_final_save_status").
+			Wrap(ErrFinalStatusPathEmpty)
 	}
 
 	data, err := json.MarshalIndent(status, "", "  ")
 	if err != nil {
-		return oops.In("automation").Code("final_status_failed").With("operation", "encode_final_save_status").Wrap(err)
+		return oops.In("automation").
+			Code("final_status_failed").
+			With("operation", "encode_final_save_status").
+			Wrap(err)
 	}
 
 	absolute, err := filepath.Abs(path)
 	if err != nil {
-		return oops.In("automation").Code("final_status_failed").With("operation", "resolve_final_save_status_path").Wrap(err)
+		return oops.In("automation").
+			Code("final_status_failed").
+			With("operation", "resolve_final_save_status_path").
+			Wrap(err)
 	}
 
 	dir, name, err := privatefs.OpenParent(absolute, true)
 	if err != nil {
-		return oops.In("automation").Code("final_status_failed").With("operation", "open_final_save_status_dir").Wrap(err)
+		return oops.In("automation").
+			Code("final_status_failed").
+			With("operation", "open_final_save_status_dir").
+			Wrap(err)
 	}
 	defer func() {
 		returnErr = errors.Join(returnErr, wrapStatusCleanup("close directory", dir.Close()))
@@ -117,13 +129,19 @@ func WriteFinalSaveStatus(path string, status FinalSaveStatus) (returnErr error)
 
 	if err := dir.Rename(temporary, dir, name); err != nil {
 		return errors.Join(
-			oops.In("automation").Code("final_status_failed").With("operation", "publish_final_save_status").Wrap(err),
+			oops.In("automation").
+				Code("final_status_failed").
+				With("operation", "publish_final_save_status").
+				Wrap(err),
 			wrapStatusCleanup("remove", removeStatusTemp(dir, temporary)),
 		)
 	}
 
 	if err := dir.Sync(); err != nil {
-		return oops.In("automation").Code("final_status_failed").With("operation", "sync_final_save_status_dir").Wrap(err)
+		return oops.In("automation").
+			Code("final_status_failed").
+			With("operation", "sync_final_save_status_dir").
+			Wrap(err)
 	}
 
 	return nil
@@ -131,17 +149,26 @@ func WriteFinalSaveStatus(path string, status FinalSaveStatus) (returnErr error)
 
 func ReadFinalSaveStatus(path string) (FinalSaveStatus, error) {
 	if path == "" {
-		return FinalSaveStatus{}, oops.In("automation").Code("final_status_failed").With("operation", "read_final_save_status").Wrap(ErrFinalStatusPathEmpty)
+		return FinalSaveStatus{}, oops.In("automation").
+			Code("final_status_failed").
+			With("operation", "read_final_save_status").
+			Wrap(ErrFinalStatusPathEmpty)
 	}
 
 	absolute, err := filepath.Abs(path)
 	if err != nil {
-		return FinalSaveStatus{}, oops.In("automation").Code("final_status_failed").With("operation", "resolve_final_save_status_path").Wrap(err)
+		return FinalSaveStatus{}, oops.In("automation").
+			Code("final_status_failed").
+			With("operation", "resolve_final_save_status_path").
+			Wrap(err)
 	}
 
 	dir, name, err := privatefs.OpenParent(absolute, false)
 	if err != nil {
-		return FinalSaveStatus{}, oops.In("automation").Code("final_status_failed").With("operation", "open_final_save_status_dir").Wrap(err)
+		return FinalSaveStatus{}, oops.In("automation").
+			Code("final_status_failed").
+			With("operation", "open_final_save_status_dir").
+			Wrap(err)
 	}
 
 	status, readErr := readFinalSaveStatus(dir, name)
@@ -154,10 +181,16 @@ func readFinalSaveStatus(dir *privatefs.Dir, name string) (FinalSaveStatus, erro
 	file, err := dir.File(name, unix.O_RDONLY)
 	if err != nil {
 		if errors.Is(err, privatefs.ErrUnsafe) {
-			return FinalSaveStatus{}, oops.In("automation").Code("final_status_failed").With("operation", "open_final_save_status").Wrap(ErrFinalStatusNotRegular)
+			return FinalSaveStatus{}, oops.In("automation").
+				Code("final_status_failed").
+				With("operation", "open_final_save_status").
+				Wrap(ErrFinalStatusNotRegular)
 		}
 
-		return FinalSaveStatus{}, oops.In("automation").Code("final_status_failed").With("operation", "open_final_save_status").Wrap(err)
+		return FinalSaveStatus{}, oops.In("automation").
+			Code("final_status_failed").
+			With("operation", "open_final_save_status").
+			Wrap(err)
 	}
 
 	data, readErr := io.ReadAll(io.LimitReader(file, maxFinalStatusBytes+1))
@@ -165,26 +198,38 @@ func readFinalSaveStatus(dir *privatefs.Dir, name string) (FinalSaveStatus, erro
 	closeErr := file.Close()
 	if readErr != nil {
 		return FinalSaveStatus{}, errors.Join(
-			oops.In("automation").Code("final_status_failed").With("operation", "read_final_save_status").Wrap(readErr),
+			oops.In("automation").
+				Code("final_status_failed").
+				With("operation", "read_final_save_status").
+				Wrap(readErr),
 			wrapStatusCleanup("close", closeErr),
 		)
 	}
 
 	if len(data) > maxFinalStatusBytes {
 		return FinalSaveStatus{}, errors.Join(
-			oops.In("automation").Code("final_status_failed").With("operation", "read_final_save_status").Wrap(ErrFinalStatusTooLarge),
+			oops.In("automation").
+				Code("final_status_failed").
+				With("operation", "read_final_save_status").
+				Wrap(ErrFinalStatusTooLarge),
 			wrapStatusCleanup("close", closeErr),
 		)
 	}
 
 	if closeErr != nil {
-		return FinalSaveStatus{}, oops.In("automation").Code("final_status_failed").With("operation", "close_final_save_status").Wrap(closeErr)
+		return FinalSaveStatus{}, oops.In("automation").
+			Code("final_status_failed").
+			With("operation", "close_final_save_status").
+			Wrap(closeErr)
 	}
 
 	var status FinalSaveStatus
 
 	if err := json.Unmarshal(data, &status); err != nil {
-		return FinalSaveStatus{}, oops.In("automation").Code("final_status_failed").With("operation", "decode_final_save_status").Wrap(err)
+		return FinalSaveStatus{}, oops.In("automation").
+			Code("final_status_failed").
+			With("operation", "decode_final_save_status").
+			Wrap(err)
 	}
 
 	return status, nil
@@ -193,7 +238,10 @@ func readFinalSaveStatus(dir *privatefs.Dir, name string) (FinalSaveStatus, erro
 func statusTemporaryName(name string) (string, error) {
 	suffix := make([]byte, statusTempNameBytes)
 	if _, err := io.ReadFull(rand.Reader, suffix); err != nil {
-		return "", oops.In("automation").Code("final_status_failed").With("operation", "generate_temp_name").Wrap(err)
+		return "", oops.In("automation").
+			Code("final_status_failed").
+			With("operation", "generate_temp_name").
+			Wrap(err)
 	}
 
 	return "." + name + ".tmp." + hex.EncodeToString(suffix), nil
@@ -202,7 +250,10 @@ func statusTemporaryName(name string) (string, error) {
 func writeStatusTemp(dir *privatefs.Dir, name string, data []byte) error {
 	file, err := dir.File(name, unix.O_WRONLY|unix.O_CREAT|unix.O_EXCL)
 	if err != nil {
-		return oops.In("automation").Code("final_status_failed").With("operation", "create_final_save_status_temp").Wrap(err)
+		return oops.In("automation").
+			Code("final_status_failed").
+			With("operation", "create_final_save_status_temp").
+			Wrap(err)
 	}
 
 	_, writeErr := file.Write(data)
@@ -211,7 +262,10 @@ func writeStatusTemp(dir *privatefs.Dir, name string, data []byte) error {
 
 	if err := errors.Join(writeErr, syncErr, closeErr); err != nil {
 		return errors.Join(
-			oops.In("automation").Code("final_status_failed").With("operation", "write_final_save_status_temp").Wrap(err),
+			oops.In("automation").
+				Code("final_status_failed").
+				With("operation", "write_final_save_status_temp").
+				Wrap(err),
 			wrapStatusCleanup("remove", removeStatusTemp(dir, name)),
 		)
 	}
@@ -221,7 +275,10 @@ func writeStatusTemp(dir *privatefs.Dir, name string, data []byte) error {
 
 func removeStatusTemp(dir *privatefs.Dir, name string) error {
 	if err := dir.Remove(name); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return oops.In("automation").Code("final_status_failed").With("operation", "remove_temp_status").Wrap(err)
+		return oops.In("automation").
+			Code("final_status_failed").
+			With("operation", "remove_temp_status").
+			Wrap(err)
 	}
 
 	return nil

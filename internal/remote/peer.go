@@ -129,7 +129,10 @@ func LoadOrCreatePeerID(dir *privatefs.Dir) (string, error) {
 	closeErr := file.Close()
 
 	if writeErr != nil {
-		return "", errors.Join(oops.In("remote").With("operation", "load_or_create_peer_id").Wrap(writeErr), closeErr)
+		return "", errors.Join(
+			oops.In("remote").With("operation", "load_or_create_peer_id").Wrap(writeErr),
+			closeErr,
+		)
 	}
 
 	if closeErr != nil {
@@ -163,7 +166,9 @@ func RunInventoryStream(ctx context.Context, opts InventoryOptions, output io.Wr
 	}
 
 	if !ValidIdentifier(opts.PeerID) || opts.Sessions == nil {
-		return oops.In("remote").With("operation", "inventory_stream").Wrap(ErrIncompleteDependencies)
+		return oops.In("remote").
+			With("operation", "inventory_stream").
+			Wrap(ErrIncompleteDependencies)
 	}
 
 	streamInstance, err := randomHex(streamInstanceRandomBytes)
@@ -234,7 +239,8 @@ func (publisher *streamPublisher) publish(state *streamState, force bool) error 
 		return err
 	}
 
-	if !force && publisher.lastPublished != nil && snapshotsSemanticallyEqual(*publisher.lastPublished, snapshot) {
+	if !force && publisher.lastPublished != nil &&
+		snapshotsSemanticallyEqual(*publisher.lastPublished, snapshot) {
 		return nil
 	}
 
@@ -279,7 +285,12 @@ func (publisher *streamPublisher) writeHealth(observedAt time.Time, health Sourc
 	return nil
 }
 
-func runStreamLoop(ctx context.Context, opts InventoryOptions, state *streamState, publisher *streamPublisher) error {
+func runStreamLoop(
+	ctx context.Context,
+	opts InventoryOptions,
+	state *streamState,
+	publisher *streamPublisher,
+) error {
 	pollTicker := time.NewTicker(positiveDuration(opts.PollInterval, defaultPoll))
 	heartbeatTicker := time.NewTicker(positiveDuration(opts.HeartbeatInterval, defaultHeartbeat))
 
@@ -289,7 +300,9 @@ func runStreamLoop(ctx context.Context, opts InventoryOptions, state *streamStat
 	for {
 		select {
 		case <-ctx.Done():
-			return oops.In("remote").With("operation", "inventory_stream").Wrapf(ctx.Err(), "running remote stream")
+			return oops.In("remote").
+				With("operation", "inventory_stream").
+				Wrapf(ctx.Err(), "running remote stream")
 		case <-pollTicker.C:
 			state.scan(ctx)
 
@@ -316,14 +329,22 @@ func (state *streamState) scanTasks(ctx context.Context) {
 	now := time.Now().UTC()
 
 	if state.options.Tasks == nil {
-		state.health.Tasks = SourceStatus{Status: HealthUnknown, Reason: HealthReasonUnavailable, CheckedAt: now}
+		state.health.Tasks = SourceStatus{
+			Status:    HealthUnknown,
+			Reason:    HealthReasonUnavailable,
+			CheckedAt: now,
+		}
 
 		return
 	}
 
 	rows, err := state.options.Tasks(ctx)
 	if err == nil && len(rows) > MaxTasks {
-		state.health.Tasks = SourceStatus{Status: HealthDegraded, Reason: HealthReasonInvalidData, CheckedAt: now}
+		state.health.Tasks = SourceStatus{
+			Status:    HealthDegraded,
+			Reason:    HealthReasonInvalidData,
+			CheckedAt: now,
+		}
 
 		return
 	}
@@ -339,7 +360,11 @@ func (state *streamState) scanWork(ctx context.Context) {
 	now := time.Now().UTC()
 
 	if state.options.Work == nil {
-		state.health.Work = SourceStatus{Status: HealthUnknown, Reason: HealthReasonUnavailable, CheckedAt: now}
+		state.health.Work = SourceStatus{
+			Status:    HealthUnknown,
+			Reason:    HealthReasonUnavailable,
+			CheckedAt: now,
+		}
 
 		return
 	}
@@ -369,7 +394,11 @@ func (state *streamState) scanAgents(ctx context.Context) {
 	now := time.Now().UTC()
 
 	if state.options.Agents == nil {
-		state.health.Agents = SourceStatus{Status: HealthUnknown, Reason: HealthReasonUnavailable, CheckedAt: now}
+		state.health.Agents = SourceStatus{
+			Status:    HealthUnknown,
+			Reason:    HealthReasonUnavailable,
+			CheckedAt: now,
+		}
 
 		return
 	}
@@ -387,7 +416,11 @@ func (state *streamState) scanSavedSessions(ctx context.Context) {
 	now := time.Now().UTC()
 
 	if state.options.SavedSessions == nil {
-		state.health.Snapshots = SourceStatus{Status: HealthUnknown, Reason: HealthReasonUnavailable, CheckedAt: now}
+		state.health.Snapshots = SourceStatus{
+			Status:    HealthUnknown,
+			Reason:    HealthReasonUnavailable,
+			CheckedAt: now,
+		}
 
 		return
 	}
@@ -416,7 +449,9 @@ func (state *streamState) scanSavedSessions(ctx context.Context) {
 
 func (state *streamState) snapshot() (Snapshot, error) {
 	if len(state.sessions)+len(state.savedSessions) > MaxSessions {
-		return Snapshot{}, oops.In("remote").With("operation", "peer_snapshot").Wrap(ErrFrameTooLarge)
+		return Snapshot{}, oops.In("remote").
+			With("operation", "peer_snapshot").
+			Wrap(ErrFrameTooLarge)
 	}
 
 	sessions := cloneSessions(state.sessions)
@@ -464,10 +499,18 @@ func sourceStatus(err error, checkedAt time.Time) SourceStatus {
 	}
 
 	if errors.Is(err, context.DeadlineExceeded) {
-		return SourceStatus{Status: HealthDegraded, Reason: HealthReasonTimeout, CheckedAt: checkedAt}
+		return SourceStatus{
+			Status:    HealthDegraded,
+			Reason:    HealthReasonTimeout,
+			CheckedAt: checkedAt,
+		}
 	}
 
-	return SourceStatus{Status: HealthDegraded, Reason: HealthReasonUnavailable, CheckedAt: checkedAt}
+	return SourceStatus{
+		Status:    HealthDegraded,
+		Reason:    HealthReasonUnavailable,
+		CheckedAt: checkedAt,
+	}
 }
 
 func cloneSessions(source []session.Session) []session.Session {

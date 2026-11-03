@@ -294,7 +294,16 @@ func HasFailures(results []Result) bool {
 func newResult(id string, status Status, message string) Result {
 	group, _, _ := strings.Cut(id, ".")
 
-	return Result{ID: id, Group: groups[group], Status: status, Reason: "", Message: message, Details: nil, Needs: "", Fix: nil}
+	return Result{
+		ID:      id,
+		Group:   groups[group],
+		Status:  status,
+		Reason:  "",
+		Message: message,
+		Details: nil,
+		Needs:   "",
+		Fix:     nil,
+	}
 }
 
 func (r Result) withReason(reason string) Result {

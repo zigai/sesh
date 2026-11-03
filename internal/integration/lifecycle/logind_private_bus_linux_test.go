@@ -361,7 +361,8 @@ func assertPrivateBusShutdownSignal(t *testing.T, service *dbus.Conn, client *Lo
 		t.Fatalf("Next failed: %v", err)
 	}
 
-	if event.Kind != EventShutdown || event.Canceled || event.Deadline.Before(receivedAt.Add(2500*time.Millisecond)) ||
+	if event.Kind != EventShutdown || event.Canceled ||
+		event.Deadline.Before(receivedAt.Add(2500*time.Millisecond)) ||
 		event.Deadline.After(dequeuedAt.Add(2900*time.Millisecond)) {
 		t.Fatalf("event = %+v, want measured shutdown deadline", event)
 	}
@@ -392,7 +393,12 @@ func assertPrivateBusCanceledSignal(t *testing.T, service *dbus.Conn, client *Lo
 	}
 }
 
-func assertPrivateBusInhibitorRelease(t *testing.T, manager *fakeLogindManager, client *Logind, readerIndexes ...int) {
+func assertPrivateBusInhibitorRelease(
+	t *testing.T,
+	manager *fakeLogindManager,
+	client *Logind,
+	readerIndexes ...int,
+) {
 	t.Helper()
 
 	released := make(chan error, len(readerIndexes))
@@ -587,7 +593,11 @@ func TestLogindRearmRejectsChangedPrivateBusOwnerBeforeAcquiringFD(t *testing.T)
 		t.Fatalf("release fake logind name: %v", err)
 	}
 
-	if reply, err := replacement.RequestName(LogindBusName, dbus.NameFlagDoNotQueue); err != nil || reply != dbus.RequestNameReplyPrimaryOwner {
+	if reply, err := replacement.RequestName(
+		LogindBusName,
+		dbus.NameFlagDoNotQueue,
+	); err != nil ||
+		reply != dbus.RequestNameReplyPrimaryOwner {
 		t.Fatalf("request replacement logind name: reply=%v err=%v", reply, err)
 	}
 
@@ -653,7 +663,11 @@ func TestOpenLogindClosesFirstInhibitorWhenOwnerChangesBetweenAcquisitions(t *te
 		t.Fatalf("release fake logind name: %v", err)
 	}
 
-	if reply, err := replacement.RequestName(LogindBusName, dbus.NameFlagDoNotQueue); err != nil || reply != dbus.RequestNameReplyPrimaryOwner {
+	if reply, err := replacement.RequestName(
+		LogindBusName,
+		dbus.NameFlagDoNotQueue,
+	); err != nil ||
+		reply != dbus.RequestNameReplyPrimaryOwner {
 		close(ownerChanged)
 		t.Fatalf("request replacement logind name: reply=%v err=%v", reply, err)
 	}
@@ -664,7 +678,11 @@ func TestOpenLogindClosesFirstInhibitorWhenOwnerChangesBetweenAcquisitions(t *te
 	if result.client != nil || !errors.Is(result.err, ErrLogindOwnerChanged) {
 		_ = clientConn.Close()
 
-		t.Fatalf("openLogindOnConnection = (%v, %v), want ErrLogindOwnerChanged", result.client, result.err)
+		t.Fatalf(
+			"openLogindOnConnection = (%v, %v), want ErrLogindOwnerChanged",
+			result.client,
+			result.err,
+		)
 	}
 
 	assertInhibitorRequests(t, manager.requestsSnapshot(), []InhibitorSpec{ShutdownInhibitor()})
@@ -727,8 +745,16 @@ func TestLogindReleaseAndCloseAttemptBothInhibitorCloses(t *testing.T) {
 		operation    string
 		precloseBoth bool
 	}{
-		{name: "release attempts sleep after shutdown failure", operation: "release", precloseBoth: false},
-		{name: "close attempts sleep after shutdown failure", operation: "close", precloseBoth: false},
+		{
+			name:         "release attempts sleep after shutdown failure",
+			operation:    "release",
+			precloseBoth: false,
+		},
+		{
+			name:         "close attempts sleep after shutdown failure",
+			operation:    "close",
+			precloseBoth: false,
+		},
 		{name: "release joins both failures", operation: "release", precloseBoth: true},
 		{name: "close joins both failures", operation: "close", precloseBoth: true},
 	}
@@ -922,7 +948,11 @@ func connectPrivateBus(t *testing.T, address string) *dbus.Conn {
 	return service
 }
 
-func connectPrivateBusWithSignals(t *testing.T, address string, signalFeed *boundedSignalHandler) *dbus.Conn {
+func connectPrivateBusWithSignals(
+	t *testing.T,
+	address string,
+	signalFeed *boundedSignalHandler,
+) *dbus.Conn {
 	t.Helper()
 
 	service, err := dbus.Connect(address, dbus.WithSignalHandler(signalFeed))
@@ -933,7 +963,11 @@ func connectPrivateBusWithSignals(t *testing.T, address string, signalFeed *boun
 	return service
 }
 
-func exportFakeLogind(t *testing.T, service *dbus.Conn, properties *fakeLogindProperties) *fakeLogindManager {
+func exportFakeLogind(
+	t *testing.T,
+	service *dbus.Conn,
+	properties *fakeLogindProperties,
+) *fakeLogindManager {
 	t.Helper()
 
 	manager := new(fakeLogindManager)
@@ -947,7 +981,11 @@ func exportFakeLogind(t *testing.T, service *dbus.Conn, properties *fakeLogindPr
 		t.Fatalf("export fake logind properties: %v", err)
 	}
 
-	if reply, err := service.RequestName(LogindBusName, dbus.NameFlagDoNotQueue); err != nil || reply != dbus.RequestNameReplyPrimaryOwner {
+	if reply, err := service.RequestName(
+		LogindBusName,
+		dbus.NameFlagDoNotQueue,
+	); err != nil ||
+		reply != dbus.RequestNameReplyPrimaryOwner {
 		t.Fatalf("request fake logind name: reply=%v err=%v", reply, err)
 	}
 

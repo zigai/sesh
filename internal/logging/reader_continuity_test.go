@@ -28,7 +28,12 @@ func TestFollowDoesNotReplayInitialRecords(t *testing.T) {
 			defer cancel()
 
 			var output bytes.Buffer
-			if err := StreamLogs(ctx, path, ReadOptions{Lines: lines, Follow: true}, &output); err != nil {
+			if err := StreamLogs(
+				ctx,
+				path,
+				ReadOptions{Lines: lines, Follow: true},
+				&output,
+			); err != nil {
 				t.Fatal(err)
 			}
 
@@ -84,7 +89,11 @@ func TestFollowTruncateClearsUnterminatedRecord(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "events.log")
 
 	initial := "{\"message\":\"initial\"}\n"
-	if err := os.WriteFile(path, append([]byte(initial+"{\"message\":\""), bytes.Repeat([]byte("x"), 100)...), 0o600); err != nil {
+	if err := os.WriteFile(
+		path,
+		append([]byte(initial+"{\"message\":\""), bytes.Repeat([]byte("x"), 100)...),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -141,7 +150,15 @@ func TestFollowPreservesOutputFailureAtRotation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := state.step(t.Context(), path, FilterOptions{}, failedReaderOutput{}); !errors.Is(err, io.ErrClosedPipe) {
+	if err := state.step(
+		t.Context(),
+		path,
+		FilterOptions{},
+		failedReaderOutput{},
+	); !errors.Is(
+		err,
+		io.ErrClosedPipe,
+	) {
 		t.Fatalf("lost writer error: %v", err)
 	}
 }

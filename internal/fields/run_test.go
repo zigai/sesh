@@ -55,14 +55,24 @@ func TestRunReturnsWholeStdoutAsOneLine(t *testing.T) {
 }
 
 func TestRunReportsExitCodeAndStderr(t *testing.T) {
-	result := fields.Run(t.Context(), shellField(`echo partial; echo "no remote" >&2; exit 3`), sessionContext(""))
-	if result.Err == nil || result.ExitCode != 3 || result.Stderr != "no remote\n" || result.Text != "partial" {
+	result := fields.Run(
+		t.Context(),
+		shellField(`echo partial; echo "no remote" >&2; exit 3`),
+		sessionContext(""),
+	)
+	if result.Err == nil || result.ExitCode != 3 || result.Stderr != "no remote\n" ||
+		result.Text != "partial" {
 		t.Fatalf("Run() = %+v", result)
 	}
 }
 
 func TestRunMissingCommandFails(t *testing.T) {
-	command := config.FieldCommand{ShellCommand: "", Command: filepath.Join(t.TempDir(), "missing"), Args: nil, Refresh: ""}
+	command := config.FieldCommand{
+		ShellCommand: "",
+		Command:      filepath.Join(t.TempDir(), "missing"),
+		Args:         nil,
+		Refresh:      "",
+	}
 
 	if result := fields.Run(t.Context(), command, sessionContext("")); result.Err == nil {
 		t.Fatalf("Run() = %+v, want start error", result)
@@ -85,12 +95,22 @@ func TestRunPassesContextOnStdinAndInEnvironment(t *testing.T) {
 		t.Fatalf("stdin = %+v, want %s", stdin, encoded)
 	}
 
-	env := fields.Run(t.Context(), shellField(`printf '%s|' "$SESH_FIELD" "$SESH_ROW" "$SESH_SESSION" "$SESH_SESSION_ID" "$SESH_ORIGIN" "$SESH_PANE_ID" "$SESH_AGENT_STATUS" "$SESH_AGENT_CWD" "$SESH_AGENT_PID"`), input)
+	env := fields.Run(
+		t.Context(),
+		shellField(
+			`printf '%s|' "$SESH_FIELD" "$SESH_ROW" "$SESH_SESSION" "$SESH_SESSION_ID" "$SESH_ORIGIN" "$SESH_PANE_ID" "$SESH_AGENT_STATUS" "$SESH_AGENT_CWD" "$SESH_AGENT_PID"`,
+		),
+		input,
+	)
 	if want := "build|agent|api|$4|ssh|%12|running|/work/api/server|4242|"; env.Text != want {
 		t.Fatalf("environment = %q, want %q", env.Text, want)
 	}
 
-	session := fields.Run(t.Context(), shellField(`printf '%s|%s|%s' "$SESH_ROW" "$SESH_PANE_ID" "$SESH_AGENT_CWD"`), sessionContext("/work/notes"))
+	session := fields.Run(
+		t.Context(),
+		shellField(`printf '%s|%s|%s' "$SESH_ROW" "$SESH_PANE_ID" "$SESH_AGENT_CWD"`),
+		sessionContext("/work/notes"),
+	)
 	if session.Text != "session|%3|" {
 		t.Fatalf("session environment = %q", session.Text)
 	}
@@ -133,11 +153,20 @@ func TestRunWorkingDirectoryFollowsLocalRows(t *testing.T) {
 func TestRunUsesShForStringsAndArgsForCommands(t *testing.T) {
 	t.Setenv("SHELL", "/bin/false")
 
-	if got := fields.Run(t.Context(), shellField(`printf '%s:%s' "$0" "$1"`), sessionContext("")).Text; got != "/bin/sh:" {
+	if got := fields.Run(
+		t.Context(),
+		shellField(`printf '%s:%s' "$0" "$1"`),
+		sessionContext(""),
+	).Text; got != "/bin/sh:" {
 		t.Fatalf("shell string ran as %q", got)
 	}
 
-	command := config.FieldCommand{ShellCommand: "", Command: "printf", Args: []string{"%s-%s", "a b", "c"}, Refresh: ""}
+	command := config.FieldCommand{
+		ShellCommand: "",
+		Command:      "printf",
+		Args:         []string{"%s-%s", "a b", "c"},
+		Refresh:      "",
+	}
 	if got := fields.Run(t.Context(), command, sessionContext("")).Text; got != "a b-c" {
 		t.Fatalf("command form ran as %q", got)
 	}
@@ -152,7 +181,11 @@ func TestRunCancelKillsBackgroundChildren(t *testing.T) {
 		cancel()
 	}()
 
-	result := fields.Run(ctx, shellField(`sleep 300 & echo $! > `+pidFile+`; wait`), sessionContext(""))
+	result := fields.Run(
+		ctx,
+		shellField(`sleep 300 & echo $! > `+pidFile+`; wait`),
+		sessionContext(""),
+	)
 	if !errors.Is(result.Err, context.Canceled) {
 		t.Fatalf("Run() error = %v, want context.Canceled", result.Err)
 	}

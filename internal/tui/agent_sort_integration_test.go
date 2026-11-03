@@ -21,7 +21,10 @@ func TestAgentPositionRefreshTracksLivePaneSwapsAndMoves(t *testing.T) {
 	source := newPositionSession(t, server, "sort")
 	left := positionSessionPane(t, source)
 
-	right, err := left.Split(t.Context(), gotmux.SplitOptions{Direction: gotmux.DirectionHorizontal})
+	right, err := left.Split(
+		t.Context(),
+		gotmux.SplitOptions{Direction: gotmux.DirectionHorizontal},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,13 +36,27 @@ func TestAgentPositionRefreshTracksLivePaneSwapsAndMoves(t *testing.T) {
 
 	windowTen := newPositionWindowPane(t, source, 10)
 	windowTwo := newPositionWindowPane(t, source, 2)
-	model := newLivePositionModel(t, server, source, []gotmux.Pane{windowTen, right, windowTwo, bottom, left})
+	model := newLivePositionModel(
+		t,
+		server,
+		source,
+		[]gotmux.Pane{windowTen, right, windowTwo, bottom, left},
+	)
 
 	if err := model.loadSessions(); err != nil {
 		t.Fatal(err)
 	}
 
-	model.cursor = assertLivePositionOrder(t, model, source, left, bottom, right, windowTwo, windowTen)
+	model.cursor = assertLivePositionOrder(
+		t,
+		model,
+		source,
+		left,
+		bottom,
+		right,
+		windowTwo,
+		windowTen,
+	)
 	model.agentCursor = 0
 	selected := model.selectedSessionIdentity()
 
@@ -61,7 +78,11 @@ func TestAgentPositionRefreshTracksLivePaneSwapsAndMoves(t *testing.T) {
 	assertPositionSelectionVisible(t, model, selected)
 
 	foreign := newPositionSession(t, server, "other")
-	if err := bottom.Join(t.Context(), positionSessionPane(t, foreign), gotmux.JoinOptions{}); err != nil {
+	if err := bottom.Join(
+		t.Context(),
+		positionSessionPane(t, foreign),
+		gotmux.JoinOptions{},
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -122,7 +143,12 @@ func newPositionWindowPane(t *testing.T, owner gotmux.Session, index int) gotmux
 	return panes[0].Handle()
 }
 
-func newLivePositionModel(t *testing.T, server *gotmux.Server, owner gotmux.Session, order []gotmux.Pane) *Model {
+func newLivePositionModel(
+	t *testing.T,
+	server *gotmux.Server,
+	owner gotmux.Session,
+	order []gotmux.Pane,
+) *Model {
 	t.Helper()
 
 	registry := make([]session.AgentSession, 0, len(order))
@@ -169,20 +195,35 @@ func observePositionPanes(ctx context.Context, server *gotmux.Server) ([]PaneLoc
 	result := make([]PaneLocation, 0, len(panes))
 	for _, pane := range panes {
 		result = append(result, PaneLocation{
-			ServerSocket: pane.ServerSocket, SessionID: pane.SessionID, SessionName: pane.SessionName,
-			WindowID: pane.WindowID, WindowIndex: pane.WindowIndex,
-			PaneID: pane.PaneID, PaneIndex: pane.PaneIndex, PanePID: pane.PanePID, Command: pane.Command,
-			PaneLeft: strconv.Itoa(pane.Left), PaneTop: strconv.Itoa(pane.Top),
+			ServerSocket: pane.ServerSocket,
+			SessionID:    pane.SessionID,
+			SessionName:  pane.SessionName,
+			WindowID:     pane.WindowID,
+			WindowIndex:  pane.WindowIndex,
+			PaneID:       pane.PaneID,
+			PaneIndex:    pane.PaneIndex,
+			PanePID:      pane.PanePID,
+			Command:      pane.Command,
+			PaneLeft:     strconv.Itoa(pane.Left),
+			PaneTop:      strconv.Itoa(pane.Top),
 		})
 	}
 
 	return result, nil
 }
 
-func assertLivePositionOrder(t *testing.T, model *Model, owner gotmux.Session, want ...gotmux.Pane) int {
+func assertLivePositionOrder(
+	t *testing.T,
+	model *Model,
+	owner gotmux.Session,
+	want ...gotmux.Pane,
+) int {
 	t.Helper()
 
-	index := slices.IndexFunc(model.filtered, func(row session.Session) bool { return row.ID == string(owner.ID()) })
+	index := slices.IndexFunc(
+		model.filtered,
+		func(row session.Session) bool { return row.ID == string(owner.ID()) },
+	)
 	if index < 0 {
 		t.Fatal("source session is absent from the picker")
 	}
@@ -196,7 +237,13 @@ func assertLivePositionOrder(t *testing.T, model *Model, owner gotmux.Session, w
 	assertAgentNames(t, row.Agents, names)
 
 	if row.AgentTotal != len(want) || row.AgentActive != len(want) {
-		t.Fatalf("agent total/active = %d/%d, want %d/%d", row.AgentTotal, row.AgentActive, len(want), len(want))
+		t.Fatalf(
+			"agent total/active = %d/%d, want %d/%d",
+			row.AgentTotal,
+			row.AgentActive,
+			len(want),
+			len(want),
+		)
 	}
 
 	return index
@@ -210,7 +257,10 @@ func assertPositionSelectionVisible(t *testing.T, model *Model, selected session
 	}
 
 	visible := model.visibleListRows(3)
-	if !slices.ContainsFunc(visible, func(row popupListRow) bool { return row.equal(model.selectedListRow()) }) {
+	if !slices.ContainsFunc(
+		visible,
+		func(row popupListRow) bool { return row.equal(model.selectedListRow()) },
+	) {
 		t.Fatal("selected agent scrolled out of view after native pane change")
 	}
 }

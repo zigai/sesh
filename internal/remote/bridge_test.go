@@ -25,7 +25,9 @@ func TestBridgeMessageRoundTripAndClosedVocabulary(t *testing.T) {
 		OriginID:          "laptop",
 		OriginLabel:       "Laptop",
 		CatalogGeneration: 3,
-		Sessions:          []OriginSession{{ID: "$1", Name: testSessionName, WindowCount: 2, Attached: true, AgentTotal: 1}},
+		Sessions: []OriginSession{
+			{ID: "$1", Name: testSessionName, WindowCount: 2, Attached: true, AgentTotal: 1},
+		},
 	}
 
 	var encoded bytes.Buffer
@@ -39,15 +41,25 @@ func TestBridgeMessageRoundTripAndClosedVocabulary(t *testing.T) {
 		t.Fatalf("ReadMessage() error = %v", err)
 	}
 
-	if decoded.OriginID != "laptop" || decoded.CatalogGeneration != 3 || len(decoded.Sessions) != 1 || decoded.Sessions[0].Name != testSessionName {
+	if decoded.OriginID != "laptop" || decoded.CatalogGeneration != 3 ||
+		len(decoded.Sessions) != 1 ||
+		decoded.Sessions[0].Name != testSessionName {
 		t.Fatalf("decoded message = %#v, want the published catalog", decoded)
 	}
 
 	invalid := []Message{
 		{Type: "unknown_type", OK: true},
 		{Type: TypeCatalogResponse, OK: false, Error: "raw remote failure"},
-		{Type: TypeCatalogResponse, OK: true, Sessions: []OriginSession{{ID: "", Name: testSessionName}}},
-		{Type: TypeCatalogResponse, OK: true, Sessions: []OriginSession{{ID: "$1", Name: testSessionName, WindowCount: -1}}},
+		{
+			Type:     TypeCatalogResponse,
+			OK:       true,
+			Sessions: []OriginSession{{ID: "", Name: testSessionName}},
+		},
+		{
+			Type:     TypeCatalogResponse,
+			OK:       true,
+			Sessions: []OriginSession{{ID: "$1", Name: testSessionName, WindowCount: -1}},
+		},
 		{Type: TypeCatalogResponse, OK: true, OriginLabel: "label\x1b[31m"},
 	}
 
@@ -66,18 +78,26 @@ func TestBridgeMessageRoundTripAndClosedVocabulary(t *testing.T) {
 }
 
 func TestBridgeMessageRejectsUnknownMembersAndOversizedFrames(t *testing.T) {
-	valid := `{"type":"auth_req","token":"` + strings.Repeat("a", 64) + `","ok":false,"error":"","originId":"","originLabel":"","catalogGeneration":0,"sessions":null,"targetId":""}`
+	valid := `{"type":"auth_req","token":"` + strings.Repeat(
+		"a",
+		64,
+	) + `","ok":false,"error":"","originId":"","originLabel":"","catalogGeneration":0,"sessions":null,"targetId":""}`
 
 	payloads := map[string]string{
 		"unknown member":   strings.Replace(valid, `"ok":false`, `"ok":false,"forged":1`, 1),
 		"duplicate member": strings.Replace(valid, `"ok":false`, `"ok":false,"ok":true`, 1),
 		"trailing content": valid + `{}`,
-		"oversized":        `{"type":"auth_req","token":"` + strings.Repeat("a", BridgeMaxFrameBytes) + `"}`,
+		"oversized": `{"type":"auth_req","token":"` + strings.Repeat(
+			"a",
+			BridgeMaxFrameBytes,
+		) + `"}`,
 	}
 
 	for name, payload := range payloads {
 		t.Run(name, func(t *testing.T) {
-			if _, err := ReadMessage(bufio.NewReader(strings.NewReader(payload + "\n"))); err == nil {
+			if _, err := ReadMessage(
+				bufio.NewReader(strings.NewReader(payload + "\n")),
+			); err == nil {
 				t.Fatalf("ReadMessage() accepted %s", name)
 			}
 		})
@@ -85,7 +105,13 @@ func TestBridgeMessageRejectsUnknownMembersAndOversizedFrames(t *testing.T) {
 }
 
 func TestBridgeServerRequiresPrivateSocketAndCapability(t *testing.T) {
-	if _, err := NewBridgeServer(t.Context(), BridgeServerConfig{}); !errors.Is(err, ErrBridgeSocketRequired) {
+	if _, err := NewBridgeServer(
+		t.Context(),
+		BridgeServerConfig{},
+	); !errors.Is(
+		err,
+		ErrBridgeSocketRequired,
+	) {
 		t.Fatalf("NewBridgeServer(empty) error = %v, want %v", err, ErrBridgeSocketRequired)
 	}
 
@@ -205,7 +231,8 @@ func TestBridgeServerServesCatalogToAuthenticatedClient(t *testing.T) {
 		t.Fatalf("GetCatalog() error = %v", err)
 	}
 
-	if catalog.OriginID != "laptop" || catalog.OriginLabel != "Laptop" || catalog.CatalogGeneration != 1 {
+	if catalog.OriginID != "laptop" || catalog.OriginLabel != "Laptop" ||
+		catalog.CatalogGeneration != 1 {
 		t.Fatalf("catalog = %#v, want the origin catalog with a generation", catalog)
 	}
 
@@ -270,25 +297,57 @@ func TestBridgeServerValidatesSwitchTargets(t *testing.T) {
 	}
 
 	unknownTarget := OriginSession{
-		ID: "$2", Name: "other", WindowCount: 1, Attached: false,
-		AgentTotal: 0, AgentActive: 0, AgentWaiting: 0,
-		TmuxServerPID: 42, TmuxServerStartedAt: time.Unix(100, 0).UTC(), SessionCreatedAt: time.Unix(200, 0).UTC(),
+		ID:                  "$2",
+		Name:                "other",
+		WindowCount:         1,
+		Attached:            false,
+		AgentTotal:          0,
+		AgentActive:         0,
+		AgentWaiting:        0,
+		TmuxServerPID:       42,
+		TmuxServerStartedAt: time.Unix(100, 0).UTC(),
+		SessionCreatedAt:    time.Unix(200, 0).UTC(),
 	}
 
-	if err := client.RequestSwitch(t.Context(), catalog.CatalogGeneration, unknownTarget); !errors.Is(err, ErrBridgeSwitchRejected) {
+	if err := client.RequestSwitch(
+		t.Context(),
+		catalog.CatalogGeneration,
+		unknownTarget,
+	); !errors.Is(
+		err,
+		ErrBridgeSwitchRejected,
+	) {
 		t.Fatalf("RequestSwitch(unknown target) error = %v, want %v", err, ErrBridgeSwitchRejected)
 	}
 
 	validTarget := catalog.Sessions[0]
 
-	if err := client.RequestSwitch(t.Context(), catalog.CatalogGeneration+1, validTarget); !errors.Is(err, ErrBridgeSwitchRejected) {
-		t.Fatalf("RequestSwitch(stale generation) error = %v, want %v", err, ErrBridgeSwitchRejected)
+	if err := client.RequestSwitch(
+		t.Context(),
+		catalog.CatalogGeneration+1,
+		validTarget,
+	); !errors.Is(
+		err,
+		ErrBridgeSwitchRejected,
+	) {
+		t.Fatalf(
+			"RequestSwitch(stale generation) error = %v, want %v",
+			err,
+			ErrBridgeSwitchRejected,
+		)
 	}
 
 	recycled := validTarget
 
 	recycled.TmuxServerPID = 999
-	if err := client.RequestSwitch(t.Context(), catalog.CatalogGeneration, recycled); !errors.Is(err, ErrBridgeSwitchRejected) {
+	if err := client.RequestSwitch(
+		t.Context(),
+		catalog.CatalogGeneration,
+		recycled,
+	); !errors.Is(
+		err,
+		ErrBridgeSwitchRejected,
+	) {
 		t.Fatalf("RequestSwitch(recycled server) error = %v, want %v", err, ErrBridgeSwitchRejected)
 	}
 
@@ -296,7 +355,11 @@ func TestBridgeServerValidatesSwitchTargets(t *testing.T) {
 		t.Fatal("refused switch request recorded a target")
 	}
 
-	if err := client.RequestSwitch(t.Context(), catalog.CatalogGeneration, validTarget); err != nil {
+	if err := client.RequestSwitch(
+		t.Context(),
+		catalog.CatalogGeneration,
+		validTarget,
+	); err != nil {
 		t.Fatalf("RequestSwitch(valid target) error = %v", err)
 	}
 
@@ -535,7 +598,8 @@ func TestBridgeMessageEncodingIsStable(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !strings.Contains(string(encoded), `"targetId":"$1"`) || !strings.Contains(string(encoded), `"catalogGeneration":2`) {
+	if !strings.Contains(string(encoded), `"targetId":"$1"`) ||
+		!strings.Contains(string(encoded), `"catalogGeneration":2`) {
 		t.Fatalf("encoded message = %s, want lower camel case members", encoded)
 	}
 }

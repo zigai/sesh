@@ -26,7 +26,12 @@ import (
 
 const maxFixtureDecompressLimit = 10_000_000
 
-func registerPendingRewriteFixture(t *testing.T, r *Repository, sourceID string, sessions []string) (string, model.Removal) {
+func registerPendingRewriteFixture(
+	t *testing.T,
+	r *Repository,
+	sourceID string,
+	sessions []string,
+) (string, model.Removal) {
 	t.Helper()
 
 	mutationID := newID()
@@ -41,7 +46,10 @@ func registerPendingRewriteFixture(t *testing.T, r *Repository, sourceID string,
 
 	_, err := r.RemoveSessions(t.Context(), mutationID, sourceID, sessions)
 	if !errors.Is(err, ErrRecoveryRequired) {
-		t.Fatalf("expected ErrRecoveryRequired after injected fault at rewrite_registered, got %v", err)
+		t.Fatalf(
+			"expected ErrRecoveryRequired after injected fault at rewrite_registered, got %v",
+			err,
+		)
 	}
 
 	r.fault = nil
@@ -185,7 +193,11 @@ func testResumeRewriteTerminalRetired(t *testing.T, r *Repository) {
 		resumedRes.Empty != origRes.Empty ||
 		!slices.Equal(resumedRes.Removed, origRes.Removed) ||
 		!slices.Equal(resumedRes.Artifacts, origRes.Artifacts) {
-		t.Fatalf("terminal retired same-intent resume mismatch: resumed=%+v orig=%+v", resumedRes, origRes)
+		t.Fatalf(
+			"terminal retired same-intent resume mismatch: resumed=%+v orig=%+v",
+			resumedRes,
+			origRes,
+		)
 	}
 }
 
@@ -194,7 +206,12 @@ func TestResumeRewritePendingAllSessionRetirement(t *testing.T) {
 	r := openRepository(t, path)
 	source := commitMultiSessionFixture(t, r)
 
-	mutationID, removal := registerPendingRewriteFixture(t, r, source.ID, []string{"s0", "s1", "s2"})
+	mutationID, removal := registerPendingRewriteFixture(
+		t,
+		r,
+		source.ID,
+		[]string{"s0", "s1", "s2"},
+	)
 	if !removal.Empty() {
 		t.Fatalf("expected removal to be empty for all sessions")
 	}
@@ -424,7 +441,8 @@ func testBoundaryPartialStageFiles(t *testing.T) {
 		t.Fatalf("read repaired generation failed: %v", err)
 	}
 
-	if len(repairedManifest.Sessions) != 2 || len(repairedManifest.Artifacts) != len(removal.Retained.Artifacts) {
+	if len(repairedManifest.Sessions) != 2 ||
+		len(repairedManifest.Artifacts) != len(removal.Retained.Artifacts) {
 		t.Fatalf("repaired manifest mismatch: %+v", repairedManifest)
 	}
 }
@@ -514,7 +532,15 @@ func testForeignArtifactInStaging(t *testing.T) {
 	artDir, _ := stageDir.CreateDir("artifacts")
 	f, _ := artDir.File("foreign_artifact.bin.gz", unix.O_WRONLY|unix.O_CREAT|unix.O_EXCL)
 	_, _ = f.WriteString("fake")
-	_ = errors.Join(f.Close(), artDir.Sync(), artDir.Close(), stageDir.Sync(), stageDir.Close(), staging.Sync(), staging.Close())
+	_ = errors.Join(
+		f.Close(),
+		artDir.Sync(),
+		artDir.Close(),
+		stageDir.Sync(),
+		stageDir.Close(),
+		staging.Sync(),
+		staging.Close(),
+	)
 
 	_, err := r.ResumeRewrite(t.Context(), mutationID)
 	if !errors.Is(err, ErrCorrupt) {
@@ -535,7 +561,13 @@ func testForeignFileInGenerations(t *testing.T) {
 	genDir, _ := generations.CreateDir(rw.Replacement)
 	f, _ := genDir.File("unexpected.txt", unix.O_WRONLY|unix.O_CREAT|unix.O_EXCL)
 	_, _ = f.WriteString("unexpected")
-	_ = errors.Join(f.Close(), genDir.Sync(), genDir.Close(), generations.Sync(), generations.Close())
+	_ = errors.Join(
+		f.Close(),
+		genDir.Sync(),
+		genDir.Close(),
+		generations.Sync(),
+		generations.Close(),
+	)
 
 	_, err := r.ResumeRewrite(t.Context(), mutationID)
 	if !errors.Is(err, ErrCorrupt) {
@@ -558,7 +590,13 @@ func testCorruptManifestDigestInGenerations(t *testing.T) {
 	_ = artDir.Close()
 	f, _ := genDir.File("manifest.json", unix.O_WRONLY|unix.O_CREAT|unix.O_EXCL)
 	_, _ = f.WriteString(`{"invalid":"json"}`)
-	_ = errors.Join(f.Close(), genDir.Sync(), genDir.Close(), generations.Sync(), generations.Close())
+	_ = errors.Join(
+		f.Close(),
+		genDir.Sync(),
+		genDir.Close(),
+		generations.Sync(),
+		generations.Close(),
+	)
 
 	_, err := r.ResumeRewrite(t.Context(), mutationID)
 	if !errors.Is(err, ErrCorrupt) {
@@ -585,7 +623,10 @@ func testBothStagingAndGenerationsExist(t *testing.T) {
 
 	_, err := r.ResumeRewrite(t.Context(), mutationID)
 	if !errors.Is(err, ErrCorrupt) {
-		t.Fatalf("expected ErrCorrupt when candidate exists in both staging and generations, got %v", err)
+		t.Fatalf(
+			"expected ErrCorrupt when candidate exists in both staging and generations, got %v",
+			err,
+		)
 	}
 }
 
@@ -596,7 +637,10 @@ func testSourceGenMissingFromCatalog(t *testing.T) {
 	mutationID, _ := registerPendingRewriteFixture(t, r, source.ID, []string{"s0"})
 
 	catalog, _ := r.Inspect(t.Context())
-	catalog.Generations = slices.DeleteFunc(catalog.Generations, func(g Generation) bool { return g.ID == source.ID })
+	catalog.Generations = slices.DeleteFunc(
+		catalog.Generations,
+		func(g Generation) bool { return g.ID == source.ID },
+	)
 
 	encoded, err := json.Marshal(catalog)
 	if err != nil {
@@ -635,9 +679,18 @@ func testTamperedPendingSessionsInCatalog(t *testing.T) {
 }
 
 func TestResumeRewriteSaveOrderingAndCurrentWatermark(t *testing.T) {
-	t.Run("rewrite_of_current_generation_makes_replacement_current", testRewriteCurrentMakesReplacementCurrent)
-	t.Run("rewrite_of_old_generation_does_not_overwrite_newer_save", testRewriteOldGenPreservesNewerSaveCurrent)
-	t.Run("retiring_old_generation_does_not_clear_newer_save_current", testRetiringOldGenPreservesNewerSaveCurrent)
+	t.Run(
+		"rewrite_of_current_generation_makes_replacement_current",
+		testRewriteCurrentMakesReplacementCurrent,
+	)
+	t.Run(
+		"rewrite_of_old_generation_does_not_overwrite_newer_save",
+		testRewriteOldGenPreservesNewerSaveCurrent,
+	)
+	t.Run(
+		"retiring_old_generation_does_not_clear_newer_save_current",
+		testRetiringOldGenPreservesNewerSaveCurrent,
+	)
 }
 
 func testRewriteCurrentMakesReplacementCurrent(t *testing.T) {
@@ -659,7 +712,11 @@ func testRewriteCurrentMakesReplacementCurrent(t *testing.T) {
 
 	finalCatalog, _ := r.Inspect(t.Context())
 	if finalCatalog.Current != res.Replacement.ID {
-		t.Fatalf("expected Current to be replacement %s, got %s", res.Replacement.ID, finalCatalog.Current)
+		t.Fatalf(
+			"expected Current to be replacement %s, got %s",
+			res.Replacement.ID,
+			finalCatalog.Current,
+		)
 	}
 
 	curr, err := r.Current(t.Context())
@@ -693,7 +750,11 @@ func testRewriteOldGenPreservesNewerSaveCurrent(t *testing.T) {
 
 	finalCatalog, _ := r.Inspect(t.Context())
 	if finalCatalog.Current != g2.ID {
-		t.Fatalf("Current was incorrectly overwritten with old rewrite replacement %s, want %s", res.Replacement.ID, g2.ID)
+		t.Fatalf(
+			"Current was incorrectly overwritten with old rewrite replacement %s, want %s",
+			res.Replacement.ID,
+			g2.ID,
+		)
 	}
 
 	curr, err := r.Current(t.Context())
@@ -725,7 +786,11 @@ func testRetiringOldGenPreservesNewerSaveCurrent(t *testing.T) {
 
 	finalCatalog, _ := r.Inspect(t.Context())
 	if finalCatalog.Current != g2.ID {
-		t.Fatalf("retiring older generation cleared Current! got %s, want %s", finalCatalog.Current, g2.ID)
+		t.Fatalf(
+			"retiring older generation cleared Current! got %s, want %s",
+			finalCatalog.Current,
+			g2.ID,
+		)
 	}
 }
 
@@ -749,7 +814,12 @@ func TestResumeRewriteDecompressedFixtureByteFidelity(t *testing.T) {
 	verifySurvivorFixtureBytes(t, r, res.Replacement.ID, expectedContents)
 }
 
-func verifySurvivorFixtureBytes(t *testing.T, r *Repository, genID string, expected map[string]string) {
+func verifySurvivorFixtureBytes(
+	t *testing.T,
+	r *Repository,
+	genID string,
+	expected map[string]string,
+) {
 	t.Helper()
 
 	generations, err := r.root.Child("generations", false)
@@ -778,7 +848,12 @@ func verifySurvivorFixtureBytes(t *testing.T, r *Repository, genID string, expec
 	}
 }
 
-func verifyDecompressedFixtureFile(t *testing.T, r *Repository, artDir *privatefs.Dir, genID, id, expectedStr string) {
+func verifyDecompressedFixtureFile(
+	t *testing.T,
+	r *Repository,
+	artDir *privatefs.Dir,
+	genID, id, expectedStr string,
+) {
 	t.Helper()
 
 	f, err := artDir.File(id+".bin.gz", unix.O_RDONLY)
@@ -803,7 +878,12 @@ func verifyDecompressedFixtureFile(t *testing.T, r *Repository, artDir *privatef
 	}
 
 	if decompressed.String() != expectedStr {
-		t.Fatalf("artifact %s content mismatch: got %q, want %q", id, decompressed.String(), expectedStr)
+		t.Fatalf(
+			"artifact %s content mismatch: got %q, want %q",
+			id,
+			decompressed.String(),
+			expectedStr,
+		)
 	}
 
 	h := sha256.Sum256(decompressed.Bytes())
@@ -999,11 +1079,21 @@ func verifyConcurrentDuplicateResults(t *testing.T, errs []error, results []Rewr
 		}
 
 		if results[i].Replacement.ID != results[0].Replacement.ID {
-			t.Fatalf("goroutine %d returned replacement %s, want %s", i, results[i].Replacement.ID, results[0].Replacement.ID)
+			t.Fatalf(
+				"goroutine %d returned replacement %s, want %s",
+				i,
+				results[i].Replacement.ID,
+				results[0].Replacement.ID,
+			)
 		}
 
 		if results[i].Replacement.Sequence != results[0].Replacement.Sequence {
-			t.Fatalf("goroutine %d sequence mismatch: %d vs %d", i, results[i].Replacement.Sequence, results[0].Replacement.Sequence)
+			t.Fatalf(
+				"goroutine %d sequence mismatch: %d vs %d",
+				i,
+				results[i].Replacement.Sequence,
+				results[0].Replacement.Sequence,
+			)
 		}
 	}
 }

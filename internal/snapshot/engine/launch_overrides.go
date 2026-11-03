@@ -28,7 +28,11 @@ type launchOverride struct {
 	digest string
 }
 
-func overrideLaunches(ctx context.Context, overrides LaunchOverrides, manifest model.Manifest) (model.Manifest, launchOverride, error) {
+func overrideLaunches(
+	ctx context.Context,
+	overrides LaunchOverrides,
+	manifest model.Manifest,
+) (model.Manifest, launchOverride, error) {
 	none := launchOverride{digest: ""}
 	if overrides == nil {
 		return manifest, none, nil

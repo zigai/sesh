@@ -80,7 +80,12 @@ func LoadCommandConfig(ctx context.Context, cmd *cobra.Command) (*config.Config,
 	}
 
 	if err != nil {
-		return nil, &ConfigurationError{err: oops.In("cli").Code("config_failed").With("operation", "load_configuration").Wrap(err)}
+		return nil, &ConfigurationError{
+			err: oops.In("cli").
+				Code("config_failed").
+				With("operation", "load_configuration").
+				Wrap(err),
+		}
 	}
 
 	cmd.SetContext(context.WithValue(ctx, commandConfigKey{}, cfg.Clone()))

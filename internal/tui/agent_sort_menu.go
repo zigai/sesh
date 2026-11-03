@@ -52,7 +52,9 @@ func (m *Model) renderAgentSortBadge() string {
 }
 
 func (m *Model) showsFooterBadges() bool {
-	return m.showsDisplayModeIndicator() || m.showsAgentSortIndicator() || m.displayMode == displayModeInbox || m.hasStatusBadge()
+	return m.showsDisplayModeIndicator() || m.showsAgentSortIndicator() ||
+		m.displayMode == displayModeInbox ||
+		m.hasStatusBadge()
 }
 
 func (m *Model) showsInboxGroupBadge() bool {

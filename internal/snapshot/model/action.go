@@ -46,7 +46,8 @@ func (s ActionState) CanBecome(next ActionState) bool {
 	case ActionStatePlanned:
 		return next == ActionStateIssued
 	case ActionStateIssued:
-		return next == ActionStateNotSent || next == ActionStateUnknown || next == ActionStateConfirmed
+		return next == ActionStateNotSent || next == ActionStateUnknown ||
+			next == ActionStateConfirmed
 	case ActionStateNotSent:
 		return next == ActionStatePlanned
 	case ActionStateUnknown:

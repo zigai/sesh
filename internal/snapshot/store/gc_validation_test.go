@@ -41,7 +41,11 @@ func TestCollectionPreservesReplacedRetiredManifest(t *testing.T) {
 	rewriteFixtureFile(t, name, replacement)
 
 	result := collectGenerations(t, r)
-	if len(result.Removed) != 0 || !slices.Contains(result.Preserved, CollectionSkip{Generation: retired.ID, Reason: CollectionReasonInvalidContent}) {
+	if len(result.Removed) != 0 ||
+		!slices.Contains(
+			result.Preserved,
+			CollectionSkip{Generation: retired.ID, Reason: CollectionReasonInvalidContent},
+		) {
 		t.Fatalf("replacement was not preserved: %+v", result)
 	}
 
@@ -68,7 +72,11 @@ func TestCollectionResumeValidatesArtifactContent(t *testing.T) {
 	rewriteFixtureFile(t, name, data)
 
 	result := collectGenerations(t, r)
-	if len(result.Removed) != 0 || !slices.Contains(result.Quarantined, CollectionSkip{Generation: retired.ID, Reason: CollectionQuarantineContent}) {
+	if len(result.Removed) != 0 ||
+		!slices.Contains(
+			result.Quarantined,
+			CollectionSkip{Generation: retired.ID, Reason: CollectionQuarantineContent},
+		) {
 		t.Fatalf("same-size replaced artifact was not quarantined: %+v", result)
 	}
 
@@ -91,12 +99,16 @@ func TestCollectionResumeBudgetIncludesManifest(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			result, err := r.Collect(t.Context(), CollectionBudget{Generations: 1, Bytes: info.Size() - 1})
+			result, err := r.Collect(
+				t.Context(),
+				CollectionBudget{Generations: 1, Bytes: info.Size() - 1},
+			)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			if result.Bytes != 0 || len(result.Removed) != 0 || !slices.Contains(result.Deferred, retired.ID) {
+			if result.Bytes != 0 || len(result.Removed) != 0 ||
+				!slices.Contains(result.Deferred, retired.ID) {
 				t.Fatalf("resumed collection exceeded byte budget: %+v", result)
 			}
 

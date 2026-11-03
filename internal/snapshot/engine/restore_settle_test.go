@@ -46,7 +46,12 @@ func newSettleFixture(t *testing.T) settleFixture {
 		t.Fatalf("begin snapshot: %v", err)
 	}
 
-	generation, err := repository.Commit(t.Context(), attempt.ID, observationFixture().Manifest, nil)
+	generation, err := repository.Commit(
+		t.Context(),
+		attempt.ID,
+		observationFixture().Manifest,
+		nil,
+	)
 	if err != nil {
 		t.Fatalf("commit snapshot: %v", err)
 	}
@@ -79,7 +84,13 @@ func (f settleFixture) register(t *testing.T, pid int, birth string) string {
 	}
 
 	id := store.NewOperationID()
-	if _, err := f.repository.RegisterOperation(t.Context(), id, f.generation, target, actions); err != nil {
+	if _, err := f.repository.RegisterOperation(
+		t.Context(),
+		id,
+		f.generation,
+		target,
+		actions,
+	); err != nil {
 		t.Fatalf("register restore: %v", err)
 	}
 
@@ -139,7 +150,8 @@ func TestSettleDeadRestoresAbandonsOnlyRestoresWhoseDaemonIsProvablyGone(t *test
 	}
 
 	states := fixture.states(t)
-	if states[earlierBoot] != "abandoned" || states[exited] != "abandoned" || states[alive] != "active" {
+	if states[earlierBoot] != "abandoned" || states[exited] != "abandoned" ||
+		states[alive] != "active" {
 		t.Fatalf("operation states = %v", states)
 	}
 
@@ -158,13 +170,24 @@ func TestSettleDeadRestoresKeepsRestoresWithoutProofOfDeath(t *testing.T) {
 
 	var output bytes.Buffer
 
-	settled, err := SettleDeadRestores(zerolog.New(&output).WithContext(t.Context()), fixture.repository)
+	settled, err := SettleDeadRestores(
+		zerolog.New(&output).WithContext(t.Context()),
+		fixture.repository,
+	)
 	if err != nil || len(settled) != 0 {
-		t.Fatalf("SettleDeadRestores = %+v, %v; want nothing settled without a recorded birth", settled, err)
+		t.Fatalf(
+			"SettleDeadRestores = %+v, %v; want nothing settled without a recorded birth",
+			settled,
+			err,
+		)
 	}
 
 	if fixture.states(t)[unrecorded] != "active" || output.Len() != 0 {
-		t.Fatalf("a restore without proof must stay active and silent: %v %q", fixture.states(t), output.String())
+		t.Fatalf(
+			"a restore without proof must stay active and silent: %v %q",
+			fixture.states(t),
+			output.String(),
+		)
 	}
 }
 
@@ -183,7 +206,8 @@ func assertSettleRecords(t *testing.T, data []byte, want int) {
 		}
 
 		if record["level"] != "warn" || record["component"] != "snapshot" || record["operation"] != "restore" ||
-			record["status"] != "abandoned" || record["reason"] != "target_daemon_gone" {
+			record["status"] != "abandoned" ||
+			record["reason"] != "target_daemon_gone" {
 			t.Fatalf("unexpected record: %+v", record)
 		}
 

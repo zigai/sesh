@@ -87,7 +87,13 @@ func TestStartCreatesAProjectTaskInItsOwnWorktreeAndWindow(t *testing.T) {
 		}
 	}
 
-	if got := waitForFile(t, f.envFile); got != strings.Join([]string{"t1", repo, worktree, "main"}, "|") {
+	if got := waitForFile(
+		t,
+		f.envFile,
+	); got != strings.Join(
+		[]string{"t1", repo, worktree, "main"},
+		"|",
+	) {
 		t.Fatalf("agent environment = %q", got)
 	}
 
@@ -118,11 +124,20 @@ func TestReopenRebuildsALostTaskWindow(t *testing.T) {
 	}
 
 	panes := rolePanes(t, f, place.Session, record.ID)
-	if _, ok := panes["agent"]; !ok || len(panes) != 2 || panes["editor"].CurrentPath != record.Directory {
-		t.Fatalf("reopened window panes = %+v, want the agent and the editor in the worktree", panes)
+	if _, ok := panes["agent"]; !ok || len(panes) != 2 ||
+		panes["editor"].CurrentPath != record.Directory {
+		t.Fatalf(
+			"reopened window panes = %+v, want the agent and the editor in the worktree",
+			panes,
+		)
 	}
 
-	if _, err := f.service.Reopen(t.Context(), place, record.ID); err != nil || len(sessionWindows(t, f.server, place.Session)) != 2 {
+	if _, err := f.service.Reopen(
+		t.Context(),
+		place,
+		record.ID,
+	); err != nil ||
+		len(sessionWindows(t, f.server, place.Session)) != 2 {
 		t.Fatalf("second Reopen() error = %v; want the window kept and no other opened", err)
 	}
 }
@@ -142,7 +157,11 @@ func TestReopenResumesASleepingTasksAgent(t *testing.T) {
 
 	if _, err := f.store.Update(t.Context(), func(ledger *task.Ledger) error {
 		record.State = task.StateSleeping
-		record.Resume = task.Resume{Harness: "pi", Session: "s1", Command: []string{"sh", "-c", "echo resumed > " + resumed + "; exec sleep 300"}}
+		record.Resume = task.Resume{
+			Harness: "pi",
+			Session: "s1",
+			Command: []string{"sh", "-c", "echo resumed > " + resumed + "; exec sleep 300"},
+		}
 		ledger.Put(record)
 
 		return nil
@@ -174,7 +193,14 @@ func TestReopenRefusesATaskWhoseDirectoryIsGone(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := f.service.Reopen(t.Context(), place, record.ID); !errors.Is(err, task.ErrTaskDirectoryMissing) {
+	if _, err := f.service.Reopen(
+		t.Context(),
+		place,
+		record.ID,
+	); !errors.Is(
+		err,
+		task.ErrTaskDirectoryMissing,
+	) {
 		t.Fatalf("Reopen() error = %v, want ErrTaskDirectoryMissing", err)
 	}
 }
@@ -215,7 +241,11 @@ func TestStartSkipsTaskNumbersWhoseBranchOrDirectoryExists(t *testing.T) {
 }
 
 func TestStartPicksABranchThatDoesNotNestWithAnExistingBranch(t *testing.T) {
-	titled := task.Request{Harness: sleepHarness, Title: "main", Location: task.Location{Where: task.WhereNew}}
+	titled := task.Request{
+		Harness:  sleepHarness,
+		Title:    "main",
+		Location: task.Location{Where: task.WhereNew},
+	}
 
 	for _, test := range []struct {
 		name     string
@@ -272,7 +302,10 @@ func TestStartRecordsAFailedTaskWhenTheWorktreeCannotBeCreated(t *testing.T) {
 		t.Fatal(loadErr)
 	}
 
-	if stored, _ := ledger.Find(record.ID); stored.State != task.StateFailed || stored.Branch != "wt/main/1" {
+	if stored, _ := ledger.Find(
+		record.ID,
+	); stored.State != task.StateFailed ||
+		stored.Branch != "wt/main/1" {
 		t.Fatalf("ledger record = %+v, want a failed record naming its branch", stored)
 	}
 
@@ -304,7 +337,8 @@ func TestStartOutsideAProjectCreatesALooseTaskNextToTheCurrentWindow(t *testing.
 		t.Fatalf("Start() error = %v", err)
 	}
 
-	if record.Kind != task.KindLoose || record.Directory != dir || record.Branch != "" || record.Project != "" {
+	if record.Kind != task.KindLoose || record.Directory != dir || record.Branch != "" ||
+		record.Project != "" {
 		t.Fatalf("Start() = %+v, want a loose task in the pane directory", record)
 	}
 
@@ -369,7 +403,13 @@ func TestOfferListsEveryCheckoutAndBranchAndMarksTheOnesTasksUse(t *testing.T) {
 		{Where: task.WhereNew, Branch: "main"},
 		{Where: task.WhereMain, Branch: "main", Directory: repo},
 		{Where: task.WhereWorktree, Branch: "hand", Directory: hand},
-		{Where: task.WhereWorktree, Branch: "wt/main/1", Directory: started.Directory, Task: started.ID, TaskTitle: "main-1"},
+		{
+			Where:     task.WhereWorktree,
+			Branch:    "wt/main/1",
+			Directory: started.Directory,
+			Task:      started.ID,
+			TaskTitle: "main-1",
+		},
 		{Where: task.WhereBranch, Branch: "feature"},
 		{Where: task.WhereNew, Branch: "feature"},
 		{Where: task.WhereNew, Branch: "gone"},
@@ -377,15 +417,24 @@ func TestOfferListsEveryCheckoutAndBranchAndMarksTheOnesTasksUse(t *testing.T) {
 		{Where: task.WhereNew, Branch: "wt/main/1"},
 	}
 	if !slices.Equal(offer.Locations, want) {
-		t.Fatalf("Offer() locations = %+v, want %+v: a missing worktree and checked-out branches left out, the task's worktree marked", offer.Locations, want)
+		t.Fatalf(
+			"Offer() locations = %+v, want %+v: a missing worktree and checked-out branches left out, the task's worktree marked",
+			offer.Locations,
+			want,
+		)
 	}
 
 	if offer.Current != 1 || offer.NextNumber != 2 {
-		t.Fatalf("Offer() current = %d, next number = %d; want the main checkout the pane is in and number 2 after task 1", offer.Current, offer.NextNumber)
+		t.Fatalf(
+			"Offer() current = %d, next number = %d; want the main checkout the pane is in and number 2 after task 1",
+			offer.Current,
+			offer.NextNumber,
+		)
 	}
 
 	if _, err := f.service.Start(t.Context(), place, task.Request{
-		Harness: sleepHarness, Location: task.Location{Where: task.WhereWorktree, Directory: started.Directory},
+		Harness:  sleepHarness,
+		Location: task.Location{Where: task.WhereWorktree, Directory: started.Directory},
 	}); !errors.Is(err, task.ErrLocationUnavailable) {
 		t.Fatalf("Start() in the task's worktree error = %v, want ErrLocationUnavailable", err)
 	}
@@ -410,17 +459,33 @@ func TestOfferDescribesEachBranchNewestFirst(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newer := task.Ref{Time: time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC).Unix(), Subject: "second step", Ahead: 2, Behind: 1}
+	newer := task.Ref{
+		Time:    time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC).Unix(),
+		Subject: "second step",
+		Ahead:   2,
+		Behind:  1,
+	}
 	if got := offer.Refs["refs/heads/newer"]; got != newer {
-		t.Errorf("newer ref = %+v, want its latest commit, 2 ahead of main and 1 behind: %+v", got, newer)
+		t.Errorf(
+			"newer ref = %+v, want its latest commit, 2 ahead of main and 1 behind: %+v",
+			got,
+			newer,
+		)
 	}
 
-	older := task.Ref{Time: time.Date(2020, 1, 2, 3, 4, 5, 0, time.UTC).Unix(), Subject: "", Ahead: 1, Behind: 1}
+	older := task.Ref{
+		Time:    time.Date(2020, 1, 2, 3, 4, 5, 0, time.UTC).Unix(),
+		Subject: "",
+		Ahead:   1,
+		Behind:  1,
+	}
 	if got, ok := offer.Refs["refs/heads/older"]; !ok || got != older {
 		t.Errorf("older ref without a subject = %+v, %t; want %+v", got, ok, older)
 	}
 
-	if shared, ok := offer.Refs["refs/remotes/origin/shared"]; !ok || shared.Subject != "remote work" || shared.Ahead != 1 {
+	if shared, ok := offer.Refs["refs/remotes/origin/shared"]; !ok ||
+		shared.Subject != "remote work" ||
+		shared.Ahead != 1 {
 		t.Errorf("remote ref = %+v, %t; want origin/shared 1 ahead", shared, ok)
 	}
 
@@ -448,7 +513,18 @@ func TestChangesCountsTheLinesEachCheckoutsChangesAddAndDelete(t *testing.T) {
 
 	writeFile(t, notes, "one\ntwo\nthree\n")
 	runGit(t, repo, "add", "notes.txt")
-	runGit(t, repo, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-q", "-m", "notes")
+	runGit(
+		t,
+		repo,
+		"-c",
+		"user.name=Test",
+		"-c",
+		"user.email=test@example.com",
+		"commit",
+		"-q",
+		"-m",
+		"notes",
+	)
 
 	clean := filepath.Join(f.base, "clean")
 	runGit(t, repo, "worktree", "add", "-q", "-b", "clean", clean)
@@ -461,7 +537,11 @@ func TestChangesCountsTheLinesEachCheckoutsChangesAddAndDelete(t *testing.T) {
 	want := map[string]git.Diff{repo: {Added: 3, Deleted: 1}, clean: {Added: 0, Deleted: 0}}
 
 	if !maps.Equal(changes, want) {
-		t.Fatalf("Changes() = %v, want %v: tracked lines only, nothing for a missing checkout", changes, want)
+		t.Fatalf(
+			"Changes() = %v, want %v: tracked lines only, nothing for a missing checkout",
+			changes,
+			want,
+		)
 	}
 }
 
@@ -486,12 +566,20 @@ func TestOfferStartsANewWorktreeFromTheBranchThePaneIsOn(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(offer.Locations) < 2 || offer.Locations[1] != (task.Location{Where: task.WhereNew, Branch: "hand"}) {
-		t.Fatalf("Offer() locations = %+v, want a new worktree from hand right after the default branch", offer.Locations)
+	if len(offer.Locations) < 2 ||
+		offer.Locations[1] != (task.Location{Where: task.WhereNew, Branch: "hand"}) {
+		t.Fatalf(
+			"Offer() locations = %+v, want a new worktree from hand right after the default branch",
+			offer.Locations,
+		)
 	}
 
 	if current := offer.Current; current < 0 || offer.Locations[current].Directory != hand {
-		t.Fatalf("Offer() current = %d in %+v, want the hand worktree the pane is in", current, offer.Locations)
+		t.Fatalf(
+			"Offer() current = %d in %+v, want the hand worktree the pane is in",
+			current,
+			offer.Locations,
+		)
 	}
 }
 
@@ -514,11 +602,18 @@ func TestOfferInAMainCheckoutInsideALinkedWorktreeStartsFromTheMainCheckout(t *t
 	}
 
 	if len(offer.Locations) < 2 || offer.Locations[1].Where != task.WhereMain {
-		t.Fatalf("Offer() locations = %+v, want only a new worktree from main before the checkouts", offer.Locations)
+		t.Fatalf(
+			"Offer() locations = %+v, want only a new worktree from main before the checkouts",
+			offer.Locations,
+		)
 	}
 
 	if current := offer.Current; current < 0 || offer.Locations[current].Directory != repo {
-		t.Fatalf("Offer() current = %d in %+v, want the main checkout the pane is in", current, offer.Locations)
+		t.Fatalf(
+			"Offer() current = %d in %+v, want the main checkout the pane is in",
+			current,
+			offer.Locations,
+		)
 	}
 }
 
@@ -528,7 +623,11 @@ func TestOutsideARepositoryOfferHasNoProject(t *testing.T) {
 	dir := mkdir(t, filepath.Join(f.base, "scratch"))
 	session := newSession(t, f.server, "scratch", dir)
 
-	offer, err := f.service.Offer(t.Context(), locate(t, f, sessionWindows(t, f.server, session.ID())[0].Window()), false)
+	offer, err := f.service.Offer(
+		t.Context(),
+		locate(t, f, sessionWindows(t, f.server, session.ID())[0].Window()),
+		false,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -543,13 +642,21 @@ func TestInARepositoryOutsideAProjectSessionOfferIsTheRepositorys(t *testing.T) 
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
 	session := newSession(t, f.server, "work", repo)
 
-	offer, err := f.service.Offer(t.Context(), locate(t, f, sessionWindows(t, f.server, session.ID())[0].Window()), false)
+	offer, err := f.service.Offer(
+		t.Context(),
+		locate(t, f, sessionWindows(t, f.server, session.ID())[0].Window()),
+		false,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if offer.Project != repo || len(offer.Locations) == 0 || offer.Locations[0] != (task.Location{Where: task.WhereNew, Branch: "main"}) {
-		t.Fatalf("Offer() = %+v, want the shop repository with a new worktree from main first", offer)
+	if offer.Project != repo || len(offer.Locations) == 0 ||
+		offer.Locations[0] != (task.Location{Where: task.WhereNew, Branch: "main"}) {
+		t.Fatalf(
+			"Offer() = %+v, want the shop repository with a new worktree from main first",
+			offer,
+		)
 	}
 }
 
@@ -569,12 +676,17 @@ func TestInARepositoryOutsideAProjectSessionATaskGetsAWorktreeNextToTheCurrentWi
 		t.Fatal(err)
 	}
 
-	record, err := f.service.Start(t.Context(), locate(t, f, first.Window()), inNewWorktree(envHarness))
+	record, err := f.service.Start(
+		t.Context(),
+		locate(t, f, first.Window()),
+		inNewWorktree(envHarness),
+	)
 	if err != nil {
 		t.Fatalf("Start() error = %v", err)
 	}
 
-	if record.Kind != task.KindProject || record.Project != repo || record.Branch != "wt/main/1" || !record.OwnsWorktree {
+	if record.Kind != task.KindProject || record.Project != repo || record.Branch != "wt/main/1" ||
+		!record.OwnsWorktree {
 		t.Fatalf("Start() = %+v, want a project task on a new worktree", record)
 	}
 
@@ -596,7 +708,11 @@ func TestStartWithATitleNamesTheTaskAndBranchAndPromptsTheAgent(t *testing.T) {
 	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
 	place := projectPlace(t, f, repo)
-	request := task.Request{Harness: promptedHarness, Title: "Fix login: redirect!", Location: task.Location{Where: task.WhereNew}}
+	request := task.Request{
+		Harness:  promptedHarness,
+		Title:    "Fix login: redirect!",
+		Location: task.Location{Where: task.WhereNew},
+	}
 
 	record, err := f.service.Start(t.Context(), place, request)
 	if err != nil {
@@ -629,7 +745,11 @@ func TestStartWithABackslashInTheTitleKeepsTheTitleAndNamesTheWindowWithoutIt(t 
 	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
 	place := projectPlace(t, f, repo)
-	request := task.Request{Harness: promptedHarness, Title: `Fix C:\Users path`, Location: task.Location{Where: task.WhereNew}}
+	request := task.Request{
+		Harness:  promptedHarness,
+		Title:    `Fix C:\Users path`,
+		Location: task.Location{Where: task.WhereNew},
+	}
 
 	record, err := f.service.Start(t.Context(), place, request)
 	if err != nil {
@@ -673,23 +793,33 @@ func TestStartRunsTheHarnessInTheUserShellWithItsFunctions(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if err := os.WriteFile(rcPath, []byte(fmt.Sprintf(shell.rc, f.promptFile)), 0o600); err != nil {
+			if err := os.WriteFile(
+				rcPath,
+				[]byte(fmt.Sprintf(shell.rc, f.promptFile)),
+				0o600,
+			); err != nil {
 				t.Fatal(err)
 			}
 
-			if err := f.server.GlobalSessionOptions().SetDefaultShell(t.Context(), path); err != nil {
+			if err := f.server.GlobalSessionOptions().
+				SetDefaultShell(t.Context(), path); err != nil {
 				t.Fatal(err)
 			}
 
 			title := `it's "quoted" $HOME`
 			if _, err := f.service.Start(t.Context(), projectPlace(t, f, repo), task.Request{
-				Harness: functionHarness, Title: title, Location: task.Location{Where: task.WhereNew},
+				Harness:  functionHarness,
+				Title:    title,
+				Location: task.Location{Where: task.WhereNew},
 			}); err != nil {
 				t.Fatalf("Start() error = %v", err)
 			}
 
 			if got := waitForFile(t, f.promptFile); got != `--yolo|a\b \'|`+title+"|" {
-				t.Fatalf("shell function ran with %q, want its own option and the title unchanged", got)
+				t.Fatalf(
+					"shell function ran with %q, want its own option and the title unchanged",
+					got,
+				)
 			}
 		})
 	}
@@ -699,7 +829,11 @@ func TestStartWithoutATitlePassesNoPrompt(t *testing.T) {
 	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
 
-	if _, err := f.service.Start(t.Context(), projectPlace(t, f, repo), inNewWorktree(promptedHarness)); err != nil {
+	if _, err := f.service.Start(
+		t.Context(),
+		projectPlace(t, f, repo),
+		inNewWorktree(promptedHarness),
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -712,7 +846,19 @@ func TestStartANewWorktreeFromAnotherBranch(t *testing.T) {
 	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
 	runGit(t, repo, "switch", "-q", "-c", "feature")
-	runGit(t, repo, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-q", "--allow-empty", "-m", "feature work")
+	runGit(
+		t,
+		repo,
+		"-c",
+		"user.name=Test",
+		"-c",
+		"user.email=test@example.com",
+		"commit",
+		"-q",
+		"--allow-empty",
+		"-m",
+		"feature work",
+	)
 	runGit(t, repo, "switch", "-q", "main")
 	place := projectPlace(t, f, repo)
 
@@ -744,20 +890,39 @@ func TestStartFromARemoteBranchCreatesALocalBranchTrackingIt(t *testing.T) {
 	}
 
 	remote := task.Location{Where: task.WhereBranch, Branch: "review", Remote: "origin"}
-	if !slices.Contains(offer.Locations, remote) || slices.Contains(offer.Locations, task.Location{Where: task.WhereBranch, Branch: "main", Remote: "origin"}) {
-		t.Fatalf("Offer() locations = %+v, want origin/review and not origin/main, which main shares", offer.Locations)
+	if !slices.Contains(offer.Locations, remote) ||
+		slices.Contains(
+			offer.Locations,
+			task.Location{Where: task.WhereBranch, Branch: "main", Remote: "origin"},
+		) {
+		t.Fatalf(
+			"Offer() locations = %+v, want origin/review and not origin/main, which main shares",
+			offer.Locations,
+		)
 	}
 
-	record, err := f.service.Start(t.Context(), place, task.Request{Harness: sleepHarness, Location: remote})
+	record, err := f.service.Start(
+		t.Context(),
+		place,
+		task.Request{Harness: sleepHarness, Location: remote},
+	)
 	if err != nil {
 		t.Fatalf("Start() error = %v", err)
 	}
 
-	if record.Branch != "review" || record.Upstream != "origin/review" || !record.OwnsBranch || !record.OwnsWorktree || record.Base != "main" {
+	if record.Branch != "review" || record.Upstream != "origin/review" || !record.OwnsBranch ||
+		!record.OwnsWorktree ||
+		record.Base != "main" {
 		t.Fatalf("Start() = %+v, want an owned local review branch tracking origin/review", record)
 	}
 
-	if got := gitOutput(t, record.Directory, "rev-parse", "--abbrev-ref", "@{upstream}"); got != "origin/review" {
+	if got := gitOutput(
+		t,
+		record.Directory,
+		"rev-parse",
+		"--abbrev-ref",
+		"@{upstream}",
+	); got != "origin/review" {
 		t.Fatalf("upstream = %q, want origin/review", got)
 	}
 }
@@ -770,13 +935,22 @@ func TestStartInAnExistingCheckoutLeavesGitAloneAndTakesTheCheckout(t *testing.T
 	place := projectPlace(t, f, repo)
 
 	for _, location := range []task.Location{{Where: task.WhereWorktree, Directory: hand}, {Where: task.WhereMain}} {
-		record, err := f.service.Start(t.Context(), place, task.Request{Harness: sleepHarness, Location: location})
+		record, err := f.service.Start(
+			t.Context(),
+			place,
+			task.Request{Harness: sleepHarness, Location: location},
+		)
 		if err != nil {
 			t.Fatalf("Start(%s) error = %v", location.Where, err)
 		}
 
-		if record.OwnsWorktree || record.OwnsBranch || record.Branch == "" || record.Base != "main" {
-			t.Fatalf("Start(%s) = %+v, want a task that owns nothing on the checkout's branch", location.Where, record)
+		if record.OwnsWorktree || record.OwnsBranch || record.Branch == "" ||
+			record.Base != "main" {
+			t.Fatalf(
+				"Start(%s) = %+v, want a task that owns nothing on the checkout's branch",
+				location.Where,
+				record,
+			)
 		}
 
 		for _, pane := range windowPanes(t, f.server, taskWindow(t, f.server, place.Session, record.ID).ID) {
@@ -785,8 +959,19 @@ func TestStartInAnExistingCheckoutLeavesGitAloneAndTakesTheCheckout(t *testing.T
 			}
 		}
 
-		if _, err := f.service.Start(t.Context(), place, task.Request{Harness: sleepHarness, Location: location}); !errors.Is(err, task.ErrLocationUnavailable) {
-			t.Fatalf("second Start(%s) error = %v, want the taken checkout refused", location.Where, err)
+		if _, err := f.service.Start(
+			t.Context(),
+			place,
+			task.Request{Harness: sleepHarness, Location: location},
+		); !errors.Is(
+			err,
+			task.ErrLocationUnavailable,
+		) {
+			t.Fatalf(
+				"second Start(%s) error = %v, want the taken checkout refused",
+				location.Where,
+				err,
+			)
 		}
 	}
 
@@ -813,7 +998,8 @@ func TestStartFromABranchChecksItOutInANewWorktree(t *testing.T) {
 	}
 
 	worktree := filepath.Join(f.worktreeDir, "shop", "main-1")
-	if record.Directory != worktree || record.Branch != "feature" || !record.OwnsWorktree || record.OwnsBranch {
+	if record.Directory != worktree || record.Branch != "feature" || !record.OwnsWorktree ||
+		record.OwnsBranch {
 		t.Fatalf("Start() = %+v, want an owned worktree on the existing branch", record)
 	}
 
@@ -837,7 +1023,14 @@ func TestStartRefusesALocationTheProjectDoesNotOffer(t *testing.T) {
 		{Where: task.WhereBranch, Branch: "main"},
 		{Where: ""},
 	} {
-		if _, err := f.service.Start(t.Context(), place, task.Request{Harness: sleepHarness, Location: location}); !errors.Is(err, task.ErrLocationUnavailable) {
+		if _, err := f.service.Start(
+			t.Context(),
+			place,
+			task.Request{Harness: sleepHarness, Location: location},
+		); !errors.Is(
+			err,
+			task.ErrLocationUnavailable,
+		) {
 			t.Fatalf("Start(%+v) error = %v, want ErrLocationUnavailable", location, err)
 		}
 	}
@@ -900,35 +1093,83 @@ func newFixture(t *testing.T) fixture {
 
 	worktreeDir := filepath.Join(base, "worktrees")
 
-	catalog, err := project.NewCatalog(config.ProjectsConfig{Roots: []string{filepath.Join(base, "code")}, Extra: nil, Overrides: nil})
+	catalog, err := project.NewCatalog(
+		config.ProjectsConfig{
+			Roots:     []string{filepath.Join(base, "code")},
+			Extra:     nil,
+			Overrides: nil,
+		},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	cfg := config.DefaultTasksConfig()
-	cfg.Panes = []config.TaskPaneConfig{{Name: "editor", Command: []string{"sleep", "300"}, Dir: "", Restart: false}}
+	cfg.Panes = []config.TaskPaneConfig{
+		{Name: "editor", Command: []string{"sleep", "300"}, Dir: "", Restart: false},
+	}
 	cfg.Harness = []config.HarnessConfig{
-		{Name: envHarness, Command: []string{"sh", "-c", `printf '%s|%s|%s|%s' "$SESH_TASK" "$SESH_PROJECT" "$SESH_WORKTREE" "$SESH_BASE" > "$0"; exec sleep 300`, envFile}},
+		{
+			Name: envHarness,
+			Command: []string{
+				"sh",
+				"-c",
+				`printf '%s|%s|%s|%s' "$SESH_TASK" "$SESH_PROJECT" "$SESH_WORKTREE" "$SESH_BASE" > "$0"; exec sleep 300`,
+				envFile,
+			},
+		},
 		{Name: sleepHarness, Command: []string{"sleep", "300"}},
-		{Name: promptedHarness, Command: []string{"sh", "-c", `printf '%s:%s' "$#" "$*" > "$0"; exec sleep 300`, promptFile}, PromptArgs: []string{"prompt for {title}"}},
-		{Name: functionHarness, Command: []string{"shellagent", `a\b \'`}, PromptArgs: []string{"{title}"}},
+		{
+			Name: promptedHarness,
+			Command: []string{
+				"sh",
+				"-c",
+				`printf '%s:%s' "$#" "$*" > "$0"; exec sleep 300`,
+				promptFile,
+			},
+			PromptArgs: []string{"prompt for {title}"},
+		},
+		{
+			Name:       functionHarness,
+			Command:    []string{"shellagent", `a\b \'`},
+			PromptArgs: []string{"{title}"},
+		},
 	}
 
 	full := config.DefaultConfig()
 	full.Tasks = cfg
 
 	service := task.NewService(task.Options{
-		Server: server, Store: store, Catalog: catalog, Config: cfg, Windows: full.TaskWindowFor, WorktreeDir: worktreeDir,
-		LookPath: exec.LookPath, Now: time.Now,
+		Server:      server,
+		Store:       store,
+		Catalog:     catalog,
+		Config:      cfg,
+		Windows:     full.TaskWindowFor,
+		WorktreeDir: worktreeDir,
+		LookPath:    exec.LookPath,
+		Now:         time.Now,
 	})
 
-	return fixture{cfg: full, server: server, service: service, store: store, base: base, worktreeDir: worktreeDir, envFile: envFile, promptFile: promptFile}
+	return fixture{
+		cfg:         full,
+		server:      server,
+		service:     service,
+		store:       store,
+		base:        base,
+		worktreeDir: worktreeDir,
+		envFile:     envFile,
+		promptFile:  promptFile,
+	}
 }
 
 func projectPlace(t *testing.T, f fixture, root string) task.Place {
 	t.Helper()
 
-	session, err := project.CreateSession(t.Context(), f.server, project.Project{Root: root, Name: filepath.Base(root), Kind: project.KindGit})
+	session, err := project.CreateSession(
+		t.Context(),
+		f.server,
+		project.Project{Root: root, Name: filepath.Base(root), Kind: project.KindGit},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1011,11 +1252,17 @@ func sessionWindows(t *testing.T, server *gotmux.Server, id gotmux.SessionID) []
 	return windows
 }
 
-func taskWindow(t *testing.T, server *gotmux.Server, id gotmux.SessionID, taskID string) gotmux.WindowInfo {
+func taskWindow(
+	t *testing.T,
+	server *gotmux.Server,
+	id gotmux.SessionID,
+	taskID string,
+) gotmux.WindowInfo {
 	t.Helper()
 
 	for _, link := range sessionWindows(t, server, id) {
-		info, err := link.Window().InfoWith(t.Context(), gotmux.QueryOptions{Filter: "", ExtraFields: []string{task.OptionTask}})
+		info, err := link.Window().
+			InfoWith(t.Context(), gotmux.QueryOptions{Filter: "", ExtraFields: []string{task.OptionTask}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1090,7 +1337,19 @@ func initRepository(t *testing.T, dir string) string {
 
 	mkdir(t, dir)
 	runGit(t, dir, "init", "-q", "-b", "main")
-	runGit(t, dir, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-q", "--allow-empty", "-m", "init")
+	runGit(
+		t,
+		dir,
+		"-c",
+		"user.name=Test",
+		"-c",
+		"user.email=test@example.com",
+		"commit",
+		"-q",
+		"--allow-empty",
+		"-m",
+		"init",
+	)
 
 	return dir
 }
@@ -1101,7 +1360,19 @@ func addRemoteBranch(t *testing.T, base, repo, branch string) {
 	upstream := filepath.Join(base, "upstream")
 	runGit(t, base, "clone", "-q", repo, upstream)
 	runGit(t, upstream, "switch", "-q", "-c", branch)
-	runGit(t, upstream, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-q", "--allow-empty", "-m", "remote work")
+	runGit(
+		t,
+		upstream,
+		"-c",
+		"user.name=Test",
+		"-c",
+		"user.email=test@example.com",
+		"commit",
+		"-q",
+		"--allow-empty",
+		"-m",
+		"remote work",
+	)
 	runGit(t, upstream, "switch", "-q", "main")
 	runGit(t, repo, "remote", "add", "origin", upstream)
 	runGit(t, repo, "fetch", "-q", "origin")
@@ -1110,7 +1381,20 @@ func addRemoteBranch(t *testing.T, base, repo, branch string) {
 func commitAt(t *testing.T, dir, message, date string) {
 	t.Helper()
 
-	command := exec.CommandContext(t.Context(), "git", "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-q", "--allow-empty", "--allow-empty-message", "-m", message)
+	command := exec.CommandContext(
+		t.Context(),
+		"git",
+		"-c",
+		"user.name=Test",
+		"-c",
+		"user.email=test@example.com",
+		"commit",
+		"-q",
+		"--allow-empty",
+		"--allow-empty-message",
+		"-m",
+		message,
+	)
 	command.Dir = dir
 
 	command.Env = append(os.Environ(), "GIT_COMMITTER_DATE="+date, "GIT_AUTHOR_DATE="+date)

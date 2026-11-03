@@ -47,8 +47,18 @@ func TestHookTimeoutsMustBePositive(t *testing.T) {
 	}{
 		{name: "global zero", hooks: config.HookConfig{Timeout: "0s"}},
 		{name: "global negative", hooks: config.HookConfig{Timeout: "-1s"}},
-		{name: "command zero", hooks: config.HookConfig{SessionSwitchPost: []config.HookCommand{{Command: "echo", Timeout: "0s"}}}},
-		{name: "command negative", hooks: config.HookConfig{SessionSwitchPost: []config.HookCommand{{Command: "echo", Timeout: "-1s"}}}},
+		{
+			name: "command zero",
+			hooks: config.HookConfig{
+				SessionSwitchPost: []config.HookCommand{{Command: "echo", Timeout: "0s"}},
+			},
+		},
+		{
+			name: "command negative",
+			hooks: config.HookConfig{
+				SessionSwitchPost: []config.HookCommand{{Command: "echo", Timeout: "-1s"}},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -82,7 +92,11 @@ session_switch_post = [{ command = "echo", timeout = 42 }]`, want: "hook timeout
 				t.Fatalf("creating config directory: %v", err)
 			}
 
-			if err := os.WriteFile(filepath.Join(configDir, "config.toml"), []byte(tt.content), 0o600); err != nil {
+			if err := os.WriteFile(
+				filepath.Join(configDir, "config.toml"),
+				[]byte(tt.content),
+				0o600,
+			); err != nil {
 				t.Fatalf("writing config: %v", err)
 			}
 
@@ -139,7 +153,8 @@ page_down = "ctrl+f"`
 	}
 
 	_, err := config.Load()
-	if err == nil || !strings.Contains(err.Error(), "cycle_mode") || !strings.Contains(err.Error(), "page_down") {
+	if err == nil || !strings.Contains(err.Error(), "cycle_mode") ||
+		!strings.Contains(err.Error(), "page_down") {
 		t.Fatalf("Load() error = %v, want cycle mode collision context", err)
 	}
 }
@@ -150,9 +165,21 @@ func TestLoadRejectsInvalidDisplayModes(t *testing.T) {
 		content string
 		want    string
 	}{
-		{name: "empty", content: "[settings]\ndisplay_modes = []", want: "display modes cannot be empty"},
-		{name: "unsupported", content: "[settings]\ndisplay_modes = [\"focus\"]", want: "invalid display mode"},
-		{name: "duplicate", content: "[settings]\ndisplay_modes = [\"agents\", \"AGENTS\"]", want: "duplicate display mode"},
+		{
+			name:    "empty",
+			content: "[settings]\ndisplay_modes = []",
+			want:    "display modes cannot be empty",
+		},
+		{
+			name:    "unsupported",
+			content: "[settings]\ndisplay_modes = [\"focus\"]",
+			want:    "invalid display mode",
+		},
+		{
+			name:    "duplicate",
+			content: "[settings]\ndisplay_modes = [\"agents\", \"AGENTS\"]",
+			want:    "duplicate display mode",
+		},
 	}
 
 	for _, tt := range tests {
@@ -165,7 +192,11 @@ func TestLoadRejectsInvalidDisplayModes(t *testing.T) {
 				t.Fatalf("mkdir failed: %v", err)
 			}
 
-			if err := os.WriteFile(filepath.Join(configDir, "config.toml"), []byte(tt.content), 0o600); err != nil {
+			if err := os.WriteFile(
+				filepath.Join(configDir, "config.toml"),
+				[]byte(tt.content),
+				0o600,
+			); err != nil {
 				t.Fatalf("write config failed: %v", err)
 			}
 
@@ -194,7 +225,11 @@ func TestLoadValidatesShortcutStyle(t *testing.T) {
 		}
 
 		content := "[settings]\nshortcut_style = \"floating\"\n"
-		if err := os.WriteFile(filepath.Join(configDir, "config.toml"), []byte(content), 0o600); err != nil {
+		if err := os.WriteFile(
+			filepath.Join(configDir, "config.toml"),
+			[]byte(content),
+			0o600,
+		); err != nil {
 			t.Fatalf("write config failed: %v", err)
 		}
 
@@ -217,7 +252,11 @@ func TestLoadValidatesSessionKeyAction(t *testing.T) {
 			}
 
 			content := "[settings]\nsession_key_action = \"" + action + "\"\n"
-			if err := os.WriteFile(filepath.Join(configDir, "config.toml"), []byte(content), 0o600); err != nil {
+			if err := os.WriteFile(
+				filepath.Join(configDir, "config.toml"),
+				[]byte(content),
+				0o600,
+			); err != nil {
 				t.Fatalf("write config failed: %v", err)
 			}
 
@@ -245,7 +284,11 @@ func checkValidShortcutStyle(t *testing.T, style string) {
 	}
 
 	content := fmt.Sprintf("[settings]\nshortcut_style = %q\n", style)
-	if err := os.WriteFile(filepath.Join(configDir, "config.toml"), []byte(content), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(configDir, "config.toml"),
+		[]byte(content),
+		0o600,
+	); err != nil {
 		t.Fatalf("write config failed: %v", err)
 	}
 
@@ -266,20 +309,76 @@ func TestLoadRejectsInvalidDisplayFormats(t *testing.T) {
 		want    string
 	}{
 		{name: "empty", content: "[display]\nsesh_format = \"\"", want: "display.sesh_format"},
-		{name: "unknown field", content: "[display]\nsesh_format = \"{session_path}\"", want: "unknown field"},
-		{name: "agent field on parent", content: "[display]\nagents_session_format = \"{status}\"", want: "display.agents_session_format"},
-		{name: "unclosed field", content: "[display]\nagents_agent_format = \"{status\"", want: "unclosed field"},
-		{name: "multiple right markers", content: "[display]\nsesh_format = \"x{right}y{right}z\"", want: "at most one {right}"},
-		{name: "invalid field alignment", content: "[display]\nsesh_format = \"{session_name:>wide}\"", want: "invalid field format"},
-		{name: "undefined custom field", content: "[display]\nsesh_format = \"{custom.weather}\"", want: "custom.weather has no display.fields.weather entry"},
-		{name: "undefined custom fallback", content: "[display]\nagents_agent_format = \"{status|custom.ci}\"", want: "display.agents_agent_format"},
-		{name: "custom field name", content: "[display.fields]\nBad-Name = \"date\"", want: "invalid display.fields.Bad-Name"},
-		{name: "empty custom command", content: "[display.fields]\nx = \" \"", want: "invalid display.fields.x: command cannot be empty"},
-		{name: "custom refresh", content: "[display.fields]\nx = { command = \"date\", refresh = \"0s\" }", want: "refresh must be a positive duration"},
-		{name: "custom refresh syntax", content: "[display.fields]\nx = { command = \"date\", refresh = \"soon\" }", want: "refresh must be a positive duration"},
-		{name: "custom unknown key", content: "[display.fields]\nx = { command = \"date\", timeout = \"1s\" }", want: "unknown field key: timeout"},
-		{name: "custom args type", content: "[display.fields]\nx = { command = \"date\", args = [1] }", want: "field args must be strings"},
-		{name: "custom value type", content: "[display.fields]\nx = 3", want: "field must be a shell command string or table"},
+		{
+			name:    "unknown field",
+			content: "[display]\nsesh_format = \"{session_path}\"",
+			want:    "unknown field",
+		},
+		{
+			name:    "agent field on parent",
+			content: "[display]\nagents_session_format = \"{status}\"",
+			want:    "display.agents_session_format",
+		},
+		{
+			name:    "unclosed field",
+			content: "[display]\nagents_agent_format = \"{status\"",
+			want:    "unclosed field",
+		},
+		{
+			name:    "multiple right markers",
+			content: "[display]\nsesh_format = \"x{right}y{right}z\"",
+			want:    "at most one {right}",
+		},
+		{
+			name:    "invalid field alignment",
+			content: "[display]\nsesh_format = \"{session_name:>wide}\"",
+			want:    "invalid field format",
+		},
+		{
+			name:    "undefined custom field",
+			content: "[display]\nsesh_format = \"{custom.weather}\"",
+			want:    "custom.weather has no display.fields.weather entry",
+		},
+		{
+			name:    "undefined custom fallback",
+			content: "[display]\nagents_agent_format = \"{status|custom.ci}\"",
+			want:    "display.agents_agent_format",
+		},
+		{
+			name:    "custom field name",
+			content: "[display.fields]\nBad-Name = \"date\"",
+			want:    "invalid display.fields.Bad-Name",
+		},
+		{
+			name:    "empty custom command",
+			content: "[display.fields]\nx = \" \"",
+			want:    "invalid display.fields.x: command cannot be empty",
+		},
+		{
+			name:    "custom refresh",
+			content: "[display.fields]\nx = { command = \"date\", refresh = \"0s\" }",
+			want:    "refresh must be a positive duration",
+		},
+		{
+			name:    "custom refresh syntax",
+			content: "[display.fields]\nx = { command = \"date\", refresh = \"soon\" }",
+			want:    "refresh must be a positive duration",
+		},
+		{
+			name:    "custom unknown key",
+			content: "[display.fields]\nx = { command = \"date\", timeout = \"1s\" }",
+			want:    "unknown field key: timeout",
+		},
+		{
+			name:    "custom args type",
+			content: "[display.fields]\nx = { command = \"date\", args = [1] }",
+			want:    "field args must be strings",
+		},
+		{
+			name:    "custom value type",
+			content: "[display.fields]\nx = 3",
+			want:    "field must be a shell command string or table",
+		},
 	}
 
 	for _, tt := range tests {
@@ -292,7 +391,11 @@ func TestLoadRejectsInvalidDisplayFormats(t *testing.T) {
 				t.Fatalf("mkdir failed: %v", err)
 			}
 
-			if err := os.WriteFile(filepath.Join(configDir, "config.toml"), []byte(tt.content), 0o600); err != nil {
+			if err := os.WriteFile(
+				filepath.Join(configDir, "config.toml"),
+				[]byte(tt.content),
+				0o600,
+			); err != nil {
 				t.Fatalf("write config failed: %v", err)
 			}
 
@@ -327,7 +430,11 @@ func TestLoadRejectsInvalidPopupDimensions(t *testing.T) {
 			}
 
 			content := "[popup]\nagents_height = \"" + tt.value + "\""
-			if err := os.WriteFile(filepath.Join(configDir, "config.toml"), []byte(content), 0o600); err != nil {
+			if err := os.WriteFile(
+				filepath.Join(configDir, "config.toml"),
+				[]byte(content),
+				0o600,
+			); err != nil {
 				t.Fatalf("write config failed: %v", err)
 			}
 
@@ -399,7 +506,9 @@ func TestValidateRemoteConfigRejectsInvalidValues(t *testing.T) {
 		{
 			name: "invalid connection ID",
 			mutate: func(remote *config.RemoteConfig) {
-				remote.Connections = []config.RemoteConnectionConfig{{ID: "team/name", Host: "host"}}
+				remote.Connections = []config.RemoteConnectionConfig{
+					{ID: "team/name", Host: "host"},
+				}
 			},
 			wantErr: "may contain only",
 		},
@@ -430,7 +539,9 @@ func TestValidateRemoteConfigRejectsInvalidValues(t *testing.T) {
 		{
 			name: "host contains control character",
 			mutate: func(remote *config.RemoteConfig) {
-				remote.Connections = []config.RemoteConnectionConfig{{ID: "work", Host: "host\ncommand"}}
+				remote.Connections = []config.RemoteConnectionConfig{
+					{ID: "work", Host: "host\ncommand"},
+				}
 			},
 			wantErr: "control characters",
 		},
@@ -444,35 +555,45 @@ func TestValidateRemoteConfigRejectsInvalidValues(t *testing.T) {
 		{
 			name: "label contains control character",
 			mutate: func(remote *config.RemoteConfig) {
-				remote.Connections = []config.RemoteConnectionConfig{{ID: "work", Host: "host", Label: "Work\r"}}
+				remote.Connections = []config.RemoteConnectionConfig{
+					{ID: "work", Host: "host", Label: "Work\r"},
+				}
 			},
 			wantErr: "control characters",
 		},
 		{
 			name: "sesh path starts with dash",
 			mutate: func(remote *config.RemoteConfig) {
-				remote.Connections = []config.RemoteConnectionConfig{{ID: "work", Host: "host", SeshPath: "-sesh"}}
+				remote.Connections = []config.RemoteConnectionConfig{
+					{ID: "work", Host: "host", SeshPath: "-sesh"},
+				}
 			},
 			wantErr: "sesh_path",
 		},
 		{
 			name: "sesh path contains control character",
 			mutate: func(remote *config.RemoteConfig) {
-				remote.Connections = []config.RemoteConnectionConfig{{ID: "work", Host: "host", SeshPath: "sesh\n"}}
+				remote.Connections = []config.RemoteConnectionConfig{
+					{ID: "work", Host: "host", SeshPath: "sesh\n"},
+				}
 			},
 			wantErr: "control characters",
 		},
 		{
 			name: "tmux socket starts with dash",
 			mutate: func(remote *config.RemoteConfig) {
-				remote.Connections = []config.RemoteConnectionConfig{{ID: "work", Host: "host", TmuxSocket: "-work"}}
+				remote.Connections = []config.RemoteConnectionConfig{
+					{ID: "work", Host: "host", TmuxSocket: "-work"},
+				}
 			},
 			wantErr: "tmux_socket",
 		},
 		{
 			name: "tmux socket contains control character",
 			mutate: func(remote *config.RemoteConfig) {
-				remote.Connections = []config.RemoteConnectionConfig{{ID: "work", Host: "host", TmuxSocket: "work\n"}}
+				remote.Connections = []config.RemoteConnectionConfig{
+					{ID: "work", Host: "host", TmuxSocket: "work\n"},
+				}
 			},
 			wantErr: "control characters",
 		},
@@ -527,7 +648,11 @@ func TestValidateRemoteConfigRejectsInvalidValues(t *testing.T) {
 
 			err := config.ValidateRemoteConfig(remote)
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
-				t.Fatalf("ValidateRemoteConfig() error = %v, want error containing %q", err, tt.wantErr)
+				t.Fatalf(
+					"ValidateRemoteConfig() error = %v, want error containing %q",
+					err,
+					tt.wantErr,
+				)
 			}
 		})
 	}
@@ -544,7 +669,11 @@ func TestLoadRejectsRemoteConcurrencyAboveConnectionLimit(t *testing.T) {
 				t.Helper()
 
 				path := filepath.Join(t.TempDir(), "config.toml")
-				if err := os.WriteFile(path, []byte("[remote]\nmax_parallel_connects = 129\n"), 0o600); err != nil {
+				if err := os.WriteFile(
+					path,
+					[]byte("[remote]\nmax_parallel_connects = 129\n"),
+					0o600,
+				); err != nil {
 					t.Fatal(err)
 				}
 
@@ -629,11 +758,20 @@ func TestValidateAgentSessionsStatusTimeFormat(t *testing.T) {
 		{name: "timer valid", format: "timer"},
 		{name: "uppercase valid", format: "CLOCK"},
 		{name: "whitespace trimmed", format: "  00:01:23  "},
-		{name: "invalid format", format: "seconds", wantErr: "invalid agent_sessions.status_time_format"},
+		{
+			name:    "invalid format",
+			format:  "seconds",
+			wantErr: "invalid agent_sessions.status_time_format",
+		},
 		{name: "style empty valid", isStyle: true, format: ""},
 		{name: "style clock valid", isStyle: true, format: "clock"},
 		{name: "style 00:01:23 valid", isStyle: true, format: "00:01:23"},
-		{name: "invalid style", isStyle: true, format: "seconds", wantErr: "invalid agent_sessions.status_time_style"},
+		{
+			name:    "invalid style",
+			isStyle: true,
+			format:  "seconds",
+			wantErr: "invalid agent_sessions.status_time_style",
+		},
 	}
 
 	for _, tt := range tests {
@@ -686,7 +824,11 @@ func TestLogLevelValidation(t *testing.T) {
 			}
 
 			content := fmt.Sprintf("[settings]\nlog_level = %q\n", tt.level)
-			if err := os.WriteFile(filepath.Join(configDir, "config.toml"), []byte(content), 0o600); err != nil {
+			if err := os.WriteFile(
+				filepath.Join(configDir, "config.toml"),
+				[]byte(content),
+				0o600,
+			); err != nil {
 				t.Fatalf("writing config: %v", err)
 			}
 
@@ -747,12 +889,18 @@ func sessionKeyConfig(prefix string, sessions map[string]string) config.KeyConfi
 
 func TestValidateKeyConfigRejectsInvalidSessionKeys(t *testing.T) {
 	tests := map[string]config.KeyConfig{
-		"upper case letter":          sessionKeyConfig("tab", map[string]string{"web": "W"}),
-		"digit":                      sessionKeyConfig("tab", map[string]string{"web": "1"}),
-		"two letters":                sessionKeyConfig("tab", map[string]string{"web": "we"}),
-		"empty session name":         sessionKeyConfig("tab", map[string]string{"": "w"}),
-		"letter used twice":          sessionKeyConfig("tab", map[string]string{"web": "w", "wiki": "w"}),
-		"letter used twice with alt": sessionKeyConfig("alt", map[string]string{"web": "w", "wiki": "w"}),
+		"upper case letter":  sessionKeyConfig("tab", map[string]string{"web": "W"}),
+		"digit":              sessionKeyConfig("tab", map[string]string{"web": "1"}),
+		"two letters":        sessionKeyConfig("tab", map[string]string{"web": "we"}),
+		"empty session name": sessionKeyConfig("tab", map[string]string{"": "w"}),
+		"letter used twice": sessionKeyConfig(
+			"tab",
+			map[string]string{"web": "w", "wiki": "w"},
+		),
+		"letter used twice with alt": sessionKeyConfig(
+			"alt",
+			map[string]string{"web": "w", "wiki": "w"},
+		),
 	}
 
 	navigation := sessionKeyConfig("alt", map[string]string{"web": "w"})
@@ -768,8 +916,14 @@ func TestValidateKeyConfigRejectsInvalidSessionKeys(t *testing.T) {
 	}
 
 	for _, prefix := range []string{"tab", "alt"} {
-		if err := config.ValidateKeyConfig(sessionKeyConfig(prefix, map[string]string{"web": "w", "api": "a"})); err != nil {
-			t.Fatalf("ValidateKeyConfig() error = %v for valid session keys with prefix %s", err, prefix)
+		if err := config.ValidateKeyConfig(
+			sessionKeyConfig(prefix, map[string]string{"web": "w", "api": "a"}),
+		); err != nil {
+			t.Fatalf(
+				"ValidateKeyConfig() error = %v for valid session keys with prefix %s",
+				err,
+				prefix,
+			)
 		}
 	}
 
@@ -777,7 +931,10 @@ func TestValidateKeyConfigRejectsInvalidSessionKeys(t *testing.T) {
 	tabbed.Top = "alt+w"
 
 	if err := config.ValidateKeyConfig(tabbed); err != nil {
-		t.Fatalf("ValidateKeyConfig() error = %v; alt+w is free when sessions use the tab prefix", err)
+		t.Fatalf(
+			"ValidateKeyConfig() error = %v; alt+w is free when sessions use the tab prefix",
+			err,
+		)
 	}
 }
 
@@ -834,32 +991,48 @@ func TestValidateAutosaveConfig(t *testing.T) {
 		t.Fatal("ValidateAutosaveConfig() error = nil for negative interval")
 	}
 
-	if err := config.ValidateAutosaveConfig(config.AutosaveConfig{Enabled: true, Interval: "0s"}); err == nil {
+	if err := config.ValidateAutosaveConfig(
+		config.AutosaveConfig{Enabled: true, Interval: "0s"},
+	); err == nil {
 		t.Fatal("ValidateAutosaveConfig() error = nil for enabled zero interval")
 	}
 
-	if err := config.ValidateAutosaveConfig(config.AutosaveConfig{Enabled: true, Interval: ""}); err == nil {
+	if err := config.ValidateAutosaveConfig(
+		config.AutosaveConfig{Enabled: true, Interval: ""},
+	); err == nil {
 		t.Fatal("ValidateAutosaveConfig() error = nil for enabled empty interval")
 	}
 
-	if err := config.ValidateAutosaveConfig(config.AutosaveConfig{Enabled: false, Interval: ""}); err != nil {
+	if err := config.ValidateAutosaveConfig(
+		config.AutosaveConfig{Enabled: false, Interval: ""},
+	); err != nil {
 		t.Fatalf("ValidateAutosaveConfig() error = %v for disabled empty interval", err)
 	}
 
-	if err := config.ValidateAutosaveConfig(config.AutosaveConfig{Enabled: true, Interval: "3m"}); err != nil {
+	if err := config.ValidateAutosaveConfig(
+		config.AutosaveConfig{Enabled: true, Interval: "3m"},
+	); err != nil {
 		t.Fatalf("ValidateAutosaveConfig() error = %v for valid 3m interval", err)
 	}
 
-	if err := config.ValidateAutosaveConfig(config.AutosaveConfig{Enabled: true, Interval: "180s"}); err != nil {
+	if err := config.ValidateAutosaveConfig(
+		config.AutosaveConfig{Enabled: true, Interval: "180s"},
+	); err != nil {
 		t.Fatalf("ValidateAutosaveConfig() error = %v for valid 180s interval", err)
 	}
 }
 
 func TestValidateAgentSessionsRefreshIntervalPositive(t *testing.T) {
 	for _, invalid := range []string{"0s", "-100ms", "-1s"} {
-		err := config.ValidateAgentSessionsConfig(config.AgentSessionsConfig{RefreshInterval: invalid})
+		err := config.ValidateAgentSessionsConfig(
+			config.AgentSessionsConfig{RefreshInterval: invalid},
+		)
 		if err == nil || !strings.Contains(err.Error(), "must be positive") {
-			t.Fatalf("ValidateAgentSessionsConfig() error = %v, want positive duration error for %q", err, invalid)
+			t.Fatalf(
+				"ValidateAgentSessionsConfig() error = %v, want positive duration error for %q",
+				err,
+				invalid,
+			)
 		}
 	}
 }
@@ -882,8 +1055,15 @@ func TestValidateAgentStatusConfig(t *testing.T) {
 	t.Run("non-positive initial backoff", func(t *testing.T) {
 		for _, dur := range []string{"0s", "-1s"} {
 			cfg := config.AgentStatusConfig{InitialBackoff: dur}
-			if err := config.ValidateAgentStatusConfig(cfg); err == nil || !strings.Contains(err.Error(), "must be positive") {
-				t.Fatalf("ValidateAgentStatusConfig() error = %v, want positive error for %s", err, dur)
+			if err := config.ValidateAgentStatusConfig(
+				cfg,
+			); err == nil ||
+				!strings.Contains(err.Error(), "must be positive") {
+				t.Fatalf(
+					"ValidateAgentStatusConfig() error = %v, want positive error for %s",
+					err,
+					dur,
+				)
 			}
 		}
 	})
@@ -897,7 +1077,10 @@ func TestValidateAgentStatusConfig(t *testing.T) {
 
 	t.Run("max backoff less than initial backoff", func(t *testing.T) {
 		cfg := config.AgentStatusConfig{InitialBackoff: "5s", MaxBackoff: "1s"}
-		if err := config.ValidateAgentStatusConfig(cfg); err == nil || !strings.Contains(err.Error(), "must be greater than or equal") {
+		if err := config.ValidateAgentStatusConfig(
+			cfg,
+		); err == nil ||
+			!strings.Contains(err.Error(), "must be greater than or equal") {
 			t.Fatalf("ValidateAgentStatusConfig() error = %v, want max >= initial error", err)
 		}
 	})
@@ -905,8 +1088,14 @@ func TestValidateAgentStatusConfig(t *testing.T) {
 	for _, factor := range []float64{-1.0, math.Inf(1), math.NaN()} {
 		t.Run(fmt.Sprintf("backoff factor %v", factor), func(t *testing.T) {
 			cfg := config.AgentStatusConfig{BackoffFactor: factor}
-			if err := config.ValidateAgentStatusConfig(cfg); err == nil || !strings.Contains(err.Error(), "must be a finite non-negative number") {
-				t.Fatalf("ValidateAgentStatusConfig() error = %v, want finite non-negative factor error", err)
+			if err := config.ValidateAgentStatusConfig(
+				cfg,
+			); err == nil ||
+				!strings.Contains(err.Error(), "must be a finite non-negative number") {
+				t.Fatalf(
+					"ValidateAgentStatusConfig() error = %v, want finite non-negative factor error",
+					err,
+				)
 			}
 		})
 	}
@@ -947,7 +1136,10 @@ func TestResolvedAgentStatusMerging(t *testing.T) {
 	}
 
 	if resolved.StyleWaiting != "fg=black,bg=yellow" {
-		t.Errorf("expected resolved StyleWaiting to be fg=black,bg=yellow, got %q", resolved.StyleWaiting)
+		t.Errorf(
+			"expected resolved StyleWaiting to be fg=black,bg=yellow, got %q",
+			resolved.StyleWaiting,
+		)
 	}
 
 	if resolved.MaxBackoff != "5s" {
@@ -959,21 +1151,30 @@ func TestValidateSnapshotProcessEnvironmentInvalidNames(t *testing.T) {
 	t.Run("rejects empty variable name", func(t *testing.T) {
 		err := config.ValidateProcessEnvironmentKeys([]string{""})
 		if !errors.Is(err, config.ErrSnapshotProcessEnvInvalid) {
-			t.Fatalf("ValidateProcessEnvironmentKeys(empty) = %v, want ErrSnapshotProcessEnvInvalid", err)
+			t.Fatalf(
+				"ValidateProcessEnvironmentKeys(empty) = %v, want ErrSnapshotProcessEnvInvalid",
+				err,
+			)
 		}
 	})
 
 	t.Run("rejects variable name containing equals", func(t *testing.T) {
 		err := config.ValidateProcessEnvironmentKeys([]string{"FOO=bar"})
 		if !errors.Is(err, config.ErrSnapshotProcessEnvInvalid) {
-			t.Fatalf("ValidateProcessEnvironmentKeys(equals) = %v, want ErrSnapshotProcessEnvInvalid", err)
+			t.Fatalf(
+				"ValidateProcessEnvironmentKeys(equals) = %v, want ErrSnapshotProcessEnvInvalid",
+				err,
+			)
 		}
 	})
 
 	t.Run("rejects variable name containing null", func(t *testing.T) {
 		err := config.ValidateProcessEnvironmentKeys([]string{"FOO\x00BAR"})
 		if !errors.Is(err, config.ErrSnapshotProcessEnvInvalid) {
-			t.Fatalf("ValidateProcessEnvironmentKeys(null) = %v, want ErrSnapshotProcessEnvInvalid", err)
+			t.Fatalf(
+				"ValidateProcessEnvironmentKeys(null) = %v, want ErrSnapshotProcessEnvInvalid",
+				err,
+			)
 		}
 	})
 }
@@ -987,7 +1188,10 @@ func TestValidateSnapshotProcessEnvironmentLimits(t *testing.T) {
 
 		err := config.ValidateProcessEnvironmentKeys(keys)
 		if !errors.Is(err, config.ErrSnapshotProcessEnvLimit) {
-			t.Fatalf("ValidateProcessEnvironmentKeys(excessive count) = %v, want ErrSnapshotProcessEnvLimit", err)
+			t.Fatalf(
+				"ValidateProcessEnvironmentKeys(excessive count) = %v, want ErrSnapshotProcessEnvLimit",
+				err,
+			)
 		}
 	})
 
@@ -996,7 +1200,10 @@ func TestValidateSnapshotProcessEnvironmentLimits(t *testing.T) {
 
 		err := config.ValidateProcessEnvironmentKeys([]string{longKey})
 		if !errors.Is(err, config.ErrSnapshotProcessEnvLimit) {
-			t.Fatalf("ValidateProcessEnvironmentKeys(excessive key length) = %v, want ErrSnapshotProcessEnvLimit", err)
+			t.Fatalf(
+				"ValidateProcessEnvironmentKeys(excessive key length) = %v, want ErrSnapshotProcessEnvLimit",
+				err,
+			)
 		}
 	})
 
@@ -1008,7 +1215,10 @@ func TestValidateSnapshotProcessEnvironmentLimits(t *testing.T) {
 
 		err := config.ValidateProcessEnvironmentKeys(keys)
 		if !errors.Is(err, config.ErrSnapshotProcessEnvLimit) {
-			t.Fatalf("ValidateProcessEnvironmentKeys(excessive total bytes) = %v, want ErrSnapshotProcessEnvLimit", err)
+			t.Fatalf(
+				"ValidateProcessEnvironmentKeys(excessive total bytes) = %v, want ErrSnapshotProcessEnvLimit",
+				err,
+			)
 		}
 	})
 }
@@ -1063,7 +1273,8 @@ command = ["claude"]
 		t.Fatalf("Load() error = %v", err)
 	}
 
-	if !slices.Equal(cfg.Projects.Roots, []string{"~/code", "/srv/repos"}) || !slices.Equal(cfg.Projects.Extra, []string{"~/notes"}) {
+	if !slices.Equal(cfg.Projects.Roots, []string{"~/code", "/srv/repos"}) ||
+		!slices.Equal(cfg.Projects.Extra, []string{"~/notes"}) {
 		t.Errorf("Projects = %+v", cfg.Projects)
 	}
 
@@ -1071,7 +1282,8 @@ command = ["claude"]
 		t.Errorf("Tasks = %+v", cfg.Tasks)
 	}
 
-	if len(cfg.Tasks.Harness) != 2 || cfg.Tasks.Harness[0].Name != "codex" || !slices.Equal(cfg.Tasks.Harness[0].Command, []string{"codex", "--yolo"}) {
+	if len(cfg.Tasks.Harness) != 2 || cfg.Tasks.Harness[0].Name != "codex" ||
+		!slices.Equal(cfg.Tasks.Harness[0].Command, []string{"codex", "--yolo"}) {
 		t.Errorf("Tasks.Harness = %+v, want codex first with its arguments", cfg.Tasks.Harness)
 	}
 }
@@ -1089,7 +1301,8 @@ func TestLoadAcceptsSupportedHarnessesByNameAlone(t *testing.T) {
 		t.Fatalf("Load() error = %v", err)
 	}
 
-	if len(cfg.Tasks.Harness) != 2 || cfg.Tasks.Harness[0].Name != "pi" || len(cfg.Tasks.Harness[0].Command) != 0 {
+	if len(cfg.Tasks.Harness) != 2 || cfg.Tasks.Harness[0].Name != "pi" ||
+		len(cfg.Tasks.Harness[0].Command) != 0 {
 		t.Fatalf("Tasks.Harness = %+v, want pi then claude without commands", cfg.Tasks.Harness)
 	}
 }
@@ -1102,35 +1315,110 @@ func TestLoadRejectsInvalidProjectsAndTasks(t *testing.T) {
 		{name: "relative root", content: "[projects]\nroots = [\"Projects\"]"},
 		{name: "relative extra folder", content: "[projects]\nextra = [\"notes\"]"},
 		{name: "pane named agent", content: "[[tasks.panes]]\nname = \"agent\""},
-		{name: "duplicate pane", content: "[[tasks.panes]]\nname = \"editor\"\n[[tasks.panes]]\nname = \"editor\""},
-		{name: "pane unknown variable", content: "[[tasks.panes]]\nname = \"logs\"\ncommand = [\"tail\", \"{repo}\"]"},
+		{
+			name:    "duplicate pane",
+			content: "[[tasks.panes]]\nname = \"editor\"\n[[tasks.panes]]\nname = \"editor\"",
+		},
+		{
+			name:    "pane unknown variable",
+			content: "[[tasks.panes]]\nname = \"logs\"\ncommand = [\"tail\", \"{repo}\"]",
+		},
 		{name: "layout without arrangement", content: "[[tasks.layouts]]\nfocus = \"agent\""},
-		{name: "layout with arrange and splits", content: "[[tasks.layouts]]\narrange = \"tiled\"\nsplits = [{ pane = \"editor\", of = \"agent\", direction = \"right\" }]"},
+		{
+			name:    "layout with arrange and splits",
+			content: "[[tasks.layouts]]\narrange = \"tiled\"\nsplits = [{ pane = \"editor\", of = \"agent\", direction = \"right\" }]",
+		},
 		{name: "unknown arrange", content: "[[tasks.layouts]]\narrange = \"spiral\""},
-		{name: "main size without main arrange", content: "[[tasks.layouts]]\narrange = \"tiled\"\nmain_size = \"60%\""},
-		{name: "main size of 100 percent", content: "[[tasks.layouts]]\narrange = \"main-vertical\"\nmain_size = \"100%\""},
-		{name: "arrange of an unknown pane", content: "[[tasks.layouts]]\narrange = \"tiled\"\npanes = [\"shell\"]"},
-		{name: "split of an unknown pane", content: "[[tasks.layouts]]\nsplits = [{ pane = \"shell\", of = \"agent\", direction = \"right\" }]"},
-		{name: "split of a later pane", content: "[[tasks.panes]]\nname = \"editor\"\n[[tasks.panes]]\nname = \"shell\"\n[[tasks.layouts]]\nsplits = [{ pane = \"shell\", of = \"editor\", direction = \"below\" }, { pane = \"editor\", of = \"agent\", direction = \"right\" }]"},
-		{name: "pane placed twice", content: "[[tasks.layouts]]\nsplits = [{ pane = \"editor\", of = \"agent\", direction = \"right\" }, { pane = \"editor\", of = \"agent\", direction = \"below\" }]"},
-		{name: "split direction", content: "[[tasks.layouts]]\nsplits = [{ pane = \"editor\", of = \"agent\", direction = \"up\" }]"},
-		{name: "split size", content: "[[tasks.layouts]]\nsplits = [{ pane = \"editor\", of = \"agent\", direction = \"right\", size = \"half\" }]"},
-		{name: "focus on an unplaced pane", content: "[[tasks.layouts]]\narrange = \"tiled\"\npanes = []\nfocus = \"editor\""},
-		{name: "orientation", content: "[[tasks.layouts]]\narrange = \"tiled\"\nwhen = { orientation = \"wide\" }"},
-		{name: "max width below min width", content: "[[tasks.layouts]]\narrange = \"tiled\"\nwhen = { min_width = 200, max_width = 100 }"},
-		{name: "duplicate layout name", content: "[[tasks.layouts]]\nname = \"a\"\narrange = \"tiled\"\n[[tasks.layouts]]\nname = \"a\"\narrange = \"tiled\""},
-		{name: "pane without a program", content: "[[tasks.panes]]\nname = \"logs\"\ncommand = [\" \", \"-f\"]"},
-		{name: "restart without a command", content: "[[tasks.panes]]\nname = \"shell\"\nrestart = true"},
-		{name: "duplicate project pane", content: "[[projects.overrides.shop.task_panes]]\nname = \"editor\"\n[[projects.overrides.shop.task_panes]]\nname = \"editor\""},
-		{name: "layout for a harness that is not offered", content: "[[tasks.harness]]\nname = \"pi\"\n[[tasks.layouts]]\narrange = \"tiled\"\nwhen = { harness = [\"claud\"] }"},
-		{name: "relative override path", content: "[[projects.overrides.\"work/api\".task_panes]]\nname = \"server\""},
-		{name: "project layout of a missing pane", content: "[[projects.overrides.shop.task_layouts]]\narrange = \"tiled\"\npanes = [\"server\"]"},
+		{
+			name:    "main size without main arrange",
+			content: "[[tasks.layouts]]\narrange = \"tiled\"\nmain_size = \"60%\"",
+		},
+		{
+			name:    "main size of 100 percent",
+			content: "[[tasks.layouts]]\narrange = \"main-vertical\"\nmain_size = \"100%\"",
+		},
+		{
+			name:    "arrange of an unknown pane",
+			content: "[[tasks.layouts]]\narrange = \"tiled\"\npanes = [\"shell\"]",
+		},
+		{
+			name:    "split of an unknown pane",
+			content: "[[tasks.layouts]]\nsplits = [{ pane = \"shell\", of = \"agent\", direction = \"right\" }]",
+		},
+		{
+			name:    "split of a later pane",
+			content: "[[tasks.panes]]\nname = \"editor\"\n[[tasks.panes]]\nname = \"shell\"\n[[tasks.layouts]]\nsplits = [{ pane = \"shell\", of = \"editor\", direction = \"below\" }, { pane = \"editor\", of = \"agent\", direction = \"right\" }]",
+		},
+		{
+			name:    "pane placed twice",
+			content: "[[tasks.layouts]]\nsplits = [{ pane = \"editor\", of = \"agent\", direction = \"right\" }, { pane = \"editor\", of = \"agent\", direction = \"below\" }]",
+		},
+		{
+			name:    "split direction",
+			content: "[[tasks.layouts]]\nsplits = [{ pane = \"editor\", of = \"agent\", direction = \"up\" }]",
+		},
+		{
+			name:    "split size",
+			content: "[[tasks.layouts]]\nsplits = [{ pane = \"editor\", of = \"agent\", direction = \"right\", size = \"half\" }]",
+		},
+		{
+			name:    "focus on an unplaced pane",
+			content: "[[tasks.layouts]]\narrange = \"tiled\"\npanes = []\nfocus = \"editor\"",
+		},
+		{
+			name:    "orientation",
+			content: "[[tasks.layouts]]\narrange = \"tiled\"\nwhen = { orientation = \"wide\" }",
+		},
+		{
+			name:    "max width below min width",
+			content: "[[tasks.layouts]]\narrange = \"tiled\"\nwhen = { min_width = 200, max_width = 100 }",
+		},
+		{
+			name:    "duplicate layout name",
+			content: "[[tasks.layouts]]\nname = \"a\"\narrange = \"tiled\"\n[[tasks.layouts]]\nname = \"a\"\narrange = \"tiled\"",
+		},
+		{
+			name:    "pane without a program",
+			content: "[[tasks.panes]]\nname = \"logs\"\ncommand = [\" \", \"-f\"]",
+		},
+		{
+			name:    "restart without a command",
+			content: "[[tasks.panes]]\nname = \"shell\"\nrestart = true",
+		},
+		{
+			name:    "duplicate project pane",
+			content: "[[projects.overrides.shop.task_panes]]\nname = \"editor\"\n[[projects.overrides.shop.task_panes]]\nname = \"editor\"",
+		},
+		{
+			name:    "layout for a harness that is not offered",
+			content: "[[tasks.harness]]\nname = \"pi\"\n[[tasks.layouts]]\narrange = \"tiled\"\nwhen = { harness = [\"claud\"] }",
+		},
+		{
+			name:    "relative override path",
+			content: "[[projects.overrides.\"work/api\".task_panes]]\nname = \"server\"",
+		},
+		{
+			name:    "project layout of a missing pane",
+			content: "[[projects.overrides.shop.task_layouts]]\narrange = \"tiled\"\npanes = [\"server\"]",
+		},
 		{name: "socket path", content: "[tasks]\npopup_socket = \"/tmp/popup\""},
 		{name: "relative popup config", content: "[tasks]\npopup_config = \"popup.conf\""},
-		{name: "reserved harness name", content: "[[tasks.harness]]\nname = \"tab\"\ncommand = [\"bash\"]"},
-		{name: "unknown harness without command", content: "[[tasks.harness]]\nname = \"myagent\"\ncommand = []"},
-		{name: "harness with empty program", content: "[[tasks.harness]]\nname = \"claude\"\ncommand = [\" \"]"},
-		{name: "harness name with spaces", content: "[[tasks.harness]]\nname = \"my agent\"\ncommand = [\"agent\"]"},
+		{
+			name:    "reserved harness name",
+			content: "[[tasks.harness]]\nname = \"tab\"\ncommand = [\"bash\"]",
+		},
+		{
+			name:    "unknown harness without command",
+			content: "[[tasks.harness]]\nname = \"myagent\"\ncommand = []",
+		},
+		{
+			name:    "harness with empty program",
+			content: "[[tasks.harness]]\nname = \"claude\"\ncommand = [\" \"]",
+		},
+		{
+			name:    "harness name with spaces",
+			content: "[[tasks.harness]]\nname = \"my agent\"\ncommand = [\"agent\"]",
+		},
 		{
 			name:    "duplicate harness",
 			content: "[[tasks.harness]]\nname = \"pi\"\ncommand = [\"pi\"]\n[[tasks.harness]]\nname = \"pi\"\ncommand = [\"pi\", \"--fast\"]",
@@ -1138,11 +1426,23 @@ func TestLoadRejectsInvalidProjectsAndTasks(t *testing.T) {
 		{name: "wake on restore word", content: "[tasks]\nwake_on_restore = \"all\""},
 		{name: "wake on restore zero", content: "[tasks]\nwake_on_restore = \"0\""},
 		{name: "menu item without run", content: "[menu.items.ship]\nprompt = \"ship it\""},
-		{name: "menu item unknown variable", content: "[menu.items.ship]\nrun = [\"claude\", \"-p\"]\nprompt = \"ship {repo}\""},
-		{name: "menu item prompt and file", content: "[menu.items.ship]\nrun = [\"claude\"]\nprompt = \"a\"\nprompt_file = \"b.md\""},
-		{name: "project override of a missing item", content: "[projects.overrides.shop.menu_items.ship]\nprompt = \"ship\""},
+		{
+			name:    "menu item unknown variable",
+			content: "[menu.items.ship]\nrun = [\"claude\", \"-p\"]\nprompt = \"ship {repo}\"",
+		},
+		{
+			name:    "menu item prompt and file",
+			content: "[menu.items.ship]\nrun = [\"claude\"]\nprompt = \"a\"\nprompt_file = \"b.md\"",
+		},
+		{
+			name:    "project override of a missing item",
+			content: "[projects.overrides.shop.menu_items.ship]\nprompt = \"ship\"",
+		},
 		{name: "menu entry that is no item", content: "[menu]\nagent = [\"go\", \"review\"]"},
-		{name: "session menu with an agent entry", content: "[menu]\nsession = [\"go\", \"snooze\"]"},
+		{
+			name:    "session menu with an agent entry",
+			content: "[menu]\nsession = [\"go\", \"snooze\"]",
+		},
 		{name: "menu entry listed twice", content: "[menu]\nagent = [\"go\", \"go\"]"},
 		{name: "inbox group", content: "[inbox]\ngroup = \"host\""},
 		{name: "inbox unknown section", content: "[inbox]\nsections = [\"ready\", \"later\"]"},
@@ -1150,7 +1450,10 @@ func TestLoadRejectsInvalidProjectsAndTasks(t *testing.T) {
 		{name: "inbox label of unknown section", content: "[inbox.labels]\nlater = \"zzz\""},
 		{name: "inbox snooze word", content: "[inbox]\nsnooze = [\"soon\"]"},
 		{name: "inbox snooze negative", content: "[inbox]\nsnooze = [\"-1h\"]"},
-		{name: "inbox snooze tomorrow without time", content: "[inbox]\nsnooze = [\"tomorrow 2h\"]"},
+		{
+			name:    "inbox snooze tomorrow without time",
+			content: "[inbox]\nsnooze = [\"tomorrow 2h\"]",
+		},
 	}
 
 	for _, tt := range tests {
@@ -1193,9 +1496,14 @@ link_pr = false
 	}
 
 	shop := cfg.MenuItemsFor("/code/shop")["ship"]
-	if shop.Key != "alt+p" || !slices.Equal(shop.Run, []string{"claude", "-p"}) || shop.Prompt != "" ||
-		shop.PromptFile != ".agents/ship.md" || shop.LinksPR() {
-		t.Errorf("shop ship = %+v, want the global action with the override's prompt file and no PR link", shop)
+	if shop.Key != "alt+p" || !slices.Equal(shop.Run, []string{"claude", "-p"}) ||
+		shop.Prompt != "" ||
+		shop.PromptFile != ".agents/ship.md" ||
+		shop.LinksPR() {
+		t.Errorf(
+			"shop ship = %+v, want the global action with the override's prompt file and no PR link",
+			shop,
+		)
 	}
 
 	other := cfg.MenuItemsFor("/code/other")["ship"]
@@ -1229,11 +1537,14 @@ splits = [{ pane = "edit", of = "agent", direction = "right", size = "40%" }]
 		t.Fatalf("Load() error = %v", err)
 	}
 
-	if len(cfg.Tasks.Panes) != 1 || cfg.Tasks.Panes[0].Name != "edit" || !slices.Equal(cfg.Tasks.Panes[0].Command, []string{"hx", "."}) || !cfg.Tasks.Panes[0].Restart {
+	if len(cfg.Tasks.Panes) != 1 || cfg.Tasks.Panes[0].Name != "edit" ||
+		!slices.Equal(cfg.Tasks.Panes[0].Command, []string{"hx", "."}) ||
+		!cfg.Tasks.Panes[0].Restart {
 		t.Errorf("Tasks.Panes = %+v, want only the configured pane", cfg.Tasks.Panes)
 	}
 
-	if len(cfg.Tasks.Layouts) != 1 || cfg.Tasks.Layouts[0].When.MinWidth != 200 || cfg.Tasks.Layouts[0].Splits[0].Size != "40%" {
+	if len(cfg.Tasks.Layouts) != 1 || cfg.Tasks.Layouts[0].When.MinWidth != 200 ||
+		cfg.Tasks.Layouts[0].Splits[0].Size != "40%" {
 		t.Errorf("Tasks.Layouts = %+v", cfg.Tasks.Layouts)
 	}
 }
@@ -1281,7 +1592,8 @@ arrange = "tiled"
 		names = append(names, pane.Name)
 	}
 
-	if !slices.Equal(names, []string{"editor", "shell", "server"}) || !slices.Equal(shop.Panes[0].Command, []string{"hx"}) {
+	if !slices.Equal(names, []string{"editor", "shell", "server"}) ||
+		!slices.Equal(shop.Panes[0].Command, []string{"hx"}) {
 		t.Errorf("shop panes = %+v, want editor replaced, shell kept, server added", shop.Panes)
 	}
 
@@ -1303,20 +1615,78 @@ func TestTaskLayoutWhenMatches(t *testing.T) {
 		harness       string
 		want          bool
 	}{
-		{name: "anything", when: config.TaskLayoutWhen{}, width: 10, height: 10, harness: "pi", want: true},
-		{name: "landscape at twice as wide", when: config.TaskLayoutWhen{Orientation: config.OrientationLandscape}, width: 200, height: 100, want: true},
-		{name: "landscape too narrow", when: config.TaskLayoutWhen{Orientation: config.OrientationLandscape}, width: 199, height: 100, want: false},
-		{name: "portrait", when: config.TaskLayoutWhen{Orientation: config.OrientationPortrait}, width: 120, height: 100, want: true},
-		{name: "below min width", when: config.TaskLayoutWhen{MinWidth: 160}, width: 159, height: 40, want: false},
-		{name: "above max height", when: config.TaskLayoutWhen{MaxHeight: 50}, width: 100, height: 51, want: false},
-		{name: "other harness", when: config.TaskLayoutWhen{Harness: []string{"claude"}}, width: 100, height: 50, harness: "pi", want: false},
-		{name: "listed harness", when: config.TaskLayoutWhen{Harness: []string{"claude", "pi"}}, width: 100, height: 50, harness: "pi", want: true},
+		{
+			name:    "anything",
+			when:    config.TaskLayoutWhen{},
+			width:   10,
+			height:  10,
+			harness: "pi",
+			want:    true,
+		},
+		{
+			name:   "landscape at twice as wide",
+			when:   config.TaskLayoutWhen{Orientation: config.OrientationLandscape},
+			width:  200,
+			height: 100,
+			want:   true,
+		},
+		{
+			name:   "landscape too narrow",
+			when:   config.TaskLayoutWhen{Orientation: config.OrientationLandscape},
+			width:  199,
+			height: 100,
+			want:   false,
+		},
+		{
+			name:   "portrait",
+			when:   config.TaskLayoutWhen{Orientation: config.OrientationPortrait},
+			width:  120,
+			height: 100,
+			want:   true,
+		},
+		{
+			name:   "below min width",
+			when:   config.TaskLayoutWhen{MinWidth: 160},
+			width:  159,
+			height: 40,
+			want:   false,
+		},
+		{
+			name:   "above max height",
+			when:   config.TaskLayoutWhen{MaxHeight: 50},
+			width:  100,
+			height: 51,
+			want:   false,
+		},
+		{
+			name:    "other harness",
+			when:    config.TaskLayoutWhen{Harness: []string{"claude"}},
+			width:   100,
+			height:  50,
+			harness: "pi",
+			want:    false,
+		},
+		{
+			name:    "listed harness",
+			when:    config.TaskLayoutWhen{Harness: []string{"claude", "pi"}},
+			width:   100,
+			height:  50,
+			harness: "pi",
+			want:    true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.when.Matches(tt.width, tt.height, tt.harness); got != tt.want {
-				t.Errorf("Matches(%d, %d, %q) = %v, want %v", tt.width, tt.height, tt.harness, got, tt.want)
+				t.Errorf(
+					"Matches(%d, %d, %q) = %v, want %v",
+					tt.width,
+					tt.height,
+					tt.harness,
+					got,
+					tt.want,
+				)
 			}
 		})
 	}
@@ -1377,7 +1747,10 @@ task_layouts = []
 		t.Fatalf("Load() error = %v", err)
 	}
 
-	if got := cfg.TaskWindowFor("/code/shop").Layouts; len(got) != len(config.DefaultTaskLayouts()) || got[0].Name == "grid" {
+	if got := cfg.TaskWindowFor(
+		"/code/shop",
+	).Layouts; len(got) != len(config.DefaultTaskLayouts()) ||
+		got[0].Name == "grid" {
 		t.Fatalf("shop layouts = %+v, want the default layouts", got)
 	}
 }

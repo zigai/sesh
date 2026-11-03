@@ -45,9 +45,16 @@ func CatalogTasks(state ConnectionState) []task.Live {
 
 	for _, row := range state.Snapshot.Tasks {
 		tasks = append(tasks, task.Live{
-			Record: row.Record, Present: row.Present, SessionID: gotmux.SessionID(row.SessionID),
-			SessionName: row.SessionName, WindowID: gotmux.WindowID(row.WindowID), WindowIndex: row.WindowIndex, WindowName: row.WindowName,
-			AgentPane: gotmux.PaneID(row.AgentPane), AgentPID: 0, Stalled: row.Stalled,
+			Record:      row.Record,
+			Present:     row.Present,
+			SessionID:   gotmux.SessionID(row.SessionID),
+			SessionName: row.SessionName,
+			WindowID:    gotmux.WindowID(row.WindowID),
+			WindowIndex: row.WindowIndex,
+			WindowName:  row.WindowName,
+			AgentPane:   gotmux.PaneID(row.AgentPane),
+			AgentPID:    0,
+			Stalled:     row.Stalled,
 		})
 	}
 
@@ -84,7 +91,8 @@ func validTaskRow(row TaskRow) bool {
 		}
 	}
 
-	if !ValidIdentifier(record.ID) || row.WindowIndex < 0 || len(record.Resume.Command) != 0 || len(record.Runs) > MaxActions {
+	if !ValidIdentifier(record.ID) || row.WindowIndex < 0 || len(record.Resume.Command) != 0 ||
+		len(record.Runs) > MaxActions {
 		return false
 	}
 

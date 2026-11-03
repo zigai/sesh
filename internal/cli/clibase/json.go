@@ -43,44 +43,128 @@ var (
 	uncertainErrors = []commandErrorContract{
 		{store.ErrUncertain, "publicationUncertain", "snapshot publication durability uncertain"},
 		{restore.ErrExecutionUncertain, "operationUncertain", "restore effect outcome uncertain"},
-		{restore.ErrPriorUncertainty, "priorEffectUncertain", "previous attempt left an uncertain effect; explicit reconciliation required"},
+		{
+			restore.ErrPriorUncertainty,
+			"priorEffectUncertain",
+			"previous attempt left an uncertain effect; explicit reconciliation required",
+		},
 	}
 
 	workflowErrors = []commandErrorContract{
 		{ErrDoctorChecksFailed, "doctorChecksFailed", "doctor checks failed"},
-		{ErrLogFileUnavailable, "logFileUnavailable", "log file cannot be opened; set paths.log_file to a file in a writable directory"},
+		{
+			ErrLogFileUnavailable,
+			"logFileUnavailable",
+			"log file cannot be opened; set paths.log_file to a file in a writable directory",
+		},
 		{ErrHelpShorthand, "usageError", "-h is not a help flag; use --help"},
 		{ErrConfigPathEmpty, "usageError", "--config requires a file path"},
-		{engine.ErrRetentionBudgetUnmet, "retentionBudgetUnmet", "protected snapshot bytes exceed retention budget"},
-		{engine.ErrCollectionQuarantined, "collectionQuarantined", "snapshot collection preserved contradictory evidence"},
-		{gotmux.ErrOutputLimit, "outputLimitExceeded", "tmux command output exceeded its byte limit"},
-		{config.ErrConfigExists, "configExists", "configuration already exists; use --force to replace it"},
-		{config.ErrConfigSymlink, "configSymlink", "configuration target must not be a symbolic link"},
-		{config.ErrConfigNotRegular, "configNotRegularFile", "configuration target must be a regular file"},
-		{config.ErrConfigNotDirectory, "configNotDirectory", "configuration path component is not a directory"},
+		{
+			engine.ErrRetentionBudgetUnmet,
+			"retentionBudgetUnmet",
+			"protected snapshot bytes exceed retention budget",
+		},
+		{
+			engine.ErrCollectionQuarantined,
+			"collectionQuarantined",
+			"snapshot collection preserved contradictory evidence",
+		},
+		{
+			gotmux.ErrOutputLimit,
+			"outputLimitExceeded",
+			"tmux command output exceeded its byte limit",
+		},
+		{
+			config.ErrConfigExists,
+			"configExists",
+			"configuration already exists; use --force to replace it",
+		},
+		{
+			config.ErrConfigSymlink,
+			"configSymlink",
+			"configuration target must not be a symbolic link",
+		},
+		{
+			config.ErrConfigNotRegular,
+			"configNotRegularFile",
+			"configuration target must be a regular file",
+		},
+		{
+			config.ErrConfigNotDirectory,
+			"configNotDirectory",
+			"configuration path component is not a directory",
+		},
 		{app.ErrPartialSnapshot, "partialSnapshot", "parity-incomplete save"},
-		{app.ErrPartialRestore, "partialRestore", "restore incomplete: sessions were skipped or not verified; see the summary"},
+		{
+			app.ErrPartialRestore,
+			"partialRestore",
+			"restore incomplete: sessions were skipped or not verified; see the summary",
+		},
 		{remote.ErrActionFailed, "remoteActionFailed", "remote action failed"},
-		{restore.ErrPriorConflict, "priorEffectConflicted", "previous restore effects conflict with recorded state; explicit reconciliation required"},
+		{
+			restore.ErrPriorConflict,
+			"priorEffectConflicted",
+			"previous restore effects conflict with recorded state; explicit reconciliation required",
+		},
 		{restore.ErrJournalRequired, "journalUnavailable", "restore journal unavailable"},
 		{restore.ErrJournalIncomplete, "journalUnavailable", "restore journal unavailable"},
 		{session.ErrNotInsideTmux, "notInsideTmux", "switch requires an attached tmux client"},
-		{session.ErrInvokingClientUnavailable, "clientUnavailable", "no attached client displays the invoking session"},
-		{session.ErrInvokingClientAmbiguous, "clientAmbiguous", "multiple attached clients display the invoking session"},
+		{
+			session.ErrInvokingClientUnavailable,
+			"clientUnavailable",
+			"no attached client displays the invoking session",
+		},
+		{
+			session.ErrInvokingClientAmbiguous,
+			"clientAmbiguous",
+			"multiple attached clients display the invoking session",
+		},
 		{session.ErrSwitchUnverified, "switchUnverified", "client switch could not be verified"},
-		{session.ErrTerminalRequired, "interactiveTerminalRequired", "attach requires an interactive terminal"},
+		{
+			session.ErrTerminalRequired,
+			"interactiveTerminalRequired",
+			"attach requires an interactive terminal",
+		},
 		{session.ErrSessionNotFound, "notFound", "session not found"},
 		{session.ErrSessionAlreadyExists, "sessionAlreadyExists", "session already exists"},
 		{session.ErrSessionAttached, "sessionAttached", "session is attached"},
-		{session.ErrSessionReplaced, "sessionReplaced", "session changed before the operation could finish"},
-		{session.ErrSavedGenerationsProtected, "savedGenerationsProtected", "saved generations containing the session are protected"},
-		{session.ErrSavedSessionScopeConflict, "savedSessionScopeConflict", "saved session source endpoint is unverified"},
+		{
+			session.ErrSessionReplaced,
+			"sessionReplaced",
+			"session changed before the operation could finish",
+		},
+		{
+			session.ErrSavedGenerationsProtected,
+			"savedGenerationsProtected",
+			"saved generations containing the session are protected",
+		},
+		{
+			session.ErrSavedSessionScopeConflict,
+			"savedSessionScopeConflict",
+			"saved session source endpoint is unverified",
+		},
 		{agents.ErrRegistrySchema, "agentRegistrySchema", "agent registry schema is not supported"},
 		{agents.ErrRegistryCorrupt, "agentRegistryCorrupt", "agent registry is corrupt"},
-		{agents.ErrRegistryUnavailable, "agentRegistryUnavailable", "agent registry is unavailable"},
-		{agents.ErrRegistryTooLarge, "agentRegistryTooLarge", "agent registry exceeds its size limit"},
-		{agents.ErrStyleOwnershipCorrupt, "agentStyleOwnershipCorrupt", "agent style ownership record is corrupt"},
-		{agents.ErrCurrentContextUnknown, "agentContextUnknown", "current tmux context could not be determined; pass --pane, --client, or --client-session"},
+		{
+			agents.ErrRegistryUnavailable,
+			"agentRegistryUnavailable",
+			"agent registry is unavailable",
+		},
+		{
+			agents.ErrRegistryTooLarge,
+			"agentRegistryTooLarge",
+			"agent registry exceeds its size limit",
+		},
+		{
+			agents.ErrStyleOwnershipCorrupt,
+			"agentStyleOwnershipCorrupt",
+			"agent style ownership record is corrupt",
+		},
+		{
+			agents.ErrCurrentContextUnknown,
+			"agentContextUnknown",
+			"current tmux context could not be determined; pass --pane, --client, or --client-session",
+		},
 		{agents.ErrCurrentPaneNotLive, "agentPaneNotLive", "agent pane is not a live tmux pane"},
 		{agents.ErrPaneNotLive, "agentPaneNotLive", "agent pane is not a live tmux pane"},
 		{agents.ErrNoTargetPane, "agentPaneNotFound", "no agent pane needs attention"},
@@ -182,7 +266,10 @@ func JSONCommandName(cmd *cobra.Command) string {
 }
 
 func JSONErrorCode(err error) string {
-	if classified, ok := errors.AsType[*action.Error](err); ok && classified.Code != action.CodeFailed {
+	if classified, ok := errors.AsType[*action.Error](
+		err,
+	); ok &&
+		classified.Code != action.CodeFailed {
 		return string(classified.Code)
 	}
 
@@ -330,7 +417,9 @@ func WriteCommandError(cmd *cobra.Command, err error) error {
 	}
 
 	if _, writeErr := fmt.Fprintln(stderr, humanCommandErrorMessage(cmd, err)); writeErr != nil {
-		return oops.In("cli").With("operation", "write_command_error").Wrapf(writeErr, "writing command error")
+		return oops.In("cli").
+			With("operation", "write_command_error").
+			Wrapf(writeErr, "writing command error")
 	}
 
 	return nil
@@ -361,7 +450,11 @@ func HumanErrorMessage(err error) string {
 func NotExistMessage(err error) string {
 	if step, ok := errorstep.Owned(err, "snapshot.store"); ok {
 		switch step.Operation {
-		case "open_generations", "open_generation", "read_manifest", "open_artifacts", "open_artifact":
+		case "open_generations",
+			"open_generation",
+			"read_manifest",
+			"open_artifacts",
+			"open_artifact":
 			return "snapshot generation files are missing"
 		default:
 			return "repository does not exist"
@@ -542,7 +635,12 @@ func configurationErrorMessage(err error) string {
 		return "configuration could not be loaded"
 	}
 
-	return fmt.Sprintf("invalid configuration at line %d, column %d: %s", docErr.Line, docErr.Column, documentProblem(docErr))
+	return fmt.Sprintf(
+		"invalid configuration at line %d, column %d: %s",
+		docErr.Line,
+		docErr.Column,
+		documentProblem(docErr),
+	)
 }
 
 func documentProblem(docErr config.DocumentError) string {
@@ -638,7 +736,8 @@ func sessionErrorCode(err error) (string, bool) {
 	switch {
 	case errors.Is(err, session.ErrCurrentSessionAmbiguous):
 		return "currentSessionAmbiguous", true
-	case errors.Is(err, session.ErrCatalogLimitExceeded), errors.Is(err, session.ErrPaneHistoryLimitExceeded):
+	case errors.Is(err, session.ErrCatalogLimitExceeded),
+		errors.Is(err, session.ErrPaneHistoryLimitExceeded):
 		return "catalogLimitExceeded", true
 	case errors.Is(err, session.ErrServerIdentityChanged):
 		return "serverChanged", true
@@ -657,7 +756,8 @@ func sessionSentinelMessage(err error) (string, bool) {
 	switch {
 	case errors.Is(err, session.ErrCurrentSessionAmbiguous):
 		return "current pane belongs to multiple sessions", true
-	case errors.Is(err, session.ErrCatalogLimitExceeded), errors.Is(err, session.ErrPaneHistoryLimitExceeded):
+	case errors.Is(err, session.ErrCatalogLimitExceeded),
+		errors.Is(err, session.ErrPaneHistoryLimitExceeded):
 		return "inventory limit exceeded", true
 	case errors.Is(err, session.ErrServerIdentityChanged):
 		return "tmux server identity changed during observation", true
@@ -723,7 +823,9 @@ func writeJSONEnvelope(output io.Writer, envelope JSONEnvelope) error {
 	encoder.SetIndent("", "  ")
 
 	if err := encoder.Encode(envelope); err != nil {
-		return oops.In("cli").With("operation", "write_json").Wrapf(err, "encoding JSON command output")
+		return oops.In("cli").
+			With("operation", "write_json").
+			Wrapf(err, "encoding JSON command output")
 	}
 
 	return nil

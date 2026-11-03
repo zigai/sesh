@@ -23,7 +23,14 @@ func TestSessionListNamesSavedSessionsANewerServerLacks(t *testing.T) {
 	server := tmuxtest.NewServer(t)
 	socket := server.Endpoint().SocketPath
 
-	stdout, stderr, err := executeCommand(t, "session", "list", testSocketFlag, socket, testNoConfigFlag)
+	stdout, stderr, err := executeCommand(
+		t,
+		"session",
+		"list",
+		testSocketFlag,
+		socket,
+		testNoConfigFlag,
+	)
 	if err != nil {
 		t.Fatalf("session list: %v\nstderr: %s", err, stderr)
 	}
@@ -39,7 +46,15 @@ func TestSessionListNamesSavedSessionsANewerServerLacks(t *testing.T) {
 		t.Fatalf("the hint must not appear in the command result: %q", stdout)
 	}
 
-	exec := executeJSON(t, "session", "list", testSocketFlag, socket, testNoConfigFlag, testJSONFlag)
+	exec := executeJSON(
+		t,
+		"session",
+		"list",
+		testSocketFlag,
+		socket,
+		testNoConfigFlag,
+		testJSONFlag,
+	)
 	if exec.Err != nil || exec.Stderr != "" {
 		t.Fatalf("JSON output must carry no hint: stderr=%q err=%v", exec.Stderr, exec.Err)
 	}
@@ -55,7 +70,15 @@ func TestSessionListNamesSavedSessionsANewerServerLacks(t *testing.T) {
 		t.Fatalf("recreate the saved session: %v", err)
 	}
 
-	if _, stderr, err := executeCommand(t, "session", "list", testSocketFlag, socket, testNoConfigFlag); err != nil || stderr != "" {
+	if _, stderr, err := executeCommand(
+		t,
+		"session",
+		"list",
+		testSocketFlag,
+		socket,
+		testNoConfigFlag,
+	); err != nil ||
+		stderr != "" {
 		t.Fatalf("once the saved sessions run, the list must be quiet: %q, %v", stderr, err)
 	}
 }

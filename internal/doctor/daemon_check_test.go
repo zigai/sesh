@@ -25,20 +25,58 @@ func TestDaemonCheckRequiresRunningPhaseAndHeldInhibitors(t *testing.T) {
 		wantFix            string
 	}{
 		{"ready", doctor.DaemonReady, "running", true, doctor.StatusOK, ""},
-		{"released", doctor.DaemonNotReady, "running", false, doctor.StatusWarn, "systemctl --user status sesh-coordinator.service"},
+		{
+			"released",
+			doctor.DaemonNotReady,
+			"running",
+			false,
+			doctor.StatusWarn,
+			"systemctl --user status sesh-coordinator.service",
+		},
 		{"initializing", doctor.DaemonNotReady, "initializing", true, doctor.StatusInfo, ""},
-		{"contradictory_ready_phase", doctor.DaemonReady, "initializing", true, doctor.StatusInfo, ""},
-		{"contradictory_ready_locks", doctor.DaemonReady, "running", false, doctor.StatusWarn, "systemctl --user status sesh-coordinator.service"},
+		{
+			"contradictory_ready_phase",
+			doctor.DaemonReady,
+			"initializing",
+			true,
+			doctor.StatusInfo,
+			"",
+		},
+		{
+			"contradictory_ready_locks",
+			doctor.DaemonReady,
+			"running",
+			false,
+			doctor.StatusWarn,
+			"systemctl --user status sesh-coordinator.service",
+		},
 		{"final_save", doctor.DaemonNotReady, "final_save", true, doctor.StatusInfo, ""},
-		{"stale", doctor.DaemonStale, "", false, doctor.StatusWarn, "rm /run/user/1000/sesh/daemon-1.sock"},
-		{"unverifiable", doctor.DaemonUnverifiable, "", false, doctor.StatusWarn, "systemctl --user status sesh-coordinator.service"},
+		{
+			"stale",
+			doctor.DaemonStale,
+			"",
+			false,
+			doctor.StatusWarn,
+			"rm /run/user/1000/sesh/daemon-1.sock",
+		},
+		{
+			"unverifiable",
+			doctor.DaemonUnverifiable,
+			"",
+			false,
+			doctor.StatusWarn,
+			"systemctl --user status sesh-coordinator.service",
+		},
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
 			check := daemonCheck(t, doctor.Options{Daemon: doctor.Daemon{
-				State: test.state, Phase: test.phase, InhibitorsHeld: test.held, RuntimePath: "/run/user/1000/sesh/daemon-1.sock",
+				State:          test.state,
+				Phase:          test.phase,
+				InhibitorsHeld: test.held,
+				RuntimePath:    "/run/user/1000/sesh/daemon-1.sock",
 			}})
 
 			fix := ""
@@ -47,7 +85,12 @@ func TestDaemonCheckRequiresRunningPhaseAndHeldInhibitors(t *testing.T) {
 			}
 
 			if check.Status != test.wantStatus || fix != test.wantFix {
-				t.Fatalf("daemon check = %+v, want %s with fix %q", check, test.wantStatus, test.wantFix)
+				t.Fatalf(
+					"daemon check = %+v, want %s with fix %q",
+					check,
+					test.wantStatus,
+					test.wantFix,
+				)
 			}
 		})
 	}
@@ -59,13 +102,23 @@ func TestAbsentDaemonFixDependsOnWhatIsInstalled(t *testing.T) {
 	unitDir := t.TempDir()
 	absent := doctor.Daemon{State: doctor.DaemonAbsent}
 
-	notInstalled := daemonCheck(t, doctor.Options{Daemon: absent, AutosaveEnabled: true, ServiceDirs: []string{unitDir}})
+	notInstalled := daemonCheck(
+		t,
+		doctor.Options{Daemon: absent, AutosaveEnabled: true, ServiceDirs: []string{unitDir}},
+	)
 	if notInstalled.Status != doctor.StatusWarn || notInstalled.Fix == nil ||
-		!strings.Contains(notInstalled.Fix.Command, "sesh setup services --apply --with-coordinator") {
+		!strings.Contains(
+			notInstalled.Fix.Command,
+			"sesh setup services --apply --with-coordinator",
+		) {
 		t.Fatalf("autosave without a coordinator must say how to install it: %+v", notInstalled)
 	}
 
-	if err := os.WriteFile(filepath.Join(unitDir, "sesh-coordinator.service"), []byte("[Service]\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(unitDir, "sesh-coordinator.service"),
+		[]byte("[Service]\n"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -82,7 +135,8 @@ func TestAbsentDaemonFixDependsOnWhatIsInstalled(t *testing.T) {
 	}
 	for _, test := range cases {
 		check := daemonCheck(t, doctor.Options{
-			Daemon: absent, ServiceDirs: []string{unitDir},
+			Daemon:          absent,
+			ServiceDirs:     []string{unitDir},
 			UnitActiveState: func(context.Context, string) (string, error) { return test.active, nil },
 		})
 
@@ -92,7 +146,13 @@ func TestAbsentDaemonFixDependsOnWhatIsInstalled(t *testing.T) {
 		}
 
 		if check.Status != test.wantStatus || fix != test.wantFix {
-			t.Fatalf("installed coordinator %s: daemon check = %+v, want %s with fix %q", test.active, check, test.wantStatus, test.wantFix)
+			t.Fatalf(
+				"installed coordinator %s: daemon check = %+v, want %s with fix %q",
+				test.active,
+				check,
+				test.wantStatus,
+				test.wantFix,
+			)
 		}
 	}
 }
@@ -101,15 +161,21 @@ func TestInstalledDaemonWithUnreadableUnitStateWarns(t *testing.T) {
 	t.Parallel()
 
 	unitDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(unitDir, "sesh-coordinator.service"), []byte("[Service]\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(unitDir, "sesh-coordinator.service"),
+		[]byte("[Service]\n"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
 	check := daemonCheck(t, doctor.Options{
-		Daemon: doctor.Daemon{State: doctor.DaemonAbsent}, ServiceDirs: []string{unitDir},
+		Daemon:          doctor.Daemon{State: doctor.DaemonAbsent},
+		ServiceDirs:     []string{unitDir},
 		UnitActiveState: func(context.Context, string) (string, error) { return "", errBusUnavailable },
 	})
-	if check.Status != doctor.StatusWarn || check.Reason != doctor.ReasonInspectionFailed || check.Fix == nil ||
+	if check.Status != doctor.StatusWarn || check.Reason != doctor.ReasonInspectionFailed ||
+		check.Fix == nil ||
 		check.Fix.Command != "systemctl --user status sesh-coordinator.service" {
 		t.Fatalf("unreadable unit state must not read as stopped: %+v", check)
 	}
@@ -125,8 +191,15 @@ func TestAbsentDaemonRetainsUnitInspectionErrors(test *testing.T) {
 		test.Fatal(err)
 	}
 
-	result := daemonCheck(test, doctor.Options{Daemon: doctor.Daemon{State: doctor.DaemonAbsent}, ServiceDirs: []string{dir}})
-	if result.Status != doctor.StatusWarn || result.Reason != doctor.ReasonInspectionFailed || result.Fix == nil {
+	result := daemonCheck(
+		test,
+		doctor.Options{
+			Daemon:      doctor.Daemon{State: doctor.DaemonAbsent},
+			ServiceDirs: []string{dir},
+		},
+	)
+	if result.Status != doctor.StatusWarn || result.Reason != doctor.ReasonInspectionFailed ||
+		result.Fix == nil {
 		test.Fatalf("unit inspection error was treated as absence: %+v", result)
 	}
 }

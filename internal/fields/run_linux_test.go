@@ -38,7 +38,12 @@ func captureCancellation(t *testing.T, leaderExits bool) {
 	readyPath, releasePath := filepath.Join(dir, "ready"), filepath.Join(dir, "release")
 	ready, release := captureFIFO(t, readyPath), captureFIFO(t, releasePath)
 	ctx, cancel := context.WithCancel(t.Context())
-	process := captureProcess{cancel: cancel, finished: make(chan struct{}), childPID: 0, childFD: -1}
+	process := captureProcess{
+		cancel:   cancel,
+		finished: make(chan struct{}),
+		childPID: 0,
+		childFD:  -1,
+	}
 
 	t.Cleanup(func() { process.close(t) })
 
@@ -56,7 +61,12 @@ func captureCancellation(t *testing.T, leaderExits bool) {
 	}()
 
 	var leader int
-	if _, err := fmt.Fscanf(bufio.NewReader(ready), "%d %d\n", &leader, &process.childPID); err != nil {
+	if _, err := fmt.Fscanf(
+		bufio.NewReader(ready),
+		"%d %d\n",
+		&leader,
+		&process.childPID,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -116,7 +126,13 @@ func (process *captureProcess) close(t *testing.T) {
 
 	// The shell may reap the child before the group kill reaches the leader.
 	var status unix.WaitStatus
-	if _, err := unix.Wait4(process.childPID, &status, 0, nil); err != nil && !errors.Is(err, unix.ECHILD) {
+	if _, err := unix.Wait4(
+		process.childPID,
+		&status,
+		0,
+		nil,
+	); err != nil &&
+		!errors.Is(err, unix.ECHILD) {
 		t.Error(err)
 	}
 

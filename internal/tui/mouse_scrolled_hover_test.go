@@ -38,7 +38,10 @@ func TestMouseHoverKeepsScrolledSessionsInPlace(t *testing.T) {
 			model.filtered = testCase.rows
 
 			for index := range 12 {
-				model.filtered = append(model.filtered, session.Session{Name: fmt.Sprintf("session-%02d", index)})
+				model.filtered = append(
+					model.filtered,
+					session.Session{Name: fmt.Sprintf("session-%02d", index)},
+				)
 			}
 
 			model.View()

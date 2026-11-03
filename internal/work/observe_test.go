@@ -13,9 +13,21 @@ var observedAt = time.Unix(1_800_000_000, 0)
 
 func sighting(conversation, pane string, pid int) work.Sighting {
 	return work.Sighting{
-		Harness: "claude", Conversation: conversation, SessionPath: "/history/" + conversation + ".jsonl",
-		Resume: []string{"claude", "--resume", conversation}, Title: "", Directory: "/code/shop", Project: "/code/shop",
-		Server: "/run/tmux/default", Pane: pane, PanePID: pid, TurnAt: observedAt,
+		Harness:      "claude",
+		Conversation: conversation,
+		SessionPath:  "/history/" + conversation + ".jsonl",
+		Resume: []string{
+			"claude",
+			"--resume",
+			conversation,
+		},
+		Title:     "",
+		Directory: "/code/shop",
+		Project:   "/code/shop",
+		Server:    "/run/tmux/default",
+		Pane:      pane,
+		PanePID:   pid,
+		TurnAt:    observedAt,
 	}
 }
 
@@ -37,7 +49,8 @@ func TestObserveStartsOneItemForANewConversation(t *testing.T) {
 	}
 
 	item := state.Items[0]
-	if item.ID != "w1" || item.Conversation != "c1" || item.Branch != "main" || item.CreatedAt != observedAt.Unix() {
+	if item.ID != "w1" || item.Conversation != "c1" || item.Branch != "main" ||
+		item.CreatedAt != observedAt.Unix() {
 		t.Errorf("item = %+v", item)
 	}
 }
@@ -46,7 +59,11 @@ func TestObserveOfAnUnchangedConversationChangesNothing(t *testing.T) {
 	state := emptyState()
 	state.Observe([]work.Sighting{sighting("c1", "%1", 100)}, observedAt, branchMain)
 
-	if state.Observe([]work.Sighting{sighting("c1", "%1", 100)}, observedAt.Add(time.Minute), branchMain) {
+	if state.Observe(
+		[]work.Sighting{sighting("c1", "%1", 100)},
+		observedAt.Add(time.Minute),
+		branchMain,
+	) {
 		t.Errorf("Observe() = true for the same sighting, Items = %+v", state.Items)
 	}
 }
@@ -58,7 +75,8 @@ func TestObserveRecordsALaterTurn(t *testing.T) {
 	later := sighting("c1", "%1", 100)
 	later.TurnAt = observedAt.Add(time.Hour)
 
-	if !state.Observe([]work.Sighting{later}, observedAt, branchMain) || state.Items[0].TurnAt != later.TurnAt.Unix() {
+	if !state.Observe([]work.Sighting{later}, observedAt, branchMain) ||
+		state.Items[0].TurnAt != later.TurnAt.Unix() {
 		t.Errorf("Items = %+v, want the later turn", state.Items)
 	}
 }
@@ -78,14 +96,19 @@ func TestAReusedPaneIDWithAnotherProcessStartsANewItem(t *testing.T) {
 	state.Observe([]work.Sighting{sighting("c1", "%1", 100)}, observedAt, branchMain)
 	state.Observe([]work.Sighting{sighting("c2", "%1", 200)}, observedAt, branchMain)
 
-	if len(state.Items) != 2 || state.Items[0].Conversation != "c1" || state.Items[1].Conversation != "c2" {
+	if len(state.Items) != 2 || state.Items[0].Conversation != "c1" ||
+		state.Items[1].Conversation != "c2" {
 		t.Errorf("Items = %+v, want separate items", state.Items)
 	}
 }
 
 func TestTwoPanesInOneDirectoryAreTwoItems(t *testing.T) {
 	state := emptyState()
-	state.Observe([]work.Sighting{sighting("c1", "%1", 100), sighting("c2", "%2", 101)}, observedAt, branchMain)
+	state.Observe(
+		[]work.Sighting{sighting("c1", "%1", 100), sighting("c2", "%2", 101)},
+		observedAt,
+		branchMain,
+	)
 
 	if len(state.Items) != 2 {
 		t.Errorf("Items = %+v, want two", state.Items)
@@ -99,7 +122,8 @@ func TestObserveIgnoresAConversationItCannotResume(t *testing.T) {
 	noResume := sighting("c2", "%2", 101)
 	noResume.Resume = nil
 
-	if state.Observe([]work.Sighting{noID, noResume}, observedAt, branchMain) || len(state.Items) != 0 {
+	if state.Observe([]work.Sighting{noID, noResume}, observedAt, branchMain) ||
+		len(state.Items) != 0 {
 		t.Errorf("Items = %+v, want none", state.Items)
 	}
 }
@@ -133,7 +157,10 @@ func TestObservedItemsSurviveTheStore(t *testing.T) {
 		t.Fatalf("Load() error = %v", err)
 	}
 
-	if item, found := state.Find("w1"); !found || item.Conversation != "c1" || item.Resume[2] != "c1" {
+	if item, found := state.Find(
+		"w1",
+	); !found || item.Conversation != "c1" ||
+		item.Resume[2] != "c1" {
 		t.Errorf("Find(w1) = %+v, %t", item, found)
 	}
 }
@@ -197,7 +224,10 @@ func TestUnlinkingAPullRequestKeepsItOutOfTheLinkedOnes(t *testing.T) {
 	state := emptyState()
 	state.Observe([]work.Sighting{sighting("c1", "%1", 100)}, observedAt, branchMain)
 
-	if err := state.Link("w1", work.PRLink{Number: 4, State: "open", URL: "", Issues: []int{2}, Source: ""}); err != nil {
+	if err := state.Link(
+		"w1",
+		work.PRLink{Number: 4, State: "open", URL: "", Issues: []int{2}, Source: ""},
+	); err != nil {
 		t.Fatalf("Link() error = %v", err)
 	}
 
@@ -283,14 +313,20 @@ func TestFinishingATaskFinishesItsConversationsInTheMainCheckout(t *testing.T) {
 
 	open, earlier, other := state.Items[0], state.Items[1], state.Items[2]
 
-	if open.FinishedBy != work.FinishedByPR || open.FinishedAt != observedAt.Add(time.Hour).Unix() || open.Task != "" ||
+	if open.FinishedBy != work.FinishedByPR ||
+		open.FinishedAt != observedAt.Add(time.Hour).Unix() ||
+		open.Task != "" ||
 		open.Directory != "/code/shop" {
 		t.Errorf("open item = %+v, want it finished by pr, detached and in /code/shop", open)
 	}
 
-	if earlier.FinishedBy != work.FinishedByUser || earlier.FinishedAt != observedAt.Unix() || earlier.Task != "" ||
+	if earlier.FinishedBy != work.FinishedByUser || earlier.FinishedAt != observedAt.Unix() ||
+		earlier.Task != "" ||
 		earlier.Directory != "/code/shop" {
-		t.Errorf("earlier finished item = %+v, want its finish kept, detached and in /code/shop", earlier)
+		t.Errorf(
+			"earlier finished item = %+v, want its finish kept, detached and in /code/shop",
+			earlier,
+		)
 	}
 
 	if other.Finished() || other.Task != "t2" || other.Directory != "/trees/shop-t2" {
@@ -302,7 +338,8 @@ func TestFinishingATaskWithoutADirectoryKeepsWhereItsConversationsRan(t *testing
 	state := taskState(t)
 	state.FinishTask("t1", work.FinishedByUser, "", observedAt)
 
-	if item := state.Items[0]; item.Directory != "/trees/shop-t1" || item.Task != "" || !item.Finished() {
+	if item := state.Items[0]; item.Directory != "/trees/shop-t1" || item.Task != "" ||
+		!item.Finished() {
 		t.Errorf("item = %+v, want it finished and detached in /trees/shop-t1", item)
 	}
 }

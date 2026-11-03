@@ -26,7 +26,12 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
-func commitCapture(t *testing.T, ctx context.Context, repoDir string, observation capture.Observation) string {
+func commitCapture(
+	t *testing.T,
+	ctx context.Context,
+	repoDir string,
+	observation capture.Observation,
+) string {
 	t.Helper()
 
 	repo, err := store.Open(ctx, repoDir)
@@ -56,7 +61,13 @@ func commitCapture(t *testing.T, ctx context.Context, repoDir string, observatio
 	return generation.ID
 }
 
-func observeSession(t *testing.T, ctx context.Context, source *gotmux.Server, repoDir string, session gotmux.Session) string {
+func observeSession(
+	t *testing.T,
+	ctx context.Context,
+	source *gotmux.Server,
+	repoDir string,
+	session gotmux.Session,
+) string {
 	t.Helper()
 
 	observation, err := capture.Observe(ctx, source, []gotmux.SessionID{session.ID()})
@@ -88,7 +99,11 @@ func disableSourceWindowRename(t *testing.T, ctx context.Context, session gotmux
 	}
 }
 
-func redirectPanesToMissingDirectory(t *testing.T, manifest *model.Manifest, sessionID, directory string) {
+func redirectPanesToMissingDirectory(
+	t *testing.T,
+	manifest *model.Manifest,
+	sessionID, directory string,
+) {
 	t.Helper()
 
 	windows := map[string]bool{}
@@ -116,7 +131,13 @@ func redirectPanesToMissingDirectory(t *testing.T, manifest *model.Manifest, ses
 	}
 }
 
-func observeSessionAtMissingDirectory(t *testing.T, ctx context.Context, source *gotmux.Server, repoDir string, session gotmux.Session) string {
+func observeSessionAtMissingDirectory(
+	t *testing.T,
+	ctx context.Context,
+	source *gotmux.Server,
+	repoDir string,
+	session gotmux.Session,
+) string {
 	t.Helper()
 
 	observation, err := capture.Observe(ctx, source, []gotmux.SessionID{session.ID()})
@@ -124,7 +145,12 @@ func observeSessionAtMissingDirectory(t *testing.T, ctx context.Context, source 
 		t.Fatalf("capture.Observe failed: %v", err)
 	}
 
-	redirectPanesToMissingDirectory(t, &observation.Manifest, observation.Manifest.Sessions[0].ID, filepath.Join(t.TempDir(), "missing"))
+	redirectPanesToMissingDirectory(
+		t,
+		&observation.Manifest,
+		observation.Manifest.Sessions[0].ID,
+		filepath.Join(t.TempDir(), "missing"),
+	)
 
 	if err := observation.Manifest.Validate(); err != nil {
 		t.Fatalf("manifest validation failed: %v", err)
@@ -152,7 +178,14 @@ func TestRestoreRecoveryAPIsRejectForeignOperation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 
-	live, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "foreign-operation-source", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly})
+	live, err := server.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{
+			Name:    "foreign-operation-source",
+			Program: gotmux.Exec("sleep", "300"),
+			Start:   gotmux.StartPolicyExistingOnly,
+		},
+	)
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -165,14 +198,27 @@ func TestRestoreRecoveryAPIsRejectForeignOperation(t *testing.T) {
 
 	operationID := store.NewOperationID()
 
-	_, err = repo.RegisterOperation(ctx, operationID, generation, model.Bytes("foreign-target"), []store.Action{
-		{ID: "launch", Kind: restore.KindLaunch, State: model.ActionStatePlanned},
-	})
+	_, err = repo.RegisterOperation(
+		ctx,
+		operationID,
+		generation,
+		model.Bytes("foreign-target"),
+		[]store.Action{
+			{ID: "launch", Kind: restore.KindLaunch, State: model.ActionStatePlanned},
+		},
+	)
 	if err != nil {
 		t.Fatalf("RegisterOperation failed: %v", err)
 	}
 
-	if _, err := engine.ReconcileRestore(ctx, repo, operationID); !errors.Is(err, store.ErrConflict) {
+	if _, err := engine.ReconcileRestore(
+		ctx,
+		repo,
+		operationID,
+	); !errors.Is(
+		err,
+		store.ErrConflict,
+	) {
 		t.Fatalf("ReconcileRestore must reject foreign operation, got %v", err)
 	}
 
@@ -199,7 +245,14 @@ func TestEnginePartialRestoreKeepsPinUntilExplicitAbandon(t *testing.T) {
 	repoDir := filepath.Join(t.TempDir(), "repo")
 	leaseRoot := filepath.Join(t.TempDir(), "leases")
 
-	live, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "pin-release", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly})
+	live, err := server.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{
+			Name:    "pin-release",
+			Program: gotmux.Exec("sleep", "300"),
+			Start:   gotmux.StartPolicyExistingOnly,
+		},
+	)
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -272,8 +325,13 @@ func assertReinspectedNoProcessPanes(t *testing.T, panes []restore.PaneResult) {
 	}
 
 	for _, pane := range panes {
-		if pane.RuntimeID == "" || pane.Outcome != restore.PaneOutcomeDefaultShell || pane.AppVerified || pane.CWDFallback {
-			t.Fatalf("reinspected no-process pane result = %+v, want verified runtime identity and default-shell evidence", pane)
+		if pane.RuntimeID == "" || pane.Outcome != restore.PaneOutcomeDefaultShell ||
+			pane.AppVerified ||
+			pane.CWDFallback {
+			t.Fatalf(
+				"reinspected no-process pane result = %+v, want verified runtime identity and default-shell evidence",
+				pane,
+			)
 		}
 	}
 }
@@ -288,7 +346,9 @@ func TestEnginePracticalRestoreSettlesVerifiedFidelityLimits(t *testing.T) {
 	leaseRoot := filepath.Join(t.TempDir(), "leases")
 
 	live, err := server.NewSession(ctx, gotmux.NewSessionOptions{
-		Name: "practical-release", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly,
+		Name:    "practical-release",
+		Program: gotmux.Exec("sleep", "300"),
+		Start:   gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
@@ -328,7 +388,12 @@ func TestEnginePracticalRestoreSettlesVerifiedFidelityLimits(t *testing.T) {
 	assertSourcePinReleased(t, ctx, repo, generation)
 }
 
-func assertPartialRestoreResult(t *testing.T, result engine.RestoreResult, err error, operationID string) {
+func assertPartialRestoreResult(
+	t *testing.T,
+	result engine.RestoreResult,
+	err error,
+	operationID string,
+) {
 	t.Helper()
 
 	if err != nil {
@@ -340,7 +405,11 @@ func assertPartialRestoreResult(t *testing.T, result engine.RestoreResult, err e
 	}
 
 	if operationID != "" && result.OperationID != operationID {
-		t.Fatalf("restore operation identity changed: got %q want %q", result.OperationID, operationID)
+		t.Fatalf(
+			"restore operation identity changed: got %q want %q",
+			result.OperationID,
+			operationID,
+		)
 	}
 }
 
@@ -353,7 +422,11 @@ func assertMissingRequirementReason(t *testing.T, result engine.RestoreResult, r
 		}
 	}
 
-	t.Fatalf("restore result omitted missing requirement %q: %+v", reason, result.MissingRequirements)
+	t.Fatalf(
+		"restore result omitted missing requirement %q: %+v",
+		reason,
+		result.MissingRequirements,
+	)
 }
 
 func TestEngineRestoreFailureRetainsPinAndSource(t *testing.T) {
@@ -372,8 +445,24 @@ func TestEngineRestoreFailureRetainsPinAndSource(t *testing.T) {
 
 	result := runFailingRestoreOnMissingDir(t, ctx, repo, server, leaseRoot, generation)
 
-	assertRetainedAndUnrelatedIntact(t, ctx, server, result, unrelated, unrelatedLinks, unrelatedPaneInfo)
-	assertFailureRetainedPinAndExplicitAbandonment(t, ctx, repo, server, leaseRoot, generation, result.OperationID)
+	assertRetainedAndUnrelatedIntact(
+		t,
+		ctx,
+		server,
+		result,
+		unrelated,
+		unrelatedLinks,
+		unrelatedPaneInfo,
+	)
+	assertFailureRetainedPinAndExplicitAbandonment(
+		t,
+		ctx,
+		repo,
+		server,
+		leaseRoot,
+		generation,
+		result.OperationID,
+	)
 }
 
 func TestEngineRestoreRefusesDispatchedButUnconfirmedEffect(t *testing.T) {
@@ -385,7 +474,14 @@ func TestEngineRestoreRefusesDispatchedButUnconfirmedEffect(t *testing.T) {
 	repoDir := filepath.Join(t.TempDir(), "repo")
 	leaseRoot := filepath.Join(t.TempDir(), "leases")
 
-	live, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "collision-source", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly})
+	live, err := server.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{
+			Name:    "collision-source",
+			Program: gotmux.Exec("sleep", "300"),
+			Start:   gotmux.StartPolicyExistingOnly,
+		},
+	)
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -420,7 +516,14 @@ func TestEngineRestoreRefusesDispatchedButUnconfirmedEffect(t *testing.T) {
 
 	firstStep := plan.Steps[0]
 
-	if err := repo.Transition(ctx, result.OperationID, restore.ActionID(firstStep.ID()), "planned", "issued", nil); err != nil {
+	if err := repo.Transition(
+		ctx,
+		result.OperationID,
+		restore.ActionID(firstStep.ID()),
+		"planned",
+		"issued",
+		nil,
+	); err != nil {
 		t.Fatalf("Transition failed: %v", err)
 	}
 
@@ -451,8 +554,14 @@ func TestEngineRestoreRefusesRestartedDaemonTarget(t *testing.T) {
 	config := gotmux.Config{
 		SocketPath: socket,
 		ConfigFile: "/dev/null",
-		Env:        []string{"PATH=" + os.Getenv("PATH"), "HOME=" + dir, "SHELL=/bin/sh", "TERM=xterm-256color", "LC_ALL=C.UTF-8"},
-		Dir:        dir,
+		Env: []string{
+			"PATH=" + os.Getenv("PATH"),
+			"HOME=" + dir,
+			"SHELL=/bin/sh",
+			"TERM=xterm-256color",
+			"LC_ALL=C.UTF-8",
+		},
+		Dir: dir,
 	}
 
 	first, err := gotmux.New(config)
@@ -460,7 +569,14 @@ func TestEngineRestoreRefusesRestartedDaemonTarget(t *testing.T) {
 		t.Fatalf("tmux.New failed: %v", err)
 	}
 
-	source, err := first.NewSession(ctx, gotmux.NewSessionOptions{Name: "restart-source", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyAllowStart})
+	source, err := first.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{
+			Name:    "restart-source",
+			Program: gotmux.Exec("sleep", "300"),
+			Start:   gotmux.StartPolicyAllowStart,
+		},
+	)
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -474,7 +590,14 @@ func TestEngineRestoreRefusesRestartedDaemonTarget(t *testing.T) {
 
 	generation := observeSessionAtMissingDirectory(t, ctx, first, repoDir, source)
 
-	if _, err := first.NewSession(ctx, gotmux.NewSessionOptions{Name: "restart-keepalive", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly}); err != nil {
+	if _, err := first.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{
+			Name:    "restart-keepalive",
+			Program: gotmux.Exec("sleep", "300"),
+			Start:   gotmux.StartPolicyExistingOnly,
+		},
+	); err != nil {
 		t.Fatalf("keepalive session failed: %v", err)
 	}
 
@@ -509,7 +632,10 @@ func TestEngineRestoreRefusesRestartedDaemonTarget(t *testing.T) {
 		t.Fatalf("tmux.New failed: %v", err)
 	}
 
-	replacement, err := second.NewSession(ctx, gotmux.NewSessionOptions{Name: "restart-source", Start: gotmux.StartPolicyAllowStart})
+	replacement, err := second.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{Name: "restart-source", Start: gotmux.StartPolicyAllowStart},
+	)
 	if err != nil {
 		t.Fatalf("starting the replacement daemon failed: %v", err)
 	}
@@ -541,7 +667,11 @@ func TestSettleDeadRestoresAbandonsARestoreWhoseServerExited(t *testing.T) {
 	repo, operationID := interruptRestoreAtMissingDirectory(t, ctx, server)
 
 	if settled, err := engine.SettleDeadRestores(ctx, repo); err != nil || len(settled) != 0 {
-		t.Fatalf("settle while the server runs = %d settled, %v; want the restore kept", len(settled), err)
+		t.Fatalf(
+			"settle while the server runs = %d settled, %v; want the restore kept",
+			len(settled),
+			err,
+		)
 	}
 
 	probe, err := server.Probe(ctx)
@@ -571,10 +701,21 @@ func TestSettleDeadRestoresAbandonsARestoreWhoseServerExited(t *testing.T) {
 	}
 }
 
-func interruptRestoreAtMissingDirectory(t *testing.T, ctx context.Context, server *gotmux.Server) (*store.Repository, string) {
+func interruptRestoreAtMissingDirectory(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+) (*store.Repository, string) {
 	t.Helper()
 
-	source, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "exited-source", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly})
+	source, err := server.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{
+			Name:    "exited-source",
+			Program: gotmux.Exec("sleep", "300"),
+			Start:   gotmux.StartPolicyExistingOnly,
+		},
+	)
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -599,7 +740,11 @@ func interruptRestoreAtMissingDirectory(t *testing.T, ctx context.Context, serve
 		MissingWorkingDir: restore.MissingWorkingDirFail,
 	})
 	if !errors.Is(err, restore.ErrWorkingDirNotFound) || interrupted.OperationID == "" {
-		t.Fatalf("restore = %q, %v; want an admitted restore stopped by the missing directory", interrupted.OperationID, err)
+		t.Fatalf(
+			"restore = %q, %v; want an admitted restore stopped by the missing directory",
+			interrupted.OperationID,
+			err,
+		)
 	}
 
 	return repo, interrupted.OperationID
@@ -625,7 +770,8 @@ func killDaemonOnCleanup(t *testing.T, server *gotmux.Server, identity gotmux.Se
 		defer cancel()
 
 		err := server.KillMatching(ctx, identity)
-		if err != nil && !errors.Is(err, gotmux.ErrNoServer) && !errors.Is(err, gotmux.ErrServerChanged) {
+		if err != nil && !errors.Is(err, gotmux.ErrNoServer) &&
+			!errors.Is(err, gotmux.ErrServerChanged) {
 			t.Errorf("cleanup kill daemon: %v", err)
 		}
 	})
@@ -640,7 +786,14 @@ func TestEngineRestoreLogSchema(t *testing.T) {
 	repoDir := filepath.Join(t.TempDir(), "repo")
 	leaseRoot := filepath.Join(t.TempDir(), "leases")
 
-	live, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "log-source", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly})
+	live, err := server.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{
+			Name:    "log-source",
+			Program: gotmux.Exec("sleep", "300"),
+			Start:   gotmux.StartPolicyExistingOnly,
+		},
+	)
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -699,7 +852,12 @@ func decodeLogRecords(t *testing.T, data []byte) []map[string]any {
 	return records
 }
 
-func assertPartialOperationVerified(t *testing.T, ctx context.Context, repo *store.Repository, operationID string) {
+func assertPartialOperationVerified(
+	t *testing.T,
+	ctx context.Context,
+	repo *store.Repository,
+	operationID string,
+) {
 	t.Helper()
 
 	status, err := engine.ReconcileRestore(ctx, repo, operationID)
@@ -718,7 +876,12 @@ func assertPartialOperationVerified(t *testing.T, ctx context.Context, repo *sto
 	}
 }
 
-func assertSourcePinReleased(t *testing.T, ctx context.Context, repo *store.Repository, generation string) {
+func assertSourcePinReleased(
+	t *testing.T,
+	ctx context.Context,
+	repo *store.Repository,
+	generation string,
+) {
 	t.Helper()
 
 	if err := repo.Delete(ctx, generation); err != nil {
@@ -730,17 +893,36 @@ func assertSourcePinReleased(t *testing.T, ctx context.Context, repo *store.Repo
 	}
 }
 
-func setupTwoSessionSourceWithMissingDir(t *testing.T, ctx context.Context, server *gotmux.Server, repoDir string) string {
+func setupTwoSessionSourceWithMissingDir(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	repoDir string,
+) string {
 	t.Helper()
 
-	first, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "fail-first", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly})
+	first, err := server.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{
+			Name:    "fail-first",
+			Program: gotmux.Exec("sleep", "300"),
+			Start:   gotmux.StartPolicyExistingOnly,
+		},
+	)
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
 
 	disableSourceWindowRename(t, ctx, first)
 
-	second, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "fail-second", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly})
+	second, err := server.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{
+			Name:    "fail-second",
+			Program: gotmux.Exec("sleep", "300"),
+			Start:   gotmux.StartPolicyExistingOnly,
+		},
+	)
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -753,7 +935,12 @@ func setupTwoSessionSourceWithMissingDir(t *testing.T, ctx context.Context, serv
 	}
 
 	missingDir := filepath.Join(t.TempDir(), "missing")
-	redirectPanesToMissingDirectory(t, &observation.Manifest, observation.Manifest.Sessions[1].ID, missingDir)
+	redirectPanesToMissingDirectory(
+		t,
+		&observation.Manifest,
+		observation.Manifest.Sessions[1].ID,
+		missingDir,
+	)
 
 	if err := observation.Manifest.Validate(); err != nil {
 		t.Fatalf("manifest validation failed: %v", err)
@@ -777,10 +964,21 @@ func setupTwoSessionSourceWithMissingDir(t *testing.T, ctx context.Context, serv
 	return generation
 }
 
-func setupUnrelatedEngineSession(t *testing.T, ctx context.Context, server *gotmux.Server) (gotmux.Session, []gotmux.WindowLinkInfo, gotmux.PaneInfo) {
+func setupUnrelatedEngineSession(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+) (gotmux.Session, []gotmux.WindowLinkInfo, gotmux.PaneInfo) {
 	t.Helper()
 
-	unrelated, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "unrelated-engine", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly})
+	unrelated, err := server.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{
+			Name:    "unrelated-engine",
+			Program: gotmux.Exec("sleep", "300"),
+			Start:   gotmux.StartPolicyExistingOnly,
+		},
+	)
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -852,7 +1050,12 @@ func assertRetainedAndUnrelatedIntact(
 	assertUnrelatedSurvives(t, ctx, server, unrelated, unrelatedLinks, unrelatedPaneInfo)
 }
 
-func assertCreatedSessionRetained(t *testing.T, ctx context.Context, server *gotmux.Server, result engine.RestoreResult) {
+func assertCreatedSessionRetained(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	result engine.RestoreResult,
+) {
 	t.Helper()
 
 	found, err := server.FindSession(ctx, "fail-first")
@@ -861,7 +1064,10 @@ func assertCreatedSessionRetained(t *testing.T, ctx context.Context, server *got
 	}
 
 	if len(result.SessionsRestored) != 1 || result.SessionsRestored[0] != string(found.ID()) {
-		t.Fatalf("expected restored session receipt for fail-first, got %+v", result.SessionsRestored)
+		t.Fatalf(
+			"expected restored session receipt for fail-first, got %+v",
+			result.SessionsRestored,
+		)
 	}
 }
 
@@ -939,7 +1145,10 @@ func assertFailureRetainedPinAndExplicitAbandonment(
 		MissingWorkingDir: restore.MissingWorkingDirFail,
 	})
 	if !errors.Is(err, restore.ErrWorkingDirNotFound) {
-		t.Fatalf("expected retained operation to resume without replay and fail at the same missing directory, got %v", err)
+		t.Fatalf(
+			"expected retained operation to resume without replay and fail at the same missing directory, got %v",
+			err,
+		)
 	}
 
 	abandoned, err := engine.AbandonRestore(ctx, repo, operationID)
@@ -956,7 +1165,12 @@ func assertFailureRetainedPinAndExplicitAbandonment(
 	}
 }
 
-func buildAllSessionsPlan(t *testing.T, ctx context.Context, repo *store.Repository, generation string) restore.Plan {
+func buildAllSessionsPlan(
+	t *testing.T,
+	ctx context.Context,
+	repo *store.Repository,
+	generation string,
+) restore.Plan {
 	t.Helper()
 
 	manifest, err := repo.Read(ctx, generation)
@@ -1027,7 +1241,13 @@ func assertTerminalRecordFields(t *testing.T, record map[string]any) {
 	}
 }
 
-func runFailingRestoreForLogging(t *testing.T, logCtx context.Context, repo *store.Repository, server *gotmux.Server, leaseRoot string) {
+func runFailingRestoreForLogging(
+	t *testing.T,
+	logCtx context.Context,
+	repo *store.Repository,
+	server *gotmux.Server,
+	leaseRoot string,
+) {
 	t.Helper()
 
 	_, err := engine.Restore(logCtx, repo, server, engine.RestoreConfig{
@@ -1080,7 +1300,14 @@ func TestEngineRestoreRefusesConfigMismatchOnSameOperationID(t *testing.T) {
 	repoDir := filepath.Join(t.TempDir(), "repo")
 	leaseRoot := filepath.Join(t.TempDir(), "leases")
 
-	live, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "config-intent", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly})
+	live, err := server.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{
+			Name:    "config-intent",
+			Program: gotmux.Exec("sleep", "300"),
+			Start:   gotmux.StartPolicyExistingOnly,
+		},
+	)
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -1135,7 +1362,14 @@ func TestEngineRestoreVerificationFailureSingleOwningErrorRecord(t *testing.T) {
 	repoDir := filepath.Join(t.TempDir(), "repo")
 	leaseRoot := filepath.Join(t.TempDir(), "leases")
 
-	live, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "schema-verify", Program: gotmux.Exec("sleep", "300"), Start: gotmux.StartPolicyExistingOnly})
+	live, err := server.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{
+			Name:    "schema-verify",
+			Program: gotmux.Exec("sleep", "300"),
+			Start:   gotmux.StartPolicyExistingOnly,
+		},
+	)
 	if err != nil {
 		t.Fatalf("NewSession failed: %v", err)
 	}
@@ -1201,11 +1435,18 @@ func assertSingleOwningFailureRecord(t *testing.T, records []map[string]any, raw
 	}
 
 	if errorsCount != 1 {
-		t.Fatalf("expected exactly one owning error record for terminal failure, got %d", errorsCount)
+		t.Fatalf(
+			"expected exactly one owning error record for terminal failure, got %d",
+			errorsCount,
+		)
 	}
 
 	if warns != 0 {
-		t.Fatalf("terminal failure must not be duplicated as warn record, got %d warns: %s", warns, raw)
+		t.Fatalf(
+			"terminal failure must not be duplicated as warn record, got %d warns: %s",
+			warns,
+			raw,
+		)
 	}
 
 	if strings.Contains(raw, "schema-verify") || strings.Contains(raw, repoDir) {

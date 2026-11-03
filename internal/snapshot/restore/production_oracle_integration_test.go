@@ -38,11 +38,21 @@ func TestProductionExecutorSourceDestructionParity(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 60*time.Second)
 	defer cancel()
 
-	unrelated, unrelatedLinks, unrelatedPane := setupTargetWithUnrelatedSession(t, ctx, targetServer)
+	unrelated, unrelatedLinks, unrelatedPane := setupTargetWithUnrelatedSession(
+		t,
+		ctx,
+		targetServer,
+	)
 
 	sessionNames := []string{"source-lead", "source-foll", "src-repeat"}
 	repoDir := filepath.Join(t.TempDir(), "repo")
-	generation, manifest, expected := captureAndDestroySource(t, ctx, sourceServer, repoDir, sessionNames)
+	generation, manifest, expected := captureAndDestroySource(
+		t,
+		ctx,
+		sourceServer,
+		repoDir,
+		sessionNames,
+	)
 
 	plan := buildPlanForNames(t, manifest, sessionNames)
 
@@ -66,7 +76,11 @@ func TestProductionExecutorResumeAfterPartialFailure(t *testing.T) {
 	sessionNames := []string{"source-lead", "source-foll", "src-repeat"}
 	expected := readIndependentSourceState(t, ctx, sourceServer, sessionNames)
 
-	observation, err := capture.Observe(ctx, sourceServer, []gotmux.SessionID{leadSess.ID(), follSess.ID(), repeatSess.ID()})
+	observation, err := capture.Observe(
+		ctx,
+		sourceServer,
+		[]gotmux.SessionID{leadSess.ID(), follSess.ID(), repeatSess.ID()},
+	)
 	if err != nil {
 		t.Fatalf("capture.Observe failed: %v", err)
 	}
@@ -95,7 +109,15 @@ func TestProductionExecutorResumeAfterPartialFailure(t *testing.T) {
 
 	defer func() { _ = repo.Close() }()
 
-	operation := registerPlanOperation(t, ctx, repo, "production-resume", generation, targetServer.Endpoint().SocketPath, plan)
+	operation := registerPlanOperation(
+		t,
+		ctx,
+		repo,
+		"production-resume",
+		generation,
+		targetServer.Endpoint().SocketPath,
+		plan,
+	)
 
 	interrupted := plan.Steps[len(plan.Steps)/2]
 
@@ -104,7 +126,11 @@ func TestProductionExecutorResumeAfterPartialFailure(t *testing.T) {
 
 	resumable := DefaultExecuteConfig()
 
-	if _, err := NewExecutor(targetServer, observation.Manifest, resumable).Execute(ctx, plan, journal); err == nil {
+	if _, err := NewExecutor(
+		targetServer,
+		observation.Manifest,
+		resumable,
+	).Execute(ctx, plan, journal); err == nil {
 		t.Fatal("expected the interrupted attempt to fail")
 	}
 
@@ -134,7 +160,11 @@ func TestProductionExecutorResumeAfterPartialFailure(t *testing.T) {
 	verifyTargetStructuralParity(t, ctx, targetServer, expected)
 }
 
-func setupTargetWithUnrelatedSession(t *testing.T, ctx context.Context, targetServer *gotmux.Server) (gotmux.Session, []gotmux.WindowLinkInfo, gotmux.PaneInfo) {
+func setupTargetWithUnrelatedSession(
+	t *testing.T,
+	ctx context.Context,
+	targetServer *gotmux.Server,
+) (gotmux.Session, []gotmux.WindowLinkInfo, gotmux.PaneInfo) {
 	t.Helper()
 
 	if err := targetServer.GlobalSessionOptions().SetBaseIndex(ctx, 2); err != nil {
@@ -178,7 +208,11 @@ func captureAndDestroySource(
 	leadSess, follSess, repeatSess := createActualSourceFixture(t, ctx, sourceServer)
 	expected := readIndependentSourceState(t, ctx, sourceServer, sessionNames)
 
-	observation, err := capture.Observe(ctx, sourceServer, []gotmux.SessionID{leadSess.ID(), follSess.ID(), repeatSess.ID()})
+	observation, err := capture.Observe(
+		ctx,
+		sourceServer,
+		[]gotmux.SessionID{leadSess.ID(), follSess.ID(), repeatSess.ID()},
+	)
 	if err != nil {
 		t.Fatalf("capture.Observe failed: %v", err)
 	}
@@ -224,7 +258,15 @@ func executeAndVerifyOnTarget(
 	}
 	defer func() { _ = repo.Close() }()
 
-	operation := registerPlanOperation(t, ctx, repo, "production-parity", generation, targetServer.Endpoint().SocketPath, plan)
+	operation := registerPlanOperation(
+		t,
+		ctx,
+		repo,
+		"production-parity",
+		generation,
+		targetServer.Endpoint().SocketPath,
+		plan,
+	)
 
 	report, err := NewExecutor(targetServer, manifest, DefaultExecuteConfig()).
 		Execute(ctx, plan, newPlanJournal(t, ctx, repo, operation))

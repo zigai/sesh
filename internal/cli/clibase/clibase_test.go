@@ -65,7 +65,13 @@ func sessionTableColumns(sessionMinWidth int) []clibase.TableColumn {
 	}
 }
 
-func renderTableLines(t *testing.T, width int, columns []clibase.TableColumn, rows []prettytable.Row, full bool) []string {
+func renderTableLines(
+	t *testing.T,
+	width int,
+	columns []clibase.TableColumn,
+	rows []prettytable.Row,
+	full bool,
+) []string {
 	t.Helper()
 
 	var buf bytes.Buffer
@@ -79,10 +85,18 @@ func renderTableLines(t *testing.T, width int, columns []clibase.TableColumn, ro
 func TestResponsiveTableCompactTruncatesFlexibleColumnAndKeepsFixedColumns(t *testing.T) {
 	t.Parallel()
 
-	rows := []prettytable.Row{{"extremely-long-session-name-for-testing-truncation-behavior-in-terminal", 3, "yes", "just now"}}
+	rows := []prettytable.Row{
+		{
+			"extremely-long-session-name-for-testing-truncation-behavior-in-terminal",
+			3,
+			"yes",
+			"just now",
+		},
+	}
 	lines := renderTableLines(t, 40, sessionTableColumns(20), rows, false)
 
-	if len(lines) != 3 || strings.Trim(lines[1], "─") != "" || strings.Contains(strings.Join(lines, "\n"), "│") {
+	if len(lines) != 3 || strings.Trim(lines[1], "─") != "" ||
+		strings.Contains(strings.Join(lines, "\n"), "│") {
 		t.Fatalf("compact table must be a header, one thin rule and one row: %q", lines)
 	}
 
@@ -91,7 +105,8 @@ func TestResponsiveTableCompactTruncatesFlexibleColumnAndKeepsFixedColumns(t *te
 		t.Fatalf("compact row width = %d, want <= 40: %q", width, row)
 	}
 
-	if !strings.Contains(row, "extremely-lo…") || !strings.Contains(row, "yes") || !strings.Contains(row, "just now") {
+	if !strings.Contains(row, "extremely-lo…") || !strings.Contains(row, "yes") ||
+		!strings.Contains(row, "just now") {
 		t.Fatalf("compact row must truncate the session and keep fixed columns: %q", row)
 	}
 }
@@ -99,13 +114,27 @@ func TestResponsiveTableCompactTruncatesFlexibleColumnAndKeepsFixedColumns(t *te
 func TestResponsiveTableLinesNeverExceedRequestedWidth(t *testing.T) {
 	t.Parallel()
 
-	rows := []prettytable.Row{{"extremely-long-session-name-for-testing-truncation-behavior-in-terminal", 3, "yes", "just now"}}
+	rows := []prettytable.Row{
+		{
+			"extremely-long-session-name-for-testing-truncation-behavior-in-terminal",
+			3,
+			"yes",
+			"just now",
+		},
+	}
 
 	for _, full := range []bool{false, true} {
 		for _, width := range []int{40, 60, 120} {
 			for _, line := range renderTableLines(t, width, sessionTableColumns(20), rows, full) {
 				if got := ansi.StringWidth(line); got > width {
-					t.Errorf("full=%t width=%d: line width = %d, want <= %d: %q", full, width, got, width, line)
+					t.Errorf(
+						"full=%t width=%d: line width = %d, want <= %d: %q",
+						full,
+						width,
+						got,
+						width,
+						line,
+					)
 				}
 			}
 		}
@@ -115,9 +144,15 @@ func TestResponsiveTableLinesNeverExceedRequestedWidth(t *testing.T) {
 func TestResponsiveTableMeasuresCellsByDisplayWidth(t *testing.T) {
 	t.Parallel()
 
-	truncated := renderTableLines(t, 5, []clibase.TableColumn{{Heading: "Name", Fixed: false, MinWidth: 0, Wrap: nil}},
-		[]prettytable.Row{{"\x1b[31m\u754c\u754c\u754c\x1b[0m"}}, false)
-	if cell := truncated[len(truncated)-1]; ansi.StringWidth(cell) != 5 || ansi.Strip(cell) != "\u754c\u754c…" {
+	truncated := renderTableLines(
+		t,
+		5,
+		[]clibase.TableColumn{{Heading: "Name", Fixed: false, MinWidth: 0, Wrap: nil}},
+		[]prettytable.Row{{"\x1b[31m\u754c\u754c\u754c\x1b[0m"}},
+		false,
+	)
+	if cell := truncated[len(truncated)-1]; ansi.StringWidth(cell) != 5 ||
+		ansi.Strip(cell) != "\u754c\u754c…" {
 		t.Fatalf("compact cell = %q, want display-aware truncation to %q", cell, "\u754c\u754c…")
 	}
 
@@ -125,10 +160,19 @@ func TestResponsiveTableMeasuresCellsByDisplayWidth(t *testing.T) {
 		{Heading: "Name", Fixed: false, MinWidth: 0, Wrap: nil},
 		{Heading: "\x1b[34m\u540d\x1b[0m", Fixed: true, MinWidth: 0, Wrap: nil},
 	}
-	fitted := renderTableLines(t, 12, columns, []prettytable.Row{{"abcdef", "\x1b[31m\u754c\u754c\x1b[0m"}}, false)
+	fitted := renderTableLines(
+		t,
+		12,
+		columns,
+		[]prettytable.Row{{"abcdef", "\x1b[31m\u754c\u754c\x1b[0m"}},
+		false,
+	)
 
 	if row := ansi.Strip(fitted[len(fitted)-1]); row != "abcdef  \u754c\u754c" {
-		t.Fatalf("row = %q, want the styled wide fixed cell measured as 4 columns so the name fits untruncated", row)
+		t.Fatalf(
+			"row = %q, want the styled wide fixed cell measured as 4 columns so the name fits untruncated",
+			row,
+		)
 	}
 }
 
@@ -156,14 +200,21 @@ func TestWrapIdentifierBreaksAtDelimitersByDisplayWidth(t *testing.T) {
 func TestResponsiveTableFullModeWrapsInsteadOfTruncating(t *testing.T) {
 	t.Parallel()
 
-	lines := renderTableLines(t, 40, sessionTableColumns(10), []prettytable.Row{{"session-one-two-three", 3, "yes", "just now"}}, true)
+	lines := renderTableLines(
+		t,
+		40,
+		sessionTableColumns(10),
+		[]prettytable.Row{{"session-one-two-three", 3, "yes", "just now"}},
+		true,
+	)
 
 	rendered := strings.Join(lines, "\n")
 	if strings.Contains(rendered, "…") || strings.Contains(rendered, "session-one-two-three") {
 		t.Fatalf("full table must wrap the session across lines without truncation:\n%s", rendered)
 	}
 
-	if len(lines) != 4 || !strings.HasPrefix(lines[2], "session-one-") || !strings.Contains(lines[2], "just now") ||
+	if len(lines) != 4 || !strings.HasPrefix(lines[2], "session-one-") ||
+		!strings.Contains(lines[2], "just now") ||
 		strings.TrimSpace(lines[3]) != "two-three" {
 		t.Fatalf("full table must continue the wrapped session on its own line:\n%s", rendered)
 	}
@@ -172,7 +223,13 @@ func TestResponsiveTableFullModeWrapsInsteadOfTruncating(t *testing.T) {
 func TestResponsiveTableFullModeStacksRowsThatCannotFit(t *testing.T) {
 	t.Parallel()
 
-	lines := renderTableLines(t, 20, sessionTableColumns(10), []prettytable.Row{{"a-very-long-session-name-that-cannot-fit", 3, "yes", "just now"}}, true)
+	lines := renderTableLines(
+		t,
+		20,
+		sessionTableColumns(10),
+		[]prettytable.Row{{"a-very-long-session-name-that-cannot-fit", 3, "yes", "just now"}},
+		true,
+	)
 
 	labels := make([]string, 0, 4)
 
@@ -187,7 +244,11 @@ func TestResponsiveTableFullModeStacksRowsThatCannotFit(t *testing.T) {
 	}
 
 	if strings.Join(labels, ",") != "Session,Panes,Attached,Activity" {
-		t.Fatalf("stacked labels = %v, want every column labeled in order:\n%s", labels, strings.Join(lines, "\n"))
+		t.Fatalf(
+			"stacked labels = %v, want every column labeled in order:\n%s",
+			labels,
+			strings.Join(lines, "\n"),
+		)
 	}
 }
 
@@ -216,7 +277,9 @@ func TestJSONHelpers(t *testing.T) {
 		t.Fatalf("JSONErrorCode(ErrOutputLimit) = %q, want 'outputLimitExceeded'", code)
 	}
 
-	if msg := clibase.SafeCommandErrorMessage(outputLimit); msg != "tmux command output exceeded its byte limit" {
+	if msg := clibase.SafeCommandErrorMessage(
+		outputLimit,
+	); msg != "tmux command output exceeded its byte limit" {
 		t.Fatalf("SafeCommandErrorMessage(ErrOutputLimit) = %q", msg)
 	}
 

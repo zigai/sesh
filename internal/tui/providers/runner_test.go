@@ -28,7 +28,11 @@ func TestRunnerRejectsStaleResultAndCancelsInvalidatedRequest(t *testing.T) {
 		t.Fatalf("invalidated request context = %v", ctx.Err())
 	}
 
-	if runner.Complete(Git, first, Rows{"%1": {display.FieldAgentGitLabel: {Text: "old", State: layout.Present}}}) {
+	if runner.Complete(
+		Git,
+		first,
+		Rows{"%1": {display.FieldAgentGitLabel: {Text: "old", State: layout.Present}}},
+	) {
 		t.Fatal("stale result replaced the snapshot")
 	}
 
@@ -45,7 +49,11 @@ func TestRunnerCompletesCurrentRequest(t *testing.T) {
 		t.Fatal("git request did not start")
 	}
 
-	if !runner.Complete(Git, request, Rows{"%1": {display.FieldAgentGitLabel: {Text: "new", State: layout.Present}}}) {
+	if !runner.Complete(
+		Git,
+		request,
+		Rows{"%1": {display.FieldAgentGitLabel: {Text: "new", State: layout.Present}}},
+	) {
 		t.Fatal("current result was rejected")
 	}
 
@@ -53,7 +61,12 @@ func TestRunnerCompletesCurrentRequest(t *testing.T) {
 		t.Fatalf("completed request context = %v", ctx.Err())
 	}
 
-	if got := runner.Cell(Git, "%1", display.FieldAgentGitLabel); got.Text != "new" || got.State != layout.Present {
+	if got := runner.Cell(
+		Git,
+		"%1",
+		display.FieldAgentGitLabel,
+	); got.Text != "new" ||
+		got.State != layout.Present {
 		t.Fatalf("git cell = %+v", got)
 	}
 }
@@ -64,22 +77,53 @@ func TestRunnerPublishesVersionedCopiesAndCellPresence(t *testing.T) {
 		t.Fatalf("unreported cell state = %v, want Pending", got)
 	}
 
-	rows := Rows{"%1": {display.FieldStatusAge: {Text: "1m", Role: "muted", Variants: []string{"1"}, State: layout.Present}}}
+	rows := Rows{
+		"%1": {
+			display.FieldStatusAge: {
+				Text:     "1m",
+				Role:     "muted",
+				Variants: []string{"1"},
+				State:    layout.Present,
+			},
+		},
+	}
 	first := runner.Publish(Clock, rows)
 
-	rows["%1"][display.FieldStatusAge] = layout.Cell{Text: "changed", Role: "", Variants: nil, State: layout.Present}
+	rows["%1"][display.FieldStatusAge] = layout.Cell{
+		Text:     "changed",
+		Role:     "",
+		Variants: nil,
+		State:    layout.Present,
+	}
 	if got := runner.Cell(Clock, "%1", display.FieldStatusAge).Text; got != "1m" {
 		t.Fatalf("published cell changed with caller map: %q", got)
 	}
 
 	snapshot := runner.Snapshot(Clock)
 
-	snapshot.Rows["%1"][display.FieldStatusAge] = layout.Cell{Text: "mutated", Role: "", Variants: nil, State: layout.Present}
+	snapshot.Rows["%1"][display.FieldStatusAge] = layout.Cell{
+		Text:     "mutated",
+		Role:     "",
+		Variants: nil,
+		State:    layout.Present,
+	}
 	if got := runner.Cell(Clock, "%1", display.FieldStatusAge).Text; got != "1m" {
 		t.Fatalf("published cell changed with snapshot copy: %q", got)
 	}
 
-	if next := runner.Publish(Clock, Rows{"%1": {display.FieldStatusAge: {Text: "1m", Role: "muted", Variants: []string{"1"}, State: layout.Present}}}); next != first {
+	if next := runner.Publish(
+		Clock,
+		Rows{
+			"%1": {
+				display.FieldStatusAge: {
+					Text:     "1m",
+					Role:     "muted",
+					Variants: []string{"1"},
+					State:    layout.Present,
+				},
+			},
+		},
+	); next != first {
 		t.Fatalf("unchanged publish advanced version: %d to %d", first, next)
 	}
 

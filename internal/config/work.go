@@ -18,14 +18,22 @@ const (
 )
 
 var (
-	errProjectPathInvalid   = errors.New("must be an absolute path or start with ~/")
-	errOverrideKey          = errors.New("must be a project directory name, an absolute path, or start with ~/")
-	errPopupSocketInvalid   = errors.New("tasks.popup_socket must be a tmux socket name without slashes or spaces")
-	errPopupConfigInvalid   = errors.New("tasks.popup_config must be empty, an absolute path, or start with ~/")
+	errProjectPathInvalid = errors.New("must be an absolute path or start with ~/")
+	errOverrideKey        = errors.New(
+		"must be a project directory name, an absolute path, or start with ~/",
+	)
+	errPopupSocketInvalid = errors.New(
+		"tasks.popup_socket must be a tmux socket name without slashes or spaces",
+	)
+	errPopupConfigInvalid = errors.New(
+		"tasks.popup_config must be empty, an absolute path, or start with ~/",
+	)
 	errHarnessNameInvalid   = errors.New("harness names may only contain a-z, 0-9, _ and -")
 	errHarnessNameReserved  = errors.New("harness name is reserved")
 	errHarnessNameDuplicate = errors.New("duplicate harness name")
-	errHarnessCommandEmpty  = errors.New("harness needs a command unless it names a harness AHT supports")
+	errHarnessCommandEmpty  = errors.New(
+		"harness needs a command unless it names a harness AHT supports",
+	)
 )
 
 type ProjectsConfig struct {
@@ -59,20 +67,37 @@ func DefaultProjectsConfig() ProjectsConfig {
 
 func DefaultTasksConfig() TasksConfig {
 	return TasksConfig{
-		Panes:   []TaskPaneConfig{{Name: "editor", Command: []string{"nvim"}, Dir: "", Restart: false}},
-		Layouts: nil, PopupSocket: DefaultPopupSocket, PopupConfig: "", Harness: nil,
-		WakeOnRestore: WakeOnRestorePrevious, ShowFooter: true,
+		Panes: []TaskPaneConfig{
+			{Name: "editor", Command: []string{"nvim"}, Dir: "", Restart: false},
+		},
+		Layouts:       nil,
+		PopupSocket:   DefaultPopupSocket,
+		PopupConfig:   "",
+		Harness:       nil,
+		WakeOnRestore: WakeOnRestorePrevious,
+		ShowFooter:    true,
 	}
 }
 
 func (p ProjectsConfig) Clone() ProjectsConfig {
-	return ProjectsConfig{Roots: slices.Clone(p.Roots), Extra: slices.Clone(p.Extra), Overrides: cloneProjects(p.Overrides)}
+	return ProjectsConfig{
+		Roots:     slices.Clone(p.Roots),
+		Extra:     slices.Clone(p.Extra),
+		Overrides: cloneProjects(p.Overrides),
+	}
 }
 
 func (t TasksConfig) Clone() TasksConfig {
 	harnesses := make([]HarnessConfig, 0, len(t.Harness))
 	for _, entry := range t.Harness {
-		harnesses = append(harnesses, HarnessConfig{Name: entry.Name, Command: slices.Clone(entry.Command), PromptArgs: slices.Clone(entry.PromptArgs)})
+		harnesses = append(
+			harnesses,
+			HarnessConfig{
+				Name:       entry.Name,
+				Command:    slices.Clone(entry.Command),
+				PromptArgs: slices.Clone(entry.PromptArgs),
+			},
+		)
 	}
 
 	if t.Harness == nil {
@@ -80,8 +105,15 @@ func (t TasksConfig) Clone() TasksConfig {
 	}
 
 	return TasksConfig{
-		Panes: cloneTaskPanes(t.Panes), Layouts: cloneTaskLayouts(t.Layouts), PopupSocket: t.PopupSocket, PopupConfig: t.PopupConfig, Harness: harnesses,
-		WakeOnRestore: t.WakeOnRestore, ShowFooter: t.ShowFooter,
+		Panes: cloneTaskPanes(
+			t.Panes,
+		),
+		Layouts:       cloneTaskLayouts(t.Layouts),
+		PopupSocket:   t.PopupSocket,
+		PopupConfig:   t.PopupConfig,
+		Harness:       harnesses,
+		WakeOnRestore: t.WakeOnRestore,
+		ShowFooter:    t.ShowFooter,
 	}
 }
 
@@ -143,7 +175,9 @@ func ValidHarnessName(name string) bool {
 	}
 
 	for _, character := range name {
-		if (character < 'a' || character > 'z') && (character < '0' || character > '9') && character != '_' && character != '-' {
+		if (character < 'a' || character > 'z') && (character < '0' || character > '9') &&
+			character != '_' &&
+			character != '-' {
 			return false
 		}
 	}
@@ -152,7 +186,10 @@ func ValidHarnessName(name string) bool {
 }
 
 func SupportedHarness(name string) bool {
-	return slices.ContainsFunc(harness.Supported(), func(id registry.Harness) bool { return string(id) == name })
+	return slices.ContainsFunc(
+		harness.Supported(),
+		func(id registry.Harness) bool { return string(id) == name },
+	)
 }
 
 func validateHarness(entry HarnessConfig) error {

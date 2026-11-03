@@ -51,11 +51,16 @@ func Bindings(cfg *config.Config) ([]Binding, error) {
 	for index, bind := range cfg.Keys.Bind {
 		binding, err := configuredBinding(bind)
 		if err != nil {
-			return nil, oops.In("action").Code("config_invalid").With("operation", "resolve_bindings", "binding", index+1).Wrap(err)
+			return nil, oops.In("action").
+				Code("config_invalid").
+				With("operation", "resolve_bindings", "binding", index+1).
+				Wrap(err)
 		}
 
 		if slices.ContainsFunc(configured, binding.sameKey) {
-			return nil, oops.In("action").Code("config_invalid").With("operation", "resolve_bindings", "binding", index+1).
+			return nil, oops.In("action").
+				Code("config_invalid").
+				With("operation", "resolve_bindings", "binding", index+1).
 				Wrap(fmt.Errorf("%w: %s", ErrDuplicateBinding, binding.Key))
 		}
 
@@ -79,16 +84,31 @@ func Bindings(cfg *config.Config) ([]Binding, error) {
 }
 
 func SurfaceBindings(bindings []Binding, surface Surface) []Binding {
-	return slices.DeleteFunc(slices.Clone(bindings), func(binding Binding) bool { return binding.In != surface })
+	return slices.DeleteFunc(
+		slices.Clone(bindings),
+		func(binding Binding) bool { return binding.In != surface },
+	)
 }
 
 func defaultBindings() []Binding {
 	picker := func(key string, definition Entry) Binding {
-		return Binding{Key: key, Action: definition.Describe().ID, In: SurfacePicker, Table: "", Values: Values{}}
+		return Binding{
+			Key:    key,
+			Action: definition.Describe().ID,
+			In:     SurfacePicker,
+			Table:  "",
+			Values: Values{},
+		}
 	}
 
 	tmux := func(key string, definition Entry, values Values) Binding {
-		return Binding{Key: key, Action: definition.Describe().ID, In: SurfaceTmux, Table: DefaultTmuxTable, Values: values}
+		return Binding{
+			Key:    key,
+			Action: definition.Describe().ID,
+			In:     SurfaceTmux,
+			Table:  DefaultTmuxTable,
+			Values: values,
+		}
 	}
 
 	return []Binding{
@@ -132,7 +152,13 @@ func taskActionBindings(cfg *config.Config, existing []Binding) []Binding {
 	bindings := make([]Binding, 0, len(keys))
 
 	for _, key := range slices.Sorted(maps.Keys(keys)) {
-		binding := Binding{Key: key, Action: TaskRun.ID, In: SurfacePicker, Table: "", Values: Values{"action": {keys[key]}}}
+		binding := Binding{
+			Key:    key,
+			Action: TaskRun.ID,
+			In:     SurfacePicker,
+			Table:  "",
+			Values: Values{"action": {keys[key]}},
+		}
 		if !slices.ContainsFunc(existing, binding.sameKey) {
 			bindings = append(bindings, binding)
 		}
@@ -146,7 +172,13 @@ func (binding Binding) sameKey(other Binding) bool {
 }
 
 func configuredBinding(bind config.KeyBindConfig) (Binding, error) {
-	binding := Binding{Key: "", Action: ID(bind.Action), In: Surface(bind.In), Table: bind.Table, Values: Values{}}
+	binding := Binding{
+		Key:    "",
+		Action: ID(bind.Action),
+		In:     Surface(bind.In),
+		Table:  bind.Table,
+		Values: Values{},
+	}
 
 	switch binding.In {
 	case SurfacePicker:
@@ -202,7 +234,11 @@ func checkBindable(descriptor Descriptor, binding Binding) error {
 		return checkValues(descriptor.Params, binding.Values, false)
 	case SurfaceTmux:
 		if descriptor.InPicker {
-			return fmt.Errorf("%w: %s runs only in the picker", ErrBindingUnsupported, descriptor.ID)
+			return fmt.Errorf(
+				"%w: %s runs only in the picker",
+				ErrBindingUnsupported,
+				descriptor.ID,
+			)
 		}
 
 		if descriptor.Subject == SubjectSavedSession && descriptor.Arity != ArityOptional {
@@ -281,11 +317,18 @@ func checkPickerKeys(keys config.KeyConfig, bindings []Binding) error {
 		case slices.ContainsFunc(reserved, func(key string) bool { return key != "" && config.PickerKeyName(key) == binding.Key }):
 			err = fmt.Errorf("%w: %s is a picker navigation key", ErrPickerKeyReserved, binding.Key)
 		case config.PickerKeyTypes(binding.Key):
-			err = fmt.Errorf("%w: %s types into the search field", ErrPickerKeyReserved, binding.Key)
+			err = fmt.Errorf(
+				"%w: %s types into the search field",
+				ErrPickerKeyReserved,
+				binding.Key,
+			)
 		}
 
 		if err != nil {
-			return oops.In("action").Code("config_invalid").With("operation", "resolve_bindings").Wrap(err)
+			return oops.In("action").
+				Code("config_invalid").
+				With("operation", "resolve_bindings").
+				Wrap(err)
 		}
 	}
 

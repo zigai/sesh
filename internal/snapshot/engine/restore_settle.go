@@ -19,12 +19,18 @@ const restoreTargetBirthPrefix = "birth="
 
 func ActiveRestores(ctx context.Context, repository *store.Repository) ([]OperationStatus, error) {
 	if repository == nil {
-		return nil, oops.In("snapshot").Code("repository_required").With("operation", "list_active_restores").Wrap(ErrRepositoryRequired)
+		return nil, oops.In("snapshot").
+			Code("repository_required").
+			With("operation", "list_active_restores").
+			Wrap(ErrRepositoryRequired)
 	}
 
 	catalog, err := repository.Inspect(ctx)
 	if err != nil {
-		return nil, oops.In("snapshot").Code("inspect_failed").With("operation", "list_active_restores").Wrap(err)
+		return nil, oops.In("snapshot").
+			Code("inspect_failed").
+			With("operation", "list_active_restores").
+			Wrap(err)
 	}
 
 	var active []OperationStatus
@@ -38,19 +44,32 @@ func ActiveRestores(ctx context.Context, repository *store.Repository) ([]Operat
 	return active, nil
 }
 
-func RestoreTargetedServer(ctx context.Context, repository *store.Repository, server *gotmux.Server) (bool, error) {
+func RestoreTargetedServer(
+	ctx context.Context,
+	repository *store.Repository,
+	server *gotmux.Server,
+) (bool, error) {
 	if repository == nil {
-		return false, oops.In("snapshot").Code("repository_required").With("operation", "find_server_restore").Wrap(ErrRepositoryRequired)
+		return false, oops.In("snapshot").
+			Code("repository_required").
+			With("operation", "find_server_restore").
+			Wrap(ErrRepositoryRequired)
 	}
 
 	live, err := observeRestoreDaemonIdentity(ctx, server)
 	if err != nil {
-		return false, oops.In("snapshot").Code("daemon_identity_unavailable").With("operation", "find_server_restore").Wrap(err)
+		return false, oops.In("snapshot").
+			Code("daemon_identity_unavailable").
+			With("operation", "find_server_restore").
+			Wrap(err)
 	}
 
 	catalog, err := repository.Inspect(ctx)
 	if err != nil {
-		return false, oops.In("snapshot").Code("inspect_failed").With("operation", "find_server_restore").Wrap(err)
+		return false, oops.In("snapshot").
+			Code("inspect_failed").
+			With("operation", "find_server_restore").
+			Wrap(err)
 	}
 
 	instance := restoreTargetInstance(server.Endpoint().SocketPath, live.Server)
@@ -66,7 +85,10 @@ func RestoreTargetedServer(ctx context.Context, repository *store.Repository, se
 
 // SettleDeadRestores abandons, as bookkeeping only, every active restore whose daemon provably no
 // longer runs and returns them. A restore whose daemon may run or cannot be checked stays active.
-func SettleDeadRestores(ctx context.Context, repository *store.Repository) ([]OperationStatus, error) {
+func SettleDeadRestores(
+	ctx context.Context,
+	repository *store.Repository,
+) ([]OperationStatus, error) {
 	active, err := ActiveRestores(ctx, repository)
 	if err != nil {
 		return nil, err

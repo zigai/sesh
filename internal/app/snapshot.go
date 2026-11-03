@@ -54,7 +54,11 @@ func (local *Local) registerSnapshotHandlers() {
 	handle(local, action.SnapshotRestore, local.restoreSnapshot)
 }
 
-func (local *Local) saveSnapshot(ctx context.Context, _ action.Caller, input action.SaveSnapshot) (action.SavedSnapshot, error) {
+func (local *Local) saveSnapshot(
+	ctx context.Context,
+	_ action.Caller,
+	input action.SaveSnapshot,
+) (action.SavedSnapshot, error) {
 	result := action.SavedSnapshot{Attempt: "", Generation: "", Status: "failed"}
 
 	selected, err := local.saveSelection(ctx, input.Sessions)
@@ -83,10 +87,16 @@ func (local *Local) saveSnapshot(ctx context.Context, _ action.Caller, input act
 		AgentSource:            local.agentSource,
 		Profile:                engine.RecoveryPractical,
 	})
-	result = action.SavedSnapshot{Attempt: saved.Attempt, Generation: saved.Generation, Status: saved.Status}
+	result = action.SavedSnapshot{
+		Attempt:    saved.Attempt,
+		Generation: saved.Generation,
+		Status:     saved.Status,
+	}
 
 	if err != nil {
-		return result, oops.In("app").With("operation", "save_snapshot").Wrap(engineLoggedError{err})
+		return result, oops.In("app").
+			With("operation", "save_snapshot").
+			Wrap(engineLoggedError{err})
 	}
 
 	if saved.Status != saveStatusComplete && saved.Status != saveStatusBestEffort {
@@ -96,7 +106,10 @@ func (local *Local) saveSnapshot(ctx context.Context, _ action.Caller, input act
 	return result, nil
 }
 
-func (local *Local) saveSelection(ctx context.Context, refs []action.SessionRef) ([]gotmux.SessionID, error) {
+func (local *Local) saveSelection(
+	ctx context.Context,
+	refs []action.SessionRef,
+) ([]gotmux.SessionID, error) {
 	if len(refs) == 0 {
 		return nil, action.Wrap(action.CodeInvalidArgument, capture.ErrSelection)
 	}
@@ -137,7 +150,11 @@ func (local *Local) saveEnvironment(input action.SaveSnapshot) ([]string, error)
 	return config.FilterProcessEnvironmentKeys(keys), nil
 }
 
-func (local *Local) restoreSnapshot(ctx context.Context, _ action.Caller, input action.RestoreSnapshot) (action.RestoredSnapshot, error) {
+func (local *Local) restoreSnapshot(
+	ctx context.Context,
+	_ action.Caller,
+	input action.RestoreSnapshot,
+) (action.RestoredSnapshot, error) {
 	var result engine.RestoreResult
 
 	repo, found, err := local.useRepository(ctx, false)
@@ -180,9 +197,14 @@ func (local *Local) restoreSnapshot(ctx context.Context, _ action.Caller, input 
 
 	switch {
 	case err != nil:
-		return output, oops.In("app").With("operation", "restore_snapshot").Wrap(engineLoggedError{err})
+		return output, oops.In("app").
+			With("operation", "restore_snapshot").
+			Wrap(engineLoggedError{err})
 	case result.Uncertain:
-		return output, action.Wrap(action.CodeUncertain, engineLoggedError{restore.ErrExecutionUncertain})
+		return output, action.Wrap(
+			action.CodeUncertain,
+			engineLoggedError{restore.ErrExecutionUncertain},
+		)
 	case !result.Verified || (result.Status != saveStatusComplete && result.Status != saveStatusBestEffort):
 		return output, action.Wrap(action.CodePartial, engineLoggedError{ErrPartialRestore})
 	default:
@@ -190,7 +212,11 @@ func (local *Local) restoreSnapshot(ctx context.Context, _ action.Caller, input 
 	}
 }
 
-func restoreGeneration(ctx context.Context, repo *store.Repository, requested string) (string, error) {
+func restoreGeneration(
+	ctx context.Context,
+	repo *store.Repository,
+	requested string,
+) (string, error) {
 	if requested != "" {
 		return requested, nil
 	}
@@ -206,8 +232,15 @@ func restoreGeneration(ctx context.Context, repo *store.Repository, requested st
 func readManifest(ctx context.Context, repo *store.Repository, generation string) *model.Manifest {
 	manifest, err := repo.Read(ctx, generation)
 	if err != nil {
-		zerolog.Ctx(ctx).Warn().Str("component", "snapshot").Str("operation", "label_restore").Str("generation", generation).
-			Str("status", "degraded").Str("reason", "manifest_read_failed").Func(logging.Cause(err)).Msg("restored sessions and panes are reported without names")
+		zerolog.Ctx(ctx).
+			Warn().
+			Str("component", "snapshot").
+			Str("operation", "label_restore").
+			Str("generation", generation).
+			Str("status", "degraded").
+			Str("reason", "manifest_read_failed").
+			Func(logging.Cause(err)).
+			Msg("restored sessions and panes are reported without names")
 
 		return nil
 	}
@@ -223,8 +256,14 @@ func (local *Local) restoredRefs(ctx context.Context, ids []string) []action.Ses
 
 	rows, err := local.liveSessions(ctx)
 	if err != nil {
-		zerolog.Ctx(ctx).Warn().Str("component", "snapshot").Str("operation", "list_restored_sessions").
-			Str("status", "degraded").Str("reason", "session_list_failed").Func(logging.Cause(err)).Msg("restored sessions are reported by tmux ID only")
+		zerolog.Ctx(ctx).
+			Warn().
+			Str("component", "snapshot").
+			Str("operation", "list_restored_sessions").
+			Str("status", "degraded").
+			Str("reason", "session_list_failed").
+			Func(logging.Cause(err)).
+			Msg("restored sessions are reported by tmux ID only")
 	}
 
 	for _, id := range ids {
@@ -244,7 +283,10 @@ func (local *Local) restoredRefs(ctx context.Context, ids []string) []action.Ses
 	return refs
 }
 
-func restoredSnapshot(result engine.RestoreResult, manifest *model.Manifest) action.RestoredSnapshot {
+func restoredSnapshot(
+	result engine.RestoreResult,
+	manifest *model.Manifest,
+) action.RestoredSnapshot {
 	panes := paneLabels(manifest)
 
 	output := action.RestoredSnapshot{
@@ -269,9 +311,15 @@ func restoredSnapshot(result engine.RestoreResult, manifest *model.Manifest) act
 		}
 
 		output.Panes = append(output.Panes, action.RestoredPane{
-			PaneID: pane.PaneID, RuntimeID: pane.RuntimeID, Outcome: pane.Outcome, Reason: pane.Reason,
-			AppVerified: pane.AppVerified, CWDFallback: pane.CWDFallback, VerificationReason: pane.VerificationReason,
-			Location: label.Location, Program: label.Program,
+			PaneID:             pane.PaneID,
+			RuntimeID:          pane.RuntimeID,
+			Outcome:            pane.Outcome,
+			Reason:             pane.Reason,
+			AppVerified:        pane.AppVerified,
+			CWDFallback:        pane.CWDFallback,
+			VerificationReason: pane.VerificationReason,
+			Location:           label.Location,
+			Program:            label.Program,
 		})
 	}
 
@@ -282,7 +330,10 @@ func restoredSnapshot(result engine.RestoreResult, manifest *model.Manifest) act
 	}
 
 	for _, skipped := range result.SessionsSkipped {
-		output.SessionsSkipped = append(output.SessionsSkipped, action.SkippedSession{ID: skipped.ID, Name: skipped.Name, Reason: skipped.Reason})
+		output.SessionsSkipped = append(
+			output.SessionsSkipped,
+			action.SkippedSession{ID: skipped.ID, Name: skipped.Name, Reason: skipped.Reason},
+		)
 	}
 
 	return output
@@ -325,7 +376,10 @@ func paneLabels(manifest *model.Manifest) map[string]paneLabel {
 func mismatches(values []restore.VerificationMismatch) []action.Mismatch {
 	converted := make([]action.Mismatch, 0, len(values))
 	for _, value := range values {
-		converted = append(converted, action.Mismatch{Domain: value.Domain, Entity: value.Entity, Reason: value.Reason})
+		converted = append(
+			converted,
+			action.Mismatch{Domain: value.Domain, Entity: value.Entity, Reason: value.Reason},
+		)
 	}
 
 	return converted

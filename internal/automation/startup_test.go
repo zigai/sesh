@@ -16,8 +16,12 @@ func TestEvaluateStartupRestore_Guards(t *testing.T) {
 		wantReason string
 	}{
 		{
-			name:       "disabled",
-			state:      automation.StartupState{Enabled: false, RepositoryPresent: true, Generation: "g"},
+			name: "disabled",
+			state: automation.StartupState{
+				Enabled:           false,
+				RepositoryPresent: true,
+				Generation:        "g",
+			},
 			wantReason: "disabled",
 		},
 		{

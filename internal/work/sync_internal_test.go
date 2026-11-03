@@ -34,7 +34,15 @@ func linkedItem(prs ...PRLink) Item {
 }
 
 func prOpenedBeforeStart(number int, state task.PRState, source LinkSource) PRLink {
-	link := PRLink{Number: number, State: state, URL: "", Issues: []int{}, Source: source, CreatedAt: startedAt - 60, EndedAt: 0}
+	link := PRLink{
+		Number:    number,
+		State:     state,
+		URL:       "",
+		Issues:    []int{},
+		Source:    source,
+		CreatedAt: startedAt - 60,
+		EndedAt:   0,
+	}
 	if link.Ended() {
 		link.EndedAt = startedAt + 60
 	}
@@ -44,17 +52,29 @@ func prOpenedBeforeStart(number int, state task.PRState, source LinkSource) PRLi
 
 func synced(item Item, found ...PRLink) Item {
 	state := State{Version: Version, LastID: 1, Items: []Item{item}}
-	state.apply(map[string]refresh{item.ID: {directory: item.Directory, gone: false, branch: item.Branch, found: found}}, syncedAt)
+	state.apply(
+		map[string]refresh{
+			item.ID: {directory: item.Directory, gone: false, branch: item.Branch, found: found},
+		},
+		syncedAt,
+	)
 
 	return state.Items[0]
 }
 
 func TestAnOpenPullRequestThatMergesFinishesTheItem(t *testing.T) {
 	for _, ended := range []task.PRState{task.PRMerged, task.PRClosed} {
-		item := synced(linkedItem(prOpenedBeforeStart(4, task.PROpen, LinkBranch)), prOpenedBeforeStart(4, ended, ""))
+		item := synced(
+			linkedItem(prOpenedBeforeStart(4, task.PROpen, LinkBranch)),
+			prOpenedBeforeStart(4, ended, ""),
+		)
 
 		if !item.Finished() || item.FinishedBy != FinishedByPR || item.PRs[0].Source != LinkBranch {
-			t.Errorf("after the pull request was %s, item = %+v, want it finished by its pull request", ended, item)
+			t.Errorf(
+				"after the pull request was %s, item = %+v, want it finished by its pull request",
+				ended,
+				item,
+			)
 		}
 	}
 }
@@ -62,8 +82,12 @@ func TestAnOpenPullRequestThatMergesFinishesTheItem(t *testing.T) {
 func TestABranchPullRequestOpenedAndMergedBetweenSyncsFinishesTheItem(t *testing.T) {
 	item := synced(linkedItem(), prOpenedBeforeStart(4, task.PRMerged, ""))
 
-	if !item.Finished() || item.FinishedBy != FinishedByPR || len(item.Linked()) != 1 || item.PRs[0].Source != LinkBranch {
-		t.Errorf("item = %+v, want the merged pull request linked and the item finished by it", item)
+	if !item.Finished() || item.FinishedBy != FinishedByPR || len(item.Linked()) != 1 ||
+		item.PRs[0].Source != LinkBranch {
+		t.Errorf(
+			"item = %+v, want the merged pull request linked and the item finished by it",
+			item,
+		)
 	}
 }
 
@@ -84,7 +108,10 @@ func TestABranchPullRequestOpenedAfterTheLastTurnIsNotLinked(t *testing.T) {
 	later.CreatedAt = startedAt + 600
 
 	if item := synced(quiet, later); len(item.PRs) != 0 {
-		t.Errorf("item = %+v, want a pull request opened after the conversation went quiet unlinked", item)
+		t.Errorf(
+			"item = %+v, want a pull request opened after the conversation went quiet unlinked",
+			item,
+		)
 	}
 }
 
@@ -98,7 +125,11 @@ func TestALinkedPullRequestOutsideTheConversationIsStillRefreshed(t *testing.T) 
 	refreshed := prOpenedBeforeStart(4, task.PROpen, "")
 	refreshed.CreatedAt, refreshed.URL = startedAt-7200, "https://example.test/pull/4"
 
-	if item := synced(quiet, refreshed); item.PRs[0].URL != refreshed.URL || item.PRs[0].Source != LinkUser {
+	if item := synced(
+		quiet,
+		refreshed,
+	); item.PRs[0].URL != refreshed.URL ||
+		item.PRs[0].Source != LinkUser {
 		t.Errorf("item = %+v, want #4 refreshed and still linked by the user", item)
 	}
 }
@@ -107,13 +138,24 @@ func TestAPullRequestThatEndedBeforeTheLatestPromptDoesNotFinishTheItem(t *testi
 	prompted := linkedItem(prOpenedBeforeStart(4, task.PROpen, LinkBranch))
 	prompted.PromptAt = startedAt + 120
 
-	if item := synced(prompted, prOpenedBeforeStart(4, task.PRMerged, "")); item.Finished() || item.PRs[0].State != task.PRMerged {
-		t.Errorf("item = %+v, want the pull request merged and the item open after a later prompt", item)
+	if item := synced(
+		prompted,
+		prOpenedBeforeStart(4, task.PRMerged, ""),
+	); item.Finished() ||
+		item.PRs[0].State != task.PRMerged {
+		t.Errorf(
+			"item = %+v, want the pull request merged and the item open after a later prompt",
+			item,
+		)
 	}
 }
 
 func TestAResumedItemWhosePullRequestEndedBeforeIsNotFinishedAgain(t *testing.T) {
-	state := State{Version: Version, LastID: 1, Items: []Item{linkedItem(prOpenedBeforeStart(4, task.PRMerged, LinkBranch))}}
+	state := State{
+		Version: Version,
+		LastID:  1,
+		Items:   []Item{linkedItem(prOpenedBeforeStart(4, task.PRMerged, LinkBranch))},
+	}
 	state.Items[0].FinishedAt, state.Items[0].FinishedBy = startedAt+90, FinishedByPR
 
 	if err := state.Reopen("w1", time.Unix(startedAt+600, 0)); err != nil {
@@ -129,7 +171,12 @@ func TestATaskItemIsNeitherLinkedNorFinishedBySync(t *testing.T) {
 	inTask := linkedItem(prOpenedBeforeStart(4, task.PROpen, LinkUser))
 	inTask.Task = "t3"
 
-	if item := synced(inTask, prOpenedBeforeStart(4, task.PRMerged, ""), prOpenedBeforeStart(7, task.PRMerged, "")); item.Finished() || len(item.PRs) != 1 || item.PRs[0].Ended() {
+	if item := synced(
+		inTask,
+		prOpenedBeforeStart(4, task.PRMerged, ""),
+		prOpenedBeforeStart(7, task.PRMerged, ""),
+	); item.Finished() || len(item.PRs) != 1 ||
+		item.PRs[0].Ended() {
 		t.Errorf("item = %+v, want the task's item left to the task ledger", item)
 	}
 }
@@ -144,7 +191,14 @@ func TestAPinnedItemStaysOpenWhenItsPullRequestEnds(t *testing.T) {
 }
 
 func TestAnItemWithAnOpenLinkedPullRequestStaysOpen(t *testing.T) {
-	item := synced(linkedItem(prOpenedBeforeStart(4, task.PROpen, LinkBranch), prOpenedBeforeStart(9, task.PROpen, LinkUser)), prOpenedBeforeStart(4, task.PRMerged, ""), prOpenedBeforeStart(9, task.PROpen, ""))
+	item := synced(
+		linkedItem(
+			prOpenedBeforeStart(4, task.PROpen, LinkBranch),
+			prOpenedBeforeStart(9, task.PROpen, LinkUser),
+		),
+		prOpenedBeforeStart(4, task.PRMerged, ""),
+		prOpenedBeforeStart(9, task.PROpen, ""),
+	)
 
 	if item.Finished() {
 		t.Errorf("item = %+v, want it open while #9 is open", item)
@@ -152,7 +206,14 @@ func TestAnItemWithAnOpenLinkedPullRequestStaysOpen(t *testing.T) {
 }
 
 func TestAnUnlinkedPullRequestIsNotLinkedAgainOrCounted(t *testing.T) {
-	item := synced(linkedItem(prOpenedBeforeStart(4, task.PROpen, LinkDismissed), prOpenedBeforeStart(9, task.PROpen, LinkUser)), prOpenedBeforeStart(4, task.PROpen, ""), prOpenedBeforeStart(9, task.PRMerged, ""))
+	item := synced(
+		linkedItem(
+			prOpenedBeforeStart(4, task.PROpen, LinkDismissed),
+			prOpenedBeforeStart(9, task.PROpen, LinkUser),
+		),
+		prOpenedBeforeStart(4, task.PROpen, ""),
+		prOpenedBeforeStart(9, task.PRMerged, ""),
+	)
 
 	if item.PRs[0].Source != LinkDismissed || !item.Finished() {
 		t.Errorf("item = %+v, want #4 still unlinked and the item finished by #9", item)
@@ -160,8 +221,22 @@ func TestAnUnlinkedPullRequestIsNotLinkedAgainOrCounted(t *testing.T) {
 }
 
 func TestABranchChangeKeepsTheEarlierPullRequestLinked(t *testing.T) {
-	state := State{Version: Version, LastID: 1, Items: []Item{linkedItem(prOpenedBeforeStart(4, task.PROpen, LinkBranch))}}
-	state.apply(map[string]refresh{"w1": {directory: "/code/shop", gone: false, branch: "next", found: []PRLink{prOpenedBeforeStart(7, task.PROpen, "")}}}, syncedAt)
+	state := State{
+		Version: Version,
+		LastID:  1,
+		Items:   []Item{linkedItem(prOpenedBeforeStart(4, task.PROpen, LinkBranch))},
+	}
+	state.apply(
+		map[string]refresh{
+			"w1": {
+				directory: "/code/shop",
+				gone:      false,
+				branch:    "next",
+				found:     []PRLink{prOpenedBeforeStart(7, task.PROpen, "")},
+			},
+		},
+		syncedAt,
+	)
 
 	if linked := state.Items[0].Linked(); len(linked) != 2 || state.Items[0].Branch != "next" {
 		t.Errorf("item = %+v, want #4 and #7 linked on branch next", state.Items[0])
@@ -185,7 +260,14 @@ func TestGitHubPullRequestTimesBecomeTheLinkLifetime(t *testing.T) {
 
 	for index, pr := range decoded {
 		if link := pr.link(); link.CreatedAt != want[index][0] || link.EndedAt != want[index][1] {
-			t.Errorf("#%d lifetime = %d..%d, want %d..%d", pr.Number, link.CreatedAt, link.EndedAt, want[index][0], want[index][1])
+			t.Errorf(
+				"#%d lifetime = %d..%d, want %d..%d",
+				pr.Number,
+				link.CreatedAt,
+				link.EndedAt,
+				want[index][0],
+				want[index][1],
+			)
 		}
 	}
 }
@@ -204,9 +286,15 @@ func TestSyncDropsItemsFinishedLongerThanTheRetentionAgo(t *testing.T) {
 	now := time.Now()
 
 	open := linkedItem()
-	open.ID, open.Directory, open.CreatedAt, open.Task = "w3", dir, now.Add(-2*finishedRetention).Unix(), "t1"
+	open.ID, open.Directory, open.CreatedAt, open.Task = "w3", dir, now.Add(-2*finishedRetention).
+		Unix(),
+		"t1"
 
-	items := []Item{finishedAt("w1", now.Add(-finishedRetention-time.Hour), dir), finishedAt("w2", now.Add(-finishedRetention+time.Hour), dir), open}
+	items := []Item{
+		finishedAt("w1", now.Add(-finishedRetention-time.Hour), dir),
+		finishedAt("w2", now.Add(-finishedRetention+time.Hour), dir),
+		open,
+	}
 
 	if _, err := store.Update(t.Context(), func(state *State) error {
 		state.Items = items
@@ -285,9 +373,16 @@ func TestRepeatedSyncFailuresLogOneDegradedRecord(t *testing.T) {
 	records := runSyncTicks(t, NewStore("relative/private/work.json"), 3)
 
 	want := map[string]any{
-		"level": "warn", "component": "work", "operation": "sync_work", "status": "degraded", "reason": "work_sync_failed",
-		"message": "periodic work sync failed", "error": "work state path must be absolute and clean",
-		"error_code": "work_state_failed", "error_domain": "work", "error_step": "load_work",
+		"level":        "warn",
+		"component":    "work",
+		"operation":    "sync_work",
+		"status":       "degraded",
+		"reason":       "work_sync_failed",
+		"message":      "periodic work sync failed",
+		"error":        "work state path must be absolute and clean",
+		"error_code":   "work_state_failed",
+		"error_domain": "work",
+		"error_step":   "load_work",
 	}
 	if len(records) != 1 || !reflect.DeepEqual(records[0], want) {
 		t.Errorf("records = %#v, want only %#v", records, want)
@@ -295,7 +390,13 @@ func TestRepeatedSyncFailuresLogOneDegradedRecord(t *testing.T) {
 }
 
 func TestSuccessfulSyncsLogNothing(t *testing.T) {
-	if records := runSyncTicks(t, NewStore(filepath.Join(t.TempDir(), "state", "work.json")), 2); len(records) != 0 {
+	if records := runSyncTicks(
+		t,
+		NewStore(filepath.Join(t.TempDir(), "state", "work.json")),
+		2,
+	); len(
+		records,
+	) != 0 {
 		t.Errorf("records = %#v, want none", records)
 	}
 }

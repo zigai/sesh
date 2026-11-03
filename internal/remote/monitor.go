@@ -90,7 +90,9 @@ func RunMonitor(ctx context.Context, opts MonitorOptions) (resultErr error) {
 	}
 
 	if err := config.ValidateRemoteConfig(opts.Remote); err != nil {
-		return oops.In("remote").With("operation", "run_monitor").Wrapf(err, "validating remote monitor configuration")
+		return oops.In("remote").
+			With("operation", "run_monitor").
+			Wrapf(err, "validating remote monitor configuration")
 	}
 
 	ownerLock, err := AcquireCatalogOwner(opts.CatalogDir)
@@ -143,7 +145,11 @@ func RunMonitor(ctx context.Context, opts MonitorOptions) (resultErr error) {
 	return state.run(ctx, opts, updates, supervisor)
 }
 
-func (state *monitorState) applyConfig(ctx context.Context, remote config.RemoteConfig, supervisor *streamSupervisor) {
+func (state *monitorState) applyConfig(
+	ctx context.Context,
+	remote config.RemoteConfig,
+	supervisor *streamSupervisor,
+) {
 	connections := remote.Connections
 	if !remote.Enabled {
 		connections = nil
@@ -193,7 +199,10 @@ func (state *monitorState) reconcileConfigured(connections []config.RemoteConnec
 	configured := make(map[string]ConnectionState, len(connections))
 
 	for _, connection := range connections {
-		current, connectionChanged := configuredConnectionState(state.catalog.Connections[connection.ID], connection)
+		current, connectionChanged := configuredConnectionState(
+			state.catalog.Connections[connection.ID],
+			connection,
+		)
 
 		if !CatalogAdmits(state.catalog, connection.ID, current) {
 			current.Label = ""
@@ -288,7 +297,9 @@ func (state *monitorState) run(
 				return err
 			}
 
-			return oops.In("remote").With("operation", "run_monitor").Wrapf(ctx.Err(), "remote monitor canceled")
+			return oops.In("remote").
+				With("operation", "run_monitor").
+				Wrapf(ctx.Err(), "remote monitor canceled")
 		case update := <-updates:
 			state.handleUpdate(ctx, update)
 		case reload, ok := <-reloadChannel:
@@ -309,7 +320,11 @@ func (state *monitorState) run(
 	}
 }
 
-func (state *monitorState) handleReload(ctx context.Context, reload config.RemoteConfig, supervisor *streamSupervisor) {
+func (state *monitorState) handleReload(
+	ctx context.Context,
+	reload config.RemoteConfig,
+	supervisor *streamSupervisor,
+) {
 	err := config.ValidateRemoteConfig(reload)
 	if state.reloadEpisode.Observe(err) && err != nil {
 		zerolog.Ctx(ctx).Warn().
@@ -374,7 +389,14 @@ func (state *monitorState) handleUpdate(ctx context.Context, update workerUpdate
 		state.handleConnectionError(ctx, update.connectionID, previous, hidden, acceptErr)
 	}
 
-	state.storeAcceptedFrame(ctx, update.connectionID, current, hidden, update.frame.Type, acceptErr)
+	state.storeAcceptedFrame(
+		ctx,
+		update.connectionID,
+		current,
+		hidden,
+		update.frame.Type,
+		acceptErr,
+	)
 
 	if update.result != nil {
 		update.result <- acceptErr
@@ -396,7 +418,11 @@ func (state *monitorState) connectionState(connectionID string) (ConnectionState
 	return current, hidden
 }
 
-func (state *monitorState) handleAttempt(connectionID string, current ConnectionState, hidden bool) {
+func (state *monitorState) handleAttempt(
+	connectionID string,
+	current ConnectionState,
+	hidden bool,
+) {
 	if hidden {
 		return
 	}
@@ -411,7 +437,13 @@ func (state *monitorState) handleAttempt(connectionID string, current Connection
 	state.dirty = true
 }
 
-func (state *monitorState) handleConnectionError(ctx context.Context, connectionID string, current ConnectionState, hidden bool, connectionErr error) {
+func (state *monitorState) handleConnectionError(
+	ctx context.Context,
+	connectionID string,
+	current ConnectionState,
+	hidden bool,
+	connectionErr error,
+) {
 	if hidden {
 		return
 	}
@@ -445,7 +477,14 @@ func (state *monitorState) handleConnectionError(ctx context.Context, connection
 	state.dirty = true
 }
 
-func (state *monitorState) storeAcceptedFrame(ctx context.Context, connectionID string, current ConnectionState, hidden bool, frameType FrameType, acceptErr error) {
+func (state *monitorState) storeAcceptedFrame(
+	ctx context.Context,
+	connectionID string,
+	current ConnectionState,
+	hidden bool,
+	frameType FrameType,
+	acceptErr error,
+) {
 	previous, _ := state.connectionState(connectionID)
 
 	switch {
@@ -475,7 +514,12 @@ func (state *monitorState) storeAcceptedFrame(ctx context.Context, connectionID 
 }
 
 func (state *monitorState) reconcile(ctx context.Context) {
-	changed, removed := ReconcileCatalog(&state.catalog, state.now().UTC(), state.staleAfter, state.hideAfter)
+	changed, removed := ReconcileCatalog(
+		&state.catalog,
+		state.now().UTC(),
+		state.staleAfter,
+		state.hideAfter,
+	)
 	if !changed {
 		return
 	}
@@ -511,11 +555,21 @@ func newConnectionState(connection config.RemoteConnectionConfig, digest string)
 		LastError:      "",
 		LastAttempt:    time.Time{},
 		LastErrorAt:    time.Time{},
-		Snapshot:       Snapshot{GeneratedAt: time.Time{}, Sessions: nil, Tasks: nil, Work: nil, Actions: nil, Health: UnavailableHealth()},
+		Snapshot: Snapshot{
+			GeneratedAt: time.Time{},
+			Sessions:    nil,
+			Tasks:       nil,
+			Work:        nil,
+			Actions:     nil,
+			Health:      UnavailableHealth(),
+		},
 	}
 }
 
-func configuredConnectionState(current ConnectionState, connection config.RemoteConnectionConfig) (ConnectionState, bool) {
+func configuredConnectionState(
+	current ConnectionState,
+	connection config.RemoteConnectionConfig,
+) (ConnectionState, bool) {
 	original := current
 	current.ID = connection.ID
 	current.Label = connection.Label
@@ -561,7 +615,8 @@ func acceptFrame(state *ConnectionState, frame Frame, observedAt time.Time) erro
 		return nil
 	}
 
-	if state.StreamInstance != frame.StreamInstance || state.PeerID != frame.PeerID || frame.Sequence <= state.Sequence {
+	if state.StreamInstance != frame.StreamInstance || state.PeerID != frame.PeerID ||
+		frame.Sequence <= state.Sequence {
 		return ErrInvalidFrame
 	}
 
@@ -580,7 +635,10 @@ func acceptFrame(state *ConnectionState, frame Frame, observedAt time.Time) erro
 	return nil
 }
 
-func newStreamSupervisor(updates chan<- workerUpdate, command func(ctx context.Context, executable string, arguments ...string) *exec.Cmd) *streamSupervisor {
+func newStreamSupervisor(
+	updates chan<- workerUpdate,
+	command func(ctx context.Context, executable string, arguments ...string) *exec.Cmd,
+) *streamSupervisor {
 	return &streamSupervisor{
 		updates:        updates,
 		command:        command,
@@ -593,7 +651,11 @@ func newStreamSupervisor(updates chan<- workerUpdate, command func(ctx context.C
 	}
 }
 
-func (supervisor *streamSupervisor) apply(ctx context.Context, remote config.RemoteConfig, connections []config.RemoteConnectionConfig) map[string]uint64 {
+func (supervisor *streamSupervisor) apply(
+	ctx context.Context,
+	remote config.RemoteConfig,
+	connections []config.RemoteConnectionConfig,
+) map[string]uint64 {
 	limiterSize := min(
 		max(remote.MaxParallelConnects, 1),
 		max(len(connections), 1),
@@ -644,7 +706,12 @@ func (supervisor *streamSupervisor) apply(ctx context.Context, remote config.Rem
 			continue
 		}
 
-		supervisor.workers[connection.ID] = supervisor.start(ctx, remote, connection, waitFor[connection.ID])
+		supervisor.workers[connection.ID] = supervisor.start(
+			ctx,
+			remote,
+			connection,
+			waitFor[connection.ID],
+		)
 	}
 
 	generations := make(map[string]uint64, len(supervisor.workers))
@@ -656,7 +723,12 @@ func (supervisor *streamSupervisor) apply(ctx context.Context, remote config.Rem
 	return generations
 }
 
-func (supervisor *streamSupervisor) start(ctx context.Context, remote config.RemoteConfig, connection config.RemoteConnectionConfig, waitFor []<-chan struct{}) streamWorkerHandle {
+func (supervisor *streamSupervisor) start(
+	ctx context.Context,
+	remote config.RemoteConfig,
+	connection config.RemoteConnectionConfig,
+	waitFor []<-chan struct{},
+) streamWorkerHandle {
 	supervisor.nextGeneration++
 
 	workerContext, cancel := context.WithCancel(ctx)
@@ -683,7 +755,15 @@ func (supervisor *streamSupervisor) start(ctx context.Context, remote config.Rem
 			}
 		}
 
-		runStreamWorker(workerContext, remote, connection, supervisor.command, limiter, generation, supervisor.updates)
+		runStreamWorker(
+			workerContext,
+			remote,
+			connection,
+			supervisor.command,
+			limiter,
+			generation,
+			supervisor.updates,
+		)
 	})
 
 	return handle
@@ -736,7 +816,9 @@ func runStreamWorker(
 		Yield: func(frame Frame, streamErr error, attempted bool) error {
 			if attempted {
 				if !acquireWorkerSlot(ctx, limiter) {
-					return oops.In("remote").With("operation", "acquire_worker_slot").Wrap(ctx.Err())
+					return oops.In("remote").
+						With("operation", "acquire_worker_slot").
+						Wrap(ctx.Err())
 				}
 
 				attemptCtx, cancel := context.WithCancelCause(ctx)
@@ -768,7 +850,15 @@ func runStreamWorker(
 			}
 
 			if streamErr != nil {
-				return handleStreamError(ctx, updates, connection.ID, generation, streamErr, cancelAttempt, release)
+				return handleStreamError(
+					ctx,
+					updates,
+					connection.ID,
+					generation,
+					streamErr,
+					cancelAttempt,
+					release,
+				)
 			}
 
 			var attemptDone <-chan struct{}
@@ -788,7 +878,13 @@ func runStreamWorker(
 	})
 }
 
-func forwardFrame(ctx context.Context, attemptDone <-chan struct{}, updates chan<- workerUpdate, update workerUpdate, release func()) error {
+func forwardFrame(
+	ctx context.Context,
+	attemptDone <-chan struct{},
+	updates chan<- workerUpdate,
+	update workerUpdate,
+	release func(),
+) error {
 	result := make(chan error, 1)
 	update.result = result
 
@@ -865,7 +961,10 @@ func sendWorkerUpdate(ctx context.Context, updates chan<- workerUpdate, update w
 	}
 }
 
-func workerFingerprint(remote config.RemoteConfig, connection config.RemoteConnectionConfig) string {
+func workerFingerprint(
+	remote config.RemoteConfig,
+	connection config.RemoteConnectionConfig,
+) string {
 	const fingerprintCapacity = 256
 
 	encoded := make([]byte, 0, fingerprintCapacity)

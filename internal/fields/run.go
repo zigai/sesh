@@ -114,7 +114,11 @@ func runCapturing(ctx context.Context, cmd *exec.Cmd, input []byte) ([]byte, []b
 
 	childEndsErr := errors.Join(stdin.read.Close(), stdout.write.Close(), stderr.write.Close())
 	if startErr != nil {
-		return nil, nil, errors.Join(fmt.Errorf("start field command: %w", startErr), childEndsErr, closePipes(pipes))
+		return nil, nil, errors.Join(
+			fmt.Errorf("start field command: %w", startErr),
+			childEndsErr,
+			closePipes(pipes),
+		)
 	}
 
 	cleanupDone := make(chan struct{})
@@ -150,7 +154,10 @@ func runCapturing(ctx context.Context, cmd *exec.Cmd, input []byte) ([]byte, []b
 		_, err := stdin.write.Write(input)
 		closeErr := stdin.write.Close()
 
-		if err = errors.Join(ignoreClosed(ignoreBrokenPipe(err)), ignoreClosed(closeErr)); err != nil {
+		if err = errors.Join(
+			ignoreClosed(ignoreBrokenPipe(err)),
+			ignoreClosed(closeErr),
+		); err != nil {
 			readErrMu.Lock()
 			readErr = errors.Join(readErr, err)
 			readErrMu.Unlock()

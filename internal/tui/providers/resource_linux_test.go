@@ -28,11 +28,27 @@ func TestReadResourceSampleParsesProcessIdentityAndRSS(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := os.WriteFile(filepath.Join(dir, "stat"), []byte(resourceStat(process.pid, process.parent, process.start, process.user, process.system)), 0o600); err != nil {
+		if err := os.WriteFile(
+			filepath.Join(dir, "stat"),
+			[]byte(
+				resourceStat(
+					process.pid,
+					process.parent,
+					process.start,
+					process.user,
+					process.system,
+				),
+			),
+			0o600,
+		); err != nil {
 			t.Fatal(err)
 		}
 
-		if err := os.WriteFile(filepath.Join(dir, "statm"), []byte("20 "+process.resident+" 0\n"), 0o600); err != nil {
+		if err := os.WriteFile(
+			filepath.Join(dir, "statm"),
+			[]byte("20 "+process.resident+" 0\n"),
+			0o600,
+		); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -47,7 +63,9 @@ func TestReadResourceSampleParsesProcessIdentityAndRSS(t *testing.T) {
 		t.Fatal("invalid page size")
 	}
 
-	if len(measured.Processes) != 2 || measured.Processes[100].StartTime != 400 || measured.Processes[100].CPUTicks != 150 || strconv.FormatUint(measured.Processes[101].RSSBytes, 10) != strconv.Itoa(8*pageSize) {
+	if len(measured.Processes) != 2 || measured.Processes[100].StartTime != 400 ||
+		measured.Processes[100].CPUTicks != 150 ||
+		strconv.FormatUint(measured.Processes[101].RSSBytes, 10) != strconv.Itoa(8*pageSize) {
 		t.Fatalf("sample = %+v", measured)
 	}
 

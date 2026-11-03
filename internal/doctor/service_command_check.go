@@ -26,7 +26,15 @@ const (
 
 var errUnitTooLarge = errors.New("unit file is too large")
 
-var execKeys = []string{"ExecStart", "ExecStartPre", "ExecStartPost", "ExecReload", "ExecStop", "ExecStopPost", "ExecCondition"}
+var execKeys = []string{
+	"ExecStart",
+	"ExecStartPre",
+	"ExecStartPost",
+	"ExecReload",
+	"ExecStop",
+	"ExecStopPost",
+	"ExecCondition",
+}
 
 type unitCommand struct {
 	args   []string
@@ -52,7 +60,9 @@ func (s *Service) checkServiceUnits() []Result {
 	}
 
 	if s.opts.ValidateCommand == nil {
-		return []Result{newResult(CheckServiceUnits, StatusSkip, "Service command validation is unavailable")}
+		return []Result{
+			newResult(CheckServiceUnits, StatusSkip, "Service command validation is unavailable"),
+		}
 	}
 
 	units, unreadable := s.unitFiles()
@@ -89,27 +99,50 @@ func (s *Service) checkServiceUnits() []Result {
 
 func (s *Service) serviceUnitsResult(checked int, stale, unreadable []string) []Result {
 	if len(stale) > 0 {
-		return []Result{newResult(CheckServiceUnits, StatusFail,
-			plural(len(stale), "unit")+" run sesh command lines this sesh rejects, so they fail on every start or stop").
-			withReason(ReasonStale).
-			withDetails(stale...).
-			withDetails(unreadable...).
-			withManual("Regenerate sesh-managed units with 'sesh setup services --apply' (add the flags you set them up with), " +
-				"update hand-maintained units to the current commands, then run 'systemctl --user daemon-reload'")}
+		return []Result{
+			newResult(
+				CheckServiceUnits,
+				StatusFail,
+				plural(
+					len(stale),
+					"unit",
+				)+" run sesh command lines this sesh rejects, so they fail on every start or stop",
+			).
+				withReason(ReasonStale).
+				withDetails(stale...).
+				withDetails(unreadable...).
+				withManual("Regenerate sesh-managed units with 'sesh setup services --apply' (add the flags you set them up with), " +
+					"update hand-maintained units to the current commands, then run 'systemctl --user daemon-reload'"),
+		}
 	}
 
 	if len(unreadable) > 0 {
-		return []Result{newResult(CheckServiceUnits, StatusWarn, plural(len(unreadable), "unit location")+" could not be read, so their sesh commands were not checked").
-			withReason(ReasonInspectionFailed).
-			withDetails(unreadable...).
-			withManual("Make the listed files and directories readable by you")}
+		return []Result{
+			newResult(
+				CheckServiceUnits,
+				StatusWarn,
+				plural(
+					len(unreadable),
+					"unit location",
+				)+" could not be read, so their sesh commands were not checked",
+			).
+				withReason(ReasonInspectionFailed).
+				withDetails(unreadable...).
+				withManual("Make the listed files and directories readable by you"),
+		}
 	}
 
 	if checked == 0 {
 		return nil
 	}
 
-	return []Result{newResult(CheckServiceUnits, StatusOK, plural(checked, "unit")+" run sesh command lines this sesh accepts")}
+	return []Result{
+		newResult(
+			CheckServiceUnits,
+			StatusOK,
+			plural(checked, "unit")+" run sesh command lines this sesh accepts",
+		),
+	}
 }
 
 func (s *Service) unitFiles() (map[string]string, []string) {
@@ -188,7 +221,13 @@ func (s *Service) unitCommands(name, path string) ([]unitCommand, error) {
 			}
 
 			if s.isSeshProgram(argv[0]) {
-				execs[key] = append(execs[key], unitCommand{args: argv[1:], source: fmt.Sprintf("%s:%d", DisplayPath(file), line.number)})
+				execs[key] = append(
+					execs[key],
+					unitCommand{
+						args:   argv[1:],
+						source: fmt.Sprintf("%s:%d", DisplayPath(file), line.number),
+					},
+				)
 			}
 		}
 	}
@@ -250,14 +289,20 @@ func readUnitLines(path string) ([]unitLine, error) {
 	}
 
 	if len(data) > maxServiceUnitBytes {
-		return nil, fmt.Errorf("%s: %w, over %d KiB", DisplayPath(path), errUnitTooLarge, maxServiceUnitKiB)
+		return nil, fmt.Errorf(
+			"%s: %w, over %d KiB",
+			DisplayPath(path),
+			errUnitTooLarge,
+			maxServiceUnitKiB,
+		)
 	}
 
 	return unitLines(data), nil
 }
 
 func (s *Service) isSeshProgram(program string) bool {
-	return filepath.Base(program) == programName || (s.opts.Executable != "" && program == s.opts.Executable)
+	return filepath.Base(program) == programName ||
+		(s.opts.Executable != "" && program == s.opts.Executable)
 }
 
 func unitLines(data []byte) []unitLine {

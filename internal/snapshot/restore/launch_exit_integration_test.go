@@ -47,7 +47,8 @@ func TestRestoredProgramExitLeavesPaneWithUsableShell(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
 			defer cancel()
 
-			if err := server.Environment().Set(ctx, "SESH_AGENT_EXIT_REMOVE", "target-value"); err != nil {
+			if err := server.Environment().
+				Set(ctx, "SESH_AGENT_EXIT_REMOVE", "target-value"); err != nil {
 				t.Fatal(err)
 			}
 
@@ -70,7 +71,11 @@ func configuredRestoredLaunchFixture(t *testing.T, placement string) restoredLau
 	configuredShell := filepath.Join(directory, "configured shell")
 	shellMarker := filepath.Join(directory, "shell")
 
-	shellScript := "#!/bin/sh\nprintf configured > '" + strings.ReplaceAll(shellMarker, "'", "'\\''") + "'\nexec /bin/sh \"$@\"\n"
+	shellScript := "#!/bin/sh\nprintf configured > '" + strings.ReplaceAll(
+		shellMarker,
+		"'",
+		"'\\''",
+	) + "'\nexec /bin/sh \"$@\"\n"
 	if err := os.WriteFile(configuredShell, []byte(shellScript), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -79,24 +84,61 @@ func configuredRestoredLaunchFixture(t *testing.T, placement string) restoredLau
 		t.Fatal(err)
 	}
 
-	manifest.Source.Options = []model.Option{{Scope: "global-session", Name: model.Bytes("default-shell"), Value: model.Bytes("/bin/sh"), Present: true}}
-	manifest.Sessions[0].Options = []model.Option{{Scope: "session", Name: model.Bytes("default-shell"), Value: model.Bytes(configuredShell), Present: true}}
+	manifest.Source.Options = []model.Option{
+		{
+			Scope:   "global-session",
+			Name:    model.Bytes("default-shell"),
+			Value:   model.Bytes("/bin/sh"),
+			Present: true,
+		},
+	}
+	manifest.Sessions[0].Options = []model.Option{
+		{
+			Scope:   "session",
+			Name:    model.Bytes("default-shell"),
+			Value:   model.Bytes(configuredShell),
+			Present: true,
+		},
+	}
 	manifest.Panes[paneIndex].Launch = model.Launch{
 		Executable: model.Bytes("/bin/sh"),
 		Arguments: []model.Bytes{
-			model.Bytes("sh"), model.Bytes("-c"),
-			model.Bytes(`trap 'printf exited > "$2"; exit 130' INT; [ "$3" = 'literal spaces "$HOME"; $(touch unexpected)' ] && [ "${SESH_AGENT_EXIT_REMOVE-unset}" = unset ] || exit 99; printf ready > "$1"; read -r answer; printf exited > "$2"`),
-			model.Bytes("sh"), model.Bytes(ready), model.Bytes(exited), model.Bytes(`literal spaces "$HOME"; $(touch unexpected)`),
+			model.Bytes("sh"),
+			model.Bytes("-c"),
+			model.Bytes(
+				`trap 'printf exited > "$2"; exit 130' INT; [ "$3" = 'literal spaces "$HOME"; $(touch unexpected)' ] && [ "${SESH_AGENT_EXIT_REMOVE-unset}" = unset ] || exit 99; printf ready > "$1"; read -r answer; printf exited > "$2"`,
+			),
+			model.Bytes(
+				"sh",
+			),
+			model.Bytes(ready),
+			model.Bytes(exited),
+			model.Bytes(`literal spaces "$HOME"; $(touch unexpected)`),
 		},
-		Directory:   model.Bytes(directory),
-		Environment: []model.Variable{{Name: model.Bytes("SESH_AGENT_EXIT_REMOVE"), State: "removed"}},
-		Recovery:    model.RecoveryResume,
+		Directory: model.Bytes(directory),
+		Environment: []model.Variable{
+			{Name: model.Bytes("SESH_AGENT_EXIT_REMOVE"), State: "removed"},
+		},
+		Recovery: model.RecoveryResume,
 	}
 
-	return restoredLaunchFixture{manifest: manifest, paneIndex: paneIndex, directory: directory, ready: ready, exited: exited, usable: usable, shellMarker: shellMarker}
+	return restoredLaunchFixture{
+		manifest:    manifest,
+		paneIndex:   paneIndex,
+		directory:   directory,
+		ready:       ready,
+		exited:      exited,
+		usable:      usable,
+		shellMarker: shellMarker,
+	}
 }
 
-func executeRestoredLaunch(t *testing.T, ctx context.Context, server *gotmux.Server, fixture restoredLaunchFixture) gotmux.Pane {
+func executeRestoredLaunch(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	fixture restoredLaunchFixture,
+) gotmux.Pane {
 	t.Helper()
 
 	plan, err := BuildPlan(fixture.manifest, []string{"s0"})
@@ -104,7 +146,11 @@ func executeRestoredLaunch(t *testing.T, ctx context.Context, server *gotmux.Ser
 		t.Fatal(err)
 	}
 
-	report, err := NewExecutor(server, fixture.manifest, ExecuteConfig{LaunchProcesses: true}).Execute(ctx, plan, newMemoryJournal())
+	report, err := NewExecutor(
+		server,
+		fixture.manifest,
+		ExecuteConfig{LaunchProcesses: true},
+	).Execute(ctx, plan, newMemoryJournal())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +171,13 @@ func executeRestoredLaunch(t *testing.T, ctx context.Context, server *gotmux.Ser
 	return pane
 }
 
-func exitRestoredProgram(t *testing.T, ctx context.Context, pane gotmux.Pane, fixture restoredLaunchFixture, interrupt bool) {
+func exitRestoredProgram(
+	t *testing.T,
+	ctx context.Context,
+	pane gotmux.Pane,
+	fixture restoredLaunchFixture,
+	interrupt bool,
+) {
 	t.Helper()
 
 	if got := waitForLaunchMarker(t, ctx, fixture.ready); got != "ready" {
@@ -148,14 +200,22 @@ func exitRestoredProgram(t *testing.T, ctx context.Context, pane gotmux.Pane, fi
 	}
 }
 
-func assertRestoredShellUsable(t *testing.T, ctx context.Context, pane gotmux.Pane, fixture restoredLaunchFixture) {
+func assertRestoredShellUsable(
+	t *testing.T,
+	ctx context.Context,
+	pane gotmux.Pane,
+	fixture restoredLaunchFixture,
+) {
 	t.Helper()
 
 	if got := waitForLaunchMarker(t, ctx, fixture.shellMarker); got != "configured" {
 		t.Fatalf("returning configured shell marker = %q", got)
 	}
 
-	command := fmt.Sprintf(`printf '%%s|%%s' "$PWD" "${SESH_AGENT_EXIT_REMOVE-unset}" > '%s'`, strings.ReplaceAll(fixture.usable, "'", "'\\''"))
+	command := fmt.Sprintf(
+		`printf '%%s|%%s' "$PWD" "${SESH_AGENT_EXIT_REMOVE-unset}" > '%s'`,
+		strings.ReplaceAll(fixture.usable, "'", "'\\''"),
+	)
 	if err := pane.SendText(ctx, command); err != nil {
 		t.Fatalf("restored pane disappeared after program exit: %v", err)
 	}
@@ -214,7 +274,12 @@ func restoredLaunchManifest(placement string) (model.Manifest, int) {
 	return manifest, paneIndex
 }
 
-func assertRestoredProgramForeground(t *testing.T, ctx context.Context, pane gotmux.Pane, fixture restoredLaunchFixture) {
+func assertRestoredProgramForeground(
+	t *testing.T,
+	ctx context.Context,
+	pane gotmux.Pane,
+	fixture restoredLaunchFixture,
+) {
 	t.Helper()
 
 	info, err := pane.Info(ctx)

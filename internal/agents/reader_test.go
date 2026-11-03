@@ -274,7 +274,8 @@ func TestLoadLiveAgentsReadsRegistryThroughAHT(t *testing.T) {
 		t.Fatalf("unexpected agent identity/attention: %+v", agent)
 	}
 
-	if agent.ServerSocket != "/tmp/fixture/socket" || agent.PaneID != "%1" || agent.PanePID != 4242 {
+	if agent.ServerSocket != "/tmp/fixture/socket" || agent.PaneID != "%1" ||
+		agent.PanePID != 4242 {
 		t.Fatalf("unexpected tmux coordinates: %+v", agent)
 	}
 
@@ -289,28 +290,47 @@ func TestLoadLiveAgentsReadsRegistryThroughAHT(t *testing.T) {
 
 func TestObservedAgentSessionsUsesPublishedNativeObservation(t *testing.T) {
 	at := time.Unix(500, 0)
-	sessions := []aht.Session{{
-		ID: "observed", Harness: aht.HarnessClaude, Liveness: aht.Live{Activity: aht.ActivityWaiting},
-		Location: aht.Location{Kind: aht.MultiplexerTmux, PaneID: "%1"},
-		Detail:   &aht.StateDetail{Value: aht.ActivityDetailPermission, Quality: aht.DetailQualityCurrent, Authority: "hook", ObservedAt: at},
-		Observations: registry.Observations{Native: &registry.NativeObservation{
-			Event: "UserPromptSubmit", ObservedAt: at,
-			Attributes: map[string]string{
-				"claude_model": "opus", "claude_notification_type": "permission_prompt", "claude_tool_name": "Bash",
+	sessions := []aht.Session{
+		{
+			ID:       "observed",
+			Harness:  aht.HarnessClaude,
+			Liveness: aht.Live{Activity: aht.ActivityWaiting},
+			Location: aht.Location{Kind: aht.MultiplexerTmux, PaneID: "%1"},
+			Detail: &aht.StateDetail{
+				Value:      aht.ActivityDetailPermission,
+				Quality:    aht.DetailQualityCurrent,
+				Authority:  "hook",
+				ObservedAt: at,
 			},
-		}},
-	}}
+			Observations: registry.Observations{Native: &registry.NativeObservation{
+				Event: "UserPromptSubmit", ObservedAt: at,
+				Attributes: map[string]string{
+					"claude_model":             "opus",
+					"claude_notification_type": "permission_prompt",
+					"claude_tool_name":         "Bash",
+				},
+			}},
+		},
+	}
 
 	observed := agents.ObservedAgentSessions(sessions)
-	if len(observed) != 1 || observed[0].Model != "opus" || observed[0].WaitingReason != "permission" ||
-		observed[0].LastTool != "Bash" || !observed[0].PromptAt.Equal(at) {
+	if len(observed) != 1 || observed[0].Model != "opus" ||
+		observed[0].WaitingReason != "permission" ||
+		observed[0].LastTool != "Bash" ||
+		!observed[0].PromptAt.Equal(at) {
 		t.Fatalf("native observation = %+v", observed)
 	}
 
-	sessions[0].Observations.Native = &registry.NativeObservation{Event: "Stop", ObservedAt: at.Add(time.Second)}
+	sessions[0].Observations.Native = &registry.NativeObservation{
+		Event:      "Stop",
+		ObservedAt: at.Add(time.Second),
+	}
 
 	sessions[0].Detail = nil
-	if next := agents.ObservedAgentSessions(sessions); len(next) != 1 || next[0].Model != "" || !next[0].PromptAt.IsZero() {
+	if next := agents.ObservedAgentSessions(
+		sessions,
+	); len(next) != 1 || next[0].Model != "" ||
+		!next[0].PromptAt.IsZero() {
 		t.Fatalf("later observation retained unsupported metadata = %+v", next)
 	}
 }
@@ -329,7 +349,11 @@ func TestLoadLiveAgentsUnsupportedSchemaFailsClosed(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "state.json")
-	if err := os.WriteFile(path, []byte(`{"schema_version": 99, "sessions": {}}`), 0o600); err != nil {
+	if err := os.WriteFile(
+		path,
+		[]byte(`{"schema_version": 99, "sessions": {}}`),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -442,11 +466,51 @@ func TestSummarizeAgentsCountsAttention(t *testing.T) {
 
 	path := writeRegistry(
 		t,
-		registryFixture{ID: "a1", Activity: string(aht.ActivityWaiting), ServerSocket: "/s", SessionID: "$1", SessionName: "dev", WindowID: "@1", PaneID: "%1"},
-		registryFixture{ID: "a2", Activity: string(aht.ActivityFailed), ServerSocket: "/s", SessionID: "$1", SessionName: "dev", WindowID: "@1", PaneID: "%2"},
-		registryFixture{ID: "a3", Activity: string(aht.ActivityIdle), ServerSocket: "/s", SessionID: "$1", SessionName: "dev", WindowID: "@1", PaneID: "%3"},
-		registryFixture{ID: "a4", Activity: string(aht.ActivityRunning), ServerSocket: "/s", SessionID: "$1", SessionName: "dev", WindowID: "@1", PaneID: "%4"},
-		registryFixture{ID: "a5", Activity: string(aht.ActivityInterrupted), ServerSocket: "/s", SessionID: "$1", SessionName: "dev", WindowID: "@1", PaneID: "%5"},
+		registryFixture{
+			ID:           "a1",
+			Activity:     string(aht.ActivityWaiting),
+			ServerSocket: "/s",
+			SessionID:    "$1",
+			SessionName:  "dev",
+			WindowID:     "@1",
+			PaneID:       "%1",
+		},
+		registryFixture{
+			ID:           "a2",
+			Activity:     string(aht.ActivityFailed),
+			ServerSocket: "/s",
+			SessionID:    "$1",
+			SessionName:  "dev",
+			WindowID:     "@1",
+			PaneID:       "%2",
+		},
+		registryFixture{
+			ID:           "a3",
+			Activity:     string(aht.ActivityIdle),
+			ServerSocket: "/s",
+			SessionID:    "$1",
+			SessionName:  "dev",
+			WindowID:     "@1",
+			PaneID:       "%3",
+		},
+		registryFixture{
+			ID:           "a4",
+			Activity:     string(aht.ActivityRunning),
+			ServerSocket: "/s",
+			SessionID:    "$1",
+			SessionName:  "dev",
+			WindowID:     "@1",
+			PaneID:       "%4",
+		},
+		registryFixture{
+			ID:           "a5",
+			Activity:     string(aht.ActivityInterrupted),
+			ServerSocket: "/s",
+			SessionID:    "$1",
+			SessionName:  "dev",
+			WindowID:     "@1",
+			PaneID:       "%5",
+		},
 	)
 
 	summary, err := agents.Status(t.Context(), path)
@@ -458,7 +522,8 @@ func TestSummarizeAgentsCountsAttention(t *testing.T) {
 		t.Fatalf("summary total/live = %d/%d, want 5/5", summary.Total, summary.Live)
 	}
 
-	if summary.Waiting != 1 || summary.Failed != 1 || summary.Idle != 2 || summary.Running != 1 || summary.Interrupted != 1 {
+	if summary.Waiting != 1 || summary.Failed != 1 || summary.Idle != 2 || summary.Running != 1 ||
+		summary.Interrupted != 1 {
 		t.Fatalf("summary attention counts = %+v", summary)
 	}
 
@@ -479,9 +544,30 @@ func TestPruneVanishedPanesDropsReusedAndDeadPanes(t *testing.T) {
 	}
 
 	panes := []agents.PaneLocation{
-		{ServerSocket: "/s", SessionID: "$1", SessionName: "dev", WindowID: "@1", PaneID: "%1", PanePID: 100},
-		{ServerSocket: "/s", SessionID: "$1", SessionName: "dev", WindowID: "@1", PaneID: "%3", PanePID: 999},
-		{ServerSocket: "/other", SessionID: "$9", SessionName: "other", WindowID: "@9", PaneID: "%4", PanePID: 400},
+		{
+			ServerSocket: "/s",
+			SessionID:    "$1",
+			SessionName:  "dev",
+			WindowID:     "@1",
+			PaneID:       "%1",
+			PanePID:      100,
+		},
+		{
+			ServerSocket: "/s",
+			SessionID:    "$1",
+			SessionName:  "dev",
+			WindowID:     "@1",
+			PaneID:       "%3",
+			PanePID:      999,
+		},
+		{
+			ServerSocket: "/other",
+			SessionID:    "$9",
+			SessionName:  "other",
+			WindowID:     "@9",
+			PaneID:       "%4",
+			PanePID:      400,
+		},
 	}
 
 	kept := agents.PruneVanishedPanes(observed, panes)
@@ -506,7 +592,10 @@ func TestPruneVanishedPanesDropsReusedAndDeadPanes(t *testing.T) {
 func TestSameServerSocketComparesFullPaths(t *testing.T) {
 	t.Parallel()
 
-	if agents.SameServerSocket("/tmp/server-a/tmux-1000/default", "/tmp/server-b/tmux-1000/default") {
+	if agents.SameServerSocket(
+		"/tmp/server-a/tmux-1000/default",
+		"/tmp/server-b/tmux-1000/default",
+	) {
 		t.Fatal("distinct full socket paths must not collide")
 	}
 
@@ -525,14 +614,70 @@ func TestObservedInitialIdleIsDistinctFromCompletedIdle(t *testing.T) {
 		native   *registry.NativeObservation
 		want     bool
 	}{
-		{name: "session start", harness: aht.HarnessCodex, activity: aht.ActivityIdle, native: &registry.NativeObservation{Event: "SessionStart", Activity: new(registry.ActivityIdle)}, want: true},
-		{name: "completed response", harness: aht.HarnessCodex, activity: aht.ActivityIdle, native: &registry.NativeObservation{Event: "Stop", Activity: new(registry.ActivityIdle)}},
-		{name: "running compaction", harness: aht.HarnessCodex, activity: aht.ActivityRunning, native: &registry.NativeObservation{Event: "SessionStart", Activity: new(registry.ActivityRunning)}},
+		{
+			name:     "session start",
+			harness:  aht.HarnessCodex,
+			activity: aht.ActivityIdle,
+			native: &registry.NativeObservation{
+				Event:    "SessionStart",
+				Activity: new(registry.ActivityIdle),
+			},
+			want: true,
+		},
+		{
+			name:     "completed response",
+			harness:  aht.HarnessCodex,
+			activity: aht.ActivityIdle,
+			native: &registry.NativeObservation{
+				Event:    "Stop",
+				Activity: new(registry.ActivityIdle),
+			},
+		},
+		{
+			name:     "running compaction",
+			harness:  aht.HarnessCodex,
+			activity: aht.ActivityRunning,
+			native: &registry.NativeObservation{
+				Event:    "SessionStart",
+				Activity: new(registry.ActivityRunning),
+			},
+		},
 		{name: "no native evidence", harness: aht.HarnessCodex, activity: aht.ActivityIdle},
-		{name: "unknown native activity", harness: aht.HarnessCodex, activity: aht.ActivityIdle, native: &registry.NativeObservation{Event: "SessionStart"}},
-		{name: "claude session start", harness: aht.HarnessClaude, activity: aht.ActivityIdle, native: &registry.NativeObservation{Event: "SessionStart", Activity: new(registry.ActivityIdle)}, want: true},
-		{name: "omp session start", harness: aht.HarnessOmp, activity: aht.ActivityIdle, native: &registry.NativeObservation{Event: "session_start", Activity: new(registry.ActivityIdle)}, want: true},
-		{name: "claude completed response", harness: aht.HarnessClaude, activity: aht.ActivityIdle, native: &registry.NativeObservation{Event: "Stop", Activity: new(registry.ActivityIdle)}},
+		{
+			name:     "unknown native activity",
+			harness:  aht.HarnessCodex,
+			activity: aht.ActivityIdle,
+			native:   &registry.NativeObservation{Event: "SessionStart"},
+		},
+		{
+			name:     "claude session start",
+			harness:  aht.HarnessClaude,
+			activity: aht.ActivityIdle,
+			native: &registry.NativeObservation{
+				Event:    "SessionStart",
+				Activity: new(registry.ActivityIdle),
+			},
+			want: true,
+		},
+		{
+			name:     "omp session start",
+			harness:  aht.HarnessOmp,
+			activity: aht.ActivityIdle,
+			native: &registry.NativeObservation{
+				Event:    "session_start",
+				Activity: new(registry.ActivityIdle),
+			},
+			want: true,
+		},
+		{
+			name:     "claude completed response",
+			harness:  aht.HarnessClaude,
+			activity: aht.ActivityIdle,
+			native: &registry.NativeObservation{
+				Event:    "Stop",
+				Activity: new(registry.ActivityIdle),
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -542,8 +687,13 @@ func TestObservedInitialIdleIsDistinctFromCompletedIdle(t *testing.T) {
 				ActivityChangedAt: at,
 				Observations:      registry.Observations{Native: tt.native},
 			}})
-			if len(observed) != 1 || observed[0].InitialIdle != tt.want || !observed[0].ActivityChanged.Equal(at) {
-				t.Fatalf("observed = %+v, want initial idle %t with preserved age", observed, tt.want)
+			if len(observed) != 1 || observed[0].InitialIdle != tt.want ||
+				!observed[0].ActivityChanged.Equal(at) {
+				t.Fatalf(
+					"observed = %+v, want initial idle %t with preserved age",
+					observed,
+					tt.want,
+				)
 			}
 		})
 	}

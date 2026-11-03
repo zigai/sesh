@@ -27,7 +27,12 @@ type historyEntry struct {
 	current  bool
 }
 
-func loadHistoryEntries(ctx context.Context, repo *store.Repository, catalog store.Catalog, limit int) []historyEntry {
+func loadHistoryEntries(
+	ctx context.Context,
+	repo *store.Repository,
+	catalog store.Catalog,
+	limit int,
+) []historyEntry {
 	var currentSeq uint64
 
 	generations := make(map[string]bool, len(catalog.Generations))
@@ -47,9 +52,10 @@ func loadHistoryEntries(ctx context.Context, repo *store.Repository, catalog sto
 		}
 
 		entry := historyEntry{
-			attempt:  attempt,
-			saved:    generations[attempt.ID],
-			current:  attempt.ID == catalog.Current || (currentSeq > 0 && attempt.Sequence == currentSeq),
+			attempt: attempt,
+			saved:   generations[attempt.ID],
+			current: attempt.ID == catalog.Current ||
+				(currentSeq > 0 && attempt.Sequence == currentSeq),
 			savedAt:  time.Time{},
 			sessions: 0,
 		}
@@ -98,7 +104,13 @@ func historyRows(entries []historyEntry, full bool) []prettytable.Row {
 			current = "yes"
 		}
 
-		row := prettytable.Row{entry.attempt.Sequence, savedAt, historyResult(entry.attempt.State), sessions, current}
+		row := prettytable.Row{
+			entry.attempt.Sequence,
+			savedAt,
+			historyResult(entry.attempt.State),
+			sessions,
+			current,
+		}
 
 		switch {
 		case full:
@@ -129,26 +141,58 @@ func renderHistoryTable(cmd *cobra.Command, entries []historyEntry, total int, f
 	}
 
 	if full {
-		columns = append(columns,
-			clibase.TableColumn{Heading: "Generation", Fixed: false, MinWidth: colWidthSession, Wrap: clibase.WrapIdentifier},
-			clibase.TableColumn{Heading: "Digest", Fixed: false, MinWidth: colWidthDigest, Wrap: clibase.WrapIdentifier},
+		columns = append(
+			columns,
+			clibase.TableColumn{
+				Heading:  "Generation",
+				Fixed:    false,
+				MinWidth: colWidthSession,
+				Wrap:     clibase.WrapIdentifier,
+			},
+			clibase.TableColumn{
+				Heading:  "Digest",
+				Fixed:    false,
+				MinWidth: colWidthDigest,
+				Wrap:     clibase.WrapIdentifier,
+			},
 		)
 	} else {
-		columns = append(columns, clibase.TableColumn{Heading: "Generation", Fixed: true, MinWidth: shortGenerationID, Wrap: nil})
+		columns = append(
+			columns,
+			clibase.TableColumn{
+				Heading:  "Generation",
+				Fixed:    true,
+				MinWidth: shortGenerationID,
+				Wrap:     nil,
+			},
+		)
 	}
 
-	if err := clibase.WriteResponsiveTable(cmd, columns, historyRows(entries, full), full); err != nil {
+	if err := clibase.WriteResponsiveTable(
+		cmd,
+		columns,
+		historyRows(entries, full),
+		full,
+	); err != nil {
 		return err
 	}
 
 	if len(entries) < total {
-		if err := clibase.WriteOutput(cmd, "Showing the newest %d of %d save attempts; --all shows every one.\n", len(entries), total); err != nil {
+		if err := clibase.WriteOutput(
+			cmd,
+			"Showing the newest %d of %d save attempts; --all shows every one.\n",
+			len(entries),
+			total,
+		); err != nil {
 			return err
 		}
 	}
 
 	if len(entries) > 0 && historyResult(entries[0].attempt.State) != "saved" {
-		return clibase.WriteLine(cmd, "The latest save did not finish; restore uses the newest saved generation (Current).")
+		return clibase.WriteLine(
+			cmd,
+			"The latest save did not finish; restore uses the newest saved generation (Current).",
+		)
 	}
 
 	return nil

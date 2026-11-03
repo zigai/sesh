@@ -59,26 +59,49 @@ func (s *Service) checkTmuxClient(ctx context.Context) (Result, bool) {
 
 	output, err := exec.CommandContext(ctx, path, "-V").Output()
 	if err != nil {
-		return newResult(CheckTmuxClient, StatusFail, fmt.Sprintf("%s -V failed: %v", DisplayPath(path), err)).
-			withReason(ReasonInspectionFailed).
-			withManual("Reinstall tmux " + tmuxRequired + " or later"), false
+		return newResult(
+				CheckTmuxClient,
+				StatusFail,
+				fmt.Sprintf("%s -V failed: %v", DisplayPath(path), err),
+			).
+				withReason(ReasonInspectionFailed).
+				withManual("Reinstall tmux " + tmuxRequired + " or later"),
+			false
 	}
 
 	version := gotmux.ParseVersion(strings.TrimSpace(string(output)))
 	if !version.AtLeast(minTmuxMajor, minTmuxMinor) {
-		return newResult(CheckTmuxClient, StatusFail, fmt.Sprintf("%s at %s is too old; sesh needs %s or later", version, DisplayPath(path), tmuxRequired)).
-			withReason(ReasonIncompatible).
-			withManual(upgradeTmux), false
+		return newResult(
+				CheckTmuxClient,
+				StatusFail,
+				fmt.Sprintf(
+					"%s at %s is too old; sesh needs %s or later",
+					version,
+					DisplayPath(path),
+					tmuxRequired,
+				),
+			).
+				withReason(ReasonIncompatible).
+				withManual(upgradeTmux),
+			false
 	}
 
-	return newResult(CheckTmuxClient, StatusOK, fmt.Sprintf("%s at %s", version, DisplayPath(path))), true
+	return newResult(
+		CheckTmuxClient,
+		StatusOK,
+		fmt.Sprintf("%s at %s", version, DisplayPath(path)),
+	), true
 }
 
 func (s *Service) checkTmuxServer(ctx context.Context) Result {
 	socket := DisplayPath(s.opts.Socket)
 
 	if s.opts.ServerError != nil || s.opts.Server == nil {
-		return newResult(CheckTmuxServer, StatusFail, fmt.Sprintf("Cannot use socket %s: %v", socket, s.opts.ServerError)).
+		return newResult(
+			CheckTmuxServer,
+			StatusFail,
+			fmt.Sprintf("Cannot use socket %s: %v", socket, s.opts.ServerError),
+		).
 			withReason(ReasonInvalid).
 			withManual("Pass an absolute path to --socket")
 	}
@@ -91,17 +114,28 @@ func (s *Service) checkTmuxServer(ctx context.Context) Result {
 	s.serverPID = info.Identity.PID
 
 	if !info.Version.AtLeast(minTmuxMajor, minTmuxMinor) {
-		return newResult(CheckTmuxServer, StatusFail, fmt.Sprintf("Server runs tmux %s; sesh needs %s or later", info.Version, tmuxRequired)).
+		return newResult(
+			CheckTmuxServer,
+			StatusFail,
+			fmt.Sprintf("Server runs tmux %s; sesh needs %s or later", info.Version, tmuxRequired),
+		).
 			withReason(ReasonIncompatible).
 			withManual(upgradeTmux + ", then restart the tmux server")
 	}
 
-	return newResult(CheckTmuxServer, StatusOK, fmt.Sprintf("tmux %s, pid %d", info.Version, info.Identity.PID))
+	return newResult(
+		CheckTmuxServer,
+		StatusOK,
+		fmt.Sprintf("tmux %s, pid %d", info.Version, info.Identity.PID),
+	)
 }
 
 func (s *Service) classifyTmuxProbeError(err error) Result {
 	socket := DisplayPath(s.opts.Socket)
-	findServer := fmt.Sprintf("Find the tmux server for %s with 'pgrep -a tmux' and check whether it is stopped or busy", socket)
+	findServer := fmt.Sprintf(
+		"Find the tmux server for %s with 'pgrep -a tmux' and check whether it is stopped or busy",
+		socket,
+	)
 
 	switch {
 	case errors.Is(err, gotmux.ErrNoServer):
@@ -109,7 +143,11 @@ func (s *Service) classifyTmuxProbeError(err error) Result {
 			withReason(ReasonNotRunning).
 			withCommand(s.startServerCommand())
 	case errors.Is(err, context.DeadlineExceeded):
-		return newResult(CheckTmuxServer, StatusFail, "Server on "+socket+" did not answer in time").
+		return newResult(
+			CheckTmuxServer,
+			StatusFail,
+			"Server on "+socket+" did not answer in time",
+		).
 			withReason(ReasonTimedOut).
 			withManual(findServer)
 	case errors.Is(err, context.Canceled):
@@ -123,12 +161,24 @@ func (s *Service) classifyTmuxProbeError(err error) Result {
 	}
 
 	if unsupported, ok := errors.AsType[*gotmux.UnsupportedError](err); ok {
-		return newResult(CheckTmuxServer, StatusFail, fmt.Sprintf("Server runs tmux %s; sesh needs %s or later", unsupported.Version, tmuxRequired)).
+		return newResult(
+			CheckTmuxServer,
+			StatusFail,
+			fmt.Sprintf(
+				"Server runs tmux %s; sesh needs %s or later",
+				unsupported.Version,
+				tmuxRequired,
+			),
+		).
 			withReason(ReasonIncompatible).
 			withManual(upgradeTmux + ", then restart the tmux server")
 	}
 
-	return newResult(CheckTmuxServer, StatusFail, fmt.Sprintf("Cannot query the server on %s: %v", socket, err)).
+	return newResult(
+		CheckTmuxServer,
+		StatusFail,
+		fmt.Sprintf("Cannot query the server on %s: %v", socket, err),
+	).
 		withReason(ReasonInspectionFailed).
 		withManual(findServer)
 }
@@ -157,10 +207,17 @@ func (s *Service) listSessions(ctx context.Context) ([]string, error) {
 
 func (s *Service) saveFix(result Result) Result {
 	if len(s.sessions) == 0 {
-		return result.withManual("Start a tmux session, then save it with 'sesh snapshot save <session>'")
+		return result.withManual(
+			"Start a tmux session, then save it with 'sesh snapshot save <session>'",
+		)
 	}
 
-	return result.withCommand(s.seshCommand("snapshot save", []string{flagSocket, flagRepository, flagHistory}, s.sessions...))
+	return result.withCommand(
+		s.seshCommand(
+			"snapshot save",
+			[]string{flagSocket, flagRepository, flagHistory},
+			s.sessions...),
+	)
 }
 
 func (s *Service) checkSmoke() Result {
@@ -169,10 +226,18 @@ func (s *Service) checkSmoke() Result {
 	}
 
 	if s.listErr != nil {
-		return newResult(CheckSmokeSessions, StatusFail, "Listing live sessions failed: "+s.listErr.Error()).
+		return newResult(
+			CheckSmokeSessions,
+			StatusFail,
+			"Listing live sessions failed: "+s.listErr.Error(),
+		).
 			withReason(ReasonInspectionFailed).
 			withCommand(s.seshCommand("session list", []string{flagSocket}))
 	}
 
-	return newResult(CheckSmokeSessions, StatusOK, "Listed "+plural(len(s.sessions), "live session"))
+	return newResult(
+		CheckSmokeSessions,
+		StatusOK,
+		"Listed "+plural(len(s.sessions), "live session"),
+	)
 }

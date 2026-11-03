@@ -93,5 +93,11 @@ func windowTitle(title string) string {
 	// tmux escapes backslashes in window names, so the name would not read back as set.
 	title = strings.ReplaceAll(strings.ToValidUTF8(title, ""), `\`, "/")
 
-	return strings.Join(strings.FieldsFunc(title, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }), " ")
+	return strings.Join(
+		strings.FieldsFunc(
+			title,
+			func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) },
+		),
+		" ",
+	)
 }

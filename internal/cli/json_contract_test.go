@@ -22,28 +22,128 @@ const (
 func TestJSONCommandTreeRequiresExplicitOutputContract(t *testing.T) {
 	contracts := map[string][]string{
 		"envelope": {
-			"agent back", "agent failed", "agent finish", "agent focus", "agent latest", "agent link", "agent merge", "agent next", "agent pin", "agent resume", "agent seen", "agent status", "agent toggle", "agent unlink", "agent unpin", "agent unread", "agent unseen", "agent waiting", "agent window-status-clear",
-			"autosave final-save", "autosave restore-on-start", "autosave save-if-due",
-			"autosave status", "config init", "doctor", "hooks list", "hooks run", "hooks validate", "keys",
-			"pick popup", "project clone", "project create", "project open", "project pick", "remote lookup",
-			"session create", "session delete", "session kill", "session list", "session rename", "session scrollback", "session switch",
-			"setup agents", "setup services", "setup tmux",
-			"snapshot gc", "snapshot history", "snapshot list", "snapshot prune", "snapshot restore", "snapshot save", "snapshot verify",
-			"snapshot recover delete resume", "snapshot recover delete show",
-			"snapshot recover restore abandon", "snapshot recover restore show",
-			"task finish", "task menu", "task merge", "task new", "task offer", "task open", "task popup", "task relayout", "task run", "task sleep", "task tab", "task wake",
+			"agent back",
+			"agent failed",
+			"agent finish",
+			"agent focus",
+			"agent latest",
+			"agent link",
+			"agent merge",
+			"agent next",
+			"agent pin",
+			"agent resume",
+			"agent seen",
+			"agent status",
+			"agent toggle",
+			"agent unlink",
+			"agent unpin",
+			"agent unread",
+			"agent unseen",
+			"agent waiting",
+			"agent window-status-clear",
+			"autosave final-save",
+			"autosave restore-on-start",
+			"autosave save-if-due",
+			"autosave status",
+			"config init",
+			"doctor",
+			"hooks list",
+			"hooks run",
+			"hooks validate",
+			"keys",
+			"pick popup",
+			"project clone",
+			"project create",
+			"project open",
+			"project pick",
+			"remote lookup",
+			"session create",
+			"session delete",
+			"session kill",
+			"session list",
+			"session rename",
+			"session scrollback",
+			"session switch",
+			"setup agents",
+			"setup services",
+			"setup tmux",
+			"snapshot gc",
+			"snapshot history",
+			"snapshot list",
+			"snapshot prune",
+			"snapshot restore",
+			"snapshot save",
+			"snapshot verify",
+			"snapshot recover delete resume",
+			"snapshot recover delete show",
+			"snapshot recover restore abandon",
+			"snapshot recover restore show",
+			"task finish",
+			"task menu",
+			"task merge",
+			"task new",
+			"task offer",
+			"task open",
+			"task popup",
+			"task relayout",
+			"task run",
+			"task sleep",
+			"task tab",
+			"task wake",
 		},
 		"log stream; path and clear use envelopes": {"logs"},
-		"interactive terminal":                     {"pick", "pick ui", "project pick-ui", "remote attach", "session new", "task action-run", "task merge-run", "task pick-ui", "task placeholder", "task popup-attach"},
+		"interactive terminal": {
+			"pick",
+			"pick ui",
+			"project pick-ui",
+			"remote attach",
+			"session new",
+			"task action-run",
+			"task merge-run",
+			"task pick-ui",
+			"task placeholder",
+			"task popup-attach",
+		},
 		"foreground service or readiness protocol": {
-			"daemon agent-window-status", "daemon coordinator", "daemon remote-monitor", "daemon tmux", "daemon wait-ready",
+			"daemon agent-window-status",
+			"daemon coordinator",
+			"daemon remote-monitor",
+			"daemon tmux",
+			"daemon wait-ready",
 		},
-		"private peer protocol": {"remote peer action", "remote peer attach", "remote peer attach-prepare", "remote peer lookup", "remote peer stream"},
+		"private peer protocol": {
+			"remote peer action",
+			"remote peer attach",
+			"remote peer attach-prepare",
+			"remote peer lookup",
+			"remote peer stream",
+		},
 		"plain help or version": {
-			"", "agent", "autosave", "config", "daemon", "help", "hooks", "project", "remote", "remote peer", "session", "setup", snapshotCmd, "task",
-			"snapshot recover", "snapshot recover delete", "snapshot recover restore",
+			"",
+			"agent",
+			"autosave",
+			"config",
+			"daemon",
+			"help",
+			"hooks",
+			"project",
+			"remote",
+			"remote peer",
+			"session",
+			"setup",
+			snapshotCmd,
+			"task",
+			"snapshot recover",
+			"snapshot recover delete",
+			"snapshot recover restore",
 		},
-		"shell completion": {"completion", "completion bash", "completion fish", "completion powershell", "completion zsh"},
+		"shell completion": {
+			"completion",
+			"completion bash",
+			"completion fish",
+			"completion powershell",
+			"completion zsh",
+		},
 	}
 	want := make(map[string]bool)
 
@@ -65,7 +165,10 @@ func TestJSONCommandTreeRequiresExplicitOutputContract(t *testing.T) {
 	collectJSONCommands(root, got)
 
 	if diff := cmp.Diff(want, got); diff != "" {
-		t.Fatalf("command output contract changed; explicitly classify new or changed commands (-want +got):\n%s", diff)
+		t.Fatalf(
+			"command output contract changed; explicitly classify new or changed commands (-want +got):\n%s",
+			diff,
+		)
 	}
 }
 
@@ -94,7 +197,12 @@ func TestJSONCommandsRejectUnknownFlagsWithoutHumanOutput(t *testing.T) {
 			assertErrorEnvelope(t, execution, "usageError", 2, "unknown flag")
 			fields := contractJSONObject(t, []byte(execution.stderr))
 			assertJSONContractFields(t, fields, map[string]any{
-				"schemaVersion": float64(2), "command": strings.ReplaceAll(path, " ", "."), "ok": false, "result": nil,
+				"schemaVersion": float64(
+					2,
+				),
+				"command": strings.ReplaceAll(path, " ", "."),
+				"ok":      false,
+				"result":  nil,
 			})
 		})
 	}
@@ -121,11 +229,21 @@ func runJSONContract(t *testing.T, command string, args ...string) map[string]an
 	return assertJSONContractSuccess(t, command, execution)
 }
 
-func assertJSONContractSuccess(t *testing.T, command string, execution commandExecution) map[string]any {
+func assertJSONContractSuccess(
+	t *testing.T,
+	command string,
+	execution commandExecution,
+) map[string]any {
 	t.Helper()
 
 	if execution.err != nil || execution.stderr != "" {
-		t.Fatalf("%s: error=%v, stderr=%q, stdout=%q", command, execution.err, execution.stderr, execution.stdout)
+		t.Fatalf(
+			"%s: error=%v, stderr=%q, stdout=%q",
+			command,
+			execution.err,
+			execution.stderr,
+			execution.stdout,
+		)
 	}
 
 	fields := contractJSONObject(t, []byte(execution.stdout))
@@ -184,10 +302,55 @@ func TestJSONOfflineCommandSuccessContracts(t *testing.T) {
 		args    []string
 		want    map[string]any
 	}{
-		{command: "config.init", args: []string{"config", "init", testConfigPathFlag, filepath.Join(home, "native.toml")}, want: map[string]any{"path": filepath.Join(home, "native.toml"), contractStatusField: "initialized"}},
-		{command: "agent.status", args: []string{"agent", "status", "--agent-state", filepath.Join(home, "missing-agents.json")}, want: map[string]any{"total": float64(0), "live": float64(0), "waiting": float64(0), "failed": float64(0), "unread": float64(0), "idle": float64(0)}},
-		{command: "autosave.status", args: []string{"autosave", "status"}, want: map[string]any{contractStatusField: "due", contractReasonField: "never_run", "recorded": false, "elapsedSeconds": float64(0), "intervalMinutes": float64(3), "historyState": "never_run", "repositoryState": "missing", "inhibitorsHeld": false}},
-		{command: "setup.tmux", args: []string{"setup", "tmux"}, want: map[string]any{"applied": float64(0), "skipped": float64(0)}},
+		{
+			command: "config.init",
+			args: []string{
+				"config",
+				"init",
+				testConfigPathFlag,
+				filepath.Join(home, "native.toml"),
+			},
+			want: map[string]any{
+				"path":              filepath.Join(home, "native.toml"),
+				contractStatusField: "initialized",
+			},
+		},
+		{
+			command: "agent.status",
+			args: []string{
+				"agent",
+				"status",
+				"--agent-state",
+				filepath.Join(home, "missing-agents.json"),
+			},
+			want: map[string]any{
+				"total":   float64(0),
+				"live":    float64(0),
+				"waiting": float64(0),
+				"failed":  float64(0),
+				"unread":  float64(0),
+				"idle":    float64(0),
+			},
+		},
+		{
+			command: "autosave.status",
+			args:    []string{"autosave", "status"},
+			want: map[string]any{
+				contractStatusField: "due",
+				contractReasonField: "never_run",
+				"recorded":          false,
+				"elapsedSeconds":    float64(0),
+				"intervalMinutes":   float64(3),
+				"historyState":      "never_run",
+				"repositoryState":   "missing",
+				"inhibitorsHeld":    false,
+			},
+		},
+		{
+			command: "setup.tmux",
+			args:    []string{"setup", "tmux"},
+			want:    map[string]any{"applied": float64(0), "skipped": float64(0)},
+		},
 	}
 	for _, test := range cases {
 		t.Run(test.command, func(t *testing.T) {
@@ -234,7 +397,17 @@ func contractJSONItem(t *testing.T, values []any, key string, want any) map[stri
 func TestJSONDoctorWarningReportSuccessContract(t *testing.T) {
 	home := isolateJSONContractHome(t)
 	socket := tmuxtest.NewServer(t).Endpoint().SocketPath
-	result := runJSONContract(t, "doctor", "doctor", testSocketFlag, socket, testRepositoryFlag, filepath.Join(home, "missing-repo"), "--history", filepath.Join(home, "missing-history"))
+	result := runJSONContract(
+		t,
+		"doctor",
+		"doctor",
+		testSocketFlag,
+		socket,
+		testRepositoryFlag,
+		filepath.Join(home, "missing-repo"),
+		"--history",
+		filepath.Join(home, "missing-history"),
+	)
 	summary := contractJSONValue[map[string]any](t, result, "summary")
 	assertJSONContractFields(t, summary, map[string]any{"fail": float64(0)})
 
@@ -247,13 +420,25 @@ func TestJSONDoctorWarningReportSuccessContract(t *testing.T) {
 
 func TestJSONAgentSetupPreviewContract(t *testing.T) {
 	home := isolateJSONContractHome(t)
-	result := runJSONContract(t, "setup.agents", "setup", "agents", "codex", "--dry-run", "--tracker=")
+	result := runJSONContract(
+		t,
+		"setup.agents",
+		"setup",
+		"agents",
+		"codex",
+		"--dry-run",
+		"--tracker=",
+	)
 	assertJSONContractFields(t, result, map[string]any{"dryRun": true})
 	harnesses := contractJSONValue[[]any](t, result, "harnesses")
 	codex := contractJSONItem(t, harnesses, "harness", "codex")
 	_ = contractJSONValue[bool](t, codex, "changed")
 	tracker := contractJSONValue[map[string]any](t, result, "tracker")
-	assertJSONContractFields(t, tracker, map[string]any{"installed": false, "running": false, "changed": false, "current": false})
+	assertJSONContractFields(
+		t,
+		tracker,
+		map[string]any{"installed": false, "running": false, "changed": false, "current": false},
+	)
 
 	if _, err := os.Stat(filepath.Join(home, ".codex")); !os.IsNotExist(err) {
 		t.Fatalf("preview created harness configuration: %v", err)
@@ -270,7 +455,16 @@ func TestJSONDisabledAutosaveSuccessContracts(t *testing.T) {
 
 	execution := executeJSON(t, "autosave", "save-if-due", testConfigFlag, configPath, testJSONFlag)
 	result := assertJSONContractSuccess(t, "autosave.save-if-due", execution)
-	assertJSONContractFields(t, result, map[string]any{contractStatusField: "disabled", contractReasonField: "disabled", "recorded": false, "inhibitorsHeld": false})
+	assertJSONContractFields(
+		t,
+		result,
+		map[string]any{
+			contractStatusField: "disabled",
+			contractReasonField: "disabled",
+			"recorded":          false,
+			"inhibitorsHeld":    false,
+		},
+	)
 
 	if _, present := result["generation"]; present {
 		t.Fatal("disabled autosave claims a saved generation")

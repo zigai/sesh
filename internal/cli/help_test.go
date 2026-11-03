@@ -124,7 +124,10 @@ func TestFlagDescriptionsWriteDefaultsInOneForm(t *testing.T) {
 		for _, flags := range []*pflag.FlagSet{cmd.LocalNonPersistentFlags(), cmd.PersistentFlags()} {
 			flags.VisitAll(func(flag *pflag.Flag) {
 				if !defaultsUseOneForm(flag.Usage) {
-					inconsistent = append(inconsistent, cmd.CommandPath()+" --"+flag.Name+": "+flag.Usage)
+					inconsistent = append(
+						inconsistent,
+						cmd.CommandPath()+" --"+flag.Name+": "+flag.Usage,
+					)
 				}
 			})
 		}
@@ -137,19 +140,24 @@ func TestFlagDescriptionsWriteDefaultsInOneForm(t *testing.T) {
 	visit(newRootCommand(t.Context()))
 
 	if len(inconsistent) > 0 {
-		t.Fatalf("defaults must end the description as \"[default: X]\" and choices must use SetFlagChoices:\n%s", strings.Join(inconsistent, "\n"))
+		t.Fatalf(
+			"defaults must end the description as \"[default: X]\" and choices must use SetFlagChoices:\n%s",
+			strings.Join(inconsistent, "\n"),
+		)
 	}
 }
 
 func defaultsUseOneForm(usage string) bool {
 	lower := strings.ToLower(usage)
-	if strings.Contains(lower, "(default") || strings.Contains(lower, "(empty") || strings.Contains(lower, "[choices") {
+	if strings.Contains(lower, "(default") || strings.Contains(lower, "(empty") ||
+		strings.Contains(lower, "[choices") {
 		return false
 	}
 
 	before, after, found := strings.Cut(usage, "[default: ")
 
-	return !found || (!strings.Contains(before, "[default") && strings.HasSuffix(after, "]") && !strings.Contains(after, "[default"))
+	return !found ||
+		(!strings.Contains(before, "[default") && strings.HasSuffix(after, "]") && !strings.Contains(after, "[default"))
 }
 
 func TestHelpRendersLiteralDefaultsInDescriptionForm(t *testing.T) {

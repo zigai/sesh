@@ -236,7 +236,12 @@ type Model struct {
 	deps                         Services
 }
 
-func NewPopupModel(ctx context.Context, cfg *config.Config, st *session.State, services Services) (*Model, error) {
+func NewPopupModel(
+	ctx context.Context,
+	cfg *config.Config,
+	st *session.State,
+	services Services,
+) (*Model, error) {
 	model, err := buildModel(ctx, cfg, st, services)
 	if err != nil {
 		return nil, err
@@ -247,11 +252,21 @@ func NewPopupModel(ctx context.Context, cfg *config.Config, st *session.State, s
 	return model, nil
 }
 
-func NewModel(ctx context.Context, cfg *config.Config, st *session.State, services Services) (*Model, error) {
+func NewModel(
+	ctx context.Context,
+	cfg *config.Config,
+	st *session.State,
+	services Services,
+) (*Model, error) {
 	return buildModel(ctx, cfg, st, services)
 }
 
-func NewInlineModel(ctx context.Context, cfg *config.Config, st *session.State, services Services) (*Model, error) {
+func NewInlineModel(
+	ctx context.Context,
+	cfg *config.Config,
+	st *session.State,
+	services Services,
+) (*Model, error) {
 	model, err := buildModel(ctx, cfg, st, services)
 	if err != nil {
 		return nil, err
@@ -262,7 +277,12 @@ func NewInlineModel(ctx context.Context, cfg *config.Config, st *session.State, 
 	return model, nil
 }
 
-func NewFullscreenModel(ctx context.Context, cfg *config.Config, st *session.State, services Services) (*Model, error) {
+func NewFullscreenModel(
+	ctx context.Context,
+	cfg *config.Config,
+	st *session.State,
+	services Services,
+) (*Model, error) {
 	model, err := buildModel(ctx, cfg, st, services)
 	if err != nil {
 		return nil, err
@@ -285,7 +305,12 @@ func detectUIMode(deps Services) uiMode {
 	return modeInline
 }
 
-func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps Services) (*Model, error) {
+func buildModel(
+	ctx context.Context,
+	cfg *config.Config,
+	st *session.State,
+	deps Services,
+) (*Model, error) {
 	if cfg == nil {
 		return nil, errNilConfig
 	}
@@ -381,54 +406,59 @@ func buildModel(ctx context.Context, cfg *config.Config, st *session.State, deps
 		popupStartup:                 popupStartupContent,
 		launchedAt:                   time.Time{},
 		initializedAt:                time.Time{},
-		agentLayoutKey:               agentLayoutReflow{width: 0, displayMode: "", uiMode: modeFullscreen, query: ""},
-		agentRowRatchet:              rowlayout.RatchetState{},
-		providerRunner:               providers.Runner{},
-		resourceSample:               providers.ResourceSample{At: time.Time{}, Processes: nil},
-		resourceEpisode:              logging.Episode{},
-		resourceProcRoot:             "",
-		ghEntries:                    nil,
-		customFields:                 customFields,
-		agentGit:                     map[string]agentGitCacheEntry{},
-		agentGitEpisode:              logging.Episode{},
-		gitScan:                      scanGitMetadata,
-		remoteCatalogUpdates:         make(chan remoteCatalogMsg, 1),
-		remoteCatalogWatchStarted:    false,
-		agentSummaryUpdates:          make(chan agentSummariesMsg, 1),
-		agentSummaryWatchStarted:     false,
-		agentSummaryRevision:         0,
-		agentSummaryObservation:      0,
-		agentSummaries:               nil,
-		tasks:                        nil,
-		tasksErr:                     nil,
-		work:                         nil,
-		workSynced:                   false,
-		pendingResume:                nil,
-		closedExpanded:               map[string]bool{},
-		openedSections:               map[string]bool{},
-		fittingHeights:               make(fittingHeights),
-		inboxItems:                   map[string]inboxItem{},
-		inboxGroupKeys:               map[string]string{},
-		menu:                         nil,
-		inbox:                        inbox.State{Version: 0, Snoozes: nil, Unseen: nil},
-		inboxErr:                     nil,
-		evidence:                     map[string]evidenceEntry{},
-		evidenceLoading:              false,
-		inboxGroup:                   cfg.Inbox.Group,
-		carriedSelection:             emptySessionIdentity(),
-		tasksSynced:                  false,
-		taskRunTickPending:           false,
-		deferredSwitch:               emptySession(),
-		hasDeferredSwitch:            false,
-		deferredAttach:               emptySession(),
-		hasDeferredAttach:            false,
-		deferredRemoteAttach:         emptySession(),
-		hasDeferredRemoteAttach:      false,
-		remoteAttachPane:             "",
-		originDetachAfterQuit:        false,
-		lifecycle:                    newLifecycle(ctx),
-		logger:                       *zerolog.Ctx(ctx),
-		deps:                         deps,
+		agentLayoutKey: agentLayoutReflow{
+			width:       0,
+			displayMode: "",
+			uiMode:      modeFullscreen,
+			query:       "",
+		},
+		agentRowRatchet:           rowlayout.RatchetState{},
+		providerRunner:            providers.Runner{},
+		resourceSample:            providers.ResourceSample{At: time.Time{}, Processes: nil},
+		resourceEpisode:           logging.Episode{},
+		resourceProcRoot:          "",
+		ghEntries:                 nil,
+		customFields:              customFields,
+		agentGit:                  map[string]agentGitCacheEntry{},
+		agentGitEpisode:           logging.Episode{},
+		gitScan:                   scanGitMetadata,
+		remoteCatalogUpdates:      make(chan remoteCatalogMsg, 1),
+		remoteCatalogWatchStarted: false,
+		agentSummaryUpdates:       make(chan agentSummariesMsg, 1),
+		agentSummaryWatchStarted:  false,
+		agentSummaryRevision:      0,
+		agentSummaryObservation:   0,
+		agentSummaries:            nil,
+		tasks:                     nil,
+		tasksErr:                  nil,
+		work:                      nil,
+		workSynced:                false,
+		pendingResume:             nil,
+		closedExpanded:            map[string]bool{},
+		openedSections:            map[string]bool{},
+		fittingHeights:            make(fittingHeights),
+		inboxItems:                map[string]inboxItem{},
+		inboxGroupKeys:            map[string]string{},
+		menu:                      nil,
+		inbox:                     inbox.State{Version: 0, Snoozes: nil, Unseen: nil},
+		inboxErr:                  nil,
+		evidence:                  map[string]evidenceEntry{},
+		evidenceLoading:           false,
+		inboxGroup:                cfg.Inbox.Group,
+		carriedSelection:          emptySessionIdentity(),
+		tasksSynced:               false,
+		taskRunTickPending:        false,
+		deferredSwitch:            emptySession(),
+		hasDeferredSwitch:         false,
+		deferredAttach:            emptySession(),
+		hasDeferredAttach:         false,
+		deferredRemoteAttach:      emptySession(),
+		hasDeferredRemoteAttach:   false,
+		remoteAttachPane:          "",
+		originDetachAfterQuit:     false,
+		lifecycle:                 newLifecycle(ctx),
+		logger:                    *zerolog.Ctx(ctx),
+		deps:                      deps,
 	}, nil
 }
 
@@ -900,7 +930,10 @@ func (m *Model) handleModelMessage(msg tea.Msg) func() (tea.Model, tea.Cmd) {
 		return func() (tea.Model, tea.Cmd) {
 			m.handleRemoteCatalog(msg)
 
-			return m, tea.Batch(m.waitRemoteCatalogUpdateCommand(), m.attachPendingResumeWhenListed())
+			return m, tea.Batch(
+				m.waitRemoteCatalogUpdateCommand(),
+				m.attachPendingResumeWhenListed(),
+			)
 		}
 	}
 
@@ -957,7 +990,10 @@ func (m *Model) handleResultMessage(msg tea.Msg) func() (tea.Model, tea.Cmd) {
 
 func (m *Model) handlePopupStartupDeadline() (tea.Model, tea.Cmd) {
 	if m.popupStartup == popupStartupWaiting {
-		logTUIFirstFrame(m.operationContext(), firstFrameTimingAt(m.initializedAt, m.launchedAt, nil, time.Now()))
+		logTUIFirstFrame(
+			m.operationContext(),
+			firstFrameTimingAt(m.initializedAt, m.launchedAt, nil, time.Now()),
+		)
 		m.popupStartup = popupStartupLoading
 	}
 

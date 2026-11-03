@@ -60,14 +60,23 @@ func SameServerSocket(left string, right string) bool {
 
 func ObservePanes(ctx context.Context, server *gotmux.Server) ([]PaneLocation, error) {
 	if server == nil {
-		return nil, oops.In("agents").Code("endpoint_required").With("operation", "list_panes").Wrap(ErrServerRequired)
+		return nil, oops.In("agents").
+			Code("endpoint_required").
+			With("operation", "list_panes").
+			Wrap(ErrServerRequired)
 	}
 
 	if err := ctx.Err(); err != nil {
-		return nil, oops.In("agents").Code("operation_canceled").With("operation", "list_panes").Wrap(err)
+		return nil, oops.In("agents").
+			Code("operation_canceled").
+			With("operation", "list_panes").
+			Wrap(err)
 	}
 
-	panes, err := server.PanesWith(ctx, gotmux.QueryOptions{Filter: "", ExtraFields: []string{"window_active"}})
+	panes, err := server.PanesWith(
+		ctx,
+		gotmux.QueryOptions{Filter: "", ExtraFields: []string{"window_active"}},
+	)
 	if err != nil {
 		return nil, oops.In("agents").Code("tmux_failed").With("operation", "list_panes").Wrap(err)
 	}
@@ -133,7 +142,12 @@ func FindPanes(panes []PaneLocation, paneID string, serverSocket string) []PaneL
 	return links
 }
 
-func FindPaneForSession(panes []PaneLocation, paneID string, serverSocket string, sessionID string) (PaneLocation, bool) {
+func FindPaneForSession(
+	panes []PaneLocation,
+	paneID string,
+	serverSocket string,
+	sessionID string,
+) (PaneLocation, bool) {
 	links := FindPanes(panes, paneID, serverSocket)
 	if len(links) == 0 {
 		return emptyPaneLocation, false

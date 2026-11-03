@@ -359,7 +359,8 @@ func safeKind(kind FormatKind) string {
 
 func tokensUseAny(tokens []token, fields []string) bool {
 	for _, item := range tokens {
-		if slices.Contains(fields, item.field) || slices.Contains(fields, item.fallback) || slices.Contains(fields, item.secondary) {
+		if slices.Contains(fields, item.field) || slices.Contains(fields, item.fallback) ||
+			slices.Contains(fields, item.secondary) {
 			return true
 		}
 	}
@@ -1087,14 +1088,16 @@ func fieldAllowed(allowed map[string]struct{}, field string) bool {
 }
 
 func allowedFields(kind FormatKind) (map[string]struct{}, error) {
-	if kind != FormatKindSession && kind != FormatKindAgentsSession && kind != FormatKindAgentsAgent {
+	if kind != FormatKindSession && kind != FormatKindAgentsSession &&
+		kind != FormatKindAgentsAgent {
 		return nil, fmt.Errorf("%w %q", ErrUnknownKind, kind)
 	}
 
 	allowed := make(map[string]struct{})
 
 	for field, info := range fieldRegistry {
-		if (kind == FormatKindAgentsAgent && info.AgentRows) || (kind != FormatKindAgentsAgent && info.SessionRows) {
+		if (kind == FormatKindAgentsAgent && info.AgentRows) ||
+			(kind != FormatKindAgentsAgent && info.SessionRows) {
 			allowed[field] = struct{}{}
 		}
 	}

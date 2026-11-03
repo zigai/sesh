@@ -129,7 +129,12 @@ func (s *Service) Offer(ctx context.Context, place Place, describe bool) (Offer,
 	offer.Current = currentCheckout(offer.Locations, place.Dir)
 
 	if len(offer.Locations) > 0 && offer.Locations[0].Where == WhereNew {
-		offer.NextNumber, _, err = s.freeNumber(p, offer.Locations[0].Branch, state.LastNumber, known.local)
+		offer.NextNumber, _, err = s.freeNumber(
+			p,
+			offer.Locations[0].Branch,
+			state.LastNumber,
+			known.local,
+		)
 		if err != nil {
 			return offer, taskError("offer_task", err)
 		}
@@ -138,11 +143,26 @@ func (s *Service) Offer(ctx context.Context, place Place, describe bool) (Offer,
 	return offer, nil
 }
 
-func (s *Service) locations(ctx context.Context, p project.Project, ledger Ledger, dir string, describe bool) ([]Location, branches, error) {
+func (s *Service) locations(
+	ctx context.Context,
+	p project.Project,
+	ledger Ledger,
+	dir string,
+	describe bool,
+) ([]Location, branches, error) {
 	if p.Kind != project.KindGit {
 		id, title := taskIn(ledger, p.Root)
 
-		return []Location{{Where: WhereMain, Branch: "", Remote: "", Directory: p.Root, Task: id, TaskTitle: title}}, noBranches(), nil
+		return []Location{
+			{
+				Where:     WhereMain,
+				Branch:    "",
+				Remote:    "",
+				Directory: p.Root,
+				Task:      id,
+				TaskTitle: title,
+			},
+		}, noBranches(), nil
 	}
 
 	base, err := defaultBranch(ctx, p.Root)
@@ -168,7 +188,11 @@ func (s *Service) locations(ctx context.Context, p project.Project, ledger Ledge
 		checkedOut = append(checkedOut, tree.branch)
 	}
 
-	if index := innermostCheckout(existing, dir); index >= 0 && existing[index].Branch != "" && existing[index].Branch != base {
+	if index := innermostCheckout(
+		existing,
+		dir,
+	); index >= 0 && existing[index].Branch != "" &&
+		existing[index].Branch != base {
 		bases = append(bases, existing[index].Branch)
 	}
 
@@ -191,7 +215,11 @@ func (s *Service) locations(ctx context.Context, p project.Project, ledger Ledge
 	return locations, known, nil
 }
 
-func (s *Service) offered(ctx context.Context, p project.Project, requested Location) (Location, []string, error) {
+func (s *Service) offered(
+	ctx context.Context,
+	p project.Project,
+	requested Location,
+) (Location, []string, error) {
 	ledger, err := s.store.Load(ctx)
 	if err != nil {
 		return emptyLocation(), nil, err
@@ -202,7 +230,10 @@ func (s *Service) offered(ctx context.Context, p project.Project, requested Loca
 		return emptyLocation(), nil, err
 	}
 
-	index := slices.IndexFunc(locations, func(l Location) bool { return l.Task == "" && l.names(requested) })
+	index := slices.IndexFunc(
+		locations,
+		func(l Location) bool { return l.Task == "" && l.names(requested) },
+	)
 	if index < 0 {
 		return emptyLocation(), nil, ErrLocationUnavailable
 	}
@@ -253,7 +284,10 @@ func NewBranch(title, base string, number int, taken []string) string {
 	}
 
 	collides := func(candidate string) bool {
-		return slices.ContainsFunc(taken, func(branch string) bool { return refsCollide(candidate, branch) })
+		return slices.ContainsFunc(
+			taken,
+			func(branch string) bool { return refsCollide(candidate, branch) },
+		)
 	}
 
 	candidate := name
@@ -273,7 +307,16 @@ func Changes(ctx context.Context, directories []string) map[string]git.Diff {
 
 	for _, directory := range directories {
 		group.Go(func() {
-			output, err := git.Output(ctx, directory, "diff", "--no-ext-diff", "--no-textconv", "--shortstat", "HEAD", "--")
+			output, err := git.Output(
+				ctx,
+				directory,
+				"diff",
+				"--no-ext-diff",
+				"--no-textconv",
+				"--shortstat",
+				"HEAD",
+				"--",
+			)
 			if err != nil {
 				return
 			}
@@ -355,12 +398,32 @@ func branchLocations(known branches, checkedOut, bases []string) []Location {
 
 	for _, branch := range known.local {
 		if !slices.Contains(checkedOut, branch) {
-			locations = append(locations, Location{Where: WhereBranch, Branch: branch, Remote: "", Directory: "", Task: "", TaskTitle: ""})
+			locations = append(
+				locations,
+				Location{
+					Where:     WhereBranch,
+					Branch:    branch,
+					Remote:    "",
+					Directory: "",
+					Task:      "",
+					TaskTitle: "",
+				},
+			)
 		}
 	}
 
 	for _, branch := range known.remote {
-		locations = append(locations, Location{Where: WhereBranch, Branch: branch.name, Remote: branch.remote, Directory: "", Task: "", TaskTitle: ""})
+		locations = append(
+			locations,
+			Location{
+				Where:     WhereBranch,
+				Branch:    branch.name,
+				Remote:    branch.remote,
+				Directory: "",
+				Task:      "",
+				TaskTitle: "",
+			},
+		)
 	}
 
 	for _, branch := range known.local {
@@ -386,14 +449,27 @@ func checkouts(root string, worktrees []worktree, ledger Ledger) []Location {
 		}
 
 		id, title := taskIn(ledger, tree.directory)
-		existing = append(existing, Location{Where: where, Branch: tree.branch, Remote: "", Directory: tree.directory, Task: id, TaskTitle: title})
+		existing = append(
+			existing,
+			Location{
+				Where:     where,
+				Branch:    tree.branch,
+				Remote:    "",
+				Directory: tree.directory,
+				Task:      id,
+				TaskTitle: title,
+			},
+		)
 	}
 
 	return existing
 }
 
 func taskIn(ledger Ledger, directory string) (string, string) {
-	index := slices.IndexFunc(ledger.Tasks, func(record Record) bool { return sameDirectory(record.Directory, directory) })
+	index := slices.IndexFunc(
+		ledger.Tasks,
+		func(record Record) bool { return sameDirectory(record.Directory, directory) },
+	)
 	if index < 0 {
 		return "", ""
 	}
@@ -402,7 +478,14 @@ func taskIn(ledger Ledger, directory string) (string, string) {
 }
 
 func newWorktreeFrom(branch string) Location {
-	return Location{Where: WhereNew, Branch: branch, Remote: "", Directory: "", Task: "", TaskTitle: ""}
+	return Location{
+		Where:     WhereNew,
+		Branch:    branch,
+		Remote:    "",
+		Directory: "",
+		Task:      "",
+		TaskTitle: "",
+	}
 }
 
 func emptyLocation() Location {
@@ -415,7 +498,14 @@ func noBranches() branches {
 
 func emptyOffer() Offer {
 	return Offer{
-		Harnesses: nil, Project: "", Locations: nil, Current: -1, NextNumber: 0, Branches: nil, Refs: nil, Starts: nil,
+		Harnesses:  nil,
+		Project:    "",
+		Locations:  nil,
+		Current:    -1,
+		NextNumber: 0,
+		Branches:   nil,
+		Refs:       nil,
+		Starts:     nil,
 	}
 }
 
@@ -431,7 +521,13 @@ func listBranches(ctx context.Context, root, base string, describe bool) (branch
 		}
 	}
 
-	format := []string{"%(refname)", "%(symref)", "%(committerdate:unix)", aheadBehind, "%(contents:subject)"}
+	format := []string{
+		"%(refname)",
+		"%(symref)",
+		"%(committerdate:unix)",
+		aheadBehind,
+		"%(contents:subject)",
+	}
 
 	output, err := git.Output(ctx, root, "for-each-ref", "--sort=-committerdate",
 		"--format="+strings.Join(format, "%09")+"%00", "refs/heads/", "refs/remotes/")
@@ -451,7 +547,13 @@ func listBranches(ctx context.Context, root, base string, describe bool) (branch
 			continue
 		}
 
-		ref := refLine{name: fields[0], symref: fields[1], committed: fields[2], aheadBehind: fields[3], subject: fields[4]}
+		ref := refLine{
+			name:        fields[0],
+			symref:      fields[1],
+			committed:   fields[2],
+			aheadBehind: fields[3],
+			subject:     fields[4],
+		}
 		if ref.isSymref() {
 			continue
 		}
@@ -516,7 +618,10 @@ func listWorktrees(ctx context.Context, root string) ([]worktree, error) {
 		line = strings.TrimRight(line, "\n")
 
 		if directory, found := strings.CutPrefix(line, "worktree "); found {
-			worktrees = append(worktrees, worktree{directory: directory, branch: "", prunable: false})
+			worktrees = append(
+				worktrees,
+				worktree{directory: directory, branch: "", prunable: false},
+			)
 
 			continue
 		}
@@ -552,7 +657,8 @@ func within(dir, directory string) bool {
 
 	relative, err := filepath.Rel(resolved(directory), resolved(dir))
 
-	return err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
+	return err == nil && relative != ".." &&
+		!strings.HasPrefix(relative, ".."+string(filepath.Separator))
 }
 
 func sameDirectory(a, b string) bool {
@@ -572,7 +678,11 @@ func resolved(path string) string {
 	return filepath.Clean(path)
 }
 
-func startPoints(ctx context.Context, root string, locations []Location) (map[string]string, error) {
+func startPoints(
+	ctx context.Context,
+	root string,
+	locations []Location,
+) (map[string]string, error) {
 	starts := make(map[string]string)
 
 	for _, location := range locations {

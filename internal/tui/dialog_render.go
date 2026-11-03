@@ -55,7 +55,9 @@ func (m *Model) helpBindings(keys actionKeyMap) []helpBinding {
 	}
 
 	if m.showsDisplayModeIndicator() {
-		bindings = append([]helpBinding{{keys.cycleMode.Help().Key, keys.cycleMode.Help().Desc}}, bindings...)
+		bindings = append(
+			[]helpBinding{{keys.cycleMode.Help().Key, keys.cycleMode.Help().Desc}},
+			bindings...)
 	}
 
 	switch m.displayMode {
@@ -74,7 +76,10 @@ func (m *Model) helpBindings(keys actionKeyMap) []helpBinding {
 		)
 	}
 
-	bindings = append(bindings, helpBinding{keys.menu.Help().Key + ", right-click", keys.menu.Help().Desc})
+	bindings = append(
+		bindings,
+		helpBinding{keys.menu.Help().Key + ", right-click", keys.menu.Help().Desc},
+	)
 
 	for _, bound := range m.viewActions(keys) {
 		bindings = append(bindings, helpBinding{bound.key.Help().Key, bound.key.Help().Desc})
@@ -161,7 +166,10 @@ func (m *Model) renderHelpStatusLine(width int) string {
 		statusStyle = statusStyle.Foreground(lipgloss.Color(color))
 	}
 
-	statusText := display.Truncate(glyph+SanitizeTerminalText(m.statusMessage), max(width-statusWidthInset, 1))
+	statusText := display.Truncate(
+		glyph+SanitizeTerminalText(m.statusMessage),
+		max(width-statusWidthInset, 1),
+	)
 
 	return "  " + statusStyle.Render(statusText)
 }
@@ -182,7 +190,13 @@ func (m *Model) renderDialog() string {
 
 		return renderConfirmDialog(m.width, m.height, "Confirm", question, m.confirmYes, m.config)
 	case dialogInputText:
-		return renderDialog(m.width, m.height, descriptor.Title, m.pending.param.Usage+": "+m.textParamInput.View(), m.config)
+		return renderDialog(
+			m.width,
+			m.height,
+			descriptor.Title,
+			m.pending.param.Usage+": "+m.textParamInput.View(),
+			m.config,
+		)
 	case dialogInputPath:
 		return m.renderPathDialog(descriptor, *m.pending)
 	case dialogNone:
@@ -215,7 +229,10 @@ func enteredValues(descriptor action.Descriptor, request pendingAction) []string
 	lines := make([]string, 0, len(descriptor.Params))
 	for _, param := range descriptor.Params {
 		if param.Name != request.param.Name && request.values.Has(param.Name) {
-			lines = append(lines, param.Usage+": "+SanitizeTerminalText(request.values.String(param.Name)))
+			lines = append(
+				lines,
+				param.Usage+": "+SanitizeTerminalText(request.values.String(param.Name)),
+			)
 		}
 	}
 
@@ -223,7 +240,10 @@ func enteredValues(descriptor action.Descriptor, request pendingAction) []string
 }
 
 func (m *Model) renderPathDialog(descriptor action.Descriptor, request pendingAction) string {
-	width := min(max(m.contentWidth()-pathDialogWidthMargin, minPathDialogWidth), maxPathDialogWidth)
+	width := min(
+		max(m.contentWidth()-pathDialogWidthMargin, minPathDialogWidth),
+		maxPathDialogWidth,
+	)
 	inputWidth := max(width-pathDialogBorderPadding, minSearchWidth)
 	originalWidth := m.pathInput.Width()
 	m.pathInput.SetWidth(inputWidth)
@@ -258,7 +278,10 @@ func (m *Model) renderPathDialog(descriptor action.Descriptor, request pendingAc
 				Bold(true)
 		}
 
-		suggestion = display.Truncate(SanitizeTerminalText(suggestion), inputWidth-lipgloss.Width(prefix))
+		suggestion = display.Truncate(
+			SanitizeTerminalText(suggestion),
+			inputWidth-lipgloss.Width(prefix),
+		)
 		lines = append(lines, style.Render(prefix+suggestion))
 	}
 
@@ -282,12 +305,18 @@ func (m *Model) pathMarker(request pendingAction) string {
 	switch m.pathState {
 	case pathMissing:
 		if request.param.CreateWith == "" {
-			return lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.Theme.Error)).Render("does not exist")
+			return lipgloss.NewStyle().
+				Foreground(lipgloss.Color(m.config.Theme.Error)).
+				Render("does not exist")
 		}
 
-		return lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.Theme.Warning)).Render("will be created")
+		return lipgloss.NewStyle().
+			Foreground(lipgloss.Color(m.config.Theme.Warning)).
+			Render("will be created")
 	case pathNotDirectory:
-		return lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.Theme.Error)).Render("not a directory")
+		return lipgloss.NewStyle().
+			Foreground(lipgloss.Color(m.config.Theme.Error)).
+			Render("not a directory")
 	case pathUnknown, pathExists:
 		return ""
 	}
@@ -312,7 +341,12 @@ func renderDialog(width, height int, title, content string, cfg *config.Config) 
 	return box.Render(titleStyle.Render(title) + "\n\n" + content)
 }
 
-func renderConfirmDialog(width, height int, title, content string, confirmYes bool, cfg *config.Config) string {
+func renderConfirmDialog(
+	width, height int,
+	title, content string,
+	confirmYes bool,
+	cfg *config.Config,
+) string {
 	buttons := renderConfirmButtons(confirmYes, cfg)
 
 	return renderDialog(width, height, title, content+"\n\n"+buttons, cfg)
@@ -379,7 +413,13 @@ func overlayOrigin(overlayLines []string, width int, height int) (int, int) {
 
 	innerWidth := max(width-innerFrameMargin, 1)
 
-	return max((innerWidth-overlayWidth)/centerDivisor, 0) + 1, max((height-len(overlayLines))/centerDivisor, 0)
+	return max(
+			(innerWidth-overlayWidth)/centerDivisor,
+			0,
+		) + 1, max(
+			(height-len(overlayLines))/centerDivisor,
+			0,
+		)
 }
 
 func overlayLineAt(baseLine string, overlayLine string, x int, width int) string {

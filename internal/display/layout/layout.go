@@ -136,7 +136,13 @@ func Measure(specs []ColumnSpec, rows [][]Cell) [][]CellWidths {
 	return measured
 }
 
-func Plan(specs []ColumnSpec, measured [][]CellWidths, width int, ratchet *RatchetState, now time.Time) ColumnPlan {
+func Plan(
+	specs []ColumnSpec,
+	measured [][]CellWidths,
+	width int,
+	ratchet *RatchetState,
+	now time.Time,
+) ColumnPlan {
 	width = max(width, 0)
 	columns := make([]Column, len(specs))
 	compact := make([]int, len(specs))
@@ -195,7 +201,11 @@ func Plan(specs []ColumnSpec, measured [][]CellWidths, width int, ratchet *Ratch
 
 func (r *RatchetState) column(index int, spec ColumnSpec) *ratchetColumn {
 	if r.columns[index].spec != spec {
-		r.columns[index] = ratchetColumn{spec: spec, natural: ratchetWidth{width: 0, narrowerAt: time.Time{}, narrowerNow: false}, compact: ratchetWidth{width: 0, narrowerAt: time.Time{}, narrowerNow: false}}
+		r.columns[index] = ratchetColumn{
+			spec:    spec,
+			natural: ratchetWidth{width: 0, narrowerAt: time.Time{}, narrowerNow: false},
+			compact: ratchetWidth{width: 0, narrowerAt: time.Time{}, narrowerNow: false},
+		}
 	}
 
 	return &r.columns[index]
@@ -225,7 +235,12 @@ func PaintColumns(plan ColumnPlan, cells []Cell, theme Theme) ([]string, []Span)
 	parts := make([]string, len(plan.Columns))
 
 	for i, column := range plan.Columns {
-		spans[i] = Span{ID: plan.specs[i].ID, Offset: column.Offset, Width: column.Width, Visible: column.Visible}
+		spans[i] = Span{
+			ID:      plan.specs[i].ID,
+			Offset:  column.Offset,
+			Width:   column.Width,
+			Visible: column.Visible,
+		}
 		if !column.Visible {
 			continue
 		}
@@ -433,7 +448,14 @@ func textTokens(value string) []textToken {
 	flushPlain := func() {
 		graphemes := uniseg.NewGraphemes(plain.String())
 		for graphemes.Next() {
-			tokens = append(tokens, textToken{text: graphemes.Str(), width: ansi.StringWidth(graphemes.Str()), escape: false})
+			tokens = append(
+				tokens,
+				textToken{
+					text:   graphemes.Str(),
+					width:  ansi.StringWidth(graphemes.Str()),
+					escape: false,
+				},
+			)
 		}
 
 		plain.Reset()
@@ -585,7 +607,9 @@ func groupNeighbors(plan ColumnPlan, cells []Cell, group string, index int) (int
 }
 
 func presentGroupField(plan ColumnPlan, cells []Cell, index int) bool {
-	return !plan.specs[index].Separator && plan.Columns[index].Visible && index < len(cells) && cells[index].State == Present && cells[index].Text != ""
+	return !plan.specs[index].Separator && plan.Columns[index].Visible && index < len(cells) &&
+		cells[index].State == Present &&
+		cells[index].Text != ""
 }
 
 func boundedWidth(spec ColumnSpec, width int) int {

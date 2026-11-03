@@ -25,8 +25,17 @@ func TestAcquireSaveLock_ContentionAndRelease(t *testing.T) {
 		t.Fatalf("first acquisition = (%v, %t), want a held lock", err, acquired)
 	}
 
-	if _, acquired, err := automation.AcquireSaveLock(ctx, path, automation.SaveLockNonBlocking); err != nil || acquired {
-		t.Fatalf("second non-blocking acquisition = (%v, %t), want contention without error", err, acquired)
+	if _, acquired, err := automation.AcquireSaveLock(
+		ctx,
+		path,
+		automation.SaveLockNonBlocking,
+	); err != nil ||
+		acquired {
+		t.Fatalf(
+			"second non-blocking acquisition = (%v, %t), want contention without error",
+			err,
+			acquired,
+		)
 	}
 
 	if err := lock.Release(); err != nil {
@@ -71,8 +80,17 @@ func TestAcquireSaveLock_BlockingWaitHonoursCancellation(t *testing.T) {
 	waitCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
 	defer cancel()
 
-	if _, acquired, err := automation.AcquireSaveLock(waitCtx, path, automation.SaveLockBlocking); !errors.Is(err, context.DeadlineExceeded) || acquired {
-		t.Fatalf("blocking acquisition = (%v, %t), want a deadline error without the lock", err, acquired)
+	if _, acquired, err := automation.AcquireSaveLock(
+		waitCtx,
+		path,
+		automation.SaveLockBlocking,
+	); !errors.Is(err, context.DeadlineExceeded) ||
+		acquired {
+		t.Fatalf(
+			"blocking acquisition = (%v, %t), want a deadline error without the lock",
+			err,
+			acquired,
+		)
 	}
 
 	if err := holder.Release(); err != nil {
@@ -100,7 +118,13 @@ func TestTryAcquireSaveLock_ReportsBusyAsAnError(t *testing.T) {
 		t.Fatalf("holder acquisition = (%v, %t), want a held lock", err, acquired)
 	}
 
-	if _, err := automation.TryAcquireSaveLock(ctx, path); !errors.Is(err, automation.ErrSaveLockBusy) {
+	if _, err := automation.TryAcquireSaveLock(
+		ctx,
+		path,
+	); !errors.Is(
+		err,
+		automation.ErrSaveLockBusy,
+	) {
 		t.Fatalf("TryAcquireSaveLock error = %v, want ErrSaveLockBusy", err)
 	}
 
@@ -143,7 +167,11 @@ func TestSaveLockHelperProcess(t *testing.T) {
 		t.Skip("helper process")
 	}
 
-	lock, acquired, err := automation.AcquireSaveLock(context.Background(), path, automation.SaveLockBlocking)
+	lock, acquired, err := automation.AcquireSaveLock(
+		context.Background(),
+		path,
+		automation.SaveLockBlocking,
+	)
 	if err != nil || !acquired {
 		t.Fatalf("helper acquisition failed: %v (acquired: %t)", err, acquired)
 	}
@@ -172,7 +200,12 @@ func startLockHelper(t *testing.T, path string) *lockHelper {
 		t.Fatalf("resolve test executable failed: %v", err)
 	}
 
-	command := exec.CommandContext(t.Context(), executable, "-test.run=TestSaveLockHelperProcess$", "-test.v")
+	command := exec.CommandContext(
+		t.Context(),
+		executable,
+		"-test.run=TestSaveLockHelperProcess$",
+		"-test.v",
+	)
 
 	command.Env = append(os.Environ(), helperSaveLockEnv+"="+path)
 
@@ -247,7 +280,13 @@ func TestSaveLockContentionAcrossProcesses(t *testing.T) {
 
 	helper := startLockHelper(t, path)
 
-	if _, err := automation.TryAcquireSaveLock(ctx, path); !errors.Is(err, automation.ErrSaveLockBusy) {
+	if _, err := automation.TryAcquireSaveLock(
+		ctx,
+		path,
+	); !errors.Is(
+		err,
+		automation.ErrSaveLockBusy,
+	) {
 		t.Fatalf("cross-process acquisition error = %v, want ErrSaveLockBusy", err)
 	}
 

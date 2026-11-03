@@ -81,12 +81,18 @@ const (
 )
 
 var (
-	errPickerTerminalRequired                   = errors.New("picker requires an interactive terminal")
-	errUnknownPickerPresentation                = errors.New("unknown picker presentation")
-	errInvalidPickerUI                          = errors.New("invalid picker ui: expected auto, popup, inline, or fullscreen")
-	errRemoteAttachUnavailable                  = errors.New("remote attach is unavailable")
-	errRemoteAttachCommandUnavailable           = errors.New("remote attach returned no terminal command")
-	_                                 term.File = terminalOutput{Writer: nil, fd: 0}
+	errPickerTerminalRequired = errors.New(
+		"picker requires an interactive terminal",
+	)
+	errUnknownPickerPresentation = errors.New("unknown picker presentation")
+	errInvalidPickerUI           = errors.New(
+		"invalid picker ui: expected auto, popup, inline, or fullscreen",
+	)
+	errRemoteAttachUnavailable        = errors.New("remote attach is unavailable")
+	errRemoteAttachCommandUnavailable = errors.New(
+		"remote attach returned no terminal command",
+	)
+	_ term.File = terminalOutput{Writer: nil, fd: 0}
 )
 
 var DefaultPickerRemoteFactory RemoteFactory
@@ -145,10 +151,13 @@ func InvokingPickerClient(ctx context.Context, server *gotmux.Server) (gotmux.Cl
 func NewPickCommand(ctx context.Context, remote ...RemoteFactory) *cobra.Command {
 	remoteFactory := firstPickerRemoteFactory(remote)
 	cmd := &cobra.Command{
-		Use:         "pick",
-		Short:       "Open the interactive session picker",
-		Args:        clibase.UsageArgs(cobra.NoArgs),
-		Annotations: map[string]string{clibase.AnnotationLiveIO: annotationEnabled, clibase.AnnotationOperation: "picker"},
+		Use:   "pick",
+		Short: "Open the interactive session picker",
+		Args:  clibase.UsageArgs(cobra.NoArgs),
+		Annotations: map[string]string{
+			clibase.AnnotationLiveIO:    annotationEnabled,
+			clibase.AnnotationOperation: "picker",
+		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			choice, _ := cmd.Flags().GetString(uiFlag)
 
@@ -173,11 +182,14 @@ func NewPickCommand(ctx context.Context, remote ...RemoteFactory) *cobra.Command
 
 func newPickUICommand(ctx context.Context, remoteFactory RemoteFactory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:         "ui",
-		Short:       "Run the session picker inside its popup",
-		Hidden:      true,
-		Args:        clibase.UsageArgs(cobra.NoArgs),
-		Annotations: map[string]string{clibase.AnnotationLiveIO: annotationEnabled, clibase.AnnotationOperation: "picker"},
+		Use:    "ui",
+		Short:  "Run the session picker inside its popup",
+		Hidden: true,
+		Args:   clibase.UsageArgs(cobra.NoArgs),
+		Annotations: map[string]string{
+			clibase.AnnotationLiveIO:    annotationEnabled,
+			clibase.AnnotationOperation: "picker",
+		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runPickCommand(executionContext(ctx, cmd), cmd, presentationPopup, remoteFactory)
 		},
@@ -219,7 +231,8 @@ func addPickerPathFlags(cmd *cobra.Command) {
 	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
 	cmd.Flags().String("lease-root", "", clibase.LeaseRootFlagUsage)
 	cmd.Flags().String("history", "", clibase.HistoryFlagUsage)
-	cmd.Flags().String("agent-state", "", "AHT agent registry file [default: agent_status.store_path setting, else AHT's default registry]")
+	cmd.Flags().
+		String("agent-state", "", "AHT agent registry file [default: agent_status.store_path setting, else AHT's default registry]")
 }
 
 func executionContext(parent context.Context, cmd *cobra.Command) context.Context {
@@ -256,7 +269,12 @@ func remoteCLIError(operation string, err error) error {
 	return oops.In("cli").With("operation", operation).Wrap(err)
 }
 
-func runPickCommand(ctx context.Context, cmd *cobra.Command, presentation presentation, remoteFactory RemoteFactory) error {
+func runPickCommand(
+	ctx context.Context,
+	cmd *cobra.Command,
+	presentation presentation,
+	remoteFactory RemoteFactory,
+) error {
 	runtime, err := preparePickerCommand(cmd)
 	if err != nil {
 		return err
@@ -302,7 +320,12 @@ func runPickerInteractive(
 	runtime commandRuntime,
 	remoteFactory RemoteFactory,
 ) error {
-	remote, err := configurePickerRemote(ctx, runtime.workspace.Config, runtime.workspace.Socket, remoteFactory)
+	remote, err := configurePickerRemote(
+		ctx,
+		runtime.workspace.Config,
+		runtime.workspace.Socket,
+		remoteFactory,
+	)
 	if err != nil {
 		return err
 	}
@@ -318,9 +341,18 @@ func runPickerInteractive(
 	services.currentSessionID, _ = cmd.Flags().GetString(sessionIDFlag)
 	services.startInitialReads(ctx)
 
-	model, err := buildPickerModel(ctx, presentation, runtime.workspace.Config, runtime.state, services.TUIServices())
+	model, err := buildPickerModel(
+		ctx,
+		presentation,
+		runtime.workspace.Config,
+		runtime.state,
+		services.TUIServices(),
+	)
 	if err != nil {
-		return errors.Join(oops.In("cli").With("operation", "construct_picker").Wrap(err), services.Close())
+		return errors.Join(
+			oops.In("cli").With("operation", "construct_picker").Wrap(err),
+			services.Close(),
+		)
 	}
 
 	if launchedAt, ok := launchedAt(cmd, time.Now()); ok {
@@ -353,7 +385,13 @@ func launchedAt(cmd *cobra.Command, now time.Time) (time.Time, bool) {
 	return launchedAt, true
 }
 
-func finishPickerInteractive(ctx context.Context, cmd *cobra.Command, finalModel *tui.Model, services *services, runErr error) error {
+func finishPickerInteractive(
+	ctx context.Context,
+	cmd *cobra.Command,
+	finalModel *tui.Model,
+	services *services,
+	runErr error,
+) error {
 	var deferredErr error
 
 	var handoffTarget *session.Session
@@ -367,14 +405,27 @@ func finishPickerInteractive(ctx context.Context, cmd *cobra.Command, finalModel
 			handoffTarget = &target
 			handoffPane = finalModel.DeferredSwitchPane()
 		} else {
-			deferredErr = runPickerDeferred(ctx, cmd.InOrStdin(), cmd.OutOrStdout(), cmd.ErrOrStderr(), finalModel, services)
+			deferredErr = runPickerDeferred(
+				ctx,
+				cmd.InOrStdin(),
+				cmd.OutOrStdout(),
+				cmd.ErrOrStderr(),
+				finalModel,
+				services,
+			)
 		}
 	}
 
 	closeErr := services.Close()
 	if handoffPath != "" && closeErr == nil {
-		handoffErr := writePickerSwitchHandoff(handoffPath, handoffTarget, handoffPane, finalModel.ReplayKey(), finalModel.TaskProject(),
-			services.takeDeferredAgentViews())
+		handoffErr := writePickerSwitchHandoff(
+			handoffPath,
+			handoffTarget,
+			handoffPane,
+			finalModel.ReplayKey(),
+			finalModel.TaskProject(),
+			services.takeDeferredAgentViews(),
+		)
 		deferredErr = errors.Join(deferredErr, handoffErr)
 	}
 
@@ -413,7 +464,9 @@ func configurePickerRemote(
 
 	remote, err := remoteFactory(ctx, cfg, socketPath)
 	if err != nil {
-		return RemoteServices{}, oops.In("cli").With("operation", "configure_remote_picker").Wrap(err)
+		return RemoteServices{}, oops.In("cli").
+			With("operation", "configure_remote_picker").
+			Wrap(err)
 	}
 
 	return remote, nil
@@ -447,7 +500,11 @@ func applyClientDimensionOverrides(caller action.Caller, client *gotmux.ClientIn
 	}
 }
 
-func resolvePopupClient(ctx context.Context, caller action.Caller, server *gotmux.Server) (gotmux.ClientInfo, error) {
+func resolvePopupClient(
+	ctx context.Context,
+	caller action.Caller,
+	server *gotmux.Server,
+) (gotmux.ClientInfo, error) {
 	targetClient := caller.Client
 	if targetClient == "" {
 		targetClient = os.Getenv(clientEnvironment)
@@ -527,7 +584,12 @@ func openPickerPopup(
 		return session.ErrInvokingClientUnavailable
 	}
 
-	if err := checkPopupClientSession(ctx, server, caller.Session, string(originSessionID)); err != nil {
+	if err := checkPopupClientSession(
+		ctx,
+		server,
+		caller.Session,
+		string(originSessionID),
+	); err != nil {
 		return err
 	}
 
@@ -542,35 +604,86 @@ func openPickerPopup(
 		targetPane = os.Getenv("TMUX_PANE")
 	}
 
-	width, height := popupDimensions(runtime.workspace.Config, runtime.state, gotmux.Size{Width: client.Width, Height: client.Height})
+	width, height := popupDimensions(
+		runtime.workspace.Config,
+		runtime.state,
+		gotmux.Size{Width: client.Width, Height: client.Height},
+	)
 	options := popupOptions(
-		gotmux.Exec(executable, popupArguments(cmd, runtime.workspace.Socket, string(originSessionID), targetPane, handoffPath, mode, launchedAt)...),
+		gotmux.Exec(
+			executable,
+			popupArguments(
+				cmd,
+				runtime.workspace.Socket,
+				string(originSessionID),
+				targetPane,
+				handoffPath,
+				mode,
+				launchedAt,
+			)...),
 		width,
 		height,
 		runtime.workspace.Config.Theme.Background,
 	)
 
-	services, err := newServices(ctx, runtime.workspace, gotmux.Streams{In: nil, Out: nil, Err: nil},
-		RemoteServices{Catalog: nil, Watcher: nil, Peer: nil, Attach: nil, OriginBridge: nil, Origin: nil})
+	services, err := newServices(
+		ctx,
+		runtime.workspace,
+		gotmux.Streams{In: nil, Out: nil, Err: nil},
+		RemoteServices{
+			Catalog:      nil,
+			Watcher:      nil,
+			Peer:         nil,
+			Attach:       nil,
+			OriginBridge: nil,
+			Origin:       nil,
+		},
+	)
 	if err != nil {
 		return err
 	}
 
 	if err := client.Handle().Popup(ctx, options); err != nil {
-		return errors.Join(oops.In("cli").With("operation", "open_picker_popup").Wrap(err), services.Close())
+		return errors.Join(
+			oops.In("cli").With("operation", "open_picker_popup").Wrap(err),
+			services.Close(),
+		)
 	}
 
 	return errors.Join(
-		completePickerSwitchHandoff(ctx, services, handoffPath, string(client.Name), string(originSessionID)),
+		completePickerSwitchHandoff(
+			ctx,
+			services,
+			handoffPath,
+			string(client.Name),
+			string(originSessionID),
+		),
 		replayPickerKey(ctx, handoffPath, runtime.workspace.Socket, string(client.Name)),
 		services.Close(),
-		openHandoffTaskMenu(ctx, cmd, runtime.workspace.Config, handoffPath,
-			action.Caller{Client: string(client.Name), Pane: targetPane, Session: "", Width: "", Height: ""}, remoteFactory),
+		openHandoffTaskMenu(
+			ctx,
+			cmd,
+			runtime.workspace.Config,
+			handoffPath,
+			action.Caller{
+				Client:  string(client.Name),
+				Pane:    targetPane,
+				Session: "",
+				Width:   "",
+				Height:  "",
+			},
+			remoteFactory,
+		),
 	)
 }
 
 func openHandoffTaskMenu(
-	ctx context.Context, cmd *cobra.Command, cfg *config.Config, path string, caller action.Caller, remoteFactory RemoteFactory,
+	ctx context.Context,
+	cmd *cobra.Command,
+	cfg *config.Config,
+	path string,
+	caller action.Caller,
+	remoteFactory RemoteFactory,
 ) error {
 	handoff, _, err := readPickerSwitchHandoff(path)
 	if err != nil || handoff.TaskProject == "" {
@@ -582,7 +695,10 @@ func openHandoffTaskMenu(
 		return err
 	}
 
-	return errors.Join(openTaskPicker(ctx, cmd, cfg, runtime, caller, remoteFactory, handoff.TaskProject), runtime.Close())
+	return errors.Join(
+		openTaskPicker(ctx, cmd, cfg, runtime, caller, remoteFactory, handoff.TaskProject),
+		runtime.Close(),
+	)
 }
 
 func popupOptions(program gotmux.Program, width, height, background string) gotmux.PopupOptions {
@@ -610,7 +726,11 @@ func popupOptions(program gotmux.Program, width, height, background string) gotm
 	return opts
 }
 
-func popupArguments(cmd *cobra.Command, socketPath, sessionID, paneID, handoffPath, mode string, launchedAt time.Time) []string {
+func popupArguments(
+	cmd *cobra.Command,
+	socketPath, sessionID, paneID, handoffPath, mode string,
+	launchedAt time.Time,
+) []string {
 	arguments := []string{"pick", "ui", "--socket", socketPath}
 
 	if mode != "" {
@@ -618,7 +738,11 @@ func popupArguments(cmd *cobra.Command, socketPath, sessionID, paneID, handoffPa
 	}
 
 	if !launchedAt.IsZero() {
-		arguments = append(arguments, "--"+launchedAtFlag, strconv.FormatInt(launchedAt.UnixNano(), 10))
+		arguments = append(
+			arguments,
+			"--"+launchedAtFlag,
+			strconv.FormatInt(launchedAt.UnixNano(), 10),
+		)
 	}
 
 	if handoffPath != "" {
@@ -636,7 +760,11 @@ func popupArguments(cmd *cobra.Command, socketPath, sessionID, paneID, handoffPa
 	return append(arguments, forwardedConfigFlags(cmd)...)
 }
 
-func popupDimensions(cfg *config.Config, state *session.State, available gotmux.Size) (string, string) {
+func popupDimensions(
+	cfg *config.Config,
+	state *session.State,
+	available gotmux.Size,
+) (string, string) {
 	mode := effectivePickerPopupMode(cfg, state)
 	agentsMode := mode != "sesh"
 	width, height := cfg.Popup.SeshWidth, cfg.Popup.SeshHeight
@@ -706,7 +834,10 @@ func effectivePickerPopupMode(cfg *config.Config, state *session.State) string {
 	return "sesh"
 }
 
-func adaptivePickerPopupDimensions(width, height string, available, minimum, fallback gotmux.Size) (string, string) {
+func adaptivePickerPopupDimensions(
+	width, height string,
+	available, minimum, fallback gotmux.Size,
+) (string, string) {
 	width = strings.TrimSpace(width)
 	height = strings.TrimSpace(height)
 
@@ -727,8 +858,20 @@ func adaptivePickerPopupDimensions(width, height string, available, minimum, fal
 		Height: max(available.Height-popupTerminalMargin, 1),
 	}
 	desired := gotmux.Size{
-		Width:  desiredPickerPopupDimension(width, available.Width, minimum.Width, fallback.Width, maximum.Width),
-		Height: desiredPickerPopupDimension(height, available.Height, minimum.Height, fallback.Height, maximum.Height),
+		Width: desiredPickerPopupDimension(
+			width,
+			available.Width,
+			minimum.Width,
+			fallback.Width,
+			maximum.Width,
+		),
+		Height: desiredPickerPopupDimension(
+			height,
+			available.Height,
+			minimum.Height,
+			fallback.Height,
+			maximum.Height,
+		),
 	}
 	balanced := balancePickerPopupSize(desired, maximum, minimum, fallback)
 
@@ -766,7 +909,10 @@ func balancePickerPopupSize(desired, maximum, minimum, target gotmux.Size) gotmu
 	area := float64(desired.Width * desired.Height)
 	balancedWidth := math.Sqrt(area * targetRatio)
 	balancedHeight := balancedWidth / targetRatio
-	scale := min(1.0, min(float64(maximum.Width)/balancedWidth, float64(maximum.Height)/balancedHeight))
+	scale := min(
+		1.0,
+		min(float64(maximum.Width)/balancedWidth, float64(maximum.Height)/balancedHeight),
+	)
 	width := int(math.Round(min(max(balancedWidth*scale, 1), float64(maximum.Width))))
 	height := int(math.Round(min(max(balancedHeight*scale, 1), float64(maximum.Height))))
 	width = max(width, min(minimum.Width, maximum.Width))
@@ -808,7 +954,12 @@ func wrapPickerModelError(err error) error {
 	return oops.In("cli").With("operation", "initialize_picker_model").Wrap(err)
 }
 
-func runPickerProgram(ctx context.Context, cmd *cobra.Command, model *tui.Model, presentation presentation) (*tui.Model, error) {
+func runPickerProgram(
+	ctx context.Context,
+	cmd *cobra.Command,
+	model *tui.Model,
+	presentation presentation,
+) (*tui.Model, error) {
 	output := programOutput(cmd.OutOrStdout())
 
 	programOptions := []tea.ProgramOption{
@@ -908,7 +1059,9 @@ func runPickerDeferred(
 
 	if target, paneID, ok := model.DeferredRemoteAttach(); ok {
 		if services.remote.Attach == nil {
-			return oops.In("cli").With("operation", "prepare_remote_attach").Wrap(errRemoteAttachUnavailable)
+			return oops.In("cli").
+				With("operation", "prepare_remote_attach").
+				Wrap(errRemoteAttachUnavailable)
 		}
 
 		command, err := services.remote.Attach.AttachRemoteSession(ctx, target, paneID)
@@ -917,7 +1070,9 @@ func runPickerDeferred(
 		}
 
 		if command == nil {
-			return oops.In("cli").With("operation", "prepare_remote_attach").Wrap(errRemoteAttachCommandUnavailable)
+			return oops.In("cli").
+				With("operation", "prepare_remote_attach").
+				Wrap(errRemoteAttachCommandUnavailable)
 		}
 
 		command.SetStdin(stdin)
@@ -939,7 +1094,10 @@ func runPickerDeferred(
 }
 
 func invokingPickerClient(ctx context.Context, server *gotmux.Server) (gotmux.ClientInfo, error) {
-	current, err := server.CurrentFrom(ctx, gotmux.TmuxVars{TMUX: os.Getenv("TMUX"), TMUXPane: os.Getenv("TMUX_PANE")})
+	current, err := server.CurrentFrom(
+		ctx,
+		gotmux.TmuxVars{TMUX: os.Getenv("TMUX"), TMUXPane: os.Getenv("TMUX_PANE")},
+	)
 	if err != nil {
 		return gotmux.ClientInfo{}, remoteCLIError("resolve_invoking_picker_session", err)
 	}
@@ -979,7 +1137,10 @@ func invokingPickerClient(ctx context.Context, server *gotmux.Server) (gotmux.Cl
 	return eligible[0], nil
 }
 
-func (r *transcriptNameCache) annotateInventory(ctx context.Context, summaries []session.AgentSummary) {
+func (r *transcriptNameCache) annotateInventory(
+	ctx context.Context,
+	summaries []session.AgentSummary,
+) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -1012,7 +1173,8 @@ func sessionNameLoads(
 	for _, summary := range summaries {
 		for index := range summary.Agents {
 			agent := &summary.Agents[index]
-			if agent.Harness != string(aht.HarnessPi) || strings.TrimSpace(agent.SessionPath) == "" {
+			if agent.Harness != string(aht.HarnessPi) ||
+				strings.TrimSpace(agent.SessionPath) == "" {
 				continue
 			}
 
@@ -1048,7 +1210,12 @@ func readPickerSessionNames(ctx context.Context, loads []sessionNameLoad) {
 		}
 
 		readers.Go(func() error {
-			loads[index].state = readPickerSessionName(ctx, loads[index].path, loads[index].state, int64(limit))
+			loads[index].state = readPickerSessionName(
+				ctx,
+				loads[index].path,
+				loads[index].state,
+				int64(limit),
+			)
 
 			return nil
 		})
@@ -1079,7 +1246,13 @@ func readPickerSessionName(
 	}
 
 	if sessionNameReset(state, info) {
-		state = sessionNameState{offset: 0, name: "", hasInfo: false, skipping: false, fileInfo: nil}
+		state = sessionNameState{
+			offset:   0,
+			name:     "",
+			hasInfo:  false,
+			skipping: false,
+			fileInfo: nil,
+		}
 	}
 
 	state.fileInfo = info

@@ -46,10 +46,18 @@ func CommitOneSession(t *testing.T, repoPath string) {
 	manifest := fixtureManifest(hex.EncodeToString(hash[:]), int64(len(content)))
 
 	for _, domain := range []string{"S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10"} {
-		manifest.Evidence = append(manifest.Evidence, model.Evidence{Domain: domain, Status: "observed", Reason: "observed_only"})
+		manifest.Evidence = append(
+			manifest.Evidence,
+			model.Evidence{Domain: domain, Status: "observed", Reason: "observed_only"},
+		)
 	}
 
-	if _, err := repo.Commit(t.Context(), attempt.ID, manifest, map[string]io.Reader{"a0": bytes.NewReader(content)}); err != nil {
+	if _, err := repo.Commit(
+		t.Context(),
+		attempt.ID,
+		manifest,
+		map[string]io.Reader{"a0": bytes.NewReader(content)},
+	); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -73,18 +81,33 @@ func RegisterRestore(t *testing.T, repoPath string, pid int, birth string) strin
 		t.Fatal(err)
 	}
 
-	target := fmt.Sprintf("restore-v1\n/tmp/fixture.sock\n%d\n%d\nlaunch=true\nmissing_working_dir=fail\ncompensate=false\nprofile=practical", pid, fixtureStarted)
+	target := fmt.Sprintf(
+		"restore-v1\n/tmp/fixture.sock\n%d\n%d\nlaunch=true\nmissing_working_dir=fail\ncompensate=false\nprofile=practical",
+		pid,
+		fixtureStarted,
+	)
 	if birth != "" {
 		target += "\nbirth=" + birth
 	}
 
 	actions := []store.Action{
-		{ID: restore.ImportStateActionID, Kind: restore.KindConfigure, State: "planned", RuntimeID: nil},
+		{
+			ID:        restore.ImportStateActionID,
+			Kind:      restore.KindConfigure,
+			State:     "planned",
+			RuntimeID: nil,
+		},
 		{ID: restore.VerifyActionID, Kind: restore.KindVerify, State: "planned", RuntimeID: nil},
 	}
 
 	id := store.NewOperationID()
-	if _, err := repo.RegisterOperation(t.Context(), id, catalog.Current, model.Bytes(target), actions); err != nil {
+	if _, err := repo.RegisterOperation(
+		t.Context(),
+		id,
+		catalog.Current,
+		model.Bytes(target),
+		actions,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -111,21 +134,59 @@ func fixtureManifest(digest string, length int64) model.Manifest {
 			Group: "", Options: nil, Environment: nil,
 		}},
 		Groups: nil,
-		Windows: []model.Window{{
-			ID: "w0", Name: model.Bytes("editor"), Width: fixtureWidth, Height: fixtureHeight,
-			Layout: model.Layout{Width: fixtureWidth, Height: fixtureHeight, Left: 0, Top: 0, Pane: "p0", Axis: "", Children: nil},
-			Zoomed: false, Options: nil,
-		}},
-		Links: []model.Link{{Session: "s0", Window: "w0", Index: 0, Active: true, Last: false, Flags: nil}},
-		Panes: []model.Pane{{
-			ID: "p0", Window: "w0", Index: 0, Title: nil, Directory: model.Bytes("/tmp"),
-			Width: fixtureWidth, Height: fixtureHeight, Left: 0, Top: 0, Active: true, Last: false, Dead: false, Options: nil,
-			Terminal: model.Terminal{Artifact: "a0", History: 0, Alternate: false, CursorX: 0, CursorY: 0, Mode: nil},
-			Launch: model.Launch{
-				Executable: nil, Arguments: nil, Directory: nil, Environment: nil, Birth: nil,
-				Recovery: model.RecoveryUnverified, Reason: "",
+		Windows: []model.Window{
+			{
+				ID:     "w0",
+				Name:   model.Bytes("editor"),
+				Width:  fixtureWidth,
+				Height: fixtureHeight,
+				Layout: model.Layout{
+					Width:    fixtureWidth,
+					Height:   fixtureHeight,
+					Left:     0,
+					Top:      0,
+					Pane:     "p0",
+					Axis:     "",
+					Children: nil,
+				},
+				Zoomed:  false,
+				Options: nil,
 			},
-		}},
-		Artifacts: []model.Artifact{{ID: "a0", Kind: "terminal-text", Length: length, SHA256: digest}},
+		},
+		Links: []model.Link{
+			{Session: "s0", Window: "w0", Index: 0, Active: true, Last: false, Flags: nil},
+		},
+		Panes: []model.Pane{
+			{
+				ID:        "p0",
+				Window:    "w0",
+				Index:     0,
+				Title:     nil,
+				Directory: model.Bytes("/tmp"),
+				Width:     fixtureWidth,
+				Height:    fixtureHeight,
+				Left:      0,
+				Top:       0,
+				Active:    true,
+				Last:      false,
+				Dead:      false,
+				Options:   nil,
+				Terminal: model.Terminal{
+					Artifact:  "a0",
+					History:   0,
+					Alternate: false,
+					CursorX:   0,
+					CursorY:   0,
+					Mode:      nil,
+				},
+				Launch: model.Launch{
+					Executable: nil, Arguments: nil, Directory: nil, Environment: nil, Birth: nil,
+					Recovery: model.RecoveryUnverified, Reason: "",
+				},
+			},
+		},
+		Artifacts: []model.Artifact{
+			{ID: "a0", Kind: "terminal-text", Length: length, SHA256: digest},
+		},
 	}
 }

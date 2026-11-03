@@ -383,7 +383,11 @@ func TestLeaseSIGKILLHolderReleasesLockWithoutStaleLockDeletion(t *testing.T) {
 
 	inoAfter := getLockInode(t, lockPath)
 	if inoAfter != inoBefore {
-		t.Fatalf("inode changed after SIGKILL recovery: %d vs %d (stale lock was recreated)", inoAfter, inoBefore)
+		t.Fatalf(
+			"inode changed after SIGKILL recovery: %d vs %d (stale lock was recreated)",
+			inoAfter,
+			inoBefore,
+		)
 	}
 
 	if err := helper2.releaseAndExit(); err != nil {

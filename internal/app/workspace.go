@@ -44,7 +44,9 @@ type Workspace struct {
 
 func Resolve(cfg *config.Config, locations Locations) (Workspace, error) {
 	if cfg == nil {
-		return Workspace{}, oops.In("app").With("operation", "resolve_workspace").Wrap(config.ErrNilConfig)
+		return Workspace{}, oops.In("app").
+			With("operation", "resolve_workspace").
+			Wrap(config.ErrNilConfig)
 	}
 
 	dataDir, err := config.GetDataDir(cfg)
@@ -96,7 +98,9 @@ func Resolve(cfg *config.Config, locations Locations) (Workspace, error) {
 
 		absolute, err := filepath.Abs(value)
 		if err != nil {
-			return Workspace{}, oops.In("app").With("operation", "resolve_workspace_path", "path", value).Wrap(err)
+			return Workspace{}, oops.In("app").
+				With("operation", "resolve_workspace_path", "path", value).
+				Wrap(err)
 		}
 
 		*path.target = absolute
@@ -117,7 +121,9 @@ func (w Workspace) OpenTmux() (*gotmux.Server, error) {
 func (w Workspace) OpenRepository(ctx context.Context) (*store.Repository, error) {
 	repository, err := store.Open(ctx, w.Repository)
 	if err != nil {
-		return nil, oops.In("app").With("operation", "open_repository").Wrapf(err, "open snapshot repository")
+		return nil, oops.In("app").
+			With("operation", "open_repository").
+			Wrapf(err, "open snapshot repository")
 	}
 
 	return repository, nil
@@ -126,7 +132,9 @@ func (w Workspace) OpenRepository(ctx context.Context) (*store.Repository, error
 func (w Workspace) OpenExistingRepository(ctx context.Context) (*store.Repository, error) {
 	repository, err := store.OpenExisting(ctx, w.Repository)
 	if err != nil {
-		return nil, oops.In("app").With("operation", "open_repository").Wrapf(err, "open snapshot repository")
+		return nil, oops.In("app").
+			With("operation", "open_repository").
+			Wrapf(err, "open snapshot repository")
 	}
 
 	return repository, nil

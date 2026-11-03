@@ -21,7 +21,12 @@ const (
 	testPriorOption       = "@sesh-agent-style-prior"
 )
 
-func windowFor(t *testing.T, ctx context.Context, server *gotmux.Server, windowID string) gotmux.Window {
+func windowFor(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	windowID string,
+) gotmux.Window {
 	t.Helper()
 
 	window, err := server.Window(ctx, gotmux.WindowID(windowID))
@@ -32,7 +37,12 @@ func windowFor(t *testing.T, ctx context.Context, server *gotmux.Server, windowI
 	return window
 }
 
-func localOption(t *testing.T, ctx context.Context, window gotmux.Window, name string) (string, bool) {
+func localOption(
+	t *testing.T,
+	ctx context.Context,
+	window gotmux.Window,
+	name string,
+) (string, bool) {
 	t.Helper()
 
 	value, err := window.Options().Get(ctx, name)
@@ -43,7 +53,12 @@ func localOption(t *testing.T, ctx context.Context, window gotmux.Window, name s
 	return value.Local.Get()
 }
 
-func userOption(t *testing.T, ctx context.Context, window gotmux.Window, name string) (string, bool) {
+func userOption(
+	t *testing.T,
+	ctx context.Context,
+	window gotmux.Window,
+	name string,
+) (string, bool) {
 	t.Helper()
 
 	value, err := window.Options().User(ctx, name)
@@ -72,7 +87,13 @@ func TestWindowStyleRestoresPreviousValue(t *testing.T) {
 		t.Fatalf("SetWindowStyle failed: %v", err)
 	}
 
-	if style, ok := localOption(t, ctx, window, testStatusStyleOption); !ok || style != "fg=blue,bold" {
+	if style, ok := localOption(
+		t,
+		ctx,
+		window,
+		testStatusStyleOption,
+	); !ok ||
+		style != "fg=blue,bold" {
 		t.Fatalf("applied style = %q (present %t), want fg=blue,bold", style, ok)
 	}
 
@@ -154,7 +175,13 @@ func TestWindowStyleFreshProcessPreservesManualEditDuringUpdate(t *testing.T) {
 		t.Fatalf("fresh-process SetWindowStyle failed: %v", err)
 	}
 
-	if style, ok := localOption(t, ctx, window, testStatusStyleOption); !ok || style != "fg=magenta,bold" {
+	if style, ok := localOption(
+		t,
+		ctx,
+		window,
+		testStatusStyleOption,
+	); !ok ||
+		style != "fg=magenta,bold" {
 		t.Fatalf("manual style overwritten by fresh process: %q (present %t)", style, ok)
 	}
 }
@@ -233,7 +260,13 @@ func TestWindowStyleCorruptPriorFailsClosedAndRetainsOwnership(t *testing.T) {
 		t.Fatalf("ClearOwned error = %v, want ErrStyleOwnershipCorrupt", err)
 	}
 
-	if style, ok := localOption(t, ctx, window, testStatusStyleOption); !ok || style != "fg=blue,bold" {
+	if style, ok := localOption(
+		t,
+		ctx,
+		window,
+		testStatusStyleOption,
+	); !ok ||
+		style != "fg=blue,bold" {
 		t.Fatalf("style changed without a readable prior: %q (present %t)", style, ok)
 	}
 
@@ -289,7 +322,10 @@ func TestTrackerRestoresUserStyleAfterSessionEnds(t *testing.T) {
 	styles := agents.NewTmuxStyleController(server, true, true)
 	tracker := agents.NewTracker(styles, agents.DefaultTrackerOptions())
 
-	if err := tracker.HandleSnapshot(ctx, []aht.Session{trackerSessionForPane(current, string(aht.ActivityWaiting))}); err != nil {
+	if err := tracker.HandleSnapshot(
+		ctx,
+		[]aht.Session{trackerSessionForPane(current, string(aht.ActivityWaiting))},
+	); err != nil {
 		t.Fatalf("HandleSnapshot failed: %v", err)
 	}
 
@@ -316,7 +352,10 @@ func TestTrackerPreservesUserManualOptionEditsDuringTracking(t *testing.T) {
 	styles := agents.NewTmuxStyleController(server, true, true)
 	tracker := agents.NewTracker(styles, agents.DefaultTrackerOptions())
 
-	if err := tracker.HandleSnapshot(ctx, []aht.Session{trackerSessionForPane(current, string(aht.ActivityWaiting))}); err != nil {
+	if err := tracker.HandleSnapshot(
+		ctx,
+		[]aht.Session{trackerSessionForPane(current, string(aht.ActivityWaiting))},
+	); err != nil {
 		t.Fatalf("HandleSnapshot failed: %v", err)
 	}
 
@@ -329,20 +368,42 @@ func TestTrackerPreservesUserManualOptionEditsDuringTracking(t *testing.T) {
 		t.Fatalf("user set style: %v", err)
 	}
 
-	if err := tracker.HandleSnapshot(ctx, []aht.Session{trackerSessionForPane(current, string(aht.ActivityFailed))}); err != nil {
+	if err := tracker.HandleSnapshot(
+		ctx,
+		[]aht.Session{trackerSessionForPane(current, string(aht.ActivityFailed))},
+	); err != nil {
 		t.Fatalf("second HandleSnapshot failed: %v", err)
 	}
 
-	if style, ok := localOption(t, ctx, window, testStatusStyleOption); !ok || style != "fg=magenta,bold" {
-		t.Fatalf("user manual edit was overwritten: style = %q (ok %t), want fg=magenta,bold", style, ok)
+	if style, ok := localOption(
+		t,
+		ctx,
+		window,
+		testStatusStyleOption,
+	); !ok ||
+		style != "fg=magenta,bold" {
+		t.Fatalf(
+			"user manual edit was overwritten: style = %q (ok %t), want fg=magenta,bold",
+			style,
+			ok,
+		)
 	}
 
 	if err := tracker.ClearAll(ctx); err != nil {
 		t.Fatalf("ClearAll failed: %v", err)
 	}
 
-	if style, ok := localOption(t, ctx, window, testStatusStyleOption); !ok || style != "fg=magenta,bold" {
-		t.Fatalf("user manual edit was overwritten by cleanup: style = %q, want fg=magenta,bold", style)
+	if style, ok := localOption(
+		t,
+		ctx,
+		window,
+		testStatusStyleOption,
+	); !ok ||
+		style != "fg=magenta,bold" {
+		t.Fatalf(
+			"user manual edit was overwritten by cleanup: style = %q, want fg=magenta,bold",
+			style,
+		)
 	}
 }
 

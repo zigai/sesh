@@ -38,7 +38,11 @@ func TestRunReportsEveryCheckInGroupOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(filepath.Join(units, "sesh.service"), []byte("[Service]\nExecStart=sesh doctor\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(units, "sesh.service"),
+		[]byte("[Service]\nExecStart=sesh doctor\n"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -66,18 +70,31 @@ func TestRunReportsEveryCheckInGroupOrder(t *testing.T) {
 			t.Errorf("%s is listed under group %q", result.ID, result.Group)
 		}
 
-		if (result.Status == doctor.StatusWarn || result.Status == doctor.StatusFail) && result.Fix == nil {
+		if (result.Status == doctor.StatusWarn || result.Status == doctor.StatusFail) &&
+			result.Fix == nil {
 			t.Errorf("%s %s has no fix: %+v", result.ID, result.Status, result)
 		}
 	}
 
 	want := []string{
-		doctor.CheckInstallPath, doctor.CheckConfigFile, doctor.CheckTmuxClient, doctor.CheckTmuxServer, doctor.FieldCheck("weather"),
-		doctor.CheckSnapshotRepository, doctor.CheckSnapshotCurrent, doctor.CheckActiveRestores, doctor.CheckHistoryFile,
+		doctor.CheckInstallPath,
+		doctor.CheckConfigFile,
+		doctor.CheckTmuxClient,
+		doctor.CheckTmuxServer,
+		doctor.FieldCheck("weather"),
+		doctor.CheckSnapshotRepository,
+		doctor.CheckSnapshotCurrent,
+		doctor.CheckActiveRestores,
+		doctor.CheckHistoryFile,
 		doctor.CheckLogFile,
 	}
 	if runtime.GOOS == "linux" {
-		want = append(want, doctor.CheckServiceUnits, doctor.CheckServiceOOMPolicy, doctor.CheckAutosaveDaemon)
+		want = append(
+			want,
+			doctor.CheckServiceUnits,
+			doctor.CheckServiceOOMPolicy,
+			doctor.CheckAutosaveDaemon,
+		)
 	}
 
 	want = append(want, doctor.CheckSmokeSessions)
@@ -136,7 +153,11 @@ func TestCustomFieldChecksReportMissingCommands(t *testing.T) {
 		t.Fatalf("shell command field = %#v", sha)
 	}
 
-	if today := findCheck(results, doctor.FieldCheck("today")); today.Status != doctor.StatusOK || !strings.HasSuffix(today.Message, "/date") {
+	if today := findCheck(
+		results,
+		doctor.FieldCheck("today"),
+	); today.Status != doctor.StatusOK ||
+		!strings.HasSuffix(today.Message, "/date") {
 		t.Fatalf("command on PATH = %#v", today)
 	}
 
@@ -163,11 +184,16 @@ func TestBrokenConfigFailsItsCheckAndSkipsTheFieldsItDefines(t *testing.T) {
 
 	config := findCheck(results, doctor.CheckConfigFile)
 	if config.Status != doctor.StatusFail || config.Message != "Invalid configuration at line 3, column 1" ||
-		config.Fix == nil || config.Fix.Manual != "Correct the error in /home/user/.config/sesh/config.toml" {
+		config.Fix == nil ||
+		config.Fix.Manual != "Correct the error in /home/user/.config/sesh/config.toml" {
 		t.Fatalf("config check = %#v", config)
 	}
 
-	if fields := findCheck(results, doctor.CheckFields); fields.Status != doctor.StatusSkip || fields.Needs != doctor.CheckConfigFile {
+	if fields := findCheck(
+		results,
+		doctor.CheckFields,
+	); fields.Status != doctor.StatusSkip ||
+		fields.Needs != doctor.CheckConfigFile {
 		t.Fatalf("fields check = %#v, want a skip that needs %s", fields, doctor.CheckConfigFile)
 	}
 }
@@ -177,7 +203,11 @@ func TestInstallPathListsEveryCopyOnPathOnce(t *testing.T) {
 
 	first, second, third := t.TempDir(), t.TempDir(), t.TempDir()
 	for _, dir := range []string{first, second} {
-		if err := os.WriteFile(filepath.Join(dir, "sesh"), []byte("#!/bin/sh\n"), 0o700); err != nil {
+		if err := os.WriteFile(
+			filepath.Join(dir, "sesh"),
+			[]byte("#!/bin/sh\n"),
+			0o700,
+		); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -187,7 +217,10 @@ func TestInstallPathListsEveryCopyOnPathOnce(t *testing.T) {
 	}
 
 	install := func(dirs ...string) doctor.Result {
-		results, err := doctor.Run(t.Context(), doctor.Options{PathEnv: strings.Join(dirs, string(os.PathListSeparator))})
+		results, err := doctor.Run(
+			t.Context(),
+			doctor.Options{PathEnv: strings.Join(dirs, string(os.PathListSeparator))},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -205,7 +238,10 @@ func TestInstallPathListsEveryCopyOnPathOnce(t *testing.T) {
 
 	result := install(second, third, first)
 	if result.Status != doctor.StatusWarn || result.Fix == nil ||
-		!slices.Equal(result.Details, []string{filepath.Join(second, "sesh"), filepath.Join(third, "sesh")}) {
+		!slices.Equal(
+			result.Details,
+			[]string{filepath.Join(second, "sesh"), filepath.Join(third, "sesh")},
+		) {
 		t.Fatalf("copies must be listed in PATH order: %#v", result)
 	}
 }
@@ -236,7 +272,11 @@ func TestLogFileCheckNeedsAWritableLocation(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if result := findCheck(results, doctor.CheckLogFile); result.Status != want || (want == doctor.StatusFail && result.Fix == nil) {
+		if result := findCheck(
+			results,
+			doctor.CheckLogFile,
+		); result.Status != want ||
+			(want == doctor.StatusFail && result.Fix == nil) {
 			t.Errorf("log %s = %#v, want %s", path, result, want)
 		}
 
@@ -260,13 +300,21 @@ func TestFixCommandsRepeatTheDoctorsFlags(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(filepath.Join(repoDir, "catalog.json"), []byte("NOT_JSON"), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(repoDir, "catalog.json"),
+		[]byte("NOT_JSON"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
 	results, err := doctor.Run(t.Context(), doctor.Options{
 		SnapshotDir: repoDir,
-		Flags:       map[string]string{"--config": "/srv/sesh.toml", "--socket": "/tmp/s", "--repository": repoDir},
+		Flags: map[string]string{
+			"--config":     "/srv/sesh.toml",
+			"--socket":     "/tmp/s",
+			"--repository": repoDir,
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -283,7 +331,10 @@ func TestFixCommandsRepeatTheDoctorsFlags(t *testing.T) {
 func TestResultJSONUsesReportFieldNames(t *testing.T) {
 	t.Parallel()
 
-	results, err := doctor.Run(t.Context(), doctor.Options{HistoryPath: filepath.Join(t.TempDir(), "history.json")})
+	results, err := doctor.Run(
+		t.Context(),
+		doctor.Options{HistoryPath: filepath.Join(t.TempDir(), "history.json")},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -550,7 +601,8 @@ func TestSnapshotRepository_CompleteSnapshot(t *testing.T) {
 	}
 
 	curRes := findCheck(results, doctor.CheckSnapshotCurrent)
-	if curRes.Status != doctor.StatusOK || !strings.HasSuffix(curRes.Message, "restores 1 session") {
+	if curRes.Status != doctor.StatusOK ||
+		!strings.HasSuffix(curRes.Message, "restores 1 session") {
 		t.Fatalf("expected ok current snapshot, got %#v", curRes)
 	}
 }
@@ -608,7 +660,8 @@ func TestSnapshotRepository_PracticalObservationalSnapshot(t *testing.T) {
 	}
 
 	curRes := findCheck(results, doctor.CheckSnapshotCurrent)
-	if curRes.Status != doctor.StatusOK || curRes.Fix != nil || !strings.HasSuffix(curRes.Message, "restores 1 session") {
+	if curRes.Status != doctor.StatusOK || curRes.Fix != nil ||
+		!strings.HasSuffix(curRes.Message, "restores 1 session") {
 		t.Fatalf("a restorable observed snapshot is healthy, got %#v", curRes)
 	}
 }
@@ -658,16 +711,25 @@ func assertUnfinishedSaveReportsNewestGeneration(t *testing.T, terminalState str
 
 	curRes := findCheck(results, doctor.CheckSnapshotCurrent)
 	if curRes.Status != doctor.StatusWarn || curRes.Reason != doctor.ReasonSaveUnfinished {
-		t.Fatalf("newer %s attempt did not report the newest saved generation: %#v", terminalState, curRes)
+		t.Fatalf(
+			"newer %s attempt did not report the newest saved generation: %#v",
+			terminalState,
+			curRes,
+		)
 	}
 
-	if !strings.Contains(curRes.Message, "the newest saved generation (1 session)") || curRes.Fix == nil {
+	if !strings.Contains(curRes.Message, "the newest saved generation (1 session)") ||
+		curRes.Fix == nil {
 		t.Fatalf("unfinished save result = %#v", curRes)
 	}
 
 	failed := strings.Contains(curRes.Message, "Latest save failed")
 	if failed != (terminalState == "failed") {
-		t.Fatalf("newer %s attempt reported the wrong unfinished-save cause: %#v", terminalState, curRes)
+		t.Fatalf(
+			"newer %s attempt reported the wrong unfinished-save cause: %#v",
+			terminalState,
+			curRes,
+		)
 	}
 }
 
@@ -960,11 +1022,13 @@ func TestHistoryState_VersionOneFixConvertsFile(t *testing.T) {
 	}
 
 	historyRes := findCheck(results, doctor.CheckHistoryFile)
-	if historyRes.Status != doctor.StatusFail || historyRes.Reason != doctor.ReasonIncompatible || historyRes.Fix == nil {
+	if historyRes.Status != doctor.StatusFail || historyRes.Reason != doctor.ReasonIncompatible ||
+		historyRes.Fix == nil {
 		t.Fatalf("expected incompatible error with a fix, got %#v", historyRes)
 	}
 
-	if out, err := exec.CommandContext(t.Context(), "sh", "-c", historyRes.Fix.Command).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sh", "-c", historyRes.Fix.Command).
+		CombinedOutput(); err != nil {
 		t.Fatalf("fix %q failed: %v\n%s", historyRes.Fix.Command, err, out)
 	}
 
@@ -973,7 +1037,10 @@ func TestHistoryState_VersionOneFixConvertsFile(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if historyRes := findCheck(results, doctor.CheckHistoryFile); historyRes.Status != doctor.StatusOK {
+	if historyRes := findCheck(
+		results,
+		doctor.CheckHistoryFile,
+	); historyRes.Status != doctor.StatusOK {
 		t.Fatalf("expected converted history to load, got %#v", historyRes)
 	}
 }
@@ -1084,16 +1151,36 @@ func commitTestFixture(t *testing.T, r *store.Repository, complete bool) store.G
 			{ID: "s0", Name: model.Bytes("work"), Directory: model.Bytes("/tmp")},
 		},
 		Windows: []model.Window{
-			{ID: "w0", Name: model.Bytes("main"), Width: 80, Height: 24, Layout: model.Layout{Width: 80, Height: 24, Pane: "p0"}},
+			{
+				ID:     "w0",
+				Name:   model.Bytes("main"),
+				Width:  80,
+				Height: 24,
+				Layout: model.Layout{Width: 80, Height: 24, Pane: "p0"},
+			},
 		},
 		Links: []model.Link{
 			{Session: "s0", Window: "w0", Index: 0, Active: true},
 		},
 		Panes: []model.Pane{
-			{ID: "p0", Window: "w0", Directory: model.Bytes("/tmp"), Width: 80, Height: 24, Active: true, Terminal: model.Terminal{Artifact: "a0"}, Launch: model.Launch{Recovery: "unverified"}},
+			{
+				ID:        "p0",
+				Window:    "w0",
+				Directory: model.Bytes("/tmp"),
+				Width:     80,
+				Height:    24,
+				Active:    true,
+				Terminal:  model.Terminal{Artifact: "a0"},
+				Launch:    model.Launch{Recovery: "unverified"},
+			},
 		},
 		Artifacts: []model.Artifact{
-			{ID: "a0", Kind: "terminal-text", Length: int64(len(content)), SHA256: hex.EncodeToString(hash[:])},
+			{
+				ID:     "a0",
+				Kind:   "terminal-text",
+				Length: int64(len(content)),
+				SHA256: hex.EncodeToString(hash[:]),
+			},
 		},
 		Evidence: nil,
 	}
@@ -1107,7 +1194,10 @@ func commitTestFixture(t *testing.T, r *store.Repository, complete bool) store.G
 			reason = "not_captured"
 		}
 
-		m.Evidence = append(m.Evidence, model.Evidence{Domain: domain, Status: status, Reason: reason})
+		m.Evidence = append(
+			m.Evidence,
+			model.Evidence{Domain: domain, Status: status, Reason: reason},
+		)
 	}
 
 	if complete {
@@ -1151,15 +1241,26 @@ func commitObservationalTestFixture(t *testing.T, r *store.Repository) store.Gen
 			{ID: "s0", Name: model.Bytes("work"), Directory: model.Bytes("/tmp")},
 		},
 		Windows: []model.Window{
-			{ID: "w0", Name: model.Bytes("main"), Width: 80, Height: 24, Layout: model.Layout{Width: 80, Height: 24, Pane: "p0"}},
+			{
+				ID:     "w0",
+				Name:   model.Bytes("main"),
+				Width:  80,
+				Height: 24,
+				Layout: model.Layout{Width: 80, Height: 24, Pane: "p0"},
+			},
 		},
 		Links: []model.Link{
 			{Session: "s0", Window: "w0", Index: 0, Active: true},
 		},
 		Panes: []model.Pane{
 			{
-				ID: "p0", Window: "w0", Directory: model.Bytes("/tmp"), Width: 80, Height: 24, Active: true,
-				Terminal: model.Terminal{Artifact: "a0"},
+				ID:        "p0",
+				Window:    "w0",
+				Directory: model.Bytes("/tmp"),
+				Width:     80,
+				Height:    24,
+				Active:    true,
+				Terminal:  model.Terminal{Artifact: "a0"},
 				Launch: model.Launch{
 					Executable: model.Bytes("/usr/bin/top"),
 					Arguments:  []model.Bytes{model.Bytes("top")},
@@ -1170,7 +1271,12 @@ func commitObservationalTestFixture(t *testing.T, r *store.Repository) store.Gen
 			},
 		},
 		Artifacts: []model.Artifact{
-			{ID: "a0", Kind: "terminal-text", Length: int64(len(content)), SHA256: hex.EncodeToString(hash[:])},
+			{
+				ID:     "a0",
+				Kind:   "terminal-text",
+				Length: int64(len(content)),
+				SHA256: hex.EncodeToString(hash[:]),
+			},
 		},
 		Evidence: []model.Evidence{
 			{Domain: "S01", Status: "observed", Reason: "observed_only"},

@@ -55,15 +55,24 @@ type RuntimeStatusConfig struct {
 type RuntimeReporter struct{}
 
 func RuntimeStatusPath(string, string) (string, error) {
-	return "", oops.In("daemon").Code("runtime_status_unavailable").With("operation", "runtime_status_path").Wrap(ErrRuntimeStatusUnavailable)
+	return "", oops.In("daemon").
+		Code("runtime_status_unavailable").
+		With("operation", "runtime_status_path").
+		Wrap(ErrRuntimeStatusUnavailable)
 }
 
 func StartRuntimeReporter(context.Context, RuntimeStatusConfig) (*RuntimeReporter, error) {
-	return nil, oops.In("daemon").Code("runtime_status_unavailable").With("operation", "start_runtime_reporter").Wrap(ErrRuntimeStatusUnavailable)
+	return nil, oops.In("daemon").
+		Code("runtime_status_unavailable").
+		With("operation", "start_runtime_reporter").
+		Wrap(ErrRuntimeStatusUnavailable)
 }
 
 func QueryRuntimeStatus(context.Context, string) (RuntimeStatus, error) {
-	return RuntimeStatus{}, oops.In("daemon").Code("runtime_status_unavailable").With("operation", "query_runtime_status").Wrap(ErrRuntimeStatusUnavailable)
+	return RuntimeStatus{}, oops.In("daemon").
+		Code("runtime_status_unavailable").
+		With("operation", "query_runtime_status").
+		Wrap(ErrRuntimeStatusUnavailable)
 }
 
 func (r *RuntimeReporter) Update(RuntimePhase) {}

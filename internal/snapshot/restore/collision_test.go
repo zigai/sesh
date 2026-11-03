@@ -40,7 +40,12 @@ func TestGroupCollisionsReportLiveGroupAndLiveNameButNotAlreadyCollidingSessions
 
 	found := map[string]string{"s3": CollisionNameInUse}
 
-	addGroupCollisions(found, collisionTestPlan(), map[string]bool{"other": true}, map[string]bool{"shared": true})
+	addGroupCollisions(
+		found,
+		collisionTestPlan(),
+		map[string]bool{"other": true},
+		map[string]bool{"shared": true},
+	)
 
 	if found["s2"] != CollisionGroupInUse {
 		t.Fatalf("a live group with the saved group name must collide: %+v", found)

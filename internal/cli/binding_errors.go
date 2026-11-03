@@ -54,7 +54,8 @@ func invokedByTmuxBinding(cmd *cobra.Command) bool {
 }
 
 func bindingDiscardsReport(cmd *cobra.Command, output *commandBuffer) bool {
-	return !output.streaming && !clibase.JSONOutputEnabled(cmd) && !helpRequested(cmd) && invokedByTmuxBinding(cmd)
+	return !output.streaming && !clibase.JSONOutputEnabled(cmd) && !helpRequested(cmd) &&
+		invokedByTmuxBinding(cmd)
 }
 
 func helpRequested(cmd *cobra.Command) bool {
@@ -72,7 +73,12 @@ func bindingFailureMessage(err error) string {
 	return bindingMessagePrefix + string(message)
 }
 
-func showBindingMessage(ctx context.Context, cmd *cobra.Command, server *gotmux.Server, message string) error {
+func showBindingMessage(
+	ctx context.Context,
+	cmd *cobra.Command,
+	server *gotmux.Server,
+	message string,
+) error {
 	if flag := cmd.Flags().Lookup("client"); flag != nil && flag.Value.String() != "" {
 		client, err := server.ClientHandle(gotmux.ClientName(flag.Value.String()))
 		if err == nil {

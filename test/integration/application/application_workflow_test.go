@@ -35,14 +35,22 @@ const (
 	fixturePollTick    = 20 * time.Millisecond
 )
 
-func resolveApplicationTool(required bool, name string, lookFn func(string) (string, error)) (string, bool, error) {
+func resolveApplicationTool(
+	required bool,
+	name string,
+	lookFn func(string) (string, error),
+) (string, bool, error) {
 	path, err := lookFn(name)
 	if err == nil {
 		return path, false, nil
 	}
 
 	if required {
-		return "", false, fmt.Errorf("required application integration tool %q is unavailable: %w", name, err)
+		return "", false, fmt.Errorf(
+			"required application integration tool %q is unavailable: %w",
+			name,
+			err,
+		)
 	}
 
 	return "", true, nil
@@ -159,7 +167,11 @@ func newApplicationTestFixture(t *testing.T) applicationTestFixture {
 	}
 }
 
-func (f applicationTestFixture) runSuccess(t *testing.T, ctx context.Context, args ...string) []byte {
+func (f applicationTestFixture) runSuccess(
+	t *testing.T,
+	ctx context.Context,
+	args ...string,
+) []byte {
 	t.Helper()
 
 	var stdout, stderr bytes.Buffer
@@ -171,7 +183,13 @@ func (f applicationTestFixture) runSuccess(t *testing.T, ctx context.Context, ar
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		t.Fatalf("sesh command %v failed: %v\nstdout: %s\nstderr: %s", args, err, stdout.String(), stderr.String())
+		t.Fatalf(
+			"sesh command %v failed: %v\nstdout: %s\nstderr: %s",
+			args,
+			err,
+			stdout.String(),
+			stderr.String(),
+		)
 	}
 
 	return stdout.Bytes()
@@ -260,7 +278,11 @@ func checkRequiredModeFails(t *testing.T) {
 		return "", errToolNotFound
 	})
 	if err == nil || skipped {
-		t.Fatalf("expected error in required mode for missing tool, got skipped=%v err=%v", skipped, err)
+		t.Fatalf(
+			"expected error in required mode for missing tool, got skipped=%v err=%v",
+			skipped,
+			err,
+		)
 	}
 }
 
@@ -271,7 +293,11 @@ func checkOptionalModeSkips(t *testing.T) {
 		return "", errToolNotFound
 	})
 	if err != nil || !skipped {
-		t.Fatalf("expected skip without error in optional mode, got skipped=%v err=%v", skipped, err)
+		t.Fatalf(
+			"expected skip without error in optional mode, got skipped=%v err=%v",
+			skipped,
+			err,
+		)
 	}
 }
 
@@ -279,9 +305,13 @@ func checkAvailableToolResolves(t *testing.T) {
 	t.Helper()
 
 	for _, req := range []bool{true, false} {
-		path, skipped, err := resolveApplicationTool(req, "test-tool", func(name string) (string, error) {
-			return "/usr/bin/" + name, nil
-		})
+		path, skipped, err := resolveApplicationTool(
+			req,
+			"test-tool",
+			func(name string) (string, error) {
+				return "/usr/bin/" + name, nil
+			},
+		)
 		if err != nil || skipped || path != "/usr/bin/test-tool" {
 			t.Fatalf("expected clean resolution, got path=%q skipped=%v err=%v", path, skipped, err)
 		}
@@ -298,7 +328,13 @@ func checkSuiteToolsResolve(t *testing.T) {
 	for _, tool := range []string{"bash", "top", "nvim", "node"} {
 		path, skipped, err := resolveApplicationTool(true, tool, exec.LookPath)
 		if err != nil || skipped || path == "" {
-			t.Fatalf("required tool %q resolution failed: path=%q skipped=%v err=%v", tool, path, skipped, err)
+			t.Fatalf(
+				"required tool %q resolution failed: path=%q skipped=%v err=%v",
+				tool,
+				path,
+				skipped,
+				err,
+			)
 		}
 	}
 }
@@ -335,19 +371,35 @@ func TestBuiltArtifactApplicationWorkflowRoundTrip(t *testing.T) {
 
 	restoreResult := executeRestore(t, ctx, fixture, targetServer, saveResult.Generation)
 
-	assertRestoredTargetSession(t, ctx, targetServer, sessionName, noteFile, restoreResult, fixture.env)
+	assertRestoredTargetSession(
+		t,
+		ctx,
+		targetServer,
+		sessionName,
+		noteFile,
+		restoreResult,
+		fixture.env,
+	)
 }
 
 func createTestApplicationFiles(t *testing.T, workDir string) (string, string) {
 	t.Helper()
 
 	noteFile := filepath.Join(workDir, "work-notes.txt")
-	if err := os.WriteFile(noteFile, []byte("sesh integration workflow notes\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		noteFile,
+		[]byte("sesh integration workflow notes\n"),
+		0o600,
+	); err != nil {
 		t.Fatalf("writing note file: %v", err)
 	}
 
 	nodeScript := filepath.Join(workDir, "worker.js")
-	if err := os.WriteFile(nodeScript, []byte("setInterval(() => {}, 1000);\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		nodeScript,
+		[]byte("setInterval(() => {}, 1000);\n"),
+		0o600,
+	); err != nil {
 		t.Fatalf("writing node script: %v", err)
 	}
 
@@ -663,7 +715,10 @@ func executeRestore(
 	envelope := decodeEnvelope(t, stdout)
 	result := decodePayload[snapshotRestoreResultJSON](t, envelope.Result)
 
-	if result.OperationID == "" || result.Generation != generation || result.Status != "best_effort" || !result.Verified || result.Uncertain {
+	if result.OperationID == "" || result.Generation != generation ||
+		result.Status != "best_effort" ||
+		!result.Verified ||
+		result.Uncertain {
 		t.Fatalf("unexpected restore result payload: %+v", result)
 	}
 
@@ -682,7 +737,10 @@ func executeRestore(
 	}
 
 	if !foundUnsupportedApp {
-		t.Errorf("restore missing expected requirement application_restart_unsupported: %+v", result.MissingRequirements)
+		t.Errorf(
+			"restore missing expected requirement application_restart_unsupported: %+v",
+			result.MissingRequirements,
+		)
 	}
 
 	return result
@@ -779,7 +837,10 @@ func assertRestoredShell(t *testing.T, ctx context.Context, pid int) {
 	}
 
 	if realHome := os.Getenv("HOME"); realHome != "" && shellHome == realHome {
-		t.Errorf("restored shell inherited host user HOME %q instead of sanitized fixture HOME", realHome)
+		t.Errorf(
+			"restored shell inherited host user HOME %q instead of sanitized fixture HOME",
+			realHome,
+		)
 	}
 }
 
@@ -840,7 +901,15 @@ func verifyNvimReopenedFile(
 	queryCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(queryCtx, "nvim", "--clean", "--server", socketPath, "--remote-expr", nvimBufferQueryExpr)
+	cmd := exec.CommandContext(
+		queryCtx,
+		"nvim",
+		"--clean",
+		"--server",
+		socketPath,
+		"--remote-expr",
+		nvimBufferQueryExpr,
+	)
 	cmd.Env = env
 
 	out, err := cmd.Output()
@@ -855,11 +924,19 @@ func verifyNvimReopenedFile(
 	}
 
 	if response.PID != expectedPID {
-		t.Errorf("nvim buffer query returned PID %d, want observed PID %d", response.PID, expectedPID)
+		t.Errorf(
+			"nvim buffer query returned PID %d, want observed PID %d",
+			response.PID,
+			expectedPID,
+		)
 	}
 
 	if !slices.Contains(response.Files, noteFile) {
-		t.Errorf("nvim buffer files %v do not contain exact expected file %s", response.Files, noteFile)
+		t.Errorf(
+			"nvim buffer files %v do not contain exact expected file %s",
+			response.Files,
+			noteFile,
+		)
 	}
 }
 
@@ -956,7 +1033,12 @@ func assertRestoredScriptFallback(t *testing.T, ctx context.Context, pid int) {
 	}
 }
 
-func waitForProcessForeground(t *testing.T, ctx context.Context, pid int, expectedBase string) *process.Observation {
+func waitForProcessForeground(
+	t *testing.T,
+	ctx context.Context,
+	pid int,
+	expectedBase string,
+) *process.Observation {
 	t.Helper()
 
 	birth, err := process.ReadIdentity(ctx, pid)

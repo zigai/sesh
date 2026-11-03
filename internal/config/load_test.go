@@ -34,7 +34,11 @@ func TestConfigPrecedenceAcrossUserEnvironmentAndExplicitPathIgnoresWorkingDirec
 	explicitPath := filepath.Join(root, "explicit.toml")
 
 	for path, timeout := range map[string]string{userPath: "11s", projectPath: "13s", explicitPath: "19s"} {
-		if err := os.WriteFile(path, []byte("[hooks]\ntimeout = \""+timeout+"\"\n"), 0o600); err != nil {
+		if err := os.WriteFile(
+			path,
+			[]byte("[hooks]\ntimeout = \""+timeout+"\"\n"),
+			0o600,
+		); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -74,7 +78,11 @@ func TestLoadedConfigPreservesItsSourceAcrossDirectoryChangesAndCloning(t *testi
 	root := t.TempDir()
 
 	path := filepath.Join(root, "selected.toml")
-	if err := os.WriteFile(path, []byte("[tasks]\npopup_socket = 'selected'\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		path,
+		[]byte("[tasks]\npopup_socket = 'selected'\n"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -124,7 +132,11 @@ sesh_format = "{session_name} {custom.sha}"
 sha = "git rev-parse --short HEAD"
 weather = { command = "/opt/bin/weather", args = ["--short", "x y"], refresh = "10m" }
 `
-	if err := os.WriteFile(filepath.Join(configHome, "sesh", "config.toml"), []byte(source), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(configHome, "sesh", "config.toml"),
+		[]byte(source),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -134,8 +146,18 @@ weather = { command = "/opt/bin/weather", args = ["--short", "x y"], refresh = "
 	}
 
 	want := config.FieldCommands{
-		"sha":     {ShellCommand: "git rev-parse --short HEAD", Command: "", Args: nil, Refresh: ""},
-		"weather": {ShellCommand: "", Command: "/opt/bin/weather", Args: []string{"--short", "x y"}, Refresh: "10m"},
+		"sha": {
+			ShellCommand: "git rev-parse --short HEAD",
+			Command:      "",
+			Args:         nil,
+			Refresh:      "",
+		},
+		"weather": {
+			ShellCommand: "",
+			Command:      "/opt/bin/weather",
+			Args:         []string{"--short", "x y"},
+			Refresh:      "10m",
+		},
 	}
 	if !reflect.DeepEqual(cfg.Display.Fields, want) {
 		t.Fatalf("Display.Fields = %#v, want %#v", cfg.Display.Fields, want)
@@ -232,8 +254,10 @@ params = { local = true }`
 	assertEqual(t, "Primary theme", cfg.Theme.Primary, "#ff0000")
 	assertEqual(t, "Warning theme", cfg.Theme.Warning, "#ff8800")
 
-	if len(cfg.Keys.Bind) != 1 || cfg.Keys.Bind[0].Key != "M-n" || cfg.Keys.Bind[0].Action != "agent.next" ||
-		cfg.Keys.Bind[0].In != "tmux" || cfg.Keys.Bind[0].Params["local"] != true {
+	if len(cfg.Keys.Bind) != 1 || cfg.Keys.Bind[0].Key != "M-n" ||
+		cfg.Keys.Bind[0].Action != "agent.next" ||
+		cfg.Keys.Bind[0].In != "tmux" ||
+		cfg.Keys.Bind[0].Params["local"] != true {
 		t.Fatalf("Keys.Bind = %#v, want the configured tmux binding", cfg.Keys.Bind)
 	}
 
@@ -279,7 +303,12 @@ display_modes = ["agents"]`
 	}
 
 	assertEqual(t, "DirectorySuggestions setting", cfg.Settings.DirectorySuggestions, 8)
-	assertEqual(t, "DefaultSessionPathSuggestion setting", cfg.Settings.DefaultSessionPathSuggestion, "~/src/{session}")
+	assertEqual(
+		t,
+		"DefaultSessionPathSuggestion setting",
+		cfg.Settings.DefaultSessionPathSuggestion,
+		"~/src/{session}",
+	)
 
 	if !slices.Equal(cfg.Settings.DisplayModes, []string{"agents"}) {
 		t.Fatalf("DisplayModes = %#v, want agents", cfg.Settings.DisplayModes)
@@ -311,8 +340,18 @@ agents_agent_format = "{status} {harness_raw} {agent_session}"`
 	}
 
 	assertEqual(t, "SESH display format", cfg.Display.SeshFormat, "{session_name} ({window_count})")
-	assertEqual(t, "AGENTS session format", cfg.Display.AgentsSessionFormat, "{agent_status}: {session_name}")
-	assertEqual(t, "AGENTS agent format", cfg.Display.AgentsAgentFormat, "{status} {harness_raw} {agent_session}")
+	assertEqual(
+		t,
+		"AGENTS session format",
+		cfg.Display.AgentsSessionFormat,
+		"{agent_status}: {session_name}",
+	)
+	assertEqual(
+		t,
+		"AGENTS agent format",
+		cfg.Display.AgentsAgentFormat,
+		"{status} {harness_raw} {agent_session}",
+	)
 }
 
 func TestLoadHooksOverride(t *testing.T) {
@@ -466,14 +505,21 @@ func TestLoadSnapshotProcessEnvironmentOverrides(t *testing.T) {
 		}
 
 		if cfg.Snapshot.ProcessEnvironment == nil || len(cfg.Snapshot.ProcessEnvironment) != 0 {
-			t.Fatalf("ProcessEnvironment = %#v, want empty slice []", cfg.Snapshot.ProcessEnvironment)
+			t.Fatalf(
+				"ProcessEnvironment = %#v, want empty slice []",
+				cfg.Snapshot.ProcessEnvironment,
+			)
 		}
 	})
 
 	t.Run("explicit custom keys", func(t *testing.T) {
 		cfg, err := config.Load(
 			config.WithExplicitPath("-"),
-			config.WithInput(strings.NewReader("[snapshot]\nprocess_environment = [\"MY_CUSTOM_VAR\", \"VIRTUAL_ENV\"]\n")),
+			config.WithInput(
+				strings.NewReader(
+					"[snapshot]\nprocess_environment = [\"MY_CUSTOM_VAR\", \"VIRTUAL_ENV\"]\n",
+				),
+			),
 		)
 		if err != nil {
 			t.Fatal(err)
@@ -481,7 +527,11 @@ func TestLoadSnapshotProcessEnvironmentOverrides(t *testing.T) {
 
 		expected := []string{"MY_CUSTOM_VAR", "VIRTUAL_ENV"}
 		if !slices.Equal(cfg.Snapshot.ProcessEnvironment, expected) {
-			t.Fatalf("ProcessEnvironment = %#v, want %#v", cfg.Snapshot.ProcessEnvironment, expected)
+			t.Fatalf(
+				"ProcessEnvironment = %#v, want %#v",
+				cfg.Snapshot.ProcessEnvironment,
+				expected,
+			)
 		}
 	})
 }
@@ -505,7 +555,10 @@ func TestLoadIntoPreservesTargetOnFailure(t *testing.T) {
 	}
 
 	if target.Theme.Primary != "#112233" {
-		t.Fatalf("target was mutated on failure: Theme.Primary = %q, want #112233", target.Theme.Primary)
+		t.Fatalf(
+			"target was mutated on failure: Theme.Primary = %q, want #112233",
+			target.Theme.Primary,
+		)
 	}
 }
 
@@ -520,7 +573,11 @@ func TestLoadRejectsParentDirSymlink(t *testing.T) {
 	}
 
 	configFile := filepath.Join(realDir, "config.toml")
-	if err := os.WriteFile(configFile, []byte("[theme]\nprimary = \"#111111\"\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		configFile,
+		[]byte("[theme]\nprimary = \"#111111\"\n"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -541,7 +598,11 @@ func TestLoadDecodesNonTomlExtensionAsToml(t *testing.T) {
 	tempDir := t.TempDir()
 
 	confPath := filepath.Join(tempDir, "myconfig.conf")
-	if err := os.WriteFile(confPath, []byte("[theme]\nprimary = \"#445566\"\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		confPath,
+		[]byte("[theme]\nprimary = \"#445566\"\n"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -580,7 +641,11 @@ func TestLoadAcceptsLeadingByteOrderMark(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "config.toml")
-	if err := os.WriteFile(path, []byte("\xef\xbb\xbf[theme]\nprimary = \"#445566\"\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		path,
+		[]byte("\xef\xbb\xbf[theme]\nprimary = \"#445566\"\n"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -601,7 +666,11 @@ func TestConsistentEnvironmentPrefixAcrossAllModes(t *testing.T) {
 	tempDir := t.TempDir()
 
 	configPath := filepath.Join(tempDir, "config.toml")
-	if err := os.WriteFile(configPath, []byte("[theme]\nprimary = \"#000000\"\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		configPath,
+		[]byte("[theme]\nprimary = \"#000000\"\n"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -611,7 +680,10 @@ func TestConsistentEnvironmentPrefixAcrossAllModes(t *testing.T) {
 	}
 
 	if cfgA.Settings.LogLevel != "info" {
-		t.Errorf("Mode A LogLevel = %q, want default info (ambient env leaked)", cfgA.Settings.LogLevel)
+		t.Errorf(
+			"Mode A LogLevel = %q, want default info (ambient env leaked)",
+			cfgA.Settings.LogLevel,
+		)
 	}
 
 	cfgB, err := config.Load(config.WithExplicitPath(configPath))
@@ -620,7 +692,10 @@ func TestConsistentEnvironmentPrefixAcrossAllModes(t *testing.T) {
 	}
 
 	if cfgB.Settings.LogLevel != "info" {
-		t.Errorf("Mode B LogLevel = %q, want default info (ambient env leaked)", cfgB.Settings.LogLevel)
+		t.Errorf(
+			"Mode B LogLevel = %q, want default info (ambient env leaked)",
+			cfgB.Settings.LogLevel,
+		)
 	}
 
 	t.Setenv("SESH_SETTINGS_LOG_LEVEL", "warn")
@@ -656,7 +731,11 @@ func TestLoadRejectsAncestorDirSymlink(t *testing.T) {
 	}
 
 	configFile := filepath.Join(realParent, "config.toml")
-	if err := os.WriteFile(configFile, []byte("[theme]\nprimary = \"#111111\"\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		configFile,
+		[]byte("[theme]\nprimary = \"#111111\"\n"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -665,7 +744,9 @@ func TestLoadRejectsAncestorDirSymlink(t *testing.T) {
 		t.Skipf("Symlink() unavailable: %v", err)
 	}
 
-	_, err := config.Load(config.WithExplicitPath(filepath.Join(symlinkGrandparent, "nested", "config.toml")))
+	_, err := config.Load(
+		config.WithExplicitPath(filepath.Join(symlinkGrandparent, "nested", "config.toml")),
+	)
 	if !errors.Is(err, config.ErrConfigSymlink) {
 		t.Fatalf("Load() error = %v, want %v", err, config.ErrConfigSymlink)
 	}

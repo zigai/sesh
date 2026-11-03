@@ -99,7 +99,11 @@ func TestSessionKeyFocusesSessionWithAgents(t *testing.T) {
 	}
 
 	if model.DeferredSwitchSession() != "" || model.textInput.Value() != "" {
-		t.Fatalf("tab d switched to %q or searched %q", model.DeferredSwitchSession(), model.textInput.Value())
+		t.Fatalf(
+			"tab d switched to %q or searched %q",
+			model.DeferredSwitchSession(),
+			model.textInput.Value(),
+		)
 	}
 }
 
@@ -109,8 +113,13 @@ func TestFocusedKeyOpensThatAgent(t *testing.T) {
 	pressSessionKey(model, "d")
 	pressAndRun(model, keyText("s"))
 
-	if model.DeferredSwitchSession() != testSupportSessionDevName || model.DeferredSwitchPane() != "%2" {
-		t.Fatalf("switch target = %q/%q, want dev pane %%2", model.DeferredSwitchSession(), model.DeferredSwitchPane())
+	if model.DeferredSwitchSession() != testSupportSessionDevName ||
+		model.DeferredSwitchPane() != "%2" {
+		t.Fatalf(
+			"switch target = %q/%q, want dev pane %%2",
+			model.DeferredSwitchSession(),
+			model.DeferredSwitchPane(),
+		)
 	}
 }
 
@@ -138,8 +147,14 @@ func TestLetterWithoutSessionPrefixSearches(t *testing.T) {
 
 	pressKey(model, keyText("d"))
 
-	if model.textInput.Value() != "d" || model.DeferredSwitchSession() != "" || model.focusedSession != "" {
-		t.Fatalf("d without tab: search = %q, switch = %q, focus = %q; want search d only", model.textInput.Value(), model.DeferredSwitchSession(), model.focusedSession)
+	if model.textInput.Value() != "d" || model.DeferredSwitchSession() != "" ||
+		model.focusedSession != "" {
+		t.Fatalf(
+			"d without tab: search = %q, switch = %q, focus = %q; want search d only",
+			model.textInput.Value(),
+			model.DeferredSwitchSession(),
+			model.focusedSession,
+		)
 	}
 }
 
@@ -159,7 +174,11 @@ func TestSessionKeyOpensTheOnlyAgent(t *testing.T) {
 	runSessionKey(model, "i")
 
 	if model.DeferredSwitchSession() != "site" || model.DeferredSwitchPane() != "%3" {
-		t.Fatalf("switch target = %q/%q, want site pane %%3", model.DeferredSwitchSession(), model.DeferredSwitchPane())
+		t.Fatalf(
+			"switch target = %q/%q, want site pane %%3",
+			model.DeferredSwitchSession(),
+			model.DeferredSwitchPane(),
+		)
 	}
 }
 
@@ -169,8 +188,13 @@ func TestSessionKeyAgainOpensFocusedSession(t *testing.T) {
 	pressSessionKey(model, "d")
 	runSessionKey(model, "d")
 
-	if model.DeferredSwitchSession() != testSupportSessionDevName || model.DeferredSwitchPane() != "" {
-		t.Fatalf("switch target = %q/%q, want the dev session", model.DeferredSwitchSession(), model.DeferredSwitchPane())
+	if model.DeferredSwitchSession() != testSupportSessionDevName ||
+		model.DeferredSwitchPane() != "" {
+		t.Fatalf(
+			"switch target = %q/%q, want the dev session",
+			model.DeferredSwitchSession(),
+			model.DeferredSwitchPane(),
+		)
 	}
 }
 
@@ -195,7 +219,11 @@ func TestUnassignedLetterAfterPrefixKeepsWaiting(t *testing.T) {
 	pressSessionKey(model, "z")
 
 	if !model.sessionPrefixPending || model.textInput.Value() != "" {
-		t.Fatalf("tab z: waiting = %v, search = %q; want still waiting and no search", model.sessionPrefixPending, model.textInput.Value())
+		t.Fatalf(
+			"tab z: waiting = %v, search = %q; want still waiting and no search",
+			model.sessionPrefixPending,
+			model.textInput.Value(),
+		)
 	}
 
 	pressKey(model, keyText("d"))
@@ -236,7 +264,11 @@ func TestOtherKeyAfterPrefixStopsWaitingAndActs(t *testing.T) {
 	}
 
 	if model.cursor != 0 || model.agentCursor != 0 {
-		t.Fatalf("down after tab left the selection at %d/%d, want dev's first agent", model.cursor, model.agentCursor)
+		t.Fatalf(
+			"down after tab left the selection at %d/%d, want dev's first agent",
+			model.cursor,
+			model.agentCursor,
+		)
 	}
 }
 
@@ -253,7 +285,11 @@ func TestArrowsKeepFocusAndOtherTypingClearsIt(t *testing.T) {
 	pressKey(model, keyText("1"))
 
 	if model.focusedSession != "" || model.textInput.Value() != "1" {
-		t.Fatalf("typing: focus = %q, search = %q; want no focus and search 1", model.focusedSession, model.textInput.Value())
+		t.Fatalf(
+			"typing: focus = %q, search = %q; want no focus and search 1",
+			model.focusedSession,
+			model.textInput.Value(),
+		)
 	}
 }
 
@@ -286,7 +322,11 @@ func TestFocusEndsWhenFocusedSessionDisappears(t *testing.T) {
 	pressAndRun(model, keyText("a"))
 
 	if model.DeferredSwitchSession() != "" || model.textInput.Value() != "a" {
-		t.Fatalf("agent key after the focused session vanished: switch = %q, search = %q", model.DeferredSwitchSession(), model.textInput.Value())
+		t.Fatalf(
+			"agent key after the focused session vanished: switch = %q, search = %q",
+			model.DeferredSwitchSession(),
+			model.textInput.Value(),
+		)
 	}
 }
 
@@ -309,7 +349,11 @@ func TestAltSessionKeysWhenPrefixIsAlt(t *testing.T) {
 	pressKey(model, keyText("d"))
 
 	if model.focusedSession != "" || model.textInput.Value() != "d" {
-		t.Fatalf("tab d with the alt prefix: focus = %q, search = %q; want search d", model.focusedSession, model.textInput.Value())
+		t.Fatalf(
+			"tab d with the alt prefix: focus = %q, search = %q; want search d",
+			model.focusedSession,
+			model.textInput.Value(),
+		)
 	}
 
 	model.textInput.SetValue("")
@@ -338,8 +382,13 @@ func TestConfiguredAgentKeysOpenAgents(t *testing.T) {
 	pressSessionKey(model, "d")
 	pressAndRun(model, keyText("2"))
 
-	if model.DeferredSwitchSession() != testSupportSessionDevName || model.DeferredSwitchPane() != "%2" {
-		t.Fatalf("switch target = %q/%q, want dev pane %%2", model.DeferredSwitchSession(), model.DeferredSwitchPane())
+	if model.DeferredSwitchSession() != testSupportSessionDevName ||
+		model.DeferredSwitchPane() != "%2" {
+		t.Fatalf(
+			"switch target = %q/%q, want dev pane %%2",
+			model.DeferredSwitchSession(),
+			model.DeferredSwitchPane(),
+		)
 	}
 }
 
@@ -349,8 +398,13 @@ func TestOpenActionOpensSessionDirectly(t *testing.T) {
 
 	runSessionKey(model, "d")
 
-	if model.DeferredSwitchSession() != testSupportSessionDevName || model.DeferredSwitchPane() != "" {
-		t.Fatalf("switch target = %q/%q, want the dev session", model.DeferredSwitchSession(), model.DeferredSwitchPane())
+	if model.DeferredSwitchSession() != testSupportSessionDevName ||
+		model.DeferredSwitchPane() != "" {
+		t.Fatalf(
+			"switch target = %q/%q, want the dev session",
+			model.DeferredSwitchSession(),
+			model.DeferredSwitchPane(),
+		)
 	}
 }
 
@@ -403,17 +457,30 @@ func TestFocusFadesOtherRowsWithoutMovingThem(t *testing.T) {
 
 	for index := range before {
 		if lipgloss.Width(before[index]) != lipgloss.Width(after[index]) {
-			t.Fatalf("row %d width changed from %d to %d", index, lipgloss.Width(before[index]), lipgloss.Width(after[index]))
+			t.Fatalf(
+				"row %d width changed from %d to %d",
+				index,
+				lipgloss.Width(before[index]),
+				lipgloss.Width(after[index]),
+			)
 		}
 	}
 
 	if firstField(after[1]) != "a" || firstField(after[2]) != "s" {
-		t.Fatalf("focused agents are not keyed a and s: %q / %q", stripANSI(after[1]), stripANSI(after[2]))
+		t.Fatalf(
+			"focused agents are not keyed a and s: %q / %q",
+			stripANSI(after[1]),
+			stripANSI(after[2]),
+		)
 	}
 
 	siteRow := 3
 	if stripANSI(before[siteRow]) != stripANSI(after[siteRow]) {
-		t.Fatalf("fading changed the text of an unfocused row: %q -> %q", stripANSI(before[siteRow]), stripANSI(after[siteRow]))
+		t.Fatalf(
+			"fading changed the text of an unfocused row: %q -> %q",
+			stripANSI(before[siteRow]),
+			stripANSI(after[siteRow]),
+		)
 	}
 
 	if before[siteRow] == after[siteRow] {
@@ -446,13 +513,23 @@ func firstField(row string) string {
 func TestSessionPrefixShowsHiddenSessionLetters(t *testing.T) {
 	model := focusTestModel()
 
-	if row := stripANSI(strings.Split(model.renderList(60, 7), "\n")[0]); strings.HasPrefix(row, "▌ d ") {
+	if row := stripANSI(
+		strings.Split(model.renderList(60, 7), "\n")[0],
+	); strings.HasPrefix(
+		row,
+		"▌ d ",
+	) {
 		t.Fatalf("letters shown before tab with shortcut_style none: %q", row)
 	}
 
 	pressKey(model, keyCode(tea.KeyTab))
 
-	if row := stripANSI(strings.Split(model.renderList(60, 7), "\n")[0]); !strings.HasPrefix(row, "d dev") {
+	if row := stripANSI(
+		strings.Split(model.renderList(60, 7), "\n")[0],
+	); !strings.HasPrefix(
+		row,
+		"d dev",
+	) {
 		t.Fatalf("row after tab = %q, want the d letter in the first column", row)
 	}
 }
@@ -477,12 +554,20 @@ func TestSessionPrefixFadesAgentRowsOnly(t *testing.T) {
 	}
 
 	agentRow, sessionRow := 1, 3
-	if stripANSI(before[agentRow]) != stripANSI(after[agentRow]) || before[agentRow] == after[agentRow] {
+	if stripANSI(before[agentRow]) != stripANSI(after[agentRow]) ||
+		before[agentRow] == after[agentRow] {
 		t.Fatalf("agent row was not faded in place after tab: %q", after[agentRow])
 	}
 
-	if !strings.HasPrefix(stripANSI(after[sessionRow]), "i   site") || strings.Contains(after[sessionRow], model.sessionRowStyles(model.calcSessionLayout(60)).fadedSeq) {
-		t.Fatalf("session row after tab = %q, want its letter shown and not faded", stripANSI(after[sessionRow]))
+	if !strings.HasPrefix(stripANSI(after[sessionRow]), "i   site") ||
+		strings.Contains(
+			after[sessionRow],
+			model.sessionRowStyles(model.calcSessionLayout(60)).fadedSeq,
+		) {
+		t.Fatalf(
+			"session row after tab = %q, want its letter shown and not faded",
+			stripANSI(after[sessionRow]),
+		)
 	}
 }
 

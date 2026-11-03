@@ -71,7 +71,13 @@ func TestSetupTmuxRenderingPersistsSuccessAndKeepsJSONSeparate(t *testing.T) {
 	cfg, path := runtimeConfig(t, "info")
 
 	var stdout, stderr bytes.Buffer
-	if err := ExecuteApplication(t.Context(), []string{"setup", "tmux", testConfigFlag, cfg, testJSONFlag}, nil, &stdout, &stderr); err != nil {
+	if err := ExecuteApplication(
+		t.Context(),
+		[]string{"setup", "tmux", testConfigFlag, cfg, testJSONFlag},
+		nil,
+		&stdout,
+		&stderr,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -87,14 +93,28 @@ func TestHooksPersistExecutionWithoutRepeatingSuccessOrLeakingOutput(t *testing.
 	cfg := filepath.Join(base, "config.toml")
 	path := filepath.Join(base, "hook.jsonl")
 
-	data := fmt.Sprintf("[settings]\nlog_level = \"info\"\n[paths]\nlog_file = %q\n[[hooks.session_switch_pre]]\ncommand = \"printf\"\nargs = [\"PRIVATE_HOOK_OUTPUT\"]\n", path)
+	data := fmt.Sprintf(
+		"[settings]\nlog_level = \"info\"\n[paths]\nlog_file = %q\n[[hooks.session_switch_pre]]\ncommand = \"printf\"\nargs = [\"PRIVATE_HOOK_OUTPUT\"]\n",
+		path,
+	)
 	if err := os.WriteFile(cfg, []byte(data), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
 	var stdout, stderr bytes.Buffer
 
-	args := []string{"hooks", "run", "session_switch_pre", "--session", "PRIVATE_SESSION", "--source", "PRIVATE_SOURCE", testConfigFlag, cfg, testJSONFlag}
+	args := []string{
+		"hooks",
+		"run",
+		"session_switch_pre",
+		"--session",
+		"PRIVATE_SESSION",
+		"--source",
+		"PRIVATE_SOURCE",
+		testConfigFlag,
+		cfg,
+		testJSONFlag,
+	}
 	if err := ExecuteApplication(t.Context(), args, nil, &stdout, &stderr); err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +135,8 @@ func assertHookExecutionRecords(t *testing.T, logs []byte, cfg string) {
 	t.Helper()
 
 	lines := bytes.Split(bytes.TrimSpace(logs), []byte("\n"))
-	if len(lines) != 3 || bytes.Contains(logs, []byte("PRIVATE_")) || bytes.Contains(logs, []byte(cfg)) {
+	if len(lines) != 3 || bytes.Contains(logs, []byte("PRIVATE_")) ||
+		bytes.Contains(logs, []byte(cfg)) {
 		t.Fatalf("unexpected hook records: %s", logs)
 	}
 
@@ -127,7 +148,9 @@ func assertHookExecutionRecords(t *testing.T, logs []byte, cfg string) {
 			t.Fatal(err)
 		}
 
-		if record["component"] != "hooks" || record["operation"] != "execute" || record["level"] != "info" || record["status"] != status {
+		if record["component"] != "hooks" || record["operation"] != "execute" ||
+			record["level"] != "info" ||
+			record["status"] != status {
 			t.Fatalf("incorrect hook boundary: %s", lines[i+1])
 		}
 	}
@@ -139,7 +162,10 @@ func TestDisabledAutosaveLogsItsReasonAndKeepsJSONSeparate(t *testing.T) {
 	cfg := filepath.Join(base, "config.toml")
 	path := filepath.Join(base, "log.jsonl")
 
-	data := fmt.Sprintf("[settings]\nlog_level = \"info\"\n[paths]\nlog_file = %q\n[autosave]\nenabled = false\n", path)
+	data := fmt.Sprintf(
+		"[settings]\nlog_level = \"info\"\n[paths]\nlog_file = %q\n[autosave]\nenabled = false\n",
+		path,
+	)
 	if err := os.WriteFile(cfg, []byte(data), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -183,8 +209,13 @@ func assertDisabledAutosaveRecords(t *testing.T, logs []byte) {
 	}
 
 	want := map[string]any{
-		"version": "dev", "level": "info", "component": "snapshot", "operation": "save-if-due", "status": "skipped",
-		"reason": "disabled", "message": "automatic snapshot operation skipped",
+		"version":   "dev",
+		"level":     "info",
+		"component": "snapshot",
+		"operation": "save-if-due",
+		"status":    "skipped",
+		"reason":    "disabled",
+		"message":   "automatic snapshot operation skipped",
 	}
 	if diff := cmp.Diff(want, record); diff != "" {
 		t.Fatalf("incorrect skip record: %s", diff)

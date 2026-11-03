@@ -46,7 +46,9 @@ func TestPickerServicesLoadAndWatchPiConversationNames(t *testing.T) {
 			PanePID:     42,
 		},
 		Observations: registry.Observations{Native: &registry.NativeObservation{
-			Process: identity, Attributes: map[string]string{"aht_interaction_mode": "tui"}, ObservedAt: now,
+			Process:    identity,
+			Attributes: map[string]string{"aht_interaction_mode": "tui"},
+			ObservedAt: now,
 		}},
 		CreatedAt: now, UpdatedAt: now, PresenceChangedAt: now, ActivityChangedAt: now,
 	}
@@ -69,26 +71,33 @@ func TestPickerServicesLoadAndWatchPiConversationNames(t *testing.T) {
 
 	published := 0
 
-	err = services.WatchAgentSummaries(t.Context(), func(_ uint64, snapshot tui.AgentSnapshot, publishErr error) error {
-		if publishErr != nil {
-			return publishErr
-		}
+	err = services.WatchAgentSummaries(
+		t.Context(),
+		func(_ uint64, snapshot tui.AgentSnapshot, publishErr error) error {
+			if publishErr != nil {
+				return publishErr
+			}
 
-		summaries := snapshot.Summaries
+			summaries := snapshot.Summaries
 
-		want := "Watched name"
-		if published > 0 {
-			want = "Later name"
-		}
+			want := "Watched name"
+			if published > 0 {
+				want = "Later name"
+			}
 
-		assertPickerServiceName(t, summaries, want)
+			assertPickerServiceName(t, summaries, want)
 
-		published++
+			published++
 
-		appendPickerNameFixture(t, transcript, `{"type":"session_info","name":"Later name"}`+"\n")
+			appendPickerNameFixture(
+				t,
+				transcript,
+				`{"type":"session_info","name":"Later name"}`+"\n",
+			)
 
-		return nil
-	})
+			return nil
+		},
+	)
 	if err != nil || published != 2 {
 		t.Fatalf("watch result: published=%d err=%v", published, err)
 	}
@@ -98,7 +107,8 @@ func TestPickerServicesLoadAndWatchPiConversationNames(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(stored) != 1 || stored[0].SessionID != "native-resume-id" || stored[0].ResumeCommand[2] != "native-resume-id" {
+	if len(stored) != 1 || stored[0].SessionID != "native-resume-id" ||
+		stored[0].ResumeCommand[2] != "native-resume-id" {
 		t.Fatalf("native resume metadata changed: %#v", stored)
 	}
 
@@ -109,7 +119,11 @@ func TestPickerServicesLoadAndWatchPiConversationNames(t *testing.T) {
 
 func TestPickerServicesLoadAndWatchClaudeNativeTitles(t *testing.T) {
 	transcript := filepath.Join(t.TempDir(), "claude.jsonl")
-	writePickerNameFixture(t, transcript, `{"type":"ai-title","sessionId":"claude-native","aiTitle":"Generated title"}`+"\n")
+	writePickerNameFixture(
+		t,
+		transcript,
+		`{"type":"ai-title","sessionId":"claude-native","aiTitle":"Generated title"}`+"\n",
+	)
 
 	source := nameWatchSource{sessions: []aht.Session{{
 		SchemaVersion: 3,
@@ -145,27 +159,38 @@ func TestPickerServicesLoadAndWatchClaudeNativeTitles(t *testing.T) {
 	summaries := snapshot.Summaries
 
 	assertTitle(summaries, "Generated title")
-	appendPickerNameFixture(t, transcript, `{"type":"custom-title","sessionId":"claude-native","customTitle":"Manual title"}`+"\n")
+	appendPickerNameFixture(
+		t,
+		transcript,
+		`{"type":"custom-title","sessionId":"claude-native","customTitle":"Manual title"}`+"\n",
+	)
 
 	published := 0
 
-	err = services.WatchAgentSummaries(t.Context(), func(_ uint64, snapshot tui.AgentSnapshot, publishErr error) error {
-		if publishErr != nil {
-			return publishErr
-		}
+	err = services.WatchAgentSummaries(
+		t.Context(),
+		func(_ uint64, snapshot tui.AgentSnapshot, publishErr error) error {
+			if publishErr != nil {
+				return publishErr
+			}
 
-		summaries := snapshot.Summaries
+			summaries := snapshot.Summaries
 
-		assertTitle(summaries, "Manual title")
+			assertTitle(summaries, "Manual title")
 
-		if published == 0 {
-			appendPickerNameFixture(t, transcript, `{"type":"ai-title","sessionId":"claude-native","aiTitle":"Later generated title"}`+"\n")
-		}
+			if published == 0 {
+				appendPickerNameFixture(
+					t,
+					transcript,
+					`{"type":"ai-title","sessionId":"claude-native","aiTitle":"Later generated title"}`+"\n",
+				)
+			}
 
-		published++
+			published++
 
-		return nil
-	})
+			return nil
+		},
+	)
 	if err != nil || published != 2 {
 		t.Fatalf("watch result: published=%d err=%v", published, err)
 	}
@@ -179,7 +204,10 @@ func TestPickerServicesLoadAndWatchClaudeNativeTitles(t *testing.T) {
 		t.Fatalf("native resume identity changed: %#v", stored)
 	}
 
-	if diff := cmp.Diff([]string{"claude", "--resume", "claude-native"}, stored[0].ResumeCommand); diff != "" {
+	if diff := cmp.Diff(
+		[]string{"claude", "--resume", "claude-native"},
+		stored[0].ResumeCommand,
+	); diff != "" {
 		t.Fatalf("native resume command changed (-want +got):\n%s", diff)
 	}
 }
@@ -192,12 +220,22 @@ func TestPickerServicesLoadCodexAndOmpNativeTitles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(filepath.Join(codexHome, "session_index.jsonl"), []byte(`{"id":"codex-native","thread_name":"Codex project plan"}`+"\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(codexHome, "session_index.jsonl"),
+		[]byte(`{"id":"codex-native","thread_name":"Codex project plan"}`+"\n"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
 	ompPath := filepath.Join(root, "omp.jsonl")
-	if err := os.WriteFile(ompPath, []byte(`{"type":"title","title":"OMP design review"}`+"\n"+`{"type":"session","id":"omp-native"}`+"\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		ompPath,
+		[]byte(
+			`{"type":"title","title":"OMP design review"}`+"\n"+`{"type":"session","id":"omp-native"}`+"\n",
+		),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -248,7 +286,10 @@ func TestPickerServicesLoadCodexAndOmpNativeTitles(t *testing.T) {
 func writePickerAgentRegistry(t *testing.T, path string, agent aht.Session) {
 	t.Helper()
 
-	document := map[string]any{"schema_version": 3, "sessions": map[string]aht.Session{agent.ID: agent}}
+	document := map[string]any{
+		"schema_version": 3,
+		"sessions":       map[string]aht.Session{agent.ID: agent},
+	}
 
 	encoded, err := json.Marshal(document)
 	if err != nil {
@@ -278,7 +319,9 @@ func (s nameWatchSource) Watch(
 			return fmt.Errorf("watch fixture canceled: %w", err)
 		}
 
-		if err := publish(aht.StateSnapshot{Revision: revision + 1, Sessions: s.sessions}); err != nil {
+		if err := publish(
+			aht.StateSnapshot{Revision: revision + 1, Sessions: s.sessions},
+		); err != nil {
 			return err
 		}
 	}
@@ -300,12 +343,17 @@ func servicesStorePath(t *testing.T, services *services) string {
 func assertPickerServiceName(t *testing.T, summaries []session.AgentSummary, want string) {
 	t.Helper()
 
-	if len(summaries) != 1 || len(summaries[0].Agents) != 1 || summaries[0].Agents[0].HarnessSession != want {
+	if len(summaries) != 1 || len(summaries[0].Agents) != 1 ||
+		summaries[0].Agents[0].HarnessSession != want {
 		t.Fatalf("picker summaries = %#v, want one agent named %q", summaries, want)
 	}
 }
 
-func resolvePickerTestWorkspace(t *testing.T, cfg *config.Config, locations app.Locations) app.Workspace {
+func resolvePickerTestWorkspace(
+	t *testing.T,
+	cfg *config.Config,
+	locations app.Locations,
+) app.Workspace {
 	t.Helper()
 
 	workspace, err := app.Resolve(cfg, locations)
@@ -325,8 +373,18 @@ func TestPickerServicesAHTStorePathRouting(t *testing.T) {
 		cfg.AgentStatus.StorePath = "/config/aht.json"
 
 		services, err := newServices(ctx, resolvePickerTestWorkspace(t, cfg, app.Locations{
-			Socket: filepath.Join(dirs, "tmux.sock"), Repository: filepath.Join(dirs, "repo1"), LeaseRoot: filepath.Join(dirs, "leases1"),
-			History: filepath.Join(dirs, "history1.json"), FinalSaveStatus: "", AgentStore: "/explicit/aht.json",
+			Socket: filepath.Join(
+				dirs,
+				"tmux.sock",
+			),
+			Repository: filepath.Join(dirs, "repo1"),
+			LeaseRoot:  filepath.Join(dirs, "leases1"),
+			History: filepath.Join(
+				dirs,
+				"history1.json",
+			),
+			FinalSaveStatus: "",
+			AgentStore:      "/explicit/aht.json",
 		}), gotmux.Streams{}, RemoteServices{})
 		if err != nil {
 			t.Fatalf("newServices failed: %v", err)
@@ -345,8 +403,15 @@ func TestPickerServicesAHTStorePathRouting(t *testing.T) {
 		cfg.AgentSessions.Status = &config.AgentStatusConfig{StorePath: "/config/fallback/aht.json"}
 
 		services, err := newServices(ctx, resolvePickerTestWorkspace(t, cfg, app.Locations{
-			Socket: filepath.Join(dirs, "tmux.sock"), Repository: filepath.Join(dirs, "repo2"), LeaseRoot: filepath.Join(dirs, "leases2"),
-			History: filepath.Join(dirs, "history2.json"), FinalSaveStatus: "", AgentStore: "",
+			Socket: filepath.Join(
+				dirs,
+				"tmux.sock",
+			),
+			Repository:      filepath.Join(dirs, "repo2"),
+			LeaseRoot:       filepath.Join(dirs, "leases2"),
+			History:         filepath.Join(dirs, "history2.json"),
+			FinalSaveStatus: "",
+			AgentStore:      "",
 		}), gotmux.Streams{}, RemoteServices{})
 		if err != nil {
 			t.Fatalf("newServices failed: %v", err)

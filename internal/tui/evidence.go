@@ -86,7 +86,11 @@ func (m *Model) loadEvidenceCommand() tea.Cmd {
 	}
 }
 
-func readReports(ctx context.Context, source EvidenceSource, wanted map[string]session.AgentSession) (map[string]evidenceEntry, error) {
+func readReports(
+	ctx context.Context,
+	source EvidenceSource,
+	wanted map[string]session.AgentSession,
+) (map[string]evidenceEntry, error) {
 	entries := make(map[string]evidenceEntry, len(wanted))
 	unread := 0
 
@@ -101,7 +105,10 @@ func readReports(ctx context.Context, source EvidenceSource, wanted map[string]s
 			continue
 		}
 
-		entries[key] = evidenceEntry{turnEndedAt: agent.StatusSince, items: inbox.ParseEvidence(report, agent.CWD)}
+		entries[key] = evidenceEntry{
+			turnEndedAt: agent.StatusSince,
+			items:       inbox.ParseEvidence(report, agent.CWD),
+		}
 	}
 
 	if unread > 0 && ctx.Err() == nil {
@@ -137,7 +144,8 @@ func (m *Model) handleEvidence(msg evidenceResultMsg) {
 
 func (m *Model) evidenceOf(item inboxItem) []inbox.Evidence {
 	entry, ok := m.evidence[conversationKey(item.agent)]
-	if !ok || conversationKey(item.agent) == "" || !entry.turnEndedAt.Equal(item.agent.StatusSince) {
+	if !ok || conversationKey(item.agent) == "" ||
+		!entry.turnEndedAt.Equal(item.agent.StatusSince) {
 		return nil
 	}
 
@@ -166,7 +174,11 @@ func evidenceName(item inbox.Evidence, dir string) string {
 		return SanitizeTerminalText(item.Target)
 	}
 
-	if relative, err := filepath.Rel(dir, item.Target); err == nil && !strings.HasPrefix(relative, "..") {
+	if relative, err := filepath.Rel(
+		dir,
+		item.Target,
+	); err == nil &&
+		!strings.HasPrefix(relative, "..") {
 		return SanitizeTerminalText(relative)
 	}
 
@@ -179,7 +191,12 @@ func (m *Model) openEvidenceMenu(item inboxItem) func() (tea.Model, tea.Cmd) {
 
 	for _, evidence := range items {
 		entries = append(entries, menuEntry{
-			label: evidenceName(evidence, item.agent.CWD), key: string(evidence.Kind), run: m.openEvidence(evidence, item.agent.CWD),
+			label: evidenceName(
+				evidence,
+				item.agent.CWD,
+			),
+			key: string(evidence.Kind),
+			run: m.openEvidence(evidence, item.agent.CWD),
 		})
 	}
 

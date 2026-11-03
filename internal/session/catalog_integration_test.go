@@ -101,9 +101,19 @@ func TestCatalogKeepsLiveRowsWhenInvokingPaneDisappears(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := session.ListCatalog(ctx, session.CatalogOptions{Server: server, CurrentPane: "%999999"})
-	if err == nil || result.Status != session.StatusPartial || len(result.Sessions) < 2 || result.LiveErr == nil {
-		t.Fatalf("stale pane catalog = status %s, rows %d, live error %v, error %v", result.Status, len(result.Sessions), result.LiveErr, err)
+	result, err := session.ListCatalog(
+		ctx,
+		session.CatalogOptions{Server: server, CurrentPane: "%999999"},
+	)
+	if err == nil || result.Status != session.StatusPartial || len(result.Sessions) < 2 ||
+		result.LiveErr == nil {
+		t.Fatalf(
+			"stale pane catalog = status %s, rows %d, live error %v, error %v",
+			result.Status,
+			len(result.Sessions),
+			result.LiveErr,
+			err,
+		)
 	}
 
 	found := map[string]bool{}
@@ -224,7 +234,11 @@ func TestCatalogIgnoresInvokingPaneFromAnotherSession(t *testing.T) {
 	for _, row := range result.Sessions {
 		if row.ID == string(second.ID()) {
 			if !row.Current || row.ActivePaneID == foreign {
-				t.Fatalf("current row = %+v, want hinted session without foreign pane %s", row, foreign)
+				t.Fatalf(
+					"current row = %+v, want hinted session without foreign pane %s",
+					row,
+					foreign,
+				)
 			}
 
 			return
@@ -254,7 +268,10 @@ func TestCatalogLiveObservationKilledServer(t *testing.T) {
 		Server: server,
 	})
 	if err != nil {
-		t.Fatalf("unexpected error on killed server (should treat as ErrNoServer 0 sessions): %v", err)
+		t.Fatalf(
+			"unexpected error on killed server (should treat as ErrNoServer 0 sessions): %v",
+			err,
+		)
 	}
 
 	if len(result.Sessions) != 0 {
@@ -269,7 +286,11 @@ func TestConcurrentUpdatesUnderLock(t *testing.T) {
 	svc := session.NewService(session.ServiceDeps{})
 	ctx := t.Context()
 
-	if err := svc.SaveState(ctx, statePath, &session.State{Version: session.CurrentHistoryVersion}); err != nil {
+	if err := svc.SaveState(
+		ctx,
+		statePath,
+		&session.State{Version: session.CurrentHistoryVersion},
+	); err != nil {
 		t.Fatalf("initial save failed: %v", err)
 	}
 
@@ -467,7 +488,11 @@ func TestMultiProcessConcurrentUpdatesUnderLock(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
 
-	if err := svc.SaveState(ctx, statePath, &session.State{Version: session.CurrentHistoryVersion}); err != nil {
+	if err := svc.SaveState(
+		ctx,
+		statePath,
+		&session.State{Version: session.CurrentHistoryVersion},
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -488,7 +513,12 @@ func TestMultiProcessConcurrentUpdatesUnderLock(t *testing.T) {
 			worker := exec.CommandContext(ctx, program, "-test.run=^TestHistoryProcessWorker$")
 			worker.WaitDelay = time.Second
 
-			worker.Env = append(os.Environ(), envLockWorkerFlag+"=worker", envWorkerID+"="+strconv.Itoa(p), envStatePath+"="+statePath)
+			worker.Env = append(
+				os.Environ(),
+				envLockWorkerFlag+"=worker",
+				envWorkerID+"="+strconv.Itoa(p),
+				envStatePath+"="+statePath,
+			)
 
 			output, err := worker.CombinedOutput()
 			if err != nil {
@@ -538,7 +568,10 @@ func TestCatalogSharedPaneDoesNotGuessCurrentSession(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "group-two", Group: "group-one"}); err != nil {
+	if _, err := server.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{Name: "group-two", Group: "group-one"},
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -547,8 +580,13 @@ func TestCatalogSharedPaneDoesNotGuessCurrentSession(t *testing.T) {
 		t.Fatalf("fixture panes: %v, %d", err, len(panes))
 	}
 
-	result, err := session.ListCatalog(ctx, session.CatalogOptions{Server: server, CurrentPane: string(panes[0].ID)})
-	if !errors.Is(err, session.ErrCurrentSessionAmbiguous) || result.Status != session.StatusPartial || len(result.Sessions) < 2 {
+	result, err := session.ListCatalog(
+		ctx,
+		session.CatalogOptions{Server: server, CurrentPane: string(panes[0].ID)},
+	)
+	if !errors.Is(err, session.ErrCurrentSessionAmbiguous) ||
+		result.Status != session.StatusPartial ||
+		len(result.Sessions) < 2 {
 		t.Fatalf("shared pane uncertainty hidden: %+v, %v", result, err)
 	}
 

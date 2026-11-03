@@ -7,7 +7,9 @@ import (
 
 func ValidNonrestartableReason(reason string) bool {
 	switch reason {
-	case string(ReasonPaneDead), string(ReasonExecutableDeleted), string(ReasonWorkingDirectoryDeleted):
+	case string(ReasonPaneDead),
+		string(ReasonExecutableDeleted),
+		string(ReasonWorkingDirectoryDeleted):
 		return true
 	default:
 		return false
@@ -30,7 +32,8 @@ func validateSettings(options []Option, environment []Variable) error {
 }
 
 func validOption(option Option) bool {
-	if len(option.Name) == 0 || bytes.ContainsRune(option.Name, 0) || bytes.ContainsRune(option.Value, 0) {
+	if len(option.Name) == 0 || bytes.ContainsRune(option.Name, 0) ||
+		bytes.ContainsRune(option.Value, 0) {
 		return false
 	}
 
@@ -38,7 +41,10 @@ func validOption(option Option) bool {
 		return false
 	}
 
-	return slices.Contains([]string{"server", "global-session", "global-window", "session", "window", "pane"}, option.Scope)
+	return slices.Contains(
+		[]string{"server", "global-session", "global-window", "session", "window", "pane"},
+		option.Scope,
+	)
 }
 
 func validateEnvironment(environment []Variable) error {
@@ -55,7 +61,8 @@ func validateEnvironment(environment []Variable) error {
 }
 
 func validVariable(variable Variable) bool {
-	if len(variable.Name) == 0 || bytes.ContainsAny(variable.Name, "=\x00") || bytes.ContainsRune(variable.Value, 0) {
+	if len(variable.Name) == 0 || bytes.ContainsAny(variable.Name, "=\x00") ||
+		bytes.ContainsRune(variable.Value, 0) {
 		return false
 	}
 
@@ -106,7 +113,8 @@ func validateLaunchRecovery(launch Launch) error {
 }
 
 func validateRunnableLaunch(launch Launch) error {
-	if launch.Reason != "" || len(launch.Executable) == 0 || len(launch.Arguments) == 0 || !validDirectory(launch.Directory) {
+	if launch.Reason != "" || len(launch.Executable) == 0 || len(launch.Arguments) == 0 ||
+		!validDirectory(launch.Directory) {
 		return ErrInvalid
 	}
 

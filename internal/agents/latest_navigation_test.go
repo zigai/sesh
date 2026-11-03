@@ -29,7 +29,15 @@ func TestLatestIdleSelectsMostRecentTransitionAndBackReturnsToOrigin(t *testing.
 	t.Parallel()
 
 	panes := navigationPanes()
-	controller := &fakeController{current: agents.CurrentContext{ServerSocket: defaultServerSocket, ClientName: "invoking-client", SessionID: "$1", PaneID: "%1"}, panes: panes}
+	controller := &fakeController{
+		current: agents.CurrentContext{
+			ServerSocket: defaultServerSocket,
+			ClientName:   "invoking-client",
+			SessionID:    "$1",
+			PaneID:       "%1",
+		},
+		panes: panes,
+	}
 	old := idleSessionAt(panes[2], 1)
 	old.UpdatedAt = time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
 	n := newFakeNavigator(t, controller, []aht.Session{old, idleSessionAt(panes[1], 2)})
@@ -43,7 +51,12 @@ func TestLatestIdleSelectsMostRecentTransitionAndBackReturnsToOrigin(t *testing.
 		t.Fatalf("history = %v", got)
 	}
 
-	controller.current = agents.CurrentContext{ServerSocket: defaultServerSocket, ClientName: "invoking-client", SessionID: "$2", PaneID: "%2"}
+	controller.current = agents.CurrentContext{
+		ServerSocket: defaultServerSocket,
+		ClientName:   "invoking-client",
+		SessionID:    "$2",
+		PaneID:       "%2",
+	}
 
 	back, err := n.Back(t.Context())
 	if err != nil || back.PaneID != "%1" {
@@ -55,15 +68,27 @@ func TestLatestIdleTiesUsePaneOrderAndCurrentWinnerDoesNotWriteHistory(t *testin
 	t.Parallel()
 
 	panes := navigationPanes()
-	controller := &fakeController{current: agents.CurrentContext{ServerSocket: defaultServerSocket, SessionID: "$1", PaneID: "%1"}, panes: panes}
-	n := newFakeNavigator(t, controller, []aht.Session{idleSessionAt(panes[2], 1), idleSessionAt(panes[0], 1)})
+	controller := &fakeController{
+		current: agents.CurrentContext{
+			ServerSocket: defaultServerSocket,
+			SessionID:    "$1",
+			PaneID:       "%1",
+		},
+		panes: panes,
+	}
+	n := newFakeNavigator(
+		t,
+		controller,
+		[]aht.Session{idleSessionAt(panes[2], 1), idleSessionAt(panes[0], 1)},
+	)
 
 	target, err := n.LatestIdle(t.Context(), agents.NavigationGlobal)
 	if err != nil || target.PaneID != "%1" {
 		t.Fatalf("target = %+v, err = %v", target, err)
 	}
 
-	if len(controller.activated) != 0 || len(controller.historyWrites) != 0 || controller.lockCalls != 0 {
+	if len(controller.activated) != 0 || len(controller.historyWrites) != 0 ||
+		controller.lockCalls != 0 {
 		t.Fatalf("current winner mutated navigation state: %+v", controller)
 	}
 }
@@ -74,8 +99,19 @@ func TestLatestIdleFiltersServerBeforeDeduplication(t *testing.T) {
 	panes := navigationPanes()
 	otherPane := panes[1]
 	otherPane.ServerSocket = "other"
-	controller := &fakeController{current: agents.CurrentContext{ServerSocket: defaultServerSocket, SessionID: "$1", PaneID: "%1"}, panes: append(panes, otherPane)}
-	n := newFakeNavigator(t, controller, []aht.Session{idleSessionAt(otherPane, 5), idleSessionAt(panes[1], 2)})
+	controller := &fakeController{
+		current: agents.CurrentContext{
+			ServerSocket: defaultServerSocket,
+			SessionID:    "$1",
+			PaneID:       "%1",
+		},
+		panes: append(panes, otherPane),
+	}
+	n := newFakeNavigator(
+		t,
+		controller,
+		[]aht.Session{idleSessionAt(otherPane, 5), idleSessionAt(panes[1], 2)},
+	)
 
 	target, err := n.LatestIdle(t.Context(), agents.NavigationGlobal)
 	if err != nil || target.PaneID != "%2" || target.ServerSocket != defaultServerSocket {
@@ -88,13 +124,29 @@ func TestLatestIdleLocalScopeRetargetsLinkedWindow(t *testing.T) {
 
 	panes := navigationPanes()
 	controller := &fakeController{
-		current: agents.CurrentContext{ServerSocket: defaultServerSocket, SessionID: "$1", SessionName: firstSessionName, PaneID: "%1"}, panes: panes,
-		sessionWindows: map[string][]agents.SessionWindow{"$1": {{SessionID: "$1", SessionName: firstSessionName, WindowID: "@2", WindowIndex: "4"}, {SessionID: "$1", SessionName: firstSessionName, WindowID: "@1", WindowIndex: "1"}}},
+		current: agents.CurrentContext{
+			ServerSocket: defaultServerSocket,
+			SessionID:    "$1",
+			SessionName:  firstSessionName,
+			PaneID:       "%1",
+		},
+		panes: panes,
+		sessionWindows: map[string][]agents.SessionWindow{
+			"$1": {
+				{SessionID: "$1", SessionName: firstSessionName, WindowID: "@2", WindowIndex: "4"},
+				{SessionID: "$1", SessionName: firstSessionName, WindowID: "@1", WindowIndex: "1"},
+			},
+		},
 	}
-	n := newFakeNavigator(t, controller, []aht.Session{idleSessionAt(panes[1], 2), idleSessionAt(panes[2], 5)})
+	n := newFakeNavigator(
+		t,
+		controller,
+		[]aht.Session{idleSessionAt(panes[1], 2), idleSessionAt(panes[2], 5)},
+	)
 
 	target, err := n.LatestIdle(t.Context(), agents.NavigationCurrentSession)
-	if err != nil || target.PaneID != "%2" || target.SessionID != "$1" || target.WindowIndex != "4" {
+	if err != nil || target.PaneID != "%2" || target.SessionID != "$1" ||
+		target.WindowIndex != "4" {
 		t.Fatalf("target = %+v, err = %v", target, err)
 	}
 }
@@ -110,7 +162,14 @@ func TestLatestIdleRejectsIneligibleRecordsWithoutSuccessLogs(t *testing.T) {
 
 			s := ineligibleIdleSession(panes[1], name)
 
-			controller := &fakeController{current: agents.CurrentContext{ServerSocket: defaultServerSocket, SessionID: "$1", PaneID: "%1"}, panes: panes}
+			controller := &fakeController{
+				current: agents.CurrentContext{
+					ServerSocket: defaultServerSocket,
+					SessionID:    "$1",
+					PaneID:       "%1",
+				},
+				panes: panes,
+			}
 			n := newFakeNavigator(t, controller, []aht.Session{s})
 
 			var output bytes.Buffer
@@ -123,7 +182,8 @@ func TestLatestIdleRejectsIneligibleRecordsWithoutSuccessLogs(t *testing.T) {
 				t.Fatalf("error = %v, code = %q", err, enriched.Code())
 			}
 
-			if output.Len() != 0 || len(controller.historyWrites) != 0 || len(controller.activated) != 0 {
+			if output.Len() != 0 || len(controller.historyWrites) != 0 ||
+				len(controller.activated) != 0 {
 				t.Fatalf("ineligible record produced effects: %s", output.String())
 			}
 		})
@@ -144,7 +204,14 @@ func TestLatestIdleLogsOnlyPrivacySafeOwnedSuccess(t *testing.T) {
 
 			t.Parallel()
 
-			controller := &fakeController{current: agents.CurrentContext{ServerSocket: defaultServerSocket, SessionID: "$1", PaneID: "%1"}, panes: panes}
+			controller := &fakeController{
+				current: agents.CurrentContext{
+					ServerSocket: defaultServerSocket,
+					SessionID:    "$1",
+					PaneID:       "%1",
+				},
+				panes: panes,
+			}
 			n := newFakeNavigator(t, controller, []aht.Session{idleSessionAt(panes[2], 1)})
 
 			var output bytes.Buffer
@@ -166,7 +233,16 @@ func TestLatestIdleLogsOnlyPrivacySafeOwnedSuccess(t *testing.T) {
 				wantScope = "current_session"
 			}
 
-			want := map[string]any{"level": "info", "component": "agents", "operation": "latest_idle", "status": "ok", "cross_session": false, "cross_window": true, "scope": wantScope, "message": "agent pane activated"}
+			want := map[string]any{
+				"level":         "info",
+				"component":     "agents",
+				"operation":     "latest_idle",
+				"status":        "ok",
+				"cross_session": false,
+				"cross_window":  true,
+				"scope":         wantScope,
+				"message":       "agent pane activated",
+			}
 			if !reflect.DeepEqual(r, want) {
 				t.Fatalf("record = %#v, want %#v", r, want)
 			}
@@ -178,7 +254,15 @@ func TestLatestIdleActivationFailurePreservesCauseAndHistory(t *testing.T) {
 	t.Parallel()
 
 	panes := navigationPanes()
-	controller := &fakeController{current: agents.CurrentContext{ServerSocket: defaultServerSocket, SessionID: "$1", PaneID: "%1"}, panes: panes, activateErr: errFakeActivation}
+	controller := &fakeController{
+		current: agents.CurrentContext{
+			ServerSocket: defaultServerSocket,
+			SessionID:    "$1",
+			PaneID:       "%1",
+		},
+		panes:       panes,
+		activateErr: errFakeActivation,
+	}
 	n := newFakeNavigator(t, controller, []aht.Session{idleSessionAt(panes[1], 1)})
 
 	var output bytes.Buffer
@@ -202,7 +286,9 @@ func ineligibleIdleSession(pane agents.PaneLocation, name string) aht.Session {
 	case "wrong_session":
 		s.Location.SessionID = "$404"
 	case "noninteractive":
-		s.Observations.Native = &registry.NativeObservation{Attributes: map[string]string{"aht_interaction_mode": "print"}}
+		s.Observations.Native = &registry.NativeObservation{
+			Attributes: map[string]string{"aht_interaction_mode": "print"},
+		}
 	case "ended":
 		s.Liveness = aht.Gone{}
 	default:

@@ -154,7 +154,12 @@ func testExactBoundaryC(t *testing.T, r *Repository, expectedRetainedB int64) {
 	}
 }
 
-func testExactBoundaryD(t *testing.T, r *Repository, secondOldestID string, expectedRetainedB, protectedBytes int64) {
+func testExactBoundaryD(
+	t *testing.T,
+	r *Repository,
+	secondOldestID string,
+	expectedRetainedB, protectedBytes int64,
+) {
 	t.Helper()
 
 	resD, err := r.RetainBytes(t.Context(), expectedRetainedB-1)
@@ -291,7 +296,10 @@ func TestRetentionBytesComposition(t *testing.T) {
 
 	protectedGens := make([]Generation, 0, 5)
 	for i := range 5 {
-		protectedGens = append(protectedGens, commitSnapshotAt(t, r, baseTime.Add(time.Duration(i)*time.Minute)))
+		protectedGens = append(
+			protectedGens,
+			commitSnapshotAt(t, r, baseTime.Add(time.Duration(i)*time.Minute)),
+		)
 	}
 
 	u, err := r.Usage(t.Context())
@@ -380,7 +388,12 @@ func testPermanentPinSurvival(t *testing.T) {
 
 	pinnedID := gens[0].ID
 
-	_, err := r.Pin(t.Context(), pinnedID, model.Bytes("target"), []Action{{ID: "act1", Kind: actionLaunch, State: "planned"}})
+	_, err := r.Pin(
+		t.Context(),
+		pinnedID,
+		model.Bytes("target"),
+		[]Action{{ID: "act1", Kind: actionLaunch, State: "planned"}},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -425,7 +438,12 @@ func runConcurrentTrial(t *testing.T, trial int) {
 		gens = append(gens, commitContentFixture(t, r, bytes.Repeat([]byte{b}, 100*(i+1))))
 	}
 
-	_, err := r.Pin(t.Context(), gens[0].ID, model.Bytes("perm-target"), []Action{{ID: "act-perm", Kind: actionLaunch, State: "planned"}})
+	_, err := r.Pin(
+		t.Context(),
+		gens[0].ID,
+		model.Bytes("perm-target"),
+		[]Action{{ID: "act-perm", Kind: actionLaunch, State: "planned"}},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -448,7 +466,12 @@ func runConcurrentTrial(t *testing.T, trial int) {
 	)
 
 	wg.Go(func() {
-		_, pinErr = r.Pin(ctx, targetID, model.Bytes("race-target"), []Action{{ID: "act-race", Kind: actionLaunch, State: "planned"}})
+		_, pinErr = r.Pin(
+			ctx,
+			targetID,
+			model.Bytes("race-target"),
+			[]Action{{ID: "act-race", Kind: actionLaunch, State: "planned"}},
+		)
 	})
 
 	wg.Go(func() {
@@ -466,7 +489,14 @@ func runConcurrentTrial(t *testing.T, trial int) {
 	verifyPinTrialOutcome(t, trial, pinErr, targetRemoved, targetID, gens[0].ID, r)
 }
 
-func verifyPinTrialOutcome(t *testing.T, trial int, pinErr error, targetRemoved bool, targetID, permID string, r *Repository) {
+func verifyPinTrialOutcome(
+	t *testing.T,
+	trial int,
+	pinErr error,
+	targetRemoved bool,
+	targetID, permID string,
+	r *Repository,
+) {
 	t.Helper()
 
 	if pinErr == nil {
@@ -481,7 +511,11 @@ func verifyPinTrialOutcome(t *testing.T, trial int, pinErr error, targetRemoved 
 
 	if pinErr != nil {
 		if !errors.Is(pinErr, ErrUnavailable) {
-			t.Fatalf("trial %d: expected ErrUnavailable when pinning pruned source, got: %v", trial, pinErr)
+			t.Fatalf(
+				"trial %d: expected ErrUnavailable when pinning pruned source, got: %v",
+				trial,
+				pinErr,
+			)
 		}
 
 		if !targetRemoved {
@@ -555,7 +589,9 @@ func TestRetentionBytesCorruptedArtifact(t *testing.T) {
 		gens = append(gens, commitContentFixture(t, r, []byte("sample artifact data")))
 	}
 
-	artifactFile := filepath.Clean(filepath.Join(path, "generations", gens[0].ID, "artifacts", "a0.bin.gz"))
+	artifactFile := filepath.Clean(
+		filepath.Join(path, "generations", gens[0].ID, "artifacts", "a0.bin.gz"),
+	)
 	rewriteFixtureFile(t, artifactFile, []byte("corrupt gzip payload!"))
 
 	_, err := r.RetainBytes(t.Context(), 100)
@@ -573,7 +609,9 @@ func TestRetentionBytesTruncatedArtifact(t *testing.T) {
 		gens = append(gens, commitContentFixture(t, r, bytes.Repeat([]byte("test"), 100)))
 	}
 
-	artifactFile := filepath.Clean(filepath.Join(path, "generations", gens[0].ID, "artifacts", "a0.bin.gz"))
+	artifactFile := filepath.Clean(
+		filepath.Join(path, "generations", gens[0].ID, "artifacts", "a0.bin.gz"),
+	)
 
 	data, err := os.ReadFile(artifactFile)
 	if err != nil {
@@ -602,7 +640,9 @@ func TestRetentionBytesOversizedArtifact(t *testing.T) {
 		gens = append(gens, commitContentFixture(t, r, []byte("short")))
 	}
 
-	artifactFile := filepath.Clean(filepath.Join(path, "generations", gens[0].ID, "artifacts", "a0.bin.gz"))
+	artifactFile := filepath.Clean(
+		filepath.Join(path, "generations", gens[0].ID, "artifacts", "a0.bin.gz"),
+	)
 
 	f, err := os.OpenFile(artifactFile, os.O_WRONLY, 0o600)
 	if err != nil {
@@ -640,7 +680,9 @@ func testSymlinkArtifact(t *testing.T) {
 		gens = append(gens, commitContentFixture(t, r, []byte("data")))
 	}
 
-	artFile := filepath.Clean(filepath.Join(path, "generations", gens[0].ID, "artifacts", "a0.bin.gz"))
+	artFile := filepath.Clean(
+		filepath.Join(path, "generations", gens[0].ID, "artifacts", "a0.bin.gz"),
+	)
 	targetFile := filepath.Clean(filepath.Join(t.TempDir(), "target.bin.gz"))
 	_ = os.WriteFile(targetFile, []byte("target"), 0o600)
 
@@ -670,7 +712,9 @@ func testHardlinkArtifact(t *testing.T) {
 		gens = append(gens, commitContentFixture(t, r, []byte("data")))
 	}
 
-	artFile := filepath.Clean(filepath.Join(path, "generations", gens[0].ID, "artifacts", "a0.bin.gz"))
+	artFile := filepath.Clean(
+		filepath.Join(path, "generations", gens[0].ID, "artifacts", "a0.bin.gz"),
+	)
 	linkFile := filepath.Clean(filepath.Join(t.TempDir(), "art_link.bin.gz"))
 
 	if err := os.Link(artFile, linkFile); err != nil {
@@ -698,7 +742,9 @@ func testFIFOArtifact(t *testing.T) {
 		gens = append(gens, commitContentFixture(t, r, []byte("data")))
 	}
 
-	artFile := filepath.Clean(filepath.Join(path, "generations", gens[0].ID, "artifacts", "a0.bin.gz"))
+	artFile := filepath.Clean(
+		filepath.Join(path, "generations", gens[0].ID, "artifacts", "a0.bin.gz"),
+	)
 
 	_ = os.Remove(artFile)
 	if err := unix.Mkfifo(artFile, 0o600); err != nil {
@@ -721,12 +767,42 @@ func TestRetentionBytesOverflowSyntheticInputs(t *testing.T) {
 		Sequence: 10,
 		Current:  "gen9",
 		Generations: []Generation{
-			{ID: "gen9", Sequence: 9, ManifestSHA256: "0000000000000000000000000000000000000000000000000000000000000000", Complete: true},
-			{ID: "gen8", Sequence: 8, ManifestSHA256: "0000000000000000000000000000000000000000000000000000000000000000", Complete: true},
-			{ID: "gen7", Sequence: 7, ManifestSHA256: "0000000000000000000000000000000000000000000000000000000000000000", Complete: true},
-			{ID: "gen6", Sequence: 6, ManifestSHA256: "0000000000000000000000000000000000000000000000000000000000000000", Complete: true},
-			{ID: "gen5", Sequence: 5, ManifestSHA256: "0000000000000000000000000000000000000000000000000000000000000000", Complete: true},
-			{ID: "gen4", Sequence: 4, ManifestSHA256: "0000000000000000000000000000000000000000000000000000000000000000", Complete: true},
+			{
+				ID:             "gen9",
+				Sequence:       9,
+				ManifestSHA256: "0000000000000000000000000000000000000000000000000000000000000000",
+				Complete:       true,
+			},
+			{
+				ID:             "gen8",
+				Sequence:       8,
+				ManifestSHA256: "0000000000000000000000000000000000000000000000000000000000000000",
+				Complete:       true,
+			},
+			{
+				ID:             "gen7",
+				Sequence:       7,
+				ManifestSHA256: "0000000000000000000000000000000000000000000000000000000000000000",
+				Complete:       true,
+			},
+			{
+				ID:             "gen6",
+				Sequence:       6,
+				ManifestSHA256: "0000000000000000000000000000000000000000000000000000000000000000",
+				Complete:       true,
+			},
+			{
+				ID:             "gen5",
+				Sequence:       5,
+				ManifestSHA256: "0000000000000000000000000000000000000000000000000000000000000000",
+				Complete:       true,
+			},
+			{
+				ID:             "gen4",
+				Sequence:       4,
+				ManifestSHA256: "0000000000000000000000000000000000000000000000000000000000000000",
+				Complete:       true,
+			},
 		},
 	}
 
@@ -972,12 +1048,42 @@ func TestRetentionBytesMissingSizeMapRejected(t *testing.T) {
 		Sequence: 10,
 		Current:  "gen9",
 		Generations: []Generation{
-			{ID: "gen9", Sequence: 9, ManifestSHA256: "0000000000000000000000000000000000000000000000000000000000000000", Complete: true},
-			{ID: "gen8", Sequence: 8, ManifestSHA256: "0000000000000000000000000000000000000000000000000000000000000000", Complete: true},
-			{ID: "gen7", Sequence: 7, ManifestSHA256: "0000000000000000000000000000000000000000000000000000000000000000", Complete: true},
-			{ID: "gen6", Sequence: 6, ManifestSHA256: "0000000000000000000000000000000000000000000000000000000000000000", Complete: true},
-			{ID: "gen5", Sequence: 5, ManifestSHA256: "0000000000000000000000000000000000000000000000000000000000000000", Complete: true},
-			{ID: "gen4", Sequence: 4, ManifestSHA256: "0000000000000000000000000000000000000000000000000000000000000000", Complete: true},
+			{
+				ID:             "gen9",
+				Sequence:       9,
+				ManifestSHA256: "0000000000000000000000000000000000000000000000000000000000000000",
+				Complete:       true,
+			},
+			{
+				ID:             "gen8",
+				Sequence:       8,
+				ManifestSHA256: "0000000000000000000000000000000000000000000000000000000000000000",
+				Complete:       true,
+			},
+			{
+				ID:             "gen7",
+				Sequence:       7,
+				ManifestSHA256: "0000000000000000000000000000000000000000000000000000000000000000",
+				Complete:       true,
+			},
+			{
+				ID:             "gen6",
+				Sequence:       6,
+				ManifestSHA256: "0000000000000000000000000000000000000000000000000000000000000000",
+				Complete:       true,
+			},
+			{
+				ID:             "gen5",
+				Sequence:       5,
+				ManifestSHA256: "0000000000000000000000000000000000000000000000000000000000000000",
+				Complete:       true,
+			},
+			{
+				ID:             "gen4",
+				Sequence:       4,
+				ManifestSHA256: "0000000000000000000000000000000000000000000000000000000000000000",
+				Complete:       true,
+			},
 		},
 	}
 

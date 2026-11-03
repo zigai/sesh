@@ -148,7 +148,11 @@ func readDarwinProcargs(ctx context.Context, req Request) (darwinProcargs, error
 
 	data, err := unix.SysctlRaw("kern.procargs2", req.PID)
 	if err != nil {
-		return darwinProcargs{}, explainDarwinReadError(ctx, req, fmt.Errorf("read process arguments: %w", err))
+		return darwinProcargs{}, explainDarwinReadError(
+			ctx,
+			req,
+			fmt.Errorf("read process arguments: %w", err),
+		)
 	}
 
 	return parseDarwinProcargs(data)
@@ -199,7 +203,12 @@ func parseDarwinProcargs(data []byte) (darwinProcargs, error) {
 	// The kernel cuts the environment of restricted processes, leaving nothing after the arguments.
 	if len(rest) == 0 {
 		return darwinProcargs{
-			executable: bytes.Clone(executable), arguments: arguments, environ: nil, environUnavailable: true,
+			executable: bytes.Clone(
+				executable,
+			),
+			arguments:          arguments,
+			environ:            nil,
+			environUnavailable: true,
 		}, nil
 	}
 
@@ -209,7 +218,12 @@ func parseDarwinProcargs(data []byte) (darwinProcargs, error) {
 	}
 
 	return darwinProcargs{
-		executable: bytes.Clone(executable), arguments: arguments, environ: environ, environUnavailable: false,
+		executable: bytes.Clone(
+			executable,
+		),
+		arguments:          arguments,
+		environ:            environ,
+		environUnavailable: false,
 	}, nil
 }
 
@@ -228,7 +242,11 @@ func darwinEnvironBlock(data []byte) ([]byte, error) {
 	return data[:end], nil
 }
 
-func readDarwinExecutable(ctx context.Context, req Request, launchedPath []byte) ([]byte, bool, error) {
+func readDarwinExecutable(
+	ctx context.Context,
+	req Request,
+	launchedPath []byte,
+) ([]byte, bool, error) {
 	var buffer [procPIDPathInfoMaxSize]byte
 
 	if _, err := procPIDInfo(req.PID, procPIDPathInfo, buffer[:]); err != nil {
@@ -258,7 +276,11 @@ func readDarwinDirectory(ctx context.Context, req Request) ([]byte, bool, error)
 
 	size, err := procPIDInfo(req.PID, procPIDVnodePathInfo, info[:])
 	if err != nil {
-		return nil, false, explainDarwinReadError(ctx, req, fmt.Errorf("read process directory: %w", err))
+		return nil, false, explainDarwinReadError(
+			ctx,
+			req,
+			fmt.Errorf("read process directory: %w", err),
+		)
 	}
 
 	if size != vnodePathInfoSize {
@@ -277,7 +299,11 @@ func readDarwinDirectory(ctx context.Context, req Request) ([]byte, bool, error)
 	}
 
 	var device int32
-	if _, err := binary.Decode(current[vinfoStatDevOffset:], binary.NativeEndian, &device); err != nil {
+	if _, err := binary.Decode(
+		current[vinfoStatDevOffset:],
+		binary.NativeEndian,
+		&device,
+	); err != nil {
 		return nil, false, errMalformedProcInfo
 	}
 
@@ -309,7 +335,9 @@ func procPIDInfo(pid, flavor int, buffer []byte) (int, error) {
 		uintptr(pid),
 		uintptr(flavor),
 		0,
-		uintptr(unsafe.Pointer(&buffer[0])), //nolint:gosec // The kernel writes into buffer, which the call keeps alive.
+		uintptr(
+			unsafe.Pointer(&buffer[0]),
+		), //nolint:gosec // The kernel writes into buffer, which the call keeps alive.
 		uintptr(len(buffer)),
 	)
 	if errno != 0 {

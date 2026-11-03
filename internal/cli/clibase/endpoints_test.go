@@ -38,7 +38,9 @@ func TestResolveSocketPrefersFlagThenAmbientServerThenTmuxDefault(t *testing.T) 
 	t.Setenv("TMUX_TMPDIR", tmpdir)
 	t.Setenv("TMUX", "/run/ambient.sock,42,0")
 
-	if got := clibase.ResolveSocket(endpointCommand(t, "--socket", "/run/explicit.sock")); got != "/run/explicit.sock" {
+	if got := clibase.ResolveSocket(
+		endpointCommand(t, "--socket", "/run/explicit.sock"),
+	); got != "/run/explicit.sock" {
 		t.Fatalf("explicit socket = %q", got)
 	}
 
@@ -81,7 +83,10 @@ func TestWorkspaceAgentStoreRouting(t *testing.T) {
 		{"explicit flag", []string{"--agent-state", "explicit.json"}, "explicit.json"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			workspace, err := app.Resolve(cfg, clibase.CommandLocations(endpointCommand(t, test.args...)))
+			workspace, err := app.Resolve(
+				cfg,
+				clibase.CommandLocations(endpointCommand(t, test.args...)),
+			)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -97,9 +102,16 @@ func TestWorkspaceAgentStoreRouting(t *testing.T) {
 		})
 	}
 
-	workspace, err := app.Resolve(config.DefaultConfig(), clibase.CommandLocations(endpointCommand(t)))
+	workspace, err := app.Resolve(
+		config.DefaultConfig(),
+		clibase.CommandLocations(endpointCommand(t)),
+	)
 	if err != nil || workspace.AgentStore != "" {
-		t.Fatalf("default agent store = %q, %v; want empty for AHT's default", workspace.AgentStore, err)
+		t.Fatalf(
+			"default agent store = %q, %v; want empty for AHT's default",
+			workspace.AgentStore,
+			err,
+		)
 	}
 }
 
@@ -121,7 +133,8 @@ func TestResolveWorkspacePathsDefaultToDataDirectory(t *testing.T) {
 	}
 
 	explicit, err := clibase.ResolveWorkspace(endpointCommand(t, "--repository", "relative/repo"))
-	if err != nil || !filepath.IsAbs(explicit.Repository) || filepath.Base(explicit.Repository) != "repo" {
+	if err != nil || !filepath.IsAbs(explicit.Repository) ||
+		filepath.Base(explicit.Repository) != "repo" {
 		t.Fatalf("explicit repository = %q, %v", explicit.Repository, err)
 	}
 }

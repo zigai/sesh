@@ -227,7 +227,11 @@ func TestRemovalIsMonotoneUnderLargerSelections(t *testing.T) {
 		}
 
 		if !withinCounts(entityCounts(large.Retained), entityCounts(small.Retained)) {
-			rt.Fatalf("larger removal retained more entities: %v > %v", entityCounts(large.Retained), entityCounts(small.Retained))
+			rt.Fatalf(
+				"larger removal retained more entities: %v > %v",
+				entityCounts(large.Retained),
+				entityCounts(small.Retained),
+			)
 		}
 
 		if !subsetOf(small.Removed, large.Removed) {
@@ -238,11 +242,41 @@ func TestRemovalIsMonotoneUnderLargerSelections(t *testing.T) {
 			rt.Fatal("larger removal did not report every smaller artifact removal")
 		}
 
-		assertRetainedEqual(rt, large.Retained.Sessions, indexSessions(small.Retained), sessionIdentity, sharedSurvivor)
-		assertRetainedEqual(rt, large.Retained.Windows, indexWindows(small.Retained), windowIdentity, sharedSurvivor)
-		assertRetainedEqual(rt, large.Retained.Panes, indexPanes(small.Retained), paneIdentity, sharedSurvivor)
-		assertRetainedEqual(rt, large.Retained.Artifacts, indexArtifacts(small.Retained), artifactIdentity, sharedSurvivor)
-		assertRetainedEqual(rt, large.Retained.Links, indexLinks(small.Retained), linkKey, sharedSurvivor)
+		assertRetainedEqual(
+			rt,
+			large.Retained.Sessions,
+			indexSessions(small.Retained),
+			sessionIdentity,
+			sharedSurvivor,
+		)
+		assertRetainedEqual(
+			rt,
+			large.Retained.Windows,
+			indexWindows(small.Retained),
+			windowIdentity,
+			sharedSurvivor,
+		)
+		assertRetainedEqual(
+			rt,
+			large.Retained.Panes,
+			indexPanes(small.Retained),
+			paneIdentity,
+			sharedSurvivor,
+		)
+		assertRetainedEqual(
+			rt,
+			large.Retained.Artifacts,
+			indexArtifacts(small.Retained),
+			artifactIdentity,
+			sharedSurvivor,
+		)
+		assertRetainedEqual(
+			rt,
+			large.Retained.Links,
+			indexLinks(small.Retained),
+			linkKey,
+			sharedSurvivor,
+		)
 	})
 }
 
@@ -306,7 +340,13 @@ func checkRepeatedRemoval(rt *rapid.T, m Manifest, first []string, withoutFirst 
 	}
 
 	for _, id := range first {
-		if _, err := RemoveSessions(withoutFirst.Retained, []string{id}); !errors.Is(err, ErrInvalid) {
+		if _, err := RemoveSessions(
+			withoutFirst.Retained,
+			[]string{id},
+		); !errors.Is(
+			err,
+			ErrInvalid,
+		) {
 			rt.Fatal("already removed identity was accepted", err)
 		}
 	}
@@ -328,7 +368,14 @@ func splitSelection(rt *rapid.T, values []string) ([]string, []string) {
 }
 
 func entityCounts(m Manifest) [6]int {
-	return [6]int{len(m.Sessions), len(m.Groups), len(m.Windows), len(m.Links), len(m.Panes), len(m.Artifacts)}
+	return [6]int{
+		len(m.Sessions),
+		len(m.Groups),
+		len(m.Windows),
+		len(m.Links),
+		len(m.Panes),
+		len(m.Artifacts),
+	}
 }
 
 func withinCounts(larger, smaller [6]int) bool {
@@ -532,11 +579,25 @@ func drawWindow(rt *rapid.T, index int, pool []Artifact) (Window, []Pane) {
 		}
 
 		panes = append(panes, Pane{
-			ID: leaf.Pane, Window: windowID, Index: paneIndex,
-			Title: Bytes(fmt.Sprintf("title-%d-%d", index, position)), Directory: Bytes(fmt.Sprintf("/srv/%d", index)),
-			Width: geometry.Width, Height: geometry.Height, Left: geometry.Left, Top: geometry.Top,
-			Active: position == 0, Dead: rapid.Bool().Draw(rt, "dead"),
-			Options: drawOptions(rt, "pane"), Terminal: drawTerminal(rt, artifact), Launch: drawLaunch(rt, index),
+			ID:     leaf.Pane,
+			Window: windowID,
+			Index:  paneIndex,
+			Title: Bytes(
+				fmt.Sprintf("title-%d-%d", index, position),
+			),
+			Directory: Bytes(fmt.Sprintf("/srv/%d", index)),
+			Width:     geometry.Width,
+			Height:    geometry.Height,
+			Left:      geometry.Left,
+			Top:       geometry.Top,
+			Active:    position == 0,
+			Dead:      rapid.Bool().Draw(rt, "dead"),
+			Options: drawOptions(
+				rt,
+				"pane",
+			),
+			Terminal: drawTerminal(rt, artifact),
+			Launch:   drawLaunch(rt, index),
 		})
 
 		paneIndex += rapid.IntRange(1, 3).Draw(rt, "paneIndexStep")
@@ -600,7 +661,10 @@ func drawEnvironment(rt *rapid.T, prefix string) []Variable {
 		name := Bytes(fmt.Sprintf("%s%d", prefix, index))
 
 		if rapid.Bool().Draw(rt, "removed") {
-			environment = append(environment, Variable{Name: name, Value: nil, State: "removed", Hidden: false})
+			environment = append(
+				environment,
+				Variable{Name: name, Value: nil, State: "removed", Hidden: false},
+			)
 			continue
 		}
 
@@ -760,7 +824,10 @@ func drawSessions(rt *rapid.T, links [][]Link) ([]Session, []Group) {
 			}
 
 			assigned[session] = id
-			groups[groupIndex[id]].Members = append(groups[groupIndex[id]].Members, sessionID(session))
+			groups[groupIndex[id]].Members = append(
+				groups[groupIndex[id]].Members,
+				sessionID(session),
+			)
 		}
 	}
 

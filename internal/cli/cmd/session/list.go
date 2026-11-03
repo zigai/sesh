@@ -72,7 +72,13 @@ func ValidateListCommand(cmd *cobra.Command, args []string) error {
 	socketPath := clibase.ResolveSocket(cmd)
 
 	if !filepath.IsAbs(socketPath) || filepath.Clean(socketPath) != socketPath {
-		return clibase.NewExitError(clibase.ExitCodeUsage, oops.In("tmux").Code("endpoint_required").With("operation", "open").Wrap(tmuxserver.ErrEndpoint))
+		return clibase.NewExitError(
+			clibase.ExitCodeUsage,
+			oops.In("tmux").
+				Code("endpoint_required").
+				With("operation", "open").
+				Wrap(tmuxserver.ErrEndpoint),
+		)
 	}
 
 	return nil
@@ -138,14 +144,19 @@ func parseListOptions(cmd *cobra.Command) (*gotmux.Server, string, bool, error) 
 	return server, currentPane, full, nil
 }
 
-func queryLiveSessions(ctx context.Context, server *gotmux.Server, currentPane string) ([]session.Session, error) {
+func queryLiveSessions(
+	ctx context.Context,
+	server *gotmux.Server,
+	currentPane string,
+) ([]session.Session, error) {
 	sessions, listErr := session.ListLive(ctx, server, currentPane)
 	if listErr != nil {
 		if errors.Is(listErr, gotmux.ErrNoServer) || session.ServerAbsent(listErr) {
 			return nil, nil
 		}
 
-		isPartial := errors.Is(listErr, session.ErrCurrentSessionAmbiguous) || errors.Is(listErr, session.ErrCatalogLimitExceeded)
+		isPartial := errors.Is(listErr, session.ErrCurrentSessionAmbiguous) ||
+			errors.Is(listErr, session.ErrCatalogLimitExceeded)
 		if !isPartial && len(sessions) == 0 {
 			return nil, oops.In("cli").With("operation", "list_sessions").Wrap(listErr)
 		}
@@ -156,7 +167,13 @@ func queryLiveSessions(ctx context.Context, server *gotmux.Server, currentPane s
 	return sessions, nil
 }
 
-func renderListOutput(cmd *cobra.Command, server *gotmux.Server, sessions []session.Session, listErr error, full bool) error {
+func renderListOutput(
+	cmd *cobra.Command,
+	server *gotmux.Server,
+	sessions []session.Session,
+	listErr error,
+	full bool,
+) error {
 	if clibase.JSONOutputEnabled(cmd) {
 		res := newListJSONResult(sessions)
 		if listErr != nil {
@@ -210,9 +227,20 @@ func hintSavedSessions(cmd *cobra.Command, server *gotmux.Server, empty bool) {
 			noun = "session"
 		}
 
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%d saved %s available. If tmux stopped, start it on the same socket first.\nRestore with: %s\n", count, noun, restoreCommand(cmd, workspace))
+		_, _ = fmt.Fprintf(
+			cmd.ErrOrStderr(),
+			"%d saved %s available. If tmux stopped, start it on the same socket first.\nRestore with: %s\n",
+			count,
+			noun,
+			restoreCommand(cmd, workspace),
+		)
 	case len(missing) > 0:
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Saved sessions not running: %s\ntmux started after the newest snapshot, so they were not restored.\nRestore with: %s\n", strings.Join(missing, ", "), restoreCommand(cmd, workspace))
+		_, _ = fmt.Fprintf(
+			cmd.ErrOrStderr(),
+			"Saved sessions not running: %s\ntmux started after the newest snapshot, so they were not restored.\nRestore with: %s\n",
+			strings.Join(missing, ", "),
+			restoreCommand(cmd, workspace),
+		)
 	}
 }
 
@@ -221,7 +249,11 @@ func restoreCommand(cmd *cobra.Command, workspace app.Workspace) string {
 		return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
 	}
 
-	command := "sesh snapshot restore --socket " + quote(workspace.Socket) + " --repository " + quote(workspace.Repository)
+	command := "sesh snapshot restore --socket " + quote(
+		workspace.Socket,
+	) + " --repository " + quote(
+		workspace.Repository,
+	)
 	if noConfig, _ := cmd.Flags().GetBool("no-config"); noConfig {
 		command += " --no-config"
 	} else if configPath, _ := cmd.Flags().GetString("config"); configPath != "" {

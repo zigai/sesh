@@ -17,9 +17,18 @@ func TestSessionSorter(t *testing.T) {
 
 	st := &State{
 		SwitchHistory: []SwitchHistoryEntry{
-			{Session: Identity{Name: "recent-switch"}, LastSwitchUnix: now.Add(-5 * time.Minute).Unix()},
-			{Session: Identity{Name: "older-switch"}, LastSwitchUnix: now.Add(-1 * time.Hour).Unix()},
-			{Session: Identity{Name: "newer-activity"}, LastSwitchUnix: now.Add(-15 * time.Minute).Unix()},
+			{
+				Session:        Identity{Name: "recent-switch"},
+				LastSwitchUnix: now.Add(-5 * time.Minute).Unix(),
+			},
+			{
+				Session:        Identity{Name: "older-switch"},
+				LastSwitchUnix: now.Add(-1 * time.Hour).Unix(),
+			},
+			{
+				Session:        Identity{Name: "newer-activity"},
+				LastSwitchUnix: now.Add(-15 * time.Minute).Unix(),
+			},
 		},
 	}
 
@@ -82,10 +91,16 @@ func TestSessionSortUsesConnectionScopedSemanticKeys(t *testing.T) {
 		},
 	}
 	st := &State{
-		RemoteSwitchHistory: []RemoteSwitchHistoryEntry{{
-			Session:        Identity{Origin: "ssh", ConnectionID: "two", Name: historyTestSessionName},
-			LastSwitchUnix: now.Add(time.Minute).Unix(),
-		}},
+		RemoteSwitchHistory: []RemoteSwitchHistoryEntry{
+			{
+				Session: Identity{
+					Origin:       "ssh",
+					ConnectionID: "two",
+					Name:         historyTestSessionName,
+				},
+				LastSwitchUnix: now.Add(time.Minute).Unix(),
+			},
+		},
 	}
 
 	SortSessions(sessions, st)
@@ -125,7 +140,10 @@ func TestSessionSortIsolatesSameNameOnDifferentSockets(t *testing.T) {
 	SortSessions(sessions, st)
 
 	if sessions[0].TmuxServerSocket != "/tmp/tmux-1000/active" {
-		t.Fatalf("expected /tmp/tmux-1000/active to sort first, got %q", sessions[0].TmuxServerSocket)
+		t.Fatalf(
+			"expected /tmp/tmux-1000/active to sort first, got %q",
+			sessions[0].TmuxServerSocket,
+		)
 	}
 }
 
@@ -140,6 +158,11 @@ func TestSessionSortDeterministicTieBreak(t *testing.T) {
 	SortSessions(sessions, nil)
 
 	if sessions[0].Name != "apple" || sessions[1].Name != "mango" || sessions[2].Name != "zebra" {
-		t.Fatalf("expected alphabetical tie break, got %v, %v, %v", sessions[0].Name, sessions[1].Name, sessions[2].Name)
+		t.Fatalf(
+			"expected alphabetical tie break, got %v, %v, %v",
+			sessions[0].Name,
+			sessions[1].Name,
+			sessions[2].Name,
+		)
 	}
 }

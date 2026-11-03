@@ -31,14 +31,21 @@ func TestSnapshotGCUncertaintyRetainsPhysicalReceiptOnStdout(t *testing.T) {
 
 	err := renderGCResult(cmd, result, store.ErrUncertain)
 	if !errors.Is(err, store.ErrUncertain) || stderr.Len() != 0 {
-		t.Fatalf("uncertain collection receipt = %v / %s / %s", err, stdout.String(), stderr.String())
+		t.Fatalf(
+			"uncertain collection receipt = %v / %s / %s",
+			err,
+			stdout.String(),
+			stderr.String(),
+		)
 	}
 
 	envelope := singleRuntimeEnvelope(t, stdout.Bytes())
 	receipt := decodeJSONPayload[gcResultJSON](t, envelope.Result)
 
 	if envelope.OK || envelope.Error == nil || envelope.Error.Code != "publicationUncertain" ||
-		len(receipt.Intents) != 1 || !receipt.Resumed || receipt.Bytes != 42 || len(receipt.Deferred) != 1 {
+		len(
+			receipt.Intents,
+		) != 1 || !receipt.Resumed || receipt.Bytes != 42 || len(receipt.Deferred) != 1 {
 		t.Fatalf("uncertain collection receipt lost evidence: %s", stdout.String())
 	}
 }

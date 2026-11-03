@@ -57,8 +57,11 @@ func TestDaemonIdentityFailureClassificationPreservesUncertainty(t *testing.T) {
 			wantReason: "daemon_identity_unavailable",
 		},
 		{
-			name:       "changed after effects",
-			err:        errors.Join(restore.ErrExecutionUncertain, tmuxserver.ErrDaemonIdentityChanged),
+			name: "changed after effects",
+			err: errors.Join(
+				restore.ErrExecutionUncertain,
+				tmuxserver.ErrDaemonIdentityChanged,
+			),
 			wantCode:   "operation_uncertain",
 			wantReason: "effect_outcome_uncertain",
 		},
@@ -68,7 +71,13 @@ func TestDaemonIdentityFailureClassificationPreservesUncertainty(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			code, reason := classifyRestoreFailure(tt.err)
 			if code != tt.wantCode || reason != tt.wantReason {
-				t.Fatalf("classification = %q/%q, want %q/%q", code, reason, tt.wantCode, tt.wantReason)
+				t.Fatalf(
+					"classification = %q/%q, want %q/%q",
+					code,
+					reason,
+					tt.wantCode,
+					tt.wantReason,
+				)
 			}
 		})
 	}
@@ -102,10 +111,30 @@ func TestExecutionMayHaveDispatchedUsesCurrentAttemptReceipts(t *testing.T) {
 		candidates map[string]bool
 		want       bool
 	}{
-		{name: "known pre-dispatch rejection", report: restore.ExecutionReport{}, candidates: map[string]bool{"create": true}, want: false},
-		{name: "successful dispatch", report: restore.ExecutionReport{Dispatched: []string{"create"}}, candidates: map[string]bool{"create": true}, want: true},
-		{name: "confirmed before install failed", report: restore.ExecutionReport{Receipts: map[string]string{"create": "$1"}}, candidates: map[string]bool{"create": true}, want: true},
-		{name: "adopted prior receipt", report: restore.ExecutionReport{Receipts: map[string]string{"create": "$1"}}, candidates: map[string]bool{}, want: false},
+		{
+			name:       "known pre-dispatch rejection",
+			report:     restore.ExecutionReport{},
+			candidates: map[string]bool{"create": true},
+			want:       false,
+		},
+		{
+			name:       "successful dispatch",
+			report:     restore.ExecutionReport{Dispatched: []string{"create"}},
+			candidates: map[string]bool{"create": true},
+			want:       true,
+		},
+		{
+			name:       "confirmed before install failed",
+			report:     restore.ExecutionReport{Receipts: map[string]string{"create": "$1"}},
+			candidates: map[string]bool{"create": true},
+			want:       true,
+		},
+		{
+			name:       "adopted prior receipt",
+			report:     restore.ExecutionReport{Receipts: map[string]string{"create": "$1"}},
+			candidates: map[string]bool{},
+			want:       false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -133,10 +162,33 @@ func restoreRecord(t *testing.T, data []byte) map[string]any {
 
 	for key := range record {
 		switch key {
-		case "level", "component", "operation", "status", "message", "reason", "phase", "sessions", "skipped", "verified",
-			"mismatches", "mismatch_reasons", "failed_step", "step_reason", "duration_ms",
-			"error", "error_domain", "error_code", "error_step", "error_context", "generation", "restore_id",
-			"resumed_panes", "restarted_panes", "shell_panes", "unrecovered_panes", "directory_fallback_panes":
+		case "level",
+			"component",
+			"operation",
+			"status",
+			"message",
+			"reason",
+			"phase",
+			"sessions",
+			"skipped",
+			"verified",
+			"mismatches",
+			"mismatch_reasons",
+			"failed_step",
+			"step_reason",
+			"duration_ms",
+			"error",
+			"error_domain",
+			"error_code",
+			"error_step",
+			"error_context",
+			"generation",
+			"restore_id",
+			"resumed_panes",
+			"restarted_panes",
+			"shell_panes",
+			"unrecovered_panes",
+			"directory_fallback_panes":
 		default:
 			t.Fatalf("unexpected restore log field %s", key)
 		}
@@ -152,7 +204,11 @@ func restoreRecord(t *testing.T, data []byte) map[string]any {
 func TestRestoreFailureRecordSummarizesVerificationDifferences(t *testing.T) {
 	var output bytes.Buffer
 
-	ctx := context.WithValue(zerolog.New(&output).WithContext(t.Context()), restoreStartedKey{}, time.Now())
+	ctx := context.WithValue(
+		zerolog.New(&output).WithContext(t.Context()),
+		restoreStartedKey{},
+		time.Now(),
+	)
 
 	report := restore.VerificationReport{Mismatches: []restore.VerificationMismatch{
 		{Domain: restore.MismatchOption, Entity: "s1", Reason: "local_option_mismatch"},
@@ -163,12 +219,14 @@ func TestRestoreFailureRecordSummarizesVerificationDifferences(t *testing.T) {
 	_ = restoreFailure(ctx, "verify", &verificationError{report: report})
 
 	record := restoreRecord(t, output.Bytes())
-	if record["level"] != "error" || record["phase"] != "verify" || record["mismatches"] != float64(3) ||
+	if record["level"] != "error" || record["phase"] != "verify" ||
+		record["mismatches"] != float64(3) ||
 		record["mismatch_reasons"] != "environment/scope_unreadable,option/local_option_mismatch" {
 		t.Fatalf("verification failure record = %v", record)
 	}
 
-	if bytes.Contains(output.Bytes(), []byte(`"s1"`)) || bytes.Contains(output.Bytes(), []byte(`"s6"`)) {
+	if bytes.Contains(output.Bytes(), []byte(`"s1"`)) ||
+		bytes.Contains(output.Bytes(), []byte(`"s6"`)) {
 		t.Fatalf("record names restored entities: %s", output.Bytes())
 	}
 }
@@ -176,16 +234,26 @@ func TestRestoreFailureRecordSummarizesVerificationDifferences(t *testing.T) {
 func TestRestoreFailureRecordNamesTheFailedStep(t *testing.T) {
 	var output bytes.Buffer
 
-	ctx := context.WithValue(zerolog.New(&output).WithContext(t.Context()), restoreStartedKey{}, time.Now())
+	ctx := context.WithValue(
+		zerolog.New(&output).WithContext(t.Context()),
+		restoreStartedKey{},
+		time.Now(),
+	)
 
 	optionErr := oops.In("snapshot.restore").Code("operation_uncertain").
-		With("operation", "import_options", "reason", "option_set_outcome_unknown").Wrap(errSecretRestoreCause)
+		With("operation", "import_options", "reason", "option_set_outcome_unknown").
+		Wrap(errSecretRestoreCause)
 
 	_ = restoreFailure(ctx, "import", scopedImportFailure(optionErr, nil))
 
 	record := restoreRecord(t, output.Bytes())
-	if record["failed_step"] != "import_options" || record["step_reason"] != "option_set_outcome_unknown" {
-		t.Fatalf("failed step = %v / %v, want import_options / option_set_outcome_unknown", record["failed_step"], record["step_reason"])
+	if record["failed_step"] != "import_options" ||
+		record["step_reason"] != "option_set_outcome_unknown" {
+		t.Fatalf(
+			"failed step = %v / %v, want import_options / option_set_outcome_unknown",
+			record["failed_step"],
+			record["step_reason"],
+		)
 	}
 
 	if _, ok := record["mismatches"]; ok {
@@ -196,10 +264,17 @@ func TestRestoreFailureRecordNamesTheFailedStep(t *testing.T) {
 func TestRestoreSuccessRecordCountsProgramOutcomes(t *testing.T) {
 	var output bytes.Buffer
 
-	ctx := context.WithValue(zerolog.New(&output).WithContext(t.Context()), restoreStartedKey{}, time.Now())
+	ctx := context.WithValue(
+		zerolog.New(&output).WithContext(t.Context()),
+		restoreStartedKey{},
+		time.Now(),
+	)
 
 	logRestoreSuccess(ctx, RestoreResult{
-		Status: "best_effort", Reason: "fidelity_limited", SessionsRestored: []string{"$1", "$2"}, Verified: true,
+		Status:           "best_effort",
+		Reason:           "fidelity_limited",
+		SessionsRestored: []string{"$1", "$2"},
+		Verified:         true,
 		Panes: []restore.PaneResult{
 			{PaneID: "p0", Outcome: restore.PaneOutcomeNativeResumeDispatch},
 			{PaneID: "p1", Outcome: restore.PaneOutcomeNativeResumeDispatch, CWDFallback: true},
@@ -211,7 +286,14 @@ func TestRestoreSuccessRecordCountsProgramOutcomes(t *testing.T) {
 
 	record := restoreRecord(t, output.Bytes())
 
-	want := map[string]float64{"resumed_panes": 2, "restarted_panes": 1, "shell_panes": 1, "unrecovered_panes": 1, "directory_fallback_panes": 1, "sessions": 2}
+	want := map[string]float64{
+		"resumed_panes":            2,
+		"restarted_panes":          1,
+		"shell_panes":              1,
+		"unrecovered_panes":        1,
+		"directory_fallback_panes": 1,
+		"sessions":                 2,
+	}
 	for field, value := range want {
 		if record[field] != value {
 			t.Fatalf("%s = %v, want %v", field, record[field], value)

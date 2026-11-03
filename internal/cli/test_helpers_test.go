@@ -95,7 +95,13 @@ func executeJSON(t *testing.T, args ...string) commandExecution {
 	if target != "" {
 		decoder := json.NewDecoder(strings.NewReader(target))
 		if decErr := decoder.Decode(&env); decErr != nil {
-			t.Fatalf("failed to decode JSON envelope from %q (err: %v)\nstdout: %q\nstderr: %q", target, decErr, rawOut, rawErr)
+			t.Fatalf(
+				"failed to decode JSON envelope from %q (err: %v)\nstdout: %q\nstderr: %q",
+				target,
+				decErr,
+				rawOut,
+				rawErr,
+			)
 		}
 
 		var extra any

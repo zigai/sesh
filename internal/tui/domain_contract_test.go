@@ -58,8 +58,13 @@ func TestDeleteSessionFailsClosedWhenDispatcherMissing(t *testing.T) {
 		t.Fatal("saved deletion was executed without an action dispatcher")
 	}
 
-	if model.statusLevel != statusError || !strings.Contains(model.statusMessage, "no action dispatcher configured") {
-		t.Fatalf("status = (%v, %q), want fail-closed unconfigured error", model.statusLevel, model.statusMessage)
+	if model.statusLevel != statusError ||
+		!strings.Contains(model.statusMessage, "no action dispatcher configured") {
+		t.Fatalf(
+			"status = (%v, %q), want fail-closed unconfigured error",
+			model.statusLevel,
+			model.statusMessage,
+		)
 	}
 }
 
@@ -87,7 +92,13 @@ func TestDeleteSessionReportsDomainFailures(t *testing.T) {
 						t.Fatalf("received input = %+v, want target %+v", invocation.Input, target)
 					}
 
-					return action.DeletedSession{Name: target.Name, LiveKilled: errors.Is(cause, errTestMockError)}, action.Wrap(action.CodeFailed, cause)
+					return action.DeletedSession{
+						Name:       target.Name,
+						LiveKilled: errors.Is(cause, errTestMockError),
+					}, action.Wrap(
+						action.CodeFailed,
+						cause,
+					)
 				},
 			})
 			model.filtered = []session.Session{target}
@@ -100,8 +111,14 @@ func TestDeleteSessionReportsDomainFailures(t *testing.T) {
 				t.Fatalf("dispatches = %d, want exactly 1", dispatched)
 			}
 
-			if model.statusLevel != statusError || !strings.Contains(model.statusMessage, cause.Error()) {
-				t.Fatalf("status = (%v, %q), want %q", model.statusLevel, model.statusMessage, cause)
+			if model.statusLevel != statusError ||
+				!strings.Contains(model.statusMessage, cause.Error()) {
+				t.Fatalf(
+					"status = (%v, %q), want %q",
+					model.statusLevel,
+					model.statusMessage,
+					cause,
+				)
 			}
 		})
 	}
@@ -126,7 +143,11 @@ func TestDeleteSessionDispatchesExactlyOnce(t *testing.T) {
 			dispatches++
 			received, _ = invocation.Input.(action.DeleteSession)
 
-			return action.DeletedSession{Name: target.Name, LiveKilled: true, SavedDeleted: true}, nil
+			return action.DeletedSession{
+				Name:         target.Name,
+				LiveKilled:   true,
+				SavedDeleted: true,
+			}, nil
 		},
 	})
 	model.filtered = []session.Session{target}
@@ -276,7 +297,12 @@ func TestModelLifecyclePreservesConfiguredLogger(t *testing.T) {
 	parentCtx := context.WithValue(context.Background(), testKey, "secret_value")
 	parentCtx = logger.WithContext(parentCtx)
 
-	model, err := NewModel(parentCtx, config.DefaultConfig(), testState(), testServices(Dependencies{}))
+	model, err := NewModel(
+		parentCtx,
+		config.DefaultConfig(),
+		testState(),
+		testServices(Dependencies{}),
+	)
 	if err != nil {
 		t.Fatalf("NewModel() error = %v", err)
 	}
@@ -377,7 +403,8 @@ func TestActionsPreserveImmutableTargetIdentityDuringConcurrentRefresh(t *testin
 		t.Fatalf("msg = %T, want sessionActionResultMsg", msg)
 	}
 
-	if receivedTarget.ID != targetA.ID || receivedTarget.TmuxServerSocket != targetA.TmuxServerSocket {
+	if receivedTarget.ID != targetA.ID ||
+		receivedTarget.TmuxServerSocket != targetA.TmuxServerSocket {
 		t.Fatalf("action received target = %+v, want targetA %+v", receivedTarget, targetA)
 	}
 

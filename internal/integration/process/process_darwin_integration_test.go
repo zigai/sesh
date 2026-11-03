@@ -58,17 +58,30 @@ func TestDarwinObserveReportsOwnedChildLaunch(t *testing.T) {
 		t.Fatalf("owned child identity unstable: first=%v second=%v", first, second)
 	}
 
-	observation, err := process.Observe(t.Context(), process.Request{PID: cmd.Process.Pid, ExpectedBirth: first})
+	observation, err := process.Observe(
+		t.Context(),
+		process.Request{PID: cmd.Process.Pid, ExpectedBirth: first},
+	)
 	if err != nil {
 		t.Fatalf("Observe: %v", err)
 	}
 
 	if observation.PID != cmd.Process.Pid || observation.Birth != first {
-		t.Fatalf("observed pid/birth = %d/%v, want %d/%v", observation.PID, observation.Birth, cmd.Process.Pid, first)
+		t.Fatalf(
+			"observed pid/birth = %d/%v, want %d/%v",
+			observation.PID,
+			observation.Birth,
+			cmd.Process.Pid,
+			first,
+		)
 	}
 
 	if string(observation.Executable) != "/bin/sleep" || observation.ExecutableDeleted {
-		t.Fatalf("executable = %q deleted=%v, want /bin/sleep", observation.Executable, observation.ExecutableDeleted)
+		t.Fatalf(
+			"executable = %q deleted=%v, want /bin/sleep",
+			observation.Executable,
+			observation.ExecutableDeleted,
+		)
 	}
 
 	wantArgs := [][]byte{[]byte("/bin/sleep"), []byte("30")}
@@ -83,7 +96,12 @@ func TestDarwinObserveReportsOwnedChildLaunch(t *testing.T) {
 	}
 
 	if string(observation.Directory) != dir || observation.DirectoryDeleted {
-		t.Fatalf("directory = %q deleted=%v, want %q", observation.Directory, observation.DirectoryDeleted, dir)
+		t.Fatalf(
+			"directory = %q deleted=%v, want %q",
+			observation.Directory,
+			observation.DirectoryDeleted,
+			dir,
+		)
 	}
 }
 
@@ -128,8 +146,14 @@ func TestDarwinObserveReportsRequestedEnvironment(t *testing.T) {
 	}
 
 	observed, absent := observation.Environment[0], observation.Environment[1]
-	if string(observed.Name) != darwinObservedVar || observed.State != "set" || string(observed.Value) != "observed value" {
-		t.Fatalf("observed variable = %+v, want %s set to %q", observed, darwinObservedVar, "observed value")
+	if string(observed.Name) != darwinObservedVar || observed.State != "set" ||
+		string(observed.Value) != "observed value" {
+		t.Fatalf(
+			"observed variable = %+v, want %s set to %q",
+			observed,
+			darwinObservedVar,
+			"observed value",
+		)
 	}
 
 	if string(absent.Name) != darwinAbsentVar || absent.State != "absent" || absent.Value != nil {
@@ -151,7 +175,10 @@ func TestDarwinObserveReportsExitedChildAsVanished(t *testing.T) {
 	_ = cmd.Process.Kill()
 	_ = cmd.Wait()
 
-	_, err = process.Observe(t.Context(), process.Request{PID: cmd.Process.Pid, ExpectedBirth: birth})
+	_, err = process.Observe(
+		t.Context(),
+		process.Request{PID: cmd.Process.Pid, ExpectedBirth: birth},
+	)
 	if !errors.Is(err, process.ErrProcessVanished) && !errors.Is(err, process.ErrIdentityMismatch) {
 		t.Fatalf("Observe error = %v, want vanished or identity mismatch", err)
 	}

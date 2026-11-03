@@ -38,10 +38,24 @@ var (
 		Subject: SubjectNone,
 		Arity:   ArityOne,
 		Params: []Param{
-			newParam("harness", ParamText, "Harness to start the task with").required().positional(),
-			newParam("where", ParamChoice, "Checkout a project task works in").withChoices("new", "branch", "worktree", "main").withDefault("new"),
+			newParam(
+				"harness",
+				ParamText,
+				"Harness to start the task with",
+			).required().
+				positional(),
+			newParam(
+				"where",
+				ParamChoice,
+				"Checkout a project task works in",
+			).withChoices("new", "branch", "worktree", "main").
+				withDefault("new"),
 			newParam("branch", ParamText, "Branch for --where branch, or the base for --where new"),
-			newParam("remote", ParamText, "Remote that has the --where branch when no local branch does"),
+			newParam(
+				"remote",
+				ParamText,
+				"Remote that has the --where branch when no local branch does",
+			),
 			newParam("dir", ParamPath, "Existing worktree for --where worktree"),
 			newParam("title", ParamText, "What the task is about"),
 			newParam("project", ParamPath, "Project to start the task in instead of the pane's"),
@@ -55,9 +69,18 @@ var (
 		check:       nil,
 	}, func(_ Subject, values Values) (NewTask, error) {
 		return NewTask{
-			Harness: values.String("harness"), Where: values.String("where"), Branch: values.String("branch"),
-			Remote: values.String("remote"), Directory: values.String("dir"), Title: values.String("title"),
-			Project: values.String("project"), Layout: values.String("layout"),
+			Harness: values.String(
+				"harness",
+			),
+			Where:  values.String("where"),
+			Branch: values.String("branch"),
+			Remote: values.String(
+				"remote",
+			),
+			Directory: values.String("dir"),
+			Title:     values.String("title"),
+			Project:   values.String("project"),
+			Layout:    values.String("layout"),
 		}, nil
 	}, func(out StartedTask) string {
 		if out.Number == 0 {
@@ -229,7 +252,11 @@ var (
 		InPicker:    false,
 		check:       nil,
 	}, func(subject Subject, values Values) (FinishTask, error) {
-		return FinishTask{Task: subject.Task, Discard: values.Bool("discard"), SkipRun: values.Bool("skip-run")}, nil
+		return FinishTask{
+			Task:    subject.Task,
+			Discard: values.Bool("discard"),
+			SkipRun: values.Bool("skip-run"),
+		}, nil
 	}, func(out FinishedTask) string { return "Finished task " + out.ID })
 
 	TaskMerge = define(Descriptor{
@@ -259,9 +286,11 @@ var (
 		Summary: "Run a named task action in the task's popup terminal",
 		Help: "Run one of the configured task actions headless in the task's worktree, in a new window of " +
 			"the task's popup terminal named after the action. The window stays open after the run.",
-		Subject:     SubjectTask,
-		Arity:       ArityOne,
-		Params:      []Param{newParam("action", ParamText, "Task action to run").required().positional()},
+		Subject: SubjectTask,
+		Arity:   ArityOne,
+		Params: []Param{
+			newParam("action", ParamText, "Task action to run").required().positional(),
+		},
 		NeedsClient: false,
 		Interactive: false,
 		Destructive: false,

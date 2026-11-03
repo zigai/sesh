@@ -23,7 +23,12 @@ type WidgetActivityResolver interface {
 	WidgetWorking() bool
 }
 
-func renderWidget(item token, resolver Resolver, value string, state layout.State) (string, string, layout.State) {
+func renderWidget(
+	item token,
+	resolver Resolver,
+	value string,
+	state layout.State,
+) (string, string, layout.State) {
 	if state == layout.Unsupported {
 		return "", "", state
 	}
@@ -59,7 +64,12 @@ func renderBarWidget(item token, value string, state layout.State) (string, stri
 	return percentageBar(percent, item.width), item.role, layout.Present
 }
 
-func renderTodoWidget(item token, resolver Resolver, value string, state layout.State) (string, string, layout.State) {
+func renderTodoWidget(
+	item token,
+	resolver Resolver,
+	value string,
+	state layout.State,
+) (string, string, layout.State) {
 	other, otherState, _ := resolveCell(resolver, item.secondary)
 	if otherState == layout.Unsupported {
 		return "", "", layout.Unsupported
@@ -81,10 +91,24 @@ func renderTodoWidget(item token, resolver Resolver, value string, state layout.
 	total = min(max(total, 0), widgetCountCap)
 	filled := min(barWidth, done*barWidth/total)
 
-	return fmt.Sprintf("%2d/%2d ", done, total) + strings.Repeat("▰", filled) + strings.Repeat("▱", barWidth-filled), item.role, layout.Present
+	return fmt.Sprintf(
+		"%2d/%2d ",
+		done,
+		total,
+	) + strings.Repeat(
+		"▰",
+		filled,
+	) + strings.Repeat(
+		"▱",
+		barWidth-filled,
+	), item.role, layout.Present
 }
 
-func renderSpinnerWidget(item token, resolver Resolver, value string) (string, string, layout.State) {
+func renderSpinnerWidget(
+	item token,
+	resolver Resolver,
+	value string,
+) (string, string, layout.State) {
 	working := value == "running" || value == "RUNNING" || value == "WORKING"
 	if source, ok := resolver.(WidgetActivityResolver); ok {
 		working = source.WidgetWorking()
@@ -104,7 +128,11 @@ func renderSpinnerWidget(item token, resolver Resolver, value string) (string, s
 	return frames[((frame%len(frames))+len(frames))%len(frames)], item.role, layout.Present
 }
 
-func renderBadgeWidget(item token, value string, state layout.State) (string, string, layout.State) {
+func renderBadgeWidget(
+	item token,
+	value string,
+	state layout.State,
+) (string, string, layout.State) {
 	if state != layout.Present {
 		return "", "", state
 	}

@@ -50,36 +50,94 @@ type paneProcess struct {
 	birth string
 }
 
-func SaveObservation(ctx context.Context, repository *store.Repository, server *gotmux.Server, selected []gotmux.SessionID, cfg SaveConfig) (SaveResult, error) {
+func SaveObservation(
+	ctx context.Context,
+	repository *store.Repository,
+	server *gotmux.Server,
+	selected []gotmux.SessionID,
+	cfg SaveConfig,
+) (SaveResult, error) {
 	started := time.Now()
 
 	if cfg.LeaseRoot == "" {
-		return SaveResult{Attempt: "", Generation: "", Status: "failed"}, saveFailure(ctx, "admission", started, ErrLeaseRootRequired)
+		return SaveResult{
+			Attempt:    "",
+			Generation: "",
+			Status:     "failed",
+		}, saveFailure(
+			ctx,
+			"admission",
+			started,
+			ErrLeaseRootRequired,
+		)
 	}
 
 	if server == nil || server.Endpoint().SocketPath == "" {
-		return SaveResult{Attempt: "", Generation: "", Status: "failed"}, saveFailure(ctx, "admission", started, tmuxserver.ErrEndpoint)
+		return SaveResult{
+			Attempt:    "",
+			Generation: "",
+			Status:     "failed",
+		}, saveFailure(
+			ctx,
+			"admission",
+			started,
+			tmuxserver.ErrEndpoint,
+		)
 	}
 
 	if repository == nil {
-		return SaveResult{Attempt: "", Generation: "", Status: "failed"}, saveFailure(ctx, "admission", started, ErrRepositoryRequired)
+		return SaveResult{
+			Attempt:    "",
+			Generation: "",
+			Status:     "failed",
+		}, saveFailure(
+			ctx,
+			"admission",
+			started,
+			ErrRepositoryRequired,
+		)
 	}
 
 	observe := func(ctx context.Context) (capture.Observation, error) {
 		if cfg.ProcessEnrichment || len(cfg.ProcessEnvironmentKeys) > 0 {
-			return capture.ObserveWithApplicationRecovery(ctx, server, selected, cfg.ProcessEnvironmentKeys, cfg.AgentSource)
+			return capture.ObserveWithApplicationRecovery(
+				ctx,
+				server,
+				selected,
+				cfg.ProcessEnvironmentKeys,
+				cfg.AgentSource,
+			)
 		}
 
 		return capture.Observe(ctx, server, selected)
 	}
 
-	return saveWithProfile(ctx, repository, cfg.LeaseRoot, server.Endpoint().SocketPath, cfg.Profile, observe)
+	return saveWithProfile(
+		ctx,
+		repository,
+		cfg.LeaseRoot,
+		server.Endpoint().SocketPath,
+		cfg.Profile,
+		observe,
+	)
 }
 
-func saveWithProfile(ctx context.Context, repository *store.Repository, leaseRoot string, socketPath string, profile RecoveryProfile, observe func(context.Context) (capture.Observation, error)) (SaveResult, error) {
+func saveWithProfile(
+	ctx context.Context,
+	repository *store.Repository,
+	leaseRoot string,
+	socketPath string,
+	profile RecoveryProfile,
+	observe func(context.Context) (capture.Observation, error),
+) (SaveResult, error) {
 	started := time.Now()
 
-	zerolog.Ctx(ctx).Info().Str("component", "snapshot").Str("operation", "save").Str("status", "started").Msg("snapshot save started")
+	zerolog.Ctx(ctx).
+		Info().
+		Str("component", "snapshot").
+		Str("operation", "save").
+		Str("status", "started").
+		Msg("snapshot save started")
 
 	result := SaveResult{Attempt: "", Generation: "", Status: "failed"}
 
@@ -149,7 +207,11 @@ func saveWithProfile(ctx context.Context, repository *store.Repository, leaseRoo
 	return result, nil
 }
 
-func observeCarryingResumeEvidence(ctx context.Context, repository *store.Repository, observe func(context.Context) (capture.Observation, error)) (capture.Observation, int, error) {
+func observeCarryingResumeEvidence(
+	ctx context.Context,
+	repository *store.Repository,
+	observe func(context.Context) (capture.Observation, error),
+) (capture.Observation, int, error) {
 	baseline, err := resumeBaseline(ctx, repository)
 	if err != nil {
 		return capture.Observation{}, 0, err
@@ -175,7 +237,10 @@ func observeCarryingResumeEvidence(ctx context.Context, repository *store.Reposi
 	return observation, carried, nil
 }
 
-func resumeBaseline(ctx context.Context, repository *store.Repository) (map[paneProcess]model.Launch, error) {
+func resumeBaseline(
+	ctx context.Context,
+	repository *store.Repository,
+) (map[paneProcess]model.Launch, error) {
 	baseline := make(map[paneProcess]model.Launch)
 
 	_, manifest, err := repository.ReadPracticalCurrent(ctx)
@@ -185,7 +250,9 @@ func resumeBaseline(ctx context.Context, repository *store.Repository) (map[pane
 
 	if err != nil {
 		if ctxErr := ctx.Err(); ctxErr != nil {
-			return nil, oops.In("snapshot").With("operation", "read_resume_baseline").Wrapf(errors.Join(err, ctxErr), "read current snapshot")
+			return nil, oops.In("snapshot").
+				With("operation", "read_resume_baseline").
+				Wrapf(errors.Join(err, ctxErr), "read current snapshot")
 		}
 
 		zerolog.Ctx(ctx).Warn().
@@ -207,7 +274,14 @@ func resumeBaseline(ctx context.Context, repository *store.Repository) (map[pane
 	return baseline, nil
 }
 
-func logSaveSuccess(ctx context.Context, observation capture.Observation, carried int, result SaveResult, reason string, started time.Time) {
+func logSaveSuccess(
+	ctx context.Context,
+	observation capture.Observation,
+	carried int,
+	result SaveResult,
+	reason string,
+	started time.Time,
+) {
 	recovery := make(map[model.Recovery]int, len(observation.Manifest.Panes))
 	for _, pane := range observation.Manifest.Panes {
 		recovery[pane.Launch.Recovery]++
@@ -242,7 +316,9 @@ func recordFailedAttempt(ctx context.Context, repository *store.Repository, id s
 	defer cancel()
 
 	if err := repository.Fail(ctx, id); err != nil {
-		return oops.In("snapshot").With("operation", "record_failed_attempt").Wrapf(err, "record failed save attempt")
+		return oops.In("snapshot").
+			With("operation", "record_failed_attempt").
+			Wrapf(err, "record failed save attempt")
 	}
 
 	return nil

@@ -137,11 +137,13 @@ func (b CollectionBudget) Validate() error {
 }
 
 func (i CollectionIntent) validate() error {
-	if i.Version != collectionVersion || i.Sequence == 0 || !validID(i.Generation) || !validDigest(i.ManifestSHA256) {
+	if i.Version != collectionVersion || i.Sequence == 0 || !validID(i.Generation) ||
+		!validDigest(i.ManifestSHA256) {
 		return ErrCorrupt
 	}
 
-	if i.ManifestBytes <= 0 || i.ManifestBytes > model.MaxManifestBytes || len(i.Files) > model.MaxEntities {
+	if i.ManifestBytes <= 0 || i.ManifestBytes > model.MaxManifestBytes ||
+		len(i.Files) > model.MaxEntities {
 		return ErrCorrupt
 	}
 
@@ -179,7 +181,8 @@ func collectionFileBytes(files []CollectionFile) (int64, error) {
 	var total int64
 
 	for _, file := range files {
-		if !validCollectionFileName(file.Name) || seen[file.Name] || file.Bytes <= 0 || file.Bytes > maxCompressedBytes {
+		if !validCollectionFileName(file.Name) || seen[file.Name] || file.Bytes <= 0 ||
+			file.Bytes > maxCompressedBytes {
 			return 0, ErrCorrupt
 		}
 
@@ -202,14 +205,22 @@ func validCollectionFileName(name string) bool {
 	return ok && model.ValidID(id)
 }
 
-func (r *Repository) Collect(ctx context.Context, budget CollectionBudget) (CollectionResult, error) {
+func (r *Repository) Collect(
+	ctx context.Context,
+	budget CollectionBudget,
+) (CollectionResult, error) {
 	if err := budget.Validate(); err != nil {
 		return CollectionResult{}, repositoryError("collect", err)
 	}
 
 	lock, err := r.root.Lock(ctx, "repository.lock")
 	if err != nil {
-		return CollectionResult{}, repositoryError("collect", oops.In("snapshot.store").With("operation", "lock_generation_collection").Wrapf(err, "lock generation collection"))
+		return CollectionResult{}, repositoryError(
+			"collect",
+			oops.In("snapshot.store").
+				With("operation", "lock_generation_collection").
+				Wrapf(err, "lock generation collection"),
+		)
 	}
 
 	result, collectErr := r.collectLocked(ctx, budget)
@@ -217,14 +228,22 @@ func (r *Repository) Collect(ctx context.Context, budget CollectionBudget) (Coll
 	return result, repositoryError("collect", errors.Join(collectErr, lock.Close()))
 }
 
-func (r *Repository) InspectCollection(ctx context.Context, generation string) (CollectionIntent, error) {
+func (r *Repository) InspectCollection(
+	ctx context.Context,
+	generation string,
+) (CollectionIntent, error) {
 	if !validID(generation) {
 		return CollectionIntent{}, repositoryError("inspect_collection", ErrCorrupt)
 	}
 
 	lock, err := r.root.Lock(ctx, "repository.lock")
 	if err != nil {
-		return CollectionIntent{}, repositoryError("inspect_collection", oops.In("snapshot.store").With("operation", "lock_collection_inspection").Wrapf(err, "lock collection inspection"))
+		return CollectionIntent{}, repositoryError(
+			"inspect_collection",
+			oops.In("snapshot.store").
+				With("operation", "lock_collection_inspection").
+				Wrapf(err, "lock collection inspection"),
+		)
 	}
 
 	intent, inspectErr := r.inspectCollectionLocked(ctx, generation)
@@ -232,7 +251,10 @@ func (r *Repository) InspectCollection(ctx context.Context, generation string) (
 	return intent, repositoryError("inspect_collection", errors.Join(inspectErr, lock.Close()))
 }
 
-func (r *Repository) inspectCollectionLocked(ctx context.Context, generation string) (CollectionIntent, error) {
+func (r *Repository) inspectCollectionLocked(
+	ctx context.Context,
+	generation string,
+) (CollectionIntent, error) {
 	records, err := r.openCollectionDirectory(false)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
@@ -269,14 +291,19 @@ func (r *Repository) inspectCollectionLocked(ctx context.Context, generation str
 	return record.intent, nil
 }
 
-func (r *Repository) collectLocked(ctx context.Context, budget CollectionBudget) (CollectionResult, error) {
+func (r *Repository) collectLocked(
+	ctx context.Context,
+	budget CollectionBudget,
+) (CollectionResult, error) {
 	catalog, err := r.catalog()
 	if err != nil {
 		return CollectionResult{}, err
 	}
 
 	if err := ctx.Err(); err != nil {
-		return CollectionResult{}, oops.In("snapshot.store").With("operation", "collect_generations").Wrap(err)
+		return CollectionResult{}, oops.In("snapshot.store").
+			With("operation", "collect_generations").
+			Wrap(err)
 	}
 
 	names, err := r.generationNames()
@@ -357,15 +384,32 @@ func classifyCollection(catalog Catalog, names []string) ([]collectionCandidate,
 			continue
 		}
 
-		candidates = append(candidates, collectionCandidate{id: name, sequence: attempt.Sequence, manifestSHA256: attempt.ManifestSHA256, present: true})
+		candidates = append(
+			candidates,
+			collectionCandidate{
+				id:             name,
+				sequence:       attempt.Sequence,
+				manifestSHA256: attempt.ManifestSHA256,
+				present:        true,
+			},
+		)
 	}
 
 	for _, attempt := range catalog.Attempts {
-		if present[attempt.ID] || !collectionRetiredState(attempt.State) || catalog.generationIndex(attempt.ID) >= 0 {
+		if present[attempt.ID] || !collectionRetiredState(attempt.State) ||
+			catalog.generationIndex(attempt.ID) >= 0 {
 			continue
 		}
 
-		candidates = append(candidates, collectionCandidate{id: attempt.ID, sequence: attempt.Sequence, manifestSHA256: attempt.ManifestSHA256, present: false})
+		candidates = append(
+			candidates,
+			collectionCandidate{
+				id:             attempt.ID,
+				sequence:       attempt.Sequence,
+				manifestSHA256: attempt.ManifestSHA256,
+				present:        false,
+			},
+		)
 	}
 
 	slices.SortFunc(candidates, func(a, b collectionCandidate) int {
@@ -439,7 +483,8 @@ func (run *collectionRun) purgeCandidate(ctx context.Context, candidate collecti
 		return nil
 	}
 
-	if record.found && (record.intent.Sequence != candidate.sequence || record.intent.ManifestSHA256 != candidate.manifestSHA256) {
+	if record.found &&
+		(record.intent.Sequence != candidate.sequence || record.intent.ManifestSHA256 != candidate.manifestSHA256) {
 		return run.quarantine(record.intent, CollectionQuarantineEvidence)
 	}
 
@@ -492,7 +537,10 @@ func (run *collectionRun) authorizedWork(candidate collectionCandidate) (collect
 	return record, true
 }
 
-func (run *collectionRun) startCandidate(ctx context.Context, candidate collectionCandidate) (CollectionIntent, bool, error) {
+func (run *collectionRun) startCandidate(
+	ctx context.Context,
+	candidate collectionCandidate,
+) (CollectionIntent, bool, error) {
 	inspected, err := run.inspectCandidate(ctx, candidate)
 	if err != nil {
 		return inspected, false, run.refuseInspection(ctx, candidate.id, err)
@@ -511,7 +559,11 @@ func (run *collectionRun) startCandidate(ctx context.Context, candidate collecti
 	return inspected, true, nil
 }
 
-func (run *collectionRun) removeCandidate(ctx context.Context, id string, intent CollectionIntent) error {
+func (run *collectionRun) removeCandidate(
+	ctx context.Context,
+	id string,
+	intent CollectionIntent,
+) error {
 	target, err := run.verifyTarget(ctx, intent)
 	if err != nil {
 		return run.quarantineContradiction(ctx, intent, err)
@@ -558,7 +610,11 @@ func (run *collectionRun) refuseInspection(ctx context.Context, id string, err e
 	return nil
 }
 
-func (run *collectionRun) quarantineContradiction(ctx context.Context, intent CollectionIntent, err error) error {
+func (run *collectionRun) quarantineContradiction(
+	ctx context.Context,
+	intent CollectionIntent,
+	err error,
+) error {
 	if interrupted := interruption(ctx, err); interrupted != nil {
 		return interrupted
 	}
@@ -625,7 +681,10 @@ func (run *collectionRun) quarantine(intent CollectionIntent, reason string) err
 		return errors.Join(ErrUncertain, err)
 	}
 
-	run.result.Quarantined = append(run.result.Quarantined, CollectionSkip{Generation: intent.Generation, Reason: reason})
+	run.result.Quarantined = append(
+		run.result.Quarantined,
+		CollectionSkip{Generation: intent.Generation, Reason: reason},
+	)
 
 	return nil
 }
@@ -642,7 +701,10 @@ func (run *collectionRun) finish(intent CollectionIntent) error {
 }
 
 func (run *collectionRun) preserve(id, reason string) {
-	run.result.Preserved = append(run.result.Preserved, CollectionSkip{Generation: id, Reason: reason})
+	run.result.Preserved = append(
+		run.result.Preserved,
+		CollectionSkip{Generation: id, Reason: reason},
+	)
 }
 
 func (run *collectionRun) deferCandidate(id string) {

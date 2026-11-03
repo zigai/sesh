@@ -65,13 +65,30 @@ func TestUnopenableLogFileNamesTheSettingAndTheDoctor(t *testing.T) {
 	}
 
 	cfg := filepath.Join(base, "config.toml")
-	if err := os.WriteFile(cfg, fmt.Appendf(nil, "[paths]\nlog_file = %q\n", filepath.Join(locked, "state", "sesh.log")), 0o600); err != nil {
+	if err := os.WriteFile(
+		cfg,
+		fmt.Appendf(nil, "[paths]\nlog_file = %q\n", filepath.Join(locked, "state", "sesh.log")),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
 	var stdout, stderr bytes.Buffer
 
-	err := ExecuteApplication(t.Context(), []string{snapshotCmd, "history", testRepositoryFlag, filepath.Join(base, "repository"), testConfigFlag, cfg}, nil, &stdout, &stderr)
+	err := ExecuteApplication(
+		t.Context(),
+		[]string{
+			snapshotCmd,
+			"history",
+			testRepositoryFlag,
+			filepath.Join(base, "repository"),
+			testConfigFlag,
+			cfg,
+		},
+		nil,
+		&stdout,
+		&stderr,
+	)
 	if err == nil {
 		t.Fatal("a command whose log cannot open must fail")
 	}
@@ -84,7 +101,10 @@ func TestUnopenableLogFileNamesTheSettingAndTheDoctor(t *testing.T) {
 
 func TestApplicationReadBoundaryLogging(t *testing.T) {
 	for _, missing := range []bool{false, true} {
-		t.Run(strconv.FormatBool(missing), func(t *testing.T) { testReadBoundaryLogging(t, missing) })
+		t.Run(
+			strconv.FormatBool(missing),
+			func(t *testing.T) { testReadBoundaryLogging(t, missing) },
+		)
 	}
 }
 
@@ -106,7 +126,21 @@ func testReadBoundaryLogging(t *testing.T, missing bool) {
 
 	var stdout, stderr bytes.Buffer
 
-	err := ExecuteApplication(t.Context(), []string{snapshotCmd, "history", testRepositoryFlag, repoPath, testConfigFlag, cfg, testJSONFlag}, nil, &stdout, &stderr)
+	err := ExecuteApplication(
+		t.Context(),
+		[]string{
+			snapshotCmd,
+			"history",
+			testRepositoryFlag,
+			repoPath,
+			testConfigFlag,
+			cfg,
+			testJSONFlag,
+		},
+		nil,
+		&stdout,
+		&stderr,
+	)
 	if (err != nil) != missing {
 		t.Fatalf("result: %v", err)
 	}
@@ -153,13 +187,25 @@ func TestCorruptRepositoryFailureNamesTheStoreStep(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(filepath.Join(repoPath, "catalog.json"), []byte("{not json"), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(repoPath, "catalog.json"),
+		[]byte("{not json"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
 	var stdout, stderr bytes.Buffer
 
-	args := []string{snapshotCmd, "list", testRepositoryFlag, repoPath, testConfigFlag, cfg, testJSONFlag}
+	args := []string{
+		snapshotCmd,
+		"list",
+		testRepositoryFlag,
+		repoPath,
+		testConfigFlag,
+		cfg,
+		testJSONFlag,
+	}
 	if err := ExecuteApplication(t.Context(), args, nil, &stdout, &stderr); err == nil {
 		t.Fatal("listing a corrupt repository must fail")
 	}
@@ -172,16 +218,26 @@ func TestCorruptRepositoryFailureNamesTheStoreStep(t *testing.T) {
 	}
 
 	var record map[string]any
-	if err := json.Unmarshal(bytes.Split(bytes.TrimSpace(data), []byte("\n"))[1], &record); err != nil {
+	if err := json.Unmarshal(
+		bytes.Split(bytes.TrimSpace(data), []byte("\n"))[1],
+		&record,
+	); err != nil {
 		t.Fatal(err)
 	}
 
 	if record["reason"] != "repositoryCorrupt" || record["store_step"] == nil {
-		t.Fatalf("corruption record = %v, want reason repositoryCorrupt with the store step", record)
+		t.Fatalf(
+			"corruption record = %v, want reason repositoryCorrupt with the store step",
+			record,
+		)
 	}
 
-	if errorContext, _ := record["error_context"].(map[string]any); errorContext["repository"] != repoPath || errorContext["file"] != "catalog.json" {
-		t.Fatalf("corruption record = %v, want the repository path and catalog file in its error context", record)
+	if errorContext, _ := record["error_context"].(map[string]any); errorContext["repository"] != repoPath ||
+		errorContext["file"] != "catalog.json" {
+		t.Fatalf(
+			"corruption record = %v, want the repository path and catalog file in its error context",
+			record,
+		)
 	}
 }
 
@@ -190,7 +246,21 @@ func TestApplicationDisabledLogging(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	_ = ExecuteApplication(t.Context(), []string{snapshotCmd, "history", testRepositoryFlag, filepath.Join(t.TempDir(), "missing"), testConfigFlag, cfg, testJSONFlag}, nil, &stdout, &stderr)
+	_ = ExecuteApplication(
+		t.Context(),
+		[]string{
+			snapshotCmd,
+			"history",
+			testRepositoryFlag,
+			filepath.Join(t.TempDir(), "missing"),
+			testConfigFlag,
+			cfg,
+			testJSONFlag,
+		},
+		nil,
+		&stdout,
+		&stderr,
+	)
 	if _, err := os.Stat(logPath); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("disabled log exists: %v", err)
 	}
@@ -204,7 +274,22 @@ func TestApplicationNoConfigStillAppliesExplicitEnvironment(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	err := ExecuteApplication(t.Context(), []string{snapshotCmd, "history", testRepositoryFlag, filepath.Join(base, "missing"), testConfigFlag, filepath.Join(base, "missing.toml"), testNoConfigFlag, testJSONFlag}, nil, &stdout, &stderr)
+	err := ExecuteApplication(
+		t.Context(),
+		[]string{
+			snapshotCmd,
+			"history",
+			testRepositoryFlag,
+			filepath.Join(base, "missing"),
+			testConfigFlag,
+			filepath.Join(base, "missing.toml"),
+			testNoConfigFlag,
+			testJSONFlag,
+		},
+		nil,
+		&stdout,
+		&stderr,
+	)
 	if !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("unexpected outcome: %v", err)
 	}
@@ -229,7 +314,13 @@ func TestApplicationUsageFailureDoesNotOpenLog(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	err := ExecuteApplication(t.Context(), []string{snapshotCmd, "save", "--unknown", testConfigFlag, cfg, testJSONFlag}, nil, &stdout, &stderr)
+	err := ExecuteApplication(
+		t.Context(),
+		[]string{snapshotCmd, "save", "--unknown", testConfigFlag, cfg, testJSONFlag},
+		nil,
+		&stdout,
+		&stderr,
+	)
 	if ExitCode(err) != exitCodeUsage {
 		t.Fatalf("unexpected outcome: %v", err)
 	}
@@ -244,7 +335,13 @@ func TestApplicationUsageFailureDoesNotOpenLog(t *testing.T) {
 func TestApplicationRejectsEmptyConfigPath(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
-	err := ExecuteApplication(t.Context(), []string{snapshotCmd, "history", testConfigFlag, "", testJSONFlag}, nil, &stdout, &stderr)
+	err := ExecuteApplication(
+		t.Context(),
+		[]string{snapshotCmd, "history", testConfigFlag, "", testJSONFlag},
+		nil,
+		&stdout,
+		&stderr,
+	)
 	if ExitCode(err) != exitCodeUsage {
 		t.Fatalf("unexpected outcome: %v", err)
 	}
@@ -258,13 +355,20 @@ func TestApplicationRejectsEmptyConfigPath(t *testing.T) {
 func TestApplicationUnknownFlagNamesTheFlag(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
-	err := ExecuteApplication(t.Context(), []string{snapshotCmd, "history", "--mistyped-flag=value-canary", testJSONFlag}, nil, &stdout, &stderr)
+	err := ExecuteApplication(
+		t.Context(),
+		[]string{snapshotCmd, "history", "--mistyped-flag=value-canary", testJSONFlag},
+		nil,
+		&stdout,
+		&stderr,
+	)
 	if ExitCode(err) != exitCodeUsage {
 		t.Fatalf("unexpected outcome: %v", err)
 	}
 
 	env := singleRuntimeEnvelope(t, stderr.Bytes())
-	if env.Error == nil || !strings.Contains(env.Error.Message, "unknown flag: --mistyped-flag") || !strings.Contains(env.Error.Message, "snapshot history --help") {
+	if env.Error == nil || !strings.Contains(env.Error.Message, "unknown flag: --mistyped-flag") ||
+		!strings.Contains(env.Error.Message, "snapshot history --help") {
 		t.Fatalf("diagnostic does not name the unknown flag: %s", stderr.Bytes())
 	}
 
@@ -280,7 +384,21 @@ func TestApplicationConfigurationUsesProvidedInput(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	err := ExecuteApplication(t.Context(), []string{snapshotCmd, "history", testRepositoryFlag, filepath.Join(base, "missing"), testConfigFlag, "-", testJSONFlag}, input, &stdout, &stderr)
+	err := ExecuteApplication(
+		t.Context(),
+		[]string{
+			snapshotCmd,
+			"history",
+			testRepositoryFlag,
+			filepath.Join(base, "missing"),
+			testConfigFlag,
+			"-",
+			testJSONFlag,
+		},
+		input,
+		&stdout,
+		&stderr,
+	)
 	if !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("unexpected outcome: %v", err)
 	}
@@ -320,7 +438,20 @@ func TestApplicationHumanConfigDiagnostics(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
 
-			err := ExecuteApplication(t.Context(), []string{"snapshot", "history", testRepositoryFlag, filepath.Join(t.TempDir(), "missing"), testConfigFlag, "-"}, strings.NewReader(tt.config), &stdout, &stderr)
+			err := ExecuteApplication(
+				t.Context(),
+				[]string{
+					"snapshot",
+					"history",
+					testRepositoryFlag,
+					filepath.Join(t.TempDir(), "missing"),
+					testConfigFlag,
+					"-",
+				},
+				strings.NewReader(tt.config),
+				&stdout,
+				&stderr,
+			)
 			if err == nil {
 				t.Fatal("invalid config accepted")
 			}
@@ -337,13 +468,28 @@ func TestApplicationConfigDiagnosticsRetainLocationWithoutPrivateValues(t *testi
 
 	input := strings.NewReader("[settings]\nlog_levl = \"private-canary\"\n")
 
-	err := ExecuteApplication(t.Context(), []string{snapshotCmd, "history", testRepositoryFlag, filepath.Join(t.TempDir(), "missing"), testConfigFlag, "-", testJSONFlag}, input, &stdout, &stderr)
+	err := ExecuteApplication(
+		t.Context(),
+		[]string{
+			snapshotCmd,
+			"history",
+			testRepositoryFlag,
+			filepath.Join(t.TempDir(), "missing"),
+			testConfigFlag,
+			"-",
+			testJSONFlag,
+		},
+		input,
+		&stdout,
+		&stderr,
+	)
 	if err == nil {
 		t.Fatal("invalid config accepted")
 	}
 
 	env := singleRuntimeEnvelope(t, stderr.Bytes())
-	if env.Error == nil || env.Error.Code != "configurationFailed" || !strings.Contains(env.Error.Message, "line 2") {
+	if env.Error == nil || env.Error.Code != "configurationFailed" ||
+		!strings.Contains(env.Error.Message, "line 2") {
 		t.Fatalf("wrong configuration diagnostic: %s", stderr.Bytes())
 	}
 
@@ -370,7 +516,20 @@ func TestApplicationSaveOwnsOneOutcome(t *testing.T) {
 			}
 
 			repoPath := filepath.Join(t.TempDir(), "private-repository-canary")
-			args := []string{snapshotCmd, "save", testRepositoryFlag, repoPath, testSocketFlag, socket, testLeaseRootFlag, filepath.Join(t.TempDir(), "leases"), string(sessions[0].ID), testConfigFlag, cfg, testJSONFlag}
+			args := []string{
+				snapshotCmd,
+				"save",
+				testRepositoryFlag,
+				repoPath,
+				testSocketFlag,
+				socket,
+				testLeaseRootFlag,
+				filepath.Join(t.TempDir(), "leases"),
+				string(sessions[0].ID),
+				testConfigFlag,
+				cfg,
+				testJSONFlag,
+			}
 
 			var stdout, stderr bytes.Buffer
 
@@ -397,7 +556,12 @@ func TestApplicationSaveOwnsOneOutcome(t *testing.T) {
 	}
 }
 
-func assertApplicationSaveOutcome(t *testing.T, failed bool, err error, env testJSONEnvelope) (string, string) {
+func assertApplicationSaveOutcome(
+	t *testing.T,
+	failed bool,
+	err error,
+	env testJSONEnvelope,
+) (string, string) {
 	t.Helper()
 
 	if failed {
@@ -481,7 +645,8 @@ func assertRuntimeOutcomeContext(t *testing.T, line []byte, record map[string]an
 		return
 	}
 
-	if record["status"] != "ok" && record["reason"] == nil && record["phase"] == nil && record["code"] == nil {
+	if record["status"] != "ok" && record["reason"] == nil && record["phase"] == nil &&
+		record["code"] == nil {
 		t.Fatalf("missing fixed reason: %s", line)
 	}
 
@@ -491,18 +656,50 @@ func assertRuntimeOutcomeContext(t *testing.T, line []byte, record map[string]an
 }
 
 var runtimePlainLogFields = []string{
-	"time", "level", "component", "operation", "status", "message", "reason", "phase", "code", "sessions", "windows", "panes", "error_code",
-	"skipped", "mismatches", "mismatch_reasons", "step_reason",
-	"pid", "version", "socket", "action", "error", "error_domain", "error_step", "generation", "restore_id",
-	"restart_panes", "resume_panes", "carried_resume_panes", "unverified_panes", "nonrestartable_panes",
-	"resumed_panes", "restarted_panes", "shell_panes", "unrecovered_panes", "directory_fallback_panes",
+	"time",
+	"level",
+	"component",
+	"operation",
+	"status",
+	"message",
+	"reason",
+	"phase",
+	"code",
+	"sessions",
+	"windows",
+	"panes",
+	"error_code",
+	"skipped",
+	"mismatches",
+	"mismatch_reasons",
+	"step_reason",
+	"pid",
+	"version",
+	"socket",
+	"action",
+	"error",
+	"error_domain",
+	"error_step",
+	"generation",
+	"restore_id",
+	"restart_panes",
+	"resume_panes",
+	"carried_resume_panes",
+	"unverified_panes",
+	"nonrestartable_panes",
+	"resumed_panes",
+	"restarted_panes",
+	"shell_panes",
+	"unrecovered_panes",
+	"directory_fallback_panes",
 }
 
 func assertRuntimeLogFields(t *testing.T, record map[string]any) {
 	t.Helper()
 
 	for key, value := range record {
-		if !slices.Contains(runtimePlainLogFields, key) && !runtimeTypedLogFieldValid(key, value, record) {
+		if !slices.Contains(runtimePlainLogFields, key) &&
+			!runtimeTypedLogFieldValid(key, value, record) {
 			t.Fatalf("unexpected or invalid log field %s: %#v", key, record)
 		}
 	}
@@ -550,7 +747,10 @@ func singleRuntimeEnvelope(t *testing.T, data []byte) testJSONEnvelope {
 
 func TestFinalizationFailurePreservesResultAndUncertainty(t *testing.T) {
 	for _, uncertain := range []bool{false, true} {
-		t.Run(strconv.FormatBool(uncertain), func(t *testing.T) { testFinalizationFailure(t, uncertain) })
+		t.Run(
+			strconv.FormatBool(uncertain),
+			func(t *testing.T) { testFinalizationFailure(t, uncertain) },
+		)
 	}
 }
 
@@ -564,7 +764,11 @@ func testFinalizationFailure(t *testing.T, uncertain bool) {
 
 	var output, diagnostics commandBuffer
 
-	_, err := output.Write([]byte(`{"schemaVersion":1,"ok":true,"result":{"generation":"9007199254740993","sequence":9007199254740993},"error":null}`))
+	_, err := output.Write(
+		[]byte(
+			`{"schemaVersion":1,"ok":true,"result":{"generation":"9007199254740993","sequence":9007199254740993},"error":null}`,
+		),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -630,7 +834,15 @@ func TestFinalizationWithoutResultRetainsUncertaintyDiagnostic(t *testing.T) {
 				stdout, stderr      bytes.Buffer
 			)
 
-			err := publishCommandOutput(cmd, &output, &diagnostics, &stdout, &stderr, clibase.NewRenderedCommandError(store.ErrUncertain), io.ErrClosedPipe)
+			err := publishCommandOutput(
+				cmd,
+				&output,
+				&diagnostics,
+				&stdout,
+				&stderr,
+				clibase.NewRenderedCommandError(store.ErrUncertain),
+				io.ErrClosedPipe,
+			)
 			if !errors.Is(err, store.ErrUncertain) || !errors.Is(err, io.ErrClosedPipe) {
 				t.Fatalf("lost causes: %v", err)
 			}
@@ -649,7 +861,13 @@ func TestFinalizationWithoutResultRetainsUncertaintyDiagnostic(t *testing.T) {
 func TestApplicationOutputFailurePreservesCause(t *testing.T) {
 	var stderr bytes.Buffer
 
-	err := ExecuteApplication(t.Context(), []string{"--version"}, nil, failingRuntimeWriter{}, &stderr)
+	err := ExecuteApplication(
+		t.Context(),
+		[]string{"--version"},
+		nil,
+		failingRuntimeWriter{},
+		&stderr,
+	)
 	if !errors.Is(err, io.ErrClosedPipe) || stderr.Len() != 0 {
 		t.Fatalf("output failure: %v / %q", err, stderr.String())
 	}
@@ -665,7 +883,15 @@ func TestHumanFinalizationReportsPrimaryAndCleanupFailures(t *testing.T) {
 		stdout, stderr      bytes.Buffer
 	)
 
-	err := publishCommandOutput(cmd, &output, &diagnostics, &stdout, &stderr, store.ErrRecoveryRequired, io.ErrClosedPipe)
+	err := publishCommandOutput(
+		cmd,
+		&output,
+		&diagnostics,
+		&stdout,
+		&stderr,
+		store.ErrRecoveryRequired,
+		io.ErrClosedPipe,
+	)
 	if !errors.Is(err, store.ErrRecoveryRequired) || !errors.Is(err, io.ErrClosedPipe) {
 		t.Fatalf("lost cause: %v", err)
 	}
@@ -720,7 +946,11 @@ func TestRestoreRuntimeLogOwnership(t *testing.T) {
 		wantRecord bool
 	}{
 		{"complete", nil, false},
-		{"partial", clibase.NewRenderedCommandError(loggedTestError{error: app.ErrPartialRestore}), false},
+		{
+			"partial",
+			clibase.NewRenderedCommandError(loggedTestError{error: app.ErrPartialRestore}),
+			false,
+		},
 		{"engine_failure", clibase.NewCommandResultError(engineFailure), false},
 		{"independent_cleanup", errors.Join(engineFailure, errSensitiveRaw), true},
 		{"admission_failure", errSensitiveRaw, true},
@@ -744,7 +974,13 @@ func TestRestoreRuntimeLogOwnership(t *testing.T) {
 			cmd.SetOut(&stdout)
 			cmd.SetErr(&stderr)
 
-			runtime := commandRuntime{cmd: cmd, sink: sink, operation: "restore", output: nil, diagnostics: nil}
+			runtime := commandRuntime{
+				cmd:         cmd,
+				sink:        sink,
+				operation:   "restore",
+				output:      nil,
+				diagnostics: nil,
+			}
 			if err := runtime.finish(tc.err); err != nil {
 				t.Fatal(err)
 			}
@@ -780,7 +1016,8 @@ func assertRestoreBoundaryRecords(t *testing.T, path string, wantRecord bool) {
 
 	assertRuntimeRecord(t, bytes.TrimSpace(data), "cli", "restore", "error", "failed")
 
-	if !bytes.Contains(data, []byte(`"reason"`)) || !bytes.Contains(data, []byte(errSensitiveRaw.Error())) {
+	if !bytes.Contains(data, []byte(`"reason"`)) ||
+		!bytes.Contains(data, []byte(errSensitiveRaw.Error())) {
 		t.Fatalf("unsafe failure schema: %s", data)
 	}
 }
@@ -790,8 +1027,18 @@ func TestRestoreTextReceiptSurvivesStagedFailure(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 
-	output := commandBuffer{buffer: bytes.Buffer{}, output: &stdout, failed: false, streaming: false}
-	diagnostics := commandBuffer{buffer: bytes.Buffer{}, output: &stderr, failed: false, streaming: false}
+	output := commandBuffer{
+		buffer:    bytes.Buffer{},
+		output:    &stdout,
+		failed:    false,
+		streaming: false,
+	}
+	diagnostics := commandBuffer{
+		buffer:    bytes.Buffer{},
+		output:    &stderr,
+		failed:    false,
+		streaming: false,
+	}
 
 	receipt := "Operation: 0123456789abcdef0123456789abcdef\n"
 	if _, err := output.Write([]byte(receipt)); err != nil {
@@ -840,8 +1087,15 @@ func TestRestoreUncertaintySurvivesLogFinalizationFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	output := commandBuffer{buffer: bytes.Buffer{}, output: &stdout, failed: false, streaming: false}
-	if _, err := output.Write([]byte(`{"result":{"operationId":"0123456789abcdef0123456789abcdef"}}`)); err != nil {
+	output := commandBuffer{
+		buffer:    bytes.Buffer{},
+		output:    &stdout,
+		failed:    false,
+		streaming: false,
+	}
+	if _, err := output.Write(
+		[]byte(`{"result":{"operationId":"0123456789abcdef0123456789abcdef"}}`),
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -851,7 +1105,8 @@ func TestRestoreUncertaintySurvivesLogFinalizationFailure(t *testing.T) {
 	}
 
 	envelope := singleRuntimeEnvelope(t, stdout.Bytes())
-	if envelope.OK || envelope.Error == nil || envelope.Error.Code != "operationUncertain" || stderr.Len() != 0 {
+	if envelope.OK || envelope.Error == nil || envelope.Error.Code != "operationUncertain" ||
+		stderr.Len() != 0 {
 		t.Fatalf("uncertainty hidden by cleanup failure: %s / %s", stdout.String(), stderr.String())
 	}
 }

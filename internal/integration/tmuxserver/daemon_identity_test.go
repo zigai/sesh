@@ -43,7 +43,10 @@ func TestObserveDaemonIdentityCancellationIsUnavailable(t *testing.T) {
 
 	_, err := ObserveDaemonIdentity(ctx, nil)
 	if !errors.Is(err, context.Canceled) || !errors.Is(err, ErrDaemonIdentityUnavailable) {
-		t.Fatalf("ObserveDaemonIdentity error = %v, want cancellation and unavailable identity", err)
+		t.Fatalf(
+			"ObserveDaemonIdentity error = %v, want cancellation and unavailable identity",
+			err,
+		)
 	}
 
 	oopsErr, ok := oops.AsOops(err)

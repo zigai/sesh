@@ -11,7 +11,10 @@ import (
 	"github.com/zigai/sesh/internal/integration/tmuxserver"
 )
 
-func observeRestoreDaemonIdentity(ctx context.Context, server *gotmux.Server) (restoreDaemonIdentity, error) {
+func observeRestoreDaemonIdentity(
+	ctx context.Context,
+	server *gotmux.Server,
+) (restoreDaemonIdentity, error) {
 	identity, err := tmuxserver.ObserveDaemonIdentity(ctx, server)
 	if err != nil {
 		return restoreDaemonIdentity{}, fmt.Errorf("observe daemon identity: %w", err)

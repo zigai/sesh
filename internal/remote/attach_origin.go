@@ -94,7 +94,13 @@ func PrepareAttachment(opts AttachOriginOptions) (AttachBootstrap, error) {
 	}, nil
 }
 
-func NewAttachPrepareCommand(ctx context.Context, remote config.RemoteConfig, connection config.RemoteConnectionConfig, bootstrap AttachBootstrap, opts AttachCommandOptions) (*exec.Cmd, error) {
+func NewAttachPrepareCommand(
+	ctx context.Context,
+	remote config.RemoteConfig,
+	connection config.RemoteConnectionConfig,
+	bootstrap AttachBootstrap,
+	opts AttachCommandOptions,
+) (*exec.Cmd, error) {
 	payload, err := EncodeAttachBootstrap(bootstrap)
 	if err != nil {
 		return nil, err
@@ -114,7 +120,13 @@ func NewAttachPrepareCommand(ctx context.Context, remote config.RemoteConfig, co
 	return command, nil
 }
 
-func NewAttachCommand(ctx context.Context, remote config.RemoteConfig, connection config.RemoteConnectionConfig, bootstrap AttachBootstrap, opts AttachCommandOptions) (*exec.Cmd, error) {
+func NewAttachCommand(
+	ctx context.Context,
+	remote config.RemoteConfig,
+	connection config.RemoteConnectionConfig,
+	bootstrap AttachBootstrap,
+	opts AttachCommandOptions,
+) (*exec.Cmd, error) {
 	if err := bootstrap.Validate(); err != nil {
 		return nil, err
 	}
@@ -123,7 +135,10 @@ func NewAttachCommand(ctx context.Context, remote config.RemoteConfig, connectio
 		return nil, errNilAttachStreams
 	}
 
-	arguments := append(PeerEntryPoint(connection, ChannelAttach), bootstrap.Capability.AttachmentID)
+	arguments := append(
+		PeerEntryPoint(connection, ChannelAttach),
+		bootstrap.Capability.AttachmentID,
+	)
 
 	command, err := NewSSHCommand(ctx, remote, connection, SSHCommandOptions{
 		Interactive: true,
@@ -144,8 +159,17 @@ func NewAttachCommand(ctx context.Context, remote config.RemoteConfig, connectio
 	return command, nil
 }
 
-func RunAttachPrepare(ctx context.Context, remote config.RemoteConfig, connection config.RemoteConnectionConfig, bootstrap AttachBootstrap, opts AttachCommandOptions) (AttachPrepareResult, error) {
-	prepareContext, cancel := context.WithTimeout(ctx, ParsedDuration(remote.ConnectTimeout, defaultConnect)+attachResultGrace)
+func RunAttachPrepare(
+	ctx context.Context,
+	remote config.RemoteConfig,
+	connection config.RemoteConnectionConfig,
+	bootstrap AttachBootstrap,
+	opts AttachCommandOptions,
+) (AttachPrepareResult, error) {
+	prepareContext, cancel := context.WithTimeout(
+		ctx,
+		ParsedDuration(remote.ConnectTimeout, defaultConnect)+attachResultGrace,
+	)
 	defer cancel()
 
 	command, err := NewAttachPrepareCommand(prepareContext, remote, connection, bootstrap, opts)
@@ -159,21 +183,30 @@ func RunAttachPrepare(ctx context.Context, remote config.RemoteConfig, connectio
 
 	output, err := command.Output()
 	if err != nil {
-		return AttachPrepareResult{}, errors.Join(ClassifySSHFailure(prepareContext.Err(), diagnostics.String()),
-			oops.In("remote").With("operation", "run_attach_prepare").Wrap(err))
+		return AttachPrepareResult{}, errors.Join(
+			ClassifySSHFailure(prepareContext.Err(), diagnostics.String()),
+			oops.In("remote").With("operation", "run_attach_prepare").Wrap(err),
+		)
 	}
 
 	if len(output) == 0 {
-		return AttachPrepareResult{}, oops.In("remote").With("operation", "run_attach_prepare").Wrap(errAttachResultMissing)
+		return AttachPrepareResult{}, oops.In("remote").
+			With("operation", "run_attach_prepare").
+			Wrap(errAttachResultMissing)
 	}
 
 	result, err := DecodeAttachPrepareResult(output)
 	if err != nil {
-		return AttachPrepareResult{}, oops.In("remote").With("operation", "run_attach_prepare").Wrap(err)
+		return AttachPrepareResult{}, oops.In("remote").
+			With("operation", "run_attach_prepare").
+			Wrap(err)
 	}
 
-	if result.AttachmentID != bootstrap.Capability.AttachmentID || result.BridgeSocket != bootstrap.BridgeSocket {
-		return AttachPrepareResult{}, oops.In("remote").With("operation", "run_attach_prepare").Wrap(ErrCapabilityMismatch)
+	if result.AttachmentID != bootstrap.Capability.AttachmentID ||
+		result.BridgeSocket != bootstrap.BridgeSocket {
+		return AttachPrepareResult{}, oops.In("remote").
+			With("operation", "run_attach_prepare").
+			Wrap(ErrCapabilityMismatch)
 	}
 
 	return result, nil

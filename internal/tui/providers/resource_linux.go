@@ -26,7 +26,11 @@ var (
 	errInvalidPageSize    = errors.New("invalid page size")
 )
 
-func ReadResourceSample(ctx context.Context, procRoot string, at time.Time) (ResourceSample, error) {
+func ReadResourceSample(
+	ctx context.Context,
+	procRoot string,
+	at time.Time,
+) (ResourceSample, error) {
 	entries, err := os.ReadDir(procRoot)
 	if err != nil {
 		return ResourceSample{}, fmt.Errorf("read process inventory: %w", err)
@@ -104,5 +108,11 @@ func parseProcessStat(pid int, value string) (ProcessSample, error) {
 		return ProcessSample{}, err
 	}
 
-	return ProcessSample{PID: pid, ParentPID: parent, StartTime: start, CPUTicks: user + system, RSSBytes: 0}, nil
+	return ProcessSample{
+		PID:       pid,
+		ParentPID: parent,
+		StartTime: start,
+		CPUTicks:  user + system,
+		RSSBytes:  0,
+	}, nil
 }

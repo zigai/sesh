@@ -110,8 +110,16 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.move(-wheelStepDelta)
 		case tea.MouseWheelDown:
 			m.move(wheelStepDelta)
-		case tea.MouseNone, tea.MouseLeft, tea.MouseMiddle, tea.MouseRight, tea.MouseWheelLeft, tea.MouseWheelRight,
-			tea.MouseBackward, tea.MouseForward, tea.MouseButton10, tea.MouseButton11:
+		case tea.MouseNone,
+			tea.MouseLeft,
+			tea.MouseMiddle,
+			tea.MouseRight,
+			tea.MouseWheelLeft,
+			tea.MouseWheelRight,
+			tea.MouseBackward,
+			tea.MouseForward,
+			tea.MouseButton10,
+			tea.MouseButton11:
 		}
 
 		return m, nil
@@ -175,7 +183,8 @@ func (m *Model) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *Model) updateClick(mouse tea.Mouse) (tea.Model, tea.Cmd) {
 	index := m.listTop + mouse.Y - listTopMargin
-	if mouse.Y < listTopMargin || index < 0 || index >= len(m.rows) || mouse.Y-listTopMargin >= m.listHeight() {
+	if mouse.Y < listTopMargin || index < 0 || index >= len(m.rows) ||
+		mouse.Y-listTopMargin >= m.listHeight() {
 		return m, nil
 	}
 
@@ -251,11 +260,13 @@ func (m *Model) filter() {
 }
 
 func (m *Model) extraChoice(query string) (Choice, bool) {
-	if strings.Contains(query, urlSchemeMarker) || (strings.Contains(query, "@") && strings.Contains(query, ":")) {
+	if strings.Contains(query, urlSchemeMarker) ||
+		(strings.Contains(query, "@") && strings.Contains(query, ":")) {
 		return Choice{Kind: ChoiceClone, Value: query}, true
 	}
 
-	if strings.ContainsAny(query, "/ ") || slices.ContainsFunc(m.entries, func(entry Entry) bool { return entry.Name == query }) {
+	if strings.ContainsAny(query, "/ ") ||
+		slices.ContainsFunc(m.entries, func(entry Entry) bool { return entry.Name == query }) {
 		return Choice{Kind: 0, Value: ""}, false
 	}
 
@@ -346,7 +357,8 @@ func (m *Model) renderFooter(width int) string {
 	}
 
 	hints := []tui.Hint{{Key: "enter", Desc: "open"}, {Key: "esc", Desc: "close"}}
-	if m.cursor < len(m.rows) && m.rows[m.cursor].entry >= 0 && m.entries[m.rows[m.cursor].entry].NameTakenBy != "" {
+	if m.cursor < len(m.rows) && m.rows[m.cursor].entry >= 0 &&
+		m.entries[m.rows[m.cursor].entry].NameTakenBy != "" {
 		hints = append(hints, tui.Hint{Key: "alt+a", Desc: "adopt"})
 	}
 

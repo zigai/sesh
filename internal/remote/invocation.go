@@ -75,14 +75,32 @@ func (invocation Invocation) IsUncertain() bool {
 
 func (invocation Invocation) Result() ActionResult {
 	if invocation.Unresolved() {
-		return ActionResult{InvocationID: invocation.ID, Action: invocation.Action, OK: false, Code: action.CodeUncertain, Output: nil}
+		return ActionResult{
+			InvocationID: invocation.ID,
+			Action:       invocation.Action,
+			OK:           false,
+			Code:         action.CodeUncertain,
+			Output:       nil,
+		}
 	}
 
 	if invocation.Outcome == outcomeOK {
-		return ActionResult{InvocationID: invocation.ID, Action: invocation.Action, OK: true, Code: "", Output: invocation.Output}
+		return ActionResult{
+			InvocationID: invocation.ID,
+			Action:       invocation.Action,
+			OK:           true,
+			Code:         "",
+			Output:       invocation.Output,
+		}
 	}
 
-	return ActionResult{InvocationID: invocation.ID, Action: invocation.Action, OK: false, Code: action.Code(invocation.Outcome), Output: invocation.Output}
+	return ActionResult{
+		InvocationID: invocation.ID,
+		Action:       invocation.Action,
+		OK:           false,
+		Code:         action.Code(invocation.Outcome),
+		Output:       invocation.Output,
+	}
 }
 
 func (invocation Invocation) Validate() error {
@@ -141,15 +159,24 @@ func InvocationPath(stateHome string) (string, error) {
 	return joinComponents(dir, invocationDirName), nil
 }
 
-func AdmitInvocation(ctx context.Context, dir *privatefs.Dir, request ActionRequest, now time.Time) (Invocation, bool, error) {
+func AdmitInvocation(
+	ctx context.Context,
+	dir *privatefs.Dir,
+	request ActionRequest,
+	now time.Time,
+) (Invocation, bool, error) {
 	if !ValidInvocationID(request.InvocationID) || !validIntentDigest(request.IntentDigest) ||
 		!request.Action.Valid() {
-		return Invocation{}, false, oops.In("remote").With("operation", "admit_invocation").Wrap(ErrInvalidFrame)
+		return Invocation{}, false, oops.In("remote").
+			With("operation", "admit_invocation").
+			Wrap(ErrInvalidFrame)
 	}
 
 	lock, err := dir.Lock(ctx, invocationLockName)
 	if err != nil {
-		return Invocation{}, false, oops.In("remote").With("operation", "admit_invocation").Wrap(err)
+		return Invocation{}, false, oops.In("remote").
+			With("operation", "admit_invocation").
+			Wrap(err)
 	}
 
 	invocation, admitted, admitErr := admitInvocationLocked(dir, request, now)
@@ -166,7 +193,13 @@ func AdmitInvocation(ctx context.Context, dir *privatefs.Dir, request ActionRequ
 	return invocation, admitted, closeErr
 }
 
-func ResolveInvocation(ctx context.Context, dir *privatefs.Dir, id, outcome string, output jsontext.Value, now time.Time) error {
+func ResolveInvocation(
+	ctx context.Context,
+	dir *privatefs.Dir,
+	id, outcome string,
+	output jsontext.Value,
+	now time.Time,
+) error {
 	if !ValidInvocationID(id) || !validOutcome(outcome) || outcome == "" {
 		return oops.In("remote").With("operation", "resolve_invocation").Wrap(ErrInvalidFrame)
 	}
@@ -188,7 +221,9 @@ func ResolveInvocation(ctx context.Context, dir *privatefs.Dir, id, outcome stri
 
 func LookupInvocation(dir *privatefs.Dir, id string) (Invocation, error) {
 	if !ValidInvocationID(id) {
-		return Invocation{}, oops.In("remote").With("operation", "lookup_invocation").Wrap(ErrInvalidFrame)
+		return Invocation{}, oops.In("remote").
+			With("operation", "lookup_invocation").
+			Wrap(ErrInvalidFrame)
 	}
 
 	inv, err := readInvocation(dir, id)
@@ -226,7 +261,11 @@ func (tombstone Tombstone) invocation(id string) Invocation {
 	}
 }
 
-func admitInvocationLocked(dir *privatefs.Dir, request ActionRequest, now time.Time) (Invocation, bool, error) {
+func admitInvocationLocked(
+	dir *privatefs.Dir,
+	request ActionRequest,
+	now time.Time,
+) (Invocation, bool, error) {
 	existing, err := readInvocation(dir, request.InvocationID)
 
 	switch {
@@ -275,7 +314,12 @@ func admitInvocationLocked(dir *privatefs.Dir, request ActionRequest, now time.T
 	return invocation, true, nil
 }
 
-func resolveInvocationLocked(dir *privatefs.Dir, id, outcome string, output jsontext.Value, now time.Time) error {
+func resolveInvocationLocked(
+	dir *privatefs.Dir,
+	id, outcome string,
+	output jsontext.Value,
+	now time.Time,
+) error {
 	invocation, err := readInvocation(dir, id)
 	if err != nil {
 		return err
@@ -286,7 +330,10 @@ func resolveInvocationLocked(dir *privatefs.Dir, id, outcome string, output json
 			return nil
 		}
 
-		return oops.In("remote").With("operation", "resolve_invocation").With("outcome", invocation.Outcome).Wrap(ErrInvocationResolved)
+		return oops.In("remote").
+			With("operation", "resolve_invocation").
+			With("outcome", invocation.Outcome).
+			Wrap(ErrInvocationResolved)
 	}
 
 	invocation.Outcome = outcome
@@ -324,7 +371,9 @@ func readInvocation(dir *privatefs.Dir, id string) (Invocation, error) {
 	}
 
 	if invocation.ID != id {
-		return Invocation{}, oops.In("remote").With("operation", "read_invocation").Wrap(ErrInvalidFrame)
+		return Invocation{}, oops.In("remote").
+			With("operation", "read_invocation").
+			Wrap(ErrInvalidFrame)
 	}
 
 	return invocation, nil
@@ -406,7 +455,12 @@ func pruneInvocations(dir *privatefs.Dir, limit int, now time.Time) error {
 	return retireOldestResolvedInvocations(dir, resolved, recordCount, target, now)
 }
 
-func retireOldestResolvedInvocations(dir *privatefs.Dir, resolved []Invocation, totalCount, target int, now time.Time) error {
+func retireOldestResolvedInvocations(
+	dir *privatefs.Dir,
+	resolved []Invocation,
+	totalCount, target int,
+	now time.Time,
+) error {
 	slices.SortFunc(resolved, func(left, right Invocation) int {
 		if order := left.AdmittedAt.Compare(right.AdmittedAt); order != 0 {
 			return order
@@ -467,7 +521,12 @@ func readReplayFence(dir *privatefs.Dir) (ReplayFence, error) {
 	}
 
 	if err != nil {
-		return ReplayFence{Version: 0, Tombstones: nil}, oops.In("remote").With("operation", "read_replay_fence").Wrap(err)
+		return ReplayFence{
+			Version:    0,
+			Tombstones: nil,
+		}, oops.In("remote").
+			With("operation", "read_replay_fence").
+			Wrap(err)
 	}
 
 	if version, ok := contentVersion(content); ok && version != ProtocolVersion {
@@ -476,7 +535,12 @@ func readReplayFence(dir *privatefs.Dir) (ReplayFence, error) {
 
 	fence, err := decodeStrict[ReplayFence](bytes.TrimSpace(content))
 	if err != nil {
-		return ReplayFence{Version: 0, Tombstones: nil}, oops.In("remote").With("operation", "read_replay_fence").Wrap(err)
+		return ReplayFence{
+			Version:    0,
+			Tombstones: nil,
+		}, oops.In("remote").
+			With("operation", "read_replay_fence").
+			Wrap(err)
 	}
 
 	if fence.Tombstones == nil {

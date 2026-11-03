@@ -31,7 +31,11 @@ func runSleepSignalHarness() int {
 	defer signal.Stop(stop)
 	defer signal.Stop(exit)
 
-	if err := os.WriteFile(fakeHarnessArgsFile, []byte(strings.Join(os.Args[1:], " ")), 0o600); err != nil {
+	if err := os.WriteFile(
+		fakeHarnessArgsFile,
+		[]byte(strings.Join(os.Args[1:], " ")),
+		0o600,
+	); err != nil {
 		return 1
 	}
 
@@ -67,7 +71,11 @@ func runFakeHarness() int {
 		signal.Ignore(syscall.SIGTERM)
 	}
 
-	if err := os.WriteFile(fakeHarnessArgsFile, []byte(strings.Join(os.Args[1:], " ")), 0o600); err != nil {
+	if err := os.WriteFile(
+		fakeHarnessArgsFile,
+		[]byte(strings.Join(os.Args[1:], " ")),
+		0o600,
+	); err != nil {
 		return 1
 	}
 

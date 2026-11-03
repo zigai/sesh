@@ -55,7 +55,12 @@ func ValidatePlan(p Plan) error {
 	}
 
 	seenSteps := make(map[string]int, len(p.Steps))
-	tracker := newPlanTracker(len(p.Steps), len(p.SourceGraph.Sessions), len(p.SourceGraph.Windows), len(p.SourceGraph.Panes))
+	tracker := newPlanTracker(
+		len(p.Steps),
+		len(p.SourceGraph.Sessions),
+		len(p.SourceGraph.Windows),
+		len(p.SourceGraph.Panes),
+	)
 
 	groupNames := make(map[string]model.Bytes, len(p.SourceGraph.Groups))
 	for _, grp := range p.SourceGraph.Groups {
@@ -442,7 +447,11 @@ func (t *planTracker) recordCreateSession(cs *CreateSessionStep, ctx validationC
 	return t.recordCreateSessionInitialWindow(cs, ctx)
 }
 
-func validateCreateSessionPayload(cs *CreateSessionStep, sessions []model.Session, groupNames map[string]model.Bytes) error {
+func validateCreateSessionPayload(
+	cs *CreateSessionStep,
+	sessions []model.Session,
+	groupNames map[string]model.Bytes,
+) error {
 	var sess *model.Session
 
 	for i := range sessions {
@@ -478,7 +487,11 @@ func validateCreateSessionPayload(cs *CreateSessionStep, sessions []model.Sessio
 	}
 
 	if cs.InitialWindowID == "" && len(cs.InitialWindowName) > 0 {
-		return planFailure("validation", "unexpected_initial_window_name_without_initial_window", ErrInvalid)
+		return planFailure(
+			"validation",
+			"unexpected_initial_window_name_without_initial_window",
+			ErrInvalid,
+		)
 	}
 
 	return nil
@@ -487,11 +500,19 @@ func validateCreateSessionPayload(cs *CreateSessionStep, sessions []model.Sessio
 func validateInitialWindowMetadata(cs *CreateSessionStep, windows []model.Window) error {
 	if cs.InitialWindowID == "" {
 		if cs.Width != 0 || cs.Height != 0 {
-			return planFailure("validation", "unexpected_window_size_without_initial_window", ErrInvalid)
+			return planFailure(
+				"validation",
+				"unexpected_window_size_without_initial_window",
+				ErrInvalid,
+			)
 		}
 
 		if len(cs.InitialWindowName) != 0 {
-			return planFailure("validation", "unexpected_initial_window_name_without_initial_window", ErrInvalid)
+			return planFailure(
+				"validation",
+				"unexpected_initial_window_name_without_initial_window",
+				ErrInvalid,
+			)
 		}
 
 		return nil
@@ -500,7 +521,11 @@ func validateInitialWindowMetadata(cs *CreateSessionStep, windows []model.Window
 	for i := range windows {
 		if windows[i].ID == cs.InitialWindowID {
 			if !bytes.Equal(cs.InitialWindowName, windows[i].Name) {
-				return planFailure("validation", "create_session_initial_window_name_mismatch", ErrInvalid)
+				return planFailure(
+					"validation",
+					"create_session_initial_window_name_mismatch",
+					ErrInvalid,
+				)
 			}
 
 			if cs.Width != windows[i].Width || cs.Height != windows[i].Height {
@@ -514,7 +539,10 @@ func validateInitialWindowMetadata(cs *CreateSessionStep, windows []model.Window
 	return planFailure("validation", "unknown_initial_window", ErrInvalid)
 }
 
-func (t *planTracker) recordCreateSessionInitialWindow(cs *CreateSessionStep, ctx validationContext) error {
+func (t *planTracker) recordCreateSessionInitialWindow(
+	cs *CreateSessionStep,
+	ctx validationContext,
+) error {
 	switch {
 	case cs.InitialWindowID != "":
 		if cs.BootstrapWindow {
@@ -532,9 +560,17 @@ func (t *planTracker) recordCreateSessionInitialWindow(cs *CreateSessionStep, ct
 		t.createdWindows[cs.InitialWindowID] = "create-session:" + cs.SessionID
 		t.handledLinks[linkSlotKey{session: cs.SessionID, window: cs.InitialWindowID, index: cs.InitialWindowIndex}] = true
 	case cs.Width != 0 || cs.Height != 0:
-		return planFailure("validation", "unexpected_window_size_without_initial_window", ErrInvalid)
+		return planFailure(
+			"validation",
+			"unexpected_window_size_without_initial_window",
+			ErrInvalid,
+		)
 	case len(cs.InitialWindowName) != 0:
-		return planFailure("validation", "unexpected_initial_window_name_without_initial_window", ErrInvalid)
+		return planFailure(
+			"validation",
+			"unexpected_initial_window_name_without_initial_window",
+			ErrInvalid,
+		)
 	}
 
 	if cs.InitialPaneID != "" {
@@ -544,7 +580,10 @@ func (t *planTracker) recordCreateSessionInitialWindow(cs *CreateSessionStep, ct
 
 		t.createdPanes[cs.InitialPaneID] = "create-session:" + cs.SessionID
 		if cs.InitialWindowID != "" {
-			t.windowPaneIDs[cs.InitialWindowID] = append(t.windowPaneIDs[cs.InitialWindowID], cs.InitialPaneID)
+			t.windowPaneIDs[cs.InitialWindowID] = append(
+				t.windowPaneIDs[cs.InitialWindowID],
+				cs.InitialPaneID,
+			)
 		}
 	}
 
@@ -712,7 +751,10 @@ func validateLinkStepMatch(lw *LinkWindowStep, links []model.Link) error {
 	return planFailure("validation", "unmatched_link_step", ErrInvalid)
 }
 
-func (t *planTracker) recordCloseBootstrap(cb *CloseBootstrapWindowStep, _ validationContext) error {
+func (t *planTracker) recordCloseBootstrap(
+	cb *CloseBootstrapWindowStep,
+	_ validationContext,
+) error {
 	if !model.ValidID(cb.SessionID) {
 		return planFailure("validation", "invalid_close_bootstrap", ErrInvalid)
 	}
@@ -771,7 +813,11 @@ func (t *planTracker) recordApplyLayout(al *ApplyLayoutStep, ctx validationConte
 	return nil
 }
 
-func (t *planTracker) validateSelectPaneDeps(step Step, windowID string, windows []model.Window) error {
+func (t *planTracker) validateSelectPaneDeps(
+	step Step,
+	windowID string,
+	windows []model.Window,
+) error {
 	var expectedPrevStep string
 
 	for i := range windows {
@@ -960,7 +1006,11 @@ func (t *planTracker) recordSelectWindow(sw *SelectWindowStep, ctx validationCon
 	return nil
 }
 
-func (t *planTracker) validateSelectWindowPrereqs(step Step, sessionID string, links []model.Link) error {
+func (t *planTracker) validateSelectWindowPrereqs(
+	step Step,
+	sessionID string,
+	links []model.Link,
+) error {
 	sessStep, sessExists := t.createdSessions[sessionID]
 	if !sessExists {
 		return planFailure("validation", "select_window_session_not_created", ErrInvalid)
@@ -978,7 +1028,11 @@ func (t *planTracker) validateSelectWindowPrereqs(step Step, sessionID string, l
 
 	if cbStep, hasCB := t.closedBootstraps[sessionID]; hasCB {
 		if !slices.Contains(step.DependsOn(), cbStep) {
-			return planFailure("validation", "select_window_missing_close_bootstrap_dep", ErrInvalid)
+			return planFailure(
+				"validation",
+				"select_window_missing_close_bootstrap_dep",
+				ErrInvalid,
+			)
 		}
 	}
 
@@ -998,7 +1052,8 @@ func (t *planTracker) validateSelectWindowPrereqs(step Step, sessionID string, l
 
 func validateSelectWindowLinks(sw *SelectWindowStep, links []model.Link) error {
 	activeLink, lastLink := findSessionActiveAndLastLinks(sw.SessionID, links)
-	if activeLink == nil || activeLink.Window != sw.ActiveWindowID || activeLink.Index != sw.ActiveIndex {
+	if activeLink == nil || activeLink.Window != sw.ActiveWindowID ||
+		activeLink.Index != sw.ActiveIndex {
 		return planFailure("validation", "select_window_active_mismatch", ErrInvalid)
 	}
 
@@ -1013,7 +1068,10 @@ func validateSelectWindowLinks(sw *SelectWindowStep, links []model.Link) error {
 	return nil
 }
 
-func findSessionActiveAndLastLinks(sessionID string, links []model.Link) (*model.Link, *model.Link) {
+func findSessionActiveAndLastLinks(
+	sessionID string,
+	links []model.Link,
+) (*model.Link, *model.Link) {
 	var active, last *model.Link
 
 	for i := range links {

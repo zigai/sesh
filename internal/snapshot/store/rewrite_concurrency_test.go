@@ -55,10 +55,26 @@ func TestConcurrentRewriteAndSameSourcePinRace(t *testing.T) {
 
 	wg.Wait()
 
-	verifySameSourcePinRaceOutcome(t, rMain, path, source.ID, rewriteRes, pinnedOp, rewriteErr, pinErr)
+	verifySameSourcePinRaceOutcome(
+		t,
+		rMain,
+		path,
+		source.ID,
+		rewriteRes,
+		pinnedOp,
+		rewriteErr,
+		pinErr,
+	)
 }
 
-func verifySameSourcePinRaceOutcome(t *testing.T, r *Repository, path, sourceID string, rewriteRes RewriteResult, pinnedOp Operation, rewriteErr, pinErr error) {
+func verifySameSourcePinRaceOutcome(
+	t *testing.T,
+	r *Repository,
+	path, sourceID string,
+	rewriteRes RewriteResult,
+	pinnedOp Operation,
+	rewriteErr, pinErr error,
+) {
 	t.Helper()
 
 	catalog, err := r.Inspect(t.Context())
@@ -81,7 +97,14 @@ func verifySameSourcePinRaceOutcome(t *testing.T, r *Repository, path, sourceID 
 	verifyPinWonOutcome(t, r, path, catalog, sourceID, pinnedOp)
 }
 
-func verifyRewriteWonOutcome(t *testing.T, r *Repository, path string, catalog Catalog, sourceID string, rewriteRes RewriteResult) {
+func verifyRewriteWonOutcome(
+	t *testing.T,
+	r *Repository,
+	path string,
+	catalog Catalog,
+	sourceID string,
+	rewriteRes RewriteResult,
+) {
 	t.Helper()
 
 	if catalog.generationIndex(sourceID) >= 0 {
@@ -97,13 +120,23 @@ func verifyRewriteWonOutcome(t *testing.T, r *Repository, path string, catalog C
 		t.Fatalf("unexpected survivor sessions count: %d", len(survivorManifest.Sessions))
 	}
 
-	art0 := readGzipFixture(t, filepath.Join(path, "generations", rewriteRes.Replacement.ID, "artifacts", "a0.bin.gz"))
+	art0 := readGzipFixture(
+		t,
+		filepath.Join(path, "generations", rewriteRes.Replacement.ID, "artifacts", "a0.bin.gz"),
+	)
 	if !bytes.Equal(art0, []byte("shared window content\n")) {
 		t.Fatal("survivor artifact a0 bytes corrupted")
 	}
 }
 
-func verifyPinWonOutcome(t *testing.T, r *Repository, path string, catalog Catalog, sourceID string, pinnedOp Operation) {
+func verifyPinWonOutcome(
+	t *testing.T,
+	r *Repository,
+	path string,
+	catalog Catalog,
+	sourceID string,
+	pinnedOp Operation,
+) {
 	t.Helper()
 
 	if catalog.generationIndex(sourceID) < 0 {
@@ -128,7 +161,10 @@ func verifyPinWonOutcome(t *testing.T, r *Repository, path string, catalog Catal
 		t.Fatalf("pinned manifest corrupted: %d sessions", len(pinnedManifest.Sessions))
 	}
 
-	art0 := readGzipFixture(t, filepath.Join(path, "generations", sourceID, "artifacts", "a0.bin.gz"))
+	art0 := readGzipFixture(
+		t,
+		filepath.Join(path, "generations", sourceID, "artifacts", "a0.bin.gz"),
+	)
 	if !bytes.Equal(art0, []byte("shared window content\n")) {
 		t.Fatal("pinned artifact a0 bytes corrupted")
 	}
@@ -176,7 +212,11 @@ func TestConcurrentRewriteAndDifferentSourcePinRace(t *testing.T) {
 	wg.Wait()
 
 	if rewriteErr != nil || pinErr != nil {
-		t.Fatalf("both should succeed on different sources: rewriteErr=%v pinErr=%v", rewriteErr, pinErr)
+		t.Fatalf(
+			"both should succeed on different sources: rewriteErr=%v pinErr=%v",
+			rewriteErr,
+			pinErr,
+		)
 	}
 
 	catalog, err := rMain.Inspect(t.Context())
@@ -244,7 +284,11 @@ func TestConcurrentRewriteAndUnrelatedSaveRace(t *testing.T) {
 	wg.Wait()
 
 	if rewriteErr != nil || saveErr != nil {
-		t.Fatalf("both rewrite and unrelated save should succeed: rewriteErr=%v saveErr=%v", rewriteErr, saveErr)
+		t.Fatalf(
+			"both rewrite and unrelated save should succeed: rewriteErr=%v saveErr=%v",
+			rewriteErr,
+			saveErr,
+		)
 	}
 
 	catalog, err := rMain.Inspect(t.Context())
@@ -257,17 +301,30 @@ func TestConcurrentRewriteAndUnrelatedSaveRace(t *testing.T) {
 	}
 
 	if len(catalog.Generations) != 2 {
-		t.Fatalf("expected 2 generations (g1 replacement + new save), got %d", len(catalog.Generations))
+		t.Fatalf(
+			"expected 2 generations (g1 replacement + new save), got %d",
+			len(catalog.Generations),
+		)
 	}
 
 	if catalog.Current != saveGen.ID {
-		t.Fatalf("expected Current to be save %s for either race ordering, got %s", saveGen.ID, catalog.Current)
+		t.Fatalf(
+			"expected Current to be save %s for either race ordering, got %s",
+			saveGen.ID,
+			catalog.Current,
+		)
 	}
 
 	verifyUnrelatedSaveSourceBytes(t, rMain, path, saveGen, rewriteRes)
 }
 
-func verifyUnrelatedSaveSourceBytes(t *testing.T, r *Repository, path string, saveGen Generation, rewriteRes RewriteResult) {
+func verifyUnrelatedSaveSourceBytes(
+	t *testing.T,
+	r *Repository,
+	path string,
+	saveGen Generation,
+	rewriteRes RewriteResult,
+) {
 	t.Helper()
 
 	saveManifest, err := r.Read(t.Context(), saveGen.ID)
@@ -279,7 +336,10 @@ func verifyUnrelatedSaveSourceBytes(t *testing.T, r *Repository, path string, sa
 		t.Fatalf("unexpected save sessions: %v", saveManifest.Sessions)
 	}
 
-	saveArt := readGzipFixture(t, filepath.Join(path, "generations", saveGen.ID, "artifacts", "a0.bin.gz"))
+	saveArt := readGzipFixture(
+		t,
+		filepath.Join(path, "generations", saveGen.ID, "artifacts", "a0.bin.gz"),
+	)
 	if !bytes.Equal(saveArt, []byte("  synthetic \x00\xff terminal history\n")) {
 		t.Fatal("save artifact bytes corrupted")
 	}
@@ -293,7 +353,10 @@ func verifyUnrelatedSaveSourceBytes(t *testing.T, r *Repository, path string, sa
 		t.Fatalf("unexpected replacement sessions: %d", len(replacementManifest.Sessions))
 	}
 
-	repArt := readGzipFixture(t, filepath.Join(path, "generations", rewriteRes.Replacement.ID, "artifacts", "a0.bin.gz"))
+	repArt := readGzipFixture(
+		t,
+		filepath.Join(path, "generations", rewriteRes.Replacement.ID, "artifacts", "a0.bin.gz"),
+	)
 	if !bytes.Equal(repArt, []byte("shared window content\n")) {
 		t.Fatal("replacement artifact bytes corrupted")
 	}

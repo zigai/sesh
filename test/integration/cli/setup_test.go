@@ -33,7 +33,10 @@ type setupApplyResultJSON struct {
 func boundKeys(t *testing.T, server *gotmux.Server, table string) map[string]string {
 	t.Helper()
 
-	bindings, err := server.FindBindings(t.Context(), gotmux.BindingsOptions{Table: gotmux.KeyTable(table)})
+	bindings, err := server.FindBindings(
+		t.Context(),
+		gotmux.BindingsOptions{Table: gotmux.KeyTable(table)},
+	)
 	if err != nil {
 		t.Fatalf("list bindings failed: %v", err)
 	}
@@ -52,7 +55,16 @@ func TestSetupTmuxApplyRegistersBindings(t *testing.T) {
 
 	isolateAutosaveEnv(t)
 
-	exec := executeJSON(t, "setup", "tmux", "--apply", testSocketFlag, socketPath, testNoConfigFlag, testJSONFlag)
+	exec := executeJSON(
+		t,
+		"setup",
+		"tmux",
+		"--apply",
+		testSocketFlag,
+		socketPath,
+		testNoConfigFlag,
+		testJSONFlag,
+	)
 	if !exec.envelope.OK {
 		t.Fatalf("setup tmux --apply failed: %+v\nstderr: %s", exec.err, exec.stderr)
 	}
@@ -75,12 +87,30 @@ func TestSetupTmuxApplySkipsExistingAndForceOverwrites(t *testing.T) {
 
 	isolateAutosaveEnv(t)
 
-	first := executeJSON(t, "setup", "tmux", "--apply", testSocketFlag, socketPath, testNoConfigFlag, testJSONFlag)
+	first := executeJSON(
+		t,
+		"setup",
+		"tmux",
+		"--apply",
+		testSocketFlag,
+		socketPath,
+		testNoConfigFlag,
+		testJSONFlag,
+	)
 	if !first.envelope.OK {
 		t.Fatalf("first apply failed: %+v\nstderr: %s", first.err, first.stderr)
 	}
 
-	second := executeJSON(t, "setup", "tmux", "--apply", testSocketFlag, socketPath, testNoConfigFlag, testJSONFlag)
+	second := executeJSON(
+		t,
+		"setup",
+		"tmux",
+		"--apply",
+		testSocketFlag,
+		socketPath,
+		testNoConfigFlag,
+		testJSONFlag,
+	)
 	if second.err == nil {
 		t.Fatal("second apply must report key conflicts, got nil error")
 	}
@@ -91,14 +121,28 @@ func TestSetupTmuxApplySkipsExistingAndForceOverwrites(t *testing.T) {
 
 	assertDegradedConflictEnvelope(t, second)
 
-	forced := executeJSON(t, "setup", "tmux", "--apply", "--force", testSocketFlag, socketPath, testNoConfigFlag, testJSONFlag)
+	forced := executeJSON(
+		t,
+		"setup",
+		"tmux",
+		"--apply",
+		"--force",
+		testSocketFlag,
+		socketPath,
+		testNoConfigFlag,
+		testJSONFlag,
+	)
 	if !forced.envelope.OK {
 		t.Fatalf("forced apply failed: %+v\nstderr: %s", forced.err, forced.stderr)
 	}
 
 	forcedResult := decodeJSONPayload[setupApplyResultJSON](t, forced.envelope.Result)
 	if forcedResult.Applied != 7 || forcedResult.Skipped != 0 {
-		t.Fatalf("forced applied/skipped = %d/%d, want 7/0", forcedResult.Applied, forcedResult.Skipped)
+		t.Fatalf(
+			"forced applied/skipped = %d/%d, want 7/0",
+			forcedResult.Applied,
+			forcedResult.Skipped,
+		)
 	}
 
 	assertBound(t, server, []string{"S-F12", "M-S-F12", "S-F1", "C-o", "M-w", "C-t", "M-n"})
@@ -110,17 +154,41 @@ func TestSetupTmuxApplySkipsAKeyBoundUnderAnotherSpelling(t *testing.T) {
 
 	isolateAutosaveEnv(t)
 
-	first := executeJSON(t, "setup", "tmux", "--apply", testSocketFlag, socketPath, testConfigFlag, writeSetupBindings(t, "C-M-F1"), testJSONFlag)
+	first := executeJSON(
+		t,
+		"setup",
+		"tmux",
+		"--apply",
+		testSocketFlag,
+		socketPath,
+		testConfigFlag,
+		writeSetupBindings(t, "C-M-F1"),
+		testJSONFlag,
+	)
 	if !first.envelope.OK {
 		t.Fatalf("first apply failed: %+v\nstderr: %s", first.err, first.stderr)
 	}
 
-	second := executeJSON(t, "setup", "tmux", "--apply", testSocketFlag, socketPath, testConfigFlag, writeSetupBindings(t, "M-C-F1"), testJSONFlag)
+	second := executeJSON(
+		t,
+		"setup",
+		"tmux",
+		"--apply",
+		testSocketFlag,
+		socketPath,
+		testConfigFlag,
+		writeSetupBindings(t, "M-C-F1"),
+		testJSONFlag,
+	)
 	if second.err == nil {
 		t.Fatal("apply of M-C-F1 over the bound C-M-F1 must report a conflict, got nil error")
 	}
 
-	if result := decodeJSONPayload[setupApplyResultJSON](t, second.envelope.Result); result.Applied != 0 || result.Skipped != 1 {
+	if result := decodeJSONPayload[setupApplyResultJSON](
+		t,
+		second.envelope.Result,
+	); result.Applied != 0 ||
+		result.Skipped != 1 {
 		t.Fatalf("applied/skipped = %d/%d, want 0/1", result.Applied, result.Skipped)
 	}
 }
@@ -135,7 +203,11 @@ func writeSetupBindings(t *testing.T, keys ...string) string {
 	}
 
 	for _, key := range keys {
-		fmt.Fprintf(&text, "[[keys.bind]]\nkey = %q\naction = \"agent.back\"\nin = \"tmux\"\ntable = \"sesh-test\"\n\n", key)
+		fmt.Fprintf(
+			&text,
+			"[[keys.bind]]\nkey = %q\naction = \"agent.back\"\nin = \"tmux\"\ntable = \"sesh-test\"\n\n",
+			key,
+		)
 	}
 
 	path := filepath.Join(t.TempDir(), "config.toml")

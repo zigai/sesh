@@ -38,9 +38,21 @@ func TestSessionCommandsMissingArguments(t *testing.T) {
 		args     []string
 		wantCode int
 	}{
-		{name: "new missing name", args: []string{"session", "new"}, wantCode: clibase.ExitCodeUsage},
-		{name: "rename missing name", args: []string{"session", "rename"}, wantCode: clibase.ExitCodeUsage},
-		{name: "switch missing target", args: []string{"session", "switch"}, wantCode: clibase.ExitCodeUsage},
+		{
+			name:     "new missing name",
+			args:     []string{"session", "new"},
+			wantCode: clibase.ExitCodeUsage,
+		},
+		{
+			name:     "rename missing name",
+			args:     []string{"session", "rename"},
+			wantCode: clibase.ExitCodeUsage,
+		},
+		{
+			name:     "switch missing target",
+			args:     []string{"session", "switch"},
+			wantCode: clibase.ExitCodeUsage,
+		},
 	}
 
 	for _, tc := range tests {
@@ -77,12 +89,23 @@ func TestSessionCommandsWithoutSocketTargetDefaultTmuxServer(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			exec := executeJSON(t, append(tc.args, testNoConfigFlag, testJSONFlag)...)
 
-			if !errors.Is(exec.Err, gotmux.ErrNoServer) && !errors.Is(exec.Err, session.ErrSessionNotFound) {
-				t.Fatalf("error = %v, want the isolated default socket to have no server or session", exec.Err)
+			if !errors.Is(exec.Err, gotmux.ErrNoServer) &&
+				!errors.Is(exec.Err, session.ErrSessionNotFound) {
+				t.Fatalf(
+					"error = %v, want the isolated default socket to have no server or session",
+					exec.Err,
+				)
 			}
 
-			if code := clibase.ExitCode(exec.Err); code == clibase.ExitCodeUsage || exec.Envelope.OK {
-				t.Fatalf("exit code %d / envelope %+v, want a non-usage failure", code, exec.Envelope)
+			if code := clibase.ExitCode(
+				exec.Err,
+			); code == clibase.ExitCodeUsage ||
+				exec.Envelope.OK {
+				t.Fatalf(
+					"exit code %d / envelope %+v, want a non-usage failure",
+					code,
+					exec.Envelope,
+				)
 			}
 		})
 	}

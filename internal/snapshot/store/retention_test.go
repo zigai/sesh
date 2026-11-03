@@ -20,7 +20,12 @@ func TestRetainedSourceReleasedOnlyAfterVerification(t *testing.T) {
 	r := openRepository(t, path)
 	source := commitFixture(t, r)
 
-	op, err := r.Pin(t.Context(), source.ID, model.Bytes("synthetic-target"), []Action{{ID: "launch", Kind: actionLaunch, State: actionPlanned}})
+	op, err := r.Pin(
+		t.Context(),
+		source.ID,
+		model.Bytes("synthetic-target"),
+		[]Action{{ID: "launch", Kind: actionLaunch, State: actionPlanned}},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +44,14 @@ func TestRetainedSourceReleasedOnlyAfterVerification(t *testing.T) {
 	}
 
 	for _, step := range [][2]model.ActionState{{actionPlanned, actionIssued}, {actionIssued, actionUnknown}, {actionUnknown, actionConfirmed}, {actionConfirmed, actionVerified}} {
-		if err := reopened.Transition(t.Context(), op.ID, "launch", step[0], step[1], model.Bytes("runtime-receipt")); err != nil {
+		if err := reopened.Transition(
+			t.Context(),
+			op.ID,
+			"launch",
+			step[0],
+			step[1],
+			model.Bytes("runtime-receipt"),
+		); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -61,7 +73,9 @@ func TestRetainedSourceReleasedOnlyAfterVerification(t *testing.T) {
 		t.Fatal("retired generation still selectable", err)
 	}
 
-	if _, err := os.Stat(filepath.Join(path, "generations", source.ID, "manifest.json")); err != nil {
+	if _, err := os.Stat(
+		filepath.Join(path, "generations", source.ID, "manifest.json"),
+	); err != nil {
 		t.Fatal("recovery bytes destroyed", err)
 	}
 }
@@ -118,7 +132,12 @@ func TestDeleteRejectsCurrentOrPinned(t *testing.T) {
 	err := r.Delete(t.Context(), gen2.ID)
 	assertRepositoryDiagnostic(t, err, "delete", "repository_conflict", ErrConflict)
 
-	op, err := r.Pin(t.Context(), gen1.ID, model.Bytes("target"), []Action{{ID: "act", Kind: actionLaunch, State: actionPlanned}})
+	op, err := r.Pin(
+		t.Context(),
+		gen1.ID,
+		model.Bytes("target"),
+		[]Action{{ID: "act", Kind: actionLaunch, State: actionPlanned}},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +164,11 @@ func TestDeleteRejectsCurrentOrPinned(t *testing.T) {
 func compactHistoryThroughRetention(t *testing.T, r *Repository) Catalog {
 	t.Helper()
 
-	if _, err := r.RetainPolicy(t.Context(), time.Time{}, RetentionPolicy{MaxAge: 0, MaxCount: 0, MaxBytes: 0}); err != nil {
+	if _, err := r.RetainPolicy(
+		t.Context(),
+		time.Time{},
+		RetentionPolicy{MaxAge: 0, MaxCount: 0, MaxBytes: 0},
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -192,7 +215,9 @@ func TestRetentionCompactsHistoryOfCollectedGenerations(t *testing.T) {
 	beforeCollection := compactHistoryThroughRetention(t, r)
 	for _, retired := range generations[:2] {
 		if beforeCollection.attemptIndex(retired.ID) < 0 {
-			t.Fatal("retention dropped the evidence collection needs for a generation still on disk")
+			t.Fatal(
+				"retention dropped the evidence collection needs for a generation still on disk",
+			)
 		}
 	}
 
@@ -215,7 +240,12 @@ func TestRetentionCompactsHistoryOfCollectedGenerations(t *testing.T) {
 	}
 
 	for _, retired := range generations[:2] {
-		if _, err := os.Stat(filepath.Join(path, collectionDirectory, retired.ID+collectionRecordSuffix)); !errors.Is(err, os.ErrNotExist) {
+		if _, err := os.Stat(
+			filepath.Join(path, collectionDirectory, retired.ID+collectionRecordSuffix),
+		); !errors.Is(
+			err,
+			os.ErrNotExist,
+		) {
 			t.Fatalf("settled collection record survived compaction: %v", err)
 		}
 	}
@@ -229,7 +259,16 @@ func TestRetentionCompactsHistoryOfCollectedGenerations(t *testing.T) {
 		t.Fatalf("compaction changed the current listing:\n%s", diff)
 	}
 
-	if result := collectGenerations(t, r); len(result.Removed)+len(result.Preserved)+len(result.Quarantined) != 0 {
+	if result := collectGenerations(
+		t,
+		r,
+	); len(
+		result.Removed,
+	)+len(
+		result.Preserved,
+	)+len(
+		result.Quarantined,
+	) != 0 {
 		t.Fatalf("collection after compaction = %+v, want no work", result)
 	}
 }

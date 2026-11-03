@@ -20,8 +20,15 @@ func Harnesses(cfg config.TasksConfig, lookPath func(string) (string, error)) []
 		offered := make([]Harness, 0)
 
 		for _, id := range harness.Supported() {
-			if command, found := installed(id, lookPath); found && config.ValidHarnessName(string(id)) {
-				offered = append(offered, Harness{Name: string(id), Command: command, PromptArgs: nil})
+			if command, found := installed(
+				id,
+				lookPath,
+			); found &&
+				config.ValidHarnessName(string(id)) {
+				offered = append(
+					offered,
+					Harness{Name: string(id), Command: command, PromptArgs: nil},
+				)
 			}
 		}
 
@@ -41,7 +48,14 @@ func Harnesses(cfg config.TasksConfig, lookPath func(string) (string, error)) []
 			command = resolved
 		}
 
-		offered = append(offered, Harness{Name: configured.Name, Command: command, PromptArgs: slices.Clone(configured.PromptArgs)})
+		offered = append(
+			offered,
+			Harness{
+				Name:       configured.Name,
+				Command:    command,
+				PromptArgs: slices.Clone(configured.PromptArgs),
+			},
+		)
 	}
 
 	return offered

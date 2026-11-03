@@ -50,7 +50,11 @@ func TestInheritedColorSentinelsAreClassifiedBeforeMutation(t *testing.T) {
 		{
 			name: "pane cursor none",
 			option: model.Option{
-				Scope: "window", Name: model.Bytes(cursorColorOption), Value: model.Bytes("none"), Present: true, Inherited: true,
+				Scope:     "window",
+				Name:      model.Bytes(cursorColorOption),
+				Value:     model.Bytes("none"),
+				Present:   true,
+				Inherited: true,
 			},
 			unsupported: true,
 			materialize: false,
@@ -58,7 +62,11 @@ func TestInheritedColorSentinelsAreClassifiedBeforeMutation(t *testing.T) {
 		{
 			name: "prompt cursor none",
 			option: model.Option{
-				Scope: "session", Name: model.Bytes(promptCursorColorOption), Value: model.Bytes("none"), Present: true, Inherited: true,
+				Scope:     "session",
+				Name:      model.Bytes(promptCursorColorOption),
+				Value:     model.Bytes("none"),
+				Present:   true,
+				Inherited: true,
 			},
 			unsupported: true,
 			materialize: false,
@@ -66,7 +74,11 @@ func TestInheritedColorSentinelsAreClassifiedBeforeMutation(t *testing.T) {
 		{
 			name: "writable cursor color",
 			option: model.Option{
-				Scope: "window", Name: model.Bytes(cursorColorOption), Value: model.Bytes("red"), Present: true, Inherited: true,
+				Scope:     "window",
+				Name:      model.Bytes(cursorColorOption),
+				Value:     model.Bytes("red"),
+				Present:   true,
+				Inherited: true,
 			},
 			unsupported: false,
 			materialize: true,

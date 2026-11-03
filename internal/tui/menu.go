@@ -145,7 +145,8 @@ func (m *Model) handleMenuKeys(msg tea.KeyPressMsg) func() (tea.Model, tea.Cmd) 
 	}
 
 	for index, entry := range m.menu.entries {
-		if !entry.divider() && entry.key != "" && keyPressSpec(config.PickerKeyName(entry.key)) == pressed {
+		if !entry.divider() && entry.key != "" &&
+			keyPressSpec(config.PickerKeyName(entry.key)) == pressed {
 			return m.runMenuEntry(index)
 		}
 	}
@@ -184,7 +185,8 @@ func (m *Model) handleMenuMouse(mouse tea.Mouse, click bool) func() (tea.Model, 
 
 	box := m.menu.box
 	index := mouse.Y - box.y - 1
-	inside := mouse.X >= box.x && mouse.X < box.x+box.width && index >= 0 && index < len(m.menu.entries)
+	inside := mouse.X >= box.x && mouse.X < box.x+box.width && index >= 0 &&
+		index < len(m.menu.entries)
 
 	switch {
 	case inside && click && mouse.Button == tea.MouseLeft:
@@ -272,7 +274,19 @@ func (m *Model) menuLines() []string {
 			continue
 		}
 
-		lines = append(lines, border.Render("│")+m.menuEntryLine(entry, inner, labelWidth, index == m.menu.cursor)+border.Render("│"))
+		lines = append(
+			lines,
+			border.Render(
+				"│",
+			)+m.menuEntryLine(
+				entry,
+				inner,
+				labelWidth,
+				index == m.menu.cursor,
+			)+border.Render(
+				"│",
+			),
+		)
 	}
 
 	return append(lines, border.Render("╰"+strings.Repeat("─", inner)+"╯"))
@@ -287,12 +301,24 @@ func (m *Model) menuDividerLine(title string, inner int) string {
 	muted := lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.Theme.Muted))
 	rest := inner - lipgloss.Width(title) - menuDividerTitleCells
 
-	return border.Render("├─ ") + muted.Render(SanitizeTerminalText(title)) + border.Render(" "+strings.Repeat("─", rest)+"┤")
+	return border.Render(
+		"├─ ",
+	) + muted.Render(
+		SanitizeTerminalText(title),
+	) + border.Render(
+		" "+strings.Repeat("─", rest)+"┤",
+	)
 }
 
 func (m *Model) menuEntryLine(entry menuEntry, inner, labelWidth int, selected bool) string {
 	label := SanitizeTerminalText(entry.label)
-	labelPart := strings.Repeat(" ", menuPaddingCells) + label + strings.Repeat(" ", max(labelWidth-lipgloss.Width(label), 0))
+	labelPart := strings.Repeat(
+		" ",
+		menuPaddingCells,
+	) + label + strings.Repeat(
+		" ",
+		max(labelWidth-lipgloss.Width(label), 0),
+	)
 
 	keyPart := ""
 	if entry.key != "" {
@@ -305,11 +331,17 @@ func (m *Model) menuEntryLine(entry menuEntry, inner, labelWidth int, selected b
 	}
 
 	if selected {
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("255")).Background(lipgloss.Color(m.config.Theme.Selected)).Bold(true).
+		return lipgloss.NewStyle().
+			Foreground(lipgloss.Color("255")).
+			Background(lipgloss.Color(m.config.Theme.Selected)).
+			Bold(true).
 			Render(labelPart + keyPart + padding)
 	}
 
-	return labelPart + lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.Theme.Muted)).Render(keyPart) + padding
+	return labelPart + lipgloss.NewStyle().
+		Foreground(lipgloss.Color(m.config.Theme.Muted)).
+		Render(keyPart) +
+		padding
 }
 
 func (m *Model) openRowMenu() func() (tea.Model, tea.Cmd) {
@@ -323,10 +355,28 @@ func (m *Model) openRowMenu() func() (tea.Model, tea.Cmd) {
 	}
 
 	if selected.isAgent() {
-		return m.openMenu(&rowMenu{entries: append(m.agentMenuEntries(), m.agentSessionMenuEntries()...), cursor: 0, anchored: false, anchorX: 0, anchorY: 0, box: menuBox{x: 0, y: 0, width: 0, height: 0}})
+		return m.openMenu(
+			&rowMenu{
+				entries:  append(m.agentMenuEntries(), m.agentSessionMenuEntries()...),
+				cursor:   0,
+				anchored: false,
+				anchorX:  0,
+				anchorY:  0,
+				box:      menuBox{x: 0, y: 0, width: 0, height: 0},
+			},
+		)
 	}
 
-	return m.openMenu(&rowMenu{entries: m.sessionMenuEntries(), cursor: 0, anchored: false, anchorX: 0, anchorY: 0, box: menuBox{x: 0, y: 0, width: 0, height: 0}})
+	return m.openMenu(
+		&rowMenu{
+			entries:  m.sessionMenuEntries(),
+			cursor:   0,
+			anchored: false,
+			anchorX:  0,
+			anchorY:  0,
+			box:      menuBox{x: 0, y: 0, width: 0, height: 0},
+		},
+	)
 }
 
 func (m *Model) handleRowRightClick(mouse tea.Mouse) func() (tea.Model, tea.Cmd) {
@@ -347,7 +397,13 @@ func (m *Model) handleRowRightClick(mouse tea.Mouse) func() (tea.Model, tea.Cmd)
 		inset = popupViewportInset
 	}
 
-	m.menu.anchored, m.menu.anchorX, m.menu.anchorY = true, max(mouse.X-inset, 0), max(mouse.Y-inset, 0)
+	m.menu.anchored, m.menu.anchorX, m.menu.anchorY = true, max(
+		mouse.X-inset,
+		0,
+	), max(
+		mouse.Y-inset,
+		0,
+	)
 
 	return handler
 }
@@ -497,7 +553,11 @@ func (m *Model) menuItemEntries(name string, item config.MenuItemConfig) []menuE
 	return []menuEntry{entry}
 }
 
-func (m *Model) actionMenuEntry(label string, id action.ID, values action.Values) (menuEntry, bool) {
+func (m *Model) actionMenuEntry(
+	label string,
+	id action.ID,
+	values action.Values,
+) (menuEntry, bool) {
 	if !m.actionRunnable(id) {
 		return menuEntry{label: "", key: "", run: nil}, false
 	}
@@ -505,7 +565,8 @@ func (m *Model) actionMenuEntry(label string, id action.ID, values action.Values
 	key := ""
 
 	for _, bound := range m.actionKeys().actions {
-		if bound.binding.Action == id && maps.EqualFunc(bound.binding.Values, values, slices.Equal) {
+		if bound.binding.Action == id &&
+			maps.EqualFunc(bound.binding.Values, values, slices.Equal) {
 			key = bound.key.Help().Key
 		}
 	}

@@ -127,17 +127,55 @@ func TestGeneratedStepIDsAndDependencies(t *testing.T) {
 	want := []entry{
 		{ID: "create-session:s0"},
 		{ID: "place-initial-window:s0", DependsOn: []string{"create-session:s0"}},
-		{ID: "create-window:w0", DependsOn: []string{"create-session:s0", "place-initial-window:s0"}},
+		{
+			ID:        "create-window:w0",
+			DependsOn: []string{"create-session:s0", "place-initial-window:s0"},
+		},
 		{ID: "split-pane:p2", DependsOn: []string{"create-window:w0"}},
 		{ID: "split-pane:p1", DependsOn: []string{"create-window:w0", "split-pane:p2"}},
 		{ID: "split-pane:p3", DependsOn: []string{"split-pane:p1", "split-pane:p2"}},
-		{ID: "close-bootstrap:s0", DependsOn: []string{"create-window:w0", "split-pane:p1", "split-pane:p2", "split-pane:p3"}},
-		{ID: "link-window:s0:w0:10", DependsOn: []string{"create-session:s0", "create-window:w0", "place-initial-window:s0", "split-pane:p1", "split-pane:p2", "split-pane:p3"}},
-		{ID: "apply-layout:w0", DependsOn: []string{"create-window:w0", "split-pane:p1", "split-pane:p2", "split-pane:p3"}},
+		{
+			ID: "close-bootstrap:s0",
+			DependsOn: []string{
+				"create-window:w0",
+				"split-pane:p1",
+				"split-pane:p2",
+				"split-pane:p3",
+			},
+		},
+		{
+			ID: "link-window:s0:w0:10",
+			DependsOn: []string{
+				"create-session:s0",
+				"create-window:w0",
+				"place-initial-window:s0",
+				"split-pane:p1",
+				"split-pane:p2",
+				"split-pane:p3",
+			},
+		},
+		{
+			ID: "apply-layout:w0",
+			DependsOn: []string{
+				"create-window:w0",
+				"split-pane:p1",
+				"split-pane:p2",
+				"split-pane:p3",
+			},
+		},
 		{ID: "set-pane-title:w0:p0", DependsOn: []string{"apply-layout:w0", "create-window:w0"}},
 		{ID: "select-pane:w0:p0", DependsOn: []string{"set-pane-title:w0:p0"}},
 		{ID: "apply-zoom:w0:p0", DependsOn: []string{"select-pane:w0:p0"}},
-		{ID: "select-window:s0", DependsOn: []string{"apply-zoom:w0:p0", "close-bootstrap:s0", "create-session:s0", "link-window:s0:w0:10", "place-initial-window:s0"}},
+		{
+			ID: "select-window:s0",
+			DependsOn: []string{
+				"apply-zoom:w0:p0",
+				"close-bootstrap:s0",
+				"create-session:s0",
+				"link-window:s0:w0:10",
+				"place-initial-window:s0",
+			},
+		},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Fatalf("step ID and dependency order changed (-want +got):\n%s", diff)
@@ -207,7 +245,9 @@ func assertSimpleSummary(t *testing.T, s PlanSummary) {
 func assertSimpleSessionStep(t *testing.T, cs *CreateSessionStep) {
 	t.Helper()
 
-	if cs.SessionID != "s0" || cs.InitialWindowID != "w0" || string(cs.InitialWindowName) != "code" || cs.InitialPaneID != "p0" {
+	if cs.SessionID != "s0" || cs.InitialWindowID != "w0" ||
+		string(cs.InitialWindowName) != "code" ||
+		cs.InitialPaneID != "p0" {
 		t.Fatalf("unexpected create session payload: %+v", cs)
 	}
 }
@@ -279,7 +319,13 @@ func countCreationsAndZoom(steps []Step) (int, int, bool) {
 			paneCreates++
 		case *ApplyZoomStep:
 			hasZoom = true
-		case *PlaceInitialWindowStep, *LinkWindowStep, *CloseBootstrapWindowStep, *ApplyLayoutStep, *SetPaneTitleStep, *SelectPaneStep, *SelectWindowStep:
+		case *PlaceInitialWindowStep,
+			*LinkWindowStep,
+			*CloseBootstrapWindowStep,
+			*ApplyLayoutStep,
+			*SetPaneTitleStep,
+			*SelectPaneStep,
+			*SelectWindowStep:
 		}
 	}
 
@@ -426,7 +472,8 @@ func checkSharedWindowSteps(steps []Step, winID, sessID string) (int, bool) {
 			creations++
 		}
 
-		if stepKind(step) == StepLinkWindow && stepAs[*LinkWindowStep](step).SessionID == sessID && stepAs[*LinkWindowStep](step).WindowID == winID {
+		if stepKind(step) == StepLinkWindow && stepAs[*LinkWindowStep](step).SessionID == sessID &&
+			stepAs[*LinkWindowStep](step).WindowID == winID {
 			linked = true
 		}
 	}
@@ -593,7 +640,11 @@ func assertNativeGroupsSteps(t *testing.T, steps []Step) {
 	}
 
 	if linkWindowCount != 0 || createWindowCount != 0 {
-		t.Fatalf("expected 0 link/create window steps, got links=%d creates=%d", linkWindowCount, createWindowCount)
+		t.Fatalf(
+			"expected 0 link/create window steps, got links=%d creates=%d",
+			linkWindowCount,
+			createWindowCount,
+		)
 	}
 }
 
@@ -622,11 +673,13 @@ func TestRepeatedLinksAndSparseIndexes(t *testing.T) {
 	foundLink10 := false
 
 	for _, step := range plan.Steps {
-		if stepKind(step) == StepCreateWindow && stepAs[*CreateWindowStep](step).WindowID == "w0" && stepAs[*CreateWindowStep](step).Index == 3 {
+		if stepKind(step) == StepCreateWindow && stepAs[*CreateWindowStep](step).WindowID == "w0" &&
+			stepAs[*CreateWindowStep](step).Index == 3 {
 			foundCreate3 = true
 		}
 
-		if stepKind(step) == StepLinkWindow && stepAs[*LinkWindowStep](step).WindowID == "w0" && stepAs[*LinkWindowStep](step).Index == 10 {
+		if stepKind(step) == StepLinkWindow && stepAs[*LinkWindowStep](step).WindowID == "w0" &&
+			stepAs[*LinkWindowStep](step).Index == 10 {
 			foundLink10 = true
 		}
 	}
@@ -708,7 +761,8 @@ func TestZoom(t *testing.T) {
 		if stepKind(step) == StepApplyZoom {
 			foundZoom = true
 
-			if stepAs[*ApplyZoomStep](step).WindowID != "w0" || stepAs[*ApplyZoomStep](step).PaneID != "p0" {
+			if stepAs[*ApplyZoomStep](step).WindowID != "w0" ||
+				stepAs[*ApplyZoomStep](step).PaneID != "p0" {
 				t.Fatalf("unexpected zoom payload: %+v", stepAs[*ApplyZoomStep](step))
 			}
 		}
@@ -800,14 +854,46 @@ func TestClosureChains(t *testing.T) {
 
 	m.Windows = append(
 		m.Windows,
-		model.Window{ID: "w1", Name: model.Bytes("w1"), Width: 80, Height: 24, Layout: model.Layout{Width: 80, Height: 24, Pane: "p1"}},
-		model.Window{ID: "w2", Name: model.Bytes("w2"), Width: 80, Height: 24, Layout: model.Layout{Width: 80, Height: 24, Pane: "p2"}},
+		model.Window{
+			ID:     "w1",
+			Name:   model.Bytes("w1"),
+			Width:  80,
+			Height: 24,
+			Layout: model.Layout{Width: 80, Height: 24, Pane: "p1"},
+		},
+		model.Window{
+			ID:     "w2",
+			Name:   model.Bytes("w2"),
+			Width:  80,
+			Height: 24,
+			Layout: model.Layout{Width: 80, Height: 24, Pane: "p2"},
+		},
 	)
 
 	m.Panes = append(
 		m.Panes,
-		model.Pane{ID: "p1", Window: "w1", Index: 0, Title: model.Bytes("p1"), Directory: model.Bytes("/tmp"), Width: 80, Height: 24, Active: true, Launch: model.Launch{Recovery: statusUnverified}},
-		model.Pane{ID: "p2", Window: "w2", Index: 0, Title: model.Bytes("p2"), Directory: model.Bytes("/tmp"), Width: 80, Height: 24, Active: true, Launch: model.Launch{Recovery: statusUnverified}},
+		model.Pane{
+			ID:        "p1",
+			Window:    "w1",
+			Index:     0,
+			Title:     model.Bytes("p1"),
+			Directory: model.Bytes("/tmp"),
+			Width:     80,
+			Height:    24,
+			Active:    true,
+			Launch:    model.Launch{Recovery: statusUnverified},
+		},
+		model.Pane{
+			ID:        "p2",
+			Window:    "w2",
+			Index:     0,
+			Title:     model.Bytes("p2"),
+			Directory: model.Bytes("/tmp"),
+			Width:     80,
+			Height:    24,
+			Active:    true,
+			Launch:    model.Launch{Recovery: statusUnverified},
+		},
 	)
 
 	m.Links = []model.Link{
@@ -856,8 +942,13 @@ func TestNamesWithUnusualBytes(t *testing.T) {
 		t.Fatalf("session name not preserved: %s", stepAs[*CreateSessionStep](plan.Steps[0]).Name)
 	}
 
-	if string(stepAs[*CreateSessionStep](plan.Steps[0]).InitialWindowName) != "win with \xff high bytes" {
-		t.Fatalf("initial window name step payload not preserved: %s", stepAs[*CreateSessionStep](plan.Steps[0]).InitialWindowName)
+	if string(
+		stepAs[*CreateSessionStep](plan.Steps[0]).InitialWindowName,
+	) != "win with \xff high bytes" {
+		t.Fatalf(
+			"initial window name step payload not preserved: %s",
+			stepAs[*CreateSessionStep](plan.Steps[0]).InitialWindowName,
+		)
 	}
 
 	var titleStepPayload string
@@ -1101,11 +1192,31 @@ func TestEvidenceGaps(t *testing.T) {
 		{Domain: "S00_Consistency", Status: "observed", Reason: "capture_not_atomic"},
 		{Domain: "S06", Status: "observed", Reason: "terminal_checkpoint_unavailable"},
 		{Domain: "S07", Status: statusUnverified, Reason: "ownership_unverified"},
-		{Domain: "atomicity", Status: "unsupported", Reason: "atomic_restore_transaction_unavailable"},
-		{Domain: "launch", Status: "unsupported", Reason: "exactly_once_process_launch_unavailable"},
-		{Domain: "ownership", Status: "unsupported", Reason: "immutable_ownership_enforcement_unavailable"},
-		{Domain: "target", Status: "unsupported", Reason: "target_options_and_group_names_require_adaptation"},
-		{Domain: "terminal", Status: "unsupported", Reason: "terminal_state_checkpoint_unavailable"},
+		{
+			Domain: "atomicity",
+			Status: "unsupported",
+			Reason: "atomic_restore_transaction_unavailable",
+		},
+		{
+			Domain: "launch",
+			Status: "unsupported",
+			Reason: "exactly_once_process_launch_unavailable",
+		},
+		{
+			Domain: "ownership",
+			Status: "unsupported",
+			Reason: "immutable_ownership_enforcement_unavailable",
+		},
+		{
+			Domain: "target",
+			Status: "unsupported",
+			Reason: "target_options_and_group_names_require_adaptation",
+		},
+		{
+			Domain: "terminal",
+			Status: "unsupported",
+			Reason: "terminal_state_checkpoint_unavailable",
+		},
 	}
 	if diff := cmp.Diff(expectedGaps, plan.MissingRequirements); diff != "" {
 		t.Fatalf("unexpected missing requirements: %s", diff)
@@ -1168,7 +1279,10 @@ func TestPlanEvidenceCompletenessReflectsManifest(t *testing.T) {
 	}
 
 	if len(plan.MissingRequirements) != 5 {
-		t.Fatalf("expected 5 runtime/target capability prerequisites, got: %+v", plan.MissingRequirements)
+		t.Fatalf(
+			"expected 5 runtime/target capability prerequisites, got: %+v",
+			plan.MissingRequirements,
+		)
 	}
 }
 
@@ -1217,7 +1331,8 @@ func TestGroupFollowerSelectWindowDependsOnSessionCreation(t *testing.T) {
 	var followerSelectWindow *SelectWindowStep
 
 	for i := range plan.Steps {
-		if stepKind(plan.Steps[i]) == StepSelectWindow && stepAs[*SelectWindowStep](plan.Steps[i]).SessionID == "s1" {
+		if stepKind(plan.Steps[i]) == StepSelectWindow &&
+			stepAs[*SelectWindowStep](plan.Steps[i]).SessionID == "s1" {
 			followerSelectWindow = stepAs[*SelectWindowStep](plan.Steps[i])
 			break
 		}
@@ -1230,7 +1345,10 @@ func TestGroupFollowerSelectWindowDependsOnSessionCreation(t *testing.T) {
 	hasSessionDep := slices.Contains(followerSelectWindow.DependsOn(), "create-session:s1")
 
 	if !hasSessionDep {
-		t.Fatalf("follower select-window step does not depend on create-session:s1; dependsOn: %v", followerSelectWindow.DependsOn())
+		t.Fatalf(
+			"follower select-window step does not depend on create-session:s1; dependsOn: %v",
+			followerSelectWindow.DependsOn(),
+		)
 	}
 }
 
@@ -1276,19 +1394,34 @@ func assertLeaderAndFollowerSteps(t *testing.T, steps []Step) {
 	leaderCreate, followerCreate := leader, follower
 
 	if leaderCreate.Group != "g0" || leaderCreate.GroupLeaderSessionID != "" {
-		t.Errorf("leader CreateSession group/leader = (%q, %q), want (g0, empty)", leaderCreate.Group, leaderCreate.GroupLeaderSessionID)
+		t.Errorf(
+			"leader CreateSession group/leader = (%q, %q), want (g0, empty)",
+			leaderCreate.Group,
+			leaderCreate.GroupLeaderSessionID,
+		)
 	}
 
 	if leaderCreate.InitialWindowID != "w0" || leaderCreate.InitialWindowIndex != 0 {
-		t.Errorf("leader CreateSession initial window = (%s, %d), want (w0, 0)", leaderCreate.InitialWindowID, leaderCreate.InitialWindowIndex)
+		t.Errorf(
+			"leader CreateSession initial window = (%s, %d), want (w0, 0)",
+			leaderCreate.InitialWindowID,
+			leaderCreate.InitialWindowIndex,
+		)
 	}
 
 	if followerCreate.Group != "g0" || followerCreate.GroupLeaderSessionID != "s0" {
-		t.Errorf("follower CreateSession group ref = (%q, %q), want (g0, s0)", followerCreate.Group, followerCreate.GroupLeaderSessionID)
+		t.Errorf(
+			"follower CreateSession group ref = (%q, %q), want (g0, s0)",
+			followerCreate.Group,
+			followerCreate.GroupLeaderSessionID,
+		)
 	}
 
 	if followerCreate.InitialWindowID != "" {
-		t.Errorf("follower CreateSession.InitialWindowID = %q, want empty", followerCreate.InitialWindowID)
+		t.Errorf(
+			"follower CreateSession.InitialWindowID = %q, want empty",
+			followerCreate.InitialWindowID,
+		)
 	}
 }
 
@@ -1325,12 +1458,24 @@ func assertSparseSlotSteps(t *testing.T, steps []Step) {
 			}
 		case StepCloseBootstrapWindow:
 			hasCloseBootstrap = true
-		case StepPlaceInitialWindow, StepSplitPane, StepLinkWindow, StepApplyLayout, StepSetPaneTitle, StepSelectPane, StepApplyZoom, StepSelectWindow:
+		case StepPlaceInitialWindow,
+			StepSplitPane,
+			StepLinkWindow,
+			StepApplyLayout,
+			StepSetPaneTitle,
+			StepSelectPane,
+			StepApplyZoom,
+			StepSelectWindow:
 		}
 	}
 
 	if createSess == nil || !createSess.BootstrapWindow || !hasCreateWindow || !hasCloseBootstrap {
-		t.Fatalf("sparse slot step assertion failed: sess=%+v, createWin=%v, closeBoot=%v", createSess, hasCreateWindow, hasCloseBootstrap)
+		t.Fatalf(
+			"sparse slot step assertion failed: sess=%+v, createWin=%v, closeBoot=%v",
+			createSess,
+			hasCreateWindow,
+			hasCloseBootstrap,
+		)
 	}
 }
 
@@ -1396,14 +1541,18 @@ func TestDeepOwnershipStepsImmutability(t *testing.T) {
 	if len(stepAs[*CreateSessionStep](plan.Steps[0]).Name) > 0 {
 		stepAs[*CreateSessionStep](plan.Steps[0]).Name[0] = 'Z'
 		if plan.SourceGraph.Sessions[0].Name[0] == 'Z' {
-			t.Fatal("mutating plan.Steps[0].(*CreateSessionStep).Name mutated plan.SourceGraph.Sessions[0].Name (aliasing bug)")
+			t.Fatal(
+				"mutating plan.Steps[0].(*CreateSessionStep).Name mutated plan.SourceGraph.Sessions[0].Name (aliasing bug)",
+			)
 		}
 	}
 
 	if len(stepAs[*CreateSessionStep](plan.Steps[0]).Directory) > 0 {
 		stepAs[*CreateSessionStep](plan.Steps[0]).Directory[0] = 'X'
 		if plan.SourceGraph.Sessions[0].Directory[0] == 'X' {
-			t.Fatal("mutating plan.Steps[0].(*CreateSessionStep).Directory mutated plan.SourceGraph.Sessions[0].Directory (aliasing bug)")
+			t.Fatal(
+				"mutating plan.Steps[0].(*CreateSessionStep).Directory mutated plan.SourceGraph.Sessions[0].Directory (aliasing bug)",
+			)
 		}
 	}
 }
@@ -1547,16 +1696,35 @@ func TestSimulatedTmuxSlotOccupancyAndGroupLinkPropagation(t *testing.T) {
 func TestBuildPlanRestoresOmittedInheritedSessionOptions(t *testing.T) {
 	m := baseFixture()
 	m.Source.Options = []model.Option{
-		{Scope: "global-session", Name: model.Bytes("status"), Value: model.Bytes("on"), Present: true},
-		{Scope: "global-session", Name: model.Bytes("@plugin"), Value: model.Bytes("tpm"), Present: true},
+		{
+			Scope:   "global-session",
+			Name:    model.Bytes("status"),
+			Value:   model.Bytes("on"),
+			Present: true,
+		},
+		{
+			Scope:   "global-session",
+			Name:    model.Bytes("@plugin"),
+			Value:   model.Bytes("tpm"),
+			Present: true,
+		},
 	}
 	m.Sessions[0].Options = []model.Option{
-		{Scope: "session", Name: model.Bytes("status"), Value: model.Bytes("on"), Present: true, Inherited: true},
+		{
+			Scope:     "session",
+			Name:      model.Bytes("status"),
+			Value:     model.Bytes("on"),
+			Present:   true,
+			Inherited: true,
+		},
 	}
 	m = m.CompactInheritedOptions()
 
 	if len(m.Sessions[0].Options) != 0 {
-		t.Fatalf("compact session options = %+v, want the inherited option omitted", m.Sessions[0].Options)
+		t.Fatalf(
+			"compact session options = %+v, want the inherited option omitted",
+			m.Sessions[0].Options,
+		)
 	}
 
 	plan, err := BuildPlan(m, []string{"s0"})
@@ -1569,7 +1737,15 @@ func TestBuildPlanRestoresOmittedInheritedSessionOptions(t *testing.T) {
 		t.Fatalf("first step has type %T, want *CreateSessionStep", plan.Steps[0])
 	}
 
-	want := []model.Option{{Scope: "session", Name: model.Bytes("status"), Value: model.Bytes("on"), Present: true, Inherited: true}}
+	want := []model.Option{
+		{
+			Scope:     "session",
+			Name:      model.Bytes("status"),
+			Value:     model.Bytes("on"),
+			Present:   true,
+			Inherited: true,
+		},
+	}
 	if diff := cmp.Diff(want, createSession.Options); diff != "" {
 		t.Fatalf("session step options (-want +got):\n%s", diff)
 	}

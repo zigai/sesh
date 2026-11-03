@@ -116,7 +116,10 @@ func TestProcessDeathDuringArtifactRemovalResumes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	killWorkerAtBoundary(t, collectionWorker(t, "collect", path, retired.ID, collectionPhaseArtifactUnlinked))
+	killWorkerAtBoundary(
+		t,
+		collectionWorker(t, "collect", path, retired.ID, collectionPhaseArtifactUnlinked),
+	)
 
 	remaining := storedArtifactNames(t, path, retired.ID)
 	if len(remaining) != 1 {
@@ -176,7 +179,13 @@ func TestCollectionWorker(t *testing.T) {
 	case "drain":
 		drainCollectionWorker(t, r)
 	case "verify":
-		verifyCollectionWorker(t, r, generation, os.Getenv("SESH_TEST_PRIOR"), os.Getenv("SESH_TEST_PHASE"))
+		verifyCollectionWorker(
+			t,
+			r,
+			generation,
+			os.Getenv("SESH_TEST_PRIOR"),
+			os.Getenv("SESH_TEST_PHASE"),
+		)
 	case "collect":
 		killableCollectionWorker(t, r, os.Getenv("SESH_TEST_PHASE"))
 	default:
@@ -188,7 +197,10 @@ func drainCollectionWorker(t *testing.T, r *Repository) {
 	t.Helper()
 
 	for range 3 {
-		if _, err := r.Collect(t.Context(), CollectionBudget{Generations: 8, Bytes: 1 << 30}); err != nil {
+		if _, err := r.Collect(
+			t.Context(),
+			CollectionBudget{Generations: 8, Bytes: 1 << 30},
+		); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -219,7 +231,10 @@ func killableCollectionWorker(t *testing.T, r *Repository, phase string) {
 		return errInjected
 	}
 
-	if _, err := r.Collect(t.Context(), CollectionBudget{Generations: 8, Bytes: 1 << 30}); err != nil {
+	if _, err := r.Collect(
+		t.Context(),
+		CollectionBudget{Generations: 8, Bytes: 1 << 30},
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -247,12 +262,26 @@ func verifyCollectionWorker(t *testing.T, r *Repository, generation, prior, phas
 		t.Fatal(err)
 	}
 
-	if len(settled.Removed)+len(settled.Deferred)+len(settled.Preserved)+len(settled.Quarantined) != 0 || settled.Bytes != 0 {
+	if len(
+		settled.Removed,
+	)+len(
+		settled.Deferred,
+	)+len(
+		settled.Preserved,
+	)+len(
+		settled.Quarantined,
+	) != 0 ||
+		settled.Bytes != 0 {
 		t.Fatalf("recovered repository still reports work: %+v", settled)
 	}
 }
 
-func assertRecoveredCollection(t *testing.T, r *Repository, generation, prior, phase string, result CollectionResult) {
+func assertRecoveredCollection(
+	t *testing.T,
+	r *Repository,
+	generation, prior, phase string,
+	result CollectionResult,
+) {
 	t.Helper()
 
 	if phase == collectionPhaseOutcomeSynced {

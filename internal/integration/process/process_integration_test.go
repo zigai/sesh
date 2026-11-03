@@ -92,7 +92,12 @@ func TestHelperProcess(t *testing.T) {
 	os.Exit(0)
 }
 
-func spawnHelper(t *testing.T, customArgs []string, customDir string, extraEnv []string) (*exec.Cmd, childReport) {
+func spawnHelper(
+	t *testing.T,
+	customArgs []string,
+	customDir string,
+	extraEnv []string,
+) (*exec.Cmd, childReport) {
 	t.Helper()
 
 	selfExe, err := os.Executable()
@@ -352,7 +357,11 @@ func openTestPTY(t *testing.T) (*os.File, *os.File) {
 		t.Fatalf("read PTY number: %v", err)
 	}
 
-	slave, err := os.OpenFile(filepath.Join("/dev/pts", strconv.Itoa(ptyNumber)), os.O_RDWR|syscall.O_NOCTTY, 0)
+	slave, err := os.OpenFile(
+		filepath.Join("/dev/pts", strconv.Itoa(ptyNumber)),
+		os.O_RDWR|syscall.O_NOCTTY,
+		0,
+	)
 	if err != nil {
 		t.Fatalf("open PTY slave: %v", err)
 	}
@@ -362,7 +371,13 @@ func openTestPTY(t *testing.T) (*os.File, *os.File) {
 	return master, slave
 }
 
-func assertObservedMetadata(t *testing.T, obs *process.Observation, pid int, birth process.Identity, tempDir string) {
+func assertObservedMetadata(
+	t *testing.T,
+	obs *process.Observation,
+	pid int,
+	birth process.Identity,
+	tempDir string,
+) {
 	t.Helper()
 
 	if obs.PID != pid {
@@ -391,7 +406,12 @@ func assertObservedMetadata(t *testing.T, obs *process.Observation, pid int, bir
 	}
 }
 
-func assertObservedArguments(t *testing.T, got [][]byte, expected []string, childArgsBase64 []string) {
+func assertObservedArguments(
+	t *testing.T,
+	got [][]byte,
+	expected []string,
+	childArgsBase64 []string,
+) {
 	t.Helper()
 
 	if len(got) < len(expected) {
@@ -456,7 +476,11 @@ func assertObservedEnvironment(t *testing.T, env []model.Variable, rep childRepo
 	}
 }
 
-func assertEnvVar(t *testing.T, envMap map[string]model.Variable, name, expectedState, expectedVal string) {
+func assertEnvVar(
+	t *testing.T,
+	envMap map[string]model.Variable,
+	name, expectedState, expectedVal string,
+) {
 	t.Helper()
 
 	v, ok := envMap[name]

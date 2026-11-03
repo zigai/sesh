@@ -44,7 +44,8 @@ func TestCaptureOmitsLiveOriginBindingsAndPreservesUserOptions(t *testing.T) {
 		t.Fatal("captured a live attachment binding")
 	}
 
-	if retained := byName[project]; !retained.Present || string(retained.Value) != "retained-setting" {
+	if retained := byName[project]; !retained.Present ||
+		string(retained.Value) != "retained-setting" {
 		t.Fatal("capture lost the unrelated user option")
 	}
 
@@ -67,7 +68,16 @@ func TestCaptureSkipsEnvironmentNamesRestoreCannotSet(t *testing.T) {
 		binary = "tmux"
 	}
 
-	set := exec.CommandContext(t.Context(), binary, "-S", server.Endpoint().SocketPath, "set-environment", "-g", "BASH_FUNC_greet%%", "() { echo hi; }")
+	set := exec.CommandContext(
+		t.Context(),
+		binary,
+		"-S",
+		server.Endpoint().SocketPath,
+		"set-environment",
+		"-g",
+		"BASH_FUNC_greet%%",
+		"() { echo hi; }",
+	)
 	if output, err := set.CombinedOutput(); err != nil {
 		t.Fatalf("set exported function: %v: %s", err, output)
 	}
@@ -87,6 +97,9 @@ func TestCaptureSkipsEnvironmentNamesRestoreCannotSet(t *testing.T) {
 	}
 
 	if names["BASH_FUNC_greet%%"] || !names["PLAIN_VALUE"] {
-		t.Fatalf("captured environment names = %v, want PLAIN_VALUE without the exported function", names)
+		t.Fatalf(
+			"captured environment names = %v, want PLAIN_VALUE without the exported function",
+			names,
+		)
 	}
 }

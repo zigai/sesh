@@ -105,15 +105,49 @@ func commitCLIMaintenanceFixtures(t *testing.T, path string, count int) {
 		}
 
 		manifest := model.Manifest{
-			Format: "sesh", Version: model.Schema, Started: int64(index*2 + 1), Finished: int64(index*2 + 2),
-			Source:   model.Source{TmuxVersion: "3.6", LibraryVersion: "v0.3.0", Consistency: "observed"},
-			Sessions: []model.Session{{ID: "s0", Name: model.Bytes("private-session"), Directory: model.Bytes("/private/path")}},
-			Windows:  []model.Window{{ID: "w0", Name: model.Bytes("private-window"), Width: 80, Height: 24, Layout: model.Layout{Width: 80, Height: 24, Pane: "p0"}}},
-			Panes:    []model.Pane{{ID: "p0", Window: "w0", Width: 80, Height: 24, Active: true, Directory: model.Bytes("/private/path"), Launch: model.Launch{Recovery: "unverified"}}},
-			Links:    []model.Link{{Session: "s0", Window: "w0", Active: true}},
+			Format:   "sesh",
+			Version:  model.Schema,
+			Started:  int64(index*2 + 1),
+			Finished: int64(index*2 + 2),
+			Source: model.Source{
+				TmuxVersion:    "3.6",
+				LibraryVersion: "v0.3.0",
+				Consistency:    "observed",
+			},
+			Sessions: []model.Session{
+				{
+					ID:        "s0",
+					Name:      model.Bytes("private-session"),
+					Directory: model.Bytes("/private/path"),
+				},
+			},
+			Windows: []model.Window{
+				{
+					ID:     "w0",
+					Name:   model.Bytes("private-window"),
+					Width:  80,
+					Height: 24,
+					Layout: model.Layout{Width: 80, Height: 24, Pane: "p0"},
+				},
+			},
+			Panes: []model.Pane{
+				{
+					ID:        "p0",
+					Window:    "w0",
+					Width:     80,
+					Height:    24,
+					Active:    true,
+					Directory: model.Bytes("/private/path"),
+					Launch:    model.Launch{Recovery: "unverified"},
+				},
+			},
+			Links: []model.Link{{Session: "s0", Window: "w0", Active: true}},
 		}
 		for _, domain := range []string{"S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10"} {
-			manifest.Evidence = append(manifest.Evidence, model.Evidence{Domain: domain, Status: "unverified", Reason: "not_captured"})
+			manifest.Evidence = append(
+				manifest.Evidence,
+				model.Evidence{Domain: domain, Status: "unverified", Reason: "not_captured"},
+			)
 		}
 
 		if _, err := repository.Commit(t.Context(), attempt.ID, manifest, nil); err != nil {
@@ -190,7 +224,8 @@ func assertRuntimeRecord(t *testing.T, line []byte, component, operation, level,
 		t.Fatalf("wrong event: %s", line)
 	}
 
-	if status != "started" && status != "ok" && record["reason"] == nil && record["phase"] == nil && record["code"] == nil {
+	if status != "started" && status != "ok" && record["reason"] == nil && record["phase"] == nil &&
+		record["code"] == nil {
 		t.Fatalf("missing fixed reason: %s", line)
 	}
 
@@ -202,17 +237,53 @@ func assertRuntimeLogFields(t *testing.T, record map[string]any) {
 
 	for key := range record {
 		switch key {
-		case "time", "level", "component", "operation", "status", "message", "reason", "phase", "code", "sessions", "windows", "panes", "error_code",
-			"pid", "version", "socket", "action", "error", "error_domain", "error_step", "generation", "restore_id",
-			"duration_ms", "failed_step", "store_step", "step_reason", "mismatches", "mismatch_reasons", "floating_panes_omitted",
-			"restart_panes", "resume_panes", "carried_resume_panes", "unverified_panes", "nonrestartable_panes",
-			"resumed_panes", "restarted_panes", "shell_panes", "unrecovered_panes", "directory_fallback_panes":
+		case "time",
+			"level",
+			"component",
+			"operation",
+			"status",
+			"message",
+			"reason",
+			"phase",
+			"code",
+			"sessions",
+			"windows",
+			"panes",
+			"error_code",
+			"pid",
+			"version",
+			"socket",
+			"action",
+			"error",
+			"error_domain",
+			"error_step",
+			"generation",
+			"restore_id",
+			"duration_ms",
+			"failed_step",
+			"store_step",
+			"step_reason",
+			"mismatches",
+			"mismatch_reasons",
+			"floating_panes_omitted",
+			"restart_panes",
+			"resume_panes",
+			"carried_resume_panes",
+			"unverified_panes",
+			"nonrestartable_panes",
+			"resumed_panes",
+			"restarted_panes",
+			"shell_panes",
+			"unrecovered_panes",
+			"directory_fallback_panes":
 		case "verified":
-			if _, ok := record[key].(bool); !ok || record["operation"] != "restore" || record["component"] != "snapshot" {
+			if _, ok := record[key].(bool); !ok || record["operation"] != "restore" ||
+				record["component"] != "snapshot" {
 				t.Fatalf("invalid verification field: %#v", record)
 			}
 		case "terminal_text_omitted":
-			if _, ok := record[key].(float64); !ok || record["operation"] != "save" || record["component"] != "snapshot" {
+			if _, ok := record[key].(float64); !ok || record["operation"] != "save" ||
+				record["component"] != "snapshot" {
 				t.Fatalf("invalid terminal text count: %#v", record)
 			}
 		default:

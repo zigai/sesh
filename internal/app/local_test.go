@@ -32,16 +32,30 @@ func TestConcurrentActionsShareTheRepository(t *testing.T) {
 	t.Cleanup(func() { _ = repository.Close() })
 
 	local := NewLocal(LocalOptions{
-		Config: nil, Server: nil, Repository: repository, LeaseRoot: "", HistoryPath: "",
-		AgentSource: nil, Streams: gotmux.Streams{In: nil, Out: nil, Err: nil}, Source: "test", DeferSwitchHistory: false,
-		TaskLedger: "", WorkState: "", WorktreeDir: "",
+		Config:             nil,
+		Server:             nil,
+		Repository:         repository,
+		LeaseRoot:          "",
+		HistoryPath:        "",
+		AgentSource:        nil,
+		Streams:            gotmux.Streams{In: nil, Out: nil, Err: nil},
+		Source:             "test",
+		DeferSwitchHistory: false,
+		TaskLedger:         "",
+		WorkState:          "",
+		WorktreeDir:        "",
 	})
 
 	var group sync.WaitGroup
 
 	for range 2 {
 		group.Go(func() {
-			if _, err := local.ResolveSubject(t.Context(), action.SubjectSavedSession, "", []string{"missing"}); err == nil {
+			if _, err := local.ResolveSubject(
+				t.Context(),
+				action.SubjectSavedSession,
+				"",
+				[]string{"missing"},
+			); err == nil {
 				t.Error("ResolveSubject found a session in an empty repository")
 			}
 		})

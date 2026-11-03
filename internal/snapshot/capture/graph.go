@@ -29,7 +29,10 @@ func (e *SessionNotFoundError) Error() string {
 	return "no tmux session has ID " + string(e.ID)
 }
 
-func tiledGraph(snapshot gotmux.Snapshot, selected []gotmux.SessionID) (model.Manifest, int, error) {
+func tiledGraph(
+	snapshot gotmux.Snapshot,
+	selected []gotmux.SessionID,
+) (model.Manifest, int, error) {
 	var m model.Manifest
 	if snapshot.Consistency != gotmux.ConsistencyComplete {
 		return m, 0, ErrChanged
@@ -47,13 +50,27 @@ func tiledGraph(snapshot gotmux.Snapshot, selected []gotmux.SessionID) (model.Ma
 			continue
 		}
 
-		session := model.Session{ID: ref("s", string(info.ID)), Name: model.Bytes(info.Name), Directory: model.Bytes(info.Path), Group: "", Options: nil, Environment: nil}
+		session := model.Session{
+			ID:          ref("s", string(info.ID)),
+			Name:        model.Bytes(info.Name),
+			Directory:   model.Bytes(info.Path),
+			Group:       "",
+			Options:     nil,
+			Environment: nil,
+		}
 		if name, grouped := info.Group.Get(); grouped {
 			index, found := groups[name]
 			if !found {
 				index = len(m.Groups)
 				groups[name] = index
-				m.Groups = append(m.Groups, model.Group{ID: "g" + strconv.Itoa(index), Name: model.Bytes(name), Members: nil})
+				m.Groups = append(
+					m.Groups,
+					model.Group{
+						ID:      "g" + strconv.Itoa(index),
+						Name:    model.Bytes(name),
+						Members: nil,
+					},
+				)
 			}
 
 			m.Groups[index].Members = append(m.Groups[index].Members, session.ID)
@@ -66,7 +83,11 @@ func tiledGraph(snapshot gotmux.Snapshot, selected []gotmux.SessionID) (model.Ma
 	return graphWindows(snapshot, wanted, m)
 }
 
-func graphWindows(snapshot gotmux.Snapshot, wanted map[gotmux.SessionID]bool, m model.Manifest) (model.Manifest, int, error) {
+func graphWindows(
+	snapshot gotmux.Snapshot,
+	wanted map[gotmux.SessionID]bool,
+	m model.Manifest,
+) (model.Manifest, int, error) {
 	windows := graphLinks(snapshot, wanted, &m)
 
 	layouts, floating, err := graphLayouts(snapshot, windows, &m)
@@ -93,7 +114,11 @@ func graphWindows(snapshot gotmux.Snapshot, wanted map[gotmux.SessionID]bool, m 
 	return m, len(floating), nil
 }
 
-func graphLinks(snapshot gotmux.Snapshot, wanted map[gotmux.SessionID]bool, m *model.Manifest) map[gotmux.WindowID]bool {
+func graphLinks(
+	snapshot gotmux.Snapshot,
+	wanted map[gotmux.SessionID]bool,
+	m *model.Manifest,
+) map[gotmux.WindowID]bool {
 	windows := make(map[gotmux.WindowID]bool)
 
 	for _, info := range snapshot.Links() {
@@ -102,13 +127,27 @@ func graphLinks(snapshot gotmux.Snapshot, wanted map[gotmux.SessionID]bool, m *m
 		}
 
 		windows[info.WindowID] = true
-		m.Links = append(m.Links, model.Link{Session: ref("s", string(info.SessionID)), Window: ref("w", string(info.WindowID)), Index: info.Index, Active: info.Active, Last: strings.Contains(info.Flags, "-"), Flags: model.Bytes(info.Flags)})
+		m.Links = append(
+			m.Links,
+			model.Link{
+				Session: ref("s", string(info.SessionID)),
+				Window:  ref("w", string(info.WindowID)),
+				Index:   info.Index,
+				Active:  info.Active,
+				Last:    strings.Contains(info.Flags, "-"),
+				Flags:   model.Bytes(info.Flags),
+			},
+		)
 	}
 
 	return windows
 }
 
-func graphLayouts(snapshot gotmux.Snapshot, windows map[gotmux.WindowID]bool, m *model.Manifest) (map[string]tmuxserver.WindowLayout, map[string]bool, error) {
+func graphLayouts(
+	snapshot gotmux.Snapshot,
+	windows map[gotmux.WindowID]bool,
+	m *model.Manifest,
+) (map[string]tmuxserver.WindowLayout, map[string]bool, error) {
 	panes := make(map[string]string)
 
 	for _, info := range snapshot.Panes() {
@@ -140,13 +179,29 @@ func graphLayouts(snapshot gotmux.Snapshot, windows map[gotmux.WindowID]bool, m 
 			floating[pane] = true
 		}
 
-		m.Windows = append(m.Windows, model.Window{ID: id, Name: model.Bytes(info.Name), Width: info.Width, Height: info.Height, Layout: layout.Tiled, Zoomed: info.Zoomed, Options: nil})
+		m.Windows = append(
+			m.Windows,
+			model.Window{
+				ID:      id,
+				Name:    model.Bytes(info.Name),
+				Width:   info.Width,
+				Height:  info.Height,
+				Layout:  layout.Tiled,
+				Zoomed:  info.Zoomed,
+				Options: nil,
+			},
+		)
 	}
 
 	return layouts, floating, nil
 }
 
-func retileWindowPanes(snapshot gotmux.Snapshot, panes []model.Pane, window string, layout tmuxserver.WindowLayout) {
+func retileWindowPanes(
+	snapshot gotmux.Snapshot,
+	panes []model.Pane,
+	window string,
+	layout tmuxserver.WindowLayout,
+) {
 	base := -1
 
 	for _, info := range snapshot.Panes() {
@@ -163,7 +218,10 @@ func retileWindowPanes(snapshot gotmux.Snapshot, panes []model.Pane, window stri
 		}
 	}
 
-	slices.SortFunc(tiled, func(left, right int) int { return panes[left].Index - panes[right].Index })
+	slices.SortFunc(
+		tiled,
+		func(left, right int) int { return panes[left].Index - panes[right].Index },
+	)
 
 	active := false
 
@@ -216,17 +274,39 @@ func paneObservation(info gotmux.PaneInfo) model.Pane {
 	}
 
 	return model.Pane{
-		ID: ref("p", string(info.ID)), Window: ref("w", string(info.WindowID)), Index: info.Index,
-		Title: model.Bytes(info.Title), Directory: model.Bytes(info.CurrentPath), Width: info.Width, Height: info.Height,
-		Left: info.Left, Top: info.Top, Active: info.Active, Last: false, Dead: dead, Options: nil,
-		Terminal: model.Terminal{Artifact: "", History: info.HistorySize, Alternate: info.Alternate, CursorX: info.CursorX, CursorY: info.CursorY, Mode: model.Bytes(mode)},
-		Launch:   launch,
+		ID:     ref("p", string(info.ID)),
+		Window: ref("w", string(info.WindowID)),
+		Index:  info.Index,
+		Title: model.Bytes(
+			info.Title,
+		),
+		Directory: model.Bytes(info.CurrentPath),
+		Width:     info.Width,
+		Height:    info.Height,
+		Left:      info.Left,
+		Top:       info.Top,
+		Active:    info.Active,
+		Last:      false,
+		Dead:      dead,
+		Options:   nil,
+		Terminal: model.Terminal{
+			Artifact:  "",
+			History:   info.HistorySize,
+			Alternate: info.Alternate,
+			CursorX:   info.CursorX,
+			CursorY:   info.CursorY,
+			Mode:      model.Bytes(mode),
+		},
+		Launch: launch,
 	}
 }
 
 func ref(prefix, id string) string { return prefix + id[1:] }
 
-func closure(snapshot gotmux.Snapshot, selected []gotmux.SessionID) (map[gotmux.SessionID]bool, error) {
+func closure(
+	snapshot gotmux.Snapshot,
+	selected []gotmux.SessionID,
+) (map[gotmux.SessionID]bool, error) {
 	if len(selected) == 0 {
 		return nil, ErrSelection
 	}

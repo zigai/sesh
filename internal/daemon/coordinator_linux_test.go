@@ -39,7 +39,10 @@ func (r *daemonLifecycleRuntime) Next(ctx context.Context) (lifecycle.Event, err
 	case event := <-r.events:
 		return event, nil
 	case <-ctx.Done():
-		return lifecycle.Event{}, fmt.Errorf("wait for daemon lifecycle event: %w", context.Cause(ctx))
+		return lifecycle.Event{}, fmt.Errorf(
+			"wait for daemon lifecycle event: %w",
+			context.Cause(ctx),
+		)
 	}
 }
 
@@ -59,7 +62,11 @@ func (r *daemonLifecycleRuntime) Rearm(context.Context) error {
 	return nil
 }
 
-func countingFinalSave(attempts *atomic.Int64, recorded bool, err error) func(context.Context) (FinalSaveOutcome, error) {
+func countingFinalSave(
+	attempts *atomic.Int64,
+	recorded bool,
+	err error,
+) func(context.Context) (FinalSaveOutcome, error) {
 	return func(context.Context) (FinalSaveOutcome, error) {
 		attempts.Add(1)
 
@@ -184,7 +191,11 @@ func TestDaemonCancellationNormalizationPreservesJoinedFailure(t *testing.T) {
 	joined := errors.Join(pureCancellation, errDaemonLifecycleUncertain)
 
 	normalized := NormalizeDaemonCancellation(joined)
-	if !errors.Is(normalized, context.Canceled) || !errors.Is(normalized, errDaemonLifecycleUncertain) {
-		t.Fatalf("joined lifecycle error normalized to %v, want cancellation and uncertainty", normalized)
+	if !errors.Is(normalized, context.Canceled) ||
+		!errors.Is(normalized, errDaemonLifecycleUncertain) {
+		t.Fatalf(
+			"joined lifecycle error normalized to %v, want cancellation and uncertainty",
+			normalized,
+		)
 	}
 }

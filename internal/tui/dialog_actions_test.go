@@ -95,7 +95,9 @@ func TestEnterNoMatchDoesNotCreateSession(t *testing.T) {
 
 func TestConfiguredCreateShortcutStartsCreateDialog(t *testing.T) {
 	model := newTestModel()
-	model.config.Keys.Bind = []config.KeyBindConfig{{Key: "ctrl+t", Action: "session.create", In: "picker", Table: "", Params: nil}}
+	model.config.Keys.Bind = []config.KeyBindConfig{
+		{Key: "ctrl+t", Action: "session.create", In: "picker", Table: "", Params: nil},
+	}
 	model.actionBindings = testBindings(model.config)
 	model.textInput.SetValue("new-session")
 
@@ -118,7 +120,9 @@ func TestConfiguredCreateShortcutStartsCreateDialog(t *testing.T) {
 
 func TestConfiguredShortcutMatchesModifiersWrittenInAnyOrder(t *testing.T) {
 	model := newTestModel()
-	model.config.Keys.Bind = []config.KeyBindConfig{{Key: "alt+ctrl+g", Action: "session.create", In: "picker", Table: "", Params: nil}}
+	model.config.Keys.Bind = []config.KeyBindConfig{
+		{Key: "alt+ctrl+g", Action: "session.create", In: "picker", Table: "", Params: nil},
+	}
 	model.actionBindings = testBindings(model.config)
 	model.textInput.SetValue("new-session")
 
@@ -127,7 +131,9 @@ func TestConfiguredShortcutMatchesModifiersWrittenInAnyOrder(t *testing.T) {
 		return cwd, nil
 	}
 
-	cmdFn := model.handleActionKeys(tea.KeyPressMsg(tea.Key{Code: 'g', Mod: tea.ModCtrl | tea.ModAlt}))
+	cmdFn := model.handleActionKeys(
+		tea.KeyPressMsg(tea.Key{Code: 'g', Mod: tea.ModCtrl | tea.ModAlt}),
+	)
 	if cmdFn == nil {
 		t.Fatal("handleActionKeys(ctrl+alt+g) returned nil, want the binding written as alt+ctrl+g")
 	}
@@ -229,7 +235,8 @@ func TestSubmitCreateDirCreatesSessionWithEditedDirectory(t *testing.T) {
 	_, cmd := model.handlePathDialogInput(keyCode(tea.KeyEnter))()
 	trace := runActionTrace(t, model, cmd)
 
-	if trace.entered == nil || trace.entered.err != nil || !trace.entered.quit || trace.entered.deferred {
+	if trace.entered == nil || trace.entered.err != nil || !trace.entered.quit ||
+		trace.entered.deferred {
 		t.Fatalf("create entry = %+v, want successful quit", trace.entered)
 	}
 
@@ -242,7 +249,11 @@ func TestSubmitCreateDirCreatesSessionWithEditedDirectory(t *testing.T) {
 	}
 
 	if model.dialog != dialogNone || model.textInput.Value() != "new-session" {
-		t.Fatalf("post-submit dialog/input = %v/%q, want none/original search", model.dialog, model.textInput.Value())
+		t.Fatalf(
+			"post-submit dialog/input = %v/%q, want none/original search",
+			model.dialog,
+			model.textInput.Value(),
+		)
 	}
 }
 
@@ -344,7 +355,11 @@ func TestCreateDirDialogTabCompletesSuggestionAndRefreshesChildren(t *testing.T)
 
 	wantChild := filepath.Join("work", "api") + string(os.PathSeparator)
 	if len(model.pathSuggestions) != 1 || model.pathSuggestions[0] != wantChild {
-		t.Fatalf("createDirSuggestions after completion = %#v, want %q", model.pathSuggestions, wantChild)
+		t.Fatalf(
+			"createDirSuggestions after completion = %#v, want %q",
+			model.pathSuggestions,
+			wantChild,
+		)
 	}
 }
 
@@ -463,7 +478,15 @@ func TestCreateDirDialogSuggestionListScrolls(t *testing.T) {
 	model.height = 24
 	openTestCreateDirectoryPrompt(model, "new-session")
 	model.pathInput.SetValue("/work/")
-	model.pathSuggestions = []string{"/work/a/", "/work/b/", "/work/c/", "/work/d/", "/work/e/", "/work/f/", "/work/g/"}
+	model.pathSuggestions = []string{
+		"/work/a/",
+		"/work/b/",
+		"/work/c/",
+		"/work/d/",
+		"/work/e/",
+		"/work/f/",
+		"/work/g/",
+	}
 
 	for range 6 {
 		if cmd := model.handlePathDialogInput(keyCode(tea.KeyDown)); cmd == nil {
@@ -486,7 +509,11 @@ func TestCreateDirDialogSuggestionListScrolls(t *testing.T) {
 
 	for _, hidden := range []string{"/work/a/", "/work/b/"} {
 		if strings.Contains(output, hidden) {
-			t.Fatalf("create dir dialog = %q, should not include scrolled-out suggestion %q", output, hidden)
+			t.Fatalf(
+				"create dir dialog = %q, should not include scrolled-out suggestion %q",
+				output,
+				hidden,
+			)
 		}
 	}
 }
@@ -517,7 +544,11 @@ func TestCreateDirDialogSuggestionListUsesConfiguredVisibleCount(t *testing.T) {
 
 	for _, hidden := range []string{"/work/a/", "/work/b/"} {
 		if strings.Contains(output, hidden) {
-			t.Fatalf("create dir dialog = %q, should not include suggestion outside configured visible count %q", output, hidden)
+			t.Fatalf(
+				"create dir dialog = %q, should not include suggestion outside configured visible count %q",
+				output,
+				hidden,
+			)
 		}
 	}
 }
@@ -540,7 +571,9 @@ func TestCreateDirDialogHeightIsStableAcrossSuggestionCounts(t *testing.T) {
 
 	noSuggestions := renderedLineCount(nil)
 	oneSuggestion := renderedLineCount([]string{"/work/api/"})
-	fullSuggestions := renderedLineCount([]string{"/work/api/", "/work/web/", "/work/docs/", "/work/tools/"})
+	fullSuggestions := renderedLineCount(
+		[]string{"/work/api/", "/work/web/", "/work/docs/", "/work/tools/"},
+	)
 
 	if noSuggestions != oneSuggestion || oneSuggestion != fullSuggestions {
 		t.Fatalf(
@@ -617,7 +650,9 @@ func TestPasteEditsTheTextPromptWithoutChangingSearch(t *testing.T) {
 	model := newTestModel()
 	t.Cleanup(model.Close)
 	model.textInput.SetValue(testSupportSessionProjectName)
-	model.filtered = []session.Session{{Name: testSupportSessionProjectName, Kind: session.KindLive}}
+	model.filtered = []session.Session{
+		{Name: testSupportSessionProjectName, Kind: session.KindLive},
+	}
 
 	handler := model.invokeAction(action.SessionRename.ID, nil)
 	if handler == nil {
@@ -676,7 +711,9 @@ func TestPasteDoesNotEditSearchBehindAConfirmation(t *testing.T) {
 	model := newTestModel()
 	t.Cleanup(model.Close)
 	model.textInput.SetValue(testSupportSessionProjectName)
-	model.filtered = []session.Session{{Name: testSupportSessionProjectName, Kind: session.KindLive}}
+	model.filtered = []session.Session{
+		{Name: testSupportSessionProjectName, Kind: session.KindLive},
+	}
 	openTestKillConfirm(model)
 
 	model.Update(tea.PasteMsg{Content: "ignored"})
@@ -700,7 +737,11 @@ func TestRenameDialogCtrlCCancels(t *testing.T) {
 	_, cmd := handler()
 
 	if model.dialog != dialogNone || model.textParamInput.Value() != "" {
-		t.Fatalf("rename dialog after ctrl+c = %v/%q, want canceled and cleared", model.dialog, model.textParamInput.Value())
+		t.Fatalf(
+			"rename dialog after ctrl+c = %v/%q, want canceled and cleared",
+			model.dialog,
+			model.textParamInput.Value(),
+		)
 	}
 
 	if cmd == nil {
@@ -736,7 +777,8 @@ func TestRenameDialogKeepsSearchInputIndependent(t *testing.T) {
 	}
 
 	model = updateTestModel(t, model, keyCode(tea.KeyEsc))
-	if model.dialog != dialogNone || model.textInput.Value() != "project" || model.textParamInput.Value() != "" {
+	if model.dialog != dialogNone || model.textInput.Value() != "project" ||
+		model.textParamInput.Value() != "" {
 		t.Fatalf(
 			"rename cancel state = dialog:%v search:%q rename:%q",
 			model.dialog,
@@ -788,7 +830,10 @@ func TestCreateDirDialogEnterAsksToCreateOnlyAMissingDirectory(t *testing.T) {
 
 					dispatched = input
 
-					return action.CreatedSession{Session: testLiveRef("$9", input.Name), Directory: input.Directory}, nil
+					return action.CreatedSession{
+						Session:   testLiveRef("$9", input.Name),
+						Directory: input.Directory,
+					}, nil
 				},
 			})
 			dependenciesForTest(model).GetWorkingDirectory = func() (string, error) { return root, nil }
@@ -799,8 +844,14 @@ func TestCreateDirDialogEnterAsksToCreateOnlyAMissingDirectory(t *testing.T) {
 			_, cmd := model.handlePathDialogInput(keyCode(tea.KeyEnter))()
 			runActionTrace(t, model, cmd)
 
-			if filepath.Clean(dispatched.Directory) != tc.path || dispatched.CreateDirectory != tc.want {
-				t.Fatalf("dispatched %+v, want directory %q with CreateDirectory=%v", dispatched, tc.path, tc.want)
+			if filepath.Clean(dispatched.Directory) != tc.path ||
+				dispatched.CreateDirectory != tc.want {
+				t.Fatalf(
+					"dispatched %+v, want directory %q with CreateDirectory=%v",
+					dispatched,
+					tc.path,
+					tc.want,
+				)
 			}
 		})
 	}

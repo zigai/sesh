@@ -22,7 +22,9 @@ var (
 	ErrServiceInspect = errors.New("inspect service manager before refreshing definitions")
 	ErrServiceReload  = errors.New("reload refreshed service definitions")
 	ErrServiceRestart = errors.New("refresh running service")
-	ErrRetiredRunning = errors.New("sesh-tmux.service is still running; stop it to remove it, or keep it with --with-tmux-service")
+	ErrRetiredRunning = errors.New(
+		"sesh-tmux.service is still running; stop it to remove it, or keep it with --with-tmux-service",
+	)
 )
 
 type ServiceManager struct {
@@ -93,14 +95,20 @@ func RefreshDefinitions(
 	}
 
 	if err := manager.run(ctx, "--user", "daemon-reload"); err != nil {
-		return applied, refreshed, enrichServiceRefresh("reload", errors.Join(ErrServiceReload, err))
+		return applied, refreshed, enrichServiceRefresh(
+			"reload",
+			errors.Join(ErrServiceReload, err),
+		)
 	}
 
 	refreshed.Reloaded = true
 
 	for _, name := range prepared.restart {
 		if err := manager.run(ctx, "--user", "try-restart", name); err != nil {
-			return applied, refreshed, enrichServiceRefresh("restart", errors.Join(ErrServiceRestart, err))
+			return applied, refreshed, enrichServiceRefresh(
+				"restart",
+				errors.Join(ErrServiceRestart, err),
+			)
 		}
 
 		refreshed.Restarted = append(refreshed.Restarted, name)
@@ -108,7 +116,10 @@ func RefreshDefinitions(
 
 	refreshed.Recovered, err = restartFailedUnits(ctx, manager, prepared.failed)
 	if err != nil {
-		return applied, refreshed, enrichServiceRefresh("recover", errors.Join(ErrServiceRestart, err))
+		return applied, refreshed, enrichServiceRefresh(
+			"recover",
+			errors.Join(ErrServiceRestart, err),
+		)
 	}
 
 	return applied, refreshed, nil
@@ -116,7 +127,11 @@ func RefreshDefinitions(
 
 // RetireDefinitions disables and deletes the retired units, and refuses before changing anything
 // while one still runs: deleting a running managed tmux unit would orphan its server and sessions.
-func RetireDefinitions(ctx context.Context, retired []ArtifactPlan, manager ServiceManager) ([]string, error) {
+func RetireDefinitions(
+	ctx context.Context,
+	retired []ArtifactPlan,
+	manager ServiceManager,
+) ([]string, error) {
 	if len(retired) == 0 {
 		return nil, nil
 	}
@@ -134,7 +149,8 @@ func RetireDefinitions(ctx context.Context, retired []ArtifactPlan, manager Serv
 
 		if state == "active" || state == "reloading" {
 			return nil, oops.In("setup").Code("retired_service_running").
-				With("operation", "retire_services").With("service", plan.Name).Wrap(ErrRetiredRunning)
+				With("operation", "retire_services").
+				With("service", plan.Name).Wrap(ErrRetiredRunning)
 		}
 
 		states = append(states, state)
@@ -180,7 +196,12 @@ func UnitStates(ctx context.Context, manager ServiceManager, names []string) ([]
 	return states, nil
 }
 
-func retireDefinition(ctx context.Context, plan ArtifactPlan, state string, manager ServiceManager) error {
+func retireDefinition(
+	ctx context.Context,
+	plan ArtifactPlan,
+	state string,
+	manager ServiceManager,
+) error {
 	existing, err := readDefinition(plan.Path)
 	if err != nil {
 		return err
@@ -203,13 +224,20 @@ func retireDefinition(ctx context.Context, plan ArtifactPlan, state string, mana
 	}
 
 	if err := os.Remove(plan.Path); err != nil {
-		return oops.In("setup").Code("setup_definition_failed").With("operation", "remove_retired_definition").Wrap(err)
+		return oops.In("setup").
+			Code("setup_definition_failed").
+			With("operation", "remove_retired_definition").
+			Wrap(err)
 	}
 
 	return syncDirectory(filepath.Dir(plan.Path))
 }
 
-func restartFailedUnits(ctx context.Context, manager ServiceManager, names []string) ([]string, error) {
+func restartFailedUnits(
+	ctx context.Context,
+	manager ServiceManager,
+	names []string,
+) ([]string, error) {
 	var restarted []string
 
 	for _, name := range names {
@@ -296,7 +324,11 @@ func inspectRefreshDefinition(
 
 	switch definition.Name {
 	case TmuxServiceName:
-		if systemdStartupDefinition(previous.Content) != systemdStartupDefinition(definition.Content) {
+		if systemdStartupDefinition(
+			previous.Content,
+		) != systemdStartupDefinition(
+			definition.Content,
+		) {
 			prepared.restartRequired = append(prepared.restartRequired, definition.Name)
 		}
 	case AutosaveTimerName, RemoteServiceName, AgentStatusServiceName, CoordinatorServiceName:
@@ -349,7 +381,15 @@ func (manager ServiceManager) property(ctx context.Context, name, property strin
 		inspect = inspectServiceCommand
 	}
 
-	output, err := inspect(ctx, "systemctl", "--user", "show", "--property="+property, "--value", name)
+	output, err := inspect(
+		ctx,
+		"systemctl",
+		"--user",
+		"show",
+		"--property="+property,
+		"--value",
+		name,
+	)
 	if err != nil {
 		return "", errors.Join(ErrServiceInspect, err)
 	}
@@ -366,7 +406,11 @@ func (manager ServiceManager) run(ctx context.Context, arguments ...string) erro
 	return run(ctx, "systemctl", arguments...)
 }
 
-func inspectServiceCommand(ctx context.Context, executable string, arguments ...string) (string, error) {
+func inspectServiceCommand(
+	ctx context.Context,
+	executable string,
+	arguments ...string,
+) (string, error) {
 	var output serviceInspectionOutput
 
 	command := exec.CommandContext(ctx, executable, arguments...)
@@ -374,7 +418,10 @@ func inspectServiceCommand(ctx context.Context, executable string, arguments ...
 	command.WaitDelay = time.Second
 
 	if err := command.Run(); err != nil {
-		return "", oops.In("setup").Code("service_refresh_failed").With("operation", "inspect_service_command").Wrap(errors.Join(err, ctx.Err()))
+		return "", oops.In("setup").
+			Code("service_refresh_failed").
+			With("operation", "inspect_service_command").
+			Wrap(errors.Join(err, ctx.Err()))
 	}
 
 	if output.overflow {
@@ -389,7 +436,10 @@ func runServiceCommand(ctx context.Context, executable string, arguments ...stri
 	command.WaitDelay = time.Second
 
 	if err := command.Run(); err != nil {
-		return oops.In("setup").Code("service_refresh_failed").With("operation", "run_service_command").Wrap(errors.Join(err, ctx.Err()))
+		return oops.In("setup").
+			Code("service_refresh_failed").
+			With("operation", "run_service_command").
+			Wrap(errors.Join(err, ctx.Err()))
 	}
 
 	return nil

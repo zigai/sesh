@@ -173,7 +173,11 @@ func WriteCapability(dir *privatefs.Dir, record StoredCapability) error {
 	return nil
 }
 
-func ReadCapability(dir *privatefs.Dir, attachmentID string, now time.Time) (StoredCapability, error) {
+func ReadCapability(
+	dir *privatefs.Dir,
+	attachmentID string,
+	now time.Time,
+) (StoredCapability, error) {
 	name, err := CapabilityName(attachmentID)
 	if err != nil {
 		return StoredCapability{}, oops.In("remote").With("operation", "read_capability").Wrap(err)
@@ -194,11 +198,15 @@ func ReadCapability(dir *privatefs.Dir, attachmentID string, now time.Time) (Sto
 	}
 
 	if record.Grant.AttachmentID != attachmentID {
-		return StoredCapability{}, oops.In("remote").With("operation", "read_capability").Wrap(ErrCapabilityMismatch)
+		return StoredCapability{}, oops.In("remote").
+			With("operation", "read_capability").
+			Wrap(ErrCapabilityMismatch)
 	}
 
 	if record.Grant.Expired(now) {
-		return StoredCapability{}, oops.In("remote").With("operation", "read_capability").Wrap(ErrCapabilityExpired)
+		return StoredCapability{}, oops.In("remote").
+			With("operation", "read_capability").
+			Wrap(ErrCapabilityExpired)
 	}
 
 	return record, nil
@@ -229,7 +237,10 @@ func CheckSocketAbsent(dir *privatefs.Dir, attachmentID string) error {
 	}
 
 	if slices.Contains(names, name) {
-		return oops.In("remote").With("operation", "check_socket_absent").With("socket_name", name).Wrap(ErrForeignSocketPath)
+		return oops.In("remote").
+			With("operation", "check_socket_absent").
+			With("socket_name", name).
+			Wrap(ErrForeignSocketPath)
 	}
 
 	return nil

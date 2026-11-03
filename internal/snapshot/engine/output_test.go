@@ -89,13 +89,19 @@ func TestSaveOutputWorker(t *testing.T) {
 	leaseRoot := os.Getenv("SESH_OUTPUT_LEASE_ROOT")
 	socketPath := os.Getenv("SESH_OUTPUT_SOCKET")
 
-	result, saveErr := save(logger.WithContext(t.Context()), r, leaseRoot, socketPath, func(context.Context) (capture.Observation, error) {
-		if scenario == "failure" {
-			return capture.Observation{}, fmt.Errorf("secret error: %w", os.ErrPermission)
-		}
+	result, saveErr := save(
+		logger.WithContext(t.Context()),
+		r,
+		leaseRoot,
+		socketPath,
+		func(context.Context) (capture.Observation, error) {
+			if scenario == "failure" {
+				return capture.Observation{}, fmt.Errorf("secret error: %w", os.ErrPermission)
+			}
 
-		return observationFixture(), nil
-	})
+			return observationFixture(), nil
+		},
+	)
 	if (saveErr != nil) != (scenario == "failure") {
 		t.Fatal("unexpected save result", saveErr)
 	}

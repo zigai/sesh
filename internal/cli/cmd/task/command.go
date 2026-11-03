@@ -35,38 +35,108 @@ func NewCommand(remoteFactory cmdpicker.RemoteFactory) *cobra.Command {
 		cmdpicker.NewTaskMenuCommand(remoteFactory),
 		cmdpicker.NewTaskPickerUICommand(remoteFactory),
 		actioncli.Command(action.TaskNew, actioncli.Options[action.NewTask, action.StartedTask]{
-			Operation: "", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
+			Operation:    "",
+			SuccessOwned: true,
+			Configure:    nil,
+			Prepare:      nil,
+			Frontend:     nil,
+			Render:       nil,
 		}),
 		actioncli.Command(action.TaskOffer, actioncli.Options[action.OfferTask, action.TaskOffered]{
-			Operation: "", SuccessOwned: false, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
+			Operation:    "",
+			SuccessOwned: false,
+			Configure:    nil,
+			Prepare:      nil,
+			Frontend:     nil,
+			Render:       nil,
 		}),
 		actioncli.Command(action.TaskTab, actioncli.Options[action.OpenTab, action.OpenedTab]{
-			Operation: "", SuccessOwned: false, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
+			Operation:    "",
+			SuccessOwned: false,
+			Configure:    nil,
+			Prepare:      nil,
+			Frontend:     nil,
+			Render:       nil,
 		}),
-		actioncli.Command(action.TaskPopup, actioncli.Options[action.OpenTaskPopup, action.ClosedTaskPopup]{
-			Operation: "", SuccessOwned: false, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
-		}),
-		actioncli.Command(action.TaskRelayout, actioncli.Options[action.RelayoutTask, action.RelaidOutTask]{
-			Operation: "", SuccessOwned: false, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
-		}),
+		actioncli.Command(
+			action.TaskPopup,
+			actioncli.Options[action.OpenTaskPopup, action.ClosedTaskPopup]{
+				Operation:    "",
+				SuccessOwned: false,
+				Configure:    nil,
+				Prepare:      nil,
+				Frontend:     nil,
+				Render:       nil,
+			},
+		),
+		actioncli.Command(
+			action.TaskRelayout,
+			actioncli.Options[action.RelayoutTask, action.RelaidOutTask]{
+				Operation:    "",
+				SuccessOwned: false,
+				Configure:    nil,
+				Prepare:      nil,
+				Frontend:     nil,
+				Render:       nil,
+			},
+		),
 		actioncli.Command(action.TaskSleep, actioncli.Options[action.SleepTask, action.SleptTask]{
-			Operation: "", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
+			Operation:    "",
+			SuccessOwned: true,
+			Configure:    nil,
+			Prepare:      nil,
+			Frontend:     nil,
+			Render:       nil,
 		}),
 		actioncli.Command(action.TaskWake, actioncli.Options[action.WakeTask, action.WokenTask]{
-			Operation: "", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
+			Operation:    "",
+			SuccessOwned: true,
+			Configure:    nil,
+			Prepare:      nil,
+			Frontend:     nil,
+			Render:       nil,
 		}),
 		actioncli.Command(action.TaskOpen, actioncli.Options[action.OpenTask, action.OpenedTask]{
-			Operation: "", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
+			Operation:    "",
+			SuccessOwned: true,
+			Configure:    nil,
+			Prepare:      nil,
+			Frontend:     nil,
+			Render:       nil,
 		}),
-		actioncli.Command(action.TaskFinish, actioncli.Options[action.FinishTask, action.FinishedTask]{
-			Operation: "", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
-		}),
-		actioncli.Command(action.TaskRun, actioncli.Options[action.RunTaskAction, action.StartedTaskAction]{
-			Operation: "", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
-		}),
-		actioncli.Command(action.TaskMerge, actioncli.Options[action.MergeTask, action.StartedTaskMerge]{
-			Operation: "", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
-		}),
+		actioncli.Command(
+			action.TaskFinish,
+			actioncli.Options[action.FinishTask, action.FinishedTask]{
+				Operation:    "",
+				SuccessOwned: true,
+				Configure:    nil,
+				Prepare:      nil,
+				Frontend:     nil,
+				Render:       nil,
+			},
+		),
+		actioncli.Command(
+			action.TaskRun,
+			actioncli.Options[action.RunTaskAction, action.StartedTaskAction]{
+				Operation:    "",
+				SuccessOwned: true,
+				Configure:    nil,
+				Prepare:      nil,
+				Frontend:     nil,
+				Render:       nil,
+			},
+		),
+		actioncli.Command(
+			action.TaskMerge,
+			actioncli.Options[action.MergeTask, action.StartedTaskMerge]{
+				Operation:    "",
+				SuccessOwned: true,
+				Configure:    nil,
+				Prepare:      nil,
+				Frontend:     nil,
+				Render:       nil,
+			},
+		),
 		newPopupAttachCommand(),
 		newPlaceholderCommand(),
 		newActionRunCommand(),
@@ -78,12 +148,15 @@ func NewCommand(remoteFactory cmdpicker.RemoteFactory) *cobra.Command {
 
 func newPopupAttachCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:         popupAttachVerb + " <task>",
-		Short:       "Attach to a task's popup terminal",
-		Hidden:      true,
-		Args:        clibase.UsageArgs(cobra.ExactArgs(1)),
-		RunE:        runPopupAttach,
-		Annotations: map[string]string{clibase.AnnotationOperation: "task_popup", clibase.AnnotationLiveIO: "true"},
+		Use:    popupAttachVerb + " <task>",
+		Short:  "Attach to a task's popup terminal",
+		Hidden: true,
+		Args:   clibase.UsageArgs(cobra.ExactArgs(1)),
+		RunE:   runPopupAttach,
+		Annotations: map[string]string{
+			clibase.AnnotationOperation: "task_popup",
+			clibase.AnnotationLiveIO:    "true",
+		},
 	}
 
 	actioncli.AddEnvironmentFlags(cmd)
@@ -104,5 +177,12 @@ func runPopupAttach(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return errors.Join(runtime.Local.AttachTaskPopup(ctx, args[0], gotmux.Streams{In: os.Stdin, Out: os.Stdout, Err: os.Stderr}), runtime.Close())
+	return errors.Join(
+		runtime.Local.AttachTaskPopup(
+			ctx,
+			args[0],
+			gotmux.Streams{In: os.Stdin, Out: os.Stdout, Err: os.Stderr},
+		),
+		runtime.Close(),
+	)
 }

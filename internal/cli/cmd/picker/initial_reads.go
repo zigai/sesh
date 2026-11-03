@@ -40,7 +40,11 @@ func openInitialReads(ctx context.Context, server *gotmux.Server, sessionID stri
 	return reads
 }
 
-func openPickerControl(ctx context.Context, server *gotmux.Server, sessionID string) (*gotmux.Connection, error) {
+func openPickerControl(
+	ctx context.Context,
+	server *gotmux.Server,
+	sessionID string,
+) (*gotmux.Connection, error) {
 	conn, err := server.OpenControl(ctx, gotmux.SessionID(sessionID), gotmux.ControlOptions{
 		PaneOutput:       false,
 		NoEcho:           false,
@@ -61,7 +65,11 @@ func openPickerControl(ctx context.Context, server *gotmux.Server, sessionID str
 	return conn, nil
 }
 
-func (r *initialReads) read(ctx context.Context, server *gotmux.Server, query func(*gotmux.Server) error) error {
+func (r *initialReads) read(
+	ctx context.Context,
+	server *gotmux.Server,
+	query func(*gotmux.Server) error,
+) error {
 	select {
 	case <-r.opened:
 	case <-ctx.Done():

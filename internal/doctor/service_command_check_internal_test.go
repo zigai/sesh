@@ -37,9 +37,14 @@ func TestSplitExecLineFollowsSystemdQuotingAndPrefixes(t *testing.T) {
 func TestUnitLinesJoinContinuationsAndDropComments(t *testing.T) {
 	t.Parallel()
 
-	data := []byte("# ExecStart=/bin/sesh old\n[Service]\nExecStart=/bin/sesh daemon \\\n  coordinator\n; note\n")
+	data := []byte(
+		"# ExecStart=/bin/sesh old\n[Service]\nExecStart=/bin/sesh daemon \\\n  coordinator\n; note\n",
+	)
 
-	want := []unitLine{{text: "[Service]", number: 2}, {text: "ExecStart=/bin/sesh daemon  coordinator", number: 3}}
+	want := []unitLine{
+		{text: "[Service]", number: 2},
+		{text: "ExecStart=/bin/sesh daemon  coordinator", number: 3},
+	}
 	if got := unitLines(data); !slices.Equal(got, want) {
 		t.Fatalf("unitLines = %+v, want %+v", got, want)
 	}
@@ -94,12 +99,28 @@ func TestServiceUnitsAreReadTheWaySystemdResolvesThem(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	writeUnit(t, filepath.Join(userDir, "replaced.service"), "[Service]\nExecStart=/usr/bin/sesh daemon coordinator\n")
-	writeUnit(t, filepath.Join(dataDir, "replaced.service.d", "override.conf"), "[Service]\nExecStart=\nExecStart=sesh old\n")
+	writeUnit(
+		t,
+		filepath.Join(userDir, "replaced.service"),
+		"[Service]\nExecStart=/usr/bin/sesh daemon coordinator\n",
+	)
+	writeUnit(
+		t,
+		filepath.Join(dataDir, "replaced.service.d", "override.conf"),
+		"[Service]\nExecStart=\nExecStart=sesh old\n",
+	)
 	writeUnit(t, filepath.Join(dataDir, "shared.service"), "[Service]\nExecStop=sesh old\n")
 	writeUnit(t, filepath.Join(userDir, "reset.service"), "[Service]\nExecStart=sesh old\n")
-	writeUnit(t, filepath.Join(userDir, "reset.service.d", "clear.conf"), "[Service]\nExecStart=\nExecStart=/bin/true\n")
-	writeUnit(t, filepath.Join(userDir, "shadow.service"), "[Service]\nExecStart=sesh daemon coordinator\n")
+	writeUnit(
+		t,
+		filepath.Join(userDir, "reset.service.d", "clear.conf"),
+		"[Service]\nExecStart=\nExecStart=/bin/true\n",
+	)
+	writeUnit(
+		t,
+		filepath.Join(userDir, "shadow.service"),
+		"[Service]\nExecStart=sesh daemon coordinator\n",
+	)
 	writeUnit(t, filepath.Join(dataDir, "shadow.service"), "[Service]\nExecStart=sesh old\n")
 
 	results := service.checkServiceUnits()
@@ -126,12 +147,25 @@ func TestServiceUnitsAreReadTheWaySystemdResolvesThem(t *testing.T) {
 		stale = append(stale, unit)
 	}
 
-	if want := []string{"linked.service", "replaced.service", "shared.service"}; !slices.Equal(stale, want) {
+	if want := []string{
+		"linked.service",
+		"replaced.service",
+		"shared.service",
+	}; !slices.Equal(
+		stale,
+		want,
+	) {
 		t.Fatalf("stale units = %q, want %q; details %q", stale, want, result.Details)
 	}
 
-	if !strings.Contains(result.Details[1], filepath.Join("replaced.service.d", "override.conf")+":3") {
-		t.Fatalf("detail must point at the drop-in line that sets the command: %q", result.Details[1])
+	if !strings.Contains(
+		result.Details[1],
+		filepath.Join("replaced.service.d", "override.conf")+":3",
+	) {
+		t.Fatalf(
+			"detail must point at the drop-in line that sets the command: %q",
+			result.Details[1],
+		)
 	}
 }
 
@@ -157,7 +191,9 @@ func TestServiceUnitsRetainInspectionErrors(test *testing.T) {
 			}
 
 			result := results[0]
-			if result.Status != StatusWarn || result.Reason != ReasonInspectionFailed || result.Fix == nil || len(result.Details) == 0 {
+			if result.Status != StatusWarn || result.Reason != ReasonInspectionFailed ||
+				result.Fix == nil ||
+				len(result.Details) == 0 {
 				test.Fatalf("inspection error was omitted or claimed healthy: %+v", result)
 			}
 		})
@@ -213,7 +249,11 @@ func TestServiceUnitsOmitMaskedAndUnrelatedUnits(test *testing.T) {
 	service, userDir, dataDir := unitsService(test)
 
 	writeUnit(test, filepath.Join(dataDir, "masked.service"), "[Service]\nExecStart=sesh old\n")
-	writeUnit(test, filepath.Join(userDir, "other.service"), "[Service]\nExecStart=/usr/bin/true old\n")
+	writeUnit(
+		test,
+		filepath.Join(userDir, "other.service"),
+		"[Service]\nExecStart=/usr/bin/true old\n",
+	)
 
 	if err := os.Symlink(os.DevNull, filepath.Join(userDir, "masked.service")); err != nil {
 		test.Fatal(err)

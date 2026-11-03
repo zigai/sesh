@@ -30,7 +30,14 @@ func TestSelectLinuxForegroundUsesUniqueProcessGroupRoot(t *testing.T) {
 		{
 			name: "pane owns foreground group",
 			processes: []foregroundFixtureProcess{
-				{pid: 10, parent: 1, group: 10, foregroundGroup: 10, startTime: 100, children: []int{20}},
+				{
+					pid:             10,
+					parent:          1,
+					group:           10,
+					foregroundGroup: 10,
+					startTime:       100,
+					children:        []int{20},
+				},
 				{pid: 20, parent: 10, group: 10, foregroundGroup: 10, startTime: 200},
 			},
 			wantPID: 10,
@@ -38,8 +45,22 @@ func TestSelectLinuxForegroundUsesUniqueProcessGroupRoot(t *testing.T) {
 		{
 			name: "shell foreground child",
 			processes: []foregroundFixtureProcess{
-				{pid: 10, parent: 1, group: 10, foregroundGroup: 20, startTime: 100, children: []int{20}},
-				{pid: 20, parent: 10, group: 20, foregroundGroup: 20, startTime: 200, children: []int{21}},
+				{
+					pid:             10,
+					parent:          1,
+					group:           10,
+					foregroundGroup: 20,
+					startTime:       100,
+					children:        []int{20},
+				},
+				{
+					pid:             20,
+					parent:          10,
+					group:           20,
+					foregroundGroup: 20,
+					startTime:       200,
+					children:        []int{21},
+				},
 				{pid: 21, parent: 20, group: 20, foregroundGroup: 20, startTime: 210},
 			},
 			wantPID: 20,
@@ -47,8 +68,22 @@ func TestSelectLinuxForegroundUsesUniqueProcessGroupRoot(t *testing.T) {
 		{
 			name: "nested shell foreground child",
 			processes: []foregroundFixtureProcess{
-				{pid: 10, parent: 1, group: 10, foregroundGroup: 30, startTime: 100, children: []int{20}},
-				{pid: 20, parent: 10, group: 20, foregroundGroup: 30, startTime: 200, children: []int{30}},
+				{
+					pid:             10,
+					parent:          1,
+					group:           10,
+					foregroundGroup: 30,
+					startTime:       100,
+					children:        []int{20},
+				},
+				{
+					pid:             20,
+					parent:          10,
+					group:           20,
+					foregroundGroup: 30,
+					startTime:       200,
+					children:        []int{30},
+				},
 				{pid: 30, parent: 20, group: 30, foregroundGroup: 30, startTime: 300},
 			},
 			wantPID: 30,
@@ -56,8 +91,22 @@ func TestSelectLinuxForegroundUsesUniqueProcessGroupRoot(t *testing.T) {
 		{
 			name: "exited descendant is skipped",
 			processes: []foregroundFixtureProcess{
-				{pid: 10, parent: 1, group: 10, foregroundGroup: 20, startTime: 100, children: []int{20}},
-				{pid: 20, parent: 10, group: 20, foregroundGroup: 20, startTime: 200, children: []int{30}},
+				{
+					pid:             10,
+					parent:          1,
+					group:           10,
+					foregroundGroup: 20,
+					startTime:       100,
+					children:        []int{20},
+				},
+				{
+					pid:             20,
+					parent:          10,
+					group:           20,
+					foregroundGroup: 20,
+					startTime:       200,
+					children:        []int{30},
+				},
 				{pid: 30, parent: 20, group: 30, foregroundGroup: 0, startTime: 300, exited: true},
 			},
 			wantPID: 20,
@@ -65,7 +114,14 @@ func TestSelectLinuxForegroundUsesUniqueProcessGroupRoot(t *testing.T) {
 		{
 			name: "exited foreground child is unavailable",
 			processes: []foregroundFixtureProcess{
-				{pid: 10, parent: 1, group: 10, foregroundGroup: 20, startTime: 100, children: []int{20}},
+				{
+					pid:             10,
+					parent:          1,
+					group:           10,
+					foregroundGroup: 20,
+					startTime:       100,
+					children:        []int{20},
+				},
 				{pid: 20, parent: 10, group: 20, foregroundGroup: 20, startTime: 200, exited: true},
 			},
 			wantErr: ErrForegroundUnavailable,
@@ -73,7 +129,14 @@ func TestSelectLinuxForegroundUsesUniqueProcessGroupRoot(t *testing.T) {
 		{
 			name: "pipeline is ambiguous",
 			processes: []foregroundFixtureProcess{
-				{pid: 10, parent: 1, group: 10, foregroundGroup: 20, startTime: 100, children: []int{20, 21}},
+				{
+					pid:             10,
+					parent:          1,
+					group:           10,
+					foregroundGroup: 20,
+					startTime:       100,
+					children:        []int{20, 21},
+				},
 				{pid: 20, parent: 10, group: 20, foregroundGroup: 20, startTime: 200},
 				{pid: 21, parent: 10, group: 20, foregroundGroup: 20, startTime: 210},
 			},
@@ -92,9 +155,15 @@ func TestSelectLinuxForegroundUsesUniqueProcessGroupRoot(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			procRoot := writeForegroundProcFixture(t, tt.processes)
 
-			selection, err := selectForeground(t.Context(), procForegroundSource{procRoot: procRoot, bootIDPath: ""}, ForegroundRequest{
-				PanePID: 10, ExpectedPaneBirth: Identity{BootID: testBootID, StartTime: 100}, EnvironmentKeys: nil,
-			})
+			selection, err := selectForeground(
+				t.Context(),
+				procForegroundSource{procRoot: procRoot, bootIDPath: ""},
+				ForegroundRequest{
+					PanePID:           10,
+					ExpectedPaneBirth: Identity{BootID: testBootID, StartTime: 100},
+					EnvironmentKeys:   nil,
+				},
+			)
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("selectForeground error = %v, want %v", err, tt.wantErr)
 			}
@@ -131,9 +200,15 @@ func TestSelectLinuxForegroundRejectsPanePIDReuse(t *testing.T) {
 		{pid: 10, parent: 1, group: 10, foregroundGroup: 10, startTime: 101},
 	})
 
-	_, err := selectForeground(t.Context(), procForegroundSource{procRoot: procRoot, bootIDPath: ""}, ForegroundRequest{
-		PanePID: 10, ExpectedPaneBirth: Identity{BootID: testBootID, StartTime: 100}, EnvironmentKeys: nil,
-	})
+	_, err := selectForeground(
+		t.Context(),
+		procForegroundSource{procRoot: procRoot, bootIDPath: ""},
+		ForegroundRequest{
+			PanePID:           10,
+			ExpectedPaneBirth: Identity{BootID: testBootID, StartTime: 100},
+			EnvironmentKeys:   nil,
+		},
+	)
 	if !errors.Is(err, ErrIdentityMismatch) {
 		t.Fatalf("reused pane PID error = %v, want identity mismatch", err)
 	}
@@ -145,7 +220,13 @@ func TestLinuxForegroundSelectionDetectsGroupAndBirthRaces(t *testing.T) {
 			pid: 10, parent: 1, group: 10, session: 10, tty: 1, foregroundGroup: 20, startTime: 100,
 		},
 		process: foregroundProcess{
-			pid: 20, parent: 10, group: 20, session: 10, tty: 1, foregroundGroup: 20, startTime: 200,
+			pid:             20,
+			parent:          10,
+			group:           20,
+			session:         10,
+			tty:             1,
+			foregroundGroup: 20,
+			startTime:       200,
 		},
 	}
 
@@ -188,7 +269,11 @@ func writeForegroundProcFixture(t *testing.T, processes []foregroundFixtureProce
 			children += strconv.Itoa(child) + " "
 		}
 
-		if err := os.WriteFile(filepath.Join(taskDir, "children"), []byte(children), 0o600); err != nil {
+		if err := os.WriteFile(
+			filepath.Join(taskDir, "children"),
+			[]byte(children),
+			0o600,
+		); err != nil {
 			t.Fatalf("write children fixture: %v", err)
 		}
 	}
@@ -204,6 +289,11 @@ func foregroundStatContent(process foregroundFixtureProcess) []byte {
 
 	return []byte(fmt.Sprintf(
 		"%d (fixture) %s %d %d 10 34816 %d 0 0 0 0 0 0 0 0 0 20 0 1 0 %d 0\n",
-		process.pid, state, process.parent, process.group, process.foregroundGroup, process.startTime,
+		process.pid,
+		state,
+		process.parent,
+		process.group,
+		process.foregroundGroup,
+		process.startTime,
 	))
 }

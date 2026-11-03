@@ -200,7 +200,12 @@ func TestCollectionRemovesOnlyRetiredGenerationBytes(t *testing.T) {
 	assertCollectionPublishesNothing(t, before, path, result)
 }
 
-func assertCollectionPublishesNothing(t *testing.T, before map[string]bool, path string, result CollectionResult) {
+func assertCollectionPublishesNothing(
+	t *testing.T,
+	before map[string]bool,
+	path string,
+	result CollectionResult,
+) {
 	t.Helper()
 
 	after := repositoryTree(t, path)
@@ -214,7 +219,10 @@ func assertCollectionPublishesNothing(t *testing.T, before map[string]bool, path
 			t.Fatal("collection replaced the authoritative catalog")
 		}
 
-		if !slices.ContainsFunc(result.Removed, func(id string) bool { return generationSubtree(entry, id) }) {
+		if !slices.ContainsFunc(
+			result.Removed,
+			func(id string) bool { return generationSubtree(entry, id) },
+		) {
 			t.Fatalf("collection removed an unrelated entry: %s", entry)
 		}
 	}
@@ -273,7 +281,10 @@ func TestCollectionDefersGenerationAboveByteBudget(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if diff := cmp.Diff([]string{retired[0].ID, retired[1].ID, retired[2].ID}, result.Deferred); diff != "" {
+	if diff := cmp.Diff(
+		[]string{retired[0].ID, retired[1].ID, retired[2].ID},
+		result.Deferred,
+	); diff != "" {
 		t.Fatal(diff)
 	}
 
@@ -363,7 +374,12 @@ func TestCollectionRejectsInvalidBudget(t *testing.T) {
 
 	assertGenerationPresent(t, path, generations[0].ID)
 
-	if _, err := os.Stat(filepath.Join(path, collectionDirectory)); !errors.Is(err, fs.ErrNotExist) {
+	if _, err := os.Stat(
+		filepath.Join(path, collectionDirectory),
+	); !errors.Is(
+		err,
+		fs.ErrNotExist,
+	) {
 		t.Fatal("invalid budget created collection state")
 	}
 }
@@ -394,7 +410,12 @@ func TestCollectionUncertainCatalogConfirmationPreventsDestruction(t *testing.T)
 
 	assertGenerationPresent(t, path, generations[0].ID)
 
-	if _, err := os.Stat(filepath.Join(path, collectionDirectory)); !errors.Is(err, fs.ErrNotExist) {
+	if _, err := os.Stat(
+		filepath.Join(path, collectionDirectory),
+	); !errors.Is(
+		err,
+		fs.ErrNotExist,
+	) {
 		t.Fatal("unconfirmed catalog still authorized an intent record")
 	}
 }
@@ -459,7 +480,12 @@ func TestCollectionKeepsPinnedAndCurrentSources(t *testing.T) {
 	r := openRepository(t, path)
 	source := commitFixture(t, r)
 
-	op, err := r.Pin(t.Context(), source.ID, model.Bytes("synthetic-target"), []Action{{ID: actionLaunch, Kind: actionLaunch, State: actionPlanned}})
+	op, err := r.Pin(
+		t.Context(),
+		source.ID,
+		model.Bytes("synthetic-target"),
+		[]Action{{ID: actionLaunch, Kind: actionLaunch, State: actionPlanned}},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -617,7 +643,11 @@ func TestCollectionAfterUncertainRetentionUsesDurableMembership(t *testing.T) {
 	}
 }
 
-func assertAttemptedRetentionRemoved(t *testing.T, r *Repository, generations []Generation) []string {
+func assertAttemptedRetentionRemoved(
+	t *testing.T,
+	r *Repository,
+	generations []Generation,
+) []string {
 	t.Helper()
 
 	catalog, err := r.Inspect(t.Context())
@@ -646,9 +676,18 @@ func twoArtifactFixture() (model.Manifest, map[string]io.Reader) {
 	firstSum, secondSum := sha256.Sum256(first), sha256.Sum256(second)
 
 	manifest := model.Manifest{
-		Format: "sesh", Version: model.Schema, Started: 1, Finished: 2,
-		Source:   model.Source{TmuxVersion: "3.6", LibraryVersion: "v0.3.0", Consistency: "observed"},
-		Sessions: []model.Session{{ID: "s0", Name: model.Bytes("work"), Directory: model.Bytes("/tmp")}},
+		Format:   "sesh",
+		Version:  model.Schema,
+		Started:  1,
+		Finished: 2,
+		Source: model.Source{
+			TmuxVersion:    "3.6",
+			LibraryVersion: "v0.3.0",
+			Consistency:    "observed",
+		},
+		Sessions: []model.Session{
+			{ID: "s0", Name: model.Bytes("work"), Directory: model.Bytes("/tmp")},
+		},
 		Windows: []model.Window{{
 			ID: "w0", Name: model.Bytes("editor"), Width: 81, Height: 24,
 			Layout: model.Layout{Width: 81, Height: 24, Axis: "x", Children: []model.Layout{
@@ -658,21 +697,57 @@ func twoArtifactFixture() (model.Manifest, map[string]io.Reader) {
 		}},
 		Links: []model.Link{{Session: "s0", Window: "w0", Index: 0, Active: true}},
 		Panes: []model.Pane{
-			{ID: "p0", Window: "w0", Index: 0, Directory: model.Bytes("/tmp"), Width: 40, Height: 24, Active: true, Terminal: model.Terminal{Artifact: "a0"}, Launch: model.Launch{Recovery: "unverified"}},
-			{ID: "p1", Window: "w0", Index: 1, Directory: model.Bytes("/tmp"), Width: 40, Height: 24, Left: 41, Terminal: model.Terminal{Artifact: "a1"}, Launch: model.Launch{Recovery: "unverified"}},
+			{
+				ID:        "p0",
+				Window:    "w0",
+				Index:     0,
+				Directory: model.Bytes("/tmp"),
+				Width:     40,
+				Height:    24,
+				Active:    true,
+				Terminal:  model.Terminal{Artifact: "a0"},
+				Launch:    model.Launch{Recovery: "unverified"},
+			},
+			{
+				ID:        "p1",
+				Window:    "w0",
+				Index:     1,
+				Directory: model.Bytes("/tmp"),
+				Width:     40,
+				Height:    24,
+				Left:      41,
+				Terminal:  model.Terminal{Artifact: "a1"},
+				Launch:    model.Launch{Recovery: "unverified"},
+			},
 		},
 		Artifacts: []model.Artifact{
-			{ID: "a0", Kind: "terminal-text", Length: int64(len(first)), SHA256: hex.EncodeToString(firstSum[:])},
-			{ID: "a1", Kind: "terminal-text", Length: int64(len(second)), SHA256: hex.EncodeToString(secondSum[:])},
+			{
+				ID:     "a0",
+				Kind:   "terminal-text",
+				Length: int64(len(first)),
+				SHA256: hex.EncodeToString(firstSum[:]),
+			},
+			{
+				ID:     "a1",
+				Kind:   "terminal-text",
+				Length: int64(len(second)),
+				SHA256: hex.EncodeToString(secondSum[:]),
+			},
 		},
 	}
 	domains := []string{"S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10"}
 
 	for _, domain := range domains {
-		manifest.Evidence = append(manifest.Evidence, model.Evidence{Domain: domain, Status: "unverified", Reason: "not_captured"})
+		manifest.Evidence = append(
+			manifest.Evidence,
+			model.Evidence{Domain: domain, Status: "unverified", Reason: "not_captured"},
+		)
 	}
 
-	return manifest, map[string]io.Reader{"a0": bytes.NewReader(first), "a1": bytes.NewReader(second)}
+	return manifest, map[string]io.Reader{
+		"a0": bytes.NewReader(first),
+		"a1": bytes.NewReader(second),
+	}
 }
 
 func commitTwoArtifactFixture(t *testing.T, r *Repository) Generation {
@@ -696,7 +771,9 @@ func commitTwoArtifactFixture(t *testing.T, r *Repository) Generation {
 func storedArtifactNames(t *testing.T, path, id string) []string {
 	t.Helper()
 
-	entries, err := os.ReadDir(filepath.Join(path, generationsDirectory, id, collectionArtifactsName))
+	entries, err := os.ReadDir(
+		filepath.Join(path, generationsDirectory, id, collectionArtifactsName),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -721,7 +798,10 @@ func TestCollectionResumesAfterPartialArtifactRemoval(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if diff := cmp.Diff([]string{"a0.bin.gz", "a1.bin.gz"}, storedArtifactNames(t, path, retired.ID)); diff != "" {
+	if diff := cmp.Diff(
+		[]string{"a0.bin.gz", "a1.bin.gz"},
+		storedArtifactNames(t, path, retired.ID),
+	); diff != "" {
 		t.Fatal(diff)
 	}
 
@@ -772,7 +852,13 @@ func TestCollectionRejectsPartialRemovalWithUnownedEntry(t *testing.T) {
 
 	interruptCollection(t, r, collectionPhaseArtifactUnlinked)
 
-	foreign := filepath.Join(path, generationsDirectory, retired.ID, collectionArtifactsName, "foreign.bin.gz")
+	foreign := filepath.Join(
+		path,
+		generationsDirectory,
+		retired.ID,
+		collectionArtifactsName,
+		"foreign.bin.gz",
+	)
 	if err := os.WriteFile(foreign, []byte("foreign"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -799,7 +885,16 @@ func TestCollectionIsIdempotentAfterCompletion(t *testing.T) {
 
 	second := collectGenerations(t, r)
 
-	if len(second.Removed)+len(second.Deferred)+len(second.Quarantined)+len(second.Preserved) != 0 || second.Bytes != 0 {
+	if len(
+		second.Removed,
+	)+len(
+		second.Deferred,
+	)+len(
+		second.Quarantined,
+	)+len(
+		second.Preserved,
+	) != 0 ||
+		second.Bytes != 0 {
 		t.Fatalf("repeated collection was not a no-op: %+v", second)
 	}
 
@@ -842,18 +937,30 @@ func TestCollectionIntentValidation(t *testing.T) {
 		{name: "generation", change: func(i *CollectionIntent) { i.Generation = "../catalog" }},
 		{name: "digest", change: func(i *CollectionIntent) { i.ManifestSHA256 = "zz" }},
 		{name: "manifest size", change: func(i *CollectionIntent) { i.ManifestBytes = 0 }},
-		{name: "manifest oversize", change: func(i *CollectionIntent) { i.ManifestBytes = model.MaxManifestBytes + 1; i.Bytes = i.ManifestBytes + 4 }},
+		{
+			name:   "manifest oversize",
+			change: func(i *CollectionIntent) { i.ManifestBytes = model.MaxManifestBytes + 1; i.Bytes = i.ManifestBytes + 4 },
+		},
 		{name: "path escaping file", change: func(i *CollectionIntent) {
 			i.Files = []CollectionFile{{Name: "../../catalog.json", Bytes: 4}}
 		}},
-		{name: "unsuffixed file", change: func(i *CollectionIntent) { i.Files = []CollectionFile{{Name: "a0", Bytes: 4}} }},
-		{name: "empty file", change: func(i *CollectionIntent) { i.Files = []CollectionFile{{Name: "a0.bin.gz", Bytes: 0}} }},
+		{
+			name:   "unsuffixed file",
+			change: func(i *CollectionIntent) { i.Files = []CollectionFile{{Name: "a0", Bytes: 4}} },
+		},
+		{
+			name:   "empty file",
+			change: func(i *CollectionIntent) { i.Files = []CollectionFile{{Name: "a0.bin.gz", Bytes: 0}} },
+		},
 		{name: "duplicate file", change: func(i *CollectionIntent) {
 			i.Files = []CollectionFile{{Name: "a0.bin.gz", Bytes: 4}, {Name: "a0.bin.gz", Bytes: 4}}
 			i.Bytes = 16
 		}},
 		{name: "total mismatch", change: func(i *CollectionIntent) { i.Bytes = 13 }},
-		{name: "state without reason", change: func(i *CollectionIntent) { i.State = collectionStateQuarantined }},
+		{
+			name:   "state without reason",
+			change: func(i *CollectionIntent) { i.State = collectionStateQuarantined },
+		},
 		{name: "unknown state", change: func(i *CollectionIntent) { i.State = "collecting" }},
 		{name: "unknown quarantine reason", change: func(i *CollectionIntent) {
 			i.State, i.Reason = collectionStateQuarantined, "mystery"
@@ -897,7 +1004,8 @@ func TestCollectionRemovesCommittedAndIncompleteGenerations(t *testing.T) {
 		states[attempt.ID] = attempt.State
 	}
 
-	if states[committed.ID] != attemptStateCommitted || states[incomplete.ID] != attemptStateIncomplete {
+	if states[committed.ID] != attemptStateCommitted ||
+		states[incomplete.ID] != attemptStateIncomplete {
 		t.Fatalf("fixture attempt states = %v", states)
 	}
 
@@ -912,7 +1020,11 @@ func TestCollectionRemovesCommittedAndIncompleteGenerations(t *testing.T) {
 	assertGenerationPresent(t, path, current.ID)
 }
 
-func retireOtherSchemaGeneration(t *testing.T, r *Repository, path string) (Generation, Generation) {
+func retireOtherSchemaGeneration(
+	t *testing.T,
+	r *Repository,
+	path string,
+) (Generation, Generation) {
 	t.Helper()
 
 	retired := commitTwoArtifactFixture(t, r)
@@ -941,7 +1053,11 @@ func TestCollectionRemovesGenerationOfOtherManifestSchema(t *testing.T) {
 
 			result := collectGenerations(t, r)
 
-			if diff := cmp.Diff([]string{retired.ID}, result.Removed); diff != "" || len(result.Preserved)+len(result.Quarantined) != 0 {
+			if diff := cmp.Diff(
+				[]string{retired.ID},
+				result.Removed,
+			); diff != "" ||
+				len(result.Preserved)+len(result.Quarantined) != 0 {
 				t.Fatalf("other-schema generation was not collected: %+v", result)
 			}
 
@@ -978,7 +1094,10 @@ func TestCollectionPreservesOtherSchemaGenerationWithUnexpectedArtifacts(t *test
 			plant: func(t *testing.T, artifacts string) {
 				t.Helper()
 
-				if err := os.Symlink(filepath.Join(artifacts, "a0.bin.gz"), filepath.Join(artifacts, "a2.bin.gz")); err != nil {
+				if err := os.Symlink(
+					filepath.Join(artifacts, "a0.bin.gz"),
+					filepath.Join(artifacts, "a2.bin.gz"),
+				); err != nil {
 					t.Fatal(err)
 				}
 			},
@@ -988,7 +1107,11 @@ func TestCollectionPreservesOtherSchemaGenerationWithUnexpectedArtifacts(t *test
 			plant: func(t *testing.T, artifacts string) {
 				t.Helper()
 
-				if err := os.WriteFile(filepath.Join(artifacts, "notes.txt"), []byte("notes"), 0o600); err != nil {
+				if err := os.WriteFile(
+					filepath.Join(artifacts, "notes.txt"),
+					[]byte("notes"),
+					0o600,
+				); err != nil {
 					t.Fatal(err)
 				}
 			},
@@ -1001,12 +1124,19 @@ func TestCollectionPreservesOtherSchemaGenerationWithUnexpectedArtifacts(t *test
 			path := filepath.Join(t.TempDir(), "repository")
 			r := openRepository(t, path)
 			retired, _ := retireOtherSchemaGeneration(t, r, path)
-			tc.plant(t, filepath.Join(path, generationsDirectory, retired.ID, collectionArtifactsName))
+			tc.plant(
+				t,
+				filepath.Join(path, generationsDirectory, retired.ID, collectionArtifactsName),
+			)
 			before := repositoryTree(t, path)
 
 			result := collectGenerations(t, r)
 
-			if diff := cmp.Diff([]CollectionSkip{{Generation: retired.ID, Reason: tc.reason}}, result.Preserved); diff != "" || len(result.Removed) != 0 {
+			if diff := cmp.Diff(
+				[]CollectionSkip{{Generation: retired.ID, Reason: tc.reason}},
+				result.Preserved,
+			); diff != "" ||
+				len(result.Removed) != 0 {
 				t.Fatalf("unexpected collection result %+v: %s", result, diff)
 			}
 

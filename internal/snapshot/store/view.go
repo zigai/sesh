@@ -28,14 +28,33 @@ func OpenView(ctx context.Context, path string) (*View, error) {
 
 	root, err := privatefs.Open(path, false)
 	if errors.Is(err, fs.ErrNotExist) {
-		return &View{repository: Repository{root: nil, path: path, fault: nil, owners: attemptOwners{mu: sync.Mutex{}, held: nil}}}, nil
+		return &View{
+			repository: Repository{
+				root:   nil,
+				path:   path,
+				fault:  nil,
+				owners: attemptOwners{mu: sync.Mutex{}, held: nil},
+			},
+		}, nil
 	}
 
 	if err != nil {
-		return nil, repositoryError("open_view", oops.In("snapshot.store").With("operation", "open_repository_view").Wrapf(err, "open repository view"))
+		return nil, repositoryError(
+			"open_view",
+			oops.In("snapshot.store").
+				With("operation", "open_repository_view").
+				Wrapf(err, "open repository view"),
+		)
 	}
 
-	return &View{repository: Repository{root: root, path: path, fault: nil, owners: attemptOwners{mu: sync.Mutex{}, held: nil}}}, nil
+	return &View{
+		repository: Repository{
+			root:   root,
+			path:   path,
+			fault:  nil,
+			owners: attemptOwners{mu: sync.Mutex{}, held: nil},
+		},
+	}, nil
 }
 
 func (v *View) Close() error {

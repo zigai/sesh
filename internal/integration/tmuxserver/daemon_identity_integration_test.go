@@ -21,8 +21,14 @@ func TestObserveDaemonIdentityRejectsReplacementAtSameSocket(t *testing.T) {
 	config := gotmux.Config{
 		SocketPath: socket,
 		ConfigFile: "/dev/null",
-		Env:        []string{"PATH=" + os.Getenv("PATH"), "HOME=" + dir, "SHELL=/bin/sh", "TERM=xterm-256color", "LC_ALL=C.UTF-8"},
-		Dir:        dir,
+		Env: []string{
+			"PATH=" + os.Getenv("PATH"),
+			"HOME=" + dir,
+			"SHELL=/bin/sh",
+			"TERM=xterm-256color",
+			"LC_ALL=C.UTF-8",
+		},
+		Dir: dir,
 	}
 
 	first := newStartedDaemon(t, ctx, config, "first")
@@ -39,7 +45,11 @@ func TestObserveDaemonIdentityRejectsReplacementAtSameSocket(t *testing.T) {
 	}
 
 	if !firstIdentity.Equal(repeatedIdentity) {
-		t.Fatalf("stable daemon identity changed: first=%+v repeated=%+v", firstIdentity, repeatedIdentity)
+		t.Fatalf(
+			"stable daemon identity changed: first=%+v repeated=%+v",
+			firstIdentity,
+			repeatedIdentity,
+		)
 	}
 
 	if err := first.Kill(ctx); err != nil {
@@ -55,11 +65,20 @@ func TestObserveDaemonIdentityRejectsReplacementAtSameSocket(t *testing.T) {
 	}
 
 	if firstIdentity.Equal(secondIdentity) {
-		t.Fatalf("replacement at same socket retained old identity: first=%+v second=%+v", firstIdentity, secondIdentity)
+		t.Fatalf(
+			"replacement at same socket retained old identity: first=%+v second=%+v",
+			firstIdentity,
+			secondIdentity,
+		)
 	}
 }
 
-func newStartedDaemon(t *testing.T, ctx context.Context, config gotmux.Config, sessionName string) *gotmux.Server {
+func newStartedDaemon(
+	t *testing.T,
+	ctx context.Context,
+	config gotmux.Config,
+	sessionName string,
+) *gotmux.Server {
 	t.Helper()
 
 	server, err := gotmux.New(config)

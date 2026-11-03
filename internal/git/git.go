@@ -75,7 +75,11 @@ func Output(ctx context.Context, dir string, args ...string) (string, error) {
 	}
 
 	if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
-		return "", &CommandError{Subcommand: subcommand(args), ExitCode: exitErr.ExitCode(), Detail: errorDetail(stderr.String())}
+		return "", &CommandError{
+			Subcommand: subcommand(args),
+			ExitCode:   exitErr.ExitCode(),
+			Detail:     errorDetail(stderr.String()),
+		}
 	}
 
 	if err != nil {

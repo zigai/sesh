@@ -18,7 +18,9 @@ type RawBytes []byte
 
 func (b RawBytes) MarshalJSONTo(out *jsontext.Encoder) error {
 	if err := out.WriteToken(jsontext.String(base64.StdEncoding.EncodeToString(b))); err != nil {
-		return oops.In("session").With("operation", "encode_raw_bytes").Wrapf(err, "encode raw bytes")
+		return oops.In("session").
+			With("operation", "encode_raw_bytes").
+			Wrapf(err, "encode raw bytes")
 	}
 
 	return nil

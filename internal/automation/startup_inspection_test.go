@@ -56,7 +56,15 @@ func TestInspectStartupState_FailedFirstSaveLeavesNothingToRecover(t *testing.T)
 		t.Fatalf("Generation = %q, want empty when no generation is readable", state.Generation)
 	}
 
-	admission := automation.EvaluateStartupRestore(automation.StartupState{Enabled: true, RepositoryPresent: state.RepositoryPresent, RecoveryRequired: state.RecoveryRequired, ObservationOnly: state.ObservationOnly, Generation: state.Generation})
+	admission := automation.EvaluateStartupRestore(
+		automation.StartupState{
+			Enabled:           true,
+			RepositoryPresent: state.RepositoryPresent,
+			RecoveryRequired:  state.RecoveryRequired,
+			ObservationOnly:   state.ObservationOnly,
+			Generation:        state.Generation,
+		},
+	)
 	if admission.Allowed || admission.Reason == automation.ReasonRecoveryRequired {
 		t.Fatalf("admission = %+v, want refusal without recovery_required", admission)
 	}

@@ -24,8 +24,10 @@ var (
 	errSnapshotPickerJSONConflict       = errors.New("--pick cannot be combined with --json")
 	errSnapshotPickerGenerationConflict = errors.New("--pick cannot be combined with --generation")
 	errSnapshotPickerOperationConflict  = errors.New("--pick cannot be combined with --operation")
-	errSnapshotPickerConnectionConflict = errors.New("--pick selects generations on this machine and cannot be combined with --connection")
-	errSnapshotPickerTerminalRequired   = errors.New("--pick requires an interactive terminal")
+	errSnapshotPickerConnectionConflict = errors.New(
+		"--pick selects generations on this machine and cannot be combined with --connection",
+	)
+	errSnapshotPickerTerminalRequired = errors.New("--pick requires an interactive terminal")
 )
 
 type fileDescriptor interface {
@@ -74,14 +76,18 @@ func selectSnapshotRestoreGeneration(
 
 	repository, err := store.OpenExisting(ctx, repositoryPath)
 	if err != nil {
-		return "", false, oops.In("cli").With("operation", "open_snapshot_picker_repository").Wrap(err)
+		return "", false, oops.In("cli").
+			With("operation", "open_snapshot_picker_repository").
+			Wrap(err)
 	}
 
 	entries, loadErr := loadSnapshotPickerEntries(ctx, repository)
 
 	closeErr := repository.Close()
 	if closeErr != nil {
-		closeErr = oops.In("cli").With("operation", "close_snapshot_picker_repository").Wrap(closeErr)
+		closeErr = oops.In("cli").
+			With("operation", "close_snapshot_picker_repository").
+			Wrap(closeErr)
 	}
 
 	if err := errors.Join(loadErr, closeErr); err != nil {
@@ -103,7 +109,10 @@ func selectSnapshotRestoreGeneration(
 	return generation, generation != "", nil
 }
 
-func loadSnapshotPickerEntries(ctx context.Context, repository *store.Repository) ([]snapshotpicker.Entry, error) {
+func loadSnapshotPickerEntries(
+	ctx context.Context,
+	repository *store.Repository,
+) ([]snapshotpicker.Entry, error) {
 	catalog, err := repository.Inspect(ctx)
 	if err != nil {
 		return nil, oops.In("cli").With("operation", "inspect_snapshot_picker_repository").Wrap(err)
@@ -130,7 +139,9 @@ func loadSnapshotPickerEntries(ctx context.Context, repository *store.Repository
 	for _, generation := range generations {
 		manifest, readErr := repository.Read(ctx, generation.ID)
 		if readErr != nil {
-			return nil, oops.In("cli").With("operation", "read_snapshot_picker_generation").Wrap(readErr)
+			return nil, oops.In("cli").
+				With("operation", "read_snapshot_picker_generation").
+				Wrap(readErr)
 		}
 
 		entries = append(entries, pickerEntry(

@@ -133,7 +133,16 @@ func (s *Service) arrange(
 		return err
 	}
 
-	if err := applyLayout(ctx, s.server, window, layout, placed, panes, info.Width, info.Height); err != nil {
+	if err := applyLayout(
+		ctx,
+		s.server,
+		window,
+		layout,
+		placed,
+		panes,
+		info.Width,
+		info.Height,
+	); err != nil {
 		return err
 	}
 
@@ -144,13 +153,24 @@ func (s *Service) arrange(
 	return s.focus(ctx, panes, layout.Focus)
 }
 
-func fitting(setup config.TaskWindow, layout config.TaskLayoutConfig, panes []windowPane, width, height int, mode arrangeMode) (config.TaskLayoutConfig, error) {
+func fitting(
+	setup config.TaskWindow,
+	layout config.TaskLayoutConfig,
+	panes []windowPane,
+	width, height int,
+	mode arrangeMode,
+) (config.TaskLayoutConfig, error) {
 	if len(layout.Splits) == 0 {
 		return layout, nil
 	}
 
 	placed := setup.Placed(layout)
-	if _, err := splitCells(width, height, layout.Splits, extraKeys(panes, paneKeys(panes, placed), placed)); err != nil {
+	if _, err := splitCells(
+		width,
+		height,
+		layout.Splits,
+		extraKeys(panes, paneKeys(panes, placed), placed),
+	); err != nil {
 		if mode != arrangeNewWindow || !errors.Is(err, ErrWindowTooSmall) {
 			return layout, err
 		}
@@ -180,7 +200,10 @@ func (s *Service) focus(ctx context.Context, panes []windowPane, role string) er
 }
 
 func (s *Service) windowPanes(ctx context.Context, window gotmux.Window) ([]windowPane, error) {
-	infos, err := window.PanesWith(ctx, gotmux.QueryOptions{Filter: "", ExtraFields: []string{OptionRole}})
+	infos, err := window.PanesWith(
+		ctx,
+		gotmux.QueryOptions{Filter: "", ExtraFields: []string{OptionRole}},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("list task panes: %w", err)
 	}
@@ -190,10 +213,16 @@ func (s *Service) windowPanes(ctx context.Context, window gotmux.Window) ([]wind
 	panes := make([]windowPane, 0, len(infos))
 	for _, info := range infos {
 		role, _ := info.Raw(OptionRole)
-		panes = append(panes, windowPane{id: info.ID, role: string(role), width: info.Width, height: info.Height})
+		panes = append(
+			panes,
+			windowPane{id: info.ID, role: string(role), width: info.Width, height: info.Height},
+		)
 	}
 
-	if !slices.ContainsFunc(panes, func(pane windowPane) bool { return pane.role == config.TaskPaneAgent }) {
+	if !slices.ContainsFunc(
+		panes,
+		func(pane windowPane) bool { return pane.role == config.TaskPaneAgent },
+	) {
 		return nil, ErrNoAgentPane
 	}
 
@@ -213,7 +242,10 @@ func (s *Service) openPanes(
 			continue
 		}
 
-		target := slices.MaxFunc(panes, func(a, b windowPane) int { return a.width*a.height - b.width*b.height })
+		target := slices.MaxFunc(
+			panes,
+			func(a, b windowPane) int { return a.width*a.height - b.width*b.height },
+		)
 
 		direction := gotmux.DirectionVertical
 		if splitSideBySide(target.width, target.height) {
@@ -268,10 +300,26 @@ func (s *Service) openPane(
 	}
 
 	created, err := pane.Split(ctx, gotmux.SplitOptions{
-		Direction: direction, Size: gotmux.SplitSize{Cells: 0, Percent: 0}, Dir: directory,
-		Program: shellProgram(shell, command), Env: nil, TmuxEnv: Env(record), Select: false, Before: false,
-		FullSize: false, KillTarget: false, Zoom: false, Title: "", BorderLines: "", Style: "",
-		ActiveBorderStyle: "", InactiveBorderStyle: "", Message: "",
+		Direction: direction,
+		Size:      gotmux.SplitSize{Cells: 0, Percent: 0},
+		Dir:       directory,
+		Program: shellProgram(
+			shell,
+			command,
+		),
+		Env:                 nil,
+		TmuxEnv:             Env(record),
+		Select:              false,
+		Before:              false,
+		FullSize:            false,
+		KillTarget:          false,
+		Zoom:                false,
+		Title:               "",
+		BorderLines:         "",
+		Style:               "",
+		ActiveBorderStyle:   "",
+		InactiveBorderStyle: "",
+		Message:             "",
 	})
 	if err != nil {
 		return fmt.Errorf("open %s pane: %w", configured.Name, err)
@@ -285,7 +333,9 @@ func (s *Service) openPane(
 		return nil
 	}
 
-	encoded, err := json.Marshal(restartCommand{Directory: directory, Argv: shellArgv(shell, command)})
+	encoded, err := json.Marshal(
+		restartCommand{Directory: directory, Argv: shellArgv(shell, command)},
+	)
 	if err != nil {
 		return fmt.Errorf("encode restart command: %w", err)
 	}
@@ -298,12 +348,23 @@ func (s *Service) openPane(
 }
 
 func layoutNamed(setup config.TaskWindow, name string) bool {
-	return slices.ContainsFunc(setup.Layouts, func(layout config.TaskLayoutConfig) bool { return layout.Name == name })
+	return slices.ContainsFunc(
+		setup.Layouts,
+		func(layout config.TaskLayoutConfig) bool { return layout.Name == name },
+	)
 }
 
-func chooseLayout(setup config.TaskWindow, harness string, width, height int, name string) (config.TaskLayoutConfig, error) {
+func chooseLayout(
+	setup config.TaskWindow,
+	harness string,
+	width, height int,
+	name string,
+) (config.TaskLayoutConfig, error) {
 	if name != "" {
-		index := slices.IndexFunc(setup.Layouts, func(layout config.TaskLayoutConfig) bool { return layout.Name == name })
+		index := slices.IndexFunc(
+			setup.Layouts,
+			func(layout config.TaskLayoutConfig) bool { return layout.Name == name },
+		)
 		if index < 0 {
 			return defaultArrangement(), fmt.Errorf("%w: %s", ErrUnknownLayout, name)
 		}
@@ -322,8 +383,20 @@ func chooseLayout(setup config.TaskWindow, harness string, width, height int, na
 
 func defaultArrangement() config.TaskLayoutConfig {
 	return config.TaskLayoutConfig{
-		Name: "", When: config.TaskLayoutWhen{Orientation: "", MinWidth: 0, MaxWidth: 0, MinHeight: 0, MaxHeight: 0, Harness: nil},
-		Arrange: config.ArrangeMainHorizontal, MainSize: "", Panes: nil, Splits: nil, Focus: "",
+		Name: "",
+		When: config.TaskLayoutWhen{
+			Orientation: "",
+			MinWidth:    0,
+			MaxWidth:    0,
+			MinHeight:   0,
+			MaxHeight:   0,
+			Harness:     nil,
+		},
+		Arrange:  config.ArrangeMainHorizontal,
+		MainSize: "",
+		Panes:    nil,
+		Splits:   nil,
+		Focus:    "",
 	}
 }
 
@@ -333,7 +406,8 @@ func paneKeys(panes []windowPane, placed []string) map[gotmux.PaneID]string {
 
 	for _, pane := range panes {
 		key := string(pane.id)
-		if (pane.role == config.TaskPaneAgent || slices.Contains(placed, pane.role)) && !taken[pane.role] {
+		if (pane.role == config.TaskPaneAgent || slices.Contains(placed, pane.role)) &&
+			!taken[pane.role] {
 			key = pane.role
 		}
 
@@ -437,7 +511,13 @@ func setMainSize(ctx context.Context, window gotmux.Window, layout config.TaskLa
 	return nil
 }
 
-func orderPanes(ctx context.Context, server *gotmux.Server, panes []windowPane, order []string, ids map[string]gotmux.PaneID) error {
+func orderPanes(
+	ctx context.Context,
+	server *gotmux.Server,
+	panes []windowPane,
+	order []string,
+	ids map[string]gotmux.PaneID,
+) error {
 	current := make([]gotmux.PaneID, 0, len(panes))
 	for _, pane := range panes {
 		current = append(current, pane.id)
@@ -469,8 +549,21 @@ func orderPanes(ctx context.Context, server *gotmux.Server, panes []windowPane, 
 	return nil
 }
 
-func splitCells(width, height int, splits []config.TaskSplitConfig, extras []string) (*cell, error) {
-	root := &cell{pane: config.TaskPaneAgent, sideBySide: false, children: nil, parent: nil, x: 0, y: 0, w: width, h: height}
+func splitCells(
+	width, height int,
+	splits []config.TaskSplitConfig,
+	extras []string,
+) (*cell, error) {
+	root := &cell{
+		pane:       config.TaskPaneAgent,
+		sideBySide: false,
+		children:   nil,
+		parent:     nil,
+		x:          0,
+		y:          0,
+		w:          width,
+		h:          height,
+	}
 
 	for _, split := range splits {
 		size, err := config.ParsePaneSize(split.Size)
@@ -478,8 +571,10 @@ func splitCells(width, height int, splits []config.TaskSplitConfig, extras []str
 			return nil, fmt.Errorf("task split size: %w", err)
 		}
 
-		sideBySide := split.Direction == config.DirectionRight || split.Direction == config.DirectionLeft
-		before := split.Direction == config.DirectionLeft || split.Direction == config.DirectionAbove
+		sideBySide := split.Direction == config.DirectionRight ||
+			split.Direction == config.DirectionLeft
+		before := split.Direction == config.DirectionLeft ||
+			split.Direction == config.DirectionAbove
 
 		// Mirrors tmux: the size comes from the split pane, and one cell goes to the border.
 		if err := root.find(split.Of).splitOff(split.Pane, sideBySide, before, size); err != nil {
@@ -491,7 +586,12 @@ func splitCells(width, height int, splits []config.TaskSplitConfig, extras []str
 		largest := root.largest()
 		sideBySide := splitSideBySide(largest.w, largest.h)
 
-		if err := largest.splitOff(extra, sideBySide, false, config.PaneSize{Cells: 0, Percent: 0}); err != nil {
+		if err := largest.splitOff(
+			extra,
+			sideBySide,
+			false,
+			config.PaneSize{Cells: 0, Percent: 0},
+		); err != nil {
 			return nil, err
 		}
 	}
@@ -562,11 +662,29 @@ func (c *cell) isLeaf() bool {
 }
 
 func (c *cell) split(pane string, sideBySide, before bool, size int) {
-	added := &cell{pane: pane, sideBySide: false, children: nil, parent: nil, x: c.x, y: c.y, w: c.w, h: c.h}
+	added := &cell{
+		pane:       pane,
+		sideBySide: false,
+		children:   nil,
+		parent:     nil,
+		x:          c.x,
+		y:          c.y,
+		w:          c.w,
+		h:          c.h,
+	}
 	kept := c
 
 	if c.parent == nil || c.parent.sideBySide != sideBySide {
-		kept = &cell{pane: c.pane, sideBySide: false, children: nil, parent: c, x: c.x, y: c.y, w: c.w, h: c.h}
+		kept = &cell{
+			pane:       c.pane,
+			sideBySide: false,
+			children:   nil,
+			parent:     c,
+			x:          c.x,
+			y:          c.y,
+			w:          c.w,
+			h:          c.h,
+		}
 		c.pane, c.sideBySide, c.children = "", sideBySide, []*cell{kept}
 		added.parent = c
 	}
@@ -589,11 +707,27 @@ func (c *cell) split(pane string, sideBySide, before bool, size int) {
 
 	if sideBySide {
 		total := kept.w
-		first.w, second.w = sizeOf(first == added, size, total), sizeOf(second == added, size, total)
+		first.w, second.w = sizeOf(
+			first == added,
+			size,
+			total,
+		), sizeOf(
+			second == added,
+			size,
+			total,
+		)
 		second.x = first.x + first.w + borderCells
 	} else {
 		total := kept.h
-		first.h, second.h = sizeOf(first == added, size, total), sizeOf(second == added, size, total)
+		first.h, second.h = sizeOf(
+			first == added,
+			size,
+			total,
+		), sizeOf(
+			second == added,
+			size,
+			total,
+		)
 		second.y = first.y + first.h + borderCells
 	}
 }
@@ -620,7 +754,15 @@ func (c *cell) leaves() []string {
 }
 
 func (c *cell) layout(ids map[string]string) string {
-	head := strconv.Itoa(c.w) + "x" + strconv.Itoa(c.h) + "," + strconv.Itoa(c.x) + "," + strconv.Itoa(c.y)
+	head := strconv.Itoa(
+		c.w,
+	) + "x" + strconv.Itoa(
+		c.h,
+	) + "," + strconv.Itoa(
+		c.x,
+	) + "," + strconv.Itoa(
+		c.y,
+	)
 	if c.isLeaf() {
 		return head + "," + ids[c.pane]
 	}

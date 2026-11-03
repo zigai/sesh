@@ -13,7 +13,8 @@ import (
 var errRejected = errors.New("rejected")
 
 func TestLoadOfAMissingLedgerIsEmpty(t *testing.T) {
-	ledger, err := task.NewStore(filepath.Join(t.TempDir(), "state", "tasks.json")).Load(t.Context())
+	ledger, err := task.NewStore(filepath.Join(t.TempDir(), "state", "tasks.json")).
+		Load(t.Context())
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -82,7 +83,12 @@ func TestConcurrentUpdatesKeepEveryRecordAndUniqueIDs(t *testing.T) {
 	}
 
 	if len(ledger.Tasks) != writers || ledger.LastID != writers {
-		t.Fatalf("ledger has %d tasks and last ID %d, want %d of each", len(ledger.Tasks), ledger.LastID, writers)
+		t.Fatalf(
+			"ledger has %d tasks and last ID %d, want %d of each",
+			len(ledger.Tasks),
+			ledger.LastID,
+			writers,
+		)
 	}
 }
 
@@ -127,7 +133,11 @@ func TestCorruptOrUnknownLedgersAreRejected(t *testing.T) {
 		{"unknown field", `{"version":2,"lastId":0,"tasks":[],"projects":[],"extra":1}`},
 		{
 			"duplicate task id",
-			`{"version":2,"lastId":2,"projects":[],"tasks":[` + record("t1") + `,` + record("t1") + `]}`,
+			`{"version":2,"lastId":2,"projects":[],"tasks":[` + record(
+				"t1",
+			) + `,` + record(
+				"t1",
+			) + `]}`,
 		},
 	}
 
@@ -148,7 +158,10 @@ func TestCorruptOrUnknownLedgersAreRejected(t *testing.T) {
 				t.Error("Load() error = nil, want rejection")
 			}
 
-			if _, err := store.Update(t.Context(), func(*task.Ledger) error { return nil }); err == nil {
+			if _, err := store.Update(
+				t.Context(),
+				func(*task.Ledger) error { return nil },
+			); err == nil {
 				t.Error("Update() error = nil, want rejection")
 			}
 

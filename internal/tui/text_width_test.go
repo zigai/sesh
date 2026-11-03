@@ -22,7 +22,11 @@ func TestFormatAgentAgeAtKeepsMinutePrecisionAfterOneHour(t *testing.T) {
 		{name: "minutes", at: now.Add(-12 * time.Minute), want: "12m"},
 		{name: "hours and minutes", at: now.Add(-(5*time.Hour + 17*time.Minute)), want: "5h 17m"},
 		{name: "whole hours", at: now.Add(-5 * time.Hour), want: "5h 0m"},
-		{name: "days hours and minutes", at: now.Add(-(72*time.Hour + 17*time.Minute)), want: "3d 0h 17m"},
+		{
+			name: "days hours and minutes",
+			at:   now.Add(-(72*time.Hour + 17*time.Minute)),
+			want: "3d 0h 17m",
+		},
 	}
 
 	for _, tt := range tests {
@@ -44,8 +48,16 @@ func TestFormatAgentClockAt(t *testing.T) {
 	}{
 		{name: "zero", at: time.Time{}, want: ""},
 		{name: "seconds only", at: now.Add(-23 * time.Second), want: "00:00:23"},
-		{name: "one minute 23 seconds", at: now.Add(-(time.Minute + 23*time.Second)), want: "00:01:23"},
-		{name: "hours minutes seconds", at: now.Add(-(5*time.Hour + 17*time.Minute + 42*time.Second)), want: "05:17:42"},
+		{
+			name: "one minute 23 seconds",
+			at:   now.Add(-(time.Minute + 23*time.Second)),
+			want: "00:01:23",
+		},
+		{
+			name: "hours minutes seconds",
+			at:   now.Add(-(5*time.Hour + 17*time.Minute + 42*time.Second)),
+			want: "05:17:42",
+		},
 		{name: "days", at: now.Add(-(72*time.Hour + 17*time.Minute)), want: "72:17:00"},
 	}
 
@@ -90,12 +102,20 @@ func TestFormatAgentStatusElapsedHoursWithoutMinutePadding(t *testing.T) {
 		{name: "whole hours", age: 5 * time.Hour, want: "5h 0m"},
 		{name: "single digit minutes", age: 5*time.Hour + 3*time.Minute, want: "5h 3m"},
 		{name: "double digit minutes", age: 5*time.Hour + 17*time.Minute, want: "5h 17m"},
-		{name: "before day boundary", age: 23*time.Hour + 59*time.Minute + 59*time.Second, want: "23h 59m"},
+		{
+			name: "before day boundary",
+			age:  23*time.Hour + 59*time.Minute + 59*time.Second,
+			want: "23h 59m",
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if got := formatAgentStatusAgeAt(now.Add(-test.age), now, "relative-seconds"); got != test.want {
+			if got := formatAgentStatusAgeAt(
+				now.Add(-test.age),
+				now,
+				"relative-seconds",
+			); got != test.want {
 				t.Fatalf("elapsed status age = %q, want %q", got, test.want)
 			}
 		})
@@ -117,7 +137,11 @@ func TestFormatAgentStatusElapsedDaysWithoutHourPadding(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if got := formatAgentStatusAgeAt(now.Add(-test.age), now, "relative-seconds"); got != test.want {
+			if got := formatAgentStatusAgeAt(
+				now.Add(-test.age),
+				now,
+				"relative-seconds",
+			); got != test.want {
 				t.Fatalf("elapsed status age = %q, want %q", got, test.want)
 			}
 		})
@@ -137,7 +161,11 @@ func TestFormatAgentStatusHoursMinutes(t *testing.T) {
 		{name: "seconds omitted", at: now.Add(-59 * time.Second), want: "00:00"},
 		{name: "minutes", at: now.Add(-83 * time.Second), want: "00:01"},
 		{name: "hour boundary", at: now.Add(-time.Hour), want: "01:00"},
-		{name: "hours", at: now.Add(-(5*time.Hour + 17*time.Minute + 42*time.Second)), want: "05:17"},
+		{
+			name: "hours",
+			at:   now.Add(-(5*time.Hour + 17*time.Minute + 42*time.Second)),
+			want: "05:17",
+		},
 		{name: "days", at: now.Add(-(72*time.Hour + 17*time.Minute)), want: "72:17"},
 		{name: "large hours", at: now.Add(-100 * time.Hour), want: "100:00"},
 	}
@@ -155,13 +183,19 @@ func TestSanitizeTerminalTextKeepSGRKeepsOnlyStyles(t *testing.T) {
 		input string
 		want  string
 	}{
-		"combining accent":    {input: "e\u0301clair", want: "e\u0301clair"},
-		"styled accent":       {input: "e\x1b[31m\u0301", want: "e\x1b[31m\u0301"},
-		"joined emoji":        {input: "👩\u200d💻", want: "👩\u200d💻"},
-		"plain":               {input: "main ✓ 漢字", want: "main ✓ 漢字"},
-		"sgr":                 {input: "\x1b[1;38;2;255;0:0mok\x1b[0m \x1b[m", want: "\x1b[1;38;2;255;0:0mok\x1b[0m \x1b[m"},
-		"cursor movement":     {input: "a\x1b[2Jb\x1b[10;3Hc\x1b[?25l", want: "abc"},
-		"osc hyperlink":       {input: "\x1b]8;;https://example.com\x1b\\link\x1b]8;;\x1b\\", want: "link"},
+		"combining accent": {input: "e\u0301clair", want: "e\u0301clair"},
+		"styled accent":    {input: "e\x1b[31m\u0301", want: "e\x1b[31m\u0301"},
+		"joined emoji":     {input: "👩\u200d💻", want: "👩\u200d💻"},
+		"plain":            {input: "main ✓ 漢字", want: "main ✓ 漢字"},
+		"sgr": {
+			input: "\x1b[1;38;2;255;0:0mok\x1b[0m \x1b[m",
+			want:  "\x1b[1;38;2;255;0:0mok\x1b[0m \x1b[m",
+		},
+		"cursor movement": {input: "a\x1b[2Jb\x1b[10;3Hc\x1b[?25l", want: "abc"},
+		"osc hyperlink": {
+			input: "\x1b]8;;https://example.com\x1b\\link\x1b]8;;\x1b\\",
+			want:  "link",
+		},
 		"osc clipboard":       {input: "x\x1b]52;c;aGFja2Vk\ay", want: "xy"},
 		"dcs":                 {input: "a\x1bPq#0;2;0;0;0\x1b\\b", want: "ab"},
 		"private sgr":         {input: "\x1b[>4;2mx", want: "x"},

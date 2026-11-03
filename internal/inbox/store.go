@@ -102,7 +102,10 @@ func (s *State) ClearUnseen(key string) {
 }
 
 func (s *State) Expire(now time.Time) {
-	s.Snoozes = slices.DeleteFunc(s.Snoozes, func(snooze Snooze) bool { return snooze.Timed() && snooze.Until <= now.Unix() })
+	s.Snoozes = slices.DeleteFunc(
+		s.Snoozes,
+		func(snooze Snooze) bool { return snooze.Timed() && snooze.Until <= now.Unix() },
+	)
 }
 
 func (s Store) Load(ctx context.Context) (State, error) {
@@ -163,7 +166,12 @@ func (s Store) open(create bool) (*privatefs.Dir, string, error) {
 	return dir, filepath.Base(s.path), err
 }
 
-func update(ctx context.Context, dir *privatefs.Dir, name string, change func(*State) error) (State, error) {
+func update(
+	ctx context.Context,
+	dir *privatefs.Dir,
+	name string,
+	change func(*State) error,
+) (State, error) {
 	state, err := read(dir, name)
 	if err != nil {
 		return State{}, err
@@ -247,7 +255,8 @@ func (s *State) validate() error {
 		return ErrVersion
 	}
 
-	if len(s.Snoozes) > maxEntries || len(s.Unseen) > maxEntries || !s.validSnoozes() || !s.validUnseen() {
+	if len(s.Snoozes) > maxEntries || len(s.Unseen) > maxEntries || !s.validSnoozes() ||
+		!s.validUnseen() {
 		return ErrInvalid
 	}
 

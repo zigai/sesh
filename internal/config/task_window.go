@@ -34,23 +34,38 @@ var (
 	errTaskLayoutName      = errors.New("layout names may only contain a-z, 0-9, _ and -")
 	errTaskLayoutDuplicate = errors.New("duplicate layout name")
 	errTaskLayoutShape     = errors.New("layout needs either arrange or splits")
-	errTaskLayoutArrange   = errors.New("arrange must be a tmux layout: main-vertical, main-horizontal, main-vertical-mirrored, main-horizontal-mirrored, even-horizontal, even-vertical or tiled")
-	errTaskLayoutMainSize  = errors.New("main_size needs a main-* arrange")
-	errTaskLayoutPanes     = errors.New("panes lists the panes of an arrange; splits place their own")
-	errTaskLayoutPane      = errors.New("layout places a pane that is not configured")
-	errTaskLayoutPlaced    = errors.New("layout places a pane twice")
-	errTaskLayoutOf        = errors.New(`split of must be "agent" or a pane placed by an earlier split`)
+	errTaskLayoutArrange   = errors.New(
+		"arrange must be a tmux layout: main-vertical, main-horizontal, main-vertical-mirrored, main-horizontal-mirrored, even-horizontal, even-vertical or tiled",
+	)
+	errTaskLayoutMainSize = errors.New("main_size needs a main-* arrange")
+	errTaskLayoutPanes    = errors.New(
+		"panes lists the panes of an arrange; splits place their own",
+	)
+	errTaskLayoutPane   = errors.New("layout places a pane that is not configured")
+	errTaskLayoutPlaced = errors.New("layout places a pane twice")
+	errTaskLayoutOf     = errors.New(
+		`split of must be "agent" or a pane placed by an earlier split`,
+	)
 	errTaskLayoutDirection = errors.New("split direction must be right, below, left or above")
 	errTaskLayoutFocus     = errors.New(`focus must be "agent" or a pane the layout places`)
-	errTaskLayoutWhen      = errors.New(`when needs orientation "landscape" or "portrait", sizes of at least 0, and max sizes not below min sizes`)
-	errTaskLayoutHarness   = errors.New("when.harness names a harness that is not offered")
-	errTaskPaneCommand     = errors.New("pane command needs a program")
-	errTaskPaneRestart     = errors.New("restart needs a command to run again")
-	errPaneSize            = errors.New(`size must be cells such as "80" or a percentage from 1% to 99%`)
+	errTaskLayoutWhen      = errors.New(
+		`when needs orientation "landscape" or "portrait", sizes of at least 0, and max sizes not below min sizes`,
+	)
+	errTaskLayoutHarness = errors.New("when.harness names a harness that is not offered")
+	errTaskPaneCommand   = errors.New("pane command needs a program")
+	errTaskPaneRestart   = errors.New("restart needs a command to run again")
+	errPaneSize          = errors.New(
+		`size must be cells such as "80" or a percentage from 1% to 99%`,
+	)
 
 	arrangements = []string{
-		ArrangeMainVertical, ArrangeMainHorizontal, "main-vertical-mirrored", "main-horizontal-mirrored",
-		"even-horizontal", "even-vertical", "tiled",
+		ArrangeMainVertical,
+		ArrangeMainHorizontal,
+		"main-vertical-mirrored",
+		"main-horizontal-mirrored",
+		"even-horizontal",
+		"even-vertical",
+		"tiled",
 	}
 )
 
@@ -104,12 +119,36 @@ type PaneSize struct {
 func DefaultTaskLayouts() []TaskLayoutConfig {
 	return []TaskLayoutConfig{
 		{
-			Name: "side", When: TaskLayoutWhen{Orientation: OrientationLandscape, MinWidth: 0, MaxWidth: 0, MinHeight: 0, MaxHeight: 0, Harness: nil},
-			Arrange: ArrangeMainVertical, MainSize: "50%", Panes: nil, Splits: nil, Focus: "",
+			Name: "side",
+			When: TaskLayoutWhen{
+				Orientation: OrientationLandscape,
+				MinWidth:    0,
+				MaxWidth:    0,
+				MinHeight:   0,
+				MaxHeight:   0,
+				Harness:     nil,
+			},
+			Arrange:  ArrangeMainVertical,
+			MainSize: "50%",
+			Panes:    nil,
+			Splits:   nil,
+			Focus:    "",
 		},
 		{
-			Name: "stacked", When: TaskLayoutWhen{Orientation: "", MinWidth: 0, MaxWidth: 0, MinHeight: 0, MaxHeight: 0, Harness: nil},
-			Arrange: ArrangeMainHorizontal, MainSize: "50%", Panes: nil, Splits: nil, Focus: "",
+			Name: "stacked",
+			When: TaskLayoutWhen{
+				Orientation: "",
+				MinWidth:    0,
+				MaxWidth:    0,
+				MinHeight:   0,
+				MaxHeight:   0,
+				Harness:     nil,
+			},
+			Arrange:  ArrangeMainHorizontal,
+			MainSize: "50%",
+			Panes:    nil,
+			Splits:   nil,
+			Focus:    "",
 		},
 	}
 }
@@ -121,7 +160,10 @@ func (c *Config) TaskWindowFor(root string) TaskWindow {
 func (c *Config) taskWindow(override ProjectConfig) TaskWindow {
 	panes := cloneTaskPanes(c.Tasks.Panes)
 	for _, pane := range override.TaskPanes {
-		index := slices.IndexFunc(panes, func(existing TaskPaneConfig) bool { return existing.Name == pane.Name })
+		index := slices.IndexFunc(
+			panes,
+			func(existing TaskPaneConfig) bool { return existing.Name == pane.Name },
+		)
 		if index < 0 {
 			panes = append(panes, pane.Clone())
 		} else {
@@ -176,7 +218,8 @@ func (w TaskLayoutWhen) Matches(width, height int, harness string) bool {
 	landscape := width >= cellHeightPerWidth*height
 
 	switch {
-	case w.Orientation == OrientationLandscape && !landscape, w.Orientation == OrientationPortrait && landscape:
+	case w.Orientation == OrientationLandscape && !landscape,
+		w.Orientation == OrientationPortrait && landscape:
 		return false
 	case width < w.MinWidth, w.MaxWidth > 0 && width > w.MaxWidth:
 		return false
@@ -322,7 +365,12 @@ func validateTaskPane(pane TaskPaneConfig, seen map[string]bool) error {
 	return ValidateTaskActionTemplate(pane.Dir)
 }
 
-func validateTaskLayout(window TaskWindow, layout TaskLayoutConfig, seen map[string]bool, harnesses []string) error {
+func validateTaskLayout(
+	window TaskWindow,
+	layout TaskLayoutConfig,
+	seen map[string]bool,
+	harnesses []string,
+) error {
 	if err := validateTaskLayoutShape(layout, seen); err != nil {
 		return err
 	}
@@ -340,7 +388,8 @@ func validateTaskLayout(window TaskWindow, layout TaskLayoutConfig, seen map[str
 		return err
 	}
 
-	if layout.Focus != "" && layout.Focus != TaskPaneAgent && !slices.Contains(placed, layout.Focus) {
+	if layout.Focus != "" && layout.Focus != TaskPaneAgent &&
+		!slices.Contains(placed, layout.Focus) {
 		return errTaskLayoutFocus
 	}
 
@@ -372,7 +421,8 @@ func validateTaskLayoutWhen(when TaskLayoutWhen, harnesses []string) error {
 		return errTaskLayoutWhen
 	case when.MinWidth < 0, when.MaxWidth < 0, when.MinHeight < 0, when.MaxHeight < 0:
 		return errTaskLayoutWhen
-	case when.MaxWidth > 0 && when.MaxWidth < when.MinWidth, when.MaxHeight > 0 && when.MaxHeight < when.MinHeight:
+	case when.MaxWidth > 0 && when.MaxWidth < when.MinWidth,
+		when.MaxHeight > 0 && when.MaxHeight < when.MinHeight:
 		return errTaskLayoutWhen
 	case slices.ContainsFunc(when.Harness, func(name string) bool { return !knownHarness(name, harnesses) }):
 		return errTaskLayoutHarness

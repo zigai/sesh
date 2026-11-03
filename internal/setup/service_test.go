@@ -37,14 +37,35 @@ func TestDefinitionsRequireResolvedInputs(t *testing.T) {
 		name   string
 		mutate func(*setup.ServiceInputs)
 	}{
-		{name: "missing program", mutate: func(inputs *setup.ServiceInputs) { inputs.Program = "" }},
-		{name: "relative program", mutate: func(inputs *setup.ServiceInputs) { inputs.Program = "sesh" }},
-		{name: "missing socket", mutate: func(inputs *setup.ServiceInputs) { inputs.SocketPath = "" }},
-		{name: "missing repository", mutate: func(inputs *setup.ServiceInputs) { inputs.RepositoryPath = "" }},
-		{name: "missing lease root", mutate: func(inputs *setup.ServiceInputs) { inputs.LeaseRootPath = "" }},
-		{name: "missing history", mutate: func(inputs *setup.ServiceInputs) { inputs.HistoryPath = "" }},
+		{
+			name:   "missing program",
+			mutate: func(inputs *setup.ServiceInputs) { inputs.Program = "" },
+		},
+		{
+			name:   "relative program",
+			mutate: func(inputs *setup.ServiceInputs) { inputs.Program = "sesh" },
+		},
+		{
+			name:   "missing socket",
+			mutate: func(inputs *setup.ServiceInputs) { inputs.SocketPath = "" },
+		},
+		{
+			name:   "missing repository",
+			mutate: func(inputs *setup.ServiceInputs) { inputs.RepositoryPath = "" },
+		},
+		{
+			name:   "missing lease root",
+			mutate: func(inputs *setup.ServiceInputs) { inputs.LeaseRootPath = "" },
+		},
+		{
+			name:   "missing history",
+			mutate: func(inputs *setup.ServiceInputs) { inputs.HistoryPath = "" },
+		},
 		{name: "zero interval", mutate: func(inputs *setup.ServiceInputs) { inputs.Interval = 0 }},
-		{name: "zero deadline", mutate: func(inputs *setup.ServiceInputs) { inputs.FinalSaveDeadline = 0 }},
+		{
+			name:   "zero deadline",
+			mutate: func(inputs *setup.ServiceInputs) { inputs.FinalSaveDeadline = 0 },
+		},
 		{
 			name: "tmux service without tmux",
 			mutate: func(inputs *setup.ServiceInputs) {
@@ -96,7 +117,10 @@ func TestSystemdDefinitionsRenderOwnedUnits(t *testing.T) {
 		t.Fatalf("autosave service is missing the ownership marker:\n%s", service.Content)
 	}
 
-	if !strings.Contains(service.Content, "ExecStart=/usr/local/bin/sesh autosave save-if-due --socket /run/user/1000/sesh/tmux.sock") {
+	if !strings.Contains(
+		service.Content,
+		"ExecStart=/usr/local/bin/sesh autosave save-if-due --socket /run/user/1000/sesh/tmux.sock",
+	) {
 		t.Fatalf("autosave service ExecStart is not the native command:\n%s", service.Content)
 	}
 
@@ -106,7 +130,10 @@ func TestSystemdDefinitionsRenderOwnedUnits(t *testing.T) {
 	}
 
 	if !strings.Contains(timer.Content, "OnUnitInactiveSec=3min") {
-		t.Fatalf("timer does not wait the configured interval after save completion:\n%s", timer.Content)
+		t.Fatalf(
+			"timer does not wait the configured interval after save completion:\n%s",
+			timer.Content,
+		)
 	}
 
 	if !strings.Contains(timer.Content, "Unit="+setup.AutosaveServiceName) {
@@ -133,7 +160,11 @@ func TestSystemdUnitsForUserTmuxServerDoNotReferenceManagedServer(t *testing.T) 
 
 	for _, definition := range append(definitions, remote) {
 		if strings.Contains(definition.Content, setup.TmuxServiceName) {
-			t.Fatalf("%s references the uninstalled managed tmux server:\n%s", definition.Name, definition.Content)
+			t.Fatalf(
+				"%s references the uninstalled managed tmux server:\n%s",
+				definition.Name,
+				definition.Content,
+			)
 		}
 	}
 
@@ -156,7 +187,8 @@ func TestSystemdUnitsForManagedTmuxServerFollowIt(t *testing.T) {
 	}
 
 	service := findServiceDefinition(t, definitions, setup.AutosaveServiceName)
-	if !strings.Contains(service.Content, "After="+setup.TmuxServiceName+"\n") || !strings.Contains(service.Content, "PartOf="+setup.TmuxServiceName+"\n") {
+	if !strings.Contains(service.Content, "After="+setup.TmuxServiceName+"\n") ||
+		!strings.Contains(service.Content, "PartOf="+setup.TmuxServiceName+"\n") {
 		t.Fatalf("autosave service is not bound to the managed tmux server:\n%s", service.Content)
 	}
 
@@ -167,7 +199,10 @@ func TestSystemdUnitsForManagedTmuxServerFollowIt(t *testing.T) {
 
 	coordinator := findServiceDefinition(t, definitions, setup.CoordinatorServiceName)
 	if !strings.Contains(coordinator.Content, "After="+setup.TmuxServiceName+"\n") {
-		t.Fatalf("coordinator is not ordered after the managed tmux server:\n%s", coordinator.Content)
+		t.Fatalf(
+			"coordinator is not ordered after the managed tmux server:\n%s",
+			coordinator.Content,
+		)
 	}
 }
 
@@ -186,7 +221,10 @@ func TestSystemdTmuxServiceRunsBoundedFinalSave(t *testing.T) {
 
 	tmux := findServiceDefinition(t, definitions, setup.TmuxServiceName)
 	if len(tmux.Requires) != 0 {
-		t.Fatalf("managed tmux service requires = %v, want no unmet prerequisites when foreground is verified", tmux.Requires)
+		t.Fatalf(
+			"managed tmux service requires = %v, want no unmet prerequisites when foreground is verified",
+			tmux.Requires,
+		)
 	}
 
 	assertTmuxServiceContent(t, tmux.Content)
@@ -221,7 +259,10 @@ func TestSystemdRestoreServiceRunsStartupRestoreAfterTmuxWithoutBlockingIt(t *te
 
 	tmux := findServiceDefinition(t, definitions, setup.TmuxServiceName)
 	if strings.Contains(tmux.Content, "autosave-restore-on-start") {
-		t.Fatalf("the tmux service must not run the restore itself, it would delay and time out the server start:\n%s", tmux.Content)
+		t.Fatalf(
+			"the tmux service must not run the restore itself, it would delay and time out the server start:\n%s",
+			tmux.Content,
+		)
 	}
 }
 
@@ -235,12 +276,19 @@ func TestSystemdUnitsForUserTmuxServerRenderNoRestoreService(t *testing.T) {
 
 	for _, definition := range definitions {
 		if definition.Name == setup.RestoreServiceName {
-			t.Fatalf("a user-run tmux server has no managed start to restore after:\n%s", definition.Content)
+			t.Fatalf(
+				"a user-run tmux server has no managed start to restore after:\n%s",
+				definition.Content,
+			)
 		}
 	}
 }
 
-func findServiceDefinition(t *testing.T, definitions []setup.ServiceDefinition, name string) setup.ServiceDefinition {
+func findServiceDefinition(
+	t *testing.T,
+	definitions []setup.ServiceDefinition,
+	name string,
+) setup.ServiceDefinition {
 	t.Helper()
 
 	for _, definition := range definitions {
@@ -301,7 +349,10 @@ func assertTmuxServiceApply(t *testing.T, definitions []setup.ServiceDefinition)
 	}
 
 	if result.Written != 4 {
-		t.Fatalf("written = %d, want 4 definitions including the tmux and restore services", result.Written)
+		t.Fatalf(
+			"written = %d, want 4 definitions including the tmux and restore services",
+			result.Written,
+		)
 	}
 
 	data, err := os.ReadFile(filepath.Join(root, setup.TmuxServiceName))
@@ -357,11 +408,22 @@ func TestUnverifiedForegroundSupportBlocksTmuxService(t *testing.T) {
 		t.Fatalf("wrote %d files, want the two unblocked definitions", result.Written)
 	}
 
-	if !slices.Equal(result.BlockedNames, []string{setup.TmuxServiceName, setup.RestoreServiceName}) {
-		t.Fatalf("blocked = %v, want the tmux service and the restore service that follows it", result.BlockedNames)
+	if !slices.Equal(
+		result.BlockedNames,
+		[]string{setup.TmuxServiceName, setup.RestoreServiceName},
+	) {
+		t.Fatalf(
+			"blocked = %v, want the tmux service and the restore service that follows it",
+			result.BlockedNames,
+		)
 	}
 
-	if _, err := os.Stat(filepath.Join(root, setup.TmuxServiceName)); !errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(
+		filepath.Join(root, setup.TmuxServiceName),
+	); !errors.Is(
+		err,
+		os.ErrNotExist,
+	) {
 		t.Fatalf("blocked definition was written: %v", err)
 	}
 }
@@ -414,12 +476,15 @@ func TestLaunchdDefinitionsRenderOwnedAgents(t *testing.T) {
 		t.Fatalf("agent is missing the ownership marker:\n%s", agent.Content)
 	}
 
-	if !strings.Contains(agent.Content, "<key>StartInterval</key>") || !strings.Contains(agent.Content, "<integer>180</integer>") {
+	if !strings.Contains(agent.Content, "<key>StartInterval</key>") ||
+		!strings.Contains(agent.Content, "<integer>180</integer>") {
 		t.Fatalf("agent does not use the configured interval:\n%s", agent.Content)
 	}
 
 	if len(agent.Requires) == 0 {
-		t.Fatal("launchd rendering must record that logout and shutdown ordering is not established")
+		t.Fatal(
+			"launchd rendering must record that logout and shutdown ordering is not established",
+		)
 	}
 }
 
@@ -452,7 +517,13 @@ func TestLaunchdAgentActivation(t *testing.T) {
 			name:       "agent status starts on load",
 			definition: status,
 			runAtLoad:  "true",
-			arguments:  []string{"/usr/local/bin/sesh", "daemon", "agent-window-status", "--socket", "/run/user/1000/sesh/tmux.sock"},
+			arguments: []string{
+				"/usr/local/bin/sesh",
+				"daemon",
+				"agent-window-status",
+				"--socket",
+				"/run/user/1000/sesh/tmux.sock",
+			},
 		},
 		{
 			name:          "autosave starts only periodically",
@@ -481,8 +552,14 @@ func TestLaunchdAgentActivation(t *testing.T) {
 			}
 
 			interval := values["StartInterval"]
-			if interval.XMLName.Local != testCase.intervalType || interval.Text != testCase.startInterval {
-				t.Errorf("StartInterval = %+v, want type %q and value %q", interval, testCase.intervalType, testCase.startInterval)
+			if interval.XMLName.Local != testCase.intervalType ||
+				interval.Text != testCase.startInterval {
+				t.Errorf(
+					"StartInterval = %+v, want type %q and value %q",
+					interval,
+					testCase.intervalType,
+					testCase.startInterval,
+				)
 			}
 
 			if keepAlive, ok := values["KeepAlive"]; ok && keepAlive.XMLName.Local != "false" {
@@ -490,7 +567,8 @@ func TestLaunchdAgentActivation(t *testing.T) {
 			}
 
 			arguments := values["ProgramArguments"]
-			if arguments.XMLName.Local != "array" || !slices.Equal(arguments.Strings, testCase.arguments) {
+			if arguments.XMLName.Local != "array" ||
+				!slices.Equal(arguments.Strings, testCase.arguments) {
 				t.Errorf("ProgramArguments = %+v, want %v", arguments, testCase.arguments)
 			}
 		})
@@ -545,7 +623,10 @@ func TestRemoteMonitorDefinitionIsGatedOnTheEntryPoint(t *testing.T) {
 		t.Fatalf("requires = %v, want the missing entry point", blocked.Requires)
 	}
 
-	if !strings.Contains(blocked.Content, "ExecStart=/usr/local/bin/sesh daemon remote-monitor --socket /run/user/1000/sesh/tmux.sock") {
+	if !strings.Contains(
+		blocked.Content,
+		"ExecStart=/usr/local/bin/sesh daemon remote-monitor --socket /run/user/1000/sesh/tmux.sock",
+	) {
 		t.Fatalf("remote monitor ExecStart is not the native command:\n%s", blocked.Content)
 	}
 
@@ -606,16 +687,25 @@ func TestCoordinatorDefinitionRendersDaemonCoordinator(t *testing.T) {
 		t.Fatalf("coordinator service missing ownership marker:\n%s", definition.Content)
 	}
 
-	if !strings.Contains(definition.Content, "ExecStart=/usr/local/bin/sesh daemon coordinator --socket /run/user/1000/sesh/tmux.sock") {
+	if !strings.Contains(
+		definition.Content,
+		"ExecStart=/usr/local/bin/sesh daemon coordinator --socket /run/user/1000/sesh/tmux.sock",
+	) {
 		t.Fatalf("coordinator service ExecStart is not daemon coordinator:\n%s", definition.Content)
 	}
 
-	if !strings.Contains(definition.Content, "--repository /home/user/.local/share/sesh/snapshots") {
+	if !strings.Contains(
+		definition.Content,
+		"--repository /home/user/.local/share/sesh/snapshots",
+	) {
 		t.Fatalf("coordinator service missing repository flag:\n%s", definition.Content)
 	}
 
 	if len(definition.Requires) != 0 {
-		t.Fatalf("coordinator service on Linux should have no unmet requirements, got %v", definition.Requires)
+		t.Fatalf(
+			"coordinator service on Linux should have no unmet requirements, got %v",
+			definition.Requires,
+		)
 	}
 
 	inputs.WithCoordinator = true
@@ -678,7 +768,11 @@ func TestSystemdLongRunningServicesTreatAStopAsSuccess(t *testing.T) {
 		}
 
 		if !strings.Contains(rendered.Content, "SuccessExitStatus=130\n") {
-			t.Errorf("%s counts the CLI's stop exit status as a failure:\n%s", name, rendered.Content)
+			t.Errorf(
+				"%s counts the CLI's stop exit status as a failure:\n%s",
+				name,
+				rendered.Content,
+			)
 		}
 	}
 }

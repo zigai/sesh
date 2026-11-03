@@ -109,17 +109,28 @@ func (adapter *testServiceAdapter) TmuxIsInsideTmux() bool {
 	return adapter.deps.TmuxIsInsideTmux()
 }
 
-func (adapter *testServiceAdapter) EnterSession(ctx context.Context, target session.Session) (EnterOutcome, error) {
+func (adapter *testServiceAdapter) EnterSession(
+	ctx context.Context,
+	target session.Session,
+) (EnterOutcome, error) {
 	if adapter.deps.EnterSession != nil {
 		return adapter.deps.EnterSession(ctx, target)
 	}
 
 	if adapter.deps.TmuxIsInsideTmux != nil && !adapter.deps.TmuxIsInsideTmux() {
-		return EnterOutcome{SessionName: target.Name, Action: EnterNeedsAttach, Restored: false}, nil
+		return EnterOutcome{
+			SessionName: target.Name,
+			Action:      EnterNeedsAttach,
+			Restored:    false,
+		}, nil
 	}
 
 	if adapter.isPopup() {
-		return EnterOutcome{SessionName: target.Name, Action: EnterNeedsSwitch, Restored: false}, nil
+		return EnterOutcome{
+			SessionName: target.Name,
+			Action:      EnterNeedsSwitch,
+			Restored:    false,
+		}, nil
 	}
 
 	if adapter.deps.TmuxSwitchSession != nil {
@@ -137,13 +148,17 @@ func (adapter *testServiceAdapter) Accepts(at action.Location, id action.ID) boo
 	}
 
 	if at.Kind == action.LocationOrigin {
-		return id == action.SessionSwitch.ID && (adapter.deps.RequestOriginSwitch != nil || adapter.deps.LoadOriginSessions != nil)
+		return id == action.SessionSwitch.ID &&
+			(adapter.deps.RequestOriginSwitch != nil || adapter.deps.LoadOriginSessions != nil)
 	}
 
 	return true
 }
 
-func (adapter *testServiceAdapter) Dispatch(ctx context.Context, invocation action.Invocation) (any, error) {
+func (adapter *testServiceAdapter) Dispatch(
+	ctx context.Context,
+	invocation action.Invocation,
+) (any, error) {
 	if adapter.deps.RunAction != nil {
 		return adapter.deps.RunAction(ctx, invocation)
 	}
@@ -156,14 +171,22 @@ func (adapter *testServiceAdapter) Dispatch(ctx context.Context, invocation acti
 	return output, nil
 }
 
-func (adapter *testServiceAdapter) dispatchFake(ctx context.Context, invocation action.Invocation) (any, error) {
+func (adapter *testServiceAdapter) dispatchFake(
+	ctx context.Context,
+	invocation action.Invocation,
+) (any, error) {
 	switch input := invocation.Input.(type) {
 	case action.CreateSession:
 		return adapter.fakeCreate(ctx, input)
 	case action.RenameSession:
 		return adapter.fakeRename(ctx, input)
 	case action.KillSession:
-		return action.KilledSession{Session: input.Session}, adapter.fakeKill(ctx, input.Session.Name)
+		return action.KilledSession{
+			Session: input.Session,
+		}, adapter.fakeKill(
+			ctx,
+			input.Session.Name,
+		)
 	case action.DeleteSession:
 		return adapter.fakeDelete(ctx, input)
 	case action.SaveSnapshot:
@@ -175,14 +198,25 @@ func (adapter *testServiceAdapter) dispatchFake(ctx context.Context, invocation 
 			return action.SwitchedSession(input), nil
 		}
 
-		return action.SwitchedSession(input), adapter.deps.RequestOriginSwitch(ctx, input.Session.Session(invocation.At))
+		return action.SwitchedSession(
+				input,
+			), adapter.deps.RequestOriginSwitch(
+				ctx,
+				input.Session.Session(invocation.At),
+			)
 	default:
 		return nil, errUnexpectedTestAction
 	}
 }
 
-func (adapter *testServiceAdapter) fakeCreate(ctx context.Context, input action.CreateSession) (action.CreatedSession, error) {
-	created := action.CreatedSession{Session: testLiveRef("$created", input.Name), Directory: input.Directory}
+func (adapter *testServiceAdapter) fakeCreate(
+	ctx context.Context,
+	input action.CreateSession,
+) (action.CreatedSession, error) {
+	created := action.CreatedSession{
+		Session:   testLiveRef("$created", input.Name),
+		Directory: input.Directory,
+	}
 
 	if adapter.deps.TmuxSessionExists != nil {
 		exists, err := adapter.deps.TmuxSessionExists(ctx, input.Name)
@@ -202,8 +236,15 @@ func (adapter *testServiceAdapter) fakeCreate(ctx context.Context, input action.
 	return created, nil
 }
 
-func (adapter *testServiceAdapter) fakeRename(ctx context.Context, input action.RenameSession) (action.RenamedSession, error) {
-	renamed := action.RenamedSession{PreviousName: input.Session.Name, Name: input.Name, HistoryUpdated: false}
+func (adapter *testServiceAdapter) fakeRename(
+	ctx context.Context,
+	input action.RenameSession,
+) (action.RenamedSession, error) {
+	renamed := action.RenamedSession{
+		PreviousName:   input.Session.Name,
+		Name:           input.Name,
+		HistoryUpdated: false,
+	}
 	if adapter.deps.TmuxRenameSession != nil {
 		return renamed, adapter.deps.TmuxRenameSession(ctx, input.Session.Name, input.Name)
 	}
@@ -219,10 +260,18 @@ func (adapter *testServiceAdapter) fakeKill(ctx context.Context, name string) er
 	return nil
 }
 
-func (adapter *testServiceAdapter) fakeDelete(ctx context.Context, input action.DeleteSession) (action.DeletedSession, error) {
+func (adapter *testServiceAdapter) fakeDelete(
+	ctx context.Context,
+	input action.DeleteSession,
+) (action.DeletedSession, error) {
 	deleted := action.DeletedSession{
-		Name: input.Session.Name, LiveKilled: false, SavedDeleted: false, SavedGenerations: 0, SavedSessions: 0,
-		PreservedGenerations: []string{}, PendingRewrites: []string{},
+		Name:                 input.Session.Name,
+		LiveKilled:           false,
+		SavedDeleted:         false,
+		SavedGenerations:     0,
+		SavedSessions:        0,
+		PreservedGenerations: []string{},
+		PendingRewrites:      []string{},
 	}
 
 	if !input.Session.Saved() {
@@ -245,7 +294,10 @@ func (adapter *testServiceAdapter) fakeDelete(ctx context.Context, input action.
 	return deleted, nil
 }
 
-func (adapter *testServiceAdapter) fakeSave(ctx context.Context, input action.SaveSnapshot) (action.SavedSnapshot, error) {
+func (adapter *testServiceAdapter) fakeSave(
+	ctx context.Context,
+	input action.SaveSnapshot,
+) (action.SavedSnapshot, error) {
 	saved := action.SavedSnapshot{Attempt: "attempt", Generation: "generation", Status: "complete"}
 
 	for _, ref := range input.Sessions {
@@ -259,11 +311,24 @@ func (adapter *testServiceAdapter) fakeSave(ctx context.Context, input action.Sa
 	return saved, nil
 }
 
-func (adapter *testServiceAdapter) fakeRestore(ctx context.Context, invocation action.Invocation, input action.RestoreSnapshot) (action.RestoredSnapshot, error) {
+func (adapter *testServiceAdapter) fakeRestore(
+	ctx context.Context,
+	invocation action.Invocation,
+	input action.RestoreSnapshot,
+) (action.RestoredSnapshot, error) {
 	restored := action.RestoredSnapshot{
-		OperationID: "operation", Generation: input.Generation, Status: "complete", Reason: "", Sessions: []action.SessionRef{},
-		Panes: []action.RestoredPane{}, Verified: true, Uncertain: false, MissingRequirements: []action.Requirement{},
-		SessionsSkipped: []action.SkippedSession{}, Advisories: []action.Mismatch{}, Mismatches: []action.Mismatch{},
+		OperationID:         "operation",
+		Generation:          input.Generation,
+		Status:              "complete",
+		Reason:              "",
+		Sessions:            []action.SessionRef{},
+		Panes:               []action.RestoredPane{},
+		Verified:            true,
+		Uncertain:           false,
+		MissingRequirements: []action.Requirement{},
+		SessionsSkipped:     []action.SkippedSession{},
+		Advisories:          []action.Mismatch{},
+		Mismatches:          []action.Mismatch{},
 	}
 
 	for _, name := range adapter.restoredNames(invocation, input) {
@@ -290,7 +355,10 @@ func (adapter *testServiceAdapter) fakeRestore(ctx context.Context, invocation a
 	return restored, nil
 }
 
-func (adapter *testServiceAdapter) restoredNames(invocation action.Invocation, input action.RestoreSnapshot) []string {
+func (adapter *testServiceAdapter) restoredNames(
+	invocation action.Invocation,
+	input action.RestoreSnapshot,
+) []string {
 	names := make([]string, 0, len(input.Sessions))
 
 	for _, id := range input.Sessions {
@@ -328,7 +396,11 @@ func testActionCode(err error) action.Code {
 	}
 }
 
-func (adapter *testServiceAdapter) TmuxActivatePane(ctx context.Context, target session.Session, paneID string) error {
+func (adapter *testServiceAdapter) TmuxActivatePane(
+	ctx context.Context,
+	target session.Session,
+	paneID string,
+) error {
 	if adapter.deps.TmuxActivatePaneTarget != nil {
 		return adapter.deps.TmuxActivatePaneTarget(ctx, target, paneID)
 	}
@@ -357,16 +429,26 @@ func (adapter *testServiceAdapter) WatchAgentSummaries(
 	ctx context.Context,
 	yield func(uint64, AgentSnapshot, error) error,
 ) error {
-	return adapter.deps.WatchAgentSummaries(ctx, func(revision uint64, summaries []session.AgentSummary, err error) error {
-		if err != nil {
-			return yield(revision, AgentSnapshot{Summaries: summaries, Panes: nil, PanesObserved: false}, err)
-		}
+	return adapter.deps.WatchAgentSummaries(
+		ctx,
+		func(revision uint64, summaries []session.AgentSummary, err error) error {
+			if err != nil {
+				return yield(
+					revision,
+					AgentSnapshot{Summaries: summaries, Panes: nil, PanesObserved: false},
+					err,
+				)
+			}
 
-		return yield(revision, adapter.agentSnapshot(ctx, summaries), nil)
-	})
+			return yield(revision, adapter.agentSnapshot(ctx, summaries), nil)
+		},
+	)
 }
 
-func (adapter *testServiceAdapter) agentSnapshot(ctx context.Context, summaries []session.AgentSummary) AgentSnapshot {
+func (adapter *testServiceAdapter) agentSnapshot(
+	ctx context.Context,
+	summaries []session.AgentSummary,
+) AgentSnapshot {
 	snapshot := AgentSnapshot{Summaries: summaries, Panes: nil, PanesObserved: false}
 	if len(summaries) == 0 || adapter.deps.OmitPanes {
 		return snapshot
@@ -390,11 +472,17 @@ func (adapter *testServiceAdapter) WatchRemoteCatalog(
 	return adapter.deps.WatchRemoteCatalog(ctx, yield)
 }
 
-func (adapter *testServiceAdapter) AttachRemoteSession(ctx context.Context, target session.Session, paneID string) (tea.ExecCommand, error) {
+func (adapter *testServiceAdapter) AttachRemoteSession(
+	ctx context.Context,
+	target session.Session,
+	paneID string,
+) (tea.ExecCommand, error) {
 	return adapter.deps.AttachRemoteSession(ctx, target, paneID)
 }
 
-func (adapter *testServiceAdapter) LoadOriginSessions(ctx context.Context) (string, []session.Session, error) {
+func (adapter *testServiceAdapter) LoadOriginSessions(
+	ctx context.Context,
+) (string, []session.Session, error) {
 	if adapter.deps.LoadOriginSessions != nil {
 		return adapter.deps.LoadOriginSessions(ctx)
 	}
@@ -613,7 +701,8 @@ func assertRightBorder(t *testing.T, output string, wantWidth int) {
 			t.Fatalf("line %d missing top border corner: %q", index, line)
 		}
 
-		if !strings.HasSuffix(line, "│") && !strings.HasSuffix(line, "┐") && !strings.HasSuffix(line, "┘") {
+		if !strings.HasSuffix(line, "│") && !strings.HasSuffix(line, "┐") &&
+			!strings.HasSuffix(line, "┘") {
 			t.Fatalf("line %d missing right border: %q", index, line)
 		}
 	}

@@ -15,12 +15,22 @@ import (
 
 const maxTargetBytes = 1 << 20
 
-func (r *Repository) RegisterOperation(ctx context.Context, id, source string, target model.Bytes, actions []Action) (Operation, error) {
+func (r *Repository) RegisterOperation(
+	ctx context.Context,
+	id, source string,
+	target model.Bytes,
+	actions []Action,
+) (Operation, error) {
 	op, err := r.registerOperation(ctx, id, source, target, actions)
 	return op, repositoryError("register_operation", err)
 }
 
-func (r *Repository) registerOperation(ctx context.Context, id, source string, target model.Bytes, actions []Action) (Operation, error) {
+func (r *Repository) registerOperation(
+	ctx context.Context,
+	id, source string,
+	target model.Bytes,
+	actions []Action,
+) (Operation, error) {
 	if err := validateRequestBoundsAndContent(id, source, target, actions); err != nil {
 		return Operation{
 			ID:      id,
@@ -41,7 +51,9 @@ func (r *Repository) registerOperation(ctx context.Context, id, source string, t
 
 	lock, err := r.root.Lock(ctx, "repository.lock")
 	if err != nil {
-		return candidate, oops.In("snapshot.store").With("operation", "lock_catalog_update").Wrapf(err, "lock catalog update")
+		return candidate, oops.In("snapshot.store").
+			With("operation", "lock_catalog_update").
+			Wrapf(err, "lock catalog update")
 	}
 
 	op, regErr := r.registerOperationLocked(ctx, candidate)
@@ -50,23 +62,33 @@ func (r *Repository) registerOperation(ctx context.Context, id, source string, t
 	}
 
 	if closeErr := lock.Close(); closeErr != nil {
-		return candidate, oops.In("snapshot.store").With("operation", "close_repository_lock").Wrapf(closeErr, "close repository lock")
+		return candidate, oops.In("snapshot.store").
+			With("operation", "close_repository_lock").
+			Wrapf(closeErr, "close repository lock")
 	}
 
 	return op, nil
 }
 
-func (r *Repository) registerOperationLocked(ctx context.Context, candidate Operation) (Operation, error) {
+func (r *Repository) registerOperationLocked(
+	ctx context.Context,
+	candidate Operation,
+) (Operation, error) {
 	catalog, err := r.catalog()
 	if err != nil {
 		return Operation{}, err
 	}
 
 	if err := ctx.Err(); err != nil {
-		return Operation{}, oops.In("snapshot.store").With("operation", "register_operation").Wrap(err)
+		return Operation{}, oops.In("snapshot.store").
+			With("operation", "register_operation").
+			Wrap(err)
 	}
 
-	index := slices.IndexFunc(catalog.Operations, func(op Operation) bool { return op.ID == candidate.ID })
+	index := slices.IndexFunc(
+		catalog.Operations,
+		func(op Operation) bool { return op.ID == candidate.ID },
+	)
 	if index >= 0 {
 		return r.confirmExistingOperationLocked(ctx, catalog.Operations[index], candidate)
 	}
@@ -103,7 +125,10 @@ func (r *Repository) registerOperationLocked(ctx context.Context, candidate Oper
 	return candidate, nil
 }
 
-func (r *Repository) confirmExistingOperationLocked(ctx context.Context, existing, candidate Operation) (Operation, error) {
+func (r *Repository) confirmExistingOperationLocked(
+	ctx context.Context,
+	existing, candidate Operation,
+) (Operation, error) {
 	if !sameIntent(existing, candidate) {
 		return Operation{}, ErrConflict
 	}
@@ -149,7 +174,11 @@ func sameIntent(existing, candidate Operation) bool {
 	return true
 }
 
-func validateRequestBoundsAndContent(id, source string, target model.Bytes, actions []Action) error {
+func validateRequestBoundsAndContent(
+	id, source string,
+	target model.Bytes,
+	actions []Action,
+) error {
 	if !validID(id) || !validID(source) || len(target) == 0 || len(target) > maxTargetBytes {
 		return ErrCorrupt
 	}

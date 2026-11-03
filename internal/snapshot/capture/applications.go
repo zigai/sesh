@@ -18,7 +18,13 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/model"
 )
 
-func ObserveWithApplicationRecovery(ctx context.Context, server *gotmux.Server, selected []gotmux.SessionID, envKeys []string, source agents.SessionSource) (Observation, error) {
+func ObserveWithApplicationRecovery(
+	ctx context.Context,
+	server *gotmux.Server,
+	selected []gotmux.SessionID,
+	envKeys []string,
+	source agents.SessionSource,
+) (Observation, error) {
 	if err := process.ValidateEnvironmentKeys(envKeys); err != nil {
 		return Observation{}, captureError(err)
 	}
@@ -28,7 +34,12 @@ func ObserveWithApplicationRecovery(ctx context.Context, server *gotmux.Server, 
 	return observation, captureError(err)
 }
 
-func captureProcessLaunch(ctx context.Context, pid int, keys []string, agent *apps.AgentResume) (model.Launch, paneProcessRecord, error) {
+func captureProcessLaunch(
+	ctx context.Context,
+	pid int,
+	keys []string,
+	agent *apps.AgentResume,
+) (model.Launch, paneProcessRecord, error) {
 	var (
 		record paneProcessRecord
 		launch model.Launch
@@ -36,11 +47,17 @@ func captureProcessLaunch(ctx context.Context, pid int, keys []string, agent *ap
 
 	birth, err := process.ReadIdentity(ctx, pid)
 	if err != nil {
-		if errors.Is(err, process.ErrProcessVanished) || errors.Is(err, process.ErrIdentityMismatch) {
-			return launch, record, errors.Join(ErrChanged, oops.In("snapshot.capture").With("operation", "read_process_identity").Wrap(err))
+		if errors.Is(err, process.ErrProcessVanished) ||
+			errors.Is(err, process.ErrIdentityMismatch) {
+			return launch, record, errors.Join(
+				ErrChanged,
+				oops.In("snapshot.capture").With("operation", "read_process_identity").Wrap(err),
+			)
 		}
 
-		return launch, record, oops.In("snapshot.capture").With("operation", "read_process_identity").Wrap(err)
+		return launch, record, oops.In("snapshot.capture").
+			With("operation", "read_process_identity").
+			Wrap(err)
 	}
 
 	observed, unsupported, err := observeForegroundOrRoot(ctx, pid, birth, keys)
@@ -79,7 +96,11 @@ func replacedInPlace(executable []byte) bool {
 	return err == nil && info.Mode().IsRegular() && info.Mode().Perm()&0o111 != 0
 }
 
-func deletedPathLaunch(observed *process.Observation, unsupported bool, agent *apps.AgentResume) model.Launch {
+func deletedPathLaunch(
+	observed *process.Observation,
+	unsupported bool,
+	agent *apps.AgentResume,
+) model.Launch {
 	// An agent's self-update deletes its old binary, so it stays resumable while its resume
 	// command resolves to a live executable.
 	if !observed.DirectoryDeleted && !unsupported && agent != nil && agent.Executable != "" {
@@ -103,11 +124,17 @@ func deletedPathLaunch(observed *process.Observation, unsupported bool, agent *a
 
 func sameProcessObservation(left, right *process.Observation) bool {
 	return left.PID == right.PID && left.Birth == right.Birth &&
-		bytes.Equal(left.Executable, right.Executable) && bytes.Equal(left.Directory, right.Directory) &&
+		bytes.Equal(
+			left.Executable,
+			right.Executable,
+		) && bytes.Equal(left.Directory, right.Directory) &&
 		slices.EqualFunc(left.Arguments, right.Arguments, bytes.Equal)
 }
 
-func recoveryAgents(ctx context.Context, source agents.SessionSource) ([]agents.AgentSession, error) {
+func recoveryAgents(
+	ctx context.Context,
+	source agents.SessionSource,
+) ([]agents.AgentSession, error) {
 	if source == nil {
 		return nil, captureError(ctx.Err())
 	}
@@ -128,7 +155,12 @@ func recoveryAgents(ctx context.Context, source agents.SessionSource) ([]agents.
 	return live, nil
 }
 
-func observeForegroundOrRoot(ctx context.Context, pid int, birth process.Identity, keys []string) (*process.Observation, bool, error) {
+func observeForegroundOrRoot(
+	ctx context.Context,
+	pid int,
+	birth process.Identity,
+	keys []string,
+) (*process.Observation, bool, error) {
 	observed, err := process.ObserveForeground(ctx, process.ForegroundRequest{
 		PanePID:           pid,
 		ExpectedPaneBirth: birth,
@@ -146,7 +178,9 @@ func observeForegroundOrRoot(ctx context.Context, pid int, birth process.Identit
 	}
 
 	if err != nil {
-		if errors.Is(err, process.ErrForegroundChanged) || errors.Is(err, process.ErrProcessVanished) || errors.Is(err, process.ErrIdentityMismatch) {
+		if errors.Is(err, process.ErrForegroundChanged) ||
+			errors.Is(err, process.ErrProcessVanished) ||
+			errors.Is(err, process.ErrIdentityMismatch) {
 			return nil, false, errors.Join(ErrChanged, captureError(err))
 		}
 
@@ -173,7 +207,11 @@ func processLaunch(observed *process.Observation) model.Launch {
 	}
 }
 
-func prepareApplication(ctx context.Context, observed *process.Observation, agent *apps.AgentResume) (model.Launch, error) {
+func prepareApplication(
+	ctx context.Context,
+	observed *process.Observation,
+	agent *apps.AgentResume,
+) (model.Launch, error) {
 	launch := processLaunch(observed)
 
 	enriched, reason, err := apps.EnrichEditor(ctx, launch, observed.PID)
@@ -197,13 +235,19 @@ func prepareApplication(ctx context.Context, observed *process.Observation, agen
 	return prepared, nil
 }
 
-func matchingAgentResume(live []agents.AgentSession, endpoint string, pane gotmux.PaneInfo) *apps.AgentResume {
+func matchingAgentResume(
+	live []agents.AgentSession,
+	endpoint string,
+	pane gotmux.PaneInfo,
+) *apps.AgentResume {
 	var found *agents.AgentSession
 
 	for i := range live {
 		candidate := &live[i]
-		if !filepath.IsAbs(candidate.ServerSocket) || filepath.Clean(candidate.ServerSocket) != endpoint ||
-			candidate.PaneID != string(pane.ID) || candidate.PanePID != pane.PID {
+		if !filepath.IsAbs(candidate.ServerSocket) ||
+			filepath.Clean(candidate.ServerSocket) != endpoint ||
+			candidate.PaneID != string(pane.ID) ||
+			candidate.PanePID != pane.PID {
 			continue
 		}
 

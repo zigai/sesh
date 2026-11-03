@@ -24,23 +24,29 @@ type popupFrontend struct {
 }
 
 func newPickPopupCommand(remoteFactory RemoteFactory) *cobra.Command {
-	return actioncli.Command(action.PickPopup, actioncli.Options[action.OpenPicker, action.ClosedPicker]{
-		Operation:    "picker",
-		SuccessOwned: false,
-		Configure: func(cmd *cobra.Command) {
-			cmd.Annotations[clibase.AnnotationLiveIO] = annotationEnabled
+	return actioncli.Command(
+		action.PickPopup,
+		actioncli.Options[action.OpenPicker, action.ClosedPicker]{
+			Operation:    "picker",
+			SuccessOwned: false,
+			Configure: func(cmd *cobra.Command) {
+				cmd.Annotations[clibase.AnnotationLiveIO] = annotationEnabled
+			},
+			Prepare:  nil,
+			Frontend: func(cmd *cobra.Command) action.Dispatcher { return popupFrontend{cmd: cmd, remote: remoteFactory} },
+			Render:   nil,
 		},
-		Prepare:  nil,
-		Frontend: func(cmd *cobra.Command) action.Dispatcher { return popupFrontend{cmd: cmd, remote: remoteFactory} },
-		Render:   nil,
-	})
+	)
 }
 
 func (frontend popupFrontend) Accepts(at action.Location, id action.ID) bool {
 	return at.Kind == action.LocationLocal && id == action.PickPopup.ID
 }
 
-func (frontend popupFrontend) Dispatch(ctx context.Context, invocation action.Invocation) (any, error) {
+func (frontend popupFrontend) Dispatch(
+	ctx context.Context,
+	invocation action.Invocation,
+) (any, error) {
 	launchedAt := time.Now()
 
 	runtime, err := preparePickerCommand(frontend.cmd)
@@ -53,14 +59,26 @@ func (frontend popupFrontend) Dispatch(ctx context.Context, invocation action.In
 		runtime.state.PopupDisplayMode = open.Mode
 	}
 
-	if err := openPickerPopup(ctx, frontend.cmd, runtime, invocation.Caller, open.Mode, launchedAt, frontend.remote); err != nil {
+	if err := openPickerPopup(
+		ctx,
+		frontend.cmd,
+		runtime,
+		invocation.Caller,
+		open.Mode,
+		launchedAt,
+		frontend.remote,
+	); err != nil {
 		return nil, err
 	}
 
 	return action.ClosedPicker{}, nil
 }
 
-func checkPopupClientSession(ctx context.Context, server *gotmux.Server, expected, shown string) error {
+func checkPopupClientSession(
+	ctx context.Context,
+	server *gotmux.Server,
+	expected, shown string,
+) error {
 	if expected == "" || expected == shown {
 		return nil
 	}
@@ -74,7 +92,10 @@ func checkPopupClientSession(ctx context.Context, server *gotmux.Server, expecte
 		return oops.In("cli").With("operation", "resolve_popup_session").Wrap(err)
 	}
 
-	if !slices.ContainsFunc(rows, func(row session.Session) bool { return row.ID == shown && row.Name == expected }) {
+	if !slices.ContainsFunc(
+		rows,
+		func(row session.Session) bool { return row.ID == shown && row.Name == expected },
+	) {
 		return session.ErrInvokingClientUnavailable
 	}
 

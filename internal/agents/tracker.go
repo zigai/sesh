@@ -80,7 +80,10 @@ func (t *Tracker) HandleSnapshot(ctx context.Context, sessions []aht.Session) er
 	t.cleanupDeadPanes(livePanes)
 
 	if err := t.reconcileWindows(ctx, activePanes); err != nil {
-		return oops.In("agents").Code("style_reconcile_failed").With("operation", "handle_snapshot").Wrap(err)
+		return oops.In("agents").
+			Code("style_reconcile_failed").
+			With("operation", "handle_snapshot").
+			Wrap(err)
 	}
 
 	return nil
@@ -181,11 +184,15 @@ func (t *Tracker) clearActiveFailed(activePanes map[string]ActivePane) {
 	}
 }
 
-func (t *Tracker) reconcileSnapshotSessions(sessions []aht.Session, activePanes map[string]ActivePane) map[string]bool {
+func (t *Tracker) reconcileSnapshotSessions(
+	sessions []aht.Session,
+	activePanes map[string]ActivePane,
+) map[string]bool {
 	livePanes := make(map[string]bool, len(sessions))
 
 	for _, session := range sessions {
-		if session.Presence() != aht.PresenceLive || session.Location.Kind != aht.MultiplexerTmux || session.Location.PaneID == "" {
+		if session.Presence() != aht.PresenceLive || session.Location.Kind != aht.MultiplexerTmux ||
+			session.Location.PaneID == "" {
 			continue
 		}
 
@@ -223,7 +230,11 @@ func (t *Tracker) reconcileSnapshotSessions(sessions []aht.Session, activePanes 
 	return livePanes
 }
 
-func (t *Tracker) reconcilePaneActivity(paneID, windowID string, currentActivity string, activePanes map[string]ActivePane) {
+func (t *Tracker) reconcilePaneActivity(
+	paneID, windowID string,
+	currentActivity string,
+	activePanes map[string]ActivePane,
+) {
 	previousActivity, hadPrevious := t.paneActivity[paneID]
 
 	if hadPrevious {
@@ -294,7 +305,12 @@ func (t *Tracker) reconcileWindows(ctx context.Context, activePanes map[string]A
 	return errors.Join(failures...)
 }
 
-func (t *Tracker) reconcileSingleWindow(ctx context.Context, windowID string, panes []string, activePanes map[string]ActivePane) error {
+func (t *Tracker) reconcileSingleWindow(
+	ctx context.Context,
+	windowID string,
+	panes []string,
+	activePanes map[string]ActivePane,
+) error {
 	highestState := StateNormal
 
 	for _, paneID := range panes {
@@ -316,13 +332,21 @@ func (t *Tracker) reconcileSingleWindow(ctx context.Context, windowID string, pa
 	return t.clearTargetStyle(ctx, windowID)
 }
 
-func (t *Tracker) applyTargetStyle(ctx context.Context, windowID string, targetStyle string, reapply bool) error {
+func (t *Tracker) applyTargetStyle(
+	ctx context.Context,
+	windowID string,
+	targetStyle string,
+	reapply bool,
+) error {
 	if !reapply && t.windowStyles[windowID] == targetStyle {
 		return nil
 	}
 
 	if err := t.tmux.SetWindowStyle(ctx, windowID, targetStyle); err != nil {
-		return oops.In("agents").Code("style_update_failed").With("operation", "set_window_style").Wrap(err)
+		return oops.In("agents").
+			Code("style_update_failed").
+			With("operation", "set_window_style").
+			Wrap(err)
 	}
 
 	t.windowStyles[windowID] = targetStyle
@@ -336,7 +360,10 @@ func (t *Tracker) clearTargetStyle(ctx context.Context, windowID string) error {
 	}
 
 	if err := t.tmux.ClearWindowStyle(ctx, windowID); err != nil {
-		return oops.In("agents").Code("style_update_failed").With("operation", "clear_window_style").Wrap(err)
+		return oops.In("agents").
+			Code("style_update_failed").
+			With("operation", "clear_window_style").
+			Wrap(err)
 	}
 
 	delete(t.windowStyles, windowID)
@@ -356,7 +383,10 @@ func (t *Tracker) resolvePaneState(paneID string) State {
 		}
 
 		return StateNormal
-	case string(aht.ActivityRunning), string(aht.ActivityIdle), string(aht.ActivityInterrupted), string(aht.ActivityUnknown):
+	case string(aht.ActivityRunning),
+		string(aht.ActivityIdle),
+		string(aht.ActivityInterrupted),
+		string(aht.ActivityUnknown):
 		if t.paneUnread[paneID] {
 			return StateUnread
 		}

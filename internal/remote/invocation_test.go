@@ -95,7 +95,15 @@ func TestAdmitInvocationRejectsConflictingIntent(t *testing.T) {
 
 	conflicting.IntentDigest = digest
 
-	if _, _, err := AdmitInvocation(t.Context(), dir, conflicting, now); !errors.Is(err, ErrInvocationConflict) {
+	if _, _, err := AdmitInvocation(
+		t.Context(),
+		dir,
+		conflicting,
+		now,
+	); !errors.Is(
+		err,
+		ErrInvocationConflict,
+	) {
 		t.Fatalf("AdmitInvocation(conflicting) error = %v, want %v", err, ErrInvocationConflict)
 	}
 }
@@ -106,14 +114,30 @@ func TestAdmitInvocationRejectsInvalidIdentity(t *testing.T) {
 	request := admittedRequest(t)
 	request.InvocationID = "short"
 
-	if _, _, err := AdmitInvocation(t.Context(), dir, request, time.Now()); !errors.Is(err, ErrInvalidFrame) {
+	if _, _, err := AdmitInvocation(
+		t.Context(),
+		dir,
+		request,
+		time.Now(),
+	); !errors.Is(
+		err,
+		ErrInvalidFrame,
+	) {
 		t.Fatalf("AdmitInvocation(short ID) error = %v, want %v", err, ErrInvalidFrame)
 	}
 
 	request = admittedRequest(t)
 	request.IntentDigest = "not-a-digest"
 
-	if _, _, err := AdmitInvocation(t.Context(), dir, request, time.Now()); !errors.Is(err, ErrInvalidFrame) {
+	if _, _, err := AdmitInvocation(
+		t.Context(),
+		dir,
+		request,
+		time.Now(),
+	); !errors.Is(
+		err,
+		ErrInvalidFrame,
+	) {
 		t.Fatalf("AdmitInvocation(bad digest) error = %v, want %v", err, ErrInvalidFrame)
 	}
 }
@@ -138,7 +162,14 @@ func TestResolveAndLookupInvocation(t *testing.T) {
 		t.Fatalf("pending result = %#v, want an explicit unknown outcome", pending.Result())
 	}
 
-	if err := ResolveInvocation(t.Context(), dir, invocation.ID, outcomeOK, nil, now.Add(time.Second)); err != nil {
+	if err := ResolveInvocation(
+		t.Context(),
+		dir,
+		invocation.ID,
+		outcomeOK,
+		nil,
+		now.Add(time.Second),
+	); err != nil {
 		t.Fatalf("ResolveInvocation() error = %v", err)
 	}
 
@@ -151,15 +182,38 @@ func TestResolveAndLookupInvocation(t *testing.T) {
 		t.Fatalf("resolved record = %#v, want a durable success", resolved)
 	}
 
-	if err := ResolveInvocation(t.Context(), dir, invocation.ID, outcomeOK, nil, now.Add(2*time.Second)); err != nil {
+	if err := ResolveInvocation(
+		t.Context(),
+		dir,
+		invocation.ID,
+		outcomeOK,
+		nil,
+		now.Add(2*time.Second),
+	); err != nil {
 		t.Fatalf("repeated ResolveInvocation() error = %v", err)
 	}
 
-	if err := ResolveInvocation(t.Context(), dir, invocation.ID, string(action.CodeUnavailable), nil, now.Add(2*time.Second)); !errors.Is(err, ErrInvocationResolved) {
+	if err := ResolveInvocation(
+		t.Context(),
+		dir,
+		invocation.ID,
+		string(action.CodeUnavailable),
+		nil,
+		now.Add(2*time.Second),
+	); !errors.Is(
+		err,
+		ErrInvocationResolved,
+	) {
 		t.Fatalf("conflicting ResolveInvocation() error = %v, want %v", err, ErrInvocationResolved)
 	}
 
-	if _, err := LookupInvocation(dir, "00000000000000000000000000000000"); !errors.Is(err, os.ErrNotExist) {
+	if _, err := LookupInvocation(
+		dir,
+		"00000000000000000000000000000000",
+	); !errors.Is(
+		err,
+		os.ErrNotExist,
+	) {
 		t.Fatalf("LookupInvocation(missing) error = %v, want not-exist", err)
 	}
 }
@@ -175,11 +229,31 @@ func TestLookupInvocationRejectsInvalidIdentity(t *testing.T) {
 func TestResolveInvocationRequiresDurableOutcome(t *testing.T) {
 	dir, _ := openTestReceiptDir(t)
 
-	if err := ResolveInvocation(t.Context(), dir, "00000000000000000000000000000000", "", nil, time.Now()); !errors.Is(err, ErrInvalidFrame) {
+	if err := ResolveInvocation(
+		t.Context(),
+		dir,
+		"00000000000000000000000000000000",
+		"",
+		nil,
+		time.Now(),
+	); !errors.Is(
+		err,
+		ErrInvalidFrame,
+	) {
 		t.Fatalf("ResolveInvocation(empty outcome) error = %v, want %v", err, ErrInvalidFrame)
 	}
 
-	if err := ResolveInvocation(t.Context(), dir, "00000000000000000000000000000000", "raw failure text", nil, time.Now()); !errors.Is(err, ErrInvalidFrame) {
+	if err := ResolveInvocation(
+		t.Context(),
+		dir,
+		"00000000000000000000000000000000",
+		"raw failure text",
+		nil,
+		time.Now(),
+	); !errors.Is(
+		err,
+		ErrInvalidFrame,
+	) {
 		t.Fatalf("ResolveInvocation(unknown outcome) error = %v, want %v", err, ErrInvalidFrame)
 	}
 }
@@ -202,7 +276,12 @@ func TestPruneInvocationsPreservesUnresolvedRecords(t *testing.T) {
 	assertTombstoneAndReplayFence(t, dir, resolved[0], now)
 }
 
-func seedResolvedInvocations(t *testing.T, dir *privatefs.Dir, now *time.Time, count int) []Invocation {
+func seedResolvedInvocations(
+	t *testing.T,
+	dir *privatefs.Dir,
+	now *time.Time,
+	count int,
+) []Invocation {
 	t.Helper()
 
 	resolved := make([]Invocation, 0, count)
@@ -215,7 +294,14 @@ func seedResolvedInvocations(t *testing.T, dir *privatefs.Dir, now *time.Time, c
 			t.Fatal(err)
 		}
 
-		if err := ResolveInvocation(t.Context(), dir, invocation.ID, outcomeOK, nil, *now); err != nil {
+		if err := ResolveInvocation(
+			t.Context(),
+			dir,
+			invocation.ID,
+			outcomeOK,
+			nil,
+			*now,
+		); err != nil {
 			t.Fatal(err)
 		}
 
@@ -245,7 +331,14 @@ func seedUnknownOutcomeInvocation(t *testing.T, dir *privatefs.Dir, now time.Tim
 		t.Fatal(err)
 	}
 
-	if err := ResolveInvocation(t.Context(), dir, unknownInv.ID, string(action.CodeUncertain), nil, now); err != nil {
+	if err := ResolveInvocation(
+		t.Context(),
+		dir,
+		unknownInv.ID,
+		string(action.CodeUncertain),
+		nil,
+		now,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -259,12 +352,21 @@ func assertUnprunedRecords(t *testing.T, dir *privatefs.Dir, unresolvedID, unkno
 		t.Fatalf("pruning removed an unresolved record: %v", err)
 	}
 
-	if looked, err := LookupInvocation(dir, unknownID); err != nil || looked.Outcome != string(action.CodeUncertain) {
+	if looked, err := LookupInvocation(
+		dir,
+		unknownID,
+	); err != nil ||
+		looked.Outcome != string(action.CodeUncertain) {
 		t.Fatalf("pruning removed an unknown-outcome record: %v, looked=%#v", err, looked)
 	}
 }
 
-func assertTombstoneAndReplayFence(t *testing.T, dir *privatefs.Dir, retired Invocation, now time.Time) {
+func assertTombstoneAndReplayFence(
+	t *testing.T,
+	dir *privatefs.Dir,
+	retired Invocation,
+	now time.Time,
+) {
 	t.Helper()
 
 	if _, err := dir.Read(retired.ID+".json", maxInvocationBytes); !errors.Is(err, os.ErrNotExist) {
@@ -302,8 +404,20 @@ func assertTombstoneAndReplayFence(t *testing.T, dir *privatefs.Dir, retired Inv
 	conflictRequest := retryRequest
 	conflictRequest.IntentDigest = strings.Repeat("f", 64)
 
-	if _, _, err := AdmitInvocation(t.Context(), dir, conflictRequest, now.Add(time.Hour)); !errors.Is(err, ErrInvocationConflict) {
-		t.Fatalf("AdmitInvocation(conflicting pruned) error = %v, want %v", err, ErrInvocationConflict)
+	if _, _, err := AdmitInvocation(
+		t.Context(),
+		dir,
+		conflictRequest,
+		now.Add(time.Hour),
+	); !errors.Is(
+		err,
+		ErrInvocationConflict,
+	) {
+		t.Fatalf(
+			"AdmitInvocation(conflicting pruned) error = %v, want %v",
+			err,
+			ErrInvocationConflict,
+		)
 	}
 }
 
@@ -405,7 +519,15 @@ func TestAdmitInvocationHonorsCancellation(t *testing.T) {
 
 	request := admittedRequest(t)
 
-	if _, _, err := AdmitInvocation(ctx, dir, request, time.Now()); !errors.Is(err, context.Canceled) {
+	if _, _, err := AdmitInvocation(
+		ctx,
+		dir,
+		request,
+		time.Now(),
+	); !errors.Is(
+		err,
+		context.Canceled,
+	) {
 		t.Fatalf("AdmitInvocation() error = %v, want cancellation", err)
 	}
 }
@@ -430,16 +552,35 @@ func TestResolvedInvocationKeepsOutputThatFitsTheReceipt(t *testing.T) {
 	}
 
 	oversized := jsontext.Value(`{"name":"` + strings.Repeat("x", maxInvocationBytes) + `"}`)
-	if err := ResolveInvocation(t.Context(), dir, large.ID, string(action.CodePartial), oversized, now); err != nil {
+	if err := ResolveInvocation(
+		t.Context(),
+		dir,
+		large.ID,
+		string(action.CodePartial),
+		oversized,
+		now,
+	); err != nil {
 		t.Fatalf("ResolveInvocation(oversized output) error = %v, want the outcome kept", err)
 	}
 
-	if result, err := LookupPeerInvocation(dir, small.ID); err != nil || !result.OK || string(result.Output) != string(output) {
+	if result, err := LookupPeerInvocation(
+		dir,
+		small.ID,
+	); err != nil || !result.OK ||
+		string(result.Output) != string(output) {
 		t.Fatalf("small receipt = %#v, %v; want success with its output", result, err)
 	}
 
-	if result, err := LookupPeerInvocation(dir, large.ID); err != nil || result.Code != action.CodePartial || len(result.Output) != 0 {
-		t.Fatalf("oversized receipt = %#v, %v; want the partial outcome without output", result, err)
+	if result, err := LookupPeerInvocation(
+		dir,
+		large.ID,
+	); err != nil || result.Code != action.CodePartial ||
+		len(result.Output) != 0 {
+		t.Fatalf(
+			"oversized receipt = %#v, %v; want the partial outcome without output",
+			result,
+			err,
+		)
 	}
 }
 
@@ -447,13 +588,23 @@ func TestPruneInvocationsRemovesRecordsFromAnotherProtocol(t *testing.T) {
 	dir, _ := openTestReceiptDir(t)
 	now := time.Unix(1000, 0).UTC()
 
-	stale := `{"version":1,"id":"0123456789abcdef0123456789abcdef","intentDigest":"` + strings.Repeat("a", 64) +
+	stale := `{"version":1,"id":"0123456789abcdef0123456789abcdef","intentDigest":"` + strings.Repeat(
+		"a",
+		64,
+	) +
 		`","operation":"kill","admittedAt":"1970-01-01T00:16:40Z","outcome":"","resolvedAt":"0001-01-01T00:00:00Z","durableOperationId":""}`
-	if err := writeFileAtomic(dir, "0123456789abcdef0123456789abcdef.json", []byte(stale)); err != nil {
+	if err := writeFileAtomic(
+		dir,
+		"0123456789abcdef0123456789abcdef.json",
+		[]byte(stale),
+	); err != nil {
 		t.Fatal(err)
 	}
 
-	staleFence := `{"version":1,"tombstones":{"fedcba9876543210fedcba9876543210":{"intentDigest":"` + strings.Repeat("b", 64) +
+	staleFence := `{"version":1,"tombstones":{"fedcba9876543210fedcba9876543210":{"intentDigest":"` + strings.Repeat(
+		"b",
+		64,
+	) +
 		`","operation":"kill","outcome":"ok","durableOperationId":"","retiredAt":"1970-01-01T00:16:40Z"}}}`
 	if err := writeFileAtomic(dir, replayFenceName, []byte(staleFence)); err != nil {
 		t.Fatal(err)
@@ -463,11 +614,27 @@ func TestPruneInvocationsRemovesRecordsFromAnotherProtocol(t *testing.T) {
 		t.Fatalf("pruneInvocations() error = %v, want older records to free their space", err)
 	}
 
-	if _, err := dir.Read("0123456789abcdef0123456789abcdef.json", maxInvocationBytes); !errors.Is(err, os.ErrNotExist) {
+	if _, err := dir.Read(
+		"0123456789abcdef0123456789abcdef.json",
+		maxInvocationBytes,
+	); !errors.Is(
+		err,
+		os.ErrNotExist,
+	) {
 		t.Fatalf("record from another protocol still on disk: %v", err)
 	}
 
-	if _, admitted, err := AdmitInvocation(t.Context(), dir, admittedRequest(t), now); err != nil || !admitted {
-		t.Fatalf("admission next to a fence from another protocol = %t, %v; want admitted", admitted, err)
+	if _, admitted, err := AdmitInvocation(
+		t.Context(),
+		dir,
+		admittedRequest(t),
+		now,
+	); err != nil ||
+		!admitted {
+		t.Fatalf(
+			"admission next to a fence from another protocol = %t, %v; want admitted",
+			admitted,
+			err,
+		)
 	}
 }

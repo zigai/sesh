@@ -56,14 +56,23 @@ func (p RetentionPolicy) Validate(now time.Time) error {
 	return nil
 }
 
-func (r *Repository) RetainPolicy(ctx context.Context, now time.Time, policy RetentionPolicy) (RetentionResult, error) {
+func (r *Repository) RetainPolicy(
+	ctx context.Context,
+	now time.Time,
+	policy RetentionPolicy,
+) (RetentionResult, error) {
 	if err := policy.Validate(now); err != nil {
 		return RetentionResult{}, repositoryError("retain", err)
 	}
 
 	lock, err := r.root.Lock(ctx, "repository.lock")
 	if err != nil {
-		return RetentionResult{}, repositoryError("retain", oops.In("snapshot.store").With("operation", "lock_catalog_update").Wrapf(err, "lock catalog update"))
+		return RetentionResult{}, repositoryError(
+			"retain",
+			oops.In("snapshot.store").
+				With("operation", "lock_catalog_update").
+				Wrapf(err, "lock catalog update"),
+		)
 	}
 
 	result, retainErr := r.retainPolicyLocked(ctx, now, policy)
@@ -80,9 +89,15 @@ func (r *Repository) RetainPolicy(ctx context.Context, now time.Time, policy Ret
 	return result, nil
 }
 
-func (r *Repository) retainPolicyLocked(ctx context.Context, now time.Time, policy RetentionPolicy) (RetentionResult, error) {
+func (r *Repository) retainPolicyLocked(
+	ctx context.Context,
+	now time.Time,
+	policy RetentionPolicy,
+) (RetentionResult, error) {
 	if err := ctx.Err(); err != nil {
-		return RetentionResult{}, oops.In("snapshot.store").With("operation", "evaluate_retention").Wrap(err)
+		return RetentionResult{}, oops.In("snapshot.store").
+			With("operation", "evaluate_retention").
+			Wrap(err)
 	}
 
 	catalog, err := r.catalog()
@@ -91,7 +106,9 @@ func (r *Repository) retainPolicyLocked(ctx context.Context, now time.Time, poli
 	}
 
 	if err := ctx.Err(); err != nil {
-		return RetentionResult{}, oops.In("snapshot.store").With("operation", "evaluate_retention").Wrap(err)
+		return RetentionResult{}, oops.In("snapshot.store").
+			With("operation", "evaluate_retention").
+			Wrap(err)
 	}
 
 	if len(catalog.Generations) == 0 {
@@ -124,7 +141,9 @@ func (r *Repository) retainPolicyLocked(ctx context.Context, now time.Time, poli
 	})
 
 	if err := ctx.Err(); err != nil {
-		return RetentionResult{}, oops.In("snapshot.store").With("operation", "publish_catalog").Wrapf(err, "publish catalog")
+		return RetentionResult{}, oops.In("snapshot.store").
+			With("operation", "publish_catalog").
+			Wrapf(err, "publish catalog")
 	}
 
 	if err := r.publish(ctx, catalog, nil); err != nil {
@@ -166,13 +185,18 @@ func (r *Repository) loadRetentionMetadata(
 	return nil, nil, nil, nil
 }
 
-func (r *Repository) loadRetentionTimestamps(ctx context.Context, gens []Generation) (map[string]int64, map[string]bool, error) {
+func (r *Repository) loadRetentionTimestamps(
+	ctx context.Context,
+	gens []Generation,
+) (map[string]int64, map[string]bool, error) {
 	timestamps := make(map[string]int64, len(gens))
 	retired := make(map[string]bool)
 
 	for _, gen := range gens {
 		if err := ctx.Err(); err != nil {
-			return nil, nil, oops.In("snapshot.store").With("operation", "load_retention_timestamps").Wrap(err)
+			return nil, nil, oops.In("snapshot.store").
+				With("operation", "load_retention_timestamps").
+				Wrap(err)
 		}
 
 		finished, err := r.readGenerationFinished(gen)
@@ -223,9 +247,23 @@ func (c Catalog) evaluateRetention(
 ) (RetentionResult, error) {
 	ordered, protectedMap := c.orderedWithProtection(retired)
 
-	removedSet := c.evaluateAgeCountRemovals(ordered, protectedMap, policy, now, timestamps, retired)
+	removedSet := c.evaluateAgeCountRemovals(
+		ordered,
+		protectedMap,
+		policy,
+		now,
+		timestamps,
+		retired,
+	)
 
-	retainedBytes, protectedBytes, budgetUnmet, err := evaluateByteBudget(ordered, removedSet, protectedMap, policy.MaxBytes, sizes, retired)
+	retainedBytes, protectedBytes, budgetUnmet, err := evaluateByteBudget(
+		ordered,
+		removedSet,
+		protectedMap,
+		policy.MaxBytes,
+		sizes,
+		retired,
+	)
 	if err != nil {
 		return RetentionResult{}, err
 	}
@@ -289,7 +327,13 @@ func evaluateByteBudget(
 		return 0, 0, false, nil
 	}
 
-	retainedBytes, protectedBytes, err := calculateCandidateBytes(ordered, removedSet, protectedMap, sizes, retired)
+	retainedBytes, protectedBytes, err := calculateCandidateBytes(
+		ordered,
+		removedSet,
+		protectedMap,
+		sizes,
+		retired,
+	)
 	if err != nil {
 		return 0, 0, false, err
 	}
@@ -385,7 +429,13 @@ func assembleRetentionSlices(
 	return removed, retained, protected
 }
 
-func shouldPrune(index int, id string, policy RetentionPolicy, cutoff time.Time, timestamps map[string]int64) bool {
+func shouldPrune(
+	index int,
+	id string,
+	policy RetentionPolicy,
+	cutoff time.Time,
+	timestamps map[string]int64,
+) bool {
 	if policy.MaxCount > 0 && index >= policy.MaxCount {
 		return true
 	}

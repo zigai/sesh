@@ -98,9 +98,18 @@ func openPinnedDir(dirPath string, create bool) (*pinnedDir, error) {
 
 func checkChildSymlink(parentFd int, part string) error {
 	var checkStat unix.Stat_t
-	if fstatatErr := unix.Fstatat(parentFd, part, &checkStat, unix.AT_SYMLINK_NOFOLLOW); fstatatErr == nil {
+	if fstatatErr := unix.Fstatat(
+		parentFd,
+		part,
+		&checkStat,
+		unix.AT_SYMLINK_NOFOLLOW,
+	); fstatatErr == nil {
 		if checkStat.Mode&unix.S_IFMT != unix.S_IFDIR {
-			return fileTypeError(checkStat.Mode&unix.S_IFMT == unix.S_IFLNK, "fs", ErrConfigNotDirectory)
+			return fileTypeError(
+				checkStat.Mode&unix.S_IFMT == unix.S_IFLNK,
+				"fs",
+				ErrConfigNotDirectory,
+			)
 		}
 	}
 
@@ -141,7 +150,12 @@ func openChildDir(parentFd int, part string, create bool) (int, error) {
 		}
 	}
 
-	childFd, openErr := unix.Openat(parentFd, part, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
+	childFd, openErr := unix.Openat(
+		parentFd,
+		part,
+		unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC,
+		0,
+	)
 	if openErr != nil {
 		if errors.Is(openErr, unix.ELOOP) {
 			return -1, symlinkError("fs")
@@ -170,7 +184,10 @@ func openChildDir(parentFd int, part string, create bool) (int, error) {
 	}
 
 	if stat.Mode&unix.S_IFMT != unix.S_IFDIR {
-		return -1, errors.Join(fileTypeError(stat.Mode&unix.S_IFMT == unix.S_IFLNK, "fs", ErrConfigNotDirectory), unix.Close(childFd))
+		return -1, errors.Join(
+			fileTypeError(stat.Mode&unix.S_IFMT == unix.S_IFLNK, "fs", ErrConfigNotDirectory),
+			unix.Close(childFd),
+		)
 	}
 
 	return childFd, nil
@@ -244,13 +261,27 @@ func (d *pinnedDir) ReadFile(name string, maxBytes int64) ([]byte, error) {
 
 func openRegularFile(dirFd int, name string, maxBytes int64) (*os.File, error) {
 	var preStat unix.Stat_t
-	if fstatatErr := unix.Fstatat(dirFd, name, &preStat, unix.AT_SYMLINK_NOFOLLOW); fstatatErr == nil {
+	if fstatatErr := unix.Fstatat(
+		dirFd,
+		name,
+		&preStat,
+		unix.AT_SYMLINK_NOFOLLOW,
+	); fstatatErr == nil {
 		if preStat.Mode&unix.S_IFMT != unix.S_IFREG {
-			return nil, fileTypeError(preStat.Mode&unix.S_IFMT == unix.S_IFLNK, "load", ErrConfigNotRegular)
+			return nil, fileTypeError(
+				preStat.Mode&unix.S_IFMT == unix.S_IFLNK,
+				"load",
+				ErrConfigNotRegular,
+			)
 		}
 	}
 
-	fileFd, err := unix.Openat(dirFd, name, unix.O_RDONLY|unix.O_NOFOLLOW|unix.O_CLOEXEC|unix.O_NONBLOCK, 0)
+	fileFd, err := unix.Openat(
+		dirFd,
+		name,
+		unix.O_RDONLY|unix.O_NOFOLLOW|unix.O_CLOEXEC|unix.O_NONBLOCK,
+		0,
+	)
 	if err != nil {
 		if errors.Is(err, unix.ELOOP) {
 			return nil, symlinkError("load")
@@ -275,7 +306,10 @@ func openRegularFile(dirFd int, name string, maxBytes int64) (*os.File, error) {
 	}
 
 	if stat.Mode&unix.S_IFMT != unix.S_IFREG {
-		return nil, errors.Join(fileTypeError(stat.Mode&unix.S_IFMT == unix.S_IFLNK, "load", ErrConfigNotRegular), unix.Close(fileFd))
+		return nil, errors.Join(
+			fileTypeError(stat.Mode&unix.S_IFMT == unix.S_IFLNK, "load", ErrConfigNotRegular),
+			unix.Close(fileFd),
+		)
 	}
 
 	if maxBytes > 0 && stat.Size > maxBytes {
@@ -363,7 +397,10 @@ func (d *pinnedDir) WriteAtomic(name string, data []byte) error {
 		if stat.Mode&unix.S_IFMT != unix.S_IFREG {
 			unlinkErr := unix.Unlinkat(d.fd, tmpName, 0)
 
-			return errors.Join(fileTypeError(stat.Mode&unix.S_IFMT == unix.S_IFLNK, "save", ErrConfigNotRegular), unlinkErr)
+			return errors.Join(
+				fileTypeError(stat.Mode&unix.S_IFMT == unix.S_IFLNK, "save", ErrConfigNotRegular),
+				unlinkErr,
+			)
 		}
 	}
 
@@ -386,13 +423,22 @@ func (d *pinnedDir) stageTempFile(name string, data []byte) (string, error) {
 	var stat unix.Stat_t
 	if fstatErr := unix.Fstatat(d.fd, name, &stat, unix.AT_SYMLINK_NOFOLLOW); fstatErr == nil {
 		if stat.Mode&unix.S_IFMT != unix.S_IFREG {
-			return "", fileTypeError(stat.Mode&unix.S_IFMT == unix.S_IFLNK, "fs", ErrConfigNotRegular)
+			return "", fileTypeError(
+				stat.Mode&unix.S_IFMT == unix.S_IFLNK,
+				"fs",
+				ErrConfigNotRegular,
+			)
 		}
 	}
 
 	tmpName := fmt.Sprintf(".%s.tmp-%d-%d", name, os.Getpid(), time.Now().UnixNano())
 
-	tmpFd, err := unix.Openat(d.fd, tmpName, unix.O_WRONLY|unix.O_CREAT|unix.O_EXCL|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0o600)
+	tmpFd, err := unix.Openat(
+		d.fd,
+		tmpName,
+		unix.O_WRONLY|unix.O_CREAT|unix.O_EXCL|unix.O_NOFOLLOW|unix.O_CLOEXEC,
+		0o600,
+	)
 	if err != nil {
 		return "", oops.In("config").
 			Code("config_temp_failed").

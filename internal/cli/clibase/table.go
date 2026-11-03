@@ -89,7 +89,12 @@ func trimHeaderRulePadding(rendered string) string {
 	return strings.Join(lines, "\n")
 }
 
-func WriteResponsiveTable(cmd *cobra.Command, columns []TableColumn, rows []prettytable.Row, full bool) error {
+func WriteResponsiveTable(
+	cmd *cobra.Command,
+	columns []TableColumn,
+	rows []prettytable.Row,
+	full bool,
+) error {
 	return CommandOutputError(RenderResponsiveTable(
 		cmd.OutOrStdout(), CommandOutputWidth(cmd), columns, rows, full,
 	))
@@ -141,7 +146,11 @@ func WrapSession(value string, width int) []string {
 	return WrapIdentifier(value, width)
 }
 
-func allocateCompactResponsiveColumns(columns []TableColumn, rows []prettytable.Row, maxWidth int) []sizedResponsiveColumn {
+func allocateCompactResponsiveColumns(
+	columns []TableColumn,
+	rows []prettytable.Row,
+	maxWidth int,
+) []sizedResponsiveColumn {
 	if maxWidth <= 0 {
 		maxWidth = defaultTableWidth
 	}
@@ -182,7 +191,11 @@ func allocateCompactResponsiveColumns(columns []TableColumn, rows []prettytable.
 	return out
 }
 
-func allocateFullResponsiveColumns(columns []TableColumn, rows []prettytable.Row, maxWidth int) ([]sizedResponsiveColumn, bool) {
+func allocateFullResponsiveColumns(
+	columns []TableColumn,
+	rows []prettytable.Row,
+	maxWidth int,
+) ([]sizedResponsiveColumn, bool) {
 	if maxWidth <= 0 {
 		maxWidth = defaultTableWidth
 	}
@@ -222,7 +235,11 @@ func allocateFullResponsiveColumns(columns []TableColumn, rows []prettytable.Row
 
 	for i, col := range columns {
 		if col.Fixed {
-			out[i] = sizedResponsiveColumn{heading: col.Heading, width: minWidths[i], wrap: col.Wrap}
+			out[i] = sizedResponsiveColumn{
+				heading: col.Heading,
+				width:   minWidths[i],
+				wrap:    col.Wrap,
+			}
 			continue
 		}
 
@@ -233,13 +250,22 @@ func allocateFullResponsiveColumns(columns []TableColumn, rows []prettytable.Row
 			add = min(unmet, (extra*unmet)/totalUnmet)
 		}
 
-		out[i] = sizedResponsiveColumn{heading: col.Heading, width: minWidths[i] + add, wrap: col.Wrap}
+		out[i] = sizedResponsiveColumn{
+			heading: col.Heading,
+			width:   minWidths[i] + add,
+			wrap:    col.Wrap,
+		}
 	}
 
 	return out, true
 }
 
-func formatStackedResponsiveRecord(out *strings.Builder, columns []TableColumn, row prettytable.Row, labelWidth, valueWidth int) {
+func formatStackedResponsiveRecord(
+	out *strings.Builder,
+	columns []TableColumn,
+	row prettytable.Row,
+	labelWidth, valueWidth int,
+) {
 	for colIndex, col := range columns {
 		cell := ""
 		if colIndex < len(row) {
@@ -291,7 +317,11 @@ func measureResponsiveNaturalWidths(columns []TableColumn, rows []prettytable.Ro
 	return maxLen
 }
 
-func newColumnConfig(number int, widthMax int, enforcer func(string, int) string) prettytable.ColumnConfig {
+func newColumnConfig(
+	number int,
+	widthMax int,
+	enforcer func(string, int) string,
+) prettytable.ColumnConfig {
 	var cfg prettytable.ColumnConfig
 
 	cfg.Number = number
@@ -318,7 +348,11 @@ func wrapDelimitedText(value string, width int, delimiters string) []string {
 	return strings.Split(ansi.Wrap(value, width, delimiters), "\n")
 }
 
-func writeCompactResponsiveTable(output io.Writer, columns []sizedResponsiveColumn, rows []prettytable.Row) error {
+func writeCompactResponsiveTable(
+	output io.Writer,
+	columns []sizedResponsiveColumn,
+	rows []prettytable.Row,
+) error {
 	header := make(prettytable.Row, len(columns))
 	configs := make([]prettytable.ColumnConfig, len(columns))
 
@@ -332,7 +366,12 @@ func writeCompactResponsiveTable(output io.Writer, columns []sizedResponsiveColu
 	return WriteTable(output, header, rows, configs)
 }
 
-func writeStackedResponsiveRows(output io.Writer, columns []TableColumn, rows []prettytable.Row, maxWidth int) error {
+func writeStackedResponsiveRows(
+	output io.Writer,
+	columns []TableColumn,
+	rows []prettytable.Row,
+	maxWidth int,
+) error {
 	if maxWidth <= 0 {
 		maxWidth = defaultTableWidth
 	}
@@ -358,7 +397,11 @@ func writeStackedResponsiveRows(output io.Writer, columns []TableColumn, rows []
 	return nil
 }
 
-func writeWrappedResponsiveTable(output io.Writer, columns []sizedResponsiveColumn, rows []prettytable.Row) error {
+func writeWrappedResponsiveTable(
+	output io.Writer,
+	columns []sizedResponsiveColumn,
+	rows []prettytable.Row,
+) error {
 	header := make(prettytable.Row, len(columns))
 	configs := make([]prettytable.ColumnConfig, len(columns))
 

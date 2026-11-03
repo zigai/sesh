@@ -96,7 +96,11 @@ func TestLeaseEndpointRejection_InvalidPaths(t *testing.T) {
 func TestLeaseReportsNoServerWhenSocketDirectoryIsMissing(t *testing.T) {
 	leaseRoot := t.TempDir()
 
-	lease, err := AcquireLease(t.Context(), leaseRoot, filepath.Join(t.TempDir(), "tmux-1000", "default"))
+	lease, err := AcquireLease(
+		t.Context(),
+		leaseRoot,
+		filepath.Join(t.TempDir(), "tmux-1000", "default"),
+	)
 	if lease != nil {
 		_ = lease.Close()
 
@@ -626,7 +630,11 @@ func TestLeaseNoLogsLeak(t *testing.T) {
 		closeErr = lease.Close()
 	}
 
-	_, invalidErr := AcquireLease(t.Context(), leaseRoot, filepath.Join(tempDir, "nonexistent", "sock"))
+	_, invalidErr := AcquireLease(
+		t.Context(),
+		leaseRoot,
+		filepath.Join(tempDir, "nonexistent", "sock"),
+	)
 
 	_ = wOut.Close()
 	_ = wErr.Close()
@@ -696,7 +704,11 @@ func TestLeasePostLockRevalidation(t *testing.T) {
 func TestLeaseCloseStateRetainsError(t *testing.T) {
 	root := t.TempDir()
 
-	lease, err := AcquireLease(t.Context(), filepath.Join(root, "leases"), filepath.Join(root, "socket"))
+	lease, err := AcquireLease(
+		t.Context(),
+		filepath.Join(root, "leases"),
+		filepath.Join(root, "socket"),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -21,7 +21,15 @@ func TestFailedCommandReportsGitsErrorLineAfterProgressOutput(t *testing.T) {
 		}
 	}
 
-	_, err := git.Output(t.Context(), repo, "worktree", "add", "-b", "taken", filepath.Join(t.TempDir(), "tree"))
+	_, err := git.Output(
+		t.Context(),
+		repo,
+		"worktree",
+		"add",
+		"-b",
+		"taken",
+		filepath.Join(t.TempDir(), "tree"),
+	)
 
 	commandErr, ok := errors.AsType[*git.CommandError](err)
 	if !ok {

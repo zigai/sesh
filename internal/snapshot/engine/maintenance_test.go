@@ -40,7 +40,8 @@ func TestPruneReportsProtectedByteOverageWithoutRemovingProtectedGeneration(t *t
 	}
 
 	records := maintenanceLogRecords(t, logs.Bytes())
-	if len(records) != 2 || records[1]["status"] != "degraded" || records[1]["reason"] != "protected_overage" {
+	if len(records) != 2 || records[1]["status"] != "degraded" ||
+		records[1]["reason"] != "protected_overage" {
 		t.Fatalf("unexpected logs: %s", logs.String())
 	}
 }
@@ -62,7 +63,11 @@ func TestPruneThenGarbageCollectDistinguishesMembershipAndPhysicalRemoval(t *tes
 		t.Fatalf("membership result = %+v", retention)
 	}
 
-	collection, err := GarbageCollect(ctx, repository, store.CollectionBudget{Generations: 8, Bytes: 1 << 30})
+	collection, err := GarbageCollect(
+		ctx,
+		repository,
+		store.CollectionBudget{Generations: 8, Bytes: 1 << 30},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,11 +90,21 @@ func TestMaintenancePreservesPinnedRecoverySource(t *testing.T) {
 	repository := testRepository(t)
 	generations := commitMaintenanceFixtures(t, repository, 7)
 
-	if _, err := repository.Pin(t.Context(), generations[0].ID, model.Bytes("target"), nil); err != nil {
+	if _, err := repository.Pin(
+		t.Context(),
+		generations[0].ID,
+		model.Bytes("target"),
+		nil,
+	); err != nil {
 		t.Fatal(err)
 	}
 
-	retention, err := Prune(t.Context(), repository, time.Now().UTC(), store.RetentionPolicy{MaxCount: 5})
+	retention, err := Prune(
+		t.Context(),
+		repository,
+		time.Now().UTC(),
+		store.RetentionPolicy{MaxCount: 5},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +113,11 @@ func TestMaintenancePreservesPinnedRecoverySource(t *testing.T) {
 		t.Fatalf("pinned source not protected: %+v", retention)
 	}
 
-	collection, err := GarbageCollect(t.Context(), repository, store.CollectionBudget{Generations: 8, Bytes: 1 << 30})
+	collection, err := GarbageCollect(
+		t.Context(),
+		repository,
+		store.CollectionBudget{Generations: 8, Bytes: 1 << 30},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +147,8 @@ func TestMaintenanceUncertaintyLogsOneTerminalFailure(t *testing.T) {
 
 	record := records[0]
 	if record["level"] != "error" || record["component"] != "snapshot" || record["operation"] != "gc" ||
-		record["status"] != "failed" || record["phase"] != "collection" || record["reason"] != "publication_uncertain" {
+		record["status"] != "failed" || record["phase"] != "collection" ||
+		record["reason"] != "publication_uncertain" {
 		t.Fatalf("uncertainty schema = %#v", record)
 	}
 
@@ -148,7 +168,8 @@ func TestGarbageCollectionQuarantineLogsOnePrivateDegradedOutcome(t *testing.T) 
 		}},
 		Bytes: 42,
 	})
-	if !errors.Is(err, ErrCollectionQuarantined) || len(result.Quarantined) != 1 || !commandOutcomeWasLogged(err) {
+	if !errors.Is(err, ErrCollectionQuarantined) || len(result.Quarantined) != 1 ||
+		!commandOutcomeWasLogged(err) {
 		t.Fatalf("quarantine identity, receipt or ownership lost: %+v / %v", result, err)
 	}
 
@@ -159,7 +180,8 @@ func TestGarbageCollectionQuarantineLogsOnePrivateDegradedOutcome(t *testing.T) 
 
 	record := records[0]
 	if record["level"] != "warn" || record["component"] != "snapshot" || record["operation"] != "gc" ||
-		record["status"] != "degraded" || record["reason"] != "quarantined" {
+		record["status"] != "degraded" ||
+		record["reason"] != "quarantined" {
 		t.Fatalf("quarantine schema = %#v", record)
 	}
 
@@ -190,7 +212,11 @@ func assertMaintenanceOutcomeFields(t *testing.T, record map[string]any) {
 	}
 }
 
-func commitMaintenanceFixtures(t *testing.T, repository *store.Repository, count int) []store.Generation {
+func commitMaintenanceFixtures(
+	t *testing.T,
+	repository *store.Repository,
+	count int,
+) []store.Generation {
 	t.Helper()
 
 	generations := make([]store.Generation, 0, count)

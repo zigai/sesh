@@ -47,7 +47,10 @@ func TestLoadThemePreset(t *testing.T) {
 preset = "tokyo-night"
 `
 
-	cfg, err := config.Load(config.WithExplicitPath("-"), config.WithInput(strings.NewReader(tomlData)))
+	cfg, err := config.Load(
+		config.WithExplicitPath("-"),
+		config.WithInput(strings.NewReader(tomlData)),
+	)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -76,7 +79,10 @@ preset = "catppuccin"
 primary = "#ffffff"
 `
 
-	cfg, err := config.Load(config.WithExplicitPath("-"), config.WithInput(strings.NewReader(tomlData)))
+	cfg, err := config.Load(
+		config.WithExplicitPath("-"),
+		config.WithInput(strings.NewReader(tomlData)),
+	)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -100,7 +106,10 @@ func TestLoadThemePresetRejectsInvalid(t *testing.T) {
 preset = "invalid-preset"
 `
 
-	_, err := config.Load(config.WithExplicitPath("-"), config.WithInput(strings.NewReader(tomlData)))
+	_, err := config.Load(
+		config.WithExplicitPath("-"),
+		config.WithInput(strings.NewReader(tomlData)),
+	)
 	if err == nil {
 		t.Fatal("Load() error = nil, want invalid theme.preset error")
 	}
@@ -137,7 +146,10 @@ error = "#ff0000"
 failed = "#aa0000"
 `
 
-		cfg, err := config.Load(config.WithExplicitPath("-"), config.WithInput(strings.NewReader(tomlData)))
+		cfg, err := config.Load(
+			config.WithExplicitPath("-"),
+			config.WithInput(strings.NewReader(tomlData)),
+		)
 		if err != nil {
 			t.Fatalf("Load() error = %v", err)
 		}
@@ -159,7 +171,10 @@ failed = "#aa0000"
 failed = "#cc0000"
 `
 
-		cfg, err := config.Load(config.WithExplicitPath("-"), config.WithInput(strings.NewReader(tomlData)))
+		cfg, err := config.Load(
+			config.WithExplicitPath("-"),
+			config.WithInput(strings.NewReader(tomlData)),
+		)
 		if err != nil {
 			t.Fatalf("Load() error = %v", err)
 		}
@@ -204,7 +219,10 @@ preset = "tokyo-night"
 error = "#ff0000"
 `
 
-	cfg, err := config.Load(config.WithExplicitPath("-"), config.WithInput(strings.NewReader(tomlData)))
+	cfg, err := config.Load(
+		config.WithExplicitPath("-"),
+		config.WithInput(strings.NewReader(tomlData)),
+	)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
@@ -229,7 +247,8 @@ func TestLoadThemePresetFromEnvironment(t *testing.T) {
 	}
 
 	nord, _ := config.LookupPreset("nord")
-	if cfg.Theme.Preset != "nord" || cfg.Theme.Primary != nord.Primary || cfg.Theme.Background != nord.Background {
+	if cfg.Theme.Preset != "nord" || cfg.Theme.Primary != nord.Primary ||
+		cfg.Theme.Background != nord.Background {
 		t.Fatalf("theme = %+v, want the nord preset colors", cfg.Theme)
 	}
 
@@ -250,7 +269,10 @@ func TestLoadThemePresetFromEnvironmentRejectsInvalid(t *testing.T) {
 func TestExplicitDraculaPresetMatchesDefaultTheme(t *testing.T) {
 	t.Parallel()
 
-	cfg, err := config.Load(config.WithExplicitPath("-"), config.WithInput(strings.NewReader("[theme]\npreset = \"dracula\"\n")))
+	cfg, err := config.Load(
+		config.WithExplicitPath("-"),
+		config.WithInput(strings.NewReader("[theme]\npreset = \"dracula\"\n")),
+	)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}

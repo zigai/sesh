@@ -21,7 +21,11 @@ import (
 	"github.com/zigai/sesh/internal/session"
 )
 
-func customFieldTestModel(t *testing.T, seshFormat string, definitions config.FieldCommands) *Model {
+func customFieldTestModel(
+	t *testing.T,
+	seshFormat string,
+	definitions config.FieldCommands,
+) *Model {
 	t.Helper()
 
 	cfg := defaultCompactTestConfig()
@@ -39,7 +43,13 @@ func shellFieldCommand(script string) config.FieldCommand {
 }
 
 func liveTestSession(id, name string) session.Session {
-	return session.Session{ID: id, Name: name, Kind: session.KindLive, Origin: session.OriginLocal, WindowCount: 1}
+	return session.Session{
+		ID:          id,
+		Name:        name,
+		Kind:        session.KindLive,
+		Origin:      session.OriginLocal,
+		WindowCount: 1,
+	}
 }
 
 func runCustomFieldCommands(t *testing.T, model *Model, command tea.Cmd) int {
@@ -86,7 +96,9 @@ func TestCustomFieldsRunForDisplayedRowsAndRenderColors(t *testing.T) {
 	model := customFieldTestModel(t, "{session_name} {custom.probe}", config.FieldCommands{
 		"probe": shellFieldCommand(`printf '%s:\033[31m%s\033[0m\n' "$SESH_SESSION" "$SESH_ROW"`),
 	})
-	model.SetInitialSessions([]session.Session{liveTestSession("$1", "alpha"), liveTestSession("$2", "beta")})
+	model.SetInitialSessions(
+		[]session.Session{liveTestSession("$1", "alpha"), liveTestSession("$2", "beta")},
+	)
 
 	if before := ansi.Strip(renderedRows(model)); strings.Contains(before, "alpha:session") {
 		t.Fatalf("value rendered before the command ran: %q", before)
@@ -97,7 +109,10 @@ func TestCustomFieldsRunForDisplayedRowsAndRenderColors(t *testing.T) {
 	}
 
 	rendered := renderedRows(model)
-	if plain := ansi.Strip(rendered); !strings.Contains(plain, "alpha alpha:session") || !strings.Contains(plain, "beta beta:session") {
+	if plain := ansi.Strip(
+		rendered,
+	); !strings.Contains(plain, "alpha alpha:session") ||
+		!strings.Contains(plain, "beta beta:session") {
 		t.Fatalf("rendered rows = %q", plain)
 	}
 
@@ -108,7 +123,9 @@ func TestCustomFieldsRunForDisplayedRowsAndRenderColors(t *testing.T) {
 
 func TestCustomFieldsRerunOnlyChangedRows(t *testing.T) {
 	model := customFieldTestModel(t, "{session_name} {custom.windows}", config.FieldCommands{
-		"windows": shellFieldCommand(`printf '%s' "$(cat | sed 's/.*"windowCount":\([0-9]*\).*/\1/')"`),
+		"windows": shellFieldCommand(
+			`printf '%s' "$(cat | sed 's/.*"windowCount":\([0-9]*\).*/\1/')"`,
+		),
 	})
 	alpha, beta := liveTestSession("$1", "alpha"), liveTestSession("$2", "beta")
 	model.SetInitialSessions([]session.Session{alpha, beta})
@@ -130,14 +147,19 @@ func TestCustomFieldsRerunOnlyChangedRows(t *testing.T) {
 		t.Fatalf("runs after one row changed = %d, want 1", runs)
 	}
 
-	if plain := ansi.Strip(renderedRows(model)); !strings.Contains(plain, "beta 4") || !strings.Contains(plain, "alpha 1") {
+	if plain := ansi.Strip(
+		renderedRows(model),
+	); !strings.Contains(plain, "beta 4") ||
+		!strings.Contains(plain, "alpha 1") {
 		t.Fatalf("rendered rows = %q", plain)
 	}
 }
 
 func TestCustomFieldsDropResultsFromReplacedRuns(t *testing.T) {
 	model := customFieldTestModel(t, "{session_name} {custom.windows}", config.FieldCommands{
-		"windows": shellFieldCommand(`printf 'w%s' "$(cat | sed 's/.*"windowCount":\([0-9]*\).*/\1/')"`),
+		"windows": shellFieldCommand(
+			`printf 'w%s' "$(cat | sed 's/.*"windowCount":\([0-9]*\).*/\1/')"`,
+		),
 	})
 	row := liveTestSession("$1", "alpha")
 	model.SetInitialSessions([]session.Session{row})
@@ -159,20 +181,29 @@ func TestCustomFieldsDropResultsFromReplacedRuns(t *testing.T) {
 
 func TestCustomFieldsDescribeRemoteSavedAndAgentRows(t *testing.T) {
 	model := customFieldTestModel(t, "{session_name} {custom.origin}", config.FieldCommands{
-		"origin": shellFieldCommand(`printf '%s/%s/%s/%s' "$SESH_ROW" "$SESH_SESSION_KIND" "$SESH_ORIGIN" "$SESH_CONNECTION_ID$SESH_AGENT_CWD"`),
+		"origin": shellFieldCommand(
+			`printf '%s/%s/%s/%s' "$SESH_ROW" "$SESH_SESSION_KIND" "$SESH_ORIGIN" "$SESH_CONNECTION_ID$SESH_AGENT_CWD"`,
+		),
 	})
 	model.config.Display.AgentsSessionFormat = "{session_name} {custom.origin}"
 
 	remote := liveTestSession("$5", "edge")
 	remote.Origin = session.OriginSSH
 	remote.RuntimeIdentity.ConnectionID = "work"
-	saved := session.Session{ID: "s1", Name: "archive", Kind: session.KindSaved, Origin: session.OriginLocal, PathRaw: []byte("/srv/archive")}
+	saved := session.Session{
+		ID:      "s1",
+		Name:    "archive",
+		Kind:    session.KindSaved,
+		Origin:  session.OriginLocal,
+		PathRaw: []byte("/srv/archive"),
+	}
 
 	model.SetInitialSessions([]session.Session{remote, saved})
 	runCustomFieldCommands(t, model, model.syncCustomFields())
 
 	plain := ansi.Strip(renderedRows(model))
-	if !strings.Contains(plain, "edge session/live/ssh/work") || !strings.Contains(plain, "archive session/saved/local/") {
+	if !strings.Contains(plain, "edge session/live/ssh/work") ||
+		!strings.Contains(plain, "archive session/saved/local/") {
 		t.Fatalf("rendered rows = %q", plain)
 	}
 
@@ -183,11 +214,18 @@ func TestCustomFieldsDescribeRemoteSavedAndAgentRows(t *testing.T) {
 	agents.displayMode = displayModeAgents
 
 	host := liveTestSession("$9", "host")
-	host.Agents = []session.AgentSession{{Harness: "claude", PaneID: "%4", CWD: "/srv/app", Status: session.AgentStatusIdle}}
+	host.Agents = []session.AgentSession{
+		{Harness: "claude", PaneID: "%4", CWD: "/srv/app", Status: session.AgentStatusIdle},
+	}
 	agents.SetInitialSessions([]session.Session{host})
 	runCustomFieldCommands(t, agents, agents.syncCustomFields())
 
-	if got := ansi.Strip(agents.FormatAgentRow(host, host.Agents[0])); !strings.Contains(got, "agent/live/local//srv/app") {
+	if got := ansi.Strip(
+		agents.FormatAgentRow(host, host.Agents[0]),
+	); !strings.Contains(
+		got,
+		"agent/live/local//srv/app",
+	) {
 		t.Fatalf("agent row = %q", got)
 	}
 }
@@ -195,7 +233,9 @@ func TestCustomFieldsDescribeRemoteSavedAndAgentRows(t *testing.T) {
 func TestCustomFieldFailureKeepsPreviousValue(t *testing.T) {
 	failFlag := filepath.Join(t.TempDir(), "fail")
 	model := customFieldTestModel(t, "{session_name} {custom.flaky}", config.FieldCommands{
-		"flaky": shellFieldCommand(`if [ -e ` + failFlag + ` ]; then echo broken >&2; exit 2; fi; printf 'v%s' "$(cat | sed 's/.*"windowCount":\([0-9]*\).*/\1/')"`),
+		"flaky": shellFieldCommand(
+			`if [ -e ` + failFlag + ` ]; then echo broken >&2; exit 2; fi; printf 'v%s' "$(cat | sed 's/.*"windowCount":\([0-9]*\).*/\1/')"`,
+		),
 	})
 	row := liveTestSession("$1", "alpha")
 	model.SetInitialSessions([]session.Session{row})
@@ -234,7 +274,11 @@ func TestCustomFieldCacheShowsPreviousValueBeforeRunAndIsRewritten(t *testing.T)
 	}
 
 	rowKey := customFieldSessionRowKey(row)
-	if err := fields.MergeCache(t.Context(), fields.CachePath("note"), map[string]fields.CacheEntry{rowKey: {ChangeKey: changeKey, Text: "cached"}}); err != nil {
+	if err := fields.MergeCache(
+		t.Context(),
+		fields.CachePath("note"),
+		map[string]fields.CacheEntry{rowKey: {ChangeKey: changeKey, Text: "cached"}},
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -263,7 +307,11 @@ func TestCustomFieldRefreshTickRerunsRows(t *testing.T) {
 	command := shellFieldCommand(`echo run >> ` + counter + `; wc -l < ` + counter + ` | tr -d ' '`)
 	command.Refresh = "1ms"
 
-	model := customFieldTestModel(t, "{session_name} {custom.count}", config.FieldCommands{"count": command})
+	model := customFieldTestModel(
+		t,
+		"{session_name} {custom.count}",
+		config.FieldCommands{"count": command},
+	)
 	model.SetInitialSessions([]session.Session{liveTestSession("$1", "alpha")})
 	runCustomFieldCommands(t, model, model.syncCustomFields())
 
@@ -301,7 +349,9 @@ func TestCustomFieldCompletedValueSurvivesCloseWithPendingRow(t *testing.T) {
 	customFieldFIFO(t, blockedPath)
 
 	model := customFieldTestModel(t, "{session_name} {custom.partial}", config.FieldCommands{
-		"partial": shellFieldCommand("if [ \"$SESH_SESSION\" = second ]; then printf 'ready\\n' > " + readyPath + "; read blocked < " + blockedPath + "; else printf completed; fi"),
+		"partial": shellFieldCommand(
+			"if [ \"$SESH_SESSION\" = second ]; then printf 'ready\\n' > " + readyPath + "; read blocked < " + blockedPath + "; else printf completed; fi",
+		),
 	})
 	first, second := liveTestSession("$1", "first"), liveTestSession("$2", "second")
 	model.SetInitialSessions([]session.Session{first, second})
@@ -395,7 +445,9 @@ func TestCustomFieldLatePublicationCannotReplaceNewerValue(t *testing.T) {
 }
 
 func TestCustomFieldPopupsPreserveEachOthersCompletedEntries(t *testing.T) {
-	definitions := config.FieldCommands{"shared": shellFieldCommand("printf '%s' \"$SESH_SESSION\"")}
+	definitions := config.FieldCommands{
+		"shared": shellFieldCommand("printf '%s' \"$SESH_SESSION\""),
+	}
 	first := customFieldTestModel(t, "{session_name} {custom.shared}", definitions)
 	second := customFieldTestModel(t, "{session_name} {custom.shared}", definitions)
 	firstRow, secondRow := liveTestSession("$1", "first"), liveTestSession("$2", "second")
@@ -407,14 +459,23 @@ func TestCustomFieldPopupsPreserveEachOthersCompletedEntries(t *testing.T) {
 	second.Close()
 
 	entries, err := fields.ReadCache(fields.CachePath("shared"))
-	if err != nil || entries[customFieldSessionRowKey(firstRow)].Text != "first" || entries[customFieldSessionRowKey(secondRow)].Text != "second" {
+	if err != nil || entries[customFieldSessionRowKey(firstRow)].Text != "first" ||
+		entries[customFieldSessionRowKey(secondRow)].Text != "second" {
 		t.Fatalf("shared cache = %#v, %v", entries, err)
 	}
 }
 
 func TestCustomFieldOlderPopupResultCannotReplaceNewerEntry(t *testing.T) {
-	older := customFieldTestModel(t, "{session_name} {custom.current}", config.FieldCommands{"current": shellFieldCommand("printf older")})
-	newer := customFieldTestModel(t, "{session_name} {custom.current}", config.FieldCommands{"current": shellFieldCommand("printf newer")})
+	older := customFieldTestModel(
+		t,
+		"{session_name} {custom.current}",
+		config.FieldCommands{"current": shellFieldCommand("printf older")},
+	)
+	newer := customFieldTestModel(
+		t,
+		"{session_name} {custom.current}",
+		config.FieldCommands{"current": shellFieldCommand("printf newer")},
+	)
 	row := liveTestSession("$1", "alpha")
 	older.SetInitialSessions([]session.Session{row})
 	newer.SetInitialSessions([]session.Session{row})
@@ -438,10 +499,30 @@ func TestCustomFieldSavedRowsRemainDistinctAcrossOriginsAndRepositories(t *testi
 		"identity": shellFieldCommand("printf '%s:%s' \"$SESH_ORIGIN\" \"$SESH_CONNECTION_ID\""),
 	})
 	rows := []session.Session{
-		{Name: "archive", Kind: session.KindSaved, Origin: session.OriginLocal, RepositorySource: "one"},
-		{Name: "archive", Kind: session.KindSaved, Origin: session.OriginLocal, RepositorySource: "two"},
-		{Name: "archive", Kind: session.KindSaved, Origin: session.OriginSSH, RuntimeIdentity: session.RuntimeIdentity{ConnectionID: "east"}},
-		{Name: "archive", Kind: session.KindSaved, Origin: session.OriginSSH, RuntimeIdentity: session.RuntimeIdentity{ConnectionID: "west"}},
+		{
+			Name:             "archive",
+			Kind:             session.KindSaved,
+			Origin:           session.OriginLocal,
+			RepositorySource: "one",
+		},
+		{
+			Name:             "archive",
+			Kind:             session.KindSaved,
+			Origin:           session.OriginLocal,
+			RepositorySource: "two",
+		},
+		{
+			Name:            "archive",
+			Kind:            session.KindSaved,
+			Origin:          session.OriginSSH,
+			RuntimeIdentity: session.RuntimeIdentity{ConnectionID: "east"},
+		},
+		{
+			Name:            "archive",
+			Kind:            session.KindSaved,
+			Origin:          session.OriginSSH,
+			RuntimeIdentity: session.RuntimeIdentity{ConnectionID: "west"},
+		},
 	}
 	model.SetInitialSessions(rows)
 
@@ -451,7 +532,12 @@ func TestCustomFieldSavedRowsRemainDistinctAcrossOriginsAndRepositories(t *testi
 
 	want := []string{"local:", "local:", "ssh:east", "ssh:west"}
 	for index, row := range rows {
-		if got := ansi.Strip(model.FormatSessionRow(row)); !strings.Contains(got, "archive "+want[index]) {
+		if got := ansi.Strip(
+			model.FormatSessionRow(row),
+		); !strings.Contains(
+			got,
+			"archive "+want[index],
+		) {
 			t.Errorf("saved row %d = %q", index, got)
 		}
 	}
@@ -461,13 +547,22 @@ func TestCustomFieldSavedRowsRemainDistinctAcrossOriginsAndRepositories(t *testi
 		t.Fatalf("saved cache = %#v, %v, want 4 distinct entries", entries, err)
 	}
 
-	reopened := customFieldTestModel(t, "{session_name} {custom.identity}", model.config.Display.Fields)
+	reopened := customFieldTestModel(
+		t,
+		"{session_name} {custom.identity}",
+		model.config.Display.Fields,
+	)
 	reopened.seedCustomFieldCaches(readCustomFieldCaches(reopened.customFieldNames()))
 	reopened.SetInitialSessions(rows)
 	reopened.syncCustomFields()
 
 	for index, row := range rows {
-		if got := ansi.Strip(reopened.FormatSessionRow(row)); !strings.Contains(got, "archive "+want[index]) {
+		if got := ansi.Strip(
+			reopened.FormatSessionRow(row),
+		); !strings.Contains(
+			got,
+			"archive "+want[index],
+		) {
 			t.Errorf("cached saved row %d = %q", index, got)
 		}
 	}
@@ -480,12 +575,19 @@ func TestCustomFieldStylesEndAtSessionAndAgentBoundaries(t *testing.T) {
 				cfg := defaultCompactTestConfig()
 				cfg.Display.SeshFormat = "{session_name} {custom.color} {window_count}"
 				cfg.Display.AgentsAgentFormat = "{harness} {custom.color} {agent_pid}"
-				cfg.Display.Fields = config.FieldCommands{"color": shellFieldCommand("printf '\\033[31;1mX'")}
+				cfg.Display.Fields = config.FieldCommands{
+					"color": shellFieldCommand("printf '\\033[31;1mX'"),
+				}
 				model := newTestModelWithConfig(t, cfg)
 				model.displayMode = displayModeSesh
 				row := liveTestSession("$1", "alpha")
 				row.WindowCount = 7
-				agent := session.AgentSession{Harness: "codex", PaneID: "%1", PID: 7, Status: session.AgentStatusIdle}
+				agent := session.AgentSession{
+					Harness: "codex",
+					PaneID:  "%1",
+					PID:     7,
+					Status:  session.AgentStatusIdle,
+				}
 
 				if agentRow {
 					model.displayMode = displayModeAgents
@@ -500,7 +602,17 @@ func TestCustomFieldStylesEndAtSessionAndAgentBoundaries(t *testing.T) {
 					values sessionFormatValues
 					output strings.Builder
 				)
-				model.writeFormattedSessionRow(&output, table, model.sessionRowStyles(table), row, agent, agentRow, false, selected, &values)
+				model.writeFormattedSessionRow(
+					&output,
+					table,
+					model.sessionRowStyles(table),
+					row,
+					agent,
+					agentRow,
+					false,
+					selected,
+					&values,
+				)
 
 				beforeContent := "a"
 				if agentRow {
@@ -516,7 +628,12 @@ func TestCustomFieldStylesEndAtSessionAndAgentBoundaries(t *testing.T) {
 				}
 
 				if !after.Equal(&before) {
-					t.Fatalf("following field style = %+v, surrounding row style = %+v; row %q", after, before, output.String())
+					t.Fatalf(
+						"following field style = %+v, surrounding row style = %+v; row %q",
+						after,
+						before,
+						output.String(),
+					)
 				}
 			})
 		}
@@ -558,7 +675,12 @@ func TestCustomFieldMissingCommandFailsModel(t *testing.T) {
 	cfg := defaultCompactTestConfig()
 	cfg.Display.SeshFormat = "{session_name} {custom.weather}"
 	cfg.Display.Fields = config.FieldCommands{
-		"weather": {ShellCommand: "", Command: filepath.Join(t.TempDir(), "weather"), Args: nil, Refresh: ""},
+		"weather": {
+			ShellCommand: "",
+			Command:      filepath.Join(t.TempDir(), "weather"),
+			Args:         nil,
+			Refresh:      "",
+		},
 	}
 
 	_, err := newModel(cfg, testState())

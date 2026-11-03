@@ -38,7 +38,12 @@ func TestReconcileCatalogHidesNeverConnectedFailureDespiteRetries(t *testing.T) 
 		Snapshot:    Snapshot{Health: UnavailableHealth()},
 	}
 
-	changed, hidden := ReconcileCatalog(&catalog, failedAt.Add(6*time.Minute), time.Minute, 5*time.Minute)
+	changed, hidden := ReconcileCatalog(
+		&catalog,
+		failedAt.Add(6*time.Minute),
+		time.Minute,
+		5*time.Minute,
+	)
 	if !changed || len(hidden) != 1 {
 		t.Fatalf("ReconcileCatalog() = (%t, %#v), want the failure hidden", changed, hidden)
 	}
@@ -54,11 +59,22 @@ func TestStoreAcceptedFramePreservesHiddenErrorAfterRejectedFrame(t *testing.T) 
 	failedAt := time.Unix(100, 0).UTC()
 	state := &monitorState{
 		hidden: map[string]ConnectionState{
-			connectionID: {ID: connectionID, LastError: ConnectionErrorStale, LastErrorAt: failedAt},
+			connectionID: {
+				ID:          connectionID,
+				LastError:   ConnectionErrorStale,
+				LastErrorAt: failedAt,
+			},
 		},
 	}
 
-	state.storeAcceptedFrame(t.Context(), connectionID, ConnectionState{ID: connectionID}, true, FrameHealth, ErrInvalidFrame)
+	state.storeAcceptedFrame(
+		t.Context(),
+		connectionID,
+		ConnectionState{ID: connectionID},
+		true,
+		FrameHealth,
+		ErrInvalidFrame,
+	)
 
 	got := state.hidden[connectionID]
 	if got.LastError != ConnectionErrorStale || !got.LastErrorAt.Equal(failedAt) {
@@ -84,11 +100,25 @@ func TestAcceptFrameRejectsSecondHelloForStream(t *testing.T) {
 		t.Fatalf("acceptFrame(second hello) error = %v, want %v", err, ErrInvalidFrame)
 	}
 
-	if err := acceptFrame(&state, helloFrame("other-peer", "other-stream", 3), observedAt); !errors.Is(err, ErrPeerMismatch) {
+	if err := acceptFrame(
+		&state,
+		helloFrame("other-peer", "other-stream", 3),
+		observedAt,
+	); !errors.Is(
+		err,
+		ErrPeerMismatch,
+	) {
 		t.Fatalf("acceptFrame(foreign peer) error = %v, want %v", err, ErrPeerMismatch)
 	}
 
-	if err := acceptFrame(&state, snapshotFrame("other-peer", "stream", 2, nil), observedAt); !errors.Is(err, ErrInvalidFrame) {
+	if err := acceptFrame(
+		&state,
+		snapshotFrame("other-peer", "stream", 2, nil),
+		observedAt,
+	); !errors.Is(
+		err,
+		ErrInvalidFrame,
+	) {
 		t.Fatalf("acceptFrame(foreign incarnation) error = %v, want %v", err, ErrInvalidFrame)
 	}
 }
@@ -108,7 +138,11 @@ func TestMonitorStateTransitionLogging(t *testing.T) {
 
 	const connectionID = "work-host"
 
-	connected := ConnectionState{ID: connectionID, Connected: true, Snapshot: Snapshot{Health: UnavailableHealth()}}
+	connected := ConnectionState{
+		ID:        connectionID,
+		Connected: true,
+		Snapshot:  Snapshot{Health: UnavailableHealth()},
+	}
 	state.catalog.Connections[connectionID] = connected
 
 	state.handleConnectionError(ctx, connectionID, connected, false, errTestConnectionFailed)
@@ -126,11 +160,24 @@ func TestMonitorStateTransitionLogging(t *testing.T) {
 
 	logs.Reset()
 
-	state.storeAcceptedFrame(ctx, connectionID, ConnectionState{ID: connectionID, Connected: true, Snapshot: Snapshot{Health: healthyHealth()}}, false, FrameSnapshot, nil)
+	state.storeAcceptedFrame(
+		ctx,
+		connectionID,
+		ConnectionState{
+			ID:        connectionID,
+			Connected: true,
+			Snapshot:  Snapshot{Health: healthyHealth()},
+		},
+		false,
+		FrameSnapshot,
+		nil,
+	)
 
 	records = decodeLogRecords(t, logs.String())
-	if len(records) != 1 || records[0]["status"] != "recovered" || records[0]["reason"] != "connection_available" ||
-		records[0]["level"] != "info" || records[0]["connection_id"] != connectionID {
+	if len(records) != 1 || records[0]["status"] != "recovered" ||
+		records[0]["reason"] != "connection_available" ||
+		records[0]["level"] != "info" ||
+		records[0]["connection_id"] != connectionID {
 		t.Fatalf("recovered records = %#v, want one recovery boundary", records)
 	}
 }
@@ -143,7 +190,10 @@ func TestMonitorReconcileLogsStaleConnections(t *testing.T) {
 	now := time.Unix(2000, 0).UTC()
 	catalog := EmptyCatalog()
 	catalog.Connections["private-host"] = ConnectionState{
-		ID: "private-host", Connected: true, LastSeen: now.Add(-time.Hour), Snapshot: Snapshot{Health: UnavailableHealth()},
+		ID:        "private-host",
+		Connected: true,
+		LastSeen:  now.Add(-time.Hour),
+		Snapshot:  Snapshot{Health: UnavailableHealth()},
 	}
 
 	state := &monitorState{
@@ -229,8 +279,13 @@ func TestStreamSupervisorRestartsOnlyAffectedConnection(t *testing.T) {
 	remote.StaleAfter = "1m"
 
 	staleAfterChanged := supervisor.apply(ctx, remote, remote.Connections)
-	if staleAfterChanged["one"] == hostChanged["one"] || staleAfterChanged["two"] == hostChanged["two"] {
-		t.Fatalf("stale_after reload retained worker generations: before=%#v after=%#v", hostChanged, staleAfterChanged)
+	if staleAfterChanged["one"] == hostChanged["one"] ||
+		staleAfterChanged["two"] == hostChanged["two"] {
+		t.Fatalf(
+			"stale_after reload retained worker generations: before=%#v after=%#v",
+			hostChanged,
+			staleAfterChanged,
+		)
 	}
 }
 
@@ -248,12 +303,19 @@ func TestStreamSupervisorBoundsLimiterForUnvalidatedConfiguration(t *testing.T) 
 	supervisor.apply(ctx, remoteConfig, nil)
 
 	if supervisor.limiterSize != 1 || cap(supervisor.limiter) != 1 {
-		t.Fatalf("limiter = size %d capacity %d, want one", supervisor.limiterSize, cap(supervisor.limiter))
+		t.Fatalf(
+			"limiter = size %d capacity %d, want one",
+			supervisor.limiterSize,
+			cap(supervisor.limiter),
+		)
 	}
 }
 
 func TestMonitorDropsUpdatesFromReplacedWorkerGeneration(t *testing.T) {
-	original := newConnectionState(config.RemoteConnectionConfig{ID: testConnectionID, Host: "work.example"}, testConfigDigest)
+	original := newConnectionState(
+		config.RemoteConnectionConfig{ID: testConnectionID, Host: "work.example"},
+		testConfigDigest,
+	)
 	original.PeerID = "peer-new"
 
 	catalog := EmptyCatalog()
@@ -306,7 +368,9 @@ func TestMonitorReloadResetsHiddenStateAfterTransportChange(t *testing.T) {
 	defer supervisor.stop()
 
 	remote := testRemoteConfig()
-	remote.Connections = []config.RemoteConnectionConfig{{ID: testConnectionID, Host: "new.example"}}
+	remote.Connections = []config.RemoteConnectionConfig{
+		{ID: testConnectionID, Host: "new.example"},
+	}
 
 	state.applyConfig(ctx, remote, supervisor)
 
@@ -341,8 +405,13 @@ func TestMonitorReloadResetsHiddenStateAfterTransportChange(t *testing.T) {
 	state.handleUpdate(t.Context(), workerUpdate{
 		connectionID: testConnectionID,
 		generation:   generation,
-		frame:        snapshotFrame("new-peer", "new-stream", 2, []session.Session{{ID: "$1", Name: testSessionName, Kind: session.KindLive}}),
-		result:       snapshotResult,
+		frame: snapshotFrame(
+			"new-peer",
+			"new-stream",
+			2,
+			[]session.Session{{ID: "$1", Name: testSessionName, Kind: session.KindLive}},
+		),
+		result: snapshotResult,
 	})
 
 	if err := <-snapshotResult; err != nil {
@@ -350,7 +419,8 @@ func TestMonitorReloadResetsHiddenStateAfterTransportChange(t *testing.T) {
 	}
 
 	replacement := state.catalog.Connections[testConnectionID]
-	if replacement.ConfigDigest != wantDigest || replacement.PeerID != "new-peer" || !replacement.Connected {
+	if replacement.ConfigDigest != wantDigest || replacement.PeerID != "new-peer" ||
+		!replacement.Connected {
 		t.Fatalf("replacement state = %#v, want an attachable replacement generation", replacement)
 	}
 }
@@ -491,10 +561,22 @@ func TestMonitorPublishesInventoryAndAppliesStaleLifecycle(t *testing.T) {
 	remote.StaleAfter = "1h"
 	remote.HideAfter = "2h"
 	remote.TmuxPollInterval = "20ms"
-	remote.Connections = []config.RemoteConnectionConfig{{ID: testConnectionID, Label: "Work", Host: "work.example"}}
+	remote.Connections = []config.RemoteConnectionConfig{
+		{ID: testConnectionID, Label: "Work", Host: "work.example"},
+	}
 
 	hello := encodeFrame(t, helloFrame(testPeerID, "stream", 1))
-	snapshotJSON := encodeFrame(t, snapshotFrame(testPeerID, "stream", 2, []session.Session{{ID: "$1", Name: testSessionName, Kind: session.KindLive, WindowCount: 2}}))
+	snapshotJSON := encodeFrame(
+		t,
+		snapshotFrame(
+			testPeerID,
+			"stream",
+			2,
+			[]session.Session{
+				{ID: "$1", Name: testSessionName, Kind: session.KindLive, WindowCount: 2},
+			},
+		),
+	)
 	script := "cat > /dev/null\nprintf '%s\\n' '" + hello + "' '" + snapshotJSON + "'\nexec tail -f /dev/null\n"
 	command := scriptSSH(t, script)
 
@@ -536,7 +618,8 @@ func TestMonitorPublishesInventoryAndAppliesStaleLifecycle(t *testing.T) {
 		t.Fatalf("cached connection = %#v, want the observed peer identity", state)
 	}
 
-	if state.Snapshot.Sessions[0].Name != testSessionName || state.Snapshot.Sessions[0].WindowCount != 2 {
+	if state.Snapshot.Sessions[0].Name != testSessionName ||
+		state.Snapshot.Sessions[0].WindowCount != 2 {
 		t.Fatalf("cached sessions = %#v, want the observed inventory", state.Snapshot.Sessions)
 	}
 
@@ -545,7 +628,8 @@ func TestMonitorPublishesInventoryAndAppliesStaleLifecycle(t *testing.T) {
 	waitForCatalog(t, catalogPath, 20*time.Second, done, func(catalog Catalog) bool {
 		state, ok := catalog.Connections[testConnectionID]
 
-		return ok && !state.Connected && state.LastError == ConnectionErrorStale && !state.LastErrorAt.IsZero()
+		return ok && !state.Connected && state.LastError == ConnectionErrorStale &&
+			!state.LastErrorAt.IsZero()
 	})
 
 	clock.Store(start.Add(2*time.Hour + time.Second).UnixNano())
@@ -563,7 +647,13 @@ func TestMonitorPublishesInventoryAndAppliesStaleLifecycle(t *testing.T) {
 	}
 }
 
-func waitForCatalog(t *testing.T, path string, timeout time.Duration, done <-chan error, accept func(Catalog) bool) Catalog {
+func waitForCatalog(
+	t *testing.T,
+	path string,
+	timeout time.Duration,
+	done <-chan error,
+	accept func(Catalog) bool,
+) Catalog {
 	t.Helper()
 
 	deadline := time.Now().Add(timeout)
@@ -574,7 +664,10 @@ func waitForCatalog(t *testing.T, path string, timeout time.Duration, done <-cha
 		if done != nil {
 			select {
 			case monitorErr := <-done:
-				t.Fatalf("remote monitor exited before the catalog reached the expected state: %v", monitorErr)
+				t.Fatalf(
+					"remote monitor exited before the catalog reached the expected state: %v",
+					monitorErr,
+				)
 			default:
 			}
 		}
@@ -642,9 +735,14 @@ func TestWatchRemoteConfigReloadsAtomicReplacement(t *testing.T) {
 
 	remote := testRemoteConfig()
 
-	reloads, err := WatchRemoteConfig(ctx, path, 20*time.Millisecond, func(_ []byte) (config.RemoteConfig, error) {
-		return remote, nil
-	})
+	reloads, err := WatchRemoteConfig(
+		ctx,
+		path,
+		20*time.Millisecond,
+		func(_ []byte) (config.RemoteConfig, error) {
+			return remote, nil
+		},
+	)
 	if err != nil {
 		t.Fatalf("WatchRemoteConfig() error = %v", err)
 	}
@@ -674,7 +772,15 @@ func TestWatchRemoteConfigReloadsAtomicReplacement(t *testing.T) {
 }
 
 func TestWatchRemoteConfigRequiresLoader(t *testing.T) {
-	if _, err := WatchRemoteConfig(t.Context(), "", time.Second, nil); !errors.Is(err, errNilConfigLoader) {
+	if _, err := WatchRemoteConfig(
+		t.Context(),
+		"",
+		time.Second,
+		nil,
+	); !errors.Is(
+		err,
+		errNilConfigLoader,
+	) {
 		t.Fatalf("WatchRemoteConfig() error = %v, want %v", err, errNilConfigLoader)
 	}
 }
@@ -685,12 +791,17 @@ func TestWatchRemoteConfigWaitsForInitiallyMissingDefault(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
-	reloads, err := WatchRemoteConfig(ctx, path, configWatchMinInterval, func(content []byte) (config.RemoteConfig, error) {
-		remote := testRemoteConfig()
-		remote.SSHPath = string(content)
+	reloads, err := WatchRemoteConfig(
+		ctx,
+		path,
+		configWatchMinInterval,
+		func(content []byte) (config.RemoteConfig, error) {
+			remote := testRemoteConfig()
+			remote.SSHPath = string(content)
 
-		return remote, nil
-	})
+			return remote, nil
+		},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -719,18 +830,23 @@ func TestWatchRemoteConfigParsesTheObservedBytes(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
-	reloads, err := WatchRemoteConfig(ctx, path, configWatchMinInterval, func(content []byte) (config.RemoteConfig, error) {
-		if string(content) == "second" {
-			if writeErr := os.WriteFile(path, []byte("third"), 0o600); writeErr != nil {
-				return config.RemoteConfig{}, fmt.Errorf("replacing test config: %w", writeErr)
+	reloads, err := WatchRemoteConfig(
+		ctx,
+		path,
+		configWatchMinInterval,
+		func(content []byte) (config.RemoteConfig, error) {
+			if string(content) == "second" {
+				if writeErr := os.WriteFile(path, []byte("third"), 0o600); writeErr != nil {
+					return config.RemoteConfig{}, fmt.Errorf("replacing test config: %w", writeErr)
+				}
 			}
-		}
 
-		remote := testRemoteConfig()
-		remote.SSHPath = string(content)
+			remote := testRemoteConfig()
+			remote.SSHPath = string(content)
 
-		return remote, nil
-	})
+			return remote, nil
+		},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -756,12 +872,17 @@ func TestWatchRemoteConfigDeletionAndRecreationAreDistinctGenerations(t *testing
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
-	reloads, err := WatchRemoteConfig(ctx, path, configWatchMinInterval, func(content []byte) (config.RemoteConfig, error) {
-		remote := testRemoteConfig()
-		remote.SSHPath = string(content)
+	reloads, err := WatchRemoteConfig(
+		ctx,
+		path,
+		configWatchMinInterval,
+		func(content []byte) (config.RemoteConfig, error) {
+			remote := testRemoteConfig()
+			remote.SSHPath = string(content)
 
-		return remote, nil
-	})
+			return remote, nil
+		},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -811,9 +932,14 @@ func TestWatchRemoteConfigRejectsFIFOWithoutBlockingShutdownOrRecovery(t *testin
 
 	ctx, cancel := context.WithCancel(t.Context())
 
-	reloads, err := WatchRemoteConfig(ctx, path, configWatchMinInterval, func(_ []byte) (config.RemoteConfig, error) {
-		return testRemoteConfig(), nil
-	})
+	reloads, err := WatchRemoteConfig(
+		ctx,
+		path,
+		configWatchMinInterval,
+		func(_ []byte) (config.RemoteConfig, error) {
+			return testRemoteConfig(), nil
+		},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -851,7 +977,11 @@ func TestWatchRemoteConfigRejectsFIFOWithoutBlockingShutdownOrRecovery(t *testin
 	}
 }
 
-func receiveConfigReload(t *testing.T, reloads <-chan ConfigReload, description string) ConfigReload {
+func receiveConfigReload(
+	t *testing.T,
+	reloads <-chan ConfigReload,
+	description string,
+) ConfigReload {
 	t.Helper()
 
 	select {

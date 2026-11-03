@@ -13,7 +13,12 @@ import (
 	"github.com/zigai/sesh/internal/agents"
 )
 
-func attachTestClient(t *testing.T, ctx context.Context, server *gotmux.Server, session gotmux.Session) string {
+func attachTestClient(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	session gotmux.Session,
+) string {
 	t.Helper()
 
 	master, slave, err := openTestPTY(t)
@@ -79,7 +84,12 @@ func attachTestClient(t *testing.T, ctx context.Context, server *gotmux.Server, 
 	return ""
 }
 
-func clientSession(t *testing.T, ctx context.Context, server *gotmux.Server, clientName string) string {
+func clientSession(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	clientName string,
+) string {
 	t.Helper()
 
 	clients, err := server.Clients(ctx)
@@ -105,7 +115,12 @@ func clientSession(t *testing.T, ctx context.Context, server *gotmux.Server, cli
 	return ""
 }
 
-func activeWindowID(t *testing.T, ctx context.Context, server *gotmux.Server, sessionID string) string {
+func activeWindowID(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	sessionID string,
+) string {
 	t.Helper()
 
 	session, err := server.Session(ctx, gotmux.SessionID(sessionID))
@@ -150,13 +165,24 @@ func paneActive(t *testing.T, ctx context.Context, server *gotmux.Server, paneID
 	return false
 }
 
-func windowActive(t *testing.T, ctx context.Context, server *gotmux.Server, sessionID string, windowID string) bool {
+func windowActive(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	sessionID string,
+	windowID string,
+) bool {
 	t.Helper()
 
 	return activeWindowID(t, ctx, server, sessionID) == windowID
 }
 
-func livePaneFor(t *testing.T, ctx context.Context, server *gotmux.Server, paneID string) agents.PaneLocation {
+func livePaneFor(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	paneID string,
+) agents.PaneLocation {
 	t.Helper()
 
 	panes, err := agents.ObservePanes(ctx, server)

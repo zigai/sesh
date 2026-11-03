@@ -15,9 +15,12 @@ import (
 
 func TestRuntimeStatusListenerLogsUnexpectedFailureAndKeepsNormalShutdownSilent(t *testing.T) {
 	for _, fail := range []bool{false, true} {
-		t.Run(map[bool]string{false: "normal_shutdown", true: "listener_failure"}[fail], func(t *testing.T) {
-			testRuntimeStatusListenerLogging(t, fail)
-		})
+		t.Run(
+			map[bool]string{false: "normal_shutdown", true: "listener_failure"}[fail],
+			func(t *testing.T) {
+				testRuntimeStatusListenerLogging(t, fail)
+			},
+		)
 	}
 }
 
@@ -29,7 +32,10 @@ func testRuntimeStatusListenerLogging(t *testing.T, fail bool) {
 	ctx := zerolog.New(&logs).WithContext(t.Context())
 	dir := shortRuntimeDir(t)
 
-	reporter, err := StartRuntimeReporter(ctx, validRuntimeConfig(dir, filepath.Join(dir, "PRIVATE_ENDPOINT"), nil))
+	reporter, err := StartRuntimeReporter(
+		ctx,
+		validRuntimeConfig(dir, filepath.Join(dir, "PRIVATE_ENDPOINT"), nil),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,8 +74,13 @@ func testRuntimeStatusListenerLogging(t *testing.T, fail bool) {
 	}
 
 	want := map[string]any{
-		"level": "error", "component": "daemon", "operation": "serve_runtime_status", "status": "failed",
-		"reason": "listener_failed", "message": "runtime status listener stopped unexpectedly", "error": record["error"],
+		"level":     "error",
+		"component": "daemon",
+		"operation": "serve_runtime_status",
+		"status":    "failed",
+		"reason":    "listener_failed",
+		"message":   "runtime status listener stopped unexpectedly",
+		"error":     record["error"],
 	}
 	if record["error"] == nil {
 		t.Fatalf("listener failure lacks its cause: %#v", record)

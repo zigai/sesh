@@ -128,7 +128,11 @@ func newSnapshotListCommand() *cobra.Command {
 	return cmd
 }
 
-func loadListManifest(ctx context.Context, repo *store.Repository, genID string) (model.Manifest, string, error) {
+func loadListManifest(
+	ctx context.Context,
+	repo *store.Repository,
+	genID string,
+) (model.Manifest, string, error) {
 	resolved, err := practicalGeneration(ctx, repo, genID)
 	if err != nil {
 		return model.Manifest{}, "", err
@@ -142,7 +146,11 @@ func loadListManifest(ctx context.Context, repo *store.Repository, genID string)
 	return m, resolved, nil
 }
 
-func practicalGeneration(ctx context.Context, repo *store.Repository, requested string) (string, error) {
+func practicalGeneration(
+	ctx context.Context,
+	repo *store.Repository,
+	requested string,
+) (string, error) {
 	if requested != "" {
 		return requested, nil
 	}
@@ -155,7 +163,12 @@ func practicalGeneration(ctx context.Context, repo *store.Repository, requested 
 	return generation.ID, nil
 }
 
-func renderListJSON(cmd *cobra.Command, manifest model.Manifest, genID string, windowCount map[string]int) error {
+func renderListJSON(
+	cmd *cobra.Command,
+	manifest model.Manifest,
+	genID string,
+	windowCount map[string]int,
+) error {
 	items := make([]sessionJSON, 0, len(manifest.Sessions))
 	for _, s := range manifest.Sessions {
 		items = append(items, sessionJSON{
@@ -172,7 +185,12 @@ func renderListJSON(cmd *cobra.Command, manifest model.Manifest, genID string, w
 	})
 }
 
-func renderListTable(cmd *cobra.Command, manifest model.Manifest, windowCount map[string]int, full bool) error {
+func renderListTable(
+	cmd *cobra.Command,
+	manifest model.Manifest,
+	windowCount map[string]int,
+	full bool,
+) error {
 	if len(manifest.Sessions) == 0 {
 		return clibase.WriteLine(cmd, "No saved sessions found.")
 	}
@@ -191,7 +209,12 @@ func renderListTable(cmd *cobra.Command, manifest model.Manifest, windowCount ma
 		{Heading: "Name", Fixed: false, MinWidth: colWidthSession, Wrap: clibase.WrapSession},
 		{Heading: "ID", Fixed: false, MinWidth: colWidthID, Wrap: nil},
 		{Heading: "Windows", Fixed: false, MinWidth: colWidthID, Wrap: nil},
-		{Heading: "Directory", Fixed: false, MinWidth: colWidthDirectory, Wrap: clibase.WrapIdentifier},
+		{
+			Heading:  "Directory",
+			Fixed:    false,
+			MinWidth: colWidthDirectory,
+			Wrap:     clibase.WrapIdentifier,
+		},
 	}
 
 	return clibase.WriteResponsiveTable(cmd, columns, rows, full)
@@ -371,7 +394,11 @@ func newSnapshotVerifyCommand() *cobra.Command {
 	return cmd
 }
 
-func loadVerifyManifest(ctx context.Context, repo *store.Repository, genID string) (string, model.Manifest, error) {
+func loadVerifyManifest(
+	ctx context.Context,
+	repo *store.Repository,
+	genID string,
+) (string, model.Manifest, error) {
 	resolved, err := practicalGeneration(ctx, repo, genID)
 	if err != nil {
 		return "", model.Manifest{}, err
@@ -379,7 +406,9 @@ func loadVerifyManifest(ctx context.Context, repo *store.Repository, genID strin
 
 	m, err := repo.Read(ctx, resolved)
 	if err != nil {
-		return resolved, model.Manifest{}, oops.In("cli").With("operation", "read_generation").Wrap(err)
+		return resolved, model.Manifest{}, oops.In("cli").
+			With("operation", "read_generation").
+			Wrap(err)
 	}
 
 	return resolved, m, nil
@@ -418,16 +447,27 @@ func renderVerifyTable(cmd *cobra.Command, targetGen string, manifest model.Mani
 	var out strings.Builder
 
 	fmt.Fprintf(&out, "Generation:               %s\n", targetGen)
-	fmt.Fprintf(&out, "Byte Integrity:           valid (manifest and %d artifacts verified)\n", len(manifest.Artifacts))
+	fmt.Fprintf(
+		&out,
+		"Byte Integrity:           valid (manifest and %d artifacts verified)\n",
+		len(manifest.Artifacts),
+	)
 
 	if manifest.Complete() {
 		fmt.Fprintf(&out, "Source Evidence Complete: yes\n")
 	} else {
-		fmt.Fprintf(&out, "Source Evidence Complete: no (observational save; consistency: %s)\n", manifest.Source.Consistency)
+		fmt.Fprintf(
+			&out,
+			"Source Evidence Complete: no (observational save; consistency: %s)\n",
+			manifest.Source.Consistency,
+		)
 	}
 
 	if manifest.PracticalRecoveryReady() {
-		fmt.Fprintf(&out, "Restore Ready:            yes (best-effort reconstruction; exact terminal and application memory recovery remain limited)\n")
+		fmt.Fprintf(
+			&out,
+			"Restore Ready:            yes (best-effort reconstruction; exact terminal and application memory recovery remain limited)\n",
+		)
 	} else {
 		fmt.Fprintf(&out, "Restore Ready:            no (snapshot graph is not reconstructable)\n")
 	}

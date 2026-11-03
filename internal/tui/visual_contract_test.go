@@ -53,7 +53,8 @@ func TestPickerRichAgentVisualContract(t *testing.T) {
 			}
 
 			divider := dividerLineIndex(plain)
-			if divider < 0 || lineIndexOf(plain, "api") >= divider || divider >= lineIndexOf(plain, "docs") {
+			if divider < 0 || lineIndexOf(plain, "api") >= divider ||
+				divider >= lineIndexOf(plain, "docs") {
 				t.Errorf("agent groups, divider, and ordinary rows are out of order")
 			}
 		})
@@ -68,7 +69,15 @@ func TestPickerRichAgentDialogsPreserveUnderlyingVisualContract(t *testing.T) {
 	model.showHelp = true
 	help := viewString(model.View())
 	assertVisualViewport(t, help, 80, 24)
-	assertVisualText(t, stripANSI(help), "Popup Keys", "Open selected", "Rename session", "Kill session", "Create session")
+	assertVisualText(
+		t,
+		stripANSI(help),
+		"Popup Keys",
+		"Open selected",
+		"Rename session",
+		"Kill session",
+		"Create session",
+	)
 
 	model.showHelp = false
 	openTestKillConfirm(model)
@@ -122,7 +131,11 @@ func TestWritePickerVisualEvidence(t *testing.T) {
 
 		model.showHelp = fixture.help
 
-		if err := root.WriteFile(fixture.name, []byte(viewString(model.View())), 0o600); err != nil {
+		if err := root.WriteFile(
+			fixture.name,
+			[]byte(viewString(model.View())),
+			0o600,
+		); err != nil {
 			t.Fatalf("write %s: %v", fixture.name, err)
 		}
 	}

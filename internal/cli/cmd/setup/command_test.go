@@ -123,9 +123,20 @@ func TestSetupTmuxRejectsBindingsTmuxCannotRun(t *testing.T) {
 		"missing params": "[[keys.bind]]\nkey = \"M-c\"\naction = \"session.create\"\nin = \"tmux\"\n",
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, _, err := executeCommand(t, "setup", "tmux", testConfigFlag, writeSetupConfig(t, text))
+			_, _, err := executeCommand(
+				t,
+				"setup",
+				"tmux",
+				testConfigFlag,
+				writeSetupConfig(t, text),
+			)
 			if clibase.ExitCode(err) != clibase.ExitCodeGeneral {
-				t.Fatalf("exit code = %d (%v), want the configuration error status %d", clibase.ExitCode(err), err, clibase.ExitCodeGeneral)
+				t.Fatalf(
+					"exit code = %d (%v), want the configuration error status %d",
+					clibase.ExitCode(err),
+					err,
+					clibase.ExitCodeGeneral,
+				)
 			}
 		})
 	}

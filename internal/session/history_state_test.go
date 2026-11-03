@@ -33,7 +33,14 @@ func TestLoadRejectsEmptyPath(t *testing.T) {
 }
 
 func TestSaveRejectsEmptyPath(t *testing.T) {
-	if err := SaveState(t.Context(), "", &State{Version: CurrentHistoryVersion}); !errors.Is(err, ErrEmptyStatePath) {
+	if err := SaveState(
+		t.Context(),
+		"",
+		&State{Version: CurrentHistoryVersion},
+	); !errors.Is(
+		err,
+		ErrEmptyStatePath,
+	) {
 		t.Fatalf("SaveState(\"\") error = %v, want ErrEmptyStatePath", err)
 	}
 }
@@ -140,7 +147,11 @@ func TestUpdateStatePreservesGeneratedSwitchHistory(t *testing.T) {
 			})
 		}
 
-		if err := service.SaveState(t.Context(), path, &State{Version: CurrentHistoryVersion, SwitchHistory: entries}); err != nil {
+		if err := service.SaveState(
+			t.Context(),
+			path,
+			&State{Version: CurrentHistoryVersion, SwitchHistory: entries},
+		); err != nil {
 			rt.Fatalf("SaveState() error = %v", err)
 		}
 
@@ -343,10 +354,16 @@ func TestSaveAndLoad(t *testing.T) {
 		SwitchHistory: []SwitchHistoryEntry{
 			{Session: Identity{Name: "session1"}, LastSwitchUnix: 1234567890},
 		},
-		RemoteSwitchHistory: []RemoteSwitchHistoryEntry{{
-			Session:        Identity{Origin: "ssh", ConnectionID: "work", Name: historyTestSessionName},
-			LastSwitchUnix: 1234567891,
-		}},
+		RemoteSwitchHistory: []RemoteSwitchHistoryEntry{
+			{
+				Session: Identity{
+					Origin:       "ssh",
+					ConnectionID: "work",
+					Name:         historyTestSessionName,
+				},
+				LastSwitchUnix: 1234567891,
+			},
+		},
 		AgentViewHistory: []AgentViewHistoryEntry{{
 			Session:          Identity{Name: "session1"},
 			PaneID:           "%7",
@@ -405,7 +422,11 @@ func TestStatePrunesOldestSwitchWhenExceedingBound(t *testing.T) {
 	}
 
 	if len(st.SwitchHistory) > maxSwitchHistory {
-		t.Fatalf("SwitchHistory length %d exceeded bound %d", len(st.SwitchHistory), maxSwitchHistory)
+		t.Fatalf(
+			"SwitchHistory length %d exceeded bound %d",
+			len(st.SwitchHistory),
+			maxSwitchHistory,
+		)
 	}
 }
 
@@ -463,7 +484,9 @@ func TestLoadRejectsSymlink(t *testing.T) {
 func TestLoadRejectsInvalidVersion(t *testing.T) {
 	path := filepath.Join(testStateDir(t), "state.json")
 
-	data := []byte(`{"version": 999, "switchHistory": [], "remoteSwitchHistory": [], "agentViewHistory": [], "lastAutosaveTimestamp": 0, "popupDisplayMode": ""}`)
+	data := []byte(
+		`{"version": 999, "switchHistory": [], "remoteSwitchHistory": [], "agentViewHistory": [], "lastAutosaveTimestamp": 0, "popupDisplayMode": ""}`,
+	)
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		t.Fatalf("writing invalid version: %v", err)
 	}
@@ -558,7 +581,13 @@ func TestLoadRejectsMissingVersionAndDuplicateFields(t *testing.T) {
 	dir := testStateDir(t)
 
 	missingVerPath := filepath.Join(dir, "missing_ver.json")
-	if err := os.WriteFile(missingVerPath, []byte(`{"switchHistory":[],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":"","sessionKeys":[],"popupHeights":[]}`), 0o600); err != nil {
+	if err := os.WriteFile(
+		missingVerPath,
+		[]byte(
+			`{"switchHistory":[],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":"","sessionKeys":[],"popupHeights":[]}`,
+		),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -567,7 +596,13 @@ func TestLoadRejectsMissingVersionAndDuplicateFields(t *testing.T) {
 	}
 
 	unknownFieldPath := filepath.Join(dir, "unknown_field.json")
-	if err := os.WriteFile(unknownFieldPath, []byte(`{"version":3,"switchHistory":[],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":"","sessionKeys":[],"popupHeights":[],"extraField":123}`), 0o600); err != nil {
+	if err := os.WriteFile(
+		unknownFieldPath,
+		[]byte(
+			`{"version":3,"switchHistory":[],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":"","sessionKeys":[],"popupHeights":[],"extraField":123}`,
+		),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -576,7 +611,13 @@ func TestLoadRejectsMissingVersionAndDuplicateFields(t *testing.T) {
 	}
 
 	dupSwitchPath := filepath.Join(dir, "dup_switch.json")
-	if err := os.WriteFile(dupSwitchPath, []byte(`{"version":3,"switchHistory":[{"session":{"origin":"","connectionId":"","socket":"","repositorySource":"","name":"dev"},"lastSwitch":1},{"session":{"origin":"","connectionId":"","socket":"","repositorySource":"","name":"dev"},"lastSwitch":2}],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":"","sessionKeys":[],"popupHeights":[]}`), 0o600); err != nil {
+	if err := os.WriteFile(
+		dupSwitchPath,
+		[]byte(
+			`{"version":3,"switchHistory":[{"session":{"origin":"","connectionId":"","socket":"","repositorySource":"","name":"dev"},"lastSwitch":1},{"session":{"origin":"","connectionId":"","socket":"","repositorySource":"","name":"dev"},"lastSwitch":2}],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":"","sessionKeys":[],"popupHeights":[]}`,
+		),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -690,7 +731,11 @@ func TestHistoryCancellationAtPublicationPreservesCommittedState(t *testing.T) {
 		return nil
 	}})
 
-	result, err := svc.UpdateState(ctx, path, func(s *State) { s.RecordSwitch(Identity{Name: "uncommitted"}) })
+	result, err := svc.UpdateState(
+		ctx,
+		path,
+		func(s *State) { s.RecordSwitch(Identity{Name: "uncommitted"}) },
+	)
 	if !errors.Is(err, context.Canceled) || result != nil || errors.Is(err, ErrUncertain) {
 		t.Fatalf("publication outcome: %+v, %v", result, err)
 	}
@@ -722,7 +767,11 @@ func TestHistoryDoesNotSilentlyDiscardUnrepresentableIdentity(t *testing.T) {
 	path := filepath.Join(testAtomicStateDir(t), "state.json")
 	svc := NewService(ServiceDeps{})
 
-	result, err := svc.UpdateState(t.Context(), path, func(s *State) { s.RecordSwitch(Identity{Name: "session-\xff"}) })
+	result, err := svc.UpdateState(
+		t.Context(),
+		path,
+		func(s *State) { s.RecordSwitch(Identity{Name: "session-\xff"}) },
+	)
 	if !errors.Is(err, ErrInvalidIdentity) || result != nil {
 		t.Fatalf("unrepresentable history was silently discarded: %+v, %v", result, err)
 	}
@@ -741,7 +790,9 @@ func TestHistoryRejectsInvalidNestedIdentitiesAndRemoteBounds(t *testing.T) {
 		`{"origin":"local","connectionId":"","socket":"","repositorySource":"","name":"dev","name":"other"}`,
 		`null`,
 	} {
-		data := []byte(`{"version":3,"switchHistory":[{"session":` + value + `,"lastSwitch":1}],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":"","sessionKeys":[],"popupHeights":[]}`)
+		data := []byte(
+			`{"version":3,"switchHistory":[{"session":` + value + `,"lastSwitch":1}],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":"","sessionKeys":[],"popupHeights":[]}`,
+		)
 		if err := os.WriteFile(path, data, 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -785,7 +836,9 @@ func makeUnsafeHistoryEntry(t *testing.T, kind, path, target string) {
 func TestLoadRejectsStateWithoutSessionKeysAsOldVersion(t *testing.T) {
 	path := testStatePath(t)
 
-	data := []byte(`{"version":1,"switchHistory":[],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":""}`)
+	data := []byte(
+		`{"version":1,"switchHistory":[],"remoteSwitchHistory":[],"agentViewHistory":[],"lastAutosaveTimestamp":0,"popupDisplayMode":""}`,
+	)
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		t.Fatalf("writing state: %v", err)
 	}
@@ -826,7 +879,10 @@ func TestStateRenameMovesAndDeleteKeepsSessionKeys(t *testing.T) {
 	renamed.Name = "site"
 	st.RenameSessionIdentity(live, renamed)
 
-	if key, ok := st.SessionKey(Identity{Origin: string(OriginLocal), Name: "site"}); !ok || key != "w" {
+	if key, ok := st.SessionKey(
+		Identity{Origin: string(OriginLocal), Name: "site"},
+	); !ok ||
+		key != "w" {
 		t.Fatalf("key after rename = %q, %v, want w", key, ok)
 	}
 
@@ -834,13 +890,21 @@ func TestStateRenameMovesAndDeleteKeepsSessionKeys(t *testing.T) {
 		t.Fatal("old name kept its key after rename")
 	}
 
-	st.DeleteSessionIdentity(Identity{Origin: string(OriginLocal), RepositorySource: "default", Name: "site"})
+	st.DeleteSessionIdentity(
+		Identity{Origin: string(OriginLocal), RepositorySource: "default", Name: "site"},
+	)
 
-	if key, ok := st.SessionKey(Identity{Origin: string(OriginLocal), Name: "site"}); !ok || key != "w" {
+	if key, ok := st.SessionKey(
+		Identity{Origin: string(OriginLocal), Name: "site"},
+	); !ok ||
+		key != "w" {
 		t.Fatalf("key after delete = %q, %v, want w kept for a session of the same name", key, ok)
 	}
 
-	if key, ok := st.SessionKey(Identity{Origin: string(OriginLocal), Name: "api"}); !ok || key != "a" {
+	if key, ok := st.SessionKey(
+		Identity{Origin: string(OriginLocal), Name: "api"},
+	); !ok ||
+		key != "a" {
 		t.Fatalf("unrelated key = %q, %v, want a", key, ok)
 	}
 }
@@ -851,9 +915,14 @@ func TestStateRenameOntoKeyedNameKeepsRenamedKey(t *testing.T) {
 		{Session: Identity{Origin: string(OriginLocal), Name: "site"}, Key: "s"},
 	}}
 
-	st.RenameSessionIdentity(Identity{Origin: string(OriginLocal), Name: "blog"}, Identity{Origin: string(OriginLocal), Name: "site"})
+	st.RenameSessionIdentity(
+		Identity{Origin: string(OriginLocal), Name: "blog"},
+		Identity{Origin: string(OriginLocal), Name: "site"},
+	)
 
-	want := []KeyAssignment{{Session: Identity{Origin: string(OriginLocal), Name: "site"}, Key: "w"}}
+	want := []KeyAssignment{
+		{Session: Identity{Origin: string(OriginLocal), Name: "site"}, Key: "w"},
+	}
 	if !slices.Equal(st.SessionKeys, want) {
 		t.Fatalf("session keys = %#v, want %#v", st.SessionKeys, want)
 	}
@@ -869,11 +938,22 @@ func TestValidateRejectsInvalidSessionKeys(t *testing.T) {
 			{Session: Identity{Origin: string(OriginLocal), Name: "blog"}, Key: "w"},
 			{Session: Identity{Origin: string(OriginLocal), Name: "blog"}, Key: "e"},
 		},
-		"upper case key":   {{Session: Identity{Origin: string(OriginLocal), Name: "blog"}, Key: "W"}},
-		"digit key":        {{Session: Identity{Origin: string(OriginLocal), Name: "blog"}, Key: "1"}},
-		"two letters":      {{Session: Identity{Origin: string(OriginLocal), Name: "blog"}, Key: "we"}},
-		"socket in key id": {{Session: Identity{Origin: string(OriginLocal), Socket: "/tmp/s", Name: "blog"}, Key: "w"}},
-		"empty name":       {{Session: Identity{Origin: string(OriginLocal)}, Key: "w"}},
+		"upper case key": {
+			{Session: Identity{Origin: string(OriginLocal), Name: "blog"}, Key: "W"},
+		},
+		"digit key": {
+			{Session: Identity{Origin: string(OriginLocal), Name: "blog"}, Key: "1"},
+		},
+		"two letters": {
+			{Session: Identity{Origin: string(OriginLocal), Name: "blog"}, Key: "we"},
+		},
+		"socket in key id": {
+			{
+				Session: Identity{Origin: string(OriginLocal), Socket: "/tmp/s", Name: "blog"},
+				Key:     "w",
+			},
+		},
+		"empty name": {{Session: Identity{Origin: string(OriginLocal)}, Key: "w"}},
 	}
 
 	for name, entries := range tests {

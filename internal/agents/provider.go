@@ -28,7 +28,9 @@ type AHTStore struct {
 }
 
 func NewAHTStore(statePath string) *AHTStore {
-	return &AHTStore{client: aht.New(aht.Config{StorePath: statePath, SocketPath: "", Mode: aht.ModeAuto})}
+	return &AHTStore{
+		client: aht.New(aht.Config{StorePath: statePath, SocketPath: "", Mode: aht.ModeAuto}),
+	}
 }
 
 func (s *AHTStore) StorePath() string {
@@ -49,11 +51,17 @@ func (s *AHTStore) SocketPath() string {
 
 func (s *AHTStore) List(ctx context.Context, filter aht.Filter) ([]aht.Session, error) {
 	if s == nil || s.client == nil {
-		return nil, oops.In("agents").Code("registry_unavailable").With("operation", "list_sessions").Wrap(ErrRegistryUnavailable)
+		return nil, oops.In("agents").
+			Code("registry_unavailable").
+			With("operation", "list_sessions").
+			Wrap(ErrRegistryUnavailable)
 	}
 
 	if err := ctx.Err(); err != nil {
-		return nil, oops.In("agents").Code("operation_canceled").With("operation", "list_sessions").Wrap(err)
+		return nil, oops.In("agents").
+			Code("operation_canceled").
+			With("operation", "list_sessions").
+			Wrap(err)
 	}
 
 	sessions, err := s.client.List(ctx, filter)
@@ -64,9 +72,16 @@ func (s *AHTStore) List(ctx context.Context, filter aht.Filter) ([]aht.Session, 
 	return sessions, nil
 }
 
-func (s *AHTStore) Watch(ctx context.Context, filter aht.Filter, yield func(aht.StateSnapshot) error) error {
+func (s *AHTStore) Watch(
+	ctx context.Context,
+	filter aht.Filter,
+	yield func(aht.StateSnapshot) error,
+) error {
 	if s == nil || s.client == nil {
-		return oops.In("agents").Code("registry_unavailable").With("operation", "watch_sessions").Wrap(ErrRegistryUnavailable)
+		return oops.In("agents").
+			Code("registry_unavailable").
+			With("operation", "watch_sessions").
+			Wrap(ErrRegistryUnavailable)
 	}
 
 	if err := s.client.Watch(ctx, filter, yield); err != nil {

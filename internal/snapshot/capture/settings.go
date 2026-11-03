@@ -20,7 +20,9 @@ type optionLister interface {
 func options(ctx context.Context, scope string, source optionLister) ([]model.Option, error) {
 	entries, err := source.ListWith(ctx, gotmux.ListOptionOptions{Inherited: true, Hooks: true})
 	if err != nil {
-		return nil, oops.In("snapshot.capture").With("operation", "observe_scoped_options").Wrapf(err, "observe scoped options")
+		return nil, oops.In("snapshot.capture").
+			With("operation", "observe_scoped_options").
+			Wrapf(err, "observe scoped options")
 	}
 
 	result := make([]model.Option, 0, len(entries))
@@ -30,13 +32,25 @@ func options(ctx context.Context, scope string, source optionLister) ([]model.Op
 		}
 
 		value, present := entry.Value.Get()
-		result = append(result, model.Option{Scope: scope, Name: model.Bytes(entry.Name), Value: model.Bytes(value), Present: present, Inherited: entry.Inherited})
+		result = append(
+			result,
+			model.Option{
+				Scope:     scope,
+				Name:      model.Bytes(entry.Name),
+				Value:     model.Bytes(value),
+				Present:   present,
+				Inherited: entry.Inherited,
+			},
+		)
 	}
 
 	return result, nil
 }
 
-func environment(ctx context.Context, scope gotmux.EnvironmentScope) ([]model.Variable, []string, error) {
+func environment(
+	ctx context.Context,
+	scope gotmux.EnvironmentScope,
+) ([]model.Variable, []string, error) {
 	var (
 		result  []model.Variable
 		skipped []string
@@ -47,7 +61,9 @@ func environment(ctx context.Context, scope gotmux.EnvironmentScope) ([]model.Va
 	for _, hidden := range []bool{false, true} {
 		entries, err := scope.ListWith(ctx, gotmux.ListEnvironmentOptions{Hidden: hidden})
 		if err != nil {
-			return nil, nil, oops.In("snapshot.capture").With("operation", "enumerate_environment").Wrapf(err, "enumerate environment")
+			return nil, nil, oops.In("snapshot.capture").
+				With("operation", "enumerate_environment").
+				Wrapf(err, "enumerate environment")
 		}
 
 		for _, entry := range entries {
@@ -77,7 +93,10 @@ func environment(ctx context.Context, scope gotmux.EnvironmentScope) ([]model.Va
 		}
 	}
 
-	slices.SortFunc(result, func(a, b model.Variable) int { return strings.Compare(string(a.Name), string(b.Name)) })
+	slices.SortFunc(
+		result,
+		func(a, b model.Variable) int { return strings.Compare(string(a.Name), string(b.Name)) },
+	)
 
 	return result, skipped, nil
 }
@@ -99,7 +118,12 @@ func environmentEntry(entry gotmux.EnvironmentEntry, hidden bool) (model.Variabl
 		return model.Variable{}, environmentUnsupported("value_unavailable")
 	}
 
-	return model.Variable{Name: model.Bytes(entry.Name), Value: model.Bytes(content), State: state, Hidden: hidden}, nil
+	return model.Variable{
+		Name:   model.Bytes(entry.Name),
+		Value:  model.Bytes(content),
+		State:  state,
+		Hidden: hidden,
+	}, nil
 }
 
 func shellName(name string) bool {

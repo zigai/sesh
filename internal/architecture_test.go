@@ -32,7 +32,18 @@ const (
 
 const testSupportReason = "production must not depend on test support"
 
-var layerNames = []string{"base", "model", "storage", "adapter", "config", "domain", "contract", "service", "composition", "surface"}
+var layerNames = []string{
+	"base",
+	"model",
+	"storage",
+	"adapter",
+	"config",
+	"domain",
+	"contract",
+	"service",
+	"composition",
+	"surface",
+}
 
 var packageLayers = map[string]layer{
 	"internal/strictjson": layerBase,
@@ -126,7 +137,11 @@ func TestProductionImportBoundaries(t *testing.T) {
 
 	for edge := range sameLayerImports {
 		if !scan.covers(edge.source) || !scan.covers(edge.target) {
-			t.Errorf("sameLayerImports entry %s -> %s matches no production package", edge.source, edge.target)
+			t.Errorf(
+				"sameLayerImports entry %s -> %s matches no production package",
+				edge.source,
+				edge.target,
+			)
 		}
 	}
 
@@ -171,7 +186,10 @@ func scanArchitecture(source fs.FS) (architectureScan, error) {
 
 	for _, pkg := range slices.Sorted(maps.Keys(scan.packages)) {
 		if _, ok := layerOf(pkg); !ok {
-			scan.violations = append(scan.violations, pkg+": package has no architecture layer in packageLayers")
+			scan.violations = append(
+				scan.violations,
+				pkg+": package has no architecture layer in packageLayers",
+			)
 		}
 	}
 
@@ -224,7 +242,10 @@ func checkArchitectureFile(source fs.FS, filename string) ([]string, error) {
 		}
 
 		for _, reason := range importViolations(path.Dir(filename), imported) {
-			violations = append(violations, fmt.Sprintf("%s: import %q: %s", positions.Position(spec.Pos()), imported, reason))
+			violations = append(
+				violations,
+				fmt.Sprintf("%s: import %q: %s", positions.Position(spec.Pos()), imported, reason),
+			)
 		}
 	}
 
@@ -234,7 +255,10 @@ func checkArchitectureFile(source fs.FS, filename string) ([]string, error) {
 func importViolations(source, imported string) []string {
 	var reasons []string
 
-	if slices.ContainsFunc(testSupport, func(root string) bool { return withinPackage(imported, root) }) {
+	if slices.ContainsFunc(
+		testSupport,
+		func(root string) bool { return withinPackage(imported, root) },
+	) {
 		reasons = append(reasons, testSupportReason)
 	}
 
@@ -245,7 +269,16 @@ func importViolations(source, imported string) []string {
 
 	for module, lowest := range moduleLayers {
 		if withinPackage(imported, module) && sourceLayer < lowest {
-			reasons = append(reasons, fmt.Sprintf("%s package %s must not import %s, which starts at the %s layer", sourceLayer, source, module, lowest))
+			reasons = append(
+				reasons,
+				fmt.Sprintf(
+					"%s package %s must not import %s, which starts at the %s layer",
+					sourceLayer,
+					source,
+					module,
+					lowest,
+				),
+			)
 		}
 	}
 
@@ -259,7 +292,13 @@ func importViolations(source, imported string) []string {
 		return reasons
 	}
 
-	reason := fmt.Sprintf("%s package %s must not import %s package %s", sourceLayer, source, targetLayer, target)
+	reason := fmt.Sprintf(
+		"%s package %s must not import %s package %s",
+		sourceLayer,
+		source,
+		targetLayer,
+		target,
+	)
 	if targetLayer == sourceLayer {
 		reason += "; list the edge in sameLayerImports if it is intended"
 	}
@@ -314,35 +353,149 @@ func TestImportBoundariesRejectForbiddenDependencies(t *testing.T) {
 	}{
 		{"entrypoint testing", "cmd/sesh/main.go", "testing", testSupportReason},
 		{"testing subpackage", "internal/cli/command.go", "testing/fstest", testSupportReason},
-		{"published fixtures", "internal/session/session.go", "github.com/zigai/gotmux/tmuxtest", testSupportReason},
+		{
+			"published fixtures",
+			"internal/session/session.go",
+			"github.com/zigai/gotmux/tmuxtest",
+			testSupportReason,
+		},
 		{"property testing", "internal/task/record.go", "pgregory.net/rapid", testSupportReason},
-		{"native fixtures", "internal/cli/command.go", nativeModule + "internal/testsupport/process", testSupportReason},
-		{"integration fixtures", "internal/cli/command.go", nativeModule + "test/integration/fixture", testSupportReason},
-		{"model to store", "internal/snapshot/model/codec.go", nativeModule + "internal/snapshot/store", "must not import storage package internal/snapshot/store"},
-		{"model to gotmux", "internal/snapshot/model/codec.go", "github.com/zigai/gotmux/tmux", "must not import github.com/zigai/gotmux"},
-		{"store to gotmux", "internal/snapshot/store/read.go", "github.com/zigai/gotmux/tmux", "must not import github.com/zigai/gotmux"},
-		{"base to gotmux", "internal/privatefs/write.go", "github.com/zigai/gotmux/tmux", "must not import github.com/zigai/gotmux"},
-		{"store to capture", "internal/snapshot/store/read.go", nativeModule + "internal/snapshot/capture", "must not import domain package internal/snapshot/capture"},
-		{"store to process", "internal/snapshot/store/read.go", nativeModule + "internal/integration/process", "must not import adapter package internal/integration/process"},
-		{"adapter to config", "internal/integration/tmuxserver/server.go", nativeModule + "internal/config", "must not import config package internal/config"},
-		{"linux to cli", "internal/integration/process/read_linux.go", nativeModule + "internal/cli", "must not import surface package internal/cli"},
-		{"darwin to tui", "internal/integration/process/read_darwin.go", nativeModule + "internal/tui/whichkey", "must not import service package internal/tui/whichkey"},
-		{"windows to session", "internal/integration/process/read_windows.go", nativeModule + "internal/session", "must not import domain package internal/session"},
-		{"adapter to engine", "internal/integration/tmuxserver/target.go", nativeModule + "internal/snapshot/engine", "must not import service package internal/snapshot/engine"},
-		{"generated production", "internal/integration/tmuxserver/generated.go", nativeModule + "internal/snapshot/restore", "must not import domain package internal/snapshot/restore"},
-		{"action to app", "internal/action/session.go", nativeModule + "internal/app", "must not import composition package internal/app"},
-		{"action to engine", "internal/action/snapshot.go", nativeModule + "internal/snapshot/engine", "must not import service package internal/snapshot/engine"},
-		{"service to app", "internal/tui/model.go", nativeModule + "internal/app", "must not import composition package internal/app"},
-		{"domain to surface", "internal/task/record.go", nativeModule + "internal/cli", "must not import surface package internal/cli"},
-		{"unlisted domain peer", "internal/work/store.go", nativeModule + "internal/session", "list the edge in sameLayerImports"},
-		{"reversed listed peer", "internal/task/record.go", nativeModule + "internal/work", "list the edge in sameLayerImports"},
-		{"unlisted service peer", "internal/remote/peer.go", nativeModule + "internal/tui", "list the edge in sameLayerImports"},
+		{
+			"native fixtures",
+			"internal/cli/command.go",
+			nativeModule + "internal/testsupport/process",
+			testSupportReason,
+		},
+		{
+			"integration fixtures",
+			"internal/cli/command.go",
+			nativeModule + "test/integration/fixture",
+			testSupportReason,
+		},
+		{
+			"model to store",
+			"internal/snapshot/model/codec.go",
+			nativeModule + "internal/snapshot/store",
+			"must not import storage package internal/snapshot/store",
+		},
+		{
+			"model to gotmux",
+			"internal/snapshot/model/codec.go",
+			"github.com/zigai/gotmux/tmux",
+			"must not import github.com/zigai/gotmux",
+		},
+		{
+			"store to gotmux",
+			"internal/snapshot/store/read.go",
+			"github.com/zigai/gotmux/tmux",
+			"must not import github.com/zigai/gotmux",
+		},
+		{
+			"base to gotmux",
+			"internal/privatefs/write.go",
+			"github.com/zigai/gotmux/tmux",
+			"must not import github.com/zigai/gotmux",
+		},
+		{
+			"store to capture",
+			"internal/snapshot/store/read.go",
+			nativeModule + "internal/snapshot/capture",
+			"must not import domain package internal/snapshot/capture",
+		},
+		{
+			"store to process",
+			"internal/snapshot/store/read.go",
+			nativeModule + "internal/integration/process",
+			"must not import adapter package internal/integration/process",
+		},
+		{
+			"adapter to config",
+			"internal/integration/tmuxserver/server.go",
+			nativeModule + "internal/config",
+			"must not import config package internal/config",
+		},
+		{
+			"linux to cli",
+			"internal/integration/process/read_linux.go",
+			nativeModule + "internal/cli",
+			"must not import surface package internal/cli",
+		},
+		{
+			"darwin to tui",
+			"internal/integration/process/read_darwin.go",
+			nativeModule + "internal/tui/whichkey",
+			"must not import service package internal/tui/whichkey",
+		},
+		{
+			"windows to session",
+			"internal/integration/process/read_windows.go",
+			nativeModule + "internal/session",
+			"must not import domain package internal/session",
+		},
+		{
+			"adapter to engine",
+			"internal/integration/tmuxserver/target.go",
+			nativeModule + "internal/snapshot/engine",
+			"must not import service package internal/snapshot/engine",
+		},
+		{
+			"generated production",
+			"internal/integration/tmuxserver/generated.go",
+			nativeModule + "internal/snapshot/restore",
+			"must not import domain package internal/snapshot/restore",
+		},
+		{
+			"action to app",
+			"internal/action/session.go",
+			nativeModule + "internal/app",
+			"must not import composition package internal/app",
+		},
+		{
+			"action to engine",
+			"internal/action/snapshot.go",
+			nativeModule + "internal/snapshot/engine",
+			"must not import service package internal/snapshot/engine",
+		},
+		{
+			"service to app",
+			"internal/tui/model.go",
+			nativeModule + "internal/app",
+			"must not import composition package internal/app",
+		},
+		{
+			"domain to surface",
+			"internal/task/record.go",
+			nativeModule + "internal/cli",
+			"must not import surface package internal/cli",
+		},
+		{
+			"unlisted domain peer",
+			"internal/work/store.go",
+			nativeModule + "internal/session",
+			"list the edge in sameLayerImports",
+		},
+		{
+			"reversed listed peer",
+			"internal/task/record.go",
+			nativeModule + "internal/work",
+			"list the edge in sameLayerImports",
+		},
+		{
+			"unlisted service peer",
+			"internal/remote/peer.go",
+			nativeModule + "internal/tui",
+			"list the edge in sameLayerImports",
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			source := "//go:build architecture_fixture\n\n// Code generated by fixture. DO NOT EDIT.\npackage fixture\nimport alias " + strconv.Quote(test.imported) + "\n"
+			source := "//go:build architecture_fixture\n\n// Code generated by fixture. DO NOT EDIT.\npackage fixture\nimport alias " + strconv.Quote(
+				test.imported,
+			) + "\n"
 
-			scan, err := scanArchitecture(fstest.MapFS{test.filename: &fstest.MapFile{Data: []byte(source)}})
+			scan, err := scanArchitecture(
+				fstest.MapFS{test.filename: &fstest.MapFile{Data: []byte(source)}},
+			)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -361,7 +514,15 @@ func TestImportBoundariesRejectForbiddenDependencies(t *testing.T) {
 }
 
 func TestImportBoundariesRejectPackageWithoutLayer(t *testing.T) {
-	scan, err := scanArchitecture(fstest.MapFS{"internal/newarea/newarea.go": {Data: []byte("package newarea\nimport \"github.com/zigai/sesh/internal/strictjson\"")}})
+	scan, err := scanArchitecture(
+		fstest.MapFS{
+			"internal/newarea/newarea.go": {
+				Data: []byte(
+					"package newarea\nimport \"github.com/zigai/sesh/internal/strictjson\"",
+				),
+			},
+		},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -374,16 +535,42 @@ func TestImportBoundariesRejectPackageWithoutLayer(t *testing.T) {
 
 func TestImportBoundariesAllowDomainDependenciesAndTestFixtures(t *testing.T) {
 	source := fstest.MapFS{
-		"cmd/sesh/main.go":                                 {Data: []byte("package main\nimport `github.com/zigai/sesh/internal/cli`")},
-		"internal/snapshot/model/codec.go":                 {Data: []byte("package model\nimport \"github.com/zigai/sesh/internal/strictjson\"")},
-		"internal/snapshot/store/repository.go":            {Data: []byte("package store\nimport (\"github.com/zigai/sesh/internal/snapshot/model\"; \"github.com/zigai/sesh/internal/privatefs\")")},
-		"internal/integration/tmuxserver/target_darwin.go": {Data: []byte("package tmuxserver\nimport (\"github.com/zigai/sesh/internal/snapshot/model\"; \"github.com/zigai/sesh/internal/integration/process\"; \"github.com/zigai/gotmux/tmux\")")},
-		"internal/snapshot/capture/capture.go":             {Data: []byte("package capture\nimport (\"github.com/zigai/sesh/internal/agents\"; \"github.com/zigai/sesh/internal/snapshot/apps\")")},
-		"internal/tui/taskpicker/model.go":                 {Data: []byte("package taskpicker\nimport (\"github.com/zigai/sesh/internal/tui\"; \"github.com/zigai/sesh/internal/task\")")},
-		"internal/cli/command.go":                          {Data: []byte("package cli\nimport (\"example.com/testing/client\"; \"github.com/zigai/sesh/internal/testsupporting\"; \"github.com/zigai/sesh/internal/app\")")},
+		"cmd/sesh/main.go": {
+			Data: []byte("package main\nimport `github.com/zigai/sesh/internal/cli`"),
+		},
+		"internal/snapshot/model/codec.go": {
+			Data: []byte("package model\nimport \"github.com/zigai/sesh/internal/strictjson\""),
+		},
+		"internal/snapshot/store/repository.go": {
+			Data: []byte(
+				"package store\nimport (\"github.com/zigai/sesh/internal/snapshot/model\"; \"github.com/zigai/sesh/internal/privatefs\")",
+			),
+		},
+		"internal/integration/tmuxserver/target_darwin.go": {
+			Data: []byte(
+				"package tmuxserver\nimport (\"github.com/zigai/sesh/internal/snapshot/model\"; \"github.com/zigai/sesh/internal/integration/process\"; \"github.com/zigai/gotmux/tmux\")",
+			),
+		},
+		"internal/snapshot/capture/capture.go": {
+			Data: []byte(
+				"package capture\nimport (\"github.com/zigai/sesh/internal/agents\"; \"github.com/zigai/sesh/internal/snapshot/apps\")",
+			),
+		},
+		"internal/tui/taskpicker/model.go": {
+			Data: []byte(
+				"package taskpicker\nimport (\"github.com/zigai/sesh/internal/tui\"; \"github.com/zigai/sesh/internal/task\")",
+			),
+		},
+		"internal/cli/command.go": {
+			Data: []byte(
+				"package cli\nimport (\"example.com/testing/client\"; \"github.com/zigai/sesh/internal/testsupporting\"; \"github.com/zigai/sesh/internal/app\")",
+			),
+		},
 	}
 	for _, filename := range []string{"internal/cli/command_test.go", "internal/cli/testdata/bad.go", "internal/testsupport/fixture.go", "test/integration/fixture/main.go", "vendor/dependency/main.go", ".agents/reference/main.go", "dist/source/main.go"} {
-		source[filename] = &fstest.MapFile{Data: []byte("not Go source; fixture must not be parsed")}
+		source[filename] = &fstest.MapFile{
+			Data: []byte("not Go source; fixture must not be parsed"),
+		}
 	}
 
 	scan, err := scanArchitecture(source)
@@ -397,7 +584,9 @@ func TestImportBoundariesAllowDomainDependenciesAndTestFixtures(t *testing.T) {
 }
 
 func TestImportScanReportsMalformedProductionSource(t *testing.T) {
-	_, err := scanArchitecture(fstest.MapFS{"internal/snapshot/model/broken.go": {Data: []byte("not Go source")}})
+	_, err := scanArchitecture(
+		fstest.MapFS{"internal/snapshot/model/broken.go": {Data: []byte("not Go source")}},
+	)
 	if err == nil || !strings.Contains(err.Error(), "internal/snapshot/model/broken.go") {
 		t.Fatalf("parse error = %v, want the malformed production filename", err)
 	}

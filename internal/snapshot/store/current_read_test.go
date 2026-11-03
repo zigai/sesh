@@ -259,7 +259,12 @@ func TestReadPracticalCurrentWithoutAnyGenerationIsUnavailable(t *testing.T) {
 	}
 }
 
-func assertPracticalCurrentAfterUnfinishedSave(t *testing.T, r *Repository, want Generation, state string) {
+func assertPracticalCurrentAfterUnfinishedSave(
+	t *testing.T,
+	r *Repository,
+	want Generation,
+	state string,
+) {
 	t.Helper()
 
 	if _, _, err := r.ReadCurrent(t.Context()); !errors.Is(err, ErrRecoveryRequired) {
@@ -268,7 +273,13 @@ func assertPracticalCurrentAfterUnfinishedSave(t *testing.T, r *Repository, want
 
 	got, _, err := r.ReadPracticalCurrent(t.Context())
 	if err != nil || got.ID != want.ID {
-		t.Fatalf("practical current view after %s save = %v, %v; want newest generation %s", state, got.ID, err, want.ID)
+		t.Fatalf(
+			"practical current view after %s save = %v, %v; want newest generation %s",
+			state,
+			got.ID,
+			err,
+			want.ID,
+		)
 	}
 
 	catalog, err := r.Inspect(t.Context())
@@ -396,7 +407,12 @@ func TestOpenRepairsCurrentStateInterruptedAfterCatalogPublication(t *testing.T)
 
 	stale, err := openView(t, path).ReadCurrentListing(t.Context())
 	if err != nil || stale.Generation != prior {
-		t.Fatalf("interrupted publication listing = %v, %v; want the prior generation %v", stale.Generation, err, prior)
+		t.Fatalf(
+			"interrupted publication listing = %v, %v; want the prior generation %v",
+			stale.Generation,
+			err,
+			prior,
+		)
 	}
 
 	assertListingMatchesPracticalCurrent(t, openRepository(t, path), path)
@@ -419,7 +435,11 @@ func TestOpenRestoresMissingOrDamagedCurrentState(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if listing, err := openView(t, path).ReadCurrentListing(t.Context()); err == nil && listing.Generation == generation {
+			if listing, err := openView(
+				t,
+				path,
+			).ReadCurrentListing(t.Context()); err == nil &&
+				listing.Generation == generation {
 				t.Fatal("damage did not change the published current state")
 			}
 
@@ -433,7 +453,11 @@ func TestUnreadableCurrentGenerationDoesNotBlockSaves(t *testing.T) {
 	r := openRepository(t, path)
 	generation := commitFixture(t, r)
 
-	corruptArtifact(t, filepath.Join(path, "generations", generation.ID, "artifacts", "a0.bin.gz"), "tampered")
+	corruptArtifact(
+		t,
+		filepath.Join(path, "generations", generation.ID, "artifacts", "a0.bin.gz"),
+		"tampered",
+	)
 
 	if err := os.Remove(filepath.Join(path, currentStateName)); err != nil {
 		t.Fatal(err)
@@ -472,7 +496,12 @@ func TestReadPracticalCurrentIgnoresRewriteOfOlderGeneration(t *testing.T) {
 
 	got, _, err := r.ReadPracticalCurrent(t.Context())
 	if err != nil || got.ID != observation.ID {
-		t.Fatalf("practical current view = %v, %v; want latest observation %s", got.ID, err, observation.ID)
+		t.Fatalf(
+			"practical current view = %v, %v; want latest observation %s",
+			got.ID,
+			err,
+			observation.ID,
+		)
 	}
 }
 

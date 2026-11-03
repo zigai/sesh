@@ -55,7 +55,11 @@ func TestMenuKeyOpensBesideTheSelectedRow(t *testing.T) {
 
 			before := strings.Split(stripANSI(viewString(model.View())), "\n")
 			if !strings.HasPrefix(before[test.selectedY], "│ ▌ ") {
-				t.Fatalf("selected row at line %d missing before opening menu:\n%s", test.selectedY, strings.Join(before, "\n"))
+				t.Fatalf(
+					"selected row at line %d missing before opening menu:\n%s",
+					test.selectedY,
+					strings.Join(before, "\n"),
+				)
 			}
 
 			model = updateTestModel(t, model, keyAlt("m"))
@@ -71,7 +75,12 @@ func TestMenuKeyOpensBesideTheSelectedRow(t *testing.T) {
 			} {
 				prefix, _, ok := strings.Cut(lines[corner.y], corner.glyph)
 				if !ok || lipgloss.Width(prefix) != 4 {
-					t.Fatalf("menu corner %s is not at column 4, line %d:\n%s", corner.glyph, corner.y, output)
+					t.Fatalf(
+						"menu corner %s is not at column 4, line %d:\n%s",
+						corner.glyph,
+						corner.y,
+						output,
+					)
 				}
 			}
 		})
@@ -89,7 +98,8 @@ func TestDefaultAltManagementKeysTriggerActions(t *testing.T) {
 		cmd()
 	}
 
-	if model.dialog != dialogInputText || model.pending.entry.Describe().ID != action.SessionRename.ID {
+	if model.dialog != dialogInputText ||
+		model.pending.entry.Describe().ID != action.SessionRename.ID {
 		t.Fatalf("dialog after alt+r = %v, want rename dialog", model.dialog)
 	}
 
@@ -113,7 +123,8 @@ func TestDefaultAltManagementKeysTriggerActions(t *testing.T) {
 		cmd()
 	}
 
-	if model.dialog != dialogConfirm || model.pending.entry.Describe().ID != action.SessionDelete.ID {
+	if model.dialog != dialogConfirm ||
+		model.pending.entry.Describe().ID != action.SessionDelete.ID {
 		t.Fatalf("dialog after alt+shift+x = %v, want confirm delete dialog", model.dialog)
 	}
 }

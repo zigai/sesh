@@ -42,9 +42,15 @@ func TestRemoteActionCrossesDisposableOpenSSHServer(t *testing.T) {
 		ID: fixture.connection.ID, ConfigDigest: remote.ConnectionDigest(fixture.connection),
 		PeerID: fixture.peerID, Connected: true,
 	}
-	options := remote.ActionOriginOptions{Remote: remoteConfig, Connection: fixture.connection, State: state}
+	options := remote.ActionOriginOptions{
+		Remote:     remoteConfig,
+		Connection: fixture.connection,
+		State:      state,
+	}
 
-	input, err := action.SessionCreate.EncodeInput(action.CreateSession{Name: "over-ssh", Directory: fixture.root})
+	input, err := action.SessionCreate.EncodeInput(
+		action.CreateSession{Name: "over-ssh", Directory: fixture.root},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +98,11 @@ func TestRemoteTaskFinishRunsOnThePeerOnlyWhenThePeerAllowsIt(t *testing.T) {
 		ID: fixture.connection.ID, ConfigDigest: remote.ConnectionDigest(fixture.connection),
 		PeerID: fixture.peerID, Connected: true,
 	}
-	options := remote.ActionOriginOptions{Remote: remoteConfig, Connection: fixture.connection, State: state}
+	options := remote.ActionOriginOptions{
+		Remote:     remoteConfig,
+		Connection: fixture.connection,
+		State:      state,
+	}
 
 	ledger := task.NewStore(filepath.Join(fixture.stateHome, "sesh", "tasks.json"))
 	if _, err := ledger.Update(t.Context(), func(l *task.Ledger) error {
@@ -130,8 +140,15 @@ func TestRemoteTaskFinishRunsOnThePeerOnlyWhenThePeerAllowsIt(t *testing.T) {
 		t.Fatalf("finish without the peer's consent = %+v, want it refused", result)
 	}
 
-	peerConfig := fmt.Sprintf("[tasks]\npopup_socket = %q\n\n[actions.task.finish]\nallow_remote = true\n", "popup-"+filepath.Base(fixture.root))
-	if err := os.WriteFile(filepath.Join(fixture.configHome, "sesh", "config.toml"), []byte(peerConfig), 0o600); err != nil {
+	peerConfig := fmt.Sprintf(
+		"[tasks]\npopup_socket = %q\n\n[actions.task.finish]\nallow_remote = true\n",
+		"popup-"+filepath.Base(fixture.root),
+	)
+	if err := os.WriteFile(
+		filepath.Join(fixture.configHome, "sesh", "config.toml"),
+		[]byte(peerConfig),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -159,7 +176,10 @@ func newRemoteSSHFixture(t *testing.T) remoteSSHFixture {
 		t.Fatal(err)
 	}
 
-	root, err := os.MkdirTemp("", "sesh-ssh-") //nolint:usetesting // Unix socket paths need a short name; cleanup is registered below.
+	root, err := os.MkdirTemp(
+		"",
+		"sesh-ssh-",
+	) //nolint:usetesting // Unix socket paths need a short name; cleanup is registered below.
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,16 +187,32 @@ func newRemoteSSHFixture(t *testing.T) remoteSSHFixture {
 	t.Cleanup(func() { _ = os.RemoveAll(root) })
 
 	fixture := remoteSSHFixture{
-		root: root, stateHome: filepath.Join(root, "state"), cacheHome: filepath.Join(root, "cache"),
-		dataHome: filepath.Join(root, "data"), configHome: filepath.Join(root, "config"),
-		sshWrapper: filepath.Join(root, "ssh-fixture"), argumentLog: filepath.Join(root, "ssh-arguments"),
-		peerID: "", connection: config.RemoteConnectionConfig{},
+		root:       root,
+		stateHome:  filepath.Join(root, "state"),
+		cacheHome:  filepath.Join(root, "cache"),
+		dataHome:   filepath.Join(root, "data"),
+		configHome: filepath.Join(root, "config"),
+		sshWrapper: filepath.Join(
+			root,
+			"ssh-fixture",
+		),
+		argumentLog: filepath.Join(root, "ssh-arguments"),
+		peerID:      "",
+		connection:  config.RemoteConnectionConfig{},
 	}
 	sshDir := filepath.Join(root, "home", ".ssh")
 	makeRemoteFixtureDirs(t, sshDir, fixture)
 	clientKey, hostKey := generateRemoteSSHKeys(t, tools.sshKeygen, sshDir, root)
 	port := reserveLoopbackPort(t)
-	clientConfig, sshdConfig := writeRemoteSSHConfigs(t, account.Username, sshDir, root, clientKey, hostKey, port)
+	clientConfig, sshdConfig := writeRemoteSSHConfigs(
+		t,
+		account.Username,
+		sshDir,
+		root,
+		clientKey,
+		hostKey,
+		port,
+	)
 	writeRemoteSSHWrapper(t, fixture.sshWrapper, fixture.argumentLog, tools.ssh, clientConfig)
 	startRemoteSSHD(t, tools.sshd, sshdConfig, port, filepath.Join(root, "sshd.log"))
 
@@ -207,8 +243,12 @@ func remoteIntegrationTools(t *testing.T) remoteSSHTools {
 	t.Helper()
 
 	return remoteSSHTools{
-		sshd: requireRemoteIntegrationTool(t, "sshd"), sshKeygen: requireRemoteIntegrationTool(t, "ssh-keygen"),
-		ssh: requireRemoteIntegrationTool(t, "ssh"),
+		sshd: requireRemoteIntegrationTool(
+			t,
+			"sshd",
+		),
+		sshKeygen: requireRemoteIntegrationTool(t, "ssh-keygen"),
+		ssh:       requireRemoteIntegrationTool(t, "ssh"),
 	}
 }
 
@@ -229,7 +269,17 @@ func generateRemoteSSHKeys(t *testing.T, keygen, sshDir, root string) (string, s
 
 	clientKey, hostKey := filepath.Join(sshDir, "id_ed25519"), filepath.Join(root, "host_ed25519")
 	for _, key := range []string{clientKey, hostKey} {
-		command := exec.CommandContext(t.Context(), keygen, "-q", "-t", "ed25519", "-N", "", "-f", key)
+		command := exec.CommandContext(
+			t.Context(),
+			keygen,
+			"-q",
+			"-t",
+			"ed25519",
+			"-N",
+			"",
+			"-f",
+			key,
+		)
 		if output, err := command.CombinedOutput(); err != nil {
 			t.Fatalf("ssh-keygen: %v: %s", err, output)
 		}
@@ -260,7 +310,11 @@ func reserveLoopbackPort(t *testing.T) int {
 	return port
 }
 
-func writeRemoteSSHConfigs(t *testing.T, username, sshDir, root, clientKey, hostKey string, port int) (string, string) {
+func writeRemoteSSHConfigs(
+	t *testing.T,
+	username, sshDir, root, clientKey, hostKey string,
+	port int,
+) (string, string) {
 	t.Helper()
 
 	clientPublic, err := os.ReadFile(clientKey + ".pub")
@@ -276,7 +330,15 @@ func writeRemoteSSHConfigs(t *testing.T, username, sshDir, root, clientKey, host
 	sshdConfig := filepath.Join(root, "sshd_config")
 
 	// Sessions get the test's PATH so the peer runs the same tmux as the local fixtures.
-	sshdBody := fmt.Sprintf("Port %d\nListenAddress 127.0.0.1\nHostKey %s\nPidFile %s\nAuthorizedKeysFile %s\nPubkeyAuthentication yes\nPasswordAuthentication no\nKbdInteractiveAuthentication no\nUsePAM no\nStrictModes no\nPermitRootLogin yes\nAllowUsers %s\nAcceptEnv XDG_STATE_HOME XDG_CACHE_HOME XDG_DATA_HOME XDG_CONFIG_HOME\nSetEnv \"PATH=%s\"\nLogLevel ERROR\n", port, hostKey, filepath.Join(root, "sshd.pid"), authorized, username, os.Getenv("PATH"))
+	sshdBody := fmt.Sprintf(
+		"Port %d\nListenAddress 127.0.0.1\nHostKey %s\nPidFile %s\nAuthorizedKeysFile %s\nPubkeyAuthentication yes\nPasswordAuthentication no\nKbdInteractiveAuthentication no\nUsePAM no\nStrictModes no\nPermitRootLogin yes\nAllowUsers %s\nAcceptEnv XDG_STATE_HOME XDG_CACHE_HOME XDG_DATA_HOME XDG_CONFIG_HOME\nSetEnv \"PATH=%s\"\nLogLevel ERROR\n",
+		port,
+		hostKey,
+		filepath.Join(root, "sshd.pid"),
+		authorized,
+		username,
+		os.Getenv("PATH"),
+	)
 	if err := os.WriteFile(sshdConfig, []byte(sshdBody), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -300,7 +362,13 @@ func writeRemoteSSHConfigs(t *testing.T, username, sshDir, root, clientKey, host
 
 	clientConfig := filepath.Join(sshDir, "config")
 
-	clientBody := fmt.Sprintf("Host sesh-fixture\n  HostName 127.0.0.1\n  Port %d\n  User %s\n  IdentityFile %s\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n  UserKnownHostsFile %s\n  SendEnv XDG_STATE_HOME XDG_CACHE_HOME XDG_DATA_HOME XDG_CONFIG_HOME\n", port, username, clientKey, knownHosts)
+	clientBody := fmt.Sprintf(
+		"Host sesh-fixture\n  HostName 127.0.0.1\n  Port %d\n  User %s\n  IdentityFile %s\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n  UserKnownHostsFile %s\n  SendEnv XDG_STATE_HOME XDG_CACHE_HOME XDG_DATA_HOME XDG_CONFIG_HOME\n",
+		port,
+		username,
+		clientKey,
+		knownHosts,
+	)
 	if err := os.WriteFile(clientConfig, []byte(clientBody), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -311,7 +379,12 @@ func writeRemoteSSHConfigs(t *testing.T, username, sshDir, root, clientKey, host
 func writeRemoteSSHWrapper(t *testing.T, path, argumentLog, ssh, clientConfig string) {
 	t.Helper()
 
-	body := fmt.Sprintf("#!/bin/sh\nprintf '%%s\\n' \"$@\" > %q\nexec %q -F %q \"$@\"\n", argumentLog, ssh, clientConfig)
+	body := fmt.Sprintf(
+		"#!/bin/sh\nprintf '%%s\\n' \"$@\" > %q\nexec %q -F %q \"$@\"\n",
+		argumentLog,
+		ssh,
+		clientConfig,
+	)
 	if err := os.WriteFile(path, []byte(body), 0o700); err != nil {
 		t.Fatal(err)
 	}

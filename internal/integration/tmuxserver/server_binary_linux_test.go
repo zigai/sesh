@@ -58,10 +58,17 @@ func listeningRow(inode, path string) string {
 }
 
 func TestServerBinaryUsesExecutableOfServerListeningOnSocket(t *testing.T) {
-	proc := newFakeProc(t, listeningRow("9001", "/run/other.sock")+listeningRow("4242", fakeServerSocket))
+	proc := newFakeProc(
+		t,
+		listeningRow("9001", "/run/other.sock")+listeningRow("4242", fakeServerSocket),
+	)
 	proc.process(t, fakeServerPID, fakeServerBinary, "pipe:[1]", "socket:[4242]")
 
-	got := resolveServerBinary(fakeServerSocket+","+fakeServerPID+",0", fakeServerSocket, os.DirFS(proc.root))
+	got := resolveServerBinary(
+		fakeServerSocket+","+fakeServerPID+",0",
+		fakeServerSocket,
+		os.DirFS(proc.root),
+	)
 	if got != fakeServerBinary {
 		t.Fatalf("server binary = %q, want %q", got, fakeServerBinary)
 	}
@@ -86,7 +93,11 @@ func TestServerBinaryFallsBackToPathWithoutVerifiedServer(t *testing.T) {
 			proc := newFakeProc(t, test.rows)
 			proc.process(t, fakeServerPID, test.executable, test.descriptor)
 
-			if got := resolveServerBinary(test.env, fakeServerSocket, os.DirFS(proc.root)); got != "" {
+			if got := resolveServerBinary(
+				test.env,
+				fakeServerSocket,
+				os.DirFS(proc.root),
+			); got != "" {
 				t.Fatalf("server binary = %q, want PATH fallback", got)
 			}
 		})

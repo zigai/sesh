@@ -24,7 +24,18 @@ func TestAgentPositionOrder(t *testing.T) {
 		{HarnessSession: "F window zero", PositionKnown: true},
 	}
 	sortAgentSessions(agents, agentSortPosition)
-	assertAgentNames(t, agents, []string{"F window zero", "E upper left", "D lower left", "C right", "B window 10", "A unknown"})
+	assertAgentNames(
+		t,
+		agents,
+		[]string{
+			"F window zero",
+			"E upper left",
+			"D lower left",
+			"C right",
+			"B window 10",
+			"A unknown",
+		},
+	)
 }
 
 func TestAgentAttentionOrder(t *testing.T) {
@@ -37,21 +48,48 @@ func TestAgentAttentionOrder(t *testing.T) {
 		{HarnessSession: "failed", Status: session.AgentStatusFailed},
 		{HarnessSession: "waiting no time", Status: session.AgentStatusWaiting},
 		{HarnessSession: "waiting new", Status: session.AgentStatusWaiting, StatusSince: now},
-		{HarnessSession: "waiting old right", Status: session.AgentStatusWaiting, StatusSince: now.Add(-time.Hour), PositionKnown: true, PaneLeft: 20},
-		{HarnessSession: "waiting old left", Status: session.AgentStatusWaiting, StatusSince: now.Add(-time.Hour), PositionKnown: true},
+		{
+			HarnessSession: "waiting old right",
+			Status:         session.AgentStatusWaiting,
+			StatusSince:    now.Add(-time.Hour),
+			PositionKnown:  true,
+			PaneLeft:       20,
+		},
+		{
+			HarnessSession: "waiting old left",
+			Status:         session.AgentStatusWaiting,
+			StatusSince:    now.Add(-time.Hour),
+			PositionKnown:  true,
+		},
 	}
 	sortAgentSessions(agents, agentSortAttention)
-	assertAgentNames(t, agents, []string{"waiting old left", "waiting old right", "waiting new", "waiting no time", "failed", "idle", "interrupted", "working", "unknown"})
+	assertAgentNames(
+		t,
+		agents,
+		[]string{
+			"waiting old left",
+			"waiting old right",
+			"waiting new",
+			"waiting no time",
+			"failed",
+			"idle",
+			"interrupted",
+			"working",
+			"unknown",
+		},
+	)
 }
 
 func TestAgentSortCyclingPreservesSelectionAndSearch(t *testing.T) {
 	model := newTestModel()
 	t.Cleanup(model.Close)
 	model.displayMode = displayModeAgents
-	model.sessions = []session.Session{{ID: "$1", Name: testSupportSessionDevName, Agents: []session.AgentSession{
-		{RegistryID: "z", HarnessSession: "Zebra", PositionKnown: true},
-		{RegistryID: "a", HarnessSession: "Alpha", PositionKnown: true, PaneLeft: 30},
-	}}}
+	model.sessions = []session.Session{
+		{ID: "$1", Name: testSupportSessionDevName, Agents: []session.AgentSession{
+			{RegistryID: "z", HarnessSession: "Zebra", PositionKnown: true},
+			{RegistryID: "a", HarnessSession: "Alpha", PositionKnown: true, PaneLeft: 30},
+		}},
+	}
 	model.textInput.SetValue(testSupportSessionDevName)
 	model.refreshDisplaySessions()
 	model.filterSessions()
@@ -62,7 +100,8 @@ func TestAgentSortCyclingPreservesSelectionAndSearch(t *testing.T) {
 
 	updateTestModel(t, model, keyCtrl('s'))
 
-	if model.dialog != dialogNone || model.agentSort != agentSortName || model.textInput.Value() != testSupportSessionDevName {
+	if model.dialog != dialogNone || model.agentSort != agentSortName ||
+		model.textInput.Value() != testSupportSessionDevName {
 		t.Fatal("cycling to Name changed dialog or reset search")
 	}
 
@@ -101,10 +140,26 @@ func TestAgentSortChoiceSurvivesSummaryRefresh(t *testing.T) {
 	model.setAgentSort(agentSortAttention)
 
 	now := time.Now()
-	summaries := []session.AgentSummary{{TmuxSessionID: "$1", TmuxSessionName: testSupportSessionDevName, Agents: []session.AgentSession{
-		{RegistryID: "a", HarnessSession: "Alpha", Status: session.AgentStatusIdle, StatusSince: now},
-		{RegistryID: "z", HarnessSession: "Zebra", Status: session.AgentStatusWaiting, StatusSince: now},
-	}}}
+	summaries := []session.AgentSummary{
+		{
+			TmuxSessionID:   "$1",
+			TmuxSessionName: testSupportSessionDevName,
+			Agents: []session.AgentSession{
+				{
+					RegistryID:     "a",
+					HarnessSession: "Alpha",
+					Status:         session.AgentStatusIdle,
+					StatusSince:    now,
+				},
+				{
+					RegistryID:     "z",
+					HarnessSession: "Zebra",
+					Status:         session.AgentStatusWaiting,
+					StatusSince:    now,
+				},
+			},
+		},
+	}
 	model.applyAgentSummaries(summaries)
 	model.agentCursor = 0
 	assertAgentNames(t, model.filtered[0].Agents, []string{"Zebra", "Alpha"})
@@ -125,7 +180,13 @@ func TestAgentPositionRefreshPreservesSelectionAndRemoteRows(t *testing.T) {
 	model.sessions = []session.Session{
 		{ID: "$1", Name: testSupportSessionDevName, Agents: []session.AgentSession{
 			{RegistryID: "a", PaneID: "%1", HarnessSession: "Alpha", PositionKnown: true},
-			{RegistryID: "z", PaneID: "%2", HarnessSession: "Zebra", PositionKnown: true, PaneLeft: 20},
+			{
+				RegistryID:     "z",
+				PaneID:         "%2",
+				HarnessSession: "Zebra",
+				PositionKnown:  true,
+				PaneLeft:       20,
+			},
 		}},
 		{ID: "$1", Name: "remote", Origin: session.OriginSSH, Agents: []session.AgentSession{
 			{RegistryID: "remote", PaneID: "%1", PositionKnown: true, WindowIndex: 9},
@@ -136,12 +197,27 @@ func TestAgentPositionRefreshPreservesSelectionAndRemoteRows(t *testing.T) {
 	model.cursor = 0
 	model.agentCursor = 0
 	model.applyAgentPositions(agentPositionsMsg{ready: true, panes: []PaneLocation{
-		{SessionID: "$1", SessionName: testSupportSessionDevName, PaneID: "%1", WindowIndex: "0", PaneLeft: "20", PaneTop: "0"},
-		{SessionID: "$1", SessionName: testSupportSessionDevName, PaneID: "%2", WindowIndex: "0", PaneLeft: "0", PaneTop: "0"},
+		{
+			SessionID:   "$1",
+			SessionName: testSupportSessionDevName,
+			PaneID:      "%1",
+			WindowIndex: "0",
+			PaneLeft:    "20",
+			PaneTop:     "0",
+		},
+		{
+			SessionID:   "$1",
+			SessionName: testSupportSessionDevName,
+			PaneID:      "%2",
+			WindowIndex: "0",
+			PaneLeft:    "0",
+			PaneTop:     "0",
+		},
 	}})
 	assertAgentNames(t, model.filtered[0].Agents, []string{"Zebra", "Alpha"})
 
-	if model.selectedSessionIdentity().agentID != "a" || model.sessions[1].Agents[0].WindowIndex != 9 {
+	if model.selectedSessionIdentity().agentID != "a" ||
+		model.sessions[1].Agents[0].WindowIndex != 9 {
 		t.Fatal("geometry refresh lost selection or overwrote remote geometry")
 	}
 
@@ -160,13 +236,47 @@ func TestAgentPositionOrderRemainsStableAcrossActivityUpdates(t *testing.T) {
 	t.Cleanup(model.Close)
 	model.displayMode = displayModeAgents
 	model.sessions = []session.Session{{ID: "$1", Name: testSupportSessionDevName}}
-	summaries := []session.AgentSummary{{TmuxSessionID: "$1", TmuxSessionName: testSupportSessionDevName, Agents: []session.AgentSession{
-		{RegistryID: "a", PaneID: "%1", PanePID: 101, HarnessSession: nameFirst, Status: session.AgentStatusRunning},
-		{RegistryID: "z", PaneID: "%2", PanePID: 102, HarnessSession: nameLast, Status: session.AgentStatusRunning},
-	}}}
+	summaries := []session.AgentSummary{
+		{
+			TmuxSessionID:   "$1",
+			TmuxSessionName: testSupportSessionDevName,
+			Agents: []session.AgentSession{
+				{
+					RegistryID:     "a",
+					PaneID:         "%1",
+					PanePID:        101,
+					HarnessSession: nameFirst,
+					Status:         session.AgentStatusRunning,
+				},
+				{
+					RegistryID:     "z",
+					PaneID:         "%2",
+					PanePID:        102,
+					HarnessSession: nameLast,
+					Status:         session.AgentStatusRunning,
+				},
+			},
+		},
+	}
 	positions := agentPositionsMsg{ready: true, panes: []PaneLocation{
-		{SessionID: "$1", SessionName: testSupportSessionDevName, PaneID: "%1", PanePID: 101, WindowIndex: "2", PaneLeft: "20", PaneTop: "0"},
-		{SessionID: "$1", SessionName: testSupportSessionDevName, PaneID: "%2", PanePID: 102, WindowIndex: "2", PaneLeft: "0", PaneTop: "0"},
+		{
+			SessionID:   "$1",
+			SessionName: testSupportSessionDevName,
+			PaneID:      "%1",
+			PanePID:     101,
+			WindowIndex: "2",
+			PaneLeft:    "20",
+			PaneTop:     "0",
+		},
+		{
+			SessionID:   "$1",
+			SessionName: testSupportSessionDevName,
+			PaneID:      "%2",
+			PanePID:     102,
+			WindowIndex: "2",
+			PaneLeft:    "0",
+			PaneTop:     "0",
+		},
 	}}
 
 	updateTestModel(t, model, agentSummariesMsg{summaries: summaries, revision: 1})
@@ -187,7 +297,8 @@ func TestAgentPositionOrderRemainsStableAcrossActivityUpdates(t *testing.T) {
 		}
 
 		updated := model.filtered[0].Agents[1]
-		if updated.Status != session.AgentStatusWaiting || !updated.StatusSince.Equal(time.Unix(int64(revision), 0)) {
+		if updated.Status != session.AgentStatusWaiting ||
+			!updated.StatusSince.Equal(time.Unix(int64(revision), 0)) {
 			t.Fatal("stable position order prevented fresh activity from being displayed")
 		}
 
@@ -224,18 +335,43 @@ func TestAgentPositionOrderUsesGeometryOnInitialLoad(t *testing.T) {
 
 	model := newTestModelWithDeps(Dependencies{
 		LoadCatalog: func(context.Context) (session.CatalogResult, error) {
-			return session.CatalogResult{Sessions: []session.Session{{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive}}, Status: session.StatusComplete}, nil
+			return session.CatalogResult{
+				Sessions: []session.Session{
+					{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive},
+				},
+				Status: session.StatusComplete,
+			}, nil
 		},
 		LoadAgentSummaries: func(context.Context) ([]session.AgentSummary, error) {
-			return []session.AgentSummary{{TmuxSessionID: "$1", TmuxSessionName: testSupportSessionDevName, Agents: []session.AgentSession{
-				{RegistryID: "a", PaneID: "%1", HarnessSession: nameFirst},
-				{RegistryID: "z", PaneID: "%2", HarnessSession: nameLast},
-			}}}, nil
+			return []session.AgentSummary{
+				{
+					TmuxSessionID:   "$1",
+					TmuxSessionName: testSupportSessionDevName,
+					Agents: []session.AgentSession{
+						{RegistryID: "a", PaneID: "%1", HarnessSession: nameFirst},
+						{RegistryID: "z", PaneID: "%2", HarnessSession: nameLast},
+					},
+				},
+			}, nil
 		},
 		TmuxPaneLocations: func(context.Context) ([]PaneLocation, error) {
 			return []PaneLocation{
-				{SessionID: "$1", SessionName: testSupportSessionDevName, PaneID: "%1", WindowIndex: "0", PaneLeft: "20", PaneTop: "0"},
-				{SessionID: "$1", SessionName: testSupportSessionDevName, PaneID: "%2", WindowIndex: "0", PaneLeft: "0", PaneTop: "0"},
+				{
+					SessionID:   "$1",
+					SessionName: testSupportSessionDevName,
+					PaneID:      "%1",
+					WindowIndex: "0",
+					PaneLeft:    "20",
+					PaneTop:     "0",
+				},
+				{
+					SessionID:   "$1",
+					SessionName: testSupportSessionDevName,
+					PaneID:      "%2",
+					WindowIndex: "0",
+					PaneLeft:    "0",
+					PaneTop:     "0",
+				},
 			}, nil
 		},
 	})
@@ -268,10 +404,25 @@ func TestAgentPositionRefreshHonorsNewPaneEvidence(t *testing.T) {
 			model := newTestModel()
 			t.Cleanup(model.Close)
 			model.displayMode = displayModeAgents
-			model.sessions = []session.Session{{ID: "$1", Name: testSupportSessionDevName, Agents: []session.AgentSession{
-				{RegistryID: "a", PaneID: "%1", PanePID: 101, HarnessSession: nameFirst, PositionKnown: true, PaneLeft: 20},
-				{RegistryID: "z", PaneID: "%2", PanePID: 102, HarnessSession: nameLast, PositionKnown: true},
-			}}}
+			model.sessions = []session.Session{
+				{ID: "$1", Name: testSupportSessionDevName, Agents: []session.AgentSession{
+					{
+						RegistryID:     "a",
+						PaneID:         "%1",
+						PanePID:        101,
+						HarnessSession: nameFirst,
+						PositionKnown:  true,
+						PaneLeft:       20,
+					},
+					{
+						RegistryID:     "z",
+						PaneID:         "%2",
+						PanePID:        102,
+						HarnessSession: nameLast,
+						PositionKnown:  true,
+					},
+				}},
+			}
 			model.refreshDisplaySessions()
 			model.filterSessions()
 			assertAgentNames(t, model.filtered[0].Agents, []string{nameLast, nameFirst})
@@ -316,12 +467,19 @@ func checkAgentSortConfigAndFooter(t *testing.T, value string) {
 		}
 	}
 
-	if !strings.Contains(model.renderModeFooter(80, false), "sort: "+parseAgentSort(value).label()) {
+	if !strings.Contains(
+		model.renderModeFooter(80, false),
+		"sort: "+parseAgentSort(value).label(),
+	) {
 		t.Fatal("single-mode footer omitted the configured order")
 	}
 
 	layout := model.popupMouseLayout()
-	updateTestModel(t, model, mouseClick(layout.bodyX+layout.layout.bodyWidth-3, layout.footerY, tea.MouseLeft))
+	updateTestModel(
+		t,
+		model,
+		mouseClick(layout.bodyX+layout.layout.bodyWidth-3, layout.footerY, tea.MouseLeft),
+	)
 
 	initialSort := parseAgentSort(value)
 	expectedChoices := agentSortChoices()
@@ -336,7 +494,11 @@ func checkAgentSortConfigAndFooter(t *testing.T, value string) {
 
 	expectedNextSort := expectedChoices[(expectedIndex+1)%len(expectedChoices)]
 	if model.dialog != dialogNone || model.agentSort != expectedNextSort {
-		t.Fatalf("clicking sort indicator = %v, want cycled to %v", model.agentSort, expectedNextSort)
+		t.Fatalf(
+			"clicking sort indicator = %v, want cycled to %v",
+			model.agentSort,
+			expectedNextSort,
+		)
 	}
 }
 
@@ -411,7 +573,11 @@ func TestHiddenAgentSortBadgeHasNoMouseTarget(t *testing.T) {
 	model.displayMode = displayModeAgents
 	model.width, model.height = 80, 24
 	layout := model.popupMouseLayout()
-	updateTestModel(t, model, mouseClick(layout.bodyX+layout.layout.bodyWidth-3, layout.footerY, tea.MouseLeft))
+	updateTestModel(
+		t,
+		model,
+		mouseClick(layout.bodyX+layout.layout.bodyWidth-3, layout.footerY, tea.MouseLeft),
+	)
 
 	if model.dialog != dialogNone || model.agentSort != agentSortPosition {
 		t.Fatal("clicking the mode badge changed sort or opened dialog")

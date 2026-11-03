@@ -50,7 +50,8 @@ func serviceOOMPolicyOf(ctx context.Context, unit string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, oomPolicyQueryTimeout)
 	defer cancel()
 
-	output, err := exec.CommandContext(ctx, "systemctl", "--user", "show", "--property=OOMPolicy", "--value", unit).Output()
+	output, err := exec.CommandContext(ctx, "systemctl", "--user", "show", "--property=OOMPolicy", "--value", unit).
+		Output()
 	if err != nil {
 		return "", fmt.Errorf("query unit oom policy: %w", err)
 	}

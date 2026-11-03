@@ -83,7 +83,11 @@ func TestAutosaveSaveIfDueSkipsWhenDefaultTmuxServerIsNotRunning(t *testing.T) {
 
 	exec := executeJSON(t, "autosave", "save-if-due", testNoConfigFlag, testJSONFlag)
 	if exec.Err != nil || !exec.Envelope.OK {
-		t.Fatalf("save-if-due without a running tmux server failed: %v\nstderr: %s", exec.Err, exec.Stderr)
+		t.Fatalf(
+			"save-if-due without a running tmux server failed: %v\nstderr: %s",
+			exec.Err,
+			exec.Stderr,
+		)
 	}
 
 	result := clitest.DecodePayload[resultJSON](t, exec.Envelope.Result)
@@ -106,7 +110,11 @@ func TestAutosaveStatusReportsHistoryUnavailable(t *testing.T) {
 	}
 
 	if clibase.ExitCode(status.Err) != clibase.ExitCodeGeneral {
-		t.Fatalf("status exit code = %d, want %d", clibase.ExitCode(status.Err), clibase.ExitCodeGeneral)
+		t.Fatalf(
+			"status exit code = %d, want %d",
+			clibase.ExitCode(status.Err),
+			clibase.ExitCodeGeneral,
+		)
 	}
 
 	if status.Envelope.Error == nil {
@@ -133,7 +141,11 @@ func TestAutosaveSaveIfDueRefusesWhenHistoryUnavailable(t *testing.T) {
 	}
 
 	if clibase.ExitCode(save.Err) != clibase.ExitCodeGeneral {
-		t.Fatalf("save exit code = %d, want %d", clibase.ExitCode(save.Err), clibase.ExitCodeGeneral)
+		t.Fatalf(
+			"save exit code = %d, want %d",
+			clibase.ExitCode(save.Err),
+			clibase.ExitCodeGeneral,
+		)
 	}
 
 	refusal := clitest.DecodePayload[resultJSON](t, save.Envelope.Result)
@@ -170,7 +182,15 @@ func TestAutosaveStatusReportsBestEffortSaveAsRestorable(t *testing.T) {
 	repoPath := filepath.Join(t.TempDir(), "snapshots")
 	snapfixture.CommitOneSession(t, repoPath)
 
-	exec := executeJSON(t, "autosave", "status", testNoConfigFlag, testJSONFlag, "--repository", repoPath)
+	exec := executeJSON(
+		t,
+		"autosave",
+		"status",
+		testNoConfigFlag,
+		testJSONFlag,
+		"--repository",
+		repoPath,
+	)
 	if !exec.Envelope.OK {
 		t.Fatalf("autosave status failed: %s", exec.Stderr)
 	}
@@ -191,7 +211,11 @@ func TestAutosaveFinalSaveRequiresPositiveDeadline(t *testing.T) {
 		"--deadline", "0s",
 	)
 	if deadline.Err == nil || clibase.ExitCode(deadline.Err) != clibase.ExitCodeUsage {
-		t.Fatalf("final-save with a zero deadline = (%v, %d), want a usage error", deadline.Err, clibase.ExitCode(deadline.Err))
+		t.Fatalf(
+			"final-save with a zero deadline = (%v, %d), want a usage error",
+			deadline.Err,
+			clibase.ExitCode(deadline.Err),
+		)
 	}
 }
 
@@ -211,7 +235,11 @@ func TestAutosaveFinalSaveWaitsForASaveInProgress(t *testing.T) {
 			home := isolatedAutosaveHome(t)
 			statusPath := filepath.Join(home, "final-save-status.json")
 
-			lock, acquired, err := automation.AcquireSaveLock(t.Context(), automation.SaveLockPath(), automation.SaveLockNonBlocking)
+			lock, acquired, err := automation.AcquireSaveLock(
+				t.Context(),
+				automation.SaveLockPath(),
+				automation.SaveLockNonBlocking,
+			)
 			if err != nil || !acquired {
 				t.Fatalf("hold save lock = (%v, %v)", acquired, err)
 			}
@@ -238,7 +266,11 @@ func TestAutosaveFinalSaveWaitsForASaveInProgress(t *testing.T) {
 			}
 
 			if status.Reason != tc.wantReason || !status.Incomplete {
-				t.Fatalf("final save status = %+v, want incomplete with reason %q", status, tc.wantReason)
+				t.Fatalf(
+					"final save status = %+v, want incomplete with reason %q",
+					status,
+					tc.wantReason,
+				)
 			}
 		})
 	}

@@ -26,7 +26,14 @@ import (
 var ErrDoctorChecksFailed = clibase.ErrDoctorChecksFailed
 
 var envVars = []string{
-	"SESH_CONFIG", "TMUX", "TMUX_TMPDIR", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_RUNTIME_DIR", "WORKTREE_DIR",
+	"SESH_CONFIG",
+	"TMUX",
+	"TMUX_TMPDIR",
+	"XDG_CONFIG_HOME",
+	"XDG_DATA_HOME",
+	"XDG_STATE_HOME",
+	"XDG_RUNTIME_DIR",
+	"WORKTREE_DIR",
 }
 
 type Build struct {
@@ -128,13 +135,22 @@ func runDoctor(cmd *cobra.Command, build Build) error {
 		return clibase.WriteJSONResult(cmd, report)
 	}
 
-	renderErr := clibase.CommandOutputError(writeReport(cmd.OutOrStdout(), report, clibase.CommandOutputWidth(cmd), clibase.ColorOutput(cmd)))
+	renderErr := clibase.CommandOutputError(
+		writeReport(
+			cmd.OutOrStdout(),
+			report,
+			clibase.CommandOutputWidth(cmd),
+			clibase.ColorOutput(cmd),
+		),
+	)
 
 	switch {
 	case renderErr != nil:
 		return errors.Join(failure, renderErr)
 	case runErr != nil:
-		return clibase.NewCommandResultError(oops.In("cli").With("operation", "doctor_run").Wrap(runErr))
+		return clibase.NewCommandResultError(
+			oops.In("cli").With("operation", "doctor_run").Wrap(runErr),
+		)
 	case failure != nil:
 		return clibase.NewRenderedCommandError(failure)
 	default:
@@ -142,7 +158,10 @@ func runDoctor(cmd *cobra.Command, build Build) error {
 	}
 }
 
-func resolveDoctorOptions(ctx context.Context, cmd *cobra.Command) (doctor.Options, ReportPaths, error) {
+func resolveDoctorOptions(
+	ctx context.Context,
+	cmd *cobra.Command,
+) (doctor.Options, ReportPaths, error) {
 	var opts doctor.Options
 
 	cfg, configErr := clibase.LoadCommandConfig(ctx, cmd)
@@ -193,15 +212,27 @@ func resolveDoctorOptions(ctx context.Context, cmd *cobra.Command) (doctor.Optio
 
 	if configErr == nil {
 		for _, name := range cfg.Display.UsedFieldNames() {
-			opts.CustomFields = append(opts.CustomFields, doctor.CustomField{Name: name, Command: cfg.Display.Fields[name].Command})
+			opts.CustomFields = append(
+				opts.CustomFields,
+				doctor.CustomField{Name: name, Command: cfg.Display.Fields[name].Command},
+			)
 		}
 	}
 
 	paths := ReportPaths{
-		Config:    opts.ConfigFiles,
-		Data:      Location{Path: dataDir, Source: setting(cfg.Paths.DataDir != "", "paths.data_dir")},
-		State:     Location{Path: filepath.Join(config.GetXDGPaths().StateHome, "sesh"), Source: ""},
-		Log:       Location{Path: logPath, Source: setting(cfg.Paths.LogFile != "", "paths.log_file")},
+		Config: opts.ConfigFiles,
+		Data: Location{
+			Path:   dataDir,
+			Source: setting(cfg.Paths.DataDir != "", "paths.data_dir"),
+		},
+		State: Location{
+			Path:   filepath.Join(config.GetXDGPaths().StateHome, "sesh"),
+			Source: "",
+		},
+		Log: Location{
+			Path:   logPath,
+			Source: setting(cfg.Paths.LogFile != "", "paths.log_file"),
+		},
 		Snapshots: Location{Path: workspace.Repository, Source: flagSource(cmd, "repository")},
 		History:   Location{Path: workspace.History, Source: flagSource(cmd, "history")},
 		Socket:    Location{Path: workspace.Socket, Source: socketSource(cmd)},
@@ -274,11 +305,20 @@ func daemonState(ctx context.Context, socket string) doctor.Daemon {
 	state, status := cmdautosave.DaemonRuntimeState(ctx, socket)
 	path, _ := daemon.RuntimeStatusPath(os.Getenv("XDG_RUNTIME_DIR"), socket)
 
-	return doctor.Daemon{State: state, Phase: string(status.Phase), InhibitorsHeld: status.InhibitorsHeld, RuntimePath: path}
+	return doctor.Daemon{
+		State:          state,
+		Phase:          string(status.Phase),
+		InhibitorsHeld: status.InhibitorsHeld,
+		RuntimePath:    path,
+	}
 }
 
 func unitActiveState(ctx context.Context, unit string) (string, error) {
-	states, err := setup.UnitStates(ctx, setup.ServiceManager{Inspect: nil, Run: nil}, []string{unit})
+	states, err := setup.UnitStates(
+		ctx,
+		setup.ServiceManager{Inspect: nil, Run: nil},
+		[]string{unit},
+	)
 	if err != nil {
 		return "", oops.In("cli").With("operation", "inspect_unit_state").Wrap(err)
 	}
@@ -339,7 +379,12 @@ func capitalize(text string) string {
 	return string(unicode.ToUpper(first)) + text[size:]
 }
 
-func newReport(build Build, opts doctor.Options, paths ReportPaths, results []doctor.Result) Report {
+func newReport(
+	build Build,
+	opts doctor.Options,
+	paths ReportPaths,
+	results []doctor.Result,
+) Report {
 	env := []EnvVar{}
 
 	for _, name := range envVars {
@@ -359,7 +404,11 @@ func newReport(build Build, opts doctor.Options, paths ReportPaths, results []do
 
 	return Report{
 		Version: build.Version,
-		Build:   ReportBuild{Commit: build.Commit, Date: build.Date, Target: runtime.GOOS + "/" + runtime.GOARCH},
+		Build: ReportBuild{
+			Commit: build.Commit,
+			Date:   build.Date,
+			Target: runtime.GOOS + "/" + runtime.GOARCH,
+		},
 		Install: ReportInstall{Executable: doctor.DisplayPath(opts.Executable)},
 		Paths:   paths,
 		Env:     env,

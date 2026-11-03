@@ -37,7 +37,12 @@ func Prune(
 		Msg("snapshot prune started")
 
 	if repository == nil {
-		return store.RetentionResult{}, maintenanceFailure(ctx, "prune", "admission", ErrRepositoryRequired)
+		return store.RetentionResult{}, maintenanceFailure(
+			ctx,
+			"prune",
+			"admission",
+			ErrRepositoryRequired,
+		)
 	}
 
 	result, err := repository.RetainPolicy(ctx, now, policy)
@@ -80,7 +85,12 @@ func GarbageCollect(
 		Msg("snapshot collection started")
 
 	if repository == nil {
-		return store.CollectionResult{}, maintenanceFailure(ctx, "gc", "admission", ErrRepositoryRequired)
+		return store.CollectionResult{}, maintenanceFailure(
+			ctx,
+			"gc",
+			"admission",
+			ErrRepositoryRequired,
+		)
 	}
 
 	result, err := repository.Collect(ctx, budget)
@@ -91,7 +101,10 @@ func GarbageCollect(
 	return collectionOutcome(ctx, result)
 }
 
-func collectionOutcome(ctx context.Context, result store.CollectionResult) (store.CollectionResult, error) {
+func collectionOutcome(
+	ctx context.Context,
+	result store.CollectionResult,
+) (store.CollectionResult, error) {
 	if len(result.Quarantined) > 0 {
 		zerolog.Ctx(ctx).Warn().
 			Str("component", "snapshot").

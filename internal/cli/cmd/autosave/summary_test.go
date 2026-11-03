@@ -12,11 +12,15 @@ import (
 
 func summaryEnv() Env {
 	return Env{
-		workspace:     app.Workspace{},
-		interval:      3 * time.Minute,
-		historyKnown:  true,
-		historyErr:    nil,
-		decision:      automation.DueDecision{Due: false, Reason: automation.ReasonNotDue, Elapsed: 80 * time.Second},
+		workspace:    app.Workspace{},
+		interval:     3 * time.Minute,
+		historyKnown: true,
+		historyErr:   nil,
+		decision: automation.DueDecision{
+			Due:     false,
+			Reason:  automation.ReasonNotDue,
+			Elapsed: 80 * time.Second,
+		},
 		lastSavedUnix: 0,
 	}
 }
@@ -36,13 +40,19 @@ func TestAutosaveSummarySaysWhatHappenedInOneLine(t *testing.T) {
 	refused.abandoned = 1
 
 	restored := newOutcome("complete", "verified")
-	restored.restore, restored.generation = &restoreCounts{restored: 2, skipped: nil}, "d879e6dc156d244c6e807b18d070d558"
+	restored.restore, restored.generation = &restoreCounts{
+		restored: 2,
+		skipped:  nil,
+	}, "d879e6dc156d244c6e807b18d070d558"
 
 	partial := newOutcome("partial", "sessions_skipped")
-	partial.restore, partial.generation = &restoreCounts{restored: 1, skipped: []engine.SkippedSession{
-		{ID: "s0", Name: "0", Reason: restore.CollisionNameInUse},
-		{ID: "s3", Name: "docs", Reason: "linked_session_collides"},
-	}}, "d879e6dc156d244c6e807b18d070d558"
+	partial.restore, partial.generation = &restoreCounts{
+		restored: 1,
+		skipped: []engine.SkippedSession{
+			{ID: "s0", Name: "0", Reason: restore.CollisionNameInUse},
+			{ID: "s3", Name: "docs", Reason: "linked_session_collides"},
+		},
+	}, "d879e6dc156d244c6e807b18d070d558"
 
 	tests := []struct {
 		name    string
@@ -51,17 +61,29 @@ func TestAutosaveSummarySaysWhatHappenedInOneLine(t *testing.T) {
 	}{
 		{"saved", saved, "Saved generation d879e6dc.\n"},
 		{"not due", notDue, "Not due: last save 1m20s ago, saves run every 3m.\n"},
-		{"held back until restored", pending, "Skipped: tmux started after the newest snapshot and its saved sessions are not restored yet.\n" +
-			"2 saved sessions are not running. Restore with: sesh snapshot restore\n" +
-			"Or keep the current state, which resumes autosave: sesh snapshot save\n"},
-		{"refused restore", refused, "Not restoring: an earlier restore is still running or was interrupted.\n" +
-			"Abandoned 1 interrupted restore whose tmux server no longer exists.\n"},
+		{
+			"held back until restored",
+			pending,
+			"Skipped: tmux started after the newest snapshot and its saved sessions are not restored yet.\n" +
+				"2 saved sessions are not running. Restore with: sesh snapshot restore\n" +
+				"Or keep the current state, which resumes autosave: sesh snapshot save\n",
+		},
+		{
+			"refused restore",
+			refused,
+			"Not restoring: an earlier restore is still running or was interrupted.\n" +
+				"Abandoned 1 interrupted restore whose tmux server no longer exists.\n",
+		},
 		{"restored", restored, "Restored 2 sessions from generation d879e6dc.\n"},
 		{"partly restored", partial, "Restored 1 session from generation d879e6dc.\n" +
 			"Skipped 2 sessions; sesh snapshot restore shows how to restore them:\n" +
 			"  0 (s0): a live session already uses this name\n" +
 			"  docs (s3): linked_session_collides\n"},
-		{"unknown skip", newOutcome(statusSkipped, "clients_attached"), "Skipped (clients_attached).\n"},
+		{
+			"unknown skip",
+			newOutcome(statusSkipped, "clients_attached"),
+			"Skipped (clients_attached).\n",
+		},
 	}
 
 	for _, tc := range tests {

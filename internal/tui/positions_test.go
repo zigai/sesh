@@ -23,10 +23,17 @@ func TestAgentPruningRejectsMissingAndConflictingPaneOwners(t *testing.T) {
 		{name: "unknown process", panes: []PaneLocation{{ServerSocket: "/test", SessionID: "$1", SessionName: testSupportSessionDevName, PaneID: "%1"}}, want: 1},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			summaries := []session.AgentSummary{{
-				TmuxServerSocket: "/test", TmuxSessionID: "$1", TmuxSessionName: testSupportSessionDevName, Total: 1,
-				Agents: []session.AgentSession{{RegistryID: "live", PaneID: "%1", PanePID: 100}},
-			}}
+			summaries := []session.AgentSummary{
+				{
+					TmuxServerSocket: "/test",
+					TmuxSessionID:    "$1",
+					TmuxSessionName:  testSupportSessionDevName,
+					Total:            1,
+					Agents: []session.AgentSession{
+						{RegistryID: "live", PaneID: "%1", PanePID: 100},
+					},
+				},
+			}
 
 			got := pruneAgentsWithVanishedPanes(summaries, testCase.panes)
 			if len(got) != testCase.want {
@@ -54,11 +61,30 @@ func TestAgentPruningRecountsSurvivingStatusesAndClocks(t *testing.T) {
 	panes := make([]PaneLocation, 0, len(statuses))
 	for index, status := range statuses {
 		paneID := string(rune('a' + index))
-		summary.Agents = append(summary.Agents, session.AgentSession{PaneID: paneID, Status: status, StatusSince: now})
-		panes = append(panes, PaneLocation{SessionID: "$1", PaneID: paneID, WindowIndex: "2", PaneLeft: "4", PaneTop: "6"})
+		summary.Agents = append(
+			summary.Agents,
+			session.AgentSession{PaneID: paneID, Status: status, StatusSince: now},
+		)
+		panes = append(
+			panes,
+			PaneLocation{
+				SessionID:   "$1",
+				PaneID:      paneID,
+				WindowIndex: "2",
+				PaneLeft:    "4",
+				PaneTop:     "6",
+			},
+		)
 	}
 
-	summary.Agents = append(summary.Agents, session.AgentSession{PaneID: "%dead", Status: session.AgentStatusWaiting, StatusSince: now.Add(-time.Hour)})
+	summary.Agents = append(
+		summary.Agents,
+		session.AgentSession{
+			PaneID:      "%dead",
+			Status:      session.AgentStatusWaiting,
+			StatusSince: now.Add(-time.Hour),
+		},
+	)
 
 	got := pruneAgentsWithVanishedPanes([]session.AgentSummary{summary}, panes)
 	if len(got) != 1 {
@@ -67,7 +93,14 @@ func TestAgentPruningRecountsSurvivingStatusesAndClocks(t *testing.T) {
 
 	kept := got[0]
 
-	counts := [6]int{kept.Total, kept.Active, kept.Waiting, kept.Failed, kept.Interrupted, kept.Unknown}
+	counts := [6]int{
+		kept.Total,
+		kept.Active,
+		kept.Waiting,
+		kept.Failed,
+		kept.Interrupted,
+		kept.Unknown,
+	}
 	if counts != [6]int{6, 1, 1, 1, 1, 1} {
 		t.Fatalf("surviving counts = %#v, want six agents, one of each status", kept)
 	}
@@ -77,7 +110,8 @@ func TestAgentPruningRecountsSurvivingStatusesAndClocks(t *testing.T) {
 	}
 
 	for _, agent := range kept.Agents {
-		if !agent.PositionKnown || agent.WindowIndex != 2 || agent.PaneLeft != 4 || agent.PaneTop != 6 {
+		if !agent.PositionKnown || agent.WindowIndex != 2 || agent.PaneLeft != 4 ||
+			agent.PaneTop != 6 {
 			t.Fatalf("surviving geometry = %#v, want 2/4/6", agent)
 		}
 	}

@@ -23,7 +23,8 @@ type restoreFixture struct {
 func TestRestoreLaunchesKeepsCapturedLaunchesWhenWakingThePrevious(t *testing.T) {
 	f := newRestoreFixture(t)
 
-	launches, err := task.NewRestoreLaunches(f.store, wakePolicy(t, config.WakeOnRestorePrevious), seshBinary).Override(t.Context(), f.manifest)
+	launches, err := task.NewRestoreLaunches(f.store, wakePolicy(t, config.WakeOnRestorePrevious), seshBinary).
+		Override(t.Context(), f.manifest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +37,12 @@ func TestRestoreLaunchesKeepsCapturedLaunchesWhenWakingThePrevious(t *testing.T)
 
 		launch.Environment = pane.Launch.Environment
 		if !reflect.DeepEqual(launch, pane.Launch) {
-			t.Errorf("launch of %s = %+v, want its captured launch %+v", pane.ID, launch, pane.Launch)
+			t.Errorf(
+				"launch of %s = %+v, want its captured launch %+v",
+				pane.ID,
+				launch,
+				pane.Launch,
+			)
 		}
 	}
 }
@@ -49,18 +55,30 @@ func TestRestoreLaunchesStartTaskPanesWithTheTaskEnvironment(t *testing.T) {
 	}
 
 	for _, policy := range []string{config.WakeOnRestorePrevious, config.WakeOnRestoreNone} {
-		launches, err := task.NewRestoreLaunches(f.store, wakePolicy(t, policy), seshBinary).Override(t.Context(), f.manifest)
+		launches, err := task.NewRestoreLaunches(f.store, wakePolicy(t, policy), seshBinary).
+			Override(t.Context(), f.manifest)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if got := slices.Sorted(maps.Keys(launches)); !slices.Equal(got, []string{"%1", "%2", "%3", "%5"}) {
+		if got := slices.Sorted(
+			maps.Keys(launches),
+		); !slices.Equal(
+			got,
+			[]string{"%1", "%2", "%3", "%5"},
+		) {
 			t.Fatalf("%s: overridden panes = %v, want every launched task pane", policy, got)
 		}
 
 		env := environment(launches["%1"])
-		if env["PATH"] != "/bin" || env[task.EnvTask] != "t1" || env[task.EnvWorktree] != "/worktrees/t1" || env[task.EnvProject] == "" {
-			t.Errorf("%s: t1's agent environment = %v, want the captured one with t1's task variables", policy, env)
+		if env["PATH"] != "/bin" || env[task.EnvTask] != "t1" ||
+			env[task.EnvWorktree] != "/worktrees/t1" ||
+			env[task.EnvProject] == "" {
+			t.Errorf(
+				"%s: t1's agent environment = %v, want the captured one with t1's task variables",
+				policy,
+				env,
+			)
 		}
 
 		if env := environment(launches["%2"]); env[task.EnvTask] != "t1" {
@@ -74,13 +92,16 @@ func TestRestoreLaunchesRunsTheRecordedCommandOfRestartingTaskPanesOnly(t *testi
 
 	restart := func(pane, value string) {
 		index := slices.IndexFunc(f.manifest.Panes, func(p model.Pane) bool { return p.ID == pane })
-		f.manifest.Panes[index].Options = append(f.manifest.Panes[index].Options, userOption("pane", task.OptionRestart, value)...)
+		f.manifest.Panes[index].Options = append(
+			f.manifest.Panes[index].Options,
+			userOption("pane", task.OptionRestart, value)...)
 	}
 
 	restart("%2", `{"directory":"/worktrees/t1/web","argv":["/bin/sh","-c","npm run dev"]}`)
 	restart("%6", `{"directory":"/srv","argv":["/bin/sh","-c","serve"]}`)
 
-	launches, err := task.NewRestoreLaunches(f.store, wakePolicy(t, config.WakeOnRestorePrevious), seshBinary).Override(t.Context(), f.manifest)
+	launches, err := task.NewRestoreLaunches(f.store, wakePolicy(t, config.WakeOnRestorePrevious), seshBinary).
+		Override(t.Context(), f.manifest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,8 +111,10 @@ func TestRestoreLaunchesRunsTheRecordedCommandOfRestartingTaskPanesOnly(t *testi
 	}
 
 	launch := launches["%2"]
-	if string(launch.Executable) != "/bin/sh" || !slices.Equal(arguments(launch), []string{"/bin/sh", "-c", "npm run dev"}) ||
-		string(launch.Directory) != "/worktrees/t1/web" || launch.Recovery != model.RecoveryRestart {
+	if string(launch.Executable) != "/bin/sh" ||
+		!slices.Equal(arguments(launch), []string{"/bin/sh", "-c", "npm run dev"}) ||
+		string(launch.Directory) != "/worktrees/t1/web" ||
+		launch.Recovery != model.RecoveryRestart {
 		t.Fatalf("restarting pane launch = %+v, want its recorded command in its directory", launch)
 	}
 }
@@ -99,11 +122,20 @@ func TestRestoreLaunchesRunsTheRecordedCommandOfRestartingTaskPanesOnly(t *testi
 func TestRestoreLaunchesIgnoresAnUnreadableRestartCommand(t *testing.T) {
 	for _, value := range []string{`not json`, `{"directory":"/w","argv":[]}`, `{"directory":"/w","argv":["sh"]}`, `{"directory":"w","argv":["/bin/sh"]}`} {
 		f := newRestoreFixture(t)
-		f.manifest.Panes[1].Options = append(f.manifest.Panes[1].Options, userOption("pane", task.OptionRestart, value)...)
+		f.manifest.Panes[1].Options = append(
+			f.manifest.Panes[1].Options,
+			userOption("pane", task.OptionRestart, value)...)
 
-		launches, err := task.NewRestoreLaunches(f.store, wakePolicy(t, config.WakeOnRestorePrevious), seshBinary).Override(t.Context(), f.manifest)
-		if launch := launches["%2"]; err != nil || !slices.Equal(arguments(launch), []string{"sh"}) {
-			t.Errorf("Override() with restart command %s = %+v, %v; want the captured launch", value, launch, err)
+		launches, err := task.NewRestoreLaunches(f.store, wakePolicy(t, config.WakeOnRestorePrevious), seshBinary).
+			Override(t.Context(), f.manifest)
+		if launch := launches["%2"]; err != nil ||
+			!slices.Equal(arguments(launch), []string{"sh"}) {
+			t.Errorf(
+				"Override() with restart command %s = %+v, %v; want the captured launch",
+				value,
+				launch,
+				err,
+			)
 		}
 	}
 }
@@ -111,7 +143,8 @@ func TestRestoreLaunchesIgnoresAnUnreadableRestartCommand(t *testing.T) {
 func TestRestoreLaunchesBringsEveryTaskBackAsleepWithNone(t *testing.T) {
 	f := newRestoreFixture(t)
 
-	launches, err := task.NewRestoreLaunches(f.store, wakePolicy(t, config.WakeOnRestoreNone), seshBinary).Override(t.Context(), f.manifest)
+	launches, err := task.NewRestoreLaunches(f.store, wakePolicy(t, config.WakeOnRestoreNone), seshBinary).
+		Override(t.Context(), f.manifest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +154,8 @@ func TestRestoreLaunchesBringsEveryTaskBackAsleepWithNone(t *testing.T) {
 	}
 
 	placeholder := launches["%3"]
-	if string(placeholder.Executable) != seshBinary || placeholder.Recovery != model.RecoveryRestart ||
+	if string(placeholder.Executable) != seshBinary ||
+		placeholder.Recovery != model.RecoveryRestart ||
 		!slices.Equal(arguments(placeholder), []string{"sesh", "task", "placeholder", "t2"}) ||
 		string(placeholder.Directory) != "/worktrees/t2" {
 		t.Fatalf("launch of t2's agent = %+v, want its placeholder in its worktree", placeholder)
@@ -135,7 +169,8 @@ func TestRestoreLaunchesBringsEveryTaskBackAsleepWithNone(t *testing.T) {
 func TestRestoreLaunchesResumesOnlyTheNewestTasksWithACount(t *testing.T) {
 	f := newRestoreFixture(t)
 
-	launches, err := task.NewRestoreLaunches(f.store, wakePolicy(t, "2"), seshBinary).Override(t.Context(), f.manifest)
+	launches, err := task.NewRestoreLaunches(f.store, wakePolicy(t, "2"), seshBinary).
+		Override(t.Context(), f.manifest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +182,11 @@ func TestRestoreLaunchesResumesOnlyTheNewestTasksWithACount(t *testing.T) {
 
 func TestRestoreLaunchesCommitRecordsResumeOnlyForPlannedPanes(t *testing.T) {
 	f := newRestoreFixture(t)
-	launches := task.NewRestoreLaunches(f.store, wakePolicy(t, config.WakeOnRestoreNone), seshBinary)
+	launches := task.NewRestoreLaunches(
+		f.store,
+		wakePolicy(t, config.WakeOnRestoreNone),
+		seshBinary,
+	)
 
 	if _, err := launches.Override(t.Context(), f.manifest); err != nil {
 		t.Fatal(err)
@@ -163,9 +202,14 @@ func TestRestoreLaunchesCommitRecordsResumeOnlyForPlannedPanes(t *testing.T) {
 	}
 
 	slept, _ := ledger.Find("t2")
-	want := task.Resume{Harness: "pi", Session: "/sessions/t2.jsonl", Command: []string{"/usr/bin/pi", "--session", "/sessions/t2.jsonl"}}
+	want := task.Resume{
+		Harness: "pi",
+		Session: "/sessions/t2.jsonl",
+		Command: []string{"/usr/bin/pi", "--session", "/sessions/t2.jsonl"},
+	}
 
-	if slept.State != task.StateSleeping || slept.Resume.Harness != want.Harness || slept.Resume.Session != want.Session ||
+	if slept.State != task.StateSleeping || slept.Resume.Harness != want.Harness ||
+		slept.Resume.Session != want.Session ||
 		!slices.Equal(slept.Resume.Command, want.Command) {
 		t.Fatalf("t2 = %s with %+v, want sleeping with %+v", slept.State, slept.Resume, want)
 	}
@@ -181,8 +225,16 @@ func TestRestoreLaunchesReconcilesCapturedAgentStates(t *testing.T) {
 	for _, policy := range []string{config.WakeOnRestorePrevious, config.WakeOnRestoreNone, "1"} {
 		t.Run(policy, func(t *testing.T) {
 			f := newRestoreFixture(t)
-			resume := task.Resume{Harness: "pi", Session: "/sessions/t2.jsonl", Command: []string{"/usr/bin/pi", "--session", "/sessions/t2.jsonl"}}
-			f.manifest.Panes[2].Launch = apps.PlaceholderLaunch(seshBinary, "t2", f.manifest.Panes[2].Launch)
+			resume := task.Resume{
+				Harness: "pi",
+				Session: "/sessions/t2.jsonl",
+				Command: []string{"/usr/bin/pi", "--session", "/sessions/t2.jsonl"},
+			}
+			f.manifest.Panes[2].Launch = apps.PlaceholderLaunch(
+				seshBinary,
+				"t2",
+				f.manifest.Panes[2].Launch,
+			)
 
 			if _, err := f.store.Update(t.Context(), func(ledger *task.Ledger) error {
 				sleeping, _ := ledger.Find("t2")
@@ -216,11 +268,18 @@ func TestRestoreLaunchesReconcilesCapturedAgentStates(t *testing.T) {
 	}
 }
 
-func assertRestoredAgentStates(t *testing.T, ledger task.Ledger, resume task.Resume, policy string) {
+func assertRestoredAgentStates(
+	t *testing.T,
+	ledger task.Ledger,
+	resume task.Resume,
+	policy string,
+) {
 	t.Helper()
 
 	sleeping, _ := ledger.Find("t2")
-	if sleeping.State != task.StateSleeping || sleeping.Resume.Harness != resume.Harness || sleeping.Resume.Session != resume.Session || !slices.Equal(sleeping.Resume.Command, resume.Command) {
+	if sleeping.State != task.StateSleeping || sleeping.Resume.Harness != resume.Harness ||
+		sleeping.Resume.Session != resume.Session ||
+		!slices.Equal(sleeping.Resume.Command, resume.Command) {
 		t.Fatalf("restored sleeping task = %+v, want sleeping with its resume evidence", sleeping)
 	}
 
@@ -277,11 +336,22 @@ func newRestoreFixture(t *testing.T) restoreFixture {
 	for _, pane := range panes {
 		launch := resumeLaunch("/worktrees/" + pane.task)
 		if pane.role != task.RoleAgent {
-			launch = model.Launch{Executable: model.Bytes("/bin/sh"), Arguments: []model.Bytes{model.Bytes("sh")}, Directory: model.Bytes("/"), Environment: nil, Birth: nil, Recovery: model.RecoveryRestart, Reason: ""}
+			launch = model.Launch{
+				Executable:  model.Bytes("/bin/sh"),
+				Arguments:   []model.Bytes{model.Bytes("sh")},
+				Directory:   model.Bytes("/"),
+				Environment: nil,
+				Birth:       nil,
+				Recovery:    model.RecoveryRestart,
+				Reason:      "",
+			}
 		}
 
 		manifest.Panes = append(manifest.Panes, model.Pane{
-			ID: pane.id, Window: pane.window, Options: userOption("pane", task.OptionRole, pane.role), Launch: launch,
+			ID:      pane.id,
+			Window:  pane.window,
+			Options: userOption("pane", task.OptionRole, pane.role),
+			Launch:  launch,
 		})
 	}
 
@@ -290,8 +360,12 @@ func newRestoreFixture(t *testing.T) restoreFixture {
 
 func resumeLaunch(dir string) model.Launch {
 	return model.Launch{
-		Executable:  model.Bytes("/usr/bin/pi"),
-		Arguments:   []model.Bytes{model.Bytes("pi"), model.Bytes("--session"), model.Bytes("/sessions/" + filepath.Base(dir) + ".jsonl")},
+		Executable: model.Bytes("/usr/bin/pi"),
+		Arguments: []model.Bytes{
+			model.Bytes("pi"),
+			model.Bytes("--session"),
+			model.Bytes("/sessions/" + filepath.Base(dir) + ".jsonl"),
+		},
 		Directory:   model.Bytes(dir),
 		Environment: nil,
 		Birth:       nil,
@@ -305,7 +379,15 @@ func userOption(scope, name, value string) []model.Option {
 		return nil
 	}
 
-	return []model.Option{{Scope: scope, Name: model.Bytes(name), Value: model.Bytes(value), Present: true, Inherited: false}}
+	return []model.Option{
+		{
+			Scope:     scope,
+			Name:      model.Bytes(name),
+			Value:     model.Bytes(value),
+			Present:   true,
+			Inherited: false,
+		},
+	}
 }
 
 func arguments(launch model.Launch) []string {

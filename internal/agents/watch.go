@@ -66,7 +66,12 @@ func (o WatchOptions) normalized() WatchOptions {
 	return o
 }
 
-func RunWatchLoop(ctx context.Context, source SnapshotSource, handler SnapshotHandler, opts WatchOptions) {
+func RunWatchLoop(
+	ctx context.Context,
+	source SnapshotSource,
+	handler SnapshotHandler,
+	opts WatchOptions,
+) {
 	opts = opts.normalized()
 	backoff := opts.InitialBackoff
 	health := watchHealth{handler: handler, quiet: opts.Quiet, disconnected: false, degraded: false}
@@ -115,14 +120,18 @@ func RunWatchLoop(ctx context.Context, source SnapshotSource, handler SnapshotHa
 func (h *watchHealth) apply(ctx context.Context, sessions []aht.Session) error {
 	if h.disconnected && !h.quiet {
 		zerolog.Ctx(ctx).Info().Str("component", "agents").Str("operation", "watch").
-			Str("status", "recovered").Str("reason", "broker_available").Msg("AHT broker watch recovered")
+			Str("status", "recovered").
+			Str("reason", "broker_available").Msg("AHT broker watch recovered")
 	}
 
 	h.disconnected = false
 
 	err := h.handler.HandleSnapshot(ctx, sessions)
 	if err != nil {
-		err = oops.In("agents").Code("snapshot_apply_failed").With("operation", "apply_snapshot").Wrap(err)
+		err = oops.In("agents").
+			Code("snapshot_apply_failed").
+			With("operation", "apply_snapshot").
+			Wrap(err)
 	}
 
 	if ctx.Err() != nil {
@@ -132,7 +141,9 @@ func (h *watchHealth) apply(ctx context.Context, sessions []aht.Session) error {
 	if err != nil {
 		if !h.degraded {
 			zerolog.Ctx(ctx).Warn().Str("component", "agents").Str("operation", "apply_snapshot").
-				Str("status", "degraded").Str("reason", "snapshot_apply_failed").Func(logging.Cause(err)).Msg("agent status snapshot could not be applied")
+				Str("status", "degraded").
+				Str("reason", "snapshot_apply_failed").
+				Func(logging.Cause(err)).Msg("agent status snapshot could not be applied")
 		}
 
 		h.degraded = true
@@ -142,7 +153,8 @@ func (h *watchHealth) apply(ctx context.Context, sessions []aht.Session) error {
 
 	if h.degraded && !h.quiet {
 		zerolog.Ctx(ctx).Info().Str("component", "agents").Str("operation", "apply_snapshot").
-			Str("status", "recovered").Str("reason", "snapshot_applied").Msg("agent status snapshot application recovered")
+			Str("status", "recovered").
+			Str("reason", "snapshot_applied").Msg("agent status snapshot application recovered")
 	}
 
 	h.degraded = false
@@ -150,7 +162,12 @@ func (h *watchHealth) apply(ctx context.Context, sessions []aht.Session) error {
 	return nil
 }
 
-func (h *watchHealth) disconnect(ctx context.Context, err error, handlerFailed bool, backoff time.Duration) {
+func (h *watchHealth) disconnect(
+	ctx context.Context,
+	err error,
+	handlerFailed bool,
+	backoff time.Duration,
+) {
 	if err == nil || handlerFailed || h.disconnected {
 		return
 	}
@@ -162,7 +179,13 @@ func (h *watchHealth) disconnect(ctx context.Context, err error, handlerFailed b
 		Func(logging.Cause(err)).Msg("AHT broker watch disconnected, will retry")
 }
 
-func RunStatusTracker(ctx context.Context, source SnapshotSource, handler SnapshotHandler, opts WatchOptions, clearOnShutdown bool) error {
+func RunStatusTracker(
+	ctx context.Context,
+	source SnapshotSource,
+	handler SnapshotHandler,
+	opts WatchOptions,
+	clearOnShutdown bool,
+) error {
 	RunWatchLoop(ctx, source, handler, opts)
 
 	if !clearOnShutdown {

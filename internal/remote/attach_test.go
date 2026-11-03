@@ -90,18 +90,54 @@ func TestAttachBootstrapRejectsUnvalidatedShapes(t *testing.T) {
 		mutate func(*AttachBootstrap)
 		want   error
 	}{
-		"unsupported version":    {mutate: func(b *AttachBootstrap) { b.Version = ProtocolVersion + 1 }, want: ErrInvalidFrame},
-		"wrong channel":          {mutate: func(b *AttachBootstrap) { b.Channel = ChannelAttach }, want: ErrInvalidFrame},
-		"peer mismatch":          {mutate: func(b *AttachBootstrap) { b.Target.PeerID = "other" }, want: ErrPeerMismatch},
-		"relative bridge socket": {mutate: func(b *AttachBootstrap) { b.BridgeSocket = "bridge.sock" }, want: ErrInvalidFrame},
-		"dirty bridge socket":    {mutate: func(b *AttachBootstrap) { b.BridgeSocket = "/home/remote/../remote.sock" }, want: ErrInvalidFrame},
-		"expired capability":     {mutate: func(b *AttachBootstrap) { b.Capability.ExpiresAt = time.Time{} }, want: ErrInvalidFrame},
-		"negative timeout":       {mutate: func(b *AttachBootstrap) { b.TimeoutMillis = -1 }, want: ErrInvalidFrame},
-		"unbounded timeout":      {mutate: func(b *AttachBootstrap) { b.TimeoutMillis = maxAttachTimeoutMillis + 1 }, want: ErrInvalidFrame},
-		"missing session id":     {mutate: func(b *AttachBootstrap) { b.Target.SessionID = "" }, want: ErrInvalidFrame},
-		"zero server pid":        {mutate: func(b *AttachBootstrap) { b.Target.TmuxServerPID = 0 }, want: ErrInvalidFrame},
-		"missing start time":     {mutate: func(b *AttachBootstrap) { b.Target.TmuxServerStartedAt = time.Time{} }, want: ErrInvalidFrame},
-		"control character":      {mutate: func(b *AttachBootstrap) { b.Target.SessionName = "dev\tforged" }, want: ErrInvalidFrame},
+		"unsupported version": {
+			mutate: func(b *AttachBootstrap) { b.Version = ProtocolVersion + 1 },
+			want:   ErrInvalidFrame,
+		},
+		"wrong channel": {
+			mutate: func(b *AttachBootstrap) { b.Channel = ChannelAttach },
+			want:   ErrInvalidFrame,
+		},
+		"peer mismatch": {
+			mutate: func(b *AttachBootstrap) { b.Target.PeerID = "other" },
+			want:   ErrPeerMismatch,
+		},
+		"relative bridge socket": {
+			mutate: func(b *AttachBootstrap) { b.BridgeSocket = "bridge.sock" },
+			want:   ErrInvalidFrame,
+		},
+		"dirty bridge socket": {
+			mutate: func(b *AttachBootstrap) { b.BridgeSocket = "/home/remote/../remote.sock" },
+			want:   ErrInvalidFrame,
+		},
+		"expired capability": {
+			mutate: func(b *AttachBootstrap) { b.Capability.ExpiresAt = time.Time{} },
+			want:   ErrInvalidFrame,
+		},
+		"negative timeout": {
+			mutate: func(b *AttachBootstrap) { b.TimeoutMillis = -1 },
+			want:   ErrInvalidFrame,
+		},
+		"unbounded timeout": {
+			mutate: func(b *AttachBootstrap) { b.TimeoutMillis = maxAttachTimeoutMillis + 1 },
+			want:   ErrInvalidFrame,
+		},
+		"missing session id": {
+			mutate: func(b *AttachBootstrap) { b.Target.SessionID = "" },
+			want:   ErrInvalidFrame,
+		},
+		"zero server pid": {
+			mutate: func(b *AttachBootstrap) { b.Target.TmuxServerPID = 0 },
+			want:   ErrInvalidFrame,
+		},
+		"missing start time": {
+			mutate: func(b *AttachBootstrap) { b.Target.TmuxServerStartedAt = time.Time{} },
+			want:   ErrInvalidFrame,
+		},
+		"control character": {
+			mutate: func(b *AttachBootstrap) { b.Target.SessionName = "dev\tforged" },
+			want:   ErrInvalidFrame,
+		},
 	}
 
 	for name, test := range tests {
@@ -131,7 +167,12 @@ func TestAttachBootstrapRejectsUnknownMembers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	injected := bytes.Replace(payload, []byte(`"timeoutMillis"`), []byte(`"forged":1,"timeoutMillis"`), 1)
+	injected := bytes.Replace(
+		payload,
+		[]byte(`"timeoutMillis"`),
+		[]byte(`"forged":1,"timeoutMillis"`),
+		1,
+	)
 	if bytes.Equal(injected, payload) {
 		t.Fatal("fixture did not inject a member")
 	}

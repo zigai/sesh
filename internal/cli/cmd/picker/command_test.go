@@ -36,7 +36,8 @@ func newTestRootCommand(ctx context.Context) *cobra.Command {
 		SilenceErrors: true,
 	}
 	rootCommand.PersistentFlags().String("config", "", "Explicit native TOML configuration file")
-	rootCommand.PersistentFlags().Bool("no-config", false, "Use built-in settings without reading configuration files")
+	rootCommand.PersistentFlags().
+		Bool("no-config", false, "Use built-in settings without reading configuration files")
 
 	rootCommand.AddCommand(NewPickCommand(ctx))
 
@@ -64,9 +65,18 @@ func TestResolvePickerPresentationFollowsChoiceAndTmuxContext(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := resolvePickerPresentation(test.choice, func(key string) string { return test.env[key] })
+			got, err := resolvePickerPresentation(
+				test.choice,
+				func(key string) string { return test.env[key] },
+			)
 			if err != nil || got != test.want {
-				t.Fatalf("resolvePickerPresentation(%q) = %d, %v; want %d", test.choice, got, err, test.want)
+				t.Fatalf(
+					"resolvePickerPresentation(%q) = %d, %v; want %d",
+					test.choice,
+					got,
+					err,
+					test.want,
+				)
 			}
 		})
 	}
@@ -126,7 +136,15 @@ func TestPopupChildReceivesInvokingPaneSessionAndRepository(t *testing.T) {
 
 	launchedAt := time.Unix(0, 1790000000123456789)
 
-	arguments := popupArguments(cmd, "/private/tmux.sock", "$7", "%2", "/private/handoff", "inbox", launchedAt)
+	arguments := popupArguments(
+		cmd,
+		"/private/tmux.sock",
+		"$7",
+		"%2",
+		"/private/handoff",
+		"inbox",
+		launchedAt,
+	)
 	if !slices.Equal(arguments[:min(len(arguments), 2)], []string{"pick", "ui"}) {
 		t.Fatalf("popup child arguments = %#v", arguments)
 	}
@@ -210,14 +228,19 @@ func TestPickerPopupUsesApplicationOwnedFrame(t *testing.T) {
 
 	options := popupOptions(gotmux.Exec("/bin/true"), "120", "32", "")
 	if !options.Borderless || options.Title != "" {
-		t.Fatalf("popup frame = borderless %t, title %q; want application-owned border", options.Borderless, options.Title)
+		t.Fatalf(
+			"popup frame = borderless %t, title %q; want application-owned border",
+			options.Borderless,
+			options.Title,
+		)
 	}
 
 	if options.Style != "bg=#000000" || options.X != "C" || options.Y != "C" {
 		t.Fatalf("popup presentation = style %q at %q,%q", options.Style, options.X, options.Y)
 	}
 
-	if !options.CloseOnExit || options.CloseOnSuccess || options.CloseOnKey || options.DisableDismiss {
+	if !options.CloseOnExit || options.CloseOnSuccess || options.CloseOnKey ||
+		options.DisableDismiss {
 		t.Fatalf("popup close policy = %+v", options)
 	}
 
@@ -246,7 +269,13 @@ func TestPickerColorProfileInsideTmuxNeedsNoTmuxQuery(t *testing.T) {
 
 			got, decided := colorProfile(test.environ)
 			if got != test.want || decided != test.decided {
-				t.Fatalf("color profile = %v, %t; want %v, %t", got, decided, test.want, test.decided)
+				t.Fatalf(
+					"color profile = %v, %t; want %v, %t",
+					got,
+					decided,
+					test.want,
+					test.decided,
+				)
 			}
 		})
 	}
@@ -280,8 +309,18 @@ func TestPickerPopupBalancesConfiguredPercentageForClientGeometry(t *testing.T) 
 		wantWidth  string
 		wantHeight string
 	}{
-		{name: "portrait", available: gotmux.Size{Width: 100, Height: 200}, wantWidth: "98", wantHeight: "25"},
-		{name: "landscape", available: gotmux.Size{Width: 200, Height: 100}, wantWidth: "198", wantHeight: "50"},
+		{
+			name:       "portrait",
+			available:  gotmux.Size{Width: 100, Height: 200},
+			wantWidth:  "98",
+			wantHeight: "25",
+		},
+		{
+			name:       "landscape",
+			available:  gotmux.Size{Width: 200, Height: 100},
+			wantWidth:  "198",
+			wantHeight: "50",
+		},
 	}
 
 	for _, test := range tests {
@@ -290,7 +329,13 @@ func TestPickerPopupBalancesConfiguredPercentageForClientGeometry(t *testing.T) 
 
 			width, height := popupDimensions(cfg, state, test.available)
 			if width != test.wantWidth || height != test.wantHeight {
-				t.Fatalf("popup dimensions = %s x %s, want %s x %s", width, height, test.wantWidth, test.wantHeight)
+				t.Fatalf(
+					"popup dimensions = %s x %s, want %s x %s",
+					width,
+					height,
+					test.wantWidth,
+					test.wantHeight,
+				)
 			}
 		})
 	}
@@ -307,10 +352,35 @@ func TestPickerPopupKeepsReadableSizeOnSmallTerminals(t *testing.T) {
 		wantWidth  string
 		wantHeight string
 	}{
-		{name: "sesh mode on laptop", state: &session.State{}, available: gotmux.Size{Width: 150, Height: 40}, wantWidth: "128", wantHeight: "32"},
-		{name: "agents mode on laptop", state: &session.State{PopupDisplayMode: "agents"}, available: gotmux.Size{Width: 150, Height: 40}, wantWidth: "128", wantHeight: "32"},
-		{name: "sesh only on laptop", modes: []string{"sesh"}, state: &session.State{}, available: gotmux.Size{Width: 150, Height: 40}, wantWidth: "96", wantHeight: "24"},
-		{name: "terminal smaller than readable size", state: &session.State{}, available: gotmux.Size{Width: 100, Height: 26}, wantWidth: "98", wantHeight: "24"},
+		{
+			name:       "sesh mode on laptop",
+			state:      &session.State{},
+			available:  gotmux.Size{Width: 150, Height: 40},
+			wantWidth:  "128",
+			wantHeight: "32",
+		},
+		{
+			name:       "agents mode on laptop",
+			state:      &session.State{PopupDisplayMode: "agents"},
+			available:  gotmux.Size{Width: 150, Height: 40},
+			wantWidth:  "128",
+			wantHeight: "32",
+		},
+		{
+			name:       "sesh only on laptop",
+			modes:      []string{"sesh"},
+			state:      &session.State{},
+			available:  gotmux.Size{Width: 150, Height: 40},
+			wantWidth:  "96",
+			wantHeight: "24",
+		},
+		{
+			name:       "terminal smaller than readable size",
+			state:      &session.State{},
+			available:  gotmux.Size{Width: 100, Height: 26},
+			wantWidth:  "98",
+			wantHeight: "24",
+		},
 	}
 
 	for _, test := range tests {
@@ -324,7 +394,13 @@ func TestPickerPopupKeepsReadableSizeOnSmallTerminals(t *testing.T) {
 
 			width, height := popupDimensions(cfg, test.state, test.available)
 			if width != test.wantWidth || height != test.wantHeight {
-				t.Fatalf("popup dimensions = %s x %s, want %s x %s", width, height, test.wantWidth, test.wantHeight)
+				t.Fatalf(
+					"popup dimensions = %s x %s, want %s x %s",
+					width,
+					height,
+					test.wantWidth,
+					test.wantHeight,
+				)
 			}
 		})
 	}
@@ -339,10 +415,30 @@ func TestPickerPopupGrowsToFitRowsUpToMostOfTheTerminal(t *testing.T) {
 		available  gotmux.Size
 		wantHeight string
 	}{
-		{name: "rows fit the configured height", fitting: 20, available: gotmux.Size{Width: 200, Height: 60}, wantHeight: "25"},
-		{name: "taller list grows the popup", fitting: 40, available: gotmux.Size{Width: 200, Height: 60}, wantHeight: "40"},
-		{name: "growth stops at most of the terminal", fitting: 90, available: gotmux.Size{Width: 200, Height: 60}, wantHeight: "48"},
-		{name: "short terminal keeps a margin", fitting: 90, available: gotmux.Size{Width: 200, Height: 9}, wantHeight: "7"},
+		{
+			name:       "rows fit the configured height",
+			fitting:    20,
+			available:  gotmux.Size{Width: 200, Height: 60},
+			wantHeight: "25",
+		},
+		{
+			name:       "taller list grows the popup",
+			fitting:    40,
+			available:  gotmux.Size{Width: 200, Height: 60},
+			wantHeight: "40",
+		},
+		{
+			name:       "growth stops at most of the terminal",
+			fitting:    90,
+			available:  gotmux.Size{Width: 200, Height: 60},
+			wantHeight: "48",
+		},
+		{
+			name:       "short terminal keeps a margin",
+			fitting:    90,
+			available:  gotmux.Size{Width: 200, Height: 9},
+			wantHeight: "7",
+		},
 	}
 
 	for _, test := range tests {
@@ -371,7 +467,13 @@ func TestPickerPopupPreservesConfiguredDimensionsWithoutClientGeometry(t *testin
 	width, height := popupDimensions(cfg, &session.State{}, gotmux.Size{Width: 0, Height: 0})
 
 	if width != cfg.Popup.SeshWidth || height != cfg.Popup.SeshHeight {
-		t.Fatalf("popup dimensions = %q x %q, want configured %q x %q", width, height, cfg.Popup.SeshWidth, cfg.Popup.SeshHeight)
+		t.Fatalf(
+			"popup dimensions = %q x %q, want configured %q x %q",
+			width,
+			height,
+			cfg.Popup.SeshWidth,
+			cfg.Popup.SeshHeight,
+		)
 	}
 }
 
@@ -385,7 +487,12 @@ func TestPickerPopupDimensionsFollowEffectiveConfiguredMode(t *testing.T) {
 		want  string
 	}{
 		{name: "agents only", modes: []string{"agents"}, state: &session.State{}, want: "agents"},
-		{name: "remembered mode disabled", modes: []string{"sesh"}, state: &session.State{PopupDisplayMode: "agents"}, want: "sesh"},
+		{
+			name:  "remembered mode disabled",
+			modes: []string{"sesh"},
+			state: &session.State{PopupDisplayMode: "agents"},
+			want:  "sesh",
+		},
 	}
 
 	for _, test := range tests {
@@ -402,7 +509,14 @@ func TestPickerPopupDimensionsFollowEffectiveConfiguredMode(t *testing.T) {
 			}
 
 			if width != wantWidth || height != wantHeight {
-				t.Fatalf("popup dimensions = %q x %q, want effective %s dimensions %q x %q", width, height, test.want, wantWidth, wantHeight)
+				t.Fatalf(
+					"popup dimensions = %q x %q, want effective %s dimensions %q x %q",
+					width,
+					height,
+					test.want,
+					wantWidth,
+					wantHeight,
+				)
 			}
 		})
 	}
@@ -426,10 +540,22 @@ func TestPickerCatalogKeepsLiveRowsWhenRepositoryCannotBeOpened(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	services, err := newServices(ctx, resolvePickerTestWorkspace(t, config.DefaultConfig(), app.Locations{
-		Socket: server.Endpoint().SocketPath, Repository: repository, LeaseRoot: filepath.Join(dirs, "leases"),
-		History: filepath.Join(dirs, "history.json"), FinalSaveStatus: "", AgentStore: filepath.Join(dirs, "agents.json"),
-	}), gotmux.Streams{}, RemoteServices{})
+	services, err := newServices(
+		ctx,
+		resolvePickerTestWorkspace(t, config.DefaultConfig(), app.Locations{
+			Socket:     server.Endpoint().SocketPath,
+			Repository: repository,
+			LeaseRoot:  filepath.Join(dirs, "leases"),
+			History: filepath.Join(
+				dirs,
+				"history.json",
+			),
+			FinalSaveStatus: "",
+			AgentStore:      filepath.Join(dirs, "agents.json"),
+		}),
+		gotmux.Streams{},
+		RemoteServices{},
+	)
 	if err != nil {
 		t.Fatalf("new picker services: %v", err)
 	}
@@ -442,10 +568,18 @@ func TestPickerCatalogKeepsLiveRowsWhenRepositoryCannotBeOpened(t *testing.T) {
 
 	catalog, err := services.LoadCatalog(ctx)
 	if err == nil || catalog.Status != session.StatusPartial || catalog.SavedErr == nil {
-		t.Fatalf("catalog status = %q, saved error = %v, error = %v; want a partial catalog that reports the repository", catalog.Status, catalog.SavedErr, err)
+		t.Fatalf(
+			"catalog status = %q, saved error = %v, error = %v; want a partial catalog that reports the repository",
+			catalog.Status,
+			catalog.SavedErr,
+			err,
+		)
 	}
 
-	if !slices.ContainsFunc(catalog.Sessions, func(row session.Session) bool { return row.Name == "live-work" }) {
+	if !slices.ContainsFunc(
+		catalog.Sessions,
+		func(row session.Session) bool { return row.Name == "live-work" },
+	) {
 		t.Fatalf("live session missing from partial catalog: %+v", catalog.Sessions)
 	}
 }
@@ -466,8 +600,15 @@ func TestPickerServiceRejectsReplacementSessionBeforeMutation(t *testing.T) {
 	cfg := config.DefaultConfig()
 
 	services, err := newServices(ctx, resolvePickerTestWorkspace(t, cfg, app.Locations{
-		Socket: server.Endpoint().SocketPath, Repository: filepath.Join(dirs, "repository"), LeaseRoot: filepath.Join(dirs, "leases"),
-		History: filepath.Join(dirs, "history.json"), FinalSaveStatus: "", AgentStore: filepath.Join(dirs, "agents.json"),
+		Socket:     server.Endpoint().SocketPath,
+		Repository: filepath.Join(dirs, "repository"),
+		LeaseRoot:  filepath.Join(dirs, "leases"),
+		History: filepath.Join(
+			dirs,
+			"history.json",
+		),
+		FinalSaveStatus: "",
+		AgentStore:      filepath.Join(dirs, "agents.json"),
 	}), gotmux.Streams{}, RemoteServices{})
 	if err != nil {
 		t.Fatalf("new picker services: %v", err)
@@ -523,7 +664,9 @@ func TestPickerSessionNamesRefreshAppendClearAndReplace(t *testing.T) {
 
 	path := filepath.Join(t.TempDir(), "2026-07-16_"+nativeID+".jsonl")
 	writePickerNameFixture(t, path, `{"type":"session_info","name":"  Initial name  "}`+"\n")
-	observed := []agents.AgentSession{{ID: "registry-id", Harness: "pi", HarnessSessionID: nativeID, SessionPath: path}}
+	observed := []agents.AgentSession{
+		{ID: "registry-id", Harness: "pi", HarnessSessionID: nativeID, SessionPath: path},
+	}
 
 	var reader transcriptNameCache
 
@@ -557,7 +700,11 @@ func TestPickerSessionNamesRefreshAppendClearAndReplace(t *testing.T) {
 	assertLabel("Truncated")
 
 	replacement := path + ".replacement"
-	writePickerNameFixture(t, replacement, `{"type":"session_info","name":"Replaced with a longer conversation name"}`+"\n")
+	writePickerNameFixture(
+		t,
+		replacement,
+		`{"type":"session_info","name":"Replaced with a longer conversation name"}`+"\n",
+	)
 
 	if err := os.Rename(replacement, path); err != nil {
 		t.Fatal(err)
@@ -610,7 +757,12 @@ func TestPickerSessionNamesSkipLargeEntriesAndResumeBoundedReads(t *testing.T) {
 	}
 
 	if state.name != "Latest" || state.offset != int64(len(transcript)) {
-		t.Fatalf("bounded reads = %q at %d, want latest name at %d", state.name, state.offset, len(transcript))
+		t.Fatalf(
+			"bounded reads = %q at %d, want latest name at %d",
+			state.name,
+			state.offset,
+			len(transcript),
+		)
 	}
 }
 
@@ -634,7 +786,12 @@ func TestPickerSessionNamesRetainUsableNameOnMalformedOrMissingMetadata(t *testi
 		t.Fatalf("missing transcript replaced cached name: %q", state.name)
 	}
 
-	state = readPickerSessionName(t.Context(), filepath.Dir(path), sessionNameState{}, nameFileReadLimit)
+	state = readPickerSessionName(
+		t.Context(),
+		filepath.Dir(path),
+		sessionNameState{},
+		nameFileReadLimit,
+	)
 	if state.hasInfo {
 		t.Fatal("directory provided metadata")
 	}
@@ -657,7 +814,11 @@ func TestPickerSessionNamesHonorCancellationBeforeAndDuringLargeReads(t *testing
 
 	state = decodePickerSessionName(ctx, input, sessionNameState{}, true)
 	if input.reads != 1 || state.offset != 0 {
-		t.Fatalf("decoder kept reading after cancellation: reads=%d, offset=%d", input.reads, state.offset)
+		t.Fatalf(
+			"decoder kept reading after cancellation: reads=%d, offset=%d",
+			input.reads,
+			state.offset,
+		)
 	}
 }
 
@@ -665,7 +826,8 @@ func TestPickerSessionNamesEvictAbsentTranscriptsAndBoundCache(t *testing.T) {
 	observed := make([]agents.AgentSession, nameCacheLimit+1)
 	for index := range observed {
 		observed[index] = agents.AgentSession{
-			Harness: "pi", SessionPath: filepath.Join(t.TempDir(), fmt.Sprintf("missing-%d.jsonl", index)),
+			Harness:     "pi",
+			SessionPath: filepath.Join(t.TempDir(), fmt.Sprintf("missing-%d.jsonl", index)),
 		}
 	}
 
@@ -692,7 +854,10 @@ func TestPickerSessionNamesEvictAbsentTranscriptsAndBoundCache(t *testing.T) {
 func TestPickerSessionNamesShareReaderAcrossConcurrentRefreshes(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "conversation.jsonl")
 	writePickerNameFixture(t, path, `{"type":"session_info","name":"Concurrent"}`+"\n")
-	observed := []agents.AgentSession{{Harness: "pi", SessionPath: path}, {Harness: "pi", SessionPath: path}}
+	observed := []agents.AgentSession{
+		{Harness: "pi", SessionPath: path},
+		{Harness: "pi", SessionPath: path},
+	}
 
 	var (
 		reader transcriptNameCache

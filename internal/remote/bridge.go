@@ -184,7 +184,9 @@ func ReadMessage(reader *bufio.Reader) (Message, error) {
 
 func NewBridgeServer(ctx context.Context, cfg BridgeServerConfig) (*BridgeServer, error) {
 	if cfg.SocketPath == "" || cfg.Token == "" || cfg.ExpiresAt.IsZero() {
-		return nil, oops.In("remote").With("operation", "new_bridge_server").Wrap(ErrBridgeSocketRequired)
+		return nil, oops.In("remote").
+			With("operation", "new_bridge_server").
+			Wrap(ErrBridgeSocketRequired)
 	}
 
 	if !validSocketPath(cfg.SocketPath) {
@@ -197,7 +199,9 @@ func NewBridgeServer(ctx context.Context, cfg BridgeServerConfig) (*BridgeServer
 	}
 
 	if !now().Before(cfg.ExpiresAt) {
-		return nil, oops.In("remote").With("operation", "new_bridge_server").Wrap(ErrCapabilityExpired)
+		return nil, oops.In("remote").
+			With("operation", "new_bridge_server").
+			Wrap(ErrCapabilityExpired)
 	}
 
 	dirPath := filepath.Dir(cfg.SocketPath)
@@ -266,7 +270,18 @@ func NewBridgeServer(ctx context.Context, cfg BridgeServerConfig) (*BridgeServer
 func (server *BridgeServer) SwitchTarget() (OriginSession, bool) {
 	target := server.switchTarget.Load()
 	if target == nil {
-		return OriginSession{ID: "", Name: "", WindowCount: 0, Attached: false, AgentTotal: 0, AgentActive: 0, AgentWaiting: 0, TmuxServerPID: 0, TmuxServerStartedAt: time.Time{}, SessionCreatedAt: time.Time{}}, false
+		return OriginSession{
+			ID:                  "",
+			Name:                "",
+			WindowCount:         0,
+			Attached:            false,
+			AgentTotal:          0,
+			AgentActive:         0,
+			AgentWaiting:        0,
+			TmuxServerPID:       0,
+			TmuxServerStartedAt: time.Time{},
+			SessionCreatedAt:    time.Time{},
+		}, false
 	}
 
 	return *target, true
@@ -288,7 +303,10 @@ func (server *BridgeServer) Close() error {
 
 		for connection := range server.connections {
 			if err := connection.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
-				server.closeErr = errors.Join(server.closeErr, oops.In("remote").With("operation", "close_bridge_server").Wrap(err))
+				server.closeErr = errors.Join(
+					server.closeErr,
+					oops.In("remote").With("operation", "close_bridge_server").Wrap(err),
+				)
 			}
 		}
 		server.connectionsMu.Unlock()
@@ -336,8 +354,12 @@ func (server *BridgeServer) serve() {
 		connection, err := server.listener.Accept()
 		if err != nil {
 			if !server.closed.Load() {
-				server.logger.Error().Str("operation", "accept").Str("status", "failed").Str("reason", "listener_failed").
-					Func(logging.Cause(err)).Msg("bridge listener stopped unexpectedly")
+				server.logger.Error().
+					Str("operation", "accept").
+					Str("status", "failed").
+					Str("reason", "listener_failed").
+					Func(logging.Cause(err)).
+					Msg("bridge listener stopped unexpectedly")
 			}
 
 			return
@@ -350,7 +372,10 @@ func (server *BridgeServer) serve() {
 		}
 
 		if !server.admit(connection) {
-			server.logger.Warn().Str("operation", "accept").Str("status", "skipped").Str("reason", "capacity").
+			server.logger.Warn().
+				Str("operation", "accept").
+				Str("status", "skipped").
+				Str("reason", "capacity").
 				Msg("bridge connection refused at capacity")
 
 			_ = connection.Close()
@@ -406,7 +431,8 @@ func (server *BridgeServer) handleConnection(connection net.Conn) {
 
 	<-server.handshakes
 
-	if err != nil || authMessage.Type != TypeAuthRequest || !server.authenticated(authMessage.Token) {
+	if err != nil || authMessage.Type != TypeAuthRequest ||
+		!server.authenticated(authMessage.Token) {
 		_ = server.reply(connection, err, Message{
 			Type: TypeAuthResponse, Token: "", OK: false, Error: "unauthorized",
 			OriginID: "", OriginLabel: "", CatalogGeneration: 0, Sessions: nil, TargetID: "",
@@ -514,9 +540,18 @@ func (server *BridgeServer) handleSwitchRequest(connection net.Conn, message Mes
 			!session.TmuxServerStartedAt.Equal(message.TargetServerStartedAt) ||
 			!session.SessionCreatedAt.Equal(message.TargetCreatedAt) {
 			_ = server.reply(connection, nil, Message{
-				Type: TypeSwitchResponse, Token: "", OK: false, Error: "target_changed",
-				OriginID: "", OriginLabel: "", CatalogGeneration: 0, Sessions: nil, TargetID: "",
-				TargetServerPID: 0, TargetServerStartedAt: time.Time{}, TargetCreatedAt: time.Time{},
+				Type:                  TypeSwitchResponse,
+				Token:                 "",
+				OK:                    false,
+				Error:                 "target_changed",
+				OriginID:              "",
+				OriginLabel:           "",
+				CatalogGeneration:     0,
+				Sessions:              nil,
+				TargetID:              "",
+				TargetServerPID:       0,
+				TargetServerStartedAt: time.Time{},
+				TargetCreatedAt:       time.Time{},
 			})
 
 			return
@@ -544,14 +579,22 @@ func (server *BridgeServer) handleSwitchRequest(connection net.Conn, message Mes
 
 func (server *BridgeServer) reply(connection net.Conn, cause error, message Message) error {
 	if !message.OK {
-		server.logger.Warn().Str("operation", string(message.Type)).Str("status", "rejected").Str("reason", message.Error).
-			Func(logging.Cause(cause)).Msg("bridge request rejected")
+		server.logger.Warn().
+			Str("operation", string(message.Type)).
+			Str("status", "rejected").
+			Str("reason", message.Error).
+			Func(logging.Cause(cause)).
+			Msg("bridge request rejected")
 	}
 
 	err := WriteMessage(connection, message)
 	if err != nil {
-		server.logger.Warn().Str("operation", string(message.Type)).Str("status", "failed").Str("reason", "write_failed").
-			Func(logging.Cause(err)).Msg("bridge response was not delivered")
+		server.logger.Warn().
+			Str("operation", string(message.Type)).
+			Str("status", "failed").
+			Str("reason", "write_failed").
+			Func(logging.Cause(err)).
+			Msg("bridge response was not delivered")
 	}
 
 	return err
@@ -559,7 +602,12 @@ func (server *BridgeServer) reply(connection net.Conn, cause error, message Mess
 
 func validateMessage(message Message) error {
 	switch message.Type {
-	case TypeAuthRequest, TypeAuthResponse, TypeCatalogRequest, TypeCatalogResponse, TypeSwitchRequest, TypeSwitchResponse:
+	case TypeAuthRequest,
+		TypeAuthResponse,
+		TypeCatalogRequest,
+		TypeCatalogResponse,
+		TypeSwitchRequest,
+		TypeSwitchResponse:
 	default:
 		return ErrBridgeInvalidFrame
 	}
@@ -603,7 +651,14 @@ func validateMessageSessions(sessions []OriginSession) error {
 
 func validBridgeErrorCode(code string) bool {
 	switch code {
-	case "unauthorized", "empty_target", "unknown_target", "catalog_failed", "switch_rejected", "target_changed", "busy", "invalid_request":
+	case "unauthorized",
+		"empty_target",
+		"unknown_target",
+		"catalog_failed",
+		"switch_rejected",
+		"target_changed",
+		"busy",
+		"invalid_request":
 		return true
 	default:
 		return false
@@ -649,7 +704,10 @@ func refuseExistingSocket(dir *privatefs.Dir, name string) error {
 		}
 
 		if slices.Contains(names, name) {
-			return oops.In("remote").With("operation", "refuse_existing_socket").With("socket_name", name).Wrap(ErrBridgeSocketExists)
+			return oops.In("remote").
+				With("operation", "refuse_existing_socket").
+				With("socket_name", name).
+				Wrap(ErrBridgeSocketExists)
 		}
 
 		return nil

@@ -30,7 +30,11 @@ type RewriteResult struct {
 	Empty       bool
 }
 
-func (r *Repository) RemoveSessions(ctx context.Context, id, source string, sessionIDs []string) (RewriteResult, error) {
+func (r *Repository) RemoveSessions(
+	ctx context.Context,
+	id, source string,
+	sessionIDs []string,
+) (RewriteResult, error) {
 	if !validID(id) || !validID(source) || len(sessionIDs) > model.MaxEntities {
 		return emptyRewriteResult(id, source, ""), repositoryError("remove_sessions", ErrCorrupt)
 	}
@@ -42,7 +46,16 @@ func (r *Repository) RemoveSessions(ctx context.Context, id, source string, sess
 
 	lock, err := r.root.Lock(ctx, "repository.lock")
 	if err != nil {
-		return emptyRewriteResult(id, source, ""), repositoryError("remove_sessions", oops.In("snapshot.store").With("operation", "lock_repository").Wrapf(err, "lock repository"))
+		return emptyRewriteResult(
+				id,
+				source,
+				"",
+			), repositoryError(
+				"remove_sessions",
+				oops.In("snapshot.store").
+					With("operation", "lock_repository").
+					Wrapf(err, "lock repository"),
+			)
 	}
 
 	result, removeErr := r.removeSessionsLocked(ctx, id, source, sessionIDs, canonicalSessions)
@@ -57,7 +70,16 @@ func (r *Repository) ReconcileRewrite(ctx context.Context, id string) (RewriteRe
 
 	lock, err := r.root.Lock(ctx, "repository.lock")
 	if err != nil {
-		return emptyRewriteResult(id, "", ""), repositoryError("reconcile_rewrite", oops.In("snapshot.store").With("operation", "lock_repository").Wrapf(err, "lock repository"))
+		return emptyRewriteResult(
+				id,
+				"",
+				"",
+			), repositoryError(
+				"reconcile_rewrite",
+				oops.In("snapshot.store").
+					With("operation", "lock_repository").
+					Wrapf(err, "lock repository"),
+			)
 	}
 
 	result, reconcileErr := r.reconcileRewriteLocked(ctx, id)
@@ -72,7 +94,16 @@ func (r *Repository) ResumeRewrite(ctx context.Context, id string) (RewriteResul
 
 	lock, err := r.root.Lock(ctx, "repository.lock")
 	if err != nil {
-		return emptyRewriteResult(id, "", ""), repositoryError("resume_rewrite", oops.In("snapshot.store").With("operation", "lock_repository").Wrapf(err, "lock repository"))
+		return emptyRewriteResult(
+				id,
+				"",
+				"",
+			), repositoryError(
+				"resume_rewrite",
+				oops.In("snapshot.store").
+					With("operation", "lock_repository").
+					Wrapf(err, "lock repository"),
+			)
 	}
 
 	result, resumeErr := r.resumeRewriteLocked(ctx, id)
@@ -87,7 +118,13 @@ func (r *Repository) reconcileRewriteLocked(ctx context.Context, id string) (Rew
 	}
 
 	if err := ctx.Err(); err != nil {
-		return emptyRewriteResult(id, "", ""), oops.In("snapshot.store").With("operation", "reconcile_rewrite").Wrap(err)
+		return emptyRewriteResult(
+				id,
+				"",
+				"",
+			), oops.In("snapshot.store").
+				With("operation", "reconcile_rewrite").
+				Wrap(err)
 	}
 
 	if err := r.confirmRewriteCatalog(ctx); err != nil {
@@ -107,19 +144,35 @@ func (r *Repository) reconcileRewriteLocked(ctx context.Context, id string) (Rew
 	return r.buildRewriteResult(catalog, existing), nil
 }
 
-func (r *Repository) removeSessionsLocked(ctx context.Context, id, source string, sessionIDs, canonicalSessions []string) (RewriteResult, error) {
+func (r *Repository) removeSessionsLocked(
+	ctx context.Context,
+	id, source string,
+	sessionIDs, canonicalSessions []string,
+) (RewriteResult, error) {
 	catalog, err := r.catalog()
 	if err != nil {
 		return emptyRewriteResult(id, source, ""), err
 	}
 
 	if err := ctx.Err(); err != nil {
-		return emptyRewriteResult(id, source, ""), oops.In("snapshot.store").With("operation", "remove_sessions").Wrap(err)
+		return emptyRewriteResult(
+				id,
+				source,
+				"",
+			), oops.In("snapshot.store").
+				With("operation", "remove_sessions").
+				Wrap(err)
 	}
 
 	index := catalog.rewriteIndex(id)
 	if index >= 0 {
-		return r.confirmExistingRewriteLocked(ctx, catalog, catalog.Rewrites[index], source, canonicalSessions)
+		return r.confirmExistingRewriteLocked(
+			ctx,
+			catalog,
+			catalog.Rewrites[index],
+			source,
+			canonicalSessions,
+		)
 	}
 
 	sourceGen, err := r.validateRewritePreconditions(catalog, source)
@@ -138,13 +191,22 @@ func (r *Repository) removeSessionsLocked(ctx context.Context, id, source string
 	}
 
 	if err := ctx.Err(); err != nil {
-		return emptyRewriteResult(id, source, ""), oops.In("snapshot.store").With("operation", "remove_sessions").Wrap(err)
+		return emptyRewriteResult(
+				id,
+				source,
+				"",
+			), oops.In("snapshot.store").
+				With("operation", "remove_sessions").
+				Wrap(err)
 	}
 
 	return r.executeRewrite(ctx, catalog, id, source, removal)
 }
 
-func (r *Repository) validateRewritePreconditions(catalog Catalog, source string) (Generation, error) {
+func (r *Repository) validateRewritePreconditions(
+	catalog Catalog,
+	source string,
+) (Generation, error) {
 	if len(catalog.Rewrites)+1 > maxEntries {
 		return Generation{}, ErrCorrupt
 	}
@@ -169,7 +231,12 @@ func (r *Repository) validateRewritePreconditions(catalog Catalog, source string
 	return catalog.Generations[genIndex], nil
 }
 
-func (r *Repository) executeRewrite(ctx context.Context, catalog Catalog, id, source string, removal model.Removal) (RewriteResult, error) {
+func (r *Repository) executeRewrite(
+	ctx context.Context,
+	catalog Catalog,
+	id, source string,
+	removal model.Removal,
+) (RewriteResult, error) {
 	pending, replacementData, err := prepareRewrite(id, source, removal)
 	if err != nil {
 		return emptyRewriteResult(id, source, ""), err
@@ -195,17 +262,45 @@ func (r *Repository) executeRewrite(ctx context.Context, catalog Catalog, id, so
 	}
 
 	if err := r.boundary("rewrite_registered"); err != nil {
-		return emptyRewriteResult(id, source, rewriteStatePending), errors.Join(ErrRecoveryRequired, err)
+		return emptyRewriteResult(
+				id,
+				source,
+				rewriteStatePending,
+			), errors.Join(
+				ErrRecoveryRequired,
+				err,
+			)
 	}
 
 	if !removal.Empty() {
-		if err := r.stageReplacement(ctx, source, pending.Replacement, removal.Retained, replacementData, digest(replacementData)); err != nil {
-			return emptyRewriteResult(id, source, rewriteStatePending), errors.Join(ErrRecoveryRequired, err)
+		if err := r.stageReplacement(
+			ctx,
+			source,
+			pending.Replacement,
+			removal.Retained,
+			replacementData,
+			digest(replacementData),
+		); err != nil {
+			return emptyRewriteResult(
+					id,
+					source,
+					rewriteStatePending,
+				), errors.Join(
+					ErrRecoveryRequired,
+					err,
+				)
 		}
 	}
 
 	if err := ctx.Err(); err != nil {
-		return emptyRewriteResult(id, source, rewriteStatePending), errors.Join(ErrRecoveryRequired, err)
+		return emptyRewriteResult(
+				id,
+				source,
+				rewriteStatePending,
+			), errors.Join(
+				ErrRecoveryRequired,
+				err,
+			)
 	}
 
 	if err := r.publish(ctx, committed, nil); err != nil {
@@ -235,13 +330,21 @@ func prepareRewrite(id, source string, removal model.Removal) (Rewrite, []byte, 
 	return pending, data, nil
 }
 
-func completedRewriteCatalog(catalog Catalog, pending Rewrite, removal model.Removal, manifestDigest string) (Catalog, error) {
+func completedRewriteCatalog(
+	catalog Catalog,
+	pending Rewrite,
+	removal model.Removal,
+	manifestDigest string,
+) (Catalog, error) {
 	if !removal.Empty() && catalog.Sequence == ^uint64(0) {
 		return Catalog{}, ErrCorrupt
 	}
 
 	catalog.Rewrites = slices.Clone(catalog.Rewrites)
-	catalog.Generations = slices.DeleteFunc(slices.Clone(catalog.Generations), func(g Generation) bool { return g.ID == pending.Source })
+	catalog.Generations = slices.DeleteFunc(
+		slices.Clone(catalog.Generations),
+		func(g Generation) bool { return g.ID == pending.Source },
+	)
 
 	index := catalog.rewriteIndex(pending.ID)
 	if index < 0 {
@@ -253,7 +356,8 @@ func completedRewriteCatalog(catalog Catalog, pending Rewrite, removal model.Rem
 		sourceAttemptIdx := catalog.attemptIndex(pending.Source)
 		latestSaveSeq := catalog.latestPublishedSaveSequence()
 
-		if sourceAttemptIdx >= 0 && (latestSaveSeq == 0 || catalog.Attempts[sourceAttemptIdx].Sequence >= latestSaveSeq) {
+		if sourceAttemptIdx >= 0 &&
+			(latestSaveSeq == 0 || catalog.Attempts[sourceAttemptIdx].Sequence >= latestSaveSeq) {
 			catalog.Current = pending.Replacement
 		} else if removal.Empty() {
 			catalog.Current = ""
@@ -284,10 +388,18 @@ func completedRewriteCatalog(catalog Catalog, pending Rewrite, removal model.Rem
 	return catalog, nil
 }
 
-func (r *Repository) stageReplacement(ctx context.Context, source, replacementID string, manifest model.Manifest, data []byte, expectedDigest string) error {
+func (r *Repository) stageReplacement(
+	ctx context.Context,
+	source, replacementID string,
+	manifest model.Manifest,
+	data []byte,
+	expectedDigest string,
+) error {
 	staging, err := r.root.Child("staging", false)
 	if err != nil {
-		return oops.In("snapshot.store").With("operation", "open_staging").Wrapf(err, "open staging")
+		return oops.In("snapshot.store").
+			With("operation", "open_staging").
+			Wrapf(err, "open staging")
 	}
 
 	dir, err := staging.CreateDir(replacementID)
@@ -310,7 +422,13 @@ func (r *Repository) stageReplacement(ctx context.Context, source, replacementID
 	}
 
 	renameErr := staging.Rename(replacementID, generations, replacementID)
-	if err := errors.Join(renameErr, generations.Sync(), staging.Sync(), generations.Close(), staging.Close()); err != nil {
+	if err := errors.Join(
+		renameErr,
+		generations.Sync(),
+		staging.Sync(),
+		generations.Close(),
+		staging.Close(),
+	); err != nil {
 		if renameErr == nil {
 			return errors.Join(ErrUncertain, err)
 		}
@@ -321,10 +439,19 @@ func (r *Repository) stageReplacement(ctx context.Context, source, replacementID
 	return r.boundary("rewrite_generation_published")
 }
 
-func (r *Repository) writeReplacementGeneration(ctx context.Context, source string, dstDir *privatefs.Dir, manifest model.Manifest, data []byte, expectedDigest string) error {
+func (r *Repository) writeReplacementGeneration(
+	ctx context.Context,
+	source string,
+	dstDir *privatefs.Dir,
+	manifest model.Manifest,
+	data []byte,
+	expectedDigest string,
+) error {
 	artifactDir, err := dstDir.CreateDir("artifacts")
 	if err != nil {
-		return oops.In("snapshot.store").With("operation", "create_artifact_directory").Wrapf(err, "create artifact directory")
+		return oops.In("snapshot.store").
+			With("operation", "create_artifact_directory").
+			Wrapf(err, "create artifact directory")
 	}
 
 	if len(manifest.Artifacts) > 0 {
@@ -360,7 +487,9 @@ func (r *Repository) writeReplacementGeneration(ctx context.Context, source stri
 	}
 
 	if err := dstDir.Sync(); err != nil {
-		return oops.In("snapshot.store").With("operation", "sync_generation").Wrapf(err, "sync generation")
+		return oops.In("snapshot.store").
+			With("operation", "sync_generation").
+			Wrapf(err, "sync generation")
 	}
 
 	_, err = readManifest(ctx, dstDir, expectedDigest)
@@ -368,7 +497,11 @@ func (r *Repository) writeReplacementGeneration(ctx context.Context, source stri
 	return err
 }
 
-func (r *Repository) copyArtifacts(ctx context.Context, srcDir, dstDir *privatefs.Dir, descriptors []model.Artifact) error {
+func (r *Repository) copyArtifacts(
+	ctx context.Context,
+	srcDir, dstDir *privatefs.Dir,
+	descriptors []model.Artifact,
+) error {
 	for _, descriptor := range descriptors {
 		if err := r.copyArtifact(ctx, srcDir, dstDir, descriptor); err != nil {
 			return err
@@ -378,14 +511,20 @@ func (r *Repository) copyArtifacts(ctx context.Context, srcDir, dstDir *privatef
 	return nil
 }
 
-func (r *Repository) copyArtifact(ctx context.Context, srcDir, dstDir *privatefs.Dir, descriptor model.Artifact) error {
+func (r *Repository) copyArtifact(
+	ctx context.Context,
+	srcDir, dstDir *privatefs.Dir,
+	descriptor model.Artifact,
+) error {
 	if err := ctx.Err(); err != nil {
 		return oops.In("snapshot.store").With("operation", "copy_artifact").Wrap(err)
 	}
 
 	srcFile, err := srcDir.File(descriptor.ID+".bin.gz", unix.O_RDONLY)
 	if err != nil {
-		return oops.In("snapshot.store").With("operation", "open_source_artifact").Wrapf(err, "open source artifact")
+		return oops.In("snapshot.store").
+			With("operation", "open_source_artifact").
+			Wrapf(err, "open source artifact")
 	}
 
 	dstFile, err := dstDir.File(descriptor.ID+".bin.gz", unix.O_WRONLY|unix.O_CREAT|unix.O_EXCL)
@@ -396,7 +535,9 @@ func (r *Repository) copyArtifact(ctx context.Context, srcDir, dstDir *privatefs
 	dstGz := gzip.NewWriter(writerFunc(func(data []byte) (int, error) {
 		n, err := dstFile.Write(data)
 		if err != nil {
-			return n, oops.In("snapshot.store").With("operation", "write_rewrite_artifact").Wrap(err)
+			return n, oops.In("snapshot.store").
+				With("operation", "write_rewrite_artifact").
+				Wrap(err)
 		}
 
 		return n, r.boundary("rewrite_artifact_copy")
@@ -414,7 +555,9 @@ func (r *Repository) copyArtifact(ctx context.Context, srcDir, dstDir *privatefs
 	closeErr := errors.Join(compressionErr, dstFile.Sync(), dstFile.Close())
 
 	if err := errors.Join(verifyErr, closeErr); err != nil {
-		return oops.In("snapshot.store").With("operation", "copy_artifact").Wrapf(err, "copy artifact")
+		return oops.In("snapshot.store").
+			With("operation", "copy_artifact").
+			Wrapf(err, "copy artifact")
 	}
 
 	if hex.EncodeToString(dstHash.Sum(nil)) != descriptor.SHA256 {
@@ -426,7 +569,13 @@ func (r *Repository) copyArtifact(ctx context.Context, srcDir, dstDir *privatefs
 
 func (f writerFunc) Write(data []byte) (int, error) { return f(data) }
 
-func (r *Repository) confirmExistingRewriteLocked(ctx context.Context, catalog Catalog, existing Rewrite, source string, canonicalSessions []string) (RewriteResult, error) {
+func (r *Repository) confirmExistingRewriteLocked(
+	ctx context.Context,
+	catalog Catalog,
+	existing Rewrite,
+	source string,
+	canonicalSessions []string,
+) (RewriteResult, error) {
 	if existing.Source != source || !slices.Equal(existing.Sessions, canonicalSessions) {
 		return emptyRewriteResult(existing.ID, source, ""), ErrConflict
 	}

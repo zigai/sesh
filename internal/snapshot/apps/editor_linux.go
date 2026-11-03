@@ -134,13 +134,20 @@ func emptyEditorProcess() editorProcess {
 	}
 }
 
-func observeEditorProcess(ctx context.Context, observed model.Launch, pid int) (editorProcess, error) {
+func observeEditorProcess(
+	ctx context.Context,
+	observed model.Launch,
+	pid int,
+) (editorProcess, error) {
 	birth, err := process.ParseIdentity(string(observed.Birth))
 	if err != nil || pid <= 0 {
 		return emptyEditorProcess(), errors.Join(ErrEditorIdentityChanged, err)
 	}
 
-	current, err := process.Observe(ctx, process.Request{PID: pid, ExpectedBirth: birth, EnvironmentKeys: nil})
+	current, err := process.Observe(
+		ctx,
+		process.Request{PID: pid, ExpectedBirth: birth, EnvironmentKeys: nil},
+	)
 	if err != nil {
 		return emptyEditorProcess(), errors.Join(ErrEditorIdentityChanged, err)
 	}
@@ -160,7 +167,8 @@ func verifyEditorProcess(ctx context.Context, observed model.Launch, pid int) er
 
 func editorObservationMatchesLaunch(current *process.Observation, observed model.Launch) bool {
 	return bytes.Equal(current.Executable, observed.Executable) && bytes.Equal(current.Directory, observed.Directory) &&
-		equalArguments(current.Arguments, observed.Arguments) && !current.ExecutableDeleted && !current.DirectoryDeleted
+		equalArguments(current.Arguments, observed.Arguments) && !current.ExecutableDeleted &&
+		!current.DirectoryDeleted
 }
 
 func resolveEditorCore(ctx context.Context, ui editorProcess) (editorProcess, error) {
@@ -201,7 +209,11 @@ func isNvimEmbeddedCore(arguments [][]byte) bool {
 	return len(arguments) > 1 && bytes.Equal(arguments[1], []byte("--embed"))
 }
 
-func sameExecutableEditorChild(ctx context.Context, ui editorProcess, pid int) (editorProcess, bool, error) {
+func sameExecutableEditorChild(
+	ctx context.Context,
+	ui editorProcess,
+	pid int,
+) (editorProcess, bool, error) {
 	birth, err := process.ReadIdentity(ctx, pid)
 	if err != nil {
 		if errors.Is(err, process.ErrProcessVanished) {
@@ -211,9 +223,13 @@ func sameExecutableEditorChild(ctx context.Context, ui editorProcess, pid int) (
 		return emptyEditorProcess(), false, errors.Join(ErrEditorIdentityChanged, err)
 	}
 
-	observation, err := process.Observe(ctx, process.Request{PID: pid, ExpectedBirth: birth, EnvironmentKeys: nil})
+	observation, err := process.Observe(
+		ctx,
+		process.Request{PID: pid, ExpectedBirth: birth, EnvironmentKeys: nil},
+	)
 	if err != nil {
-		if errors.Is(err, process.ErrProcessVanished) || errors.Is(err, process.ErrIdentityMismatch) {
+		if errors.Is(err, process.ErrProcessVanished) ||
+			errors.Is(err, process.ErrIdentityMismatch) {
 			return emptyEditorProcess(), false, nil
 		}
 
@@ -355,7 +371,10 @@ func appendEditorChildren(children []int, data []byte) ([]int, error) {
 }
 
 func processParentPID(pid int) (int, error) {
-	data, err := readBoundedFile(filepath.Join("/proc", strconv.Itoa(pid), "stat"), maxEditorStatBytes)
+	data, err := readBoundedFile(
+		filepath.Join("/proc", strconv.Itoa(pid), "stat"),
+		maxEditorStatBytes,
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -499,7 +518,9 @@ func processSocketInodes(pid int) (map[string]bool, error) {
 	inodes := make(map[string]bool)
 
 	for _, entry := range entries {
-		target, readErr := os.Readlink(filepath.Join("/proc", strconv.Itoa(pid), "fd", entry.Name()))
+		target, readErr := os.Readlink(
+			filepath.Join("/proc", strconv.Itoa(pid), "fd", entry.Name()),
+		)
 		if readErr != nil {
 			continue
 		}
@@ -583,11 +604,20 @@ func queryNvimBuffers(
 		return nvimBufferResponse{}, errors.Join(ErrEditorQueryFailed, err)
 	}
 
-	response, queryErr := queryNvimBuffersInDirectory(queryCtx, executable, directory, endpoint, queryDirectory)
+	response, queryErr := queryNvimBuffersInDirectory(
+		queryCtx,
+		executable,
+		directory,
+		endpoint,
+		queryDirectory,
+	)
 
 	cleanupErr := os.RemoveAll(queryDirectory)
 	if cleanupErr != nil {
-		cleanupErr = errors.Join(ErrEditorQueryFailed, fmt.Errorf("remove editor query environment: %w", cleanupErr))
+		cleanupErr = errors.Join(
+			ErrEditorQueryFailed,
+			fmt.Errorf("remove editor query environment: %w", cleanupErr),
+		)
 	}
 
 	return response, errors.Join(queryErr, cleanupErr)
@@ -600,7 +630,15 @@ func queryNvimBuffersInDirectory(
 	endpoint string,
 	queryDirectory string,
 ) (nvimBufferResponse, error) {
-	command := exec.CommandContext(queryCtx, executable, "--clean", "--server", endpoint, "--remote-expr", nvimBufferExpression)
+	command := exec.CommandContext(
+		queryCtx,
+		executable,
+		"--clean",
+		"--server",
+		endpoint,
+		"--remote-expr",
+		nvimBufferExpression,
+	)
 	command.Dir = directory
 	command.Env = []string{
 		"HOME=" + queryDirectory,

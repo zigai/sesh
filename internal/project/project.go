@@ -66,7 +66,10 @@ func NewCatalog(cfg config.ProjectsConfig) (Catalog, error) {
 func (c Catalog) Resolve(ctx context.Context, dir string) (Project, error) {
 	resolved, err := filepath.EvalSymlinks(dir)
 	if err != nil {
-		return Project{}, oops.In("project").Code("project_resolve_failed").With("operation", "resolve_project").Wrap(err)
+		return Project{}, oops.In("project").
+			Code("project_resolve_failed").
+			With("operation", "resolve_project").
+			Wrap(err)
 	}
 
 	folder, hasFolder := c.registeredFolder(resolved)
@@ -107,7 +110,10 @@ func (c Catalog) List() ([]Project, error) {
 	for _, folder := range c.extra {
 		resolved, err := filepath.EvalSymlinks(folder)
 		if err != nil {
-			return nil, oops.In("project").Code("project_list_failed").With("operation", "list_registered_folder").Wrap(err)
+			return nil, oops.In("project").
+				Code("project_list_failed").
+				With("operation", "list_registered_folder").
+				Wrap(err)
 		}
 
 		if !seen[resolved] {
@@ -141,13 +147,26 @@ func (c Catalog) registeredFolder(dir string) (string, bool) {
 }
 
 func repositoryOf(ctx context.Context, dir string) (repository, bool, error) {
-	output, err := git.Output(ctx, dir, "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir")
+	output, err := git.Output(
+		ctx,
+		dir,
+		"rev-parse",
+		"--path-format=absolute",
+		"--show-toplevel",
+		"--git-common-dir",
+	)
 	if _, failed := errors.AsType[*git.CommandError](err); failed {
 		return repository{toplevel: "", root: ""}, false, nil
 	}
 
 	if err != nil {
-		return repository{toplevel: "", root: ""}, false, oops.In("project").Code("project_resolve_failed").With("operation", "query_repository").Wrap(err)
+		return repository{
+			toplevel: "",
+			root:     "",
+		}, false, oops.In("project").
+			Code("project_resolve_failed").
+			With("operation", "query_repository").
+			Wrap(err)
 	}
 
 	toplevel, commonDir, found := strings.Cut(output, "\n")
@@ -166,7 +185,10 @@ func repositoryOf(ctx context.Context, dir string) (repository, bool, error) {
 func repositoriesUnder(root string) ([]Project, error) {
 	entries, err := os.ReadDir(root)
 	if err != nil {
-		return nil, oops.In("project").Code("project_list_failed").With("operation", "list_root").Wrap(err)
+		return nil, oops.In("project").
+			Code("project_list_failed").
+			With("operation", "list_root").
+			Wrap(err)
 	}
 
 	projects := make([]Project, 0, len(entries))
@@ -189,12 +211,18 @@ func repositoriesUnder(root string) ([]Project, error) {
 		}
 
 		if err != nil {
-			return nil, oops.In("project").Code("project_list_failed").With("operation", "inspect_repository").Wrap(err)
+			return nil, oops.In("project").
+				Code("project_list_failed").
+				With("operation", "inspect_repository").
+				Wrap(err)
 		}
 
 		resolved, err := filepath.EvalSymlinks(dir)
 		if err != nil {
-			return nil, oops.In("project").Code("project_list_failed").With("operation", "inspect_repository").Wrap(err)
+			return nil, oops.In("project").
+				Code("project_list_failed").
+				With("operation", "inspect_repository").
+				Wrap(err)
 		}
 
 		projects = append(projects, gitProject(resolved))

@@ -34,7 +34,8 @@ func TestOpenCreatesATaggedSessionWithAMainWindowInTheRoot(t *testing.T) {
 		t.Fatalf("second Open() error = %v", err)
 	}
 
-	if again.How != project.OpenedExisting || again.Session.ID != opened.Session.ID || len(sessions(t, server)) != before+1 {
+	if again.How != project.OpenedExisting || again.Session.ID != opened.Session.ID ||
+		len(sessions(t, server)) != before+1 {
 		t.Fatalf("second Open() = %+v, want the existing session", again)
 	}
 }
@@ -46,16 +47,33 @@ func TestOpenLeavesASessionWithTheProjectNameAloneUnlessAdopting(t *testing.T) {
 	existing := newPlainSession(t, server, "shop", base)
 	before := len(sessions(t, server))
 
-	if _, err := project.Open(t.Context(), server, p, false); !errors.Is(err, project.ErrNameTaken) {
+	if _, err := project.Open(
+		t.Context(),
+		server,
+		p,
+		false,
+	); !errors.Is(
+		err,
+		project.ErrNameTaken,
+	) {
 		t.Fatalf("Open() error = %v, want ErrNameTaken", err)
 	}
 
-	if root, err := project.RootOfSession(t.Context(), server, existing.ID()); err != nil || root != "" {
+	if root, err := project.RootOfSession(
+		t.Context(),
+		server,
+		existing.ID(),
+	); err != nil ||
+		root != "" {
 		t.Fatalf("session was tagged with %q (err %v) without adopting", root, err)
 	}
 
 	if count := windowCount(t, existing); count != 1 || len(sessions(t, server)) != before {
-		t.Fatalf("refused Open() changed tmux: %d windows, %d sessions", count, len(sessions(t, server)))
+		t.Fatalf(
+			"refused Open() changed tmux: %d windows, %d sessions",
+			count,
+			len(sessions(t, server)),
+		)
 	}
 
 	opened, err := project.Open(t.Context(), server, p, true)
@@ -63,8 +81,12 @@ func TestOpenLeavesASessionWithTheProjectNameAloneUnlessAdopting(t *testing.T) {
 		t.Fatalf("adopting Open() error = %v", err)
 	}
 
-	if opened.How != project.OpenedAdopted || opened.Session.ID != existing.ID() || windowCount(t, existing) != 2 {
-		t.Fatalf("adopting Open() = %+v, want the existing session with its window kept and main added", opened)
+	if opened.How != project.OpenedAdopted || opened.Session.ID != existing.ID() ||
+		windowCount(t, existing) != 2 {
+		t.Fatalf(
+			"adopting Open() = %+v, want the existing session with its window kept and main added",
+			opened,
+		)
 	}
 
 	assertProjectSession(t, server, existing.ID(), p.Root)
@@ -87,7 +109,11 @@ func TestOpenSeparatesProjectsThatShareAName(t *testing.T) {
 	}
 
 	if openedFirst.Session.Name != "api_v2" || openedSecond.Session.Name != "api_v2-2" {
-		t.Fatalf("session names = %q, %q; want api_v2 and api_v2-2", openedFirst.Session.Name, openedSecond.Session.Name)
+		t.Fatalf(
+			"session names = %q, %q; want api_v2 and api_v2-2",
+			openedFirst.Session.Name,
+			openedSecond.Session.Name,
+		)
 	}
 
 	assertProjectSession(t, server, openedSecond.Session.ID, second.Root)
@@ -111,7 +137,8 @@ func assertProjectSession(t *testing.T, server *gotmux.Server, id gotmux.Session
 	}
 
 	for _, link := range windows {
-		info, err := link.Window().InfoWith(t.Context(), gotmux.QueryOptions{Filter: "", ExtraFields: []string{project.OptionMain}})
+		info, err := link.Window().
+			InfoWith(t.Context(), gotmux.QueryOptions{Filter: "", ExtraFields: []string{project.OptionMain}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -123,7 +150,12 @@ func assertProjectSession(t *testing.T, server *gotmux.Server, id gotmux.Session
 			}
 
 			if info.Name != project.MainWindowName || panes[0].CurrentPath != root {
-				t.Fatalf("main window %q runs in %q, want main in %q", info.Name, panes[0].CurrentPath, root)
+				t.Fatalf(
+					"main window %q runs in %q, want main in %q",
+					info.Name,
+					panes[0].CurrentPath,
+					root,
+				)
 			}
 
 			return

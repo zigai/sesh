@@ -26,15 +26,39 @@ func NewCommand() *cobra.Command {
 	}
 
 	cmd.AddCommand(
-		actioncli.Command(action.ProjectOpen, actioncli.Options[action.OpenProject, action.OpenedProject]{
-			Operation: "", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
-		}),
-		actioncli.Command(action.ProjectClone, actioncli.Options[action.CloneProject, action.OpenedProject]{
-			Operation: "", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
-		}),
-		actioncli.Command(action.ProjectCreate, actioncli.Options[action.CreateProject, action.OpenedProject]{
-			Operation: "", SuccessOwned: true, Configure: nil, Prepare: nil, Frontend: nil, Render: nil,
-		}),
+		actioncli.Command(
+			action.ProjectOpen,
+			actioncli.Options[action.OpenProject, action.OpenedProject]{
+				Operation:    "",
+				SuccessOwned: true,
+				Configure:    nil,
+				Prepare:      nil,
+				Frontend:     nil,
+				Render:       nil,
+			},
+		),
+		actioncli.Command(
+			action.ProjectClone,
+			actioncli.Options[action.CloneProject, action.OpenedProject]{
+				Operation:    "",
+				SuccessOwned: true,
+				Configure:    nil,
+				Prepare:      nil,
+				Frontend:     nil,
+				Render:       nil,
+			},
+		),
+		actioncli.Command(
+			action.ProjectCreate,
+			actioncli.Options[action.CreateProject, action.OpenedProject]{
+				Operation:    "",
+				SuccessOwned: true,
+				Configure:    nil,
+				Prepare:      nil,
+				Frontend:     nil,
+				Render:       nil,
+			},
+		),
 		cmdpicker.NewProjectPickCommand(),
 		cmdpicker.NewProjectPickerUICommand(),
 	)

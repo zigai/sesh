@@ -51,7 +51,8 @@ func TestSavedCatalogPreservesBytesAndNanosecondTimestamp(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if string(row.NameRaw) != "name-\xff" || string(row.PathRaw) != "/tmp/path-\xfd" || row.Activity.UnixNano() != 2000 {
+	if string(row.NameRaw) != "name-\xff" || string(row.PathRaw) != "/tmp/path-\xfd" ||
+		row.Activity.UnixNano() != 2000 {
 		t.Fatalf("native bytes or timestamp changed: %+v", row)
 	}
 }
@@ -82,13 +83,22 @@ func TestCatalogAbsentServerRetainsIndependentFailures(t *testing.T) {
 	}
 }
 
-func commitTestSnapshot(t *testing.T, r *store.Repository, sessionName, dir string, linkCount int) store.Generation {
+func commitTestSnapshot(
+	t *testing.T,
+	r *store.Repository,
+	sessionName, dir string,
+	linkCount int,
+) store.Generation {
 	t.Helper()
 
 	return commitTestManifest(t, r, testSnapshotManifest(sessionName, dir, linkCount))
 }
 
-func commitTestObservation(t *testing.T, r *store.Repository, sessionName, dir string) store.Generation {
+func commitTestObservation(
+	t *testing.T,
+	r *store.Repository,
+	sessionName, dir string,
+) store.Generation {
 	t.Helper()
 
 	m := testSnapshotManifest(sessionName, dir, 1)
@@ -241,7 +251,15 @@ func TestListSavedPreservesManifestBytesAndMetadata(t *testing.T) {
 		t.Fatalf("expected 1 session, got %d", len(currentSessions))
 	}
 
-	assertSavedSessionProperties(t, currentSessions[0], specialName, specialDir, gen.ID, repoPath, 3)
+	assertSavedSessionProperties(
+		t,
+		currentSessions[0],
+		specialName,
+		specialDir,
+		gen.ID,
+		repoPath,
+		3,
+	)
 
 	explicitSessions, err := ListSaved(t.Context(), repo, repoPath, gen.ID)
 	if err != nil {
@@ -270,12 +288,23 @@ func TestCatalogListsSavedSessionsThroughLockFreeView(t *testing.T) {
 	}
 	defer func() { _ = view.Close() }()
 
-	result, err := ListCatalog(t.Context(), CatalogOptions{Repository: view, RepositorySource: repoPath})
+	result, err := ListCatalog(
+		t.Context(),
+		CatalogOptions{Repository: view, RepositorySource: repoPath},
+	)
 	if err != nil || result.Status != StatusComplete || len(result.Sessions) != 1 {
 		t.Fatalf("catalog through view = %+v, %v; want one complete saved row", result, err)
 	}
 
-	assertSavedSessionProperties(t, result.Sessions[0], "viewed", "/work/viewed", gen.ID, repoPath, 2)
+	assertSavedSessionProperties(
+		t,
+		result.Sessions[0],
+		"viewed",
+		"/work/viewed",
+		gen.ID,
+		repoPath,
+		2,
+	)
 }
 
 func TestCatalogThroughViewOfMissingRepositoryIsComplete(t *testing.T) {
@@ -287,7 +316,10 @@ func TestCatalogThroughViewOfMissingRepositoryIsComplete(t *testing.T) {
 	}
 	defer func() { _ = view.Close() }()
 
-	result, err := ListCatalog(t.Context(), CatalogOptions{Repository: view, RepositorySource: repoPath})
+	result, err := ListCatalog(
+		t.Context(),
+		CatalogOptions{Repository: view, RepositorySource: repoPath},
+	)
 	if err != nil || result.Status != StatusComplete || len(result.Sessions) != 0 {
 		t.Fatalf("catalog of missing repository = %+v, %v; want complete and empty", result, err)
 	}
@@ -399,7 +431,11 @@ func TestListCatalogBoundsTotalInventory(t *testing.T) {
 		Version:  model.Schema,
 		Started:  1,
 		Finished: 2,
-		Source:   model.Source{TmuxVersion: "3.6", LibraryVersion: "v0.3.0", Consistency: "checkpoint"},
+		Source: model.Source{
+			TmuxVersion:    "3.6",
+			LibraryVersion: "v0.3.0",
+			Consistency:    "checkpoint",
+		},
 		Windows: []model.Window{
 			{
 				ID:     "w0",
@@ -448,7 +484,10 @@ func TestListCatalogBoundsTotalInventory(t *testing.T) {
 	}
 
 	for _, domain := range []string{"S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10"} {
-		m.Evidence = append(m.Evidence, model.Evidence{Domain: domain, Status: "verified", Reason: ""})
+		m.Evidence = append(
+			m.Evidence,
+			model.Evidence{Domain: domain, Status: "verified", Reason: ""},
+		)
 	}
 
 	_, err = repo.Commit(t.Context(), attempt.ID, m, map[string]io.Reader{
@@ -458,7 +497,10 @@ func TestListCatalogBoundsTotalInventory(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := ListCatalog(t.Context(), CatalogOptions{Repository: repo, RepositorySource: repoPath})
+	result, err := ListCatalog(
+		t.Context(),
+		CatalogOptions{Repository: repo, RepositorySource: repoPath},
+	)
 	if !errors.Is(err, ErrCatalogLimitExceeded) {
 		t.Fatalf("ListCatalog() error = %v, want ErrCatalogLimitExceeded", err)
 	}
@@ -468,7 +510,11 @@ func TestListCatalogBoundsTotalInventory(t *testing.T) {
 	}
 
 	if len(result.Sessions) != maxCatalogInventory {
-		t.Fatalf("inventory count = %d, want exactly maxCatalogInventory %d", len(result.Sessions), maxCatalogInventory)
+		t.Fatalf(
+			"inventory count = %d, want exactly maxCatalogInventory %d",
+			len(result.Sessions),
+			maxCatalogInventory,
+		)
 	}
 }
 
@@ -487,16 +533,37 @@ func TestListSavedRejectsEmptyOrInvalidSource(t *testing.T) {
 		t.Fatalf("empty source err = %v, want ErrEmptyRepositorySource", err)
 	}
 
-	if _, err := ListSaved(t.Context(), repo, "   ", ""); !errors.Is(err, ErrEmptyRepositorySource) {
+	if _, err := ListSaved(
+		t.Context(),
+		repo,
+		"   ",
+		"",
+	); !errors.Is(
+		err,
+		ErrEmptyRepositorySource,
+	) {
 		t.Fatalf("whitespace source err = %v, want ErrEmptyRepositorySource", err)
 	}
 
-	if _, err := ListSaved(t.Context(), repo, "bad\xffsource", ""); !errors.Is(err, ErrEmptyRepositorySource) {
+	if _, err := ListSaved(
+		t.Context(),
+		repo,
+		"bad\xffsource",
+		"",
+	); !errors.Is(
+		err,
+		ErrEmptyRepositorySource,
+	) {
 		t.Fatalf("invalid UTF-8 source err = %v, want ErrEmptyRepositorySource", err)
 	}
 }
 
-func assertSavedSessionProperties(t *testing.T, s Session, wantName, wantDir, wantGen, wantSource string, wantLinks int) {
+func assertSavedSessionProperties(
+	t *testing.T,
+	s Session,
+	wantName, wantDir, wantGen, wantSource string,
+	wantLinks int,
+) {
 	t.Helper()
 
 	if s.ID != "s0" {

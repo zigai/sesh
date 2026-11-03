@@ -13,7 +13,12 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/model"
 )
 
-func (r *Repository) Pin(ctx context.Context, source string, target model.Bytes, actions []Action) (Operation, error) {
+func (r *Repository) Pin(
+	ctx context.Context,
+	source string,
+	target model.Bytes,
+	actions []Action,
+) (Operation, error) {
 	op, err := r.registerOperation(ctx, newID(), source, target, actions)
 	return op, repositoryError("pin", err)
 }
@@ -22,9 +27,17 @@ func NewOperationID() string {
 	return newID()
 }
 
-func (r *Repository) Transition(ctx context.Context, operation, action string, expected, next model.ActionState, runtimeID model.Bytes) error {
+func (r *Repository) Transition(
+	ctx context.Context,
+	operation, action string,
+	expected, next model.ActionState,
+	runtimeID model.Bytes,
+) error {
 	err := r.update(ctx, func(c *Catalog) error {
-		index := slices.IndexFunc(c.Operations, func(op Operation) bool { return op.ID == operation })
+		index := slices.IndexFunc(
+			c.Operations,
+			func(op Operation) bool { return op.ID == operation },
+		)
 		if index < 0 || c.Operations[index].State != "active" {
 			return ErrConflict
 		}
@@ -46,7 +59,10 @@ func (r *Repository) Transition(ctx context.Context, operation, action string, e
 
 func (r *Repository) Finish(ctx context.Context, operation string, abandon bool) error {
 	err := r.update(ctx, func(c *Catalog) error {
-		index := slices.IndexFunc(c.Operations, func(op Operation) bool { return op.ID == operation })
+		index := slices.IndexFunc(
+			c.Operations,
+			func(op Operation) bool { return op.ID == operation },
+		)
 		if index < 0 || c.Operations[index].State != "active" {
 			return ErrConflict
 		}
@@ -91,7 +107,9 @@ func (r *Repository) reconcileOperationLocked(ctx context.Context, id string) (O
 	}
 
 	if err := ctx.Err(); err != nil {
-		return Operation{}, oops.In("snapshot.store").With("operation", "read_operation_journal").Wrapf(err, "read operation journal")
+		return Operation{}, oops.In("snapshot.store").
+			With("operation", "read_operation_journal").
+			Wrapf(err, "read operation journal")
 	}
 
 	if err := r.boundary("operation_reconcile_sync"); err != nil {

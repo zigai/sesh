@@ -20,7 +20,11 @@ func TestStrataRejectsUnknownTopLevelKey(t *testing.T) {
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "config.toml")
 
-	err := os.WriteFile(configPath, []byte("unknown_top_level = 42\nsecret_value = \"super-secret-token\"\n"), 0o600)
+	err := os.WriteFile(
+		configPath,
+		[]byte("unknown_top_level = 42\nsecret_value = \"super-secret-token\"\n"),
+		0o600,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +61,8 @@ func TestStrataRejectsUnknownTopLevelKey(t *testing.T) {
 	}
 
 	strictErr, ok := errors.AsType[*toml.StrictMissingError](err)
-	if !ok || len(strictErr.Errors) == 0 || strings.Join(strictErr.Errors[0].Key(), ".") != "unknown_top_level" {
+	if !ok || len(strictErr.Errors) == 0 ||
+		strings.Join(strictErr.Errors[0].Key(), ".") != "unknown_top_level" {
 		t.Errorf("typed parse cause does not preserve unknown_top_level: %v", err)
 	}
 
@@ -78,7 +83,13 @@ func assertNoValuesLeakedInContext(t *testing.T, ctx map[string]any, forbidden .
 }
 
 func TestStrataRejectsUnknownNestedKey(t *testing.T) {
-	assertRejectedConfigField(t, "[theme]\nbad_theme_field = \"#ffffff\"\n", "theme.bad_theme_field", "unknown_field", "#ffffff")
+	assertRejectedConfigField(
+		t,
+		"[theme]\nbad_theme_field = \"#ffffff\"\n",
+		"theme.bad_theme_field",
+		"unknown_field",
+		"#ffffff",
+	)
 }
 
 func TestStrataRejectsUnknownKeyInHooks(t *testing.T) {
@@ -101,7 +112,11 @@ func TestStrataRejectsUnknownKeyInHooks(t *testing.T) {
 		tempDir := t.TempDir()
 		configPath := filepath.Join(tempDir, "config.toml")
 
-		err := os.WriteFile(configPath, []byte("[hooks]\nsession_switch_post = [{ command = \"echo\", bad_key = 123 }]\n"), 0o600)
+		err := os.WriteFile(
+			configPath,
+			[]byte("[hooks]\nsession_switch_post = [{ command = \"echo\", bad_key = 123 }]\n"),
+			0o600,
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -117,7 +132,11 @@ func TestStrataRejectsDuplicateKey(t *testing.T) {
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "config.toml")
 
-	err := os.WriteFile(configPath, []byte("[settings]\nshow_footer = true\nshow_footer = false\n"), 0o600)
+	err := os.WriteFile(
+		configPath,
+		[]byte("[settings]\nshow_footer = true\nshow_footer = false\n"),
+		0o600,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,10 +167,19 @@ func TestStrataRejectsDuplicateKey(t *testing.T) {
 }
 
 func TestStrataRejectsInvalidType(t *testing.T) {
-	assertRejectedConfigField(t, "[settings]\ndirectory_suggestions = \"not-a-number\"\n", "settings.directory_suggestions", "invalid_type", "not-a-number")
+	assertRejectedConfigField(
+		t,
+		"[settings]\ndirectory_suggestions = \"not-a-number\"\n",
+		"settings.directory_suggestions",
+		"invalid_type",
+		"not-a-number",
+	)
 }
 
-func assertRejectedConfigField(t *testing.T, tomlContent, wantField, wantReason, forbiddenValue string) {
+func assertRejectedConfigField(
+	t *testing.T,
+	tomlContent, wantField, wantReason, forbiddenValue string,
+) {
 	t.Helper()
 
 	tempDir := t.TempDir()
@@ -178,9 +206,14 @@ func assertRejectedConfigField(t *testing.T, tomlContent, wantField, wantReason,
 	}
 
 	var detectedField string
-	if strictErr, ok := errors.AsType[*toml.StrictMissingError](err); ok && len(strictErr.Errors) > 0 {
+	if strictErr, ok := errors.AsType[*toml.StrictMissingError](
+		err,
+	); ok &&
+		len(strictErr.Errors) > 0 {
 		detectedField = strings.Join(strictErr.Errors[0].Key(), ".")
-	} else if decodeErr, ok := errors.AsType[*toml.DecodeError](err); ok {
+	} else if decodeErr, ok := errors.AsType[*toml.DecodeError](
+		err,
+	); ok {
 		detectedField = strings.Join(decodeErr.Key(), ".")
 	}
 
@@ -333,7 +366,9 @@ func verifyPreHooks(t *testing.T, pre []config.HookCommand) {
 	}
 
 	pre1 := pre[1]
-	if pre1.ShellCommand != "" || pre1.Command != "git" || !slices.Equal(pre1.Args, []string{"fetch", "--all"}) || pre1.Timeout != "5s" {
+	if pre1.ShellCommand != "" || pre1.Command != "git" ||
+		!slices.Equal(pre1.Args, []string{"fetch", "--all"}) ||
+		pre1.Timeout != "5s" {
 		t.Errorf("pre1 = %#v, want structured command 'git fetch --all'", pre1)
 	}
 }
@@ -346,7 +381,8 @@ func verifyPostHooks(t *testing.T, post []config.HookCommand) {
 	}
 
 	post0 := post[0]
-	if post0.Command != "tmux" || !slices.Equal(post0.Args, []string{"display-message", "switched"}) {
+	if post0.Command != "tmux" ||
+		!slices.Equal(post0.Args, []string{"display-message", "switched"}) {
 		t.Errorf("post0 = %#v, want structured command 'tmux display-message switched'", post0)
 	}
 }

@@ -107,7 +107,10 @@ func classifyTUIErrorCode(err error) string {
 		return code
 	}
 
-	if outcome, ok := operationOutcome(err); ok && (outcome.Effect == gotmux.EffectUnspecified || outcome.Effect == gotmux.EffectUnknown) {
+	if outcome, ok := operationOutcome(
+		err,
+	); ok &&
+		(outcome.Effect == gotmux.EffectUnspecified || outcome.Effect == gotmux.EffectUnknown) {
 		return tuiErrorUncertainOutcome
 	}
 
@@ -205,14 +208,25 @@ func logCacheWriteFailure(ctx context.Context, cache string, err error) {
 
 func logProviderEpisode(ctx context.Context, provider string, err error) {
 	if err == nil {
-		zerolog.Ctx(ctx).Info().Str("component", "tui").Str("operation", "read_provider").Str("provider", provider).
-			Str("status", "recovered").Msg("tui provider recovered")
+		zerolog.Ctx(ctx).
+			Info().
+			Str("component", "tui").
+			Str("operation", "read_provider").
+			Str("provider", provider).
+			Str("status", "recovered").
+			Msg("tui provider recovered")
 
 		return
 	}
 
-	zerolog.Ctx(ctx).Warn().Str("component", "tui").Str("operation", "read_provider").Str("provider", provider).
-		Str("status", "degraded").Func(logging.Cause(err)).Msg("tui provider could not be read")
+	zerolog.Ctx(ctx).
+		Warn().
+		Str("component", "tui").
+		Str("operation", "read_provider").
+		Str("provider", provider).
+		Str("status", "degraded").
+		Func(logging.Cause(err)).
+		Msg("tui provider could not be read")
 }
 
 func logTUIDegradation(ctx context.Context, operation tuiLogOperation, err error) {
@@ -276,7 +290,11 @@ func logTUIFirstFrame(ctx context.Context, timing firstFrameTiming) {
 	event.Msg("tui first frame shown")
 }
 
-func firstFrameTimingAt(initializedAt, launchedAt time.Time, load *sessionLoadTiming, now time.Time) firstFrameTiming {
+func firstFrameTimingAt(
+	initializedAt, launchedAt time.Time,
+	load *sessionLoadTiming,
+	now time.Time,
+) firstFrameTiming {
 	timing := firstFrameTiming{load: 0, loaders: load, sinceLaunch: 0, launched: false}
 	if !initializedAt.IsZero() {
 		timing.load = now.Sub(initializedAt)

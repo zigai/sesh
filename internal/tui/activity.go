@@ -72,7 +72,11 @@ func FormatElapsedAt(t time.Time, now time.Time) string {
 	case seconds < secondsPerHour:
 		return fmt.Sprintf("%dm", seconds/secondsPerMinute)
 	case seconds < secondsPerDay:
-		return fmt.Sprintf("%dh %dm", seconds/secondsPerHour, (seconds/secondsPerMinute)%minutesPerHour)
+		return fmt.Sprintf(
+			"%dh %dm",
+			seconds/secondsPerHour,
+			(seconds/secondsPerMinute)%minutesPerHour,
+		)
 	default:
 		return fmt.Sprintf("%dd %dh", seconds/secondsPerDay, (seconds/secondsPerHour)%hoursPerDay)
 	}

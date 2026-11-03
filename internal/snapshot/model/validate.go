@@ -26,15 +26,26 @@ func ValidID(id string) bool {
 
 func (m Manifest) Validate() error {
 	if m.Format != "sesh" {
-		return oops.In("snapshot.model").Code("snapshot_invalid").With("operation", "validate", "phase", "format").Wrap(ErrInvalid)
+		return oops.In("snapshot.model").
+			Code("snapshot_invalid").
+			With("operation", "validate", "phase", "format").
+			Wrap(ErrInvalid)
 	}
 
 	if m.Version != Schema {
-		return oops.In("snapshot.model").Code("snapshot_version_unsupported").With("operation", "validate", "phase", "version").Wrap(ErrVersion)
+		return oops.In("snapshot.model").
+			Code("snapshot_version_unsupported").
+			With("operation", "validate", "phase", "version").
+			Wrap(ErrVersion)
 	}
 
-	if m.Started <= 0 || m.Finished < m.Started || m.Source.TmuxVersion == "" || m.Source.LibraryVersion == "" || !validEndpointScope(m.Source.EndpointScope) {
-		return oops.In("snapshot.model").Code("snapshot_invalid").With("operation", "validate", "phase", "provenance").Wrap(ErrInvalid)
+	if m.Started <= 0 || m.Finished < m.Started || m.Source.TmuxVersion == "" ||
+		m.Source.LibraryVersion == "" ||
+		!validEndpointScope(m.Source.EndpointScope) {
+		return oops.In("snapshot.model").
+			Code("snapshot_invalid").
+			With("operation", "validate", "phase", "provenance").
+			Wrap(ErrInvalid)
 	}
 
 	checks := []struct {
@@ -51,7 +62,10 @@ func (m Manifest) Validate() error {
 	}
 	for _, check := range checks {
 		if err := check.validate(); err != nil {
-			return oops.In("snapshot.model").Code("snapshot_invalid").With("operation", "validate", "phase", check.phase).Wrap(err)
+			return oops.In("snapshot.model").
+				Code("snapshot_invalid").
+				With("operation", "validate", "phase", check.phase).
+				Wrap(err)
 		}
 	}
 
@@ -73,7 +87,19 @@ func (m Manifest) Complete() bool {
 }
 
 func (m Manifest) validateBounds() error {
-	total := len(m.Sessions) + len(m.Groups) + len(m.Windows) + len(m.Links) + len(m.Panes) + len(m.Artifacts)
+	total := len(
+		m.Sessions,
+	) + len(
+		m.Groups,
+	) + len(
+		m.Windows,
+	) + len(
+		m.Links,
+	) + len(
+		m.Panes,
+	) + len(
+		m.Artifacts,
+	)
 	if total > MaxEntities || len(m.Sessions) == 0 || len(m.Windows) == 0 || len(m.Panes) == 0 {
 		return ErrInvalid
 	}
@@ -83,13 +109,15 @@ func (m Manifest) validateBounds() error {
 
 func (m Manifest) validateEvidence() error {
 	domains := []string{"S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10"}
-	if len(m.Evidence) != len(domains) || !slices.Contains([]string{"observed", "checkpoint"}, m.Source.Consistency) {
+	if len(m.Evidence) != len(domains) ||
+		!slices.Contains([]string{"observed", "checkpoint"}, m.Source.Consistency) {
 		return ErrInvalid
 	}
 
 	seen := make(map[string]bool)
 	for _, evidence := range m.Evidence {
-		if seen[evidence.Domain] || !slices.Contains(domains, evidence.Domain) || !validEvidence(evidence) {
+		if seen[evidence.Domain] || !slices.Contains(domains, evidence.Domain) ||
+			!validEvidence(evidence) {
 			return ErrInvalid
 		}
 
@@ -118,7 +146,8 @@ func validEvidence(e Evidence) bool {
 func (m Manifest) validateSessions() error {
 	ids, names := make(map[string]bool), make(map[string]bool)
 	for _, session := range m.Sessions {
-		if !ValidID(session.ID) || ids[session.ID] || len(session.Name) == 0 || names[string(session.Name)] {
+		if !ValidID(session.ID) || ids[session.ID] || len(session.Name) == 0 ||
+			names[string(session.Name)] {
 			return ErrInvalid
 		}
 
@@ -159,7 +188,9 @@ func (m Manifest) validateWindows() error {
 }
 
 func (m Manifest) validateWindow(window Window, seen map[string]bool) error {
-	if window.Layout.Width != window.Width || window.Layout.Height != window.Height || window.Layout.Left != 0 || window.Layout.Top != 0 {
+	if window.Layout.Width != window.Width || window.Layout.Height != window.Height ||
+		window.Layout.Left != 0 ||
+		window.Layout.Top != 0 {
 		return ErrInvalid
 	}
 
@@ -175,7 +206,11 @@ func (m Manifest) validateWindow(window Window, seen map[string]bool) error {
 	return m.validateWindowPanes(window, leaves, seen)
 }
 
-func (m Manifest) validateWindowPanes(window Window, leaves map[string]Layout, seen map[string]bool) error {
+func (m Manifest) validateWindowPanes(
+	window Window,
+	leaves map[string]Layout,
+	seen map[string]bool,
+) error {
 	indexes := make(map[int]bool)
 	active, last, count := 0, 0, 0
 
@@ -213,7 +248,12 @@ func (m Manifest) validateWindowPanes(window Window, leaves map[string]Layout, s
 	return nil
 }
 
-func (p Pane) validate(leaves map[string]Layout, seen map[string]bool, indexes map[int]bool, window Window) error {
+func (p Pane) validate(
+	leaves map[string]Layout,
+	seen map[string]bool,
+	indexes map[int]bool,
+	window Window,
+) error {
 	leaf, exists := leaves[p.ID]
 	if !exists || !ValidID(p.ID) || seen[p.ID] || p.Index < 0 || indexes[p.Index] {
 		return ErrInvalid
@@ -246,7 +286,8 @@ func (p Pane) validateGeometry(leaf Layout, window Window) error {
 	}
 
 	leaf = terminalRectangle(leaf, window)
-	if !window.Zoomed && (p.Width != leaf.Width || p.Height != leaf.Height || p.Left != leaf.Left || p.Top != leaf.Top) {
+	if !window.Zoomed &&
+		(p.Width != leaf.Width || p.Height != leaf.Height || p.Left != leaf.Left || p.Top != leaf.Top) {
 		return ErrInvalid
 	}
 

@@ -52,7 +52,11 @@ func TestReadSourceFileRejectsSymlinkedParent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(filepath.Join(realDir, "config.toml"), []byte("[remote]\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(realDir, "config.toml"),
+		[]byte("[remote]\n"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -90,7 +94,12 @@ func TestReadSourceFileRejectsSpecialAndOversizedFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := config.ReadSourceFile(filepath.Join(regular, "config.toml")); !errors.Is(err, config.ErrConfigNotDirectory) {
+	if _, err := config.ReadSourceFile(
+		filepath.Join(regular, "config.toml"),
+	); !errors.Is(
+		err,
+		config.ErrConfigNotDirectory,
+	) {
 		t.Fatalf("file as directory component error = %v, want ErrConfigNotDirectory", err)
 	}
 

@@ -24,7 +24,9 @@ const (
 	skipReasonLinkedCollision = "linked_session_collides"
 )
 
-var ErrNoServerRunning = errors.New("no tmux server is running on the selected socket; start tmux there first, then retry")
+var ErrNoServerRunning = errors.New(
+	"no tmux server is running on the selected socket; start tmux there first, then retry",
+)
 
 // CollisionPolicy left empty skips colliding sessions when every saved session was requested and
 // fails when the caller named sessions explicitly.
@@ -55,7 +57,11 @@ func effectiveCollisionPolicy(cfg RestoreConfig) CollisionPolicy {
 	}
 }
 
-func restoreOperationExists(ctx context.Context, repository *store.Repository, operationID string) (bool, error) {
+func restoreOperationExists(
+	ctx context.Context,
+	repository *store.Repository,
+	operationID string,
+) (bool, error) {
 	if operationID == "" {
 		return false, nil
 	}
@@ -65,7 +71,10 @@ func restoreOperationExists(ctx context.Context, repository *store.Repository, o
 		return false, fmt.Errorf("inspect operations: %w", err)
 	}
 
-	return slices.ContainsFunc(catalog.Operations, func(op store.Operation) bool { return op.ID == operationID }), nil
+	return slices.ContainsFunc(
+		catalog.Operations,
+		func(op store.Operation) bool { return op.ID == operationID },
+	), nil
 }
 
 func planAroundCollisions(
@@ -112,7 +121,11 @@ func planAroundCollisions(
 		Wrap(restore.ErrSessionCollision)
 }
 
-func partitionSelection(manifest model.Manifest, selected []string, collisions []restore.Collision) ([]string, []SkippedSession, error) {
+func partitionSelection(
+	manifest model.Manifest,
+	selected []string,
+	collisions []restore.Collision,
+) ([]string, []SkippedSession, error) {
 	colliding := make(map[string]string, len(collisions))
 	for _, collision := range collisions {
 		colliding[collision.SessionID] = collision.Reason
@@ -143,7 +156,11 @@ func partitionSelection(manifest model.Manifest, selected []string, collisions [
 	return kept, blocked, nil
 }
 
-func selectionBlocker(manifest model.Manifest, id string, colliding map[string]string) (string, bool, error) {
+func selectionBlocker(
+	manifest model.Manifest,
+	id string,
+	colliding map[string]string,
+) (string, bool, error) {
 	if reason, ok := colliding[id]; ok {
 		return reason, true, nil
 	}

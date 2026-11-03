@@ -102,12 +102,46 @@ func agentOptionTakesValue(harness aht.Harness, flag string) bool {
 	}
 
 	switch flag {
-	case "--mode", "--model", "-m", "--provider", "--api-key", "--system-prompt", "--append-system-prompt",
-		"--session", "--session-id", "--session-dir", "--fork", "--name", "-n", "--models",
-		"--tools", "-t", "--exclude-tools", "-xt", "--thinking", "--extension", "-e",
-		"--skill", "--prompt-template", "--theme", "--use-theme", "--tui-mode",
-		"--config", "--profile", "--cd", "-C", "--cwd", "--dir", "--agent",
-		"--interactive", "-i", "--permission-mode", "--output-format", "--input-format", "--prompt", "--message":
+	case "--mode",
+		"--model",
+		"-m",
+		"--provider",
+		"--api-key",
+		"--system-prompt",
+		"--append-system-prompt",
+		"--session",
+		"--session-id",
+		"--session-dir",
+		"--fork",
+		"--name",
+		"-n",
+		"--models",
+		"--tools",
+		"-t",
+		"--exclude-tools",
+		"-xt",
+		"--thinking",
+		"--extension",
+		"-e",
+		"--skill",
+		"--prompt-template",
+		"--theme",
+		"--use-theme",
+		"--tui-mode",
+		"--config",
+		"--profile",
+		"--cd",
+		"-C",
+		"--cwd",
+		"--dir",
+		"--agent",
+		"--interactive",
+		"-i",
+		"--permission-mode",
+		"--output-format",
+		"--input-format",
+		"--prompt",
+		"--message":
 		return true
 	default:
 		return false
@@ -115,7 +149,8 @@ func agentOptionTakesValue(harness aht.Harness, flag string) bool {
 }
 
 func nonInteractiveMode(harness aht.Harness, flag, value string) bool {
-	return (harness == aht.HarnessPi || harness == aht.HarnessOmp) && flag == "--mode" && (value == "json" || value == "rpc")
+	return (harness == aht.HarnessPi || harness == aht.HarnessOmp) && flag == "--mode" &&
+		(value == "json" || value == "rpc")
 }
 
 func agentCommandArguments(argv []string) []string {
@@ -137,7 +172,20 @@ func interactiveAgentFlag(harness aht.Harness, flag string) bool {
 
 func isRuntimeLauncher(name string) bool {
 	switch name {
-	case "node", "bun", "deno", "python", "python3", "uv", "uvx", "npx", "pnpm", "yarn", "env", "sh", "bash", "zsh":
+	case "node",
+		"bun",
+		"deno",
+		"python",
+		"python3",
+		"uv",
+		"uvx",
+		"npx",
+		"pnpm",
+		"yarn",
+		"env",
+		"sh",
+		"bash",
+		"zsh":
 		return true
 	default:
 		return false

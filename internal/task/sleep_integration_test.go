@@ -59,7 +59,12 @@ func TestSleepStopsAnIdleAgentAndRecordsHowToResumeIt(t *testing.T) {
 
 	want := []string{f.harness, "--session", f.agents.session}
 	if record.Resume.Harness != fakeHarnessName || !slices.Equal(record.Resume.Command, want) {
-		t.Fatalf("resume evidence = %+v, want harness %s and %v", record.Resume, fakeHarnessName, want)
+		t.Fatalf(
+			"resume evidence = %+v, want harness %s and %v",
+			record.Resume,
+			fakeHarnessName,
+			want,
+		)
 	}
 
 	if processAlive(pid) {
@@ -107,7 +112,11 @@ func TestInterruptedSleepRetainsResumeAndCanWakeSafely(t *testing.T) {
 	for _, running := range []bool{false, true} {
 		t.Run(fmt.Sprintf("harness_running=%t", running), func(t *testing.T) {
 			f := newSleepFixtureWith(t, func(dir string) {
-				if err := os.WriteFile(filepath.Join(dir, sleepSignalGate), nil, 0o600); err != nil {
+				if err := os.WriteFile(
+					filepath.Join(dir, sleepSignalGate),
+					nil,
+					0o600,
+				); err != nil {
 					t.Fatal(err)
 				}
 			})
@@ -126,7 +135,12 @@ func TestInterruptedSleepRetainsResumeAndCanWakeSafely(t *testing.T) {
 			stored, _ := ledger.Find(f.record.ID)
 			assertSleepResume(t, f, stored)
 
-			if _, err := os.Stat(filepath.Join(f.record.Directory, placeholderMarker)); !errors.Is(err, os.ErrNotExist) {
+			if _, err := os.Stat(
+				filepath.Join(f.record.Directory, placeholderMarker),
+			); !errors.Is(
+				err,
+				os.ErrNotExist,
+			) {
 				t.Fatalf("placeholder after interrupted sleep: %v, want absent", err)
 			}
 
@@ -217,7 +231,11 @@ func assertWakeAfterInterruptedSleep(t *testing.T, f sleepFixture, pid int, runn
 			t.Fatal("Wake() replaced the already-running harness")
 		}
 	} else {
-		if got := waitForArgs(t, f, "--session "+f.agents.session); got != "--session "+f.agents.session {
+		if got := waitForArgs(
+			t,
+			f,
+			"--session "+f.agents.session,
+		); got != "--session "+f.agents.session {
 			t.Fatalf("resumed harness arguments = %q", got)
 		}
 	}
@@ -258,7 +276,8 @@ func TestSleepTimeoutRetainsResumeAndWakeKeepsTheRunningAgent(t *testing.T) {
 		t.Fatalf("Wake() after stop timeout: %v", err)
 	}
 
-	if !woken.AlreadyAwake || woken.Record.State != task.StateActive || !processAlive(pid) || readArgs(t, f) != "" {
+	if !woken.AlreadyAwake || woken.Record.State != task.StateActive || !processAlive(pid) ||
+		readArgs(t, f) != "" {
 		t.Fatalf("Wake() = %+v, want the original running harness reconciled", woken)
 	}
 
@@ -278,7 +297,11 @@ func TestWakeRelaunchesTheAgentThroughItsResumeCommand(t *testing.T) {
 		t.Fatalf("Wake() = %+v, want a relaunch that leaves the task active", woken)
 	}
 
-	if got := waitForArgs(t, f, "--session "+f.agents.session); got != "--session "+f.agents.session {
+	if got := waitForArgs(
+		t,
+		f,
+		"--session "+f.agents.session,
+	); got != "--session "+f.agents.session {
 		t.Fatalf("relaunched harness arguments = %q", got)
 	}
 
@@ -323,7 +346,11 @@ func TestWakeOnlyMarksAwakeATaskWhoseHarnessAlreadyRuns(t *testing.T) {
 	}
 
 	if !woken.AlreadyAwake || readArgs(t, f) != "--again" {
-		t.Fatalf("Wake() = %+v with harness arguments %q, want the running harness kept", woken, readArgs(t, f))
+		t.Fatalf(
+			"Wake() = %+v with harness arguments %q, want the running harness kept",
+			woken,
+			readArgs(t, f),
+		)
 	}
 
 	assertStoredState(t, f, task.StateActive)
@@ -352,11 +379,21 @@ func (agents *paneAgent) AgentsIn(ctx context.Context, pane gotmux.PaneID) ([]ta
 		return nil, fmt.Errorf("inspect pane: %w", err)
 	}
 
-	return []task.Agent{{
-		Harness: agents.harness, Activity: agents.activity, SessionID: "", SessionPath: agents.session,
-		ResumeCommand: []string{fakeHarnessName, "--session", agents.session}, Executable: agents.executable,
-		PanePID: details.PID,
-	}}, nil
+	return []task.Agent{
+		{
+			Harness:     agents.harness,
+			Activity:    agents.activity,
+			SessionID:   "",
+			SessionPath: agents.session,
+			ResumeCommand: []string{
+				fakeHarnessName,
+				"--session",
+				agents.session,
+			},
+			Executable: agents.executable,
+			PanePID:    details.PID,
+		},
+	}, nil
 }
 
 func newSleepFixture(t *testing.T) sleepFixture {
@@ -386,21 +423,46 @@ func newSleepFixtureWith(t *testing.T, prepareWorktree func(dir string)) sleepFi
 		session: filepath.Join(f.base, "sessions", "one.jsonl"), missing: false,
 	}
 
-	catalog, err := project.NewCatalog(config.ProjectsConfig{Roots: []string{filepath.Join(f.base, "code")}, Extra: nil, Overrides: nil})
+	catalog, err := project.NewCatalog(
+		config.ProjectsConfig{
+			Roots:     []string{filepath.Join(f.base, "code")},
+			Extra:     nil,
+			Overrides: nil,
+		},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	cfg := config.DefaultTasksConfig()
-	cfg.Panes = []config.TaskPaneConfig{{Name: "editor", Command: []string{"sleep", "300"}, Dir: "", Restart: false}}
-	cfg.Harness = []config.HarnessConfig{{Name: fakeHarnessName, Command: []string{"sh", "-c", `while [ ! -e ready ]; do sleep 0.05; done; exec "$0"`, harness}}}
+	cfg.Panes = []config.TaskPaneConfig{
+		{Name: "editor", Command: []string{"sleep", "300"}, Dir: "", Restart: false},
+	}
+	cfg.Harness = []config.HarnessConfig{
+		{
+			Name: fakeHarnessName,
+			Command: []string{
+				"sh",
+				"-c",
+				`while [ ! -e ready ]; do sleep 0.05; done; exec "$0"`,
+				harness,
+			},
+		},
+	}
 
 	full := config.DefaultConfig()
 	full.Tasks = cfg
 
 	f.service = task.NewService(task.Options{
-		Server: f.server, Store: f.store, Catalog: catalog, Config: cfg, Windows: full.TaskWindowFor, WorktreeDir: f.worktreeDir,
-		LookPath: exec.LookPath, Now: time.Now, Agents: agents,
+		Server:      f.server,
+		Store:       f.store,
+		Catalog:     catalog,
+		Config:      cfg,
+		Windows:     full.TaskWindowFor,
+		WorktreeDir: f.worktreeDir,
+		LookPath:    exec.LookPath,
+		Now:         time.Now,
+		Agents:      agents,
 		SleepingAgentCommand: func(string) []string {
 			return []string{"sh", "-c", "echo shown > " + placeholderMarker + "; exec sleep 300"}
 		},
@@ -408,7 +470,11 @@ func newSleepFixtureWith(t *testing.T, prepareWorktree func(dir string)) sleepFi
 
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
 
-	record, err := f.service.Start(t.Context(), projectPlace(t, f, repo), inNewWorktree(fakeHarnessName))
+	record, err := f.service.Start(
+		t.Context(),
+		projectPlace(t, f, repo),
+		inNewWorktree(fakeHarnessName),
+	)
 	if err != nil {
 		t.Fatalf("Start() error = %v", err)
 	}
@@ -421,7 +487,13 @@ func newSleepFixtureWith(t *testing.T, prepareWorktree func(dir string)) sleepFi
 
 	pane := agentPane(t, f, record.ID)
 
-	sleeping := sleepFixture{fixture: f, agents: agents, harness: harness, record: record, pane: pane}
+	sleeping := sleepFixture{
+		fixture: f,
+		agents:  agents,
+		harness: harness,
+		record:  record,
+		pane:    pane,
+	}
 	waitForForeground(t, sleeping, func(command string) bool { return command == fakeHarnessName })
 	waitForHarnessStart(t, sleeping)
 
@@ -483,7 +555,10 @@ func setStoredState(t *testing.T, f sleepFixture, state task.State) {
 func agentPane(t *testing.T, f fixture, id string) gotmux.PaneID {
 	t.Helper()
 
-	panes, err := f.server.PanesWith(t.Context(), gotmux.QueryOptions{Filter: "", ExtraFields: []string{task.OptionTask, task.OptionRole}})
+	panes, err := f.server.PanesWith(
+		t.Context(),
+		gotmux.QueryOptions{Filter: "", ExtraFields: []string{task.OptionTask, task.OptionRole}},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

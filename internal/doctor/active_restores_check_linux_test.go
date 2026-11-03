@@ -17,7 +17,10 @@ import (
 func activeRestoresResult(t *testing.T, repoPath string) doctor.Result {
 	t.Helper()
 
-	results, err := doctor.Run(t.Context(), doctor.Options{SnapshotDir: repoPath, Flags: map[string]string{"--repository": repoPath}})
+	results, err := doctor.Run(
+		t.Context(),
+		doctor.Options{SnapshotDir: repoPath, Flags: map[string]string{"--repository": repoPath}},
+	)
 	if err != nil {
 		t.Fatalf("doctor.Run: %v", err)
 	}
@@ -44,7 +47,8 @@ func TestDoctorNamesARestoreThatHoldsBackSavesAndHowToClearIt(t *testing.T) {
 	}
 
 	want := "sesh snapshot recover restore abandon --repository " + repoPath + " " + live
-	if !slices.Equal(result.Details, []string{live}) || result.Fix == nil || result.Fix.Command != want {
+	if !slices.Equal(result.Details, []string{live}) || result.Fix == nil ||
+		result.Fix.Command != want {
 		t.Fatalf("result must name the restore and the abandon command %q: %+v", want, result)
 	}
 }
@@ -54,11 +58,19 @@ func TestDoctorNotesRestoresWhoseServerIsGoneAsSelfClearing(t *testing.T) {
 
 	repoPath := filepath.Join(t.TempDir(), "repository")
 	snapfixture.CommitOneSession(t, repoPath)
-	dead := snapfixture.RegisterRestore(t, repoPath, os.Getpid(), "00000000-1111-2222-3333-444444444444:1")
+	dead := snapfixture.RegisterRestore(
+		t,
+		repoPath,
+		os.Getpid(),
+		"00000000-1111-2222-3333-444444444444:1",
+	)
 
 	result := activeRestoresResult(t, repoPath)
 	if result.Status != doctor.StatusInfo || result.Reason != doctor.ReasonStale ||
-		!strings.Contains(result.Message, "abandons these") || !slices.Equal(result.Details, []string{dead}) {
+		!strings.Contains(
+			result.Message,
+			"abandons these",
+		) || !slices.Equal(result.Details, []string{dead}) {
 		t.Fatalf("active restores = %+v, want a self-clearing note", result)
 	}
 }

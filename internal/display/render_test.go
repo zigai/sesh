@@ -240,7 +240,11 @@ func TestAlignPartAndTruncateUnusualUnicode(t *testing.T) {
 		HasMaxWidth: true,
 	})
 	if truncatedLeftJapanese != "   …\u30e9\u30df\u30f3\u30b0" {
-		t.Fatalf("truncatedLeftJapanese = %q, want %q", truncatedLeftJapanese, "   …\\u30e9\\u30df\\u30f3\\u30b0")
+		t.Fatalf(
+			"truncatedLeftJapanese = %q, want %q",
+			truncatedLeftJapanese,
+			"   …\\u30e9\\u30df\\u30f3\\u30b0",
+		)
 	}
 
 	if w := StringWidth(truncatedLeftJapanese); w != 12 {

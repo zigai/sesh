@@ -25,7 +25,12 @@ func TestOriginBindingCleanupPreservesReplacement(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := live.clearOriginBinding(t.Context(), sessions[0].Handle(), name, "old-owner"); err != nil {
+	if err := live.clearOriginBinding(
+		t.Context(),
+		sessions[0].Handle(),
+		name,
+		"old-owner",
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -34,7 +39,12 @@ func TestOriginBindingCleanupPreservesReplacement(t *testing.T) {
 		t.Fatalf("replacement binding changed: %q, %v", got, err)
 	}
 
-	if err := live.clearOriginBinding(t.Context(), sessions[0].Handle(), name, "replacement"); err != nil {
+	if err := live.clearOriginBinding(
+		t.Context(),
+		sessions[0].Handle(),
+		name,
+		"replacement",
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -61,7 +71,9 @@ func TestOriginBindingCleanupSurvivesKilledSession(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := NewGotmuxLiveServer(server).clearOriginBinding(t.Context(), handle, name, "owned"); err != nil {
+	if err := NewGotmuxLiveServer(
+		server,
+	).clearOriginBinding(t.Context(), handle, name, "owned"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -86,7 +98,9 @@ func TestOriginBindingCleanupRefusesDifferentDaemon(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := NewGotmuxLiveServer(foreign).clearOriginBinding(t.Context(), sessions[0].Handle(), name, "same-id"); err != nil {
+	if err := NewGotmuxLiveServer(
+		foreign,
+	).clearOriginBinding(t.Context(), sessions[0].Handle(), name, "same-id"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -123,9 +137,15 @@ func TestOriginAttachmentRefusesExistingTerminalBinding(t *testing.T) {
 	identity := sessions[0].Handle().ServerIdentity()
 
 	record := StoredCapability{Target: AttachTarget{
-		SessionID: string(sessions[0].ID), TmuxServerPID: identity.PID, TmuxServerStartedAt: identity.Started,
+		SessionID: string(
+			sessions[0].ID,
+		),
+		TmuxServerPID:       identity.PID,
+		TmuxServerStartedAt: identity.Started,
 	}, Grant: BridgeGrant{AttachmentID: "new-attachment"}}
-	if err := NewGotmuxLiveServer(server).AttachWithOrigin(t.Context(), record, AttachStreams{In: terminal, Out: terminal, Err: terminal}); err == nil {
+	if err := NewGotmuxLiveServer(
+		server,
+	).AttachWithOrigin(t.Context(), record, AttachStreams{In: terminal, Out: terminal, Err: terminal}); err == nil {
 		t.Fatal("attachment proceeded despite another binding")
 	}
 

@@ -110,7 +110,9 @@ func newRootCommand(ctx context.Context) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			showVersion, err := cmd.Flags().GetBool("version")
 			if err != nil {
-				return oops.In("cli").With("operation", "read_version_flag").Wrapf(err, "read version flag")
+				return oops.In("cli").
+					With("operation", "read_version_flag").
+					Wrapf(err, "read version flag")
 			}
 
 			if showVersion {
@@ -122,7 +124,9 @@ func newRootCommand(ctx context.Context) *cobra.Command {
 					date,
 				)
 				if err != nil {
-					return oops.In("cli").With("operation", "print_version").Wrapf(err, "print version")
+					return oops.In("cli").
+						With("operation", "print_version").
+						Wrapf(err, "print version")
 				}
 
 				return nil
@@ -144,8 +148,10 @@ func newRootCommand(ctx context.Context) *cobra.Command {
 		return err
 	})
 	rootCommand.PersistentFlags().String("config", "", "Explicit native TOML configuration file")
-	rootCommand.PersistentFlags().Bool("no-config", false, "Use built-in settings without reading configuration files")
-	rootCommand.PersistentFlags().Bool(setup.BindingFlag, false, "Report through tmux messages, as a key binding run by run-shell")
+	rootCommand.PersistentFlags().
+		Bool("no-config", false, "Use built-in settings without reading configuration files")
+	rootCommand.PersistentFlags().
+		Bool(setup.BindingFlag, false, "Report through tmux messages, as a key binding run by run-shell")
 	_ = rootCommand.PersistentFlags().MarkHidden(setup.BindingFlag)
 	rootCommand.AddCommand(
 		cmdpicker.NewPickCommand(ctx, cmdremote.DefaultPickerRemoteFactory),
@@ -161,7 +167,11 @@ func newRootCommand(ctx context.Context) *cobra.Command {
 		newHooksCommand(),
 		cmdconfig.NewCommand(),
 		cmdsetup.NewCommand(),
-		cmddaemon.NewCommand(cmdautosave.NewDaemonCoordinatorCommand(), cmdremote.NewDaemonMonitorCommand(), cmdagent.NewDaemonWindowStatusCommand()),
+		cmddaemon.NewCommand(
+			cmdautosave.NewDaemonCoordinatorCommand(),
+			cmdremote.NewDaemonMonitorCommand(),
+			cmdagent.NewDaemonWindowStatusCommand(),
+		),
 		cmddoctor.NewCommand(cmddoctor.Build{Version: version, Commit: commit, Date: date}),
 	)
 	rootCommand.InitDefaultHelpCmd()
@@ -189,7 +199,11 @@ func newHooksCommand() *cobra.Command {
 
 	cmd.AddCommand(
 		newHooksListCommand("list", "List configured hook commands per lifecycle event", false),
-		newHooksListCommand("validate", "Validate hook configuration without running anything", true),
+		newHooksListCommand(
+			"validate",
+			"Validate hook configuration without running anything",
+			true,
+		),
 		newHooksRunCommand(),
 	)
 
@@ -278,7 +292,10 @@ func runHooksList(cmd *cobra.Command, validate bool) error {
 	timeout := hookTimeoutSeconds(cfg)
 
 	if clibase.JSONOutputEnabled(cmd) {
-		return clibase.WriteJSONResult(cmd, hooksResultJSON{TimeoutSeconds: timeout, Events: summary})
+		return clibase.WriteJSONResult(
+			cmd,
+			hooksResultJSON{TimeoutSeconds: timeout, Events: summary},
+		)
 	}
 
 	var out []byte
@@ -313,10 +330,16 @@ func runHooksRun(cmd *cobra.Command, args []string) error {
 	return renderHookRun(cmd, event.Name, result, runErr)
 }
 
-func prepareHookRun(cmd *cobra.Command, eventName string) (config.HookConfig, session.HookEvent, error) {
+func prepareHookRun(
+	cmd *cobra.Command,
+	eventName string,
+) (config.HookConfig, session.HookEvent, error) {
 	hookAction, phase := session.HookEventDefaults(eventName)
 	if hookAction == "" {
-		return config.HookConfig{}, session.HookEvent{}, NewExitError(exitCodeUsage, errUnknownHookEvent)
+		return config.HookConfig{}, session.HookEvent{}, NewExitError(
+			exitCodeUsage,
+			errUnknownHookEvent,
+		)
 	}
 
 	cfg, err := loadHookConfig(cmd)
@@ -325,17 +348,27 @@ func prepareHookRun(cmd *cobra.Command, eventName string) (config.HookConfig, se
 	}
 
 	if err := session.ValidateHookConfig(cfg.Hooks, eventName); err != nil {
-		return config.HookConfig{}, session.HookEvent{}, oops.In("cli").With("operation", "validate_hooks", "event", eventName).Wrap(err)
+		return config.HookConfig{}, session.HookEvent{}, oops.In("cli").
+			With("operation", "validate_hooks", "event", eventName).
+			Wrap(err)
 	}
 
 	if len(session.CommandsForHookEvent(cfg.Hooks, eventName)) == 0 {
-		return config.HookConfig{}, session.HookEvent{}, NewExitError(exitCodeGeneral, errNoHooksConfigured)
+		return config.HookConfig{}, session.HookEvent{}, NewExitError(
+			exitCodeGeneral,
+			errNoHooksConfigured,
+		)
 	}
 
 	return cfg.Hooks, hookEventFromFlags(cmd, eventName, hookAction, phase), nil
 }
 
-func renderHookRun(cmd *cobra.Command, eventName string, result session.HookResult, runErr error) error {
+func renderHookRun(
+	cmd *cobra.Command,
+	eventName string,
+	result session.HookResult,
+	runErr error,
+) error {
 	if clibase.JSONOutputEnabled(cmd) {
 		payload := hookRunResultJSON{
 			Event:     eventName,
@@ -355,7 +388,12 @@ func renderHookRun(cmd *cobra.Command, eventName string, result session.HookResu
 
 	summary := fmt.Sprintf(
 		"Hooks %s: attempted %d, completed %d, failed %d, timed out %d (%s)\n",
-		eventName, result.Attempted, result.Completed, result.Failed, result.TimedOut, hookRunStatus(result),
+		eventName,
+		result.Attempted,
+		result.Completed,
+		result.Failed,
+		result.TimedOut,
+		hookRunStatus(result),
 	)
 
 	if runErr != nil {
@@ -426,7 +464,10 @@ func keyBindings(cfg *config.Config) ([]keyBindingJSON, error) {
 	}
 
 	for name, letter := range keys.Sessions {
-		bindings = append(bindings, keyBindingJSON{Name: "sessions." + name, Bind: keys.PickerSessionKey(letter)})
+		bindings = append(
+			bindings,
+			keyBindingJSON{Name: "sessions." + name, Bind: keys.PickerSessionKey(letter)},
+		)
 	}
 
 	actions, err := action.Bindings(cfg)

@@ -47,11 +47,19 @@ func TestSessionActionCommandDefersWorkflowUntilCommandRuns(t *testing.T) {
 		Agents:                 nil,
 	}
 
-	command := model.sessionActionCommand(tuiOperationEnterLiveSession, target, func(context.Context) (EnterOutcome, error) {
-		called = true
+	command := model.sessionActionCommand(
+		tuiOperationEnterLiveSession,
+		target,
+		func(context.Context) (EnterOutcome, error) {
+			called = true
 
-		return EnterOutcome{SessionName: testSupportSessionDevName, Action: EnterCompleted, Restored: false}, nil
-	})
+			return EnterOutcome{
+				SessionName: testSupportSessionDevName,
+				Action:      EnterCompleted,
+				Restored:    false,
+			}, nil
+		},
+	)
 
 	if called {
 		t.Fatal("sessionActionCommand() ran workflow on the update loop")
@@ -83,15 +91,21 @@ type sessionActionOutcomeCase struct {
 func TestSessionActionCommandReportsDeferredAndAttachOutcomes(t *testing.T) {
 	tests := []sessionActionOutcomeCase{
 		{
-			name:         "popup switch is deferred to the caller",
-			popup:        true,
-			outcome:      EnterOutcome{SessionName: testSupportSessionDevName, Action: EnterNeedsSwitch},
+			name:  "popup switch is deferred to the caller",
+			popup: true,
+			outcome: EnterOutcome{
+				SessionName: testSupportSessionDevName,
+				Action:      EnterNeedsSwitch,
+			},
 			wantDeferred: true,
 			wantSwitch:   testSupportSessionDevName,
 		},
 		{
-			name:       "standalone attach defers the terminal action",
-			outcome:    EnterOutcome{SessionName: testSupportSessionDevName, Action: EnterNeedsAttach},
+			name: "standalone attach defers the terminal action",
+			outcome: EnterOutcome{
+				SessionName: testSupportSessionDevName,
+				Action:      EnterNeedsAttach,
+			},
 			wantAttach: true,
 		},
 		{
@@ -182,7 +196,11 @@ func runSessionActionOutcomeCase(t *testing.T, test sessionActionOutcomeCase) {
 	}
 
 	if message.statePersisted != test.wantStateSaved {
-		t.Fatalf("result state persisted = %v, want %v", message.statePersisted, test.wantStateSaved)
+		t.Fatalf(
+			"result state persisted = %v, want %v",
+			message.statePersisted,
+			test.wantStateSaved,
+		)
 	}
 
 	if message.err != nil {
@@ -226,9 +244,17 @@ func TestSessionActionCommandReportsWorkflowFailureWithoutStateChange(t *testing
 		Agents:                 nil,
 	}
 
-	command := model.sessionActionCommand(tuiOperationEnterLiveSession, target, func(context.Context) (EnterOutcome, error) {
-		return EnterOutcome{SessionName: testSupportSessionDevName, Action: EnterCompleted, Restored: false}, errRenameFailed
-	})
+	command := model.sessionActionCommand(
+		tuiOperationEnterLiveSession,
+		target,
+		func(context.Context) (EnterOutcome, error) {
+			return EnterOutcome{
+				SessionName: testSupportSessionDevName,
+				Action:      EnterCompleted,
+				Restored:    false,
+			}, errRenameFailed
+		},
+	)
 
 	message, ok := command().(sessionActionResultMsg)
 	if !ok {
@@ -243,7 +269,9 @@ func TestSessionActionCommandReportsWorkflowFailureWithoutStateChange(t *testing
 		t.Fatalf("failed result = %#v, want no state change and no quit", message)
 	}
 
-	if got := model.state.GetLastSwitch(session.Identity{Name: testSupportSessionDevName}); got != 0 {
+	if got := model.state.GetLastSwitch(
+		session.Identity{Name: testSupportSessionDevName},
+	); got != 0 {
 		t.Fatalf("failed entry recorded switch at %d, want none", got)
 	}
 }

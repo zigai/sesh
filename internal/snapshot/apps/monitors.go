@@ -205,7 +205,12 @@ func consumeTopToggle(args []string, i int, argv *[]string) (bool, int) {
 	return false, i
 }
 
-func consumeTopUser(args []string, i int, argv *[]string, hasEUser, hasAnyUser *bool) (bool, int, bool) {
+func consumeTopUser(
+	args []string,
+	i int,
+	argv *[]string,
+	hasEUser, hasAnyUser *bool,
+) (bool, int, bool) {
 	if val, nextI, matched, ok := matchFlagValue(args, i, "-u", "--filter-only-euser"); matched {
 		if !ok || *hasAnyUser || !validTopUser(val) {
 			return true, i, false

@@ -69,9 +69,20 @@ func newSavedSessionFixture(t *testing.T) pendingRestoreFixture {
 		t.Fatalf("create the session to save: %v", err)
 	}
 
-	saved := executeJSON(t, "snapshot", "save", string(work.ID()),
-		testSocketFlag, source.Endpoint().SocketPath, "--repository", repoPath, "--lease-root", leaseRoot,
-		testNoConfigFlag, testJSONFlag)
+	saved := executeJSON(
+		t,
+		"snapshot",
+		"save",
+		string(work.ID()),
+		testSocketFlag,
+		source.Endpoint().SocketPath,
+		"--repository",
+		repoPath,
+		"--lease-root",
+		leaseRoot,
+		testNoConfigFlag,
+		testJSONFlag,
+	)
 	if saved.Err != nil || !saved.Envelope.OK {
 		t.Fatalf("save the source session: %v\nstderr: %s", saved.Err, saved.Stderr)
 	}
@@ -97,7 +108,11 @@ func (f pendingRestoreFixture) withoutStartupRestore(t *testing.T) pendingRestor
 	t.Helper()
 
 	path := filepath.Join(t.TempDir(), "config.toml")
-	if err := os.WriteFile(path, []byte("[autosave]\nrestore_last_on_start = false\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		path,
+		[]byte("[autosave]\nrestore_last_on_start = false\n"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -134,8 +149,16 @@ func (f pendingRestoreFixture) autosave(t *testing.T) resultJSON {
 	t.Helper()
 
 	exec := executeJSON(t, append([]string{
-		"autosave", "save-if-due",
-		testSocketFlag, f.socket, "--repository", f.repoPath, "--history", f.history, "--lease-root", f.leaseRoot,
+		"autosave",
+		"save-if-due",
+		testSocketFlag,
+		f.socket,
+		"--repository",
+		f.repoPath,
+		"--history",
+		f.history,
+		"--lease-root",
+		f.leaseRoot,
 		testJSONFlag,
 	}, f.config...)...)
 	if exec.Err != nil || !exec.Envelope.OK {
@@ -172,8 +195,12 @@ func TestAutosaveHoldsBackSavesUntilSavedSessionsAreRestored(t *testing.T) {
 
 	for range 2 {
 		held := fixture.autosave(t)
-		if held.Status != "skipped" || held.Reason != "restore_pending" || held.Restorable != 1 || held.Recorded {
-			t.Fatalf("autosave on the unrestored server = %#v, want a restore_pending skip naming 1 session", held)
+		if held.Status != "skipped" || held.Reason != "restore_pending" || held.Restorable != 1 ||
+			held.Recorded {
+			t.Fatalf(
+				"autosave on the unrestored server = %#v, want a restore_pending skip naming 1 session",
+				held,
+			)
 		}
 	}
 
@@ -206,9 +233,20 @@ func TestExplicitSaveKeepsTheLiveStateAndResumesAutosave(t *testing.T) {
 		t.Fatalf("list the scratch session: %v, %d sessions", err, len(live))
 	}
 
-	explicit := executeJSON(t, "snapshot", "save", string(live[0].ID),
-		testSocketFlag, fixture.socket, "--repository", fixture.repoPath, "--lease-root", fixture.leaseRoot,
-		testNoConfigFlag, testJSONFlag)
+	explicit := executeJSON(
+		t,
+		"snapshot",
+		"save",
+		string(live[0].ID),
+		testSocketFlag,
+		fixture.socket,
+		"--repository",
+		fixture.repoPath,
+		"--lease-root",
+		fixture.leaseRoot,
+		testNoConfigFlag,
+		testJSONFlag,
+	)
 	if explicit.Err != nil || !explicit.Envelope.OK {
 		t.Fatalf("explicit save failed: %v\nstderr: %s", explicit.Err, explicit.Stderr)
 	}
@@ -222,12 +260,31 @@ func TestExplicitSaveKeepsTheLiveStateAndResumesAutosave(t *testing.T) {
 func TestFinalSaveDoesNotReplaceUnrestoredSessions(t *testing.T) {
 	fixture := newPendingRestoreFixture(t)
 
-	exec := executeJSON(t, "autosave", "final-save",
-		testSocketFlag, fixture.socket, "--repository", fixture.repoPath, "--history", fixture.history,
-		"--lease-root", fixture.leaseRoot, "--status-file", fixture.statusPath, "--deadline", "20s",
-		testNoConfigFlag, testJSONFlag)
+	exec := executeJSON(
+		t,
+		"autosave",
+		"final-save",
+		testSocketFlag,
+		fixture.socket,
+		"--repository",
+		fixture.repoPath,
+		"--history",
+		fixture.history,
+		"--lease-root",
+		fixture.leaseRoot,
+		"--status-file",
+		fixture.statusPath,
+		"--deadline",
+		"20s",
+		testNoConfigFlag,
+		testJSONFlag,
+	)
 	if exec.Err != nil || !exec.Envelope.OK {
-		t.Fatalf("final save on an unrestored server must not fail the stop: %v\nstderr: %s", exec.Err, exec.Stderr)
+		t.Fatalf(
+			"final save on an unrestored server must not fail the stop: %v\nstderr: %s",
+			exec.Err,
+			exec.Stderr,
+		)
 	}
 
 	result := clitest.DecodePayload[resultJSON](t, exec.Envelope.Result)
@@ -246,7 +303,9 @@ func TestAutosaveRestoresAServerThatStartedWithoutTheStartupRestore(t *testing.T
 	fixture.autosave(t)
 
 	if !fixture.workSessionLive(t) {
-		t.Fatal("autosave on a server that missed its startup restore did not restore the saved session")
+		t.Fatal(
+			"autosave on a server that missed its startup restore did not restore the saved session",
+		)
 	}
 
 	fixture.killWorkSession(t)
@@ -298,7 +357,10 @@ func TestAutosaveRestoresAnEmptyServerThatMissedTheStartupRestore(t *testing.T) 
 	}
 
 	if skipped.Status != "skipped" || skipped.Reason != "no_sessions" {
-		t.Fatalf("autosave after closing the restored session = %#v, want a no_sessions skip", skipped)
+		t.Fatalf(
+			"autosave after closing the restored session = %#v, want a no_sessions skip",
+			skipped,
+		)
 	}
 
 	if got := fixture.generations(t); got != 1 {
@@ -309,7 +371,11 @@ func TestAutosaveRestoresAnEmptyServerThatMissedTheStartupRestore(t *testing.T) 
 func TestAutosaveRetriesALateRestoreThatFoundTheSaveLockBusy(t *testing.T) {
 	fixture := newSavedSessionFixture(t)
 
-	holder, acquired, err := automation.AcquireSaveLock(t.Context(), automation.SaveLockPath(), automation.SaveLockNonBlocking)
+	holder, acquired, err := automation.AcquireSaveLock(
+		t.Context(),
+		automation.SaveLockPath(),
+		automation.SaveLockNonBlocking,
+	)
 	if err != nil || !acquired {
 		t.Fatalf("hold the save lock: acquired=%v err=%v", acquired, err)
 	}
@@ -321,7 +387,10 @@ func TestAutosaveRetriesALateRestoreThatFoundTheSaveLockBusy(t *testing.T) {
 	}
 
 	if busy.Reason != "lock_busy" || fixture.workSessionLive(t) {
-		t.Fatalf("autosave while another save holds the lock = %#v, want a lock_busy skip without restoring", busy)
+		t.Fatalf(
+			"autosave while another save holds the lock = %#v, want a lock_busy skip without restoring",
+			busy,
+		)
 	}
 
 	fixture.autosave(t)
@@ -334,9 +403,21 @@ func TestAutosaveRetriesALateRestoreThatFoundTheSaveLockBusy(t *testing.T) {
 func TestAutosaveDoesNotRestoreAServerItsStartupRestoreAlreadyHandled(t *testing.T) {
 	fixture := newSavedSessionFixture(t)
 
-	startup := executeJSON(t, "autosave", "restore-on-start",
-		testSocketFlag, fixture.socket, "--repository", fixture.repoPath, "--lease-root", fixture.leaseRoot,
-		"--history", fixture.history, testNoConfigFlag, testJSONFlag)
+	startup := executeJSON(
+		t,
+		"autosave",
+		"restore-on-start",
+		testSocketFlag,
+		fixture.socket,
+		"--repository",
+		fixture.repoPath,
+		"--lease-root",
+		fixture.leaseRoot,
+		"--history",
+		fixture.history,
+		testNoConfigFlag,
+		testJSONFlag,
+	)
 	if startup.Err != nil || !startup.Envelope.OK {
 		t.Fatalf("startup restore failed: %v\nstderr: %s", startup.Err, startup.Stderr)
 	}
@@ -350,6 +431,9 @@ func TestAutosaveDoesNotRestoreAServerItsStartupRestoreAlreadyHandled(t *testing
 	}
 
 	if resumed.Status != "saved" {
-		t.Fatalf("autosave after the startup restore = %#v, want it to save the live state", resumed)
+		t.Fatalf(
+			"autosave after the startup restore = %#v, want it to save the live state",
+			resumed,
+		)
 	}
 }

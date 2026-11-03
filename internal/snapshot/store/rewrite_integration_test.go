@@ -58,7 +58,15 @@ func TestProcessDeathAtRewriteBoundaries(t *testing.T) {
 			cmd := rewriteWorker(t, "rewrite", path, mutationID, source.ID, tc.boundary, tc.kind)
 			killWorkerAtBoundary(t, cmd)
 
-			verifyCmd := rewriteWorker(t, "verify", path, mutationID, source.ID, tc.boundary, tc.kind)
+			verifyCmd := rewriteWorker(
+				t,
+				"verify",
+				path,
+				mutationID,
+				source.ID,
+				tc.boundary,
+				tc.kind,
+			)
 			if output, err := verifyCmd.CombinedOutput(); err != nil {
 				t.Fatalf("fresh process recovery failed for %s: %v\n%s", name, err, output)
 			}
@@ -115,7 +123,10 @@ func TestRewriteWorker(t *testing.T) {
 	executeRewriteWorkerSubprocess(t, path, mutationID, sourceID, boundary, kind)
 }
 
-func executeRewriteWorkerSubprocess(t *testing.T, path, mutationID, sourceID, boundary, kind string) {
+func executeRewriteWorkerSubprocess(
+	t *testing.T,
+	path, mutationID, sourceID, boundary, kind string,
+) {
 	t.Helper()
 
 	r := openRepository(t, path)
@@ -193,7 +204,12 @@ func verifyRewriteProcessDeath(t *testing.T, path, mutationID, sourceID, boundar
 	}
 }
 
-func verifySyncedPendingState(t *testing.T, r *Repository, catalog Catalog, mutationID, sourceID, kind string) {
+func verifySyncedPendingState(
+	t *testing.T,
+	r *Repository,
+	catalog Catalog,
+	mutationID, sourceID, kind string,
+) {
 	t.Helper()
 
 	if catalog.rewriteIndex(mutationID) >= 0 {
@@ -239,7 +255,12 @@ func verifySyncedPendingState(t *testing.T, r *Repository, catalog Catalog, muta
 	}
 }
 
-func verifyPendingProtectedState(t *testing.T, r *Repository, catalog Catalog, mutationID, sourceID, boundary, kind string) {
+func verifyPendingProtectedState(
+	t *testing.T,
+	r *Repository,
+	catalog Catalog,
+	mutationID, sourceID, boundary, kind string,
+) {
 	t.Helper()
 
 	rwIdx := catalog.rewriteIndex(mutationID)
@@ -261,7 +282,15 @@ func verifyPendingProtectedState(t *testing.T, r *Repository, catalog Catalog, m
 		sessions = []string{"s0", "s1", "s2"}
 	}
 
-	if _, err := r.RemoveSessions(t.Context(), mutationID, sourceID, sessions); !errors.Is(err, ErrRecoveryRequired) {
+	if _, err := r.RemoveSessions(
+		t.Context(),
+		mutationID,
+		sourceID,
+		sessions,
+	); !errors.Is(
+		err,
+		ErrRecoveryRequired,
+	) {
 		t.Fatalf("expected ErrRecoveryRequired on retry at %s, got %v", boundary, err)
 	}
 
@@ -281,7 +310,12 @@ func verifyPendingProtectedState(t *testing.T, r *Repository, catalog Catalog, m
 	}
 }
 
-func verifyReplacedTerminalState(t *testing.T, r *Repository, catalog Catalog, mutationID, sourceID, kind string) {
+func verifyReplacedTerminalState(
+	t *testing.T,
+	r *Repository,
+	catalog Catalog,
+	mutationID, sourceID, kind string,
+) {
 	t.Helper()
 
 	if catalog.generationIndex(sourceID) >= 0 {
@@ -319,7 +353,12 @@ func verifyReplacedTerminalState(t *testing.T, r *Repository, catalog Catalog, m
 	}
 }
 
-func verifyTerminalReplacementOutcome(t *testing.T, r *Repository, catalog Catalog, res RewriteResult) {
+func verifyTerminalReplacementOutcome(
+	t *testing.T,
+	r *Repository,
+	catalog Catalog,
+	res RewriteResult,
+) {
 	t.Helper()
 
 	if res.State != rewriteStateCompleted || res.Empty {
@@ -331,7 +370,11 @@ func verifyTerminalReplacementOutcome(t *testing.T, r *Repository, catalog Catal
 	}
 
 	if catalog.Current != res.Replacement.ID {
-		t.Fatalf("expected Current to be replacement %s, got %s", res.Replacement.ID, catalog.Current)
+		t.Fatalf(
+			"expected Current to be replacement %s, got %s",
+			res.Replacement.ID,
+			catalog.Current,
+		)
 	}
 
 	currentManifest, err := r.Current(t.Context())
@@ -353,7 +396,12 @@ func verifyTerminalReplacementOutcome(t *testing.T, r *Repository, catalog Catal
 	}
 }
 
-func verifyTerminalRetirementOutcome(t *testing.T, r *Repository, catalog Catalog, res RewriteResult) {
+func verifyTerminalRetirementOutcome(
+	t *testing.T,
+	r *Repository,
+	catalog Catalog,
+	res RewriteResult,
+) {
 	t.Helper()
 
 	if res.State != rewriteStateRetired || !res.Empty {

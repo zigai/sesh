@@ -199,7 +199,10 @@ func (s *State) ClearUnseen(id string) error {
 
 func (s *State) Prune(cutoff time.Time) bool {
 	count := len(s.Items)
-	s.Items = slices.DeleteFunc(s.Items, func(item Item) bool { return item.Finished() && item.FinishedAt < cutoff.Unix() })
+	s.Items = slices.DeleteFunc(
+		s.Items,
+		func(item Item) bool { return item.Finished() && item.FinishedAt < cutoff.Unix() },
+	)
 
 	return len(s.Items) != count
 }
@@ -215,7 +218,10 @@ func (s *State) Unpin(id string) error {
 func (s *State) Link(id string, pr PRLink) error {
 	return s.change(id, func(item *Item) error {
 		pr.Source = LinkUser
-		item.PRs = slices.DeleteFunc(item.PRs, func(linked PRLink) bool { return linked.Number == pr.Number })
+		item.PRs = slices.DeleteFunc(
+			item.PRs,
+			func(linked PRLink) bool { return linked.Number == pr.Number },
+		)
 		item.PRs = append(item.PRs, pr)
 
 		return nil
@@ -224,7 +230,10 @@ func (s *State) Link(id string, pr PRLink) error {
 
 func (s *State) Unlink(id string, number int) error {
 	return s.change(id, func(item *Item) error {
-		index := slices.IndexFunc(item.PRs, func(linked PRLink) bool { return linked.Number == number && linked.Source != LinkDismissed })
+		index := slices.IndexFunc(
+			item.PRs,
+			func(linked PRLink) bool { return linked.Number == number && linked.Source != LinkDismissed },
+		)
 		if index < 0 {
 			return ErrNotLinked
 		}
@@ -253,13 +262,17 @@ func (i Item) Pinned() bool {
 }
 
 func (i Item) Linked() []PRLink {
-	return slices.DeleteFunc(slices.Clone(i.PRs), func(pr PRLink) bool { return pr.Source == LinkDismissed })
+	return slices.DeleteFunc(
+		slices.Clone(i.PRs),
+		func(pr PRLink) bool { return pr.Source == LinkDismissed },
+	)
 }
 
 func (i Item) PRsEnded() bool {
 	linked := i.Linked()
 
-	return len(linked) > 0 && !slices.ContainsFunc(linked, func(pr PRLink) bool { return !pr.Ended() })
+	return len(linked) > 0 &&
+		!slices.ContainsFunc(linked, func(pr PRLink) bool { return !pr.Ended() })
 }
 
 func (i Item) reopened(now time.Time) Item {
@@ -274,9 +287,28 @@ func (pr PRLink) Ended() bool {
 
 func EmptyItem() Item {
 	return Item{
-		ID: "", Harness: "", Conversation: "", SessionPath: "", Resume: []string{}, Title: "", Directory: "",
-		Project: "", Branch: "", Task: "", PRs: []PRLink{}, Server: "", Pane: "", PanePID: 0, CreatedAt: 0, TurnAt: 0,
-		PromptAt: 0, PinnedAt: 0, FinishedAt: 0, FinishedBy: "", ReopenedAt: 0, UnseenAt: 0,
+		ID:           "",
+		Harness:      "",
+		Conversation: "",
+		SessionPath:  "",
+		Resume:       []string{},
+		Title:        "",
+		Directory:    "",
+		Project:      "",
+		Branch:       "",
+		Task:         "",
+		PRs:          []PRLink{},
+		Server:       "",
+		Pane:         "",
+		PanePID:      0,
+		CreatedAt:    0,
+		TurnAt:       0,
+		PromptAt:     0,
+		PinnedAt:     0,
+		FinishedAt:   0,
+		FinishedBy:   "",
+		ReopenedAt:   0,
+		UnseenAt:     0,
 	}
 }
 
@@ -338,7 +370,12 @@ func (s Store) open(create bool) (*privatefs.Dir, string, error) {
 	return dir, filepath.Base(s.path), err
 }
 
-func update(ctx context.Context, dir *privatefs.Dir, name string, change func(*State) error) (State, error) {
+func update(
+	ctx context.Context,
+	dir *privatefs.Dir,
+	name string,
+	change func(*State) error,
+) (State, error) {
 	state, err := read(dir, name)
 	if err != nil {
 		return State{}, err
@@ -429,7 +466,8 @@ func (s *State) validate() error {
 	ids := make(map[string]bool, len(s.Items))
 
 	for _, item := range s.Items {
-		if item.ID == "" || ids[item.ID] || item.Conversation == "" || len(item.Resume) == 0 || !filepath.IsAbs(item.Directory) ||
+		if item.ID == "" || ids[item.ID] || item.Conversation == "" || len(item.Resume) == 0 ||
+			!filepath.IsAbs(item.Directory) ||
 			!item.validLifecycle() {
 			return ErrInvalid
 		}
@@ -457,7 +495,8 @@ func (i Item) validLifecycle() bool {
 	numbers := make(map[int]bool, len(i.PRs))
 
 	for _, pr := range i.PRs {
-		if pr.Number <= 0 || numbers[pr.Number] || (pr.Source != LinkBranch && pr.Source != LinkUser && pr.Source != LinkDismissed) {
+		if pr.Number <= 0 || numbers[pr.Number] ||
+			(pr.Source != LinkBranch && pr.Source != LinkUser && pr.Source != LinkDismissed) {
 			return false
 		}
 

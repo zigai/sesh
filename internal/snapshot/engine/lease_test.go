@@ -27,16 +27,22 @@ func TestSaveLeaseCoversCaptureWithoutBlockingOtherEndpoints(t *testing.T) {
 	go func() {
 		defer close(finished)
 
-		firstResult, firstErr = save(ctx, first, leaseRoot, endpoint, func(ctx context.Context) (capture.Observation, error) {
-			close(entered)
+		firstResult, firstErr = save(
+			ctx,
+			first,
+			leaseRoot,
+			endpoint,
+			func(ctx context.Context) (capture.Observation, error) {
+				close(entered)
 
-			select {
-			case <-release:
-				return observationFixture(), nil
-			case <-ctx.Done():
-				return capture.Observation{}, ctx.Err()
-			}
-		})
+				select {
+				case <-release:
+					return observationFixture(), nil
+				case <-ctx.Done():
+					return capture.Observation{}, ctx.Err()
+				}
+			},
+		)
 	}()
 
 	defer func() { cancel(); <-finished }()
@@ -49,9 +55,15 @@ func TestSaveLeaseCoversCaptureWithoutBlockingOtherEndpoints(t *testing.T) {
 
 	assertSaveBlockedBeforeRegistration(ctx, t, contended, leaseRoot, endpoint)
 
-	other, err := save(ctx, independent, leaseRoot, filepath.Join(t.TempDir(), "other.sock"), func(context.Context) (capture.Observation, error) {
-		return observationFixture(), nil
-	})
+	other, err := save(
+		ctx,
+		independent,
+		leaseRoot,
+		filepath.Join(t.TempDir(), "other.sock"),
+		func(context.Context) (capture.Observation, error) {
+			return observationFixture(), nil
+		},
+	)
 	if err != nil || other.Status != "partial" {
 		t.Fatalf("independent endpoint blocked behind first save: %#v, %v", other, err)
 	}
@@ -64,7 +76,12 @@ func TestSaveLeaseCoversCaptureWithoutBlockingOtherEndpoints(t *testing.T) {
 	}
 }
 
-func assertSaveBlockedBeforeRegistration(ctx context.Context, t *testing.T, contended *store.Repository, leaseRoot, endpoint string) {
+func assertSaveBlockedBeforeRegistration(
+	ctx context.Context,
+	t *testing.T,
+	contended *store.Repository,
+	leaseRoot, endpoint string,
+) {
 	t.Helper()
 
 	blockedCtx, blockedCancel := context.WithTimeout(ctx, 50*time.Millisecond)
@@ -72,10 +89,16 @@ func assertSaveBlockedBeforeRegistration(ctx context.Context, t *testing.T, cont
 
 	called := false
 
-	blocked, err := save(blockedCtx, contended, leaseRoot, endpoint, func(context.Context) (capture.Observation, error) {
-		called = true
-		return observationFixture(), nil
-	})
+	blocked, err := save(
+		blockedCtx,
+		contended,
+		leaseRoot,
+		endpoint,
+		func(context.Context) (capture.Observation, error) {
+			called = true
+			return observationFixture(), nil
+		},
+	)
 	if !errors.Is(err, context.DeadlineExceeded) || called || blocked.Attempt != "" {
 		t.Fatalf("contended save reached registration or capture: %#v, %v", blocked, err)
 	}

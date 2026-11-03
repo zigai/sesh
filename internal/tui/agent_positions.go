@@ -25,7 +25,8 @@ func (m *Model) agentPositionTickCommand() tea.Cmd {
 }
 
 func (m *Model) loadAgentPositionsCommand() tea.Cmd {
-	if m.agentSort == agentSortName || m.displayMode != displayModeAgents || m.loadingSessions || m.deps.Panes == nil {
+	if m.agentSort == agentSortName || m.displayMode != displayModeAgents || m.loadingSessions ||
+		m.deps.Panes == nil {
 		return m.agentPositionTickCommand()
 	}
 
@@ -55,7 +56,8 @@ func (m *Model) applyAgentPositions(msg agentPositionsMsg) {
 	selected := m.selectedSessionIdentity()
 	for index := range m.sessions {
 		row := &m.sessions[index]
-		if row.Origin == session.OriginSSH || row.Origin == session.OriginBridge || len(row.Agents) == 0 {
+		if row.Origin == session.OriginSSH || row.Origin == session.OriginBridge ||
+			len(row.Agents) == 0 {
 			continue
 		}
 

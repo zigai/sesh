@@ -124,14 +124,26 @@ func TestJSONEnvelopeFormatAndTaxonomy(t *testing.T) {
 	}
 }
 
-func assertErrorEnvelope(t *testing.T, exec commandExecution, wantCode string, wantExitCode int, wantSubstr string) {
+func assertErrorEnvelope(
+	t *testing.T,
+	exec commandExecution,
+	wantCode string,
+	wantExitCode int,
+	wantSubstr string,
+) {
 	t.Helper()
 
 	assertErrorEnvelopeFields(t, exec, wantCode, wantExitCode, wantSubstr)
 	assertErrorStreamDiscipline(t, exec)
 }
 
-func assertErrorEnvelopeFields(t *testing.T, exec commandExecution, wantCode string, wantExitCode int, wantSubstr string) {
+func assertErrorEnvelopeFields(
+	t *testing.T,
+	exec commandExecution,
+	wantCode string,
+	wantExitCode int,
+	wantSubstr string,
+) {
 	t.Helper()
 
 	if exec.envelope.OK {
@@ -226,7 +238,9 @@ func TestUncertaintyOutranksCanceledInClassification(t *testing.T) {
 }
 
 func TestSafeCommandErrorMessagePrivacy(t *testing.T) {
-	oopsErr := oops.In("cli").Public("arbitrary public string with /secret/path").Wrap(errSensitiveRaw)
+	oopsErr := oops.In("cli").
+		Public("arbitrary public string with /secret/path").
+		Wrap(errSensitiveRaw)
 	msg := clibase.SafeCommandErrorMessage(oopsErr)
 
 	if strings.Contains(msg, "/secret/path") || strings.Contains(msg, "/private/") {
@@ -237,11 +251,15 @@ func TestSafeCommandErrorMessagePrivacy(t *testing.T) {
 		t.Fatalf("unknown error produced %q, want %q", msg, "operation failed")
 	}
 
-	if msg := clibase.SafeCommandErrorMessage(store.ErrUncertain); msg != "snapshot publication durability uncertain" {
+	if msg := clibase.SafeCommandErrorMessage(
+		store.ErrUncertain,
+	); msg != "snapshot publication durability uncertain" {
 		t.Fatalf("ErrUncertain produced %q", msg)
 	}
 
-	if msg := clibase.SafeCommandErrorMessage(app.ErrPartialSnapshot); msg != "parity-incomplete save" {
+	if msg := clibase.SafeCommandErrorMessage(
+		app.ErrPartialSnapshot,
+	); msg != "parity-incomplete save" {
 		t.Fatalf("app.ErrPartialSnapshot produced %q", msg)
 	}
 }
@@ -249,10 +267,16 @@ func TestSafeCommandErrorMessagePrivacy(t *testing.T) {
 func TestHumanErrorMessageReportsUnmappedCause(t *testing.T) {
 	wrapped := oops.In("cli").With("operation", "open_history").Wrap(errUnmappedHistoryCause)
 	if msg := clibase.HumanErrorMessage(wrapped); msg != errUnmappedHistoryCause.Error() {
-		t.Fatalf("unmapped error produced %q, want its cause %q", msg, errUnmappedHistoryCause.Error())
+		t.Fatalf(
+			"unmapped error produced %q, want its cause %q",
+			msg,
+			errUnmappedHistoryCause.Error(),
+		)
 	}
 
-	if msg := clibase.HumanErrorMessage(store.ErrUncertain); msg != "snapshot publication durability uncertain" {
+	if msg := clibase.HumanErrorMessage(
+		store.ErrUncertain,
+	); msg != "snapshot publication durability uncertain" {
 		t.Fatalf("ErrUncertain produced %q", msg)
 	}
 }
@@ -297,7 +321,14 @@ func TestJSONFlagDetectionFollowsFinalParsedValue(t *testing.T) {
 	})
 
 	t.Run("repeated boolean false wins produces plain text", func(t *testing.T) {
-		assertPlainTextErrorOutput(t, snapshotCmd, "save", testJSONFlag, "--json=false", "--unknown")
+		assertPlainTextErrorOutput(
+			t,
+			snapshotCmd,
+			"save",
+			testJSONFlag,
+			"--json=false",
+			"--unknown",
+		)
 	})
 
 	t.Run("repeated boolean true wins produces json", func(t *testing.T) {

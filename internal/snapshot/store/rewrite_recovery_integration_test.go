@@ -71,12 +71,43 @@ func TestProcessDeathResumeRewriteBoundaries(t *testing.T) {
 			kind:     rewriteKindReplacement,
 			custom:   resumeWorkerModeResumeInterrupt,
 		},
-		{name: "partial_compressed_body", boundary: "gzip_body", kind: rewriteKindReplacement, custom: resumeWorkerModePartialArtifact},
-		{name: "second_death_during_partial_repair", boundary: "rewrite_resume_artifact_synced", kind: rewriteKindReplacement, custom: resumeWorkerModeResumeInterrupt, partial: true},
-		{name: "replacement_resume_catalog_synced", boundary: "catalog_synced", kind: rewriteKindReplacement, custom: resumeWorkerModeResumeInterrupt},
-		{name: "replacement_resume_catalog_replaced", boundary: "catalog_replaced", kind: rewriteKindReplacement, custom: resumeWorkerModeResumeInterrupt},
-		{name: "retirement_resume_catalog_synced", boundary: "catalog_synced", kind: rewriteKindRetirement, custom: resumeWorkerModeResumeInterrupt},
-		{name: "retirement_resume_catalog_replaced", boundary: "catalog_replaced", kind: rewriteKindRetirement, custom: resumeWorkerModeResumeInterrupt},
+		{
+			name:     "partial_compressed_body",
+			boundary: "gzip_body",
+			kind:     rewriteKindReplacement,
+			custom:   resumeWorkerModePartialArtifact,
+		},
+		{
+			name:     "second_death_during_partial_repair",
+			boundary: "rewrite_resume_artifact_synced",
+			kind:     rewriteKindReplacement,
+			custom:   resumeWorkerModeResumeInterrupt,
+			partial:  true,
+		},
+		{
+			name:     "replacement_resume_catalog_synced",
+			boundary: "catalog_synced",
+			kind:     rewriteKindReplacement,
+			custom:   resumeWorkerModeResumeInterrupt,
+		},
+		{
+			name:     "replacement_resume_catalog_replaced",
+			boundary: "catalog_replaced",
+			kind:     rewriteKindReplacement,
+			custom:   resumeWorkerModeResumeInterrupt,
+		},
+		{
+			name:     "retirement_resume_catalog_synced",
+			boundary: "catalog_synced",
+			kind:     rewriteKindRetirement,
+			custom:   resumeWorkerModeResumeInterrupt,
+		},
+		{
+			name:     "retirement_resume_catalog_replaced",
+			boundary: "catalog_replaced",
+			kind:     rewriteKindRetirement,
+			custom:   resumeWorkerModeResumeInterrupt,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -87,7 +118,17 @@ func TestProcessDeathResumeRewriteBoundaries(t *testing.T) {
 
 			mutationID := newID()
 			if tc.partial {
-				killWorkerAtBoundary(t, resumeWorkerCmd(t, resumeWorkerModePartialArtifact, path, mutationID, source.ID, "gzip_body"))
+				killWorkerAtBoundary(
+					t,
+					resumeWorkerCmd(
+						t,
+						resumeWorkerModePartialArtifact,
+						path,
+						mutationID,
+						source.ID,
+						"gzip_body",
+					),
+				)
 			} else if tc.custom == resumeWorkerModeResumeInterrupt {
 				sessions := []string{"s0"}
 				if tc.kind == rewriteKindRetirement {
@@ -106,11 +147,23 @@ func TestProcessDeathResumeRewriteBoundaries(t *testing.T) {
 
 			killWorkerAtBoundary(t, cmd)
 
-			verifyCmd := resumeWorkerCmd(t, resumeWorkerModeVerify, path, mutationID, source.ID, tc.boundary)
+			verifyCmd := resumeWorkerCmd(
+				t,
+				resumeWorkerModeVerify,
+				path,
+				mutationID,
+				source.ID,
+				tc.boundary,
+			)
 
 			output, err := verifyCmd.CombinedOutput()
 			if err != nil {
-				t.Fatalf("fresh process resume recovery failed for %s: %v\n%s", tc.name, err, output)
+				t.Fatalf(
+					"fresh process resume recovery failed for %s: %v\n%s",
+					tc.name,
+					err,
+					output,
+				)
 			}
 		})
 	}
@@ -163,7 +216,10 @@ func TestResumeRewriteWorker(t *testing.T) {
 	}
 }
 
-func executePartialArtifactWorkerSubprocess(t *testing.T, path, mutationID, sourceID, boundary string) {
+func executePartialArtifactWorkerSubprocess(
+	t *testing.T,
+	path, mutationID, sourceID, boundary string,
+) {
 	t.Helper()
 
 	r := openRepository(t, path)
@@ -270,7 +326,12 @@ func executeVerifyWorkerSubprocess(t *testing.T, path, mutationID, sourceID stri
 	}
 }
 
-func verifyReconcileAndIdempotentResume(t *testing.T, r *Repository, catalog Catalog, mutationID string) {
+func verifyReconcileAndIdempotentResume(
+	t *testing.T,
+	r *Repository,
+	catalog Catalog,
+	mutationID string,
+) {
 	t.Helper()
 
 	rwIdx := catalog.rewriteIndex(mutationID)
@@ -278,14 +339,23 @@ func verifyReconcileAndIdempotentResume(t *testing.T, r *Repository, catalog Cat
 	_, recErr := r.ReconcileRewrite(t.Context(), mutationID)
 	if catalog.Rewrites[rwIdx].State == rewriteStatePending {
 		if !errors.Is(recErr, ErrRecoveryRequired) {
-			t.Fatalf("expected ErrRecoveryRequired from ReconcileRewrite for pending, got %v", recErr)
+			t.Fatalf(
+				"expected ErrRecoveryRequired from ReconcileRewrite for pending, got %v",
+				recErr,
+			)
 		}
 	} else if recErr != nil {
 		t.Fatalf("ReconcileRewrite failed: %v", recErr)
 	}
 }
 
-func verifyRetirementFinalCatalog(t *testing.T, r *Repository, finalCatalog Catalog, sourceID string, result RewriteResult) {
+func verifyRetirementFinalCatalog(
+	t *testing.T,
+	r *Repository,
+	finalCatalog Catalog,
+	sourceID string,
+	result RewriteResult,
+) {
 	t.Helper()
 
 	if result.State != rewriteStateRetired {
@@ -305,7 +375,13 @@ func verifyRetirementFinalCatalog(t *testing.T, r *Repository, finalCatalog Cata
 	}
 }
 
-func verifyReplacementFinalCatalog(t *testing.T, r *Repository, finalCatalog Catalog, sourceID string, result RewriteResult) {
+func verifyReplacementFinalCatalog(
+	t *testing.T,
+	r *Repository,
+	finalCatalog Catalog,
+	sourceID string,
+	result RewriteResult,
+) {
 	t.Helper()
 
 	if result.State != rewriteStateCompleted {
@@ -321,7 +397,11 @@ func verifyReplacementFinalCatalog(t *testing.T, r *Repository, finalCatalog Cat
 	}
 
 	if finalCatalog.Current != result.Replacement.ID {
-		t.Fatalf("expected Current to be replacement %s, got %s", result.Replacement.ID, finalCatalog.Current)
+		t.Fatalf(
+			"expected Current to be replacement %s, got %s",
+			result.Replacement.ID,
+			finalCatalog.Current,
+		)
 	}
 
 	survivorManifest, err := r.Read(t.Context(), result.Replacement.ID)
@@ -339,7 +419,12 @@ func verifyReplacementFinalCatalog(t *testing.T, r *Repository, finalCatalog Cat
 	})
 }
 
-func verifyDecompressedArtifacts(t *testing.T, r *Repository, genID string, expected map[string]string) {
+func verifyDecompressedArtifacts(
+	t *testing.T,
+	r *Repository,
+	genID string,
+	expected map[string]string,
+) {
 	t.Helper()
 
 	generations, err := r.root.Child("generations", false)
@@ -368,7 +453,12 @@ func verifyDecompressedArtifacts(t *testing.T, r *Repository, genID string, expe
 	}
 }
 
-func verifySingleArtifact(t *testing.T, r *Repository, artDir *privatefs.Dir, genID, id, expectedContent string) {
+func verifySingleArtifact(
+	t *testing.T,
+	r *Repository,
+	artDir *privatefs.Dir,
+	genID, id, expectedContent string,
+) {
 	t.Helper()
 
 	f, err := artDir.File(id+".bin.gz", unix.O_RDONLY)
@@ -393,7 +483,12 @@ func verifySingleArtifact(t *testing.T, r *Repository, artDir *privatefs.Dir, ge
 	}
 
 	if decompressed.String() != expectedContent {
-		t.Fatalf("decompressed artifact %s content mismatch: got %q, want %q", id, decompressed.String(), expectedContent)
+		t.Fatalf(
+			"decompressed artifact %s content mismatch: got %q, want %q",
+			id,
+			decompressed.String(),
+			expectedContent,
+		)
 	}
 
 	h := sha256.Sum256(decompressed.Bytes())

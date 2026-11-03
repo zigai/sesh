@@ -49,7 +49,13 @@ func loggingTestContext(output *bytes.Buffer) context.Context {
 		Int("pid", 4242).
 		Logger()
 
-	return logger.WithContext(context.WithValue(context.Background(), loggingTestContextKey{}, loggingTestPrivacySentinel))
+	return logger.WithContext(
+		context.WithValue(
+			context.Background(),
+			loggingTestContextKey{},
+			loggingTestPrivacySentinel,
+		),
+	)
 }
 
 func loggingTestRecords(t *testing.T, output *bytes.Buffer) []map[string]any {
@@ -137,10 +143,18 @@ func TestCustomFieldFailureLoggingIsPrivateAndIsolated(t *testing.T) {
 	records := loggingTestRecords(t, &logs)
 
 	want := map[string]any{
-		"command": "tui.test", "version": "test-version", "commit": "test-commit", "pid": float64(4242),
-		"component": "tui", "operation": "custom_field_run", "level": zerolog.ErrorLevel.String(), "status": "failed",
-		"reason": "command_failed", zerolog.ErrorFieldName: "run field command: exit status 3", "exit_code": float64(3),
-		"message": "custom field command failed",
+		"command":              "tui.test",
+		"version":              "test-version",
+		"commit":               "test-commit",
+		"pid":                  float64(4242),
+		"component":            "tui",
+		"operation":            "custom_field_run",
+		"level":                zerolog.ErrorLevel.String(),
+		"status":               "failed",
+		"reason":               "command_failed",
+		zerolog.ErrorFieldName: "run field command: exit status 3",
+		"exit_code":            float64(3),
+		"message":              "custom field command failed",
 	}
 	if len(records) != 1 || !maps.Equal(records[0], want) {
 		t.Fatalf("failure records = %#v, want exactly %#v", records, want)
@@ -179,10 +193,18 @@ func TestCustomFieldCacheFailureIsRetainedAndCloseFlushesAcceptedValue(t *testin
 	records := loggingTestRecords(t, &logs)
 
 	want := map[string]any{
-		"command": "tui.test", "version": "test-version", "commit": "test-commit", "pid": float64(4242),
-		"component": "tui", "operation": "custom_field_cache_write", "level": zerolog.ErrorLevel.String(), "status": "failed",
-		"reason": "cache_write_failed", "field": "blocked", zerolog.ErrorFieldName: "open field cache: unsafe private storage entry",
-		"message": "custom field cache write failed",
+		"command":              "tui.test",
+		"version":              "test-version",
+		"commit":               "test-commit",
+		"pid":                  float64(4242),
+		"component":            "tui",
+		"operation":            "custom_field_cache_write",
+		"level":                zerolog.ErrorLevel.String(),
+		"status":               "failed",
+		"reason":               "cache_write_failed",
+		"field":                "blocked",
+		zerolog.ErrorFieldName: "open field cache: unsafe private storage entry",
+		"message":              "custom field cache write failed",
 	}
 	if len(records) != 1 || !maps.Equal(records[0], want) {
 		t.Fatalf("cache failure records = %#v, want exactly %#v", records, want)
@@ -220,7 +242,11 @@ func TestCustomFieldCanceledSuccessfulAndStaleResultsAreSilent(t *testing.T) {
 	row := liveTestSession("$1", "alpha")
 	model.SetInitialSessions([]session.Session{row})
 	result := collectCustomFieldResults(model.syncCustomFields())[0]
-	result.result = fields.Result{Err: context.Canceled, Stderr: loggingTestPrivacySentinel, ExitCode: -1}
+	result.result = fields.Result{
+		Err:      context.Canceled,
+		Stderr:   loggingTestPrivacySentinel,
+		ExitCode: -1,
+	}
 	model.Update(result)
 	result.request++
 	result.result.Err = errLoggingTestActionFailure
@@ -239,9 +265,15 @@ func TestOriginSessionLoadsLogDegradationAndRecoveryAcrossInitialAndRefreshLoads
 	var logs bytes.Buffer
 
 	model := loggingTestModel(t, &logs)
-	model.applySessionRows(sessionLoadResultMsg{originQueried: true, originErr: errLoggingTestRemoteFailure})
-	model.handleOriginSessions(originSessionsMsg{observation: model.originObservation, err: errLoggingTestRemoteFailure})
-	model.handleOriginSessions(originSessionsMsg{observation: model.originObservation + 1, err: nil})
+	model.applySessionRows(
+		sessionLoadResultMsg{originQueried: true, originErr: errLoggingTestRemoteFailure},
+	)
+	model.handleOriginSessions(
+		originSessionsMsg{observation: model.originObservation, err: errLoggingTestRemoteFailure},
+	)
+	model.handleOriginSessions(
+		originSessionsMsg{observation: model.originObservation + 1, err: nil},
+	)
 	model.handleOriginSessions(originSessionsMsg{observation: model.originObservation, err: nil})
 	model.handleOriginSessions(originSessionsMsg{observation: model.originObservation, err: nil})
 
@@ -250,8 +282,22 @@ func TestOriginSessionLoadsLogDegradationAndRecoveryAcrossInitialAndRefreshLoads
 		t.Fatalf("expected one degradation and recovery: %s", logs.String())
 	}
 
-	assertLoggingTestRecord(t, records[0], tuiOperationLoadOriginSessions, "warn", "degraded", "tui dependency degraded")
-	assertLoggingTestRecord(t, records[1], tuiOperationLoadOriginSessions, "info", "recovered", "tui dependency recovered")
+	assertLoggingTestRecord(
+		t,
+		records[0],
+		tuiOperationLoadOriginSessions,
+		"warn",
+		"degraded",
+		"tui dependency degraded",
+	)
+	assertLoggingTestRecord(
+		t,
+		records[1],
+		tuiOperationLoadOriginSessions,
+		"info",
+		"recovered",
+		"tui dependency recovered",
+	)
 }
 
 func TestOriginSessionLoadsKeepHealthyAndStaleResultsSilent(t *testing.T) {
@@ -259,7 +305,12 @@ func TestOriginSessionLoadsKeepHealthyAndStaleResultsSilent(t *testing.T) {
 
 	model := loggingTestModel(t, &logs)
 	model.applySessionRows(sessionLoadResultMsg{originQueried: true, originErr: nil})
-	model.handleOriginSessions(originSessionsMsg{observation: model.originObservation + 1, err: errLoggingTestRemoteFailure})
+	model.handleOriginSessions(
+		originSessionsMsg{
+			observation: model.originObservation + 1,
+			err:         errLoggingTestRemoteFailure,
+		},
+	)
 
 	if logs.Len() != 0 {
 		t.Fatalf("healthy or stale origin load logged: %s", logs.String())
@@ -270,11 +321,20 @@ func TestOriginSessionDegradationNamesItsCause(t *testing.T) {
 	var logs bytes.Buffer
 
 	model := loggingTestModel(t, &logs)
-	model.applySessionRows(sessionLoadResultMsg{originQueried: true, originErr: fmt.Errorf("origin: %w", gotmux.ErrNoServer)})
+	model.applySessionRows(
+		sessionLoadResultMsg{
+			originQueried: true,
+			originErr:     fmt.Errorf("origin: %w", gotmux.ErrNoServer),
+		},
+	)
 
 	records := loggingTestRecords(t, &logs)
-	if len(records) != 1 || records[0]["status"] != "degraded" || records[0][zerolog.ErrorFieldName] != "origin: "+gotmux.ErrNoServer.Error() {
-		t.Fatalf("degradation record = %s, want one record naming the missing server", logs.String())
+	if len(records) != 1 || records[0]["status"] != "degraded" ||
+		records[0][zerolog.ErrorFieldName] != "origin: "+gotmux.ErrNoServer.Error() {
+		t.Fatalf(
+			"degradation record = %s, want one record naming the missing server",
+			logs.String(),
+		)
 	}
 }
 
@@ -368,10 +428,34 @@ func TestLogTUIEventUsesExactOutcomeSchemas(t *testing.T) {
 		status  string
 		message string
 	}{
-		{name: "success", outcome: tuiLogOutcomeSuccess, level: "info", status: "ok", message: "tui operation completed"},
-		{name: "failure", outcome: tuiLogOutcomeFailure, level: "error", status: "failed", message: "tui operation failed"},
-		{name: "degradation", outcome: tuiLogOutcomeDegradation, level: "warn", status: "degraded", message: "tui dependency degraded"},
-		{name: "recovery", outcome: tuiLogOutcomeRecovery, level: "info", status: "recovered", message: "tui dependency recovered"},
+		{
+			name:    "success",
+			outcome: tuiLogOutcomeSuccess,
+			level:   "info",
+			status:  "ok",
+			message: "tui operation completed",
+		},
+		{
+			name:    "failure",
+			outcome: tuiLogOutcomeFailure,
+			level:   "error",
+			status:  "failed",
+			message: "tui operation failed",
+		},
+		{
+			name:    "degradation",
+			outcome: tuiLogOutcomeDegradation,
+			level:   "warn",
+			status:  "degraded",
+			message: "tui dependency degraded",
+		},
+		{
+			name:    "recovery",
+			outcome: tuiLogOutcomeRecovery,
+			level:   "info",
+			status:  "recovered",
+			message: "tui dependency recovered",
+		},
 	}
 
 	for _, test := range tests {
@@ -385,7 +469,14 @@ func TestLogTUIEventUsesExactOutcomeSchemas(t *testing.T) {
 				t.Fatalf("log record count = %d, want 1", len(records))
 			}
 
-			assertLoggingTestRecord(t, records[0], tuiOperationSaveState, test.level, test.status, test.message)
+			assertLoggingTestRecord(
+				t,
+				records[0],
+				tuiOperationSaveState,
+				test.level,
+				test.status,
+				test.message,
+			)
 
 			if strings.Contains(output.String(), loggingTestPrivacySentinel) {
 				t.Fatalf("log contains private context value: %s", output.String())
@@ -437,7 +528,14 @@ func TestLogTUIEventSupportsOnlyClosedOperations(t *testing.T) {
 	}
 
 	for index, operation := range operations {
-		assertLoggingTestRecord(t, records[index], operation, "info", "ok", "tui operation completed")
+		assertLoggingTestRecord(
+			t,
+			records[index],
+			operation,
+			"info",
+			"ok",
+			"tui operation completed",
+		)
 	}
 
 	if strings.Contains(output.String(), loggingTestPrivacySentinel) {
@@ -467,7 +565,14 @@ func TestModelOperationContextCarriesLoggerWithoutPrivateValues(t *testing.T) {
 		t.Fatalf("log record count = %d, want 1", len(records))
 	}
 
-	assertLoggingTestRecord(t, records[0], tuiOperationLoadCatalog, "info", "ok", "tui operation completed")
+	assertLoggingTestRecord(
+		t,
+		records[0],
+		tuiOperationLoadCatalog,
+		"info",
+		"ok",
+		"tui operation completed",
+	)
 
 	if strings.Contains(output.String(), loggingTestPrivacySentinel) {
 		t.Fatalf("log contains private context value: %s", output.String())
@@ -496,8 +601,22 @@ func TestLoggingKeepsRecordsOffStdStreams(t *testing.T) {
 		t.Fatalf("log record count = %d, want the two logger-bound records", len(records))
 	}
 
-	assertLoggingTestRecord(t, records[0], tuiOperationSaveState, "info", "ok", "tui operation completed")
-	assertLoggingTestRecord(t, records[1], tuiOperationKillSession, "error", "failed", "tui operation failed")
+	assertLoggingTestRecord(
+		t,
+		records[0],
+		tuiOperationSaveState,
+		"info",
+		"ok",
+		"tui operation completed",
+	)
+	assertLoggingTestRecord(
+		t,
+		records[1],
+		tuiOperationKillSession,
+		"error",
+		"failed",
+		"tui operation failed",
+	)
 }
 
 func TestSessionActionLoggingDefersOnlyPendingPopupOperations(t *testing.T) {
@@ -551,8 +670,12 @@ func TestPopupSavedRestoreLogsCompletionWithDeferredSwitch(t *testing.T) {
 	_, command := model.handleEnter()()
 	trace := runActionTrace(t, model, command)
 
-	if trace.entered == nil || !trace.entered.deferred || trace.entered.switchSession != loggingTestPrivacySentinel {
-		t.Fatalf("popup restore entry = %+v, want a deferred switch to the restored session", trace.entered)
+	if trace.entered == nil || !trace.entered.deferred ||
+		trace.entered.switchSession != loggingTestPrivacySentinel {
+		t.Fatalf(
+			"popup restore entry = %+v, want a deferred switch to the restored session",
+			trace.entered,
+		)
 	}
 
 	model.handleSessionActionResult(*trace.entered)
@@ -594,7 +717,9 @@ func checkEnterOrCreateCase(t *testing.T, test enterOrCreateCase) {
 	}
 
 	if test.exists {
-		model.sessions = []session.Session{{Name: loggingTestPrivacySentinel, Kind: session.KindLive, Origin: session.OriginLocal}}
+		model.sessions = []session.Session{
+			{Name: loggingTestPrivacySentinel, Kind: session.KindLive, Origin: session.OriginLocal},
+		}
 	}
 
 	dependenciesForTest(model).TmuxSessionExists = func(context.Context, string) (bool, error) {
@@ -613,7 +738,11 @@ func checkEnterOrCreateCase(t *testing.T, test enterOrCreateCase) {
 
 	trace := pressTestKey(t, model, keyCode(tea.KeyEnter))
 	if trace.entered == nil || trace.entered.deferred != test.wantDeferred {
-		t.Fatalf("create entry = %+v, want an entry with deferred=%v", trace.entered, test.wantDeferred)
+		t.Fatalf(
+			"create entry = %+v, want an entry with deferred=%v",
+			trace.entered,
+			test.wantDeferred,
+		)
 	}
 
 	wantCreateCalls := 1
@@ -630,7 +759,14 @@ func checkEnterOrCreateCase(t *testing.T, test enterOrCreateCase) {
 		t.Fatalf("create log count = %d, want one create outcome: %#v", len(records), records)
 	}
 
-	assertLoggingTestRecord(t, records[0], tuiOperationCreateSession, "info", "ok", "tui operation completed")
+	assertLoggingTestRecord(
+		t,
+		records[0],
+		tuiOperationCreateSession,
+		"info",
+		"ok",
+		"tui operation completed",
+	)
 
 	if strings.Contains(output.String(), loggingTestPrivacySentinel) ||
 		strings.Contains(output.String(), "TOP_SECRET_PATH") {
@@ -679,8 +815,22 @@ func TestSessionActionLoggingMapsSuccessAndConsumedFailure(t *testing.T) {
 	}
 
 	for index, operation := range operations {
-		assertLoggingTestRecord(t, records[index*2], operation, "info", "ok", "tui operation completed")
-		assertLoggingTestRecord(t, records[index*2+1], operation, "error", "failed", "tui operation failed")
+		assertLoggingTestRecord(
+			t,
+			records[index*2],
+			operation,
+			"info",
+			"ok",
+			"tui operation completed",
+		)
+		assertLoggingTestRecord(
+			t,
+			records[index*2+1],
+			operation,
+			"error",
+			"failed",
+			"tui operation failed",
+		)
 	}
 }
 
@@ -744,7 +894,14 @@ func TestLoaderLoggingRecordsOnlyHealthTransitions(t *testing.T) {
 	}
 
 	for index, expected := range want {
-		assertLoggingTestRecord(t, records[index], expected.operation, expected.level, expected.status, expected.message)
+		assertLoggingTestRecord(
+			t,
+			records[index],
+			expected.operation,
+			expected.level,
+			expected.status,
+			expected.message,
+		)
 	}
 }
 
@@ -780,8 +937,22 @@ func TestLoaderLoggingRecordsPartialCatalogReloadAsOneDegradation(t *testing.T) 
 		t.Fatalf("partial reload log count = %d, want 2: %#v", len(records), records)
 	}
 
-	assertLoggingTestRecord(t, records[0], tuiOperationLoadCatalog, "warn", "degraded", "tui dependency degraded")
-	assertLoggingTestRecord(t, records[1], tuiOperationLoadCatalog, "info", "recovered", "tui dependency recovered")
+	assertLoggingTestRecord(
+		t,
+		records[0],
+		tuiOperationLoadCatalog,
+		"warn",
+		"degraded",
+		"tui dependency degraded",
+	)
+	assertLoggingTestRecord(
+		t,
+		records[1],
+		tuiOperationLoadCatalog,
+		"info",
+		"recovered",
+		"tui dependency recovered",
+	)
 }
 
 func TestLoaderLoggingKeepsHealthyLoadsSilent(t *testing.T) {
@@ -826,9 +997,11 @@ func TestLoaderLoggingKeepsHealthyLoadsSilent(t *testing.T) {
 
 func firstFrameTestLoad() sessionLoadResultMsg {
 	return sessionLoadResultMsg{
-		sessions: []session.Session{{ID: "$1", Name: loggingTestPrivacySentinel, Kind: session.KindLive}},
-		status:   session.StatusComplete,
-		timing:   sessionLoadTiming{catalog: 40 * time.Millisecond, agents: 120 * time.Millisecond},
+		sessions: []session.Session{
+			{ID: "$1", Name: loggingTestPrivacySentinel, Kind: session.KindLive},
+		},
+		status: session.StatusComplete,
+		timing: sessionLoadTiming{catalog: 40 * time.Millisecond, agents: 120 * time.Millisecond},
 	}
 }
 
@@ -857,20 +1030,36 @@ func TestPopupFirstFrameLogsOneTimingRecord(t *testing.T) {
 	record := records[0]
 	for _, field := range []string{"load_ms", "catalog_ms", "agents_ms", "since_launch_ms"} {
 		if _, ok := record[field].(float64); !ok {
-			t.Fatalf("record[%q] = %#v, want a millisecond count in %#v", field, record[field], record)
+			t.Fatalf(
+				"record[%q] = %#v, want a millisecond count in %#v",
+				field,
+				record[field],
+				record,
+			)
 		}
 	}
 
 	sinceLaunch, _ := record["since_launch_ms"].(float64)
-	if record["catalog_ms"] != float64(40) || record["agents_ms"] != float64(120) || sinceLaunch < 250 {
-		t.Fatalf("first-frame timing = %#v, want catalog 40, agents 120, since launch >= 250", record)
+	if record["catalog_ms"] != float64(40) || record["agents_ms"] != float64(120) ||
+		sinceLaunch < 250 {
+		t.Fatalf(
+			"first-frame timing = %#v, want catalog 40, agents 120, since launch >= 250",
+			record,
+		)
 	}
 
 	delete(record, "load_ms")
 	delete(record, "catalog_ms")
 	delete(record, "agents_ms")
 	delete(record, "since_launch_ms")
-	assertLoggingTestRecord(t, record, tuiLogOperation(tuiOperationFirstFrame), "info", "ok", "tui first frame shown")
+	assertLoggingTestRecord(
+		t,
+		record,
+		tuiLogOperation(tuiOperationFirstFrame),
+		"info",
+		"ok",
+		"tui first frame shown",
+	)
 
 	if strings.Contains(output.String(), loggingTestPrivacySentinel) {
 		t.Fatalf("first-frame record leaked a session name: %s", output.String())
@@ -912,7 +1101,14 @@ func TestPopupLoadingFirstFrameOmitsUnfinishedLoaderTimings(t *testing.T) {
 
 	delete(record, "load_ms")
 	delete(record, "since_launch_ms")
-	assertLoggingTestRecord(t, record, tuiLogOperation(tuiOperationFirstFrame), "info", "ok", "tui first frame shown")
+	assertLoggingTestRecord(
+		t,
+		record,
+		tuiLogOperation(tuiOperationFirstFrame),
+		"info",
+		"ok",
+		"tui first frame shown",
+	)
 
 	if strings.Contains(output.String(), loggingTestPrivacySentinel) {
 		t.Fatalf("first-frame record leaked a session name: %s", output.String())
@@ -930,7 +1126,8 @@ func TestSeededPopupStartupStaysPopulatedAndSilent(t *testing.T) {
 	updateTestModel(t, model, popupStartupDeadlineMsg{})
 
 	view := stripANSI(viewString(model.View()))
-	if !strings.Contains(view, loggingTestPrivacySentinel) || strings.Contains(view, "Loading sessions...") {
+	if !strings.Contains(view, loggingTestPrivacySentinel) ||
+		strings.Contains(view, "Loading sessions...") {
 		t.Fatalf("seeded popup view = %q, want populated sessions without a loading frame", view)
 	}
 
@@ -955,7 +1152,10 @@ func TestFirstFrameRecordOmitsUnknownLaunchAndSkipsInlinePickers(t *testing.T) {
 	}
 
 	if _, ok := records[0]["since_launch_ms"]; ok {
-		t.Fatalf("first-frame record = %#v, want no launch latency without a launch time", records[0])
+		t.Fatalf(
+			"first-frame record = %#v, want no launch latency without a launch time",
+			records[0],
+		)
 	}
 
 	var inlineOutput bytes.Buffer
@@ -1010,11 +1210,23 @@ func TestDialogActionsLogTypedSuccessOperations(t *testing.T) {
 		tuiOperationDeleteSession,
 	}
 	if len(records) != len(wantOperations) {
-		t.Fatalf("dialog action log count = %d, want %d: %#v", len(records), len(wantOperations), records)
+		t.Fatalf(
+			"dialog action log count = %d, want %d: %#v",
+			len(records),
+			len(wantOperations),
+			records,
+		)
 	}
 
 	for index, operation := range wantOperations {
-		assertLoggingTestRecord(t, records[index], operation, "info", "ok", "tui operation completed")
+		assertLoggingTestRecord(
+			t,
+			records[index],
+			operation,
+			"info",
+			"ok",
+			"tui operation completed",
+		)
 	}
 
 	if strings.Contains(output.String(), "TOP_SECRET") {
@@ -1056,7 +1268,14 @@ func TestCreateDirectoryAndStateSaveLoggingBoundaries(t *testing.T) {
 		"failed",
 		"tui operation failed",
 	)
-	assertLoggingTestRecord(t, records[1], tuiOperationSaveState, "error", "failed", "tui operation failed")
+	assertLoggingTestRecord(
+		t,
+		records[1],
+		tuiOperationSaveState,
+		"error",
+		"failed",
+		"tui operation failed",
+	)
 
 	if strings.Contains(output.String(), loggingTestPrivacySentinel) {
 		t.Fatalf("boundary log contains typed input: %s", output.String())
@@ -1078,7 +1297,11 @@ func TestConfirmWithoutPendingActionDoesNotLogSuccess(t *testing.T) {
 	_, cmd := handler()
 
 	if output.Len() != 0 || cmd != nil {
-		t.Fatalf("confirming nothing logged %q and returned command %v, want neither", output.String(), cmd)
+		t.Fatalf(
+			"confirming nothing logged %q and returned command %v, want neither",
+			output.String(),
+			cmd,
+		)
 	}
 
 	if model.dialog != dialogNone {
@@ -1104,8 +1327,22 @@ func TestSnapshotActionLoggingUsesFixedSchema(t *testing.T) {
 		t.Fatalf("snapshot log count = %d, want 2", len(records))
 	}
 
-	assertLoggingTestRecord(t, records[0], tuiOperationSnapshotSession, "error", "failed", "tui operation failed")
-	assertLoggingTestRecord(t, records[1], tuiOperationSnapshotSession, "info", "ok", "tui operation completed")
+	assertLoggingTestRecord(
+		t,
+		records[0],
+		tuiOperationSnapshotSession,
+		"error",
+		"failed",
+		"tui operation failed",
+	)
+	assertLoggingTestRecord(
+		t,
+		records[1],
+		tuiOperationSnapshotSession,
+		"info",
+		"ok",
+		"tui operation completed",
+	)
 }
 
 func TestLogTUIFailureClassification(t *testing.T) {
@@ -1243,14 +1480,19 @@ func checkFailureClassification(t *testing.T, tt failureClassificationCase) {
 		t.Errorf("reason = %q, want %q", record["reason"], tt.wantCode)
 	}
 
-	if record["component"] != "tui" || record["operation"] != string(tuiOperationEnterLiveSession) ||
-		record["level"] != "error" || record["status"] != "failed" {
+	if record["component"] != "tui" ||
+		record["operation"] != string(tuiOperationEnterLiveSession) ||
+		record["level"] != "error" ||
+		record["status"] != "failed" {
 		t.Errorf("record schema = %#v, want fixed tui failure schema", record)
 	}
 
 	assertClassificationContext(t, record, tt)
 
-	if errorContext, _ := record["error_context"].(map[string]any); !maps.Equal(errorContext, tt.wantContext) {
+	if errorContext, _ := record["error_context"].(map[string]any); !maps.Equal(
+		errorContext,
+		tt.wantContext,
+	) {
 		t.Errorf("error_context = %#v, want %#v", record["error_context"], tt.wantContext)
 	}
 
@@ -1268,12 +1510,20 @@ func assertAllowedFailureFields(t *testing.T, record map[string]any) {
 			"operation", "level", "status", "message", "reason", zerolog.ErrorFieldName, "error_domain", "error_code", "error_step",
 			"error_context":
 		default:
-			t.Errorf("record field %q = %#v, want only the fixed failure schema", field, record[field])
+			t.Errorf(
+				"record field %q = %#v, want only the fixed failure schema",
+				field,
+				record[field],
+			)
 		}
 	}
 }
 
-func assertClassificationContext(t *testing.T, record map[string]any, tt failureClassificationCase) {
+func assertClassificationContext(
+	t *testing.T,
+	record map[string]any,
+	tt failureClassificationCase,
+) {
 	t.Helper()
 
 	if tt.wantPhase != "" && record["phase"] != tt.wantPhase {
@@ -1296,7 +1546,15 @@ func TestInboxSaveAndOpenLogOnlyFailures(t *testing.T) {
 
 	model.handleInboxUpdated(inboxUpdatedMsg{state: model.inbox, err: errLoggingTestActionFailure})
 	model.handleInboxUpdated(inboxUpdatedMsg{state: model.inbox, err: nil})
-	model.handleOpened(openedMsg{err: startOpener(t.Context(), t.TempDir(), filepath.Join(t.TempDir(), loggingTestPrivacySentinel))})
+	model.handleOpened(
+		openedMsg{
+			err: startOpener(
+				t.Context(),
+				t.TempDir(),
+				filepath.Join(t.TempDir(), loggingTestPrivacySentinel),
+			),
+		},
+	)
 	model.handleOpened(openedMsg{err: nil})
 
 	records := loggingTestRecords(t, &output)
@@ -1304,9 +1562,18 @@ func TestInboxSaveAndOpenLogOnlyFailures(t *testing.T) {
 		t.Fatalf("log count = %d, want one record per failure: %#v", len(records), records)
 	}
 
-	assertLoggingTestRecord(t, records[0], tuiOperationSaveInbox, "error", "failed", "tui operation failed")
+	assertLoggingTestRecord(
+		t,
+		records[0],
+		tuiOperationSaveInbox,
+		"error",
+		"failed",
+		"tui operation failed",
+	)
 
-	if open := records[1]; open["operation"] != string(tuiOperationOpen) || open["level"] != "error" || open["reason"] != "not_found" {
+	if open := records[1]; open["operation"] != string(tuiOperationOpen) ||
+		open["level"] != "error" ||
+		open["reason"] != "not_found" {
 		t.Fatalf("open failure record = %#v, want an error with reason not_found", open)
 	}
 }
@@ -1324,5 +1591,12 @@ func TestUnreadableReportsLogOneDegradation(t *testing.T) {
 		t.Fatalf("log count = %d, want one failure record: %#v", len(records), records)
 	}
 
-	assertLoggingTestRecord(t, records[0], tuiOperationLoadEvidence, "warn", "degraded", "tui dependency degraded")
+	assertLoggingTestRecord(
+		t,
+		records[0],
+		tuiOperationLoadEvidence,
+		"warn",
+		"degraded",
+		"tui dependency degraded",
+	)
 }

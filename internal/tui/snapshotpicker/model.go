@@ -218,8 +218,16 @@ func snapshotWheelDelta(button tea.MouseButton) int {
 		return -wheelStepDelta
 	case tea.MouseWheelDown:
 		return wheelStepDelta
-	case tea.MouseNone, tea.MouseLeft, tea.MouseMiddle, tea.MouseRight, tea.MouseWheelLeft, tea.MouseWheelRight,
-		tea.MouseBackward, tea.MouseForward, tea.MouseButton10, tea.MouseButton11:
+	case tea.MouseNone,
+		tea.MouseLeft,
+		tea.MouseMiddle,
+		tea.MouseRight,
+		tea.MouseWheelLeft,
+		tea.MouseWheelRight,
+		tea.MouseBackward,
+		tea.MouseForward,
+		tea.MouseButton10,
+		tea.MouseButton11:
 		return 0
 	}
 
@@ -387,7 +395,10 @@ func (m *Model) snapshotHistoryTitle(width int) string {
 	}
 
 	return padSnapshotLine(
-		lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.Theme.Primary)).Bold(true).Render(title),
+		lipgloss.NewStyle().
+			Foreground(lipgloss.Color(m.config.Theme.Primary)).
+			Bold(true).
+			Render(title),
 		width,
 	)
 }
@@ -395,7 +406,10 @@ func (m *Model) snapshotHistoryTitle(width int) string {
 func (m *Model) snapshotHistoryHeader(width int) string {
 	columns := snapshotColumns(width)
 
-	return padSnapshotLine(renderSnapshotColumns(columns, emptySnapshotEntry(), m.now, false, true), width)
+	return padSnapshotLine(
+		renderSnapshotColumns(columns, emptySnapshotEntry(), m.now, false, true),
+		width,
+	)
 }
 
 func (m *Model) writeSnapshotHistoryRows(
@@ -405,7 +419,9 @@ func (m *Model) writeSnapshotHistoryRows(
 	right string,
 ) {
 	if len(m.entries) == 0 {
-		line := lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.Theme.Muted)).Render("No saved snapshots found")
+		line := lipgloss.NewStyle().
+			Foreground(lipgloss.Color(m.config.Theme.Muted)).
+			Render("No saved snapshots found")
 		writeExactFramedLine(out, padSnapshotLine(line, layout.bodyWidth), left, right)
 
 		for row := 1; row < layout.listHeight; row++ {
@@ -448,7 +464,9 @@ func snapshotColumns(width int) snapshotColumnLayout {
 		fileWidth:     0,
 	}
 
-	fixed := lipgloss.Width(snapshotHistorySelectionPrefix) + fixedPrefixWidth + fixedGapWidth + fixedStatusWidth
+	fixed := lipgloss.Width(
+		snapshotHistorySelectionPrefix,
+	) + fixedPrefixWidth + fixedGapWidth + fixedStatusWidth
 	if columns.showTimestamp {
 		fixed += fixedGapWidth + timestampFieldWidth
 	}
@@ -511,7 +529,12 @@ func renderSnapshotColumns(
 		parts = append(parts, fitSnapshotCell(size, sizeFieldWidth, true), " ")
 	}
 
-	parts = append(parts, fitSnapshotCell(status, fixedStatusWidth, false), " ", fitSnapshotCell(file, columns.fileWidth, false))
+	parts = append(
+		parts,
+		fitSnapshotCell(status, fixedStatusWidth, false),
+		" ",
+		fitSnapshotCell(file, columns.fileWidth, false),
+	)
 
 	return strings.Join(parts, "")
 }
@@ -582,7 +605,12 @@ func padSnapshotLine(line string, width int) string {
 	return line
 }
 
-func writeExactFramedLine(out *strings.Builder, line string, leftBorder string, rightBorder string) {
+func writeExactFramedLine(
+	out *strings.Builder,
+	line string,
+	leftBorder string,
+	rightBorder string,
+) {
 	out.WriteByte('\n')
 	out.WriteString(leftBorder)
 	out.WriteByte(' ')

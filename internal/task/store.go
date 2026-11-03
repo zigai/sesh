@@ -193,10 +193,25 @@ func (l *Ledger) Remove(id string) {
 
 func EmptyRecord() Record {
 	return Record{
-		ID: "", Kind: "", State: "", Project: "", Number: 0, Harness: "", Directory: "", Branch: "", Base: "",
-		OwnsWorktree: false, OwnsBranch: false, Upstream: "", CreatedAt: 0,
-		Title: "", WindowName: "", Resume: Resume{Harness: "", Session: "", Command: []string{}}, PR: PullRequest{Number: 0, State: "", URL: ""}, Runs: []Run{},
-		Owner: Process{PID: 0, Birth: ""},
+		ID:           "",
+		Kind:         "",
+		State:        "",
+		Project:      "",
+		Number:       0,
+		Harness:      "",
+		Directory:    "",
+		Branch:       "",
+		Base:         "",
+		OwnsWorktree: false,
+		OwnsBranch:   false,
+		Upstream:     "",
+		CreatedAt:    0,
+		Title:        "",
+		WindowName:   "",
+		Resume:       Resume{Harness: "", Session: "", Command: []string{}},
+		PR:           PullRequest{Number: 0, State: "", URL: ""},
+		Runs:         []Run{},
+		Owner:        Process{PID: 0, Birth: ""},
 	}
 }
 
@@ -204,7 +219,8 @@ func ValidateRecords(records []Record) error {
 	ids := make(map[string]bool, len(records))
 
 	for _, record := range records {
-		if record.ID == "" || ids[record.ID] || (record.Kind != KindProject && record.Kind != KindLoose) {
+		if record.ID == "" || ids[record.ID] ||
+			(record.Kind != KindProject && record.Kind != KindLoose) {
 			return ErrLedgerInvalid
 		}
 
@@ -305,7 +321,12 @@ func (s Store) open(create bool) (*privatefs.Dir, string, error) {
 	return dir, filepath.Base(s.path), err
 }
 
-func update(ctx context.Context, dir *privatefs.Dir, name string, change func(*Ledger) error) (Ledger, error) {
+func update(
+	ctx context.Context,
+	dir *privatefs.Dir,
+	name string,
+	change func(*Ledger) error,
+) (Ledger, error) {
 	ledger, err := read(dir, name)
 	if err != nil {
 		return Ledger{}, err

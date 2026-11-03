@@ -64,7 +64,10 @@ func (e *LossError) Error() string {
 		parts = append(parts, "its branch is not merged")
 	}
 
-	return "finishing would discard " + strings.Join(parts, " and ") + "; finish with discard to remove it anyway"
+	return "finishing would discard " + strings.Join(
+		parts,
+		" and ",
+	) + "; finish with discard to remove it anyway"
 }
 
 func (e *LossError) Is(target error) bool {
@@ -159,7 +162,11 @@ func (s *Service) Finish(ctx context.Context, id string, opts FinishOptions) (Re
 	return record, taskError("finish_task", err)
 }
 
-func (s *Service) prepareFinish(ctx context.Context, record Record, opts FinishOptions) (Record, error) {
+func (s *Service) prepareFinish(
+	ctx context.Context,
+	record Record,
+	opts FinishOptions,
+) (Record, error) {
 	if !opts.Discard {
 		mergedHead := ""
 
@@ -211,7 +218,11 @@ func (s *Service) runFinish(ctx context.Context, record Record) error {
 }
 
 func (s *Service) checkLoss(ctx context.Context, record Record, mergedHead string) error {
-	loss := LossError{UnmergedCommits: 0, ChangedFiles: 0, ClosedUnmerged: record.OwnsBranch && record.PR.State == PRClosed}
+	loss := LossError{
+		UnmergedCommits: 0,
+		ChangedFiles:    0,
+		ClosedUnmerged:  record.OwnsBranch && record.PR.State == PRClosed,
+	}
 
 	if _, err := os.Stat(record.Directory); err == nil && record.OwnsWorktree {
 		status, err := git.Output(ctx, record.Directory, "status", "--porcelain")
@@ -249,7 +260,10 @@ func unmergedCommitCount(ctx context.Context, record Record, mergedHead string) 
 		return 0, err
 	}
 
-	count, err := git.Output(ctx, record.Project, append([]string{"rev-list", "--count", record.Branch, "--not"}, bases...)...)
+	count, err := git.Output(
+		ctx,
+		record.Project,
+		append([]string{"rev-list", "--count", record.Branch, "--not"}, bases...)...)
 	if err != nil {
 		return 0, fmt.Errorf("count unmerged commits: %w", err)
 	}
@@ -340,7 +354,14 @@ func (s *Service) removeTask(ctx context.Context, record Record) error {
 
 func removeWorktree(ctx context.Context, record Record) error {
 	if _, err := os.Stat(record.Directory); err == nil {
-		if _, err := git.Output(ctx, record.Project, "worktree", "remove", "--force", record.Directory); err != nil {
+		if _, err := git.Output(
+			ctx,
+			record.Project,
+			"worktree",
+			"remove",
+			"--force",
+			record.Directory,
+		); err != nil {
 			return fmt.Errorf("remove worktree: %w", err)
 		}
 
@@ -391,7 +412,12 @@ func (GitHub) FindPR(ctx context.Context, dir, branch string) (PullRequest, stri
 		"--json", "number,state,url,headRefOid,isCrossRepository")
 	command.Dir = dir
 
-	command.Env = append(os.Environ(), "GH_PROMPT_DISABLED=1", "GIT_TERMINAL_PROMPT=0", "NO_COLOR=1")
+	command.Env = append(
+		os.Environ(),
+		"GH_PROMPT_DISABLED=1",
+		"GIT_TERMINAL_PROMPT=0",
+		"NO_COLOR=1",
+	)
 
 	output := git.NewLimitedBuffer(ghOutputLimit)
 

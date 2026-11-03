@@ -13,13 +13,19 @@ func (w *Workflow) RenameSession(ctx context.Context, oldName, newName string) e
 	return w.RenameSessionTarget(ctx, oldName, newName, "")
 }
 
-func (w *Workflow) RenameSessionTarget(ctx context.Context, oldName, newName, expectedSessionID string) error {
+func (w *Workflow) RenameSessionTarget(
+	ctx context.Context,
+	oldName, newName, expectedSessionID string,
+) error {
 	_, err := w.RenameSessionTargetOutcome(ctx, oldName, newName, expectedSessionID)
 
 	return err
 }
 
-func (w *Workflow) RenameSessionOutcome(ctx context.Context, oldName, newName string) (RenameOutcome, error) {
+func (w *Workflow) RenameSessionOutcome(
+	ctx context.Context,
+	oldName, newName string,
+) (RenameOutcome, error) {
 	return w.RenameSessionTargetOutcome(ctx, oldName, newName, "")
 }
 
@@ -61,7 +67,13 @@ func (w *Workflow) RenameSessionTargetOutcome(
 	}
 
 	if exists {
-		return out, w.fail(ctx, "rename", oops.In("session").Code("already_exists").Wrapf(ErrSessionAlreadyExists, "session %q already exists", newName))
+		return out, w.fail(
+			ctx,
+			"rename",
+			oops.In("session").
+				Code("already_exists").
+				Wrapf(ErrSessionAlreadyExists, "session %q already exists", newName),
+		)
 	}
 
 	if expectedSessionID == "" {
@@ -76,13 +88,21 @@ func (w *Workflow) RenameSessionTargetOutcome(
 	}
 
 	if err := target.session.Rename(ctx, newName); err != nil {
-		return out, w.fail(ctx, "rename", oops.In("session").Code("tmux_failed").With("operation", "rename_session").Wrap(err))
+		return out, w.fail(
+			ctx,
+			"rename",
+			oops.In("session").Code("tmux_failed").With("operation", "rename_session").Wrap(err),
+		)
 	}
 
 	out.Renamed = true
 
 	if err := w.renameHistory(ctx, oldName, newName); err != nil {
-		return out, w.fail(ctx, "rename", oops.In("session").Code("history_failed").With("operation", "rename_history").Wrap(err))
+		return out, w.fail(
+			ctx,
+			"rename",
+			oops.In("session").Code("history_failed").With("operation", "rename_history").Wrap(err),
+		)
 	}
 
 	out.HistoryUpdated = true
@@ -118,7 +138,11 @@ func (w *Workflow) KillSession(ctx context.Context, name string, force bool) err
 	return w.KillSessionTarget(ctx, name, "", force)
 }
 
-func (w *Workflow) KillSessionTarget(ctx context.Context, name, expectedSessionID string, force bool) error {
+func (w *Workflow) KillSessionTarget(
+	ctx context.Context,
+	name, expectedSessionID string,
+	force bool,
+) error {
 	if w.server == nil {
 		return oops.In("session").Code("endpoint_required").Wrap(errServerRequired)
 	}
@@ -137,7 +161,11 @@ func (w *Workflow) KillSessionTarget(ctx context.Context, name, expectedSessionI
 	}
 
 	if err := target.session.Kill(ctx); err != nil {
-		return w.fail(ctx, "kill", oops.In("session").Code("tmux_failed").With("operation", "kill_session").Wrap(err))
+		return w.fail(
+			ctx,
+			"kill",
+			oops.In("session").Code("tmux_failed").With("operation", "kill_session").Wrap(err),
+		)
 	}
 
 	zerolog.Ctx(ctx).Info().

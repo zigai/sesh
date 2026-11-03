@@ -39,7 +39,8 @@ func TestPeerActionLogsReceiptOutcome(t *testing.T) {
 				OK: tc.code == "", Code: tc.code, Output: jsontext.Value(`{"name":"PRIVATE_NAME"}`),
 			}, nil)
 
-			if bytes.Count(logs.Bytes(), []byte("\n")) != 1 || strings.Contains(logs.String(), "PRIVATE_NAME") {
+			if bytes.Count(logs.Bytes(), []byte("\n")) != 1 ||
+				strings.Contains(logs.String(), "PRIVATE_NAME") {
 				t.Fatalf("unexpected receipt log: %s", logs.String())
 			}
 
@@ -49,8 +50,14 @@ func TestPeerActionLogsReceiptOutcome(t *testing.T) {
 			}
 
 			want := map[string]any{
-				"component": "remote", "operation": "remote_peer_action", "action": "session.kill", "invocation_id": "invocation-1", "level": tc.level,
-				"status": tc.status, "phase": "receipt", "message": "remote action receipt resolved",
+				"component":     "remote",
+				"operation":     "remote_peer_action",
+				"action":        "session.kill",
+				"invocation_id": "invocation-1",
+				"level":         tc.level,
+				"status":        tc.status,
+				"phase":         "receipt",
+				"message":       "remote action receipt resolved",
 			}
 			if tc.code != "" {
 				want["reason"] = string(tc.code)

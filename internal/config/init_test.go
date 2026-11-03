@@ -60,7 +60,10 @@ func TestInitOverwritesWithForce(t *testing.T) {
 		t.Fatalf("corrupting config: %v", err)
 	}
 
-	if _, err := config.Init(config.WithInitPath(targetPath), config.WithInitForce(true)); err != nil {
+	if _, err := config.Init(
+		config.WithInitPath(targetPath),
+		config.WithInitForce(true),
+	); err != nil {
 		t.Fatalf("Init(force=true) error = %v", err)
 	}
 
@@ -206,7 +209,9 @@ func TestInitRejectsAncestorDirSymlink(t *testing.T) {
 		t.Skipf("Symlink() unavailable: %v", err)
 	}
 
-	_, err := config.Init(config.WithInitPath(filepath.Join(symlinkGrandparent, "nested", "config.toml")))
+	_, err := config.Init(
+		config.WithInitPath(filepath.Join(symlinkGrandparent, "nested", "config.toml")),
+	)
 	if !errors.Is(err, config.ErrConfigSymlink) {
 		t.Fatalf("Init() error = %v, want %v", err, config.ErrConfigSymlink)
 	}
@@ -272,7 +277,11 @@ func TestInitNoClobberDoesNotOverwriteExistingFile(t *testing.T) {
 	}
 
 	if string(data) != string(initialContent) {
-		t.Fatalf("existing file was modified: got %q, want %q", string(data), string(initialContent))
+		t.Fatalf(
+			"existing file was modified: got %q, want %q",
+			string(data),
+			string(initialContent),
+		)
 	}
 }
 

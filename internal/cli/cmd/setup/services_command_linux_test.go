@@ -34,7 +34,10 @@ func TestSetupServicesPrintsWithoutWriting(t *testing.T) {
 	}
 
 	if len(result.Services) != 4 {
-		t.Fatalf("services = %d, want the autosave service, timer, remote monitor and agent status tracker", len(result.Services))
+		t.Fatalf(
+			"services = %d, want the autosave service, timer, remote monitor and agent status tracker",
+			len(result.Services),
+		)
 	}
 
 	service := result.Services[0]
@@ -166,11 +169,20 @@ func TestSetupServicesDefaultsToUserTmuxServer(t *testing.T) {
 		}
 
 		if !targetsSocket(service.Content, want) {
-			t.Fatalf("%s does not target tmux's default server %q:\n%s", service.Name, want, service.Content)
+			t.Fatalf(
+				"%s does not target tmux's default server %q:\n%s",
+				service.Name,
+				want,
+				service.Content,
+			)
 		}
 
 		if strings.Contains(service.Content, setup.TmuxServiceName) {
-			t.Fatalf("%s references the uninstalled managed tmux server:\n%s", service.Name, service.Content)
+			t.Fatalf(
+				"%s references the uninstalled managed tmux server:\n%s",
+				service.Name,
+				service.Content,
+			)
 		}
 	}
 }
@@ -194,8 +206,14 @@ func TestSetupServicesWithTmuxServiceDefaultsToManagedSocket(t *testing.T) {
 
 	result := clitest.DecodePayload[servicesResultJSON](t, exec.Envelope.Result)
 	for _, service := range result.Services {
-		if service.Kind == string(setup.KindSystemdService) && !targetsSocket(service.Content, want) {
-			t.Fatalf("%s does not target the managed server %q:\n%s", service.Name, want, service.Content)
+		if service.Kind == string(setup.KindSystemdService) &&
+			!targetsSocket(service.Content, want) {
+			t.Fatalf(
+				"%s does not target the managed server %q:\n%s",
+				service.Name,
+				want,
+				service.Content,
+			)
 		}
 	}
 }
@@ -219,13 +237,22 @@ func TestSetupServicesWritesRunnableRemoteMonitorDefinition(t *testing.T) {
 		t.Fatalf("blocked = %v, want runnable remote monitor definition", result.Blocked)
 	}
 
-	index := slices.IndexFunc(result.Services, func(service serviceJSON) bool { return service.Name == setup.RemoteServiceName })
+	index := slices.IndexFunc(
+		result.Services,
+		func(service serviceJSON) bool { return service.Name == setup.RemoteServiceName },
+	)
 	if index < 0 || len(result.Services[index].Requires) != 0 {
-		t.Fatalf("services = %+v, want a remote monitor with no unmet prerequisite", result.Services)
+		t.Fatalf(
+			"services = %+v, want a remote monitor with no unmet prerequisite",
+			result.Services,
+		)
 	}
 
 	if !strings.Contains(result.Services[index].Content, "daemon remote-monitor") {
-		t.Fatalf("remote definition does not name the native entry point:\n%s", result.Services[index].Content)
+		t.Fatalf(
+			"remote definition does not name the native entry point:\n%s",
+			result.Services[index].Content,
+		)
 	}
 
 	if _, err := os.Stat(filepath.Join(directory, setup.RemoteServiceName)); err != nil {
@@ -247,12 +274,19 @@ func TestSetupServicesApplyWritesManagedTmuxService(t *testing.T) {
 		testNoConfigFlag, testJSONFlag,
 	)
 	if !exec.Envelope.OK {
-		t.Fatalf("setup services --with-tmux-service --apply failed: %+v\nstderr: %s", exec.Err, exec.Stderr)
+		t.Fatalf(
+			"setup services --with-tmux-service --apply failed: %+v\nstderr: %s",
+			exec.Err,
+			exec.Stderr,
+		)
 	}
 
 	result := clitest.DecodePayload[servicesResultJSON](t, exec.Envelope.Result)
 	if !result.Applied || result.Written != 6 {
-		t.Fatalf("result = %+v, want 6 written definitions including the tmux and restore services", result)
+		t.Fatalf(
+			"result = %+v, want 6 written definitions including the tmux and restore services",
+			result,
+		)
 	}
 
 	assertWrittenManagedUnits(t, directory)
@@ -275,7 +309,8 @@ func TestSetupServicesApplyWritesManagedTmuxService(t *testing.T) {
 }
 
 func targetsSocket(content, socket string) bool {
-	return strings.Contains(content, "--socket "+socket+" ") || strings.Contains(content, "--socket "+socket+"\n")
+	return strings.Contains(content, "--socket "+socket+" ") ||
+		strings.Contains(content, "--socket "+socket+"\n")
 }
 
 func assertWrittenManagedUnits(t *testing.T, directory string) {
@@ -434,7 +469,10 @@ func TestSetupServicesCoordinatorPrintsWithoutWriting(t *testing.T) {
 		t.Fatal("preview must not report an applied result")
 	}
 
-	index := slices.IndexFunc(result.Services, func(service serviceJSON) bool { return service.Name == setup.CoordinatorServiceName })
+	index := slices.IndexFunc(
+		result.Services,
+		func(service serviceJSON) bool { return service.Name == setup.CoordinatorServiceName },
+	)
 	if index < 0 {
 		t.Fatalf("services = %+v, want %s included", result.Services, setup.CoordinatorServiceName)
 	}
@@ -466,7 +504,11 @@ func TestSetupServicesWithCoordinatorApplyWritesAllDefinitions(t *testing.T) {
 		testNoConfigFlag, testJSONFlag,
 	)
 	if !exec.Envelope.OK {
-		t.Fatalf("setup services --with-coordinator --apply failed: %+v\nstderr: %s", exec.Err, exec.Stderr)
+		t.Fatalf(
+			"setup services --with-coordinator --apply failed: %+v\nstderr: %s",
+			exec.Err,
+			exec.Stderr,
+		)
 	}
 
 	result := clitest.DecodePayload[servicesResultJSON](t, exec.Envelope.Result)

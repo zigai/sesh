@@ -54,7 +54,9 @@ func TestAgentsPopupInitialIdleIsReadAndCompletedTurnIsUnread(t *testing.T) {
 		}
 	}
 
-	encoded, err := json.Marshal(map[string]any{"schema_version": 3, "revision": 1, "sessions": records})
+	encoded, err := json.Marshal(
+		map[string]any{"schema_version": 3, "revision": 1, "sessions": records},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +73,13 @@ func TestAgentsPopupInitialIdleIsReadAndCompletedTurnIsUnread(t *testing.T) {
 	}
 
 	configPath := filepath.Join(root, "picker.toml")
-	if err := os.WriteFile(configPath, []byte("[agent_sessions]\npopup_sort = \"name\"\nstatus_style = \"text\"\n[display]\nagents_agent_format = \"{tree}{status_text} {agent_session} {harness}\"\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		configPath,
+		[]byte(
+			"[agent_sessions]\npopup_sort = \"name\"\nstatus_style = \"text\"\n[display]\nagents_agent_format = \"{tree}{status_text} {agent_session} {harness}\"\n",
+		),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -91,7 +99,8 @@ func TestAgentsPopupInitialIdleIsReadAndCompletedTurnIsUnread(t *testing.T) {
 		stopCtx, stopCancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer stopCancel()
 
-		_ = exec.CommandContext(stopCtx, termtraceExecutable, "stop", "-q", alias, "--wait", "--timeout-ms", "1500").Run()
+		_ = exec.CommandContext(stopCtx, termtraceExecutable, "stop", "-q", alias, "--wait", "--timeout-ms", "1500").
+			Run()
 	})
 
 	record := exec.CommandContext(ctx, termtraceExecutable,
@@ -130,7 +139,8 @@ func assertIdleStartupAndCompletionStatuses(t *testing.T, screen []string) {
 
 			found = true
 
-			if !strings.Contains(row, "IDLE") || strings.Contains(row, "IDLE*") != (event == "Stop") {
+			if !strings.Contains(row, "IDLE") ||
+				strings.Contains(row, "IDLE*") != (event == "Stop") {
 				t.Errorf("%s status row = %q", event, row)
 			}
 		}

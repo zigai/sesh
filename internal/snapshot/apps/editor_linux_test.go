@@ -15,15 +15,32 @@ func TestNvimEmbeddedCoreRequiresNativeEmbedArgument(t *testing.T) {
 		arguments [][]byte
 		want      bool
 	}{
-		{name: "native UI core", arguments: [][]byte{[]byte("nvim"), []byte("--embed"), []byte("--clean")}, want: true},
-		{name: "nested editor", arguments: [][]byte{[]byte("nvim"), []byte("--clean")}, want: false},
-		{name: "embed option is not native core position", arguments: [][]byte{[]byte("nvim"), []byte("--clean"), []byte("--embed")}, want: false},
+		{
+			name:      "native UI core",
+			arguments: [][]byte{[]byte("nvim"), []byte("--embed"), []byte("--clean")},
+			want:      true,
+		},
+		{
+			name:      "nested editor",
+			arguments: [][]byte{[]byte("nvim"), []byte("--clean")},
+			want:      false,
+		},
+		{
+			name:      "embed option is not native core position",
+			arguments: [][]byte{[]byte("nvim"), []byte("--clean"), []byte("--embed")},
+			want:      false,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			if got := isNvimEmbeddedCore(test.arguments); got != test.want {
-				t.Fatalf("isNvimEmbeddedCore(%q) = %t, want %t", bytes.Join(test.arguments, []byte(" ")), got, test.want)
+				t.Fatalf(
+					"isNvimEmbeddedCore(%q) = %t, want %t",
+					bytes.Join(test.arguments, []byte(" ")),
+					got,
+					test.want,
+				)
 			}
 		})
 	}
@@ -43,7 +60,9 @@ func TestUnixSocketLinePreservesExactSocketPath(t *testing.T) {
 func TestUnixSocketLineRejectsMissingPath(t *testing.T) {
 	t.Parallel()
 
-	if _, _, ok := unixSocketLine("0000000000000000: 00000002 00000000 00010000 0001 01 424242"); ok {
+	if _, _, ok := unixSocketLine(
+		"0000000000000000: 00000002 00000000 00010000 0001 01 424242",
+	); ok {
 		t.Fatal("unixSocketLine() accepted a record without a socket path")
 	}
 }

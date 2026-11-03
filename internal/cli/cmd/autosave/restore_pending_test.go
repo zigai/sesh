@@ -16,7 +16,12 @@ import (
 	"github.com/zigai/sesh/internal/app"
 )
 
-func reportPendingRestoreRecords(t *testing.T, env Env, pending pendingRestore, runs int) []map[string]any {
+func reportPendingRestoreRecords(
+	t *testing.T,
+	env Env,
+	pending pendingRestore,
+	runs int,
+) []map[string]any {
 	t.Helper()
 
 	return reportRecords(t, reportPendingRestore, env, pending, runs)
@@ -63,14 +68,21 @@ func TestPendingRestoreIsReportedOncePerServerStart(t *testing.T) {
 
 	records := reportPendingRestoreRecords(t, env, pending, 3)
 	if len(records) != 1 {
-		t.Fatalf("expected exactly one record across repeated intervals, got %d: %+v", len(records), records)
+		t.Fatalf(
+			"expected exactly one record across repeated intervals, got %d: %+v",
+			len(records),
+			records,
+		)
 	}
 
 	assertPendingRestoreRecord(t, records[0], historyPath)
 
 	restarted := pendingRestore{sessions: 8, serverStarted: time.Unix(3_000, 0)}
 	if records := reportPendingRestoreRecords(t, env, restarted, 2); len(records) != 1 {
-		t.Fatalf("a later server start is a new episode reported once, got %d records", len(records))
+		t.Fatalf(
+			"a later server start is a new episode reported once, got %d records",
+			len(records),
+		)
 	}
 }
 
@@ -78,18 +90,23 @@ func assertPendingRestoreRecord(t *testing.T, record map[string]any, historyPath
 	t.Helper()
 
 	if record["level"] != "warn" || record["component"] != "snapshot" || record["operation"] != "autosave" ||
-		record["status"] != "skipped" || record["reason"] != "restore_pending" || record["sessions"] != float64(8) {
+		record["status"] != "skipped" || record["reason"] != "restore_pending" ||
+		record["sessions"] != float64(8) {
 		t.Fatalf("unexpected record schema: %+v", record)
 	}
 
 	for key := range record {
-		if !slices.Contains([]string{"level", "component", "operation", "status", "reason", "sessions", "message"}, key) {
+		if !slices.Contains(
+			[]string{"level", "component", "operation", "status", "reason", "sessions", "message"},
+			key,
+		) {
 			t.Fatalf("unexpected field %q in %+v", key, record)
 		}
 	}
 
 	message, ok := record["message"].(string)
-	if !ok || strings.Contains(message, historyPath) || strings.Contains(message, filepath.Dir(historyPath)) {
+	if !ok || strings.Contains(message, historyPath) ||
+		strings.Contains(message, filepath.Dir(historyPath)) {
 		t.Fatalf("the record must have a fixed message naming no paths: %+v", record)
 	}
 }
@@ -109,14 +126,21 @@ func TestRestoreIncompleteIsReportedOncePerServerStart(t *testing.T) {
 
 	records := reportRecords(t, reportRestoreIncomplete, env, pending, 3)
 	if len(records) != 1 {
-		t.Fatalf("expected exactly one record across repeated intervals, got %d: %+v", len(records), records)
+		t.Fatalf(
+			"expected exactly one record across repeated intervals, got %d: %+v",
+			len(records),
+			records,
+		)
 	}
 
 	assertRestoreIncompleteRecord(t, records[0], historyPath)
 
 	restarted := pendingRestore{sessions: 3, serverStarted: time.Unix(3_000, 0)}
 	if records := reportRecords(t, reportRestoreIncomplete, env, restarted, 2); len(records) != 1 {
-		t.Fatalf("a later server start is a new episode reported once, got %d records", len(records))
+		t.Fatalf(
+			"a later server start is a new episode reported once, got %d records",
+			len(records),
+		)
 	}
 }
 
@@ -124,17 +148,22 @@ func assertRestoreIncompleteRecord(t *testing.T, record map[string]any, historyP
 	t.Helper()
 
 	if record["level"] != "warn" || record["component"] != "snapshot" || record["operation"] != "autosave" ||
-		record["status"] != "degraded" || record["reason"] != "restore_incomplete" || record["sessions"] != float64(3) {
+		record["status"] != "degraded" || record["reason"] != "restore_incomplete" ||
+		record["sessions"] != float64(3) {
 		t.Fatalf("unexpected record schema: %+v", record)
 	}
 
 	for key := range record {
-		if !slices.Contains([]string{"level", "component", "operation", "status", "reason", "sessions", "message"}, key) {
+		if !slices.Contains(
+			[]string{"level", "component", "operation", "status", "reason", "sessions", "message"},
+			key,
+		) {
 			t.Fatalf("unexpected field %q in %+v", key, record)
 		}
 	}
 
-	if message, ok := record["message"].(string); !ok || strings.Contains(message, filepath.Dir(historyPath)) {
+	if message, ok := record["message"].(string); !ok ||
+		strings.Contains(message, filepath.Dir(historyPath)) {
 		t.Fatalf("the record must have a fixed message naming no paths: %+v", record)
 	}
 }
@@ -157,7 +186,8 @@ func TestPendingRestoreWarnsWhenMarkerCannotBeWritten(t *testing.T) {
 	pending := pendingRestore{sessions: 2, serverStarted: time.Unix(2_000, 0)}
 
 	records := reportPendingRestoreRecords(t, env, pending, 1)
-	if len(records) != 1 || records[0]["level"] != "warn" || records[0]["reason"] != "episode_marker_failed" {
+	if len(records) != 1 || records[0]["level"] != "warn" ||
+		records[0]["reason"] != "episode_marker_failed" {
 		t.Fatalf("an unwritable marker must be reported, got %+v", records)
 	}
 }

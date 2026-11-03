@@ -23,20 +23,47 @@ import (
 func healthyHealth() SourceHealth {
 	status := SourceStatus{Status: HealthOK, Reason: HealthReasonNone}
 
-	return SourceHealth{Tmux: status, Agents: status, Snapshots: status, Tasks: status, Work: status}
+	return SourceHealth{
+		Tmux:      status,
+		Agents:    status,
+		Snapshots: status,
+		Tasks:     status,
+		Work:      status,
+	}
 }
 
 func helloFrame(peerID, streamInstance string, sequence uint64) Frame {
 	return Frame{
-		Version: ProtocolVersion, Type: FrameHello, PeerID: peerID, StreamInstance: streamInstance, Sequence: sequence,
-		Hello: &Hello{PeerID: peerID, StreamInstance: streamInstance, Hostname: "remote", StartedAt: time.Unix(1, 0).UTC()},
+		Version:        ProtocolVersion,
+		Type:           FrameHello,
+		PeerID:         peerID,
+		StreamInstance: streamInstance,
+		Sequence:       sequence,
+		Hello: &Hello{
+			PeerID:         peerID,
+			StreamInstance: streamInstance,
+			Hostname:       "remote",
+			StartedAt:      time.Unix(1, 0).UTC(),
+		},
 	}
 }
 
-func snapshotFrame(peerID, streamInstance string, sequence uint64, sessions []session.Session) Frame {
+func snapshotFrame(
+	peerID, streamInstance string,
+	sequence uint64,
+	sessions []session.Session,
+) Frame {
 	return Frame{
-		Version: ProtocolVersion, Type: FrameSnapshot, PeerID: peerID, StreamInstance: streamInstance, Sequence: sequence,
-		Snapshot: &Snapshot{GeneratedAt: time.Unix(2, 0).UTC(), Sessions: sessions, Health: healthyHealth()},
+		Version:        ProtocolVersion,
+		Type:           FrameSnapshot,
+		PeerID:         peerID,
+		StreamInstance: streamInstance,
+		Sequence:       sequence,
+		Snapshot: &Snapshot{
+			GeneratedAt: time.Unix(2, 0).UTC(),
+			Sessions:    sessions,
+			Health:      healthyHealth(),
+		},
 	}
 }
 
@@ -140,7 +167,12 @@ func TestStreamDeliversFramesAndReconnectsAfterSilence(t *testing.T) {
 	script := frameScript(
 		t,
 		helloFrame("peer", "stream", 1),
-		snapshotFrame("peer", "stream", 2, []session.Session{{ID: "$1", Name: "dev", Kind: session.KindLive}}),
+		snapshotFrame(
+			"peer",
+			"stream",
+			2,
+			[]session.Session{{ID: "$1", Name: "dev", Kind: session.KindLive}},
+		),
 	)
 
 	var (
@@ -354,7 +386,8 @@ func TestStreamWritesBootstrapOnStandardInput(t *testing.T) {
 	}
 
 	for _, argument := range capturedArguments {
-		if strings.Contains(argument, string(expected)) || strings.Contains(argument, "pollInterval") {
+		if strings.Contains(argument, string(expected)) ||
+			strings.Contains(argument, "pollInterval") {
 			t.Fatalf("bootstrap material traveled in argv: %q", argument)
 		}
 	}
@@ -382,7 +415,15 @@ func (stream *blockingFrameStream) Close() error {
 func TestReadFrameWithTimeoutClosesAndJoinsTimedOutRead(t *testing.T) {
 	stream := &blockingFrameStream{started: make(chan struct{}), closed: make(chan struct{})}
 
-	if _, err := readFrameWithTimeout(t.Context(), NewFrameReader(stream), stream, 20*time.Millisecond); !errors.Is(err, context.DeadlineExceeded) {
+	if _, err := readFrameWithTimeout(
+		t.Context(),
+		NewFrameReader(stream),
+		stream,
+		20*time.Millisecond,
+	); !errors.Is(
+		err,
+		context.DeadlineExceeded,
+	) {
 		t.Fatalf("readFrameWithTimeout() error = %v, want deadline", err)
 	}
 
@@ -402,7 +443,12 @@ func TestReadFrameWithTimeoutClosesAndJoinsTimedOutRead(t *testing.T) {
 func TestStreamIdentityRequiresMonotonicSequence(t *testing.T) {
 	var identity StreamIdentity
 
-	if err := identity.Accept(snapshotFrame("peer", "stream", 1, nil)); !errors.Is(err, ErrInvalidFrame) {
+	if err := identity.Accept(
+		snapshotFrame("peer", "stream", 1, nil),
+	); !errors.Is(
+		err,
+		ErrInvalidFrame,
+	) {
 		t.Fatalf("Accept(snapshot first) error = %v, want %v", err, ErrInvalidFrame)
 	}
 
@@ -418,11 +464,25 @@ func TestStreamIdentityRequiresMonotonicSequence(t *testing.T) {
 		t.Fatalf("Accept(snapshot) error = %v", err)
 	}
 
-	if err := identity.Accept(snapshotFrame("peer", "stream", 2, nil)); !errors.Is(err, ErrInvalidFrame) {
+	if err := identity.Accept(
+		snapshotFrame("peer", "stream", 2, nil),
+	); !errors.Is(
+		err,
+		ErrInvalidFrame,
+	) {
 		t.Fatalf("Accept(repeated sequence) error = %v, want %v", err, ErrInvalidFrame)
 	}
 
-	if err := identity.Accept(Frame{Version: ProtocolVersion, Type: FrameHealth, PeerID: "peer", StreamInstance: "stream", Sequence: 3, Health: &Health{Sources: healthyHealth()}}); err != nil {
+	if err := identity.Accept(
+		Frame{
+			Version:        ProtocolVersion,
+			Type:           FrameHealth,
+			PeerID:         "peer",
+			StreamInstance: "stream",
+			Sequence:       3,
+			Health:         &Health{Sources: healthyHealth()},
+		},
+	); err != nil {
 		t.Fatalf("Accept(health) error = %v", err)
 	}
 }

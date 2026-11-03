@@ -42,7 +42,11 @@ func TestSnapshotRestorePickerCleansTerminalBeforeRestoringSelectedGeneration(t 
 		currentName  = "snapshot-picker-current"
 	)
 
-	repository, leaseRoot, selectedGeneration, currentGeneration := captureSnapshotPickerTimeline(t, selectedName, currentName)
+	repository, leaseRoot, selectedGeneration, currentGeneration := captureSnapshotPickerTimeline(
+		t,
+		selectedName,
+		currentName,
+	)
 	target := tmuxtest.NewServer(t)
 
 	testExecutable, err := pickerTestExecutable()
@@ -56,7 +60,9 @@ func TestSnapshotRestorePickerCleansTerminalBeforeRestoringSelectedGeneration(t 
 		"--lease-root", leaseRoot,
 		"--socket", target.Endpoint().SocketPath,
 	}
-	childArguments := append([]string{"-test.run=^TestSnapshotPickerApplicationHelper$", "--"}, arguments...)
+	childArguments := append(
+		[]string{"-test.run=^TestSnapshotPickerApplicationHelper$", "--"},
+		arguments...)
 	alias := "sesh-snapshot-picker-" + strconv.Itoa(os.Getpid())
 
 	ctx, cancel := context.WithTimeout(t.Context(), pickerTermtraceTimeout)
@@ -84,22 +90,33 @@ func TestSnapshotRestorePickerCleansTerminalBeforeRestoringSelectedGeneration(t 
 		stopCtx, stopCancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer stopCancel()
 
-		_ = exec.CommandContext(stopCtx, termtraceExecutable, "stop", "-q", alias, "--wait", "--timeout-ms", "1500").Run()
+		_ = exec.CommandContext(stopCtx, termtraceExecutable, "stop", "-q", alias, "--wait", "--timeout-ms", "1500").
+			Run()
 	})
 
 	if output, err := exec.CommandContext(
 		ctx,
 		termtraceExecutable,
-		"send", "-q", alias, "down", "enter", "--until-screen", "snapshot-picker-terminal-restored", "--timeout", "8s",
+		"send",
+		"-q",
+		alias,
+		"down",
+		"enter",
+		"--until-screen",
+		"snapshot-picker-terminal-restored",
+		"--timeout",
+		"8s",
 	).CombinedOutput(); err != nil {
 		t.Fatalf("select snapshot generation: %v: %s", err, output)
 	}
 
-	if output, err := exec.CommandContext(ctx, termtraceExecutable, "status", "-q", alias, "--wait-complete", "--timeout-ms", "5000").CombinedOutput(); err != nil {
+	if output, err := exec.CommandContext(ctx, termtraceExecutable, "status", "-q", alias, "--wait-complete", "--timeout-ms", "5000").
+		CombinedOutput(); err != nil {
 		t.Fatalf("wait for selected restore: %v: %s", err, output)
 	}
 
-	childOutput, err := exec.CommandContext(ctx, termtraceExecutable, "analyze", "output", "--raw", alias).CombinedOutput()
+	childOutput, err := exec.CommandContext(ctx, termtraceExecutable, "analyze", "output", "--raw", alias).
+		CombinedOutput()
 	if err != nil || !bytes.Contains(childOutput, []byte("snapshot-picker-terminal-restored")) {
 		t.Fatalf("terminal restoration evidence: error=%v output=%q", err, childOutput)
 	}
@@ -116,7 +133,8 @@ func TestSnapshotRestorePickerCleansTerminalBeforeRestoringSelectedGeneration(t 
 		t.Fatal("restore silently fell back to the current generation")
 	}
 
-	if bytes.Contains(childOutput, []byte("from generation "+currentGeneration[:8])) || !bytes.Contains(childOutput, []byte("from generation "+selectedGeneration[:8])) {
+	if bytes.Contains(childOutput, []byte("from generation "+currentGeneration[:8])) ||
+		!bytes.Contains(childOutput, []byte("from generation "+selectedGeneration[:8])) {
 		t.Fatalf("restore receipt does not identify the exact selected generation: %q", childOutput)
 	}
 }
@@ -161,7 +179,9 @@ func assertSnapshotRestorePickerCancellation(t *testing.T, command []string, ali
 		"--lease-root", leaseRoot,
 		"--socket", target.Endpoint().SocketPath,
 	)
-	childArguments := append([]string{"-test.run=^TestSnapshotPickerApplicationHelper$", "--"}, arguments...)
+	childArguments := append(
+		[]string{"-test.run=^TestSnapshotPickerApplicationHelper$", "--"},
+		arguments...)
 	alias := "sesh-snapshot-picker-cancel-" + aliasKind + "-" + strconv.Itoa(os.Getpid())
 
 	ctx, cancel := context.WithTimeout(t.Context(), pickerTermtraceTimeout)
@@ -189,18 +209,27 @@ func assertSnapshotRestorePickerCancellation(t *testing.T, command []string, ali
 		stopCtx, stopCancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer stopCancel()
 
-		_ = exec.CommandContext(stopCtx, termtraceExecutable, "stop", "-q", alias, "--wait", "--timeout-ms", "1500").Run()
+		_ = exec.CommandContext(stopCtx, termtraceExecutable, "stop", "-q", alias, "--wait", "--timeout-ms", "1500").
+			Run()
 	})
 
 	if output, err := exec.CommandContext(
 		ctx,
 		termtraceExecutable,
-		"send", "-q", alias, "q", "--until-screen", "snapshot-picker-terminal-restored", "--timeout", "8s",
+		"send",
+		"-q",
+		alias,
+		"q",
+		"--until-screen",
+		"snapshot-picker-terminal-restored",
+		"--timeout",
+		"8s",
 	).CombinedOutput(); err != nil {
 		t.Fatalf("cancel snapshot selection: %v: %s", err, output)
 	}
 
-	if output, err := exec.CommandContext(ctx, termtraceExecutable, "status", "-q", alias, "--wait-complete", "--timeout-ms", "5000").CombinedOutput(); err != nil {
+	if output, err := exec.CommandContext(ctx, termtraceExecutable, "status", "-q", alias, "--wait-complete", "--timeout-ms", "5000").
+		CombinedOutput(); err != nil {
 		t.Fatalf("wait for canceled selection: %v: %s", err, output)
 	}
 
@@ -223,7 +252,10 @@ func assertSnapshotRestorePickerCancellation(t *testing.T, command []string, ali
 	}
 }
 
-func captureSnapshotPickerTimeline(t *testing.T, selectedName, currentName string) (string, string, string, string) {
+func captureSnapshotPickerTimeline(
+	t *testing.T,
+	selectedName, currentName string,
+) (string, string, string, string) {
 	t.Helper()
 
 	source := newCaptureCLIServer(t)

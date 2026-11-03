@@ -31,14 +31,20 @@ const (
 )
 
 var (
-	errOpenServer             = errors.New("open disposable tmux server")
-	errUnexpectedVersion      = errors.New("disposable tmux server is not version 3.7c or later 3.x")
-	errCreateSession          = errors.New("create disposable tmux session")
-	errCreateWindow           = errors.New("create disposable tmux window")
-	errSetFixtureEnv          = errors.New("set fixture environment")
-	errSessionNotFound        = errors.New("session not found")
-	errUsage                  = errors.New("usage: fixture [create|verify] ABSOLUTE_SOCKET [args...]")
-	errProcessesTimeout       = errors.New("timeout waiting for fixture pane processes to initialize")
+	errOpenServer        = errors.New("open disposable tmux server")
+	errUnexpectedVersion = errors.New(
+		"disposable tmux server is not version 3.7c or later 3.x",
+	)
+	errCreateSession   = errors.New("create disposable tmux session")
+	errCreateWindow    = errors.New("create disposable tmux window")
+	errSetFixtureEnv   = errors.New("set fixture environment")
+	errSessionNotFound = errors.New("session not found")
+	errUsage           = errors.New(
+		"usage: fixture [create|verify] ABSOLUTE_SOCKET [args...]",
+	)
+	errProcessesTimeout = errors.New(
+		"timeout waiting for fixture pane processes to initialize",
+	)
 	errWindowCountMismatch    = errors.New("window count mismatch")
 	errEditorWindowMissing    = errors.New("editor window not found in restored session")
 	errMonitorWindowMissing   = errors.New("monitor window not found in restored session")
@@ -384,7 +390,14 @@ func outputVerification(report RestoreVerification, sessionName string) error {
 	fmt.Println("--- PANES ---")
 
 	for _, p := range report.Panes {
-		fmt.Printf("%s:%s pid=%d cmd=%s args=%s\n", sessionName, p.WindowName, p.PID, p.Command, strings.Join(p.Args, " "))
+		fmt.Printf(
+			"%s:%s pid=%d cmd=%s args=%s\n",
+			sessionName,
+			p.WindowName,
+			p.PID,
+			p.Command,
+			strings.Join(p.Args, " "),
+		)
 	}
 
 	return nil
@@ -412,7 +425,10 @@ func locateWindows(ctx context.Context, session gotmux.Session) (windowSet, erro
 			return windowSet{}, fmt.Errorf("query window info: %w", infoErr)
 		}
 
-		res.names = append(res.names, fmt.Sprintf("%d: %s (layout %s)", link.Index(), winInfo.Name, winInfo.Layout))
+		res.names = append(
+			res.names,
+			fmt.Sprintf("%d: %s (layout %s)", link.Index(), winInfo.Name, winInfo.Layout),
+		)
 		switch winInfo.Name {
 		case "editor":
 			res.editor = win
@@ -438,7 +454,11 @@ func locateWindows(ctx context.Context, session gotmux.Session) (windowSet, erro
 	return res, nil
 }
 
-func verifyEditorPane(ctx context.Context, win gotmux.Window, alphaFile, betaFile string) (VerifiedPane, error) {
+func verifyEditorPane(
+	ctx context.Context,
+	win gotmux.Window,
+	alphaFile, betaFile string,
+) (VerifiedPane, error) {
 	panes, err := win.Panes(ctx)
 	if err != nil || len(panes) == 0 {
 		return VerifiedPane{}, fmt.Errorf("%w: %w", errEditorPaneMissing, err)
@@ -448,7 +468,12 @@ func verifyEditorPane(ctx context.Context, win gotmux.Window, alphaFile, betaFil
 
 	ePID, eArgs, ok := findProcessOrChildren(editorPane.PID, "nvim")
 	if !ok {
-		return VerifiedPane{}, fmt.Errorf("%w: pid %d running %q", errEditorCommandMismatch, editorPane.PID, editorPane.CurrentCommand)
+		return VerifiedPane{}, fmt.Errorf(
+			"%w: pid %d running %q",
+			errEditorCommandMismatch,
+			editorPane.PID,
+			editorPane.CurrentCommand,
+		)
 	}
 
 	hasAlpha, hasBeta := false, false
@@ -487,7 +512,12 @@ func verifyMonitorPane(ctx context.Context, win gotmux.Window) (VerifiedPane, er
 
 	mPID, mArgs, ok := findProcessOrChildren(monitorPane.PID, "top")
 	if !ok {
-		return VerifiedPane{}, fmt.Errorf("%w: pid %d running %q", errMonitorCommandMismatch, monitorPane.PID, monitorPane.CurrentCommand)
+		return VerifiedPane{}, fmt.Errorf(
+			"%w: pid %d running %q",
+			errMonitorCommandMismatch,
+			monitorPane.PID,
+			monitorPane.CurrentCommand,
+		)
 	}
 
 	return VerifiedPane{
@@ -514,7 +544,12 @@ func verifySleepPane(ctx context.Context, win gotmux.Window) (VerifiedPane, erro
 	}
 
 	if !ok {
-		return VerifiedPane{}, fmt.Errorf("%w: pid %d running %q", errSleepCommandMismatch, sleepPane.PID, sleepPane.CurrentCommand)
+		return VerifiedPane{}, fmt.Errorf(
+			"%w: pid %d running %q",
+			errSleepCommandMismatch,
+			sleepPane.PID,
+			sleepPane.CurrentCommand,
+		)
 	}
 
 	return VerifiedPane{
@@ -527,7 +562,11 @@ func verifySleepPane(ctx context.Context, win gotmux.Window) (VerifiedPane, erro
 	}, nil
 }
 
-func verifySessionState(ctx context.Context, session gotmux.Session, alphaFile, betaFile string) (RestoreVerification, error) {
+func verifySessionState(
+	ctx context.Context,
+	session gotmux.Session,
+	alphaFile, betaFile string,
+) (RestoreVerification, error) {
 	ws, err := locateWindows(ctx, session)
 	if err != nil {
 		return RestoreVerification{}, err

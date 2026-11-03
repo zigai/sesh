@@ -97,7 +97,12 @@ func TestSnapshotPickerEmptyStateDoesNotSelect(t *testing.T) {
 	model := newSnapshotPickerTestModel(t, nil)
 	setSnapshotPickerSize(model, 48, 8)
 
-	if view := snapshotPickerStripANSI(snapshotPickerView(model.View())); !strings.Contains(view, "No saved snapshots found") {
+	if view := snapshotPickerStripANSI(
+		snapshotPickerView(model.View()),
+	); !strings.Contains(
+		view,
+		"No saved snapshots found",
+	) {
 		t.Fatalf("empty snapshot picker view = %q", view)
 	}
 
@@ -142,8 +147,10 @@ func TestSnapshotPickerNarrowAndConstrainedViewsStayWithinBounds(t *testing.T) {
 	entries := make([]Entry, 8)
 	for index := range entries {
 		entries[index] = Entry{
-			ID:       "snap-" + string(rune('a'+index)),
-			Path:     "/tmp/snapshot-with-a-very-long-file-name-" + string(rune('a'+index)) + ".txt",
+			ID: "snap-" + string(rune('a'+index)),
+			Path: "/tmp/snapshot-with-a-very-long-file-name-" + string(
+				rune('a'+index),
+			) + ".txt",
 			SavedAt:  time.Now().Add(-time.Duration(index) * time.Hour),
 			Validity: SnapshotValid,
 		}
@@ -200,17 +207,29 @@ func TestSnapshotPickerPagingAndMouseSelectionUseVisibleRows(t *testing.T) {
 
 	scrolled := model.cursor
 
-	model, _ = updateSnapshotPickerTestModel(t, model, snapshotPickerMouseWheel(1, 3, tea.MouseWheelDown))
+	model, _ = updateSnapshotPickerTestModel(
+		t,
+		model,
+		snapshotPickerMouseWheel(1, 3, tea.MouseWheelDown),
+	)
 	if want := min(scrolled+3, len(entries)-1); model.cursor != want {
 		t.Fatalf("wheel down cursor = %d, want %d", model.cursor, want)
 	}
 
-	model, cmd := updateSnapshotPickerTestModel(t, model, snapshotPickerMouseClick(1, 3, tea.MouseRight))
+	model, cmd := updateSnapshotPickerTestModel(
+		t,
+		model,
+		snapshotPickerMouseClick(1, 3, tea.MouseRight),
+	)
 	if cmd != nil {
 		t.Fatal("right click returned a command, want selection without activation")
 	}
 
-	updated, cmd := updateSnapshotPickerTestModel(t, model, snapshotPickerMouseClick(1, 3, tea.MouseLeft))
+	updated, cmd := updateSnapshotPickerTestModel(
+		t,
+		model,
+		snapshotPickerMouseClick(1, 3, tea.MouseLeft),
+	)
 	if cmd == nil {
 		t.Fatal("click on visible snapshot returned nil command, want tea.Quit")
 	}

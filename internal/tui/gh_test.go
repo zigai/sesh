@@ -15,7 +15,11 @@ func TestGHScanSharesRepositoryBranchResultAndRetainsMinuteCache(t *testing.T) {
 	calls := 0
 	query := func(_ context.Context, _ ghTarget, at time.Time) ghEntry {
 		calls++
-		return ghEntry{at: at, pr: ghCell("#12", "", layout.Present), ci: ghCell("passing", "success", layout.Present)}
+		return ghEntry{
+			at: at,
+			pr: ghCell("#12", "", layout.Present),
+			ci: ghCell("passing", "success", layout.Present),
+		}
 	}
 	directory := t.TempDir()
 	key := ghKey{repo: directory, branch: "feature"}
@@ -48,7 +52,19 @@ func TestGHScanSharesRepositoryBranchResultAndRetainsMinuteCache(t *testing.T) {
 func TestGHScanReportsUnsupportedWithoutCLI(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 
-	_, rows := scanGH(t.Context(), []ghTarget{{paneID: "%1", key: ghKey{repo: "repo", branch: "branch"}, directory: t.TempDir(), hasRemote: true}}, nil, time.Now())
+	_, rows := scanGH(
+		t.Context(),
+		[]ghTarget{
+			{
+				paneID:    "%1",
+				key:       ghKey{repo: "repo", branch: "branch"},
+				directory: t.TempDir(),
+				hasRemote: true,
+			},
+		},
+		nil,
+		time.Now(),
+	)
 	if got := rows["%1"][display.FieldAgentCI].State; got != layout.Unsupported {
 		t.Fatalf("CI state without gh = %v", got)
 	}

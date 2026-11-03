@@ -19,7 +19,9 @@ func (s *Service) checkServiceOOMPolicy(ctx context.Context) []Result {
 	}
 
 	if s.serverPID <= 0 {
-		return []Result{skipped(CheckServiceOOMPolicy, CheckTmuxServer, "tmux server is unavailable")}
+		return []Result{
+			skipped(CheckServiceOOMPolicy, CheckTmuxServer, "tmux server is unavailable"),
+		}
 	}
 
 	unit, err := s.unitOf(s.serverPID)
@@ -33,24 +35,43 @@ func (s *Service) checkServiceOOMPolicy(ctx context.Context) []Result {
 			message = fmt.Sprintf("tmux server service membership could not be inspected: %v", err)
 		}
 
-		return []Result{newResult(CheckServiceOOMPolicy, StatusWarn, message).
-			withReason(ReasonInspectionFailed).
-			withManual("Check that the tmux server process cgroup is readable, then run 'sesh doctor' again")}
+		return []Result{
+			newResult(CheckServiceOOMPolicy, StatusWarn, message).
+				withReason(ReasonInspectionFailed).
+				withManual("Check that the tmux server process cgroup is readable, then run 'sesh doctor' again"),
+		}
 	}
 
 	policy, err := s.oomPolicyOf(ctx, unit)
 	if err != nil {
-		return []Result{newResult(CheckServiceOOMPolicy, StatusWarn, fmt.Sprintf("OOMPolicy of %s is unreadable: %v", unit, err)).
-			withReason(ReasonInspectionFailed).
-			withCommand("systemctl --user show --property=OOMPolicy " + shellArg(unit))}
+		return []Result{
+			newResult(
+				CheckServiceOOMPolicy,
+				StatusWarn,
+				fmt.Sprintf("OOMPolicy of %s is unreadable: %v", unit, err),
+			).
+				withReason(ReasonInspectionFailed).
+				withCommand("systemctl --user show --property=OOMPolicy " + shellArg(unit)),
+		}
 	}
 
 	if policy != oomPolicyStop {
-		return []Result{newResult(CheckServiceOOMPolicy, StatusOK, fmt.Sprintf("%s uses OOMPolicy=%s", unit, policy))}
+		return []Result{
+			newResult(
+				CheckServiceOOMPolicy,
+				StatusOK,
+				fmt.Sprintf("%s uses OOMPolicy=%s", unit, policy),
+			),
+		}
 	}
 
-	return []Result{newResult(CheckServiceOOMPolicy, StatusWarn,
-		unit+" uses OOMPolicy=stop: one process killed for memory stops the unit, including the tmux server and every pane").
-		withReason(ReasonUnsafe).
-		withManual(fmt.Sprintf("Set OOMPolicy=continue in the [Service] section of %s (systemctl --user edit %s), then restart tmux at a convenient time", unit, unit))}
+	return []Result{
+		newResult(
+			CheckServiceOOMPolicy,
+			StatusWarn,
+			unit+" uses OOMPolicy=stop: one process killed for memory stops the unit, including the tmux server and every pane",
+		).
+			withReason(ReasonUnsafe).
+			withManual(fmt.Sprintf("Set OOMPolicy=continue in the [Service] section of %s (systemctl --user edit %s), then restart tmux at a convenient time", unit, unit)),
+	}
 }

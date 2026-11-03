@@ -16,15 +16,28 @@ const (
 )
 
 var (
-	evidenceHeading = regexp.MustCompile(`(?i)^\s*(?:#{1,6}\s*evidence\s*:?\s*|\*\*\s*evidence\s*:?\s*\*\*\s*:?)\s*$`)
-	sectionHeading  = regexp.MustCompile(`^\s*(?:#{1,6}\s+\S|\*\*[^*]+\*\*\s*:?\s*$)`)
-	listItem        = regexp.MustCompile(`^\s*(?:[-*+]|\d+[.)])\s+(.*)$`)
-	markdownLink    = regexp.MustCompile(`\[[^\]]*\]\(([^)\s]+)\)`)
-	codeSpan        = regexp.MustCompile("`([^`]+)`")
+	evidenceHeading = regexp.MustCompile(
+		`(?i)^\s*(?:#{1,6}\s*evidence\s*:?\s*|\*\*\s*evidence\s*:?\s*\*\*\s*:?)\s*$`,
+	)
+	sectionHeading = regexp.MustCompile(`^\s*(?:#{1,6}\s+\S|\*\*[^*]+\*\*\s*:?\s*$)`)
+	listItem       = regexp.MustCompile(`^\s*(?:[-*+]|\d+[.)])\s+(.*)$`)
+	markdownLink   = regexp.MustCompile(`\[[^\]]*\]\(([^)\s]+)\)`)
+	codeSpan       = regexp.MustCompile("`([^`]+)`")
 
 	imageExtensions = []string{".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp"}
 	videoExtensions = []string{".mp4", ".webm", ".mkv", ".mov"}
-	textExtensions  = []string{".txt", ".log", ".md", ".json", ".jsonl", ".csv", ".diff", ".patch", ".cast", ".out"}
+	textExtensions  = []string{
+		".txt",
+		".log",
+		".md",
+		".json",
+		".jsonl",
+		".csv",
+		".diff",
+		".patch",
+		".cast",
+		".out",
+	}
 )
 
 type EvidenceKind string
@@ -77,7 +90,10 @@ func itemTargets(item string) []string {
 	}
 
 	if spans := codeSpan.FindAllStringSubmatch(item, -1); spans != nil {
-		return slices.DeleteFunc(submatches(spans), func(span string) bool { return !looksLikeTarget(span) })
+		return slices.DeleteFunc(
+			submatches(spans),
+			func(span string) bool { return !looksLikeTarget(span) },
+		)
 	}
 
 	words := strings.Fields(item)
@@ -103,7 +119,10 @@ func looksLikeTarget(text string) bool {
 		return false
 	case strings.HasPrefix(text, "http://"), strings.HasPrefix(text, "https://"):
 		return true
-	case strings.HasPrefix(text, "/"), strings.HasPrefix(text, "~/"), strings.HasPrefix(text, "./"), strings.HasPrefix(text, "../"):
+	case strings.HasPrefix(text, "/"),
+		strings.HasPrefix(text, "~/"),
+		strings.HasPrefix(text, "./"),
+		strings.HasPrefix(text, "../"):
 		return true
 	default:
 		return strings.Contains(text, "/") || kindOf(text) != EvidenceFile

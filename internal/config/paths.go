@@ -64,7 +64,10 @@ func DefaultConfigPath() string {
 
 func GetDataDir(cfg *Config) (string, error) {
 	if cfg == nil {
-		return "", oops.In("config").Code("config_invalid").With("operation", "get_data_dir").Wrap(ErrNilConfig)
+		return "", oops.In("config").
+			Code("config_invalid").
+			With("operation", "get_data_dir").
+			Wrap(ErrNilConfig)
 	}
 
 	if cfg.Paths.DataDir != "" {
@@ -76,7 +79,10 @@ func GetDataDir(cfg *Config) (string, error) {
 
 func GetLogFile(cfg *Config) (string, error) {
 	if cfg == nil {
-		return "", oops.In("config").Code("config_invalid").With("operation", "get_log_file").Wrap(ErrNilConfig)
+		return "", oops.In("config").
+			Code("config_invalid").
+			With("operation", "get_log_file").
+			Wrap(ErrNilConfig)
 	}
 
 	if cfg.Paths.LogFile != "" {
@@ -88,7 +94,10 @@ func GetLogFile(cfg *Config) (string, error) {
 
 func EnsureDir(path string) error {
 	if err := os.MkdirAll(path, defaultDirMode); err != nil {
-		return oops.In("config").Code("directory_create_failed").With("operation", "ensure_dir", "path", path).Wrap(err)
+		return oops.In("config").
+			Code("directory_create_failed").
+			With("operation", "ensure_dir", "path", path).
+			Wrap(err)
 	}
 
 	return nil

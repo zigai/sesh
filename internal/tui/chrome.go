@@ -155,7 +155,14 @@ func (c Chrome) RowWidth(tree, name, right string) int {
 		return inputGutterWidth() + lipgloss.Width(tree) + lipgloss.Width(name)
 	}
 
-	return inputGutterWidth() + lipgloss.Width(tree) + max(lipgloss.Width(name), minSearchWidth) + 1 + lipgloss.Width(right)
+	return inputGutterWidth() + lipgloss.Width(
+		tree,
+	) + max(
+		lipgloss.Width(name),
+		minSearchWidth,
+	) + 1 + lipgloss.Width(
+		right,
+	)
 }
 
 func (c Chrome) Muted(text string) string {
@@ -194,7 +201,14 @@ func (c Chrome) Footer(hints []Hint, badge string, width int) string {
 
 	hintWidth := max(width-labelWidth-frameBorderPadding, 0)
 
-	return renderFooterLine(parts, hintWidth, "") + strings.Repeat(" ", width-labelWidth-hintWidth) + label
+	return renderFooterLine(
+		parts,
+		hintWidth,
+		"",
+	) + strings.Repeat(
+		" ",
+		width-labelWidth-hintWidth,
+	) + label
 }
 
 func (c Chrome) Border(text string) string {
@@ -214,7 +228,10 @@ func (c Chrome) Hints(hints []Hint) string {
 		}
 
 		writeFooterPart(&out, footerPart{
-			key: hint.Key, desc: hint.Desc, width: 0, binding: action.Binding{Key: "", Action: "", In: "", Table: "", Values: nil},
+			key:      hint.Key,
+			desc:     hint.Desc,
+			width:    0,
+			binding:  action.Binding{Key: "", Action: "", In: "", Table: "", Values: nil},
 			disabled: false,
 		}, false)
 	}

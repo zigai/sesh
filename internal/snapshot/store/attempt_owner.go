@@ -42,7 +42,9 @@ func (r *Repository) Release(id string) error {
 	}
 
 	if err := releaseAttemptOwner(r.root, id, file); err != nil {
-		return oops.In("snapshot.store").With("operation", "release_attempt", "attempt", id).Wrap(err)
+		return oops.In("snapshot.store").
+			With("operation", "release_attempt", "attempt", id).
+			Wrap(err)
 	}
 
 	return nil
@@ -53,7 +55,12 @@ func (r *Repository) Release(id string) error {
 func (r *Repository) SettleAbandonedAttempts(ctx context.Context) (Catalog, error) {
 	lock, err := r.root.Lock(ctx, "repository.lock")
 	if err != nil {
-		return Catalog{}, repositoryError("settle_attempts", oops.In("snapshot.store").With("operation", "lock_catalog_update").Wrapf(err, "lock catalog update"))
+		return Catalog{}, repositoryError(
+			"settle_attempts",
+			oops.In("snapshot.store").
+				With("operation", "lock_catalog_update").
+				Wrapf(err, "lock catalog update"),
+		)
 	}
 
 	catalog, abandoned, settleErr := r.settleLocked(ctx)
@@ -78,7 +85,9 @@ func (r *Repository) settleLocked(ctx context.Context) (Catalog, []string, error
 	}
 
 	if err := ctx.Err(); err != nil {
-		return Catalog{}, nil, oops.In("snapshot.store").With("operation", "publish_catalog").Wrapf(err, "publish catalog")
+		return Catalog{}, nil, oops.In("snapshot.store").
+			With("operation", "publish_catalog").
+			Wrapf(err, "publish catalog")
 	}
 
 	if err := r.publish(ctx, catalog, nil); err != nil {
@@ -141,7 +150,10 @@ func (r *Repository) sweepAttemptOwners(dir *privatefs.Dir, catalog Catalog) err
 			continue
 		}
 
-		if index := catalog.attemptIndex(id); index >= 0 && catalog.Attempts[index].State == attemptStatePending {
+		if index := catalog.attemptIndex(
+			id,
+		); index >= 0 &&
+			catalog.Attempts[index].State == attemptStatePending {
 			continue
 		}
 
@@ -161,7 +173,10 @@ func (r *Repository) holdAttempt(id string) error {
 
 	file, err := dir.File(id+attemptOwnerSuffix, unix.O_RDWR|unix.O_CREAT|unix.O_EXCL)
 	if err != nil {
-		return errors.Join(oops.In("snapshot.store").With("operation", "create_attempt_owner").Wrap(err), dir.Close())
+		return errors.Join(
+			oops.In("snapshot.store").With("operation", "create_attempt_owner").Wrap(err),
+			dir.Close(),
+		)
 	}
 
 	if err := flockAttemptOwner(file); err != nil {
@@ -230,7 +245,9 @@ func attemptOwnerHeld(dir *privatefs.Dir, id string) (bool, error) {
 	}
 
 	if err != nil {
-		return false, oops.In("snapshot.store").With("operation", "open_attempt_owner", "attempt", id).Wrap(err)
+		return false, oops.In("snapshot.store").
+			With("operation", "open_attempt_owner", "attempt", id).
+			Wrap(err)
 	}
 
 	lockErr := flockAttemptOwner(file)
@@ -238,14 +255,18 @@ func attemptOwnerHeld(dir *privatefs.Dir, id string) (bool, error) {
 
 	if errors.Is(lockErr, unix.EWOULDBLOCK) {
 		if closeErr != nil {
-			return true, oops.In("snapshot.store").With("operation", "probe_attempt_owner", "attempt", id).Wrap(closeErr)
+			return true, oops.In("snapshot.store").
+				With("operation", "probe_attempt_owner", "attempt", id).
+				Wrap(closeErr)
 		}
 
 		return true, nil
 	}
 
 	if err := errors.Join(lockErr, closeErr); err != nil {
-		return false, oops.In("snapshot.store").With("operation", "probe_attempt_owner", "attempt", id).Wrap(err)
+		return false, oops.In("snapshot.store").
+			With("operation", "probe_attempt_owner", "attempt", id).
+			Wrap(err)
 	}
 
 	return false, nil

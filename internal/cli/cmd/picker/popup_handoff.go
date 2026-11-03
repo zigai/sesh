@@ -57,7 +57,12 @@ func createPickerSwitchHandoff() (string, func(), error) {
 	return path, func() { _ = os.Remove(path) }, nil
 }
 
-func writePickerSwitchHandoff(path string, target *session.Session, paneID, replayKey, taskProject string, views []tui.AgentView) error {
+func writePickerSwitchHandoff(
+	path string,
+	target *session.Session,
+	paneID, replayKey, taskProject string,
+	views []tui.AgentView,
+) error {
 	var handoff switchHandoff
 
 	handoff.ReplayKey = replayKey
@@ -65,15 +70,21 @@ func writePickerSwitchHandoff(path string, target *session.Session, paneID, repl
 
 	if target != nil {
 		if !applyPickerHandoffTarget(&handoff, target, paneID) {
-			return oops.In("cli").With("operation", "write_picker_handoff").Wrap(errPickerHandoffInvalid)
+			return oops.In("cli").
+				With("operation", "write_picker_handoff").
+				Wrap(errPickerHandoffInvalid)
 		}
 	}
 
 	for _, view := range views[max(0, len(views)-handoffMaxAgentViews):] {
-		handoff.AgentViews = append(handoff.AgentViews, handoffView{Session: view.Session, PaneID: view.PaneID})
+		handoff.AgentViews = append(
+			handoff.AgentViews,
+			handoffView{Session: view.Session, PaneID: view.PaneID},
+		)
 	}
 
-	if target == nil && len(handoff.AgentViews) == 0 && handoff.ReplayKey == "" && handoff.TaskProject == "" {
+	if target == nil && len(handoff.AgentViews) == 0 && handoff.ReplayKey == "" &&
+		handoff.TaskProject == "" {
 		return nil
 	}
 
@@ -83,7 +94,9 @@ func writePickerSwitchHandoff(path string, target *session.Session, paneID, repl
 	}
 
 	if len(encoded) > handoffMaxBytes {
-		return oops.In("cli").With("operation", "write_picker_handoff").Wrap(errPickerHandoffInvalid)
+		return oops.In("cli").
+			With("operation", "write_picker_handoff").
+			Wrap(errPickerHandoffInvalid)
 	}
 
 	file, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC|syscall.O_NOFOLLOW, 0)
@@ -97,7 +110,8 @@ func writePickerSwitchHandoff(path string, target *session.Session, paneID, repl
 }
 
 func applyPickerHandoffTarget(handoff *switchHandoff, target *session.Session, paneID string) bool {
-	if target.ID == "" || target.Name == "" || target.Kind != session.KindLive || target.Origin != session.OriginLocal {
+	if target.ID == "" || target.Name == "" || target.Kind != session.KindLive ||
+		target.Origin != session.OriginLocal {
 		return false
 	}
 
@@ -114,12 +128,16 @@ func applyPickerHandoffTarget(handoff *switchHandoff, target *session.Session, p
 func readPickerSwitchHandoff(path string) (switchHandoff, bool, error) {
 	file, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
 	if err != nil {
-		return switchHandoff{}, false, oops.In("cli").With("operation", "open_picker_handoff").Wrap(err)
+		return switchHandoff{}, false, oops.In("cli").
+			With("operation", "open_picker_handoff").
+			Wrap(err)
 	}
 
 	encoded, readErr := io.ReadAll(io.LimitReader(file, handoffMaxBytes+1))
 	if err := errors.Join(readErr, file.Close()); err != nil {
-		return switchHandoff{}, false, oops.In("cli").With("operation", "read_picker_handoff").Wrap(err)
+		return switchHandoff{}, false, oops.In("cli").
+			With("operation", "read_picker_handoff").
+			Wrap(err)
 	}
 
 	if len(encoded) == 0 {
@@ -129,14 +147,19 @@ func readPickerSwitchHandoff(path string) (switchHandoff, bool, error) {
 	}
 
 	if len(encoded) > handoffMaxBytes {
-		return switchHandoff{}, false, oops.In("cli").With("operation", "read_picker_handoff").Wrap(errPickerHandoffInvalid)
+		return switchHandoff{}, false, oops.In("cli").
+			With("operation", "read_picker_handoff").
+			Wrap(errPickerHandoffInvalid)
 	}
 
 	var handoff switchHandoff
 
 	if json.Unmarshal(encoded, &handoff) != nil || (handoff.SessionID == "") != (handoff.SessionName == "") ||
-		len(handoff.AgentViews) > handoffMaxAgentViews || (handoff.TaskProject != "" && !filepath.IsAbs(handoff.TaskProject)) {
-		return switchHandoff{}, false, oops.In("cli").With("operation", "read_picker_handoff").Wrap(errPickerHandoffInvalid)
+		len(handoff.AgentViews) > handoffMaxAgentViews ||
+		(handoff.TaskProject != "" && !filepath.IsAbs(handoff.TaskProject)) {
+		return switchHandoff{}, false, oops.In("cli").
+			With("operation", "read_picker_handoff").
+			Wrap(errPickerHandoffInvalid)
 	}
 
 	return handoff, handoff.SessionID != "", nil
@@ -166,12 +189,21 @@ func completePickerSwitchHandoff(
 	}
 
 	if clientName == "" || originSessionID == "" {
-		return oops.In("cli").With("operation", "complete_picker_handoff").Wrap(errPickerHandoffInvalid)
+		return oops.In("cli").
+			With("operation", "complete_picker_handoff").
+			Wrap(errPickerHandoffInvalid)
 	}
 
 	target := newPickerSwitchTarget(handoff)
 
-	return services.performSwitchValidated(ctx, target, handoff.PaneID, clientName, originSessionID, views)
+	return services.performSwitchValidated(
+		ctx,
+		target,
+		handoff.PaneID,
+		clientName,
+		originSessionID,
+		views,
+	)
 }
 
 func newPickerSwitchTarget(handoff switchHandoff) session.Session {
@@ -200,7 +232,10 @@ func replayPickerKey(ctx context.Context, path, socketPath, clientName string) e
 
 	args := []string{"-S", socketPath, "send-keys", "-K", "-c", clientName, handoff.ReplayKey}
 	if output, err := exec.CommandContext(ctx, "tmux", args...).CombinedOutput(); err != nil {
-		return oops.In("cli").With("operation", "replay_picker_key").With("output", string(output)).Wrap(err)
+		return oops.In("cli").
+			With("operation", "replay_picker_key").
+			With("output", string(output)).
+			Wrap(err)
 	}
 
 	return nil

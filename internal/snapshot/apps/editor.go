@@ -16,7 +16,11 @@ var (
 	ErrEditorResponseInvalid = errors.New("nvim buffer response is invalid")
 )
 
-func EnrichEditor(ctx context.Context, observed model.Launch, pid int) (model.Launch, Reason, error) {
+func EnrichEditor(
+	ctx context.Context,
+	observed model.Launch,
+	pid int,
+) (model.Launch, Reason, error) {
 	fallback := cloneLaunch(observed)
 	fallback.Recovery = "unverified"
 
@@ -28,7 +32,10 @@ func EnrichEditor(ctx context.Context, observed model.Launch, pid int) (model.La
 	if err != nil {
 		reason := editorEnrichmentReason(err)
 
-		return fallback, reason, oops.In("snapshot.apps").Code(string(reason)).With("operation", "enrich_editor").Wrap(err)
+		return fallback, reason, oops.In("snapshot.apps").
+			Code(string(reason)).
+			With("operation", "enrich_editor").
+			Wrap(err)
 	}
 
 	if len(files) == 0 {

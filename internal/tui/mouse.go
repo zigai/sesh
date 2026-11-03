@@ -103,8 +103,16 @@ func (m *Model) handleMouseWheel(mouse tea.Mouse) func() (tea.Model, tea.Cmd) {
 		}
 
 		return func() (tea.Model, tea.Cmd) { return m, nil }
-	case tea.MouseNone, tea.MouseLeft, tea.MouseMiddle, tea.MouseRight, tea.MouseWheelLeft, tea.MouseWheelRight,
-		tea.MouseBackward, tea.MouseForward, tea.MouseButton10, tea.MouseButton11:
+	case tea.MouseNone,
+		tea.MouseLeft,
+		tea.MouseMiddle,
+		tea.MouseRight,
+		tea.MouseWheelLeft,
+		tea.MouseWheelRight,
+		tea.MouseBackward,
+		tea.MouseForward,
+		tea.MouseButton10,
+		tea.MouseButton11:
 		return nil
 	}
 
@@ -174,7 +182,10 @@ func (m *Model) handleDialogMouse(mouse tea.Mouse, click bool) func() (tea.Model
 			return nil
 		}
 
-		return m.handlePathSuggestionMouse(line-(len(lines)-dialogBottomRows-m.visiblePathSuggestions()), click)
+		return m.handlePathSuggestionMouse(
+			line-(len(lines)-dialogBottomRows-m.visiblePathSuggestions()),
+			click,
+		)
 	case dialogInputText, dialogNone:
 		return nil
 	}
@@ -182,7 +193,11 @@ func (m *Model) handleDialogMouse(mouse tea.Mouse, click bool) func() (tea.Model
 	return nil
 }
 
-func (m *Model) handleConfirmMouse(column int, onButtonRow bool, click bool) func() (tea.Model, tea.Cmd) {
+func (m *Model) handleConfirmMouse(
+	column int,
+	onButtonRow bool,
+	click bool,
+) func() (tea.Model, tea.Cmd) {
 	yes, ok := confirmButtonAt(column)
 	if !ok || !onButtonRow {
 		return nil
@@ -244,8 +259,16 @@ func (m *Model) handlePathDialogWheel(mouse tea.Mouse) func() (tea.Model, tea.Cm
 		m.movePathSuggestion(-1)
 	case tea.MouseWheelDown:
 		m.movePathSuggestion(1)
-	case tea.MouseNone, tea.MouseLeft, tea.MouseMiddle, tea.MouseRight, tea.MouseWheelLeft, tea.MouseWheelRight,
-		tea.MouseBackward, tea.MouseForward, tea.MouseButton10, tea.MouseButton11:
+	case tea.MouseNone,
+		tea.MouseLeft,
+		tea.MouseMiddle,
+		tea.MouseRight,
+		tea.MouseWheelLeft,
+		tea.MouseWheelRight,
+		tea.MouseBackward,
+		tea.MouseForward,
+		tea.MouseButton10,
+		tea.MouseButton11:
 		return nil
 	}
 
@@ -481,7 +504,10 @@ func runeDisplayWidth(value rune) int {
 	return width
 }
 
-func (m *Model) handleFooterBadgeClick(mouse tea.Mouse, layout popupMouseLayout) (func() (tea.Model, tea.Cmd), bool) {
+func (m *Model) handleFooterBadgeClick(
+	mouse tea.Mouse,
+	layout popupMouseLayout,
+) (func() (tea.Model, tea.Cmd), bool) {
 	if !layout.layout.showFooter || mouse.Y != layout.footerY {
 		return nil, false
 	}
@@ -555,7 +581,8 @@ func (m *Model) updateFooterHover(mouse tea.Mouse) bool {
 	m.statusBadgeHovered = m.checkStatusBadgeHover(mouse, layout)
 
 	hintWidth := m.modeFooterHintWidth(layout.layout.bodyWidth)
-	if layout.layout.showFooterHints && mouse.X >= layout.bodyX && mouse.X < layout.bodyX+hintWidth {
+	if layout.layout.showFooterHints && mouse.X >= layout.bodyX &&
+		mouse.X < layout.bodyX+hintWidth {
 		if part, ok := m.footerPartAt(mouse.X-layout.bodyX, hintWidth); ok {
 			m.footerHoverDesc = part.desc
 		}

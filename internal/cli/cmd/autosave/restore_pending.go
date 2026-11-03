@@ -27,7 +27,12 @@ type pendingRestore struct {
 	serverStarted time.Time
 }
 
-func findPendingRestore(ctx context.Context, cmd *cobra.Command, server *gotmux.Server, repo *store.Repository) pendingRestore {
+func findPendingRestore(
+	ctx context.Context,
+	cmd *cobra.Command,
+	server *gotmux.Server,
+	repo *store.Repository,
+) pendingRestore {
 	// A save of explicitly selected sessions is deliberate and never held back.
 	if explicit, _ := cmd.Flags().GetStringSlice("session"); len(explicit) > 0 {
 		return pendingRestore{sessions: 0, serverStarted: time.Time{}}
@@ -37,7 +42,10 @@ func findPendingRestore(ctx context.Context, cmd *cobra.Command, server *gotmux.
 	// state. An inspection failure is logged by the engine and lets the save go ahead.
 	unrestored := engine.FindUnrestored(ctx, server, repo)
 
-	return pendingRestore{sessions: len(unrestored.Sessions), serverStarted: unrestored.ServerStarted}
+	return pendingRestore{
+		sessions:      len(unrestored.Sessions),
+		serverStarted: unrestored.ServerStarted,
+	}
 }
 
 type pendingRestoreAction int
@@ -48,7 +56,13 @@ const (
 	pendingRestoreSave
 )
 
-func decidePendingRestore(ctx context.Context, env Env, server *gotmux.Server, repo *store.Repository, pending pendingRestore) pendingRestoreAction {
+func decidePendingRestore(
+	ctx context.Context,
+	env Env,
+	server *gotmux.Server,
+	repo *store.Repository,
+	pending pendingRestore,
+) pendingRestoreAction {
 	targeted, err := engine.RestoreTargetedServer(ctx, repo, server)
 	if err != nil {
 		logPendingRestoreFailure(ctx, reasonRestoreTarget, err)
@@ -79,7 +93,10 @@ func pendingEpisodeUnhandled(env Env, pending pendingRestore) (bool, error) {
 		return false, nil
 	}
 
-	unhandled, err := automation.EpisodeUnreported(automation.RestorePendingMarkerPath(env.workspace.History), pending.serverStarted.Unix())
+	unhandled, err := automation.EpisodeUnreported(
+		automation.RestorePendingMarkerPath(env.workspace.History),
+		pending.serverStarted.Unix(),
+	)
 	if err != nil {
 		return false, oops.In("cli").With("operation", "read_restore_pending_marker").Wrap(err)
 	}
@@ -93,7 +110,10 @@ func claimPendingEpisode(env Env, pending pendingRestore) (bool, error) {
 		return false, err
 	}
 
-	if err := automation.RecordEpisodeReported(automation.RestorePendingMarkerPath(env.workspace.History), pending.serverStarted.Unix()); err != nil {
+	if err := automation.RecordEpisodeReported(
+		automation.RestorePendingMarkerPath(env.workspace.History),
+		pending.serverStarted.Unix(),
+	); err != nil {
 		return false, oops.In("cli").With("operation", "record_restore_pending_marker").Wrap(err)
 	}
 

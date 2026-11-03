@@ -133,7 +133,13 @@ func verifyOperationIdentity(t *testing.T, path, opID, sourceID, phase string) {
 	verifyJournalAndPinRetained(t, r, opID, sourceID, target)
 }
 
-func verifyPreReplacement(t *testing.T, r *Repository, opID, sourceID string, target model.Bytes, actions []Action) {
+func verifyPreReplacement(
+	t *testing.T,
+	r *Repository,
+	opID, sourceID string,
+	target model.Bytes,
+	actions []Action,
+) {
 	t.Helper()
 
 	_, err := r.ReconcileOperation(t.Context(), opID)
@@ -151,7 +157,13 @@ func verifyPreReplacement(t *testing.T, r *Repository, opID, sourceID string, ta
 	}
 }
 
-func verifyPostReplacement(t *testing.T, r *Repository, opID, sourceID string, target model.Bytes, actions []Action) {
+func verifyPostReplacement(
+	t *testing.T,
+	r *Repository,
+	opID, sourceID string,
+	target model.Bytes,
+	actions []Action,
+) {
 	t.Helper()
 
 	reconciled, err := r.ReconcileOperation(t.Context(), opID)
@@ -173,7 +185,12 @@ func verifyPostReplacement(t *testing.T, r *Repository, opID, sourceID string, t
 	}
 }
 
-func verifyJournalAndPinRetained(t *testing.T, r *Repository, opID, sourceID string, target model.Bytes) {
+func verifyJournalAndPinRetained(
+	t *testing.T,
+	r *Repository,
+	opID, sourceID string,
+	target model.Bytes,
+) {
 	t.Helper()
 
 	catalog, err := r.Inspect(t.Context())

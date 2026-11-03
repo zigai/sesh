@@ -54,12 +54,21 @@ func (o *Observation) OmittedTerminalText() int {
 	return omitted
 }
 
-func Observe(ctx context.Context, server *gotmux.Server, selected []gotmux.SessionID) (Observation, error) {
+func Observe(
+	ctx context.Context,
+	server *gotmux.Server,
+	selected []gotmux.SessionID,
+) (Observation, error) {
 	observation, err := observe(ctx, server, selected, nil, false, nil)
 	return observation, captureError(err)
 }
 
-func ObserveWithProcessEnrichment(ctx context.Context, server *gotmux.Server, selected []gotmux.SessionID, envKeys []string) (Observation, error) {
+func ObserveWithProcessEnrichment(
+	ctx context.Context,
+	server *gotmux.Server,
+	selected []gotmux.SessionID,
+	envKeys []string,
+) (Observation, error) {
 	if err := process.ValidateEnvironmentKeys(envKeys); err != nil {
 		return Observation{}, captureError(err)
 	}
@@ -94,7 +103,14 @@ func filterProcessEnvKeys(keys []string) []string {
 	return filtered
 }
 
-func observe(ctx context.Context, server *gotmux.Server, selected []gotmux.SessionID, envKeys []string, enrichProcesses bool, agentSource agents.SessionSource) (Observation, error) {
+func observe(
+	ctx context.Context,
+	server *gotmux.Server,
+	selected []gotmux.SessionID,
+	envKeys []string,
+	enrichProcesses bool,
+	agentSource agents.SessionSource,
+) (Observation, error) {
 	var lastErr error
 
 	for attempt := range maxCaptureAttempts {
@@ -123,7 +139,14 @@ func observe(ctx context.Context, server *gotmux.Server, selected []gotmux.Sessi
 	return Observation{}, lastErr
 }
 
-func observeOnce(ctx context.Context, server *gotmux.Server, selected []gotmux.SessionID, envKeys []string, enrichProcesses bool, agentSource agents.SessionSource) (Observation, error) {
+func observeOnce(
+	ctx context.Context,
+	server *gotmux.Server,
+	selected []gotmux.SessionID,
+	envKeys []string,
+	enrichProcesses bool,
+	agentSource agents.SessionSource,
+) (Observation, error) {
 	if len(selected) == 0 {
 		return Observation{}, ErrSelection
 	}
@@ -144,7 +167,12 @@ func observeOnce(ctx context.Context, server *gotmux.Server, selected []gotmux.S
 		return Observation{}, err
 	}
 
-	result := Observation{Manifest: m, Artifacts: make(map[string][]byte), FloatingPanesOmitted: floating, skippedEnvironment: nil}
+	result := Observation{
+		Manifest:             m,
+		Artifacts:            make(map[string][]byte),
+		FloatingPanesOmitted: floating,
+		skippedEnvironment:   nil,
+	}
 	if err := result.collect(ctx, server, before); err != nil {
 		return Observation{}, changedDuringCollect(ctx, server, before, selected, err)
 	}
@@ -152,7 +180,13 @@ func observeOnce(ctx context.Context, server *gotmux.Server, selected []gotmux.S
 	var paneProcesses map[string]paneProcessRecord
 
 	if enrichProcesses {
-		records, err := result.processes(ctx, before, envKeys, agentSource, server.Endpoint().SocketPath)
+		records, err := result.processes(
+			ctx,
+			before,
+			envKeys,
+			agentSource,
+			server.Endpoint().SocketPath,
+		)
 		if err != nil {
 			return Observation{}, err
 		}
@@ -164,18 +198,35 @@ func observeOnce(ctx context.Context, server *gotmux.Server, selected []gotmux.S
 		beforeCompareGraphHook()
 	}
 
-	if err := compareGraph(ctx, server, before, selected, &result.Manifest, paneProcesses); err != nil {
+	if err := compareGraph(
+		ctx,
+		server,
+		before,
+		selected,
+		&result.Manifest,
+		paneProcesses,
+	); err != nil {
 		return Observation{}, err
 	}
 
-	if err := result.finalize(info, started, server.Endpoint().SocketPath, enrichProcesses); err != nil {
+	if err := result.finalize(
+		info,
+		started,
+		server.Endpoint().SocketPath,
+		enrichProcesses,
+	); err != nil {
 		return Observation{}, err
 	}
 
 	return result, nil
 }
 
-func (o *Observation) finalize(info gotmux.ServerInfo, started int64, endpoint string, enriched bool) error {
+func (o *Observation) finalize(
+	info gotmux.ServerInfo,
+	started int64,
+	endpoint string,
+	enriched bool,
+) error {
 	o.Manifest.Format, o.Manifest.Version = "sesh", model.Schema
 	o.Manifest.Started, o.Manifest.Finished = started, time.Now().UnixNano()
 	o.Manifest.Source.TmuxVersion = fmt.Sprint(info.Version)
@@ -194,13 +245,21 @@ func (o *Observation) finalize(info gotmux.ServerInfo, started int64, endpoint s
 	o.Manifest = o.Manifest.CompactInheritedOptions()
 
 	if err := o.Manifest.Validate(); err != nil {
-		return oops.In("snapshot.capture").With("operation", "validate_observation").Wrapf(err, "validate observation")
+		return oops.In("snapshot.capture").
+			With("operation", "validate_observation").
+			Wrapf(err, "validate observation")
 	}
 
 	return nil
 }
 
-func (o *Observation) processes(ctx context.Context, snapshot gotmux.Snapshot, envKeys []string, source agents.SessionSource, endpoint string) (map[string]paneProcessRecord, error) {
+func (o *Observation) processes(
+	ctx context.Context,
+	snapshot gotmux.Snapshot,
+	envKeys []string,
+	source agents.SessionSource,
+	endpoint string,
+) (map[string]paneProcessRecord, error) {
 	liveAgents, err := recoveryAgents(ctx, source)
 	if err != nil {
 		return nil, err
@@ -244,7 +303,12 @@ func (o *Observation) processes(ctx context.Context, snapshot gotmux.Snapshot, e
 			continue
 		}
 
-		launch, record, err := captureProcessLaunch(ctx, paneInfo.PID, filteredKeys, matchingAgentResume(liveAgents, endpoint, paneInfo))
+		launch, record, err := captureProcessLaunch(
+			ctx,
+			paneInfo.PID,
+			filteredKeys,
+			matchingAgentResume(liveAgents, endpoint, paneInfo),
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -255,7 +319,11 @@ func (o *Observation) processes(ctx context.Context, snapshot gotmux.Snapshot, e
 	return records, nil
 }
 
-func (o *Observation) collect(ctx context.Context, server *gotmux.Server, snapshot gotmux.Snapshot) error {
+func (o *Observation) collect(
+	ctx context.Context,
+	server *gotmux.Server,
+	snapshot gotmux.Snapshot,
+) error {
 	checks := []func() error{
 		func() error { return o.globals(ctx, server) },
 		func() error { return o.sessions(ctx, snapshot) },
@@ -299,7 +367,10 @@ func (o *Observation) globals(ctx context.Context, server *gotmux.Server) error 
 
 func (o *Observation) sessions(ctx context.Context, snapshot gotmux.Snapshot) error {
 	for _, info := range snapshot.Sessions() {
-		index := slices.IndexFunc(o.Manifest.Sessions, func(s model.Session) bool { return s.ID == ref("s", string(info.ID)) })
+		index := slices.IndexFunc(
+			o.Manifest.Sessions,
+			func(s model.Session) bool { return s.ID == ref("s", string(info.ID)) },
+		)
 		if index < 0 {
 			continue
 		}
@@ -323,7 +394,10 @@ func (o *Observation) sessions(ctx context.Context, snapshot gotmux.Snapshot) er
 
 func (o *Observation) windows(ctx context.Context, snapshot gotmux.Snapshot) error {
 	for _, info := range snapshot.Windows() {
-		index := slices.IndexFunc(o.Manifest.Windows, func(w model.Window) bool { return w.ID == ref("w", string(info.ID)) })
+		index := slices.IndexFunc(
+			o.Manifest.Windows,
+			func(w model.Window) bool { return w.ID == ref("w", string(info.ID)) },
+		)
 		if index < 0 {
 			continue
 		}
@@ -339,11 +413,18 @@ func (o *Observation) windows(ctx context.Context, snapshot gotmux.Snapshot) err
 	return nil
 }
 
-func (o *Observation) panes(ctx context.Context, snapshot gotmux.Snapshot, outputLimit int64) error {
+func (o *Observation) panes(
+	ctx context.Context,
+	snapshot gotmux.Snapshot,
+	outputLimit int64,
+) error {
 	var total int64
 
 	for _, info := range snapshot.Panes() {
-		index := slices.IndexFunc(o.Manifest.Panes, func(p model.Pane) bool { return p.ID == ref("p", string(info.ID)) })
+		index := slices.IndexFunc(
+			o.Manifest.Panes,
+			func(p model.Pane) bool { return p.ID == ref("p", string(info.ID)) },
+		)
 		if index < 0 {
 			continue
 		}
@@ -355,7 +436,11 @@ func (o *Observation) panes(ctx context.Context, snapshot gotmux.Snapshot, outpu
 
 		o.Manifest.Panes[index].Options = settings
 
-		data, omitted, err := captureWithinBudget(ctx, info.Handle(), min(outputLimit, model.MaxArtifactBytes, model.MaxGenerationBytes-total))
+		data, omitted, err := captureWithinBudget(
+			ctx,
+			info.Handle(),
+			min(outputLimit, model.MaxArtifactBytes, model.MaxGenerationBytes-total),
+		)
 		if err != nil {
 			return err
 		}
@@ -368,14 +453,26 @@ func (o *Observation) panes(ctx context.Context, snapshot gotmux.Snapshot, outpu
 		hash := sha256.Sum256(data)
 		id := ref("a", string(info.ID))
 		o.Artifacts[id] = data
-		o.Manifest.Artifacts = append(o.Manifest.Artifacts, model.Artifact{ID: id, Kind: "terminal-text", Length: int64(len(data)), SHA256: hex.EncodeToString(hash[:])})
+		o.Manifest.Artifacts = append(
+			o.Manifest.Artifacts,
+			model.Artifact{
+				ID:     id,
+				Kind:   "terminal-text",
+				Length: int64(len(data)),
+				SHA256: hex.EncodeToString(hash[:]),
+			},
+		)
 		o.Manifest.Panes[index].Terminal.Artifact = id
 	}
 
 	return nil
 }
 
-func captureWithinBudget(ctx context.Context, pane gotmux.Pane, budget int64) ([]byte, bool, error) {
+func captureWithinBudget(
+	ctx context.Context,
+	pane gotmux.Pane,
+	budget int64,
+) ([]byte, bool, error) {
 	if budget <= 0 {
 		return nil, true, nil
 	}
@@ -391,13 +488,22 @@ func captureWithinBudget(ctx context.Context, pane gotmux.Pane, budget int64) ([
 	}
 
 	if err != nil {
-		return nil, false, oops.In("snapshot.capture").With("operation", "observe_terminal_text").Wrapf(err, "observe terminal text")
+		return nil, false, oops.In("snapshot.capture").
+			With("operation", "observe_terminal_text").
+			Wrapf(err, "observe terminal text")
 	}
 
 	return data, false, nil
 }
 
-func compareGraph(ctx context.Context, server *gotmux.Server, before gotmux.Snapshot, selected []gotmux.SessionID, captured *model.Manifest, paneProcesses map[string]paneProcessRecord) error {
+func compareGraph(
+	ctx context.Context,
+	server *gotmux.Server,
+	before gotmux.Snapshot,
+	selected []gotmux.SessionID,
+	captured *model.Manifest,
+	paneProcesses map[string]paneProcessRecord,
+) error {
 	after, err := reobserveGraph(ctx, server, before)
 	if err != nil {
 		return err
@@ -444,7 +550,13 @@ func compareGraph(ctx context.Context, server *gotmux.Server, before gotmux.Snap
 
 // changedDuringCollect marks a failed per-target query as a state change when the graph shows
 // that sessions, windows or panes changed since it was observed, such as a pane that exited.
-func changedDuringCollect(ctx context.Context, server *gotmux.Server, before gotmux.Snapshot, selected []gotmux.SessionID, err error) error {
+func changedDuringCollect(
+	ctx context.Context,
+	server *gotmux.Server,
+	before gotmux.Snapshot,
+	selected []gotmux.SessionID,
+	err error,
+) error {
 	if errors.Is(err, ErrChanged) || ctx.Err() != nil {
 		return err
 	}
@@ -482,15 +594,22 @@ func changedDuringCollect(ctx context.Context, server *gotmux.Server, before got
 	return err
 }
 
-func probeInitialSnapshot(ctx context.Context, server *gotmux.Server) (gotmux.ServerInfo, gotmux.Snapshot, error) {
+func probeInitialSnapshot(
+	ctx context.Context,
+	server *gotmux.Server,
+) (gotmux.ServerInfo, gotmux.Snapshot, error) {
 	info, err := server.Probe(ctx)
 	if err != nil {
-		return gotmux.ServerInfo{}, gotmux.Snapshot{}, oops.In("snapshot.capture").With("operation", "probe_capture_source").Wrapf(err, "probe capture source")
+		return gotmux.ServerInfo{}, gotmux.Snapshot{}, oops.In("snapshot.capture").
+			With("operation", "probe_capture_source").
+			Wrapf(err, "probe capture source")
 	}
 
 	before, err := server.Snapshot(ctx)
 	if err != nil {
-		return gotmux.ServerInfo{}, gotmux.Snapshot{}, oops.In("snapshot.capture").With("operation", "observe_source_graph").Wrapf(err, "observe source graph")
+		return gotmux.ServerInfo{}, gotmux.Snapshot{}, oops.In("snapshot.capture").
+			With("operation", "observe_source_graph").
+			Wrapf(err, "observe source graph")
 	}
 
 	if !info.Identity.Equal(before.Identity) {
@@ -500,7 +619,11 @@ func probeInitialSnapshot(ctx context.Context, server *gotmux.Server) (gotmux.Se
 	return info, before, nil
 }
 
-func revalidateProcesses(ctx context.Context, panes []model.Pane, paneProcesses map[string]paneProcessRecord) error {
+func revalidateProcesses(
+	ctx context.Context,
+	panes []model.Pane,
+	paneProcesses map[string]paneProcessRecord,
+) error {
 	if paneProcesses == nil {
 		return nil
 	}
@@ -548,10 +671,16 @@ func revalidateProcesses(ctx context.Context, panes []model.Pane, paneProcesses 
 	return nil
 }
 
-func reobserveGraph(ctx context.Context, server *gotmux.Server, before gotmux.Snapshot) (gotmux.Snapshot, error) {
+func reobserveGraph(
+	ctx context.Context,
+	server *gotmux.Server,
+	before gotmux.Snapshot,
+) (gotmux.Snapshot, error) {
 	after, err := server.Snapshot(ctx)
 	if err != nil {
-		return gotmux.Snapshot{}, oops.In("snapshot.capture").With("operation", "reobserve_source_graph").Wrapf(err, "reobserve source graph")
+		return gotmux.Snapshot{}, oops.In("snapshot.capture").
+			With("operation", "reobserve_source_graph").
+			Wrapf(err, "reobserve source graph")
 	}
 
 	if !before.Identity.Equal(after.Identity) {
@@ -560,7 +689,9 @@ func reobserveGraph(ctx context.Context, server *gotmux.Server, before gotmux.Sn
 
 	afterProbe, err := server.Probe(ctx)
 	if err != nil {
-		return gotmux.Snapshot{}, oops.In("snapshot.capture").With("operation", "reprobe_capture_source").Wrapf(err, "reprobe capture source")
+		return gotmux.Snapshot{}, oops.In("snapshot.capture").
+			With("operation", "reprobe_capture_source").
+			Wrapf(err, "reprobe capture source")
 	}
 
 	if !afterProbe.Identity.Equal(after.Identity) {
@@ -574,12 +705,21 @@ func stabilityBytes(m model.Manifest) ([]byte, error) {
 	m.Panes = slices.Clone(m.Panes)
 	for index := range m.Panes {
 		m.Panes[index].Title = nil
-		m.Panes[index].Terminal = model.Terminal{Artifact: "", History: 0, Alternate: false, CursorX: 0, CursorY: 0, Mode: nil}
+		m.Panes[index].Terminal = model.Terminal{
+			Artifact:  "",
+			History:   0,
+			Alternate: false,
+			CursorX:   0,
+			CursorY:   0,
+			Mode:      nil,
+		}
 	}
 
 	data, err := json.Marshal(m)
 	if err != nil {
-		return nil, oops.In("snapshot.capture").With("operation", "compare_graph").Wrapf(err, "encode graph observation")
+		return nil, oops.In("snapshot.capture").
+			With("operation", "compare_graph").
+			Wrapf(err, "encode graph observation")
 	}
 
 	return data, nil

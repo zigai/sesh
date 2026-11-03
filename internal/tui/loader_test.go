@@ -33,7 +33,12 @@ func loaderTestServices(deps Dependencies) Services {
 func loaderTestModel(t *testing.T, cfg *config.Config, deps Dependencies) *Model {
 	t.Helper()
 
-	model, err := newModelWithContext(context.Background(), cfg, testState(), loaderTestServices(deps))
+	model, err := newModelWithContext(
+		context.Background(),
+		cfg,
+		testState(),
+		loaderTestServices(deps),
+	)
 	if err != nil {
 		t.Fatalf("newModelWithContext() error = %v", err)
 	}
@@ -119,7 +124,10 @@ func TestLoadSessionRowsLoadsSourcesConcurrently(t *testing.T) {
 
 			<-result
 
-			t.Fatalf("loader sources = %#v, want catalog and agents started before either completes", seen)
+			t.Fatalf(
+				"loader sources = %#v, want catalog and agents started before either completes",
+				seen,
+			)
 		}
 	}
 
@@ -137,7 +145,10 @@ func TestLoadSessionRowsLoadsSourcesConcurrently(t *testing.T) {
 	}
 
 	if len(loaded.sessions) != 1 || loaded.sessions[0].AgentTotal != 1 {
-		t.Fatalf("loadSessionRows() sessions = %#v, want catalog row with merged agent summary", loaded.sessions)
+		t.Fatalf(
+			"loadSessionRows() sessions = %#v, want catalog row with merged agent summary",
+			loaded.sessions,
+		)
 	}
 }
 
@@ -152,9 +163,11 @@ func TestLoadSessionRowsSortsLocalCatalogByNativeIdentityHistoryAndActivity(t *t
 		Session:        rows[2].SemanticIdentity(),
 		LastSwitchUnix: now.Unix(),
 	}}}
-	model := newTestModelWithDeps(Dependencies{LoadCatalog: func(context.Context) (session.CatalogResult, error) {
-		return session.CatalogResult{Sessions: rows, Status: session.StatusComplete}, nil
-	}})
+	model := newTestModelWithDeps(
+		Dependencies{LoadCatalog: func(context.Context) (session.CatalogResult, error) {
+			return session.CatalogResult{Sessions: rows, Status: session.StatusComplete}, nil
+		}},
+	)
 	t.Cleanup(model.Close)
 	model.state = state
 
@@ -165,7 +178,16 @@ func TestLoadSessionRowsSortsLocalCatalogByNativeIdentityHistoryAndActivity(t *t
 
 	model.handleSessionLoadResult(msg)
 
-	if got, want := sessionNamesForTest(model.sessions), []string{"visited", "active", "older"}; !slices.Equal(got, want) {
+	if got, want := sessionNamesForTest(
+		model.sessions,
+	), []string{
+		"visited",
+		"active",
+		"older",
+	}; !slices.Equal(
+		got,
+		want,
+	) {
 		t.Fatalf("loaded session order = %v, want %v", got, want)
 	}
 }
@@ -213,7 +235,10 @@ func TestLoadSessionRowsExposesPartialCatalogStatusAndKeepsRows(t *testing.T) {
 	})
 
 	if _, ok := model.degradedSources[degradedSourceCatalog]; ok {
-		t.Fatalf("degraded sources after recovery = %#v, want catalog cleared", model.degradedSources)
+		t.Fatalf(
+			"degraded sources after recovery = %#v, want catalog cleared",
+			model.degradedSources,
+		)
 	}
 
 	if model.statusLevel != statusNone || model.statusMessage != "" {
@@ -228,13 +253,17 @@ func TestLoadSessionRowsExposesPartialCatalogStatusAndKeepsRows(t *testing.T) {
 func TestDegradedObservationSourcesKeepRowsAndReportStatus(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Remote.Enabled = true
-	cfg.Remote.Connections = []config.RemoteConnectionConfig{{ID: testSupportSessionWorkName, Host: testSupportSessionWorkName}}
+	cfg.Remote.Connections = []config.RemoteConnectionConfig{
+		{ID: testSupportSessionWorkName, Host: testSupportSessionWorkName},
+	}
 
 	model := loaderTestModel(t, cfg, Dependencies{
 		LoadCatalog: func(context.Context) (session.CatalogResult, error) {
 			return session.CatalogResult{
-				Sessions: []session.Session{{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive}},
-				Status:   session.StatusComplete,
+				Sessions: []session.Session{
+					{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive},
+				},
+				Status: session.StatusComplete,
 			}, nil
 		},
 		LoadAgentSummaries: func(context.Context) ([]session.AgentSummary, error) {
@@ -261,17 +290,23 @@ func TestDegradedObservationSourcesKeepRowsAndReportStatus(t *testing.T) {
 		}
 	}
 
-	if model.degradedSources[degradedSourceRemote] == "" || model.degradedSources[degradedSourceAgents] == "" {
+	if model.degradedSources[degradedSourceRemote] == "" ||
+		model.degradedSources[degradedSourceAgents] == "" {
 		t.Fatalf("degraded sources = %#v, want remote and agents recorded", model.degradedSources)
 	}
 
 	model.handleSessionLoadResult(sessionLoadResultMsg{
-		sessions: []session.Session{{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive}},
-		status:   session.StatusComplete,
+		sessions: []session.Session{
+			{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive},
+		},
+		status: session.StatusComplete,
 	})
 
 	if len(model.degradedSources) != 0 {
-		t.Fatalf("degraded sources after healthy observation = %#v, want none", model.degradedSources)
+		t.Fatalf(
+			"degraded sources after healthy observation = %#v, want none",
+			model.degradedSources,
+		)
 	}
 
 	if model.statusLevel != statusNone || model.statusMessage != "" {
@@ -342,7 +377,8 @@ func TestMergeRemoteSessionRowsKeepsLocalSavedNameCollision(t *testing.T) {
 		t.Fatalf("local row = %#v, want saved dev", local)
 	}
 
-	if remoteRow.Name != testSupportSessionDevName || remoteRow.RemoteStatus != session.RemoteStatusStale {
+	if remoteRow.Name != testSupportSessionDevName ||
+		remoteRow.RemoteStatus != session.RemoteStatusStale {
 		t.Fatalf("remote row = %#v, want stale remote dev", remoteRow)
 	}
 
@@ -378,7 +414,9 @@ func TestMergeRemoteSessionRowsAppendsOnlyConfiguredConnections(t *testing.T) {
 
 	cfg := config.DefaultConfig()
 	cfg.Remote.Enabled = true
-	cfg.Remote.Connections = []config.RemoteConnectionConfig{{ID: testSupportSessionWorkName, Host: testSupportSessionWorkName}}
+	cfg.Remote.Connections = []config.RemoteConnectionConfig{
+		{ID: testSupportSessionWorkName, Host: testSupportSessionWorkName},
+	}
 
 	rows := mergeRemoteSessionRows(local, catalog, cfg, testState(), now)
 
@@ -403,7 +441,14 @@ func TestMergeRemoteSessionRowsAppendsOnlyConfiguredConnections(t *testing.T) {
 
 	cfg.Remote.Enabled = false
 
-	if got := mergeRemoteSessionRows(local, catalog, cfg, testState(), now); len(got) != 1 || got[0].Name != "local" {
+	if got := mergeRemoteSessionRows(
+		local,
+		catalog,
+		cfg,
+		testState(),
+		now,
+	); len(got) != 1 ||
+		got[0].Name != "local" {
 		t.Fatalf("disabled remote rows = %#v, want local rows only", sessionNamesForTest(got))
 	}
 }
@@ -484,26 +529,34 @@ func TestRemoteConnectionStatus(t *testing.T) {
 func TestWatchedCatalogRemovesRemoteRowsWhenConnectionsDisappear(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Remote.Enabled = true
-	cfg.Remote.Connections = []config.RemoteConnectionConfig{{ID: testSupportSessionWorkName, Host: testSupportSessionWorkName}}
+	cfg.Remote.Connections = []config.RemoteConnectionConfig{
+		{ID: testSupportSessionWorkName, Host: testSupportSessionWorkName},
+	}
 
 	model := loaderTestModel(t, cfg, Dependencies{})
 	now := time.Date(2026, time.August, 12, 12, 0, 0, 0, time.UTC)
 
 	model.handleRemoteCatalog(remoteCatalogMsg{catalog: RemoteCatalog{
 		GeneratedAt: now,
-		Connections: []RemoteConnection{{
-			ID:        testSupportSessionWorkName,
-			Connected: true,
-			LastSeen:  now,
-			Sessions:  []session.Session{{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive}},
-		}},
+		Connections: []RemoteConnection{
+			{
+				ID:        testSupportSessionWorkName,
+				Connected: true,
+				LastSeen:  now,
+				Sessions: []session.Session{
+					{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive},
+				},
+			},
+		},
 	}})
 
 	if len(model.sessions) != 1 || model.sessions[0].Name != testSupportSessionDevName {
 		t.Fatalf("sessions before catalog removal = %#v, want remote dev", model.sessions)
 	}
 
-	model.handleRemoteCatalog(remoteCatalogMsg{catalog: RemoteCatalog{GeneratedAt: now.Add(time.Second)}})
+	model.handleRemoteCatalog(
+		remoteCatalogMsg{catalog: RemoteCatalog{GeneratedAt: now.Add(time.Second)}},
+	)
 
 	if len(model.sessions) != 0 {
 		t.Fatalf("sessions after catalog removal = %#v, want no remote rows", model.sessions)
@@ -514,19 +567,25 @@ func TestRemoteStatusTickAgesRowsWithoutCatalogUpdatesAndPreservesSelection(t *t
 	cfg := config.DefaultConfig()
 	cfg.Remote.Enabled = true
 	cfg.Remote.StaleAfter = "30s"
-	cfg.Remote.Connections = []config.RemoteConnectionConfig{{ID: testSupportSessionWorkName, Host: testSupportSessionWorkName}}
+	cfg.Remote.Connections = []config.RemoteConnectionConfig{
+		{ID: testSupportSessionWorkName, Host: testSupportSessionWorkName},
+	}
 
 	model := loaderTestModel(t, cfg, Dependencies{})
 	now := time.Date(2026, time.August, 12, 12, 0, 0, 0, time.UTC)
 
 	model.handleRemoteCatalog(remoteCatalogMsg{catalog: RemoteCatalog{
 		GeneratedAt: now,
-		Connections: []RemoteConnection{{
-			ID:        testSupportSessionWorkName,
-			Connected: true,
-			LastSeen:  now,
-			Sessions:  []session.Session{{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive}},
-		}},
+		Connections: []RemoteConnection{
+			{
+				ID:        testSupportSessionWorkName,
+				Connected: true,
+				LastSeen:  now,
+				Sessions: []session.Session{
+					{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive},
+				},
+			},
+		},
 	}})
 
 	model.cursor = 0
@@ -611,7 +670,13 @@ func TestCurrentTmuxSessionIsHiddenInSeshAndVisibleInAgents(t *testing.T) {
 		LoadCatalog: func(context.Context) (session.CatalogResult, error) {
 			return session.CatalogResult{
 				Sessions: []session.Session{
-					{ID: "$1", Name: "current", Kind: session.KindLive, Current: true, ActivePaneID: "%7"},
+					{
+						ID:           "$1",
+						Name:         "current",
+						Kind:         session.KindLive,
+						Current:      true,
+						ActivePaneID: "%7",
+					},
 					{ID: "$2", Name: "other", Kind: session.KindLive},
 				},
 				Status: session.StatusComplete,
@@ -623,9 +688,14 @@ func TestCurrentTmuxSessionIsHiddenInSeshAndVisibleInAgents(t *testing.T) {
 				TmuxSessionName: "current",
 				Total:           1,
 				Active:          1,
-				Agents: []session.AgentSession{{
-					RegistryID: testSupportAgentRegistryID, Harness: "pi", HarnessSession: "current-agent", PaneID: "%7",
-				}},
+				Agents: []session.AgentSession{
+					{
+						RegistryID:     testSupportAgentRegistryID,
+						Harness:        "pi",
+						HarnessSession: "current-agent",
+						PaneID:         "%7",
+					},
+				},
 			}}, nil
 		},
 	})
@@ -646,7 +716,9 @@ func TestCurrentTmuxSessionIsHiddenInSeshAndVisibleInAgents(t *testing.T) {
 		t.Fatalf("AGENTS rows = %#v, want current session and regular other session", got)
 	}
 
-	if got, want := model.selectedListRow(), (popupListRow{sessionIndex: 0, agentIndex: 0}); !got.equal(want) {
+	if got, want := model.selectedListRow(), (popupListRow{sessionIndex: 0, agentIndex: 0}); !got.equal(
+		want,
+	) {
 		t.Fatalf("AGENTS selection = %#v, want current session active agent %#v", got, want)
 	}
 }
@@ -677,7 +749,8 @@ func TestAgentsModeSelectsCurrentAgentWhenInventoryArrivesAfterSessions(t *testi
 		},
 	}})
 
-	if got := model.selectedListRow(); got.sessionIndex != 0 || !got.isAgent() || model.filtered[got.sessionIndex].Agents[got.agentIndex].PaneID != "%8" {
+	if got := model.selectedListRow(); got.sessionIndex != 0 || !got.isAgent() ||
+		model.filtered[got.sessionIndex].Agents[got.agentIndex].PaneID != "%8" {
 		t.Fatalf("selection after inventory = %#v, want current pane %%8", got)
 	}
 }
@@ -716,7 +789,9 @@ func TestAgentsModeSelectsCurrentAgentWhenOriginLoadsFirst(t *testing.T) {
 
 	model.loadingSessions = true
 	model.handleOriginSessions(originSessionsMsg{
-		rows: []session.Session{{ID: "$3", Name: "origin", Kind: session.KindLive, Origin: session.OriginBridge}},
+		rows: []session.Session{
+			{ID: "$3", Name: "origin", Kind: session.KindLive, Origin: session.OriginBridge},
+		},
 	})
 	model.applySessionRows(sessionLoadResultMsg{
 		sessions: []session.Session{{
@@ -737,8 +812,10 @@ func TestLoadSessionsPrunesAgentsWithVanishedPanes(t *testing.T) {
 	model := newTestModelWithDeps(Dependencies{
 		LoadCatalog: func(context.Context) (session.CatalogResult, error) {
 			return session.CatalogResult{
-				Sessions: []session.Session{{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive}},
-				Status:   session.StatusComplete,
+				Sessions: []session.Session{
+					{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive},
+				},
+				Status: session.StatusComplete,
 			}, nil
 		},
 		LoadAgentSummaries: func(context.Context) ([]session.AgentSummary, error) {
@@ -754,7 +831,14 @@ func TestLoadSessionsPrunesAgentsWithVanishedPanes(t *testing.T) {
 			}}, nil
 		},
 		TmuxPaneLocations: func(context.Context) ([]PaneLocation, error) {
-			return []PaneLocation{{ServerSocket: "", SessionID: "$1", SessionName: testSupportSessionDevName, PaneID: "%364"}}, nil
+			return []PaneLocation{
+				{
+					ServerSocket: "",
+					SessionID:    "$1",
+					SessionName:  testSupportSessionDevName,
+					PaneID:       "%364",
+				},
+			}, nil
 		},
 	})
 
@@ -772,8 +856,10 @@ func TestLoadSessionsKeepsAgentSummariesWhenPaneListingFails(t *testing.T) {
 	model := newTestModelWithDeps(Dependencies{
 		LoadCatalog: func(context.Context) (session.CatalogResult, error) {
 			return session.CatalogResult{
-				Sessions: []session.Session{{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive}},
-				Status:   session.StatusComplete,
+				Sessions: []session.Session{
+					{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive},
+				},
+				Status: session.StatusComplete,
 			}, nil
 		},
 		LoadAgentSummaries: func(context.Context) ([]session.AgentSummary, error) {
@@ -794,19 +880,32 @@ func TestLoadSessionsKeepsAgentSummariesWhenPaneListingFails(t *testing.T) {
 
 	row := model.sessions[0]
 	if row.AgentTotal != 1 || len(row.Agents) != 1 {
-		t.Fatalf("dev agent row = total %d details %#v, want unpruned on pane listing failure", row.AgentTotal, row.Agents)
+		t.Fatalf(
+			"dev agent row = total %d details %#v, want unpruned on pane listing failure",
+			row.AgentTotal,
+			row.Agents,
+		)
 	}
 }
 
 func TestLoadSessionsMergesAgentSummariesIntoLiveRows(t *testing.T) {
-	agentSessions := []session.AgentSession{{
-		Harness: testSupportHarnessCodex, HarnessSession: testSupportAgentRegistryID, Status: session.AgentStatusRunning,
-	}}
+	agentSessions := []session.AgentSession{
+		{
+			Harness:        testSupportHarnessCodex,
+			HarnessSession: testSupportAgentRegistryID,
+			Status:         session.AgentStatusRunning,
+		},
+	}
 	model := newTestModelWithDeps(Dependencies{
 		LoadCatalog: func(context.Context) (session.CatalogResult, error) {
 			return session.CatalogResult{
 				Sessions: []session.Session{
-					{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive, WindowCount: 2},
+					{
+						ID:          "$1",
+						Name:        testSupportSessionDevName,
+						Kind:        session.KindLive,
+						WindowCount: 2,
+					},
 					{ID: "$2", Name: "ops", Kind: session.KindLive, WindowCount: 1},
 				},
 				Status: session.StatusComplete,
@@ -814,7 +913,13 @@ func TestLoadSessionsMergesAgentSummariesIntoLiveRows(t *testing.T) {
 		},
 		LoadAgentSummaries: func(context.Context) ([]session.AgentSummary, error) {
 			return []session.AgentSummary{
-				{TmuxSessionID: "$1", TmuxSessionName: testSupportSessionDevName, Total: 5, Active: 3, Agents: agentSessions},
+				{
+					TmuxSessionID:   "$1",
+					TmuxSessionName: testSupportSessionDevName,
+					Total:           5,
+					Active:          3,
+					Agents:          agentSessions,
+				},
 				{TmuxSessionName: "ops", Total: 1, Active: 1},
 			}, nil
 		},
@@ -833,7 +938,8 @@ func TestLoadSessionsMergesAgentSummariesIntoLiveRows(t *testing.T) {
 		t.Fatalf("dev agent counts = %d/%d, want 3/5", got.AgentActive, got.AgentTotal)
 	}
 
-	if got := byName[testSupportSessionDevName].Agents; len(got) != 1 || got[0].HarnessSession != testSupportAgentRegistryID {
+	if got := byName[testSupportSessionDevName].Agents; len(got) != 1 ||
+		got[0].HarnessSession != testSupportAgentRegistryID {
 		t.Fatalf("dev agent details = %#v, want mapped agent", got)
 	}
 
@@ -855,15 +961,47 @@ func TestAgentSortByStableName(t *testing.T) {
 		TmuxSessionName: testSupportSessionDevName,
 		Total:           9,
 		Agents: []session.AgentSession{
-			{HarnessSession: "idle-old", Status: session.AgentStatusIdle, StatusSince: now.Add(-time.Hour)},
+			{
+				HarnessSession: "idle-old",
+				Status:         session.AgentStatusIdle,
+				StatusSince:    now.Add(-time.Hour),
+			},
 			{HarnessSession: "unknown", Status: session.AgentStatusUnknown, StatusSince: now},
-			{HarnessSession: "waiting-new", Status: session.AgentStatusWaiting, StatusSince: now.Add(-time.Minute)},
-			{HarnessSession: "working-old", Status: session.AgentStatusRunning, StatusSince: now.Add(-time.Hour)},
-			{HarnessSession: "idle-new", Status: session.AgentStatusIdle, StatusSince: now.Add(-time.Minute)},
-			{HarnessSession: "waiting-old", Status: session.AgentStatusWaiting, StatusSince: now.Add(-time.Hour)},
-			{HarnessSession: "working-new", Status: session.AgentStatusRunning, StatusSince: now.Add(-time.Minute)},
-			{HarnessSession: "beta", Status: session.AgentStatusIdle, StatusSince: now.Add(-2 * time.Minute)},
-			{HarnessSession: "Alpha", Status: session.AgentStatusIdle, StatusSince: now.Add(-2 * time.Minute)},
+			{
+				HarnessSession: "waiting-new",
+				Status:         session.AgentStatusWaiting,
+				StatusSince:    now.Add(-time.Minute),
+			},
+			{
+				HarnessSession: "working-old",
+				Status:         session.AgentStatusRunning,
+				StatusSince:    now.Add(-time.Hour),
+			},
+			{
+				HarnessSession: "idle-new",
+				Status:         session.AgentStatusIdle,
+				StatusSince:    now.Add(-time.Minute),
+			},
+			{
+				HarnessSession: "waiting-old",
+				Status:         session.AgentStatusWaiting,
+				StatusSince:    now.Add(-time.Hour),
+			},
+			{
+				HarnessSession: "working-new",
+				Status:         session.AgentStatusRunning,
+				StatusSince:    now.Add(-time.Minute),
+			},
+			{
+				HarnessSession: "beta",
+				Status:         session.AgentStatusIdle,
+				StatusSince:    now.Add(-2 * time.Minute),
+			},
+			{
+				HarnessSession: "Alpha",
+				Status:         session.AgentStatusIdle,
+				StatusSince:    now.Add(-2 * time.Minute),
+			},
 		},
 	}
 
@@ -937,8 +1075,10 @@ func TestLoadSessionRowsKeepsRowsOnAgentSummaryError(t *testing.T) {
 	model := newTestModelWithDeps(Dependencies{
 		LoadCatalog: func(context.Context) (session.CatalogResult, error) {
 			return session.CatalogResult{
-				Sessions: []session.Session{{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive}},
-				Status:   session.StatusComplete,
+				Sessions: []session.Session{
+					{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive},
+				},
+				Status: session.StatusComplete,
 			}, nil
 		},
 		LoadAgentSummaries: func(context.Context) ([]session.AgentSummary, error) {
@@ -971,8 +1111,10 @@ func TestAgentSummaryRefreshUpdatesCountsWithoutReloadingSessions(t *testing.T) 
 			catalogLoads++
 
 			return session.CatalogResult{
-				Sessions: []session.Session{{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive}},
-				Status:   session.StatusComplete,
+				Sessions: []session.Session{
+					{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive},
+				},
+				Status: session.StatusComplete,
 			}, nil
 		},
 		LoadAgentSummaries: func(context.Context) ([]session.AgentSummary, error) {
@@ -987,9 +1129,13 @@ func TestAgentSummaryRefreshUpdatesCountsWithoutReloadingSessions(t *testing.T) 
 				TmuxSessionID: "$1",
 				Total:         2,
 				Active:        summaryLoads,
-				Agents: []session.AgentSession{{
-					Harness: testSupportHarnessCodex, HarnessSession: label, Status: session.AgentStatusRunning,
-				}},
+				Agents: []session.AgentSession{
+					{
+						Harness:        testSupportHarnessCodex,
+						HarnessSession: label,
+						Status:         session.AgentStatusRunning,
+					},
+				},
 			}}, nil
 		},
 	})
@@ -1081,9 +1227,13 @@ func TestAgentSummaryRefreshErrorRetainsChildDetails(t *testing.T) {
 		Name:       testSupportSessionDevName,
 		Kind:       session.KindLive,
 		AgentTotal: 1,
-		Agents: []session.AgentSession{{
-			Harness: testSupportHarnessCodex, HarnessSession: testSupportAgentRegistryID, Status: session.AgentStatusRunning,
-		}},
+		Agents: []session.AgentSession{
+			{
+				Harness:        testSupportHarnessCodex,
+				HarnessSession: testSupportAgentRegistryID,
+				Status:         session.AgentStatusRunning,
+			},
+		},
 	}}
 	model.refreshDisplaySessions()
 	model.filterSessions()
@@ -1091,8 +1241,14 @@ func TestAgentSummaryRefreshErrorRetainsChildDetails(t *testing.T) {
 
 	model.handleAgentSummaries(agentSummariesMsg{err: errSaveFailed})
 
-	if got := model.filtered[0].Agents; len(got) != 1 || got[0].HarnessSession != testSupportAgentRegistryID || model.agentCursor != 0 {
-		t.Fatalf("agent details/selection = %#v/%d, want retained selected child", got, model.agentCursor)
+	if got := model.filtered[0].Agents; len(got) != 1 ||
+		got[0].HarnessSession != testSupportAgentRegistryID ||
+		model.agentCursor != 0 {
+		t.Fatalf(
+			"agent details/selection = %#v/%d, want retained selected child",
+			got,
+			model.agentCursor,
+		)
 	}
 
 	if !errors.Is(model.agentSummaryErr, errSaveFailed) {
@@ -1129,7 +1285,12 @@ func TestAgentSummaryRefreshRestoresSelectedChildByStableIdentity(t *testing.T) 
 		AgentTotal: 2,
 		Agents: []session.AgentSession{
 			{RegistryID: "record-1", Harness: "pi", HarnessSession: "first", PaneID: "%1"},
-			{RegistryID: "record-2", Harness: testSupportHarnessCodex, HarnessSession: "selected", PaneID: "%1"},
+			{
+				RegistryID:     "record-2",
+				Harness:        testSupportHarnessCodex,
+				HarnessSession: "selected",
+				PaneID:         "%1",
+			},
 		},
 	}}
 	model.refreshDisplaySessions()
@@ -1140,13 +1301,22 @@ func TestAgentSummaryRefreshRestoresSelectedChildByStableIdentity(t *testing.T) 
 		TmuxSessionID: "$1",
 		Total:         2,
 		Agents: []session.AgentSession{
-			{RegistryID: "record-2", Harness: testSupportHarnessCodex, HarnessSession: "selected-updated", PaneID: "%1"},
+			{
+				RegistryID:     "record-2",
+				Harness:        testSupportHarnessCodex,
+				HarnessSession: "selected-updated",
+				PaneID:         "%1",
+			},
 			{RegistryID: "record-1", Harness: "pi", HarnessSession: "first", PaneID: "%1"},
 		},
 	}})
 
 	if model.cursor != 0 || model.agentCursor != 1 {
-		t.Fatalf("restored selection = %d/%d, want sorted selected pane at 0/1", model.cursor, model.agentCursor)
+		t.Fatalf(
+			"restored selection = %d/%d, want sorted selected pane at 0/1",
+			model.cursor,
+			model.agentCursor,
+		)
 	}
 
 	if got := model.filtered[0].Agents[model.agentCursor]; got.RegistryID != "record-2" ||
@@ -1158,25 +1328,42 @@ func TestAgentSummaryRefreshRestoresSelectedChildByStableIdentity(t *testing.T) 
 func TestAgentSummaryRefreshFallsBackToFirstAgentWhenSelectedAgentDisappears(t *testing.T) {
 	model := newTestModel()
 	model.displayMode = displayModeAgents
-	model.sessions = []session.Session{{
-		ID:         "$1",
-		Name:       testSupportSessionDevName,
-		Kind:       session.KindLive,
-		AgentTotal: 1,
-		Agents:     []session.AgentSession{{RegistryID: "record-1", Harness: "pi", HarnessSession: "gone", PaneID: "%1"}},
-	}}
+	model.sessions = []session.Session{
+		{
+			ID:         "$1",
+			Name:       testSupportSessionDevName,
+			Kind:       session.KindLive,
+			AgentTotal: 1,
+			Agents: []session.AgentSession{
+				{RegistryID: "record-1", Harness: "pi", HarnessSession: "gone", PaneID: "%1"},
+			},
+		},
+	}
 	model.refreshDisplaySessions()
 	model.filterSessions()
 	model.agentCursor = 0
 
-	model.applyAgentSummaries([]session.AgentSummary{{
-		TmuxSessionID: "$1",
-		Total:         1,
-		Agents:        []session.AgentSession{{RegistryID: "record-2", Harness: testSupportHarnessCodex, HarnessSession: "new", PaneID: "%1"}},
-	}})
+	model.applyAgentSummaries([]session.AgentSummary{
+		{
+			TmuxSessionID: "$1",
+			Total:         1,
+			Agents: []session.AgentSession{
+				{
+					RegistryID:     "record-2",
+					Harness:        testSupportHarnessCodex,
+					HarnessSession: "new",
+					PaneID:         "%1",
+				},
+			},
+		},
+	})
 
 	if model.cursor != 0 || model.agentCursor != 0 {
-		t.Fatalf("fallback selection = %d/%d, want first replacement agent", model.cursor, model.agentCursor)
+		t.Fatalf(
+			"fallback selection = %d/%d, want first replacement agent",
+			model.cursor,
+			model.agentCursor,
+		)
 	}
 }
 
@@ -1190,8 +1377,10 @@ func TestSeshOnlyWithoutPopupCountsSkipsAgentSummaryLoading(t *testing.T) {
 	model := loaderTestModel(t, cfg, Dependencies{
 		LoadCatalog: func(context.Context) (session.CatalogResult, error) {
 			return session.CatalogResult{
-				Sessions: []session.Session{{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive}},
-				Status:   session.StatusComplete,
+				Sessions: []session.Session{
+					{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive},
+				},
+				Status: session.StatusComplete,
 			}, nil
 		},
 		LoadAgentSummaries: func(context.Context) ([]session.AgentSummary, error) {
@@ -1206,7 +1395,11 @@ func TestSeshOnlyWithoutPopupCountsSkipsAgentSummaryLoading(t *testing.T) {
 	}
 
 	if summaryLoads != 0 || model.agentSummaryRefreshEnabled() {
-		t.Fatalf("SESH-only summary loading/refresh = %d/%v, want disabled", summaryLoads, model.agentSummaryRefreshEnabled())
+		t.Fatalf(
+			"SESH-only summary loading/refresh = %d/%v, want disabled",
+			summaryLoads,
+			model.agentSummaryRefreshEnabled(),
+		)
 	}
 }
 
@@ -1221,8 +1414,10 @@ func TestSeshOnlyCustomAgentFieldsLoadAgentSummaries(t *testing.T) {
 	model := loaderTestModel(t, cfg, Dependencies{
 		LoadCatalog: func(context.Context) (session.CatalogResult, error) {
 			return session.CatalogResult{
-				Sessions: []session.Session{{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive}},
-				Status:   session.StatusComplete,
+				Sessions: []session.Session{
+					{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive},
+				},
+				Status: session.StatusComplete,
 			}, nil
 		},
 		LoadAgentSummaries: func(context.Context) ([]session.AgentSummary, error) {
@@ -1259,19 +1454,29 @@ func TestAgentDisplayModeLoadsSummariesWithoutPopupCounts(t *testing.T) {
 	model := loaderTestModel(t, cfg, Dependencies{
 		LoadCatalog: func(context.Context) (session.CatalogResult, error) {
 			return session.CatalogResult{
-				Sessions: []session.Session{{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive}},
-				Status:   session.StatusComplete,
+				Sessions: []session.Session{
+					{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive},
+				},
+				Status: session.StatusComplete,
 			}, nil
 		},
 		LoadAgentSummaries: func(context.Context) ([]session.AgentSummary, error) {
 			summaryLoads++
 
-			return []session.AgentSummary{{
-				TmuxSessionID: "$1",
-				Total:         1,
-				Active:        1,
-				Agents:        []session.AgentSession{{RegistryID: testSupportAgentRegistryID, Harness: "pi", Status: session.AgentStatusRunning}},
-			}}, nil
+			return []session.AgentSummary{
+				{
+					TmuxSessionID: "$1",
+					Total:         1,
+					Active:        1,
+					Agents: []session.AgentSession{
+						{
+							RegistryID: testSupportAgentRegistryID,
+							Harness:    "pi",
+							Status:     session.AgentStatusRunning,
+						},
+					},
+				},
+			}, nil
 		},
 	})
 
@@ -1284,7 +1489,11 @@ func TestAgentDisplayModeLoadsSummariesWithoutPopupCounts(t *testing.T) {
 	}
 
 	if got := model.sessions[0]; got.AgentTotal != 1 || len(got.Agents) != 1 {
-		t.Fatalf("dev agent row = total %d details %#v, want agent inventory", got.AgentTotal, got.Agents)
+		t.Fatalf(
+			"dev agent row = total %d details %#v, want agent inventory",
+			got.AgentTotal,
+			got.Agents,
+		)
 	}
 }
 
@@ -1292,7 +1501,11 @@ func assertPartialLoadState(t *testing.T, model *Model, loaded sessionLoadResult
 	t.Helper()
 
 	if !errors.Is(loaded.catalogErr, errTmuxUnavailable) {
-		t.Fatalf("loadSessionRows() catalog error = %v, want %v", loaded.catalogErr, errTmuxUnavailable)
+		t.Fatalf(
+			"loadSessionRows() catalog error = %v, want %v",
+			loaded.catalogErr,
+			errTmuxUnavailable,
+		)
 	}
 
 	if loaded.status != session.StatusPartial {
@@ -1305,7 +1518,8 @@ func assertPartialLoadState(t *testing.T, model *Model, loaded sessionLoadResult
 
 	model.handleSessionLoadResult(loaded)
 
-	if model.statusLevel != statusDegraded || !strings.Contains(model.statusMessage, "Session list is incomplete") {
+	if model.statusLevel != statusDegraded ||
+		!strings.Contains(model.statusMessage, "Session list is incomplete") {
 		t.Fatalf(
 			"partial catalog status = (%v, %q), want degraded incomplete-catalog line",
 			model.statusLevel,
@@ -1341,7 +1555,12 @@ func TestSessionLoadPreservesNewerRemoteWatchObservations(t *testing.T) {
 				LoadCatalog: func(context.Context) (session.CatalogResult, error) {
 					return session.CatalogResult{Sessions: []session.Session{
 						{ID: "$local", Name: "local", Kind: session.KindLive},
-						{ID: "$origin", Name: "origin", Kind: session.KindLive, Origin: session.OriginBridge},
+						{
+							ID:     "$origin",
+							Name:   "origin",
+							Kind:   session.KindLive,
+							Origin: session.OriginBridge,
+						},
 					}, Status: session.StatusComplete}, nil
 				},
 				LoadRemoteCatalog: func() (RemoteCatalog, error) { return oldCatalog, nil },
@@ -1377,10 +1596,15 @@ func TestSessionLoadPreservesNewerRemoteWatchObservations(t *testing.T) {
 			}
 
 			if observation != "removal" && model.selectedSessionIdentity() != selected {
-				t.Fatalf("selection = %#v, want watched row %#v", model.selectedSessionIdentity(), selected)
+				t.Fatalf(
+					"selection = %#v, want watched row %#v",
+					model.selectedSessionIdentity(),
+					selected,
+				)
 			}
 
-			if observation == "error" && (!errors.Is(model.remoteCatalogErr, errTmuxUnavailable) || model.degradedSources[degradedSourceRemote] == "") {
+			if observation == "error" &&
+				(!errors.Is(model.remoteCatalogErr, errTmuxUnavailable) || model.degradedSources[degradedSourceRemote] == "") {
 				t.Fatal("delayed load cleared the newer remote watch error")
 			}
 		})
@@ -1409,14 +1633,34 @@ func TestAgentWatchValidatesPanesBeforePublishing(t *testing.T) {
 		{name: "unavailable inventory", paneErr: errTmuxUnavailable, want: 3},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			summaries := []session.AgentSummary{{
-				TmuxSessionID: "$1", TmuxSessionName: testSupportSessionDevName, Total: 3, Active: 3,
-				Agents: []session.AgentSession{
-					{RegistryID: "live", PaneID: "%1", PanePID: 101, Status: session.AgentStatusRunning},
-					{RegistryID: "moved", PaneID: "%2", PanePID: 102, Status: session.AgentStatusRunning},
-					{RegistryID: "gone", PaneID: "%3", PanePID: 103, Status: session.AgentStatusRunning},
+			summaries := []session.AgentSummary{
+				{
+					TmuxSessionID:   "$1",
+					TmuxSessionName: testSupportSessionDevName,
+					Total:           3,
+					Active:          3,
+					Agents: []session.AgentSession{
+						{
+							RegistryID: "live",
+							PaneID:     "%1",
+							PanePID:    101,
+							Status:     session.AgentStatusRunning,
+						},
+						{
+							RegistryID: "moved",
+							PaneID:     "%2",
+							PanePID:    102,
+							Status:     session.AgentStatusRunning,
+						},
+						{
+							RegistryID: "gone",
+							PaneID:     "%3",
+							PanePID:    103,
+							Status:     session.AgentStatusRunning,
+						},
+					},
 				},
-			}}
+			}
 			paneLoads := 0
 			model := loaderTestModel(t, config.DefaultConfig(), Dependencies{
 				WatchAgentSummaries: func(_ context.Context, publish func(uint64, []session.AgentSummary, error) error) error {
@@ -1427,7 +1671,9 @@ func TestAgentWatchValidatesPanesBeforePublishing(t *testing.T) {
 					return testCase.panes, testCase.paneErr
 				},
 			})
-			model.sessions = []session.Session{{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive}}
+			model.sessions = []session.Session{
+				{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive},
+			}
 			model.startAgentSummaryWatchCommand()()
 			message := model.waitAgentSummaryUpdateCommand()()
 			loadsBeforeUpdate := paneLoads
@@ -1435,12 +1681,23 @@ func TestAgentWatchValidatesPanesBeforePublishing(t *testing.T) {
 			updateTestModel(t, model, message)
 
 			row := model.sessions[0]
-			if len(row.Agents) != testCase.want || row.AgentTotal != testCase.want || row.AgentActive != testCase.want {
-				t.Fatalf("watched agents/counts = %d/%d/%d, want %d", len(row.Agents), row.AgentTotal, row.AgentActive, testCase.want)
+			if len(row.Agents) != testCase.want || row.AgentTotal != testCase.want ||
+				row.AgentActive != testCase.want {
+				t.Fatalf(
+					"watched agents/counts = %d/%d/%d, want %d",
+					len(row.Agents),
+					row.AgentTotal,
+					row.AgentActive,
+					testCase.want,
+				)
 			}
 
 			if paneLoads != 1 || loadsBeforeUpdate != paneLoads {
-				t.Fatalf("pane queries before/after Update = %d/%d, want one worker query", loadsBeforeUpdate, paneLoads)
+				t.Fatalf(
+					"pane queries before/after Update = %d/%d, want one worker query",
+					loadsBeforeUpdate,
+					paneLoads,
+				)
 			}
 
 			if len(summaries[0].Agents) != 3 || summaries[0].Agents[0].PositionKnown {
@@ -1472,8 +1729,10 @@ func TestAgentWatchUnavailableBrokerUsesPollingWithoutWarning(t *testing.T) {
 			model.width = 80
 			model.height = 20
 			model.handleSessionLoadResult(sessionLoadResultMsg{
-				sessions: []session.Session{{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive}},
-				status:   session.StatusComplete,
+				sessions: []session.Session{
+					{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive},
+				},
+				status: session.StatusComplete,
 			})
 
 			command := model.startAgentSummaryWatchCommand()
@@ -1492,7 +1751,11 @@ func TestAgentWatchUnavailableBrokerUsesPollingWithoutWarning(t *testing.T) {
 			warningVisible := strings.Contains(stripANSI(viewString(model.View())), "⚠") ||
 				strings.Contains(stripANSI(viewString(model.View())), "Agent status unavailable")
 			if warningVisible == testCase.pollEnabled {
-				t.Fatalf("agent warning visible = %t, poll available = %t", warningVisible, testCase.pollEnabled)
+				t.Fatalf(
+					"agent warning visible = %t, poll available = %t",
+					warningVisible,
+					testCase.pollEnabled,
+				)
 			}
 		})
 	}
@@ -1509,7 +1772,8 @@ func TestRemoteWatchErrorFencesOutstandingRead(t *testing.T) {
 	model.handleRemoteCatalog(remoteCatalogMsg{err: errTmuxUnavailable})
 	updateTestModel(t, model, loaded)
 
-	if !errors.Is(model.remoteCatalogErr, errTmuxUnavailable) || model.degradedSources[degradedSourceRemote] == "" {
+	if !errors.Is(model.remoteCatalogErr, errTmuxUnavailable) ||
+		model.degradedSources[degradedSourceRemote] == "" {
 		t.Fatal("outstanding initial read erased the newer watch failure")
 	}
 
@@ -1547,7 +1811,10 @@ func TestOpenPickerReceivesRemoteCatalogChanges(t *testing.T) {
 		updateTestModel(t, model, *catalog)
 
 		if len(model.sessions) != 1 || model.sessions[0].Name != "remote" {
-			t.Fatalf("sessions = %+v, want the remote session from the catalog change", model.sessions)
+			t.Fatalf(
+				"sessions = %+v, want the remote session from the catalog change",
+				model.sessions,
+			)
 		}
 	})
 }
@@ -1643,7 +1910,9 @@ func TestAgentWatchDeliversQueuedRemoval(t *testing.T) {
 				return publish(2, nil, nil)
 			},
 		})
-		model.sessions = []session.Session{{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive}}
+		model.sessions = []session.Session{
+			{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive},
+		}
 
 		command := model.startAgentSummaryWatchCommand()
 		go command()
@@ -1674,18 +1943,33 @@ func TestSessionLoadPreservesNewerAgentWatchObservations(t *testing.T) {
 		t.Run(observation, func(t *testing.T) {
 			model := loaderTestModel(t, config.DefaultConfig(), Dependencies{
 				LoadCatalog: func(context.Context) (session.CatalogResult, error) {
-					return session.CatalogResult{Status: session.StatusComplete, Sessions: []session.Session{{
-						ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive,
-					}}}, nil
+					return session.CatalogResult{
+						Status: session.StatusComplete,
+						Sessions: []session.Session{{
+							ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive,
+						}},
+					}, nil
 				},
 				LoadAgentSummaries: func(context.Context) ([]session.AgentSummary, error) {
-					return []session.AgentSummary{{TmuxSessionID: "$1", Total: 1, Agents: []session.AgentSession{{RegistryID: "old"}}}}, nil
+					return []session.AgentSummary{
+						{
+							TmuxSessionID: "$1",
+							Total:         1,
+							Agents:        []session.AgentSession{{RegistryID: "old"}},
+						},
+					}, nil
 				},
 			})
 			loaded := model.loadInitialSessionsCommand()()
 			model.handleAgentSummaries(agentSummariesMsg{
-				revision:  1,
-				summaries: []session.AgentSummary{{TmuxSessionID: "$1", Total: 1, Agents: []session.AgentSession{{RegistryID: "new"}}}},
+				revision: 1,
+				summaries: []session.AgentSummary{
+					{
+						TmuxSessionID: "$1",
+						Total:         1,
+						Agents:        []session.AgentSession{{RegistryID: "new"}},
+					},
+				},
 			})
 
 			if observation == "removal" {
@@ -1702,7 +1986,8 @@ func TestSessionLoadPreservesNewerAgentWatchObservations(t *testing.T) {
 
 			updateTestModel(t, model, model.refreshSessions()())
 
-			if agents := model.sessions[0].Agents; len(agents) != 1 || agents[0].RegistryID != "old" {
+			if agents := model.sessions[0].Agents; len(agents) != 1 ||
+				agents[0].RegistryID != "old" {
 				t.Fatalf("fresh load was ignored after earlier watch delivery: %#v", agents)
 			}
 		})
@@ -1721,7 +2006,8 @@ func assertAgentWatchObservation(t *testing.T, model *Model, observation string)
 		t.Fatalf("late load replaced newer agent: %#v", row.Agents)
 	}
 
-	if observation == "error" && (!errors.Is(model.agentSummaryErr, errTmuxUnavailable) || model.degradedSources[degradedSourceAgents] == "") {
+	if observation == "error" &&
+		(!errors.Is(model.agentSummaryErr, errTmuxUnavailable) || model.degradedSources[degradedSourceAgents] == "") {
 		t.Fatal("late load erased the newer agent error")
 	}
 }
@@ -1732,7 +2018,8 @@ func TestAgentWatchFailureRejectsOlderRevision(t *testing.T) {
 	model.handleAgentSummaries(agentSummariesMsg{revision: 3, err: errTmuxUnavailable})
 	model.handleAgentSummaries(agentSummariesMsg{revision: 2})
 
-	if !errors.Is(model.agentSummaryErr, errTmuxUnavailable) || model.degradedSources[degradedSourceAgents] == "" {
+	if !errors.Is(model.agentSummaryErr, errTmuxUnavailable) ||
+		model.degradedSources[degradedSourceAgents] == "" {
 		t.Fatal("stale agent revision cleared the newer watch failure")
 	}
 }
@@ -1758,11 +2045,19 @@ func TestAgentPollPreservesNewerWatchObservations(t *testing.T) {
 					}}, pollErr
 				},
 			})
-			model.sessions = []session.Session{{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive}}
+			model.sessions = []session.Session{
+				{ID: "$1", Name: testSupportSessionDevName, Kind: session.KindLive},
+			}
 			loaded := model.loadAgentSummariesCommand()()
 			model.handleAgentSummaries(agentSummariesMsg{
-				revision:  1,
-				summaries: []session.AgentSummary{{TmuxSessionID: "$1", Total: 1, Agents: []session.AgentSession{{RegistryID: "new"}}}},
+				revision: 1,
+				summaries: []session.AgentSummary{
+					{
+						TmuxSessionID: "$1",
+						Total:         1,
+						Agents:        []session.AgentSession{{RegistryID: "new"}},
+					},
+				},
 			})
 
 			switch testCase.observation {
@@ -1783,7 +2078,8 @@ func TestAgentPollPreservesNewerWatchObservations(t *testing.T) {
 
 			updateTestModel(t, model, model.loadAgentSummariesCommand()())
 
-			if agents := model.sessions[0].Agents; len(agents) != 1 || agents[0].RegistryID != "old" {
+			if agents := model.sessions[0].Agents; len(agents) != 1 ||
+				agents[0].RegistryID != "old" {
 				t.Fatalf("new periodic poll was ignored after watch delivery: %#v", agents)
 			}
 		})
@@ -1802,7 +2098,11 @@ func TestAgentSummaryIndexPreservesReusedTmuxIDCompositeIdentity(t *testing.T) {
 	applyAgentSummaryToSession(&row, byID, byName)
 
 	if row.AgentTotal != 1 || row.AgentActive != 1 {
-		t.Fatalf("exact ($4,kwinl) summary was dropped: active/total = %d/%d", row.AgentActive, row.AgentTotal)
+		t.Fatalf(
+			"exact ($4,kwinl) summary was dropped: active/total = %d/%d",
+			row.AgentActive,
+			row.AgentTotal,
+		)
 	}
 }
 

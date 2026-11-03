@@ -246,7 +246,10 @@ func compareAgentsModeSessions(left session.Session, right session.Session) int 
 }
 
 func compareFoldedLabels(left string, right string) int {
-	if byFoldedLabel := strings.Compare(strings.ToLower(left), strings.ToLower(right)); byFoldedLabel != 0 {
+	if byFoldedLabel := strings.Compare(
+		strings.ToLower(left),
+		strings.ToLower(right),
+	); byFoldedLabel != 0 {
 		return byFoldedLabel
 	}
 
@@ -322,8 +325,9 @@ func (m *Model) restoreSelectedSession(selected sessionIdentity) {
 func (m *Model) restoreSelectedInboxItem(selected sessionIdentity) {
 	for index, group := range m.filtered {
 		agentIndex := slices.IndexFunc(group.Agents, func(agent session.AgentSession) bool {
-			return agent.Host == selected.host && ((selected.paneID != "" && agent.PaneID == selected.paneID) ||
-				(selected.agentID != "" && agent.RegistryID == selected.agentID))
+			return agent.Host == selected.host &&
+				((selected.paneID != "" && agent.PaneID == selected.paneID) ||
+					(selected.agentID != "" && agent.RegistryID == selected.agentID))
 		})
 		if agentIndex >= 0 || (len(group.Agents) == 0 && group.ID == selected.id) {
 			m.cursor = index
@@ -377,11 +381,15 @@ func (m *Model) restoreCurrentAgent(current session.Session) {
 }
 
 func (m *Model) settleInitialAgentSelection() {
-	if !m.initialAgentSelectionPending || m.displayMode != displayModeAgents || m.textInput.Value() != "" {
+	if !m.initialAgentSelectionPending || m.displayMode != displayModeAgents ||
+		m.textInput.Value() != "" {
 		return
 	}
 
-	currentIndex := slices.IndexFunc(m.filtered, func(row session.Session) bool { return row.Current })
+	currentIndex := slices.IndexFunc(
+		m.filtered,
+		func(row session.Session) bool { return row.Current },
+	)
 	if currentIndex < 0 || len(m.filtered[currentIndex].Agents) == 0 || m.cursor != currentIndex {
 		return
 	}

@@ -47,10 +47,13 @@ func newDaemonTmuxCommand() *cobra.Command {
 		},
 		RunE: runDaemonServe,
 	}
-	cmd.Flags().String("socket", "", "Explicit absolute path to the owned tmux server socket (required)")
+	cmd.Flags().
+		String("socket", "", "Explicit absolute path to the owned tmux server socket (required)")
 	cmd.Flags().String("tmux", "tmux", "Path of the tmux executable")
-	cmd.Flags().String("tmux-config", "", "Configuration file for the tmux server [default: tmux's own configuration lookup]")
-	cmd.Flags().Duration("stop-grace", defaultDaemonStopGrace, "Grace period before a forced process stop is reported incomplete")
+	cmd.Flags().
+		String("tmux-config", "", "Configuration file for the tmux server [default: tmux's own configuration lookup]")
+	cmd.Flags().
+		Duration("stop-grace", defaultDaemonStopGrace, "Grace period before a forced process stop is reported incomplete")
 
 	return cmd
 }
@@ -73,7 +76,10 @@ func newDaemonWaitReadyCommand() *cobra.Command {
 			defer cancel()
 
 			if err := daemon.WaitReady(ctx, socket); err != nil {
-				return oops.In("cli").Code("daemon_not_ready").With("operation", "daemon_wait_ready").Wrap(err)
+				return oops.In("cli").
+					Code("daemon_not_ready").
+					With("operation", "daemon_wait_ready").
+					Wrap(err)
 			}
 
 			return nil
@@ -101,11 +107,17 @@ func runDaemonServe(cmd *cobra.Command, _ []string) error {
 			return clibase.NewExitError(clibase.ExitCodeUsage, err)
 		}
 
-		return oops.In("cli").Code("daemon_config_failed").With("operation", "daemon_serve").Wrap(err)
+		return oops.In("cli").
+			Code("daemon_config_failed").
+			With("operation", "daemon_serve").
+			Wrap(err)
 	}
 
 	if err := supervisor.Run(clibase.CommandContext(cmd)); err != nil {
-		return oops.In("cli").Code("daemon_supervision_failed").With("operation", "daemon_serve").Wrap(err)
+		return oops.In("cli").
+			Code("daemon_supervision_failed").
+			With("operation", "daemon_serve").
+			Wrap(err)
 	}
 
 	return nil

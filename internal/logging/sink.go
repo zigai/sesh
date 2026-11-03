@@ -168,17 +168,30 @@ func openPinnedParentDir(path string, create bool) (*os.File, string, error) {
 }
 
 func openNextParentComponent(currentFd int, part string, create bool) (int, error) {
-	nextFd, openErr := unix.Openat(currentFd, part, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
+	nextFd, openErr := unix.Openat(
+		currentFd,
+		part,
+		unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC,
+		0,
+	)
 	if openErr != nil {
 		if create && errors.Is(openErr, unix.ENOENT) {
 			mkErr := unix.Mkdirat(currentFd, part, uint32(parentDirectoryMode))
 			if mkErr != nil && !errors.Is(mkErr, unix.EEXIST) {
 				closeErr := unix.Close(currentFd)
 
-				return -1, errors.Join(wrapErr(mkErr, "log_open_failed", "create directory component"), closeErr)
+				return -1, errors.Join(
+					wrapErr(mkErr, "log_open_failed", "create directory component"),
+					closeErr,
+				)
 			}
 
-			nextFd, openErr = unix.Openat(currentFd, part, unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
+			nextFd, openErr = unix.Openat(
+				currentFd,
+				part,
+				unix.O_RDONLY|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_CLOEXEC,
+				0,
+			)
 		}
 
 		if openErr != nil {
@@ -188,7 +201,11 @@ func openNextParentComponent(currentFd int, part string, create bool) (int, erro
 
 	closeErr := unix.Close(currentFd)
 	if closeErr != nil {
-		return -1, wrapErr(errors.Join(closeErr, unix.Close(nextFd)), "log_open_failed", "close parent directory component")
+		return -1, wrapErr(
+			errors.Join(closeErr, unix.Close(nextFd)),
+			"log_open_failed",
+			"close parent directory component",
+		)
 	}
 
 	return nextFd, nil
@@ -202,7 +219,11 @@ func handleOpenatError(currentFd int, part string, openErr error) error {
 
 	if fstatErr := unix.Fstatat(currentFd, part, &stat, unix.AT_SYMLINK_NOFOLLOW); fstatErr == nil {
 		if stat.Mode&unix.S_IFMT == unix.S_IFLNK || stat.Mode&unix.S_IFMT != unix.S_IFDIR {
-			retErr = wrapErr(ErrLogPathNotRegular, "log_path_not_regular", "parent directory component is not regular")
+			retErr = wrapErr(
+				ErrLogPathNotRegular,
+				"log_path_not_regular",
+				"parent directory component is not regular",
+			)
 		}
 	}
 
@@ -212,7 +233,14 @@ func handleOpenatError(currentFd int, part string, openErr error) error {
 	}
 
 	if errors.Is(openErr, unix.ELOOP) || errors.Is(openErr, unix.ENOTDIR) {
-		return errors.Join(wrapErr(ErrLogPathNotRegular, "log_path_not_regular", "parent directory component is not regular"), closeErr)
+		return errors.Join(
+			wrapErr(
+				ErrLogPathNotRegular,
+				"log_path_not_regular",
+				"parent directory component is not regular",
+			),
+			closeErr,
+		)
 	}
 
 	return errors.Join(wrapErr(openErr, "log_open_failed", "open directory component"), closeErr)
@@ -233,7 +261,11 @@ func acquireProcessLockFile(parentFile *os.File, baseName string) (*os.File, err
 	return lockFile, nil
 }
 
-func acquireProcessLockFileWithContext(ctx context.Context, parentFile *os.File, baseName string) (*os.File, error) {
+func acquireProcessLockFileWithContext(
+	ctx context.Context,
+	parentFile *os.File,
+	baseName string,
+) (*os.File, error) {
 	lockFile, err := openProcessLockFileDescriptor(parentFile, baseName)
 	if err != nil {
 		return nil, err
@@ -252,7 +284,12 @@ func openProcessLockFileDescriptor(parentFile *os.File, baseName string) (*os.Fi
 	parentFd := int(parentFile.Fd())
 	lockName := baseName + ".lock"
 
-	lockFd, err := unix.Openat(parentFd, lockName, unix.O_RDWR|unix.O_CREAT|unix.O_NOFOLLOW|unix.O_CLOEXEC|unix.O_NONBLOCK, 0o600)
+	lockFd, err := unix.Openat(
+		parentFd,
+		lockName,
+		unix.O_RDWR|unix.O_CREAT|unix.O_NOFOLLOW|unix.O_CLOEXEC|unix.O_NONBLOCK,
+		0o600,
+	)
 	if err != nil {
 		if errors.Is(err, unix.ELOOP) {
 			return nil, wrapErr(ErrLogPathNotRegular, "log_path_not_regular", "open log lock file")
@@ -271,21 +308,30 @@ func openProcessLockFileDescriptor(parentFile *os.File, baseName string) (*os.Fi
 	if stat.Mode&unix.S_IFMT != unix.S_IFREG {
 		closeErr := unix.Close(lockFd)
 
-		return nil, errors.Join(wrapErr(ErrLogPathNotRegular, "log_path_not_regular", "inspect log lock file"), closeErr)
+		return nil, errors.Join(
+			wrapErr(ErrLogPathNotRegular, "log_path_not_regular", "inspect log lock file"),
+			closeErr,
+		)
 	}
 
 	if fs.FileMode(stat.Mode).Perm() != logFileMode {
 		if err := unix.Fchmod(lockFd, 0o600); err != nil {
 			closeErr := unix.Close(lockFd)
 
-			return nil, errors.Join(wrapErr(err, "log_lock_failed", "set log lock file permissions"), closeErr)
+			return nil, errors.Join(
+				wrapErr(err, "log_lock_failed", "set log lock file permissions"),
+				closeErr,
+			)
 		}
 	}
 
 	if _, err := unix.FcntlInt(uintptr(lockFd), unix.F_SETFL, unix.O_RDWR); err != nil {
 		closeErr := unix.Close(lockFd)
 
-		return nil, errors.Join(wrapErr(err, "log_lock_failed", "configure log lock file flags"), closeErr)
+		return nil, errors.Join(
+			wrapErr(err, "log_lock_failed", "configure log lock file flags"),
+			closeErr,
+		)
 	}
 
 	lockFile := os.NewFile(uintptr(lockFd), filepath.Join(parentFile.Name(), lockName))
@@ -296,7 +342,12 @@ func openProcessLockFileDescriptor(parentFile *os.File, baseName string) (*os.Fi
 func openOrCreateActiveFile(parentFile *os.File, path, baseName string) (*os.File, error) {
 	parentFd := int(parentFile.Fd())
 
-	fd, openErr := unix.Openat(parentFd, baseName, unix.O_CREAT|unix.O_EXCL|unix.O_APPEND|unix.O_RDWR|unix.O_NOFOLLOW|unix.O_CLOEXEC|unix.O_NONBLOCK, 0o600)
+	fd, openErr := unix.Openat(
+		parentFd,
+		baseName,
+		unix.O_CREAT|unix.O_EXCL|unix.O_APPEND|unix.O_RDWR|unix.O_NOFOLLOW|unix.O_CLOEXEC|unix.O_NONBLOCK,
+		0o600,
+	)
 	if openErr == nil {
 		return configureActiveFD(fd, path)
 	}
@@ -317,33 +368,49 @@ func configureActiveFD(fd int, path string) (*os.File, error) {
 	if err := unix.Fstat(fd, &stat); err != nil {
 		closeErr := unix.Close(fd)
 
-		return nil, errors.Join(wrapErr(err, "log_open_failed", "inspect active log file"), closeErr)
+		return nil, errors.Join(
+			wrapErr(err, "log_open_failed", "inspect active log file"),
+			closeErr,
+		)
 	}
 
 	if stat.Mode&unix.S_IFMT != unix.S_IFREG {
 		closeErr := unix.Close(fd)
 
-		return nil, errors.Join(wrapErr(ErrLogPathNotRegular, "log_path_not_regular", "inspect active log file"), closeErr)
+		return nil, errors.Join(
+			wrapErr(ErrLogPathNotRegular, "log_path_not_regular", "inspect active log file"),
+			closeErr,
+		)
 	}
 
 	if fs.FileMode(stat.Mode).Perm() != logFileMode {
 		if err := unix.Fchmod(fd, 0o600); err != nil {
 			closeErr := unix.Close(fd)
 
-			return nil, errors.Join(wrapErr(err, "log_open_failed", "set active log file permissions"), closeErr)
+			return nil, errors.Join(
+				wrapErr(err, "log_open_failed", "set active log file permissions"),
+				closeErr,
+			)
 		}
 	}
 
 	if _, err := unix.FcntlInt(uintptr(fd), unix.F_SETFL, unix.O_APPEND|unix.O_RDWR); err != nil {
 		closeErr := unix.Close(fd)
 
-		return nil, errors.Join(wrapErr(err, "log_open_failed", "configure active log file flags"), closeErr)
+		return nil, errors.Join(
+			wrapErr(err, "log_open_failed", "configure active log file flags"),
+			closeErr,
+		)
 	}
 
 	return os.NewFile(uintptr(fd), path), nil
 }
 
-func openExisting(parentFile *os.File, path, baseName string, expectedStat *unix.Stat_t) (*os.File, error) {
+func openExisting(
+	parentFile *os.File,
+	path, baseName string,
+	expectedStat *unix.Stat_t,
+) (*os.File, error) {
 	parentFd := int(parentFile.Fd())
 
 	var pathStat unix.Stat_t
@@ -354,10 +421,19 @@ func openExisting(parentFile *os.File, path, baseName string, expectedStat *unix
 	}
 
 	if pathStat.Mode&unix.S_IFMT != unix.S_IFREG {
-		return nil, wrapErr(ErrLogPathNotRegular, "log_path_not_regular", "inspect existing log file")
+		return nil, wrapErr(
+			ErrLogPathNotRegular,
+			"log_path_not_regular",
+			"inspect existing log file",
+		)
 	}
 
-	fd, err := unix.Openat(parentFd, baseName, unix.O_APPEND|unix.O_RDWR|unix.O_NOFOLLOW|unix.O_CLOEXEC|unix.O_NONBLOCK, 0)
+	fd, err := unix.Openat(
+		parentFd,
+		baseName,
+		unix.O_APPEND|unix.O_RDWR|unix.O_NOFOLLOW|unix.O_CLOEXEC|unix.O_NONBLOCK,
+		0,
+	)
 	if err != nil {
 		if errors.Is(err, unix.ELOOP) {
 			return nil, wrapErr(ErrLogPathNotRegular, "log_path_not_regular", "open log file")
@@ -376,13 +452,19 @@ func openExisting(parentFile *os.File, path, baseName string, expectedStat *unix
 		if err := unix.Fstat(fd, &fileStat); err != nil {
 			closeErr := file.Close()
 
-			return nil, errors.Join(wrapErr(err, "log_open_failed", "inspect open log file"), closeErr)
+			return nil, errors.Join(
+				wrapErr(err, "log_open_failed", "inspect open log file"),
+				closeErr,
+			)
 		}
 
 		if fileStat.Dev != expectedStat.Dev || fileStat.Ino != expectedStat.Ino {
 			closeErr := file.Close()
 
-			return nil, errors.Join(wrapErr(ErrLogPathChanged, "log_path_changed", "inspect open log file"), closeErr)
+			return nil, errors.Join(
+				wrapErr(ErrLogPathChanged, "log_path_changed", "inspect open log file"),
+				closeErr,
+			)
 		}
 	}
 
@@ -449,7 +531,10 @@ func (s *Sink) Write(p []byte) (int, error) {
 	if err != nil {
 		s.writeErr = errors.Join(s.writeErr, wrapErr(err, "log_write_failed", "write log event"))
 	} else if n != len(p) {
-		s.writeErr = errors.Join(s.writeErr, wrapErr(io.ErrShortWrite, "log_write_failed", "write log event"))
+		s.writeErr = errors.Join(
+			s.writeErr,
+			wrapErr(io.ErrShortWrite, "log_write_failed", "write log event"),
+		)
 	}
 
 	return len(p), nil

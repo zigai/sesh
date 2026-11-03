@@ -89,11 +89,28 @@ func TestAgentsPopupInitiallySelectsInvokingAgentPane(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 8*time.Second)
 	defer cancel()
 
-	command := exec.CommandContext(ctx, artifact.binary,
-		"pick", "ui", "--no-config", "--socket", fixture.socket,
-		"--target-pane", string(secondInfo.ID), "--current-session-id", string(origin.ID),
-		"--agent-state", registryPath, "--switch-handoff", handoffPath,
-		"--history", fixture.historyPath, "--repository", fixture.repository, "--lease-root", fixture.leaseRoot,
+	command := exec.CommandContext(
+		ctx,
+		artifact.binary,
+		"pick",
+		"ui",
+		"--no-config",
+		"--socket",
+		fixture.socket,
+		"--target-pane",
+		string(secondInfo.ID),
+		"--current-session-id",
+		string(origin.ID),
+		"--agent-state",
+		registryPath,
+		"--switch-handoff",
+		handoffPath,
+		"--history",
+		fixture.historyPath,
+		"--repository",
+		fixture.repository,
+		"--lease-root",
+		fixture.leaseRoot,
 	)
 	command.Dir = artifact.workDir
 	command.Env = artifact.env
@@ -208,7 +225,11 @@ func TestTmuxPopupSelectsInvokingAgentWithLinkedWindow(t *testing.T) {
 	}
 
 	index := 10
-	if _, err := window.Link(t.Context(), linked.Handle(), gotmux.LinkOptions{Index: &index}); err != nil {
+	if _, err := window.Link(
+		t.Context(),
+		linked.Handle(),
+		gotmux.LinkOptions{Index: &index},
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -259,7 +280,10 @@ func TestTmuxPopupSelectsInvokingAgentWithLinkedWindow(t *testing.T) {
 	}
 }
 
-func prepareAgentPickerPopup(t *testing.T, fixture *cliSessionFixture) (gotmux.SessionInfo, gotmux.PaneInfo, string, string) {
+func prepareAgentPickerPopup(
+	t *testing.T,
+	fixture *cliSessionFixture,
+) (gotmux.SessionInfo, gotmux.PaneInfo, string, string) {
 	t.Helper()
 	origin := fixture.fixtureSession(t)
 
@@ -270,7 +294,10 @@ func prepareAgentPickerPopup(t *testing.T, fixture *cliSessionFixture) (gotmux.S
 
 	first := panes[0].Handle()
 
-	second, err := first.Split(t.Context(), gotmux.SplitOptions{Direction: gotmux.DirectionVertical})
+	second, err := first.Split(
+		t.Context(),
+		gotmux.SplitOptions{Direction: gotmux.DirectionVertical},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -289,8 +316,17 @@ func prepareAgentPickerPopup(t *testing.T, fixture *cliSessionFixture) (gotmux.S
 		t.Fatal(err)
 	}
 
-	registryPath := writePickerPopupAgentRegistry(t, fixture.socket, origin, []gotmux.PaneInfo{panes[0], secondInfo})
-	if observed, err := agents.LoadLiveAgents(t.Context(), agents.NewAHTStore(registryPath)); err != nil || len(observed) != 2 {
+	registryPath := writePickerPopupAgentRegistry(
+		t,
+		fixture.socket,
+		origin,
+		[]gotmux.PaneInfo{panes[0], secondInfo},
+	)
+	if observed, err := agents.LoadLiveAgents(
+		t.Context(),
+		agents.NewAHTStore(registryPath),
+	); err != nil ||
+		len(observed) != 2 {
 		t.Fatalf("agent registry fixture = %d records, error %v", len(observed), err)
 	}
 
@@ -302,7 +338,12 @@ func prepareAgentPickerPopup(t *testing.T, fixture *cliSessionFixture) (gotmux.S
 	return origin, secondInfo, registryPath, handoffPath
 }
 
-func writePickerPopupAgentRegistry(t *testing.T, socket string, origin gotmux.SessionInfo, panes []gotmux.PaneInfo) string {
+func writePickerPopupAgentRegistry(
+	t *testing.T,
+	socket string,
+	origin gotmux.SessionInfo,
+	panes []gotmux.PaneInfo,
+) string {
 	t.Helper()
 
 	now := time.Now().UTC().Format(time.RFC3339Nano)
@@ -315,9 +356,15 @@ func writePickerPopupAgentRegistry(t *testing.T, socket string, origin gotmux.Se
 		}
 
 		records[id] = map[string]any{
-			"schema_version": 3, "id": id, "harness": "omp", "liveness": map[string]any{"kind": "live", "activity": "running"},
-			"session_id": id, "created_at": now, "updated_at": now,
-			"presence_changed_at": now, "activity_changed_at": now,
+			"schema_version":      3,
+			"id":                  id,
+			"harness":             "omp",
+			"liveness":            map[string]any{"kind": "live", "activity": "running"},
+			"session_id":          id,
+			"created_at":          now,
+			"updated_at":          now,
+			"presence_changed_at": now,
+			"activity_changed_at": now,
 			"location": map[string]any{
 				"kind": "tmux", "server_id": socket, "session_id": string(origin.ID),
 				"session_name": origin.Name, "window_id": string(pane.WindowID),
@@ -326,7 +373,9 @@ func writePickerPopupAgentRegistry(t *testing.T, socket string, origin gotmux.Se
 		}
 	}
 
-	encoded, err := json.Marshal(map[string]any{"schema_version": 3, "revision": 1, "sessions": records})
+	encoded, err := json.Marshal(
+		map[string]any{"schema_version": 3, "revision": 1, "sessions": records},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -343,14 +392,23 @@ func openPickerPopupPTY(t *testing.T) (*os.File, *os.File) {
 	t.Helper()
 
 	master, slave := openTestPTY(t)
-	if err := unix.IoctlSetWinsize(int(slave.Fd()), unix.TIOCSWINSZ, &unix.Winsize{Row: 30, Col: 100}); err != nil {
+	if err := unix.IoctlSetWinsize(
+		int(slave.Fd()),
+		unix.TIOCSWINSZ,
+		&unix.Winsize{Row: 30, Col: 100},
+	); err != nil {
 		t.Fatal(err)
 	}
 
 	return master, slave
 }
 
-func attachPickerPopupClient(t *testing.T, fixture *cliSessionFixture, origin gotmux.SessionInfo, slave *os.File) string {
+func attachPickerPopupClient(
+	t *testing.T,
+	fixture *cliSessionFixture,
+	origin gotmux.SessionInfo,
+	slave *os.File,
+) string {
 	t.Helper()
 	attachCtx, cancelAttach := context.WithCancel(context.WithoutCancel(t.Context()))
 
@@ -378,7 +436,13 @@ func runPickerPopupArtifact(command *exec.Cmd) <-chan error {
 	return done
 }
 
-func waitForPickerPopupText(t *testing.T, ctx context.Context, master *os.File, commandDone <-chan error, needles ...string) {
+func waitForPickerPopupText(
+	t *testing.T,
+	ctx context.Context,
+	master *os.File,
+	commandDone <-chan error,
+	needles ...string,
+) {
 	t.Helper()
 
 	rendered := make(chan struct{})
@@ -430,7 +494,12 @@ func waitForPickerPopupText(t *testing.T, ctx context.Context, master *os.File, 
 	}
 }
 
-func waitForPickerPopupExit(t *testing.T, ctx context.Context, commandDone <-chan error, diagnostic func() string) {
+func waitForPickerPopupExit(
+	t *testing.T,
+	ctx context.Context,
+	commandDone <-chan error,
+	diagnostic func() string,
+) {
 	t.Helper()
 
 	select {

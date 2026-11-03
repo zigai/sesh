@@ -61,7 +61,8 @@ func reopenable(ctx context.Context, record Record) error {
 }
 
 func (s *Service) reopenLaunch(record Record) ([]string, error) {
-	if (record.State == StateSleeping || record.State == StateWaking) && len(record.Resume.Command) > 0 {
+	if (record.State == StateSleeping || record.State == StateWaking) &&
+		len(record.Resume.Command) > 0 {
 		return slices.Clone(record.Resume.Command), nil
 	}
 

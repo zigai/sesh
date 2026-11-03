@@ -28,7 +28,11 @@ func TestHarnessesOfferConfiguredEntriesInOrderAndResolveNameOnlyOnes(t *testing
 	if !slices.EqualFunc(offered, want, func(a, b task.Harness) bool {
 		return a.Name == b.Name && slices.Equal(a.Command, b.Command)
 	}) {
-		t.Fatalf("Harnesses() = %+v, want %+v: name-only pi resolved, uninstalled codex left out", offered, want)
+		t.Fatalf(
+			"Harnesses() = %+v, want %+v: name-only pi resolved, uninstalled codex left out",
+			offered,
+			want,
+		)
 	}
 }
 

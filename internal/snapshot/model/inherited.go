@@ -79,7 +79,8 @@ func withoutSuppliedOptions(options []Option, parent map[string]Option) []Option
 	kept := make([]Option, 0, len(options))
 
 	for _, option := range options {
-		if supplied, ok := parent[string(option.Name)]; ok && option.Inherited && sameSetting(option, supplied) {
+		if supplied, ok := parent[string(option.Name)]; ok && option.Inherited &&
+			sameSetting(option, supplied) {
 			continue
 		}
 
@@ -113,7 +114,10 @@ func withSuppliedOptions(options []Option, parent map[string]Option, scope strin
 	}
 
 	appended := result[len(options):]
-	slices.SortFunc(appended, func(left, right Option) int { return bytes.Compare(left.Name, right.Name) })
+	slices.SortFunc(
+		appended,
+		func(left, right Option) int { return bytes.Compare(left.Name, right.Name) },
+	)
 
 	return result
 }

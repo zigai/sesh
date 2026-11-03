@@ -22,8 +22,10 @@ import (
 )
 
 var (
-	ErrEndpointAlias = errors.New("tmux endpoint path must be canonical without symlinks, aliases, or hard-links")
-	ErrLeaseRoot     = errors.New("an explicit private lease root directory is required")
+	ErrEndpointAlias = errors.New(
+		"tmux endpoint path must be canonical without symlinks, aliases, or hard-links",
+	)
+	ErrLeaseRoot = errors.New("an explicit private lease root directory is required")
 )
 
 type Lease struct {
@@ -40,7 +42,11 @@ func AcquireLease(ctx context.Context, leaseRoot string, socket string) (*Lease,
 	return acquireLease(ctx, leaseRoot, socket, nil)
 }
 
-func acquireLease(ctx context.Context, leaseRoot, socket string, afterLock func() error) (*Lease, error) {
+func acquireLease(
+	ctx context.Context,
+	leaseRoot, socket string,
+	afterLock func() error,
+) (*Lease, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, wrapAcquireError(err)
 	}
@@ -107,7 +113,10 @@ func acquireLease(ctx context.Context, leaseRoot, socket string, afterLock func(
 func validateLeaseRoot(leaseRoot string) error {
 	if leaseRoot == "" || strings.Contains(leaseRoot, "\x00") ||
 		!filepath.IsAbs(leaseRoot) || filepath.Clean(leaseRoot) != leaseRoot || leaseRoot == "/" {
-		return oops.In("tmux").Code("endpoint_required").With("operation", "acquire_lease").Wrap(ErrLeaseRoot)
+		return oops.In("tmux").
+			Code("endpoint_required").
+			With("operation", "acquire_lease").
+			Wrap(ErrLeaseRoot)
 	}
 
 	return nil
@@ -117,12 +126,18 @@ func validateLeaseRoot(leaseRoot string) error {
 // they are resolved before the endpoint must be canonical and before it names the lease.
 func resolveEndpoint(socket string) (string, error) {
 	if !validEndpointPath(socket) {
-		return "", oops.In("tmux").Code("endpoint_required").With("operation", "acquire_lease").Wrap(ErrEndpoint)
+		return "", oops.In("tmux").
+			Code("endpoint_required").
+			With("operation", "acquire_lease").
+			Wrap(ErrEndpoint)
 	}
 
 	resolved, err := privatefs.ResolveSystemSymlinks(socket)
 	if err != nil {
-		return "", oops.In("tmux").Code("endpoint_required").With("operation", "acquire_lease").Wrap(errors.Join(ErrEndpoint, sanitizePathError(err)))
+		return "", oops.In("tmux").
+			Code("endpoint_required").
+			With("operation", "acquire_lease").
+			Wrap(errors.Join(ErrEndpoint, sanitizePathError(err)))
 	}
 
 	return resolved, nil
@@ -135,7 +150,10 @@ func validEndpointPath(socket string) bool {
 
 func validateEndpoint(socket string) error {
 	if !validEndpointPath(socket) {
-		return oops.In("tmux").Code("endpoint_required").With("operation", "acquire_lease").Wrap(ErrEndpoint)
+		return oops.In("tmux").
+			Code("endpoint_required").
+			With("operation", "acquire_lease").
+			Wrap(ErrEndpoint)
 	}
 
 	parentDir := filepath.Dir(socket)
@@ -143,15 +161,24 @@ func validateEndpoint(socket string) error {
 	resolvedParent, err := filepath.EvalSymlinks(parentDir)
 	if errors.Is(err, fs.ErrNotExist) {
 		// tmux creates the socket directory when a server starts; its absence means no server.
-		return oops.In("tmux").Code("server_unavailable").With("operation", "acquire_lease").Wrap(gotmux.ErrNoServer)
+		return oops.In("tmux").
+			Code("server_unavailable").
+			With("operation", "acquire_lease").
+			Wrap(gotmux.ErrNoServer)
 	}
 
 	if err != nil {
-		return oops.In("tmux").Code("endpoint_required").With("operation", "acquire_lease").Wrap(errors.Join(ErrEndpoint, sanitizePathError(err)))
+		return oops.In("tmux").
+			Code("endpoint_required").
+			With("operation", "acquire_lease").
+			Wrap(errors.Join(ErrEndpoint, sanitizePathError(err)))
 	}
 
 	if resolvedParent != parentDir {
-		return oops.In("tmux").Code("endpoint_required").With("operation", "acquire_lease").Wrap(errors.Join(ErrEndpoint, ErrEndpointAlias))
+		return oops.In("tmux").
+			Code("endpoint_required").
+			With("operation", "acquire_lease").
+			Wrap(errors.Join(ErrEndpoint, ErrEndpointAlias))
 	}
 
 	return validateExistingSocket(socket)
@@ -168,25 +195,40 @@ func validateExistingSocket(socket string) error {
 	}
 
 	if fi.Mode()&os.ModeSymlink != 0 {
-		return oops.In("tmux").Code("endpoint_required").With("operation", "acquire_lease").Wrap(errors.Join(ErrEndpoint, ErrEndpointAlias))
+		return oops.In("tmux").
+			Code("endpoint_required").
+			With("operation", "acquire_lease").
+			Wrap(errors.Join(ErrEndpoint, ErrEndpointAlias))
 	}
 
 	resolvedSocket, err := filepath.EvalSymlinks(socket)
 	if err != nil {
-		return oops.In("tmux").Code("endpoint_required").With("operation", "acquire_lease").Wrap(errors.Join(ErrEndpoint, sanitizePathError(err)))
+		return oops.In("tmux").
+			Code("endpoint_required").
+			With("operation", "acquire_lease").
+			Wrap(errors.Join(ErrEndpoint, sanitizePathError(err)))
 	}
 
 	if resolvedSocket != socket {
-		return oops.In("tmux").Code("endpoint_required").With("operation", "acquire_lease").Wrap(errors.Join(ErrEndpoint, ErrEndpointAlias))
+		return oops.In("tmux").
+			Code("endpoint_required").
+			With("operation", "acquire_lease").
+			Wrap(errors.Join(ErrEndpoint, ErrEndpointAlias))
 	}
 
 	if fi.Mode()&os.ModeSocket == 0 {
-		return oops.In("tmux").Code("endpoint_required").With("operation", "acquire_lease").Wrap(ErrEndpoint)
+		return oops.In("tmux").
+			Code("endpoint_required").
+			With("operation", "acquire_lease").
+			Wrap(ErrEndpoint)
 	}
 
 	stat, ok := fi.Sys().(*syscall.Stat_t)
 	if !ok || stat.Nlink != 1 {
-		return oops.In("tmux").Code("endpoint_required").With("operation", "acquire_lease").Wrap(errors.Join(ErrEndpoint, ErrEndpointAlias))
+		return oops.In("tmux").
+			Code("endpoint_required").
+			With("operation", "acquire_lease").
+			Wrap(errors.Join(ErrEndpoint, ErrEndpointAlias))
 	}
 
 	return nil
@@ -231,11 +273,17 @@ func wrapAcquireError(err error) error {
 	sanitized := sanitizePathError(err)
 
 	if errors.Is(err, context.Canceled) {
-		return oops.In("tmux").Code("operation_canceled").With("operation", "acquire_lease").Wrap(sanitized)
+		return oops.In("tmux").
+			Code("operation_canceled").
+			With("operation", "acquire_lease").
+			Wrap(sanitized)
 	}
 
 	if errors.Is(err, context.DeadlineExceeded) {
-		return oops.In("tmux").Code("operation_timed_out").With("operation", "acquire_lease").Wrap(sanitized)
+		return oops.In("tmux").
+			Code("operation_timed_out").
+			With("operation", "acquire_lease").
+			Wrap(sanitized)
 	}
 
 	return oops.In("tmux").With("operation", "acquire_lease").Wrap(sanitized)

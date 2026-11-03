@@ -32,7 +32,8 @@ func TestSeshDisplayFormatControlsFieldsAndAlignment(t *testing.T) {
 	}
 
 	lines := strings.Split(stripANSI(model.renderList(72, 2)), "\n")
-	if !strings.Contains(lines[0], "* dev [editor] dev windows=4 attached") || !strings.HasSuffix(lines[0], "2/3") {
+	if !strings.Contains(lines[0], "* dev [editor] dev windows=4 attached") ||
+		!strings.HasSuffix(lines[0], "2/3") {
 		t.Fatalf("custom live row = %q", lines[0])
 	}
 
@@ -154,7 +155,9 @@ func TestAgentsDisplayFormatsControlParentAndChildRows(t *testing.T) {
 func TestAgentTreeRemainsMutedWhenSelected(t *testing.T) {
 	model := newTestModel()
 	model.displayMode = displayModeAgents
-	model.filtered = []session.Session{{Name: "project", AgentTotal: 1, Agents: []session.AgentSession{{HarnessSession: "agent"}}}}
+	model.filtered = []session.Session{
+		{Name: "project", AgentTotal: 1, Agents: []session.AgentSession{{HarnessSession: "agent"}}},
+	}
 
 	for _, selected := range []bool{false, true} {
 		model.agentCursor = parentAgentIndex
@@ -185,7 +188,9 @@ func TestSeshAgentCountsDefaultAndOptIn(t *testing.T) {
 			}
 
 			model := newTestModelWithConfig(t, cfg)
-			model.filtered = []session.Session{{Name: testSupportSessionProjectName, AgentTotal: 2, AgentActive: 1}}
+			model.filtered = []session.Session{
+				{Name: testSupportSessionProjectName, AgentTotal: 2, AgentActive: 1},
+			}
 
 			line := strings.Join(strings.Fields(stripANSI(model.renderList(52, 1))), " ")
 			if line != test.want {
@@ -414,8 +419,22 @@ func TestAgentGitCountersKeepSeparateColumns(t *testing.T) {
 	model := newTestModelWithConfig(t, cfg)
 	model.displayMode = displayModeAgents
 	model.filtered = []session.Session{{Name: "dev", AgentTotal: 2, Agents: []session.AgentSession{
-		{HarnessSession: "first", Worktree: "/work/repo", GitBranch: "main", GitChanges: "+1 -200", GitAhead: 2, GitBehind: 12, GitTrackingKnown: true},
-		{HarnessSession: "second", Worktree: "/work/repo", GitBranch: "feature/long-branch-name", GitChanges: "+1234 -0", GitTrackingKnown: true},
+		{
+			HarnessSession:   "first",
+			Worktree:         "/work/repo",
+			GitBranch:        "main",
+			GitChanges:       "+1 -200",
+			GitAhead:         2,
+			GitBehind:        12,
+			GitTrackingKnown: true,
+		},
+		{
+			HarnessSession:   "second",
+			Worktree:         "/work/repo",
+			GitBranch:        "feature/long-branch-name",
+			GitChanges:       "+1234 -0",
+			GitTrackingKnown: true,
+		},
 	}}}
 	lines := strings.Split(stripANSI(model.renderList(100, 3)), "\n")
 
@@ -441,12 +460,18 @@ func TestAgentGitCountersKeepSeparateColumns(t *testing.T) {
 
 		for index := range columns {
 			if columns[index] != actual[index] {
-				t.Fatalf("Git column %d shifted from %d to %d", index, columns[index], actual[index])
+				t.Fatalf(
+					"Git column %d shifted from %d to %d",
+					index,
+					columns[index],
+					actual[index],
+				)
 			}
 		}
 	}
 
-	if !strings.Contains(lines[1], "↑2") || !strings.Contains(lines[1], "↓12") || !strings.Contains(lines[2], "↑0") {
+	if !strings.Contains(lines[1], "↑2") || !strings.Contains(lines[1], "↓12") ||
+		!strings.Contains(lines[2], "↑0") {
 		t.Fatalf("tracking counters missing: %#v", lines)
 	}
 }
@@ -530,7 +555,10 @@ func TestAgentOutsideGitHidesBranchIconAndGitColumns(t *testing.T) {
 		t.Fatalf("no-git agent with right shortcut showed git icon: %q", outputRight)
 	}
 
-	if agentLine := strings.Split(outputRight, "\n")[1]; !strings.HasSuffix(strings.TrimRight(agentLine, " "), " a") {
+	if agentLine := strings.Split(outputRight, "\n")[1]; !strings.HasSuffix(
+		strings.TrimRight(agentLine, " "),
+		" a",
+	) {
 		t.Fatalf("no-git agent with right shortcut missing shortcut badge: %q", outputRight)
 	}
 }

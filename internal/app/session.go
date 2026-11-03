@@ -35,7 +35,11 @@ func (local *Local) registerSessionHandlers() {
 	handle(local, action.SessionSwitch, local.switchSession)
 }
 
-func (local *Local) createSession(ctx context.Context, _ action.Caller, input action.CreateSession) (action.CreatedSession, error) {
+func (local *Local) createSession(
+	ctx context.Context,
+	_ action.Caller,
+	input action.CreateSession,
+) (action.CreatedSession, error) {
 	var created action.CreatedSession
 
 	directory, err := sessionDirectory(ctx, input.Directory, input.CreateDirectory)
@@ -56,16 +60,29 @@ func (local *Local) createSession(ctx context.Context, _ action.Caller, input ac
 	return action.CreatedSession{Session: action.RefOf(row), Directory: directory}, nil
 }
 
-func (local *Local) renameSession(ctx context.Context, _ action.Caller, input action.RenameSession) (action.RenamedSession, error) {
+func (local *Local) renameSession(
+	ctx context.Context,
+	_ action.Caller,
+	input action.RenameSession,
+) (action.RenamedSession, error) {
 	var unchanged action.RenamedSession
 
 	if _, err := local.liveTarget(ctx, input.Session); err != nil {
 		return unchanged, err
 	}
 
-	outcome, err := local.workflow.RenameSessionTargetOutcome(ctx, input.Session.Name, input.Name, input.Session.ID)
+	outcome, err := local.workflow.RenameSessionTargetOutcome(
+		ctx,
+		input.Session.Name,
+		input.Name,
+		input.Session.ID,
+	)
 
-	result := action.RenamedSession{PreviousName: input.Session.Name, Name: input.Name, HistoryUpdated: outcome.HistoryUpdated}
+	result := action.RenamedSession{
+		PreviousName:   input.Session.Name,
+		Name:           input.Name,
+		HistoryUpdated: outcome.HistoryUpdated,
+	}
 	if !outcome.Renamed {
 		result = unchanged
 	}
@@ -77,24 +94,45 @@ func (local *Local) renameSession(ctx context.Context, _ action.Caller, input ac
 	return result, nil
 }
 
-func (local *Local) killSession(ctx context.Context, _ action.Caller, input action.KillSession) (action.KilledSession, error) {
+func (local *Local) killSession(
+	ctx context.Context,
+	_ action.Caller,
+	input action.KillSession,
+) (action.KilledSession, error) {
 	result := action.KilledSession{Session: input.Session}
 
 	if _, err := local.liveTarget(ctx, input.Session); err != nil {
 		return result, err
 	}
 
-	if err := local.workflow.KillSessionTarget(ctx, input.Session.Name, input.Session.ID, input.Force); err != nil {
+	if err := local.workflow.KillSessionTarget(
+		ctx,
+		input.Session.Name,
+		input.Session.ID,
+		input.Force,
+	); err != nil {
 		return result, oops.In("app").With("operation", "kill_session").Wrap(err)
 	}
 
 	return result, nil
 }
 
-func (local *Local) deleteSession(ctx context.Context, _ action.Caller, input action.DeleteSession) (action.DeletedSession, error) {
+func (local *Local) deleteSession(
+	ctx context.Context,
+	_ action.Caller,
+	input action.DeleteSession,
+) (action.DeletedSession, error) {
 	refused := deletedSession(input.Session.Name, session.DeleteOutcome{
-		LivePresent: false, LiveKilled: false, LiveSessionID: "", SavedFound: false, SavedDeleted: false,
-		SavedGenerations: 0, SavedSessions: 0, PreservedGenerations: nil, PendingRewrites: nil, HistoryUpdated: false,
+		LivePresent:          false,
+		LiveKilled:           false,
+		LiveSessionID:        "",
+		SavedFound:           false,
+		SavedDeleted:         false,
+		SavedGenerations:     0,
+		SavedSessions:        0,
+		PreservedGenerations: nil,
+		PendingRewrites:      nil,
+		HistoryUpdated:       false,
 	})
 	expectedID := ""
 
@@ -118,15 +156,29 @@ func (local *Local) deleteSession(ctx context.Context, _ action.Caller, input ac
 		return refused, err
 	}
 
-	outcome, err := local.workflow.DeleteSessionTargetEverywhere(ctx, input.Session.Name, expectedID, input.Force)
+	outcome, err := local.workflow.DeleteSessionTargetEverywhere(
+		ctx,
+		input.Session.Name,
+		expectedID,
+		input.Force,
+	)
 	if err != nil {
-		return deletedSession(input.Session.Name, outcome), oops.In("app").With("operation", "delete_session").Wrap(err)
+		return deletedSession(
+				input.Session.Name,
+				outcome,
+			), oops.In("app").
+				With("operation", "delete_session").
+				Wrap(err)
 	}
 
 	return deletedSession(input.Session.Name, outcome), nil
 }
 
-func (local *Local) switchSession(ctx context.Context, caller action.Caller, input action.SwitchSession) (action.SwitchedSession, error) {
+func (local *Local) switchSession(
+	ctx context.Context,
+	caller action.Caller,
+	input action.SwitchSession,
+) (action.SwitchedSession, error) {
 	result := action.SwitchedSession(input)
 
 	target, err := local.liveTarget(ctx, input.Session)
@@ -135,7 +187,12 @@ func (local *Local) switchSession(ctx context.Context, caller action.Caller, inp
 	}
 
 	if caller.Client != "" && caller.Session != "" {
-		_, err = local.workflow.SwitchSessionOutcomeForClientTarget(ctx, target, caller.Client, caller.Session)
+		_, err = local.workflow.SwitchSessionOutcomeForClientTarget(
+			ctx,
+			target,
+			caller.Client,
+			caller.Session,
+		)
 	} else {
 		_, err = local.workflow.SwitchSessionOutcome(ctx, target.Name)
 	}
@@ -164,7 +221,10 @@ func (local *Local) refuseLiveNamesake(ctx context.Context, name string) error {
 	return nil
 }
 
-func (local *Local) liveTarget(ctx context.Context, ref action.SessionRef) (session.Session, error) {
+func (local *Local) liveTarget(
+	ctx context.Context,
+	ref action.SessionRef,
+) (session.Session, error) {
 	if ref.Saved() {
 		return session.Session{}, action.Wrap(action.CodeInvalidArgument, errLiveRequired)
 	}
@@ -276,11 +336,16 @@ func createSessionDirectory(ctx context.Context, directory string) (string, erro
 		}
 
 		return "", action.Wrap(code, oops.In("app").Code("session_directory_create_failed").
-			With("operation", "create_session_directory").With("directory", directory).Wrapf(err, "creating directory"))
+			With("operation", "create_session_directory").
+			With("directory", directory).Wrapf(err, "creating directory"))
 	}
 
-	zerolog.Ctx(ctx).Info().Str("component", "session").Str("operation", "create_session_directory").
-		Str("directory", directory).Msg("created session directory")
+	zerolog.Ctx(ctx).
+		Info().
+		Str("component", "session").
+		Str("operation", "create_session_directory").
+		Str("directory", directory).
+		Msg("created session directory")
 
 	return directory, nil
 }

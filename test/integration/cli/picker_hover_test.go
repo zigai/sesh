@@ -39,13 +39,43 @@ func TestAgentsPopupHoverKeepsScrolledSessionRowsStable(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 25*time.Second)
 	defer cancel()
 
-	record := exec.CommandContext(ctx, termtraceExecutable,
-		"record", "-d", alias, "--out", evidencePath, "--cols", "80", "--rows", "12",
-		"--until-screen", "hover-session-00", "--timeout", "8s", "--max-duration", "20s", "--no-input",
-		executable, "-test.run=^TestPickerApplicationHelper$", "--", "pick", "--ui", "popup",
-		"--config", configPath, testSocketFlag, server.Endpoint().SocketPath,
-		testRepositoryFlag, filepath.Join(root, "repository"), "--lease-root", filepath.Join(root, "leases"),
-		"--history", historyPath, "--agent-state", filepath.Join(root, "agents.json"),
+	record := exec.CommandContext(
+		ctx,
+		termtraceExecutable,
+		"record",
+		"-d",
+		alias,
+		"--out",
+		evidencePath,
+		"--cols",
+		"80",
+		"--rows",
+		"12",
+		"--until-screen",
+		"hover-session-00",
+		"--timeout",
+		"8s",
+		"--max-duration",
+		"20s",
+		"--no-input",
+		executable,
+		"-test.run=^TestPickerApplicationHelper$",
+		"--",
+		"pick",
+		"--ui",
+		"popup",
+		"--config",
+		configPath,
+		testSocketFlag,
+		server.Endpoint().SocketPath,
+		testRepositoryFlag,
+		filepath.Join(root, "repository"),
+		"--lease-root",
+		filepath.Join(root, "leases"),
+		"--history",
+		historyPath,
+		"--agent-state",
+		filepath.Join(root, "agents.json"),
 	)
 
 	record.Env = append(pickerEnvironmentWithout(os.Environ(), "NO_COLOR", "TERM"),
@@ -55,7 +85,8 @@ func TestAgentsPopupHoverKeepsScrolledSessionRowsStable(t *testing.T) {
 		stopCtx, stopCancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer stopCancel()
 
-		_ = exec.CommandContext(stopCtx, termtraceExecutable, "stop", "-q", alias, "--wait", "--timeout-ms", "1500").Run()
+		_ = exec.CommandContext(stopCtx, termtraceExecutable, "stop", "-q", alias, "--wait", "--timeout-ms", "1500").
+			Run()
 	})
 
 	if output, err := record.CombinedOutput(); err != nil {
@@ -84,8 +115,15 @@ func TestAgentsPopupHoverKeepsScrolledSessionRowsStable(t *testing.T) {
 		after := pickerHoverScreen(t, ctx, alias)
 		assertPickerHoverRowsStable(t, motion+1, before, after)
 
-		if !strings.Contains(after[hoverRow], "▌") || !strings.Contains(after[hoverRow], hoveredName) {
-			t.Fatalf("hover motion %d did not select %q at row %d: %s", motion+1, hoveredName, hoverRow+1, after[hoverRow])
+		if !strings.Contains(after[hoverRow], "▌") ||
+			!strings.Contains(after[hoverRow], hoveredName) {
+			t.Fatalf(
+				"hover motion %d did not select %q at row %d: %s",
+				motion+1,
+				hoveredName,
+				hoverRow+1,
+				after[hoverRow],
+			)
 		}
 	}
 
@@ -93,12 +131,19 @@ func TestAgentsPopupHoverKeepsScrolledSessionRowsStable(t *testing.T) {
 	termtracePickerCommand(t, ctx, "status", "-q", alias, "--wait-complete", "--timeout-ms", "5000")
 }
 
-func prepareOrdinaryHoverSessions(t *testing.T, root string, server *gotmux.Server) (string, string) {
+func prepareOrdinaryHoverSessions(
+	t *testing.T,
+	root string,
+	server *gotmux.Server,
+) (string, string) {
 	t.Helper()
 
 	for index := range 20 {
 		name := fmt.Sprintf("hover-session-%02d", index)
-		if _, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{Name: name}); err != nil {
+		if _, err := server.NewSession(
+			t.Context(),
+			gotmux.NewSessionOptions{Name: name},
+		); err != nil {
 			t.Fatalf("create session %q: %v", name, err)
 		}
 	}
@@ -111,7 +156,11 @@ func prepareOrdinaryHoverSessions(t *testing.T, root string, server *gotmux.Serv
 	}
 
 	configPath := filepath.Join(root, "picker.toml")
-	if err := os.WriteFile(configPath, []byte("[agent_sessions]\nenabled = false\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		configPath,
+		[]byte("[agent_sessions]\nenabled = false\n"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -143,7 +192,8 @@ func pickerHoverTarget(t *testing.T, before []string) (int, string) {
 func pickerHoverScreen(t *testing.T, ctx context.Context, alias string) []string {
 	t.Helper()
 
-	screen, err := exec.CommandContext(ctx, termtraceExecutable, "screen", "--format", "text", alias).CombinedOutput()
+	screen, err := exec.CommandContext(ctx, termtraceExecutable, "screen", "--format", "text", alias).
+		CombinedOutput()
 	if err != nil {
 		t.Fatalf("inspect hover screen: %v: %s", err, screen)
 	}

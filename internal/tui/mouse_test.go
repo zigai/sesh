@@ -40,7 +40,12 @@ func TestRightClickOpensMenuAtTheClickPosition(t *testing.T) {
 	} {
 		prefix, _, ok := strings.Cut(lines[corner.y], corner.glyph)
 		if !ok || lipgloss.Width(prefix) != 30 {
-			t.Fatalf("menu corner %s is not at column 30, line %d:\n%s", corner.glyph, corner.y, output)
+			t.Fatalf(
+				"menu corner %s is not at column 30, line %d:\n%s",
+				corner.glyph,
+				corner.y,
+				output,
+			)
 		}
 	}
 }
@@ -100,7 +105,11 @@ func TestMouseWheelUpRevealsEarlierAgentGroup(t *testing.T) {
 			}
 
 			layout := model.popupMouseLayout()
-			model = updateTestModel(t, model, mouseWheel(layout.bodyX, layout.listY, tea.MouseWheelDown))
+			model = updateTestModel(
+				t,
+				model,
+				mouseWheel(layout.bodyX, layout.listY, tea.MouseWheelDown),
+			)
 
 			model = updateTestModel(t, model, mouseMotion(layout.bodyX, layout.listY+1))
 			if testCase.hoverChild {
@@ -111,11 +120,19 @@ func TestMouseWheelUpRevealsEarlierAgentGroup(t *testing.T) {
 			}
 
 			output := stripANSI(viewString(model.View()))
-			if strings.Contains(output, "earlier-project") || !strings.Contains(output, "middle-project") {
-				t.Fatalf("popup after wheel down = %q, want middle-project heading without earlier-project", output)
+			if strings.Contains(output, "earlier-project") ||
+				!strings.Contains(output, "middle-project") {
+				t.Fatalf(
+					"popup after wheel down = %q, want middle-project heading without earlier-project",
+					output,
+				)
 			}
 
-			model = updateTestModel(t, model, mouseWheel(layout.bodyX, layout.listY, tea.MouseWheelUp))
+			model = updateTestModel(
+				t,
+				model,
+				mouseWheel(layout.bodyX, layout.listY, tea.MouseWheelUp),
+			)
 
 			output = stripANSI(viewString(model.View()))
 			if !strings.Contains(output, "earlier-project") {
@@ -138,7 +155,10 @@ func TestMouseWheelUpWithinTallAgentGroupPreservesVisibleSelection(t *testing.T)
 		{Name: "later-project", Agents: threeAgentsForTest()},
 	}
 	for index := range model.filtered[0].Agents {
-		model.filtered[0].Agents[index] = session.AgentSession{Harness: "codex", HarnessSession: fmt.Sprintf("agent-%d", index)}
+		model.filtered[0].Agents[index] = session.AgentSession{
+			Harness:        "codex",
+			HarnessSession: fmt.Sprintf("agent-%d", index),
+		}
 	}
 
 	layout := model.popupMouseLayout()
@@ -296,7 +316,11 @@ func footerPartPoint(t *testing.T, model *Model, desc string) (int, int) {
 		x += part.width + 2
 	}
 
-	t.Fatalf("footer shortcut %q not visible in %#v", desc, model.footerParts(layout.layout.bodyWidth))
+	t.Fatalf(
+		"footer shortcut %q not visible in %#v",
+		desc,
+		model.footerParts(layout.layout.bodyWidth),
+	)
 
 	return 0, 0
 }
@@ -329,7 +353,13 @@ func TestMouseClickConfirmDialogButtons(t *testing.T) {
 			model = updateTestModelWithCommand(t, model, mouseClick(x+1, y, tea.MouseLeft))
 
 			if killed != testCase.wantKilled || model.dialog != dialogNone {
-				t.Fatalf("after clicking %s: killed=%q dialog=%v, want killed=%q and dialog closed", testCase.button, killed, model.dialog, testCase.wantKilled)
+				t.Fatalf(
+					"after clicking %s: killed=%q dialog=%v, want killed=%q and dialog closed",
+					testCase.button,
+					killed,
+					model.dialog,
+					testCase.wantKilled,
+				)
 			}
 		})
 	}
@@ -385,7 +415,11 @@ func TestMouseClickPathSuggestionCompletesIt(t *testing.T) {
 
 	wantChild := filepath.Join("beta", "child") + string(os.PathSeparator)
 	if len(model.pathSuggestions) != 1 || model.pathSuggestions[0] != wantChild {
-		t.Fatalf("suggestions after clicking beta = %#v, want [%q]", model.pathSuggestions, wantChild)
+		t.Fatalf(
+			"suggestions after clicking beta = %#v, want [%q]",
+			model.pathSuggestions,
+			wantChild,
+		)
 	}
 }
 

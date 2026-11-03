@@ -54,14 +54,27 @@ func verifyDefaultSocketWithoutServer(t *testing.T, cmdName string) {
 
 	exec := executeJSON(t, append(strings.Fields(cmdName), testNoConfigFlag, testJSONFlag)...)
 	if exec.Err != nil || !exec.Envelope.OK {
-		t.Fatalf("%s without --socket on a server-less default socket = %v / %+v, want an empty result", cmdName, exec.Err, exec.Envelope.Error)
+		t.Fatalf(
+			"%s without --socket on a server-less default socket = %v / %+v, want an empty result",
+			cmdName,
+			exec.Err,
+			exec.Envelope.Error,
+		)
 	}
 }
 
 func verifyRelativeSocketPath(t *testing.T, cmdName string) {
 	t.Helper()
 
-	exec := executeJSON(t, append(strings.Fields(cmdName), testSocketFlag, "relative/sock", testNoConfigFlag, testJSONFlag)...)
+	exec := executeJSON(
+		t,
+		append(
+			strings.Fields(cmdName),
+			testSocketFlag,
+			"relative/sock",
+			testNoConfigFlag,
+			testJSONFlag,
+		)...)
 	if exec.Err == nil {
 		t.Fatal("expected error for relative socket, got nil")
 	}
@@ -82,7 +95,16 @@ func verifyRelativeSocketPath(t *testing.T, cmdName string) {
 func verifyPositionalArgs(t *testing.T, cmdName string) {
 	t.Helper()
 
-	exec := executeJSON(t, append(strings.Fields(cmdName), testSocketFlag, "/tmp/valid.sock", "unexpected-arg", testNoConfigFlag, testJSONFlag)...)
+	exec := executeJSON(
+		t,
+		append(
+			strings.Fields(cmdName),
+			testSocketFlag,
+			"/tmp/valid.sock",
+			"unexpected-arg",
+			testNoConfigFlag,
+			testJSONFlag,
+		)...)
 	if exec.Err == nil {
 		t.Fatal("expected error for positional args, got nil")
 	}
@@ -126,7 +148,15 @@ func TestListJSONEnvelopeContractEmpty(t *testing.T) {
 	t.Parallel()
 
 	sockPath := filepath.Join(t.TempDir(), "nonexistent.sock")
-	exec := executeJSON(t, "session", "list", testSocketFlag, sockPath, testNoConfigFlag, testJSONFlag)
+	exec := executeJSON(
+		t,
+		"session",
+		"list",
+		testSocketFlag,
+		sockPath,
+		testNoConfigFlag,
+		testJSONFlag,
+	)
 
 	if exec.Err != nil {
 		t.Fatalf("list on nonexistent socket returned error: %v", exec.Err)
@@ -153,14 +183,26 @@ func TestListJSONEnvelopeContractEmpty(t *testing.T) {
 		t.Fatalf("result JSON does not contain empty array: %s", string(exec.Envelope.Result))
 	}
 
-	assertAllKeysCamelCase(t, clitest.DecodePayload[map[string]any](t, exec.Envelope.Result), "list.result")
+	assertAllKeysCamelCase(
+		t,
+		clitest.DecodePayload[map[string]any](t, exec.Envelope.Result),
+		"list.result",
+	)
 }
 
 func TestScrollbackJSONEnvelopeSessionsEmpty(t *testing.T) {
 	t.Parallel()
 
 	sockPath := filepath.Join(t.TempDir(), "nonexistent.sock")
-	exec := executeJSON(t, "session", "scrollback", testSocketFlag, sockPath, testNoConfigFlag, testJSONFlag)
+	exec := executeJSON(
+		t,
+		"session",
+		"scrollback",
+		testSocketFlag,
+		sockPath,
+		testNoConfigFlag,
+		testJSONFlag,
+	)
 
 	if exec.Err != nil {
 		t.Fatalf("history returned error: %v", exec.Err)
@@ -187,14 +229,27 @@ func TestScrollbackJSONEnvelopeSessionsEmpty(t *testing.T) {
 		t.Fatalf("result JSON missing empty array: %s", string(exec.Envelope.Result))
 	}
 
-	assertAllKeysCamelCase(t, clitest.DecodePayload[map[string]any](t, exec.Envelope.Result), "history.result")
+	assertAllKeysCamelCase(
+		t,
+		clitest.DecodePayload[map[string]any](t, exec.Envelope.Result),
+		"history.result",
+	)
 }
 
 func TestScrollbackJSONEnvelopePanesEmpty(t *testing.T) {
 	t.Parallel()
 
 	sockPath := filepath.Join(t.TempDir(), "nonexistent.sock")
-	exec := executeJSON(t, "session", "scrollback", "--panes", testSocketFlag, sockPath, testNoConfigFlag, testJSONFlag)
+	exec := executeJSON(
+		t,
+		"session",
+		"scrollback",
+		"--panes",
+		testSocketFlag,
+		sockPath,
+		testNoConfigFlag,
+		testJSONFlag,
+	)
 
 	if exec.Err != nil {
 		t.Fatalf("history --panes returned error: %v", exec.Err)
@@ -221,7 +276,11 @@ func TestScrollbackJSONEnvelopePanesEmpty(t *testing.T) {
 		t.Fatalf("result JSON missing empty array: %s", string(exec.Envelope.Result))
 	}
 
-	assertAllKeysCamelCase(t, clitest.DecodePayload[map[string]any](t, exec.Envelope.Result), "history_panes.result")
+	assertAllKeysCamelCase(
+		t,
+		clitest.DecodePayload[map[string]any](t, exec.Envelope.Result),
+		"history_panes.result",
+	)
 }
 
 func TestListTableEmptyOutput(t *testing.T) {
@@ -229,7 +288,14 @@ func TestListTableEmptyOutput(t *testing.T) {
 
 	sockPath := filepath.Join(t.TempDir(), "nonexistent.sock")
 
-	stdout, stderr, err := executeCommand(t, "session", "list", testSocketFlag, sockPath, testNoConfigFlag)
+	stdout, stderr, err := executeCommand(
+		t,
+		"session",
+		"list",
+		testSocketFlag,
+		sockPath,
+		testNoConfigFlag,
+	)
 	if err != nil {
 		t.Fatalf("list returned error: %v", err)
 	}
@@ -248,7 +314,14 @@ func TestScrollbackSummaryTableEmptyOutput(t *testing.T) {
 
 	sockPath := filepath.Join(t.TempDir(), "nonexistent.sock")
 
-	stdout, stderr, err := executeCommand(t, "session", "scrollback", testSocketFlag, sockPath, testNoConfigFlag)
+	stdout, stderr, err := executeCommand(
+		t,
+		"session",
+		"scrollback",
+		testSocketFlag,
+		sockPath,
+		testNoConfigFlag,
+	)
 	if err != nil {
 		t.Fatalf("history returned error: %v", err)
 	}
@@ -267,7 +340,15 @@ func TestScrollbackPanesTableEmptyOutput(t *testing.T) {
 
 	sockPath := filepath.Join(t.TempDir(), "nonexistent.sock")
 
-	stdout, stderr, err := executeCommand(t, "session", "scrollback", "--panes", testSocketFlag, sockPath, testNoConfigFlag)
+	stdout, stderr, err := executeCommand(
+		t,
+		"session",
+		"scrollback",
+		"--panes",
+		testSocketFlag,
+		sockPath,
+		testNoConfigFlag,
+	)
 	if err != nil {
 		t.Fatalf("history --panes returned error: %v", err)
 	}

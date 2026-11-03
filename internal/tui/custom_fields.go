@@ -21,7 +21,9 @@ import (
 	"github.com/zigai/sesh/internal/session"
 )
 
-var errCustomFieldCommandNotFound = errors.New("custom field command is not an executable file on PATH")
+var errCustomFieldCommandNotFound = errors.New(
+	"custom field command is not an executable file on PATH",
+)
 
 type customFieldKey struct {
 	field string
@@ -65,7 +67,10 @@ type customFieldTickMsg struct {
 	field string
 }
 
-func newCustomFieldState(formats sessionRowFormats, definitions config.FieldCommands) (customFieldState, error) {
+func newCustomFieldState(
+	formats sessionRowFormats,
+	definitions config.FieldCommands,
+) (customFieldState, error) {
 	names := slices.Concat(
 		formats.seshSession.CustomFields(),
 		formats.agentsSession.CustomFields(),
@@ -172,9 +177,16 @@ func (m *Model) syncCustomFields() tea.Cmd {
 }
 
 func (m *Model) seededCustomFieldCell(target customFieldTarget) *customFieldCell {
-	cell := &customFieldCell{request: 0, cancel: nil, changeKey: "", text: "", state: layout.Pending}
+	cell := &customFieldCell{
+		request:   0,
+		cancel:    nil,
+		changeKey: "",
+		text:      "",
+		state:     layout.Pending,
+	}
 
-	if entry, ok := m.customFields.cache[target.key.field][target.key.row]; ok && entry.ChangeKey == target.changeKey {
+	if entry, ok := m.customFields.cache[target.key.field][target.key.row]; ok &&
+		entry.ChangeKey == target.changeKey {
 		cell.text = entry.Text
 	}
 
@@ -204,7 +216,13 @@ func (m *Model) startCustomFieldRun(cell *customFieldCell, target customFieldTar
 
 		result := fields.Run(ctx, command, input)
 
-		return customFieldResultMsg{key: key, request: request, changeKey: changeKey, result: result, at: time.Now()}
+		return customFieldResultMsg{
+			key:       key,
+			request:   request,
+			changeKey: changeKey,
+			result:    result,
+			at:        time.Now(),
+		}
 	}
 }
 
@@ -339,7 +357,12 @@ func (m *Model) customFieldTargets() []customFieldTarget {
 	for _, row := range m.displaySessions {
 		sessionInput := customFieldSessionContext(row)
 
-		targets = appendCustomFieldTargets(targets, sessionFields, customFieldSessionRowKey(row), sessionInput)
+		targets = appendCustomFieldTargets(
+			targets,
+			sessionFields,
+			customFieldSessionRowKey(row),
+			sessionInput,
+		)
 
 		if len(agentFields) == 0 {
 			continue
@@ -350,14 +373,24 @@ func (m *Model) customFieldTargets() []customFieldTarget {
 			input.Row = fields.RowAgent
 			input.Agent = customFieldAgentContext(agent)
 
-			targets = appendCustomFieldTargets(targets, agentFields, customFieldAgentRowKey(row, agent), input)
+			targets = appendCustomFieldTargets(
+				targets,
+				agentFields,
+				customFieldAgentRowKey(row, agent),
+				input,
+			)
 		}
 	}
 
 	return targets
 }
 
-func appendCustomFieldTargets(targets []customFieldTarget, names []string, row string, input fields.Context) []customFieldTarget {
+func appendCustomFieldTargets(
+	targets []customFieldTarget,
+	names []string,
+	row string,
+	input fields.Context,
+) []customFieldTarget {
 	for _, name := range names {
 		input.Field = name
 
@@ -366,7 +399,14 @@ func appendCustomFieldTargets(targets []customFieldTarget, names []string, row s
 			continue
 		}
 
-		targets = append(targets, customFieldTarget{key: customFieldKey{field: name, row: row}, input: input, changeKey: changeKey})
+		targets = append(
+			targets,
+			customFieldTarget{
+				key:       customFieldKey{field: name, row: row},
+				input:     input,
+				changeKey: changeKey,
+			},
+		)
 	}
 
 	return targets
@@ -400,10 +440,19 @@ func customFieldSessionContext(row session.Session) fields.Context {
 		Field:         "",
 		Row:           fields.RowSession,
 		Session: fields.Session{
-			ID: row.ID, Name: row.Name, Kind: string(row.Kind), Path: path, Origin: string(origin),
-			ConnectionID: row.RuntimeIdentity.ConnectionID, WindowCount: row.WindowCount, Attached: row.Attached,
-			Activity: row.Activity, ActivePaneID: row.ActivePaneID, ActivePanePath: row.ActivePanePath,
-			ActivePaneCommand: row.ActivePaneCommand, ActivePaneTitle: row.ActivePaneTitle,
+			ID:                row.ID,
+			Name:              row.Name,
+			Kind:              string(row.Kind),
+			Path:              path,
+			Origin:            string(origin),
+			ConnectionID:      row.RuntimeIdentity.ConnectionID,
+			WindowCount:       row.WindowCount,
+			Attached:          row.Attached,
+			Activity:          row.Activity,
+			ActivePaneID:      row.ActivePaneID,
+			ActivePanePath:    row.ActivePanePath,
+			ActivePaneCommand: row.ActivePaneCommand,
+			ActivePaneTitle:   row.ActivePaneTitle,
 		},
 		Agent: nil,
 	}
@@ -411,9 +460,18 @@ func customFieldSessionContext(row session.Session) fields.Context {
 
 func customFieldAgentContext(agent session.AgentSession) *fields.Agent {
 	return &fields.Agent{
-		PaneID: agent.PaneID, Harness: agent.Harness, Status: string(agent.Status), StatusSince: agent.StatusSince,
-		CWD: agent.CWD, ProjectRoot: agent.ProjectRoot, GitBranch: agent.GitBranch, Worktree: agent.Worktree,
-		SessionPath: agent.SessionPath, PID: agent.PID, Model: agent.Model, Task: agent.Task,
+		PaneID:      agent.PaneID,
+		Harness:     agent.Harness,
+		Status:      string(agent.Status),
+		StatusSince: agent.StatusSince,
+		CWD:         agent.CWD,
+		ProjectRoot: agent.ProjectRoot,
+		GitBranch:   agent.GitBranch,
+		Worktree:    agent.Worktree,
+		SessionPath: agent.SessionPath,
+		PID:         agent.PID,
+		Model:       agent.Model,
+		Task:        agent.Task,
 	}
 }
 

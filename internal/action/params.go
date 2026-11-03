@@ -94,7 +94,10 @@ func normalize(params []Param, values Values) (Values, error) {
 
 		if !present {
 			if param.Required {
-				return nil, Wrap(CodeInvalidArgument, fmt.Errorf("%w: %s", ErrMissingParam, param.Name))
+				return nil, Wrap(
+					CodeInvalidArgument,
+					fmt.Errorf("%w: %s", ErrMissingParam, param.Name),
+				)
 			}
 
 			continue
@@ -146,13 +149,24 @@ func (param Param) checkScalar(value string) (string, error) {
 	case ParamBool:
 		parsed, err := strconv.ParseBool(value)
 		if err != nil {
-			return "", Wrap(CodeInvalidArgument, fmt.Errorf("%w: %s must be true or false", ErrInvalidParam, param.Name))
+			return "", Wrap(
+				CodeInvalidArgument,
+				fmt.Errorf("%w: %s must be true or false", ErrInvalidParam, param.Name),
+			)
 		}
 
 		return strconv.FormatBool(parsed), nil
 	case ParamChoice:
 		if !slices.Contains(param.Choices, value) {
-			return "", Wrap(CodeInvalidArgument, fmt.Errorf("%w: %s must be one of %s", ErrInvalidParam, param.Name, strings.Join(param.Choices, ", ")))
+			return "", Wrap(
+				CodeInvalidArgument,
+				fmt.Errorf(
+					"%w: %s must be one of %s",
+					ErrInvalidParam,
+					param.Name,
+					strings.Join(param.Choices, ", "),
+				),
+			)
 		}
 
 		return value, nil

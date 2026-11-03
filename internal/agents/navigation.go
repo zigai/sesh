@@ -44,7 +44,10 @@ func NewNavigator(opts NavigatorOptions) (*Navigator, error) {
 
 	if controller == nil {
 		if opts.Server == nil {
-			return nil, oops.In("agents").Code("endpoint_required").With("operation", "new_navigator").Wrap(ErrServerRequired)
+			return nil, oops.In("agents").
+				Code("endpoint_required").
+				With("operation", "new_navigator").
+				Wrap(ErrServerRequired)
 		}
 
 		controller = NewTmuxController(opts.Server, opts.Target)
@@ -76,7 +79,10 @@ func (n *Navigator) NextIdle(ctx context.Context, scope NavigationScope) (PaneLo
 
 	target, ok := nextIdlePane(current, panes, agents, scope, sessionWindows)
 	if !ok {
-		return PaneLocation{}, oops.In("agents").Code("not_found").With("operation", "next_idle").Wrap(ErrNoTargetPane)
+		return PaneLocation{}, oops.In("agents").
+			Code("not_found").
+			With("operation", "next_idle").
+			Wrap(ErrNoTargetPane)
 	}
 
 	target = retargetToCurrentSession(current, target, sessionWindows)
@@ -105,7 +111,11 @@ func (n *Navigator) Failed(ctx context.Context, scope NavigationScope) (PaneLoca
 	return visit.Pane, err
 }
 
-func (n *Navigator) UnreadIdle(ctx context.Context, scope NavigationScope, visits []PaneVisit) (AgentVisit, error) {
+func (n *Navigator) UnreadIdle(
+	ctx context.Context,
+	scope NavigationScope,
+	visits []PaneVisit,
+) (AgentVisit, error) {
 	return n.rankedAgent(ctx, scope, agentSelection{kind: selectionUnread, visits: visits})
 }
 
@@ -121,7 +131,10 @@ func (n *Navigator) Back(ctx context.Context) (PaneLocation, error) {
 	defer cancel()
 
 	if err := n.controller.Lock(lockCtx, navigationLockChannel); err != nil {
-		return emptyPaneLocation, oops.In("agents").Code("fencing_failed").With("operation", "navigation_lock").Wrap(err)
+		return emptyPaneLocation, oops.In("agents").
+			Code("fencing_failed").
+			With("operation", "navigation_lock").
+			Wrap(err)
 	}
 
 	target, backErr := n.backLocked(ctx, current, panes, clientKey)
@@ -137,15 +150,24 @@ func (n *Navigator) Focus(ctx context.Context, focus FocusTarget) (PaneLocation,
 
 	target, ok := focusPaneLocation(panes, focus, current)
 	if !ok {
-		return PaneLocation{}, oops.In("agents").Code("pane_not_live").With("operation", "focus").Wrap(ErrPaneNotLive)
+		return PaneLocation{}, oops.In("agents").
+			Code("pane_not_live").
+			With("operation", "focus").
+			Wrap(ErrPaneNotLive)
 	}
 
 	if focus.SessionID != "" && target.SessionID != focus.SessionID {
-		return PaneLocation{}, oops.In("agents").Code("pane_not_live").With("operation", "focus").Wrap(ErrPaneNotLive)
+		return PaneLocation{}, oops.In("agents").
+			Code("pane_not_live").
+			With("operation", "focus").
+			Wrap(ErrPaneNotLive)
 	}
 
 	if focus.SessionName != "" && target.SessionName != focus.SessionName {
-		return PaneLocation{}, oops.In("agents").Code("pane_not_live").With("operation", "focus").Wrap(ErrPaneNotLive)
+		return PaneLocation{}, oops.In("agents").
+			Code("pane_not_live").
+			With("operation", "focus").
+			Wrap(ErrPaneNotLive)
 	}
 
 	if target.PaneID == current.PaneID {
@@ -163,7 +185,12 @@ func (n *Navigator) Focus(ctx context.Context, focus FocusTarget) (PaneLocation,
 		target = retargetToCurrentSession(current, target, sessionWindows)
 	}
 
-	if err := n.activateWithHistory(ctx, current, target, n.focusVisit(ctx, target, panes)); err != nil {
+	if err := n.activateWithHistory(
+		ctx,
+		current,
+		target,
+		n.focusVisit(ctx, target, panes),
+	); err != nil {
 		return PaneLocation{}, err
 	}
 
@@ -184,7 +211,10 @@ func (n *Navigator) backLocked(
 	}
 
 	if len(history) == 0 {
-		return emptyPaneLocation, oops.In("agents").Code("empty_history").With("operation", "back").Wrap(ErrEmptyNavigationHistory)
+		return emptyPaneLocation, oops.In("agents").
+			Code("empty_history").
+			With("operation", "back").
+			Wrap(ErrEmptyNavigationHistory)
 	}
 
 	sessionWindows, err := n.sessionWindows(ctx, current)
@@ -208,7 +238,14 @@ func (n *Navigator) backLocked(
 
 		target = retargetToCurrentSession(current, target, sessionWindows)
 
-		if err := n.replaceHistoryAndActivate(ctx, clientKey, raw, history, current, target); err != nil {
+		if err := n.replaceHistoryAndActivate(
+			ctx,
+			clientKey,
+			raw,
+			history,
+			current,
+			target,
+		); err != nil {
 			return emptyPaneLocation, err
 		}
 
@@ -218,13 +255,24 @@ func (n *Navigator) backLocked(
 	}
 
 	if err := n.controller.SetHistory(ctx, clientKey, ""); err != nil {
-		return emptyPaneLocation, oops.In("agents").Code("tmux_failed").With("operation", "write_history").Wrap(err)
+		return emptyPaneLocation, oops.In("agents").
+			Code("tmux_failed").
+			With("operation", "write_history").
+			Wrap(err)
 	}
 
-	return emptyPaneLocation, oops.In("agents").Code("not_found").With("operation", "back").Wrap(ErrNoTargetPane)
+	return emptyPaneLocation, oops.In("agents").
+		Code("not_found").
+		With("operation", "back").
+		Wrap(ErrNoTargetPane)
 }
 
-func (n *Navigator) matchHistoryEntry(ctx context.Context, entry HistoryEntry, target PaneLocation, current CurrentContext) bool {
+func (n *Navigator) matchHistoryEntry(
+	ctx context.Context,
+	entry HistoryEntry,
+	target PaneLocation,
+	current CurrentContext,
+) bool {
 	if entry.PanePID > 0 && entry.PanePID != target.PanePID {
 		zerolog.Ctx(ctx).Warn().
 			Str("component", "agents").
@@ -254,21 +302,32 @@ func (n *Navigator) matchHistoryEntry(ctx context.Context, entry HistoryEntry, t
 	return true
 }
 
-func (n *Navigator) currentAndLivePanes(ctx context.Context) (CurrentContext, []PaneLocation, error) {
+func (n *Navigator) currentAndLivePanes(
+	ctx context.Context,
+) (CurrentContext, []PaneLocation, error) {
 	current, err := n.controller.CurrentContext(ctx)
 	if err != nil {
-		return CurrentContext{}, nil, oops.In("agents").Code("current_context").With("operation", "navigation").Wrap(err)
+		return CurrentContext{}, nil, oops.In("agents").
+			Code("current_context").
+			With("operation", "navigation").
+			Wrap(err)
 	}
 
 	panes, err := n.controller.Panes(ctx)
 	if err != nil {
-		return CurrentContext{}, nil, oops.In("agents").Code("tmux_failed").With("operation", "list_panes").Wrap(err)
+		return CurrentContext{}, nil, oops.In("agents").
+			Code("tmux_failed").
+			With("operation", "list_panes").
+			Wrap(err)
 	}
 
 	if current.PaneID != "" {
 		pane, ok := FindPane(panes, current.PaneID, current.ServerSocket)
 		if !ok {
-			return CurrentContext{}, nil, oops.In("agents").Code("current_pane_not_live").With("operation", "current_context").Wrap(ErrCurrentPaneNotLive)
+			return CurrentContext{}, nil, oops.In("agents").
+				Code("current_pane_not_live").
+				With("operation", "current_context").
+				Wrap(ErrCurrentPaneNotLive)
 		}
 
 		current = completeContext(current, pane)
@@ -277,14 +336,19 @@ func (n *Navigator) currentAndLivePanes(ctx context.Context) (CurrentContext, []
 	return current, panes, nil
 }
 
-func focusPaneLocation(panes []PaneLocation, focus FocusTarget, current CurrentContext) (PaneLocation, bool) {
+func focusPaneLocation(
+	panes []PaneLocation,
+	focus FocusTarget,
+	current CurrentContext,
+) (PaneLocation, bool) {
 	sessionID := focus.SessionID
 	if sessionID == "" && focus.SessionName == "" {
 		sessionID = current.SessionID
 	}
 
 	for _, target := range panes {
-		if target.PaneID != focus.PaneID || !SameServerSocket(target.ServerSocket, current.ServerSocket) {
+		if target.PaneID != focus.PaneID ||
+			!SameServerSocket(target.ServerSocket, current.ServerSocket) {
 			continue
 		}
 
@@ -325,7 +389,10 @@ func completeContext(current CurrentContext, pane PaneLocation) CurrentContext {
 	return current
 }
 
-func (n *Navigator) attentionCandidates(ctx context.Context, panes []PaneLocation) ([]AgentSession, error) {
+func (n *Navigator) attentionCandidates(
+	ctx context.Context,
+	panes []PaneLocation,
+) ([]AgentSession, error) {
 	agents, err := LoadLiveAgents(ctx, n.source)
 	if err != nil {
 		return nil, err
@@ -341,7 +408,10 @@ func nextIdlePane(
 	scope NavigationScope,
 	sessionWindows map[string]SessionWindow,
 ) (PaneLocation, bool) {
-	currentIndex := slices.IndexFunc(panes, func(pane PaneLocation) bool { return pane.PaneID == current.PaneID })
+	currentIndex := slices.IndexFunc(
+		panes,
+		func(pane PaneLocation) bool { return pane.PaneID == current.PaneID },
+	)
 	if currentIndex < 0 {
 		return emptyPaneLocation, false
 	}
@@ -362,14 +432,20 @@ func nextIdlePane(
 	return emptyPaneLocation, false
 }
 
-func (n *Navigator) sessionWindows(ctx context.Context, current CurrentContext) (map[string]SessionWindow, error) {
+func (n *Navigator) sessionWindows(
+	ctx context.Context,
+	current CurrentContext,
+) (map[string]SessionWindow, error) {
 	if current.SessionID == "" {
 		return map[string]SessionWindow{}, nil
 	}
 
 	windows, err := n.controller.SessionWindows(ctx, current.SessionID)
 	if err != nil {
-		return nil, oops.In("agents").Code("tmux_failed").With("operation", "session_windows").Wrap(err)
+		return nil, oops.In("agents").
+			Code("tmux_failed").
+			With("operation", "session_windows").
+			Wrap(err)
 	}
 
 	indexed := make(map[string]SessionWindow, len(windows))
@@ -391,7 +467,11 @@ func paneInSessionWindows(pane PaneLocation, sessionWindows map[string]SessionWi
 	return ok
 }
 
-func retargetToCurrentSession(current CurrentContext, target PaneLocation, sessionWindows map[string]SessionWindow) PaneLocation {
+func retargetToCurrentSession(
+	current CurrentContext,
+	target PaneLocation,
+	sessionWindows map[string]SessionWindow,
+) PaneLocation {
 	if current.SessionID == "" || current.SessionID == target.SessionID {
 		return target
 	}
@@ -454,7 +534,11 @@ func paneMatchesAgentSession(agent AgentSession, pane PaneLocation) bool {
 	return true
 }
 
-func (n *Navigator) focusVisit(ctx context.Context, target PaneLocation, panes []PaneLocation) navigationVisit {
+func (n *Navigator) focusVisit(
+	ctx context.Context,
+	target PaneLocation,
+	panes []PaneLocation,
+) navigationVisit {
 	agents, err := LoadLiveAgents(ctx, n.source)
 	if err != nil {
 		return navigationPane
@@ -462,7 +546,9 @@ func (n *Navigator) focusVisit(ctx context.Context, target PaneLocation, panes [
 
 	for _, agent := range agents {
 		for _, pane := range panes {
-			if pane.PaneID == target.PaneID && pane.PanePID == target.PanePID && SameServerSocket(pane.ServerSocket, target.ServerSocket) && paneMatchesAgentOwner(&agent, pane) {
+			if pane.PaneID == target.PaneID && pane.PanePID == target.PanePID &&
+				SameServerSocket(pane.ServerSocket, target.ServerSocket) &&
+				paneMatchesAgentOwner(&agent, pane) {
 				return navigationAgent
 			}
 		}
@@ -471,7 +557,12 @@ func (n *Navigator) focusVisit(ctx context.Context, target PaneLocation, panes [
 	return navigationPane
 }
 
-func (n *Navigator) activateWithHistory(ctx context.Context, current CurrentContext, target PaneLocation, visit navigationVisit) (retErr error) {
+func (n *Navigator) activateWithHistory(
+	ctx context.Context,
+	current CurrentContext,
+	target PaneLocation,
+	visit navigationVisit,
+) (retErr error) {
 	if target.PaneID == current.PaneID {
 		return nil
 	}
@@ -480,7 +571,10 @@ func (n *Navigator) activateWithHistory(ctx context.Context, current CurrentCont
 	defer cancel()
 
 	if err := n.controller.Lock(lockCtx, navigationLockChannel); err != nil {
-		return oops.In("agents").Code("fencing_failed").With("operation", "navigation_lock").Wrap(err)
+		return oops.In("agents").
+			Code("fencing_failed").
+			With("operation", "navigation_lock").
+			Wrap(err)
 	}
 	defer func() { retErr = errors.Join(retErr, n.unlockNavigation(ctx)) }()
 
@@ -506,14 +600,19 @@ func (n *Navigator) activateWithHistory(ctx context.Context, current CurrentCont
 	}
 
 	next := togglePair{Working: working, Agent: paneHistoryEntry(target, current.ServerPID)}
-	if pair != nil && next.Agent.PaneID == pair.Working.PaneID && next.Agent.PanePID == pair.Working.PanePID {
+	if pair != nil && next.Agent.PaneID == pair.Working.PaneID &&
+		next.Agent.PanePID == pair.Working.PanePID {
 		next = *pair
 	}
 
 	return n.stageToggleAndActivate(ctx, current, target, previous, next)
 }
 
-func (n *Navigator) activateHistoryLocked(ctx context.Context, current CurrentContext, target PaneLocation) error {
+func (n *Navigator) activateHistoryLocked(
+	ctx context.Context,
+	current CurrentContext,
+	target PaneLocation,
+) error {
 	clientKey := current.HistoryKey()
 
 	raw, history, err := n.loadHistory(ctx, clientKey)
@@ -554,11 +653,20 @@ func (n *Navigator) replaceHistoryAndActivate(
 		return nil
 	}
 
-	enriched := oops.In("agents").Code("activate_failed").With("operation", "activate").Wrap(activationErr)
+	enriched := oops.In("agents").
+		Code("activate_failed").
+		With("operation", "activate").
+		Wrap(activationErr)
 
 	currentRaw, readErr := n.controller.History(ctx, clientKey)
 	if readErr != nil {
-		return errors.Join(enriched, oops.In("agents").Code("history_read_failed").With("operation", "history_rollback").Wrap(readErr))
+		return errors.Join(
+			enriched,
+			oops.In("agents").
+				Code("history_read_failed").
+				With("operation", "history_rollback").
+				Wrap(readErr),
+		)
 	}
 
 	if currentRaw != newRaw {
@@ -587,10 +695,16 @@ func (n *Navigator) replaceHistoryAndActivate(
 	return errors.Join(enriched, rollbackErr)
 }
 
-func (n *Navigator) loadHistory(ctx context.Context, clientKey string) (string, []HistoryEntry, error) {
+func (n *Navigator) loadHistory(
+	ctx context.Context,
+	clientKey string,
+) (string, []HistoryEntry, error) {
 	raw, err := n.controller.History(ctx, clientKey)
 	if err != nil {
-		return "", nil, oops.In("agents").Code("tmux_failed").With("operation", "read_history").Wrap(err)
+		return "", nil, oops.In("agents").
+			Code("tmux_failed").
+			With("operation", "read_history").
+			Wrap(err)
 	}
 
 	if strings.TrimSpace(raw) == "" {
@@ -600,13 +714,21 @@ func (n *Navigator) loadHistory(ctx context.Context, clientKey string) (string, 
 	var history []HistoryEntry
 
 	if err := json.Unmarshal([]byte(raw), &history); err != nil {
-		return "", nil, oops.In("agents").Code("corrupt_history").With("operation", "read_history").Wrap(errors.Join(ErrNavigationHistoryCorrupt, err))
+		return "", nil, oops.In("agents").
+			Code("corrupt_history").
+			With("operation", "read_history").
+			Wrap(errors.Join(ErrNavigationHistoryCorrupt, err))
 	}
 
 	for _, entry := range history {
-		if entry.PaneID == "" || entry.PanePID <= 0 || entry.WindowID == "" || entry.SessionID == "" ||
-			entry.ServerSocket == "" || entry.ServerPID <= 0 {
-			return "", nil, oops.In("agents").Code("corrupt_history").With("operation", "read_history").Wrap(ErrNavigationHistoryCorrupt)
+		if entry.PaneID == "" || entry.PanePID <= 0 || entry.WindowID == "" ||
+			entry.SessionID == "" ||
+			entry.ServerSocket == "" ||
+			entry.ServerPID <= 0 {
+			return "", nil, oops.In("agents").
+				Code("corrupt_history").
+				With("operation", "read_history").
+				Wrap(ErrNavigationHistoryCorrupt)
 		}
 	}
 
@@ -618,28 +740,47 @@ func (n *Navigator) unlockNavigation(ctx context.Context) error {
 	defer cancel()
 
 	if err := n.controller.Unlock(unlockCtx, navigationLockChannel); err != nil {
-		return oops.In("agents").Code("fencing_failed").With("operation", "navigation_unlock").Wrap(err)
+		return oops.In("agents").
+			Code("fencing_failed").
+			With("operation", "navigation_unlock").
+			Wrap(err)
 	}
 
 	return nil
 }
 
-func (n *Navigator) saveHistory(ctx context.Context, clientKey string, history []HistoryEntry) (string, error) {
+func (n *Navigator) saveHistory(
+	ctx context.Context,
+	clientKey string,
+	history []HistoryEntry,
+) (string, error) {
 	encoded, err := json.Marshal(history)
 	if err != nil {
-		return "", oops.In("agents").Code("encode_history").With("operation", "write_history").Wrap(err)
+		return "", oops.In("agents").
+			Code("encode_history").
+			With("operation", "write_history").
+			Wrap(err)
 	}
 
 	newRaw := string(encoded)
 
 	if err := n.controller.SetHistory(ctx, clientKey, newRaw); err != nil {
-		return "", oops.In("agents").Code("tmux_failed").With("operation", "write_history").Wrap(err)
+		return "", oops.In("agents").
+			Code("tmux_failed").
+			With("operation", "write_history").
+			Wrap(err)
 	}
 
 	return newRaw, nil
 }
 
-func logNavigation(ctx context.Context, operation string, current CurrentContext, target PaneLocation, scope string) {
+func logNavigation(
+	ctx context.Context,
+	operation string,
+	current CurrentContext,
+	target PaneLocation,
+	scope string,
+) {
 	event := zerolog.Ctx(ctx).Info().
 		Str("component", "agents").
 		Str("operation", operation).

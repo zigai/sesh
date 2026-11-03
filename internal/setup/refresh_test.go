@@ -158,7 +158,10 @@ func TestForcedApplyReplacesAForeignDefinition(t *testing.T) {
 	}
 
 	if forced.Written != 2 {
-		t.Fatalf("forced written = %d, want the replaced foreign and missing definitions", forced.Written)
+		t.Fatalf(
+			"forced written = %d, want the replaced foreign and missing definitions",
+			forced.Written,
+		)
 	}
 
 	content, err := os.ReadFile(path)
@@ -255,7 +258,10 @@ func TestBlockedDefinitionIsNeverWrittenEvenWhenForced(t *testing.T) {
 	}
 
 	if len(result.BlockedNames) != 2 {
-		t.Fatalf("blocked = %v, want the tmux service and the restore service that follows it", result.BlockedNames)
+		t.Fatalf(
+			"blocked = %v, want the tmux service and the restore service that follows it",
+			result.BlockedNames,
+		)
 	}
 
 	if _, err := os.Stat(filepath.Join(root, setup.TmuxServiceName)); err == nil {
@@ -274,7 +280,12 @@ func TestApplyDefinitionsRejectsMismatchedInputs(t *testing.T) {
 	}
 }
 
-func assertPlanState(t *testing.T, plan setup.ArtifactPlan, state setup.ArtifactState, changed bool) {
+func assertPlanState(
+	t *testing.T,
+	plan setup.ArtifactPlan,
+	state setup.ArtifactState,
+	changed bool,
+) {
 	t.Helper()
 
 	if plan.State != state || plan.Changed != changed {

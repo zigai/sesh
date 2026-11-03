@@ -101,15 +101,18 @@ func TestSummarizePaneHistory(t *testing.T) {
 		t.Fatalf("got %d summaries, want 3", len(summaries))
 	}
 
-	if summaries[0].SessionName != testSessionDev || summaries[0].Lines != 75 || summaries[0].PaneCount != 2 {
+	if summaries[0].SessionName != testSessionDev || summaries[0].Lines != 75 ||
+		summaries[0].PaneCount != 2 {
 		t.Fatalf("summary[0] = %+v, want dev with 75 lines, 2 panes", summaries[0])
 	}
 
-	if summaries[1].SessionName != "stage" || summaries[1].Lines != 75 || summaries[1].PaneCount != 1 {
+	if summaries[1].SessionName != "stage" || summaries[1].Lines != 75 ||
+		summaries[1].PaneCount != 1 {
 		t.Fatalf("summary[1] = %+v, want stage with 75 lines, 1 pane", summaries[1])
 	}
 
-	if summaries[2].SessionName != "ops" || summaries[2].Lines != 10 || summaries[2].PaneCount != 1 {
+	if summaries[2].SessionName != "ops" || summaries[2].Lines != 10 ||
+		summaries[2].PaneCount != 1 {
 		t.Fatalf("summary[2] = %+v, want ops with 10 lines, 1 pane", summaries[2])
 	}
 }

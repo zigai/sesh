@@ -41,7 +41,11 @@ func (*recoveringWatchSource) List(context.Context, aht.Filter) ([]aht.Session, 
 	return nil, nil
 }
 
-func (s *recoveringWatchSource) Watch(_ context.Context, _ aht.Filter, yield func(aht.StateSnapshot) error) error {
+func (s *recoveringWatchSource) Watch(
+	_ context.Context,
+	_ aht.Filter,
+	yield func(aht.StateSnapshot) error,
+) error {
 	s.calls++
 	if s.calls <= s.failures {
 		return errWatchUnavailable
@@ -130,7 +134,11 @@ func TestWatchDistinguishesSnapshotApplicationFailuresFromBrokerOutages(t *testi
 
 			source := &recoveringWatchSource{cancel: cancel}
 			handler := &recoveringSnapshotHandler{failures: 3}
-			opts := agents.WatchOptions{InitialBackoff: time.Nanosecond, MaxBackoff: time.Nanosecond, Quiet: quiet}
+			opts := agents.WatchOptions{
+				InitialBackoff: time.Nanosecond,
+				MaxBackoff:     time.Nanosecond,
+				Quiet:          quiet,
+			}
 			agents.RunWatchLoop(ctx, source, handler, opts)
 
 			records := decodeLogRecords(t, &logs)
@@ -147,15 +155,28 @@ func TestWatchDistinguishesSnapshotApplicationFailuresFromBrokerOutages(t *testi
 func assertSnapshotApplicationLogs(t *testing.T, records []map[string]any, quiet bool) {
 	t.Helper()
 
-	want := []map[string]any{{
-		"level": "warn", "component": "agents", "operation": "apply_snapshot", "status": "degraded",
-		"reason": "snapshot_apply_failed", "message": "agent status snapshot could not be applied",
-		"error": errWatchUnavailable.Error(), "error_domain": "agents", "error_code": "snapshot_apply_failed", "error_step": "apply_snapshot",
-	}}
+	want := []map[string]any{
+		{
+			"level":        "warn",
+			"component":    "agents",
+			"operation":    "apply_snapshot",
+			"status":       "degraded",
+			"reason":       "snapshot_apply_failed",
+			"message":      "agent status snapshot could not be applied",
+			"error":        errWatchUnavailable.Error(),
+			"error_domain": "agents",
+			"error_code":   "snapshot_apply_failed",
+			"error_step":   "apply_snapshot",
+		},
+	}
 	if !quiet {
 		want = append(want, map[string]any{
-			"level": "info", "component": "agents", "operation": "apply_snapshot", "status": "recovered",
-			"reason": "snapshot_applied", "message": "agent status snapshot application recovered",
+			"level":     "info",
+			"component": "agents",
+			"operation": "apply_snapshot",
+			"status":    "recovered",
+			"reason":    "snapshot_applied",
+			"message":   "agent status snapshot application recovered",
 		})
 	}
 

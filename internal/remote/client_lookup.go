@@ -20,17 +20,26 @@ type InvocationLookupRequest struct {
 	InvocationID string `json:"invocationId"`
 }
 
-func NewInvocationLookupRequest(opts ActionOriginOptions, invocationID string) (InvocationLookupRequest, error) {
+func NewInvocationLookupRequest(
+	opts ActionOriginOptions,
+	invocationID string,
+) (InvocationLookupRequest, error) {
 	if !opts.Remote.Enabled {
 		return InvocationLookupRequest{}, ErrRemoteDisabled
 	}
 
 	if opts.Connection.ID != opts.State.ID ||
-		ConnectionDigest(opts.Connection) != opts.State.ConfigDigest || !ValidIdentifier(opts.State.PeerID) {
+		ConnectionDigest(
+			opts.Connection,
+		) != opts.State.ConfigDigest || !ValidIdentifier(opts.State.PeerID) {
 		return InvocationLookupRequest{}, ErrConnectionChanged
 	}
 
-	request := InvocationLookupRequest{Version: ProtocolVersion, PeerID: opts.State.PeerID, InvocationID: invocationID}
+	request := InvocationLookupRequest{
+		Version:      ProtocolVersion,
+		PeerID:       opts.State.PeerID,
+		InvocationID: invocationID,
+	}
 	if err := ValidateInvocationLookupRequest(request); err != nil {
 		return InvocationLookupRequest{}, err
 	}
@@ -39,7 +48,8 @@ func NewInvocationLookupRequest(opts ActionOriginOptions, invocationID string) (
 }
 
 func ValidateInvocationLookupRequest(request InvocationLookupRequest) error {
-	if request.Version != ProtocolVersion || !ValidIdentifier(request.PeerID) || !ValidInvocationID(request.InvocationID) {
+	if request.Version != ProtocolVersion || !ValidIdentifier(request.PeerID) ||
+		!ValidInvocationID(request.InvocationID) {
 		return ErrInvalidFrame
 	}
 
@@ -48,16 +58,22 @@ func ValidateInvocationLookupRequest(request InvocationLookupRequest) error {
 
 func EncodeInvocationLookupRequest(request InvocationLookupRequest) ([]byte, error) {
 	if err := ValidateInvocationLookupRequest(request); err != nil {
-		return nil, oops.In("remote").With("operation", "encode_invocation_lookup_request").Wrap(err)
+		return nil, oops.In("remote").
+			With("operation", "encode_invocation_lookup_request").
+			Wrap(err)
 	}
 
 	encoded, err := json.Marshal(request)
 	if err != nil {
-		return nil, oops.In("remote").With("operation", "encode_invocation_lookup_request").Wrap(err)
+		return nil, oops.In("remote").
+			With("operation", "encode_invocation_lookup_request").
+			Wrap(err)
 	}
 
 	if len(encoded) > MaxActionBytes {
-		return nil, oops.In("remote").With("operation", "encode_invocation_lookup_request").Wrap(ErrFrameTooLarge)
+		return nil, oops.In("remote").
+			With("operation", "encode_invocation_lookup_request").
+			Wrap(ErrFrameTooLarge)
 	}
 
 	return encoded, nil
@@ -76,46 +92,83 @@ func DecodeInvocationLookupRequest(payload []byte) (InvocationLookupRequest, err
 	return request, ValidateInvocationLookupRequest(request)
 }
 
-func ExecutePeerLookup(dir *privatefs.Dir, peerID string, request InvocationLookupRequest) ActionResult {
+func ExecutePeerLookup(
+	dir *privatefs.Dir,
+	peerID string,
+	request InvocationLookupRequest,
+) ActionResult {
 	if err := ValidateInvocationLookupRequest(request); err != nil || request.PeerID != peerID {
-		return ActionResult{InvocationID: request.InvocationID, Action: "", OK: false, Code: action.CodeTargetChanged, Output: nil}
+		return ActionResult{
+			InvocationID: request.InvocationID,
+			Action:       "",
+			OK:           false,
+			Code:         action.CodeTargetChanged,
+			Output:       nil,
+		}
 	}
 
 	result, err := LookupPeerInvocation(dir, request.InvocationID)
 	if errors.Is(err, ErrInvocationNotFound) {
-		return ActionResult{InvocationID: request.InvocationID, Action: "", OK: false, Code: action.CodeNotFound, Output: nil}
+		return ActionResult{
+			InvocationID: request.InvocationID,
+			Action:       "",
+			OK:           false,
+			Code:         action.CodeNotFound,
+			Output:       nil,
+		}
 	}
 
 	if err != nil {
-		return ActionResult{InvocationID: request.InvocationID, Action: "", OK: false, Code: action.CodeUnavailable, Output: nil}
+		return ActionResult{
+			InvocationID: request.InvocationID,
+			Action:       "",
+			OK:           false,
+			Code:         action.CodeUnavailable,
+			Output:       nil,
+		}
 	}
 
 	return result
 }
 
-func RunInvocationLookup(ctx context.Context, opts ActionOriginOptions, request InvocationLookupRequest) (ActionResult, error) {
+func RunInvocationLookup(
+	ctx context.Context,
+	opts ActionOriginOptions,
+	request InvocationLookupRequest,
+) (ActionResult, error) {
 	if err := ValidateInvocationLookupRequest(request); err != nil {
-		return ActionResult{}, oops.In("remote").With("operation", "run_invocation_lookup").Wrap(err)
+		return ActionResult{}, oops.In("remote").
+			With("operation", "run_invocation_lookup").
+			Wrap(err)
 	}
 
 	if request.PeerID != opts.State.PeerID || opts.Connection.ID != opts.State.ID ||
 		ConnectionDigest(opts.Connection) != opts.State.ConfigDigest {
-		return ActionResult{}, oops.In("remote").With("operation", "run_invocation_lookup").Wrap(ErrConnectionChanged)
+		return ActionResult{}, oops.In("remote").
+			With("operation", "run_invocation_lookup").
+			Wrap(ErrConnectionChanged)
 	}
 
 	payload, err := EncodeInvocationLookupRequest(request)
 	if err != nil {
-		return ActionResult{}, oops.In("remote").With("operation", "run_invocation_lookup").Wrap(err)
+		return ActionResult{}, oops.In("remote").
+			With("operation", "run_invocation_lookup").
+			Wrap(err)
 	}
 
-	lookupCtx, cancel := context.WithTimeout(ctx, ParsedDuration(opts.Remote.ActionTimeout, defaultAction))
+	lookupCtx, cancel := context.WithTimeout(
+		ctx,
+		ParsedDuration(opts.Remote.ActionTimeout, defaultAction),
+	)
 	defer cancel()
 
 	command, err := NewSSHCommand(lookupCtx, opts.Remote, opts.Connection, SSHCommandOptions{
 		Interactive: false, Forward: nil, Command: nil,
 	}, PeerEntryPoint(opts.Connection, ChannelLookup)...)
 	if err != nil {
-		return ActionResult{}, oops.In("remote").With("operation", "run_invocation_lookup").Wrap(err)
+		return ActionResult{}, oops.In("remote").
+			With("operation", "run_invocation_lookup").
+			Wrap(err)
 	}
 
 	command.Stdin = bytes.NewReader(payload)
@@ -126,17 +179,30 @@ func RunInvocationLookup(ctx context.Context, opts ActionOriginOptions, request 
 	if runErr != nil {
 		cause := ClassifySSHFailure(lookupCtx.Err(), diagnostics.String())
 
-		return ActionResult{InvocationID: request.InvocationID, Action: "", OK: false, Code: action.CodeUnavailable, Output: nil},
-			errors.Join(cause, oops.In("remote").With("operation", "run_invocation_lookup").Wrap(runErr))
+		return ActionResult{
+				InvocationID: request.InvocationID,
+				Action:       "",
+				OK:           false,
+				Code:         action.CodeUnavailable,
+				Output:       nil,
+			},
+			errors.Join(
+				cause,
+				oops.In("remote").With("operation", "run_invocation_lookup").Wrap(runErr),
+			)
 	}
 
 	result, err := DecodeActionResult(output)
 	if err != nil {
-		return ActionResult{}, oops.In("remote").With("operation", "run_invocation_lookup").Wrap(err)
+		return ActionResult{}, oops.In("remote").
+			With("operation", "run_invocation_lookup").
+			Wrap(err)
 	}
 
 	if result.InvocationID != request.InvocationID {
-		return ActionResult{}, oops.In("remote").With("operation", "run_invocation_lookup").Wrap(ErrInvocationConflict)
+		return ActionResult{}, oops.In("remote").
+			With("operation", "run_invocation_lookup").
+			Wrap(ErrInvocationConflict)
 	}
 
 	return result, nil

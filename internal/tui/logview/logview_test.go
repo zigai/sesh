@@ -36,10 +36,18 @@ func writeLogsTestFile(t *testing.T, content string) string {
 }
 
 func TestLogRendererUsesCompactComponentPrefixesAndFields(t *testing.T) {
-	popupStartedRecord := []byte(`{"time":"2026-08-06T16:36:09Z","level":"info","component":"popup","command":"popup","message":"popup operation started"}` + "\n")
-	popupCompletedRecord := []byte(`{"time":"2026-08-06T16:36:09Z","level":"info","component":"popup","command":"popup","message":"popup operation completed"}` + "\n")
-	commandRecord := []byte(`{"time":"2026-08-06T16:36:09Z","level":"info","component":"command","command":"popup","message":"command completed"}` + "\n")
-	resurrectRecord := []byte(`{"time":"2026-08-06T16:36:09Z","level":"info","component":"resurrect","command":"continuum.tick","message":"resurrect save started"}` + "\n")
+	popupStartedRecord := []byte(
+		`{"time":"2026-08-06T16:36:09Z","level":"info","component":"popup","command":"popup","message":"popup operation started"}` + "\n",
+	)
+	popupCompletedRecord := []byte(
+		`{"time":"2026-08-06T16:36:09Z","level":"info","component":"popup","command":"popup","message":"popup operation completed"}` + "\n",
+	)
+	commandRecord := []byte(
+		`{"time":"2026-08-06T16:36:09Z","level":"info","component":"command","command":"popup","message":"command completed"}` + "\n",
+	)
+	resurrectRecord := []byte(
+		`{"time":"2026-08-06T16:36:09Z","level":"info","component":"resurrect","command":"continuum.tick","message":"resurrect save started"}` + "\n",
+	)
 
 	popupStartedLine := renderLogTestLine(t, popupStartedRecord)
 	popupCompletedLine := renderLogTestLine(t, popupCompletedRecord)
@@ -93,8 +101,18 @@ func renderLogTestLine(t *testing.T, record []byte) string {
 }
 
 func TestLogWatchContinuesAfterCopyTruncateRotation(t *testing.T) {
-	first := strings.Replace(formattedInfoRecord, `"message":"resurrect save completed"`, `"payload":"`+strings.Repeat("x", 128)+`","message":"first"`, 1) + "\n"
-	second := strings.Replace(formattedInfoRecord, `"message":"resurrect save completed"`, `"message":"second"`, 1) + "\n"
+	first := strings.Replace(
+		formattedInfoRecord,
+		`"message":"resurrect save completed"`,
+		`"payload":"`+strings.Repeat("x", 128)+`","message":"first"`,
+		1,
+	) + "\n"
+	second := strings.Replace(
+		formattedInfoRecord,
+		`"message":"resurrect save completed"`,
+		`"message":"second"`,
+		1,
+	) + "\n"
 	path := writeLogsTestFile(t, first)
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -119,16 +137,20 @@ func TestLogWatchContinuesAfterCopyTruncateRotation(t *testing.T) {
 
 	output := writer.String()
 
-	if !strings.Contains(output, "resurrect") || !strings.Contains(output, "first") || !strings.Contains(output, "second") {
+	if !strings.Contains(output, "resurrect") || !strings.Contains(output, "first") ||
+		!strings.Contains(output, "second") {
 		t.Fatalf("watch output = %q, want records before and after truncation", output)
 	}
 }
 
 func TestLogRendererPreservesExactNumbers(t *testing.T) {
-	line := []byte(`{"level":"info","message":"observed","sequence":9007199254740993,"duration_ms":4983}`)
+	line := []byte(
+		`{"level":"info","message":"observed","sequence":9007199254740993,"duration_ms":4983}`,
+	)
 
 	text, err := RenderLogLine(line, NewLogStyles(false))
-	if err != nil || !strings.Contains(text, "sequence=9007199254740993") || !strings.Contains(text, "duration=5.0s") {
+	if err != nil || !strings.Contains(text, "sequence=9007199254740993") ||
+		!strings.Contains(text, "duration=5.0s") {
 		t.Fatalf("numbers changed in rendering: %q, %v", text, err)
 	}
 }
@@ -141,7 +163,13 @@ func TestDisplayRetainedLogsPreservesJoinedOutputFailure(t *testing.T) {
 	path := writeLogsTestFile(t, formattedInfoRecord+"\n")
 	cause := errors.Join(context.Canceled, io.ErrUnexpectedEOF)
 
-	err := DisplayRetainedLogs(t.Context(), failingLogOutput{err: cause}, io.Discard, path, Options{Raw: true})
+	err := DisplayRetainedLogs(
+		t.Context(),
+		failingLogOutput{err: cause},
+		io.Discard,
+		path,
+		Options{Raw: true},
+	)
 	if !errors.Is(err, context.Canceled) || !errors.Is(err, io.ErrUnexpectedEOF) {
 		t.Fatalf("joined output failure was discarded: %v", err)
 	}
@@ -176,7 +204,9 @@ func TestLogRendererAppliesStylesAndEscapesTerminalControlCharacters(t *testing.
 		}
 	}
 
-	unsafeRecord := []byte("{\"time\":\"2026-08-06T15:45:52Z\",\"level\":\"error\",\"component\":\"bad\\u001b[2J\",\"message\":\"line\\nnext\"}\n")
+	unsafeRecord := []byte(
+		"{\"time\":\"2026-08-06T15:45:52Z\",\"level\":\"error\",\"component\":\"bad\\u001b[2J\",\"message\":\"line\\nnext\"}\n",
+	)
 
 	safe, err := RenderLogLine(unsafeRecord, Styles{})
 	if err != nil {
@@ -214,7 +244,9 @@ func TestHumanizeDuration(t *testing.T) {
 }
 
 func TestLogRendererPrunesRedundantFieldsInCompactMode(t *testing.T) {
-	record := []byte(`{"time":"2026-09-09T11:08:36Z","level":"info","component":"continuum","command":"continuum.startup","operation":"startup","status":"ok","boot_reconciled":false,"default_session_changed":false,"duration_ms":25,"hook_dispatched":true,"restore_partial":false,"restore_skipped_reason":"not_startup","restore_status":"skipped","message":"continuum startup completed"}` + "\n")
+	record := []byte(
+		`{"time":"2026-09-09T11:08:36Z","level":"info","component":"continuum","command":"continuum.startup","operation":"startup","status":"ok","boot_reconciled":false,"default_session_changed":false,"duration_ms":25,"hook_dispatched":true,"restore_partial":false,"restore_skipped_reason":"not_startup","restore_status":"skipped","message":"continuum startup completed"}` + "\n",
+	)
 
 	compactLine, err := RenderLogLine(record, NewLogStyles(false, false))
 	if err != nil {
@@ -306,7 +338,9 @@ func TestFormatRelativeTime(t *testing.T) {
 func TestLogStylesStatusHighlighting(t *testing.T) {
 	styles := NewLogStyles(true)
 
-	degradedRecord := []byte(`{"time":"2026-08-06T15:46:01Z","level":"warn","component":"resurrect","status":"degraded","message":"save degraded"}` + "\n")
+	degradedRecord := []byte(
+		`{"time":"2026-08-06T15:46:01Z","level":"warn","component":"resurrect","status":"degraded","message":"save degraded"}` + "\n",
+	)
 
 	rendered, err := RenderLogLine(degradedRecord, styles)
 	if err != nil {
@@ -384,17 +418,31 @@ func TestDisplayRetainedLogsWithLineLimitShowsShortTimesWhenAllRecordsAreFromTod
 	want := "00:00:01 INFO  probe: alpha\n" +
 		"00:00:02 INFO  probe: beta\n"
 	if output.String() != want || diagnostics.Len() != 0 {
-		t.Fatalf("output = %q, diagnostics = %q, want %q and no diagnostics", output.String(), diagnostics.String(), want)
+		t.Fatalf(
+			"output = %q, diagnostics = %q, want %q and no diagnostics",
+			output.String(),
+			diagnostics.String(),
+			want,
+		)
 	}
 }
 
 func TestDisplayRetainedLogsWithLineLimitShowsFullTimesWhenAnyRecordIsFromAnotherDay(t *testing.T) {
 	today, date := todayLogTime("00:00:02")
-	path := writeLogsTestFile(t, boundedLogRecord("2001-02-03T04:05:06Z", "old")+boundedLogRecord(today, "new"))
+	path := writeLogsTestFile(
+		t,
+		boundedLogRecord("2001-02-03T04:05:06Z", "old")+boundedLogRecord(today, "new"),
+	)
 
 	var output bytes.Buffer
 
-	if err := DisplayRetainedLogs(t.Context(), &output, io.Discard, path, Options{Lines: 10}); err != nil {
+	if err := DisplayRetainedLogs(
+		t.Context(),
+		&output,
+		io.Discard,
+		path,
+		Options{Lines: 10},
+	); err != nil {
 		t.Fatalf("DisplayRetainedLogs() error = %v", err)
 	}
 
@@ -405,7 +453,9 @@ func TestDisplayRetainedLogsWithLineLimitShowsFullTimesWhenAnyRecordIsFromAnothe
 	}
 }
 
-func TestDisplayRetainedLogsWithLineLimitIgnoresRecordsWithoutUsableTimeForShortTimes(t *testing.T) {
+func TestDisplayRetainedLogsWithLineLimitIgnoresRecordsWithoutUsableTimeForShortTimes(
+	t *testing.T,
+) {
 	today, _ := todayLogTime("00:00:03")
 	content := boundedLogRecord("", "untimed") +
 		boundedLogRecord("not-a-time", "garbled") +
@@ -414,7 +464,13 @@ func TestDisplayRetainedLogsWithLineLimitIgnoresRecordsWithoutUsableTimeForShort
 
 	var output bytes.Buffer
 
-	if err := DisplayRetainedLogs(t.Context(), &output, io.Discard, path, Options{Lines: 10}); err != nil {
+	if err := DisplayRetainedLogs(
+		t.Context(),
+		&output,
+		io.Discard,
+		path,
+		Options{Lines: 10},
+	); err != nil {
 		t.Fatalf("DisplayRetainedLogs() error = %v", err)
 	}
 
@@ -434,7 +490,13 @@ func TestDisplayRetainedLogsWithLineLimitReportsMalformedRecordAndKeepsRendering
 
 	var output, diagnostics bytes.Buffer
 
-	if err := DisplayRetainedLogs(t.Context(), &output, &diagnostics, path, Options{Lines: 10}); err != nil {
+	if err := DisplayRetainedLogs(
+		t.Context(),
+		&output,
+		&diagnostics,
+		path,
+		Options{Lines: 10},
+	); err != nil {
 		t.Fatalf("DisplayRetainedLogs() error = %v", err)
 	}
 
@@ -459,7 +521,13 @@ func TestDisplayRetainedLogsWithLineLimitShowsOnlyTheLastRecords(t *testing.T) {
 
 	var output bytes.Buffer
 
-	if err := DisplayRetainedLogs(t.Context(), &output, io.Discard, path, Options{Lines: 2}); err != nil {
+	if err := DisplayRetainedLogs(
+		t.Context(),
+		&output,
+		io.Discard,
+		path,
+		Options{Lines: 2},
+	); err != nil {
 		t.Fatalf("DisplayRetainedLogs() error = %v", err)
 	}
 
@@ -487,7 +555,11 @@ func TestDisplayRetainedLogsWithLineLimitStopsWhenCanceledMidOutput(t *testing.T
 
 	want := "2001-02-03 04:05:01 INFO  probe: one\n"
 	if writer.String() != want {
-		t.Fatalf("output = %q, want only the record written before cancellation %q", writer.String(), want)
+		t.Fatalf(
+			"output = %q, want only the record written before cancellation %q",
+			writer.String(),
+			want,
+		)
 	}
 }
 
@@ -496,7 +568,13 @@ func TestDisplayRetainedLogsPrettyRawIndentsJSONAndPassesOtherLinesThrough(t *te
 
 	var output bytes.Buffer
 
-	if err := DisplayRetainedLogs(t.Context(), &output, io.Discard, path, Options{Raw: true, Pretty: true, Lines: 10}); err != nil {
+	if err := DisplayRetainedLogs(
+		t.Context(),
+		&output,
+		io.Discard,
+		path,
+		Options{Raw: true, Pretty: true, Lines: 10},
+	); err != nil {
 		t.Fatalf("DisplayRetainedLogs() error = %v", err)
 	}
 

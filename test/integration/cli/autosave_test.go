@@ -143,7 +143,15 @@ func runDueSave(t *testing.T, socketPath, sessionID string) autosaveResultJSON {
 func runSecondSave(t *testing.T, socketPath string) {
 	t.Helper()
 
-	exec := executeJSON(t, "autosave", "save-if-due", testSocketFlag, socketPath, testNoConfigFlag, testJSONFlag)
+	exec := executeJSON(
+		t,
+		"autosave",
+		"save-if-due",
+		testSocketFlag,
+		socketPath,
+		testNoConfigFlag,
+		testJSONFlag,
+	)
 	if !exec.envelope.OK {
 		t.Fatalf("second autosave failed: %s", exec.stderr)
 	}
@@ -161,7 +169,15 @@ func runSecondSave(t *testing.T, socketPath string) {
 func assertAutomaticPracticalRestore(t *testing.T, socketPath string, server *gotmux.Server) {
 	t.Helper()
 
-	exec := executeJSON(t, "autosave", "restore-on-start", testSocketFlag, socketPath, testNoConfigFlag, testJSONFlag)
+	exec := executeJSON(
+		t,
+		"autosave",
+		"restore-on-start",
+		testSocketFlag,
+		socketPath,
+		testNoConfigFlag,
+		testJSONFlag,
+	)
 	if exec.err != nil || !exec.envelope.OK {
 		t.Fatalf("automatic practical restore failed: %v, %s", exec.err, exec.stderr)
 	}
@@ -288,9 +304,16 @@ func TestAutosaveFinalSaveSkipsAServerTheShutdownSaveCovered(t *testing.T) {
 
 	statusPath := filepath.Join(dataHome(t), "final-save-status.json")
 	covered := automation.FinalSaveStatus{
-		StartedAtUnix: 1, CompletedAtUnix: 2, Result: automation.FinalSaveSaved, Generation: "covered",
-		SnapshotStatus: "best_effort", Recorded: true, Bookkeeping: true,
-		ServerPID: probe.Identity.PID, ServerStarted: probe.Identity.Started.Unix(), Announcement: true,
+		StartedAtUnix:   1,
+		CompletedAtUnix: 2,
+		Result:          automation.FinalSaveSaved,
+		Generation:      "covered",
+		SnapshotStatus:  "best_effort",
+		Recorded:        true,
+		Bookkeeping:     true,
+		ServerPID:       probe.Identity.PID,
+		ServerStarted:   probe.Identity.Started.Unix(),
+		Announcement:    true,
 	}
 
 	finalSave := func() commandExecution {
@@ -313,7 +336,11 @@ func TestAutosaveFinalSaveSkipsAServerTheShutdownSaveCovered(t *testing.T) {
 		t.Fatalf("final-save = (%+v, %v), want a successful skip", skipped.envelope, skipped.err)
 	}
 
-	if result := decodeJSONPayload[autosaveResultJSON](t, skipped.envelope.Result); result.Status != "skipped" || result.Generation != "" {
+	if result := decodeJSONPayload[autosaveResultJSON](
+		t,
+		skipped.envelope.Result,
+	); result.Status != "skipped" ||
+		result.Generation != "" {
 		t.Fatalf("result = %#v, want a skip without a new generation", result)
 	}
 
@@ -336,7 +363,9 @@ func assertPracticalFinalSaveResult(t *testing.T, exec commandExecution) autosav
 	}
 
 	result := decodeJSONPayload[autosaveResultJSON](t, exec.envelope.Result)
-	if result.Status != autosaveStatusSaved || result.Reason != automation.ReasonDurableGeneration || result.Snapshot != "best_effort" {
+	if result.Status != autosaveStatusSaved ||
+		result.Reason != automation.ReasonDurableGeneration ||
+		result.Snapshot != "best_effort" {
 		t.Fatalf("result = %#v, want saved durable best_effort generation", result)
 	}
 
@@ -359,7 +388,9 @@ func assertPracticalFinalSaveStatus(t *testing.T, statusPath, generation string)
 		t.Fatalf("ReadFinalSaveStatus failed: %v", err)
 	}
 
-	if status.Result != automation.FinalSaveSaved || status.Incomplete || !status.Recorded || !status.Bookkeeping || status.SnapshotStatus != "best_effort" {
+	if status.Result != automation.FinalSaveSaved || status.Incomplete || !status.Recorded ||
+		!status.Bookkeeping ||
+		status.SnapshotStatus != "best_effort" {
 		t.Fatalf("status artifact = %#v, want a recorded practical recovery save", status)
 	}
 
@@ -371,14 +402,25 @@ func assertPracticalFinalSaveStatus(t *testing.T, statusPath, generation string)
 func assertAutosaveNotDueAfterFinalSave(t *testing.T, socketPath string) {
 	t.Helper()
 
-	due := executeJSON(t, "autosave", "save-if-due", testSocketFlag, socketPath, testNoConfigFlag, testJSONFlag)
+	due := executeJSON(
+		t,
+		"autosave",
+		"save-if-due",
+		testSocketFlag,
+		socketPath,
+		testNoConfigFlag,
+		testJSONFlag,
+	)
 	if !due.envelope.OK {
 		t.Fatalf("save-if-due failed: %s", due.stderr)
 	}
 
 	skipped := decodeJSONPayload[autosaveResultJSON](t, due.envelope.Result)
 	if skipped.Status != "not_due" {
-		t.Fatalf("status = %q, want not_due after the final save recorded completion", skipped.Status)
+		t.Fatalf(
+			"status = %q, want not_due after the final save recorded completion",
+			skipped.Status,
+		)
 	}
 }
 
@@ -416,7 +458,9 @@ func TestAutosaveSkipsAServerWithoutSessions(t *testing.T) {
 		{"autosave", "save-if-due"},
 	}
 	for _, args := range runs {
-		exec := executeJSON(t, append(args, testSocketFlag, socketPath, testNoConfigFlag, testJSONFlag)...)
+		exec := executeJSON(
+			t,
+			append(args, testSocketFlag, socketPath, testNoConfigFlag, testJSONFlag)...)
 		if !exec.envelope.OK || exec.err != nil {
 			t.Fatalf("%v = (%+v, %v), want a successful skip", args, exec.envelope, exec.err)
 		}
@@ -445,7 +489,10 @@ func TestAutosaveSkipsAServerWithoutSessions(t *testing.T) {
 		Attempts []json.RawMessage `json:"attempts"`
 	}](t, history.envelope.Result)
 	if len(attempts.Attempts) != 0 {
-		t.Fatalf("history attempts = %s, want none for a server without sessions", attempts.Attempts)
+		t.Fatalf(
+			"history attempts = %s, want none for a server without sessions",
+			attempts.Attempts,
+		)
 	}
 }
 

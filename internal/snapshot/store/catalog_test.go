@@ -120,7 +120,11 @@ func FuzzNativeCatalog(f *testing.F) {
 	}
 
 	f.Add(data)
-	f.Add([]byte(`{"version":1,"sequence":0,"current":"../escape","attempts":[],"generations":[],"operations":[],"rewrites":[]}`))
+	f.Add(
+		[]byte(
+			`{"version":1,"sequence":0,"current":"../escape","attempts":[],"generations":[],"operations":[],"rewrites":[]}`,
+		),
+	)
 	f.Add([]byte(`{"schemaVersion":1,"generation":1}`))
 	f.Fuzz(func(t *testing.T, input []byte) {
 		if len(input) > maxCatalogBytes {

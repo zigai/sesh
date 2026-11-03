@@ -26,7 +26,13 @@ func (r *Repository) resumeRewriteLocked(ctx context.Context, id string) (Rewrit
 	}
 
 	if err := ctx.Err(); err != nil {
-		return emptyRewriteResult(id, "", ""), oops.In("snapshot.store").With("operation", "resume_rewrite").Wrap(err)
+		return emptyRewriteResult(
+				id,
+				"",
+				"",
+			), oops.In("snapshot.store").
+				With("operation", "resume_rewrite").
+				Wrap(err)
 	}
 
 	if err := r.confirmRewriteCatalog(ctx); err != nil {
@@ -45,12 +51,26 @@ func (r *Repository) resumeRewriteLocked(ctx context.Context, id string) (Rewrit
 
 	sourceManifest, err := r.loadAndValidatePendingSource(ctx, catalog, existing)
 	if err != nil {
-		return emptyRewriteResult(id, existing.Source, existing.State), errors.Join(ErrRecoveryRequired, err)
+		return emptyRewriteResult(
+				id,
+				existing.Source,
+				existing.State,
+			), errors.Join(
+				ErrRecoveryRequired,
+				err,
+			)
 	}
 
 	removal, err := validatePendingRemoval(sourceManifest, existing)
 	if err != nil {
-		return emptyRewriteResult(id, existing.Source, existing.State), errors.Join(ErrRecoveryRequired, err)
+		return emptyRewriteResult(
+				id,
+				existing.Source,
+				existing.State,
+			), errors.Join(
+				ErrRecoveryRequired,
+				err,
+			)
 	}
 
 	if removal.Empty() {
@@ -60,7 +80,10 @@ func (r *Repository) resumeRewriteLocked(ctx context.Context, id string) (Rewrit
 	return r.resumeReplacementRewriteLocked(ctx, catalog, existing, removal)
 }
 
-func (r *Repository) resolveNonPendingRewrite(catalog Catalog, existing Rewrite) (RewriteResult, error) {
+func (r *Repository) resolveNonPendingRewrite(
+	catalog Catalog,
+	existing Rewrite,
+) (RewriteResult, error) {
 	if existing.State == rewriteStateCompleted || existing.State == rewriteStateRetired {
 		return r.buildRewriteResult(catalog, existing), nil
 	}
@@ -68,7 +91,11 @@ func (r *Repository) resolveNonPendingRewrite(catalog Catalog, existing Rewrite)
 	return emptyRewriteResult(existing.ID, existing.Source, existing.State), ErrCorrupt
 }
 
-func (r *Repository) loadAndValidatePendingSource(ctx context.Context, catalog Catalog, existing Rewrite) (model.Manifest, error) {
+func (r *Repository) loadAndValidatePendingSource(
+	ctx context.Context,
+	catalog Catalog,
+	existing Rewrite,
+) (model.Manifest, error) {
 	sourceGenIdx := catalog.generationIndex(existing.Source)
 	if sourceGenIdx < 0 {
 		return model.Manifest{}, ErrCorrupt
@@ -88,13 +115,18 @@ func (r *Repository) loadAndValidatePendingSource(ctx context.Context, catalog C
 	}
 
 	if err := ctx.Err(); err != nil {
-		return model.Manifest{}, oops.In("snapshot.store").With("operation", "resume_rewrite").Wrap(err)
+		return model.Manifest{}, oops.In("snapshot.store").
+			With("operation", "resume_rewrite").
+			Wrap(err)
 	}
 
 	return sourceManifest, nil
 }
 
-func validatePendingRemoval(sourceManifest model.Manifest, existing Rewrite) (model.Removal, error) {
+func validatePendingRemoval(
+	sourceManifest model.Manifest,
+	existing Rewrite,
+) (model.Removal, error) {
 	removal, err := model.RemoveSessions(sourceManifest, existing.Sessions)
 	if err != nil {
 		return model.Removal{}, errors.Join(ErrCorrupt, err)
@@ -109,7 +141,12 @@ func validatePendingRemoval(sourceManifest model.Manifest, existing Rewrite) (mo
 	return removal, nil
 }
 
-func (r *Repository) resumeRetiredRewriteLocked(ctx context.Context, catalog Catalog, existing Rewrite, removal model.Removal) (RewriteResult, error) {
+func (r *Repository) resumeRetiredRewriteLocked(
+	ctx context.Context,
+	catalog Catalog,
+	existing Rewrite,
+	removal model.Removal,
+) (RewriteResult, error) {
 	committed, err := completedRewriteCatalog(catalog, existing, removal, "")
 	if err != nil {
 		return emptyRewriteResult(existing.ID, existing.Source, existing.State), err
@@ -120,28 +157,66 @@ func (r *Repository) resumeRetiredRewriteLocked(ctx context.Context, catalog Cat
 	}
 
 	if err := ctx.Err(); err != nil {
-		return emptyRewriteResult(existing.ID, existing.Source, existing.State), oops.In("snapshot.store").With("operation", "resume_rewrite").Wrap(err)
+		return emptyRewriteResult(
+				existing.ID,
+				existing.Source,
+				existing.State,
+			), oops.In("snapshot.store").
+				With("operation", "resume_rewrite").
+				Wrap(err)
 	}
 
 	if err := errors.Join(r.boundary("rewrite_resume_pre_publish"), ctx.Err()); err != nil {
-		return emptyRewriteResult(existing.ID, existing.Source, existing.State), errors.Join(ErrRecoveryRequired, err)
+		return emptyRewriteResult(
+				existing.ID,
+				existing.Source,
+				existing.State,
+			), errors.Join(
+				ErrRecoveryRequired,
+				err,
+			)
 	}
 
 	if err := r.publish(ctx, committed, nil); err != nil {
-		return emptyRewriteResult(existing.ID, existing.Source, ""), errors.Join(ErrRecoveryRequired, err)
+		return emptyRewriteResult(
+				existing.ID,
+				existing.Source,
+				"",
+			), errors.Join(
+				ErrRecoveryRequired,
+				err,
+			)
 	}
 
-	return r.buildRewriteResult(committed, committed.Rewrites[committed.rewriteIndex(existing.ID)]), nil
+	return r.buildRewriteResult(
+		committed,
+		committed.Rewrites[committed.rewriteIndex(existing.ID)],
+	), nil
 }
 
-func (r *Repository) resumeReplacementRewriteLocked(ctx context.Context, catalog Catalog, existing Rewrite, removal model.Removal) (RewriteResult, error) {
-	committed, expectedData, expectedDigest, err := prepareReplacementCatalog(catalog, existing, removal)
+func (r *Repository) resumeReplacementRewriteLocked(
+	ctx context.Context,
+	catalog Catalog,
+	existing Rewrite,
+	removal model.Removal,
+) (RewriteResult, error) {
+	committed, expectedData, expectedDigest, err := prepareReplacementCatalog(
+		catalog,
+		existing,
+		removal,
+	)
 	if err != nil {
 		return emptyRewriteResult(existing.ID, existing.Source, existing.State), err
 	}
 
 	if err := ctx.Err(); err != nil {
-		return emptyRewriteResult(existing.ID, existing.Source, existing.State), oops.In("snapshot.store").With("operation", "resume_rewrite").Wrap(err)
+		return emptyRewriteResult(
+				existing.ID,
+				existing.Source,
+				existing.State,
+			), oops.In("snapshot.store").
+				With("operation", "resume_rewrite").
+				Wrap(err)
 	}
 
 	generations, staging, err := r.openGenerationsAndStaging()
@@ -149,32 +224,76 @@ func (r *Repository) resumeReplacementRewriteLocked(ctx context.Context, catalog
 		return emptyRewriteResult(existing.ID, existing.Source, existing.State), err
 	}
 
-	storageErr := r.reconcileCandidateStorage(ctx, generations, staging, existing, removal, expectedData, expectedDigest)
+	storageErr := r.reconcileCandidateStorage(
+		ctx,
+		generations,
+		staging,
+		existing,
+		removal,
+		expectedData,
+		expectedDigest,
+	)
 	if err := errors.Join(storageErr, generations.Close(), staging.Close()); err != nil {
-		return emptyRewriteResult(existing.ID, existing.Source, rewriteStatePending), errors.Join(ErrRecoveryRequired, err)
+		return emptyRewriteResult(
+				existing.ID,
+				existing.Source,
+				rewriteStatePending,
+			), errors.Join(
+				ErrRecoveryRequired,
+				err,
+			)
 	}
 
 	if err := ctx.Err(); err != nil {
-		return emptyRewriteResult(existing.ID, existing.Source, rewriteStatePending), oops.In("snapshot.store").With("operation", "resume_rewrite").Wrap(err)
+		return emptyRewriteResult(
+				existing.ID,
+				existing.Source,
+				rewriteStatePending,
+			), oops.In("snapshot.store").
+				With("operation", "resume_rewrite").
+				Wrap(err)
 	}
 
 	if err := errors.Join(r.boundary("rewrite_resume_pre_publish"), ctx.Err()); err != nil {
-		return emptyRewriteResult(existing.ID, existing.Source, rewriteStatePending), errors.Join(ErrRecoveryRequired, err)
+		return emptyRewriteResult(
+				existing.ID,
+				existing.Source,
+				rewriteStatePending,
+			), errors.Join(
+				ErrRecoveryRequired,
+				err,
+			)
 	}
 
 	if err := r.publish(ctx, committed, nil); err != nil {
-		return emptyRewriteResult(existing.ID, existing.Source, ""), errors.Join(ErrRecoveryRequired, err)
+		return emptyRewriteResult(
+				existing.ID,
+				existing.Source,
+				"",
+			), errors.Join(
+				ErrRecoveryRequired,
+				err,
+			)
 	}
 
-	return r.buildRewriteResult(committed, committed.Rewrites[committed.rewriteIndex(existing.ID)]), nil
+	return r.buildRewriteResult(
+		committed,
+		committed.Rewrites[committed.rewriteIndex(existing.ID)],
+	), nil
 }
 
-func prepareReplacementCatalog(catalog Catalog, existing Rewrite, removal model.Removal) (Catalog, []byte, string, error) {
+func prepareReplacementCatalog(
+	catalog Catalog,
+	existing Rewrite,
+	removal model.Removal,
+) (Catalog, []byte, string, error) {
 	expectedManifest := removal.Retained
 
 	expectedData, err := model.Encode(expectedManifest)
 	if err != nil {
-		return Catalog{}, nil, "", oops.In("snapshot.store").With("operation", "encode_rewrite").Wrap(err)
+		return Catalog{}, nil, "", oops.In("snapshot.store").
+			With("operation", "encode_rewrite").
+			Wrap(err)
 	}
 
 	expectedDigest := digest(expectedData)
@@ -191,23 +310,54 @@ func prepareReplacementCatalog(catalog Catalog, existing Rewrite, removal model.
 	return committed, expectedData, expectedDigest, nil
 }
 
-func (r *Repository) reconcileCandidateStorage(ctx context.Context, generations, staging *privatefs.Dir, existing Rewrite, removal model.Removal, expectedData []byte, expectedDigest string) error {
-	genDir, genExists, stageDir, stageExists, err := openCandidateDirs(generations, staging, existing.Replacement)
+func (r *Repository) reconcileCandidateStorage(
+	ctx context.Context,
+	generations, staging *privatefs.Dir,
+	existing Rewrite,
+	removal model.Removal,
+	expectedData []byte,
+	expectedDigest string,
+) error {
+	genDir, genExists, stageDir, stageExists, err := openCandidateDirs(
+		generations,
+		staging,
+		existing.Replacement,
+	)
 	if err != nil {
 		return errors.Join(ErrRecoveryRequired, err)
 	}
 
 	switch {
 	case genExists:
-		if err := r.validateRenamedGeneration(ctx, genDir, removal.Retained, expectedDigest); err != nil {
+		if err := r.validateRenamedGeneration(
+			ctx,
+			genDir,
+			removal.Retained,
+			expectedDigest,
+		); err != nil {
 			return err
 		}
 
 		return r.confirmRewriteGeneration(ctx, generations, staging)
 	case stageExists:
-		return r.publishStagedReplacement(ctx, staging, generations, stageDir, existing, removal, expectedData)
+		return r.publishStagedReplacement(
+			ctx,
+			staging,
+			generations,
+			stageDir,
+			existing,
+			removal,
+			expectedData,
+		)
 	default:
-		if err := r.stageReplacement(ctx, existing.Source, existing.Replacement, removal.Retained, expectedData, expectedDigest); err != nil {
+		if err := r.stageReplacement(
+			ctx,
+			existing.Source,
+			existing.Replacement,
+			removal.Retained,
+			expectedData,
+			expectedDigest,
+		); err != nil {
 			return errors.Join(ErrRecoveryRequired, err)
 		}
 
@@ -218,21 +368,30 @@ func (r *Repository) reconcileCandidateStorage(ctx context.Context, generations,
 func (r *Repository) openGenerationsAndStaging() (*privatefs.Dir, *privatefs.Dir, error) {
 	generations, err := r.root.Child("generations", false)
 	if err != nil {
-		return nil, nil, oops.In("snapshot.store").With("operation", "open_generations").Wrapf(err, "open generations")
+		return nil, nil, oops.In("snapshot.store").
+			With("operation", "open_generations").
+			Wrapf(err, "open generations")
 	}
 
 	staging, err := r.root.Child("staging", false)
 	if err != nil {
-		return nil, nil, oops.In("snapshot.store").With("operation", "open_staging").Wrapf(errors.Join(err, generations.Close()), "open staging")
+		return nil, nil, oops.In("snapshot.store").
+			With("operation", "open_staging").
+			Wrapf(errors.Join(err, generations.Close()), "open staging")
 	}
 
 	return generations, staging, nil
 }
 
-func openCandidateDirs(generations, staging *privatefs.Dir, replacementID string) (*privatefs.Dir, bool, *privatefs.Dir, bool, error) {
+func openCandidateDirs(
+	generations, staging *privatefs.Dir,
+	replacementID string,
+) (*privatefs.Dir, bool, *privatefs.Dir, bool, error) {
 	genDir, genErr := generations.Child(replacementID, false)
 	if genErr != nil && !errors.Is(genErr, os.ErrNotExist) {
-		return nil, false, nil, false, oops.In("snapshot.store").With("operation", "open_candidate_gen_dir").Wrap(genErr)
+		return nil, false, nil, false, oops.In("snapshot.store").
+			With("operation", "open_candidate_gen_dir").
+			Wrap(genErr)
 	}
 
 	genExists := genErr == nil
@@ -243,7 +402,9 @@ func openCandidateDirs(generations, staging *privatefs.Dir, replacementID string
 			stageErr = errors.Join(stageErr, genDir.Close())
 		}
 
-		return nil, false, nil, false, oops.In("snapshot.store").With("operation", "open_candidate_stage_dir").Wrap(stageErr)
+		return nil, false, nil, false, oops.In("snapshot.store").
+			With("operation", "open_candidate_stage_dir").
+			Wrap(stageErr)
 	}
 
 	stageExists := stageErr == nil
@@ -255,7 +416,12 @@ func openCandidateDirs(generations, staging *privatefs.Dir, replacementID string
 	return genDir, genExists, stageDir, stageExists, nil
 }
 
-func (r *Repository) validateRenamedGeneration(ctx context.Context, genDir *privatefs.Dir, expectedManifest model.Manifest, expectedDigest string) error {
+func (r *Repository) validateRenamedGeneration(
+	ctx context.Context,
+	genDir *privatefs.Dir,
+	expectedManifest model.Manifest,
+	expectedDigest string,
+) error {
 	valErr := validateReplacementDirectory(ctx, genDir, expectedManifest, expectedDigest)
 	closeErr := genDir.Close()
 
@@ -270,8 +436,20 @@ func (r *Repository) validateRenamedGeneration(ctx context.Context, genDir *priv
 	return nil
 }
 
-func (r *Repository) publishStagedReplacement(ctx context.Context, staging, generations, stageDir *privatefs.Dir, existing Rewrite, removal model.Removal, expectedData []byte) error {
-	repairErr := r.completeRewriteStage(ctx, stageDir, existing.Source, removal.Retained, expectedData)
+func (r *Repository) publishStagedReplacement(
+	ctx context.Context,
+	staging, generations, stageDir *privatefs.Dir,
+	existing Rewrite,
+	removal model.Removal,
+	expectedData []byte,
+) error {
+	repairErr := r.completeRewriteStage(
+		ctx,
+		stageDir,
+		existing.Source,
+		removal.Retained,
+		expectedData,
+	)
 	if err := errors.Join(repairErr, stageDir.Close()); err != nil {
 		return errors.Join(ErrRecoveryRequired, err)
 	}
@@ -295,7 +473,10 @@ func (r *Repository) publishStagedReplacement(ctx context.Context, staging, gene
 	return r.boundary("rewrite_generation_published")
 }
 
-func (r *Repository) confirmRewriteGeneration(ctx context.Context, generations, staging *privatefs.Dir) error {
+func (r *Repository) confirmRewriteGeneration(
+	ctx context.Context,
+	generations, staging *privatefs.Dir,
+) error {
 	if err := r.boundary("rewrite_resume_generation_sync"); err != nil {
 		return errors.Join(ErrRecoveryRequired, ErrUncertain, err, ctx.Err())
 	}
@@ -307,13 +488,20 @@ func (r *Repository) confirmRewriteGeneration(ctx context.Context, generations, 
 	return nil
 }
 
-func validateReplacementDirectory(ctx context.Context, dir *privatefs.Dir, manifest model.Manifest, expectedDigest string) error {
+func validateReplacementDirectory(
+	ctx context.Context,
+	dir *privatefs.Dir,
+	manifest model.Manifest,
+	expectedDigest string,
+) error {
 	names, err := dir.NamesLimit(model.MaxEntities + expectedReplacementDirectoryEntries)
 	if err != nil {
 		return oops.In("snapshot.store").With("operation", "list_replacement_directory").Wrap(err)
 	}
 
-	if len(names) != expectedReplacementDirectoryEntries || !slices.Contains(names, "manifest.json") || !slices.Contains(names, "artifacts") {
+	if len(names) != expectedReplacementDirectoryEntries ||
+		!slices.Contains(names, "manifest.json") ||
+		!slices.Contains(names, "artifacts") {
 		return ErrCorrupt
 	}
 
@@ -338,7 +526,11 @@ func validateReplacementDirectory(ctx context.Context, dir *privatefs.Dir, manif
 	return validateReplacementArtifacts(ctx, dir, manifest.Artifacts)
 }
 
-func validateReplacementArtifacts(ctx context.Context, dir *privatefs.Dir, descriptors []model.Artifact) error {
+func validateReplacementArtifacts(
+	ctx context.Context,
+	dir *privatefs.Dir,
+	descriptors []model.Artifact,
+) error {
 	artDir, err := dir.Child("artifacts", false)
 	if err != nil {
 		return oops.In("snapshot.store").With("operation", "open_replacement_artifacts").Wrap(err)
@@ -346,7 +538,9 @@ func validateReplacementArtifacts(ctx context.Context, dir *privatefs.Dir, descr
 
 	artNames, err := artDir.NamesLimit(len(descriptors) + maxArtifactListingPadding)
 	if err != nil {
-		return oops.In("snapshot.store").With("operation", "list_replacement_artifacts").Wrap(errors.Join(err, artDir.Close()))
+		return oops.In("snapshot.store").
+			With("operation", "list_replacement_artifacts").
+			Wrap(errors.Join(err, artDir.Close()))
 	}
 
 	if len(artNames) != len(descriptors) {

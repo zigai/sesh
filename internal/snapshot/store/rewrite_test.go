@@ -30,15 +30,31 @@ func multiSessionSnapshotFixture() (model.Manifest, map[string]io.Reader) {
 		Version:  model.Schema,
 		Started:  10,
 		Finished: 20,
-		Source:   model.Source{TmuxVersion: "3.6", LibraryVersion: "v0.3.0", Consistency: "checkpoint"},
+		Source: model.Source{
+			TmuxVersion:    "3.6",
+			LibraryVersion: "v0.3.0",
+			Consistency:    "checkpoint",
+		},
 		Sessions: []model.Session{
 			{ID: "s0", Name: model.Bytes("work"), Group: "g0", Directory: model.Bytes("/tmp")},
 			{ID: "s1", Name: model.Bytes("play"), Group: "g0", Directory: model.Bytes("/tmp")},
 			{ID: "s2", Name: model.Bytes("other"), Directory: model.Bytes("/tmp")},
 		},
 		Windows: []model.Window{
-			{ID: "w0", Name: model.Bytes("shared"), Width: 80, Height: 24, Layout: model.Layout{Width: 80, Height: 24, Pane: "p0"}},
-			{ID: "w1", Name: model.Bytes("code"), Width: 80, Height: 24, Layout: model.Layout{Width: 80, Height: 24, Pane: "p1"}},
+			{
+				ID:     "w0",
+				Name:   model.Bytes("shared"),
+				Width:  80,
+				Height: 24,
+				Layout: model.Layout{Width: 80, Height: 24, Pane: "p0"},
+			},
+			{
+				ID:     "w1",
+				Name:   model.Bytes("code"),
+				Width:  80,
+				Height: 24,
+				Layout: model.Layout{Width: 80, Height: 24, Pane: "p1"},
+			},
 		},
 		Links: []model.Link{
 			{Session: "s0", Window: "w0", Index: 0, Active: true},
@@ -47,20 +63,51 @@ func multiSessionSnapshotFixture() (model.Manifest, map[string]io.Reader) {
 			{Session: "s2", Window: "w1", Index: 1, Active: false},
 		},
 		Panes: []model.Pane{
-			{ID: "p0", Window: "w0", Directory: model.Bytes("/tmp"), Width: 80, Height: 24, Active: true, Terminal: model.Terminal{Artifact: "a0"}, Launch: model.Launch{Recovery: "unverified"}},
-			{ID: "p1", Window: "w1", Directory: model.Bytes("/tmp"), Width: 80, Height: 24, Active: true, Terminal: model.Terminal{Artifact: "a1"}, Launch: model.Launch{Recovery: "unverified"}},
+			{
+				ID:        "p0",
+				Window:    "w0",
+				Directory: model.Bytes("/tmp"),
+				Width:     80,
+				Height:    24,
+				Active:    true,
+				Terminal:  model.Terminal{Artifact: "a0"},
+				Launch:    model.Launch{Recovery: "unverified"},
+			},
+			{
+				ID:        "p1",
+				Window:    "w1",
+				Directory: model.Bytes("/tmp"),
+				Width:     80,
+				Height:    24,
+				Active:    true,
+				Terminal:  model.Terminal{Artifact: "a1"},
+				Launch:    model.Launch{Recovery: "unverified"},
+			},
 		},
 		Groups: []model.Group{
 			{ID: "g0", Members: []string{"s0", "s1"}},
 		},
 		Artifacts: []model.Artifact{
-			{ID: "a0", Kind: "terminal-text", Length: int64(len(c0)), SHA256: hex.EncodeToString(h0[:])},
-			{ID: "a1", Kind: "terminal-text", Length: int64(len(c1)), SHA256: hex.EncodeToString(h1[:])},
+			{
+				ID:     "a0",
+				Kind:   "terminal-text",
+				Length: int64(len(c0)),
+				SHA256: hex.EncodeToString(h0[:]),
+			},
+			{
+				ID:     "a1",
+				Kind:   "terminal-text",
+				Length: int64(len(c1)),
+				SHA256: hex.EncodeToString(h1[:]),
+			},
 		},
 	}
 
 	for _, domain := range []string{"S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10"} {
-		m.Evidence = append(m.Evidence, model.Evidence{Domain: domain, Status: "verified", Reason: ""})
+		m.Evidence = append(
+			m.Evidence,
+			model.Evidence{Domain: domain, Status: "verified", Reason: ""},
+		)
 	}
 
 	artifacts := map[string]io.Reader{
@@ -122,10 +169,15 @@ func verifyExactSurvivorManifest(t *testing.T, r *Repository, result RewriteResu
 	}
 
 	if len(survivorManifest.Sessions) != 2 || len(survivorManifest.Windows) != 2 {
-		t.Fatalf("unexpected survivor sessions/windows: %d / %d", len(survivorManifest.Sessions), len(survivorManifest.Windows))
+		t.Fatalf(
+			"unexpected survivor sessions/windows: %d / %d",
+			len(survivorManifest.Sessions),
+			len(survivorManifest.Windows),
+		)
 	}
 
-	if len(survivorManifest.Groups) != 1 || !slices.Equal(survivorManifest.Groups[0].Members, []string{"s1"}) {
+	if len(survivorManifest.Groups) != 1 ||
+		!slices.Equal(survivorManifest.Groups[0].Members, []string{"s1"}) {
 		t.Fatalf("expected group g0 trimmed to [s1], got %v", survivorManifest.Groups)
 	}
 
@@ -139,18 +191,33 @@ func verifyExactSurvivorManifest(t *testing.T, r *Repository, result RewriteResu
 	}
 }
 
-func verifyExactSurvivorSecondRemoval(t *testing.T, r *Repository, source Generation, result RewriteResult) {
+func verifyExactSurvivorSecondRemoval(
+	t *testing.T,
+	r *Repository,
+	source Generation,
+	result RewriteResult,
+) {
 	t.Helper()
 
 	mutationID2 := newID()
 
-	result2, err := r.RemoveSessions(t.Context(), mutationID2, result.Replacement.ID, []string{"s2"})
+	result2, err := r.RemoveSessions(
+		t.Context(),
+		mutationID2,
+		result.Replacement.ID,
+		[]string{"s2"},
+	)
 	if err != nil {
 		t.Fatalf("RemoveSessions on survivor failed: %v", err)
 	}
 
-	if !slices.Equal(result2.Removed, []string{"s2"}) || !slices.Equal(result2.Artifacts, []string{"a1"}) {
-		t.Fatalf("unexpected result2 removed/artifacts: %v / %v", result2.Removed, result2.Artifacts)
+	if !slices.Equal(result2.Removed, []string{"s2"}) ||
+		!slices.Equal(result2.Artifacts, []string{"a1"}) {
+		t.Fatalf(
+			"unexpected result2 removed/artifacts: %v / %v",
+			result2.Removed,
+			result2.Artifacts,
+		)
 	}
 
 	sourceManifest, err := r.readGeneration(t.Context(), source)
@@ -165,7 +232,12 @@ func verifyExactSurvivorSecondRemoval(t *testing.T, r *Repository, source Genera
 	verifyExactSurvivorCatalog(t, r, source, result.Replacement.ID, result2.Replacement.ID)
 }
 
-func verifyExactSurvivorCatalog(t *testing.T, r *Repository, source Generation, intermediateID, finalID string) {
+func verifyExactSurvivorCatalog(
+	t *testing.T,
+	r *Repository,
+	source Generation,
+	intermediateID, finalID string,
+) {
 	t.Helper()
 
 	catalog, err := r.Inspect(t.Context())
@@ -182,7 +254,8 @@ func verifyExactSurvivorCatalog(t *testing.T, r *Repository, source Generation, 
 	}
 
 	sourceAttemptIdx := catalog.attemptIndex(source.ID)
-	if sourceAttemptIdx < 0 || catalog.Attempts[sourceAttemptIdx].ManifestSHA256 != source.ManifestSHA256 {
+	if sourceAttemptIdx < 0 ||
+		catalog.Attempts[sourceAttemptIdx].ManifestSHA256 != source.ManifestSHA256 {
 		t.Fatal("source attempt digest missing or altered")
 	}
 }
@@ -199,7 +272,8 @@ func TestRemoveSessionsAllRetirement(t *testing.T) {
 		t.Fatalf("RemoveSessions all failed: %v", err)
 	}
 
-	if !result.Empty || result.State != rewriteStateRetired || result.Replacement != (Generation{}) {
+	if !result.Empty || result.State != rewriteStateRetired ||
+		result.Replacement != (Generation{}) {
 		t.Fatalf("unexpected retirement result: %v", result)
 	}
 
@@ -218,8 +292,13 @@ func verifyRetirementCatalog(t *testing.T, r *Repository, sourceID, mutationID s
 		t.Fatal(err)
 	}
 
-	if catalog.generationIndex(sourceID) >= 0 || len(catalog.Generations) != 0 || catalog.Current != "" {
-		t.Fatalf("unexpected catalog state after retirement: gens=%d current=%s", len(catalog.Generations), catalog.Current)
+	if catalog.generationIndex(sourceID) >= 0 || len(catalog.Generations) != 0 ||
+		catalog.Current != "" {
+		t.Fatalf(
+			"unexpected catalog state after retirement: gens=%d current=%s",
+			len(catalog.Generations),
+			catalog.Current,
+		)
 	}
 
 	if _, err := r.Current(t.Context()); !errors.Is(err, ErrUnavailable) {
@@ -267,23 +346,63 @@ func TestRemoveSessionsInvalidAndUnknownSelections(t *testing.T) {
 	r := openRepository(t, path)
 	source := commitMultiSessionFixture(t, r)
 
-	if _, err := r.RemoveSessions(t.Context(), newID(), source.ID, []string{"s_unknown"}); !errors.Is(err, model.ErrInvalid) {
+	if _, err := r.RemoveSessions(
+		t.Context(),
+		newID(),
+		source.ID,
+		[]string{"s_unknown"},
+	); !errors.Is(
+		err,
+		model.ErrInvalid,
+	) {
 		t.Fatalf("expected model.ErrInvalid on unknown session, got %v", err)
 	}
 
-	if _, err := r.RemoveSessions(t.Context(), newID(), source.ID, []string{"bad/id"}); !errors.Is(err, model.ErrInvalid) {
+	if _, err := r.RemoveSessions(
+		t.Context(),
+		newID(),
+		source.ID,
+		[]string{"bad/id"},
+	); !errors.Is(
+		err,
+		model.ErrInvalid,
+	) {
 		t.Fatalf("expected model.ErrInvalid on malformed session, got %v", err)
 	}
 
-	if _, err := r.RemoveSessions(t.Context(), "short", source.ID, []string{"s0"}); !errors.Is(err, ErrCorrupt) {
+	if _, err := r.RemoveSessions(
+		t.Context(),
+		"short",
+		source.ID,
+		[]string{"s0"},
+	); !errors.Is(
+		err,
+		ErrCorrupt,
+	) {
 		t.Fatalf("expected ErrCorrupt on invalid mutation ID, got %v", err)
 	}
 
-	if _, err := r.RemoveSessions(t.Context(), newID(), "short", []string{"s0"}); !errors.Is(err, ErrCorrupt) {
+	if _, err := r.RemoveSessions(
+		t.Context(),
+		newID(),
+		"short",
+		[]string{"s0"},
+	); !errors.Is(
+		err,
+		ErrCorrupt,
+	) {
 		t.Fatalf("expected ErrCorrupt on invalid source ID, got %v", err)
 	}
 
-	if _, err := r.RemoveSessions(t.Context(), newID(), newID(), []string{"s0"}); !errors.Is(err, ErrUnavailable) {
+	if _, err := r.RemoveSessions(
+		t.Context(),
+		newID(),
+		newID(),
+		[]string{"s0"},
+	); !errors.Is(
+		err,
+		ErrUnavailable,
+	) {
 		t.Fatalf("expected ErrUnavailable on unknown source generation, got %v", err)
 	}
 
@@ -292,7 +411,15 @@ func TestRemoveSessionsInvalidAndUnknownSelections(t *testing.T) {
 		oversized[i] = fmt.Sprintf("s%d", i)
 	}
 
-	if _, err := r.RemoveSessions(t.Context(), newID(), source.ID, oversized); !errors.Is(err, ErrCorrupt) {
+	if _, err := r.RemoveSessions(
+		t.Context(),
+		newID(),
+		source.ID,
+		oversized,
+	); !errors.Is(
+		err,
+		ErrCorrupt,
+	) {
 		t.Fatalf("expected ErrCorrupt on oversized selection, got %v", err)
 	}
 }
@@ -333,7 +460,11 @@ func testRewriteNonCurrent(t *testing.T, r *Repository, g1, g2 Generation) Rewri
 	}
 
 	if catalog.Current != g2.ID {
-		t.Fatalf("Current was altered by non-current rewrite: got %s, want %s", catalog.Current, g2.ID)
+		t.Fatalf(
+			"Current was altered by non-current rewrite: got %s, want %s",
+			catalog.Current,
+			g2.ID,
+		)
 	}
 
 	currentAfter, err := r.Current(t.Context())
@@ -396,7 +527,15 @@ func TestRemoveSessionsActiveRecoveryPinConflict(t *testing.T) {
 
 	mutationID := newID()
 
-	if _, err := r.RemoveSessions(t.Context(), mutationID, source.ID, []string{"s0"}); !errors.Is(err, ErrConflict) {
+	if _, err := r.RemoveSessions(
+		t.Context(),
+		mutationID,
+		source.ID,
+		[]string{"s0"},
+	); !errors.Is(
+		err,
+		ErrConflict,
+	) {
 		t.Fatalf("expected ErrConflict on pinned source, got %v", err)
 	}
 
@@ -429,17 +568,41 @@ func TestRemoveSessionsConcurrentPendingConflict(t *testing.T) {
 
 	mutationID := newID()
 
-	if _, err := r.RemoveSessions(t.Context(), mutationID, source.ID, []string{"s0"}); !errors.Is(err, errInjected) {
+	if _, err := r.RemoveSessions(
+		t.Context(),
+		mutationID,
+		source.ID,
+		[]string{"s0"},
+	); !errors.Is(
+		err,
+		errInjected,
+	) {
 		t.Fatalf("expected injected fault, got %v", err)
 	}
 
 	r.fault = nil
 
-	if _, err := r.Pin(t.Context(), source.ID, model.Bytes("target"), []Action{{ID: "a0", Kind: actionLaunch, State: "planned"}}); !errors.Is(err, ErrConflict) {
+	if _, err := r.Pin(
+		t.Context(),
+		source.ID,
+		model.Bytes("target"),
+		[]Action{{ID: "a0", Kind: actionLaunch, State: "planned"}},
+	); !errors.Is(
+		err,
+		ErrConflict,
+	) {
 		t.Fatalf("expected ErrConflict when pinning source of pending rewrite, got %v", err)
 	}
 
-	if _, err := r.RemoveSessions(t.Context(), newID(), source.ID, []string{"s1"}); !errors.Is(err, ErrConflict) {
+	if _, err := r.RemoveSessions(
+		t.Context(),
+		newID(),
+		source.ID,
+		[]string{"s1"},
+	); !errors.Is(
+		err,
+		ErrConflict,
+	) {
 		t.Fatalf("expected ErrConflict when rewriting source of pending rewrite, got %v", err)
 	}
 
@@ -447,7 +610,15 @@ func TestRemoveSessionsConcurrentPendingConflict(t *testing.T) {
 		t.Fatalf("expected ErrConflict when deleting protected source, got %v", err)
 	}
 
-	if _, err := r.RemoveSessions(t.Context(), mutationID, source.ID, []string{"s0"}); !errors.Is(err, ErrRecoveryRequired) {
+	if _, err := r.RemoveSessions(
+		t.Context(),
+		mutationID,
+		source.ID,
+		[]string{"s0"},
+	); !errors.Is(
+		err,
+		ErrRecoveryRequired,
+	) {
 		t.Fatalf("expected ErrRecoveryRequired on retrying pending rewrite, got %v", err)
 	}
 
@@ -487,11 +658,27 @@ func TestRemoveSessionsCallerIDConflictAndReplay(t *testing.T) {
 		t.Fatalf("replay with duplicates differed: %s", diff)
 	}
 
-	if _, err := r.RemoveSessions(t.Context(), mutationID, source2.ID, []string{"s0"}); !errors.Is(err, ErrConflict) {
+	if _, err := r.RemoveSessions(
+		t.Context(),
+		mutationID,
+		source2.ID,
+		[]string{"s0"},
+	); !errors.Is(
+		err,
+		ErrConflict,
+	) {
 		t.Fatalf("expected ErrConflict on different source, got %v", err)
 	}
 
-	if _, err := r.RemoveSessions(t.Context(), mutationID, source1.ID, []string{"s1"}); !errors.Is(err, ErrConflict) {
+	if _, err := r.RemoveSessions(
+		t.Context(),
+		mutationID,
+		source1.ID,
+		[]string{"s1"},
+	); !errors.Is(
+		err,
+		ErrConflict,
+	) {
 		t.Fatalf("expected ErrConflict on different selection, got %v", err)
 	}
 }
@@ -545,7 +732,11 @@ func TestRemoveSessionsCallerOwnedResults(t *testing.T) {
 	}
 
 	if reconciled.Removed[0] != "s2" || reconciled.Artifacts[0] != "a1" {
-		t.Fatalf("caller mutation affected catalog: %v / %v", reconciled.Removed, reconciled.Artifacts)
+		t.Fatalf(
+			"caller mutation affected catalog: %v / %v",
+			reconciled.Removed,
+			reconciled.Artifacts,
+		)
 	}
 }
 
@@ -615,7 +806,11 @@ func TestRemoveSessionsSubsequentCollectionAndIdentitySurvival(t *testing.T) {
 	}
 
 	if !slices.Contains(collectResult.Removed, source.ID) {
-		t.Fatalf("expected source %s in collectResult.Removed, got %v", source.ID, collectResult.Removed)
+		t.Fatalf(
+			"expected source %s in collectResult.Removed, got %v",
+			source.ID,
+			collectResult.Removed,
+		)
 	}
 
 	catalog, err := r.Inspect(t.Context())
@@ -650,7 +845,13 @@ func TestRemoveSessionsFaultBoundaries(t *testing.T) {
 	}
 }
 
-func runFaultBoundaryScenario(t *testing.T, path string, r *Repository, source Generation, boundary string) {
+func runFaultBoundaryScenario(
+	t *testing.T,
+	path string,
+	r *Repository,
+	source Generation,
+	boundary string,
+) {
 	t.Helper()
 
 	catalogReplacedCount := 0
@@ -673,7 +874,15 @@ func runFaultBoundaryScenario(t *testing.T, path string, r *Repository, source G
 
 	mutationID := newID()
 
-	if _, err := r.RemoveSessions(t.Context(), mutationID, source.ID, []string{"s0"}); !errors.Is(err, errInjected) {
+	if _, err := r.RemoveSessions(
+		t.Context(),
+		mutationID,
+		source.ID,
+		[]string{"s0"},
+	); !errors.Is(
+		err,
+		errInjected,
+	) {
 		t.Fatalf("expected injected fault at %s, got %v", boundary, err)
 	}
 
@@ -682,7 +891,12 @@ func runFaultBoundaryScenario(t *testing.T, path string, r *Repository, source G
 	verifyFaultBoundaryRecovery(t, path, mutationID, source, boundary)
 }
 
-func verifyFaultBoundaryRecovery(t *testing.T, path, mutationID string, source Generation, boundary string) {
+func verifyFaultBoundaryRecovery(
+	t *testing.T,
+	path, mutationID string,
+	source Generation,
+	boundary string,
+) {
 	t.Helper()
 
 	reopened := openRepository(t, path)
@@ -690,13 +904,25 @@ func verifyFaultBoundaryRecovery(t *testing.T, path, mutationID string, source G
 	if boundary == "catalog_replaced_commit" {
 		result, err := reopened.RemoveSessions(t.Context(), mutationID, source.ID, []string{"s0"})
 		if err != nil || result.State != rewriteStateCompleted {
-			t.Fatalf("expected replay after commit replacement to succeed: %v / %s", err, result.State)
+			t.Fatalf(
+				"expected replay after commit replacement to succeed: %v / %s",
+				err,
+				result.State,
+			)
 		}
 
 		return
 	}
 
-	if _, err := reopened.RemoveSessions(t.Context(), mutationID, source.ID, []string{"s0"}); !errors.Is(err, ErrRecoveryRequired) {
+	if _, err := reopened.RemoveSessions(
+		t.Context(),
+		mutationID,
+		source.ID,
+		[]string{"s0"},
+	); !errors.Is(
+		err,
+		ErrRecoveryRequired,
+	) {
 		t.Fatalf("expected ErrRecoveryRequired after interruption at %s, got %v", boundary, err)
 	}
 

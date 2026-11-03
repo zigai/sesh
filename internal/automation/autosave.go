@@ -94,17 +94,33 @@ func EvaluateDueState(state DueState) DueDecision {
 func EvaluateSaveCompletion(result SaveCompletion, err error) CompletionDecision {
 	if err != nil {
 		if result.Uncertain {
-			return CompletionDecision{Record: false, Status: CompletionUncertain, Reason: ReasonPublicationUnsafe}
+			return CompletionDecision{
+				Record: false,
+				Status: CompletionUncertain,
+				Reason: ReasonPublicationUnsafe,
+			}
 		}
 
-		return CompletionDecision{Record: false, Status: CompletionUnsaved, Reason: ReasonSaveFailed}
+		return CompletionDecision{
+			Record: false,
+			Status: CompletionUnsaved,
+			Reason: ReasonSaveFailed,
+		}
 	}
 
 	if result.Generation == "" {
-		return CompletionDecision{Record: false, Status: CompletionUnsaved, Reason: ReasonGenerationMissing}
+		return CompletionDecision{
+			Record: false,
+			Status: CompletionUnsaved,
+			Reason: ReasonGenerationMissing,
+		}
 	}
 
-	return CompletionDecision{Record: true, Status: CompletionSaved, Reason: ReasonDurableGeneration}
+	return CompletionDecision{
+		Record: true,
+		Status: CompletionSaved,
+		Reason: ReasonDurableGeneration,
+	}
 }
 
 func MaintenanceDue(previousSaveUnix int64, now time.Time) bool {
@@ -112,7 +128,9 @@ func MaintenanceDue(previousSaveUnix int64, now time.Time) bool {
 		return true
 	}
 
-	previousYear, previousMonth, previousDay := time.Unix(previousSaveUnix, 0).In(now.Location()).Date()
+	previousYear, previousMonth, previousDay := time.Unix(previousSaveUnix, 0).
+		In(now.Location()).
+		Date()
 	year, month, day := now.Date()
 
 	return previousYear != year || previousMonth != month || previousDay != day

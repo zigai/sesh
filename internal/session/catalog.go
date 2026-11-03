@@ -74,17 +74,32 @@ func ListCatalog(ctx context.Context, opts CatalogOptions) (CatalogResult, error
 	)
 
 	loaders.Go(func() {
-		liveSessions, liveErr = fetchLiveSessions(ctx, opts.Server, opts.CurrentPane, opts.CurrentSessionID)
+		liveSessions, liveErr = fetchLiveSessions(
+			ctx,
+			opts.Server,
+			opts.CurrentPane,
+			opts.CurrentSessionID,
+		)
 	})
 	loaders.Go(func() {
-		savedSessions, savedErr = fetchSavedSessions(ctx, opts.Repository, opts.RepositorySource, opts.GenerationID)
+		savedSessions, savedErr = fetchSavedSessions(
+			ctx,
+			opts.Repository,
+			opts.RepositorySource,
+			opts.GenerationID,
+		)
 	})
 	loaders.Wait()
 
 	result.LiveErr = liveErr
 	result.SavedErr = savedErr
 
-	requested, failed := countConstituents(opts.Server, opts.Repository, result.LiveErr, result.SavedErr)
+	requested, failed := countConstituents(
+		opts.Server,
+		opts.Repository,
+		result.LiveErr,
+		result.SavedErr,
+	)
 	combined, combinedExceeded := combineCatalogSessions(liveSessions, savedSessions)
 	result.Sessions = combined
 
@@ -96,7 +111,10 @@ func ListCatalog(ctx context.Context, opts CatalogOptions) (CatalogResult, error
 		result.Status = StatusFailed
 		cause := selectCatalogError(result.LiveErr, result.SavedErr)
 
-		return result, oops.In("session").Code("catalog_failed").With("operation", "list_catalog").Wrap(cause)
+		return result, oops.In("session").
+			Code("catalog_failed").
+			With("operation", "list_catalog").
+			Wrap(cause)
 	}
 
 	if failed > 0 || limitExceeded {
@@ -107,7 +125,10 @@ func ListCatalog(ctx context.Context, opts CatalogOptions) (CatalogResult, error
 			cause = ErrCatalogLimitExceeded
 		}
 
-		return result, oops.In("session").Code("catalog_failed").With("operation", "list_catalog").Wrap(cause)
+		return result, oops.In("session").
+			Code("catalog_failed").
+			With("operation", "list_catalog").
+			Wrap(cause)
 	}
 
 	return result, nil
@@ -117,18 +138,28 @@ func ListLive(ctx context.Context, server *gotmux.Server, currentPane string) ([
 	return listLive(ctx, server, currentPane, "")
 }
 
-func ListSaved(ctx context.Context, repo SavedSnapshots, source, generationID string) ([]Session, error) {
+func ListSaved(
+	ctx context.Context,
+	repo SavedSnapshots,
+	source, generationID string,
+) ([]Session, error) {
 	if repo == nil {
 		return nil, nil
 	}
 
 	if strings.TrimSpace(source) == "" || !utf8.ValidString(source) {
-		return nil, oops.In("session").Code("catalog_failed").With("operation", "list_saved").Wrap(ErrEmptyRepositorySource)
+		return nil, oops.In("session").
+			Code("catalog_failed").
+			With("operation", "list_saved").
+			Wrap(ErrEmptyRepositorySource)
 	}
 
 	listing, err := loadSavedListing(ctx, repo, generationID)
 	if err != nil {
-		return nil, oops.In("session").Code("catalog_failed").With("operation", "list_saved").Wrap(err)
+		return nil, oops.In("session").
+			Code("catalog_failed").
+			With("operation", "list_saved").
+			Wrap(err)
 	}
 
 	genID := listing.Generation.ID
@@ -186,7 +217,11 @@ func ListSaved(ctx context.Context, repo SavedSnapshots, source, generationID st
 	return result, nil
 }
 
-func listLive(ctx context.Context, server *gotmux.Server, currentPane, currentSessionID string) ([]Session, error) {
+func listLive(
+	ctx context.Context,
+	server *gotmux.Server,
+	currentPane, currentSessionID string,
+) ([]Session, error) {
 	if server == nil {
 		return nil, nil
 	}
@@ -207,7 +242,10 @@ func listLive(ctx context.Context, server *gotmux.Server, currentPane, currentSe
 		Filter:      "",
 	})
 	if err != nil {
-		return nil, oops.In("session").Code("catalog_failed").With("operation", "list_live").Wrapf(err, "listing live sessions")
+		return nil, oops.In("session").
+			Code("catalog_failed").
+			With("operation", "list_live").
+			Wrapf(err, "listing live sessions")
 	}
 
 	if len(sessionInfos) == 0 {
@@ -216,15 +254,26 @@ func listLive(ctx context.Context, server *gotmux.Server, currentPane, currentSe
 
 	identity := sessionInfos[0].Handle().ServerIdentity()
 
-	currentSession, invokingPane, currentErr := catalogInvokingPane(ctx, server, currentPane, currentSessionID)
+	currentSession, invokingPane, currentErr := catalogInvokingPane(
+		ctx,
+		server,
+		currentPane,
+		currentSessionID,
+	)
 
 	postProbe, err := server.Probe(ctx)
 	if err != nil {
-		return nil, oops.In("session").Code("catalog_failed").With("operation", "list_live").Wrapf(err, "post-probe server")
+		return nil, oops.In("session").
+			Code("catalog_failed").
+			With("operation", "list_live").
+			Wrapf(err, "post-probe server")
 	}
 
 	if !postProbe.Identity.Equal(identity) {
-		return nil, oops.In("session").Code("catalog_failed").With("operation", "list_live").Wrap(ErrServerIdentityChanged)
+		return nil, oops.In("session").
+			Code("catalog_failed").
+			With("operation", "list_live").
+			Wrap(ErrServerIdentityChanged)
 	}
 
 	socket := identity.ReportedSocket
@@ -244,7 +293,11 @@ func listLive(ctx context.Context, server *gotmux.Server, currentPane, currentSe
 	return result, currentErr
 }
 
-func catalogInvokingPane(ctx context.Context, server *gotmux.Server, currentPane, currentSessionID string) (string, string, error) {
+func catalogInvokingPane(
+	ctx context.Context,
+	server *gotmux.Server,
+	currentPane, currentSessionID string,
+) (string, string, error) {
 	pane := strings.TrimSpace(currentPane)
 	currentSession := currentSessionID
 
@@ -265,7 +318,12 @@ func catalogInvokingPane(ctx context.Context, server *gotmux.Server, currentPane
 	return currentSession, pane, currentErr
 }
 
-func buildLiveRows(infos []gotmux.SessionInfo, socket string, identity gotmux.ServerIdentity, currentSession, invokingPane string) []Session {
+func buildLiveRows(
+	infos []gotmux.SessionInfo,
+	socket string,
+	identity gotmux.ServerIdentity,
+	currentSession, invokingPane string,
+) []Session {
 	result := make([]Session, 0, len(infos))
 	for _, info := range infos {
 		row := buildLiveSession(info, socket, identity, currentSession)
@@ -279,7 +337,11 @@ func buildLiveRows(infos []gotmux.SessionInfo, socket string, identity gotmux.Se
 	return result
 }
 
-func fetchLiveSessions(ctx context.Context, server *gotmux.Server, currentPane, currentSessionID string) ([]Session, error) {
+func fetchLiveSessions(
+	ctx context.Context,
+	server *gotmux.Server,
+	currentPane, currentSessionID string,
+) ([]Session, error) {
 	if server == nil {
 		return nil, nil
 	}
@@ -355,13 +417,20 @@ func absentCommandCauses(err error) bool {
 	return errors.Is(err, gotmux.ErrNoServer)
 }
 
-func fetchSavedSessions(ctx context.Context, repo SavedSnapshots, source, genID string) ([]Session, error) {
+func fetchSavedSessions(
+	ctx context.Context,
+	repo SavedSnapshots,
+	source, genID string,
+) ([]Session, error) {
 	if repo == nil {
 		return nil, nil
 	}
 
 	if strings.TrimSpace(source) == "" || !utf8.ValidString(source) {
-		return nil, oops.In("session").Code("catalog_failed").With("operation", "list_saved").Wrap(ErrEmptyRepositorySource)
+		return nil, oops.In("session").
+			Code("catalog_failed").
+			With("operation", "list_saved").
+			Wrap(ErrEmptyRepositorySource)
 	}
 
 	saved, err := ListSaved(ctx, repo, source, genID)
@@ -376,7 +445,11 @@ func fetchSavedSessions(ctx context.Context, repo SavedSnapshots, source, genID 
 	return saved, nil
 }
 
-func countConstituents(srv *gotmux.Server, repo SavedSnapshots, liveErr, savedErr error) (int, int) {
+func countConstituents(
+	srv *gotmux.Server,
+	repo SavedSnapshots,
+	liveErr, savedErr error,
+) (int, int) {
 	requested, failed := 0, 0
 	if srv != nil {
 		requested++
@@ -428,7 +501,11 @@ func combineCatalogSessions(live, saved []Session) ([]Session, bool) {
 	return combined, exceeded
 }
 
-func resolveCurrentSession(ctx context.Context, server *gotmux.Server, currentPane string) (string, error) {
+func resolveCurrentSession(
+	ctx context.Context,
+	server *gotmux.Server,
+	currentPane string,
+) (string, error) {
 	pane := strings.TrimSpace(currentPane)
 	if pane == "" {
 		return "", nil
@@ -463,17 +540,27 @@ func resolveCurrentSession(ctx context.Context, server *gotmux.Server, currentPa
 	return current, nil
 }
 
-func paneLinkedToSession(ctx context.Context, server *gotmux.Server, paneID, sessionID string) bool {
+func paneLinkedToSession(
+	ctx context.Context,
+	server *gotmux.Server,
+	paneID, sessionID string,
+) bool {
 	records, err := server.QueryRecords(ctx, gotmux.RecordQuery{
 		Kind:   gotmux.ObjectKindPane,
 		Fields: []string{"pane_id"},
-		Filter: gotmux.Format("#{&&:#{==:#{pane_id}," + paneID + "},#{==:#{session_id}," + sessionID + "}}"),
+		Filter: gotmux.Format(
+			"#{&&:#{==:#{pane_id}," + paneID + "},#{==:#{session_id}," + sessionID + "}}",
+		),
 	})
 
 	return err == nil && len(records.Rows) > 0
 }
 
-func loadSavedListing(ctx context.Context, repo SavedSnapshots, generationID string) (store.Listing, error) {
+func loadSavedListing(
+	ctx context.Context,
+	repo SavedSnapshots,
+	generationID string,
+) (store.Listing, error) {
 	if generationID == "" {
 		listing, err := repo.ReadCurrentListing(ctx)
 		if err != nil {

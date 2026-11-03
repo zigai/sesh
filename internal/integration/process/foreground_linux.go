@@ -31,7 +31,11 @@ type procForegroundSource struct {
 }
 
 func observeForegroundPlatform(ctx context.Context, req ForegroundRequest) (*Observation, error) {
-	return observeForeground(ctx, procForegroundSource{procRoot: defaultProcRoot, bootIDPath: defaultBootIDPath}, req)
+	return observeForeground(
+		ctx,
+		procForegroundSource{procRoot: defaultProcRoot, bootIDPath: defaultBootIDPath},
+		req,
+	)
 }
 
 func (s procForegroundSource) readIdentity(ctx context.Context, pid int) (Identity, error) {
@@ -126,7 +130,11 @@ func appendLinuxDescendants(
 	return queue, nil
 }
 
-func readLinuxDescendant(ctx context.Context, procRoot string, pid int) (foregroundProcess, bool, error) {
+func readLinuxDescendant(
+	ctx context.Context,
+	procRoot string,
+	pid int,
+) (foregroundProcess, bool, error) {
 	process, err := readLinuxForegroundProcess(ctx, procRoot, pid)
 	if err != nil {
 		if isProcessGone(err) || errors.Is(err, ErrProcessZombie) {
@@ -211,8 +219,16 @@ func readLinuxTaskChildren(ctx context.Context, path string) ([]int, error) {
 	return children, nil
 }
 
-func readLinuxForegroundProcess(ctx context.Context, procRoot string, pid int) (foregroundProcess, error) {
-	data, err := readBoundedFile(ctx, filepath.Join(procRoot, strconv.Itoa(pid), "stat"), maxStatBytes)
+func readLinuxForegroundProcess(
+	ctx context.Context,
+	procRoot string,
+	pid int,
+) (foregroundProcess, error) {
+	data, err := readBoundedFile(
+		ctx,
+		filepath.Join(procRoot, strconv.Itoa(pid), "stat"),
+		maxStatBytes,
+	)
 	if err != nil {
 		if isProcessGone(err) {
 			return foregroundProcess{}, ErrProcessVanished
@@ -238,11 +254,13 @@ func parseLinuxForegroundStat(data []byte) (foregroundProcess, error) {
 	}
 
 	fields := bytes.Fields(data[closeParen+2:])
-	if len(fields) < statMinFields || len(fields[statStateIndex]) != 1 || !isKnownProcessState(fields[statStateIndex][0]) {
+	if len(fields) < statMinFields || len(fields[statStateIndex]) != 1 ||
+		!isKnownProcessState(fields[statStateIndex][0]) {
 		return foregroundProcess{}, ErrMalformedStat
 	}
 
-	if fields[statStateIndex][0] == 'Z' || fields[statStateIndex][0] == 'X' || fields[statStateIndex][0] == 'x' {
+	if fields[statStateIndex][0] == 'Z' || fields[statStateIndex][0] == 'X' ||
+		fields[statStateIndex][0] == 'x' {
 		return foregroundProcess{}, ErrProcessZombie
 	}
 

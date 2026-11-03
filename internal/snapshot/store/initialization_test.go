@@ -24,7 +24,8 @@ func TestInitializationNormalBrandNew(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if catalog.Sequence != 0 || len(catalog.Attempts) != 0 || len(catalog.Generations) != 0 || len(catalog.Operations) != 0 {
+	if catalog.Sequence != 0 || len(catalog.Attempts) != 0 || len(catalog.Generations) != 0 ||
+		len(catalog.Operations) != 0 {
 		t.Fatalf("unexpected catalog state: %+v", catalog)
 	}
 
@@ -270,7 +271,11 @@ func TestInitializationArbitraryTempFileRejected(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(filepath.Join(path, ".temp-catalog"), []byte("data"), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(path, ".temp-catalog"),
+		[]byte("data"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -292,7 +297,11 @@ func TestInitializationMalformedTempCatalogRejected(t *testing.T) {
 
 	writeTestInitMarker(t, path)
 
-	if err := os.WriteFile(filepath.Join(path, ".catalog-nothex"), []byte("data"), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(path, ".catalog-nothex"),
+		[]byte("data"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -323,7 +332,10 @@ func TestInitializationSymlinkedRecordRejected(t *testing.T) {
 	target := filepath.Join(t.TempDir(), "real-init.json")
 	writeTestInitMarker(t, filepath.Dir(target))
 
-	if err := os.Rename(filepath.Join(filepath.Dir(target), initializationMarker), target); err != nil {
+	if err := os.Rename(
+		filepath.Join(filepath.Dir(target), initializationMarker),
+		target,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -639,25 +651,28 @@ func TestInitializationPreservesPartialCatalog(t *testing.T) {
 func TestInitializationUnsafeMarkerPreserved(t *testing.T) {
 	for _, published := range []bool{false, true} {
 		for _, kind := range []string{"file", "nonempty"} {
-			t.Run(kind+map[bool]string{false: "_unpublished", true: "_published"}[published], func(t *testing.T) {
-				path := filepath.Join(t.TempDir(), "repository")
-				if published {
-					openRepository(t, path)
-				} else if err := os.Mkdir(path, 0o700); err != nil {
-					t.Fatal(err)
-				}
+			t.Run(
+				kind+map[bool]string{false: "_unpublished", true: "_published"}[published],
+				func(t *testing.T) {
+					path := filepath.Join(t.TempDir(), "repository")
+					if published {
+						openRepository(t, path)
+					} else if err := os.Mkdir(path, 0o700); err != nil {
+						t.Fatal(err)
+					}
 
-				marker := makeInvalidInitMarker(t, path, kind)
+					marker := makeInvalidInitMarker(t, path, kind)
 
-				_, err := Open(t.Context(), path)
-				if !errors.Is(err, ErrCorrupt) {
-					t.Fatalf("accepted unsafe marker: %v", err)
-				}
+					_, err := Open(t.Context(), path)
+					if !errors.Is(err, ErrCorrupt) {
+						t.Fatalf("accepted unsafe marker: %v", err)
+					}
 
-				if _, err := os.Lstat(marker); err != nil {
-					t.Fatalf("removed marker: %v", err)
-				}
-			})
+					if _, err := os.Lstat(marker); err != nil {
+						t.Fatalf("removed marker: %v", err)
+					}
+				},
+			)
 		}
 	}
 }
@@ -798,7 +813,12 @@ func TestInitializationInterruptedMarkerRemovalRequiresSync(t *testing.T) {
 		t.Fatalf("expected uncertain unlink: %v", err)
 	}
 
-	if _, err := os.Stat(filepath.Join(path, initializationMarker)); !errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(
+		filepath.Join(path, initializationMarker),
+	); !errors.Is(
+		err,
+		os.ErrNotExist,
+	) {
 		t.Fatalf("marker still exists: %v", err)
 	}
 

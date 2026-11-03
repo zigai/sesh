@@ -15,7 +15,10 @@ func Status(ctx context.Context, statePath string) (StatusSummary, error) {
 
 func StatusFromSource(ctx context.Context, source SessionSource) (StatusSummary, error) {
 	if err := ctx.Err(); err != nil {
-		return StatusSummary{}, oops.In("agents").Code("operation_canceled").With("operation", "agent_status").Wrap(err)
+		return StatusSummary{}, oops.In("agents").
+			Code("operation_canceled").
+			With("operation", "agent_status").
+			Wrap(err)
 	}
 
 	agents, err := LoadLiveAgents(ctx, source)

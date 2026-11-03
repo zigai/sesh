@@ -44,7 +44,11 @@ func TestSplitsLayoutPlacesEachPaneWhereItsSplitPutsIt(t *testing.T) {
 	}
 
 	panes := rolePanes(t, f, place.Session, record.ID)
-	want := map[string]rect{"agent": {0, 0, 47, 24}, "editor": {48, 0, 32, 15}, "shell": {48, 16, 32, 8}}
+	want := map[string]rect{
+		"agent":  {0, 0, 47, 24},
+		"editor": {48, 0, 32, 15},
+		"shell":  {48, 16, 32, 8},
+	}
 
 	for role, wanted := range want {
 		pane := panes[role]
@@ -67,7 +71,11 @@ func TestSplitsLayoutPlacesEachPaneWhereItsSplitPutsIt(t *testing.T) {
 	}
 
 	value, _ := panes["editor"].Raw(task.OptionRestart)
-	if err := json.Unmarshal(value, &restart); err != nil || restart.Directory != dir || len(restart.Argv) == 0 {
+	if err := json.Unmarshal(
+		value,
+		&restart,
+	); err != nil || restart.Directory != dir ||
+		len(restart.Argv) == 0 {
 		t.Errorf("editor restart command = %q, want its command and directory", value)
 	}
 
@@ -81,7 +89,11 @@ func TestStartTakesTheFirstLayoutTheWindowAndHarnessFit(t *testing.T) {
 	dir := mkdir(t, filepath.Join(f.base, "scratch"))
 	f.cfg.Tasks.Layouts = []config.TaskLayoutConfig{
 		{Name: "huge", When: config.TaskLayoutWhen{MinWidth: 1000}, Arrange: "even-horizontal"},
-		{Name: "below", When: config.TaskLayoutWhen{Harness: []string{sleepHarness}}, Splits: []config.TaskSplitConfig{{Pane: "editor", Of: "agent", Direction: "below"}}},
+		{
+			Name:   "below",
+			When:   config.TaskLayoutWhen{Harness: []string{sleepHarness}},
+			Splits: []config.TaskSplitConfig{{Pane: "editor", Of: "agent", Direction: "below"}},
+		},
 		{Name: "beside", Arrange: config.ArrangeMainVertical, MainSize: "60%"},
 	}
 
@@ -104,11 +116,24 @@ func TestStartTakesTheFirstLayoutTheWindowAndHarnessFit(t *testing.T) {
 
 		panes := rolePanes(t, f, place.Session, record.ID)
 		if below := panes["editor"].Top > 0; below != tt.below {
-			t.Errorf("Start(%+v) editor pane at %d,%d; want below the agent: %v", tt.request, panes["editor"].Left, panes["editor"].Top, tt.below)
+			t.Errorf(
+				"Start(%+v) editor pane at %d,%d; want below the agent: %v",
+				tt.request,
+				panes["editor"].Left,
+				panes["editor"].Top,
+				tt.below,
+			)
 		}
 	}
 
-	if _, err := f.service.Start(t.Context(), place, task.Request{Harness: envHarness, Layout: "missing"}); !errors.Is(err, task.ErrUnknownLayout) {
+	if _, err := f.service.Start(
+		t.Context(),
+		place,
+		task.Request{Harness: envHarness, Layout: "missing"},
+	); !errors.Is(
+		err,
+		task.ErrUnknownLayout,
+	) {
 		t.Fatalf("Start() with an unknown layout error = %v, want ErrUnknownLayout", err)
 	}
 }
@@ -116,7 +141,9 @@ func TestStartTakesTheFirstLayoutTheWindowAndHarnessFit(t *testing.T) {
 func TestMainSizeSetsTheAgentsShareOfAnArrangement(t *testing.T) {
 	f := newFixture(t)
 	dir := mkdir(t, filepath.Join(f.base, "scratch"))
-	f.cfg.Tasks.Layouts = []config.TaskLayoutConfig{{Arrange: config.ArrangeMainVertical, MainSize: "60%"}}
+	f.cfg.Tasks.Layouts = []config.TaskLayoutConfig{
+		{Arrange: config.ArrangeMainVertical, MainSize: "60%"},
+	}
 
 	place := scratchPlace(t, f, dir)
 
@@ -162,14 +189,19 @@ func TestRelayoutFitsTheWindowsNewSizeAndReopensClosedPanes(t *testing.T) {
 
 	panes = rolePanes(t, f, place.Session, record.ID)
 	if editor, ok := panes["editor"]; !ok || editor.Left != 0 || editor.Top == 0 {
-		t.Fatalf("editor pane after relayout = %+v, want it reopened below the agent in a portrait window", editor)
+		t.Fatalf(
+			"editor pane after relayout = %+v, want it reopened below the agent in a portrait window",
+			editor,
+		)
 	}
 }
 
 func TestRelayoutKeepsAPaneTheSplitsDoNotName(t *testing.T) {
 	f := newFixture(t)
 	dir := mkdir(t, filepath.Join(f.base, "scratch"))
-	f.cfg.Tasks.Layouts = []config.TaskLayoutConfig{{Splits: []config.TaskSplitConfig{{Pane: "editor", Of: "agent", Direction: "right"}}}}
+	f.cfg.Tasks.Layouts = []config.TaskLayoutConfig{
+		{Splits: []config.TaskSplitConfig{{Pane: "editor", Of: "agent", Direction: "right"}}},
+	}
 	place := scratchPlace(t, f, dir)
 
 	record, err := f.service.Start(t.Context(), place, task.Request{Harness: envHarness})
@@ -184,7 +216,10 @@ func TestRelayoutKeepsAPaneTheSplitsDoNotName(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	extra, err := agent.Split(t.Context(), gotmux.SplitOptions{Direction: gotmux.DirectionVertical, Dir: dir})
+	extra, err := agent.Split(
+		t.Context(),
+		gotmux.SplitOptions{Direction: gotmux.DirectionVertical, Dir: dir},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,7 +234,13 @@ func TestRelayoutKeepsAPaneTheSplitsDoNotName(t *testing.T) {
 	}
 
 	if panes["editor"].Left <= panes["agent"].Left || panes["editor"].Top != panes["agent"].Top {
-		t.Errorf("editor pane at %d,%d, want it right of the agent at %d,%d", panes["editor"].Left, panes["editor"].Top, panes["agent"].Left, panes["agent"].Top)
+		t.Errorf(
+			"editor pane at %d,%d, want it right of the agent at %d,%d",
+			panes["editor"].Left,
+			panes["editor"].Top,
+			panes["agent"].Left,
+			panes["agent"].Top,
+		)
 	}
 }
 
@@ -222,7 +263,11 @@ func TestSplitsLayoutPlacesPanesLeftOfAndAbove(t *testing.T) {
 	}
 
 	panes := rolePanes(t, f, place.Session, record.ID)
-	want := map[string]rect{"shell": {0, 0, 30, 6}, "editor": {0, 7, 30, 17}, "agent": {31, 0, 49, 24}}
+	want := map[string]rect{
+		"shell":  {0, 0, 30, 6},
+		"editor": {0, 7, 30, 17},
+		"agent":  {31, 0, 49, 24},
+	}
 
 	for role, wanted := range want {
 		pane := panes[role]
@@ -235,10 +280,19 @@ func TestSplitsLayoutPlacesPanesLeftOfAndAbove(t *testing.T) {
 func TestStartRefusesAPaneDirectoryThatDoesNotExist(t *testing.T) {
 	f := newFixture(t)
 	dir := mkdir(t, filepath.Join(f.base, "scratch"))
-	f.cfg.Tasks.Panes = []config.TaskPaneConfig{{Name: "docs", Command: nil, Dir: "missing", Restart: false}}
+	f.cfg.Tasks.Panes = []config.TaskPaneConfig{
+		{Name: "docs", Command: nil, Dir: "missing", Restart: false},
+	}
 	place := scratchPlace(t, f, dir)
 
-	if _, err := f.service.Start(t.Context(), place, task.Request{Harness: envHarness}); !errors.Is(err, task.ErrPaneDirectory) {
+	if _, err := f.service.Start(
+		t.Context(),
+		place,
+		task.Request{Harness: envHarness},
+	); !errors.Is(
+		err,
+		task.ErrPaneDirectory,
+	) {
 		t.Fatalf("Start() error = %v, want ErrPaneDirectory", err)
 	}
 }
@@ -247,7 +301,9 @@ func TestProjectTaskWindowsOpenTheProjectsPanes(t *testing.T) {
 	f := newFixture(t)
 	repo := initRepository(t, filepath.Join(f.base, "code", "shop"))
 	f.cfg.Projects.Overrides = map[string]config.ProjectConfig{"shop": {
-		TaskPanes: []config.TaskPaneConfig{{Name: "server", Command: []string{"sleep", "300"}, Dir: "", Restart: false}},
+		TaskPanes: []config.TaskPaneConfig{
+			{Name: "server", Command: []string{"sleep", "300"}, Dir: "", Restart: false},
+		},
 	}}
 	place := projectPlace(t, f, repo)
 
@@ -266,9 +322,14 @@ func TestARestartingPaneRunsAgainWithItsTaskAfterARestore(t *testing.T) {
 	f := newFixture(t)
 	dir := mkdir(t, filepath.Join(f.base, "scratch"))
 	marker := filepath.Join(f.base, "marker")
-	f.cfg.Tasks.Panes = []config.TaskPaneConfig{{
-		Name: "server", Command: []string{"sh", "-c", `echo "$SESH_TASK" > "$0"; exec sleep 300`, marker}, Dir: "", Restart: true,
-	}}
+	f.cfg.Tasks.Panes = []config.TaskPaneConfig{
+		{
+			Name:    "server",
+			Command: []string{"sh", "-c", `echo "$SESH_TASK" > "$0"; exec sleep 300`, marker},
+			Dir:     "",
+			Restart: true,
+		},
+	}
 	place := scratchPlace(t, f, dir)
 
 	record, err := f.service.Start(t.Context(), place, task.Request{Harness: envHarness})
@@ -287,9 +348,15 @@ func TestARestartingPaneRunsAgainWithItsTaskAfterARestore(t *testing.T) {
 
 	leases := filepath.Join(f.base, "leases")
 
-	saved, err := engine.SaveObservation(t.Context(), repo, f.server, []gotmux.SessionID{place.Session}, engine.SaveConfig{
-		LeaseRoot: leases, ProcessEnrichment: true, Profile: engine.RecoveryPractical,
-	})
+	saved, err := engine.SaveObservation(
+		t.Context(),
+		repo,
+		f.server,
+		[]gotmux.SessionID{place.Session},
+		engine.SaveConfig{
+			LeaseRoot: leases, ProcessEnrichment: true, Profile: engine.RecoveryPractical,
+		},
+	)
 	if err != nil {
 		t.Fatalf("SaveObservation() error = %v", err)
 	}
@@ -308,8 +375,15 @@ func TestARestartingPaneRunsAgainWithItsTaskAfterARestore(t *testing.T) {
 	}
 
 	if _, err := engine.Restore(t.Context(), repo, f.server, engine.RestoreConfig{
-		LeaseRoot: leases, Generation: saved.Generation, LaunchProcesses: true, Profile: engine.RecoveryPractical,
-		Launches: task.NewRestoreLaunches(f.store, wakePolicy(t, config.WakeOnRestorePrevious), "/nonexistent/sesh"),
+		LeaseRoot:       leases,
+		Generation:      saved.Generation,
+		LaunchProcesses: true,
+		Profile:         engine.RecoveryPractical,
+		Launches: task.NewRestoreLaunches(
+			f.store,
+			wakePolicy(t, config.WakeOnRestorePrevious),
+			"/nonexistent/sesh",
+		),
 	}); err != nil {
 		t.Fatalf("Restore() error = %v", err)
 	}
@@ -338,7 +412,12 @@ func locatePane(t *testing.T, f fixture, pane gotmux.PaneID) task.Place {
 	return place
 }
 
-func rolePanes(t *testing.T, f fixture, session gotmux.SessionID, id string) map[string]gotmux.PaneInfo {
+func rolePanes(
+	t *testing.T,
+	f fixture,
+	session gotmux.SessionID,
+	id string,
+) map[string]gotmux.PaneInfo {
 	t.Helper()
 
 	window, err := f.server.Window(t.Context(), taskWindow(t, f.server, session, id).ID)
@@ -346,7 +425,10 @@ func rolePanes(t *testing.T, f fixture, session gotmux.SessionID, id string) map
 		t.Fatal(err)
 	}
 
-	infos, err := window.PanesWith(t.Context(), gotmux.QueryOptions{Filter: "", ExtraFields: []string{task.OptionRole, task.OptionRestart}})
+	infos, err := window.PanesWith(
+		t.Context(),
+		gotmux.QueryOptions{Filter: "", ExtraFields: []string{task.OptionRole, task.OptionRestart}},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

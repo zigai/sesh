@@ -17,7 +17,11 @@ func (local *Local) registerProjectHandlers() {
 	handle(local, action.ProjectCreate, local.createProject)
 }
 
-func (local *Local) openProject(ctx context.Context, caller action.Caller, input action.OpenProject) (action.OpenedProject, error) {
+func (local *Local) openProject(
+	ctx context.Context,
+	caller action.Caller,
+	input action.OpenProject,
+) (action.OpenedProject, error) {
 	catalog, err := local.projectCatalog()
 	if err != nil {
 		return emptyOpenedProject(), err
@@ -31,7 +35,11 @@ func (local *Local) openProject(ctx context.Context, caller action.Caller, input
 	return local.enterProject(ctx, caller, opened, input.Adopt)
 }
 
-func (local *Local) cloneProject(ctx context.Context, caller action.Caller, input action.CloneProject) (action.OpenedProject, error) {
+func (local *Local) cloneProject(
+	ctx context.Context,
+	caller action.Caller,
+	input action.CloneProject,
+) (action.OpenedProject, error) {
 	catalog, err := local.projectCatalog()
 	if err != nil {
 		return emptyOpenedProject(), err
@@ -45,7 +53,11 @@ func (local *Local) cloneProject(ctx context.Context, caller action.Caller, inpu
 	return local.enterProject(ctx, caller, cloned, false)
 }
 
-func (local *Local) createProject(ctx context.Context, caller action.Caller, input action.CreateProject) (action.OpenedProject, error) {
+func (local *Local) createProject(
+	ctx context.Context,
+	caller action.Caller,
+	input action.CreateProject,
+) (action.OpenedProject, error) {
 	catalog, err := local.projectCatalog()
 	if err != nil {
 		return emptyOpenedProject(), err
@@ -59,7 +71,12 @@ func (local *Local) createProject(ctx context.Context, caller action.Caller, inp
 	return local.enterProject(ctx, caller, created, false)
 }
 
-func (local *Local) enterProject(ctx context.Context, caller action.Caller, p project.Project, adopt bool) (action.OpenedProject, error) {
+func (local *Local) enterProject(
+	ctx context.Context,
+	caller action.Caller,
+	p project.Project,
+	adopt bool,
+) (action.OpenedProject, error) {
 	result := action.OpenedProject{Root: p.Root, Session: "", Created: false, Adopted: false}
 
 	if local.server == nil {
@@ -76,7 +93,12 @@ func (local *Local) enterProject(ctx context.Context, caller action.Caller, p pr
 	result.Adopted = opened.How == project.OpenedAdopted
 
 	if caller.Client != "" && caller.Session != "" {
-		_, err = local.workflow.SwitchSessionOutcomeForClient(ctx, opened.Session.Name, caller.Client, caller.Session)
+		_, err = local.workflow.SwitchSessionOutcomeForClient(
+			ctx,
+			opened.Session.Name,
+			caller.Client,
+			caller.Session,
+		)
 	} else {
 		_, err = local.workflow.SwitchSessionOutcome(ctx, opened.Session.Name)
 	}

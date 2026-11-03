@@ -64,9 +64,19 @@ const (
 )
 
 var footerActionIDs = map[displayMode][]action.ID{
-	displayModeSesh:   {action.SessionCreate.ID, action.SessionRename.ID, action.SessionKill.ID, action.SnapshotSave.ID},
+	displayModeSesh: {
+		action.SessionCreate.ID,
+		action.SessionRename.ID,
+		action.SessionKill.ID,
+		action.SnapshotSave.ID,
+	},
 	displayModeAgents: {action.SessionCreate.ID, action.SessionRename.ID, action.SessionKill.ID},
-	displayModeInbox:  {action.InboxTask.ID, action.InboxFinish.ID, action.TaskSleep.ID, action.TaskOpen.ID},
+	displayModeInbox: {
+		action.InboxTask.ID,
+		action.InboxFinish.ID,
+		action.TaskSleep.ID,
+		action.TaskOpen.ID,
+	},
 }
 
 type popupLayout struct {
@@ -126,11 +136,15 @@ func (m *Model) viewContent() string {
 	frame := m.renderFrame()
 
 	if m.showHelp {
-		return m.insetPopupContent(overlayCentered(frame, m.renderHelpOverlay(), m.contentWidth(), m.contentHeight()))
+		return m.insetPopupContent(
+			overlayCentered(frame, m.renderHelpOverlay(), m.contentWidth(), m.contentHeight()),
+		)
 	}
 
 	if dialogOverlay := m.renderDialog(); dialogOverlay != "" {
-		return m.insetPopupContent(overlayCentered(frame, dialogOverlay, m.contentWidth(), m.contentHeight()))
+		return m.insetPopupContent(
+			overlayCentered(frame, dialogOverlay, m.contentWidth(), m.contentHeight()),
+		)
 	}
 
 	if m.menu != nil {
@@ -156,7 +170,12 @@ func (m *Model) renderFrame() string {
 	m.recordFittingHeight(layout)
 
 	if layout.showFooter {
-		writeExactFramedSection(&out, m.renderModeFooter(layout.bodyWidth, layout.showFooterHints), leftBorder, rightBorder)
+		writeExactFramedSection(
+			&out,
+			m.renderModeFooter(layout.bodyWidth, layout.showFooterHints),
+			leftBorder,
+			rightBorder,
+		)
 	}
 
 	out.WriteByte('\n')
@@ -166,7 +185,8 @@ func (m *Model) renderFrame() string {
 }
 
 func (m *Model) recordFittingHeight(layout popupLayout) {
-	if m.mode != modePopup || m.textInput.Value() != "" || len(m.closedExpanded) > 0 || len(m.openedSections) > 0 {
+	if m.mode != modePopup || m.textInput.Value() != "" || len(m.closedExpanded) > 0 ||
+		len(m.openedSections) > 0 {
 		return
 	}
 
@@ -203,13 +223,23 @@ func frameBorders(cfg *config.Config, horizontal string) (string, string, string
 		borderStyle.Render("│")
 }
 
-func writeExactFramedSection(out *strings.Builder, section string, leftBorder string, rightBorder string) {
+func writeExactFramedSection(
+	out *strings.Builder,
+	section string,
+	leftBorder string,
+	rightBorder string,
+) {
 	for line := range strings.SplitSeq(section, "\n") {
 		writeExactFramedLine(out, line, leftBorder, rightBorder)
 	}
 }
 
-func writeExactFramedLine(out *strings.Builder, line string, leftBorder string, rightBorder string) {
+func writeExactFramedLine(
+	out *strings.Builder,
+	line string,
+	leftBorder string,
+	rightBorder string,
+) {
 	out.WriteByte('\n')
 	out.WriteString(leftBorder)
 	out.WriteByte(' ')
@@ -465,7 +495,14 @@ func (m *Model) writePopupListRow(
 	case selected:
 		m.writeListRowContent(out, layout, styles, listRow, true, values)
 	case m.inFocusedSession(listRow):
-		m.writeListRowContent(out, layout, focusedRowStyles(styles, listRow.isAgent()), listRow, true, values)
+		m.writeListRowContent(
+			out,
+			layout,
+			focusedRowStyles(styles, listRow.isAgent()),
+			listRow,
+			true,
+			values,
+		)
 	case m.fadesListRow(listRow):
 		var rendered strings.Builder
 
@@ -532,7 +569,12 @@ func (m *Model) calcSessionLayout(width int) sessionTableLayout {
 	prefixWidth := lipgloss.Width(defaultSelectionBar)
 	now := time.Now()
 
-	reflow := agentLayoutReflow{width: width, displayMode: m.displayMode, uiMode: m.mode, query: m.textInput.Value()}
+	reflow := agentLayoutReflow{
+		width:       width,
+		displayMode: m.displayMode,
+		uiMode:      m.mode,
+		query:       m.textInput.Value(),
+	}
 	if reflow != m.agentLayoutKey {
 		m.agentRowRatchet.Reset()
 		m.agentLayoutKey = reflow
@@ -566,7 +608,11 @@ func (m *Model) calcSessionLayout(width int) sessionTableLayout {
 	return layout
 }
 
-func (m *Model) renderSessionRow(layout sessionTableLayout, s session.Session, selected bool) string {
+func (m *Model) renderSessionRow(
+	layout sessionTableLayout,
+	s session.Session,
+	selected bool,
+) string {
 	return m.renderSessionRowWithStyles(layout, m.sessionRowStyles(layout), s, selected)
 }
 
@@ -848,7 +894,8 @@ func agentCountLabel(s session.Session) string {
 }
 
 func (m *Model) agentStatusStyle() string {
-	if m.config != nil && strings.EqualFold(strings.TrimSpace(m.config.AgentSessions.StatusStyle), "text") {
+	if m.config != nil &&
+		strings.EqualFold(strings.TrimSpace(m.config.AgentSessions.StatusStyle), "text") {
 		return "text"
 	}
 
@@ -864,7 +911,8 @@ func (m *Model) agentStatusTimeFormat() string {
 }
 
 func (m *Model) agentIdleUnread(row session.Session, agent session.AgentSession) bool {
-	if agent.Status.DisplayStatus() != session.AgentStatusIdle || agent.InitialIdle || agent.StatusSince.IsZero() {
+	if agent.Status.DisplayStatus() != session.AgentStatusIdle || agent.InitialIdle ||
+		agent.StatusSince.IsZero() {
 		return false
 	}
 
@@ -978,7 +1026,10 @@ func (m *Model) agentStatusColor(status session.AgentStatus) string {
 		return colors.Waiting
 	case session.AgentStatusFailed:
 		return colors.Failed
-	case session.AgentStatusIdle, session.AgentStatusInterrupted, session.AgentStatusUnknown, session.AgentStatusSleeping,
+	case session.AgentStatusIdle,
+		session.AgentStatusInterrupted,
+		session.AgentStatusUnknown,
+		session.AgentStatusSleeping,
 		session.AgentStatusClosed:
 		return colors.Idle
 	case session.AgentStatusMerged:
@@ -1028,7 +1079,10 @@ func formattedAgentContextAt(s session.Session, now time.Time, ageWidth int) str
 	return m.formattedAgentContextAt(s, now, ageWidth)
 }
 
-func (m *Model) agentStatusAndAgeAt(s session.Session, now time.Time) (string, session.AgentStatus, string) {
+func (m *Model) agentStatusAndAgeAt(
+	s session.Session,
+	now time.Time,
+) (string, session.AgentStatus, string) {
 	status := "IDLE"
 	statusEnum := session.AgentStatusIdle
 	since := s.AgentIdleSince
@@ -1272,7 +1326,10 @@ func inputGutterWidth() int {
 func (m *Model) renderEmptyState(width int) string {
 	emptyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(m.config.Theme.Muted))
 
-	message := display.Truncate(SanitizeTerminalText(strings.Join(strings.Fields(m.emptyStateMessage()), " ")), width)
+	message := display.Truncate(
+		SanitizeTerminalText(strings.Join(strings.Fields(m.emptyStateMessage()), " ")),
+		width,
+	)
 	if messageWidth := lipgloss.Width(message); messageWidth < width {
 		message += strings.Repeat(" ", width-messageWidth)
 	}
@@ -1393,7 +1450,10 @@ func (m *Model) renderStatusHoverPrefix(width int) string {
 		statusStyle = statusStyle.Foreground(lipgloss.Color(color))
 	}
 
-	statusLine := display.Truncate(SanitizeTerminalText(m.statusMessage), max(width-frameBorderPadding, 1))
+	statusLine := display.Truncate(
+		SanitizeTerminalText(m.statusMessage),
+		max(width-frameBorderPadding, 1),
+	)
 	prefix := statusStyle.Render(statusLine)
 
 	if prefixLen := lipgloss.Width(prefix); prefixLen < width {
@@ -1524,7 +1584,10 @@ func newActionFooterPart(bound boundAction, disabled bool) footerPart {
 		label, _, _ = strings.Cut(strings.ToLower(entry.Describe().Title), " ")
 	}
 
-	if name := bound.binding.Values.String("action"); bound.binding.Action == action.TaskRun.ID && name != "" {
+	if name := bound.binding.Values.String(
+		"action",
+	); bound.binding.Action == action.TaskRun.ID &&
+		name != "" {
 		label = name
 	}
 

@@ -234,7 +234,8 @@ func (descriptor Descriptor) matchSessions(sessions []session.Session) error {
 
 	for _, candidate := range sessions {
 		saved := candidate.Saved()
-		if (descriptor.Subject == SubjectLiveSession && saved) || (descriptor.Subject == SubjectSavedSession && !saved) {
+		if (descriptor.Subject == SubjectLiveSession && saved) ||
+			(descriptor.Subject == SubjectSavedSession && !saved) {
 			return Wrap(CodeInvalidArgument, ErrSubjectMismatch)
 		}
 	}
@@ -278,11 +279,17 @@ func SubjectOf(sessions ...session.Session) Subject {
 
 // SelectSession matches an exact ID before a name.
 func SelectSession(rows []session.Session, selector string) (session.Session, error) {
-	if index := slices.IndexFunc(rows, func(row session.Session) bool { return row.ID == selector }); index >= 0 {
+	if index := slices.IndexFunc(
+		rows,
+		func(row session.Session) bool { return row.ID == selector },
+	); index >= 0 {
 		return rows[index], nil
 	}
 
-	if index := slices.IndexFunc(rows, func(row session.Session) bool { return row.Name == selector }); index >= 0 {
+	if index := slices.IndexFunc(
+		rows,
+		func(row session.Session) bool { return row.Name == selector },
+	); index >= 0 {
 		return rows[index], nil
 	}
 
@@ -316,7 +323,10 @@ func Run[In, Out any](
 ) (Out, error) {
 	var zero Out
 
-	output, err := dispatcher.Dispatch(ctx, Invocation{Action: definition.ID, At: at, Caller: caller, Input: input})
+	output, err := dispatcher.Dispatch(
+		ctx,
+		Invocation{Action: definition.ID, At: at, Caller: caller, Input: input},
+	)
 	if err != nil {
 		err = oops.In("action").With("action", string(definition.ID)).Wrap(err)
 	}
@@ -413,7 +423,8 @@ func validSegment(segment string) bool {
 	}
 
 	for _, character := range segment {
-		if (character < 'a' || character > 'z') && (character < '0' || character > '9') && character != '-' {
+		if (character < 'a' || character > 'z') && (character < '0' || character > '9') &&
+			character != '-' {
 			return false
 		}
 	}

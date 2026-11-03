@@ -64,7 +64,10 @@ func TestSupervisorReturnsNaturalExit(t *testing.T) {
 	process := &fakeProcess{wait: make(chan error, 1)}
 	process.wait <- nil
 
-	supervisor, err := NewSupervisor(func(context.Context) (Process, error) { return process, nil }, time.Second)
+	supervisor, err := NewSupervisor(
+		func(context.Context) (Process, error) { return process, nil },
+		time.Second,
+	)
 	if err != nil {
 		t.Fatalf("NewSupervisor failed: %v", err)
 	}
@@ -153,7 +156,10 @@ func TestSupervisorCancelsSignalsAndJoins(t *testing.T) {
 
 	process := &fakeProcess{wait: make(chan error, 1)}
 
-	supervisor, err := NewSupervisor(func(context.Context) (Process, error) { return process, nil }, time.Second)
+	supervisor, err := NewSupervisor(
+		func(context.Context) (Process, error) { return process, nil },
+		time.Second,
+	)
 	if err != nil {
 		t.Fatalf("NewSupervisor failed: %v", err)
 	}
@@ -204,7 +210,10 @@ func TestSupervisorReportsForcedStopIncomplete(t *testing.T) {
 
 	process := &fakeProcess{wait: make(chan error, 1)}
 
-	supervisor, err := NewSupervisor(func(context.Context) (Process, error) { return process, nil }, time.Millisecond)
+	supervisor, err := NewSupervisor(
+		func(context.Context) (Process, error) { return process, nil },
+		time.Millisecond,
+	)
 	if err != nil {
 		t.Fatalf("NewSupervisor failed: %v", err)
 	}
@@ -272,7 +281,15 @@ func TestSupervisorReportsForcedStopIncomplete(t *testing.T) {
 func TestTmuxSupervisorRequiresExplicitSocket(t *testing.T) {
 	t.Parallel()
 
-	if _, err := NewTmuxSupervisor("tmux", "relative.sock", "/dev/null", time.Second); !errors.Is(err, ErrSocketRequired) {
+	if _, err := NewTmuxSupervisor(
+		"tmux",
+		"relative.sock",
+		"/dev/null",
+		time.Second,
+	); !errors.Is(
+		err,
+		ErrSocketRequired,
+	) {
 		t.Fatalf("NewTmuxSupervisor error = %v, want ErrSocketRequired", err)
 	}
 }
@@ -295,7 +312,10 @@ func TestTmuxSupervisorCreatesPrivateSocketParents(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := supervisor.Run(t.Context()); !errors.Is(err, ErrStart) || !errors.Is(err, os.ErrNotExist) {
+	if err := supervisor.Run(
+		t.Context(),
+	); !errors.Is(err, ErrStart) ||
+		!errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("Run error = %v, want ErrStart and os.ErrNotExist", err)
 	}
 
@@ -332,7 +352,12 @@ func TestTmuxSupervisorPreservesExistingSocketParent(t *testing.T) {
 
 	binary := createSupervisorExecutable(t, root)
 
-	supervisor, err := NewTmuxSupervisor(binary, filepath.Join(parent, "tmux.sock"), "/dev/null", time.Second)
+	supervisor, err := NewTmuxSupervisor(
+		binary,
+		filepath.Join(parent, "tmux.sock"),
+		"/dev/null",
+		time.Second,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -379,7 +404,12 @@ func TestTmuxSupervisorPropagatesSocketParentFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	supervisor, err := NewTmuxSupervisor(binary, filepath.Join(parent, "sesh", "tmux.sock"), "/dev/null", time.Second)
+	supervisor, err := NewTmuxSupervisor(
+		binary,
+		filepath.Join(parent, "sesh", "tmux.sock"),
+		"/dev/null",
+		time.Second,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

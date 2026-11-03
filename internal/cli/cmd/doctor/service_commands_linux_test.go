@@ -31,9 +31,16 @@ func serviceCommandsCheck(t *testing.T) doctor.Result {
 
 	root := t.TempDir()
 
-	exec := clitest.ExecuteJSON(t, "doctor",
-		"--socket", filepath.Join(root, "absent.sock"), "--repository", filepath.Join(root, "snapshots"),
-		"--no-config", "--json")
+	exec := clitest.ExecuteJSON(
+		t,
+		"doctor",
+		"--socket",
+		filepath.Join(root, "absent.sock"),
+		"--repository",
+		filepath.Join(root, "snapshots"),
+		"--no-config",
+		"--json",
+	)
 	if !exec.Envelope.OK && exec.Envelope.Result == nil {
 		t.Fatalf("doctor produced no report: %v\nstderr: %s", exec.Err, exec.Stderr)
 	}
@@ -84,7 +91,8 @@ func TestDoctorReportsUnitsRunningRemovedCommandsAndFlags(t *testing.T) {
 	}
 
 	check := serviceCommandsCheck(t)
-	if check.Status != doctor.StatusFail || check.Reason != doctor.ReasonStale || !strings.HasPrefix(check.Message, "2 units ") {
+	if check.Status != doctor.StatusFail || check.Reason != doctor.ReasonStale ||
+		!strings.HasPrefix(check.Message, "2 units ") {
 		t.Fatalf("stale units were not reported: %+v", check)
 	}
 

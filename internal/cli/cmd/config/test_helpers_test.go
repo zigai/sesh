@@ -16,7 +16,8 @@ func newRootCommand(_ context.Context) *cobra.Command {
 		SilenceErrors: true,
 	}
 	rootCommand.PersistentFlags().String("config", "", "Explicit native TOML configuration file")
-	rootCommand.PersistentFlags().Bool("no-config", false, "Use built-in settings without reading configuration files")
+	rootCommand.PersistentFlags().
+		Bool("no-config", false, "Use built-in settings without reading configuration files")
 
 	rootCommand.AddCommand(
 		NewCommand(),

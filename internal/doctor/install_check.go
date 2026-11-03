@@ -14,9 +14,17 @@ func (s *Service) checkInstallPath() Result {
 
 	switch len(copies) {
 	case 0:
-		return newResult(CheckInstallPath, StatusInfo, "sesh is not on PATH").withReason(ReasonNotFound)
+		return newResult(
+			CheckInstallPath,
+			StatusInfo,
+			"sesh is not on PATH",
+		).withReason(ReasonNotFound)
 	case 1:
-		return newResult(CheckInstallPath, StatusOK, DisplayPath(copies[0])+", no other copies on PATH")
+		return newResult(
+			CheckInstallPath,
+			StatusOK,
+			DisplayPath(copies[0])+", no other copies on PATH",
+		)
 	}
 
 	details := make([]string, 0, len(copies))
@@ -24,7 +32,11 @@ func (s *Service) checkInstallPath() Result {
 		details = append(details, DisplayPath(candidate))
 	}
 
-	return newResult(CheckInstallPath, StatusWarn, fmt.Sprintf("%d copies on PATH; the shell runs the first", len(copies))).
+	return newResult(
+		CheckInstallPath,
+		StatusWarn,
+		fmt.Sprintf("%d copies on PATH; the shell runs the first", len(copies)),
+	).
 		withReason(ReasonDuplicate).
 		withDetails(details...).
 		withManual("Remove the copies you do not use")

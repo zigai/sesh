@@ -58,9 +58,21 @@ func (local *Local) registerTaskHandlers() {
 	handle(local, action.TaskMerge, local.mergeTask)
 }
 
-func (local *Local) TaskOffer(ctx context.Context, caller action.Caller, dir string, describe bool) (TaskOffer, error) {
+func (local *Local) TaskOffer(
+	ctx context.Context,
+	caller action.Caller,
+	dir string,
+	describe bool,
+) (TaskOffer, error) {
 	offered := TaskOffer{Project: "", Offer: task.Offer{
-		Harnesses: nil, Project: "", Locations: nil, Current: -1, NextNumber: 0, Branches: nil, Refs: nil, Starts: nil,
+		Harnesses:  nil,
+		Project:    "",
+		Locations:  nil,
+		Current:    -1,
+		NextNumber: 0,
+		Branches:   nil,
+		Refs:       nil,
+		Starts:     nil,
 	}}
 
 	service, place, err := local.taskPlace(ctx, caller)
@@ -114,7 +126,11 @@ func (local *Local) ShowTask(ctx context.Context, caller action.Caller, id strin
 	}
 
 	if _, err := navigator.Focus(ctx, agents.FocusTarget{
-		PaneID: string(live.AgentPane), SessionID: string(live.SessionID), SessionName: live.SessionName,
+		PaneID: string(
+			live.AgentPane,
+		),
+		SessionID:   string(live.SessionID),
+		SessionName: live.SessionName,
 	}); err != nil {
 		return oops.In("app").With("operation", "show_task").Wrap(err)
 	}
@@ -122,15 +138,30 @@ func (local *Local) ShowTask(ctx context.Context, caller action.Caller, id strin
 	return nil
 }
 
-func (local *Local) openTask(ctx context.Context, caller action.Caller, input action.OpenTask) (action.OpenedTask, error) {
+func (local *Local) openTask(
+	ctx context.Context,
+	caller action.Caller,
+	input action.OpenTask,
+) (action.OpenedTask, error) {
 	tasks, err := task.Inventory(ctx, local.server, task.NewStore(local.taskLedger))
 	if err != nil {
-		return action.OpenedTask{ID: input.Task}, oops.In("app").With("operation", "open_task").Wrap(err)
+		return action.OpenedTask{
+			ID: input.Task,
+		}, oops.In("app").
+			With("operation", "open_task").
+			Wrap(err)
 	}
 
-	index := slices.IndexFunc(tasks, func(live task.Live) bool { return live.Record.ID == input.Task })
+	index := slices.IndexFunc(
+		tasks,
+		func(live task.Live) bool { return live.Record.ID == input.Task },
+	)
 	if index < 0 {
-		return action.OpenedTask{ID: input.Task}, oops.In("app").With("operation", "open_task").Wrap(task.ErrNotFound)
+		return action.OpenedTask{
+			ID: input.Task,
+		}, oops.In("app").
+			With("operation", "open_task").
+			Wrap(task.ErrNotFound)
 	}
 
 	if !tasks[index].Present {
@@ -140,7 +171,11 @@ func (local *Local) openTask(ctx context.Context, caller action.Caller, input ac
 	return action.OpenedTask{ID: input.Task}, err
 }
 
-func (local *Local) reopenTask(ctx context.Context, caller action.Caller, record task.Record) (task.Live, error) {
+func (local *Local) reopenTask(
+	ctx context.Context,
+	caller action.Caller,
+	record task.Record,
+) (task.Live, error) {
 	service, err := local.taskService()
 	if err != nil {
 		return task.Live{}, err
@@ -160,7 +195,10 @@ func (local *Local) reopenTask(ctx context.Context, caller action.Caller, record
 		return task.Live{}, oops.In("app").With("operation", "open_task").Wrap(err)
 	}
 
-	index := slices.IndexFunc(tasks, func(live task.Live) bool { return live.Record.ID == record.ID && live.Present })
+	index := slices.IndexFunc(
+		tasks,
+		func(live task.Live) bool { return live.Record.ID == record.ID && live.Present },
+	)
 	if index < 0 {
 		return task.Live{}, oops.In("app").With("operation", "open_task").Wrap(task.ErrNotFound)
 	}
@@ -168,17 +206,35 @@ func (local *Local) reopenTask(ctx context.Context, caller action.Caller, record
 	return tasks[index], nil
 }
 
-func (local *Local) reopenPlace(ctx context.Context, caller action.Caller, record task.Record) (task.Place, error) {
+func (local *Local) reopenPlace(
+	ctx context.Context,
+	caller action.Caller,
+	record task.Record,
+) (task.Place, error) {
 	if record.Kind == task.KindLoose {
 		_, place, err := local.taskPlace(ctx, caller)
 
 		return place, err
 	}
 
-	return local.projectPlace(ctx, task.Place{Pane: gotmux.PaneID(cmp.Or(caller.Pane, os.Getenv(paneEnvironment))), Session: "", Dir: "", Project: "", Task: ""}, record.Project)
+	return local.projectPlace(
+		ctx,
+		task.Place{
+			Pane:    gotmux.PaneID(cmp.Or(caller.Pane, os.Getenv(paneEnvironment))),
+			Session: "",
+			Dir:     "",
+			Project: "",
+			Task:    "",
+		},
+		record.Project,
+	)
 }
 
-func (local *Local) startTask(ctx context.Context, caller action.Caller, input action.NewTask) (action.StartedTask, error) {
+func (local *Local) startTask(
+	ctx context.Context,
+	caller action.Caller,
+	input action.NewTask,
+) (action.StartedTask, error) {
 	none := action.StartedTask{ID: "", Kind: "", Number: 0, Directory: "", Branch: "", Session: ""}
 
 	service, place, err := local.startPlace(ctx, caller, input.Project)
@@ -190,14 +246,24 @@ func (local *Local) startTask(ctx context.Context, caller action.Caller, input a
 		Harness: input.Harness,
 		Title:   strings.TrimSpace(input.Title),
 		Location: task.Location{
-			Where: task.Where(input.Where), Branch: input.Branch, Remote: input.Remote, Directory: input.Directory,
-			Task: "", TaskTitle: "",
+			Where: task.Where(
+				input.Where,
+			),
+			Branch:    input.Branch,
+			Remote:    input.Remote,
+			Directory: input.Directory,
+			Task:      "",
+			TaskTitle: "",
 		},
 		Layout: input.Layout,
 	})
 	started := action.StartedTask{
-		ID: record.ID, Kind: string(record.Kind), Number: record.Number, Directory: record.Directory, Branch: record.Branch,
-		Session: string(place.Session),
+		ID:        record.ID,
+		Kind:      string(record.Kind),
+		Number:    record.Number,
+		Directory: record.Directory,
+		Branch:    record.Branch,
+		Session:   string(place.Session),
 	}
 
 	if err != nil {
@@ -207,7 +273,11 @@ func (local *Local) startTask(ctx context.Context, caller action.Caller, input a
 	return started, nil
 }
 
-func (local *Local) startPlace(ctx context.Context, caller action.Caller, dir string) (*task.Service, task.Place, error) {
+func (local *Local) startPlace(
+	ctx context.Context,
+	caller action.Caller,
+	dir string,
+) (*task.Service, task.Place, error) {
 	if dir == "" || caller.Pane != "" || os.Getenv(paneEnvironment) != "" {
 		service, place, err := local.taskPlace(ctx, caller)
 		if err != nil || dir == "" {
@@ -224,14 +294,29 @@ func (local *Local) startPlace(ctx context.Context, caller action.Caller, dir st
 		return nil, task.Place{}, err
 	}
 
-	place, err := local.projectPlace(ctx, task.Place{Pane: "", Session: "", Dir: "", Project: "", Task: ""}, dir)
+	place, err := local.projectPlace(
+		ctx,
+		task.Place{Pane: "", Session: "", Dir: "", Project: "", Task: ""},
+		dir,
+	)
 
 	return service, place, err
 }
 
-func (local *Local) offerTask(ctx context.Context, _ action.Caller, input action.OfferTask) (action.TaskOffered, error) {
+func (local *Local) offerTask(
+	ctx context.Context,
+	_ action.Caller,
+	input action.OfferTask,
+) (action.TaskOffered, error) {
 	offered := action.TaskOffered{
-		Project: "", Harnesses: nil, Locations: nil, Current: -1, NextNumber: 0, Branches: nil, Refs: nil, Starts: nil,
+		Project:    "",
+		Harnesses:  nil,
+		Locations:  nil,
+		Current:    -1,
+		NextNumber: 0,
+		Branches:   nil,
+		Refs:       nil,
+		Starts:     nil,
 	}
 
 	catalog, err := local.projectCatalog()
@@ -244,7 +329,10 @@ func (local *Local) offerTask(ctx context.Context, _ action.Caller, input action
 		return offered, oops.In("app").With("operation", "list_projects").Wrap(err)
 	}
 
-	projects = slices.DeleteFunc(projects, func(p project.Project) bool { return p.Kind != project.KindGit || p.Name != input.Project })
+	projects = slices.DeleteFunc(
+		projects,
+		func(p project.Project) bool { return p.Kind != project.KindGit || p.Name != input.Project },
+	)
 
 	switch len(projects) {
 	case 0:
@@ -261,7 +349,11 @@ func (local *Local) offerTask(ctx context.Context, _ action.Caller, input action
 
 	root := projects[0].Root
 
-	offer, err := service.Offer(ctx, task.Place{Pane: "", Session: "", Dir: root, Project: root, Task: ""}, input.Describe)
+	offer, err := service.Offer(
+		ctx,
+		task.Place{Pane: "", Session: "", Dir: root, Project: root, Task: ""},
+		input.Describe,
+	)
 	if err != nil {
 		return offered, oops.In("app").With("operation", "offer_task").Wrap(err)
 	}
@@ -271,10 +363,14 @@ func (local *Local) offerTask(ctx context.Context, _ action.Caller, input action
 
 func OfferedTask(offer task.Offer) action.TaskOffered {
 	offered := action.TaskOffered{
-		Project: offer.Project, Harnesses: make([]string, 0, len(offer.Harnesses)),
-		Locations: make([]action.OfferedLocation, 0, len(offer.Locations)), Current: offer.Current,
-		NextNumber: offer.NextNumber, Branches: offer.Branches, Refs: make(map[string]action.OfferedRef, len(offer.Refs)),
-		Starts: offer.Starts,
+		Project:    offer.Project,
+		Harnesses:  make([]string, 0, len(offer.Harnesses)),
+		Locations:  make([]action.OfferedLocation, 0, len(offer.Locations)),
+		Current:    offer.Current,
+		NextNumber: offer.NextNumber,
+		Branches:   offer.Branches,
+		Refs:       make(map[string]action.OfferedRef, len(offer.Refs)),
+		Starts:     offer.Starts,
 	}
 
 	for _, harness := range offer.Harnesses {
@@ -289,13 +385,22 @@ func OfferedTask(offer task.Offer) action.TaskOffered {
 	}
 
 	for name, ref := range offer.Refs {
-		offered.Refs[name] = action.OfferedRef{Time: ref.Time, Subject: ref.Subject, Ahead: ref.Ahead, Behind: ref.Behind}
+		offered.Refs[name] = action.OfferedRef{
+			Time:    ref.Time,
+			Subject: ref.Subject,
+			Ahead:   ref.Ahead,
+			Behind:  ref.Behind,
+		}
 	}
 
 	return offered
 }
 
-func (local *Local) projectOf(ctx context.Context, from task.Place, dir string) (task.Place, error) {
+func (local *Local) projectOf(
+	ctx context.Context,
+	from task.Place,
+	dir string,
+) (task.Place, error) {
 	catalog, err := local.projectCatalog()
 	if err != nil {
 		return from, err
@@ -309,7 +414,11 @@ func (local *Local) projectOf(ctx context.Context, from task.Place, dir string) 
 	return task.Place{Pane: from.Pane, Session: "", Dir: p.Root, Project: p.Root, Task: ""}, nil
 }
 
-func (local *Local) projectPlace(ctx context.Context, from task.Place, dir string) (task.Place, error) {
+func (local *Local) projectPlace(
+	ctx context.Context,
+	from task.Place,
+	dir string,
+) (task.Place, error) {
 	catalog, err := local.projectCatalog()
 	if err != nil {
 		return from, err
@@ -325,10 +434,20 @@ func (local *Local) projectPlace(ctx context.Context, from task.Place, dir strin
 		return from, oops.In("app").With("operation", "open_project").Wrap(err)
 	}
 
-	return task.Place{Pane: from.Pane, Session: opened.Session.ID, Dir: p.Root, Project: p.Root, Task: ""}, nil
+	return task.Place{
+		Pane:    from.Pane,
+		Session: opened.Session.ID,
+		Dir:     p.Root,
+		Project: p.Root,
+		Task:    "",
+	}, nil
 }
 
-func (local *Local) openTab(ctx context.Context, caller action.Caller, _ action.OpenTab) (action.OpenedTab, error) {
+func (local *Local) openTab(
+	ctx context.Context,
+	caller action.Caller,
+	_ action.OpenTab,
+) (action.OpenedTab, error) {
 	service, place, err := local.taskPlace(ctx, caller)
 	if err != nil {
 		return action.OpenedTab{}, err
@@ -341,7 +460,11 @@ func (local *Local) openTab(ctx context.Context, caller action.Caller, _ action.
 	return action.OpenedTab{}, nil
 }
 
-func (local *Local) relayoutTask(ctx context.Context, caller action.Caller, input action.RelayoutTask) (action.RelaidOutTask, error) {
+func (local *Local) relayoutTask(
+	ctx context.Context,
+	caller action.Caller,
+	input action.RelayoutTask,
+) (action.RelaidOutTask, error) {
 	service, place, err := local.taskPlace(ctx, caller)
 	if err != nil {
 		return action.RelaidOutTask{Task: ""}, err
@@ -352,13 +475,21 @@ func (local *Local) relayoutTask(ctx context.Context, caller action.Caller, inpu
 	}
 
 	if err := service.Relayout(ctx, place, input.Layout); err != nil {
-		return action.RelaidOutTask{Task: place.Task}, oops.In("app").With("operation", "relayout_task").Wrap(err)
+		return action.RelaidOutTask{
+			Task: place.Task,
+		}, oops.In("app").
+			With("operation", "relayout_task").
+			Wrap(err)
 	}
 
 	return action.RelaidOutTask{Task: place.Task}, nil
 }
 
-func (local *Local) openTaskPopup(ctx context.Context, caller action.Caller, _ action.OpenTaskPopup) (action.ClosedTaskPopup, error) {
+func (local *Local) openTaskPopup(
+	ctx context.Context,
+	caller action.Caller,
+	_ action.OpenTaskPopup,
+) (action.ClosedTaskPopup, error) {
 	_, place, err := local.taskPlace(ctx, caller)
 	if err != nil {
 		return action.ClosedTaskPopup{Task: ""}, err
@@ -405,7 +536,14 @@ func (local *Local) openTaskPopup(ctx context.Context, caller action.Caller, _ a
 
 	var options gotmux.PopupOptions
 
-	options.Program = gotmux.Exec(executable, "task", popupAttachVerb, record.ID, "--socket", local.server.Endpoint().SocketPath)
+	options.Program = gotmux.Exec(
+		executable,
+		"task",
+		popupAttachVerb,
+		record.ID,
+		"--socket",
+		local.server.Endpoint().SocketPath,
+	)
 	options.Dir = record.Directory
 	options.Width = strconv.Itoa(popupWidthShare) + "%"
 	options.Height = strconv.Itoa(popupHeightShare) + "%"
@@ -420,7 +558,11 @@ func (local *Local) openTaskPopup(ctx context.Context, caller action.Caller, _ a
 	return result, nil
 }
 
-func (local *Local) AttachTaskPopup(ctx context.Context, taskID string, streams gotmux.Streams) error {
+func (local *Local) AttachTaskPopup(
+	ctx context.Context,
+	taskID string,
+	streams gotmux.Streams,
+) error {
 	popup, err := local.openPopupServer()
 	if err != nil {
 		return err
@@ -457,7 +599,11 @@ func (local *Local) openPopupServer() (*gotmux.Server, error) {
 		configFile = expanded
 	}
 
-	server, err := tmuxserver.OpenNamed(local.server.Endpoint().SocketPath, local.cfg.Tasks.PopupSocket, configFile)
+	server, err := tmuxserver.OpenNamed(
+		local.server.Endpoint().SocketPath,
+		local.cfg.Tasks.PopupSocket,
+		configFile,
+	)
 	if err != nil {
 		return nil, oops.In("app").With("operation", "open_popup_server").Wrap(err)
 	}
@@ -465,7 +611,10 @@ func (local *Local) openPopupServer() (*gotmux.Server, error) {
 	return server, nil
 }
 
-func (local *Local) taskPlace(ctx context.Context, caller action.Caller) (*task.Service, task.Place, error) {
+func (local *Local) taskPlace(
+	ctx context.Context,
+	caller action.Caller,
+) (*task.Service, task.Place, error) {
 	service, err := local.taskService()
 	if err != nil {
 		return nil, task.Place{}, err
@@ -488,11 +637,17 @@ func (local *Local) taskPlace(ctx context.Context, caller action.Caller) (*task.
 	return service, place, nil
 }
 
-func (local *Local) callerClient(ctx context.Context, caller action.Caller, place task.Place) (gotmux.Client, error) {
+func (local *Local) callerClient(
+	ctx context.Context,
+	caller action.Caller,
+	place task.Place,
+) (gotmux.Client, error) {
 	if caller.Client != "" {
 		client, err := local.server.Client(ctx, gotmux.ClientName(caller.Client))
 		if err != nil {
-			return gotmux.Client{}, oops.In("app").With("operation", "resolve_client").Wrap(errors.Join(session.ErrInvokingClientUnavailable, err))
+			return gotmux.Client{}, oops.In("app").
+				With("operation", "resolve_client").
+				Wrap(errors.Join(session.ErrInvokingClientUnavailable, err))
 		}
 
 		return client, nil

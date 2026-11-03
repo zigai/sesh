@@ -57,20 +57,44 @@ func TestPickerSwitchHandoffCarriesSelectionAndTreatsEmptyFileAsCancel(t *testin
 	assertHandoffMatches(t, handoff, target, "%4")
 }
 
-func assertHandoffMatches(t *testing.T, handoff switchHandoff, target session.Session, paneID string) {
+func assertHandoffMatches(
+	t *testing.T,
+	handoff switchHandoff,
+	target session.Session,
+	paneID string,
+) {
 	t.Helper()
 
 	if handoff.SessionID != target.ID || handoff.SessionName != target.Name {
-		t.Fatalf("handoff identity = (%s, %s), want (%s, %s)", handoff.SessionID, handoff.SessionName, target.ID, target.Name)
+		t.Fatalf(
+			"handoff identity = (%s, %s), want (%s, %s)",
+			handoff.SessionID,
+			handoff.SessionName,
+			target.ID,
+			target.Name,
+		)
 	}
 
-	if handoff.TmuxServerSocket != target.TmuxServerSocket || handoff.PaneID != paneID || handoff.ActivePaneID != target.ActivePaneID {
-		t.Fatalf("handoff routing = (%s, %s, %s), want (%s, %s, %s)", handoff.TmuxServerSocket, handoff.PaneID, handoff.ActivePaneID, target.TmuxServerSocket, paneID, target.ActivePaneID)
+	if handoff.TmuxServerSocket != target.TmuxServerSocket || handoff.PaneID != paneID ||
+		handoff.ActivePaneID != target.ActivePaneID {
+		t.Fatalf(
+			"handoff routing = (%s, %s, %s), want (%s, %s, %s)",
+			handoff.TmuxServerSocket,
+			handoff.PaneID,
+			handoff.ActivePaneID,
+			target.TmuxServerSocket,
+			paneID,
+			target.ActivePaneID,
+		)
 	}
 
 	if handoff.RuntimeIdentity.TmuxServerPID != target.RuntimeIdentity.TmuxServerPID ||
-		!handoff.RuntimeIdentity.TmuxServerStartedAt.Equal(target.RuntimeIdentity.TmuxServerStartedAt) ||
-		!handoff.RuntimeIdentity.TmuxSessionCreatedAt.Equal(target.RuntimeIdentity.TmuxSessionCreatedAt) {
+		!handoff.RuntimeIdentity.TmuxServerStartedAt.Equal(
+			target.RuntimeIdentity.TmuxServerStartedAt,
+		) ||
+		!handoff.RuntimeIdentity.TmuxSessionCreatedAt.Equal(
+			target.RuntimeIdentity.TmuxSessionCreatedAt,
+		) {
 		t.Fatalf("handoff runtime = %+v, want %+v", handoff.RuntimeIdentity, target.RuntimeIdentity)
 	}
 }
@@ -93,7 +117,11 @@ func TestPickerSwitchHandoffRejectsInvalidSelection(t *testing.T) {
 	}
 
 	if writeOops.Domain() != "cli" || writeOops.Context()["operation"] != "write_picker_handoff" {
-		t.Fatalf("unexpected oops metadata: domain=%q context=%v", writeOops.Domain(), writeOops.Context())
+		t.Fatalf(
+			"unexpected oops metadata: domain=%q context=%v",
+			writeOops.Domain(),
+			writeOops.Context(),
+		)
 	}
 
 	if err := os.WriteFile(path, []byte("{"), 0o600); err != nil {
@@ -111,7 +139,11 @@ func TestPickerSwitchHandoffRejectsInvalidSelection(t *testing.T) {
 	}
 
 	if readOops.Domain() != "cli" || readOops.Context()["operation"] != "read_picker_handoff" {
-		t.Fatalf("unexpected oops metadata: domain=%q context=%v", readOops.Domain(), readOops.Context())
+		t.Fatalf(
+			"unexpected oops metadata: domain=%q context=%v",
+			readOops.Domain(),
+			readOops.Context(),
+		)
 	}
 }
 
@@ -143,8 +175,13 @@ func TestCompletePickerSwitchHandoffRejectsInvalidSelection(t *testing.T) {
 		t.Fatalf("expected oops error, got %T", err)
 	}
 
-	if completeOops.Domain() != "cli" || completeOops.Context()["operation"] != "complete_picker_handoff" {
-		t.Fatalf("unexpected oops metadata: domain=%q context=%v", completeOops.Domain(), completeOops.Context())
+	if completeOops.Domain() != "cli" ||
+		completeOops.Context()["operation"] != "complete_picker_handoff" {
+		t.Fatalf(
+			"unexpected oops metadata: domain=%q context=%v",
+			completeOops.Domain(),
+			completeOops.Context(),
+		)
 	}
 }
 
@@ -162,7 +199,11 @@ func TestBuildPickerModelUnknownPresentation(t *testing.T) {
 	}
 
 	if oopsErr.Domain() != "cli" || oopsErr.Context()["operation"] != "initialize_picker_model" {
-		t.Fatalf("unexpected oops metadata: domain=%q context=%v", oopsErr.Domain(), oopsErr.Context())
+		t.Fatalf(
+			"unexpected oops metadata: domain=%q context=%v",
+			oopsErr.Domain(),
+			oopsErr.Context(),
+		)
 	}
 }
 
@@ -177,7 +218,10 @@ func TestPickerHandoffWithoutResultStaysEmpty(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if handoff, selected, err := readPickerSwitchHandoff(path); err != nil || selected || len(handoff.AgentViews) != 0 {
+	if handoff, selected, err := readPickerSwitchHandoff(
+		path,
+	); err != nil || selected ||
+		len(handoff.AgentViews) != 0 {
 		t.Fatalf("handoff without result = %+v, %t, %v; want empty", handoff, selected, err)
 	}
 }
@@ -190,8 +234,14 @@ func TestPickerHandoffCarriesDeferredAgentViewsWithoutSelection(t *testing.T) {
 	defer cleanup()
 
 	views := []tui.AgentView{
-		{Session: session.Identity{Origin: "local", Socket: "/tmp/tmux.sock", Name: "alpha"}, PaneID: "%1"},
-		{Session: session.Identity{Origin: "local", Socket: "/tmp/tmux.sock", Name: "beta"}, PaneID: "%7"},
+		{
+			Session: session.Identity{Origin: "local", Socket: "/tmp/tmux.sock", Name: "alpha"},
+			PaneID:  "%1",
+		},
+		{
+			Session: session.Identity{Origin: "local", Socket: "/tmp/tmux.sock", Name: "beta"},
+			PaneID:  "%7",
+		},
 	}
 	if err := writePickerSwitchHandoff(path, nil, "", "", "", views); err != nil {
 		t.Fatal(err)
@@ -224,7 +274,9 @@ func TestPopupPickerDefersAgentViewsInMemory(t *testing.T) {
 	}
 
 	popup := &services{popupChild: true}
-	if !popup.DeferAgentViews([]tui.AgentView{{Session: alpha, PaneID: "%1"}, {Session: beta, PaneID: "%2"}}) {
+	if !popup.DeferAgentViews(
+		[]tui.AgentView{{Session: alpha, PaneID: "%1"}, {Session: beta, PaneID: "%2"}},
+	) {
 		t.Fatal("a popup picker recorded agent views itself; it must defer them")
 	}
 
@@ -250,7 +302,14 @@ func TestCompletePickerHandoffRecordsDeferredViewsAfterCancel(t *testing.T) {
 	defer cleanup()
 
 	identity := session.Identity{Origin: "local", Socket: "/tmp/tmux.sock", Name: "alpha"}
-	if err := writePickerSwitchHandoff(path, nil, "", "", "", []tui.AgentView{{Session: identity, PaneID: "%3"}}); err != nil {
+	if err := writePickerSwitchHandoff(
+		path,
+		nil,
+		"",
+		"",
+		"",
+		[]tui.AgentView{{Session: identity, PaneID: "%3"}},
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -274,7 +333,8 @@ func TestCompletePickerHandoffRecordsDeferredViewsAfterCancel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(state.AgentViewHistory) != 1 || state.AgentViewHistory[0].Session != identity || state.AgentViewHistory[0].PaneID != "%3" {
+	if len(state.AgentViewHistory) != 1 || state.AgentViewHistory[0].Session != identity ||
+		state.AgentViewHistory[0].PaneID != "%3" {
 		t.Fatalf("agent view history = %+v, want the deferred view", state.AgentViewHistory)
 	}
 }
@@ -286,7 +346,14 @@ func TestPickerHandoffCarriesReplayKeyWithoutSelection(t *testing.T) {
 	}
 	defer cleanup()
 
-	if err := writePickerSwitchHandoff(path, nil, "", tui.ReplayKeyFloatingTerminal, "", nil); err != nil {
+	if err := writePickerSwitchHandoff(
+		path,
+		nil,
+		"",
+		tui.ReplayKeyFloatingTerminal,
+		"",
+		nil,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -313,7 +380,12 @@ func TestPickerHandoffCarriesTheTaskMenuProject(t *testing.T) {
 
 	handoff, selected, err := readPickerSwitchHandoff(path)
 	if err != nil || selected || handoff.TaskProject != "/work/api" {
-		t.Fatalf("handoff = %+v, selected = %v, err = %v, want only the project /work/api", handoff, selected, err)
+		t.Fatalf(
+			"handoff = %+v, selected = %v, err = %v, want only the project /work/api",
+			handoff,
+			selected,
+			err,
+		)
 	}
 }
 

@@ -21,7 +21,10 @@ func runtimeFixture(t *testing.T) (string, string) {
 	t.Helper()
 	isolatedAutosaveHome(t)
 
-	runtimeDir, err := os.MkdirTemp("/tmp", "sesh-runtime-") //nolint:usetesting // Unix socket paths need a short name; t.Cleanup removes this private fixture.
+	runtimeDir, err := os.MkdirTemp(
+		"/tmp",
+		"sesh-runtime-",
+	) //nolint:usetesting // Unix socket paths need a short name; t.Cleanup removes this private fixture.
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +99,15 @@ func TestAutosaveRuntimeStatusTracksReadinessAndLiveProbeFailure(t *testing.T) {
 			unavailable.Store(test.unavailable)
 			reporter.Update(test.phase)
 
-			execution := executeJSON(t, "autosave", "status", testNoConfigFlag, testJSONFlag, testSocketFlag, endpoint)
+			execution := executeJSON(
+				t,
+				"autosave",
+				"status",
+				testNoConfigFlag,
+				testJSONFlag,
+				testSocketFlag,
+				endpoint,
+			)
 			if execution.Err != nil || !execution.Envelope.OK {
 				t.Fatalf("status inspection failed: %v", execution.Err)
 			}
@@ -109,7 +120,13 @@ func TestAutosaveRuntimeStatusTracksReadinessAndLiveProbeFailure(t *testing.T) {
 	}
 }
 
-func assertAutosaveRuntimeFacts(t *testing.T, result resultJSON, state string, phase daemon.RuntimePhase, held bool) {
+func assertAutosaveRuntimeFacts(
+	t *testing.T,
+	result resultJSON,
+	state string,
+	phase daemon.RuntimePhase,
+	held bool,
+) {
 	t.Helper()
 
 	if result.DaemonState != state {
@@ -141,7 +158,15 @@ func TestAutosaveRuntimeStatusDistinguishesAbsentAndStaleEndpoints(t *testing.T)
 
 	query := func(want string) {
 		t.Helper()
-		execution := executeJSON(t, "autosave", "status", testNoConfigFlag, testJSONFlag, testSocketFlag, endpoint)
+		execution := executeJSON(
+			t,
+			"autosave",
+			"status",
+			testNoConfigFlag,
+			testJSONFlag,
+			testSocketFlag,
+			endpoint,
+		)
 		assertRuntimeJSONPrivacy(t, execution, endpoint)
 
 		result := clitest.DecodePayload[resultJSON](t, execution.Envelope.Result)

@@ -35,7 +35,10 @@ func executeCommand(t *testing.T, args ...string) (string, string, error) {
 func writeAgentRegistry(t *testing.T, sessions ...string) string {
 	t.Helper()
 
-	document := `{"schema_version": 3, "revision": 1, "sessions": {` + strings.Join(sessions, ",") + `}}`
+	document := `{"schema_version": 3, "revision": 1, "sessions": {` + strings.Join(
+		sessions,
+		",",
+	) + `}}`
 
 	path := filepath.Join(t.TempDir(), "state.json")
 	if err := os.WriteFile(path, []byte(document), 0o600); err != nil {
@@ -83,7 +86,12 @@ func TestAgentCommandsHelp(t *testing.T) {
 
 			stdout, stderr, err := executeCommand(t, append(command, "--help")...)
 			if err != nil {
-				t.Fatalf("%s --help failed: %v\nstderr: %s", strings.Join(command, " "), err, stderr)
+				t.Fatalf(
+					"%s --help failed: %v\nstderr: %s",
+					strings.Join(command, " "),
+					err,
+					stderr,
+				)
 			}
 
 			if !strings.Contains(stdout, "sesh "+strings.Join(command, " ")) {
@@ -100,7 +108,10 @@ func TestAgentNavigationWithoutSocketTargetsDefaultTmuxServer(t *testing.T) {
 
 			_, _, err := executeCommand(t, "agent", verb, "--no-config")
 			if !errors.Is(err, gotmux.ErrNoServer) {
-				t.Fatalf("error = %v, want the isolated default socket to report no tmux server", err)
+				t.Fatalf(
+					"error = %v, want the isolated default socket to report no tmux server",
+					err,
+				)
 			}
 
 			if code := clibase.ExitCode(err); code != clibase.ExitCodeGeneral {
@@ -113,7 +124,14 @@ func TestAgentNavigationWithoutSocketTargetsDefaultTmuxServer(t *testing.T) {
 func TestAgentFocusRequiresTargetPane(t *testing.T) {
 	t.Setenv("TMUX", "")
 
-	_, _, err := executeCommand(t, "agent", "focus", "--no-config", "--socket", "/tmp/does-not-exist.sock")
+	_, _, err := executeCommand(
+		t,
+		"agent",
+		"focus",
+		"--no-config",
+		"--socket",
+		"/tmp/does-not-exist.sock",
+	)
 	if err == nil {
 		t.Fatal("expected usage error without a target pane, got nil")
 	}
@@ -133,7 +151,15 @@ func TestAgentStatusSummaryJSON(t *testing.T) {
 		registrySession("idle-agent", "idle", "%3"),
 	)
 
-	stdout, stderr, err := executeCommand(t, "agent", "status", "--no-config", "--agent-state", statePath, "--json")
+	stdout, stderr, err := executeCommand(
+		t,
+		"agent",
+		"status",
+		"--no-config",
+		"--agent-state",
+		statePath,
+		"--json",
+	)
 	if err != nil {
 		t.Fatalf("agent status failed: %v\nstderr: %s", err, stderr)
 	}
@@ -167,7 +193,14 @@ func TestAgentStatusSummaryText(t *testing.T) {
 
 	statePath := writeAgentRegistry(t, registrySession("waiting-agent", "waiting", "%1"))
 
-	stdout, stderr, err := executeCommand(t, "agent", "status", "--no-config", "--agent-state", statePath)
+	stdout, stderr, err := executeCommand(
+		t,
+		"agent",
+		"status",
+		"--no-config",
+		"--agent-state",
+		statePath,
+	)
 	if err != nil {
 		t.Fatalf("agent status failed: %v\nstderr: %s", err, stderr)
 	}
@@ -181,7 +214,11 @@ func TestAgentStatusReportsUnsupportedRegistry(t *testing.T) {
 	t.Parallel()
 
 	statePath := filepath.Join(t.TempDir(), "state.json")
-	if err := os.WriteFile(statePath, []byte(`{"schema_version": 99, "sessions": {}}`), 0o600); err != nil {
+	if err := os.WriteFile(
+		statePath,
+		[]byte(`{"schema_version": 99, "sessions": {}}`),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -195,7 +232,11 @@ func writeAgentStoreConfig(t *testing.T, storePath string) string {
 	t.Helper()
 
 	path := filepath.Join(t.TempDir(), "config.toml")
-	if err := os.WriteFile(path, []byte("[agent_status]\nstore_path = "+strconv.Quote(storePath)+"\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		path,
+		[]byte("[agent_status]\nstore_path = "+strconv.Quote(storePath)+"\n"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -205,7 +246,9 @@ func writeAgentStoreConfig(t *testing.T, storePath string) string {
 func statusTotal(t *testing.T, args ...string) int {
 	t.Helper()
 
-	stdout, stderr, err := executeCommand(t, append([]string{"agent", "status", "--json"}, args...)...)
+	stdout, stderr, err := executeCommand(
+		t,
+		append([]string{"agent", "status", "--json"}, args...)...)
 	if err != nil {
 		t.Fatalf("agent status failed: %v\nstderr: %s", err, stderr)
 	}
@@ -241,7 +284,13 @@ func TestAgentStatusStateFlagOverridesConfiguredRegistry(t *testing.T) {
 		registrySession("third-agent", "failed", "%3"),
 	)
 
-	if total := statusTotal(t, "--config", writeAgentStoreConfig(t, configured), "--agent-state", explicit); total != 3 {
+	if total := statusTotal(
+		t,
+		"--config",
+		writeAgentStoreConfig(t, configured),
+		"--agent-state",
+		explicit,
+	); total != 3 {
 		t.Fatalf("status total = %d, want 3 agents from --agent-state", total)
 	}
 }

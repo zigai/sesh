@@ -21,7 +21,11 @@ func TestObservedAgentSessionsDoesNotInferWaitingFromConfigurationOrRuleNames(t 
 				Harness: aht.HarnessClaude, Liveness: aht.Live{Activity: activity},
 				Location: aht.Location{Kind: aht.MultiplexerTmux, PaneID: "%1"},
 				Observations: registry.Observations{
-					Native: &registry.NativeObservation{Attributes: map[string]string{"claude_permission_mode": "bypassPermissions"}},
+					Native: &registry.NativeObservation{
+						Attributes: map[string]string{
+							"claude_permission_mode": "bypassPermissions",
+						},
+					},
 					Screen: &registry.ScreenObservation{RuleID: "question_prompt"},
 				},
 			}})
@@ -55,10 +59,18 @@ func TestObservedAgentSessionsUsesNormalizedDetailAndPreservesEvidence(t *testin
 		t.Run(test.name, func(t *testing.T) {
 			detail := test.detail
 			source := aht.Session{
-				Harness: aht.HarnessClaude, Liveness: aht.Live{Activity: test.activity},
+				Harness:           aht.HarnessClaude,
+				Liveness:          aht.Live{Activity: test.activity},
 				Location:          aht.Location{Kind: aht.MultiplexerTmux, PaneID: "%1"},
-				ActivityChangedAt: at, Detail: &detail,
-				Observations: registry.Observations{Native: &registry.NativeObservation{Attributes: map[string]string{"claude_notification_type": "permission_prompt"}}},
+				ActivityChangedAt: at,
+				Detail:            &detail,
+				Observations: registry.Observations{
+					Native: &registry.NativeObservation{
+						Attributes: map[string]string{
+							"claude_notification_type": "permission_prompt",
+						},
+					},
+				},
 			}
 
 			observed := agents.ObservedAgentSessions([]aht.Session{source})
@@ -67,7 +79,9 @@ func TestObservedAgentSessionsUsesNormalizedDetailAndPreservesEvidence(t *testin
 			}
 
 			agent := observed[0]
-			if agent.WaitingReason != test.waiting || agent.FailureReason != test.failure || agent.Detail != test.detail || !agent.ActivityChanged.Equal(at) {
+			if agent.WaitingReason != test.waiting || agent.FailureReason != test.failure ||
+				agent.Detail != test.detail ||
+				!agent.ActivityChanged.Equal(at) {
 				t.Fatalf("normalized detail = %+v", agent)
 			}
 

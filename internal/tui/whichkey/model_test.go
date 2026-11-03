@@ -47,7 +47,13 @@ func TestViewFitsNarrowPhonePopupViewport(t *testing.T) {
 
 	for i, line := range lines {
 		if got := lipgloss.Width(line); got > model.width {
-			t.Fatalf("phone keys popup line %d width = %d, want <= %d: %q", i, got, model.width, line)
+			t.Fatalf(
+				"phone keys popup line %d width = %d, want <= %d: %q",
+				i,
+				got,
+				model.width,
+				line,
+			)
 		}
 	}
 }
@@ -84,7 +90,10 @@ type whichKeyTestSource struct {
 	hasDeadline bool
 }
 
-func (source *whichKeyTestSource) ListKeyBindings(ctx context.Context, _ string) ([]Binding, error) {
+func (source *whichKeyTestSource) ListKeyBindings(
+	ctx context.Context,
+	_ string,
+) ([]Binding, error) {
 	source.ctxDone = ctx.Done()
 	source.deadline, source.hasDeadline = ctx.Deadline()
 
@@ -95,7 +104,9 @@ func TestPressingBindingKeyDefersCommandAndQuits(t *testing.T) {
 	model := NewModel(context.Background(), config.DefaultConfig(), &whichKeyTestSource{
 		bindings: []Binding{{Key: "c", Description: "Create a new window", Command: "new-window"}},
 	}, "prefix")
-	model.bindings = []Binding{{Key: "c", Description: "Create a new window", Command: "new-window"}}
+	model.bindings = []Binding{
+		{Key: "c", Description: "Create a new window", Command: "new-window"},
+	}
 	model.filter()
 
 	_, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: 'c', Text: "c"}))
@@ -114,7 +125,12 @@ func TestPressingBindingKeyDefersCommandAndQuits(t *testing.T) {
 }
 
 func TestLoadErrorExposesKeyBindingFailure(t *testing.T) {
-	model := NewModel(context.Background(), config.DefaultConfig(), &whichKeyTestSource{}, "missing")
+	model := NewModel(
+		context.Background(),
+		config.DefaultConfig(),
+		&whichKeyTestSource{},
+		"missing",
+	)
 	model.err = errWhichKeyTestLoadFailed
 
 	if !errors.Is(model.LoadError(), errWhichKeyTestLoadFailed) {
@@ -155,7 +171,12 @@ func TestModelOperationContextPreservesDeadline(t *testing.T) {
 	_ = model.loadKeysCommand()()
 
 	if !source.hasDeadline || !source.deadline.Equal(deadline) {
-		t.Fatalf("operation deadline = %v, %v; want %v, true", source.deadline, source.hasDeadline, deadline)
+		t.Fatalf(
+			"operation deadline = %v, %v; want %v, true",
+			source.deadline,
+			source.hasDeadline,
+			deadline,
+		)
 	}
 }
 
@@ -180,7 +201,10 @@ type blockingWhichKeySource struct {
 	joined  chan struct{}
 }
 
-func (source *blockingWhichKeySource) ListKeyBindings(ctx context.Context, _ string) ([]Binding, error) {
+func (source *blockingWhichKeySource) ListKeyBindings(
+	ctx context.Context,
+	_ string,
+) ([]Binding, error) {
 	close(source.started)
 	<-ctx.Done()
 	close(source.joined)
@@ -348,7 +372,15 @@ func TestRowNavigationWrapsAtListEnds(t *testing.T) {
 func TestRowNavigationOnEmptyListKeepsCursorAtTop(t *testing.T) {
 	model := newBindingModel(t)
 
-	press(t, model, keyCode(tea.KeyUp), keyCode(tea.KeyDown), ctrlKey('p'), ctrlKey('n'), keyCode(tea.KeyEnd))
+	press(
+		t,
+		model,
+		keyCode(tea.KeyUp),
+		keyCode(tea.KeyDown),
+		ctrlKey('p'),
+		ctrlKey('n'),
+		keyCode(tea.KeyEnd),
+	)
 
 	if model.cursor != 0 {
 		t.Fatalf("cursor = %d, want 0", model.cursor)
@@ -458,7 +490,15 @@ func TestClearingSearchQueryRestoresFullList(t *testing.T) {
 	press(t, model, append([]tea.KeyPressMsg{ctrlKey('f')}, typeText("leave")...)...)
 	assertFiltered(t, model, "d")
 
-	press(t, model, keyCode(tea.KeyBackspace), keyCode(tea.KeyBackspace), keyCode(tea.KeyBackspace), keyCode(tea.KeyBackspace), keyCode(tea.KeyBackspace))
+	press(
+		t,
+		model,
+		keyCode(tea.KeyBackspace),
+		keyCode(tea.KeyBackspace),
+		keyCode(tea.KeyBackspace),
+		keyCode(tea.KeyBackspace),
+		keyCode(tea.KeyBackspace),
+	)
 
 	assertFiltered(t, model, "c", "d", "%", "m")
 }

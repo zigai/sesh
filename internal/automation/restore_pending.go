@@ -7,7 +7,8 @@ import "time"
 func UnrestoredSessions(serverStarted, snapshotFinished time.Time, saved, live []string) []string {
 	// tmux reports its start in whole seconds, so a snapshot finished within the server's start
 	// second, as a stop-time save just before a restart is, counts as older than the server.
-	if serverStarted.IsZero() || snapshotFinished.IsZero() || snapshotFinished.Truncate(time.Second).After(serverStarted) {
+	if serverStarted.IsZero() || snapshotFinished.IsZero() ||
+		snapshotFinished.Truncate(time.Second).After(serverStarted) {
 		return nil
 	}
 

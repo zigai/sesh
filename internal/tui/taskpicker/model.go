@@ -127,10 +127,25 @@ type Model struct {
 func NewModel(cfg *config.Config, opts Options) *Model {
 	chrome := tui.NewChrome(cfg)
 	m := &Model{
-		chrome: chrome, options: opts, all: rowsOf(opts), rows: nil, title: chrome.NewTextInput(),
-		filter: chrome.NewTextInput(), focus: fieldTitle, where: whereNew, cursor: 0, listTop: 0,
-		agent: opts.Agent, width: 0, height: 0, stage: stagePicking, failure: "", chosen: emptyChoice(),
-		done: false, showFooter: cfg.Tasks.ShowFooter, changes: nil,
+		chrome:     chrome,
+		options:    opts,
+		all:        rowsOf(opts),
+		rows:       nil,
+		title:      chrome.NewTextInput(),
+		filter:     chrome.NewTextInput(),
+		focus:      fieldTitle,
+		where:      whereNew,
+		cursor:     0,
+		listTop:    0,
+		agent:      opts.Agent,
+		width:      0,
+		height:     0,
+		stage:      stagePicking,
+		failure:    "",
+		chosen:     emptyChoice(),
+		done:       false,
+		showFooter: cfg.Tasks.ShowFooter,
+		changes:    nil,
 	}
 
 	m.title.CharLimit = maxTitleRunes
@@ -164,7 +179,10 @@ func (m *Model) Init() tea.Cmd {
 		return tea.RequestWindowSize
 	}
 
-	return tea.Batch(tea.RequestWindowSize, func() tea.Msg { return changesMsg(m.options.Changes()) })
+	return tea.Batch(
+		tea.RequestWindowSize,
+		func() tea.Msg { return changesMsg(m.options.Changes()) },
+	)
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -391,7 +409,8 @@ func (m *Model) reopen(expanded bool) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) hasWhere() bool {
-	return m.options.Project != "" && len(m.options.Locations) > 0 && m.options.Locations[0].Where == task.WhereNew
+	return m.options.Project != "" && len(m.options.Locations) > 0 &&
+		m.options.Locations[0].Where == task.WhereNew
 }
 
 func (m *Model) current() (task.Location, bool) {
@@ -519,7 +538,13 @@ func (m *Model) filterRows() {
 	}
 
 	slices.SortStableFunc(m.rows, func(a, b int) int {
-		return slices.Index(sectionOrder, m.all[a].section) - slices.Index(sectionOrder, m.all[b].section)
+		return slices.Index(
+			sectionOrder,
+			m.all[a].section,
+		) - slices.Index(
+			sectionOrder,
+			m.all[b].section,
+		)
 	})
 
 	m.cursor = 0
@@ -559,7 +584,10 @@ func (m *Model) keepCursorVisible() {
 	rows := m.layout().listRows
 	lines := m.lines()
 
-	target := slices.IndexFunc(lines, func(l listLine) bool { return !l.heading && l.row == m.cursor })
+	target := slices.IndexFunc(
+		lines,
+		func(l listLine) bool { return !l.heading && l.row == m.cursor },
+	)
 	if target < 0 || rows <= 0 {
 		m.listTop = 0
 
@@ -588,8 +616,16 @@ func (m *Model) wheel(mouse tea.Mouse) {
 		m.move(-1)
 	case tea.MouseWheelDown:
 		m.move(1)
-	case tea.MouseNone, tea.MouseLeft, tea.MouseMiddle, tea.MouseRight, tea.MouseWheelLeft, tea.MouseWheelRight,
-		tea.MouseBackward, tea.MouseForward, tea.MouseButton10, tea.MouseButton11:
+	case tea.MouseNone,
+		tea.MouseLeft,
+		tea.MouseMiddle,
+		tea.MouseRight,
+		tea.MouseWheelLeft,
+		tea.MouseWheelRight,
+		tea.MouseBackward,
+		tea.MouseForward,
+		tea.MouseButton10,
+		tea.MouseButton11:
 	}
 }
 
@@ -601,7 +637,12 @@ func (m *Model) click(mouse tea.Mouse) (tea.Model, tea.Cmd) {
 	geometry := m.layout()
 	line, column := mouse.Y-1, mouse.X-bodyColumn
 
-	if index, found := clickedChoice(geometry.machineChoices, geometry.machineTop, line, column); found {
+	if index, found := clickedChoice(
+		geometry.machineChoices,
+		geometry.machineTop,
+		line,
+		column,
+	); found {
 		return m.reopenOn(index)
 	}
 
@@ -611,7 +652,12 @@ func (m *Model) click(mouse tea.Mouse) (tea.Model, tea.Cmd) {
 	case line >= geometry.listTop && line < geometry.listTop+geometry.listRows:
 		m.clickList(line - geometry.listTop)
 	default:
-		if index, found := clickedChoice(geometry.agentChoices, geometry.agentTop, line, column); found {
+		if index, found := clickedChoice(
+			geometry.agentChoices,
+			geometry.agentTop,
+			line,
+			column,
+		); found {
 			m.agent = m.agents()[index]
 		}
 	}
@@ -651,7 +697,10 @@ func rowsOf(opts Options) []row {
 	for _, location := range opts.Locations {
 		leading = leading && location.Where == task.WhereNew
 		filterOnly := !leading && location.Where == task.WhereNew
-		rows = append(rows, row{section: sectionOf(location), location: location, filterOnly: filterOnly})
+		rows = append(
+			rows,
+			row{section: sectionOf(location), location: location, filterOnly: filterOnly},
+		)
 	}
 
 	return rows
@@ -671,7 +720,16 @@ func sectionOf(location task.Location) section {
 }
 
 func emptyChoice() Choice {
-	return Choice{Reopen: false, Expanded: false, Machine: 0, Tab: false, Harness: "", Title: "", Location: emptyLocation(), Show: ""}
+	return Choice{
+		Reopen:   false,
+		Expanded: false,
+		Machine:  0,
+		Tab:      false,
+		Harness:  "",
+		Title:    "",
+		Location: emptyLocation(),
+		Show:     "",
+	}
 }
 
 func emptyLocation() task.Location {

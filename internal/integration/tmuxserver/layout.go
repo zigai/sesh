@@ -212,7 +212,12 @@ func (r *layoutReader) floating() ([]string, error) {
 	}
 }
 
-func appendLayout(out *strings.Builder, node model.Layout, panes map[string]gotmux.PaneID, depth int) error {
+func appendLayout(
+	out *strings.Builder,
+	node model.Layout,
+	panes map[string]gotmux.PaneID,
+	depth int,
+) error {
 	if depth > maxLayoutDepth {
 		return model.ErrInvalid
 	}
@@ -312,7 +317,14 @@ func decodeTypedLayout(text string, panes map[string]string) (WindowLayout, erro
 		return WindowLayout{}, model.ErrInvalid
 	}
 
-	decoder := typedDecoder{panes: panes, floating: nil, recent: "", recentRank: 0, last: "", lastRank: 0}
+	decoder := typedDecoder{
+		panes:      panes,
+		floating:   nil,
+		recent:     "",
+		recentRank: 0,
+		last:       "",
+		lastRank:   0,
+	}
 
 	tiled, present, err := decoder.node(root, 0)
 	if err != nil {
@@ -323,7 +335,12 @@ func decodeTypedLayout(text string, panes map[string]string) (WindowLayout, erro
 		return WindowLayout{}, model.ErrInvalid
 	}
 
-	return WindowLayout{Tiled: tiled, Floating: decoder.floating, Recent: decoder.recent, Last: decoder.last}, nil
+	return WindowLayout{
+		Tiled:    tiled,
+		Floating: decoder.floating,
+		Recent:   decoder.recent,
+		Last:     decoder.last,
+	}, nil
 }
 
 func (d *typedDecoder) node(raw json.RawMessage, depth int) (model.Layout, bool, error) {
@@ -382,9 +399,17 @@ func decodeTypedGeometry(node map[string]json.RawMessage, depth int) (model.Layo
 	}, nil
 }
 
-func (d *typedDecoder) branch(node map[string]json.RawMessage, result model.Layout, depth int) (model.Layout, bool, error) {
+func (d *typedDecoder) branch(
+	node map[string]json.RawMessage,
+	result model.Layout,
+	depth int,
+) (model.Layout, bool, error) {
 	var children []json.RawMessage
-	if err := json.Unmarshal(node["c"], &children); err != nil || len(children) < minBranchChildren {
+	if err := json.Unmarshal(
+		node["c"],
+		&children,
+	); err != nil ||
+		len(children) < minBranchChildren {
 		return model.Layout{}, false, model.ErrInvalid
 	}
 
@@ -411,7 +436,10 @@ func (d *typedDecoder) branch(node map[string]json.RawMessage, result model.Layo
 	}
 }
 
-func (d *typedDecoder) leaf(node map[string]json.RawMessage, result model.Layout) (model.Layout, bool, error) {
+func (d *typedDecoder) leaf(
+	node map[string]json.RawMessage,
+	result model.Layout,
+) (model.Layout, bool, error) {
 	if len(node["c"]) != 0 {
 		return model.Layout{}, false, model.ErrInvalid
 	}

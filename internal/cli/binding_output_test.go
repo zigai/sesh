@@ -72,7 +72,15 @@ func testBindingReportOutput(t *testing.T, path []string, mode string) {
 		t.Fatal(err)
 	}
 
-	if err := publishCommandOutput(cmd, &output, &diagnostics, &stdout, &stderr, nil, nil); err != nil {
+	if err := publishCommandOutput(
+		cmd,
+		&output,
+		&diagnostics,
+		&stdout,
+		&stderr,
+		nil,
+		nil,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -106,12 +114,24 @@ func TestBindingPartialSnapshotKeepsFailureWithoutPrintingReport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = publishCommandOutput(cmd, &output, &diagnostics, &stdout, &stderr, app.ErrPartialSnapshot, nil)
+	err = publishCommandOutput(
+		cmd,
+		&output,
+		&diagnostics,
+		&stdout,
+		&stderr,
+		app.ErrPartialSnapshot,
+		nil,
+	)
 	if !errors.Is(err, app.ErrPartialSnapshot) {
 		t.Fatalf("error = %v, want partial snapshot cause", err)
 	}
 
 	if stdout.Len() != 0 || stderr.Len() == 0 {
-		t.Fatalf("output = %q / %q, want no stdout and a failure diagnostic", stdout.String(), stderr.String())
+		t.Fatalf(
+			"output = %q / %q, want no stdout and a failure diagnostic",
+			stdout.String(),
+			stderr.String(),
+		)
 	}
 }

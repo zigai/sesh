@@ -16,13 +16,25 @@ import (
 func TestOriginCatalogAddsDistinctRowsWithoutReplacingLocalNames(t *testing.T) {
 	deps := testServices(Dependencies{
 		LoadCatalog: func(context.Context) (session.CatalogResult, error) {
-			return session.CatalogResult{Sessions: []session.Session{{ID: "$1", Name: "work", Kind: session.KindLive, Origin: session.OriginLocal}}}, nil
+			return session.CatalogResult{
+				Sessions: []session.Session{
+					{ID: "$1", Name: "work", Kind: session.KindLive, Origin: session.OriginLocal},
+				},
+			}, nil
 		},
 		LoadOriginSessions: func(context.Context) (string, []session.Session, error) {
-			return "Laptop", []session.Session{{
-				ID: "$1", Name: "work", Kind: session.KindLive, Origin: session.OriginBridge,
-				RuntimeIdentity: session.RuntimeIdentity{ConnectionID: "origin", ConnectionLabel: "Laptop"},
-			}}, nil
+			return "Laptop", []session.Session{
+				{
+					ID:     "$1",
+					Name:   "work",
+					Kind:   session.KindLive,
+					Origin: session.OriginBridge,
+					RuntimeIdentity: session.RuntimeIdentity{
+						ConnectionID:    "origin",
+						ConnectionLabel: "Laptop",
+					},
+				},
+			}, nil
 		},
 	})
 
@@ -40,12 +52,21 @@ func TestInitialLocalRowsAppearBeforeOriginDiscoveryCompletes(t *testing.T) {
 	releaseOrigin := make(chan struct{})
 	model := loaderTestModel(t, config.DefaultConfig(), Dependencies{
 		LoadCatalog: func(context.Context) (session.CatalogResult, error) {
-			return session.CatalogResult{Sessions: []session.Session{{ID: "$1", Name: "local", Kind: session.KindLive}}}, nil
+			return session.CatalogResult{
+				Sessions: []session.Session{{ID: "$1", Name: "local", Kind: session.KindLive}},
+			}, nil
 		},
 		LoadOriginSessions: func(ctx context.Context) (string, []session.Session, error) {
 			select {
 			case <-releaseOrigin:
-				return "origin", []session.Session{{ID: "$2", Name: "origin", Kind: session.KindLive, Origin: session.OriginBridge}}, nil
+				return "origin", []session.Session{
+					{
+						ID:     "$2",
+						Name:   "origin",
+						Kind:   session.KindLive,
+						Origin: session.OriginBridge,
+					},
+				}, nil
 			case <-ctx.Done():
 				return "", nil, ctx.Err()
 			}
@@ -87,8 +108,15 @@ func TestInitialLocalRowsAppearBeforeOriginDiscoveryCompletes(t *testing.T) {
 
 func TestFailedOriginRefreshKeepsObservedOriginRows(t *testing.T) {
 	model := newTestModel()
-	origin := session.Session{ID: "$2", Name: "origin", Kind: session.KindLive, Origin: session.OriginBridge}
-	model.handleOriginSessions(originSessionsMsg{rows: []session.Session{origin}, observation: 0, err: nil})
+	origin := session.Session{
+		ID:     "$2",
+		Name:   "origin",
+		Kind:   session.KindLive,
+		Origin: session.OriginBridge,
+	}
+	model.handleOriginSessions(
+		originSessionsMsg{rows: []session.Session{origin}, observation: 0, err: nil},
+	)
 
 	model.applySessionRows(sessionLoadResultMsg{
 		sessions:      []session.Session{{ID: "$1", Name: "local", Kind: session.KindLive}},
@@ -105,7 +133,12 @@ func TestOriginSwitchLogsOnlyItsFailureBoundary(t *testing.T) {
 	var output bytes.Buffer
 
 	model := loggingTestModel(t, &output)
-	target := session.Session{ID: "$secret", Name: loggingTestPrivacySentinel, Origin: session.OriginBridge, Kind: session.KindLive}
+	target := session.Session{
+		ID:     "$secret",
+		Name:   loggingTestPrivacySentinel,
+		Origin: session.OriginBridge,
+		Kind:   session.KindLive,
+	}
 	deps := dependenciesForTest(model)
 	deps.RequestOriginSwitch = func(context.Context, session.Session) error { return errLoggingTestActionFailure }
 	model.sessions = []session.Session{target}
@@ -114,7 +147,11 @@ func TestOriginSwitchLogsOnlyItsFailureBoundary(t *testing.T) {
 	leaked := loggingTestWithCapturedStdStreams(t, func() {
 		trace := pressTestKey(t, model, keyCode(tea.KeyEnter))
 		if len(trace.results) != 1 || trace.quit || model.DeferredOriginDetach() {
-			t.Fatalf("failed origin switch trace = %+v, detach %t", trace, model.DeferredOriginDetach())
+			t.Fatalf(
+				"failed origin switch trace = %+v, detach %t",
+				trace,
+				model.DeferredOriginDetach(),
+			)
 		}
 	})
 	if leaked != "" {
@@ -126,7 +163,14 @@ func TestOriginSwitchLogsOnlyItsFailureBoundary(t *testing.T) {
 		t.Fatalf("origin outcome record count = %d, want 1", len(records))
 	}
 
-	assertLoggingTestRecord(t, records[0], tuiOperationEnterLiveSession, "error", "failed", "tui operation failed")
+	assertLoggingTestRecord(
+		t,
+		records[0],
+		tuiOperationEnterLiveSession,
+		"error",
+		"failed",
+		"tui operation failed",
+	)
 }
 
 func TestOriginDiscoveryDeadlinePreservesLocalCatalog(t *testing.T) {
@@ -134,7 +178,9 @@ func TestOriginDiscoveryDeadlinePreservesLocalCatalog(t *testing.T) {
 
 	deps := testServices(Dependencies{
 		LoadCatalog: func(context.Context) (session.CatalogResult, error) {
-			return session.CatalogResult{Sessions: []session.Session{{ID: "$1", Name: "local"}}}, nil
+			return session.CatalogResult{
+				Sessions: []session.Session{{ID: "$1", Name: "local"}},
+			}, nil
 		},
 		LoadOriginSessions: func(ctx context.Context) (string, []session.Session, error) {
 			deadline, present := ctx.Deadline()
@@ -150,7 +196,9 @@ func TestOriginDiscoveryDeadlinePreservesLocalCatalog(t *testing.T) {
 	})
 
 	result := loadSessionRows(t.Context(), config.DefaultConfig(), deps)
-	if !errors.Is(expired, context.DeadlineExceeded) || result.catalogErr != nil || len(result.sessions) != 1 || result.sessions[0].Name != "local" {
+	if !errors.Is(expired, context.DeadlineExceeded) || result.catalogErr != nil ||
+		len(result.sessions) != 1 ||
+		result.sessions[0].Name != "local" {
 		t.Fatalf("origin timeout affected local catalog: %#v, %v", result, expired)
 	}
 }
@@ -197,7 +245,12 @@ func checkOriginSelectionOutcome(t *testing.T, refused bool) {
 
 	trace := runActionTrace(t, model, command)
 	if calls != 1 || model.DeferredOriginDetach() == refused || trace.quit == refused {
-		t.Fatalf("calls = %d, detach = %t, quit = %t", calls, model.DeferredOriginDetach(), trace.quit)
+		t.Fatalf(
+			"calls = %d, detach = %t, quit = %t",
+			calls,
+			model.DeferredOriginDetach(),
+			trace.quit,
+		)
 	}
 
 	if refused && model.statusLevel != statusError {
@@ -209,7 +262,12 @@ func TestRemoteEntryDefersSSHUntilPickerCloses(t *testing.T) {
 	model := newTestModel()
 	t.Cleanup(model.Close)
 
-	target := session.Session{ID: "$9", Name: "remote", Kind: session.KindLive, Origin: session.OriginSSH}
+	target := session.Session{
+		ID:     "$9",
+		Name:   "remote",
+		Kind:   session.KindLive,
+		Origin: session.OriginSSH,
+	}
 	model.deps.RemoteAttach = &testServiceAdapter{deps: &Dependencies{
 		AttachRemoteSession: func(context.Context, session.Session, string) (tea.ExecCommand, error) {
 			t.Fatal("SSH began before the picker released the terminal")
@@ -237,10 +295,14 @@ func TestOriginRowsKeepTheirOwnAgentCountsAndPositions(t *testing.T) {
 		Agents: []session.AgentSession{{PaneID: "%1", PaneLeft: 40}},
 	}}
 	model.applyAgentSummaries([]session.AgentSummary{{TmuxSessionID: "$1", Total: 9, Active: 9}})
-	model.applyAgentPositions(agentPositionsMsg{ready: true, panes: []PaneLocation{{PaneID: "%1", PaneLeft: "2"}}})
+	model.applyAgentPositions(
+		agentPositionsMsg{ready: true, panes: []PaneLocation{{PaneID: "%1", PaneLeft: "2"}}},
+	)
 
 	row := model.sessions[0]
-	if row.AgentTotal != 3 || row.AgentActive != 2 || row.AgentWaiting != 1 || len(row.Agents) != 1 || row.Agents[0].PaneLeft != 40 {
+	if row.AgentTotal != 3 || row.AgentActive != 2 || row.AgentWaiting != 1 ||
+		len(row.Agents) != 1 ||
+		row.Agents[0].PaneLeft != 40 {
 		t.Fatalf("origin state was overwritten by local agents: %#v", row)
 	}
 

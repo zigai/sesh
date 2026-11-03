@@ -24,11 +24,23 @@ func TestSaveEnvironmentSelectsCapturedKeys(t *testing.T) {
 		input action.SaveSnapshot
 		want  []string
 	}{
-		{"configured keys without tmux keys", saveInput(true, nil, false), []string{"CONFIGURED", "VIRTUAL_ENV"}},
+		{
+			"configured keys without tmux keys",
+			saveInput(true, nil, false),
+			[]string{"CONFIGURED", "VIRTUAL_ENV"},
+		},
 		{"explicit empty list captures nothing", saveInput(true, []string{}, true), nil},
-		{"explicit list replaces configured keys", saveInput(true, []string{"PATH", "TMUX_PANE", "CUSTOM"}, true), []string{"PATH", "CUSTOM"}},
+		{
+			"explicit list replaces configured keys",
+			saveInput(true, []string{"PATH", "TMUX_PANE", "CUSTOM"}, true),
+			[]string{"PATH", "CUSTOM"},
+		},
 		{"no enrichment captures nothing", saveInput(false, nil, false), nil},
-		{"explicit list without enrichment", saveInput(false, []string{"CUSTOM"}, true), []string{"CUSTOM"}},
+		{
+			"explicit list without enrichment",
+			saveInput(false, []string{"CUSTOM"}, true),
+			[]string{"CUSTOM"},
+		},
 	}
 
 	for _, test := range tests {
@@ -97,12 +109,22 @@ func TestSaveEnvironmentRejectsInvalidConfiguredKeys(t *testing.T) {
 
 			_, err := local.saveEnvironment(saveInput(true, nil, false))
 			if !errors.Is(err, test.want) || action.CodeOf(err) != action.CodeInvalidArgument {
-				t.Fatalf("error = %v (code %q), want %v classified invalid argument", err, action.CodeOf(err), test.want)
+				t.Fatalf(
+					"error = %v (code %q), want %v classified invalid argument",
+					err,
+					action.CodeOf(err),
+					test.want,
+				)
 			}
 		})
 	}
 }
 
 func saveInput(enrichment bool, environment []string, set bool) action.SaveSnapshot {
-	return action.SaveSnapshot{Sessions: nil, ProcessEnrichment: enrichment, Environment: environment, EnvironmentSet: set}
+	return action.SaveSnapshot{
+		Sessions:          nil,
+		ProcessEnrichment: enrichment,
+		Environment:       environment,
+		EnvironmentSet:    set,
+	}
 }

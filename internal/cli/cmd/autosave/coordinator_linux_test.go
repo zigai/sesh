@@ -59,10 +59,18 @@ func TestCoordinatorStartsPastARestoreFromAnEarlierBoot(t *testing.T) {
 	repoPath := filepath.Join(t.TempDir(), "repository")
 	snapfixture.CommitOneSession(t, repoPath)
 
-	stale := snapfixture.RegisterRestore(t, repoPath, os.Getpid(), "00000000-1111-2222-3333-444444444444:1")
+	stale := snapfixture.RegisterRestore(
+		t,
+		repoPath,
+		os.Getpid(),
+		"00000000-1111-2222-3333-444444444444:1",
+	)
 
 	if err := coordinatorGate(t, repoPath); err != nil {
-		t.Fatalf("a restore aimed at a tmux server from an earlier boot must not block the coordinator: %v", err)
+		t.Fatalf(
+			"a restore aimed at a tmux server from an earlier boot must not block the coordinator: %v",
+			err,
+		)
 	}
 
 	if state := operationState(t, repoPath, stale); state != "abandoned" {
@@ -82,11 +90,13 @@ func TestCoordinatorNamesARestoreThatMayStillRun(t *testing.T) {
 	live := snapfixture.RegisterRestore(t, repoPath, os.Getpid(), self.String())
 
 	err = coordinatorGate(t, repoPath)
-	if !errors.Is(err, errCoordinatorRecoveryBarrier) || !errors.Is(err, automation.ErrActiveRestores) {
+	if !errors.Is(err, errCoordinatorRecoveryBarrier) ||
+		!errors.Is(err, automation.ErrActiveRestores) {
 		t.Fatalf("gate error = %v, want the active-restore barrier", err)
 	}
 
-	if !strings.Contains(err.Error(), live) || !strings.Contains(err.Error(), "sesh snapshot recover restore abandon "+live) {
+	if !strings.Contains(err.Error(), live) ||
+		!strings.Contains(err.Error(), "sesh snapshot recover restore abandon "+live) {
 		t.Fatalf("the error must name the restore and how to abandon it: %v", err)
 	}
 
@@ -127,6 +137,9 @@ func TestCoordinatorStartsAfterFailedFirstSave(t *testing.T) {
 	}
 
 	if err := ensureCoordinatorRepositoryReady(t.Context(), env); err != nil {
-		t.Fatalf("ensureCoordinatorRepositoryReady error = %v, want nil with no generation to recover", err)
+		t.Fatalf(
+			"ensureCoordinatorRepositoryReady error = %v, want nil with no generation to recover",
+			err,
+		)
 	}
 }

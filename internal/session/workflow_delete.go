@@ -44,7 +44,10 @@ func (w *Workflow) DeleteSession(ctx context.Context, name string, force bool) (
 	return out.LiveKilled, out.SavedDeleted, err
 }
 
-func (w *Workflow) DeleteSavedSessionTarget(ctx context.Context, generationID, sessionID string) (string, error) {
+func (w *Workflow) DeleteSavedSessionTarget(
+	ctx context.Context,
+	generationID, sessionID string,
+) (string, error) {
 	if w.server == nil {
 		return "", oops.In("session").Code("endpoint_required").Wrap(errServerRequired)
 	}
@@ -91,11 +94,22 @@ func manifestHasSessionID(manifest model.Manifest, sessionID string) bool {
 func savedRewriteError(rewriteID string, err error) error {
 	switch {
 	case errors.Is(err, store.ErrUncertain):
-		return oops.In("session").Code("publication_uncertain").With("operation", "remove_sessions").With("rewrite_id", rewriteID).Wrap(err)
+		return oops.In("session").
+			Code("publication_uncertain").
+			With("operation", "remove_sessions").
+			With("rewrite_id", rewriteID).
+			Wrap(err)
 	case errors.Is(err, store.ErrRecoveryRequired):
-		return oops.In("session").Code("recovery_required").With("operation", "remove_sessions").With("rewrite_id", rewriteID).Wrap(err)
+		return oops.In("session").
+			Code("recovery_required").
+			With("operation", "remove_sessions").
+			With("rewrite_id", rewriteID).
+			Wrap(err)
 	default:
-		return oops.In("session").Code("rewrite_failed").With("operation", "remove_sessions").Wrap(err)
+		return oops.In("session").
+			Code("rewrite_failed").
+			With("operation", "remove_sessions").
+			Wrap(err)
 	}
 }
 
@@ -126,7 +140,11 @@ func logDeleteSuccess(ctx context.Context, out DeleteOutcome) {
 		Msg("session deleted")
 }
 
-func (w *Workflow) DeleteSessionEverywhere(ctx context.Context, name string, force bool) (DeleteOutcome, error) {
+func (w *Workflow) DeleteSessionEverywhere(
+	ctx context.Context,
+	name string,
+	force bool,
+) (DeleteOutcome, error) {
 	return w.DeleteSessionTargetEverywhere(ctx, name, "", force)
 }
 
@@ -149,12 +167,22 @@ func (w *Workflow) DeleteSessionTargetEverywhere(
 
 	endpointScope, scopeErr := model.EndpointScope(w.server.Endpoint().SocketPath)
 	if scopeErr != nil {
-		err := oops.In("session").Code("invalid_endpoint").With("operation", "scope_endpoint").Wrap(scopeErr)
+		err := oops.In("session").
+			Code("invalid_endpoint").
+			With("operation", "scope_endpoint").
+			Wrap(scopeErr)
 
 		return out, w.fail(ctx, "delete", errors.Join(err, closeLease(lease)))
 	}
 
-	live, plan, prepErr := w.prepareDeleteTargetAndPlan(ctx, name, expectedSessionID, endpointScope, force, &out)
+	live, plan, prepErr := w.prepareDeleteTargetAndPlan(
+		ctx,
+		name,
+		expectedSessionID,
+		endpointScope,
+		force,
+		&out,
+	)
 	if prepErr != nil {
 		return out, w.fail(ctx, "delete", errors.Join(prepErr, closeLease(lease)))
 	}
@@ -163,12 +191,29 @@ func (w *Workflow) DeleteSessionTargetEverywhere(
 		return out, w.fail(ctx, "delete", errors.Join(applyErr, closeLease(lease)))
 	}
 
-	if killErr := w.revalidateAndDeleteLive(ctx, live, name, endpointScope, force, &out); killErr != nil {
+	if killErr := w.revalidateAndDeleteLive(
+		ctx,
+		live,
+		name,
+		endpointScope,
+		force,
+		&out,
+	); killErr != nil {
 		return out, w.fail(ctx, "delete", errors.Join(killErr, closeLease(lease)))
 	}
 
 	if histErr := w.deleteHistory(ctx, name); histErr != nil {
-		return out, w.fail(ctx, "delete", errors.Join(oops.In("session").Code("history_failed").With("operation", "delete_history").Wrap(histErr), closeLease(lease)))
+		return out, w.fail(
+			ctx,
+			"delete",
+			errors.Join(
+				oops.In("session").
+					Code("history_failed").
+					With("operation", "delete_history").
+					Wrap(histErr),
+				closeLease(lease),
+			),
+		)
 	}
 
 	if closeErr := closeLease(lease); closeErr != nil {
@@ -182,15 +227,24 @@ func (w *Workflow) DeleteSessionTargetEverywhere(
 	return out, nil
 }
 
-func (w *Workflow) deleteSavedSessionTarget(ctx context.Context, generationID, sessionID string) (string, error) {
+func (w *Workflow) deleteSavedSessionTarget(
+	ctx context.Context,
+	generationID, sessionID string,
+) (string, error) {
 	endpointScope, err := model.EndpointScope(w.server.Endpoint().SocketPath)
 	if err != nil {
-		return "", oops.In("session").Code("invalid_endpoint").With("operation", "scope_endpoint").Wrap(err)
+		return "", oops.In("session").
+			Code("invalid_endpoint").
+			With("operation", "scope_endpoint").
+			Wrap(err)
 	}
 
 	manifest, err := w.repo.Read(ctx, generationID)
 	if err != nil {
-		return "", oops.In("session").Code("repository_unavailable").With("operation", "read_generation").Wrap(err)
+		return "", oops.In("session").
+			Code("repository_unavailable").
+			With("operation", "read_generation").
+			Wrap(err)
 	}
 
 	if manifest.Source.EndpointScope == "" {
@@ -198,11 +252,17 @@ func (w *Workflow) deleteSavedSessionTarget(ctx context.Context, generationID, s
 	}
 
 	if manifest.Source.EndpointScope != endpointScope {
-		return "", oops.In("session").Code("saved_session_scope_conflict").With("operation", "delete_saved").Wrap(ErrSavedSessionScopeConflict)
+		return "", oops.In("session").
+			Code("saved_session_scope_conflict").
+			With("operation", "delete_saved").
+			Wrap(ErrSavedSessionScopeConflict)
 	}
 
 	if !manifestHasSessionID(manifest, sessionID) {
-		return "", oops.In("session").Code("not_found").With("operation", "delete_saved").Wrap(ErrSessionNotFound)
+		return "", oops.In("session").
+			Code("not_found").
+			With("operation", "delete_saved").
+			Wrap(ErrSessionNotFound)
 	}
 
 	rewriteID, err := newRewriteID()
@@ -236,7 +296,10 @@ func (w *Workflow) prepareDeleteTargetAndPlan(
 	}
 
 	if expectedSessionID != "" && (!out.LivePresent || out.LiveSessionID != expectedSessionID) {
-		return deleteLiveTarget{}, nil, oops.In("session").Code("target_replaced").With("operation", "preflight_session").Wrap(ErrSessionReplaced)
+		return deleteLiveTarget{}, nil, oops.In("session").
+			Code("target_replaced").
+			With("operation", "preflight_session").
+			Wrap(ErrSessionReplaced)
 	}
 
 	plan, planErr := w.planSavedDelete(ctx, name, endpointScope, out)
@@ -245,13 +308,22 @@ func (w *Workflow) prepareDeleteTargetAndPlan(
 	}
 
 	if !out.LivePresent && !out.SavedFound {
-		return deleteLiveTarget{}, nil, oops.In("session").Code("not_found").Wrapf(ErrSessionNotFound, "session %q not found", name)
+		return deleteLiveTarget{}, nil, oops.In("session").
+			Code("not_found").
+			Wrapf(ErrSessionNotFound, "session %q not found", name)
 	}
 
 	return live, plan, nil
 }
 
-func (w *Workflow) revalidateAndDeleteLive(ctx context.Context, live deleteLiveTarget, name string, endpointScope string, force bool, out *DeleteOutcome) error {
+func (w *Workflow) revalidateAndDeleteLive(
+	ctx context.Context,
+	live deleteLiveTarget,
+	name string,
+	endpointScope string,
+	force bool,
+	out *DeleteOutcome,
+) error {
 	if revalErr := w.revalidateSavedDeletions(ctx, name, endpointScope); revalErr != nil {
 		return revalErr
 	}
@@ -260,13 +332,21 @@ func (w *Workflow) revalidateAndDeleteLive(ctx context.Context, live deleteLiveT
 		return targetErr
 	}
 
-	if attachErr := revalidateLiveNotAttached(ctx, live.session, force, out.LivePresent); attachErr != nil {
+	if attachErr := revalidateLiveNotAttached(
+		ctx,
+		live.session,
+		force,
+		out.LivePresent,
+	); attachErr != nil {
 		return attachErr
 	}
 
 	if out.LivePresent {
 		if killErr := live.session.Kill(ctx); killErr != nil {
-			return oops.In("session").Code("tmux_failed").With("operation", "kill_session").Wrap(killErr)
+			return oops.In("session").
+				Code("tmux_failed").
+				With("operation", "kill_session").
+				Wrap(killErr)
 		}
 
 		out.LiveKilled = true
@@ -275,7 +355,12 @@ func (w *Workflow) revalidateAndDeleteLive(ctx context.Context, live deleteLiveT
 	return nil
 }
 
-func (w *Workflow) prepareLiveDelete(ctx context.Context, name string, force bool, out *DeleteOutcome) (deleteLiveTarget, error) {
+func (w *Workflow) prepareLiveDelete(
+	ctx context.Context,
+	name string,
+	force bool,
+	out *DeleteOutcome,
+) (deleteLiveTarget, error) {
 	sess, err := w.server.FindSession(ctx, name)
 	if err != nil {
 		if isAbsentSession(err) {
@@ -287,7 +372,10 @@ func (w *Workflow) prepareLiveDelete(ctx context.Context, name string, force boo
 
 	probe, err := w.server.Probe(ctx)
 	if err != nil || probe.Identity.PID <= 0 {
-		return deleteLiveTarget{}, oops.In("session").Code("tmux_failed").With("operation", "identify_server").Wrap(errors.Join(err, ErrSessionReplaced))
+		return deleteLiveTarget{}, oops.In("session").
+			Code("tmux_failed").
+			With("operation", "identify_server").
+			Wrap(errors.Join(err, ErrSessionReplaced))
 	}
 
 	target := deleteLiveTarget{session: sess, serverPID: probe.Identity.PID}
@@ -301,17 +389,25 @@ func (w *Workflow) prepareLiveDelete(ctx context.Context, name string, force boo
 
 	info, err := sess.Info(ctx)
 	if err != nil {
-		return deleteLiveTarget{}, oops.In("session").Code("tmux_failed").With("operation", "inspect_session").Wrap(err)
+		return deleteLiveTarget{}, oops.In("session").
+			Code("tmux_failed").
+			With("operation", "inspect_session").
+			Wrap(err)
 	}
 
 	if info.Attached > 0 {
-		return deleteLiveTarget{}, oops.In("session").Code("session_attached").Wrapf(ErrSessionAttached, "session %q is attached", name)
+		return deleteLiveTarget{}, oops.In("session").
+			Code("session_attached").
+			Wrapf(ErrSessionAttached, "session %q is attached", name)
 	}
 
 	return target, nil
 }
 
-func (w *Workflow) prepareRequiredLiveTarget(ctx context.Context, name, expectedSessionID string) (deleteLiveTarget, error) {
+func (w *Workflow) prepareRequiredLiveTarget(
+	ctx context.Context,
+	name, expectedSessionID string,
+) (deleteLiveTarget, error) {
 	sess, err := w.server.FindSession(ctx, name)
 	if err != nil {
 		return deleteLiveTarget{}, lookupSessionError(err)
@@ -319,24 +415,37 @@ func (w *Workflow) prepareRequiredLiveTarget(ctx context.Context, name, expected
 
 	probe, err := w.server.Probe(ctx)
 	if err != nil || probe.Identity.PID <= 0 {
-		return deleteLiveTarget{}, oops.In("session").Code("tmux_failed").With("operation", "identify_server").Wrap(errors.Join(err, ErrSessionReplaced))
+		return deleteLiveTarget{}, oops.In("session").
+			Code("tmux_failed").
+			With("operation", "identify_server").
+			Wrap(errors.Join(err, ErrSessionReplaced))
 	}
 
 	if expectedSessionID != "" && string(sess.ID()) != expectedSessionID {
-		return deleteLiveTarget{}, oops.In("session").Code("target_replaced").With("operation", "preflight_session").Wrap(ErrSessionReplaced)
+		return deleteLiveTarget{}, oops.In("session").
+			Code("target_replaced").
+			With("operation", "preflight_session").
+			Wrap(ErrSessionReplaced)
 	}
 
 	return deleteLiveTarget{session: sess, serverPID: probe.Identity.PID}, nil
 }
 
-func (w *Workflow) planSavedDelete(ctx context.Context, name, endpointScope string, out *DeleteOutcome) ([]deleteStep, error) {
+func (w *Workflow) planSavedDelete(
+	ctx context.Context,
+	name, endpointScope string,
+	out *DeleteOutcome,
+) ([]deleteStep, error) {
 	if w.repo == nil {
 		return nil, nil
 	}
 
 	catalog, err := w.repo.SettleAbandonedAttempts(ctx)
 	if err != nil {
-		return nil, oops.In("session").Code("repository_unavailable").With("operation", "inspect_repository").Wrap(err)
+		return nil, oops.In("session").
+			Code("repository_unavailable").
+			With("operation", "inspect_repository").
+			Wrap(err)
 	}
 
 	if _, pending := pendingAttempt(catalog); pending {
@@ -351,7 +460,10 @@ func (w *Workflow) planSavedDelete(ctx context.Context, name, endpointScope stri
 	for _, generation := range catalog.Generations {
 		manifest, err := w.repo.Read(ctx, generation.ID)
 		if err != nil {
-			return nil, oops.In("session").Code("repository_unavailable").With("operation", "read_generation").Wrap(err)
+			return nil, oops.In("session").
+				Code("repository_unavailable").
+				With("operation", "read_generation").
+				Wrap(err)
 		}
 
 		sessionIDs := manifestSessionIDs(manifest, name)
@@ -387,11 +499,18 @@ func (w *Workflow) planSavedDelete(ctx context.Context, name, endpointScope stri
 	return steps, nil
 }
 
-func (w *Workflow) applySavedDelete(ctx context.Context, plan []deleteStep, out *DeleteOutcome) error {
+func (w *Workflow) applySavedDelete(
+	ctx context.Context,
+	plan []deleteStep,
+	out *DeleteOutcome,
+) error {
 	for _, step := range plan {
 		rewriteID, err := newRewriteID()
 		if err != nil {
-			return oops.In("session").Code("rewrite_failed").With("operation", "generate_rewrite_id").Wrap(err)
+			return oops.In("session").
+				Code("rewrite_failed").
+				With("operation", "generate_rewrite_id").
+				Wrap(err)
 		}
 
 		result, err := w.repo.RemoveSessions(ctx, rewriteID, step.Generation, step.SessionIDs)
@@ -401,14 +520,25 @@ func (w *Workflow) applySavedDelete(ctx context.Context, plan []deleteStep, out 
 			}
 
 			if errors.Is(err, store.ErrUncertain) {
-				return oops.In("session").Code("publication_uncertain").With("operation", "remove_sessions").With("rewrite_id", rewriteID).Wrap(err)
+				return oops.In("session").
+					Code("publication_uncertain").
+					With("operation", "remove_sessions").
+					With("rewrite_id", rewriteID).
+					Wrap(err)
 			}
 
 			if errors.Is(err, store.ErrRecoveryRequired) {
-				return oops.In("session").Code("recovery_required").With("operation", "remove_sessions").With("rewrite_id", rewriteID).Wrap(err)
+				return oops.In("session").
+					Code("recovery_required").
+					With("operation", "remove_sessions").
+					With("rewrite_id", rewriteID).
+					Wrap(err)
 			}
 
-			return oops.In("session").Code("rewrite_failed").With("operation", "remove_sessions").Wrap(err)
+			return oops.In("session").
+				Code("rewrite_failed").
+				With("operation", "remove_sessions").
+				Wrap(err)
 		}
 
 		out.SavedDeleted = true
@@ -433,52 +563,91 @@ func closeLease(lease *tmuxserver.Lease) error {
 
 func (w *Workflow) acquireDeleteLease(ctx context.Context) (*tmuxserver.Lease, error) {
 	if w.server == nil {
-		return nil, oops.In("session").Code("endpoint_required").With("operation", "acquire_lease").Wrap(errServerRequired)
+		return nil, oops.In("session").
+			Code("endpoint_required").
+			With("operation", "acquire_lease").
+			Wrap(errServerRequired)
 	}
 
 	if w.leaseRoot == "" {
-		return nil, oops.In("session").Code("lease_failed").With("operation", "acquire_lease").Wrap(tmuxserver.ErrLeaseRoot)
+		return nil, oops.In("session").
+			Code("lease_failed").
+			With("operation", "acquire_lease").
+			Wrap(tmuxserver.ErrLeaseRoot)
 	}
 
 	lease, err := tmuxserver.AcquireLease(ctx, w.leaseRoot, w.server.Endpoint().SocketPath)
 	if err != nil {
-		return nil, oops.In("session").Code("lease_failed").With("operation", "acquire_lease").Wrap(err)
+		return nil, oops.In("session").
+			Code("lease_failed").
+			With("operation", "acquire_lease").
+			Wrap(err)
 	}
 
 	return lease, nil
 }
 
-func (w *Workflow) revalidateLiveTarget(ctx context.Context, target deleteLiveTarget, name string, livePresent bool) error {
+func (w *Workflow) revalidateLiveTarget(
+	ctx context.Context,
+	target deleteLiveTarget,
+	name string,
+	livePresent bool,
+) error {
 	if !livePresent {
 		return nil
 	}
 
 	probe, err := w.server.Probe(ctx)
 	if err != nil {
-		return oops.In("session").Code("tmux_failed").With("operation", "revalidate_server").Wrap(err)
+		return oops.In("session").
+			Code("tmux_failed").
+			With("operation", "revalidate_server").
+			Wrap(err)
 	}
 
-	if !sameLiveDeleteTarget(target.serverPID, probe.Identity.PID, target.session.ID(), target.session.ID()) {
-		return oops.In("session").Code("target_replaced").With("operation", "revalidate_server").Wrap(ErrSessionReplaced)
+	if !sameLiveDeleteTarget(
+		target.serverPID,
+		probe.Identity.PID,
+		target.session.ID(),
+		target.session.ID(),
+	) {
+		return oops.In("session").
+			Code("target_replaced").
+			With("operation", "revalidate_server").
+			Wrap(ErrSessionReplaced)
 	}
 
 	current, err := w.server.FindSession(ctx, name)
 	if err != nil {
 		if isAbsentSession(err) {
-			return oops.In("session").Code("target_replaced").With("operation", "revalidate_session").Wrap(ErrSessionReplaced)
+			return oops.In("session").
+				Code("target_replaced").
+				With("operation", "revalidate_session").
+				Wrap(ErrSessionReplaced)
 		}
 
 		return lookupSessionError(err)
 	}
 
-	if !sameLiveDeleteTarget(target.serverPID, probe.Identity.PID, target.session.ID(), current.ID()) {
-		return oops.In("session").Code("target_replaced").With("operation", "revalidate_session").Wrap(ErrSessionReplaced)
+	if !sameLiveDeleteTarget(
+		target.serverPID,
+		probe.Identity.PID,
+		target.session.ID(),
+		current.ID(),
+	) {
+		return oops.In("session").
+			Code("target_replaced").
+			With("operation", "revalidate_session").
+			Wrap(ErrSessionReplaced)
 	}
 
 	return nil
 }
 
-func sameLiveDeleteTarget(initialServerPID, currentServerPID int, initialSessionID, currentSessionID gotmux.SessionID) bool {
+func sameLiveDeleteTarget(
+	initialServerPID, currentServerPID int,
+	initialSessionID, currentSessionID gotmux.SessionID,
+) bool {
 	return initialServerPID > 0 && initialServerPID == currentServerPID &&
 		initialSessionID != "" && initialSessionID == currentSessionID
 }
@@ -490,13 +659,19 @@ func (w *Workflow) revalidateSavedDeletions(ctx context.Context, name, endpointS
 
 	catalogAfter, catErr := w.repo.Inspect(ctx)
 	if catErr != nil {
-		return oops.In("session").Code("repository_unavailable").With("operation", "revalidate_catalog").Wrap(catErr)
+		return oops.In("session").
+			Code("repository_unavailable").
+			With("operation", "revalidate_catalog").
+			Wrap(catErr)
 	}
 
 	for _, gen := range catalogAfter.Generations {
 		manifest, readErr := w.repo.Read(ctx, gen.ID)
 		if readErr != nil {
-			return oops.In("session").Code("repository_unavailable").With("operation", "revalidate_generation").Wrap(readErr)
+			return oops.In("session").
+				Code("repository_unavailable").
+				With("operation", "revalidate_generation").
+				Wrap(readErr)
 		}
 
 		if len(manifestSessionIDs(manifest, name)) == 0 {
@@ -508,7 +683,9 @@ func (w *Workflow) revalidateSavedDeletions(ctx context.Context, name, endpointS
 		}
 
 		if manifest.Source.EndpointScope == endpointScope {
-			return oops.In("session").Code("saved_generations_protected").Wrapf(ErrSavedGenerationsProtected, "saved generations still contain session %q after concurrent publication", name)
+			return oops.In("session").
+				Code("saved_generations_protected").
+				Wrapf(ErrSavedGenerationsProtected, "saved generations still contain session %q after concurrent publication", name)
 		}
 	}
 
@@ -529,14 +706,21 @@ func savedSessionScopeConflict(name, operation string) error {
 		Wrapf(ErrSavedSessionScopeConflict, "saved session %q has no endpoint scope", name)
 }
 
-func revalidateLiveNotAttached(ctx context.Context, live gotmux.Session, force, livePresent bool) error {
+func revalidateLiveNotAttached(
+	ctx context.Context,
+	live gotmux.Session,
+	force, livePresent bool,
+) error {
 	if !livePresent || force {
 		return nil
 	}
 
 	liveInfo, infoErr := live.Info(ctx)
 	if infoErr != nil {
-		return oops.In("session").Code("tmux_failed").With("operation", "inspect_session").Wrap(infoErr)
+		return oops.In("session").
+			Code("tmux_failed").
+			With("operation", "inspect_session").
+			Wrap(infoErr)
 	}
 
 	if liveInfo.Attached > 0 {
@@ -600,7 +784,10 @@ func pendingAttempt(catalog store.Catalog) (store.Attempt, bool) {
 func newRewriteID() (string, error) {
 	value := make([]byte, rewriteIDBytes)
 	if _, err := rand.Read(value); err != nil {
-		return "", oops.In("session").Code("rewrite_failed").With("operation", "generate_rewrite_id").Wrap(err)
+		return "", oops.In("session").
+			Code("rewrite_failed").
+			With("operation", "generate_rewrite_id").
+			Wrap(err)
 	}
 
 	return hex.EncodeToString(value), nil

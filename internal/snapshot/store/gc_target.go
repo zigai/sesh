@@ -88,7 +88,9 @@ func closeCollectionDirectory(dir *privatefs.Dir) error {
 	}
 
 	if err := dir.Close(); err != nil {
-		return oops.In("snapshot.store").With("operation", "close_collection_directory").Wrapf(err, "close collection directory")
+		return oops.In("snapshot.store").
+			With("operation", "close_collection_directory").
+			Wrapf(err, "close collection directory")
 	}
 
 	return nil
@@ -112,7 +114,10 @@ func (r *Repository) openGenerationDirectory(id string) (*privatefs.Dir, error) 
 	return dir, nil
 }
 
-func (run *collectionRun) inspectCandidate(ctx context.Context, candidate collectionCandidate) (CollectionIntent, error) {
+func (run *collectionRun) inspectCandidate(
+	ctx context.Context,
+	candidate collectionCandidate,
+) (CollectionIntent, error) {
 	dir, err := run.repository.openGenerationDirectory(candidate.id)
 	if err != nil {
 		return CollectionIntent{}, errors.Join(errCollectionUnsafe, err, ctx.Err())
@@ -123,20 +128,31 @@ func (run *collectionRun) inspectCandidate(ctx context.Context, candidate collec
 	return intent, errors.Join(inspectErr, dir.Close())
 }
 
-func inspectGenerationContent(ctx context.Context, dir *privatefs.Dir, candidate collectionCandidate) (CollectionIntent, error) {
+func inspectGenerationContent(
+	ctx context.Context,
+	dir *privatefs.Dir,
+	candidate collectionCandidate,
+) (CollectionIntent, error) {
 	names, err := collectionNames(dir, collectionGenerationEntries)
 	if err != nil {
 		return CollectionIntent{}, err
 	}
 
-	if !slices.Equal(slices.Sorted(slices.Values(names)), []string{collectionArtifactsName, collectionManifestName}) {
+	if !slices.Equal(
+		slices.Sorted(slices.Values(names)),
+		[]string{collectionArtifactsName, collectionManifestName},
+	) {
 		return CollectionIntent{}, errCollectionStructure
 	}
 
 	return readGenerationInventory(ctx, dir, candidate)
 }
 
-func readGenerationInventory(ctx context.Context, dir *privatefs.Dir, candidate collectionCandidate) (CollectionIntent, error) {
+func readGenerationInventory(
+	ctx context.Context,
+	dir *privatefs.Dir,
+	candidate collectionCandidate,
+) (CollectionIntent, error) {
 	data, err := dir.Read(collectionManifestName, model.MaxManifestBytes)
 	if err != nil {
 		return CollectionIntent{}, errors.Join(errCollectionUnsafe, err)
@@ -199,13 +215,20 @@ func decodeManifestArtifacts(data []byte) (manifestArtifacts, error) {
 	}
 
 	if err != nil {
-		return manifestArtifacts{}, oops.In("snapshot.store").With("operation", "decode_retired_manifest").Wrap(err)
+		return manifestArtifacts{}, oops.In("snapshot.store").
+			With("operation", "decode_retired_manifest").
+			Wrap(err)
 	}
 
 	return manifestArtifacts{descriptors: manifest.Artifacts, otherSchema: false}, nil
 }
 
-func (a manifestArtifacts) size(ctx context.Context, dir *privatefs.Dir, index int, name string) (int64, error) {
+func (a manifestArtifacts) size(
+	ctx context.Context,
+	dir *privatefs.Dir,
+	index int,
+	name string,
+) (int64, error) {
 	if a.otherSchema {
 		return listedArtifactSize(dir, name)
 	}
@@ -216,7 +239,9 @@ func (a manifestArtifacts) size(ctx context.Context, dir *privatefs.Dir, index i
 func listedArtifactSize(dir *privatefs.Dir, name string) (int64, error) {
 	file, err := dir.File(name, unix.O_RDONLY)
 	if err != nil {
-		return 0, oops.In("snapshot.store").With("operation", "open_listed_artifact", "artifact", name).Wrap(err)
+		return 0, oops.In("snapshot.store").
+			With("operation", "open_listed_artifact", "artifact", name).
+			Wrap(err)
 	}
 
 	info, statErr := file.Stat()
@@ -231,7 +256,10 @@ func listedArtifactSize(dir *privatefs.Dir, name string) (int64, error) {
 	return info.Size(), nil
 }
 
-func inventoryListedArtifacts(ctx context.Context, dir *privatefs.Dir) ([]CollectionFile, int64, error) {
+func inventoryListedArtifacts(
+	ctx context.Context,
+	dir *privatefs.Dir,
+) ([]CollectionFile, int64, error) {
 	names, err := collectionNames(dir, model.MaxEntities)
 	if err != nil {
 		return nil, 0, err
@@ -243,7 +271,9 @@ func inventoryListedArtifacts(ctx context.Context, dir *privatefs.Dir) ([]Collec
 
 	for _, name := range slices.Sorted(slices.Values(names)) {
 		if err := ctx.Err(); err != nil {
-			return nil, 0, oops.In("snapshot.store").With("operation", "inventory_generation_artifacts").Wrap(err)
+			return nil, 0, oops.In("snapshot.store").
+				With("operation", "inventory_generation_artifacts").
+				Wrap(err)
 		}
 
 		if !validCollectionFileName(name) {
@@ -266,7 +296,11 @@ func inventoryListedArtifacts(ctx context.Context, dir *privatefs.Dir) ([]Collec
 	return files, total, nil
 }
 
-func inventoryArtifacts(ctx context.Context, dir *privatefs.Dir, descriptors []model.Artifact) ([]CollectionFile, int64, error) {
+func inventoryArtifacts(
+	ctx context.Context,
+	dir *privatefs.Dir,
+	descriptors []model.Artifact,
+) ([]CollectionFile, int64, error) {
 	names, err := collectionNames(dir, len(descriptors))
 	if err != nil {
 		return nil, 0, err
@@ -293,7 +327,9 @@ func inventoryArtifacts(ctx context.Context, dir *privatefs.Dir, descriptors []m
 
 	for _, descriptor := range descriptors {
 		if err := ctx.Err(); err != nil {
-			return nil, 0, oops.In("snapshot.store").With("operation", "inventory_generation_artifacts").Wrap(err)
+			return nil, 0, oops.In("snapshot.store").
+				With("operation", "inventory_generation_artifacts").
+				Wrap(err)
 		}
 
 		size, err := readValidatedArtifact(ctx, dir, descriptor)
@@ -306,13 +342,19 @@ func inventoryArtifacts(ctx context.Context, dir *privatefs.Dir, descriptors []m
 			return nil, 0, errors.Join(errCollectionContent, err)
 		}
 
-		files = append(files, CollectionFile{Name: descriptor.ID + collectionArtifactSuffix, Bytes: size})
+		files = append(
+			files,
+			CollectionFile{Name: descriptor.ID + collectionArtifactSuffix, Bytes: size},
+		)
 	}
 
 	return files, total, nil
 }
 
-func (run *collectionRun) verifyTarget(ctx context.Context, intent CollectionIntent) (collectionTarget, error) {
+func (run *collectionRun) verifyTarget(
+	ctx context.Context,
+	intent CollectionIntent,
+) (collectionTarget, error) {
 	dir, err := run.repository.openGenerationDirectory(intent.Generation)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) && !errors.Is(err, ErrCorrupt) {
@@ -327,7 +369,11 @@ func (run *collectionRun) verifyTarget(ctx context.Context, intent CollectionInt
 	return verifyGenerationContent(ctx, dir, intent)
 }
 
-func verifyGenerationContent(ctx context.Context, dir *privatefs.Dir, intent CollectionIntent) (collectionTarget, error) {
+func verifyGenerationContent(
+	ctx context.Context,
+	dir *privatefs.Dir,
+	intent CollectionIntent,
+) (collectionTarget, error) {
 	if err := ctx.Err(); err != nil {
 		return collectionTarget{}, errors.Join(err, dir.Close())
 	}
@@ -379,7 +425,13 @@ func verifyGenerationEntries(names []string) error {
 	return nil
 }
 
-func verifyTargetArtifacts(ctx context.Context, dir *privatefs.Dir, target collectionTarget, intent CollectionIntent, owned manifestArtifacts) (collectionTarget, error) {
+func verifyTargetArtifacts(
+	ctx context.Context,
+	dir *privatefs.Dir,
+	target collectionTarget,
+	intent CollectionIntent,
+	owned manifestArtifacts,
+) (collectionTarget, error) {
 	artifacts, err := dir.Child(collectionArtifactsName, false)
 	if err != nil {
 		return collectionTarget{}, errors.Join(errCollectionUnsafe, err, dir.Close())
@@ -391,7 +443,11 @@ func verifyTargetArtifacts(ctx context.Context, dir *privatefs.Dir, target colle
 	}
 
 	if !target.manifest && len(files) > 0 {
-		return collectionTarget{}, errors.Join(errCollectionContradiction, artifacts.Close(), dir.Close())
+		return collectionTarget{}, errors.Join(
+			errCollectionContradiction,
+			artifacts.Close(),
+			dir.Close(),
+		)
 	}
 
 	target.artifacts, target.files = artifacts, files
@@ -400,7 +456,10 @@ func verifyTargetArtifacts(ctx context.Context, dir *privatefs.Dir, target colle
 	return target, nil
 }
 
-func verifyGenerationManifest(dir *privatefs.Dir, intent CollectionIntent) (manifestArtifacts, error) {
+func verifyGenerationManifest(
+	dir *privatefs.Dir,
+	intent CollectionIntent,
+) (manifestArtifacts, error) {
 	data, err := dir.Read(collectionManifestName, model.MaxManifestBytes)
 	if err != nil {
 		return manifestArtifacts{}, errors.Join(errCollectionUnsafe, err)
@@ -432,7 +491,12 @@ func verifyGenerationManifest(dir *privatefs.Dir, intent CollectionIntent) (mani
 	return owned, nil
 }
 
-func verifyArtifactFiles(ctx context.Context, dir *privatefs.Dir, intent CollectionIntent, manifest manifestArtifacts) ([]CollectionFile, int64, error) {
+func verifyArtifactFiles(
+	ctx context.Context,
+	dir *privatefs.Dir,
+	intent CollectionIntent,
+	manifest manifestArtifacts,
+) ([]CollectionFile, int64, error) {
 	names, err := collectionNames(dir, len(intent.Files))
 	if err != nil {
 		return nil, 0, err
@@ -481,7 +545,11 @@ func verifyArtifactFiles(ctx context.Context, dir *privatefs.Dir, intent Collect
 	return files, total, nil
 }
 
-func (run *collectionRun) remove(ctx context.Context, intent CollectionIntent, target *collectionTarget) (int64, error) {
+func (run *collectionRun) remove(
+	ctx context.Context,
+	intent CollectionIntent,
+	target *collectionTarget,
+) (int64, error) {
 	removed, err := run.removeArtifacts(ctx, target)
 	if err != nil {
 		return removed, err
@@ -505,7 +573,10 @@ func (run *collectionRun) remove(ctx context.Context, intent CollectionIntent, t
 	return removed, run.repository.boundary(collectionPhaseGenerationUnlinked)
 }
 
-func (run *collectionRun) removeArtifacts(ctx context.Context, target *collectionTarget) (int64, error) {
+func (run *collectionRun) removeArtifacts(
+	ctx context.Context,
+	target *collectionTarget,
+) (int64, error) {
 	if target.artifacts == nil {
 		return 0, nil
 	}
@@ -518,7 +589,10 @@ func (run *collectionRun) removeArtifacts(ctx context.Context, target *collectio
 		}
 
 		if err := target.artifacts.Remove(file.Name); err != nil {
-			return removed, errors.Join(collectionOperationError("remove_generation_artifact", err), target.close())
+			return removed, errors.Join(
+				collectionOperationError("remove_generation_artifact", err),
+				target.close(),
+			)
 		}
 
 		removed += file.Bytes
@@ -541,7 +615,10 @@ func (run *collectionRun) removeArtifacts(ctx context.Context, target *collectio
 	}
 
 	if err := target.dir.RemoveDir(collectionArtifactsName); err != nil {
-		return removed, errors.Join(collectionOperationError("remove_artifact_directory", err), target.close())
+		return removed, errors.Join(
+			collectionOperationError("remove_artifact_directory", err),
+			target.close(),
+		)
 	}
 
 	if err := run.repository.boundary(collectionPhaseArtifactsUnlinked); err != nil {
@@ -551,7 +628,11 @@ func (run *collectionRun) removeArtifacts(ctx context.Context, target *collectio
 	return removed, nil
 }
 
-func (run *collectionRun) removeManifest(ctx context.Context, intent CollectionIntent, target *collectionTarget) (int64, error) {
+func (run *collectionRun) removeManifest(
+	ctx context.Context,
+	intent CollectionIntent,
+	target *collectionTarget,
+) (int64, error) {
 	if err := ctx.Err(); err != nil {
 		return 0, errors.Join(err, target.close())
 	}
@@ -561,7 +642,10 @@ func (run *collectionRun) removeManifest(ctx context.Context, intent CollectionI
 	}
 
 	if err := target.dir.Remove(collectionManifestName); err != nil {
-		return 0, errors.Join(collectionOperationError("remove_generation_manifest", err), target.close())
+		return 0, errors.Join(
+			collectionOperationError("remove_generation_manifest", err),
+			target.close(),
+		)
 	}
 
 	if err := target.dir.Sync(); err != nil {
@@ -586,7 +670,10 @@ func (run *collectionRun) removeGenerationDirectory(ctx context.Context, id stri
 	}
 
 	if err := dir.RemoveDir(id); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return errors.Join(collectionOperationError("remove_generation_directory", err), dir.Close())
+		return errors.Join(
+			collectionOperationError("remove_generation_directory", err),
+			dir.Close(),
+		)
 	}
 
 	if err := dir.Sync(); err != nil {
@@ -597,7 +684,9 @@ func (run *collectionRun) removeGenerationDirectory(ctx context.Context, id stri
 }
 
 func collectionOperationError(operation string, err error) error {
-	return oops.In("snapshot.store").With("operation", operation).Wrapf(err, "collect retired generation")
+	return oops.In("snapshot.store").
+		With("operation", operation).
+		Wrapf(err, "collect retired generation")
 }
 
 func collectionNames(dir *privatefs.Dir, limit int) ([]string, error) {

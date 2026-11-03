@@ -13,7 +13,13 @@ func TestFieldMetadataDescribesProviderAndRowKind(t *testing.T) {
 		{field: FieldSessionName, provider: ProviderSession, bound: 0, session: true, agent: true},
 		{field: FieldStatusAge, provider: ProviderClock, bound: 0, session: false, agent: true},
 		{field: FieldAgentGitGlyph, provider: ProviderGit, bound: 1, session: false, agent: true},
-		{field: FieldCurrentMarker, provider: ProviderSession, bound: markerCellWidth, session: true, agent: true},
+		{
+			field:    FieldCurrentMarker,
+			provider: ProviderSession,
+			bound:    markerCellWidth,
+			session:  true,
+			agent:    true,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -23,7 +29,9 @@ func TestFieldMetadataDescribesProviderAndRowKind(t *testing.T) {
 			continue
 		}
 
-		if info.Provider != testCase.provider || info.WidthBound != testCase.bound || info.SessionRows != testCase.session || info.AgentRows != testCase.agent {
+		if info.Provider != testCase.provider || info.WidthBound != testCase.bound ||
+			info.SessionRows != testCase.session ||
+			info.AgentRows != testCase.agent {
 			t.Errorf("field %s metadata = %+v", testCase.field, info)
 		}
 	}

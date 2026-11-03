@@ -104,7 +104,8 @@ func NewLocal(opts LocalOptions) *Local {
 
 	for _, entry := range action.All() {
 		descriptor := entry.Describe()
-		if _, ok := local.handlers[descriptor.ID]; !ok && !descriptor.Interactive && !descriptor.InPicker {
+		if _, ok := local.handlers[descriptor.ID]; !ok && !descriptor.Interactive &&
+			!descriptor.InPicker {
 			panic("app: no local handler for action " + string(entry.Describe().ID))
 		}
 	}
@@ -185,7 +186,10 @@ func (repository *Repository) Close() error {
 	return nil
 }
 
-func (repository *Repository) open(ctx context.Context, create bool) (*store.Repository, bool, error) {
+func (repository *Repository) open(
+	ctx context.Context,
+	create bool,
+) (*store.Repository, bool, error) {
 	if repository == nil || repository.path == "" {
 		if create {
 			return nil, false, action.Wrap(action.CodeUnavailable, ErrRepositoryRequired)
@@ -216,7 +220,9 @@ func (repository *Repository) open(ctx context.Context, create bool) (*store.Rep
 	}
 
 	if err != nil {
-		return nil, false, oops.In("app").With("operation", "open_repository").Wrapf(err, "open repository")
+		return nil, false, oops.In("app").
+			With("operation", "open_repository").
+			Wrapf(err, "open repository")
 	}
 
 	repository.repo = repo
@@ -224,7 +230,10 @@ func (repository *Repository) open(ctx context.Context, create bool) (*store.Rep
 	return repo, true, nil
 }
 
-func (local *Local) useRepository(ctx context.Context, create bool) (*store.Repository, bool, error) {
+func (local *Local) useRepository(
+	ctx context.Context,
+	create bool,
+) (*store.Repository, bool, error) {
 	repo, found, err := local.repository.open(ctx, create)
 	if err != nil || !found {
 		return nil, false, err

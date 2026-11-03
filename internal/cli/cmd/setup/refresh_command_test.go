@@ -36,8 +36,14 @@ func TestSetupServicesShowsStartCommandForSelectedFeatures(t *testing.T) {
 			}
 
 			stdout, stderr, err := executeCommand(t, args...)
-			if err != nil || stderr != "" || !strings.Contains(stdout, "To start automatic saves:\n  "+want+"\n") {
-				t.Fatalf("setup did not explain how to start the selected features: stdout=%q stderr=%q err=%v", stdout, stderr, err)
+			if err != nil || stderr != "" ||
+				!strings.Contains(stdout, "To start automatic saves:\n  "+want+"\n") {
+				t.Fatalf(
+					"setup did not explain how to start the selected features: stdout=%q stderr=%q err=%v",
+					stdout,
+					stderr,
+					err,
+				)
 			}
 
 			if !slices.Equal(fake.commands(t), []string{"daemon-reload"}) {
@@ -63,20 +69,37 @@ func TestSetupServicesExplainsPreviewAndKeepsCustomDirectoryOffline(t *testing.T
 	fake := refreshManager(t, "")
 
 	stdout, _, err := executeCommand(t, "setup", "services", "--dir", directory, testNoConfigFlag)
-	if err != nil || !strings.Contains(stdout, "To install, repeat this command with --apply.") || strings.Contains(stdout, "To start automatic saves:") {
+	if err != nil || !strings.Contains(stdout, "To install, repeat this command with --apply.") ||
+		strings.Contains(stdout, "To start automatic saves:") {
 		t.Fatalf("preview must explain installation: stdout=%q err=%v", stdout, err)
 	}
 
-	stdout, _, err = executeCommand(t, "setup", "services", "--apply", "--dir", directory, testNoConfigFlag)
-	if err != nil || strings.Contains(stdout, "To start automatic saves:") || len(fake.commands(t)) != 0 {
-		t.Fatalf("custom-directory setup must stay offline: stdout=%q err=%v commands=%v", stdout, err, fake.commands(t))
+	stdout, _, err = executeCommand(
+		t,
+		"setup",
+		"services",
+		"--apply",
+		"--dir",
+		directory,
+		testNoConfigFlag,
+	)
+	if err != nil || strings.Contains(stdout, "To start automatic saves:") ||
+		len(fake.commands(t)) != 0 {
+		t.Fatalf(
+			"custom-directory setup must stay offline: stdout=%q err=%v commands=%v",
+			stdout,
+			err,
+			fake.commands(t),
+		)
 	}
 }
 
 func executeSetupServices(t *testing.T, arguments ...string) commandExecution {
 	t.Helper()
 
-	args := append([]string{"setup", "services", "--program", "/private-program-canary/sesh", testJSONFlag}, arguments...)
+	args := append(
+		[]string{"setup", "services", "--program", "/private-program-canary/sesh", testJSONFlag},
+		arguments...)
 
 	return executeJSON(t, args...)
 }
@@ -97,11 +120,21 @@ func TestSetupServicesApplyReloadsAndPreservesActiveServices(t *testing.T) {
 		t.Fatalf("refresh result = %+v", result)
 	}
 
-	if !slices.Equal(result.Manager.Restarted, []string{setup.AutosaveTimerName, setup.RemoteServiceName}) {
+	if !slices.Equal(
+		result.Manager.Restarted,
+		[]string{setup.AutosaveTimerName, setup.RemoteServiceName},
+	) {
 		t.Fatalf("restart result = %+v", result.Manager)
 	}
 
-	if !slices.Equal(fake.commands(t), []string{"daemon-reload", "try-restart " + setup.AutosaveTimerName, "try-restart " + setup.RemoteServiceName}) {
+	if !slices.Equal(
+		fake.commands(t),
+		[]string{
+			"daemon-reload",
+			"try-restart " + setup.AutosaveTimerName,
+			"try-restart " + setup.RemoteServiceName,
+		},
+	) {
 		t.Fatalf("manager commands = %v", fake.commands(t))
 	}
 
@@ -131,7 +164,11 @@ func seedSetupRefreshServices(t *testing.T) string {
 	}
 
 	for _, name := range []string{setup.AutosaveTimerName, setup.RemoteServiceName} {
-		if err := os.WriteFile(filepath.Join(directory, name), []byte("# "+setup.ManagedMarker+"\nold private definition\n"), 0o600); err != nil {
+		if err := os.WriteFile(
+			filepath.Join(directory, name),
+			[]byte("# "+setup.ManagedMarker+"\nold private definition\n"),
+			0o600,
+		); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -244,10 +281,15 @@ func TestSetupServicesManagerFailureRetainsPartialJSONAndOneErrorRecord(t *testi
 	}
 }
 
-func assertRefreshPartialManagerResult(t *testing.T, phase string, manager *setup.ServiceRefreshResult) {
+func assertRefreshPartialManagerResult(
+	t *testing.T,
+	phase string,
+	manager *setup.ServiceRefreshResult,
+) {
 	t.Helper()
 
-	if phase == "try-restart "+setup.RemoteServiceName && (!manager.Reloaded || !slices.Equal(manager.Restarted, []string{setup.AutosaveTimerName})) {
+	if phase == "try-restart "+setup.RemoteServiceName &&
+		(!manager.Reloaded || !slices.Equal(manager.Restarted, []string{setup.AutosaveTimerName})) {
 		t.Fatalf("lost completed manager operations: %+v", manager)
 	}
 }
@@ -275,7 +317,12 @@ func assertRefreshInspectionDidNotWrite(t *testing.T, directory string, result s
 		t.Fatalf("failed inspection wrote definitions: %+v", result)
 	}
 
-	if _, err := os.Stat(filepath.Join(directory, setup.AutosaveServiceName)); !errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(
+		filepath.Join(directory, setup.AutosaveServiceName),
+	); !errors.Is(
+		err,
+		os.ErrNotExist,
+	) {
 		t.Fatalf("failed inspection created autosave definition: %v", err)
 	}
 
@@ -306,7 +353,12 @@ func TestSetupServicesPreviewAndExplicitDirectoryNeverContactManager(t *testing.
 				t.Fatalf("definition-only refresh = %+v", execution)
 			}
 
-			assertDefinitionOnlyRefresh(t, mode == "preview", directory, clitest.DecodePayload[servicesResultJSON](t, execution.Envelope.Result))
+			assertDefinitionOnlyRefresh(
+				t,
+				mode == "preview",
+				directory,
+				clitest.DecodePayload[servicesResultJSON](t, execution.Envelope.Result),
+			)
 
 			if calls := fake.calls(t); len(calls) != 0 {
 				t.Fatalf("contacted manager from preview or explicit directory: %v", calls)
@@ -315,7 +367,12 @@ func TestSetupServicesPreviewAndExplicitDirectoryNeverContactManager(t *testing.
 	}
 }
 
-func assertDefinitionOnlyRefresh(t *testing.T, preview bool, directory string, result servicesResultJSON) {
+func assertDefinitionOnlyRefresh(
+	t *testing.T,
+	preview bool,
+	directory string,
+	result servicesResultJSON,
+) {
 	t.Helper()
 
 	if result.Manager != nil {
@@ -341,7 +398,11 @@ func statefulManager(t *testing.T, failed []string, unitFileState string) fakeSy
 
 	var failedCases strings.Builder
 	for _, name := range failed {
-		fmt.Fprintf(&failedCases, "\"--user show --property=ActiveState --value %s\") echo failed; exit 0;;\n", name)
+		fmt.Fprintf(
+			&failedCases,
+			"\"--user show --property=ActiveState --value %s\") echo failed; exit 0;;\n",
+			name,
+		)
 	}
 
 	script := fmt.Sprintf(`#!/bin/sh
@@ -366,7 +427,11 @@ func seedSetupCoordinator(t *testing.T) {
 	t.Helper()
 
 	directory := seedSetupRefreshServices(t)
-	if err := os.WriteFile(filepath.Join(directory, setup.CoordinatorServiceName), []byte("# "+setup.ManagedMarker+"\nExecStart=/old/sesh daemon run\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(directory, setup.CoordinatorServiceName),
+		[]byte("# "+setup.ManagedMarker+"\nExecStart=/old/sesh daemon run\n"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -376,7 +441,14 @@ func TestSetupServicesStartsAFailedServiceAgainAfterFixingIt(t *testing.T) {
 	seedSetupCoordinator(t)
 	fake := statefulManager(t, []string{setup.CoordinatorServiceName}, "enabled")
 
-	stdout, stderr, err := executeCommand(t, "setup", "services", "--with-coordinator", "--apply", testNoConfigFlag)
+	stdout, stderr, err := executeCommand(
+		t,
+		"setup",
+		"services",
+		"--with-coordinator",
+		"--apply",
+		testNoConfigFlag,
+	)
 	if err != nil || stderr != "" {
 		t.Fatalf("setup failed: %v\nstderr: %s", err, stderr)
 	}
@@ -390,12 +462,14 @@ func TestSetupServicesStartsAFailedServiceAgainAfterFixingIt(t *testing.T) {
 	}
 
 	commands := fake.commands(t)
-	if !slices.Contains(commands, "reset-failed "+setup.CoordinatorServiceName) || !slices.Contains(commands, "restart "+setup.CoordinatorServiceName) {
+	if !slices.Contains(commands, "reset-failed "+setup.CoordinatorServiceName) ||
+		!slices.Contains(commands, "restart "+setup.CoordinatorServiceName) {
 		t.Fatalf("the failed coordinator was not started again: %v", commands)
 	}
 
 	for _, command := range commands {
-		if strings.HasPrefix(command, "enable") || strings.Contains(command, setup.TmuxServiceName) {
+		if strings.HasPrefix(command, "enable") ||
+			strings.Contains(command, setup.TmuxServiceName) {
 			t.Fatalf("setup changed enablement or touched tmux: %v", commands)
 		}
 	}
@@ -406,12 +480,22 @@ func TestSetupServicesSaysWhenAutomaticSavesAreAlreadyOn(t *testing.T) {
 	seedSetupCoordinator(t)
 	statefulManager(t, nil, "enabled")
 
-	stdout, _, err := executeCommand(t, "setup", "services", "--with-coordinator", "--apply", testNoConfigFlag)
+	stdout, _, err := executeCommand(
+		t,
+		"setup",
+		"services",
+		"--with-coordinator",
+		"--apply",
+		testNoConfigFlag,
+	)
 	if err != nil {
 		t.Fatalf("setup failed: %v", err)
 	}
 
-	if !strings.Contains(stdout, "Automatic saves are on: sesh-autosave.timer, sesh-coordinator.service enabled and running.") ||
+	if !strings.Contains(
+		stdout,
+		"Automatic saves are on: sesh-autosave.timer, sesh-coordinator.service enabled and running.",
+	) ||
 		strings.Contains(stdout, "enable --now") {
 		t.Fatalf("setup must report that nothing is left to start:\n%s", stdout)
 	}
@@ -430,7 +514,10 @@ func TestSetupServicesLabelsEachFileByWhatHappened(t *testing.T) {
 	assertServiceFileLabel(t, stdout, setup.AutosaveTimerName, "updated")
 	assertServiceFileLabel(t, stdout, setup.AutosaveServiceName, "created")
 
-	if !strings.Contains(stdout, "To start automatic saves:\n  systemctl --user enable --now sesh-autosave.timer\n") {
+	if !strings.Contains(
+		stdout,
+		"To start automatic saves:\n  systemctl --user enable --now sesh-autosave.timer\n",
+	) {
 		t.Fatalf("output must say how to start the disabled timer:\n%s", stdout)
 	}
 
@@ -468,7 +555,11 @@ func TestSetupServicesWithoutManagedTmuxPlansRemovingItsUnitsAndRefusesWhileItRu
 	}
 
 	tmuxUnit := filepath.Join(directory, setup.TmuxServiceName)
-	if err := os.WriteFile(tmuxUnit, []byte("# "+setup.ManagedMarker+"\n[Install]\nWantedBy=default.target\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		tmuxUnit,
+		[]byte("# "+setup.ManagedMarker+"\n[Install]\nWantedBy=default.target\n"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -476,9 +567,17 @@ func TestSetupServicesWithoutManagedTmuxPlansRemovingItsUnitsAndRefusesWhileItRu
 
 	stdout, _, err := executeCommand(t, "setup", "services", testNoConfigFlag)
 
-	removal := regexp.MustCompile(regexp.QuoteMeta(setup.TmuxServiceName) + ` +will be removed: --with-tmux-service was not given`)
+	removal := regexp.MustCompile(
+		regexp.QuoteMeta(
+			setup.TmuxServiceName,
+		) + ` +will be removed: --with-tmux-service was not given`,
+	)
 	if err != nil || !removal.MatchString(stdout) {
-		t.Fatalf("preview must announce removing the managed tmux unit: stdout=%q err=%v", stdout, err)
+		t.Fatalf(
+			"preview must announce removing the managed tmux unit: stdout=%q err=%v",
+			stdout,
+			err,
+		)
 	}
 
 	_, _, err = executeCommand(t, "setup", "services", "--apply", testNoConfigFlag)
@@ -490,7 +589,12 @@ func TestSetupServicesWithoutManagedTmuxPlansRemovingItsUnitsAndRefusesWhileItRu
 		t.Fatalf("refusal removed the running unit: %v", statErr)
 	}
 
-	if _, statErr := os.Stat(filepath.Join(directory, setup.AutosaveTimerName)); !errors.Is(statErr, os.ErrNotExist) {
+	if _, statErr := os.Stat(
+		filepath.Join(directory, setup.AutosaveTimerName),
+	); !errors.Is(
+		statErr,
+		os.ErrNotExist,
+	) {
 		t.Fatalf("refusal wrote other definitions: %v", statErr)
 	}
 

@@ -32,7 +32,8 @@ func TestPlanProperties(t *testing.T) {
 		}
 
 		subsetSize := rapid.IntRange(1, len(sessionIDs)).Draw(rt, "subsetSize")
-		subset := rapid.SliceOfN(rapid.SampledFrom(sessionIDs), subsetSize, subsetSize).Draw(rt, "subset")
+		subset := rapid.SliceOfN(rapid.SampledFrom(sessionIDs), subsetSize, subsetSize).
+			Draw(rt, "subset")
 
 		withDups := append([]string(nil), subset...)
 
@@ -104,7 +105,14 @@ func countStepCreations(steps []Step) (map[string]int, map[string]int) {
 			paneCreateCount[step.InitialPaneID]++
 		case *SplitPaneStep:
 			paneCreateCount[step.PaneID]++
-		case *PlaceInitialWindowStep, *LinkWindowStep, *CloseBootstrapWindowStep, *ApplyLayoutStep, *SetPaneTitleStep, *SelectPaneStep, *ApplyZoomStep, *SelectWindowStep:
+		case *PlaceInitialWindowStep,
+			*LinkWindowStep,
+			*CloseBootstrapWindowStep,
+			*ApplyLayoutStep,
+			*SetPaneTitleStep,
+			*SelectPaneStep,
+			*ApplyZoomStep,
+			*SelectWindowStep:
 		}
 	}
 
@@ -126,25 +134,45 @@ func assertPlanCreations(rt *rapid.T, plan Plan) {
 	}
 
 	if len(windowCreateCount) != len(plan.SourceGraph.Windows) {
-		rt.Fatalf("total window creates = %d, want %d", len(windowCreateCount), len(plan.SourceGraph.Windows))
+		rt.Fatalf(
+			"total window creates = %d, want %d",
+			len(windowCreateCount),
+			len(plan.SourceGraph.Windows),
+		)
 	}
 
 	if len(paneCreateCount) != len(plan.SourceGraph.Panes) {
-		rt.Fatalf("total pane creates = %d, want %d", len(paneCreateCount), len(plan.SourceGraph.Panes))
+		rt.Fatalf(
+			"total pane creates = %d, want %d",
+			len(paneCreateCount),
+			len(plan.SourceGraph.Panes),
+		)
 	}
 }
 
 func assertPlanSummary(rt *rapid.T, plan Plan) {
 	if plan.Summary.SessionCount != len(plan.SourceGraph.Sessions) {
-		rt.Fatalf("summary SessionCount = %d, want %d", plan.Summary.SessionCount, len(plan.SourceGraph.Sessions))
+		rt.Fatalf(
+			"summary SessionCount = %d, want %d",
+			plan.Summary.SessionCount,
+			len(plan.SourceGraph.Sessions),
+		)
 	}
 
 	if plan.Summary.WindowCount != len(plan.SourceGraph.Windows) {
-		rt.Fatalf("summary WindowCount = %d, want %d", plan.Summary.WindowCount, len(plan.SourceGraph.Windows))
+		rt.Fatalf(
+			"summary WindowCount = %d, want %d",
+			plan.Summary.WindowCount,
+			len(plan.SourceGraph.Windows),
+		)
 	}
 
 	if plan.Summary.PaneCount != len(plan.SourceGraph.Panes) {
-		rt.Fatalf("summary PaneCount = %d, want %d", plan.Summary.PaneCount, len(plan.SourceGraph.Panes))
+		rt.Fatalf(
+			"summary PaneCount = %d, want %d",
+			plan.Summary.PaneCount,
+			len(plan.SourceGraph.Panes),
+		)
 	}
 
 	if plan.Summary.StepCount != len(plan.Steps) {
@@ -152,7 +180,11 @@ func assertPlanSummary(rt *rapid.T, plan Plan) {
 	}
 }
 
-func assertCreateSessionTitle(rt *rapid.T, cs *CreateSessionStep, windowsByID map[string]model.Window) {
+func assertCreateSessionTitle(
+	rt *rapid.T,
+	cs *CreateSessionStep,
+	windowsByID map[string]model.Window,
+) {
 	if cs.InitialWindowID != "" {
 		w, exists := windowsByID[cs.InitialWindowID]
 		if !exists {
@@ -163,11 +195,18 @@ func assertCreateSessionTitle(rt *rapid.T, cs *CreateSessionStep, windowsByID ma
 			rt.Fatalf("initial window name mismatch: got %q, want %q", cs.InitialWindowName, w.Name)
 		}
 	} else if len(cs.InitialWindowName) != 0 {
-		rt.Fatalf("unexpected initial window name on session %s without initial window", cs.SessionID)
+		rt.Fatalf(
+			"unexpected initial window name on session %s without initial window",
+			cs.SessionID,
+		)
 	}
 }
 
-func assertSetPaneTitlePayload(rt *rapid.T, spt *SetPaneTitleStep, panesByID map[string]model.Pane) {
+func assertSetPaneTitlePayload(
+	rt *rapid.T,
+	spt *SetPaneTitleStep,
+	panesByID map[string]model.Pane,
+) {
 	p, exists := panesByID[spt.PaneID]
 	if !exists {
 		rt.Fatalf("pane %s not found in source graph", spt.PaneID)
@@ -208,7 +247,14 @@ func assertPlanTitlesAndNames(rt *rapid.T, plan Plan) {
 			assertSetPaneTitlePayload(rt, step, panesByID)
 		case *SplitPaneStep:
 			assertSplitPaneTitlePayload(rt, step, panesByID)
-		case *PlaceInitialWindowStep, *CreateWindowStep, *LinkWindowStep, *CloseBootstrapWindowStep, *ApplyLayoutStep, *SelectPaneStep, *ApplyZoomStep, *SelectWindowStep:
+		case *PlaceInitialWindowStep,
+			*CreateWindowStep,
+			*LinkWindowStep,
+			*CloseBootstrapWindowStep,
+			*ApplyLayoutStep,
+			*SelectPaneStep,
+			*ApplyZoomStep,
+			*SelectWindowStep:
 		}
 	}
 }

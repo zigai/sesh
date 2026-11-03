@@ -43,7 +43,11 @@ type LiveSession struct {
 	Root string
 }
 
-func SessionOf(ctx context.Context, server *gotmux.Server, root string) (gotmux.SessionInfo, bool, error) {
+func SessionOf(
+	ctx context.Context,
+	server *gotmux.Server,
+	root string,
+) (gotmux.SessionInfo, bool, error) {
 	sessions, err := taggedSessions(ctx, server)
 	if err != nil {
 		return emptySessionInfo(), false, err
@@ -58,7 +62,11 @@ func SessionOf(ctx context.Context, server *gotmux.Server, root string) (gotmux.
 	return emptySessionInfo(), false, nil
 }
 
-func RootOfSession(ctx context.Context, server *gotmux.Server, id gotmux.SessionID) (string, error) {
+func RootOfSession(
+	ctx context.Context,
+	server *gotmux.Server,
+	id gotmux.SessionID,
+) (string, error) {
 	sessions, err := taggedSessions(ctx, server)
 	if err != nil {
 		return "", err
@@ -73,7 +81,11 @@ func RootOfSession(ctx context.Context, server *gotmux.Server, id gotmux.Session
 	return "", ErrSessionNotFound
 }
 
-func NameConflict(ctx context.Context, server *gotmux.Server, p Project) (gotmux.SessionInfo, bool, error) {
+func NameConflict(
+	ctx context.Context,
+	server *gotmux.Server,
+	p Project,
+) (gotmux.SessionInfo, bool, error) {
 	sessions, err := taggedSessions(ctx, server)
 	if err != nil {
 		return emptySessionInfo(), false, err
@@ -102,8 +114,15 @@ func CreateSession(ctx context.Context, server *gotmux.Server, p Project) (gotmu
 	}
 
 	created, err := server.NewSession(ctx, gotmux.NewSessionOptions{
-		Name: name, Dir: p.Root, Window: MainWindowName, Program: gotmux.Program{}, Env: nil, TmuxEnv: nil,
-		Size: gotmux.Size{Width: 0, Height: 0}, Start: gotmux.StartPolicyExistingOnly, Group: "",
+		Name:    name,
+		Dir:     p.Root,
+		Window:  MainWindowName,
+		Program: gotmux.Program{},
+		Env:     nil,
+		TmuxEnv: nil,
+		Size:    gotmux.Size{Width: 0, Height: 0},
+		Start:   gotmux.StartPolicyExistingOnly,
+		Group:   "",
 	})
 	if err != nil {
 		return gotmux.Session{}, sessionError("create_project_session", err)
@@ -121,7 +140,12 @@ func CreateSession(ctx context.Context, server *gotmux.Server, p Project) (gotmu
 	return created, tagMainWindow(ctx, windows[0].Window())
 }
 
-func AdoptSession(ctx context.Context, server *gotmux.Server, id gotmux.SessionID, p Project) (gotmux.Session, error) {
+func AdoptSession(
+	ctx context.Context,
+	server *gotmux.Server,
+	id gotmux.SessionID,
+	p Project,
+) (gotmux.Session, error) {
 	current, err := RootOfSession(ctx, server, id)
 	if err != nil {
 		return gotmux.Session{}, sessionError("adopt_project_session", err)
@@ -237,7 +261,10 @@ func tagMainWindow(ctx context.Context, window gotmux.Window) error {
 }
 
 func taggedSessions(ctx context.Context, server *gotmux.Server) ([]gotmux.SessionInfo, error) {
-	sessions, err := server.SessionsWith(ctx, gotmux.QueryOptions{Filter: "", ExtraFields: []string{OptionProject}})
+	sessions, err := server.SessionsWith(
+		ctx,
+		gotmux.QueryOptions{Filter: "", ExtraFields: []string{OptionProject}},
+	)
 	if err != nil {
 		return nil, sessionError("list_project_sessions", err)
 	}

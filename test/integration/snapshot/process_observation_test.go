@@ -68,7 +68,12 @@ func TestProcessObservationExactLaunchFacts(t *testing.T) {
 
 	envKeys := []string{"SELECTED_VAR", "EMPTY_VAR", "ABSENT_VAR", "TMUX", "TMUX_PANE"}
 
-	observation, err := capture.ObserveWithProcessEnrichment(t.Context(), server, []gotmux.SessionID{session.ID()}, envKeys)
+	observation, err := capture.ObserveWithProcessEnrichment(
+		t.Context(),
+		server,
+		[]gotmux.SessionID{session.ID()},
+		envKeys,
+	)
 	if err != nil {
 		t.Fatalf("observe with process enrichment failed: %v", err)
 	}
@@ -83,7 +88,12 @@ func TestProcessObservationExactLaunchFacts(t *testing.T) {
 	assertObservedEvidence(t, observation.Manifest.Evidence)
 }
 
-func assertObservedLaunchMetadata(t *testing.T, launch model.Launch, helper, dir string, report processReport) {
+func assertObservedLaunchMetadata(
+	t *testing.T,
+	launch model.Launch,
+	helper, dir string,
+	report processReport,
+) {
 	t.Helper()
 
 	if string(launch.Executable) != helper {
@@ -91,7 +101,11 @@ func assertObservedLaunchMetadata(t *testing.T, launch model.Launch, helper, dir
 	}
 
 	if len(launch.Arguments) != len(report.Argv) {
-		t.Fatalf("arguments length mismatch: got %d, want %d", len(launch.Arguments), len(report.Argv))
+		t.Fatalf(
+			"arguments length mismatch: got %d, want %d",
+			len(launch.Arguments),
+			len(report.Argv),
+		)
 	}
 
 	for i, arg := range launch.Arguments {
@@ -199,7 +213,12 @@ func TestProcessObservationDirectForegroundBirth(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	obs, err := capture.ObserveWithProcessEnrichment(t.Context(), server, []gotmux.SessionID{session.ID()}, nil)
+	obs, err := capture.ObserveWithProcessEnrichment(
+		t.Context(),
+		server,
+		[]gotmux.SessionID{session.ID()},
+		nil,
+	)
 	if err != nil {
 		t.Fatalf("observation failed: %v", err)
 	}
@@ -215,7 +234,11 @@ func TestProcessObservationDirectForegroundBirth(t *testing.T) {
 
 	launch := obs.Manifest.Panes[0].Launch
 	if string(launch.Birth) != rootBirth.String() {
-		t.Fatalf("birth identity was not bound to pane root PID: got %s, want %s", string(launch.Birth), rootBirth.String())
+		t.Fatalf(
+			"birth identity was not bound to pane root PID: got %s, want %s",
+			string(launch.Birth),
+			rootBirth.String(),
+		)
 	}
 }
 
@@ -250,7 +273,12 @@ func TestProcessObservationPreservesPaneWithDeletedExecutable(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	observation, err := capture.ObserveWithProcessEnrichment(t.Context(), server, []gotmux.SessionID{session.ID()}, nil)
+	observation, err := capture.ObserveWithProcessEnrichment(
+		t.Context(),
+		server,
+		[]gotmux.SessionID{session.ID()},
+		nil,
+	)
 	if err != nil {
 		t.Fatalf("observe pane with deleted executable: %v", err)
 	}
@@ -292,12 +320,22 @@ func TestProcessObservationPreservesPaneWithDeletedDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	observation, err := capture.ObserveWithProcessEnrichment(t.Context(), server, []gotmux.SessionID{session.ID()}, nil)
+	observation, err := capture.ObserveWithProcessEnrichment(
+		t.Context(),
+		server,
+		[]gotmux.SessionID{session.ID()},
+		nil,
+	)
 	if err != nil {
 		t.Fatalf("observe pane with deleted directory: %v", err)
 	}
 
-	assertPreservedNonrestartablePane(t, observation, false, string(model.ReasonWorkingDirectoryDeleted))
+	assertPreservedNonrestartablePane(
+		t,
+		observation,
+		false,
+		string(model.ReasonWorkingDirectoryDeleted),
+	)
 }
 
 func TestProcessObservationPreservesExitedAndUnaffectedPanes(t *testing.T) {
@@ -322,7 +360,8 @@ func TestProcessObservationPreservesExitedAndUnaffectedPanes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := server.GlobalWindowOptions().SetRemainOnExit(t.Context(), gotmux.RemainOn); err != nil {
+	if err := server.GlobalWindowOptions().
+		SetRemainOnExit(t.Context(), gotmux.RemainOn); err != nil {
 		t.Fatal(err)
 	}
 
@@ -344,7 +383,12 @@ func TestProcessObservationPreservesExitedAndUnaffectedPanes(t *testing.T) {
 
 	_ = awaitPaneDead(t, ephemeralWin.Window(), pane.ID())
 
-	observation, err := capture.ObserveWithProcessEnrichment(t.Context(), server, []gotmux.SessionID{session.ID()}, nil)
+	observation, err := capture.ObserveWithProcessEnrichment(
+		t.Context(),
+		server,
+		[]gotmux.SessionID{session.ID()},
+		nil,
+	)
 	if err != nil {
 		t.Fatalf("observe session with exited pane: %v", err)
 	}
@@ -352,7 +396,12 @@ func TestProcessObservationPreservesExitedAndUnaffectedPanes(t *testing.T) {
 	assertPreservedDeadAndLivePanes(t, observation)
 }
 
-func assertPreservedNonrestartablePane(t *testing.T, observation capture.Observation, dead bool, reason string) {
+func assertPreservedNonrestartablePane(
+	t *testing.T,
+	observation capture.Observation,
+	dead bool,
+	reason string,
+) {
 	t.Helper()
 
 	if len(observation.Manifest.Panes) != 1 {
@@ -367,7 +416,13 @@ func assertPreservedNonrestartablePane(t *testing.T, observation capture.Observa
 	assertPaneArtifactRetained(t, observation, pane)
 
 	if pane.Launch.Recovery != model.RecoveryNonrestartable || pane.Launch.Reason != reason {
-		t.Fatalf("launch recovery/reason = %q/%q, want %q/%q", pane.Launch.Recovery, pane.Launch.Reason, model.RecoveryNonrestartable, reason)
+		t.Fatalf(
+			"launch recovery/reason = %q/%q, want %q/%q",
+			pane.Launch.Recovery,
+			pane.Launch.Reason,
+			model.RecoveryNonrestartable,
+			reason,
+		)
 	}
 }
 
@@ -375,7 +430,10 @@ func assertPreservedDeadAndLivePanes(t *testing.T, observation capture.Observati
 	t.Helper()
 
 	if len(observation.Manifest.Panes) != 2 {
-		t.Fatalf("captured %d panes, want dead and unaffected panes", len(observation.Manifest.Panes))
+		t.Fatalf(
+			"captured %d panes, want dead and unaffected panes",
+			len(observation.Manifest.Panes),
+		)
 	}
 
 	var deadCount, liveCount int
@@ -386,8 +444,15 @@ func assertPreservedDeadAndLivePanes(t *testing.T, observation capture.Observati
 		if pane.Dead {
 			deadCount++
 
-			if pane.Launch.Recovery != model.RecoveryNonrestartable || pane.Launch.Reason != string(model.ReasonPaneDead) {
-				t.Fatalf("dead pane recovery/reason = %q/%q, want %q/%q", pane.Launch.Recovery, pane.Launch.Reason, model.RecoveryNonrestartable, string(model.ReasonPaneDead))
+			if pane.Launch.Recovery != model.RecoveryNonrestartable ||
+				pane.Launch.Reason != string(model.ReasonPaneDead) {
+				t.Fatalf(
+					"dead pane recovery/reason = %q/%q, want %q/%q",
+					pane.Launch.Recovery,
+					pane.Launch.Reason,
+					model.RecoveryNonrestartable,
+					string(model.ReasonPaneDead),
+				)
 			}
 
 			continue
@@ -395,8 +460,15 @@ func assertPreservedDeadAndLivePanes(t *testing.T, observation capture.Observati
 
 		liveCount++
 
-		if pane.Launch.Recovery != model.RecoveryUnverified || pane.Launch.Reason != string(model.ReasonUnsupportedApplication) {
-			t.Fatalf("unaffected pane recovery/reason = %q/%q, want %q/%q", pane.Launch.Recovery, pane.Launch.Reason, model.RecoveryUnverified, model.ReasonUnsupportedApplication)
+		if pane.Launch.Recovery != model.RecoveryUnverified ||
+			pane.Launch.Reason != string(model.ReasonUnsupportedApplication) {
+			t.Fatalf(
+				"unaffected pane recovery/reason = %q/%q, want %q/%q",
+				pane.Launch.Recovery,
+				pane.Launch.Reason,
+				model.RecoveryUnverified,
+				model.ReasonUnsupportedApplication,
+			)
 		}
 	}
 
@@ -443,7 +515,13 @@ func assertPaneProcessLifetimes(t *testing.T, panes []model.Pane, panePIDs map[s
 		}
 
 		if got := string(pane.Launch.Birth); got != birth.String() {
-			t.Fatalf("pane %q birth was not bound to PID %d: got %s, want %s", pane.ID, pid, got, birth.String())
+			t.Fatalf(
+				"pane %q birth was not bound to PID %d: got %s, want %s",
+				pane.ID,
+				pid,
+				got,
+				birth.String(),
+			)
 		}
 
 		lifetime := processLifetime{pid: pid, birth: birth.String()}
@@ -507,7 +585,12 @@ func TestProcessObservationMultiplePanesInClosure(t *testing.T) {
 		panePIDs["p"+strings.TrimPrefix(string(pane.ID), "%")] = pane.PID
 	}
 
-	obs, err := capture.ObserveWithProcessEnrichment(t.Context(), server, []gotmux.SessionID{session.ID()}, []string{"PANE_TAG"})
+	obs, err := capture.ObserveWithProcessEnrichment(
+		t.Context(),
+		server,
+		[]gotmux.SessionID{session.ID()},
+		[]string{"PANE_TAG"},
+	)
 	if err != nil {
 		t.Fatalf("observation failed: %v", err)
 	}
@@ -526,9 +609,16 @@ func TestProcessObservationSaveLoggingPrivacyAndIsolation(t *testing.T) {
 	reportPath := filepath.Join(dir, "log_privacy.report")
 
 	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{
-		Name:    "log-priv",
-		Dir:     dir,
-		Program: gotmux.Exec(helper, "-report", reportPath, "-hold", "300s", "CUSTOM_ARG_VALUE_9988"),
+		Name: "log-priv",
+		Dir:  dir,
+		Program: gotmux.Exec(
+			helper,
+			"-report",
+			reportPath,
+			"-hold",
+			"300s",
+			"CUSTOM_ARG_VALUE_9988",
+		),
 		TmuxEnv: map[string]string{"CUSTOM_ENV_KEY": "CUSTOM_ENV_VALUE_7766"},
 		Start:   gotmux.StartPolicyExistingOnly,
 	})

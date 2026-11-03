@@ -54,7 +54,13 @@ func repositoryWorker(t *testing.T, mode, path, attempt, phase string) *exec.Cmd
 	t.Cleanup(cancel)
 
 	cmd := exec.CommandContext(ctx, program, "-test.run=^TestRepositoryWorker$")
-	cmd.Env = []string{testenv.IsolatedMarker + "=1", "SESH_TEST_WORKER=" + mode, "SESH_TEST_ROOT=" + path, "SESH_TEST_ATTEMPT=" + attempt, "SESH_TEST_PHASE=" + phase}
+	cmd.Env = []string{
+		testenv.IsolatedMarker + "=1",
+		"SESH_TEST_WORKER=" + mode,
+		"SESH_TEST_ROOT=" + path,
+		"SESH_TEST_ATTEMPT=" + attempt,
+		"SESH_TEST_PHASE=" + phase,
+	}
 
 	return cmd
 }
@@ -147,7 +153,13 @@ func TestRepositoryWorker(t *testing.T) {
 		t.Skip("subprocess entry point")
 	}
 
-	path, attempt, phase := os.Getenv("SESH_TEST_ROOT"), os.Getenv("SESH_TEST_ATTEMPT"), os.Getenv("SESH_TEST_PHASE")
+	path, attempt, phase := os.Getenv(
+		"SESH_TEST_ROOT",
+	), os.Getenv(
+		"SESH_TEST_ATTEMPT",
+	), os.Getenv(
+		"SESH_TEST_PHASE",
+	)
 	if mode == "append" {
 		r := openRepository(t, path)
 		for range 20 {
@@ -160,7 +172,13 @@ func TestRepositoryWorker(t *testing.T) {
 	}
 
 	if mode == "verify" {
-		verifyPublication(t, path, os.Getenv("SESH_TEST_PRIOR"), attempt, phase == faultCatalogReplaced)
+		verifyPublication(
+			t,
+			path,
+			os.Getenv("SESH_TEST_PRIOR"),
+			attempt,
+			phase == faultCatalogReplaced,
+		)
 		return
 	}
 
@@ -314,7 +332,14 @@ func TestJournalWorker(t *testing.T) {
 
 		return errInjected
 	}
-	if err := r.Transition(t.Context(), id, "launch", actionPlanned, actionIssued, nil); err != nil {
+	if err := r.Transition(
+		t.Context(),
+		id,
+		"launch",
+		actionPlanned,
+		actionIssued,
+		nil,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -334,7 +359,17 @@ func verifyJournal(t *testing.T, r *Repository, id string, want model.ActionStat
 	}
 
 	if want == actionIssued {
-		if err := r.Transition(t.Context(), id, "launch", actionPlanned, actionIssued, nil); !errors.Is(err, ErrConflict) {
+		if err := r.Transition(
+			t.Context(),
+			id,
+			"launch",
+			actionPlanned,
+			actionIssued,
+			nil,
+		); !errors.Is(
+			err,
+			ErrConflict,
+		) {
 			t.Fatal("duplicate dispatch admitted", err)
 		}
 	}

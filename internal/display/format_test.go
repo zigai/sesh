@@ -30,21 +30,33 @@ func TestCompileAgentGitFields(t *testing.T) {
 }
 
 func TestTemplateGroupsFallbackPipesAndStyleRoles(t *testing.T) {
-	template, err := Compile(FormatKindAgentsAgent, "[{agent_git_label|agent_cwd_name|upper} {agent_git_added:5@success}]{right}{agent_cwd|path_short|trunc_left:4|default:\"-\"}")
+	template, err := Compile(
+		FormatKindAgentsAgent,
+		"[{agent_git_label|agent_cwd_name|upper} {agent_git_added:5@success}]{right}{agent_cwd|path_short|trunc_left:4|default:\"-\"}",
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !template.UsesAny(FieldAgentGitLabel, FieldAgentCWDName) || !template.UsesAny(FieldAgentCWD) {
+	if !template.UsesAny(FieldAgentGitLabel, FieldAgentCWDName) ||
+		!template.UsesAny(FieldAgentCWD) {
 		t.Fatal("template did not report referenced fields")
 	}
 
-	line := template.Render(testResolver{FieldAgentCWDName: "workspace", FieldAgentGitAdded: "+2", FieldAgentCWD: "/work/development"})
-	if line.Left[1].Value != "WORKSPACE" || line.Left[3].Role != "success" || line.Right[0].Value != "…ent" {
+	line := template.Render(
+		testResolver{
+			FieldAgentCWDName:  "workspace",
+			FieldAgentGitAdded: "+2",
+			FieldAgentCWD:      "/work/development",
+		},
+	)
+	if line.Left[1].Value != "WORKSPACE" || line.Left[3].Role != "success" ||
+		line.Right[0].Value != "…ent" {
 		t.Fatalf("rendered line = %+v", line)
 	}
 
-	if line.Left[0].Group == "" || line.Left[0].Group != line.Left[1].Group || !line.Left[2].Separator {
+	if line.Left[0].Group == "" || line.Left[0].Group != line.Left[1].Group ||
+		!line.Left[2].Separator {
 		t.Fatalf("group metadata = %+v", line.Left)
 	}
 
@@ -106,14 +118,56 @@ func TestCompileRendersFieldsAlignmentAndEscapedBraces(t *testing.T) {
 	})
 
 	wantLeft := []Part{
-		{Field: "", Value: "{", Alignment: AlignmentNone, Width: 0, MaxWidth: 0, HasMaxWidth: false},
-		{Field: FieldSessionName, Value: "dev", Alignment: AlignmentNone, Width: 0, MaxWidth: 0, HasMaxWidth: false},
-		{Field: "", Value: "} ", Alignment: AlignmentNone, Width: 0, MaxWidth: 0, HasMaxWidth: false},
-		{Field: FieldSessionKind, Value: "live", Alignment: AlignmentNone, Width: 0, MaxWidth: 0, HasMaxWidth: false},
+		{
+			Field:       "",
+			Value:       "{",
+			Alignment:   AlignmentNone,
+			Width:       0,
+			MaxWidth:    0,
+			HasMaxWidth: false,
+		},
+		{
+			Field:       FieldSessionName,
+			Value:       "dev",
+			Alignment:   AlignmentNone,
+			Width:       0,
+			MaxWidth:    0,
+			HasMaxWidth: false,
+		},
+		{
+			Field:       "",
+			Value:       "} ",
+			Alignment:   AlignmentNone,
+			Width:       0,
+			MaxWidth:    0,
+			HasMaxWidth: false,
+		},
+		{
+			Field:       FieldSessionKind,
+			Value:       "live",
+			Alignment:   AlignmentNone,
+			Width:       0,
+			MaxWidth:    0,
+			HasMaxWidth: false,
+		},
 	}
 	wantRight := []Part{
-		{Field: FieldWindowCount, Value: "3", Alignment: AlignmentNone, Width: 0, MaxWidth: 0, HasMaxWidth: false},
-		{Field: "", Value: " windows", Alignment: AlignmentNone, Width: 0, MaxWidth: 0, HasMaxWidth: false},
+		{
+			Field:       FieldWindowCount,
+			Value:       "3",
+			Alignment:   AlignmentNone,
+			Width:       0,
+			MaxWidth:    0,
+			HasMaxWidth: false,
+		},
+		{
+			Field:       "",
+			Value:       " windows",
+			Alignment:   AlignmentNone,
+			Width:       0,
+			MaxWidth:    0,
+			HasMaxWidth: false,
+		},
 	}
 
 	if !slices.Equal(line.Left, wantLeft) || !slices.Equal(line.Right, wantRight) {
@@ -122,7 +176,10 @@ func TestCompileRendersFieldsAlignmentAndEscapedBraces(t *testing.T) {
 }
 
 func TestCompileAllowsAgentFieldsOnlyForAgentRows(t *testing.T) {
-	if _, err := Compile(FormatKindAgentsAgent, "{session_name}: {status} {agent_cwd_name}"); err != nil {
+	if _, err := Compile(
+		FormatKindAgentsAgent,
+		"{session_name}: {status} {agent_cwd_name}",
+	); err != nil {
 		t.Fatalf("Compile(agent row) error = %v", err)
 	}
 
@@ -223,7 +280,10 @@ func TestCompilePreservesPerFieldAlignment(t *testing.T) {
 		}
 	}
 
-	if width := template.RightWidth(testResolver{FieldActiveWindowName: "editor"}, byteWidth); width != 20 {
+	if width := template.RightWidth(
+		testResolver{FieldActiveWindowName: "editor"},
+		byteWidth,
+	); width != 20 {
 		t.Fatalf("RightWidth() = %d, want configured minimum 20", width)
 	}
 }
@@ -235,9 +295,17 @@ func TestCompileRejectsInvalidFormats(t *testing.T) {
 		wantErr error
 	}{
 		{name: "empty", source: "  ", wantErr: ErrEmptyFormat},
-		{name: "control character newline", source: "{session_name}\n", wantErr: ErrControlCharacter},
+		{
+			name:    "control character newline",
+			source:  "{session_name}\n",
+			wantErr: ErrControlCharacter,
+		},
 		{name: "control character tab", source: "{session_name}\t", wantErr: ErrControlCharacter},
-		{name: "control character return", source: "{session_name}\r", wantErr: ErrControlCharacter},
+		{
+			name:    "control character return",
+			source:  "{session_name}\r",
+			wantErr: ErrControlCharacter,
+		},
 		{name: "unclosed field", source: "{session_name", wantErr: ErrUnclosedField},
 		{name: "unexpected brace", source: "{session_name}}", wantErr: ErrUnexpectedBrace},
 		{name: "empty field", source: "{}", wantErr: ErrEmptyField},
@@ -246,8 +314,16 @@ func TestCompileRejectsInvalidFormats(t *testing.T) {
 		{name: "invalid alignment", source: "{session_name:*8}", wantErr: ErrInvalidFieldSpec},
 		{name: "zero width", source: "{session_name:0}", wantErr: ErrInvalidFieldSpec},
 		{name: "excessive width", source: "{session_name:4097}", wantErr: ErrInvalidFieldSpec},
-		{name: "invalid maximum width", source: "{session_name:20.wide}", wantErr: ErrInvalidFieldSpec},
-		{name: "excessive maximum width", source: "{session_name:.4097}", wantErr: ErrInvalidFieldSpec},
+		{
+			name:    "invalid maximum width",
+			source:  "{session_name:20.wide}",
+			wantErr: ErrInvalidFieldSpec,
+		},
+		{
+			name:    "excessive maximum width",
+			source:  "{session_name:.4097}",
+			wantErr: ErrInvalidFieldSpec,
+		},
 		{name: "right field format", source: "{right:>8}", wantErr: ErrRightFieldSpec},
 	}
 
@@ -274,13 +350,17 @@ func TestCompileRejectsUnknownField(t *testing.T) {
 
 func TestCompileAcceptsCustomFieldsInEveryRowKind(t *testing.T) {
 	for _, kind := range []FormatKind{FormatKindSession, FormatKindAgentsSession, FormatKindAgentsAgent} {
-		template, err := Compile(kind, "{custom.weather:<8.12@warn}{right}{session_name|custom.git_sha}")
+		template, err := Compile(
+			kind,
+			"{custom.weather:<8.12@warn}{right}{session_name|custom.git_sha}",
+		)
 		if err != nil {
 			t.Fatalf("Compile(%s) error = %v", kind, err)
 		}
 
 		line := template.Render(testResolver{"custom.weather": "sunny", "custom.git_sha": "abc123"})
-		if line.Left[0].Value != "sunny" || line.Left[0].Role != "warn" || line.Right[0].Value != "abc123" {
+		if line.Left[0].Value != "sunny" || line.Left[0].Role != "warn" ||
+			line.Right[0].Value != "abc123" {
 			t.Fatalf("Render(%s) = %+v", kind, line)
 		}
 	}
@@ -292,7 +372,9 @@ func TestPipesKeepColoredValuesValid(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	line := template.Render(testResolver{FieldSessionName: "\x1b[31mok\x1b[0m", FieldSource: "\x1b[32mabc\x1b[1mdef"})
+	line := template.Render(
+		testResolver{FieldSessionName: "\x1b[31mok\x1b[0m", FieldSource: "\x1b[32mabc\x1b[1mdef"},
+	)
 	if line.Left[0].Value != "\x1b[31mOK\x1b[0m" {
 		t.Fatalf("upper = %q", line.Left[0].Value)
 	}
@@ -311,7 +393,10 @@ func TestCompileRejectsMalformedCustomFieldNames(t *testing.T) {
 }
 
 func TestTemplateCustomFieldsListsFallbacksOnce(t *testing.T) {
-	template, err := Compile(FormatKindAgentsAgent, "{custom.zeta} {status|custom.alpha}{right}{custom.zeta:>4}")
+	template, err := Compile(
+		FormatKindAgentsAgent,
+		"{custom.zeta} {status|custom.alpha}{right}{custom.zeta:>4}",
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -332,7 +417,10 @@ func TestTemplateCustomFieldsListsFallbacksOnce(t *testing.T) {
 
 func TestCompileAllowsStatusGlyphAndTextFields(t *testing.T) {
 	for _, kind := range []FormatKind{FormatKindSession, FormatKindAgentsSession} {
-		if _, err := Compile(kind, "{session_name} {agent_status_glyph} {agent_status_text}"); err != nil {
+		if _, err := Compile(
+			kind,
+			"{session_name} {agent_status_glyph} {agent_status_text}",
+		); err != nil {
 			t.Fatalf("Compile(%q) error = %v", kind, err)
 		}
 	}
@@ -489,7 +577,10 @@ func TestCompileRightOnly(t *testing.T) {
 }
 
 func TestCompileBothSides(t *testing.T) {
-	tBoth, err := Compile(FormatKindSession, "{{left}} {session_name}{right}{{right}} {window_count}")
+	tBoth, err := Compile(
+		FormatKindSession,
+		"{{left}} {session_name}{right}{{right}} {window_count}",
+	)
 	if err != nil {
 		t.Fatalf("Compile() error = %v", err)
 	}
@@ -543,10 +634,18 @@ func TestCompileRejectsMalformedTemplatesAndExcessiveWidths(t *testing.T) {
 		{name: "nested braces", source: "{session_{name}}", wantErr: ErrInvalidFieldName},
 		{name: "closing brace", source: "just a closing brace}", wantErr: ErrUnexpectedBrace},
 		{name: "unclosed field", source: "prefix {session_name", wantErr: ErrUnclosedField},
-		{name: "multiple right markers", source: "{session_name}{right}mid{right}end", wantErr: ErrMultipleRight},
+		{
+			name:    "multiple right markers",
+			source:  "{session_name}{right}mid{right}end",
+			wantErr: ErrMultipleRight,
+		},
 		{name: "right marker with spec", source: "{right:<20}", wantErr: ErrRightFieldSpec},
 		{name: "non-numeric width", source: "{session_name:abc}", wantErr: ErrInvalidFieldSpec},
-		{name: "non-numeric max width", source: "{session_name:10.abc}", wantErr: ErrInvalidFieldSpec},
+		{
+			name:    "non-numeric max width",
+			source:  "{session_name:10.abc}",
+			wantErr: ErrInvalidFieldSpec,
+		},
 		{name: "empty field with spec", source: "{:10}", wantErr: ErrEmptyField},
 	}
 	for _, tt := range invalid {

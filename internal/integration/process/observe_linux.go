@@ -28,7 +28,11 @@ func observePlatform(ctx context.Context, req Request) (*Observation, error) {
 	return observeLinux(ctx, defaultProcRoot, defaultBootIDPath, req)
 }
 
-func observeLinux(ctx context.Context, procRoot, bootIDPath string, req Request) (*Observation, error) {
+func observeLinux(
+	ctx context.Context,
+	procRoot, bootIDPath string,
+	req Request,
+) (*Observation, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, fmt.Errorf("observe canceled: %w", err)
 	}
@@ -87,7 +91,11 @@ func observeLinux(ctx context.Context, procRoot, bootIDPath string, req Request)
 	}, nil
 }
 
-func readExecutable(ctx context.Context, procRoot, bootIDPath string, pid int) ([]byte, bool, error) {
+func readExecutable(
+	ctx context.Context,
+	procRoot, bootIDPath string,
+	pid int,
+) ([]byte, bool, error) {
 	exePath := filepath.Join(procRoot, strconv.Itoa(pid), "exe")
 
 	exeBytes, exeDeleted, err := readProcLink(ctx, exePath)
@@ -98,7 +106,11 @@ func readExecutable(ctx context.Context, procRoot, bootIDPath string, pid int) (
 	return exeBytes, exeDeleted, nil
 }
 
-func readDirectory(ctx context.Context, procRoot, bootIDPath string, pid int) ([]byte, bool, error) {
+func readDirectory(
+	ctx context.Context,
+	procRoot, bootIDPath string,
+	pid int,
+) ([]byte, bool, error) {
 	cwdPath := filepath.Join(procRoot, strconv.Itoa(pid), "cwd")
 
 	dirBytes, dirDeleted, err := readProcLink(ctx, cwdPath)
@@ -139,7 +151,12 @@ func readArguments(ctx context.Context, procRoot string, pid int) ([][]byte, err
 	return args, nil
 }
 
-func readEnvironment(ctx context.Context, procRoot string, pid int, keys []string) ([]model.Variable, error) {
+func readEnvironment(
+	ctx context.Context,
+	procRoot string,
+	pid int,
+	keys []string,
+) ([]model.Variable, error) {
 	if len(keys) == 0 {
 		return nil, nil
 	}
@@ -199,7 +216,10 @@ func readOpenProcLink(ctx context.Context, fd int) ([]byte, bool, error) {
 	return classifyProcLink([]byte(targetText), beforeStat.Nlink, afterStat.Nlink)
 }
 
-func classifyProcLink[T ~uint32 | ~uint64](targetBytes []byte, beforeLinks, afterLinks T) ([]byte, bool, error) {
+func classifyProcLink[T ~uint32 | ~uint64](
+	targetBytes []byte,
+	beforeLinks, afterLinks T,
+) ([]byte, bool, error) {
 	// A live directory gains and loses links with its subdirectories, so only a change between
 	// zero and nonzero links counts as a changed target.
 	if (beforeLinks == 0) != (afterLinks == 0) {

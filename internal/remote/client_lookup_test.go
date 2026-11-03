@@ -13,7 +13,9 @@ import (
 
 func TestInvocationLookupRequestRoundTrip(t *testing.T) {
 	request := InvocationLookupRequest{
-		Version: ProtocolVersion, PeerID: testPeerID, InvocationID: "0123456789abcdef0123456789abcdef",
+		Version:      ProtocolVersion,
+		PeerID:       testPeerID,
+		InvocationID: "0123456789abcdef0123456789abcdef",
 	}
 
 	payload, err := EncodeInvocationLookupRequest(request)
@@ -40,25 +42,43 @@ func TestExecutePeerLookupReadsReceiptWithoutRedispatch(t *testing.T) {
 	dir, _ := openTestReceiptDir(t)
 	admittedRequest := liveActionRequest(t)
 
-	invocation, admitted, err := AdmitInvocation(t.Context(), dir, admittedRequest, time.Unix(1000, 0).UTC())
+	invocation, admitted, err := AdmitInvocation(
+		t.Context(),
+		dir,
+		admittedRequest,
+		time.Unix(1000, 0).UTC(),
+	)
 	if err != nil || !admitted {
 		t.Fatalf("AdmitInvocation() = %#v, %v, want admitted", invocation, err)
 	}
 
-	request := InvocationLookupRequest{Version: ProtocolVersion, PeerID: testPeerID, InvocationID: admittedRequest.InvocationID}
+	request := InvocationLookupRequest{
+		Version:      ProtocolVersion,
+		PeerID:       testPeerID,
+		InvocationID: admittedRequest.InvocationID,
+	}
 
 	pending := ExecutePeerLookup(dir, testPeerID, request)
-	if pending.OK || pending.Code != action.CodeUncertain || pending.Action != action.SessionKill.ID {
+	if pending.OK || pending.Code != action.CodeUncertain ||
+		pending.Action != action.SessionKill.ID {
 		t.Fatalf("pending lookup = %#v, want unknown outcome", pending)
 	}
 
 	output := jsontext.Value(`{"session":{"id":"$1"}}`)
-	if err := ResolveInvocation(t.Context(), dir, admittedRequest.InvocationID, string(action.CodePartial), output, time.Unix(1001, 0).UTC()); err != nil {
+	if err := ResolveInvocation(
+		t.Context(),
+		dir,
+		admittedRequest.InvocationID,
+		string(action.CodePartial),
+		output,
+		time.Unix(1001, 0).UTC(),
+	); err != nil {
 		t.Fatal(err)
 	}
 
 	resolved := ExecutePeerLookup(dir, testPeerID, request)
-	if resolved.OK || resolved.Code != action.CodePartial || string(resolved.Output) != string(output) {
+	if resolved.OK || resolved.Code != action.CodePartial ||
+		string(resolved.Output) != string(output) {
 		t.Fatalf("resolved lookup = %#v, want retained partial receipt", resolved)
 	}
 

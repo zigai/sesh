@@ -50,12 +50,18 @@ func EpisodeUnreported(path string, stamp int64) (bool, error) {
 func RecordEpisodeReported(path string, stamp int64) (returnErr error) {
 	data, err := json.Marshal(episodeMarker{ReportedFor: stamp})
 	if err != nil {
-		return oops.In("automation").Code("episode_marker_failed").With("operation", "encode_episode_marker").Wrap(err)
+		return oops.In("automation").
+			Code("episode_marker_failed").
+			With("operation", "encode_episode_marker").
+			Wrap(err)
 	}
 
 	dir, name, err := privatefs.OpenParent(path, true)
 	if err != nil {
-		return oops.In("automation").Code("episode_marker_failed").With("operation", "open_episode_marker_dir").Wrap(err)
+		return oops.In("automation").
+			Code("episode_marker_failed").
+			With("operation", "open_episode_marker_dir").
+			Wrap(err)
 	}
 
 	defer func() {
@@ -73,7 +79,10 @@ func RecordEpisodeReported(path string, stamp int64) (returnErr error) {
 
 	if err := dir.Rename(temporary, dir, name); err != nil {
 		return errors.Join(
-			oops.In("automation").Code("episode_marker_failed").With("operation", "publish_episode_marker").Wrap(err),
+			oops.In("automation").
+				Code("episode_marker_failed").
+				With("operation", "publish_episode_marker").
+				Wrap(err),
 			wrapStatusCleanup("remove", removeStatusTemp(dir, temporary)),
 		)
 	}
@@ -88,7 +97,12 @@ func readEpisodeMarker(path string) (episodeMarker, error) {
 			return episodeMarker{ReportedFor: 0}, nil
 		}
 
-		return episodeMarker{ReportedFor: 0}, oops.In("automation").Code("episode_marker_failed").With("operation", "open_episode_marker_dir").Wrap(err)
+		return episodeMarker{
+			ReportedFor: 0,
+		}, oops.In("automation").
+			Code("episode_marker_failed").
+			With("operation", "open_episode_marker_dir").
+			Wrap(err)
 	}
 
 	marker, readErr := readEpisodeMarkerFile(dir, name)
@@ -104,19 +118,34 @@ func readEpisodeMarkerFile(dir *privatefs.Dir, name string) (episodeMarker, erro
 			return episodeMarker{ReportedFor: 0}, nil
 		}
 
-		return episodeMarker{ReportedFor: 0}, oops.In("automation").Code("episode_marker_failed").With("operation", "open_episode_marker").Wrap(err)
+		return episodeMarker{
+			ReportedFor: 0,
+		}, oops.In("automation").
+			Code("episode_marker_failed").
+			With("operation", "open_episode_marker").
+			Wrap(err)
 	}
 
 	data, readErr := io.ReadAll(io.LimitReader(file, maxEpisodeMarkerBytes+1))
 	closeErr := file.Close()
 
 	if err := errors.Join(readErr, closeErr); err != nil {
-		return episodeMarker{ReportedFor: 0}, oops.In("automation").Code("episode_marker_failed").With("operation", "read_episode_marker").Wrap(err)
+		return episodeMarker{
+			ReportedFor: 0,
+		}, oops.In("automation").
+			Code("episode_marker_failed").
+			With("operation", "read_episode_marker").
+			Wrap(err)
 	}
 
 	marker, err := strictjson.Decode[episodeMarker](data)
 	if err != nil || len(data) > maxEpisodeMarkerBytes || marker.ReportedFor < 0 {
-		return episodeMarker{ReportedFor: 0}, oops.In("automation").Code("episode_marker_failed").With("operation", "decode_episode_marker").Wrap(strictjson.ErrInvalid)
+		return episodeMarker{
+			ReportedFor: 0,
+		}, oops.In("automation").
+			Code("episode_marker_failed").
+			With("operation", "decode_episode_marker").
+			Wrap(strictjson.ErrInvalid)
 	}
 
 	return marker, nil

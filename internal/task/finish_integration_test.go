@@ -39,14 +39,23 @@ func TestFinishRefusesToLoseUnmergedCommitsAndChanges(t *testing.T) {
 	f := newFinishFixture(t)
 	commit(t, f.record.Directory)
 
-	if err := os.WriteFile(filepath.Join(f.record.Directory, "notes"), []byte("draft"), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(f.record.Directory, "notes"),
+		[]byte("draft"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
-	_, err := f.service.Finish(t.Context(), f.record.ID, task.FinishOptions{Discard: false, SkipRun: false})
+	_, err := f.service.Finish(
+		t.Context(),
+		f.record.ID,
+		task.FinishOptions{Discard: false, SkipRun: false},
+	)
 
 	var loss *task.LossError
-	if !errors.As(err, &loss) || loss.UnmergedCommits != 1 || loss.ChangedFiles != 1 || loss.ClosedUnmerged {
+	if !errors.As(err, &loss) || loss.UnmergedCommits != 1 || loss.ChangedFiles != 1 ||
+		loss.ClosedUnmerged {
 		t.Fatalf("Finish() error = %v, want 1 unmerged commit and 1 changed file", err)
 	}
 
@@ -62,7 +71,11 @@ func TestFinishRefusesUnmergedCommitsWhenTheWorktreeIsGone(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err := f.service.Finish(t.Context(), f.record.ID, task.FinishOptions{Discard: false, SkipRun: false})
+	_, err := f.service.Finish(
+		t.Context(),
+		f.record.ID,
+		task.FinishOptions{Discard: false, SkipRun: false},
+	)
 
 	var loss *task.LossError
 	if !errors.As(err, &loss) || loss.UnmergedCommits != 1 {
@@ -84,7 +97,11 @@ func TestFinishRefusesATaskWhosePullRequestWasClosedUnmerged(t *testing.T) {
 	f := newFinishFixture(t)
 	f.prs.pr, f.prs.found = task.PullRequest{Number: 7, State: task.PRClosed, URL: ""}, true
 
-	_, err := f.service.Finish(t.Context(), f.record.ID, task.FinishOptions{Discard: false, SkipRun: false})
+	_, err := f.service.Finish(
+		t.Context(),
+		f.record.ID,
+		task.FinishOptions{Discard: false, SkipRun: false},
+	)
 
 	var loss *task.LossError
 	if !errors.As(err, &loss) || !loss.ClosedUnmerged {
@@ -121,7 +138,11 @@ func TestFinishRemovesAMergedTaskWithoutDiscard(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if _, err := f.service.Finish(t.Context(), f.record.ID, task.FinishOptions{Discard: false, SkipRun: false}); err != nil {
+			if _, err := f.service.Finish(
+				t.Context(),
+				f.record.ID,
+				task.FinishOptions{Discard: false, SkipRun: false},
+			); err != nil {
 				t.Fatalf("Finish() error = %v", err)
 			}
 
@@ -138,10 +159,15 @@ func TestFinishRefusesCommitsAddedAfterPullRequestMerge(t *testing.T) {
 			commit(t, f.record.Directory)
 			tip := gitOutput(t, f.record.Directory, "rev-parse", "HEAD")
 
-			_, err := f.service.Finish(t.Context(), f.record.ID, task.FinishOptions{Discard: false, SkipRun: false})
+			_, err := f.service.Finish(
+				t.Context(),
+				f.record.ID,
+				task.FinishOptions{Discard: false, SkipRun: false},
+			)
 
 			var loss *task.LossError
-			if !errors.As(err, &loss) || loss.UnmergedCommits != 1 || loss.ChangedFiles != 0 || loss.ClosedUnmerged {
+			if !errors.As(err, &loss) || loss.UnmergedCommits != 1 || loss.ChangedFiles != 0 ||
+				loss.ClosedUnmerged {
 				t.Fatalf("Finish() error = %v, want the post-merge commit reported", err)
 			}
 
@@ -176,11 +202,19 @@ func TestFinishRefusesCachedMergedStateWithoutFreshHeadEvidence(t *testing.T) {
 
 			f.prs.head, f.prs.found, f.prs.err = "", tt.found, tt.err
 
-			_, err := f.service.Finish(t.Context(), f.record.ID, task.FinishOptions{Discard: false, SkipRun: false})
+			_, err := f.service.Finish(
+				t.Context(),
+				f.record.ID,
+				task.FinishOptions{Discard: false, SkipRun: false},
+			)
 
 			var loss *task.LossError
-			if !errors.As(err, &loss) || loss.UnmergedCommits != 1 || loss.ChangedFiles != 0 || loss.ClosedUnmerged {
-				t.Fatalf("Finish() error = %v, want cached merged state insufficient to discard commits", err)
+			if !errors.As(err, &loss) || loss.UnmergedCommits != 1 || loss.ChangedFiles != 0 ||
+				loss.ClosedUnmerged {
+				t.Fatalf(
+					"Finish() error = %v, want cached merged state insufficient to discard commits",
+					err,
+				)
 			}
 
 			assertTaskKept(t, f)
@@ -191,7 +225,11 @@ func TestFinishRefusesCachedMergedStateWithoutFreshHeadEvidence(t *testing.T) {
 func mergeTask(t *testing.T, f *finishFixture, squash bool) {
 	t.Helper()
 
-	if err := os.WriteFile(filepath.Join(f.record.Directory, "merged"), []byte("work"), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(f.record.Directory, "merged"),
+		[]byte("work"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -201,9 +239,33 @@ func mergeTask(t *testing.T, f *finishFixture, squash bool) {
 
 	if squash {
 		runGit(t, f.repo, "merge", "-q", "--squash", f.record.Branch)
-		runGit(t, f.repo, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-q", "-m", "squash task")
+		runGit(
+			t,
+			f.repo,
+			"-c",
+			"user.name=Test",
+			"-c",
+			"user.email=test@example.com",
+			"commit",
+			"-q",
+			"-m",
+			"squash task",
+		)
 	} else {
-		runGit(t, f.repo, "-c", "user.name=Test", "-c", "user.email=test@example.com", "merge", "-q", "--no-ff", "-m", "merge task", f.record.Branch)
+		runGit(
+			t,
+			f.repo,
+			"-c",
+			"user.name=Test",
+			"-c",
+			"user.email=test@example.com",
+			"merge",
+			"-q",
+			"--no-ff",
+			"-m",
+			"merge task",
+			f.record.Branch,
+		)
 	}
 
 	f.prs.pr, f.prs.found = task.PullRequest{Number: 7, State: task.PRMerged, URL: ""}, true
@@ -212,7 +274,11 @@ func mergeTask(t *testing.T, f *finishFixture, squash bool) {
 func TestFinishRemovesATaskWithNothingToLose(t *testing.T) {
 	f := newFinishFixture(t)
 
-	if _, err := f.service.Finish(t.Context(), f.record.ID, task.FinishOptions{Discard: false, SkipRun: false}); err != nil {
+	if _, err := f.service.Finish(
+		t.Context(),
+		f.record.ID,
+		task.FinishOptions{Discard: false, SkipRun: false},
+	); err != nil {
 		t.Fatalf("Finish() error = %v", err)
 	}
 
@@ -223,7 +289,11 @@ func TestFinishWithDiscardRemovesUnmergedWork(t *testing.T) {
 	f := newFinishFixture(t)
 	commit(t, f.record.Directory)
 
-	if _, err := f.service.Finish(t.Context(), f.record.ID, task.FinishOptions{Discard: true, SkipRun: false}); err != nil {
+	if _, err := f.service.Finish(
+		t.Context(),
+		f.record.ID,
+		task.FinishOptions{Discard: true, SkipRun: false},
+	); err != nil {
 		t.Fatalf("Finish() error = %v", err)
 	}
 
@@ -245,7 +315,11 @@ func TestFinishCompletesARemovalThatStoppedPartWay(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := f.service.Finish(t.Context(), f.record.ID, task.FinishOptions{Discard: false, SkipRun: false}); err != nil {
+	if _, err := f.service.Finish(
+		t.Context(),
+		f.record.ID,
+		task.FinishOptions{Discard: false, SkipRun: false},
+	); err != nil {
 		t.Fatalf("Finish() error = %v", err)
 	}
 
@@ -269,8 +343,15 @@ func TestFinishLeavesACheckoutSeshDidNotCreateWithItsWork(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := f.service.Finish(t.Context(), record.ID, task.FinishOptions{Discard: false, SkipRun: false}); err != nil {
-		t.Fatalf("Finish() error = %v, want a checkout sesh does not own finished without loss checks", err)
+	if _, err := f.service.Finish(
+		t.Context(),
+		record.ID,
+		task.FinishOptions{Discard: false, SkipRun: false},
+	); err != nil {
+		t.Fatalf(
+			"Finish() error = %v, want a checkout sesh does not own finished without loss checks",
+			err,
+		)
 	}
 
 	if _, err := os.Stat(filepath.Join(hand, "notes")); err != nil {
@@ -285,7 +366,19 @@ func TestFinishLeavesACheckoutSeshDidNotCreateWithItsWork(t *testing.T) {
 func TestFinishOfABranchWorktreeRemovesTheWorktreeAndKeepsTheBranch(t *testing.T) {
 	f := newFinishFixture(t)
 	runGit(t, f.repo, "branch", "feature")
-	runGit(t, f.repo, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-q", "--allow-empty", "-m", "main moves on")
+	runGit(
+		t,
+		f.repo,
+		"-c",
+		"user.name=Test",
+		"-c",
+		"user.email=test@example.com",
+		"commit",
+		"-q",
+		"--allow-empty",
+		"-m",
+		"main moves on",
+	)
 
 	record, err := f.service.Start(t.Context(), projectSessionPlace(t, f), task.Request{
 		Harness: envHarness, Location: task.Location{Where: task.WhereBranch, Branch: "feature"},
@@ -296,11 +389,19 @@ func TestFinishOfABranchWorktreeRemovesTheWorktreeAndKeepsTheBranch(t *testing.T
 
 	commit(t, record.Directory)
 
-	if err := os.WriteFile(filepath.Join(record.Directory, "notes"), []byte("draft"), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(record.Directory, "notes"),
+		[]byte("draft"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = f.service.Finish(t.Context(), record.ID, task.FinishOptions{Discard: false, SkipRun: false})
+	_, err = f.service.Finish(
+		t.Context(),
+		record.ID,
+		task.FinishOptions{Discard: false, SkipRun: false},
+	)
 
 	var loss *task.LossError
 	if !errors.As(err, &loss) || loss.ChangedFiles != 1 || loss.UnmergedCommits != 0 {
@@ -311,7 +412,11 @@ func TestFinishOfABranchWorktreeRemovesTheWorktreeAndKeepsTheBranch(t *testing.T
 		t.Fatal(err)
 	}
 
-	if _, err := f.service.Finish(t.Context(), record.ID, task.FinishOptions{Discard: false, SkipRun: false}); err != nil {
+	if _, err := f.service.Finish(
+		t.Context(),
+		record.ID,
+		task.FinishOptions{Discard: false, SkipRun: false},
+	); err != nil {
 		t.Fatalf("Finish() error = %v, want the branch's commits kept, not counted as loss", err)
 	}
 
@@ -329,7 +434,8 @@ func TestFinishOfARemoteBranchTaskKeepsUnpushedWorkAndTheRemoteBranch(t *testing
 	addRemoteBranch(t, f.base, f.repo, "review")
 
 	record, err := f.service.Start(t.Context(), projectSessionPlace(t, f), task.Request{
-		Harness: envHarness, Location: task.Location{Where: task.WhereBranch, Branch: "review", Remote: "origin"},
+		Harness:  envHarness,
+		Location: task.Location{Where: task.WhereBranch, Branch: "review", Remote: "origin"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -337,7 +443,11 @@ func TestFinishOfARemoteBranchTaskKeepsUnpushedWorkAndTheRemoteBranch(t *testing
 
 	commit(t, record.Directory)
 
-	_, err = f.service.Finish(t.Context(), record.ID, task.FinishOptions{Discard: false, SkipRun: false})
+	_, err = f.service.Finish(
+		t.Context(),
+		record.ID,
+		task.FinishOptions{Discard: false, SkipRun: false},
+	)
 
 	var loss *task.LossError
 	if !errors.As(err, &loss) || loss.UnmergedCommits != 1 {
@@ -346,7 +456,11 @@ func TestFinishOfARemoteBranchTaskKeepsUnpushedWorkAndTheRemoteBranch(t *testing
 
 	runGit(t, record.Directory, "push", "-q", "origin", "review")
 
-	if _, err := f.service.Finish(t.Context(), record.ID, task.FinishOptions{Discard: false, SkipRun: false}); err != nil {
+	if _, err := f.service.Finish(
+		t.Context(),
+		record.ID,
+		task.FinishOptions{Discard: false, SkipRun: false},
+	); err != nil {
 		t.Fatalf("Finish() error = %v, want a pushed branch removed without loss", err)
 	}
 
@@ -387,7 +501,11 @@ func TestRefreshPRUsesTheProjectWhenTheWorktreeIsGone(t *testing.T) {
 
 	bin := t.TempDir()
 	listing := `[{"number":12,"state":"OPEN","url":"https://example.test/pr/12","headRefOid":"","isCrossRepository":false}]`
-	writeFile(t, filepath.Join(bin, "gh"), "#!/bin/sh\n[ \"$PWD\" = \"$PR_PROJECT\" ] && [ \"$4\" = \"wt/main/1\" ] || exit 1\nprintf '%s' '"+listing+"'\n")
+	writeFile(
+		t,
+		filepath.Join(bin, "gh"),
+		"#!/bin/sh\n[ \"$PWD\" = \"$PR_PROJECT\" ] && [ \"$4\" = \"wt/main/1\" ] || exit 1\nprintf '%s' '"+listing+"'\n",
+	)
 
 	if err := os.Chmod(filepath.Join(bin, "gh"), 0o700); err != nil {
 		t.Fatal(err)
@@ -401,7 +519,12 @@ func TestRefreshPRUsesTheProjectWhenTheWorktreeIsGone(t *testing.T) {
 
 	refreshed, changed, err := service.RefreshPR(t.Context(), record.ID)
 	if err != nil || !changed || refreshed.PR != want {
-		t.Fatalf("RefreshPR() = %+v, %t, %v; want the branch's PR despite its missing worktree", refreshed.PR, changed, err)
+		t.Fatalf(
+			"RefreshPR() = %+v, %t, %v; want the branch's PR despite its missing worktree",
+			refreshed.PR,
+			changed,
+			err,
+		)
 	}
 
 	ledger, err := store.Load(t.Context())
@@ -410,8 +533,13 @@ func TestRefreshPRUsesTheProjectWhenTheWorktreeIsGone(t *testing.T) {
 	}
 
 	stored, found := ledger.Find(record.ID)
-	if !found || stored.PR != want || stored.State != task.StateActive || stored.Directory != directory {
-		t.Fatalf("stored task = %+v, found %t; want the active task kept with its PR refreshed", stored, found)
+	if !found || stored.PR != want || stored.State != task.StateActive ||
+		stored.Directory != directory {
+		t.Fatalf(
+			"stored task = %+v, found %t; want the active task kept with its PR refreshed",
+			stored,
+			found,
+		)
 	}
 }
 
@@ -452,7 +580,12 @@ func TestRetitleRenamesTheWindowUntilTheUserRenamesItAndKeepsTheTitle(t *testing
 		t.Fatal(err)
 	}
 
-	if changed, err := f.service.Retitle(t.Context(), f.record.ID, "another title"); err != nil || !changed {
+	if changed, err := f.service.Retitle(
+		t.Context(),
+		f.record.ID,
+		"another title",
+	); err != nil ||
+		!changed {
 		t.Fatalf("Retitle() after a manual rename = %v, %v; want the title recorded", changed, err)
 	}
 
@@ -470,7 +603,11 @@ func TestRetitleRenamesTheWindowUntilTheUserRenamesItAndKeepsTheTitle(t *testing
 	}
 }
 
-func (prs *pullRequests) FindPR(context.Context, string, string) (task.PullRequest, string, bool, error) {
+func (prs *pullRequests) FindPR(
+	context.Context,
+	string,
+	string,
+) (task.PullRequest, string, bool, error) {
 	return prs.pr, prs.head, prs.found, prs.err
 }
 
@@ -478,25 +615,54 @@ func newFinishFixture(t *testing.T) *finishFixture {
 	t.Helper()
 
 	f := &finishFixture{
-		fixture: newFixture(t), prs: &pullRequests{pr: task.PullRequest{Number: 0, State: "", URL: ""}, head: "", found: false, err: nil},
-		closed: nil, record: task.EmptyRecord(), repo: "",
+		fixture: newFixture(
+			t,
+		),
+		prs: &pullRequests{
+			pr:    task.PullRequest{Number: 0, State: "", URL: ""},
+			head:  "",
+			found: false,
+			err:   nil,
+		},
+		closed: nil,
+		record: task.EmptyRecord(),
+		repo:   "",
 	}
 
-	catalog, err := project.NewCatalog(config.ProjectsConfig{Roots: []string{filepath.Join(f.base, "code")}, Extra: nil, Overrides: nil})
+	catalog, err := project.NewCatalog(
+		config.ProjectsConfig{
+			Roots:     []string{filepath.Join(f.base, "code")},
+			Extra:     nil,
+			Overrides: nil,
+		},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	cfg := config.DefaultTasksConfig()
-	cfg.Panes = []config.TaskPaneConfig{{Name: "editor", Command: []string{"sleep", "300"}, Dir: "", Restart: false}}
-	cfg.Harness = []config.HarnessConfig{{Name: envHarness, Command: []string{"sleep", "300"}, PromptArgs: nil}}
+	cfg.Panes = []config.TaskPaneConfig{
+		{Name: "editor", Command: []string{"sleep", "300"}, Dir: "", Restart: false},
+	}
+	cfg.Harness = []config.HarnessConfig{
+		{Name: envHarness, Command: []string{"sleep", "300"}, PromptArgs: nil},
+	}
 
 	full := config.DefaultConfig()
 	full.Tasks = cfg
 
 	f.service = task.NewService(task.Options{
-		Server: f.server, Store: f.store, Catalog: catalog, Config: cfg, Windows: full.TaskWindowFor, WorktreeDir: f.worktreeDir,
-		LookPath: exec.LookPath, Now: time.Now, Agents: nil, SleepingAgentCommand: nil, PRs: f.prs,
+		Server:               f.server,
+		Store:                f.store,
+		Catalog:              catalog,
+		Config:               cfg,
+		Windows:              full.TaskWindowFor,
+		WorktreeDir:          f.worktreeDir,
+		LookPath:             exec.LookPath,
+		Now:                  time.Now,
+		Agents:               nil,
+		SleepingAgentCommand: nil,
+		PRs:                  f.prs,
 		ClosePopup: func(_ context.Context, id string) error {
 			f.closed = append(f.closed, id)
 
@@ -506,7 +672,11 @@ func newFinishFixture(t *testing.T) *finishFixture {
 
 	f.repo = initRepository(t, filepath.Join(f.base, "code", "shop"))
 
-	f.record, err = f.service.Start(t.Context(), projectPlace(t, f.fixture, f.repo), inNewWorktree(envHarness))
+	f.record, err = f.service.Start(
+		t.Context(),
+		projectPlace(t, f.fixture, f.repo),
+		inNewWorktree(envHarness),
+	)
 	if err != nil {
 		t.Fatalf("Start() error = %v", err)
 	}
@@ -517,7 +687,19 @@ func newFinishFixture(t *testing.T) *finishFixture {
 func commit(t *testing.T, dir string) {
 	t.Helper()
 
-	runGit(t, dir, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-q", "--allow-empty", "-m", "work")
+	runGit(
+		t,
+		dir,
+		"-c",
+		"user.name=Test",
+		"-c",
+		"user.email=test@example.com",
+		"commit",
+		"-q",
+		"--allow-empty",
+		"-m",
+		"work",
+	)
 }
 
 func assertTaskKept(t *testing.T, f *finishFixture) {
@@ -560,7 +742,10 @@ func assertTaskRemoved(t *testing.T, f *finishFixture) {
 		t.Fatalf("closed popups = %v, want the task's", f.closed)
 	}
 
-	panes, err := f.server.PanesWith(t.Context(), gotmux.QueryOptions{Filter: "", ExtraFields: []string{task.OptionTask}})
+	panes, err := f.server.PanesWith(
+		t.Context(),
+		gotmux.QueryOptions{Filter: "", ExtraFields: []string{task.OptionTask}},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -631,16 +816,30 @@ func TestATaskStartedFromOriginsNewerBaseFinishesWithNothingToLose(t *testing.T)
 	commitAt(t, upstream, "upstream moves on", "2026-02-01T00:00:00Z")
 	runGit(t, f.repo, "fetch", "-q", "origin")
 
-	record, err := f.service.Start(t.Context(), projectPlace(t, f.fixture, f.repo), inNewWorktree(envHarness))
+	record, err := f.service.Start(
+		t.Context(),
+		projectPlace(t, f.fixture, f.repo),
+		inNewWorktree(envHarness),
+	)
 	if err != nil {
 		t.Fatalf("Start() error = %v", err)
 	}
 
-	if got := gitOutput(t, record.Directory, "log", "-1", "--format=%s"); got != "upstream moves on" {
+	if got := gitOutput(
+		t,
+		record.Directory,
+		"log",
+		"-1",
+		"--format=%s",
+	); got != "upstream moves on" {
 		t.Fatalf("new branch starts at %q, want origin's newer main", got)
 	}
 
-	if _, err := f.service.Finish(t.Context(), record.ID, task.FinishOptions{Discard: false, SkipRun: false}); err != nil {
+	if _, err := f.service.Finish(
+		t.Context(),
+		record.ID,
+		task.FinishOptions{Discard: false, SkipRun: false},
+	); err != nil {
 		t.Fatalf("Finish() error = %v, want nothing to lose", err)
 	}
 }
@@ -650,7 +849,11 @@ func TestATaskStartsFromTheLocalBaseWhenItHasCommitsOriginLacks(t *testing.T) {
 	addRemoteBranch(t, f.base, f.repo, "shared")
 	commitAt(t, f.repo, "local work", "2026-02-01T00:00:00Z")
 
-	record, err := f.service.Start(t.Context(), projectPlace(t, f.fixture, f.repo), inNewWorktree(envHarness))
+	record, err := f.service.Start(
+		t.Context(),
+		projectPlace(t, f.fixture, f.repo),
+		inNewWorktree(envHarness),
+	)
 	if err != nil {
 		t.Fatalf("Start() error = %v", err)
 	}
@@ -684,8 +887,18 @@ func TestFinishRemovesATaskWhoseCreationStoppedWithItsProcess(t *testing.T) {
 	running := task.Process{PID: os.Getpid(), Birth: ""}
 	setCreating(t, f, running)
 
-	if _, err := f.service.Finish(t.Context(), f.record.ID, task.FinishOptions{Discard: false, SkipRun: false}); !errors.Is(err, task.ErrTaskStarting) {
-		t.Fatalf("Finish() of a task its running process is creating error = %v, want ErrTaskStarting", err)
+	if _, err := f.service.Finish(
+		t.Context(),
+		f.record.ID,
+		task.FinishOptions{Discard: false, SkipRun: false},
+	); !errors.Is(
+		err,
+		task.ErrTaskStarting,
+	) {
+		t.Fatalf(
+			"Finish() of a task its running process is creating error = %v, want ErrTaskStarting",
+			err,
+		)
 	}
 
 	gone := exec.CommandContext(t.Context(), "true")
@@ -693,18 +906,30 @@ func TestFinishRemovesATaskWhoseCreationStoppedWithItsProcess(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	setCreating(t, f, task.Process{PID: gone.Process.Pid, Birth: "00000000-0000-0000-0000-000000000000:1"})
+	setCreating(
+		t,
+		f,
+		task.Process{PID: gone.Process.Pid, Birth: "00000000-0000-0000-0000-000000000000:1"},
+	)
 
 	live, err := task.Inventory(t.Context(), f.server, f.store)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if index := slices.IndexFunc(live, func(l task.Live) bool { return l.Record.ID == f.record.ID }); index < 0 || !live[index].Stalled {
+	if index := slices.IndexFunc(
+		live,
+		func(l task.Live) bool { return l.Record.ID == f.record.ID },
+	); index < 0 ||
+		!live[index].Stalled {
 		t.Fatal("Inventory() does not report the task as stalled")
 	}
 
-	if _, err := f.service.Finish(t.Context(), f.record.ID, task.FinishOptions{Discard: false, SkipRun: false}); err != nil {
+	if _, err := f.service.Finish(
+		t.Context(),
+		f.record.ID,
+		task.FinishOptions{Discard: false, SkipRun: false},
+	); err != nil {
 		t.Fatalf("Finish() error = %v", err)
 	}
 

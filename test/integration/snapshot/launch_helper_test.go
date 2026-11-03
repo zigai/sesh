@@ -125,7 +125,11 @@ func applyReportSection(t *testing.T, path, name string, entries []string, repor
 	switch name {
 	case "pid":
 		if len(entries) != 1 {
-			t.Fatalf("malformed launch report pid section in %s: expected 1 entry, got %d", path, len(entries))
+			t.Fatalf(
+				"malformed launch report pid section in %s: expected 1 entry, got %d",
+				path,
+				len(entries),
+			)
 		}
 
 		pid, err := strconv.Atoi(entries[0])
@@ -148,12 +152,22 @@ func readSectionEntries(t *testing.T, path, name string, data []byte, idx *int) 
 
 	countStr, ok := popNULTerminated(data, idx)
 	if !ok {
-		t.Fatalf("malformed launch report at %s: unexpected EOF reading section %s count", path, name)
+		t.Fatalf(
+			"malformed launch report at %s: unexpected EOF reading section %s count",
+			path,
+			name,
+		)
 	}
 
 	count, err := strconv.Atoi(countStr)
 	if err != nil || count < 0 || count > maxReportSectionEntries {
-		t.Fatalf("malformed launch report section %s count in %s: %q (max %d)", name, path, countStr, maxReportSectionEntries)
+		t.Fatalf(
+			"malformed launch report section %s count in %s: %q (max %d)",
+			name,
+			path,
+			countStr,
+			maxReportSectionEntries,
+		)
 	}
 
 	entries := make([]string, count)
@@ -161,7 +175,12 @@ func readSectionEntries(t *testing.T, path, name string, data []byte, idx *int) 
 	for i := range count {
 		entry, ok := popNULTerminated(data, idx)
 		if !ok {
-			t.Fatalf("malformed launch report section %s entry %d in %s: unexpected EOF", name, i, path)
+			t.Fatalf(
+				"malformed launch report section %s entry %d in %s: unexpected EOF",
+				name,
+				i,
+				path,
+			)
 		}
 
 		entries[i] = entry
@@ -194,8 +213,15 @@ func parseProcessReport(t *testing.T, path string, data []byte) processReport {
 		applyReportSection(t, path, name, entries, &report)
 	}
 
-	if !sectionsSeen["pid"] || !sectionsSeen["argv"] || !sectionsSeen["env"] || report.PID <= 0 || len(report.Argv) == 0 {
-		t.Fatalf("incomplete launch report at %s (pid=%d, argv=%d, env=%d)", path, report.PID, len(report.Argv), len(report.Env))
+	if !sectionsSeen["pid"] || !sectionsSeen["argv"] || !sectionsSeen["env"] || report.PID <= 0 ||
+		len(report.Argv) == 0 {
+		t.Fatalf(
+			"incomplete launch report at %s (pid=%d, argv=%d, env=%d)",
+			path,
+			report.PID,
+			len(report.Argv),
+			len(report.Env),
+		)
 	}
 
 	return report

@@ -16,7 +16,13 @@ var (
 	errTestSystemd = errors.New("systemctl missing")
 )
 
-func oomService(serverPID int, unit string, unitErr error, policy string, policyErr error) *Service {
+func oomService(
+	serverPID int,
+	unit string,
+	unitErr error,
+	policy string,
+	policyErr error,
+) *Service {
 	service := NewService(Options{ServiceDirs: []string{}})
 	service.serverPID = serverPID
 	service.unitOf = func(int) (string, error) { return unit, unitErr }
@@ -61,7 +67,10 @@ func TestServiceOOMPolicyReportsApplicablePoliciesAndInspectionErrors(test *test
 			}
 
 			result := results[0]
-			if result.ID != CheckServiceOOMPolicy || result.Status != scenario.status || result.Reason != scenario.reason || result.Needs != scenario.needs || !strings.Contains(result.Message, scenario.message) {
+			if result.ID != CheckServiceOOMPolicy || result.Status != scenario.status ||
+				result.Reason != scenario.reason ||
+				result.Needs != scenario.needs ||
+				!strings.Contains(result.Message, scenario.message) {
 				test.Fatalf("unexpected OOM check: %+v", result)
 			}
 
@@ -85,7 +94,8 @@ func assertOOMRepair(tb testing.TB, result Result, fix string) {
 		tb.Fatalf("missing actionable repair %q: %+v", fix, result)
 	}
 
-	if result.Reason == ReasonUnsafe && !strings.Contains(result.Fix.Manual, "systemctl --user edit tmux.service") {
+	if result.Reason == ReasonUnsafe &&
+		!strings.Contains(result.Fix.Manual, "systemctl --user edit tmux.service") {
 		tb.Fatalf("unsafe OOM repair lost its unit: %+v", result.Fix)
 	}
 }

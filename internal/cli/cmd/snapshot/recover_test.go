@@ -76,7 +76,24 @@ func testMissingOperation(t *testing.T, command, operation string) {
 
 	var stdout, stderr bytes.Buffer
 
-	err = cli.ExecuteApplication(t.Context(), []string{"snapshot", "recover", "restore", command, store.NewOperationID(), testRepositoryFlag, path, testConfigFlag, cfg, testJSONFlag}, nil, &stdout, &stderr)
+	err = cli.ExecuteApplication(
+		t.Context(),
+		[]string{
+			"snapshot",
+			"recover",
+			"restore",
+			command,
+			store.NewOperationID(),
+			testRepositoryFlag,
+			path,
+			testConfigFlag,
+			cfg,
+			testJSONFlag,
+		},
+		nil,
+		&stdout,
+		&stderr,
+	)
 	if !errors.Is(err, store.ErrUnavailable) || stdout.Len() != 0 {
 		t.Fatalf("missing operation: %v / %s", err, stdout.String())
 	}
@@ -124,7 +141,18 @@ func checkMissingRewriteReceipt(t *testing.T, command, operation string) {
 
 	var stdout, stderr bytes.Buffer
 
-	args := []string{"snapshot", "recover", "delete", command, id, testRepositoryFlag, path, testConfigFlag, cfg, testJSONFlag}
+	args := []string{
+		"snapshot",
+		"recover",
+		"delete",
+		command,
+		id,
+		testRepositoryFlag,
+		path,
+		testConfigFlag,
+		cfg,
+		testJSONFlag,
+	}
 
 	err = cli.ExecuteApplication(t.Context(), args, nil, &stdout, &stderr)
 	if err == nil || stderr.Len() != 0 {

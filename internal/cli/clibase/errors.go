@@ -225,7 +225,10 @@ func IsUncertaintyError(err error) bool {
 		}
 	}
 
-	if classified, ok := errors.AsType[*action.Error](err); ok && classified.Code == action.CodeUncertain {
+	if classified, ok := errors.AsType[*action.Error](
+		err,
+	); ok &&
+		classified.Code == action.CodeUncertain {
 		return true
 	}
 

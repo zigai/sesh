@@ -32,7 +32,13 @@ func TestDarwinStartTimeValidatesAndCombinesTimeval(t *testing.T) {
 	} {
 		_, err := darwinStartTime(input.seconds, input.microseconds)
 		if !errors.Is(err, ErrMalformedIdentity) {
-			t.Fatalf("darwinStartTime(%d, %d) error = %v, want %v", input.seconds, input.microseconds, err, ErrMalformedIdentity)
+			t.Fatalf(
+				"darwinStartTime(%d, %d) error = %v, want %v",
+				input.seconds,
+				input.microseconds,
+				err,
+				ErrMalformedIdentity,
+			)
 		}
 	}
 }
@@ -60,7 +66,12 @@ func TestObserveDarwinCancellation(t *testing.T) {
 func TestClassifyDarwinProcessError(t *testing.T) {
 	for _, vanished := range []error{unix.ESRCH, unix.ENOENT} {
 		if got := classifyDarwinProcessError(vanished); !errors.Is(got, ErrProcessVanished) {
-			t.Fatalf("classifyDarwinProcessError(%v) = %v, want %v", vanished, got, ErrProcessVanished)
+			t.Fatalf(
+				"classifyDarwinProcessError(%v) = %v, want %v",
+				vanished,
+				got,
+				ErrProcessVanished,
+			)
 		}
 	}
 

@@ -31,7 +31,11 @@ func (r *Repository) Retain(ctx context.Context, count int) ([]string, error) {
 		return nil, repositoryError("retain", ErrConflict)
 	}
 
-	result, err := r.RetainPolicy(ctx, time.Time{}, RetentionPolicy{MaxAge: 0, MaxCount: count, MaxBytes: 0})
+	result, err := r.RetainPolicy(
+		ctx,
+		time.Time{},
+		RetentionPolicy{MaxAge: 0, MaxCount: count, MaxBytes: 0},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +44,11 @@ func (r *Repository) Retain(ctx context.Context, count int) ([]string, error) {
 }
 
 func (r *Repository) RetainBytes(ctx context.Context, maxBytes int64) (RetentionResult, error) {
-	return r.RetainPolicy(ctx, time.Time{}, RetentionPolicy{MaxAge: 0, MaxCount: 0, MaxBytes: maxBytes})
+	return r.RetainPolicy(
+		ctx,
+		time.Time{},
+		RetentionPolicy{MaxAge: 0, MaxCount: 0, MaxBytes: maxBytes},
+	)
 }
 
 func (r *Repository) Delete(ctx context.Context, id string) error {
@@ -53,7 +61,10 @@ func (r *Repository) Delete(ctx context.Context, id string) error {
 			return ErrConflict
 		}
 
-		c.Generations = slices.DeleteFunc(c.Generations, func(g Generation) bool { return g.ID == id })
+		c.Generations = slices.DeleteFunc(
+			c.Generations,
+			func(g Generation) bool { return g.ID == id },
+		)
 
 		return nil
 	})
@@ -81,14 +92,19 @@ func (c Catalog) protected() map[string]bool {
 	return protected
 }
 
-func (r *Repository) loadRetentionBytes(ctx context.Context, gens []Generation) (map[string]int64, map[string]int64, map[string]bool, error) {
+func (r *Repository) loadRetentionBytes(
+	ctx context.Context,
+	gens []Generation,
+) (map[string]int64, map[string]int64, map[string]bool, error) {
 	sizes := make(map[string]int64, len(gens))
 	timestamps := make(map[string]int64, len(gens))
 	retired := make(map[string]bool)
 
 	for _, gen := range gens {
 		if err := ctx.Err(); err != nil {
-			return nil, nil, nil, oops.In("snapshot.store").With("operation", "load_retention_bytes").Wrap(err)
+			return nil, nil, nil, oops.In("snapshot.store").
+				With("operation", "load_retention_bytes").
+				Wrap(err)
 		}
 
 		size, finished, err := r.generationUsage(ctx, gen)
@@ -111,7 +127,12 @@ func (r *Repository) loadRetentionBytes(ctx context.Context, gens []Generation) 
 func (r *Repository) Usage(ctx context.Context) (Usage, error) {
 	lock, err := r.root.Lock(ctx, "repository.lock")
 	if err != nil {
-		return Usage{}, repositoryError("usage", oops.In("snapshot.store").With("operation", "lock_repository_usage").Wrapf(err, "lock repository usage"))
+		return Usage{}, repositoryError(
+			"usage",
+			oops.In("snapshot.store").
+				With("operation", "lock_repository_usage").
+				Wrapf(err, "lock repository usage"),
+		)
 	}
 
 	usage, usageErr := r.usageLocked(ctx)
@@ -127,7 +148,12 @@ func (r *Repository) Usage(ctx context.Context) (Usage, error) {
 func (r *Repository) GenerationUsage(ctx context.Context, id string) (int64, error) {
 	lock, err := r.root.Lock(ctx, "repository.lock")
 	if err != nil {
-		return 0, repositoryError("usage", oops.In("snapshot.store").With("operation", "lock_repository_usage").Wrapf(err, "lock repository usage"))
+		return 0, repositoryError(
+			"usage",
+			oops.In("snapshot.store").
+				With("operation", "lock_repository_usage").
+				Wrapf(err, "lock repository usage"),
+		)
 	}
 
 	size, usageErr := r.generationUsageByIDLocked(ctx, id)
@@ -269,9 +295,15 @@ func (r *Repository) generationUsage(ctx context.Context, gen Generation) (int64
 	return totalGenBytes, manifest.Finished, nil
 }
 
-func readValidatedManifest(ctx context.Context, dir *privatefs.Dir, gen Generation) (model.Manifest, int64, error) {
+func readValidatedManifest(
+	ctx context.Context,
+	dir *privatefs.Dir,
+	gen Generation,
+) (model.Manifest, int64, error) {
 	if err := ctx.Err(); err != nil {
-		return model.Manifest{}, 0, oops.In("snapshot.store").With("operation", "read_manifest").Wrap(err)
+		return model.Manifest{}, 0, oops.In("snapshot.store").
+			With("operation", "read_manifest").
+			Wrap(err)
 	}
 
 	manifestFile, fileErr := dir.File("manifest.json", unix.O_RDONLY)
@@ -319,7 +351,11 @@ func readValidatedManifest(ctx context.Context, dir *privatefs.Dir, gen Generati
 	return manifest, manifestSize, nil
 }
 
-func readValidatedArtifacts(ctx context.Context, dir *privatefs.Dir, descriptors []model.Artifact) (int64, error) {
+func readValidatedArtifacts(
+	ctx context.Context,
+	dir *privatefs.Dir,
+	descriptors []model.Artifact,
+) (int64, error) {
 	if err := ctx.Err(); err != nil {
 		return 0, oops.In("snapshot.store").With("operation", "read_artifacts").Wrap(err)
 	}
@@ -364,7 +400,11 @@ func readValidatedArtifacts(ctx context.Context, dir *privatefs.Dir, descriptors
 	return totalBytes, nil
 }
 
-func readValidatedArtifact(ctx context.Context, dir *privatefs.Dir, descriptor model.Artifact) (int64, error) {
+func readValidatedArtifact(
+	ctx context.Context,
+	dir *privatefs.Dir,
+	descriptor model.Artifact,
+) (int64, error) {
 	name := descriptor.ID + ".bin.gz"
 
 	file, err := dir.File(name, unix.O_RDONLY)

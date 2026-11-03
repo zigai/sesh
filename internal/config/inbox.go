@@ -37,13 +37,32 @@ var (
 	errInboxLabelInvalid  = errors.New("inbox section label must be non-empty text")
 	errInboxSnoozeEmpty   = errors.New("inbox.snooze must list at least one choice")
 	errInboxSnoozeTwice   = errors.New("inbox snooze choice is listed twice")
-	errInboxSnoozeInvalid = errors.New("inbox snooze choice is not a duration, a time of day or next message")
-	errInboxClosedShown   = errors.New("inbox.closed_shown must not be negative")
-	defaultInboxSections  = []string{
-		InboxReady, InboxFailed, InboxApproval, InboxQuestion, InboxNeedsYou, InboxLimited, InboxToMerge, InboxWorking, InboxSnoozed, InboxPaused, InboxSeen, InboxClosed,
+	errInboxSnoozeInvalid = errors.New(
+		"inbox snooze choice is not a duration, a time of day or next message",
+	)
+	errInboxClosedShown  = errors.New("inbox.closed_shown must not be negative")
+	defaultInboxSections = []string{
+		InboxReady,
+		InboxFailed,
+		InboxApproval,
+		InboxQuestion,
+		InboxNeedsYou,
+		InboxLimited,
+		InboxToMerge,
+		InboxWorking,
+		InboxSnoozed,
+		InboxPaused,
+		InboxSeen,
+		InboxClosed,
 	}
-	inboxSectionNames      = append(slices.Clone(defaultInboxSections), InboxArchived)
-	defaultInboxDimmed     = []string{InboxWorking, InboxSnoozed, InboxPaused, InboxClosed, InboxArchived}
+	inboxSectionNames  = append(slices.Clone(defaultInboxSections), InboxArchived)
+	defaultInboxDimmed = []string{
+		InboxWorking,
+		InboxSnoozed,
+		InboxPaused,
+		InboxClosed,
+		InboxArchived,
+	}
 	defaultInboxCollapsed  = []string{InboxClosed, InboxArchived}
 	defaultInboxSnoozeList = []string{SnoozeNextMessage, "1h", "4h", "tomorrow 09:00"}
 )
@@ -68,15 +87,29 @@ func InboxSections() []string {
 
 func DefaultInboxConfig() InboxConfig {
 	return InboxConfig{
-		Group: InboxGroupState, Sections: InboxSections(), Labels: nil,
-		Dim: slices.Clone(defaultInboxDimmed), Collapsed: slices.Clone(defaultInboxCollapsed), Snooze: slices.Clone(defaultInboxSnoozeList), ClosedShown: defaultClosedShown,
+		Group:    InboxGroupState,
+		Sections: InboxSections(),
+		Labels:   nil,
+		Dim: slices.Clone(
+			defaultInboxDimmed,
+		),
+		Collapsed:   slices.Clone(defaultInboxCollapsed),
+		Snooze:      slices.Clone(defaultInboxSnoozeList),
+		ClosedShown: defaultClosedShown,
 	}
 }
 
 func (c InboxConfig) Clone() InboxConfig {
 	return InboxConfig{
-		Group: c.Group, Sections: slices.Clone(c.Sections), Labels: maps.Clone(c.Labels),
-		Dim: slices.Clone(c.Dim), Collapsed: slices.Clone(c.Collapsed), Snooze: slices.Clone(c.Snooze), ClosedShown: c.ClosedShown,
+		Group:    c.Group,
+		Sections: slices.Clone(c.Sections),
+		Labels:   maps.Clone(c.Labels),
+		Dim: slices.Clone(
+			c.Dim,
+		),
+		Collapsed:   slices.Clone(c.Collapsed),
+		Snooze:      slices.Clone(c.Snooze),
+		ClosedShown: c.ClosedShown,
 	}
 }
 

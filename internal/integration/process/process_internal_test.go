@@ -22,7 +22,10 @@ const (
 	oversizedBytes = (2 << 20) + 16
 )
 
-func createProcFixture(t *testing.T, statContent, cmdlineContent, environContent []byte) (string, string) {
+func createProcFixture(
+	t *testing.T,
+	statContent, cmdlineContent, environContent []byte,
+) (string, string) {
 	t.Helper()
 
 	procRoot := t.TempDir()
@@ -44,13 +47,21 @@ func createProcFixture(t *testing.T, statContent, cmdlineContent, environContent
 	}
 
 	if cmdlineContent != nil {
-		if err := os.WriteFile(filepath.Join(pidDir, "cmdline"), cmdlineContent, 0o600); err != nil {
+		if err := os.WriteFile(
+			filepath.Join(pidDir, "cmdline"),
+			cmdlineContent,
+			0o600,
+		); err != nil {
 			t.Fatalf("write cmdline: %v", err)
 		}
 	}
 
 	if environContent != nil {
-		if err := os.WriteFile(filepath.Join(pidDir, "environ"), environContent, 0o600); err != nil {
+		if err := os.WriteFile(
+			filepath.Join(pidDir, "environ"),
+			environContent,
+			0o600,
+		); err != nil {
 			t.Fatalf("write environ: %v", err)
 		}
 	}
@@ -62,11 +73,22 @@ func createProcFixture(t *testing.T, statContent, cmdlineContent, environContent
 }
 
 func validStatContent(pid int, state byte, startTime uint64) []byte {
-	return []byte(fmt.Sprintf("%d (test_proc) %c 1 1 1 0 -1 0 0 0 0 0 0 0 0 0 20 0 1 0 %d 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n",
-		pid, state, startTime))
+	return []byte(
+		fmt.Sprintf(
+			"%d (test_proc) %c 1 1 1 0 -1 0 0 0 0 0 0 0 0 0 20 0 1 0 %d 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n",
+			pid,
+			state,
+			startTime,
+		),
+	)
 }
 
-func assertFixtureError(t *testing.T, procRoot, bootIDPath string, envKeys []string, wantErr error) {
+func assertFixtureError(
+	t *testing.T,
+	procRoot, bootIDPath string,
+	envKeys []string,
+	wantErr error,
+) {
 	t.Helper()
 
 	_, err := observeLinux(t.Context(), procRoot, bootIDPath, Request{
@@ -83,7 +105,12 @@ func TestObserve_ParserFixtures(t *testing.T) {
 	validStat := validStatContent(testPID, 'S', testStartTime)
 
 	t.Run("malformed cmdline lacking trailing NUL", func(t *testing.T) {
-		procRoot, bootIDPath := createProcFixture(t, validStat, []byte("arg1\x00arg2_without_nul"), nil)
+		procRoot, bootIDPath := createProcFixture(
+			t,
+			validStat,
+			[]byte("arg1\x00arg2_without_nul"),
+			nil,
+		)
 		assertFixtureError(t, procRoot, bootIDPath, nil, ErrMalformedCmdline)
 	})
 
@@ -99,7 +126,12 @@ func TestObserve_ParserFixtures(t *testing.T) {
 	})
 
 	t.Run("malformed environ lacking trailing NUL", func(t *testing.T) {
-		procRoot, bootIDPath := createProcFixture(t, validStat, []byte("tool\x00"), []byte("FOO=bar"))
+		procRoot, bootIDPath := createProcFixture(
+			t,
+			validStat,
+			[]byte("tool\x00"),
+			[]byte("FOO=bar"),
+		)
 		assertFixtureError(t, procRoot, bootIDPath, []string{"FOO"}, ErrMalformedEnviron)
 	})
 
@@ -116,7 +148,8 @@ func TestObserve_ParserFixtures(t *testing.T) {
 			t.Fatalf("observeLinux: %v", err)
 		}
 
-		if len(obs.Environment) != 2 || obs.Environment[0].State != "absent" || string(obs.Environment[1].Value) != "value" {
+		if len(obs.Environment) != 2 || obs.Environment[0].State != "absent" ||
+			string(obs.Environment[1].Value) != "value" {
 			t.Fatalf("unexpected selected environment: %+v", obs.Environment)
 		}
 	})
@@ -124,13 +157,25 @@ func TestObserve_ParserFixtures(t *testing.T) {
 	t.Run("duplicate requested environment variable with same value", func(t *testing.T) {
 		environ := []byte("FOO=bar\x00FOO=bar\x00")
 		procRoot, bootIDPath := createProcFixture(t, validStat, []byte("tool\x00"), environ)
-		assertFixtureError(t, procRoot, bootIDPath, []string{"FOO"}, ErrDuplicateEnvironmentVariable)
+		assertFixtureError(
+			t,
+			procRoot,
+			bootIDPath,
+			[]string{"FOO"},
+			ErrDuplicateEnvironmentVariable,
+		)
 	})
 
 	t.Run("duplicate requested environment variable with different value", func(t *testing.T) {
 		environ := []byte("FOO=bar\x00FOO=baz\x00")
 		procRoot, bootIDPath := createProcFixture(t, validStat, []byte("tool\x00"), environ)
-		assertFixtureError(t, procRoot, bootIDPath, []string{"FOO"}, ErrDuplicateEnvironmentVariable)
+		assertFixtureError(
+			t,
+			procRoot,
+			bootIDPath,
+			[]string{"FOO"},
+			ErrDuplicateEnvironmentVariable,
+		)
 	})
 
 	t.Run("duplicate unrequested environment variable ignored", func(t *testing.T) {
@@ -246,13 +291,21 @@ func TestClassifyProcLinkRejectsPositiveLinkDeletedSuffix(t *testing.T) {
 }
 
 func TestClassifyProcLinkStripsOneSuffixWithZeroLinks(t *testing.T) {
-	path, deleted, err := classifyProcLink([]byte("/tmp/work (deleted) (deleted)"), uint64(0), uint64(0))
+	path, deleted, err := classifyProcLink(
+		[]byte("/tmp/work (deleted) (deleted)"),
+		uint64(0),
+		uint64(0),
+	)
 	if err != nil {
 		t.Fatalf("classifyProcLink: %v", err)
 	}
 
 	if string(path) != "/tmp/work (deleted)" || !deleted {
-		t.Fatalf("classifyProcLink = (%q, %t), want literal suffixed path marked deleted", path, deleted)
+		t.Fatalf(
+			"classifyProcLink = (%q, %t), want literal suffixed path marked deleted",
+			path,
+			deleted,
+		)
 	}
 }
 
@@ -287,7 +340,9 @@ func TestParseStat_Valid(t *testing.T) {
 	})
 
 	t.Run("comm with parentheses", func(t *testing.T) {
-		complexCommStat := []byte("42 (complex (comm) name) S 1 1 1 0 -1 0 0 0 0 0 0 0 0 0 20 0 1 0 123456 0\n")
+		complexCommStat := []byte(
+			"42 (complex (comm) name) S 1 1 1 0 -1 0 0 0 0 0 0 0 0 0 20 0 1 0 123456 0\n",
+		)
 
 		state, startTime, err := parseStat(complexCommStat)
 		if err != nil {
@@ -333,7 +388,9 @@ func TestParseStat_Invalid(t *testing.T) {
 	})
 
 	t.Run("multi-byte state rejected", func(t *testing.T) {
-		multiByteStateStat := []byte("42 (test) SS 1 1 1 0 -1 0 0 0 0 0 0 0 0 0 20 0 1 0 123456 0\n")
+		multiByteStateStat := []byte(
+			"42 (test) SS 1 1 1 0 -1 0 0 0 0 0 0 0 0 0 20 0 1 0 123456 0\n",
+		)
 
 		_, _, err := parseStat(multiByteStateStat)
 		if !errors.Is(err, ErrMalformedStat) {
@@ -360,7 +417,9 @@ func TestParseStat_Invalid(t *testing.T) {
 	})
 
 	t.Run("non-numeric start time rejected", func(t *testing.T) {
-		nonNumericStat := []byte("42 (test) S 1 1 1 0 -1 0 0 0 0 0 0 0 0 0 20 0 1 0 not_a_number 0\n")
+		nonNumericStat := []byte(
+			"42 (test) S 1 1 1 0 -1 0 0 0 0 0 0 0 0 0 20 0 1 0 not_a_number 0\n",
+		)
 
 		_, _, err := parseStat(nonNumericStat)
 		if !errors.Is(err, ErrMalformedStat) {

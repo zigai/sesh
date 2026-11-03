@@ -3,7 +3,8 @@ package model
 const maxLayoutDepth = 64
 
 func validateLayout(node Layout, depth int, leaves map[string]Layout) error {
-	if depth > maxLayoutDepth || !validSize(node.Width, node.Height) || node.Left < 0 || node.Top < 0 {
+	if depth > maxLayoutDepth || !validSize(node.Width, node.Height) || node.Left < 0 ||
+		node.Top < 0 {
 		return ErrInvalid
 	}
 

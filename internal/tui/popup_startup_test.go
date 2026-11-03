@@ -72,8 +72,10 @@ func TestPopupStartupShowsLoadingWhileInitialLoadIsBlocked(t *testing.T) {
 				<-release
 
 				return session.CatalogResult{
-					Sessions: []session.Session{{ID: "$1", Name: "loaded-agent-session", Kind: session.KindLive}},
-					Status:   session.StatusComplete,
+					Sessions: []session.Session{
+						{ID: "$1", Name: "loaded-agent-session", Kind: session.KindLive},
+					},
+					Status: session.StatusComplete,
 				}, nil
 			},
 			LoadAgentSummaries: func(context.Context) ([]session.AgentSummary, error) {
@@ -86,9 +88,15 @@ func TestPopupStartupShowsLoadingWhileInitialLoadIsBlocked(t *testing.T) {
 
 		var output popupStartupOutput
 
-		program := tea.NewProgram(popupStartupTestModel{Model: model}, tea.WithInput(nil), tea.WithOutput(&output),
-			tea.WithColorProfile(colorprofile.TrueColor), tea.WithEnvironment([]string{}),
-			tea.WithoutSignalHandler(), tea.WithWindowSize(80, 20))
+		program := tea.NewProgram(
+			popupStartupTestModel{Model: model},
+			tea.WithInput(nil),
+			tea.WithOutput(&output),
+			tea.WithColorProfile(colorprofile.TrueColor),
+			tea.WithEnvironment([]string{}),
+			tea.WithoutSignalHandler(),
+			tea.WithWindowSize(80, 20),
+		)
 		done := make(chan error, 1)
 
 		go func() {
@@ -127,7 +135,11 @@ func TestPopupStartupShowsLoadingWhileInitialLoadIsBlocked(t *testing.T) {
 		synctest.Wait()
 
 		if got := strings.Count(output.String(), ansi.EraseEntireScreen); got != clears {
-			t.Fatalf("unchanged startup cleared the screen again: %d clears, previously %d", got, clears)
+			t.Fatalf(
+				"unchanged startup cleared the screen again: %d clears, previously %d",
+				got,
+				clears,
+			)
 		}
 
 		time.Sleep(160 * time.Millisecond)
@@ -140,7 +152,8 @@ func TestPopupStartupShowsLoadingWhileInitialLoadIsBlocked(t *testing.T) {
 
 		assertRightBorder(t, view, 80)
 
-		if strings.Contains(view, "No live agent sessions found") || strings.Contains(view, "loaded-agent-session") {
+		if strings.Contains(view, "No live agent sessions found") ||
+			strings.Contains(view, "loaded-agent-session") {
 			t.Fatalf("blocked popup view = %q, want no empty state or incomplete rows", view)
 		}
 
@@ -148,7 +161,8 @@ func TestPopupStartupShowsLoadingWhileInitialLoadIsBlocked(t *testing.T) {
 		synctest.Wait()
 
 		view = readView()
-		if !strings.Contains(view, "loaded-agent-session") || strings.Contains(view, "Loading sessions...") {
+		if !strings.Contains(view, "loaded-agent-session") ||
+			strings.Contains(view, "Loading sessions...") {
 			t.Fatalf("completed popup view = %q, want populated agent session", view)
 		}
 	})
@@ -167,10 +181,16 @@ func TestPopupStartupKeepsHiddenRowsInactiveUntilLoadingCompletes(t *testing.T) 
 			model.initialAgentSelectionPending = true
 			model.SetSize(80, 20)
 			model.Init()
-			updateTestModel(t, model, originSessionsMsg{rows: []session.Session{{
-				ID: "$2", Name: "hidden-origin-session", Kind: session.KindLive, Origin: session.OriginBridge,
-				AgentTotal: 1, Agents: []session.AgentSession{{PaneID: "%2", Harness: "codex"}},
-			}}})
+			updateTestModel(t, model, originSessionsMsg{rows: []session.Session{
+				{
+					ID:         "$2",
+					Name:       "hidden-origin-session",
+					Kind:       session.KindLive,
+					Origin:     session.OriginBridge,
+					AgentTotal: 1,
+					Agents:     []session.AgentSession{{PaneID: "%2", Harness: "codex"}},
+				},
+			}})
 
 			if !waiting {
 				updateTestModel(t, model, popupStartupDeadlineMsg{})
@@ -186,8 +206,12 @@ func TestPopupStartupKeepsHiddenRowsInactiveUntilLoadingCompletes(t *testing.T) 
 			}
 			for _, input := range inputs {
 				_, cmd := model.Update(input)
-				if cmd != nil || !model.initialAgentSelectionPending || model.agentCursor != parentAgentIndex {
-					t.Fatalf("hidden row input %T produced command or changed initial selection", input)
+				if cmd != nil || !model.initialAgentSelectionPending ||
+					model.agentCursor != parentAgentIndex {
+					t.Fatalf(
+						"hidden row input %T produced command or changed initial selection",
+						input,
+					)
 				}
 			}
 
@@ -195,11 +219,19 @@ func TestPopupStartupKeepsHiddenRowsInactiveUntilLoadingCompletes(t *testing.T) 
 
 			_, cmd := model.Update(keyCode(tea.KeyEnter))
 			if cmd == nil {
-				t.Fatalf("completed popup did not allow opening origin row: filtered=%#v status=%q query=%q bridge=%T", model.filtered, model.statusMessage, model.textInput.Value(), model.deps.OriginBridge)
+				t.Fatalf(
+					"completed popup did not allow opening origin row: filtered=%#v status=%q query=%q bridge=%T",
+					model.filtered,
+					model.statusMessage,
+					model.textInput.Value(),
+					model.deps.OriginBridge,
+				)
 			}
 
 			trace := runActionTrace(t, model, cmd)
-			if len(trace.results) != 1 || trace.results[0].request.subject.Sessions[0].Name != "hidden-origin-session" || !trace.quit {
+			if len(trace.results) != 1 ||
+				trace.results[0].request.subject.Sessions[0].Name != "hidden-origin-session" ||
+				!trace.quit {
 				t.Fatalf("completed row action = %+v, want origin session activation", trace)
 			}
 		})

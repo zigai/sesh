@@ -94,7 +94,9 @@ func TestDecodeAcceptsCompleteNestedDocument(t *testing.T) {
 }
 
 func TestDecodeAcceptsEmptySlice(t *testing.T) {
-	got, err := strictjson.Decode[document]([]byte(`{"title":"t","owner":{"name":"n"},"items":[],"data":""}`))
+	got, err := strictjson.Decode[document](
+		[]byte(`{"title":"t","owner":{"name":"n"},"items":[],"data":""}`),
+	)
 	if err != nil {
 		t.Fatalf("Decode() error = %v", err)
 	}
@@ -123,12 +125,18 @@ func TestDecodeRejectsInvalidDocument(t *testing.T) {
 	}{
 		{"missing top-level field", `{"title":"t","owner":{"name":"n"},"items":[]}`},
 		{"missing nested struct field", `{"title":"t","owner":{},"items":[],"data":""}`},
-		{"missing field in slice element", `{"title":"t","owner":{"name":"n"},"items":[{"id":"a","count":1},{"id":"b"}],"data":""}`},
+		{
+			"missing field in slice element",
+			`{"title":"t","owner":{"name":"n"},"items":[{"id":"a","count":1},{"id":"b"}],"data":""}`,
+		},
 		{"null string", `{"title":null,"owner":{"name":"n"},"items":[],"data":""}`},
 		{"null struct", `{"title":"t","owner":null,"items":[],"data":""}`},
 		{"null slice", `{"title":"t","owner":{"name":"n"},"items":null,"data":""}`},
 		{"unknown member", `{"title":"t","owner":{"name":"n"},"items":[],"data":"","extra":1}`},
-		{"unknown nested member", `{"title":"t","owner":{"name":"n","age":3},"items":[],"data":""}`},
+		{
+			"unknown nested member",
+			`{"title":"t","owner":{"name":"n","age":3},"items":[],"data":""}`,
+		},
 		{"type mismatch", `{"title":5,"owner":{"name":"n"},"items":[],"data":""}`},
 		{"trailing data", `{"title":"t","owner":{"name":"n"},"items":[],"data":""} {}`},
 		{"malformed", `{"title":"t",`},
@@ -162,7 +170,13 @@ func TestDecodeRejectsUnsupportedFieldKind(t *testing.T) {
 }
 
 func nestedNodes(levels int) string {
-	return strings.Repeat(`{"children":[`, levels-1) + `{"children":[]}` + strings.Repeat(`]}`, levels-1)
+	return strings.Repeat(
+		`{"children":[`,
+		levels-1,
+	) + `{"children":[]}` + strings.Repeat(
+		`]}`,
+		levels-1,
+	)
 }
 
 func TestDecodeLimitsNestingDepth(t *testing.T) {

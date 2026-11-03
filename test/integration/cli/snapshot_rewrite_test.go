@@ -35,7 +35,18 @@ func TestSnapshotRewriteCommandsPreserveCompletedDeletionReceipt(t *testing.T) {
 
 		var stdout, stderr bytes.Buffer
 
-		args := []string{snapshotCmd, "recover", "delete", command, id, testRepositoryFlag, path, testConfigFlag, cfg, testJSONFlag}
+		args := []string{
+			snapshotCmd,
+			"recover",
+			"delete",
+			command,
+			id,
+			testRepositoryFlag,
+			path,
+			testConfigFlag,
+			cfg,
+			testJSONFlag,
+		}
 		if err := cli.ExecuteApplication(t.Context(), args, nil, &stdout, &stderr); err != nil {
 			t.Fatalf("%s: %v / %s", command, err, stderr.String())
 		}
@@ -43,7 +54,10 @@ func TestSnapshotRewriteCommandsPreserveCompletedDeletionReceipt(t *testing.T) {
 		envelope := singleRuntimeEnvelope(t, stdout.Bytes())
 
 		result := decodeJSONPayload[snapshotRewriteOutput](t, envelope.Result)
-		if !envelope.OK || stderr.Len() != 0 || result.OperationID != id || result.Source != generation || !result.Empty || result.State != "retired" {
+		if !envelope.OK || stderr.Len() != 0 || result.OperationID != id ||
+			result.Source != generation ||
+			!result.Empty ||
+			result.State != "retired" {
 			t.Fatalf("wrong rewrite receipt: %s / %s", stdout.String(), stderr.String())
 		}
 
@@ -70,7 +84,12 @@ func completeSnapshotRewrite(t *testing.T, path, generation string) string {
 	}
 
 	id := store.NewOperationID()
-	if _, err := repo.RemoveSessions(t.Context(), id, generation, []string{manifest.Sessions[0].ID}); err != nil {
+	if _, err := repo.RemoveSessions(
+		t.Context(),
+		id,
+		generation,
+		[]string{manifest.Sessions[0].ID},
+	); err != nil {
 		t.Fatal(err)
 	}
 

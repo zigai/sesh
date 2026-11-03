@@ -70,7 +70,15 @@ func TestLogsBinaryIntegration(t *testing.T) {
 		t.Fatalf("resolving repo root: %v", err)
 	}
 
-	buildCmd := exec.CommandContext(t.Context(), "go", "build", "-mod=readonly", "-o", binaryPath, "./cmd/sesh")
+	buildCmd := exec.CommandContext(
+		t.Context(),
+		"go",
+		"build",
+		"-mod=readonly",
+		"-o",
+		binaryPath,
+		"./cmd/sesh",
+	)
 
 	buildCmd.Dir = repoRoot
 	if out, err := buildCmd.CombinedOutput(); err != nil {
@@ -137,7 +145,15 @@ func testBinaryLogsBrokenPipe(t *testing.T, binaryPath, configPath string) {
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, binaryPath, testConfigFlag, configPath, testLogsCmd, "--all", "--json")
+	cmd := exec.CommandContext(
+		ctx,
+		binaryPath,
+		testConfigFlag,
+		configPath,
+		testLogsCmd,
+		"--all",
+		"--json",
+	)
 	cmd.WaitDelay = time.Second
 
 	var stderr bytes.Buffer
@@ -182,7 +198,15 @@ func testBinaryWatchInterrupt(t *testing.T, binaryPath, configPath string) {
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, binaryPath, testConfigFlag, configPath, testLogsCmd, "--watch", "--json")
+	cmd := exec.CommandContext(
+		ctx,
+		binaryPath,
+		testConfigFlag,
+		configPath,
+		testLogsCmd,
+		"--watch",
+		"--json",
+	)
 	cmd.WaitDelay = time.Second
 
 	var stderr bytes.Buffer
@@ -229,7 +253,8 @@ func testBinaryHumanOutput(t *testing.T, binaryPath, configPath string) {
 		t.Fatalf("logs error: %v\noutput: %s", err, out)
 	}
 
-	if !strings.Contains(string(out), "system boot") || !strings.Contains(string(out), "high memory") {
+	if !strings.Contains(string(out), "system boot") ||
+		!strings.Contains(string(out), "high memory") {
 		t.Fatalf("missing records in human output: %s", out)
 	}
 }
@@ -237,7 +262,14 @@ func testBinaryHumanOutput(t *testing.T, binaryPath, configPath string) {
 func testBinaryJSONLStream(t *testing.T, binaryPath, configPath string) {
 	t.Helper()
 
-	cmd := exec.CommandContext(t.Context(), binaryPath, "--config", configPath, testLogsCmd, "--json")
+	cmd := exec.CommandContext(
+		t.Context(),
+		binaryPath,
+		"--config",
+		configPath,
+		testLogsCmd,
+		"--json",
+	)
 
 	var stdout, stderr bytes.Buffer
 
@@ -268,7 +300,14 @@ func testBinaryJSONLStream(t *testing.T, binaryPath, configPath string) {
 func testBinaryPathText(t *testing.T, binaryPath, configPath, logPath string) {
 	t.Helper()
 
-	cmd := exec.CommandContext(t.Context(), binaryPath, "--config", configPath, testLogsCmd, "--path")
+	cmd := exec.CommandContext(
+		t.Context(),
+		binaryPath,
+		"--config",
+		configPath,
+		testLogsCmd,
+		"--path",
+	)
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -283,7 +322,15 @@ func testBinaryPathText(t *testing.T, binaryPath, configPath, logPath string) {
 func testBinaryPathJSON(t *testing.T, binaryPath, configPath, logPath string) {
 	t.Helper()
 
-	cmd := exec.CommandContext(t.Context(), binaryPath, "--config", configPath, testLogsCmd, "--path", "--json")
+	cmd := exec.CommandContext(
+		t.Context(),
+		binaryPath,
+		"--config",
+		configPath,
+		testLogsCmd,
+		"--path",
+		"--json",
+	)
 
 	var stdout, stderr bytes.Buffer
 
@@ -318,7 +365,15 @@ func testBinaryPathJSON(t *testing.T, binaryPath, configPath, logPath string) {
 func testBinaryClearJSON(t *testing.T, binaryPath, configPath, logPath string) {
 	t.Helper()
 
-	cmd := exec.CommandContext(t.Context(), binaryPath, "--config", configPath, testLogsCmd, "--clear", "--json")
+	cmd := exec.CommandContext(
+		t.Context(),
+		binaryPath,
+		"--config",
+		configPath,
+		testLogsCmd,
+		"--clear",
+		"--json",
+	)
 
 	var stdout, stderr bytes.Buffer
 
@@ -353,7 +408,10 @@ func testBinaryClearJSON(t *testing.T, binaryPath, configPath, logPath string) {
 func TestLogsFollowRenameAndTruncateContinuity(t *testing.T) {
 	tempDir := t.TempDir()
 	logPath := filepath.Join(tempDir, "continuity.log")
-	rec1 := `{"time":"2026-09-20T12:00:00Z","level":"info","component":"cli","payload":"` + strings.Repeat("x", 128) + `","message":"msg1"}` + "\n"
+	rec1 := `{"time":"2026-09-20T12:00:00Z","level":"info","component":"cli","payload":"` + strings.Repeat(
+		"x",
+		128,
+	) + `","message":"msg1"}` + "\n"
 	rec2 := `{"time":"2026-09-20T12:01:00Z","level":"info","component":"cli","message":"msg2"}` + "\n"
 	rec3 := `{"time":"2026-09-20T12:02:00Z","level":"info","component":"cli","message":"msg3"}` + "\n"
 
@@ -411,7 +469,8 @@ func TestLogsFollowRenameAndTruncateContinuity(t *testing.T) {
 	}
 
 	out := writer.String()
-	if !strings.Contains(out, "msg1") || !strings.Contains(out, "msg2") || !strings.Contains(out, "msg3") {
+	if !strings.Contains(out, "msg1") || !strings.Contains(out, "msg2") ||
+		!strings.Contains(out, "msg3") {
 		t.Fatalf("output missing records across copy-truncate and rename: %s", out)
 	}
 }
@@ -444,7 +503,13 @@ func TestLogsHostileRecordsAndTerminalSanitization(t *testing.T) {
 		HasUntil:  false,
 		Grep:      nil,
 	}
-	if err := logview.DisplayRetainedLogs(t.Context(), &buf, io.Discard, logPath, options); err != nil {
+	if err := logview.DisplayRetainedLogs(
+		t.Context(),
+		&buf,
+		io.Discard,
+		logPath,
+		options,
+	); err != nil {
 		t.Fatalf("displayRetainedLogs error: %v", err)
 	}
 
@@ -485,7 +550,13 @@ func TestLogsBrokenWriterNoRecursion(t *testing.T) {
 		Grep:      nil,
 	}
 
-	err := logview.DisplayRetainedLogs(t.Context(), failingRuntimeWriter{}, io.Discard, logPath, options)
+	err := logview.DisplayRetainedLogs(
+		t.Context(),
+		failingRuntimeWriter{},
+		io.Discard,
+		logPath,
+		options,
+	)
 	if err == nil {
 		t.Fatalf("expected error for failing writer")
 	}

@@ -78,12 +78,42 @@ func TestResolveTrustedLinksFollowsOnlyLinksRootControls(t *testing.T) {
 		want string
 		err  error
 	}{
-		{"relative target with parent step", filepath.Join(sys, "relative", "data"), filepath.Join(realDir, "data"), nil},
-		{"absolute target", filepath.Join(sys, "absolute", "data"), filepath.Join(realDir, "data"), nil},
-		{"link to a link", filepath.Join(sys, "chained", "data"), filepath.Join(realDir, "data"), nil},
-		{"missing components stay", filepath.Join(sys, "relative", "missing", "deeper"), filepath.Join(realDir, "missing", "deeper"), nil},
-		{"untrusted link stays", filepath.Join(sys, "user", "data"), filepath.Join(sys, "user", "data"), nil},
-		{"trusted link in untrusted directory stays", filepath.Join(open, "link", "data"), filepath.Join(open, "link", "data"), nil},
+		{
+			"relative target with parent step",
+			filepath.Join(sys, "relative", "data"),
+			filepath.Join(realDir, "data"),
+			nil,
+		},
+		{
+			"absolute target",
+			filepath.Join(sys, "absolute", "data"),
+			filepath.Join(realDir, "data"),
+			nil,
+		},
+		{
+			"link to a link",
+			filepath.Join(sys, "chained", "data"),
+			filepath.Join(realDir, "data"),
+			nil,
+		},
+		{
+			"missing components stay",
+			filepath.Join(sys, "relative", "missing", "deeper"),
+			filepath.Join(realDir, "missing", "deeper"),
+			nil,
+		},
+		{
+			"untrusted link stays",
+			filepath.Join(sys, "user", "data"),
+			filepath.Join(sys, "user", "data"),
+			nil,
+		},
+		{
+			"trusted link in untrusted directory stays",
+			filepath.Join(open, "link", "data"),
+			filepath.Join(open, "link", "data"),
+			nil,
+		},
 		{"link loop", filepath.Join(sys, "loop-a", "data"), "", ErrSystemLinkLoop},
 		{"parent step past an untrusted link", filepath.Join(sys, "escape", "data"), "", ErrUnsafe},
 	}

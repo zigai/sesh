@@ -40,25 +40,38 @@ func (local *Local) registerAgentHandlers() {
 	handle(local, action.AgentUnlink, local.unlinkWork)
 }
 
-func (local *Local) handleNavigation(definition *action.Definition[action.NavigateAgents, action.FocusedPane], navigate agentNavigation) {
-	handle(local, definition, func(ctx context.Context, caller action.Caller, input action.NavigateAgents) (action.FocusedPane, error) {
-		navigator, err := local.navigator(caller)
-		if err != nil {
-			return action.FocusedPane{}, err
-		}
+func (local *Local) handleNavigation(
+	definition *action.Definition[action.NavigateAgents, action.FocusedPane],
+	navigate agentNavigation,
+) {
+	handle(
+		local,
+		definition,
+		func(ctx context.Context, caller action.Caller, input action.NavigateAgents) (action.FocusedPane, error) {
+			navigator, err := local.navigator(caller)
+			if err != nil {
+				return action.FocusedPane{}, err
+			}
 
-		target, err := navigate(navigator, ctx, navigationScope(input))
-		if err != nil {
-			return action.FocusedPane{}, oops.In("app").With("operation", string(definition.ID)).Wrap(err)
-		}
+			target, err := navigate(navigator, ctx, navigationScope(input))
+			if err != nil {
+				return action.FocusedPane{}, oops.In("app").
+					With("operation", string(definition.ID)).
+					Wrap(err)
+			}
 
-		local.recordAgentView(ctx, target)
+			local.recordAgentView(ctx, target)
 
-		return focusedPane(target), nil
-	})
+			return focusedPane(target), nil
+		},
+	)
 }
 
-func (local *Local) advanceUnreadAgent(ctx context.Context, caller action.Caller, input action.NavigateAgents) (action.FocusedPane, error) {
+func (local *Local) advanceUnreadAgent(
+	ctx context.Context,
+	caller action.Caller,
+	input action.NavigateAgents,
+) (action.FocusedPane, error) {
 	navigator, err := local.navigator(caller)
 	if err != nil {
 		return action.FocusedPane{}, err
@@ -76,7 +89,10 @@ func (local *Local) advanceUnreadAgent(ctx context.Context, caller action.Caller
 		}
 
 		visits = append(visits, agents.PaneVisit{
-			ServerSocket: entry.Session.Socket, SessionName: entry.Session.Name, PaneID: entry.PaneID, ViewedAt: time.Unix(0, entry.ViewedAtUnixNano),
+			ServerSocket: entry.Session.Socket,
+			SessionName:  entry.Session.Name,
+			PaneID:       entry.PaneID,
+			ViewedAt:     time.Unix(0, entry.ViewedAtUnixNano),
 		})
 	}
 
@@ -92,7 +108,11 @@ func (local *Local) advanceUnreadAgent(ctx context.Context, caller action.Caller
 	return focusedPane(visit.Pane), nil
 }
 
-func (local *Local) agentBack(ctx context.Context, caller action.Caller, _ action.ReturnToAgent) (action.FocusedPane, error) {
+func (local *Local) agentBack(
+	ctx context.Context,
+	caller action.Caller,
+	_ action.ReturnToAgent,
+) (action.FocusedPane, error) {
 	navigator, err := local.navigator(caller)
 	if err != nil {
 		return action.FocusedPane{}, err
@@ -106,7 +126,11 @@ func (local *Local) agentBack(ctx context.Context, caller action.Caller, _ actio
 	return focusedPane(target), nil
 }
 
-func (local *Local) focusAgent(ctx context.Context, caller action.Caller, input action.FocusAgent) (action.FocusedPane, error) {
+func (local *Local) focusAgent(
+	ctx context.Context,
+	caller action.Caller,
+	input action.FocusAgent,
+) (action.FocusedPane, error) {
 	target, err := local.liveTarget(ctx, input.Session)
 	if err != nil {
 		return action.FocusedPane{}, err
@@ -117,7 +141,10 @@ func (local *Local) focusAgent(ctx context.Context, caller action.Caller, input 
 		return action.FocusedPane{}, err
 	}
 
-	focused, err := navigator.Focus(ctx, agents.FocusTarget{PaneID: input.Pane, SessionID: target.ID, SessionName: target.Name})
+	focused, err := navigator.Focus(
+		ctx,
+		agents.FocusTarget{PaneID: input.Pane, SessionID: target.ID, SessionName: target.Name},
+	)
 	if err != nil {
 		return action.FocusedPane{}, oops.In("app").With("operation", "agent_focus").Wrap(err)
 	}
@@ -127,13 +154,19 @@ func (local *Local) focusAgent(ctx context.Context, caller action.Caller, input 
 	return focusedPane(focused), nil
 }
 
-func (local *Local) clearWindowStatus(ctx context.Context, _ action.Caller, _ action.ClearWindowStatus) (action.ClearedWindowStatus, error) {
+func (local *Local) clearWindowStatus(
+	ctx context.Context,
+	_ action.Caller,
+	_ action.ClearWindowStatus,
+) (action.ClearedWindowStatus, error) {
 	if local.server == nil {
 		return action.ClearedWindowStatus{}, action.Wrap(action.CodeUnavailable, ErrServerRequired)
 	}
 
 	if err := agents.NewTmuxStyleController(local.server, true, true).ClearOwned(ctx); err != nil {
-		return action.ClearedWindowStatus{}, oops.In("app").With("operation", "agent_window_status_clear").Wrap(err)
+		return action.ClearedWindowStatus{}, oops.In("app").
+			With("operation", "agent_window_status_clear").
+			Wrap(err)
 	}
 
 	return action.ClearedWindowStatus{}, nil
@@ -144,7 +177,12 @@ func (local *Local) navigator(caller action.Caller) (*agents.Navigator, error) {
 		return nil, action.Wrap(action.CodeUnavailable, ErrServerRequired)
 	}
 
-	current := agents.CurrentTarget{PaneID: caller.Pane, Client: caller.Client, SessionID: "", Session: ""}
+	current := agents.CurrentTarget{
+		PaneID:    caller.Pane,
+		Client:    caller.Client,
+		SessionID: "",
+		Session:   "",
+	}
 	if strings.HasPrefix(caller.Session, "$") {
 		current.SessionID = caller.Session
 	} else {
@@ -152,7 +190,11 @@ func (local *Local) navigator(caller action.Caller) (*agents.Navigator, error) {
 	}
 
 	navigator, err := agents.NewNavigator(agents.NavigatorOptions{
-		Server: local.server, StatePath: "", Target: current, Controller: nil, Source: local.agentSource,
+		Server:     local.server,
+		StatePath:  "",
+		Target:     current,
+		Controller: nil,
+		Source:     local.agentSource,
 	})
 	if err != nil {
 		return nil, oops.In("app").With("operation", "agent_navigator").Wrap(err)
@@ -171,7 +213,9 @@ func (local *Local) recordAgentView(ctx context.Context, target agents.PaneLocat
 	})
 	if err != nil {
 		zerolog.Ctx(ctx).Warn().Str("component", "agents").Str("operation", "record_view").
-			Str("status", "degraded").Str("reason", "history_update_failed").Func(logging.Cause(err)).Msg("agent navigation history was not recorded")
+			Str("status", "degraded").
+			Str("reason", "history_update_failed").
+			Func(logging.Cause(err)).Msg("agent navigation history was not recorded")
 	}
 }
 
@@ -182,22 +226,39 @@ func (local *Local) acknowledgeUnread(ctx context.Context, visit agents.AgentVis
 
 	_, err := session.UpdateState(ctx, local.historyPath, func(state *session.State) {
 		if origin := visit.Origin; origin != nil {
-			state.RecordAgentViewAt(localIdentity(origin.ServerSocket, origin.SessionName), origin.PaneID, origin.ViewedAt)
+			state.RecordAgentViewAt(
+				localIdentity(origin.ServerSocket, origin.SessionName),
+				origin.PaneID,
+				origin.ViewedAt,
+			)
 		}
 
 		if pane := visit.Pane; pane.PaneID != "" {
-			state.RecordAgentViewAt(localIdentity(pane.ServerSocket, pane.SessionName), pane.PaneID, visit.ActivityChanged)
+			state.RecordAgentViewAt(
+				localIdentity(pane.ServerSocket, pane.SessionName),
+				pane.PaneID,
+				visit.ActivityChanged,
+			)
 		}
 	})
 	if err != nil {
-		return oops.In("app").Code("history_write_failed").With("operation", "agent_unread").Wrap(err)
+		return oops.In("app").
+			Code("history_write_failed").
+			With("operation", "agent_unread").
+			Wrap(err)
 	}
 
 	return nil
 }
 
 func localIdentity(socket, name string) session.Identity {
-	return session.Identity{Origin: string(session.OriginLocal), ConnectionID: "", Socket: socket, RepositorySource: "", Name: name}
+	return session.Identity{
+		Origin:           string(session.OriginLocal),
+		ConnectionID:     "",
+		Socket:           socket,
+		RepositorySource: "",
+		Name:             name,
+	}
 }
 
 func navigationScope(input action.NavigateAgents) agents.NavigationScope {
@@ -209,5 +270,9 @@ func navigationScope(input action.NavigateAgents) agents.NavigationScope {
 }
 
 func focusedPane(target agents.PaneLocation) action.FocusedPane {
-	return action.FocusedPane{Pane: target.PaneID, SessionID: target.SessionID, Session: target.SessionName}
+	return action.FocusedPane{
+		Pane:      target.PaneID,
+		SessionID: target.SessionID,
+		Session:   target.SessionName,
+	}
 }

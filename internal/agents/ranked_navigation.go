@@ -37,7 +37,11 @@ type agentSelection struct {
 	visits []PaneVisit
 }
 
-func (n *Navigator) rankedAgent(ctx context.Context, scope NavigationScope, selection agentSelection) (AgentVisit, error) {
+func (n *Navigator) rankedAgent(
+	ctx context.Context,
+	scope NavigationScope,
+	selection agentSelection,
+) (AgentVisit, error) {
 	current, panes, err := n.currentAndLivePanes(ctx)
 	if err != nil {
 		return AgentVisit{}, err
@@ -63,7 +67,10 @@ func (n *Navigator) rankedAgent(ctx context.Context, scope NavigationScope, sele
 
 	visit, ok := rankedAgentPane(current, panes, agents, scope, sessionWindows, selection)
 	if !ok {
-		return visit, oops.In("agents").Code("not_found").With("operation", selection.operation()).Wrap(ErrNoTargetPane)
+		return visit, oops.In("agents").
+			Code("not_found").
+			With("operation", selection.operation()).
+			Wrap(ErrNoTargetPane)
 	}
 
 	target := retargetToCurrentSession(current, visit.Pane, sessionWindows)
@@ -88,15 +95,25 @@ func (s agentSelection) activity() string {
 	return [...]string{"idle", "waiting", "failed", "idle"}[s.kind]
 }
 
-func observedCurrentIdleVisit(current CurrentContext, panes []PaneLocation, agents []AgentSession) *PaneVisit {
+func observedCurrentIdleVisit(
+	current CurrentContext,
+	panes []PaneLocation,
+	agents []AgentSession,
+) *PaneVisit {
 	for _, pane := range panes {
 		if pane.PaneID != current.PaneID {
 			continue
 		}
 
 		for _, agent := range agents {
-			if agent.Activity == "idle" && !agent.ActivityChanged.IsZero() && paneMatchesAgentOwner(&agent, pane) {
-				return &PaneVisit{ServerSocket: pane.ServerSocket, SessionName: current.SessionName, PaneID: pane.PaneID, ViewedAt: agent.ActivityChanged}
+			if agent.Activity == "idle" && !agent.ActivityChanged.IsZero() &&
+				paneMatchesAgentOwner(&agent, pane) {
+				return &PaneVisit{
+					ServerSocket: pane.ServerSocket,
+					SessionName:  current.SessionName,
+					PaneID:       pane.PaneID,
+					ViewedAt:     agent.ActivityChanged,
+				}
 			}
 		}
 	}
@@ -104,7 +121,14 @@ func observedCurrentIdleVisit(current CurrentContext, panes []PaneLocation, agen
 	return nil
 }
 
-func rankedAgentPane(current CurrentContext, panes []PaneLocation, agents []AgentSession, scope NavigationScope, windows map[string]SessionWindow, selection agentSelection) (AgentVisit, bool) {
+func rankedAgentPane(
+	current CurrentContext,
+	panes []PaneLocation,
+	agents []AgentSession,
+	scope NavigationScope,
+	windows map[string]SessionWindow,
+	selection agentSelection,
+) (AgentVisit, bool) {
 	var selected AgentVisit
 
 	found := false
@@ -126,7 +150,8 @@ func rankedAgentPane(current CurrentContext, panes []PaneLocation, agents []Agen
 			newer := agent.ActivityChanged.After(selected.ActivityChanged)
 
 			older := agent.ActivityChanged.Before(selected.ActivityChanged)
-			if !found || selection.kind == selectionWaiting && older || selection.kind != selectionWaiting && newer {
+			if !found || selection.kind == selectionWaiting && older ||
+				selection.kind != selectionWaiting && newer {
 				selected.Pane = pane
 				selected.ActivityChanged = agent.ActivityChanged
 				found = true
@@ -137,8 +162,13 @@ func rankedAgentPane(current CurrentContext, panes []PaneLocation, agents []Agen
 	return selected, found
 }
 
-func (s agentSelection) eligible(current CurrentContext, pane PaneLocation, agent *AgentSession) bool {
-	if agent.Activity != s.activity() || agent.ActivityChanged.IsZero() || !paneMatchesAgentOwner(agent, pane) {
+func (s agentSelection) eligible(
+	current CurrentContext,
+	pane PaneLocation,
+	agent *AgentSession,
+) bool {
+	if agent.Activity != s.activity() || agent.ActivityChanged.IsZero() ||
+		!paneMatchesAgentOwner(agent, pane) {
 		return false
 	}
 
@@ -151,7 +181,9 @@ func (s agentSelection) eligible(current CurrentContext, pane PaneLocation, agen
 	}
 
 	for _, visit := range s.visits {
-		if visit.PaneID != pane.PaneID || !SameServerSocket(visit.ServerSocket, pane.ServerSocket) || visit.ViewedAt.Before(agent.ActivityChanged) {
+		if visit.PaneID != pane.PaneID ||
+			!SameServerSocket(visit.ServerSocket, pane.ServerSocket) ||
+			visit.ViewedAt.Before(agent.ActivityChanged) {
 			continue
 		}
 

@@ -32,12 +32,15 @@ const (
 
 func newPlaceholderCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:         placeholderVerb + " <task>",
-		Short:       "Hold a sleeping task's agent pane until it is woken",
-		Hidden:      true,
-		Args:        clibase.UsageArgs(cobra.ExactArgs(1)),
-		RunE:        runPlaceholder,
-		Annotations: map[string]string{clibase.AnnotationOperation: "task_placeholder", clibase.AnnotationLiveIO: "true"},
+		Use:    placeholderVerb + " <task>",
+		Short:  "Hold a sleeping task's agent pane until it is woken",
+		Hidden: true,
+		Args:   clibase.UsageArgs(cobra.ExactArgs(1)),
+		RunE:   runPlaceholder,
+		Annotations: map[string]string{
+			clibase.AnnotationOperation: "task_placeholder",
+			clibase.AnnotationLiveIO:    "true",
+		},
 	}
 
 	actioncli.AddEnvironmentFlags(cmd)
@@ -65,7 +68,10 @@ func runPlaceholder(cmd *cobra.Command, args []string) error {
 
 	state, err := term.MakeRaw(os.Stdin.Fd())
 	if err != nil {
-		return errors.Join(oops.In("cli").With("operation", "placeholder_terminal").Wrap(err), runtime.Close())
+		return errors.Join(
+			oops.In("cli").With("operation", "placeholder_terminal").Wrap(err),
+			runtime.Close(),
+		)
 	}
 
 	command, err := awaitWake(ctx, runtime, cfg, args[0], harness)
@@ -80,7 +86,12 @@ func runPlaceholder(cmd *cobra.Command, args []string) error {
 	return execResume(command)
 }
 
-func awaitWake(ctx context.Context, runtime *actioncli.Runtime, cfg *config.Config, id, harness string) ([]string, error) {
+func awaitWake(
+	ctx context.Context,
+	runtime *actioncli.Runtime,
+	cfg *config.Config,
+	id, harness string,
+) ([]string, error) {
 	resized := make(chan os.Signal, 1)
 	signal.Notify(resized, syscall.SIGWINCH)
 
@@ -121,7 +132,10 @@ func drawPlaceholder(cfg *config.Config, harness, failure string) {
 		width, height = 0, 0
 	}
 
-	_, _ = fmt.Fprint(os.Stdout, hideCursor+clearScreen+tui.SleepPlaceholder(cfg, harness, failure, width, height))
+	_, _ = fmt.Fprint(
+		os.Stdout,
+		hideCursor+clearScreen+tui.SleepPlaceholder(cfg, harness, failure, width, height),
+	)
 }
 
 func readKeys(input io.Reader) <-chan byte {

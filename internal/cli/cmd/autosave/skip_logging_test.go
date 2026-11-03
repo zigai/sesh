@@ -21,7 +21,9 @@ func TestAutomaticSnapshotSkipsLogOnlyFixedReasonsWithoutPrivateOutcomeFields(t 
 		t.Run(reason, func(t *testing.T) {
 			var logs bytes.Buffer
 
-			cmd := &cobra.Command{Annotations: map[string]string{clibase.AnnotationOperation: "restore-on-start"}}
+			cmd := &cobra.Command{
+				Annotations: map[string]string{clibase.AnnotationOperation: "restore-on-start"},
+			}
 			cmd.SetContext(zerolog.New(&logs).WithContext(t.Context()))
 
 			outcome := newOutcome(statusSkipped, reason)
@@ -34,8 +36,12 @@ func TestAutomaticSnapshotSkipsLogOnlyFixedReasonsWithoutPrivateOutcomeFields(t 
 			}
 
 			want := map[string]any{
-				"level": "info", "component": "snapshot", "operation": "restore-on-start", "status": "skipped",
-				"reason": reason, "message": "automatic snapshot operation skipped",
+				"level":     "info",
+				"component": "snapshot",
+				"operation": "restore-on-start",
+				"status":    "skipped",
+				"reason":    reason,
+				"message":   "automatic snapshot operation skipped",
 			}
 			if diff := cmp.Diff(want, record); diff != "" {
 				t.Fatalf("incorrect skip schema: %s", diff)
@@ -48,7 +54,9 @@ func TestAutomaticSnapshotSkipsLogOnlyFixedReasonsWithoutPrivateOutcomeFields(t 
 	}
 }
 
-func TestAutomaticSnapshotSkipLoggingLeavesDomainOutcomesAndTerminalFailuresToTheirOwners(t *testing.T) {
+func TestAutomaticSnapshotSkipLoggingLeavesDomainOutcomesAndTerminalFailuresToTheirOwners(
+	t *testing.T,
+) {
 	for _, outcome := range []outcome{
 		newOutcome(statusSaved, automation.ReasonDurableGeneration),
 		newOutcome(statusSkipped, automation.ReasonRecoveryRequired),
@@ -57,7 +65,9 @@ func TestAutomaticSnapshotSkipLoggingLeavesDomainOutcomesAndTerminalFailuresToTh
 	} {
 		var logs bytes.Buffer
 
-		cmd := &cobra.Command{Annotations: map[string]string{clibase.AnnotationOperation: "save-if-due"}}
+		cmd := &cobra.Command{
+			Annotations: map[string]string{clibase.AnnotationOperation: "save-if-due"},
+		}
 		cmd.SetContext(zerolog.New(&logs).WithContext(t.Context()))
 		logAutosaveSkip(cmd, outcome)
 

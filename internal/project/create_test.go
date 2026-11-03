@@ -18,7 +18,11 @@ func TestCreateMakesAnEmptyRepositoryInTheFirstRoot(t *testing.T) {
 		t.Fatalf("Create() error = %v", err)
 	}
 
-	want := project.Project{Root: filepath.Join(root, "notes"), Name: "notes", Kind: project.KindGit}
+	want := project.Project{
+		Root: filepath.Join(root, "notes"),
+		Name: "notes",
+		Kind: project.KindGit,
+	}
 	if created != want {
 		t.Fatalf("Create() = %+v, want %+v", created, want)
 	}
@@ -43,7 +47,14 @@ func TestCreateRefusesNamesOutsideTheRootAndExistingDirectories(t *testing.T) {
 		t.Errorf("Create(taken) error = %v, want ErrExists", err)
 	}
 
-	if _, err := newCatalog(t, nil, nil).Create(t.Context(), "notes"); !errors.Is(err, project.ErrNoRoot) {
+	if _, err := newCatalog(
+		t,
+		nil,
+		nil,
+	).Create(t.Context(), "notes"); !errors.Is(
+		err,
+		project.ErrNoRoot,
+	) {
 		t.Errorf("Create() without roots error = %v, want ErrNoRoot", err)
 	}
 }

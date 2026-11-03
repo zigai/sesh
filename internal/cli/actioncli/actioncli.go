@@ -53,7 +53,10 @@ type Runtime struct {
 	Router     action.Router
 }
 
-func Command[In, Out any](definition *action.Definition[In, Out], opts Options[In, Out]) *cobra.Command {
+func Command[In, Out any](
+	definition *action.Definition[In, Out],
+	opts Options[In, Out],
+) *cobra.Command {
 	operation := opts.Operation
 	if operation == "" {
 		operation = definition.ID.Verb()
@@ -67,7 +70,10 @@ func Command[In, Out any](definition *action.Definition[In, Out], opts Options[I
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd, args, definition, opts)
 		},
-		Annotations: map[string]string{clibase.AnnotationOperation: operation, clibase.AnnotationAction: string(definition.ID)},
+		Annotations: map[string]string{
+			clibase.AnnotationOperation: operation,
+			clibase.AnnotationAction:    string(definition.ID),
+		},
 	}
 
 	if opts.SuccessOwned {
@@ -77,7 +83,8 @@ func Command[In, Out any](definition *action.Definition[In, Out], opts Options[I
 	AddEnvironmentFlags(cmd)
 
 	if definition.Remote != action.RemoteNever {
-		cmd.Flags().String(ConnectionFlag, "", "Run on this configured remote connection instead of this machine")
+		cmd.Flags().
+			String(ConnectionFlag, "", "Run on this configured remote connection instead of this machine")
 	}
 
 	if definition.NeedsClient {
@@ -102,15 +109,19 @@ func AddEnvironmentFlags(cmd *cobra.Command) {
 	cmd.Flags().String("repository", "", clibase.RepositoryFlagUsage)
 	cmd.Flags().String("lease-root", "", clibase.LeaseRootFlagUsage)
 	cmd.Flags().String("history", "", clibase.HistoryFlagUsage)
-	cmd.Flags().String("agent-state", "", "AHT agent registry file [default: agent_status.store_path setting, else AHT's default registry]")
+	cmd.Flags().
+		String("agent-state", "", "AHT agent registry file [default: agent_status.store_path setting, else AHT's default registry]")
 }
 
 func addCallerFlags(cmd *cobra.Command) {
-	cmd.Flags().String(ClientFlag, "", "Invoking tmux client, by name or tty [default: the client of the invoking pane]")
+	cmd.Flags().
+		String(ClientFlag, "", "Invoking tmux client, by name or tty [default: the client of the invoking pane]")
 	cmd.Flags().String(PaneFlag, "", "Invoking tmux pane ID, for example %1 [default: $TMUX_PANE]")
-	cmd.Flags().String(ClientSessionFlag, "", "Session name or ID the invoking client is expected to show")
+	cmd.Flags().
+		String(ClientSessionFlag, "", "Session name or ID the invoking client is expected to show")
 	cmd.Flags().String(ClientWidthFlag, "", "Invoking client width [default: the client's width]")
-	cmd.Flags().String(ClientHeightFlag, "", "Invoking client height [default: the client's height]")
+	cmd.Flags().
+		String(ClientHeightFlag, "", "Invoking client height [default: the client's height]")
 }
 
 func CallerOf(cmd *cobra.Command) action.Caller {
@@ -160,7 +171,11 @@ func OpenRuntime(cmd *cobra.Command, cfg *config.Config) (*Runtime, error) {
 		WorktreeDir:        workspace.WorktreeDir,
 	})
 
-	return &Runtime{Local: local, Repository: repository, Router: action.Router{Local: local, Peer: nil, Origin: nil}}, nil
+	return &Runtime{
+		Local:      local,
+		Repository: repository,
+		Router:     action.Router{Local: local, Peer: nil, Origin: nil},
+	}, nil
 }
 
 func TerminalStreams(cmd *cobra.Command) gotmux.Streams {
@@ -189,7 +204,12 @@ func (runtime *Runtime) Close() error {
 	return runtime.Repository.Close()
 }
 
-func run[In, Out any](cmd *cobra.Command, args []string, definition *action.Definition[In, Out], opts Options[In, Out]) error {
+func run[In, Out any](
+	cmd *cobra.Command,
+	args []string,
+	definition *action.Definition[In, Out],
+	opts Options[In, Out],
+) error {
 	ctx := clibase.CommandContext(cmd)
 
 	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
@@ -260,7 +280,12 @@ func execute[In, Out any](
 ) (Out, bool, error) {
 	var zero Out
 
-	subject, err := runtime.Local.ResolveSubject(ctx, definition.Subject, values.String("generation"), subjectArgs)
+	subject, err := runtime.Local.ResolveSubject(
+		ctx,
+		definition.Subject,
+		values.String("generation"),
+		subjectArgs,
+	)
 	if err != nil {
 		return zero, false, err
 	}
@@ -314,7 +339,11 @@ func executeRemote[In, Out any](
 	}
 
 	if definition.Subject != action.SubjectNone {
-		sessions, err := peerSessions(remote.CatalogSessions(state), definition.Subject, subjectArgs)
+		sessions, err := peerSessions(
+			remote.CatalogSessions(state),
+			definition.Subject,
+			subjectArgs,
+		)
 		if err != nil {
 			return zero, false, err
 		}
@@ -328,7 +357,14 @@ func executeRemote[In, Out any](
 	}
 
 	router := action.Router{Local: nil, Peer: peer, Origin: nil}
-	output, err := action.Run(ctx, router, definition, subject.At, action.Caller{Client: "", Pane: "", Session: "", Width: "", Height: ""}, input)
+	output, err := action.Run(
+		ctx,
+		router,
+		definition,
+		subject.At,
+		action.Caller{Client: "", Pane: "", Session: "", Width: "", Height: ""},
+		input,
+	)
 
 	return output, true, err
 }
@@ -345,9 +381,16 @@ func commandLocation(cmd *cobra.Command) action.Location {
 	return action.Local()
 }
 
-func peerSessions(rows []session.Session, kind action.SubjectKind, selectors []string) ([]session.Session, error) {
+func peerSessions(
+	rows []session.Session,
+	kind action.SubjectKind,
+	selectors []string,
+) ([]session.Session, error) {
 	live := slices.DeleteFunc(slices.Clone(rows), session.Session.Saved)
-	saved := slices.DeleteFunc(slices.Clone(rows), func(row session.Session) bool { return !row.Saved() })
+	saved := slices.DeleteFunc(
+		slices.Clone(rows),
+		func(row session.Session) bool { return !row.Saved() },
+	)
 
 	selected := make([]session.Session, 0, len(selectors))
 
@@ -383,7 +426,12 @@ func peerSessions(rows []session.Session, kind action.SubjectKind, selectors []s
 	return selected, nil
 }
 
-func Render[In, Out any](cmd *cobra.Command, definition *action.Definition[In, Out], output Out, err error) error {
+func Render[In, Out any](
+	cmd *cobra.Command,
+	definition *action.Definition[In, Out],
+	output Out,
+	err error,
+) error {
 	if clibase.JSONOutputEnabled(cmd) {
 		return clibase.WriteJSONResultError(cmd, output, err)
 	}
@@ -400,7 +448,11 @@ func Render[In, Out any](cmd *cobra.Command, definition *action.Definition[In, O
 	return clibase.WriteOutput(cmd, "%s\n", report)
 }
 
-func commandValues(cmd *cobra.Command, args []string, descriptor action.Descriptor) ([]string, action.Values, error) {
+func commandValues(
+	cmd *cobra.Command,
+	args []string,
+	descriptor action.Descriptor,
+) ([]string, action.Values, error) {
 	values := make(action.Values)
 	local := commandLocation(cmd).Kind == action.LocationLocal
 
@@ -528,7 +580,10 @@ func subjectName(kind action.SubjectKind) string {
 		return "pane"
 	case action.SubjectTask:
 		return "task"
-	case action.SubjectNone, action.SubjectLiveSession, action.SubjectSavedSession, action.SubjectSession:
+	case action.SubjectNone,
+		action.SubjectLiveSession,
+		action.SubjectSavedSession,
+		action.SubjectSession:
 		return "session"
 	default:
 		return "session"

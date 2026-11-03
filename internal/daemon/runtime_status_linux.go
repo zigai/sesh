@@ -104,22 +104,34 @@ type runtimeIdentity struct {
 func RuntimeStatusPath(runtimeDir, endpoint string) (string, error) {
 	if !filepath.IsAbs(runtimeDir) || filepath.Clean(runtimeDir) != runtimeDir ||
 		!filepath.IsAbs(endpoint) || filepath.Clean(endpoint) != endpoint {
-		return "", oops.In("daemon").Code("runtime_status_failed").With("operation", "runtime_status_path").Wrap(ErrRuntimeStatusPath)
+		return "", oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "runtime_status_path").
+			Wrap(ErrRuntimeStatusPath)
 	}
 
 	name := "daemon-" + runtimeEndpointID(endpoint) + ".sock"
 
 	path := filepath.Join(runtimeDir, "sesh", name)
 	if len(path) > linuxUnixPathMaximum {
-		return "", oops.In("daemon").Code("runtime_status_failed").With("operation", "runtime_status_path").Wrap(ErrRuntimeStatusPath)
+		return "", oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "runtime_status_path").
+			Wrap(ErrRuntimeStatusPath)
 	}
 
 	return path, nil
 }
 
-func StartRuntimeReporter(ctx context.Context, config RuntimeStatusConfig) (*RuntimeReporter, error) {
+func StartRuntimeReporter(
+	ctx context.Context,
+	config RuntimeStatusConfig,
+) (*RuntimeReporter, error) {
 	if config.LiveStatus == nil {
-		return nil, oops.In("daemon").Code("runtime_status_unavailable").With("operation", "start_runtime_reporter").Wrap(ErrRuntimeStatusUnavailable)
+		return nil, oops.In("daemon").
+			Code("runtime_status_unavailable").
+			With("operation", "start_runtime_reporter").
+			Wrap(ErrRuntimeStatusUnavailable)
 	}
 
 	_, name, dir, lock, err := prepareRuntimeEndpoint(ctx, config)
@@ -129,30 +141,47 @@ func StartRuntimeReporter(ctx context.Context, config RuntimeStatusConfig) (*Run
 
 	identity, err := currentRuntimeIdentity(ctx)
 	if err != nil {
-		return nil, oops.In("daemon").Code("runtime_status_failed").With("operation", "start_runtime_reporter").Wrap(errors.Join(err, lock.Close(), dir.Close()))
+		return nil, oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "start_runtime_reporter").
+			Wrap(errors.Join(err, lock.Close(), dir.Close()))
 	}
 
 	listener, err := listenRuntimeEndpoint(dir, name)
 	if err != nil {
-		return nil, oops.In("daemon").Code("runtime_status_failed").With("operation", "start_runtime_reporter").Wrap(errors.Join(err, lock.Close(), dir.Close()))
+		return nil, oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "start_runtime_reporter").
+			Wrap(errors.Join(err, lock.Close(), dir.Close()))
 	}
 
 	listener.SetUnlinkOnClose(false)
 
 	pinnedPath, err := dir.PinnedPath(name)
 	if err != nil {
-		return nil, oops.In("daemon").Code("runtime_status_failed").With("operation", "start_runtime_reporter").Wrap(errors.Join(err, listener.Close(), lock.Close(), dir.Close()))
+		return nil, oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "start_runtime_reporter").
+			Wrap(errors.Join(err, listener.Close(), lock.Close(), dir.Close()))
 	}
 
 	if err := os.Chmod(pinnedPath, 0o600); err != nil {
-		return nil, oops.In("daemon").Code("runtime_status_failed").With("operation", "start_runtime_reporter").Wrap(errors.Join(err, listener.Close(), lock.Close(), dir.Close()))
+		return nil, oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "start_runtime_reporter").
+			Wrap(errors.Join(err, listener.Close(), lock.Close(), dir.Close()))
 	}
 
 	socketIdentity, err := dir.Inspect(name)
 
 	uid, uidErr := effectiveUID()
-	if err != nil || uidErr != nil || socketIdentity.Mode&uint64(unix.S_IFMT) != uint64(unix.S_IFSOCK) || socketIdentity.UID != uid {
-		return nil, oops.In("daemon").Code("runtime_status_failed").With("operation", "start_runtime_reporter").Wrap(errors.Join(ErrRuntimeStatusIdentity, err, uidErr, listener.Close(), lock.Close(), dir.Close()))
+	if err != nil || uidErr != nil ||
+		socketIdentity.Mode&uint64(unix.S_IFMT) != uint64(unix.S_IFSOCK) ||
+		socketIdentity.UID != uid {
+		return nil, oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "start_runtime_reporter").
+			Wrap(errors.Join(ErrRuntimeStatusIdentity, err, uidErr, listener.Close(), lock.Close(), dir.Close()))
 	}
 
 	reporter := &RuntimeReporter{
@@ -197,7 +226,10 @@ func (r *RuntimeReporter) Close() error {
 	removeErr := r.removeSocket()
 
 	if err := errors.Join(listenErr, removeErr, r.lock.Close(), r.dir.Close()); err != nil {
-		return oops.In("daemon").Code("runtime_status_failed").With("operation", "close_runtime_reporter").Wrap(err)
+		return oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "close_runtime_reporter").
+			Wrap(err)
 	}
 
 	return nil
@@ -217,7 +249,10 @@ func QueryRuntimeStatus(ctx context.Context, path string) (RuntimeStatus, error)
 	}
 
 	if err := unixConnection.SetReadDeadline(deadline); err != nil {
-		return status, oops.In("daemon").Code("runtime_status_unavailable").With("operation", "query_runtime_status").Wrap(errors.Join(ErrRuntimeStatusUnavailable, err, unixConnection.Close()))
+		return status, oops.In("daemon").
+			Code("runtime_status_unavailable").
+			With("operation", "query_runtime_status").
+			Wrap(errors.Join(ErrRuntimeStatusUnavailable, err, unixConnection.Close()))
 	}
 
 	stopCancel := context.AfterFunc(ctx, func() { _ = unixConnection.Close() })
@@ -227,15 +262,24 @@ func QueryRuntimeStatus(ctx context.Context, path string) (RuntimeStatus, error)
 
 	closeErr := unixConnection.Close()
 	if readErr != nil || closeErr != nil {
-		return status, oops.In("daemon").Code("runtime_status_unavailable").With("operation", "query_runtime_status").Wrap(errors.Join(ErrRuntimeStatusUnavailable, runtimeContextCause(ctx), readErr, closeErr))
+		return status, oops.In("daemon").
+			Code("runtime_status_unavailable").
+			With("operation", "query_runtime_status").
+			Wrap(errors.Join(ErrRuntimeStatusUnavailable, runtimeContextCause(ctx), readErr, closeErr))
 	}
 
 	if len(data) > runtimeStatusMaximumBytes {
-		return status, oops.In("daemon").Code("runtime_status_unavailable").With("operation", "query_runtime_status").Wrap(ErrRuntimeStatusUnavailable)
+		return status, oops.In("daemon").
+			Code("runtime_status_unavailable").
+			With("operation", "query_runtime_status").
+			Wrap(ErrRuntimeStatusUnavailable)
 	}
 
 	if err := json.Unmarshal(data, &status, json.RejectUnknownMembers(true)); err != nil {
-		return RuntimeStatus{}, oops.In("daemon").Code("runtime_status_unavailable").With("operation", "query_runtime_status").Wrap(errors.Join(ErrRuntimeStatusUnavailable, err))
+		return RuntimeStatus{}, oops.In("daemon").
+			Code("runtime_status_unavailable").
+			With("operation", "query_runtime_status").
+			Wrap(errors.Join(ErrRuntimeStatusUnavailable, err))
 	}
 
 	if err := verifyRuntimeStatus(ctx, status, peer.pid, path); err != nil {
@@ -247,12 +291,18 @@ func QueryRuntimeStatus(ctx context.Context, path string) (RuntimeStatus, error)
 
 func runtimeContextCause(ctx context.Context) error {
 	if cause := context.Cause(ctx); cause != nil {
-		return oops.In("daemon").Code("operation_canceled").With("operation", "context_cause").Wrap(cause)
+		return oops.In("daemon").
+			Code("operation_canceled").
+			With("operation", "context_cause").
+			Wrap(cause)
 	}
 
 	deadline, ok := ctx.Deadline()
 	if ok && !time.Now().Before(deadline) {
-		return oops.In("daemon").Code("operation_timed_out").With("operation", "context_cause").Wrap(context.DeadlineExceeded)
+		return oops.In("daemon").
+			Code("operation_timed_out").
+			With("operation", "context_cause").
+			Wrap(context.DeadlineExceeded)
 	}
 
 	return nil
@@ -261,16 +311,25 @@ func runtimeContextCause(ctx context.Context) error {
 func listenRuntimeEndpoint(dir *privatefs.Dir, name string) (*net.UnixListener, error) {
 	pinnedPath, err := dir.PinnedPath(name)
 	if err != nil {
-		return nil, oops.In("daemon").Code("runtime_status_failed").With("operation", "listen_runtime_endpoint").Wrap(err)
+		return nil, oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "listen_runtime_endpoint").
+			Wrap(err)
 	}
 
 	if len(pinnedPath) > linuxUnixPathMaximum {
-		return nil, oops.In("daemon").Code("runtime_status_failed").With("operation", "listen_runtime_endpoint").Wrap(ErrRuntimeStatusPath)
+		return nil, oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "listen_runtime_endpoint").
+			Wrap(ErrRuntimeStatusPath)
 	}
 
 	listener, err := net.ListenUnix("unix", &net.UnixAddr{Name: pinnedPath, Net: "unix"})
 	if err != nil {
-		return nil, oops.In("daemon").Code("runtime_status_failed").With("operation", "listen_runtime_endpoint").Wrap(err)
+		return nil, oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "listen_runtime_endpoint").
+			Wrap(err)
 	}
 
 	return listener, nil
@@ -287,7 +346,10 @@ func prepareRuntimeEndpoint(
 
 	dir, err := privatefs.Ensure(filepath.Dir(path))
 	if err != nil {
-		return "", "", nil, nil, oops.In("daemon").Code("runtime_status_failed").With("operation", "prepare_runtime_endpoint").Wrap(err)
+		return "", "", nil, nil, oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "prepare_runtime_endpoint").
+			Wrap(err)
 	}
 
 	name := filepath.Base(path)
@@ -301,37 +363,58 @@ func prepareRuntimeEndpoint(
 			lockErr = ErrRuntimeStatusActive
 		}
 
-		return "", "", nil, nil, oops.In("daemon").Code("runtime_status_failed").With("operation", "prepare_runtime_endpoint").Wrap(errors.Join(lockErr, dir.Close()))
+		return "", "", nil, nil, oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "prepare_runtime_endpoint").
+			Wrap(errors.Join(lockErr, dir.Close()))
 	}
 
 	if err := checkRuntimeSocketAvailable(ctx, dir, name, path); err != nil {
-		return "", "", nil, nil, oops.In("daemon").Code("runtime_status_failed").With("operation", "prepare_runtime_endpoint").Wrap(errors.Join(err, lock.Close(), dir.Close()))
+		return "", "", nil, nil, oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "prepare_runtime_endpoint").
+			Wrap(errors.Join(err, lock.Close(), dir.Close()))
 	}
 
 	return path, name, dir, lock, nil
 }
 
-func openRuntimeConnection(ctx context.Context, path string) (*net.UnixConn, runtimeIdentity, error) {
+func openRuntimeConnection(
+	ctx context.Context,
+	path string,
+) (*net.UnixConn, runtimeIdentity, error) {
 	var dialer net.Dialer
 
 	connection, err := dialer.DialContext(ctx, "unix", path)
 	if err != nil {
-		return nil, runtimeIdentity{}, oops.In("daemon").Code("runtime_status_unavailable").With("operation", "open_runtime_connection").Wrap(errors.Join(ErrRuntimeStatusUnavailable, err))
+		return nil, runtimeIdentity{}, oops.In("daemon").
+			Code("runtime_status_unavailable").
+			With("operation", "open_runtime_connection").
+			Wrap(errors.Join(ErrRuntimeStatusUnavailable, err))
 	}
 
 	unixConnection, ok := connection.(*net.UnixConn)
 	if !ok {
-		return nil, runtimeIdentity{}, oops.In("daemon").Code("runtime_status_failed").With("operation", "open_runtime_connection").Wrap(errors.Join(ErrRuntimeStatusIdentity, connection.Close()))
+		return nil, runtimeIdentity{}, oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "open_runtime_connection").
+			Wrap(errors.Join(ErrRuntimeStatusIdentity, connection.Close()))
 	}
 
 	peer, err := unixPeerIdentity(unixConnection)
 	if err != nil {
-		return nil, runtimeIdentity{}, oops.In("daemon").Code("runtime_status_failed").With("operation", "open_runtime_connection").Wrap(errors.Join(err, unixConnection.Close()))
+		return nil, runtimeIdentity{}, oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "open_runtime_connection").
+			Wrap(errors.Join(err, unixConnection.Close()))
 	}
 
 	uid, err := effectiveUID()
 	if err != nil || peer.uid != uid {
-		return nil, runtimeIdentity{}, oops.In("daemon").Code("runtime_status_failed").With("operation", "open_runtime_connection").Wrap(errors.Join(ErrRuntimeStatusIdentity, err, unixConnection.Close()))
+		return nil, runtimeIdentity{}, oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "open_runtime_connection").
+			Wrap(errors.Join(ErrRuntimeStatusIdentity, err, unixConnection.Close()))
 	}
 
 	return unixConnection, peer, nil
@@ -348,8 +431,14 @@ func (r *RuntimeReporter) serve(ctx context.Context) {
 			r.mu.RUnlock()
 
 			if !stopping {
-				zerolog.Ctx(ctx).Error().Str("component", "daemon").Str("operation", "serve_runtime_status").
-					Str("status", "failed").Str("reason", "listener_failed").Func(logging.Cause(err)).Msg("runtime status listener stopped unexpectedly")
+				zerolog.Ctx(ctx).
+					Error().
+					Str("component", "daemon").
+					Str("operation", "serve_runtime_status").
+					Str("status", "failed").
+					Str("reason", "listener_failed").
+					Func(logging.Cause(err)).
+					Msg("runtime status listener stopped unexpectedly")
 			}
 
 			return
@@ -441,7 +530,10 @@ func checkRuntimeSocketAvailable(ctx context.Context, dir *privatefs.Dir, name, 
 	}
 
 	if err != nil {
-		return oops.In("daemon").Code("runtime_status_failed").With("operation", "check_runtime_socket").Wrap(err)
+		return oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "check_runtime_socket").
+			Wrap(err)
 	}
 
 	uid, err := effectiveUID()
@@ -468,7 +560,10 @@ func (r *RuntimeReporter) removeSocket() error {
 	}
 
 	if err != nil {
-		return oops.In("daemon").Code("runtime_status_failed").With("operation", "remove_socket").Wrap(err)
+		return oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "remove_socket").
+			Wrap(err)
 	}
 
 	if identity != r.socket {
@@ -476,7 +571,10 @@ func (r *RuntimeReporter) removeSocket() error {
 	}
 
 	if err := r.dir.Remove(r.name); err != nil {
-		return oops.In("daemon").Code("runtime_status_failed").With("operation", "remove_socket").Wrap(err)
+		return oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "remove_socket").
+			Wrap(err)
 	}
 
 	return nil
@@ -487,7 +585,10 @@ func currentRuntimeIdentity(ctx context.Context) (runtimeIdentity, error) {
 
 	identity, err := processintegration.ReadIdentity(ctx, pid)
 	if err != nil {
-		return runtimeIdentity{}, oops.In("daemon").Code("runtime_status_failed").With("operation", "current_runtime_identity").Wrap(err)
+		return runtimeIdentity{}, oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "current_runtime_identity").
+			Wrap(err)
 	}
 
 	uid, err := effectiveUID()
@@ -495,13 +596,21 @@ func currentRuntimeIdentity(ctx context.Context) (runtimeIdentity, error) {
 		return runtimeIdentity{}, err
 	}
 
-	return runtimeIdentity{pid: pid, uid: uid, bootID: identity.BootID, startTicks: identity.StartTime}, nil
+	return runtimeIdentity{
+		pid:        pid,
+		uid:        uid,
+		bootID:     identity.BootID,
+		startTicks: identity.StartTime,
+	}, nil
 }
 
 func unixPeerIdentity(connection *net.UnixConn) (runtimeIdentity, error) {
 	raw, err := connection.SyscallConn()
 	if err != nil {
-		return runtimeIdentity{}, oops.In("daemon").Code("runtime_status_failed").With("operation", "peer_identity").Wrap(errors.Join(ErrRuntimeStatusIdentity, err))
+		return runtimeIdentity{}, oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "peer_identity").
+			Wrap(errors.Join(ErrRuntimeStatusIdentity, err))
 	}
 
 	var (
@@ -512,38 +621,69 @@ func unixPeerIdentity(connection *net.UnixConn) (runtimeIdentity, error) {
 	if err := raw.Control(func(fd uintptr) {
 		credentials, socketErr = unix.GetsockoptUcred(int(fd), unix.SOL_SOCKET, unix.SO_PEERCRED)
 	}); err != nil {
-		return runtimeIdentity{}, oops.In("daemon").Code("runtime_status_failed").With("operation", "peer_identity").Wrap(errors.Join(ErrRuntimeStatusIdentity, err))
+		return runtimeIdentity{}, oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "peer_identity").
+			Wrap(errors.Join(ErrRuntimeStatusIdentity, err))
 	}
 
 	if socketErr != nil || credentials == nil {
-		return runtimeIdentity{}, oops.In("daemon").Code("runtime_status_failed").With("operation", "peer_identity").Wrap(errors.Join(ErrRuntimeStatusIdentity, socketErr))
+		return runtimeIdentity{}, oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "peer_identity").
+			Wrap(errors.Join(ErrRuntimeStatusIdentity, socketErr))
 	}
 
-	return runtimeIdentity{pid: int(credentials.Pid), uid: credentials.Uid, bootID: "", startTicks: 0}, nil
+	return runtimeIdentity{
+		pid:        int(credentials.Pid),
+		uid:        credentials.Uid,
+		bootID:     "",
+		startTicks: 0,
+	}, nil
 }
 
 func effectiveUID() (uint32, error) {
 	value := os.Geteuid()
 	if value < 0 || uint64(value) > uint64(^uint32(0)) {
-		return 0, oops.In("daemon").Code("runtime_status_failed").With("operation", "effective_uid").Wrap(ErrRuntimeStatusIdentity)
+		return 0, oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "effective_uid").
+			Wrap(ErrRuntimeStatusIdentity)
 	}
 
 	return uint32(value), nil
 }
 
-func verifyRuntimeStatus(ctx context.Context, status RuntimeStatus, peerPID int, path string) error {
-	expectedEndpoint := strings.TrimSuffix(strings.TrimPrefix(filepath.Base(path), "daemon-"), ".sock")
+func verifyRuntimeStatus(
+	ctx context.Context,
+	status RuntimeStatus,
+	peerPID int,
+	path string,
+) error {
+	expectedEndpoint := strings.TrimSuffix(
+		strings.TrimPrefix(filepath.Base(path), "daemon-"),
+		".sock",
+	)
 	if err := validateRuntimeStatus(status, peerPID, expectedEndpoint); err != nil {
-		return oops.In("daemon").Code("runtime_status_failed").With("operation", "verify_runtime_status").Wrap(err)
+		return oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "verify_runtime_status").
+			Wrap(err)
 	}
 
 	identity, err := processintegration.ReadIdentity(ctx, peerPID)
 	if err != nil {
-		return oops.In("daemon").Code("runtime_status_failed").With("operation", "verify_runtime_status").Wrap(errors.Join(ErrRuntimeStatusIdentity, err))
+		return oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "verify_runtime_status").
+			Wrap(errors.Join(ErrRuntimeStatusIdentity, err))
 	}
 
 	if identity.BootID != status.BootID || identity.StartTime != status.ProcessStartTicks {
-		return oops.In("daemon").Code("runtime_status_failed").With("operation", "verify_runtime_status").Wrap(ErrRuntimeStatusIdentity)
+		return oops.In("daemon").
+			Code("runtime_status_failed").
+			With("operation", "verify_runtime_status").
+			Wrap(ErrRuntimeStatusIdentity)
 	}
 
 	return nil
@@ -558,7 +698,8 @@ func validateRuntimeStatus(status RuntimeStatus, peerPID int, expectedEndpoint s
 		return ErrRuntimeStatusIdentity
 	}
 
-	if len(expectedEndpoint) != runtimeStatusSocketBytes*2 || status.EndpointID != expectedEndpoint {
+	if len(expectedEndpoint) != runtimeStatusSocketBytes*2 ||
+		status.EndpointID != expectedEndpoint {
 		return ErrRuntimeStatusIdentity
 	}
 

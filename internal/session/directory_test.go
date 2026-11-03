@@ -47,7 +47,12 @@ func TestDirectoryPathSuggestionsSupportsRelativeAndAbsolutePaths(t *testing.T) 
 		t.Fatalf("DirectoryPathSuggestions(relative) err = %v", err)
 	}
 
-	if want := "src" + string(os.PathSeparator) + "server" + string(os.PathSeparator); len(relative) != 1 || relative[0] != want {
+	if want := "src" + string(
+		os.PathSeparator,
+	) + "server" + string(
+		os.PathSeparator,
+	); len(relative) != 1 ||
+		relative[0] != want {
 		t.Fatalf("relative suggestions = %#v, want %q", relative, want)
 	}
 
@@ -58,7 +63,10 @@ func TestDirectoryPathSuggestionsSupportsRelativeAndAbsolutePaths(t *testing.T) 
 		t.Fatalf("DirectoryPathSuggestions(absolute) err = %v", err)
 	}
 
-	if want := EnsureTrailingSeparator(filepath.Join(src, "server")); len(absolute) != 1 || absolute[0] != want {
+	if want := EnsureTrailingSeparator(
+		filepath.Join(src, "server"),
+	); len(absolute) != 1 ||
+		absolute[0] != want {
 		t.Fatalf("absolute suggestions = %#v, want %q", absolute, want)
 	}
 }
@@ -205,15 +213,34 @@ func TestDirectoryPathSuggestionsNarrowsLargeDirectoriesByPrefix(t *testing.T) {
 func TestDefaultCreateSessionDirectory(t *testing.T) {
 	cwd := "/test/cwd"
 
-	if got := DefaultCreateSessionDirectory(cwd, "my-sess", ""); got != filepath.Join(cwd, "my-sess") {
+	if got := DefaultCreateSessionDirectory(
+		cwd,
+		"my-sess",
+		"",
+	); got != filepath.Join(
+		cwd,
+		"my-sess",
+	) {
 		t.Fatalf("got %q, want %q", got, filepath.Join(cwd, "my-sess"))
 	}
 
-	if got := DefaultCreateSessionDirectory(cwd, "my-sess", "projects/{session}"); got != filepath.Join(cwd, "projects", "my-sess") {
+	if got := DefaultCreateSessionDirectory(
+		cwd,
+		"my-sess",
+		"projects/{session}",
+	); got != filepath.Join(
+		cwd,
+		"projects",
+		"my-sess",
+	) {
 		t.Fatalf("got %q, want %q", got, filepath.Join(cwd, "projects", "my-sess"))
 	}
 
-	if got := DefaultCreateSessionDirectory(cwd, "my-sess", "/opt/{session}"); got != "/opt/my-sess" {
+	if got := DefaultCreateSessionDirectory(
+		cwd,
+		"my-sess",
+		"/opt/{session}",
+	); got != "/opt/my-sess" {
 		t.Fatalf("got %q, want /opt/my-sess", got)
 	}
 }

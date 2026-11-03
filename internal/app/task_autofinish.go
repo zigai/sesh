@@ -34,7 +34,11 @@ func (local *Local) FinishMergedTasksEvery(ctx context.Context, interval time.Du
 	finishOnTicks(ctx, ticker.C, local.finishMergedTasks)
 }
 
-func finishOnTicks(ctx context.Context, ticks <-chan time.Time, scan func(context.Context, map[string]bool) error) {
+func finishOnTicks(
+	ctx context.Context,
+	ticks <-chan time.Time,
+	scan func(context.Context, map[string]bool) error,
+) {
 	refused := make(map[string]bool)
 
 	var episode logging.Episode
@@ -54,11 +58,21 @@ func finishOnTicks(ctx context.Context, ticks <-chan time.Time, scan func(contex
 		switch {
 		case !episode.Observe(err):
 		case err != nil:
-			zerolog.Ctx(ctx).Warn().Str("component", "task").Str("operation", "finish_merged_tasks").
-				Str("status", "degraded").Str("reason", "task_scan_failed").Func(logging.Cause(err)).Msg("periodic merged task finish failed")
+			zerolog.Ctx(ctx).
+				Warn().
+				Str("component", "task").
+				Str("operation", "finish_merged_tasks").
+				Str("status", "degraded").
+				Str("reason", "task_scan_failed").
+				Func(logging.Cause(err)).
+				Msg("periodic merged task finish failed")
 		default:
-			zerolog.Ctx(ctx).Info().Str("component", "task").Str("operation", "finish_merged_tasks").
-				Str("status", "recovered").Msg("periodic merged task finish recovered")
+			zerolog.Ctx(ctx).
+				Info().
+				Str("component", "task").
+				Str("operation", "finish_merged_tasks").
+				Str("status", "recovered").
+				Msg("periodic merged task finish recovered")
 		}
 	}
 }
@@ -100,7 +114,11 @@ func (local *Local) finishMergedTasks(ctx context.Context, refused map[string]bo
 }
 
 func (local *Local) readyToFinish(
-	ctx context.Context, service *task.Service, live task.Live, shown map[gotmux.WindowID]bool, refused map[string]bool,
+	ctx context.Context,
+	service *task.Service,
+	live task.Live,
+	shown map[gotmux.WindowID]bool,
+	refused map[string]bool,
 ) (bool, error) {
 	record := live.Record
 
@@ -118,7 +136,12 @@ func (local *Local) readyToFinish(
 	return !local.agentBusy(ctx, live), nil
 }
 
-func (local *Local) finishMergedTask(ctx context.Context, service *task.Service, id string, refused map[string]bool) {
+func (local *Local) finishMergedTask(
+	ctx context.Context,
+	service *task.Service,
+	id string,
+	refused map[string]bool,
+) {
 	record, err := service.Finish(ctx, id, task.FinishOptions{Discard: false, SkipRun: false})
 	if ctx.Err() != nil {
 		return
@@ -140,7 +163,11 @@ func logMergedTaskFinish(ctx context.Context, id string, err error) {
 	logger := zerolog.Ctx(ctx)
 
 	if err == nil {
-		logger.Info().Str("component", "task").Str("operation", "finish_merged_task").Str("task_id", id).Str("status", "ok").
+		logger.Info().
+			Str("component", "task").
+			Str("operation", "finish_merged_task").
+			Str("task_id", id).
+			Str("status", "ok").
 			Msg("finished a task whose pull request merged")
 
 		return
@@ -157,12 +184,21 @@ func logMergedTaskFinish(ctx context.Context, id string, err error) {
 		reason = "finish_run_failed"
 	}
 
-	logger.Warn().Str("component", "task").Str("operation", "finish_merged_task").Str("task_id", id).Str("status", "degraded").
-		Str("reason", reason).Func(logging.Cause(err)).Msg("task whose pull request merged was not finished")
+	logger.Warn().
+		Str("component", "task").
+		Str("operation", "finish_merged_task").
+		Str("task_id", id).
+		Str("status", "degraded").
+		Str("reason", reason).
+		Func(logging.Cause(err)).
+		Msg("task whose pull request merged was not finished")
 }
 
 func (local *Local) shownWindows(ctx context.Context) (map[gotmux.WindowID]bool, error) {
-	clients, err := local.server.ClientsWith(ctx, gotmux.QueryOptions{Filter: "", ExtraFields: []string{"window_id"}})
+	clients, err := local.server.ClientsWith(
+		ctx,
+		gotmux.QueryOptions{Filter: "", ExtraFields: []string{"window_id"}},
+	)
 	if err != nil {
 		return nil, oops.In("app").With("operation", "list_clients").Wrap(err)
 	}
@@ -183,7 +219,10 @@ func (local *Local) agentBusy(ctx context.Context, live task.Live) bool {
 		return false
 	}
 
-	finder := paneAgents{source: local.agentSource, socket: agents.NormalizeServerSocket(local.server.Endpoint().SocketPath)}
+	finder := paneAgents{
+		source: local.agentSource,
+		socket: agents.NormalizeServerSocket(local.server.Endpoint().SocketPath),
+	}
 
 	found, err := finder.AgentsIn(ctx, live.AgentPane)
 	if err != nil {
@@ -191,5 +230,8 @@ func (local *Local) agentBusy(ctx context.Context, live task.Live) bool {
 		return true
 	}
 
-	return slices.ContainsFunc(found, func(agent task.Agent) bool { return !slices.Contains(finishableActivities, agent.Activity) })
+	return slices.ContainsFunc(
+		found,
+		func(agent task.Agent) bool { return !slices.Contains(finishableActivities, agent.Activity) },
+	)
 }

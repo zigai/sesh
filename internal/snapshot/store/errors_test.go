@@ -81,7 +81,8 @@ func assertReconciledPublication(t *testing.T, path, id string) {
 		t.Fatal(err)
 	}
 
-	if len(catalog.Generations) != 1 || len(catalog.Attempts) != 1 || catalog.Attempts[0].State != "incomplete" {
+	if len(catalog.Generations) != 1 || len(catalog.Attempts) != 1 ||
+		catalog.Attempts[0].State != "incomplete" {
 		t.Fatal("reconciliation duplicated or changed committed snapshot")
 	}
 

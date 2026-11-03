@@ -53,7 +53,8 @@ func newConfigInitCommand() *cobra.Command {
 		RunE: runConfigInit,
 	}
 
-	cmd.Flags().String("path", "", "Configuration file to create [default: $XDG_CONFIG_HOME/sesh/config.toml]")
+	cmd.Flags().
+		String("path", "", "Configuration file to create [default: $XDG_CONFIG_HOME/sesh/config.toml]")
 	cmd.Flags().Bool("force", false, "Replace an existing regular configuration file")
 	clibase.AddJSONFlag(cmd)
 
@@ -63,12 +64,18 @@ func newConfigInitCommand() *cobra.Command {
 func runConfigInit(cmd *cobra.Command, _ []string) error {
 	path, err := cmd.Flags().GetString("path")
 	if err != nil {
-		return oops.In("cli").Code("config_init_failed").With("operation", "read_config_init_path").Wrap(err)
+		return oops.In("cli").
+			Code("config_init_failed").
+			With("operation", "read_config_init_path").
+			Wrap(err)
 	}
 
 	force, err := cmd.Flags().GetBool("force")
 	if err != nil {
-		return oops.In("cli").Code("config_init_failed").With("operation", "read_config_init_force").Wrap(err)
+		return oops.In("cli").
+			Code("config_init_failed").
+			With("operation", "read_config_init_force").
+			Wrap(err)
 	}
 
 	initializedPath, err := config.Init(
@@ -76,7 +83,10 @@ func runConfigInit(cmd *cobra.Command, _ []string) error {
 		config.WithInitForce(force),
 	)
 	if err != nil {
-		return oops.In("cli").Code("config_init_failed").With("operation", "initialize_configuration").Wrap(err)
+		return oops.In("cli").
+			Code("config_init_failed").
+			With("operation", "initialize_configuration").
+			Wrap(err)
 	}
 
 	if clibase.JSONOutputEnabled(cmd) {

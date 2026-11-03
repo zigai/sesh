@@ -69,7 +69,12 @@ func isQuitMsg(msg tea.Msg) bool {
 }
 
 func newModelWithSnapshotService(deps Dependencies) *Model {
-	model, err := newModelWithContext(context.Background(), config.DefaultConfig(), testState(), testServices(deps))
+	model, err := newModelWithContext(
+		context.Background(),
+		config.DefaultConfig(),
+		testState(),
+		testServices(deps),
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -268,12 +273,17 @@ func TestEnterAgentRowInPopupDefersPaneSwitchUntilAfterQuit(t *testing.T) {
 
 	msg := runEnterAction(t, model)
 
-	if msg.err != nil || !msg.deferred || !msg.quit || msg.operation != tuiOperationActivateAgentPane {
+	if msg.err != nil || !msg.deferred || !msg.quit ||
+		msg.operation != tuiOperationActivateAgentPane {
 		t.Fatalf("popup agent enter msg = %#v, want deferred pane switch", msg)
 	}
 
 	if msg.switchSession != testSupportSessionDevName || msg.switchPane != "%7" {
-		t.Fatalf("popup agent enter switch = %q/%q, want dev/%%7", msg.switchSession, msg.switchPane)
+		t.Fatalf(
+			"popup agent enter switch = %q/%q, want dev/%%7",
+			msg.switchSession,
+			msg.switchPane,
+		)
 	}
 
 	quitCmd := handlePopupLiveEnterResult(t, model, msg)
@@ -334,7 +344,8 @@ func TestEnterRemoteRowReportsUnsupportedStatus(t *testing.T) {
 		t.Fatal("handleEnter() returned a command for a remote row")
 	}
 
-	if model.statusLevel != statusError || !strings.Contains(model.statusMessage, "not supported for remote sessions") {
+	if model.statusLevel != statusError ||
+		!strings.Contains(model.statusMessage, "not supported for remote sessions") {
 		t.Fatalf(
 			"remote enter status = (%v, %q), want unsupported error",
 			model.statusLevel,
@@ -411,8 +422,14 @@ func TestActionsOnRemoteRowsReportRejectedLocation(t *testing.T) {
 				t.Fatalf("%s dispatched for a rejected location: %+v", descriptor.ID, trace.results)
 			}
 
-			if model.statusLevel != statusError || !strings.Contains(model.statusMessage, descriptor.Title+" unavailable") {
-				t.Fatalf("%s status = (%v, %q), want unavailable error", descriptor.ID, model.statusLevel, model.statusMessage)
+			if model.statusLevel != statusError ||
+				!strings.Contains(model.statusMessage, descriptor.Title+" unavailable") {
+				t.Fatalf(
+					"%s status = (%v, %q), want unavailable error",
+					descriptor.ID,
+					model.statusLevel,
+					model.statusMessage,
+				)
 			}
 		})
 	}
@@ -420,7 +437,9 @@ func TestActionsOnRemoteRowsReportRejectedLocation(t *testing.T) {
 
 func TestEnterSavedRowRestoresThenEntersRestoredSession(t *testing.T) {
 	model := newTestModel()
-	model.filtered = []session.Session{{Name: testSupportSessionArchiveName, Kind: session.KindSaved}}
+	model.filtered = []session.Session{
+		{Name: testSupportSessionArchiveName, Kind: session.KindSaved},
+	}
 
 	deps := dependenciesForTest(model)
 	deps.TmuxSessionExists = func(context.Context, string) (bool, error) { return false, nil }
@@ -449,7 +468,8 @@ func TestEnterSavedRowRestoresThenEntersRestoredSession(t *testing.T) {
 		t.Fatalf("restore results = %+v, want one success", trace.results)
 	}
 
-	if trace.entered == nil || trace.entered.err != nil || !trace.entered.quit || trace.entered.target.Name != testSupportSessionArchiveName {
+	if trace.entered == nil || trace.entered.err != nil || !trace.entered.quit ||
+		trace.entered.target.Name != testSupportSessionArchiveName {
 		t.Fatalf("entry after restore = %+v, want the restored session", trace.entered)
 	}
 
@@ -460,15 +480,19 @@ func TestEnterSavedRowRestoresThenEntersRestoredSession(t *testing.T) {
 
 func TestHandleSessionActionResultRefreshesAfterSavedRestore(t *testing.T) {
 	model := newTestModel()
-	model.sessions = []session.Session{{Name: testSupportSessionArchiveName, Kind: session.KindSaved}}
+	model.sessions = []session.Session{
+		{Name: testSupportSessionArchiveName, Kind: session.KindSaved},
+	}
 	model.filtered = model.sessions
 
 	deps := dependenciesForTest(model)
 	deps.SaveModelState = func(*session.State) error { return nil }
 	deps.LoadCatalog = func(context.Context) (session.CatalogResult, error) {
 		return session.CatalogResult{
-			Sessions: []session.Session{{Name: testSupportSessionArchiveName, Kind: session.KindLive}},
-			Status:   session.StatusComplete,
+			Sessions: []session.Session{
+				{Name: testSupportSessionArchiveName, Kind: session.KindLive},
+			},
+			Status: session.StatusComplete,
 		}, nil
 	}
 
@@ -490,14 +514,17 @@ func TestHandleSessionActionResultRefreshesAfterSavedRestore(t *testing.T) {
 		t.Fatalf("sessions after refresh = %#v, want one live archive row", updated.sessions)
 	}
 
-	if got := updated.sessions[0]; got.Name != testSupportSessionArchiveName || got.Kind != session.KindLive {
+	if got := updated.sessions[0]; got.Name != testSupportSessionArchiveName ||
+		got.Kind != session.KindLive {
 		t.Fatalf("refreshed row = %#v, want live archive row", got)
 	}
 }
 
 func TestSavedSessionEnterGuardsLiveConflict(t *testing.T) {
 	model := newTestModel()
-	model.filtered = []session.Session{{Name: testSupportSessionArchiveName, Kind: session.KindSaved}}
+	model.filtered = []session.Session{
+		{Name: testSupportSessionArchiveName, Kind: session.KindSaved},
+	}
 
 	deps := dependenciesForTest(model)
 	deps.TmuxSessionExists = func(context.Context, string) (bool, error) { return true, nil }
@@ -509,18 +536,26 @@ func TestSavedSessionEnterGuardsLiveConflict(t *testing.T) {
 	_, cmd := model.handleEnter()()
 	trace := runActionTrace(t, model, cmd)
 
-	if len(trace.results) != 1 || action.CodeOf(trace.results[0].err) != action.CodeAlreadyExists || trace.entered != nil {
+	if len(trace.results) != 1 || action.CodeOf(trace.results[0].err) != action.CodeAlreadyExists ||
+		trace.entered != nil {
 		t.Fatalf("saved enter trace = %+v, want an already-exists failure without entry", trace)
 	}
 
-	if model.statusLevel != statusError || !strings.Contains(model.statusMessage, "Restore session failed") {
-		t.Fatalf("conflict status = (%v, %q), want restore failure", model.statusLevel, model.statusMessage)
+	if model.statusLevel != statusError ||
+		!strings.Contains(model.statusMessage, "Restore session failed") {
+		t.Fatalf(
+			"conflict status = (%v, %q), want restore failure",
+			model.statusLevel,
+			model.statusMessage,
+		)
 	}
 }
 
 func TestSavedRowsCannotRenameOrKill(t *testing.T) {
 	model := newTestModel()
-	model.filtered = []session.Session{{Name: testSupportSessionArchiveName, Kind: session.KindSaved}}
+	model.filtered = []session.Session{
+		{Name: testSupportSessionArchiveName, Kind: session.KindSaved},
+	}
 
 	for _, definition := range []action.Entry{action.SessionRename, action.SessionKill} {
 		descriptor := definition.Describe()
@@ -529,11 +564,22 @@ func TestSavedRowsCannotRenameOrKill(t *testing.T) {
 
 		trace := invokeTestAction(t, model, descriptor.ID)
 		if len(trace.results) != 0 || model.dialog != dialogNone {
-			t.Fatalf("%s started for a saved row: %+v dialog %v", descriptor.ID, trace.results, model.dialog)
+			t.Fatalf(
+				"%s started for a saved row: %+v dialog %v",
+				descriptor.ID,
+				trace.results,
+				model.dialog,
+			)
 		}
 
-		if model.statusLevel != statusError || !strings.Contains(model.statusMessage, descriptor.Title+" unavailable") {
-			t.Fatalf("%s status = (%v, %q), want saved-row error", descriptor.ID, model.statusLevel, model.statusMessage)
+		if model.statusLevel != statusError ||
+			!strings.Contains(model.statusMessage, descriptor.Title+" unavailable") {
+			t.Fatalf(
+				"%s status = (%v, %q), want saved-row error",
+				descriptor.ID,
+				model.statusLevel,
+				model.statusMessage,
+			)
 		}
 	}
 }
@@ -638,20 +684,32 @@ func TestAgentChildKillPreservesAttachedAndErrorSafety(t *testing.T) {
 	invokeTestAction(t, model, action.SessionKill.ID)
 
 	if killCalls != 0 || model.dialog != dialogNone {
-		t.Fatalf("attached child kill = calls:%d dialog:%v, want no action", killCalls, model.dialog)
+		t.Fatalf(
+			"attached child kill = calls:%d dialog:%v, want no action",
+			killCalls,
+			model.dialog,
+		)
 	}
 
 	model.filtered[0].Attached = false
 	invokeTestAction(t, model, action.SessionKill.ID)
 
-	if killCalls != 1 || model.statusLevel != statusError || !strings.Contains(model.statusMessage, "Kill session failed") {
-		t.Fatalf("failed child kill = calls:%d status:(%v,%q)", killCalls, model.statusLevel, model.statusMessage)
+	if killCalls != 1 || model.statusLevel != statusError ||
+		!strings.Contains(model.statusMessage, "Kill session failed") {
+		t.Fatalf(
+			"failed child kill = calls:%d status:(%v,%q)",
+			killCalls,
+			model.statusLevel,
+			model.statusMessage,
+		)
 	}
 }
 
 func TestDeleteSavedRowRemovesState(t *testing.T) {
 	model := newTestModel()
-	model.sessions = []session.Session{{Name: testSupportSessionArchiveName, Kind: session.KindSaved}}
+	model.sessions = []session.Session{
+		{Name: testSupportSessionArchiveName, Kind: session.KindSaved},
+	}
 	model.filtered = model.sessions
 
 	identity := model.filtered[0].SemanticIdentity()
@@ -750,14 +808,20 @@ func TestKillConfirmationCanBeDisabled(t *testing.T) {
 	}
 
 	if model.statusLevel != statusNone {
-		t.Fatalf("status = (%v, %q), want no error after an unconfirmed kill", model.statusLevel, model.statusMessage)
+		t.Fatalf(
+			"status = (%v, %q), want no error after an unconfirmed kill",
+			model.statusLevel,
+			model.statusMessage,
+		)
 	}
 }
 
 func TestDeleteConfirmationCanBeDisabled(t *testing.T) {
 	model := newTestModel()
 	setActionConfirm(model.config, action.SessionDelete.ID, false)
-	model.filtered = []session.Session{{Name: testSupportSessionArchiveName, Kind: session.KindSaved}}
+	model.filtered = []session.Session{
+		{Name: testSupportSessionArchiveName, Kind: session.KindSaved},
+	}
 
 	deleted := ""
 
@@ -829,7 +893,9 @@ func TestDeleteSelectedRowMovesSelectionToPreviousEntry(t *testing.T) {
 
 func TestDeleteAttachedLiveRowIsUnavailable(t *testing.T) {
 	model := newTestModel()
-	model.filtered = []session.Session{{Name: testSupportSessionDevName, Kind: session.KindLive, Attached: true}}
+	model.filtered = []session.Session{
+		{Name: testSupportSessionDevName, Kind: session.KindLive, Attached: true},
+	}
 
 	deps := dependenciesForTest(model)
 	deps.DeleteSavedSession = func(_ context.Context, name string) (int, error) {
@@ -844,14 +910,24 @@ func TestDeleteAttachedLiveRowIsUnavailable(t *testing.T) {
 	}
 
 	if model.statusLevel != statusError || !strings.Contains(model.statusMessage, "attached") {
-		t.Fatalf("delete status = (%v, %q), want attached error", model.statusLevel, model.statusMessage)
+		t.Fatalf(
+			"delete status = (%v, %q), want attached error",
+			model.statusLevel,
+			model.statusMessage,
+		)
 	}
 }
 
 func TestRenameFailureShowsStatus(t *testing.T) {
 	model := newTestModel()
 	model.displayMode = displayModeAgents
-	model.filtered = []session.Session{{Name: "old", Kind: session.KindLive, Agents: []session.AgentSession{{RegistryID: testSupportAgentRegistryID}}}}
+	model.filtered = []session.Session{
+		{
+			Name:   "old",
+			Kind:   session.KindLive,
+			Agents: []session.AgentSession{{RegistryID: testSupportAgentRegistryID}},
+		},
+	}
 	model.cursor = 0
 	model.agentCursor = 0
 
@@ -916,12 +992,16 @@ func runSnapshotCaptureSubtest(t *testing.T) {
 			catalogLoads++
 
 			return session.CatalogResult{
-				Sessions: []session.Session{{Name: testSupportSessionDevName, Kind: session.KindLive}},
-				Status:   session.StatusComplete,
+				Sessions: []session.Session{
+					{Name: testSupportSessionDevName, Kind: session.KindLive},
+				},
+				Status: session.StatusComplete,
 			}, nil
 		},
 	})
-	model.filtered = []session.Session{{Name: testSupportSessionDevName, Kind: session.KindLive, Origin: session.OriginLocal}}
+	model.filtered = []session.Session{
+		{Name: testSupportSessionDevName, Kind: session.KindLive, Origin: session.OriginLocal},
+	}
 
 	trace := invokeTestAction(t, model, action.SnapshotSave.ID)
 	if len(trace.results) != 1 || trace.results[0].err != nil || trace.quit {
@@ -937,7 +1017,11 @@ func runSnapshotCaptureSubtest(t *testing.T) {
 	}
 
 	if model.statusLevel != statusNone {
-		t.Fatalf("status = (%v, %q), want cleared after snapshot", model.statusLevel, model.statusMessage)
+		t.Fatalf(
+			"status = (%v, %q), want cleared after snapshot",
+			model.statusLevel,
+			model.statusMessage,
+		)
 	}
 }
 
@@ -947,14 +1031,17 @@ func runSnapshotFailureSubtest(t *testing.T) {
 	model := newModelWithSnapshotService(Dependencies{
 		SnapshotSession: func(context.Context, string) error { return errSnapshotFailed },
 	})
-	model.filtered = []session.Session{{Name: testSupportSessionDevName, Kind: session.KindLive, Origin: session.OriginLocal}}
+	model.filtered = []session.Session{
+		{Name: testSupportSessionDevName, Kind: session.KindLive, Origin: session.OriginLocal},
+	}
 
 	trace := invokeTestAction(t, model, action.SnapshotSave.ID)
 	if len(trace.results) != 1 || trace.results[0].err == nil {
 		t.Fatalf("snapshot failure trace = %+v, want one failure", trace)
 	}
 
-	if model.statusLevel != statusError || !strings.Contains(model.statusMessage, "snapshot failed") {
+	if model.statusLevel != statusError ||
+		!strings.Contains(model.statusMessage, "snapshot failed") {
 		t.Fatalf(
 			"snapshot failure status = (%v, %q), want snapshot error",
 			model.statusLevel,
@@ -975,12 +1062,19 @@ func TestSnapshotActionCapturesSessionAndRefreshes(t *testing.T) {
 
 func TestActionsWithoutDispatcherReportUnavailable(t *testing.T) {
 	model := newTestModelWithDeps(Dependencies{OmitActions: true})
-	model.filtered = []session.Session{{Name: testSupportSessionDevName, Kind: session.KindLive, Origin: session.OriginLocal}}
+	model.filtered = []session.Session{
+		{Name: testSupportSessionDevName, Kind: session.KindLive, Origin: session.OriginLocal},
+	}
 
 	invokeTestAction(t, model, action.SnapshotSave.ID)
 
-	if model.statusLevel != statusError || !strings.Contains(model.statusMessage, "no action dispatcher") {
-		t.Fatalf("snapshot status = (%v, %q), want unavailable error", model.statusLevel, model.statusMessage)
+	if model.statusLevel != statusError ||
+		!strings.Contains(model.statusMessage, "no action dispatcher") {
+		t.Fatalf(
+			"snapshot status = (%v, %q), want unavailable error",
+			model.statusLevel,
+			model.statusMessage,
+		)
 	}
 }
 
@@ -1020,7 +1114,12 @@ func TestCreateDialogSubmitsEditedDirectoryToNewSession(t *testing.T) {
 	assertCreatedSessionResult(t, model, edited, &createdName, &createdDir)
 }
 
-func assertCreatedSessionResult(t *testing.T, model *Model, edited string, createdName, createdDir *string) {
+func assertCreatedSessionResult(
+	t *testing.T,
+	model *Model,
+	edited string,
+	createdName, createdDir *string,
+) {
 	t.Helper()
 
 	model.pathSuggestions = nil
@@ -1030,7 +1129,8 @@ func assertCreatedSessionResult(t *testing.T, model *Model, edited string, creat
 		t.Fatalf("create results = %+v, want one success", trace.results)
 	}
 
-	if trace.entered == nil || trace.entered.err != nil || !trace.entered.quit || trace.entered.target.Name != "news" {
+	if trace.entered == nil || trace.entered.err != nil || !trace.entered.quit ||
+		trace.entered.target.Name != "news" {
 		t.Fatalf("entry after create = %+v, want the new session", trace.entered)
 	}
 

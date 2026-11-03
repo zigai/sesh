@@ -52,7 +52,11 @@ func TestLoadOrCreatePeerIDPersistsIdentity(t *testing.T) {
 func TestLoadOrCreatePeerIDRejectsCorruptIdentity(t *testing.T) {
 	dir, path := openTestCatalogDir(t)
 
-	if err := os.WriteFile(filepath.Join(path, peerIDName), []byte("bad\x1bidentity"), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(path, peerIDName),
+		[]byte("bad\x1bidentity"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -173,16 +177,35 @@ func (harness *inventoryHarness) next(t *testing.T) Frame {
 }
 
 func TestInventoryStreamPublishesHelloAndInventory(t *testing.T) {
-	live := []session.Session{{
-		ID: "$1", Name: testSessionName, Kind: session.KindLive, TmuxServerSocket: "/tmp/tmux-work", WindowCount: 2,
-		RuntimeIdentity: session.RuntimeIdentity{TmuxServerPID: 42, TmuxServerStartedAt: time.Unix(1, 0).UTC(), TmuxSessionCreatedAt: time.Unix(2, 0).UTC()},
-	}}
+	live := []session.Session{
+		{
+			ID:               "$1",
+			Name:             testSessionName,
+			Kind:             session.KindLive,
+			TmuxServerSocket: "/tmp/tmux-work",
+			WindowCount:      2,
+			RuntimeIdentity: session.RuntimeIdentity{
+				TmuxServerPID:        42,
+				TmuxServerStartedAt:  time.Unix(1, 0).UTC(),
+				TmuxSessionCreatedAt: time.Unix(2, 0).UTC(),
+			},
+		},
+	}
 
 	saved := []session.Session{{ID: "$9", Name: "archive", Kind: session.KindSaved}}
-	summaries := []session.AgentSummary{{
-		TmuxServerSocket: "/tmp/tmux-work", TmuxSessionID: "$1", TmuxSessionName: testSessionName,
-		Total: 2, Active: 1, Waiting: 1, Agents: []session.AgentSession{{PaneID: "%0", Status: session.AgentStatusWaiting}},
-	}}
+	summaries := []session.AgentSummary{
+		{
+			TmuxServerSocket: "/tmp/tmux-work",
+			TmuxSessionID:    "$1",
+			TmuxSessionName:  testSessionName,
+			Total:            2,
+			Active:           1,
+			Waiting:          1,
+			Agents: []session.AgentSession{
+				{PaneID: "%0", Status: session.AgentStatusWaiting},
+			},
+		},
+	}
 
 	harness := startInventoryStream(t, InventoryOptions{
 		PeerID:            testPeerID,
@@ -212,17 +235,32 @@ func TestInventoryStreamPublishesHelloAndInventory(t *testing.T) {
 func TestInventoryStreamPublishesTasksWithoutTheirResumeCommand(t *testing.T) {
 	record := task.EmptyRecord()
 	record.ID, record.Kind, record.State, record.Harness = "t3", task.KindProject, task.StateSleeping, "pi"
-	record.Resume = task.Resume{Harness: "pi", Session: "s1", Command: []string{"pi", "--session", "s1"}}
+	record.Resume = task.Resume{
+		Harness: "pi",
+		Session: "s1",
+		Command: []string{"pi", "--session", "s1"},
+	}
 	live := task.Live{
-		Record: record, Present: true, SessionID: "$1", SessionName: testSessionName, WindowID: "@2", WindowIndex: 2,
-		WindowName: "3", AgentPane: "%4", AgentPID: 0,
+		Record:      record,
+		Present:     true,
+		SessionID:   "$1",
+		SessionName: testSessionName,
+		WindowID:    "@2",
+		WindowIndex: 2,
+		WindowName:  "3",
+		AgentPane:   "%4",
+		AgentPID:    0,
 	}
 
 	harness := startInventoryStream(t, InventoryOptions{
-		PeerID: testPeerID, Hostname: "remote-host", BridgeDir: "", TmuxSocket: "/tmp/tmux-work",
-		PollInterval: 10 * time.Millisecond, HeartbeatInterval: time.Hour,
-		Sessions: func(context.Context) ([]session.Session, error) { return nil, nil },
-		Tasks:    func(context.Context) ([]TaskRow, error) { return []TaskRow{NewTaskRow(live)}, nil },
+		PeerID:            testPeerID,
+		Hostname:          "remote-host",
+		BridgeDir:         "",
+		TmuxSocket:        "/tmp/tmux-work",
+		PollInterval:      10 * time.Millisecond,
+		HeartbeatInterval: time.Hour,
+		Sessions:          func(context.Context) ([]session.Session, error) { return nil, nil },
+		Tasks:             func(context.Context) ([]TaskRow, error) { return []TaskRow{NewTaskRow(live)}, nil },
 	})
 
 	harness.next(t)
@@ -233,7 +271,8 @@ func TestInventoryStreamPublishesTasksWithoutTheirResumeCommand(t *testing.T) {
 	}
 
 	row := snapshot.Tasks[0]
-	if row.Record.ID != "t3" || row.Record.State != task.StateSleeping || row.AgentPane != "%4" || row.WindowID != "@2" {
+	if row.Record.ID != "t3" || row.Record.State != task.StateSleeping || row.AgentPane != "%4" ||
+		row.WindowID != "@2" {
 		t.Fatalf("task row = %+v, want t3 asleep in pane %%4", row)
 	}
 
@@ -243,7 +282,14 @@ func TestInventoryStreamPublishesTasksWithoutTheirResumeCommand(t *testing.T) {
 }
 
 func TestInventoryStreamMergesAgentsByNameAndSkipsLiveSavedDuplicates(t *testing.T) {
-	live := []session.Session{{ID: "$1", Name: testSessionName, Kind: session.KindLive, TmuxServerSocket: "/tmp/tmux-work"}}
+	live := []session.Session{
+		{
+			ID:               "$1",
+			Name:             testSessionName,
+			Kind:             session.KindLive,
+			TmuxServerSocket: "/tmp/tmux-work",
+		},
+	}
 	saved := []session.Session{
 		{ID: "$9", Name: testSessionName, Kind: session.KindSaved},
 		{ID: "$10", Name: "archive", Kind: session.KindSaved},
@@ -273,7 +319,8 @@ func TestInventoryStreamMergesAgentsByNameAndSkipsLiveSavedDuplicates(t *testing
 		t.Fatalf("snapshot sessions = %#v, want the live session and the saved archive", sessions)
 	}
 
-	if sessions[0].Name != testSessionName || sessions[0].Kind != session.KindLive || sessions[0].AgentTotal != 1 {
+	if sessions[0].Name != testSessionName || sessions[0].Kind != session.KindLive ||
+		sessions[0].AgentTotal != 1 {
 		t.Fatalf("live session = %#v, want agents merged by session name", sessions[0])
 	}
 
@@ -347,11 +394,28 @@ func TestInventoryStreamSkipsUnchangedInventoryAndEmitsHeartbeats(t *testing.T) 
 }
 
 func TestInventoryStreamRequiresNativeSources(t *testing.T) {
-	if err := RunInventoryStream(t.Context(), InventoryOptions{PeerID: testPeerID}, io.Discard); !errors.Is(err, ErrIncompleteDependencies) {
+	if err := RunInventoryStream(
+		t.Context(),
+		InventoryOptions{PeerID: testPeerID},
+		io.Discard,
+	); !errors.Is(
+		err,
+		ErrIncompleteDependencies,
+	) {
 		t.Fatalf("RunInventoryStream() error = %v, want %v", err, ErrIncompleteDependencies)
 	}
 
-	if err := RunInventoryStream(t.Context(), InventoryOptions{PeerID: testPeerID, Sessions: func(context.Context) ([]session.Session, error) { return nil, nil }}, nil); !errors.Is(err, errNilStreamOutput) {
+	if err := RunInventoryStream(
+		t.Context(),
+		InventoryOptions{
+			PeerID:   testPeerID,
+			Sessions: func(context.Context) ([]session.Session, error) { return nil, nil },
+		},
+		nil,
+	); !errors.Is(
+		err,
+		errNilStreamOutput,
+	) {
 		t.Fatalf("RunInventoryStream() error = %v, want %v", err, errNilStreamOutput)
 	}
 }
@@ -372,9 +436,17 @@ func TestInventoryStreamBoundsInventory(t *testing.T) {
 }
 
 func TestInventoryStreamUsesConfiguredRemoteEntryPoint(t *testing.T) {
-	connection := config.RemoteConnectionConfig{ID: testConnectionID, Host: "work.example", SeshPath: "/opt/sesh"}
+	connection := config.RemoteConnectionConfig{
+		ID:       testConnectionID,
+		Host:     "work.example",
+		SeshPath: "/opt/sesh",
+	}
 
-	if entry := PeerEntryPoint(connection, ChannelStream); entry[0] != "/opt/sesh" || entry[3] != ChannelStream {
+	if entry := PeerEntryPoint(
+		connection,
+		ChannelStream,
+	); entry[0] != "/opt/sesh" ||
+		entry[3] != ChannelStream {
 		t.Fatalf("stream entry point = %#v", entry)
 	}
 
@@ -409,7 +481,8 @@ func assertInventorySnapshot(t *testing.T, snapshot Frame) {
 
 	assertSnapshotSessions(t, snapshot.Snapshot.Sessions)
 
-	if !ValidSourceHealth(snapshot.Snapshot.Health) || snapshot.Snapshot.Health.Tmux.Status != HealthOK {
+	if !ValidSourceHealth(snapshot.Snapshot.Health) ||
+		snapshot.Snapshot.Health.Tmux.Status != HealthOK {
 		t.Fatalf("snapshot health = %#v, want a healthy tmux source", snapshot.Snapshot.Health)
 	}
 }
@@ -421,11 +494,13 @@ func assertSnapshotSessions(t *testing.T, sessions []session.Session) {
 		t.Fatalf("snapshot sessions = %#v, want the live and saved inventory", sessions)
 	}
 
-	if sessions[0].AgentTotal != 2 || sessions[0].AgentWaiting != 1 || len(sessions[0].Agents) != 1 {
+	if sessions[0].AgentTotal != 2 || sessions[0].AgentWaiting != 1 ||
+		len(sessions[0].Agents) != 1 {
 		t.Fatalf("live session agents = %#v, want the merged agent summary", sessions[0])
 	}
 
-	if sessions[1].Name != "archive" || sessions[1].Kind != session.KindSaved || sessions[1].TmuxServerSocket != "/tmp/tmux-work" {
+	if sessions[1].Name != "archive" || sessions[1].Kind != session.KindSaved ||
+		sessions[1].TmuxServerSocket != "/tmp/tmux-work" {
 		t.Fatalf("saved session = %#v, want the saved inventory bound to the socket", sessions[1])
 	}
 }

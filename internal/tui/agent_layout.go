@@ -71,7 +71,10 @@ func (m *Model) measureAgentRows(table sessionTableLayout) agentRowMeasurements 
 			}
 
 			cells := agentCells(*values, left)
-			cells = append(cells, rowlayout.Cell{Text: " ", Role: "", Variants: nil, State: rowlayout.Present})
+			cells = append(
+				cells,
+				rowlayout.Cell{Text: " ", Role: "", Variants: nil, State: rowlayout.Present},
+			)
 			cells = append(cells, agentCells(*values, right)...)
 			rows = append(rows, cells)
 		}
@@ -89,18 +92,38 @@ func agentSpacerSpec() rowlayout.ColumnSpec {
 	}
 }
 
-func (m *Model) planAgentRows(table sessionTableLayout, measured agentRowMeasurements) agentTableLayout {
+func (m *Model) planAgentRows(
+	table sessionTableLayout,
+	measured agentRowMeasurements,
+) agentTableLayout {
 	if len(measured.rows) == 0 {
 		var empty rowlayout.ColumnPlan
 		return agentTableLayout{plan: empty, theme: nil, rightStart: 0, valid: false}
 	}
 
-	plan := rowlayout.Plan(measured.specs, rowlayout.Measure(measured.specs, measured.rows), max(table.width-table.prefixWidth, 0), &m.agentRowRatchet, table.now)
+	plan := rowlayout.Plan(
+		measured.specs,
+		rowlayout.Measure(measured.specs, measured.rows),
+		max(table.width-table.prefixWidth, 0),
+		&m.agentRowRatchet,
+		table.now,
+	)
 
-	return agentTableLayout{plan: plan, theme: m.agentLayoutTheme(), rightStart: measured.rightStart, valid: true}
+	return agentTableLayout{
+		plan:       plan,
+		theme:      m.agentLayoutTheme(),
+		rightStart: measured.rightStart,
+		valid:      true,
+	}
 }
 
-func (m *Model) agentLayoutCells(table sessionTableLayout, row session.Session, agent session.AgentSession, last bool, values *sessionFormatValues) ([]display.Part, []display.Part) {
+func (m *Model) agentLayoutCells(
+	table sessionTableLayout,
+	row session.Session,
+	agent session.AgentSession,
+	last bool,
+	values *sessionFormatValues,
+) ([]display.Part, []display.Part) {
 	table.rightWidth = 0
 	table.agentAgeWidth = 0
 
@@ -140,10 +163,18 @@ func agentColumnSpec(index int, part display.Part) rowlayout.ColumnSpec {
 	}
 
 	return rowlayout.ColumnSpec{
-		ID: fmt.Sprintf("%d:%s", index, part.Field), Align: agentAlignment(part.Alignment),
-		Min: minWidth, Max: maxWidth, Reserve: info.WidthBound,
-		Flex: info.Flexible, Grow: false, ShrinkPriority: agentShrinkPriority, HidePriority: agentHidePriority(part.Field, info),
-		TruncateSide: truncate, Group: part.Group, Separator: part.Separator,
+		ID:             fmt.Sprintf("%d:%s", index, part.Field),
+		Align:          agentAlignment(part.Alignment),
+		Min:            minWidth,
+		Max:            maxWidth,
+		Reserve:        info.WidthBound,
+		Flex:           info.Flexible,
+		Grow:           false,
+		ShrinkPriority: agentShrinkPriority,
+		HidePriority:   agentHidePriority(part.Field, info),
+		TruncateSide:   truncate,
+		Group:          part.Group,
+		Separator:      part.Separator,
 	}
 }
 
@@ -163,7 +194,8 @@ func agentAlignment(align display.Alignment) rowlayout.Alignment {
 func agentHidePriority(field string, info display.FieldMetadata) int {
 	switch {
 	case field == display.FieldTree || field == display.FieldTreeBranch || field == display.FieldTreeIndent,
-		field == display.FieldStatus || field == display.FieldStatusGlyph || field == display.FieldStatusText,
+		field == display.FieldStatus || field == display.FieldStatusGlyph ||
+			field == display.FieldStatusText,
 		field == display.FieldActiveMarker:
 		return agentRequiredPriority
 	case info.Provider == display.ProviderGit:
@@ -186,14 +218,24 @@ func agentCells(values sessionFormatValues, parts []display.Part) []rowlayout.Ce
 	return cells
 }
 
-func agentCell(values sessionFormatValues, parts []display.Part, index int, part display.Part) rowlayout.Cell {
+func agentCell(
+	values sessionFormatValues,
+	parts []display.Part,
+	index int,
+	part display.Part,
+) rowlayout.Cell {
 	cell := agentBaseCell(values, parts, index, part)
 	cell = agentReportedCell(values, part, cell)
 
 	return agentCompactCell(values, part, cell)
 }
 
-func agentBaseCell(values sessionFormatValues, parts []display.Part, index int, part display.Part) rowlayout.Cell {
+func agentBaseCell(
+	values sessionFormatValues,
+	parts []display.Part,
+	index int,
+	part display.Part,
+) rowlayout.Cell {
 	state := rowlayout.Absent
 	if part.Value != "" {
 		state = rowlayout.Present
@@ -203,7 +245,8 @@ func agentBaseCell(values sessionFormatValues, parts []display.Part, index int, 
 		state = part.State
 	}
 
-	if !agentHasGit(values.agent) && (isGitPart(part) || (part.Field == "" && index+1 < len(parts) && isGitPart(parts[index+1]))) {
+	if !agentHasGit(values.agent) &&
+		(isGitPart(part) || (part.Field == "" && index+1 < len(parts) && isGitPart(parts[index+1]))) {
 		state = rowlayout.Absent
 	}
 
@@ -221,9 +264,14 @@ func agentCellText(part display.Part) string {
 	return ansi.Strip(part.Value)
 }
 
-func agentReportedCell(values sessionFormatValues, part display.Part, cell rowlayout.Cell) rowlayout.Cell {
+func agentReportedCell(
+	values sessionFormatValues,
+	part display.Part,
+	cell rowlayout.Cell,
+) rowlayout.Cell {
 	providerID := agentProviderID(part.Field)
-	if values.agent.PaneID != "" && !remoteAgentRow(values.row, values.agent) && providerID != "" && values.model.providerRunner.Version(providerID) > 0 {
+	if values.agent.PaneID != "" && !remoteAgentRow(values.row, values.agent) && providerID != "" &&
+		values.model.providerRunner.Version(providerID) > 0 {
 		reported := values.model.providerRunner.Cell(providerID, values.agent.PaneID, part.Field)
 
 		cell.Text, cell.State = reported.Text, reported.State
@@ -246,10 +294,18 @@ func agentReportedCell(values sessionFormatValues, part display.Part, cell rowla
 	return cell
 }
 
-func agentCompactCell(values sessionFormatValues, part display.Part, cell rowlayout.Cell) rowlayout.Cell {
-	if info, ok := display.FieldInfo(part.Field); ok && info.Compact != "" && cell.State == rowlayout.Present {
+func agentCompactCell(
+	values sessionFormatValues,
+	part display.Part,
+	cell rowlayout.Cell,
+) rowlayout.Cell {
+	if info, ok := display.FieldInfo(
+		part.Field,
+	); ok && info.Compact != "" &&
+		cell.State == rowlayout.Present {
 		compact, compactState := values.ResolveSessionFormatCell(info.Compact)
-		if compactState == rowlayout.Present && ansi.StringWidth(compact) < ansi.StringWidth(cell.Text) {
+		if compactState == rowlayout.Present &&
+			ansi.StringWidth(compact) < ansi.StringWidth(cell.Text) {
 			cell.Variants = []string{ansi.Strip(compact)}
 		}
 	}
@@ -324,10 +380,21 @@ func isGitPart(part display.Part) bool {
 	return ok && info.Provider == display.ProviderGit
 }
 
-func (m *Model) writePlannedAgentRow(out *strings.Builder, table sessionTableLayout, styles sessionRowStyles, row session.Session, agent session.AgentSession, last, selected bool, values *sessionFormatValues) {
+func (m *Model) writePlannedAgentRow(
+	out *strings.Builder,
+	table sessionTableLayout,
+	styles sessionRowStyles,
+	row session.Session,
+	agent session.AgentSession,
+	last, selected bool,
+	values *sessionFormatValues,
+) {
 	leftParts, rightParts := m.agentLayoutCells(table, row, agent, last, values)
 	cells := agentCells(*values, leftParts)
-	cells = append(cells, rowlayout.Cell{Text: " ", Role: "", Variants: nil, State: rowlayout.Present})
+	cells = append(
+		cells,
+		rowlayout.Cell{Text: " ", Role: "", Variants: nil, State: rowlayout.Present},
+	)
 	cells = append(cells, agentCells(*values, rightParts)...)
 	painted, _ := rowlayout.PaintColumns(table.agentRows.plan, cells, table.agentRows.theme)
 	left := strings.Join(painted[:table.agentRows.rightStart], "")
@@ -343,14 +410,19 @@ func (m *Model) writePlannedAgentRow(out *strings.Builder, table sessionTableLay
 	}
 }
 
-func (m *Model) agentCellRole(row session.Session, agent session.AgentSession, part display.Part) string {
+func (m *Model) agentCellRole(
+	row session.Session,
+	agent session.AgentSession,
+	part display.Part,
+) string {
 	if part.Role != "" {
 		return part.Role
 	}
 
 	switch part.Field {
 	case display.FieldStatusGlyph, display.FieldStatus:
-		if agent.Status.DisplayStatus() == session.AgentStatusIdle && m.agentIdleUnread(row, agent) {
+		if agent.Status.DisplayStatus() == session.AgentStatusIdle &&
+			m.agentIdleUnread(row, agent) {
 			return "status_unread"
 		}
 

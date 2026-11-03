@@ -35,17 +35,20 @@ func TestPickerAgentSnapshotsCarryPanesObservedWithAgents(t *testing.T) {
 
 	published := 0
 
-	err = services.WatchAgentSummaries(t.Context(), func(_ uint64, watched tui.AgentSnapshot, publishErr error) error {
-		if publishErr != nil {
-			return publishErr
-		}
+	err = services.WatchAgentSummaries(
+		t.Context(),
+		func(_ uint64, watched tui.AgentSnapshot, publishErr error) error {
+			if publishErr != nil {
+				return publishErr
+			}
 
-		assertPickerAgentPanes(t, "watch", watched, livePane)
+			assertPickerAgentPanes(t, "watch", watched, livePane)
 
-		published++
+			published++
 
-		return nil
-	})
+			return nil
+		},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +64,9 @@ func TestPickerAgentSnapshotLeavesPanesUnobservedWhenTmuxFails(t *testing.T) {
 	livePane := firstPane(t, origin.Handle())
 
 	services := newInitialReadsServices(t, server, "", "")
-	services.agentStore = nameWatchSource{sessions: []aht.Session{paneAgent(server, "live-agent", livePane)}}
+	services.agentStore = nameWatchSource{
+		sessions: []aht.Session{paneAgent(server, "live-agent", livePane)},
+	}
 
 	if err := server.Kill(t.Context()); err != nil {
 		t.Fatal(err)
@@ -81,7 +86,12 @@ func TestPickerAgentSnapshotLeavesPanesUnobservedWhenTmuxFails(t *testing.T) {
 	}
 }
 
-func assertPickerAgentPanes(t *testing.T, label string, snapshot tui.AgentSnapshot, livePane string) {
+func assertPickerAgentPanes(
+	t *testing.T,
+	label string,
+	snapshot tui.AgentSnapshot,
+	livePane string,
+) {
 	t.Helper()
 
 	if !snapshot.PanesObserved {
@@ -127,7 +137,9 @@ func paneAgent(server *gotmux.Server, id, pane string) aht.Session {
 			PanePID:     42,
 		},
 		Observations: registry.Observations{Native: &registry.NativeObservation{
-			Process: identity, Attributes: map[string]string{"aht_interaction_mode": "tui"}, ObservedAt: now,
+			Process:    identity,
+			Attributes: map[string]string{"aht_interaction_mode": "tui"},
+			ObservedAt: now,
 		}},
 		CreatedAt: now, UpdatedAt: now, PresenceChangedAt: now, ActivityChangedAt: now,
 	}

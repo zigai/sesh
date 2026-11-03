@@ -34,7 +34,10 @@ func (m *Model) agentGitTickCommand() tea.Cmd {
 
 	definition, _ := providers.DefinitionFor(providers.Git)
 
-	return tea.Tick(definition.Cadence.Interval, func(time.Time) tea.Msg { return agentGitTickMsg{} })
+	return tea.Tick(
+		definition.Cadence.Interval,
+		func(time.Time) tea.Msg { return agentGitTickMsg{} },
+	)
 }
 
 func (m *Model) loadAgentGitCommand() tea.Cmd {

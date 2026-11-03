@@ -103,7 +103,12 @@ func (o Options) toLoggingFilter() logging.FilterOptions {
 	}
 }
 
-func DisplayRetainedLogs(ctx context.Context, output, diagnostics io.Writer, path string, opts Options) error {
+func DisplayRetainedLogs(
+	ctx context.Context,
+	output, diagnostics io.Writer,
+	path string,
+	opts Options,
+) error {
 	readOpts := logging.ReadOptions{
 		Lines:  opts.Lines,
 		Follow: opts.Watch,
@@ -117,7 +122,13 @@ func DisplayRetainedLogs(ctx context.Context, output, diagnostics io.Writer, pat
 	return StreamRetainedLogs(ctx, output, diagnostics, path, readOpts, opts)
 }
 
-func StreamRetainedLogs(ctx context.Context, output, diagnostics io.Writer, path string, readOpts logging.ReadOptions, options Options) error {
+func StreamRetainedLogs(
+	ctx context.Context,
+	output, diagnostics io.Writer,
+	path string,
+	readOpts logging.ReadOptions,
+	options Options,
+) error {
 	styles := NewLogStyles(options.Color, options)
 	writer := NewLogStreamWriter(output, diagnostics, options, styles)
 
@@ -128,7 +139,11 @@ func StreamRetainedLogs(ctx context.Context, output, diagnostics io.Writer, path
 	return nil
 }
 
-func NewLogStreamWriter(output, diagnostics io.Writer, opts Options, styles Styles) *LogStreamWriter {
+func NewLogStreamWriter(
+	output, diagnostics io.Writer,
+	opts Options,
+	styles Styles,
+) *LogStreamWriter {
 	return &LogStreamWriter{
 		output:      output,
 		diagnostics: diagnostics,
@@ -264,7 +279,13 @@ func NewLogStyles(color bool, extra ...any) Styles {
 	}
 }
 
-func displayBoundedRetainedLogs(ctx context.Context, output, diagnostics io.Writer, path string, readOpts logging.ReadOptions, options Options) error {
+func displayBoundedRetainedLogs(
+	ctx context.Context,
+	output, diagnostics io.Writer,
+	path string,
+	readOpts logging.ReadOptions,
+	options Options,
+) error {
 	var buf bytes.Buffer
 	if err := logging.StreamLogs(ctx, path, readOpts, &buf); err != nil {
 		return oops.In("tui").With("operation", "read_logs").Wrap(err)
@@ -282,7 +303,15 @@ func displayBoundedRetainedLogs(ctx context.Context, output, diagnostics io.Writ
 			return oops.In("tui").With("operation", "read_logs").Wrap(err)
 		}
 
-		if err := writeLogLine(output, diagnostics, line, options.Raw, options.Pretty, styles, i+1); err != nil {
+		if err := writeLogLine(
+			output,
+			diagnostics,
+			line,
+			options.Raw,
+			options.Pretty,
+			styles,
+			i+1,
+		); err != nil {
 			return err
 		}
 	}
@@ -316,14 +345,29 @@ func (w *LogStreamWriter) Write(p []byte) (int, error) {
 	}
 
 	w.lineNumber++
-	if err := writeLogLine(w.output, w.diagnostics, p, w.options.Raw, w.options.Pretty, w.styles, w.lineNumber); err != nil {
+	if err := writeLogLine(
+		w.output,
+		w.diagnostics,
+		p,
+		w.options.Raw,
+		w.options.Pretty,
+		w.styles,
+		w.lineNumber,
+	); err != nil {
 		return 0, err
 	}
 
 	return len(p), nil
 }
 
-func writeLogLine(output, diagnostics io.Writer, line []byte, raw bool, pretty bool, styles Styles, lineNumber int) error {
+func writeLogLine(
+	output, diagnostics io.Writer,
+	line []byte,
+	raw bool,
+	pretty bool,
+	styles Styles,
+	lineNumber int,
+) error {
 	if raw {
 		return writeRawLogLine(output, line, pretty)
 	}

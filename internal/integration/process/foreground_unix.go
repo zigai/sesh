@@ -34,7 +34,11 @@ type foregroundSource interface {
 	observe(ctx context.Context, req Request) (*Observation, error)
 }
 
-func observeForeground(ctx context.Context, source foregroundSource, req ForegroundRequest) (*Observation, error) {
+func observeForeground(
+	ctx context.Context,
+	source foregroundSource,
+	req ForegroundRequest,
+) (*Observation, error) {
 	if err := checkPaneBirth(ctx, source, req); err != nil {
 		return nil, err
 	}
@@ -45,8 +49,11 @@ func observeForeground(ctx context.Context, source foregroundSource, req Foregro
 	}
 
 	observation, err := source.observe(ctx, Request{
-		PID:             before.process.pid,
-		ExpectedBirth:   Identity{BootID: req.ExpectedPaneBirth.BootID, StartTime: before.process.startTime},
+		PID: before.process.pid,
+		ExpectedBirth: Identity{
+			BootID:    req.ExpectedPaneBirth.BootID,
+			StartTime: before.process.startTime,
+		},
 		EnvironmentKeys: req.EnvironmentKeys,
 	})
 	if err != nil {
@@ -87,7 +94,11 @@ func sameForegroundSelection(first, second foregroundSelection) bool {
 	return first == second
 }
 
-func selectForeground(ctx context.Context, source foregroundSource, req ForegroundRequest) (foregroundSelection, error) {
+func selectForeground(
+	ctx context.Context,
+	source foregroundSource,
+	req ForegroundRequest,
+) (foregroundSelection, error) {
 	pane, err := source.readProcess(ctx, req.PanePID)
 	if err != nil {
 		return foregroundSelection{}, err

@@ -34,25 +34,35 @@ const (
 )
 
 var (
-	ErrInvalidPID                   = errors.New("a positive process identifier is required")
-	ErrBirthRequired                = errors.New("expected birth identity precondition is required")
-	ErrIdentityMismatch             = errors.New("process birth identity does not match expected identity")
-	ErrProcessVanished              = errors.New("process does not exist or terminated during observation")
+	ErrInvalidPID       = errors.New("a positive process identifier is required")
+	ErrBirthRequired    = errors.New("expected birth identity precondition is required")
+	ErrIdentityMismatch = errors.New(
+		"process birth identity does not match expected identity",
+	)
+	ErrProcessVanished = errors.New(
+		"process does not exist or terminated during observation",
+	)
 	ErrProcessZombie                = errors.New("process is in a zombie or terminated state")
 	ErrEmptyCmdline                 = errors.New("process command line is empty")
 	ErrMalformedCmdline             = errors.New("process command line is malformed or truncated")
 	ErrMalformedEnviron             = errors.New("process environment is malformed or truncated")
-	ErrDuplicateEnvironmentVariable = errors.New("duplicate requested environment variable in process environment")
-	ErrMalformedStat                = errors.New("process stat is malformed or truncated")
-	ErrMalformedIdentity            = errors.New("process birth identity format is invalid")
-	ErrInputTooLarge                = errors.New("process input exceeded bounded read limit")
-	ErrInvalidVariableName          = errors.New("requested environment variable name is invalid")
-	ErrEnvironmentLimitExceeded     = errors.New("requested environment keys exceed count or byte bounds")
-	ErrUnsupported                  = errors.New("process observation is not supported on this platform")
-	ErrAmbiguousProcLink            = errors.New("process link path is ambiguous")
-	ErrForegroundUnavailable        = errors.New("foreground process is unavailable")
-	ErrForegroundAmbiguous          = errors.New("foreground process is ambiguous")
-	ErrForegroundChanged            = errors.New("foreground process changed during observation")
+	ErrDuplicateEnvironmentVariable = errors.New(
+		"duplicate requested environment variable in process environment",
+	)
+	ErrMalformedStat            = errors.New("process stat is malformed or truncated")
+	ErrMalformedIdentity        = errors.New("process birth identity format is invalid")
+	ErrInputTooLarge            = errors.New("process input exceeded bounded read limit")
+	ErrInvalidVariableName      = errors.New("requested environment variable name is invalid")
+	ErrEnvironmentLimitExceeded = errors.New(
+		"requested environment keys exceed count or byte bounds",
+	)
+	ErrUnsupported = errors.New(
+		"process observation is not supported on this platform",
+	)
+	ErrAmbiguousProcLink     = errors.New("process link path is ambiguous")
+	ErrForegroundUnavailable = errors.New("foreground process is unavailable")
+	ErrForegroundAmbiguous   = errors.New("foreground process is ambiguous")
+	ErrForegroundChanged     = errors.New("foreground process changed during observation")
 )
 
 func wrapError(err error, op string) error {

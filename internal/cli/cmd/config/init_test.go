@@ -39,7 +39,12 @@ func TestConfigInitUsesNativeXDGPathWithoutLoadingMalformedConfig(t *testing.T) 
 
 	wantOutput := "Initialized configuration at " + target + ".\n"
 	if exec.Stdout != wantOutput || exec.Stderr != "" {
-		t.Fatalf("stdout = %q, stderr = %q, want %q and empty", exec.Stdout, exec.Stderr, wantOutput)
+		t.Fatalf(
+			"stdout = %q, stderr = %q, want %q and empty",
+			exec.Stdout,
+			exec.Stderr,
+			wantOutput,
+		)
 	}
 
 	content, err := os.ReadFile(target)
@@ -115,7 +120,8 @@ func TestConfigInitRejectsSymlinkWithoutChangingTarget(t *testing.T) {
 		t.Fatalf("stdout = %q, want empty", exec.Stdout)
 	}
 
-	if strings.Contains(exec.Stderr, symlinkPath) || strings.Contains(exec.Stderr, string(privateContent)) {
+	if strings.Contains(exec.Stderr, symlinkPath) ||
+		strings.Contains(exec.Stderr, string(privateContent)) {
 		t.Fatalf("stderr leaked private path or contents: %q", exec.Stderr)
 	}
 

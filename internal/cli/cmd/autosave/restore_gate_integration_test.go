@@ -30,9 +30,20 @@ func TestStartupRestoreAbandonsARestoreFromAnEarlierBootAndRestores(t *testing.T
 		t.Fatalf("create the session to save: %v", err)
 	}
 
-	saved := executeJSON(t, "snapshot", "save", string(work.ID()),
-		testSocketFlag, source.Endpoint().SocketPath, "--repository", repoPath, "--lease-root", leaseRoot,
-		testNoConfigFlag, testJSONFlag)
+	saved := executeJSON(
+		t,
+		"snapshot",
+		"save",
+		string(work.ID()),
+		testSocketFlag,
+		source.Endpoint().SocketPath,
+		"--repository",
+		repoPath,
+		"--lease-root",
+		leaseRoot,
+		testNoConfigFlag,
+		testJSONFlag,
+	)
 	if saved.Err != nil || !saved.Envelope.OK {
 		t.Fatalf("save the source session: %v\nstderr: %s", saved.Err, saved.Stderr)
 	}
@@ -51,7 +62,10 @@ func TestStartupRestoreAbandonsARestoreFromAnEarlierBootAndRestores(t *testing.T
 
 	result := clitest.DecodePayload[resultJSON](t, exec.Envelope.Result)
 	if result.Abandoned != 1 || result.Generation == "" || result.Reason == "pending_operation" {
-		t.Fatalf("startup restore = %#v, want the stale restore abandoned and the snapshot restored", result)
+		t.Fatalf(
+			"startup restore = %#v, want the stale restore abandoned and the snapshot restored",
+			result,
+		)
 	}
 }
 
@@ -73,7 +87,10 @@ func TestStartupRestoreRestoresEverySessionWhenASavedDirectoryIsGone(t *testing.
 
 	for _, session := range []struct{ name, dir string }{{"alpha", root}, {"beta", removed}, {"gamma", root}} {
 		created, err := source.NewSession(t.Context(), gotmux.NewSessionOptions{
-			Name: session.name, Dir: session.dir, Program: gotmux.Exec("/bin/sh"), Start: gotmux.StartPolicyExistingOnly,
+			Name:    session.name,
+			Dir:     session.dir,
+			Program: gotmux.Exec("/bin/sh"),
+			Start:   gotmux.StartPolicyExistingOnly,
 		})
 		if err != nil {
 			t.Fatalf("create %s: %v", session.name, err)
@@ -82,9 +99,17 @@ func TestStartupRestoreRestoresEverySessionWhenASavedDirectoryIsGone(t *testing.
 		saved = append(saved, string(created.ID()))
 	}
 
-	save := executeJSON(t, append(append([]string{"snapshot", "save"}, saved...),
-		testSocketFlag, source.Endpoint().SocketPath, "--repository", repoPath, "--lease-root", leaseRoot,
-		testNoConfigFlag, testJSONFlag)...)
+	save := executeJSON(t, append(
+		append([]string{"snapshot", "save"}, saved...),
+		testSocketFlag,
+		source.Endpoint().SocketPath,
+		"--repository",
+		repoPath,
+		"--lease-root",
+		leaseRoot,
+		testNoConfigFlag,
+		testJSONFlag,
+	)...)
 	if save.Err != nil || !save.Envelope.OK {
 		t.Fatalf("save the source sessions: %v\nstderr: %s", save.Err, save.Stderr)
 	}

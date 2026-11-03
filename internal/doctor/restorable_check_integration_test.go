@@ -48,7 +48,10 @@ func savedRepository(t *testing.T) string {
 func tmuxServerCheck(t *testing.T, server *gotmux.Server, snapshotDir string) doctor.Result {
 	t.Helper()
 
-	results, err := doctor.Run(t.Context(), doctor.Options{PathEnv: os.Getenv("PATH"), Server: server, SnapshotDir: snapshotDir})
+	results, err := doctor.Run(
+		t.Context(),
+		doctor.Options{PathEnv: os.Getenv("PATH"), Server: server, SnapshotDir: snapshotDir},
+	)
 	if err != nil {
 		t.Fatalf("unexpected run error: %v", err)
 	}
@@ -58,7 +61,8 @@ func tmuxServerCheck(t *testing.T, server *gotmux.Server, snapshotDir string) do
 
 func TestRestorableSessionsAreNamedWhenNoServerRuns(t *testing.T) {
 	result := tmuxServerCheck(t, absentTmuxServer(t), savedRepository(t))
-	if result.Status != doctor.StatusFail || result.Reason != doctor.ReasonNotRunning || result.Fix == nil {
+	if result.Status != doctor.StatusFail || result.Reason != doctor.ReasonNotRunning ||
+		result.Fix == nil {
 		t.Fatalf("expected a not-running failure with a fix, got %#v", result)
 	}
 
@@ -69,11 +73,22 @@ func TestRestorableSessionsAreNamedWhenNoServerRuns(t *testing.T) {
 }
 
 func TestRestorableSessionsAreNotMentionedWhileTmuxRunsOrNothingIsSaved(t *testing.T) {
-	if live := tmuxServerCheck(t, tmuxtest.NewServer(t), savedRepository(t)); live.Status != doctor.StatusOK || len(live.Details) != 0 {
+	if live := tmuxServerCheck(
+		t,
+		tmuxtest.NewServer(t),
+		savedRepository(t),
+	); live.Status != doctor.StatusOK ||
+		len(live.Details) != 0 {
 		t.Fatalf("a running server has nothing to restore, got %#v", live)
 	}
 
-	if empty := tmuxServerCheck(t, absentTmuxServer(t), filepath.Join(t.TempDir(), "none")); len(empty.Details) != 0 {
+	if empty := tmuxServerCheck(
+		t,
+		absentTmuxServer(t),
+		filepath.Join(t.TempDir(), "none"),
+	); len(
+		empty.Details,
+	) != 0 {
 		t.Fatalf("no repository means nothing to restore, got %#v", empty)
 	}
 }

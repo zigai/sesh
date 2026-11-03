@@ -47,7 +47,11 @@ func retainAgentPositions(agents []session.AgentSession, previous []session.Agen
 	}
 }
 
-func applyPanePosition(summary *session.AgentSummary, agent *session.AgentSession, panes []PaneLocation) bool {
+func applyPanePosition(
+	summary *session.AgentSummary,
+	agent *session.AgentSession,
+	panes []PaneLocation,
+) bool {
 	agent.PositionKnown = false
 
 	for _, pane := range panes {
@@ -59,7 +63,8 @@ func applyPanePosition(summary *session.AgentSummary, agent *session.AgentSessio
 		left, leftErr := strconv.Atoi(pane.PaneLeft)
 
 		top, topErr := strconv.Atoi(pane.PaneTop)
-		if windowErr == nil && leftErr == nil && topErr == nil && window >= 0 && left >= 0 && top >= 0 {
+		if windowErr == nil && leftErr == nil && topErr == nil && window >= 0 && left >= 0 &&
+			top >= 0 {
 			agent.PositionKnown = true
 			agent.WindowIndex = window
 			agent.PaneLeft = left
@@ -72,8 +77,13 @@ func applyPanePosition(summary *session.AgentSummary, agent *session.AgentSessio
 	return false
 }
 
-func paneMatchesAgentOwner(summary *session.AgentSummary, agent *session.AgentSession, pane PaneLocation) bool {
-	if pane.PaneID != agent.PaneID || !sameServerSocket(pane.ServerSocket, summary.TmuxServerSocket) {
+func paneMatchesAgentOwner(
+	summary *session.AgentSummary,
+	agent *session.AgentSession,
+	pane PaneLocation,
+) bool {
+	if pane.PaneID != agent.PaneID ||
+		!sameServerSocket(pane.ServerSocket, summary.TmuxServerSocket) {
 		return false
 	}
 
@@ -88,7 +98,10 @@ func paneMatchesAgentOwner(summary *session.AgentSummary, agent *session.AgentSe
 	return agent.PanePID <= 0 || pane.PanePID <= 0 || agent.PanePID == pane.PanePID
 }
 
-func pruneAgentsWithVanishedPanes(summaries []session.AgentSummary, panes []PaneLocation) []session.AgentSummary {
+func pruneAgentsWithVanishedPanes(
+	summaries []session.AgentSummary,
+	panes []PaneLocation,
+) []session.AgentSummary {
 	result := make([]session.AgentSummary, 0, len(summaries))
 
 	for _, summary := range summaries {
@@ -138,7 +151,10 @@ func recountAgentSummary(summary *session.AgentSummary) {
 		case session.AgentStatusInterrupted:
 			summary.Interrupted++
 			summary.IdleSince = earlierAgentStatus(summary.IdleSince, agent.StatusSince)
-		case session.AgentStatusUnknown, session.AgentStatusSleeping, session.AgentStatusMerged, session.AgentStatusClosed:
+		case session.AgentStatusUnknown,
+			session.AgentStatusSleeping,
+			session.AgentStatusMerged,
+			session.AgentStatusClosed:
 			summary.Unknown++
 		default:
 			summary.Unknown++

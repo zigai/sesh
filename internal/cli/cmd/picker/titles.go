@@ -28,7 +28,11 @@ type titleState struct {
 	title    string
 }
 
-func (c *titleCache) annotate(ctx context.Context, observed []agents.AgentSession, summaries []session.AgentSummary) {
+func (c *titleCache) annotate(
+	ctx context.Context,
+	observed []agents.AgentSession,
+	summaries []session.AgentSummary,
+) {
 	lookups := make([]aht.Session, 0, len(observed))
 	registryIDs := make([]string, 0, len(observed))
 
@@ -141,7 +145,8 @@ func titleCacheKey(lookup aht.Session) string {
 }
 
 func titleSourceUnchanged(cached, current os.FileInfo) bool {
-	return os.SameFile(cached, current) && cached.Size() == current.Size() && cached.ModTime().Equal(current.ModTime())
+	return os.SameFile(cached, current) && cached.Size() == current.Size() &&
+		cached.ModTime().Equal(current.ModTime())
 }
 
 func titleLookupSession(agent agents.AgentSession) (aht.Session, bool) {

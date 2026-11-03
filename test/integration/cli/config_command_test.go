@@ -50,7 +50,15 @@ func newConfigInitBinaryFixture(t *testing.T) configInitBinaryFixture {
 		t.Fatalf("resolving repository root: %v", err)
 	}
 
-	buildCmd := exec.CommandContext(t.Context(), "go", "build", "-mod=readonly", "-o", binaryPath, "./cmd/sesh")
+	buildCmd := exec.CommandContext(
+		t.Context(),
+		"go",
+		"build",
+		"-mod=readonly",
+		"-o",
+		binaryPath,
+		"./cmd/sesh",
+	)
 
 	buildCmd.Dir = repoRoot
 	if output, buildErr := buildCmd.CombinedOutput(); buildErr != nil {
@@ -85,7 +93,11 @@ func (f configInitBinaryFixture) run(t *testing.T, args ...string) ([]byte, erro
 	return f.runWithEnvironment(t, f.env, args...)
 }
 
-func (f configInitBinaryFixture) runWithEnvironment(t *testing.T, env []string, args ...string) ([]byte, error) {
+func (f configInitBinaryFixture) runWithEnvironment(
+	t *testing.T,
+	env []string,
+	args ...string,
+) ([]byte, error) {
 	t.Helper()
 
 	cmd := exec.CommandContext(t.Context(), f.binaryPath, args...)
@@ -116,7 +128,9 @@ func verifyConfigInitCreatesNativeXDGFile(t *testing.T, fixture configInitBinary
 		t.Fatalf("decoding JSON output: %v\noutput: %s", decodeErr, output)
 	}
 
-	if !envelope.OK || envelope.Command != "config.init" || envelope.Result.Path != fixture.target || envelope.Result.Status != "initialized" {
+	if !envelope.OK || envelope.Command != "config.init" ||
+		envelope.Result.Path != fixture.target ||
+		envelope.Result.Status != "initialized" {
 		t.Fatalf("unexpected init envelope: %+v", envelope)
 	}
 }
@@ -182,7 +196,12 @@ func verifyConfigInitRejectsSymlink(t *testing.T, fixture configInitBinaryFixtur
 	verifyConfigInitSymlinkTarget(t, privateTarget, privateContent)
 }
 
-func verifyConfigInitSymlinkError(t *testing.T, output []byte, symlinkPath string, privateContent []byte) {
+func verifyConfigInitSymlinkError(
+	t *testing.T,
+	output []byte,
+	symlinkPath string,
+	privateContent []byte,
+) {
 	t.Helper()
 
 	if bytes.Contains(output, []byte(symlinkPath)) || bytes.Contains(output, privateContent) {
@@ -197,7 +216,8 @@ func verifyConfigInitSymlinkError(t *testing.T, output []byte, symlinkPath strin
 		t.Fatalf("decoding symlink error envelope: %v\noutput: %s", decodeErr, output)
 	}
 
-	if failureEnvelope.OK || failureEnvelope.Error == nil || failureEnvelope.Error.Code != "configSymlink" ||
+	if failureEnvelope.OK || failureEnvelope.Error == nil ||
+		failureEnvelope.Error.Code != "configSymlink" ||
 		failureEnvelope.Error.Message != "configuration target must not be a symbolic link" {
 		t.Fatalf("unexpected symlink error envelope: %+v", failureEnvelope)
 	}
@@ -235,7 +255,9 @@ func verifyConfigInitInvalidFlagDoesNotMutate(t *testing.T, fixture configInitBi
 	}
 }
 
-func isolatedConfigInitEnvironment(home, configHome, dataHome, stateHome, cacheHome string) []string {
+func isolatedConfigInitEnvironment(
+	home, configHome, dataHome, stateHome, cacheHome string,
+) []string {
 	prefixes := []string{
 		"HOME=",
 		"XDG_CONFIG_HOME=",

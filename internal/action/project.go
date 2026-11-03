@@ -25,13 +25,15 @@ var (
 	}, reportOpenedProject)
 
 	ProjectClone = define(Descriptor{
-		ID:          "project.clone",
-		Title:       "Clone project",
-		Summary:     "Clone a repository into the first project root and open it",
-		Help:        "Clone a repository into the first configured project root and switch to its new session.",
-		Subject:     SubjectNone,
-		Arity:       ArityOne,
-		Params:      []Param{newParam("url", ParamText, "Repository URL").required().positional().fromQuery()},
+		ID:      "project.clone",
+		Title:   "Clone project",
+		Summary: "Clone a repository into the first project root and open it",
+		Help:    "Clone a repository into the first configured project root and switch to its new session.",
+		Subject: SubjectNone,
+		Arity:   ArityOne,
+		Params: []Param{
+			newParam("url", ParamText, "Repository URL").required().positional().fromQuery(),
+		},
 		NeedsClient: true,
 		Interactive: false,
 		Destructive: false,
@@ -43,13 +45,21 @@ var (
 	}, reportOpenedProject)
 
 	ProjectCreate = define(Descriptor{
-		ID:          "project.create",
-		Title:       "Create project",
-		Summary:     "Create a repository in the first project root and open it",
-		Help:        "Create a directory with an empty git repository in the first configured project root and switch to its new session.",
-		Subject:     SubjectNone,
-		Arity:       ArityOne,
-		Params:      []Param{newParam("name", ParamText, "Project directory name").required().positional().fromQuery()},
+		ID:      "project.create",
+		Title:   "Create project",
+		Summary: "Create a repository in the first project root and open it",
+		Help:    "Create a directory with an empty git repository in the first configured project root and switch to its new session.",
+		Subject: SubjectNone,
+		Arity:   ArityOne,
+		Params: []Param{
+			newParam(
+				"name",
+				ParamText,
+				"Project directory name",
+			).required().
+				positional().
+				fromQuery(),
+		},
 		NeedsClient: true,
 		Interactive: false,
 		Destructive: false,

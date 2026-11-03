@@ -50,19 +50,36 @@ func (w *Workflow) AttachSession(ctx context.Context, name string) (EnterOutcome
 		Flags:               nil,
 	})
 	if cmdErr != nil {
-		return out, w.fail(ctx, "attach", oops.In("session").Code("attach_failed").With("operation", "prepare_attach").Wrap(cmdErr))
+		return out, w.fail(
+			ctx,
+			"attach",
+			oops.In("session").
+				Code("attach_failed").
+				With("operation", "prepare_attach").
+				Wrap(cmdErr),
+		)
 	}
 
 	state, stateErr := term.GetState(streams.In.Fd())
 	if stateErr != nil {
-		return out, w.fail(ctx, "attach", oops.In("session").Code("attach_failed").With("operation", "read_terminal_state").Wrap(stateErr))
+		return out, w.fail(
+			ctx,
+			"attach",
+			oops.In("session").
+				Code("attach_failed").
+				With("operation", "read_terminal_state").
+				Wrap(stateErr),
+		)
 	}
 
 	if startErr := cmd.Start(); startErr != nil {
 		restoreErr := wrapTerminalRestore(term.Restore(streams.In.Fd(), state))
 
 		return out, w.fail(ctx, "attach", errors.Join(
-			oops.In("session").Code("attach_failed").With("operation", "start_attach").Wrap(startErr),
+			oops.In("session").
+				Code("attach_failed").
+				With("operation", "start_attach").
+				Wrap(startErr),
 			restoreErr,
 		))
 	}
@@ -88,9 +105,14 @@ func (w *Workflow) AttachSession(ctx context.Context, name string) (EnterOutcome
 	return out, nil
 }
 
-func (w *Workflow) prepareAttachTarget(ctx context.Context, name string) (gotmux.Session, gotmux.Streams, string, error) {
+func (w *Workflow) prepareAttachTarget(
+	ctx context.Context,
+	name string,
+) (gotmux.Session, gotmux.Streams, string, error) {
 	if w.server == nil {
-		return gotmux.Session{}, gotmux.Streams{}, "", oops.In("session").Code("endpoint_required").Wrap(errServerRequired)
+		return gotmux.Session{}, gotmux.Streams{}, "", oops.In("session").
+			Code("endpoint_required").
+			Wrap(errServerRequired)
 	}
 
 	sess, findErr := w.server.FindSession(ctx, name)
@@ -100,21 +122,33 @@ func (w *Workflow) prepareAttachTarget(ctx context.Context, name string) (gotmux
 
 	streams := w.terminalStreams()
 	if streamErr := validateTerminalStreams(streams); streamErr != nil {
-		return gotmux.Session{}, gotmux.Streams{}, "", oops.In("session").Code("terminal_required").With("operation", "validate_terminals").Wrap(streamErr)
+		return gotmux.Session{}, gotmux.Streams{}, "", oops.In("session").
+			Code("terminal_required").
+			With("operation", "validate_terminals").
+			Wrap(streamErr)
 	}
 
 	if valErr := ValidateHookConfig(w.hooks, EventSessionAttachPre); valErr != nil {
-		return gotmux.Session{}, gotmux.Streams{}, "", oops.In("session").Code("hook_failed").With("operation", "validate_hooks").Wrap(valErr)
+		return gotmux.Session{}, gotmux.Streams{}, "", oops.In("session").
+			Code("hook_failed").
+			With("operation", "validate_hooks").
+			Wrap(valErr)
 	}
 
 	if valErr := ValidateHookConfig(w.hooks, EventSessionAttachPost); valErr != nil {
-		return gotmux.Session{}, gotmux.Streams{}, "", oops.In("session").Code("hook_failed").With("operation", "validate_hooks").Wrap(valErr)
+		return gotmux.Session{}, gotmux.Streams{}, "", oops.In("session").
+			Code("hook_failed").
+			With("operation", "validate_hooks").
+			Wrap(valErr)
 	}
 
 	return sess, streams, string(sess.ID()), nil
 }
 
-func (w *Workflow) runAttachPreHook(ctx context.Context, name, sessionID string) (HookSummary, error) {
+func (w *Workflow) runAttachPreHook(
+	ctx context.Context,
+	name, sessionID string,
+) (HookSummary, error) {
 	return w.runHookBoundary(ctx, HookEvent{
 		Name:          EventSessionAttachPre,
 		Phase:         "pre",
@@ -127,7 +161,11 @@ func (w *Workflow) runAttachPreHook(ctx context.Context, name, sessionID string)
 	})
 }
 
-func (w *Workflow) runAttachPostHook(ctx context.Context, name, sessionID string, cmd *exec.Cmd) (HookSummary, error) {
+func (w *Workflow) runAttachPostHook(
+	ctx context.Context,
+	name, sessionID string,
+	cmd *exec.Cmd,
+) (HookSummary, error) {
 	summary, postErr := w.runHookBoundary(ctx, HookEvent{
 		Name:          EventSessionAttachPost,
 		Phase:         "post",
@@ -164,7 +202,10 @@ func validateTerminalStreams(streams gotmux.Streams) error {
 
 func attachWaitError(ctx context.Context, waitErr error) error {
 	if ctxErr := ctx.Err(); ctxErr != nil {
-		return oops.In("session").Code("operation_canceled").With("operation", "attach_session").Wrap(ctxErr)
+		return oops.In("session").
+			Code("operation_canceled").
+			With("operation", "attach_session").
+			Wrap(ctxErr)
 	}
 
 	if waitErr == nil {
@@ -173,10 +214,17 @@ func attachWaitError(ctx context.Context, waitErr error) error {
 
 	exitErr, ok := errors.AsType[*exec.ExitError](waitErr)
 	if ok {
-		return oops.In("session").Code("attach_failed").With("operation", "attach_session").With("exit_code", exitErr.ExitCode()).Wrap(waitErr)
+		return oops.In("session").
+			Code("attach_failed").
+			With("operation", "attach_session").
+			With("exit_code", exitErr.ExitCode()).
+			Wrap(waitErr)
 	}
 
-	return oops.In("session").Code("attach_failed").With("operation", "attach_session").Wrap(waitErr)
+	return oops.In("session").
+		Code("attach_failed").
+		With("operation", "attach_session").
+		Wrap(waitErr)
 }
 
 func wrapTerminalRestore(err error) error {

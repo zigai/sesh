@@ -53,10 +53,22 @@ func TestAgentCtrlArrowKeysJumpBetweenTmuxSessionGroups(t *testing.T) {
 		key  tea.KeyPressMsg
 		want popupListRow
 	}{
-		{key: keyCtrlCode(tea.KeyDown), want: popupListRow{sessionIndex: 1, agentIndex: parentAgentIndex}},
-		{key: keyCtrlCode(tea.KeyDown), want: popupListRow{sessionIndex: 2, agentIndex: parentAgentIndex}},
-		{key: keyCtrlCode(tea.KeyDown), want: popupListRow{sessionIndex: 0, agentIndex: parentAgentIndex}},
-		{key: keyCtrlCode(tea.KeyUp), want: popupListRow{sessionIndex: 2, agentIndex: parentAgentIndex}},
+		{
+			key:  keyCtrlCode(tea.KeyDown),
+			want: popupListRow{sessionIndex: 1, agentIndex: parentAgentIndex},
+		},
+		{
+			key:  keyCtrlCode(tea.KeyDown),
+			want: popupListRow{sessionIndex: 2, agentIndex: parentAgentIndex},
+		},
+		{
+			key:  keyCtrlCode(tea.KeyDown),
+			want: popupListRow{sessionIndex: 0, agentIndex: parentAgentIndex},
+		},
+		{
+			key:  keyCtrlCode(tea.KeyUp),
+			want: popupListRow{sessionIndex: 2, agentIndex: parentAgentIndex},
+		},
 	}
 
 	for index, step := range steps {
@@ -83,8 +95,14 @@ func TestRegularArrowFromCtrlSelectedSessionEntersAgentRows(t *testing.T) {
 	model.moveAgentGroup(1)
 	model.moveSelectionByStep(1)
 
-	if got, want := model.selectedListRow(), (popupListRow{sessionIndex: 1, agentIndex: 0}); !got.equal(want) {
-		t.Fatalf("selection after ctrl session then down = %#v, want first open agent %#v", got, want)
+	if got, want := model.selectedListRow(), (popupListRow{sessionIndex: 1, agentIndex: 0}); !got.equal(
+		want,
+	) {
+		t.Fatalf(
+			"selection after ctrl session then down = %#v, want first open agent %#v",
+			got,
+			want,
+		)
 	}
 }
 
@@ -121,13 +139,17 @@ func TestAgentNavigationBoundariesSelectFirstAndLastAgents(t *testing.T) {
 
 	model.selectListBoundary(true)
 
-	if got, want := model.selectedListRow(), (popupListRow{sessionIndex: 2, agentIndex: 0}); !got.equal(want) {
+	if got, want := model.selectedListRow(), (popupListRow{sessionIndex: 2, agentIndex: 0}); !got.equal(
+		want,
+	) {
 		t.Fatalf("bottom selection = %#v, want %#v", got, want)
 	}
 
 	model.selectListBoundary(false)
 
-	if got, want := model.selectedListRow(), (popupListRow{sessionIndex: 0, agentIndex: 0}); !got.equal(want) {
+	if got, want := model.selectedListRow(), (popupListRow{sessionIndex: 0, agentIndex: 0}); !got.equal(
+		want,
+	) {
 		t.Fatalf("top selection = %#v, want %#v", got, want)
 	}
 }
@@ -141,7 +163,9 @@ func TestAgentSelectionNormalizationPreservesHeadingSelection(t *testing.T) {
 
 	model.normalizeFilteredCursor()
 
-	if got, want := model.selectedListRow(), (popupListRow{sessionIndex: 1, agentIndex: parentAgentIndex}); !got.equal(want) {
+	if got, want := model.selectedListRow(), (popupListRow{sessionIndex: 1, agentIndex: parentAgentIndex}); !got.equal(
+		want,
+	) {
 		t.Fatalf("normalized selection = %#v, want %#v", got, want)
 	}
 }
@@ -167,7 +191,9 @@ func TestCtrlArrowKeySelectsSessionWithOpenAgentsAndEnterSwitchesSession(t *test
 
 	handler()
 
-	if got, want := model.selectedListRow(), (popupListRow{sessionIndex: 1, agentIndex: parentAgentIndex}); !got.equal(want) {
+	if got, want := model.selectedListRow(), (popupListRow{sessionIndex: 1, agentIndex: parentAgentIndex}); !got.equal(
+		want,
+	) {
 		t.Fatalf("selection after ctrl+down = %#v, want session heading %#v", got, want)
 	}
 
@@ -184,7 +210,11 @@ func TestCtrlArrowKeySelectsSessionWithOpenAgentsAndEnterSwitchesSession(t *test
 	model.Update(cmd())
 
 	if model.DeferredSwitchSession() != "termtrace" || model.DeferredSwitchPane() != "" {
-		t.Fatalf("enter target = %q/%q, want termtrace without pane", model.DeferredSwitchSession(), model.DeferredSwitchPane())
+		t.Fatalf(
+			"enter target = %q/%q, want termtrace without pane",
+			model.DeferredSwitchSession(),
+			model.DeferredSwitchPane(),
+		)
 	}
 
 	if switched {
@@ -194,7 +224,10 @@ func TestCtrlArrowKeySelectsSessionWithOpenAgentsAndEnterSwitchesSession(t *test
 
 func agentNavigationSessions() []session.Session {
 	return []session.Session{
-		{Name: "pi-codex-core", Agents: []session.AgentSession{{HarnessSession: "first"}, {HarnessSession: "second"}}},
+		{
+			Name:   "pi-codex-core",
+			Agents: []session.AgentSession{{HarnessSession: "first"}, {HarnessSession: "second"}},
+		},
 		{Name: "termtrace", Agents: []session.AgentSession{{HarnessSession: "third"}}},
 		{Name: "pi-tweaks", Agents: []session.AgentSession{{HarnessSession: "fourth"}}},
 	}
