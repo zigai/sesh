@@ -9,7 +9,14 @@ formatters:
   enable:
     - goimports
     - gofumpt
+    - golines
   settings:
+    gofumpt:
+      extra:
+        balance-calls: true
+    golines:
+      max-len: 100
+      reformat-tags: false
     goimports:
       local-prefixes:
         - github.com/zigai/sesh
@@ -66,6 +73,7 @@ linters:
     - interfacebloat
     - intrange
     - iotamixing
+    - lll
     - loggercheck
     - maintidx
     - makezero
@@ -114,6 +122,9 @@ linters:
     - zerologlint
 
   settings:
+    thelper:
+      benchmark:
+        begin: false
     embeddedstructfieldcheck:
       forbid-mutex: true
     errcheck:
@@ -121,7 +132,6 @@ linters:
     exhaustive:
       check:
         - switch
-        - map
     gochecksumtype:
       default-signifies-exhaustive: false
     cyclop:
@@ -139,7 +149,11 @@ linters:
       min-complexity: 20
     goconst:
       min-occurrences: 16
+    lll:
+      line-length: 120
+      tab-width: 4
     gocritic:
+      enabled-tags: [diagnostic]
       settings:
         captLocal:
           paramsOnly: false
@@ -201,6 +215,8 @@ linters:
         - name: indent-error-flow
         - name: superfluous-else
         - name: modifies-parameter
+        - name: enforce-repeated-arg-type-style
+          arguments: ["full"]
         - name: unreachable-code
           disabled: true
         - name: redefines-builtin-id
@@ -208,6 +224,12 @@ linters:
     rowserrcheck:
       packages:
         - github.com/jmoiron/sqlx
+    tagliatelle:
+      case:
+        rules:
+          json: camel
+          yaml: camel
+          toml: camel
     staticcheck:
       checks:
         - all
@@ -215,22 +237,31 @@ linters:
         - -ST1016
         - -QF1008
     nolintlint:
-      allow-no-explanation: [funlen, gocognit, golines]
+      allow-no-explanation: [gocognit, golines]
       require-explanation: true
       require-specific: true
     gosec:
       excludes:
-        - G204 # exec.Command from $EDITOR is user-controlled by design
+        - G204 # subprocess launched with variable
         - G301 # directory perms
         - G302 # file perms
         - G304 # file path from variable
         - G703 # path traversal taint on paths from variables, same as G304
     exhaustruct_v5:
+      allow-empty-returns: true
+      # Types whose zero fields mean "use the default". Mark such types in
+      # this module with //exhaustruct:optional instead of listing them here.
       ignore-patterns:
-        - "github.com/urfave/cli/v3\\..*"
-        - "github.com/urfave/cli\\..*"
-        - "github.com/spf13/cobra\\..*"
-        - "github.com/spf13/pflag\\..*"
+        - "^github\\.com/spf13/cobra\\..+$"
+        - "^github\\.com/spf13/pflag\\..+$"
+        - "^github\\.com/urfave/cli(/v[0-9]+)?\\..+$"
+        - "^net/http\\.(Client|Server|Transport)$"
+        - "^net\\.(Dialer|ListenConfig)$"
+        - "^net/url\\.URL$"
+        - "^crypto/tls\\.Config$"
+        - "^log/slog\\.HandlerOptions$"
+        - "^os/exec\\.Cmd$"
+        - "^syscall\\.SysProcAttr$"
 
   exclusions:
     warn-unused: false
@@ -242,11 +273,17 @@ linters:
       - path: "internal/cli/.*"
         linters: [wrapcheck, contextcheck, funcorder, decorder]
 
-      - path: "internal/cli/root\\.go"
-        linters: [exhaustruct_v5]
-
       - path: ".*_test\\.go"
-        linters: [decorder, funcorder, exhaustruct_v5, unparam, contextcheck, cyclop, gocognit, gosec, gosmopolitan]
+        linters: [decorder, funcorder, exhaustruct_v5, unparam, contextcheck, cyclop, gocognit, gosec, gosmopolitan, dupl, maintidx, goconst]
+
+      # A test writes its own output to paths the developer running it chooses.
+      - path: ".*_test\\.go"
+        linters: [gosec]
+        text: "G703:"
+
+      # Test-helper packages (named like httptest) only build fixtures.
+      - path: "(^|/)[a-z0-9]+test/"
+        linters: [exhaustruct_v5]
 
 issues:
   max-issues-per-linter: 0
