@@ -9,6 +9,51 @@ integration_env := "TMUX_INTEGRATION_REQUIRED=1 SESH_APPLICATION_INTEGRATION_REQ
 help:
     @just --list
 
+# Start a scratch tmux server with this checkout's sesh, isolated from the live server
+sandbox:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -f .cache/sandbox/root ]; then
+        printf 'A sandbox is already running; source %s/env, or run just sandbox-stop\n' "$(cat .cache/sandbox/root)" >&2
+        exit 1
+    fi
+    mkdir -p .cache/sandbox "$HOME/.cache"
+    # Under ~/.cache rather than the checkout: tmux and sesh sockets fail past 108 bytes.
+    root=$(mktemp -d "$HOME/.cache/ssb.XXXXXX")
+    mkdir -p "$root"/{bin,home,config,data,state,cache,tmux}
+    go build -o "$root/bin/{{ binary }}" ./cmd/sesh
+    cat > "$root/env" <<EOF
+    export HOME="$root/home" XDG_CONFIG_HOME="$root/config" XDG_DATA_HOME="$root/data"
+    export XDG_STATE_HOME="$root/state" XDG_CACHE_HOME="$root/cache" TMUX_TMPDIR="$root/tmux"
+    export PATH="$root/bin:\$PATH" SHELL=/bin/bash
+    unset TMUX TMUX_PANE DBUS_SESSION_BUS_ADDRESS CLAUDE_PID
+    for name in \${!SESH_@}; do unset "\$name"; done
+    EOF
+    printf '%s\n' "$root" > .cache/sandbox/root
+    (source "$root/env"; tmux new-session -d -s sandbox -c "$HOME")
+    printf 'Run this in each shell: source %s/env\nThen sesh and tmux use only the sandbox. Stop it with just sandbox-stop.\n' "$root"
+
+# Stop the scratch tmux server and delete its files
+sandbox-stop:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ ! -f .cache/sandbox/root ]; then
+        printf 'No sandbox is running\n'
+        exit 0
+    fi
+    root=$(cat .cache/sandbox/root)
+    (
+        source "$root/env"
+        shopt -s nullglob
+        for socket in "$TMUX_TMPDIR"/tmux-*/*; do
+            # The server exits with its last session.
+            tmux -S "$socket" list-sessions -F '#{session_id}' 2>/dev/null \
+                | while read -r session; do tmux -S "$socket" kill-session -t "$session"; done
+        done
+    )
+    rm -rf "$root" .cache/sandbox/root
+    printf 'Stopped the sandbox\n'
+
 # Run all tests
 test:
     go test ./...

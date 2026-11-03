@@ -22,7 +22,7 @@ Agent row goldens in `internal/tui/testdata/agent_rows` are rewritten with `SESH
 
 - Every test package must have a `TestMain` that calls `testenv.RunIsolated(m)` (`internal/testsupport/testenv`). It moves `$HOME`, XDG dirs and `$TMUX_TMPDIR` into a temp dir and clears `TMUX`, `TMUX_PANE`, `DBUS_SESSION_BUS_ADDRESS` and `SESH_*` variables, so tests never reach the user's live tmux sessions, systemd user manager or real snapshot repository. `just test-isolation` enforces this.
 - Name tests for the behavior they exercise and place them with the owning feature. Do not use historical-origin prefixes or separate historical suites.
-- When testing sesh by hand, never touch the live tmux server. Run it inside a throwaway `tmux -L <name>` pane, by full binary path, with `TMUX_TMPDIR` set to a scratch directory and `TMUX_PANE` unset. Unsetting `TMUX` is not isolation, and task popups open a second server by name under `TMUX_TMPDIR`.
+- When testing sesh by hand, never touch the live tmux server. Use `just sandbox`, source the env file it prints in each shell, and finish with `just sandbox-stop`.
 - Tests use `tmux` from `PATH` unless `TMUX_TEST_BINARY` is set.
 - Integration tests use the `//go:build ... && integration` tag. They live next to the code (`*_integration_test.go`) and in `test/integration/{cli,snapshot,application,lifecycle}`, which drive the built binary against disposable tmux servers.
 - Property tests use `pgregory.net/rapid`; its failure cases are saved under `testdata/rapid/`.
