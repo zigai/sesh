@@ -577,7 +577,7 @@ func rejectCorruptRepositoryWithoutTargetMutation(
 
 	if err := os.WriteFile(
 		filepath.Join(repository, "catalog.json"),
-		[]byte("pane\tlegacy\n"),
+		[]byte("pane\tother\n"),
 		0o600,
 	); err != nil {
 		t.Fatalf("replace native catalog with non-native bytes: %v", err)

@@ -545,7 +545,7 @@ func TestCollectionKeepsCatalogAndForeignEntries(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(foreign[1], []byte("legacy log"), 0o600); err != nil {
+	if err := os.WriteFile(foreign[1], []byte("foreign log"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 

@@ -10,7 +10,7 @@ import (
 func TestUnitFromCgroupDistinguishesNonMembershipFromInspectionFailure(test *testing.T) {
 	test.Parallel()
 
-	for _, data := range []string{"", "malformed", "0::relative.scope", "1:name=systemd:/legacy.scope"} {
+	for _, data := range []string{"", "malformed", "0::relative.scope", "1:name=systemd:/other.scope"} {
 		_, err := unitFromCgroup([]byte(data))
 		if err == nil || errors.Is(err, errNoServiceUnit) {
 			test.Errorf("uninspected cgroup %q was treated as known non-membership: %v", data, err)

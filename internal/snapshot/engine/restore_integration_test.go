@@ -323,14 +323,14 @@ func addRetiredOptions(t *testing.T, manifest *model.Manifest) {
 
 	manifest.Sessions[0].Options = append(manifest.Sessions[0].Options, model.Option{
 		Scope:     "session",
-		Name:      model.Bytes("legacy-session-style"),
+		Name:      model.Bytes("other-session-style"),
 		Value:     model.Bytes("default"),
 		Present:   true,
 		Inherited: false,
 	})
 	manifest.Windows[0].Options = append(manifest.Windows[0].Options, model.Option{
 		Scope:     "window",
-		Name:      model.Bytes("legacy-window-style"),
+		Name:      model.Bytes("other-window-style"),
 		Value:     model.Bytes("default"),
 		Present:   true,
 		Inherited: false,

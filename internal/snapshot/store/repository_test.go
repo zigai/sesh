@@ -513,17 +513,17 @@ func rewriteFixtureFile(t *testing.T, path string, data []byte) {
 	}
 }
 
-func TestLegacyPointerCannotInitializeNativeRepository(t *testing.T) {
+func TestForeignPointerCannotInitializeNativeRepository(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "repository")
 	if err := os.Mkdir(path, 0o700); err != nil {
 		t.Fatal(err)
 	}
 
-	legacy := filepath.Join(t.TempDir(), "old-snapshot.txt")
+	foreign := filepath.Join(t.TempDir(), "other-snapshot.txt")
 	content := []byte("pane\tsynthetic\t0\t0\n")
-	rewriteFixtureFile(t, legacy, content)
+	rewriteFixtureFile(t, foreign, content)
 
-	if err := os.Symlink(legacy, filepath.Join(path, "last")); err != nil {
+	if err := os.Symlink(foreign, filepath.Join(path, "last")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -535,11 +535,11 @@ func TestLegacyPointerCannotInitializeNativeRepository(t *testing.T) {
 	}
 
 	if !errors.Is(err, ErrCorrupt) {
-		t.Fatal("legacy pointer admitted as native repository", err)
+		t.Fatal("foreign pointer admitted as native repository", err)
 	}
 
-	after, err := os.ReadFile(legacy)
+	after, err := os.ReadFile(foreign)
 	if err != nil || !bytes.Equal(content, after) {
-		t.Fatal("external legacy source changed", err)
+		t.Fatal("foreign source changed", err)
 	}
 }

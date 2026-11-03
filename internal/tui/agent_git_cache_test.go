@@ -259,9 +259,9 @@ func TestAgentGitCacheUsesOnlyNativePath(t *testing.T) {
 	directory := t.TempDir()
 	t.Setenv("XDG_CACHE_HOME", directory)
 
-	legacyPath := filepath.Join(directory, "legacy-tool", "agent-git.json")
+	otherPath := filepath.Join(directory, "other-tool", "agent-git.json")
 	if err := writeAgentGitCache(
-		legacyPath,
+		otherPath,
 		map[string]agentGitCacheEntry{"/project": {GitBranch: "old-tool"}},
 	); err != nil {
 		t.Fatal(err)

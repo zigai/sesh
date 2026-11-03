@@ -107,7 +107,7 @@ func TestRejectsMalformedNativeDocuments(t *testing.T) {
 	withVersion := func(replacement string) []byte { return bytes.Replace(data, version, []byte(replacement), 1) }
 
 	cases := map[string][]byte{
-		"legacy":    []byte("session\twork\t0\n"),
+		"tabbed":    []byte("session\twork\t0\n"),
 		"duplicate": withVersion(string(version) + "," + string(version)),
 		"unknown":   withVersion(string(version) + `,"other":0`),
 		"missing":   bytes.Replace(data, append(bytes.Clone(version), ','), nil, 1),
@@ -311,7 +311,7 @@ func FuzzNativeManifest(f *testing.F) {
 
 	f.Add(data)
 	f.Add([]byte(`{"format":"sesh","version":1}`))
-	f.Add([]byte("pane\tlegacy\n"))
+	f.Add([]byte("pane\tother\n"))
 	f.Fuzz(func(t *testing.T, input []byte) {
 		m, err := Decode(input)
 		if err != nil {
