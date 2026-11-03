@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"io/fs"
-	"sync"
 
 	"github.com/samber/oops"
 
@@ -33,7 +32,7 @@ func OpenView(ctx context.Context, path string) (*View, error) {
 				root:   nil,
 				path:   path,
 				fault:  nil,
-				owners: attemptOwners{mu: sync.Mutex{}, held: nil},
+				owners: attemptOwners{held: nil},
 			},
 		}, nil
 	}
@@ -52,7 +51,7 @@ func OpenView(ctx context.Context, path string) (*View, error) {
 			root:   root,
 			path:   path,
 			fault:  nil,
-			owners: attemptOwners{mu: sync.Mutex{}, held: nil},
+			owners: attemptOwners{held: nil},
 		},
 	}, nil
 }

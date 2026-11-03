@@ -179,6 +179,7 @@ func TestRepositoryWorker(t *testing.T) {
 			attempt,
 			phase == faultCatalogReplaced,
 		)
+
 		return
 	}
 

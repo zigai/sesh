@@ -167,7 +167,8 @@ func verifyEditorProcess(ctx context.Context, observed model.Launch, pid int) er
 
 func editorObservationMatchesLaunch(current *process.Observation, observed model.Launch) bool {
 	return bytes.Equal(current.Executable, observed.Executable) && bytes.Equal(current.Directory, observed.Directory) &&
-		equalArguments(current.Arguments, observed.Arguments) && !current.ExecutableDeleted &&
+		equalArguments(current.Arguments, observed.Arguments) &&
+		!current.ExecutableDeleted &&
 		!current.DirectoryDeleted
 }
 

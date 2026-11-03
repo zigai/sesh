@@ -235,6 +235,7 @@ func readDefinition(path string) (definitionFile, error) {
 				Code("setup_definition_failed").
 				With("operation", "close_definition").
 				Wrap(closeErr)
+
 			return emptyDefinitionFile(), errors.Join(readFailure, closeFailure)
 		}
 
@@ -283,6 +284,7 @@ func writeDefinition(path, content string) error {
 			Code("setup_definition_failed").
 			With("operation", "publish_definition").
 			Wrap(err)
+
 		return errors.Join(renameErr, removeDefinitionTemp(temp))
 	}
 
@@ -318,6 +320,7 @@ func writeDefinitionTemp(temp string, data []byte) error {
 			Code("setup_definition_failed").
 			With("operation", "write_definition").
 			Wrap(err)
+
 		return errors.Join(writeFailure, removeDefinitionTemp(temp))
 	}
 

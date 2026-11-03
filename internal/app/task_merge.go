@@ -232,7 +232,8 @@ func (local *Local) openTaskRunWindow(
 				"task-action",
 				source.Input,
 			},
-			argv...)
+			argv...,
+		)
 	}
 
 	if err := task.OpenRunWindow(ctx, popup, popupSession, record, name, argv); err != nil {

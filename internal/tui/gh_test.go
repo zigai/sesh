@@ -15,6 +15,7 @@ func TestGHScanSharesRepositoryBranchResultAndRetainsMinuteCache(t *testing.T) {
 	calls := 0
 	query := func(_ context.Context, _ ghTarget, at time.Time) ghEntry {
 		calls++
+
 		return ghEntry{
 			at: at,
 			pr: ghCell("#12", "", layout.Present),

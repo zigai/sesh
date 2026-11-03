@@ -183,7 +183,8 @@ func runStreamAttempt(
 			Forward:     nil,
 			Command:     opts.Command,
 		},
-		PeerEntryPoint(opts.Connection, ChannelStream)...)
+		PeerEntryPoint(opts.Connection, ChannelStream)...,
+	)
 	if cmdErr != nil {
 		return cmdErr, false
 	}

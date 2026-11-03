@@ -17,7 +17,9 @@ func TestJSONServiceSetupPreviewContracts(t *testing.T) {
 				"setup.services",
 				append(
 					[]string{"setup", "services", "--dir", filepath.Join(home, name)},
-					flags...)...)
+					flags...,
+				)...,
+			)
 			assertJSONContractFields(
 				t,
 				result,

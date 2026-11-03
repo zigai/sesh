@@ -23,7 +23,8 @@ type monitorReloads struct {
 	configs <-chan config.RemoteConfig
 	cancel  context.CancelFunc
 	done    <-chan struct{}
-	once    sync.Once
+	//exhaustruct:optional
+	once sync.Once
 }
 
 func startRemoteMonitorReloads(ctx context.Context, cmd *cobra.Command) (*monitorReloads, error) {
@@ -32,7 +33,7 @@ func startRemoteMonitorReloads(ctx context.Context, cmd *cobra.Command) (*monito
 		return nil, err
 	}
 
-	reloads := &monitorReloads{configs: nil, cancel: nil, done: nil, once: sync.Once{}}
+	reloads := &monitorReloads{configs: nil, cancel: nil, done: nil}
 	if !enabled {
 		return reloads, nil
 	}

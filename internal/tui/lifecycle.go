@@ -15,12 +15,16 @@ type lifecycle struct {
 	done        chan struct{}
 	deadline    time.Time
 	hasDeadline bool
-	mu          sync.RWMutex
-	err         error
-	stopParent  func() bool
-	closeOnce   sync.Once
-	wg          sync.WaitGroup
-	closed      atomic.Bool
+	//exhaustruct:optional
+	mu         sync.RWMutex
+	err        error
+	stopParent func() bool
+	//exhaustruct:optional
+	closeOnce sync.Once
+	//exhaustruct:optional
+	wg sync.WaitGroup
+	//exhaustruct:optional
+	closed atomic.Bool
 }
 
 func newLifecycle(parent context.Context) *lifecycle {
@@ -31,12 +35,8 @@ func newLifecycle(parent context.Context) *lifecycle {
 		done:        done,
 		deadline:    deadline,
 		hasDeadline: hasDeadline,
-		mu:          sync.RWMutex{},
 		err:         nil,
 		stopParent:  nil,
-		closeOnce:   sync.Once{},
-		wg:          sync.WaitGroup{},
-		closed:      atomic.Bool{},
 	}
 	owner.stopParent = context.AfterFunc(parent, func() {
 		owner.closeWithError(parent.Err())

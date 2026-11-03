@@ -42,8 +42,10 @@ type streamSupervisor struct {
 	limiter        chan struct{}
 	limiterSize    int
 	nextGeneration uint64
-	wait           sync.WaitGroup
-	stopOnce       sync.Once
+	//exhaustruct:optional
+	wait sync.WaitGroup
+	//exhaustruct:optional
+	stopOnce sync.Once
 }
 
 type streamWorkerHandle struct {
@@ -646,8 +648,6 @@ func newStreamSupervisor(
 		limiter:        nil,
 		limiterSize:    0,
 		nextGeneration: 0,
-		wait:           sync.WaitGroup{},
-		stopOnce:       sync.Once{},
 	}
 }
 

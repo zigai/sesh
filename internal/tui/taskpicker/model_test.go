@@ -461,7 +461,8 @@ func TestPopupsFitTheirContentWithoutTruncating(t *testing.T) {
 	list := listOptions("", nil)
 	list.Locations = append(
 		[]task.Location{{Where: task.WhereNew, Branch: "wt/fix-login-redirect"}},
-		list.Locations...)
+		list.Locations...,
+	)
 	list.Current = 2
 
 	for _, tc := range []struct {

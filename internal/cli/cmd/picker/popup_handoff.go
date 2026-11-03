@@ -154,7 +154,8 @@ func readPickerSwitchHandoff(path string) (switchHandoff, bool, error) {
 
 	var handoff switchHandoff
 
-	if json.Unmarshal(encoded, &handoff) != nil || (handoff.SessionID == "") != (handoff.SessionName == "") ||
+	if json.Unmarshal(encoded, &handoff) != nil ||
+		(handoff.SessionID == "") != (handoff.SessionName == "") ||
 		len(handoff.AgentViews) > handoffMaxAgentViews ||
 		(handoff.TaskProject != "" && !filepath.IsAbs(handoff.TaskProject)) {
 		return switchHandoff{}, false, oops.In("cli").

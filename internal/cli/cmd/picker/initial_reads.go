@@ -11,8 +11,9 @@ import (
 )
 
 type initialReads struct {
-	opened   chan struct{}
-	closed   chan struct{}
+	opened chan struct{}
+	closed chan struct{}
+	//exhaustruct:optional
 	mu       sync.RWMutex
 	conn     *gotmux.Connection
 	openErr  error
@@ -24,7 +25,6 @@ func openInitialReads(ctx context.Context, server *gotmux.Server, sessionID stri
 	reads := &initialReads{
 		opened:   make(chan struct{}),
 		closed:   make(chan struct{}),
-		mu:       sync.RWMutex{},
 		conn:     nil,
 		openErr:  nil,
 		finished: false,

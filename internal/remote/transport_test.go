@@ -303,7 +303,8 @@ func TestSSHCommandPreservesRemoteArgumentsThroughShell(t *testing.T) {
 		config.RemoteConfig{},
 		config.RemoteConnectionConfig{Host: "work"},
 		SSHCommandOptions{},
-		remoteCommand...)
+		remoteCommand...,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

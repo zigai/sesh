@@ -460,7 +460,8 @@ func TestAutosaveSkipsAServerWithoutSessions(t *testing.T) {
 	for _, args := range runs {
 		exec := executeJSON(
 			t,
-			append(args, testSocketFlag, socketPath, testNoConfigFlag, testJSONFlag)...)
+			append(args, testSocketFlag, socketPath, testNoConfigFlag, testJSONFlag)...,
+		)
 		if !exec.envelope.OK || exec.err != nil {
 			t.Fatalf("%v = (%+v, %v), want a successful skip", args, exec.envelope, exec.err)
 		}

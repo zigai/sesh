@@ -22,6 +22,7 @@ type Recorder struct {
 
 	server string
 
+	//exhaustruct:optional
 	mu                 sync.Mutex
 	known              State
 	taskByConversation map[string]string
@@ -34,7 +35,6 @@ func NewRecorder(store Store, panes Panes) *Recorder {
 		store:              store,
 		panes:              panes,
 		server:             "",
-		mu:                 sync.Mutex{},
 		known:              emptyState(),
 		taskByConversation: map[string]string{},
 	}

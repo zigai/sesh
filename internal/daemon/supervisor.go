@@ -41,8 +41,9 @@ type commandProcess struct{ command *exec.Cmd }
 type Supervisor struct {
 	prepare   PrepareProcess
 	stopGrace time.Duration
-	mu        sync.Mutex
-	used      bool
+	//exhaustruct:optional
+	mu   sync.Mutex
+	used bool
 }
 
 func (p *commandProcess) Start() error {
@@ -104,7 +105,7 @@ func NewSupervisor(prepare PrepareProcess, stopGrace time.Duration) (*Supervisor
 			Wrap(ErrStopGrace)
 	}
 
-	return &Supervisor{prepare: prepare, stopGrace: stopGrace, mu: sync.Mutex{}, used: false}, nil
+	return &Supervisor{prepare: prepare, stopGrace: stopGrace, used: false}, nil
 }
 
 func NewTmuxSupervisor(

@@ -36,7 +36,8 @@ func TestJSONSessionWorkflowSuccessContracts(t *testing.T) {
 	renamed := runJSONContract(
 		t,
 		"session.rename",
-		append([]string{sessionCmd, "rename", name, "json-renamed"}, fixture.sessionArgs()...)...)
+		append([]string{sessionCmd, "rename", name, "json-renamed"}, fixture.sessionArgs()...)...,
+	)
 	assertJSONContractFields(
 		t,
 		renamed,
@@ -47,7 +48,8 @@ func TestJSONSessionWorkflowSuccessContracts(t *testing.T) {
 	killed := runJSONContract(
 		t,
 		"session.kill",
-		append([]string{sessionCmd, "kill", "json-renamed"}, fixture.sessionArgs()...)...)
+		append([]string{sessionCmd, "kill", "json-renamed"}, fixture.sessionArgs()...)...,
+	)
 	assertJSONContractFields(
 		t,
 		contractJSONValue[map[string]any](t, killed, "session"),
@@ -58,7 +60,8 @@ func TestJSONSessionWorkflowSuccessContracts(t *testing.T) {
 	deleted := runJSONContract(
 		t,
 		"session.delete",
-		append([]string{sessionCmd, "delete", name}, fixture.deleteArgs()...)...)
+		append([]string{sessionCmd, "delete", name}, fixture.deleteArgs()...)...,
+	)
 	assertJSONContractFields(
 		t,
 		deleted,
@@ -94,7 +97,8 @@ func TestJSONSwitchAndAgentClearSuccessContracts(t *testing.T) {
 		result := runJSONContract(
 			t,
 			strings.Join(path, "."),
-			append(args, fixture.sessionArgs()...)...)
+			append(args, fixture.sessionArgs()...)...,
+		)
 		assertJSONContractFields(
 			t,
 			contractJSONValue[map[string]any](t, result, "session"),

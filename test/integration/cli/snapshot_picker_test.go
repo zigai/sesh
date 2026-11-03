@@ -62,7 +62,8 @@ func TestSnapshotRestorePickerCleansTerminalBeforeRestoringSelectedGeneration(t 
 	}
 	childArguments := append(
 		[]string{"-test.run=^TestSnapshotPickerApplicationHelper$", "--"},
-		arguments...)
+		arguments...,
+	)
 	alias := "sesh-snapshot-picker-" + strconv.Itoa(os.Getpid())
 
 	ctx, cancel := context.WithTimeout(t.Context(), pickerTermtraceTimeout)
@@ -181,7 +182,8 @@ func assertSnapshotRestorePickerCancellation(t *testing.T, command []string, ali
 	)
 	childArguments := append(
 		[]string{"-test.run=^TestSnapshotPickerApplicationHelper$", "--"},
-		arguments...)
+		arguments...,
+	)
 	alias := "sesh-snapshot-picker-cancel-" + aliasKind + "-" + strconv.Itoa(os.Getpid())
 
 	ctx, cancel := context.WithTimeout(t.Context(), pickerTermtraceTimeout)

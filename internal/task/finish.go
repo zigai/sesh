@@ -263,7 +263,8 @@ func unmergedCommitCount(ctx context.Context, record Record, mergedHead string) 
 	count, err := git.Output(
 		ctx,
 		record.Project,
-		append([]string{"rev-list", "--count", record.Branch, "--not"}, bases...)...)
+		append([]string{"rev-list", "--count", record.Branch, "--not"}, bases...)...,
+	)
 	if err != nil {
 		return 0, fmt.Errorf("count unmerged commits: %w", err)
 	}

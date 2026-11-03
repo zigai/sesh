@@ -39,7 +39,17 @@ func TestEmptySessionListPointsAtSavedSessionsOnStderrOnly(t *testing.T) {
 
 	if !strings.Contains(stderr, "1 saved session available.") ||
 		!strings.Contains(stderr, "start it on the same socket first") ||
-		!strings.Contains(stderr, "Restore with: sesh snapshot restore --socket '"+filepath.Join(home, "absent.sock")+"' --repository '"+filepath.Join(home, "sesh", "snapshots")+"' --no-config") {
+		!strings.Contains(
+			stderr,
+			"Restore with: sesh snapshot restore --socket '"+filepath.Join(
+				home,
+				"absent.sock",
+			)+"' --repository '"+filepath.Join(
+				home,
+				"sesh",
+				"snapshots",
+			)+"' --no-config",
+		) {
 		t.Fatalf("expected the restore hint on stderr, got %q", stderr)
 	}
 

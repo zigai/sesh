@@ -202,7 +202,8 @@ func (m *Model) renderForm(geometry layout) []string {
 			m.machineNames(),
 			m.options.Machine,
 			geometry.machineChoices,
-		)...)
+		)...,
+	)
 
 	switch {
 	case m.options.Problem != "":

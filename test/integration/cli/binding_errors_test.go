@@ -136,7 +136,8 @@ func testBindingActionReports(t *testing.T, args []string) {
 
 	stdout, stderr, err = executeCommand(
 		t,
-		slices.DeleteFunc(args, func(arg string) bool { return arg == bindingFlag })...)
+		slices.DeleteFunc(args, func(arg string) bool { return arg == bindingFlag })...,
+	)
 	if err != nil || stdout == "" || stderr != "" {
 		t.Fatalf("direct output = %q / %q / %v, want a report and success", stdout, stderr, err)
 	}

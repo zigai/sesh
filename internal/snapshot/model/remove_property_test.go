@@ -665,6 +665,7 @@ func drawEnvironment(rt *rapid.T, prefix string) []Variable {
 				environment,
 				Variable{Name: name, Value: nil, State: "removed", Hidden: false},
 			)
+
 			continue
 		}
 

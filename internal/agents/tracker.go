@@ -22,6 +22,7 @@ type TrackerOptions struct {
 }
 
 type Tracker struct {
+	//exhaustruct:optional
 	mu   sync.Mutex
 	tmux StyleController
 	opts TrackerOptions
@@ -48,7 +49,6 @@ func DefaultTrackerOptions() TrackerOptions {
 
 func NewTracker(tmux StyleController, opts TrackerOptions) *Tracker {
 	return &Tracker{
-		mu:              sync.Mutex{},
 		tmux:            tmux,
 		opts:            opts,
 		paneActivity:    make(map[string]string),

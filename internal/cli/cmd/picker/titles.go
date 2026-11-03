@@ -18,6 +18,7 @@ import (
 )
 
 type titleCache struct {
+	//exhaustruct:optional
 	mu       sync.Mutex
 	cache    map[string]titleState
 	inflight singleflight.Group

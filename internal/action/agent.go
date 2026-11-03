@@ -302,7 +302,8 @@ func defineWorkAction(
 		Arity:   ArityOne,
 		Params: append(
 			[]Param{newParam("item", ParamText, "Recorded conversation").required().positional()},
-			params...),
+			params...,
+		),
 		NeedsClient: false,
 		Interactive: false,
 		Destructive: false,

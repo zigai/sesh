@@ -203,7 +203,9 @@ func (m *Model) sectionCollapsed(section string) bool {
 }
 
 func (m *Model) collapsedSectionAt(row popupListRow) (string, bool) {
-	if m.displayMode != displayModeInbox || m.inboxGroup != config.InboxGroupState || row.isAgent() || row.isSeparator() ||
+	if m.displayMode != displayModeInbox || m.inboxGroup != config.InboxGroupState ||
+		row.isAgent() ||
+		row.isSeparator() ||
 		row.sessionIndex < 0 ||
 		row.sessionIndex >= len(m.filtered) ||
 		len(m.filtered[row.sessionIndex].Agents) > 0 {

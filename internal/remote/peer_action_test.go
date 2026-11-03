@@ -19,6 +19,7 @@ import (
 var errTestDispatch = errors.New("dispatch failed")
 
 type fakeDispatcher struct {
+	//exhaustruct:optional
 	mu       sync.Mutex
 	calls    []action.Invocation
 	dispatch func(ctx context.Context, invocation action.Invocation) (any, error)
@@ -67,7 +68,7 @@ func peerActionFixtureAt(t *testing.T) (PeerActionOptions, *fakeDispatcher, stri
 	t.Helper()
 
 	receipts, receiptsPath := openTestReceiptDir(t)
-	dispatcher := &fakeDispatcher{mu: sync.Mutex{}, calls: nil, dispatch: nil}
+	dispatcher := &fakeDispatcher{calls: nil, dispatch: nil}
 
 	return PeerActionOptions{
 		PeerID:     testPeerID,

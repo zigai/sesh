@@ -248,7 +248,8 @@ func statusTotal(t *testing.T, args ...string) int {
 
 	stdout, stderr, err := executeCommand(
 		t,
-		append([]string{"agent", "status", "--json"}, args...)...)
+		append([]string{"agent", "status", "--json"}, args...)...,
+	)
 	if err != nil {
 		t.Fatalf("agent status failed: %v\nstderr: %s", err, stderr)
 	}

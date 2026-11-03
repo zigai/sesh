@@ -147,7 +147,8 @@ func TestMaintenanceUncertaintyLogsOneTerminalFailure(t *testing.T) {
 
 	record := records[0]
 	if record["level"] != "error" || record["component"] != "snapshot" || record["operation"] != "gc" ||
-		record["status"] != "failed" || record["phase"] != "collection" ||
+		record["status"] != "failed" ||
+		record["phase"] != "collection" ||
 		record["reason"] != "publication_uncertain" {
 		t.Fatalf("uncertainty schema = %#v", record)
 	}
@@ -179,7 +180,8 @@ func TestGarbageCollectionQuarantineLogsOnePrivateDegradedOutcome(t *testing.T) 
 	}
 
 	record := records[0]
-	if record["level"] != "warn" || record["component"] != "snapshot" || record["operation"] != "gc" ||
+	if record["level"] != "warn" || record["component"] != "snapshot" ||
+		record["operation"] != "gc" ||
 		record["status"] != "degraded" ||
 		record["reason"] != "quarantined" {
 		t.Fatalf("quarantine schema = %#v", record)

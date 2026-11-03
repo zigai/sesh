@@ -183,7 +183,8 @@ func TestBrokenConfigFailsItsCheckAndSkipsTheFieldsItDefines(t *testing.T) {
 	}
 
 	config := findCheck(results, doctor.CheckConfigFile)
-	if config.Status != doctor.StatusFail || config.Message != "Invalid configuration at line 3, column 1" ||
+	if config.Status != doctor.StatusFail ||
+		config.Message != "Invalid configuration at line 3, column 1" ||
 		config.Fix == nil ||
 		config.Fix.Manual != "Correct the error in /home/user/.config/sesh/config.toml" {
 		t.Fatalf("config check = %#v", config)

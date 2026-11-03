@@ -90,7 +90,8 @@ func assertPendingRestoreRecord(t *testing.T, record map[string]any, historyPath
 	t.Helper()
 
 	if record["level"] != "warn" || record["component"] != "snapshot" || record["operation"] != "autosave" ||
-		record["status"] != "skipped" || record["reason"] != "restore_pending" ||
+		record["status"] != "skipped" ||
+		record["reason"] != "restore_pending" ||
 		record["sessions"] != float64(8) {
 		t.Fatalf("unexpected record schema: %+v", record)
 	}
@@ -148,7 +149,8 @@ func assertRestoreIncompleteRecord(t *testing.T, record map[string]any, historyP
 	t.Helper()
 
 	if record["level"] != "warn" || record["component"] != "snapshot" || record["operation"] != "autosave" ||
-		record["status"] != "degraded" || record["reason"] != "restore_incomplete" ||
+		record["status"] != "degraded" ||
+		record["reason"] != "restore_incomplete" ||
 		record["sessions"] != float64(3) {
 		t.Fatalf("unexpected record schema: %+v", record)
 	}

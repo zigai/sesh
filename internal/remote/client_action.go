@@ -27,12 +27,13 @@ type ActionOriginOptions struct {
 type Peer struct {
 	remote config.RemoteConfig
 	load   func() (Catalog, error)
+	//exhaustruct:optional
 	mu     sync.Mutex
 	offers map[string][]action.ID
 }
 
 func NewPeer(remote config.RemoteConfig, load func() (Catalog, error)) *Peer {
-	return &Peer{remote: remote, load: load, mu: sync.Mutex{}, offers: map[string][]action.ID{}}
+	return &Peer{remote: remote, load: load, offers: map[string][]action.ID{}}
 }
 
 func NewCatalogPeer(remote config.RemoteConfig, cacheHome string) *Peer {

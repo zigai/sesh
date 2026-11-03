@@ -29,21 +29,16 @@ type Controller interface {
 }
 
 type tmuxController struct {
-	server    *gotmux.Server
-	target    CurrentTarget
-	getenv    func(string) string
+	server *gotmux.Server
+	target CurrentTarget
+	getenv func(string) string
+	//exhaustruct:optional
 	mu        sync.Mutex
 	serverPID int
 }
 
 func NewTmuxController(server *gotmux.Server, target CurrentTarget) Controller {
-	return &tmuxController{
-		server:    server,
-		target:    target,
-		getenv:    os.Getenv,
-		mu:        sync.Mutex{},
-		serverPID: 0,
-	}
+	return &tmuxController{server: server, target: target, getenv: os.Getenv, serverPID: 0}
 }
 
 func (c *tmuxController) CurrentContext(ctx context.Context) (CurrentContext, error) {

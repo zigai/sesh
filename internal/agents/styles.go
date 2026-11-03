@@ -43,8 +43,9 @@ type TmuxStyleController struct {
 	server         *gotmux.Server
 	setStatusStyle bool
 	setBellStyle   bool
-	mu             sync.Mutex
-	owned          map[string]ownedWindowStyle
+	//exhaustruct:optional
+	mu    sync.Mutex
+	owned map[string]ownedWindowStyle
 }
 
 type ownedWindowStyle struct {
@@ -72,7 +73,6 @@ func NewTmuxStyleController(
 		server:         server,
 		setStatusStyle: setStatusStyle,
 		setBellStyle:   setBellStyle,
-		mu:             sync.Mutex{},
 		owned:          make(map[string]ownedWindowStyle),
 	}
 }

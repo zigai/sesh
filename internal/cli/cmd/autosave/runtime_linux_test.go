@@ -21,10 +21,10 @@ func runtimeFixture(t *testing.T) (string, string) {
 	t.Helper()
 	isolatedAutosaveHome(t)
 
-	runtimeDir, err := os.MkdirTemp(
+	runtimeDir, err := os.MkdirTemp( //nolint:usetesting // Unix socket paths need a short name; t.Cleanup removes this private fixture.
 		"/tmp",
 		"sesh-runtime-",
-	) //nolint:usetesting // Unix socket paths need a short name; t.Cleanup removes this private fixture.
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

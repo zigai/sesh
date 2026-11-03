@@ -99,7 +99,8 @@ func executeSetupServices(t *testing.T, arguments ...string) commandExecution {
 
 	args := append(
 		[]string{"setup", "services", "--program", "/private-program-canary/sesh", testJSONFlag},
-		arguments...)
+		arguments...,
+	)
 
 	return executeJSON(t, args...)
 }

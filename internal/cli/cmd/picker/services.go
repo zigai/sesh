@@ -63,8 +63,9 @@ type services struct {
 	actions          action.Router
 	local            *app.Local
 	remote           RemoteServices
-	viewsMu          sync.Mutex
-	deferredViews    []tui.AgentView
+	//exhaustruct:optional
+	viewsMu       sync.Mutex
+	deferredViews []tui.AgentView
 }
 
 func AgentSummaries(observed []agents.AgentSession) []session.AgentSummary {
@@ -111,15 +112,14 @@ func newServices(
 		popupChild:       false,
 		repository:       repository,
 		agentStore:       agentStore,
-		sessionNames:     transcriptNameCache{mu: sync.Mutex{}, cache: nil},
-		titles:           titleCache{mu: sync.Mutex{}, cache: nil, inflight: singleflight.Group{}},
+		sessionNames:     transcriptNameCache{cache: nil},
+		titles:           titleCache{cache: nil, inflight: singleflight.Group{}},
 		panes:            singleflight.Group{},
 		initialReads:     nil,
 		workflow:         local.Workflow(),
 		actions:          action.Router{Local: local, Peer: remote.Peer, Origin: remote.Origin},
 		local:            local,
 		remote:           remote,
-		viewsMu:          sync.Mutex{},
 		deferredViews:    nil,
 	}, nil
 }

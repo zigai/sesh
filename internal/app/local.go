@@ -50,13 +50,15 @@ type Local struct {
 	workState   string
 	worktreeDir string
 	workflow    *session.Workflow
-	attachRepo  sync.Once
-	handlers    map[action.ID]handler
+	//exhaustruct:optional
+	attachRepo sync.Once
+	handlers   map[action.ID]handler
 }
 
 // Repository opens the snapshot repository on first use and shares it between actions.
 type Repository struct {
 	path string
+	//exhaustruct:optional
 	mu   sync.Mutex
 	repo *store.Repository
 }
@@ -92,8 +94,7 @@ func NewLocal(opts LocalOptions) *Local {
 			Source:             opts.Source,
 			DeferSwitchHistory: opts.DeferSwitchHistory,
 		}),
-		attachRepo: sync.Once{},
-		handlers:   make(map[action.ID]handler),
+		handlers: make(map[action.ID]handler),
 	}
 
 	local.registerSessionHandlers()
@@ -115,7 +116,7 @@ func NewLocal(opts LocalOptions) *Local {
 
 // NewRepository treats an empty path as no repository.
 func NewRepository(path string) *Repository {
-	return &Repository{path: path, mu: sync.Mutex{}, repo: nil}
+	return &Repository{path: path, repo: nil}
 }
 
 func (local *Local) Accepts(at action.Location, id action.ID) bool {

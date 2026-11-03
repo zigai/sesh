@@ -240,6 +240,7 @@ func allocateFullResponsiveColumns(
 				width:   minWidths[i],
 				wrap:    col.Wrap,
 			}
+
 			continue
 		}
 

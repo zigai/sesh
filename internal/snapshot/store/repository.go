@@ -7,7 +7,6 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"slices"
-	"sync"
 
 	"github.com/samber/oops"
 	"golang.org/x/sys/unix"
@@ -37,12 +36,7 @@ func OpenExisting(ctx context.Context, path string) (*Repository, error) {
 		return nil, repositoryError("open_existing", err)
 	}
 
-	repository := &Repository{
-		root:   root,
-		path:   path,
-		fault:  nil,
-		owners: attemptOwners{mu: sync.Mutex{}, held: nil},
-	}
+	repository := &Repository{root: root, path: path, fault: nil, owners: attemptOwners{held: nil}}
 	if err := repository.inspectExisting(ctx); err != nil {
 		return nil, repositoryError("open_existing", errors.Join(err, root.Close()))
 	}
@@ -69,7 +63,7 @@ func openWithFault(
 		root:   root,
 		path:   path,
 		fault:  fault,
-		owners: attemptOwners{mu: sync.Mutex{}, held: nil},
+		owners: attemptOwners{held: nil},
 	}
 	if err := repository.initialize(ctx); err != nil {
 		return nil, repositoryError("open", errors.Join(err, root.Close()))

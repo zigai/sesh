@@ -129,7 +129,8 @@ func TestPickerPresentationsRenderInCurrentTerminal(t *testing.T) {
 			}
 			childArguments := append(
 				[]string{"-test.run=^TestPickerApplicationHelper$", "--"},
-				arguments...)
+				arguments...,
+			)
 			childOutput := runPickerTermtrace(
 				t,
 				testExecutable,

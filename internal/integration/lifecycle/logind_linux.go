@@ -53,6 +53,7 @@ type Logind struct {
 	pumpCancel context.CancelFunc
 	signalFeed *boundedSignalHandler
 
+	//exhaustruct:optional
 	mu         sync.Mutex
 	inhibitors [logindInhibitorCount]*os.File
 	cycle      uint64
@@ -445,7 +446,6 @@ func openLogindOnConnection(
 		pumpDone:   make(chan struct{}),
 		pumpCancel: pumpCancel,
 		signalFeed: signalFeed,
-		mu:         sync.Mutex{},
 		inhibitors: [logindInhibitorCount]*os.File{},
 		cycle:      0,
 		activeKind: "",

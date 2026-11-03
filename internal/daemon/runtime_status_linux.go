@@ -88,6 +88,7 @@ type RuntimeReporter struct {
 	name     string
 	socket   privatefs.EntryIdentity
 
+	//exhaustruct:optional
 	mu      sync.RWMutex
 	status  RuntimeStatus
 	live    func(context.Context) (RuntimeLiveStatus, error)
@@ -191,7 +192,6 @@ func StartRuntimeReporter(
 		done:     make(chan struct{}),
 		name:     name,
 		socket:   socketIdentity,
-		mu:       sync.RWMutex{},
 		live:     config.LiveStatus,
 		status: RuntimeStatus{
 			Protocol:          runtimeStatusProtocol,

@@ -216,7 +216,8 @@ func (s *Service) saveFix(result Result) Result {
 		s.seshCommand(
 			"snapshot save",
 			[]string{flagSocket, flagRepository, flagHistory},
-			s.sessions...),
+			s.sessions...,
+		),
 	)
 }
 

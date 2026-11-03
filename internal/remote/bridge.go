@@ -69,28 +69,35 @@ type BridgeServerConfig struct {
 }
 
 type BridgeServer struct {
-	listener      net.Listener
-	dir           *privatefs.Dir
-	socketPath    string
-	socketName    string
-	token         string
-	expiresAt     time.Time
-	originID      string
-	originLabel   string
-	listSessions  func() ([]OriginSession, error)
-	now           func() time.Time
-	switchTarget  atomic.Pointer[OriginSession]
-	switchNotify  chan struct{}
-	switchOnce    sync.Once
-	generation    atomic.Uint64
-	closed        atomic.Bool
-	handshakes    chan struct{}
+	listener     net.Listener
+	dir          *privatefs.Dir
+	socketPath   string
+	socketName   string
+	token        string
+	expiresAt    time.Time
+	originID     string
+	originLabel  string
+	listSessions func() ([]OriginSession, error)
+	now          func() time.Time
+	//exhaustruct:optional
+	switchTarget atomic.Pointer[OriginSession]
+	switchNotify chan struct{}
+	//exhaustruct:optional
+	switchOnce sync.Once
+	//exhaustruct:optional
+	generation atomic.Uint64
+	//exhaustruct:optional
+	closed     atomic.Bool
+	handshakes chan struct{}
+	//exhaustruct:optional
 	connectionsMu sync.Mutex
 	connections   map[net.Conn]struct{}
-	wg            sync.WaitGroup
-	closeOnce     sync.Once
-	logger        zerolog.Logger
-	closeErr      error
+	//exhaustruct:optional
+	wg sync.WaitGroup
+	//exhaustruct:optional
+	closeOnce sync.Once
+	logger    zerolog.Logger
+	closeErr  error
 }
 
 type MessageType string
@@ -236,28 +243,21 @@ func NewBridgeServer(ctx context.Context, cfg BridgeServerConfig) (*BridgeServer
 	}
 
 	server := &BridgeServer{
-		listener:      listener,
-		dir:           dir,
-		socketPath:    cfg.SocketPath,
-		socketName:    socketName,
-		token:         cfg.Token,
-		expiresAt:     cfg.ExpiresAt,
-		originID:      cfg.OriginID,
-		originLabel:   cfg.OriginLabel,
-		listSessions:  cfg.ListSessions,
-		now:           now,
-		switchTarget:  atomic.Pointer[OriginSession]{},
-		switchNotify:  make(chan struct{}),
-		switchOnce:    sync.Once{},
-		generation:    atomic.Uint64{},
-		closed:        atomic.Bool{},
-		handshakes:    make(chan struct{}, bridgeMaxHandshakes),
-		connectionsMu: sync.Mutex{},
-		connections:   make(map[net.Conn]struct{}),
-		wg:            sync.WaitGroup{},
-		closeOnce:     sync.Once{},
-		closeErr:      nil,
-		logger:        zerolog.Ctx(ctx).With().Str("component", "remote_bridge").Logger(),
+		listener:     listener,
+		dir:          dir,
+		socketPath:   cfg.SocketPath,
+		socketName:   socketName,
+		token:        cfg.Token,
+		expiresAt:    cfg.ExpiresAt,
+		originID:     cfg.OriginID,
+		originLabel:  cfg.OriginLabel,
+		listSessions: cfg.ListSessions,
+		now:          now,
+		switchNotify: make(chan struct{}),
+		handshakes:   make(chan struct{}, bridgeMaxHandshakes),
+		connections:  make(map[net.Conn]struct{}),
+		closeErr:     nil,
+		logger:       zerolog.Ctx(ctx).With().Str("component", "remote_bridge").Logger(),
 	}
 
 	server.wg.Add(1)

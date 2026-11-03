@@ -1158,7 +1158,9 @@ func TestCLIIntegrationSessionSwitchWithoutClientFailsClosed(t *testing.T) {
 		t,
 		append(
 			[]string{sessionCmd, "switch", "switch-target"},
-			append(fixture.sessionArgs(), testJSONFlag)...)...)
+			append(fixture.sessionArgs(), testJSONFlag)...,
+		)...,
+	)
 	if exec.err == nil {
 		t.Fatal("switch reported success without an invoking client")
 	}
@@ -1191,7 +1193,9 @@ func TestCLIIntegrationSessionSwitchSwitchesInvokingClient(t *testing.T) {
 		t,
 		append(
 			[]string{sessionCmd, "switch", "switch-target"},
-			append(fixture.sessionArgs(), testJSONFlag)...)...)
+			append(fixture.sessionArgs(), testJSONFlag)...,
+		)...,
+	)
 	if exec.err != nil {
 		t.Fatalf("switch failed: %v", exec.err)
 	}
@@ -1258,7 +1262,9 @@ func TestCLIIntegrationSessionCreateDoesNotAttach(t *testing.T) {
 		t,
 		append(
 			[]string{sessionCmd, "create", "created-session", "--dir", "/tmp"},
-			append(fixture.sessionArgs(), testJSONFlag)...)...)
+			append(fixture.sessionArgs(), testJSONFlag)...,
+		)...,
+	)
 	if created.err != nil || !created.envelope.OK {
 		t.Fatalf("session create failed: %v / %+v", created.err, created.envelope)
 	}
@@ -1280,7 +1286,9 @@ func TestCLIIntegrationSessionCreateDoesNotAttach(t *testing.T) {
 		t,
 		append(
 			[]string{sessionCmd, "create", "created-session", "--dir", "/tmp"},
-			append(fixture.sessionArgs(), testJSONFlag)...)...)
+			append(fixture.sessionArgs(), testJSONFlag)...,
+		)...,
+	)
 	if again.err == nil || again.envelope.OK {
 		t.Fatal("expected already-exists failure for a duplicate create")
 	}
@@ -1303,7 +1311,9 @@ func TestCLIIntegrationSessionCreateMakesMissingDirectoryOnRequest(t *testing.T)
 		t,
 		append(
 			[]string{sessionCmd, "create", "fresh", "--dir", directory},
-			append(fixture.sessionArgs(), testJSONFlag)...)...)
+			append(fixture.sessionArgs(), testJSONFlag)...,
+		)...,
+	)
 	if refused.err == nil || refused.envelope.OK {
 		t.Fatalf(
 			"create without --create-dir = %v / %+v, want a missing directory failure",
@@ -1320,7 +1330,9 @@ func TestCLIIntegrationSessionCreateMakesMissingDirectoryOnRequest(t *testing.T)
 		t,
 		append(
 			[]string{sessionCmd, "create", "fresh", "--dir", directory, "--create-dir"},
-			append(fixture.sessionArgs(), testJSONFlag)...)...)
+			append(fixture.sessionArgs(), testJSONFlag)...,
+		)...,
+	)
 	if created.err != nil || !created.envelope.OK {
 		t.Fatalf("create with --create-dir failed: %v / %+v", created.err, created.envelope)
 	}
@@ -1354,7 +1366,9 @@ func TestCLIIntegrationSessionRenameConflictReportsNoResult(t *testing.T) {
 		t,
 		append(
 			[]string{sessionCmd, "rename", "rename-source", "rename-taken"},
-			append(fixture.sessionArgs(), testJSONFlag)...)...)
+			append(fixture.sessionArgs(), testJSONFlag)...,
+		)...,
+	)
 	if renamed.err == nil || renamed.envelope.OK || renamed.envelope.Error == nil ||
 		renamed.envelope.Error.Code != "alreadyExists" {
 		t.Fatalf(
@@ -1387,7 +1401,9 @@ func TestCLIIntegrationSessionNewInteractiveEnters(t *testing.T) {
 		t,
 		append(
 			[]string{sessionCmd, "new", "target-session", "--dir", "/tmp"},
-			fixture.sessionArgs()...)...)
+			fixture.sessionArgs()...,
+		)...,
+	)
 	if err != nil {
 		t.Fatalf("interactive new failed: %v\nstderr: %s", err, stderr)
 	}
@@ -1408,7 +1424,9 @@ func TestCLIIntegrationSessionCreateOutsideTmux(t *testing.T) {
 		t,
 		append(
 			[]string{sessionCmd, "create", "scripted-session", "--dir", "/tmp"},
-			append(fixture.sessionArgs(), testJSONFlag)...)...)
+			append(fixture.sessionArgs(), testJSONFlag)...,
+		)...,
+	)
 	if exec.err != nil || !exec.envelope.OK {
 		t.Fatalf("session create outside tmux failed: %v / %+v", exec.err, exec.envelope)
 	}
@@ -1434,7 +1452,9 @@ func TestCLIIntegrationSessionNewInteractiveOutsideTmuxFailsBeforeCreate(t *test
 		t,
 		append(
 			[]string{sessionCmd, "new", "interactive-session", "--dir", "/tmp"},
-			fixture.sessionArgs()...)...)
+			fixture.sessionArgs()...,
+		)...,
+	)
 	if err == nil {
 		t.Fatal("interactive new outside tmux succeeded without an interactive terminal")
 	}
@@ -1470,7 +1490,9 @@ func TestCLIIntegrationSessionDeleteRemovesLiveAndSavedState(t *testing.T) {
 		t,
 		append(
 			[]string{sessionCmd, "delete", "fixture", testRepositoryFlag, fixture.repository},
-			append(fixture.deleteArgs(), testJSONFlag)...)...)
+			append(fixture.deleteArgs(), testJSONFlag)...,
+		)...,
+	)
 	if exec.err != nil || !exec.envelope.OK {
 		t.Fatalf("session delete failed: %v / %+v", exec.err, exec.envelope)
 	}
@@ -1507,7 +1529,9 @@ func TestCLIIntegrationSessionDeleteRetainsRecoveryBarrier(t *testing.T) {
 		t,
 		append(
 			[]string{sessionCmd, "delete", "fixture", testRepositoryFlag, fixture.repository},
-			append(fixture.deleteArgs(), testJSONFlag)...)...)
+			append(fixture.deleteArgs(), testJSONFlag)...,
+		)...,
+	)
 	if exec.err == nil {
 		t.Fatal("delete succeeded while a save attempt was pending")
 	}
@@ -1547,7 +1571,9 @@ func TestCLIIntegrationSessionDeleteRequiresForceForAttachedSession(t *testing.T
 		t,
 		append(
 			[]string{sessionCmd, "delete", "fixture", testRepositoryFlag, fixture.repository},
-			append(fixture.deleteArgs(), testJSONFlag)...)...)
+			append(fixture.deleteArgs(), testJSONFlag)...,
+		)...,
+	)
 	if refused.err == nil {
 		t.Fatal("attached session was deleted without --force")
 	}
@@ -1571,7 +1597,9 @@ func TestCLIIntegrationSessionDeleteRequiresForceForAttachedSession(t *testing.T
 				testRepositoryFlag,
 				fixture.repository,
 			},
-			append(fixture.deleteArgs(), testJSONFlag)...)...)
+			append(fixture.deleteArgs(), testJSONFlag)...,
+		)...,
+	)
 	if forced.err != nil || !forced.envelope.OK {
 		t.Fatalf("forced delete failed: %v / %+v", forced.err, forced.envelope)
 	}
@@ -1591,7 +1619,9 @@ func TestCLIIntegrationSessionKillReportsMissingSession(t *testing.T) {
 		t,
 		append(
 			[]string{sessionCmd, "kill", "missing-session"},
-			append(fixture.sessionArgs(), testJSONFlag)...)...)
+			append(fixture.sessionArgs(), testJSONFlag)...,
+		)...,
+	)
 	if exec.err == nil {
 		t.Fatal("kill of a missing session reported success")
 	}

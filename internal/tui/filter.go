@@ -264,9 +264,9 @@ func agentStatusMatches(query string, status session.AgentStatus) bool {
 			query,
 			"paused",
 			"stopped",
-			"cancelled",
+			"cancelled", //nolint:misspell // British spelling is an intentional search alias.
 			"canceled",
-		) //nolint:misspell // British spelling is an intentional search alias.
+		)
 	case session.AgentStatusIdle:
 		return fuzzyMatch(query, "offline")
 	case session.AgentStatusSleeping:

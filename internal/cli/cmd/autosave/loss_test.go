@@ -93,7 +93,8 @@ func TestMissingServerWithSavedSessionsIsReportedOncePerAutosaveEpisode(t *testi
 
 	record := records[0]
 	if record["level"] != "warn" || record["component"] != "snapshot" || record["operation"] != "autosave" ||
-		record["status"] != "skipped" || record["reason"] != "restorable_sessions" ||
+		record["status"] != "skipped" ||
+		record["reason"] != "restorable_sessions" ||
 		record["sessions"] != float64(1) {
 		t.Fatalf("unexpected record schema: %+v", record)
 	}

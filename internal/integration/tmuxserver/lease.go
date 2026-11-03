@@ -29,6 +29,7 @@ var (
 )
 
 type Lease struct {
+	//exhaustruct:optional
 	mu       sync.Mutex
 	dir      *privatefs.Dir
 	file     *os.File
@@ -102,7 +103,6 @@ func acquireLease(
 	}
 
 	return &Lease{
-		mu:       sync.Mutex{},
 		dir:      dir,
 		file:     file,
 		closeErr: nil,

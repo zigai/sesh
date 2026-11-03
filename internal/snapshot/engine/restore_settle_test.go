@@ -205,7 +205,8 @@ func assertSettleRecords(t *testing.T, data []byte, want int) {
 			t.Fatal(err)
 		}
 
-		if record["level"] != "warn" || record["component"] != "snapshot" || record["operation"] != "restore" ||
+		if record["level"] != "warn" || record["component"] != "snapshot" ||
+			record["operation"] != "restore" ||
 			record["status"] != "abandoned" ||
 			record["reason"] != "target_daemon_gone" {
 			t.Fatalf("unexpected record: %+v", record)

@@ -243,6 +243,7 @@ func (s *Service) SaveState(ctx context.Context, path string, current *State) er
 	lockFile, err := dir.Lock(ctx, lockName)
 	if err != nil {
 		closeErr := dir.Close()
+
 		return oops.In("session").
 			Code("history_failed").
 			With("operation", "save_history").
@@ -251,6 +252,7 @@ func (s *Service) SaveState(ctx context.Context, path string, current *State) er
 
 	if err := ctx.Err(); err != nil {
 		cleanupErr := errors.Join(lockFile.Close(), dir.Close())
+
 		return oops.In("session").
 			Code("history_failed").
 			With("operation", "save_history").
@@ -333,6 +335,7 @@ func (s *Service) UpdateState(
 	lockFile, err := dir.Lock(ctx, lockName)
 	if err != nil {
 		closeErr := dir.Close()
+
 		return nil, oops.In("session").
 			Code("history_failed").
 			With("operation", "update_history").
@@ -341,6 +344,7 @@ func (s *Service) UpdateState(
 
 	if err := ctx.Err(); err != nil {
 		cleanupErr := errors.Join(lockFile.Close(), dir.Close())
+
 		return nil, oops.In("session").
 			Code("history_failed").
 			With("operation", "update_history").

@@ -57,7 +57,8 @@ func (m *Model) helpBindings(keys actionKeyMap) []helpBinding {
 	if m.showsDisplayModeIndicator() {
 		bindings = append(
 			[]helpBinding{{keys.cycleMode.Help().Key, keys.cycleMode.Help().Desc}},
-			bindings...)
+			bindings...,
+		)
 	}
 
 	switch m.displayMode {

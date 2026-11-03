@@ -115,6 +115,7 @@ type terminalOutput struct {
 }
 
 type transcriptNameCache struct {
+	//exhaustruct:optional
 	mu    sync.Mutex
 	cache map[string]sessionNameState
 }
@@ -620,7 +621,8 @@ func openPickerPopup(
 				handoffPath,
 				mode,
 				launchedAt,
-			)...),
+			)...,
+		),
 		width,
 		height,
 		runtime.workspace.Config.Theme.Background,

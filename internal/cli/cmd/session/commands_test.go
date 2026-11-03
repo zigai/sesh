@@ -74,7 +74,8 @@ func verifyRelativeSocketPath(t *testing.T, cmdName string) {
 			"relative/sock",
 			testNoConfigFlag,
 			testJSONFlag,
-		)...)
+		)...,
+	)
 	if exec.Err == nil {
 		t.Fatal("expected error for relative socket, got nil")
 	}
@@ -104,7 +105,8 @@ func verifyPositionalArgs(t *testing.T, cmdName string) {
 			"unexpected-arg",
 			testNoConfigFlag,
 			testJSONFlag,
-		)...)
+		)...,
+	)
 	if exec.Err == nil {
 		t.Fatal("expected error for positional args, got nil")
 	}

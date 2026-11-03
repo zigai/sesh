@@ -1273,7 +1273,8 @@ func assertPrepared(
 		gotArguments[index] = string(argument)
 	}
 
-	if gotReason != wantReason || !gotReason.Supported() || string(prepared.Executable) != wantExecutable ||
+	if gotReason != wantReason || !gotReason.Supported() ||
+		string(prepared.Executable) != wantExecutable ||
 		!slices.Equal(gotArguments, wantArguments) ||
 		prepared.Recovery != wantRecovery {
 		t.Fatalf(

@@ -33,7 +33,8 @@ func startCliServer(t *testing.T) string {
 		command := exec.CommandContext(
 			t.Context(),
 			"tmux",
-			append([]string{"-S", socketPath}, args...)...)
+			append([]string{"-S", socketPath}, args...)...,
+		)
 		command.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + t.TempDir()}
 
 		if out, err := command.CombinedOutput(); err != nil {

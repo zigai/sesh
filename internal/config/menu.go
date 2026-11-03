@@ -239,7 +239,8 @@ func ValidateMenu(cfg *Config) error {
 
 		names = append(
 			names,
-			slices.Collect(maps.Keys(cfg.Projects.Overrides[project].MenuItems))...)
+			slices.Collect(maps.Keys(cfg.Projects.Overrides[project].MenuItems))...,
+		)
 	}
 
 	if err := validateMenuList(

@@ -353,7 +353,8 @@ func (m *Model) render() string {
 	body = append(body, header, m.searchLine(contentWidth), "")
 	body = append(
 		body,
-		m.renderRows(contentWidth, max(contentHeight-whichKeyHeaderFooterRows, 1))...)
+		m.renderRows(contentWidth, max(contentHeight-whichKeyHeaderFooterRows, 1))...,
+	)
 	body = append(body, "", m.footer(contentWidth))
 
 	box = box.Width(width).Height(height)

@@ -81,13 +81,14 @@ type SSHCommandOptions struct {
 }
 
 type DiagnosticsBuffer struct {
+	//exhaustruct:optional
 	mu       sync.Mutex
 	buffer   bytes.Buffer
 	maxBytes int
 }
 
 func NewDiagnosticsBuffer(maxBytes int) *DiagnosticsBuffer {
-	return &DiagnosticsBuffer{mu: sync.Mutex{}, buffer: bytes.Buffer{}, maxBytes: maxBytes}
+	return &DiagnosticsBuffer{buffer: bytes.Buffer{}, maxBytes: maxBytes}
 }
 
 func (b *DiagnosticsBuffer) Write(data []byte) (int, error) {

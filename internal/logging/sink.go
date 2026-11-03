@@ -32,6 +32,7 @@ type sinkFile interface {
 }
 
 type Sink struct {
+	//exhaustruct:optional
 	mu sync.Mutex
 
 	path      string
@@ -473,7 +474,6 @@ func openExisting(
 
 func newSink(file sinkFile) *Sink {
 	sink := &Sink{
-		mu:        sync.Mutex{},
 		path:      "",
 		baseName:  "",
 		parentDir: nil,

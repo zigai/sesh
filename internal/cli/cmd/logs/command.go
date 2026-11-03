@@ -414,6 +414,7 @@ func parseTimeFilter(value string, now time.Time) (time.Time, error) {
 
 	if strings.EqualFold(trimmed, "yesterday") {
 		yesterday := utcNow.AddDate(0, 0, -1)
+
 		return time.Date(
 			yesterday.Year(),
 			yesterday.Month(),

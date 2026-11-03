@@ -354,16 +354,11 @@ func ProbeJSONFlag(cmdFlags *pflag.FlagSet, args []string) bool {
 		}
 
 		fs.AddFlag(&pflag.Flag{
-			Name:                f.Name,
-			Shorthand:           f.Shorthand,
-			Usage:               "",
-			Value:               noopValue{},
-			DefValue:            f.DefValue,
-			NoOptDefVal:         f.NoOptDefVal,
-			Deprecated:          "",
-			Hidden:              false,
-			ShorthandDeprecated: "",
-			Annotations:         nil,
+			Name:        f.Name,
+			Shorthand:   f.Shorthand,
+			Value:       noopValue{},
+			DefValue:    f.DefValue,
+			NoOptDefVal: f.NoOptDefVal,
 		})
 	})
 

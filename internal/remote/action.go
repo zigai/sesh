@@ -221,7 +221,8 @@ func ValidateActionResult(result ActionResult) error {
 }
 
 func ValidateActionRequest(request ActionRequest) error {
-	if !request.Action.Valid() || !ValidIdentifier(request.PeerID) || !ValidIdentifier(request.ConnectionID) ||
+	if !request.Action.Valid() || !ValidIdentifier(request.PeerID) ||
+		!ValidIdentifier(request.ConnectionID) ||
 		!ValidIdentifier(request.ConfigDigest) ||
 		!ValidText(request.Socket) {
 		return ErrInvalidFrame

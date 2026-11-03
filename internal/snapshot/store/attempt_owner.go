@@ -25,6 +25,7 @@ const (
 // attemptOwners holds one flock per pending attempt this process is saving. A pending attempt
 // whose lock file nobody holds belongs to a save process that died.
 type attemptOwners struct {
+	//exhaustruct:optional
 	mu   sync.Mutex
 	held map[string]*os.File
 }

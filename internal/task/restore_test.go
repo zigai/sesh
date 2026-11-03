@@ -94,7 +94,8 @@ func TestRestoreLaunchesRunsTheRecordedCommandOfRestartingTaskPanesOnly(t *testi
 		index := slices.IndexFunc(f.manifest.Panes, func(p model.Pane) bool { return p.ID == pane })
 		f.manifest.Panes[index].Options = append(
 			f.manifest.Panes[index].Options,
-			userOption("pane", task.OptionRestart, value)...)
+			userOption("pane", task.OptionRestart, value)...,
+		)
 	}
 
 	restart("%2", `{"directory":"/worktrees/t1/web","argv":["/bin/sh","-c","npm run dev"]}`)
@@ -124,7 +125,8 @@ func TestRestoreLaunchesIgnoresAnUnreadableRestartCommand(t *testing.T) {
 		f := newRestoreFixture(t)
 		f.manifest.Panes[1].Options = append(
 			f.manifest.Panes[1].Options,
-			userOption("pane", task.OptionRestart, value)...)
+			userOption("pane", task.OptionRestart, value)...,
+		)
 
 		launches, err := task.NewRestoreLaunches(f.store, wakePolicy(t, config.WakeOnRestorePrevious), seshBinary).
 			Override(t.Context(), f.manifest)

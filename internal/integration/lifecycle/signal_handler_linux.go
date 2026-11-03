@@ -10,6 +10,7 @@ import (
 )
 
 type boundedSignalHandler struct {
+	//exhaustruct:optional
 	mu            sync.Mutex
 	registrations map[chan<- *dbus.Signal]struct{}
 	received      map[*dbus.Signal]time.Time
@@ -20,7 +21,6 @@ type boundedSignalHandler struct {
 
 func newBoundedSignalHandler() *boundedSignalHandler {
 	return &boundedSignalHandler{
-		mu:            sync.Mutex{},
 		registrations: make(map[chan<- *dbus.Signal]struct{}),
 		received:      make(map[*dbus.Signal]time.Time),
 		overflow:      make(chan struct{}),
