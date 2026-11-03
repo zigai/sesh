@@ -661,7 +661,7 @@ func TestListRowsShowEachBranchsLatestCommitDistanceAndAge(t *testing.T) {
 	model := sized(options)
 
 	hotfix := sectionRows(t, model, "checkouts")[1]
-	for _, part := range []string{"shop-hotfix", "fix the login", "…", "hotfix", "↑2 ↓0", "3h"} {
+	for _, part := range []string{"shop-hotfix", "fix the login", "…", "hotfix", "↑2  ↓0", "3h"} {
 		if !strings.Contains(hotfix, part) {
 			t.Errorf("hotfix row %q lacks %q", hotfix, part)
 		}
@@ -673,12 +673,16 @@ func TestListRowsShowEachBranchsLatestCommitDistanceAndAge(t *testing.T) {
 	}
 
 	main := sectionRows(t, model, "checkouts")[0]
-	if !strings.Contains(main, "↑0 ↓0") || !strings.Contains(main, "5m") {
+	if !strings.Contains(main, "↑0  ↓0") || !strings.Contains(main, "5m") {
 		t.Errorf("main row %q, want an age and no distance from itself", main)
 	}
 
 	if column(hotfix, "3h") != column(main, "5m") {
 		t.Errorf("ages are not aligned:\n%s\n%s", main, hotfix)
+	}
+
+	if column(hotfix, "↓0")+utf8.RuneCountInString("↓0") != column(feature, "↓40")+utf8.RuneCountInString("↓40") {
+		t.Errorf("behind counts do not end in the same column:\n%s\n%s", hotfix, feature)
 	}
 }
 
@@ -698,8 +702,12 @@ func TestCheckoutsShowTheLinesTheirChangesAddAndDeleteOnceCounted(t *testing.T) 
 	}
 
 	rows := sectionRows(t, model, "checkouts")
-	if !strings.Contains(rows[1], "+12 -3") || !strings.Contains(rows[0], "+0  -0") {
+	if !strings.Contains(rows[1], "+12 -3") || !strings.Contains(rows[0], "+0 -0") {
 		t.Fatalf("checkout rows = %q, want +12 -3 in the hotfix worktree and +0 -0 in the clean main checkout", rows)
+	}
+
+	if column(rows[0], "+0")+len("+0") != column(rows[1], "+12")+len("+12") {
+		t.Errorf("added counts do not end in the same column:\n%s\n%s", rows[0], rows[1])
 	}
 }
 

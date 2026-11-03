@@ -481,15 +481,16 @@ func rightSpans(parts rowParts, widths columns) []tui.Span {
 	var spans []tui.Span
 
 	for _, column := range []struct {
-		text  string
-		width int
-		role  tui.SpanRole
+		text       string
+		width      int
+		role       tui.SpanRole
+		alignRight bool
 	}{
-		{display.Truncate(parts.label, widths.label), widths.label, tui.SpanMuted},
-		{parts.added, widths.added, parts.addedRole},
-		{parts.deleted, widths.deleted, parts.deletedRole},
-		{parts.ahead, widths.ahead, parts.aheadRole},
-		{parts.behind, widths.behind, parts.behindRole},
+		{display.Truncate(parts.label, widths.label), widths.label, tui.SpanMuted, false},
+		{parts.added, widths.added, parts.addedRole, true},
+		{parts.deleted, widths.deleted, parts.deletedRole, true},
+		{parts.ahead, widths.ahead, parts.aheadRole, true},
+		{parts.behind, widths.behind, parts.behindRole, true},
 	} {
 		if column.width == 0 {
 			continue
@@ -499,7 +500,12 @@ func rightSpans(parts rowParts, widths columns) []tui.Span {
 			spans = append(spans, tui.Span{Text: " ", Role: tui.SpanMuted})
 		}
 
-		spans = append(spans, tui.Span{Text: pad(column.text, column.width), Role: column.role})
+		text := pad(column.text, column.width)
+		if column.alignRight {
+			text = padLeft(column.text, column.width)
+		}
+
+		spans = append(spans, tui.Span{Text: text, Role: column.role})
 	}
 
 	return spans
@@ -522,6 +528,10 @@ func (m *Model) ref(location task.Location) (task.Ref, bool) {
 
 func pad(text string, width int) string {
 	return text + strings.Repeat(" ", max(width-lipgloss.Width(text), 0))
+}
+
+func padLeft(text string, width int) string {
+	return strings.Repeat(" ", max(width-lipgloss.Width(text), 0)) + text
 }
 
 func age(at, now time.Time) string {
