@@ -55,7 +55,7 @@ func TestSnapshotRecoverUnknownRestorePreservesRepository(t *testing.T) {
 	}
 }
 
-func testMissingOperation(t *testing.T, command, operation string) {
+func testMissingOperation(t *testing.T, command string, operation string) {
 	t.Helper()
 	cfg, logPath := runtimeConfig(t, "info")
 	path := filepath.Join(t.TempDir(), "repository")
@@ -118,7 +118,7 @@ func TestSnapshotRecoverUnknownDeletionIsVisibleWithoutMutation(t *testing.T) {
 	}
 }
 
-func checkMissingRewriteReceipt(t *testing.T, command, operation string) {
+func checkMissingRewriteReceipt(t *testing.T, command string, operation string) {
 	t.Helper()
 	cfg, logPath := runtimeConfig(t, "info")
 	path := filepath.Join(t.TempDir(), "repository")

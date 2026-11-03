@@ -68,7 +68,7 @@ func TestRejectUnsafeFiles(t *testing.T) {
 	}
 }
 
-func makeUnsafeFile(t *testing.T, root, kind string) {
+func makeUnsafeFile(t *testing.T, root string, kind string) {
 	t.Helper()
 
 	path := filepath.Join(root, "unsafe")

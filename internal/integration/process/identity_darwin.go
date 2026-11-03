@@ -67,7 +67,7 @@ func readDarwinIdentity(ctx context.Context, pid int) (Identity, error) {
 	return Identity{BootID: bootID, StartTime: startTime}, nil
 }
 
-func darwinStartTime(seconds, microseconds int64) (uint64, error) {
+func darwinStartTime(seconds int64, microseconds int64) (uint64, error) {
 	if seconds < 0 || microseconds < 0 || microseconds >= microsecondsPerSecond {
 		return 0, ErrMalformedIdentity
 	}

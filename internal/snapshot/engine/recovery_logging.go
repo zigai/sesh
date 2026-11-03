@@ -12,7 +12,7 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
-func logRecoveryInspectionFailure(ctx context.Context, operation, phase string, err error) {
+func logRecoveryInspectionFailure(ctx context.Context, operation string, phase string, err error) {
 	if ctx.Err() != nil || errors.Is(err, store.ErrUnavailable) {
 		return
 	}

@@ -105,7 +105,7 @@ func (o Options) toLoggingFilter() logging.FilterOptions {
 
 func DisplayRetainedLogs(
 	ctx context.Context,
-	output, diagnostics io.Writer,
+	output io.Writer, diagnostics io.Writer,
 	path string,
 	opts Options,
 ) error {
@@ -124,7 +124,7 @@ func DisplayRetainedLogs(
 
 func StreamRetainedLogs(
 	ctx context.Context,
-	output, diagnostics io.Writer,
+	output io.Writer, diagnostics io.Writer,
 	path string,
 	readOpts logging.ReadOptions,
 	options Options,
@@ -140,7 +140,7 @@ func StreamRetainedLogs(
 }
 
 func NewLogStreamWriter(
-	output, diagnostics io.Writer,
+	output io.Writer, diagnostics io.Writer,
 	opts Options,
 	styles Styles,
 ) *LogStreamWriter {
@@ -281,7 +281,7 @@ func NewLogStyles(color bool, extra ...any) Styles {
 
 func displayBoundedRetainedLogs(
 	ctx context.Context,
-	output, diagnostics io.Writer,
+	output io.Writer, diagnostics io.Writer,
 	path string,
 	readOpts logging.ReadOptions,
 	options Options,
@@ -361,7 +361,7 @@ func (w *LogStreamWriter) Write(p []byte) (int, error) {
 }
 
 func writeLogLine(
-	output, diagnostics io.Writer,
+	output io.Writer, diagnostics io.Writer,
 	line []byte,
 	raw bool,
 	pretty bool,

@@ -406,7 +406,7 @@ func TestRestoreOfWindowWithFloatingPaneVerifies(t *testing.T) {
 func restoreSessionWithScopedState(
 	t *testing.T,
 	ctx context.Context,
-	sourceServer, targetServer *gotmux.Server,
+	sourceServer *gotmux.Server, targetServer *gotmux.Server,
 	source gotmux.Session,
 	name string,
 ) (Plan, map[string]string) {
@@ -532,7 +532,7 @@ func windowPaneIndexes(t *testing.T, ctx context.Context, window gotmux.Window) 
 	return indexes
 }
 
-func requirePaneIndexes(t *testing.T, got, want []int) {
+func requirePaneIndexes(t *testing.T, got []int, want []int) {
 	t.Helper()
 
 	if !slices.Equal(got, want) {
@@ -873,8 +873,7 @@ func assertInheritedRestoreState(
 	t *testing.T,
 	ctx context.Context,
 	server *gotmux.Server,
-	restored,
-	unrelated gotmux.Session,
+	restored gotmux.Session, unrelated gotmux.Session,
 ) {
 	t.Helper()
 	assertOptionValue(t, ctx, restored.Options(), "status-left", "source", true)
@@ -1077,7 +1076,7 @@ func assertOptionValue(
 	t *testing.T,
 	ctx context.Context,
 	scope optionScope,
-	name, want string,
+	name string, want string,
 	local bool,
 ) {
 	t.Helper()
@@ -1708,7 +1707,11 @@ func setupScopedStateSourceSession(
 	return source, readScopeState(t, ctx, source)
 }
 
-func assertTargetScopedOptionsAndEnv(t *testing.T, sourceState, targetState observedScopeState) {
+func assertTargetScopedOptionsAndEnv(
+	t *testing.T,
+	sourceState observedScopeState,
+	targetState observedScopeState,
+) {
 	t.Helper()
 
 	scopes := map[string][2]map[string]string{

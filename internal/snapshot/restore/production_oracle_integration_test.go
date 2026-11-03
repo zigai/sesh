@@ -246,7 +246,7 @@ func executeAndVerifyOnTarget(
 	t *testing.T,
 	ctx context.Context,
 	targetServer *gotmux.Server,
-	repoDir, generation string,
+	repoDir string, generation string,
 	manifest model.Manifest,
 	plan Plan,
 ) {

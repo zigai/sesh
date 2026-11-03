@@ -238,7 +238,7 @@ func assertProgressedOperation(
 	t *testing.T,
 	op Operation,
 	opID string,
-	runtimeLaunch, runtimeConfig []byte,
+	runtimeLaunch []byte, runtimeConfig []byte,
 ) {
 	t.Helper()
 

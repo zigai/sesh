@@ -79,7 +79,7 @@ type layoutLeaf struct {
 	height  int
 }
 
-func (r *VerificationReport) mismatch(domain, entity, reason string) {
+func (r *VerificationReport) mismatch(domain string, entity string, reason string) {
 	if len(r.Mismatches) >= maxVerificationMismatches {
 		return
 	}
@@ -90,7 +90,7 @@ func (r *VerificationReport) mismatch(domain, entity, reason string) {
 	)
 }
 
-func (r *VerificationReport) advisory(domain, entity, reason string) {
+func (r *VerificationReport) advisory(domain string, entity string, reason string) {
 	if len(r.Advisories) >= maxVerificationMismatches {
 		return
 	}

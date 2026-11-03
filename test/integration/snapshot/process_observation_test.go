@@ -91,7 +91,7 @@ func TestProcessObservationExactLaunchFacts(t *testing.T) {
 func assertObservedLaunchMetadata(
 	t *testing.T,
 	launch model.Launch,
-	helper, dir string,
+	helper string, dir string,
 	report processReport,
 ) {
 	t.Helper()
@@ -709,7 +709,7 @@ func assertSaveLogSchema(t *testing.T, lines [][]byte) {
 	}
 }
 
-func copyExecutable(t *testing.T, src, dst string) {
+func copyExecutable(t *testing.T, src string, dst string) {
 	t.Helper()
 
 	srcFile, err := os.Open(filepath.Clean(src))

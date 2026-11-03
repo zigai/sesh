@@ -387,7 +387,7 @@ func validDigest(value string) bool {
 	return err == nil && len(digest) == 32 && hex.EncodeToString(digest) == value
 }
 
-func validSize(width, height int) bool {
+func validSize(width int, height int) bool {
 	return width > 0 && height > 0 && width <= maxDimension && height <= maxDimension
 }
 

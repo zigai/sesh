@@ -410,7 +410,14 @@ func setupSourceSession(
 	t *testing.T,
 	ctx context.Context,
 	server *gotmux.Server,
-	sessionName, workDir, bashPath, topPath, nvimPath, nodePath, noteFile, nodeScript string,
+	sessionName string,
+	workDir string,
+	bashPath string,
+	topPath string,
+	nvimPath string,
+	nodePath string,
+	noteFile string,
+	nodeScript string,
 ) gotmux.Session {
 	t.Helper()
 
@@ -528,7 +535,7 @@ func checkSourceApplicationsReady(ctx context.Context, session gotmux.Session) b
 	return len(observed) == 4
 }
 
-func isExpectedProcessForWindow(windowName, execBase string) bool {
+func isExpectedProcessForWindow(windowName string, execBase string) bool {
 	switch windowName {
 	case "shell-win":
 		return execBase == "bash"
@@ -574,7 +581,7 @@ func executeSave(
 func validateSavedRepository(
 	t *testing.T,
 	ctx context.Context,
-	repoDir, generation, sessionName, noteFile string,
+	repoDir string, generation string, sessionName string, noteFile string,
 ) {
 	t.Helper()
 
@@ -597,7 +604,12 @@ func validateSavedRepository(
 	assertPersistedManifest(t, manifest, sessionName, noteFile)
 }
 
-func assertPersistedManifest(t *testing.T, manifest model.Manifest, sessionName, noteFile string) {
+func assertPersistedManifest(
+	t *testing.T,
+	manifest model.Manifest,
+	sessionName string,
+	noteFile string,
+) {
 	t.Helper()
 
 	if len(manifest.Sessions) != 1 {
@@ -750,7 +762,7 @@ func assertRestoredTargetSession(
 	t *testing.T,
 	ctx context.Context,
 	targetServer *gotmux.Server,
-	sessionName, noteFile string,
+	sessionName string, noteFile string,
 	restoreResult snapshotRestoreResultJSON,
 	env []string,
 ) {

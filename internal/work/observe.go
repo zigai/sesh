@@ -123,7 +123,7 @@ func reopenedBy(item Item, seen Sighting) bool {
 	return item.Finished() && (moved || unixOrZero(seen.PromptAt) > item.FinishedAt)
 }
 
-func same(a, b Item) bool {
+func same(a Item, b Item) bool {
 	return reflect.DeepEqual(withoutEmptySlices(a), withoutEmptySlices(b))
 }
 

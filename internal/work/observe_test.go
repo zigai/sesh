@@ -11,7 +11,7 @@ import (
 
 var observedAt = time.Unix(1_800_000_000, 0)
 
-func sighting(conversation, pane string, pid int) work.Sighting {
+func sighting(conversation string, pane string, pid int) work.Sighting {
 	return work.Sighting{
 		Harness:      "claude",
 		Conversation: conversation,

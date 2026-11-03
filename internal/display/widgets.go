@@ -154,7 +154,7 @@ func renderBadgeWidget(
 	return strconv.Itoa(count), role, layout.Present
 }
 
-func percentageBar(percent, width int) string {
+func percentageBar(percent int, width int) string {
 	percent = min(max(percent, 0), widgetPercentMax)
 	units := percent * width * barSubcells / widgetPercentMax
 	full, partial := units/barSubcells, units%barSubcells

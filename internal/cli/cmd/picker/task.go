@@ -569,7 +569,7 @@ func loadTaskChoices(
 	runtime *actioncli.Runtime,
 	caller action.Caller,
 	remoteFactory RemoteFactory,
-	dir, machine string,
+	dir string, machine string,
 	describe bool,
 ) (taskChoices, error) {
 	choices := taskChoices{

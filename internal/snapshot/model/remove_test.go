@@ -386,7 +386,7 @@ func assertRetainedEqual[T any](
 	}
 }
 
-func assertSurvivors(tb rapid.TB, source, retained Manifest) {
+func assertSurvivors(tb rapid.TB, source Manifest, retained Manifest) {
 	tb.Helper()
 
 	assertRetainedEqual(
@@ -428,7 +428,7 @@ func assertSurvivors(tb rapid.TB, source, retained Manifest) {
 	assertProvenanceRetained(tb, source, retained)
 }
 
-func assertGroupNames(tb rapid.TB, source, retained Manifest) {
+func assertGroupNames(tb rapid.TB, source Manifest, retained Manifest) {
 	tb.Helper()
 
 	groups := indexGroups(source)
@@ -445,7 +445,7 @@ func assertGroupNames(tb rapid.TB, source, retained Manifest) {
 	}
 }
 
-func assertProvenanceRetained(tb rapid.TB, source, retained Manifest) {
+func assertProvenanceRetained(tb rapid.TB, source Manifest, retained Manifest) {
 	tb.Helper()
 
 	if diff := cmp.Diff(source.Source, retained.Source); diff != "" {

@@ -281,7 +281,7 @@ func contractJSONValue[T any](t *testing.T, object map[string]any, key string) T
 	return value
 }
 
-func assertJSONContractFields(t *testing.T, object, want map[string]any) {
+func assertJSONContractFields(t *testing.T, object map[string]any, want map[string]any) {
 	t.Helper()
 
 	for key, expected := range want {

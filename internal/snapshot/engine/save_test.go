@@ -296,7 +296,7 @@ func TestCaptureFailureHasFixedReason(t *testing.T) {
 	}
 }
 
-func assertCaptureFailureRecord(t *testing.T, data []byte, reason, processCode string) {
+func assertCaptureFailureRecord(t *testing.T, data []byte, reason string, processCode string) {
 	t.Helper()
 
 	if lines := bytes.Count(data, []byte{'\n'}); lines != 1 {

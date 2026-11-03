@@ -135,7 +135,7 @@ func (m *Model) handleSessionFocusKeys(msg tea.KeyPressMsg) func() (tea.Model, t
 	return m.openAgentRow(index, slot)
 }
 
-func (m *Model) openAgentRow(sessionIndex, agentIndex int) func() (tea.Model, tea.Cmd) {
+func (m *Model) openAgentRow(sessionIndex int, agentIndex int) func() (tea.Model, tea.Cmd) {
 	m.selectListRow(popupListRow{sessionIndex: sessionIndex, agentIndex: agentIndex})
 	m.clearSessionFocus()
 

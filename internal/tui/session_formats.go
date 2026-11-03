@@ -170,7 +170,7 @@ func (formats sessionRowFormats) agentRowsUseWidget(widget string) bool {
 		(formats.inbox && formats.inboxAgent.UsesWidget(widget))
 }
 
-func withShortcutBadge(format, defaultFormat string) string {
+func withShortcutBadge(format string, defaultFormat string) string {
 	if format == defaultFormat || format == "" {
 		return format + "  {shortcut:>3}"
 	}

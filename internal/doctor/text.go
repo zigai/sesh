@@ -46,7 +46,7 @@ func shellPath(path string) string {
 	return shellArg(path)
 }
 
-func pathCopies(pathEnv, name string) []string {
+func pathCopies(pathEnv string, name string) []string {
 	var (
 		copies []string
 		seen   []os.FileInfo
@@ -85,7 +85,7 @@ func pathCopies(pathEnv, name string) []string {
 	return copies
 }
 
-func lookPath(pathEnv, command string) (string, bool) {
+func lookPath(pathEnv string, command string) (string, bool) {
 	if strings.Contains(command, "/") {
 		info, err := os.Stat(command)
 

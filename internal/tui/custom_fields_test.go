@@ -42,7 +42,7 @@ func shellFieldCommand(script string) config.FieldCommand {
 	return config.FieldCommand{ShellCommand: script, Command: "", Args: nil, Refresh: ""}
 }
 
-func liveTestSession(id, name string) session.Session {
+func liveTestSession(id string, name string) session.Session {
 	return session.Session{
 		ID:          id,
 		Name:        name,
@@ -640,7 +640,7 @@ func TestCustomFieldStylesEndAtSessionAndAgentBoundaries(t *testing.T) {
 	}
 }
 
-func styledFieldPen(t *testing.T, text, content string) *lipgloss.WrapWriter {
+func styledFieldPen(t *testing.T, text string, content string) *lipgloss.WrapWriter {
 	t.Helper()
 
 	pen := lipgloss.NewWrapWriter(io.Discard)

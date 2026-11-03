@@ -111,7 +111,7 @@ func newAutosaveSessionAt(t *testing.T, server *gotmux.Server, dir string) gotmu
 	return sess
 }
 
-func runDueSave(t *testing.T, socketPath, sessionID string) autosaveResultJSON {
+func runDueSave(t *testing.T, socketPath string, sessionID string) autosaveResultJSON {
 	t.Helper()
 
 	exec := executeJSON(
@@ -196,7 +196,12 @@ func assertAutomaticPracticalRestore(t *testing.T, socketPath string, server *go
 	}
 }
 
-func assertExplicitRestore(t *testing.T, socketPath, generation string, server *gotmux.Server) {
+func assertExplicitRestore(
+	t *testing.T,
+	socketPath string,
+	generation string,
+	server *gotmux.Server,
+) {
 	t.Helper()
 
 	exec := executeJSON(
@@ -380,7 +385,7 @@ func assertPracticalFinalSaveResult(t *testing.T, exec commandExecution) autosav
 	return result
 }
 
-func assertPracticalFinalSaveStatus(t *testing.T, statusPath, generation string) {
+func assertPracticalFinalSaveStatus(t *testing.T, statusPath string, generation string) {
 	t.Helper()
 
 	status, err := automation.ReadFinalSaveStatus(statusPath)

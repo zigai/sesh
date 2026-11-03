@@ -1960,7 +1960,11 @@ func launchEnvironment(variables []model.Variable) (map[string]string, []string)
 	return environment, removed
 }
 
-func literalLaunchProgram(executable string, arguments, removed []string) (gotmux.Program, bool) {
+func literalLaunchProgram(
+	executable string,
+	arguments []string,
+	removed []string,
+) (gotmux.Program, bool) {
 	if len(removed) == 0 {
 		return gotmux.Exec(executable, arguments...), true
 	}
@@ -2099,7 +2103,12 @@ func (e *Executor) paneLaunchOutcome(pane model.Pane, launch paneLaunch) string 
 	}
 }
 
-func (e *Executor) recordPaneResult(paneID, runtimeID string, pane model.Pane, launch paneLaunch) {
+func (e *Executor) recordPaneResult(
+	paneID string,
+	runtimeID string,
+	pane model.Pane,
+	launch paneLaunch,
+) {
 	e.paneResults[paneID] = PaneResult{
 		PaneID:             paneID,
 		RuntimeID:          runtimeID,

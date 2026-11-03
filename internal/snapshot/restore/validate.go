@@ -187,7 +187,7 @@ func validatePlanSteps(steps []Step, ctx validationContext) error {
 	return nil
 }
 
-func newPlanTracker(stepCount, sessionCount, windowCount, paneCount int) planTracker {
+func newPlanTracker(stepCount int, sessionCount int, windowCount int, paneCount int) planTracker {
 	return planTracker{
 		createdWindows:         make(map[string]string, windowCount),
 		createdPanes:           make(map[string]string, paneCount),
@@ -847,7 +847,7 @@ func (t *planTracker) validateSelectPaneDeps(
 	return nil
 }
 
-func validateSelectPaneLast(panes []model.Pane, windowID, lastPaneID string) error {
+func validateSelectPaneLast(panes []model.Pane, windowID string, lastPaneID string) error {
 	want := ""
 
 	for i := range panes {
@@ -863,7 +863,7 @@ func validateSelectPaneLast(panes []model.Pane, windowID, lastPaneID string) err
 	return nil
 }
 
-func validateSelectPaneActive(panes []model.Pane, windowID, paneID string) error {
+func validateSelectPaneActive(panes []model.Pane, windowID string, paneID string) error {
 	for i := range panes {
 		if panes[i].ID == paneID && panes[i].Window == windowID {
 			if !panes[i].Active {

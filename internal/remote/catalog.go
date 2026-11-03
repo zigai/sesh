@@ -226,7 +226,7 @@ func CatalogAdmits(catalog Catalog, connectionID string, candidate ConnectionSta
 func ReconcileCatalog(
 	catalog *Catalog,
 	now time.Time,
-	staleAfter, hideAfter time.Duration,
+	staleAfter time.Duration, hideAfter time.Duration,
 ) (bool, map[string]ConnectionState) {
 	if catalog == nil {
 		return false, nil

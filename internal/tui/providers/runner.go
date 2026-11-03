@@ -174,7 +174,7 @@ func (r *Runner) CurrentRequest(id ID) uint64 {
 	return r.get(id).request
 }
 
-func (r *Runner) Cell(id ID, row, field string) layout.Cell {
+func (r *Runner) Cell(id ID, row string, field string) layout.Cell {
 	current := r.get(id)
 	if current.snapshot.Version == 0 {
 		return layout.Cell{Text: "", Role: "", Variants: nil, State: layout.Pending}
@@ -232,7 +232,7 @@ func cloneCell(cell layout.Cell) layout.Cell {
 	return cell
 }
 
-func rowsEqual(a, b Rows) bool {
+func rowsEqual(a Rows, b Rows) bool {
 	return maps.EqualFunc(a, b, func(a, b map[string]layout.Cell) bool {
 		return maps.EqualFunc(a, b, func(a, b layout.Cell) bool {
 			return a.Text == b.Text && a.Role == b.Role && a.State == b.State &&

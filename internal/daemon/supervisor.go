@@ -109,7 +109,7 @@ func NewSupervisor(prepare PrepareProcess, stopGrace time.Duration) (*Supervisor
 }
 
 func NewTmuxSupervisor(
-	binary, socket, configFile string,
+	binary string, socket string, configFile string,
 	stopGrace time.Duration,
 ) (*Supervisor, error) {
 	if !filepath.IsAbs(socket) || filepath.Clean(socket) != socket {

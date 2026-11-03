@@ -157,7 +157,7 @@ func fitting(
 	setup config.TaskWindow,
 	layout config.TaskLayoutConfig,
 	panes []windowPane,
-	width, height int,
+	width int, height int,
 	mode arrangeMode,
 ) (config.TaskLayoutConfig, error) {
 	if len(layout.Splits) == 0 {
@@ -357,7 +357,7 @@ func layoutNamed(setup config.TaskWindow, name string) bool {
 func chooseLayout(
 	setup config.TaskWindow,
 	harness string,
-	width, height int,
+	width int, height int,
 	name string,
 ) (config.TaskLayoutConfig, error) {
 	if name != "" {
@@ -436,7 +436,7 @@ func applyLayout(
 	layout config.TaskLayoutConfig,
 	placed []string,
 	panes []windowPane,
-	width, height int,
+	width int, height int,
 ) error {
 	keys := paneKeys(panes, placed)
 	ids := make(map[string]gotmux.PaneID, len(keys))
@@ -550,7 +550,7 @@ func orderPanes(
 }
 
 func splitCells(
-	width, height int,
+	width int, height int,
 	splits []config.TaskSplitConfig,
 	extras []string,
 ) (*cell, error) {
@@ -599,11 +599,11 @@ func splitCells(
 	return root, nil
 }
 
-func splitSideBySide(width, height int) bool {
+func splitSideBySide(width int, height int) bool {
 	return width >= cellHeightPerWidth*height
 }
 
-func (c *cell) splitOff(pane string, sideBySide, before bool, size config.PaneSize) error {
+func (c *cell) splitOff(pane string, sideBySide bool, before bool, size config.PaneSize) error {
 	total := c.h
 	if sideBySide {
 		total = c.w
@@ -661,7 +661,7 @@ func (c *cell) isLeaf() bool {
 	return c.pane != ""
 }
 
-func (c *cell) split(pane string, sideBySide, before bool, size int) {
+func (c *cell) split(pane string, sideBySide bool, before bool, size int) {
 	added := &cell{
 		pane:       pane,
 		sideBySide: false,
@@ -732,7 +732,7 @@ func (c *cell) split(pane string, sideBySide, before bool, size int) {
 	}
 }
 
-func sizeOf(isAdded bool, size, total int) int {
+func sizeOf(isAdded bool, size int, total int) int {
 	if isAdded {
 		return size
 	}

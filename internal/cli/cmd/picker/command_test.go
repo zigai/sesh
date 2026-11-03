@@ -913,7 +913,7 @@ func (r *nameCancelReader) Read(buffer []byte) (int, error) {
 	return len(buffer), nil
 }
 
-func writePickerNameFixture(t *testing.T, path, content string) {
+func writePickerNameFixture(t *testing.T, path string, content string) {
 	t.Helper()
 
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
@@ -921,7 +921,7 @@ func writePickerNameFixture(t *testing.T, path, content string) {
 	}
 }
 
-func appendPickerNameFixture(t *testing.T, path, content string) {
+func appendPickerNameFixture(t *testing.T, path string, content string) {
 	t.Helper()
 
 	file, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0)

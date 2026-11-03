@@ -221,7 +221,7 @@ func prepareFixtureFiles() (string, string, string, error) {
 	return homeDir, alphaFile, betaFile, nil
 }
 
-func runCreate(socket, sessionName string) error {
+func runCreate(socket string, sessionName string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
@@ -337,7 +337,7 @@ func checkProcessesRunning(ctx context.Context, session gotmux.Session) bool {
 	return editorOK && monitorOK && sleepOK
 }
 
-func runVerify(socket, sessionName, alphaFile, betaFile string) error {
+func runVerify(socket string, sessionName string, alphaFile string, betaFile string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
@@ -457,7 +457,7 @@ func locateWindows(ctx context.Context, session gotmux.Session) (windowSet, erro
 func verifyEditorPane(
 	ctx context.Context,
 	win gotmux.Window,
-	alphaFile, betaFile string,
+	alphaFile string, betaFile string,
 ) (VerifiedPane, error) {
 	panes, err := win.Panes(ctx)
 	if err != nil || len(panes) == 0 {
@@ -565,7 +565,7 @@ func verifySleepPane(ctx context.Context, win gotmux.Window) (VerifiedPane, erro
 func verifySessionState(
 	ctx context.Context,
 	session gotmux.Session,
-	alphaFile, betaFile string,
+	alphaFile string, betaFile string,
 ) (RestoreVerification, error) {
 	ws, err := locateWindows(ctx, session)
 	if err != nil {

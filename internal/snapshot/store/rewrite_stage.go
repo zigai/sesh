@@ -97,7 +97,7 @@ func validateStageNames(stage *privatefs.Dir, manifest model.Manifest) error {
 
 func (r *Repository) completeStageFiles(
 	ctx context.Context,
-	stage, source *privatefs.Dir,
+	stage *privatefs.Dir, source *privatefs.Dir,
 	manifest model.Manifest,
 	data []byte,
 ) error {
@@ -166,7 +166,7 @@ func (r *Repository) completeStageFiles(
 
 func (r *Repository) recoverStageArtifacts(
 	ctx context.Context,
-	source, stage *privatefs.Dir,
+	source *privatefs.Dir, stage *privatefs.Dir,
 	descriptors []model.Artifact,
 	write bool,
 ) error {

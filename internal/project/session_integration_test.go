@@ -173,7 +173,7 @@ func gitProjectAt(t *testing.T, dir string) project.Project {
 	return project.Project{Root: dir, Name: filepath.Base(dir), Kind: project.KindGit}
 }
 
-func newPlainSession(t *testing.T, server *gotmux.Server, name, dir string) gotmux.Session {
+func newPlainSession(t *testing.T, server *gotmux.Server, name string, dir string) gotmux.Session {
 	t.Helper()
 
 	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{

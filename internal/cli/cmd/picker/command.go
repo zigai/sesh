@@ -703,7 +703,12 @@ func openHandoffTaskMenu(
 	)
 }
 
-func popupOptions(program gotmux.Program, width, height, background string) gotmux.PopupOptions {
+func popupOptions(
+	program gotmux.Program,
+	width string,
+	height string,
+	background string,
+) gotmux.PopupOptions {
 	var opts gotmux.PopupOptions
 
 	opts.Program = program
@@ -730,7 +735,7 @@ func popupOptions(program gotmux.Program, width, height, background string) gotm
 
 func popupArguments(
 	cmd *cobra.Command,
-	socketPath, sessionID, paneID, handoffPath, mode string,
+	socketPath string, sessionID string, paneID string, handoffPath string, mode string,
 	launchedAt time.Time,
 ) []string {
 	arguments := []string{"pick", "ui", "--socket", socketPath}
@@ -799,7 +804,7 @@ func popupDimensions(
 	return width, height
 }
 
-func grownPopupHeight(height string, fitting, available int) string {
+func grownPopupHeight(height string, fitting int, available int) string {
 	current, err := strconv.Atoi(height)
 	if err != nil || fitting <= current || available <= 0 {
 		return height
@@ -837,8 +842,8 @@ func effectivePickerPopupMode(cfg *config.Config, state *session.State) string {
 }
 
 func adaptivePickerPopupDimensions(
-	width, height string,
-	available, minimum, fallback gotmux.Size,
+	width string, height string,
+	available gotmux.Size, minimum gotmux.Size, fallback gotmux.Size,
 ) (string, string) {
 	width = strings.TrimSpace(width)
 	height = strings.TrimSpace(height)
@@ -884,7 +889,13 @@ func popupDimensionIsDynamic(value string) bool {
 	return value == "" || strings.EqualFold(value, "auto") || strings.EqualFold(value, "dynamic")
 }
 
-func desiredPickerPopupDimension(configured string, available, minimum, fallback, maximum int) int {
+func desiredPickerPopupDimension(
+	configured string,
+	available int,
+	minimum int,
+	fallback int,
+	maximum int,
+) int {
 	desired := fallback
 
 	if !popupDimensionIsDynamic(configured) {
@@ -900,7 +911,12 @@ func desiredPickerPopupDimension(configured string, available, minimum, fallback
 	return min(max(desired, min(minimum, maximum)), maximum)
 }
 
-func balancePickerPopupSize(desired, maximum, minimum, target gotmux.Size) gotmux.Size {
+func balancePickerPopupSize(
+	desired gotmux.Size,
+	maximum gotmux.Size,
+	minimum gotmux.Size,
+	target gotmux.Size,
+) gotmux.Size {
 	targetRatio := float64(target.Width) / float64(target.Height)
 	desiredRatio := float64(desired.Width) / float64(desired.Height)
 
@@ -1043,7 +1059,7 @@ func wrapPickerProgramError(err error) error {
 func runPickerDeferred(
 	ctx context.Context,
 	stdin io.Reader,
-	stdout, stderr io.Writer,
+	stdout io.Writer, stderr io.Writer,
 	model *tui.Model,
 	services *services,
 ) error {

@@ -725,7 +725,11 @@ func stabilityBytes(m model.Manifest) ([]byte, error) {
 	return data, nil
 }
 
-func compareSelectedProcesses(before, after gotmux.Snapshot, projected model.Manifest) error {
+func compareSelectedProcesses(
+	before gotmux.Snapshot,
+	after gotmux.Snapshot,
+	projected model.Manifest,
+) error {
 	wanted := make(map[string]bool, len(projected.Panes))
 	for _, pane := range projected.Panes {
 		wanted[pane.ID] = true
@@ -745,7 +749,7 @@ func compareSelectedProcesses(before, after gotmux.Snapshot, projected model.Man
 	return nil
 }
 
-func observationEvidence(enriched, floatingOmitted bool) []model.Evidence {
+func observationEvidence(enriched bool, floatingOmitted bool) []model.Evidence {
 	domains := []string{"S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10"}
 
 	result := make([]model.Evidence, 0, len(domains))

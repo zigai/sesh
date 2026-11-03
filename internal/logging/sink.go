@@ -90,7 +90,12 @@ func Open(path string) (*Sink, error) {
 	return sink, nil
 }
 
-func setupSinkFiles(parentFile, lockFile *os.File, cleanPath, baseName string) (*Sink, error) {
+func setupSinkFiles(
+	parentFile *os.File,
+	lockFile *os.File,
+	cleanPath string,
+	baseName string,
+) (*Sink, error) {
 	if err := cleanStaleRotationTemp(parentFile, baseName); err != nil {
 		return nil, err
 	}
@@ -340,7 +345,7 @@ func openProcessLockFileDescriptor(parentFile *os.File, baseName string) (*os.Fi
 	return lockFile, nil
 }
 
-func openOrCreateActiveFile(parentFile *os.File, path, baseName string) (*os.File, error) {
+func openOrCreateActiveFile(parentFile *os.File, path string, baseName string) (*os.File, error) {
 	parentFd := int(parentFile.Fd())
 
 	fd, openErr := unix.Openat(
@@ -409,7 +414,7 @@ func configureActiveFD(fd int, path string) (*os.File, error) {
 
 func openExisting(
 	parentFile *os.File,
-	path, baseName string,
+	path string, baseName string,
 	expectedStat *unix.Stat_t,
 ) (*os.File, error) {
 	parentFd := int(parentFile.Fd())

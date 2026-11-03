@@ -325,7 +325,7 @@ func (m *Model) pathMarker(request pendingAction) string {
 	return ""
 }
 
-func renderDialog(width, height int, title, content string, cfg *config.Config) string {
+func renderDialog(width int, height int, title string, content string, cfg *config.Config) string {
 	_ = height
 
 	border := lipgloss.Color(cfg.Theme.Border)
@@ -343,8 +343,8 @@ func renderDialog(width, height int, title, content string, cfg *config.Config) 
 }
 
 func renderConfirmDialog(
-	width, height int,
-	title, content string,
+	width int, height int,
+	title string, content string,
 	confirmYes bool,
 	cfg *config.Config,
 ) string {

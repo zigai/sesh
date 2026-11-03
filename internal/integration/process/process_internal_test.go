@@ -24,7 +24,7 @@ const (
 
 func createProcFixture(
 	t *testing.T,
-	statContent, cmdlineContent, environContent []byte,
+	statContent []byte, cmdlineContent []byte, environContent []byte,
 ) (string, string) {
 	t.Helper()
 
@@ -85,7 +85,7 @@ func validStatContent(pid int, state byte, startTime uint64) []byte {
 
 func assertFixtureError(
 	t *testing.T,
-	procRoot, bootIDPath string,
+	procRoot string, bootIDPath string,
 	envKeys []string,
 	wantErr error,
 ) {

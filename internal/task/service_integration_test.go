@@ -545,7 +545,7 @@ func TestChangesCountsTheLinesEachCheckoutsChangesAddAndDelete(t *testing.T) {
 	}
 }
 
-func writeFile(t *testing.T, path, content string) {
+func writeFile(t *testing.T, path string, content string) {
 	t.Helper()
 
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
@@ -1215,7 +1215,7 @@ func assertNoTasks(t *testing.T, f fixture, place task.Place) {
 	}
 }
 
-func newSession(t *testing.T, server *gotmux.Server, name, dir string) gotmux.Session {
+func newSession(t *testing.T, server *gotmux.Server, name string, dir string) gotmux.Session {
 	t.Helper()
 
 	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{
@@ -1354,7 +1354,7 @@ func initRepository(t *testing.T, dir string) string {
 	return dir
 }
 
-func addRemoteBranch(t *testing.T, base, repo, branch string) {
+func addRemoteBranch(t *testing.T, base string, repo string, branch string) {
 	t.Helper()
 
 	upstream := filepath.Join(base, "upstream")
@@ -1378,7 +1378,7 @@ func addRemoteBranch(t *testing.T, base, repo, branch string) {
 	runGit(t, repo, "fetch", "-q", "origin")
 }
 
-func commitAt(t *testing.T, dir, message, date string) {
+func commitAt(t *testing.T, dir string, message string, date string) {
 	t.Helper()
 
 	command := exec.CommandContext(

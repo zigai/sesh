@@ -52,7 +52,7 @@ func TestConcurrentAppendAndRotationIntegration(t *testing.T) {
 	verifyIntegrationRecords(t, logPath)
 }
 
-func startIntegrationWorker(t *testing.T, exe, logPath, id string) *workerProc {
+func startIntegrationWorker(t *testing.T, exe string, logPath string, id string) *workerProc {
 	t.Helper()
 
 	cmd := exec.CommandContext(
@@ -106,7 +106,7 @@ func startIntegrationWorker(t *testing.T, exe, logPath, id string) *workerProc {
 	return proc
 }
 
-func releaseWorkerBarrier(t *testing.T, w0, w1 *workerProc) {
+func releaseWorkerBarrier(t *testing.T, w0 *workerProc, w1 *workerProc) {
 	t.Helper()
 
 	if _, err := w0.stdin.WriteString("START\n"); err != nil {
@@ -126,7 +126,7 @@ func releaseWorkerBarrier(t *testing.T, w0, w1 *workerProc) {
 	}
 }
 
-func verifyWorkerOutputs(t *testing.T, w0, w1 *workerProc) {
+func verifyWorkerOutputs(t *testing.T, w0 *workerProc, w1 *workerProc) {
 	t.Helper()
 
 	if w0.stderr.Len() > 0 {

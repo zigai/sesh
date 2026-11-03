@@ -119,7 +119,13 @@ func popNULTerminated(data []byte, idx *int) (string, bool) {
 	return val, true
 }
 
-func applyReportSection(t *testing.T, path, name string, entries []string, report *processReport) {
+func applyReportSection(
+	t *testing.T,
+	path string,
+	name string,
+	entries []string,
+	report *processReport,
+) {
 	t.Helper()
 
 	switch name {
@@ -147,7 +153,7 @@ func applyReportSection(t *testing.T, path, name string, entries []string, repor
 	}
 }
 
-func readSectionEntries(t *testing.T, path, name string, data []byte, idx *int) []string {
+func readSectionEntries(t *testing.T, path string, name string, data []byte, idx *int) []string {
 	t.Helper()
 
 	countStr, ok := popNULTerminated(data, idx)

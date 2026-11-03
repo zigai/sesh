@@ -479,7 +479,7 @@ func assertObservedEnvironment(t *testing.T, env []model.Variable, rep childRepo
 func assertEnvVar(
 	t *testing.T,
 	envMap map[string]model.Variable,
-	name, expectedState, expectedVal string,
+	name string, expectedState string, expectedVal string,
 ) {
 	t.Helper()
 

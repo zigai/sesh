@@ -887,7 +887,11 @@ func validateAgentSessionStatusFormats(agentSessions AgentSessionsConfig) error 
 	return nil
 }
 
-func validatePositiveDuration(label, raw string, errNotPositive error) (time.Duration, error) {
+func validatePositiveDuration(
+	label string,
+	raw string,
+	errNotPositive error,
+) (time.Duration, error) {
 	dur, err := time.ParseDuration(raw)
 	if err != nil {
 		return 0, fmt.Errorf("invalid %s %q: %w", label, raw, err)

@@ -74,7 +74,15 @@ func TestProcessDeathAtRewriteBoundaries(t *testing.T) {
 	}
 }
 
-func rewriteWorker(t *testing.T, mode, path, id, source, boundary, kind string) *exec.Cmd {
+func rewriteWorker(
+	t *testing.T,
+	mode string,
+	path string,
+	id string,
+	source string,
+	boundary string,
+	kind string,
+) *exec.Cmd {
 	t.Helper()
 
 	program, err := os.Executable()
@@ -125,7 +133,7 @@ func TestRewriteWorker(t *testing.T) {
 
 func executeRewriteWorkerSubprocess(
 	t *testing.T,
-	path, mutationID, sourceID, boundary, kind string,
+	path string, mutationID string, sourceID string, boundary string, kind string,
 ) {
 	t.Helper()
 
@@ -167,7 +175,12 @@ func executeRewriteWorkerSubprocess(
 	t.Fatal("rewrite worker escaped interruption")
 }
 
-func checkBoundaryTrigger(current, boundary string, syncedCount, replacedCount *int) bool {
+func checkBoundaryTrigger(
+	current string,
+	boundary string,
+	syncedCount *int,
+	replacedCount *int,
+) bool {
 	switch current {
 	case "catalog_synced":
 		*syncedCount++
@@ -184,7 +197,14 @@ func checkBoundaryTrigger(current, boundary string, syncedCount, replacedCount *
 	}
 }
 
-func verifyRewriteProcessDeath(t *testing.T, path, mutationID, sourceID, boundary, kind string) {
+func verifyRewriteProcessDeath(
+	t *testing.T,
+	path string,
+	mutationID string,
+	sourceID string,
+	boundary string,
+	kind string,
+) {
 	t.Helper()
 
 	r := openRepository(t, path)
@@ -208,7 +228,7 @@ func verifySyncedPendingState(
 	t *testing.T,
 	r *Repository,
 	catalog Catalog,
-	mutationID, sourceID, kind string,
+	mutationID string, sourceID string, kind string,
 ) {
 	t.Helper()
 
@@ -259,7 +279,7 @@ func verifyPendingProtectedState(
 	t *testing.T,
 	r *Repository,
 	catalog Catalog,
-	mutationID, sourceID, boundary, kind string,
+	mutationID string, sourceID string, boundary string, kind string,
 ) {
 	t.Helper()
 
@@ -314,7 +334,7 @@ func verifyReplacedTerminalState(
 	t *testing.T,
 	r *Repository,
 	catalog Catalog,
-	mutationID, sourceID, kind string,
+	mutationID string, sourceID string, kind string,
 ) {
 	t.Helper()
 

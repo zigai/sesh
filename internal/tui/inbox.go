@@ -237,7 +237,7 @@ func (m *Model) openSection(section string) func() (tea.Model, tea.Cmd) {
 	}
 }
 
-func inboxGroupRow(id, name string, agents []session.AgentSession) session.Session {
+func inboxGroupRow(id string, name string, agents []session.AgentSession) session.Session {
 	var row session.Session
 
 	row.ID = inboxGroupIDPrefix + id
@@ -261,7 +261,7 @@ func inboxProject(item inboxItem) string {
 	}
 }
 
-func (m *Model) compareInboxItems(left, right inboxItem) int {
+func (m *Model) compareInboxItems(left inboxItem, right inboxItem) int {
 	sections := m.config.Inbox.Sections
 	if order := cmp.Compare(
 		slices.Index(sections, left.section),
@@ -273,7 +273,7 @@ func (m *Model) compareInboxItems(left, right inboxItem) int {
 	return compareRecency(left, right)
 }
 
-func inboxKey(host, paneID string) string {
+func inboxKey(host string, paneID string) string {
 	return host + "\x00" + paneID
 }
 

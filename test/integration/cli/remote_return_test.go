@@ -364,7 +364,7 @@ func newRemoteReturnSession(
 	t *testing.T,
 	server *gotmux.Server,
 	fixture remoteSSHFixture,
-	name, marker string,
+	name string, marker string,
 ) gotmux.Session {
 	t.Helper()
 

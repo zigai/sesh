@@ -147,7 +147,7 @@ func (w *Workflow) prepareAttachTarget(
 
 func (w *Workflow) runAttachPreHook(
 	ctx context.Context,
-	name, sessionID string,
+	name string, sessionID string,
 ) (HookSummary, error) {
 	return w.runHookBoundary(ctx, HookEvent{
 		Name:          EventSessionAttachPre,
@@ -163,7 +163,7 @@ func (w *Workflow) runAttachPreHook(
 
 func (w *Workflow) runAttachPostHook(
 	ctx context.Context,
-	name, sessionID string,
+	name string, sessionID string,
 	cmd *exec.Cmd,
 ) (HookSummary, error) {
 	summary, postErr := w.runHookBoundary(ctx, HookEvent{
@@ -235,7 +235,7 @@ func wrapTerminalRestore(err error) error {
 	return oops.In("session").Code("attach_failed").With("operation", "restore_terminal").Wrap(err)
 }
 
-func mergeHookSummaries(base, next HookSummary) HookSummary {
+func mergeHookSummaries(base HookSummary, next HookSummary) HookSummary {
 	return HookSummary{
 		Attempted: base.Attempted + next.Attempted,
 		Completed: base.Completed + next.Completed,

@@ -56,7 +56,7 @@ func (s *Service) RecordRun(ctx context.Context, id string, run Run) error {
 }
 
 // Retitle leaves the window name alone when the user renamed the window.
-func (s *Service) Retitle(ctx context.Context, id, title string) (bool, error) {
+func (s *Service) Retitle(ctx context.Context, id string, title string) (bool, error) {
 	title = windowTitle(title)
 	if title == "" {
 		return false, nil

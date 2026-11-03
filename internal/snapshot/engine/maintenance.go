@@ -128,7 +128,7 @@ func collectionOutcome(
 	return result, nil
 }
 
-func maintenanceFailure(ctx context.Context, operation, phase string, err error) error {
+func maintenanceFailure(ctx context.Context, operation string, phase string, err error) error {
 	reason := "repository_failed"
 
 	switch {

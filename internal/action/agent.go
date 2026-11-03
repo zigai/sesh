@@ -265,7 +265,7 @@ type ResumedAgent struct {
 
 func defineAgentNavigation(
 	id ID,
-	title, summary, help string,
+	title string, summary string, help string,
 ) *Definition[NavigateAgents, FocusedPane] {
 	return define(Descriptor{
 		ID:      id,
@@ -290,7 +290,7 @@ func defineAgentNavigation(
 
 func defineWorkAction(
 	id ID,
-	done, title, summary, help string,
+	done string, title string, summary string, help string,
 	params ...Param,
 ) *Definition[ChangeWork, ChangedWork] {
 	return define(Descriptor{

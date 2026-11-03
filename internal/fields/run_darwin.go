@@ -21,7 +21,7 @@ func waitForFieldExit(pid int) error {
 	return errors.Join(err, unix.Close(queue))
 }
 
-func observeFieldExit(queue, pid int) error {
+func observeFieldExit(queue int, pid int) error {
 	if pid <= 0 {
 		return fmt.Errorf("observe field command exit: %w", unix.EINVAL)
 	}

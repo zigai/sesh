@@ -143,7 +143,13 @@ func TestProcessDeathDuringArtifactRemovalResumes(t *testing.T) {
 	}
 }
 
-func collectionWorker(t *testing.T, mode, path, generation, phase string) *exec.Cmd {
+func collectionWorker(
+	t *testing.T,
+	mode string,
+	path string,
+	generation string,
+	phase string,
+) *exec.Cmd {
 	t.Helper()
 
 	program, err := os.Executable()
@@ -241,7 +247,13 @@ func killableCollectionWorker(t *testing.T, r *Repository, phase string) {
 	t.Fatal("collection worker escaped interruption")
 }
 
-func verifyCollectionWorker(t *testing.T, r *Repository, generation, prior, phase string) {
+func verifyCollectionWorker(
+	t *testing.T,
+	r *Repository,
+	generation string,
+	prior string,
+	phase string,
+) {
 	t.Helper()
 
 	if os.Getenv("SESH_TEST_MODE") == "preserve" {
@@ -279,7 +291,7 @@ func verifyCollectionWorker(t *testing.T, r *Repository, generation, prior, phas
 func assertRecoveredCollection(
 	t *testing.T,
 	r *Repository,
-	generation, prior, phase string,
+	generation string, prior string, phase string,
 	result CollectionResult,
 ) {
 	t.Helper()
@@ -313,7 +325,7 @@ func assertRecoveredCollection(
 	assertEveryGenerationDirectoryIsMember(t, r)
 }
 
-func assertPendingSourcePreserved(t *testing.T, r *Repository, orphan, prior string) {
+func assertPendingSourcePreserved(t *testing.T, r *Repository, orphan string, prior string) {
 	t.Helper()
 
 	result, err := r.Collect(t.Context(), CollectionBudget{Generations: 8, Bytes: 1 << 30})

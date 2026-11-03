@@ -157,7 +157,12 @@ func (n *Navigator) stageToggleAndActivate(
 	return nil
 }
 
-func (n *Navigator) rollbackToggle(ctx context.Context, key, previous, expected string) error {
+func (n *Navigator) rollbackToggle(
+	ctx context.Context,
+	key string,
+	previous string,
+	expected string,
+) error {
 	raw, err := n.controller.History(ctx, key)
 	if err != nil {
 		return oops.In("agents").

@@ -17,7 +17,7 @@ var (
 	ErrExecutionFailed    = errors.New("execution failed")
 )
 
-func planFailure(phase, reason string, cause error) error {
+func planFailure(phase string, reason string, cause error) error {
 	builder := oops.In("snapshot.restore").
 		Code("snapshot_invalid").
 		With("operation", "plan", "phase", phase)

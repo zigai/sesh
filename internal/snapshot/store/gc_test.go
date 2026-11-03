@@ -51,7 +51,7 @@ func collectGenerations(t *testing.T, r *Repository) CollectionResult {
 	return result
 }
 
-func assertGenerationRemoved(t *testing.T, path, id string) {
+func assertGenerationRemoved(t *testing.T, path string, id string) {
 	t.Helper()
 
 	if _, err := os.Stat(filepath.Join(path, "generations", id)); !errors.Is(err, fs.ErrNotExist) {
@@ -59,7 +59,7 @@ func assertGenerationRemoved(t *testing.T, path, id string) {
 	}
 }
 
-func assertGenerationPresent(t *testing.T, path, id string) {
+func assertGenerationPresent(t *testing.T, path string, id string) {
 	t.Helper()
 
 	if _, err := os.Stat(filepath.Join(path, "generations", id, "manifest.json")); err != nil {
@@ -67,7 +67,7 @@ func assertGenerationPresent(t *testing.T, path, id string) {
 	}
 }
 
-func generationStoredBytes(t *testing.T, path, id string) int64 {
+func generationStoredBytes(t *testing.T, path string, id string) int64 {
 	t.Helper()
 
 	dir := filepath.Join(path, generationsDirectory, id)
@@ -122,7 +122,7 @@ func repositoryTree(t *testing.T, path string) map[string]bool {
 	return tree
 }
 
-func writeCollectionRecordFixture(t *testing.T, path, generation string, data []byte) {
+func writeCollectionRecordFixture(t *testing.T, path string, generation string, data []byte) {
 	t.Helper()
 
 	dir := filepath.Join(path, "gc")
@@ -135,7 +135,7 @@ func writeCollectionRecordFixture(t *testing.T, path, generation string, data []
 	}
 }
 
-func readCollectionRecordFixture(t *testing.T, path, generation string) CollectionIntent {
+func readCollectionRecordFixture(t *testing.T, path string, generation string) CollectionIntent {
 	t.Helper()
 
 	data, err := os.ReadFile(filepath.Join(path, "gc", generation+".json"))
@@ -251,7 +251,7 @@ func assertCollectionPublishesNothing(
 	}
 }
 
-func generationSubtree(entry, id string) bool {
+func generationSubtree(entry string, id string) bool {
 	dir := filepath.Join(generationsDirectory, id)
 
 	return entry == dir || strings.HasPrefix(entry, dir+string(filepath.Separator))
@@ -768,7 +768,7 @@ func commitTwoArtifactFixture(t *testing.T, r *Repository) Generation {
 	return generation
 }
 
-func storedArtifactNames(t *testing.T, path, id string) []string {
+func storedArtifactNames(t *testing.T, path string, id string) []string {
 	t.Helper()
 
 	entries, err := os.ReadDir(

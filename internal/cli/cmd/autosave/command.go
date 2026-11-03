@@ -96,7 +96,7 @@ type Env struct {
 	lastSavedUnix int64
 }
 
-func newOutcome(status, reason string) outcome {
+func newOutcome(status string, reason string) outcome {
 	return outcome{
 		status:       status,
 		reason:       reason,

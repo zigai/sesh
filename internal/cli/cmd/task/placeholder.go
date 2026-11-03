@@ -90,7 +90,7 @@ func awaitWake(
 	ctx context.Context,
 	runtime *actioncli.Runtime,
 	cfg *config.Config,
-	id, harness string,
+	id string, harness string,
 ) ([]string, error) {
 	resized := make(chan os.Signal, 1)
 	signal.Notify(resized, syscall.SIGWINCH)
@@ -126,7 +126,7 @@ func awaitWake(
 	}
 }
 
-func drawPlaceholder(cfg *config.Config, harness, failure string) {
+func drawPlaceholder(cfg *config.Config, harness string, failure string) {
 	width, height, err := term.GetSize(os.Stdout.Fd())
 	if err != nil {
 		width, height = 0, 0

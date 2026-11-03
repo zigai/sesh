@@ -80,7 +80,7 @@ func hookDecodeRecords(t *testing.T, logText string) []map[string]any {
 	return records
 }
 
-func hookAssertRecord(t *testing.T, got, want map[string]any) {
+func hookAssertRecord(t *testing.T, got map[string]any, want map[string]any) {
 	t.Helper()
 
 	for k, wantVal := range want {

@@ -852,7 +852,7 @@ func verifyDecompressedFixtureFile(
 	t *testing.T,
 	r *Repository,
 	artDir *privatefs.Dir,
-	genID, id, expectedStr string,
+	genID string, id string, expectedStr string,
 ) {
 	t.Helper()
 

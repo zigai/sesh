@@ -201,7 +201,7 @@ func pickerHoverScreen(t *testing.T, ctx context.Context, alias string) []string
 	return strings.Split(strings.TrimSuffix(string(screen), "\n"), "\n")
 }
 
-func assertPickerHoverRowsStable(t *testing.T, motion int, before, after []string) {
+func assertPickerHoverRowsStable(t *testing.T, motion int, before []string, after []string) {
 	t.Helper()
 
 	for row, line := range before {

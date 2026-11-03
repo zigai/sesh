@@ -269,7 +269,7 @@ func (l Location) names(requested Location) bool {
 	}
 }
 
-func NewBranch(title, base string, number int, taken []string) string {
+func NewBranch(title string, base string, number int, taken []string) string {
 	name := taskBranch(base, number)
 	if slug := slug(title); slug != "" {
 		name = branchPrefix + slug
@@ -389,11 +389,11 @@ func slug(title string) string {
 	return out.String()
 }
 
-func refsCollide(a, b string) bool {
+func refsCollide(a string, b string) bool {
 	return a == b || strings.HasPrefix(a, b+"/") || strings.HasPrefix(b, a+"/")
 }
 
-func branchLocations(known branches, checkedOut, bases []string) []Location {
+func branchLocations(known branches, checkedOut []string, bases []string) []Location {
 	locations := make([]Location, 0, len(known.local)*2+len(known.remote))
 
 	for _, branch := range known.local {
@@ -509,7 +509,7 @@ func emptyOffer() Offer {
 	}
 }
 
-func listBranches(ctx context.Context, root, base string, describe bool) (branches, error) {
+func listBranches(ctx context.Context, root string, base string, describe bool) (branches, error) {
 	aheadBehind := ""
 
 	if describe {
@@ -591,7 +591,7 @@ func (r refLine) ref() Ref {
 	return Ref{Time: committed, Subject: r.subject, Ahead: ahead, Behind: behind}
 }
 
-func aheadBehindFormat(ctx context.Context, root, base string) (string, error) {
+func aheadBehindFormat(ctx context.Context, root string, base string) (string, error) {
 	for _, ref := range []string{"refs/heads/" + base, "refs/remotes/origin/" + base} {
 		exists, err := refExists(ctx, root, ref)
 		if err != nil {
@@ -650,7 +650,7 @@ func listWorktrees(ctx context.Context, root string) ([]worktree, error) {
 	return worktrees, nil
 }
 
-func within(dir, directory string) bool {
+func within(dir string, directory string) bool {
 	if dir == "" || directory == "" {
 		return false
 	}
@@ -661,7 +661,7 @@ func within(dir, directory string) bool {
 		!strings.HasPrefix(relative, ".."+string(filepath.Separator))
 }
 
-func sameDirectory(a, b string) bool {
+func sameDirectory(a string, b string) bool {
 	if a == "" || b == "" {
 		return false
 	}

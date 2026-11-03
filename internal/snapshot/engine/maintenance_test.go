@@ -146,7 +146,8 @@ func TestMaintenanceUncertaintyLogsOneTerminalFailure(t *testing.T) {
 	}
 
 	record := records[0]
-	if record["level"] != "error" || record["component"] != "snapshot" || record["operation"] != "gc" ||
+	if record["level"] != "error" || record["component"] != "snapshot" ||
+		record["operation"] != "gc" ||
 		record["status"] != "failed" ||
 		record["phase"] != "collection" ||
 		record["reason"] != "publication_uncertain" {

@@ -398,7 +398,7 @@ func checkLockFileStat(parentFd int, baseName string) (bool, error) {
 	return false, wrapErr(err, "log_truncate_failed", "inspect log lock file")
 }
 
-func openReaderAt(parentFd int, baseName, path string) (*os.File, error) {
+func openReaderAt(parentFd int, baseName string, path string) (*os.File, error) {
 	fd, err := unix.Openat(
 		parentFd,
 		baseName,
@@ -563,7 +563,7 @@ func parseRecordTime(value string) (time.Time, error) {
 	return t, nil
 }
 
-func newRingBuffer(size, maxBytes int) *ringBuffer {
+func newRingBuffer(size int, maxBytes int) *ringBuffer {
 	if size <= 0 {
 		size = 50
 	}

@@ -77,7 +77,7 @@ func (frontend popupFrontend) Dispatch(
 func checkPopupClientSession(
 	ctx context.Context,
 	server *gotmux.Server,
-	expected, shown string,
+	expected string, shown string,
 ) error {
 	if expected == "" || expected == shown {
 		return nil

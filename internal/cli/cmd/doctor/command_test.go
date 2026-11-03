@@ -164,7 +164,7 @@ func applicableReportChecks(scenario string) map[string]bool {
 
 func assertReportApplicability(
 	tb testing.TB,
-	scenario, text string,
+	scenario string, text string,
 	byID map[string]checks.Result,
 ) {
 	tb.Helper()
@@ -194,7 +194,7 @@ func assertReportApplicability(
 	}
 }
 
-func assertReportCheckRows(tb testing.TB, text, id string, want bool) {
+func assertReportCheckRows(tb testing.TB, text string, id string, want bool) {
 	tb.Helper()
 
 	_, name, _ := strings.Cut(id, ".")
@@ -214,7 +214,7 @@ func assertReportCheckRows(tb testing.TB, text, id string, want bool) {
 
 func assertReportOutcomes(
 	tb testing.TB,
-	report, decoded Report,
+	report Report, decoded Report,
 	text string,
 	byID map[string]checks.Result,
 ) {

@@ -96,7 +96,7 @@ func (local *Local) runTaskAction(
 
 func (local *Local) RunTaskAction(
 	ctx context.Context,
-	id, name string,
+	id string, name string,
 	streams gotmux.Streams,
 ) (TaskActionRun, error) {
 	run := TaskActionRun{

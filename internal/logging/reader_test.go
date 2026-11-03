@@ -704,7 +704,14 @@ func TestRingBufferTrackingAndReplacement(t *testing.T) {
 	testRingBufferOverflowRejection(t, ring)
 }
 
-func testRingBufferFillAndDrain(t *testing.T, ring *ringBuffer, line1, line2, line3, line4 []byte) {
+func testRingBufferFillAndDrain(
+	t *testing.T,
+	ring *ringBuffer,
+	line1 []byte,
+	line2 []byte,
+	line3 []byte,
+	line4 []byte,
+) {
 	t.Helper()
 
 	assertRingAdd(t, ring, line1, 1, 30)
@@ -720,7 +727,7 @@ func testRingBufferFillAndDrain(t *testing.T, ring *ringBuffer, line1, line2, li
 	}
 }
 
-func assertRingAdd(t *testing.T, ring *ringBuffer, line []byte, wantCount, wantBytes int) {
+func assertRingAdd(t *testing.T, ring *ringBuffer, line []byte, wantCount int, wantBytes int) {
 	t.Helper()
 
 	if err := ring.add(line); err != nil {

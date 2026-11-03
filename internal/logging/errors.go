@@ -22,7 +22,7 @@ var (
 	ErrLockTimeout            = errors.New("timeout acquiring log file lock")
 )
 
-func wrapErr(err error, code, msg string) error {
+func wrapErr(err error, code string, msg string) error {
 	if err == nil {
 		return nil
 	}

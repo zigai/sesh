@@ -293,7 +293,7 @@ func dividerLineIndex(text string) int {
 	return -1
 }
 
-func lineIndexOf(text, substring string) int {
+func lineIndexOf(text string, substring string) int {
 	for index, line := range strings.Split(text, "\n") {
 		if strings.Contains(line, substring) {
 			return index

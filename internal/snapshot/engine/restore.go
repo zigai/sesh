@@ -249,7 +249,7 @@ func AbandonRestore(
 func abandonRestore(
 	ctx context.Context,
 	repository *store.Repository,
-	operationID, reason string,
+	operationID string, reason string,
 ) (OperationStatus, error) {
 	if repository == nil {
 		return OperationStatus{}, oops.In("snapshot").
@@ -1047,7 +1047,7 @@ func postRestoreDaemonIdentity(
 	return joinPhaseIdentityFailure(phaseErr, identityErr, effectsPossible)
 }
 
-func joinPhaseIdentityFailure(phaseErr, identityErr error, effectsPossible bool) error {
+func joinPhaseIdentityFailure(phaseErr error, identityErr error, effectsPossible bool) error {
 	if identityErr != nil && effectsPossible {
 		identityErr = errors.Join(restore.ErrExecutionUncertain, identityErr)
 	}
@@ -1098,7 +1098,7 @@ func (l *actionLedger) state(id string) (store.Action, error) {
 func (l *actionLedger) transition(
 	ctx context.Context,
 	id string,
-	expected, next model.ActionState,
+	expected model.ActionState, next model.ActionState,
 	runtimeID model.Bytes,
 ) error {
 	if err := l.repository.Transition(ctx, l.operation, id, expected, next, runtimeID); err != nil {
@@ -1267,7 +1267,7 @@ func runScopedImport(
 	)
 }
 
-func scopedImportFailure(importErr, journalErr error) error {
+func scopedImportFailure(importErr error, journalErr error) error {
 	return oops.In("snapshot.restore").
 		Code("operation_uncertain").
 		With("operation", "import_scoped_state", "reason", "import_failed_uncertain").
@@ -1359,7 +1359,10 @@ func verifyAction(ctx context.Context, ledger *actionLedger, id string) error {
 	return ledger.transition(ctx, id, "confirmed", "verified", nil)
 }
 
-func mergeRequirements(planned, runtime []restore.MissingRequirement) []restore.MissingRequirement {
+func mergeRequirements(
+	planned []restore.MissingRequirement,
+	runtime []restore.MissingRequirement,
+) []restore.MissingRequirement {
 	merged := make([]restore.MissingRequirement, 0, len(planned)+len(runtime))
 
 	merged = append(merged, runtime...)

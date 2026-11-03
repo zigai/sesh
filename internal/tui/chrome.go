@@ -74,15 +74,21 @@ func (c Chrome) InputBar(input *textinput.Model, width int) string {
 	return inputBar(input, width)
 }
 
-func (c Chrome) Row(name, right string, selected bool, width int) string {
+func (c Chrome) Row(name string, right string, selected bool, width int) string {
 	return c.TreeRow("", name, right, selected, width)
 }
 
-func (c Chrome) TreeRow(tree, name, right string, selected bool, width int) string {
+func (c Chrome) TreeRow(tree string, name string, right string, selected bool, width int) string {
 	return c.TreeRowSpans(tree, name, []Span{{Text: right, Role: SpanMuted}}, selected, width)
 }
 
-func (c Chrome) TreeRowSpans(tree, name string, spans []Span, selected bool, width int) string {
+func (c Chrome) TreeRowSpans(
+	tree string,
+	name string,
+	spans []Span,
+	selected bool,
+	width int,
+) string {
 	styles := rowStyles(c.cfg, inputGutterWidth(), width)
 	treeWidth := lipgloss.Width(tree)
 
@@ -150,7 +156,7 @@ func SpansWidth(spans []Span) int {
 	return width
 }
 
-func (c Chrome) RowWidth(tree, name, right string) int {
+func (c Chrome) RowWidth(tree string, name string, right string) int {
 	if right == "" {
 		return inputGutterWidth() + lipgloss.Width(tree) + lipgloss.Width(name)
 	}

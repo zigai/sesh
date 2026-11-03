@@ -81,7 +81,7 @@ func savedHeadline(outcome outcome) string {
 	return "Saved generation " + shortGeneration(outcome.generation) + "."
 }
 
-func restoredHeadline(generation, status string, counts restoreCounts) string {
+func restoredHeadline(generation string, status string, counts restoreCounts) string {
 	var headline strings.Builder
 
 	fmt.Fprintf(
@@ -248,7 +248,7 @@ func sessionCount(count int) string {
 	return countNoun(count, "session", "sessions")
 }
 
-func countNoun(count int, singular, plural string) string {
+func countNoun(count int, singular string, plural string) string {
 	if count == 1 {
 		return "1 " + singular
 	}

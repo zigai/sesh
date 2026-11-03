@@ -88,7 +88,12 @@ func nameCollisions(plan Plan, liveNames map[string]bool) map[string]string {
 	return found
 }
 
-func addGroupCollisions(found map[string]string, plan Plan, liveNames, liveGroups map[string]bool) {
+func addGroupCollisions(
+	found map[string]string,
+	plan Plan,
+	liveNames map[string]bool,
+	liveGroups map[string]bool,
+) {
 	for _, step := range plan.Steps {
 		create, ok := step.(*CreateSessionStep)
 		if !ok || len(create.GroupName) == 0 {

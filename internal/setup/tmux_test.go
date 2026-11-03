@@ -13,7 +13,7 @@ import (
 	"github.com/zigai/sesh/internal/setup"
 )
 
-func tmuxBinding(key, table string, id action.ID, values action.Values) action.Binding {
+func tmuxBinding(key string, table string, id action.ID, values action.Values) action.Binding {
 	return action.Binding{
 		Key:    key,
 		Action: id,

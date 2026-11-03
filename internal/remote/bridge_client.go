@@ -26,7 +26,7 @@ type BridgeClient struct {
 	Timeout    time.Duration
 }
 
-func NewBridgeClient(socketPath, token string) *BridgeClient {
+func NewBridgeClient(socketPath string, token string) *BridgeClient {
 	return &BridgeClient{SocketPath: socketPath, Token: token, Timeout: bridgeClientTimeout}
 }
 

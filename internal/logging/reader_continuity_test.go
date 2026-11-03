@@ -167,7 +167,7 @@ type failedReaderOutput struct{}
 
 func (failedReaderOutput) Write([]byte) (int, error) { return 0, io.ErrClosedPipe }
 
-func appendReaderFixture(t *testing.T, path, data string) {
+func appendReaderFixture(t *testing.T, path string, data string) {
 	t.Helper()
 
 	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o600)

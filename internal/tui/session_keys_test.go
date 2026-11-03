@@ -17,7 +17,7 @@ func localKeyIdentity(name string) session.Identity {
 	return session.Identity{Origin: string(session.OriginLocal), Name: name}
 }
 
-func keyEntry(name, key string) session.KeyAssignment {
+func keyEntry(name string, key string) session.KeyAssignment {
 	return session.KeyAssignment{Session: localKeyIdentity(name), Key: key}
 }
 

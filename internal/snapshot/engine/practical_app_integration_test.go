@@ -133,7 +133,11 @@ func savePracticalObservation(
 	return result
 }
 
-func assertDistinctPracticalGeneration(t *testing.T, saved, newer engine.SaveResult) {
+func assertDistinctPracticalGeneration(
+	t *testing.T,
+	saved engine.SaveResult,
+	newer engine.SaveResult,
+) {
 	t.Helper()
 
 	if newer.Generation == saved.Generation {
@@ -177,12 +181,16 @@ func assertCompletedPracticalRetryRejected(
 	}
 }
 
-func assertSamePracticalTop(t *testing.T, before, after *process.Observation) {
+func assertSamePracticalTop(t *testing.T, before *process.Observation, after *process.Observation) {
 	t.Helper()
 	assertSamePracticalProcess(t, before, after)
 }
 
-func assertSamePracticalProcess(t *testing.T, before, after *process.Observation) {
+func assertSamePracticalProcess(
+	t *testing.T,
+	before *process.Observation,
+	after *process.Observation,
+) {
 	t.Helper()
 
 	if after.PID != before.PID || after.Birth != before.Birth {
@@ -570,7 +578,7 @@ func startSyntheticAgentSession(
 	t *testing.T,
 	ctx context.Context,
 	source *gotmux.Server,
-	nodePath, scriptPath string,
+	nodePath string, scriptPath string,
 ) (gotmux.Session, gotmux.PaneInfo) {
 	t.Helper()
 
@@ -763,7 +771,7 @@ func setupOutcomesSourceSession(
 func assertExpectedPaneOutcomes(
 	t *testing.T,
 	panes []restore.PaneResult,
-	p0ID, p1ID, p2ID string,
+	p0ID string, p1ID string, p2ID string,
 ) {
 	t.Helper()
 
@@ -940,7 +948,7 @@ func setupMixedSourceSession(
 	t *testing.T,
 	ctx context.Context,
 	source *gotmux.Server,
-	topPath, shPath string,
+	topPath string, shPath string,
 ) gotmux.Session {
 	t.Helper()
 
@@ -989,7 +997,7 @@ func setupMixedSourceSession(
 func assertMixedPanesOutcomes(
 	t *testing.T,
 	panes []restore.PaneResult,
-	p0ID, p1ID, p2ID string,
+	p0ID string, p1ID string, p2ID string,
 ) {
 	t.Helper()
 
@@ -1022,7 +1030,7 @@ func assertLiveMissingDirectoryFails(
 	ctx context.Context,
 	repo *store.Repository,
 	manifest model.Manifest,
-	missingDir, leaseRoot string,
+	missingDir string, leaseRoot string,
 ) {
 	t.Helper()
 
@@ -1106,7 +1114,7 @@ func startTopAndShellSession(
 	t *testing.T,
 	ctx context.Context,
 	source *gotmux.Server,
-	topPath, shPath string,
+	topPath string, shPath string,
 ) gotmux.Session {
 	t.Helper()
 
@@ -1147,7 +1155,7 @@ func commitWithRemovedDirectory(
 	t *testing.T,
 	ctx context.Context,
 	repo *store.Repository,
-	saved, removed string,
+	saved string, removed string,
 ) (string, model.Manifest) {
 	t.Helper()
 
@@ -1185,7 +1193,7 @@ func commitWithRemovedDirectory(
 func assertRemovedDirectoryOutcomes(
 	t *testing.T,
 	restored engine.RestoreResult,
-	removedPaneID, healthyPaneID string,
+	removedPaneID string, healthyPaneID string,
 ) {
 	t.Helper()
 

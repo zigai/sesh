@@ -93,7 +93,7 @@ func assertSavedSelection(t *testing.T, saved model.Manifest, pane gotmux.Pane, 
 func saveSessionFixture(
 	t *testing.T,
 	server *gotmux.Server,
-	name, dir, marker string,
+	name string, dir string, marker string,
 ) (gotmux.Session, gotmux.Pane) {
 	t.Helper()
 

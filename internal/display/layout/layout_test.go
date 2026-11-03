@@ -105,7 +105,14 @@ func TestProviderUpdateOnlyChangesOwnedCells(t *testing.T) {
 	})
 }
 
-func assertUnownedColumns(t *rapid.T, plan, next ColumnPlan, before, after string, changed int) {
+func assertUnownedColumns(
+	t *rapid.T,
+	plan ColumnPlan,
+	next ColumnPlan,
+	before string,
+	after string,
+	changed int,
+) {
 	for i, span := range plan.Columns {
 		if i == changed || !span.Visible {
 			continue
@@ -186,7 +193,7 @@ func TestTruncationKeepsGraphemesWhole(t *testing.T) {
 	})
 }
 
-func wholeGraphemeTruncation(value, painted string, side TruncateSide) bool {
+func wholeGraphemeTruncation(value string, painted string, side TruncateSide) bool {
 	mark := "…"
 
 	graphemes := uniseg.NewGraphemes(value)

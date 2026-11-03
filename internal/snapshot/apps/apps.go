@@ -123,7 +123,11 @@ func StopSignal(harnessName string) (syscall.Signal, bool) {
 	return signal, ok
 }
 
-func prepareApplication(observed, fallback model.Launch, name string) (model.Launch, Reason) {
+func prepareApplication(
+	observed model.Launch,
+	fallback model.Launch,
+	name string,
+) (model.Launch, Reason) {
 	switch {
 	case isShell(name):
 		return restartLaunch(observed, []string{name}), ReasonShellRestart

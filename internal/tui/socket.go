@@ -14,7 +14,7 @@ func normalizeServerSocket(value string) string {
 	return filepath.Clean(value)
 }
 
-func sameServerSocket(left, right string) bool {
+func sameServerSocket(left string, right string) bool {
 	left = normalizeServerSocket(left)
 	right = normalizeServerSocket(right)
 

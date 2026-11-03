@@ -187,7 +187,7 @@ func assertNativeObservation(t *testing.T, result capture.Observation) {
 func assertCapturedClosure(
 	t *testing.T,
 	server *gotmux.Server,
-	first, second, third gotmux.Session,
+	first gotmux.Session, second gotmux.Session, third gotmux.Session,
 ) {
 	t.Helper()
 

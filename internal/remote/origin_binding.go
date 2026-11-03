@@ -137,7 +137,7 @@ func selectAttachmentPane(ctx context.Context, handle gotmux.Session, paneID str
 func (live *GotmuxLiveServer) clearOriginBinding(
 	ctx context.Context,
 	handle gotmux.Session,
-	name, attachmentID string,
+	name string, attachmentID string,
 ) error {
 	probe, err := live.server.Probe(ctx)
 	if err != nil {

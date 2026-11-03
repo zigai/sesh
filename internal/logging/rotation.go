@@ -52,7 +52,7 @@ func defaultRotationPolicy() rotationPolicy {
 
 func newRotatingSink(
 	file *os.File,
-	path, baseName string,
+	path string, baseName string,
 	parentDir *os.File,
 	policy rotationPolicy,
 ) *Sink {
@@ -113,7 +113,7 @@ func releaseLogFileLock(fd int) error {
 	}
 }
 
-func acquireBoundedLock(fd, operation int) error {
+func acquireBoundedLock(fd int, operation int) error {
 	deadline := time.Now().Add(defaultLockTimeout)
 
 	for {
@@ -140,7 +140,7 @@ func acquireBoundedLock(fd, operation int) error {
 	}
 }
 
-func acquireBoundedLockContext(ctx context.Context, fd, operation int) error {
+func acquireBoundedLockContext(ctx context.Context, fd int, operation int) error {
 	deadline := time.Now().Add(defaultLockTimeout)
 
 	for {
@@ -261,7 +261,7 @@ func (s *Sink) reopenActiveLog(currentFile *os.File, expectedStat *unix.Stat_t) 
 	return newFile, nil
 }
 
-func openOrCreateActiveLog(parentFile *os.File, path, baseName string) (*os.File, error) {
+func openOrCreateActiveLog(parentFile *os.File, path string, baseName string) (*os.File, error) {
 	return openOrCreateActiveFile(parentFile, path, baseName)
 }
 
@@ -538,7 +538,7 @@ func (s *Sink) writeEvent(event []byte) (int, error) {
 }
 
 func (s *Sink) handleRotationFailure(
-	file, newFile *os.File,
+	file *os.File, newFile *os.File,
 	rotationErr error,
 	lockTarget *os.File,
 	event []byte,

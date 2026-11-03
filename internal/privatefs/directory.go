@@ -61,7 +61,7 @@ func OpenParent(path string, create bool) (*Dir, string, error) {
 	return dir, name, nil
 }
 
-func openPath(path string, create, parents, privateLeaf bool) (*Dir, error) {
+func openPath(path string, create bool, parents bool, privateLeaf bool) (*Dir, error) {
 	if !filepath.IsAbs(path) || filepath.Clean(path) != path || path == "/" {
 		return nil, ErrUnsafe
 	}
@@ -281,7 +281,7 @@ func (d *Dir) names(count int) ([]string, error) {
 	return names, nil
 }
 
-func (d *Dir) child(name string, create, private bool) (*Dir, error) {
+func (d *Dir) child(name string, create bool, private bool) (*Dir, error) {
 	if !validName(name) {
 		return nil, ErrUnsafe
 	}

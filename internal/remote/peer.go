@@ -207,7 +207,7 @@ func RunInventoryStream(ctx context.Context, opts InventoryOptions, output io.Wr
 	return runStreamLoop(ctx, opts, &state, publisher)
 }
 
-func (publisher *streamPublisher) writeHello(hostname, bridgeDir string) error {
+func (publisher *streamPublisher) writeHello(hostname string, bridgeDir string) error {
 	err := publisher.writer.Write(Frame{
 		Version:        ProtocolVersion,
 		Type:           FrameHello,
@@ -556,7 +556,7 @@ func mergeAgentSummaries(sessions []session.Session, summaries []session.AgentSu
 	}
 }
 
-func snapshotsSemanticallyEqual(left, right Snapshot) bool {
+func snapshotsSemanticallyEqual(left Snapshot, right Snapshot) bool {
 	left.GeneratedAt = time.Time{}
 	right.GeneratedAt = time.Time{}
 	left.Health.Tmux.CheckedAt = time.Time{}
@@ -573,7 +573,7 @@ func snapshotsSemanticallyEqual(left, right Snapshot) bool {
 	return reflect.DeepEqual(left, right)
 }
 
-func positiveDuration(value, fallback time.Duration) time.Duration {
+func positiveDuration(value time.Duration, fallback time.Duration) time.Duration {
 	if value > 0 {
 		return value
 	}

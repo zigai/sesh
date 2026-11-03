@@ -166,7 +166,8 @@ func verifyEditorProcess(ctx context.Context, observed model.Launch, pid int) er
 }
 
 func editorObservationMatchesLaunch(current *process.Observation, observed model.Launch) bool {
-	return bytes.Equal(current.Executable, observed.Executable) && bytes.Equal(current.Directory, observed.Directory) &&
+	return bytes.Equal(current.Executable, observed.Executable) &&
+		bytes.Equal(current.Directory, observed.Directory) &&
 		equalArguments(current.Arguments, observed.Arguments) &&
 		!current.ExecutableDeleted &&
 		!current.DirectoryDeleted
@@ -279,7 +280,7 @@ func verifyResolvedEditorCore(ctx context.Context, uiPID int, core editorProcess
 	return nil
 }
 
-func sameEditorObservation(current, expected *process.Observation) bool {
+func sameEditorObservation(current *process.Observation, expected *process.Observation) bool {
 	return current.PID == expected.PID && current.Birth == expected.Birth &&
 		bytes.Equal(current.Executable, expected.Executable) &&
 		bytes.Equal(current.Directory, expected.Directory) &&

@@ -9,13 +9,13 @@ import (
 	"github.com/samber/oops"
 )
 
-func (w *Workflow) RenameSession(ctx context.Context, oldName, newName string) error {
+func (w *Workflow) RenameSession(ctx context.Context, oldName string, newName string) error {
 	return w.RenameSessionTarget(ctx, oldName, newName, "")
 }
 
 func (w *Workflow) RenameSessionTarget(
 	ctx context.Context,
-	oldName, newName, expectedSessionID string,
+	oldName string, newName string, expectedSessionID string,
 ) error {
 	_, err := w.RenameSessionTargetOutcome(ctx, oldName, newName, expectedSessionID)
 
@@ -24,7 +24,7 @@ func (w *Workflow) RenameSessionTarget(
 
 func (w *Workflow) RenameSessionOutcome(
 	ctx context.Context,
-	oldName, newName string,
+	oldName string, newName string,
 ) (RenameOutcome, error) {
 	return w.RenameSessionTargetOutcome(ctx, oldName, newName, "")
 }
@@ -116,7 +116,7 @@ func (w *Workflow) RenameSessionTargetOutcome(
 	return out, nil
 }
 
-func (w *Workflow) renameHistory(ctx context.Context, oldName, newName string) error {
+func (w *Workflow) renameHistory(ctx context.Context, oldName string, newName string) error {
 	oldIdent, ok := w.localIdentity(oldName)
 	if !ok {
 		return nil
@@ -140,7 +140,7 @@ func (w *Workflow) KillSession(ctx context.Context, name string, force bool) err
 
 func (w *Workflow) KillSessionTarget(
 	ctx context.Context,
-	name, expectedSessionID string,
+	name string, expectedSessionID string,
 	force bool,
 ) error {
 	if w.server == nil {

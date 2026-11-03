@@ -257,7 +257,7 @@ func TestRemoteMonitorReloadsSymlinkedDefaultConfig(t *testing.T) {
 	assertReload("retargeted")
 }
 
-func writeRemoteReloadTestConfig(t *testing.T, path, sshPath string) {
+func writeRemoteReloadTestConfig(t *testing.T, path string, sshPath string) {
 	t.Helper()
 
 	if err := os.WriteFile(

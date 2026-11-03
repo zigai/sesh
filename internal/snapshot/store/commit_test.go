@@ -70,7 +70,7 @@ func TestPublicationNeverFallsBack(t *testing.T) {
 	}
 }
 
-func stageAttempt(t *testing.T, r *Repository, id, state string) {
+func stageAttempt(t *testing.T, r *Repository, id string, state string) {
 	t.Helper()
 
 	if state == "pending" {

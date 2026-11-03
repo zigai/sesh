@@ -261,7 +261,7 @@ func (m *Model) createsMissingPath(request pendingAction, value string) bool {
 	return inspectPath(value, cwd) == pathMissing
 }
 
-func inspectPath(value, cwd string) pathState {
+func inspectPath(value string, cwd string) pathState {
 	path := strings.TrimSpace(value)
 	if path == "" {
 		return pathUnknown

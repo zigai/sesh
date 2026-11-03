@@ -693,11 +693,11 @@ func defaultBranch(ctx context.Context, root string) (string, error) {
 	return branch, nil
 }
 
-func branchExists(ctx context.Context, root, branch string) (bool, error) {
+func branchExists(ctx context.Context, root string, branch string) (bool, error) {
 	return refExists(ctx, root, "refs/heads/"+branch)
 }
 
-func startPoint(ctx context.Context, root, base string) (string, error) {
+func startPoint(ctx context.Context, root string, base string) (string, error) {
 	local, remote := "refs/heads/"+base, "refs/remotes/origin/"+base
 
 	onRemote, err := refExists(ctx, root, remote)
@@ -722,7 +722,7 @@ func startPoint(ctx context.Context, root, base string) (string, error) {
 	return remote, nil
 }
 
-func refExists(ctx context.Context, root, ref string) (bool, error) {
+func refExists(ctx context.Context, root string, ref string) (bool, error) {
 	_, err := git.Output(ctx, root, "rev-parse", "--verify", "--quiet", ref)
 	if _, missing := errors.AsType[*git.CommandError](err); missing {
 		return false, nil

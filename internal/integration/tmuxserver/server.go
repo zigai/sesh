@@ -48,7 +48,7 @@ func Open(socket string) (*gotmux.Server, error) {
 }
 
 // OpenNamed runs the same tmux build as the server at socket, so both answer to the same features.
-func OpenNamed(socket, name, configFile string) (*gotmux.Server, error) {
+func OpenNamed(socket string, name string, configFile string) (*gotmux.Server, error) {
 	if !filepath.IsAbs(socket) || filepath.Clean(socket) != socket {
 		return nil, oops.In("tmux").
 			Code("endpoint_required").

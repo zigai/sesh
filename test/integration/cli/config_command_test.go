@@ -256,7 +256,7 @@ func verifyConfigInitInvalidFlagDoesNotMutate(t *testing.T, fixture configInitBi
 }
 
 func isolatedConfigInitEnvironment(
-	home, configHome, dataHome, stateHome, cacheHome string,
+	home string, configHome string, dataHome string, stateHome string, cacheHome string,
 ) []string {
 	prefixes := []string{
 		"HOME=",

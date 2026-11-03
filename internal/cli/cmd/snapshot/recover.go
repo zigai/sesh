@@ -80,7 +80,7 @@ func newRecoverDeleteCommand() *cobra.Command {
 	return cmd
 }
 
-func newSnapshotGroupCommand(use, short string) *cobra.Command {
+func newSnapshotGroupCommand(use string, short string) *cobra.Command {
 	return &cobra.Command{
 		Use:   use,
 		Short: short,
@@ -96,7 +96,7 @@ func newSnapshotGroupCommand(use, short string) *cobra.Command {
 }
 
 func newRecoverOperationCommand(
-	name, short, long, operation string,
+	name string, short string, long string, operation string,
 	run func(*cobra.Command, *store.Repository, string) error,
 ) *cobra.Command {
 	cmd := &cobra.Command{

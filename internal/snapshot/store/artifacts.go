@@ -195,7 +195,7 @@ func normalizeTrailingError(err error) error {
 }
 
 func validateArtifactContent(
-	written, readCount, size int64,
+	written int64, readCount int64, size int64,
 	descriptor model.Artifact,
 	hash []byte,
 ) error {

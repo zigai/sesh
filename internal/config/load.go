@@ -283,7 +283,11 @@ func readConfigFile(explicitPath string, input io.Reader) ([]byte, bool, error) 
 	return readPinnedConfigFile(parentDir, fileName, isExplicit)
 }
 
-func readPinnedConfigFile(parentDir, fileName string, isExplicit bool) ([]byte, bool, error) {
+func readPinnedConfigFile(
+	parentDir string,
+	fileName string,
+	isExplicit bool,
+) ([]byte, bool, error) {
 	dir, err := openPinnedDir(parentDir, false)
 	if err != nil {
 		notFoundErr := handleNotFoundError(err, isExplicit)

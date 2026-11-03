@@ -145,7 +145,7 @@ func titleCacheKey(lookup aht.Session) string {
 	return string(lookup.Harness) + "\x00" + lookup.SessionID + "\x00" + lookup.SessionPath
 }
 
-func titleSourceUnchanged(cached, current os.FileInfo) bool {
+func titleSourceUnchanged(cached os.FileInfo, current os.FileInfo) bool {
 	return os.SameFile(cached, current) && cached.Size() == current.Size() &&
 		cached.ModTime().Equal(current.ModTime())
 }

@@ -61,7 +61,7 @@ func TestUncertainPublicationRetainsTypedCause(t *testing.T) {
 	assertReconciledPublication(t, path, attempt.ID)
 }
 
-func assertReconciledPublication(t *testing.T, path, id string) {
+func assertReconciledPublication(t *testing.T, path string, id string) {
 	t.Helper()
 
 	reopened := openRepository(t, path)
@@ -91,7 +91,13 @@ func assertReconciledPublication(t *testing.T, path, id string) {
 	}
 }
 
-func assertRepositoryDiagnostic(t *testing.T, err error, operation, code string, sentinel error) {
+func assertRepositoryDiagnostic(
+	t *testing.T,
+	err error,
+	operation string,
+	code string,
+	sentinel error,
+) {
 	t.Helper()
 
 	if !errors.Is(err, sentinel) {

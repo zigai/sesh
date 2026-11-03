@@ -665,7 +665,7 @@ func (m *Model) click(mouse tea.Mouse) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func clickedChoice(rows [][]placed, top, line, column int) (int, bool) {
+func clickedChoice(rows [][]placed, top int, line int, column int) (int, bool) {
 	if line < top || line >= top+len(rows) {
 		return 0, false
 	}

@@ -214,7 +214,7 @@ func (w TaskWindow) Pane(name string) (TaskPaneConfig, bool) {
 	return w.Panes[index], true
 }
 
-func (w TaskLayoutWhen) Matches(width, height int, harness string) bool {
+func (w TaskLayoutWhen) Matches(width int, height int, harness string) bool {
 	landscape := width >= cellHeightPerWidth*height
 
 	switch {

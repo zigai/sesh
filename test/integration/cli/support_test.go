@@ -262,7 +262,7 @@ func contractJSONItem(t *testing.T, values []any, key string, want any) map[stri
 	return nil
 }
 
-func assertJSONContractFields(t *testing.T, object, want map[string]any) {
+func assertJSONContractFields(t *testing.T, object map[string]any, want map[string]any) {
 	t.Helper()
 
 	for key, expected := range want {
@@ -306,7 +306,14 @@ func runtimeConfig(t *testing.T, level string) (string, string) {
 	return path, logPath
 }
 
-func assertRuntimeLog(t *testing.T, path, component, operation, level, status string) {
+func assertRuntimeLog(
+	t *testing.T,
+	path string,
+	component string,
+	operation string,
+	level string,
+	status string,
+) {
 	t.Helper()
 
 	data, err := os.ReadFile(path)
@@ -329,7 +336,14 @@ func assertRuntimeLog(t *testing.T, path, component, operation, level, status st
 	}
 }
 
-func assertRuntimeRecord(t *testing.T, line []byte, component, operation, level, status string) {
+func assertRuntimeRecord(
+	t *testing.T,
+	line []byte,
+	component string,
+	operation string,
+	level string,
+	status string,
+) {
 	t.Helper()
 
 	var record map[string]any
@@ -427,7 +441,7 @@ func assertOperationLogField(t *testing.T, record map[string]any, key string) {
 	}
 }
 
-func writeTestConfig(t *testing.T, path, body string) {
+func writeTestConfig(t *testing.T, path string, body string) {
 	t.Helper()
 
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {

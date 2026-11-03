@@ -162,7 +162,7 @@ func recountAgentSummary(summary *session.AgentSummary) {
 	}
 }
 
-func earlierAgentStatus(current, next time.Time) time.Time {
+func earlierAgentStatus(current time.Time, next time.Time) time.Time {
 	if current.IsZero() || (!next.IsZero() && next.Before(current)) {
 		return next
 	}

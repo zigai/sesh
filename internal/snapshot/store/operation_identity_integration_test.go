@@ -37,7 +37,14 @@ func TestProcessDeathAtOperationRegistrationBoundaries(t *testing.T) {
 	}
 }
 
-func operationWorker(t *testing.T, mode, path, id, source, phase string) *exec.Cmd {
+func operationWorker(
+	t *testing.T,
+	mode string,
+	path string,
+	id string,
+	source string,
+	phase string,
+) *exec.Cmd {
 	t.Helper()
 
 	program, err := os.Executable()
@@ -115,7 +122,13 @@ func TestOperationIdentityWorker(t *testing.T) {
 	t.Fatal("operation worker escaped interruption")
 }
 
-func verifyOperationIdentity(t *testing.T, path, opID, sourceID, phase string) {
+func verifyOperationIdentity(
+	t *testing.T,
+	path string,
+	opID string,
+	sourceID string,
+	phase string,
+) {
 	t.Helper()
 
 	r := openRepository(t, path)
@@ -136,7 +149,7 @@ func verifyOperationIdentity(t *testing.T, path, opID, sourceID, phase string) {
 func verifyPreReplacement(
 	t *testing.T,
 	r *Repository,
-	opID, sourceID string,
+	opID string, sourceID string,
 	target model.Bytes,
 	actions []Action,
 ) {
@@ -160,7 +173,7 @@ func verifyPreReplacement(
 func verifyPostReplacement(
 	t *testing.T,
 	r *Repository,
-	opID, sourceID string,
+	opID string, sourceID string,
 	target model.Bytes,
 	actions []Action,
 ) {
@@ -188,7 +201,7 @@ func verifyPostReplacement(
 func verifyJournalAndPinRetained(
 	t *testing.T,
 	r *Repository,
-	opID, sourceID string,
+	opID string, sourceID string,
 	target model.Bytes,
 ) {
 	t.Helper()

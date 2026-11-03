@@ -44,7 +44,12 @@ func ReadIdentity(ctx context.Context, pid int) (Identity, error) {
 	return identity, nil
 }
 
-func readIdentity(ctx context.Context, procRoot, bootIDPath string, pid int) (Identity, error) {
+func readIdentity(
+	ctx context.Context,
+	procRoot string,
+	bootIDPath string,
+	pid int,
+) (Identity, error) {
 	if err := ctx.Err(); err != nil {
 		return Identity{BootID: "", StartTime: 0}, fmt.Errorf("context canceled: %w", err)
 	}

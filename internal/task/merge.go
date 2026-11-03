@@ -86,7 +86,7 @@ func MergeExitCode(err error) int {
 // checkout only when it is clean on the base. An empty base means origin's default branch.
 func MergeBranch(
 	ctx context.Context,
-	dir, base string,
+	dir string, base string,
 	check []string,
 	out io.Writer,
 ) (Merged, error) {
@@ -160,7 +160,7 @@ func requireClean(ctx context.Context, dir string) error {
 	return nil
 }
 
-func resolveMergeBranches(ctx context.Context, dir, base string) (Merged, error) {
+func resolveMergeBranches(ctx context.Context, dir string, base string) (Merged, error) {
 	merged := Merged{Branch: "", Base: base}
 
 	var err error
@@ -198,7 +198,7 @@ func resolveMergeBranches(ctx context.Context, dir, base string) (Merged, error)
 	return merged, nil
 }
 
-func mergeStep(ctx context.Context, out io.Writer, dir, step string, args ...string) error {
+func mergeStep(ctx context.Context, out io.Writer, dir string, step string, args ...string) error {
 	_, _ = fmt.Fprintln(out, "· "+step)
 
 	if _, err := git.Output(ctx, dir, args...); err != nil {
@@ -228,7 +228,7 @@ func runMergeCheck(ctx context.Context, dir string, check []string, out io.Write
 	return nil
 }
 
-func fastForwardMainCheckout(ctx context.Context, dir, base string, out io.Writer) error {
+func fastForwardMainCheckout(ctx context.Context, dir string, base string, out io.Writer) error {
 	worktrees, err := git.Output(ctx, dir, "worktree", "list", "--porcelain")
 	if err != nil {
 		return fmt.Errorf("list worktrees: %w", err)
@@ -256,7 +256,7 @@ func fastForwardMainCheckout(ctx context.Context, dir, base string, out io.Write
 	)
 }
 
-func cleanOnBranch(ctx context.Context, dir, branch string) bool {
+func cleanOnBranch(ctx context.Context, dir string, branch string) bool {
 	head, err := git.Output(ctx, dir, "symbolic-ref", "--quiet", "--short", "HEAD")
 	if err != nil || head != branch {
 		return false

@@ -80,7 +80,7 @@ func (m *Model) loadAgentGitCommand() tea.Cmd {
 
 func retainPreviousAgentGit(
 	directories []string,
-	previous, scanned map[string]agentGitCacheEntry,
+	previous map[string]agentGitCacheEntry, scanned map[string]agentGitCacheEntry,
 	incomplete []string,
 ) map[string]agentGitCacheEntry {
 	retained := make(map[string]agentGitCacheEntry, len(directories))

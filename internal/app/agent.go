@@ -251,7 +251,7 @@ func (local *Local) acknowledgeUnread(ctx context.Context, visit agents.AgentVis
 	return nil
 }
 
-func localIdentity(socket, name string) session.Identity {
+func localIdentity(socket string, name string) session.Identity {
 	return session.Identity{
 		Origin:           string(session.OriginLocal),
 		ConnectionID:     "",

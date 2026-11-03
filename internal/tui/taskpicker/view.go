@@ -314,7 +314,7 @@ func (m *Model) lines() []listLine {
 	return lines
 }
 
-func (m *Model) renderLine(lines []listLine, index, width int) string {
+func (m *Model) renderLine(lines []listLine, index int, width int) string {
 	switch {
 	case index < len(lines) && lines[index].heading:
 		return strings.Repeat(" ", rowGutter) + lines[index].section.label()
@@ -406,7 +406,7 @@ func (m *Model) renderChoiceRows(
 	return lines
 }
 
-func (m *Model) renderFailure(width, height int) []string {
+func (m *Model) renderFailure(width int, height int) []string {
 	lines := make([]string, 0, height)
 
 	for _, line := range wrapWords(m.failure, width) {
@@ -634,7 +634,7 @@ func padLeft(text string, width int) string {
 	return strings.Repeat(" ", max(width-lipgloss.Width(text), 0)) + text
 }
 
-func age(at, now time.Time) string {
+func age(at time.Time, now time.Time) string {
 	elapsed := now.Sub(at)
 
 	switch {
@@ -774,7 +774,7 @@ func wrapWords(text string, width int) []string {
 	return lines
 }
 
-func placeChoices(choices []string, indent, width int) [][]placed {
+func placeChoices(choices []string, indent int, width int) [][]placed {
 	rows := [][]placed{{}}
 	column := indent
 

@@ -517,7 +517,7 @@ func drawRandomWindow(rt *rapid.T, windowID string, wIdx int) (model.Window, []m
 	return window, panes
 }
 
-func drawRandomLinks(rt *rapid.T, sessionCount, windowCount int) [][]model.Link {
+func drawRandomLinks(rt *rapid.T, sessionCount int, windowCount int) [][]model.Link {
 	links := make([][]model.Link, sessionCount)
 
 	for wIdx := range windowCount {

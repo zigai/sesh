@@ -497,7 +497,7 @@ func applyTokenPipe(item *token, segment string, allowed map[string]struct{}) er
 	return nil
 }
 
-func parseNamedPipe(name, value string, hasValue bool) (pipe, error) {
+func parseNamedPipe(name string, value string, hasValue bool) (pipe, error) {
 	switch name {
 	case "trunc_left":
 		width, err := parseFieldWidth(value)
@@ -541,7 +541,7 @@ func parseWidgetExpression(expression string, allowed map[string]struct{}) (toke
 	return item, true, nil
 }
 
-func parseWidgetToken(name, rest string) (token, bool, error) {
+func parseWidgetToken(name string, rest string) (token, bool, error) {
 	item := newToken()
 	item.alignment = AlignmentLeft
 
@@ -898,7 +898,7 @@ func splitGroupLiterals(tokens []token) []token {
 	return split
 }
 
-func markGroupRange(tokens []token, open, closeIndex int, side string) {
+func markGroupRange(tokens []token, open int, closeIndex int, side string) {
 	hasField := false
 	for i := open + 1; i < closeIndex; i++ {
 		hasField = hasField || tokens[i].field != ""

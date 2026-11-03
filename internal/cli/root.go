@@ -210,7 +210,7 @@ func newHooksCommand() *cobra.Command {
 	return cmd
 }
 
-func newHooksListCommand(use, short string, validate bool) *cobra.Command {
+func newHooksListCommand(use string, short string, validate bool) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   use,
 		Short: short,
@@ -407,7 +407,12 @@ func renderHookRun(
 	return writeOutput(cmd, "%s", summary)
 }
 
-func hookEventFromFlags(cmd *cobra.Command, eventName, hookAction, phase string) session.HookEvent {
+func hookEventFromFlags(
+	cmd *cobra.Command,
+	eventName string,
+	hookAction string,
+	phase string,
+) session.HookEvent {
 	sessionName, _ := cmd.Flags().GetString("session")
 	prevSession, _ := cmd.Flags().GetString("prev-session")
 	source, _ := cmd.Flags().GetString("source")

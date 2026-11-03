@@ -81,7 +81,14 @@ func runtimeConfig(t *testing.T, level string) (string, string) {
 	return path, logPath
 }
 
-func assertRuntimeLog(t *testing.T, path, component, operation, level, status string) {
+func assertRuntimeLog(
+	t *testing.T,
+	path string,
+	component string,
+	operation string,
+	level string,
+	status string,
+) {
 	t.Helper()
 
 	data, err := os.ReadFile(path)
@@ -104,7 +111,14 @@ func assertRuntimeLog(t *testing.T, path, component, operation, level, status st
 	}
 }
 
-func assertRuntimeRecord(t *testing.T, line []byte, component, operation, level, status string) {
+func assertRuntimeRecord(
+	t *testing.T,
+	line []byte,
+	component string,
+	operation string,
+	level string,
+	status string,
+) {
 	t.Helper()
 
 	var record map[string]any

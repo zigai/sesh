@@ -86,7 +86,7 @@ func TestCatalogAbsentServerRetainsIndependentFailures(t *testing.T) {
 func commitTestSnapshot(
 	t *testing.T,
 	r *store.Repository,
-	sessionName, dir string,
+	sessionName string, dir string,
 	linkCount int,
 ) store.Generation {
 	t.Helper()
@@ -97,7 +97,7 @@ func commitTestSnapshot(
 func commitTestObservation(
 	t *testing.T,
 	r *store.Repository,
-	sessionName, dir string,
+	sessionName string, dir string,
 ) store.Generation {
 	t.Helper()
 
@@ -131,7 +131,7 @@ func commitTestManifest(t *testing.T, r *store.Repository, m model.Manifest) sto
 
 var testSnapshotContent = []byte("terminal content\n")
 
-func testSnapshotManifest(sessionName, dir string, linkCount int) model.Manifest {
+func testSnapshotManifest(sessionName string, dir string, linkCount int) model.Manifest {
 	content := testSnapshotContent
 	hash := sha256.Sum256(content)
 
@@ -561,7 +561,7 @@ func TestListSavedRejectsEmptyOrInvalidSource(t *testing.T) {
 func assertSavedSessionProperties(
 	t *testing.T,
 	s Session,
-	wantName, wantDir, wantGen, wantSource string,
+	wantName string, wantDir string, wantGen string, wantSource string,
 	wantLinks int,
 ) {
 	t.Helper()

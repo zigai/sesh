@@ -62,7 +62,7 @@ type ghCheck struct {
 	State      string `json:"state"`
 }
 
-func ghCell(text, role string, state layout.State) layout.Cell {
+func ghCell(text string, role string, state layout.State) layout.Cell {
 	return layout.Cell{Text: text, Role: role, Variants: nil, State: state}
 }
 
@@ -198,7 +198,7 @@ func scanGHWithQuery(
 func ghEntryForTarget(
 	ctx context.Context,
 	target ghTarget,
-	entries, previous map[ghKey]ghEntry,
+	entries map[ghKey]ghEntry, previous map[ghKey]ghEntry,
 	now time.Time,
 	available bool,
 	query func(context.Context, ghTarget, time.Time) ghEntry,

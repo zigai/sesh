@@ -334,7 +334,7 @@ func defaultBranch(ctx context.Context, dir string) string {
 	return branch
 }
 
-func branchPR(ctx context.Context, dir, branch string) (PRLink, error) {
+func branchPR(ctx context.Context, dir string, branch string) (PRLink, error) {
 	var listed []ghPR
 
 	if err := runGH(

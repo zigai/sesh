@@ -522,7 +522,12 @@ func assignWindowOwnership(g model.Manifest, roles groupRoles, idx entityIndexes
 	}
 }
 
-func newStepRegistry(sessionCount, windowCount, paneCount, linkCount int) *stepRegistry {
+func newStepRegistry(
+	sessionCount int,
+	windowCount int,
+	paneCount int,
+	linkCount int,
+) *stepRegistry {
 	return &stepRegistry{
 		sessionStepID:        make(map[string]string, sessionCount),
 		sessionReadyStepID:   make(map[string]string, sessionCount),
@@ -535,7 +540,7 @@ func newStepRegistry(sessionCount, windowCount, paneCount, linkCount int) *stepR
 	}
 }
 
-func placeInitialWindow(session, window string, index int, reg *stepRegistry) Step {
+func placeInitialWindow(session string, window string, index int, reg *stepRegistry) Step {
 	id := "place-initial-window:" + session
 	step := &PlaceInitialWindowStep{
 		stepBase:  newStep(id, []string{reg.sessionStepID[session]}),

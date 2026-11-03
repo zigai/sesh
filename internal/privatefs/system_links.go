@@ -116,7 +116,7 @@ func (w *linkWalk) step() error {
 	}
 }
 
-func (w *linkWalk) descend(name, resolved string) {
+func (w *linkWalk) descend(name string, resolved string) {
 	w.resolved = resolved
 	w.trustedDir = false
 

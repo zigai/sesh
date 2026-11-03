@@ -92,7 +92,7 @@ func (local *Local) resolvePane(ctx context.Context, paneID string) (session.Ses
 func (local *Local) resolveSession(
 	ctx context.Context,
 	kind action.SubjectKind,
-	generation, selector string,
+	generation string, selector string,
 ) (session.Session, error) {
 	switch kind {
 	case action.SubjectLiveSession:
@@ -129,7 +129,7 @@ func (local *Local) resolveLive(ctx context.Context, selector string) (session.S
 
 func (local *Local) resolveSaved(
 	ctx context.Context,
-	generation, selector string,
+	generation string, selector string,
 ) (session.Session, error) {
 	repo, found, err := local.useRepository(ctx, false)
 	if err != nil {

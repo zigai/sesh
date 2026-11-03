@@ -330,7 +330,7 @@ func (r Result) withDetails(details ...string) Result {
 	return r
 }
 
-func skipped(id, needs, message string) Result {
+func skipped(id string, needs string, message string) Result {
 	result := newResult(id, StatusSkip, message)
 	result.Needs = needs
 

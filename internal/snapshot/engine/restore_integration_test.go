@@ -395,7 +395,13 @@ type optionReader interface {
 	Get(ctx context.Context, name string) (gotmux.OptionValue[string], error)
 }
 
-func assertLocalOption(t *testing.T, ctx context.Context, scope optionReader, name, want string) {
+func assertLocalOption(
+	t *testing.T,
+	ctx context.Context,
+	scope optionReader,
+	name string,
+	want string,
+) {
 	t.Helper()
 
 	value, err := scope.Get(ctx, name)

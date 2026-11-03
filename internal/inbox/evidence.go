@@ -47,7 +47,7 @@ type Evidence struct {
 	Kind   EvidenceKind
 }
 
-func ParseEvidence(report, dir string) []Evidence {
+func ParseEvidence(report string, dir string) []Evidence {
 	var items []Evidence
 
 	inside := false
@@ -129,7 +129,7 @@ func looksLikeTarget(text string) bool {
 	}
 }
 
-func newEvidence(target, dir string) (Evidence, bool) {
+func newEvidence(target string, dir string) (Evidence, bool) {
 	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
 		return Evidence{Target: target, Kind: EvidenceURL}, true
 	}

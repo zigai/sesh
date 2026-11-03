@@ -80,7 +80,7 @@ func assertSaveBlockedBeforeRegistration(
 	ctx context.Context,
 	t *testing.T,
 	contended *store.Repository,
-	leaseRoot, endpoint string,
+	leaseRoot string, endpoint string,
 ) {
 	t.Helper()
 

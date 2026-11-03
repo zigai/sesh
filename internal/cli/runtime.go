@@ -108,7 +108,7 @@ func ExecuteApplication(
 	ctx context.Context,
 	args []string,
 	input io.Reader,
-	stdout, stderr io.Writer,
+	stdout io.Writer, stderr io.Writer,
 ) error {
 	root := newRootCommand(ctx)
 	root.SetContext(ctx)
@@ -440,9 +440,9 @@ func validateCommandBeforeConfig(cmd *cobra.Command, args []string) error {
 
 func publishCommandOutput(
 	cmd *cobra.Command,
-	output, diagnostics *commandBuffer,
-	stdout, stderr io.Writer,
-	runErr, closeErr error,
+	output *commandBuffer, diagnostics *commandBuffer,
+	stdout io.Writer, stderr io.Writer,
+	runErr error, closeErr error,
 ) error {
 	if bindingDiscardsReport(cmd, output) {
 		stdout = io.Discard
@@ -476,8 +476,8 @@ func publishCommandOutput(
 }
 
 func copyStagedBuffers(
-	output, diagnostics *commandBuffer,
-	stdout, stderr io.Writer,
+	output *commandBuffer, diagnostics *commandBuffer,
+	stdout io.Writer, stderr io.Writer,
 	runErr error,
 ) error {
 	var outputErr error
@@ -515,7 +515,7 @@ func writeStreamDiagnosticError(cmd *cobra.Command, err error) error {
 	return commandOutputError(writeErr)
 }
 
-func writeFinalizationErrors(cmd *cobra.Command, runErr, closeErr error) error {
+func writeFinalizationErrors(cmd *cobra.Command, runErr error, closeErr error) error {
 	if cause := clibase.UncertainCause(runErr); cause != nil {
 		runErr = cause
 	}
@@ -530,7 +530,7 @@ func writeFinalizationErrors(cmd *cobra.Command, runErr, closeErr error) error {
 func publishFinalizationFailure(
 	cmd *cobra.Command,
 	output *commandBuffer,
-	runErr, closeErr error,
+	runErr error, closeErr error,
 ) error {
 	combined := errors.Join(runErr, closeErr)
 

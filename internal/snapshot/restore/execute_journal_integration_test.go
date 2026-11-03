@@ -61,7 +61,7 @@ func registerPlanOperation(
 	t *testing.T,
 	ctx context.Context,
 	repo *store.Repository,
-	label, generation, target string,
+	label string, generation string, target string,
 	plan Plan,
 ) string {
 	t.Helper()
@@ -615,7 +615,7 @@ func requirePinReleasedOnlyByAbandonment(
 	t *testing.T,
 	ctx context.Context,
 	repo *store.Repository,
-	generation, operation string,
+	generation string, operation string,
 ) {
 	t.Helper()
 
@@ -644,7 +644,7 @@ const (
 func runCrashWorker(
 	t *testing.T,
 	ctx context.Context,
-	repoDir, generation, operation, socket, stepID string,
+	repoDir string, generation string, operation string, socket string, stepID string,
 ) {
 	t.Helper()
 

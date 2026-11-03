@@ -836,7 +836,7 @@ func TestANarrowListDropsTheSubjectButKeepsTheNames(t *testing.T) {
 	}
 }
 
-func column(line, part string) int {
+func column(line string, part string) int {
 	before, _, _ := strings.Cut(line, part)
 
 	return utf8.RuneCountInString(before)

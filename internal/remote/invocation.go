@@ -196,7 +196,7 @@ func AdmitInvocation(
 func ResolveInvocation(
 	ctx context.Context,
 	dir *privatefs.Dir,
-	id, outcome string,
+	id string, outcome string,
 	output jsontext.Value,
 	now time.Time,
 ) error {
@@ -316,7 +316,7 @@ func admitInvocationLocked(
 
 func resolveInvocationLocked(
 	dir *privatefs.Dir,
-	id, outcome string,
+	id string, outcome string,
 	output jsontext.Value,
 	now time.Time,
 ) error {
@@ -458,7 +458,7 @@ func pruneInvocations(dir *privatefs.Dir, limit int, now time.Time) error {
 func retireOldestResolvedInvocations(
 	dir *privatefs.Dir,
 	resolved []Invocation,
-	totalCount, target int,
+	totalCount int, target int,
 	now time.Time,
 ) error {
 	slices.SortFunc(resolved, func(left, right Invocation) int {

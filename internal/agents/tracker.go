@@ -231,7 +231,7 @@ func (t *Tracker) reconcileSnapshotSessions(
 }
 
 func (t *Tracker) reconcilePaneActivity(
-	paneID, windowID string,
+	paneID string, windowID string,
 	currentActivity string,
 	activePanes map[string]ActivePane,
 ) {

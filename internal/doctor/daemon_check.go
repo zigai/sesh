@@ -118,7 +118,7 @@ func (s *Service) absentDaemon(ctx context.Context, unit string) []Result {
 	}
 }
 
-func (s *Service) installedDaemon(ctx context.Context, unit, enable string) Result {
+func (s *Service) installedDaemon(ctx context.Context, unit string, enable string) Result {
 	state, err := s.opts.UnitActiveState(ctx, unit)
 	if err != nil {
 		return newResult(CheckAutosaveDaemon, StatusWarn, unit+" state could not be read").

@@ -30,7 +30,7 @@ func observePlatform(ctx context.Context, req Request) (*Observation, error) {
 
 func observeLinux(
 	ctx context.Context,
-	procRoot, bootIDPath string,
+	procRoot string, bootIDPath string,
 	req Request,
 ) (*Observation, error) {
 	if err := ctx.Err(); err != nil {
@@ -93,7 +93,7 @@ func observeLinux(
 
 func readExecutable(
 	ctx context.Context,
-	procRoot, bootIDPath string,
+	procRoot string, bootIDPath string,
 	pid int,
 ) ([]byte, bool, error) {
 	exePath := filepath.Join(procRoot, strconv.Itoa(pid), "exe")
@@ -108,7 +108,7 @@ func readExecutable(
 
 func readDirectory(
 	ctx context.Context,
-	procRoot, bootIDPath string,
+	procRoot string, bootIDPath string,
 	pid int,
 ) ([]byte, bool, error) {
 	cwdPath := filepath.Join(procRoot, strconv.Itoa(pid), "cwd")
@@ -218,7 +218,7 @@ func readOpenProcLink(ctx context.Context, fd int) ([]byte, bool, error) {
 
 func classifyProcLink[T ~uint32 | ~uint64](
 	targetBytes []byte,
-	beforeLinks, afterLinks T,
+	beforeLinks T, afterLinks T,
 ) ([]byte, bool, error) {
 	// A live directory gains and loses links with its subdirectories, so only a change between
 	// zero and nonzero links counts as a changed target.
@@ -240,7 +240,13 @@ func classifyProcLink[T ~uint32 | ~uint64](
 	return bytes.Clone(targetBytes), false, nil
 }
 
-func checkLinkError(ctx context.Context, procRoot, bootIDPath string, pid int, err error) error {
+func checkLinkError(
+	ctx context.Context,
+	procRoot string,
+	bootIDPath string,
+	pid int,
+	err error,
+) error {
 	if isProcessGone(err) {
 		_, statErr := readIdentity(ctx, procRoot, bootIDPath, pid)
 		if statErr != nil {

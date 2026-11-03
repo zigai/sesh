@@ -98,7 +98,7 @@ func (m *Model) shownClosedItems(host inboxHost, group string, items []inboxItem
 	)
 }
 
-func newMoreItem(firstHidden inboxItem, group, expandKey string, hidden int) inboxItem {
+func newMoreItem(firstHidden inboxItem, group string, expandKey string, hidden int) inboxItem {
 	more := firstHidden
 	more.agent.PaneID = moreRowPrefix + group
 	more.agent.HarnessSession = strconv.Itoa(hidden) + " more"
@@ -178,7 +178,7 @@ func (m *Model) newClosedItem(host inboxHost, recorded work.Item) inboxItem {
 	}
 }
 
-func compareRecency(left, right inboxItem) int {
+func compareRecency(left inboxItem, right inboxItem) int {
 	if left.work.Pinned() != right.work.Pinned() {
 		if left.work.Pinned() {
 			return -1

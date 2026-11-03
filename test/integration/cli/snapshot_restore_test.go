@@ -77,7 +77,7 @@ func TestApplicationRestoreReportsBestEffortWithSettledReceipt(t *testing.T) {
 	}
 }
 
-func assertCompletedRestoreOperation(t *testing.T, path, id string) {
+func assertCompletedRestoreOperation(t *testing.T, path string, id string) {
 	t.Helper()
 
 	before, err := os.ReadFile(filepath.Join(path, "catalog.json"))
@@ -95,7 +95,7 @@ func assertCompletedRestoreOperation(t *testing.T, path, id string) {
 	assertCompletedRestoreCannotBeAbandoned(t, path, id, before)
 }
 
-func assertCompletedRestoreCannotBeAbandoned(t *testing.T, path, id string, before []byte) {
+func assertCompletedRestoreCannotBeAbandoned(t *testing.T, path string, id string, before []byte) {
 	t.Helper()
 
 	cfg, _ := runtimeConfig(t, "info")
@@ -124,7 +124,13 @@ func assertCompletedRestoreCannotBeAbandoned(t *testing.T, path, id string, befo
 	}
 }
 
-func checkRestoreOperationCommand(t *testing.T, path, id, command, want string) string {
+func checkRestoreOperationCommand(
+	t *testing.T,
+	path string,
+	id string,
+	command string,
+	want string,
+) string {
 	t.Helper()
 	cfg, logPath := runtimeConfig(t, "info")
 

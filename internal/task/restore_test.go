@@ -376,7 +376,7 @@ func resumeLaunch(dir string) model.Launch {
 	}
 }
 
-func userOption(scope, name, value string) []model.Option {
+func userOption(scope string, name string, value string) []model.Option {
 	if value == "" {
 		return nil
 	}

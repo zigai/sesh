@@ -92,7 +92,7 @@ func TestTmuxSupervisorOwnsDisposableForegroundServer(t *testing.T) {
 	checkSupervisorStateRetained(t, state)
 }
 
-func checkSupervisorSocketAndWriteState(t *testing.T, parent, socket string) string {
+func checkSupervisorSocketAndWriteState(t *testing.T, parent string, socket string) string {
 	t.Helper()
 
 	parentInfo, err := os.Stat(parent)

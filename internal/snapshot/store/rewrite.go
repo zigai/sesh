@@ -32,7 +32,7 @@ type RewriteResult struct {
 
 func (r *Repository) RemoveSessions(
 	ctx context.Context,
-	id, source string,
+	id string, source string,
 	sessionIDs []string,
 ) (RewriteResult, error) {
 	if !validID(id) || !validID(source) || len(sessionIDs) > model.MaxEntities {
@@ -146,8 +146,8 @@ func (r *Repository) reconcileRewriteLocked(ctx context.Context, id string) (Rew
 
 func (r *Repository) removeSessionsLocked(
 	ctx context.Context,
-	id, source string,
-	sessionIDs, canonicalSessions []string,
+	id string, source string,
+	sessionIDs []string, canonicalSessions []string,
 ) (RewriteResult, error) {
 	catalog, err := r.catalog()
 	if err != nil {
@@ -234,7 +234,7 @@ func (r *Repository) validateRewritePreconditions(
 func (r *Repository) executeRewrite(
 	ctx context.Context,
 	catalog Catalog,
-	id, source string,
+	id string, source string,
 	removal model.Removal,
 ) (RewriteResult, error) {
 	pending, replacementData, err := prepareRewrite(id, source, removal)
@@ -310,7 +310,7 @@ func (r *Repository) executeRewrite(
 	return r.buildRewriteResult(committed, committed.Rewrites[len(committed.Rewrites)-1]), nil
 }
 
-func prepareRewrite(id, source string, removal model.Removal) (Rewrite, []byte, error) {
+func prepareRewrite(id string, source string, removal model.Removal) (Rewrite, []byte, error) {
 	pending := Rewrite{
 		ID: id, Source: source, Replacement: "", State: rewriteStatePending,
 		Sessions:  append([]string{}, removal.Removed...),
@@ -390,7 +390,7 @@ func completedRewriteCatalog(
 
 func (r *Repository) stageReplacement(
 	ctx context.Context,
-	source, replacementID string,
+	source string, replacementID string,
 	manifest model.Manifest,
 	data []byte,
 	expectedDigest string,
@@ -499,7 +499,7 @@ func (r *Repository) writeReplacementGeneration(
 
 func (r *Repository) copyArtifacts(
 	ctx context.Context,
-	srcDir, dstDir *privatefs.Dir,
+	srcDir *privatefs.Dir, dstDir *privatefs.Dir,
 	descriptors []model.Artifact,
 ) error {
 	for _, descriptor := range descriptors {
@@ -513,7 +513,7 @@ func (r *Repository) copyArtifacts(
 
 func (r *Repository) copyArtifact(
 	ctx context.Context,
-	srcDir, dstDir *privatefs.Dir,
+	srcDir *privatefs.Dir, dstDir *privatefs.Dir,
 	descriptor model.Artifact,
 ) error {
 	if err := ctx.Err(); err != nil {
@@ -650,7 +650,7 @@ func cloneStringSlice(values []string) []string {
 	return slices.Clone(values)
 }
 
-func emptyRewriteResult(id, source, state string) RewriteResult {
+func emptyRewriteResult(id string, source string, state string) RewriteResult {
 	return RewriteResult{
 		ID:          id,
 		Source:      source,

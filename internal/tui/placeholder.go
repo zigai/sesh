@@ -16,7 +16,7 @@ func SleepPlaceholder(
 	cfg *config.Config,
 	harness string,
 	failure string,
-	width, height int,
+	width int, height int,
 ) string {
 	chrome := NewChrome(cfg)
 	glyph := lipgloss.NewStyle().Foreground(lipgloss.Color(cfg.ResolvedAgentStatusColors().Idle)).

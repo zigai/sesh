@@ -160,7 +160,7 @@ func newTaskActionArtifactFixture(
 func runConfiguredTaskAction(
 	t *testing.T,
 	fixture artifactBinaryFixture,
-	server, popup *gotmux.Server,
+	server *gotmux.Server, popup *gotmux.Server,
 	store task.Store,
 	selection string,
 ) {
@@ -491,7 +491,7 @@ func observeArtifactSession(
 func saveThroughArtifact(
 	t *testing.T,
 	fixture artifactBinaryFixture,
-	repository, leaseRoot string,
+	repository string, leaseRoot string,
 	server *gotmux.Server,
 	session gotmux.Session,
 ) string {
@@ -526,7 +526,7 @@ func saveThroughArtifact(
 func restoreThroughArtifact(
 	t *testing.T,
 	fixture artifactBinaryFixture,
-	repository, leaseRoot, generation string,
+	repository string, leaseRoot string, generation string,
 	target *gotmux.Server,
 	want artifactSessionStructure,
 ) {
@@ -570,7 +570,7 @@ func restoreThroughArtifact(
 func rejectCorruptRepositoryWithoutTargetMutation(
 	t *testing.T,
 	fixture artifactBinaryFixture,
-	repository, leaseRoot, generation string,
+	repository string, leaseRoot string, generation string,
 ) {
 	t.Helper()
 

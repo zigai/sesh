@@ -16,7 +16,7 @@ var (
 	errRearmLogindTest = errors.New("rearm logind test")
 )
 
-func testLifecycleSignal(owner, name string, preparing bool) *dbus.Signal {
+func testLifecycleSignal(owner string, name string, preparing bool) *dbus.Signal {
 	return &dbus.Signal{
 		Sender: owner,
 		Path:   dbus.ObjectPath(LogindObjectPath),

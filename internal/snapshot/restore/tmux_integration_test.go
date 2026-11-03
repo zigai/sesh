@@ -256,7 +256,7 @@ func verifyNativeGroupState(
 func assertNativeGroupCommonGroup(
 	t *testing.T,
 	ctx context.Context,
-	leadSess, foll1Sess, foll2Sess gotmux.Session,
+	leadSess gotmux.Session, foll1Sess gotmux.Session, foll2Sess gotmux.Session,
 	wantGroupName string,
 ) {
 	t.Helper()
@@ -298,7 +298,7 @@ func assertNativeGroupCommonGroup(
 func assertNativeGroupSharedWindows(
 	t *testing.T,
 	ctx context.Context,
-	leadSess, foll1Sess, foll2Sess gotmux.Session,
+	leadSess gotmux.Session, foll1Sess gotmux.Session, foll2Sess gotmux.Session,
 ) {
 	t.Helper()
 
@@ -864,7 +864,12 @@ func assertPanesMatchOriginalIDs(
 	}
 }
 
-func assertLeftColumnNestedGeometry(t *testing.T, p0, p1 gotmux.PaneInfo, height int) {
+func assertLeftColumnNestedGeometry(
+	t *testing.T,
+	p0 gotmux.PaneInfo,
+	p1 gotmux.PaneInfo,
+	height int,
+) {
 	t.Helper()
 
 	if p0.Left != 0 || p0.Top != 0 {
@@ -887,8 +892,8 @@ func assertLeftColumnNestedGeometry(t *testing.T, p0, p1 gotmux.PaneInfo, height
 
 func assertRightColumnNestedGeometry(
 	t *testing.T,
-	p2, p3 gotmux.PaneInfo,
-	leftColWidth, width, height int,
+	p2 gotmux.PaneInfo, p3 gotmux.PaneInfo,
+	leftColWidth int, width int, height int,
 ) {
 	t.Helper()
 
@@ -1193,7 +1198,7 @@ func TestUnrelatedFixturesPreservedAcrossTargetOptions(t *testing.T) {
 func verifyUnrelatedSessionsIntact(
 	t *testing.T,
 	ctx context.Context,
-	u1, u2 gotmux.Session,
+	u1 gotmux.Session, u2 gotmux.Session,
 	base int,
 ) {
 	t.Helper()
@@ -1233,7 +1238,7 @@ func executeRestorePlan(
 	server *gotmux.Server,
 	manifest model.Manifest,
 	plan Plan,
-	beforeStep, afterStep restoreObserver,
+	beforeStep restoreObserver, afterStep restoreObserver,
 ) *restoredTarget {
 	t.Helper()
 
@@ -1505,7 +1510,7 @@ func (target *restoredTarget) assertPaneRectangles(
 func assertActiveAndLast(
 	t *testing.T,
 	links []gotmux.WindowLinkInfo,
-	wantActive, wantLast int,
+	wantActive int, wantLast int,
 	sessionLabel string,
 ) {
 	t.Helper()
@@ -1842,7 +1847,7 @@ func readSessionLinks(
 	t *testing.T,
 	ctx context.Context,
 	sess gotmux.Session,
-	name, groupName string,
+	name string, groupName string,
 	state *independentSourceState,
 ) independentSessionState {
 	t.Helper()
@@ -2115,7 +2120,7 @@ func selectSlot(t *testing.T, ctx context.Context, sess gotmux.Session, slot int
 func configureGroupNavigation(
 	t *testing.T,
 	ctx context.Context,
-	leadSess, follSess gotmux.Session,
+	leadSess gotmux.Session, follSess gotmux.Session,
 	nestedLink gotmux.WindowLink,
 ) {
 	t.Helper()
@@ -2259,7 +2264,7 @@ func commitObservationToRepo(
 func runRoundtripWorkerSubprocess(
 	t *testing.T,
 	ctx context.Context,
-	repoDir, genID, targetSocket string,
+	repoDir string, genID string, targetSocket string,
 	sessionNames []string,
 ) {
 	t.Helper()
@@ -2719,7 +2724,7 @@ func assertTargetSessionAndGroupParity(
 
 func assertDisjointSessionIDs(
 	t *testing.T,
-	leadSess, follSess, repeatSess gotmux.Session,
+	leadSess gotmux.Session, follSess gotmux.Session, repeatSess gotmux.Session,
 	expected *independentSourceState,
 ) {
 	t.Helper()
@@ -2752,7 +2757,7 @@ func assertDisjointSessionIDs(
 func assertTargetWindowSharingAndSlots(
 	t *testing.T,
 	ctx context.Context,
-	leadSess, follSess, repeatSess gotmux.Session,
+	leadSess gotmux.Session, follSess gotmux.Session, repeatSess gotmux.Session,
 	expected *independentSourceState,
 ) ([]gotmux.WindowLinkInfo, []gotmux.WindowLinkInfo) {
 	t.Helper()
@@ -2799,7 +2804,12 @@ func assertTargetWindowSharingAndSlots(
 
 func assertSharedWindowIDs(
 	t *testing.T,
-	leadSlot2, leadSlot5, follSlot2, follSlot5, repeatSlot3, repeatSlot8 gotmux.WindowID,
+	leadSlot2 gotmux.WindowID,
+	leadSlot5 gotmux.WindowID,
+	follSlot2 gotmux.WindowID,
+	follSlot5 gotmux.WindowID,
+	repeatSlot3 gotmux.WindowID,
+	repeatSlot8 gotmux.WindowID,
 	expected *independentSourceState,
 ) {
 	t.Helper()

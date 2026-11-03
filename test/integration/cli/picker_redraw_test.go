@@ -225,7 +225,7 @@ func assertPickerScreenRows(
 	t *testing.T,
 	ctx context.Context,
 	alias string,
-	present, absent []string,
+	present []string, absent []string,
 ) {
 	t.Helper()
 
@@ -250,7 +250,7 @@ func assertPickerScreenRows(
 func termtracePickerOutputBetween(
 	t *testing.T,
 	ctx context.Context,
-	alias, from, to string,
+	alias string, from string, to string,
 ) []byte {
 	t.Helper()
 

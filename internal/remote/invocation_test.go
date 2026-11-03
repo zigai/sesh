@@ -345,7 +345,12 @@ func seedUnknownOutcomeInvocation(t *testing.T, dir *privatefs.Dir, now time.Tim
 	return unknownInv
 }
 
-func assertUnprunedRecords(t *testing.T, dir *privatefs.Dir, unresolvedID, unknownID string) {
+func assertUnprunedRecords(
+	t *testing.T,
+	dir *privatefs.Dir,
+	unresolvedID string,
+	unknownID string,
+) {
 	t.Helper()
 
 	if _, err := LookupInvocation(dir, unresolvedID); err != nil {

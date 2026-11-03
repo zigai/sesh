@@ -164,7 +164,7 @@ func (i CollectionIntent) validate() error {
 	return nil
 }
 
-func validCollectionIntentState(state, reason string) bool {
+func validCollectionIntentState(state string, reason string) bool {
 	switch state {
 	case collectionStateDeleting, collectionStateRemoved:
 		return reason == ""
@@ -700,7 +700,7 @@ func (run *collectionRun) finish(intent CollectionIntent) error {
 	return run.repository.boundary(collectionPhaseOutcomeSynced)
 }
 
-func (run *collectionRun) preserve(id, reason string) {
+func (run *collectionRun) preserve(id string, reason string) {
 	run.result.Preserved = append(
 		run.result.Preserved,
 		CollectionSkip{Generation: id, Reason: reason},

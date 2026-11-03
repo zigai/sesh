@@ -310,7 +310,7 @@ func (m *Model) menuDividerLine(title string, inner int) string {
 	)
 }
 
-func (m *Model) menuEntryLine(entry menuEntry, inner, labelWidth int, selected bool) string {
+func (m *Model) menuEntryLine(entry menuEntry, inner int, labelWidth int, selected bool) string {
 	label := SanitizeTerminalText(entry.label)
 	labelPart := strings.Repeat(
 		" ",

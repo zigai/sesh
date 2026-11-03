@@ -159,7 +159,7 @@ func TestPickerInitialReadsStopWaitingWhenCanceled(t *testing.T) {
 func newInitialReadsServices(
 	t *testing.T,
 	server *gotmux.Server,
-	sessionID, pane string,
+	sessionID string, pane string,
 ) *services {
 	t.Helper()
 
@@ -223,7 +223,11 @@ func controlClientCount(t *testing.T, server *gotmux.Server) int {
 	return count
 }
 
-func assertPickerCatalogsEqual(t *testing.T, got, want session.CatalogResult) {
+func assertPickerCatalogsEqual(
+	t *testing.T,
+	got session.CatalogResult,
+	want session.CatalogResult,
+) {
 	t.Helper()
 
 	if got.LiveErr != nil || got.SavedErr != nil || want.LiveErr != nil || want.SavedErr != nil {

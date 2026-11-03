@@ -77,7 +77,7 @@ func inboxTestLive(record task.Record, pane string) task.Live {
 }
 
 func inboxTestAgent(
-	name, pane string,
+	name string, pane string,
 	status session.AgentStatus,
 	since time.Time,
 ) session.AgentSession {
@@ -956,7 +956,7 @@ func TestInboxDoesNotReadTheReportsOfRemoteAgents(t *testing.T) {
 	}
 }
 
-func closedTestItem(id, conversation string, turnAt time.Time) work.Item {
+func closedTestItem(id string, conversation string, turnAt time.Time) work.Item {
 	item := work.EmptyItem()
 	item.ID = id
 	item.Harness = inboxTestHarness

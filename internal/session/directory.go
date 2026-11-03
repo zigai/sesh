@@ -38,7 +38,7 @@ func DefaultCreateSessionDirectory(cwd string, sessionName string, suggestion st
 	return path
 }
 
-func DirectoryPathSuggestions(ctx context.Context, input, cwd string) ([]string, error) {
+func DirectoryPathSuggestions(ctx context.Context, input string, cwd string) ([]string, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, oops.In("session").
 			Code("operation_canceled").
@@ -155,7 +155,7 @@ func entryIsDirectory(parent string, entry os.DirEntry) bool {
 	return err == nil && info.IsDir()
 }
 
-func resolveParentAndPrefix(input, cwd string) (string, string, string, error) {
+func resolveParentAndPrefix(input string, cwd string) (string, string, string, error) {
 	separator := string(os.PathSeparator)
 
 	switch {
@@ -250,7 +250,7 @@ func readPrefixedEntries(
 func collectMatchingDirectories(
 	ctx context.Context,
 	entries []os.DirEntry,
-	parent, dirPart, namePrefix string,
+	parent string, dirPart string, namePrefix string,
 ) ([]string, error) {
 	separator := string(os.PathSeparator)
 	matches := make([]string, 0, min(len(entries), maxDirectorySuggestions))

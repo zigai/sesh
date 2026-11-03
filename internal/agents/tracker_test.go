@@ -38,7 +38,7 @@ func newFakeStyles() *fakeStyles {
 	}
 }
 
-func (f *fakeStyles) setActive(paneID, windowID string, paneActive, windowActive bool) {
+func (f *fakeStyles) setActive(paneID string, windowID string, paneActive bool, windowActive bool) {
 	f.active[paneID] = agents.ActivePane{
 		PaneID:       paneID,
 		WindowID:     windowID,
@@ -94,7 +94,7 @@ func (f *fakeStyles) ClearOwned(_ context.Context) error {
 }
 
 func trackerSession(
-	paneID, windowID string,
+	paneID string, windowID string,
 	activity aht.Activity,
 	presence aht.Presence,
 ) aht.Session {

@@ -148,7 +148,7 @@ func (c Context) WorkingDir() string {
 	return dir
 }
 
-func mergeEnv(base, overrides []string) []string {
+func mergeEnv(base []string, overrides []string) []string {
 	keys := make(map[string]struct{}, len(overrides))
 	for _, entry := range overrides {
 		key, _, _ := strings.Cut(entry, "=")

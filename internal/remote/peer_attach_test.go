@@ -127,7 +127,7 @@ func assertStoredCapabilityRecord(
 	}
 }
 
-func assertCapabilityFileMode(t *testing.T, bridgePath, attachmentID string) {
+func assertCapabilityFileMode(t *testing.T, bridgePath string, attachmentID string) {
 	t.Helper()
 
 	name, err := CapabilityName(attachmentID)

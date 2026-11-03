@@ -42,7 +42,13 @@ func TestProcessDeathAtPublicationBoundaries(t *testing.T) {
 	}
 }
 
-func repositoryWorker(t *testing.T, mode, path, attempt, phase string) *exec.Cmd {
+func repositoryWorker(
+	t *testing.T,
+	mode string,
+	path string,
+	attempt string,
+	phase string,
+) *exec.Cmd {
 	t.Helper()
 
 	program, err := os.Executable()
@@ -65,7 +71,7 @@ func repositoryWorker(t *testing.T, mode, path, attempt, phase string) *exec.Cmd
 	return cmd
 }
 
-func killPublicationWorker(t *testing.T, path, attempt, phase string) {
+func killPublicationWorker(t *testing.T, path string, attempt string, phase string) {
 	t.Helper()
 	killWorkerAtBoundary(t, repositoryWorker(t, "commit", path, attempt, phase))
 }

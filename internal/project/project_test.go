@@ -144,7 +144,7 @@ func TestNewCatalogRejectsRelativePaths(t *testing.T) {
 	}
 }
 
-func newCatalog(t *testing.T, roots, extra []string) project.Catalog {
+func newCatalog(t *testing.T, roots []string, extra []string) project.Catalog {
 	t.Helper()
 
 	catalog, err := project.NewCatalog(

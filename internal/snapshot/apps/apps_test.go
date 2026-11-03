@@ -1103,7 +1103,7 @@ func testAdapterEmpty(t *testing.T, executable string) {
 
 func testAdapterArgv0(
 	t *testing.T,
-	executable, name string,
+	executable string, name string,
 	allowBare bool,
 	bareReason apps.Reason,
 ) {
@@ -1127,7 +1127,7 @@ func testAdapterArgv0(
 	}
 }
 
-func testAdapterOversized(t *testing.T, executable, name string) {
+func testAdapterOversized(t *testing.T, executable string, name string) {
 	t.Helper()
 
 	manyArgs := make([]string, 0, 40)

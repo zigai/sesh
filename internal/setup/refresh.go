@@ -262,7 +262,7 @@ func emptyDefinitionFile() definitionFile {
 	return definitionFile{Exists: false, Owned: false, Content: ""}
 }
 
-func writeDefinition(path, content string) error {
+func writeDefinition(path string, content string) error {
 	directory := filepath.Dir(path)
 
 	if err := os.MkdirAll(directory, definitionDirectoryMode); err != nil {

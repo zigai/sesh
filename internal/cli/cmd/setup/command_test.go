@@ -151,6 +151,6 @@ func TestSetupTmuxApplyTargetsAmbientServerWithoutSocket(t *testing.T) {
 	}
 }
 
-func rootBinding(key, command string) string {
+func rootBinding(key string, command string) string {
 	return `bind-key -T root ` + key + ` if-shell -F "#{@sesh_remote}" "send-keys ` + key + `" "run-shell -b \"` + command
 }

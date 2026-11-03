@@ -375,7 +375,11 @@ func (manager ServiceManager) activeState(ctx context.Context, name string) (str
 	}
 }
 
-func (manager ServiceManager) property(ctx context.Context, name, property string) (string, error) {
+func (manager ServiceManager) property(
+	ctx context.Context,
+	name string,
+	property string,
+) (string, error) {
 	inspect := manager.Inspect
 	if inspect == nil {
 		inspect = inspectServiceCommand

@@ -403,7 +403,11 @@ func (s *Service) closeWindow(ctx context.Context, id string) error {
 	return nil
 }
 
-func (GitHub) FindPR(ctx context.Context, dir, branch string) (PullRequest, string, bool, error) {
+func (GitHub) FindPR(
+	ctx context.Context,
+	dir string,
+	branch string,
+) (PullRequest, string, bool, error) {
 	ghPath, err := exec.LookPath("gh")
 	if err != nil {
 		return noPR(), "", false, errors.Join(ErrGitHubFailed, err)

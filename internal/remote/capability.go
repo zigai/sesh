@@ -134,7 +134,7 @@ func BridgeSocketName(attachmentID string) (string, error) {
 	return capabilityPrefix + attachmentID + socketSuffix, nil
 }
 
-func BridgeSocketPath(bridgeDir, attachmentID string) (string, error) {
+func BridgeSocketPath(bridgeDir string, attachmentID string) (string, error) {
 	if !validSocketPath(bridgeDir) {
 		return "", ErrUnsafePath
 	}

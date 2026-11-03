@@ -168,7 +168,7 @@ func buildRemoteReloadBinary(t *testing.T, root string) string {
 
 func startRemoteReloadProcess(
 	t *testing.T,
-	binary, configPath, root, cacheHome, stateHome string,
+	binary string, configPath string, root string, cacheHome string, stateHome string,
 ) *remoteReloadProcess {
 	t.Helper()
 

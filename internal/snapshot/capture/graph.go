@@ -301,7 +301,7 @@ func paneObservation(info gotmux.PaneInfo) model.Pane {
 	}
 }
 
-func ref(prefix, id string) string { return prefix + id[1:] }
+func ref(prefix string, id string) string { return prefix + id[1:] }
 
 func closure(
 	snapshot gotmux.Snapshot,

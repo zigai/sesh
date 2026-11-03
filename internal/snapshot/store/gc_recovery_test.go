@@ -109,7 +109,7 @@ func TestCollectionResumesAfterInterruptionAtEachBoundary(t *testing.T) {
 func assertCollectionRecovery(
 	t *testing.T,
 	r *Repository,
-	path, retired, current string,
+	path string, retired string, current string,
 	finished bool,
 ) {
 	t.Helper()
@@ -210,7 +210,13 @@ func TestCollectionQuarantinesChangedGenerationContent(t *testing.T) {
 	}
 }
 
-func assertCollectionQuarantine(t *testing.T, r *Repository, path, retired, current string) {
+func assertCollectionQuarantine(
+	t *testing.T,
+	r *Repository,
+	path string,
+	retired string,
+	current string,
+) {
 	t.Helper()
 
 	tree := repositoryTree(t, path)
@@ -254,7 +260,7 @@ func assertCollectionQuarantine(t *testing.T, r *Repository, path, retired, curr
 	assertRepositoryUnavailable(t, r, retired)
 }
 
-func assertOnlyIntentRecordsChanged(t *testing.T, before, after map[string]bool) {
+func assertOnlyIntentRecordsChanged(t *testing.T, before map[string]bool, after map[string]bool) {
 	t.Helper()
 
 	for entry := range after {
@@ -565,7 +571,7 @@ func assertStoredIntentInventory(t *testing.T, stored CollectionIntent) {
 	}
 }
 
-func storedCollectionIntent(t *testing.T, path, generation string) ([]string, []byte) {
+func storedCollectionIntent(t *testing.T, path string, generation string) ([]string, []byte) {
 	t.Helper()
 
 	records, err := privatefs.Open(filepath.Join(path, collectionDirectory), false)

@@ -92,7 +92,7 @@ type InboxOutput struct{}
 
 func defineInboxAction(
 	id ID,
-	title, summary, help string,
+	title string, summary string, help string,
 	params ...Param,
 ) *Definition[InboxInput, InboxOutput] {
 	return define(Descriptor{

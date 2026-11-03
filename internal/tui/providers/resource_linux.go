@@ -62,7 +62,12 @@ func ReadResourceSample(
 	return sample, nil
 }
 
-func readProcessSample(procRoot, name string, pid int, pageBytes uint64) (ProcessSample, bool) {
+func readProcessSample(
+	procRoot string,
+	name string,
+	pid int,
+	pageBytes uint64,
+) (ProcessSample, bool) {
 	stat, err := os.ReadFile(filepath.Join(procRoot, name, "stat"))
 	if err != nil {
 		return ProcessSample{PID: 0, ParentPID: 0, StartTime: 0, CPUTicks: 0, RSSBytes: 0}, false

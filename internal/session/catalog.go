@@ -141,7 +141,7 @@ func ListLive(ctx context.Context, server *gotmux.Server, currentPane string) ([
 func ListSaved(
 	ctx context.Context,
 	repo SavedSnapshots,
-	source, generationID string,
+	source string, generationID string,
 ) ([]Session, error) {
 	if repo == nil {
 		return nil, nil
@@ -220,7 +220,7 @@ func ListSaved(
 func listLive(
 	ctx context.Context,
 	server *gotmux.Server,
-	currentPane, currentSessionID string,
+	currentPane string, currentSessionID string,
 ) ([]Session, error) {
 	if server == nil {
 		return nil, nil
@@ -296,7 +296,7 @@ func listLive(
 func catalogInvokingPane(
 	ctx context.Context,
 	server *gotmux.Server,
-	currentPane, currentSessionID string,
+	currentPane string, currentSessionID string,
 ) (string, string, error) {
 	pane := strings.TrimSpace(currentPane)
 	currentSession := currentSessionID
@@ -322,7 +322,7 @@ func buildLiveRows(
 	infos []gotmux.SessionInfo,
 	socket string,
 	identity gotmux.ServerIdentity,
-	currentSession, invokingPane string,
+	currentSession string, invokingPane string,
 ) []Session {
 	result := make([]Session, 0, len(infos))
 	for _, info := range infos {
@@ -340,7 +340,7 @@ func buildLiveRows(
 func fetchLiveSessions(
 	ctx context.Context,
 	server *gotmux.Server,
-	currentPane, currentSessionID string,
+	currentPane string, currentSessionID string,
 ) ([]Session, error) {
 	if server == nil {
 		return nil, nil
@@ -420,7 +420,7 @@ func absentCommandCauses(err error) bool {
 func fetchSavedSessions(
 	ctx context.Context,
 	repo SavedSnapshots,
-	source, genID string,
+	source string, genID string,
 ) ([]Session, error) {
 	if repo == nil {
 		return nil, nil
@@ -448,7 +448,7 @@ func fetchSavedSessions(
 func countConstituents(
 	srv *gotmux.Server,
 	repo SavedSnapshots,
-	liveErr, savedErr error,
+	liveErr error, savedErr error,
 ) (int, int) {
 	requested, failed := 0, 0
 	if srv != nil {
@@ -470,7 +470,7 @@ func countConstituents(
 	return requested, failed
 }
 
-func selectCatalogError(liveErr, savedErr error) error {
+func selectCatalogError(liveErr error, savedErr error) error {
 	switch {
 	case liveErr != nil && savedErr != nil:
 		return errors.Join(liveErr, savedErr)
@@ -481,7 +481,7 @@ func selectCatalogError(liveErr, savedErr error) error {
 	}
 }
 
-func combineCatalogSessions(live, saved []Session) ([]Session, bool) {
+func combineCatalogSessions(live []Session, saved []Session) ([]Session, bool) {
 	totalLen := len(live) + len(saved)
 	exceeded := totalLen > maxCatalogInventory
 	count := min(totalLen, maxCatalogInventory)
@@ -543,7 +543,7 @@ func resolveCurrentSession(
 func paneLinkedToSession(
 	ctx context.Context,
 	server *gotmux.Server,
-	paneID, sessionID string,
+	paneID string, sessionID string,
 ) bool {
 	records, err := server.QueryRecords(ctx, gotmux.RecordQuery{
 		Kind:   gotmux.ObjectKindPane,

@@ -289,7 +289,7 @@ func (m *Model) markSeen(id action.ID, item inboxItem, key string) func() (tea.M
 	)
 }
 
-func (m *Model) snoozeItem(key, until string) func() (tea.Model, tea.Cmd) {
+func (m *Model) snoozeItem(key string, until string) func() (tea.Model, tea.Cmd) {
 	if until == "" {
 		entries := make([]menuEntry, 0, len(m.config.Inbox.Snooze)+1)
 		for _, choice := range m.config.Inbox.Snooze {

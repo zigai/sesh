@@ -851,7 +851,7 @@ func TestInitializationPublishedMissingDirectoryRejected(t *testing.T) {
 	}
 }
 
-func makeInvalidInitMarker(t *testing.T, path, kind string) string {
+func makeInvalidInitMarker(t *testing.T, path string, kind string) string {
 	t.Helper()
 
 	marker := filepath.Join(path, initializationMarker)
@@ -870,7 +870,7 @@ func makeInvalidInitMarker(t *testing.T, path, kind string) string {
 	return marker
 }
 
-func makeUnsafeCatalogTemporary(t *testing.T, kind, target, temp string) {
+func makeUnsafeCatalogTemporary(t *testing.T, kind string, target string, temp string) {
 	t.Helper()
 
 	var err error

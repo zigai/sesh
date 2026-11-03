@@ -390,7 +390,7 @@ func TestLateOlderSaveDoesNotUndoCurrentRetirement(t *testing.T) {
 	}
 }
 
-func registerRewriteOutcome(t *testing.T, r *Repository, source, id, outcome string) {
+func registerRewriteOutcome(t *testing.T, r *Repository, source string, id string, outcome string) {
 	t.Helper()
 
 	if outcome == "absent" {

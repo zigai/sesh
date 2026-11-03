@@ -1118,7 +1118,7 @@ func assertCreatedSessionResult(
 	t *testing.T,
 	model *Model,
 	edited string,
-	createdName, createdDir *string,
+	createdName *string, createdDir *string,
 ) {
 	t.Helper()
 

@@ -286,7 +286,7 @@ func measureColumn(spec ColumnSpec, measured [][]CellWidths, index int) (int, in
 	return natural, compact
 }
 
-func shrinkFlexible(specs []ColumnSpec, columns []Column, width, total int) int {
+func shrinkFlexible(specs []ColumnSpec, columns []Column, width int, total int) int {
 	for _, i := range priorityOrder(specs, true) {
 		if !specs[i].Flex || total <= width {
 			continue
@@ -305,7 +305,7 @@ func shrinkFlexible(specs []ColumnSpec, columns []Column, width, total int) int 
 	return total
 }
 
-func useCompact(specs []ColumnSpec, columns []Column, compact []int, width, total int) int {
+func useCompact(specs []ColumnSpec, columns []Column, compact []int, width int, total int) int {
 	for _, i := range priorityOrder(specs, true) {
 		if compact[i] >= columns[i].Width {
 			continue
@@ -324,7 +324,7 @@ func useCompact(specs []ColumnSpec, columns []Column, compact []int, width, tota
 	return total
 }
 
-func hideOverflow(specs []ColumnSpec, columns []Column, width, total int) {
+func hideOverflow(specs []ColumnSpec, columns []Column, width int, total int) {
 	for _, i := range priorityOrder(specs, false) {
 		total -= columns[i].Width
 		columns[i].Width = 0
@@ -540,7 +540,7 @@ func keepSuffix(tokens []textToken, remaining int) string {
 	return result.String()
 }
 
-func writeWithBaseStyle(out *strings.Builder, value, base string) {
+func writeWithBaseStyle(out *strings.Builder, value string, base string) {
 	for value != "" {
 		index := strings.Index(value, "\x1b[")
 		if index < 0 {

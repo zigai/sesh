@@ -102,7 +102,7 @@ func disableSourceWindowRename(t *testing.T, ctx context.Context, session gotmux
 func redirectPanesToMissingDirectory(
 	t *testing.T,
 	manifest *model.Manifest,
-	sessionID, directory string,
+	sessionID string, directory string,
 ) {
 	t.Helper()
 
@@ -1008,7 +1008,7 @@ func runFailingRestoreOnMissingDir(
 	ctx context.Context,
 	repo *store.Repository,
 	server *gotmux.Server,
-	leaseRoot, generation string,
+	leaseRoot string, generation string,
 ) engine.RestoreResult {
 	t.Helper()
 
@@ -1115,7 +1115,7 @@ func assertFailureRetainedPinAndExplicitAbandonment(
 	ctx context.Context,
 	repo *store.Repository,
 	server *gotmux.Server,
-	leaseRoot, generation, operationID string,
+	leaseRoot string, generation string, operationID string,
 ) {
 	t.Helper()
 
@@ -1263,7 +1263,7 @@ func runFailingRestoreForLogging(
 	}
 }
 
-func assertFailureLogRecords(t *testing.T, data []byte, repoDir, raw string) {
+func assertFailureLogRecords(t *testing.T, data []byte, repoDir string, raw string) {
 	t.Helper()
 
 	failures := 0
@@ -1413,7 +1413,12 @@ func TestEngineRestoreVerificationFailureSingleOwningErrorRecord(t *testing.T) {
 	assertSingleOwningFailureRecord(t, records, buffer.String(), repoDir)
 }
 
-func assertSingleOwningFailureRecord(t *testing.T, records []map[string]any, raw, repoDir string) {
+func assertSingleOwningFailureRecord(
+	t *testing.T,
+	records []map[string]any,
+	raw string,
+	repoDir string,
+) {
 	t.Helper()
 
 	warns, errorsCount := 0, 0

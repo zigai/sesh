@@ -395,7 +395,7 @@ func revalidatePickerLiveTarget(
 func findPickerLiveTarget(
 	ctx context.Context,
 	server *gotmux.Server,
-	id, name string,
+	id string, name string,
 ) (session.Session, error) {
 	rows, err := session.ListLive(ctx, server, "")
 	if err != nil {
@@ -424,7 +424,7 @@ func (s *services) TmuxActivatePane(
 func (s *services) activatePane(
 	ctx context.Context,
 	target session.Session,
-	paneID, clientName string,
+	paneID string, clientName string,
 ) error {
 	if err := revalidatePickerLiveTarget(ctx, s.server, target); err != nil {
 		return err
@@ -706,7 +706,7 @@ func agentStatus(item agents.AgentSession) session.AgentStatus {
 	}
 }
 
-func laterTime(left, right time.Time) time.Time {
+func laterTime(left time.Time, right time.Time) time.Time {
 	if right.After(left) {
 		return right
 	}
@@ -714,7 +714,7 @@ func laterTime(left, right time.Time) time.Time {
 	return left
 }
 
-func earlierNonZero(left, right time.Time) time.Time {
+func earlierNonZero(left time.Time, right time.Time) time.Time {
 	if left.IsZero() || (!right.IsZero() && right.Before(left)) {
 		return right
 	}
@@ -797,7 +797,7 @@ func (s *services) performDeferredSwitch(
 func (s *services) performSwitch(
 	ctx context.Context,
 	target session.Session,
-	paneID, clientName, originSessionID string,
+	paneID string, clientName string, originSessionID string,
 ) error {
 	target = clonePickerTarget(target)
 	if err := revalidatePickerLiveTarget(ctx, s.server, target); err != nil {
@@ -810,7 +810,7 @@ func (s *services) performSwitch(
 func (s *services) performSwitchValidated(
 	ctx context.Context,
 	target session.Session,
-	paneID, clientName, originSessionID string,
+	paneID string, clientName string, originSessionID string,
 	views []tui.AgentView,
 ) error {
 	var outcome session.EnterOutcome

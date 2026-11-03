@@ -60,7 +60,7 @@ func createPickerSwitchHandoff() (string, func(), error) {
 func writePickerSwitchHandoff(
 	path string,
 	target *session.Session,
-	paneID, replayKey, taskProject string,
+	paneID string, replayKey string, taskProject string,
 	views []tui.AgentView,
 ) error {
 	var handoff switchHandoff
@@ -169,7 +169,7 @@ func readPickerSwitchHandoff(path string) (switchHandoff, bool, error) {
 func completePickerSwitchHandoff(
 	ctx context.Context,
 	services *services,
-	path, clientName, originSessionID string,
+	path string, clientName string, originSessionID string,
 ) error {
 	handoff, selected, err := readPickerSwitchHandoff(path)
 	if err != nil {
@@ -221,7 +221,7 @@ func newPickerSwitchTarget(handoff switchHandoff) session.Session {
 	return target
 }
 
-func replayPickerKey(ctx context.Context, path, socketPath, clientName string) error {
+func replayPickerKey(ctx context.Context, path string, socketPath string, clientName string) error {
 	handoff, _, err := readPickerSwitchHandoff(path)
 	if err != nil || handoff.ReplayKey == "" {
 		return err

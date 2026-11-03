@@ -17,7 +17,7 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/model"
 )
 
-func generationDiskBytes(t *testing.T, repoPath, genID string) int64 {
+func generationDiskBytes(t *testing.T, repoPath string, genID string) int64 {
 	t.Helper()
 
 	manifestPath := filepath.Join(repoPath, "generations", genID, "manifest.json")

@@ -122,7 +122,7 @@ func deletedPathLaunch(
 	return launch
 }
 
-func sameProcessObservation(left, right *process.Observation) bool {
+func sameProcessObservation(left *process.Observation, right *process.Observation) bool {
 	return left.PID == right.PID && left.Birth == right.Birth &&
 		bytes.Equal(
 			left.Executable,

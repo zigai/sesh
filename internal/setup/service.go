@@ -635,7 +635,7 @@ func launchdDefinitions(root string, inputs ServiceInputs) ([]ServiceDefinition,
 }
 
 func renderLaunchdAgent(
-	label, description, program string,
+	label string, description string, program string,
 	args []string,
 	intervalSeconds int,
 	runAtLoad bool,

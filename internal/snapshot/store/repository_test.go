@@ -434,7 +434,7 @@ func TestPendingAttemptOfGoneSaveIsSettledAndLiveOneIsKept(t *testing.T) {
 	}
 }
 
-func verifyPublication(t *testing.T, path, prior, attempt string, published bool) {
+func verifyPublication(t *testing.T, path string, prior string, attempt string, published bool) {
 	t.Helper()
 
 	reopened := openRepository(t, path)
@@ -461,7 +461,7 @@ func verifyPublication(t *testing.T, path, prior, attempt string, published bool
 	}
 }
 
-func corruptFixture(t *testing.T, path, generation, name, kind string) {
+func corruptFixture(t *testing.T, path string, generation string, name string, kind string) {
 	t.Helper()
 
 	switch kind {

@@ -81,7 +81,7 @@ func (s slotSimulation) place(t *testing.T, step PlaceInitialWindowStep) {
 	}
 }
 
-func (s slotSimulation) link(t *testing.T, session, window string, index int) {
+func (s slotSimulation) link(t *testing.T, session string, window string, index int) {
 	t.Helper()
 
 	slots := s[session]

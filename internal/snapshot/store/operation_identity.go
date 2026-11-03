@@ -17,7 +17,7 @@ const maxTargetBytes = 1 << 20
 
 func (r *Repository) RegisterOperation(
 	ctx context.Context,
-	id, source string,
+	id string, source string,
 	target model.Bytes,
 	actions []Action,
 ) (Operation, error) {
@@ -27,7 +27,7 @@ func (r *Repository) RegisterOperation(
 
 func (r *Repository) registerOperation(
 	ctx context.Context,
-	id, source string,
+	id string, source string,
 	target model.Bytes,
 	actions []Action,
 ) (Operation, error) {
@@ -127,7 +127,7 @@ func (r *Repository) registerOperationLocked(
 
 func (r *Repository) confirmExistingOperationLocked(
 	ctx context.Context,
-	existing, candidate Operation,
+	existing Operation, candidate Operation,
 ) (Operation, error) {
 	if !sameIntent(existing, candidate) {
 		return Operation{}, ErrConflict
@@ -148,7 +148,7 @@ func (r *Repository) confirmExistingOperationLocked(
 	return cloneOperation(existing), nil
 }
 
-func sameIntent(existing, candidate Operation) bool {
+func sameIntent(existing Operation, candidate Operation) bool {
 	if existing.Source != candidate.Source {
 		return false
 	}
@@ -175,7 +175,7 @@ func sameIntent(existing, candidate Operation) bool {
 }
 
 func validateRequestBoundsAndContent(
-	id, source string,
+	id string, source string,
 	target model.Bytes,
 	actions []Action,
 ) error {

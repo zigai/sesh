@@ -236,7 +236,7 @@ func verifyExactSurvivorCatalog(
 	t *testing.T,
 	r *Repository,
 	source Generation,
-	intermediateID, finalID string,
+	intermediateID string, finalID string,
 ) {
 	t.Helper()
 
@@ -284,7 +284,7 @@ func TestRemoveSessionsAllRetirement(t *testing.T) {
 	verifyRetirementCatalog(t, r, source.ID, mutationID)
 }
 
-func verifyRetirementCatalog(t *testing.T, r *Repository, sourceID, mutationID string) {
+func verifyRetirementCatalog(t *testing.T, r *Repository, sourceID string, mutationID string) {
 	t.Helper()
 
 	catalog, err := r.Inspect(t.Context())
@@ -444,7 +444,12 @@ func TestRemoveSessionsCurrentVsNonCurrent(t *testing.T) {
 	testRetireCurrent(t, r, result1.Replacement.ID, g2)
 }
 
-func testRewriteNonCurrent(t *testing.T, r *Repository, g1, g2 Generation) RewriteResult {
+func testRewriteNonCurrent(
+	t *testing.T,
+	r *Repository,
+	g1 Generation,
+	g2 Generation,
+) RewriteResult {
 	t.Helper()
 
 	id1 := newID()
@@ -893,7 +898,7 @@ func runFaultBoundaryScenario(
 
 func verifyFaultBoundaryRecovery(
 	t *testing.T,
-	path, mutationID string,
+	path string, mutationID string,
 	source Generation,
 	boundary string,
 ) {

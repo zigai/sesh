@@ -32,7 +32,7 @@ func healthyHealth() SourceHealth {
 	}
 }
 
-func helloFrame(peerID, streamInstance string, sequence uint64) Frame {
+func helloFrame(peerID string, streamInstance string, sequence uint64) Frame {
 	return Frame{
 		Version:        ProtocolVersion,
 		Type:           FrameHello,
@@ -49,7 +49,7 @@ func helloFrame(peerID, streamInstance string, sequence uint64) Frame {
 }
 
 func snapshotFrame(
-	peerID, streamInstance string,
+	peerID string, streamInstance string,
 	sequence uint64,
 	sessions []session.Session,
 ) Frame {

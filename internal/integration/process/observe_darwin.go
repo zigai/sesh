@@ -328,7 +328,7 @@ func darwinPathMatches(path []byte, device int32, inode uint64) bool {
 	return stat.Dev == device && stat.Ino == inode
 }
 
-func procPIDInfo(pid, flavor int, buffer []byte) (int, error) {
+func procPIDInfo(pid int, flavor int, buffer []byte) (int, error) {
 	result, _, errno := unix.Syscall6(
 		unix.SYS_PROC_INFO, //nolint:staticcheck // libSystem's proc_pidinfo needs cgo; the proc_info trap is stable.
 		procInfoCallPIDInfo,

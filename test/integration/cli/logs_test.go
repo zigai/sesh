@@ -131,7 +131,7 @@ func TestLogsBinaryIntegration(t *testing.T) {
 	})
 }
 
-func testBinaryLogsBrokenPipe(t *testing.T, binaryPath, configPath string) {
+func testBinaryLogsBrokenPipe(t *testing.T, binaryPath string, configPath string) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "pipe.log")
 
@@ -192,7 +192,7 @@ func testBinaryLogsBrokenPipe(t *testing.T, binaryPath, configPath string) {
 	}
 }
 
-func testBinaryWatchInterrupt(t *testing.T, binaryPath, configPath string) {
+func testBinaryWatchInterrupt(t *testing.T, binaryPath string, configPath string) {
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
@@ -243,7 +243,7 @@ func testBinaryWatchInterrupt(t *testing.T, binaryPath, configPath string) {
 	}
 }
 
-func testBinaryHumanOutput(t *testing.T, binaryPath, configPath string) {
+func testBinaryHumanOutput(t *testing.T, binaryPath string, configPath string) {
 	t.Helper()
 
 	cmd := exec.CommandContext(t.Context(), binaryPath, "--config", configPath, testLogsCmd)
@@ -259,7 +259,7 @@ func testBinaryHumanOutput(t *testing.T, binaryPath, configPath string) {
 	}
 }
 
-func testBinaryJSONLStream(t *testing.T, binaryPath, configPath string) {
+func testBinaryJSONLStream(t *testing.T, binaryPath string, configPath string) {
 	t.Helper()
 
 	cmd := exec.CommandContext(
@@ -297,7 +297,7 @@ func testBinaryJSONLStream(t *testing.T, binaryPath, configPath string) {
 	}
 }
 
-func testBinaryPathText(t *testing.T, binaryPath, configPath, logPath string) {
+func testBinaryPathText(t *testing.T, binaryPath string, configPath string, logPath string) {
 	t.Helper()
 
 	cmd := exec.CommandContext(
@@ -319,7 +319,7 @@ func testBinaryPathText(t *testing.T, binaryPath, configPath, logPath string) {
 	}
 }
 
-func testBinaryPathJSON(t *testing.T, binaryPath, configPath, logPath string) {
+func testBinaryPathJSON(t *testing.T, binaryPath string, configPath string, logPath string) {
 	t.Helper()
 
 	cmd := exec.CommandContext(
@@ -362,7 +362,7 @@ func testBinaryPathJSON(t *testing.T, binaryPath, configPath, logPath string) {
 	assertAllKeysCamelCase(t, res, "result")
 }
 
-func testBinaryClearJSON(t *testing.T, binaryPath, configPath, logPath string) {
+func testBinaryClearJSON(t *testing.T, binaryPath string, configPath string, logPath string) {
 	t.Helper()
 
 	cmd := exec.CommandContext(

@@ -350,7 +350,7 @@ func cloneFinishConfig(finish *FinishConfig) *FinishConfig {
 
 func validateMenuList(
 	name string,
-	entries, builtIn []string,
+	entries []string, builtIn []string,
 	takesItems bool,
 	items []string,
 ) error {
@@ -373,7 +373,7 @@ func validateMenuList(
 	return nil
 }
 
-func mergeMenuItem(base, override MenuItemConfig) MenuItemConfig {
+func mergeMenuItem(base MenuItemConfig, override MenuItemConfig) MenuItemConfig {
 	merged := base.Clone()
 
 	if override.Label != "" {
@@ -416,7 +416,7 @@ func projectPathKey(key string) bool {
 	return strings.HasPrefix(key, "/") || key == "~" || strings.HasPrefix(key, "~/")
 }
 
-func sameProjectPath(key, root string) bool {
+func sameProjectPath(key string, root string) bool {
 	path := key
 	if rest, home := strings.CutPrefix(key, "~"); home {
 		dir, err := os.UserHomeDir()

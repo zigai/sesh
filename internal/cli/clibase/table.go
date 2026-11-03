@@ -265,7 +265,7 @@ func formatStackedResponsiveRecord(
 	out *strings.Builder,
 	columns []TableColumn,
 	row prettytable.Row,
-	labelWidth, valueWidth int,
+	labelWidth int, valueWidth int,
 ) {
 	for colIndex, col := range columns {
 		cell := ""

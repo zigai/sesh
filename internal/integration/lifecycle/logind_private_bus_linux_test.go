@@ -28,7 +28,12 @@ type fakeLogindManager struct {
 	afterCall func(int)
 }
 
-func (f *fakeLogindManager) Inhibit(what, who, why, mode string) (dbus.UnixFD, *dbus.Error) {
+func (f *fakeLogindManager) Inhibit(
+	what string,
+	who string,
+	why string,
+	mode string,
+) (dbus.UnixFD, *dbus.Error) {
 	if (what != LogindShutdownInhibitorWhat && what != LogindSleepInhibitorWhat) ||
 		who != LogindInhibitorWho || why != LogindInhibitorWhy || mode != LogindInhibitorMode {
 		return -1, dbus.MakeFailedError(ErrLogindSignal)
@@ -139,7 +144,7 @@ type fakeLogindProperties struct {
 	preparingSleep    bool
 }
 
-func (f *fakeLogindProperties) Get(iface, property string) (dbus.Variant, *dbus.Error) {
+func (f *fakeLogindProperties) Get(iface string, property string) (dbus.Variant, *dbus.Error) {
 	if iface != LogindManagerIface {
 		return dbus.Variant{}, dbus.MakeFailedError(ErrLogindSignal)
 	}
@@ -159,7 +164,7 @@ func (f *fakeLogindProperties) Get(iface, property string) (dbus.Variant, *dbus.
 	}
 }
 
-func (f *fakeLogindProperties) setPreparing(shutdown, sleep bool) {
+func (f *fakeLogindProperties) setPreparing(shutdown bool, sleep bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -876,7 +881,7 @@ func assertReaderClosed(t *testing.T, reader *os.File) {
 	}
 }
 
-func assertInhibitorRequests(t *testing.T, got, want []InhibitorSpec) {
+func assertInhibitorRequests(t *testing.T, got []InhibitorSpec, want []InhibitorSpec) {
 	t.Helper()
 
 	if !slices.Equal(got, want) {

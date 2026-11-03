@@ -42,8 +42,8 @@ func (m Manifest) validateLinks() error {
 }
 
 func validateLinkCoverage(
-	sessions, windows, linked map[string]bool,
-	active, last map[string]int,
+	sessions map[string]bool, windows map[string]bool, linked map[string]bool,
+	active map[string]int, last map[string]int,
 ) error {
 	for session := range sessions {
 		if active[session] != 1 || last[session] > 1 {
@@ -93,7 +93,7 @@ func (m Manifest) validateGroups() error {
 	return nil
 }
 
-func sameMembership(links []Link, first, second string) bool {
+func sameMembership(links []Link, first string, second string) bool {
 	slots := make(map[int]string)
 
 	for _, link := range links {

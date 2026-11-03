@@ -378,7 +378,7 @@ func (adapter *testServiceAdapter) restoredNames(
 	return names
 }
 
-func testLiveRef(id, name string) action.SessionRef {
+func testLiveRef(id string, name string) action.SessionRef {
 	return action.SessionRef{
 		Kind: session.KindLive, ID: id, Name: name, Socket: "", ServerPID: 0,
 		ServerStartedAt: time.Time{}, CreatedAt: time.Time{}, Generation: "",

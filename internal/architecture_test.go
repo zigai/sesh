@@ -252,7 +252,7 @@ func checkArchitectureFile(source fs.FS, filename string) ([]string, error) {
 	return violations, nil
 }
 
-func importViolations(source, imported string) []string {
+func importViolations(source string, imported string) []string {
 	var reasons []string
 
 	if slices.ContainsFunc(
@@ -343,7 +343,7 @@ func directoryTree(pkg string) string {
 	return first + "/" + second
 }
 
-func withinPackage(candidate, root string) bool {
+func withinPackage(candidate string, root string) bool {
 	return candidate == root || strings.HasPrefix(candidate, root+"/")
 }
 

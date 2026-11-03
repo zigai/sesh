@@ -72,7 +72,7 @@ func TestUnrestoredSessionInspectionWarnsWhenSelectedServerCannotBeProbed(t *tes
 	assertRecoveryInspectionRecord(t, logs.Bytes(), "find_unrestored", "probe")
 }
 
-func assertRecoveryInspectionRecord(t *testing.T, data []byte, operation, phase string) {
+func assertRecoveryInspectionRecord(t *testing.T, data []byte, operation string, phase string) {
 	t.Helper()
 
 	var record map[string]any

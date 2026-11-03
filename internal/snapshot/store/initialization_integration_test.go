@@ -133,7 +133,7 @@ func TestProcessDeathConcurrentOpen(t *testing.T) {
 	}
 }
 
-func initWorker(t *testing.T, mode, path, phase string) *exec.Cmd {
+func initWorker(t *testing.T, mode string, path string, phase string) *exec.Cmd {
 	t.Helper()
 
 	program, err := os.Executable()
@@ -155,7 +155,7 @@ func initWorker(t *testing.T, mode, path, phase string) *exec.Cmd {
 	return cmd
 }
 
-func killInitWorker(t *testing.T, path, phase string) {
+func killInitWorker(t *testing.T, path string, phase string) {
 	t.Helper()
 
 	cmd := initWorker(t, "init", path, phase)
@@ -241,7 +241,7 @@ func TestInitializationWorker(t *testing.T) {
 	}
 }
 
-func runWorkerInit(t *testing.T, path, phase string) {
+func runWorkerInit(t *testing.T, path string, phase string) {
 	t.Helper()
 
 	ready := os.NewFile(3, "init-boundary")

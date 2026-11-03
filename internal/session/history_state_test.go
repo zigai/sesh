@@ -810,7 +810,7 @@ func TestHistoryRejectsInvalidNestedIdentitiesAndRemoteBounds(t *testing.T) {
 	}
 }
 
-func makeUnsafeHistoryEntry(t *testing.T, kind, path, target string) {
+func makeUnsafeHistoryEntry(t *testing.T, kind string, path string, target string) {
 	t.Helper()
 
 	var err error

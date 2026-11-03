@@ -45,7 +45,7 @@ func AcquireLease(ctx context.Context, leaseRoot string, socket string) (*Lease,
 
 func acquireLease(
 	ctx context.Context,
-	leaseRoot, socket string,
+	leaseRoot string, socket string,
 	afterLock func() error,
 ) (*Lease, error) {
 	if err := ctx.Err(); err != nil {

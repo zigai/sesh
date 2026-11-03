@@ -691,7 +691,7 @@ func (c *AgentStatusConfig) colorForRole(role string) string {
 	}
 }
 
-func resolveStatusStyle(configured, customColor, fallback string) string {
+func resolveStatusStyle(configured string, customColor string, fallback string) string {
 	if customColor != "" && (configured == "" || configured == fallback) {
 		return SynthesizeTmuxStyle(customColor)
 	}
@@ -827,7 +827,7 @@ func (c *Config) ResolvedAgentStatus() AgentStatusConfig {
 	return mergeAgentStatus(c.AgentStatus, *c.AgentSessions.Status)
 }
 
-func mergeAgentStatus(base, override AgentStatusConfig) AgentStatusConfig {
+func mergeAgentStatus(base AgentStatusConfig, override AgentStatusConfig) AgentStatusConfig {
 	merged := base.Clone()
 
 	if override.explicitBools == nil {
@@ -841,7 +841,11 @@ func mergeAgentStatus(base, override AgentStatusConfig) AgentStatusConfig {
 	return merged
 }
 
-func applyImplicitBools(merged *AgentStatusConfig, base, override AgentStatusConfig) {
+func applyImplicitBools(
+	merged *AgentStatusConfig,
+	base AgentStatusConfig,
+	override AgentStatusConfig,
+) {
 	if override.Enabled != base.Enabled {
 		merged.Enabled = override.Enabled
 	}

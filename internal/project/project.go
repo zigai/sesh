@@ -254,6 +254,6 @@ func expandAll(paths []string) ([]string, error) {
 	return expanded, nil
 }
 
-func within(path, dir string) bool {
+func within(path string, dir string) bool {
 	return path == dir || strings.HasPrefix(path, dir+string(filepath.Separator))
 }

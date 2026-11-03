@@ -386,7 +386,7 @@ func (m *Model) writePlannedAgentRow(
 	styles sessionRowStyles,
 	row session.Session,
 	agent session.AgentSession,
-	last, selected bool,
+	last bool, selected bool,
 	values *sessionFormatValues,
 ) {
 	leftParts, rightParts := m.agentLayoutCells(table, row, agent, last, values)
@@ -439,7 +439,7 @@ func (m *Model) agentCellRole(
 	return ""
 }
 
-func agentGitCountRole(field, value string) string {
+func agentGitCountRole(field string, value string) string {
 	switch field {
 	case display.FieldAgentGitAdded:
 		if value != "+0" {

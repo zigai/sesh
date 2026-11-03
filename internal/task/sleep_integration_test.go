@@ -680,7 +680,7 @@ func processAlive(pid int) bool {
 	return err == nil
 }
 
-func copyExecutable(t *testing.T, source, target string) {
+func copyExecutable(t *testing.T, source string, target string) {
 	t.Helper()
 
 	data, err := os.ReadFile(source)

@@ -144,7 +144,12 @@ func TestJSONSnapshotWorkflowSuccessContracts(t *testing.T) {
 	assertJSONContractFields(t, collected, map[string]any{"removed": nil})
 }
 
-func assertSnapshotReadContracts(t *testing.T, repository, generation, attempt string) {
+func assertSnapshotReadContracts(
+	t *testing.T,
+	repository string,
+	generation string,
+	attempt string,
+) {
 	t.Helper()
 	listed := runJSONContract(
 		t,

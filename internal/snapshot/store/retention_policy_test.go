@@ -18,7 +18,7 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/model"
 )
 
-func commitTimedFixture(t *testing.T, r *Repository, started, finished int64) Generation {
+func commitTimedFixture(t *testing.T, r *Repository, started int64, finished int64) Generation {
 	t.Helper()
 
 	attempt, err := r.Begin(t.Context())
@@ -1024,7 +1024,7 @@ func TestRetentionRetainsUnderlyingErrorCauses(t *testing.T) {
 	})
 }
 
-func retireManifestSchema(t *testing.T, r *Repository, path, id string) {
+func retireManifestSchema(t *testing.T, r *Repository, path string, id string) {
 	t.Helper()
 
 	manifestPath := filepath.Clean(filepath.Join(path, "generations", id, "manifest.json"))

@@ -34,7 +34,7 @@ func newFakeProc(t *testing.T, unixRows string) fakeProc {
 	return fakeProc{root: root}
 }
 
-func (p fakeProc) process(t *testing.T, pid, executable string, descriptors ...string) {
+func (p fakeProc) process(t *testing.T, pid string, executable string, descriptors ...string) {
 	t.Helper()
 
 	fd := filepath.Join(p.root, pid, "fd")
@@ -53,7 +53,7 @@ func (p fakeProc) process(t *testing.T, pid, executable string, descriptors ...s
 	}
 }
 
-func listeningRow(inode, path string) string {
+func listeningRow(inode string, path string) string {
 	return "0000000000000000: 00000002 00000000 00010000 0001 01 " + inode + " " + path + "\n"
 }
 

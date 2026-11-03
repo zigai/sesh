@@ -387,7 +387,7 @@ func (m *Model) renderLoadingState(width int) string {
 		Render(line)
 }
 
-func (m *Model) renderList(width, height int) string {
+func (m *Model) renderList(width int, height int) string {
 	layout := m.calcSessionLayout(width)
 
 	if height <= 0 {
@@ -620,7 +620,7 @@ func (m *Model) sessionRowStyles(layout sessionTableLayout) sessionRowStyles {
 	return rowStyles(m.config, layout.prefixWidth, layout.width)
 }
 
-func rowStyles(cfg *config.Config, prefixWidth, width int) sessionRowStyles {
+func rowStyles(cfg *config.Config, prefixWidth int, width int) sessionRowStyles {
 	blankPrefix := strings.Repeat(" ", prefixWidth)
 
 	blankLine := strings.Repeat(" ", width)
@@ -1272,7 +1272,7 @@ func extractStylePrefix(style lipgloss.Style) string {
 	return prefix
 }
 
-func writeStyledWithBackground(out *strings.Builder, text, styleSeq string) {
+func writeStyledWithBackground(out *strings.Builder, text string, styleSeq string) {
 	if styleSeq == "" {
 		out.WriteString(text)
 

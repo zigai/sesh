@@ -151,7 +151,7 @@ func ShellWord(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", `'\''`) + "'"
 }
 
-func bindingProgram(key, table, command string) []string {
+func bindingProgram(key string, table string, command string) []string {
 	if table != rootTable {
 		return []string{"run-shell", "-b", command}
 	}
@@ -159,7 +159,7 @@ func bindingProgram(key, table, command string) []string {
 	return forwardInRemoteAttachment(key, command)
 }
 
-func forwardInRemoteAttachment(key, command string) []string {
+func forwardInRemoteAttachment(key string, command string) []string {
 	return []string{
 		"if-shell",
 		"-F",

@@ -378,7 +378,7 @@ func entityCounts(m Manifest) [6]int {
 	}
 }
 
-func withinCounts(larger, smaller [6]int) bool {
+func withinCounts(larger [6]int, smaller [6]int) bool {
 	for index := range larger {
 		if larger[index] > smaller[index] {
 			return false
@@ -388,7 +388,7 @@ func withinCounts(larger, smaller [6]int) bool {
 	return true
 }
 
-func subsetOf(subset, superset []string) bool {
+func subsetOf(subset []string, superset []string) bool {
 	values := make(map[string]bool, len(superset))
 	for _, value := range superset {
 		values[value] = true
@@ -444,7 +444,7 @@ func sortedDistinct(values []string) []string {
 	return sorted
 }
 
-func artifactDiff(before, after Manifest) []string {
+func artifactDiff(before Manifest, after Manifest) []string {
 	retained := make(map[string]bool, len(after.Artifacts))
 	for _, artifact := range after.Artifacts {
 		retained[artifact.ID] = true
@@ -678,7 +678,7 @@ func drawEnvironment(rt *rapid.T, prefix string) []Variable {
 	return environment
 }
 
-func drawLinks(rt *rapid.T, sessionCount, windowCount int) [][]Link {
+func drawLinks(rt *rapid.T, sessionCount int, windowCount int) [][]Link {
 	shapeCount := rapid.IntRange(1, 3).Draw(rt, "shapeCount")
 	shapes := make([][]Link, 0, shapeCount)
 
@@ -869,6 +869,6 @@ func windowID(index int) string {
 	return fmt.Sprintf("w%d", index)
 }
 
-func paneID(window, pane int) string {
+func paneID(window int, pane int) string {
 	return fmt.Sprintf("p%d-%d", window, pane)
 }

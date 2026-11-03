@@ -46,7 +46,7 @@ func (w *Workflow) DeleteSession(ctx context.Context, name string, force bool) (
 
 func (w *Workflow) DeleteSavedSessionTarget(
 	ctx context.Context,
-	generationID, sessionID string,
+	generationID string, sessionID string,
 ) (string, error) {
 	if w.server == nil {
 		return "", oops.In("session").Code("endpoint_required").Wrap(errServerRequired)
@@ -229,7 +229,7 @@ func (w *Workflow) DeleteSessionTargetEverywhere(
 
 func (w *Workflow) deleteSavedSessionTarget(
 	ctx context.Context,
-	generationID, sessionID string,
+	generationID string, sessionID string,
 ) (string, error) {
 	endpointScope, err := model.EndpointScope(w.server.Endpoint().SocketPath)
 	if err != nil {
@@ -406,7 +406,7 @@ func (w *Workflow) prepareLiveDelete(
 
 func (w *Workflow) prepareRequiredLiveTarget(
 	ctx context.Context,
-	name, expectedSessionID string,
+	name string, expectedSessionID string,
 ) (deleteLiveTarget, error) {
 	sess, err := w.server.FindSession(ctx, name)
 	if err != nil {
@@ -433,7 +433,7 @@ func (w *Workflow) prepareRequiredLiveTarget(
 
 func (w *Workflow) planSavedDelete(
 	ctx context.Context,
-	name, endpointScope string,
+	name string, endpointScope string,
 	out *DeleteOutcome,
 ) ([]deleteStep, error) {
 	if w.repo == nil {
@@ -645,14 +645,18 @@ func (w *Workflow) revalidateLiveTarget(
 }
 
 func sameLiveDeleteTarget(
-	initialServerPID, currentServerPID int,
-	initialSessionID, currentSessionID gotmux.SessionID,
+	initialServerPID int, currentServerPID int,
+	initialSessionID gotmux.SessionID, currentSessionID gotmux.SessionID,
 ) bool {
 	return initialServerPID > 0 && initialServerPID == currentServerPID &&
 		initialSessionID != "" && initialSessionID == currentSessionID
 }
 
-func (w *Workflow) revalidateSavedDeletions(ctx context.Context, name, endpointScope string) error {
+func (w *Workflow) revalidateSavedDeletions(
+	ctx context.Context,
+	name string,
+	endpointScope string,
+) error {
 	if w.repo == nil {
 		return nil
 	}
@@ -692,7 +696,7 @@ func (w *Workflow) revalidateSavedDeletions(ctx context.Context, name, endpointS
 	return nil
 }
 
-func savedSessionScopeConflict(name, operation string) error {
+func savedSessionScopeConflict(name string, operation string) error {
 	if name == "" {
 		return oops.In("session").
 			Code("saved_session_scope_conflict").
@@ -709,7 +713,7 @@ func savedSessionScopeConflict(name, operation string) error {
 func revalidateLiveNotAttached(
 	ctx context.Context,
 	live gotmux.Session,
-	force, livePresent bool,
+	force bool, livePresent bool,
 ) error {
 	if !livePresent || force {
 		return nil

@@ -439,7 +439,7 @@ func TestPeerAttachValidationAgainstDisposableServer(t *testing.T) {
 func commitSavedDeleteFixture(
 	t *testing.T,
 	ctx context.Context,
-	repository, socket, name string,
+	repository string, socket string, name string,
 ) (string, string) {
 	t.Helper()
 

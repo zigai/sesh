@@ -262,7 +262,7 @@ func unsafeEntryFixtures() []struct {
 	}
 }
 
-func replaceGenerationWithSymlink(t *testing.T, path, id string) {
+func replaceGenerationWithSymlink(t *testing.T, path string, id string) {
 	t.Helper()
 
 	target := filepath.Join(path, "foreign-data")
@@ -279,7 +279,7 @@ func replaceGenerationWithSymlink(t *testing.T, path, id string) {
 	}
 }
 
-func replaceGenerationWithFifo(t *testing.T, path, id string) {
+func replaceGenerationWithFifo(t *testing.T, path string, id string) {
 	t.Helper()
 
 	entry := filepath.Join(path, generationsDirectory, id)
@@ -292,7 +292,7 @@ func replaceGenerationWithFifo(t *testing.T, path, id string) {
 	}
 }
 
-func chmodGenerationDirectory(t *testing.T, path, id string) {
+func chmodGenerationDirectory(t *testing.T, path string, id string) {
 	t.Helper()
 
 	if err := os.Chmod(filepath.Join(path, generationsDirectory, id), 0o755); err != nil {
@@ -300,7 +300,7 @@ func chmodGenerationDirectory(t *testing.T, path, id string) {
 	}
 }
 
-func chmodArtifactDirectory(t *testing.T, path, id string) {
+func chmodArtifactDirectory(t *testing.T, path string, id string) {
 	t.Helper()
 
 	if err := os.Chmod(
@@ -311,7 +311,7 @@ func chmodArtifactDirectory(t *testing.T, path, id string) {
 	}
 }
 
-func hardlinkArtifact(t *testing.T, path, id string) {
+func hardlinkArtifact(t *testing.T, path string, id string) {
 	t.Helper()
 
 	source := filepath.Join(path, generationsDirectory, id, collectionArtifactsName, "a0.bin.gz")
@@ -338,7 +338,13 @@ func TestCollectionPreservesUnsafeRetiredGenerationEntries(t *testing.T) {
 	}
 }
 
-func assertGenerationEntryPreserved(t *testing.T, r *Repository, path, id, reason string) {
+func assertGenerationEntryPreserved(
+	t *testing.T,
+	r *Repository,
+	path string,
+	id string,
+	reason string,
+) {
 	t.Helper()
 
 	result := collectGenerations(t, r)
@@ -400,7 +406,7 @@ func unknownContentFixtures() []struct {
 	}
 }
 
-func plantGenerationEntry(t *testing.T, path, id string) {
+func plantGenerationEntry(t *testing.T, path string, id string) {
 	t.Helper()
 
 	name := filepath.Join(path, generationsDirectory, id, "extra.txt")
@@ -409,7 +415,7 @@ func plantGenerationEntry(t *testing.T, path, id string) {
 	}
 }
 
-func plantArtifactEntry(t *testing.T, path, id string) {
+func plantArtifactEntry(t *testing.T, path string, id string) {
 	t.Helper()
 
 	name := filepath.Join(path, generationsDirectory, id, collectionArtifactsName, "stray")
@@ -418,7 +424,7 @@ func plantArtifactEntry(t *testing.T, path, id string) {
 	}
 }
 
-func replaceArtifactWithFifo(t *testing.T, path, id string) {
+func replaceArtifactWithFifo(t *testing.T, path string, id string) {
 	t.Helper()
 
 	name := filepath.Join(path, generationsDirectory, id, collectionArtifactsName, "a0.bin.gz")
@@ -431,7 +437,7 @@ func replaceArtifactWithFifo(t *testing.T, path, id string) {
 	}
 }
 
-func removeGenerationManifest(t *testing.T, path, id string) {
+func removeGenerationManifest(t *testing.T, path string, id string) {
 	t.Helper()
 
 	if err := os.Remove(
@@ -441,7 +447,7 @@ func removeGenerationManifest(t *testing.T, path, id string) {
 	}
 }
 
-func truncateGenerationManifest(t *testing.T, path, id string) {
+func truncateGenerationManifest(t *testing.T, path string, id string) {
 	t.Helper()
 
 	if err := os.WriteFile(
@@ -453,7 +459,7 @@ func truncateGenerationManifest(t *testing.T, path, id string) {
 	}
 }
 
-func replaceArtifactBytes(t *testing.T, path, id string) {
+func replaceArtifactBytes(t *testing.T, path string, id string) {
 	t.Helper()
 
 	name := filepath.Join(path, generationsDirectory, id, collectionArtifactsName, "a0.bin.gz")

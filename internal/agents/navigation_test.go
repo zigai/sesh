@@ -258,7 +258,12 @@ func nativeHistory(t *testing.T, entries ...agents.HistoryEntry) string {
 	return string(data)
 }
 
-func historyEntry(paneID string, panePID int, windowID, sessionID string) agents.HistoryEntry {
+func historyEntry(
+	paneID string,
+	panePID int,
+	windowID string,
+	sessionID string,
+) agents.HistoryEntry {
 	return agents.HistoryEntry{
 		PaneID:       paneID,
 		PanePID:      panePID,

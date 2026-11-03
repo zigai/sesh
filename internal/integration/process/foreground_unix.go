@@ -90,7 +90,7 @@ func checkPaneBirth(ctx context.Context, source foregroundSource, req Foreground
 	return nil
 }
 
-func sameForegroundSelection(first, second foregroundSelection) bool {
+func sameForegroundSelection(first foregroundSelection, second foregroundSelection) bool {
 	return first == second
 }
 
@@ -162,7 +162,7 @@ func uniqueForegroundCandidate(
 	return candidates[0], 1
 }
 
-func isForegroundCandidate(process, pane foregroundProcess) bool {
+func isForegroundCandidate(process foregroundProcess, pane foregroundProcess) bool {
 	return process.pid != pane.pid &&
 		process.group == pane.foregroundGroup &&
 		process.foregroundGroup == pane.foregroundGroup &&

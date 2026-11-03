@@ -171,7 +171,7 @@ func location(loc Location) string {
 	return fmt.Sprintf("%s (via %s)", loc.Path, loc.Source)
 }
 
-func withSource(status, source string) string {
+func withSource(status string, source string) string {
 	if source == "" {
 		return status
 	}
@@ -187,7 +187,7 @@ func statusWord(status doctor.Status, color bool) string {
 	return statusColors[status] + string(status) + "\x1b[0m"
 }
 
-func wrap(text string, width, indent int) []string {
+func wrap(text string, width int, indent int) []string {
 	if width <= 0 {
 		return []string{text}
 	}

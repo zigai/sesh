@@ -22,7 +22,7 @@ func serverBinary(socket string) string {
 	return resolveServerBinary(os.Getenv("TMUX"), socket, os.DirFS("/proc"))
 }
 
-func resolveServerBinary(tmuxEnvironment, socket string, proc fs.FS) string {
+func resolveServerBinary(tmuxEnvironment string, socket string, proc fs.FS) string {
 	pid, ok := tmuxServerPID(tmuxEnvironment, socket)
 	if !ok {
 		return ""
@@ -43,7 +43,7 @@ func resolveServerBinary(tmuxEnvironment, socket string, proc fs.FS) string {
 	return executable
 }
 
-func tmuxServerPID(tmuxEnvironment, socket string) (string, bool) {
+func tmuxServerPID(tmuxEnvironment string, socket string) (string, bool) {
 	// $TMUX is "socket,pid,session".
 	fields := strings.Split(tmuxEnvironment, ",")
 	if len(fields) != 3 || filepath.Clean(fields[0]) != socket {

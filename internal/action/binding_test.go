@@ -15,7 +15,7 @@ func configWithBinds(binds ...config.KeyBindConfig) *config.Config {
 	return cfg
 }
 
-func bind(in, key, id string, params map[string]any) config.KeyBindConfig {
+func bind(in string, key string, id string, params map[string]any) config.KeyBindConfig {
 	return config.KeyBindConfig{Key: key, Action: id, In: in, Table: "", Params: params}
 }
 

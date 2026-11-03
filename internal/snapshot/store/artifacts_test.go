@@ -43,7 +43,7 @@ func TestGenerationArtifactsAreBoundToSource(t *testing.T) {
 	}
 }
 
-func corruptArtifact(t *testing.T, file, kind string) {
+func corruptArtifact(t *testing.T, file string, kind string) {
 	t.Helper()
 
 	data, err := os.ReadFile(file)

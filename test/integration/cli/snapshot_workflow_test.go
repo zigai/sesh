@@ -56,7 +56,13 @@ func TestSnapshotSaveListHistoryVerifyWorkflow(t *testing.T) {
 	_ = savedAttempt
 }
 
-func testSaveWorkflow(t *testing.T, repoDir, socket, leaseDir, sessionID string) (string, string) {
+func testSaveWorkflow(
+	t *testing.T,
+	repoDir string,
+	socket string,
+	leaseDir string,
+	sessionID string,
+) (string, string) {
 	t.Helper()
 
 	execution := executeJSON(
@@ -100,7 +106,13 @@ func testSaveWorkflow(t *testing.T, repoDir, socket, leaseDir, sessionID string)
 	return res.Generation, res.Attempt
 }
 
-func testActionSaveParity(t *testing.T, repoDir, socket, leaseDir, sessionID string) {
+func testActionSaveParity(
+	t *testing.T,
+	repoDir string,
+	socket string,
+	leaseDir string,
+	sessionID string,
+) {
 	t.Helper()
 
 	execution := executeJSON(
@@ -135,7 +147,13 @@ func testActionSaveParity(t *testing.T, repoDir, socket, leaseDir, sessionID str
 	}
 }
 
-func testSavePlainText(t *testing.T, repoDir, socket, leaseDir, sessionID string) {
+func testSavePlainText(
+	t *testing.T,
+	repoDir string,
+	socket string,
+	leaseDir string,
+	sessionID string,
+) {
 	t.Helper()
 
 	stdout, stderr, err := executeCommand(
@@ -163,7 +181,7 @@ func testSavePlainText(t *testing.T, repoDir, socket, leaseDir, sessionID string
 	}
 }
 
-func testListWorkflow(t *testing.T, repoDir, savedGen, sessionName string) {
+func testListWorkflow(t *testing.T, repoDir string, savedGen string, sessionName string) {
 	t.Helper()
 
 	implicitExec := executeJSON(t, snapshotCmd, "list", testRepositoryFlag, repoDir, testJSONFlag)
@@ -265,7 +283,7 @@ func testHistoryWorkflow(t *testing.T, repoDir string) {
 	}
 }
 
-func testVerifyWorkflow(t *testing.T, repoDir, savedGen string) {
+func testVerifyWorkflow(t *testing.T, repoDir string, savedGen string) {
 	t.Helper()
 
 	implicitExec := executeJSON(t, snapshotCmd, "verify", testRepositoryFlag, repoDir, testJSONFlag)
@@ -381,7 +399,7 @@ func TestSnapshotVerifyReportsCorruptedArtifacts(t *testing.T) {
 	}
 }
 
-func corruptFirstArtifact(t *testing.T, repoDir, genID string) {
+func corruptFirstArtifact(t *testing.T, repoDir string, genID string) {
 	t.Helper()
 
 	artifactsDir := filepath.Join(repoDir, "generations", genID, "artifacts")

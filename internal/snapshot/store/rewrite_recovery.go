@@ -312,7 +312,7 @@ func prepareReplacementCatalog(
 
 func (r *Repository) reconcileCandidateStorage(
 	ctx context.Context,
-	generations, staging *privatefs.Dir,
+	generations *privatefs.Dir, staging *privatefs.Dir,
 	existing Rewrite,
 	removal model.Removal,
 	expectedData []byte,
@@ -384,7 +384,7 @@ func (r *Repository) openGenerationsAndStaging() (*privatefs.Dir, *privatefs.Dir
 }
 
 func openCandidateDirs(
-	generations, staging *privatefs.Dir,
+	generations *privatefs.Dir, staging *privatefs.Dir,
 	replacementID string,
 ) (*privatefs.Dir, bool, *privatefs.Dir, bool, error) {
 	genDir, genErr := generations.Child(replacementID, false)
@@ -438,7 +438,7 @@ func (r *Repository) validateRenamedGeneration(
 
 func (r *Repository) publishStagedReplacement(
 	ctx context.Context,
-	staging, generations, stageDir *privatefs.Dir,
+	staging *privatefs.Dir, generations *privatefs.Dir, stageDir *privatefs.Dir,
 	existing Rewrite,
 	removal model.Removal,
 	expectedData []byte,
@@ -475,7 +475,7 @@ func (r *Repository) publishStagedReplacement(
 
 func (r *Repository) confirmRewriteGeneration(
 	ctx context.Context,
-	generations, staging *privatefs.Dir,
+	generations *privatefs.Dir, staging *privatefs.Dir,
 ) error {
 	if err := r.boundary("rewrite_resume_generation_sync"); err != nil {
 		return errors.Join(ErrRecoveryRequired, ErrUncertain, err, ctx.Err())

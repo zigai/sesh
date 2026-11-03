@@ -7,7 +7,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
-func option(scope, name, value string, inherited bool) Option {
+func option(scope string, name string, value string, inherited bool) Option {
 	return Option{
 		Scope:     scope,
 		Name:      Bytes(name),

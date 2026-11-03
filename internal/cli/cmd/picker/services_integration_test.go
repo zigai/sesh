@@ -117,7 +117,7 @@ func assertPickerAgentPanes(
 	}
 }
 
-func paneAgent(server *gotmux.Server, id, pane string) aht.Session {
+func paneAgent(server *gotmux.Server, id string, pane string) aht.Session {
 	now := time.Now().UTC()
 	identity := registry.ProcessIdentity{PID: 42, StartIdentity: "fixture:" + id}
 

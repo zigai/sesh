@@ -673,7 +673,7 @@ func loadRemoteCatalog() (remote.Catalog, *privatefs.Dir, error) {
 
 func resolveRemoteTarget(
 	catalog remote.Catalog,
-	connectionID, selector string,
+	connectionID string, selector string,
 ) (remote.ConnectionState, session.Session, error) {
 	state, ok := catalog.Connections[connectionID]
 	if !ok || !state.Connected {

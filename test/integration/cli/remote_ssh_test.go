@@ -264,7 +264,12 @@ func makeRemoteFixtureDirs(t *testing.T, sshDir string, fixture remoteSSHFixture
 	}
 }
 
-func generateRemoteSSHKeys(t *testing.T, keygen, sshDir, root string) (string, string) {
+func generateRemoteSSHKeys(
+	t *testing.T,
+	keygen string,
+	sshDir string,
+	root string,
+) (string, string) {
 	t.Helper()
 
 	clientKey, hostKey := filepath.Join(sshDir, "id_ed25519"), filepath.Join(root, "host_ed25519")
@@ -312,7 +317,7 @@ func reserveLoopbackPort(t *testing.T) int {
 
 func writeRemoteSSHConfigs(
 	t *testing.T,
-	username, sshDir, root, clientKey, hostKey string,
+	username string, sshDir string, root string, clientKey string, hostKey string,
 	port int,
 ) (string, string) {
 	t.Helper()
@@ -376,7 +381,13 @@ func writeRemoteSSHConfigs(
 	return clientConfig, sshdConfig
 }
 
-func writeRemoteSSHWrapper(t *testing.T, path, argumentLog, ssh, clientConfig string) {
+func writeRemoteSSHWrapper(
+	t *testing.T,
+	path string,
+	argumentLog string,
+	ssh string,
+	clientConfig string,
+) {
 	t.Helper()
 
 	body := fmt.Sprintf(
@@ -390,7 +401,13 @@ func writeRemoteSSHWrapper(t *testing.T, path, argumentLog, ssh, clientConfig st
 	}
 }
 
-func startRemoteSSHD(t *testing.T, sshd, configPath string, port int, diagnosticsPath string) {
+func startRemoteSSHD(
+	t *testing.T,
+	sshd string,
+	configPath string,
+	port int,
+	diagnosticsPath string,
+) {
 	t.Helper()
 
 	diagnostics, err := os.OpenFile(diagnosticsPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)

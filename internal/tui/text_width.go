@@ -101,7 +101,7 @@ func formatAgentAgeAt(t time.Time, now time.Time) string {
 	return fmt.Sprintf("%dh %dm", hours, minutes)
 }
 
-func formatCompactAgeAt(at, now time.Time) string {
+func formatCompactAgeAt(at time.Time, now time.Time) string {
 	if at.IsZero() {
 		return ""
 	}

@@ -395,7 +395,7 @@ func todayLogTime(clock string) (string, string) {
 	return date + "T" + clock + "Z", date
 }
 
-func boundedLogRecord(timestamp, message string) string {
+func boundedLogRecord(timestamp string, message string) string {
 	if timestamp == "" {
 		return `{"level":"info","component":"probe","message":"` + message + `"}` + "\n"
 	}

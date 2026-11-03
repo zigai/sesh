@@ -210,7 +210,7 @@ func newStoreJournal(
 func (j *storeJournal) transition(
 	ctx context.Context,
 	id string,
-	expected, next model.ActionState,
+	expected model.ActionState, next model.ActionState,
 	runtimeID model.Bytes,
 ) error {
 	if err := j.repository.Transition(ctx, j.operation, id, expected, next, runtimeID); err != nil {

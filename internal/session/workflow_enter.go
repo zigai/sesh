@@ -27,7 +27,11 @@ type previousSession struct {
 	ID   string
 }
 
-func (w *Workflow) CreateSession(ctx context.Context, name, dir string) (gotmux.Session, error) {
+func (w *Workflow) CreateSession(
+	ctx context.Context,
+	name string,
+	dir string,
+) (gotmux.Session, error) {
 	sess, err := w.createSession(ctx, name, dir)
 	if err != nil {
 		return gotmux.Session{}, w.fail(ctx, "create", err)
@@ -44,7 +48,7 @@ func (w *Workflow) CreateSession(ctx context.Context, name, dir string) (gotmux.
 
 func (w *Workflow) EnterOrCreateSession(
 	ctx context.Context,
-	name, dir string,
+	name string, dir string,
 ) (EnterOutcome, error) {
 	out := EnterOutcome{
 		SessionName: name,
@@ -124,7 +128,7 @@ func (w *Workflow) SwitchSessionOutcome(ctx context.Context, name string) (Enter
 
 func (w *Workflow) SwitchSessionOutcomeForClient(
 	ctx context.Context,
-	name, clientName, originSessionID string,
+	name string, clientName string, originSessionID string,
 ) (EnterOutcome, error) {
 	if clientName == "" || originSessionID == "" {
 		return EnterOutcome{}, oops.In("session").
@@ -139,7 +143,7 @@ func (w *Workflow) SwitchSessionOutcomeForClient(
 func (w *Workflow) SwitchSessionOutcomeForClientTarget(
 	ctx context.Context,
 	expected Session,
-	clientName, originSessionID string,
+	clientName string, originSessionID string,
 ) (EnterOutcome, error) {
 	if clientName == "" || originSessionID == "" {
 		return EnterOutcome{}, oops.In("session").
@@ -238,7 +242,7 @@ func newSessionSwitchOutcome(name string) EnterOutcome {
 
 func (w *Workflow) switchSessionOutcome(
 	ctx context.Context,
-	name, clientName, originSessionID string,
+	name string, clientName string, originSessionID string,
 ) (EnterOutcome, error) {
 	out := newSessionSwitchOutcome(name)
 
@@ -262,7 +266,7 @@ func (w *Workflow) switchSessionOutcomeWithTarget(
 	ctx context.Context,
 	out EnterOutcome,
 	sess gotmux.Session,
-	clientName, originSessionID string,
+	clientName string, originSessionID string,
 ) (EnterOutcome, error) {
 	var (
 		client   gotmux.ClientInfo
@@ -359,7 +363,7 @@ func (w *Workflow) switchSessionOutcomeWithClient(
 
 func (w *Workflow) clientForSession(
 	ctx context.Context,
-	clientName, originSessionID string,
+	clientName string, originSessionID string,
 ) (gotmux.ClientInfo, previousSession, error) {
 	clientHandle, err := w.server.ClientHandle(gotmux.ClientName(clientName))
 	if err != nil {
@@ -406,7 +410,11 @@ func (w *Workflow) clientForSession(
 	return client, previousSession{Name: string(originName), ID: originSessionID}, nil
 }
 
-func (w *Workflow) createSession(ctx context.Context, name, dir string) (gotmux.Session, error) {
+func (w *Workflow) createSession(
+	ctx context.Context,
+	name string,
+	dir string,
+) (gotmux.Session, error) {
 	if err := validateSessionName(name); err != nil {
 		return gotmux.Session{}, oops.In("session").Code("invalid_argument").Wrap(err)
 	}

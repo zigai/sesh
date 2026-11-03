@@ -97,7 +97,7 @@ func (s *Service) checkServiceUnits() []Result {
 	return s.serviceUnitsResult(checked, stale, unreadable)
 }
 
-func (s *Service) serviceUnitsResult(checked int, stale, unreadable []string) []Result {
+func (s *Service) serviceUnitsResult(checked int, stale []string, unreadable []string) []Result {
 	if len(stale) > 0 {
 		return []Result{
 			newResult(
@@ -190,7 +190,7 @@ func (s *Service) unitFiles() (map[string]string, []string) {
 	return units, unreadable
 }
 
-func (s *Service) unitCommands(name, path string) ([]unitCommand, error) {
+func (s *Service) unitCommands(name string, path string) ([]unitCommand, error) {
 	execs := make(map[string][]unitCommand)
 
 	dropIns, err := s.dropIns(name)

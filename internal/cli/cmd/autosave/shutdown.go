@@ -16,7 +16,7 @@ const (
 	reasonFinalSaveUnverifiable = "final_save_unverifiable"
 )
 
-func previousShutdownUnsaved(lastSavedUnix, finalSaveUnix, bootUnix int64) bool {
+func previousShutdownUnsaved(lastSavedUnix int64, finalSaveUnix int64, bootUnix int64) bool {
 	return lastSavedUnix > 0 && lastSavedUnix < bootUnix && finalSaveUnix < lastSavedUnix
 }
 
@@ -31,7 +31,12 @@ func reportUnsavedShutdownSinceBoot(ctx context.Context, env Env) {
 	reportUnsavedShutdown(ctx, env.workspace.FinalSaveStatus, env.lastSavedUnix, bootUnix)
 }
 
-func reportUnsavedShutdown(ctx context.Context, statusPath string, lastSavedUnix, bootUnix int64) {
+func reportUnsavedShutdown(
+	ctx context.Context,
+	statusPath string,
+	lastSavedUnix int64,
+	bootUnix int64,
+) {
 	finalSaveUnix := int64(0)
 
 	status, err := automation.ReadFinalSaveStatus(statusPath)

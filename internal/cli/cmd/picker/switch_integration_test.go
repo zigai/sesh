@@ -296,7 +296,7 @@ func resolvePopupClientFlag(
 	)
 }
 
-func assertPopupClientResolves(t *testing.T, server *gotmux.Server, flag, want string) {
+func assertPopupClientResolves(t *testing.T, server *gotmux.Server, flag string, want string) {
 	t.Helper()
 
 	resolved, err := resolvePopupClientFlag(t, server, flag)
@@ -311,7 +311,12 @@ func assertPopupClientResolves(t *testing.T, server *gotmux.Server, flag, want s
 	}
 }
 
-func assertPopupClientRejected(t *testing.T, server *gotmux.Server, flag, description string) {
+func assertPopupClientRejected(
+	t *testing.T,
+	server *gotmux.Server,
+	flag string,
+	description string,
+) {
 	t.Helper()
 
 	if _, err := resolvePopupClientFlag(

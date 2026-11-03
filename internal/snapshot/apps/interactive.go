@@ -258,7 +258,7 @@ func parseLessArguments(args []string) ([]string, bool) {
 	return argv, true
 }
 
-func classifyLessArg(arg string, endOfOptions *bool, flags, files *[]string) bool {
+func classifyLessArg(arg string, endOfOptions *bool, flags *[]string, files *[]string) bool {
 	if !*endOfOptions && arg == "--" {
 		*endOfOptions = true
 

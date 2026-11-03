@@ -527,7 +527,7 @@ func TestSetupServicesLabelsEachFileByWhatHappened(t *testing.T) {
 	}
 }
 
-func assertServiceFileLabel(t *testing.T, stdout, name, label string) {
+func assertServiceFileLabel(t *testing.T, stdout string, name string, label string) {
 	t.Helper()
 
 	for line := range strings.SplitSeq(stdout, "\n") {

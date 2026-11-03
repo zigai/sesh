@@ -424,7 +424,7 @@ func readValidatedArtifact(
 	return size, nil
 }
 
-func safeAdd(a, b int64) (int64, error) {
+func safeAdd(a int64, b int64) (int64, error) {
 	if a < 0 || b < 0 {
 		return 0, ErrCorrupt
 	}

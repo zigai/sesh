@@ -386,7 +386,7 @@ func applyOptions(
 func applyWantedOptions(
 	ctx context.Context,
 	scope optionScope,
-	wanted, live map[string]optionShape,
+	wanted map[string]optionShape, live map[string]optionShape,
 ) (int, error) {
 	applied := 0
 
@@ -529,8 +529,7 @@ func effectiveEnvironmentMatch(
 	ctx context.Context,
 	global map[environmentKey]environmentShape,
 	scope gotmux.EnvironmentScope,
-	expectedGlobal,
-	expectedLocal []model.Variable,
+	expectedGlobal []model.Variable, expectedLocal []model.Variable,
 ) (bool, error) {
 	liveLocal, err := environmentTable(ctx, scope)
 	if err != nil {
@@ -549,7 +548,10 @@ func effectiveEnvironmentMatch(
 	return maps.Equal(observed, wanted), nil
 }
 
-func effectiveEnvironmentVariables(global, local []model.Variable) []model.Variable {
+func effectiveEnvironmentVariables(
+	global []model.Variable,
+	local []model.Variable,
+) []model.Variable {
 	values := make(map[string]model.Variable, len(global)+len(local))
 	for _, variable := range global {
 		if variable.State == "absent" {
@@ -575,7 +577,10 @@ func effectiveEnvironmentVariables(global, local []model.Variable) []model.Varia
 	return result
 }
 
-func effectiveEnvironment(global, local []model.Variable) map[string]environmentShape {
+func effectiveEnvironment(
+	global []model.Variable,
+	local []model.Variable,
+) map[string]environmentShape {
 	values := map[string]environmentShape{}
 	for _, variable := range effectiveEnvironmentVariables(global, local) {
 		values[string(variable.Name)] = variableEnvironmentShape(variable)
@@ -698,8 +703,7 @@ func applyEnvironment(
 
 func environmentMaskNames(
 	expected []model.Variable,
-	live,
-	targetGlobal map[environmentKey]environmentShape,
+	live map[environmentKey]environmentShape, targetGlobal map[environmentKey]environmentShape,
 ) map[string]struct{} {
 	wantedNames := make(map[string]struct{}, len(expected))
 	for _, variable := range expected {

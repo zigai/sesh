@@ -308,7 +308,7 @@ func TestSetupServicesApplyWritesManagedTmuxService(t *testing.T) {
 	}
 }
 
-func targetsSocket(content, socket string) bool {
+func targetsSocket(content string, socket string) bool {
 	return strings.Contains(content, "--socket "+socket+" ") ||
 		strings.Contains(content, "--socket "+socket+"\n")
 }

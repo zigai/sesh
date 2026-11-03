@@ -70,10 +70,10 @@ func TestConcurrentRewriteAndSameSourcePinRace(t *testing.T) {
 func verifySameSourcePinRaceOutcome(
 	t *testing.T,
 	r *Repository,
-	path, sourceID string,
+	path string, sourceID string,
 	rewriteRes RewriteResult,
 	pinnedOp Operation,
-	rewriteErr, pinErr error,
+	rewriteErr error, pinErr error,
 ) {
 	t.Helper()
 

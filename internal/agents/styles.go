@@ -348,7 +348,7 @@ func (c *TmuxStyleController) applyStyleSelective(
 	ctx context.Context,
 	window gotmux.Window,
 	style string,
-	applyStatus, applyBell bool,
+	applyStatus bool, applyBell bool,
 ) error {
 	options := window.Options()
 

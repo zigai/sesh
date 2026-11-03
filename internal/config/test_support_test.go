@@ -2,7 +2,7 @@ package config_test
 
 import "testing"
 
-func assertEqual[T comparable](t *testing.T, name string, got, want T) {
+func assertEqual[T comparable](t *testing.T, name string, got T, want T) {
 	t.Helper()
 
 	if got != want {

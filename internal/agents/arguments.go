@@ -148,7 +148,7 @@ func agentOptionTakesValue(harness aht.Harness, flag string) bool {
 	}
 }
 
-func nonInteractiveMode(harness aht.Harness, flag, value string) bool {
+func nonInteractiveMode(harness aht.Harness, flag string, value string) bool {
 	return (harness == aht.HarnessPi || harness == aht.HarnessOmp) && flag == "--mode" &&
 		(value == "json" || value == "rpc")
 }

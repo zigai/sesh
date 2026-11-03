@@ -180,7 +180,7 @@ func reclaimKeyFromUnlistedSession(
 	return slices.Delete(assigned, index, index+1), letter, true
 }
 
-func compareKeyIdentities(left, right session.Identity) int {
+func compareKeyIdentities(left session.Identity, right session.Identity) int {
 	return cmp.Or(
 		cmp.Compare(left.Name, right.Name),
 		cmp.Compare(left.Origin, right.Origin),
@@ -188,7 +188,7 @@ func compareKeyIdentities(left, right session.Identity) int {
 	)
 }
 
-func freeSessionKey(name string, taken, blocked map[string]bool) (string, bool) {
+func freeSessionKey(name string, taken map[string]bool, blocked map[string]bool) (string, bool) {
 	for _, candidate := range strings.ToLower(name) + sessionKeyLetters {
 		letter := string(candidate)
 		if config.ValidSessionKey(letter) && !taken[letter] && !blocked[letter] {

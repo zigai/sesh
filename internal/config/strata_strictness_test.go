@@ -178,7 +178,7 @@ func TestStrataRejectsInvalidType(t *testing.T) {
 
 func assertRejectedConfigField(
 	t *testing.T,
-	tomlContent, wantField, wantReason, forbiddenValue string,
+	tomlContent string, wantField string, wantReason string, forbiddenValue string,
 ) {
 	t.Helper()
 

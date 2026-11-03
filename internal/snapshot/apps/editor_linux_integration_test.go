@@ -272,7 +272,7 @@ type interactiveNvim struct {
 	stopped bool
 }
 
-func writeEditorFile(t *testing.T, path, contents string) {
+func writeEditorFile(t *testing.T, path string, contents string) {
 	t.Helper()
 
 	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
@@ -280,7 +280,12 @@ func writeEditorFile(t *testing.T, path, contents string) {
 	}
 }
 
-func startInteractiveNvim(t *testing.T, nvim, directory, first string) *interactiveNvim {
+func startInteractiveNvim(
+	t *testing.T,
+	nvim string,
+	directory string,
+	first string,
+) *interactiveNvim {
 	t.Helper()
 
 	master, slave := openTestPTY(t)
@@ -489,7 +494,7 @@ func isolatedEditorEnvironment(t *testing.T, directory string) []string {
 
 func startNvimWithExtraArgs(
 	t *testing.T,
-	nvim, directory string,
+	nvim string, directory string,
 	extraArgs []string,
 	files ...string,
 ) *exec.Cmd {
@@ -519,7 +524,7 @@ func startNvimWithExtraArgs(
 
 func startNvim(
 	t *testing.T,
-	nvim, directory string,
+	nvim string, directory string,
 	explicitListen bool,
 	files ...string,
 ) *exec.Cmd {

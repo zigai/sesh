@@ -50,7 +50,7 @@ func ResourceCadence() Cadence {
 	return Cadence{Kind: CadencePoll, Interval: resourceTickInterval}
 }
 
-func ResourceRows(sample, previous ResourceSample, targets []ResourceTarget) Rows {
+func ResourceRows(sample ResourceSample, previous ResourceSample, targets []ResourceTarget) Rows {
 	rows := make(Rows, len(targets))
 	paneTotals, windowTotals, sessionTotals := aggregateResourceTargets(sample, previous, targets)
 
@@ -83,7 +83,7 @@ func ResourceRows(sample, previous ResourceSample, targets []ResourceTarget) Row
 }
 
 func aggregateResourceTargets(
-	sample, previous ResourceSample,
+	sample ResourceSample, previous ResourceSample,
 	targets []ResourceTarget,
 ) (map[string]resourceTotals, map[string]resourceTotals, map[string]resourceTotals) {
 	children := make(map[int][]int)
@@ -117,7 +117,7 @@ func aggregateResourceTargets(
 	return paneTotals, windowTotals, sessionTotals
 }
 
-func addResourceTotals(current, next resourceTotals) resourceTotals {
+func addResourceTotals(current resourceTotals, next resourceTotals) resourceTotals {
 	current.cpu += next.cpu
 	current.memory += next.memory
 	current.pending = current.pending || next.pending
@@ -127,7 +127,7 @@ func addResourceTotals(current, next resourceTotals) resourceTotals {
 
 func measurePaneSubtree(
 	rootPID int,
-	sample, previous ResourceSample,
+	sample ResourceSample, previous ResourceSample,
 	children map[int][]int,
 ) (resourceTotals, bool) {
 	var total resourceTotals

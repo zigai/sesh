@@ -161,7 +161,7 @@ func loadSnapshotPickerEntries(
 func pickerEntry(
 	generation store.Generation,
 	finished int64,
-	sessions, windows, panes int,
+	sessions int, windows int, panes int,
 	size int64,
 	current string,
 ) snapshotpicker.Entry {

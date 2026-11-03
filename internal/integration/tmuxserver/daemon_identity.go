@@ -129,6 +129,6 @@ func validDaemonServerIdentity(identity gotmux.ServerIdentity, endpoint gotmux.E
 		identity.ReportedSocket == endpoint.SocketPath
 }
 
-func daemonIdentityError(code, operation string, err error) error {
+func daemonIdentityError(code string, operation string, err error) error {
 	return oops.In("tmux").Code(code).With("operation", operation).Wrap(err)
 }

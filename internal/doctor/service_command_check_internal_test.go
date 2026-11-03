@@ -50,7 +50,7 @@ func TestUnitLinesJoinContinuationsAndDropComments(t *testing.T) {
 	}
 }
 
-func writeUnit(tb testing.TB, path, content string) {
+func writeUnit(tb testing.TB, path string, content string) {
 	tb.Helper()
 
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {

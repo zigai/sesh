@@ -346,7 +346,7 @@ func pickerTestExecutable() (string, error) {
 	return executable, nil
 }
 
-func samePickerSessions(left, right []gotmux.SessionInfo) bool {
+func samePickerSessions(left []gotmux.SessionInfo, right []gotmux.SessionInfo) bool {
 	if len(left) != len(right) {
 		return false
 	}

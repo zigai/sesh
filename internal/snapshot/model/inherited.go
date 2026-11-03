@@ -128,7 +128,7 @@ func arrayName(name string) string {
 	return base
 }
 
-func sameSetting(option, supplied Option) bool {
+func sameSetting(option Option, supplied Option) bool {
 	return option.Present == supplied.Present && bytes.Equal(option.Value, supplied.Value)
 }
 

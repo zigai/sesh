@@ -460,7 +460,7 @@ func TestMultiWindowMultiPane(t *testing.T) {
 	}
 }
 
-func checkSharedWindowSteps(steps []Step, winID, sessID string) (int, bool) {
+func checkSharedWindowSteps(steps []Step, winID string, sessID string) (int, bool) {
 	var (
 		creations int
 		linked    bool

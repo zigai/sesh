@@ -291,7 +291,7 @@ func logTUIFirstFrame(ctx context.Context, timing firstFrameTiming) {
 }
 
 func firstFrameTimingAt(
-	initializedAt, launchedAt time.Time,
+	initializedAt time.Time, launchedAt time.Time,
 	load *sessionLoadTiming,
 	now time.Time,
 ) firstFrameTiming {

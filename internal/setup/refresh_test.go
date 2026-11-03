@@ -293,7 +293,7 @@ func assertPlanState(
 	}
 }
 
-func writeOwnedDefinition(t *testing.T, path, body string) {
+func writeOwnedDefinition(t *testing.T, path string, body string) {
 	t.Helper()
 
 	content := "# " + setup.ManagedMarker + "\n" + body

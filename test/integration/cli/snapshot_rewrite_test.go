@@ -70,7 +70,7 @@ func TestSnapshotRewriteCommandsPreserveCompletedDeletionReceipt(t *testing.T) {
 	}
 }
 
-func completeSnapshotRewrite(t *testing.T, path, generation string) string {
+func completeSnapshotRewrite(t *testing.T, path string, generation string) string {
 	t.Helper()
 
 	repo, err := store.OpenExisting(t.Context(), path)

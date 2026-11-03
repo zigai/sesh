@@ -597,7 +597,7 @@ func TestCatalogSharedPaneDoesNotGuessCurrentSession(t *testing.T) {
 	}
 }
 
-func testHistoryLockWaiter(t *testing.T, ctx context.Context, program, statePath string) {
+func testHistoryLockWaiter(t *testing.T, ctx context.Context, program string, statePath string) {
 	t.Helper()
 
 	dir, err := privatefs.Open(filepath.Dir(statePath), false)

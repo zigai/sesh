@@ -18,7 +18,7 @@ func PlaceholderArguments(task string) []string {
 	return []string{"task", "placeholder", task}
 }
 
-func PlaceholderLaunch(executable, task string, agent model.Launch) model.Launch {
+func PlaceholderLaunch(executable string, task string, agent model.Launch) model.Launch {
 	argv := append([]string{seshName}, PlaceholderArguments(task)...)
 
 	return model.Launch{

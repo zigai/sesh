@@ -29,8 +29,8 @@ func NewOperationID() string {
 
 func (r *Repository) Transition(
 	ctx context.Context,
-	operation, action string,
-	expected, next model.ActionState,
+	operation string, action string,
+	expected model.ActionState, next model.ActionState,
 	runtimeID model.Bytes,
 ) error {
 	err := r.update(ctx, func(c *Catalog) error {

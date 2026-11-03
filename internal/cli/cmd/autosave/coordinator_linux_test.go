@@ -31,7 +31,7 @@ func coordinatorGate(t *testing.T, repoPath string) error {
 	return ensureCoordinatorRepositoryReady(t.Context(), env)
 }
 
-func operationState(t *testing.T, repoPath, id string) string {
+func operationState(t *testing.T, repoPath string, id string) string {
 	t.Helper()
 
 	repo, err := store.Open(t.Context(), repoPath)

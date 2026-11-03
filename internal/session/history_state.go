@@ -523,7 +523,7 @@ func (s *Service) saveStateToDir(
 func (s *Service) publishTempState(
 	ctx context.Context,
 	dir *privatefs.Dir,
-	tempName, fileName string,
+	tempName string, fileName string,
 ) error {
 	if s.faultHook != nil {
 		if fault := s.faultHook("rename"); fault != nil {
@@ -654,7 +654,7 @@ func isPureNotExist(err error) bool {
 	return onlySessionError(err, os.ErrNotExist)
 }
 
-func onlySessionError(err, target error) bool {
+func onlySessionError(err error, target error) bool {
 	if err == nil {
 		return false
 	}

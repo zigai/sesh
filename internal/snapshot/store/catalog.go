@@ -211,7 +211,7 @@ func (a Attempt) validateDigest() error {
 	return nil
 }
 
-func validAttemptOutcome(state, reason string) bool {
+func validAttemptOutcome(state string, reason string) bool {
 	switch state {
 	case "pending":
 		return reason == "capture_pending"

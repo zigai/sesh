@@ -102,7 +102,7 @@ type runtimeIdentity struct {
 	startTicks uint64
 }
 
-func RuntimeStatusPath(runtimeDir, endpoint string) (string, error) {
+func RuntimeStatusPath(runtimeDir string, endpoint string) (string, error) {
 	if !filepath.IsAbs(runtimeDir) || filepath.Clean(runtimeDir) != runtimeDir ||
 		!filepath.IsAbs(endpoint) || filepath.Clean(endpoint) != endpoint {
 		return "", oops.In("daemon").
@@ -523,7 +523,12 @@ func runtimeEndpointID(endpoint string) string {
 	return hex.EncodeToString(digest[:runtimeStatusSocketBytes])
 }
 
-func checkRuntimeSocketAvailable(ctx context.Context, dir *privatefs.Dir, name, path string) error {
+func checkRuntimeSocketAvailable(
+	ctx context.Context,
+	dir *privatefs.Dir,
+	name string,
+	path string,
+) error {
 	entry, err := dir.Inspect(name)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil

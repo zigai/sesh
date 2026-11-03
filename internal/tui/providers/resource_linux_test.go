@@ -77,7 +77,7 @@ func TestReadResourceSampleParsesProcessIdentityAndRSS(t *testing.T) {
 	}
 }
 
-func resourceStat(pid, parent int, start, user, system uint64) string {
+func resourceStat(pid int, parent int, start uint64, user uint64, system uint64) string {
 	fields := make([]string, 20)
 	for i := range fields {
 		fields[i] = "0"

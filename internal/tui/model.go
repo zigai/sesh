@@ -499,7 +499,7 @@ func (m *Model) SetTerminal(terminal *os.File) {
 	m.terminal = terminal
 }
 
-func (m *Model) SetSize(width, height int) {
+func (m *Model) SetSize(width int, height int) {
 	if m == nil || width <= 0 || height <= 0 {
 		return
 	}

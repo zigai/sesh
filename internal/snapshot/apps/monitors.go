@@ -103,7 +103,7 @@ func validHtopSort(sortField string) bool {
 	return ok
 }
 
-func appendHtopParam(argv *[]string, args []string, i, nextI int, short, value string) {
+func appendHtopParam(argv *[]string, args []string, i int, nextI int, short string, value string) {
 	if strings.HasPrefix(args[i], "--") {
 		*argv = append(*argv, args[i:nextI+1]...)
 
@@ -113,7 +113,7 @@ func appendHtopParam(argv *[]string, args []string, i, nextI int, short, value s
 	*argv = append(*argv, short, value)
 }
 
-func appendBtopParam(argv *[]string, arg, short, long, value string) {
+func appendBtopParam(argv *[]string, arg string, short string, long string, value string) {
 	if strings.HasPrefix(arg, "--") {
 		*argv = append(*argv, long, value)
 
@@ -170,7 +170,13 @@ func parseTopArguments(name string, args []string) ([]string, bool) {
 	return argv, true
 }
 
-func stepTopArgument(args []string, i int, argv *[]string, hasEUser, hasAnyUser *bool) (int, bool) {
+func stepTopArgument(
+	args []string,
+	i int,
+	argv *[]string,
+	hasEUser *bool,
+	hasAnyUser *bool,
+) (int, bool) {
 	if matched, nextI := consumeTopToggle(args, i, argv); matched {
 		return nextI, true
 	}
@@ -209,7 +215,7 @@ func consumeTopUser(
 	args []string,
 	i int,
 	argv *[]string,
-	hasEUser, hasAnyUser *bool,
+	hasEUser *bool, hasAnyUser *bool,
 ) (bool, int, bool) {
 	if val, nextI, matched, ok := matchFlagValue(args, i, "-u", "--filter-only-euser"); matched {
 		if !ok || *hasAnyUser || !validTopUser(val) {
@@ -607,7 +613,7 @@ func isBtopToggle(arg string) bool {
 		arg == "--force-utf"
 }
 
-func matchFlagValue(args []string, i int, short, long string) (string, int, bool, bool) {
+func matchFlagValue(args []string, i int, short string, long string) (string, int, bool, bool) {
 	arg := args[i]
 
 	if arg == short || (long != "" && arg == long) {

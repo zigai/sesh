@@ -256,7 +256,7 @@ func assertSnapshotRestorePickerCancellation(t *testing.T, command []string, ali
 
 func captureSnapshotPickerTimeline(
 	t *testing.T,
-	selectedName, currentName string,
+	selectedName string, currentName string,
 ) (string, string, string, string) {
 	t.Helper()
 

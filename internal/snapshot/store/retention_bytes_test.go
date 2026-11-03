@@ -90,7 +90,7 @@ func setupExactBoundaryFixture(t *testing.T) (*Repository, []Generation, []int64
 	return r, gens, sizes, total, protectedBytes
 }
 
-func testExactBoundaryA(t *testing.T, r *Repository, total, protectedBytes int64) {
+func testExactBoundaryA(t *testing.T, r *Repository, total int64, protectedBytes int64) {
 	t.Helper()
 
 	resA, err := r.RetainBytes(t.Context(), total)
@@ -115,7 +115,13 @@ func testExactBoundaryA(t *testing.T, r *Repository, total, protectedBytes int64
 	}
 }
 
-func testExactBoundaryB(t *testing.T, r *Repository, oldestID string, total, oldestSize int64) {
+func testExactBoundaryB(
+	t *testing.T,
+	r *Repository,
+	oldestID string,
+	total int64,
+	oldestSize int64,
+) {
 	t.Helper()
 
 	resB, err := r.RetainBytes(t.Context(), total-1)
@@ -158,7 +164,7 @@ func testExactBoundaryD(
 	t *testing.T,
 	r *Repository,
 	secondOldestID string,
-	expectedRetainedB, protectedBytes int64,
+	expectedRetainedB int64, protectedBytes int64,
 ) {
 	t.Helper()
 
@@ -494,7 +500,7 @@ func verifyPinTrialOutcome(
 	trial int,
 	pinErr error,
 	targetRemoved bool,
-	targetID, permID string,
+	targetID string, permID string,
 	r *Repository,
 ) {
 	t.Helper()

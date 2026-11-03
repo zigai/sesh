@@ -169,7 +169,14 @@ func TestProcessDeathResumeRewriteBoundaries(t *testing.T) {
 	}
 }
 
-func resumeWorkerCmd(t *testing.T, mode, path, id, source, boundary string) *exec.Cmd {
+func resumeWorkerCmd(
+	t *testing.T,
+	mode string,
+	path string,
+	id string,
+	source string,
+	boundary string,
+) *exec.Cmd {
 	t.Helper()
 
 	program, err := os.Executable()
@@ -218,7 +225,7 @@ func TestResumeRewriteWorker(t *testing.T) {
 
 func executePartialArtifactWorkerSubprocess(
 	t *testing.T,
-	path, mutationID, sourceID, boundary string,
+	path string, mutationID string, sourceID string, boundary string,
 ) {
 	t.Helper()
 
@@ -259,7 +266,12 @@ func executePartialArtifactWorkerSubprocess(
 	t.Fatal("partial artifact worker escaped interruption")
 }
 
-func executeResumeInterruptWorkerSubprocess(t *testing.T, path, mutationID, boundary string) {
+func executeResumeInterruptWorkerSubprocess(
+	t *testing.T,
+	path string,
+	mutationID string,
+	boundary string,
+) {
 	t.Helper()
 
 	rSetup := openRepository(t, path)
@@ -292,7 +304,7 @@ func executeResumeInterruptWorkerSubprocess(t *testing.T, path, mutationID, boun
 	t.Fatal("resume interrupt worker escaped interruption")
 }
 
-func executeVerifyWorkerSubprocess(t *testing.T, path, mutationID, sourceID string) {
+func executeVerifyWorkerSubprocess(t *testing.T, path string, mutationID string, sourceID string) {
 	t.Helper()
 
 	r := openRepository(t, path)
@@ -457,7 +469,7 @@ func verifySingleArtifact(
 	t *testing.T,
 	r *Repository,
 	artDir *privatefs.Dir,
-	genID, id, expectedContent string,
+	genID string, id string, expectedContent string,
 ) {
 	t.Helper()
 
@@ -502,7 +514,12 @@ func verifySingleArtifact(
 	verifyArtifactSHAInManifest(t, m.Artifacts, id, expectedSHA)
 }
 
-func verifyArtifactSHAInManifest(t *testing.T, artifacts []model.Artifact, id, expectedSHA string) {
+func verifyArtifactSHAInManifest(
+	t *testing.T,
+	artifacts []model.Artifact,
+	id string,
+	expectedSHA string,
+) {
 	t.Helper()
 
 	found := false

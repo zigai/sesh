@@ -212,7 +212,7 @@ func ValidateHookConfig(cfg config.HookConfig, eventName string) error {
 	return nil
 }
 
-func ResolveHookTimeout(globalTimeoutStr, hookTimeoutStr string) (time.Duration, error) {
+func ResolveHookTimeout(globalTimeoutStr string, hookTimeoutStr string) (time.Duration, error) {
 	if hookTimeoutStr != "" {
 		d, err := time.ParseDuration(hookTimeoutStr)
 		if err != nil || d <= 0 {
