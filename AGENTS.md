@@ -22,7 +22,8 @@ Agent row goldens in `internal/tui/testdata/agent_rows` are rewritten with `SESH
 
 - Every test package must have a `TestMain` that calls `testenv.RunIsolated(m)` (`internal/testsupport/testenv`). It moves `$HOME`, XDG dirs and `$TMUX_TMPDIR` into a temp dir and clears `TMUX`, `TMUX_PANE`, `DBUS_SESSION_BUS_ADDRESS` and `SESH_*` variables, so tests never reach the user's live tmux sessions, systemd user manager or real snapshot repository. `just test-isolation` enforces this.
 - Name tests for the behavior they exercise and place them with the owning feature. Do not use historical-origin prefixes or separate historical suites.
-- When testing sesh by hand, never touch the live tmux server. Use a separate server (`tmux -L <name>`) or a scratch `TMUX_TMPDIR`.
+- When testing sesh by hand, never touch the live tmux server. Run it inside a throwaway `tmux -L <name>` pane, by full binary path, with `TMUX_TMPDIR` set to a scratch directory and `TMUX_PANE` unset. Unsetting `TMUX` is not isolation, and task popups open a second server by name under `TMUX_TMPDIR`.
+- Tests use `tmux` from `PATH` unless `TMUX_TEST_BINARY` is set.
 - Integration tests use the `//go:build ... && integration` tag. They live next to the code (`*_integration_test.go`) and in `test/integration/{cli,snapshot,application,lifecycle}`, which drive the built binary against disposable tmux servers.
 - Property tests use `pgregory.net/rapid`; its failure cases are saved under `testdata/rapid/`.
 - `internal/testsupport/clitest` runs the real command pipeline for command tests.
@@ -52,6 +53,13 @@ tmux access goes through `github.com/zigai/gotmux` (imported as `gotmux`).
 - gotmux may be imported only from the adapter layer up.
 - Production code must not import `testing`, `internal/testsupport`, `test/`, `gotmux/tmuxtest`, `rapid` or `go-cmp`.
 
+## Restore behavior
+
+- Automatic restores give a pane whose saved directory is gone a shell in the fallback directory, and do not relaunch its program. Explicit `snapshot restore` fails unless `--allow-missing-dir` is set.
+- Once a restore has targeted the live server, autosave saves again with one `restore_incomplete` warning instead of holding back.
+- A program whose executable was replaced in place counts as running normally, not as `executable_deleted`.
+- A nonzero `carried_resume_panes` on a save means aht lost a running agent. Investigate aht, and keep the carry-forward.
+
 ## Error handling
 
 - Use `github.com/samber/oops` at application and domain error boundaries for structured operation details, stable codes, phases and stack traces (`oops.In("<domain>").Code(...).With("operation", ...)`).
@@ -73,4 +81,9 @@ tmux access goes through `github.com/zigai/gotmux` (imported as `gotmux`).
 
 - golangci-lint is strict: declaration order const, var, type, func (`decorder`, `funcorder`); `exhaustruct`; `wrapcheck`; `wsl_v5`; `err113`; `nolint` needs a specific linter and an explanation. `internal/cli` and test files have some of these relaxed.
 - Many packages are `//go:build linux || darwin`, with `_linux.go`, `_darwin.go` and `_other.go` variants.
-- Edit `README.md` only to keep it accurate. When a command, flag or feature it describes changes, correct that part at about the same length. Do not add new sections, examples or long explanations.
+- Import the tmux library as `gotmux "github.com/zigai/gotmux/tmux"`, never bare `tmux`.
+- Name options parameters `opts` and predicates `validX`. Use `Is` only on classification nouns.
+- Packages under `internal/cli/cmd/*` do not prefix identifiers or file names with the package name.
+- `int64` instants carry their unit in the Go name, such as `LastSwitchUnix`.
+- New TUI draws through `tui.Chrome` and the existing renderers, and must match them visually.
+- A gotmux bump also updates `tmuxserver.LibraryVersion` and the artifact test's version and sum.
