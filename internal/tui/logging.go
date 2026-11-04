@@ -36,7 +36,10 @@ const (
 	tuiOperationLoadEvidence            tuiLogOperation = "load_evidence"
 )
 
-const tuiOperationFirstFrame = "first_frame"
+const (
+	tuiOperationFirstFrame = "first_frame"
+	tuiOperationRowsShown  = "rows_shown"
+)
 
 const (
 	tuiLogOutcomeSuccess tuiLogOutcome = iota
@@ -288,6 +291,18 @@ func logTUIFirstFrame(ctx context.Context, timing firstFrameTiming) {
 	}
 
 	event.Msg("tui first frame shown")
+}
+
+// logTUIRowsShown covers the opens whose first frame came from the startup deadline, before any rows.
+func logTUIRowsShown(ctx context.Context, sinceInit time.Duration, timing *sessionLoadTiming) {
+	zerolog.Ctx(ctx).Info().
+		Str("component", "tui").
+		Str("operation", tuiOperationRowsShown).
+		Str("status", "ok").
+		Int64("since_init_ms", sinceInit.Milliseconds()).
+		Int64("catalog_ms", timing.catalog.Milliseconds()).
+		Int64("agents_ms", timing.agents.Milliseconds()).
+		Msg("tui rows shown after the first frame")
 }
 
 func firstFrameTimingAt(

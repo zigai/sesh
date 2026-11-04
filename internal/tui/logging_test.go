@@ -1085,8 +1085,13 @@ func TestPopupLoadingFirstFrameOmitsUnfinishedLoaderTimings(t *testing.T) {
 	}
 
 	records := loggingTestRecords(t, &output)
-	if len(records) != 1 {
-		t.Fatalf("records = %#v, want one loading first-frame record", records)
+	if len(records) != 2 {
+		t.Fatalf("records = %#v, want a first-frame record and a rows-shown record", records)
+	}
+
+	if shown := records[1]; shown["operation"] != tuiOperationRowsShown ||
+		shown["agents_ms"] == nil || shown["since_init_ms"] == nil {
+		t.Fatalf("record = %#v, want when the rows appeared and what they waited on", shown)
 	}
 
 	record := records[0]

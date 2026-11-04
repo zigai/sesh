@@ -1085,13 +1085,21 @@ func (m *Model) agentSummaryWatchEnabled() bool {
 	return agentSummariesEnabled(m.config, m.deps)
 }
 
-func (m *Model) handleSessionLoadResult(msg sessionLoadResultMsg) tea.Cmd {
-	if m.popupStartup == popupStartupWaiting {
+func (m *Model) logPopupLoadShown(timing *sessionLoadTiming) {
+	switch m.popupStartup {
+	case popupStartupWaiting:
 		logTUIFirstFrame(
 			m.operationContext(),
-			firstFrameTimingAt(m.initializedAt, m.launchedAt, &msg.timing, time.Now()),
+			firstFrameTimingAt(m.initializedAt, m.launchedAt, timing, time.Now()),
 		)
+	case popupStartupLoading:
+		logTUIRowsShown(m.operationContext(), time.Since(m.initializedAt), timing)
+	case popupStartupContent:
 	}
+}
+
+func (m *Model) handleSessionLoadResult(msg sessionLoadResultMsg) tea.Cmd {
+	m.logPopupLoadShown(&msg.timing)
 
 	m.popupStartup = popupStartupContent
 
