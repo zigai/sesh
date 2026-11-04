@@ -40,9 +40,15 @@ var (
 	}
 )
 
+type logSink interface {
+	Logger() zerolog.Logger
+	SetLevel(level zerolog.Level)
+	Close() error
+}
+
 type commandRuntime struct {
 	cmd         *cobra.Command
-	sink        *logging.Sink
+	sink        logSink
 	operation   string
 	output      *commandBuffer
 	diagnostics *commandBuffer
@@ -298,12 +304,18 @@ func (r *commandRuntime) openLog(
 		return oops.In("cli").With("operation", "configure_logging").Wrap(err)
 	}
 
-	r.sink, err = logging.Open(logPath)
-	if err != nil {
-		return oops.In("cli").
-			Code("logging_failed").
-			With("operation", "configure_logging").
-			Wrap(fmt.Errorf("%w: %w", clibase.ErrLogFileUnavailable, err))
+	if cmd.Annotations[clibase.AnnotationBackgroundLog] != "" {
+		r.sink = logging.OpenBackground(logPath)
+	} else {
+		sink, err := logging.Open(logPath)
+		if err != nil {
+			return oops.In("cli").
+				Code("logging_failed").
+				With("operation", "configure_logging").
+				Wrap(fmt.Errorf("%w: %w", clibase.ErrLogFileUnavailable, err))
+		}
+
+		r.sink = sink
 	}
 
 	r.sink.SetLevel(level)
