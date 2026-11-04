@@ -19,6 +19,7 @@ import (
 	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/session"
+	"github.com/zigai/sesh/internal/setup"
 	"github.com/zigai/sesh/internal/tui"
 )
 
@@ -164,12 +165,6 @@ func TestPopupHandoffSwitchesOnlyOpeningClientAfterPopupSelection(t *testing.T) 
 
 	root := t.TempDir()
 
-	path, cleanup, err := createPickerSwitchHandoff()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cleanup()
-
 	target, err := findPickerLiveTarget(ctx, server, string(targetSession.ID()), "mobile-target")
 	if err != nil {
 		t.Fatal(err)
@@ -183,17 +178,6 @@ func TestPopupHandoffSwitchesOnlyOpeningClientAfterPopupSelection(t *testing.T) 
 		},
 		PaneID: "%0",
 	}
-	if err := writePickerSwitchHandoff(
-		path,
-		&target,
-		"",
-		"",
-		"",
-		[]tui.AgentView{originView},
-	); err != nil {
-		t.Fatal(err)
-	}
-
 	runtime := commandRuntime{
 		workspace: resolvePickerTestWorkspace(t, config.DefaultConfig(), app.Locations{
 			Socket:     server.Endpoint().SocketPath,
@@ -220,14 +204,10 @@ func TestPopupHandoffSwitchesOnlyOpeningClientAfterPopupSelection(t *testing.T) 
 
 	t.Cleanup(func() { _ = services.Close() })
 
-	if err := completePickerSwitchHandoff(
-		ctx,
-		services,
-		path,
-		openingClient,
-		string(origin.ID),
+	if err := services.performSwitchValidated(
+		ctx, target, "", openingClient, string(origin.ID), []tui.AgentView{originView},
 	); err != nil {
-		t.Fatalf("popup handoff failed: %v", err)
+		t.Fatalf("popup switch failed: %v", err)
 	}
 
 	assertPickerClientDisplays(t, server, openingClient, targetSession.ID())
@@ -249,6 +229,116 @@ func TestPopupHandoffSwitchesOnlyOpeningClientAfterPopupSelection(t *testing.T) 
 
 	if st.GetLastAgentView(originView.Session, originView.PaneID) == 0 {
 		t.Fatal("popup handoff did not record the popup's deferred agent view")
+	}
+}
+
+func TestSavedPopupCommandOpensThePopupWithoutALauncher(t *testing.T) {
+	server := tmuxtest.NewServer(t)
+	ctx := t.Context()
+
+	origin := originSession(t, server)
+	clientName := attachPickerTestClient(t, origin.Handle())
+	root := t.TempDir()
+	record := filepath.Join(root, "record")
+	program := filepath.Join(root, "program")
+
+	script := "#!/bin/sh\n" + `printf '%s\n' "$SESH_TMUX_CLIENT $*" >> "` + record + "\"\n"
+	if err := os.WriteFile(program, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	workspace := resolvePickerTestWorkspace(t, config.DefaultConfig(), app.Locations{
+		Socket:          server.Endpoint().SocketPath,
+		Repository:      filepath.Join(root, "repository"),
+		LeaseRoot:       filepath.Join(root, "leases"),
+		History:         historyPath(t, root),
+		FinalSaveStatus: "",
+		AgentStore:      "",
+	})
+
+	clients, err := server.Clients(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var client gotmux.ClientInfo
+
+	for _, candidate := range clients {
+		if string(candidate.Name) == clientName {
+			client = candidate
+		}
+	}
+
+	picker := NewPickCommand(ctx)
+	if err := savePopupCommand(
+		ctx,
+		picker,
+		server,
+		workspace,
+		nil,
+		"",
+		program,
+		client,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	bindings, err := setup.Bindings([]action.Binding{
+		{
+			Key:    "F5",
+			Action: action.PickPopup.ID,
+			In:     action.SurfaceTmux,
+			Table:  "root",
+			Values: action.Values{},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bindingFile := filepath.Join(root, "binding.conf")
+	if err := os.WriteFile(bindingFile, []byte(bindings[0].Text()+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	source, err := gotmux.NewCommand("source-file", bindingFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := server.Run(ctx, source); err != nil {
+		t.Fatal(err)
+	}
+
+	press, err := gotmux.NewCommand("send-keys", "-K", "-c", clientName, "F5")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := server.Run(ctx, press); err != nil {
+		t.Fatal(err)
+	}
+
+	var lines []string
+
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		content, _ := os.ReadFile(record)
+		lines = strings.Split(strings.TrimSpace(string(content)), "\n")
+
+		if lines[0] != "" {
+			break
+		}
+	}
+
+	popup := lines[0]
+	for _, want := range []string{
+		clientName + " pick ui",
+		"--socket " + server.Endpoint().SocketPath,
+		"--current-session-id " + string(origin.ID),
+	} {
+		if !strings.Contains(popup, want) {
+			t.Fatalf("popup run = %q, missing %q", popup, want)
+		}
 	}
 }
 

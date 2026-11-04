@@ -31,6 +31,7 @@ func newPickPopupCommand(remoteFactory RemoteFactory) *cobra.Command {
 			SuccessOwned: false,
 			Configure: func(cmd *cobra.Command) {
 				cmd.Annotations[clibase.AnnotationLiveIO] = annotationEnabled
+				cmd.Annotations[clibase.AnnotationBackgroundLog] = annotationEnabled
 			},
 			Prepare: nil,
 			Frontend: func(cmd *cobra.Command) action.Dispatcher {
@@ -68,7 +69,6 @@ func (frontend popupFrontend) Dispatch(
 		invocation.Caller,
 		open.Mode,
 		launchedAt,
-		frontend.remote,
 	); err != nil {
 		return nil, err
 	}

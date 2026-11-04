@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -75,7 +76,13 @@ func testTmuxPopupSelectionSwitchesOpeningClient(t *testing.T, newerSession bool
 
 	waitForPickerPopupExit(t, ctx, commandDone, commandOutput.String)
 
-	if displayed := fixture.clientDisplayedSession(t, clientName); displayed != target.ID {
+	displayed := fixture.clientDisplayedSession(t, clientName)
+	for deadline := time.Now().Add(5 * time.Second); displayed != target.ID &&
+		time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+		displayed = fixture.clientDisplayedSession(t, clientName)
+	}
+
+	if displayed != target.ID {
 		t.Fatalf("opening client displays %q, want %q", displayed, target.ID)
 	}
 }
@@ -83,7 +90,9 @@ func testTmuxPopupSelectionSwitchesOpeningClient(t *testing.T, newerSession bool
 func TestAgentsPopupInitiallySelectsInvokingAgentPane(t *testing.T) {
 	fixture := newCLISessionFixture(t)
 	artifact := newArtifactBinaryFixture(t)
-	origin, secondInfo, registryPath, handoffPath := prepareAgentPickerPopup(t, fixture)
+	origin, secondInfo, registryPath := prepareAgentPickerPopup(t, fixture)
+	_, clientSlave := openPickerPopupPTY(t)
+	clientName := attachPickerPopupClient(t, fixture, origin, clientSlave)
 	master, slave := openPickerPopupPTY(t)
 
 	ctx, cancel := context.WithTimeout(t.Context(), 8*time.Second)
@@ -103,8 +112,7 @@ func TestAgentsPopupInitiallySelectsInvokingAgentPane(t *testing.T) {
 		string(origin.ID),
 		"--agent-state",
 		registryPath,
-		"--switch-handoff",
-		handoffPath,
+		"--popup-child",
 		"--history",
 		fixture.historyPath,
 		"--repository",
@@ -113,7 +121,7 @@ func TestAgentsPopupInitiallySelectsInvokingAgentPane(t *testing.T) {
 		fixture.leaseRoot,
 	)
 	command.Dir = artifact.workDir
-	command.Env = artifact.env
+	command.Env = append(slices.Clone(artifact.env), "SESH_TMUX_CLIENT="+clientName)
 	command.Stdin = slave
 	command.Stdout = slave
 	command.Stderr = slave
@@ -126,28 +134,13 @@ func TestAgentsPopupInitiallySelectsInvokingAgentPane(t *testing.T) {
 
 	waitForPickerPopupExit(t, ctx, commandDone, func() string { return "" })
 
-	encoded, err := os.ReadFile(handoffPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var handoff struct {
-		SessionID string `json:"sessionId"`
-		PaneID    string `json:"paneId"`
-	}
-	if err := json.Unmarshal(encoded, &handoff); err != nil {
-		t.Fatalf("decode handoff: %v", err)
-	}
-
-	if handoff.SessionID != string(origin.ID) || handoff.PaneID != string(secondInfo.ID) {
-		t.Fatalf("initial agent selection = %+v, want pane %s", handoff, secondInfo.ID)
-	}
+	waitForSelectedPickerPane(t, secondInfo)
 }
 
 func TestTmuxAgentsPopupShowsLoadingWhileRegistryIsLocked(t *testing.T) {
 	fixture := newCLISessionFixture(t)
 	artifact := newArtifactBinaryFixture(t)
-	origin, secondInfo, registryPath, _ := prepareAgentPickerPopup(t, fixture)
+	origin, secondInfo, registryPath := prepareAgentPickerPopup(t, fixture)
 	master, slave := openPickerPopupPTY(t)
 	clientName := attachPickerPopupClient(t, fixture, origin, slave)
 
@@ -198,25 +191,13 @@ func TestTmuxAgentsPopupShowsLoadingWhileRegistryIsLocked(t *testing.T) {
 
 	waitForPickerPopupExit(t, ctx, commandDone, commandOutput.String)
 
-	active, err := secondInfo.Handle().Window(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	selected, err := active.ActivePane(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if selected.ID() != secondInfo.ID {
-		t.Fatalf("selected pane = %s, want invoking agent %s", selected.ID(), secondInfo.ID)
-	}
+	waitForSelectedPickerPane(t, secondInfo)
 }
 
 func TestTmuxPopupSelectsInvokingAgentWithLinkedWindow(t *testing.T) {
 	fixture := newCLISessionFixture(t)
 	artifact := newArtifactBinaryFixture(t)
-	origin, secondInfo, registryPath, _ := prepareAgentPickerPopup(t, fixture)
+	origin, secondInfo, registryPath := prepareAgentPickerPopup(t, fixture)
 	linked := fixture.newLiveSession(t, "linked-session")
 
 	window, err := secondInfo.Handle().Window(t.Context())
@@ -270,20 +251,13 @@ func TestTmuxPopupSelectsInvokingAgentWithLinkedWindow(t *testing.T) {
 
 	waitForPickerPopupExit(t, ctx, commandDone, commandOutput.String)
 
-	active, err := window.ActivePane(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if active.ID() != secondInfo.ID {
-		t.Fatalf("selected pane = %s, want invoking agent pane %s", active.ID(), secondInfo.ID)
-	}
+	waitForSelectedPickerPane(t, secondInfo)
 }
 
 func prepareAgentPickerPopup(
 	t *testing.T,
 	fixture *cliSessionFixture,
-) (gotmux.SessionInfo, gotmux.PaneInfo, string, string) {
+) (gotmux.SessionInfo, gotmux.PaneInfo, string) {
 	t.Helper()
 	origin := fixture.fixtureSession(t)
 
@@ -330,12 +304,7 @@ func prepareAgentPickerPopup(
 		t.Fatalf("agent registry fixture = %d records, error %v", len(observed), err)
 	}
 
-	handoffPath := filepath.Join(t.TempDir(), "handoff.json")
-	if err := os.WriteFile(handoffPath, nil, 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	return origin, secondInfo, registryPath, handoffPath
+	return origin, secondInfo, registryPath
 }
 
 func writePickerPopupAgentRegistry(
@@ -514,4 +483,30 @@ func waitForPickerPopupExit(
 	case <-ctx.Done():
 		t.Fatal("popup did not finish after selection")
 	}
+}
+
+// The popup is gone before its program focuses the pane, so its launcher can exit first.
+func waitForSelectedPickerPane(t *testing.T, want gotmux.PaneInfo) {
+	t.Helper()
+
+	var selected gotmux.PaneID
+
+	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+		window, err := want.Handle().Window(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		pane, err := window.ActivePane(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		selected = pane.ID()
+		if selected == want.ID {
+			return
+		}
+	}
+
+	t.Fatalf("selected pane = %s, want invoking agent %s", selected, want.ID)
 }

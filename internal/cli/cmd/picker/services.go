@@ -112,7 +112,7 @@ func newServices(
 		popupChild:       false,
 		repository:       repository,
 		agentStore:       agentStore,
-		sessionNames:     transcriptNameCache{cache: nil},
+		sessionNames:     transcriptNameCache{restored: false, cache: nil},
 		titles:           titleCache{cache: nil, inflight: singleflight.Group{}},
 		panes:            singleflight.Group{},
 		initialReads:     nil,
@@ -906,16 +906,8 @@ func (s *services) performDeferredAttach(ctx context.Context, target session.Ses
 	return nil
 }
 
-func (s *services) recordPopupHeights(
-	ctx context.Context,
-	recorded *session.State,
-	heights []session.PopupHeight,
-) {
-	if !s.popupChild || s.workspace.History == "" ||
-		!slices.ContainsFunc(
-			heights,
-			func(fit session.PopupHeight) bool { return recorded.PopupHeight(fit.Mode) != fit.Height },
-		) {
+func (s *services) recordPopupHeights(ctx context.Context, heights []session.PopupHeight) {
+	if s.workspace.History == "" || len(heights) == 0 {
 		return
 	}
 

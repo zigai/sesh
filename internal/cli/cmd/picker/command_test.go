@@ -26,6 +26,7 @@ import (
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/session"
+	"github.com/zigai/sesh/internal/setup"
 )
 
 func newTestRootCommand(ctx context.Context) *cobra.Command {
@@ -38,6 +39,7 @@ func newTestRootCommand(ctx context.Context) *cobra.Command {
 	rootCommand.PersistentFlags().String("config", "", "Explicit native TOML configuration file")
 	rootCommand.PersistentFlags().
 		Bool("no-config", false, "Use built-in settings without reading configuration files")
+	rootCommand.PersistentFlags().Bool(setup.BindingFlag, false, "Report through tmux messages")
 
 	rootCommand.AddCommand(NewPickCommand(ctx))
 
@@ -117,7 +119,7 @@ func TestPickKeepsPopupChildFlagsOnHiddenChildAndOmitsLauncherFlags(t *testing.T
 		t.Fatalf("pick ui = %v, %v; want a hidden popup child", child, err)
 	}
 
-	for _, name := range []string{"switch-handoff", "launched-at", "target-pane", "current-session-id"} {
+	for _, name := range []string{"popup-child", "launched-at", "target-pane", "current-session-id"} {
 		if cmd.Flags().Lookup(name) != nil || child.Flags().Lookup(name) == nil {
 			t.Fatalf("--%s belongs only to the popup child", name)
 		}
@@ -161,7 +163,6 @@ func TestPopupChildReceivesInvokingPaneSessionAndRepository(t *testing.T) {
 		"/private/tmux.sock",
 		"$7",
 		"%2",
-		"/private/handoff",
 		"inbox",
 		launchedAt,
 	)
@@ -175,7 +176,7 @@ func TestPopupChildReceivesInvokingPaneSessionAndRepository(t *testing.T) {
 
 	for _, required := range []string{
 		"--repository", "/private/repository", "--target-pane", "%2", "--current-session-id", "$7",
-		"--switch-handoff", "/private/handoff", "--launched-at", "1790000000123456789", "--mode", "inbox",
+		"--popup-child", "--launched-at", "1790000000123456789", "--mode", "inbox",
 	} {
 		if !slices.Contains(arguments, required) {
 			t.Fatalf("popup child arguments lack %q: %#v", required, arguments)

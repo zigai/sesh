@@ -21,6 +21,9 @@ const (
 	// messages instead of run-shell output and exit status.
 	BindingFlag = "tmux-binding"
 	rootTable   = "root"
+
+	popupOptionPrefix = "@sesh_popup_"
+	popupDefaultMode  = "default"
 )
 
 var (
@@ -108,7 +111,7 @@ func Bindings(bindings []action.Binding) ([]Binding, error) {
 			Action:  string(binding.Action),
 			Purpose: purpose(descriptor, binding.Values),
 			Command: command,
-			Program: bindingProgram(binding.Key, binding.Table, command),
+			Program: bindingProgram(binding, command),
 		})
 	}
 
@@ -151,21 +154,62 @@ func ShellWord(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", `'\''`) + "'"
 }
 
-func bindingProgram(key string, table string, command string) []string {
-	if table != rootTable {
-		return []string{"run-shell", "-b", command}
-	}
-
-	return forwardInRemoteAttachment(key, command)
+// PopupCommandOption names the server option holding the tmux command that opens the picker popup
+// for mode, or for the saved mode when mode is empty.
+func PopupCommandOption(mode string) string {
+	return popupOptionPrefix + "command_" + popupOptionMode(mode)
 }
 
-func forwardInRemoteAttachment(key string, command string) []string {
+// PopupSizeOption names the server option holding the client size PopupCommandOption was sized for.
+func PopupSizeOption(mode string) string {
+	return popupOptionPrefix + "size_" + popupOptionMode(mode)
+}
+
+func popupOptionMode(mode string) string {
+	if mode == "" {
+		return popupDefaultMode
+	}
+
+	return mode
+}
+
+func bindingProgram(binding action.Binding, command string) []string {
+	program := []string{"run-shell", "-b", command}
+	if binding.Action == action.PickPopup.ID {
+		program = popupProgram(binding.Values.String("mode"), command)
+	}
+
+	if binding.Table != rootTable {
+		return program
+	}
+
+	return forwardInRemoteAttachment(binding.Key, program)
+}
+
+// popupProgram opens the popup from the command the picker saved, without starting a process first.
+// The launching command runs instead until one is saved for this client size.
+func popupProgram(mode string, command string) []string {
+	return []string{
+		"if-shell",
+		"-F",
+		"#{==:#{" + PopupSizeOption(mode) + "},#{client_width}x#{client_height}}",
+		"run-shell -C " + quote("#{E:"+PopupCommandOption(mode)+"}"),
+		"run-shell -b " + quote(command),
+	}
+}
+
+func forwardInRemoteAttachment(key string, program []string) []string {
+	words := make([]string, 0, len(program))
+	for _, word := range program {
+		words = append(words, quote(word))
+	}
+
 	return []string{
 		"if-shell",
 		"-F",
 		"#{" + remote.AttachmentPaneOption + "}",
 		"send-keys " + quote(key),
-		"run-shell -b " + quote(command),
+		strings.Join(words, " "),
 	}
 }
 

@@ -236,7 +236,7 @@ func showTaskPopup(
 			Wrap(err)
 	}
 
-	handoffPath, cleanup, err := createPickerSwitchHandoff()
+	handoffPath, cleanup, err := createPopupHandoff()
 	if err != nil {
 		return taskHandoff{}, false, err
 	}

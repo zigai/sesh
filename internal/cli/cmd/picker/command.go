@@ -32,12 +32,12 @@ import (
 
 	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/app"
-	"github.com/zigai/sesh/internal/cli/actioncli"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/integration/tmuxserver"
 	"github.com/zigai/sesh/internal/logging"
 	"github.com/zigai/sesh/internal/session"
+	"github.com/zigai/sesh/internal/setup"
 	"github.com/zigai/sesh/internal/tui"
 )
 
@@ -51,7 +51,7 @@ const (
 	annotationEnabled = "true"
 	clientEnvironment = "SESH_TMUX_CLIENT"
 	launchedAtFlag    = "launched-at"
-	switchHandoffFlag = "switch-handoff"
+	popupChildFlag    = "popup-child"
 	targetPaneFlag    = "target-pane"
 	sessionIDFlag     = "current-session-id"
 	uiFlag            = "ui"
@@ -181,7 +181,10 @@ func NewPickCommand(ctx context.Context, remote ...RemoteFactory) *cobra.Command
 	clibase.SetFlagChoices(cmd, uiFlag, uiAuto, "popup", "inline", "fullscreen")
 	addPickerModeFlag(cmd)
 
-	cmd.AddCommand(newPickPopupCommand(remoteFactory), newPickUICommand(ctx, remoteFactory))
+	cmd.AddCommand(
+		newPickPopupCommand(remoteFactory),
+		newPickUICommand(ctx, remoteFactory),
+	)
 
 	return cmd
 }
@@ -193,8 +196,9 @@ func newPickUICommand(ctx context.Context, remoteFactory RemoteFactory) *cobra.C
 		Hidden: true,
 		Args:   clibase.UsageArgs(cobra.NoArgs),
 		Annotations: map[string]string{
-			clibase.AnnotationLiveIO:    annotationEnabled,
-			clibase.AnnotationOperation: "picker",
+			clibase.AnnotationBackgroundLog: annotationEnabled,
+			clibase.AnnotationLiveIO:        annotationEnabled,
+			clibase.AnnotationOperation:     "picker",
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runPickCommand(executionContext(ctx, cmd), cmd, presentationPopup, remoteFactory)
@@ -203,7 +207,7 @@ func newPickUICommand(ctx context.Context, remoteFactory RemoteFactory) *cobra.C
 
 	addPickerPathFlags(cmd)
 	addPickerModeFlag(cmd)
-	cmd.Flags().String(switchHandoffFlag, "", "Popup switch handoff file")
+	cmd.Flags().Bool(popupChildFlag, false, "Run as the program of a picker popup")
 	cmd.Flags().Int64(launchedAtFlag, 0, "Popup launch time")
 	cmd.Flags().String(targetPaneFlag, "", "Invoking tmux pane")
 	cmd.Flags().String(sessionIDFlag, "", "Invoking tmux session ID")
@@ -346,10 +350,11 @@ func runPickerInteractive(
 	}
 
 	services.currentPane = currentPane(cmd)
-	handoffPath, _ := cmd.Flags().GetString(switchHandoffFlag)
-	services.popupChild = handoffPath != ""
+	services.popupChild, _ = cmd.Flags().GetBool(popupChildFlag)
 	services.currentSessionID, _ = cmd.Flags().GetString(sessionIDFlag)
 	services.startInitialReads(ctx)
+
+	startMode := runtime.state.PopupDisplayMode
 
 	model, err := buildPickerModel(
 		ctx,
@@ -370,11 +375,10 @@ func runPickerInteractive(
 	}
 
 	finalModel, runErr := runPickerProgram(ctx, cmd, model, presentation)
-	if runErr == nil {
-		services.recordPopupHeights(ctx, runtime.state, finalModel.FittingPopupHeights())
-	}
 
-	return finishPickerInteractive(ctx, cmd, finalModel, services, runErr)
+	return finishPickerInteractive(
+		ctx, cmd, finalModel, services, runtime, startMode, remoteFactory, runErr,
+	)
 }
 
 func launchedAt(cmd *cobra.Command, now time.Time) (time.Time, bool) {
@@ -400,50 +404,46 @@ func finishPickerInteractive(
 	cmd *cobra.Command,
 	finalModel *tui.Model,
 	services *services,
+	runtime commandRuntime,
+	startMode string,
+	remoteFactory RemoteFactory,
 	runErr error,
 ) error {
-	var deferredErr error
-
-	var handoffTarget *session.Session
-
-	var handoffPane string
-
-	handoffPath, _ := cmd.Flags().GetString(switchHandoffFlag)
-
-	if runErr == nil && ctx.Err() == nil {
-		if target, ok := finalModel.DeferredSwitchTarget(); ok && handoffPath != "" {
-			handoffTarget = &target
-			handoffPane = finalModel.DeferredSwitchPane()
-		} else {
-			deferredErr = runPickerDeferred(
-				ctx,
-				cmd.InOrStdin(),
-				cmd.OutOrStdout(),
-				cmd.ErrOrStderr(),
-				finalModel,
-				services,
-			)
-		}
-	}
-
-	closeErr := services.Close()
-	if handoffPath != "" && closeErr == nil {
-		handoffErr := writePickerSwitchHandoff(
-			handoffPath,
-			handoffTarget,
-			handoffPane,
-			finalModel.ReplayKey(),
-			finalModel.TaskProject(),
-			services.takeDeferredAgentViews(),
-		)
-		deferredErr = errors.Join(deferredErr, handoffErr)
-	}
-
 	if runErr != nil {
-		runErr = oops.In("cli").With("operation", "run_picker").Wrap(runErr)
+		return errors.Join(
+			oops.In("cli").With("operation", "run_picker").Wrap(runErr),
+			services.Close(),
+		)
 	}
 
-	return errors.Join(runErr, deferredErr, closeErr)
+	if ctx.Err() != nil {
+		return services.Close()
+	}
+
+	if services.popupChild {
+		return finishPopupPicker(
+			ctx,
+			cmd,
+			finalModel,
+			services,
+			runtime.workspace,
+			runtime.state,
+			startMode,
+			remoteFactory,
+		)
+	}
+
+	return errors.Join(
+		runPickerDeferred(
+			ctx,
+			cmd.InOrStdin(),
+			cmd.OutOrStdout(),
+			cmd.ErrOrStderr(),
+			finalModel,
+			services,
+		),
+		services.Close(),
+	)
 }
 
 func preparePickerCommand(cmd *cobra.Command) (commandRuntime, error) {
@@ -572,7 +572,6 @@ func openPickerPopup(
 	caller action.Caller,
 	mode string,
 	launchedAt time.Time,
-	remoteFactory RemoteFactory,
 ) error {
 	server, err := tmuxserver.OpenInteractive(runtime.workspace.Socket)
 	if err != nil {
@@ -603,15 +602,15 @@ func openPickerPopup(
 		return err
 	}
 
-	handoffPath, cleanup, err := createPickerSwitchHandoff()
-	if err != nil {
-		return err
-	}
-	defer cleanup()
-
 	targetPane := caller.Pane
 	if targetPane == "" {
 		targetPane = os.Getenv("TMUX_PANE")
+	}
+
+	if err := savePopupCommand(
+		ctx, cmd, server, runtime.workspace, runtime.state, mode, executable, client,
+	); err != nil {
+		return err
 	}
 
 	width, height := popupDimensions(
@@ -627,7 +626,6 @@ func openPickerPopup(
 				runtime.workspace.Socket,
 				string(originSessionID),
 				targetPane,
-				handoffPath,
 				mode,
 				launchedAt,
 			)...,
@@ -637,61 +635,17 @@ func openPickerPopup(
 		runtime.workspace.Config.Theme.Background,
 	)
 
-	services, err := newServices(
-		ctx,
-		runtime.workspace,
-		gotmux.Streams{In: nil, Out: nil, Err: nil},
-		RemoteServices{
-			Catalog:      nil,
-			Watcher:      nil,
-			Peer:         nil,
-			Attach:       nil,
-			OriginBridge: nil,
-			Origin:       nil,
-		},
-	)
-	if err != nil {
-		return err
-	}
-
 	options.TmuxEnv = map[string]string{clientEnvironment: string(client.Name)}
 
 	if err := client.Handle().Popup(ctx, options); err != nil {
 		if popupAlreadyOpen(err) {
-			return services.Close()
+			return nil
 		}
 
-		return errors.Join(
-			oops.In("cli").With("operation", "open_picker_popup").Wrap(err),
-			services.Close(),
-		)
+		return oops.In("cli").With("operation", "open_picker_popup").Wrap(err)
 	}
 
-	return errors.Join(
-		completePickerSwitchHandoff(
-			ctx,
-			services,
-			handoffPath,
-			string(client.Name),
-			string(originSessionID),
-		),
-		replayPickerKey(ctx, handoffPath, runtime.workspace.Socket, string(client.Name)),
-		services.Close(),
-		openHandoffTaskMenu(
-			ctx,
-			cmd,
-			runtime.workspace.Config,
-			handoffPath,
-			action.Caller{
-				Client:  string(client.Name),
-				Pane:    targetPane,
-				Session: "",
-				Width:   "",
-				Height:  "",
-			},
-			remoteFactory,
-		),
-	)
+	return nil
 }
 
 // popupAlreadyOpen recognizes the refusal tmux gives while a window shows a popup, which is what a
@@ -700,30 +654,6 @@ func popupAlreadyOpen(err error) bool {
 	command, ok := errors.AsType[*gotmux.CommandError](err)
 
 	return ok && bytes.Contains(command.Result.Stderr, []byte("already has a modal pane"))
-}
-
-func openHandoffTaskMenu(
-	ctx context.Context,
-	cmd *cobra.Command,
-	cfg *config.Config,
-	path string,
-	caller action.Caller,
-	remoteFactory RemoteFactory,
-) error {
-	handoff, _, err := readPickerSwitchHandoff(path)
-	if err != nil || handoff.TaskProject == "" {
-		return err
-	}
-
-	runtime, err := actioncli.OpenRuntime(cmd, cfg)
-	if err != nil {
-		return err
-	}
-
-	return errors.Join(
-		openTaskPicker(ctx, cmd, cfg, runtime, caller, remoteFactory, handoff.TaskProject),
-		runtime.Close(),
-	)
 }
 
 func popupOptions(
@@ -758,10 +688,12 @@ func popupOptions(
 
 func popupArguments(
 	cmd *cobra.Command,
-	socketPath string, sessionID string, paneID string, handoffPath string, mode string,
+	socketPath string, sessionID string, paneID string, mode string,
 	launchedAt time.Time,
 ) []string {
-	arguments := []string{"pick", "ui", "--socket", socketPath}
+	arguments := []string{
+		"pick", "ui", "--socket", socketPath, "--" + setup.BindingFlag, "--" + popupChildFlag,
+	}
 
 	if mode != "" {
 		arguments = append(arguments, "--"+modeFlag, mode)
@@ -773,10 +705,6 @@ func popupArguments(
 			"--"+launchedAtFlag,
 			strconv.FormatInt(launchedAt.UnixNano(), 10),
 		)
-	}
-
-	if handoffPath != "" {
-		arguments = append(arguments, "--"+switchHandoffFlag, handoffPath)
 	}
 
 	if paneID != "" {

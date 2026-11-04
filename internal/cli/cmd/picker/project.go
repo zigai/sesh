@@ -112,7 +112,7 @@ func (frontend projectFrontend) Dispatch(
 		return nil, oops.In("cli").With("operation", "resolve_executable").Wrap(err)
 	}
 
-	handoffPath, cleanup, err := createPickerSwitchHandoff()
+	handoffPath, cleanup, err := createPopupHandoff()
 	if err != nil {
 		return nil, err
 	}

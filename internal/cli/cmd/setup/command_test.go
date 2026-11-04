@@ -53,7 +53,8 @@ func TestSetupTmuxPrintsBindingsWithoutSocket(t *testing.T) {
 		rootBinding("S-F12", "sesh agent next"+caller+" --tmux-binding") + `\""`,
 		rootBinding("M-S-F12", "sesh agent next --local=true"+caller+" --tmux-binding") + `\""`,
 		rootBinding("S-F1", "sesh agent back"+caller+" --tmux-binding") + `\""`,
-		rootBinding("C-o", "sesh pick popup"+caller+" --tmux-binding") + `\""`,
+		"sesh pick popup" + caller + " --tmux-binding",
+		`run-shell -C \\\"#{E:@sesh_popup_command_default}\\\"`,
 	} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("stdout missing %q:\n%s", want, stdout)

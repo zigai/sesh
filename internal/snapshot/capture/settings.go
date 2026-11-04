@@ -27,7 +27,8 @@ func options(ctx context.Context, scope string, source optionLister) ([]model.Op
 
 	result := make([]model.Option, 0, len(entries))
 	for _, entry := range entries {
-		if scope == "server" && strings.HasPrefix(entry.Name, "@sesh_origin_") {
+		if scope == "server" && (strings.HasPrefix(entry.Name, "@sesh_origin_") ||
+			strings.HasPrefix(entry.Name, "@sesh_popup_")) {
 			continue
 		}
 
