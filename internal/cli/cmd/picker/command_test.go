@@ -927,7 +927,7 @@ func TestPickerSessionNamesResetSameSizeRewrite(t *testing.T) {
 	state := readPickerSessionName(t.Context(), path, sessionNameState{}, nameFileReadLimit)
 	writePickerNameFixture(t, path, `{"type":"session_info","name":"After!"}`+"\n")
 
-	changed := state.fileInfo.ModTime().Add(time.Second)
+	changed := time.Unix(0, state.stamp.Modified).Add(time.Second)
 	if err := os.Chtimes(path, changed, changed); err != nil {
 		t.Fatal(err)
 	}
@@ -975,5 +975,74 @@ func appendPickerNameFixture(t *testing.T, path string, content string) {
 	closeErr := file.Close()
 	if writeErr != nil || closeErr != nil {
 		t.Fatalf("append transcript: write=%v close=%v", writeErr, closeErr)
+	}
+}
+
+func TestSessionNameStaysCurrentAcrossPickerProcesses(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_RUNTIME_DIR", dir)
+
+	transcript := filepath.Join(dir, "transcript.jsonl")
+	summaries := func() []session.AgentSummary {
+		return []session.AgentSummary{{Agents: []session.AgentSession{{
+			Harness: "pi", SessionPath: transcript,
+		}}}}
+	}
+	nameLine := func(name string) string {
+		return `{"type":"session_info","name":"` + name + `"}` + "\n"
+	}
+	shown := func(t *testing.T) string {
+		t.Helper()
+
+		var picker transcriptNameCache
+
+		rows := summaries()
+		picker.annotateInventory(t.Context(), rows)
+
+		return rows[0].Agents[0].HarnessSession
+	}
+
+	if err := os.WriteFile(transcript, []byte(nameLine("first")), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := shown(t); !strings.Contains(got, "first") {
+		t.Fatalf("name = %q, want first", got)
+	}
+
+	appended, err := os.OpenFile(transcript, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := appended.WriteString(nameLine("renamed")); err != nil {
+		t.Fatal(err)
+	}
+
+	_ = appended.Close()
+
+	if got := shown(t); !strings.Contains(got, "renamed") {
+		t.Fatalf("name = %q, want the rename made after the last picker closed", got)
+	}
+
+	replacement := transcript + ".new"
+	if err := os.WriteFile(replacement, []byte(nameLine("replaced")), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.Rename(replacement, transcript); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := shown(t); !strings.Contains(got, "replaced") {
+		t.Fatalf("name = %q, want the replaced transcript's name", got)
+	}
+
+	if err := os.WriteFile(filepath.Join(dir, sessionNamesFile), []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := shown(t); !strings.Contains(got, "replaced") {
+		t.Fatalf("name = %q with an unreadable store, want it read from the transcript", got)
 	}
 }

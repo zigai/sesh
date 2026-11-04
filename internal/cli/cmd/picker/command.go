@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"maps"
 	"math"
 	"os"
 	"path/filepath"
@@ -22,6 +23,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/term"
+	"github.com/rs/zerolog"
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
 	"github.com/zigai/aht/v2/pkg/aht"
@@ -34,6 +36,7 @@ import (
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/integration/tmuxserver"
+	"github.com/zigai/sesh/internal/logging"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/tui"
 )
@@ -115,6 +118,7 @@ type terminalOutput struct {
 }
 
 type transcriptNameCache struct {
+	restored bool
 	//exhaustruct:optional
 	mu    sync.Mutex
 	cache map[string]sessionNameState
@@ -125,7 +129,8 @@ type sessionNameState struct {
 	name     string
 	hasInfo  bool
 	skipping bool
-	fileInfo os.FileInfo
+	stamp    sessionNameStamp
+	stamped  bool
 }
 
 type sessionNameLoad struct {
@@ -1180,10 +1185,19 @@ func (r *transcriptNameCache) annotateInventory(
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	storePath := sessionNamesPath()
+
+	if !r.restored {
+		r.restored = true
+		r.cache = loadSessionNames(storePath)
+	}
+
 	loads := sessionNameLoads(summaries, r.cache)
 	if len(loads) != 0 {
 		readPickerSessionNames(ctx, loads)
 	}
+
+	previous := r.cache
 
 	r.cache = make(map[string]sessionNameState, len(loads))
 	for _, load := range loads {
@@ -1196,6 +1210,16 @@ func (r *transcriptNameCache) annotateInventory(
 			agent.HarnessSession = load.state.name
 			agent.HarnessSession = harnessSessionLabel(*agent)
 		}
+	}
+
+	if maps.Equal(previous, r.cache) {
+		return
+	}
+
+	if err := saveSessionNames(storePath, r.cache); err != nil {
+		zerolog.Ctx(ctx).Warn().Str("component", "picker").
+			Str("operation", "save_session_names").Str("status", "degraded").
+			Func(logging.Cause(err)).Msg("session names were not stored")
 	}
 }
 
@@ -1287,11 +1311,13 @@ func readPickerSessionName(
 			name:     "",
 			hasInfo:  false,
 			skipping: false,
-			fileInfo: nil,
+			stamp:    sessionNameStamp{Inode: 0, Size: 0, Modified: 0},
+			stamped:  false,
 		}
 	}
 
-	state.fileInfo = info
+	state.stamp = newSessionNameStamp(info)
+	state.stamped = true
 	remaining := info.Size() - state.offset
 	length := min(remaining, limit)
 	reader := io.NewSectionReader(file, state.offset, length)
@@ -1300,12 +1326,14 @@ func readPickerSessionName(
 }
 
 func sessionNameReset(state sessionNameState, info os.FileInfo) bool {
-	if state.fileInfo == nil {
+	if !state.stamped {
 		return false
 	}
 
-	return !os.SameFile(state.fileInfo, info) || info.Size() < state.fileInfo.Size() ||
-		(info.Size() == state.fileInfo.Size() && !info.ModTime().Equal(state.fileInfo.ModTime()))
+	current := newSessionNameStamp(info)
+
+	return current.Inode != state.stamp.Inode || current.Size < state.stamp.Size ||
+		(current.Size == state.stamp.Size && current.Modified != state.stamp.Modified)
 }
 
 func decodePickerSessionName(
