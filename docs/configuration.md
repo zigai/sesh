@@ -237,7 +237,7 @@ After a crash, start tmux on the same socket and run `sesh snapshot restore`.
 
 ### `[snapshot]`
 
-The newest five snapshots are always kept.
+The newest five snapshots are always kept. Snapshots older than 24 hours are thinned to one per hour.
 
 - `retention_days` `(int: 14)` - Delete snapshots older than this. `0` disables the limit.
 - `max_count` `(int: 0)` - Keep at most this many snapshots. `0` disables the limit.

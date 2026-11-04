@@ -64,6 +64,7 @@ func newSnapshotPruneCommand() *cobra.Command {
 		Use:   "prune",
 		Short: "Apply configured snapshot retention to catalog membership",
 		Long: "Apply configured snapshot retention to catalog membership.\n\n" +
+			"Generations older than 24 hours are thinned to one per hour.\n\n" +
 			"Pruning removes catalog references and retires generations without deleting physical bytes immediately.",
 		Args: validateSnapshotMaintenanceArgs,
 		RunE: runSnapshotPrune,
@@ -200,9 +201,10 @@ func resolvedRetentionPolicy(
 	}
 
 	return store.RetentionPolicy{
-		MaxAge:   time.Duration(days) * 24 * time.Hour,
-		MaxCount: count,
-		MaxBytes: bytes,
+		MaxAge:      time.Duration(days) * 24 * time.Hour,
+		HourlyAfter: store.HourlyRetentionAfter,
+		MaxCount:    count,
+		MaxBytes:    bytes,
 	}, nil
 }
 

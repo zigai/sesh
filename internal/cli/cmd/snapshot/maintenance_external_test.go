@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/zigai/sesh/internal/cli"
 	"github.com/zigai/sesh/internal/cli/clibase"
@@ -213,4 +214,33 @@ func TestSnapshotPruneProtectedOverageEmitsOneEngineOwnedJSONOutcome(t *testing.
 	assertRuntimeRecord(t, records[0], "cli", "prune", "info", "started")
 	assertRuntimeRecord(t, records[1], "snapshot", "prune", "info", "started")
 	assertRuntimeRecord(t, records[2], "snapshot", "prune", "warn", "degraded")
+}
+
+func TestSnapshotPruneThinsGenerationsOlderThanADay(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "repository")
+	oldHour := time.Now().Add(-48 * time.Hour).Truncate(time.Hour)
+
+	commitCLIMaintenanceFixturesAt(t, path, oldHour, 3)
+	commitCLIMaintenanceFixturesAt(t, path, time.Now(), 5)
+
+	configPath := writeMaintenanceConfig(t, "retention_days = 14\nmax_count = 0\nmax_bytes = 0\n")
+
+	stdout, stderr, err := executeSnapshotCommand(
+		t,
+		"--config", configPath, "snapshot", "prune", "--repository", path, "--json",
+	)
+	if err != nil || stderr != "" {
+		t.Fatalf("prune failed: %v / %s", err, stderr)
+	}
+
+	var envelope struct {
+		Result testSnapshotPruneResult `json:"result"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &envelope); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(envelope.Result.Removed) != 2 || len(envelope.Result.Retained) != 6 {
+		t.Fatalf("prune result = %s, want two old saves thinned", stdout)
+	}
 }

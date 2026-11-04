@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/snapshot/model"
@@ -29,7 +30,7 @@ func TestAutosaveMaintenanceRetiresAndReclaimsGenerations(t *testing.T) {
 	})
 
 	for range 7 {
-		commitMaintenanceObservation(t, repo)
+		commitMaintenanceObservation(t, repo, time.Now())
 	}
 
 	if err := maintainAutosaveRepository(
@@ -62,7 +63,48 @@ func TestAutosaveMaintenanceRetiresAndReclaimsGenerations(t *testing.T) {
 	}
 }
 
-func commitMaintenanceObservation(t *testing.T, repo *store.Repository) {
+func TestAutosaveMaintenanceThinsSavesOlderThanADay(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "snapshots")
+
+	repo, err := store.Open(t.Context(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Cleanup(func() {
+		if err := repo.Close(); err != nil {
+			t.Error(err)
+		}
+	})
+
+	oldHour := time.Now().Add(-48 * time.Hour).Truncate(time.Hour)
+	for minute := range 4 {
+		commitMaintenanceObservation(t, repo, oldHour.Add(time.Duration(minute)*time.Minute))
+	}
+
+	for range 5 {
+		commitMaintenanceObservation(t, repo, time.Now())
+	}
+
+	if err := maintainAutosaveRepository(
+		t.Context(),
+		repo,
+		config.SnapshotConfig{RetentionDays: 14, MaxCount: 0, MaxBytes: 0},
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	entries, err := os.ReadDir(filepath.Join(path, "generations"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(entries) != 6 {
+		t.Fatalf("generation directories = %d, want one old save and the 5 newest", len(entries))
+	}
+}
+
+func commitMaintenanceObservation(t *testing.T, repo *store.Repository, finished time.Time) {
 	t.Helper()
 
 	attempt, err := repo.Begin(t.Context())
@@ -76,8 +118,8 @@ func commitMaintenanceObservation(t *testing.T, repo *store.Repository) {
 	manifest := model.Manifest{
 		Format:   "sesh",
 		Version:  model.Schema,
-		Started:  1,
-		Finished: 2,
+		Started:  finished.UnixNano() - 1,
+		Finished: finished.UnixNano(),
 		Source: model.Source{
 			TmuxVersion:    "3.6",
 			LibraryVersion: "v0.3.0",

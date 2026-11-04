@@ -15,12 +15,17 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/model"
 )
 
+// HourlyRetentionAfter is the age at which configured retention thins generations to one per hour.
+const HourlyRetentionAfter = 24 * time.Hour
+
 // RetentionPolicy always keeps the five newest generations by sequence, the current generation and
-// every active restore's source, and never alters the latest save attempt.
+// every active restore's source, and never alters the latest save attempt. Generations older than
+// HourlyAfter are reduced to one per UTC hour, preferring the newest complete one.
 type RetentionPolicy struct {
-	MaxAge   time.Duration
-	MaxCount int
-	MaxBytes int64
+	MaxAge      time.Duration
+	HourlyAfter time.Duration
+	MaxCount    int
+	MaxBytes    int64
 }
 
 type RetentionResult struct {
@@ -46,6 +51,10 @@ func (p RetentionPolicy) Validate(now time.Time) error {
 	}
 
 	if p.MaxAge > 0 && now.IsZero() {
+		return ErrConflict
+	}
+
+	if p.HourlyAfter < 0 || (p.HourlyAfter > 0 && now.IsZero()) {
 		return ErrConflict
 	}
 
@@ -177,7 +186,7 @@ func (r *Repository) loadRetentionMetadata(
 		return r.loadRetentionBytes(ctx, gens)
 	}
 
-	if policy.MaxAge > 0 {
+	if policy.MaxAge > 0 || policy.HourlyAfter > 0 {
 		timestamps, retired, err := r.loadRetentionTimestamps(ctx, gens)
 		return nil, timestamps, retired, err
 	}
@@ -293,6 +302,7 @@ func (c Catalog) evaluateAgeCountRemovals(
 		cutoff = now.UTC().Add(-policy.MaxAge)
 	}
 
+	thinned := thinnedGenerations(ordered, policy.HourlyAfter, now, timestamps, retired)
 	removedSet := make(map[string]bool)
 	index := 0
 
@@ -305,6 +315,12 @@ func (c Catalog) evaluateAgeCountRemovals(
 			continue
 		}
 
+		// A thinned generation is outside the kept history, so it does not use up a MaxCount slot.
+		if thinned[gen.ID] && !protectedMap[gen.ID] {
+			removedSet[gen.ID] = true
+			continue
+		}
+
 		if !protectedMap[gen.ID] && shouldPrune(index, gen.ID, policy, cutoff, timestamps) {
 			removedSet[gen.ID] = true
 		}
@@ -313,6 +329,52 @@ func (c Catalog) evaluateAgeCountRemovals(
 	}
 
 	return removedSet
+}
+
+// thinnedGenerations chooses each hour's survivor from every generation in that hour, not only the
+// old ones, so it does not change as the generations age past the threshold.
+func thinnedGenerations(
+	ordered []Generation,
+	after time.Duration,
+	now time.Time,
+	timestamps map[string]int64,
+	retired map[string]bool,
+) map[string]bool {
+	if after <= 0 {
+		return nil
+	}
+
+	finishedHour := func(gen Generation) int64 {
+		return time.Unix(0, timestamps[gen.ID]).UTC().Truncate(time.Hour).Unix()
+	}
+
+	survivors := make(map[int64]Generation)
+
+	for _, gen := range ordered {
+		if retired[gen.ID] {
+			continue
+		}
+
+		hour := finishedHour(gen)
+		if survivor, ok := survivors[hour]; !ok || (gen.Complete && !survivor.Complete) {
+			survivors[hour] = gen
+		}
+	}
+
+	cutoff := now.UTC().Add(-after)
+	thinned := make(map[string]bool)
+
+	for _, gen := range ordered {
+		if retired[gen.ID] || survivors[finishedHour(gen)].ID == gen.ID {
+			continue
+		}
+
+		if time.Unix(0, timestamps[gen.ID]).Before(cutoff) {
+			thinned[gen.ID] = true
+		}
+	}
+
+	return thinned
 }
 
 func evaluateByteBudget(

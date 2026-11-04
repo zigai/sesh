@@ -128,10 +128,5 @@ func MaintenanceDue(previousSaveUnix int64, now time.Time) bool {
 		return true
 	}
 
-	previousYear, previousMonth, previousDay := time.Unix(previousSaveUnix, 0).
-		In(now.Location()).
-		Date()
-	year, month, day := now.Date()
-
-	return previousYear != year || previousMonth != month || previousDay != day
+	return !time.Unix(previousSaveUnix, 0).Truncate(time.Hour).Equal(now.Truncate(time.Hour))
 }

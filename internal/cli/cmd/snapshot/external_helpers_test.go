@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/zigai/sesh/internal/cli"
 	"github.com/zigai/sesh/internal/cli/clibase"
@@ -87,6 +88,12 @@ func writeMaintenanceConfig(t *testing.T, snapshotBody string) string {
 func commitCLIMaintenanceFixtures(t *testing.T, path string, count int) {
 	t.Helper()
 
+	commitCLIMaintenanceFixturesAt(t, path, time.Now(), count)
+}
+
+func commitCLIMaintenanceFixturesAt(t *testing.T, path string, at time.Time, count int) {
+	t.Helper()
+
 	repository, err := store.Open(t.Context(), path)
 	if err != nil {
 		t.Fatal(err)
@@ -98,6 +105,8 @@ func commitCLIMaintenanceFixtures(t *testing.T, path string, count int) {
 		}
 	})
 
+	base := at.UnixNano()
+
 	for index := range count {
 		attempt, err := repository.Begin(t.Context())
 		if err != nil {
@@ -107,8 +116,8 @@ func commitCLIMaintenanceFixtures(t *testing.T, path string, count int) {
 		manifest := model.Manifest{
 			Format:   "sesh",
 			Version:  model.Schema,
-			Started:  int64(index*2 + 1),
-			Finished: int64(index*2 + 2),
+			Started:  base + int64(index*2+1),
+			Finished: base + int64(index*2+2),
 			Source: model.Source{
 				TmuxVersion:    "3.6",
 				LibraryVersion: "v0.3.0",

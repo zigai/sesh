@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -33,7 +34,7 @@ func newLossFixture(t *testing.T, committed bool) *lossFixture {
 	t.Cleanup(func() { _ = repo.Close() })
 
 	if committed {
-		commitMaintenanceObservation(t, repo)
+		commitMaintenanceObservation(t, repo, time.Now())
 	}
 
 	historyPath := filepath.Join(t.TempDir(), "state", "history.json")
@@ -192,7 +193,7 @@ func TestNothingSavedDoesNotConsumeTheEpisode(t *testing.T) {
 		t.Fatalf("expected silence without a snapshot, got %d", count)
 	}
 
-	commitMaintenanceObservation(t, fixture.repo)
+	commitMaintenanceObservation(t, fixture.repo, time.Now())
 
 	if count := fixture.report(t); count != 1 {
 		t.Fatalf("a snapshot that appears later must still be reported, got %d", count)

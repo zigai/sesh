@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/zigai/sesh/internal/snapshot/model"
 )
@@ -503,6 +504,8 @@ func TestRetentionInvalidPolicies(t *testing.T) {
 		{"negative count", now, RetentionPolicy{MaxCount: -1}},
 		{"negative age", now, RetentionPolicy{MaxAge: -time.Hour}},
 		{"zero time with age enabled", time.Time{}, RetentionPolicy{MaxAge: time.Hour}},
+		{"negative hourly threshold", now, RetentionPolicy{HourlyAfter: -time.Hour}},
+		{"zero time with hourly thinning", time.Time{}, RetentionPolicy{HourlyAfter: time.Hour}},
 	}
 
 	for _, tc := range cases {
@@ -1114,5 +1117,255 @@ func TestRetentionRemovesGenerationsWithUnsupportedSchema(t *testing.T) {
 				t.Fatal("a kept retired generation must not count against the byte budget")
 			}
 		})
+	}
+}
+
+func commitCompleteSnapshotAt(t *testing.T, r *Repository, finishedTime time.Time) Generation {
+	t.Helper()
+
+	attempt, err := r.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	m, artifacts := snapshotFixture()
+	m.Started = finishedTime.UnixNano() - int64(time.Millisecond)
+	m.Finished = finishedTime.UnixNano()
+	m.Source.Consistency = "checkpoint"
+
+	for i := range m.Evidence {
+		m.Evidence[i].Status, m.Evidence[i].Reason = "verified", ""
+	}
+
+	generation, err := r.Commit(t.Context(), attempt.ID, m, artifacts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return generation
+}
+
+func commitRecentGenerations(t *testing.T, r *Repository, now time.Time) []Generation {
+	t.Helper()
+
+	gens := make([]Generation, minimumRetained)
+	for i := range gens {
+		gens[i] = commitSnapshotAt(t, r, now.Add(-time.Duration(minimumRetained-i)*time.Minute))
+	}
+
+	return gens
+}
+
+func generationIDs(gens ...Generation) []string {
+	ids := make([]string, 0, len(gens))
+	for _, gen := range gens {
+		ids = append(ids, gen.ID)
+	}
+
+	slices.Sort(ids)
+
+	return ids
+}
+
+func assertRemoved(t *testing.T, result RetentionResult, want ...Generation) {
+	t.Helper()
+
+	got := slices.Sorted(slices.Values(result.Removed))
+	if diff := cmp.Diff(generationIDs(want...), got, cmpopts.EquateEmpty()); diff != "" {
+		t.Fatalf("removed generations diff (-want +got):\n%s", diff)
+	}
+}
+
+func TestHourlyThinningKeepsEverySaveInsideTheWindow(t *testing.T) {
+	r := openRepository(t, filepath.Join(t.TempDir(), "repository"))
+	now := time.Date(2026, 9, 19, 12, 30, 0, 0, time.UTC)
+
+	for i := range 8 {
+		commitSnapshotAt(t, r, now.Add(-23*time.Hour-time.Duration(i)*time.Minute))
+	}
+
+	commitRecentGenerations(t, r, now)
+
+	result, err := r.RetainPolicy(t.Context(), now, RetentionPolicy{HourlyAfter: 24 * time.Hour})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertRemoved(t, result)
+}
+
+func TestHourlyThinningKeepsNewestOfEachOldHourAsTimeAdvances(t *testing.T) {
+	r := openRepository(t, filepath.Join(t.TempDir(), "repository"))
+	now := time.Date(2026, 9, 19, 12, 30, 0, 0, time.UTC)
+	firstHour := time.Date(2026, 9, 17, 8, 0, 0, 0, time.UTC)
+
+	early := commitSnapshotAt(t, r, firstHour.Add(5*time.Minute))
+	middle := commitSnapshotAt(t, r, firstHour.Add(25*time.Minute))
+	kept := commitSnapshotAt(t, r, firstHour.Add(59*time.Minute))
+	nextHourEarly := commitSnapshotAt(t, r, firstHour.Add(time.Hour))
+	nextHourKept := commitSnapshotAt(t, r, firstHour.Add(time.Hour+time.Minute))
+	commitRecentGenerations(t, r, now)
+
+	policy := RetentionPolicy{HourlyAfter: 24 * time.Hour}
+
+	result, err := r.RetainPolicy(t.Context(), now, policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertRemoved(t, result, early, middle, nextHourEarly)
+
+	result, err = r.RetainPolicy(t.Context(), now.Add(72*time.Hour), policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, id := range result.Removed {
+		if id == kept.ID || id == nextHourKept.ID {
+			t.Fatalf("a later run removed the survivor of an old hour: %s", id)
+		}
+	}
+}
+
+func TestHourlyThinningOfHourCrossingTheCutoffKeepsItsNewestSave(t *testing.T) {
+	r := openRepository(t, filepath.Join(t.TempDir(), "repository"))
+	now := time.Date(2026, 9, 19, 12, 30, 0, 0, time.UTC)
+
+	old := commitSnapshotAt(t, r, now.Add(-24*time.Hour-20*time.Minute))
+	young := commitSnapshotAt(t, r, now.Add(-24*time.Hour+20*time.Minute))
+	commitRecentGenerations(t, r, now)
+
+	policy := RetentionPolicy{HourlyAfter: 24 * time.Hour}
+
+	result, err := r.RetainPolicy(t.Context(), now, policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertRemoved(t, result, old)
+
+	result, err = r.RetainPolicy(t.Context(), now.Add(time.Hour), policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if slices.Contains(result.Removed, young.ID) {
+		t.Fatal("the only remaining save of an hour was removed once it aged")
+	}
+}
+
+func TestHourlyThinningPrefersCompleteGeneration(t *testing.T) {
+	r := openRepository(t, filepath.Join(t.TempDir(), "repository"))
+	now := time.Date(2026, 9, 19, 12, 30, 0, 0, time.UTC)
+	mixedHour := time.Date(2026, 9, 17, 8, 0, 0, 0, time.UTC)
+	incompleteHour := mixedHour.Add(time.Hour)
+
+	olderIncomplete := commitSnapshotAt(t, r, mixedHour.Add(time.Minute))
+	commitCompleteSnapshotAt(t, r, mixedHour.Add(2*time.Minute))
+	newerIncomplete := commitSnapshotAt(t, r, mixedHour.Add(3*time.Minute))
+	firstOfIncompleteHour := commitSnapshotAt(t, r, incompleteHour.Add(time.Minute))
+	commitSnapshotAt(t, r, incompleteHour.Add(2*time.Minute))
+	commitRecentGenerations(t, r, now)
+
+	result, err := r.RetainPolicy(t.Context(), now, RetentionPolicy{HourlyAfter: 24 * time.Hour})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertRemoved(t, result, olderIncomplete, newerIncomplete, firstOfIncompleteHour)
+}
+
+func TestHourlyThinningNeverRemovesProtectedGenerations(t *testing.T) {
+	r := openRepository(t, filepath.Join(t.TempDir(), "repository"))
+	now := time.Date(2026, 9, 19, 12, 30, 0, 0, time.UTC)
+	oldHour := time.Date(2026, 9, 17, 8, 0, 0, 0, time.UTC)
+
+	pinned := commitSnapshotAt(t, r, oldHour.Add(time.Minute))
+	thinned := commitSnapshotAt(t, r, oldHour.Add(2*time.Minute))
+	commitSnapshotAt(t, r, oldHour.Add(3*time.Minute))
+
+	// The newest five saves share one old hour, so only their protection keeps them.
+	newest := make([]Generation, minimumRetained)
+	for i := range newest {
+		newest[i] = commitSnapshotAt(t, r, oldHour.Add(time.Hour+time.Duration(i)*time.Minute))
+	}
+
+	op, err := r.Pin(
+		t.Context(),
+		pinned.ID,
+		model.Bytes("target"),
+		[]Action{{ID: "act", Kind: actionLaunch, State: actionPlanned}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	policy := RetentionPolicy{HourlyAfter: 24 * time.Hour}
+
+	result, err := r.RetainPolicy(t.Context(), now, policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertRemoved(t, result, thinned)
+
+	if err := r.Finish(t.Context(), op.ID, true); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err = r.RetainPolicy(t.Context(), now, policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertRemoved(t, result, pinned)
+}
+
+func TestAgeLimitRemovesHourlySurvivors(t *testing.T) {
+	r := openRepository(t, filepath.Join(t.TempDir(), "repository"))
+	now := time.Date(2026, 9, 19, 12, 30, 0, 0, time.UTC)
+
+	expired := commitSnapshotAt(t, r, now.Add(-15*24*time.Hour))
+	survivor := commitSnapshotAt(t, r, now.Add(-13*24*time.Hour))
+	commitRecentGenerations(t, r, now)
+
+	result, err := r.RetainPolicy(
+		t.Context(),
+		now,
+		RetentionPolicy{MaxAge: 14 * 24 * time.Hour, HourlyAfter: 24 * time.Hour},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertRemoved(t, result, expired)
+
+	if !slices.Contains(result.Retained, survivor.ID) {
+		t.Fatal("hourly survivor inside the age limit was not retained")
+	}
+}
+
+func TestThinnedGenerationsDoNotUseCountSlots(t *testing.T) {
+	r := openRepository(t, filepath.Join(t.TempDir(), "repository"))
+	now := time.Date(2026, 9, 19, 12, 30, 0, 0, time.UTC)
+	oldHour := time.Date(2026, 9, 17, 8, 0, 0, 0, time.UTC)
+
+	thinned := commitSnapshotAt(t, r, oldHour.Add(time.Minute))
+	survivor := commitSnapshotAt(t, r, oldHour.Add(2*time.Minute))
+	commitRecentGenerations(t, r, now)
+
+	result, err := r.RetainPolicy(
+		t.Context(),
+		now,
+		RetentionPolicy{MaxCount: minimumRetained + 1, HourlyAfter: 24 * time.Hour},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertRemoved(t, result, thinned)
+
+	if !slices.Contains(result.Retained, survivor.ID) {
+		t.Fatal("thinned generation used the count slot of the hourly survivor")
 	}
 }

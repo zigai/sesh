@@ -678,9 +678,10 @@ func maintainAutosaveRepository(
 	snapshot config.SnapshotConfig,
 ) error {
 	policy := store.RetentionPolicy{
-		MaxAge:   time.Duration(snapshot.RetentionDays) * hoursPerDay * time.Hour,
-		MaxCount: snapshot.MaxCount,
-		MaxBytes: snapshot.MaxBytes,
+		MaxAge:      time.Duration(snapshot.RetentionDays) * hoursPerDay * time.Hour,
+		HourlyAfter: store.HourlyRetentionAfter,
+		MaxCount:    snapshot.MaxCount,
+		MaxBytes:    snapshot.MaxBytes,
 	}
 
 	_, pruneErr := engine.Prune(ctx, repo, time.Now().UTC(), policy)

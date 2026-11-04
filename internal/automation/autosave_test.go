@@ -229,7 +229,7 @@ func TestEffectiveInterval(t *testing.T) {
 	}
 }
 
-func TestMaintenanceDueOncePerCalendarDay(t *testing.T) {
+func TestMaintenanceDueOncePerHour(t *testing.T) {
 	t.Parallel()
 
 	location := time.FixedZone("test", 2*60*60)
@@ -243,22 +243,28 @@ func TestMaintenanceDueOncePerCalendarDay(t *testing.T) {
 	}{
 		{name: "no previous save", previous: 0, now: morning, want: true},
 		{
-			name:     "earlier the same day",
-			previous: morning.Add(-2 * time.Hour).Unix(),
-			now:      morning,
+			name:     "earlier the same hour",
+			previous: morning.Add(time.Minute).Unix(),
+			now:      morning.Add(30 * time.Minute),
 			want:     false,
 		},
 		{
-			name:     "just before midnight",
-			previous: time.Date(2026, 9, 24, 23, 59, 0, 0, location).Unix(),
+			name:     "just before the hour",
+			previous: morning.Add(-time.Minute).Unix(),
 			now:      morning,
 			want:     true,
 		},
 		{
-			name:     "same day across utc midnight",
-			previous: time.Date(2026, 9, 25, 1, 30, 0, 0, location).Unix(),
+			name:     "exactly on the hour",
+			previous: morning.Unix(),
 			now:      morning,
 			want:     false,
+		},
+		{
+			name:     "same minute of an earlier hour",
+			previous: morning.Add(-time.Hour).Unix(),
+			now:      morning,
+			want:     true,
 		},
 	}
 

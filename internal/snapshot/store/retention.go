@@ -34,7 +34,7 @@ func (r *Repository) Retain(ctx context.Context, count int) ([]string, error) {
 	result, err := r.RetainPolicy(
 		ctx,
 		time.Time{},
-		RetentionPolicy{MaxAge: 0, MaxCount: count, MaxBytes: 0},
+		RetentionPolicy{MaxAge: 0, HourlyAfter: 0, MaxCount: count, MaxBytes: 0},
 	)
 	if err != nil {
 		return nil, err
@@ -47,7 +47,7 @@ func (r *Repository) RetainBytes(ctx context.Context, maxBytes int64) (Retention
 	return r.RetainPolicy(
 		ctx,
 		time.Time{},
-		RetentionPolicy{MaxAge: 0, MaxCount: 0, MaxBytes: maxBytes},
+		RetentionPolicy{MaxAge: 0, HourlyAfter: 0, MaxCount: 0, MaxBytes: maxBytes},
 	)
 }
 
