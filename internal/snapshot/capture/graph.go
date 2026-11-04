@@ -13,6 +13,10 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/model"
 )
 
+// AllSessions selects every session in the view of tmux being captured, so a session closing after
+// a caller listed it cannot fail the capture.
+const AllSessions gotmux.SessionID = "*"
+
 var (
 	ErrChanged        = errors.New("tmux state changed during observation")
 	ErrSelection      = errors.New("explicit session selection required")
@@ -302,6 +306,21 @@ func paneObservation(info gotmux.PaneInfo) model.Pane {
 }
 
 func ref(prefix string, id string) string { return prefix + id[1:] }
+
+func resolveSelection(snapshot gotmux.Snapshot, selected []gotmux.SessionID) []gotmux.SessionID {
+	if !slices.Contains(selected, AllSessions) {
+		return selected
+	}
+
+	sessions := snapshot.Sessions()
+	resolved := make([]gotmux.SessionID, 0, len(sessions))
+
+	for _, info := range sessions {
+		resolved = append(resolved, info.ID)
+	}
+
+	return resolved
+}
 
 func closure(
 	snapshot gotmux.Snapshot,

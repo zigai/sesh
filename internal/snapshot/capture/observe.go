@@ -162,6 +162,8 @@ func observeOnce(
 		return Observation{}, err
 	}
 
+	selected = resolveSelection(before, selected)
+
 	m, floating, err := tiledGraph(before, selected)
 	if err != nil {
 		return Observation{}, err

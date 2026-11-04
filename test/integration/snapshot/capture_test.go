@@ -98,6 +98,40 @@ func TestCaptureRejectsUnknownSession(t *testing.T) {
 	}
 }
 
+func TestCaptureAllSessionsTakesThemFromTheCapturedView(t *testing.T) {
+	server := tmuxtest.NewServer(t)
+
+	for _, name := range []string{"first", "second"} {
+		if _, err := server.NewSession(
+			t.Context(),
+			gotmux.NewSessionOptions{
+				Name:    name,
+				Program: gotmux.Exec("/bin/sh", "-c", "exec sleep 300"),
+				Size:    gotmux.Size{Width: 100, Height: 35},
+				Start:   gotmux.StartPolicyExistingOnly,
+			},
+		); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	result, err := capture.Observe(t.Context(), server, []gotmux.SessionID{capture.AllSessions})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	captured := make([]string, 0, len(result.Manifest.Sessions))
+	for _, session := range result.Manifest.Sessions {
+		captured = append(captured, string(session.Name))
+	}
+
+	for _, name := range []string{"first", "second"} {
+		if !slices.Contains(captured, name) {
+			t.Fatalf("captured sessions = %q, want %q included", captured, name)
+		}
+	}
+}
+
 func setCaptureSettings(t *testing.T, session gotmux.Session) {
 	t.Helper()
 

@@ -14,6 +14,7 @@ import (
 	"github.com/zigai/sesh/internal/automation"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/session"
+	"github.com/zigai/sesh/internal/snapshot/capture"
 	"github.com/zigai/sesh/internal/snapshot/engine"
 	"github.com/zigai/sesh/internal/snapshot/restore"
 	"github.com/zigai/sesh/internal/snapshot/store"
@@ -276,9 +277,9 @@ func resolveAutosaveSelection(
 		return nil, oops.In("cli").With("operation", "list_live_sessions").Wrap(err)
 	}
 
-	for _, item := range live {
-		selected = append(selected, gotmux.SessionID(item.ID))
+	if len(live) == 0 {
+		return selected, nil
 	}
 
-	return selected, nil
+	return []gotmux.SessionID{capture.AllSessions}, nil
 }
