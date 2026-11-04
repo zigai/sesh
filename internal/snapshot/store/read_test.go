@@ -19,7 +19,7 @@ func TestReadsRevalidateSameSizeAndTimestamp(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	file := filepath.Join(path, "generations", generation.ID, "manifest.json")
+	file := filepath.Join(path, "generations", generation.ID, manifestFileName)
 
 	info, err := os.Stat(file)
 	if err != nil {
@@ -31,10 +31,8 @@ func TestReadsRevalidateSameSizeAndTimestamp(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	changed := bytes.Replace(data, []byte(`"started":1`), []byte(`"started":2`), 1)
-	if bytes.Equal(data, changed) || len(data) != len(changed) {
-		t.Fatal("fixture did not change equal-sized contents")
-	}
+	changed := bytes.Clone(data)
+	changed[len(changed)-1] ^= 1
 
 	rewriteFixtureFile(t, file, changed)
 

@@ -50,7 +50,7 @@ func stagedRewriteFixture(t *testing.T) (*Repository, string, Rewrite) {
 }
 
 func TestResumeRewritePreservesCorruptKnownStageFiles(t *testing.T) {
-	for _, relative := range []string{"manifest.json", "artifacts/a0.bin.gz"} {
+	for _, relative := range []string{manifestFileName, "artifacts/a0.bin.gz"} {
 		t.Run(relative, func(t *testing.T) {
 			r, path, rw := stagedRewriteFixture(t)
 			file := filepath.Join(path, "staging", rw.Replacement, relative)
@@ -76,7 +76,7 @@ func TestResumeRewritePreservesCorruptKnownStageFiles(t *testing.T) {
 func TestResumeRewriteRetainsUnsafeEntryCause(t *testing.T) {
 	r, path, rw := stagedRewriteFixture(t)
 
-	file := filepath.Join(path, "staging", rw.Replacement, "manifest.json")
+	file := filepath.Join(path, "staging", rw.Replacement, manifestFileName)
 	if err := os.Chmod(file, 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func assertPendingRewriteSource(t *testing.T, r *Repository, rw Rewrite) {
 }
 
 func TestResumeRewriteCompletesMatchingPrefixesInPlace(t *testing.T) {
-	for _, relative := range []string{"manifest.json", "artifacts/a0.bin.gz"} {
+	for _, relative := range []string{manifestFileName, "artifacts/a0.bin.gz"} {
 		t.Run(relative, func(t *testing.T) {
 			verifyCompletedPrefixInPlace(t, relative)
 		})

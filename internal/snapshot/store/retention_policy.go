@@ -485,7 +485,7 @@ func (r *Repository) readManifestBytes(generationID string) ([]byte, error) {
 		return nil, errors.Join(ErrCorrupt, openErr, closeParentErr)
 	}
 
-	data, readErr := dir.Read("manifest.json", model.MaxManifestBytes)
+	data, _, readErr := readManifestFile(dir)
 	closeDirErr := dir.Close()
 
 	if err := errors.Join(readErr, closeDirErr, closeParentErr); err != nil {

@@ -153,9 +153,14 @@ func readGenerationInventory(
 	dir *privatefs.Dir,
 	candidate collectionCandidate,
 ) (CollectionIntent, error) {
-	data, err := dir.Read(collectionManifestName, model.MaxManifestBytes)
+	compressed, err := dir.Read(collectionManifestName, model.MaxManifestBytes)
 	if err != nil {
 		return CollectionIntent{}, errors.Join(errCollectionUnsafe, err)
+	}
+
+	data, err := decompressManifest(compressed)
+	if err != nil {
+		return CollectionIntent{}, errors.Join(errCollectionContent, err)
 	}
 
 	if digest(data) != candidate.manifestSHA256 {
@@ -190,7 +195,7 @@ func readGenerationInventory(
 		return CollectionIntent{}, err
 	}
 
-	total, err := safeAdd(artifactBytes, int64(len(data)))
+	total, err := safeAdd(artifactBytes, int64(len(compressed)))
 	if err != nil {
 		return CollectionIntent{}, errors.Join(errCollectionContent, err)
 	}
@@ -202,7 +207,7 @@ func readGenerationInventory(
 		State:          collectionStateDeleting,
 		Reason:         "",
 		ManifestSHA256: digest(data),
-		ManifestBytes:  int64(len(data)),
+		ManifestBytes:  int64(len(compressed)),
 		Files:          files,
 		Bytes:          total,
 	}, nil
@@ -460,12 +465,17 @@ func verifyGenerationManifest(
 	dir *privatefs.Dir,
 	intent CollectionIntent,
 ) (manifestArtifacts, error) {
-	data, err := dir.Read(collectionManifestName, model.MaxManifestBytes)
+	compressed, err := dir.Read(collectionManifestName, model.MaxManifestBytes)
 	if err != nil {
 		return manifestArtifacts{}, errors.Join(errCollectionUnsafe, err)
 	}
 
-	if int64(len(data)) != intent.ManifestBytes || digest(data) != intent.ManifestSHA256 {
+	data, err := decompressManifest(compressed)
+	if err != nil {
+		return manifestArtifacts{}, errors.Join(errCollectionContradiction, err)
+	}
+
+	if int64(len(compressed)) != intent.ManifestBytes || digest(data) != intent.ManifestSHA256 {
 		return manifestArtifacts{}, errCollectionContradiction
 	}
 

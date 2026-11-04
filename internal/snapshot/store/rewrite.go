@@ -482,7 +482,7 @@ func (r *Repository) writeReplacementGeneration(
 		return err
 	}
 
-	if err := writeFile(dstDir, "manifest.json", data); err != nil {
+	if err := writeManifestFile(dstDir, data); err != nil {
 		return err
 	}
 

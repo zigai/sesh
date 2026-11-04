@@ -306,36 +306,12 @@ func readValidatedManifest(
 			Wrap(err)
 	}
 
-	manifestFile, fileErr := dir.File("manifest.json", unix.O_RDONLY)
-	if fileErr != nil {
-		return model.Manifest{}, 0, errors.Join(ErrCorrupt, fileErr)
+	data, manifestSize, readErr := readManifestFile(dir)
+	if readErr != nil {
+		return model.Manifest{}, 0, errors.Join(ErrCorrupt, readErr)
 	}
 
-	stat, statErr := manifestFile.Stat()
-	if statErr != nil {
-		closeFileErr := manifestFile.Close()
-		return model.Manifest{}, 0, errors.Join(ErrCorrupt, statErr, closeFileErr)
-	}
-
-	manifestSize := stat.Size()
-	if manifestSize < 0 || manifestSize > model.MaxManifestBytes {
-		closeFileErr := manifestFile.Close()
-		return model.Manifest{}, 0, errors.Join(ErrCorrupt, closeFileErr)
-	}
-
-	if err := ctx.Err(); err != nil {
-		closeFileErr := manifestFile.Close()
-		return model.Manifest{}, 0, errors.Join(err, closeFileErr)
-	}
-
-	data, readErr := io.ReadAll(io.LimitReader(manifestFile, model.MaxManifestBytes+1))
-	closeFileErr := manifestFile.Close()
-
-	if err := errors.Join(readErr, closeFileErr); err != nil {
-		return model.Manifest{}, 0, errors.Join(ErrCorrupt, err)
-	}
-
-	if int64(len(data)) != manifestSize || digest(data) != gen.ManifestSHA256 {
+	if digest(data) != gen.ManifestSHA256 {
 		return model.Manifest{}, 0, ErrCorrupt
 	}
 

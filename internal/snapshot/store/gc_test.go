@@ -62,7 +62,7 @@ func assertGenerationRemoved(t *testing.T, path string, id string) {
 func assertGenerationPresent(t *testing.T, path string, id string) {
 	t.Helper()
 
-	if _, err := os.Stat(filepath.Join(path, "generations", id, "manifest.json")); err != nil {
+	if _, err := os.Stat(filepath.Join(path, "generations", id, manifestFileName)); err != nil {
 		t.Fatal("generation bytes were destroyed", err)
 	}
 }

@@ -524,7 +524,7 @@ func TestRetentionRejectsTamperedManifestDigest(t *testing.T) {
 		gens[i] = commitSnapshotAt(t, r, now.Add(-5*time.Hour))
 	}
 
-	manifestPath := filepath.Clean(filepath.Join(path, "generations", gens[0].ID, "manifest.json"))
+	manifestPath := filepath.Clean(filepath.Join(path, "generations", gens[0].ID, manifestFileName))
 
 	m, err := r.Read(t.Context(), gens[0].ID)
 	if err != nil {
@@ -538,9 +538,7 @@ func TestRetentionRejectsTamperedManifestDigest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(manifestPath, encoded, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	writeManifestFixture(t, manifestPath, encoded)
 
 	_, err = r.RetainPolicy(t.Context(), now, policy)
 	assertRepositoryDiagnostic(t, err, "retain", "repository_corrupt", ErrCorrupt)
@@ -557,10 +555,8 @@ func TestRetentionRejectsMalformedManifestJSON(t *testing.T) {
 		gens[i] = commitSnapshotAt(t, r, now.Add(-5*time.Hour))
 	}
 
-	manifestPath := filepath.Clean(filepath.Join(path, "generations", gens[0].ID, "manifest.json"))
-	if err := os.WriteFile(manifestPath, []byte("{malformed json"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	manifestPath := filepath.Clean(filepath.Join(path, "generations", gens[0].ID, manifestFileName))
+	writeManifestFixture(t, manifestPath, []byte("{malformed json"))
 
 	_, err := r.RetainPolicy(t.Context(), now, policy)
 	assertRepositoryDiagnostic(t, err, "retain", "repository_corrupt", ErrCorrupt)
@@ -577,7 +573,7 @@ func TestRetentionRejectsInvalidStartedTimestamp(t *testing.T) {
 		gens[i] = commitSnapshotAt(t, r, now.Add(-5*time.Hour))
 	}
 
-	manifestPath := filepath.Clean(filepath.Join(path, "generations", gens[0].ID, "manifest.json"))
+	manifestPath := filepath.Clean(filepath.Join(path, "generations", gens[0].ID, manifestFileName))
 
 	m, err := r.Read(t.Context(), gens[0].ID)
 	if err != nil {
@@ -591,9 +587,7 @@ func TestRetentionRejectsInvalidStartedTimestamp(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(manifestPath, encoded, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	writeManifestFixture(t, manifestPath, encoded)
 
 	_, err = r.RetainPolicy(t.Context(), now, policy)
 	assertRepositoryDiagnostic(t, err, "retain", "repository_corrupt", ErrCorrupt)
@@ -610,7 +604,7 @@ func TestRetentionRejectsInvalidFinishedTimestamp(t *testing.T) {
 		gens[i] = commitSnapshotAt(t, r, now.Add(-5*time.Hour))
 	}
 
-	manifestPath := filepath.Clean(filepath.Join(path, "generations", gens[0].ID, "manifest.json"))
+	manifestPath := filepath.Clean(filepath.Join(path, "generations", gens[0].ID, manifestFileName))
 
 	m, err := r.Read(t.Context(), gens[0].ID)
 	if err != nil {
@@ -624,9 +618,7 @@ func TestRetentionRejectsInvalidFinishedTimestamp(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(manifestPath, encoded, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	writeManifestFixture(t, manifestPath, encoded)
 
 	_, err = r.RetainPolicy(t.Context(), now, policy)
 	assertRepositoryDiagnostic(t, err, "retain", "repository_corrupt", ErrCorrupt)
@@ -643,7 +635,7 @@ func TestRetentionRejectsCompletenessMismatch(t *testing.T) {
 		gens[i] = commitCompleteFixture(t, r)
 	}
 
-	manifestPath := filepath.Clean(filepath.Join(path, "generations", gens[0].ID, "manifest.json"))
+	manifestPath := filepath.Clean(filepath.Join(path, "generations", gens[0].ID, manifestFileName))
 
 	m, err := r.Read(t.Context(), gens[0].ID)
 	if err != nil {
@@ -657,9 +649,7 @@ func TestRetentionRejectsCompletenessMismatch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(manifestPath, encoded, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	writeManifestFixture(t, manifestPath, encoded)
 
 	newDigest := digest(encoded)
 
@@ -689,7 +679,7 @@ func TestRetentionRejectsMissingManifest(t *testing.T) {
 		gens[i] = commitSnapshotAt(t, r, now.Add(-5*time.Hour))
 	}
 
-	manifestPath := filepath.Clean(filepath.Join(path, "generations", gens[0].ID, "manifest.json"))
+	manifestPath := filepath.Clean(filepath.Join(path, "generations", gens[0].ID, manifestFileName))
 	if err := os.Remove(manifestPath); err != nil {
 		t.Fatal(err)
 	}
@@ -779,7 +769,7 @@ func TestRetentionCatalogMembershipOnlyNoPhysicalDeletion(t *testing.T) {
 			t.Fatalf("expected ErrUnavailable for %s, got %v", id, err)
 		}
 
-		manifestPath := filepath.Join(path, "generations", id, "manifest.json")
+		manifestPath := filepath.Join(path, "generations", id, manifestFileName)
 		if _, err := os.Stat(manifestPath); err != nil {
 			t.Fatalf("quarantined manifest destroyed on disk: %v", err)
 		}
@@ -970,7 +960,7 @@ func TestRetentionRetainsUnderlyingErrorCauses(t *testing.T) {
 		}
 
 		manifestPath := filepath.Clean(
-			filepath.Join(path, "generations", gens[0].ID, "manifest.json"),
+			filepath.Join(path, "generations", gens[0].ID, manifestFileName),
 		)
 		if err := os.Remove(manifestPath); err != nil {
 			t.Fatal(err)
@@ -994,13 +984,11 @@ func TestRetentionRetainsUnderlyingErrorCauses(t *testing.T) {
 		}
 
 		manifestPath := filepath.Clean(
-			filepath.Join(path, "generations", gens[0].ID, "manifest.json"),
+			filepath.Join(path, "generations", gens[0].ID, manifestFileName),
 		)
 
 		data := []byte(`{"not": "valid manifest"}`)
-		if err := os.WriteFile(manifestPath, data, 0o600); err != nil {
-			t.Fatal(err)
-		}
+		writeManifestFixture(t, manifestPath, data)
 
 		newDigest := digest(data)
 
@@ -1027,12 +1015,9 @@ func TestRetentionRetainsUnderlyingErrorCauses(t *testing.T) {
 func retireManifestSchema(t *testing.T, r *Repository, path string, id string) {
 	t.Helper()
 
-	manifestPath := filepath.Clean(filepath.Join(path, "generations", id, "manifest.json"))
+	manifestPath := filepath.Clean(filepath.Join(path, "generations", id, manifestFileName))
 
-	data, err := os.ReadFile(manifestPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := readManifestFixture(t, manifestPath)
 
 	var fields map[string]any
 	if err := json.Unmarshal(data, &fields); err != nil {
@@ -1046,9 +1031,7 @@ func retireManifestSchema(t *testing.T, r *Repository, path string, id string) {
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(manifestPath, encoded, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	writeManifestFixture(t, manifestPath, encoded)
 
 	newDigest := digest(encoded)
 

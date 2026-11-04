@@ -62,7 +62,7 @@ func validateStageNames(stage *privatefs.Dir, manifest model.Manifest) error {
 	}
 
 	for _, name := range names {
-		if name != "manifest.json" && name != "artifacts" {
+		if name != manifestFileName && name != "artifacts" {
 			return ErrCorrupt
 		}
 	}
@@ -101,18 +101,7 @@ func (r *Repository) completeStageFiles(
 	manifest model.Manifest,
 	data []byte,
 ) error {
-	emitManifest := func(dst io.Writer) error {
-		_, err := io.Copy(dst, bytes.NewReader(data))
-		return oops.In("snapshot.store").With("operation", "complete_rewrite_stage").Wrap(err)
-	}
-	if err := recoverPrefixFile(
-		ctx,
-		stage,
-		"manifest.json",
-		model.MaxManifestBytes,
-		false,
-		emitManifest,
-	); err != nil {
+	if err := recoverManifestFile(ctx, stage, data, false); err != nil {
 		return err
 	}
 
@@ -146,14 +135,7 @@ func (r *Repository) completeStageFiles(
 		return err
 	}
 
-	if err := recoverPrefixFile(
-		ctx,
-		stage,
-		"manifest.json",
-		model.MaxManifestBytes,
-		true,
-		emitManifest,
-	); err != nil {
+	if err := recoverManifestFile(ctx, stage, data, true); err != nil {
 		return err
 	}
 
@@ -203,6 +185,20 @@ func (r *Repository) recoverStageArtifacts(
 	}
 
 	return nil
+}
+
+func recoverManifestFile(ctx context.Context, stage *privatefs.Dir, data []byte, write bool) error {
+	compressed, err := compressManifest(data)
+	if err != nil {
+		return err
+	}
+
+	emit := func(dst io.Writer) error {
+		_, err := io.Copy(dst, bytes.NewReader(compressed))
+		return oops.In("snapshot.store").With("operation", "complete_rewrite_stage").Wrap(err)
+	}
+
+	return recoverPrefixFile(ctx, stage, manifestFileName, model.MaxManifestBytes, write, emit)
 }
 
 func recoverPrefixFile(
@@ -322,7 +318,7 @@ func readSyncedManifest(ctx context.Context, dir *privatefs.Dir) ([]byte, error)
 		return nil, oops.In("snapshot.store").With("operation", "verify_rewrite_manifest").Wrap(err)
 	}
 
-	file, err := dir.File("manifest.json", unix.O_RDONLY)
+	file, err := dir.File(manifestFileName, unix.O_RDONLY)
 	if err != nil {
 		return nil, oops.In("snapshot.store").With("operation", "open_rewrite_manifest").Wrap(err)
 	}
@@ -331,18 +327,18 @@ func readSyncedManifest(ctx context.Context, dir *privatefs.Dir) ([]byte, error)
 		return nil, errors.Join(ErrUncertain, err, file.Close())
 	}
 
-	data, readErr := io.ReadAll(
+	compressed, readErr := io.ReadAll(
 		io.LimitReader(cancellableReader(ctx, file), model.MaxManifestBytes+1),
 	)
 	if err := errors.Join(readErr, file.Close()); err != nil {
 		return nil, err
 	}
 
-	if len(data) > model.MaxManifestBytes {
+	if len(compressed) > model.MaxManifestBytes {
 		return nil, ErrCorrupt
 	}
 
-	return data, nil
+	return decompressManifest(compressed)
 }
 
 func verifySyncedArtifact(

@@ -570,17 +570,14 @@ func TestRetentionBytesTamperedManifestDigest(t *testing.T) {
 		gens = append(gens, commitContentFixture(t, r, []byte("data")))
 	}
 
-	manifestPath := filepath.Clean(filepath.Join(path, "generations", gens[0].ID, "manifest.json"))
+	manifestPath := filepath.Clean(filepath.Join(path, "generations", gens[0].ID, manifestFileName))
 
-	data, err := os.ReadFile(manifestPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := readManifestFixture(t, manifestPath)
 
 	data[len(data)-2] = 'Z'
-	rewriteFixtureFile(t, manifestPath, data)
+	writeManifestFixture(t, manifestPath, data)
 
-	_, err = r.RetainBytes(t.Context(), 100)
+	_, err := r.RetainBytes(t.Context(), 100)
 	if !errors.Is(err, ErrCorrupt) {
 		t.Fatalf("expected ErrCorrupt on tampered manifest, got %v", err)
 	}
@@ -950,7 +947,7 @@ func testRetentionBytesUncertainAfter(t *testing.T) {
 	}
 
 	for _, g := range gens {
-		manifestPath := filepath.Join(path, "generations", g.ID, "manifest.json")
+		manifestPath := filepath.Join(path, "generations", g.ID, manifestFileName)
 		if _, err := os.Stat(manifestPath); err != nil {
 			t.Fatalf("manifest destroyed after uncertain publication: %v", err)
 		}
@@ -991,9 +988,9 @@ func TestRetentionBytesPhysicalSourcePreservation(t *testing.T) {
 		t.Fatalf("retired generation still readable from catalog: %v", err)
 	}
 
-	manifestPath := filepath.Join(path, "generations", gens[0].ID, "manifest.json")
+	manifestPath := filepath.Join(path, "generations", gens[0].ID, manifestFileName)
 	if _, err := os.Stat(manifestPath); err != nil {
-		t.Fatalf("manifest.json destroyed on disk: %v", err)
+		t.Fatalf("manifest destroyed on disk: %v", err)
 	}
 
 	artifactPath := filepath.Join(path, "generations", gens[0].ID, "artifacts", "a0.bin.gz")

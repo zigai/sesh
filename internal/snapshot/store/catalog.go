@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	catalogVersion  = 1
+	catalogVersion  = 2
 	maxCatalogBytes = 16 << 20
 	maxEntries      = 10000
 	minimumRetained = 5

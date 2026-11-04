@@ -22,7 +22,7 @@ const (
 	collectionRecordSuffix   = ".json"
 	collectionScratchPrefix  = ".gc-scratch-"
 	generationsDirectory     = "generations"
-	collectionManifestName   = "manifest.json"
+	collectionManifestName   = manifestFileName
 	collectionArtifactsName  = "artifacts"
 	collectionArtifactSuffix = ".bin.gz"
 	maxCollectionEntries     = 2 * maxEntries

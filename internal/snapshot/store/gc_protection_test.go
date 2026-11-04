@@ -88,7 +88,7 @@ func TestCollectionPreservesInterruptedSaveSources(t *testing.T) {
 	staged := stagedSaveFixture(t, r)
 	current := commitFixture(t, r)
 
-	orphanManifest := filepath.Join(path, "generations", orphan, "manifest.json")
+	orphanManifest := filepath.Join(path, "generations", orphan, manifestFileName)
 	if _, err := os.Stat(orphanManifest); err != nil {
 		t.Fatal("fixture did not publish an orphan generation", err)
 	}
@@ -124,7 +124,7 @@ func TestCollectionPreservesFailedAttemptSources(t *testing.T) {
 	orphan := interruptedSaveFixture(t, r)
 	current := commitFixture(t, r)
 
-	orphanManifest := filepath.Join(path, "generations", orphan, "manifest.json")
+	orphanManifest := filepath.Join(path, "generations", orphan, manifestFileName)
 
 	orphanBefore, err := os.ReadFile(orphanManifest)
 	if err != nil {
@@ -191,7 +191,7 @@ func TestCollectionPreservesEntriesWithoutAuthorizedEvidence(t *testing.T) {
 	}
 
 	if err := os.WriteFile(
-		filepath.Join(plantedDir, "manifest.json"),
+		filepath.Join(plantedDir, manifestFileName),
 		[]byte("{}"),
 		0o600,
 	); err != nil {
@@ -568,7 +568,11 @@ func TestCollectionNeverFollowsGenerationSymlinks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(filepath.Join(decoy, "manifest.json"), []byte("{}"), 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(decoy, manifestFileName),
+		[]byte("{}"),
+		0o600,
+	); err != nil {
 		t.Fatal(err)
 	}
 
@@ -587,7 +591,7 @@ func TestCollectionNeverFollowsGenerationSymlinks(t *testing.T) {
 		t.Fatalf("symlinked generation was followed: %+v", result)
 	}
 
-	if _, err := os.Stat(filepath.Join(decoy, "manifest.json")); err != nil {
+	if _, err := os.Stat(filepath.Join(decoy, manifestFileName)); err != nil {
 		t.Fatal("symlink target was modified", err)
 	}
 

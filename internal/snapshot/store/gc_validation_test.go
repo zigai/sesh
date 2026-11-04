@@ -19,14 +19,9 @@ func TestCollectionPreservesReplacedRetiredManifest(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "repository")
 	r := openRepository(t, path)
 	retired := retireGenerations(t, r, 2)[0]
-	name := filepath.Join(path, "generations", retired.ID, "manifest.json")
+	name := filepath.Join(path, "generations", retired.ID, manifestFileName)
 
-	data, err := os.ReadFile(name)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	manifest, err := model.Decode(data)
+	manifest, err := model.Decode(readManifestFixture(t, name))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +33,7 @@ func TestCollectionPreservesReplacedRetiredManifest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rewriteFixtureFile(t, name, replacement)
+	writeManifestFixture(t, name, replacement)
 
 	result := collectGenerations(t, r)
 	if len(result.Removed) != 0 ||
@@ -49,9 +44,8 @@ func TestCollectionPreservesReplacedRetiredManifest(t *testing.T) {
 		t.Fatalf("replacement was not preserved: %+v", result)
 	}
 
-	got, err := os.ReadFile(name)
-	if err != nil || !bytes.Equal(got, replacement) {
-		t.Fatalf("replacement bytes changed: %v", err)
+	if !bytes.Equal(readManifestFixture(t, name), replacement) {
+		t.Fatal("replacement bytes changed")
 	}
 }
 
@@ -94,7 +88,7 @@ func TestCollectionResumeBudgetIncludesManifest(t *testing.T) {
 			retired := retireGenerations(t, r, 2)[0]
 			interruptCollection(t, r, phase)
 
-			info, err := os.Stat(filepath.Join(path, "generations", retired.ID, "manifest.json"))
+			info, err := os.Stat(filepath.Join(path, "generations", retired.ID, manifestFileName))
 			if err != nil {
 				t.Fatal(err)
 			}

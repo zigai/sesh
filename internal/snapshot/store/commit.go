@@ -198,7 +198,7 @@ func (r *Repository) writeGeneration(
 		return err
 	}
 
-	if err := writeFile(dir, "manifest.json", data); err != nil {
+	if err := writeManifestFile(dir, data); err != nil {
 		return err
 	}
 

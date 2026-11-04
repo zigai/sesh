@@ -781,7 +781,7 @@ func TestSnapshotRepository_CorruptManifest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manifestPath := filepath.Join(repoDir, "generations", gen.ID, "manifest.json")
+	manifestPath := filepath.Join(repoDir, "generations", gen.ID, "manifest.json.gz")
 	if err := os.WriteFile(manifestPath, []byte("CORRUPT_MANIFEST_BYTES"), 0o600); err != nil {
 		t.Fatal(err)
 	}

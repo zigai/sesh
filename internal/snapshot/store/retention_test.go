@@ -79,7 +79,7 @@ func TestRetainedSourceReleasedOnlyAfterVerification(t *testing.T) {
 	}
 
 	if _, err := os.Stat(
-		filepath.Join(path, "generations", source.ID, "manifest.json"),
+		filepath.Join(path, "generations", source.ID, manifestFileName),
 	); err != nil {
 		t.Fatal("recovery bytes destroyed", err)
 	}

@@ -471,7 +471,7 @@ func corruptFixture(t *testing.T, path string, generation string, name string, k
 
 	switch kind {
 	case "manifest":
-		name = filepath.Join(path, "generations", generation, "manifest.json")
+		name = filepath.Join(path, "generations", generation, manifestFileName)
 	case "trailing":
 		file, err := os.OpenFile(name, os.O_WRONLY|os.O_APPEND, 0o600)
 		if err != nil {

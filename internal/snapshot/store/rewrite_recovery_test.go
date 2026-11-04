@@ -588,7 +588,7 @@ func testCorruptManifestDigestInGenerations(t *testing.T) {
 	genDir, _ := generations.CreateDir(rw.Replacement)
 	artDir, _ := genDir.CreateDir("artifacts")
 	_ = artDir.Close()
-	f, _ := genDir.File("manifest.json", unix.O_WRONLY|unix.O_CREAT|unix.O_EXCL)
+	f, _ := genDir.File(manifestFileName, unix.O_WRONLY|unix.O_CREAT|unix.O_EXCL)
 	_, _ = f.WriteString(`{"invalid":"json"}`)
 	_ = errors.Join(
 		f.Close(),

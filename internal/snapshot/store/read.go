@@ -273,7 +273,7 @@ func readManifest(
 	dir *privatefs.Dir,
 	expected string,
 ) (model.Manifest, error) {
-	data, err := dir.Read("manifest.json", model.MaxManifestBytes)
+	data, _, err := readManifestFile(dir)
 	if err != nil {
 		return model.Manifest{}, oops.In("snapshot.store").
 			With("operation", "read_manifest").

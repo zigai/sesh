@@ -437,7 +437,7 @@ func TestEstablishedMissingCatalogPreserved(t *testing.T) {
 
 	genDir := filepath.Join(path, "generations", gen.ID)
 
-	manifestData, err := os.ReadFile(filepath.Join(genDir, "manifest.json"))
+	manifestData, err := os.ReadFile(filepath.Join(genDir, manifestFileName))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -460,7 +460,7 @@ func TestEstablishedMissingCatalogPreserved(t *testing.T) {
 		t.Fatalf("expected ErrCorrupt for missing catalog on established repo, got: %v", err)
 	}
 
-	afterManifest, err := os.ReadFile(filepath.Join(genDir, "manifest.json"))
+	afterManifest, err := os.ReadFile(filepath.Join(genDir, manifestFileName))
 	if err != nil || !bytes.Equal(manifestData, afterManifest) {
 		t.Fatal("manifest was altered or deleted")
 	}
@@ -525,7 +525,7 @@ func TestEstablishedPlantedRecordCannotOverwriteGenerations(t *testing.T) {
 		t.Fatalf("expected ErrCorrupt when generations is non-empty, got: %v", err)
 	}
 
-	if _, err := os.Stat(filepath.Join(path, "generations", gen.ID, "manifest.json")); err != nil {
+	if _, err := os.Stat(filepath.Join(path, "generations", gen.ID, manifestFileName)); err != nil {
 		t.Fatal("generation manifest was lost", err)
 	}
 }
@@ -596,7 +596,7 @@ func TestEstablishedRepositoryCorruptCatalogPreserved(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	genManifest := filepath.Join(path, "generations", gen.ID, "manifest.json")
+	genManifest := filepath.Join(path, "generations", gen.ID, manifestFileName)
 
 	manifestBytes, err := os.ReadFile(genManifest)
 	if err != nil {

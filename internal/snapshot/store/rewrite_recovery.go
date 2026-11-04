@@ -500,7 +500,7 @@ func validateReplacementDirectory(
 	}
 
 	if len(names) != expectedReplacementDirectoryEntries ||
-		!slices.Contains(names, "manifest.json") ||
+		!slices.Contains(names, manifestFileName) ||
 		!slices.Contains(names, "artifacts") {
 		return ErrCorrupt
 	}

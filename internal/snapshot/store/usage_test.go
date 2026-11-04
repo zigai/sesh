@@ -20,7 +20,7 @@ import (
 func generationDiskBytes(t *testing.T, repoPath string, genID string) int64 {
 	t.Helper()
 
-	manifestPath := filepath.Join(repoPath, "generations", genID, "manifest.json")
+	manifestPath := filepath.Join(repoPath, "generations", genID, manifestFileName)
 
 	mStat, err := os.Stat(manifestPath)
 	if err != nil {
@@ -170,17 +170,14 @@ func TestUsageRejectsTamperedManifestDigest(t *testing.T) {
 	r := openRepository(t, path)
 	g := commitContentFixture(t, r, []byte("content"))
 
-	manifestPath := filepath.Clean(filepath.Join(path, "generations", g.ID, "manifest.json"))
+	manifestPath := filepath.Clean(filepath.Join(path, "generations", g.ID, manifestFileName))
 
-	data, err := os.ReadFile(manifestPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := readManifestFixture(t, manifestPath)
 
 	data[len(data)-2] = 'X'
-	rewriteFixtureFile(t, manifestPath, data)
+	writeManifestFixture(t, manifestPath, data)
 
-	_, err = r.Usage(t.Context())
+	_, err := r.Usage(t.Context())
 	if !errors.Is(err, ErrCorrupt) {
 		t.Fatalf("Usage error = %v, want ErrCorrupt", err)
 	}
