@@ -155,13 +155,6 @@ func ensureCoordinatorRepositoryReady(ctx context.Context, env Env) error {
 		return err
 	}
 
-	if state.PendingOperations > 0 {
-		return errors.Join(
-			errCoordinatorRecoveryBarrier,
-			&automation.ActiveRestoresError{Operations: state.ActiveOperations},
-		)
-	}
-
 	if state.RecoveryRequired {
 		return errors.Join(errCoordinatorRecoveryBarrier, store.ErrRecoveryRequired)
 	}

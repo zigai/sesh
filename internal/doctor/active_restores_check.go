@@ -59,7 +59,7 @@ func (s *Service) checkActiveRestores(ctx context.Context) Result {
 			plural(
 				len(blocking),
 				"restore",
-			)+" marked in progress; this holds back the shutdown save coordinator and startup restores",
+			)+" marked in progress; this holds back startup restores and keeps its snapshot from cleanup",
 		).
 			withReason(ReasonRecoveryRequired).
 			withDetails(blocking...).

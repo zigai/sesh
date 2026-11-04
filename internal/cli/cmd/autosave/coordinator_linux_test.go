@@ -3,13 +3,10 @@
 package autosave
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
-	"github.com/zigai/sesh/internal/automation"
 	"github.com/zigai/sesh/internal/integration/process"
 	"github.com/zigai/sesh/internal/snapshot/store"
 	"github.com/zigai/sesh/internal/testsupport/snapfixture"
@@ -78,7 +75,7 @@ func TestCoordinatorStartsPastARestoreFromAnEarlierBoot(t *testing.T) {
 	}
 }
 
-func TestCoordinatorNamesARestoreThatMayStillRun(t *testing.T) {
+func TestCoordinatorStartsBesideARestoreThatMayStillRun(t *testing.T) {
 	repoPath := filepath.Join(t.TempDir(), "repository")
 	snapfixture.CommitOneSession(t, repoPath)
 
@@ -89,15 +86,8 @@ func TestCoordinatorNamesARestoreThatMayStillRun(t *testing.T) {
 
 	live := snapfixture.RegisterRestore(t, repoPath, os.Getpid(), self.String())
 
-	err = coordinatorGate(t, repoPath)
-	if !errors.Is(err, errCoordinatorRecoveryBarrier) ||
-		!errors.Is(err, automation.ErrActiveRestores) {
-		t.Fatalf("gate error = %v, want the active-restore barrier", err)
-	}
-
-	if !strings.Contains(err.Error(), live) ||
-		!strings.Contains(err.Error(), "sesh snapshot recover restore abandon "+live) {
-		t.Fatalf("the error must name the restore and how to abandon it: %v", err)
+	if err := coordinatorGate(t, repoPath); err != nil {
+		t.Fatalf("a restore in progress must not stop shutdown saves: %v", err)
 	}
 
 	if state := operationState(t, repoPath, live); state != "active" {
