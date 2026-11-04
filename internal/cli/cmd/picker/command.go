@@ -649,7 +649,13 @@ func openPickerPopup(
 		return err
 	}
 
+	options.TmuxEnv = map[string]string{clientEnvironment: string(client.Name)}
+
 	if err := client.Handle().Popup(ctx, options); err != nil {
+		if popupAlreadyOpen(err) {
+			return services.Close()
+		}
+
 		return errors.Join(
 			oops.In("cli").With("operation", "open_picker_popup").Wrap(err),
 			services.Close(),
@@ -681,6 +687,14 @@ func openPickerPopup(
 			remoteFactory,
 		),
 	)
+}
+
+// popupAlreadyOpen recognizes the refusal tmux gives while a window shows a popup, which is what a
+// repeated or held picker key produces.
+func popupAlreadyOpen(err error) bool {
+	command, ok := errors.AsType[*gotmux.CommandError](err)
+
+	return ok && bytes.Contains(command.Result.Stderr, []byte("already has a modal pane"))
 }
 
 func openHandoffTaskMenu(
