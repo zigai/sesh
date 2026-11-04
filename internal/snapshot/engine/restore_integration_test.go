@@ -218,6 +218,87 @@ func disableWindowRename(t *testing.T, ctx context.Context, sess gotmux.Session)
 	}
 }
 
+func savedSessionWithTargetHook(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	name string,
+	hookCommand string,
+) (*store.Repository, engine.RestoreConfig) {
+	t.Helper()
+
+	live := sessionWithLocalOptions(t, ctx, server, name)
+
+	observation, err := capture.Observe(ctx, server, []gotmux.SessionID{live.ID()})
+	if err != nil {
+		t.Fatalf("capture.Observe failed: %v", err)
+	}
+
+	repoDir := filepath.Join(t.TempDir(), "repo")
+	generation := commitCapture(t, ctx, repoDir, observation)
+
+	if err := live.Kill(ctx); err != nil {
+		t.Fatalf("Kill session failed: %v", err)
+	}
+
+	if err := server.GlobalSessionOptions().
+		Set(ctx, "session-created[7]", hookCommand); err != nil {
+		t.Fatalf("set target hook: %v", err)
+	}
+
+	return openFixture(t, ctx, repoDir), engine.RestoreConfig{
+		LeaseRoot:         filepath.Join(t.TempDir(), "leases"),
+		Generation:        generation,
+		LaunchProcesses:   false,
+		MissingWorkingDir: restore.MissingWorkingDirLaunch,
+		Profile:           engine.RecoveryPractical,
+	}
+}
+
+func TestEngineRestore_AcceptsAHookTheTargetConfigurationAddedAfterTheSave(t *testing.T) {
+	server := tmuxtest.NewServer(t)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+
+	repo, cfg := savedSessionWithTargetHook(
+		t, ctx, server, "newer-target", "display-message restored",
+	)
+
+	result, err := engine.Restore(ctx, repo, server, cfg)
+	if err != nil {
+		t.Fatalf("Restore failed: %v, mismatches %+v", err, result.Mismatches)
+	}
+
+	if !result.Verified {
+		t.Fatalf("restore status = %q, want verified", result.Status)
+	}
+
+	assertOperationSettled(t, ctx, repo, result.OperationID)
+}
+
+func TestEngineRestore_SettlesARestoreThatFailsVerification(t *testing.T) {
+	server := tmuxtest.NewServer(t)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+
+	repo, cfg := savedSessionWithTargetHook(
+		t, ctx, server, "unsaved-local-option", "set-option @unsaved 1",
+	)
+
+	result, err := engine.Restore(ctx, repo, server, cfg)
+	if err == nil || len(result.Mismatches) == 0 {
+		t.Fatalf(
+			"Restore error = %v, mismatches %+v; want a verification failure",
+			err,
+			result.Mismatches,
+		)
+	}
+
+	assertOperationSettled(t, ctx, repo, result.OperationID)
+}
+
 func TestEngineRestore_LeavesOutOptionsTheTargetDoesNotSupport(t *testing.T) {
 	server := tmuxtest.NewServer(t)
 

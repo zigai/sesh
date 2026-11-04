@@ -476,7 +476,12 @@ func executeRestore(
 	if !verification.Verified {
 		result.Mismatches = verification.Mismatches
 
-		return result, closeWith(ctx, lease, "verify", reportVerificationFailure(verification))
+		return result, closeWith(
+			ctx,
+			lease,
+			"verify",
+			settleFailedVerification(ctx, repository, op.ID, verification),
+		)
 	}
 
 	if err := markVerified(ctx, ledger, plan, verification); err != nil {
@@ -651,7 +656,7 @@ func reinspectVerifiedRestore(
 			ctx,
 			lease,
 			"reinspect",
-			reportVerificationFailure(verification),
+			settleFailedVerification(ctx, repository, operation, verification),
 		)
 	}
 
@@ -879,8 +884,18 @@ func applyAndVerify(
 	return verification, missing, nil
 }
 
-func reportVerificationFailure(verification restore.VerificationReport) error {
-	return &verificationError{report: verification}
+// settleFailedVerification ends the operation: every effect is confirmed, so resuming could only
+// repeat the comparison, and an active operation would hold its source pinned until tmux exits.
+func settleFailedVerification(
+	ctx context.Context,
+	repository *store.Repository,
+	operation string,
+	verification restore.VerificationReport,
+) error {
+	return errors.Join(
+		&verificationError{report: verification},
+		repository.Finish(ctx, operation, true),
+	)
 }
 
 func finishRestore(

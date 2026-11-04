@@ -807,6 +807,14 @@ func verifyOptions(
 		delete(liveValues, name)
 	}
 
+	// An inherited entry the snapshot holds no value for comes from the target's own global table:
+	// an option a newer tmux added, or a hook a later configuration set.
+	for _, entry := range live {
+		if _, saved := wanted[entry.Name]; entry.Inherited && !saved {
+			delete(liveValues, entry.Name)
+		}
+	}
+
 	if !maps.Equal(liveValues, wanted) {
 		report.mismatch(MismatchOption, entity, "local_option_mismatch")
 
