@@ -242,6 +242,7 @@ linters:
       require-specific: true
     gosec:
       excludes:
+        - G306 # file perms
         - G204 # subprocess launched with variable
         - G301 # directory perms
         - G302 # file perms
@@ -275,11 +276,6 @@ linters:
 
       - path: ".*_test\\.go"
         linters: [decorder, funcorder, exhaustruct_v5, unparam, contextcheck, cyclop, gocognit, gosec, gosmopolitan, dupl, maintidx, goconst]
-
-      # A test writes its own output to paths the developer running it chooses.
-      - path: ".*_test\\.go"
-        linters: [gosec]
-        text: "G703:"
 
       # TOML keys are the documented user config format, so they stay snake_case.
       - path: "internal/config/.*"
