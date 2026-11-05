@@ -217,9 +217,9 @@ install-binary:
         fi
     fi
 
-# Remove build artifacts
+# Remove generated output and caches
 clean:
-    rm -rf sesh sesh.exe dist/
+    rm -rf sesh sesh.exe dist coverage.out *.test *.prof
 
 # Validate local packaging configuration without publishing
 package-check:
