@@ -97,7 +97,7 @@ func TestAgentsPopupHoverKeepsScrolledSessionRowsStable(t *testing.T) {
 	arguments = append(arguments, "send", "-q", alias)
 
 	for range 15 {
-		arguments = append(arguments, "down")
+		arguments = append(arguments, "ctrl+down")
 	}
 
 	arguments = append(arguments, "--until-screen", "▌ hover-session-14", "--timeout", "5s")

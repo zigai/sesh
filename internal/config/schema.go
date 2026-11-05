@@ -177,14 +177,15 @@ type SnapshotConfig struct {
 }
 
 type AgentSessionsConfig struct {
-	PopupSort        string             `toml:"popup_sort"`
-	Enabled          bool               `toml:"enabled"`
-	PopupCounts      bool               `toml:"popup_counts"`
-	RefreshInterval  string             `toml:"refresh_interval"`
-	StatusStyle      string             `toml:"status_style,omitempty"`
-	StatusTimeFormat string             `toml:"status_time_format,omitempty"`
-	StatusTimeStyle  string             `toml:"status_time_style,omitempty"`
-	Status           *AgentStatusConfig `toml:"status,omitempty"`
+	PopupSort              string             `toml:"popup_sort"`
+	PopupShowEmptySessions bool               `toml:"popup_show_empty_sessions"`
+	Enabled                bool               `toml:"enabled"`
+	PopupCounts            bool               `toml:"popup_counts"`
+	RefreshInterval        string             `toml:"refresh_interval"`
+	StatusStyle            string             `toml:"status_style,omitempty"`
+	StatusTimeFormat       string             `toml:"status_time_format,omitempty"`
+	StatusTimeStyle        string             `toml:"status_time_style,omitempty"`
+	Status                 *AgentStatusConfig `toml:"status,omitempty"`
 }
 
 type AgentStatusConfig struct {
@@ -486,14 +487,15 @@ func DefaultConfig() *Config {
 			TmuxStartupPost:   nil,
 		},
 		AgentSessions: AgentSessionsConfig{
-			PopupSort:        "position",
-			Enabled:          true,
-			PopupCounts:      false,
-			RefreshInterval:  defaultAgentSessionsRefreshInterval.String(),
-			StatusStyle:      "glyph",
-			StatusTimeFormat: "relative-seconds",
-			StatusTimeStyle:  "",
-			Status:           nil,
+			PopupSort:              "position",
+			PopupShowEmptySessions: true,
+			Enabled:                true,
+			PopupCounts:            false,
+			RefreshInterval:        defaultAgentSessionsRefreshInterval.String(),
+			StatusStyle:            "glyph",
+			StatusTimeFormat:       "relative-seconds",
+			StatusTimeStyle:        "",
+			Status:                 nil,
 		},
 		Remote: RemoteConfig{
 			Enabled:             false,

@@ -75,6 +75,10 @@
 # Position follows window index, then panes left to right and top to bottom.
 # popup_sort = "position"
 
+# Show tmux sessions without agents in Agents view (Ctrl+Up/Down visits them).
+# Move mode always offers empty sessions as destinations.
+# popup_show_empty_sessions = true
+
 # Enable agent state, navigation, and counts. Application recovery is incomplete.
 # enabled = true
 

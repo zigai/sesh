@@ -252,10 +252,15 @@ Agent rows in the popup.
 
 - `enabled` `(bool: true)` - Show agents and enable agent navigation.
 - `popup_sort` `(string: "position")` - Agent order within a session: `position`, `name`, or `attention`.
+- `popup_show_empty_sessions` `(bool: true)` - Show tmux sessions without agents in Agents view. Set to `false` to hide them. They remain available as destinations in move mode.
 - `popup_counts` `(bool: false)` - Show agent counts on sesh mode rows.
 - `refresh_interval` `(duration: "250ms")` - Refresh rate when live updates are unavailable.
 - `status_style` `(string: "glyph")` - `glyph` for colored circles, `text` for words such as `WORKING`.
 - `status_time_format` `(string: "relative-seconds")` - `relative` (`12m`), `relative-seconds` (`40s`, `12m`), `clock` (`00:01:23`), or `hh:mm` (`00:01`).
+
+In Agents view, ↑/↓ cycles only through agent rows, wrapping within those rows.
+Ctrl+↑/↓ visits all visible tmux sessions, including empty ones when shown.
+Move mode uses ↑/↓ to select destination sessions instead.
 
 ### `[agent_status]`
 

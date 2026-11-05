@@ -1184,9 +1184,9 @@ func assertMixedAgentSessionRows(t *testing.T, model *Model) {
 	}
 
 	selectable := model.popupSelectableRows()
-	if len(selectable) != 3 {
+	if len(selectable) != 1 {
 		t.Fatalf(
-			"selectable count = %d, want agent child and two regular sessions: %#v",
+			"selectable count = %d, want only the agent child: %#v",
 			len(selectable),
 			selectable,
 		)
@@ -1216,11 +1216,11 @@ func assertMixedAgentSessionSwitch(t *testing.T, model *Model) {
 		t.Fatalf("selected row after step down = %#v, want agent (0, 0)", got)
 	}
 
-	model.moveSelectionByStep(1)
+	model.moveAgentGroup(1)
 
 	selected := model.selectedListRow()
 	if selected.sessionIndex != 1 || selected.isAgent() {
-		t.Fatalf("selected row after step down = %#v, want regular-session-1 (1, -1)", selected)
+		t.Fatalf("selected row after group down = %#v, want regular-session-1 (1, -1)", selected)
 	}
 
 	cmdFn := model.handleEnter()
@@ -1426,7 +1426,7 @@ func TestAgentMouseClickOnSeparatorIsNoOp(t *testing.T) {
 	}
 }
 
-func TestStepNavigationWrapsAcrossAgentsAndRegularSessions(t *testing.T) {
+func TestStepNavigationWrapsWithinAgentsAndSkipsRegularSessions(t *testing.T) {
 	model := newTestModel()
 	model.displayMode = displayModeAgents
 	model.filtered = []session.Session{
@@ -1436,22 +1436,12 @@ func TestStepNavigationWrapsAcrossAgentsAndRegularSessions(t *testing.T) {
 	model.cursor = 0
 	model.agentCursor = 0
 
-	model.moveSelectionByStep(1)
+	for _, direction := range []int{1, 1, -1, -1} {
+		model.moveSelectionByStep(direction)
 
-	if got := model.selectedListRow(); got.sessionIndex != 1 || got.isAgent() {
-		t.Fatalf("selection after step down = %#v, want reg-1 (1, -1)", got)
-	}
-
-	model.moveSelectionByStep(1)
-
-	if got := model.selectedListRow(); got.sessionIndex != 0 || got.agentIndex != 0 {
-		t.Fatalf("selection after wrap step down = %#v, want agent pi (0, 0)", got)
-	}
-
-	model.moveSelectionByStep(-1)
-
-	if got := model.selectedListRow(); got.sessionIndex != 1 || got.isAgent() {
-		t.Fatalf("selection after wrap step up = %#v, want reg-1 (1, -1)", got)
+		if got := model.selectedListRow(); got.sessionIndex != 0 || got.agentIndex != 0 {
+			t.Fatalf("selection after step %d = %#v, want the only agent (0, 0)", direction, got)
+		}
 	}
 }
 

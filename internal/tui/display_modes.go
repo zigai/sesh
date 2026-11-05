@@ -169,7 +169,7 @@ func (m *Model) refreshDisplaySessions() {
 				displayed = append(displayed, row)
 			}
 		case displayModeAgents:
-			if !row.Saved() {
+			if m.agentsSessionVisible(row) {
 				displayed = append(displayed, row)
 			}
 		case displayModeInbox:
@@ -183,6 +183,11 @@ func (m *Model) refreshDisplaySessions() {
 
 	m.displaySessions = displayed
 	m.markCustomFieldsDirty()
+}
+
+func (m *Model) agentsSessionVisible(row session.Session) bool {
+	return !row.Saved() &&
+		(m.config.AgentSessions.PopupShowEmptySessions || m.tabMove != nil || len(row.Agents) > 0)
 }
 
 func compareAgentSessionRows(left session.Session, right session.Session) int {

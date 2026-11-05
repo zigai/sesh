@@ -143,16 +143,9 @@ func (m *Model) popupSelectableRows() []popupListRow {
 			continue
 		}
 
-		if !m.displayMode.tree() {
-			m.selectableRows = append(m.selectableRows, popupListRow{
-				sessionIndex: sessionIndex,
-				agentIndex:   parentAgentIndex,
-			})
-
-			continue
-		}
-
-		if len(row.Agents) == 0 {
+		// Ordinary navigation in Agents view is confined to agent rows. Session
+		// headings and empty sessions stay available to group navigation and mouse.
+		if !m.displayMode.tree() || (m.displayMode != displayModeAgents && len(row.Agents) == 0) {
 			m.selectableRows = append(m.selectableRows, popupListRow{
 				sessionIndex: sessionIndex,
 				agentIndex:   parentAgentIndex,

@@ -25,7 +25,7 @@ func TestMouseHoverKeepsScrolledSessionsInPlace(t *testing.T) {
 					Harness: testSupportHarnessCodex, HarnessSession: "agent-session",
 				}},
 			}},
-			steps: 13,
+			steps: 12,
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -47,7 +47,7 @@ func TestMouseHoverKeepsScrolledSessionsInPlace(t *testing.T) {
 			model.View()
 
 			for range testCase.steps {
-				model = updateTestModel(t, model, keyCode(tea.KeyDown))
+				model = updateTestModel(t, model, keyCtrlCode(tea.KeyDown))
 				model.View()
 			}
 

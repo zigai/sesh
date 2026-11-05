@@ -70,10 +70,8 @@ func (m *Model) beginTabMove(subject action.Subject) func() (tea.Model, tea.Cmd)
 		m.footerHoverDesc = ""
 		m.clearStatus()
 
-		if m.displayMode == displayModeInbox {
-			m.refreshDisplaySessions()
-			m.filterSessions()
-		}
+		m.refreshDisplaySessions()
+		m.filterSessions()
 
 		m.normalizeTabMoveCursor()
 
