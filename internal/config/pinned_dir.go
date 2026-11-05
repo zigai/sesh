@@ -3,13 +3,12 @@
 package config
 
 import (
+	"crypto/rand"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/samber/oops"
 	"golang.org/x/sys/unix"
@@ -431,7 +430,9 @@ func (d *pinnedDir) stageTempFile(name string, data []byte) (string, error) {
 		}
 	}
 
-	tmpName := fmt.Sprintf(".%s.tmp-%d-%d", name, os.Getpid(), time.Now().UnixNano())
+	// Concurrent writers can observe the same wall-clock timestamp. Random names
+	// keep staging collisions separate from the destination's no-clobber check.
+	tmpName := "." + name + ".tmp-" + rand.Text()
 
 	tmpFd, err := unix.Openat(
 		d.fd,

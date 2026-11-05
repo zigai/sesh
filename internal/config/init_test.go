@@ -291,10 +291,11 @@ func TestConcurrentInitWinnerIsFullValidConfig(t *testing.T) {
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "concurrent_init.toml")
 
-	const goroutines = 16
+	const goroutines = 64
 
 	var wg sync.WaitGroup
 
+	start := make(chan struct{})
 	errs := make([]error, goroutines)
 	paths := make([]string, goroutines)
 
@@ -303,12 +304,15 @@ func TestConcurrentInitWinnerIsFullValidConfig(t *testing.T) {
 		go func(idx int) {
 			defer wg.Done()
 
+			<-start
+
 			p, err := config.Init(config.WithInitPath(configPath), config.WithInitForce(false))
 			errs[idx] = err
 			paths[idx] = p
 		}(i)
 	}
 
+	close(start)
 	wg.Wait()
 
 	winnerCount := 0
@@ -330,8 +334,22 @@ func TestConcurrentInitWinnerIsFullValidConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(data) == 0 {
-		t.Fatal("config file on disk is empty")
+	expected, err := os.ReadFile("default.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Equal(data, expected) {
+		t.Fatal("winning config does not match the complete default config")
+	}
+
+	entries, err := os.ReadDir(tempDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(entries) != 1 || entries[0].Name() != filepath.Base(configPath) {
+		t.Fatalf("concurrent initialization left staging files behind: %v", entries)
 	}
 
 	cfg, err := config.Load(config.WithExplicitPath(configPath))
