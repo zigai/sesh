@@ -97,7 +97,7 @@ Other files sesh writes:
 
 ### `[popup]`
 
-Sizes are terminal cells (`"80"`), percentages (`"50%"`), or `"auto"`. When a mode's rows did not fit the last time, the popup grows taller, up to 80% of the terminal height.
+Sizes are terminal cells (`"80"`), percentages (`"50%"`), or `"auto"`. When a mode's rows did not fit the last time, the popup grows taller, up to 80% of the terminal height. In Agents mode, only sessions with agents (their headings and agent rows) count toward growth. Empty tmux sessions remain visible and scrollable with Ctrl+↑/↓, but do not increase the popup height.
 
 - `sesh_width` `(string: "40%")` - Width in sesh mode.
 - `sesh_height` `(string: "45%")` - Height in sesh mode.

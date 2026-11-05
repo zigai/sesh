@@ -586,7 +586,8 @@ func (m *Model) ReplayKey() string {
 	return m.replayKey
 }
 
-// FittingPopupHeights returns, per display mode shown, the popup height that fits all its rows.
+// FittingPopupHeights returns the auto-growth height for each display mode shown.
+// Agents mode counts only session headings and rows for sessions with agents.
 func (m *Model) FittingPopupHeights() []session.PopupHeight {
 	heights := make([]session.PopupHeight, 0, len(m.fittingHeights))
 	for mode, height := range m.fittingHeights {

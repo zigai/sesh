@@ -196,7 +196,16 @@ func (m *Model) recordFittingHeight(layout popupLayout) {
 	}
 
 	rows := layout.listHeight
-	if len(m.listRows) > 0 {
+	if m.displayMode == displayModeAgents {
+		// Empty tmux sessions remain scrollable, but do not drive popup growth.
+		rows = 0
+
+		for _, row := range m.filtered {
+			if len(row.Agents) > 0 {
+				rows += 1 + len(row.Agents)
+			}
+		}
+	} else if len(m.listRows) > 0 {
 		rows = len(m.listRows)
 	}
 
