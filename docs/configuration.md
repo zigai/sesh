@@ -382,8 +382,15 @@ The inbox lists agent conversations by state. The agent status service records t
 
 Row menus, opened with `keys.menu` or a right-click. A menu shows only the entries that apply to the row. `-` is a divider, and `items` lists the `[menu.items]` entries not named elsewhere.
 
-- `agent` `(list: ["go", "snooze", "unsnooze", "seen", "unseen", "pin", "unpin", "evidence", "pr", "link", "unlink", "merge", "sleep", "wake", "open", "finish", "task", "-", "items"])` - Menu of agent rows.
+- `agent` `(list: ["go", "move", "snooze", "unsnooze", "seen", "unseen", "pin", "unpin", "evidence", "pr", "link", "unlink", "merge", "sleep", "wake", "open", "finish", "task", "-", "items"])` - Menu of agent rows.
 - `session` `(list: ["go", "rename", "snapshot", "kill", "delete"])` - Menu of session rows.
+
+`move` shows **move** for live local agent tabs. The menu closes and the current
+view stays visible: agent rows dim while live sessions become selectable. In Inbox, its
+status/project groups remain visible and destination sessions appear below them. Select a
+session and press Enter (or click it) to move the whole tab, including split panes and
+running programs. Escape cancels. Moving the last tab removes the source session; linked
+windows, grouped destinations, remote sessions, and saved sessions are not supported.
 
 ### `[menu.items.<name>]`
 

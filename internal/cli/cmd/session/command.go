@@ -26,6 +26,7 @@ func NewCommand() *cobra.Command {
 		newSessionCreateCommand(),
 		newSessionSwitchCommand(),
 		newSessionRenameCommand(),
+		newSessionMoveWindowCommand(),
 		newSessionKillCommand(),
 		newSessionDeleteCommand(),
 		newScrollbackCommand(),

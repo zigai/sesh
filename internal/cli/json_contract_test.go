@@ -61,6 +61,7 @@ func TestJSONCommandTreeRequiresExplicitOutputContract(t *testing.T) {
 			"session delete",
 			"session kill",
 			"session list",
+			"session move-window",
 			"session rename",
 			"session scrollback",
 			"session switch",

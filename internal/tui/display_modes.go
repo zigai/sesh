@@ -147,6 +147,10 @@ func (m *Model) showsDisplayModeIndicator() bool {
 func (m *Model) refreshDisplaySessions() {
 	if m.displayMode == displayModeInbox {
 		m.displaySessions = m.inboxSessions()
+		if m.tabMove != nil {
+			m.appendTabMoveSessions()
+		}
+
 		m.inboxGroupKeys = inboxGroupKeys(m.displaySessions, m.sessionKeys.blocked)
 		m.markCustomFieldsDirty()
 
@@ -298,6 +302,11 @@ func (m *Model) selectedSessionIdentity() sessionIdentity {
 }
 
 func (m *Model) restoreSelectedSession(selected sessionIdentity) {
+	if m.tabMove != nil {
+		m.restoreTabMoveDestination(selected)
+		return
+	}
+
 	if selected.empty() {
 		m.restoreCurrentSession()
 		return

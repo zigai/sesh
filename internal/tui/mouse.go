@@ -47,6 +47,10 @@ func (m *Model) handleMouseClick(mouse tea.Mouse) func() (tea.Model, tea.Cmd) {
 		return m.handleMenuMouse(mouse, true)
 	}
 
+	if m.blocksTabMoveClick(mouse) {
+		return func() (tea.Model, tea.Cmd) { return m, nil }
+	}
+
 	if mouse.Button == tea.MouseRight {
 		return m.handleRowRightClick(mouse)
 	}
@@ -64,14 +68,7 @@ func (m *Model) handleMouseClick(mouse tea.Mouse) func() (tea.Model, tea.Cmd) {
 			return func() (tea.Model, tea.Cmd) { return m, nil }
 		}
 
-		m.selectListRow(row)
-		m.clearStatus()
-
-		if handler := m.handleEnter(); handler != nil {
-			return handler
-		}
-
-		return func() (tea.Model, tea.Cmd) { return m, nil }
+		return m.enterMouseRow(row)
 	}
 
 	if handler, ok := m.handleFooterMouseClick(mouse); ok {
@@ -81,9 +78,24 @@ func (m *Model) handleMouseClick(mouse tea.Mouse) func() (tea.Model, tea.Cmd) {
 	return nil
 }
 
+func (m *Model) enterMouseRow(row popupListRow) func() (tea.Model, tea.Cmd) {
+	m.selectListRow(row)
+	m.clearStatus()
+
+	if handler := m.handleEnter(); handler != nil {
+		return handler
+	}
+
+	return func() (tea.Model, tea.Cmd) { return m, nil }
+}
+
 func (m *Model) handleMouseWheel(mouse tea.Mouse) func() (tea.Model, tea.Cmd) {
 	if m.mouseReady() && m.dialog == dialogInputPath {
 		return m.handlePathDialogWheel(mouse)
+	}
+
+	if m.tabMove != nil && m.tabMove.pending {
+		return func() (tea.Model, tea.Cmd) { return m, nil }
 	}
 
 	if !m.mouseInteractionsEnabled() || !m.pointInsidePopupBody(mouse) {
@@ -120,6 +132,10 @@ func (m *Model) handleMouseWheel(mouse tea.Mouse) func() (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleMouseMotion(mouse tea.Mouse) func() (tea.Model, tea.Cmd) {
+	if m.tabMove != nil && m.tabMove.pending {
+		return func() (tea.Model, tea.Cmd) { return m, nil }
+	}
+
 	if m.mouseReady() && !m.showHelp && m.dialog != dialogNone {
 		return m.handleDialogMouse(mouse, false)
 	}
@@ -142,6 +158,7 @@ func (m *Model) handleMouseMotion(mouse tea.Mouse) func() (tea.Model, tea.Cmd) {
 	}
 
 	if !m.selectedListRow().equal(row) {
+		m.movedAgentSelection = nil
 		m.selectListRow(row)
 		m.clearStatus()
 	}
@@ -299,7 +316,7 @@ func (m *Model) popupMouseLayout() popupMouseLayout {
 		bodyX:      inset + mouseBorderMargin,
 		inputX:     inset + mouseBorderMargin + inputGutterWidth(),
 		inputY:     inputY,
-		inputWidth: max(layout.bodyWidth-inputGutterWidth()-1, 0),
+		inputWidth: max(m.inputBarWidth(layout.bodyWidth)-inputGutterWidth()-1, 0),
 		listY:      listY,
 		footerY:    footerY,
 		topY:       inset,
@@ -605,6 +622,21 @@ func (m *Model) footerPartAt(x int, width int) (footerPart, bool) {
 }
 
 func (m *Model) resolveFooterAction(part footerPart) func() (tea.Model, tea.Cmd) {
+	if m.tabMove != nil {
+		if m.tabMove.pending {
+			return func() (tea.Model, tea.Cmd) { return m, nil }
+		}
+
+		switch part.desc {
+		case "move":
+			return m.confirmTabMove
+		case "cancel":
+			return m.cancelTabMove
+		default:
+			return nil
+		}
+	}
+
 	if part.disabled {
 		return func() (tea.Model, tea.Cmd) { return m, nil }
 	}

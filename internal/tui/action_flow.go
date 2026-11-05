@@ -186,6 +186,9 @@ func (m *Model) actionSubject(descriptor action.Descriptor) (action.Subject, boo
 
 func (m *Model) continueAction(request pendingAction) func() (tea.Model, tea.Cmd) {
 	descriptor := request.entry.Describe()
+	if descriptor.ID == action.SessionMoveWindow.ID && !request.values.Has("destination") {
+		return m.beginTabMove(request.subject)
+	}
 
 	for _, param := range descriptor.Params {
 		if prompted(param) && !request.values.Has(param.Name) {
@@ -342,6 +345,12 @@ func (m *Model) dispatchAction(request pendingAction) func() (tea.Model, tea.Cmd
 		return func() (tea.Model, tea.Cmd) { return m, nil }
 	}
 
+	if move, ok := input.(action.MoveWindow); ok && m.tabMove != nil &&
+		m.tabMove.destination != nil {
+		move.Destination = action.RefOf(*m.tabMove.destination)
+		input = move
+	}
+
 	m.clearStatus()
 
 	ctx := m.operationContext()
@@ -370,6 +379,18 @@ func (m *Model) handleActionResult(msg actionResultMsg) (tea.Model, tea.Cmd) {
 	descriptor := msg.request.entry.Describe()
 	operation := actionOperation(descriptor.ID)
 	ctx := m.operationContext()
+
+	if descriptor.ID == action.SessionMoveWindow.ID && m.tabMove != nil {
+		if msg.err != nil {
+			logTUIFailure(ctx, operation, msg.err)
+		} else {
+			logTUIEvent(ctx, operation, tuiLogOutcomeSuccess)
+		}
+
+		cmd := m.finishTabMove(msg)
+
+		return m, cmd
+	}
 
 	if msg.err != nil {
 		if cmd, recovered := m.recoverActionFailure(msg); recovered {

@@ -500,29 +500,39 @@ func (m *Model) agentMenuEntry(name string, items map[string]config.MenuItemConf
 	switch {
 	case name == config.MenuDivider:
 		return []menuEntry{{label: "", key: "", run: nil}}
+	case name == config.MenuMove:
+		if subject, ok := m.tabMoveSubject(); ok {
+			return []menuEntry{{label: "move", key: "", run: m.beginTabMove(subject)}}
+		}
 	case name == config.MenuGo:
 		if run := m.handleEnter(); run != nil {
 			return []menuEntry{{label: "open", key: "enter", run: run}}
 		}
 	case agentMenuActions[name] != "":
-		id := agentMenuActions[name]
-		if name == config.MenuMerge {
-			if item, ok := m.selectedInboxItem(); ok && !m.unmergedItem(item) {
-				return nil
-			}
-
-			if !m.selectedRowIsTask() {
-				id = action.AgentMerge.ID
-			}
-		}
-
-		if entry, ok := m.actionMenuEntry(menuLabel(name), id, action.Values{}); ok {
-			return []menuEntry{entry}
-		}
+		return m.agentActionMenuEntries(name)
 	default:
 		if configured, ok := items[name]; ok {
 			return m.menuItemEntries(name, configured)
 		}
+	}
+
+	return nil
+}
+
+func (m *Model) agentActionMenuEntries(name string) []menuEntry {
+	id := agentMenuActions[name]
+	if name == config.MenuMerge {
+		if item, ok := m.selectedInboxItem(); ok && !m.unmergedItem(item) {
+			return nil
+		}
+
+		if !m.selectedRowIsTask() {
+			id = action.AgentMerge.ID
+		}
+	}
+
+	if entry, ok := m.actionMenuEntry(menuLabel(name), id, action.Values{}); ok {
+		return []menuEntry{entry}
 	}
 
 	return nil

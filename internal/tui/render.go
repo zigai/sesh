@@ -315,7 +315,33 @@ func (m *Model) calcPopupLayout(_ bool) popupLayout {
 }
 
 func (m *Model) renderInputBar(width int) string {
-	return inputBar(&m.textInput, width)
+	notice := m.successNotice(width)
+	if notice == "" {
+		return inputBar(&m.textInput, width)
+	}
+
+	return inputBar(&m.textInput, m.inputBarWidth(width)) + "  " + NewChrome(m.config).Muted(notice)
+}
+
+func (m *Model) inputBarWidth(width int) int {
+	if notice := m.successNotice(width); notice != "" {
+		return width - lipgloss.Width(notice) - frameBorderPadding
+	}
+
+	return width
+}
+
+func (m *Model) successNotice(width int) string {
+	if m.tabMove != nil || m.statusLevel != statusNone || m.statusMessage == "" {
+		return ""
+	}
+
+	notice := display.Truncate(SanitizeTerminalText(m.statusMessage), width/centerDivisor)
+	if width-lipgloss.Width(notice)-frameBorderPadding < minSearchWidth {
+		return ""
+	}
+
+	return notice
 }
 
 func inputBar(input *textinput.Model, width int) string {
@@ -489,7 +515,8 @@ func (m *Model) writePopupListRow(
 	listRow popupListRow,
 	values *sessionFormatValues,
 ) {
-	selected := !listRow.isSeparator() && listRow.equal(m.selectedListRow())
+	selected := !listRow.isSeparator() && listRow.equal(m.selectedListRow()) &&
+		(m.tabMove == nil || m.tabMoveDestination(listRow))
 
 	switch {
 	case selected:
@@ -1464,6 +1491,10 @@ func (m *Model) renderStatusHoverPrefix(width int) string {
 }
 
 func (m *Model) renderModeBadge() string {
+	if m.tabMove != nil {
+		return modeBadge(m.config, "MOVE")
+	}
+
 	return modeBadge(m.config, m.displayMode.label())
 }
 
@@ -1486,6 +1517,10 @@ func (m *Model) modeFooterHintWidth(width int) int {
 func (m *Model) footerParts(width int) []footerPart {
 	footerWidth := max(width, 1)
 	keys := m.actionKeys()
+
+	if m.tabMove != nil {
+		return m.tabMoveFooterParts(footerWidth)
+	}
 
 	if footerWidth < minFullFooterWidth {
 		return []footerPart{newFooterPart(keys.help.Help().Key, "help")}

@@ -33,6 +33,7 @@ func (local *Local) registerSessionHandlers() {
 	handle(local, action.SessionKill, local.killSession)
 	handle(local, action.SessionDelete, local.deleteSession)
 	handle(local, action.SessionSwitch, local.switchSession)
+	handle(local, action.SessionMoveWindow, local.moveWindow)
 }
 
 func (local *Local) createSession(

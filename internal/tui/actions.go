@@ -435,6 +435,10 @@ func (m *Model) dismissStatus() {
 }
 
 func (m *Model) handleEnter() func() (tea.Model, tea.Cmd) {
+	if m.tabMove != nil {
+		return m.confirmTabMove
+	}
+
 	if m.cursor >= len(m.filtered) {
 		return nil
 	}

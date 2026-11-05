@@ -173,6 +173,10 @@ func (m *Model) inFocusedSession(row popupListRow) bool {
 }
 
 func (m *Model) fadesListRow(row popupListRow) bool {
+	if m.tabMove != nil {
+		return !m.tabMoveDestination(row)
+	}
+
 	if m.sessionPrefixPending {
 		return row.isAgent()
 	}

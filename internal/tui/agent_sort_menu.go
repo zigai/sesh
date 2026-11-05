@@ -52,7 +52,7 @@ func (m *Model) renderAgentSortBadge() string {
 }
 
 func (m *Model) showsFooterBadges() bool {
-	return m.showsDisplayModeIndicator() || m.showsAgentSortIndicator() ||
+	return m.tabMove != nil || m.showsDisplayModeIndicator() || m.showsAgentSortIndicator() ||
 		m.displayMode == displayModeInbox ||
 		m.hasStatusBadge()
 }
@@ -94,6 +94,10 @@ func (m *Model) footerBadges() []footerBadge {
 	var badges []footerBadge
 	if m.hasStatusBadge() {
 		badges = append(badges, footerBadge{text: m.renderStatusBadge(), click: m.dismissStatus})
+	}
+
+	if m.tabMove != nil {
+		return append(badges, footerBadge{text: m.renderModeBadge(), click: nil})
 	}
 
 	if m.showsAgentSortBadge() {

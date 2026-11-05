@@ -41,6 +41,7 @@ type sessionLoadResultMsg struct {
 	agentSummaryErr   error
 	agentSummaries    []session.AgentSummary
 	agentObservation  uint64
+	moveObservation   uint64
 	tasks             []task.Live
 	tasksLoaded       bool
 	tasksErr          error
@@ -66,9 +67,10 @@ type sessionLoadTiming struct {
 type refreshMsg struct{}
 
 func (m *Model) loadSessions() error {
-	result := loadSessionRows(m.operationContext(), m.config, m.deps)
+	result := loadSessionRows(m.operationContext(), m.config, m.deps, m.agentRelocations...)
 	result.remoteObservation = m.remoteCatalogObservation
 	result.agentObservation = m.agentSummaryObservation
+	result.moveObservation = m.tabMoveObservation
 
 	if result.catalogErr != nil && len(result.sessions) == 0 {
 		logTUILoadTransition(
@@ -108,7 +110,12 @@ func (m *Model) loadSessions() error {
 	return nil
 }
 
-func loadSessionRows(ctx context.Context, cfg *config.Config, deps Services) sessionLoadResultMsg {
+func loadSessionRows(
+	ctx context.Context,
+	cfg *config.Config,
+	deps Services,
+	moves ...agentRelocation,
+) sessionLoadResultMsg {
 	var (
 		catalogResult   session.CatalogResult
 		catalogErr      error
@@ -143,7 +150,7 @@ func loadSessionRows(ctx context.Context, cfg *config.Config, deps Services) ses
 
 	loaders.Go(func() {
 		started := time.Now()
-		agentSummaries, agentSummaryErr = loadAgentSummaries(ctx, cfg, deps)
+		agentSummaries, agentSummaryErr = loadAgentSummaries(ctx, cfg, deps, moves...)
 		timing.agents = time.Since(started)
 	})
 
@@ -192,6 +199,7 @@ func loadSessionRows(ctx context.Context, cfg *config.Config, deps Services) ses
 			agentSummaryErr:   nil,
 			agentSummaries:    nil,
 			agentObservation:  0,
+			moveObservation:   0,
 			tasks:             nil,
 			tasksLoaded:       false,
 			tasksErr:          nil,
@@ -226,6 +234,7 @@ func loadSessionRows(ctx context.Context, cfg *config.Config, deps Services) ses
 		agentSummaryErr:   agentSummaryErr,
 		agentSummaries:    agentSummaries,
 		agentObservation:  0,
+		moveObservation:   0,
 		tasks:             tasks,
 		tasksLoaded:       tasksLoaded,
 		tasksErr:          tasksErr,
@@ -277,6 +286,7 @@ func loadAgentSummaries(
 	ctx context.Context,
 	cfg *config.Config,
 	deps Services,
+	moves ...agentRelocation,
 ) ([]session.AgentSummary, error) {
 	if !agentSummariesEnabled(cfg, deps) {
 		return nil, nil
@@ -290,7 +300,7 @@ func loadAgentSummaries(
 			Wrap(err)
 	}
 
-	return liveAgentSummaries(snapshot), nil
+	return liveAgentSummaries(relocateConfirmedAgents(snapshot, moves)), nil
 }
 
 func liveAgentSummaries(snapshot AgentSnapshot) []session.AgentSummary {
@@ -557,6 +567,7 @@ func (m *Model) applySessionRows(result sessionLoadResultMsg) []agentViewStateUp
 	m.filterSessions()
 	m.restoreSelectedSession(selected)
 	m.settleInitialAgentSelection()
+	m.restoreMovedAgentSelection()
 
 	views := m.recordActiveAgentViews()
 
@@ -780,6 +791,13 @@ func (m *Model) handleAgentSummaries(msg agentSummariesMsg) tea.Cmd {
 		return nil
 	}
 
+	if msg.snapshot != nil && msg.err == nil {
+		m.agentRelocations = pendingAgentRelocations(*msg.snapshot, m.agentRelocations)
+		msg.summaries = liveAgentSummaries(
+			relocateConfirmedAgents(*msg.snapshot, m.agentRelocations),
+		)
+	}
+
 	m.agentSummaryObservation++
 	if msg.revision != 0 {
 		m.agentSummaryRevision = msg.revision
@@ -847,6 +865,7 @@ func (m *Model) applyAgentSummaries(summaries []session.AgentSummary) {
 	m.filterSessions()
 	m.restoreSelectedSession(selected)
 	m.settleInitialAgentSelection()
+	m.restoreMovedAgentSelection()
 }
 
 func (m *Model) recordActiveAgentViews() []agentViewStateUpdate {
@@ -978,6 +997,7 @@ func (m *Model) loadAgentSummariesCommand() tea.Cmd {
 	cfg := m.config
 	deps := m.deps
 	observation := m.agentSummaryObservation
+	moves := slices.Clone(m.agentRelocations)
 
 	return func() tea.Msg {
 		if !m.lifecycle.BeginWorker() {
@@ -985,10 +1005,11 @@ func (m *Model) loadAgentSummariesCommand() tea.Cmd {
 		}
 		defer m.lifecycle.EndWorker()
 
-		summaries, err := loadAgentSummaries(ctx, cfg, deps)
+		summaries, err := loadAgentSummaries(ctx, cfg, deps, moves...)
 
 		return agentSummariesMsg{
 			summaries:   summaries,
+			snapshot:    nil,
 			revision:    0,
 			polled:      true,
 			observation: observation,
@@ -1022,9 +1043,13 @@ func (m *Model) startAgentSummaryWatchCommand() tea.Cmd {
 					summaries = liveAgentSummaries(snapshot)
 				}
 
+				snapshot.Summaries = cloneAgentSummaries(snapshot.Summaries)
+				snapshot.Panes = slices.Clone(snapshot.Panes)
+
 				select {
 				case updates <- agentSummariesMsg{
 					summaries:   summaries,
+					snapshot:    &snapshot,
 					revision:    revision,
 					polled:      false,
 					observation: 0,
@@ -1041,6 +1066,7 @@ func (m *Model) startAgentSummaryWatchCommand() tea.Cmd {
 			select {
 			case updates <- agentSummariesMsg{
 				summaries:   nil,
+				snapshot:    nil,
 				revision:    0,
 				polled:      false,
 				observation: 0,
@@ -1099,6 +1125,10 @@ func (m *Model) logPopupLoadShown(timing *sessionLoadTiming) {
 }
 
 func (m *Model) handleSessionLoadResult(msg sessionLoadResultMsg) tea.Cmd {
+	if msg.moveObservation != m.tabMoveObservation {
+		return nil
+	}
+
 	m.logPopupLoadShown(&msg.timing)
 
 	m.popupStartup = popupStartupContent
@@ -1178,6 +1208,8 @@ func (m *Model) refreshSessions() tea.Cmd {
 	deps := m.deps
 	remoteObservation := m.remoteCatalogObservation
 	agentObservation := m.agentSummaryObservation
+	moveObservation := m.tabMoveObservation
+	moves := slices.Clone(m.agentRelocations)
 
 	m.loadingSessions = true
 	m.invalidateAgentGit()
@@ -1190,9 +1222,10 @@ func (m *Model) refreshSessions() tea.Cmd {
 		}
 		defer m.lifecycle.EndWorker()
 
-		result := loadSessionRows(ctx, cfg, deps)
+		result := loadSessionRows(ctx, cfg, deps, moves...)
 		result.remoteObservation = remoteObservation
 		result.agentObservation = agentObservation
+		result.moveObservation = moveObservation
 
 		return result
 	}

@@ -50,6 +50,11 @@ func (m *Model) normalizeFilteredCursor() {
 }
 
 func (m *Model) normalizeFilteredAgentCursor() {
+	if m.tabMove != nil {
+		m.normalizeTabMoveCursor()
+		return
+	}
+
 	if !m.displayMode.tree() {
 		m.agentCursor = parentAgentIndex
 		return

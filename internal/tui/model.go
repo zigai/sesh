@@ -109,6 +109,7 @@ type stateUpdateResultMsg struct {
 
 type agentSummariesMsg struct {
 	summaries   []session.AgentSummary
+	snapshot    *AgentSnapshot
 	revision    uint64
 	polled      bool
 	observation uint64
@@ -136,6 +137,10 @@ type Model struct {
 	selectableRows               []popupListRow
 	focusedSession               string
 	sessionPrefixPending         bool
+	tabMove                      *tabMoveState
+	movedAgentSelection          *sessionIdentity
+	agentRelocations             []agentRelocation
+	tabMoveObservation           uint64
 	state                        *session.State
 	config                       *config.Config
 	sessionKeys                  sessionKeyRules
@@ -356,6 +361,10 @@ func buildModel(
 		selectableRows:               []popupListRow{},
 		focusedSession:               "",
 		sessionPrefixPending:         false,
+		tabMove:                      nil,
+		movedAgentSelection:          nil,
+		agentRelocations:             nil,
+		tabMoveObservation:           0,
 		state:                        st,
 		config:                       cfg,
 		sessionKeys:                  newSessionKeyRules(cfg, bindings),
@@ -522,6 +531,7 @@ func (m *Model) SetInitialSessions(sessions []session.Session) {
 		agentSummaryErr:   nil,
 		agentSummaries:    nil,
 		agentObservation:  0,
+		moveObservation:   0,
 		tasks:             nil,
 		tasksLoaded:       false,
 		tasksErr:          nil,
@@ -725,6 +735,9 @@ func (m *Model) updateState(ctx context.Context, update session.StateUpdate) err
 }
 
 func (m *Model) handleKeyPressMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	// Once the user navigates again, a late agent refresh must not steal selection.
+	m.movedAgentSelection = nil
+
 	if m.popupStartup != popupStartupContent {
 		if cmd := m.handleNavigationKeys(msg); cmd != nil {
 			return cmd()
@@ -745,6 +758,10 @@ func (m *Model) handleKeyPressMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.showHelp = false
 
 		return m, nil
+	}
+
+	if m.tabMove != nil {
+		return m.handleTabMoveKeys(msg)
 	}
 
 	if cmd := m.handleSessionPrefixKeys(msg); cmd != nil {
@@ -771,6 +788,8 @@ func (m *Model) handleKeyPressMsg(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleMouseClickMsg(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
+	m.movedAgentSelection = nil
+
 	if cmd := m.handleMouseClick(msg.Mouse()); cmd != nil {
 		return cmd()
 	}
@@ -779,6 +798,8 @@ func (m *Model) handleMouseClickMsg(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) 
 }
 
 func (m *Model) handleMouseWheelMsg(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
+	m.movedAgentSelection = nil
+
 	if cmd := m.handleMouseWheel(msg.Mouse()); cmd != nil {
 		return cmd()
 	}
@@ -795,6 +816,10 @@ func (m *Model) handleMouseMotionMsg(msg tea.MouseMotionMsg) (tea.Model, tea.Cmd
 }
 
 func (m *Model) updateTextInput(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.tabMove != nil && m.tabMove.pending {
+		return m, nil
+	}
+
 	switch m.dialog {
 	case dialogInputText:
 		return m.handleTextDialogInput(msg)()

@@ -30,6 +30,7 @@ const (
 	MenuLink     = "link"
 	MenuUnlink   = "unlink"
 	MenuMerge    = "merge"
+	MenuMove     = "move"
 	MenuSleep    = "sleep"
 	MenuWake     = "wake"
 	MenuOpen     = "open"
@@ -44,6 +45,7 @@ const (
 var (
 	AgentMenuEntries = []string{
 		MenuGo,
+		MenuMove,
 		MenuSnooze,
 		MenuUnsnooze,
 		MenuSeen,

@@ -79,6 +79,20 @@ func newSessionRenameCommand() *cobra.Command {
 	)
 }
 
+func newSessionMoveWindowCommand() *cobra.Command {
+	return actioncli.Command(
+		action.SessionMoveWindow,
+		actioncli.Options[action.MoveWindow, action.MovedWindow]{
+			Operation:    "move-window",
+			SuccessOwned: true,
+			Configure:    nil,
+			Prepare:      nil,
+			Frontend:     nil,
+			Render:       nil,
+		},
+	)
+}
+
 func newSessionKillCommand() *cobra.Command {
 	return actioncli.Command(
 		action.SessionKill,
