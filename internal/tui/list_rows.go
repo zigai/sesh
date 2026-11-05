@@ -96,38 +96,44 @@ func (m *Model) popupListRows() []popupListRow {
 	separatorInserted := false
 
 	for sessionIndex, row := range m.filtered {
+		if m.sessionSeparatorAt(sessionIndex, hasAgentSessions, separatorInserted) {
+			m.listRows = append(m.listRows, popupListRow{
+				sessionIndex: sessionIndex,
+				agentIndex:   separatorAgentIndex,
+			})
+			separatorInserted = true
+		}
+
+		m.listRows = append(m.listRows, popupListRow{
+			sessionIndex: sessionIndex,
+			agentIndex:   parentAgentIndex,
+		})
+
+		for agentIndex := range row.Agents {
+			m.listRows = append(m.listRows, popupListRow{
+				sessionIndex: sessionIndex,
+				agentIndex:   agentIndex,
+			})
+		}
+
 		if len(row.Agents) > 0 {
 			hasAgentSessions = true
-
-			m.listRows = append(m.listRows, popupListRow{
-				sessionIndex: sessionIndex,
-				agentIndex:   parentAgentIndex,
-			})
-
-			for agentIndex := range row.Agents {
-				m.listRows = append(m.listRows, popupListRow{
-					sessionIndex: sessionIndex,
-					agentIndex:   agentIndex,
-				})
-			}
-		} else {
-			if hasAgentSessions && !separatorInserted &&
-				(m.displayMode != displayModeInbox || (m.tabMove != nil && !inboxSyntheticSession(row))) {
-				m.listRows = append(m.listRows, popupListRow{
-					sessionIndex: sessionIndex,
-					agentIndex:   separatorAgentIndex,
-				})
-				separatorInserted = true
-			}
-
-			m.listRows = append(m.listRows, popupListRow{
-				sessionIndex: sessionIndex,
-				agentIndex:   parentAgentIndex,
-			})
 		}
 	}
 
 	return m.listRows
+}
+
+func (m *Model) sessionSeparatorAt(index int, hasAgents bool, inserted bool) bool {
+	if m.displayMode == displayModeAgents {
+		return index > 0 &&
+			(len(m.filtered[index-1].Agents) > 0) != (len(m.filtered[index].Agents) > 0)
+	}
+
+	row := m.filtered[index]
+
+	return hasAgents && !inserted && len(row.Agents) == 0 &&
+		(m.displayMode != displayModeInbox || (m.tabMove != nil && !inboxSyntheticSession(row)))
 }
 
 func (m *Model) popupSelectableRows() []popupListRow {

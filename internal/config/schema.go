@@ -178,6 +178,7 @@ type SnapshotConfig struct {
 
 type AgentSessionsConfig struct {
 	PopupSort              string             `toml:"popup_sort"`
+	SessionOrder           []SessionOrderRule `toml:"session_order"`
 	PopupShowEmptySessions bool               `toml:"popup_show_empty_sessions"`
 	Enabled                bool               `toml:"enabled"`
 	PopupCounts            bool               `toml:"popup_counts"`
@@ -319,6 +320,8 @@ func (c *Config) Clone() *Config {
 	cp.Hooks.SessionAttachPre = cloneHookCommands(c.Hooks.SessionAttachPre)
 	cp.Hooks.SessionAttachPost = cloneHookCommands(c.Hooks.SessionAttachPost)
 	cp.Hooks.TmuxStartupPost = cloneHookCommands(c.Hooks.TmuxStartupPost)
+
+	cp.AgentSessions.SessionOrder = slices.Clone(c.AgentSessions.SessionOrder)
 
 	if c.AgentSessions.Status != nil {
 		clonedStatus := c.AgentSessions.Status.Clone()
@@ -488,6 +491,7 @@ func DefaultConfig() *Config {
 		},
 		AgentSessions: AgentSessionsConfig{
 			PopupSort:              "position",
+			SessionOrder:           nil,
 			PopupShowEmptySessions: true,
 			Enabled:                true,
 			PopupCounts:            false,

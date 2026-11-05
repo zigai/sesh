@@ -178,7 +178,7 @@ func (m *Model) refreshDisplaySessions() {
 	}
 
 	if m.displayMode == displayModeAgents {
-		slices.SortStableFunc(displayed, compareAgentsModeSessions)
+		sortAgentsModeSessions(displayed, m.config.AgentSessions.SessionOrder)
 	}
 
 	m.displaySessions = displayed

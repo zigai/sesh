@@ -252,6 +252,7 @@ Agent rows in the popup.
 
 - `enabled` `(bool: true)` - Show agents and enable agent navigation.
 - `popup_sort` `(string: "position")` - Agent order within a session: `position`, `name`, or `attention`.
+- `session_order` `(list: [])` - Rules placing session groups in Agents view; see below. Does not change agent order within a session or ordering in other views.
 - `popup_show_empty_sessions` `(bool: true)` - Show tmux sessions without agents in Agents view. Set to `false` to hide them. They remain available as destinations in move mode.
 - `popup_counts` `(bool: false)` - Show agent counts on sesh mode rows.
 - `refresh_interval` `(duration: "250ms")` - Refresh rate when live updates are unavailable.
@@ -261,6 +262,27 @@ Agent rows in the popup.
 In Agents view, ↑/↓ cycles only through agent rows, wrapping within those rows.
 Ctrl+↑/↓ visits all visible tmux sessions, including empty ones when shown.
 Move mode uses ↑/↓ to select destination sessions instead.
+
+#### Session order rules
+
+Use repeated `[[agent_sessions.session_order]]` tables with `match` and `position` fields:
+
+- `match` is a nonblank, case-sensitive glob matched against the tmux session name using Go's `path.Match` syntax: `*`, `?`, character classes such as `[ab]`, and backslash escapes. A glob matches the whole name; `*` and `?` do not match `/`. Invalid globs are rejected.
+- `position` must be exactly `first`, `normal`, or `last`.
+
+Sessions with agents always appear above the separate section of empty tmux sessions. Rules apply independently within each section: `last` puts an agent-bearing session at the bottom of the agent-bearing section, not below empty sessions. Here, “with agents” includes all agent statuses, not just working agents.
+
+The first matching rule wins. Within each section, session groups are placed `first`, then `normal`, then `last`. Within each placement, rule groups follow configuration order. Unmatched sessions are normal and follow all explicit-normal rule groups. Multiple sessions matching the same rule, and unmatched sessions, retain their current fallback session ordering within their group. With no rules, the current session ordering is unchanged. `popup_sort` still controls only the agents within each session.
+
+For example, keep the `agents` session last among sessions with agents (above empty sessions):
+
+```toml
+[[agent_sessions.session_order]]
+match = "agents"
+position = "last"
+```
+
+Omit `session_order = []` when defining rule tables; TOML does not allow both forms for the same key.
 
 ### `[agent_status]`
 

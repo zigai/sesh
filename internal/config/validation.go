@@ -330,6 +330,10 @@ func ValidateAgentSessionsConfig(agentSessions AgentSessionsConfig) error {
 		}
 	}
 
+	if err := validateSessionOrder(agentSessions.SessionOrder); err != nil {
+		return err
+	}
+
 	if err := validateAgentSessionStatusFormats(agentSessions); err != nil {
 		return err
 	}

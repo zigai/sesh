@@ -75,6 +75,15 @@
 # Position follows window index, then panes left to right and top to bottom.
 # popup_sort = "position"
 
+# Order session groups in Agents view using case-sensitive globs (first match wins).
+# Placements: "first", "normal", "last", applied separately to sessions with agents and empty ones.
+# Sessions with agents always stay above empty sessions. No rules preserves the current ordering.
+# session_order = []
+# Example: put "agents" last in its section (remove session_order = [] when adding tables).
+#   [[agent_sessions.session_order]]
+#   match = "agents"
+#   position = "last"
+
 # Show tmux sessions without agents in Agents view (Ctrl+Up/Down visits them).
 # Move mode always offers empty sessions as destinations.
 # popup_show_empty_sessions = true
