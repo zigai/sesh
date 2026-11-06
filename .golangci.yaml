@@ -276,19 +276,33 @@ linters:
         linters: [wrapcheck]
 
       - path: ".*_test\\.go"
-        linters: [decorder, funcorder, exhaustruct_v5, unparam, contextcheck, cyclop, gocognit, gosec, gosmopolitan, dupl, maintidx, goconst]
+        linters:
+          [
+            decorder,
+            funcorder,
+            exhaustruct_v5,
+            unparam,
+            contextcheck,
+            cyclop,
+            gocognit,
+            gosec,
+            gosmopolitan,
+            dupl,
+            maintidx,
+            goconst,
+          ]
 
       # The popup owns its generated CreateTemp handoff path in the user's runtime directory.
       # Cleanup removes that exact file, not a confined request path.
       - path: '^internal/cli/cmd/picker/popup_handoff\.go$'
-        text: '^G703: Path traversal via taint analysis$'
+        text: "^G703: Path traversal via taint analysis$"
         source: '^\s*(_ = os\.Remove\(path\)|return path, func\(\) \{ _ = os\.Remove\(path\) \}, nil)$'
         linters: [gosec]
 
       # A user-configured log destination is unrestricted; Lstat rejects a final symlink
       # before pinned-parent, no-follow opening. Sink path and symlink tests cover this boundary.
       - path: '^internal/logging/sink\.go$'
-        text: '^G703: Path traversal via taint analysis$'
+        text: "^G703: Path traversal via taint analysis$"
         source: '^\s*pathInfo, lstatErr := os\.Lstat\(cleanPath\)$'
         linters: [gosec]
 
@@ -302,8 +316,6 @@ linters:
         linters: [exhaustruct_v5]
       - path: "(?:(^|/)(node_modules|third_party|forks|vendor|testdata|fixtures|__fixtures__|snapshots|__snapshots__|__image_snapshots__|golden|corpus|fuzz_corpus|baselines|generated|\\.tmp|\\.gameops|\\.stryker-tmp|\\.cache)(/|$))"
         linters: [whitespace]
-
-
 
 issues:
   max-issues-per-linter: 0
