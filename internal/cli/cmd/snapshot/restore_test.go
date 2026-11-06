@@ -38,8 +38,8 @@ func renderRestoreJSONForTest(
 		t.Fatal(err)
 	}
 
-	resultErr := renderSnapshotRestore(cmd, result, cause)
-	if err := clibase.WriteCommandError(cmd, resultErr); err != nil {
+	resultErr := renderSnapshotRestore(t.Context(), cmd, result, cause)
+	if err := clibase.WriteCommandError(t.Context(), cmd, resultErr); err != nil {
 		t.Fatal(err)
 	}
 
@@ -193,7 +193,7 @@ func TestRestoreJSONProjectionExposesPanes(t *testing.T) {
 	var stdout bytes.Buffer
 	cmd.SetOut(&stdout)
 
-	if err := renderSnapshotRestore(cmd, result, nil); err != nil {
+	if err := renderSnapshotRestore(t.Context(), cmd, result, nil); err != nil {
 		t.Fatalf("renderSnapshotRestore failed: %v", err)
 	}
 
@@ -233,7 +233,7 @@ func TestRestoreRefusedForCollisionNamesSessionsWithoutAnOperation(t *testing.T)
 	var stdout bytes.Buffer
 	cmd.SetOut(&stdout)
 
-	err := renderSnapshotRestore(
+	err := renderSnapshotRestore(t.Context(),
 		cmd,
 		result,
 		action.Wrap(action.CodeAlreadyExists, restore.ErrSessionCollision),

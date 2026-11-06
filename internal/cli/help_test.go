@@ -103,7 +103,7 @@ func TestCommandAndFlagDescriptionsStartWithCapital(t *testing.T) {
 		}
 	}
 
-	visit(newRootCommand(t.Context()))
+	visit(newRootCommand())
 
 	if len(lowercase) > 0 {
 		t.Fatalf("descriptions start lowercase:\n%s", strings.Join(lowercase, "\n"))
@@ -138,7 +138,7 @@ func TestFlagDescriptionsWriteDefaultsInOneForm(t *testing.T) {
 		}
 	}
 
-	visit(newRootCommand(t.Context()))
+	visit(newRootCommand())
 
 	if len(inconsistent) > 0 {
 		t.Fatalf(

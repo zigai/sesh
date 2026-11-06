@@ -90,7 +90,7 @@ func runConfigInit(cmd *cobra.Command, _ []string) error {
 			Wrap(err)
 	}
 
-	if clibase.JSONOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(clibase.CommandContext(cmd), cmd) {
 		return clibase.WriteJSONResult(cmd, initResultJSON{
 			Path:   initializedPath,
 			Status: "initialized",

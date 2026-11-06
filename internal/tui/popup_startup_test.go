@@ -112,7 +112,7 @@ func TestPopupStartupShowsLoadingWhileInitialLoadIsBlocked(t *testing.T) {
 				t.Errorf("popup program failed: %v", err)
 			}
 
-			model.Close()
+			model.Close(t.Context())
 			time.Sleep(time.Minute)
 			synctest.Wait()
 		}()
@@ -174,7 +174,7 @@ func TestPopupStartupKeepsHiddenRowsInactiveUntilLoadingCompletes(t *testing.T) 
 			model := newTestModelWithDeps(Dependencies{
 				RequestOriginSwitch: func(context.Context, session.Session) error { return nil },
 			})
-			defer model.Close()
+			defer model.Close(t.Context())
 
 			model.mode = modePopup
 			model.displayMode = displayModeAgents
@@ -240,7 +240,7 @@ func TestPopupStartupKeepsHiddenRowsInactiveUntilLoadingCompletes(t *testing.T) 
 
 func TestPopupStartupAllowsSearchAndClose(t *testing.T) {
 	model := newTestModel()
-	defer model.Close()
+	defer model.Close(t.Context())
 
 	model.mode = modePopup
 	model.Init()

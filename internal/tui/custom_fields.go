@@ -274,16 +274,26 @@ func (m *Model) handleCustomFieldResult(msg customFieldResultMsg) {
 	}
 
 	updates[msg.key.row] = entry
-	m.saveCustomFieldCache(msg.key.field)
+
+	ctx, cancel := m.customFieldCacheContext(m.operationContext())
+	defer cancel()
+
+	m.saveCustomFieldCache(ctx, msg.key.field)
 }
 
-func (m *Model) saveCustomFieldCache(name string) {
+func (m *Model) customFieldCacheContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(
+		context.WithoutCancel(m.logger.WithContext(ctx)),
+		defaultShutdownTimeout,
+	)
+}
+
+func (m *Model) saveCustomFieldCache(ctx context.Context, name string) {
 	updates := m.customFields.unsaved[name]
 	if len(updates) == 0 {
 		return
 	}
 
-	ctx := context.WithoutCancel(m.operationContext())
 	if err := fields.MergeCache(ctx, fields.CachePath(name), updates); err != nil {
 		if m.customFields.writeErrors[name] == nil {
 			zerolog.Ctx(ctx).Error().
@@ -308,9 +318,9 @@ func (m *Model) saveCustomFieldCache(name string) {
 	delete(m.customFields.writeErrors, name)
 }
 
-func (m *Model) flushCustomFieldCaches() {
+func (m *Model) flushCustomFieldCaches(ctx context.Context) {
 	for _, name := range m.customFieldNames() {
-		m.saveCustomFieldCache(name)
+		m.saveCustomFieldCache(ctx, name)
 	}
 }
 

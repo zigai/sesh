@@ -163,7 +163,7 @@ func runSetupAgents(cmd *cobra.Command, args []string) error {
 }
 
 func renderSetupAgents(cmd *cobra.Command, result setup.AgentResult) error {
-	if clibase.JSONOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(clibase.CommandContext(cmd), cmd) {
 		payload := agentResultJSON{
 			DryRun:    result.DryRun,
 			TrackerOp: result.TrackerOp,
@@ -303,7 +303,7 @@ func addServiceSetupFlags(cmd *cobra.Command) {
 }
 
 func resolveServiceInputs(cmd *cobra.Command, withTmux bool) (setup.ServiceInputs, error) {
-	workspace, err := clibase.ResolveWorkspace(cmd)
+	workspace, err := clibase.ResolveWorkspace(clibase.CommandContext(cmd), cmd)
 	if err != nil {
 		return setup.ServiceInputs{}, err
 	}
@@ -515,7 +515,7 @@ func applySetupDefinitionsWithManager(
 
 	outcomeErr := errors.Join(err, serviceOutcome(payload))
 
-	if clibase.JSONOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(clibase.CommandContext(cmd), cmd) {
 		return clibase.WriteJSONResultError(cmd, payload, outcomeErr)
 	}
 

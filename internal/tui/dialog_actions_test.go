@@ -648,7 +648,8 @@ func TestRenameDialogUsesCommonShellEditingKeys(t *testing.T) {
 
 func TestPasteEditsTheTextPromptWithoutChangingSearch(t *testing.T) {
 	model := newTestModel()
-	t.Cleanup(model.Close)
+
+	t.Cleanup(func() { model.Close(t.Context()) })
 	model.textInput.SetValue(testSupportSessionProjectName)
 	model.filtered = []session.Session{
 		{Name: testSupportSessionProjectName, Kind: session.KindLive},
@@ -674,7 +675,8 @@ func TestPasteEditsTheTextPromptWithoutChangingSearch(t *testing.T) {
 
 func TestPasteEditsTheDirectoryPromptAndRefreshesSuggestions(t *testing.T) {
 	model := newTestModel()
-	t.Cleanup(model.Close)
+
+	t.Cleanup(func() { model.Close(t.Context()) })
 	model.textInput.SetValue(testSupportSessionProjectName)
 
 	cwd := t.TempDir()
@@ -709,7 +711,8 @@ func TestPasteEditsTheDirectoryPromptAndRefreshesSuggestions(t *testing.T) {
 
 func TestPasteDoesNotEditSearchBehindAConfirmation(t *testing.T) {
 	model := newTestModel()
-	t.Cleanup(model.Close)
+
+	t.Cleanup(func() { model.Close(t.Context()) })
 	model.textInput.SetValue(testSupportSessionProjectName)
 	model.filtered = []session.Session{
 		{Name: testSupportSessionProjectName, Kind: session.KindLive},

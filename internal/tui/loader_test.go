@@ -43,7 +43,7 @@ func loaderTestModel(t *testing.T, cfg *config.Config, deps Dependencies) *Model
 		t.Fatalf("newModelWithContext() error = %v", err)
 	}
 
-	t.Cleanup(model.Close)
+	t.Cleanup(func() { model.Close(t.Context()) })
 
 	return model
 }
@@ -168,7 +168,9 @@ func TestLoadSessionRowsSortsLocalCatalogByNativeIdentityHistoryAndActivity(t *t
 			return session.CatalogResult{Sessions: rows, Status: session.StatusComplete}, nil
 		}},
 	)
-	t.Cleanup(model.Close)
+
+	t.Cleanup(func() { model.Close(t.Context()) })
+
 	model.state = state
 
 	msg, ok := model.refreshSessions()().(sessionLoadResultMsg)
@@ -201,7 +203,8 @@ func TestLoadSessionsKeepsLiveRowsWhenSavedCatalogFails(t *testing.T) {
 			}, errTmuxUnavailable
 		},
 	})
-	t.Cleanup(model.Close)
+
+	t.Cleanup(func() { model.Close(t.Context()) })
 
 	if err := model.loadSessions(); err != nil {
 		t.Fatalf("loadSessions() with a partial catalog = %v, want the live rows applied", err)
@@ -660,7 +663,7 @@ func TestRemoteCatalogWatcherStopsWithModelLifecycle(t *testing.T) {
 	}()
 
 	<-started
-	model.Close()
+	model.Close(t.Context())
 	<-stopped
 	<-commandDone
 }
@@ -1810,7 +1813,7 @@ func TestOpenPickerReceivesRemoteCatalogChanges(t *testing.T) {
 		})
 
 		defer func() {
-			model.Close()
+			model.Close(t.Context())
 			time.Sleep(time.Hour)
 		}()
 
@@ -2029,7 +2032,8 @@ func assertAgentWatchObservation(t *testing.T, model *Model, observation string)
 
 func TestAgentWatchFailureRejectsOlderRevision(t *testing.T) {
 	model := newTestModel()
-	t.Cleanup(model.Close)
+
+	t.Cleanup(func() { model.Close(t.Context()) })
 	model.handleAgentSummaries(agentSummariesMsg{revision: 3, err: errTmuxUnavailable})
 	model.handleAgentSummaries(agentSummariesMsg{revision: 2})
 

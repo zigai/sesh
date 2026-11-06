@@ -333,7 +333,7 @@ func runLogs(cmd *cobra.Command, _ []string) error {
 	}
 
 	if getBoolFlag(cmd, "path") {
-		if clibase.JSONOutputEnabled(cmd) {
+		if clibase.JSONOutputEnabled(clibase.CommandContext(cmd), cmd) {
 			return clibase.WriteJSONResult(cmd, map[string]any{"path": path})
 		}
 
@@ -348,7 +348,7 @@ func runLogs(cmd *cobra.Command, _ []string) error {
 				Wrap(err)
 		}
 
-		if clibase.JSONOutputEnabled(cmd) {
+		if clibase.JSONOutputEnabled(clibase.CommandContext(cmd), cmd) {
 			return clibase.WriteJSONResult(cmd, map[string]any{"cleared": true, "path": path})
 		}
 

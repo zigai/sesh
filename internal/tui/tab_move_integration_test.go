@@ -85,7 +85,9 @@ func TestTabMoveMenuThroughDispatcherRefreshesLiveAgentOwnership(t *testing.T) {
 					return observePositionPanes(ctx, server)
 				},
 			})
-			t.Cleanup(model.Close)
+
+			t.Cleanup(func() { model.Close(t.Context()) })
+
 			model.mode = modePopup
 			model.displayMode = mode
 			model.width, model.height = 120, 30

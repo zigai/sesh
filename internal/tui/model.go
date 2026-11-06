@@ -494,12 +494,15 @@ func newTextInputStyles(cfg *config.Config) textinput.Styles {
 	return styles
 }
 
-func (m *Model) Close() {
+func (m *Model) Close(ctx context.Context) {
 	if m == nil {
 		return
 	}
 
-	m.flushCustomFieldCaches()
+	ctx, cancel := m.customFieldCacheContext(ctx)
+	defer cancel()
+
+	m.flushCustomFieldCaches(ctx)
 	m.providerRunner.Close()
 	m.lifecycle.Close()
 }

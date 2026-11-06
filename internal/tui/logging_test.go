@@ -111,7 +111,7 @@ func loggingTestModel(t *testing.T, output *bytes.Buffer) *Model {
 		t.Fatalf("newModelWithTestContext() error = %v", err)
 	}
 
-	t.Cleanup(model.Close)
+	t.Cleanup(func() { model.Close(t.Context()) })
 
 	return model
 }
@@ -220,7 +220,7 @@ func TestCustomFieldCacheFailureIsRetainedAndCloseFlushesAcceptedValue(t *testin
 		t.Fatal(err)
 	}
 
-	model.Close()
+	model.Close(t.Context())
 
 	entries, err := fields.ReadCache(path)
 	if err != nil || entries[customFieldSessionRowKey(row)].Text != "private-value" {
@@ -556,7 +556,7 @@ func TestModelOperationContextCarriesLoggerWithoutPrivateValues(t *testing.T) {
 		t.Fatalf("newModelWithTestContext() error = %v", err)
 	}
 
-	t.Cleanup(model.Close)
+	t.Cleanup(func() { model.Close(t.Context()) })
 
 	logTUIEvent(model.operationContext(), tuiOperationLoadCatalog, tuiLogOutcomeSuccess)
 

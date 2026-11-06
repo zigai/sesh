@@ -148,7 +148,7 @@ func InvokingPickerClient(ctx context.Context, server *gotmux.Server) (gotmux.Cl
 	return invokingPickerClient(ctx, server)
 }
 
-func NewPickCommand(ctx context.Context, remote ...RemoteFactory) *cobra.Command {
+func NewPickCommand(remote ...RemoteFactory) *cobra.Command {
 	remoteFactory := firstPickerRemoteFactory(remote)
 	cmd := &cobra.Command{
 		Use:   "pick",
@@ -166,7 +166,7 @@ func NewPickCommand(ctx context.Context, remote ...RemoteFactory) *cobra.Command
 				return err
 			}
 
-			return runPickCommand(executionContext(ctx, cmd), cmd, presentation, remoteFactory)
+			return runPickCommand(cmd.Context(), cmd, presentation, remoteFactory)
 		},
 	}
 
@@ -177,7 +177,7 @@ func NewPickCommand(ctx context.Context, remote ...RemoteFactory) *cobra.Command
 
 	cmd.AddCommand(
 		newPickPopupCommand(remoteFactory),
-		newPickUICommand(ctx, remoteFactory),
+		newPickUICommand(remoteFactory),
 	)
 
 	return cmd
@@ -197,7 +197,7 @@ func (o terminalOutput) Close() error { return nil }
 
 func (o terminalOutput) Fd() uintptr { return o.fd }
 
-func newPickUICommand(ctx context.Context, remoteFactory RemoteFactory) *cobra.Command {
+func newPickUICommand(remoteFactory RemoteFactory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:    "ui",
 		Short:  "Run the session picker inside its popup",
@@ -209,7 +209,8 @@ func newPickUICommand(ctx context.Context, remoteFactory RemoteFactory) *cobra.C
 			clibase.AnnotationOperation:     "picker",
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runPickCommand(executionContext(ctx, cmd), cmd, presentationPopup, remoteFactory)
+			ctx := clibase.CommandContext(cmd)
+			return runPickCommand(ctx, cmd, presentationPopup, remoteFactory)
 		},
 	}
 
@@ -249,14 +250,6 @@ func addPickerPathFlags(cmd *cobra.Command) {
 		)
 }
 
-func executionContext(parent context.Context, cmd *cobra.Command) context.Context {
-	if ctx := cmd.Context(); ctx != nil {
-		return ctx
-	}
-
-	return parent
-}
-
 func commandTerminalStreams(cmd *cobra.Command) gotmux.Streams {
 	var streams gotmux.Streams
 
@@ -289,7 +282,7 @@ func runPickCommand(
 	presentation presentation,
 	remoteFactory RemoteFactory,
 ) error {
-	runtime, err := preparePickerCommand(cmd)
+	runtime, err := preparePickerCommand(ctx, cmd)
 	if err != nil {
 		return err
 	}
@@ -446,8 +439,8 @@ func finishPickerInteractive(
 	)
 }
 
-func preparePickerCommand(cmd *cobra.Command) (commandRuntime, error) {
-	workspace, err := clibase.ResolveWorkspace(cmd)
+func preparePickerCommand(ctx context.Context, cmd *cobra.Command) (commandRuntime, error) {
+	workspace, err := clibase.ResolveWorkspace(ctx, cmd)
 	if err != nil {
 		return commandRuntime{}, err
 	}
@@ -958,7 +951,7 @@ func runPickerProgram(
 
 	final, err := program.Run()
 
-	model.Close()
+	model.Close(ctx)
 
 	if typed, ok := final.(*tui.Model); ok {
 		return typed, wrapPickerProgramError(err)

@@ -21,8 +21,8 @@ const (
 	bindingMessageTimeout = 2 * time.Second
 )
 
-func showBindingFailureMessage(cmd *cobra.Command, err error) bool {
-	if err == nil || clibase.JSONOutputEnabled(cmd) || !invokedByTmuxBinding(cmd) {
+func showBindingFailureMessage(ctx context.Context, cmd *cobra.Command, err error) bool {
+	if err == nil || clibase.JSONOutputEnabled(ctx, cmd) || !invokedByTmuxBinding(cmd) {
 		return false
 	}
 
@@ -35,7 +35,7 @@ func showBindingFailureMessage(cmd *cobra.Command, err error) bool {
 		return false
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), bindingMessageTimeout)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), bindingMessageTimeout)
 	defer cancel()
 
 	// run-shell would print "'…' returned 1" for the failure or, with -E, cover the pane in view
@@ -53,8 +53,8 @@ func invokedByTmuxBinding(cmd *cobra.Command) bool {
 	return flag != nil && flag.Value.String() == "true"
 }
 
-func bindingDiscardsReport(cmd *cobra.Command, output *commandBuffer) bool {
-	return !output.streaming && !clibase.JSONOutputEnabled(cmd) && !helpRequested(cmd) &&
+func bindingDiscardsReport(ctx context.Context, cmd *cobra.Command, output *commandBuffer) bool {
+	return !output.streaming && !clibase.JSONOutputEnabled(ctx, cmd) && !helpRequested(cmd) &&
 		invokedByTmuxBinding(cmd)
 }
 

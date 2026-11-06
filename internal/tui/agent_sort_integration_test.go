@@ -180,7 +180,9 @@ func newLivePositionModel(
 			return observePositionPanes(ctx, server)
 		},
 	})
-	t.Cleanup(model.Close)
+
+	t.Cleanup(func() { model.Close(t.Context()) })
+
 	model.displayMode = displayModeAgents
 
 	return model

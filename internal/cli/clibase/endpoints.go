@@ -1,6 +1,7 @@
 package clibase
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -54,8 +55,8 @@ func DefaultTmuxSocket() string {
 	return filepath.Join(dir, "tmux-"+strconv.Itoa(os.Getuid()), "default")
 }
 
-func ResolveWorkspace(cmd *cobra.Command) (app.Workspace, error) {
-	cfg, err := LoadCommandConfig(CommandContext(cmd), cmd)
+func ResolveWorkspace(ctx context.Context, cmd *cobra.Command) (app.Workspace, error) {
+	cfg, err := LoadCommandConfig(ctx, cmd)
 	if err != nil {
 		return app.Workspace{}, err
 	}

@@ -194,7 +194,10 @@ func (f *workflowFixture) attachClient(t *testing.T, sessionID gotmux.SessionID)
 		cancelAttach()
 
 		select {
-		case <-done:
+		case err := <-done:
+			if err != nil {
+				t.Logf("attach client for %s stopped: %v", sessionID, err)
+			}
 		case <-time.After(5 * time.Second):
 			t.Logf("attach client for %s did not exit in time", sessionID)
 		}

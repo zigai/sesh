@@ -185,7 +185,7 @@ func TestAgentGitRefreshCancelsInFlightScanOnClose(t *testing.T) {
 		t.Fatal("git scan did not start")
 	}
 
-	model.Close()
+	model.Close(t.Context())
 
 	select {
 	case <-scanCanceled:
@@ -236,7 +236,7 @@ func TestAgentGitRefreshDoesNotOverlapScans(t *testing.T) {
 
 	model.loadAgentGitCommand()
 
-	model.Close()
+	model.Close(t.Context())
 	<-done
 
 	if got := calls.Load(); got != 1 {
@@ -429,7 +429,7 @@ func TestAgentGitRefreshKeepsCountsUntilACompleteScanSucceeds(t *testing.T) {
 
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	model := gitTestModel(t)
-	t.Cleanup(model.Close)
+	t.Cleanup(func() { model.Close(t.Context()) })
 
 	rows := gitTestSessions()[:1]
 	rows[0].Agents = []session.AgentSession{{PaneID: "%1", CWD: directory}}

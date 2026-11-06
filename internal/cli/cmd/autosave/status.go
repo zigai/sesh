@@ -123,14 +123,14 @@ func runAutosaveStatus(cmd *cobra.Command, _ []string) error {
 			clibase.ExitCodeGeneral,
 			errors.Join(errAutosaveHistoryUnavailable, env.historyErr),
 		)
-		if clibase.JSONOutputEnabled(cmd) {
+		if clibase.JSONOutputEnabled(ctx, cmd) {
 			return clibase.WriteJSONResultError(cmd, payload(env, outcome), err)
 		}
 
 		return errors.Join(clibase.WriteOutput(cmd, "%s", statusSummary(env, outcome)), err)
 	}
 
-	if clibase.JSONOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(ctx, cmd) {
 		return clibase.WriteJSONResult(cmd, payload(env, outcome))
 	}
 
@@ -220,17 +220,17 @@ func decisionStatus(decision automation.DueDecision) string {
 	return "not_due"
 }
 
-func renderAutosaveResult(cmd *cobra.Command, env Env, outcome outcome) error {
-	logAutosaveSkip(cmd, outcome)
+func renderAutosaveResult(ctx context.Context, cmd *cobra.Command, env Env, outcome outcome) error {
+	logAutosaveSkip(ctx, cmd, outcome)
 
-	if clibase.JSONOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(ctx, cmd) {
 		return clibase.WriteJSONResult(cmd, payload(env, outcome))
 	}
 
 	return clibase.WriteOutput(cmd, "%s", summary(env, outcome))
 }
 
-func logAutosaveSkip(cmd *cobra.Command, outcome outcome) {
+func logAutosaveSkip(ctx context.Context, cmd *cobra.Command, outcome outcome) {
 	if outcome.status != statusSkipped && outcome.reason != automation.ReasonDisabled &&
 		outcome.reason != automation.ReasonNotDue {
 		return
@@ -253,7 +253,7 @@ func logAutosaveSkip(cmd *cobra.Command, outcome outcome) {
 		return
 	}
 
-	zerolog.Ctx(clibase.CommandContext(cmd)).Info().Str("component", "snapshot").
+	zerolog.Ctx(ctx).Info().Str("component", "snapshot").
 		Str("operation", cmd.Annotations[clibase.AnnotationOperation]).Str("status", statusSkipped).
 		Str("reason", outcome.reason).Msg("automatic snapshot operation skipped")
 }
@@ -283,12 +283,18 @@ func payload(env Env, outcome outcome) resultJSON {
 	}
 }
 
-func renderAutosaveDegraded(cmd *cobra.Command, env Env, outcome outcome, err error) error {
-	if clibase.JSONOutputEnabled(cmd) {
+func renderAutosaveDegraded(
+	ctx context.Context,
+	cmd *cobra.Command,
+	env Env,
+	outcome outcome,
+	err error,
+) error {
+	if clibase.JSONOutputEnabled(ctx, cmd) {
 		return clibase.WriteJSONResultError(cmd, payload(env, outcome), err)
 	}
 
-	if renderErr := renderAutosaveResult(cmd, env, outcome); renderErr != nil {
+	if renderErr := renderAutosaveResult(ctx, cmd, env, outcome); renderErr != nil {
 		return errors.Join(renderErr, err)
 	}
 

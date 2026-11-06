@@ -168,7 +168,7 @@ func TestModelCloseCancelsOperationContext(t *testing.T) {
 	default:
 	}
 
-	model.Close()
+	model.Close(t.Context())
 
 	select {
 	case <-operationContext.Done():
@@ -180,7 +180,7 @@ func TestModelCloseCancelsOperationContext(t *testing.T) {
 		t.Fatalf("operation context error = %v, want context.Canceled", operationContext.Err())
 	}
 
-	model.Close()
+	model.Close(t.Context())
 }
 
 func TestUpdatePassesNonKeyMessagesToTextInput(t *testing.T) {
@@ -242,7 +242,7 @@ func BenchmarkNewModelWithCompleteDependencies(b *testing.B) {
 			b.Fatal("newModelWithDeps() returned nil")
 		}
 
-		model.Close()
+		model.Close(b.Context())
 	}
 }
 

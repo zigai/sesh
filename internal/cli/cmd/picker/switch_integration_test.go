@@ -269,7 +269,7 @@ func TestSavedPopupCommandOpensThePopupWithoutALauncher(t *testing.T) {
 		}
 	}
 
-	picker := NewPickCommand(ctx)
+	picker := NewPickCommand()
 	if err := savePopupCommand(
 		ctx,
 		picker,
@@ -515,7 +515,10 @@ func attachPickerTestClient(t *testing.T, liveSession gotmux.Session) string {
 		cancel()
 
 		select {
-		case <-done:
+		case err := <-done:
+			if err != nil {
+				t.Logf("attached client stopped: %v", err)
+			}
 		case <-time.After(5 * time.Second):
 			t.Error("attached client did not stop")
 		}

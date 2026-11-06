@@ -215,10 +215,10 @@ func TestUncertaintyOutranksCanceledInClassification(t *testing.T) {
 
 	var stderr bytes.Buffer
 
-	root := newRootCommand(t.Context())
+	root := newRootCommand()
 	root.SetErr(&stderr)
 
-	if err := clibase.WriteCommandError(root, joined); err != nil {
+	if err := clibase.WriteCommandError(t.Context(), root, joined); err != nil {
 		t.Fatalf("WriteCommandError returned error: %v", err)
 	}
 
@@ -228,7 +228,7 @@ func TestUncertaintyOutranksCanceledInClassification(t *testing.T) {
 
 	stderr.Reset()
 
-	if err := clibase.WriteCommandError(root, context.Canceled); err != nil {
+	if err := clibase.WriteCommandError(t.Context(), root, context.Canceled); err != nil {
 		t.Fatalf("WriteCommandError returned error: %v", err)
 	}
 

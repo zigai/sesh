@@ -84,7 +84,7 @@ func TestResourceProviderSamplesWithoutBlockingRender(t *testing.T) {
 		t.Fatalf("first cpu sample state = %v", got)
 	}
 
-	model.Close()
+	model.Close(t.Context())
 }
 
 func writeResourceProcFixture(t *testing.T, root string, pid int) {

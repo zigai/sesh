@@ -232,7 +232,8 @@ func checkOriginSelectionOutcome(t *testing.T, refused bool) {
 			return nil
 		},
 	})
-	t.Cleanup(model.Close)
+
+	t.Cleanup(func() { model.Close(t.Context()) })
 
 	model.sessions = []session.Session{target}
 	model.filtered = model.sessions
@@ -260,7 +261,8 @@ func checkOriginSelectionOutcome(t *testing.T, refused bool) {
 
 func TestRemoteEntryDefersSSHUntilPickerCloses(t *testing.T) {
 	model := newTestModel()
-	t.Cleanup(model.Close)
+
+	t.Cleanup(func() { model.Close(t.Context()) })
 
 	target := session.Session{
 		ID:     "$9",
@@ -288,7 +290,9 @@ func TestRemoteEntryDefersSSHUntilPickerCloses(t *testing.T) {
 
 func TestOriginRowsKeepTheirOwnAgentCountsAndPositions(t *testing.T) {
 	model := newTestModel()
-	t.Cleanup(model.Close)
+
+	t.Cleanup(func() { model.Close(t.Context()) })
+
 	model.sessions = []session.Session{{
 		ID: "$1", Name: "work", Origin: session.OriginBridge, Kind: session.KindLive,
 		AgentTotal: 3, AgentActive: 2, AgentWaiting: 1,

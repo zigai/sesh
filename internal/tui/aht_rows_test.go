@@ -18,7 +18,9 @@ func TestAgentRowsRenderCurrentReasonsAndSuppressStaleReasons(t *testing.T) {
 	for _, width := range []int{58, 120} {
 		t.Run(strconv.Itoa(width), func(t *testing.T) {
 			model := newTestModel()
-			t.Cleanup(model.Close)
+
+			t.Cleanup(func() { model.Close(t.Context()) })
+
 			model.displayMode = displayModeAgents
 			model.config.Display.AgentsAgentFormat = "{tree}{status_text} {agent_waiting_reason} " +
 				"{agent_failure_reason}{stale} {agent_session}"

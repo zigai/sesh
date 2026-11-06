@@ -2,6 +2,9 @@ package tui
 
 import (
 	"bufio"
+	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -14,10 +17,12 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/rs/zerolog"
 
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/display/layout"
 	"github.com/zigai/sesh/internal/fields"
+	"github.com/zigai/sesh/internal/privatefs"
 	"github.com/zigai/sesh/internal/session"
 )
 
@@ -366,7 +371,7 @@ func TestCustomFieldCompletedValueSurvivesCloseWithPendingRow(t *testing.T) {
 	finished := make(chan struct{})
 
 	t.Cleanup(func() {
-		model.Close()
+		model.Close(t.Context())
 		<-finished
 	})
 
@@ -389,7 +394,7 @@ func TestCustomFieldCompletedValueSurvivesCloseWithPendingRow(t *testing.T) {
 	}
 
 	model.Update(result)
-	model.Close()
+	model.Close(t.Context())
 	<-finished
 
 	entries, err := fields.ReadCache(fields.CachePath("partial"))
@@ -457,8 +462,8 @@ func TestCustomFieldPopupsPreserveEachOthersCompletedEntries(t *testing.T) {
 	second.SetInitialSessions([]session.Session{secondRow})
 	runCustomFieldCommands(t, first, first.syncCustomFields())
 	runCustomFieldCommands(t, second, second.syncCustomFields())
-	first.Close()
-	second.Close()
+	first.Close(t.Context())
+	second.Close(t.Context())
 
 	entries, err := fields.ReadCache(fields.CachePath("shared"))
 	if err != nil || entries[customFieldSessionRowKey(firstRow)].Text != "first" ||
@@ -688,5 +693,104 @@ func TestCustomFieldMissingCommandFailsModel(t *testing.T) {
 	_, err := newModel(cfg, testState())
 	if err == nil || !strings.Contains(err.Error(), "display.fields.weather") {
 		t.Fatalf("newModel() error = %v, want missing command naming the field", err)
+	}
+}
+
+func TestCustomFieldCacheContextRetainsCallerValuesAndModelLogger(t *testing.T) {
+	type contextKey struct{}
+
+	var modelLog, callerLog bytes.Buffer
+
+	model := customFieldTestModel(
+		t,
+		"{custom.cleanup}",
+		config.FieldCommands{"cleanup": shellFieldCommand("true")},
+	)
+	model.logger = zerolog.New(&modelLog)
+	callerLogger := zerolog.New(&callerLog)
+	parent, stop := context.WithCancel(
+		context.WithValue(callerLogger.WithContext(t.Context()), contextKey{}, "caller"),
+	)
+	stop()
+
+	ctx, cancel := model.customFieldCacheContext(parent)
+	defer cancel()
+
+	if ctx.Err() != nil || ctx.Value(contextKey{}) != "caller" {
+		t.Fatalf("cleanup context lost values or inherited cancellation: %v", ctx.Err())
+	}
+
+	deadline, ok := ctx.Deadline()
+	if !ok || time.Until(deadline) > defaultShutdownTimeout {
+		t.Fatal("cleanup context must have a bounded deadline")
+	}
+
+	zerolog.Ctx(ctx).Info().Msg("cleanup")
+
+	if !strings.Contains(modelLog.String(), "cleanup") || callerLog.Len() != 0 {
+		t.Fatal("cleanup must use the model logger")
+	}
+
+	model.Close(parent)
+}
+
+func TestCloseBoundsCacheLockWaitAfterCallerCancellation(t *testing.T) {
+	model := customFieldTestModel(
+		t,
+		"{custom.cleanup}",
+		config.FieldCommands{"cleanup": shellFieldCommand("true")},
+	)
+	model.customFields.unsaved["cleanup"] = map[string]fields.CacheEntry{
+		"row": {Text: "completed", At: time.Now()},
+	}
+
+	dir, err := privatefs.Ensure(filepath.Dir(fields.CachePath("cleanup")))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() { _ = dir.Close() }()
+
+	lock, err := dir.Lock(t.Context(), "cleanup.json.lock")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() { _ = lock.Close() }()
+
+	parent, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	started := time.Now()
+
+	model.Close(parent)
+
+	elapsed := time.Since(started)
+	if elapsed < defaultShutdownTimeout || elapsed > 3*defaultShutdownTimeout {
+		t.Fatalf("cleanup lock wait = %v", elapsed)
+	}
+
+	if !errors.Is(model.customFields.writeErrors["cleanup"], context.DeadlineExceeded) {
+		t.Fatalf("cleanup error = %v", model.customFields.writeErrors["cleanup"])
+	}
+}
+
+func TestCloseFlushesCacheAfterCallerCancellation(t *testing.T) {
+	model := customFieldTestModel(
+		t,
+		"{custom.cleanup}",
+		config.FieldCommands{"cleanup": shellFieldCommand("true")},
+	)
+	model.customFields.unsaved["cleanup"] = map[string]fields.CacheEntry{
+		"row": {Text: "completed", At: time.Now()},
+	}
+	parent, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	model.Close(parent)
+
+	entries, err := fields.ReadCache(fields.CachePath("cleanup"))
+	if err != nil || entries["row"].Text != "completed" {
+		t.Fatalf("cache after canceled close = %#v, %v", entries, err)
 	}
 }

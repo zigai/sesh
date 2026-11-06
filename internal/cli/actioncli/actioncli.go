@@ -44,7 +44,7 @@ type Options[In, Out any] struct {
 	Configure    func(cmd *cobra.Command)
 	Prepare      func(ctx context.Context, cmd *cobra.Command, values action.Values) (bool, error)
 	Frontend     func(cmd *cobra.Command) action.Dispatcher
-	Render       func(cmd *cobra.Command, output Out, err error) error
+	Render       func(ctx context.Context, cmd *cobra.Command, output Out, err error) error
 }
 
 type Runtime struct {
@@ -68,7 +68,8 @@ func Command[In, Out any](
 		Long:  long(definition.Descriptor),
 		Args:  clibase.UsageArgs(argumentCount(definition.Descriptor)),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(cmd, args, definition, opts)
+			ctx := clibase.CommandContext(cmd)
+			return run(ctx, cmd, args, definition, opts)
 		},
 		Annotations: map[string]string{
 			clibase.AnnotationOperation: operation,
@@ -190,12 +191,13 @@ func TerminalStreams(cmd *cobra.Command) gotmux.Streams {
 }
 
 func Render[In, Out any](
+	ctx context.Context,
 	cmd *cobra.Command,
 	definition *action.Definition[In, Out],
 	output Out,
 	err error,
 ) error {
-	if clibase.JSONOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(ctx, cmd) {
 		return clibase.WriteJSONResultError(cmd, output, err)
 	}
 
@@ -231,14 +233,13 @@ func addCallerFlags(cmd *cobra.Command) {
 }
 
 func run[In, Out any](
+	ctx context.Context,
 	cmd *cobra.Command,
 	args []string,
 	definition *action.Definition[In, Out],
 	opts Options[In, Out],
 ) error {
-	ctx := clibase.CommandContext(cmd)
-
-	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
+	cfg, err := clibase.LoadCommandConfig(ctx, cmd)
 	if err != nil {
 		return err
 	}
@@ -261,10 +262,10 @@ func run[In, Out any](
 	}
 
 	if opts.Render != nil {
-		return opts.Render(cmd, output, runErr)
+		return opts.Render(ctx, cmd, output, runErr)
 	}
 
-	return Render(cmd, definition, output, runErr)
+	return Render(ctx, cmd, definition, output, runErr)
 }
 
 func dispatch[In, Out any](

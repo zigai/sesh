@@ -91,7 +91,8 @@ func NewCommand(build Build) *cobra.Command {
 			"files, tmux or services. Exits 1 when a check fails.",
 		Args: clibase.UsageArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runDoctor(cmd, build)
+			ctx := clibase.CommandContext(cmd)
+			return runDoctor(ctx, cmd, build)
 		},
 		Annotations: map[string]string{
 			// The doctor loads configuration itself so a broken file becomes a failed check, and
@@ -108,12 +109,7 @@ func NewCommand(build Build) *cobra.Command {
 	return cmd
 }
 
-func runDoctor(cmd *cobra.Command, build Build) error {
-	ctx := cmd.Context()
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
+func runDoctor(ctx context.Context, cmd *cobra.Command, build Build) error {
 	opts, paths, err := resolveDoctorOptions(ctx, cmd)
 	if err != nil {
 		return err
@@ -127,7 +123,7 @@ func runDoctor(cmd *cobra.Command, build Build) error {
 		failure = clibase.NewExitError(clibase.ExitCodeGeneral, ErrDoctorChecksFailed)
 	}
 
-	if clibase.JSONOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(ctx, cmd) {
 		if failure != nil {
 			return clibase.WriteJSONResultError(cmd, report, failure)
 		}

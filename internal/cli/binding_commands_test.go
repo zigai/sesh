@@ -131,7 +131,7 @@ func TestTmuxBindingsRunCommandsTheCLIAccepts(t *testing.T) {
 
 		args := strings.Split(strings.TrimSuffix(string(output), "\x00"), "\x00")[1:]
 
-		cmd, rest, err := newRootCommand(t.Context()).Find(args)
+		cmd, rest, err := newRootCommand().Find(args)
 		if err != nil || cmd.Annotations[clibase.AnnotationAction] != binding.Action {
 			t.Fatalf(
 				"%q resolves to %v (%v), want the %s command",

@@ -116,7 +116,8 @@ func ExecuteApplication(
 	input io.Reader,
 	stdout io.Writer, stderr io.Writer,
 ) error {
-	root := newRootCommand(ctx)
+	//nolint:contextcheck // Command construction is context-free; ExecuteContextC supplies the caller context.
+	root := newRootCommand()
 	root.SetContext(ctx)
 	root.SetArgs(args)
 	root.SetIn(input)
@@ -150,8 +151,17 @@ func ExecuteApplication(
 
 	closeErr := runtime.finish(runErr)
 
-	err := publishCommandOutput(executed, &output, &diagnostics, stdout, stderr, runErr, closeErr)
-	if showBindingFailureMessage(executed, err) {
+	err := publishCommandOutput(
+		ctx,
+		executed,
+		&output,
+		&diagnostics,
+		stdout,
+		stderr,
+		runErr,
+		closeErr,
+	)
+	if showBindingFailureMessage(ctx, executed, err) {
 		return nil
 	}
 
@@ -451,12 +461,13 @@ func validateCommandBeforeConfig(cmd *cobra.Command, args []string) error {
 }
 
 func publishCommandOutput(
+	ctx context.Context,
 	cmd *cobra.Command,
 	output *commandBuffer, diagnostics *commandBuffer,
 	stdout io.Writer, stderr io.Writer,
 	runErr error, closeErr error,
 ) error {
-	if bindingDiscardsReport(cmd, output) {
+	if bindingDiscardsReport(ctx, cmd, output) {
 		stdout = io.Discard
 	}
 
@@ -464,8 +475,8 @@ func publishCommandOutput(
 	cmd.SetErr(stderr)
 
 	resultErr := errors.Join(runErr, closeErr)
-	if closeErr != nil && clibase.JSONOutputEnabled(cmd) && !output.streaming {
-		return publishFinalizationFailure(cmd, output, runErr, closeErr)
+	if closeErr != nil && clibase.JSONOutputEnabled(ctx, cmd) && !output.streaming {
+		return publishFinalizationFailure(ctx, cmd, output, runErr, closeErr)
 	}
 
 	if copyErr := copyStagedBuffers(output, diagnostics, stdout, stderr, runErr); copyErr != nil {
@@ -473,7 +484,7 @@ func publishCommandOutput(
 	}
 
 	if closeErr != nil {
-		return errors.Join(resultErr, writeFinalizationErrors(cmd, runErr, closeErr))
+		return errors.Join(resultErr, writeFinalizationErrors(ctx, cmd, runErr, closeErr))
 	}
 
 	if output.streaming {
@@ -484,7 +495,7 @@ func publishCommandOutput(
 		return resultErr
 	}
 
-	return errors.Join(resultErr, clibase.WriteCommandError(cmd, runErr))
+	return errors.Join(resultErr, clibase.WriteCommandError(ctx, cmd, runErr))
 }
 
 func copyStagedBuffers(
@@ -528,19 +539,25 @@ func writeStreamDiagnosticError(cmd *cobra.Command, err error) error {
 	return commandOutputError(writeErr)
 }
 
-func writeFinalizationErrors(cmd *cobra.Command, runErr error, closeErr error) error {
+func writeFinalizationErrors(
+	ctx context.Context,
+	cmd *cobra.Command,
+	runErr error,
+	closeErr error,
+) error {
 	if cause := clibase.UncertainCause(runErr); cause != nil {
 		runErr = cause
 	}
 
-	if err := clibase.WriteCommandError(cmd, runErr); err != nil {
+	if err := clibase.WriteCommandError(ctx, cmd, runErr); err != nil {
 		return err
 	}
 
-	return clibase.WriteCommandError(cmd, closeErr)
+	return clibase.WriteCommandError(ctx, cmd, closeErr)
 }
 
 func publishFinalizationFailure(
+	ctx context.Context,
 	cmd *cobra.Command,
 	output *commandBuffer,
 	runErr error, closeErr error,
@@ -563,6 +580,6 @@ func publishFinalizationFailure(
 
 	return NewExitError(
 		exitCodeGeneral,
-		errors.Join(combined, clibase.WriteCommandError(cmd, diagnostic)),
+		errors.Join(combined, clibase.WriteCommandError(ctx, cmd, diagnostic)),
 	)
 }

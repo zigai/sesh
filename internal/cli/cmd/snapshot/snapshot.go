@@ -224,7 +224,7 @@ func renderListTable(
 }
 
 func runSnapshotList(cmd *cobra.Command, _ []string) error {
-	workspace, err := clibase.ResolveWorkspace(cmd)
+	workspace, err := clibase.ResolveWorkspace(clibase.CommandContext(cmd), cmd)
 	if err != nil {
 		return err
 	}
@@ -249,7 +249,7 @@ func runSnapshotList(cmd *cobra.Command, _ []string) error {
 
 	if combinedErr := errors.Join(readErr, closeErr); combinedErr != nil {
 		if errors.Is(combinedErr, store.ErrUnavailable) && genID == "" {
-			if clibase.JSONOutputEnabled(cmd) {
+			if clibase.JSONOutputEnabled(ctx, cmd) {
 				return clibase.WriteJSONResult(cmd, ListResultJSON{
 					Generation: "",
 					Sessions:   []sessionJSON{},
@@ -267,7 +267,7 @@ func runSnapshotList(cmd *cobra.Command, _ []string) error {
 		windowCount[link.Session]++
 	}
 
-	if clibase.JSONOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(ctx, cmd) {
 		return renderListJSON(cmd, manifest, generationID, windowCount)
 	}
 
@@ -326,7 +326,7 @@ func renderHistoryJSON(cmd *cobra.Command, catalog store.Catalog) error {
 }
 
 func runSnapshotHistory(cmd *cobra.Command, _ []string) error {
-	workspace, err := clibase.ResolveWorkspace(cmd)
+	workspace, err := clibase.ResolveWorkspace(clibase.CommandContext(cmd), cmd)
 	if err != nil {
 		return err
 	}
@@ -347,7 +347,7 @@ func runSnapshotHistory(cmd *cobra.Command, _ []string) error {
 	}
 
 	var entries []historyEntry
-	if inspectErr == nil && !clibase.JSONOutputEnabled(cmd) {
+	if inspectErr == nil && !clibase.JSONOutputEnabled(ctx, cmd) {
 		entries = loadHistoryEntries(ctx, repo, catalog, historyLimit(cmd))
 	}
 
@@ -360,7 +360,7 @@ func runSnapshotHistory(cmd *cobra.Command, _ []string) error {
 		return combinedErr
 	}
 
-	if clibase.JSONOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(ctx, cmd) {
 		return renderHistoryJSON(cmd, catalog)
 	}
 
@@ -496,7 +496,7 @@ func practicalRestoreReason(ready bool) string {
 }
 
 func runSnapshotVerify(cmd *cobra.Command, _ []string) error {
-	workspace, err := clibase.ResolveWorkspace(cmd)
+	workspace, err := clibase.ResolveWorkspace(clibase.CommandContext(cmd), cmd)
 	if err != nil {
 		return err
 	}
@@ -525,7 +525,7 @@ func runSnapshotVerify(cmd *cobra.Command, _ []string) error {
 			return combinedErr
 		}
 
-		if clibase.JSONOutputEnabled(cmd) {
+		if clibase.JSONOutputEnabled(ctx, cmd) {
 			return clibase.WriteJSONResultError(cmd, VerifyResultJSON{
 				Generation:             targetGen,
 				ByteIntegrity:          false,
@@ -544,7 +544,7 @@ func runSnapshotVerify(cmd *cobra.Command, _ []string) error {
 		return combinedErr
 	}
 
-	if clibase.JSONOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(ctx, cmd) {
 		return renderVerifyJSON(cmd, targetGen, manifest)
 	}
 

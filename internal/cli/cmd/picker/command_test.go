@@ -41,7 +41,8 @@ func newTestRootCommand(ctx context.Context) *cobra.Command {
 		Bool("no-config", false, "Use built-in settings without reading configuration files")
 	rootCommand.PersistentFlags().Bool(setup.BindingFlag, false, "Report through tmux messages")
 
-	rootCommand.AddCommand(NewPickCommand(ctx))
+	rootCommand.SetContext(ctx)
+	rootCommand.AddCommand(NewPickCommand())
 
 	return rootCommand
 }
@@ -107,7 +108,7 @@ func TestResolvePickerPresentationFollowsChoiceAndTmuxContext(t *testing.T) {
 func TestPickKeepsPopupChildFlagsOnHiddenChildAndOmitsLauncherFlags(t *testing.T) {
 	t.Parallel()
 
-	cmd := NewPickCommand(t.Context())
+	cmd := NewPickCommand()
 
 	ui := cmd.Flags().Lookup("ui")
 	if ui == nil || ui.Hidden || ui.DefValue != "auto" {
@@ -210,7 +211,7 @@ func TestPopupChildAcceptsOnlyRecentLaunchTimes(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			cmd := newPickUICommand(t.Context(), DefaultPickerRemoteFactory)
+			cmd := newPickUICommand(DefaultPickerRemoteFactory)
 			if test.value != "" {
 				if err := cmd.Flags().Set("launched-at", test.value); err != nil {
 					t.Fatal(err)
@@ -227,7 +228,7 @@ func TestPopupChildAcceptsOnlyRecentLaunchTimes(t *testing.T) {
 func TestPickerCommandsExposeLiveInteractiveSurface(t *testing.T) {
 	t.Parallel()
 
-	for _, cmd := range []*cobra.Command{NewPickCommand(t.Context()), pickPopupCommand(t)} {
+	for _, cmd := range []*cobra.Command{NewPickCommand(), pickPopupCommand(t)} {
 		t.Run(cmd.Name(), func(t *testing.T) {
 			t.Parallel()
 

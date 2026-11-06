@@ -158,7 +158,7 @@ func TestJSONCommandTreeRequiresExplicitOutputContract(t *testing.T) {
 		}
 	}
 
-	root := newRootCommand(t.Context())
+	root := newRootCommand()
 	root.InitDefaultHelpCmd()
 	root.InitDefaultCompletionCmd()
 
@@ -183,7 +183,7 @@ func collectJSONCommands(cmd *cobra.Command, commands map[string]bool) {
 }
 
 func TestJSONCommandsRejectUnknownFlagsWithoutHumanOutput(t *testing.T) {
-	root := newRootCommand(t.Context())
+	root := newRootCommand()
 	commands := make(map[string]bool)
 	collectJSONCommands(root, commands)
 

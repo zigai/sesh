@@ -31,7 +31,9 @@ func TestSearchQueryChangeResetsCursorToFirstResult(t *testing.T) {
 
 func TestPasteUpdatesSearchResultsAndResetsSelection(t *testing.T) {
 	model := newTestModel()
-	t.Cleanup(model.Close)
+
+	t.Cleanup(func() { model.Close(t.Context()) })
+
 	model.sessions = []session.Session{{Name: "alpha"}, {Name: "beta"}, {Name: "gamma"}}
 	model.refreshDisplaySessions()
 	model.filterSessions()
@@ -56,7 +58,9 @@ func TestSearchUpdatesResultsWithoutClearingScreen(t *testing.T) {
 	for _, mode := range []uiMode{modePopup, modeFullscreen, modeInline} {
 		synctest.Test(t, func(t *testing.T) {
 			model := newTestModel()
-			t.Cleanup(model.Close)
+
+			t.Cleanup(func() { model.Close(t.Context()) })
+
 			model.mode = mode
 			model.width, model.height = 80, 24
 			model.displayMode = displayModeAgents

@@ -34,7 +34,7 @@ func TestOperationalCommandsPersistFailuresWithoutPrivateDetails(t *testing.T) {
 
 			var stdout, stderr bytes.Buffer
 
-			root := newRootCommand(t.Context())
+			root := newRootCommand()
 
 			cmd, _, err := root.Find(tc.args)
 			if err != nil {
@@ -235,7 +235,7 @@ func TestAgentNavigationCommandsPersistTheirSuccessOutcome(t *testing.T) {
 	for _, operation := range []string{"next", "back", "latest", "focus", "waiting", "failed", "unread", "toggle"} {
 		t.Run(operation, func(t *testing.T) {
 			cfg, path := runtimeConfig(t, "info")
-			root := newRootCommand(t.Context())
+			root := newRootCommand()
 
 			cmd, _, err := root.Find([]string{"agent", operation})
 			if err != nil {
@@ -278,7 +278,7 @@ func TestAgentNavigationCommandsPersistTheirSuccessOutcome(t *testing.T) {
 func testQuietTrackerOutcome(t *testing.T, failed bool) {
 	t.Helper()
 	cfg, path := runtimeConfig(t, "info")
-	root := newRootCommand(t.Context())
+	root := newRootCommand()
 
 	cmd, _, err := root.Find([]string{"daemon", "agent-window-status"})
 	if err != nil {

@@ -121,7 +121,7 @@ func TestResolveWorkspacePathsDefaultToDataDirectory(t *testing.T) {
 	dataHome := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", dataHome)
 
-	workspace, err := clibase.ResolveWorkspace(endpointCommand(t))
+	workspace, err := clibase.ResolveWorkspace(t.Context(), endpointCommand(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +134,10 @@ func TestResolveWorkspacePathsDefaultToDataDirectory(t *testing.T) {
 		t.Fatalf("default lease root = %q", workspace.LeaseRoot)
 	}
 
-	explicit, err := clibase.ResolveWorkspace(endpointCommand(t, "--repository", "relative/repo"))
+	explicit, err := clibase.ResolveWorkspace(
+		t.Context(),
+		endpointCommand(t, "--repository", "relative/repo"),
+	)
 	if err != nil || !filepath.IsAbs(explicit.Repository) ||
 		filepath.Base(explicit.Repository) != "repo" {
 		t.Fatalf("explicit repository = %q, %v", explicit.Repository, err)

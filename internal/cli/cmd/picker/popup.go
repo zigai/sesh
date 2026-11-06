@@ -52,7 +52,7 @@ func (frontend popupFrontend) Dispatch(
 ) (any, error) {
 	launchedAt := time.Now()
 
-	runtime, err := preparePickerCommand(frontend.cmd)
+	runtime, err := preparePickerCommand(ctx, frontend.cmd)
 	if err != nil {
 		return nil, err
 	}

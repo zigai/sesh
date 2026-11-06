@@ -61,7 +61,7 @@ func renderSummary(t *testing.T, res action.RestoredSnapshot, verbose bool) stri
 	var stdout bytes.Buffer
 	cmd.SetOut(&stdout)
 
-	if err := renderSnapshotRestore(cmd, res, nil); err != nil {
+	if err := renderSnapshotRestore(t.Context(), cmd, res, nil); err != nil {
 		t.Fatalf("renderSnapshotRestore: %v", err)
 	}
 

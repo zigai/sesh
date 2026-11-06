@@ -809,7 +809,16 @@ func testFinalizationFailure(t *testing.T, uncertain bool) {
 
 	var stdout, stderr bytes.Buffer
 
-	err = publishCommandOutput(cmd, &output, &diagnostics, &stdout, &stderr, runErr, closeErr)
+	err = publishCommandOutput(
+		t.Context(),
+		cmd,
+		&output,
+		&diagnostics,
+		&stdout,
+		&stderr,
+		runErr,
+		closeErr,
+	)
 	if !errors.Is(err, closeErr) || (uncertain && !errors.Is(err, store.ErrUncertain)) {
 		t.Fatalf("lost cause: %v", err)
 	}
@@ -861,7 +870,7 @@ func TestFinalizationWithoutResultRetainsUncertaintyDiagnostic(t *testing.T) {
 				stdout, stderr      bytes.Buffer
 			)
 
-			err := publishCommandOutput(
+			err := publishCommandOutput(t.Context(),
 				cmd,
 				&output,
 				&diagnostics,
@@ -910,7 +919,7 @@ func TestHumanFinalizationReportsPrimaryAndCleanupFailures(t *testing.T) {
 		stdout, stderr      bytes.Buffer
 	)
 
-	err := publishCommandOutput(
+	err := publishCommandOutput(t.Context(),
 		cmd,
 		&output,
 		&diagnostics,
@@ -944,7 +953,7 @@ func TestStreamingBufferDetectsShortWrite(t *testing.T) {
 }
 
 func TestLogStreamDiagnosticsPreserveIndependentFailures(t *testing.T) {
-	cmd, _, err := newRootCommand(t.Context()).Find([]string{"logs"})
+	cmd, _, err := newRootCommand().Find([]string{"logs"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -992,7 +1001,7 @@ func TestRestoreRuntimeLogOwnership(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			cmd, _, findErr := newRootCommand(t.Context()).Find([]string{snapshotCmd, "restore"})
+			cmd, _, findErr := newRootCommand().Find([]string{snapshotCmd, "restore"})
 			if findErr != nil {
 				t.Fatal(findErr)
 			}
@@ -1081,7 +1090,7 @@ func TestRestoreTextReceiptSurvivesStagedFailure(t *testing.T) {
 		t.Fatal("restore receipt was discarded")
 	}
 
-	cmd, _, findErr := newRootCommand(t.Context()).Find([]string{snapshotCmd, "restore"})
+	cmd, _, findErr := newRootCommand().Find([]string{snapshotCmd, "restore"})
 	if findErr != nil {
 		t.Fatal(findErr)
 	}
@@ -1089,7 +1098,7 @@ func TestRestoreTextReceiptSurvivesStagedFailure(t *testing.T) {
 	cmd.SetOut(&stdout)
 	cmd.SetErr(&stderr)
 
-	if err := clibase.WriteCommandError(cmd, err); err != nil {
+	if err := clibase.WriteCommandError(t.Context(), cmd, err); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1101,7 +1110,7 @@ func TestRestoreTextReceiptSurvivesStagedFailure(t *testing.T) {
 func TestRestoreUncertaintySurvivesLogFinalizationFailure(t *testing.T) {
 	t.Parallel()
 
-	cmd, _, findErr := newRootCommand(t.Context()).Find([]string{snapshotCmd, "restore"})
+	cmd, _, findErr := newRootCommand().Find([]string{snapshotCmd, "restore"})
 	if findErr != nil {
 		t.Fatal(findErr)
 	}
@@ -1126,7 +1135,13 @@ func TestRestoreUncertaintySurvivesLogFinalizationFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := publishFinalizationFailure(cmd, &output, restore.ErrExecutionUncertain, errSensitiveRaw)
+	err := publishFinalizationFailure(
+		t.Context(),
+		cmd,
+		&output,
+		restore.ErrExecutionUncertain,
+		errSensitiveRaw,
+	)
 	if !errors.Is(err, restore.ErrExecutionUncertain) || !errors.Is(err, errSensitiveRaw) {
 		t.Fatal("finalization lost an independent cause")
 	}
@@ -1141,10 +1156,36 @@ func TestRestoreUncertaintySurvivesLogFinalizationFailure(t *testing.T) {
 func findTestCommand(t *testing.T, path ...string) *cobra.Command {
 	t.Helper()
 
-	cmd, _, err := newRootCommand(t.Context()).Find(path)
+	cmd, _, err := newRootCommand().Find(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	return cmd
+}
+
+func TestCommandHandlerUsesContextEnrichedAfterConstruction(t *testing.T) {
+	root := newRootCommand()
+
+	var stdout bytes.Buffer
+	root.SetOut(&stdout)
+	root.SetErr(io.Discard)
+	root.SetArgs([]string{"--no-config", "hooks", "list"})
+
+	root.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
+		cmd.SetContext(clibase.ContextWithRawArgs(cmd.Context(), []string{"--json"}))
+		return nil
+	}
+	if err := root.ExecuteContext(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	var output map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &output); err != nil {
+		t.Fatalf("handler ignored execution-time JSON context: %v; output=%s", err, stdout.Bytes())
+	}
+
+	if output["ok"] != true {
+		t.Fatalf("unexpected JSON output: %s", stdout.Bytes())
+	}
 }

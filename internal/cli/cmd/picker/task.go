@@ -101,7 +101,8 @@ func NewTaskPickerUICommand(remoteFactory RemoteFactory) *cobra.Command {
 		Hidden: true,
 		Args:   clibase.UsageArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runTaskPickerUI(cmd, args, remoteFactory)
+			ctx := clibase.CommandContext(cmd)
+			return runTaskPickerUI(ctx, cmd, args, remoteFactory)
 		},
 		Annotations: map[string]string{
 			clibase.AnnotationOperation: "task_picker", clibase.AnnotationLiveIO: annotationEnabled,
@@ -130,7 +131,7 @@ func (frontend taskFrontend) Dispatch(
 ) (any, error) {
 	cmd := frontend.cmd
 
-	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
+	cfg, err := clibase.LoadCommandConfig(ctx, cmd)
 	if err != nil {
 		return action.OpenedTaskMenu{}, err
 	}
@@ -348,10 +349,13 @@ func showRemoteAttachPopup(
 	return nil
 }
 
-func runTaskPickerUI(cmd *cobra.Command, _ []string, remoteFactory RemoteFactory) error {
-	ctx := clibase.CommandContext(cmd)
-
-	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
+func runTaskPickerUI(
+	ctx context.Context,
+	cmd *cobra.Command,
+	_ []string,
+	remoteFactory RemoteFactory,
+) error {
+	cfg, err := clibase.LoadCommandConfig(ctx, cmd)
 	if err != nil {
 		return err
 	}

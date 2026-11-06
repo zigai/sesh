@@ -24,11 +24,12 @@ func TestAutomaticSnapshotSkipsLogOnlyFixedReasonsWithoutPrivateOutcomeFields(t 
 			cmd := &cobra.Command{
 				Annotations: map[string]string{clibase.AnnotationOperation: "restore-on-start"},
 			}
-			cmd.SetContext(zerolog.New(&logs).WithContext(t.Context()))
+			cmd.SetContext(t.Context())
+			ctx := zerolog.New(&logs).WithContext(t.Context())
 
 			outcome := newOutcome(statusSkipped, reason)
 			outcome.generation, outcome.attempt = "PRIVATE_GENERATION", "PRIVATE_ATTEMPT"
-			logAutosaveSkip(cmd, outcome)
+			logAutosaveSkip(ctx, cmd, outcome)
 
 			var record map[string]any
 			if err := json.Unmarshal(logs.Bytes(), &record); err != nil {
@@ -69,7 +70,7 @@ func TestAutomaticSnapshotSkipLoggingLeavesDomainOutcomesAndTerminalFailuresToTh
 			Annotations: map[string]string{clibase.AnnotationOperation: "save-if-due"},
 		}
 		cmd.SetContext(zerolog.New(&logs).WithContext(t.Context()))
-		logAutosaveSkip(cmd, outcome)
+		logAutosaveSkip(cmd.Context(), cmd, outcome)
 
 		if logs.Len() != 0 {
 			t.Fatalf("duplicate or unsafe skip log: %s", logs.String())

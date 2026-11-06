@@ -82,7 +82,9 @@ func TestAgentAttentionOrder(t *testing.T) {
 
 func TestAgentSortCyclingPreservesSelectionAndSearch(t *testing.T) {
 	model := newTestModel()
-	t.Cleanup(model.Close)
+
+	t.Cleanup(func() { model.Close(t.Context()) })
+
 	model.displayMode = displayModeAgents
 	model.sessions = []session.Session{
 		{ID: "$1", Name: testSupportSessionDevName, Agents: []session.AgentSession{
@@ -134,7 +136,9 @@ func TestAgentSortCyclingPreservesSelectionAndSearch(t *testing.T) {
 
 func TestAgentSortChoiceSurvivesSummaryRefresh(t *testing.T) {
 	model := newTestModel()
-	t.Cleanup(model.Close)
+
+	t.Cleanup(func() { model.Close(t.Context()) })
+
 	model.displayMode = displayModeAgents
 	model.sessions = []session.Session{{ID: "$1", Name: testSupportSessionDevName}}
 	model.setAgentSort(agentSortAttention)
@@ -175,7 +179,9 @@ func TestAgentSortChoiceSurvivesSummaryRefresh(t *testing.T) {
 
 func TestAgentPositionRefreshPreservesSelectionAndRemoteRows(t *testing.T) {
 	model := newTestModel()
-	t.Cleanup(model.Close)
+
+	t.Cleanup(func() { model.Close(t.Context()) })
+
 	model.displayMode = displayModeAgents
 	model.sessions = []session.Session{
 		{ID: "$1", Name: testSupportSessionDevName, Agents: []session.AgentSession{
@@ -233,7 +239,9 @@ func TestAgentPositionOrderRemainsStableAcrossActivityUpdates(t *testing.T) {
 	)
 
 	model := newTestModel()
-	t.Cleanup(model.Close)
+
+	t.Cleanup(func() { model.Close(t.Context()) })
+
 	model.displayMode = displayModeAgents
 	model.sessions = []session.Session{{ID: "$1", Name: testSupportSessionDevName}}
 	summaries := []session.AgentSummary{
@@ -375,7 +383,9 @@ func TestAgentPositionOrderUsesGeometryOnInitialLoad(t *testing.T) {
 			}, nil
 		},
 	})
-	t.Cleanup(model.Close)
+
+	t.Cleanup(func() { model.Close(t.Context()) })
+
 	model.displayMode = displayModeAgents
 
 	if err := model.loadSessions(); err != nil {
@@ -421,7 +431,9 @@ func TestAgentPositionRefreshHonorsNewPaneEvidence(t *testing.T) {
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			model := newTestModel()
-			t.Cleanup(model.Close)
+
+			t.Cleanup(func() { model.Close(t.Context()) })
+
 			model.displayMode = displayModeAgents
 			model.sessions = []session.Session{
 				{ID: "$1", Name: testSupportSessionDevName, Agents: []session.AgentSession{
@@ -476,7 +488,7 @@ func checkAgentSortConfigAndFooter(t *testing.T, value string) {
 		t.Fatal(err)
 	}
 
-	t.Cleanup(model.Close)
+	t.Cleanup(func() { model.Close(t.Context()) })
 
 	model.width, model.height = 100, 24
 	for _, width := range []int{20, 40, 80} {
@@ -544,7 +556,9 @@ func assertAgentNames(t *testing.T, agents []session.AgentSession, want []string
 
 func TestAgentSortCycleWrapsThroughChoices(t *testing.T) {
 	model := newTestModel()
-	t.Cleanup(model.Close)
+
+	t.Cleanup(func() { model.Close(t.Context()) })
+
 	model.displayMode = displayModeAgents
 
 	expected := []agentSort{agentSortName, agentSortAttention, agentSortPosition, agentSortName}
@@ -561,7 +575,9 @@ func TestAgentSortCycleWrapsThroughChoices(t *testing.T) {
 
 func TestAgentSortBadgeStylingMatchesFooterShortcuts(t *testing.T) {
 	model := newTestModel()
-	t.Cleanup(model.Close)
+
+	t.Cleanup(func() { model.Close(t.Context()) })
+
 	model.displayMode = displayModeAgents
 
 	badge := model.renderAgentSortBadge()
@@ -588,7 +604,9 @@ func TestAgentSortBadgeStylingMatchesFooterShortcuts(t *testing.T) {
 
 func TestHiddenAgentSortBadgeHasNoMouseTarget(t *testing.T) {
 	model := newTestModel()
-	t.Cleanup(model.Close)
+
+	t.Cleanup(func() { model.Close(t.Context()) })
+
 	model.displayMode = displayModeAgents
 	model.width, model.height = 80, 24
 	layout := model.popupMouseLayout()
@@ -612,7 +630,9 @@ func TestAgentPositionPollingContinuesWithQuietBroker(t *testing.T) {
 			return []PaneLocation{{PaneID: "%1"}}, nil
 		},
 	})
-	t.Cleanup(model.Close)
+
+	t.Cleanup(func() { model.Close(t.Context()) })
+
 	model.mode = modePopup
 	model.displayMode = displayModeAgents
 	model.agentSummaryWatchStarted = true

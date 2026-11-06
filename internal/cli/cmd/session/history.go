@@ -122,7 +122,7 @@ func renderHistoryPanes(
 		listErr = wrapHistoryListError(listErr)
 	}
 
-	if clibase.JSONOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(clibase.CommandContext(cmd), cmd) {
 		res := newPaneHistoryJSONResult(panes)
 		if listErr != nil {
 			return clibase.WriteJSONResultError(cmd, res, listErr)
@@ -150,7 +150,7 @@ func renderHistorySessions(
 		listErr = wrapHistoryListError(listErr)
 	}
 
-	if clibase.JSONOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(clibase.CommandContext(cmd), cmd) {
 		res := newHistoryJSONResult(summaries)
 		if listErr != nil {
 			return clibase.WriteJSONResultError(cmd, res, listErr)

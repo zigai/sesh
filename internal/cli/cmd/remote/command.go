@@ -339,7 +339,7 @@ func runRemotePeerStream(cmd *cobra.Command, _ []string) error {
 		return cliError("decode_remote_stream_bootstrap", err)
 	}
 
-	workspace, err := clibase.ResolveWorkspace(cmd)
+	workspace, err := clibase.ResolveWorkspace(clibase.CommandContext(cmd), cmd)
 	if err != nil {
 		return err
 	}
@@ -423,7 +423,7 @@ func runRemotePeerAction(cmd *cobra.Command, _ []string) (resultErr error) {
 		return cliError("decode_remote_action", err)
 	}
 
-	workspace, err := clibase.ResolveWorkspace(cmd)
+	workspace, err := clibase.ResolveWorkspace(clibase.CommandContext(cmd), cmd)
 	if err != nil {
 		return err
 	}
@@ -774,14 +774,14 @@ func runRemoteLookup(cmd *cobra.Command, args []string) (resultErr error) {
 	}
 
 	if runErr != nil {
-		if clibase.JSONOutputEnabled(cmd) {
+		if clibase.JSONOutputEnabled(clibase.CommandContext(cmd), cmd) {
 			return clibase.WriteJSONResultError(cmd, output, cliError("run_remote_lookup", runErr))
 		}
 
 		return cliError("run_remote_lookup", runErr)
 	}
 
-	if clibase.JSONOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(clibase.CommandContext(cmd), cmd) {
 		return clibase.WriteJSONResult(cmd, output)
 	}
 

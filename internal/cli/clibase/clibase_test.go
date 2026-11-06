@@ -258,12 +258,12 @@ func TestJSONHelpers(t *testing.T) {
 	cmd := &cobra.Command{Use: "test"}
 	clibase.AddJSONFlag(cmd)
 
-	if clibase.JSONOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(clibase.CommandContext(cmd), cmd) {
 		t.Fatal("JSONOutputEnabled should be false by default")
 	}
 
 	_ = cmd.Flags().Set(clibase.JSONFlagName, "true")
-	if !clibase.JSONOutputEnabled(cmd) {
+	if !clibase.JSONOutputEnabled(clibase.CommandContext(cmd), cmd) {
 		t.Fatal("JSONOutputEnabled should be true after setting flag")
 	}
 
@@ -334,5 +334,25 @@ func TestCommandContextAndConfig(t *testing.T) {
 
 	if clibase.JSONErrorCode(err) != "configurationFailed" {
 		t.Fatalf("JSONErrorCode(err) = %q, want 'configurationFailed'", clibase.JSONErrorCode(err))
+	}
+}
+
+func TestJSONOutputEnabledProbesCallerRawArgsAfterParseFailure(t *testing.T) {
+	cmd := &cobra.Command{Use: "test"}
+	clibase.AddJSONFlag(cmd)
+	cmd.Flags().Int("count", 0, "count")
+
+	args := []string{"--count=invalid", "--json"}
+	if err := cmd.ParseFlags(args); err == nil {
+		t.Fatal("expected parse error")
+	}
+
+	ctx := clibase.ContextWithRawArgs(t.Context(), args)
+	if !clibase.JSONOutputEnabled(ctx, cmd) {
+		t.Fatal("JSON flag should be probed from caller context after parse failure")
+	}
+
+	if clibase.JSONOutputEnabled(t.Context(), cmd) {
+		t.Fatal("JSON flag should not be enabled without caller raw args")
 	}
 }

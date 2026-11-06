@@ -394,7 +394,10 @@ func attachPickerPopupClient(
 		cancelAttach()
 
 		select {
-		case <-attachDone:
+		case err := <-attachDone:
+			if err != nil {
+				t.Logf("picker popup client stopped: %v", err)
+			}
 		case <-time.After(5 * time.Second):
 		}
 	})

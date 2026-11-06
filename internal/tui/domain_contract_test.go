@@ -267,7 +267,7 @@ func TestModelCloseBlocksUntilWorkersJoinAndRejectsPostCloseState(t *testing.T) 
 		}
 	}
 
-	model.Close()
+	model.Close(t.Context())
 
 	if !workerJoined.Load() {
 		t.Fatal("Close() returned before in-flight background worker joined")
@@ -306,7 +306,7 @@ func TestModelLifecyclePreservesConfiguredLogger(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewModel() error = %v", err)
 	}
-	defer model.Close()
+	defer model.Close(t.Context())
 
 	opCtx := model.operationContext()
 

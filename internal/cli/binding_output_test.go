@@ -35,7 +35,7 @@ func testBindingReportOutput(t *testing.T, path []string, mode string) {
 	t.Helper()
 	t.Setenv("TMUX", "/tmp/test-binding/socket,1,0")
 
-	root := newRootCommand(t.Context())
+	root := newRootCommand()
 	if mode != "tmux_pane" {
 		if err := root.PersistentFlags().Set(setup.BindingFlag, "true"); err != nil {
 			t.Fatal(err)
@@ -72,7 +72,7 @@ func testBindingReportOutput(t *testing.T, path []string, mode string) {
 		t.Fatal(err)
 	}
 
-	if err := publishCommandOutput(
+	if err := publishCommandOutput(t.Context(),
 		cmd,
 		&output,
 		&diagnostics,
@@ -95,7 +95,7 @@ func testBindingReportOutput(t *testing.T, path []string, mode string) {
 }
 
 func TestBindingPartialSnapshotKeepsFailureWithoutPrintingReport(t *testing.T) {
-	root := newRootCommand(t.Context())
+	root := newRootCommand()
 	if err := root.PersistentFlags().Set(setup.BindingFlag, "true"); err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func TestBindingPartialSnapshotKeepsFailureWithoutPrintingReport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = publishCommandOutput(
+	err = publishCommandOutput(t.Context(),
 		cmd,
 		&output,
 		&diagnostics,

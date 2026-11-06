@@ -243,7 +243,7 @@ func collectionBudget(cmd *cobra.Command) (store.CollectionBudget, error) {
 }
 
 func openMaintenanceRepository(cmd *cobra.Command) (*store.Repository, error) {
-	workspace, err := clibase.ResolveWorkspace(cmd)
+	workspace, err := clibase.ResolveWorkspace(clibase.CommandContext(cmd), cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +290,7 @@ func collectionSkipsJSON(skips []store.CollectionSkip) []collectionSkipJSON {
 }
 
 func renderPruneResult(cmd *cobra.Command, result pruneResultJSON, err error) error {
-	if clibase.JSONOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(clibase.CommandContext(cmd), cmd) {
 		if err != nil {
 			return clibase.WriteJSONResultError(cmd, result, err)
 		}
@@ -315,7 +315,11 @@ func renderPruneResult(cmd *cobra.Command, result pruneResultJSON, err error) er
 	}
 
 	if err != nil {
-		if writeErr := clibase.WriteCommandError(cmd, err); writeErr != nil {
+		if writeErr := clibase.WriteCommandError(
+			clibase.CommandContext(cmd),
+			cmd,
+			err,
+		); writeErr != nil {
 			return errors.Join(err, writeErr)
 		}
 
@@ -326,7 +330,7 @@ func renderPruneResult(cmd *cobra.Command, result pruneResultJSON, err error) er
 }
 
 func renderGCResult(cmd *cobra.Command, result gcResultJSON, err error) error {
-	if clibase.JSONOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(clibase.CommandContext(cmd), cmd) {
 		if err != nil {
 			return clibase.WriteJSONResultError(cmd, result, err)
 		}
@@ -351,7 +355,11 @@ func renderGCResult(cmd *cobra.Command, result gcResultJSON, err error) error {
 	}
 
 	if err != nil {
-		if writeErr := clibase.WriteCommandError(cmd, err); writeErr != nil {
+		if writeErr := clibase.WriteCommandError(
+			clibase.CommandContext(cmd),
+			cmd,
+			err,
+		); writeErr != nil {
 			return errors.Join(err, writeErr)
 		}
 

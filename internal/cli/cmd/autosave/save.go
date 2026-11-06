@@ -66,6 +66,8 @@ func newSaveIfDueCommand() *cobra.Command {
 }
 
 func runAutosaveSaveIfDue(cmd *cobra.Command, _ []string) error {
+	ctx := clibase.CommandContext(cmd)
+
 	env, err := ResolveEnv(cmd)
 	if err != nil {
 		return err
@@ -76,6 +78,7 @@ func runAutosaveSaveIfDue(cmd *cobra.Command, _ []string) error {
 		degraded.history = historyUnavailable
 
 		return renderAutosaveDegraded(
+			ctx,
 			cmd,
 			env,
 			degraded,
@@ -90,10 +93,10 @@ func runAutosaveSaveIfDue(cmd *cobra.Command, _ []string) error {
 		skipped := newOutcome(decisionStatus(env.decision), env.decision.Reason)
 		skipped.history = historyState(env)
 
-		return renderAutosaveResult(cmd, env, skipped)
+		return renderAutosaveResult(ctx, cmd, env, skipped)
 	}
 
-	return executeAutosaveSave(clibase.CommandContext(cmd), cmd, env)
+	return executeAutosaveSave(ctx, cmd, env)
 }
 
 func executeAutosaveSave(ctx context.Context, cmd *cobra.Command, env Env) error {
@@ -126,14 +129,14 @@ func executeAutosaveSave(ctx context.Context, cmd *cobra.Command, env Env) error
 		case pendingRestoreSave:
 			reportRestoreIncomplete(ctx, env, pending)
 		case pendingRestoreRun:
-			return runLateStartupRestore(cmd, env, repo, pending)
+			return runLateStartupRestore(ctx, cmd, env, repo, pending)
 		case pendingRestoreHold:
 			return skipAutosaveWhileRestorePending(ctx, cmd, env, repo, pending)
 		}
 	}
 
 	if len(selected) == 0 {
-		return skipAutosaveWithoutSessions(cmd, env, repo)
+		return skipAutosaveWithoutSessions(ctx, cmd, env, repo)
 	}
 
 	lock, err := automation.TryAcquireSaveLock(ctx, automation.SaveLockPath())
@@ -171,7 +174,7 @@ func finishAutosave(
 		skipped.history = historyState(env)
 
 		return errors.Join(
-			renderAutosaveResult(cmd, env, skipped),
+			renderAutosaveResult(ctx, cmd, env, skipped),
 			wrapCloseError(closeErr),
 			lockErr,
 		)
@@ -182,6 +185,7 @@ func finishAutosave(
 		lockErr := lock.Release()
 
 		return renderAutosaveDegraded(
+			ctx,
 			cmd,
 			env,
 			failedSaveOutcome(env, result, saveErr),
@@ -222,7 +226,7 @@ func finishAutosave(
 		bookkeepingErr = recordCompletedAutosave(ctx, env, &outcome)
 	}
 
-	renderErr := renderAutosaveResult(cmd, env, outcome)
+	renderErr := renderAutosaveResult(ctx, cmd, env, outcome)
 
 	return errors.Join(renderErr, bookkeepingErr, wrapCloseError(closeErr), lockErr)
 }
@@ -275,14 +279,14 @@ func runAutosaveFinalSave(cmd *cobra.Command, _ []string) error {
 	outcome, saveErr, statusErr := runFinalSave(ctx, cmd, env, false)
 	if saveErr != nil {
 		return errors.Join(
-			renderAutosaveDegraded(cmd, env, outcome, errors.Join(saveErr, statusErr)),
+			renderAutosaveDegraded(ctx, cmd, env, outcome, errors.Join(saveErr, statusErr)),
 			statusErr,
 		)
 	}
 
 	cmd.Annotations[clibase.AnnotationSuccessOwned] = "true"
 
-	renderErr := renderAutosaveResult(cmd, env, outcome)
+	renderErr := renderAutosaveResult(ctx, cmd, env, outcome)
 
 	if renderErr != nil || statusErr != nil {
 		return errors.Join(renderErr, statusErr)
@@ -709,16 +713,21 @@ func skipAutosaveWithoutServer(
 	idle.repository = repositoryState(ctx, env)
 	idle.restorable = restorable
 
-	return errors.Join(renderAutosaveResult(cmd, env, idle), closeErr)
+	return errors.Join(renderAutosaveResult(ctx, cmd, env, idle), closeErr)
 }
 
-func skipAutosaveWithoutSessions(cmd *cobra.Command, env Env, repo *store.Repository) error {
+func skipAutosaveWithoutSessions(
+	ctx context.Context,
+	cmd *cobra.Command,
+	env Env,
+	repo *store.Repository,
+) error {
 	closeErr := wrapCloseError(repo.Close())
 
 	empty := newOutcome(statusSkipped, reasonNoSessions)
 	empty.history = historyState(env)
 
-	return errors.Join(renderAutosaveResult(cmd, env, empty), closeErr)
+	return errors.Join(renderAutosaveResult(ctx, cmd, env, empty), closeErr)
 }
 
 func recordCompletedAutosave(ctx context.Context, env Env, outcome *outcome) error {
@@ -739,6 +748,7 @@ func recordCompletedAutosave(ctx context.Context, env Env, outcome *outcome) err
 }
 
 func runLateStartupRestore(
+	ctx context.Context,
 	cmd *cobra.Command,
 	env Env,
 	repo *store.Repository,
@@ -748,7 +758,7 @@ func runLateStartupRestore(
 		return err
 	}
 
-	held, err := acquireStartupRestore(cmd, env)
+	held, err := acquireStartupRestore(ctx, cmd, env)
 	if held == nil {
 		return err
 	}
@@ -757,10 +767,10 @@ func runLateStartupRestore(
 	// interval while a refused restore is not retried.
 	claimed, err := claimPendingEpisode(env, pending)
 	if err != nil || !claimed {
-		return held.skip(cmd, env, err)
+		return held.skip(ctx, cmd, env, err)
 	}
 
-	return restoreUnderLock(cmd, env, held)
+	return restoreUnderLock(ctx, cmd, env, held)
 }
 
 func skipAutosaveWhileRestorePending(
@@ -779,7 +789,7 @@ func skipAutosaveWhileRestorePending(
 
 	closeErr := wrapCloseError(repo.Close())
 
-	return errors.Join(renderAutosaveResult(cmd, env, skipped), closeErr)
+	return errors.Join(renderAutosaveResult(ctx, cmd, env, skipped), closeErr)
 }
 
 func handleAutosaveLockError(
@@ -796,7 +806,7 @@ func handleAutosaveLockError(
 		busy.history = historyState(env)
 		busy.repository = repositoryState(ctx, env)
 
-		return errors.Join(renderAutosaveResult(cmd, env, busy), closeErr)
+		return errors.Join(renderAutosaveResult(ctx, cmd, env, busy), closeErr)
 	}
 
 	return errors.Join(

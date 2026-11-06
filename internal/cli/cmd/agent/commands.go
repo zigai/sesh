@@ -192,7 +192,7 @@ func newAgentStatusCommand() *cobra.Command {
 }
 
 func runAgentStatus(cmd *cobra.Command, _ []string) error {
-	workspace, err := clibase.ResolveWorkspace(cmd)
+	workspace, err := clibase.ResolveWorkspace(clibase.CommandContext(cmd), cmd)
 	if err != nil {
 		return err
 	}
@@ -202,7 +202,7 @@ func runAgentStatus(cmd *cobra.Command, _ []string) error {
 		return oops.In("cli").With("operation", "agent_status").Wrap(err)
 	}
 
-	if clibase.JSONOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(clibase.CommandContext(cmd), cmd) {
 		return clibase.WriteJSONResult(cmd, statusResultJSON{
 			Total:   summary.Total,
 			Live:    summary.Live,
@@ -243,7 +243,7 @@ func newAgentStatusRunCommand() *cobra.Command {
 }
 
 func runAgentStatusRun(cmd *cobra.Command, _ []string) error {
-	workspace, err := clibase.ResolveWorkspace(cmd)
+	workspace, err := clibase.ResolveWorkspace(clibase.CommandContext(cmd), cmd)
 	if err != nil {
 		return err
 	}

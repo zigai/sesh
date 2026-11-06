@@ -94,7 +94,7 @@ func Execute() {
 	}
 }
 
-func newRootCommand(ctx context.Context) *cobra.Command {
+func newRootCommand() *cobra.Command {
 	disableCommandSorting.Do(func() {
 		cobra.EnableCommandSorting = false
 	})
@@ -154,7 +154,7 @@ func newRootCommand(ctx context.Context) *cobra.Command {
 		Bool(setup.BindingFlag, false, "Report through tmux messages, as a key binding run by run-shell")
 	_ = rootCommand.PersistentFlags().MarkHidden(setup.BindingFlag)
 	rootCommand.AddCommand(
-		cmdpicker.NewPickCommand(ctx, cmdremote.DefaultPickerRemoteFactory),
+		cmdpicker.NewPickCommand(cmdremote.DefaultPickerRemoteFactory),
 		cmdsession.NewCommand(),
 		cmdsnapshot.NewCommand(),
 		cmdagent.NewCommand(),
@@ -218,7 +218,8 @@ func newHooksListCommand(use string, short string, validate bool) *cobra.Command
 		Short: short,
 		Args:  usageArgs(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runHooksList(cmd, validate)
+			ctx := clibase.CommandContext(cmd)
+			return runHooksList(ctx, cmd, validate)
 		},
 	}
 
@@ -247,15 +248,6 @@ func newHooksRunCommand() *cobra.Command {
 	return cmd
 }
 
-func loadHookConfig(cmd *cobra.Command) (*config.Config, error) {
-	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
-	if err != nil {
-		return nil, err
-	}
-
-	return cfg, nil
-}
-
 func hookEventSummary(cfg *config.Config) []hookCommandJSON {
 	summary := make([]hookCommandJSON, 0, len(hookEvents))
 
@@ -278,8 +270,8 @@ func hookTimeoutSeconds(cfg *config.Config) int {
 	return int(resolved.Seconds())
 }
 
-func runHooksList(cmd *cobra.Command, validate bool) error {
-	cfg, err := loadHookConfig(cmd)
+func runHooksList(ctx context.Context, cmd *cobra.Command, validate bool) error {
+	cfg, err := clibase.LoadCommandConfig(ctx, cmd)
 	if err != nil {
 		return err
 	}
@@ -295,7 +287,7 @@ func runHooksList(cmd *cobra.Command, validate bool) error {
 	summary := hookEventSummary(cfg)
 	timeout := hookTimeoutSeconds(cfg)
 
-	if clibase.JSONOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(ctx, cmd) {
 		return clibase.WriteJSONResult(
 			cmd,
 			hooksResultJSON{TimeoutSeconds: timeout, Events: summary},
@@ -346,7 +338,7 @@ func prepareHookRun(
 		)
 	}
 
-	cfg, err := loadHookConfig(cmd)
+	cfg, err := clibase.LoadCommandConfig(clibase.CommandContext(cmd), cmd)
 	if err != nil {
 		return config.HookConfig{}, session.HookEvent{}, err
 	}
@@ -373,7 +365,7 @@ func renderHookRun(
 	result session.HookResult,
 	runErr error,
 ) error {
-	if clibase.JSONOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(clibase.CommandContext(cmd), cmd) {
 		payload := hookRunResultJSON{
 			Event:     eventName,
 			Attempted: result.Attempted,
@@ -506,7 +498,7 @@ func runKeysList(cmd *cobra.Command) error {
 		return err
 	}
 
-	if clibase.JSONOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(clibase.CommandContext(cmd), cmd) {
 		return clibase.WriteJSONResult(cmd, struct {
 			Bindings []keyBindingJSON `json:"bindings"`
 		}{Bindings: bindings})

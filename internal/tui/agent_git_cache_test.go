@@ -62,7 +62,8 @@ func TestAgentGitCacheInvalidDataIsColdStart(t *testing.T) {
 
 func TestAgentGitCacheAppearsOnFirstRender(t *testing.T) {
 	model := gitTestModel(t)
-	t.Cleanup(model.Close)
+	t.Cleanup(func() { model.Close(t.Context()) })
+
 	model.loadingSessions = true
 	model.gitScan = func(context.Context, []string) (map[string]agentGitCacheEntry, []string, error) {
 		t.Error("initial load or render ran a Git scan")
@@ -100,7 +101,7 @@ func TestAgentGitCacheAppearsOnFirstRender(t *testing.T) {
 
 func TestAgentGitRefreshPersistsChangesAndReplacesStaleEntries(t *testing.T) {
 	model := gitTestModel(t)
-	t.Cleanup(model.Close)
+	t.Cleanup(func() { model.Close(t.Context()) })
 
 	previous := map[string]agentGitCacheEntry{
 		"/work/alpha": {GitBranch: "old-branch"},
@@ -133,7 +134,7 @@ func TestAgentGitRefreshPersistsChangesAndReplacesStaleEntries(t *testing.T) {
 
 func TestAgentGitCanceledRefreshPreservesCache(t *testing.T) {
 	model := gitTestModel(t)
-	t.Cleanup(model.Close)
+	t.Cleanup(func() { model.Close(t.Context()) })
 
 	want := map[string]agentGitCacheEntry{"/work/alpha": {GitBranch: "previous-branch"}}
 	if err := writeAgentGitCache(agentGitCachePath(), want); err != nil {
@@ -170,7 +171,7 @@ func TestAgentGitCanceledRefreshPreservesCache(t *testing.T) {
 
 func TestAgentGitCacheFailureDoesNotHideLiveResults(t *testing.T) {
 	model := gitTestModel(t)
-	t.Cleanup(model.Close)
+	t.Cleanup(func() { model.Close(t.Context()) })
 
 	if err := os.WriteFile(
 		filepath.Dir(agentGitCachePath()),
@@ -278,7 +279,8 @@ func TestAgentGitCacheUsesOnlyNativePath(t *testing.T) {
 
 func TestAgentGitCacheDoesNotScanOrDecorateRemoteOrigins(t *testing.T) {
 	model := gitTestModel(t)
-	t.Cleanup(model.Close)
+	t.Cleanup(func() { model.Close(t.Context()) })
+
 	model.sessions = []session.Session{
 		{
 			Origin: session.OriginSSH,

@@ -87,7 +87,7 @@ func (frontend projectFrontend) Dispatch(
 ) (any, error) {
 	cmd := frontend.cmd
 
-	cfg, err := clibase.LoadCommandConfig(cmd.Context(), cmd)
+	cfg, err := clibase.LoadCommandConfig(ctx, cmd)
 	if err != nil {
 		return nil, err
 	}

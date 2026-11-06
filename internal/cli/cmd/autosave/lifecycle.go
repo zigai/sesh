@@ -43,22 +43,26 @@ func newRestoreOnStartCommand() *cobra.Command {
 }
 
 func runAutosaveRestoreOnStart(cmd *cobra.Command, _ []string) error {
+	ctx := clibase.CommandContext(cmd)
+
 	env, err := ResolveEnv(cmd)
 	if err != nil {
 		return err
 	}
 
-	held, err := acquireStartupRestore(cmd, env)
+	held, err := acquireStartupRestore(ctx, cmd, env)
 	if held == nil {
 		return err
 	}
 
-	return restoreUnderLock(cmd, env, held)
+	return restoreUnderLock(ctx, cmd, env, held)
 }
 
-func acquireStartupRestore(cmd *cobra.Command, env Env) (*heldStartupRestore, error) {
-	ctx := clibase.CommandContext(cmd)
-
+func acquireStartupRestore(
+	ctx context.Context,
+	cmd *cobra.Command,
+	env Env,
+) (*heldStartupRestore, error) {
 	reportUnsavedShutdownSinceBoot(ctx, env)
 
 	repo, err := env.workspace.OpenExistingRepository(ctx)
@@ -68,7 +72,7 @@ func acquireStartupRestore(cmd *cobra.Command, env Env) (*heldStartupRestore, er
 			missing.repository = repositoryMissing
 			missing.history = historyState(env)
 
-			return nil, renderAutosaveResult(cmd, env, missing)
+			return nil, renderAutosaveResult(ctx, cmd, env, missing)
 		}
 
 		return nil, err
@@ -82,7 +86,7 @@ func acquireStartupRestore(cmd *cobra.Command, env Env) (*heldStartupRestore, er
 			busy := newOutcome(statusSkipped, reasonLockBusy)
 			busy.history = historyState(env)
 
-			return nil, errors.Join(renderAutosaveResult(cmd, env, busy), closeErr)
+			return nil, errors.Join(renderAutosaveResult(ctx, cmd, env, busy), closeErr)
 		}
 
 		return nil, errors.Join(
@@ -94,8 +98,12 @@ func acquireStartupRestore(cmd *cobra.Command, env Env) (*heldStartupRestore, er
 	return &heldStartupRestore{repo: repo, lock: lock}, nil
 }
 
-func restoreUnderLock(cmd *cobra.Command, env Env, held *heldStartupRestore) error {
-	ctx := clibase.CommandContext(cmd)
+func restoreUnderLock(
+	ctx context.Context,
+	cmd *cobra.Command,
+	env Env,
+	held *heldStartupRestore,
+) error {
 	repo, lock := held.repo, held.lock
 
 	settled, settleErr := engine.SettleDeadRestores(ctx, repo)
@@ -124,7 +132,7 @@ func restoreUnderLock(cmd *cobra.Command, env Env, held *heldStartupRestore) err
 	admission := automation.EvaluateStartupRestore(state)
 	if !admission.Allowed {
 		return errors.Join(
-			renderDeniedStartupRestore(cmd, env, admission, state, repo),
+			renderDeniedStartupRestore(ctx, cmd, env, admission, state, repo),
 			lock.Release(),
 		)
 	}
@@ -176,12 +184,13 @@ func restoreUnderLock(cmd *cobra.Command, env Env, held *heldStartupRestore) err
 		skipped:  result.SessionsSkipped,
 	}
 
-	renderErr := renderAutosaveResult(cmd, env, restored)
+	renderErr := renderAutosaveResult(ctx, cmd, env, restored)
 
 	return errors.Join(renderErr, wrapCloseError(closeErr), lockErr)
 }
 
 func renderDeniedStartupRestore(
+	ctx context.Context,
 	cmd *cobra.Command,
 	env Env,
 	admission automation.RestoreAdmission,
@@ -194,7 +203,7 @@ func renderDeniedStartupRestore(
 	outcome.history = historyState(env)
 	outcome.abandoned = state.Abandoned
 
-	renderErr := renderAutosaveResult(cmd, env, outcome)
+	renderErr := renderAutosaveResult(ctx, cmd, env, outcome)
 	closeErr := wrapCloseError(repo.Close())
 
 	switch admission.Reason {
@@ -273,12 +282,17 @@ func resolveAutosaveSelection(
 	return []gotmux.SessionID{capture.AllSessions}, nil
 }
 
-func (h *heldStartupRestore) skip(cmd *cobra.Command, env Env, err error) error {
+func (h *heldStartupRestore) skip(
+	ctx context.Context,
+	cmd *cobra.Command,
+	env Env,
+	err error,
+) error {
 	held := newOutcome(statusSkipped, reasonRestorePending)
 	held.history = historyState(env)
 
 	return errors.Join(
-		renderAutosaveDegraded(cmd, env, held, err),
+		renderAutosaveDegraded(ctx, cmd, env, held, err),
 		wrapCloseError(h.repo.Close()),
 		h.lock.Release(),
 	)

@@ -1081,7 +1081,10 @@ func (f *cliSessionFixture) attachCLIClient(tb testing.TB, id gotmux.SessionID) 
 		cancelAttach()
 
 		select {
-		case <-done:
+		case err := <-done:
+			if err != nil {
+				tb.Logf("attach client for %s stopped: %v", id, err)
+			}
 		case <-time.After(5 * time.Second):
 			tb.Logf("attach client for %s did not exit in time", id)
 		}

@@ -567,7 +567,7 @@ func TestIdleAgentWithSessionSwitchAfterIdleIsViewed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Cleanup(model.Close)
+	t.Cleanup(func() { model.Close(t.Context()) })
 
 	model.displayMode = displayModeAgents
 	model = updateTestModel(t, model, sessionLoadResultMsg{sessions: []session.Session{row}})

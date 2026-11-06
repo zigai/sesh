@@ -115,7 +115,7 @@ func assertWorkflowErrorEnvelope(t *testing.T, err error, code string) {
 		t.Fatal(flagErr)
 	}
 
-	if renderErr := clibase.WriteCommandError(cmd, err); renderErr != nil {
+	if renderErr := clibase.WriteCommandError(t.Context(), cmd, err); renderErr != nil {
 		t.Fatal(renderErr)
 	}
 

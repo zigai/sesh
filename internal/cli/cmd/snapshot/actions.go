@@ -47,12 +47,17 @@ func newSnapshotRestoreCommand() *cobra.Command {
 	)
 }
 
-func renderSnapshotSave(cmd *cobra.Command, output action.SavedSnapshot, err error) error {
+func renderSnapshotSave(
+	ctx context.Context,
+	cmd *cobra.Command,
+	output action.SavedSnapshot,
+	err error,
+) error {
 	if err != nil && output.Attempt == "" {
 		return err
 	}
 
-	if clibase.JSONOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(ctx, cmd) {
 		return clibase.WriteJSONResultError(cmd, output, err)
 	}
 
@@ -79,7 +84,7 @@ func prepareSnapshotRestore(
 		return true, nil
 	}
 
-	workspace, err := clibase.ResolveWorkspace(cmd)
+	workspace, err := clibase.ResolveWorkspace(ctx, cmd)
 	if err != nil {
 		return false, err
 	}
@@ -94,12 +99,17 @@ func prepareSnapshotRestore(
 	return true, nil
 }
 
-func renderSnapshotRestore(cmd *cobra.Command, output action.RestoredSnapshot, err error) error {
+func renderSnapshotRestore(
+	ctx context.Context,
+	cmd *cobra.Command,
+	output action.RestoredSnapshot,
+	err error,
+) error {
 	if err != nil && output.OperationID == "" && len(output.SessionsSkipped) == 0 {
 		return err
 	}
 
-	if clibase.JSONOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(ctx, cmd) {
 		return clibase.WriteJSONResultError(cmd, output, err)
 	}
 

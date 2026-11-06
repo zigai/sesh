@@ -122,12 +122,14 @@ func newRecoverOperationCommand(
 		Args:        clibase.UsageArgs(cobra.ExactArgs(1)),
 		Annotations: map[string]string{clibase.AnnotationOperation: operation},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			workspace, err := clibase.ResolveWorkspace(cmd)
+			ctx := clibase.CommandContext(cmd)
+
+			workspace, err := clibase.ResolveWorkspace(ctx, cmd)
 			if err != nil {
 				return err
 			}
 
-			repo, err := workspace.OpenExistingRepository(cmd.Context())
+			repo, err := workspace.OpenExistingRepository(ctx)
 			if err != nil {
 				return oops.In("cli").With("operation", "open_repository").Wrap(err)
 			}
@@ -163,7 +165,7 @@ func writeRestoreOperationResult(
 		return oops.In("cli").With("operation", commandOperation(cmd)).Wrap(err)
 	}
 
-	if clibase.JSONOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(clibase.CommandContext(cmd), cmd) {
 		return clibase.WriteJSONResult(cmd, result)
 	}
 
@@ -204,7 +206,7 @@ func writeRewriteResult(
 		err = oops.In("cli").With("operation", commandOperation(cmd)).Wrap(err)
 	}
 
-	if clibase.JSONOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(clibase.CommandContext(cmd), cmd) {
 		return clibase.WriteJSONResultError(cmd, output, err)
 	}
 

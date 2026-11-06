@@ -32,7 +32,7 @@ type listJSONResult struct {
 }
 
 func LoadHistoryState(cmd *cobra.Command) (*session.State, error) {
-	workspace, err := clibase.ResolveWorkspace(cmd)
+	workspace, err := clibase.ResolveWorkspace(clibase.CommandContext(cmd), cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +175,7 @@ func renderListOutput(
 	listErr error,
 	full bool,
 ) error {
-	if clibase.JSONOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(clibase.CommandContext(cmd), cmd) {
 		res := newListJSONResult(sessions)
 		if listErr != nil {
 			return clibase.WriteJSONResultError(cmd, res, listErr)
@@ -196,7 +196,7 @@ func renderListOutput(
 }
 
 func hintSavedSessions(cmd *cobra.Command, server *gotmux.Server, empty bool) {
-	workspace, err := clibase.ResolveWorkspace(cmd)
+	workspace, err := clibase.ResolveWorkspace(clibase.CommandContext(cmd), cmd)
 	if err != nil {
 		return
 	}

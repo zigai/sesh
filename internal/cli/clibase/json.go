@@ -297,7 +297,7 @@ func JSONErrorCode(err error) string {
 	return generalErrorCode(err)
 }
 
-func JSONOutputEnabled(cmd *cobra.Command) bool {
+func JSONOutputEnabled(ctx context.Context, cmd *cobra.Command) bool {
 	if cmd == nil || cmd.Flags().Lookup(JSONFlagName) == nil {
 		return false
 	}
@@ -307,7 +307,7 @@ func JSONOutputEnabled(cmd *cobra.Command) bool {
 		return true
 	}
 
-	if ctx := cmd.Context(); ctx != nil {
+	if ctx != nil {
 		if rawArgs, ok := RawArgsFromContext(ctx); ok && len(rawArgs) > 0 {
 			return ProbeJSONFlag(cmd.Flags(), rawArgs)
 		}
@@ -364,12 +364,12 @@ func SafeCommandErrorMessage(err error) string {
 	return cobraErrorMessage(err)
 }
 
-func WriteCommandError(cmd *cobra.Command, err error) error {
+func WriteCommandError(ctx context.Context, cmd *cobra.Command, err error) error {
 	if err == nil || CommandErrorWasRendered(err) {
 		return nil
 	}
 
-	if JSONOutputEnabled(cmd) {
+	if JSONOutputEnabled(ctx, cmd) {
 		var stderr io.Writer = os.Stderr
 		if cmd != nil {
 			stderr = cmd.ErrOrStderr()

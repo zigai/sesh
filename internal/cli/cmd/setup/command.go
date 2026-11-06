@@ -119,7 +119,7 @@ func runSetupTmux(cmd *cobra.Command, _ []string) error {
 }
 
 func renderSetupBlock(cmd *cobra.Command, bindings []setup.Binding) error {
-	if clibase.JSONOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(clibase.CommandContext(cmd), cmd) {
 		return clibase.WriteJSONResult(cmd, applyResultJSON{
 			Applied:  0,
 			Skipped:  0,
@@ -277,7 +277,7 @@ func renderSetupApplyResult(
 
 	conflictErr := conflictError(len(conflicts))
 
-	if clibase.JSONOutputEnabled(cmd) {
+	if clibase.JSONOutputEnabled(clibase.CommandContext(cmd), cmd) {
 		return clibase.WriteJSONResultError(cmd, payload, conflictErr)
 	}
 

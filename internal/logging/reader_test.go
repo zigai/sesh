@@ -605,7 +605,9 @@ func TestFollowDrainsBeforeRotation(t *testing.T) {
 
 	cancel()
 
-	<-done
+	if err := <-done; err != nil {
+		t.Fatalf("follow logs through rotation: %v", err)
+	}
 
 	_ = sink.Close()
 

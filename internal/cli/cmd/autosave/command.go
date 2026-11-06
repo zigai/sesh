@@ -126,7 +126,7 @@ func NewCommand() *cobra.Command {
 }
 
 func ResolveEnv(cmd *cobra.Command) (Env, error) {
-	workspace, err := clibase.ResolveWorkspace(cmd)
+	workspace, err := clibase.ResolveWorkspace(clibase.CommandContext(cmd), cmd)
 	if err != nil {
 		return Env{}, err
 	}

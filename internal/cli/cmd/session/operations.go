@@ -3,6 +3,7 @@
 package session
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -158,8 +159,13 @@ func newSessionNewCommand() *cobra.Command {
 	return cmd
 }
 
-func renderSessionDelete(cmd *cobra.Command, output action.DeletedSession, err error) error {
-	if clibase.JSONOutputEnabled(cmd) {
+func renderSessionDelete(
+	ctx context.Context,
+	cmd *cobra.Command,
+	output action.DeletedSession,
+	err error,
+) error {
+	if clibase.JSONOutputEnabled(ctx, cmd) {
 		return clibase.WriteJSONResultError(cmd, output, err)
 	}
 
