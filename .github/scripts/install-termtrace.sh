@@ -9,7 +9,10 @@ revision=bbbb5513a9f928bf6157ec0f27f6590848578ef4
 for directory in "$prefix" "$source_dir"; do
     case "$directory" in
         /*) ;;
-        *) echo 'installation prefix and source directory must be absolute' >&2; exit 2 ;;
+        *)
+            echo 'installation prefix and source directory must be absolute' >&2
+            exit 2
+            ;;
     esac
 done
 
@@ -29,8 +32,8 @@ git submodule update --init --recursive --depth 1
 bash scripts/bootstrap.sh
 
 TERMTRACE_BUILD_REVISION=$revision \
-TERMTRACE_GHOSTTY_PREFIX="$source_dir/vendor/ghostty/zig-out" \
-CARGO_TARGET_DIR="$source_dir/target" \
+    TERMTRACE_GHOSTTY_PREFIX="$source_dir/vendor/ghostty/zig-out" \
+    CARGO_TARGET_DIR="$source_dir/target" \
     cargo +1.99.1 build --locked --release --bin termtrace
 
 install -d "$prefix/bin"

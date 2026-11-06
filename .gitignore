@@ -6,3 +6,6 @@ coverage.out
 .DS_Store
 /AGENTS.md
 /.agents/
+
+/bin/
+coverage/

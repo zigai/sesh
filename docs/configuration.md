@@ -24,12 +24,12 @@ sesh runs its background work as systemd user services. To write them, run:
 sesh setup services --apply
 ```
 
-| Service | Purpose |
-| --- | --- |
-| `sesh-autosave.timer` | Saves a snapshot every `autosave.interval`. |
-| `sesh-coordinator.service` | Saves before sleep and shutdown. Written only with `--with-coordinator`. |
-| `sesh-agent-status.service` | Tracks agents, colors windows that need attention, and finishes merged tasks. |
-| `sesh-remote-monitor.service` | Keeps the list of remote sessions current. |
+| Service                       | Purpose                                                                       |
+| ----------------------------- | ----------------------------------------------------------------------------- |
+| `sesh-autosave.timer`         | Saves a snapshot every `autosave.interval`.                                   |
+| `sesh-coordinator.service`    | Saves before sleep and shutdown. Written only with `--with-coordinator`.      |
+| `sesh-agent-status.service`   | Tracks agents, colors windows that need attention, and finishes merged tasks. |
+| `sesh-remote-monitor.service` | Keeps the list of remote sessions current.                                    |
 
 Enable the services you want:
 
@@ -84,14 +84,14 @@ table = "prefix"
 
 Other files sesh writes:
 
-| Data | Path |
-| --- | --- |
-| Snapshots | `<data_dir>/snapshots` |
-| Session history | `$XDG_STATE_HOME/sesh/history.json` |
-| Tasks | `$XDG_STATE_HOME/sesh/tasks.json` |
-| Agent conversations | `$XDG_STATE_HOME/sesh/work.json` |
-| Task worktrees | `$WORKTREE_DIR/<project>/`, else `~/Worktrees/<project>/` |
-| Custom field cache | `$XDG_CACHE_HOME/sesh/fields` |
+| Data                | Path                                                      |
+| ------------------- | --------------------------------------------------------- |
+| Snapshots           | `<data_dir>/snapshots`                                    |
+| Session history     | `$XDG_STATE_HOME/sesh/history.json`                       |
+| Tasks               | `$XDG_STATE_HOME/sesh/tasks.json`                         |
+| Agent conversations | `$XDG_STATE_HOME/sesh/work.json`                          |
+| Task worktrees      | `$WORKTREE_DIR/<project>/`, else `~/Worktrees/<project>/` |
+| Custom field cache  | `$XDG_CACHE_HOME/sesh/fields`                             |
 
 ## Picker
 
@@ -139,16 +139,16 @@ Field names use `a-z`, `0-9`, and `_`. The command starts in the row's directory
 
 The command gets the row as one JSON line on stdin, and these environment variables:
 
-| Variable | Value |
-| --- | --- |
-| `SESH_FIELD` | Field name |
-| `SESH_ROW` | `session` or `agent` |
-| `SESH_SESSION`, `SESH_SESSION_ID` | Session name and ID |
-| `SESH_SESSION_KIND` | `live` or `saved` |
-| `SESH_SESSION_PATH` | Session directory |
-| `SESH_ORIGIN`, `SESH_CONNECTION_ID` | `local`, `ssh`, or `bridge`, and the remote connection |
-| `SESH_PANE_ID` | Agent pane on agent rows, active pane on session rows |
-| `SESH_AGENT_HARNESS`, `SESH_AGENT_STATUS`, `SESH_AGENT_CWD`, `SESH_AGENT_PROJECT_ROOT`, `SESH_AGENT_GIT_BRANCH`, `SESH_AGENT_PID` | Agent details, empty on session rows |
+| Variable                                                                                                                          | Value                                                  |
+| --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `SESH_FIELD`                                                                                                                      | Field name                                             |
+| `SESH_ROW`                                                                                                                        | `session` or `agent`                                   |
+| `SESH_SESSION`, `SESH_SESSION_ID`                                                                                                 | Session name and ID                                    |
+| `SESH_SESSION_KIND`                                                                                                               | `live` or `saved`                                      |
+| `SESH_SESSION_PATH`                                                                                                               | Session directory                                      |
+| `SESH_ORIGIN`, `SESH_CONNECTION_ID`                                                                                               | `local`, `ssh`, or `bridge`, and the remote connection |
+| `SESH_PANE_ID`                                                                                                                    | Agent pane on agent rows, active pane on session rows  |
+| `SESH_AGENT_HARNESS`, `SESH_AGENT_STATUS`, `SESH_AGENT_CWD`, `SESH_AGENT_PROJECT_ROOT`, `SESH_AGENT_GIT_BRANCH`, `SESH_AGENT_PID` | Agent details, empty on session rows                   |
 
 ### `[keys]`
 
@@ -186,25 +186,25 @@ Picker bindings cannot use the popup's navigation keys or keys that type into it
 
 Default bindings:
 
-| Key | In | Action |
-| --- | --- | --- |
-| `alt+c` | picker | `session.create` |
-| `alt+r` | picker | `session.rename` |
-| `alt+x` | picker | `session.kill` |
-| `alt+X` | picker | `session.delete` |
-| `alt+s` | picker | `snapshot.save` |
-| `alt+z` | picker | `task.sleep` |
-| `alt+Z` | picker | `task.wake` |
-| `alt+f` | picker | `inbox.finish` |
-| `alt+o` | picker | `task.open` |
-| `alt+t` | picker | `inbox.task` |
-| `C-o` | tmux | `pick.popup` |
-| `M-w` | tmux | `pick.popup` with `mode = "inbox"` |
-| `C-t` | tmux | `task.menu` |
-| `M-n` | tmux | `project.pick` |
-| `S-F12` | tmux | `agent.next` |
-| `M-S-F12` | tmux | `agent.next` with `local = true` |
-| `S-F1` | tmux | `agent.back` |
+| Key       | In     | Action                             |
+| --------- | ------ | ---------------------------------- |
+| `alt+c`   | picker | `session.create`                   |
+| `alt+r`   | picker | `session.rename`                   |
+| `alt+x`   | picker | `session.kill`                     |
+| `alt+X`   | picker | `session.delete`                   |
+| `alt+s`   | picker | `snapshot.save`                    |
+| `alt+z`   | picker | `task.sleep`                       |
+| `alt+Z`   | picker | `task.wake`                        |
+| `alt+f`   | picker | `inbox.finish`                     |
+| `alt+o`   | picker | `task.open`                        |
+| `alt+t`   | picker | `inbox.task`                       |
+| `C-o`     | tmux   | `pick.popup`                       |
+| `M-w`     | tmux   | `pick.popup` with `mode = "inbox"` |
+| `C-t`     | tmux   | `task.menu`                        |
+| `M-n`     | tmux   | `project.pick`                     |
+| `S-F12`   | tmux   | `agent.next`                       |
+| `M-S-F12` | tmux   | `agent.next` with `local = true`   |
+| `S-F1`    | tmux   | `agent.back`                       |
 
 ### `[theme]`
 

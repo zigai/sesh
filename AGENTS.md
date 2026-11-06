@@ -6,12 +6,12 @@ sesh is a Go CLI and TUI that adds a picker, snapshots, tasks, agent tracking an
 
 Tasks run through `just` (see `Justfile`):
 
-- `just build` builds `./sesh`. `just install` builds to `~/.local/bin/sesh` and restarts running `sesh-*` systemd user services that still run the old binary.
+- `just build` builds `bin/sesh`. `just install` builds to `~/.local/bin/sesh` and restarts running `sesh-*` systemd user services that still run the old binary.
 - `just test` runs unit tests (`go test ./...`).
 - `just integration` runs unit and integration tests (`-tags=integration`) with the `*_INTEGRATION_REQUIRED` variables set, so a missing tmux, application fixture or terminal tool fails instead of skipping.
 - `just race` is the same with `-race`.
 - `just lint`, `just fix`, `just format` run golangci-lint (config in `.golangci.yaml`, which also lints the `integration` build tag).
-- `just check` runs everything CI-like: `mod-check`, `lint`, `test-isolation`, `race`, and a format diff. Run it locally before merging.
+- `just check` runs formatting, module hygiene, lint, isolation checks and unit tests. `just checkfull` adds race and integration tests.
 - `just guest` / `just guest-extended` run the QEMU lifecycle harness (needs KVM).
 
 Single test: `go test ./internal/session -run TestName`. Integration tests need the tag: `go test -tags=integration ./test/integration/cli -run TestName`.

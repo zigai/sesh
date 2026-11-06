@@ -5,7 +5,10 @@ set -eu
 prefix=${1:?pass an absolute installation prefix}
 case "$prefix" in
     /*) ;;
-    *) echo 'installation prefix must be absolute' >&2; exit 2 ;;
+    *)
+        echo 'installation prefix must be absolute' >&2
+        exit 2
+        ;;
 esac
 
 build_dir=$(mktemp -d)
