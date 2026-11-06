@@ -249,7 +249,6 @@ linters:
         - G301 # directory perms
         - G302 # file perms
         - G304 # file path from variable
-        - G703 # path traversal taint on paths from variables, same as G304
     exhaustruct_v5:
       allow-empty-returns: true
       # Types whose zero fields mean "use the default". Mark such types in
@@ -274,10 +273,24 @@ linters:
         linters: [mnd]
 
       - path: "internal/cli/.*"
-        linters: [wrapcheck, contextcheck, funcorder, decorder]
+        linters: [wrapcheck]
 
       - path: ".*_test\\.go"
         linters: [decorder, funcorder, exhaustruct_v5, unparam, contextcheck, cyclop, gocognit, gosec, gosmopolitan, dupl, maintidx, goconst]
+
+      # The popup owns its generated CreateTemp handoff path in the user's runtime directory.
+      # Cleanup removes that exact file, not a confined request path.
+      - path: '^internal/cli/cmd/picker/popup_handoff\.go$'
+        text: '^G703: Path traversal via taint analysis$'
+        source: '^\s*(_ = os\.Remove\(path\)|return path, func\(\) \{ _ = os\.Remove\(path\) \}, nil)$'
+        linters: [gosec]
+
+      # A user-configured log destination is unrestricted; Lstat rejects a final symlink
+      # before pinned-parent, no-follow opening. Sink path and symlink tests cover this boundary.
+      - path: '^internal/logging/sink\.go$'
+        text: '^G703: Path traversal via taint analysis$'
+        source: '^\s*pathInfo, lstatErr := os\.Lstat\(cleanPath\)$'
+        linters: [gosec]
 
       # TOML keys are the documented user config format, so they stay snake_case.
       - path: "internal/config/.*"
