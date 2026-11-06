@@ -120,5 +120,5 @@ jobs:
         if: runner.os == 'Linux'
         uses: goreleaser/goreleaser-action@v6
         with:
-          version: "~> v2"
+          version: v2.13.3
           args: check
