@@ -27,7 +27,6 @@ archives:
     formats:
       - tar.gz
     files:
-
       - README.md
       - docs/*.md
 
@@ -68,7 +67,6 @@ changelog:
       - '^test(\([^)]+\))?!?:'
       - '^ci(\([^)]+\))?!?:'
       - '^chore(\([^)]+\))?!?:'
-
 
 release:
   github:
