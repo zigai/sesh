@@ -68,60 +68,12 @@ type services struct {
 	deferredViews []tui.AgentView
 }
 
-func AgentSummaries(observed []agents.AgentSession) []session.AgentSummary {
-	return agentSummaries(observed)
+type unreadableSnapshots struct {
+	err error
 }
 
-func newServices(
-	ctx context.Context,
-	workspace app.Workspace,
-	streams gotmux.Streams,
-	remote RemoteServices,
-) (*services, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-
-	server, err := workspace.OpenTmux()
-	if err != nil {
-		return nil, err
-	}
-
-	agentStore := workspace.AgentSource()
-	repository := app.NewRepository(workspace.Repository)
-	local := app.NewLocal(app.LocalOptions{
-		Config:             workspace.Config,
-		Server:             server,
-		Repository:         repository,
-		LeaseRoot:          workspace.LeaseRoot,
-		HistoryPath:        workspace.History,
-		AgentSource:        agentStore,
-		Streams:            streams,
-		Source:             "picker",
-		DeferSwitchHistory: true,
-		TaskLedger:         workspace.Tasks,
-		WorkState:          workspace.Work,
-		WorktreeDir:        workspace.WorktreeDir,
-	})
-
-	return &services{
-		workspace:        workspace,
-		server:           server,
-		currentPane:      "",
-		currentSessionID: "",
-		popupChild:       false,
-		repository:       repository,
-		agentStore:       agentStore,
-		sessionNames:     transcriptNameCache{restored: false, cache: nil},
-		titles:           titleCache{cache: nil, inflight: singleflight.Group{}},
-		panes:            singleflight.Group{},
-		initialReads:     nil,
-		workflow:         local.Workflow(),
-		actions:          action.Router{Local: local, Peer: remote.Peer, Origin: remote.Origin},
-		local:            local,
-		remote:           remote,
-		deferredViews:    nil,
-	}, nil
+func AgentSummaries(observed []agents.AgentSession) []session.AgentSummary {
+	return agentSummaries(observed)
 }
 
 func (s *services) Close() error {
@@ -138,26 +90,10 @@ func (s *services) Close() error {
 	return errors.Join(readsErr, repositoryErr)
 }
 
-func (s *services) startInitialReads(ctx context.Context) {
-	if s.currentSessionID == "" {
-		return
-	}
-
-	s.initialReads = openInitialReads(ctx, s.server, s.currentSessionID)
-}
-
 func (s *services) FinishInitialLoad() {
 	if s.initialReads != nil {
 		s.initialReads.release()
 	}
-}
-
-func (s *services) readTmux(ctx context.Context, query func(*gotmux.Server) error) error {
-	if s.initialReads == nil {
-		return query(s.server)
-	}
-
-	return s.initialReads.read(ctx, s.server, query)
 }
 
 func (s *services) TUIServices() tui.Services {
@@ -292,38 +228,6 @@ func (s *services) LoadCatalog(ctx context.Context) (session.CatalogResult, erro
 	return result, err
 }
 
-func (s *services) listCatalog(
-	ctx context.Context,
-	saved session.SavedSnapshots,
-) (session.CatalogResult, error) {
-	var result session.CatalogResult
-
-	err := s.readTmux(ctx, func(server *gotmux.Server) error {
-		var listErr error
-
-		result, listErr = session.ListCatalog(ctx, session.CatalogOptions{
-			Server:           server,
-			Repository:       saved,
-			RepositorySource: s.workspace.Repository,
-			GenerationID:     "",
-			CurrentPane:      s.currentPane,
-			CurrentSessionID: s.currentSessionID,
-		})
-
-		return listErr
-	})
-	if err != nil {
-		// Partial results keep live sessions visible when the saved repository cannot be read.
-		return result, oops.In("cli").With("operation", "load_picker_catalog").Wrap(err)
-	}
-
-	return result, nil
-}
-
-type unreadableSnapshots struct {
-	err error
-}
-
 func (u unreadableSnapshots) ReadCurrentListing(context.Context) (store.Listing, error) {
 	return store.Listing{}, u.err
 }
@@ -348,6 +252,154 @@ func (s *services) EnterSession(
 	outcome.Target = clonePickerTarget(target)
 
 	return outcome, nil
+}
+
+func (s *services) TmuxActivatePane(
+	ctx context.Context,
+	target session.Session,
+	paneID string,
+) error {
+	return s.activatePane(ctx, target, paneID, "")
+}
+
+func (s *services) TmuxPaneLocations(ctx context.Context) ([]tui.PaneLocation, error) {
+	value, err, _ := s.panes.Do("panes", func() (any, error) {
+		return s.observePaneLocations(ctx)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	locations, _ := value.([]tui.PaneLocation)
+
+	return locations, nil
+}
+
+func (s *services) LoadAgentSummaries(ctx context.Context) (tui.AgentSnapshot, error) {
+	observed, err := agents.LoadLiveAgents(ctx, s.agentStore)
+	if err != nil {
+		return tui.AgentSnapshot{}, oops.In("cli").With("operation", "load_picker_agents").Wrap(err)
+	}
+
+	return s.agentSnapshot(ctx, observed), nil
+}
+
+func (s *services) WatchAgentSummaries(
+	ctx context.Context,
+	publish func(revision uint64, snapshot tui.AgentSnapshot, err error) error,
+) error {
+	var filter aht.Filter
+
+	err := s.agentStore.Watch(ctx, filter, func(snapshot aht.StateSnapshot) error {
+		return publish(
+			snapshot.Revision,
+			s.agentSnapshot(ctx, agents.ObservedAgentSessions(snapshot.Sessions)),
+			nil,
+		)
+	})
+	if err != nil {
+		return oops.In("cli").With("operation", "watch_picker_agents").Wrap(err)
+	}
+
+	return nil
+}
+
+func (*services) GetWorkingDirectory() (string, error) {
+	directory, err := os.Getwd()
+	if err != nil {
+		return "", oops.In("cli").With("operation", "picker_working_directory").Wrap(err)
+	}
+
+	return directory, nil
+}
+
+func (s *services) UpdateModelState(ctx context.Context, update session.StateUpdate) error {
+	_, err := session.UpdateState(ctx, s.workspace.History, update)
+	if err != nil {
+		return oops.In("cli").With("operation", "update_picker_state").Wrap(err)
+	}
+
+	return nil
+}
+
+func (s *services) DeferAgentViews(views []tui.AgentView) bool {
+	if !s.popupChild {
+		return false
+	}
+
+	// The invoking process records these with its switch, so the popup never waits on a history
+	// write.
+	s.viewsMu.Lock()
+	defer s.viewsMu.Unlock()
+
+	for _, view := range views {
+		index := slices.IndexFunc(s.deferredViews, func(existing tui.AgentView) bool {
+			return existing.Session == view.Session && existing.PaneID == view.PaneID
+		})
+		if index >= 0 {
+			s.deferredViews = slices.Delete(s.deferredViews, index, index+1)
+		}
+
+		s.deferredViews = append(s.deferredViews, view)
+	}
+
+	if excess := len(s.deferredViews) - handoffMaxAgentViews; excess > 0 {
+		s.deferredViews = slices.Delete(s.deferredViews, 0, excess)
+	}
+
+	return true
+}
+
+func newServices(
+	ctx context.Context,
+	workspace app.Workspace,
+	streams gotmux.Streams,
+	remote RemoteServices,
+) (*services, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	server, err := workspace.OpenTmux()
+	if err != nil {
+		return nil, err
+	}
+
+	agentStore := workspace.AgentSource()
+	repository := app.NewRepository(workspace.Repository)
+	local := app.NewLocal(app.LocalOptions{
+		Config:             workspace.Config,
+		Server:             server,
+		Repository:         repository,
+		LeaseRoot:          workspace.LeaseRoot,
+		HistoryPath:        workspace.History,
+		AgentSource:        agentStore,
+		Streams:            streams,
+		Source:             "picker",
+		DeferSwitchHistory: true,
+		TaskLedger:         workspace.Tasks,
+		WorkState:          workspace.Work,
+		WorktreeDir:        workspace.WorktreeDir,
+	})
+
+	return &services{
+		workspace:        workspace,
+		server:           server,
+		currentPane:      "",
+		currentSessionID: "",
+		popupChild:       false,
+		repository:       repository,
+		agentStore:       agentStore,
+		sessionNames:     transcriptNameCache{restored: false, cache: nil},
+		titles:           titleCache{cache: nil, inflight: singleflight.Group{}},
+		panes:            singleflight.Group{},
+		initialReads:     nil,
+		workflow:         local.Workflow(),
+		actions:          action.Router{Local: local, Peer: remote.Peer, Origin: remote.Origin},
+		local:            local,
+		remote:           remote,
+		deferredViews:    nil,
+	}, nil
 }
 
 func enterOutcome(name string, enterAction tui.EnterAction, restored bool) tui.EnterOutcome {
@@ -411,161 +463,6 @@ func findPickerLiveTarget(
 	}
 
 	return session.Session{}, errPickerTargetChanged
-}
-
-func (s *services) TmuxActivatePane(
-	ctx context.Context,
-	target session.Session,
-	paneID string,
-) error {
-	return s.activatePane(ctx, target, paneID, "")
-}
-
-func (s *services) activatePane(
-	ctx context.Context,
-	target session.Session,
-	paneID string, clientName string,
-) error {
-	if err := revalidatePickerLiveTarget(ctx, s.server, target); err != nil {
-		return err
-	}
-
-	current := agents.CurrentTarget{PaneID: "", Client: clientName, SessionID: "", Session: ""}
-	if clientName == "" {
-		current.PaneID = s.currentPane
-		if current.PaneID == "" {
-			current.PaneID = os.Getenv("TMUX_PANE")
-		}
-	}
-
-	navigator, err := agents.NewNavigator(agents.NavigatorOptions{
-		Server:     s.server,
-		StatePath:  "",
-		Target:     current,
-		Controller: nil,
-		Source:     s.agentStore,
-	})
-	if err != nil {
-		return oops.In("cli").With("operation", "construct_picker_navigator").Wrap(err)
-	}
-
-	_, err = navigator.Focus(
-		ctx,
-		agents.FocusTarget{PaneID: paneID, SessionID: target.ID, SessionName: target.Name},
-	)
-	if err != nil {
-		return oops.In("cli").With("operation", "focus_picker_pane").Wrap(err)
-	}
-
-	return nil
-}
-
-func (s *services) TmuxPaneLocations(ctx context.Context) ([]tui.PaneLocation, error) {
-	value, err, _ := s.panes.Do("panes", func() (any, error) {
-		return s.observePaneLocations(ctx)
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	locations, _ := value.([]tui.PaneLocation)
-
-	return locations, nil
-}
-
-func (s *services) observePaneLocations(ctx context.Context) ([]tui.PaneLocation, error) {
-	var panes []agents.PaneLocation
-
-	err := s.readTmux(ctx, func(server *gotmux.Server) error {
-		var observeErr error
-
-		panes, observeErr = agents.ObservePanes(ctx, server)
-
-		return observeErr
-	})
-	if err != nil {
-		return nil, oops.In("cli").With("operation", "observe_picker_panes").Wrap(err)
-	}
-
-	result := make([]tui.PaneLocation, 0, len(panes))
-	for _, pane := range panes {
-		result = append(result, tui.PaneLocation{
-			ServerSocket: pane.ServerSocket,
-			SessionID:    pane.SessionID,
-			SessionName:  pane.SessionName,
-			WindowID:     pane.WindowID,
-			WindowIndex:  pane.WindowIndex,
-			PaneID:       pane.PaneID,
-			PaneIndex:    pane.PaneIndex,
-			PanePID:      pane.PanePID,
-			Command:      pane.Command,
-			PaneLeft:     strconv.Itoa(pane.Left),
-			PaneTop:      strconv.Itoa(pane.Top),
-		})
-	}
-
-	return result, nil
-}
-
-func (s *services) LoadAgentSummaries(ctx context.Context) (tui.AgentSnapshot, error) {
-	observed, err := agents.LoadLiveAgents(ctx, s.agentStore)
-	if err != nil {
-		return tui.AgentSnapshot{}, oops.In("cli").With("operation", "load_picker_agents").Wrap(err)
-	}
-
-	return s.agentSnapshot(ctx, observed), nil
-}
-
-func (s *services) WatchAgentSummaries(
-	ctx context.Context,
-	publish func(revision uint64, snapshot tui.AgentSnapshot, err error) error,
-) error {
-	var filter aht.Filter
-
-	err := s.agentStore.Watch(ctx, filter, func(snapshot aht.StateSnapshot) error {
-		return publish(
-			snapshot.Revision,
-			s.agentSnapshot(ctx, agents.ObservedAgentSessions(snapshot.Sessions)),
-			nil,
-		)
-	})
-	if err != nil {
-		return oops.In("cli").With("operation", "watch_picker_agents").Wrap(err)
-	}
-
-	return nil
-}
-
-func (s *services) agentSnapshot(
-	ctx context.Context,
-	observed []agents.AgentSession,
-) tui.AgentSnapshot {
-	var (
-		panes    []tui.PaneLocation
-		panesErr error
-		observer sync.WaitGroup
-	)
-
-	if len(observed) > 0 {
-		observer.Go(func() {
-			paneCtx, cancel := context.WithTimeout(ctx, time.Second)
-			defer cancel()
-
-			panes, panesErr = s.TmuxPaneLocations(paneCtx)
-		})
-	}
-
-	summaries := agentSummaries(observed)
-	s.sessionNames.annotateInventory(ctx, summaries)
-	s.titles.annotate(ctx, observed, summaries)
-
-	observer.Wait()
-
-	return tui.AgentSnapshot{
-		Summaries:     summaries,
-		Panes:         panes,
-		PanesObserved: len(observed) > 0 && panesErr == nil,
-	}
 }
 
 func agentSummaries(observed []agents.AgentSession) []session.AgentSummary {
@@ -722,50 +619,161 @@ func earlierNonZero(left time.Time, right time.Time) time.Time {
 	return left
 }
 
-func (*services) GetWorkingDirectory() (string, error) {
-	directory, err := os.Getwd()
-	if err != nil {
-		return "", oops.In("cli").With("operation", "picker_working_directory").Wrap(err)
-	}
+func clonePickerTarget(target session.Session) session.Session {
+	target.NameRaw = slices.Clone(target.NameRaw)
+	target.PathRaw = slices.Clone(target.PathRaw)
+	target.Agents = slices.Clone(target.Agents)
 
-	return directory, nil
+	return target
 }
 
-func (s *services) UpdateModelState(ctx context.Context, update session.StateUpdate) error {
-	_, err := session.UpdateState(ctx, s.workspace.History, update)
+func (s *services) startInitialReads(ctx context.Context) {
+	if s.currentSessionID == "" {
+		return
+	}
+
+	s.initialReads = openInitialReads(ctx, s.server, s.currentSessionID)
+}
+
+func (s *services) readTmux(ctx context.Context, query func(*gotmux.Server) error) error {
+	if s.initialReads == nil {
+		return query(s.server)
+	}
+
+	return s.initialReads.read(ctx, s.server, query)
+}
+
+func (s *services) listCatalog(
+	ctx context.Context,
+	saved session.SavedSnapshots,
+) (session.CatalogResult, error) {
+	var result session.CatalogResult
+
+	err := s.readTmux(ctx, func(server *gotmux.Server) error {
+		var listErr error
+
+		result, listErr = session.ListCatalog(ctx, session.CatalogOptions{
+			Server:           server,
+			Repository:       saved,
+			RepositorySource: s.workspace.Repository,
+			GenerationID:     "",
+			CurrentPane:      s.currentPane,
+			CurrentSessionID: s.currentSessionID,
+		})
+
+		return listErr
+	})
 	if err != nil {
-		return oops.In("cli").With("operation", "update_picker_state").Wrap(err)
+		// Partial results keep live sessions visible when the saved repository cannot be read.
+		return result, oops.In("cli").With("operation", "load_picker_catalog").Wrap(err)
+	}
+
+	return result, nil
+}
+
+func (s *services) activatePane(
+	ctx context.Context,
+	target session.Session,
+	paneID string, clientName string,
+) error {
+	if err := revalidatePickerLiveTarget(ctx, s.server, target); err != nil {
+		return err
+	}
+
+	current := agents.CurrentTarget{PaneID: "", Client: clientName, SessionID: "", Session: ""}
+	if clientName == "" {
+		current.PaneID = s.currentPane
+		if current.PaneID == "" {
+			current.PaneID = os.Getenv("TMUX_PANE")
+		}
+	}
+
+	navigator, err := agents.NewNavigator(agents.NavigatorOptions{
+		Server:     s.server,
+		StatePath:  "",
+		Target:     current,
+		Controller: nil,
+		Source:     s.agentStore,
+	})
+	if err != nil {
+		return oops.In("cli").With("operation", "construct_picker_navigator").Wrap(err)
+	}
+
+	_, err = navigator.Focus(
+		ctx,
+		agents.FocusTarget{PaneID: paneID, SessionID: target.ID, SessionName: target.Name},
+	)
+	if err != nil {
+		return oops.In("cli").With("operation", "focus_picker_pane").Wrap(err)
 	}
 
 	return nil
 }
 
-func (s *services) DeferAgentViews(views []tui.AgentView) bool {
-	if !s.popupChild {
-		return false
+func (s *services) observePaneLocations(ctx context.Context) ([]tui.PaneLocation, error) {
+	var panes []agents.PaneLocation
+
+	err := s.readTmux(ctx, func(server *gotmux.Server) error {
+		var observeErr error
+
+		panes, observeErr = agents.ObservePanes(ctx, server)
+
+		return observeErr
+	})
+	if err != nil {
+		return nil, oops.In("cli").With("operation", "observe_picker_panes").Wrap(err)
 	}
 
-	// The invoking process records these with its switch, so the popup never waits on a history
-	// write.
-	s.viewsMu.Lock()
-	defer s.viewsMu.Unlock()
-
-	for _, view := range views {
-		index := slices.IndexFunc(s.deferredViews, func(existing tui.AgentView) bool {
-			return existing.Session == view.Session && existing.PaneID == view.PaneID
+	result := make([]tui.PaneLocation, 0, len(panes))
+	for _, pane := range panes {
+		result = append(result, tui.PaneLocation{
+			ServerSocket: pane.ServerSocket,
+			SessionID:    pane.SessionID,
+			SessionName:  pane.SessionName,
+			WindowID:     pane.WindowID,
+			WindowIndex:  pane.WindowIndex,
+			PaneID:       pane.PaneID,
+			PaneIndex:    pane.PaneIndex,
+			PanePID:      pane.PanePID,
+			Command:      pane.Command,
+			PaneLeft:     strconv.Itoa(pane.Left),
+			PaneTop:      strconv.Itoa(pane.Top),
 		})
-		if index >= 0 {
-			s.deferredViews = slices.Delete(s.deferredViews, index, index+1)
-		}
-
-		s.deferredViews = append(s.deferredViews, view)
 	}
 
-	if excess := len(s.deferredViews) - handoffMaxAgentViews; excess > 0 {
-		s.deferredViews = slices.Delete(s.deferredViews, 0, excess)
+	return result, nil
+}
+
+func (s *services) agentSnapshot(
+	ctx context.Context,
+	observed []agents.AgentSession,
+) tui.AgentSnapshot {
+	var (
+		panes    []tui.PaneLocation
+		panesErr error
+		observer sync.WaitGroup
+	)
+
+	if len(observed) > 0 {
+		observer.Go(func() {
+			paneCtx, cancel := context.WithTimeout(ctx, time.Second)
+			defer cancel()
+
+			panes, panesErr = s.TmuxPaneLocations(paneCtx)
+		})
 	}
 
-	return true
+	summaries := agentSummaries(observed)
+	s.sessionNames.annotateInventory(ctx, summaries)
+	s.titles.annotate(ctx, observed, summaries)
+
+	observer.Wait()
+
+	return tui.AgentSnapshot{
+		Summaries:     summaries,
+		Panes:         panes,
+		PanesObserved: len(observed) > 0 && panesErr == nil,
+	}
 }
 
 func (s *services) takeDeferredAgentViews() []tui.AgentView {
@@ -776,14 +784,6 @@ func (s *services) takeDeferredAgentViews() []tui.AgentView {
 	s.deferredViews = nil
 
 	return views
-}
-
-func clonePickerTarget(target session.Session) session.Session {
-	target.NameRaw = slices.Clone(target.NameRaw)
-	target.PathRaw = slices.Clone(target.PathRaw)
-	target.Agents = slices.Clone(target.Agents)
-
-	return target
 }
 
 func (s *services) performDeferredSwitch(

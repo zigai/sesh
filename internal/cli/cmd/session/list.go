@@ -45,26 +45,6 @@ func LoadHistoryState(cmd *cobra.Command) (*session.State, error) {
 	return st, nil
 }
 
-func newListCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:         "list",
-		Short:       "List live tmux sessions",
-		Annotations: map[string]string{clibase.AnnotationOperation: "list"},
-		Long: "List live tmux sessions ordered by activity and switch history.\n\n" +
-			"Reads metadata only from the explicit tmux server socket and configured history state.",
-		Args: clibase.UsageArgs(cobra.NoArgs),
-		RunE: runList,
-	}
-
-	clibase.AddSocketFlag(cmd)
-	cmd.Flags().String("current-pane", "", "Explicit current pane ID for active session resolution")
-	cmd.Flags().String("history", "", clibase.HistoryFlagUsage)
-	cmd.Flags().Bool("full", false, "Show complete values using an adaptive layout")
-	clibase.AddJSONFlag(cmd)
-
-	return cmd
-}
-
 func ValidateListCommand(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		return clibase.NewExitError(clibase.ExitCodeUsage, errListPositionalArgs)
@@ -83,6 +63,26 @@ func ValidateListCommand(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func newListCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:         "list",
+		Short:       "List live tmux sessions",
+		Annotations: map[string]string{clibase.AnnotationOperation: "list"},
+		Long: "List live tmux sessions ordered by activity and switch history.\n\n" +
+			"Reads metadata only from the explicit tmux server socket and configured history state.",
+		Args: clibase.UsageArgs(cobra.NoArgs),
+		RunE: runList,
+	}
+
+	clibase.AddSocketFlag(cmd)
+	cmd.Flags().String("current-pane", "", "Explicit current pane ID for active session resolution")
+	cmd.Flags().String("history", "", clibase.HistoryFlagUsage)
+	cmd.Flags().Bool("full", false, "Show complete values using an adaptive layout")
+	clibase.AddJSONFlag(cmd)
+
+	return cmd
 }
 
 func formatActivity(t time.Time) string {

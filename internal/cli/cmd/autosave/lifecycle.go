@@ -20,6 +20,11 @@ import (
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
+type heldStartupRestore struct {
+	repo *store.Repository
+	lock *automation.SaveLock
+}
+
 func newRestoreOnStartCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "restore-on-start",
@@ -49,11 +54,6 @@ func runAutosaveRestoreOnStart(cmd *cobra.Command, _ []string) error {
 	}
 
 	return restoreUnderLock(cmd, env, held)
-}
-
-type heldStartupRestore struct {
-	repo *store.Repository
-	lock *automation.SaveLock
 }
 
 func acquireStartupRestore(cmd *cobra.Command, env Env) (*heldStartupRestore, error) {
@@ -92,17 +92,6 @@ func acquireStartupRestore(cmd *cobra.Command, env Env) (*heldStartupRestore, er
 	}
 
 	return &heldStartupRestore{repo: repo, lock: lock}, nil
-}
-
-func (h *heldStartupRestore) skip(cmd *cobra.Command, env Env, err error) error {
-	held := newOutcome(statusSkipped, reasonRestorePending)
-	held.history = historyState(env)
-
-	return errors.Join(
-		renderAutosaveDegraded(cmd, env, held, err),
-		wrapCloseError(h.repo.Close()),
-		h.lock.Release(),
-	)
 }
 
 func restoreUnderLock(cmd *cobra.Command, env Env, held *heldStartupRestore) error {
@@ -282,4 +271,15 @@ func resolveAutosaveSelection(
 	}
 
 	return []gotmux.SessionID{capture.AllSessions}, nil
+}
+
+func (h *heldStartupRestore) skip(cmd *cobra.Command, env Env, err error) error {
+	held := newOutcome(statusSkipped, reasonRestorePending)
+	held.history = historyState(env)
+
+	return errors.Join(
+		renderAutosaveDegraded(cmd, env, held, err),
+		wrapCloseError(h.repo.Close()),
+		h.lock.Release(),
+	)
 }

@@ -117,17 +117,6 @@ func AddEnvironmentFlags(cmd *cobra.Command) {
 		)
 }
 
-func addCallerFlags(cmd *cobra.Command) {
-	cmd.Flags().
-		String(ClientFlag, "", "Invoking tmux client, by name or tty [default: the client of the invoking pane]")
-	cmd.Flags().String(PaneFlag, "", "Invoking tmux pane ID, for example %1 [default: $TMUX_PANE]")
-	cmd.Flags().
-		String(ClientSessionFlag, "", "Session name or ID the invoking client is expected to show")
-	cmd.Flags().String(ClientWidthFlag, "", "Invoking client width [default: the client's width]")
-	cmd.Flags().
-		String(ClientHeightFlag, "", "Invoking client height [default: the client's height]")
-}
-
 func CallerOf(cmd *cobra.Command) action.Caller {
 	value := func(name string) string {
 		if cmd.Flags().Lookup(name) == nil {
@@ -200,12 +189,45 @@ func TerminalStreams(cmd *cobra.Command) gotmux.Streams {
 	return streams
 }
 
+func Render[In, Out any](
+	cmd *cobra.Command,
+	definition *action.Definition[In, Out],
+	output Out,
+	err error,
+) error {
+	if clibase.JSONOutputEnabled(cmd) {
+		return clibase.WriteJSONResultError(cmd, output, err)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	report := definition.Report(output)
+	if report == "" {
+		return nil
+	}
+
+	return clibase.WriteOutput(cmd, "%s\n", report)
+}
+
 func (runtime *Runtime) Close() error {
 	if runtime == nil {
 		return nil
 	}
 
 	return runtime.Repository.Close()
+}
+
+func addCallerFlags(cmd *cobra.Command) {
+	cmd.Flags().
+		String(ClientFlag, "", "Invoking tmux client, by name or tty [default: the client of the invoking pane]")
+	cmd.Flags().String(PaneFlag, "", "Invoking tmux pane ID, for example %1 [default: $TMUX_PANE]")
+	cmd.Flags().
+		String(ClientSessionFlag, "", "Session name or ID the invoking client is expected to show")
+	cmd.Flags().String(ClientWidthFlag, "", "Invoking client width [default: the client's width]")
+	cmd.Flags().
+		String(ClientHeightFlag, "", "Invoking client height [default: the client's height]")
 }
 
 func run[In, Out any](
@@ -428,28 +450,6 @@ func peerSessions(
 	}
 
 	return selected, nil
-}
-
-func Render[In, Out any](
-	cmd *cobra.Command,
-	definition *action.Definition[In, Out],
-	output Out,
-	err error,
-) error {
-	if clibase.JSONOutputEnabled(cmd) {
-		return clibase.WriteJSONResultError(cmd, output, err)
-	}
-
-	if err != nil {
-		return err
-	}
-
-	report := definition.Report(output)
-	if report == "" {
-		return nil
-	}
-
-	return clibase.WriteOutput(cmd, "%s\n", report)
 }
 
 func commandValues(

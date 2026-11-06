@@ -39,6 +39,36 @@ type resultJSON struct {
 	MaintenanceState string `json:"maintenanceState,omitempty"`
 }
 
+func DaemonRuntimeState(ctx context.Context, socket string) (string, daemon.RuntimeStatus) {
+	path, err := daemon.RuntimeStatusPath(os.Getenv("XDG_RUNTIME_DIR"), socket)
+	if err != nil {
+		logStateUnavailable(ctx, "daemon_runtime_state", err)
+
+		return daemonUnverifiable, emptyDaemonRuntimeStatus()
+	}
+
+	status, err := daemon.QueryRuntimeStatus(ctx, path)
+	if err == nil {
+		if status.Phase != daemon.RuntimePhaseRunning || !status.InhibitorsHeld {
+			return daemonNotReady, status
+		}
+
+		return daemonReady, status
+	}
+
+	if errors.Is(err, os.ErrNotExist) {
+		return daemonAbsent, emptyDaemonRuntimeStatus()
+	}
+
+	if errors.Is(err, unix.ECONNREFUSED) {
+		return daemonStale, emptyDaemonRuntimeStatus()
+	}
+
+	logStateUnavailable(ctx, "daemon_runtime_state", err)
+
+	return daemonUnverifiable, emptyDaemonRuntimeStatus()
+}
+
 func emptyDaemonRuntimeStatus() daemon.RuntimeStatus {
 	return daemon.RuntimeStatus{
 		Protocol:          0,
@@ -105,36 +135,6 @@ func runAutosaveStatus(cmd *cobra.Command, _ []string) error {
 	}
 
 	return clibase.WriteOutput(cmd, "%s", statusSummary(env, outcome))
-}
-
-func DaemonRuntimeState(ctx context.Context, socket string) (string, daemon.RuntimeStatus) {
-	path, err := daemon.RuntimeStatusPath(os.Getenv("XDG_RUNTIME_DIR"), socket)
-	if err != nil {
-		logStateUnavailable(ctx, "daemon_runtime_state", err)
-
-		return daemonUnverifiable, emptyDaemonRuntimeStatus()
-	}
-
-	status, err := daemon.QueryRuntimeStatus(ctx, path)
-	if err == nil {
-		if status.Phase != daemon.RuntimePhaseRunning || !status.InhibitorsHeld {
-			return daemonNotReady, status
-		}
-
-		return daemonReady, status
-	}
-
-	if errors.Is(err, os.ErrNotExist) {
-		return daemonAbsent, emptyDaemonRuntimeStatus()
-	}
-
-	if errors.Is(err, unix.ECONNREFUSED) {
-		return daemonStale, emptyDaemonRuntimeStatus()
-	}
-
-	logStateUnavailable(ctx, "daemon_runtime_state", err)
-
-	return daemonUnverifiable, emptyDaemonRuntimeStatus()
 }
 
 func logStateUnavailable(ctx context.Context, state string, err error) {

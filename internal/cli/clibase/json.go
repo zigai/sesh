@@ -189,6 +189,7 @@ type JSONErrorPayload struct {
 type RenderedCommandError struct {
 	err error
 }
+
 type commandErrorContract struct {
 	cause   error
 	code    string
@@ -197,18 +198,6 @@ type commandErrorContract struct {
 
 type noopValue struct{}
 
-func (e *RenderedCommandError) Error() string {
-	return e.err.Error()
-}
-
-func (e *RenderedCommandError) Unwrap() error {
-	return e.err
-}
-
-func (e *RenderedCommandError) RenderedCommandError() bool {
-	return true
-}
-
 func NewRenderedCommandError(err error) error {
 	if err == nil {
 		return nil
@@ -216,10 +205,6 @@ func NewRenderedCommandError(err error) error {
 
 	return &RenderedCommandError{err: err}
 }
-
-func (noopValue) String() string   { return "" }
-func (noopValue) Set(string) error { return nil }
-func (noopValue) Type() string     { return "string" }
 
 func AddJSONFlag(cmd *cobra.Command) {
 	if cmd.Flags().Lookup(JSONFlagName) == nil {
@@ -489,35 +474,6 @@ func HumanConfigurationErrorMessage(err error) (string, bool) {
 	return message, true
 }
 
-func tomlDocumentError(err error) bool {
-	_, strict := errors.AsType[*toml.StrictMissingError](err)
-	_, decode := errors.AsType[*toml.DecodeError](err)
-
-	return strict || decode
-}
-
-func humanCommandErrorMessage(cmd *cobra.Command, err error) string {
-	message := HumanErrorMessage(err)
-	if EnvironmentError(err) {
-		return message + "; run 'sesh doctor' for details"
-	}
-
-	if cmd == nil || ExitCode(err) != ExitCodeUsage {
-		return message
-	}
-
-	return message + "; run '" + cmd.CommandPath() + " --help' for valid usage"
-}
-
-func commandErrorMessage(cmd *cobra.Command, err error) string {
-	message := SafeCommandErrorMessage(err)
-	if cmd == nil || ExitCode(err) != ExitCodeUsage {
-		return message
-	}
-
-	return message + "; run '" + cmd.CommandPath() + " --help' for valid usage"
-}
-
 func WriteJSONResult(cmd *cobra.Command, result any) error {
 	return writeJSONEnvelope(cmd.OutOrStdout(), JSONEnvelope{
 		SchemaVersion: JSONSchemaVersion,
@@ -549,6 +505,53 @@ func WriteJSONResultFailure(cmd *cobra.Command, result any, err error) error {
 		Result:        result,
 		Error:         NewJSONErrorPayload(err),
 	})
+}
+
+func (e *RenderedCommandError) Error() string {
+	return e.err.Error()
+}
+
+func (e *RenderedCommandError) Unwrap() error {
+	return e.err
+}
+
+func (e *RenderedCommandError) RenderedCommandError() bool {
+	return true
+}
+
+func (noopValue) String() string { return "" }
+
+func (noopValue) Set(string) error { return nil }
+
+func (noopValue) Type() string { return "string" }
+
+func tomlDocumentError(err error) bool {
+	_, strict := errors.AsType[*toml.StrictMissingError](err)
+	_, decode := errors.AsType[*toml.DecodeError](err)
+
+	return strict || decode
+}
+
+func humanCommandErrorMessage(cmd *cobra.Command, err error) string {
+	message := HumanErrorMessage(err)
+	if EnvironmentError(err) {
+		return message + "; run 'sesh doctor' for details"
+	}
+
+	if cmd == nil || ExitCode(err) != ExitCodeUsage {
+		return message
+	}
+
+	return message + "; run '" + cmd.CommandPath() + " --help' for valid usage"
+}
+
+func commandErrorMessage(cmd *cobra.Command, err error) string {
+	message := SafeCommandErrorMessage(err)
+	if cmd == nil || ExitCode(err) != ExitCodeUsage {
+		return message
+	}
+
+	return message + "; run '" + cmd.CommandPath() + " --help' for valid usage"
 }
 
 func captureErrorCode(err error) (string, bool) {

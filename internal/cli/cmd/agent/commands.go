@@ -22,6 +22,11 @@ import (
 	"github.com/zigai/sesh/internal/work"
 )
 
+const (
+	stateFlag        = "agent-state"
+	workSyncInterval = 5 * time.Minute
+)
+
 type statusResultJSON struct {
 	Total   int `json:"total"`
 	Live    int `json:"live"`
@@ -31,10 +36,11 @@ type statusResultJSON struct {
 	Idle    int `json:"idle"`
 }
 
-const (
-	stateFlag        = "agent-state"
-	workSyncInterval = 5 * time.Minute
-)
+type recordingTracker struct {
+	*agents.Tracker
+
+	recorder *work.Recorder
+}
 
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
@@ -123,6 +129,17 @@ func NewCommand() *cobra.Command {
 	)
 
 	return cmd
+}
+
+func NewDaemonWindowStatusCommand() *cobra.Command {
+	cmd := newAgentStatusRunCommand()
+	cmd.Use = "agent-window-status"
+
+	return cmd
+}
+
+func (t recordingTracker) HandleSnapshot(ctx context.Context, sessions []aht.Session) error {
+	return errors.Join(t.Tracker.HandleSnapshot(ctx, sessions), t.recorder.Record(ctx, sessions))
 }
 
 func workCommand(
@@ -323,21 +340,4 @@ func statusWatchOptions(resolved config.AgentStatusConfig, quiet bool) agents.Wa
 
 func commandContextOrBackground(cmd *cobra.Command) context.Context {
 	return clibase.CommandContext(cmd)
-}
-
-func NewDaemonWindowStatusCommand() *cobra.Command {
-	cmd := newAgentStatusRunCommand()
-	cmd.Use = "agent-window-status"
-
-	return cmd
-}
-
-type recordingTracker struct {
-	*agents.Tracker
-
-	recorder *work.Recorder
-}
-
-func (t recordingTracker) HandleSnapshot(ctx context.Context, sessions []aht.Session) error {
-	return errors.Join(t.Tracker.HandleSnapshot(ctx, sessions), t.recorder.Record(ctx, sessions))
 }

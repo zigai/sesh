@@ -144,12 +144,6 @@ type sessionInfo struct {
 	Name *string `json:"name"`
 }
 
-func (o terminalOutput) Read([]byte) (int, error) { return 0, io.EOF }
-
-func (o terminalOutput) Close() error { return nil }
-
-func (o terminalOutput) Fd() uintptr { return o.fd }
-
 func InvokingPickerClient(ctx context.Context, server *gotmux.Server) (gotmux.ClientInfo, error) {
 	return invokingPickerClient(ctx, server)
 }
@@ -189,6 +183,20 @@ func NewPickCommand(ctx context.Context, remote ...RemoteFactory) *cobra.Command
 	return cmd
 }
 
+func HasTerminal(cmd *cobra.Command) bool {
+	return hasTerminal(cmd)
+}
+
+func ProgramOutput(output io.Writer) io.Writer {
+	return programOutput(output)
+}
+
+func (o terminalOutput) Read([]byte) (int, error) { return 0, io.EOF }
+
+func (o terminalOutput) Close() error { return nil }
+
+func (o terminalOutput) Fd() uintptr { return o.fd }
+
 func newPickUICommand(ctx context.Context, remoteFactory RemoteFactory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:    "ui",
@@ -218,14 +226,6 @@ func newPickUICommand(ctx context.Context, remoteFactory RemoteFactory) *cobra.C
 func addPickerModeFlag(cmd *cobra.Command) {
 	cmd.Flags().String(modeFlag, "", "Display mode to open in")
 	clibase.SetFlagChoices(cmd, modeFlag, "sesh", "agents", "inbox")
-}
-
-func HasTerminal(cmd *cobra.Command) bool {
-	return hasTerminal(cmd)
-}
-
-func ProgramOutput(output io.Writer) io.Writer {
-	return programOutput(output)
 }
 
 func firstPickerRemoteFactory(values []RemoteFactory) RemoteFactory {
@@ -1106,51 +1106,6 @@ func invokingPickerClient(ctx context.Context, server *gotmux.Server) (gotmux.Cl
 	return eligible[0], nil
 }
 
-func (r *transcriptNameCache) annotateInventory(
-	ctx context.Context,
-	summaries []session.AgentSummary,
-) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	storePath := sessionNamesPath()
-
-	if !r.restored {
-		r.restored = true
-		r.cache = loadSessionNames(storePath)
-	}
-
-	loads := sessionNameLoads(summaries, r.cache)
-	if len(loads) != 0 {
-		readPickerSessionNames(ctx, loads)
-	}
-
-	previous := r.cache
-
-	r.cache = make(map[string]sessionNameState, len(loads))
-	for _, load := range loads {
-		r.cache[load.path] = load.state
-		if !load.state.hasInfo {
-			continue
-		}
-
-		for _, agent := range load.agents {
-			agent.HarnessSession = load.state.name
-			agent.HarnessSession = harnessSessionLabel(*agent)
-		}
-	}
-
-	if maps.Equal(previous, r.cache) {
-		return
-	}
-
-	if err := saveSessionNames(storePath, r.cache); err != nil {
-		zerolog.Ctx(ctx).Warn().Str("component", "picker").
-			Str("operation", "save_session_names").Str("status", "degraded").
-			Func(logging.Cause(err)).Msg("session names were not stored")
-	}
-}
-
 func sessionNameLoads(
 	summaries []session.AgentSummary,
 	cache map[string]sessionNameState,
@@ -1392,4 +1347,49 @@ func piSessionID(filename string) string {
 	}
 
 	return id
+}
+
+func (r *transcriptNameCache) annotateInventory(
+	ctx context.Context,
+	summaries []session.AgentSummary,
+) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	storePath := sessionNamesPath()
+
+	if !r.restored {
+		r.restored = true
+		r.cache = loadSessionNames(storePath)
+	}
+
+	loads := sessionNameLoads(summaries, r.cache)
+	if len(loads) != 0 {
+		readPickerSessionNames(ctx, loads)
+	}
+
+	previous := r.cache
+
+	r.cache = make(map[string]sessionNameState, len(loads))
+	for _, load := range loads {
+		r.cache[load.path] = load.state
+		if !load.state.hasInfo {
+			continue
+		}
+
+		for _, agent := range load.agents {
+			agent.HarnessSession = load.state.name
+			agent.HarnessSession = harnessSessionLabel(*agent)
+		}
+	}
+
+	if maps.Equal(previous, r.cache) {
+		return
+	}
+
+	if err := saveSessionNames(storePath, r.cache); err != nil {
+		zerolog.Ctx(ctx).Warn().Str("component", "picker").
+			Str("operation", "save_session_names").Str("status", "degraded").
+			Func(logging.Cause(err)).Msg("session names were not stored")
+	}
 }

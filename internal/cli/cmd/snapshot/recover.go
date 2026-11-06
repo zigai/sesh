@@ -19,6 +19,19 @@ type rewriteOutput struct {
 	Empty       bool   `json:"empty"`
 }
 
+func ValidateSnapshotCommand(cmd *cobra.Command, args []string) error {
+	if cmd.Annotations[clibase.AnnotationOperation] == "restore" {
+		return validateSnapshotRestorePicker(cmd)
+	}
+
+	if cmd.Parent() != nil && cmd.Parent().Name() == "snapshot" &&
+		(cmd.Name() == "prune" || cmd.Name() == "gc") {
+		return validateSnapshotMaintenanceCommand(cmd)
+	}
+
+	return nil
+}
+
 func newSnapshotRecoverCommand() *cobra.Command {
 	cmd := newSnapshotGroupCommand(
 		"recover",
@@ -205,17 +218,4 @@ func writeRewriteResult(
 	)
 
 	return errors.Join(err, writeErr)
-}
-
-func ValidateSnapshotCommand(cmd *cobra.Command, args []string) error {
-	if cmd.Annotations[clibase.AnnotationOperation] == "restore" {
-		return validateSnapshotRestorePicker(cmd)
-	}
-
-	if cmd.Parent() != nil && cmd.Parent().Name() == "snapshot" &&
-		(cmd.Name() == "prune" || cmd.Name() == "gc") {
-		return validateSnapshotMaintenanceCommand(cmd)
-	}
-
-	return nil
 }

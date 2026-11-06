@@ -65,22 +65,6 @@ func NewCommand() *cobra.Command {
 	return newRemoteCommand()
 }
 
-func newRemoteCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "remote",
-		Short: "Browse and operate configured remote tmux peers",
-		Args:  clibase.UsageArgs(cobra.NoArgs),
-		RunE:  clibase.RequireSubcommand,
-	}
-	cmd.AddCommand(
-		newRemoteAttachCommand(),
-		newRemoteLookupCommand(),
-		newRemotePeerCommand(),
-	)
-
-	return cmd
-}
-
 func NewDaemonMonitorCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "remote-monitor",
@@ -94,6 +78,22 @@ func NewDaemonMonitorCommand() *cobra.Command {
 	}
 	cmd.Flags().
 		String("socket", "", "Managed tmux socket retained for service-definition consistency")
+
+	return cmd
+}
+
+func newRemoteCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "remote",
+		Short: "Browse and operate configured remote tmux peers",
+		Args:  clibase.UsageArgs(cobra.NoArgs),
+		RunE:  clibase.RequireSubcommand,
+	}
+	cmd.AddCommand(
+		newRemoteAttachCommand(),
+		newRemoteLookupCommand(),
+		newRemotePeerCommand(),
+	)
 
 	return cmd
 }
@@ -326,25 +326,6 @@ func openPeerRuntime(socket string, needReceipts bool) (*peerRuntime, error) {
 	}
 
 	return runtime, nil
-}
-
-func (runtime *peerRuntime) openReceipts(stateHome string) error {
-	receiptPath, err := remote.InvocationDir(stateHome)
-	if err != nil {
-		return cliError("resolve_remote_invocations", err)
-	}
-
-	runtime.receipts, err = openRemotePrivate(receiptPath)
-
-	return err
-}
-
-func (runtime *peerRuntime) close() error {
-	if runtime == nil || runtime.receipts == nil {
-		return nil
-	}
-
-	return cliError("close_remote_invocations", runtime.receipts.Close())
 }
 
 func runRemotePeerStream(cmd *cobra.Command, _ []string) error {
@@ -826,4 +807,23 @@ func lookupReport(result remote.ActionResult) string {
 	}
 
 	return report + "\n" + entry.ReportAny(output)
+}
+
+func (runtime *peerRuntime) openReceipts(stateHome string) error {
+	receiptPath, err := remote.InvocationDir(stateHome)
+	if err != nil {
+		return cliError("resolve_remote_invocations", err)
+	}
+
+	runtime.receipts, err = openRemotePrivate(receiptPath)
+
+	return err
+}
+
+func (runtime *peerRuntime) close() error {
+	if runtime == nil || runtime.receipts == nil {
+		return nil
+	}
+
+	return cliError("close_remote_invocations", runtime.receipts.Close())
 }

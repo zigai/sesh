@@ -22,10 +22,18 @@ const (
 	reasonRestoreTarget     = "restore_target_unavailable"
 )
 
+const (
+	pendingRestoreHold pendingRestoreAction = iota
+	pendingRestoreRun
+	pendingRestoreSave
+)
+
 type pendingRestore struct {
 	sessions      int
 	serverStarted time.Time
 }
+
+type pendingRestoreAction int
 
 func findPendingRestore(
 	ctx context.Context,
@@ -47,14 +55,6 @@ func findPendingRestore(
 		serverStarted: unrestored.ServerStarted,
 	}
 }
-
-type pendingRestoreAction int
-
-const (
-	pendingRestoreHold pendingRestoreAction = iota
-	pendingRestoreRun
-	pendingRestoreSave
-)
 
 func decidePendingRestore(
 	ctx context.Context,

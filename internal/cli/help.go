@@ -38,6 +38,10 @@ var flagMetavars = map[string]string{
 	"retention-days":  "<days>",
 }
 
+type defaultlessValue struct {
+	pflag.Value
+}
+
 func configureCommandHelp(root *cobra.Command) {
 	root.SetUsageFunc(writeCommandUsage)
 	addHelpFlags(root)
@@ -192,10 +196,6 @@ func flagUsages(flags *pflag.FlagSet) string {
 	}
 
 	return usages
-}
-
-type defaultlessValue struct {
-	pflag.Value
 }
 
 func flagDefault(flag *pflag.Flag) (string, bool) {

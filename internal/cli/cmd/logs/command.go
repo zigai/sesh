@@ -48,6 +48,14 @@ func NewCommand() *cobra.Command {
 	return newLogsCommand()
 }
 
+func ValidateCommand(cmd *cobra.Command) error {
+	return validateLogsCommand(cmd)
+}
+
+func ValidateLogsCommand(cmd *cobra.Command) error {
+	return validateLogsCommand(cmd)
+}
+
 func newLogsCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "logs",
@@ -95,14 +103,6 @@ JSON for humans and takes precedence over --json.`,
 	cmd.Flags().BoolP("relative", "r", false, "Display relative timestamps (e.g. 2m ago, just now)")
 
 	return cmd
-}
-
-func ValidateCommand(cmd *cobra.Command) error {
-	return validateLogsCommand(cmd)
-}
-
-func ValidateLogsCommand(cmd *cobra.Command) error {
-	return validateLogsCommand(cmd)
 }
 
 func validateLogsCommand(cmd *cobra.Command) error {

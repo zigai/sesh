@@ -67,6 +67,15 @@ type taskFrontend struct {
 	remote RemoteFactory
 }
 
+type pickedTask struct {
+	choice   taskpicker.Choice
+	machines []action.Location
+	at       action.Location
+	session  string
+	started  string
+	remote   RemoteServices
+}
+
 func NewTaskMenuCommand(remoteFactory RemoteFactory) *cobra.Command {
 	return actioncli.Command(
 		action.TaskMenu,
@@ -425,15 +434,6 @@ func finishTaskPicker(ctx context.Context, handoffPath string, picked pickedTask
 	}
 }
 
-type pickedTask struct {
-	choice   taskpicker.Choice
-	machines []action.Location
-	at       action.Location
-	session  string
-	started  string
-	remote   RemoteServices
-}
-
 func pickTask(
 	ctx context.Context,
 	cmd *cobra.Command,
@@ -633,64 +633,6 @@ func machineLocation(machine string) action.Location {
 	return action.Peer(machine)
 }
 
-func (choices *taskChoices) listMachines() ([]taskpicker.Machine, error) {
-	catalog, err := choices.remote.Catalog.LoadRemoteCatalog()
-	if err != nil {
-		return nil, err
-	}
-
-	machines := []taskpicker.Machine{{Name: thisMachine, Usable: true}}
-
-	for _, connection := range catalog.Connections {
-		if !connection.Connected {
-			continue
-		}
-
-		at := action.Peer(connection.ID)
-		usable := choices.remote.Peer.Accepts(at, action.TaskOffer.ID) &&
-			choices.remote.Peer.Accepts(at, action.TaskNew.ID)
-		machines = append(
-			machines,
-			taskpicker.Machine{Name: cmp.Or(connection.Label, connection.ID), Usable: usable},
-		)
-		choices.machines = append(choices.machines, at)
-	}
-
-	return machines, nil
-}
-
-func (choices *taskChoices) useMachine(
-	ctx context.Context,
-	project string,
-	index int,
-	describe bool,
-) {
-	machines := choices.options.Machines
-	router := action.Router{Local: nil, Peer: choices.remote.Peer, Origin: nil}
-	remoteOffer, err := action.Run(
-		ctx,
-		router,
-		action.TaskOffer,
-		choices.machines[index],
-		emptyCaller(),
-		action.OfferTask{Project: project, Describe: describe},
-	)
-
-	switch {
-	case action.CodeOf(err) == action.CodeNotFound:
-		choices.options = taskPickerOptions(project, emptyTaskOffered())
-		choices.options.Problem = "not on " + machines[index].Name
-	case err != nil:
-		choices.options = taskPickerOptions(project, emptyTaskOffered())
-		choices.options.Problem = machines[index].Name + " unavailable"
-	default:
-		choices.options = taskPickerOptions(project, remoteOffer)
-		choices.remoteProject = remoteOffer.Project
-	}
-
-	choices.options.Machines, choices.options.Machine = machines, index
-}
-
 func taskPickerOptions(project string, offered action.TaskOffered) taskpicker.Options {
 	locations := make([]task.Location, 0, len(offered.Locations))
 	for _, location := range offered.Locations {
@@ -885,4 +827,62 @@ func checkoutDirectories(locations []task.Location) []string {
 	}
 
 	return directories
+}
+
+func (choices *taskChoices) listMachines() ([]taskpicker.Machine, error) {
+	catalog, err := choices.remote.Catalog.LoadRemoteCatalog()
+	if err != nil {
+		return nil, err
+	}
+
+	machines := []taskpicker.Machine{{Name: thisMachine, Usable: true}}
+
+	for _, connection := range catalog.Connections {
+		if !connection.Connected {
+			continue
+		}
+
+		at := action.Peer(connection.ID)
+		usable := choices.remote.Peer.Accepts(at, action.TaskOffer.ID) &&
+			choices.remote.Peer.Accepts(at, action.TaskNew.ID)
+		machines = append(
+			machines,
+			taskpicker.Machine{Name: cmp.Or(connection.Label, connection.ID), Usable: usable},
+		)
+		choices.machines = append(choices.machines, at)
+	}
+
+	return machines, nil
+}
+
+func (choices *taskChoices) useMachine(
+	ctx context.Context,
+	project string,
+	index int,
+	describe bool,
+) {
+	machines := choices.options.Machines
+	router := action.Router{Local: nil, Peer: choices.remote.Peer, Origin: nil}
+	remoteOffer, err := action.Run(
+		ctx,
+		router,
+		action.TaskOffer,
+		choices.machines[index],
+		emptyCaller(),
+		action.OfferTask{Project: project, Describe: describe},
+	)
+
+	switch {
+	case action.CodeOf(err) == action.CodeNotFound:
+		choices.options = taskPickerOptions(project, emptyTaskOffered())
+		choices.options.Problem = "not on " + machines[index].Name
+	case err != nil:
+		choices.options = taskPickerOptions(project, emptyTaskOffered())
+		choices.options.Problem = machines[index].Name + " unavailable"
+	default:
+		choices.options = taskPickerOptions(project, remoteOffer)
+		choices.remoteProject = remoteOffer.Project
+	}
+
+	choices.options.Machines, choices.options.Machine = machines, index
 }

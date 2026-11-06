@@ -96,28 +96,6 @@ type Env struct {
 	lastSavedUnix int64
 }
 
-func newOutcome(status string, reason string) outcome {
-	return outcome{
-		status:       status,
-		reason:       reason,
-		attempt:      "",
-		generation:   "",
-		snapshot:     "",
-		history:      "",
-		repository:   "",
-		finalSave:    "",
-		finalSaveAt:  0,
-		finalSaveAge: 0,
-		recorded:     false,
-		restorable:   0,
-		abandoned:    0,
-		daemonState:  DaemonUnselected,
-		daemonStatus: emptyDaemonRuntimeStatus(),
-		maintenance:  "",
-		restore:      nil,
-	}
-}
-
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "autosave",
@@ -145,14 +123,6 @@ func NewCommand() *cobra.Command {
 	)
 
 	return cmd
-}
-
-func addAutosaveFlags(flags *pflag.FlagSet) {
-	flags.String("socket", "", clibase.SocketFlagUsage)
-	flags.String("repository", "", clibase.RepositoryFlagUsage)
-	flags.String("lease-root", "", clibase.LeaseRootFlagUsage)
-	flags.String("history", "", clibase.HistoryFlagUsage)
-	flags.StringSlice("session", nil, "Explicit selected session IDs")
 }
 
 func ResolveEnv(cmd *cobra.Command) (Env, error) {
@@ -190,6 +160,36 @@ func (e Env) Interval() time.Duration {
 
 func (e Env) Workspace() app.Workspace {
 	return e.workspace
+}
+
+func newOutcome(status string, reason string) outcome {
+	return outcome{
+		status:       status,
+		reason:       reason,
+		attempt:      "",
+		generation:   "",
+		snapshot:     "",
+		history:      "",
+		repository:   "",
+		finalSave:    "",
+		finalSaveAt:  0,
+		finalSaveAge: 0,
+		recorded:     false,
+		restorable:   0,
+		abandoned:    0,
+		daemonState:  DaemonUnselected,
+		daemonStatus: emptyDaemonRuntimeStatus(),
+		maintenance:  "",
+		restore:      nil,
+	}
+}
+
+func addAutosaveFlags(flags *pflag.FlagSet) {
+	flags.String("socket", "", clibase.SocketFlagUsage)
+	flags.String("repository", "", clibase.RepositoryFlagUsage)
+	flags.String("lease-root", "", clibase.LeaseRootFlagUsage)
+	flags.String("history", "", clibase.HistoryFlagUsage)
+	flags.StringSlice("session", nil, "Explicit selected session IDs")
 }
 
 func loadAutosaveHistory(path string) (int64, error) {
