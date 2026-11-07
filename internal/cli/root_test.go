@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -41,9 +42,9 @@ func TestRootCommandShowsVersion(t *testing.T) {
 		t.Fatalf("stderr = %q, want empty", stderr)
 	}
 
-	want := "sesh dev (commit: none, built: unknown)\n"
-	if stdout != want {
-		t.Fatalf("stdout = %q, want %q", stdout, want)
+	pattern := regexp.MustCompile(`^sesh \S+ \([^(),\s]+(?:, dirty)?\)\n$`)
+	if !pattern.MatchString(stdout) {
+		t.Fatalf("stdout = %q, want version, commit, and optional dirty marker", stdout)
 	}
 }
 

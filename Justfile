@@ -138,9 +138,10 @@ check: (run-checks "formatcheck" "lockcheck" "test-isolation" "lint" "test")
 build:
     #!/usr/bin/env sh
     set -e
-    commit=$(git rev-parse --short HEAD 2>/dev/null || echo none)
+    version=$(git describe --tags --dirty --always)
+    commit=$(git rev-parse --short HEAD)
     build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-    go build -ldflags "-X github.com/zigai/sesh/internal/cli.version=dev -X github.com/zigai/sesh/internal/cli.commit=${commit} -X github.com/zigai/sesh/internal/cli.date=${build_date}" -o bin/{{ BINARY }} ./cmd/sesh
+    go build -ldflags "-X github.com/zigai/sesh/internal/cli.version=${version} -X github.com/zigai/sesh/internal/cli.commit=${commit} -X github.com/zigai/sesh/internal/cli.date=${build_date}" -o bin/{{ BINARY }} ./cmd/sesh
 
 # Install the command and restart running services using the old binary
 install: install-binary && (report-install PREFIX / BINARY) restart-services
@@ -149,9 +150,10 @@ install: install-binary && (report-install PREFIX / BINARY) restart-services
 install-binary:
     #!/usr/bin/env bash
     set -euo pipefail
-    commit=$(git rev-parse --short HEAD 2>/dev/null || printf none)
+    version=$(git describe --tags --dirty --always)
+    commit=$(git rev-parse --short HEAD)
     build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-    CGO_ENABLED=0 GOBIN={{ quote(PREFIX) }} go install -trimpath -ldflags "-s -w -X github.com/zigai/sesh/internal/cli.version=dev -X github.com/zigai/sesh/internal/cli.commit=$commit -X github.com/zigai/sesh/internal/cli.date=$build_date" ./cmd/sesh
+    CGO_ENABLED=0 GOBIN={{ quote(PREFIX) }} go install -trimpath -ldflags "-s -w -X github.com/zigai/sesh/internal/cli.version=${version} -X github.com/zigai/sesh/internal/cli.commit=$commit -X github.com/zigai/sesh/internal/cli.date=$build_date" ./cmd/sesh
 
 # Remove generated output and caches
 clean: (remove "bin" "sesh" "sesh.exe" "dist" "coverage.out" "*.test" "*.prof" "coverage")

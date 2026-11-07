@@ -21,6 +21,7 @@ builds:
       - -X github.com/zigai/sesh/internal/cli.version={{.Version}}
       - -X github.com/zigai/sesh/internal/cli.commit={{.ShortCommit}}
       - -X github.com/zigai/sesh/internal/cli.date={{.Date}}
+      - -X github.com/zigai/sesh/internal/cli.dirty=false
 
 archives:
   - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"

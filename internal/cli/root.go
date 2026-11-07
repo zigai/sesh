@@ -39,6 +39,7 @@ var (
 	version               = "dev"
 	commit                = "none"
 	date                  = "unknown"
+	dirty                 = ""
 	disableCommandSorting sync.Once
 )
 
@@ -116,13 +117,7 @@ func newRootCommand() *cobra.Command {
 			}
 
 			if showVersion {
-				_, err := fmt.Fprintf(
-					cmd.OutOrStdout(),
-					"sesh %s (commit: %s, built: %s)\n",
-					version,
-					commit,
-					date,
-				)
+				_, err := fmt.Fprintln(cmd.OutOrStdout(), versionText())
 				if err != nil {
 					return oops.In("cli").
 						With("operation", "print_version").
