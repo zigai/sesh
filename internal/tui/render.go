@@ -558,7 +558,13 @@ func (m *Model) writeListRowContent(
 	values *sessionFormatValues,
 ) {
 	if listRow.isSeparator() {
-		m.writeSeparatorRow(out, layout, styles)
+		if m.displayMode == displayModeInbox &&
+			inboxSyntheticSession(m.filtered[listRow.sessionIndex]) {
+			out.WriteString(styles.blankLine)
+		} else {
+			m.writeSeparatorRow(out, layout, styles)
+		}
+
 		return
 	}
 

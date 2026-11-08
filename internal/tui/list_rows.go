@@ -101,7 +101,9 @@ func (m *Model) popupListRows() []popupListRow {
 				sessionIndex: sessionIndex,
 				agentIndex:   separatorAgentIndex,
 			})
-			separatorInserted = true
+			if m.displayMode != displayModeInbox || !inboxSyntheticSession(row) {
+				separatorInserted = true
+			}
 		}
 
 		m.listRows = append(m.listRows, popupListRow{
@@ -131,6 +133,9 @@ func (m *Model) sessionSeparatorAt(index int, hasAgents bool, inserted bool) boo
 	}
 
 	row := m.filtered[index]
+	if m.displayMode == displayModeInbox && inboxSyntheticSession(row) {
+		return index > 0
+	}
 
 	return hasAgents && !inserted && len(row.Agents) == 0 &&
 		(m.displayMode != displayModeInbox || (m.tabMove != nil && !inboxSyntheticSession(row)))
