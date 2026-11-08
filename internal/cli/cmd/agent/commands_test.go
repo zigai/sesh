@@ -35,7 +35,7 @@ func executeCommand(t *testing.T, args ...string) (string, string, error) {
 func writeAgentRegistry(t *testing.T, sessions ...string) string {
 	t.Helper()
 
-	document := `{"schema_version": 3, "revision": 1, "sessions": {` + strings.Join(
+	document := `{"schema_version": 4, "revision": 1, "sessions": {` + strings.Join(
 		sessions,
 		",",
 	) + `}}`
@@ -51,10 +51,11 @@ func writeAgentRegistry(t *testing.T, sessions ...string) string {
 func registrySession(id string, activity string, paneID string) string {
 	//nolint:lll // raw JSON fixture line cannot wrap without changing the string.
 	return `"` + id + `": {
-		"schema_version": 3,
+		"schema_version": 4,
 		"id": "` + id + `",
 		"harness": "omp",
 		"liveness": {"kind": "live", "activity": "` + activity + `"},
+		"incarnation": {"state": "live", "evidence_at": "2026-09-20T10:00:00Z", "transition_at": "2026-09-20T10:00:00Z"},
 		"observations": {},
 		"created_at": "2026-09-20T10:00:00Z",
 		"updated_at": "2026-09-20T10:00:00Z",

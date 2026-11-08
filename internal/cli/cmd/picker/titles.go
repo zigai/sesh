@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/zigai/aht/v2/pkg/aht"
+	"github.com/zigai/aht/v2/pkg/registry"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/singleflight"
 
@@ -162,7 +163,7 @@ func titleLookupSession(agent agents.AgentSession) (aht.Session, bool) {
 		return lookup, false
 	}
 
-	lookup.SchemaVersion = 3
+	lookup.SchemaVersion = registry.StoreSchemaVersion
 	lookup.Harness = aht.Harness(agent.Harness)
 	lookup.SessionID = agent.HarnessSessionID
 	lookup.SessionPath = agent.SessionPath

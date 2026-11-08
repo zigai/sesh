@@ -54,7 +54,7 @@ func writeRegistry(t *testing.T, fixtures ...registryFixture) string {
 	}
 
 	document := map[string]any{
-		"schema_version": 3,
+		"schema_version": 4,
 		"revision":       1,
 		"sessions":       sessions,
 	}
@@ -100,11 +100,29 @@ func registryRecord(fixture registryFixture) map[string]any {
 		liveness["activity"] = act
 	}
 
+	// A location-only observation may establish liveness before a harness process
+	// is identified. Once known, the incarnation must carry that same identity.
+	incarnationState := "live"
+
+	switch presence {
+	case string(aht.PresenceGone):
+		incarnationState = "exited"
+	case string(aht.PresenceUnknown):
+		incarnationState = "starting"
+	}
+
+	incarnation := map[string]any{
+		"state":         incarnationState,
+		"evidence_at":   updatedAt,
+		"transition_at": updatedAt,
+	}
+
 	record := map[string]any{
-		"schema_version":      3,
+		"schema_version":      4,
 		"id":                  fixture.ID,
 		"harness":             defaultString(fixture.Harness, string(aht.HarnessOmp)),
 		"liveness":            liveness,
+		"incarnation":         incarnation,
 		"observations":        map[string]any{},
 		"created_at":          updatedAt,
 		"updated_at":          updatedAt,
@@ -127,6 +145,7 @@ func registryRecord(fixture registryFixture) map[string]any {
 
 	if process := processRecord(fixture); process != nil {
 		record["process"] = process
+		incarnation["process"] = process
 	}
 
 	if native := nativeRecord(fixture, updatedAt); native != nil {
@@ -367,7 +386,7 @@ func TestLoadLiveAgentsCorruptRegistryFailsClosed(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "state.json")
-	if err := os.WriteFile(path, []byte(`{"schema_version": 3, "sessions": [`), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(`{"schema_version": 4, "sessions": [`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 

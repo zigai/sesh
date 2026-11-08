@@ -26,7 +26,7 @@ type agentNavResultJSON struct {
 func writeAgentRegistry(t *testing.T, sessions ...string) string {
 	t.Helper()
 
-	document := `{"schema_version": 3, "revision": 1, "sessions": {` + strings.Join(
+	document := `{"schema_version": 4, "revision": 1, "sessions": {` + strings.Join(
 		sessions,
 		",",
 	) + `}}`
@@ -122,10 +122,13 @@ func livePane(
 
 func agentRegistrySessionForPane(pane agents.PaneLocation, activity string) string {
 	return `"agent-` + pane.PaneID + `": {
-		"schema_version": 3,
+		"schema_version": 4,
 		"id": "agent-` + pane.PaneID + `",
 		"harness": "omp",
 		"liveness": {"kind": "live", "activity": "` + activity + `"},
+		"incarnation": {
+			"state": "live", "evidence_at": "2026-09-20T10:00:00Z", "transition_at": "2026-09-20T10:00:00Z"
+		},
 		"observations": {},
 		"created_at": "2026-09-20T10:00:00Z",
 		"updated_at": "2026-09-20T10:00:00Z",
@@ -519,7 +522,7 @@ func TestCLIAgentUnreadAdvancesAndAcknowledgesObservedOrigin(t *testing.T) {
 		t.Fatalf("exhausted unread changed active window to %q", got)
 	}
 
-	registry := `{"schema_version":3,"revision":2,"sessions":{` +
+	registry := `{"schema_version":4,"revision":2,"sessions":{` +
 		agentRegistrySessionForPane(fixture.current, "idle") + "," +
 		strings.ReplaceAll(
 			agentRegistrySessionForPane(older, "idle"),

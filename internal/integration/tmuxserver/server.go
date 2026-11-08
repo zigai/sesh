@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	LibraryVersion            = "v0.7.4"
+	LibraryVersion            = "v0.7.6"
 	interactiveCommandTimeout = 24 * time.Hour
 
 	OutputBytes = model.MaxArtifactBytes

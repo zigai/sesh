@@ -38,7 +38,10 @@ func TestAgentsPopupInitialIdleIsReadAndCompletedTurnIsUnread(t *testing.T) {
 		pane := panes[0]
 		now := time.Now().UTC()
 		records[event] = map[string]any{
-			"schema_version": 3, "id": event, "harness": "codex",
+			"schema_version": 4, "id": event, "harness": "codex",
+			"incarnation": map[string]any{
+				"state": "live", "evidence_at": now, "transition_at": now,
+			},
 			"liveness":   map[string]any{"kind": "live", "activity": "idle"},
 			"session_id": event, "created_at": now, "updated_at": now,
 			"presence_changed_at": now, "activity_changed_at": now,
@@ -55,7 +58,7 @@ func TestAgentsPopupInitialIdleIsReadAndCompletedTurnIsUnread(t *testing.T) {
 	}
 
 	encoded, err := json.Marshal(
-		map[string]any{"schema_version": 3, "revision": 1, "sessions": records},
+		map[string]any{"schema_version": 4, "revision": 1, "sessions": records},
 	)
 	if err != nil {
 		t.Fatal(err)

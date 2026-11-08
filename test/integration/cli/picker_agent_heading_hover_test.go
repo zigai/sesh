@@ -174,9 +174,12 @@ func prepareHeadingHoverRegistry(t *testing.T, fixture *cliSessionFixture, root 
 		for index, pane := range panes {
 			id := fmt.Sprintf("%s%d", name[:1], index)
 			records[id] = map[string]any{
-				"schema_version":      3,
-				"id":                  id,
-				"harness":             "omp",
+				"schema_version": 4,
+				"id":             id,
+				"harness":        "omp",
+				"incarnation": map[string]any{
+					"state": "live", "evidence_at": now, "transition_at": now,
+				},
 				"liveness":            map[string]any{"kind": "live", "activity": "running"},
 				"session_id":          id,
 				"created_at":          now,
@@ -193,7 +196,7 @@ func prepareHeadingHoverRegistry(t *testing.T, fixture *cliSessionFixture, root 
 	}
 
 	encoded, err := json.Marshal(
-		map[string]any{"schema_version": 3, "revision": 1, "sessions": records},
+		map[string]any{"schema_version": 4, "revision": 1, "sessions": records},
 	)
 	if err != nil {
 		t.Fatal(err)

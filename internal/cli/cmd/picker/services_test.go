@@ -32,8 +32,12 @@ func TestPickerServicesLoadAndWatchPiConversationNames(t *testing.T) {
 	now := time.Now().UTC()
 	identity := registry.ProcessIdentity{PID: 42, StartIdentity: "fixture:42"}
 	agent := aht.Session{
-		SchemaVersion: 3,
+		SchemaVersion: 4,
 		ID:            "registry-id", Harness: aht.HarnessPi,
+		Incarnation: registry.Incarnation{
+			State: registry.IncarnationLive, Process: identity,
+			EvidenceAt: now, TransitionAt: now,
+		},
 		Liveness:  aht.Live{Activity: aht.ActivityIdle},
 		SessionID: "native-resume-id", SessionPath: transcript, Process: &identity,
 		ResumeCommand: []string{"pi", "--resume", "native-resume-id"},
@@ -125,8 +129,13 @@ func TestPickerServicesLoadAndWatchClaudeNativeTitles(t *testing.T) {
 		`{"type":"ai-title","sessionId":"claude-native","aiTitle":"Generated title"}`+"\n",
 	)
 
+	now := time.Now().UTC()
 	source := nameWatchSource{sessions: []aht.Session{{
-		SchemaVersion: 3,
+		SchemaVersion: 4,
+		Incarnation: registry.Incarnation{
+			State:      registry.IncarnationLive,
+			EvidenceAt: now, TransitionAt: now,
+		},
 		ID:            "claude-registry",
 		Harness:       aht.HarnessClaude,
 		Liveness:      aht.Live{Activity: aht.ActivityIdle},
@@ -239,8 +248,13 @@ func TestPickerServicesLoadCodexAndOmpNativeTitles(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	now := time.Now().UTC()
 	base := aht.Session{
-		SchemaVersion: 3,
+		Incarnation: registry.Incarnation{
+			State:      registry.IncarnationLive,
+			EvidenceAt: now, TransitionAt: now,
+		},
+		SchemaVersion: 4,
 		Liveness:      aht.Live{Activity: aht.ActivityIdle},
 		Location: aht.Location{
 			Kind:        aht.MultiplexerTmux,
@@ -287,7 +301,7 @@ func writePickerAgentRegistry(t *testing.T, path string, agent aht.Session) {
 	t.Helper()
 
 	document := map[string]any{
-		"schema_version": 3,
+		"schema_version": 4,
 		"sessions":       map[string]aht.Session{agent.ID: agent},
 	}
 
