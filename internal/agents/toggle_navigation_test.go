@@ -247,3 +247,49 @@ func TestFocusLinkedAgentRecognizesOwnerAndKeepsInvokingSession(t *testing.T) {
 		t.Fatalf("linked agent = %+v, error = %v", target, err)
 	}
 }
+
+func TestNavigationThroughExitedPanesKeepsLaterNavigationWorking(t *testing.T) {
+	t.Parallel()
+
+	for _, exited := range []int{0, 1} {
+		t.Run(
+			map[int]string{0: "exited_working_pane", 1: "exited_agent_pane"}[exited],
+			func(t *testing.T) {
+				t.Parallel()
+
+				panes := navigationPanes()
+				// tmux reports no pane_pid for a pane whose process has exited.
+				panes[exited].PanePID = 0
+				controller := &fakeController{
+					current: paneContext(panes[0], "client"),
+					panes:   panes,
+				}
+				n := newFakeNavigator(t, controller, []aht.Session{idleSessionAt(panes[1], 1)})
+
+				target, err := n.Focus(
+					t.Context(),
+					agents.FocusTarget{PaneID: "%2", SessionID: "$2"},
+				)
+				if err != nil || target.PaneID != "%2" {
+					t.Fatalf("first focus = %+v, error = %v", target, err)
+				}
+
+				controller.current = paneContext(target, "client")
+
+				target, err = n.Focus(
+					t.Context(),
+					agents.FocusTarget{PaneID: "%3", SessionID: "$1"},
+				)
+				if err != nil || target.PaneID != "%3" {
+					t.Fatalf("second focus = %+v, error = %v", target, err)
+				}
+
+				controller.current = paneContext(target, "client")
+
+				if _, err := n.Back(t.Context()); err != nil {
+					t.Fatalf("back failed: %v", err)
+				}
+			},
+		)
+	}
+}

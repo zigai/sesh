@@ -620,12 +620,15 @@ func (n *Navigator) activateHistoryLocked(
 		return err
 	}
 
+	// A pane whose process has exited has no PID, so it cannot be verified on the way back.
 	currentEntry := contextHistoryEntry(current)
 
-	if len(history) == 0 || history[len(history)-1].PaneID != current.PaneID {
-		history = append(history, currentEntry)
-	} else if history[len(history)-1].PaneID == current.PaneID {
-		history[len(history)-1] = currentEntry
+	if validHistoryEntry(currentEntry) {
+		if len(history) == 0 || history[len(history)-1].PaneID != current.PaneID {
+			history = append(history, currentEntry)
+		} else {
+			history[len(history)-1] = currentEntry
+		}
 	}
 
 	if len(history) > maxNavigationHistory {
@@ -721,10 +724,7 @@ func (n *Navigator) loadHistory(
 	}
 
 	for _, entry := range history {
-		if entry.PaneID == "" || entry.PanePID <= 0 || entry.WindowID == "" ||
-			entry.SessionID == "" ||
-			entry.ServerSocket == "" ||
-			entry.ServerPID <= 0 {
+		if !validHistoryEntry(entry) {
 			return "", nil, oops.In("agents").
 				Code("corrupt_history").
 				With("operation", "read_history").

@@ -44,7 +44,7 @@ func paneHistoryEntry(pane PaneLocation, serverPID int) HistoryEntry {
 	}
 }
 
-func validToggleEntry(entry HistoryEntry) bool {
+func validHistoryEntry(entry HistoryEntry) bool {
 	return entry.PaneID != "" && entry.PanePID > 0 && entry.WindowID != "" &&
 		entry.SessionID != "" &&
 		entry.ServerSocket != "" &&
@@ -118,7 +118,7 @@ func (n *Navigator) loadTogglePair(
 			Wrap(errors.Join(ErrNavigationHistoryCorrupt, err))
 	}
 
-	if !validToggleEntry(pair.Working) || !validToggleEntry(pair.Agent) ||
+	if !validHistoryEntry(pair.Working) || !validHistoryEntry(pair.Agent) ||
 		pair.Working.PaneID == pair.Agent.PaneID ||
 		pair.Working.ServerPID != pair.Agent.ServerPID ||
 		!SameServerSocket(pair.Working.ServerSocket, pair.Agent.ServerSocket) {
@@ -138,14 +138,23 @@ func (n *Navigator) stageToggleAndActivate(
 	previous string,
 	pair togglePair,
 ) error {
-	encoded, err := json.Marshal(pair)
-	if err != nil {
-		return oops.In("agents").Code("encode_history").With("operation", "write_toggle").Wrap(err)
-	}
-
 	key := toggleHistoryKey(current.HistoryKey())
 
-	next := string(encoded)
+	// A pair with an exited pane cannot be verified later, so it clears the toggle instead.
+	next := ""
+
+	if validHistoryEntry(pair.Working) && validHistoryEntry(pair.Agent) {
+		encoded, err := json.Marshal(pair)
+		if err != nil {
+			return oops.In("agents").
+				Code("encode_history").
+				With("operation", "write_toggle").
+				Wrap(err)
+		}
+
+		next = string(encoded)
+	}
+
 	if err := n.controller.SetHistory(ctx, key, next); err != nil {
 		return oops.In("agents").Code("tmux_failed").With("operation", "write_toggle").Wrap(err)
 	}
