@@ -7,6 +7,7 @@ import (
 	"errors"
 	"maps"
 	"testing"
+	"time"
 
 	"github.com/zigai/aht/v2/pkg/aht"
 	"github.com/zigai/aht/v2/pkg/registry"
@@ -101,7 +102,7 @@ func trackerSession(
 	return aht.Session{
 		ID:       "session-" + paneID,
 		Harness:  aht.HarnessOmp,
-		Liveness: registry.NewLiveness(presence, activity, nil),
+		Liveness: registry.NewLiveness(presence, activity, nil, time.Time{}, ""),
 		Location: aht.Location{
 			Kind:        aht.MultiplexerTmux,
 			ServerID:    "/tmp/fixture/socket",

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/samber/oops"
+	"github.com/zigai/aht/v2/pkg/aht"
 	"github.com/zigai/aht/v2/pkg/harness"
 	"github.com/zigai/aht/v2/pkg/manage"
 	"github.com/zigai/aht/v2/pkg/registry"
@@ -77,7 +78,7 @@ func Agents(ctx context.Context, request AgentRequest) (AgentResult, error) {
 		Binary:             "",
 		StorePath:          "",
 		TrackerInterval:    0,
-		TrackerGracePeriod: 0,
+		TrackerGracePeriod: nil,
 	})
 
 	result := AgentResult{
@@ -136,7 +137,7 @@ func AgentStatus(ctx context.Context, request AgentRequest) (AgentResult, error)
 		Binary:             "",
 		StorePath:          "",
 		TrackerInterval:    0,
-		TrackerGracePeriod: 0,
+		TrackerGracePeriod: nil,
 	})
 
 	result := AgentResult{
@@ -158,7 +159,7 @@ func AgentStatus(ctx context.Context, request AgentRequest) (AgentResult, error)
 		result.Harnesses = append(result.Harnesses, AgentHarnessResult{
 			Harness:  string(status.Harness),
 			Path:     strings.Join(status.Paths, ", "),
-			Changed:  status.Status == manage.ArtifactCurrent,
+			Changed:  status.Status == aht.ArtifactCurrent,
 			Message:  string(status.Status) + ": " + status.Message,
 			NextStep: status.NextStep,
 		})
