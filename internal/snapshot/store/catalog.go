@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	catalogVersion  = 2
+	catalogVersion  = 3
 	maxCatalogBytes = 16 << 20
 	maxEntries      = 10000
 	minimumRetained = 5
@@ -61,10 +61,12 @@ type Attempt struct {
 }
 
 type Generation struct {
-	ID             string `json:"id"`
-	Sequence       uint64 `json:"sequence"`
-	ManifestSHA256 string `json:"manifestSha256"`
-	Complete       bool   `json:"complete"`
+	ID               string `json:"id"`
+	Sequence         uint64 `json:"sequence"`
+	ManifestSHA256   string `json:"manifestSha256"`
+	ManifestSchema   int    `json:"manifestSchema"`
+	FinishedUnixNano int64  `json:"finishedUnixNano"`
+	Complete         bool   `json:"complete"`
 }
 
 type Operation struct {
@@ -134,8 +136,7 @@ func (c Catalog) validateGenerations() error {
 	seen := make(map[string]bool)
 
 	for _, generation := range c.Generations {
-		if !validID(generation.ID) || seen[generation.ID] ||
-			!validDigest(generation.ManifestSHA256) {
+		if !generation.validFields() || seen[generation.ID] {
 			return ErrCorrupt
 		}
 
@@ -162,6 +163,11 @@ func (c Catalog) validateGenerations() error {
 	}
 
 	return nil
+}
+
+func (g Generation) validFields() bool {
+	return validID(g.ID) && validDigest(g.ManifestSHA256) && g.ManifestSchema > 0 &&
+		g.FinishedUnixNano > 0
 }
 
 func (a Attempt) matchesGeneration(generation Generation) bool {

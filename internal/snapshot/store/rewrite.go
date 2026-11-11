@@ -381,7 +381,8 @@ func completedRewriteCatalog(
 	catalog.Attempts = append(slices.Clone(catalog.Attempts), attempt)
 	catalog.Generations = append(catalog.Generations, Generation{
 		ID: attempt.ID, Sequence: attempt.Sequence,
-		ManifestSHA256: manifestDigest, Complete: removal.Retained.Complete(),
+		ManifestSHA256: manifestDigest, ManifestSchema: removal.Retained.Version,
+		FinishedUnixNano: removal.Retained.Finished, Complete: removal.Retained.Complete(),
 	})
 	catalog.Rewrites[index].State = rewriteStateCompleted
 
@@ -602,10 +603,12 @@ func (r *Repository) buildRewriteResult(catalog Catalog, rw Rewrite) RewriteResu
 		} else if idx := catalog.attemptIndex(rw.Replacement); idx >= 0 {
 			attempt := catalog.Attempts[idx]
 			replacementGen = Generation{
-				ID:             attempt.ID,
-				Sequence:       attempt.Sequence,
-				ManifestSHA256: attempt.ManifestSHA256,
-				Complete:       attempt.State == "committed",
+				ID:               attempt.ID,
+				Sequence:         attempt.Sequence,
+				ManifestSHA256:   attempt.ManifestSHA256,
+				ManifestSchema:   0,
+				FinishedUnixNano: 0,
+				Complete:         attempt.State == "committed",
 			}
 		}
 	}
@@ -654,7 +657,7 @@ func emptyRewriteResult(id string, source string, state string) RewriteResult {
 	return RewriteResult{
 		ID:          id,
 		Source:      source,
-		Replacement: Generation{ID: "", Sequence: 0, ManifestSHA256: "", Complete: false},
+		Replacement: noGeneration,
 		Removed:     nil,
 		Artifacts:   nil,
 		State:       state,

@@ -187,41 +187,27 @@ func (r *Repository) loadRetentionMetadata(
 	}
 
 	if policy.MaxAge > 0 || policy.HourlyAfter > 0 {
-		timestamps, retired, err := r.loadRetentionTimestamps(ctx, gens)
-		return nil, timestamps, retired, err
+		timestamps, retired := retentionTimestamps(gens)
+		return nil, timestamps, retired, nil
 	}
 
 	return nil, nil, nil, nil
 }
 
-func (r *Repository) loadRetentionTimestamps(
-	ctx context.Context,
-	gens []Generation,
-) (map[string]int64, map[string]bool, error) {
+func retentionTimestamps(gens []Generation) (map[string]int64, map[string]bool) {
 	timestamps := make(map[string]int64, len(gens))
 	retired := make(map[string]bool)
 
 	for _, gen := range gens {
-		if err := ctx.Err(); err != nil {
-			return nil, nil, oops.In("snapshot.store").
-				With("operation", "load_retention_timestamps").
-				Wrap(err)
-		}
-
-		finished, err := r.readGenerationFinished(gen)
-		if errors.Is(err, model.ErrVersion) {
+		if gen.ManifestSchema != model.Schema {
 			retired[gen.ID] = true
 			continue
 		}
 
-		if err != nil {
-			return nil, nil, err
-		}
-
-		timestamps[gen.ID] = finished
+		timestamps[gen.ID] = gen.FinishedUnixNano
 	}
 
-	return timestamps, retired, nil
+	return timestamps, retired
 }
 
 func (c Catalog) orderedWithProtection(retired map[string]bool) ([]Generation, map[string]bool) {
@@ -510,51 +496,6 @@ func shouldPrune(
 	}
 
 	return false
-}
-
-func (r *Repository) readGenerationFinished(generation Generation) (int64, error) {
-	data, err := r.readManifestBytes(generation.ID)
-	if err != nil {
-		return 0, err
-	}
-
-	if digest(data) != generation.ManifestSHA256 {
-		return 0, ErrCorrupt
-	}
-
-	manifest, decodeErr := model.Decode(data)
-	if decodeErr != nil {
-		return 0, errors.Join(ErrCorrupt, decodeErr)
-	}
-
-	if err := validateManifestMetadata(manifest, generation); err != nil {
-		return 0, err
-	}
-
-	return manifest.Finished, nil
-}
-
-func (r *Repository) readManifestBytes(generationID string) ([]byte, error) {
-	parent, err := r.root.Child("generations", false)
-	if err != nil {
-		return nil, errors.Join(ErrCorrupt, err)
-	}
-
-	dir, openErr := parent.Child(generationID, false)
-	closeParentErr := parent.Close()
-
-	if openErr != nil {
-		return nil, errors.Join(ErrCorrupt, openErr, closeParentErr)
-	}
-
-	data, _, readErr := readManifestFile(dir)
-	closeDirErr := dir.Close()
-
-	if err := errors.Join(readErr, closeDirErr, closeParentErr); err != nil {
-		return nil, errors.Join(ErrCorrupt, err)
-	}
-
-	return data, nil
 }
 
 func validateManifestMetadata(manifest model.Manifest, generation Generation) error {

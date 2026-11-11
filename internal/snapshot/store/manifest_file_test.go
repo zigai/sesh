@@ -125,7 +125,7 @@ func TestOpenRejectsRepositoryWithUncompressedManifestVersion(t *testing.T) {
 	writeCatalogCorruption(
 		t,
 		path,
-		bytes.Replace(catalog, []byte(`"version":2`), []byte(`"version":1`), 1),
+		bytes.Replace(catalog, []byte(`"version":3`), []byte(`"version":1`), 1),
 	)
 
 	reopened, err := Open(t.Context(), path)

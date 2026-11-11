@@ -95,13 +95,13 @@ func TestCatalogJSONCannotGuessOrFallback(t *testing.T) {
 func malformedCatalogBytes(data []byte, kind string) []byte {
 	switch kind {
 	case "unknown":
-		return bytes.Replace(data, []byte(`"version":2`), []byte(`"version":2,"other":true`), 1)
+		return bytes.Replace(data, []byte(`"version":3`), []byte(`"version":3,"other":true`), 1)
 	case "duplicate":
-		return bytes.Replace(data, []byte(`"version":2`), []byte(`"version":2,"version":2`), 1)
+		return bytes.Replace(data, []byte(`"version":3`), []byte(`"version":3,"version":3`), 1)
 	case "missing":
-		return bytes.Replace(data, []byte(`"version":2,`), nil, 1)
+		return bytes.Replace(data, []byte(`"version":3,`), nil, 1)
 	case "null":
-		return bytes.Replace(data, []byte(`"version":2`), []byte(`"version":null`), 1)
+		return bytes.Replace(data, []byte(`"version":3`), []byte(`"version":null`), 1)
 	case "trailing":
 		return append(data, []byte("\n{}")...)
 	default:
@@ -126,7 +126,7 @@ func FuzzNativeCatalog(f *testing.F) {
 	f.Add(data)
 	f.Add(
 		[]byte(
-			`{"version":2,"sequence":0,"current":"../escape","attempts":[],` +
+			`{"version":3,"sequence":0,"current":"../escape","attempts":[],` +
 				`"generations":[],"operations":[],"rewrites":[]}`,
 		),
 	)

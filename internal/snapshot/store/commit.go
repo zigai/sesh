@@ -69,10 +69,12 @@ func (r *Repository) commitLocked(
 	}
 
 	generation := Generation{
-		ID:             id,
-		Sequence:       catalog.Attempts[index].Sequence,
-		ManifestSHA256: digest(data),
-		Complete:       manifest.Complete(),
+		ID:               id,
+		Sequence:         catalog.Attempts[index].Sequence,
+		ManifestSHA256:   digest(data),
+		ManifestSchema:   manifest.Version,
+		FinishedUnixNano: manifest.Finished,
+		Complete:         manifest.Complete(),
 	}
 	if existing := catalog.generationIndex(id); existing >= 0 {
 		if catalog.Generations[existing] != generation {

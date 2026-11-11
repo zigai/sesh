@@ -516,162 +516,7 @@ func TestRetentionInvalidPolicies(t *testing.T) {
 	}
 }
 
-func TestRetentionRejectsTamperedManifestDigest(t *testing.T) {
-	now := time.Date(2026, 9, 19, 12, 0, 0, 0, time.UTC)
-	policy := RetentionPolicy{MaxAge: 1 * time.Hour, MaxCount: 0}
-	path := filepath.Join(t.TempDir(), "repository")
-	r := openRepository(t, path)
-
-	gens := make([]Generation, 7)
-	for i := range gens {
-		gens[i] = commitSnapshotAt(t, r, now.Add(-5*time.Hour))
-	}
-
-	manifestPath := filepath.Clean(filepath.Join(path, "generations", gens[0].ID, manifestFileName))
-
-	m, err := r.Read(t.Context(), gens[0].ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	m.Source.TmuxVersion = "3.7"
-
-	encoded, err := json.Marshal(m)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	writeManifestFixture(t, manifestPath, encoded)
-
-	_, err = r.RetainPolicy(t.Context(), now, policy)
-	assertRepositoryDiagnostic(t, err, "retain", "repository_corrupt", ErrCorrupt)
-}
-
-func TestRetentionRejectsMalformedManifestJSON(t *testing.T) {
-	now := time.Date(2026, 9, 19, 12, 0, 0, 0, time.UTC)
-	policy := RetentionPolicy{MaxAge: 1 * time.Hour, MaxCount: 0}
-	path := filepath.Join(t.TempDir(), "repository")
-	r := openRepository(t, path)
-
-	gens := make([]Generation, 7)
-	for i := range gens {
-		gens[i] = commitSnapshotAt(t, r, now.Add(-5*time.Hour))
-	}
-
-	manifestPath := filepath.Clean(filepath.Join(path, "generations", gens[0].ID, manifestFileName))
-	writeManifestFixture(t, manifestPath, []byte("{malformed json"))
-
-	_, err := r.RetainPolicy(t.Context(), now, policy)
-	assertRepositoryDiagnostic(t, err, "retain", "repository_corrupt", ErrCorrupt)
-}
-
-func TestRetentionRejectsInvalidStartedTimestamp(t *testing.T) {
-	now := time.Date(2026, 9, 19, 12, 0, 0, 0, time.UTC)
-	policy := RetentionPolicy{MaxAge: 1 * time.Hour, MaxCount: 0}
-	path := filepath.Join(t.TempDir(), "repository")
-	r := openRepository(t, path)
-
-	gens := make([]Generation, 7)
-	for i := range gens {
-		gens[i] = commitSnapshotAt(t, r, now.Add(-5*time.Hour))
-	}
-
-	manifestPath := filepath.Clean(filepath.Join(path, "generations", gens[0].ID, manifestFileName))
-
-	m, err := r.Read(t.Context(), gens[0].ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	m.Started = 0
-
-	encoded, err := json.Marshal(m)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	writeManifestFixture(t, manifestPath, encoded)
-
-	_, err = r.RetainPolicy(t.Context(), now, policy)
-	assertRepositoryDiagnostic(t, err, "retain", "repository_corrupt", ErrCorrupt)
-}
-
-func TestRetentionRejectsInvalidFinishedTimestamp(t *testing.T) {
-	now := time.Date(2026, 9, 19, 12, 0, 0, 0, time.UTC)
-	policy := RetentionPolicy{MaxAge: 1 * time.Hour, MaxCount: 0}
-	path := filepath.Join(t.TempDir(), "repository")
-	r := openRepository(t, path)
-
-	gens := make([]Generation, 7)
-	for i := range gens {
-		gens[i] = commitSnapshotAt(t, r, now.Add(-5*time.Hour))
-	}
-
-	manifestPath := filepath.Clean(filepath.Join(path, "generations", gens[0].ID, manifestFileName))
-
-	m, err := r.Read(t.Context(), gens[0].ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	m.Finished = m.Started - 1
-
-	encoded, err := json.Marshal(m)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	writeManifestFixture(t, manifestPath, encoded)
-
-	_, err = r.RetainPolicy(t.Context(), now, policy)
-	assertRepositoryDiagnostic(t, err, "retain", "repository_corrupt", ErrCorrupt)
-}
-
-func TestRetentionRejectsCompletenessMismatch(t *testing.T) {
-	now := time.Date(2026, 9, 19, 12, 0, 0, 0, time.UTC)
-	policy := RetentionPolicy{MaxAge: 1 * time.Hour, MaxCount: 0}
-	path := filepath.Join(t.TempDir(), "repository")
-	r := openRepository(t, path)
-
-	gens := make([]Generation, 7)
-	for i := range gens {
-		gens[i] = commitCompleteFixture(t, r)
-	}
-
-	manifestPath := filepath.Clean(filepath.Join(path, "generations", gens[0].ID, manifestFileName))
-
-	m, err := r.Read(t.Context(), gens[0].ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	m.Source.Consistency = "observed"
-
-	encoded, err := json.Marshal(m)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	writeManifestFixture(t, manifestPath, encoded)
-
-	newDigest := digest(encoded)
-
-	err = r.update(t.Context(), func(c *Catalog) error {
-		idx := c.generationIndex(gens[0].ID)
-		c.Generations[idx].ManifestSHA256 = newDigest
-		c.Attempts[c.attemptIndex(gens[0].ID)].ManifestSHA256 = newDigest
-
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = r.RetainPolicy(t.Context(), now, policy)
-	assertRepositoryDiagnostic(t, err, "retain", "repository_corrupt", ErrCorrupt)
-}
-
-func TestRetentionRejectsMissingManifest(t *testing.T) {
+func TestRetentionByAgeDoesNotReadManifests(t *testing.T) {
 	now := time.Date(2026, 9, 19, 12, 0, 0, 0, time.UTC)
 	policy := RetentionPolicy{MaxAge: 1 * time.Hour, MaxCount: 0}
 	path := filepath.Join(t.TempDir(), "repository")
@@ -687,8 +532,14 @@ func TestRetentionRejectsMissingManifest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err := r.RetainPolicy(t.Context(), now, policy)
-	assertRepositoryDiagnostic(t, err, "retain", "repository_corrupt", ErrCorrupt)
+	result, err := r.RetainPolicy(t.Context(), now, policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !slices.Contains(result.Removed, gens[0].ID) {
+		t.Fatalf("expired generation without a manifest was kept: %+v", result)
+	}
 }
 
 func TestRetentionPublicationFaultPreservesUncertainty(t *testing.T) {
@@ -949,72 +800,6 @@ func TestRetentionFutureTimestampSubjectToCountPolicy(t *testing.T) {
 	}
 }
 
-func TestRetentionRetainsUnderlyingErrorCauses(t *testing.T) {
-	now := time.Date(2026, 9, 19, 12, 0, 0, 0, time.UTC)
-	policy := RetentionPolicy{MaxAge: 1 * time.Hour, MaxCount: 0}
-
-	t.Run("missing manifest preserves os.ErrNotExist", func(t *testing.T) {
-		path := filepath.Join(t.TempDir(), "repository")
-		r := openRepository(t, path)
-
-		gens := make([]Generation, 7)
-		for i := range gens {
-			gens[i] = commitSnapshotAt(t, r, now.Add(-5*time.Hour))
-		}
-
-		manifestPath := filepath.Clean(
-			filepath.Join(path, "generations", gens[0].ID, manifestFileName),
-		)
-		if err := os.Remove(manifestPath); err != nil {
-			t.Fatal(err)
-		}
-
-		_, err := r.RetainPolicy(t.Context(), now, policy)
-		assertRepositoryDiagnostic(t, err, "retain", "repository_corrupt", ErrCorrupt)
-
-		if !errors.Is(err, os.ErrNotExist) {
-			t.Fatalf("expected underlying os.ErrNotExist cause to be preserved, got %v", err)
-		}
-	})
-
-	t.Run("decode failure preserves model.ErrInvalid", func(t *testing.T) {
-		path := filepath.Join(t.TempDir(), "repository")
-		r := openRepository(t, path)
-
-		gens := make([]Generation, 7)
-		for i := range gens {
-			gens[i] = commitSnapshotAt(t, r, now.Add(-5*time.Hour))
-		}
-
-		manifestPath := filepath.Clean(
-			filepath.Join(path, "generations", gens[0].ID, manifestFileName),
-		)
-
-		data := []byte(`{"not": "valid manifest"}`)
-		writeManifestFixture(t, manifestPath, data)
-
-		newDigest := digest(data)
-
-		err := r.update(t.Context(), func(c *Catalog) error {
-			idx := c.generationIndex(gens[0].ID)
-			c.Generations[idx].ManifestSHA256 = newDigest
-			c.Attempts[c.attemptIndex(gens[0].ID)].ManifestSHA256 = newDigest
-
-			return nil
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		_, err = r.RetainPolicy(t.Context(), now, policy)
-		assertRepositoryDiagnostic(t, err, "retain", "repository_corrupt", ErrCorrupt)
-
-		if !errors.Is(err, model.ErrInvalid) {
-			t.Fatalf("expected underlying model.ErrInvalid cause to be preserved, got %v", err)
-		}
-	})
-}
-
 func retireManifestSchema(t *testing.T, r *Repository, path string, id string) {
 	t.Helper()
 
@@ -1040,6 +825,7 @@ func retireManifestSchema(t *testing.T, r *Repository, path string, id string) {
 
 	err = r.update(t.Context(), func(c *Catalog) error {
 		c.Generations[c.generationIndex(id)].ManifestSHA256 = newDigest
+		c.Generations[c.generationIndex(id)].ManifestSchema = model.Schema - 1
 		c.Attempts[c.attemptIndex(id)].ManifestSHA256 = newDigest
 
 		return nil

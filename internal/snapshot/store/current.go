@@ -16,7 +16,7 @@ import (
 const (
 	currentStateName     = "current.json"
 	currentStatePrefix   = ".current-"
-	currentStateVersion  = 1
+	currentStateVersion  = 2
 	maxCurrentStateBytes = 16 << 20
 )
 
@@ -27,7 +27,14 @@ const (
 	currentStatusUnreadable       = "unreadable"
 )
 
-var noGeneration = Generation{ID: "", Sequence: 0, ManifestSHA256: "", Complete: false}
+var noGeneration = Generation{
+	ID:               "",
+	Sequence:         0,
+	ManifestSHA256:   "",
+	ManifestSchema:   0,
+	FinishedUnixNano: 0,
+	Complete:         false,
+}
 
 type Listing struct {
 	Generation Generation      `json:"generation"`
