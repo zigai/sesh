@@ -6,7 +6,7 @@ sesh is a Go CLI and TUI that adds a picker, snapshots, tasks, agent tracking an
 
 Tasks run through `just` (see `Justfile`):
 
-- `just build` builds `bin/sesh`. `just install` builds to `~/.local/bin/sesh` and restarts running `sesh-*` systemd user services that still run the old binary.
+- `just build` builds `bin/sesh`. `just install` builds to `~/.local/bin/sesh` and restarts running `sesh-*` systemd user services that still run the old binary. After a change lands on `master`, run `just install` without asking, and mention it in the report.
 - `just test` runs unit tests (`go test ./...`).
 - `just integration` runs unit and integration tests (`-tags=integration`) with the `*_INTEGRATION_REQUIRED` variables set, so a missing tmux, application fixture or terminal tool fails instead of skipping.
 - `just race` is the same with `-race`.
