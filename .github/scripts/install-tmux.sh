@@ -15,11 +15,11 @@ build_dir=$(mktemp -d)
 trap 'rm -rf "$build_dir"' EXIT HUP INT TERM
 cd "$build_dir"
 curl --fail --location --silent --show-error \
-    https://github.com/tmux/tmux/releases/download/3.7c/tmux-3.7c.tar.gz \
+    https://github.com/tmux/tmux/releases/download/3.8/tmux-3.8.tar.gz \
     --output tmux.tar.gz
-printf '%s\n' '7c60cae9a0e25288e2e24750aafc9e8800fc7fd4555e447e1b29ee4201cfb3bf  tmux.tar.gz' | shasum -a 256 -c -
+printf '%s\n' 'e79c699c7e949dccd0a4a125e17b8d1261e311b16979dbc8eb34542f3966d82e  tmux.tar.gz' | shasum -a 256 -c -
 tar -xzf tmux.tar.gz
-cd tmux-3.7c
+cd tmux-3.8
 if [ "$(uname -s)" = Darwin ]; then
     ./configure --prefix="$prefix" --enable-utf8proc --enable-jemalloc
 else

@@ -250,7 +250,7 @@ start_daemon() {
     local status_file=$4
     local tmux_unit=${5:-sesh-tmux.service}
 
-    guest_ssh "sudo systemd-run --unit=$unit --property=User=sesh --property=Group=sesh --property=After=$tmux_unit --property=Requires=$tmux_unit --property=RuntimeDirectory=sesh-guest --property=RuntimeDirectoryMode=0700 --property=RuntimeDirectoryPreserve=yes --property=TimeoutStopSec=30s --setenv=HOME=/home/sesh --setenv=PATH=/opt/tmux-3.7c/bin:/usr/local/bin:/usr/bin:/bin --setenv=XDG_RUNTIME_DIR=/run/sesh-guest --setenv=XDG_DATA_HOME=/var/lib/sesh-guest/data --setenv=XDG_STATE_HOME=/var/lib/sesh-guest/state /opt/sesh --no-config daemon coordinator --socket /run/sesh-guest/tmux.sock --repository $repository --lease-root /var/lib/sesh-guest/leases --history $history --status-file $status_file"
+    guest_ssh "sudo systemd-run --unit=$unit --property=User=sesh --property=Group=sesh --property=After=$tmux_unit --property=Requires=$tmux_unit --property=RuntimeDirectory=sesh-guest --property=RuntimeDirectoryMode=0700 --property=RuntimeDirectoryPreserve=yes --property=TimeoutStopSec=30s --setenv=HOME=/home/sesh --setenv=PATH=/opt/tmux-3.8/bin:/usr/local/bin:/usr/bin:/bin --setenv=XDG_RUNTIME_DIR=/run/sesh-guest --setenv=XDG_DATA_HOME=/var/lib/sesh-guest/data --setenv=XDG_STATE_HOME=/var/lib/sesh-guest/state /opt/sesh --no-config daemon coordinator --socket /run/sesh-guest/tmux.sock --repository $repository --lease-root /var/lib/sesh-guest/leases --history $history --status-file $status_file"
 }
 
 assert_daemon_runtime_status() {
@@ -267,7 +267,7 @@ assert_daemon_runtime_status() {
 
 ensure_tmux_ready() {
     if ! guest_ssh 'systemctl is-active --quiet sesh-tmux.service' >/dev/null 2>&1; then
-        guest_ssh 'sudo systemd-run --unit=sesh-tmux --property=User=sesh --property=Group=sesh --property=RuntimeDirectory=sesh-guest --property=RuntimeDirectoryMode=0700 --property=RuntimeDirectoryPreserve=yes --setenv=HOME=/home/sesh --setenv=PATH=/opt/tmux-3.7c/bin:/usr/local/bin:/usr/bin:/bin --setenv=XDG_RUNTIME_DIR=/run/sesh-guest /opt/sesh --no-config daemon tmux --socket /run/sesh-guest/tmux.sock --tmux /opt/tmux-3.7c/bin/tmux'
+        guest_ssh 'sudo systemd-run --unit=sesh-tmux --property=User=sesh --property=Group=sesh --property=RuntimeDirectory=sesh-guest --property=RuntimeDirectoryMode=0700 --property=RuntimeDirectoryPreserve=yes --setenv=HOME=/home/sesh --setenv=PATH=/opt/tmux-3.8/bin:/usr/local/bin:/usr/bin:/bin --setenv=XDG_RUNTIME_DIR=/run/sesh-guest /opt/sesh --no-config daemon tmux --socket /run/sesh-guest/tmux.sock --tmux /opt/tmux-3.8/bin/tmux'
         guest_ssh '/opt/sesh --no-config daemon wait-ready --socket /run/sesh-guest/tmux.sock --timeout 20s'
         guest_ssh '/opt/sesh-fixture /run/sesh-guest/tmux.sock'
     fi
@@ -317,12 +317,12 @@ timeout 180 scp "${scp_opts[@]}" \
     "$repo_root/.github/scripts/install-tmux.sh" \
     sesh@127.0.0.1:/tmp/
 
-guest_ssh_long 'sudo install -m 0755 /tmp/sesh /opt/sesh && sudo install -m 0755 /tmp/fixture /opt/sesh-fixture && timeout 600 sudo /bin/sh /tmp/install-tmux.sh /opt/tmux-3.7c && sudo ln -sfn /opt/tmux-3.7c/bin/tmux /usr/local/bin/tmux && (which nvim >/dev/null 2>&1 || (sudo apt-get update && sudo apt-get install -y neovim))'
+guest_ssh_long 'sudo install -m 0755 /tmp/sesh /opt/sesh && sudo install -m 0755 /tmp/fixture /opt/sesh-fixture && timeout 600 sudo /bin/sh /tmp/install-tmux.sh /opt/tmux-3.8 && sudo ln -sfn /opt/tmux-3.8/bin/tmux /usr/local/bin/tmux && (which nvim >/dev/null 2>&1 || (sudo apt-get update && sudo apt-get install -y neovim))'
 guest_ssh 'sudo rm -f /usr/lib/systemd/logind.conf.d/unattended* /lib/systemd/logind.conf.d/unattended* /etc/systemd/logind.conf.d/* && sudo mkdir -p /etc/systemd/logind.conf.d && printf "[Login]\nInhibitDelayMaxSec=3\n" | sudo tee /etc/systemd/logind.conf.d/zz-sesh.conf >/dev/null && sudo ln -sfn /dev/null /etc/systemd/logind.conf.d/unattended-upgrades-logind-maxdelay.conf && sudo sed -i "s/#\?InhibitDelayMaxSec=.*/InhibitDelayMaxSec=3/" /etc/systemd/logind.conf && sudo systemctl restart systemd-logind && timeout 10 systemctl is-active --quiet systemd-logind.service'
 guest_ssh 'sudo install -d -o sesh -g sesh -m 0700 /run/sesh-guest /var/lib/sesh-guest /var/lib/sesh-guest/data /var/lib/sesh-guest/state /var/lib/sesh-guest/leases'
 guest_ssh 'timeout 5 systemd-inhibit --what=shutdown --who=sesh --why=fixture-readiness --mode=delay true'
 guest_ssh 'timeout 5 systemd-inhibit --what=sleep --who=sesh --why=fixture-readiness --mode=delay true'
-guest_ssh 'sudo systemd-run --unit=sesh-tmux --property=User=sesh --property=Group=sesh --property=RuntimeDirectory=sesh-guest --property=RuntimeDirectoryMode=0700 --property=RuntimeDirectoryPreserve=yes --setenv=HOME=/home/sesh --setenv=PATH=/opt/tmux-3.7c/bin:/usr/local/bin:/usr/bin:/bin --setenv=XDG_RUNTIME_DIR=/run/sesh-guest /opt/sesh --no-config daemon tmux --socket /run/sesh-guest/tmux.sock --tmux /opt/tmux-3.7c/bin/tmux'
+guest_ssh 'sudo systemd-run --unit=sesh-tmux --property=User=sesh --property=Group=sesh --property=RuntimeDirectory=sesh-guest --property=RuntimeDirectoryMode=0700 --property=RuntimeDirectoryPreserve=yes --setenv=HOME=/home/sesh --setenv=PATH=/opt/tmux-3.8/bin:/usr/local/bin:/usr/bin:/bin --setenv=XDG_RUNTIME_DIR=/run/sesh-guest /opt/sesh --no-config daemon tmux --socket /run/sesh-guest/tmux.sock --tmux /opt/tmux-3.8/bin/tmux'
 guest_ssh '/opt/sesh --no-config daemon wait-ready --socket /run/sesh-guest/tmux.sock --timeout 20s'
 guest_ssh '/opt/sesh-fixture /run/sesh-guest/tmux.sock'
 
@@ -462,7 +462,7 @@ if [[ ${SESH_GUEST_LIFECYCLE_SUITE:-} == extended ]]; then
     # Recreate only the owned fixture after reboot, seed a known generation, then
     # stall the complete owned tmux service cgroup during another real reboot.
     echo 'extended phase: stalled tmux during reboot'
-    guest_ssh 'sudo systemd-run --unit=sesh-tmux-budget --property=User=sesh --property=Group=sesh --property=RuntimeDirectory=sesh-guest --property=RuntimeDirectoryMode=0700 --property=RuntimeDirectoryPreserve=yes --setenv=HOME=/home/sesh --setenv=PATH=/opt/tmux-3.7c/bin:/usr/local/bin:/usr/bin:/bin --setenv=XDG_RUNTIME_DIR=/run/sesh-guest /opt/sesh --no-config daemon tmux --socket /run/sesh-guest/tmux.sock --tmux /opt/tmux-3.7c/bin/tmux'
+    guest_ssh 'sudo systemd-run --unit=sesh-tmux-budget --property=User=sesh --property=Group=sesh --property=RuntimeDirectory=sesh-guest --property=RuntimeDirectoryMode=0700 --property=RuntimeDirectoryPreserve=yes --setenv=HOME=/home/sesh --setenv=PATH=/opt/tmux-3.8/bin:/usr/local/bin:/usr/bin:/bin --setenv=XDG_RUNTIME_DIR=/run/sesh-guest /opt/sesh --no-config daemon tmux --socket /run/sesh-guest/tmux.sock --tmux /opt/tmux-3.8/bin/tmux'
     guest_ssh '/opt/sesh --no-config daemon wait-ready --socket /run/sesh-guest/tmux.sock --timeout 20s'
     guest_ssh '/opt/sesh-fixture /run/sesh-guest/tmux.sock'
     if guest_ssh '/opt/sesh --no-config autosave final-save --socket /run/sesh-guest/tmux.sock --repository /var/lib/sesh-guest/budget-repository --lease-root /var/lib/sesh-guest/leases --history /var/lib/sesh-guest/budget-seed-history.json --status-file /var/lib/sesh-guest/budget-seed-status.json --deadline 5s --json' >"$work_dir/budget-seed.json"; then
@@ -706,7 +706,7 @@ jq -e --arg generation "$expected_generation" '.ok == true and .result.generatio
 guest_ssh 'sudo journalctl -b -1 -u sesh-daemon.service -u sesh-tmux.service --no-pager --output=short-iso' >"$work_dir/guest-journal.txt"
 
 echo 'phase: postboot practical application restore'
-guest_ssh 'sudo systemd-run --unit=sesh-tmux-restore --property=User=sesh --property=Group=sesh --property=RuntimeDirectory=sesh-guest --property=RuntimeDirectoryMode=0700 --property=RuntimeDirectoryPreserve=yes --setenv=HOME=/home/sesh --setenv=PATH=/opt/tmux-3.7c/bin:/usr/local/bin:/usr/bin:/bin --setenv=XDG_RUNTIME_DIR=/run/sesh-guest /opt/sesh --no-config daemon tmux --socket /run/sesh-guest/restore-tmux.sock --tmux /opt/tmux-3.7c/bin/tmux'
+guest_ssh 'sudo systemd-run --unit=sesh-tmux-restore --property=User=sesh --property=Group=sesh --property=RuntimeDirectory=sesh-guest --property=RuntimeDirectoryMode=0700 --property=RuntimeDirectoryPreserve=yes --setenv=HOME=/home/sesh --setenv=PATH=/opt/tmux-3.8/bin:/usr/local/bin:/usr/bin:/bin --setenv=XDG_RUNTIME_DIR=/run/sesh-guest /opt/sesh --no-config daemon tmux --socket /run/sesh-guest/restore-tmux.sock --tmux /opt/tmux-3.8/bin/tmux'
 guest_ssh '/opt/sesh --no-config daemon wait-ready --socket /run/sesh-guest/restore-tmux.sock --timeout 20s'
 
 guest_ssh "/opt/sesh --no-config snapshot restore --socket /run/sesh-guest/restore-tmux.sock --repository /var/lib/sesh-guest/repository --lease-root /var/lib/sesh-guest/leases --generation $expected_generation --json" >"$work_dir/postboot-restore.json"
