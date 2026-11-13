@@ -54,39 +54,10 @@ jobs:
           for tool in nvim top htop bash fish node dbus-daemon sshd ssh-keygen; do
             command -v "$tool" >/dev/null || { echo "missing required fixture tool: $tool" >&2; exit 1; }
           done
-      - name: Require access to the private terminal-test tool
-        if: runner.os == 'Linux'
-        env:
-          TERMTRACE_READ_TOKEN: ${{ secrets.TERMTRACE_READ_TOKEN }}
-        run: |
-          if [[ -z "$TERMTRACE_READ_TOKEN" ]]; then
-            echo 'Add TERMTRACE_READ_TOKEN with read-only contents access to zigai/termtrace.' >&2
-            exit 1
-          fi
-      - name: Check out pinned Termtrace and its native dependency
-        if: runner.os == 'Linux'
-        uses: actions/checkout@v7
-        with:
-          repository: zigai/termtrace
-          ref: bbbb5513a9f928bf6157ec0f27f6590848578ef4
-          token: ${{ secrets.TERMTRACE_READ_TOKEN }}
-          path: .ci/termtrace
-          submodules: recursive
-          persist-credentials: false
-      - name: Install Termtrace's pinned Rust toolchain
-        if: runner.os == 'Linux'
-        uses: dtolnay/rust-toolchain@70dec6087f2cb6bab9fbac4da23160afbe848e91
-        with:
-          toolchain: 1.99.1
-      - name: Cache terminal-tool Rust build
-        if: runner.os == 'Linux'
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
-        with:
-          workspaces: .ci/termtrace -> target
-      - name: Build and require the terminal-test tool
+      - name: Install and require the terminal-test tool
         if: runner.os == 'Linux'
         run: |
-          sh .github/scripts/install-termtrace.sh "$RUNNER_TEMP/sesh-termtrace" "$GITHUB_WORKSPACE/.ci/termtrace"
+          sh .github/scripts/install-termtrace.sh "$RUNNER_TEMP/sesh-termtrace"
           echo "$RUNNER_TEMP/sesh-termtrace/bin" >> "$GITHUB_PATH"
           echo "SESH_TERMINAL_INTEGRATION_REQUIRED=1" >> "$GITHUB_ENV"
       - name: Install macOS build dependencies and test fixtures

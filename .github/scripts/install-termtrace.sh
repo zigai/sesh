@@ -1,41 +1,32 @@
 #!/bin/sh
-# Build the reviewed terminal-test tool from an explicitly selected checkout.
+# Install the checksum-pinned terminal-test tool release.
 set -eu
 
 prefix=${1:?pass an absolute installation prefix}
-source_dir=${2:?pass an absolute disposable Termtrace checkout}
-revision=bbbb5513a9f928bf6157ec0f27f6590848578ef4
+version=v0.1.0
+archive=termtrace-x86_64-unknown-linux-gnu
+sha256=5fd039202d9076ccf38eb09290229793bf4836209f5da1c97bcb0476af021931
 
-for directory in "$prefix" "$source_dir"; do
-    case "$directory" in
-        /*) ;;
-        *)
-            echo 'installation prefix and source directory must be absolute' >&2
-            exit 2
-            ;;
-    esac
-done
+case "$prefix" in
+    /*) ;;
+    *)
+        echo 'installation prefix must be absolute' >&2
+        exit 2
+        ;;
+esac
 
-if [ "$(uname -s)" != Linux ]; then
-    echo 'the required terminal-test tool currently builds on Linux only' >&2
+if [ "$(uname -s)-$(uname -m)" != Linux-x86_64 ]; then
+    echo 'the pinned terminal-test tool release is Linux x86_64 only' >&2
     exit 2
 fi
 
-if [ "$(git -C "$source_dir" rev-parse HEAD)" != "$revision" ]; then
-    echo 'Termtrace checkout does not match the pinned revision' >&2
-    exit 2
-fi
-git -C "$source_dir" diff --exit-code --quiet HEAD --
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
 
-cd "$source_dir"
-git submodule update --init --recursive --depth 1
-bash scripts/bootstrap.sh
-
-TERMTRACE_BUILD_REVISION=$revision \
-    TERMTRACE_GHOSTTY_PREFIX="$source_dir/vendor/ghostty/zig-out" \
-    CARGO_TARGET_DIR="$source_dir/target" \
-    cargo +1.99.1 build --locked --release --bin termtrace
+curl -fsSL -o "$work/$archive.tar.gz" "https://github.com/zigai/termtrace/releases/download/$version/$archive.tar.gz"
+echo "$sha256  $work/$archive.tar.gz" | sha256sum -c -
+tar -xzf "$work/$archive.tar.gz" -C "$work"
 
 install -d "$prefix/bin"
-install -m 0755 target/release/termtrace "$prefix/bin/termtrace"
+install -m 0755 "$work/$archive/termtrace" "$prefix/bin/termtrace"
 "$prefix/bin/termtrace" --version
