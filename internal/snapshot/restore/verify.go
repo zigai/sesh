@@ -79,6 +79,13 @@ type layoutLeaf struct {
 	height  int
 }
 
+// A popup takes focus while it is open, so the tiled pane focus returns to stands in for the
+// active pane. Typed layouts report it as the most recently used tiled pane.
+type activeUnderFloating struct {
+	floating map[gotmux.PaneID]bool
+	recent   gotmux.PaneID
+}
+
 func (r *VerificationReport) mismatch(domain string, entity string, reason string) {
 	if len(r.Mismatches) >= maxVerificationMismatches {
 		return
@@ -409,26 +416,39 @@ func verifyWindow(
 	state.window[window.ID] = windowOK
 	state.zoom[window.ID] = zoomOK
 
-	observedPanes, paneErr := handle.Panes(ctx)
+	allPanes, paneErr := handle.PanesWith(
+		ctx,
+		gotmux.QueryOptions{Filter: "", ExtraFields: []string{floatingPaneField}},
+	)
 	if paneErr != nil {
 		report.mismatch(MismatchPane, window.ID, "window_panes_unreadable")
 
 		return
 	}
 
+	observedPanes, floating := splitFloatingPanes(allPanes)
+
 	if len(observedPanes) != len(expectedPanes) {
 		report.mismatch(MismatchPane, window.ID, "pane_count_mismatch")
 	}
 
-	state.layout[window.ID] = verifyWindowLayout(
+	layout, layoutOK := verifyWindowLayout(
 		ctx,
 		handle,
 		window,
 		identities,
-		observedPanes,
+		allPanes,
 		report,
 	)
-	state.active[window.ID] = verifyActivePane(ctx, handle, expectedPanes, identities, report)
+	state.layout[window.ID] = layoutOK
+	state.active[window.ID] = verifyActivePane(
+		ctx,
+		handle,
+		expectedPanes,
+		identities,
+		activeUnderFloating{floating: floating, recent: gotmux.PaneID(layout.Recent)},
+		report,
+	)
 
 	verifyWindowPanes(observedPanes, expectedPanes, identities, state, report)
 }
@@ -538,12 +558,14 @@ func verifyWindowLayout(
 	identities RuntimeIdentities,
 	observedPanes []gotmux.PaneInfo,
 	report *VerificationReport,
-) bool {
+) (tmuxserver.WindowLayout, bool) {
+	var none tmuxserver.WindowLayout
+
 	info, err := handle.Info(ctx)
 	if err != nil {
 		report.mismatch(MismatchGeometry, window.ID, "window_layout_unreadable")
 
-		return false
+		return none, false
 	}
 
 	paneNames := make(map[string]string, len(observedPanes))
@@ -555,7 +577,7 @@ func verifyWindowLayout(
 	if err != nil {
 		report.mismatch(MismatchGeometry, window.ID, "window_layout_undecodable")
 
-		return false
+		return none, false
 	}
 
 	expected := make([]layoutLeaf, 0, len(observedPanes))
@@ -566,7 +588,7 @@ func verifyWindowLayout(
 		if !ok {
 			report.mismatch(MismatchGeometry, window.ID, "pane_receipt_missing")
 
-			return false
+			return observed, false
 		}
 
 		expected[i].runtime = string(runtimeID)
@@ -581,18 +603,43 @@ func verifyWindowLayout(
 	if len(expected) != len(actual) {
 		report.mismatch(MismatchGeometry, window.ID, "pane_layout_count_mismatch")
 
-		return false
+		return observed, false
 	}
 
 	for i := range expected {
 		if expected[i] != actual[i] {
 			report.mismatch(MismatchGeometry, window.ID, "pane_layout_mismatch")
 
-			return false
+			return observed, false
 		}
 	}
 
-	return true
+	return observed, true
+}
+
+func (a activeUnderFloating) tiledActive(active gotmux.PaneID) gotmux.PaneID {
+	if a.floating[active] {
+		return a.recent
+	}
+
+	return active
+}
+
+func splitFloatingPanes(panes []gotmux.PaneInfo) ([]gotmux.PaneInfo, map[gotmux.PaneID]bool) {
+	tiled := make([]gotmux.PaneInfo, 0, len(panes))
+	floating := map[gotmux.PaneID]bool{}
+
+	for _, pane := range panes {
+		if value, ok := pane.Raw(floatingPaneField); ok && string(value) == "1" {
+			floating[pane.ID] = true
+
+			continue
+		}
+
+		tiled = append(tiled, pane)
+	}
+
+	return tiled, floating
 }
 
 func collectLayoutLeaves(node model.Layout, out *[]layoutLeaf) {
@@ -632,6 +679,7 @@ func verifyActivePane(
 	handle gotmux.Window,
 	expectedPanes []model.Pane,
 	identities RuntimeIdentities,
+	underFloating activeUnderFloating,
 	report *VerificationReport,
 ) bool {
 	expectedActive := ""
@@ -662,7 +710,7 @@ func verifyActivePane(
 		return false
 	}
 
-	if activePane.ID() != runtimeActive {
+	if underFloating.tiledActive(activePane.ID()) != runtimeActive {
 		report.mismatch(MismatchPane, expectedActive, "active_pane_mismatch")
 
 		return false

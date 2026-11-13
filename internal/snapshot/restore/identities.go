@@ -9,6 +9,12 @@ import (
 	gotmux "github.com/zigai/gotmux/tmux"
 )
 
+// Popups open as floating panes of the window under them, and snapshots leave floating panes out.
+const (
+	floatingPaneField               = "pane_floating_flag"
+	tiledPaneFilter   gotmux.Format = "#{!:#{" + floatingPaneField + "}}"
+)
+
 type RuntimeIdentities struct {
 	Sessions map[string]gotmux.SessionID
 	Windows  map[string]gotmux.WindowID
@@ -195,7 +201,10 @@ func initialPaneIDOf(
 	windowID string,
 	produced map[gotmux.PaneID]bool,
 ) (gotmux.PaneID, error) {
-	panes, err := window.Panes(ctx)
+	panes, err := window.PanesWith(
+		ctx,
+		gotmux.QueryOptions{Filter: tiledPaneFilter, ExtraFields: nil},
+	)
 	if err != nil {
 		return "", oops.In("snapshot.restore").
 			Code("operation_uncertain").

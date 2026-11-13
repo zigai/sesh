@@ -282,6 +282,27 @@ func TestSnapshotRestoreReleasesWindowSizeWhenRestoreFails(t *testing.T) {
 	assertWindowsFollowGlobalSize(t, ctx, server)
 }
 
+func TestSnapshotRestoreIgnoresPopupsInRestoredWindows(t *testing.T) {
+	server := tmuxtest.NewServer(t)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+
+	repo, cfg := savePinnedSession(t, ctx, server)
+
+	// A client can open a popup in a restored window while the restore still runs.
+	options := server.GlobalSessionOptions()
+	for _, hook := range []string{"after-new-session[7]", "after-new-window[7]"} {
+		if err := options.Set(ctx, hook, "new-pane -O 'sleep 300'"); err != nil {
+			t.Fatalf("set %s: %v", hook, err)
+		}
+	}
+
+	if _, err := engine.Restore(ctx, repo, server, cfg); err != nil {
+		t.Fatalf("Restore failed: %v", err)
+	}
+}
+
 // savePinnedSession saves a session whose windows resize-window pinned to window-size manual, as an
 // earlier restore leaves them, then removes the session so a restore recreates it.
 func savePinnedSession(
