@@ -935,7 +935,9 @@ func TestCaptureKeepsAnAgentNonrestartableWhenNoVersionIsInstalled(t *testing.T)
 func captureAgentAfterUpdate(t *testing.T, installNewer bool) (model.Launch, string) {
 	t.Helper()
 
-	sleepPath := requireApplicationExecutable(t, "sleep")
+	// Multicall coreutils such as uutils pick the utility from argv[0], so a renamed copy of sleep
+	// does not run. bash runs under any name and waits in a builtin.
+	bashPath := requireApplicationExecutable(t, "bash")
 	cpPath := requireApplicationExecutable(t, "cp")
 	server, session, pane, _ := applicationCaptureFixture(t, "agent-update")
 	fixtureDir := t.TempDir()
@@ -950,7 +952,7 @@ func captureAgentAfterUpdate(t *testing.T, installNewer bool) (model.Launch, str
 		t.Helper()
 
 		target := filepath.Join(versions, version)
-		if err := exec.CommandContext(t.Context(), cpPath, sleepPath, target).Run(); err != nil {
+		if err := exec.CommandContext(t.Context(), cpPath, bashPath, target).Run(); err != nil {
 			t.Fatalf("install version %s: %v", version, err)
 		}
 
@@ -966,7 +968,7 @@ func captureAgentAfterUpdate(t *testing.T, installNewer bool) (model.Launch, str
 	install("1.0")
 	t.Setenv("PATH", fixtureDir)
 
-	if err := pane.Submit(t.Context(), link+" 300"); err != nil {
+	if err := pane.Submit(t.Context(), link+" --norc -c 'read -t 300'"); err != nil {
 		t.Fatalf("start agent fixture: %v", err)
 	}
 
