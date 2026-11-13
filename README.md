@@ -1,8 +1,8 @@
 # sesh
 
 <p align="center">
-  <a href="https://github.com/zigai/sesh/actions/workflows/test.yml"><img src="https://img.shields.io/github/actions/workflow/status/zigai/sesh/test.yml?branch=master&label=tests&labelColor=333333" alt="tests" /></a>
-  <a href="https://github.com/zigai/sesh/blob/master/go.mod"><img src="https://img.shields.io/github/go-mod/go-version/zigai/sesh?label=go&labelColor=333333&color=666666" alt="Go version" /></a>
+  <a href="https://github.com/zigai/sesh/actions/workflows/test.yml"><img alt="tests" src="https://img.shields.io/github/actions/workflow/status/zigai/sesh/test.yml?branch=master&label=tests&labelColor=30363d"></a>
+  <a href="go.mod"><img alt="go" src="https://img.shields.io/github/go-mod/go-version/zigai/sesh?label=&logo=go&logoColor=white&labelColor=30363d"></a>
 </p>
 
 ---
