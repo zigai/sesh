@@ -439,6 +439,10 @@ func executeRestore(
 	}
 
 	report, err := executeRestorePlan(ctx, server, daemon, cfg, plan, ledger)
+	// Verification compares the saved window sizes, so the windows stay pinned until it ends. A
+	// failed restore releases them too, or they would stay at the saved size.
+	defer releaseWindowSizes(ctx, server, report.WindowsCreated)
+
 	result.SessionsRestored = report.SessionsCreated
 	result.Panes = slices.Clone(report.Panes)
 
@@ -1068,6 +1072,17 @@ func joinPhaseIdentityFailure(phaseErr error, identityErr error, effectsPossible
 	}
 
 	return errors.Join(phaseErr, identityErr)
+}
+
+func releaseWindowSizes(ctx context.Context, server *gotmux.Server, windowIDs []string) {
+	if err := restore.ReleaseWindowSizes(ctx, server, windowIDs); err != nil {
+		zerolog.Ctx(ctx).Warn().
+			Str("component", "snapshot").
+			Str("operation", "restore").
+			Str("phase", "release_window_sizes").
+			Func(logging.Cause(err)).
+			Msg("restored windows keep their saved size")
+	}
 }
 
 func closeWith(ctx context.Context, lease *tmuxserver.Lease, phase string, err error) error {

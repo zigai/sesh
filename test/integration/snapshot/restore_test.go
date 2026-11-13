@@ -252,14 +252,53 @@ func TestSnapshotRestoreReleasesWindowSizePinnedByResize(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 
+	repo, cfg := savePinnedSession(t, ctx, server)
+
+	if _, err := engine.Restore(ctx, repo, server, cfg); err != nil {
+		t.Fatalf("Restore failed: %v", err)
+	}
+
+	assertWindowsFollowGlobalSize(t, ctx, server)
+}
+
+func TestSnapshotRestoreReleasesWindowSizeWhenRestoreFails(t *testing.T) {
+	server := tmuxtest.NewServer(t)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+
+	repo, cfg := savePinnedSession(t, ctx, server)
+
+	// An extra pane in each new window fails the restore after the window exists.
+	if err := server.GlobalSessionOptions().
+		Set(ctx, "after-new-window[7]", "split-window -d 'sleep 300'"); err != nil {
+		t.Fatalf("set target hook: %v", err)
+	}
+
+	if _, err := engine.Restore(ctx, repo, server, cfg); err == nil {
+		t.Fatal("Restore succeeded, want the failure the hook causes")
+	}
+
+	assertWindowsFollowGlobalSize(t, ctx, server)
+}
+
+// savePinnedSession saves a session whose windows resize-window pinned to window-size manual, as an
+// earlier restore leaves them, then removes the session so a restore recreates it.
+func savePinnedSession(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+) (*store.Repository, engine.RestoreConfig) {
+	t.Helper()
+
 	repo, err := store.Open(ctx, filepath.Join(t.TempDir(), "repo"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	defer func() {
+	t.Cleanup(func() {
 		_ = repo.Close()
-	}()
+	})
 
 	leaseRoot := filepath.Join(t.TempDir(), "leases")
 	sess := setupTestMultiWindowSession(t, ctx, server)
@@ -269,9 +308,12 @@ func TestSnapshotRestoreReleasesWindowSizePinnedByResize(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// resize-window pins the window to window-size manual, as an earlier restore leaves it.
-	if err := windows[0].Handle().Resize(ctx, gotmux.Size{Width: 150, Height: 50}); err != nil {
-		t.Fatal(err)
+	// Different sizes make restore resize the window it creates, not only the session's first one.
+	for index, window := range windows {
+		size := gotmux.Size{Width: 150 - 20*index, Height: 50 - 10*index}
+		if err := window.Handle().Resize(ctx, size); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	pinned, err := windows[0].Handle().Options().WindowSize(ctx)
@@ -302,15 +344,17 @@ func TestSnapshotRestoreReleasesWindowSizePinnedByResize(t *testing.T) {
 		t.Fatalf("Kill session failed: %v", err)
 	}
 
-	if _, err := engine.Restore(ctx, repo, server, engine.RestoreConfig{
+	return repo, engine.RestoreConfig{
 		LeaseRoot:         leaseRoot,
 		Generation:        saveRes.Generation,
 		Sessions:          nil,
 		LaunchProcesses:   false,
 		MissingWorkingDir: restore.MissingWorkingDirLaunch,
-	}); err != nil {
-		t.Fatalf("Restore failed: %v", err)
 	}
+}
+
+func assertWindowsFollowGlobalSize(t *testing.T, ctx context.Context, server *gotmux.Server) {
+	t.Helper()
 
 	global, err := server.GlobalWindowOptions().WindowSize(ctx)
 	if err != nil {
@@ -327,6 +371,10 @@ func TestSnapshotRestoreReleasesWindowSizePinnedByResize(t *testing.T) {
 	restoredWindows, _, err := restored.WindowInfos(ctx)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	if len(restoredWindows) < 2 {
+		t.Fatalf("restored %d windows, want the created window too", len(restoredWindows))
 	}
 
 	for _, window := range restoredWindows {
