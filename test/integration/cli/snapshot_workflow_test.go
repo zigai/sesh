@@ -722,7 +722,7 @@ func TestSubprocessExecution(t *testing.T) {
 		t.Fatalf("sesh --version error: %v\noutput: %s", err, out)
 	}
 
-	if !strings.HasPrefix(string(out), "sesh dev") {
+	if !strings.HasPrefix(string(out), "sesh ") || !strings.HasSuffix(string(out), ")\n") {
 		t.Fatalf("unexpected version output: %s", out)
 	}
 
