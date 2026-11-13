@@ -120,10 +120,15 @@ func newApplicationTestFixture(t *testing.T) applicationTestFixture {
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(t.Context(), 60*time.Second)
-	defer cancel()
-
-	buildCmd := exec.CommandContext(ctx, "go", "build", "-mod=readonly", "-o", binary, "./cmd/sesh")
+	buildCmd := exec.CommandContext(
+		t.Context(),
+		"go",
+		"build",
+		"-mod=readonly",
+		"-o",
+		binary,
+		"./cmd/sesh",
+	)
 	buildCmd.Dir = repoRoot
 
 	buildCmd.Env = append(os.Environ(), "GOWORK=off")
@@ -131,6 +136,9 @@ func newApplicationTestFixture(t *testing.T) applicationTestFixture {
 	if out, err := buildCmd.CombinedOutput(); err != nil {
 		t.Fatalf("building sesh standalone artifact: %v\noutput: %s", err, out)
 	}
+
+	ctx, cancel := context.WithTimeout(t.Context(), 60*time.Second)
+	defer cancel()
 
 	isolatedEnv := []string{
 		"PATH=" + os.Getenv("PATH"),
