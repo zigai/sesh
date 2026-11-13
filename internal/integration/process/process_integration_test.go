@@ -110,8 +110,8 @@ func spawnHelper(
 	args := append([]string{"-test.run=^TestHelperProcess$", "--"}, customArgs...)
 	cmd := exec.CommandContext(t.Context(), selfExe, args...)
 
-	env := make([]string, 0, 2+len(extraEnv))
-	env = append(env, envHelperFlag+"=1", "PATH=/usr/bin:/bin")
+	env := make([]string, 0, 3+len(extraEnv))
+	env = append(env, testenv.IsolatedMarker+"=1", envHelperFlag+"=1", "PATH=/usr/bin:/bin")
 	env = append(env, extraEnv...)
 	cmd.Env = env
 
