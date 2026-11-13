@@ -1,9 +1,9 @@
 # sesh
 
-<p align="center">
-  <a href="https://github.com/zigai/sesh/actions/workflows/test.yml"><img alt="tests" src="https://img.shields.io/github/actions/workflow/status/zigai/sesh/test.yml?branch=master&label=tests&labelColor=30363d"></a>
-  <a href="go.mod"><img alt="go" src="https://img.shields.io/github/go-mod/go-version/zigai/sesh?label=&logo=go&logoColor=white&labelColor=30363d"></a>
-</p>
+[![tests](https://img.shields.io/github/actions/workflow/status/zigai/sesh/test.yml?branch=master&label=tests&labelColor=30363d)](https://github.com/zigai/sesh/actions/workflows/test.yml)
+[![lint](https://img.shields.io/github/actions/workflow/status/zigai/sesh/lint.yml?branch=master&label=lint&labelColor=30363d)](https://github.com/zigai/sesh/actions/workflows/lint.yml)
+[![go](https://img.shields.io/github/go-mod/go-version/zigai/sesh?label=&logo=go&logoColor=white&labelColor=30363d)](go.mod)
+[![tmux](https://img.shields.io/badge/tmux-3.6+-blue?logo=tmux&logoColor=white&labelColor=30363d)](https://github.com/tmux/tmux)
 
 ---
 
@@ -19,21 +19,42 @@
 
 ---
 
-## Install
+## Installation
 
 ```sh
 go install github.com/zigai/sesh/cmd/sesh@latest
 ```
 
-Requirements: Linux, tmux 3.6+, Go 1.27.4+.
+Requires Linux, tmux 3.6+, Go 1.27.4+, and [AHT](https://github.com/zigai/aht) for agent features.
 
-## Usage
+## Quick start
+
+Register the key bindings on the running tmux server and connect the coding agents you use:
 
 ```sh
-sesh --help
+sesh setup tmux --apply
+sesh setup agents claude codex
 ```
 
-```txt
+Press `Ctrl+o` in tmux to open the picker. Add the output of `sesh setup tmux` to your `tmux.conf` to keep the bindings after tmux restarts.
+
+Save sessions and track agents in the background:
+
+```sh
+sesh setup services --apply
+systemctl --user enable --now sesh-autosave.timer sesh-agent-status.service
+```
+
+After a reboot, start tmux and restore the saved sessions:
+
+```sh
+sesh snapshot restore
+```
+
+## Commands
+
+```text
+$ sesh --help
 Session, task, and agent manager for tmux
 
 Usage:
@@ -66,6 +87,26 @@ Flags:
 
 Use "sesh [command] --help" for more information about a command.
 ```
+
+## Configuration
+
+Configuration is optional. Create `~/.config/sesh/config.toml` with every setting and its default, commented out:
+
+```sh
+sesh config init
+```
+
+A minimal example that adds a second project folder and saves less often:
+
+```toml
+[projects]
+roots = ["~/Projects", "~/work"]
+
+[autosave]
+interval = "10m"
+```
+
+`SESH_<TABLE>_<KEY>` environment variables override single settings, such as `SESH_SETTINGS_LOG_LEVEL=warn`.
 
 ## Documentation
 
