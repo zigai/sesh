@@ -1,6 +1,6 @@
 # AGENTS.md
 
-sesh is a Go CLI and TUI that adds a picker, snapshots, tasks, agent tracking and remote access to stock tmux. It targets Linux, tmux 3.6+, Go 1.27.1+. Configuration is documented in `docs/configuration.md`.
+sesh is a Go CLI and TUI that adds a picker, snapshots, tasks, agent tracking and remote access to stock tmux. It targets Linux, tmux 3.6+, Go 1.27.4+. Configuration is documented in `docs/configuration.md`.
 
 ## Commands
 

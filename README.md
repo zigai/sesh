@@ -25,7 +25,7 @@
 go install github.com/zigai/sesh/cmd/sesh@latest
 ```
 
-Requirements: Linux, tmux 3.6+, Go 1.27.1+.
+Requirements: Linux, tmux 3.6+, Go 1.27.4+.
 
 ## Usage
 
