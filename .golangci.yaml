@@ -20,8 +20,6 @@ formatters:
     goimports:
       local-prefixes:
         - github.com/zigai/sesh
-  exclusions:
-    paths:
 
 linters:
   enable:
