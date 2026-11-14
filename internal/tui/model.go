@@ -722,7 +722,7 @@ func (m *Model) setErrorStatus(message string) {
 	m.statusLevel = statusError
 }
 
-func (m *Model) updateState(ctx context.Context, update session.StateUpdate) error {
+func (m *Model) saveState(ctx context.Context, update session.StateUpdate) error {
 	if m.lifecycle.Closed() || ctx.Err() != nil {
 		return errModelClosed
 	}
@@ -731,6 +731,15 @@ func (m *Model) updateState(ctx context.Context, update session.StateUpdate) err
 		return oops.In("tui").With("operation", "save_state").Wrap(err)
 	}
 
+	return nil
+}
+
+func (m *Model) updateState(ctx context.Context, update session.StateUpdate) error {
+	if err := m.saveState(ctx, update); err != nil {
+		return err
+	}
+
+	// m.state belongs to the update loop, so commands call saveState instead.
 	if m.state != nil {
 		update(m.state)
 	}

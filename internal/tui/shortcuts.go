@@ -86,7 +86,7 @@ func (m *Model) saveDisplayStateCommand() tea.Cmd {
 		}
 		defer m.lifecycle.EndWorker()
 
-		err := m.updateState(ctx, func(current *session.State) {
+		err := m.saveState(ctx, func(current *session.State) {
 			current.PopupDisplayMode = mode
 		})
 

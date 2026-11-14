@@ -918,7 +918,7 @@ func (m *Model) persistAgentViewsCommand(views []agentViewStateUpdate) tea.Cmd {
 		}
 		defer m.lifecycle.EndWorker()
 
-		if err := m.updateState(ctx, func(current *session.State) {
+		if err := m.saveState(ctx, func(current *session.State) {
 			for _, view := range views {
 				current.RecordAgentView(view.identity, view.paneID)
 			}

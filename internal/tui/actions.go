@@ -296,7 +296,7 @@ func (m *Model) persistSessionState(
 ) error {
 	identity := target.SemanticIdentity()
 
-	if err := m.updateState(ctx, func(current *session.State) {
+	if err := m.saveState(ctx, func(current *session.State) {
 		current.RecordSwitchIdentity(identity)
 
 		if agentView != nil {
@@ -362,6 +362,7 @@ func (m *Model) handleSessionActionResult(msg sessionActionResultMsg) (tea.Model
 	}
 
 	m.clearStatus()
+	m.recordPersistedSessionState(msg)
 
 	if msg.switchSession != "" {
 		m.deferredSwitch = msg.target
@@ -388,6 +389,18 @@ func (m *Model) handleSessionActionResult(msg sessionActionResultMsg) (tea.Model
 	}
 
 	return m, nil
+}
+
+func (m *Model) recordPersistedSessionState(msg sessionActionResultMsg) {
+	if !msg.statePersisted || m.state == nil {
+		return
+	}
+
+	m.state.RecordSwitchIdentity(msg.target.SemanticIdentity())
+
+	if msg.agentView != nil {
+		m.state.RecordAgentView(msg.agentView.identity, msg.agentView.paneID)
+	}
 }
 
 func (m *Model) deferTerminalAttach(target session.Session) (tea.Model, tea.Cmd) {
