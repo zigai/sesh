@@ -24,7 +24,10 @@ func TestPickerInitialLoadMatchesSubprocessReadsAndReleasesControlClient(t *test
 	origin := originSession(t, server)
 	attachPickerTestClient(t, origin.Handle())
 
-	if _, err := server.NewSession(ctx, gotmux.NewSessionOptions{Name: "other"}); err != nil {
+	if _, err := server.NewSession(
+		ctx,
+		gotmux.NewSessionOptions{Name: "other", Program: gotmux.Exec("sleep", "300")},
+	); err != nil {
 		t.Fatal(err)
 	}
 
