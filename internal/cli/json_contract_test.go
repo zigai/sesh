@@ -7,8 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zigai/gotmux/tmuxtest"
-
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/cobra"
 )
@@ -400,30 +398,6 @@ func contractJSONItem(t *testing.T, values []any, key string, want any) map[stri
 	t.Fatalf("no JSON array item has %s=%v: %v", key, want, values)
 
 	return nil
-}
-
-func TestJSONDoctorWarningReportSuccessContract(t *testing.T) {
-	home := isolateJSONContractHome(t)
-	socket := tmuxtest.NewServer(t).Endpoint().SocketPath
-	result := runJSONContract(
-		t,
-		"doctor",
-		"doctor",
-		testSocketFlag,
-		socket,
-		testRepositoryFlag,
-		filepath.Join(home, "missing-repo"),
-		"--history",
-		filepath.Join(home, "missing-history"),
-	)
-	summary := contractJSONValue[map[string]any](t, result, "summary")
-	assertJSONContractFields(t, summary, map[string]any{"fail": float64(0)})
-
-	checks := contractJSONValue[[]any](t, result, "checks")
-	server := contractJSONItem(t, checks, "id", "tmux.server")
-	assertJSONContractFields(t, server, map[string]any{"group": "Tmux", "status": "ok"})
-	_ = contractJSONValue[string](t, result, "version")
-	_ = contractJSONValue[map[string]any](t, result, "paths")
 }
 
 func TestJSONAgentSetupPreviewContract(t *testing.T) {

@@ -10,34 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	gotmux "github.com/zigai/gotmux/tmux"
-	"github.com/zigai/gotmux/tmuxtest"
-
 	"github.com/zigai/sesh/internal/cli/clibase"
 )
-
-func newCaptureCLIServer(t *testing.T) *gotmux.Server {
-	t.Helper()
-	server := tmuxtest.NewServer(t)
-
-	windows, err := server.Windows(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for _, window := range windows {
-		options := window.Handle().Options()
-		if err := options.SetAutomaticRename(t.Context(), false); err != nil {
-			t.Fatal(err)
-		}
-
-		if err := options.SetAllowRename(t.Context(), false); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	return server
-}
 
 const (
 	testRepositoryFlag        = "--repository"

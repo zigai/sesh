@@ -1,4 +1,3 @@
-INTEGRATION_TESTS := "^(TestApplicationSaveOwnsOneOutcome|TestDoctorApplicationWarningOnlyJSONSucceeds|TestJSONDoctorWarningReportSuccessContract|TestPickerCatalogKeepsLiveRowsWhenRepositoryCannotBeOpened|TestPickerServiceRejectsReplacementSessionBeforeMutation|TestQueryRuntimeStatusHonorsReadDeadline|TestQueryRuntimeStatusRejectsInvalidBudget)$"
 BINARY := "sesh"
 PREFIX := env_var_or_default("SESH_INSTALL_PREFIX", env_var("HOME") + "/.local/bin")
 INTEGRATION_ENV := "TMUX_INTEGRATION_REQUIRED=1 SESH_APPLICATION_INTEGRATION_REQUIRED=1 SESH_LIFECYCLE_INTEGRATION_REQUIRED=1 SESH_TERMINAL_INTEGRATION_REQUIRED=1"
@@ -53,7 +52,7 @@ sandbox-stop:
 test *args:
     #!/usr/bin/env bash
     set -euo pipefail
-    if (( $# )); then go test -skip '{{ INTEGRATION_TESTS }}' "$@"; else go test -skip '{{ INTEGRATION_TESTS }}' ./...; fi
+    if (( $# )); then go test "$@"; else go test ./...; fi
 
 # Run unit and integration tests against disposable tmux servers, applications, terminals and buses
 integration:
