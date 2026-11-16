@@ -61,6 +61,27 @@ func OpenParent(path string, create bool) (*Dir, string, error) {
 	return dir, name, nil
 }
 
+// OpenFileAt opens name below an open directory with mode 0600. macOS can fail a creating openat
+// with ENOENT while another opener creates the same name, so a create that is not exclusive runs
+// as a plain open followed by an exclusive create.
+func OpenFileAt(dirFd int, name string, flags int) (int, error) {
+	if flags&unix.O_CREAT == 0 || flags&unix.O_EXCL != 0 {
+		return openFileAt(dirFd, name, flags)
+	}
+
+	for {
+		fd, err := openFileAt(dirFd, name, flags&^unix.O_CREAT)
+		if !errors.Is(err, unix.ENOENT) {
+			return fd, err
+		}
+
+		fd, err = openFileAt(dirFd, name, flags|unix.O_EXCL)
+		if !errors.Is(err, unix.EEXIST) {
+			return fd, err
+		}
+	}
+}
+
 func openPath(path string, create bool, parents bool, privateLeaf bool) (*Dir, error) {
 	if !filepath.IsAbs(path) || filepath.Clean(path) != path || path == "/" {
 		return nil, ErrUnsafe
@@ -105,6 +126,15 @@ func openRoot() (*Dir, error) {
 	return &Dir{file: os.NewFile(uintptr(fd), "/")}, nil
 }
 
+func openFileAt(dirFd int, name string, flags int) (int, error) {
+	fd, err := unix.Openat(dirFd, name, flags, 0o600)
+	if err != nil {
+		return -1, fmt.Errorf("open private file: %w", err)
+	}
+
+	return fd, nil
+}
+
 func (d *Dir) Child(name string, create bool) (*Dir, error) {
 	return d.child(name, create, true)
 }
@@ -146,14 +176,13 @@ func (d *Dir) File(name string, flags int) (*os.File, error) {
 		return nil, ErrUnsafe
 	}
 
-	fd, err := unix.Openat(
+	fd, err := OpenFileAt(
 		int(d.file.Fd()),
 		name,
 		flags|unix.O_NOFOLLOW|unix.O_CLOEXEC|unix.O_NONBLOCK,
-		0o600,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("open private file: %w", err)
+		return nil, err
 	}
 
 	file := os.NewFile(uintptr(fd), name)

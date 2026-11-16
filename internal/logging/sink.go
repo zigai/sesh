@@ -290,11 +290,10 @@ func openProcessLockFileDescriptor(parentFile *os.File, baseName string) (*os.Fi
 	parentFd := int(parentFile.Fd())
 	lockName := baseName + ".lock"
 
-	lockFd, err := unix.Openat(
+	lockFd, err := privatefs.OpenFileAt(
 		parentFd,
 		lockName,
 		unix.O_RDWR|unix.O_CREAT|unix.O_NOFOLLOW|unix.O_CLOEXEC|unix.O_NONBLOCK,
-		0o600,
 	)
 	if err != nil {
 		if errors.Is(err, unix.ELOOP) {
