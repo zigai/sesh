@@ -10,6 +10,7 @@ import (
 
 	"github.com/samber/oops"
 
+	"github.com/zigai/sesh/internal/git"
 	"github.com/zigai/sesh/internal/tui"
 )
 
@@ -45,8 +46,12 @@ func replayPickerKey(ctx context.Context, key string, socketPath string, clientN
 		return oops.In("cli").With("operation", "replay_picker_key").Wrap(errPickerHandoffInvalid)
 	}
 
-	args := []string{"-S", socketPath, "send-keys", "-K", "-c", clientName, key}
-	if output, err := exec.CommandContext(ctx, "tmux", args...).CombinedOutput(); err != nil {
+	command := exec.CommandContext(
+		ctx, "tmux", "-S", socketPath, "send-keys", "-K", "-c", clientName, key,
+	)
+	command.WaitDelay = git.WaitDelay
+
+	if output, err := command.CombinedOutput(); err != nil {
 		return oops.In("cli").
 			With("operation", "replay_picker_key").
 			With("output", string(output)).

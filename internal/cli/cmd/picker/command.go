@@ -349,8 +349,12 @@ func runPickerInteractive(
 
 	startMode := runtime.state.PopupDisplayMode
 
+	// Workers stop when the program ends; joining them waits until the popup is closed.
+	workerCtx, stopWorkers := context.WithCancel(ctx)
+	defer stopWorkers()
+
 	model, err := buildPickerModel(
-		ctx,
+		workerCtx,
 		presentation,
 		runtime.workspace.Config,
 		runtime.state,
@@ -368,6 +372,8 @@ func runPickerInteractive(
 	}
 
 	finalModel, runErr := runPickerProgram(ctx, cmd, model, presentation)
+
+	stopWorkers()
 
 	return finishPickerInteractive(
 		ctx, cmd, finalModel, services, runtime, startMode, remoteFactory, runErr,
@@ -403,18 +409,18 @@ func finishPickerInteractive(
 	runErr error,
 ) error {
 	if runErr != nil {
-		return errors.Join(
-			oops.In("cli").With("operation", "run_picker").Wrap(runErr),
-			services.Close(),
-		)
+		runErr = oops.In("cli").With("operation", "run_picker").Wrap(runErr)
 	}
 
-	if ctx.Err() != nil {
-		return services.Close()
-	}
+	completed := runErr == nil && ctx.Err() == nil
 
-	if services.popupChild {
-		return finishPopupPicker(
+	var (
+		handoff    popupHandoff
+		handoffErr error
+	)
+
+	if services.popupChild && ctx.Err() == nil {
+		handoff, handoffErr = finishPopupPicker(
 			ctx,
 			cmd,
 			finalModel,
@@ -422,20 +428,30 @@ func finishPickerInteractive(
 			runtime.workspace,
 			runtime.state,
 			startMode,
-			remoteFactory,
+			completed,
 		)
 	}
 
-	return errors.Join(
-		runPickerDeferred(
+	finalModel.Close(ctx)
+
+	var deferredErr error
+	if completed && !services.popupChild {
+		deferredErr = runPickerDeferred(
 			ctx,
 			cmd.InOrStdin(),
 			cmd.OutOrStdout(),
 			cmd.ErrOrStderr(),
 			finalModel,
 			services,
-		),
+		)
+	}
+
+	return errors.Join(
+		runErr,
+		handoffErr,
+		deferredErr,
 		services.Close(),
+		handoff.open(ctx, cmd, runtime.workspace.Config, remoteFactory),
 	)
 }
 
@@ -950,9 +966,6 @@ func runPickerProgram(
 	program := tea.NewProgram(model, programOptions...)
 
 	final, err := program.Run()
-
-	model.Close(ctx)
-
 	if typed, ok := final.(*tui.Model); ok {
 		return typed, wrapPickerProgramError(err)
 	}

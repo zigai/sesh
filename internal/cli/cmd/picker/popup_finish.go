@@ -33,25 +33,16 @@ type popupRequest struct {
 	mode   string
 }
 
-type popupOutcome struct {
-	target   session.Session
-	selected bool
-	pane     string
-	views    []tui.AgentView
-	heights  []session.PopupHeight
-	refresh  bool
-	replay   string
-	project  string
+type popupHandoff struct {
+	request popupRequest
+	replay  string
+	project string
 }
 
-func (outcome popupOutcome) empty() bool {
-	return !outcome.selected && len(outcome.views) == 0 && !outcome.refresh &&
-		outcome.replay == "" && outcome.project == ""
-}
-
-// finishPopupPicker closes the popup before doing what the choice asks for. Disk writes then cannot
-// hold it on screen, and tmux can focus a pane and accept keys, which it refuses or undoes while a
-// popup is up. Closing the popup signals this process, which outlives it to finish the work.
+// finishPopupPicker closes the popup before anything that can wait. Worker joins and disk writes
+// then cannot hold it on screen, and tmux can focus a pane and accept keys, which it refuses or
+// undoes while a popup is up. Closing the popup signals this process, which outlives it to finish
+// the work. The returned handoff opens once the picker has released its services.
 func finishPopupPicker(
 	ctx context.Context,
 	cmd *cobra.Command,
@@ -60,19 +51,22 @@ func finishPopupPicker(
 	workspace app.Workspace,
 	state *session.State,
 	startMode string,
-	remoteFactory RemoteFactory,
-) error {
-	target, selected := finalModel.DeferredSwitchTarget()
-	if selected && (target.ID == "" || target.Name == "" || target.Kind != session.KindLive ||
-		target.Origin != session.OriginLocal) {
-		return errors.Join(
-			oops.In("cli").With("operation", "switch_picker_session").Wrap(errPickerHandoffInvalid),
-			services.Close(),
-		)
+	completed bool,
+) (popupHandoff, error) {
+	request := popupRequest{
+		socket: workspace.Socket,
+		client: os.Getenv(clientEnvironment),
+		pane:   services.currentPane,
+		mode:   popupModeFlag(cmd),
 	}
+	handoff := popupHandoff{request: request, replay: "", project: ""}
+
+	_, _, remoteAttach := finalModel.DeferredRemoteAttach()
+	remoteAttach = completed && remoteAttach
 
 	var deferredErr error
-	if !selected {
+	if remoteAttach {
+		// The remote session runs in the popup's terminal.
 		deferredErr = runPickerDeferred(
 			ctx,
 			cmd.InOrStdin(),
@@ -83,80 +77,81 @@ func finishPopupPicker(
 		)
 	}
 
-	heights := changedPopupHeights(state, finalModel.FittingPopupHeights())
-	outcome := popupOutcome{
-		target:   target,
-		selected: selected,
-		pane:     finalModel.DeferredSwitchPane(),
-		views:    services.takeDeferredAgentViews(),
-		heights:  heights,
-		refresh:  len(heights) > 0 || state.PopupDisplayMode != startMode,
-		replay:   finalModel.ReplayKey(),
-		project:  finalModel.TaskProject(),
-	}
-
-	if outcome.empty() {
-		return errors.Join(deferredErr, services.Close())
-	}
-
-	return errors.Join(
-		deferredErr,
-		completePopup(ctx, cmd, services, workspace, outcome, remoteFactory),
-	)
-}
-
-func completePopup(
-	ctx context.Context,
-	cmd *cobra.Command,
-	services *services,
-	workspace app.Workspace,
-	outcome popupOutcome,
-	remoteFactory RemoteFactory,
-) error {
-	request := popupRequest{
-		socket: workspace.Socket,
-		client: os.Getenv(clientEnvironment),
-		pane:   services.currentPane,
-		mode:   popupModeFlag(cmd),
-	}
-
 	signal.Ignore(syscall.SIGHUP, syscall.SIGTERM)
 
 	client, err := popupClient(ctx, services.server, request.client)
 	if err != nil {
-		return errors.Join(err, services.Close())
+		return handoff, errors.Join(deferredErr, err)
 	}
 
 	closeErr := remoteCLIError("close_picker_popup", client.Handle().ClosePopup(ctx))
-
-	var enterErr error
-	if outcome.selected {
-		enterErr = services.performSwitchValidated(
-			ctx,
-			outcome.target,
-			outcome.pane,
-			request.client,
-			services.currentSessionID,
-			outcome.views,
-		)
-	} else {
-		enterErr = services.recordPickerHistory(ctx, "", outcome.views)
+	if !completed {
+		return handoff, closeErr
 	}
 
-	services.recordPopupHeights(ctx, outcome.heights)
+	target, selected := finalModel.DeferredSwitchTarget()
+	if selected && !validPopupTarget(target) {
+		return handoff, errors.Join(
+			closeErr,
+			oops.In("cli").With("operation", "switch_picker_session").Wrap(errPickerHandoffInvalid),
+		)
+	}
+
+	if !selected && !remoteAttach {
+		deferredErr = runPickerDeferred(
+			ctx,
+			cmd.InOrStdin(),
+			cmd.OutOrStdout(),
+			cmd.ErrOrStderr(),
+			finalModel,
+			services,
+		)
+	}
+
+	views := services.takeDeferredAgentViews()
+
+	var enterErr error
+	if selected {
+		enterErr = services.performSwitchValidated(
+			ctx,
+			target,
+			finalModel.DeferredSwitchPane(),
+			request.client,
+			services.currentSessionID,
+			views,
+		)
+	} else {
+		enterErr = services.recordPickerHistory(ctx, "", views)
+	}
+
+	heights := changedPopupHeights(state, finalModel.FittingPopupHeights())
+	services.recordPopupHeights(ctx, heights)
 
 	var refreshErr error
-	if outcome.refresh {
+	if len(heights) > 0 || state.PopupDisplayMode != startMode {
 		refreshErr = refreshPopupCommand(ctx, cmd, services.server, workspace, request.mode, client)
 	}
 
+	handoff.replay = finalModel.ReplayKey()
+	handoff.project = finalModel.TaskProject()
+
+	return handoff, errors.Join(deferredErr, closeErr, enterErr, refreshErr)
+}
+
+func validPopupTarget(target session.Session) bool {
+	return target.ID != "" && target.Name != "" && target.Kind == session.KindLive &&
+		target.Origin == session.OriginLocal
+}
+
+func (handoff popupHandoff) open(
+	ctx context.Context,
+	cmd *cobra.Command,
+	cfg *config.Config,
+	remoteFactory RemoteFactory,
+) error {
 	return errors.Join(
-		closeErr,
-		enterErr,
-		refreshErr,
-		services.Close(),
-		replayPickerKey(ctx, outcome.replay, request.socket, request.client),
-		openHandoffTaskMenu(ctx, cmd, workspace.Config, outcome.project, request, remoteFactory),
+		replayPickerKey(ctx, handoff.replay, handoff.request.socket, handoff.request.client),
+		openHandoffTaskMenu(ctx, cmd, cfg, handoff.project, handoff.request, remoteFactory),
 	)
 }
 
