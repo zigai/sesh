@@ -19,7 +19,7 @@ require (
 	github.com/samber/oops v1.23.2
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.1.0
-	github.com/zigai/aht/v2 v2.11.5
+	github.com/zigai/aht/v2 v2.12.0
 	github.com/zigai/gotmux v0.8.0
 	github.com/zigai/strata v0.6.0
 	golang.org/x/sync v0.25.0
