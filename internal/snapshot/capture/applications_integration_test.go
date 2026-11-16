@@ -230,10 +230,13 @@ func applicationCaptureFixture(
 	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{
 		Name: name,
 		Dir:  workingDir,
+		// Without history, bash writes no ~/.bash_history into the fixture directory while it is removed.
 		Program: gotmux.Exec(
 			bashPath,
 			"--noprofile",
 			"--norc",
+			"+o",
+			"history",
 		),
 		Start: gotmux.StartPolicyExistingOnly,
 	})
@@ -430,6 +433,8 @@ func TestCapturePreservesDeadPaneAlongsideHealthyPane(t *testing.T) {
 			bashPath,
 			"--noprofile",
 			"--norc",
+			"+o",
+			"history",
 		),
 		Start: gotmux.StartPolicyExistingOnly,
 	})
@@ -448,7 +453,7 @@ func TestCapturePreservesDeadPaneAlongsideHealthyPane(t *testing.T) {
 	}
 
 	healthyPane, err := deadPane.Split(t.Context(), gotmux.SplitOptions{
-		Program: gotmux.Exec(bashPath, "--noprofile", "--norc"),
+		Program: gotmux.Exec(bashPath, "--noprofile", "--norc", "+o", "history"),
 		Dir:     workingDir,
 	})
 	if err != nil {

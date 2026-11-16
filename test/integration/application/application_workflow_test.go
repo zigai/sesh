@@ -441,10 +441,11 @@ func setupSourceSession(
 	t.Helper()
 
 	session, err := server.NewSession(ctx, gotmux.NewSessionOptions{
-		Name:    sessionName,
-		Dir:     workDir,
-		Window:  "shell-win",
-		Program: gotmux.Exec(bashPath, "--norc", "--noprofile"),
+		Name:   sessionName,
+		Dir:    workDir,
+		Window: "shell-win",
+		// Without history, bash writes no ~/.bash_history into the fixture directory while it is removed.
+		Program: gotmux.Exec(bashPath, "--norc", "--noprofile", "+o", "history"),
 		Size:    gotmux.Size{Width: 120, Height: 40},
 		Start:   gotmux.StartPolicyExistingOnly,
 	})
