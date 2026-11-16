@@ -392,25 +392,6 @@ func currentSavedSessionNames(t *testing.T, repo *store.Repository) []string {
 	return savedSessionNames(t, repo, catalog.Current)
 }
 
-func generationsContaining(t *testing.T, repo *store.Repository, name string) []string {
-	t.Helper()
-
-	catalog, err := repo.Inspect(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	matching := make([]string, 0, len(catalog.Generations))
-
-	for _, generation := range catalog.Generations {
-		if slices.Contains(savedSessionNames(t, repo, generation.ID), name) {
-			matching = append(matching, generation.ID)
-		}
-	}
-
-	return matching
-}
-
 func generationRetired(t *testing.T, repo *store.Repository, generation string) bool {
 	t.Helper()
 
@@ -1194,7 +1175,7 @@ func TestWorkflow_DeleteRefusesPendingSaveBeforeMutation(t *testing.T) {
 	}
 }
 
-func TestWorkflow_DeleteRemovesEverySavedGeneration(t *testing.T) {
+func TestWorkflow_DeleteRemovesSessionFromCurrentGenerationOnly(t *testing.T) {
 	fixture := newWorkflowFixture(t)
 	repo := openTestRepository(t)
 
@@ -1215,8 +1196,8 @@ func TestWorkflow_DeleteRemovesEverySavedGeneration(t *testing.T) {
 		t.Fatalf("unexpected outcome: %+v", outcome)
 	}
 
-	if outcome.SavedGenerations != 3 {
-		t.Fatalf("rewritten generations = %d, want 3", outcome.SavedGenerations)
+	if outcome.SavedGenerations != 1 {
+		t.Fatalf("rewritten generations = %d, want 1", outcome.SavedGenerations)
 	}
 
 	if _, err := fixture.server.FindSession(
@@ -1229,22 +1210,23 @@ func TestWorkflow_DeleteRemovesEverySavedGeneration(t *testing.T) {
 		t.Fatalf("live session survived deletion: %v", err)
 	}
 
-	for _, generation := range []store.Generation{first, second, third} {
-		if !generationRetired(t, repo, generation.ID) {
-			t.Fatalf("source generation %s was not retired", generation.ID)
+	if !generationRetired(t, repo, third.ID) {
+		t.Fatal("current generation was not retired")
+	}
+
+	for _, generation := range []store.Generation{first, second} {
+		if generationRetired(t, repo, generation.ID) {
+			t.Fatalf("older generation %s was rewritten", generation.ID)
+		}
+
+		if names := savedSessionNames(t, repo, generation.ID); !slices.Contains(names, "fixture") {
+			t.Fatalf("older generation %s lost the session: %v", generation.ID, names)
 		}
 	}
 
-	if remaining := generationsContaining(t, repo, "fixture"); len(remaining) != 0 {
-		t.Fatalf("generations still contain the deleted session: %v", remaining)
-	}
-
-	if remaining := generationsContaining(t, repo, "unrelated"); len(remaining) == 0 {
-		t.Fatal("unrelated saved session was removed from every generation")
-	}
-
-	if names := currentSavedSessionNames(t, repo); !slices.Contains(names, "unrelated") {
-		t.Fatalf("unrelated saved session was removed: %v", names)
+	names := currentSavedSessionNames(t, repo)
+	if slices.Contains(names, "fixture") || !slices.Contains(names, "unrelated") {
+		t.Fatalf("current saved session names = %v", names)
 	}
 }
 

@@ -227,6 +227,54 @@ func (w *Workflow) DeleteSessionTargetEverywhere(
 	return out, nil
 }
 
+// DeleteSavedSession removes the named session from the current saved generation and leaves a
+// live session with the same name running.
+func (w *Workflow) DeleteSavedSession(ctx context.Context, name string) (DeleteOutcome, error) {
+	out := initialDeleteOutcome()
+
+	if w.server == nil {
+		return out, oops.In("session").Code("endpoint_required").Wrap(errServerRequired)
+	}
+
+	lease, leaseErr := w.acquireDeleteLease(ctx)
+	if leaseErr != nil {
+		return out, w.fail(ctx, "delete_saved", leaseErr)
+	}
+
+	deleteErr := w.deleteSavedSession(ctx, name, &out)
+
+	if err := errors.Join(deleteErr, closeLease(lease)); err != nil {
+		return out, w.fail(ctx, "delete_saved", err)
+	}
+
+	logDeleteSuccess(ctx, out)
+
+	return out, nil
+}
+
+func (w *Workflow) deleteSavedSession(ctx context.Context, name string, out *DeleteOutcome) error {
+	endpointScope, err := model.EndpointScope(w.server.Endpoint().SocketPath)
+	if err != nil {
+		return oops.In("session").
+			Code("invalid_endpoint").
+			With("operation", "scope_endpoint").
+			Wrap(err)
+	}
+
+	plan, err := w.planSavedDelete(ctx, name, endpointScope, out)
+	if err != nil {
+		return err
+	}
+
+	if !out.SavedFound {
+		return oops.In("session").
+			Code("not_found").
+			Wrapf(ErrSessionNotFound, "saved session %q not found", name)
+	}
+
+	return w.applySavedDelete(ctx, plan, out)
+}
+
 func (w *Workflow) deleteSavedSessionTarget(
 	ctx context.Context,
 	generationID string, sessionID string,
@@ -455,48 +503,46 @@ func (w *Workflow) planSavedDelete(
 			Wrapf(store.ErrRecoveryRequired, "a save attempt is still pending")
 	}
 
-	steps := make([]deleteStep, 0, len(catalog.Generations))
-
-	for _, generation := range catalog.Generations {
-		manifest, err := w.repo.Read(ctx, generation.ID)
-		if err != nil {
-			return nil, oops.In("session").
-				Code("repository_unavailable").
-				With("operation", "read_generation").
-				Wrap(err)
-		}
-
-		sessionIDs := manifestSessionIDs(manifest, name)
-		if len(sessionIDs) == 0 {
-			continue
-		}
-
-		if manifest.Source.EndpointScope == "" {
-			out.SavedFound = true
-
-			return nil, savedSessionScopeConflict(name, "preflight_saved_delete")
-		}
-
-		if manifest.Source.EndpointScope != endpointScope {
-			continue
-		}
-
-		out.SavedFound = true
-
-		if barrier := generationBarrier(catalog, generation.ID); barrier != "" {
-			out.PreservedGenerations = append(out.PreservedGenerations, generation.ID)
-
-			return nil, oops.In("session").
-				Code("saved_generations_protected").
-				With("operation", "preflight_saved_delete").
-				With("barrier", barrier).
-				Wrapf(ErrSavedGenerationsProtected, "saved generation containing session %q is protected", name)
-		}
-
-		steps = append(steps, deleteStep{Generation: generation.ID, SessionIDs: sessionIDs})
+	if catalog.Current == "" {
+		return nil, nil
 	}
 
-	return steps, nil
+	manifest, err := w.repo.Read(ctx, catalog.Current)
+	if err != nil {
+		return nil, oops.In("session").
+			Code("repository_unavailable").
+			With("operation", "read_generation").
+			Wrap(err)
+	}
+
+	sessionIDs := manifestSessionIDs(manifest, name)
+	if len(sessionIDs) == 0 {
+		return nil, nil
+	}
+
+	if manifest.Source.EndpointScope == "" {
+		out.SavedFound = true
+
+		return nil, savedSessionScopeConflict(name, "preflight_saved_delete")
+	}
+
+	if manifest.Source.EndpointScope != endpointScope {
+		return nil, nil
+	}
+
+	out.SavedFound = true
+
+	if barrier := generationBarrier(catalog, catalog.Current); barrier != "" {
+		out.PreservedGenerations = append(out.PreservedGenerations, catalog.Current)
+
+		return nil, oops.In("session").
+			Code("saved_generations_protected").
+			With("operation", "preflight_saved_delete").
+			With("barrier", barrier).
+			Wrapf(ErrSavedGenerationsProtected, "saved generation containing session %q is protected", name)
+	}
+
+	return []deleteStep{{Generation: catalog.Current, SessionIDs: sessionIDs}}, nil
 }
 
 func (w *Workflow) applySavedDelete(
@@ -669,32 +715,34 @@ func (w *Workflow) revalidateSavedDeletions(
 			Wrap(catErr)
 	}
 
-	for _, gen := range catalogAfter.Generations {
-		manifest, readErr := w.repo.Read(ctx, gen.ID)
-		if readErr != nil {
-			return oops.In("session").
-				Code("repository_unavailable").
-				With("operation", "revalidate_generation").
-				Wrap(readErr)
-		}
+	if catalogAfter.Current == "" {
+		return nil
+	}
 
-		if len(manifestSessionIDs(manifest, name)) == 0 {
-			continue
-		}
+	manifest, readErr := w.repo.Read(ctx, catalogAfter.Current)
+	if readErr != nil {
+		return oops.In("session").
+			Code("repository_unavailable").
+			With("operation", "revalidate_generation").
+			Wrap(readErr)
+	}
 
-		if manifest.Source.EndpointScope == "" {
-			return savedSessionScopeConflict(name, "revalidate_saved_delete")
-		}
+	if len(manifestSessionIDs(manifest, name)) == 0 {
+		return nil
+	}
 
-		if manifest.Source.EndpointScope == endpointScope {
-			return oops.In("session").
-				Code("saved_generations_protected").
-				Wrapf(
-					ErrSavedGenerationsProtected,
-					"saved generations still contain session %q after concurrent publication",
-					name,
-				)
-		}
+	if manifest.Source.EndpointScope == "" {
+		return savedSessionScopeConflict(name, "revalidate_saved_delete")
+	}
+
+	if manifest.Source.EndpointScope == endpointScope {
+		return oops.In("session").
+			Code("saved_generations_protected").
+			Wrapf(
+				ErrSavedGenerationsProtected,
+				"current saved generation still contains session %q after concurrent publication",
+				name,
+			)
 	}
 
 	return nil

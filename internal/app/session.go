@@ -136,11 +136,15 @@ func (local *Local) deleteSession(
 		HistoryUpdated:       false,
 	})
 	expectedID := ""
+	savedOnly := false
 
 	if input.Session.Saved() {
-		if err := local.refuseLiveNamesake(ctx, input.Session.Name); err != nil {
+		live, err := local.hasLiveNamesake(ctx, input.Session.Name)
+		if err != nil {
 			return refused, err
 		}
+
+		savedOnly = live
 	} else {
 		if _, err := local.liveTarget(ctx, input.Session); err != nil {
 			return refused, err
@@ -157,12 +161,22 @@ func (local *Local) deleteSession(
 		return refused, err
 	}
 
-	outcome, err := local.workflow.DeleteSessionTargetEverywhere(
-		ctx,
-		input.Session.Name,
-		expectedID,
-		input.Force,
+	var (
+		outcome session.DeleteOutcome
+		err     error
 	)
+
+	if savedOnly {
+		outcome, err = local.workflow.DeleteSavedSession(ctx, input.Session.Name)
+	} else {
+		outcome, err = local.workflow.DeleteSessionTargetEverywhere(
+			ctx,
+			input.Session.Name,
+			expectedID,
+			input.Force,
+		)
+	}
+
 	if err != nil {
 		return deletedSession(
 				input.Session.Name,
@@ -205,21 +219,20 @@ func (local *Local) switchSession(
 	return result, nil
 }
 
-func (local *Local) refuseLiveNamesake(ctx context.Context, name string) error {
+func (local *Local) hasLiveNamesake(ctx context.Context, name string) (bool, error) {
 	rows, err := local.liveSessions(ctx)
 	if errors.Is(err, gotmux.ErrNoServer) {
-		return nil
+		return false, nil
 	}
 
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	if slices.ContainsFunc(rows, func(row session.Session) bool { return row.Name == name }) {
-		return action.Wrap(action.CodeTargetChanged, ErrTargetChanged)
-	}
-
-	return nil
+	return slices.ContainsFunc(
+		rows,
+		func(row session.Session) bool { return row.Name == name },
+	), nil
 }
 
 func (local *Local) liveTarget(

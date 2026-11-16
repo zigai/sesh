@@ -323,7 +323,7 @@ func TestPeerDeleteRefusesSameNameReplacement(t *testing.T) {
 	}
 }
 
-func TestPeerSavedDeleteRefusesToKillALiveNamesake(t *testing.T) {
+func TestPeerSavedDeleteRemovesSavedCopyAndKeepsLiveNamesake(t *testing.T) {
 	harness := newPeerHarness(t)
 
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
@@ -356,12 +356,32 @@ func TestPeerSavedDeleteRefusesToKillALiveNamesake(t *testing.T) {
 		action.SessionDelete.ID,
 		action.DeleteSession{Session: saved, Force: false},
 	)
-	if result.Code != action.CodeTargetChanged {
-		t.Fatalf("saved delete result = %#v, want %s", result, action.CodeTargetChanged)
+	if !result.OK {
+		t.Fatalf("saved delete result = %#v, want success", result)
 	}
 
 	if _, err := harness.server.Session(ctx, gotmux.SessionID(live.ID)); err != nil {
 		t.Fatalf("saved-only deletion killed the live session: %v", err)
+	}
+
+	repo, err := store.OpenExisting(ctx, harness.repository)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	listing, err := repo.ReadCurrentListing(ctx)
+	if closeErr := repo.Close(); closeErr != nil {
+		t.Error(closeErr)
+	}
+
+	if err != nil && !errors.Is(err, store.ErrUnavailable) {
+		t.Fatal(err)
+	}
+
+	for _, saved := range listing.Sessions {
+		if string(saved.Name) == live.Name {
+			t.Fatalf("saved copy survived deletion in generation %s", generation)
+		}
 	}
 }
 

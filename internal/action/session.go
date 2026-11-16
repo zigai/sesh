@@ -87,7 +87,7 @@ var (
 		ID:      "session.delete",
 		Title:   "Delete session",
 		Summary: "Delete a session from live tmux and the snapshot repository",
-		Help: "Delete a session from live tmux and every saved generation of this tmux server.\n\n" +
+		Help: "Delete a session from live tmux and the current saved generation of this tmux server.\n\n" +
 			"Live state is killed first so a concurrent save cannot re-create the session; attachments and save " +
 			"races are checked again before anything is destroyed. " +
 			"Refuses an attached session unless --force is given.",
