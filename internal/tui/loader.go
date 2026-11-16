@@ -60,8 +60,9 @@ type sessionLoadResultMsg struct {
 }
 
 type sessionLoadTiming struct {
-	catalog time.Duration
-	agents  time.Duration
+	catalog    time.Duration
+	agents     time.Duration
+	agentParts AgentLoadTiming
 }
 
 type refreshMsg struct{}
@@ -150,7 +151,12 @@ func loadSessionRows(
 
 	loaders.Go(func() {
 		started := time.Now()
-		agentSummaries, agentSummaryErr = loadAgentSummaries(ctx, cfg, deps, moves...)
+		agentSummaries, timing.agentParts, agentSummaryErr = loadAgentSummaries(
+			ctx,
+			cfg,
+			deps,
+			moves...,
+		)
 		timing.agents = time.Since(started)
 	})
 
@@ -287,20 +293,20 @@ func loadAgentSummaries(
 	cfg *config.Config,
 	deps Services,
 	moves ...agentRelocation,
-) ([]session.AgentSummary, error) {
+) ([]session.AgentSummary, AgentLoadTiming, error) {
 	if !agentSummariesEnabled(cfg, deps) {
-		return nil, nil
+		return nil, AgentLoadTiming{List: 0, Names: 0, Titles: 0, Panes: 0}, nil
 	}
 
 	snapshot, err := deps.Agents.LoadAgentSummaries(ctx)
 	if err != nil {
-		return nil, oops.In("tui").
+		return nil, snapshot.Timing, oops.In("tui").
 			Code("load_agents_failed").
 			With("operation", "load_agent_summaries").
 			Wrap(err)
 	}
 
-	return liveAgentSummaries(relocateConfirmedAgents(snapshot, moves)), nil
+	return liveAgentSummaries(relocateConfirmedAgents(snapshot, moves)), snapshot.Timing, nil
 }
 
 func liveAgentSummaries(snapshot AgentSnapshot) []session.AgentSummary {
@@ -1005,7 +1011,7 @@ func (m *Model) loadAgentSummariesCommand() tea.Cmd {
 		}
 		defer m.lifecycle.EndWorker()
 
-		summaries, err := loadAgentSummaries(ctx, cfg, deps, moves...)
+		summaries, _, err := loadAgentSummaries(ctx, cfg, deps, moves...)
 
 		return agentSummariesMsg{
 			summaries:   summaries,

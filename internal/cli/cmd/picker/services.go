@@ -276,12 +276,22 @@ func (s *services) TmuxPaneLocations(ctx context.Context) ([]tui.PaneLocation, e
 }
 
 func (s *services) LoadAgentSummaries(ctx context.Context) (tui.AgentSnapshot, error) {
+	started := time.Now()
 	observed, err := agents.LoadLiveAgents(ctx, s.agentStore)
+	listed := time.Since(started)
+
 	if err != nil {
-		return tui.AgentSnapshot{}, oops.In("cli").With("operation", "load_picker_agents").Wrap(err)
+		var failed tui.AgentSnapshot
+
+		failed.Timing.List = listed
+
+		return failed, oops.In("cli").With("operation", "load_picker_agents").Wrap(err)
 	}
 
-	return s.agentSnapshot(ctx, observed), nil
+	snapshot := s.agentSnapshot(ctx, observed)
+	snapshot.Timing.List = listed
+
+	return snapshot, nil
 }
 
 func (s *services) WatchAgentSummaries(
@@ -755,6 +765,7 @@ func (s *services) agentSnapshot(
 	var (
 		panes    []tui.PaneLocation
 		panesErr error
+		timing   tui.AgentLoadTiming
 		observer sync.WaitGroup
 	)
 
@@ -763,13 +774,24 @@ func (s *services) agentSnapshot(
 			paneCtx, cancel := context.WithTimeout(ctx, time.Second)
 			defer cancel()
 
+			started := time.Now()
 			panes, panesErr = s.TmuxPaneLocations(paneCtx)
+			timing.Panes = time.Since(started)
 		})
 	}
 
 	summaries := agentSummaries(observed)
+
+	namesStarted := time.Now()
+
 	s.sessionNames.annotateInventory(ctx, summaries)
+
+	timing.Names = time.Since(namesStarted)
+	titlesStarted := time.Now()
+
 	s.titles.annotate(ctx, observed, summaries)
+
+	timing.Titles = time.Since(titlesStarted)
 
 	observer.Wait()
 
@@ -777,6 +799,7 @@ func (s *services) agentSnapshot(
 		Summaries:     summaries,
 		Panes:         panes,
 		PanesObserved: len(observed) > 0 && panesErr == nil,
+		Timing:        timing,
 	}
 }
 

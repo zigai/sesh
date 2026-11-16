@@ -549,7 +549,11 @@ func (m *Model) SetInitialSessions(sessions []session.Session) {
 		remoteCatalog:     RemoteCatalog{GeneratedAt: time.Time{}, Connections: nil},
 		remoteErr:         nil,
 		remoteObservation: 0,
-		timing:            sessionLoadTiming{catalog: 0, agents: 0},
+		timing: sessionLoadTiming{
+			catalog:    0,
+			agents:     0,
+			agentParts: AgentLoadTiming{List: 0, Names: 0, Titles: 0, Panes: 0},
+		},
 	})
 	m.loadingSessions = false
 	m.popupStartup = popupStartupContent

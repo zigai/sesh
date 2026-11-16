@@ -283,7 +283,8 @@ func logTUIFirstFrame(ctx context.Context, timing firstFrameTiming) {
 
 	if timing.loaders != nil {
 		event.Int64("catalog_ms", timing.loaders.catalog.Milliseconds()).
-			Int64("agents_ms", timing.loaders.agents.Milliseconds())
+			Int64("agents_ms", timing.loaders.agents.Milliseconds()).
+			Func(agentPartTimings(timing.loaders.agentParts))
 	}
 
 	if timing.launched {
@@ -302,7 +303,17 @@ func logTUIRowsShown(ctx context.Context, sinceInit time.Duration, timing *sessi
 		Int64("since_init_ms", sinceInit.Milliseconds()).
 		Int64("catalog_ms", timing.catalog.Milliseconds()).
 		Int64("agents_ms", timing.agents.Milliseconds()).
+		Func(agentPartTimings(timing.agentParts)).
 		Msg("tui rows shown after the first frame")
+}
+
+func agentPartTimings(parts AgentLoadTiming) func(*zerolog.Event) {
+	return func(event *zerolog.Event) {
+		event.Int64("agents_list_ms", parts.List.Milliseconds()).
+			Int64("agents_names_ms", parts.Names.Milliseconds()).
+			Int64("agents_titles_ms", parts.Titles.Milliseconds()).
+			Int64("agents_panes_ms", parts.Panes.Milliseconds())
+	}
 }
 
 func firstFrameTimingAt(

@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"errors"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -59,6 +60,14 @@ type AgentSnapshot struct {
 	Summaries     []session.AgentSummary
 	Panes         []PaneLocation
 	PanesObserved bool
+	Timing        AgentLoadTiming
+}
+
+type AgentLoadTiming struct {
+	List   time.Duration
+	Names  time.Duration
+	Titles time.Duration
+	Panes  time.Duration
 }
 
 type AgentSource interface {

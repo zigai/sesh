@@ -1001,7 +1001,16 @@ func firstFrameTestLoad() sessionLoadResultMsg {
 			{ID: "$1", Name: loggingTestPrivacySentinel, Kind: session.KindLive},
 		},
 		status: session.StatusComplete,
-		timing: sessionLoadTiming{catalog: 40 * time.Millisecond, agents: 120 * time.Millisecond},
+		timing: sessionLoadTiming{
+			catalog: 40 * time.Millisecond,
+			agents:  120 * time.Millisecond,
+			agentParts: AgentLoadTiming{
+				List:   70 * time.Millisecond,
+				Names:  10 * time.Millisecond,
+				Titles: 30 * time.Millisecond,
+				Panes:  50 * time.Millisecond,
+			},
+		},
 	}
 }
 
@@ -1048,6 +1057,8 @@ func TestPopupFirstFrameLogsOneTimingRecord(t *testing.T) {
 		)
 	}
 
+	assertAgentPartTimings(t, record)
+
 	delete(record, "load_ms")
 	delete(record, "catalog_ms")
 	delete(record, "agents_ms")
@@ -1063,6 +1074,24 @@ func TestPopupFirstFrameLogsOneTimingRecord(t *testing.T) {
 
 	if strings.Contains(output.String(), loggingTestPrivacySentinel) {
 		t.Fatalf("first-frame record leaked a session name: %s", output.String())
+	}
+}
+
+func assertAgentPartTimings(t *testing.T, record map[string]any) {
+	t.Helper()
+
+	want := map[string]float64{
+		"agents_list_ms":   70,
+		"agents_names_ms":  10,
+		"agents_titles_ms": 30,
+		"agents_panes_ms":  50,
+	}
+	for field, value := range want {
+		if record[field] != value {
+			t.Fatalf("record[%q] = %#v, want %v in %#v", field, record[field], value, record)
+		}
+
+		delete(record, field)
 	}
 }
 
@@ -1093,6 +1122,8 @@ func TestPopupLoadingFirstFrameOmitsUnfinishedLoaderTimings(t *testing.T) {
 		shown["agents_ms"] == nil || shown["since_init_ms"] == nil {
 		t.Fatalf("record = %#v, want when the rows appeared and what they waited on", shown)
 	}
+
+	assertAgentPartTimings(t, records[1])
 
 	record := records[0]
 	if _, ok := record["load_ms"].(float64); !ok {
