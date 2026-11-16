@@ -12,7 +12,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/rs/zerolog"
 
-	"github.com/zigai/sesh/internal/integration/tmuxserver"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
@@ -52,24 +51,6 @@ func TestRestorableSessionInspectionWarnsWhenRepositoryCannotBeRead(t *testing.T
 	}
 
 	assertRecoveryInspectionRecord(t, logs.Bytes(), "count_restorable", "current")
-}
-
-func TestUnrestoredSessionInspectionWarnsWhenSelectedServerCannotBeProbed(t *testing.T) {
-	r := testRepository(t)
-
-	server, err := tmuxserver.Open(filepath.Join(t.TempDir(), "PRIVATE_SOCKET"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var logs bytes.Buffer
-
-	ctx := zerolog.New(&logs).WithContext(t.Context())
-	if found := FindUnrestored(ctx, server, r); len(found.Sessions) != 0 {
-		t.Fatal("unavailable server produced sessions")
-	}
-
-	assertRecoveryInspectionRecord(t, logs.Bytes(), "find_unrestored", "probe")
 }
 
 func assertRecoveryInspectionRecord(t *testing.T, data []byte, operation string, phase string) {

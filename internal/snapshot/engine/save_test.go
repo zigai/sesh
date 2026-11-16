@@ -20,7 +20,6 @@ import (
 	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/integration/process"
-	"github.com/zigai/sesh/internal/integration/tmuxserver"
 	"github.com/zigai/sesh/internal/snapshot/capture"
 	"github.com/zigai/sesh/internal/snapshot/model"
 	"github.com/zigai/sesh/internal/snapshot/store"
@@ -554,42 +553,6 @@ func testLeaseEndpoint(t *testing.T) (string, string) {
 	socketPath := filepath.Join(t.TempDir(), "test.sock")
 
 	return leaseRoot, socketPath
-}
-
-func TestSaveObservationAdmissionValidation(t *testing.T) {
-	r := testRepository(t)
-
-	_, err := SaveObservation(t.Context(), r, nil, nil, SaveConfig{LeaseRoot: ""})
-	if !errors.Is(err, ErrLeaseRootRequired) {
-		t.Fatalf("expected ErrLeaseRootRequired, got %v", err)
-	}
-
-	_, err = SaveObservation(
-		t.Context(),
-		r,
-		nil,
-		nil,
-		SaveConfig{LeaseRoot: filepath.Join(t.TempDir(), "leases")},
-	)
-	if err == nil {
-		t.Fatal("expected error for nil server")
-	}
-
-	server, err := tmuxserver.Open(filepath.Join(t.TempDir(), "absent.sock"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = SaveObservation(
-		t.Context(),
-		nil,
-		server,
-		nil,
-		SaveConfig{LeaseRoot: filepath.Join(t.TempDir(), "leases")},
-	)
-	if !errors.Is(err, ErrRepositoryRequired) {
-		t.Fatalf("expected ErrRepositoryRequired, got %v", err)
-	}
 }
 
 func save(

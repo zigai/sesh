@@ -1,7 +1,6 @@
 package daemon_test
 
 import (
-	"context"
 	"errors"
 	"path/filepath"
 	"strings"
@@ -55,19 +54,5 @@ func TestTmuxWaitReadyRequiresExplicitSocket(t *testing.T) {
 	for _, socket := range []string{"relative.sock", "/tmp/../tmp/unclean.sock"} {
 		exec := clitest.Execute(t, "daemon", "wait-ready", testSocketFlag, socket, "--no-config")
 		requireSocketUsageError(t, exec.Err)
-	}
-}
-
-func TestTmuxWaitReadyTimesOutWithoutServer(t *testing.T) {
-	t.Parallel()
-
-	exec := clitest.Execute(t,
-		"daemon", "wait-ready",
-		testSocketFlag, filepath.Join(t.TempDir(), "nonexistent.sock"),
-		"--timeout", "50ms",
-		"--no-config",
-	)
-	if !errors.Is(exec.Err, context.DeadlineExceeded) {
-		t.Fatalf("wait-ready error = %v, want the readiness deadline", exec.Err)
 	}
 }

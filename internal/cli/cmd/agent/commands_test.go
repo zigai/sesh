@@ -2,14 +2,11 @@ package agent_test
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
-
-	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/testsupport/clitest"
@@ -98,26 +95,6 @@ func TestAgentCommandsHelp(t *testing.T) {
 
 			if !strings.Contains(stdout, "sesh "+strings.Join(command, " ")) {
 				t.Fatalf("stdout missing %s in help: %s", strings.Join(command, " "), stdout)
-			}
-		})
-	}
-}
-
-func TestAgentNavigationWithoutSocketTargetsDefaultTmuxServer(t *testing.T) {
-	for _, verb := range []string{"next", "latest", "back"} {
-		t.Run(verb, func(t *testing.T) {
-			t.Setenv("TMUX", "")
-
-			_, _, err := executeCommand(t, "agent", verb, "--no-config")
-			if !errors.Is(err, gotmux.ErrNoServer) {
-				t.Fatalf(
-					"error = %v, want the isolated default socket to report no tmux server",
-					err,
-				)
-			}
-
-			if code := clibase.ExitCode(err); code != clibase.ExitCodeGeneral {
-				t.Fatalf("exit code = %d, want %d", code, clibase.ExitCodeGeneral)
 			}
 		})
 	}

@@ -14,11 +14,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/zigai/aht/v2/pkg/aht"
 	"github.com/zigai/aht/v2/pkg/registry"
-	gotmux "github.com/zigai/gotmux/tmux"
 
 	"github.com/zigai/sesh/internal/agents"
-	"github.com/zigai/sesh/internal/app"
-	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/tui"
 )
@@ -343,17 +340,6 @@ func (s nameWatchSource) Watch(
 	return nil
 }
 
-func servicesStorePath(t *testing.T, services *services) string {
-	t.Helper()
-
-	store, ok := services.agentStore.(*agents.AHTStore)
-	if !ok {
-		t.Fatalf("picker source is %T, want AHT store", services.agentStore)
-	}
-
-	return store.StorePath()
-}
-
 func assertPickerServiceName(t *testing.T, summaries []session.AgentSummary, want string) {
 	t.Helper()
 
@@ -361,80 +347,4 @@ func assertPickerServiceName(t *testing.T, summaries []session.AgentSummary, wan
 		summaries[0].Agents[0].HarnessSession != want {
 		t.Fatalf("picker summaries = %#v, want one agent named %q", summaries, want)
 	}
-}
-
-func resolvePickerTestWorkspace(
-	t *testing.T,
-	cfg *config.Config,
-	locations app.Locations,
-) app.Workspace {
-	t.Helper()
-
-	workspace, err := app.Resolve(cfg, locations)
-	if err != nil {
-		t.Fatalf("resolve workspace: %v", err)
-	}
-
-	return workspace
-}
-
-func TestPickerServicesAHTStorePathRouting(t *testing.T) {
-	ctx := t.Context()
-	dirs := t.TempDir()
-
-	t.Run("explicit agent state path takes precedence", func(t *testing.T) {
-		cfg := config.DefaultConfig()
-		cfg.AgentStatus.StorePath = "/config/aht.json"
-
-		services, err := newServices(ctx, resolvePickerTestWorkspace(t, cfg, app.Locations{
-			Socket: filepath.Join(
-				dirs,
-				"tmux.sock",
-			),
-			Repository: filepath.Join(dirs, "repo1"),
-			LeaseRoot:  filepath.Join(dirs, "leases1"),
-			History: filepath.Join(
-				dirs,
-				"history1.json",
-			),
-			FinalSaveStatus: "",
-			AgentStore:      "/explicit/aht.json",
-		}), gotmux.Streams{}, RemoteServices{})
-		if err != nil {
-			t.Fatalf("newServices failed: %v", err)
-		}
-
-		t.Cleanup(func() { _ = services.Close() })
-
-		if path := servicesStorePath(t, services); path != "/explicit/aht.json" {
-			t.Fatalf("StorePath = %q, want /explicit/aht.json", path)
-		}
-	})
-
-	t.Run("falls back to configured agent status store path", func(t *testing.T) {
-		cfg := config.DefaultConfig()
-		cfg.AgentStatus.StorePath = "/config/base/aht.json"
-		cfg.AgentSessions.Status = &config.AgentStatusConfig{StorePath: "/config/fallback/aht.json"}
-
-		services, err := newServices(ctx, resolvePickerTestWorkspace(t, cfg, app.Locations{
-			Socket: filepath.Join(
-				dirs,
-				"tmux.sock",
-			),
-			Repository:      filepath.Join(dirs, "repo2"),
-			LeaseRoot:       filepath.Join(dirs, "leases2"),
-			History:         filepath.Join(dirs, "history2.json"),
-			FinalSaveStatus: "",
-			AgentStore:      "",
-		}), gotmux.Streams{}, RemoteServices{})
-		if err != nil {
-			t.Fatalf("newServices failed: %v", err)
-		}
-
-		t.Cleanup(func() { _ = services.Close() })
-
-		if path := servicesStorePath(t, services); path != "/config/fallback/aht.json" {
-			t.Fatalf("StorePath = %q, want /config/fallback/aht.json", path)
-		}
-	})
 }

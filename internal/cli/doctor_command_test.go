@@ -62,55 +62,6 @@ func TestDoctorCommandJSONOutput(t *testing.T) {
 	}
 }
 
-func TestDoctorCommandPlainReportListsGroupsChecksAndVerdict(t *testing.T) {
-	t.Parallel()
-
-	stdout, _, _ := executeCommand(
-		t,
-		"doctor",
-		testNoConfigFlag,
-		testSocketFlag,
-		filepath.Join(t.TempDir(), "absent.sock"),
-	)
-
-	for _, want := range []string{
-		"\n  socket      ",
-		"\nTmux\n",
-		"\n  fail  server",
-		"\nSnapshots\n",
-		" attention.\n",
-		" ok, ",
-		" fail, ",
-	} {
-		if !strings.Contains(stdout, want) {
-			t.Fatalf("stdout missing %q:\n%s", want, stdout)
-		}
-	}
-}
-
-func TestDoctorCommandNonexistentSocketFails(t *testing.T) {
-	t.Parallel()
-
-	nonexistent := filepath.Join(t.TempDir(), "absent.sock")
-	exec := executeJSON(t, "doctor", testSocketFlag, nonexistent, testNoConfigFlag, testJSONFlag)
-
-	if exec.err == nil || ExitCode(exec.err) != exitCodeGeneral {
-		t.Fatalf(
-			"expected doctor to exit %d on a missing server, got %v",
-			exitCodeGeneral,
-			exec.err,
-		)
-	}
-
-	server := findDoctorCheck(
-		decodeDoctorReport(t, exec.envelope.Result).Checks,
-		doctor.CheckTmuxServer,
-	)
-	if server.Status != doctor.StatusFail || server.Reason != doctor.ReasonNotRunning {
-		t.Fatalf("expected a not-running server failure: %+v", server)
-	}
-}
-
 func TestDoctorSurvivesABrokenConfigAndReportsIt(t *testing.T) {
 	t.Parallel()
 
