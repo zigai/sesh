@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	waitDelay   = time.Second
+	WaitDelay   = time.Second
 	outputLimit = 1 << 20
 	detailLimit = 512
 )
@@ -52,7 +52,7 @@ func (e *CommandError) Error() string {
 func Output(ctx context.Context, dir string, args ...string) (string, error) {
 	command := exec.CommandContext(ctx, "git", args...)
 	command.Dir = dir
-	command.WaitDelay = waitDelay
+	command.WaitDelay = WaitDelay
 
 	for _, variable := range os.Environ() {
 		if !strings.HasPrefix(variable, "GIT_") {

@@ -419,6 +419,7 @@ func runGH(ctx context.Context, dir string, decoded any, args ...string) error {
 
 	command := exec.CommandContext(ctx, ghPath, args...)
 	command.Dir = dir
+	command.WaitDelay = git.WaitDelay
 
 	command.Env = append(
 		os.Environ(),

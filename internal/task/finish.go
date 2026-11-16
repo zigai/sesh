@@ -416,6 +416,7 @@ func (GitHub) FindPR(
 	command := exec.CommandContext(ctx, ghPath, "pr", "list", "--head", branch, "--state", "all",
 		"--json", "number,state,url,headRefOid,isCrossRepository")
 	command.Dir = dir
+	command.WaitDelay = git.WaitDelay
 
 	command.Env = append(
 		os.Environ(),
