@@ -67,7 +67,10 @@ type menuEntry struct {
 }
 
 type menuBox struct {
-	x, y, width, height int
+	x      int
+	y      int
+	width  int
+	height int
 }
 
 func (entry menuEntry) divider() bool {

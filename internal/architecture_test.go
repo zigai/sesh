@@ -112,7 +112,8 @@ var testSupport = []string{
 type layer int
 
 type packageEdge struct {
-	source, target string
+	source string
+	target string
 }
 
 type architectureScan struct {
@@ -350,7 +351,10 @@ func withinPackage(candidate string, root string) bool {
 
 func TestImportBoundariesRejectForbiddenDependencies(t *testing.T) {
 	tests := []struct {
-		name, filename, imported, reason string
+		name     string
+		filename string
+		imported string
+		reason   string
 	}{
 		{"entrypoint testing", "cmd/sesh/main.go", "testing", testSupportReason},
 		{"testing subpackage", "internal/cli/command.go", "testing/fstest", testSupportReason},

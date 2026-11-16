@@ -41,7 +41,10 @@ func (r *Repository) initializeLocked(ctx context.Context) error {
 		return err
 	}
 
-	for _, step := range []struct{ name, phase string }{
+	for _, step := range []struct {
+		name  string
+		phase string
+	}{
 		{"generations", "init_generations_created"},
 		{"staging", "init_staging_created"},
 	} {

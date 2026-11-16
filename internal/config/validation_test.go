@@ -1619,11 +1619,12 @@ arrange = "tiled"
 
 func TestTaskLayoutWhenMatches(t *testing.T) {
 	tests := []struct {
-		name          string
-		when          config.TaskLayoutWhen
-		width, height int
-		harness       string
-		want          bool
+		name    string
+		when    config.TaskLayoutWhen
+		width   int
+		height  int
+		harness string
+		want    bool
 	}{
 		{
 			name:    "anything",

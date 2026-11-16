@@ -16,9 +16,12 @@ import (
 func TestReadResourceSampleParsesProcessIdentityAndRSS(t *testing.T) {
 	root := t.TempDir()
 	for _, process := range []struct {
-		pid, parent         int
-		start, user, system uint64
-		resident            string
+		pid      int
+		parent   int
+		start    uint64
+		user     uint64
+		system   uint64
+		resident string
 	}{
 		{pid: 100, parent: 1, start: 400, user: 120, system: 30, resident: "12"},
 		{pid: 101, parent: 100, start: 401, user: 40, system: 10, resident: "8"},

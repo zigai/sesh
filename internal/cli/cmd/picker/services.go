@@ -466,7 +466,11 @@ func findPickerLiveTarget(
 }
 
 func agentSummaries(observed []agents.AgentSession) []session.AgentSummary {
-	type key struct{ socket, id, name string }
+	type key struct {
+		socket string
+		id     string
+		name   string
+	}
 
 	index := make(map[key]int)
 	result := make([]session.AgentSummary, 0)

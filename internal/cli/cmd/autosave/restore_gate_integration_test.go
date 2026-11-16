@@ -85,7 +85,10 @@ func TestStartupRestoreRestoresEverySessionWhenASavedDirectoryIsGone(t *testing.
 
 	saved := make([]string, 0, 3)
 
-	for _, session := range []struct{ name, dir string }{{"alpha", root}, {"beta", removed}, {"gamma", root}} {
+	for _, session := range []struct {
+		name string
+		dir  string
+	}{{"alpha", root}, {"beta", removed}, {"gamma", root}} {
 		created, err := source.NewSession(t.Context(), gotmux.NewSessionOptions{
 			Name:    session.name,
 			Dir:     session.dir,

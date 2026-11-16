@@ -132,7 +132,11 @@ type OperationStatus struct {
 }
 
 type restoredPaneTally struct {
-	resumed, restarted, shell, unrecovered, directoryFallback int
+	resumed           int
+	restarted         int
+	shell             int
+	unrecovered       int
+	directoryFallback int
 }
 
 type restoreStartedKey struct{}

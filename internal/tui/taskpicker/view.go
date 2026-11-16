@@ -60,12 +60,28 @@ const (
 )
 
 type columns struct {
-	age, name, label, added, deleted, ahead, behind int
+	age     int
+	name    int
+	label   int
+	added   int
+	deleted int
+	ahead   int
+	behind  int
 }
 
 type rowParts struct {
-	age, name, subject, label, added, deleted, ahead, behind string
-	addedRole, deletedRole, aheadRole, behindRole            tui.SpanRole
+	age         string
+	name        string
+	subject     string
+	label       string
+	added       string
+	deleted     string
+	ahead       string
+	behind      string
+	addedRole   tui.SpanRole
+	deletedRole tui.SpanRole
+	aheadRole   tui.SpanRole
+	behindRole  tui.SpanRole
 }
 
 type layout struct {

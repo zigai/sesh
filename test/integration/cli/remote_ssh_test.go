@@ -25,12 +25,22 @@ import (
 )
 
 type remoteSSHFixture struct {
-	root, stateHome, cacheHome, dataHome, configHome string
-	sshWrapper, argumentLog, peerID                  string
-	connection                                       config.RemoteConnectionConfig
+	root        string
+	stateHome   string
+	cacheHome   string
+	dataHome    string
+	configHome  string
+	sshWrapper  string
+	argumentLog string
+	peerID      string
+	connection  config.RemoteConnectionConfig
 }
 
-type remoteSSHTools struct{ sshd, sshKeygen, ssh string }
+type remoteSSHTools struct {
+	sshd      string
+	sshKeygen string
+	ssh       string
+}
 
 func TestRemoteActionCrossesDisposableOpenSSHServer(t *testing.T) {
 	fixture := newRemoteSSHFixture(t)

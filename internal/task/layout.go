@@ -52,8 +52,10 @@ type cell struct {
 	sideBySide bool
 	children   []*cell
 	parent     *cell
-	x, y       int
-	w, h       int
+	x          int
+	y          int
+	w          int
+	h          int
 }
 
 type windowPane struct {

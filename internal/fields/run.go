@@ -20,7 +20,8 @@ const (
 )
 
 type pipe struct {
-	read, write *os.File
+	read  *os.File
+	write *os.File
 }
 
 type Result struct {

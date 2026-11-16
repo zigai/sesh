@@ -17,7 +17,12 @@ import (
 	"github.com/zigai/sesh/internal/task"
 )
 
-type rect struct{ left, top, width, height int }
+type rect struct {
+	left   int
+	top    int
+	width  int
+	height int
+}
 
 func TestSplitsLayoutPlacesEachPaneWhereItsSplitPutsIt(t *testing.T) {
 	f := newFixture(t)

@@ -375,8 +375,9 @@ func applyEnvironmentThemePreset(theme *ThemeConfig, fileTheme ThemeConfig) {
 	theme.applyPreset(preset)
 
 	for _, field := range []struct {
-		target        *string
-		fromEnv, file string
+		target  *string
+		fromEnv string
+		file    string
 	}{
 		{&theme.Primary, fromEnv.Primary, fileTheme.Primary},
 		{&theme.Secondary, fromEnv.Secondary, fileTheme.Secondary},

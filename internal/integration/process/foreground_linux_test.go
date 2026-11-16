@@ -14,10 +14,13 @@ import (
 )
 
 type foregroundFixtureProcess struct {
-	pid, parent, group, foregroundGroup int
-	startTime                           uint64
-	children                            []int
-	exited                              bool
+	pid             int
+	parent          int
+	group           int
+	foregroundGroup int
+	startTime       uint64
+	children        []int
+	exited          bool
 }
 
 func TestSelectLinuxForegroundUsesUniqueProcessGroupRoot(t *testing.T) {

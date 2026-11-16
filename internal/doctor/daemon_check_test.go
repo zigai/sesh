@@ -19,10 +19,12 @@ func TestDaemonCheckRequiresRunningPhaseAndHeldInhibitors(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name, state, phase string
-		held               bool
-		wantStatus         doctor.Status
-		wantFix            string
+		name       string
+		state      string
+		phase      string
+		held       bool
+		wantStatus doctor.Status
+		wantFix    string
 	}{
 		{"ready", doctor.DaemonReady, "running", true, doctor.StatusOK, ""},
 		{

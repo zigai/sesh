@@ -774,7 +774,9 @@ func TestStartWithABackslashInTheTitleKeepsTheTitleAndNamesTheWindowWithoutIt(t 
 
 func TestStartRunsTheHarnessInTheUserShellWithItsFunctions(t *testing.T) {
 	for _, shell := range []struct {
-		name, rcFile, rc string
+		name   string
+		rcFile string
+		rc     string
 	}{
 		{name: "bash", rcFile: ".bashrc", rc: "shellagent() { printf '%%s|' --yolo \"$@\" > '%s'; exec sleep 300; }\n"},
 		{

@@ -1540,7 +1540,10 @@ func assertPartialLoadState(t *testing.T, model *Model, loaded sessionLoadResult
 }
 
 func TestSessionLoadPreservesNewerRemoteWatchObservations(t *testing.T) {
-	for _, testCase := range []struct{ loadMode, observation string }{
+	for _, testCase := range []struct {
+		loadMode    string
+		observation string
+	}{
 		{"initial", "replacement"},
 		{"initial", "removal"},
 		{"initial", "error"},

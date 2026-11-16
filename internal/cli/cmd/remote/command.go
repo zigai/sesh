@@ -55,10 +55,11 @@ type lookupRuntime struct {
 }
 
 type peerRuntime struct {
-	peerID, bridgeDir string
-	server            *gotmux.Server
-	live              *remote.GotmuxLiveServer
-	receipts          *privatefs.Dir
+	peerID    string
+	bridgeDir string
+	server    *gotmux.Server
+	live      *remote.GotmuxLiveServer
+	receipts  *privatefs.Dir
 }
 
 func NewCommand() *cobra.Command {

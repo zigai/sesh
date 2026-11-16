@@ -326,7 +326,12 @@ func newRestoreFixture(t *testing.T) restoreFixture {
 	}
 
 	manifest := model.Manifest{}
-	panes := []struct{ id, window, role, task string }{
+	panes := []struct {
+		id     string
+		window string
+		role   string
+		task   string
+	}{
 		{"%1", "@1", task.RoleAgent, "t1"},
 		{"%2", "@1", "editor", "t1"},
 		{"%3", "@2", task.RoleAgent, "t2"},
@@ -334,7 +339,10 @@ func newRestoreFixture(t *testing.T) restoreFixture {
 		{"%6", "@4", "", ""},
 	}
 
-	for _, window := range []struct{ id, task string }{{"@1", "t1"}, {"@2", "t2"}, {"@3", "t3"}, {"@4", ""}} {
+	for _, window := range []struct {
+		id   string
+		task string
+	}{{"@1", "t1"}, {"@2", "t2"}, {"@3", "t3"}, {"@4", ""}} {
 		manifest.Windows = append(manifest.Windows, model.Window{
 			ID: window.id, Options: userOption("window", task.OptionTask, window.task),
 		})
