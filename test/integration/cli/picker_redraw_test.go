@@ -15,6 +15,8 @@ import (
 
 	gotmux "github.com/zigai/gotmux/tmux"
 	"github.com/zigai/gotmux/tmuxtest"
+
+	"github.com/zigai/sesh/internal/session"
 )
 
 func TestPickerSearchShrinkAndRegrowAvoidFullScreenErase(t *testing.T) {
@@ -25,13 +27,31 @@ func TestPickerSearchShrinkAndRegrowAvoidFullScreenErase(t *testing.T) {
 	root := pickerIntegrationRoot(t)
 	server := tmuxtest.NewServer(t)
 
-	for _, name := range []string{"alpha-target", "bravo-stale", "charlie-stale"} {
+	names := []string{"alpha-target", "bravo-stale", "charlie-stale"}
+	history := &session.State{Version: session.CurrentHistoryVersion}
+
+	for index, name := range names {
 		if _, err := server.NewSession(
 			t.Context(),
 			gotmux.NewSessionOptions{Name: name},
 		); err != nil {
 			t.Fatalf("create session %q: %v", name, err)
 		}
+
+		// Rows otherwise sort by the second each session was created in.
+		history.SwitchHistory = append(history.SwitchHistory, session.SwitchHistoryEntry{
+			Session: session.Identity{
+				Origin: string(session.OriginLocal),
+				Socket: server.Endpoint().SocketPath,
+				Name:   name,
+			},
+			LastSwitchUnix: int64(len(names) - index),
+		})
+	}
+
+	historyPath := filepath.Join(root, "history.json")
+	if err := session.SaveState(t.Context(), historyPath, history); err != nil {
+		t.Fatalf("write picker history: %v", err)
 	}
 
 	configPath := filepath.Join(root, "picker.toml")
@@ -55,7 +75,7 @@ func TestPickerSearchShrinkAndRegrowAvoidFullScreenErase(t *testing.T) {
 		testSocketFlag, server.Endpoint().SocketPath,
 		testRepositoryFlag, filepath.Join(root, "repository"),
 		"--lease-root", filepath.Join(root, "leases"),
-		"--history", filepath.Join(root, "history.json"),
+		"--history", historyPath,
 		"--agent-state", filepath.Join(root, "agents.json"),
 	}
 
