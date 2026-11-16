@@ -159,6 +159,10 @@ func (m *Model) refreshDisplaySessions() {
 
 	displayed := make([]session.Session, 0, len(m.sessions))
 	for _, row := range m.sessions {
+		if m.beingDeleted(row) {
+			continue
+		}
+
 		row.Agents = slices.Clone(row.Agents)
 		m.applyCachedAgentGit(&row)
 		sortAgentSessions(row.Agents, m.agentSort)

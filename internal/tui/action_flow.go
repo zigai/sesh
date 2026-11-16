@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -353,6 +354,10 @@ func (m *Model) dispatchAction(request pendingAction) func() (tea.Model, tea.Cmd
 
 	m.clearStatus()
 
+	if descriptor.ID == action.SessionDelete.ID {
+		m.hideDeletingSessions(request.subject.Sessions)
+	}
+
 	ctx := m.operationContext()
 	invocation := action.Invocation{
 		Action: descriptor.ID,
@@ -379,6 +384,10 @@ func (m *Model) handleActionResult(msg actionResultMsg) (tea.Model, tea.Cmd) {
 	descriptor := msg.request.entry.Describe()
 	operation := actionOperation(descriptor.ID)
 	ctx := m.operationContext()
+
+	if descriptor.ID == action.SessionDelete.ID {
+		m.finishDeletingSessions(msg.request.subject.Sessions, msg.err == nil)
+	}
 
 	if descriptor.ID == action.SessionMoveWindow.ID && m.tabMove != nil {
 		if msg.err != nil {
@@ -478,7 +487,6 @@ func (m *Model) followAction(msg actionResultMsg) tea.Cmd {
 		deleted := msg.request.subject.Sessions[0].SemanticIdentity()
 
 		m.recordActionState(func(current *session.State) { current.DeleteSessionIdentity(deleted) })
-		m.moveCursorToPreviousRow()
 	case action.StartedTaskMerge, action.StartedTaskAction:
 		return tea.Batch(m.refreshSessions(), m.taskRunTickCommand(true))
 	case action.ResumedAgent:
@@ -508,4 +516,58 @@ func emptyParam() action.Param {
 	var param action.Param
 
 	return param
+}
+
+func (m *Model) hideDeletingSessions(targets []session.Session) {
+	m.deletingSessions = append(m.deletingSessions, targets...)
+
+	kept := 0
+
+	for _, row := range m.filtered[:min(m.cursor, len(m.filtered))] {
+		if !m.beingDeleted(row) {
+			kept++
+		}
+	}
+
+	m.refreshDisplaySessions()
+	m.filterSessions()
+
+	m.cursor = max(kept-1, 0)
+	m.normalizeFilteredCursor()
+}
+
+func (m *Model) finishDeletingSessions(targets []session.Session, deleted bool) {
+	for _, target := range targets {
+		if deleted {
+			m.sessions = slices.DeleteFunc(m.sessions, func(row session.Session) bool {
+				return deletedBy(row, target)
+			})
+		}
+
+		index := slices.IndexFunc(m.deletingSessions, func(pending session.Session) bool {
+			return pending.SemanticIdentity() == target.SemanticIdentity()
+		})
+		if index >= 0 {
+			m.deletingSessions = slices.Delete(m.deletingSessions, index, index+1)
+		}
+	}
+
+	m.refreshDisplaySessions()
+	m.filterSessions()
+}
+
+func (m *Model) beingDeleted(row session.Session) bool {
+	return slices.ContainsFunc(m.deletingSessions, func(target session.Session) bool {
+		return deletedBy(row, target)
+	})
+}
+
+// Deleting a live session also removes its saved copy from the current snapshot.
+func deletedBy(row session.Session, target session.Session) bool {
+	if row.SemanticIdentity() == target.SemanticIdentity() {
+		return true
+	}
+
+	return !target.Saved() && row.Saved() && row.Name == target.Name &&
+		action.LocationOf(row) == action.LocationOf(target)
 }

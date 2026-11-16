@@ -169,6 +169,7 @@ type Model struct {
 	pathSuggestionIndex          int
 	pathSuggestionTop            int
 	pathState                    pathState
+	deletingSessions             []session.Session
 	statusMessage                string
 	statusLevel                  statusLevel
 	degradedSources              map[string]string
@@ -393,6 +394,7 @@ func buildModel(
 		pathSuggestionIndex:          0,
 		pathSuggestionTop:            0,
 		pathState:                    pathUnknown,
+		deletingSessions:             nil,
 		statusMessage:                "",
 		statusLevel:                  statusNone,
 		degradedSources:              nil,

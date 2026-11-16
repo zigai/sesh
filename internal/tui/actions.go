@@ -543,12 +543,6 @@ func (m *Model) rejectRemoteAction(operation string) func() (tea.Model, tea.Cmd)
 	return func() (tea.Model, tea.Cmd) { return m, nil }
 }
 
-func (m *Model) moveCursorToPreviousRow() {
-	if m.cursor > 0 {
-		m.cursor--
-	}
-}
-
 func (m *Model) remoteStatusTickCommand() tea.Cmd {
 	if !remoteSessionsEnabled(m.config, m.deps) {
 		return nil
