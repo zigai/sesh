@@ -404,6 +404,9 @@ func attachPickerPopupClient(
 			}
 		case <-time.After(5 * time.Second):
 		}
+
+		// The popup child keeps writing history for a few milliseconds after the popup closes.
+		waitForFixtureIdle(t, fixtureRoot(fixture))
 	})
 
 	return fixture.waitForNewCLIClient(t, origin.ID, nil)
