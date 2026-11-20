@@ -1,42 +1,13 @@
-//go:build darwin && integration
-
-package agents_test
+package ptytest
 
 import (
 	"fmt"
-	"os"
-	"testing"
 	"unsafe"
 
 	"golang.org/x/sys/unix"
 )
 
-func openTestPTY(t *testing.T) (*os.File, *os.File, error) {
-	t.Helper()
-
-	master, err := os.OpenFile("/dev/ptmx", os.O_RDWR|unix.O_NOCTTY, 0)
-	if err != nil {
-		return nil, nil, fmt.Errorf("opening /dev/ptmx: %w", err)
-	}
-
-	name, err := unlockPTY(int(master.Fd()))
-	if err != nil {
-		_ = master.Close()
-
-		return nil, nil, err
-	}
-
-	slave, err := os.OpenFile(name, os.O_RDWR|unix.O_NOCTTY, 0)
-	if err != nil {
-		_ = master.Close()
-
-		return nil, nil, fmt.Errorf("opening pty slave: %w", err)
-	}
-
-	return master, slave, nil
-}
-
-func unlockPTY(fd int) (string, error) {
+func unlock(fd int) (string, error) {
 	if err := unix.IoctlSetInt(fd, unix.TIOCPTYGRANT, 0); err != nil {
 		return "", fmt.Errorf("granting pty: %w", err)
 	}

@@ -15,25 +15,14 @@ import (
 
 	"github.com/zigai/sesh/internal/daemon"
 	"github.com/zigai/sesh/internal/testsupport/clitest"
+	"github.com/zigai/sesh/internal/testsupport/testenv"
 )
 
 func runtimeFixture(t *testing.T) (string, string) {
 	t.Helper()
 	isolatedAutosaveHome(t)
 
-	runtimeDir, err := os.MkdirTemp( //nolint:usetesting // Unix socket paths need a short name; t.Cleanup removes it.
-		"/tmp",
-		"sesh-runtime-",
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Cleanup(func() {
-		if err := os.RemoveAll(runtimeDir); err != nil {
-			t.Error(err)
-		}
-	})
+	runtimeDir := testenv.ShortTempDir(t)
 	t.Setenv("XDG_RUNTIME_DIR", runtimeDir)
 
 	return runtimeDir, filepath.Join(runtimeDir, "private-endpoint.sock")

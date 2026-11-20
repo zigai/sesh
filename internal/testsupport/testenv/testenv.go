@@ -75,6 +75,25 @@ func RunIsolated(m *testing.M) int {
 	return code
 }
 
+// ShortTempDir returns a new directory directly under the short temp root, removed when the test
+// ends. t.TempDir adds the test name, which can push a unix socket path below it past sun_path.
+func ShortTempDir(tb testing.TB) string {
+	tb.Helper()
+
+	dir, err := os.MkdirTemp("", "sesh-") //nolint:usetesting // see the doc comment
+	if err != nil {
+		tb.Fatal(err)
+	}
+
+	tb.Cleanup(func() {
+		if err := os.RemoveAll(dir); err != nil {
+			tb.Error(err)
+		}
+	})
+
+	return dir
+}
+
 func useShortCanonicalTempDir() error {
 	// Tests bind unix sockets under t.TempDir, so its root must be short enough for sun_path (104
 	// bytes on macOS), and tmux endpoints must be canonical. macOS's per-user TMPDIR is long and

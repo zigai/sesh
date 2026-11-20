@@ -12,17 +12,15 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"syscall"
 	"testing"
 	"time"
 
-	"golang.org/x/sys/unix"
-
 	"github.com/zigai/sesh/internal/integration/process"
 	"github.com/zigai/sesh/internal/snapshot/apps"
 	"github.com/zigai/sesh/internal/snapshot/model"
+	"github.com/zigai/sesh/internal/testsupport/ptytest"
 )
 
 func TestEnrichEditorReadsListedFilesFromOwnedNvimServer(t *testing.T) {
@@ -288,7 +286,7 @@ func startInteractiveNvim(
 ) *interactiveNvim {
 	t.Helper()
 
-	master, slave := openTestPTY(t)
+	master, slave := ptytest.Open(t)
 	command := exec.CommandContext(t.Context(), nvim, "--clean", first)
 	command.Dir = directory
 	command.Env = isolatedEditorEnvironment(t, directory)
@@ -669,58 +667,6 @@ func byteArguments(arguments []model.Bytes) []string {
 	return result
 }
 
-func openTestPTY(t *testing.T) (*os.File, *os.File) {
-	t.Helper()
-
-	failOrSkip := func(msg string, err error) {
-		if os.Getenv("SESH_APPLICATION_INTEGRATION_REQUIRED") == "1" {
-			t.Fatalf("%s in required mode: %v", msg, err)
-		}
-
-		t.Skipf("%s: %v", msg, err)
-	}
-
-	master, err := os.OpenFile("/dev/ptmx", os.O_RDWR|unix.O_NOCTTY, 0)
-	if err != nil {
-		failOrSkip("pty allocation unavailable", err)
-
-		return nil, nil
-	}
-
-	if err := unix.IoctlSetPointerInt(int(master.Fd()), unix.TIOCSPTLCK, 0); err != nil {
-		_ = master.Close()
-
-		failOrSkip("pty unlock failed", err)
-
-		return nil, nil
-	}
-
-	number, err := unix.IoctlGetInt(int(master.Fd()), unix.TIOCGPTN)
-	if err != nil {
-		_ = master.Close()
-
-		failOrSkip("pty get number failed", err)
-
-		return nil, nil
-	}
-
-	slave, err := os.OpenFile("/dev/pts/"+strconv.Itoa(number), os.O_RDWR|unix.O_NOCTTY, 0)
-	if err != nil {
-		_ = master.Close()
-
-		failOrSkip("pty open slave failed", err)
-
-		return nil, nil
-	}
-
-	t.Cleanup(func() {
-		_ = slave.Close()
-		_ = master.Close()
-	})
-
-	return master, slave
-}
-
 func TestMonitorAcceptedArgumentsStartInRealPTY(t *testing.T) {
 	topPath := requireFixture(t, topName)
 
@@ -791,7 +737,7 @@ func testTopAcceptedArgumentsStartInRealPTY(t *testing.T, topPath string) {
 	}
 
 	argv := byteArguments(prepared.Arguments)
-	master, slave := openTestPTY(t)
+	master, slave := ptytest.Open(t)
 
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
@@ -860,7 +806,7 @@ func testTopRejectedArgumentExitsWithErrorInRealPTY(t *testing.T, topPath string
 		t.Fatalf("Prepare() reason = %q, want ReasonUnsafeArguments", reason)
 	}
 
-	master, slave := openTestPTY(t)
+	master, slave := ptytest.Open(t)
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 
 	defer cancel()
@@ -937,7 +883,7 @@ func testHtopAcceptedSortKeyStartsSuccessfullyInRealPTY(t *testing.T) {
 	}
 
 	argv := byteArguments(prepared.Arguments)
-	master, slave := openTestPTY(t)
+	master, slave := ptytest.Open(t)
 
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()

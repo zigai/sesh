@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json/v2"
 	"errors"
-	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -16,12 +15,11 @@ import (
 	"time"
 
 	"github.com/zigai/sesh/internal/privatefs"
+	"github.com/zigai/sesh/internal/testsupport/testenv"
 )
 
-var runtimeTestDirectoryCounter atomic.Uint64
-
 func TestRuntimeReporterReturnsVerifiedLiveState(t *testing.T) {
-	runtimeDir := shortRuntimeDir(t)
+	runtimeDir := testenv.ShortTempDir(t)
 	endpoint := filepath.Join(runtimeDir, "tmux.sock")
 
 	var held atomic.Bool
@@ -88,7 +86,7 @@ func assertRunningRuntimeStatus(t *testing.T, status RuntimeStatus) {
 }
 
 func TestRuntimeReporterRejectsSecondActiveOwner(t *testing.T) {
-	runtimeDir := shortRuntimeDir(t)
+	runtimeDir := testenv.ShortTempDir(t)
 	config := RuntimeStatusConfig{
 		RuntimeDir: runtimeDir,
 		Endpoint:   filepath.Join(runtimeDir, "tmux.sock"),
@@ -118,7 +116,7 @@ func TestRuntimeReporterRejectsSecondActiveOwner(t *testing.T) {
 }
 
 func TestRuntimeReporterFailsClosedOnOwnedStaleSocket(t *testing.T) {
-	runtimeDir := shortRuntimeDir(t)
+	runtimeDir := testenv.ShortTempDir(t)
 	endpoint := filepath.Join(runtimeDir, "tmux.sock")
 
 	path, err := RuntimeStatusPath(runtimeDir, endpoint)
@@ -154,7 +152,7 @@ func TestRuntimeReporterFailsClosedOnOwnedStaleSocket(t *testing.T) {
 }
 
 func TestRuntimeReporterDoesNotUnlinkReplacementSocket(t *testing.T) {
-	runtimeDir := shortRuntimeDir(t)
+	runtimeDir := testenv.ShortTempDir(t)
 	endpoint := filepath.Join(runtimeDir, "tmux.sock")
 	config := RuntimeStatusConfig{
 		RuntimeDir:  runtimeDir,
@@ -196,7 +194,7 @@ func TestRuntimeReporterDoesNotUnlinkReplacementSocket(t *testing.T) {
 }
 
 func TestRuntimeListenerUsesPinnedParentAfterPathReplacement(t *testing.T) {
-	root := shortRuntimeDir(t)
+	root := testenv.ShortTempDir(t)
 	parent := filepath.Join(root, "sesh")
 
 	dir, err := privatefs.Ensure(parent)
@@ -236,7 +234,7 @@ func TestRuntimeListenerUsesPinnedParentAfterPathReplacement(t *testing.T) {
 }
 
 func TestQueryRuntimeStatusRejectsReporterForAnotherEndpoint(t *testing.T) {
-	runtimeDir := shortRuntimeDir(t)
+	runtimeDir := testenv.ShortTempDir(t)
 	endpointB := filepath.Join(runtimeDir, "tmux-b.sock")
 
 	reporter, err := StartRuntimeReporter(
@@ -263,7 +261,7 @@ func TestQueryRuntimeStatusRejectsReporterForAnotherEndpoint(t *testing.T) {
 }
 
 func TestRuntimeReporterRejectsTornPhaseResponse(t *testing.T) {
-	runtimeDir := shortRuntimeDir(t)
+	runtimeDir := testenv.ShortTempDir(t)
 	endpoint := filepath.Join(runtimeDir, "tmux.sock")
 	probeStarted := make(chan struct{})
 	releaseProbe := make(chan struct{})
@@ -321,7 +319,7 @@ func validRuntimeConfig(
 }
 
 func TestQueryRuntimeStatusHonorsReadDeadline(t *testing.T) {
-	runtimeDir := shortRuntimeDir(t)
+	runtimeDir := testenv.ShortTempDir(t)
 	path := filepath.Join(runtimeDir, "stall.sock")
 
 	listener, err := net.ListenUnix("unix", &net.UnixAddr{Name: path, Net: "unix"})
@@ -354,7 +352,7 @@ func TestQueryRuntimeStatusHonorsReadDeadline(t *testing.T) {
 }
 
 func TestQueryRuntimeStatusRejectsInvalidBudget(t *testing.T) {
-	runtimeDir := shortRuntimeDir(t)
+	runtimeDir := testenv.ShortTempDir(t)
 	endpoint := filepath.Join(runtimeDir, "tmux.sock")
 
 	path, err := RuntimeStatusPath(runtimeDir, endpoint)
@@ -472,24 +470,4 @@ func TestValidateRuntimeStatusRejectsNonUnknownServerManagement(t *testing.T) {
 			)
 		}
 	}
-}
-
-func shortRuntimeDir(t *testing.T) string {
-	t.Helper()
-
-	directory := filepath.Join(
-		"/tmp", //nolint:gocritic // filepathJoin: Unix socket paths need a short fixed parent.
-		fmt.Sprintf("sesh-runtime-%d-%d", os.Getpid(), runtimeTestDirectoryCounter.Add(1)),
-	)
-	if err := os.Mkdir(directory, 0o700); err != nil {
-		t.Fatal(err)
-	}
-
-	t.Cleanup(func() {
-		if err := os.RemoveAll(directory); err != nil {
-			t.Error(err)
-		}
-	})
-
-	return directory
 }

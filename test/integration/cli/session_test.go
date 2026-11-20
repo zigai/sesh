@@ -15,6 +15,7 @@ import (
 
 	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/cli"
+	"github.com/zigai/sesh/internal/testsupport/ptytest"
 
 	gotmux "github.com/zigai/gotmux/tmux"
 
@@ -1061,7 +1062,7 @@ func (f *cliSessionFixture) attachCLIClient(tb testing.TB, id gotmux.SessionID) 
 		tb.Fatal(err)
 	}
 
-	_, slave := openTestPTY(tb)
+	_, slave := ptytest.Open(tb)
 
 	attachCtx, cancelAttach := context.WithCancel(context.WithoutCancel(tb.Context()))
 

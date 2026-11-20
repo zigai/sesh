@@ -11,6 +11,7 @@ import (
 	"github.com/zigai/gotmux/tmuxtest"
 
 	"github.com/zigai/sesh/internal/agents"
+	"github.com/zigai/sesh/internal/testsupport/ptytest"
 )
 
 func attachTestClient(
@@ -21,15 +22,7 @@ func attachTestClient(
 ) string {
 	t.Helper()
 
-	master, slave, err := openTestPTY(t)
-	if err != nil {
-		t.Skipf("pty allocation unavailable: %v", err)
-	}
-
-	t.Cleanup(func() {
-		_ = slave.Close()
-		_ = master.Close()
-	})
+	_, slave := ptytest.Open(t)
 
 	sessionID := session.ID()
 

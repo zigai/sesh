@@ -20,6 +20,7 @@ import (
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/setup"
+	"github.com/zigai/sesh/internal/testsupport/ptytest"
 	"github.com/zigai/sesh/internal/tui"
 )
 
@@ -502,7 +503,7 @@ func attachPickerTestClient(t *testing.T, liveSession gotmux.Session) string {
 		existing[client.Name] = true
 	}
 
-	slave := openPickerTestPTY(t)
+	_, slave := ptytest.Open(t)
 
 	attachCtx, cancel := context.WithCancel(context.WithoutCancel(t.Context()))
 

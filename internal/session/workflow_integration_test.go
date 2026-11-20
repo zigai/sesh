@@ -27,6 +27,7 @@ import (
 	"github.com/zigai/sesh/internal/session"
 	"github.com/zigai/sesh/internal/snapshot/model"
 	"github.com/zigai/sesh/internal/snapshot/store"
+	"github.com/zigai/sesh/internal/testsupport/ptytest"
 )
 
 const (
@@ -174,7 +175,7 @@ func (f *workflowFixture) attachClient(t *testing.T, sessionID gotmux.SessionID)
 		t.Fatalf("session handle: %v", err)
 	}
 
-	_, slave := openTestPTY(t)
+	_, slave := ptytest.Open(t)
 
 	attachCtx, cancelAttach := context.WithCancel(context.WithoutCancel(t.Context()))
 
@@ -597,7 +598,7 @@ func TestWorkflow_EnterExistingSessionOutsideTmuxAttaches(t *testing.T) {
 
 	target := fixture.fixtureSession(t)
 
-	master, slave := openTestPTY(t)
+	master, slave := ptytest.Open(t)
 	_ = master
 
 	wf := session.NewWorkflowWithOptions(session.WorkflowOptions{
@@ -1046,7 +1047,7 @@ func TestWorkflow_AttachRequiresTerminalStreams(t *testing.T) {
 func TestWorkflow_AttachPreHookFailurePreventsAttach(t *testing.T) {
 	fixture := newWorkflowFixture(t)
 
-	_, slave := openTestPTY(t)
+	_, slave := ptytest.Open(t)
 
 	hooks := config.HookConfig{
 		SessionAttachPre: []config.HookCommand{{ShellCommand: "true", Timeout: "0s"}},
@@ -1090,7 +1091,7 @@ func TestWorkflow_AttachPostHookRunsAfterClientStart(t *testing.T) {
 	marker := filepath.Join(t.TempDir(), "attach-post")
 	t.Setenv("SESH_TEST_HOOK_MARKER", marker)
 
-	_, slave := openTestPTY(t)
+	_, slave := ptytest.Open(t)
 
 	hooks := config.HookConfig{
 		SessionAttachPost: []config.HookCommand{

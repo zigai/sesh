@@ -11,6 +11,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/rs/zerolog"
+
+	"github.com/zigai/sesh/internal/testsupport/testenv"
 )
 
 func TestRuntimeStatusListenerLogsUnexpectedFailureAndKeepsNormalShutdownSilent(t *testing.T) {
@@ -30,7 +32,7 @@ func testRuntimeStatusListenerLogging(t *testing.T, fail bool) {
 	var logs bytes.Buffer
 
 	ctx := zerolog.New(&logs).WithContext(t.Context())
-	dir := shortRuntimeDir(t)
+	dir := testenv.ShortTempDir(t)
 
 	reporter, err := StartRuntimeReporter(
 		ctx,

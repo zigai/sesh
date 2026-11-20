@@ -15,7 +15,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -25,10 +24,9 @@ import (
 
 	"github.com/zigai/sesh/internal/integration/process"
 	"github.com/zigai/sesh/internal/snapshot/model"
+	"github.com/zigai/sesh/internal/testsupport/ptytest"
 	"github.com/zigai/sesh/internal/testsupport/testenv"
 )
-
-const kernelPTYDir = "/dev/pts"
 
 const (
 	envHelperFlag     = "GO_PROCESS_TEST_HELPER"
@@ -269,7 +267,7 @@ func TestObserveForegroundSelectsShellForegroundChild(t *testing.T) {
 		t.Skip("bash is unavailable")
 	}
 
-	master, slave := openTestPTY(t)
+	master, slave := ptytest.Open(t)
 	cmd := exec.CommandContext(t.Context(), bashPath, "--noprofile", "--norc", "-i")
 	cmd.Stdin = slave
 	cmd.Stdout = slave
@@ -336,41 +334,6 @@ func waitForForegroundChild(t *testing.T, request process.ForegroundRequest) *pr
 
 		time.Sleep(10 * time.Millisecond)
 	}
-}
-
-func openTestPTY(t *testing.T) (*os.File, *os.File) {
-	t.Helper()
-
-	masterFD, err := unix.Open("/dev/ptmx", unix.O_RDWR|unix.O_NOCTTY|unix.O_CLOEXEC, 0)
-	if err != nil {
-		t.Fatalf("open PTY master: %v", err)
-	}
-
-	master := os.NewFile(uintptr(masterFD), "pty-master")
-
-	t.Cleanup(func() { _ = master.Close() })
-
-	if err := unix.IoctlSetPointerInt(masterFD, unix.TIOCSPTLCK, 0); err != nil {
-		t.Fatalf("unlock PTY: %v", err)
-	}
-
-	ptyNumber, err := unix.IoctlGetInt(masterFD, unix.TIOCGPTN)
-	if err != nil {
-		t.Fatalf("read PTY number: %v", err)
-	}
-
-	slave, err := os.OpenFile(
-		filepath.Join(kernelPTYDir, strconv.Itoa(ptyNumber)),
-		os.O_RDWR|syscall.O_NOCTTY,
-		0,
-	)
-	if err != nil {
-		t.Fatalf("open PTY slave: %v", err)
-	}
-
-	t.Cleanup(func() { _ = slave.Close() })
-
-	return master, slave
 }
 
 func assertObservedMetadata(

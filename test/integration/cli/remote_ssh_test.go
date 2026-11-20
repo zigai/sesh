@@ -22,6 +22,7 @@ import (
 	"github.com/zigai/sesh/internal/privatefs"
 	"github.com/zigai/sesh/internal/remote"
 	"github.com/zigai/sesh/internal/task"
+	"github.com/zigai/sesh/internal/testsupport/testenv"
 )
 
 type remoteSSHFixture struct {
@@ -187,15 +188,7 @@ func newRemoteSSHFixture(t *testing.T) remoteSSHFixture {
 		t.Fatal(err)
 	}
 
-	root, err := os.MkdirTemp( //nolint:usetesting // Unix socket paths need a short name; cleanup is registered below.
-		"",
-		"sesh-ssh-",
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Cleanup(func() { _ = os.RemoveAll(root) })
+	root := testenv.ShortTempDir(t)
 
 	fixture := remoteSSHFixture{
 		root:       root,

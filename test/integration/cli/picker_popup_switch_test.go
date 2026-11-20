@@ -19,6 +19,7 @@ import (
 
 	"github.com/zigai/sesh/internal/agents"
 	"github.com/zigai/sesh/internal/session"
+	"github.com/zigai/sesh/internal/testsupport/ptytest"
 )
 
 func TestTmuxPopupSelectionSwitchesOpeningClientAfterClose(t *testing.T) {
@@ -363,7 +364,7 @@ func writePickerPopupAgentRegistry(
 func openPickerPopupPTY(t *testing.T) (*os.File, *os.File) {
 	t.Helper()
 
-	master, slave := openTestPTY(t)
+	master, slave := ptytest.Open(t)
 	if err := unix.IoctlSetWinsize(
 		int(slave.Fd()),
 		unix.TIOCSWINSZ,
