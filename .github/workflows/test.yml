@@ -95,7 +95,7 @@ jobs:
       - name: Select the pinned tmux
         run: echo "$HOME/.sesh-tmux/bin" >> "$GITHUB_PATH"
       - name: Run tests and required isolated integration with race detection
-        run: xargs go test -race -count=1 -timeout=5m -tags=integration <"$RUNNER_TEMP/shard.txt"
+        run: xargs go test -race -count=1 -shuffle=on -timeout=5m -tags=integration <"$RUNNER_TEMP/shard.txt"
 
   test-macos:
     strategy:
@@ -142,7 +142,7 @@ jobs:
           go mod tidy -diff
           go mod verify
       - name: Run tests and required isolated integration with race detection
-        run: xargs go test -race -count=1 -timeout=5m -tags=integration <"$RUNNER_TEMP/shard.txt"
+        run: xargs go test -race -count=1 -shuffle=on -timeout=5m -tags=integration <"$RUNNER_TEMP/shard.txt"
       - name: Check macOS process observation without cgo
         if: matrix.shard == 1
         env:
