@@ -170,18 +170,19 @@ func setDirectories(root string, keepSet bool) error {
 		if err := os.Setenv(variable, dir); err != nil {
 			return fmt.Errorf("set %s: %w", variable, err)
 		}
-
-		if variable == "XDG_CONFIG_HOME" {
-			if err := disableGoTelemetry(dir); err != nil {
-				return err
-			}
-		}
 	}
 
-	return nil
+	return disableGoTelemetry()
 }
 
-func disableGoTelemetry(configDir string) error {
+func disableGoTelemetry() error {
+	// Go keeps telemetry in the user config directory, which is under HOME on macOS and
+	// XDG_CONFIG_HOME elsewhere.
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		return fmt.Errorf("find go telemetry directory: %w", err)
+	}
+
 	dir := filepath.Join(configDir, "go", "telemetry")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("create go telemetry directory: %w", err)
