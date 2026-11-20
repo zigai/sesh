@@ -107,7 +107,7 @@ func (local *Local) finishMergedTasks(ctx context.Context, refused map[string]bo
 	}
 
 	if failed != nil {
-		return oops.In("app").With("operation", "refresh_task_prs").Wrap(failed)
+		return oops.In("app").With("operation", "check_merged_tasks").Wrap(failed)
 	}
 
 	return nil
@@ -133,7 +133,9 @@ func (local *Local) readyToFinish(
 		}
 	}
 
-	return !local.agentBusy(ctx, live), nil
+	busy, err := local.agentBusy(ctx, live)
+
+	return !busy && err == nil, err
 }
 
 func (local *Local) finishMergedTask(
@@ -214,9 +216,9 @@ func (local *Local) shownWindows(ctx context.Context) (map[gotmux.WindowID]bool,
 	return shown, nil
 }
 
-func (local *Local) agentBusy(ctx context.Context, live task.Live) bool {
+func (local *Local) agentBusy(ctx context.Context, live task.Live) (bool, error) {
 	if !live.Present || live.AgentPane == "" {
-		return false
+		return false, nil
 	}
 
 	finder := paneAgents{
@@ -226,12 +228,14 @@ func (local *Local) agentBusy(ctx context.Context, live task.Live) bool {
 
 	found, err := finder.AgentsIn(ctx, live.AgentPane)
 	if err != nil {
-		// An agent whose activity cannot be read may be working.
-		return true
+		return true, oops.In("app").
+			With("operation", "read_task_agent").
+			With("task_id", live.Record.ID).
+			Wrap(err)
 	}
 
 	return slices.ContainsFunc(
 		found,
 		func(agent task.Agent) bool { return !slices.Contains(finishableActivities, agent.Activity) },
-	)
+	), nil
 }
