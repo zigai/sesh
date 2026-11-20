@@ -161,6 +161,61 @@ clean: (remove "bin" "sesh" "sesh.exe" "dist" "coverage.out" "*.test" "*.prof" "
 package-check:
     goreleaser check
 
+# Check the files changed since the merge base before pushing
+prepush:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    upstream=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD || echo origin/master)
+    base=$(git merge-base "$upstream" HEAD)
+    changed=()
+    while IFS= read -r path; do
+        changed+=("$path")
+    done < <(git diff --name-only --no-renames "$base" --)
+    if ((${#changed[@]} == 0)); then
+        echo "prepush: no changes since $base"
+        exit 0
+    fi
+    files=() go_files=() shell_files=() markdown_files=() other_files=() packages=() justfiles=()
+    for path in "${changed[@]}"; do
+        if [[ ! -f $path ]]; then continue; fi
+        files+=("$path")
+        case "$path" in
+            */testdata/* | testdata/*) ;;
+            Justfile | justfile | *.just) justfiles+=("$path") ;;
+            *.go) go_files+=("$path") ;;
+            *.md) markdown_files+=("$path") ;;
+            *.sh) shell_files+=("$path") ;;
+            *) other_files+=("$path") ;;
+        esac
+    done
+    if ((${#files[@]})); then
+        editorconfig-checker -disable-indent-size -disable-indentation -disable-max-line-length -disable-charset "${files[@]}"
+    fi
+    for path in "${justfiles[@]}"; do
+        just --justfile "$path" --fmt --check
+    done
+    if ((${#go_files[@]})); then
+        while IFS= read -r directory; do
+            packages+=("./$directory")
+        done < <(for path in "${go_files[@]}"; do dirname "$path"; done | sort -u)
+    fi
+    if ((${#packages[@]})); then
+        go vet -tags=integration "${packages[@]}"
+        golangci-lint run "${packages[@]}"
+    fi
+    if ((${#go_files[@]})); then
+        golangci-lint fmt --diff "${go_files[@]}"
+    fi
+    if ((${#shell_files[@]})); then
+        shfmt -d "${shell_files[@]}"
+    fi
+    if ((${#markdown_files[@]})); then
+        just --justfile {{ quote(justfile()) }} markdown check "${markdown_files[@]}"
+    fi
+    if ((${#other_files[@]})); then
+        oxfmt --check --no-error-on-unmatched-pattern "${other_files[@]}"
+    fi
+
 # Check the same files and tools without writing
 formatcheck:
     @golangci-lint run --allow-parallel-runners --enable-only whitespace
