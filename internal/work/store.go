@@ -66,17 +66,16 @@ type Item struct {
 	Server       string   `json:"server"`
 	Pane         string   `json:"pane"`
 	PanePID      int      `json:"panePid"`
-	// CreatedAt, TurnAt (last activity change) and PromptAt (last user prompt, as far as the
-	// harness reports it) are Unix seconds.
-	CreatedAt int64 `json:"createdAt"`
-	TurnAt    int64 `json:"turnAt"`
-	PromptAt  int64 `json:"promptAt"`
-	// PinnedAt, FinishedAt, ReopenedAt and UnseenAt are Unix seconds, zero when unset.
-	PinnedAt   int64        `json:"pinnedAt"`
-	FinishedAt int64        `json:"finishedAt"`
-	FinishedBy FinishReason `json:"finishedBy"`
-	ReopenedAt int64        `json:"reopenedAt"`
-	UnseenAt   int64        `json:"unseenAt"`
+	// TurnAtUnix is the last activity change and PromptAtUnix the last user prompt, as far as the
+	// harness reports it.
+	CreatedAtUnix  int64        `json:"createdAt"`
+	TurnAtUnix     int64        `json:"turnAt"`
+	PromptAtUnix   int64        `json:"promptAt"`
+	PinnedAtUnix   int64        `json:"pinnedAt"`
+	FinishedAtUnix int64        `json:"finishedAt"`
+	FinishedBy     FinishReason `json:"finishedBy"`
+	ReopenedAtUnix int64        `json:"reopenedAt"`
+	UnseenAtUnix   int64        `json:"unseenAt"`
 }
 
 type PRLink struct {
@@ -85,9 +84,9 @@ type PRLink struct {
 	URL    string       `json:"url"`
 	Issues []int        `json:"issues"`
 	Source LinkSource   `json:"source"`
-	// CreatedAt and EndedAt are Unix seconds, zero when unknown or still open.
-	CreatedAt int64 `json:"createdAt"`
-	EndedAt   int64 `json:"endedAt"`
+	// EndedAtUnix is zero while the pull request is open.
+	CreatedAtUnix int64 `json:"createdAt"`
+	EndedAtUnix   int64 `json:"endedAt"`
 }
 
 type State struct {
@@ -140,7 +139,7 @@ func (s *State) NextID() string {
 
 func (s *State) Finish(id string, by FinishReason, now time.Time) error {
 	return s.change(id, func(item *Item) error {
-		item.FinishedAt, item.FinishedBy = now.Unix(), by
+		item.FinishedAtUnix, item.FinishedBy = now.Unix(), by
 
 		return nil
 	})
@@ -154,7 +153,7 @@ func (s *State) FinishTask(id string, by FinishReason, directory string, now tim
 		}
 
 		if !item.Finished() {
-			item.FinishedAt, item.FinishedBy = now.Unix(), by
+			item.FinishedAtUnix, item.FinishedBy = now.Unix(), by
 		}
 
 		item.Task = ""
@@ -175,7 +174,7 @@ func (s *State) Reopen(id string, now time.Time) error {
 
 func (s *State) Pin(id string, now time.Time) error {
 	return s.change(id, func(item *Item) error {
-		item.PinnedAt = now.Unix()
+		item.PinnedAtUnix = now.Unix()
 
 		return nil
 	})
@@ -183,7 +182,7 @@ func (s *State) Pin(id string, now time.Time) error {
 
 func (s *State) MarkUnseen(id string, now time.Time) error {
 	return s.change(id, func(item *Item) error {
-		item.UnseenAt = now.Unix()
+		item.UnseenAtUnix = now.Unix()
 
 		return nil
 	})
@@ -191,7 +190,7 @@ func (s *State) MarkUnseen(id string, now time.Time) error {
 
 func (s *State) ClearUnseen(id string) error {
 	return s.change(id, func(item *Item) error {
-		item.UnseenAt = 0
+		item.UnseenAtUnix = 0
 
 		return nil
 	})
@@ -201,7 +200,7 @@ func (s *State) Prune(cutoff time.Time) bool {
 	count := len(s.Items)
 	s.Items = slices.DeleteFunc(
 		s.Items,
-		func(item Item) bool { return item.Finished() && item.FinishedAt < cutoff.Unix() },
+		func(item Item) bool { return item.Finished() && item.FinishedAtUnix < cutoff.Unix() },
 	)
 
 	return len(s.Items) != count
@@ -209,7 +208,7 @@ func (s *State) Prune(cutoff time.Time) bool {
 
 func (s *State) Unpin(id string) error {
 	return s.change(id, func(item *Item) error {
-		item.PinnedAt = 0
+		item.PinnedAtUnix = 0
 
 		return nil
 	})
@@ -254,11 +253,11 @@ func (s *State) change(id string, apply func(*Item) error) error {
 }
 
 func (i Item) Finished() bool {
-	return i.FinishedAt != 0
+	return i.FinishedAtUnix != 0
 }
 
 func (i Item) Pinned() bool {
-	return i.PinnedAt != 0
+	return i.PinnedAtUnix != 0
 }
 
 func (i Item) Linked() []PRLink {
@@ -276,7 +275,7 @@ func (i Item) PRsEnded() bool {
 }
 
 func (i Item) reopened(now time.Time) Item {
-	i.FinishedAt, i.FinishedBy, i.ReopenedAt = 0, "", now.Unix()
+	i.FinishedAtUnix, i.FinishedBy, i.ReopenedAtUnix = 0, "", now.Unix()
 
 	return i
 }
@@ -287,28 +286,28 @@ func (pr PRLink) Ended() bool {
 
 func EmptyItem() Item {
 	return Item{
-		ID:           "",
-		Harness:      "",
-		Conversation: "",
-		SessionPath:  "",
-		Resume:       []string{},
-		Title:        "",
-		Directory:    "",
-		Project:      "",
-		Branch:       "",
-		Task:         "",
-		PRs:          []PRLink{},
-		Server:       "",
-		Pane:         "",
-		PanePID:      0,
-		CreatedAt:    0,
-		TurnAt:       0,
-		PromptAt:     0,
-		PinnedAt:     0,
-		FinishedAt:   0,
-		FinishedBy:   "",
-		ReopenedAt:   0,
-		UnseenAt:     0,
+		ID:             "",
+		Harness:        "",
+		Conversation:   "",
+		SessionPath:    "",
+		Resume:         []string{},
+		Title:          "",
+		Directory:      "",
+		Project:        "",
+		Branch:         "",
+		Task:           "",
+		PRs:            []PRLink{},
+		Server:         "",
+		Pane:           "",
+		PanePID:        0,
+		CreatedAtUnix:  0,
+		TurnAtUnix:     0,
+		PromptAtUnix:   0,
+		PinnedAtUnix:   0,
+		FinishedAtUnix: 0,
+		FinishedBy:     "",
+		ReopenedAtUnix: 0,
+		UnseenAtUnix:   0,
 	}
 }
 
@@ -483,11 +482,11 @@ func (s *State) validate() error {
 func (i Item) validLifecycle() bool {
 	switch i.FinishedBy {
 	case "":
-		if i.FinishedAt != 0 {
+		if i.FinishedAtUnix != 0 {
 			return false
 		}
 	case FinishedByPR, FinishedByUser:
-		if i.FinishedAt == 0 {
+		if i.FinishedAtUnix == 0 {
 			return false
 		}
 	default:

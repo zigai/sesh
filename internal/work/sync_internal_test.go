@@ -27,7 +27,7 @@ func linkedItem(prs ...PRLink) Item {
 	item.Resume = []string{"claude", "--resume", "c1"}
 	item.Directory = "/code/shop"
 	item.Branch = "fix"
-	item.CreatedAt = startedAt
+	item.CreatedAtUnix = startedAt
 	item.PRs = append(item.PRs, prs...)
 
 	return item
@@ -35,16 +35,16 @@ func linkedItem(prs ...PRLink) Item {
 
 func prOpenedBeforeStart(number int, state task.PRState, source LinkSource) PRLink {
 	link := PRLink{
-		Number:    number,
-		State:     state,
-		URL:       "",
-		Issues:    []int{},
-		Source:    source,
-		CreatedAt: startedAt - 60,
-		EndedAt:   0,
+		Number:        number,
+		State:         state,
+		URL:           "",
+		Issues:        []int{},
+		Source:        source,
+		CreatedAtUnix: startedAt - 60,
+		EndedAtUnix:   0,
 	}
 	if link.Ended() {
-		link.EndedAt = startedAt + 60
+		link.EndedAtUnix = startedAt + 60
 	}
 
 	return link
@@ -93,7 +93,7 @@ func TestABranchPullRequestOpenedAndMergedBetweenSyncsFinishesTheItem(t *testing
 
 func TestABranchPullRequestThatEndedBeforeTheConversationIsNotLinked(t *testing.T) {
 	old := prOpenedBeforeStart(4, task.PRMerged, "")
-	old.CreatedAt, old.EndedAt = startedAt-7200, startedAt-3600
+	old.CreatedAtUnix, old.EndedAtUnix = startedAt-7200, startedAt-3600
 
 	if item := synced(linkedItem(), old); item.Finished() || len(item.PRs) != 0 {
 		t.Errorf("item = %+v, want the earlier pull request unlinked and the item open", item)
@@ -102,10 +102,10 @@ func TestABranchPullRequestThatEndedBeforeTheConversationIsNotLinked(t *testing.
 
 func TestABranchPullRequestOpenedAfterTheLastTurnIsNotLinked(t *testing.T) {
 	quiet := linkedItem()
-	quiet.TurnAt = startedAt + 60
+	quiet.TurnAtUnix = startedAt + 60
 
 	later := prOpenedBeforeStart(4, task.PROpen, "")
-	later.CreatedAt = startedAt + 600
+	later.CreatedAtUnix = startedAt + 600
 
 	if item := synced(quiet, later); len(item.PRs) != 0 {
 		t.Errorf(
@@ -117,13 +117,13 @@ func TestABranchPullRequestOpenedAfterTheLastTurnIsNotLinked(t *testing.T) {
 
 func TestALinkedPullRequestOutsideTheConversationIsStillRefreshed(t *testing.T) {
 	linked := prOpenedBeforeStart(4, task.PROpen, LinkUser)
-	linked.CreatedAt = startedAt - 7200
+	linked.CreatedAtUnix = startedAt - 7200
 
 	quiet := linkedItem(linked)
-	quiet.TurnAt = startedAt - 3600
+	quiet.TurnAtUnix = startedAt - 3600
 
 	refreshed := prOpenedBeforeStart(4, task.PROpen, "")
-	refreshed.CreatedAt, refreshed.URL = startedAt-7200, "https://example.test/pull/4"
+	refreshed.CreatedAtUnix, refreshed.URL = startedAt-7200, "https://example.test/pull/4"
 
 	if item := synced(
 		quiet,
@@ -136,7 +136,7 @@ func TestALinkedPullRequestOutsideTheConversationIsStillRefreshed(t *testing.T) 
 
 func TestAPullRequestThatEndedBeforeTheLatestPromptDoesNotFinishTheItem(t *testing.T) {
 	prompted := linkedItem(prOpenedBeforeStart(4, task.PROpen, LinkBranch))
-	prompted.PromptAt = startedAt + 120
+	prompted.PromptAtUnix = startedAt + 120
 
 	if item := synced(
 		prompted,
@@ -156,7 +156,7 @@ func TestAResumedItemWhosePullRequestEndedBeforeIsNotFinishedAgain(t *testing.T)
 		LastID:  1,
 		Items:   []Item{linkedItem(prOpenedBeforeStart(4, task.PRMerged, LinkBranch))},
 	}
-	state.Items[0].FinishedAt, state.Items[0].FinishedBy = startedAt+90, FinishedByPR
+	state.Items[0].FinishedAtUnix, state.Items[0].FinishedBy = startedAt+90, FinishedByPR
 
 	if err := state.Reopen("w1", time.Unix(startedAt+600, 0)); err != nil {
 		t.Fatalf("Reopen() error = %v", err)
@@ -183,7 +183,7 @@ func TestATaskItemIsNeitherLinkedNorFinishedBySync(t *testing.T) {
 
 func TestAPinnedItemStaysOpenWhenItsPullRequestEnds(t *testing.T) {
 	pinned := linkedItem(prOpenedBeforeStart(4, task.PROpen, LinkBranch))
-	pinned.PinnedAt = syncedAt.Unix()
+	pinned.PinnedAtUnix = syncedAt.Unix()
 
 	if item := synced(pinned, prOpenedBeforeStart(4, task.PRMerged, "")); item.Finished() {
 		t.Errorf("item = %+v, want a pinned item open", item)
@@ -260,12 +260,13 @@ func TestGitHubPullRequestTimesBecomeTheLinkLifetime(t *testing.T) {
 	want := [][2]int64{{opened, opened + 7200}, {opened, opened + 3600}, {opened, 0}}
 
 	for index, pr := range decoded {
-		if link := pr.link(); link.CreatedAt != want[index][0] || link.EndedAt != want[index][1] {
+		if link := pr.link(); link.CreatedAtUnix != want[index][0] ||
+			link.EndedAtUnix != want[index][1] {
 			t.Errorf(
 				"#%d lifetime = %d..%d, want %d..%d",
 				pr.Number,
-				link.CreatedAt,
-				link.EndedAt,
+				link.CreatedAtUnix,
+				link.EndedAtUnix,
 				want[index][0],
 				want[index][1],
 			)
@@ -276,7 +277,7 @@ func TestGitHubPullRequestTimesBecomeTheLinkLifetime(t *testing.T) {
 func finishedAt(id string, at time.Time, dir string) Item {
 	item := linkedItem()
 	item.ID, item.Conversation, item.Directory = id, id, dir
-	item.FinishedAt, item.FinishedBy = at.Unix(), FinishedByUser
+	item.FinishedAtUnix, item.FinishedBy = at.Unix(), FinishedByUser
 
 	return item
 }
@@ -287,7 +288,7 @@ func TestSyncDropsItemsFinishedLongerThanTheRetentionAgo(t *testing.T) {
 	now := time.Now()
 
 	open := linkedItem()
-	open.ID, open.Directory, open.CreatedAt, open.Task = "w3", dir, now.Add(-2*finishedRetention).
+	open.ID, open.Directory, open.CreatedAtUnix, open.Task = "w3", dir, now.Add(-2*finishedRetention).
 		Unix(),
 		"t1"
 

@@ -467,10 +467,10 @@ func TestOfferDescribesEachBranchNewestFirst(t *testing.T) {
 	}
 
 	newer := task.Ref{
-		Time:    time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC).Unix(),
-		Subject: "second step",
-		Ahead:   2,
-		Behind:  1,
+		TimeUnix: time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC).Unix(),
+		Subject:  "second step",
+		Ahead:    2,
+		Behind:   1,
 	}
 	if got := offer.Refs["refs/heads/newer"]; got != newer {
 		t.Errorf(
@@ -481,10 +481,10 @@ func TestOfferDescribesEachBranchNewestFirst(t *testing.T) {
 	}
 
 	older := task.Ref{
-		Time:    time.Date(2020, 1, 2, 3, 4, 5, 0, time.UTC).Unix(),
-		Subject: "",
-		Ahead:   1,
-		Behind:  1,
+		TimeUnix: time.Date(2020, 1, 2, 3, 4, 5, 0, time.UTC).Unix(),
+		Subject:  "",
+		Ahead:    1,
+		Behind:   1,
 	}
 	if got, ok := offer.Refs["refs/heads/older"]; !ok || got != older {
 		t.Errorf("older ref without a subject = %+v, %t; want %+v", got, ok, older)

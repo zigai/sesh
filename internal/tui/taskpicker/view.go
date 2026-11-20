@@ -533,7 +533,7 @@ func (m *Model) parts(entry row) rowParts {
 		return parts
 	}
 
-	parts.age = age(time.Unix(ref.Time, 0), m.options.Now)
+	parts.age = age(time.Unix(ref.TimeUnix, 0), m.options.Now)
 	parts.ahead, parts.behind = "↑"+strconv.Itoa(ref.Ahead), "↓"+strconv.Itoa(ref.Behind)
 
 	parts.aheadRole, parts.behindRole = countRole(

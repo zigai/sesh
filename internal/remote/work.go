@@ -13,7 +13,10 @@ const MaxWork = 4096
 
 func NewWorkRows(items []work.Item) []work.Item {
 	rows := slices.Clone(items)
-	slices.SortStableFunc(rows, func(a, b work.Item) int { return cmp.Compare(b.TurnAt, a.TurnAt) })
+	slices.SortStableFunc(
+		rows,
+		func(a, b work.Item) int { return cmp.Compare(b.TurnAtUnix, a.TurnAtUnix) },
+	)
 	rows = rows[:min(len(rows), MaxWork)]
 
 	for index := range rows {

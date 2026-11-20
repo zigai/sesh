@@ -59,11 +59,10 @@ type Offer struct {
 }
 
 type Ref struct {
-	// Time is Unix seconds.
-	Time    int64
-	Subject string
-	Ahead   int
-	Behind  int
+	TimeUnix int64
+	Subject  string
+	Ahead    int
+	Behind   int
 }
 
 type remoteBranch struct {
@@ -588,7 +587,7 @@ func (r refLine) ref() Ref {
 	ahead, _ := strconv.Atoi(aheadText)
 	behind, _ := strconv.Atoi(behindText)
 
-	return Ref{Time: committed, Subject: r.subject, Ahead: ahead, Behind: behind}
+	return Ref{TimeUnix: committed, Subject: r.subject, Ahead: ahead, Behind: behind}
 }
 
 func aheadBehindFormat(ctx context.Context, root string, base string) (string, error) {

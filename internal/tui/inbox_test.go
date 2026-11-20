@@ -965,7 +965,7 @@ func closedTestItem(id string, conversation string, turnAt time.Time) work.Item 
 	item.Title = "closed " + id
 	item.Directory = "/work/api"
 	item.Project = "/work/api"
-	item.TurnAt = turnAt.Unix()
+	item.TurnAtUnix = turnAt.Unix()
 
 	return item
 }
@@ -988,7 +988,7 @@ func TestInboxListsARecordedConversationOnlyAfterItsAgentCloses(t *testing.T) {
 func TestInboxLeavesOutFinishedAndTaskConversations(t *testing.T) {
 	model := newInboxTestModel(t, nil, nil)
 	finished := closedTestItem("w1", "conversation-finished", time.Now())
-	finished.FinishedAt, finished.FinishedBy = time.Now().Unix(), work.FinishedByPR
+	finished.FinishedAtUnix, finished.FinishedBy = time.Now().Unix(), work.FinishedByPR
 	ofTask := closedTestItem("w3", "conversation-task", time.Now())
 	ofTask.Task = "t1"
 	model.work = []work.Item{
@@ -1052,7 +1052,7 @@ func TestPinnedRowsComeFirstAndStayAmongTheShownClosedRows(t *testing.T) {
 	model.config.Inbox.ClosedShown = 2
 
 	pinned := closedTestItem("w1", "conversation-w1", now.Add(-time.Hour))
-	pinned.PinnedAt = now.Unix()
+	pinned.PinnedAtUnix = now.Unix()
 	model.work = []work.Item{
 		pinned,
 		closedTestItem("w2", "conversation-w2", now),
@@ -1128,7 +1128,7 @@ func TestMarkingAClosedConversationUnseenAndSeenAsksItsMachine(t *testing.T) {
 		t.Fatal("unseen mark was kept in the local inbox state")
 	}
 
-	model.work[0].UnseenAt = time.Now().Unix()
+	model.work[0].UnseenAtUnix = time.Now().Unix()
 	refreshInbox(model)
 	assertInboxRows(t, model, map[string][]string{config.InboxReady: {"closed w1"}})
 	selectInboxRow(t, model, "closed w1")
@@ -1172,7 +1172,7 @@ func TestMarkingARemoteClosedConversationUnseenGoesToItsMachine(t *testing.T) {
 
 func finishedTestItem(id string, turnAt time.Time) work.Item {
 	item := closedTestItem(id, "conversation-"+id, turnAt)
-	item.FinishedAt, item.FinishedBy = turnAt.Unix(), work.FinishedByUser
+	item.FinishedAtUnix, item.FinishedBy = turnAt.Unix(), work.FinishedByUser
 
 	return item
 }
@@ -1204,7 +1204,7 @@ func TestFinishedRowsCollapseApartFromClosedRows(t *testing.T) {
 	model.config.Inbox.ClosedShown = 1
 
 	unseen := closedTestItem("w3", "conversation-w3", now.Add(-time.Hour))
-	unseen.UnseenAt = now.Unix()
+	unseen.UnseenAtUnix = now.Unix()
 	model.work = []work.Item{
 		closedTestItem("w1", "conversation-w1", now.Add(-time.Minute)),
 		closedTestItem("w2", "conversation-w2", now),
@@ -1296,13 +1296,13 @@ func TestATaskRowShowsOnlyItsLedgerPullRequestAndRefusesLinking(t *testing.T) {
 	ofTask.Task = "t1"
 	ofTask.PRs = []work.PRLink{
 		{
-			Number:    7,
-			State:     task.PROpen,
-			URL:       "",
-			Issues:    []int{3},
-			Source:    work.LinkUser,
-			CreatedAt: 0,
-			EndedAt:   0,
+			Number:        7,
+			State:         task.PROpen,
+			URL:           "",
+			Issues:        []int{3},
+			Source:        work.LinkUser,
+			CreatedAtUnix: 0,
+			EndedAtUnix:   0,
 		},
 	}
 	model.work = []work.Item{ofTask}

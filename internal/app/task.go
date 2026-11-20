@@ -386,7 +386,7 @@ func OfferedTask(offer task.Offer) action.TaskOffered {
 
 	for name, ref := range offer.Refs {
 		offered.Refs[name] = action.OfferedRef{
-			Time:    ref.Time,
+			Time:    ref.TimeUnix,
 			Subject: ref.Subject,
 			Ahead:   ref.Ahead,
 			Behind:  ref.Behind,

@@ -211,9 +211,9 @@ func recordedSeenError(id action.ID, item inboxItem) error {
 	switch {
 	case item.work.ID == "":
 		return errNotRecorded
-	case id == action.InboxSeen.ID && item.work.UnseenAt == 0:
+	case id == action.InboxSeen.ID && item.work.UnseenAtUnix == 0:
 		return errAlreadySeen
-	case id == action.InboxUnseen.ID && item.work.UnseenAt != 0:
+	case id == action.InboxUnseen.ID && item.work.UnseenAtUnix != 0:
 		return errNotSeen
 	default:
 		return nil

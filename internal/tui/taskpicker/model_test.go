@@ -759,22 +759,22 @@ func TestListRowsShowEachBranchsLatestCommitDistanceAndAge(t *testing.T) {
 	options.Now = now
 	options.Refs = map[string]task.Ref{
 		"refs/heads/main": {
-			Time:    now.Add(-5 * time.Minute).Unix(),
-			Subject: "ship it",
-			Ahead:   0,
-			Behind:  0,
+			TimeUnix: now.Add(-5 * time.Minute).Unix(),
+			Subject:  "ship it",
+			Ahead:    0,
+			Behind:   0,
 		},
 		"refs/heads/hotfix": {
-			Time:    now.Add(-3 * time.Hour).Unix(),
-			Subject: "fix the login redirect for expired sessions",
-			Ahead:   2,
-			Behind:  0,
+			TimeUnix: now.Add(-3 * time.Hour).Unix(),
+			Subject:  "fix the login redirect for expired sessions",
+			Ahead:    2,
+			Behind:   0,
 		},
 		"refs/heads/feature": {
-			Time:    now.Add(-15 * 24 * time.Hour).Unix(),
-			Subject: "draft",
-			Ahead:   1,
-			Behind:  40,
+			TimeUnix: now.Add(-15 * 24 * time.Hour).Unix(),
+			Subject:  "draft",
+			Ahead:    1,
+			Behind:   40,
 		},
 	}
 	model := sized(options)
@@ -851,10 +851,10 @@ func TestANarrowListDropsTheSubjectButKeepsTheNames(t *testing.T) {
 	options := listOptions("", nil)
 	options.Refs = map[string]task.Ref{
 		"refs/heads/hotfix": {
-			Time:    1,
-			Subject: "a subject that cannot fit",
-			Ahead:   12,
-			Behind:  340,
+			TimeUnix: 1,
+			Subject:  "a subject that cannot fit",
+			Ahead:    12,
+			Behind:   340,
 		},
 	}
 	model := taskpicker.NewModel(config.DefaultConfig(), options)
@@ -894,10 +894,10 @@ func TestCommitSubjectsCannotSendTerminalSequences(t *testing.T) {
 	options := listOptions("", nil)
 	options.Refs = map[string]task.Ref{
 		"refs/heads/feature": {
-			Time:    0,
-			Subject: "\x1b]2;owned\x07draft \u202eevil",
-			Ahead:   0,
-			Behind:  0,
+			TimeUnix: 0,
+			Subject:  "\x1b]2;owned\x07draft \u202eevil",
+			Ahead:    0,
+			Behind:   0,
 		},
 	}
 	model := sized(options)
@@ -915,14 +915,14 @@ func TestCommitSubjectsCannotSendTerminalSequences(t *testing.T) {
 func TestANewWorktreeRowShowsTheCommitTheWorktreeStartsFrom(t *testing.T) {
 	options := listOptions("", nil)
 	options.Refs = map[string]task.Ref{
-		"refs/heads/main": {Time: 0, Subject: "local base", Ahead: 0, Behind: 0},
+		"refs/heads/main": {TimeUnix: 0, Subject: "local base", Ahead: 0, Behind: 0},
 		"refs/heads/origin/main": {
-			Time:    0,
-			Subject: "a local branch named like the remote one",
-			Ahead:   0,
-			Behind:  0,
+			TimeUnix: 0,
+			Subject:  "a local branch named like the remote one",
+			Ahead:    0,
+			Behind:   0,
 		},
-		"refs/remotes/origin/main": {Time: 0, Subject: "remote base", Ahead: 0, Behind: 0},
+		"refs/remotes/origin/main": {TimeUnix: 0, Subject: "remote base", Ahead: 0, Behind: 0},
 	}
 	options.Starts = map[string]string{"main": "refs/remotes/origin/main"}
 	model := sized(options)

@@ -36,7 +36,7 @@ func (s *State) Observe(sightings []Sighting, now time.Time, checkout Checkout) 
 		if index < 0 {
 			item := EmptyItem()
 			item.ID = s.NextID()
-			item.CreatedAt = now.Unix()
+			item.CreatedAtUnix = now.Unix()
 			s.Items = append(s.Items, item)
 			index = len(s.Items) - 1
 		}
@@ -68,7 +68,8 @@ func (s *State) match(seen Sighting) int {
 	latest := -1
 
 	for index, item := range s.Items {
-		if continuesItem(item, seen) && (latest < 0 || item.TurnAt > s.Items[latest].TurnAt) {
+		if continuesItem(item, seen) &&
+			(latest < 0 || item.TurnAtUnix > s.Items[latest].TurnAtUnix) {
 			latest = index
 		}
 	}
@@ -103,11 +104,11 @@ func apply(item Item, seen Sighting, now time.Time, checkout Checkout) Item {
 		item.Title = seen.Title
 	}
 
-	if turn := seen.TurnAt.Unix(); !seen.TurnAt.IsZero() && turn > item.TurnAt {
-		item.TurnAt = turn
+	if turn := seen.TurnAt.Unix(); !seen.TurnAt.IsZero() && turn > item.TurnAtUnix {
+		item.TurnAtUnix = turn
 	}
 
-	item.PromptAt = max(item.PromptAt, unixOrZero(seen.PromptAt))
+	item.PromptAtUnix = max(item.PromptAtUnix, unixOrZero(seen.PromptAt))
 
 	return item
 }
@@ -120,7 +121,7 @@ func continuesItem(item Item, seen Sighting) bool {
 func reopenedBy(item Item, seen Sighting) bool {
 	moved := item.Server != seen.Server || item.Pane != seen.Pane || item.PanePID != seen.PanePID
 
-	return item.Finished() && (moved || unixOrZero(seen.PromptAt) > item.FinishedAt)
+	return item.Finished() && (moved || unixOrZero(seen.PromptAt) > item.FinishedAtUnix)
 }
 
 func same(a Item, b Item) bool {

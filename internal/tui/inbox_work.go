@@ -84,7 +84,7 @@ func (m *Model) hostClosedItems(host inboxHost) []inboxItem {
 func (m *Model) shownClosedItems(host inboxHost, group string, items []inboxItem) []inboxItem {
 	shown := m.config.Inbox.ClosedShown
 	expandKey := host.identity.ConnectionID + "\x00" + group
-	unseen := items[0].work.UnseenAt != 0
+	unseen := items[0].work.UnseenAtUnix != 0
 
 	if unseen || shown == 0 || len(items) <= shown || m.closedExpanded[expandKey] {
 		return items
@@ -139,7 +139,7 @@ func (m *Model) newClosedItem(host inboxHost, recorded work.Item) inboxItem {
 	agent.HarnessSession = recorded.Title
 	agent.Task = recorded.Title
 	agent.Status = session.AgentStatusClosed
-	agent.StatusSince = time.Unix(recorded.TurnAt, 0)
+	agent.StatusSince = time.Unix(recorded.TurnAtUnix, 0)
 	agent.Host = host.identity.ConnectionID
 
 	if agent.HarnessSession == "" {
@@ -159,7 +159,7 @@ func (m *Model) newClosedItem(host inboxHost, recorded work.Item) inboxItem {
 	section := config.InboxClosed
 
 	switch {
-	case recorded.UnseenAt != 0:
+	case recorded.UnseenAtUnix != 0:
 		section = config.InboxReady
 	case recorded.Finished():
 		section = config.InboxArchived
@@ -205,7 +205,7 @@ func recordedWork(
 			matches = recorded.Task == live.Record.ID
 		}
 
-		if matches && (found.ID == "" || recorded.TurnAt > found.TurnAt) {
+		if matches && (found.ID == "" || recorded.TurnAtUnix > found.TurnAtUnix) {
 			found = recorded
 		}
 	}

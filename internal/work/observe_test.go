@@ -50,7 +50,7 @@ func TestObserveStartsOneItemForANewConversation(t *testing.T) {
 
 	item := state.Items[0]
 	if item.ID != "w1" || item.Conversation != "c1" || item.Branch != "main" ||
-		item.CreatedAt != observedAt.Unix() {
+		item.CreatedAtUnix != observedAt.Unix() {
 		t.Errorf("item = %+v", item)
 	}
 }
@@ -76,7 +76,7 @@ func TestObserveRecordsALaterTurn(t *testing.T) {
 	later.TurnAt = observedAt.Add(time.Hour)
 
 	if !state.Observe([]work.Sighting{later}, observedAt, branchMain) ||
-		state.Items[0].TurnAt != later.TurnAt.Unix() {
+		state.Items[0].TurnAtUnix != later.TurnAt.Unix() {
 		t.Errorf("Items = %+v, want the later turn", state.Items)
 	}
 }
@@ -255,7 +255,7 @@ func TestObserveKeepsTheLatestPrompt(t *testing.T) {
 	earlier.PromptAt = observedAt
 
 	if state.Observe([]work.Sighting{sighting("c1", "%1", 100), earlier}, observedAt, branchMain) ||
-		state.Items[0].PromptAt != prompted.PromptAt.Unix() {
+		state.Items[0].PromptAtUnix != prompted.PromptAt.Unix() {
 		t.Errorf("Items = %+v, want the later prompt kept unchanged", state.Items)
 	}
 }
@@ -267,7 +267,7 @@ func TestAFinishedConversationPromptedAgainInItsPaneReopens(t *testing.T) {
 	prompted.PromptAt = observedAt.Add(time.Minute)
 	state.Observe([]work.Sighting{prompted}, observedAt, branchMain)
 
-	if state.Items[0].Finished() || state.Items[0].PromptAt != prompted.PromptAt.Unix() {
+	if state.Items[0].Finished() || state.Items[0].PromptAtUnix != prompted.PromptAt.Unix() {
 		t.Errorf("item = %+v, want it reopened with the new prompt", state.Items[0])
 	}
 }
@@ -314,13 +314,13 @@ func TestFinishingATaskFinishesItsConversationsInTheMainCheckout(t *testing.T) {
 	open, earlier, other := state.Items[0], state.Items[1], state.Items[2]
 
 	if open.FinishedBy != work.FinishedByPR ||
-		open.FinishedAt != observedAt.Add(time.Hour).Unix() ||
+		open.FinishedAtUnix != observedAt.Add(time.Hour).Unix() ||
 		open.Task != "" ||
 		open.Directory != "/code/shop" {
 		t.Errorf("open item = %+v, want it finished by pr, detached and in /code/shop", open)
 	}
 
-	if earlier.FinishedBy != work.FinishedByUser || earlier.FinishedAt != observedAt.Unix() ||
+	if earlier.FinishedBy != work.FinishedByUser || earlier.FinishedAtUnix != observedAt.Unix() ||
 		earlier.Task != "" ||
 		earlier.Directory != "/code/shop" {
 		t.Errorf(

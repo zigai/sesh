@@ -236,7 +236,7 @@ func (i Item) withFound(found []PRLink, now time.Time) Item {
 	}
 
 	if !i.Pinned() && !i.Finished() && i.endedByPRs() {
-		i.FinishedAt, i.FinishedBy = now.Unix(), FinishedByPR
+		i.FinishedAtUnix, i.FinishedBy = now.Unix(), FinishedByPR
 	}
 
 	return i
@@ -251,11 +251,11 @@ func (i Item) prsOwnedByTask() bool {
 }
 
 func (i Item) openDuringConversation(pr PRLink) bool {
-	if i.TurnAt != 0 && pr.CreatedAt > i.TurnAt {
+	if i.TurnAtUnix != 0 && pr.CreatedAtUnix > i.TurnAtUnix {
 		return false
 	}
 
-	return !pr.Ended() || pr.EndedAt >= i.CreatedAt
+	return !pr.Ended() || pr.EndedAtUnix >= i.CreatedAtUnix
 }
 
 func (i Item) endedByPRs() bool {
@@ -265,10 +265,10 @@ func (i Item) endedByPRs() bool {
 
 	var latest int64
 	for _, pr := range i.Linked() {
-		latest = max(latest, pr.EndedAt)
+		latest = max(latest, pr.EndedAtUnix)
 	}
 
-	return latest >= i.CreatedAt && latest >= i.PromptAt && latest >= i.ReopenedAt
+	return latest >= i.CreatedAtUnix && latest >= i.PromptAtUnix && latest >= i.ReopenedAtUnix
 }
 
 func (i Item) withPR(pr PRLink) Item {
@@ -371,20 +371,20 @@ func (pr ghPR) link() PRLink {
 	slices.Sort(issues)
 
 	link := PRLink{
-		Number:    pr.Number,
-		State:     task.PRState(strings.ToLower(pr.State)),
-		URL:       pr.URL,
-		Issues:    issues,
-		Source:    "",
-		CreatedAt: unixOrZero(pr.CreatedAt),
-		EndedAt:   0,
+		Number:        pr.Number,
+		State:         task.PRState(strings.ToLower(pr.State)),
+		URL:           pr.URL,
+		Issues:        issues,
+		Source:        "",
+		CreatedAtUnix: unixOrZero(pr.CreatedAt),
+		EndedAtUnix:   0,
 	}
 
 	switch link.State {
 	case task.PRMerged:
-		link.EndedAt = unixOrZero(pr.MergedAt)
+		link.EndedAtUnix = unixOrZero(pr.MergedAt)
 	case task.PRClosed:
-		link.EndedAt = unixOrZero(pr.ClosedAt)
+		link.EndedAtUnix = unixOrZero(pr.ClosedAt)
 	case task.PROpen:
 	}
 
@@ -401,13 +401,13 @@ func unixOrZero(at time.Time) int64 {
 
 func noPR() PRLink {
 	return PRLink{
-		Number:    0,
-		State:     "",
-		URL:       "",
-		Issues:    []int{},
-		Source:    "",
-		CreatedAt: 0,
-		EndedAt:   0,
+		Number:        0,
+		State:         "",
+		URL:           "",
+		Issues:        []int{},
+		Source:        "",
+		CreatedAtUnix: 0,
+		EndedAtUnix:   0,
 	}
 }
 

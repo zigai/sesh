@@ -649,10 +649,10 @@ func taskPickerOptions(project string, offered action.TaskOffered) taskpicker.Op
 	refs := make(map[string]task.Ref, len(offered.Refs))
 	for name, ref := range offered.Refs {
 		refs[name] = task.Ref{
-			Time:    ref.Time,
-			Subject: ref.Subject,
-			Ahead:   ref.Ahead,
-			Behind:  ref.Behind,
+			TimeUnix: ref.Time,
+			Subject:  ref.Subject,
+			Ahead:    ref.Ahead,
+			Behind:   ref.Behind,
 		}
 	}
 

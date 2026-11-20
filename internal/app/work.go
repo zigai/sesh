@@ -77,7 +77,7 @@ func (local *Local) resumeAgent(
 	resumed.Session = action.RefOf(row)
 	resumed.Pane = string(pane)
 
-	if item.Finished() || item.UnseenAt != 0 {
+	if item.Finished() || item.UnseenAtUnix != 0 {
 		if err := local.updateWork(ctx, func(state *work.State) error {
 			return errors.Join(state.Reopen(item.ID, time.Now()), state.ClearUnseen(item.ID))
 		}); err != nil {
