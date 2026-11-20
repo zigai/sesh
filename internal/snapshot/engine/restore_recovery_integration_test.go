@@ -581,7 +581,7 @@ func TestEngineRestoreRefusesRestartedDaemonTarget(t *testing.T) {
 		t.Fatalf("NewSession failed: %v", err)
 	}
 
-	killDaemonOnCleanup(t, first, source.ServerIdentity())
+	forgetFirst := killDaemonOnCleanup(t, first, source.ServerIdentity())
 
 	disableSourceWindowRename(t, ctx, source)
 
@@ -626,6 +626,8 @@ func TestEngineRestoreRefusesRestartedDaemonTarget(t *testing.T) {
 	if err := first.Kill(ctx); err != nil {
 		t.Fatalf("Killing the daemon failed: %v", err)
 	}
+
+	forgetFirst()
 
 	second, err := gotmux.New(config)
 	if err != nil {
@@ -762,10 +764,20 @@ func waitForProcessExit(t *testing.T, ctx context.Context, pid int) {
 	}
 }
 
-func killDaemonOnCleanup(t *testing.T, server *gotmux.Server, identity gotmux.ServerIdentity) {
+func killDaemonOnCleanup(
+	t *testing.T,
+	server *gotmux.Server,
+	identity gotmux.ServerIdentity,
+) func() {
 	t.Helper()
 
+	killed := false
+
 	t.Cleanup(func() {
+		if killed {
+			return
+		}
+
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
@@ -775,6 +787,8 @@ func killDaemonOnCleanup(t *testing.T, server *gotmux.Server, identity gotmux.Se
 			t.Errorf("cleanup kill daemon: %v", err)
 		}
 	})
+
+	return func() { killed = true }
 }
 
 func TestEngineRestoreLogSchema(t *testing.T) {
