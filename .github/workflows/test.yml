@@ -9,16 +9,102 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  GOWORK: "off"
+  GO_VERSION: "1.27.4"
+
 jobs:
-  test:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Verify published dependencies
+        run: |
+          go mod tidy -diff
+          go mod verify
+      - name: Build standalone artifact
+        run: go build -o "$RUNNER_TEMP/sesh" ./cmd/sesh
+      - name: Check artifact outside the checkout
+        working-directory: ${{ runner.temp }}
+        run: ./sesh --version && ./sesh --help
+      - name: Validate packaging configuration
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: v2.13.3
+          args: check
+
+  test-linux:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+        shard: [1, 2]
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      GOWORK: "off"
+      CGO_ENABLED: "1"
+      TMUX_INTEGRATION_REQUIRED: "1"
+      SESH_LIFECYCLE_INTEGRATION_REQUIRED: "1"
+      SESH_APPLICATION_INTEGRATION_REQUIRED: "1"
+      SESH_TERMINAL_INTEGRATION_REQUIRED: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Select this shard's packages
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          go list -tags=integration ./... >"$RUNNER_TEMP/packages.txt"
+          sh .github/scripts/test-shard.sh linux "$SHARD" 2 <"$RUNNER_TEMP/packages.txt" >"$RUNNER_TEMP/shard.txt"
+      - name: Restore pinned tmux
+        id: tmux
+        uses: actions/cache@v4
+        with:
+          path: ~/.sesh-tmux
+          key: tmux-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.github/scripts/install-tmux.sh') }}
+      - name: Install Linux build dependencies and application test fixtures
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            build-essential libevent-dev libncurses-dev bison pkg-config \
+            dbus openssh-server openssh-client neovim procps htop bash fish nodejs
+          echo "/usr/sbin" >> "$GITHUB_PATH"
+      - name: Verify Linux test fixtures
+        run: |
+          for tool in nvim top htop bash fish node dbus-daemon sshd ssh-keygen; do
+            command -v "$tool" >/dev/null || { echo "missing required fixture tool: $tool" >&2; exit 1; }
+          done
+      - name: Install and require the terminal-test tool
+        run: |
+          sh .github/scripts/install-termtrace.sh "$RUNNER_TEMP/sesh-termtrace"
+          echo "$RUNNER_TEMP/sesh-termtrace/bin" >> "$GITHUB_PATH"
+      - name: Build checksum-pinned tmux
+        if: steps.tmux.outputs.cache-hit != 'true'
+        run: sh .github/scripts/install-tmux.sh "$HOME/.sesh-tmux"
+      - name: Select the pinned tmux
+        run: echo "$HOME/.sesh-tmux/bin" >> "$GITHUB_PATH"
+      - name: Run tests and required isolated integration with race detection
+        run: xargs go test -race -count=1 -timeout=5m -tags=integration <"$RUNNER_TEMP/shard.txt"
+
+  test-macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    runs-on: macos-latest
+    timeout-minutes: 20
+    env:
       CGO_ENABLED: "1"
       TMUX_INTEGRATION_REQUIRED: "1"
       SESH_LIFECYCLE_INTEGRATION_REQUIRED: "1"
@@ -26,70 +112,46 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.27.4"
+          go-version: ${{ env.GO_VERSION }}
           cache: true
-      - name: Install Linux build dependencies and application test fixtures
-        if: runner.os == 'Linux'
+      - name: Select this shard's packages
+        env:
+          SHARD: ${{ matrix.shard }}
         run: |
-          sudo apt-get update && sudo apt-get install -y \
-            build-essential \
-            libevent-dev \
-            libncurses-dev \
-            bison \
-            pkg-config \
-            dbus \
-            openssh-server \
-            openssh-client \
-            neovim \
-            procps \
-            htop \
-            bash \
-            fish \
-            nodejs
-          echo "SESH_APPLICATION_INTEGRATION_REQUIRED=1" >> "$GITHUB_ENV"
-          echo "/usr/sbin" >> "$GITHUB_PATH"
-      - name: Verify Linux test fixtures
-        if: runner.os == 'Linux'
-        run: |
-          for tool in nvim top htop bash fish node dbus-daemon sshd ssh-keygen; do
-            command -v "$tool" >/dev/null || { echo "missing required fixture tool: $tool" >&2; exit 1; }
-          done
-      - name: Install and require the terminal-test tool
-        if: runner.os == 'Linux'
-        run: |
-          sh .github/scripts/install-termtrace.sh "$RUNNER_TEMP/sesh-termtrace"
-          echo "$RUNNER_TEMP/sesh-termtrace/bin" >> "$GITHUB_PATH"
-          echo "SESH_TERMINAL_INTEGRATION_REQUIRED=1" >> "$GITHUB_ENV"
+          go list -tags=integration ./... >"$RUNNER_TEMP/packages.txt"
+          sh .github/scripts/test-shard.sh macos "$SHARD" 2 <"$RUNNER_TEMP/packages.txt" >"$RUNNER_TEMP/shard.txt"
+      - name: Restore pinned tmux
+        id: tmux
+        uses: actions/cache@v4
+        with:
+          path: ~/.sesh-tmux
+          key: tmux-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.github/scripts/install-tmux.sh') }}
       - name: Install macOS build dependencies and test fixtures
-        if: runner.os == 'macOS'
         run: brew install fish jemalloc libevent ncurses pkgconf utf8proc
       - name: Build checksum-pinned tmux
-        shell: bash
+        if: steps.tmux.outputs.cache-hit != 'true'
         run: |
-          if [[ "$RUNNER_OS" == macOS ]]; then
-            export PKG_CONFIG_PATH="$(brew --prefix libevent)/lib/pkgconfig:$(brew --prefix ncurses)/lib/pkgconfig:$(brew --prefix utf8proc)/lib/pkgconfig:$(brew --prefix jemalloc)/lib/pkgconfig"
-          fi
-          sh .github/scripts/install-tmux.sh "$RUNNER_TEMP/sesh-tmux"
-          echo "$RUNNER_TEMP/sesh-tmux/bin" >> "$GITHUB_PATH"
+          PKG_CONFIG_PATH="$(brew --prefix libevent)/lib/pkgconfig:$(brew --prefix ncurses)/lib/pkgconfig:$(brew --prefix utf8proc)/lib/pkgconfig:$(brew --prefix jemalloc)/lib/pkgconfig"
+          export PKG_CONFIG_PATH
+          sh .github/scripts/install-tmux.sh "$HOME/.sesh-tmux"
+      - name: Select the pinned tmux
+        run: echo "$HOME/.sesh-tmux/bin" >> "$GITHUB_PATH"
       - name: Verify published dependencies
+        if: matrix.shard == 1
         run: |
           go mod tidy -diff
           go mod verify
       - name: Run tests and required isolated integration with race detection
-        run: go test -race -count=1 -timeout=5m -tags=integration ./...
+        run: xargs go test -race -count=1 -timeout=5m -tags=integration <"$RUNNER_TEMP/shard.txt"
       - name: Check macOS process observation without cgo
-        if: runner.os == 'macOS'
+        if: matrix.shard == 1
         env:
           CGO_ENABLED: "0"
         run: go test -count=1 -timeout=1m ./internal/integration/process
       - name: Build standalone artifact
+        if: matrix.shard == 1
         run: go build -o "$RUNNER_TEMP/sesh" ./cmd/sesh
       - name: Check artifact outside the checkout
+        if: matrix.shard == 1
         working-directory: ${{ runner.temp }}
         run: ./sesh --version && ./sesh --help
-      - name: Validate packaging configuration
-        if: runner.os == 'Linux'
-        uses: goreleaser/goreleaser-action@v6
-        with:
-          version: v2.13.3
-          args: check
