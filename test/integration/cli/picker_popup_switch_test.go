@@ -491,12 +491,12 @@ func waitForPickerPopupExit(
 	}
 }
 
-// The popup is gone before its program focuses the pane, so its launcher can exit first.
 func waitForSelectedPickerPane(t *testing.T, want gotmux.PaneInfo) {
 	t.Helper()
 
 	var selected gotmux.PaneID
 
+	// The popup is gone before its program focuses the pane, so its launcher can exit first.
 	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
 		window, err := want.Handle().Window(t.Context())
 		if err != nil {

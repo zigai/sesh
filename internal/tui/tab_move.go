@@ -12,8 +12,6 @@ import (
 	"github.com/zigai/sesh/internal/session"
 )
 
-// tabMoveState changes selection eligibility, not the display mode or visible agent rows.
-// The source subject is captured before the cursor is repurposed for destination selection.
 type tabMoveState struct {
 	subject        action.Subject
 	candidates     []session.AgentSession
@@ -51,6 +49,7 @@ func (m *Model) beginTabMove(subject action.Subject) func() (tea.Model, tea.Cmd)
 			}
 		}
 
+		// The source subject is captured before the cursor moves on to choose a destination.
 		m.tabMove = &tabMoveState{
 			subject:        subject,
 			candidates:     m.tabMoveCandidates(subject),
@@ -83,9 +82,9 @@ func inboxSyntheticSession(row session.Session) bool {
 	return strings.HasPrefix(row.ID, inboxGroupIDPrefix)
 }
 
-// Inbox groups are not tmux sessions. Keep those groups intact and add actual session
-// destinations below them, without duplicating their agent rows.
 func (m *Model) appendTabMoveSessions() {
+	// Inbox groups are not tmux sessions. Keep those groups intact and add actual session
+	// destinations below them, without duplicating their agent rows.
 	for _, row := range m.sessions {
 		if row.Saved() || inboxSyntheticSession(row) {
 			continue

@@ -122,8 +122,6 @@ func validateLeaseRoot(leaseRoot string) error {
 	return nil
 }
 
-// Links only root can change, such as macOS's /tmp -> /private/tmp, name the same endpoint, so
-// they are resolved before the endpoint must be canonical and before it names the lease.
 func resolveEndpoint(socket string) (string, error) {
 	if !validEndpointPath(socket) {
 		return "", oops.In("tmux").
@@ -132,6 +130,8 @@ func resolveEndpoint(socket string) (string, error) {
 			Wrap(ErrEndpoint)
 	}
 
+	// Links only root can change, such as macOS's /tmp -> /private/tmp, name the same endpoint, so
+	// they are resolved before the endpoint must be canonical and before it names the lease.
 	resolved, err := privatefs.ResolveSystemSymlinks(socket)
 	if err != nil {
 		return "", oops.In("tmux").

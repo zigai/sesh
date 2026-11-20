@@ -8,11 +8,10 @@ import (
 )
 
 const (
-	mouseWheelRows    = 3
-	mouseBorderMargin = 2
-	footerPartSpacing = 2
-	// Rows below the confirm buttons and path suggestions: bottom padding and border.
-	dialogBottomRows    = 2
+	mouseWheelRows      = 3
+	mouseBorderMargin   = 2
+	footerPartSpacing   = 2
+	dialogBottomRows    = 2 // padding and border below the confirm buttons and path suggestions
 	dialogContentColumn = 1 + boxHorizontalPadding
 )
 

@@ -186,9 +186,9 @@ func bindingProgram(binding action.Binding, command string) []string {
 	return forwardInRemoteAttachment(binding.Key, program)
 }
 
-// popupProgram opens the popup from the command the picker saved, without starting a process first.
-// The launching command runs instead until one is saved for this client size.
 func popupProgram(mode string, command string) []string {
+	// The command the picker saved opens the popup without starting a process first. The launching
+	// command runs instead until one is saved for this client size.
 	return []string{
 		"if-shell",
 		"-F",

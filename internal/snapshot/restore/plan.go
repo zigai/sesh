@@ -93,13 +93,13 @@ func BuildPlan(m model.Manifest, selected []string) (Plan, error) {
 	return plan, nil
 }
 
-// resize-window pins a window to window-size manual, so a captured manual value is what an
-// earlier restore left behind. Dropping it lets the global policy size the restored window.
 func withoutPinnedWindowSize(m model.Manifest) model.Manifest {
 	released := m
 
 	released.Windows = make([]model.Window, len(m.Windows))
 	for index, window := range m.Windows {
+		// resize-window pins a window to window-size manual, so a captured manual value is what an
+		// earlier restore left behind. Dropping it lets the global policy size the restored window.
 		window.Options = slices.DeleteFunc(
 			slices.Clone(window.Options),
 			func(option model.Option) bool {

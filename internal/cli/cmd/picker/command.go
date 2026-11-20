@@ -657,11 +657,10 @@ func openPickerPopup(
 	return nil
 }
 
-// popupAlreadyOpen recognizes the refusal tmux gives while a window shows a popup, which is what a
-// repeated or held picker key produces.
 func popupAlreadyOpen(err error) bool {
 	command, ok := errors.AsType[*gotmux.CommandError](err)
 
+	// tmux refuses a popup while one is up, which a repeated or held picker key produces.
 	return ok && bytes.Contains(command.Result.Stderr, []byte("already has a modal pane"))
 }
 

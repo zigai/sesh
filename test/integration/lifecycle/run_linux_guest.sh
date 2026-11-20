@@ -539,7 +539,6 @@ if [[ ${SESH_GUEST_LIFECYCLE_SUITE:-} == extended ]]; then
     guest_ssh "/opt/sesh --no-config snapshot verify --repository /var/lib/sesh-guest/enospc-mnt/repo --generation $enospc_prior_gen --json" >"$work_dir/enospc-prior-verify-before.json"
     jq -e --arg gen "$enospc_prior_gen" '.ok == true and .result.generation == $gen and .result.byteIntegrity == true' "$work_dir/enospc-prior-verify-before.json" >/dev/null
 
-    # Fill the mount completely
     guest_ssh 'dd if=/dev/zero of=/var/lib/sesh-guest/enospc-mnt/filler bs=1M count=20 2>/dev/null || true; sync'
     guest_ssh 'df -h /var/lib/sesh-guest/enospc-mnt' >"$work_dir/enospc-df.txt"
 
@@ -614,7 +613,6 @@ EOF'
     powercut_boot_before=$(guest_ssh 'cat /proc/sys/kernel/random/boot_id')
     printf '%s\n' "$powercut_boot_before" >"$work_dir/powercut-boot-before.txt"
 
-    # Host-side immediate power cut
     kill -KILL "$qemu_pid"
     for _ in {1..50}; do
         kill -0 "$qemu_pid" 2>/dev/null || break
@@ -624,7 +622,6 @@ EOF'
     qemu_pid=
     rm -f "$work_dir/qmp.sock"
 
-    # Restart guest with identical drive
     qemu-system-x86_64 \
         -enable-kvm -cpu host -smp 2 -m 2048 \
         -display none -monitor none -serial "file:$work_dir/console.log" \
@@ -712,7 +709,6 @@ guest_ssh '/opt/sesh --no-config daemon wait-ready --socket /run/sesh-guest/rest
 guest_ssh "/opt/sesh --no-config snapshot restore --socket /run/sesh-guest/restore-tmux.sock --repository /var/lib/sesh-guest/repository --lease-root /var/lib/sesh-guest/leases --generation $expected_generation --json" >"$work_dir/postboot-restore.json"
 jq -e '.ok == true and (.result.status == "best_effort" or .result.status == "exact")' "$work_dir/postboot-restore.json" >/dev/null
 
-# Verify restored windows and panes through gotmux in fixture (zero direct tmux subprocess calls)
 guest_ssh "/opt/sesh-fixture verify /run/sesh-guest/restore-tmux.sock guest-lifecycle-fixture /home/sesh/fixture-alpha.txt /home/sesh/fixture-beta.txt" >"$work_dir/postboot-fixture-verify.txt"
 awk '/--- WINDOWS ---/{flag=1;next}/--- PANES ---/{flag=0}flag' "$work_dir/postboot-fixture-verify.txt" >"$work_dir/postboot-windows.txt"
 awk '/--- PANES ---/{flag=1;next}flag' "$work_dir/postboot-fixture-verify.txt" >"$work_dir/postboot-panes.txt"

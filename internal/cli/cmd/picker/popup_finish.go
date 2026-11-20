@@ -39,10 +39,6 @@ type popupHandoff struct {
 	project string
 }
 
-// finishPopupPicker closes the popup before anything that can wait. Worker joins and disk writes
-// then cannot hold it on screen, and tmux can focus a pane and accept keys, which it refuses or
-// undoes while a popup is up. Closing the popup signals this process, which outlives it to finish
-// the work. The returned handoff opens once the picker has released its services.
 func finishPopupPicker(
 	ctx context.Context,
 	cmd *cobra.Command,
@@ -77,6 +73,7 @@ func finishPopupPicker(
 		)
 	}
 
+	// Closing the popup signals this process, which outlives it to finish the work.
 	signal.Ignore(syscall.SIGHUP, syscall.SIGTERM)
 
 	client, err := popupClient(ctx, services.server, request.client)
@@ -84,6 +81,8 @@ func finishPopupPicker(
 		return handoff, errors.Join(deferredErr, err)
 	}
 
+	// Close the popup before anything that can wait: worker joins and disk writes would hold it on
+	// screen, and tmux refuses or undoes pane focus and keys while a popup is up.
 	closeErr := remoteCLIError("close_picker_popup", client.Handle().ClosePopup(ctx))
 	if !completed {
 		return handoff, closeErr
@@ -255,8 +254,6 @@ func openHandoffTaskMenu(
 	)
 }
 
-// savePopupCommand stores the tmux command the key binding runs, sized for client. The formats in it
-// are expanded when the key is pressed, so it stays correct for any pane and session.
 func savePopupCommand(
 	ctx context.Context,
 	cmd *cobra.Command,
@@ -272,6 +269,7 @@ func savePopupCommand(
 		state,
 		gotmux.Size{Width: client.Width, Height: client.Height},
 	)
+	// The formats in the command expand when the key is pressed, so it fits any pane and session.
 	command := popupCommand(cmd, workspace, mode, executable, width, height)
 	size := strconv.Itoa(client.Width) + "x" + strconv.Itoa(client.Height)
 	options := server.Options()

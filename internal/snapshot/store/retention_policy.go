@@ -317,8 +317,6 @@ func (c Catalog) evaluateAgeCountRemovals(
 	return removedSet
 }
 
-// thinnedGenerations chooses each hour's survivor from every generation in that hour, not only the
-// old ones, so it does not change as the generations age past the threshold.
 func thinnedGenerations(
 	ordered []Generation,
 	after time.Duration,
@@ -334,6 +332,8 @@ func thinnedGenerations(
 		return time.Unix(0, timestamps[gen.ID]).UTC().Truncate(time.Hour).Unix()
 	}
 
+	// Every generation in an hour competes, not only the old ones, so an hour's survivor does not
+	// change as the generations age past the threshold.
 	survivors := make(map[int64]Generation)
 
 	for _, gen := range ordered {

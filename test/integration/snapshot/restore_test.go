@@ -303,8 +303,6 @@ func TestSnapshotRestoreIgnoresPopupsInRestoredWindows(t *testing.T) {
 	}
 }
 
-// savePinnedSession saves a session whose windows resize-window pinned to window-size manual, as an
-// earlier restore leaves them, then removes the session so a restore recreates it.
 func savePinnedSession(
 	t *testing.T,
 	ctx context.Context,
@@ -329,6 +327,7 @@ func savePinnedSession(
 		t.Fatal(err)
 	}
 
+	// resize-window pins each window to window-size manual, as an earlier restore leaves them.
 	// Different sizes make restore resize the window it creates, not only the session's first one.
 	for index, window := range windows {
 		size := gotmux.Size{Width: 150 - 20*index, Height: 50 - 10*index}

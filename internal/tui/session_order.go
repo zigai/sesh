@@ -22,8 +22,6 @@ type sessionOrderKey struct {
 	rule      int
 }
 
-// Keep agent-bearing sessions above empty sessions. Apply placement rules within
-// each section, preserving complete agent groups and the fallback ordering.
 func sortAgentsModeSessions(rows []session.Session, rules []config.SessionOrderRule) {
 	if len(rules) == 0 {
 		slices.SortStableFunc(rows, compareAgentsModeSessions)

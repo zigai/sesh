@@ -294,7 +294,6 @@ func logTUIFirstFrame(ctx context.Context, timing firstFrameTiming) {
 	event.Msg("tui first frame shown")
 }
 
-// logTUIRowsShown covers the opens whose first frame came from the startup deadline, before any rows.
 func logTUIRowsShown(ctx context.Context, sinceInit time.Duration, timing *sessionLoadTiming) {
 	zerolog.Ctx(ctx).Info().
 		Str("component", "tui").

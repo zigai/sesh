@@ -75,10 +75,10 @@ func RunIsolated(m *testing.M) int {
 	return code
 }
 
-// Tests bind unix sockets under t.TempDir, so its root must be short enough for sun_path (104 bytes
-// on macOS), and tmux endpoints must be canonical. macOS's per-user TMPDIR is long and sits behind
-// the /var -> /private/var symlink.
 func useShortCanonicalTempDir() error {
+	// Tests bind unix sockets under t.TempDir, so its root must be short enough for sun_path (104
+	// bytes on macOS), and tmux endpoints must be canonical. macOS's per-user TMPDIR is long and
+	// sits behind the /var -> /private/var symlink.
 	dir, err := filepath.EvalSymlinks(shortTempRoot)
 	if err != nil {
 		return fmt.Errorf("resolve %s: %w", shortTempRoot, err)

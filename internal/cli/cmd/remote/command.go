@@ -265,7 +265,7 @@ func runRemoteMonitor(cmd *cobra.Command, _ []string) (resultErr error) {
 
 func readRemoteInput(
 	reader io.Reader,
-	limit int, //nolint:unparam // Action and bootstrap protocols keep independent limits.
+	limit int, //nolint:unparam // MaxBootstrapBytes and MaxActionBytes are separate limits that are equal today.
 ) ([]byte, error) {
 	content, err := io.ReadAll(io.LimitReader(reader, int64(limit)+1))
 	if err != nil {

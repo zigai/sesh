@@ -562,12 +562,12 @@ func (m *Model) beingDeleted(row session.Session) bool {
 	})
 }
 
-// Deleting a live session also removes its saved copy from the current snapshot.
 func deletedBy(row session.Session, target session.Session) bool {
 	if row.SemanticIdentity() == target.SemanticIdentity() {
 		return true
 	}
 
+	// Deleting a live session also removes its saved copy from the current snapshot.
 	return !target.Saved() && row.Saved() && row.Name == target.Name &&
 		action.LocationOf(row) == action.LocationOf(target)
 }

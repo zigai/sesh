@@ -892,14 +892,14 @@ func applyAndVerify(
 	return verification, missing, nil
 }
 
-// settleFailedVerification ends the operation: every effect is confirmed, so resuming could only
-// repeat the comparison, and an active operation would hold its source pinned until tmux exits.
 func settleFailedVerification(
 	ctx context.Context,
 	repository *store.Repository,
 	operation string,
 	verification restore.VerificationReport,
 ) error {
+	// Every effect is confirmed, so resuming could only repeat the comparison, and an active
+	// operation would hold its source pinned until tmux exits.
 	return errors.Join(
 		&verificationError{report: verification},
 		repository.Finish(ctx, operation, true),

@@ -79,8 +79,6 @@ type layoutLeaf struct {
 	height  int
 }
 
-// A popup takes focus while it is open, so the tiled pane focus returns to stands in for the
-// active pane. Typed layouts report it as the most recently used tiled pane.
 type activeUnderFloating struct {
 	floating map[gotmux.PaneID]bool
 	recent   gotmux.PaneID
@@ -618,6 +616,8 @@ func verifyWindowLayout(
 }
 
 func (a activeUnderFloating) tiledActive(active gotmux.PaneID) gotmux.PaneID {
+	// A popup takes focus while it is open, so the tiled pane focus returns to stands in for the
+	// active pane. Typed layouts report it as the most recently used tiled pane.
 	if a.floating[active] {
 		return a.recent
 	}

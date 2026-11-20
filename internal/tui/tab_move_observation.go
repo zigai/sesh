@@ -10,9 +10,6 @@ import (
 
 const tabMoveRegistryGracePeriod = 30 * time.Second
 
-// A confirmed move can precede aht's next location observation. Only these exact
-// agent/pane/process identities may bridge that lag, and only while a fresh tmux
-// inventory independently confirms their destination. Normal pruning stays strict.
 type agentRelocation struct {
 	paneID          string
 	panePID         int
@@ -70,6 +67,9 @@ func (m *Model) recordAgentRelocations(
 }
 
 func relocateConfirmedAgents(snapshot AgentSnapshot, hints []agentRelocation) AgentSnapshot {
+	// A confirmed move can precede aht's next location observation. Only these exact
+	// agent/pane/process identities may bridge that lag, and only while a fresh tmux
+	// inventory independently confirms their destination. Normal pruning stays strict.
 	if !snapshot.PanesObserved || len(hints) == 0 {
 		return snapshot
 	}

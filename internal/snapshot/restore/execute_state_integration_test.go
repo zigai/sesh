@@ -733,8 +733,6 @@ func TestVerifyReportsPaneTitleRewrittenByRunningProgramAsAdvisory(t *testing.T)
 	}
 }
 
-// Both hidden variables must independently report unset in child output.
-//
 //nolint:dupword // the two trailing unset lines are distinct hidden variables.
 const inheritedChildEnvironment = "source-global\nsource-local\n\n\n\nunset\nunset\n"
 

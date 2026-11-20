@@ -86,8 +86,6 @@ func runSupervisedCommand(
 	}
 }
 
-// The leader stays unreaped until its group is killed, so the process group ID cannot be reused
-// by an unrelated group in between.
 func pollProcessState(
 	probe *exitProbe,
 	pgid int,
@@ -115,6 +113,8 @@ func pollProcessState(
 		return false, HookStatusCompleted, 0, nil
 	}
 
+	// The leader stays unreaped until its group is killed, so the process group ID cannot be reused
+	// by an unrelated group in between.
 	cleanErr := terminateProcessGroup(pgid)
 	waitErr := cmd.Wait()
 	duration := now().Sub(start)

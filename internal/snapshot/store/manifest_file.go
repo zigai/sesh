@@ -66,7 +66,6 @@ func writeManifestFile(dir *privatefs.Dir, data []byte) error {
 	return writeFile(dir, manifestFileName, compressed)
 }
 
-// readManifestFile returns the manifest JSON, which catalog digests cover, and its size on disk.
 func readManifestFile(dir *privatefs.Dir) ([]byte, int64, error) {
 	compressed, err := dir.Read(manifestFileName, model.MaxManifestBytes)
 	if err != nil {
@@ -80,5 +79,6 @@ func readManifestFile(dir *privatefs.Dir) ([]byte, int64, error) {
 		return nil, 0, err
 	}
 
+	// Catalog digests cover the manifest JSON; the size is the compressed file's.
 	return data, int64(len(compressed)), nil
 }

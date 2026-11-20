@@ -22,8 +22,6 @@ const (
 	attemptReasonAbandoned = "abandoned"
 )
 
-// attemptOwners holds one flock per pending attempt this process is saving. A pending attempt
-// whose lock file nobody holds belongs to a save process that died.
 type attemptOwners struct {
 	//exhaustruct:optional
 	mu   sync.Mutex
@@ -98,9 +96,9 @@ func (r *Repository) settleLocked(ctx context.Context) (Catalog, []string, error
 	return catalog, abandoned, nil
 }
 
-// resolveAbandoned must run under repository.lock: an owner creates its lock file under the same
-// lock before publishing the pending attempt, so an unheld or missing lock file means a dead owner.
 func (r *Repository) resolveAbandoned(catalog *Catalog) ([]string, error) {
+	// This must run under repository.lock: an owner creates its lock file under the same lock
+	// before publishing the pending attempt, so an unheld or missing lock file means a dead owner.
 	dir, err := r.root.Child(attemptOwnersDir, true)
 	if err != nil {
 		return nil, oops.In("snapshot.store").With("operation", "open_attempt_owners").Wrap(err)

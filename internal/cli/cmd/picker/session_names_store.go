@@ -18,8 +18,6 @@ type sessionNameStamp struct {
 	Modified int64  `json:"modified"`
 }
 
-// storedSessionName lets a new picker process continue reading each transcript where the last one
-// stopped. Every open still reads what was appended since, so the stored name cannot go stale.
 type storedSessionName struct {
 	Offset   int64            `json:"offset"`
 	Name     string           `json:"name"`
@@ -42,9 +40,8 @@ func newSessionNameStamp(info os.FileInfo) sessionNameStamp {
 	return stamp
 }
 
-// sessionNamesPath is empty without a memory-backed runtime directory: the store exists to avoid
-// disk work, so it is not worth keeping on disk.
 func sessionNamesPath() string {
+	// The store only saves disk work, so it is kept only in a memory-backed runtime directory.
 	dir := os.Getenv("XDG_RUNTIME_DIR")
 	if dir == "" {
 		return ""
@@ -53,13 +50,12 @@ func sessionNamesPath() string {
 	return filepath.Join(dir, sessionNamesFile)
 }
 
-// loadSessionNames treats an unreadable store as empty, which only costs a full read of each
-// transcript.
 func loadSessionNames(path string) map[string]sessionNameState {
 	if path == "" {
 		return nil
 	}
 
+	// An unreadable store only costs a full read of each transcript.
 	encoded, err := os.ReadFile(path)
 	if err != nil {
 		return nil
@@ -70,6 +66,8 @@ func loadSessionNames(path string) map[string]sessionNameState {
 		return nil
 	}
 
+	// Every open still reads what was appended to a transcript since, so a stored name cannot go
+	// stale.
 	cache := make(map[string]sessionNameState, len(stored))
 	for transcript, entry := range stored {
 		cache[transcript] = sessionNameState{

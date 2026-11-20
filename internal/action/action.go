@@ -277,7 +277,6 @@ func SubjectOf(sessions ...session.Session) Subject {
 	return Subject{At: at, Sessions: sessions, Pane: "", Task: ""}
 }
 
-// SelectSession matches an exact ID before a name.
 func SelectSession(rows []session.Session, selector string) (session.Session, error) {
 	if index := slices.IndexFunc(
 		rows,

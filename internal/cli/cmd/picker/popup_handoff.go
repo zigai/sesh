@@ -21,7 +21,6 @@ const (
 
 var errPickerHandoffInvalid = errors.New("invalid popup handoff")
 
-// createPopupHandoff makes the file a popup's program writes its choice to.
 func createPopupHandoff() (string, func(), error) {
 	file, err := os.CreateTemp(os.Getenv("XDG_RUNTIME_DIR"), "sesh-picker-*.handoff")
 	if err != nil {

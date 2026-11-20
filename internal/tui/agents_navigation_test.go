@@ -101,7 +101,7 @@ func TestAgentsControlArrowsVisitEveryVisibleTmuxSession(t *testing.T) {
 func TestAgentsArrowsReturnFromEmptySessionToAgents(t *testing.T) {
 	for _, direction := range []int{1, -1} {
 		model := newAgentsNavigationModel(t)
-		model.Update(keyCtrlCode(tea.KeyUp)) // Last empty session, via group navigation.
+		model.Update(keyCtrlCode(tea.KeyUp))
 
 		if model.filtered[model.cursor].ID != "$4" {
 			t.Fatal("control-up did not reach empty session")

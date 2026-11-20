@@ -295,8 +295,6 @@ func runAutosaveFinalSave(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-// runFinalSave records announced final saves so the final save that stopping tmux runs later
-// during the same shutdown can skip a server the coordinator already saved.
 func runFinalSave(
 	ctx context.Context,
 	cmd *cobra.Command,
@@ -315,6 +313,8 @@ func runFinalSave(
 	status.CompletedAtUnix = time.Now().Unix()
 	status.DurationMS = time.Since(started).Milliseconds()
 
+	// Stopping tmux runs another final save later in the same shutdown; this status lets it skip a
+	// server the coordinator already saved.
 	statusErr := automation.WriteFinalSaveStatus(env.workspace.FinalSaveStatus, status)
 	if statusErr != nil {
 		statusErr = oops.In("cli").With("operation", "write_final_save_status").Wrap(statusErr)

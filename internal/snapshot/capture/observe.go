@@ -552,8 +552,6 @@ func compareGraph(
 	return nil
 }
 
-// changedDuringCollect marks a failed per-target query as a state change when the graph shows
-// that sessions, windows or panes changed since it was observed, such as a pane that exited.
 func changedDuringCollect(
 	ctx context.Context,
 	server *gotmux.Server,
@@ -565,6 +563,8 @@ func changedDuringCollect(
 		return err
 	}
 
+	// A per-target query fails when its target goes away, such as a pane that exited, so a graph
+	// that changed since it was observed makes the failure a state change.
 	after, reobserveErr := reobserveGraph(ctx, server, before)
 	if errors.Is(reobserveErr, ErrChanged) {
 		return errors.Join(ErrChanged, err)
