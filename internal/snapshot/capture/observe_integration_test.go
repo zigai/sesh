@@ -349,6 +349,10 @@ func scriptedSessionFixture(
 		t.Fatal(err)
 	}
 
+	if err := windows[0].Handle().Options().SetAutomaticRename(t.Context(), false); err != nil {
+		t.Fatal(err)
+	}
+
 	pane, err := windows[0].Handle().ActivePane(t.Context())
 	if err != nil {
 		t.Fatal(err)
@@ -428,6 +432,12 @@ func captureSessionFixture(
 
 	windows, _, err := session.WindowInfos(t.Context())
 	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Automatic rename names the window after a new pane's program a moment after the pane
+	// starts, which would change the observed graph between two captures.
+	if err := windows[0].Handle().Options().SetAutomaticRename(t.Context(), false); err != nil {
 		t.Fatal(err)
 	}
 
