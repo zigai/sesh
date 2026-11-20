@@ -228,17 +228,10 @@ func applicationCaptureFixture(
 	workingDir := t.TempDir()
 
 	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{
-		Name: name,
-		Dir:  workingDir,
-		// Without history, bash writes no ~/.bash_history into the fixture directory while it is removed.
-		Program: gotmux.Exec(
-			bashPath,
-			"--noprofile",
-			"--norc",
-			"+o",
-			"history",
-		),
-		Start: gotmux.StartPolicyExistingOnly,
+		Name:    name,
+		Dir:     workingDir,
+		Program: gotmux.Exec(bashPath, "--noprofile", "--norc"),
+		Start:   gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("create application session: %v", err)
@@ -427,16 +420,10 @@ func TestCapturePreservesDeadPaneAlongsideHealthyPane(t *testing.T) {
 	workingDir := t.TempDir()
 
 	session, err := server.NewSession(t.Context(), gotmux.NewSessionOptions{
-		Name: "dead-and-healthy",
-		Dir:  workingDir,
-		Program: gotmux.Exec(
-			bashPath,
-			"--noprofile",
-			"--norc",
-			"+o",
-			"history",
-		),
-		Start: gotmux.StartPolicyExistingOnly,
+		Name:    "dead-and-healthy",
+		Dir:     workingDir,
+		Program: gotmux.Exec(bashPath, "--noprofile", "--norc"),
+		Start:   gotmux.StartPolicyExistingOnly,
 	})
 	if err != nil {
 		t.Fatalf("create session: %v", err)
@@ -453,7 +440,7 @@ func TestCapturePreservesDeadPaneAlongsideHealthyPane(t *testing.T) {
 	}
 
 	healthyPane, err := deadPane.Split(t.Context(), gotmux.SplitOptions{
-		Program: gotmux.Exec(bashPath, "--noprofile", "--norc", "+o", "history"),
+		Program: gotmux.Exec(bashPath, "--noprofile", "--norc"),
 		Dir:     workingDir,
 	})
 	if err != nil {
