@@ -77,6 +77,9 @@ func Agents(ctx context.Context, request AgentRequest) (AgentResult, error) {
 	manager := manage.New(manage.Config{
 		Binary:             "",
 		StorePath:          "",
+		ConfigPath:         "",
+		ConfigStdin:        nil,
+		NoConfig:           false,
 		TrackerInterval:    0,
 		TrackerGracePeriod: nil,
 	})
@@ -136,6 +139,9 @@ func AgentStatus(ctx context.Context, request AgentRequest) (AgentResult, error)
 	manager := manage.New(manage.Config{
 		Binary:             "",
 		StorePath:          "",
+		ConfigPath:         "",
+		ConfigStdin:        nil,
+		NoConfig:           false,
 		TrackerInterval:    0,
 		TrackerGracePeriod: nil,
 	})
