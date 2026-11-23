@@ -161,7 +161,16 @@ func prepareEditor(fallback model.Launch, name string) (model.Launch, Reason) {
 	return restartLaunch(fallback, argv), ReasonEditorReopen
 }
 
-func prepareAgent(observed model.Launch, agent *AgentResume) (model.Launch, Reason) {
+func prepareAgent(observed model.Launch, resume *AgentResume) (model.Launch, Reason) {
+	assignments, command := SplitResumeCommand(resume.Command)
+	agent := &AgentResume{
+		Harness:     resume.Harness,
+		SessionID:   resume.SessionID,
+		SessionPath: resume.SessionPath,
+		Command:     command,
+		Executable:  resume.Executable,
+	}
+
 	harnessID, reason := validateAgentMetadata(agent)
 	if reason != "" {
 		return observed, reason
@@ -181,7 +190,7 @@ func prepareAgent(observed model.Launch, agent *AgentResume) (model.Launch, Reas
 		Executable:  model.Bytes(executable),
 		Arguments:   stringArguments(arguments),
 		Directory:   slices.Clone(observed.Directory),
-		Environment: cloneVariables(observed.Environment),
+		Environment: withAssignments(observed.Environment, assignments),
 		Birth:       slices.Clone(observed.Birth),
 		Recovery:    RecoveryResume,
 		Reason:      "",

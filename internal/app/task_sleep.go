@@ -217,9 +217,9 @@ func taskAgent(observed aht.Session) task.Agent {
 		agent.Activity = string(*activity)
 	}
 
-	if len(observed.ResumeCommand) > 0 {
+	if _, command := apps.SplitResumeCommand(observed.ResumeCommand); len(command) > 0 {
 		if executable, err := exec.LookPath(
-			observed.ResumeCommand[0],
+			command[0],
 		); err == nil &&
 			filepath.IsAbs(executable) {
 			agent.Executable = filepath.Clean(executable)

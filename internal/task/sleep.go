@@ -299,9 +299,23 @@ func planSleep(ctx context.Context, agent Agent, panePID int) (sleepPlan, error)
 	}
 
 	return sleepPlan{
-		signal: signal, process: foreground,
-		resume: Resume{Harness: agent.Harness, Session: session, Command: prepared.Command()},
+		signal:  signal,
+		process: foreground,
+		resume: Resume{
+			Harness: agent.Harness,
+			Session: session,
+			Command: resumeCommand(agent, prepared),
+		},
 	}, nil
+}
+
+func resumeCommand(agent Agent, prepared model.Launch) []string {
+	assignments, _ := apps.SplitResumeCommand(agent.ResumeCommand)
+	if len(assignments) == 0 {
+		return prepared.Command()
+	}
+
+	return slices.Concat([]string{"env"}, assignments, prepared.Command())
 }
 
 func harnessRunning(ctx context.Context, panePID int, harness string) (bool, error) {

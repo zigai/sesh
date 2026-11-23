@@ -1,6 +1,7 @@
 package apps_test
 
 import (
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -423,6 +424,43 @@ func TestPrepareUsesExactNativeAgentResumeCommandAndResolvedExecutable(t *testin
 
 	if string(prepared.Arguments[2]) != "019abc-session" {
 		t.Fatal("prepared resume argv aliases caller metadata")
+	}
+}
+
+func TestPrepareMovesResumeAssignmentsIntoLaunchEnvironment(t *testing.T) {
+	t.Parallel()
+
+	observed := launch("/home/user/.local/bin/codex", "codex")
+	observed.Environment = []model.Variable{
+		{Name: model.Bytes("PATH"), Value: model.Bytes("/usr/bin"), State: "set", Hidden: false},
+		{Name: model.Bytes("MODE"), Value: nil, State: "absent", Hidden: false},
+	}
+	resume := &apps.AgentResume{
+		Harness:     codexHarness,
+		SessionID:   "019abc-session",
+		SessionPath: "",
+		Command:     []string{"env", "MODE=on", codexHarness, "resume", "019abc-session"},
+		Executable:  "/home/user/.local/bin/codex",
+	}
+
+	prepared, reason := apps.Prepare(observed, resume)
+
+	assertPrepared(
+		t,
+		prepared,
+		reason,
+		apps.ReasonAgentResume,
+		resume.Executable,
+		[]string{codexHarness, "resume", "019abc-session"},
+		apps.RecoveryResume,
+	)
+
+	want := []model.Variable{
+		{Name: model.Bytes("PATH"), Value: model.Bytes("/usr/bin"), State: "set", Hidden: false},
+		{Name: model.Bytes("MODE"), Value: model.Bytes("on"), State: "set", Hidden: false},
+	}
+	if !reflect.DeepEqual(prepared.Environment, want) {
+		t.Fatalf("prepared environment = %+v, want %+v", prepared.Environment, want)
 	}
 }
 

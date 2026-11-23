@@ -262,7 +262,12 @@ func matchingAgentResume(
 		return nil
 	}
 
-	executable, err := exec.LookPath(found.ResumeCommand[0])
+	_, command := apps.SplitResumeCommand(found.ResumeCommand)
+	if len(command) == 0 {
+		return nil
+	}
+
+	executable, err := exec.LookPath(command[0])
 	if err != nil || !filepath.IsAbs(executable) {
 		executable = ""
 	} else {
