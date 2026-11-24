@@ -680,10 +680,10 @@ func assertSparseRepeatedAndSharedLinks(t *testing.T, ctx context.Context, targe
 }
 
 func TestDeepAsymmetricLayoutTinyCellsBordersAndZoom(t *testing.T) {
-	for _, border := range []gotmux.PaneBorderStatus{
-		gotmux.PaneBorderStatusOff,
-		gotmux.PaneBorderStatusTop,
-		gotmux.PaneBorderStatusBottom,
+	for _, border := range []gotmux.PaneStatus{
+		gotmux.PaneStatusOff,
+		gotmux.PaneStatusTop,
+		gotmux.PaneStatusBottom,
 	} {
 		t.Run(string(border), func(t *testing.T) {
 			verifyDeepLayoutAtBorder(t, border)
@@ -691,7 +691,7 @@ func TestDeepAsymmetricLayoutTinyCellsBordersAndZoom(t *testing.T) {
 	}
 }
 
-func verifyDeepLayoutAtBorder(t *testing.T, border gotmux.PaneBorderStatus) {
+func verifyDeepLayoutAtBorder(t *testing.T, border gotmux.PaneStatus) {
 	t.Helper()
 	server := tmuxtest.NewServer(t)
 
@@ -744,23 +744,23 @@ func verifyDeepLayoutAtBorder(t *testing.T, border gotmux.PaneBorderStatus) {
 
 func computeExpectedBorderRectangles(
 	wantRects map[string][4]int,
-	border gotmux.PaneBorderStatus,
+	border gotmux.PaneStatus,
 ) map[string][4]int {
 	expectedRects := make(map[string][4]int, len(wantRects))
 	for id, rect := range wantRects {
 		left, top, width, height := rect[0], rect[1], rect[2], rect[3]
 
 		switch border {
-		case gotmux.PaneBorderStatusTop:
+		case gotmux.PaneStatusTop:
 			if top == 0 {
 				top++
 				height--
 			}
-		case gotmux.PaneBorderStatusBottom:
+		case gotmux.PaneStatusBottom:
 			if top+height == 41 {
 				height--
 			}
-		case gotmux.PaneBorderStatusOff:
+		case gotmux.PaneStatusOff:
 		}
 
 		expectedRects[id] = [4]int{left, top, width, height}

@@ -78,7 +78,7 @@ func TestLayoutRemappingPreservesExactGeometry(t *testing.T) {
 }
 
 func TestCapturePaneBordersAndZoom(t *testing.T) {
-	for _, border := range []gotmux.PaneBorderStatus{"off", "top", "bottom"} {
+	for _, border := range []gotmux.PaneStatus{"off", "top", "bottom"} {
 		t.Run(string(border), func(t *testing.T) {
 			server := tmuxtest.NewServer(t)
 

@@ -365,7 +365,7 @@ func TestProcessObservationPreservesExitedAndUnaffectedPanes(t *testing.T) {
 	}
 
 	if err := server.GlobalWindowOptions().
-		SetRemainOnExit(t.Context(), gotmux.RemainOn); err != nil {
+		SetRemainOnExit(t.Context(), gotmux.RemainOnExitOn); err != nil {
 		t.Fatal(err)
 	}
 

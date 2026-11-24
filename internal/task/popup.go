@@ -118,7 +118,7 @@ func OpenRunWindow(
 func applyPopupDefaults(ctx context.Context, popup *gotmux.Server) error {
 	options := popup.GlobalSessionOptions()
 
-	if err := options.SetStatus(ctx, gotmux.StatusModeOff); err != nil {
+	if err := options.SetStatus(ctx, gotmux.StatusOff); err != nil {
 		return fmt.Errorf("hide popup status: %w", err)
 	}
 
