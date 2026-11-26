@@ -137,6 +137,8 @@ func restoreUnderLock(
 		)
 	}
 
+	awaitDesktopKeyring(ctx)
+
 	server, err := env.workspace.OpenTmux()
 	if err != nil {
 		return errors.Join(err, wrapCloseError(repo.Close()), lock.Release())
