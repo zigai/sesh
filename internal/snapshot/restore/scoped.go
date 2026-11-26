@@ -100,6 +100,7 @@ func ObserveScopedStateConflicts(
 	server *gotmux.Server,
 	plan Plan,
 	receipts map[string]string,
+	ownership Ownership,
 ) ([]VerificationMismatch, error) {
 	identities, err := ResolveRuntimeIdentities(ctx, server, plan, receipts)
 	if err != nil {
@@ -119,7 +120,7 @@ func ObserveScopedStateConflicts(
 	}
 
 	state := newVerifiedState()
-	verifyScopedState(ctx, server, plan, identities, state, &report)
+	verifyScopedState(ctx, server, plan, identities, ownership, state, &report)
 
 	return report.Mismatches, nil
 }
@@ -531,9 +532,26 @@ func effectiveEnvironmentMatch(
 	scope gotmux.EnvironmentScope,
 	expectedGlobal []model.Variable, expectedLocal []model.Variable,
 ) (bool, error) {
+	differing, err := effectiveEnvironmentDifferences(
+		ctx,
+		global,
+		scope,
+		expectedGlobal,
+		expectedLocal,
+	)
+
+	return len(differing) == 0, err
+}
+
+func effectiveEnvironmentDifferences(
+	ctx context.Context,
+	global map[environmentKey]environmentShape,
+	scope gotmux.EnvironmentScope,
+	expectedGlobal []model.Variable, expectedLocal []model.Variable,
+) ([]string, error) {
 	liveLocal, err := environmentTable(ctx, scope)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
 	wanted := effectiveEnvironment(expectedGlobal, expectedLocal)
@@ -545,7 +563,23 @@ func effectiveEnvironmentMatch(
 		}
 	}
 
-	return maps.Equal(observed, wanted), nil
+	differing := []string{}
+
+	for name, shape := range observed {
+		if expected, ok := wanted[name]; !ok || expected != shape {
+			differing = append(differing, name)
+		}
+	}
+
+	for name := range wanted {
+		if _, ok := observed[name]; !ok {
+			differing = append(differing, name)
+		}
+	}
+
+	slices.Sort(differing)
+
+	return differing, nil
 }
 
 func effectiveEnvironmentVariables(

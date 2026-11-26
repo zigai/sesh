@@ -14,6 +14,7 @@ import (
 	"github.com/samber/oops"
 	gotmux "github.com/zigai/gotmux/tmux"
 
+	"github.com/zigai/sesh/internal/agents"
 	"github.com/zigai/sesh/internal/errorstep"
 	"github.com/zigai/sesh/internal/integration/process"
 	"github.com/zigai/sesh/internal/integration/tmuxserver"
@@ -151,7 +152,12 @@ func (i restoreDaemonIdentity) Equal(other restoreDaemonIdentity) bool {
 func (e *verificationError) Error() string {
 	codes := make([]string, 0, len(e.report.Mismatches))
 	for _, mismatch := range e.report.Mismatches {
-		codes = append(codes, mismatch.Domain+"/"+mismatch.Entity+"/"+mismatch.Reason)
+		code := mismatch.Domain + "/" + mismatch.Entity + "/" + mismatch.Reason
+		if len(mismatch.Names) > 0 {
+			code += "[" + strings.Join(mismatch.Names, " ") + "]"
+		}
+
+		codes = append(codes, code)
 	}
 
 	return fmt.Sprintf(
@@ -899,7 +905,7 @@ func applyAndVerify(
 		return restore.VerificationReport{}, missing, err
 	}
 
-	verification, err := restore.Verify(ctx, server, plan, receipts)
+	verification, err := restore.Verify(ctx, server, plan, receipts, agentStyleOwnership())
 	if err != nil {
 		verifyErr := fmt.Errorf("verify restored target: %w", err)
 
@@ -1268,7 +1274,13 @@ func runScopedImport(
 
 	switch action.State {
 	case model.ActionStateConfirmed, model.ActionStateVerified:
-		mismatches, observeErr := restore.ObserveScopedStateConflicts(ctx, server, plan, receipts)
+		mismatches, observeErr := restore.ObserveScopedStateConflicts(
+			ctx,
+			server,
+			plan,
+			receipts,
+			agentStyleOwnership(),
+		)
 		if observeErr != nil {
 			return staticMissing, false, fmt.Errorf(
 				"observe scoped state conflicts: %w",
@@ -1588,6 +1600,12 @@ func restoreFailure(ctx context.Context, phase string, err error) error {
 
 func (e *restoreOutcomeError) Unwrap() error       { return e.error }
 func (e *restoreOutcomeError) OutcomeLogged() bool { return true }
+
+func agentStyleOwnership() restore.Ownership {
+	marker, options := agents.StyledWindowOptions()
+
+	return restore.Ownership{TrackerMarker: marker, TrackerOptions: options}
+}
 
 func mismatchReasons(mismatches []restore.VerificationMismatch) string {
 	reasons := make([]string, 0, len(mismatches))

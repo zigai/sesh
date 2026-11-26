@@ -64,6 +64,16 @@ type styleRecord struct {
 	Bell   optionPrior `json:"bell"`
 }
 
+// StyledWindowOptions returns the option the tracker marks a styled window with and the options
+// it rewrites on such a window.
+func StyledWindowOptions() (string, []string) {
+	return styleOwnerOption, []string{
+		stylePriorOption,
+		windowStatusStyleOption,
+		windowStatusBellStyleOption,
+	}
+}
+
 func NewTmuxStyleController(
 	server *gotmux.Server,
 	setStatusStyle bool,

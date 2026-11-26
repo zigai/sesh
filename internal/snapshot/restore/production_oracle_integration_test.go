@@ -148,7 +148,7 @@ func TestProductionExecutorResumeAfterPartialFailure(t *testing.T) {
 		t.Fatalf("ImportScopedState failed: %v", err)
 	}
 
-	verification, err := Verify(ctx, targetServer, plan, resumed.Receipts)
+	verification, err := Verify(ctx, targetServer, plan, resumed.Receipts, Ownership{})
 	if err != nil {
 		t.Fatalf("Verify failed: %v", err)
 	}
@@ -278,7 +278,7 @@ func executeAndVerifyOnTarget(
 		t.Fatalf("ImportScopedState failed: %v", err)
 	}
 
-	verification, err := Verify(ctx, targetServer, plan, report.Receipts)
+	verification, err := Verify(ctx, targetServer, plan, report.Receipts, Ownership{})
 	if err != nil {
 		t.Fatalf("Verify failed: %v", err)
 	}

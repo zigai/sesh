@@ -154,7 +154,7 @@ func TestExecutorImportsScopedStateFaithfully(t *testing.T) {
 
 	assertTargetScopedOptionsAndEnv(t, sourceState, targetState)
 
-	verification, err := Verify(ctx, targetServer, plan, report.Receipts)
+	verification, err := Verify(ctx, targetServer, plan, report.Receipts, Ownership{})
 	if err != nil {
 		t.Fatalf("Verify failed: %v", err)
 	}
@@ -467,7 +467,7 @@ func assertRestoreVerified(
 ) {
 	t.Helper()
 
-	verification, err := Verify(ctx, server, plan, receipts)
+	verification, err := Verify(ctx, server, plan, receipts, Ownership{})
 	if err != nil {
 		t.Fatalf("Verify failed: %v", err)
 	}
@@ -504,7 +504,7 @@ func TestInheritedDefaultsAreMaterializedOnOwnedScopes(t *testing.T) {
 	assertOptionValue(t, ctx, restored.Options(), "status-left", "source", true)
 	assertChildEnvironment(t, ctx, restored, inheritedChildEnvironment)
 
-	mismatches, err := ObserveScopedStateConflicts(ctx, targetServer, plan, receipts)
+	mismatches, err := ObserveScopedStateConflicts(ctx, targetServer, plan, receipts, Ownership{})
 	if err != nil {
 		t.Fatalf("ObserveScopedStateConflicts failed: %v", err)
 	}
@@ -623,7 +623,7 @@ func assertPaneIndexVerification(
 ) {
 	t.Helper()
 
-	verified, err := Verify(ctx, server, plan, receipts)
+	verified, err := Verify(ctx, server, plan, receipts, Ownership{})
 	if err != nil || !verified.Verified {
 		t.Fatalf("exact pane indexes did not verify: %+v, %v", verified, err)
 	}
@@ -632,7 +632,7 @@ func assertPaneIndexVerification(
 	wrongPlan.SourceGraph.Panes = slices.Clone(plan.SourceGraph.Panes)
 	wrongPlan.SourceGraph.Panes[0].Index += 10
 
-	mismatch, err := Verify(ctx, server, wrongPlan, receipts)
+	mismatch, err := Verify(ctx, server, wrongPlan, receipts, Ownership{})
 	if err != nil {
 		t.Fatalf("Verify wrong pane index failed: %v", err)
 	}
@@ -717,7 +717,7 @@ func TestVerifyReportsPaneTitleRewrittenByRunningProgramAsAdvisory(t *testing.T)
 		t.Fatalf("SetTitle failed: %v", err)
 	}
 
-	verification, err := Verify(ctx, targetServer, plan, report.Receipts)
+	verification, err := Verify(ctx, targetServer, plan, report.Receipts, Ownership{})
 	if err != nil {
 		t.Fatalf("Verify failed: %v", err)
 	}
@@ -730,6 +730,279 @@ func TestVerifyReportsPaneTitleRewrittenByRunningProgramAsAdvisory(t *testing.T)
 		return entry.Domain == MismatchPane && entry.Reason == "pane_title_changed"
 	}) {
 		t.Fatalf("rewritten title was not reported as an advisory: %+v", verification.Advisories)
+	}
+}
+
+var agentTrackerOwnership = Ownership{
+	TrackerMarker:  "@sesh-agent-style",
+	TrackerOptions: []string{"window-status-style", "window-status-bell-style"},
+}
+
+type restoredVerifyFixture struct {
+	server   *gotmux.Server
+	plan     Plan
+	receipts map[string]string
+	session  gotmux.Session
+	windows  []gotmux.Window
+}
+
+func restoreTwoWindowSession(t *testing.T, ctx context.Context, name string) restoredVerifyFixture {
+	t.Helper()
+
+	sourceServer := tmuxtest.NewServer(t)
+
+	source, _ := createTwoPaneSession(t, ctx, sourceServer, name)
+	if _, err := source.NewWindow(ctx, gotmux.NewWindowOptions{
+		Program: gotmux.Exec("sleep", "300"),
+	}); err != nil {
+		t.Fatalf("NewWindow failed: %v", err)
+	}
+
+	observation, err := capture.Observe(ctx, sourceServer, []gotmux.SessionID{source.ID()})
+	if err != nil {
+		t.Fatalf("capture.Observe failed: %v", err)
+	}
+
+	plan, err := BuildPlan(
+		observation.Manifest,
+		[]string{sessionIDByName(t, observation.Manifest, name)},
+	)
+	if err != nil {
+		t.Fatalf("BuildPlan failed: %v", err)
+	}
+
+	targetServer := tmuxtest.NewServer(t)
+	if err := targetServer.GlobalSessionOptions().
+		SetWith(ctx, "update-environment", gotmux.SetOptionOptions{
+			Value:  gotmux.PresentValue("CLIENT_LOGIN_VARIABLE"),
+			Append: true,
+		}); err != nil {
+		t.Fatalf("adding a client environment variable failed: %v", err)
+	}
+
+	report, _ := restorePaneIndexPlan(t, ctx, targetServer, observation, plan)
+
+	identities, err := ResolveRuntimeIdentities(ctx, targetServer, plan, report.Receipts)
+	if err != nil {
+		t.Fatalf("ResolveRuntimeIdentities failed: %v", err)
+	}
+
+	session, err := targetServer.Session(ctx, identities.Sessions[plan.SourceGraph.Sessions[0].ID])
+	if err != nil {
+		t.Fatalf("resolving restored session failed: %v", err)
+	}
+
+	windows := make([]gotmux.Window, 0, len(plan.SourceGraph.Windows))
+	for _, window := range plan.SourceGraph.Windows {
+		handle, err := targetServer.Window(ctx, identities.Windows[window.ID])
+		if err != nil {
+			t.Fatalf("resolving restored window failed: %v", err)
+		}
+
+		windows = append(windows, handle)
+	}
+
+	return restoredVerifyFixture{
+		server:   targetServer,
+		plan:     plan,
+		receipts: report.Receipts,
+		session:  session,
+		windows:  windows,
+	}
+}
+
+func visitWithClient(t *testing.T, ctx context.Context, fixture restoredVerifyFixture) {
+	t.Helper()
+
+	connection, err := fixture.server.OpenControl(
+		ctx,
+		fixture.session.ID(),
+		gotmux.ControlOptions{},
+	)
+	if err != nil {
+		t.Fatalf("OpenControl failed: %v", err)
+	}
+
+	t.Cleanup(func() { _ = connection.Close() })
+}
+
+func requireVerification(
+	t *testing.T,
+	ctx context.Context,
+	fixture restoredVerifyFixture,
+	ownership Ownership,
+) VerificationReport {
+	t.Helper()
+
+	verification, err := Verify(ctx, fixture.server, fixture.plan, fixture.receipts, ownership)
+	if err != nil {
+		t.Fatalf("Verify failed: %v", err)
+	}
+
+	return verification
+}
+
+func findEntry(
+	entries []VerificationMismatch,
+	domain string,
+	reason string,
+) (VerificationMismatch, bool) {
+	index := slices.IndexFunc(entries, func(entry VerificationMismatch) bool {
+		return entry.Domain == domain && entry.Reason == reason
+	})
+	if index < 0 {
+		return VerificationMismatch{}, false
+	}
+
+	return entries[index], true
+}
+
+func TestVerifyLeavesAgentTrackerWindowStylesToTheTracker(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+
+	fixture := restoreTwoWindowSession(t, ctx, "tracker-style")
+	options := fixture.windows[0].Options()
+
+	if err := options.SetUser(ctx, "@sesh-agent-style", "fg=black,bg=yellow"); err != nil {
+		t.Fatalf("setting the tracker marker failed: %v", err)
+	}
+
+	if err := options.Set(ctx, "window-status-style", "fg=black,bg=yellow"); err != nil {
+		t.Fatalf("setting the tracker style failed: %v", err)
+	}
+
+	verification := requireVerification(t, ctx, fixture, agentTrackerOwnership)
+	if !verification.Verified || len(verification.Mismatches) != 0 {
+		t.Fatalf("a tracker-styled window must not fail verification: %+v", verification)
+	}
+
+	advisory, ok := findEntry(
+		verification.Advisories,
+		MismatchOption,
+		"option_set_by_agent_tracker",
+	)
+	if !ok || !slices.Equal(advisory.Names, []string{"@sesh-agent-style", "window-status-style"}) {
+		t.Fatalf(
+			"tracker style advisory = %+v, want both tracker options named",
+			verification.Advisories,
+		)
+	}
+}
+
+func TestVerifyNamesWindowOptionsChangedWithoutTheTrackerMarker(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+
+	fixture := restoreTwoWindowSession(t, ctx, "unmarked-style")
+
+	if err := fixture.windows[0].Options().Set(ctx, "window-status-style", "fg=red"); err != nil {
+		t.Fatalf("setting the window style failed: %v", err)
+	}
+
+	verification := requireVerification(t, ctx, fixture, agentTrackerOwnership)
+
+	mismatch, ok := findEntry(verification.Mismatches, MismatchOption, "local_option_mismatch")
+	if verification.Verified || !ok ||
+		!slices.Equal(mismatch.Names, []string{"window-status-style"}) {
+		t.Fatalf(
+			"unmarked style change = %+v, want a mismatch naming window-status-style",
+			verification,
+		)
+	}
+}
+
+func TestVerifyLeavesNavigationToAClientThatVisitedTheSession(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+
+	fixture := restoreTwoWindowSession(t, ctx, "client-navigation")
+
+	_, links, err := fixture.session.WindowInfos(ctx)
+	if err != nil {
+		t.Fatalf("WindowInfos failed: %v", err)
+	}
+
+	inactive := slices.IndexFunc(
+		links,
+		func(link gotmux.WindowLinkInfo) bool { return !link.Active },
+	)
+	if inactive < 0 {
+		t.Fatalf("restored links = %+v, want an inactive window", links)
+	}
+
+	if err := links[inactive].Handle().Select(ctx); err != nil {
+		t.Fatalf("selecting the inactive window failed: %v", err)
+	}
+
+	unvisited := requireVerification(t, ctx, fixture, Ownership{})
+	if _, ok := findEntry(unvisited.Mismatches, MismatchNavigation, "active_slot_mismatch"); !ok {
+		t.Fatalf("navigation changed without a client = %+v, want a mismatch", unvisited.Mismatches)
+	}
+
+	visitWithClient(t, ctx, fixture)
+
+	visited := requireVerification(t, ctx, fixture, Ownership{})
+	if _, ok := findEntry(visited.Mismatches, MismatchNavigation, "active_slot_mismatch"); ok {
+		t.Fatalf(
+			"navigation changed after a client visit = %+v, want no mismatch",
+			visited.Mismatches,
+		)
+	}
+
+	if _, ok := findEntry(
+		visited.Advisories,
+		MismatchNavigation,
+		"navigation_changed_by_client",
+	); !ok {
+		t.Fatalf(
+			"navigation changed after a client visit = %+v, want an advisory",
+			visited.Advisories,
+		)
+	}
+}
+
+func TestVerifyLeavesUpdateEnvironmentVariablesToVisitingClients(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+
+	fixture := restoreTwoWindowSession(t, ctx, "client-environment")
+	visitWithClient(t, ctx, fixture)
+
+	environment := fixture.session.Environment()
+	if err := environment.Set(ctx, "CLIENT_LOGIN_VARIABLE", "from-client"); err != nil {
+		t.Fatalf("setting the client variable failed: %v", err)
+	}
+
+	clientOnly := requireVerification(t, ctx, fixture, Ownership{})
+	if _, ok := findEntry(clientOnly.Mismatches, MismatchEnvironment, "environment_mismatch"); ok {
+		t.Fatalf("a client-set variable = %+v, want no mismatch", clientOnly.Mismatches)
+	}
+
+	advisory, ok := findEntry(
+		clientOnly.Advisories,
+		MismatchEnvironment,
+		"environment_set_by_client",
+	)
+	if !ok || !slices.Equal(advisory.Names, []string{"CLIENT_LOGIN_VARIABLE"}) {
+		t.Fatalf(
+			"client-set variable advisories = %+v, want CLIENT_LOGIN_VARIABLE",
+			clientOnly.Advisories,
+		)
+	}
+
+	if err := environment.Set(ctx, "UNRELATED_VARIABLE", "changed"); err != nil {
+		t.Fatalf("setting an unrelated variable failed: %v", err)
+	}
+
+	unrelated := requireVerification(t, ctx, fixture, Ownership{})
+
+	mismatch, ok := findEntry(unrelated.Mismatches, MismatchEnvironment, "environment_mismatch")
+	if !ok || !slices.Equal(mismatch.Names, []string{"UNRELATED_VARIABLE"}) {
+		t.Fatalf(
+			"unrelated variable = %+v, want a mismatch naming UNRELATED_VARIABLE",
+			unrelated.Mismatches,
+		)
 	}
 }
 
@@ -2084,7 +2357,7 @@ func tamperAndAssertScopedConflict(
 		t.Fatalf("tampering option failed: %v", err)
 	}
 
-	mismatches, err := ObserveScopedStateConflicts(ctx, targetServer, plan, receipts)
+	mismatches, err := ObserveScopedStateConflicts(ctx, targetServer, plan, receipts, Ownership{})
 	if err != nil {
 		t.Fatalf("ObserveScopedStateConflicts failed: %v", err)
 	}

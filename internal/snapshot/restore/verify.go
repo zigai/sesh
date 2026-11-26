@@ -3,8 +3,9 @@
 package restore
 
 import (
+	"bytes"
 	"context"
-	"maps"
+	"slices"
 	"sort"
 
 	gotmux "github.com/zigai/gotmux/tmux"
@@ -28,9 +29,21 @@ const (
 )
 
 type VerificationMismatch struct {
-	Domain string `json:"domain"`
-	Entity string `json:"entity"`
-	Reason string `json:"reason"`
+	Domain string   `json:"domain"`
+	Entity string   `json:"entity"`
+	Reason string   `json:"reason"`
+	Names  []string `json:"names,omitempty"`
+}
+
+// Ownership names restored state that another component rewrites once restore has created it.
+// The zero value names none.
+//
+//exhaustruct:optional
+type Ownership struct {
+	// TrackerMarker is the window option an agent tracker sets on a window it styles; while either
+	// the snapshot or the live window carries it, the window's TrackerOptions are the tracker's.
+	TrackerMarker  string
+	TrackerOptions []string
 }
 
 type VerificationReport struct {
@@ -85,24 +98,42 @@ type activeUnderFloating struct {
 }
 
 func (r *VerificationReport) mismatch(domain string, entity string, reason string) {
+	r.mismatchNamed(domain, entity, reason, nil)
+}
+
+func (r *VerificationReport) mismatchNamed(
+	domain string,
+	entity string,
+	reason string,
+	names []string,
+) {
 	if len(r.Mismatches) >= maxVerificationMismatches {
 		return
 	}
 
 	r.Mismatches = append(
 		r.Mismatches,
-		VerificationMismatch{Domain: domain, Entity: entity, Reason: reason},
+		VerificationMismatch{Domain: domain, Entity: entity, Reason: reason, Names: names},
 	)
 }
 
 func (r *VerificationReport) advisory(domain string, entity string, reason string) {
+	r.advisoryNamed(domain, entity, reason, nil)
+}
+
+func (r *VerificationReport) advisoryNamed(
+	domain string,
+	entity string,
+	reason string,
+	names []string,
+) {
 	if len(r.Advisories) >= maxVerificationMismatches {
 		return
 	}
 
 	r.Advisories = append(
 		r.Advisories,
-		VerificationMismatch{Domain: domain, Entity: entity, Reason: reason},
+		VerificationMismatch{Domain: domain, Entity: entity, Reason: reason, Names: names},
 	)
 }
 
@@ -111,6 +142,7 @@ func Verify(
 	server *gotmux.Server,
 	plan Plan,
 	receipts map[string]string,
+	ownership Ownership,
 ) (VerificationReport, error) {
 	report := VerificationReport{
 		Verified:      false,
@@ -138,7 +170,7 @@ func Verify(
 
 	verifySessions(ctx, server, plan, identities, state, &report)
 	verifyWindows(ctx, server, plan, identities, state, &report)
-	verifyScopedState(ctx, server, plan, identities, state, &report)
+	verifyScopedState(ctx, server, plan, identities, ownership, state, &report)
 
 	report.VerifiedSteps = verifiedSteps(plan, state)
 	report.Verified = len(report.Mismatches) == 0 && len(report.VerifiedSteps) == len(plan.Steps)
@@ -339,20 +371,57 @@ func verifySessionLinks(
 		state.slot[slotKey{session: session, index: slot}] = true
 		report.Links++
 
-		if link.Active != want.active {
-			report.mismatch(MismatchNavigation, session, "active_slot_mismatch")
-
-			navOK = false
-		}
-
-		if containsFlag(link.Flags, '-') != want.last {
-			report.mismatch(MismatchNavigation, session, "last_slot_mismatch")
-
-			navOK = false
-		}
+		navOK = verifySlotNavigation(ctx, handle, session, link, want, report) && navOK
 	}
 
 	return navOK
+}
+
+func verifySlotNavigation(
+	ctx context.Context,
+	handle gotmux.Session,
+	session string,
+	link gotmux.WindowLinkInfo,
+	want slotExpectation,
+	report *VerificationReport,
+) bool {
+	navOK := true
+
+	if link.Active != want.active {
+		navOK = verifyNavigation(ctx, handle, session, "active_slot_mismatch", report)
+	}
+
+	if containsFlag(link.Flags, '-') != want.last {
+		navOK = verifyNavigation(ctx, handle, session, "last_slot_mismatch", report) && navOK
+	}
+
+	return navOK
+}
+
+func verifyNavigation(
+	ctx context.Context,
+	handle gotmux.Session,
+	session string,
+	reason string,
+	report *VerificationReport,
+) bool {
+	// Once a client has been in the session, its current and last windows are the client's.
+	if clientVisited(ctx, handle) {
+		report.advisory(MismatchNavigation, session, "navigation_changed_by_client")
+
+		return true
+	}
+
+	report.mismatch(MismatchNavigation, session, reason)
+
+	return false
+}
+
+func clientVisited(ctx context.Context, handle gotmux.Session) bool {
+	// Restore creates every session it verifies, so any attach or switch came after restore.
+	lastAttached, err := handle.Format(ctx, "#{session_last_attached}")
+
+	return err == nil && len(bytes.TrimSpace(lastAttached)) > 0
 }
 
 func containsFlag(flags string, flag byte) bool {
@@ -724,10 +793,16 @@ func verifyScopedState(
 	server *gotmux.Server,
 	plan Plan,
 	identities RuntimeIdentities,
+	ownership Ownership,
 	state *verifiedState,
 	report *VerificationReport,
 ) {
 	targetGlobal, globalErr := environmentTable(ctx, server.Environment())
+
+	clientVariables, clientErr := clientEnvironmentNames(ctx, server)
+	if clientErr != nil {
+		clientVariables = map[string]bool{}
+	}
 
 	for _, session := range plan.SourceGraph.Sessions {
 		runtimeID, ok := identities.Sessions[session.ID]
@@ -747,6 +822,7 @@ func verifyScopedState(
 				handle.Options(),
 				session.Options,
 				session.ID,
+				Ownership{},
 				report,
 			)
 			state.variables[session.ID] = false
@@ -760,6 +836,7 @@ func verifyScopedState(
 			handle,
 			plan.SourceGraph.Source.Environment,
 			session,
+			clientVariables,
 			report,
 		)
 
@@ -783,6 +860,7 @@ func verifyScopedState(
 			handle.Options(),
 			window.Options,
 			window.ID,
+			ownership,
 			report,
 		)
 	}
@@ -798,7 +876,14 @@ func verifyScopedState(
 			continue
 		}
 
-		state.options[pane.ID] = verifyOptions(ctx, handle.Options(), pane.Options, pane.ID, report)
+		state.options[pane.ID] = verifyOptions(
+			ctx,
+			handle.Options(),
+			pane.Options,
+			pane.ID,
+			Ownership{},
+			report,
+		)
 	}
 }
 
@@ -808,11 +893,19 @@ func verifySessionScope(
 	handle gotmux.Session,
 	expectedGlobal []model.Variable,
 	session model.Session,
+	clientVariables map[string]bool,
 	report *VerificationReport,
 ) (bool, bool) {
-	optionsOK := verifyOptions(ctx, handle.Options(), session.Options, session.ID, report)
+	optionsOK := verifyOptions(
+		ctx,
+		handle.Options(),
+		session.Options,
+		session.ID,
+		Ownership{},
+		report,
+	)
 
-	matches, err := effectiveEnvironmentMatch(
+	differing, err := effectiveEnvironmentDifferences(
 		ctx,
 		targetGlobal,
 		handle.Environment(),
@@ -825,8 +918,29 @@ func verifySessionScope(
 		return optionsOK, false
 	}
 
-	if !matches {
-		report.mismatch(MismatchEnvironment, session.ID, "environment_mismatch")
+	// An attaching client copies its update-environment variables into the session, so after a
+	// client visit those values are the client's, not restored facts.
+	var fromClient []string
+	if len(differing) > 0 && clientVisited(ctx, handle) {
+		fromClient = slices.DeleteFunc(slices.Clone(differing), func(name string) bool {
+			return !clientVariables[name]
+		})
+		differing = slices.DeleteFunc(differing, func(name string) bool {
+			return clientVariables[name]
+		})
+	}
+
+	if len(fromClient) > 0 {
+		report.advisoryNamed(
+			MismatchEnvironment,
+			session.ID,
+			"environment_set_by_client",
+			fromClient,
+		)
+	}
+
+	if len(differing) > 0 {
+		report.mismatchNamed(MismatchEnvironment, session.ID, "environment_mismatch", differing)
 
 		return optionsOK, false
 	}
@@ -839,6 +953,7 @@ func verifyOptions(
 	scope optionScope,
 	expected []model.Option,
 	entity string,
+	ownership Ownership,
 	report *VerificationReport,
 ) bool {
 	live, err := scope.ListWith(ctx, gotmux.ListOptionOptions{Inherited: true, Hooks: true})
@@ -863,13 +978,61 @@ func verifyOptions(
 		}
 	}
 
-	if !maps.Equal(liveValues, wanted) {
-		report.mismatch(MismatchOption, entity, "local_option_mismatch")
+	differing := optionDifferences(liveValues, wanted)
+
+	tracked := func(name string) bool { return ownership.tracks(name, liveValues, wanted) }
+
+	tracker := slices.DeleteFunc(slices.Clone(differing), func(name string) bool {
+		return !tracked(name)
+	})
+	if len(tracker) > 0 {
+		report.advisoryNamed(MismatchOption, entity, "option_set_by_agent_tracker", tracker)
+	}
+
+	differing = slices.DeleteFunc(differing, tracked)
+	if len(differing) > 0 {
+		report.mismatchNamed(MismatchOption, entity, "local_option_mismatch", differing)
 
 		return false
 	}
 
 	return true
+}
+
+func optionDifferences(live map[string]optionShape, wanted map[string]optionShape) []string {
+	differing := []string{}
+
+	for name, shape := range live {
+		if expected, ok := wanted[name]; !ok || expected != shape {
+			differing = append(differing, name)
+		}
+	}
+
+	for name := range wanted {
+		if _, ok := live[name]; !ok {
+			differing = append(differing, name)
+		}
+	}
+
+	slices.Sort(differing)
+
+	return differing
+}
+
+func (o Ownership) tracks(
+	option string,
+	live map[string]optionShape,
+	wanted map[string]optionShape,
+) bool {
+	if o.TrackerMarker == "" {
+		return false
+	}
+
+	_, liveMarked := live[o.TrackerMarker]
+	_, savedMarked := wanted[o.TrackerMarker]
+
+	return (liveMarked || savedMarked) &&
+		(option == o.TrackerMarker || slices.Contains(o.TrackerOptions, option))
 }
 
 func verifiedSteps(plan Plan, state *verifiedState) []string {
