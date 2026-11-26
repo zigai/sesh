@@ -190,6 +190,7 @@ func (local *Local) restoreSnapshot(
 		OnCollision:       engine.CollisionPolicy(input.OnCollision),
 		Profile:           engine.RecoveryPractical,
 		Launches:          launches,
+		LoginEnvironment:  LoginEnvironment(ctx),
 	})
 
 	output := restoredSnapshot(result, readManifest(ctx, repo, generation))

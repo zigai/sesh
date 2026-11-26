@@ -159,6 +159,7 @@ func restoreUnderLock(
 		OnCollision:       engine.CollisionPolicyDefault,
 		Profile:           engine.RecoveryPractical,
 		Launches:          launches,
+		LoginEnvironment:  app.LoginEnvironment(ctx),
 	})
 
 	closeErr := repo.Close()

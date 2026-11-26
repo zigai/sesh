@@ -1110,6 +1110,122 @@ func TestEnginePracticalRestoreStartsAShellForAPaneWhoseDirectoryIsGone(t *testi
 	assertRemovedDirectoryOutcomes(t, restored, manifest.Panes[0].ID, manifest.Panes[1].ID)
 }
 
+func TestEnginePracticalRestoreGivesRestartedShellsTheCurrentLoginsVariables(t *testing.T) {
+	shPath := requireFixtureExecutable(t, "sh")
+	tempDir := t.TempDir()
+	t.Setenv("HOME", tempDir)
+
+	source := tmuxtest.NewServer(t)
+	target := tmuxtest.NewServer(t)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 45*time.Second)
+	defer cancel()
+
+	if err := target.GlobalSessionOptions().
+		SetWith(ctx, "update-environment", gotmux.SetOptionOptions{
+			Value:  gotmux.PresentValue("CLIENT_LOGIN_VARIABLE"),
+			Append: true,
+		}); err != nil {
+		t.Fatalf("adding a client environment variable failed: %v", err)
+	}
+
+	sourceSession, err := source.NewSession(ctx, gotmux.NewSessionOptions{
+		Name:    "login-variables",
+		Program: gotmux.Exec(shPath),
+		Start:   gotmux.StartPolicyExistingOnly,
+	})
+	if err != nil {
+		t.Fatalf("new session: %v", err)
+	}
+
+	disableSourceWindowRename(t, ctx, sourceSession)
+
+	for name, value := range map[string]string{
+		"XAUTHORITY":            "/run/user/1000/xauth_previous_login",
+		"ICEAUTHORITY":          "/run/user/1000/iceauth_previous_login",
+		"CLIENT_LOGIN_VARIABLE": "previous-login",
+		"KEPT_VARIABLE":         "kept",
+	} {
+		if err := sourceSession.Environment().Set(ctx, name, value); err != nil {
+			t.Fatalf("setting %s failed: %v", name, err)
+		}
+	}
+
+	repo := openFixture(t, ctx, filepath.Join(tempDir, "repo"))
+	leaseRoot := filepath.Join(tempDir, "leases")
+
+	saved := savePracticalObservation(t, ctx, repo, source, sourceSession, engine.SaveConfig{
+		LeaseRoot:         leaseRoot,
+		ProcessEnrichment: true,
+		Profile:           engine.RecoveryPractical,
+	})
+
+	restored := restorePracticalSnapshot(t, ctx, repo, target, engine.RestoreConfig{
+		LeaseRoot:         leaseRoot,
+		Generation:        saved.Generation,
+		LaunchProcesses:   true,
+		MissingWorkingDir: restore.MissingWorkingDirShell,
+		Profile:           engine.RecoveryPractical,
+		LoginEnvironment:  map[string]string{"XAUTHORITY": "/run/user/1000/xauth_current_login"},
+	})
+
+	if len(restored.Panes) != 1 {
+		t.Fatalf("restored panes = %+v, want one", restored.Panes)
+	}
+
+	environment := paneProcessEnvironment(t, ctx, target, restored.Panes[0].RuntimeID)
+
+	want := map[string]string{
+		"XAUTHORITY":    "/run/user/1000/xauth_current_login",
+		"KEPT_VARIABLE": "kept",
+	}
+	for name, value := range want {
+		if environment[name] != value {
+			t.Fatalf("restored shell %s = %q, want %q", name, environment[name], value)
+		}
+	}
+
+	for _, name := range []string{"ICEAUTHORITY", "CLIENT_LOGIN_VARIABLE"} {
+		if value, ok := environment[name]; ok {
+			t.Fatalf("restored shell %s = %q, want it unset", name, value)
+		}
+	}
+}
+
+func paneProcessEnvironment(
+	t *testing.T,
+	ctx context.Context,
+	server *gotmux.Server,
+	paneID string,
+) map[string]string {
+	t.Helper()
+
+	pane, err := server.Pane(ctx, gotmux.PaneID(paneID))
+	if err != nil {
+		t.Fatalf("resolve restored pane: %v", err)
+	}
+
+	pid, err := pane.Format(ctx, "#{pane_pid}")
+	if err != nil {
+		t.Fatalf("read pane pid: %v", err)
+	}
+
+	data, err := os.ReadFile("/proc/" + strings.TrimSpace(string(pid)) + "/environ")
+	if err != nil {
+		t.Fatalf("read pane process environment: %v", err)
+	}
+
+	environment := map[string]string{}
+
+	for assignment := range strings.SplitSeq(string(data), "\x00") {
+		if name, value, ok := strings.Cut(assignment, "="); ok {
+			environment[name] = value
+		}
+	}
+
+	return environment
+}
+
 func startTopAndShellSession(
 	t *testing.T,
 	ctx context.Context,

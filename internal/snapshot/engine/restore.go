@@ -97,6 +97,9 @@ type RestoreConfig struct {
 	OnCollision       CollisionPolicy
 	Profile           RecoveryProfile
 	Launches          LaunchOverrides
+	// LoginEnvironment holds the current login's environment; saved per-login variables are
+	// replaced with its values or unset when it lacks them.
+	LoginEnvironment map[string]string
 }
 
 type RestoreResult struct {
@@ -751,12 +754,10 @@ func prepareRestorePlan(
 		return restore.Plan{}, none, genID, nil, err
 	}
 
-	target, err := restore.ReadTargetOptions(ctx, server)
+	manifest, unsupportedOptions, err := adaptToTarget(ctx, server, manifest, cfg.LoginEnvironment)
 	if err != nil {
-		return restore.Plan{}, none, genID, nil, fmt.Errorf("read target options: %w", err)
+		return restore.Plan{}, none, genID, nil, err
 	}
-
-	manifest, unsupportedOptions := target.Adapt(manifest)
 
 	selected := cfg.Sessions
 	if len(selected) == 0 {
@@ -803,6 +804,27 @@ func prepareRestorePlan(
 	plan.UnsupportedOptions = unsupportedOptions
 
 	return plan, override, genID, skipped, nil
+}
+
+func adaptToTarget(
+	ctx context.Context,
+	server *gotmux.Server,
+	manifest model.Manifest,
+	login map[string]string,
+) (model.Manifest, int, error) {
+	target, err := restore.ReadTargetOptions(ctx, server)
+	if err != nil {
+		return manifest, 0, fmt.Errorf("read target options: %w", err)
+	}
+
+	manifest, unsupported := target.Adapt(manifest)
+
+	variables, err := restore.ReadLoginVariables(ctx, server)
+	if err != nil {
+		return manifest, 0, fmt.Errorf("read login variables: %w", err)
+	}
+
+	return variables.Localize(manifest, login), unsupported, nil
 }
 
 func readManifest(plan restore.Plan) model.Manifest {
