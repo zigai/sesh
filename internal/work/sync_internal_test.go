@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -400,5 +402,102 @@ func TestSuccessfulSyncsLogNothing(t *testing.T) {
 		records,
 	) != 0 {
 		t.Errorf("records = %#v, want none", records)
+	}
+}
+
+func installGH(t *testing.T, script string) {
+	t.Helper()
+
+	bin := t.TempDir()
+	if err := os.WriteFile(
+		filepath.Join(bin, "gh"),
+		[]byte("#!/bin/sh\n"+script),
+		0o700,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+func repoWithoutRemote(t *testing.T, name string) string {
+	t.Helper()
+
+	dir := filepath.Join(t.TempDir(), name)
+
+	init := exec.CommandContext(t.Context(), "git", "init", "--quiet", "-b", "fix", dir)
+	if output, err := init.CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v: %s", err, output)
+	}
+
+	return dir
+}
+
+func TestAFailingPullRequestLookupInOneRepositoryStillLinksTheNextOne(t *testing.T) {
+	installGH(t, `case "$PWD" in */local-only) echo 'no git remotes found' >&2; exit 1 ;; esac
+printf '%s' '[{"number":9,"state":"OPEN","url":"https://example.test/pull/9","isCrossRepository":false}]'
+`)
+
+	local := linkedItem()
+	local.Directory = repoWithoutRemote(t, "local-only")
+
+	hosted := linkedItem()
+	hosted.ID, hosted.Conversation, hosted.Resume = "w2", "c2", []string{"claude", "--resume", "c2"}
+	hosted.Directory = repoWithoutRemote(t, "hosted")
+
+	store := NewStore(filepath.Join(t.TempDir(), "state", "work.json"))
+	if _, err := store.Update(t.Context(), func(state *State) error {
+		state.Items = []Item{local, hosted}
+
+		return nil
+	}); err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+
+	if _, err := Sync(t.Context(), store); err != nil {
+		t.Fatalf("Sync() error = %v", err)
+	}
+
+	state, err := store.Load(t.Context())
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	linked := map[string][]int{}
+
+	for _, item := range state.Items {
+		for _, pr := range item.Linked() {
+			linked[item.ID] = append(linked[item.ID], pr.Number)
+		}
+	}
+
+	if want := map[string][]int{"w2": {9}}; !reflect.DeepEqual(linked, want) {
+		t.Errorf("linked pull requests = %v, want %v", linked, want)
+	}
+}
+
+func TestAMissingGHStopsPullRequestLookupsForLaterItems(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+
+	first := linkedItem(prOpenedBeforeStart(5, task.PROpen, LinkBranch))
+	first.Directory = t.TempDir()
+
+	second := first
+	second.ID, second.Directory = "w2", t.TempDir()
+
+	lookups := 0
+
+	refreshItems(
+		t.Context(),
+		[]Item{first, second},
+		func(ctx context.Context, item Item, branch string) ([]PRLink, error) {
+			lookups++
+
+			return findPRs(ctx, item, branch)
+		},
+	)
+
+	if lookups != 1 {
+		t.Errorf("pull request lookups = %d, want 1 when gh is not installed", lookups)
 	}
 }

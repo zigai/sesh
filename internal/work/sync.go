@@ -57,7 +57,7 @@ func Sync(ctx context.Context, store Store) (bool, error) {
 		return false, err
 	}
 
-	refreshed := refreshItems(ctx, state.Items)
+	refreshed := refreshItems(ctx, state.Items, findPRs)
 	changed := false
 
 	_, err = store.Update(ctx, func(state *State) error {
@@ -101,7 +101,11 @@ func ViewPR(ctx context.Context, dir string, number int) (PRLink, error) {
 	return viewed.link(), nil
 }
 
-func refreshItems(ctx context.Context, items []Item) map[string]refresh {
+func refreshItems(
+	ctx context.Context,
+	items []Item,
+	find func(context.Context, Item, string) ([]PRLink, error),
+) map[string]refresh {
 	refreshed := make(map[string]refresh, len(items))
 	ghWorks := true
 
@@ -123,8 +127,8 @@ func refreshItems(ctx context.Context, items []Item) map[string]refresh {
 		if ghWorks && !item.prsOwnedByTask() {
 			var err error
 
-			update.found, err = findPRs(ctx, item, update.branch)
-			ghWorks = err == nil
+			update.found, err = find(ctx, item, update.branch)
+			ghWorks = !errors.Is(err, exec.ErrNotFound) && ctx.Err() == nil
 		}
 
 		refreshed[item.ID] = update

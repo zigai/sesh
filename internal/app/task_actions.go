@@ -175,16 +175,9 @@ func (local *Local) SyncTasks(ctx context.Context, titles map[string]string) (bo
 		return false, oops.In("app").With("operation", "load_tasks").Wrap(err)
 	}
 
-	changed := false
-	findPRs := true
+	changed := refreshTaskPRs(ctx, ledger.Tasks, service.RefreshPR)
 
 	for _, record := range ledger.Tasks {
-		if findPRs {
-			_, refreshed, err := service.RefreshPR(ctx, record.ID)
-			changed = changed || refreshed
-			findPRs = !errors.Is(err, task.ErrGitHubFailed)
-		}
-
 		if title := titles[record.ID]; title != "" {
 			renamed, err := service.Retitle(ctx, record.ID, title)
 			if err != nil && !errors.Is(err, task.ErrWindowMissing) {
@@ -295,4 +288,23 @@ func runCommand(
 	}
 
 	return 0
+}
+
+func refreshTaskPRs(
+	ctx context.Context,
+	records []task.Record,
+	refresh func(context.Context, string) (task.Record, bool, error),
+) bool {
+	changed := false
+
+	for _, record := range records {
+		_, refreshed, err := refresh(ctx, record.ID)
+		changed = changed || refreshed
+
+		if errors.Is(err, exec.ErrNotFound) || ctx.Err() != nil {
+			break
+		}
+	}
+
+	return changed
 }
