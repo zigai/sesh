@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strconv"
@@ -23,6 +24,12 @@ var ErrOutputTooLarge = errors.New("command output exceeds its limit")
 type LimitedBuffer struct {
 	data     bytes.Buffer
 	limit    int
+	exceeded bool
+}
+
+type lineWriter struct {
+	each     func(line string)
+	pending  []byte
 	exceeded bool
 }
 
@@ -50,43 +57,40 @@ func (e *CommandError) Error() string {
 // Output drops inherited GIT_ variables so a caller inside a git hook cannot redirect the command
 // to another repository.
 func Output(ctx context.Context, dir string, args ...string) (string, error) {
-	command := exec.CommandContext(ctx, "git", args...)
-	command.Dir = dir
-	command.WaitDelay = WaitDelay
-
-	for _, variable := range os.Environ() {
-		if !strings.HasPrefix(variable, "GIT_") {
-			command.Env = append(command.Env, variable)
-		}
-	}
-
-	command.Env = append(command.Env, "GIT_TERMINAL_PROMPT=0", "LC_ALL=C")
-
 	stdout := NewLimitedBuffer(outputLimit)
-	stderr := NewLimitedBuffer(outputLimit)
 
-	command.Stdout = stdout
-	command.Stderr = stderr
-
-	err := command.Run()
-
+	err := run(ctx, dir, stdout, args)
 	if stdout.exceeded {
 		return "", ErrOutputTooLarge
 	}
 
-	if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
-		return "", &CommandError{
-			Subcommand: subcommand(args),
-			ExitCode:   exitErr.ExitCode(),
-			Detail:     errorDetail(stderr.String()),
-		}
-	}
-
 	if err != nil {
-		return "", fmt.Errorf("run git %s: %w", subcommand(args), err)
+		return "", err
 	}
 
 	return strings.TrimSpace(stdout.String()), nil
+}
+
+// EachLine runs git like Output but hands each stdout line to each as it arrives, so the whole
+// output is never held at once; only a single line longer than Output's limit fails. Lines
+// delivered before an error are not retracted.
+func EachLine(ctx context.Context, dir string, each func(line string), args ...string) error {
+	stdout := &lineWriter{each: each, pending: nil, exceeded: false}
+
+	err := run(ctx, dir, stdout, args)
+	if stdout.exceeded {
+		return ErrOutputTooLarge
+	}
+
+	if err != nil {
+		return err
+	}
+
+	if len(stdout.pending) > 0 {
+		each(string(stdout.pending))
+	}
+
+	return nil
 }
 
 func NewLimitedBuffer(limit int) *LimitedBuffer {
@@ -113,6 +117,38 @@ func (b *LimitedBuffer) String() string {
 	return b.data.String()
 }
 
+func (w *lineWriter) Write(data []byte) (int, error) {
+	written := len(data)
+
+	for {
+		end := bytes.IndexByte(data, '\n')
+		if end < 0 {
+			break
+		}
+
+		if len(w.pending)+end > outputLimit {
+			w.exceeded = true
+
+			return 0, ErrOutputTooLarge
+		}
+
+		w.pending = append(w.pending, data[:end]...)
+		w.each(string(w.pending))
+		w.pending = w.pending[:0]
+		data = data[end+1:]
+	}
+
+	if len(w.pending)+len(data) > outputLimit {
+		w.exceeded = true
+
+		return 0, ErrOutputTooLarge
+	}
+
+	w.pending = append(w.pending, data...)
+
+	return written, nil
+}
+
 func ParseShortStat(output string) (Diff, bool) {
 	var diff Diff
 
@@ -136,6 +172,41 @@ func ParseShortStat(output string) (Diff, bool) {
 	}
 
 	return diff, true
+}
+
+func run(ctx context.Context, dir string, stdout io.Writer, args []string) error {
+	command := exec.CommandContext(ctx, "git", args...)
+	command.Dir = dir
+	command.WaitDelay = WaitDelay
+
+	for _, variable := range os.Environ() {
+		if !strings.HasPrefix(variable, "GIT_") {
+			command.Env = append(command.Env, variable)
+		}
+	}
+
+	command.Env = append(command.Env, "GIT_TERMINAL_PROMPT=0", "LC_ALL=C")
+
+	stderr := NewLimitedBuffer(outputLimit)
+
+	command.Stdout = stdout
+	command.Stderr = stderr
+
+	err := command.Run()
+
+	if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
+		return &CommandError{
+			Subcommand: subcommand(args),
+			ExitCode:   exitErr.ExitCode(),
+			Detail:     errorDetail(stderr.String()),
+		}
+	}
+
+	if err != nil {
+		return fmt.Errorf("run git %s: %w", subcommand(args), err)
+	}
+
+	return nil
 }
 
 func subcommand(args []string) string {

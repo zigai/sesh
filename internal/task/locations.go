@@ -71,8 +71,6 @@ type remoteBranch struct {
 }
 
 type refLine struct {
-	name        string
-	symref      string
 	committed   string
 	aheadBehind string
 	subject     string
@@ -509,76 +507,62 @@ func emptyOffer() Offer {
 }
 
 func listBranches(ctx context.Context, root string, base string, describe bool) (branches, error) {
-	aheadBehind := ""
+	format := []string{"%(refname)", "%(symref)"}
 
 	if describe {
-		var err error
-
-		aheadBehind, err = aheadBehindFormat(ctx, root, base)
+		aheadBehind, err := aheadBehindFormat(ctx, root, base)
 		if err != nil {
 			return noBranches(), err
 		}
-	}
 
-	format := []string{
-		"%(refname)",
-		"%(symref)",
-		"%(committerdate:unix)",
-		aheadBehind,
-		"%(contents:subject)",
-	}
-
-	output, err := git.Output(ctx, root, "for-each-ref", "--sort=-committerdate",
-		"--format="+strings.Join(format, "%09")+"%00", "refs/heads/", "refs/remotes/")
-	if err != nil {
-		return branches{}, fmt.Errorf("list branches: %w", err)
+		format = append(format, "%(committerdate:unix)", aheadBehind, "%(contents:subject)")
 	}
 
 	found := branches{local: nil, remote: nil, refs: make(map[string]Ref), starts: nil}
+	local := make(map[string]bool)
 
 	var remotes []remoteBranch
 
-	for line := range strings.Lines(output) {
-		record, _ := strings.CutSuffix(strings.TrimRight(line, "\n"), "\x00")
+	err := git.EachLine(ctx, root, func(line string) {
+		record, _ := strings.CutSuffix(line, "\x00")
 
 		fields := strings.SplitN(record, "\t", len(format))
 		if len(fields) != len(format) {
-			continue
+			return
 		}
 
-		ref := refLine{
-			name:        fields[0],
-			symref:      fields[1],
-			committed:   fields[2],
-			aheadBehind: fields[3],
-			subject:     fields[4],
-		}
-		if ref.isSymref() {
-			continue
+		name, symref := fields[0], fields[1]
+		if symref != "" {
+			return
 		}
 
-		if branch, local := strings.CutPrefix(ref.name, "refs/heads/"); local {
+		if branch, head := strings.CutPrefix(name, "refs/heads/"); head {
+			local[branch] = true
 			found.local = append(found.local, branch)
-		} else if remote, branch, ok := strings.Cut(strings.TrimPrefix(ref.name, "refs/remotes/"), "/"); ok {
+		} else if remote, branch, ok := strings.Cut(strings.TrimPrefix(name, "refs/remotes/"), "/"); ok {
 			remotes = append(remotes, remoteBranch{remote: remote, name: branch})
 		}
 
 		if describe {
-			found.refs[ref.name] = ref.ref()
+			found.refs[name] = refLine{
+				committed:   fields[2],
+				aheadBehind: fields[3],
+				subject:     fields[4],
+			}.ref()
 		}
+	}, "for-each-ref", "--sort=-committerdate", "--format="+strings.Join(format, "%09")+"%00",
+		"refs/heads/", "refs/remotes/")
+	if err != nil {
+		return noBranches(), fmt.Errorf("list branches: %w", err)
 	}
 
 	for _, branch := range remotes {
-		if !slices.Contains(found.local, branch.name) {
+		if !local[branch.name] {
 			found.remote = append(found.remote, branch)
 		}
 	}
 
 	return found, nil
-}
-
-func (r refLine) isSymref() bool {
-	return r.symref != ""
 }
 
 func (r refLine) ref() Ref {
