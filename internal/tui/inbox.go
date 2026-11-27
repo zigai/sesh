@@ -594,7 +594,8 @@ func taskStatus(live task.Live, status session.AgentStatus) session.AgentStatus 
 		return session.AgentStatusSleeping
 	case record.State == task.StateFailed || live.Stalled:
 		return session.AgentStatusFailed
-	case record.PREnded() && status != session.AgentStatusRunning && status != session.AgentStatusWaiting:
+	case record.PR.State == task.PRMerged &&
+		status != session.AgentStatusRunning && status != session.AgentStatusWaiting:
 		return session.AgentStatusMerged
 	default:
 		return status

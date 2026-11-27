@@ -685,6 +685,55 @@ func TestMergedTaskShowsRecordedPullRequestOnceGitHubNoLongerListsIt(t *testing.
 	}
 }
 
+func TestTaskWhosePullRequestClosedUnmergedIsNotShownAsMerged(t *testing.T) {
+	now := time.Now()
+
+	merged := inboxTestRecord("merged", task.StateActive)
+	merged.PR = task.PullRequest{Number: 4, State: task.PRMerged, URL: ""}
+	closed := inboxTestRecord("closed", task.StateActive)
+	closed.PR = task.PullRequest{Number: 5, State: task.PRClosed, URL: ""}
+	windowless := inboxTestRecord("windowless", task.StateActive)
+	windowless.PR = task.PullRequest{Number: 6, State: task.PRClosed, URL: ""}
+
+	mergedAgent := inboxTestAgent("merged", "%1", session.AgentStatusIdle, now.Add(-time.Hour))
+	mergedAgent.GitUnmerged = 2
+	closedAgent := inboxTestAgent("closed", "%2", session.AgentStatusIdle, now.Add(-time.Hour))
+	closedAgent.GitUnmerged = 2
+
+	model := newInboxTestModel(t, []task.Live{
+		inboxTestLive(merged, "%1"),
+		inboxTestLive(closed, "%2"),
+		inboxTestLive(windowless, ""),
+	}, []session.AgentSession{mergedAgent, closedAgent})
+	markViewed(model, "%1", now)
+	markViewed(model, "%2", now)
+	refreshInbox(model)
+
+	assertInboxRows(t, model, map[string][]string{
+		config.InboxToMerge: {"closed", "windowless"},
+		config.InboxSeen:    {"merged"},
+	})
+
+	statuses := make(map[string]session.AgentStatus)
+
+	for _, group := range model.filtered {
+		for _, agent := range group.Agents {
+			statuses[agent.HarnessSession] = agent.Status
+		}
+	}
+
+	want := map[string]session.AgentStatus{
+		"merged":     session.AgentStatusMerged,
+		"closed":     session.AgentStatusIdle,
+		"windowless": session.AgentStatusUnknown,
+	}
+	for name, status := range want {
+		if statuses[name] != status {
+			t.Errorf("%s status = %q, want %q", name, statuses[name], status)
+		}
+	}
+}
+
 func TestCyclingThroughEmptyInboxKeepsTheSessionSelection(t *testing.T) {
 	model := newTestModel()
 	model.sessions = []session.Session{
