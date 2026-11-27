@@ -16,7 +16,8 @@ type Snooze struct {
 	nextMessage bool
 	duration    time.Duration
 	atClock     bool
-	clock       time.Duration
+	hour        int
+	minute      int
 	tomorrow    bool
 }
 
@@ -27,20 +28,20 @@ func ParseSnooze(choice string) (Snooze, error) {
 			nextMessage: true,
 			duration:    0,
 			atClock:     false,
-			clock:       0,
+			hour:        0,
+			minute:      0,
 			tomorrow:    false,
 		}, nil
 	}
 
 	rest, tomorrow := strings.CutPrefix(text, snoozeTomorrow)
 	if clock, err := time.Parse(snoozeClockForm, strings.TrimSpace(rest)); err == nil {
-		offset := time.Duration(clock.Hour())*time.Hour + time.Duration(clock.Minute())*time.Minute
-
 		return Snooze{
 			nextMessage: false,
 			duration:    0,
 			atClock:     true,
-			clock:       offset,
+			hour:        clock.Hour(),
+			minute:      clock.Minute(),
 			tomorrow:    tomorrow,
 		}, nil
 	}
@@ -54,7 +55,8 @@ func ParseSnooze(choice string) (Snooze, error) {
 		nextMessage: false,
 		duration:    duration,
 		atClock:     false,
-		clock:       0,
+		hour:        0,
+		minute:      0,
 		tomorrow:    false,
 	}, nil
 }
@@ -69,10 +71,10 @@ func (s Snooze) Until(now time.Time) time.Time {
 	}
 
 	year, month, day := now.Date()
-	until := time.Date(year, month, day, 0, 0, 0, 0, now.Location()).Add(s.clock)
+	until := time.Date(year, month, day, s.hour, s.minute, 0, 0, now.Location())
 
 	if s.tomorrow || !until.After(now) {
-		until = until.AddDate(0, 0, 1)
+		until = time.Date(year, month, day+1, s.hour, s.minute, 0, 0, now.Location())
 	}
 
 	return until
