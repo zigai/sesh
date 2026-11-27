@@ -302,6 +302,8 @@ func TestSSHCommandPreservesRemoteArgumentsThroughShell(t *testing.T) {
 		"; exit 23",
 		"\\",
 		"\"quoted\"",
+		"~",
+		"~/literal",
 	}
 	remoteCommand := append([]string{"printf", "%s\\000"}, arguments...)
 
@@ -351,6 +353,81 @@ func TestPeerEntryPointIsFixedPerChannel(t *testing.T) {
 		if got := ShellJoin(entry); got != strings.Join(want, " ") {
 			t.Fatalf("ShellJoin(%s) = %q", channel, got)
 		}
+	}
+}
+
+func TestSSHCommandExpandsHomeOnlyInSeshPath(t *testing.T) {
+	for _, seshPath := range []string{
+		"~/.local/bin/sesh",
+		"~/my bin/sesh",
+		"~/it's $(touch expanded) *[a] bin/sesh",
+	} {
+		t.Run(seshPath, func(t *testing.T) {
+			home := t.TempDir()
+			executable := filepath.Join(home, strings.TrimPrefix(seshPath, "~/"))
+
+			if err := os.MkdirAll(filepath.Dir(executable), 0o700); err != nil {
+				t.Fatal(err)
+			}
+
+			script := "#!/bin/sh\nprintf '%s\\000' \"$@\"\n"
+			if err := os.WriteFile(executable, []byte(script), 0o600); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := os.Chmod(executable, 0o700); err != nil {
+				t.Fatal(err)
+			}
+
+			connection := config.RemoteConnectionConfig{Host: "work", SeshPath: seshPath}
+
+			command, err := NewSSHCommand(
+				t.Context(),
+				config.RemoteConfig{},
+				connection,
+				SSHCommandOptions{},
+				append(PeerEntryPoint(connection, ChannelAttach), "~/literal")...,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			workdir := t.TempDir()
+			remoteShell := exec.CommandContext(
+				t.Context(),
+				"sh",
+				"-c",
+				command.Args[len(command.Args)-1],
+			)
+			remoteShell.Dir = workdir
+			remoteShell.Env = []string{"HOME=" + home, "PATH=/usr/bin:/bin"}
+
+			output, err := remoteShell.Output()
+			if err != nil {
+				t.Fatalf("remote command %q: %v", command.Args[len(command.Args)-1], err)
+			}
+
+			if want := "remote\x00peer\x00attach\x00~/literal\x00"; string(output) != want {
+				t.Fatalf("remote arguments = %q, want %q", output, want)
+			}
+
+			if _, err := os.Stat(
+				filepath.Join(workdir, "expanded"),
+			); !errors.Is(
+				err,
+				os.ErrNotExist,
+			) {
+				t.Fatalf("remote shell expanded the sesh path remainder: %v", err)
+			}
+		})
+	}
+}
+
+func TestShellJoinKeepsHomePrefixLiteral(t *testing.T) {
+	got := ShellJoin([]string{"~/.local/bin/sesh", "~/session", "~"})
+
+	if want := "'~/.local/bin/sesh' '~/session' '~'"; got != want {
+		t.Fatalf("ShellJoin = %q, want %q", got, want)
 	}
 }
 

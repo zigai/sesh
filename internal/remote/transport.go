@@ -208,7 +208,7 @@ func NewSSHCommand(
 		}
 	}
 
-	arguments = append(arguments, "--", connection.Host, ShellJoin(remoteCommand))
+	arguments = append(arguments, "--", connection.Host, remoteShellCommand(remoteCommand))
 
 	command := opts.Command
 	if command == nil {
@@ -227,7 +227,7 @@ func ShellJoin(arguments []string) string {
 	quoted := make([]string, len(arguments))
 
 	for index, argument := range arguments {
-		quoted[index] = "'" + strings.ReplaceAll(argument, "'", `'\''`) + "'"
+		quoted[index] = shellQuote(argument)
 	}
 
 	return strings.Join(quoted, " ")
@@ -349,4 +349,28 @@ func FinishCommand(
 	}
 
 	return result
+}
+
+func remoteShellCommand(remoteCommand []string) string {
+	if len(remoteCommand) == 0 {
+		return ""
+	}
+
+	executable := shellQuote(remoteCommand[0])
+
+	// The remote shell expands a leading ~/ only when it is unquoted; sesh_path
+	// accepts ~/ like the other sesh path settings.
+	if rest, ok := strings.CutPrefix(remoteCommand[0], "~/"); ok && rest != "" {
+		executable = "~/" + shellQuote(rest)
+	}
+
+	if len(remoteCommand) == 1 {
+		return executable
+	}
+
+	return executable + " " + ShellJoin(remoteCommand[1:])
+}
+
+func shellQuote(argument string) string {
+	return "'" + strings.ReplaceAll(argument, "'", `'\''`) + "'"
 }
