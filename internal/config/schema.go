@@ -98,6 +98,7 @@ type DisplayConfig struct {
 	AgentsAgentFormat   string        `toml:"agents_agent_format"`
 	InboxGroupFormat    string        `toml:"inbox_group_format"`
 	InboxAgentFormat    string        `toml:"inbox_agent_format"`
+	ColumnPriority      []string      `toml:"column_priority,omitempty"`
 	Fields              FieldCommands `toml:"fields,omitempty"`
 }
 
@@ -312,6 +313,7 @@ func (c *Config) Clone() *Config {
 
 	cp := *c
 	cp.Settings.DisplayModes = slices.Clone(c.Settings.DisplayModes)
+	cp.Display.ColumnPriority = slices.Clone(c.Display.ColumnPriority)
 	cp.Display.Fields = c.Display.Fields.Clone()
 	cp.Snapshot.ProcessEnvironment = slices.Clone(c.Snapshot.ProcessEnvironment)
 
@@ -455,6 +457,7 @@ func DefaultConfig() *Config {
 			AgentsAgentFormat:   DefaultAgentsAgentFormat,
 			InboxGroupFormat:    DefaultInboxGroupFormat,
 			InboxAgentFormat:    DefaultInboxAgentFormat,
+			ColumnPriority:      nil,
 			Fields:              nil,
 		},
 		Paths: PathConfig{

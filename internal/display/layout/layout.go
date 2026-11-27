@@ -55,6 +55,7 @@ type ColumnSpec struct {
 	ID             string
 	Align          Alignment
 	Min            int
+	FlexMin        int
 	Max            int
 	Reserve        int
 	Flex           bool
@@ -64,6 +65,7 @@ type ColumnSpec struct {
 	TruncateSide   TruncateSide
 	Group          string
 	Separator      bool
+	AttachedTo     string
 }
 
 type CellWidths struct {
@@ -171,23 +173,18 @@ func Plan(
 
 	total := columnTotal(columns)
 	if total > width {
-		total = shrinkFlexible(specs, columns, width, total)
-	}
-
-	if total > width {
 		total = useCompact(specs, columns, compact, width, total)
 	}
 
 	if total > width {
-		hideOverflow(specs, columns, width, total)
+		fitByPriority(specs, columns, width, total)
 	}
 
 	total = columnTotal(columns)
 	if total < width {
 		for i, spec := range specs {
-			if spec.Grow {
+			if spec.Grow && columns[i].Visible {
 				columns[i].Width += width - total
-				columns[i].Visible = true
 
 				break
 			}
@@ -314,13 +311,55 @@ func measureColumn(spec ColumnSpec, measured [][]CellWidths, index int) (int, in
 	return natural, compact
 }
 
-func shrinkFlexible(specs []ColumnSpec, columns []Column, width int, total int) int {
+func fitByPriority(specs []ColumnSpec, columns []Column, width int, total int) int {
+	for _, tier := range hidePriorityTiers(specs) {
+		if total <= width {
+			return total
+		}
+
+		total = shrinkFlexibleTier(specs, columns, tier, width, total)
+		if total <= width {
+			return total
+		}
+
+		total = hidePriorityTier(specs, columns, tier, width, total)
+	}
+
+	return total
+}
+
+func hidePriorityTiers(specs []ColumnSpec) []int {
+	tiers := make([]int, 0, len(specs))
+	for _, spec := range specs {
+		if !slices.Contains(tiers, spec.HidePriority) {
+			tiers = append(tiers, spec.HidePriority)
+		}
+	}
+
+	slices.SortFunc(tiers, func(a, b int) int {
+		return cmp.Compare(b, a)
+	})
+
+	return tiers
+}
+
+func shrinkFlexibleTier(
+	specs []ColumnSpec,
+	columns []Column,
+	tier int,
+	width int,
+	total int,
+) int {
 	for _, i := range priorityOrder(specs, true) {
-		if !specs[i].Flex || total <= width {
+		if total <= width {
+			return total
+		}
+
+		if !specs[i].Flex || specs[i].HidePriority != tier || !columns[i].Visible {
 			continue
 		}
 
-		minimum := boundedWidth(specs[i], max(specs[i].Min, 0))
+		minimum := boundedWidth(specs[i], flexMinimum(specs[i]))
 
 		shrink := min(columns[i].Width-minimum, total-width)
 		if shrink > 0 {
@@ -331,6 +370,14 @@ func shrinkFlexible(specs []ColumnSpec, columns []Column, width int, total int) 
 	}
 
 	return total
+}
+
+func flexMinimum(spec ColumnSpec) int {
+	if spec.FlexMin > 0 {
+		return spec.FlexMin
+	}
+
+	return max(spec.Min, 0)
 }
 
 func useCompact(specs []ColumnSpec, columns []Column, compact []int, width int, total int) int {
@@ -352,16 +399,51 @@ func useCompact(specs []ColumnSpec, columns []Column, compact []int, width int, 
 	return total
 }
 
-func hideOverflow(specs []ColumnSpec, columns []Column, width int, total int) {
+func hidePriorityTier(
+	specs []ColumnSpec,
+	columns []Column,
+	tier int,
+	width int,
+	total int,
+) int {
 	for _, i := range priorityOrder(specs, false) {
-		total -= columns[i].Width
-		columns[i].Width = 0
-		columns[i].Visible = false
-
 		if total <= width {
-			return
+			return total
 		}
+
+		if specs[i].HidePriority != tier || specs[i].AttachedTo != "" {
+			continue
+		}
+
+		total = hideColumnWithAttachments(specs, columns, i, total)
 	}
+
+	return total
+}
+
+func hideColumnWithAttachments(specs []ColumnSpec, columns []Column, index int, total int) int {
+	if columns[index].Visible {
+		total -= columns[index].Width
+		columns[index].Width = 0
+		columns[index].Visible = false
+	}
+
+	ownerID := specs[index].ID
+	if ownerID == "" {
+		return total
+	}
+
+	for j, spec := range specs {
+		if spec.AttachedTo != ownerID || !columns[j].Visible {
+			continue
+		}
+
+		total -= columns[j].Width
+		columns[j].Width = 0
+		columns[j].Visible = false
+	}
+
+	return total
 }
 
 func paintColumn(plan ColumnPlan, cells []Cell, index int, theme Theme) string {
@@ -695,7 +777,11 @@ func priorityOrder(specs []ColumnSpec, shrink bool) []int {
 			first, second = specs[a].ShrinkPriority, specs[b].ShrinkPriority
 		}
 
-		return cmp.Compare(second, first)
+		if diff := cmp.Compare(second, first); diff != 0 {
+			return diff
+		}
+
+		return cmp.Compare(b, a)
 	})
 
 	return order

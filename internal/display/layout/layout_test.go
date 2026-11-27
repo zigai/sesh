@@ -607,6 +607,66 @@ func TestGrowingSpacerAnchorsRightColumns(t *testing.T) {
 	})
 }
 
+func TestLowerPriorityColumnsHideBeforeHigherPriorityFlexShrinks(t *testing.T) {
+	specs := []ColumnSpec{
+		{ID: "name", Flex: true, FlexMin: 3, HidePriority: 10, ShrinkPriority: 10},
+		{ID: "spacer", Min: 1, Reserve: 1, Grow: true, HidePriority: 30, ShrinkPriority: 30},
+		{ID: "git_icon", HidePriority: 30, ShrinkPriority: 30, AttachedTo: "git_branch"},
+		{ID: "git_branch", HidePriority: 30, ShrinkPriority: 30},
+	}
+	rows := [][]Cell{{
+		{Text: "core-worker-long-name", State: Present},
+		{Text: " ", State: Present},
+		{Text: " * ", State: Present},
+		{Text: "feature/grid", State: Present},
+	}}
+
+	plan := Plan(specs, Measure(specs, rows), 24, nil, time.Time{})
+	if !plan.Columns[0].Visible || plan.Columns[0].Width != len("core-worker-long-name") {
+		t.Fatalf("high-priority flex column shrank before right column hid: %+v", plan.Columns)
+	}
+
+	if plan.Columns[2].Visible || plan.Columns[3].Visible {
+		t.Fatalf("lower-priority column or its attached icon stayed visible: %+v", plan.Columns)
+	}
+}
+
+func TestFlexMinAllowsPaddedColumnToShrinkAtItsTier(t *testing.T) {
+	specs := []ColumnSpec{
+		{
+			ID:             "cwd",
+			Min:            20,
+			FlexMin:        6,
+			Max:            20,
+			Flex:           true,
+			HidePriority:   20,
+			ShrinkPriority: 25,
+		},
+		{ID: "sep", HidePriority: 20, ShrinkPriority: 20, AttachedTo: "name"},
+		{
+			ID:             "name",
+			FlexMin:        3,
+			Flex:           true,
+			HidePriority:   20,
+			ShrinkPriority: 20,
+		},
+	}
+	rows := [][]Cell{{
+		{Text: "very-long-directory", State: Present},
+		{Text: " ", State: Present},
+		{Text: "important-session", State: Present},
+	}}
+
+	plan := Plan(specs, Measure(specs, rows), 28, nil, time.Time{})
+	if plan.Columns[2].Width != len("important-session") {
+		t.Fatalf("name column = %+v, want full width %d", plan.Columns[2], len("important-session"))
+	}
+
+	if !plan.Columns[0].Visible || plan.Columns[0].Width != 10 {
+		t.Fatalf("cwd column = %+v, want shrunk width 10", plan.Columns[0])
+	}
+}
+
 func boolState(present bool) State {
 	if present {
 		return Present

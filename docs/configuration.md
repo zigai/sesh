@@ -113,6 +113,7 @@ Row templates. `{field}` inserts a value, and `{right}` starts a right-aligned c
 - `agents_agent_format` `(string)` - Agent rows in agents mode.
 - `inbox_group_format` `(string)` - Group headings in inbox mode.
 - `inbox_agent_format` `(string)` - Rows in inbox mode.
+- `column_priority` `(list: [])` - Field names in narrow-screen priority order, kept longest first. Unlisted fields follow the built-in order: markers and status, left fields and session name, then right fields.
 
 The defaults are in the file `sesh config init` writes.
 

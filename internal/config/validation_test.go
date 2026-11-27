@@ -379,6 +379,26 @@ func TestLoadRejectsInvalidDisplayFormats(t *testing.T) {
 			content: "[display.fields]\nx = 3",
 			want:    "field must be a shell command string or table",
 		},
+		{
+			name:    "column priority empty entry",
+			content: "[display]\ncolumn_priority = [\"\"]",
+			want:    "display.column_priority",
+		},
+		{
+			name:    "column priority unknown field",
+			content: "[display]\ncolumn_priority = [\"not_a_field\"]",
+			want:    "unknown display field",
+		},
+		{
+			name:    "column priority duplicate field",
+			content: "[display]\ncolumn_priority = [\"agent_session\", \"agent_session\"]",
+			want:    "duplicate display field",
+		},
+		{
+			name:    "column priority undefined custom field",
+			content: "[display]\ncolumn_priority = [\"custom.missing\"]",
+			want:    "custom.missing has no display.fields.missing entry",
+		},
 	}
 
 	for _, tt := range tests {

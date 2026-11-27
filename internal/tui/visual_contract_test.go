@@ -37,7 +37,7 @@ func TestPickerRichAgentVisualContract(t *testing.T) {
 
 			assertVisualViewport(t, rendered, viewport.width, viewport.height)
 			assertVisualText(t, plain, "sesh", "api", "docs", "shell")
-			assertVisualText(t, plain, "main", "+413", "-102", "↑2", "↓1")
+			assertVisualText(t, plain, "Fix native restore receipt", "Codex", "main")
 			assertVisualText(t, plain, "enter select", "AGENTS")
 
 			if !strings.Contains(rendered, ansiDefaultSelectedBg) {
@@ -45,11 +45,18 @@ func TestPickerRichAgentVisualContract(t *testing.T) {
 			}
 
 			if viewport.width == 160 {
-				assertVisualText(t, plain, "Fix native restore receipt", "Codex")
+				assertVisualText(t, plain, "+413", "-102", "↑2", "↓1")
 				assertVisualText(t, plain, "↑/↓ agents", "ctrl+↑/↓ sessions")
 				assertAlignedVisualColumn(t, plain, "\ue725")
 			} else {
-				assertVisualText(t, plain, "…", "↑/↓ agent", "⌃↑/↓ session")
+				assertVisualText(
+					t,
+					plain,
+					"Review picker visual parity",
+					"Investigate lifecycle boundary",
+					"↑/↓ agent",
+					"⌃↑/↓ session",
+				)
 			}
 
 			divider := dividerLineIndex(plain)

@@ -38,14 +38,17 @@ var (
 	errFieldNameInvalid       = errors.New(
 		"field names may only contain a-z, 0-9 and _",
 	)
-	errFieldRefreshInvalid    = errors.New("refresh must be a positive duration")
-	errDuplicateKeyBinding    = errors.New("duplicate key binding")
-	errInvalidSessionKey      = errors.New("invalid session key")
-	errDisplayModesEmpty      = errors.New("display modes cannot be empty")
-	errDisplayModeInvalid     = errors.New("invalid display mode")
-	errDisplayModeDuplicate   = errors.New("duplicate display mode")
-	errPopupDimensionInvalid  = errors.New("invalid popup dimension")
-	errPopupDimensionPositive = errors.New(
+	errFieldRefreshInvalid     = errors.New("refresh must be a positive duration")
+	errColumnPriorityEmpty     = errors.New("column priority entry cannot be empty")
+	errColumnPriorityUnknown   = errors.New("unknown display field")
+	errColumnPriorityDuplicate = errors.New("duplicate display field")
+	errDuplicateKeyBinding     = errors.New("duplicate key binding")
+	errInvalidSessionKey       = errors.New("invalid session key")
+	errDisplayModesEmpty       = errors.New("display modes cannot be empty")
+	errDisplayModeInvalid      = errors.New("invalid display mode")
+	errDisplayModeDuplicate    = errors.New("duplicate display mode")
+	errPopupDimensionInvalid   = errors.New("invalid popup dimension")
+	errPopupDimensionPositive  = errors.New(
 		"expected a positive cell count or percentage",
 	)
 	errPopupPercentageRange      = errors.New("percentage must be between 1% and 100%")
@@ -254,7 +257,7 @@ func ValidateDisplayConfig(disp DisplayConfig) error {
 		}
 	}
 
-	return nil
+	return validateDisplayColumnPriority(disp)
 }
 
 func ValidateFieldCommand(name string, command FieldCommand) error {
@@ -583,6 +586,49 @@ func validateConfig(cfg *Config) error {
 	for _, v := range validators {
 		if err := v(); err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+func validateDisplayColumnPriority(disp DisplayConfig) error {
+	seen := make(map[string]struct{}, len(disp.ColumnPriority))
+
+	for _, field := range disp.ColumnPriority {
+		if strings.TrimSpace(field) == "" {
+			return fmt.Errorf("invalid display.column_priority: %w", errColumnPriorityEmpty)
+		}
+
+		if _, duplicate := seen[field]; duplicate {
+			return fmt.Errorf(
+				"invalid display.column_priority %q: %w",
+				field,
+				errColumnPriorityDuplicate,
+			)
+		}
+
+		seen[field] = struct{}{}
+
+		if customName, isCustom := display.CustomFieldName(field); isCustom {
+			if _, ok := disp.Fields[customName]; !ok {
+				return fmt.Errorf(
+					"invalid display.column_priority: %w: custom.%s has no display.fields.%s entry",
+					errFieldUndefined,
+					customName,
+					customName,
+				)
+			}
+
+			continue
+		}
+
+		if _, ok := display.FieldInfo(field); !ok {
+			return fmt.Errorf(
+				"invalid display.column_priority %q: %w",
+				field,
+				errColumnPriorityUnknown,
+			)
 		}
 	}
 

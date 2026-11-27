@@ -130,6 +130,7 @@ func TestLoadDecodesDisplayFieldCommands(t *testing.T) {
 
 	source := `[display]
 sesh_format = "{session_name} {custom.sha}"
+column_priority = ["agent_session", "agent_git_label", "custom.sha"]
 
 [display.fields]
 sha = "git rev-parse --short HEAD"
@@ -170,11 +171,21 @@ weather = { command = "/opt/bin/weather", args = ["--short", "x y"], refresh = "
 		t.Fatalf("SeshFormat = %q, want environment override", cfg.Display.SeshFormat)
 	}
 
+	wantPriority := []string{"agent_session", "agent_git_label", "custom.sha"}
+	if !reflect.DeepEqual(cfg.Display.ColumnPriority, wantPriority) {
+		t.Fatalf("Display.ColumnPriority = %#v, want %#v", cfg.Display.ColumnPriority, wantPriority)
+	}
+
 	cloned := cfg.Clone()
 	cloned.Display.Fields["weather"].Args[0] = "--long"
+	cloned.Display.ColumnPriority[0] = "harness"
 
 	if cfg.Display.Fields["weather"].Args[0] != "--short" {
 		t.Fatal("Clone() shares field args with the original")
+	}
+
+	if cfg.Display.ColumnPriority[0] != "agent_session" {
+		t.Fatal("Clone() shares column_priority with the original")
 	}
 }
 

@@ -844,8 +844,14 @@ func (m *Model) writeFormattedSessionRow(
 	line := m.formattedSessionLine(row, agent, hasAgent, isLastAgent, layout, values)
 
 	gutter := ""
-	if !hasAgent && layout.leftWidth > sessionKeyGutterWidth {
+	if !hasAgent && layout.width-layout.prefixWidth > sessionKeyGutterWidth {
 		gutter = m.sessionKeyGutter()
+	}
+
+	available := max(layout.width-layout.prefixWidth-lipgloss.Width(gutter), 0)
+	if !hasAgent && m.sessionRowOverflows(line, layout, available) {
+		m.writePlannedSessionRow(out, layout, styles, row, line, gutter, available, selected)
+		return
 	}
 
 	leftWidth := max(layout.leftWidth-lipgloss.Width(gutter), 0)

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -15,13 +16,19 @@ import (
 )
 
 const (
-	agentMinimumFlexWidth = 3
-	agentRequiredPriority = 0
-	agentDefaultPriority  = 10
-	agentFlexiblePriority = 20
-	agentLiteralPriority  = 25
-	agentGitPriority      = 30
-	agentShrinkPriority   = 20
+	agentMinimumFlexWidth    = 3
+	agentMinimumContextWidth = 8
+	agentMinimumGitWidth     = 6
+
+	columnPriorityRequired      = 0
+	columnPriorityLeft          = 20
+	columnPriorityLeftShrink    = 25
+	columnPriorityLeftSecondary = 30
+	columnPriorityRight         = 40
+	columnPriorityRightMeta     = 45
+	columnPriorityGitBranch     = 50
+	columnPriorityGitChanges    = 60
+	columnPriorityGitTracking   = 70
 )
 
 type agentTableLayout struct {
@@ -56,6 +63,8 @@ func (m *Model) measureAgentRows(table sessionTableLayout) agentRowMeasurements 
 
 	rightStart := 0
 
+	configured := m.configuredColumnPriority()
+
 	for _, row := range m.filtered {
 		for index, agent := range row.Agents {
 			if values == nil {
@@ -64,17 +73,17 @@ func (m *Model) measureAgentRows(table sessionTableLayout) agentRowMeasurements 
 
 			left, right := m.agentLayoutCells(table, row, agent, index == len(row.Agents)-1, values)
 			if len(rows) == 0 {
-				specs = append(specs, agentColumnSpecs(left)...)
-				specs = append(specs, agentSpacerSpec())
-				specs = append(specs, agentColumnSpecs(right)...)
+				leftSpecs := agentColumnSpecs(left, false, configured)
+				rightSpecs := agentColumnSpecs(right, true, configured)
+
+				specs = append(specs, leftSpecs...)
+				specs = append(specs, agentSpacerSpec(rightSpecs))
+				specs = append(specs, rightSpecs...)
 				rightStart = len(left) + 1
 			}
 
 			cells := agentCells(*values, left)
-			cells = append(
-				cells,
-				rowlayout.Cell{Text: " ", Role: "", Variants: nil, State: rowlayout.Present},
-			)
+			cells = append(cells, spacerCell(len(right) > 0))
 			cells = append(cells, agentCells(*values, right)...)
 			rows = append(rows, cells)
 		}
@@ -83,12 +92,44 @@ func (m *Model) measureAgentRows(table sessionTableLayout) agentRowMeasurements 
 	return agentRowMeasurements{specs: specs, rows: rows, rightStart: rightStart}
 }
 
-func agentSpacerSpec() rowlayout.ColumnSpec {
+func (m *Model) configuredColumnPriority() []string {
+	if m == nil || m.config == nil {
+		return nil
+	}
+
+	return m.config.Display.ColumnPriority
+}
+
+func spacerCell(hasRight bool) rowlayout.Cell {
+	if !hasRight {
+		return rowlayout.Cell{Text: "", Role: "", Variants: nil, State: rowlayout.Absent}
+	}
+
+	return rowlayout.Cell{Text: " ", Role: "", Variants: nil, State: rowlayout.Present}
+}
+
+func agentSpacerSpec(rightSpecs []rowlayout.ColumnSpec) rowlayout.ColumnSpec {
+	if len(rightSpecs) == 0 {
+		return rowlayout.ColumnSpec{
+			ID: "right_spacer", Align: rowlayout.Left, Min: 0, FlexMin: 0, Max: 0,
+			Reserve: 0, Flex: false, Grow: false,
+			ShrinkPriority: columnPriorityRight, HidePriority: columnPriorityRight,
+			TruncateSide: rowlayout.TruncateRight, Group: "", Separator: false,
+			AttachedTo: "",
+		}
+	}
+
+	priority := rightSpecs[0].HidePriority
+	for _, spec := range rightSpecs[1:] {
+		priority = min(priority, spec.HidePriority)
+	}
+
 	return rowlayout.ColumnSpec{
-		ID: "right_spacer", Align: rowlayout.Left, Min: 1, Max: 0,
+		ID: "right_spacer", Align: rowlayout.Left, Min: 1, FlexMin: 0, Max: 0,
 		Reserve: 1, Flex: false, Grow: true,
-		ShrinkPriority: agentShrinkPriority, HidePriority: agentRequiredPriority,
+		ShrinkPriority: priority, HidePriority: priority,
 		TruncateSide: rowlayout.TruncateRight, Group: "", Separator: false,
+		AttachedTo: "",
 	}
 }
 
@@ -135,16 +176,27 @@ func (m *Model) agentLayoutCells(
 	return line.Left, line.Right
 }
 
-func agentColumnSpecs(parts []display.Part) []rowlayout.ColumnSpec {
+func agentColumnSpecs(
+	parts []display.Part,
+	rightSide bool,
+	configured []string,
+) []rowlayout.ColumnSpec {
 	specs := make([]rowlayout.ColumnSpec, len(parts))
 	for index, part := range parts {
-		specs[index] = agentColumnSpec(index, part)
+		specs[index] = agentColumnSpec(index, part, rightSide, configured)
 	}
+
+	attachLiteralSpecs(specs, parts)
 
 	return specs
 }
 
-func agentColumnSpec(index int, part display.Part) rowlayout.ColumnSpec {
+func agentColumnSpec(
+	index int,
+	part display.Part,
+	rightSide bool,
+	configured []string,
+) rowlayout.ColumnSpec {
 	info, _ := display.FieldInfo(part.Field)
 
 	maxWidth := info.WidthBound
@@ -152,29 +204,90 @@ func agentColumnSpec(index int, part display.Part) rowlayout.ColumnSpec {
 		maxWidth = part.MaxWidth
 	}
 
-	minWidth := part.Width
-	if info.Flexible {
-		minWidth = max(minWidth, agentMinimumFlexWidth)
-	}
+	flex, flexMin := columnFlexBounds(part.Field, info)
 
 	truncate := rowlayout.TruncateRight
 	if info.TruncateLeft || part.Alignment == display.AlignmentRight {
 		truncate = rowlayout.TruncateLeft
 	}
 
+	sidePrefix := "L"
+	if rightSide {
+		sidePrefix = "R"
+	}
+
+	hidePriority, shrinkPriority := columnPriorities(part.Field, info, rightSide, configured)
+
 	return rowlayout.ColumnSpec{
-		ID:             fmt.Sprintf("%d:%s", index, part.Field),
+		ID:             fmt.Sprintf("%s%d:%s", sidePrefix, index, part.Field),
 		Align:          agentAlignment(part.Alignment),
-		Min:            minWidth,
+		Min:            part.Width,
+		FlexMin:        flexMin,
 		Max:            maxWidth,
 		Reserve:        info.WidthBound,
-		Flex:           info.Flexible,
+		Flex:           flex,
 		Grow:           false,
-		ShrinkPriority: agentShrinkPriority,
-		HidePriority:   agentHidePriority(part.Field, info),
+		ShrinkPriority: shrinkPriority,
+		HidePriority:   hidePriority,
 		TruncateSide:   truncate,
 		Group:          part.Group,
 		Separator:      part.Separator,
+		AttachedTo:     "",
+	}
+}
+
+func attachLiteralSpecs(specs []rowlayout.ColumnSpec, parts []display.Part) {
+	for index, part := range parts {
+		if part.Field != "" || part.Group != "" {
+			continue
+		}
+
+		owner := adjacentFieldIndex(parts, index)
+		if owner < 0 {
+			continue
+		}
+
+		specs[index].AttachedTo = specs[owner].ID
+		specs[index].HidePriority = specs[owner].HidePriority
+		specs[index].ShrinkPriority = specs[owner].ShrinkPriority
+	}
+}
+
+func adjacentFieldIndex(parts []display.Part, index int) int {
+	for next := index + 1; next < len(parts); next++ {
+		if parts[next].Field != "" {
+			return next
+		}
+	}
+
+	for prev := index - 1; prev >= 0; prev-- {
+		if parts[prev].Field != "" {
+			return prev
+		}
+	}
+
+	return -1
+}
+
+func columnFlexBounds(field string, info display.FieldMetadata) (bool, int) {
+	if info.Flexible {
+		return true, agentMinimumFlexWidth
+	}
+
+	switch field {
+	case display.FieldAgentCWDName,
+		display.FieldAgentProjectName,
+		display.FieldAgentCWD,
+		display.FieldAgentProjectRoot:
+		return true, agentMinimumContextWidth
+	case display.FieldAgentGitLabel,
+		display.FieldAgentGitBranch,
+		display.FieldAgentGitInfo,
+		display.FieldAgentWorktree,
+		display.FieldAgentWorktreeName:
+		return true, agentMinimumGitWidth
+	default:
+		return false, 0
 	}
 }
 
@@ -191,21 +304,108 @@ func agentAlignment(align display.Alignment) rowlayout.Alignment {
 	return rowlayout.Left
 }
 
-func agentHidePriority(field string, info display.FieldMetadata) int {
-	switch {
-	case field == display.FieldTree || field == display.FieldTreeBranch || field == display.FieldTreeIndent,
-		field == display.FieldStatus || field == display.FieldStatusGlyph ||
-			field == display.FieldStatusText,
-		field == display.FieldActiveMarker:
-		return agentRequiredPriority
-	case info.Provider == display.ProviderGit:
-		return agentGitPriority
-	case info.Flexible:
-		return agentFlexiblePriority
-	case field == "":
-		return agentLiteralPriority
+func columnPriorities(
+	field string,
+	info display.FieldMetadata,
+	rightSide bool,
+	configured []string,
+) (int, int) {
+	if field == "" {
+		base := columnPriorityLeft
+		if rightSide {
+			base = columnPriorityRight
+		}
+
+		priority := len(configured) + base
+
+		return priority, priority
+	}
+
+	if idx := slices.Index(configured, field); idx >= 0 {
+		return idx, idx
+	}
+
+	base := defaultColumnPriority(field, info, rightSide)
+	shrink := base
+
+	if !rightSide && isContextShrinkField(field) {
+		shrink = columnPriorityLeftShrink
+	}
+
+	offset := len(configured)
+
+	return offset + base, offset + shrink
+}
+
+func defaultColumnPriority(field string, info display.FieldMetadata, rightSide bool) int {
+	if isRequiredColumnField(field) {
+		return columnPriorityRequired
+	}
+
+	if !rightSide {
+		if info.Provider == display.ProviderClock {
+			return columnPriorityLeftSecondary
+		}
+
+		return columnPriorityLeft
+	}
+
+	if info.Provider == display.ProviderGit {
+		return defaultGitColumnPriority(field)
+	}
+
+	switch field {
+	case display.FieldAgentPR, display.FieldAgentCI, display.FieldEvidence, display.FieldHost:
+		return columnPriorityRightMeta
 	default:
-		return agentDefaultPriority
+		return columnPriorityRight
+	}
+}
+
+func isRequiredColumnField(field string) bool {
+	switch field {
+	case display.FieldTree,
+		display.FieldTreeBranch,
+		display.FieldTreeIndent,
+		display.FieldStatus,
+		display.FieldStatusGlyph,
+		display.FieldStatusText,
+		display.FieldActiveMarker,
+		display.FieldCurrentMarker,
+		display.FieldAttachedMarker,
+		display.FieldShortcut,
+		display.FieldSessionKey:
+		return true
+	default:
+		return false
+	}
+}
+
+func isContextShrinkField(field string) bool {
+	switch field {
+	case display.FieldAgentCWDName,
+		display.FieldAgentProjectName,
+		display.FieldAgentCWD,
+		display.FieldAgentProjectRoot:
+		return true
+	default:
+		return false
+	}
+}
+
+func defaultGitColumnPriority(field string) int {
+	switch field {
+	case display.FieldAgentGitAhead, display.FieldAgentGitBehind:
+		return columnPriorityGitTracking
+	case display.FieldAgentGitAdded,
+		display.FieldAgentGitDeleted,
+		display.FieldAgentGitChanges,
+		display.FieldAgentGitDirty,
+		display.FieldAgentGitConflicts,
+		display.FieldAgentGitStash:
+		return columnPriorityGitChanges
+	default:
+		return columnPriorityGitBranch
 	}
 }
 
@@ -299,6 +499,20 @@ func agentCompactCell(
 	part display.Part,
 	cell rowlayout.Cell,
 ) rowlayout.Cell {
+	if part.Field == "" && cell.State == rowlayout.Present {
+		if compact := collapseSpaces(
+			cell.Text,
+		); ansi.StringWidth(
+			compact,
+		) < ansi.StringWidth(
+			cell.Text,
+		) {
+			cell.Variants = []string{compact}
+		}
+
+		return cell
+	}
+
 	if info, ok := display.FieldInfo(
 		part.Field,
 	); ok && info.Compact != "" &&
@@ -311,6 +525,35 @@ func agentCompactCell(
 	}
 
 	return cell
+}
+
+func collapseSpaces(value string) string {
+	if !strings.Contains(value, "  ") {
+		return value
+	}
+
+	var b strings.Builder
+	b.Grow(len(value))
+
+	inSpace := false
+
+	for _, r := range value {
+		if r == ' ' {
+			if !inSpace {
+				b.WriteRune(r)
+
+				inSpace = true
+			}
+
+			continue
+		}
+
+		inSpace = false
+
+		b.WriteRune(r)
+	}
+
+	return b.String()
 }
 
 func agentProviderID(field string) providers.ID {
@@ -391,10 +634,7 @@ func (m *Model) writePlannedAgentRow(
 ) {
 	leftParts, rightParts := m.agentLayoutCells(table, row, agent, last, values)
 	cells := agentCells(*values, leftParts)
-	cells = append(
-		cells,
-		rowlayout.Cell{Text: " ", Role: "", Variants: nil, State: rowlayout.Present},
-	)
+	cells = append(cells, spacerCell(len(rightParts) > 0))
 	cells = append(cells, agentCells(*values, rightParts)...)
 	painted, _ := rowlayout.PaintColumns(table.agentRows.plan, cells, table.agentRows.theme)
 	left := strings.Join(painted[:table.agentRows.rightStart], "")
@@ -408,6 +648,133 @@ func (m *Model) writePlannedAgentRow(
 	} else {
 		m.writeMutedAgentText(out, right)
 	}
+}
+
+func (m *Model) sessionRowOverflows(
+	line display.Line,
+	layout sessionTableLayout,
+	available int,
+) bool {
+	if available <= 0 {
+		return false
+	}
+
+	leftNatural := measuredPartsWidth(line.Left)
+	rightNatural := measuredPartsWidth(line.Right)
+
+	effectiveRight := max(layout.rightWidth, rightNatural)
+	if len(line.Right) == 0 {
+		effectiveRight = 0
+	}
+
+	gap := 0
+	if effectiveRight > 0 {
+		gap = 1
+	}
+
+	return leftNatural+gap+effectiveRight > available
+}
+
+func measuredPartsWidth(parts []display.Part) int {
+	width := 0
+	for _, part := range parts {
+		width += lipgloss.Width(alignSessionFormatPart(part))
+	}
+
+	return width
+}
+
+func (m *Model) writePlannedSessionRow(
+	out *strings.Builder,
+	layout sessionTableLayout,
+	styles sessionRowStyles,
+	row session.Session,
+	line display.Line,
+	gutter string,
+	available int,
+	selected bool,
+) {
+	configured := m.configuredColumnPriority()
+	leftSpecs := agentColumnSpecs(line.Left, false, configured)
+	rightSpecs := agentColumnSpecs(line.Right, true, configured)
+	specs := make([]rowlayout.ColumnSpec, 0, len(leftSpecs)+1+len(rightSpecs))
+	specs = append(specs, leftSpecs...)
+	specs = append(specs, agentSpacerSpec(rightSpecs))
+	specs = append(specs, rightSpecs...)
+
+	rightStart := len(leftSpecs) + 1
+	cells := make([]rowlayout.Cell, 0, len(specs))
+	cells = append(cells, sessionRowCells(line.Left)...)
+	cells = append(cells, spacerCell(len(line.Right) > 0))
+	cells = append(cells, sessionRowCells(line.Right)...)
+
+	plan := rowlayout.Plan(
+		specs,
+		rowlayout.Measure(specs, [][]rowlayout.Cell{cells}),
+		available,
+		nil,
+		layout.now,
+	)
+	painted, _ := rowlayout.PaintColumns(plan, cells, m.agentLayoutTheme())
+	left := strings.Join(painted[:rightStart], "")
+	right := strings.Join(painted[rightStart:], "")
+
+	out.WriteString(rowPrefix(styles, m.rowKey(row, emptyAgentSession(), false), selected))
+
+	if gutter != "" && selected {
+		writeStyledWithBackground(out, gutter, styles.selectedBgSeq)
+	} else {
+		out.WriteString(gutter)
+	}
+
+	m.writePrimarySessionText(out, left, selected, styles)
+
+	if right == "" {
+		return
+	}
+
+	if selected {
+		writeStyledWithBackground(out, right, styles.selectedBgSeq)
+	} else {
+		out.WriteString(right)
+	}
+}
+
+func sessionRowCells(parts []display.Part) []rowlayout.Cell {
+	cells := make([]rowlayout.Cell, len(parts))
+	for i, part := range parts {
+		state := rowlayout.Absent
+		if part.Value != "" {
+			state = rowlayout.Present
+		}
+
+		if part.StateKnown {
+			state = part.State
+		}
+
+		var variants []string
+
+		if part.Field == "" && state == rowlayout.Present {
+			if compact := collapseSpaces(
+				part.Value,
+			); ansi.StringWidth(
+				compact,
+			) < ansi.StringWidth(
+				part.Value,
+			) {
+				variants = []string{compact}
+			}
+		}
+
+		cells[i] = rowlayout.Cell{
+			Text:     part.Value,
+			Role:     part.Role,
+			Variants: variants,
+			State:    state,
+		}
+	}
+
+	return cells
 }
 
 func (m *Model) agentCellRole(

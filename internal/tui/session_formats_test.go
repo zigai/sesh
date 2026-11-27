@@ -616,7 +616,15 @@ func TestAgentSessionExpandsWhenSpacePermits(t *testing.T) {
 		t.Fatalf("harness columns misaligned: row 1 at %d, row 2 at %d:\n%s", idx1, idx2, wide)
 	}
 
-	narrow := stripANSI(model.renderList(70, 4))
+	medium := stripANSI(model.renderList(70, 4))
+	if !strings.Contains(medium, longTitle) {
+		t.Fatalf(
+			"70-column render should keep full session name ahead of right columns: %q",
+			medium,
+		)
+	}
+
+	narrow := stripANSI(model.renderList(50, 4))
 	if strings.Contains(narrow, longTitle) {
 		t.Fatalf("narrow render should have truncated session name: %q", narrow)
 	}

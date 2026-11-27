@@ -33,7 +33,7 @@ func TestAgentRowsUseCompactStatusAcrossWholeColumn(t *testing.T) {
 	for _, agent := range row.Agents {
 		left, _ := model.agentLayoutCells(table, row, agent, false, &values)
 		if specs == nil {
-			specs = agentColumnSpecs(left)
+			specs = agentColumnSpecs(left, false, nil)
 		}
 
 		rows = append(rows, agentCells(values, left))
@@ -121,4 +121,144 @@ func paintRow(plan rowlayout.ColumnPlan, cells []rowlayout.Cell) (string, []rowl
 	parts, spans := rowlayout.PaintColumns(plan, cells, nil)
 
 	return strings.Join(parts, ""), spans
+}
+
+func TestNarrowAgentAndInboxRowsPrioritizeLeftAndSessionName(t *testing.T) {
+	now := time.Now()
+	row := session.Session{
+		ID: "$1", Name: "work", AgentTotal: 1, AgentActive: 1, ActivePaneID: "%1",
+		Agents: []session.AgentSession{{
+			PaneID:           "%1",
+			Harness:          "codex",
+			HarnessSession:   "Fix narrow popup columns",
+			CWD:              "/work/sesh",
+			ProjectRoot:      "/work/sesh",
+			Status:           session.AgentStatusRunning,
+			StatusSince:      now.Add(-5 * time.Minute),
+			Worktree:         "/work/sesh",
+			GitBranch:        "feature/narrow-layout",
+			GitChanges:       "+150 -22",
+			GitAhead:         4,
+			GitBehind:        1,
+			GitTrackingKnown: true,
+			Host:             "workstation",
+		}},
+	}
+
+	for _, mode := range []displayMode{displayModeAgents, displayModeInbox} {
+		t.Run(string(mode), func(t *testing.T) {
+			model := newTestModelWithConfig(t, config.DefaultConfig())
+			model.displayMode = mode
+			model.filtered = []session.Session{row}
+
+			lines := strings.Split(stripANSI(model.renderList(44, 2)), "\n")
+			agentLine := lines[1]
+
+			if !strings.Contains(agentLine, "Fix narrow popup columns") {
+				t.Fatalf("narrow %s row collapsed session name: %q", mode, agentLine)
+			}
+
+			if !strings.Contains(agentLine, "sesh") {
+				t.Fatalf("narrow %s row lost left context: %q", mode, agentLine)
+			}
+
+			for _, hidden := range []string{"feature/narrow", "+150", "-22", GitGlyph} {
+				if strings.Contains(agentLine, hidden) {
+					t.Fatalf("narrow %s row kept right-side %q: %q", mode, hidden, agentLine)
+				}
+			}
+		})
+	}
+}
+
+func TestDisplayColumnPriorityOverridesDefaultNarrowOrder(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.Display.ColumnPriority = []string{
+		display.FieldTree,
+		display.FieldStatusGlyph,
+		display.FieldAgentGitLabel,
+		display.FieldAgentGitAdded,
+		display.FieldAgentGitDeleted,
+	}
+	model := newTestModelWithConfig(t, cfg)
+	model.displayMode = displayModeAgents
+	model.filtered = []session.Session{{
+		ID: "$1", Name: "work", AgentTotal: 1, AgentActive: 1,
+		Agents: []session.AgentSession{{
+			PaneID:           "%1",
+			Harness:          "codex",
+			HarnessSession:   "core-worker-long-name",
+			CWD:              "/work/alpha",
+			Status:           session.AgentStatusRunning,
+			Worktree:         "/work/repo",
+			GitBranch:        "feature/grid",
+			GitChanges:       "+150 -2",
+			GitAhead:         4,
+			GitBehind:        1,
+			GitTrackingKnown: true,
+		}},
+	}}
+
+	lines := strings.Split(stripANSI(model.renderList(44, 2)), "\n")
+	agentLine := lines[1]
+
+	for _, kept := range []string{"feature/grid", "+150", "-2"} {
+		if !strings.Contains(agentLine, kept) {
+			t.Fatalf("custom priority row hid prioritized %q: %q", kept, agentLine)
+		}
+	}
+
+	if strings.Contains(agentLine, "core-worker-long-name") {
+		t.Fatalf("custom priority row kept full unprioritized session name: %q", agentLine)
+	}
+}
+
+func TestNarrowSeshRowsPrioritizeSessionNameAndHonorColumnPriority(t *testing.T) {
+	row := session.Session{
+		ID:               "$1",
+		Name:             "backend-api-server",
+		Kind:             session.KindLive,
+		ActiveWindowName: "neovim-editor",
+		ActivePanePath:   "/work/backend-api-server",
+		WindowCount:      4,
+	}
+
+	t.Run("default prioritizes session name over right columns", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.Display.SeshFormat = "{session_name}{right}{active_window_name} {active_pane_path_name}"
+		model := newTestModelWithConfig(t, cfg)
+		model.filtered = []session.Session{row}
+
+		line := stripANSI(model.renderList(32, 1))
+		if !strings.Contains(line, "backend-api-server") {
+			t.Fatalf("narrow sesh row collapsed session name: %q", line)
+		}
+
+		if strings.Contains(line, "neovim-editor") {
+			t.Fatalf("narrow sesh row kept right column over session name: %q", line)
+		}
+	})
+
+	t.Run("configured column priority keeps prioritized right column", func(t *testing.T) {
+		cfg := config.DefaultConfig()
+		cfg.Display.SeshFormat = "{session_name}{right}{active_window_name} {active_pane_path_name}"
+		cfg.Display.ColumnPriority = []string{
+			display.FieldActiveWindowName,
+			display.FieldSessionName,
+		}
+		model := newTestModelWithConfig(t, cfg)
+		model.filtered = []session.Session{row}
+
+		line := stripANSI(model.renderList(32, 1))
+		if !strings.Contains(line, "neovim-editor") {
+			t.Fatalf("custom priority sesh row hid prioritized right column: %q", line)
+		}
+
+		if !strings.Contains(line, "backend-api-ser…") {
+			t.Fatalf(
+				"custom priority sesh row did not shrink lower-priority session name: %q",
+				line,
+			)
+		}
+	})
 }
