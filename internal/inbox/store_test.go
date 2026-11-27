@@ -223,6 +223,78 @@ func TestUpdateAcceptsTheEntryLimit(t *testing.T) {
 	}
 }
 
+func TestPutAndMarkUnseenAtTheEntryLimitEvictTheOldestEntry(t *testing.T) {
+	path := statePath(t)
+	store := inbox.NewStore(path)
+
+	_, err := store.Update(t.Context(), func(state *inbox.State) error {
+		state.Snoozes = agedSnoozes(4096)
+		state.Unseen = agedUnseenMarks(4096)
+
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("seed Update() error = %v", err)
+	}
+
+	_, err = store.Update(t.Context(), func(state *inbox.State) error {
+		state.Put(inbox.Snooze{Key: "agent/new", Until: 0, SnoozedAt: 10_000})
+		state.MarkUnseen("agent/new", time.Unix(0, 10_000))
+
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Update() past the entry limit error = %v", err)
+	}
+
+	loaded, err := store.Load(t.Context())
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if len(loaded.Snoozes) != 4096 || len(loaded.Unseen) != 4096 {
+		t.Fatalf(
+			"Load() returned %d snoozes and %d unseen marks, want 4096 each",
+			len(loaded.Snoozes),
+			len(loaded.Unseen),
+		)
+	}
+
+	for key, want := range map[string]bool{
+		"agent/new": true, "agent/0": true, "agent/4094": true, "agent/4095": false,
+	} {
+		if _, ok := loaded.Find(key); ok != want {
+			t.Errorf("snooze %q kept = %v, want %v", key, ok, want)
+		}
+
+		if _, ok := loaded.FindUnseen(key); ok != want {
+			t.Errorf("unseen mark %q kept = %v, want %v", key, ok, want)
+		}
+	}
+}
+
+func TestReplacingAnEntryAtTheEntryLimitEvictsNothing(t *testing.T) {
+	state := inbox.State{Version: 1, Snoozes: agedSnoozes(4096), Unseen: agedUnseenMarks(4096)}
+
+	state.Put(inbox.Snooze{Key: "agent/4095", Until: 0, SnoozedAt: 10_000})
+	state.MarkUnseen("agent/4095", time.Unix(0, 10_000))
+
+	if len(state.Snoozes) != 4096 || len(state.Unseen) != 4096 {
+		t.Fatalf(
+			"state has %d snoozes and %d unseen marks, want 4096 each",
+			len(state.Snoozes),
+			len(state.Unseen),
+		)
+	}
+
+	snooze, _ := state.Find("agent/4095")
+	mark, _ := state.FindUnseen("agent/4095")
+
+	if snooze.SnoozedAt != 10_000 || mark.At != 10_000 {
+		t.Fatalf("replaced entries = %+v and %+v, want both at 10000", snooze, mark)
+	}
+}
+
 func TestUpdateRejectsStateThatEncodesOverTheSizeLimit(t *testing.T) {
 	path := seededStore(t)
 	before := readFile(t, path)
@@ -485,6 +557,28 @@ func unseenMarks(count int) []inbox.Unseen {
 	out := make([]inbox.Unseen, count)
 	for i := range out {
 		out[i] = inbox.Unseen{Key: fmt.Sprintf("agent/%d", i), At: 1}
+	}
+
+	return out
+}
+
+func agedSnoozes(count int) []inbox.Snooze {
+	out := make([]inbox.Snooze, count)
+	for i := range out {
+		out[i] = inbox.Snooze{
+			Key:       fmt.Sprintf("agent/%d", i),
+			Until:     0,
+			SnoozedAt: int64(count - i),
+		}
+	}
+
+	return out
+}
+
+func agedUnseenMarks(count int) []inbox.Unseen {
+	out := make([]inbox.Unseen, count)
+	for i := range out {
+		out[i] = inbox.Unseen{Key: fmt.Sprintf("agent/%d", i), At: int64(count - i)}
 	}
 
 	return out

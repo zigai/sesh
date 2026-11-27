@@ -1,6 +1,7 @@
 package inbox
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -75,7 +76,10 @@ func (s *State) Find(key string) (Snooze, bool) {
 
 func (s *State) Put(snooze Snooze) {
 	s.Remove(snooze.Key)
-	s.Snoozes = append(s.Snoozes, snooze)
+	s.Snoozes = append(
+		withoutOldest(s.Snoozes, func(entry Snooze) int64 { return entry.SnoozedAt }),
+		snooze,
+	)
 }
 
 func (s *State) Remove(key string) {
@@ -94,7 +98,10 @@ func (s *State) FindUnseen(key string) (Unseen, bool) {
 
 func (s *State) MarkUnseen(key string, at time.Time) {
 	s.ClearUnseen(key)
-	s.Unseen = append(s.Unseen, Unseen{Key: key, At: at.UnixNano()})
+	s.Unseen = append(
+		withoutOldest(s.Unseen, func(mark Unseen) int64 { return mark.At }),
+		Unseen{Key: key, At: at.UnixNano()},
+	)
 }
 
 func (s *State) ClearUnseen(key string) {
@@ -291,6 +298,38 @@ func (s *State) validUnseen() bool {
 	}
 
 	return true
+}
+
+func withoutOldest[T any](entries []T, age func(T) int64) []T {
+	excess := len(entries) - maxEntries + 1
+	if excess <= 0 {
+		return entries
+	}
+
+	byAge := make([]int, len(entries))
+	for i := range byAge {
+		byAge[i] = i
+	}
+
+	slices.SortStableFunc(
+		byAge,
+		func(a, b int) int { return cmp.Compare(age(entries[a]), age(entries[b])) },
+	)
+
+	evicted := make([]bool, len(entries))
+	for _, i := range byAge[:excess] {
+		evicted[i] = true
+	}
+
+	kept := make([]T, 0, len(entries)-excess)
+
+	for i, entry := range entries {
+		if !evicted[i] {
+			kept = append(kept, entry)
+		}
+	}
+
+	return kept
 }
 
 func emptyState() State {

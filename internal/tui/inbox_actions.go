@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -49,6 +51,17 @@ type openedMsg struct {
 	err error
 }
 
+type inboxLiveness struct {
+	current map[string]bool
+	known   map[string]bool
+	agents  map[string][]liveConversation
+}
+
+type liveConversation struct {
+	agent    session.AgentSession
+	viewedAt int64
+}
+
 func conversationKey(agent session.AgentSession) string {
 	if agent.SessionID == "" {
 		return ""
@@ -67,9 +80,13 @@ func (m *Model) snoozed(item inboxItem) bool {
 		return false
 	}
 
-	switch item.agent.Status.DisplayStatus() {
+	return snoozeHolds(snooze, item.agent)
+}
+
+func snoozeHolds(snooze inbox.Snooze, agent session.AgentSession) bool {
+	switch agent.Status.DisplayStatus() {
 	case session.AgentStatusIdle, session.AgentStatusWaiting, session.AgentStatusFailed:
-		return item.agent.StatusSince.UnixNano() <= snooze.SnoozedAt
+		return agent.StatusSince.UnixNano() <= snooze.SnoozedAt
 	case session.AgentStatusRunning, session.AgentStatusInterrupted, session.AgentStatusUnknown,
 		session.AgentStatusSleeping, session.AgentStatusMerged, session.AgentStatusClosed:
 		return true
@@ -349,7 +366,6 @@ func (m *Model) snoozeItem(key string, until string) func() (tea.Model, tea.Cmd)
 			untilUnix = ends.Unix()
 		}
 
-		state.Expire(now)
 		state.Put(inbox.Snooze{Key: key, Until: untilUnix, SnoozedAt: now.UnixNano()})
 
 		return nil
@@ -361,17 +377,122 @@ func (m *Model) updateInbox(change func(*inbox.State) error) func() (tea.Model, 
 	ctx := m.operationContext()
 
 	return func() (tea.Model, tea.Cmd) {
+		// The update runs off the UI goroutine, so it prunes against a copy taken here.
+		liveness := m.inboxLiveness()
+		now := time.Now()
+
 		return m, func() tea.Msg {
 			if !m.lifecycle.BeginWorker() {
 				return nil
 			}
 			defer m.lifecycle.EndWorker()
 
-			state, err := store.UpdateInbox(ctx, change)
+			state, err := store.UpdateInbox(ctx, func(state *inbox.State) error {
+				liveness.prune(state, now)
+
+				return change(state)
+			})
 
 			return inboxUpdatedMsg{state: state, err: err}
 		}
 	}
+}
+
+func (m *Model) inboxLiveness() inboxLiveness {
+	liveness := inboxLiveness{
+		current: make(map[string]bool),
+		known:   make(map[string]bool, len(m.inbox.Snoozes)+len(m.inbox.Unseen)),
+		agents:  make(map[string][]liveConversation),
+	}
+
+	for _, snooze := range m.inbox.Snoozes {
+		liveness.known[snooze.Key] = true
+	}
+
+	for _, mark := range m.inbox.Unseen {
+		liveness.known[mark.Key] = true
+	}
+
+	for _, host := range m.inboxHosts() {
+		liveness.current[host.identity.ConnectionID] = m.inboxHostCurrent(host)
+
+		for _, item := range m.hostAgentItems(host, m.hostAgentsByPane(host)) {
+			key := conversationKey(item.agent)
+			if key == "" {
+				continue
+			}
+
+			var viewedAt int64
+			if item.owner.ID != "" && m.state != nil {
+				viewedAt = m.state.GetLastAgentView(
+					item.owner.SemanticIdentity(),
+					item.agent.PaneID,
+				)
+			}
+
+			liveness.agents[key] = append(
+				liveness.agents[key],
+				liveConversation{agent: item.agent, viewedAt: viewedAt},
+			)
+		}
+	}
+
+	return liveness
+}
+
+func (m *Model) inboxHostCurrent(host inboxHost) bool {
+	if host.origin == session.OriginLocal {
+		return m.sessionLoadErr == nil && m.agentSummaryErr == nil
+	}
+
+	for _, connection := range m.remoteCatalog.Connections {
+		if connection.ID == host.identity.ConnectionID {
+			return remoteConnectionStatus(connection, m.config.Remote.StaleAfter, time.Now()) ==
+				session.RemoteStatusAvailable
+		}
+	}
+
+	return false
+}
+
+func (l inboxLiveness) prune(state *inbox.State, now time.Time) {
+	state.Expire(now)
+	state.Snoozes = slices.DeleteFunc(state.Snoozes, l.staleSnooze)
+	state.Unseen = slices.DeleteFunc(state.Unseen, l.staleUnseen)
+}
+
+func (l inboxLiveness) staleSnooze(snooze inbox.Snooze) bool {
+	if snooze.Timed() {
+		return false
+	}
+
+	conversations, live := l.agents[snooze.Key]
+	if !live {
+		return l.gone(snooze.Key)
+	}
+
+	return !slices.ContainsFunc(
+		conversations,
+		func(conversation liveConversation) bool { return snoozeHolds(snooze, conversation.agent) },
+	)
+}
+
+func (l inboxLiveness) staleUnseen(mark inbox.Unseen) bool {
+	conversations, live := l.agents[mark.Key]
+	if !live {
+		return l.gone(mark.Key)
+	}
+
+	return !slices.ContainsFunc(
+		conversations,
+		func(conversation liveConversation) bool { return conversation.viewedAt < mark.At },
+	)
+}
+
+func (l inboxLiveness) gone(key string) bool {
+	host, _, _ := strings.Cut(key, "/")
+
+	return l.known[key] && l.current[host]
 }
 
 func (m *Model) handleInboxUpdated(msg inboxUpdatedMsg) {
