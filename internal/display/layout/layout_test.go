@@ -322,6 +322,97 @@ func TestRoleColorResumesAfterCellReset(t *testing.T) {
 	}
 }
 
+func TestBaseStyleResumesAfterCombinedSGRReset(t *testing.T) {
+	const base = "\x1b[34m"
+
+	tests := []struct {
+		name  string
+		value string
+		want  string
+	}{
+		{
+			name:  "reset then foreground",
+			value: "\x1b[0;32mok",
+			want:  "\x1b[0m" + base + "\x1b[32mok",
+		},
+		{
+			name:  "empty reset then foreground",
+			value: "\x1b[;32mok",
+			want:  "\x1b[0m" + base + "\x1b[32mok",
+		},
+		{
+			name:  "zero padded reset then foreground",
+			value: "\x1b[00;32mok",
+			want:  "\x1b[0m" + base + "\x1b[32mok",
+		},
+		{
+			name:  "attributes after the last reset",
+			value: "\x1b[1;0;32;4mok",
+			want:  "\x1b[0m" + base + "\x1b[32;4mok",
+		},
+		{
+			name:  "trailing reset",
+			value: "\x1b[1;0mok",
+			want:  "\x1b[1;0m" + base + "ok",
+		},
+		{
+			name:  "reset then truecolor foreground",
+			value: "\x1b[0;38;2;255;0;0mok",
+			want:  "\x1b[0m" + base + "\x1b[38;2;255;0;0mok",
+		},
+		{
+			name:  "colon truecolor with zero components",
+			value: "\x1b[38:2:255:0:0mok",
+			want:  "\x1b[38:2:255:0:0mok",
+		},
+		{
+			name:  "semicolon truecolor with zero components",
+			value: "\x1b[38;2;255;0;0mok",
+			want:  "\x1b[38;2;255;0;0mok",
+		},
+		{
+			name:  "indexed background zero",
+			value: "\x1b[48;5;0mok",
+			want:  "\x1b[48;5;0mok",
+		},
+		{
+			name:  "non SGR sequence ending in m",
+			value: "\x1b[>4;0mok",
+			want:  "\x1b[>4;0mok",
+		},
+		{
+			name:  "unterminated sequence",
+			value: "ok\x1b[0;3",
+			want:  "ok\x1b[0;3",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var out strings.Builder
+			WriteWithBaseStyle(&out, tt.value, base)
+
+			if got := out.String(); got != tt.want {
+				t.Fatalf("WriteWithBaseStyle(%q) = %q, want %q", tt.value, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRoleColorResumesAfterCombinedCellReset(t *testing.T) {
+	specs := []ColumnSpec{{ID: "value", Min: 8, Max: 8}}
+	cells := []Cell{{Text: "\x1b[0;31mred\x1b[39m tail", Role: "success", State: Present}}
+
+	painted, _ := Paint(
+		Plan(specs, Measure(specs, [][]Cell{cells}), 8, nil, time.Time{}),
+		cells,
+		Theme{"success": "32"},
+	)
+	if want := "\x1b[32m\x1b[0m\x1b[32m\x1b[31mred\x1b[39m tail\x1b[m"; painted != want {
+		t.Fatalf("painted = %q, want %q", painted, want)
+	}
+}
+
 func TestSameSnapshotsPaintIdenticallyRegardlessOfArrivalOrder(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		specs, rows, width := generatedTable(t)

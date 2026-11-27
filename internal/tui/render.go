@@ -14,6 +14,7 @@ import (
 	"github.com/zigai/sesh/internal/action"
 	"github.com/zigai/sesh/internal/config"
 	"github.com/zigai/sesh/internal/display"
+	rowlayout "github.com/zigai/sesh/internal/display/layout"
 	"github.com/zigai/sesh/internal/session"
 )
 
@@ -1322,42 +1323,7 @@ func writeStyledWithBackground(out *strings.Builder, text string, styleSeq strin
 	}
 
 	out.WriteString(styleSeq)
-
-	if !strings.Contains(text, "\x1b") {
-		out.WriteString(text)
-		out.WriteString(ansiReset)
-
-		return
-	}
-
-	for {
-		idx := strings.Index(text, "\x1b[")
-		if idx < 0 {
-			out.WriteString(text)
-
-			break
-		}
-
-		out.WriteString(text[:idx])
-		text = text[idx:]
-
-		end := strings.IndexByte(text, 'm')
-		if end < 0 {
-			out.WriteString(text)
-
-			break
-		}
-
-		seq := text[:end+1]
-		text = text[end+1:]
-
-		out.WriteString(seq)
-
-		if seq == "\x1b[m" || seq == "\x1b[0m" {
-			out.WriteString(styleSeq)
-		}
-	}
-
+	rowlayout.WriteWithBaseStyle(out, text, styleSeq)
 	out.WriteString(ansiReset)
 }
 

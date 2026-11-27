@@ -31,7 +31,11 @@ const (
 const (
 	Decay              = 30 * time.Second
 	centerPaddingSides = 2
+	csi                = "\x1b["
 	sgrReset           = "\x1b[m"
+	sgrFullReset       = "\x1b[0m"
+	indexedColorArgs   = 2
+	rgbColorArgs       = 4
 )
 
 type State uint8
@@ -269,6 +273,30 @@ func TruncateLeftWithMark(value string, width int, mark string) string {
 	return mark + keepSuffix(textTokens(value), width-ansi.StringWidth(mark))
 }
 
+// WriteWithBaseStyle writes value and re-applies base after every SGR reset in
+// it, keeping the attributes that follow a reset in the same sequence.
+func WriteWithBaseStyle(out *strings.Builder, value string, base string) {
+	for value != "" {
+		index := strings.Index(value, csi)
+		if index < 0 {
+			out.WriteString(value)
+			return
+		}
+
+		out.WriteString(value[:index])
+		value = value[index:]
+
+		end := strings.IndexByte(value, 'm')
+		if end < 0 {
+			out.WriteString(value)
+			return
+		}
+
+		writeSGRWithBaseStyle(out, value[:end+1], base)
+		value = value[end+1:]
+	}
+}
+
 func measureColumn(spec ColumnSpec, measured [][]CellWidths, index int) (int, int) {
 	natural := max(spec.Reserve, spec.Min, 0)
 	compact := max(spec.Reserve, 0)
@@ -370,7 +398,7 @@ func paintColumn(plan ColumnPlan, cells []Cell, index int, theme Theme) string {
 	if color := theme[cell.Role]; color != "" && value != "" {
 		open := "\x1b[" + color + "m"
 		out.WriteString(open)
-		writeWithBaseStyle(&out, value, open)
+		WriteWithBaseStyle(&out, value, open)
 		out.WriteString(sgrReset)
 	} else {
 		out.WriteString(value)
@@ -540,31 +568,56 @@ func keepSuffix(tokens []textToken, remaining int) string {
 	return result.String()
 }
 
-func writeWithBaseStyle(out *strings.Builder, value string, base string) {
-	for value != "" {
-		index := strings.Index(value, "\x1b[")
-		if index < 0 {
-			out.WriteString(value)
-			return
-		}
-
-		out.WriteString(value[:index])
-		value = value[index:]
-
-		end := strings.IndexByte(value, 'm')
-		if end < 0 {
-			out.WriteString(value)
-			return
-		}
-
-		seq := value[:end+1]
-		value = value[end+1:]
-
+func writeSGRWithBaseStyle(out *strings.Builder, seq string, base string) {
+	params := seq[len(csi) : len(seq)-1]
+	if strings.Trim(params, "0123456789;:") != "" {
 		out.WriteString(seq)
+		return
+	}
 
-		if seq == sgrReset || seq == "\x1b[0m" {
-			out.WriteString(base)
+	fields := strings.Split(params, ";")
+	lastReset := lastSGRReset(fields)
+
+	switch lastReset {
+	case -1:
+		out.WriteString(seq)
+	case len(fields) - 1:
+		out.WriteString(seq)
+		out.WriteString(base)
+	default:
+		out.WriteString(sgrFullReset)
+		out.WriteString(base)
+		out.WriteString(csi + strings.Join(fields[lastReset+1:], ";") + "m")
+	}
+}
+
+func lastSGRReset(fields []string) int {
+	last := -1
+
+	for i := 0; i < len(fields); i++ {
+		switch strings.TrimLeft(fields[i], "0") {
+		case "":
+			last = i
+		case "38", "48", "58":
+			i += extendedColorArgCount(fields[i+1:])
 		}
+	}
+
+	return last
+}
+
+func extendedColorArgCount(fields []string) int {
+	if len(fields) == 0 {
+		return 0
+	}
+
+	switch strings.TrimLeft(fields[0], "0") {
+	case "5":
+		return min(indexedColorArgs, len(fields))
+	case "2":
+		return min(rgbColorArgs, len(fields))
+	default:
+		return 0
 	}
 }
 

@@ -673,6 +673,16 @@ func TestSelectedAgentRightColumnKeepsBackgroundAroundStyledStatus(t *testing.T)
 	}
 }
 
+func TestSelectedRowBackgroundResumesAfterCombinedSGRReset(t *testing.T) {
+	var rendered strings.Builder
+	writeStyledWithBackground(&rendered, "\x1b[0;32mok\x1b[39m after", ansiDefaultSelected)
+
+	want := ansiDefaultSelected + ansiReset + ansiDefaultSelected + "\x1b[32mok\x1b[39m after" + ansiReset
+	if got := rendered.String(); got != want {
+		t.Fatalf("selected row text = %q, want %q", got, want)
+	}
+}
+
 func TestSelectedAgentRowPreservesStatusGlyphColor(t *testing.T) {
 	model := newTestModel()
 	model.displayMode = displayModeAgents
