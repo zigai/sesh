@@ -200,7 +200,9 @@ func (s *State) Prune(cutoff time.Time) bool {
 	count := len(s.Items)
 	s.Items = slices.DeleteFunc(
 		s.Items,
-		func(item Item) bool { return item.Finished() && item.FinishedAtUnix < cutoff.Unix() },
+		func(item Item) bool {
+			return !item.Pinned() && item.Finished() && item.FinishedAtUnix < cutoff.Unix()
+		},
 	)
 
 	return len(s.Items) != count
