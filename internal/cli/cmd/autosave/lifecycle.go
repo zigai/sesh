@@ -104,6 +104,16 @@ func restoreUnderLock(
 	env Env,
 	held *heldStartupRestore,
 ) error {
+	return restoreUnderLockWithClaim(ctx, cmd, env, held, nil)
+}
+
+func restoreUnderLockWithClaim(
+	ctx context.Context,
+	cmd *cobra.Command,
+	env Env,
+	held *heldStartupRestore,
+	claim func() (bool, error),
+) error {
 	repo, lock := held.repo, held.lock
 
 	settled, settleErr := engine.SettleDeadRestores(ctx, repo)
@@ -131,13 +141,28 @@ func restoreUnderLock(
 
 	admission := automation.EvaluateStartupRestore(state)
 	if !admission.Allowed {
+		var claimErr error
+		if claim != nil {
+			_, claimErr = claim()
+		}
+
 		return errors.Join(
 			renderDeniedStartupRestore(ctx, cmd, env, admission, state, repo),
+			claimErr,
 			lock.Release(),
 		)
 	}
 
-	awaitDesktopKeyring(ctx)
+	if !awaitDesktopKeyring(ctx) {
+		return renderDeferredStartupRestore(ctx, cmd, env, admission, state, repo, lock)
+	}
+
+	if claim != nil {
+		claimed, claimErr := claim()
+		if claimErr != nil || !claimed {
+			return held.skip(ctx, cmd, env, claimErr)
+		}
+	}
 
 	server, err := env.workspace.OpenTmux()
 	if err != nil {
@@ -190,6 +215,28 @@ func restoreUnderLock(
 	renderErr := renderAutosaveResult(ctx, cmd, env, restored)
 
 	return errors.Join(renderErr, wrapCloseError(closeErr), lockErr)
+}
+
+func renderDeferredStartupRestore(
+	ctx context.Context,
+	cmd *cobra.Command,
+	env Env,
+	admission automation.RestoreAdmission,
+	state automation.StartupState,
+	repo *store.Repository,
+	lock *automation.SaveLock,
+) error {
+	outcome := newOutcome(statusSkipped, reasonAwaitingLogin)
+	outcome.generation = admission.Generation
+	outcome.repository = repositoryFromState(state)
+	outcome.history = historyState(env)
+	outcome.abandoned = state.Abandoned
+
+	return errors.Join(
+		renderAutosaveResult(ctx, cmd, env, outcome),
+		wrapCloseError(repo.Close()),
+		lock.Release(),
+	)
 }
 
 func renderDeniedStartupRestore(

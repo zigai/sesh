@@ -30,6 +30,7 @@ const (
 	reasonRestorableSessions = "restorable_sessions"
 	reasonCaptureChanged     = "capture_changed"
 	reasonAnnouncedStopSaved = "announced_stop_saved"
+	reasonAwaitingLogin      = "awaiting_login"
 
 	maintenanceFailed = "failed"
 

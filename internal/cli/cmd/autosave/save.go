@@ -763,14 +763,11 @@ func runLateStartupRestore(
 		return err
 	}
 
-	// The episode is claimed under the lock, so a busy lock leaves the late restore to the next
-	// interval while a refused restore is not retried.
-	claimed, err := claimPendingEpisode(env, pending)
-	if err != nil || !claimed {
-		return held.skip(ctx, cmd, env, err)
-	}
-
-	return restoreUnderLock(ctx, cmd, env, held)
+	// The episode is claimed under the lock once login is ready, so a busy lock or deferred
+	// pre-login wait leaves the late restore eligible while a refused restore is not retried.
+	return restoreUnderLockWithClaim(ctx, cmd, env, held, func() (bool, error) {
+		return claimPendingEpisode(env, pending)
+	})
 }
 
 func skipAutosaveWhileRestorePending(

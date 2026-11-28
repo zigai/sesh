@@ -8,21 +8,34 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"sync"
 
 	"github.com/rs/zerolog"
 	"github.com/samber/oops"
 	"github.com/spf13/cobra"
+	gotmux "github.com/zigai/gotmux/tmux"
 
+	"github.com/zigai/sesh/internal/app"
 	"github.com/zigai/sesh/internal/automation"
 	"github.com/zigai/sesh/internal/cli/clibase"
 	"github.com/zigai/sesh/internal/daemon"
 	"github.com/zigai/sesh/internal/integration/lifecycle"
 	"github.com/zigai/sesh/internal/logging"
 	"github.com/zigai/sesh/internal/snapshot/engine"
+	"github.com/zigai/sesh/internal/snapshot/restore"
 	"github.com/zigai/sesh/internal/snapshot/store"
 )
 
 var errCoordinatorRecoveryBarrier = errors.New("repository has unresolved recovery state")
+
+type loginRestoreWatcher struct {
+	cancel context.CancelFunc
+	done   chan struct{}
+
+	//exhaustruct:optional
+	mu            sync.Mutex
+	activeRestore context.CancelFunc
+}
 
 func NewDaemonCoordinatorCommand() *cobra.Command {
 	cmd := &cobra.Command{
@@ -110,10 +123,15 @@ func runCoordinator(cmd *cobra.Command, _ []string) (resultErr error) {
 
 	reporter.Update(daemon.RuntimePhaseRunning)
 
+	watcher := startLoginRestoreWatcher(ctx, env)
+	defer watcher.stop()
+
 	if err := daemon.RunLifecycle(ctx, daemon.CoordinatorConfig{
 		Runtime:  logind,
 		Reporter: reporter,
 		FinalSave: func(saveCtx context.Context) (daemon.FinalSaveOutcome, error) {
+			watcher.cancelActive()
+
 			return coordinatorFinalSave(saveCtx, cmd, env)
 		},
 		Resumed: func(context.Context) error {
@@ -124,6 +142,183 @@ func runCoordinator(cmd *cobra.Command, _ []string) (resultErr error) {
 	}
 
 	return nil
+}
+
+func startLoginRestoreWatcher(ctx context.Context, env Env) *loginRestoreWatcher {
+	if !env.workspace.Config.Autosave.RestoreLastOnStart {
+		return nil
+	}
+
+	watchCtx, cancel := context.WithCancel(ctx)
+	watcher := &loginRestoreWatcher{
+		cancel:        cancel,
+		done:          make(chan struct{}),
+		activeRestore: nil,
+	}
+
+	go func() {
+		defer close(watcher.done)
+
+		err := lifecycle.WatchUserLogins(watchCtx, os.Getuid(), func(loginCtx context.Context) {
+			watcher.runRestore(loginCtx, env)
+		})
+		if err != nil && !errors.Is(err, context.Canceled) {
+			zerolog.Ctx(ctx).Warn().
+				Str("component", "daemon").
+				Str("operation", "watch_user_logins").
+				Str("status", statusDegraded).
+				Func(logging.Cause(err)).
+				Msg("deferred login restore watcher stopped")
+		}
+	}()
+
+	return watcher
+}
+
+func (w *loginRestoreWatcher) runRestore(ctx context.Context, env Env) {
+	restoreCtx, cancel := context.WithCancel(ctx)
+
+	w.mu.Lock()
+	w.activeRestore = cancel
+	w.mu.Unlock()
+
+	defer func() {
+		w.mu.Lock()
+		w.activeRestore = nil
+		w.mu.Unlock()
+		cancel()
+	}()
+
+	runCoordinatorDeferredRestore(restoreCtx, env)
+}
+
+func (w *loginRestoreWatcher) cancelActive() {
+	if w == nil {
+		return
+	}
+
+	w.mu.Lock()
+	cancel := w.activeRestore
+	w.mu.Unlock()
+
+	if cancel != nil {
+		cancel()
+	}
+}
+
+func (w *loginRestoreWatcher) stop() {
+	if w == nil {
+		return
+	}
+
+	w.cancel()
+	<-w.done
+}
+
+func runCoordinatorDeferredRestore(ctx context.Context, env Env) {
+	if !env.workspace.Config.Autosave.RestoreLastOnStart {
+		return
+	}
+
+	server, err := env.workspace.OpenTmux()
+	if err != nil {
+		return
+	}
+
+	repo, err := env.workspace.OpenExistingRepository(ctx)
+	if err != nil {
+		return
+	}
+
+	if !hasPendingStartupRestore(ctx, server, repo) {
+		_ = repo.Close()
+
+		return
+	}
+
+	lock, err := automation.TryAcquireSaveLock(ctx, automation.SaveLockPath())
+	if err != nil {
+		_ = repo.Close()
+
+		return
+	}
+
+	defer func() {
+		_ = repo.Close()
+		_ = lock.Release()
+	}()
+
+	if !hasPendingStartupRestore(ctx, server, repo) {
+		return
+	}
+
+	settled, err := engine.SettleDeadRestores(ctx, repo)
+	if err != nil {
+		logDeferredRestoreDegraded(ctx, "settle_dead_restores", err)
+
+		return
+	}
+
+	state, err := automation.InspectStartupState(ctx, repo)
+	if err != nil {
+		logDeferredRestoreDegraded(ctx, "inspect_startup_state", err)
+
+		return
+	}
+
+	state.Abandoned = len(settled)
+	state.Enabled = env.workspace.Config.Autosave.RestoreLastOnStart
+	state.Practical = true
+
+	admission := automation.EvaluateStartupRestore(state)
+	if !admission.Allowed {
+		return
+	}
+
+	if !awaitDesktopKeyring(ctx) {
+		return
+	}
+
+	launches, err := app.TaskRestoreLaunches(env.workspace.Tasks, env.workspace.Config.Tasks)
+	if err != nil {
+		logDeferredRestoreDegraded(ctx, "task_restore_launches", err)
+
+		return
+	}
+
+	_, _ = engine.Restore(ctx, repo, server, engine.RestoreConfig{
+		OperationID:       "",
+		LeaseRoot:         env.workspace.LeaseRoot,
+		Generation:        admission.Generation,
+		Sessions:          nil,
+		LaunchProcesses:   true,
+		MissingWorkingDir: restore.MissingWorkingDirShell,
+		OnCollision:       engine.CollisionPolicyDefault,
+		Profile:           engine.RecoveryPractical,
+		Launches:          launches,
+		LoginEnvironment:  app.LoginEnvironment(ctx),
+	})
+}
+
+func hasPendingStartupRestore(
+	ctx context.Context,
+	server *gotmux.Server,
+	repo *store.Repository,
+) bool {
+	targeted, err := engine.RestoreTargetedServer(ctx, repo, server)
+	if err != nil || targeted {
+		return false
+	}
+
+	unrestored := engine.FindUnrestored(ctx, server, repo)
+
+	return len(unrestored.Sessions) > 0
+}
+
+func logDeferredRestoreDegraded(ctx context.Context, operation string, err error) {
+	zerolog.Ctx(ctx).Warn().Str("component", "daemon").Str("operation", operation).
+		Str("status", statusDegraded).Func(logging.Cause(err)).
+		Msg("deferred login restore could not run")
 }
 
 func coordinatorFinalSave(

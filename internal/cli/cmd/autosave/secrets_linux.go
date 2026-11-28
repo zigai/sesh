@@ -14,7 +14,7 @@ import (
 
 const secretServiceStartWait = 20 * time.Second
 
-func awaitDesktopKeyring(ctx context.Context) {
+func awaitDesktopKeyring(ctx context.Context) bool {
 	started := time.Now()
 
 	state, err := lifecycle.WaitForSecretService(ctx, secretServiceStartWait)
@@ -25,6 +25,12 @@ func awaitDesktopKeyring(ctx context.Context) {
 		logger.Warn().Str("component", "snapshot").Str("operation", "await_secret_service").
 			Str("status", statusDegraded).Func(logging.Cause(err)).
 			Msg("startup restore could not check the desktop keyring")
+	case state == lifecycle.SecretServiceAwaitingLogin:
+		logger.Info().Str("component", "snapshot").Str("operation", "await_secret_service").
+			Str("secret_service", string(state)).Dur("waited", time.Since(started)).
+			Msg("startup restore deferred until user login")
+
+		return false
 	case state == lifecycle.SecretServiceTimedOut:
 		logger.Warn().Str("component", "snapshot").Str("operation", "await_secret_service").
 			Str("status", statusDegraded).Dur("waited", time.Since(started)).
@@ -34,4 +40,6 @@ func awaitDesktopKeyring(ctx context.Context) {
 			Str("secret_service", string(state)).Dur("waited", time.Since(started)).
 			Msg("startup restore checked the desktop keyring")
 	}
+
+	return true
 }
