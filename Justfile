@@ -178,15 +178,15 @@ prepush:
     files=() go_files=() shell_files=() markdown_files=() other_files=() packages=() justfiles=()
     for path in "${changed[@]}"; do
         if [[ ! -f $path ]]; then continue; fi
-        files+=("$path")
         case "$path" in
-            */testdata/* | testdata/*) ;;
+            */testdata/* | testdata/*) continue ;;
             Justfile | justfile | *.just) justfiles+=("$path") ;;
             *.go) go_files+=("$path") ;;
             *.md) markdown_files+=("$path") ;;
             *.sh) shell_files+=("$path") ;;
             *) other_files+=("$path") ;;
         esac
+        files+=("$path")
     done
     if ((${#files[@]})); then
         editorconfig-checker -disable-indent-size -disable-indentation -disable-max-line-length -disable-charset "${files[@]}"
